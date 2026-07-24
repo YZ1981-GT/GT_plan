@@ -8,6 +8,15 @@ import { ref, type Ref, type ComputedRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import { refreshDisclosureFromWorkpapers, type RefreshFromWorkpapersResult } from '@/services/commonApi'
 import { handleApiError } from '@/utils/errorHandler'
+// 复用「跳转至披露表」的同一套章节判定函数，消除跳转/刷新两套硬编码映射漂移（单一真源）
+import {
+  isG14CreditImpairmentNoteSection,
+  isH1FixedAssetNoteSection,
+  isH8RouNoteSection,
+  isH9LeaseLiabilityNoteSection,
+  isH10AssetDisposalNoteSection,
+  isI1IntangibleNoteSection,
+} from './noteDisclosureJump'
 
 export interface UseNoteRefreshOptions {
   projectId: ComputedRef<string> | Ref<string>
@@ -203,7 +212,22 @@ export function useNoteRefresh(options: UseNoteRefreshOptions): UseNoteRefreshRe
     // 6711 营业外支出（K13）：关键词（区别于营业外收入 6301）
     const isK13NonOpExp = String(payload.accountCode || '') === '6711'
       && current.includes('营业外支出')
-    if (!matched && !isG7Lte && !isG10Tfl && !isG13Fvc && !isI5Ona && !isK11Impair && !isK13NonOpExp) return
+    // 兜底：补齐跳转侧支持但刷新侧此前缺失的 6 族（G14/H1/H8/H9/H10/I1）。
+    // 复用 noteDisclosureJump 的章节判定（单一真源），当载荷携带 accountCode（=某底稿披露已变更）
+    // 且当前正查看的附注节匹配上述任一披露族时兜底刷新；重取当前节详情幂等无害。
+    const hasAccountCode = !!String(payload.accountCode || '').trim()
+    const matchesDisclosureFamily = hasAccountCode && (
+      isG14CreditImpairmentNoteSection(current)
+      || isH1FixedAssetNoteSection(current)
+      || isH8RouNoteSection(current)
+      || isH9LeaseLiabilityNoteSection(current)
+      || isH10AssetDisposalNoteSection(current)
+      || isI1IntangibleNoteSection(current)
+    )
+    if (
+      !matched && !isG7Lte && !isG10Tfl && !isG13Fvc && !isI5Ona
+      && !isK11Impair && !isK13NonOpExp && !matchesDisclosureFamily
+    ) return
 
     if (syncDebounceTimer) clearTimeout(syncDebounceTimer)
     syncDebounceTimer = setTimeout(async () => {

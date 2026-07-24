@@ -1,0 +1,7 @@
+{
+  "_schema": "报表行→附注单元格 linkage 回退真源。格式: { report_row_code: [ { note_section, cell, table_index } ] }。cell 为 R{row}C{col}（1-based Excel 风格，如 R9C2）。以 _ 开头的键为元数据/示例，ReportNoteLinkage 加载时忽略。",
+  "_rules": "① 优先级低于附注单元格内嵌 REPORT Cell_Binding（就地绑定为单一真源）；仅覆盖模板未内嵌绑定的章节。② 禁止臆造大量报表行→附注单元格映射（映射错=写错披露）；按 note_section 逐节依据源模板/审计口径增量维护。③ 坐标非法/缺失自动跳过并记录，不写入非目标单元格。",
+  "_example": [
+    { "note_section": "五、22", "cell": "R9C2", "table_index": 0 }
+  ]
+}

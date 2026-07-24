@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from decimal import Decimal
 from enum import Enum
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
@@ -210,67 +211,158 @@ class ValidationContext:
     tb_data: dict[str, Decimal] = field(default_factory=dict)  # account_code -> amount
     report_data: dict[str, Decimal] = field(default_factory=dict)  # row_code -> amount
     wp_data: dict[str, Any] = field(default_factory=dict)  # wp_code -> parsed_data
+    # 账龄衔接校验用：上年（year-1）附注表格数据 section_code -> table_data（可选，向后兼容）
+    prior_note_data: dict[str, Any] = field(default_factory=dict)
+    # 完整性校验用：account_code -> note_section（可选；空则完整性回退 section-scope 粗检，Req7.3）
+    account_section_map: dict[str, str] = field(default_factory=dict)
 
 
 # ---------------------------------------------------------------------------
 # Preset Loader
 # ---------------------------------------------------------------------------
 
+# 校验公式预设 md 相对项目根（``Path(__file__).parents[3]`` = ``d:\GT_plan``）的路径。
+# 实际文件位于 ``基础数据/附注模版/`` 下（历史缺 ``基础数据/`` 前缀导致路径永远找不到）。
 _PRESET_FILES = {
-    "soe": "附注模版/国企版校验公式预设.md",
-    "listed": "附注模版/上市版校验公式预设.md",
+    "soe": "基础数据/附注模版/国企版校验公式预设.md",
+    "listed": "基础数据/附注模版/上市版校验公式预设.md",
 }
+
+# markdown 表头行首列 token（跳过表头，不当数据行）
+_PRESET_TABLE_HEADER_C0 = ("编号", "序号")
+# markdown 分隔行单元格：``---`` / ``:---:`` / ``:--``
+_MD_SEPARATOR_CELL_RE = re.compile(r"^:?-{2,}:?$")
+
+
+def _split_md_table_row(line: str) -> list[str] | None:
+    """把一行 markdown 表格行拆成单元格列表（去首尾竖线）。非表格行返回 None。"""
+    s = line.strip()
+    if not s.startswith("|"):
+        return None
+    inner = s[1:]
+    if inner.endswith("|"):
+        inner = inner[:-1]
+    return [c.strip() for c in inner.split("|")]
+
+
+def _is_md_separator_row(cells: list[str]) -> bool:
+    """判定是否为 markdown 表格分隔行（``|---|---|``）。"""
+    non_empty = [c for c in cells if c != ""]
+    if not non_empty:
+        return False
+    return all(_MD_SEPARATOR_CELL_RE.match(c) for c in non_empty)
+
+
+def _clean_section_header(title: str) -> str:
+    """清理 markdown 标题为 section_code：去尾随 ``#``、首尾空白。"""
+    return title.strip().rstrip("#").strip()
+
+
+def _normalize_expr_for_dedup(expr: str) -> str:
+    """去重归一：剥离反引号 + 全部空白（同一公式的 bullet 与表格写法归一为同键）。"""
+    return re.sub(r"\s+", "", (expr or "").replace("`", ""))
 
 
 def _parse_preset_md(content: str) -> list[ValidationRule]:
-    """Parse a validation preset MD file into rules.
+    """把校验公式预设 md 解析成 ValidationRule 列表。
 
-    Expected format in MD:
-    ## section_code: 章节名称
-    - [余额] expression: 描述
-    - [宽表] expression: 描述
+    支持两种并存格式（Req5.2 / Req5.4）：
+
+    1. **markdown 表格**（附注模版 preset.md 实际格式，逐科目/逐表格列出）::
+
+           ## 一、资产负债表科目
+           ### 4. 应收票据
+           | 编号 | 公式类型 | 校验公式 |
+           |------|----------|----------|
+           | F4-1 | 余额 | `报表.应收票据期末 = ①分类表.合计行.期末账面价值` |
+
+       - 表头行（首列为「编号/序号」或含「公式类型」「校验公式」）自动跳过。
+       - 分隔行（``|---|---|``）自动跳过。
+       - 数据行：第 1 列=编号（存 metadata.rule_id）、第 2 列=公式类型、第 3 列=校验公式；
+         若公式内含 ``|`` 被误切，则把第 3 列及之后重新拼回（robust）。
+       - 无表头行的裸数据行（如 ``**⑨ 核销** `` 下直接列 ``| F4-24 | 其中项 | ... |``）
+         同样能解析（不依赖表头存在）。
+
+    2. **bullet 行**（历史格式，向后兼容）::
+
+           ## 五、18: 存货
+           - [余额] 报表.存货期末 = ①分类表.合计行.期末账面价值 : 描述
+
+    去重（Req5.4）：同一规则以 bullet 与表格两种格式书写时（同 section_code + 公式类型 +
+    归一表达式），只保留一条，不重复执行。
     """
     rules: list[ValidationRule] = []
+    seen: set[tuple[str, str, str]] = set()
     current_section = ""
 
-    # Pattern for rule lines: - [类型] expression
-    rule_pattern = re.compile(
-        r"^[-*]\s*\[([^\]]+)\]\s*(.+?)(?:\s*[:：]\s*(.+))?$"
-    )
-    # Section header pattern
-    section_pattern = re.compile(r"^#{1,4}\s+(\S+?)[:：\s]")
+    bullet_pattern = re.compile(r"^[-*]\s*\[([^\]]+)\]\s*(.+?)(?:\s*[:：]\s*(.+))?$")
+    header_pattern = re.compile(r"^#{1,6}\s+(.+?)\s*$")
 
-    for line in content.split("\n"):
-        line = line.strip()
+    def _emit(
+        section: str,
+        type_str: str,
+        expression: str,
+        description: str,
+        metadata: dict[str, Any],
+    ) -> None:
+        type_str = (type_str or "").strip()
+        expression = (expression or "").strip()
+        if not expression:
+            return
+        try:
+            rule_type = ValidationType(type_str)
+        except ValueError:
+            logger.debug("Unknown validation type: %s", type_str)
+            return
+        key = (section, rule_type.value, _normalize_expr_for_dedup(expression))
+        if key in seen:
+            return  # 去重（bullet ↔ 表格同一规则）
+        seen.add(key)
+        rules.append(ValidationRule(
+            section_code=section,
+            rule_type=rule_type,
+            expression=expression,
+            description=(description or "").strip(),
+            metadata=metadata,
+        ))
+
+    for raw in content.split("\n"):
+        line = raw.strip()
         if not line:
             continue
 
-        # Check for section header
-        sec_match = section_pattern.match(line)
-        if sec_match:
-            current_section = sec_match.group(1)
+        # ── markdown 表格行（优先于 bullet/header 判定：表格行以 | 起始）──
+        if line.startswith("|"):
+            cells = _split_md_table_row(line)
+            if not cells or len(cells) < 3:
+                continue
+            if _is_md_separator_row(cells):
+                continue
+            c0, c1 = cells[0].strip(), cells[1].strip()
+            # 公式列：若被内嵌 | 误切，拼回第 3 列及之后
+            expr = cells[2].strip() if len(cells) == 3 else "|".join(cells[2:]).strip()
+            # 跳过表头行（编号/公式类型/校验公式）
+            if c0 in _PRESET_TABLE_HEADER_C0 or "公式类型" in c1 or "校验公式" in expr:
+                continue
+            _emit(
+                current_section, c1, expr, "",
+                {"rule_id": c0, "trigger_source": "preset_md_table"},
+            )
             continue
 
-        # Check for rule line
-        rule_match = rule_pattern.match(line)
-        if rule_match:
-            type_str = rule_match.group(1).strip()
-            expression = rule_match.group(2).strip()
-            description = rule_match.group(3) or ""
+        # ── markdown 标题 → 更新 current_section ──
+        hm = header_pattern.match(line)
+        if hm:
+            current_section = _clean_section_header(hm.group(1))
+            continue
 
-            # Map type string to enum
-            try:
-                rule_type = ValidationType(type_str)
-            except ValueError:
-                logger.debug("Unknown validation type: %s", type_str)
-                continue
-
-            rules.append(ValidationRule(
-                section_code=current_section,
-                rule_type=rule_type,
-                expression=expression,
-                description=description.strip(),
-            ))
+        # ── bullet 规则（向后兼容）──
+        bm = bullet_pattern.match(line)
+        if bm:
+            _emit(
+                current_section, bm.group(1), bm.group(2), bm.group(3) or "",
+                {"trigger_source": "preset_md_bullet"},
+            )
 
     return rules
 
@@ -293,6 +385,59 @@ def load_preset_rules(template_type: str, base_dir: Path | None = None) -> list[
     except Exception as e:
         logger.error("Failed to load validation preset: %s", e)
         return []
+
+
+# ---------------------------------------------------------------------------
+# account_code → note_section 映射（完整性校验科目粒度用，Req7）
+# ---------------------------------------------------------------------------
+
+_ACCOUNT_SECTION_SEED_PATH = (
+    Path(__file__).resolve().parent.parent.parent / "data" / "note_templates_seed.json"
+)
+
+
+@lru_cache(maxsize=1)
+def build_account_section_map(base_dir: Path | None = None) -> dict[str, str]:
+    """构建 ``account_code → note_section`` 映射（Req7.1）。
+
+    真源复用披露模板 ``note_templates_seed.json`` 的 ``account_mapping_template``——
+    每个披露章节的 ``table_template.rows[].account_codes`` 直接给出科目码 → note_section，
+    **不新造孤立真源**。供完整性 executor 落到科目粒度（Req7.2）。
+
+    fail-open（Req7.3）：文件缺失/解析异常 → 返回 ``{}``（完整性校验回退 section-scope 粗检）。
+    结果 lru_cache（映射为静态种子，进程内不变）。
+
+    Returns:
+        ``{account_code(str): note_section(str)}``；同一科目码多处出现时保留首个（setdefault）。
+    """
+    import json
+
+    seed_path = (base_dir / "note_templates_seed.json") if base_dir else _ACCOUNT_SECTION_SEED_PATH
+    try:
+        if not seed_path.exists():
+            logger.warning("account_section_map seed not found: %s", seed_path)
+            return {}
+        data = json.loads(seed_path.read_text(encoding="utf-8-sig"))
+    except Exception as e:  # fail-open
+        logger.warning("build_account_section_map fail-open: %s", e)
+        return {}
+
+    out: dict[str, str] = {}
+    for entry in data.get("account_mapping_template", []) or []:
+        if not isinstance(entry, dict):
+            continue
+        section = str(entry.get("note_section") or "").strip()
+        if not section:
+            continue
+        table_template = entry.get("table_template") or {}
+        for row in table_template.get("rows", []) or []:
+            if not isinstance(row, dict):
+                continue
+            for code in row.get("account_codes", []) or []:
+                c = str(code).strip()
+                if c:
+                    out.setdefault(c, section)
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -333,7 +478,10 @@ def _check_mutual_exclusion(rules: list[ValidationRule]) -> list[ValidationRule]
 
 
 # 规则执行器已抽到伴生模块 note_validation_executors.py
-from app.services.note_validation_executors import EXECUTORS as _EXECUTORS
+from app.services.note_validation_executors import (
+    EXECUTORS as _EXECUTORS,
+    _execute_llm_review_async,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -381,6 +529,29 @@ class NoteValidationEngine:
                 passed=True,  # Don't block on errors
                 details={"error": str(e)},
             )
+
+    async def _run_rule(
+        self, rule: ValidationRule, context: ValidationContext
+    ) -> ValidationResult:
+        """按规则类型分发执行：LLM_REVIEW 走 async 特例（需 await chat_completion），
+        其余 10 个同步执行器沿用同步 ``execute_rule``（行为不变）。
+
+        LLM async 全程 fail-open（不阻断其余规则）：async 执行器内部已 try/except，
+        此处再兜底一层，异常 → passed=True + skipped。
+        """
+        if rule.rule_type == ValidationType.LLM_REVIEW:
+            try:
+                return await _execute_llm_review_async(rule, context)
+            except Exception as e:  # pragma: no cover - defensive fail-open
+                logger.warning("LLM review async fail-open: %s", e)
+                return ValidationResult(
+                    section_code=rule.section_code,
+                    rule_type=rule.rule_type.value,
+                    rule_expression=rule.expression,
+                    passed=True,
+                    details={"check": "llm_review", "skipped": True, "reason": str(e), "ai_hint": True},
+                )
+        return self.execute_rule(rule, context)
 
     # ------------------------------------------------------------------
     # Sprint 4 Task 4.1 — _validation_rules / check_presets 触发路径
@@ -491,9 +662,10 @@ class NoteValidationEngine:
             for section_code, table_data in context.note_data.items():
                 if not isinstance(table_data, dict):
                     continue
-                inline = self.execute_inline_rules(section_code, table_data, context)
-                if inline:
-                    results.extend(inline)
+                inline_rules = self.collect_inline_rules_for_note(section_code, table_data)
+                if inline_rules:
+                    for r in inline_rules:
+                        results.append(await self._run_rule(r, context))
                     consumed_sections.add(section_code)
 
         # ── 兼容路径：preset.md 解析 ──
@@ -502,8 +674,7 @@ class NoteValidationEngine:
             # 已被 inline 路径处理过的章节不重复执行（避免重复结果）
             if rule.section_code in consumed_sections:
                 continue
-            result = self.execute_rule(rule, context)
-            results.append(result)
+            results.append(await self._run_rule(rule, context))
 
         # Persist results if db is available
         if self.db is not None:
@@ -563,6 +734,101 @@ class NoteValidationEngine:
     # Router-facing aliases (bridging router calls to internal methods)
     # ------------------------------------------------------------------
 
+    # ------------------------------------------------------------------
+    # ValidationContext 数据装配（只读，每源独立 fail-open）
+    # ------------------------------------------------------------------
+
+    async def _load_report_data(self, project_id: UUID, year: int) -> dict[str, Decimal]:
+        """加载报表行次审定金额 → {row_code: current_period_amount}。
+
+        权威源：FinancialReport（BS+IS 等全部报表类型），取审定口径
+        current_period_amount。异常 fail-open 置 {}。只读。
+        """
+        if not self.db:
+            return {}
+        try:
+            from app.models.report_models import FinancialReport
+
+            result = await self.db.execute(
+                sa.select(
+                    FinancialReport.row_code,
+                    FinancialReport.current_period_amount,
+                ).where(
+                    FinancialReport.project_id == project_id,
+                    FinancialReport.year == year,
+                    FinancialReport.is_deleted == sa.false(),
+                )
+            )
+            data: dict[str, Decimal] = {}
+            for row_code, amount in result.all():
+                if not row_code or amount is None:
+                    continue
+                # 同一 row_code 可能跨报表类型出现；保留首个非空审定金额
+                if row_code not in data:
+                    data[row_code] = Decimal(str(amount))
+            return data
+        except Exception as e:
+            logger.warning("_load_report_data fail-open: %s", e)
+            return {}
+
+    async def _load_tb_data(self, project_id: UUID, year: int) -> dict[str, Decimal]:
+        """加载试算表审定余额 → {standard_account_code: audited_amount}。
+
+        经 get_active_filter（dataset 版本治理统一入口）取当前 active 数据集；
+        多 company_code 时按科目汇总。异常 fail-open 置 {}。只读。
+        """
+        if not self.db:
+            return {}
+        try:
+            from app.models.audit_platform_models import TrialBalance
+            from app.services.dataset_query import get_active_filter
+
+            active_filter = await get_active_filter(
+                self.db, TrialBalance.__table__, project_id, year
+            )
+            result = await self.db.execute(
+                sa.select(
+                    TrialBalance.standard_account_code,
+                    sa.func.sum(TrialBalance.audited_amount),
+                )
+                .where(active_filter)
+                .group_by(TrialBalance.standard_account_code)
+            )
+            data: dict[str, Decimal] = {}
+            for code, amount in result.all():
+                if not code or amount is None:
+                    continue
+                data[code] = Decimal(str(amount))
+            return data
+        except Exception as e:
+            logger.warning("_load_tb_data fail-open: %s", e)
+            return {}
+
+    async def _load_prior_notes(self, project_id: UUID, prior_year: int) -> dict[str, Any]:
+        """加载上年附注表格 → {note_section: table_data}（账龄衔接用）。
+
+        prior_year = 本年 - 1。异常 fail-open 置 {}。只读。
+        """
+        if not self.db:
+            return {}
+        try:
+            result = await self.db.execute(
+                sa.select(DisclosureNote).where(
+                    DisclosureNote.project_id == str(project_id),
+                    DisclosureNote.year == prior_year,
+                    DisclosureNote.is_deleted == sa.false(),
+                )
+            )
+            notes = result.scalars().all()
+            return {
+                n.note_section: n.table_data
+                for n in notes
+                if n.table_data and isinstance(n.table_data, dict)
+            }
+        except Exception as e:
+            logger.warning("_load_prior_notes fail-open: %s", e)
+            return {}
+
     async def validate_all(
         self,
         project_id: UUID,
@@ -595,6 +861,20 @@ class NoteValidationEngine:
                 }
             except Exception as e:
                 logger.warning("validate_all: failed to load note_data: %s", e)
+
+            # ── 本 spec 新增：装配 report_data / tb_data / prior_note_data ──
+            # 每源独立 fail-open（异常记 warning 置 {}），不阻断整体校验。
+            context.report_data = await self._load_report_data(project_id, year)
+            context.tb_data = await self._load_tb_data(project_id, year)
+            context.prior_note_data = await self._load_prior_notes(project_id, year - 1)
+
+        # ── Wave4 (Task 5.4)：装配 account_code → note_section 映射（供完整性校验科目粒度）──
+        # fail-open 返 {}（完整性回退 section-scope，Req7.3）；不依赖 db，无 db 时也装配。
+        try:
+            context.account_section_map = build_account_section_map()
+        except Exception as e:  # pragma: no cover - defensive fail-open
+            logger.warning("assemble account_section_map fail-open: %s", e)
+            context.account_section_map = {}
 
         results = await self.execute_all(
             project_id, year, template_type=template_type, context=context

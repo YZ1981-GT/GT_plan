@@ -44,8 +44,23 @@ from app.services.note_section_catalog import (
 from app.services.note_template_service import NoteTemplateService
 from app.services.note_template_merge import merge_templates
 from app.services.note_custom_template_service import NoteCustomTemplateService
+from app.core.config import settings
+from app.services.llm_client import chat_completion
+from app.services.note_knowledge_enricher import NoteKnowledgeEnricher
 
 logger = logging.getLogger(__name__)
+
+
+def _is_llm_error(text: str | None) -> bool:
+    """判断 chat_completion 返回是否为服务降级占位串（非有效生成）。
+
+    chat_completion 失败/熔断/超时时返回占位串（`[LLM ...]` / `⚠️...`）而非抛异常，
+    故非空且非占位串才当作有效正文。等价于 enricher 内部同款判定。
+    """
+    if not text:
+        return True
+    t = str(text).strip()
+    return (not t) or t.startswith("[") or t.startswith("⚠️")
 
 SEED_DATA_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "note_templates_seed.json"
 
@@ -54,6 +69,64 @@ def _load_seed_data() -> dict:
     """加载附注模版种子数据"""
     with open(SEED_DATA_PATH, encoding="utf-8-sig") as f:
         return json.load(f)
+
+
+# ── Wave4 Task 5.3：模板 check role → 附注校验 preset 枚举（供 collect_inline_rules_for_note 消费）──
+# 中文枚举（seed ``check_roles``）直接透传；英文 formula-gen 键（``check_presets``）仅映射语义
+# 明确者，其余跳过（不臆造校验规则）。
+_CHECK_ROLE_TO_VALIDATION_PRESET = {
+    "balance": "余额",
+    "sub_item": "其中项",
+    "movement": "宽表",
+}
+_VALID_VALIDATION_PRESETS = frozenset(
+    {"余额", "宽表", "纵向", "交叉", "跨科目", "其中项",
+     "二级明细", "完整性", "账龄衔接", "LLM审核", "描述"}
+)
+
+
+def _resolve_check_roles(tmpl: dict) -> list[str]:
+    """从模板抽取校验 preset 枚举（中文），供注入 ``table_data._validation_rules``。
+
+    ``check_roles``（seed，中文）优先，回退 ``check_presets``（formula-gen 键，英文）。
+    中文枚举透传（须在 _VALID_VALIDATION_PRESETS 内）；英文键经 map 转语义明确者，
+    未知键跳过（不臆造）。去重保序。
+    """
+    raw = tmpl.get("check_roles")
+    if not isinstance(raw, list) or not raw:
+        raw = tmpl.get("check_presets")
+    if not isinstance(raw, list):
+        return []
+    out: list[str] = []
+    for item in raw:
+        if not isinstance(item, str):
+            continue
+        s = item.strip()
+        val = s if s in _VALID_VALIDATION_PRESETS else _CHECK_ROLE_TO_VALIDATION_PRESET.get(s)
+        if val and val not in out:
+            out.append(val)
+    return out
+
+
+def _inject_validation_rules(table_data: dict | None, tmpl: dict) -> None:
+    """把模板声明的校验 preset 注入 ``table_data._validation_rules``（Wave4 Task 5.3 补装配）。
+
+    背景（实证断链）：``_build_table_data`` 只返回 ``{headers, rows}``，生成链从不把校验
+    preset 写进 note.table_data → ``collect_inline_rules_for_note`` 生产中无 inline 规则可消费。
+    此处从模板 ``check_roles``/``check_presets`` 解析枚举并写入 sidecar 键 ``_validation_rules``。
+
+    附加式 + 幂等：仅当解析出非空 preset 且 table_data 尚无 ``_validation_rules`` 时注入；
+    只新增一个 sidecar 键，不改既有 headers/rows/_tables（渲染忽略未知键 → 零渲染回归）。
+    校验由 ``NoteValidationEngine.collect_inline_rules_for_note`` 在 ``validate_all``
+    （按需 ``POST /disclosure-notes/.../validate`` 触发）时消费，不在生成时自动跑。
+    """
+    if not isinstance(table_data, dict):
+        return
+    if table_data.get("_validation_rules"):
+        return
+    presets = _resolve_check_roles(tmpl)
+    if presets:
+        table_data["_validation_rules"] = presets
 
 
 def _extract_basic_info(wizard_state: dict | None) -> dict:
@@ -373,6 +446,23 @@ class DisclosureEngine:
         self._wp_account_cache: dict = {}
         self._tb_cache: dict = {}
         self._wp_fine_cache: dict = {}  # 底稿精细化明细行缓存
+        # RAG 增强旁路：按 note_section 暂存本次生成所依据的 Citation，
+        # 供后续落库/返回时附带（不改 _generate_text_with_llm 的 str|None 签名）。
+        self._last_citations: dict = {}
+        # 知识库增强编排层（仅开关开启时按需构造，Property 6 零回归依赖此惰性构造）
+        self._enricher: NoteKnowledgeEnricher | None = None
+
+    def _get_enricher(self) -> NoteKnowledgeEnricher:
+        """惰性构造 NoteKnowledgeEnricher（仅 RAG 开关开启的调用路径触达）。"""
+        if self._enricher is None:
+            self._enricher = NoteKnowledgeEnricher(self.db)
+        return self._enricher
+
+    def _stash_citations(self, note_section: str, citations: list) -> None:
+        """把本次 RAG 生成所依据的 Citation 暂存到旁路 dict。"""
+        if not isinstance(getattr(self, "_last_citations", None), dict):
+            self._last_citations = {}
+        self._last_citations[note_section] = citations or []
 
     async def _get_project_basic_info(self, project_id: UUID) -> dict:
         result = await self.db.execute(
@@ -535,12 +625,30 @@ class DisclosureEngine:
         3. 通用附注生成提示词
 
         返回 None 表示LLM不可用或未配置，降级到模板默认文字。
-        """
-        try:
-            from app.services.llm_client import llm_client
-            if not llm_client:
-                return None
 
+        接入 disclosure-note-knowledge-ai-enrichment：
+        - RAG 开关开启时优先经 NoteKnowledgeEnricher grounded 生成（附 Citation 旁路暂存）；
+          text 非空则用之，否则退回下方通用 LLM 路径。
+        - 通用路径已修复历史 dead-import（原 `from ... import llm_client` 符号不存在，
+          导致本函数恒返 None）：现使用模块级 `chat_completion`（返回 str），非占位串即正文。
+        - 任一环失败一律 fail-open 返回 None，降级到模板默认文字（Req6）。
+        """
+        # ── RAG 注入（开关开启时优先）────────────────────────────────
+        if settings.DISCLOSURE_NOTE_RAG_ENABLED:
+            try:
+                enricher = self._get_enricher()
+                draft = await enricher.generate_note_text(
+                    project_id, year, note_section, section_title, account_name,
+                )
+                if draft and draft.text:
+                    self._stash_citations(note_section, draft.citations)
+                    return draft.text
+                # text 为空 → 退回通用 LLM 路径
+            except Exception as e:  # fail-open：RAG 异常不阻断，降级通用路径
+                logger.warning("RAG note generation degraded for %s: %s", note_section, e)
+
+        # ── 通用 LLM 路径（dead-import 已修复）────────────────────────
+        try:
             # 构建上下文
             context_parts = [
                 f"科目: {account_name}",
@@ -565,7 +673,9 @@ class DisclosureEngine:
                 "如果数据不足，请生成标准模板文字并标注需要补充的信息。"
             )
 
-            result = await llm_client.chat_completion(
+            # chat_completion 返回 str；服务不可用/熔断/超时返回占位串（[LLM.../⚠️...），
+            # 经 _is_llm_error 判定，非占位串且非空才当作有效正文。
+            result = await chat_completion(
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": f"请为以下附注章节生成正文：\n\n{context}"},
@@ -574,8 +684,8 @@ class DisclosureEngine:
                 max_tokens=2000,
             )
 
-            if result and result.get("content"):
-                return result["content"]
+            if result and not _is_llm_error(result):
+                return result
         except Exception as e:
             logger.debug("LLM text generation skipped for %s: %s", note_section, e)
 
@@ -666,21 +776,38 @@ class DisclosureEngine:
             except Exception:
                 pass
 
-        # 预加载上年附注（避免 generate_notes 循环中 165 次逐章节查询）
+        # 预加载上年附注（避免 generate_notes 循环中 165 次逐章节查询）。
+        # 缓存结构扩为 {note_section: {"text": str|None, "table": dict|None}}，
+        # 供 resolve_prior_year_note 的 value 模式做单元格级反查（Wave1 Task2.3）。
+        # text 读取路径（generate_notes 优先级1）兼容 dict + 旧扁平字符串。
         try:
             prior_notes_result = await self.db.execute(
-                sa.select(DisclosureNote.note_section, DisclosureNote.text_content).where(
+                sa.select(
+                    DisclosureNote.note_section,
+                    DisclosureNote.text_content,
+                    DisclosureNote.table_data,
+                ).where(
                     DisclosureNote.project_id == project_id,
                     DisclosureNote.year == year - 1,
                     DisclosureNote.is_deleted == sa.false(),
-                    DisclosureNote.text_content.isnot(None),
+                    sa.or_(
+                        DisclosureNote.text_content.isnot(None),
+                        DisclosureNote.table_data.isnot(None),
+                    ),
                 )
             )
-            self._prior_notes_cache = {
-                row.note_section: row.text_content
-                for row in prior_notes_result.fetchall()
-                if row.text_content and len(row.text_content) > 20
-            }
+            prior_cache: dict[str, Any] = {}
+            for row in prior_notes_result.fetchall():
+                text = (
+                    row.text_content
+                    if (row.text_content and len(row.text_content) > 20)
+                    else None
+                )
+                table = row.table_data if isinstance(row.table_data, dict) else None
+                if text is None and table is None:
+                    continue
+                prior_cache[row.note_section] = {"text": text, "table": table}
+            self._prior_notes_cache = prior_cache
         except Exception as _pn_err:
             logger.warning("preload prior notes failed: %s", _pn_err)
             self._prior_notes_cache = {}
@@ -1066,6 +1193,76 @@ class DisclosureEngine:
         return {"headers": list(headers), "rows": output_rows}
 
     # ------------------------------------------------------------------
+    # Wave2 (Task 3.2)：表内公式二次求值编排（灰度内调用）
+    # ------------------------------------------------------------------
+    async def _evaluate_note_formulas(
+        self,
+        project_id: UUID,
+        year: int,
+        note_section: str,
+        table_data: dict,
+    ) -> dict:
+        """对已构建的 table_data 跑公式家族（sum/report/aging/prior_year_note）
+        第二遍求值回填。
+
+        - 复用 ``_resolve_cell_binding`` 从 section binding 重建各格 binding
+          （按 table_index 定位多表），不重复造 binding 解析。
+        - 交 ``NoteFormulaEvaluator.evaluate_table`` 求值：manual/locked 保留、
+          单元格级 fail-open、返回新 table_data（不就地改）。
+        - 仅在 ``DISCLOSURE_NOTE_FORMULA_ENABLED`` 开启时被调用（调用方旁路）；
+          且公式家族 resolver 内部亦受开关约束，双重零回归保障。
+        """
+        from app.services.note_formula_evaluator import NoteFormulaEvaluator
+        from app.services.note_template_bindings_loader import (
+            get_binding_for_section,
+        )
+
+        try:
+            sec_binding = get_binding_for_section(note_section)
+        except Exception:
+            sec_binding = None
+        sec_tables = (
+            (sec_binding.get("tables") or [])
+            if isinstance(sec_binding, dict)
+            else []
+        )
+
+        def _binding_resolver(
+            table_index: int,
+            label: str,
+            col_idx: int,
+            cell_meta: dict,
+        ) -> dict | None:
+            if not (0 <= table_index < len(sec_tables)):
+                return None
+            tbl_binding = sec_tables[table_index]
+            if not isinstance(tbl_binding, dict):
+                return None
+            binding_rows = tbl_binding.get("rows") or {}
+            if not isinstance(binding_rows, dict):
+                return None
+            header_normalize = tbl_binding.get("header_normalize") or []
+            if not isinstance(header_normalize, list):
+                header_normalize = []
+            return self._resolve_cell_binding(
+                label, col_idx, binding_rows, header_normalize, cell_meta,
+            )
+
+        ctx: dict[str, Any] = {
+            "project_id": project_id,
+            "year": year,
+            "db": self.db,
+            "section_number": note_section,
+            "_tb_cache": getattr(self, "_tb_cache", None) or {},
+            "_wp_cache": getattr(self, "_wp_cache", None) or {},
+            "_prior_notes_cache": getattr(self, "_prior_notes_cache", None) or {},
+            "report_data": getattr(self, "_report_data_cache", None) or {},
+            "_cell_binding_resolver": _binding_resolver,
+        }
+        evaluator = NoteFormulaEvaluator()
+        return await evaluator.evaluate_table(table_data, ctx)
+
+    # ------------------------------------------------------------------
     # 生成附注
     # ------------------------------------------------------------------
     @staticmethod
@@ -1129,9 +1326,14 @@ class DisclosureEngine:
             text_sections = tmpl.get("text_sections", [])
             text_content = None
 
-            # 优先级1：从上年附注拉取（连续审计场景）- 从预加载缓存取，避免逐章节查询
+            # 优先级1：从上年附注拉取（连续审计场景）- 从预加载缓存取，避免逐章节查询。
+            # 缓存条目为 {"text","table"} dict（Wave1 Task2.3）；兼容旧扁平字符串 / 测试 stub。
             prior_notes_cache = getattr(self, '_prior_notes_cache', {})
-            prior_text = prior_notes_cache.get(note_section)
+            prior_entry = prior_notes_cache.get(note_section)
+            if isinstance(prior_entry, dict):
+                prior_text = prior_entry.get("text")
+            else:
+                prior_text = prior_entry
             if prior_text and len(prior_text) > 20:
                 # 上年数据可能混装 guidance（旧版未分流），自动清洗
                 split_result = identify_guidance(prior_text)
@@ -1143,6 +1345,26 @@ class DisclosureEngine:
                     text_content = prior_text
                 if text_content:
                     logger.info("note %s: filled from prior year (cache)", note_section)
+
+            # 优先级1b：知识库上年回退 —— 仅当 DB 缺失（text_content 空）且 RAG 开关开启。
+            # 保持 DB 优先（Property 3：DB 命中则不调知识库回退）。单章 try/except 隔离（Property 12）。
+            if not text_content and settings.DISCLOSURE_NOTE_RAG_ENABLED:
+                try:
+                    enricher = self._get_enricher()
+                    py_draft = await enricher.retrieve_prior_year_note(
+                        project_id, note_section, section_title, account_name,
+                    )
+                    if py_draft and py_draft.text and len(py_draft.text) > 20:
+                        text_content = py_draft.text
+                        self._stash_citations(note_section, py_draft.citations)
+                        logger.info(
+                            "note %s: filled from prior year (knowledge_doc)", note_section
+                        )
+                except Exception as _rag_py_err:  # 单章降级，不影响其余章节
+                    logger.warning(
+                        "prior-year RAG fallback degraded for %s: %s",
+                        note_section, _rag_py_err,
+                    )
 
             # 优先级2：LLM生成（预留接口，通过 note_prompts 配置每章节独立提示词）
             if not text_content:
@@ -1208,6 +1430,34 @@ class DisclosureEngine:
             except Exception as _tbl_err:
                 logger.warning("build table_data failed for %s: %s", note_section, _tbl_err)
                 table_data = None
+
+            # ── Wave2 (Task 3.2)：表内公式二次求值（灰度内） ──
+            # _build_with_binding 首遍未解算公式家族单元格（sum/report/aging 依赖
+            # 同表/报表在首遍落值后才能算），此处构表后、upsert 前跑第二遍回填；
+            # 随后走既有 merge_table_data_preserving_cell_modes 合并保留 manual/locked。
+            # 开关关时旁路（零回归 Property 12）；异常 fail-open 不阻断附注生成。
+            if settings.DISCLOSURE_NOTE_FORMULA_ENABLED and table_data is not None:
+                try:
+                    table_data = await self._evaluate_note_formulas(
+                        project_id, year, note_section, table_data,
+                    )
+                except Exception as _ev_err:
+                    logger.warning(
+                        "evaluate note formulas failed for %s: %s (fail-open)",
+                        note_section, _ev_err,
+                    )
+
+            # ── Wave4 (Task 5.3)：注入 inline 校验 preset（供 validate_all 消费）──
+            # 补装配生成链断链：让 note.table_data 携带 _validation_rules，
+            # 使 collect_inline_rules_for_note 在按需校验时能派发规则。附加式、零渲染回归。
+            if table_data is not None:
+                try:
+                    _inject_validation_rules(table_data, tmpl)
+                except Exception as _vr_err:  # pragma: no cover - defensive
+                    logger.warning(
+                        "inject _validation_rules failed for %s: %s (fail-open)",
+                        note_section, _vr_err,
+                    )
 
             # Upsert into disclosure_notes
             existing = await self.db.execute(
@@ -1389,7 +1639,10 @@ class DisclosureEngine:
         """
         from sqlalchemy.orm.attributes import flag_modified
 
-        from app.services.note_source_resolvers import dispatch_resolver
+        from app.services.note_source_resolvers import (
+            dispatch_resolver,
+            resolve_formula,
+        )
         from app.services.note_template_bindings_loader import (
             get_binding_for_section,
         )
@@ -1470,6 +1723,8 @@ class DisclosureEngine:
 
             # 更新 ctx section_number
             ctx["section_number"] = section
+            # Wave2：暴露当前 note table_data 供 sum source 反查兄弟单元格
+            ctx["table_data"] = td
 
             section_had_error = False
             section_touched = False
@@ -1505,8 +1760,20 @@ class DisclosureEngine:
                             # 无 binding → 无法重算，跳过
                             continue
 
-                        # 调 dispatch_resolver
-                        new_val = await dispatch_resolver(cell_binding, ctx)
+                        # Wave2：公式家族（sum/report/aging）由 resolve_formula 承载
+                        # （dispatch_resolver 未注册），受灰度开关约束。
+                        _src = cell_binding.get("source")
+                        if _src in ("sum", "report", "aging"):
+                            if not settings.DISCLOSURE_NOTE_FORMULA_ENABLED:
+                                # 开关关 → 旁路公式家族，绝不用 None 覆盖既有值（零回归）
+                                continue
+                            new_val = await resolve_formula(cell_binding, ctx)
+                            if new_val is None:
+                                # 缺数据不覆盖既有值（fail-open）
+                                continue
+                        else:
+                            # 调 dispatch_resolver（含 prior_year_note / 数据源）
+                            new_val = await dispatch_resolver(cell_binding, ctx)
 
                         old_val = values[col_idx]
 
