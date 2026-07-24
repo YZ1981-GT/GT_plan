@@ -13,6 +13,7 @@ Requirements: 22.1-22.7 + R3.x（check_presets 接入）
 """
 from __future__ import annotations
 
+import json
 import logging
 import re
 from dataclasses import dataclass, field
@@ -881,18 +882,57 @@ class NoteValidationEngine:
         )
 
         # Build response
-        findings = []
+        # P0-A（DISCLOSURE_NOTE_VALIDATION_STRICT 冲击缓冲）：
+        # 默认宽松（strict=False）→ findings 仅逐条列 error 级；warning 级折叠进
+        # warning_summary（按 note_section×check_type 聚合计数），避免 Wave4 激活 760/187
+        # 条规则后大量 warning 淹没审计师。严格（strict=True）→ 全部逐条列。
+        # 无论开关如何，failed 计数、findings 产生与持久化（_persist_results）均不变，
+        # 仅影响响应 findings 明细呈现粒度。
+        try:
+            from app.core.config import settings as _settings
+            _strict = bool(getattr(_settings, "DISCLOSURE_NOTE_VALIDATION_STRICT", False))
+        except Exception:  # pragma: no cover - defensive
+            _strict = False
+
+        findings: list[dict] = []
+        warning_summary: dict[str, dict] = {}
+        error_count = 0
+        warning_count = 0
         for r in results:
-            if not r.passed:
-                findings.append({
-                    "note_section": r.section_code,
-                    "check_type": r.rule_type,
-                    "severity": "error" if r.diff_amount and abs(float(r.diff_amount)) > 0.01 else "warning",
-                    "message": r.rule_expression,
-                    "expected_value": float(r.expected_value) if r.expected_value is not None else None,
-                    "actual_value": float(r.actual_value) if r.actual_value is not None else None,
-                    "table_name": r.details.get("table_name", "") if r.details else "",
-                })
+            if r.passed:
+                continue
+            severity = (
+                "error"
+                if r.diff_amount and abs(float(r.diff_amount)) > 0.01
+                else "warning"
+            )
+            finding = {
+                "note_section": r.section_code,
+                "check_type": r.rule_type,
+                "severity": severity,
+                "message": r.rule_expression,
+                "expected_value": float(r.expected_value) if r.expected_value is not None else None,
+                "actual_value": float(r.actual_value) if r.actual_value is not None else None,
+                "table_name": r.details.get("table_name", "") if r.details else "",
+            }
+            if severity == "error":
+                error_count += 1
+                findings.append(finding)
+            else:
+                warning_count += 1
+                if _strict:
+                    findings.append(finding)
+                else:
+                    key = f"{r.section_code}|{r.rule_type}"
+                    bucket = warning_summary.get(key)
+                    if bucket is None:
+                        warning_summary[key] = {
+                            "note_section": r.section_code,
+                            "check_type": r.rule_type,
+                            "count": 1,
+                        }
+                    else:
+                        bucket["count"] += 1
 
         return {
             "project_id": str(project_id),
@@ -900,9 +940,103 @@ class NoteValidationEngine:
             "template_type": template_type,
             "total_rules": len(results),
             "passed": sum(1 for r in results if r.passed),
-            "failed": len(findings),
+            "failed": error_count + warning_count,
             "findings": findings,
+            "strict": _strict,
+            "error_count": error_count,
+            "warning_count": warning_count,
+            # 宽松模式下 warning 聚合明细；严格模式为空（warning 已逐条进 findings）。
+            "warning_summary": list(warning_summary.values()),
         }
+
+    async def diagnose_formula_health(
+        self,
+        project_id: UUID,
+        year: int,
+        *,
+        template_type: str = "soe",
+    ) -> dict:
+        """附注公式/校验管线健康度诊断（纯只读，不跑规则、不 persist、不写库）。
+
+        显性化"哪些管线真正生效 / 哪些休眠"（P0-B）：
+        - 表内公式求值（NoteFormulaEvaluator）→ 依赖附注单元格含 binding；
+        - 报表→附注同步（sync_report_to_notes）→ 依赖 report binding 或 linkage 配置；
+        - 附注校验 findings（validate_all）→ 依赖 preset 规则加载（Wave4 修后 760/187）。
+
+        仅做廉价的 table_data 文本标记扫描 + preset/linkage 计数，避免 DB 查询放大。
+        """
+        summary = {
+            "project_id": str(project_id),
+            "year": year,
+            "notes_total": 0,
+            "notes_with_cell_meta": 0,
+            "notes_with_binding": 0,
+            "notes_with_report_binding": 0,
+            "notes_with_inline_rules": 0,
+            "notes_with_text": 0,
+        }
+
+        if self.db:
+            try:
+                result = await self.db.execute(
+                    sa.select(DisclosureNote).where(
+                        DisclosureNote.project_id == str(project_id),
+                        DisclosureNote.year == year,
+                        DisclosureNote.is_deleted == sa.false(),
+                    )
+                )
+                notes = result.scalars().all()
+                summary["notes_total"] = len(notes)
+                for n in notes:
+                    if getattr(n, "text_content", None):
+                        summary["notes_with_text"] += 1
+                    td = getattr(n, "table_data", None)
+                    if not isinstance(td, dict):
+                        continue
+                    blob = json.dumps(td, ensure_ascii=False)
+                    if '"_cell_meta"' in blob:
+                        summary["notes_with_cell_meta"] += 1
+                    if '"binding"' in blob:
+                        summary["notes_with_binding"] += 1
+                    if '"source": "report"' in blob or '"source":"report"' in blob:
+                        summary["notes_with_report_binding"] += 1
+                    if '"_validation_rules"' in blob or '"_check_presets"' in blob:
+                        summary["notes_with_inline_rules"] += 1
+            except Exception as e:  # pragma: no cover - defensive fail-open
+                logger.warning("diagnose_formula_health: load notes failed: %s", e)
+
+        # preset 规则计数（Wave4 路径修复后应 > 0；恒 0 说明 preset 加载仍断）
+        try:
+            preset_soe = len(load_preset_rules("soe"))
+            preset_listed = len(load_preset_rules("listed"))
+        except Exception:  # pragma: no cover - defensive
+            preset_soe = preset_listed = 0
+
+        # linkage 业务映射条目数（骨架/仅元数据 → 0，报表→附注同步无回退目标）
+        linkage_entries = 0
+        try:
+            from app.services.report_note_linkage import ReportNoteLinkage
+
+            _lk = ReportNoteLinkage()
+            linkage_entries = sum(len(v) for v in _lk._config.values())
+        except Exception:  # pragma: no cover - defensive
+            linkage_entries = 0
+
+        preset_count = preset_soe if template_type == "soe" else preset_listed
+        summary["preset_rule_count"] = {"soe": preset_soe, "listed": preset_listed}
+        summary["linkage_config_entries"] = linkage_entries
+        # 管线激活判定（供前端把"休眠"显性化）
+        summary["pipelines"] = {
+            # 校验 findings：preset 规则可加载即活（Wave4 激活；inline 是可选快路径）
+            "validation_findings_active": preset_count > 0,
+            # 表内公式求值：需附注单元格含 binding
+            "in_cell_formula_active": summary["notes_with_binding"] > 0,
+            # 报表→附注同步：需 report binding 或 linkage 业务映射
+            "report_sync_active": (
+                summary["notes_with_report_binding"] > 0 or linkage_entries > 0
+            ),
+        }
+        return summary
 
     async def get_latest_results(
         self,

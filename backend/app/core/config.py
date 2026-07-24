@@ -283,6 +283,13 @@ class Settings(BaseSettings):
     # 任一环求值/同步异常一律 fail-open（返 None / 跳过计 skipped），不阻塞附注生成或报表流程。
     # 注：附注校验 preset 加载/解析修复（Wave4）是纯 bug 修复，不受本开关约束。
     DISCLOSURE_NOTE_FORMULA_ENABLED: bool = False
+    # 附注校验 findings 严格度开关（Wave4 修 preset 路径后，soe 760 / listed 187 条规则从
+    # "恒 0 findings" 变为全量运行 → 有数据章节会瞬间涌现大量 warning，冲击审计师）。
+    # 默认 False = 宽松缓冲：validate_all 只逐条返回 error 级 findings（合计不平等硬性），
+    # warning 级折叠进 warning_summary（按 note_section×check_type 聚合计数，不逐条弹）。
+    # True = 严格：全部 findings（含 warning）逐条返回。上线平稳后可置 True。
+    # 不影响 findings 的产生与持久化，仅影响 validate_all 响应的 findings 明细呈现粒度。
+    DISCLOSURE_NOTE_VALIDATION_STRICT: bool = False
 
     model_config = SettingsConfigDict(env_file=_env_file, extra="ignore")
 
