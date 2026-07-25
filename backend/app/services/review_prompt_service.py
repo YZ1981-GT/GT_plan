@@ -253,6 +253,18 @@ class ReviewPromptService:
                             content, "sheet", str(sheet_path)
                         )
 
+        # Level 1b: 裸 wp_code 作为底稿级文件名（单 sheet 底稿，如 A9/B15/C1/B1A/A17-5-1）。
+        # A/B/C 循环大量底稿是单 sheet（sheet_name 无 "-N" 后缀，resolve_sheet_suffix
+        # 提取不到），故按 wp_code 直接匹配 {cycle}/{wp_code}.md。对 D~N 无影响
+        # （这些循环不存在裸 wp_code 的 .md 文件，命中 is_file() 失败后照常降级）。
+        if wp_code:
+            cyc = wp_code[0].upper()
+            bare_path = self._base_dir / cyc / f"{wp_code}.md"
+            if bare_path.is_file():
+                content = self._read_file(bare_path)
+                if content:
+                    return self._build_result(content, "sheet", str(bare_path))
+
         # Level 2: Subject-level prompt (keyword matching)
         subject_result = self._load_subject_prompt(wp_code)
         if subject_result:
