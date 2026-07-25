@@ -437,6 +437,7 @@ class TbAuxBalance(Base):
     aux_type_name: Mapped[str | None] = mapped_column(String, nullable=True)  # 核算项目类型名称
     aux_code: Mapped[str | None] = mapped_column(String, nullable=True)
     aux_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    aux_dimensions_raw: Mapped[str | None] = mapped_column(String, nullable=True)  # 多维核算原始串（金融机构:..;银行账户:..）
     opening_balance: Mapped[Decimal | None] = mapped_column(sa.Numeric(20, 2), nullable=True)
     opening_debit: Mapped[Decimal | None] = mapped_column(sa.Numeric(20, 2), nullable=True)
     opening_credit: Mapped[Decimal | None] = mapped_column(sa.Numeric(20, 2), nullable=True)
@@ -680,6 +681,13 @@ class Adjustment(Base):
     passed_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     # DB 列为 TIMESTAMPTZ（V078），service 写入完整 datetime，故 ORM 用 datetime 对齐
     passed_communication_date: Mapped[datetime | None] = mapped_column(nullable=True)
+    # V124: 底稿调整汇聚（workpaper-adjustment-centralization）
+    #   origin='manual'（手工录入，默认）/ 'workpaper'（底稿汇聚）
+    #   source_ref='{wp_id}:{item_id}' 溯源+幂等键（origin='workpaper' 时非空）
+    origin: Mapped[str] = mapped_column(
+        String(20), server_default=text("'manual'"), nullable=False
+    )
+    source_ref: Mapped[str | None] = mapped_column(String(120), nullable=True)
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
@@ -914,6 +922,10 @@ class AdjustmentEntry(Base):
     )
     line_no: Mapped[int] = mapped_column(sa.Integer, nullable=False)
     standard_account_code: Mapped[str] = mapped_column(String, nullable=False)
+    # 明细/二级科目码（V127）：审计师原始选定的明细科目，可空。
+    # NULL = 无更细明细，按一级 standard_account_code 处理。仅用于精确推送到底稿明细表，
+    # 不参与科目校验/试算表 recalc/报表（recalc 按 adjustments 头表 account_code 聚合）。
+    detail_account_code: Mapped[str | None] = mapped_column(String, nullable=True)
     account_name: Mapped[str | None] = mapped_column(String, nullable=True)
     report_line_code: Mapped[str | None] = mapped_column(String, nullable=True)
     debit_amount: Mapped[Decimal] = mapped_column(
@@ -936,6 +948,137 @@ class AdjustmentEntry(Base):
     __table_args__ = (
         Index("idx_adjustment_entries_adjustment_id", "adjustment_id"),
         Index("idx_adjustment_entries_entry_group_id", "entry_group_id"),
+    )
+
+
+# ---------------------------------------------------------------------------
+# AdjustmentCollaboration 模型（调整分录协作接力，V125）
+# ---------------------------------------------------------------------------
+
+
+class AdjustmentCollaboration(Base):
+    """调整分录协作记录（分录组级转派→知晓→补充→确认）。
+
+    spec: adjustment-collaboration-and-propagation
+    锚点 = 集中登记分录组 entry_group_id；协作是受控多人编辑通道。
+    """
+
+    __tablename__ = "adjustment_collaboration"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("projects.id"), nullable=False
+    )
+    year: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    entry_group_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=False
+    )
+    source_ref: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    initiator_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id"), nullable=False
+    )
+    assignee_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id"), nullable=False
+    )
+    # pending/acknowledged/contributed/confirmed/closed/rejected
+    status: Mapped[str] = mapped_column(
+        String(20), server_default=text("'pending'"), nullable=False
+    )
+    round: Mapped[int] = mapped_column(
+        sa.Integer, server_default=text("1"), nullable=False
+    )
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_deleted: Mapped[bool] = mapped_column(
+        server_default=text("false"), nullable=False
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    def soft_delete(self) -> None:
+        self.is_deleted = True
+
+    __table_args__ = (
+        Index("idx_adj_collab_project_group", "project_id", "entry_group_id"),
+        Index("idx_adj_collab_assignee_status", "assignee_id", "status"),
+        Index("idx_adj_collab_project_status", "project_id", "status"),
+    )
+
+
+class AdjustmentCollaborationEvent(Base):
+    """协作历史事件（append-only，仅 INSERT）。"""
+
+    __tablename__ = "adjustment_collaboration_event"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    collaboration_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("adjustment_collaboration.id"), nullable=False
+    )
+    actor_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id"), nullable=False
+    )
+    # assigned/reassigned/acknowledged/contributed/confirmed/rejected/commented/closed
+    event_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    payload: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+
+    __table_args__ = (
+        Index("idx_adj_collab_event_collab_time", "collaboration_id", "created_at"),
+    )
+
+
+class AuditCheckSignoff(Base):
+    """审计检查复核门禁签认（audit-check-review-gate-hardening / V126）。
+
+    项目概览「审计检查」作为完成复核最后一次检查的签认留痕：
+    每次签认记录当时的汇总快照 summary_snapshot 与是否存在未处理阻断项
+    blocking_present（只提示不阻断，Req8.3/P14）。
+    """
+
+    __tablename__ = "audit_check_signoff"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=False
+    )
+    year: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    signed_by: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=False
+    )
+    signed_by_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    signed_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    # {decided,passed,failed,uncovered,pass_rate,blocking_count}
+    summary_snapshot: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    blocking_present: Mapped[bool] = mapped_column(
+        server_default=text("false"), nullable=False
+    )
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_deleted: Mapped[bool] = mapped_column(
+        server_default=text("false"), nullable=False
+    )
+
+    def soft_delete(self) -> None:
+        self.is_deleted = True
+
+    __table_args__ = (
+        Index(
+            "idx_audit_check_signoff_proj_year",
+            "project_id",
+            "year",
+            postgresql_where=text("is_deleted = false"),
+        ),
     )
 
 

@@ -42,6 +42,11 @@
           </template>
           <template #left>
             <el-button size="small" type="primary" v-permission="'adjustment:create'" @click="openCreateDialog" :disabled="!canEdit" :title="!canEdit ? '项目已归档，无法编辑' : ''">+ 新建分录</el-button>
+            <el-badge :value="collabInboxCount" :max="99" :hidden="collabInboxCount === 0" class="gt-adj-inbox-badge">
+              <el-button size="small" plain @click="inboxDrawerVisible = true" title="转派给我、待我补充/确认的调整分录协作">
+                🤝 待我协作
+              </el-button>
+            </el-badge>
             <div class="gt-adj-batch-toggle">
               <el-switch v-model="batchMode" size="small" active-text="批量模式" inactive-text="" />
               <el-badge v-if="batchPendingCount > 0" :value="batchPendingCount" :max="99" class="gt-adj-batch-badge">
@@ -98,6 +103,19 @@
         <span class="gt-summary-label">{{ dictStore.label('adjustment_status', st as string) }}</span>
         <span class="gt-summary-value">{{ cnt }}</span>
       </div>
+      <el-button
+        style="margin-left: auto; align-self: flex-start"
+        type="primary"
+        plain
+        :icon="Reading"
+        @click="showHandbook = true"
+      >
+        使用手册
+      </el-button>
+    </div>
+    <!-- summary 未就绪时也保留手册入口 -->
+    <div v-else class="gt-adj-handbook-fallback">
+      <el-button type="primary" plain :icon="Reading" @click="showHandbook = true">使用手册</el-button>
     </div>
 
     <!-- Tab 切换 + 全屏按钮（同行右对齐） -->
@@ -107,6 +125,31 @@
         <el-tab-pane label="审计调整" name="aje" />
         <el-tab-pane label="重分类" name="rje" />
       </el-tabs>
+      <el-segmented
+        v-model="originFilter"
+        :options="ORIGIN_FILTER_OPTIONS"
+        size="small"
+        class="gt-adj-origin-filter"
+        @change="loadEntries"
+      >
+        <template #default="{ item }">
+          <el-tooltip :content="item.tip" placement="top" :disabled="!item.tip" :show-after="200">
+            <span>{{ item.label }}</span>
+          </el-tooltip>
+        </template>
+      </el-segmented>
+      <el-select
+        v-model="creatorFilter"
+        placeholder="全部编制人"
+        clearable
+        size="small"
+        class="gt-adj-creator-filter"
+        style="width: 150px"
+        @change="adjPage = 1"
+      >
+        <el-option v-for="name in creatorOptions" :key="name" :label="name" :value="name" />
+      </el-select>
+      <el-checkbox v-model="collabOnly" size="small" class="gt-adj-collab-only" @change="adjPage = 1">仅看协作中</el-checkbox>
       <el-tooltip content="全屏查看（ESC 退出）" placement="bottom">
         <el-button size="small" plain class="gt-adj-fs-btn" @click="onToggleFullscreen">
           {{ tableFullscreen ? '退出全屏' : '⛶ 全屏' }}
@@ -255,8 +298,20 @@
         </div>
       </template>
       <template #col-created_at="{ row }">{{ row.created_at?.slice(0, 10) }}</template>
+      <template #col-origin="{ row }">
+        <el-tag v-if="row.origin === 'workpaper'" type="success" size="small"
+          style="cursor: pointer" @click="jumpToSourceWorkpaper(row)"
+          :title="'跳转来源底稿 ' + (sourceWpLabel(row) || '')">
+          底稿 {{ sourceWpLabel(row) }}
+        </el-tag>
+        <el-tag v-else type="info" size="small" effect="plain">手工</el-tag>
+      </template>
       <template #col-review_status="{ row }">
         <GtStatusTag dict-key="adjustment_status" :value="row.review_status" />
+        <el-tag v-if="row.has_active_collaboration" type="primary" size="small" effect="plain"
+          style="margin-left: 4px; cursor: pointer" title="存在进行中的协作补充，点击查看" @click="openCollabDialog(row)">
+          🤝协作中
+        </el-tag>
         <!-- Sprint 4：StaleIndicator 统一组件 -->
         <StaleIndicator
           v-if="row.converted_to_misstatement_id && missStaleIdSet.has(row.converted_to_misstatement_id)"
@@ -266,12 +321,16 @@
         />
       </template>
       <template #extra-columns>
-        <el-table-column label="操作" width="180" fixed="right">
+        <el-table-column label="操作" width="250" fixed="right">
           <template #default="{ row }">
             <el-button size="small" @click="openEditDialog(row)"
-              :disabled="!canEdit || row.review_status === ADJUSTMENT_STATUS.APPROVED || row.review_status === ADJUSTMENT_STATUS.PENDING_REVIEW"
-              :title="!canEdit ? '项目已归档，无法编辑' : ''">
+              :disabled="!canEdit || row.origin === 'workpaper' || row.review_status === ADJUSTMENT_STATUS.APPROVED || row.review_status === ADJUSTMENT_STATUS.PENDING_REVIEW"
+              :title="!canEdit ? '项目已归档，无法编辑' : (row.origin === 'workpaper' ? '该分录来源于底稿，请在来源底稿中修改后重新同步（此处编辑会在下次同步时被覆盖）' : '')">
               编辑
+            </el-button>
+            <el-button size="small" type="primary" plain @click="openCollabDialog(row)"
+              title="转派给项目成员补充明细并确认（多人协作）">
+              协作
             </el-button>
             <el-button size="small" type="danger" @click="onDelete(row)"
               v-permission="'adjustment:delete'"
@@ -484,6 +543,39 @@
       @update:visible="showCellFormulaDetail = $event"
       @navigate="onCellDetailNavigate"
     />
+
+    <!-- 调整分录协作接力（adjustment-collaboration-and-propagation） -->
+    <AdjustmentCollaborationDialog
+      v-model="collabDialogVisible"
+      :project-id="projectId"
+      :year="selectedYear ?? year ?? 2025"
+      :entry-group-id="collabRow?.entry_group_id || ''"
+      :adjustment-no="collabRow?.adjustment_no"
+      :account-options="accountOptions"
+      :line-items="collabLineItems"
+      :can-edit="canEdit"
+      @updated="onCollabUpdated"
+    />
+
+    <!-- 待我协作 收件箱（P0-3） -->
+    <el-drawer v-model="inboxDrawerVisible" title="待我协作的调整分录" size="420px" append-to-body>
+      <el-empty v-if="collabInbox.length === 0" description="暂无待我协作的分录组" :image-size="80" />
+      <div v-else class="gt-adj-inbox-list">
+        <div v-for="it in collabInbox" :key="it.id" class="gt-adj-inbox-item" @click="openCollabFromInbox(it)">
+          <div class="gt-adj-inbox-row">
+            <span class="gt-adj-inbox-no">{{ it.entry_group_id.slice(0, 8) }}</span>
+            <el-tag size="small" :type="it.status === 'contributed' ? 'primary' : (it.status === 'acknowledged' ? 'warning' : 'info')">
+              {{ COLLAB_STATUS_LABELS[it.status] || it.status }}
+            </el-tag>
+            <span class="gt-adj-inbox-round">第 {{ it.round }} 轮</span>
+          </div>
+          <div v-if="it.note" class="gt-adj-inbox-note">📝 {{ it.note }}</div>
+        </div>
+      </div>
+    </el-drawer>
+
+    <!-- 使用手册 -->
+    <AdjustmentsHandbookDialog v-model="showHandbook" />
   </div>
 </template>
 
@@ -491,15 +583,18 @@
 import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { ArrowDown } from '@element-plus/icons-vue'
+import { ArrowDown, Reading } from '@element-plus/icons-vue'
+import AdjustmentsHandbookDialog from '@/views/adjustments/AdjustmentsHandbookDialog.vue'
 import { confirmDelete, confirmConvert, confirmDangerous } from '@/utils/confirm'
 import {
   listAdjustments, createAdjustment, updateAdjustment, deleteAdjustment,
   reviewAdjustment, getAdjustmentSummary, getAccountDropdown, getProjectAuditYear,
   batchCommitAdjustments,
   convertAjeToMisstatement,
+  getCollaborationInbox,
   type AdjustmentSummary, type AccountOption,
 } from '@/services/auditPlatformApi'
+import { COLLAB_STATUS_LABELS } from '@/components/workpaper/composables/useAdjustmentCollaboration'
 import { useProjectStore } from '@/stores/project'
 import { useDictStore } from '@/stores/dict'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
@@ -526,6 +621,7 @@ import GtEditableTable from '@/components/common/GtEditableTable.vue'
 import type { GtColumn } from '@/components/common/GtEditableTable.vue'
 import ImpactPreviewPanel from '@/components/ImpactPreviewPanel.vue'
 import CellFormulaDetail from '@/components/CellFormulaDetail.vue'
+import AdjustmentCollaborationDialog from '@/components/adjustment/AdjustmentCollaborationDialog.vue'
 import { useImpactPreview } from '@/composables/useImpactPreview'
 import { useDecimalCalc } from '@/composables/useDecimalCalc'
 import { useAuditContext } from '@/composables/useAuditContext'
@@ -542,6 +638,7 @@ import { rules, makeRules } from '@/utils/formRules'
 import { useFormSubmit } from '@/composables/useFormSubmit'
 import type { FormInstance, FormRules } from 'element-plus'
 
+const showHandbook = ref(false)
 const route = useRoute()
 const router = useRouter()
 const { add: decAdd, sub: decSub, sum: decSum } = useDecimalCalc()
@@ -556,8 +653,10 @@ const adjColumns: GtColumn[] = [
   { prop: 'main_account', label: '主要科目', minWidth: 280 },
   { prop: 'total_debit', label: '借方金额', width: 130, align: 'right' },
   { prop: 'total_credit', label: '贷方金额', width: 130, align: 'right' },
+  { prop: 'creator_name', label: '编制人', width: 100 },
   { prop: 'created_at', label: '日期', width: 130 },
-  { prop: 'review_status', label: '状态', width: 100 },
+  { prop: 'origin', label: '来源', width: 110 },
+  { prop: 'review_status', label: '状态', width: 110 },
 ]
 
 /** 判断当前行是否是借/贷方向切换点（用于在三列同步加分隔线） */
@@ -618,6 +717,13 @@ const showImportDialog = ref(false)
 const submitLoading = ref(false)
 const currentTemplateType = ref<'soe' | 'listed' | ''>('')  // 当前项目的模板类型(国企/上市)
 const activeTab = ref('all')
+// 来源筛选（workpaper-adjustment-centralization）：全部/手工/底稿
+const ORIGIN_FILTER_OPTIONS = [
+  { label: '全部来源', value: 'all', tip: '显示手工录入与底稿汇聚的全部调整分录' },
+  { label: '手工录入', value: 'manual', tip: '在本模块直接新建/录入的调整分录' },
+  { label: '底稿汇聚', value: 'workpaper', tip: '从各科目底稿点击"同步到调整分录模块"汇聚而来的分录' },
+]
+const originFilter = ref('all')
 const entries = ref<any[]>([])
 const summary = ref<AdjustmentSummary | null>(null)
 const selectedRows = ref<any[]>([])
@@ -625,10 +731,22 @@ const selectedRows = ref<any[]>([])
 // ─── 分页 ─────────────────────────────────────────────────────────────────────
 const adjPage = ref(1)
 const adjPageSize = ref(50)
-const adjTotal = computed(() => entries.value.length)
+// P2-7 按编制人筛选 / P2-8 仅看协作中（客户端过滤，数据由 list 接口 enrich 的 creator_name/has_active_collaboration 驱动）
+const creatorFilter = ref('')
+const collabOnly = ref(false)
+const creatorOptions = computed<string[]>(() => {
+  const s = new Set<string>()
+  for (const e of entries.value) if (e.creator_name) s.add(e.creator_name)
+  return [...s].sort((a, b) => a.localeCompare(b, 'zh-CN'))
+})
+const filteredEntries = computed(() => entries.value.filter((e: any) =>
+  (!creatorFilter.value || e.creator_name === creatorFilter.value)
+  && (!collabOnly.value || e.has_active_collaboration),
+))
+const adjTotal = computed(() => filteredEntries.value.length)
 const pagedEntries = computed(() => {
   const start = (adjPage.value - 1) * adjPageSize.value
-  return entries.value.slice(start, start + adjPageSize.value)
+  return filteredEntries.value.slice(start, start + adjPageSize.value)
 })
 
 // ─── Impact Preview [enterprise-linkage 3.8] ─────────────────────────────────
@@ -768,6 +886,27 @@ const rejectReason = ref('')
 const rejectMode = ref<'unified' | 'individual'>('unified')
 const individualReasons = ref<Record<string, string>>({})
 const accountOptions = ref<AccountOption[]>([])
+
+// ─── 协作接力对话框（adjustment-collaboration-and-propagation） ───────────────
+const collabDialogVisible = ref(false)
+const collabRow = ref<any>(null)
+const collabLineItems = computed<Array<{ standard_account_code?: string; account_name?: string; debit_amount: number; credit_amount: number }>>(() =>
+  (collabRow.value?.line_items || []).map((li: any) => ({
+    standard_account_code: li.standard_account_code,
+    account_name: li.account_name,
+    debit_amount: Number(li.debit_amount) || 0,
+    credit_amount: Number(li.credit_amount) || 0,
+  })),
+)
+function openCollabDialog(row: any): void {
+  collabRow.value = row
+  collabDialogVisible.value = true
+}
+/** 协作对话框操作后：刷新分录列表 + 待我协作收件箱。 */
+async function onCollabUpdated(): Promise<void> {
+  await fetchEntries()
+  await refreshCollabInbox()
+}
 
 // 科目过滤（来自 route.query.account，支持从试算表跳转过来）
 const filterAccount = ref(typeof route.query.account === 'string' ? route.query.account : '')
@@ -921,6 +1060,7 @@ async function fetchEntries() {
   try {
     const opts: any = { page_size: 200 }
     if (activeTab.value !== 'all') opts.adjustment_type = activeTab.value
+    if (originFilter.value !== 'all') opts.origin = originFilter.value
     const result = await listAdjustments(projectId.value, year.value, opts)
     let items = Array.isArray(result) ? result : (result.items || [])
     // 按科目过滤（来自试算表跳转的 account query 参数）
@@ -978,6 +1118,11 @@ function openCreateDialog() {
 }
 
 function openEditDialog(row: any) {
+  // workpaper-origin 分录以来源底稿为准，中央页编辑会在下次同步时被覆盖 → 引导至来源底稿
+  if (row.origin === 'workpaper') {
+    ElMessage.info('该分录来源于底稿，请在来源底稿中修改后重新同步（中央页编辑会在下次同步时被覆盖）')
+    return
+  }
   isEditing.value = true
   editingGroupId.value = row.entry_group_id
   form.value = {
@@ -1090,6 +1235,31 @@ async function onDelete(row: any) {
       fetchSummary()
     },
   })
+}
+
+// workpaper-adjustment-centralization — 来源底稿展示 + 跳转
+/** 从 source_ref='{wp_id}:{item_id}' 解析展示用底稿编码（item_id 前缀，如 D4/K9-3） */
+function sourceWpLabel(row: any): string {
+  const ref = row?.source_ref || ''
+  const idx = ref.indexOf(':')
+  const itemId = idx >= 0 ? ref.slice(idx + 1) : ''
+  const m = itemId.match(/^[A-Z]\d+(?:-\d+)?/)
+  return m ? m[0] : ''
+}
+/** 跳转到来源底稿的调整分录页（source_ref 前缀即 wp_id；item_id 前缀编码作 ?sheet= 定位 tab） */
+function jumpToSourceWorkpaper(row: any) {
+  const ref = row?.source_ref || ''
+  const wpId = ref.indexOf(':') >= 0 ? ref.slice(0, ref.indexOf(':')) : ''
+  if (!wpId) {
+    ElMessage.info('无来源底稿信息')
+    return
+  }
+  // sheetCode 如 K9-3 / D4-4 → GtWpRenderer 以编码 endsWith/includes 兜底定位调整分录 sheet，
+  // 不带 ?sheet= 会回退到底稿目录页。
+  const sheetCode = sourceWpLabel(row)
+  const query: Record<string, string> = {}
+  if (sheetCode) query.sheet = sheetCode
+  router.push({ name: 'WorkpaperEditor', params: { projectId: projectId.value, wpId }, query })
 }
 
 // R1 需求 3 / Task 10 — 将被驳回的 AJE 一键转为未更正错报
@@ -1228,6 +1398,39 @@ async function reloadAdjustmentContext() {
   await fetchSummary()
   await fetchAccountOptions()
   if (!projectOptions.value.length) projectStore.loadProjectOptions()
+  await refreshCollabInbox()
+  maybeOpenGroupFromQuery()
+}
+
+// ─── 协作深链（?group=）+ 待我协作收件箱（P0-2 / P0-3） ─────────────────────
+const collabInbox = ref<Array<{ id: string; entry_group_id: string; status: string; round: number; note?: string | null }>>([])
+const inboxDrawerVisible = ref(false)
+const collabInboxCount = computed(() => collabInbox.value.length)
+
+async function refreshCollabInbox() {
+  try {
+    collabInbox.value = await getCollaborationInbox(projectId.value)
+  } catch { collabInbox.value = [] }
+}
+
+/** 通知/明细表跳转携 ?group= → 定位分录组并打开协作对话框（处理后清除 query 防重复触发）。 */
+function maybeOpenGroupFromQuery() {
+  const g = typeof route.query.group === 'string' ? route.query.group : ''
+  if (!g) return
+  const row = entries.value.find((e: any) => e.entry_group_id === g)
+    || { entry_group_id: g, line_items: [] }
+  openCollabDialog(row)
+  const q = { ...route.query }
+  delete q.group
+  router.replace({ path: route.path, query: q }).catch(() => { /* ignore */ })
+}
+
+/** 从收件箱打开某分录组协作（优先用列表中已加载的完整行以预填明细）。 */
+function openCollabFromInbox(item: { entry_group_id: string }) {
+  inboxDrawerVisible.value = false
+  const row = entries.value.find((e: any) => e.entry_group_id === item.entry_group_id)
+    || { entry_group_id: item.entry_group_id, line_items: [] }
+  openCollabDialog(row)
 }
 
 // 初次加载（替代 onMounted 一次性加载）

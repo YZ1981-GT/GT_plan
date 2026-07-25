@@ -408,12 +408,27 @@ async def _import_adjustments(
         elif sub_name:
             std_code = _resolve_code("", sub_name)
 
+        # 明细科目码（detail_account_code）：审计师原始选定的二级/明细科目码。
+        # 优先用户填写的二级编码,否则用二级名称反查出的原始码(可能是 client 二级码)。
+        # 仅当明细码非空且 ≠ 归一后的一级码 std_code 时保留,否则 None(不冗余存与一级相同的值)。
+        # standard_account_code(std_code) 归一逻辑保持不变,校验/recalc/报表仍按一级。
+        detail_candidate = ""
+        try:
+            if sub_code:
+                detail_candidate = sub_code
+            elif sub_name and sub_name in name_to_code:
+                detail_candidate = name_to_code[sub_name]
+        except Exception:
+            detail_candidate = ""
+        detail_code = detail_candidate if (detail_candidate and detail_candidate != std_code) else None
+
         groups[adj_no]["type"] = adj_type_raw if adj_type_raw in ("AJE", "RJE") else "AJE"
         if desc and not groups[adj_no]["description"]:
             groups[adj_no]["description"] = desc
         groups[adj_no]["lines"].append({
             "row_idx": i,
             "code": std_code,
+            "detail_code": detail_code,  # 明细科目码(V127),用于精确推送到底稿明细表
             "raw_code": sub_code or level1_code,  # 保留用户原始输入,供错误信息使用
             "name": sub_name,
             "debit": _Dec(str(debit or 0)),
@@ -452,6 +467,7 @@ async def _import_adjustments(
             line_items = [
                 AdjustmentLineItem(
                     standard_account_code=ln["code"],
+                    detail_account_code=ln.get("detail_code"),
                     account_name=ln["name"] or None,
                     debit_amount=ln["debit"],
                     credit_amount=ln["credit"],

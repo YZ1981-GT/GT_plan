@@ -25,6 +25,11 @@ import type { UseE1BaseOptions } from '../composables/useE1Adjudication'
 import GtIndexChip from '../GtIndexChip.vue'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { amountFormatter, amountParser } from '../composables/wpAmountInput'
+import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '@/components/workpaper/composables/useAdjustmentCentralSync'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { useRouter } from 'vue-router'
+import { Right } from '@element-plus/icons-vue'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -65,6 +70,39 @@ const {
   updateCell,
   pushToA2,
 } = useE1Adjustment(options)
+
+// ─── 同步到集中登记 ───────────────────────────────────────────────────────────
+const { year: auditYear } = useAuditContext()
+const {
+  centralStatus,
+  syncing: centralSyncing,
+  syncToCentral,
+  refreshStatus,
+} = useAdjustmentCentralSync({
+  projectId: () => props.projectId,
+  year: auditYear,
+  wpId: () => props.wpId,
+  wpCode: 'E1',
+  itemId: 'E1-5-adjustment',
+  buildLineItems: () => rows.value.map((r: AdjustmentRow) => ({
+    account_name: r.accountName,
+    report_line_code: r.reportItem || undefined,
+    debit_amount: r.debit,
+    credit_amount: r.credit,
+  })),
+  buildMeta: () => ({
+    description: rows.value.find((r: AdjustmentRow) => r.description)?.description || 'E1 调整',
+    adjustmentType: rows.value.every((r: AdjustmentRow) => r.category === '报表调整') ? 'rje' : 'aje',
+  }),
+})
+void refreshStatus()
+
+// ─── 跳转到调整分录模块 ────────────────────────────────────────────────────────
+const router = useRouter()
+function goToAdjustmentModule() {
+  if (!props.projectId) return
+  router.push({ name: 'Adjustments', params: { projectId: props.projectId } })
+}
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -133,10 +171,39 @@ function saveAuditConclusion(val: string): void {
             <el-button v-if="!isReadonly" type="warning" size="small" @click="pushToA2">
               推送至A2
             </el-button>
+            <el-button
+              size="small"
+              type="primary"
+              plain
+              :loading="centralSyncing"
+              :disabled="isReadonly || !balanced || rows.length === 0"
+              title="把本页调整分录同步到调整分录模块，供合伙人跨循环审阅"
+              @click="syncToCentral"
+            >
+              同步到调整分录模块
+            </el-button>
+            <el-button
+              size="small"
+              type="primary"
+              link
+              :disabled="!projectId"
+              title="前往调整分录模块查看全部调整分录"
+              @click="goToAdjustmentModule"
+            >
+              前往调整分录模块<el-icon class="el-icon--right"><Right /></el-icon>
+            </el-button>
           </div>
           <div class="toolbar-right">
             <span class="chip-wrap"><GtIndexChip value="wp:A2" :context-project-id="projectId" /></span>
             <span class="chip-wrap"><GtIndexChip value="wp:E1-1" :context-project-id="projectId" /></span>
+            <el-tag
+              v-if="centralStatus?.review_status"
+              size="small"
+              :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
+              :title="centralStatus.rejection_reason || ''"
+            >
+              集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
+            </el-tag>
             <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
           </div>
         </div>
@@ -217,6 +284,9 @@ function saveAuditConclusion(val: string): void {
                 :model-value="row.debit"
                 :disabled="isReadonly"
                 :controls="false"
+                :precision="2"
+                :formatter="amountFormatter"
+                :parser="amountParser"
                 size="small"
                 @change="(val: number | undefined) => updateCell(row.id, 'debit', val ?? 0)"
               />
@@ -230,6 +300,9 @@ function saveAuditConclusion(val: string): void {
                 :model-value="row.credit"
                 :disabled="isReadonly"
                 :controls="false"
+                :precision="2"
+                :formatter="amountFormatter"
+                :parser="amountParser"
                 size="small"
                 @change="(val: number | undefined) => updateCell(row.id, 'credit', val ?? 0)"
               />

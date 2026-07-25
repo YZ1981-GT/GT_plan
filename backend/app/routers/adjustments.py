@@ -35,13 +35,22 @@ from app.models.audit_platform_models import (
 )
 from app.models.audit_platform_schemas import (
     AccountOption,
+    AdjustmentCollaborationAssignRequest,
+    AdjustmentCollaborationContributeRequest,
+    AdjustmentCollaborationRejectRequest,
     AdjustmentCreate,
     AdjustmentSummary,
+    AdjustmentSyncRequest,
     AdjustmentUpdate,
     ReviewStatusChange,
     WPAdjustmentSummary,
 )
 from app.services.adjustment_service import AdjustmentService
+from app.services.adjustment_sync_service import AdjustmentSyncService, AdjustmentSyncError
+from app.services.adjustment_collaboration_service import (
+    AdjustmentCollaborationService,
+    CollaborationError,
+)
 from app.services.adjustment_impact_service import preview_impact as preview_impact_service
 from app.services.formula_management.delivery_export import content_disposition_attachment
 from app.services.mapping_service import get_codes_by_cycles
@@ -55,23 +64,77 @@ router = APIRouter(
 )
 
 
+async def _enrich_adjustment_list(db: AsyncSession, project_id: UUID, items: list[dict]) -> None:
+    """批量附加 creator_name + has_active_collaboration（P2 视图/筛选，fail-open 不阻断列表）。"""
+    from app.models.audit_platform_models import AdjustmentCollaboration
+    from app.models.staff_models import StaffMember
+    from app.services.adjustment_collaboration_service import ACTIVE_STATUSES
+
+    def _as_uuid(v):
+        try:
+            return UUID(str(v))
+        except Exception:
+            return None
+
+    group_ids = [g for g in (_as_uuid(it.get("entry_group_id")) for it in items) if g]
+    creator_raw = {it.get("created_by") for it in items if it.get("created_by")}
+    creator_ids = [g for g in (_as_uuid(c) for c in creator_raw) if g]
+
+    active_groups: set[str] = set()
+    if group_ids:
+        r = await db.execute(
+            sa.select(AdjustmentCollaboration.entry_group_id).where(
+                AdjustmentCollaboration.project_id == project_id,
+                AdjustmentCollaboration.entry_group_id.in_(group_ids),
+                AdjustmentCollaboration.status.in_(list(ACTIVE_STATUSES)),
+                AdjustmentCollaboration.is_deleted == sa.false(),
+            )
+        )
+        active_groups = {str(x) for x in r.scalars().all()}
+
+    name_map: dict[str, str] = {}
+    if creator_ids:
+        sr = await db.execute(
+            sa.select(StaffMember.user_id, StaffMember.staff_name).where(
+                StaffMember.user_id.in_(creator_ids),
+                StaffMember.is_deleted == sa.false(),
+            )
+        )
+        for uid, sname in sr.all():
+            if sname:
+                name_map[str(uid)] = sname
+        ur = await db.execute(
+            sa.select(User.id, User.username).where(User.id.in_(creator_ids))
+        )
+        for uid, uname in ur.all():
+            name_map.setdefault(str(uid), uname)
+
+    for it in items:
+        gid = it.get("entry_group_id")
+        it["has_active_collaboration"] = bool(gid and str(gid) in active_groups)
+        cb = it.get("created_by")
+        it["creator_name"] = name_map.get(str(cb)) if cb else None
+
+
 @router.get("")
 async def list_adjustments(
     project_id: UUID,
     year: int = Query(...),
     adjustment_type: AdjustmentType | None = Query(None),
     review_status: ReviewStatus | None = Query(None),
+    origin: str | None = Query(None, description="来源筛选：manual（手工，含历史）/ workpaper（底稿汇聚）"),
     fields: str | None = Query(None, description="逗号分隔的字段名，如 id,adjustment_no,description"),
     pagination: PaginationParams = Depends(),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
-    """分录列表（支持 type/status 筛选，需项目成员权限）"""
+    """分录列表（支持 type/status/origin 筛选，需项目成员权限）"""
     svc = AdjustmentService(db)
     result = await svc.list_entries(
         project_id, year,
         adjustment_type=adjustment_type,
         review_status=review_status,
+        origin=origin,
         page=pagination.page, page_size=pagination.page_size,
     )
 
@@ -91,6 +154,13 @@ async def list_adjustments(
                 result["total"] = len(result["items"])
     except Exception:
         pass  # scope filtering failure should not block the response
+
+    # P2 增强：批量附加 creator_name（按人分组）+ has_active_collaboration（协作中筛选），fail-open
+    if isinstance(result, dict) and result.get("items"):
+        try:
+            await _enrich_adjustment_list(db, project_id, result["items"])
+        except Exception:
+            pass
 
     # 字段选择：过滤返回字段（仅过滤 items 内的字段，保留分页元数据）
     requested_fields = parse_fields(fields)
@@ -122,6 +192,222 @@ async def create_adjustment(
         return result.model_dump()
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/sync-from-workpaper")
+async def sync_from_workpaper(
+    project_id: UUID,
+    data: AdjustmentSyncRequest,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_operation("wp:edit")),
+    _lock_check=Depends(check_consol_lock),
+):
+    """底稿调整分录组 → 集中式登记（幂等 by source_ref，origin='workpaper'）。
+
+    - UNBALANCED / UNRESOLVED_ACCOUNTS → 400
+    - APPROVED_LOCKED → 409（已复核通过，需先撤回）
+    - 不触发 recalc（workpaper origin 已由审定表 writeback 体现于 audited_amount）
+    """
+    svc = AdjustmentSyncService(db)
+    try:
+        result = await svc.sync_from_workpaper(project_id, data, user.id)
+        await db.commit()
+        return result.model_dump()
+    except AdjustmentSyncError as e:
+        if e.code in ("APPROVED_LOCKED", "COLLABORATION_LOCKED"):
+            raise HTTPException(status_code=409, detail={
+                "error_code": e.code, "message": str(e), "detail": e.detail,
+            })
+        raise HTTPException(status_code=400, detail={
+            "error_code": e.code, "message": str(e), "detail": e.detail,
+        })
+
+
+# ---------------------------------------------------------------------------
+# 调整分录协作接力（adjustment-collaboration-and-propagation）
+# ---------------------------------------------------------------------------
+
+
+def _collab_http(e: CollaborationError) -> HTTPException:
+    """CollaborationError → HTTPException（409 锁定类 / 403 权限类 / 400 其余）。"""
+    if e.code in ("APPROVED_LOCKED",):
+        code = 409
+    elif e.code in ("NOT_ASSIGNEE", "NOT_PARTICIPANT", "NOT_PROJECT_MEMBER"):
+        code = 403
+    elif e.code in ("GROUP_NOT_FOUND", "COLLAB_NOT_FOUND"):
+        code = 404
+    else:
+        code = 400
+    return HTTPException(status_code=code, detail={
+        "error_code": e.code, "message": str(e), "detail": e.detail,
+    })
+
+
+@router.get("/collaboration/inbox")
+async def collaboration_inbox(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """被指派人待办：当前用户在该项目下的活跃协作。"""
+    svc = AdjustmentCollaborationService(db)
+    rows = await svc.list_inbox(project_id, current_user.id)
+    return [
+        {
+            "id": str(r.id),
+            "entry_group_id": str(r.entry_group_id),
+            "status": r.status,
+            "round": r.round,
+            "initiator_id": str(r.initiator_id),
+            "note": r.note,
+            "updated_at": r.updated_at.isoformat() if r.updated_at else None,
+        }
+        for r in rows
+    ]
+
+
+@router.post("/{entry_group_id}/collaboration/assign")
+async def collaboration_assign(
+    project_id: UUID,
+    entry_group_id: UUID,
+    data: AdjustmentCollaborationAssignRequest,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_project_access("edit")),
+):
+    """转派/重派分录组给项目成员补充+确认。"""
+    svc = AdjustmentCollaborationService(db)
+    try:
+        result = await svc.assign(
+            project_id,
+            entry_group_id=entry_group_id,
+            assignee_id=data.assignee_id,
+            initiator_id=user.id,
+            year=data.year,
+            note=data.note,
+        )
+        await db.commit()
+        return result.model_dump()
+    except CollaborationError as e:
+        raise _collab_http(e)
+
+
+@router.get("/{entry_group_id}/collaboration")
+async def get_group_collaboration(
+    project_id: UUID,
+    entry_group_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """分录组当前协作 + 事件时间线。"""
+    svc = AdjustmentCollaborationService(db)
+    latest = await svc.get_latest_by_group(project_id, entry_group_id)
+    if latest is None:
+        return {"collaboration": None, "timeline": []}
+    timeline = await svc.get_timeline(latest.id)
+    return {
+        "collaboration": {
+            "id": str(latest.id),
+            "entry_group_id": str(latest.entry_group_id),
+            "status": latest.status,
+            "round": latest.round,
+            "initiator_id": str(latest.initiator_id),
+            "assignee_id": str(latest.assignee_id),
+            "note": latest.note,
+            "rejection_reason": latest.rejection_reason,
+        },
+        "timeline": [
+            {
+                "id": str(ev.id),
+                "event_type": ev.event_type,
+                "actor_id": str(ev.actor_id),
+                "payload": ev.payload,
+                "created_at": ev.created_at.isoformat() if ev.created_at else None,
+            }
+            for ev in timeline
+        ],
+    }
+
+
+@router.post("/collaboration/{collaboration_id}/acknowledge")
+async def collaboration_acknowledge(
+    project_id: UUID,
+    collaboration_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_project_access("edit")),
+):
+    svc = AdjustmentCollaborationService(db)
+    try:
+        result = await svc.acknowledge(project_id, collaboration_id, user.id)
+        await db.commit()
+        return result.model_dump()
+    except CollaborationError as e:
+        raise _collab_http(e)
+
+
+@router.post("/collaboration/{collaboration_id}/contribute")
+async def collaboration_contribute(
+    project_id: UUID,
+    collaboration_id: UUID,
+    data: AdjustmentCollaborationContributeRequest,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_project_access("edit")),
+    _lock_check=Depends(check_consol_lock),
+):
+    svc = AdjustmentCollaborationService(db)
+    try:
+        result = await svc.contribute(
+            project_id, collaboration_id, user.id, data.line_items, data.note
+        )
+        await db.commit()
+        return result.model_dump()
+    except CollaborationError as e:
+        raise _collab_http(e)
+
+
+@router.post("/collaboration/{collaboration_id}/confirm")
+async def collaboration_confirm(
+    project_id: UUID,
+    collaboration_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_project_access("edit")),
+):
+    svc = AdjustmentCollaborationService(db)
+    try:
+        result = await svc.confirm(project_id, collaboration_id, user.id)
+        await db.commit()
+        return result.model_dump()
+    except CollaborationError as e:
+        raise _collab_http(e)
+
+
+@router.post("/collaboration/{collaboration_id}/reject")
+async def collaboration_reject(
+    project_id: UUID,
+    collaboration_id: UUID,
+    data: AdjustmentCollaborationRejectRequest,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_project_access("edit")),
+):
+    svc = AdjustmentCollaborationService(db)
+    try:
+        result = await svc.reject(project_id, collaboration_id, user.id, data.reason)
+        await db.commit()
+        return result.model_dump()
+    except CollaborationError as e:
+        raise _collab_http(e)
+
+
+@router.get("/by-source-ref")
+async def get_adjustment_by_source_ref(
+    project_id: UUID,
+    source_ref: str = Query(..., description="底稿溯源键 {wp_id}:{item_id}"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """回流：按 source_ref 返回集中登记复核状态（供底稿侧只读展示）。"""
+    svc = AdjustmentSyncService(db)
+    status = await svc.get_status_by_source_ref(project_id, source_ref)
+    return status or {}
 
 
 @router.post("/batch-commit")
@@ -1058,7 +1344,7 @@ def _adj_to_dict(adj) -> dict:
 def _write_adj_sheet(ws, entries, adj_type: str):
     from openpyxl.styles import Font, Alignment, PatternFill
 
-    headers = ["编号", "摘要", "科目编码", "科目名称", "借方金额", "贷方金额"]
+    headers = ["编号", "摘要", "科目编码", "科目名称", "借方金额", "贷方金额", "来源"]
     header_fill = PatternFill(start_color="F4F0FA", end_color="F4F0FA", fill_type="solid")
     header_font = Font(bold=True, size=11)
 
@@ -1068,9 +1354,20 @@ def _write_adj_sheet(ws, entries, adj_type: str):
         cell.font = header_font
         cell.alignment = Alignment(horizontal="center")
 
+    def _origin_label(a: dict) -> str:
+        """来源标签：底稿 {wp_code} / 手工。wp_code 从 source_ref item_id 前缀派生。"""
+        if (a.get("origin") or "manual") != "workpaper":
+            return "手工"
+        ref = a.get("source_ref") or ""
+        item_id = ref.split(":", 1)[1] if ":" in ref else ""
+        import re as _re
+        m = _re.match(r"[A-Z]\d+(?:-\d+)?", item_id)
+        return f"底稿 {m.group(0)}" if m else "底稿"
+
     row_idx = 2
     for adj in entries:
         if isinstance(adj, dict) and "line_items" in adj:
+            origin_label = _origin_label(adj)
             # 分录组模式：每个 line_item 一行
             line_items = adj.get("line_items", [])
             if not line_items:
@@ -1081,6 +1378,7 @@ def _write_adj_sheet(ws, entries, adj_type: str):
                 ws.cell(row=row_idx, column=4, value="")
                 ws.cell(row=row_idx, column=5, value=float(adj.get("total_debit") or 0))
                 ws.cell(row=row_idx, column=6, value=float(adj.get("total_credit") or 0))
+                ws.cell(row=row_idx, column=7, value=origin_label)
                 row_idx += 1
             else:
                 for li in line_items:
@@ -1090,6 +1388,7 @@ def _write_adj_sheet(ws, entries, adj_type: str):
                     ws.cell(row=row_idx, column=4, value=li.get("account_name", ""))
                     ws.cell(row=row_idx, column=5, value=float(li.get("debit_amount") or 0))
                     ws.cell(row=row_idx, column=6, value=float(li.get("credit_amount") or 0))
+                    ws.cell(row=row_idx, column=7, value=origin_label)
                     row_idx += 1
         else:
             # 扁平模式兼容
@@ -1100,6 +1399,7 @@ def _write_adj_sheet(ws, entries, adj_type: str):
             ws.cell(row=row_idx, column=4, value=d["account_name"])
             ws.cell(row=row_idx, column=5, value=float(d["debit_amount"] or 0))
             ws.cell(row=row_idx, column=6, value=float(d["credit_amount"] or 0))
+            ws.cell(row=row_idx, column=7, value=_origin_label(d) if isinstance(d, dict) else "手工")
             row_idx += 1
 
     # 列宽
@@ -1109,6 +1409,7 @@ def _write_adj_sheet(ws, entries, adj_type: str):
     ws.column_dimensions["D"].width = 20
     ws.column_dimensions["E"].width = 16
     ws.column_dimensions["F"].width = 16
+    ws.column_dimensions["G"].width = 14
 
 
 # R10 Spec B / Sprint 3.2.3 — 调整分录组关联底稿

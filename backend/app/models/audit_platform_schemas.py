@@ -588,6 +588,8 @@ class ConsistencyReport(BaseModel):
 class AdjustmentLineItem(BaseModel):
     """调整分录明细行"""
     standard_account_code: str
+    # 明细/二级科目码（可选）：仅用于精确推送到底稿明细表，NULL 时按一级 standard_account_code 处理。
+    detail_account_code: str | None = None
     account_name: str | None = None
     report_line_code: str | None = None
     debit_amount: AmountDecimal = Decimal("0")
@@ -616,6 +618,7 @@ class AdjustmentEntryResponse(BaseModel):
     id: UUID | None = None
     line_no: int
     standard_account_code: str
+    detail_account_code: str | None = None
     account_name: str | None = None
     report_line_code: str | None = None
     debit_amount: Decimal = Decimal("0")
@@ -637,6 +640,81 @@ class AdjustmentGroupResponse(BaseModel):
     line_items: list[AdjustmentEntryResponse] = []
     created_by: UUID | None = None
     created_at: datetime | None = None
+    # V124: 来源标记 + 溯源键（origin='workpaper' 时 source_ref='{wp_id}:{item_id}'）
+    origin: str = "manual"
+    source_ref: str | None = None
+
+
+class AdjustmentSyncLineItem(BaseModel):
+    """底稿汇聚调整明细行（standard_account_code 可空，服务层按 account_name 解析）"""
+    standard_account_code: str | None = None
+    account_name: str | None = None
+    report_line_code: str | None = None
+    debit_amount: AmountDecimal = Decimal("0")
+    credit_amount: AmountDecimal = Decimal("0")
+
+
+class AdjustmentSyncRequest(BaseModel):
+    """底稿调整分录组 → 集中式登记（workpaper-adjustment-centralization）"""
+    year: int
+    wp_id: UUID
+    item_id: str                       # 底稿分录组 checklist item_id（幂等键构成）
+    source_wp_code: str                # 来源底稿编码（展示/溯源）
+    description: str | None = None
+    adjustment_type: AdjustmentType    # 由底稿行 category 映射（报表调整→rje / 其余→aje）
+    company_code: str = "default"
+    line_items: list[AdjustmentSyncLineItem] = Field(min_length=1)
+
+
+# ── adjustment-collaboration-and-propagation：调整分录协作接力 ──
+
+
+class AdjustmentCollaborationAssignRequest(BaseModel):
+    """转派/重派：把分录组转给项目成员补充+确认。"""
+    assignee_id: UUID
+    year: int
+    note: str | None = None
+
+
+class AdjustmentCollaborationContributeRequest(BaseModel):
+    """被指派人补充明细行（提供整组新明细，服务层重建分录组并校验借贷平衡）。"""
+    line_items: list[AdjustmentSyncLineItem] = Field(min_length=1)
+    note: str | None = None
+
+
+class AdjustmentCollaborationRejectRequest(BaseModel):
+    """退回协作。"""
+    reason: str
+
+
+class AdjustmentCollaborationEventResponse(BaseModel):
+    """协作历史事件响应。"""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    event_type: str
+    actor_id: UUID
+    payload: dict | None = None
+    created_at: datetime | None = None
+
+
+class AdjustmentCollaborationResponse(BaseModel):
+    """协作记录响应。"""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    project_id: UUID
+    year: int
+    entry_group_id: UUID
+    source_ref: str | None = None
+    initiator_id: UUID
+    assignee_id: UUID
+    status: str
+    round: int = 1
+    note: str | None = None
+    rejection_reason: str | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 class ReviewStatusChange(BaseModel):
@@ -884,6 +962,9 @@ class MisstatementCreate(BaseModel):
     misstatement_type: MisstatementType
     management_reason: str | None = None
     auditor_evaluation: str | None = None
+    # 溯源：来源底稿编码（如 K9/D4/G8-6），供 A13 错报汇总反查来源底稿。
+    # 底稿"推送错报至A13"时携带，写入 unadjusted_misstatements.source_wp_code。
+    source_wp_code: str | None = None
 
 
 class MisstatementUpdate(BaseModel):
@@ -912,6 +993,7 @@ class MisstatementResponse(BaseModel):
     misstatement_type: MisstatementType
     management_reason: str | None = None
     auditor_evaluation: str | None = None
+    source_wp_code: str | None = None
     is_carried_forward: bool = False
     prior_year_id: UUID | None = None
     created_by: UUID | None = None
