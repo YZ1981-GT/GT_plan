@@ -8,7 +8,7 @@
         <el-tag type="success" size="small">国企</el-tag>
       </div>
       <div class="section-header-right">
-        <el-button size="small" @click="handleAI('disclosure-soe')">
+        <el-button size="small" :loading="aiLoading === 'disclosure-soe'" :disabled="isReadonly" @click="handleAI('disclosure-soe')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
         <el-button size="small" @click="handleReview">
@@ -32,7 +32,7 @@
       <template #header>
         <div class="card-header">
           <span>应付股利（利润）明细</span>
-          <el-button size="small" @click="handleAI('section-detail')">
+          <el-button size="small" :loading="aiLoading === 'section-detail'" :disabled="isReadonly" @click="handleAI('section-detail')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </div>
@@ -73,7 +73,7 @@
       <template #header>
         <div class="card-header">
           <span>国有资本经营收益上缴说明</span>
-          <el-button size="small" @click="handleAI('section-soe-capital')">
+          <el-button size="small" :loading="aiLoading === 'section-soe-capital'" :disabled="isReadonly" @click="handleAI('section-soe-capital')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </div>
@@ -93,7 +93,7 @@
       <template #header>
         <div class="card-header">
           <span>利润分配专项说明</span>
-          <el-button size="small" @click="handleAI('section-distribution')">
+          <el-button size="small" :loading="aiLoading === 'section-distribution'" :disabled="isReadonly" @click="handleAI('section-distribution')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </div>
@@ -138,8 +138,10 @@
  */
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
 import { Check } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import { useM1FormData } from '../../composables/useM1FormData'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 
 const props = defineProps<{
   wpId: string
@@ -152,6 +154,8 @@ const emit = defineEmits<{
 }>()
 
 const openReviewDialog = inject<((sectionId: string, sectionLabel?: string) => void) | null>('openReviewDialog', null)
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
 
 // ─── FormData ───────────────────────────────────────────────────────────────
 
@@ -194,14 +198,25 @@ function handleConclusionChange() {
   formData.debouncedSave('M1-disc-soe-conclusion', { remark: disclosureConclusion.value || null })
 }
 
-function handleAI(section: string) {
-  import('@/utils/http').then(({ default: h }) => {
-    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
-      section: `m1-disclosure-soe-${section}`,
-      prompt: `请基于应付股利底稿"${section}"区段数据，给出审计分析建议`,
-      context: { section, wpId: props.wpId },
-    }).catch(() => {})
-  })
+async function handleAI(section: string) {
+  if (props.isReadonly) return
+  aiLoading.value = section
+  try {
+    // distribution → 利润分配专项说明；其余（header/detail/capital）→ 国有资本经营收益上缴说明
+    const target = section.includes('distribution') ? 'distribution' : 'capital'
+    const existing = target === 'distribution' ? distributionNote.value : soeCapitalNote.value
+    const totalRow = detailRows.value.find(r => r.item === '合计')
+    const context: Record<string, string> = {
+      科目: '2232 应付股利 / 附注披露信息（国有企业）',
+      区段: section,
+      年初余额合计: fmtAmount(totalRow?.beginBalance ?? 0),
+      期末余额合计: fmtAmount(totalRow?.endBalance ?? 0),
+    }
+    const text = await generateAiText({ section: `m1-disclosure-soe-${section}`, context, existingContent: existing })
+    if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+    if (target === 'distribution') { distributionNote.value = text; handleDistributionNoteChange() }
+    else { soeCapitalNote.value = text; handleSoeCapitalNoteChange() }
+  } catch { ElMessage.warning('AI 生成失败，请稍后重试') } finally { aiLoading.value = '' }
 }
 function handleReview() { openReviewDialog?.('M1-disclosure-soe', '附注披露（国企）') }
 

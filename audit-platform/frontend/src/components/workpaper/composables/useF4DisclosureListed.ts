@@ -359,7 +359,8 @@ export function useF4DisclosureListed(options: UseF4DisclosureListedOptions) {
   watch(disclosureText, (value) => {
     setItem(TEXT_KEY, value)
     window.dispatchEvent(new CustomEvent('disclosure:note-text-updated', {
-      detail: { accountCode: '2202', type: 'listed', text: value },
+      // 应付账款 listed → 五、37（note_template_variant_matrix）→ useNoteRefresh 定向刷新
+      detail: { wpCode: 'F4', accountCode: '2202', type: 'listed', sectionIds: ['五、37'], text: value },
     }))
   })
 

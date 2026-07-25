@@ -284,29 +284,38 @@ function getCurrentProjectId(): string {
 
 // ─── Standard Fields ────────────────────────────────────────────────────────
 
+// 标准字段选项（value/label 与后端 smart_import_engine.FIELD_LABELS 单一真源对齐，
+// 否则后端自动映射出的字段键在前端下拉框无匹配项 → el-select 回退显示英文原值）
 const availableStandardFields: StandardField[] = [
   { value: 'account_code', label: '科目编码' },
   { value: 'account_name', label: '科目名称' },
+  { value: 'company_code', label: '组织编码' },
   { value: 'opening_balance', label: '期初余额' },
   { value: 'opening_debit', label: '期初借方' },
   { value: 'opening_credit', label: '期初贷方' },
+  { value: 'year_opening_debit', label: '年初借方' },
+  { value: 'year_opening_credit', label: '年初贷方' },
   { value: 'closing_balance', label: '期末余额' },
   { value: 'closing_debit', label: '期末借方' },
   { value: 'closing_credit', label: '期末贷方' },
   { value: 'debit_amount', label: '借方发生额' },
   { value: 'credit_amount', label: '贷方发生额' },
+  { value: 'year_debit', label: '本年累计借方' },
+  { value: 'year_credit', label: '本年累计贷方' },
   { value: 'voucher_date', label: '凭证日期' },
   { value: 'voucher_no', label: '凭证号' },
   { value: 'voucher_type', label: '凭证类型' },
+  { value: 'accounting_period', label: '会计期间' },
   { value: 'summary', label: '摘要' },
   { value: 'preparer', label: '制单人' },
   { value: 'currency_code', label: '币种' },
-  { value: 'level', label: '级次' },
+  { value: 'level', label: '科目级次' },
+  { value: 'aux_dimensions', label: '核算维度' },
   { value: 'aux_type', label: '辅助类型' },
   { value: 'aux_code', label: '辅助编码' },
   { value: 'aux_name', label: '辅助名称' },
   { value: 'amount', label: '金额' },
-  { value: 'direction', label: '方向' },
+  { value: 'direction', label: '借贷方向' },
   { value: 'entry_seq', label: '分录序号' },
 ]
 
@@ -506,6 +515,7 @@ watch(showImportMappingDialog, async (visible) => {
   padding: 8px 12px;
   border-radius: 4px;
   background: var(--el-fill-color-lighter);
+  flex-wrap: wrap;
 }
 
 .mapping-row.missing {
@@ -515,6 +525,7 @@ watch(showImportMappingDialog, async (visible) => {
 
 .original-col {
   min-width: 120px;
+  flex-shrink: 0;
   font-size: var(--gt-font-size-sm);
   font-weight: 500;
 }
@@ -524,7 +535,8 @@ watch(showImportMappingDialog, async (visible) => {
 }
 
 .field-select {
-  width: 200px;
+  width: 240px;
+  flex-shrink: 0;
 }
 
 .extra-info {
@@ -559,5 +571,17 @@ watch(showImportMappingDialog, async (visible) => {
 .sample-values {
   margin-left: auto;
   font-size: var(--gt-font-size-xs);
+  max-width: 340px;
+  overflow: hidden;
+}
+
+.sample-values :deep(.el-tag) {
+  max-width: 100%;
+}
+
+.sample-values :deep(.el-tag__content) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>

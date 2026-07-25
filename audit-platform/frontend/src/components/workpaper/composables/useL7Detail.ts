@@ -237,12 +237,19 @@ export function useL7Detail(
         remark: String(computed.endAudited),
       })
     }
-    // 保存行完整数据
+    // CrossSheet 勾稽键（仅需 endAudited）
     debouncedSave('L7-L7-2-rows', {
       remark: JSON.stringify(detailRows.value.map((r, i) => ({
         key: r.key,
         itemName: r.itemName,
         endAudited: computedRows.value[i]?.endAudited ?? 0,
+      }))),
+    })
+    // 🔴 修复：保存完整行到 full-data 键（组件 _restoreRowsFromResponses 优先读此键；此前从不写 → 刷新丢失全部字段）
+    debouncedSave('L7-L7-2-full-data', {
+      remark: JSON.stringify(detailRows.value.map((r, i) => ({
+        ...r,
+        endAudited: computedRows.value[i]?.endAudited ?? r.endAudited ?? 0,
       }))),
     })
   }
@@ -259,6 +266,12 @@ export function useL7Detail(
         key: r.key,
         itemName: r.itemName,
         endAudited: computedRows.value[i]?.endAudited ?? 0,
+      }))),
+    })
+    debouncedSave('L7-L7-2-full-data', {
+      remark: JSON.stringify(detailRows.value.map((r, i) => ({
+        ...r,
+        endAudited: computedRows.value[i]?.endAudited ?? r.endAudited ?? 0,
       }))),
     })
   }

@@ -10,12 +10,6 @@
         </el-tag>
       </div>
       <div class="section-header-right">
-        <el-segmented
-          v-model="dualMode.mode.value"
-          :options="dualMode.modeOptions.value"
-          size="small"
-          @change="(val: any) => dualMode.switchMode(val)"
-        />
         <el-dropdown trigger="click" @command="handleImportExport">
           <el-button size="small">
             导入导出 <el-icon class="el-icon--right"><ArrowDown /></el-icon>
@@ -28,7 +22,7 @@
             </el-dropdown-menu>
           </template>
         </el-dropdown>
-        <el-button size="small" @click="handleAI('detail')">
+        <el-button size="small" :loading="aiLoading === 'detail'" :disabled="isReadonly" @click="handleAI('detail')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
         <el-button size="small" @click="handleReview">
@@ -215,7 +209,7 @@
       <template #header>
         <div class="section-header">
           <span class="card-title">明细表审计说明</span>
-          <el-button size="small" @click="handleAI('detailNote')"><el-icon><MagicStick /></el-icon> AI辅助</el-button>
+          <el-button size="small" :loading="aiLoading === 'detailNote'" :disabled="isReadonly" @click="handleAI('detailNote')"><el-icon><MagicStick /></el-icon> AI辅助</el-button>
         </div>
       </template>
       <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" placeholder="请填写盈余公积明细表审计说明..." :disabled="isReadonly" @change="saveAuditNote" />
@@ -254,8 +248,8 @@ import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { MagicStick, Check, ArrowDown } from '@element-plus/icons-vue'
 import { useM5FormData } from '../../composables/useM5FormData'
-import { useM5DualMode } from '../../composables/useM5DualMode'
 import { useM5ImportExport } from '../../composables/useM5ImportExport'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import {
   useM5Detail,
   type M5DetailRow,
@@ -270,8 +264,9 @@ const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => vo
 
 // ─── Composables ─────────────────────────────────────────────────────────────
 const formData = useM5FormData({ wpId: computed(() => props.wpId), projectId: computed(() => props.projectId) })
-const dualMode = useM5DualMode({ wpId: computed(() => props.wpId) })
 const importExport = useM5ImportExport({ wpId: computed(() => props.wpId), projectId: computed(() => props.projectId) })
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
 
 const detailRows = ref<M5DetailRow[]>([])
 
@@ -400,7 +395,24 @@ function saveAuditNote() {
   formData.debouncedSave('M5-2-auditNote', { remark: auditNote.value || null })
 }
 
-function handleAI(_section: string) { /* AI辅助钩子 */ }
+async function handleAI(section: string) {
+  if (props.isReadonly) return
+  aiLoading.value = section
+  try {
+    const context: Record<string, string> = {
+      科目: '4101 盈余公积（权益类贷方）',
+      法定小计期末: fmtAmount(statutorySubtotal.value.endBalance),
+      任意小计期末: fmtAmount(discretionarySubtotal.value.endBalance),
+      合计期末: fmtAmount(grandTotal.value.endBalance),
+      明细行数: String(computedRows.value.length),
+      与M5_1交叉验证: crossValidation.value.isMatch ? '一致' : '差异',
+    }
+    const text = await generateAiText({ section: `m5-detail-${section}`, context, existingContent: auditNote.value })
+    if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+    auditNote.value = text
+    saveAuditNote()
+  } catch { ElMessage.warning('AI 生成失败，请稍后重试') } finally { aiLoading.value = '' }
+}
 function handleReview() { openReviewDialog?.('M5-2-detail', '盈余公积明细表') }
 
 // ─── 导入导出 ────────────────────────────────────────────────────────────────

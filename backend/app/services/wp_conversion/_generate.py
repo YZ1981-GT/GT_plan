@@ -197,7 +197,8 @@ class WpConversionGenerateMixin:
             # 已存在未删除底稿 → 跳过（不覆盖用户数据）
             return False
 
-        wp_name = lib_entry.get("name") or lib_entry.get("wp_name") or f"底稿{wp_code}"
+        from app.services.wp_name_source import resolve_wp_name
+        wp_name = resolve_wp_name(wp_code, lib_entry.get("name"), lib_entry.get("wp_name"))
         cycle = lib_entry.get("cycle_prefix") or (wp_code[0] if wp_code else "X")
 
         soft_deleted_row = existing_rows[0] if existing_rows else None

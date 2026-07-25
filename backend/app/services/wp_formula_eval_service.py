@@ -14,6 +14,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.audit_platform_models import TrialBalance
+from app.services.dataset_query import get_active_filter
 from app.services.formula_engine import FormulaContext, execute
 from app.services.formula_engine import WPExecutor
 
@@ -24,6 +25,40 @@ _SUM_TB_PATTERN = re.compile(r"SUM_TB\('([^']+)','([^']+)'\)")
 # 三参 WP（D2-3 嵌套寻址）须先于两参匹配：WP('D2','坏账准备明细表D2-3','本期计提合计')
 _WP3_PATTERN = re.compile(r"WP\('([^']+)','([^']+)','([^']+)'\)")
 _WP_PATTERN = re.compile(r"WP\('([^']+)','([^']+)'\)")
+
+# ── d-cycle-four-table-extraction-formulas 决策3（方案 a）：Tier A 可编辑公式
+# 不支持 AUX/PREV/序时账（LEDGER/COUNT_LEDGER）函数——这些正是 Tier B 复杂归集，
+# 由 `_build_adjudication_prefill` prefill 承担。保存端点检出即返 422（不静默返 0）。
+# 用 \b 词边界避免误伤：`COUNT_LEDGER(` 中 `LEDGER` 前是 `_`（词字符），故
+# `\bLEDGER\(` 不会命中 COUNT_LEDGER，二者各自单列。
+_UNSUPPORTED_FUNCTION_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("AUX", re.compile(r"\bAUX\s*\(")),
+    ("PREV", re.compile(r"\bPREV\s*\(")),
+    ("LEDGER", re.compile(r"\bLEDGER\s*\(")),
+    ("COUNT_LEDGER", re.compile(r"\bCOUNT_LEDGER\s*\(")),
+)
+
+
+def find_unsupported_formula_functions(expression: str | None) -> list[str]:
+    """检出 Tier A 可编辑公式表达式中不受支持的四表库函数（决策3 方案 a）。
+
+    返回命中的函数名列表（去重、保持声明顺序）。当前评估器
+    ``evaluate_wp_formula_expression`` 只真实实现 ``TB``/``SUM_TB``/``WP``（+ 字面量/
+    四则运算/``Sheet!Cell`` 跨 sheet 引用），``AUX``/``PREV``/``LEDGER``/``COUNT_LEDGER``
+    未实现（会静默求值为 0），故保存时应拒绝而非静默落空。
+
+    仅作纯字符串检测（不依赖 DB），供保存端点在写库前调用。
+    """
+    if not expression:
+        return []
+    raw = expression.strip()
+    if raw.startswith("="):
+        raw = raw[1:]
+    hits: list[str] = []
+    for name, pat in _UNSUPPORTED_FUNCTION_PATTERNS:
+        if pat.search(raw) and name not in hits:
+            hits.append(name)
+    return hits
 
 _COLUMN_MAP = {
     "期末余额": "audited_amount",
@@ -44,13 +79,16 @@ async def _resolve_tb(
     column_name: str,
 ) -> Decimal:
     field = _COLUMN_MAP.get(column_name, "audited_amount")
+    # 数据集版本口径统一（与 Tier B prefill 同口径，见决策3）：
+    # 用 get_active_filter 替代裸 is_deleted，规避读到 superseded/staged 数据。
+    active_filter = await get_active_filter(
+        db, TrialBalance.__table__, project_id, year
+    )
     row = (
         await db.execute(
             sa.select(TrialBalance).where(
-                TrialBalance.project_id == project_id,
-                TrialBalance.year == year,
+                active_filter,
                 TrialBalance.standard_account_code == account_code,
-                TrialBalance.is_deleted == sa.false(),
             ).limit(1)
         )
     ).scalar_one_or_none()
@@ -76,14 +114,16 @@ async def _resolve_sum_tb(
         return Decimal("0")
     start_code, end_code = parts[0].strip(), parts[1].strip()
     field = _COLUMN_MAP.get(column_name, "audited_amount")
+    # 数据集版本口径统一（与 Tier B prefill 同口径，见决策3）。
+    active_filter = await get_active_filter(
+        db, TrialBalance.__table__, project_id, year
+    )
     rows = (
         await db.execute(
             sa.select(TrialBalance).where(
-                TrialBalance.project_id == project_id,
-                TrialBalance.year == year,
+                active_filter,
                 TrialBalance.standard_account_code >= start_code,
                 TrialBalance.standard_account_code <= end_code,
-                TrialBalance.is_deleted == sa.false(),
             )
         )
     ).scalars().all()

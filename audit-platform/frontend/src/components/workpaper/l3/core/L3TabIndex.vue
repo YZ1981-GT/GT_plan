@@ -1,129 +1,125 @@
 <template>
   <div class="l3-tab-index">
-    <!-- ═══ 项目信息区 ═══ -->
-    <el-card shadow="never" class="l3-project-info">
-      <div class="info-grid">
-        <div class="info-item">
-          <span class="info-label">客户名称</span>
-          <span class="info-value">{{ projectInfo.clientName || '—' }}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">会计期间</span>
-          <span class="info-value">{{ projectInfo.accountingPeriod || '—' }}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">编制人</span>
-          <span class="info-value">{{ projectInfo.preparer || '—' }}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">复核人</span>
-          <span class="info-value">{{ projectInfo.reviewer || '—' }}</span>
-        </div>
-      </div>
-    </el-card>
+    <!-- 编制信息由页面级头部统一渲染，此处不重复 -->
 
-    <!-- ═══ 蓝色渐变操作引导区 ═══ -->
-    <div class="l3-guide">
-      <div class="l3-guide-header">
-        <el-icon><InfoFilled /></el-icon>
-        <span>操作步骤引导</span>
+    <!-- ═══ 目录卡（标题 + 复核 + 编制/使用手册 + 进度条 → 跨表结论口径 → 编制提示） ═══ -->
+    <div class="l3-dir">
+      <div class="index-header">
+        <h3 class="title">L3 长期借款底稿目录</h3>
+        <GtReviewTrigger section-id="L3-index-directory" />
+        <div class="handbook-btns">
+          <el-button size="small" type="primary" plain @click="openHandbook('preparation')">📖 编制手册</el-button>
+          <el-button size="small" @click="openHandbook('usage')">使用手册</el-button>
+        </div>
+        <div class="progress-wrap">
+          <span>编制进度 {{ completedCount }}/{{ totalCount }}</span>
+          <el-progress :percentage="progressPercent" :stroke-width="10" />
+        </div>
       </div>
-      <div class="l3-guide-steps">
-        <div class="step-item">
-          <span class="step-num">①</span>
-          <span class="step-text">填写审定表（L3-1）确认长期借款科目余额</span>
+
+      <L3PreparationHandbookDialog v-model="handbookVisible" :initial-tab="handbookTab" />
+
+      <div class="conclusion-board" data-testid="l3-conclusion-board">
+        <div class="board-head">
+          <strong>跨表结论口径</strong>
+          <el-tag size="small" :type="conclusionWorstType">{{ conclusionWorstLabel }}</el-tag>
+          <span class="board-meta">已填 {{ conclusionFilledCount }}/{{ conclusionSheets.length }}</span>
         </div>
-        <div class="step-item">
-          <span class="step-num">②</span>
-          <span class="step-text">录入借款明细（L3-2）标记一年内到期</span>
+        <div class="board-tags">
+          <el-tag
+            v-for="c in conclusionSheets"
+            :key="c.code"
+            size="small"
+            class="concl-tag clickable"
+            :type="c.filled ? 'success' : 'info'"
+            effect="plain"
+            @click="emit('navigate', c.sheetKey)"
+          >
+            {{ c.code }} {{ c.filled ? '已填' : '未填' }}
+          </el-tag>
         </div>
-        <div class="step-item">
-          <span class="step-num">③</span>
-          <span class="step-text">利息测算（L3-5）验证应计利息（联动L2/L8）</span>
-        </div>
-        <div class="step-item">
-          <span class="step-num">④</span>
-          <span class="step-text">征信/逾期/抵质押核对（L3-4/L3-7/L3-8）</span>
+        <p v-if="conclusionHasUnfilled" class="board-hint">存在未填审计结论，请点击标签跳转补全审计说明与结论。</p>
+      </div>
+
+      <details class="methodology-hint">
+        <summary>编制提示</summary>
+        <ul>
+          <li>长期借款为<strong>负债类贷方科目</strong>（2501）：期末 = 期初 + 贷方（借入）− 借方（归还）</li>
+          <li>审定表按<strong>借款种类</strong>（信用/抵押/保证/质押）分类，双期列示（期初/期末各未审、账项调整、重分类、审定）</li>
+          <li><strong>减一年内到期 → 披露审定数</strong>：披露审定 = 审定 − 一年内到期；一年内到期经 L3-3 重分类（借 2501 / 贷 2801）转入流动负债</li>
+          <li>利息测算采用 <strong>365 天制</strong>：应计利息 = 本金 × 年利率 × 天数 / 365，区分资本化/费用化，联动 L2 应付利息 / L8 财务费用</li>
+          <li>征信报告核对（L3-4）与逾期检查（L3-7）保证完整性：与账面借款双向差集，防账外借款</li>
+          <li>审定合计（按种类）回写 TB(2501)，披露审定（非流动数）驱动附注披露；各表填妥"审计说明或结论"后目录标签转为"已填"</li>
+        </ul>
+      </details>
+    </div>
+
+    <!-- ═══ 底稿架构（4 阶段泳道） ═══ -->
+    <div class="l3-arch">
+      <div class="arch-header">
+        <h4 class="arch-title">底稿架构</h4>
+        <span class="arch-hint">点击卡片可跳转至对应底稿</span>
+      </div>
+      <GtBArchitectureTree
+        :wp-id="wpId"
+        :project-id="projectId"
+        :active-sheet="''"
+        :html-data="archHtmlData"
+        @navigate="handleNavigate"
+      />
+    </div>
+
+    <!-- ═══ 本循环底稿目录（L 循环其他科目，可跳转） ═══ -->
+    <div v-if="cycleWorkpapers.length" class="l3-cycle">
+      <div class="cycle-header">
+        <h4 class="cycle-title">本循环底稿目录</h4>
+        <span class="cycle-hint">点击可跳转至同循环其他底稿（灰色表示尚未生成）</span>
+      </div>
+      <div class="cycle-grid">
+        <div
+          v-for="wp in cycleWorkpapers"
+          :key="wp.wp_code"
+          class="cycle-card"
+          :class="{ 'is-current': wp.is_current, 'is-disabled': !wp.wp_id }"
+          @click="onCycleCardClick(wp)"
+        >
+          <div class="cycle-card-top">
+            <span class="cycle-code">{{ wp.wp_code }}</span>
+            <el-tag v-if="wp.is_current" size="small" effect="plain" class="cycle-current-tag">当前</el-tag>
+          </div>
+          <span class="cycle-name" :title="wp.wp_name">{{ wp.wp_name }}</span>
         </div>
       </div>
     </div>
-
-    <!-- ═══ 总体进度 ═══ -->
-    <div class="l3-progress-section">
-      <div class="progress-info">
-        <span>编制进度</span>
-        <span class="progress-text">{{ completedCount }} / {{ totalCount }} ({{ progressPercent }}%)</span>
-      </div>
-      <el-progress :percentage="progressPercent" :stroke-width="8" :show-text="false" />
-    </div>
-
-    <!-- ═══ 底稿目录表格 ═══ -->
-    <el-card shadow="never" class="l3-index-card">
-      <template #header>
-        <span class="card-title">L3 长期借款底稿目录</span>
-      </template>
-      <el-table
-        :data="sheetRows"
-        border
-        size="small"
-        highlight-current-row
-        style="width: 100%"
-        :row-class-name="getRowClassName"
-        @row-click="handleRowClick"
-      >
-        <el-table-column prop="seq" label="序号" width="60" align="center" />
-        <el-table-column prop="name" label="底稿名称" min-width="220">
-          <template #default="{ row }">
-            <span class="sheet-name-link">{{ row.name }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="code" label="索引号" width="90" align="center" />
-        <el-table-column prop="description" label="简要说明" min-width="200" />
-        <el-table-column label="完成进度" width="140" align="center">
-          <template #default="{ row }">
-            <el-progress
-              :percentage="row.progress"
-              :stroke-width="6"
-              :show-text="false"
-              :color="getProgressColor(row.progress)"
-              style="width: 80px; display: inline-block"
-            />
-            <span class="progress-label">{{ row.progress }}%</span>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
-
-    <!-- ═══ 编制提示（折叠） ═══ -->
-    <details class="l3-details-tip">
-      <summary>编制提示</summary>
-      <ul>
-        <li>长期借款为<strong>负债类贷方科目</strong>：期末 = 期初 + 贷方（借入）− 借方（归还）</li>
-        <li>利息测算采用 <strong>365 天制</strong>：利息 = 本金 × 年利率 × 天数 / 365</li>
-        <li><strong>一年内到期的长期借款</strong>需重分类至流动负债（生成RJE）</li>
-        <li>征信报告核对保证借款完整性：差异需逐笔说明</li>
-        <li>逾期贷款需评价风险等级并关注展期情况</li>
-        <li>L3-5 利息测算结果将联动 L2 应付利息 / L8 财务费用</li>
-      </ul>
-    </details>
   </div>
 </template>
 
 <script setup lang="ts">
 /**
- * L3TabIndex — L3 长期借款底稿目录
+ * L3TabIndex.vue — L3 长期借款底稿目录（严格镜像 L1/E1 标准）
  *
- * 13 行 sheet 目录列表（排除底稿目录自身，14 sheets 总计）+ 进度条。
- * 点击行 emit navigate 事件（由 GtL3LongTermLoans 监听切换 sheetName）。
- * 引导区 4 步：审定表 → 明细（标记一年内到期） → 利息测算（联动L2/L8） → 征信/逾期/抵质押核对。
+ * 结构：目录卡（标题+复核+编制/使用手册+进度→跨表结论口径→编制提示）
+ *       + 底稿架构 4 阶段泳道（GtBArchitectureTree）+ 本循环底稿目录 grid。
+ * 编制信息由页面级头部渲染，此处不重复。自包含：自行拉取 checklist-responses。
  *
- * Requirements: 1.2
+ * 负债类贷方科目（2501 长期借款）— 期末=期初+贷方−借方；审定按种类(信用/抵押/保证/质押)双期，
+ * 减一年内到期得披露审定数（一年内到期经 L3-3 重分类借 2501/贷 2801）；
+ * L3-5 利息测算(365 天制，资本化/费用化)联动 L2/L8，L3-4 征信/L3-7 逾期保证完整性。
+ *
+ * 🔴 L3 各表审计说明/结论存储键前缀经 grep 实测（非照抄 L1）：
+ *    L3-1=L3-L3-1- / L3-4=L3-cred- / L3-7=L3-ovd- / L3-8=L3-plg- / L3-9=L3-L3-9-，
+ *    故 conclusionSheets 携各自 conclPrefix；calcSheetProgress 用真实前缀。
  */
-import { computed } from 'vue'
-import { InfoFilled } from '@element-plus/icons-vue'
+import { computed, ref, onMounted, defineAsyncComponent } from 'vue'
+import { useRouter } from 'vue-router'
+import http from '@/utils/http'
+import { loadCycleWorkpaperCards, type CycleWpCard } from '@/services/cycleDirectory'
+import GtReviewTrigger from '../../GtReviewTrigger.vue'
+import GtBArchitectureTree from '../../GtBArchitectureTree.vue'
+
+const L3PreparationHandbookDialog = defineAsyncComponent(() => import('../L3PreparationHandbookDialog.vue'))
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
-
 const props = defineProps<{
   wpId: string
   projectId: string
@@ -134,335 +130,217 @@ const emit = defineEmits<{
   (e: 'navigate', sheetName: string): void
 }>()
 
-// ─── Sheet 目录行定义 ────────────────────────────────────────────────────────
+const router = useRouter()
 
-interface SheetRow {
-  seq: number
-  name: string
-  code: string
-  /** sheetName（传给父组件用于 v-if 分发） */
-  sheetKey: string
-  description: string
-  progress: number
+// ─── 编制/使用手册弹窗 ─────────────────────────────────────────────────────────
+const handbookVisible = ref(false)
+const handbookTab = ref<'preparation' | 'usage'>('preparation')
+function openHandbook(tab: 'preparation' | 'usage') {
+  handbookTab.value = tab
+  handbookVisible.value = true
 }
 
-/**
- * 13 行 sheet 目录（底稿目录自身不出现在列表中，14 sheets 总计）。
- * 进度条默认 0%，后续集成时根据 checklist_responses 数据填充。
- */
-const sheetRows = computed<SheetRow[]>(() => [
-  {
-    seq: 1,
-    name: '长期借款实质性程序表',
-    code: 'L3A',
-    sheetKey: '长期借款实质性程序表L3A',
-    description: '实质性程序清单与执行情况',
-    progress: 0,
-  },
-  {
-    seq: 2,
-    name: '审定表',
-    code: 'L3-1',
-    sheetKey: '审定表L3-1',
-    description: '科目审定汇总（负债类贷方，期末=期初+贷-借，含一年内到期列）',
-    progress: 0,
-  },
-  {
-    seq: 3,
-    name: '附注披露信息核对（上市公司）',
-    code: '附注上市',
-    sheetKey: '附注披露信息核对（上市公司）',
-    description: '上市公司长期借款附注披露核对',
-    progress: 0,
-  },
-  {
-    seq: 4,
-    name: '附注披露信息核对（国企）',
-    code: '附注国企',
-    sheetKey: '附注披露信息核对（国企）',
-    description: '国有企业长期借款附注披露核对',
-    progress: 0,
-  },
-  {
-    seq: 5,
-    name: '明细表',
-    code: 'L3-2',
-    sheetKey: '明细表L3-2',
-    description: '按借款银行/合同逐笔列示（32列分4区段Tab+一年内到期标记）',
-    progress: 0,
-  },
-  {
-    seq: 6,
-    name: '调整分录汇总',
-    code: 'L3-3',
-    sheetKey: '调整分录汇总L3-3',
-    description: 'AJE/RJE管理（含重分类RJE: 一年内到期→流动负债）',
-    progress: 0,
-  },
-  {
-    seq: 7,
-    name: '征信报告核对表',
-    code: 'L3-4',
-    sheetKey: '征信报告核对表L3-4',
-    description: '征信报告与账面余额核对（完整性认定）',
-    progress: 0,
-  },
-  {
-    seq: 8,
-    name: '利息测算表',
-    code: 'L3-5',
-    sheetKey: '利息测算表L3-5',
-    description: '利息=本金×利率×天数/365（核心！联动L2/L8）',
-    progress: 0,
-  },
-  {
-    seq: 9,
-    name: '贷款合同检查',
-    code: 'L3-6',
-    sheetKey: '贷款合同检查L3-6',
-    description: '合同要素检查（区段Tab+行级OCR）',
-    progress: 0,
-  },
-  {
-    seq: 10,
-    name: '逾期贷款检查表',
-    code: 'L3-7',
-    sheetKey: '逾期贷款检查表L3-7',
-    description: '逾期天数计算与风险评价',
-    progress: 0,
-  },
-  {
-    seq: 11,
-    name: '抵质押资产检查表',
-    code: 'L3-8',
-    sheetKey: '抵质押资产检查表L3-8',
-    description: '担保比例=担保借款/账面价值×100%',
-    progress: 0,
-  },
-  {
-    seq: 12,
-    name: '长期借款检查表',
-    code: 'L3-9',
-    sheetKey: '长期借款检查表L3-9',
-    description: '综合核对清单与审计结论',
-    progress: 0,
-  },
+// ─── 自包含：拉取本底稿 checklist-responses（主入口不持有 allResponses） ─────────
+const responses = ref<Map<string, any>>(new Map())
+onMounted(async () => {
+  if (!props.wpId) return
+  try {
+    const res: any = await http.get(`/api/workpapers/${props.wpId}/checklist-responses`)
+    const list = res?.data?.items ?? res?.items ?? res?.data ?? res
+    const map = new Map<string, any>()
+    if (Array.isArray(list)) {
+      for (const it of list) {
+        if (it?.item_id) map.set(it.item_id, it)
+      }
+    }
+    responses.value = map
+  } catch {
+    /* silent：拉取失败则看板全显未填 */
+  }
+})
+
+// ─── Sheet 行定义 ─────────────────────────────────────────────────────────────
+interface SheetRow {
+  name: string
+  code: string
+  sheetKey: string
+  progress: number
+  /** 审计说明/结论存储键前缀（实测式，仅结论核心表有） */
+  conclPrefix?: string
+}
+
+/** 按 responses 中以指定前缀存储的字段数计算完成度。 */
+function calcSheetProgress(prefix: string, expectedFields: number): number {
+  const map = responses.value
+  if (!map || map.size === 0) return 0
+  let count = 0
+  for (const key of map.keys()) {
+    if (key.startsWith(prefix)) count++
+  }
+  if (count === 0) return 0
+  if (count >= expectedFields) return 100
+  return Math.min(Math.round((count / expectedFields) * 100), 99)
+}
+
+const allSheets = computed<SheetRow[]>(() => [
+  { name: '长期借款实质性程序表', code: 'L3A', sheetKey: '长期借款实质性程序表L3A', progress: calcSheetProgress('L3-L3A-', 5) },
+  { name: '审定表（按种类：信用/抵押/保证/质押，双期，含减一年内到期）', code: 'L3-1', sheetKey: '审定表L3-1', progress: calcSheetProgress('L3-L3-1-', 6), conclPrefix: 'L3-L3-1-' },
+  { name: '明细表（按银行/合同逐笔，标记一年内到期）', code: 'L3-2', sheetKey: '明细表L3-2', progress: calcSheetProgress('L3-L3-2-', 4) },
+  { name: '调整分录汇总（含重分类 RJE：一年内到期→2801）', code: 'L3-3', sheetKey: '调整分录汇总L3-3', progress: calcSheetProgress('L3-adj-', 2) },
+  { name: '征信报告核对表', code: 'L3-4', sheetKey: '征信报告核对表L3-4', progress: calcSheetProgress('L3-cred-', 4), conclPrefix: 'L3-cred-' },
+  { name: '利息测算表（本金×利率×天数/365，资本化/费用化，联动 L2/L8）', code: 'L3-5', sheetKey: '利息测算表L3-5', progress: calcSheetProgress('L3-L3-5-', 4) },
+  { name: '贷款合同检查', code: 'L3-6', sheetKey: '贷款合同检查L3-6', progress: calcSheetProgress('L3-L3-6-', 4) },
+  { name: '逾期贷款检查表', code: 'L3-7', sheetKey: '逾期贷款检查表L3-7', progress: calcSheetProgress('L3-ovd-', 4), conclPrefix: 'L3-ovd-' },
+  { name: '抵质押资产检查表', code: 'L3-8', sheetKey: '抵质押资产检查表L3-8', progress: calcSheetProgress('L3-plg-', 4), conclPrefix: 'L3-plg-' },
+  { name: '长期借款检查表（凭证级）', code: 'L3-9', sheetKey: '长期借款检查表L3-9', progress: calcSheetProgress('L3-L3-9-', 4), conclPrefix: 'L3-L3-9-' },
+  { name: '附注披露信息核对（上市公司）', code: '附注上市', sheetKey: '附注披露信息核对（上市公司）', progress: calcSheetProgress('L3-disc-listed', 3) },
+  { name: '附注披露信息核对（国企）', code: '附注国企', sheetKey: '附注披露信息核对（国企）', progress: calcSheetProgress('L3-disc-soe', 3) },
 ])
 
 // ─── 进度计算 ─────────────────────────────────────────────────────────────────
-
-const totalCount = computed(() => sheetRows.value.length)
-
-const completedCount = computed(() =>
-  sheetRows.value.filter(r => r.progress >= 100).length,
-)
-
+const totalCount = computed(() => allSheets.value.length)
+const completedCount = computed(() => allSheets.value.filter(r => r.progress >= 100).length)
 const progressPercent = computed(() => {
   if (totalCount.value === 0) return 0
-  const avgProgress = sheetRows.value.reduce((sum, r) => sum + r.progress, 0) / totalCount.value
-  return Math.round(avgProgress)
+  const avg = allSheets.value.reduce((sum, r) => sum + r.progress, 0) / totalCount.value
+  return Math.round(avg)
 })
 
-// ─── 项目信息（简单版：默认占位，后续集成时从 render-config 填充） ──────────
-
-const projectInfo = computed(() => ({
-  clientName: '',
-  accountingPeriod: '',
-  preparer: '',
-  reviewer: '',
+// ─── 底稿架构泳道（GtBArchitectureTree 数据源） ───────────────────────────────
+const COMPONENT_TYPE_MAP: Record<string, string> = {
+  L3A: 'a-program-console',
+  '附注上市': 'c-note-table',
+  '附注国企': 'c-note-table',
+}
+function sheetStatus(progress: number): string {
+  if (progress >= 100) return 'completed'
+  if (progress > 0) return 'in_progress'
+  return 'pending'
+}
+const archHtmlData = computed(() => ({
+  navigation_rows: allSheets.value.map((s, i) => ({
+    seq: i + 1,
+    content: s.sheetKey,
+    sheet_name: s.sheetKey,
+    index_ref: s.code,
+    component_type: COMPONENT_TYPE_MAP[s.code] ?? 'd-form-table',
+    status: sheetStatus(s.progress),
+  })),
 }))
 
+// ─── 跨表结论口径看板 ─────────────────────────────────────────────────────────
+/** 有审计结论/说明的核心表（审定/征信/逾期/抵质押/凭证检查；程序表、明细、调整、利息、合同、附注不计入） */
+const L3_CONCLUSION_CODES = new Set(['L3-1', 'L3-4', 'L3-7', 'L3-8', 'L3-9'])
+
+/**
+ * 按各表真实 conclPrefix（实测式）判定审计说明/结论是否已填。
+ * key 含 conclPrefix 且匹配 /conclusion|audit-note|note/ 且文本非空即为已填；
+ * L3 各前缀互不为兄弟前缀（L3-L3-1-/cred/ovd/plg/L3-L3-9-），无重叠误判。
+ */
+function isConclusionFilled(conclPrefix: string): boolean {
+  const map = responses.value
+  if (!map?.size) return false
+  for (const [key, val] of map.entries()) {
+    if (!key.includes(conclPrefix)) continue
+    if (!/conclusion|audit-note|note/i.test(key)) continue
+    const text = (val?.remark ?? val?.conclusion ?? '') as string
+    if (typeof text === 'string' && text.trim().length > 0) return true
+  }
+  return false
+}
+
+const conclusionSheets = computed(() =>
+  allSheets.value
+    .filter(s => s.conclPrefix && L3_CONCLUSION_CODES.has(s.code))
+    .map(s => ({ code: s.code, sheetKey: s.sheetKey, filled: isConclusionFilled(s.conclPrefix as string) })),
+)
+const conclusionFilledCount = computed(() => conclusionSheets.value.filter(c => c.filled).length)
+const conclusionHasUnfilled = computed(() => conclusionSheets.value.some(c => !c.filled))
+const conclusionWorstLabel = computed(() => {
+  if (conclusionFilledCount.value === 0) return '结论未填'
+  if (conclusionHasUnfilled.value) return `结论未齐 ${conclusionSheets.value.length - conclusionFilledCount.value} 项`
+  return '总体已齐'
+})
+const conclusionWorstType = computed<'success' | 'warning' | 'info'>(() => {
+  if (conclusionFilledCount.value === 0) return 'info'
+  if (conclusionHasUnfilled.value) return 'warning'
+  return 'success'
+})
+
 // ─── 交互 ────────────────────────────────────────────────────────────────────
-
-function handleRowClick(row: SheetRow) {
-  if (props.isReadonly && row.progress === 0) return
-  emit('navigate', row.sheetKey)
+function handleNavigate(sheetName: string) {
+  if (sheetName) emit('navigate', sheetName)
 }
 
-function getRowClassName({ row }: { row: SheetRow }): string {
-  return row.progress >= 100 ? 'completed-row' : ''
+// ─── 本循环底稿目录（L 循环其他科目，跨底稿跳转；canonical 源模板过滤污染） ───
+const cycleWorkpapers = ref<CycleWpCard[]>([])
+async function loadCycleWorkpapers(): Promise<void> {
+  cycleWorkpapers.value = await loadCycleWorkpaperCards(props.projectId, 'L', props.wpId)
 }
-
-function getProgressColor(percent: number): string {
-  if (percent >= 100) return '#67c23a'
-  if (percent >= 50) return '#409eff'
-  return '#e6e8eb'
+function onCycleCardClick(wp: CycleWpCard): void {
+  if (!wp.wp_id || wp.is_current || !props.projectId) return
+  router.push({ name: 'WorkpaperEditor', params: { projectId: props.projectId, wpId: wp.wp_id } })
 }
+onMounted(loadCycleWorkpapers)
 </script>
 
 <style scoped>
 .l3-tab-index {
-  padding: 12px;
+  padding: 16px;
   font-size: var(--wp-font-size, 13px);
 }
 
-/* ─── 项目信息区 ─── */
-.l3-project-info {
-  margin-bottom: 16px;
-}
-
-.info-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px 32px;
-}
-
-.info-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.info-label {
-  font-size: var(--wp-font-size, 13px);
-  color: #909399;
-  white-space: nowrap;
-}
-
-.info-value {
-  font-size: var(--wp-font-size, 13px);
-  font-weight: 500;
-  color: #303133;
-}
-
-/* ─── 蓝色渐变引导区 ─── */
-.l3-guide {
-  background: linear-gradient(135deg, #e8f4fd 0%, #d6eaf8 100%);
-  border: 1px solid #b3d9f2;
-  border-radius: 8px;
-  padding: 14px 20px;
-  margin-bottom: 16px;
-}
-
-.l3-guide-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-weight: 500;
-  color: #1a73e8;
-  margin-bottom: 10px;
-  font-size: var(--wp-font-size, 13px);
-}
-
-.l3-guide-steps {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px 24px;
-}
-
-.step-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: var(--wp-font-size, 13px);
-  color: #374151;
-}
-
-.step-num {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: #1a73e8;
-  color: #fff;
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.step-text {
-  font-size: var(--wp-font-size, 13px);
-}
-
-/* ─── 进度条区 ─── */
-.l3-progress-section {
-  margin-bottom: 16px;
-  padding: 12px 16px;
+/* ─── 目录卡 ─── */
+.l3-dir { margin-bottom: 20px; }
+.index-header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
+.title { margin: 0; font-size: 16px; font-weight: 600; color: #303133; }
+.handbook-btns { display: flex; gap: 6px; }
+.progress-wrap { flex: 1; min-width: 200px; }
+.conclusion-board {
+  margin-bottom: 12px;
+  padding: 10px 12px;
   background: #f5f7fa;
   border-radius: 6px;
+  border-left: 3px solid #409eff;
 }
+.board-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.board-meta { font-size: 12px; color: #909399; }
+.board-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.concl-tag.clickable { cursor: pointer; }
+.board-hint { margin: 8px 0 0; font-size: 12px; color: #e6a23c; }
+.methodology-hint { margin-top: 12px; font-size: 12px; color: #606266; }
+.methodology-hint summary { cursor: pointer; font-weight: 500; color: #303133; }
+.methodology-hint ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
 
-.progress-info {
+/* ─── 底稿架构 ─── */
+.l3-arch { margin-top: 16px; }
+.arch-header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
+.arch-title { margin: 0; font-size: 16px; font-weight: 600; color: #303133; }
+.arch-hint { font-size: 12px; color: #909399; }
+
+/* ─── 本循环底稿目录 ─── */
+.l3-cycle { margin-top: 28px; }
+.cycle-header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
+.cycle-title { margin: 0; font-size: 16px; font-weight: 600; color: #303133; }
+.cycle-hint { font-size: 12px; color: #909399; }
+.cycle-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+.cycle-card {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-  font-size: var(--wp-font-size, 13px);
-  color: #606266;
-}
-
-.progress-text {
-  font-weight: 600;
-  color: #303133;
-}
-
-/* ─── 目录卡片 ─── */
-.l3-index-card {
-  margin-bottom: 16px;
-}
-
-.card-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #303133;
-}
-
-.sheet-name-link {
-  color: #1a73e8;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--gt-color-border-purple, #e8e4f0);
+  border-radius: 8px;
+  background: #fff;
   cursor: pointer;
-  font-size: var(--wp-font-size, 13px);
+  transition: all 0.2s;
 }
-
-.sheet-name-link:hover {
-  text-decoration: underline;
-}
-
-.progress-label {
-  display: inline-block;
-  margin-left: 8px;
-  font-size: 12px;
-  color: #909399;
-  width: 32px;
-}
-
-:deep(.completed-row) {
-  background-color: #f0f9eb !important;
-}
-
-:deep(.el-table) {
-  font-size: var(--wp-font-size, 13px);
-}
-
-:deep(.el-table .el-table__row) {
-  cursor: pointer;
-}
-
-:deep(.el-table .el-table__row:hover) {
-  background-color: #ecf5ff !important;
-}
-
-/* ─── 编制提示折叠 ─── */
-.l3-details-tip {
-  margin-top: 12px;
-  padding: 12px 16px;
-  background: #fafafa;
-  border: 1px solid #ebeef5;
-  border-radius: 6px;
-  font-size: var(--wp-font-size, 13px);
-  color: #606266;
-}
-
-.l3-details-tip summary {
-  cursor: pointer;
-  font-weight: 500;
-  color: #303133;
-  margin-bottom: 8px;
-}
-
-.l3-details-tip ul {
-  padding-left: 20px;
-  margin: 8px 0 0;
-  line-height: 1.8;
-}
+.cycle-card:hover { border-color: var(--gt-color-primary, #4b2d77); box-shadow: 0 2px 8px rgba(75, 45, 119, 0.12); transform: translateY(-2px); }
+.cycle-card.is-current { border-color: var(--gt-color-primary, #4b2d77); background: var(--gt-color-primary-bg, #f4f0fa); box-shadow: 0 0 0 1px var(--gt-color-primary, #4b2d77); cursor: default; }
+.cycle-card.is-disabled { opacity: 0.5; cursor: not-allowed; }
+.cycle-card.is-disabled:hover { border-color: var(--gt-color-border-purple, #e8e4f0); box-shadow: none; transform: none; }
+.cycle-card-top { display: flex; align-items: center; gap: 6px; }
+.cycle-code { font-size: var(--wp-font-size, 13px); font-weight: 700; color: var(--gt-color-primary, #4b2d77); }
+.cycle-current-tag { margin-left: auto; }
+.cycle-name { font-size: var(--wp-font-size, 13px); line-height: 1.4; color: #303133; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 </style>

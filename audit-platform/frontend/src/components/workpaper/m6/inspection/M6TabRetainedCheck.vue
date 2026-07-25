@@ -51,7 +51,7 @@
         <div class="card-header">
           <span>核对清单</span>
           <div class="card-header-right">
-            <el-button size="small" @click="handleAI('checklist')">
+            <el-button size="small" :loading="aiLoading === 'checklist'" :disabled="isReadonly" @click="handleAI('checklist')">
               <el-icon><MagicStick /></el-icon> AI辅助
             </el-button>
           </div>
@@ -169,7 +169,7 @@
         <div class="card-header">
           <span>审计说明</span>
           <div class="card-header-right">
-            <el-button size="small" @click="handleAI('explanation')">
+            <el-button size="small" :loading="aiLoading === 'explanation'" :disabled="isReadonly" @click="handleAI('explanation')">
               <el-icon><MagicStick /></el-icon> AI辅助
             </el-button>
           </div>
@@ -192,7 +192,7 @@
         <div class="card-header">
           <span>审计结论</span>
           <div class="card-header-right">
-            <el-button size="small" @click="handleAI('conclusion')">
+            <el-button size="small" :loading="aiLoading === 'conclusion'" :disabled="isReadonly" @click="handleAI('conclusion')">
               <el-icon><MagicStick /></el-icon> AI辅助
             </el-button>
           </div>
@@ -271,10 +271,12 @@
  * 科目：4104 利润分配-未分配利润（**贷方/权益类！**）
  */
 import { computed, inject, onMounted, ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, Check } from '@element-plus/icons-vue'
 import { useM6FormData } from '../../composables/useM6FormData'
 import { useM6CrossSheet } from '../../composables/useM6CrossSheet'
 import { useM6RetainedCheck, type CheckStatus } from '../../composables/useM6RetainedCheck'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import GtIndexChip from '../../GtIndexChip.vue'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
@@ -295,6 +297,8 @@ const openReviewDialog = inject<((sectionId: string, sectionLabel?: string) => v
   'openReviewDialog',
   null,
 )
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
 
 // ─── FormData + CrossSheet ───────────────────────────────────────────────────
 
@@ -383,8 +387,37 @@ function statusLabel(status: CheckStatus): string {
 
 // ─── Handlers ────────────────────────────────────────────────────────────────
 
-function handleAI(_section: string) {
-  /* AI辅助待集成 Phase 6 */
+async function handleAI(section: string) {
+  if (props.isReadonly) return
+  aiLoading.value = section
+  try {
+    const s = checkSummary.value
+    const context: Record<string, string> = {
+      科目: '4104 利润分配-未分配利润 / 检查表（M6-4）',
+      核对项总数: String(s.total),
+      通过: String(s.passed),
+      不通过: String(s.failed),
+      待核: String(s.pending),
+      通过率: (s.passRate * 100).toFixed(1) + '%',
+      结论类型: conclusion.value.conclusionType,
+    }
+    if (section === 'explanation') {
+      const text = await generateAiText({ section: 'm6-check-explanation', context, existingContent: auditExplanation.value })
+      if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+      setAuditExplanation(text)
+      return
+    }
+    if (section === 'conclusion') {
+      const text = await generateAiText({ section: 'm6-check-conclusion', context, existingContent: conclusion.value.conclusionText })
+      if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+      updateConclusion('conclusionText', text)
+      return
+    }
+    // checklist 无对应文本区 → 弹窗展示建议
+    const text = await generateAiText({ section: `m6-check-${section}`, context, existingContent: '' })
+    if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+    ElMessageBox.alert(text, 'AI 辅助建议', { confirmButtonText: '知道了' }).catch(() => {})
+  } catch { ElMessage.warning('AI 生成失败，请稍后重试') } finally { aiLoading.value = '' }
 }
 
 function handleReview() {

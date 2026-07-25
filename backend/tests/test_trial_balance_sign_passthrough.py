@@ -377,3 +377,73 @@ async def test_audited_revenue_credit_increase_direction(pg_factory):
     tb_map = {r.standard_account_code: r for r in rows}
     assert tb_map["6001"].aje_adjustment == Decimal("500")
     assert tb_map["6001"].audited_amount == Decimal("100500")
+
+
+async def _seed_mixed_direction(factory, uid):
+    """构造"混合方向 + 无符号绝对值存储"账套：贷方类父科目下含一个借方性质挂账叶子。
+
+    模拟真实门店 其他应付款(2241) 场景：
+    - 叶子 C2202A 贷方余额 8000（closing_direction='credit'，closing_balance=+8000 磁量）
+    - 叶子 C2202B 借方性质挂账 3000（closing_direction='debit'，closing_balance=+3000 磁量）
+    正确净额 = 8000(贷) - 3000(借) = 5000(贷) → trial_balance 2202 应=5000。
+    旧逻辑 SUM(|closing_balance|)+abs = 11000（虚增 6000）。
+    """
+    async with factory() as db:
+        pid = _TEST_PROJECT_ID
+        db.add(AccountChart(
+            project_id=pid, account_code="2202", account_name="应付账款",
+            direction=AccountDirection.credit, level=1,
+            category=AccountCategory.liability, source=AccountSource.standard,
+        ))
+        db.add_all([
+            AccountMapping(
+                project_id=pid, original_account_code="C2202A",
+                original_account_name="应付账款-货款", standard_account_code="2202",
+                mapping_type=MappingType.auto_exact, created_by=uid,
+            ),
+            AccountMapping(
+                project_id=pid, original_account_code="C2202B",
+                original_account_name="应付账款-预付挂账", standard_account_code="2202",
+                mapping_type=MappingType.auto_exact, created_by=uid,
+            ),
+        ])
+        db.add_all([
+            # 贷方叶子：绝对值存储 +8000，方向 credit
+            TbBalance(
+                project_id=pid, year=_TEST_YEAR, company_code=_COMPANY,
+                account_code="C2202A", account_name="应付账款-货款",
+                opening_balance=Decimal("0"), closing_balance=Decimal("8000"),
+                closing_direction="credit",
+            ),
+            # 借方性质挂账叶子：绝对值存储 +3000，方向 debit（应冲减而非累加）
+            TbBalance(
+                project_id=pid, year=_TEST_YEAR, company_code=_COMPANY,
+                account_code="C2202B", account_name="应付账款-预付挂账",
+                opening_balance=Decimal("0"), closing_balance=Decimal("3000"),
+                closing_direction="debit",
+            ),
+        ])
+        await db.commit()
+    return pid
+
+
+@pytest.mark.asyncio
+async def test_mixed_direction_magnitude_nets_by_direction(pg_factory):
+    """混合方向叶子（绝对值存储）：借方性质挂账按 closing_direction 冲减而非同号累加。
+
+    回归 2026-07-25 门店报表不平 bug：recalc 曾对 SUM(closing_balance) 再 abs()，
+    把借方性质挂账（其他应付款-应付利润 等）同号累加致负债虚增。修复后按 closing_direction
+    归一到"借正贷负"再求和：8000(贷) − 3000(借) = 5000。
+    """
+    factory, uid = pg_factory
+    pid = await _seed_mixed_direction(factory, uid)
+
+    async with factory() as db:
+        svc = TrialBalanceService(db)
+        await svc.recalc_unadjusted(pid, _TEST_YEAR, _COMPANY)
+        await db.commit()
+        rows = await svc.get_trial_balance(pid, _TEST_YEAR, _COMPANY)
+
+    tb_map = {r.standard_account_code: r for r in rows}
+    # 净额 5000（而非旧 bug 的 11000）
+    assert tb_map["2202"].unadjusted_amount == Decimal("5000")

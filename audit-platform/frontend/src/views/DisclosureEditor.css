@@ -94,12 +94,9 @@
 /* ── TipTap ── */
 .gt-de-tiptap-wrapper { border: 1px solid var(--gt-color-border-purple); border-radius: 6px; margin-top: 10px; }
 .gt-guidance-bar {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
   margin-top: 10px;
   margin-bottom: 8px;
-  padding: 10px 12px;
+  padding: 8px 12px;
   background: #f4f0fa;
   border-left: 3px solid #4b2d77;
   border-radius: 4px;
@@ -107,9 +104,24 @@
   font-size: var(--gt-font-size-sm);
   line-height: 1.6;
 }
-.gt-guidance-bar .el-icon { flex-shrink: 0; margin-top: 2px; color: #4b2d77; }
-.gt-guidance-text { flex: 1; white-space: pre-wrap; }
-.gt-guidance-close { flex-shrink: 0; cursor: pointer; color: #4b2d77; opacity: 0.5; transition: opacity 0.2s; font-size: 14px; margin-top: 1px; }
+.gt-guidance-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+.gt-guidance-head .el-icon { flex-shrink: 0; color: #4b2d77; }
+.gt-guidance-title { font-weight: 600; font-size: var(--gt-font-size-xs); }
+.gt-guidance-caret { font-size: 12px; opacity: 0.7; }
+.gt-guidance-spacer { flex: 1; }
+.gt-guidance-text {
+  white-space: pre-wrap;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(75, 45, 119, 0.25);
+}
+.gt-guidance-close { flex-shrink: 0; cursor: pointer; color: #4b2d77; opacity: 0.5; transition: opacity 0.2s; font-size: 14px; }
 .gt-guidance-close:hover { opacity: 1; }
 .gt-de-tiptap-toolbar { padding: 4px 8px; border-bottom: 1px solid var(--gt-color-border-purple); background: var(--gt-color-primary-bg); border-radius: 6px 6px 0 0; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 .gt-de-toolbar-divider { width: 1px; height: 20px; background: var(--gt-color-primary-lighter); margin: 0 6px; }

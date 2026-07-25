@@ -116,11 +116,13 @@ export function useN4CrossSheet(
    * 载荷: { items: [{ tax, accrual }], wpCode, timestamp }
    */
   function _onTaxAccrualUpdated(payload: any): void {
-    const items: any[] = payload?.items ?? []
+    // 🔴 N2 发布载荷字段为 accruals/items，项形状 {tax, amount|accrual}，此处兼容读取 + 归一化税种名。
+    const items: any[] = payload?.items ?? payload?.accruals ?? []
     for (const item of items) {
-      if (item?.tax && item?.accrual !== undefined) {
-        _n2AccrualMap.value.set(String(item.tax), parseNum(item.accrual))
-      }
+      if (item?.tax === undefined) continue
+      const accrual = item.accrual ?? item.amount
+      if (accrual === undefined) continue
+      _n2AccrualMap.value.set(_normalizeTaxName(String(item.tax)), parseNum(accrual))
     }
     // 持久化到 checklist_responses 避免会话丢失
     _persistN2AccrualData()
@@ -155,7 +157,7 @@ export function useN4CrossSheet(
       try {
         const parsed = JSON.parse(accrualResp.conclusion)
         if (parsed && typeof parsed === 'object') {
-          _n2AccrualMap.value = new Map(Object.entries(parsed).map(([k, v]) => [k, parseNum(v)]))
+          _n2AccrualMap.value = new Map(Object.entries(parsed).map(([k, v]) => [_normalizeTaxName(k), parseNum(v)]))
         }
       } catch { /* 解析失败忽略 */ }
     }
@@ -167,21 +169,70 @@ export function useN4CrossSheet(
   // ─── Helper: 从allResponses取数 ───────────────────────────────────────────
 
   /**
-   * 获取N4-1审定表某税种的审定发生额
-   * item_id规范: "N4-1-{taxType}-audited"
+   * 税种名称归一化。消除各底稿命名分歧（城建税/城市维护建设税、土地使用税/城镇土地使用税、
+   * 车船税/车船使用税/车船牌照税、所得税/企业所得税、增值税/未交增值税），使跨表按名匹配可靠。
    */
-  function _getAdjudicationAmount(taxType: string): number {
-    const resp = allResponses.value.get(`N4-1-${taxType}-audited`)
-    return parseNum(resp?.conclusion)
+  function _normalizeTaxName(name: string): string {
+    const s = String(name ?? '').trim()
+    if (s === '城建税' || s === '城市维护建设税') return '城市维护建设税'
+    if (s === '土地使用税' || s === '城镇土地使用税') return '土地使用税'
+    if (s === '车船税' || s === '车船使用税' || s === '车船牌照税') return '车船税'
+    if (s === '所得税' || s === '企业所得税') return '企业所得税'
+    if (s === '增值税' || s === '未交增值税') return '增值税'
+    return s
+  }
+
+  function _parseRows(itemId: string): any[] {
+    const resp = allResponses.value.get(itemId)
+    const raw = resp?.remark ?? resp?.conclusion
+    if (!raw) return []
+    try {
+      const parsed = JSON.parse(raw)
+      return Array.isArray(parsed) ? parsed : []
+    } catch {
+      return []
+    }
   }
 
   /**
-   * 获取N4-2明细表某税种的本期发生额
-   * item_id规范: "N4-2-{taxType}-amount"
+   * N4-1 审定表各税种审定发生额映射（key=归一化税种名）。
+   * 🔴 useN4Adjudication 存储整行数组于 "N4-1-rows"（不写 per-tax "N4-1-{tax}-audited"），
+   *    审定数=未审+AJE+RJE，须从行数组现算，否则读 per-tax 键恒 0。
    */
+  const _adjudicationMap: ComputedRef<Map<string, number>> = computed(() => {
+    const map = new Map<string, number>()
+    for (const row of _parseRows('N4-1-rows')) {
+      const key = _normalizeTaxName(row.taxType)
+      if (!key) continue
+      const audited = parseNum(row.unadjusted) + parseNum(row.aje) + parseNum(row.rje)
+      map.set(key, (map.get(key) ?? 0) + audited)
+    }
+    return map
+  })
+
+  /**
+   * N4-2 明细表各税种本期发生额映射（key=归一化税种名）。
+   * useN4Detail 存储 "N4-2-detail-rows"，本期税额=计税依据×税率。
+   */
+  const _detailMap: ComputedRef<Map<string, number>> = computed(() => {
+    const map = new Map<string, number>()
+    for (const row of _parseRows('N4-2-detail-rows')) {
+      const key = _normalizeTaxName(row.taxType)
+      if (!key) continue
+      const amount = parseNum(row.taxBasis) * parseNum(row.taxRate)
+      map.set(key, (map.get(key) ?? 0) + amount)
+    }
+    return map
+  })
+
+  /** 获取N4-1审定表某税种的审定发生额（从 N4-1-rows 现算，归一化匹配） */
+  function _getAdjudicationAmount(taxType: string): number {
+    return _adjudicationMap.value.get(_normalizeTaxName(taxType)) ?? 0
+  }
+
+  /** 获取N4-2明细表某税种的本期发生额（从 N4-2-detail-rows 现算，归一化匹配） */
   function _getDetailAmount(taxType: string): number {
-    const resp = allResponses.value.get(`N4-2-${taxType}-amount`)
-    return parseNum(resp?.conclusion)
+    return _detailMap.value.get(_normalizeTaxName(taxType)) ?? 0
   }
 
   // ─── 1. adjudicationVsDetail — N4-1审定表合计 vs N4-2明细表合计 ─────────────
@@ -196,25 +247,21 @@ export function useN4CrossSheet(
    * - 也读取合计行: "N4-1-total-audited" / "N4-2-total-amount"
    */
   const adjudicationVsDetail: ComputedRef<AdjudicationVsDetailResult> = computed(() => {
-    // 优先使用合计行item_id（如果存在）
-    const totalAuditResp = allResponses.value.get('N4-1-total-audited')
-    const totalDetailResp = allResponses.value.get('N4-2-total-amount')
-
-    let adjTotal: number
-    let detailTotal: number
-
-    if (totalAuditResp?.conclusion !== undefined && totalAuditResp?.conclusion !== null) {
-      adjTotal = parseNum(totalAuditResp.conclusion)
+    // 审定表合计：优先从 N4-1-rows 现算（审定=未审+AJE+RJE），回退持久化的 N4-1-audited-total。
+    let adjTotal = 0
+    if (_adjudicationMap.value.size > 0) {
+      for (const v of _adjudicationMap.value.values()) adjTotal += v
     } else {
-      // 逐税种累加
-      adjTotal = TAX_TYPES.reduce((sum, t) => sum + _getAdjudicationAmount(t), 0)
+      adjTotal = getResponseNum(allResponses.value, 'N4-1-audited-total')
     }
 
-    if (totalDetailResp?.conclusion !== undefined && totalDetailResp?.conclusion !== null) {
-      detailTotal = parseNum(totalDetailResp.conclusion)
+    // 明细表合计：优先从 N4-2-detail-rows 现算，回退持久化的 N4-2-subtotal。
+    // 🔴 useN4Detail 存储键为 "N4-2-subtotal"（非 "N4-2-total-amount"）。
+    let detailTotal = 0
+    if (_detailMap.value.size > 0) {
+      for (const v of _detailMap.value.values()) detailTotal += v
     } else {
-      // 逐税种累加
-      detailTotal = TAX_TYPES.reduce((sum, t) => sum + _getDetailAmount(t), 0)
+      detailTotal = getResponseNum(allResponses.value, 'N4-2-subtotal')
     }
 
     const diff = parseFloat((adjTotal - detailTotal).toFixed(2))
@@ -238,7 +285,7 @@ export function useN4CrossSheet(
   const n4VsN2Accrual: ComputedRef<N4VsN2AccrualItem[]> = computed(() => {
     return TAX_TYPES.map((tax) => {
       const expense = _getAdjudicationAmount(tax)
-      const accrual = _n2AccrualMap.value.get(tax) ?? 0
+      const accrual = _n2AccrualMap.value.get(_normalizeTaxName(tax)) ?? 0
       const diff = calcExpenseDiff(expense, accrual)
       return { tax, expense, accrual, diff }
     })
@@ -253,15 +300,13 @@ export function useN4CrossSheet(
    * 取自N4-1审定表合计行（优先），或逐税种审定额累加
    */
   const toIncomeStatement: ComputedRef<ToIncomeStatementResult> = computed(() => {
-    const totalResp = allResponses.value.get('N4-1-total-audited')
-    let amount: number
-
-    if (totalResp?.conclusion !== undefined && totalResp?.conclusion !== null) {
-      amount = parseNum(totalResp.conclusion)
+    // 🔴 审定合计持久化键为 "N4-1-audited-total"（非 "N4-1-total-audited"）；优先从 N4-1-rows 现算。
+    let amount = 0
+    if (_adjudicationMap.value.size > 0) {
+      for (const v of _adjudicationMap.value.values()) amount += v
     } else {
-      amount = TAX_TYPES.reduce((sum, t) => sum + _getAdjudicationAmount(t), 0)
+      amount = getResponseNum(allResponses.value, 'N4-1-audited-total')
     }
-
     return { amount: parseFloat(amount.toFixed(2)) }
   })
 
@@ -306,11 +351,21 @@ export function useN4CrossSheet(
       )
       const responses: any[] = Array.isArray(res) ? res : (res?.data ?? [])
 
-      // N2各税种计提额 item_id 规范: "N2-1-{taxType}-accrual"
-      for (const tax of TAX_TYPES) {
-        const resp = responses.find((r: any) => r.item_id === `N2-1-${tax}-accrual`)
-        if (resp?.conclusion !== undefined && resp?.conclusion !== null) {
-          _n2AccrualMap.value.set(tax, parseNum(resp.conclusion))
+      // 🔴 N2各税种本期计提额 = 应交税费本期贷方发生额(creditAmount)，存于整行数组 "N2-1-adjudication-rows"
+      //    （useN2Adjudication 不写 per-tax "N2-1-{tax}-accrual"），须从行数组现算 + 归一化税种名。
+      const rowsResp = responses.find((r: any) => r.item_id === 'N2-1-adjudication-rows')
+      if (rowsResp) {
+        const raw = rowsResp.remark ?? rowsResp.conclusion
+        let n2Rows: any[] = []
+        if (raw) {
+          try {
+            const parsed = JSON.parse(raw)
+            if (Array.isArray(parsed)) n2Rows = parsed
+          } catch { /* 忽略 */ }
+        }
+        for (const row of n2Rows) {
+          const key = _normalizeTaxName(String(row.taxType ?? ''))
+          if (key) _n2AccrualMap.value.set(key, parseNum(row.creditAmount))
         }
       }
 

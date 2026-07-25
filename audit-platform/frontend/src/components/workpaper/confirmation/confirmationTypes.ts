@@ -152,10 +152,20 @@ export interface ConfirmationPayload {
 // ─── 覆盖率质量指标 ──────────────────────────────────────────────────────────
 
 export interface ConfirmationCoverageMetrics {
-  /** 函证覆盖率（confirmed / total amount） */
-  confirmation_coverage: number
-  /** 回函覆盖率（replied / total count） */
+  /**
+   * 函证覆盖率 = 发函总额(Σ已发函行账面金额) / 科目审定总额(TB population) × 100%。
+   * 度量该科目余额被纳入函证程序的比例。population 缺失(无法从 TB 解析)时为 null（不误导）。
+   */
+  confirmation_coverage: number | null
+  /**
+   * 确认覆盖率 =（回函确认 + 替代确认金额）/ 科目审定总额(TB population) × 100%。
+   * 度量已取得确认证据占科目余额的比例。population 缺失时为 null。
+   */
+  confirmed_coverage: number | null
+  /** 回函覆盖率 = 已回函笔数 / 已发函笔数 × 100%（笔数口径，与公式面板一致） */
   reply_coverage: number
   /** 预警等级 */
   warn_level: 'ok' | 'warn' | 'danger'
+  /** 科目审定总额(population)是否可用；false 时 UI 显示占位而非百分比 */
+  population_available: boolean
 }

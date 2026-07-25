@@ -117,6 +117,23 @@
           <span class="card-title">衍生金融资产</span>
           <div class="title-actions">
             <el-tag size="small" type="warning">对应附注 八、3</el-tag>
+            <!-- 跳转回附注（默认国企 八、3，下拉可切上市 五、3）-->
+            <el-dropdown
+              split-button
+              type="primary"
+              size="small"
+              trigger="click"
+              @click="jumpDerivativeToNote('soe')"
+              @command="jumpDerivativeToNote"
+            >
+              ↩ 跳转回附注（八、3）
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="listed">上市版附注（五、3）</el-dropdown-item>
+                  <el-dropdown-item command="soe">国企版附注（八、3）</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
             <el-button size="small" type="primary" link :disabled="isReadonly" @click="dis.addDerivativeRow()">
               新增明细
             </el-button>
@@ -231,8 +248,10 @@
 
 <script setup lang="ts">
 import { computed, inject, ref, toRef } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import { useG1DisclosureSoe } from '../../composables/useG1DisclosureSoe'
 import { buildG1SoeSyncPayloads } from '../../composables/g1DisclosureSyncPayload'
 import { G1_NOTE_SECTION, resolveG1NoteSectionTarget } from '../../composables/g1NoteSectionMap'
@@ -262,6 +281,18 @@ const noteChip = computed(() => {
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 const isSyncing = ref(false)
+const router = useRouter()
+
+// 跳转回附注模块「衍生金融资产」（披露表 → 附注为单向推送；此处仅导航方便相互编辑确认）
+// 国企默认→八、3，下拉可切上市↔五、3
+function jumpDerivativeToNote(target: DisclosureVariant): void {
+  const route = buildNoteJumpRoute(projectId.value, 'G1_DERIVATIVE', target)
+  if (!route) {
+    ElMessage.warning('未找到对应的衍生金融资产附注章节')
+    return
+  }
+  router.push(route)
+}
 
 const dis = useG1DisclosureSoe({
   allResponses: toRef(props, 'allResponses'),

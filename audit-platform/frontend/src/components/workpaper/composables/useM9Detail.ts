@@ -416,11 +416,44 @@ export function useM9Detail(
     debouncedSave('M9-2-auditedEndTotal', {
       remark: String(totalAuditedEnd.value),
     })
+    // 同步写整包JSON（与M9TabDetail._initDefaultRows读取路径 getField('2','detail-rows') 一致）
+    _syncFullData()
   }
 
   function _triggerSaveAll(): void {
     computedRows.value.forEach((_, i) => {
       _triggerSave(i)
+    })
+    _syncFullData()
+  }
+
+  /**
+   * 同步写整包 full-data（保证 _initDefaultRows 读取路径 M9-2-detail-rows / conclusion 一致）
+   * 只存基础字段（公式列 afterTaxNet/endBalance/auditedX/changeX 由 computedRows 重算）
+   */
+  function _syncFullData(): void {
+    debouncedSave('M9-2-detail-rows', {
+      conclusion: JSON.stringify(detailRows.value.map(row => ({
+        key: row.key,
+        itemName: row.itemName,
+        ociCategory: row.ociCategory,
+        beginning: row.beginning,
+        preTaxAmount: row.preTaxAmount,
+        taxEffect: row.taxEffect,
+        creditAmount: row.creditAmount,
+        debitAmount: row.debitAmount,
+        beginAje: row.beginAje,
+        beginRje: row.beginRje,
+        preTaxAje: row.preTaxAje,
+        preTaxRje: row.preTaxRje,
+        taxAje: row.taxAje,
+        taxRje: row.taxRje,
+        priorBeginning: row.priorBeginning,
+        priorAfterTaxNet: row.priorAfterTaxNet,
+        priorEnd: row.priorEnd,
+        sourceWpCode: row.sourceWpCode,
+        remark: row.remark,
+      }))),
     })
   }
 

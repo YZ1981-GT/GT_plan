@@ -18,6 +18,14 @@ DEFAULT_BASE_DIR = DATA_DIR / "audit_report_templates"
 MANIFEST_FILENAME = "template_manifest.json"
 ALLOWED_SUFFIXES = frozenset({".docx", ".xlsx", ".json"})
 
+# opinion_type 归一：强调事项段是「无保留意见」报告内的可选段落（OPT），
+# 并非独立模板族。与 ReportBodyService._resolve_opinion_enum 语义一致
+# （unqualified_with_emphasis → unqualified）。manifest report_body 仅有
+# unqualified/qualified/adverse/disclaimer 四族，故此处归一避免 KeyError。
+_OPINION_TYPE_ALIASES = {
+    "unqualified_with_emphasis": "unqualified",
+}
+
 
 def resolve_template_base_dir() -> Path:
     """解析模板根目录（settings.TEMPLATE_MANIFEST_DIR 或默认 data 路径）."""
@@ -103,6 +111,11 @@ class TemplateManifestLoader:
           report_scope 缺省时取 consolidated（向后兼容现有合并套）；
           standalone 缺失时回退 consolidated。
         """
+        # 归一 opinion_type（强调事项段 → 无保留意见模板族，emphasis 作为可选段）
+        opinion_type = _OPINION_TYPE_ALIASES.get(opinion_type, opinion_type)
+        # 归一 variant：显式 None/空 → 默认 simple（前端可能传 null）
+        variant = variant or "simple"
+
         body = self._manifest.get("report_body", {})
         opinion = body.get(opinion_type)
         if opinion is None:

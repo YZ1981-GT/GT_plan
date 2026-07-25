@@ -24,7 +24,7 @@
         <el-button size="small" :disabled="isReadonly" @click="handlePullFromDetail">
           从M3-2带入
         </el-button>
-        <el-button size="small" @click="handleAI('fx-invest')">
+        <el-button size="small" :loading="aiLoading === 'fx-invest'" :disabled="isReadonly" @click="handleAI('fx-invest')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
         <el-button size="small" @click="handleReview">
@@ -227,6 +227,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { calcFxConverted, calcFxDiff } from '../../composables/useM3FxEngine'
 import { useM3FormData } from '../../composables/useM3FormData'
 import { useM3ImportExport, type M3ImportableSheet } from '../../composables/useM3ImportExport'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 
 const props = defineProps<{
   wpId: string
@@ -239,6 +240,8 @@ const emit = defineEmits<{
 }>()
 
 const openReviewDialog = inject<((sectionId: string, sectionLabel?: string) => void) | null>('openReviewDialog', null)
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -431,7 +434,26 @@ function handleImportExport(command: string) {
 
 // ─── AI / Review ─────────────────────────────────────────────────────────────
 
-function handleAI(_section: string) { /* AI辅助待集成 */ }
+async function handleAI(section: string) {
+  if (props.isReadonly) return
+  aiLoading.value = section
+  try {
+    const context: Record<string, string> = {
+      科目: '4002 库存股（权益备抵类·借方，外币投资汇率测算 M3-4）',
+      折算本位币合计: fmtAmount(totalConverted.value),
+      折算差异合计: fmtAmount(totalDiff.value),
+      外币批次数: String(computedFxRows.value.length),
+      高亮阈值: `|差异| > ${FX_DIFF_THRESHOLD}元 或 差异率 > 1%`,
+    }
+    const text = await generateAiText({ section: `m3-fx-invest-${section}`, context, existingContent: '' })
+    if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+    ElMessageBox.alert(text, 'AI 辅助建议', { confirmButtonText: '知道了' }).catch(() => {})
+  } catch {
+    ElMessage.warning('AI 生成失败，请稍后重试')
+  } finally {
+    aiLoading.value = ''
+  }
+}
 function handleReview() { openReviewDialog?.('M3-4-fx-invest', '外币投资汇率测算') }
 
 // ─── Save / Restore ──────────────────────────────────────────────────────────

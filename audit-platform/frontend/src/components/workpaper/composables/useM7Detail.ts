@@ -376,6 +376,15 @@ export function useM7Detail(
     debouncedSave('M7-2-auditedEndTotal', {
       remark: String(totalAuditedEnd.value),
     })
+    // 🔴 修复：同步写整包 full-data（M7TabDetail._restoreRowsFromResponses 优先读此键；此前从不写 → 刷新明细全丢）
+    _syncFullData()
+  }
+
+  /** 同步写整包 full-data（保证 _restoreRowsFromResponses 读取路径一致，完整行序列化避免字段丢失） */
+  function _syncFullData(): void {
+    debouncedSave('M7-2-full-data', {
+      remark: JSON.stringify(detailRows.value),
+    })
   }
 
   function _triggerSaveAll(): void {

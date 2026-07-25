@@ -157,7 +157,7 @@
 import { ref, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
-import { reportLineMapping } from '@/services/apiPaths'
+import { reportLineMapping, accountMapping } from '@/services/apiPaths'
 import { useProjectStore } from '@/stores/project'
 import { handleApiError } from '@/utils/errorHandler'
 import { confirmDelete } from '@/utils/confirm'
@@ -348,6 +348,48 @@ function _buildDefaultReportLines() {
 // ─── 一键预设（生成 + 自动确认） ───
 async function onPreset() {
   if (!props.projectId) { ElMessage.warning('请先选择项目'); return }
+
+  // 前置校验：科目映射（客户科目→标准科目）未完成时，报表映射（余额表科目→报表项目）
+  // 只能匹配到极少数科目（试算表为空），会让用户误以为功能坏了。此处检测映射完成度，
+  // 未完成则提示先做科目映射，并提供"自动完成科目映射并继续"一键补做。
+  try {
+    const cr: any = await api.get(accountMapping.completionRate(props.projectId))
+    const totalClient = cr?.total_count ?? cr?.total ?? 0
+    const mappedCount = cr?.mapped_count ?? cr?.mapped ?? 0
+    const rate = cr?.rate ?? cr?.completion_rate ?? (totalClient > 0 ? (mappedCount / totalClient * 100) : 0)
+    if (totalClient === 0 || mappedCount === 0 || rate < 1) {
+      let doAutoMap = false
+      try {
+        await ElMessageBox.confirm(
+          '检测到「科目映射」（客户科目 → 标准科目）尚未完成。\n\n' +
+          '报表映射依赖科目映射生成的试算表，未完成时只能匹配到极少数科目。\n\n' +
+          '是否现在自动完成科目映射（并生成试算表）后再继续报表映射？',
+          '请先完成科目映射',
+          { confirmButtonText: '自动完成科目映射并继续', cancelButtonText: '取消', type: 'warning' }
+        )
+        doAutoMap = true
+      } catch {
+        ElMessage.info('已取消。请先在「科目映射」页完成「自动匹配」，再执行报表映射一键预设。')
+        return
+      }
+      if (doAutoMap) {
+        presetLoading.value = true
+        try {
+          const mr: any = await api.post(accountMapping.autoMatch(props.projectId), {})
+          const savedN = mr?.data?.saved ?? mr?.saved ?? mr?.matched ?? 0
+          ElMessage.success(`科目映射已自动完成（新增 ${savedN} 条），继续报表映射…`)
+        } catch (e) {
+          presetLoading.value = false
+          handleApiError(e, '自动完成科目映射')
+          return
+        }
+        presetLoading.value = false
+      }
+    }
+  } catch (e) {
+    // 完成度查询失败不阻断主流程（best-effort 前置校验）
+    console.warn('[ReportLineMapping] 科目映射前置校验失败，继续:', e)
+  }
 
   // 检测是否有老格式记录,有则提示用户是否强制刷新
   const oldFormatCount = mappings.value.filter(m =>

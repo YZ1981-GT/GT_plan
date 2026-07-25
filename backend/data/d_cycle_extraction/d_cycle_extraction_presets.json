@@ -1,0 +1,84 @@
+{
+  "_meta": {
+    "spec": ".kiro/specs/d-cycle-four-table-extraction-formulas/",
+    "task": "1.3 Tier A 预设库脚手架 (Wave 0)",
+    "description": "D-cycle Tier A 可编辑提取公式预设库（按 wp_code）。每条 = 一个可表达为单条公式（TB/SUM_TB…）的简单科目/子目总额提取，target_cell=checklist_responses item_id（锚点，必 ∈ d_cycle_anchor_registry.json 该 wp_code 锚点集）。读时与用户 wp_formula 收敛（app/services/d_cycle_extraction/presets.py::resolve_effective），同锚点用户覆盖预设，预设不落库。分类/账龄/客户按名归集属 Tier B（prefill.py），不在此。真实 Tier A 预设在 Wave 3/4 对照 anchor registry 补入；本 Wave 仅交付空/最小结构，load_presets 解析为 []。",
+    "entry_schema": {
+      "anchor": "checklist_responses item_id（必填，必 ∈ known_anchors(wp_code)）",
+      "expression": "公式表达式，如 TB('1402','期末余额') / SUM_TB('起始~结束','列')（必填）",
+      "sheet_name": "sheet 编码（可选，如 D6-1）",
+      "formula_type": "默认 auto_calc（可选）",
+      "description": "说明（可选）"
+    }
+  },
+  "D6": [
+    {
+      "anchor": "D6-1-tb-amount",
+      "expression": "TB('1402','期末余额')",
+      "sheet_name": "D6-1",
+      "formula_type": "auto_calc",
+      "description": "试算表 1402 合同资产期末余额（审定数），供 D6-1 审定表 TB↔审定核对行（D6-1-tb-amount）。可表达为单条 TB 公式（Tier A）可编辑；求值经 get_active_filter 数据集版本读取，与 Tier B prefill 同口径。分类未审/原值 block1 属 Tier B 复杂归集（动态 rowKey），不在此。"
+    }
+  ],
+  "D2": [
+    {
+      "anchor": "D2-adj-tb-amount",
+      "expression": "TB('1122','期末余额')",
+      "sheet_name": "D2-1",
+      "formula_type": "auto_calc",
+      "description": "试算表 1122 应收账款期末余额（审定数），供 D2-1 审定表 TB↔审定核对行（D2-adj-tb-amount）。可表达为单条 TB 公式（Tier A）可编辑；求值经 get_active_filter 数据集版本读取，与 Tier B prefill 同口径。审定表按信用风险组合分类（单项计提/账龄组合/客户类型组合）的未审数无法从 TB 按维度拆分（宁缺勿造 R3.4），属 D2-2 明细 SUMIF，不在此。"
+    }
+  ],
+  "D1": [
+    {
+      "anchor": "D1-adj-tb-amount",
+      "expression": "TB('1121','期末余额')",
+      "sheet_name": "D1-1",
+      "formula_type": "auto_calc",
+      "description": "试算表 1121 应收票据期末余额（审定数），供 D1-1 审定表 TB↔审定净值核对行（D1-adj-tb-amount）。可表达为单条 TB 公式（Tier A）可编辑；求值经 get_active_filter 数据集版本读取，与 Tier B prefill 同口径。审定表按票据类型固定分类（银行承兑汇票/商业承兑汇票，原值/坏账/净值三区块）的未审数由 D1-2 按类别明细（D1-cat-rows）SUMIF 派生、非 TB 按维度拆分（宁缺勿造 R3.4），不在此。"
+    }
+  ],
+  "D3": [
+    {
+      "anchor": "D3-adj-trial-balance-amount",
+      "expression": "TB('2203','期末余额')",
+      "sheet_name": "D3-1",
+      "formula_type": "auto_calc",
+      "description": "试算表 2203 预收账款期末余额（审定数），供 D3-1 审定表 TB↔账龄合计核对行（D3-adj-trial-balance-amount，同为 D3-2 明细核对标量）。可表达为单条 TB 公式（Tier A）可编辑；求值经 get_active_filter 数据集版本读取，与 Tier B prefill 同口径。审定表双区块固定分类（按性质：固定资产/土地使用权/合同不成立对价/其他；按账龄段）的未审数由 D3-2 明细（D3-det-rows）SUMIF 聚合、非 TB 按维度拆分（宁缺勿造 R3.4），不在此。"
+    }
+  ],
+  "D4": [
+    {
+      "anchor": "D4-1-adj-tb-6001",
+      "expression": "TB('6001','审定数')",
+      "sheet_name": "D4-1",
+      "formula_type": "auto_calc",
+      "description": "试算表 6001 主营业务收入审定发生额，供 D4-1 审定表主营小计 TB↔审定核对行（D4-1-adj-tb-6001）。损益类科目 trial_balance.audited_amount 存审定发生额（期末余额=审定数 同映射 audited_amount）。可表达为单条 TB 公式（Tier A）可编辑；求值经 get_active_filter 数据集版本读取，与 Tier B prefill 同口径。审定表主营明细行按产品由 D4-2 明细（D4-2-rows，序时账 6001 贷方按产品×月归集）SUMIF 聚合、非 TB 按产品维度拆分（宁缺勿造 R3.4），不在此。"
+    },
+    {
+      "anchor": "D4-1-adj-tb-6051",
+      "expression": "TB('6051','审定数')",
+      "sheet_name": "D4-1",
+      "formula_type": "auto_calc",
+      "description": "试算表 6051 其他业务收入审定发生额，供 D4-1 审定表其他小计 TB↔审定核对行（D4-1-adj-tb-6051）。损益类 audited_amount 存审定发生额。可表达为单条 TB 公式（Tier A）可编辑；求值经 get_active_filter 数据集版本读取，与 Tier B prefill 同口径。其他收入明细行由 D4-3 明细（D4-3-rows）聚合、非 TB 按维度拆分（宁缺勿造 R3.4），不在此。"
+    }
+  ],
+  "D5": [
+    {
+      "anchor": "D5-1-tb-amount",
+      "expression": "TB('1124','期末余额')",
+      "sheet_name": "D5-1",
+      "formula_type": "auto_calc",
+      "description": "试算表 1124 应收款项融资期末余额（审定数），供 D5-1 审定表 TB↔审定核对行（D5-1-tb-amount，试算平衡表数）。可表达为单条 TB 公式（Tier A）可编辑；求值经 get_active_filter 数据集版本读取，与 Tier B prefill 同口径。审定表固定两分类行（应收票据/应收账款）的未审数由 D5-2 明细（D5-2-rows）按类别 SUMIF 聚合（useD5Adjudication categoryAggregation）、非 TB 按维度拆分（宁缺勿造 R3.4），不在此。OCI 公允价值变动减项来自 D5-4，非四表库。"
+    }
+  ],
+  "D7": [
+    {
+      "anchor": "D7-1-adj-aging-trial-balance-currentAudited",
+      "expression": "TB('2205','期末余额')",
+      "sheet_name": "D7-1",
+      "formula_type": "auto_calc",
+      "description": "试算表 2205 合同负债期末余额（审定数），供 D7-1 审定表账龄区块 TB↔账龄合计核对行（D7-1-adj-aging-trial-balance-currentAudited，试算平衡表数）。可表达为单条 TB 公式（Tier A）可编辑；求值经 get_active_filter 数据集版本读取，与 Tier B prefill 同口径；render project_context.tb_amount 亦按 2205 seed（前端 tbSeedAmount 回退，本预设作可编辑覆盖）。审定表双区块固定分类（一、按性质：预收货款/开发项目预收款/预收工程款/其他；二、按账龄段）的未审数由 D7-2 明细（D7-2-rows）SUMIF 聚合（useD7Adjudication natAgg/agingByKey）、非 TB 按维度拆分（宁缺勿造 R3.4），不在此。"
+    }
+  ]
+}

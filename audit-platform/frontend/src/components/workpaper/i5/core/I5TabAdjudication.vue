@@ -130,6 +130,9 @@
     </el-card>
 
     <div class="action-bar">
+      <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
+        <el-icon><Download /></el-icon>带入调整
+      </el-button>
       <el-button size="small" type="primary" plain :disabled="isReadonly" @click="seedFromI52">从 I5-2 带入</el-button>
       <el-button size="small" plain :disabled="isReadonly" @click="syncFromI53">从 I5-3 同步调整</el-button>
       <el-button size="small" plain :disabled="isReadonly" @click="() => applyTbData()">TB写入未审</el-button>
@@ -448,8 +451,18 @@
         <li>明细合计(I5-2)、调整分录(I5-3)应与本表勾稽；TB 差异须为 0 后方可回写。</li>
         <li>变动率＝（本期审定−上期审定）/|上期审定|；上期为 0 时显示 N/A（勿出现 #DIV/0!）。变动率超过 30% 的项目须在审计说明中解释原因。</li>
         <li>权属、抵押情况应单独说明；审计结论可选用 A/B/C 模板。</li>
+        <li>「带入调整」：从集中登记按科目 1911 拉取调整分录，逐笔分配到各项目的 AJE/RJE，带入后审定数自动更新并联动附注。</li>
       </ol>
     </details>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="1911 其他非流动资产"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
@@ -464,7 +477,11 @@ import {
   I5_CONCLUSION_OPTIONS,
   type I5AdjudicationRow,
 } from '../../composables/useI5Adjudication'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { Download } from '@element-plus/icons-vue'
 import GtIndexChip from '../../GtIndexChip.vue'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 
 const props = defineProps<{
   wpId: string
@@ -522,6 +539,29 @@ const {
     onSave: (itemId: string, value: any) => emit('save', itemId, value),
   },
 )
+
+// ─── 从集中登记带入调整（1911 其他非流动资产，资产借方；带入 AJE/RJE） ───
+const bringInRows = computed(() =>
+  rows.value.map((r) => ({ rowKey: r.rowId, name: r.projectName, aje: r.aje, rje: r.rje })),
+)
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: computed(() => props.projectId) as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '1911',
+  direction: 'debit',
+  subjectCode: '1911',
+  wpCode: 'I5',
+  subjectLabel: '其他非流动资产(1911)',
+  rows: bringInRows,
+  updateCell: (rowKey: string, field: any, value: number) => updateCell(rowKey, field, value),
+  totalAudited: () => subtotals.value.audited,
+})
 
 const BROWSE_THRESHOLD = 30
 const browseMode = ref(true)

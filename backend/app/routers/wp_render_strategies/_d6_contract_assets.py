@@ -12,9 +12,125 @@ import logging
 
 import sqlalchemy as sa
 
+from app.core.config import settings
+from app.services.d_cycle_extraction.detail_aggregation import (
+    aggregate_d6_detail_rows,
+)
+from app.services.d_cycle_extraction.prefill import (
+    MODE_BALANCE,
+    build_d_adjudication_prefill,
+)
+from app.services.d_cycle_extraction.presets import resolve_effective
+from app.services.d_cycle_extraction.tier_a_seed import (
+    seed_tier_a_reconciliation,
+)
+from app.services.wp_formula_eval_service import evaluate_wp_formula_expression
+
 from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
+
+# D6 合同资产科目前缀（Tier B 审定表原值 block1 未审数取数来源）
+_D6_ACCOUNT_PREFIX = "1402"
+
+# D6 wp_code base（Tier A 提取公式 / 锚点登记 key）
+_D6_WP_CODE = "D6"
+
+# D6-2 明细表行存储 item_id（checklist_responses.remark 存 JSON 数组）
+_D6_DETAIL_ITEM_ID = "D6-2-rows"
+
+
+def _detail_rows_empty(responses_snapshot: dict) -> bool:
+    """判定 D6-2 明细表是否完全空（手工优先 R4.2 / Property 8）.
+
+    D6-2 行存储于 checklist_responses item_id=`D6-2-rows` 的 `remark` 字段（JSON 数组字符串，
+    参照 import-aux-balance 端点 item_id）。`[]`/`null`/`{}`/空/缺失 = 空（可 seed）；
+    非空数组 = 已有行（手工录入或既有一键取数结果）→ 不 seed（不覆盖）。
+
+    判空稳健：无法解析或非列表结构一律保守视为「非空」（不 seed），避免覆盖不明数据。
+    """
+    val = (responses_snapshot or {}).get(_D6_DETAIL_ITEM_ID)
+    if not isinstance(val, dict):
+        return True  # 缺失
+    remark = (val.get("remark") or "").strip()
+    if not remark or remark in ("[]", "null", "{}"):
+        return True  # 空/空标记
+    try:
+        parsed = json.loads(remark)
+    except (ValueError, TypeError):
+        return False  # 无法解析但非空 → 保守视为有内容，不 seed
+    if isinstance(parsed, list):
+        return len(parsed) == 0
+    return False  # 非列表意外结构 → 保守视为非空
+
+
+async def _seed_d6_detail_prefill(
+    ctx: RenderContext, responses_snapshot: dict
+) -> list[dict] | None:
+    """P0-2：D6-2 明细表维度归集 transient 自动 seed（决策4 / R4 / Property 8/9/11/13）.
+
+    D6-2 明细完全空时，调既有可复用归集 `aggregate_d6_detail_rows`（tb_aux_balance 1402
+    客户/合同维度，复用不新造第 3 套四表库读取 / Property 9）得明细行，附 `source:"four-table"`
+    标注供前端识别为自动取数，作 `detail_prefill` transient 返回（不落库 / Property 13）。
+    手工优先（已有行 → 返回 None 不 seed / Property 8）+ fail-open 空（归集异常 → None / R4.5）。
+    行字段用 aggregate_d6_detail_rows 产出的 30 列 schema。
+    """
+    if not _detail_rows_empty(responses_snapshot):
+        return None  # 手工优先：已有行 → 不覆盖
+    try:
+        rows = await aggregate_d6_detail_rows(ctx.db, str(ctx.project_id))
+    except Exception as e:  # noqa: BLE001 — 归集失败 fail-open 空（R4.5）
+        logger.warning("D6 render: detail_prefill 归集失败（fail-open，省略）: %s", e)
+        return None
+    if not rows:
+        return None
+    return [{**row, "source": "four-table"} for row in rows]
+
+
+def _block1_has_user_data(responses_snapshot: dict) -> bool:
+    """判定审定表 block1（原值）是否已有用户/既有一键取数录入的未审数据.
+
+    手工优先（R1.5 / Property 2）：block1 原值锚点完全为空时才自动预填；
+    只要 block1 已有行键清单或任一原值未审 per-field 值非空，即视为已填，
+    render 不再返回 adjudication_prefill（不覆盖手工/既有一键取数结果）。
+
+    锚点来源见 `d_cycle_anchor_registry.json`（D6）：
+      * `D6-1-adj-block1-rowKeys`（JSON 行键清单，结构性）
+      * `re:^D6-1-adj-block1-.+-(priorUnadjusted|currentUnadjusted|...)$`（per-field）
+    """
+    for item_id, val in (responses_snapshot or {}).items():
+        if not item_id.startswith("D6-1-adj-block1-"):
+            continue
+        remark = ""
+        if isinstance(val, dict):
+            remark = (val.get("remark") or "").strip()
+        if item_id == "D6-1-adj-block1-rowKeys":
+            # 行键清单非空数组视为已建行（用户/既有已填）
+            if remark and remark not in ("[]", "null", "{}"):
+                return True
+            continue
+        # per-field 原值未审数（期初/期末）非空即视为已填
+        if item_id.endswith("-priorUnadjusted") or item_id.endswith("-currentUnadjusted"):
+            if remark:
+                return True
+    return False
+
+
+async def _seed_tier_a_reconciliation(ctx: RenderContext, responses_snapshot: dict) -> None:
+    """D6 Tier A render transient seed —— 委托共享助手（DRY / Task 4.2）.
+
+    从 Task 4.1 的 D6 私有实现提取到 `d_cycle_extraction.tier_a_seed`（供 D1-D7 复用），
+    此处保留薄委托 + 注入 D6 模块级 `resolve_effective`/`evaluate_wp_formula_expression`
+    （kwargs RHS 于**调用时**从 D6 模块全局解析 → 现有 D6 测试 monkeypatch `d6.*` 仍生效）。
+    规则/语义/fail-open 完全等价原实现，详见共享助手 docstring。
+    """
+    await seed_tier_a_reconciliation(
+        ctx,
+        _D6_WP_CODE,
+        responses_snapshot,
+        resolve_effective=resolve_effective,
+        evaluate_wp_formula_expression=evaluate_wp_formula_expression,
+    )
 
 
 async def render(ctx: RenderContext) -> dict | None:
@@ -209,7 +325,19 @@ async def render(ctx: RenderContext) -> dict | None:
 
     project_context["related_parties"] = related_parties
 
-    return {
+    # ─── Tier A 公式驱动 TB 核对行 transient seed（P0-1 主机制，灰度开关控制）─────
+    # spec: d-cycle-tier-a-writeback-detail-seed R3（决策1/3 / Property 6/7/10/11/13）
+    # 主开关关（默认）→ 不 seed，responses_snapshot 逐字节等价当前（Property 10 零回归）。
+    # 主开关开 → 用 resolve_effective 的有效 Tier A 公式求值 transient seed TB 核对行锚点
+    # （D6-1-tb-amount）进 responses_snapshot（不落库；手工优先；disabled 跳过；写对字段
+    # remark；fail-open）。任一环异常一律 fail-open（不阻断 render）。
+    if settings.D_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED:
+        try:
+            await _seed_tier_a_reconciliation(ctx, responses_snapshot)
+        except Exception as e:  # noqa: BLE001 — 兜底 fail-open，不阻断 render
+            logger.warning("D6 render: Tier A seed 兜底异常（fail-open）: %s", e)
+
+    html_data: dict = {
         "sections": sections,
         "adjudication_config": adjudication_config,
         "ecl_config": ecl_config,
@@ -217,3 +345,56 @@ async def render(ctx: RenderContext) -> dict | None:
         "disclosure_visibility": disclosure_visibility,
         "responses_snapshot": responses_snapshot,
     }
+
+    # ─── Tier B 四表库审定表预填（ADDITIVE，灰度开关控制）─────────────────
+    # spec: d-cycle-four-table-extraction-formulas (R1.1/1.5/1.6/2.3/7.1/7.2)
+    # 开关关闭（默认）→ 不返回 adjudication_prefill，render 逐字节等价当前（Property 9）。
+    # 开关开启 → 从 tb_balance 1402 叶子子科目取期初/期末余额，仅在 block1 原值锚点
+    # 完全为空时并入（手工优先 Property 2），供前端 seed block1 原值 期初/期末未审行。
+    # 任一环异常一律 fail-open（省略 adjudication_prefill，不阻断 render）。
+    if settings.D_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED:
+        try:
+            if not _block1_has_user_data(responses_snapshot):
+                seed_rows = await build_d_adjudication_prefill(
+                    ctx, account_prefix=_D6_ACCOUNT_PREFIX, mode=MODE_BALANCE
+                )
+                if seed_rows:
+                    # 镜像 K9/K1/N5：adjudication_prefill 为行列表，附来源标注供前端识别
+                    # 为自动取数。D6 仅 block1（原值）四表可填 → opening/closing 映射
+                    # 期初未审/期末未审（对齐 anchor registry D6-1-adj-block1-*）。
+                    html_data["adjudication_prefill"] = [
+                        {
+                            "code": r["code"],
+                            "name": r["name"],
+                            "opening_balance": r["opening_balance"],
+                            "closing_balance": r["closing_balance"],
+                            "block": "block1",
+                            "source": "four-table",
+                        }
+                        for r in seed_rows
+                    ]
+        except Exception as e:  # noqa: BLE001
+            logger.warning(
+                "D6 render: adjudication_prefill 构建失败（fail-open，省略）: %s", e
+            )
+
+    # ─── P0-2：D6-2 明细表维度归集 transient 自动 seed（主 ∧ 子开关门控）──────
+    # spec: d-cycle-tier-a-writeback-detail-seed R4（决策4 / Property 8/9/11/13）
+    # 生效条件 = 主开关 D_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED ∧ 子开关 D_CYCLE_DETAIL_SEED_ENABLED
+    #   （子开关默认关，被主开关 AND；故可"发 P0-1、压 P0-2" / R5.2）。任一关 → 无 detail seed
+    #   （Property 8/10 零回归）。
+    # 明细完全空时调既有归集 aggregate_d6_detail_rows（复用不新造 / Property 9）transient seed
+    # 明细行进 detail_prefill（不落库 / Property 13；手工优先：有行不 seed；fail-open 空 / R4.5）。
+    # 前端手动"一键取数"按钮保留（自动 seed 为叠加 / R4.6）。任一环异常一律 fail-open。
+    if (
+        settings.D_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED
+        and settings.D_CYCLE_DETAIL_SEED_ENABLED
+    ):
+        try:
+            detail_prefill = await _seed_d6_detail_prefill(ctx, responses_snapshot)
+            if detail_prefill:
+                html_data["detail_prefill"] = detail_prefill
+        except Exception as e:  # noqa: BLE001 — 兜底 fail-open，不阻断 render
+            logger.warning("D6 render: detail_prefill 兜底异常（fail-open）: %s", e)
+
+    return html_data

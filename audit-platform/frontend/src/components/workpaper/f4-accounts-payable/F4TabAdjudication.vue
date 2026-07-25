@@ -2,6 +2,7 @@
 /** F4TabAdjudication — F4-1 应付账款审定表（严格对齐源表双分类结构）。 */
 import { computed, inject, toRef, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Download } from '@element-plus/icons-vue'
 import {
   useF4Adjudication,
   type F4AdjudicationRow,
@@ -9,10 +10,13 @@ import {
   type StoredF4AdjRow,
 } from '../composables/useF4Adjudication'
 import { useF4AiGenerate } from '../composables/useF4AiGenerate'
+import { useAdjudicationBringIn } from '../composables/useAdjudicationBringIn'
+import { useAuditContext } from '@/composables/useAuditContext'
 import F4AdjudicationTable from './F4AdjudicationTable.vue'
 import F4ImportExportToolbar from './F4ImportExportToolbar.vue'
 import F4SheetAttachments from './F4SheetAttachments.vue'
 import GtIndexChip from '../GtIndexChip.vue'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 
 const props = defineProps<{
   wpId: string
@@ -52,6 +56,30 @@ const {
 const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF4AiGenerate(
   toRef(props, 'wpId') as Ref<string>,
 )
+
+// ─── 从集中登记带入调整（2202 应付账款，负债贷方；带入按性质主维度的期末 AJE/RJE） ───
+const bringInRows = computed(() =>
+  natureDataRows.value.map((r) => ({ rowKey: r.rowKey, name: r.label, aje: r.closingAje, rje: r.closingRje })),
+)
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: toRef(props, 'projectId') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '2202',
+  direction: 'credit',
+  subjectCode: '2202',
+  wpCode: 'F4',
+  subjectLabel: '应付账款(2202)',
+  rows: bringInRows,
+  updateCell: (rowKey: string, field: any, value: number) =>
+    updateCell('nature', rowKey, field === 'rje' ? 'closingRje' : 'closingAje', value),
+  totalAudited: () => natureSubtotalRow.value.closingAdjusted,
+})
 
 const natureTableData = computed(() => [...natureDataRows.value, natureSubtotalRow.value])
 const agingTableData = computed(() => [...agingDataRows.value, agingSubtotalRow.value])
@@ -178,6 +206,7 @@ function confirmAdjudication(): void {
         <p>4. 变动额 = 本期审定数 - 上期审定数；变动率 = 变动额 ÷ 上期审定数。变动率绝对值超过30%的项目必须说明主要原因。</p>
         <p>5. 按账龄的账项调整采用源表逻辑：审定账龄 - 未审账龄 - 重分类调整；无法合理分摊的余额归入“其他/未分类”。</p>
         <p>6. 期初、期末审定合计分别与试算平衡表2202科目核对，差异应为零。</p>
+        <p>7. 「带入调整」：可从集中登记按科目 2202 拉取调整分录，逐笔分配到按性质分类行的期末账项/重分类调整，带入后审定数自动更新并联动附注。</p>
       </div>
     </details>
 
@@ -198,6 +227,9 @@ function confirmAdjudication(): void {
         <el-tag v-else type="warning" size="small">F4-2无有效明细，期末可手工录入</el-tag>
       </div>
       <div class="toolbar-right">
+        <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
+          <el-icon><Download /></el-icon>带入调整
+        </el-button>
         <GtIndexChip value="wp:F4-1" :context-project-id="projectId" />
         <GtIndexChip value="wp:F4-2" :context-project-id="projectId" />
         <GtIndexChip value="wp:F4-3" :context-project-id="projectId" />
@@ -354,6 +386,15 @@ function confirmAdjudication(): void {
         placeholder="评价应付账款余额、分类、调整重分类及列报是否恰当。"
       />
     </el-card>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="2202 应付账款"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 

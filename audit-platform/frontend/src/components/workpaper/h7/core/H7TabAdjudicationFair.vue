@@ -10,6 +10,9 @@
 
     <!-- 工具栏 -->
     <div class="tab-toolbar">
+      <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
+        <el-icon><Download /></el-icon>带入调整
+      </el-button>
       <span class="chip-wrap"><GtIndexChip value="wp:H7-1" :context-project-id="projectId" /></span>
       <el-tag size="small" type="warning">公允价值模式</el-tag>
     </div>
@@ -120,8 +123,18 @@
         <li>未审数从试算表(1621)自动取入(只读)，审定数=未审+AJE。</li>
         <li>应关注公允价值层级(L1/L2/L3)、估值技术与关键参数，参见 H7-13 公允价值复核表。</li>
         <li>"确认审定"将回写 trial_balance(1621) 并发布 substantive:adjudicated 事件供附注刷新。</li>
+        <li>"带入调整"：从集中登记按科目 1621 拉取调整分录，累加到公允价值调整列(AJE)，带入后审定数自动更新并联动附注。</li>
       </ul>
     </details>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="1621 生产性生物资产（公允价值模式）"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
@@ -136,11 +149,15 @@
  */
 import { ref, computed, onMounted, inject, toRef } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Download } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
 import { useProjectStore } from '@/stores/project'
+import { useAuditContext } from '@/composables/useAuditContext'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { useH7AdjudicationFair } from '../../composables/useH7AdjudicationFair'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 
 const projectStore = useProjectStore()
 
@@ -170,6 +187,34 @@ const publishing = ref(false)
 
 function fairEnd(r: FairRow): number { return num(r.begin) + num(r.increase) - num(r.decrease) + num(r.fvChange) }
 const auditedFair = computed(() => num(fairRow.value.unadjusted) + num(fairRow.value.aje))
+
+// ─── 从集中登记带入调整（1621 生产性生物资产，资产借方；单一调整列累加到 aje） ───
+const bringInRows = computed(() => [
+  { rowKey: 'fair', name: fairRow.value.category, aje: 0, rje: 0 },
+])
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: toRef(props, 'projectId') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '1621',
+  direction: 'debit',
+  subjectCode: '1621',
+  wpCode: 'H7',
+  subjectLabel: '生产性生物资产(1621)',
+  rows: bringInRows,
+  // 公允价值模式单一调整列（审定=未审+aje）：aje/rje 净额均累加至 fairRow.aje（增量累加）
+  updateCell: (_rowKey: string, _field: any, value: number) => {
+    const live = num(fairRow.value.aje)
+    fairRow.value.aje = Math.round((live + value) * 100) / 100
+    void persist('H7-1-fair', fairRow.value)
+  },
+  totalAudited: () => auditedFair.value,
+})
 
 async function loadOwn() {
   try {

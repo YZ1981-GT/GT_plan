@@ -121,7 +121,8 @@ export function useF3DisclosureListed(options: {
     debounceSave()
     try {
       window.dispatchEvent(new CustomEvent('disclosure:note-text-updated', {
-        detail: { wpCode: 'F3', section: 'listed', text: val },
+        // 应付票据 listed → 五、36（note_template_variant_matrix）
+        detail: { wpCode: 'F3', accountCode: '2201', section: 'listed', sectionIds: ['五、36'], text: val },
       }))
     } catch { /* silent */ }
   })

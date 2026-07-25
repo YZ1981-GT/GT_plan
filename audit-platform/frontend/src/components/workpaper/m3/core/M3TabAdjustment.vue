@@ -21,7 +21,9 @@
         >
           保存并发布
         </el-button>
-        <el-button size="small" @click="handleAI('adjustment')">
+        <el-button size="small" type="primary" plain :loading="centralSyncing" :disabled="isReadonly || !currentBalance.isBalanced || filteredEntries.length === 0" @click="syncToCentral" title="把当前类型调整分录汇聚到集中调整登记，供合伙人跨循环审阅">同步到集中登记</el-button>
+        <el-tag v-if="centralStatus?.review_status" size="small" :type="centralStatus.review_status==='approved'?'success':(centralStatus.review_status==='rejected'?'danger':'info')" :title="centralStatus.rejection_reason||''">集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status]||centralStatus.review_status }}</el-tag>
+        <el-button size="small" :loading="aiLoading === 'adjustment'" :disabled="isReadonly" @click="handleAI('adjustment')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
         <el-button size="small" @click="handleReview">
@@ -220,11 +222,15 @@
  *
  * 科目：4002 库存股（**借方/权益备抵类！**）
  */
-import { computed, inject, onMounted, onUnmounted } from 'vue'
+import { computed, inject, onMounted, onUnmounted, ref, toRef, watch, type Ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, MagicStick, Check } from '@element-plus/icons-vue'
 import { useM3FormData } from '../../composables/useM3FormData'
 import { useM3Adjustment, type M3AdjustmentEntry } from '../../composables/useM3Adjustment'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import { eventBus } from '@/utils/eventBus'
+import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '@/components/workpaper/composables/useAdjustmentCentralSync'
+import { useAuditContext } from '@/composables/useAuditContext'
 
 const props = defineProps<{
   wpId: string
@@ -237,6 +243,8 @@ const emit = defineEmits<{
 }>()
 
 const openReviewDialog = inject<((sectionId: string, sectionLabel?: string) => void) | null>('openReviewDialog', null)
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
 
 // ─── FormData + Composable ──────────────────────────────────────────────────
 
@@ -258,6 +266,27 @@ const {
   updateEntry,
   saveAndPublish,
 } = useM3AdjustmentObj
+
+// ─── 同步到集中调整登记（workpaper-adjustment-centralization） ─────────────────
+const { year: auditYear } = useAuditContext()
+const { centralStatus, syncing: centralSyncing, syncToCentral, refreshStatus } = useAdjustmentCentralSync({
+  projectId: toRef(props, 'projectId') as Ref<string>,
+  year: auditYear,
+  wpId: toRef(props, 'wpId') as Ref<string>,
+  wpCode: 'M3',
+  itemId: () => `M3-adj-${activeType.value}`,
+  buildLineItems: () => filteredEntries.value.map(e => ({
+    account_name: e.accountName,
+    report_line_code: e.reportItem || undefined,
+    debit_amount: e.debitAmount,
+    credit_amount: e.creditAmount,
+  })),
+  buildMeta: () => ({
+    description: filteredEntries.value.find(e => e.description)?.description || 'M3 调整（' + activeType.value + '）',
+    adjustmentType: activeType.value === 'RJE' ? 'rje' : 'aje',
+  }),
+})
+watch(activeType, () => refreshStatus())
 
 const typeOptions = [
   { label: 'AJE 审计调整', value: 'AJE' },
@@ -282,7 +311,30 @@ function handleUpdateEntry(index: number, field: keyof M3AdjustmentEntry, value:
   if (realIndex >= 0) updateEntry(realIndex, field, value)
 }
 async function handleSaveAndPublish() { await saveAndPublish() }
-function handleAI(_section: string) { /* AI辅助待集成 */ }
+async function handleAI(section: string) {
+  if (props.isReadonly) return
+  aiLoading.value = section
+  try {
+    const bal = currentBalance.value
+    const context: Record<string, string> = {
+      科目: '4002 库存股（权益备抵类·借方，调整分录 M3-3）',
+      当前类型: activeType.value,
+      借方合计: fmtAmount(bal.totalDebit),
+      贷方合计: fmtAmount(bal.totalCredit),
+      是否平衡: bal.isBalanced ? '平衡' : `不平衡（差额${fmtAmount(bal.diff)}）`,
+      AJE对库存股净影响: fmtAmount(ajeNet4002.value),
+      RJE对库存股净影响: fmtAmount(rjeNet4002.value),
+      分录数: String(filteredEntries.value.length),
+    }
+    const text = await generateAiText({ section: `m3-adjustment-${section}`, context, existingContent: '' })
+    if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+    ElMessageBox.alert(text, 'AI 辅助建议', { confirmButtonText: '知道了' }).catch(() => {})
+  } catch {
+    ElMessage.warning('AI 生成失败，请稍后重试')
+  } finally {
+    aiLoading.value = ''
+  }
+}
 function handleReview() { openReviewDialog?.('M3-3-adjustment', '调整分录') }
 
 function fmtAmount(val: number): string {
@@ -295,6 +347,7 @@ function fmtAmount(val: number): string {
 onMounted(async () => {
   await formData.loadData()
   _restoreEntries()
+  refreshStatus()
   // 订阅M3-5推送的建议AJE
   eventBus.on('adjustment:created' as any, _handleIncomingAje)
 })

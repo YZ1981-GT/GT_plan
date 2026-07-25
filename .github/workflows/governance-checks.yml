@@ -400,6 +400,22 @@ jobs:
       - name: Check ACNR snapshot count (strict mode)
         run: python backend/scripts/check/check_acnr_snapshot_count.py --strict
 
+  acnr-sheet-display-names:
+    # ACNR sheet 显示名覆盖/漂移守卫（report 模式）
+    # catalog 新增/改名后 sheet_display_names.json 未更新会产生重名占位显示；
+    # 本检查仅用已提交文件（global_catalog + wp_account_mapping + sheet_display_names
+    # + prefill_formula_mapping）报告未覆盖 sheet（GAP）。当前 GAP=0；report 模式
+    # 不阻断，稳定后可切 --strict。漂移时重跑 scripts/gen_sheet_display_names.py 补齐。
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check ACNR sheet display names coverage (report mode)
+        run: python backend/scripts/check/check_sheet_display_names.py
+
   render-smoke:
     # P0-3: Playwright render 冒烟测试（BLOCKING 模式）
     # 验证底稿渲染无 console error + 关键选择器存在

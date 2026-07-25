@@ -101,7 +101,7 @@
  *
  * persistence三连环：selfLoad(checklist-responses GET) + allResponses Map + handleChildSave(PUT)
  */
-import { computed, ref, onMounted, defineAsyncComponent, inject, toRef, watch } from 'vue'
+import { computed, ref, onMounted, defineAsyncComponent, inject, provide, toRef, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import CycleTabProcedure from '../shared/CycleTabProcedure.vue'
 import {
@@ -137,6 +137,9 @@ const emit = defineEmits<{
 
 const isLoading = ref(true)
 const runtime = inject(WorkpaperRuntimeContextKey, null)
+
+// 目录页跳转：J2TabIndex inject('jumpToSection') → 转发为 navigate-sheet 交 GtWpRenderer 切页
+provide('jumpToSection', (sheetName: string) => emit('navigate-sheet', sheetName))
 
 /** 当前 sheet 名（从 props.sheetName 提取） */
 const currentSheet = computed(() => {

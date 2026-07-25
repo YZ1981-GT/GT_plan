@@ -25,6 +25,26 @@
       <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">+ 新增调整分录</el-button>
       <el-button size="small" type="success" :disabled="!isBalanced || isReadonly" @click="publishAdjustment">发布至H3-1</el-button>
       <el-button size="small" :disabled="isReadonly" @click="pushToA13()">推送A13</el-button>
+      <el-button
+        v-if="!isReadonly"
+        size="small"
+        type="primary"
+        plain
+        :loading="centralSyncing"
+        :disabled="!isBalanced || rows.length === 0"
+        title="把本页调整分录汇聚到集中调整登记，供合伙人跨循环审阅"
+        @click="syncToCentral"
+      >
+        同步到集中登记
+      </el-button>
+      <el-tag
+        v-if="centralStatus?.review_status"
+        size="small"
+        :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
+        :title="centralStatus.rejection_reason || ''"
+      >
+        集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
+      </el-tag>
     </div>
 
     <!-- H3-3 → H3-1 同步预览 -->
@@ -176,9 +196,11 @@
  * H3TabAdjustment.vue — H3-3 调整分录
  * el-table 10列+借贷平衡+推送A13
  */
-import { ref, computed, inject, toRef, onMounted } from 'vue'
+import { ref, computed, inject, toRef, onMounted, type Ref } from 'vue'
 import { useH3Adjustment } from '../../composables/useH3Adjustment'
 import { useH3FormData } from '../../composables/useH3FormData'
+import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
+import { useAuditContext } from '@/composables/useAuditContext'
 import { H3_ASSET_CATEGORIES } from '../../composables/h3CategoryMap'
 
 const props = defineProps<{
@@ -209,6 +231,27 @@ const {
   projectId: toRef(props, 'projectId'),
   getValue, setValue, saveImmediate,
 })
+
+// ─── 同步到集中调整登记（workpaper-adjustment-centralization） ───
+const { year: centralYear } = useAuditContext()
+const { centralStatus, syncing: centralSyncing, syncToCentral, refreshStatus } = useAdjustmentCentralSync({
+  projectId: toRef(props, 'projectId') as Ref<string>,
+  year: centralYear,
+  wpId: toRef(props, 'wpId') as Ref<string>,
+  wpCode: 'H3',
+  itemId: 'H3-3-adj-rows',
+  buildLineItems: () => rows.value.map((e: any) => ({
+    standard_account_code: e.accountCode || undefined,
+    account_name: e.accountName,
+    debit_amount: e.debitAmount,
+    credit_amount: e.creditAmount,
+  })),
+  buildMeta: () => ({
+    description: rows.value.find((e: any) => e.description)?.description || 'H3 投资性房地产调整',
+    adjustmentType: rows.value.length > 0 && rows.value.every((e: any) => e.entryType === 'RJE') ? 'rje' : 'aje',
+  }),
+})
+onMounted(() => refreshStatus())
 
 function fmtNum(v: number): string {
   return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })

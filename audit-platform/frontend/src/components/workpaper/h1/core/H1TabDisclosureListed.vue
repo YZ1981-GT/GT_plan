@@ -20,6 +20,7 @@
           :disabled="isReadonly || !projectId"
           @click="syncToNotes"
         >同步到附注</el-button>
+        <el-button size="small" type="primary" plain :disabled="!projectId" @click="jumpToNote('listed')">↩ 跳转回附注（五、22）</el-button>
         <el-dropdown trigger="click" @command="handleImportExport">
           <el-button size="small">导入导出 ▾</el-button>
           <template #dropdown>
@@ -472,6 +473,8 @@
  */
 import { ref, reactive, computed, inject, watch, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useRouter } from 'vue-router'
+import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import { eventBus } from '@/utils/eventBus'
 import { api } from '@/services/apiProxy'
 import GtIndexChip from '../../GtIndexChip.vue'
@@ -537,6 +540,14 @@ const props = defineProps<{
 
 const isReadonly = computed(() => props.isReadonly)
 const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
+
+const router = useRouter()
+// 跳转回附注模块（披露表 → 附注为单向推送；此处仅导航，方便相互编辑确认）
+function jumpToNote(target: DisclosureVariant): void {
+  const route = buildNoteJumpRoute(props.projectId, 'H1', target)
+  if (!route) { ElMessage.warning('未找到对应的附注章节'); return }
+  router.push(route)
+}
 const noteSectionId = H1_NOTE_SECTION.listed
 const isSyncing = ref(false)
 const jsonInputRef = ref<HTMLInputElement | null>(null)

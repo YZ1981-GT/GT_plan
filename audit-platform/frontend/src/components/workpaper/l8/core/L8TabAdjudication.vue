@@ -8,6 +8,9 @@
         <el-tag type="danger" size="small">损益类·发生额</el-tag>
       </div>
       <div class="section-header-right">
+        <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
+          <el-icon><Download /></el-icon> 带入调整
+        </el-button>
         <el-segmented
           v-model="dualMode.mode.value"
           :options="dualMode.modeOptions.value"
@@ -245,8 +248,18 @@
         <li>合计 = +利息费用总额 − 利息资本化 − 利息收入 + 未确认融资费用 − 未实现融资收益 + 承兑贴息 + 汇兑损失 − 汇兑收益 − 汇兑资本化 + 手续费及其他</li>
         <li>变动额 = 本期审定 − 上期发生额；变动率 = 变动额 / 上期 × 100%</li>
         <li>TB回写使用发生额口径，与L1~L7负债类余额口径不同！</li>
+        <li>「带入调整」：可从集中登记按科目 6603 拉取调整分录，逐笔分配到各费用项目行的本期账项/重分类调整，带入后审定数自动更新并联动附注</li>
       </ul>
     </details>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="6603 财务费用"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
@@ -264,7 +277,7 @@
  * 科目：6603 财务费用（借方/损益类！取发生额，不是余额！）
  */
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
-import { MagicStick, Check } from '@element-plus/icons-vue'
+import { MagicStick, Check, Download } from '@element-plus/icons-vue'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
 import { useL8FormData } from '../../composables/useL8FormData'
 import { useL8DualMode } from '../../composables/useL8DualMode'
@@ -273,6 +286,9 @@ import {
   L8_ADJUDICATION_ITEMS,
   type L8AdjudicationRow,
 } from '../../composables/useL8Adjudication'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import { useAuditContext } from '@/composables/useAuditContext'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import { eventBus } from '@/utils/eventBus'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
@@ -331,6 +347,32 @@ const {
   updateRow,
   saveAndWriteback,
 } = useL8Adjudication(formData, rows)
+
+// ─── 从集中登记带入调整（6603 财务费用，损益借方·发生额口径；带入本期 AJE/RJE） ────
+const bringInRows = computed(() =>
+  computedRows.value.map((r) => ({ rowKey: r.key, name: r.itemName, aje: r.currentAje, rje: r.currentRje })),
+)
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: computed(() => props.projectId) as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '6603',
+  direction: 'debit',
+  subjectCode: '6603',
+  wpCode: 'L8',
+  subjectLabel: '财务费用(6603)',
+  rows: bringInRows,
+  updateCell: (rowKey: string, field: any, value: number) => {
+    const i = rows.value.findIndex((r) => r.key === rowKey)
+    if (i >= 0) handleUpdate(i, field === 'rje' ? 'currentRje' : 'currentAje', value)
+  },
+  totalAudited: () => totalRow.value.currentAudited,
+})
 
 // ─── 拼装表格数据（10项目行+合计行+TB核对行） ────────────────────────────────
 

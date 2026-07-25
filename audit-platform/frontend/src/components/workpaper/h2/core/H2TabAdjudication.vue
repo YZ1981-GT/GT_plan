@@ -34,6 +34,16 @@
         >
           从 TB 带入工程物资
         </el-button>
+        <el-button
+          v-if="!isReadonly"
+          size="small"
+          type="primary"
+          plain
+          :loading="adjPull.loading.value"
+          @click="openBringInAdjustment"
+        >
+          <el-icon><Download /></el-icon>带入调整
+        </el-button>
         <el-tag size="small" type="info" effect="plain">
           TB·1604 未审 {{ fmtAmt(tbData.unadjusted_amount) }} / 审定 {{ fmtAmt(tbData.audited_amount) }}
         </el-tag>
@@ -360,8 +370,18 @@
         <li>三角勾稽（期末=期初+增加−减少−转固）在 H2-2 实施，本表展示异常。</li>
         <li>净值变动率≥{{ state.CHANGE_RATE_THRESHOLD }}% 须在说明(1)解释；转固情况填入说明(2)。</li>
         <li>BOT 业务按《企业会计准则解释第2号》判断确认为无形资产或长期应收款。</li>
+        <li>「带入调整」：从集中登记按科目 1604 拉取调整分录（资产借方净额=借−贷），逐笔分配到各工程的期末账项调整（增量累加），带入后审定数自动更新并联动附注。</li>
       </ul>
     </details>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="1604 在建工程"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
@@ -371,6 +391,7 @@
  * 对齐致同：原值 / 减值 / 净值 + 试算核对 + 结构化说明 + 结论 A/B/C
  */
 import { ref, computed, inject, toRef, defineComponent, h, onMounted } from 'vue'
+import { Download } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox, ElTable, ElTableColumn, ElInputNumber, ElButton } from 'element-plus'
 import http from '@/utils/http'
 import { eventBus } from '@/utils/eventBus'
@@ -381,6 +402,9 @@ import {
 } from '../../composables/useH2Adjudication'
 import { useH2CrossSheet } from '../../composables/useH2CrossSheet'
 import { cacheH2CipSnapshot, parseH2CipFromAdjudicatedEvent } from '../../composables/h2CipBridge'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
@@ -493,6 +517,34 @@ const state = useH2Adjudication({
 const h23AdjDiff = computed(
   () => state.costTotalRow.value.endAdjustment - h23Sync.value.cipAjeNet,
 )
+
+// ─── 从集中登记带入调整（1604 在建工程，资产借方；单一账项调整列→带入期末账项调整，增量累加） ───
+const bringInRows = computed(() =>
+  state.costDetailRows.value.map((r) => ({ rowKey: r.rowId, name: r.name, aje: 0, rje: 0 })),
+)
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: toRef(props, 'projectId') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '1604',
+  direction: 'debit',
+  subjectCode: '1604',
+  wpCode: 'H2',
+  subjectLabel: '在建工程(1604)',
+  rows: bringInRows,
+  // 单一账项调整列：忽略 field，读期末账项调整实时值增量累加
+  updateCell: (rowKey: string, _field: any, value: number) => {
+    const r = state.costDetailRows.value.find((x) => x.rowId === rowKey)
+    const cur = Number(r?.endAdjustment) || 0
+    state.updateCell('cost', rowKey, 'endAdjustment', cur + value)
+  },
+  totalAudited: () => state.costTotalRow.value.endAudited,
+})
 
 const costDisplayRows = computed(() => [
   ...state.costDetailRows.value,

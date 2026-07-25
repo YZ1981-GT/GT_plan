@@ -8,6 +8,14 @@
         <div class="section-title">
           <span>H5-3 调整分录</span>
           <div class="title-actions">
+            <el-tag
+              v-if="centralStatus?.review_status"
+              size="small"
+              :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
+              :title="centralStatus.rejection_reason || ''"
+            >
+              集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
+            </el-tag>
             <el-button size="small" type="default" link @click="handleReview('H5-3')">
               💬 复核
             </el-button>
@@ -99,6 +107,17 @@
       <el-button type="primary" size="small" :disabled="!state.isBalanced.value" @click="state.publishAdjustment()">
         发布到A13
       </el-button>
+      <el-button
+        size="small"
+        type="primary"
+        plain
+        :loading="centralSyncing"
+        :disabled="!state.isBalanced.value || state.entries.value.length === 0"
+        title="把本页调整分录汇聚到集中调整登记，供合伙人跨循环审阅"
+        @click="syncToCentral"
+      >
+        同步到集中登记
+      </el-button>
     </div>
 
     <!-- 审计说明 -->
@@ -129,10 +148,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, inject, onMounted, toRef } from 'vue'
+import { ref, computed, inject, onMounted, toRef, type Ref } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useH5Adjustment } from '../../composables/useH5Adjustment'
 import { useH5FormData } from '../../composables/useH5FormData'
+import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
+import { useAuditContext } from '@/composables/useAuditContext'
 import { eventBus } from '@/utils/eventBus'
 
 const props = defineProps<{
@@ -157,6 +178,27 @@ const state = useH5Adjustment({
     eventBus.emit(event as any, { ...payload, timestamp: Date.now() })
   },
 })
+
+// ─── 同步到集中调整登记（workpaper-adjustment-centralization） ───
+const { year: centralYear } = useAuditContext()
+const { centralStatus, syncing: centralSyncing, syncToCentral, refreshStatus } = useAdjustmentCentralSync({
+  projectId: toRef(props, 'projectId') as Ref<string>,
+  year: centralYear,
+  wpId: toRef(props, 'wpId') as Ref<string>,
+  wpCode: 'H5',
+  itemId: 'H5-3-entries',
+  buildLineItems: () => state.entries.value.map((e: any) => ({
+    standard_account_code: e.accountCode || undefined,
+    account_name: e.accountName,
+    debit_amount: e.debitAmount,
+    credit_amount: e.creditAmount,
+  })),
+  buildMeta: () => ({
+    description: state.entries.value.find((e: any) => e.description)?.description || 'H5 油气资产调整',
+    adjustmentType: state.entries.value.length > 0 && state.entries.value.every((e: any) => e.type === 'RJE') ? 'rje' : 'aje',
+  }),
+})
+onMounted(() => refreshStatus())
 
 // 审计结论（component-local，沿用本 entry useH5FormData 持久化契约，conclusion:null）
 const CONCLUSION_KEY = 'H5-3-audit-conclusion'

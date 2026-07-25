@@ -1,58 +1,109 @@
 <template>
   <div v-for="(list, docType) in grouped" :key="docType" class="deliverable-group">
-    <h3 class="deliverable-group__title">{{ label(docType) }}</h3>
-    <el-table :data="list" stripe size="small">
-      <el-table-column prop="file_name" label="文件名" min-width="200">
-        <template #default="{ row }">{{ row.file_name || label(row.doc_type) }}</template>
-      </el-table-column>
-      <el-table-column prop="version_no" label="版本" width="70" />
-      <el-table-column prop="status" label="状态" width="100" />
-      <el-table-column prop="exporter_name" label="导出者" width="120" />
-      <el-table-column prop="exported_at" label="导出时间" width="170">
-        <template #default="{ row }">{{ formatTime(row.exported_at) }}</template>
-      </el-table-column>
-      <el-table-column prop="file_size" label="大小" width="100">
-        <template #default="{ row }">{{ formatSize(row.file_size) }}</template>
-      </el-table-column>
-      <el-table-column label="操作" width="280" fixed="right">
-        <template #default="{ row }">
-          <el-button link type="primary" @click="emit('select', row)">选中</el-button>
-          <el-button link type="primary" @click="emit('toggle-versions', row.task_id)">版本链</el-button>
-          <el-button link type="primary" @click="emit('preview', row)">预览</el-button>
-          <el-button
-            v-if="!['confirmed', 'signed', 'archived'].includes(row.status)"
-            link
-            type="primary"
-            @click="emit('edit', row)"
-          >
-            编辑
-          </el-button>
-          <el-button link type="primary" @click="emit('download', row)">下载</el-button>
-          <el-button
-            v-if="docType === 'audit_report'"
-            link
-            type="info"
-            title="仅供项目组编制参考，不可对外出具"
-            @click="emit('download-guidance', row)"
-          >
-            下载编制参考版
-          </el-button>
-          <el-button
-            v-if="!['confirmed', 'signed', 'archived'].includes(row.status)"
-            link
-            type="danger"
-            @click="emit('delete', row)"
-          >
-            删除
-          </el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+    <div class="deliverable-group__title">
+      <el-icon class="deliverable-group__icon"><Folder /></el-icon>
+      <span>{{ label(docType) }}</span>
+      <span class="deliverable-group__count">{{ list.length }}</span>
+    </div>
+    <el-card class="deliverable-group__card" shadow="never" :body-style="{ padding: '0' }">
+      <el-table
+        :data="list"
+        size="small"
+        highlight-current-row
+        row-key="task_id"
+        :current-row-key="selectedTaskId || undefined"
+        @row-click="(row) => emit('select', row)"
+      >
+        <el-table-column prop="file_name" label="文件名" min-width="240">
+          <template #default="{ row }">
+            <div class="deliverable-file">
+              <el-icon class="deliverable-file__icon" :style="{ color: fileColor(row) }">
+                <Document />
+              </el-icon>
+              <span class="deliverable-file__name">{{ row.file_name || label(row.doc_type) }}</span>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column prop="version_no" label="版本" width="70" align="center">
+          <template #default="{ row }">
+            <span class="deliverable-ver">v{{ row.version_no }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="status" label="状态" width="100" align="center">
+          <template #default="{ row }">
+            <el-tag :type="statusTag(row.status)" size="small" effect="light" round>
+              {{ statusLabel(row.status) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="exporter_name" label="导出者" width="110">
+          <template #default="{ row }">{{ row.exporter_name || '-' }}</template>
+        </el-table-column>
+        <el-table-column prop="exported_at" label="导出时间" width="160">
+          <template #default="{ row }">
+            <span class="deliverable-time">{{ formatTime(row.exported_at) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="file_size" label="大小" width="90" align="right">
+          <template #default="{ row }">
+            <span class="deliverable-time">{{ formatSize(row.file_size) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="230" fixed="right">
+          <template #default="{ row }">
+            <div class="deliverable-actions" @click.stop>
+              <el-button link type="primary" @click="emit('preview', row)">预览</el-button>
+              <el-button
+                v-if="!locked(row.status)"
+                link
+                type="primary"
+                @click="emit('edit', row)"
+              >
+                编辑
+              </el-button>
+              <el-button link type="primary" @click="emit('download', row)">下载</el-button>
+              <el-dropdown
+                trigger="click"
+                popper-class="deliverable-more-dropdown"
+                @command="(cmd: string) => onCommand(cmd, row)"
+              >
+                <el-button link type="primary" class="deliverable-actions__more">
+                  更多<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+                </el-button>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item command="versions">
+                      <el-icon><Connection /></el-icon>版本链
+                    </el-dropdown-item>
+                    <el-dropdown-item v-if="docType === 'audit_report'" command="guidance">
+                      <el-icon><Reading /></el-icon>下载编制参考版
+                    </el-dropdown-item>
+                    <el-dropdown-item v-if="!locked(row.status)" command="delete" divided>
+                      <span class="deliverable-actions__danger">
+                        <el-icon><Delete /></el-icon>删除
+                      </span>
+                    </el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+            </div>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
   </div>
   <el-empty v-if="!Object.keys(grouped).length" description="暂无交付物，请使用上方生成入口创建" />
 </template>
 
 <script setup lang="ts">
+import {
+  ArrowDown,
+  Connection,
+  Delete,
+  Document,
+  Folder,
+  Reading,
+} from '@element-plus/icons-vue'
 import type { DeliverableItem } from '@/services/deliverableApi'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
@@ -71,6 +122,7 @@ function formatTime(v: string | null | undefined): string {
 defineProps<{
   grouped: Record<string, DeliverableItem[]>
   expandedTaskId: string | null
+  selectedTaskId?: string | null
 }>()
 
 const emit = defineEmits<{
@@ -83,6 +135,12 @@ const emit = defineEmits<{
   delete: [item: DeliverableItem]
 }>()
 
+function onCommand(cmd: string, row: DeliverableItem) {
+  if (cmd === 'versions') emit('toggle-versions', row.task_id)
+  else if (cmd === 'guidance') emit('download-guidance', row)
+  else if (cmd === 'delete') emit('delete', row)
+}
+
 const LABELS: Record<string, string> = {
   audit_report: '审计报告正文',
   financial_report: '财务报表',
@@ -92,6 +150,39 @@ const LABELS: Record<string, string> = {
 
 function label(docType: string) {
   return LABELS[docType] || docType
+}
+
+// 交付物状态 → 中文标签 + 标签色（全中文化）
+const STATUS_MAP: Record<string, { label: string; tag: 'success' | 'warning' | 'info' | 'primary' | 'danger' | '' }> = {
+  draft: { label: '草稿', tag: 'info' },
+  generated: { label: '已生成', tag: 'primary' },
+  editing: { label: '编辑中', tag: 'warning' },
+  pending_approval: { label: '待审批', tag: 'warning' },
+  confirmed: { label: '已确认', tag: 'success' },
+  signed: { label: '已签章', tag: 'success' },
+  archived: { label: '已归档', tag: 'info' },
+}
+
+function statusLabel(status: string) {
+  return STATUS_MAP[status]?.label || status
+}
+
+function statusTag(status: string) {
+  return STATUS_MAP[status]?.tag ?? ''
+}
+
+function locked(status: string) {
+  return ['confirmed', 'signed', 'archived'].includes(status)
+}
+
+// 文件图标配色：报表类（xlsx）绿，文档类（docx）蓝
+function fileColor(row: DeliverableItem) {
+  const dt = row.doc_type || ''
+  const suffix = row.file_name?.split('.').pop()?.toLowerCase()
+  if (suffix === 'xlsx' || suffix === 'xls' || dt.startsWith('financial_report')) {
+    return 'var(--el-color-success)'
+  }
+  return 'var(--el-color-primary)'
 }
 
 function formatSize(size: number | null) {
@@ -104,10 +195,97 @@ function formatSize(size: number | null) {
 
 <style scoped>
 .deliverable-group {
-  margin-bottom: 20px;
+  margin-bottom: 22px;
 }
 .deliverable-group__title {
-  margin: 0 0 8px;
-  font-size: 15px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+.deliverable-group__icon {
+  color: var(--el-color-primary);
+  font-size: 16px;
+}
+.deliverable-group__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--el-color-primary);
+  background: var(--el-color-primary-light-9);
+  border-radius: 9px;
+}
+.deliverable-group__card {
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.deliverable-group__card :deep(.el-table) {
+  font-size: 13px;
+}
+.deliverable-group__card :deep(.el-table th.el-table__cell) {
+  background: var(--el-fill-color-lighter);
+  color: var(--el-text-color-regular);
+  font-weight: 600;
+}
+.deliverable-group__card :deep(.el-table__row) {
+  cursor: pointer;
+}
+.deliverable-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.deliverable-file__icon {
+  flex-shrink: 0;
+  font-size: 16px;
+}
+.deliverable-file__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.deliverable-ver {
+  font-variant-numeric: tabular-nums;
+  color: var(--el-text-color-regular);
+}
+.deliverable-time {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+.deliverable-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.deliverable-actions__more {
+  padding-left: 4px;
+}
+.deliverable-actions__danger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--el-color-danger);
+}
+</style>
+
+<!-- 非 scoped：el-dropdown 菜单 teleport 到 body，scoped 无法命中，用 popper-class 定向 -->
+<style>
+.deliverable-more-dropdown .el-dropdown-menu__item {
+  font-size: 13px;
+  line-height: 1.6;
+  padding: 6px 14px;
+}
+.deliverable-more-dropdown .el-dropdown-menu__item .el-icon {
+  font-size: 13px;
 }
 </style>

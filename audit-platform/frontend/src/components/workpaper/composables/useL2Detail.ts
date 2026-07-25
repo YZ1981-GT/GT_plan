@@ -33,6 +33,7 @@ export interface DetailRow {
   // ── 区段A~K（来源+未审）──
   source: string              // 借款来源类别（短期借款/长期借款/应付债券）
   contractName: string        // 合同/借款名称
+  creditor: string            // 债权人名称（源模板C列）
   currency: string            // 币种
   principal: number           // 本金
   rate: number                // 年利率(%)
@@ -83,7 +84,7 @@ export const SOURCE_OPTIONS = ['短期借款利息', '长期借款利息', '应�
 
 /** 区段列映射 */
 export const AREA_GROUPS: Record<AreaGroup, string[]> = {
-  source: ['source', 'contractName', 'currency', 'principal', 'rate', 'periodStart', 'periodEnd', 'beginBalance', 'accrued', 'paid', 'endBalance'],
+  source: ['source', 'contractName', 'creditor', 'currency', 'principal', 'rate', 'periodStart', 'periodEnd', 'beginBalance', 'accrued', 'paid', 'endBalance'],
   adjustment: ['entityReclass', 'endUnadjusted', 'aje', 'rje', 'audited'],
   audited: ['adjustedBegin', 'adjustedAccrued', 'adjustedPaid', 'adjustedEnd'],
   overdue: ['overdueMonths', 'overdueReason', 'pledgeType', 'noteRef', 'isOverdue', 'remark'],
@@ -118,6 +119,7 @@ function normalizeRow(raw: any): DetailRow {
     rowId: raw.rowId || generateRowId(),
     source: raw.source || '',
     contractName: raw.contractName || '',
+    creditor: raw.creditor || '',
     currency: raw.currency || 'CNY',
     principal: parseNum(raw.principal),
     rate: parseNum(raw.rate),
@@ -174,6 +176,7 @@ export function createEmptyRow(source?: string): DetailRow {
     rowId: generateRowId(),
     source: source || '',
     contractName: '',
+    creditor: '',
     currency: 'CNY',
     principal: 0,
     rate: 0,
@@ -247,6 +250,7 @@ export function useL2Detail(options: UseL2DetailOptions) {
       rowId: '__subtotal__',
       source: '',
       contractName: '合计',
+      creditor: '',
       currency: '',
       principal: calcSubtotal(allRows.map(r => r.principal)),
       rate: 0,

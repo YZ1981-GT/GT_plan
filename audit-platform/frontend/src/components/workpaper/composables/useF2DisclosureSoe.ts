@@ -296,7 +296,8 @@ export function useF2DisclosureSoe(options: {
     debounceSave()
     try {
       window.dispatchEvent(new CustomEvent('disclosure:note-text-updated', {
-        detail: { wpCode: 'F2', section, text: val },
+        // 存货 soe → 八、10（note_template_variant_matrix）
+        detail: { wpCode: 'F2', accountCode: '1405', section, sectionIds: ['八、10'], text: val },
       }))
     } catch { /* silent */ }
   }

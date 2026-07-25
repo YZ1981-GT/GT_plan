@@ -76,6 +76,23 @@ function generateRowId(): string {
   return `row-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
+/** 源模板 N2-2 明细表默认 13 类标准税种（与 N2-1 审定表同源） */
+export const N2_DEFAULT_TAX_TYPES: string[] = [
+  '企业所得税',
+  '增值税',
+  '消费税',
+  '资源税',
+  '土地增值税',
+  '城市维护建设税',
+  '车船牌照税',
+  '房产税',
+  '土地使用税',
+  '教育费附加',
+  '矿产资源补偿费',
+  '代扣代缴外国企业所得税',
+  '代扣代缴个人所得税',
+]
+
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export interface UseN2DetailOptions {
@@ -177,6 +194,31 @@ export function useN2Detail(options: UseN2DetailOptions) {
   }
 
   /**
+   * 预置源模板 N2-2 明细表 13 类标准税种（仅当前为空时生效，避免覆盖已录数据）。
+   * 对齐致同 N2-2 明细表固定税种行（与 N2-1 审定表同源）。
+   */
+  async function seedDefaultRows(): Promise<void> {
+    const stored = getField('2', 'rows') || []
+    const raw: any[] = Array.isArray(stored) ? [...stored] : []
+    if (raw.length > 0) return
+    for (const taxType of N2_DEFAULT_TAX_TYPES) {
+      raw.push({
+        id: generateRowId(),
+        taxType,
+        subItem: '',
+        taxBase: 0,
+        taxRate: 0,
+        beginning: 0,
+        accrual: 0,
+        payment: 0,
+        declaredAmount: 0,
+        conclusion: '',
+      })
+    }
+    await saveField('2', 'rows', raw)
+  }
+
+  /**
    * 删除指定行
    */
   async function removeRow(rowId: string): Promise<void> {
@@ -219,6 +261,7 @@ export function useN2Detail(options: UseN2DetailOptions) {
     summary,
     diffRowIds,
     addRow,
+    seedDefaultRows,
     removeRow,
     updateRow,
     syncSummary,

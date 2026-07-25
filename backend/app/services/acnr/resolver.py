@@ -223,11 +223,9 @@ def _detect_non_wp_domain(
 
     if formula_ref:
         upper = formula_ref.strip().upper()
-        for func in _NON_WP_FORMULA_FUNCS:
-            if upper.startswith(func):
-                return func.rstrip("(").lower()
-                # 映射 ROW/SUM_ROW → report, SUM_TB → tb
-        # 细粒度映射
+        # 细粒度映射到 canonical 域（tb/report/note/aux）——不能用
+        # `func.rstrip("(").lower()` 一刀切，否则 ROW(/SUM_ROW(/SUM_TB( 会返回
+        # 非 canonical 的 "row"/"sum_row"/"sum_tb"，污染 metrics domain 维度。
         if upper.startswith("ROW(") or upper.startswith("SUM_ROW(") or upper.startswith("REPORT("):
             return "report"
         if upper.startswith("TB(") or upper.startswith("SUM_TB("):

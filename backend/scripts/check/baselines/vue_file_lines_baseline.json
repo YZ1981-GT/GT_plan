@@ -71,7 +71,7 @@
     "audit-platform/frontend/src/components/report/MultiYearCompare.vue": 548,
     "audit-platform/frontend/src/components/workpaper/ExpenseAnalysisDialog.vue": 545,
     "audit-platform/frontend/src/components/panorama/ForceGraph.vue": 538,
-    "audit-platform/frontend/src/components/workpaper/WorkpaperAssignmentMatrix.vue": 538,
+    "audit-platform/frontend/src/components/workpaper/WorkpaperAssignmentMatrix.vue": 692,
     "audit-platform/frontend/src/components/workpaper/FairValueTestDialog.vue": 532,
     "audit-platform/frontend/src/views/WorkpaperList.vue": 530,
     "audit-platform/frontend/src/components/notes/NoteTableEditor.vue": 529,

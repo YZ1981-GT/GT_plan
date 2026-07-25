@@ -14,6 +14,7 @@ import { useE1AiGenerate } from '../composables/useE1AiGenerate'
 import GtIndexChip from '../GtIndexChip.vue'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { amountFormatter, amountParser } from '../composables/wpAmountInput'
 
 const props = defineProps<{
   wpId: string
@@ -250,17 +251,17 @@ async function generateNarrative(kind: 'note' | 'conclusion' | 'anomaly'): Promi
           </el-tab-pane>
           <el-tab-pane label="人民币余额链">
             <el-form label-width="150px" class="dialog-grid">
-              <el-form-item label="期初余额"><el-input-number :model-value="editingRow.opening" :disabled="isReadonly || variant === 'multi'" :controls="false" @change="(v: number | undefined) => updateCell(editingRow!.id, 'opening', v ?? 0)" /></el-form-item>
-              <el-form-item label="本期增加"><el-input-number :model-value="editingRow.increase" :disabled="isReadonly || variant === 'multi'" :controls="false" @change="(v: number | undefined) => updateCell(editingRow!.id, 'increase', v ?? 0)" /></el-form-item>
-              <el-form-item label="本期减少"><el-input-number :model-value="editingRow.decrease" :disabled="isReadonly || variant === 'multi'" :controls="false" @change="(v: number | undefined) => updateCell(editingRow!.id, 'decrease', v ?? 0)" /></el-form-item>
+              <el-form-item label="期初余额"><el-input-number :model-value="editingRow.opening" :disabled="isReadonly || variant === 'multi'" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" @change="(v: number | undefined) => updateCell(editingRow!.id, 'opening', v ?? 0)" /></el-form-item>
+              <el-form-item label="本期增加"><el-input-number :model-value="editingRow.increase" :disabled="isReadonly || variant === 'multi'" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" @change="(v: number | undefined) => updateCell(editingRow!.id, 'increase', v ?? 0)" /></el-form-item>
+              <el-form-item label="本期减少"><el-input-number :model-value="editingRow.decrease" :disabled="isReadonly || variant === 'multi'" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" @change="(v: number | undefined) => updateCell(editingRow!.id, 'decrease', v ?? 0)" /></el-form-item>
               <el-form-item label="期末余额（计算）"><el-input :model-value="displayPrefs.fmtAmount(editingRow.ending)" disabled /></el-form-item>
-              <el-form-item label="账项调整"><el-input-number :model-value="editingRow.adjustment" :disabled="isReadonly || variant === 'multi'" :controls="false" @change="(v: number | undefined) => updateCell(editingRow!.id, 'adjustment', v ?? 0)" /></el-form-item>
+              <el-form-item label="账项调整"><el-input-number :model-value="editingRow.adjustment" :disabled="isReadonly || variant === 'multi'" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" @change="(v: number | undefined) => updateCell(editingRow!.id, 'adjustment', v ?? 0)" /></el-form-item>
               <el-form-item label="审定数（计算）"><el-input :model-value="displayPrefs.fmtAmount(editingRow.audited)" disabled /></el-form-item>
-              <el-form-item label="银行对账单余额"><el-input-number :model-value="editingRow.statementBalance" :disabled="isReadonly" :controls="false" @change="(v: number | undefined) => updateCell(editingRow!.id, 'statementBalance', v ?? 0)" /></el-form-item>
+              <el-form-item label="银行对账单余额"><el-input-number :model-value="editingRow.statementBalance" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" @change="(v: number | undefined) => updateCell(editingRow!.id, 'statementBalance', v ?? 0)" /></el-form-item>
               <el-form-item label="账面对账单差异"><el-input :model-value="displayPrefs.fmtAmount(editingRow.accountStatementDiff)" disabled /></el-form-item>
-              <el-form-item label="回函确认金额"><el-input-number :model-value="editingRow.confirmAmount" :disabled="isReadonly" :controls="false" @change="(v: number | undefined) => updateCell(editingRow!.id, 'confirmAmount', v ?? 0)" /></el-form-item>
+              <el-form-item label="回函确认金额"><el-input-number :model-value="editingRow.confirmAmount" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" @change="(v: number | undefined) => updateCell(editingRow!.id, 'confirmAmount', v ?? 0)" /></el-form-item>
               <el-form-item label="函证差异"><el-input :model-value="displayPrefs.fmtAmount(editingRow.confirmDiff)" disabled /></el-form-item>
-              <el-form-item label="受限金额"><el-input-number :model-value="editingRow.restrictedAmount" :disabled="isReadonly" :controls="false" @change="(v: number | undefined) => updateCell(editingRow!.id, 'restrictedAmount', v ?? 0)" /></el-form-item>
+              <el-form-item label="受限金额"><el-input-number :model-value="editingRow.restrictedAmount" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" @change="(v: number | undefined) => updateCell(editingRow!.id, 'restrictedAmount', v ?? 0)" /></el-form-item>
               <el-form-item label="受限原因"><el-input :model-value="editingRow.restrictedReason" :disabled="isReadonly" @change="(v: string) => updateCell(editingRow!.id, 'restrictedReason', v)" /></el-form-item>
             </el-form>
           </el-tab-pane>
@@ -268,11 +269,11 @@ async function generateNarrative(kind: 'note' | 'conclusion' | 'anomaly'): Promi
             <el-form label-width="150px" class="dialog-grid">
               <el-form-item label="原币币种"><el-input :model-value="editingRow.fxCurrency" :disabled="isReadonly" @change="(v: string) => updateCell(editingRow!.id, 'fxCurrency', v)" /></el-form-item>
               <el-form-item label="期末汇率"><el-input-number :model-value="editingRow.fxRate" :disabled="isReadonly" :controls="false" :precision="6" @change="(v: number | undefined) => updateCell(editingRow!.id, 'fxRate', v ?? 1)" /></el-form-item>
-              <el-form-item label="期初原币"><el-input-number :model-value="editingRow.openingFc" :disabled="isReadonly" :controls="false" @change="(v: number | undefined) => updateCell(editingRow!.id, 'openingFc', v ?? 0)" /></el-form-item>
-              <el-form-item label="增加原币"><el-input-number :model-value="editingRow.increaseFc" :disabled="isReadonly" :controls="false" @change="(v: number | undefined) => updateCell(editingRow!.id, 'increaseFc', v ?? 0)" /></el-form-item>
-              <el-form-item label="减少原币"><el-input-number :model-value="editingRow.decreaseFc" :disabled="isReadonly" :controls="false" @change="(v: number | undefined) => updateCell(editingRow!.id, 'decreaseFc', v ?? 0)" /></el-form-item>
+              <el-form-item label="期初原币"><el-input-number :model-value="editingRow.openingFc" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" @change="(v: number | undefined) => updateCell(editingRow!.id, 'openingFc', v ?? 0)" /></el-form-item>
+              <el-form-item label="增加原币"><el-input-number :model-value="editingRow.increaseFc" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" @change="(v: number | undefined) => updateCell(editingRow!.id, 'increaseFc', v ?? 0)" /></el-form-item>
+              <el-form-item label="减少原币"><el-input-number :model-value="editingRow.decreaseFc" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" @change="(v: number | undefined) => updateCell(editingRow!.id, 'decreaseFc', v ?? 0)" /></el-form-item>
               <el-form-item label="期末原币（计算）"><el-input :model-value="displayPrefs.fmtAmount(editingRow.endingFc)" disabled /></el-form-item>
-              <el-form-item label="调整原币"><el-input-number :model-value="editingRow.adjustmentFc" :disabled="isReadonly" :controls="false" @change="(v: number | undefined) => updateCell(editingRow!.id, 'adjustmentFc', v ?? 0)" /></el-form-item>
+              <el-form-item label="调整原币"><el-input-number :model-value="editingRow.adjustmentFc" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" @change="(v: number | undefined) => updateCell(editingRow!.id, 'adjustmentFc', v ?? 0)" /></el-form-item>
               <el-form-item label="审定原币（计算）"><el-input :model-value="displayPrefs.fmtAmount(editingRow.auditedFc)" disabled /></el-form-item>
             </el-form>
           </el-tab-pane>

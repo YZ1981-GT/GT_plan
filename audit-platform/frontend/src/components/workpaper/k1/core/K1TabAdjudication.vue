@@ -119,6 +119,9 @@
         <div class="section-title">
           <span>一、其他应收款（不含应收利息、应收股利）</span>
           <div class="title-actions">
+            <el-button size="small" type="warning" plain :disabled="isReadonly" :loading="recAdjPull.loading.value" @click="openRecBringIn">
+              <el-icon><Download /></el-icon> 带入调整
+            </el-button>
             <el-button size="small" type="default" link @click="handleReview('K1-1-receivable')">💬 复核</el-button>
           </div>
         </div>
@@ -164,6 +167,9 @@
         <div class="section-title">
           <span>{{ badDebtSection?.sectionLabel }}</span>
           <div class="title-actions">
+            <el-button size="small" type="warning" plain :disabled="isReadonly" :loading="bdAdjPull.loading.value" @click="openBdBringIn">
+              <el-icon><Download /></el-icon> 带入调整
+            </el-button>
             <el-button size="small" type="default" link @click="handleReview('K1-1-baddebt')">💬 复核</el-button>
           </div>
         </div>
@@ -347,9 +353,27 @@
         <li>三角勾稽：期末=期初+增加-减少，差额须为0</li>
         <li>审定数=未审数+AJE+RJE，未审数从TB自动取入(只读)</li>
         <li>K1-4 保存后可「从 K1-4 回写 AJE/RJE」，1221/1231 净额按未审数权重分摊至各行</li>
+        <li>「带入调整」：应收原值(1221)/坏账准备(1231)各按科目拉取调整分录，逐笔选目标组合行累加到期末 AJE/RJE，带入后自动联动披露/附注；账龄/性质分布表为同一余额的分析视图（二级），不在带入范围</li>
         <li>"确认审定"将回写trial_balance(1221+坏账准备)并发布EventBus事件</li>
       </ul>
     </details>
+
+    <AdjudicationBringInDialog
+      v-model="recBringInVisible"
+      :matches="recAdjPull.matches.value"
+      :row-options="recBringInRowOptions"
+      subject-label="1221 其他应收款原值"
+      :loading="recAdjPull.loading.value"
+      @apply="onRecBringInApply"
+    />
+    <AdjudicationBringInDialog
+      v-model="bdBringInVisible"
+      :matches="bdAdjPull.matches.value"
+      :row-options="bdBringInRowOptions"
+      subject-label="1231 坏账准备"
+      :loading="bdAdjPull.loading.value"
+      @apply="onBdBringInApply"
+    />
   </div>
 </template>
 
@@ -361,11 +385,14 @@
  * 双区块(1221+坏账准备)+净值+47公式+三角勾稽+TB回写+89行虚拟滚动
  */
 import { ref, computed, inject, toRef, onMounted, onBeforeUnmount, nextTick } from 'vue'
-import { MagicStick } from '@element-plus/icons-vue'
+import { MagicStick, Download } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import type { UploadFile } from 'element-plus'
 import http from '@/utils/http'
 import { eventBus } from '@/utils/eventBus'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import { useK1Adjudication, type K1AdjRow, type K14WritebackScope, type K1AdjudicationPrefill } from '../../composables/useK1Adjudication'
 import { useK1FormData } from '../../composables/useK1FormData'
 import { useK1CrossSheet } from '../../composables/useK1CrossSheet'
@@ -530,6 +557,47 @@ const publishing = ref(false)
 const receivableSection = computed(() => adjudicationSections.value[0])
 const badDebtSection = computed(() => adjudicationSections.value[1])
 const netValueSection = computed(() => adjudicationSections.value[2])
+
+// ─── 从集中登记带入调整（K1 双科目：应收原值1221借方 + 坏账准备1231贷方，两独立流） ──
+// 目标行为组合计提方式行（单项计提/账龄组合/客户类型组合/其他组合），带入至期末 AJE/RJE 列。
+// 账龄/性质分布表为同一余额的分析性拆分视图（二级），不在带入范围。
+const {
+  adjPull: recAdjPull,
+  visible: recBringInVisible,
+  rowOptions: recBringInRowOptions,
+  open: openRecBringIn,
+  apply: onRecBringInApply,
+} = useAdjudicationBringIn({
+  projectId: toRef(props, 'projectId') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '1221',
+  direction: 'debit', // 其他应收款原值（资产借方）：净发生额 = 借 − 贷
+  subjectCode: '1221',
+  wpCode: 'K1',
+  subjectLabel: '其他应收款原值(1221)',
+  rows: computed(() => (receivableSection.value?.rows ?? []).map(r => ({ rowKey: r.rowKey, name: r.label, aje: r.aje, rje: r.rje }))),
+  updateCell: (rowKey: string, field: any, value: number) => { writeRowField('receivable', rowKey, field, value); persistAuditedTotals() },
+  totalAudited: () => receivableSection.value?.subtotalRow.audited ?? 0,
+})
+
+const {
+  adjPull: bdAdjPull,
+  visible: bdBringInVisible,
+  rowOptions: bdBringInRowOptions,
+  open: openBdBringIn,
+  apply: onBdBringInApply,
+} = useAdjudicationBringIn({
+  projectId: toRef(props, 'projectId') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '1231',
+  direction: 'credit', // 坏账准备（备抵/贷方）：净发生额 = 贷 − 借
+  subjectCode: '1231',
+  wpCode: 'K1',
+  subjectLabel: '坏账准备(1231)',
+  rows: computed(() => (badDebtSection.value?.rows ?? []).map(r => ({ rowKey: r.rowKey, name: r.label, aje: r.aje, rje: r.rje }))),
+  updateCell: (rowKey: string, field: any, value: number) => { writeRowField('baddebt', rowKey, field, value); persistAuditedTotals() },
+  totalAudited: () => badDebtSection.value?.subtotalRow.audited ?? 0,
+})
 
 const receivableDisplayRows = computed((): K1AdjRow[] => {
   const sec = receivableSection.value

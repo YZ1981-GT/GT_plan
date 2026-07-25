@@ -214,8 +214,10 @@
  * - 审计结论区（el-card包裹）
  * - 使用 useM10InstrumentCheck composable
  */
-import { computed, inject, onMounted } from 'vue'
+import { computed, inject, onMounted, ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, Check, CircleCheckFilled, CircleCloseFilled } from '@element-plus/icons-vue'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
 import { useM10FormData } from '../../composables/useM10FormData'
 import { useM10InstrumentCheck } from '../../composables/useM10InstrumentCheck'
@@ -249,8 +251,29 @@ const instrumentCheck = useM10InstrumentCheck(formData)
 
 // ─── Handlers ────────────────────────────────────────────────────────────────
 
-function handleAI(_section: string) {
-  // AI辅助钩子（Phase 6集成）
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
+
+async function handleAI(section: string) {
+  if (props.isReadonly) return
+  aiLoading.value = section
+  let text = ''
+  try {
+    const items = instrumentCheck.checkItems.value
+    const done = items.filter(i => i.status && i.status !== 'pending').length
+    const context: Record<string, string> = {
+      科目: '4003 其他权益工具 / 其他权益工具检查表（M10-5）',
+      区段: section,
+      检查项总数: String(items.length),
+      已完成检查项: String(done),
+    }
+    text = await generateAiText({ section: `m10-5-${section}`, context })
+  } catch {
+    ElMessage.warning('AI 生成失败，请稍后重试'); aiLoading.value = ''; return
+  }
+  aiLoading.value = ''
+  if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+  ElMessageBox.alert(text, 'AI 辅助 — 其他权益工具检查建议', { confirmButtonText: '知道了' }).catch(() => { /* 用户关闭 */ })
 }
 
 function handleReview() {

@@ -43,6 +43,9 @@
     </div>
 
     <div class="action-bar">
+      <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
+        <el-icon><Download /></el-icon>带入调整
+      </el-button>
       <el-button size="small" plain :disabled="isReadonly" :loading="isLoadingTb" data-testid="i2-1-load-tb" @click="handleLoadTb()">从 TB 带入</el-button>
       <el-button size="small" type="primary" plain :disabled="isReadonly" data-testid="i2-1-seed-i22" @click="handleSeedI22">从 I2-2 带入</el-button>
       <el-button size="small" plain :disabled="isReadonly" @click="handleSyncI23">从 I2-3 同步调整</el-button>
@@ -227,6 +230,7 @@
           <li>记录识别的特别风险、重大异常交易、关联方及会计估计相关事项；</li>
           <li>逐项列示审计调整并交叉索引至 I2-3 / 支持性底稿；</li>
           <li>说明与 TB、明细表、附注披露的勾稽结果。</li>
+          <li>「带入调整」：从集中登记按科目 1717 拉取调整分录，逐笔分配到各项目的账项调整列，带入后审定数自动更新并联动附注。</li>
         </ul>
       </details>
     </el-card>
@@ -242,6 +246,15 @@
         @change="(v: string) => saveAuditField('conclusion', v)"
       />
     </el-card>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="1717 开发支出"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
@@ -252,6 +265,10 @@ import GtIndexChip from '../../GtIndexChip.vue'
 import { useI2Adjudication, formatChangeRate } from '../../composables/useI2Adjudication'
 import { fetchI2TbData, persistI2TbData, type I2TbData } from '../../composables/useI2FormData'
 import { useI2ImportExport } from '../../composables/useI2ImportExport'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { Download } from '@element-plus/icons-vue'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import http from '@/utils/http'
 
 const props = defineProps<{
@@ -331,6 +348,34 @@ const displayRows = computed(() => [
   { ...tbRow.value, _footer: true },
   { ...diffRow.value, _footer: true },
 ])
+
+// ─── 从集中登记带入调整（1717 开发支出，资产借方；单一「账项调整」列 endAdj，读实时值增量累加） ───
+const bringInRows = computed(() =>
+  rows.value.map((r) => ({ rowKey: r.rowId, name: r.projectName, aje: 0, rje: 0 })),
+)
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: computed(() => props.projectId) as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '1717',
+  direction: 'debit',
+  subjectCode: '1717',
+  wpCode: 'I2',
+  subjectLabel: '开发支出(1717)',
+  rows: bringInRows,
+  // 单一「账项调整」列：aje/rje 净额均累加至 endAdj（读取实时值做增量累加）
+  updateCell: (rowKey: string, _field: any, value: number) => {
+    const row = rows.value.find((r) => r.rowId === rowKey)
+    const live = Number(row?.endAdj) || 0
+    updateRow(rowKey, 'endAdj', Math.round((live + value) * 100) / 100)
+  },
+  totalAudited: () => summary.value.endAudited,
+})
 
 function rowClassName({ row }: { row: any }) {
   if (row.projectName === '合计') return 'total-row'

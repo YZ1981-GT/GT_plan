@@ -629,6 +629,19 @@ def _safe_decimal(val) -> Optional[Decimal]:
         return None
 
 
+def _first_decimal(*vals) -> Optional[Decimal]:
+    """按顺序返回首个可解析为 Decimal 的值（Decimal(0) 视为有值），全缺返回 None。
+
+    禁用 ``or``：Decimal(0) 是合法值但 falsy。与 v2 converter._first_decimal 口径一致
+    （年度优先 + 月度兜底）。
+    """
+    for v in vals:
+        d = _safe_decimal(v)
+        if d is not None:
+            return d
+    return None
+
+
 def _parse_date_val(val) -> Optional[date]:
     if val is None:
         return None
@@ -1034,16 +1047,11 @@ def convert_balance_rows(rows: list[dict]) -> tuple[list[dict], list[dict]]:
         account_name = str(row.get("account_name", "")).strip()
         company_code = str(row.get("company_code", "")).strip() or "default"
 
-        # ── 期初 ──
-        od = _safe_decimal(row.get("opening_debit"))
-        oc = _safe_decimal(row.get("opening_credit"))
+        # ── 期初：年度优先（年初 → 期初分列），月度兜底（与 v2 converter 同步）──
+        od = _first_decimal(row.get("year_opening_debit"), row.get("opening_debit"))
+        oc = _first_decimal(row.get("year_opening_credit"), row.get("opening_credit"))
         opening_bal = _safe_decimal(row.get("opening_balance"))
         opening_dir = row.get("opening_direction") or row.get("direction")
-
-        # 年初余额作为备选
-        if od is None and oc is None and opening_bal is None:
-            od = _safe_decimal(row.get("year_opening_debit"))
-            oc = _safe_decimal(row.get("year_opening_credit"))
 
         # 分列模式：有借贷分列 → 保留原始借贷，同时算净额
         if od is not None or oc is not None:
@@ -1077,8 +1085,9 @@ def convert_balance_rows(rows: list[dict]) -> tuple[list[dict], list[dict]]:
         else:
             closing_balance = closing_bal
 
-        debit_amount = _safe_decimal(row.get("debit_amount"))
-        credit_amount = _safe_decimal(row.get("credit_amount"))
+        # ── 发生额：本年累计优先（year_debit/credit），本期兜底（与 v2 converter 同步）──
+        debit_amount = _first_decimal(row.get("year_debit"), row.get("debit_amount"))
+        credit_amount = _first_decimal(row.get("year_credit"), row.get("credit_amount"))
 
         # 核算维度处理（支持单列表"核算维度"和多列表"辅助类型+辅助编码+辅助名称"两种格式）
         aux_dim_str = str(row.get("aux_dimensions", "")).strip()

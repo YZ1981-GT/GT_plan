@@ -50,6 +50,7 @@ from app.routers.wp_render_config_helpers import (  # noqa: F401
     _CONFIRMATION_FORMAT_MAP,
     _HEURISTIC_TO_SHEET_CONTENT_TYPE,
     _confirmation_initial_data,
+    _inject_confirmation_population,
     _extract_field_sources,
     _has_custom_procedure,
     _infer_sheet_type_by_heuristic,
@@ -86,13 +87,26 @@ def _sheet_name_matches(actual: str | None, requested: str | None) -> bool:
     含空格）不完全一致，导致 render-config 精确过滤 `!=` 全部落空 → 返回空 sheets →
     前端程序表兜底去请求不存在的 `/procedure-tables/J1` → 「程序表模板缺失」告警 + 空表。
     去掉空白后比较可覆盖这类空格/全半角空格差异，且不会误匹配带后缀的 sheet（如 -原版）。
+
+    二次回退：程序表类尾码一致即视为匹配。前端 cycleProcedureSheets 注册的 sheetLabel
+    存在科目前缀漂移（K 循环用「其他应付款实质性程序表K3A」，模板真实名却是「实质性程序表K3A」，
+    无前缀），空格回退无法覆盖前缀差异 → 程序表控制台「程序表数据加载失败」。仅对以字母结尾
+    的程序表尾码（如 K3A/D4A/J1A）放宽，绝不误匹配审定表/明细表（K3-1/K3-2，尾码以数字结尾）。
     """
     if actual == requested:
         return True
     if not actual or not requested:
         return False
     _strip = str.maketrans("", "", " \u3000\t")
-    return actual.translate(_strip) == requested.translate(_strip)
+    if actual.translate(_strip) == requested.translate(_strip):
+        return True
+    a_code = _SHEET_CODE_RE.search(actual)
+    r_code = _SHEET_CODE_RE.search(requested)
+    if a_code and r_code:
+        ac, rc = a_code.group(1), r_code.group(1)
+        if ac == rc and ac[-1:].isalpha():
+            return True
+    return False
 
 
 _TEMPLATE_SHEET_ORDER_CACHE: dict[str, tuple[float, dict[str, int]]] = {}
@@ -849,6 +863,15 @@ async def _get_render_config_impl(
         # skip 类 sheet 不加入输出（隐藏的辅助说明 sheet）
         if component_type == "skip":
             continue
+        # 函证覆盖率 population：向 confirmation-summary 注入科目审定总额（TB）作覆盖率分母。
+        # 加法式，不改 rows/_format；不可解析时注入 null（前端显示"不可用"，Skip-on-missing）。
+        if component_type == "confirmation-summary" and isinstance(sheet_html_data, dict):
+            try:
+                await _inject_confirmation_population(
+                    db, project_id, _prog_year, sheet_html_data
+                )
+            except Exception:  # noqa: BLE001 — 注入失败不阻断渲染
+                pass
         sheets.append({"sheet_name": cls.sheet_name, "componentType": component_type,
                        "schema": sheet_schema, "html_data": sheet_html_data,
                        "cross_refs": [i.model_dump() for i in cross_ref_items],

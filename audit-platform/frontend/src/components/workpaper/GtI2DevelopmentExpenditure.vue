@@ -434,7 +434,8 @@ const currentSheet = computed(() => {
 })
 
 const showHtmlToolbar = computed(() => {
-  return currentSheet.value !== ''
+  // 目录页（I2）不显示头部工具栏（无复核对象/无需双模式）
+  return currentSheet.value !== '' && currentSheet.value !== 'I2'
 })
 
 // ─── 6.2 / 6.3: useI2CrossSheet（I6↔I2 双向 + I2→I1 转入联动）──────────────

@@ -288,6 +288,7 @@
     <!-- ═══ 新增行按钮 ═══ -->
     <div v-if="!isReadonly" class="add-row-bar">
       <el-button size="small" type="primary" @click="handleAddRow">+ 新增应纳税暂时性差异项目</el-button>
+      <el-button v-if="rows.length === 0" size="small" @click="handleSeedDefaults">预置源模板常见项目（10项）</el-button>
     </div>
 
     <!-- ═══ 编制提示（折叠底部） ═══ -->
@@ -355,12 +356,12 @@ const props = defineProps<{
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 /** N3-1审定表分类选项（对应SUMIF汇总） */
+/** N3-1/N3-2 分类选项（对齐致同源模板 N3-1 审定表固定 5 类） */
 const CATEGORIES = [
-  '固定资产折旧差异',
+  '评估增值',
   '公允价值变动',
-  '一次性税前扣除',
-  '长期股权投资',
-  '商誉',
+  '使用权资产',
+  '购入摊销年限大于税法规定的资产',
   '其他',
 ]
 
@@ -413,6 +414,7 @@ const {
   reversedRowIds,
   specialRowIds,
   addRow,
+  seedDefaultRows,
   removeRow,
   updateRow,
   syncSummary,
@@ -492,6 +494,23 @@ async function handleAddRow() {
     await addRow(itemName, '其他')
     await syncSummary()
     ElMessage.success(`已新增：${itemName}`)
+  } catch {
+    // 用户取消
+  }
+}
+
+// ─── 预置源模板常见项目 ──────────────────────────────────────────────────────
+
+async function handleSeedDefaults() {
+  try {
+    await ElMessageBox.confirm(
+      '将预置致同源模板 N3-2 的 10 项常见应纳税暂时性差异项目（金额为0，可按被审计单位税收情况增减）。仅在当前明细为空时生效。',
+      '预置常见项目',
+      { type: 'info', confirmButtonText: '预置', cancelButtonText: '取消' },
+    )
+    await seedDefaultRows()
+    await syncSummary()
+    ElMessage.success('已预置源模板常见项目')
   } catch {
     // 用户取消
   }

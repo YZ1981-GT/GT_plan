@@ -8,7 +8,7 @@
         <el-tag type="success" size="small">国企·元</el-tag>
       </div>
       <div class="section-header-right">
-        <el-button size="small" @click="handleAI('disclosure-soe')">
+        <el-button size="small" :loading="aiLoading === 'disclosure-soe'" :disabled="isReadonly" @click="handleAI('disclosure-soe')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
         <el-button size="small" @click="handleReview">
@@ -32,7 +32,7 @@
       <template #header>
         <div class="card-header">
           <span>实收资本变动明细（单位：元）</span>
-          <el-button size="small" @click="handleAI('section-capital-change')">
+          <el-button size="small" :loading="aiLoading === 'section-capital-change'" :disabled="isReadonly" @click="handleAI('section-capital-change')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </div>
@@ -101,7 +101,7 @@
       <template #header>
         <div class="card-header">
           <span>国有资本出资情况说明</span>
-          <el-button size="small" @click="handleAI('section-state-capital')">
+          <el-button size="small" :loading="aiLoading === 'section-state-capital'" :disabled="isReadonly" @click="handleAI('section-state-capital')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </div>
@@ -121,7 +121,7 @@
       <template #header>
         <div class="card-header">
           <span>出资方式说明</span>
-          <el-button size="small" @click="handleAI('section-method')">
+          <el-button size="small" :loading="aiLoading === 'section-method'" :disabled="isReadonly" @click="handleAI('section-method')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </div>
@@ -141,7 +141,7 @@
       <template #header>
         <div class="card-header">
           <span>验资及工商登记情况</span>
-          <el-button size="small" @click="handleAI('section-registration')">
+          <el-button size="small" :loading="aiLoading === 'section-registration'" :disabled="isReadonly" @click="handleAI('section-registration')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </div>
@@ -189,7 +189,9 @@
  */
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
 import { MagicStick, Check } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import { useM2FormData } from '../../composables/useM2FormData'
 
 const props = defineProps<{
@@ -203,6 +205,8 @@ const emit = defineEmits<{
 }>()
 
 const openReviewDialog = inject<((sectionId: string, sectionLabel?: string) => void) | null>('openReviewDialog', null)
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
 
 // ─── FormData ───────────────────────────────────────────────────────────────
 
@@ -270,7 +274,46 @@ function handleNoteChange(section: string, value: string) {
   formData.debouncedSave(`M2-disclosure-soe-${section}`, { remark: value || null })
 }
 
-function handleAI(_section: string) { /* AI辅助待集成 */ }
+// section → { ref, 持久化key } 映射
+const AI_TARGETS: Record<string, { get: () => string; set: (v: string) => void; key: string }> = {
+  'section-method': { get: () => methodNote.value, set: (v) => (methodNote.value = v), key: 'method' },
+  'section-registration': { get: () => registrationNote.value, set: (v) => (registrationNote.value = v), key: 'registration' },
+  'section-state-capital': { get: () => stateCapitalNote.value, set: (v) => (stateCapitalNote.value = v), key: 'state-capital' },
+  // 顶部/实收资本变动明细（表格无独立文本区）→ 归入"国有资本出资情况说明"
+  'disclosure-soe': { get: () => stateCapitalNote.value, set: (v) => (stateCapitalNote.value = v), key: 'state-capital' },
+  'section-capital-change': { get: () => stateCapitalNote.value, set: (v) => (stateCapitalNote.value = v), key: 'state-capital' },
+}
+
+function buildContext(): Record<string, string> {
+  const totalRow = capitalChangeRows.value.find((r) => r.item === '合计')
+  return {
+    披露类型: '国有企业实收资本附注（单位：元）',
+    科目: '4001 实收资本',
+    期末余额合计: totalRow ? fmtAmount(totalRow.endAmount) : '—',
+    本期增加合计: totalRow ? fmtAmount(totalRow.increaseAmount) : '—',
+    本期减少合计: totalRow ? fmtAmount(totalRow.decreaseAmount) : '—',
+  }
+}
+
+async function handleAI(section: string) {
+  if (props.isReadonly) return
+  const target = AI_TARGETS[section] || AI_TARGETS['disclosure-soe']
+  aiLoading.value = section
+  try {
+    const text = await generateAiText({
+      section: `m2-disclosure-soe-${target.key}`,
+      context: buildContext(),
+      existingContent: target.get(),
+    })
+    if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+    target.set(text)
+    handleNoteChange(target.key, text)
+  } catch {
+    ElMessage.warning('AI 生成失败，请稍后重试')
+  } finally {
+    aiLoading.value = ''
+  }
+}
 function handleReview() { openReviewDialog?.('M2-disclosure-soe', '附注披露（国企）') }
 
 function fmtAmount(val: number): string {

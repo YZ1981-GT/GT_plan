@@ -149,6 +149,15 @@ export function deliverableDownloadUrl(projectId: string, taskId: string, versio
   return deliverables.download(projectId, taskId, versionNo)
 }
 
+/** 编制参考版（含内部提示的 with_notes 副本，§13.2）下载 URL。 */
+export function deliverableGuidanceDownloadUrl(
+  projectId: string,
+  taskId: string,
+  versionNo: number,
+): string {
+  return deliverables.guidanceDownload(projectId, taskId, versionNo)
+}
+
 export async function renderDisclosureNotes(
   projectId: string,
   body: { year: number; template_type?: string; selected_sections?: string[] },

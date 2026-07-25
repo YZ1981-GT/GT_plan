@@ -22,7 +22,12 @@ import GtIndexChip from '../GtIndexChip.vue'
 import GtVoucherSamplingEngine from '../voucher-sampling/GtVoucherSamplingEngine.vue'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { amountFormatter, amountParser, isAmountColumn } from '../composables/wpAmountInput'
 import { ElMessage } from 'element-plus'
+import {
+  pullSamplesForWorkpaper,
+  listAttachedVouchers,
+} from '../composables/useAttachedVouchers'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -132,6 +137,44 @@ function onSampleFilled(payload: any): void {
   ElMessage.success(added > 0 ? `已导入 ${added} 笔凭证` : '未新增（凭证号重复已跳过）')
 }
 
+// ─── 从序时账挂入导入（挂凭到底稿联动）─────────────────────────────────────
+
+const attachedCount = ref(0)
+const importingAttached = ref(false)
+/** 货币资金科目前缀（收支检查取现金/银行/其他货币资金那条分录判收/支） */
+const MF_ACCOUNT_PREFIXES = ['1001', '1002', '1012']
+
+async function refreshAttachedCount(): Promise<void> {
+  if (!props.projectId || !props.wpId) return
+  try {
+    const recs = await listAttachedVouchers(props.projectId, samplingYear.value, props.wpId)
+    attachedCount.value = recs.length
+  } catch {
+    attachedCount.value = 0
+  }
+}
+
+/** 拉取挂到本底稿的序时账凭证 → 映射为样本 → 复用 onSampleFilled 导入检查行 */
+async function importFromAttached(): Promise<void> {
+  if (props.isReadonly) return
+  importingAttached.value = true
+  try {
+    const { samples } = await pullSamplesForWorkpaper(
+      props.projectId,
+      samplingYear.value,
+      props.wpId,
+      MF_ACCOUNT_PREFIXES,
+    )
+    if (samples.length === 0) {
+      ElMessage.info('暂无挂入本底稿的序时账凭证。可在「账簿查询」右键凭证「挂凭到底稿」挂入。')
+      return
+    }
+    onSampleFilled({ samples })
+  } finally {
+    importingAttached.value = false
+  }
+}
+
 const NOTE_KEY = 'E1-largecheck-audit-note'
 const CONCLUSION_KEY = 'E1-largecheck-audit-conclusion'
 const auditNote = ref('')
@@ -142,6 +185,7 @@ onMounted(() => {
   if (noteResp?.remark) auditNote.value = noteResp.remark
   const concResp = props.allResponses.get(CONCLUSION_KEY)
   if (concResp?.remark) auditConclusion.value = concResp.remark
+  void refreshAttachedCount()
 })
 
 function saveAuditNote(val: string): void {
@@ -188,6 +232,15 @@ function saveAuditConclusion(val: string): void {
         <el-tag size="small" type="success">收支检查 (E1-23)</el-tag>
         <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">+ 添加行</el-button>
         <el-button size="small" type="warning" :disabled="isReadonly" @click="samplingVisible = true">🎲 抽凭引擎</el-button>
+        <el-badge :value="attachedCount" :hidden="attachedCount === 0" type="warning">
+          <el-button
+            size="small"
+            :disabled="isReadonly"
+            :loading="importingAttached"
+            title="导入在「账簿查询」右键挂凭到本底稿的序时账凭证"
+            @click="importFromAttached"
+          >📎 从序时账挂入导入</el-button>
+        </el-badge>
       </div>
       <div class="toolbar-right">
         <span class="chip-wrap"><GtIndexChip value="wp:E1-1" :context-project-id="projectId" /></span>
@@ -217,6 +270,9 @@ function saveAuditConclusion(val: string): void {
                 :model-value="row[col.key]"
                 :disabled="isReadonly"
                 :controls="false"
+                :precision="isAmountColumn(col) ? 2 : undefined"
+                :formatter="isAmountColumn(col) ? amountFormatter : undefined"
+                :parser="isAmountColumn(col) ? amountParser : undefined"
                 size="small"
                 @change="(val: number) => updateCell(row.id, col.key, val ?? 0)"
               />

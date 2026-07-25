@@ -10,13 +10,10 @@
         </el-tag>
       </div>
       <div class="section-header-right">
-        <el-segmented
-          v-model="dualMode.mode.value"
-          :options="dualMode.modeOptions.value"
-          size="small"
-          @change="(val: any) => dualMode.switchMode(val)"
-        />
-        <el-button size="small" @click="handleAI('adjudication')">
+        <el-button size="small" type="primary" plain :loading="adjPull.loading.value" :disabled="isReadonly" @click="openBringInAdjustment">
+          <el-icon><Download /></el-icon> 带入调整
+        </el-button>
+        <el-button size="small" :loading="aiLoading === 'adjudication'" :disabled="isReadonly" @click="handleAI('adjudication')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
         <el-button size="small" @click="handleReview">
@@ -484,7 +481,7 @@
       <template #header>
         <div class="section-header">
           <span class="card-title">审计结论</span>
-          <el-button size="small" @click="handleAI('conclusion')">
+          <el-button size="small" :loading="aiLoading === 'conclusion'" :disabled="isReadonly" @click="handleAI('conclusion')">
             <el-icon><MagicStick /></el-icon> AI辅助
           </el-button>
         </div>
@@ -511,8 +508,18 @@
         <li>合计行应与M9-2明细表合计一致（交叉验证）</li>
         <li>变动率: IF(AND(期初=0,期末=0),0; IF(期初=0,100%; 否则期末/期初))</li>
         <li>试算差异≠0时，检查是否遗漏调整分录或TB数据需更新</li>
+        <li>「带入调整」：从集中登记按科目 4103 拉取调整分录，逐笔分配到各 OCI 项目行的 AJE/RJE，带入后审定数自动更新并联动附注</li>
       </ul>
     </details>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="4103 其他综合收益"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
@@ -545,28 +552,32 @@
  * 47×12 structure, 41 formulas
  */
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
-import { ElMessageBox } from 'element-plus'
-import { MagicStick, Check, InfoFilled } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { MagicStick, Check, InfoFilled, Download } from '@element-plus/icons-vue'
 import { useM9FormData } from '../../composables/useM9FormData'
-import { useM9DualMode } from '../../composables/useM9DualMode'
 import {
   useM9Adjudication,
   type M9AdjudicationRow,
   type M9AdjudicationBlock,
   type M9RowCategory,
 } from '../../composables/useM9Adjudication'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import { useAuditContext } from '@/composables/useAuditContext'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import { useVersionTrail } from '../../composables/useVersionTrail'
 import { eventBus } from '@/utils/eventBus'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 
 const props = defineProps<{ wpId: string; projectId: string; isReadonly: boolean }>()
 const emit = defineEmits<{ (e: 'navigate', sheetName: string): void; (e: 'save'): void }>()
 
-// ─── Inject复核对话 ──────────────────────────────────────────────────────────
+// ─── Inject复核对话 + AI ─────────────────────────────────────────────────────
 const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', () => {})
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
 
 // ─── Composables ─────────────────────────────────────────────────────────────
 const formData = useM9FormData({ wpId: computed(() => props.wpId), projectId: computed(() => props.projectId) })
-const dualMode = useM9DualMode({ wpId: computed(() => props.wpId) })
 const rows = ref<M9AdjudicationRow[]>([])
 
 const {
@@ -583,6 +594,38 @@ const {
   subscribeAdjudicated,
   subscribeDisclosure,
 } = useM9Adjudication(formData, rows)
+
+// ─── 从集中登记带入调整（4103 其他综合收益，权益贷方；单期 aje/rje，双大类OCI项目行） ───
+const bringInRows = computed(() =>
+  computedRows.value.map((r) => ({
+    rowKey: r.key,
+    name: r.itemName || 'OCI项目',
+    aje: r.aje ?? 0,
+    rje: r.rje ?? 0,
+  })),
+)
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: computed(() => props.projectId) as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '4103',
+  direction: 'credit',
+  subjectCode: '4103',
+  wpCode: 'M9',
+  subjectLabel: '其他综合收益(4103)',
+  rows: bringInRows,
+  updateCell: (rowKey: string, field: any, value: number) => {
+    const idx = rows.value.findIndex((r) => r.key === rowKey)
+    if (idx < 0) return
+    composableUpdateRow(idx, field === 'aje' ? 'aje' : 'rje', value)
+  },
+  totalAudited: () => totalRow.value.audited,
+})
 
 // Version trail (autoSnapshot on save)
 const versionTrail = useVersionTrail({ projectId: computed(() => props.projectId), workpaperId: computed(() => props.wpId) })
@@ -719,7 +762,26 @@ function saveAuditConclusion(): void {
   formData.debouncedSave('M9-1-auditConclusion', { remark: auditConclusion.value || null })
 }
 
-function handleAI(_section: string): void { /* AI辅助钩子：后续集成 */ }
+async function handleAI(section: string): Promise<void> {
+  if (props.isReadonly) return
+  aiLoading.value = section
+  try {
+    const context: Record<string, string> = {
+      科目: '4103 其他综合收益 / 审定表（M9-1 权益类贷方·双大类：不可/可重分类）',
+      审定合计: fmtAmount(totalRow.value.audited),
+      期末未审合计: fmtAmount(totalRow.value.unadjusted),
+      不可重分类小计: fmtAmount(nonReclassSubtotal.value.audited),
+      可重分类小计: fmtAmount(reclassSubtotal.value.audited),
+      审定与试算差异: fmtAmount(totalRow.value.tbDiff),
+      '与M9-2明细核对': '审定合计应与明细表M9-2税后净额合计一致',
+    }
+    const existing = auditConclusion.value
+    const text = await generateAiText({ section: `m9-adjudication-${section}`, context, existingContent: existing })
+    if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+    auditConclusion.value = text
+    saveAuditConclusion()
+  } catch { ElMessage.warning('AI 生成失败，请稍后重试') } finally { aiLoading.value = '' }
+}
 function handleReview(): void { openReviewDialog?.('M9-1-adjudication', '其他综合收益审定表') }
 
 // ─── EventBus + Lifecycle ────────────────────────────────────────────────────

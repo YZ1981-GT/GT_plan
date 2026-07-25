@@ -17,6 +17,10 @@
         <el-tag type="danger" size="small" class="liability-tag">负债类·贷方</el-tag>
       </div>
       <div class="section-actions">
+        <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
+          <el-icon><Download /></el-icon>
+          带入调整
+        </el-button>
         <el-button size="small" @click="handleAiAssist">
           <el-icon><MagicStick /></el-icon>
           AI辅助
@@ -288,8 +292,19 @@
         <li>各测算表（N2-6增值税/N2-8城建税/N2-9房产税/N2-10土增税）测算结果应与本表对应行一致</li>
         <li>城建税/教育费附加/房产税/土地使用税/印花税/土增税计提联动N4税金及附加</li>
         <li>"回写审定数"将合计审定数回写至试算表（科目2221期末余额）</li>
+        <li>「带入调整」：按科目2221拉取调整分录，逐笔选目标税种行累加到 AJE/RJE，带入后自动联动披露与附注</li>
       </ul>
     </details>
+
+    <!-- ═══ 带入调整 弹窗 ═══ -->
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="2221 应交税费"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
@@ -313,11 +328,14 @@
  */
 import { ref, computed, inject, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { MagicStick, ChatDotSquare, WarningFilled } from '@element-plus/icons-vue'
+import { MagicStick, ChatDotSquare, WarningFilled, Download } from '@element-plus/icons-vue'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
 import { useN2FormData } from '../../composables/useN2FormData'
 import { useN2Adjudication, type N2TaxType } from '../../composables/useN2Adjudication'
 import { useN2CrossSheet } from '../../composables/useN2CrossSheet'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -368,6 +386,28 @@ const {
   accrualToN4,
   publishTaxAccrualUpdated,
 } = useN2CrossSheet(allResponsesRef)
+
+// ─── 带入调整（adjustment-collaboration-and-propagation） ─────────────────────
+// 审定表按科目(2221)拉取调整分录，逐笔分配到目标税种行的 AJE/RJE 列（累加），
+// 带入后发 substantive:adjudicated → 披露表 + 附注自动刷新。
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: projectIdRef as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '2221',
+  direction: 'credit', // 负债贷方：净发生额 = 贷 − 借
+  subjectCode: '2221',
+  wpCode: 'N2',
+  subjectLabel: '应交税费(2221)',
+  rows: computed(() => rows.value.map((r) => ({ rowKey: r.taxType, name: r.taxType, aje: r.aje, rje: r.rje }))),
+  updateCell: (rowKey: string, field: any, value: number) => { void updateRow(rowKey as N2TaxType, field, value) },
+  totalAudited: () => total.value.audited,
+})
 
 // ─── 审计说明/结论 ───────────────────────────────────────────────────────────
 

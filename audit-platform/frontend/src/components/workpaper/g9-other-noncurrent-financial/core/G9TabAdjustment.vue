@@ -88,6 +88,26 @@
       >
         推送至调整分录模块
       </el-button>
+      <el-button
+        v-if="!isReadonly"
+        size="small"
+        type="primary"
+        plain
+        :loading="centralSyncing"
+        :disabled="!adj.balanceOk.value || adj.rows.value.length === 0"
+        title="把本页调整分录汇聚到集中调整登记，供合伙人跨循环审阅"
+        @click="syncToCentral"
+      >
+        同步到集中登记
+      </el-button>
+      <el-tag
+        v-if="centralStatus?.review_status"
+        size="small"
+        :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
+        :title="centralStatus.rejection_reason || ''"
+      >
+        集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
+      </el-tag>
       <span class="row-count">共 {{ adj.summary.value.rowCount }} 行（AJE {{ adj.summary.value.ajeCount }} / RJE {{ adj.summary.value.rjeCount }}）</span>
       <span v-if="adj.lastSyncMsg.value" class="sync-msg">{{ adj.lastSyncMsg.value }}</span>
     </div>
@@ -279,6 +299,8 @@ import G9ImportExportDropdown from '../G9ImportExportDropdown.vue'
 import G9AuditTextCards from '../G9AuditTextCards.vue'
 import { G9_ADJ_WRITEBACK_ROW_KEY } from '../../composables/g9Constants'
 import { G9_ADJ_ACCOUNT_OPTIONS, useG9Adjustment } from '../../composables/useG9Adjustment'
+import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
+import { useAuditContext } from '@/composables/useAuditContext'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import type { GCycleCutoffFilledDetail } from '../../composables/gCycleCutoffFill'
 import { GCYCLE_CUTOFF_EVENT } from '../../composables/gCycleCutoffFill'
@@ -301,6 +323,27 @@ const adj = useG9Adjustment({
   projectId: computed(() => props.projectId || ''),
   auditYear: computed(() => props.auditYear),
 })
+
+// ─── 同步到集中调整登记（workpaper-adjustment-centralization） ───
+const { year: centralYear } = useAuditContext()
+const { centralStatus, syncing: centralSyncing, syncToCentral, refreshStatus } = useAdjustmentCentralSync({
+  projectId: () => props.projectId || '',
+  year: centralYear,
+  wpId: () => props.wpId,
+  wpCode: 'G9',
+  itemId: 'G9-3-rows',
+  buildLineItems: () => adj.rows.value.map((r) => ({
+    standard_account_code: r.accountCode || undefined,
+    account_name: r.accountName,
+    debit_amount: r.debitAmount,
+    credit_amount: r.creditAmount,
+  })),
+  buildMeta: () => ({
+    description: adj.rows.value.find((r) => r.summary)?.summary || 'G9 其他非流动金融资产调整',
+    adjustmentType: adj.rows.value.length > 0 && adj.rows.value.every((r) => r.entryType === 'RJE') ? 'rje' : 'aje',
+  }),
+})
+onMounted(() => refreshStatus())
 
 function onImported() { emit('imported') }
 

@@ -128,7 +128,7 @@
 
       <!-- ═══ 区段1：借款信息（10列） ═══ -->
       <template v-if="activeSegment === 'basic'">
-        <el-table-column prop="bank" label="借款银行" min-width="120">
+        <el-table-column v-if="isColVisible('bank')" prop="bank" label="借款银行" min-width="120">
           <template #default="{ row, $index }">
             <el-input
               v-if="!isReadonly && !row._isTotal"
@@ -139,7 +139,7 @@
             <span v-else class="cell-text">{{ row.bank }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="contractNo" label="合同号" min-width="130">
+        <el-table-column v-if="isColVisible('contractNo')" prop="contractNo" label="合同号" min-width="130">
           <template #default="{ row, $index }">
             <el-input
               v-if="!isReadonly && !row._isTotal"
@@ -150,7 +150,7 @@
             <span v-else>{{ row.contractNo }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="loanType" label="借款类型" min-width="100">
+        <el-table-column v-if="isColVisible('loanType')" prop="loanType" label="借款类型" min-width="100">
           <template #default="{ row, $index }">
             <el-select
               v-if="!isReadonly && !row._isTotal"
@@ -167,7 +167,7 @@
             <span v-else>{{ row.loanType }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="amount" label="借款金额" min-width="120" align="right">
+        <el-table-column v-if="isColVisible('amount')" prop="amount" label="借款金额" min-width="120" align="right">
           <template #default="{ row, $index }">
             <el-input-number
               v-if="!isReadonly && !row._isTotal"
@@ -180,7 +180,7 @@
             <span v-else>{{ fmtAmount(row.amount) }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="rate" label="年利率(%)" min-width="90" align="right">
+        <el-table-column v-if="isColVisible('rate')" prop="rate" label="年利率(%)" min-width="90" align="right">
           <template #default="{ row, $index }">
             <el-input-number
               v-if="!isReadonly && !row._isTotal"
@@ -194,7 +194,7 @@
             <span v-else>{{ row.rate ? (row.rate * 100).toFixed(2) + '%' : '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="startDate" label="起始日" min-width="120">
+        <el-table-column v-if="isColVisible('startDate')" prop="startDate" label="起始日" min-width="120">
           <template #default="{ row, $index }">
             <el-date-picker
               v-if="!isReadonly && !row._isTotal"
@@ -209,7 +209,7 @@
             <span v-else>{{ row.startDate }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="endDate" label="到期日" min-width="120">
+        <el-table-column v-if="isColVisible('endDate')" prop="endDate" label="到期日" min-width="120">
           <template #default="{ row, $index }">
             <el-date-picker
               v-if="!isReadonly && !row._isTotal"
@@ -224,7 +224,7 @@
             <span v-else>{{ row.endDate }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="purpose" label="用途" min-width="120">
+        <el-table-column v-if="isColVisible('purpose')" prop="purpose" label="用途" min-width="120">
           <template #default="{ row, $index }">
             <el-input
               v-if="!isReadonly && !row._isTotal"
@@ -235,7 +235,7 @@
             <span v-else>{{ row.purpose || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="guarantee" label="担保方式" min-width="100">
+        <el-table-column v-if="isColVisible('guarantee')" prop="guarantee" label="担保方式" min-width="100">
           <template #default="{ row, $index }">
             <el-input
               v-if="!isReadonly && !row._isTotal"
@@ -246,7 +246,7 @@
             <span v-else>{{ row.guarantee || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="currency" label="币种" min-width="80">
+        <el-table-column v-if="isColVisible('currency')" prop="currency" label="币种" min-width="80">
           <template #default="{ row, $index }">
             <el-select
               v-if="!isReadonly && !row._isTotal"
@@ -266,7 +266,7 @@
 
       <!-- ═══ 区段2：期间变动（3列） ═══ -->
       <template v-if="activeSegment === 'movement'">
-        <el-table-column prop="beginning" label="期初余额" min-width="130" align="right">
+        <el-table-column v-if="isColVisible('beginning')" prop="beginning" label="期初余额" min-width="130" align="right">
           <template #default="{ row, $index }">
             <el-input-number
               v-if="!isReadonly && !row._isTotal"
@@ -279,7 +279,7 @@
             <span v-else>{{ fmtAmount(row.beginning) }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="creditAmount" label="贷方(借入)" min-width="130" align="right">
+        <el-table-column v-if="isColVisible('creditAmount')" prop="creditAmount" label="贷方(借入)" min-width="130" align="right">
           <template #default="{ row, $index }">
             <el-input-number
               v-if="!isReadonly && !row._isTotal"
@@ -292,7 +292,7 @@
             <span v-else>{{ fmtAmount(row.creditAmount) }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="debitAmount" label="借方(归还)" min-width="130" align="right">
+        <el-table-column v-if="isColVisible('debitAmount')" prop="debitAmount" label="借方(归还)" min-width="130" align="right">
           <template #default="{ row, $index }">
             <el-input-number
               v-if="!isReadonly && !row._isTotal"
@@ -360,6 +360,56 @@
       </div>
     </div>
 
+    <!-- ═══ 审计说明 ═══ -->
+    <el-card class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header">
+          <span>审计说明</span>
+          <el-button
+            v-if="!isReadonly"
+            size="small"
+            type="primary"
+            plain
+            :loading="aiNoteLoading"
+            @click="handleAiNote"
+          >🤖 AI 辅助</el-button>
+        </div>
+      </template>
+      <el-input
+        :model-value="note"
+        type="textarea"
+        :autosize="{ minRows: 5 }"
+        :disabled="isReadonly"
+        placeholder="如为外币借款，说明原币金额及折合汇率；如存在逾期借款，单独说明贷款单位/金额/利率/用途/未偿原因/预计还款期。概述程序测试情况与结果、拟调整/未调整事项及影响。"
+        @input="onNoteInput"
+      />
+    </el-card>
+
+    <!-- ═══ 审计结论 ═══ -->
+    <el-card class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header">
+          <span>审计结论</span>
+          <el-button
+            v-if="!isReadonly"
+            size="small"
+            type="primary"
+            plain
+            :loading="aiConclusionLoading"
+            @click="handleAiConclusion"
+          >🤖 AI 辅助</el-button>
+        </div>
+      </template>
+      <el-input
+        :model-value="conclusion"
+        type="textarea"
+        :autosize="{ minRows: 3 }"
+        :disabled="isReadonly"
+        placeholder="参考：A.未见异常。 B.除上述重大不符事项应作为调整事项予以调整外，其余未见异常。 C.由于存在重大未调整事项（或审计范围受限无法获取充分适当证据），不可确认。"
+        @input="onConclusionInput"
+      />
+    </el-card>
+
     <!-- ═══ 编制提示（折叠） ═══ -->
     <details class="l1-details-tip">
       <summary>编制提示</summary>
@@ -400,11 +450,12 @@
  * Task: 4.3
  * Requirements: 3.1-3.6
  */
-import { computed, inject, reactive, ref, type Ref } from 'vue'
+import { computed, inject, onMounted, reactive, ref, toRef, type Ref } from 'vue'
 import type { useL1FormData } from '@/composables/useL1FormData'
 import type { DetailRow } from '@/composables/useL1FormData'
 import { useL1Detail, DETAIL_SEGMENTS } from '@/composables/useL1Detail'
 import { useL1ImportExport } from '@/composables/useL1ImportExport'
+import { useL1AiNote } from '@/composables/useL1AiNote'
 import type { AdjudicationVsDetailResult } from '@/composables/useL1CrossSheet'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
@@ -506,32 +557,27 @@ const COL_PREFS_KEY = 'l1-2-column-prefs'
 
 interface ColPref { key: string; label: string; visible: boolean }
 
-// 每个区段的列定义
+// 每个区段的列定义（key 必须与模板实际渲染列一致，否则显隐不生效）
 const ALL_COL_DEFS: Record<string, ColPref[]> = {
   basic: [
     { key: 'bank', label: '借款银行', visible: true },
-    { key: 'loanType', label: '借款种类', visible: true },
-    { key: 'contractNo', label: '合同编号', visible: true },
+    { key: 'contractNo', label: '合同号', visible: true },
+    { key: 'loanType', label: '借款类型', visible: true },
     { key: 'amount', label: '借款金额', visible: true },
     { key: 'rate', label: '年利率', visible: true },
-    { key: 'rateMode', label: '固定/浮动', visible: true },
-    { key: 'startDate', label: '起始日期', visible: true },
-    { key: 'endDate', label: '到期日期', visible: true },
+    { key: 'startDate', label: '起始日', visible: true },
+    { key: 'endDate', label: '到期日', visible: true },
+    { key: 'purpose', label: '用途', visible: true },
+    { key: 'guarantee', label: '担保方式', visible: true },
     { key: 'currency', label: '币种', visible: false },
-    { key: 'purpose', label: '借款用途', visible: true },
   ],
   movement: [
     { key: 'beginning', label: '期初余额', visible: true },
-    { key: 'increase', label: '本期借入', visible: true },
-    { key: 'decrease', label: '本期归还', visible: true },
+    { key: 'creditAmount', label: '贷方(借入)', visible: true },
+    { key: 'debitAmount', label: '借方(归还)', visible: true },
   ],
   balance: [
     { key: 'endBalance', label: '期末余额', visible: true },
-    { key: 'guarantor', label: '保证人/抵押', visible: true },
-    { key: 'isOverdue', label: '是否逾期', visible: true },
-    { key: 'confirmRef', label: '询证函索引', visible: true },
-    { key: 'creditMatch', label: '征信核对', visible: true },
-    { key: 'remark', label: '备注', visible: true },
   ],
 }
 
@@ -582,6 +628,32 @@ function loadColPrefs(): void {
   } catch { /* */ }
 }
 loadColPrefs()
+
+// ─── 审计说明 + 审计结论（AI 辅助） ─────────────────────────────────────────
+
+const isReadonlyRef = toRef(props, 'isReadonly')
+const {
+  note, conclusion, aiNoteLoading, aiConclusionLoading,
+  load: loadNote, onNoteInput, onConclusionInput, generateNote, generateConclusion,
+} = useL1AiNote(formData, toRef(props, 'wpId'), 'det', isReadonlyRef)
+
+function _aiContext() {
+  return {
+    借款笔数: formData.detailRows.value.length,
+    期末合计: totalEndBalance.value,
+    银行家数: bankOptions.value.length,
+  }
+}
+function handleAiNote() {
+  generateNote('请基于短期借款明细表数据撰写审计说明，覆盖外币借款/逾期借款/程序测试结果/拟调整事项。', _aiContext())
+}
+function handleAiConclusion() {
+  generateConclusion('请基于短期借款明细核对情况生成审计结论。', _aiContext())
+}
+
+onMounted(() => {
+  loadNote()
+})
 
 // ─── 表格数据（含合计行） ────────────────────────────────────────────────────
 
@@ -873,6 +945,22 @@ function fmtAmount(val: number | null | undefined): string {
 .cell-text {
   font-weight: 500;
 }
+
+/* ─── 审计说明/结论卡片 ─── */
+.opinion-card {
+  margin-top: 16px;
+}
+.opinion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+  font-size: var(--wp-font-size, 13px);
+}
+.opinion-card :deep(.el-textarea__inner) {
+  font-size: var(--wp-font-size, 13px);
+}
+
 .col-prefs { max-height: 280px; overflow-y: auto; }
 .col-prefs-title { font-weight: 600; margin-bottom: 6px; font-size: 13px; }
 .col-prefs :deep(.el-checkbox) { display: block; margin-bottom: 3px; }

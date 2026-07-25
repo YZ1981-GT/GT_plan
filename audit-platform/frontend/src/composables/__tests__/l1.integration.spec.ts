@@ -38,15 +38,12 @@ afterEach(() => {
 // ─── 测试数据工厂 ────────────────────────────────────────────────────────────
 
 function createAdjudicationState(endTotal: number): AdjudicationState {
+  // 双期结构：期末未审 = endTotal（分拆到信用/抵押两类），账项调整/重分类均为0（未审=审定）
   return {
     categories: [
-      { name: '信用借款', beginning: 5000000, creditAmount: 2000000, debitAmount: 1000000, endBalance: 6000000, unadjusted: 6000000, aje: 0, rje: 0, audited: 6000000 },
-      { name: '抵押借款', beginning: 3000000, creditAmount: 1000000, debitAmount: 500000, endBalance: endTotal - 6000000, unadjusted: endTotal - 6000000, aje: 0, rje: 0, audited: endTotal - 6000000 },
+      { name: '信用借款', beginUnadjusted: 5000000, beginAje: 0, beginRje: 0, endUnadjusted: 6000000, endAje: 0, endRje: 0, reason: '' },
+      { name: '抵押借款', beginUnadjusted: 3000000, beginAje: 0, beginRje: 0, endUnadjusted: endTotal - 6000000, endAje: 0, endRje: 0, reason: '' },
     ],
-    total: {
-      beginning: 8000000, credit: 3000000, debit: 1500000, end: endTotal,
-      unadjusted: endTotal, aje: 0, rje: 0, audited: endTotal,
-    },
   }
 }
 

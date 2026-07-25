@@ -445,29 +445,51 @@ export function useE1Adjudication(options: UseE1BaseOptions) {
 
   // ─── TB Writeback (debounce 2s, by accountCode) ──────────────────────
 
+  /**
+   * 归集三科目（1001/1002/1012）审定合计（纯计算，供内存同步与 TB 回写共用）。
+   * @param period 'ending'=期末审定数（默认，TB 回写口径）；'opening'=期初审定数（供披露表期初预填）
+   */
+  function aggregateAuditedByCode(period: 'opening' | 'ending' = 'ending'): Record<string, number> {
+    const byCode: Record<string, number> = { '1001': 0, '1002': 0, '1012': 0 }
+    const val = (r: { openingAudited: number; endingAudited: number } | undefined): number =>
+      r ? (period === 'opening' ? r.openingAudited : r.endingAudited) : 0
+    // 1001 = 库存现金
+    byCode['1001'] = val(detailRows.value.find(r => r.itemKey === 'cash'))
+    // 1002 = 银行存款本金 (includes finance_co + bank_institution as sub-items)
+    byCode['1002'] = val(detailRows.value.find(r => r.itemKey === 'bank_principal'))
+    // 1012 = 其他货币资金 + 数字货币
+    byCode['1012'] = val(detailRows.value.find(r => r.itemKey === 'other_mf'))
+      + val(detailRows.value.find(r => r.itemKey === 'digital'))
+    return byCode
+  }
+
+  /**
+   * 将三科目审定合计写入 allResponses（仅内存，不落库、不发事件）。
+   * 供 E1-14 分析表 / 附注披露 / 主入口全局告警实时读取——审定表一挂载或数据变化即同步，
+   * 不再依赖用户触发 writebackTrialBalance（此前 E1-adj-total-* 仅在回写时写入，
+   * 而 E1 从不主动回写 → 全局告警「审定合计」恒 0.00，产生虚假全额差异）。
+   *
+   * 同时写期末（E1-adj-total-{code}）与期初（E1-adj-total-{code}-opening）审定数，
+   * 供披露表期末数（只读取数）与期初数（自动预填，可手工覆盖）跨 sheet 消费。
+   */
+  function syncAuditedTotals(): void {
+    const ending = aggregateAuditedByCode('ending')
+    for (const [code, amount] of Object.entries(ending)) {
+      setLocal(`E1-adj-total-${code}`, String(amount))
+    }
+    const opening = aggregateAuditedByCode('opening')
+    for (const [code, amount] of Object.entries(opening)) {
+      setLocal(`E1-adj-total-${code}-opening`, String(amount))
+    }
+  }
+
   function writebackTrialBalance(): void {
     if (!projectId.value) return
 
-    // Aggregate by accountCode from detail + total rows
-    const byCode: Record<string, number> = { '1001': 0, '1002': 0, '1012': 0 }
-
-    // 1001 = 库存现金
-    const cashRow = detailRows.value.find(r => r.itemKey === 'cash')
-    if (cashRow) byCode['1001'] = cashRow.endingAudited
-
-    // 1002 = 银行存款本金 (includes finance_co + bank_institution as sub-items)
-    const bankRow = detailRows.value.find(r => r.itemKey === 'bank_principal')
-    if (bankRow) byCode['1002'] = bankRow.endingAudited
-
-    // 1012 = 其他货币资金 + 数字货币
-    const otherRow = detailRows.value.find(r => r.itemKey === 'other_mf')
-    const digitalRow = detailRows.value.find(r => r.itemKey === 'digital')
-    byCode['1012'] = (otherRow?.endingAudited ?? 0) + (digitalRow?.endingAudited ?? 0)
+    const byCode = aggregateAuditedByCode()
 
     // Write to allResponses for cross-spec consumption (E1-14 分析表/全局告警读取)
-    for (const [code, amount] of Object.entries(byCode)) {
-      setLocal(`E1-adj-total-${code}`, String(amount))
-    }
+    syncAuditedTotals()
 
     // 真实 TB 回写：走平台统一端点（对齐 F3/F4/F5/G 循环 writebackTrialBalance）。
     // 按 1001/1002/1012 三科目分别 upsert 审定数到 trial_balance。
@@ -559,6 +581,14 @@ export function useE1Adjudication(options: UseE1BaseOptions) {
       }
       previousTotalAudited = current
     },
+  )
+
+  // 实时同步三科目审定合计到 allResponses（含首次挂载）——与 TB 回写/事件解耦，
+  // 仅内存写入，确保「审定合计」全局告警 + E1-14 + 附注披露即时读到正确审定数。
+  watch(
+    detailRows,
+    () => syncAuditedTotals(),
+    { immediate: true },
   )
 
   // ─── Hydration ───────────────────────────────────────────────────────

@@ -1,14 +1,20 @@
 <template>
-  <el-dialog v-model="visible" :title="title" :width="maximized ? '100%' : '95%'" :top="maximized ? '0' : '2vh'" :fullscreen="maximized" @close="cleanup" destroy-on-close>
-    <!-- 最大化按钮 -->
+  <el-dialog v-model="visible" :title="title" width="95%" top="2vh" :show-close="false" :close-on-press-escape="false" @close="cleanup" destroy-on-close>
+    <!-- 全屏按钮：调用 OnlyOffice 编辑器容器的浏览器原生全屏 -->
     <template #header="{ close, titleId, titleClass }">
       <div class="onlyoffice-editor__header">
         <span :id="titleId" :class="titleClass">{{ title }}</span>
         <div class="onlyoffice-editor__header-actions">
-          <el-button size="small" text @click="maximized = !maximized" :title="maximized ? '还原' : '最大化'">
-            <template #icon><svg v-if="!maximized" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 1024 1024"><path fill="currentColor" d="M160 96h320v64H198.4l256 256H160V96zm704 832H544v-64h281.6l-256-256H864v320z"/></svg><svg v-else xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 1024 1024"><path fill="currentColor" d="M512 544H192v-64h281.6L217.6 224H160V160h352v384zm0-64h320v64H550.4L806.4 800H864v64H512V480z"/></svg></template>
+          <el-button
+            v-if="!degraded && editorReady"
+            size="small"
+            text
+            @click="toggleFullscreen"
+            :title="isFullscreen ? '退出全屏' : '全屏'"
+          >
+            <template #icon><svg v-if="!isFullscreen" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 1024 1024"><path fill="currentColor" d="M160 96h320v64H198.4l256 256H160V96zm704 832H544v-64h281.6l-256-256H864v320z"/></svg><svg v-else xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 1024 1024"><path fill="currentColor" d="M512 544H192v-64h281.6L217.6 224H160V160h352v384zm0-64h320v64H550.4L806.4 800H864v64H512V480z"/></svg></template>
           </el-button>
-          <el-button size="small" text @click="close" title="关闭">✕</el-button>
+          <el-button size="small" text :icon="Close" title="关闭" @click="close" />
         </div>
       </div>
     </template>
@@ -22,8 +28,17 @@
     />
     <!-- 正常编辑模式：split layout -->
     <div v-if="!degraded && editorReady" class="onlyoffice-editor__layout">
-      <!-- 左侧：编辑器主体 -->
-      <div class="onlyoffice-editor__main">
+      <!-- 左侧：编辑器主体（OnlyOffice 会替换内部占位 div，故全屏挂在此稳定容器上） -->
+      <div ref="editorMainRef" class="onlyoffice-editor__main">
+        <!-- 全屏内退出条：仅在原生全屏时显示，位于 iframe 上方（不被 iframe 遮挡，可点击） -->
+        <div class="onlyoffice-editor__fs-bar">
+          <el-button size="small" @click="toggleFullscreen">
+            <template #icon>
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 1024 1024"><path fill="currentColor" d="M512 544H192v-64h281.6L217.6 224H160V160h352v384zm0-64h320v64H550.4L806.4 800H864v64H512V480z"/></svg>
+            </template>
+            退出全屏
+          </el-button>
+        </div>
         <div :id="editorContainerId" class="onlyoffice-editor__container" />
       </div>
       <!-- 右侧：溯源面板（可折叠） -->
@@ -73,14 +88,6 @@
           >
             {{ showLineagePanel ? '隐藏溯源' : '查看溯源' }}
           </el-button>
-          <el-button
-            v-if="!degraded && editorReady"
-            size="small"
-            class="onlyoffice-editor__trace-btn"
-            @click="onTraceCurrentSection"
-          >
-            溯源当前章节
-          </el-button>
         </div>
         <div class="onlyoffice-editor__footer-right">
           <el-button v-if="previewUrl" type="primary" @click="doDownload">下载</el-button>
@@ -103,8 +110,13 @@
 
 <script setup lang="ts">
 import { nextTick, onMounted, onUnmounted, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { Close } from '@element-plus/icons-vue'
 import { fetchOnlyOfficeConfig, fetchOnlyOfficeHealth } from '@/services/deliverableApi'
+import {
+  AUTO_FOLLOW_ENABLED,
+  createLineageAutoFollow,
+  type LineageAutoFollow,
+} from './useLineageAutoFollow'
 import { downloadFile } from '@/utils/http'
 import DeliverablePreview from './DeliverablePreview.vue'
 import LineagePanel from './LineagePanel.vue'
@@ -128,8 +140,9 @@ const props = defineProps<{
 const emit = defineEmits<{ close: [] }>()
 
 const visible = ref(true)
-const maximized = ref(false)
+const isFullscreen = ref(false)
 const degraded = ref(false)
+const editorMainRef = ref<HTMLElement | null>(null)
 const editorReady = ref(false)
 const editorContainerId = `oo-editor-${Date.now()}`
 
@@ -143,8 +156,14 @@ const conflictDialogVisible = ref(false)
 const currentConflicts = ref<WritebackConflict[]>([])
 
 let editorInstance: any = null
+// 真·光标跟随溯源句柄（默认关闭 AUTO_FOLLOW_ENABLED，P0 live 验证通过后开启）
+let lineageFollow: LineageAutoFollow | null = null
 
 function cleanup() {
+  if (lineageFollow) {
+    try { lineageFollow.dispose() } catch { /* ignore */ }
+    lineageFollow = null
+  }
   if (editorInstance) {
     try { editorInstance.destroyEditor() } catch { /* ignore */ }
     editorInstance = null
@@ -159,63 +178,38 @@ function doDownload() {
   }
 }
 
+/**
+ * 全屏：对 OnlyOffice 编辑器容器调用浏览器原生 Fullscreen API，
+ * 让 OnlyOffice 自身铺满整个物理屏幕（而非仅撑满弹窗）。
+ */
+function toggleFullscreen() {
+  const el = editorMainRef.value as (HTMLElement & {
+    webkitRequestFullscreen?: () => Promise<void> | void
+  }) | null
+  if (!el) return
+  const doc = document as Document & {
+    webkitFullscreenElement?: Element
+    webkitExitFullscreen?: () => Promise<void> | void
+  }
+  const active = doc.fullscreenElement || doc.webkitFullscreenElement
+  if (!active) {
+    (el.requestFullscreen?.() ?? el.webkitRequestFullscreen?.()) as unknown
+  } else {
+    (doc.exitFullscreen?.() ?? doc.webkitExitFullscreen?.()) as unknown
+  }
+}
+
+function onFullscreenChange() {
+  const doc = document as Document & { webkitFullscreenElement?: Element }
+  isFullscreen.value = !!(doc.fullscreenElement || doc.webkitFullscreenElement)
+}
+
 /** 切换溯源面板显示 */
 function toggleLineagePanel() {
   showLineagePanel.value = !showLineagePanel.value
-}
-
-/**
- * "溯源当前章节"按钮：
- * 尝试通过 OnlyOffice JS API 获取书签信息。
- * 若 API 不支持细粒度书签检测，则显示全文档概览。
- */
-async function onTraceCurrentSection() {
-  if (!showLineagePanel.value) {
-    showLineagePanel.value = true
-    await nextTick()
-  }
-
-  if (!editorInstance) {
-    lineagePanelRef.value?.setNoAnchors()
-    return
-  }
-
-  // 尝试 OnlyOffice Plugin/Macro API 获取当前书签
-  try {
-    editorInstance.executeMethod('GetAllBookmarks', [], (bookmarks: any) => {
-      if (!bookmarks || (Array.isArray(bookmarks) && bookmarks.length === 0)) {
-        hasNoAnchors.value = true
-        lineagePanelRef.value?.setNoAnchors()
-        return
-      }
-
-      hasNoAnchors.value = false
-
-      // 筛选 sec_ 前缀书签
-      const secBookmarks = Array.isArray(bookmarks)
-        ? bookmarks.filter((bm: any) => {
-            const name = typeof bm === 'string' ? bm : bm?.Name || bm?.name || ''
-            return name.startsWith('sec_')
-          })
-        : []
-
-      if (secBookmarks.length === 0) {
-        hasNoAnchors.value = true
-        lineagePanelRef.value?.setNoAnchors()
-        return
-      }
-
-      // 取第一个 sec_ 书签作为当前章节（简化 MVP）
-      const firstAnchor = typeof secBookmarks[0] === 'string'
-        ? secBookmarks[0]
-        : secBookmarks[0]?.Name || secBookmarks[0]?.name || ''
-
-      if (firstAnchor) {
-        lineagePanelRef.value?.onBookmarkDetected(firstAnchor)
-      }
-    })
-  } catch {
-    ElMessage.info('暂无法检测当前章节，请查看全文档溯源状态')
+  // 打开面板时主动查询当前光标所在章节（自动跟随启用时；需求 4.1），fail-open
+  if (showLineagePanel.value && lineageFollow) {
+    lineageFollow.queryCurrent()
   }
 }
 
@@ -237,6 +231,8 @@ function onWritebackComplete(_result: WritebackResult) {
 }
 
 onMounted(async () => {
+  document.addEventListener('fullscreenchange', onFullscreenChange)
+  document.addEventListener('webkitfullscreenchange', onFullscreenChange)
   try {
     const health = await fetchOnlyOfficeHealth(props.projectId)
     if (!health.enabled || !health.available) {
@@ -272,6 +268,14 @@ onMounted(async () => {
     }
 
     editorInstance = new DocsAPI.DocEditor(editorContainerId, config)
+
+    // 真·光标跟随溯源（默认关闭；仅 P0 live 验证通过并开启 AUTO_FOLLOW_ENABLED 时建立连接器）
+    // fail-open：连接器不可用不阻断编辑器，手动章节溯源仍可用。
+    if (AUTO_FOLLOW_ENABLED) {
+      lineageFollow = createLineageAutoFollow(editorInstance, (tag) => {
+        lineagePanelRef.value?.onBookmarkDetected(tag)
+      })
+    }
   } catch (e) {
     console.error('OnlyOffice init failed:', e)
     degraded.value = true
@@ -279,6 +283,12 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  document.removeEventListener('fullscreenchange', onFullscreenChange)
+  document.removeEventListener('webkitfullscreenchange', onFullscreenChange)
+  if (lineageFollow) {
+    try { lineageFollow.dispose() } catch { /* ignore */ }
+    lineageFollow = null
+  }
   if (editorInstance) {
     try { editorInstance.destroyEditor() } catch { /* ignore */ }
     editorInstance = null
@@ -314,10 +324,41 @@ function loadOnlyOfficeScript(baseUrl: string): Promise<void> {
   flex: 1;
   min-width: 0;
   height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 .onlyoffice-editor__container {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+}
+/* 全屏内退出条：非全屏时隐藏（进入全屏用弹窗头部按钮） */
+.onlyoffice-editor__fs-bar {
+  display: none;
+  flex-shrink: 0;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 8px 16px;
+  background: #fff;
+  border-bottom: 1px solid #dcdfe6;
+}
+/* 浏览器原生全屏：OnlyOffice 自身铺满整个物理屏幕 */
+.onlyoffice-editor__main:fullscreen,
+.onlyoffice-editor__main:-webkit-full-screen {
+  width: 100vw;
+  height: 100vh;
+  background: #fff;
+}
+/* 全屏时显示退出条（位于 iframe 上方，独立元素不被 iframe 指针拦截） */
+.onlyoffice-editor__main:fullscreen .onlyoffice-editor__fs-bar,
+.onlyoffice-editor__main:-webkit-full-screen .onlyoffice-editor__fs-bar {
+  display: flex;
+}
+/* OnlyOffice 会用 iframe 替换内部占位 div，直接约束 iframe 填满 */
+.onlyoffice-editor__main :deep(iframe) {
   width: 100%;
   height: 100%;
+  border: 0;
 }
 .onlyoffice-editor__sidebar {
   width: 320px;

@@ -391,6 +391,15 @@ export function useM10Detail(
         distributionRemark: row.distributionRemark,
       }),
     })
+    // 🔴 修复：同步写整包 full-data（M10TabDetail._restoreRows 读此键；此前从不写 → 刷新明细全丢）
+    _syncFullData()
+  }
+
+  /** 同步写整包 full-data（保证 _restoreRows 读取路径一致，完整行序列化避免字段丢失） */
+  function _syncFullData(): void {
+    debouncedSave('M10-2-full-data', {
+      remark: JSON.stringify(detailRows.value),
+    })
   }
 
   function _triggerSaveAll(): void {

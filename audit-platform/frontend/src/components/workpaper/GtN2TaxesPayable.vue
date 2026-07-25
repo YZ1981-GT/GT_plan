@@ -2,7 +2,7 @@
   <div class="n2-taxes-payable">
     <div v-if="isLoading" class="loading-container"><el-skeleton :rows="8" animated /></div>
     <template v-else>
-      <div v-if="isHtmlSheet" class="n2-taxes-payable-toolbar">
+      <div v-if="isHtmlSheet && currentSheet !== 'N2' && currentSheet !== '底稿目录'" class="n2-taxes-payable-toolbar">
         <el-segmented
           v-model="dualMode.currentMode.value"
           :options="dualMode.modeOptions"

@@ -42,6 +42,15 @@ router = APIRouter(
     tags=["working-papers"],
 )
 
+# 公共状态端点专用路由（无 {wp_id} 路由 → router_registry 不会附加 dedicated_wp_gate）。
+# /onlyoffice/health 是无鉴权状态探针（设计如此：docstring + native_authz_audit 均标注公开，
+# 契约测试断言不返回 401/403）。若挂在主 router 上会被 dedicated_wp_gate 的 get_current_user
+# 拦截 → 前端裸 fetch（无 Authorization）恒 401 → 双模式"OO不可用"。故独立到本路由保持公开。
+public_router = APIRouter(
+    prefix="/api/workpapers",
+    tags=["working-papers"],
+)
+
 
 # ---------------------------------------------------------------------------
 # Task 11 · 组件 C11 EditorSecurity — 统一门接入 + 全 claim 令牌
@@ -420,7 +429,7 @@ def _sign_wopi_token(wp_id: UUID, wp_code: str, ttl_seconds: int = 300) -> str:
 # ---------------------------------------------------------------------------
 
 
-@router.get("/onlyoffice/health")
+@public_router.get("/onlyoffice/health")
 async def get_onlyoffice_health(db: AsyncSession = Depends(get_db)):
     """底稿模块 OnlyOffice 健康预检。
 
@@ -811,7 +820,10 @@ async def get_whole_excel_grid(
 # ---------------------------------------------------------------------------
 
 
-@router.get("/{wp_id}/sheets/{sheet_name}/wopi/contents")
+# 🔴 OnlyOffice DocServer 机对机端点：用 ?token=（editor_read 签名 JWT）自校验，不带用户 Bearer。
+# 必须挂 public_router（不经 dedicated_wp_gate 的 get_current_user）——否则 DocServer 下载文档
+# 恒 401 → 编辑器 onError -4「下载失败」→ 双模式点在线编辑后立刻降级回结构化。自身 JWT 校验完整。
+@public_router.get("/{wp_id}/sheets/{sheet_name}/wopi/contents")
 async def get_sheet_wopi_contents(
     wp_id: UUID,
     sheet_name: str,
@@ -995,7 +1007,9 @@ def _verify_callback_jwt(request: Request) -> bool:
         return False
 
 
-@router.post("/{wp_id}/sheets/{sheet_name}/onlyoffice-callback")
+# 🔴 OnlyOffice DocServer 回调端点：用 OnlyOffice callback JWT 自校验（无用户 Bearer）。
+# 同 wopi/contents，必须挂 public_router 绕过 dedicated_wp_gate，否则保存回写恒 401。
+@public_router.post("/{wp_id}/sheets/{sheet_name}/onlyoffice-callback")
 async def post_sheet_onlyoffice_callback(
     wp_id: UUID,
     sheet_name: str,

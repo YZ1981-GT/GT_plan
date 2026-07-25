@@ -221,19 +221,14 @@
 
       <!-- 底稿目录优先走 b-index（对齐 F2）；此处仅作非 B- 分类时的 Host 兜底 -->
       <template v-else-if="currentSheet === '底稿目录'">
-        <div class="g1-index-toolbar">
-          <el-button size="small" type="primary" plain @click="openHandbook('preparation')">
-            📖 编制手册
-          </el-button>
-          <el-button size="small" @click="openHandbook('usage')">使用手册</el-button>
-        </div>
         <GCycleBIndexExtras
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :sheet-name="props.sheetName"
           :wp-code="props.wpCode"
-          :html-data="props.htmlData"
+          :html-data="directoryHtmlData"
           :available-sheets="availableSheets"
+          :all-responses="formData.allResponses.value"
         />
         <G1SheetStatusBar :all-responses="formData.allResponses.value" />
       </template>
@@ -278,6 +273,7 @@ import { useG1DualMode, type G1RenderMode } from './composables/useG1DualMode'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInjections'
 import { extractG1SheetCode } from './composables/g1SheetLabels'
+import { buildDirectoryHtmlData } from './composables/gCycleIndexRouting'
 import { useG1ImportExport, resolveG1ImportableSheet } from './composables/useG1ImportExport'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 import G1TabAdjudication from './g1-trading-financial-assets/core/G1TabAdjudication.vue'
@@ -423,6 +419,11 @@ const availableSheets = computed(() => {
   if (Array.isArray(fromHtml) && fromHtml.length) return fromHtml
   return Object.keys(formData.sheetCache.value).map(sheet_name => ({ sheet_name }))
 })
+
+/** 目录页传给 GCycleBIndexExtras 的 htmlData：从 sheetCache 补全 cycle_workpapers（本循环底稿目录 grid） */
+const directoryHtmlData = computed(() =>
+  buildDirectoryHtmlData(props.htmlData, formData.sheetCache.value),
+)
 
 const dualMode = useG1DualMode({
   wpId: wpIdRef,

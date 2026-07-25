@@ -143,6 +143,7 @@
             :wp-code="props.wpCode"
             :html-data="props.htmlData"
             :available-sheets="availableSheets"
+            :all-responses="formData.allResponses.value"
           />
         </div>
       </template>
@@ -172,7 +173,8 @@
  * GtG11InvestmentIncome — G11 投资收益底稿主入口
  * sheetName v-if 分发（参照 D4/G14 精细模式）
  */
-import { ref, computed, onMounted, onBeforeUnmount, defineAsyncComponent, provide, inject } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, defineAsyncComponent, provide, inject } from 'vue'
+import { useAuditCheckReport, type AuditCheckItemInput } from '@/composables/useAuditCheckReport'
 import { useG11FormData } from './composables/useG11FormData'
 import { useG11DualMode } from './composables/useG11DualMode'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
@@ -218,6 +220,38 @@ const projectIdRef = computed(() => props.projectId)
 const formData = useG11FormData({ wpId: wpIdRef, projectId: projectIdRef })
 const crossValidation = useG11CrossValidation(formData.allResponses)
 const isReadonly = computed(() => !!props.readonly)
+
+// ─── 运行时勾稽上报「审计检查」面板（Task 4.3，旁路增强，失败静默）──────────────
+// items 来自已有 useG11CrossValidation.crossCheck（G11-1↔G11-2 勾稽），不新造判定；
+// passed 三态：一致→true，不一致→false，无明细数据→null（不误判 true）。
+const { reportAuditChecks } = useAuditCheckReport()
+
+function buildG11CrossCheckItems(): AuditCheckItemInput[] {
+  const c = crossValidation.crossCheck.value
+  return [{
+    code: 'G11-1-vs-G11-2-detail',
+    severity: 'warning',
+    check_type: 'reconciliation',
+    description: 'G11-1 审定表与 G11-2 明细表勾稽',
+    message: c.message ?? 'G11-1 审定合计与 G11-2 明细合计一致',
+    passed: c.hasDetailData ? c.isBalanced : null,
+    actual: c.adjTotal,
+    expected: c.detailTotal,
+    diff: c.diff,
+    sheet_hint: 'G11-1',
+  }]
+}
+
+let auditCheckReportTimer: ReturnType<typeof setTimeout> | null = null
+function scheduleAuditCheckReport(): void {
+  if (isReadonly.value) return
+  if (auditCheckReportTimer) clearTimeout(auditCheckReportTimer)
+  auditCheckReportTimer = setTimeout(() => {
+    void reportAuditChecks(props.projectId, props.wpId, 'report_cross_check', buildG11CrossCheckItems())
+  }, 1500)
+}
+// 保存成功后（勾稽 computed 随 allResponses / 编辑变化）debounce 上报
+watch(() => crossValidation.crossCheck.value, () => scheduleAuditCheckReport())
 // ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ───
 const runtime = inject(WorkpaperRuntimeContextKey, null)
 const auditYear = computed(() => {
@@ -327,6 +361,7 @@ onMounted(async () => {
   window.addEventListener(G11_OFFER_DISCLOSURE_PULL_EVENT, handleG11OfferDisclosurePull)
   await formData.loadAll()
   isLoading.value = false
+  scheduleAuditCheckReport()
 })
 
 onBeforeUnmount(() => {

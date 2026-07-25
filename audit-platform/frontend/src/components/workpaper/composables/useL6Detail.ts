@@ -291,13 +291,12 @@ export function useL6Detail(
         remark: String(computed.endBalance),
       })
     }
-    // 保存行完整数据
+    // 保存行完整数据（🔴 修复：序列化整行而非字段子集，此前仅存 key/project/endBalance/auditedEnd → 刷新丢失其余字段）
     debouncedSave('L6-L6-2-rows', {
       remark: JSON.stringify(detailRows.value.map((r, i) => ({
-        key: r.key,
-        project: r.project,
-        endBalance: computedRows.value[i]?.endBalance ?? 0,
-        auditedEnd: computedRows.value[i]?.auditedEnd ?? 0,
+        ...r,
+        endBalance: computedRows.value[i]?.endBalance ?? r.endBalance ?? 0,
+        auditedEnd: computedRows.value[i]?.auditedEnd ?? r.auditedEnd ?? 0,
       }))),
     })
   }
@@ -311,10 +310,9 @@ export function useL6Detail(
     })
     debouncedSave('L6-L6-2-rows', {
       remark: JSON.stringify(detailRows.value.map((r, i) => ({
-        key: r.key,
-        project: r.project,
-        endBalance: computedRows.value[i]?.endBalance ?? 0,
-        auditedEnd: computedRows.value[i]?.auditedEnd ?? 0,
+        ...r,
+        endBalance: computedRows.value[i]?.endBalance ?? r.endBalance ?? 0,
+        auditedEnd: computedRows.value[i]?.auditedEnd ?? r.auditedEnd ?? 0,
       }))),
     })
   }

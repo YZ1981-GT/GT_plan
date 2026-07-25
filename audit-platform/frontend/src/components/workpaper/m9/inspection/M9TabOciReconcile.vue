@@ -8,13 +8,7 @@
         <el-tag type="danger" effect="dark" size="small" class="core-badge">核心</el-tag>
       </div>
       <div class="section-header-right">
-        <el-segmented
-          v-model="dualMode.mode.value"
-          :options="dualMode.modeOptions.value"
-          size="small"
-          @change="(val: any) => dualMode.switchMode(val)"
-        />
-        <el-button size="small" @click="handleAI('reconcile')">
+        <el-button size="small" :loading="aiLoading === 'reconcile'" :disabled="isReadonly" @click="handleAI('reconcile')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
         <el-button size="small" @click="handleReview">
@@ -72,7 +66,7 @@
       <div class="block-header">
         <h4 class="block-title">一、以后不能重分类进损益的OCI来源</h4>
         <div class="block-header-right">
-          <el-button size="small" @click="handleAI('nonReclass')">
+          <el-button size="small" :loading="aiLoading === 'nonReclass'" :disabled="isReadonly" @click="handleAI('nonReclass')">
             <el-icon><MagicStick /></el-icon> AI辅助
           </el-button>
           <el-button
@@ -238,7 +232,7 @@
       <div class="block-header">
         <h4 class="block-title">二、以后能重分类进损益的OCI来源</h4>
         <div class="block-header-right">
-          <el-button size="small" @click="handleAI('reclass')">
+          <el-button size="small" :loading="aiLoading === 'reclass'" :disabled="isReadonly" @click="handleAI('reclass')">
             <el-icon><MagicStick /></el-icon> AI辅助
           </el-button>
           <el-button
@@ -468,7 +462,7 @@
       <template #header>
         <div class="section-header">
           <span class="card-title">核对说明与审计结论</span>
-          <el-button size="small" @click="handleAI('conclusion')">
+          <el-button size="small" :loading="aiLoading === 'conclusion'" :disabled="isReadonly" @click="handleAI('conclusion')">
             <el-icon><MagicStick /></el-icon> AI辅助
           </el-button>
         </div>
@@ -523,14 +517,13 @@
  *         AI辅助按钮section标题右对齐; 蓝色渐变引导区; 方法论上下文琥珀色块
  */
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
-import { ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   MagicStick, Check, InfoFilled, WarningFilled,
   CircleCheckFilled, CircleCloseFilled,
 } from '@element-plus/icons-vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { useM9FormData } from '../../composables/useM9FormData'
-import { useM9DualMode } from '../../composables/useM9DualMode'
 import {
   useM9OciReconcile,
   M9_RECONCILE_DEFAULT_SOURCES,
@@ -538,16 +531,18 @@ import {
   type M9ReconcileCategory,
 } from '../../composables/useM9OciReconcile'
 import { useVersionTrail } from '../../composables/useVersionTrail'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 
 const props = defineProps<{ wpId: string; projectId: string; isReadonly: boolean }>()
 const emit = defineEmits<{ (e: 'navigate', sheetName: string): void; (e: 'save'): void }>()
 
-// ─── Inject复核对话 ──────────────────────────────────────────────────────────
+// ─── Inject复核对话 + AI ─────────────────────────────────────────────────────
 const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', () => {})
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
 
 // ─── Composables ─────────────────────────────────────────────────────────────
 const formData = useM9FormData({ wpId: computed(() => props.wpId), projectId: computed(() => props.projectId) })
-const dualMode = useM9DualMode({ wpId: computed(() => props.wpId) })
 const versionTrail = useVersionTrail({ projectId: computed(() => props.projectId), workpaperId: computed(() => props.wpId) })
 
 // 核对行数据（初始化默认来源）
@@ -707,8 +702,25 @@ function saveConclusion(): void {
 }
 
 // ─── AI辅助 + 复核 ──────────────────────────────────────────────────────────
-function handleAI(_section: string): void {
-  // AI辅助调用（占位，由AI模块集成）
+async function handleAI(section: string): Promise<void> {
+  if (props.isReadonly) return
+  aiLoading.value = section
+  try {
+    const context: Record<string, string> = {
+      科目: '4103 其他综合收益 / OCI核对表（M9-4 多来源核对：G8/J2/外币折算）',
+      来源税前合计: fmtAmount(grandTotalPreTax.value),
+      所得税影响合计: fmtAmount(grandTotalTaxEffect.value),
+      不可重分类税后合计: fmtAmount(nonReclassSummary.value.totalSourceAfterTax),
+      可重分类税后合计: fmtAmount(reclassSummary.value.totalSourceAfterTax),
+      核对总差异: fmtAmount(totalSummary.value.totalDiff),
+      是否全部核对一致: totalSummary.value.isAllReconciled ? '一致' : '存在差异',
+      '与M9-1审定核对': 'OCI来源税后净额合计应与审定表M9-1本期增加一致',
+    }
+    const text = await generateAiText({ section: `m9-reconcile-${section}`, context, existingContent: auditConclusion.value })
+    if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+    auditConclusion.value = text
+    saveConclusion()
+  } catch { ElMessage.warning('AI 生成失败，请稍后重试') } finally { aiLoading.value = '' }
 }
 
 function handleReview(): void {

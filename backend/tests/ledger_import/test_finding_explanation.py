@@ -81,14 +81,15 @@ async def db_session() -> AsyncSession:
 class TestL1AmountExplanation:
     def test_key_column_amount_not_numeric_has_explanation(self):
         """关键列金额非数值 → blocking + L1TypeErrorExplanation."""
-        rows = [{"account_code": "1001", "debit_amount": "abc", "credit_amount": "0"}]
+        # year_debit（本年累计/年度关键列）为余额表关键列；debit_amount 本期为推荐列
+        rows = [{"account_code": "1001", "year_debit": "abc", "year_credit": "0"}]
         findings, _ = validate_l1(rows, "balance", column_mapping={})
 
         blocking = [f for f in findings if f.code == "AMOUNT_NOT_NUMERIC_KEY"]
         assert len(blocking) == 1
         exp = blocking[0].explanation
         assert isinstance(exp, L1TypeErrorExplanation)
-        assert exp.field_name == "debit_amount"
+        assert exp.field_name == "year_debit"
         assert exp.actual_value == "abc"
         assert exp.expected_type == "numeric"
         assert "parse_numeric" in exp.formula
@@ -120,7 +121,7 @@ class TestL1AmountExplanation:
     def test_actual_value_truncated_to_128(self):
         """超长原始值应被截断到 128 char，避免 explanation 体积爆炸."""
         long_value = "X" * 500
-        rows = [{"account_code": "1001", "debit_amount": long_value, "credit_amount": "0"}]
+        rows = [{"account_code": "1001", "year_debit": long_value, "year_credit": "0"}]
         findings, _ = validate_l1(rows, "balance", column_mapping={})
 
         blocking = [f for f in findings if f.code == "AMOUNT_NOT_NUMERIC_KEY"]
@@ -201,8 +202,8 @@ class TestExplanationSerialization:
         rows = [
             {
                 "account_code": "1001",
-                "debit_amount": "abc",  # 触发 L1TypeErrorExplanation
-                "credit_amount": "0",
+                "year_debit": "abc",  # 触发 L1TypeErrorExplanation（年度关键列）
+                "year_credit": "0",
             }
         ]
         findings, _ = validate_l1(rows, "balance", column_mapping={})
@@ -211,7 +212,7 @@ class TestExplanationSerialization:
         # 子类 L1TypeErrorExplanation 的字段必须在 dump 输出里
         assert "field_name" in dump["explanation"]
         assert "expected_type" in dump["explanation"]
-        assert dump["explanation"]["field_name"] == "debit_amount"
+        assert dump["explanation"]["field_name"] == "year_debit"
         assert dump["explanation"]["expected_type"] == "numeric"
 
 

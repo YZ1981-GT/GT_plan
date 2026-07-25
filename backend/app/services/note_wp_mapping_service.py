@@ -115,6 +115,29 @@ class NoteWpMappingService:
             "errors": report.errors,
         }
 
+    async def refresh_section_from_workpapers(
+        self, project_id: UUID, year: int, note_section: str
+    ) -> dict:
+        """只从底稿重算「单个章节」的科目数据（当前页面刷新用）。
+
+        与 refresh_from_workpapers（项目级全量）区别：仅重算传入的 note_section，
+        使「刷新当前页面」的前后端行为一致（后端只动当前节，不再全量写库）。
+        委托 DisclosureEngine.refill_sections 传单元素列表；只 flush 不 commit。
+        """
+        from app.services.disclosure_engine import DisclosureEngine
+
+        engine = DisclosureEngine(self.db)
+        report = await engine.refill_sections(
+            project_id, year, [note_section], skip_manual=True
+        )
+        return {
+            "refreshed": report.cells_updated,
+            "total_notes": 1,
+            "sections_recomputed": report.sections_recomputed,
+            "text_only_sections": report.text_only_sections,
+            "errors": report.errors,
+        }
+
     async def toggle_cell_mode(
         self, note_id: UUID, row_label: str, col_index: int, mode: str, manual_value: float | None = None
     ) -> dict:

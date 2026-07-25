@@ -39,6 +39,27 @@ def _stable_ledger_order(tbl) -> tuple:
     return (tbl.c.voucher_date, tbl.c.voucher_no, tbl.c.id)
 
 
+_SYSTEM_KEY_PREFIX = "_"  # 系统标记统一 _ 前缀
+
+
+def _attach_extra_fields(rows: list[dict]) -> list[dict]:
+    """将每行 dict 的 raw_extra 展开为 extra_fields（过滤 _ 前缀系统标记），
+    并移除原始 raw_extra 键。就地修改并返回同一列表。
+
+    - raw_extra 为 None / 空 / 非 dict / 仅含 _ 前缀键 → extra_fields = {}
+    - 业务键值原样保留、保持 dict 迭代顺序（Python3.7+ 插入序 = 导入列序）
+    """
+    for row in rows:
+        raw = row.pop("raw_extra", None)
+        if isinstance(raw, dict):
+            row["extra_fields"] = {
+                k: v for k, v in raw.items() if not k.startswith(_SYSTEM_KEY_PREFIX)
+            }
+        else:
+            row["extra_fields"] = {}
+    return rows
+
+
 class DecimalEncoder(json.JSONEncoder):
     """JSON encoder that handles Decimal and date types."""
     def default(self, o: Any) -> Any:
@@ -279,6 +300,7 @@ class LedgerPenetrationService:
                 tbl.c.account_code, tbl.c.account_name,
                 tbl.c.debit_amount, tbl.c.credit_amount,
                 tbl.c.summary, tbl.c.preparer,
+                tbl.c.raw_extra,
             )
             .where(active_filter)
         )
@@ -301,6 +323,7 @@ class LedgerPenetrationService:
         )
         result = await self.db.execute(data_stmt)
         items = [dict(r._mapping) for r in result.fetchall()]
+        items = _attach_extra_fields(items)
 
         return {"items": items, "total": total, "page": page, "page_size": page_size}
 
@@ -329,6 +352,7 @@ class LedgerPenetrationService:
                 tbl.c.account_code, tbl.c.account_name,
                 tbl.c.debit_amount, tbl.c.credit_amount,
                 tbl.c.counterpart_account, tbl.c.summary,
+                tbl.c.raw_extra,
             )
             .where(active_filter, code_filter)
         )
@@ -349,6 +373,7 @@ class LedgerPenetrationService:
         )
         result = await self.db.execute(data_stmt)
         items = [dict(r._mapping) for r in result.fetchall()]
+        items = _attach_extra_fields(items)
 
         return {"items": items, "total": total, "page": page, "page_size": page_size}
 
@@ -364,12 +389,13 @@ class LedgerPenetrationService:
                 tbl.c.account_code, tbl.c.account_name,
                 tbl.c.debit_amount, tbl.c.credit_amount,
                 tbl.c.summary,
+                tbl.c.raw_extra,
             )
             .where(active_filter, tbl.c.voucher_no == voucher_no)
             .order_by(tbl.c.account_code)
         )
         result = await self.db.execute(stmt)
-        return [dict(r._mapping) for r in result.fetchall()]
+        return _attach_extra_fields([dict(r._mapping) for r in result.fetchall()])
 
     async def get_all_aux_balance(
         self, project_id: UUID, year: int,
@@ -427,6 +453,7 @@ class LedgerPenetrationService:
                 tbl.c.account_code, tbl.c.aux_type, tbl.c.aux_code,
                 tbl.c.aux_name, tbl.c.debit_amount, tbl.c.credit_amount,
                 tbl.c.summary,
+                tbl.c.raw_extra,
             )
             .where(active_filter, tbl.c.account_code == account_code)
         )
@@ -445,6 +472,7 @@ class LedgerPenetrationService:
         )
         result = await self.db.execute(data_stmt)
         items = [dict(r._mapping) for r in result.fetchall()]
+        items = _attach_extra_fields(items)
 
         return {"items": items, "total": total, "page": page, "page_size": page_size}
 
@@ -637,6 +665,7 @@ class LedgerPenetrationService:
                 tbl.c.debit_amount, tbl.c.credit_amount,
                 tbl.c.counterpart_account, tbl.c.summary,
                 tbl.c.accounting_period, tbl.c.voucher_type,
+                tbl.c.raw_extra,  # passthrough 列，不参与 window/游标排序
                 running_balance_expr,
             )
             .where(*where_clauses)
@@ -683,6 +712,8 @@ class LedgerPenetrationService:
             vd = last.get("voucher_date")
             vd_str = vd.isoformat() if hasattr(vd, "isoformat") else str(vd)
             next_cursor = f"{vd_str}|{last['id']}"
+
+        items = _attach_extra_fields(items)
 
         resp = {
             "items": items,
@@ -736,6 +767,7 @@ class LedgerPenetrationService:
                 tbl.c.account_code, tbl.c.aux_type, tbl.c.aux_code,
                 tbl.c.aux_name, tbl.c.debit_amount, tbl.c.credit_amount,
                 tbl.c.summary,
+                tbl.c.raw_extra,
             )
             .where(*where_clauses)
             # 同主序时账游标：ORDER BY 与 tiebreaker 用同一 cast(id, String) 表达式。
@@ -755,6 +787,8 @@ class LedgerPenetrationService:
             vd = last.get("voucher_date")
             vd_str = vd.isoformat() if hasattr(vd, "isoformat") else str(vd)
             next_cursor = f"{vd_str}|{last['id']}"
+
+        items = _attach_extra_fields(items)
 
         return {
             "items": items,

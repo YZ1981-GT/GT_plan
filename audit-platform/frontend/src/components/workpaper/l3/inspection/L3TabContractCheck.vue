@@ -442,7 +442,7 @@
  * Task: 4.6
  * Requirements: 8.1-8.2
  */
-import { inject, ref, onMounted } from 'vue'
+import { inject, ref, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import { useL3ImportExport } from '@/components/workpaper/composables/useL3ImportExport'
@@ -563,45 +563,35 @@ const contractRows = ref<ContractRow[]>([])
 
 // ─── Load from checklist_responses ───────────────────────────────────────────
 
+// 🔴 P0 修复（2026-07）：改为 JSON-array 存储 item_id `L3-L3-6-rows`。
+// 此前用 flat per-field keys `L3-con-{n}-{field}` → ①删行残留孤儿键致幻影行 ②与后端导入导出（L3-contract-check-rows JSON）断裂。
 function loadFromFormData(): void {
-  const pattern = /^L3-con-(\d+)-(\w+)$/
-  const rows: ContractRow[] = []
-
-  const map = formData.allResponses.value
-  for (const [itemId, resp] of map.entries()) {
-    const match = itemId.match(pattern)
-    if (!match) continue
-    const idx = parseInt(match[1], 10)
-    const field = match[2] as keyof ContractRow
-
-    while (rows.length < idx) rows.push(createEmptyRow())
-    if (ALL_FIELDS.includes(field)) {
-      const val = resp.remark || resp.conclusion || ''
-      const numVal = parseFloat(val)
-      ;(rows[idx - 1] as any)[field] = isNaN(numVal) ? val : numVal
-    }
+  const resp = formData.allResponses.value.get('L3-L3-6-rows')
+  if (resp?.remark) {
+    try {
+      const parsed = JSON.parse(resp.remark)
+      if (Array.isArray(parsed)) { contractRows.value = parsed; return }
+    } catch { /* ignore */ }
   }
-
-  contractRows.value = rows.length > 0 ? rows : []
 }
 
 onMounted(() => {
   loadFromFormData()
 })
+// allResponses 异步加载完成后再水合一次
+watch(
+  () => formData.allResponses.value.get('L3-L3-6-rows')?.remark,
+  (v) => { if (v && contractRows.value.length === 0) loadFromFormData() },
+)
 
 // ─── Persistence ─────────────────────────────────────────────────────────────
 
-function saveRow(index: number): void {
-  const row = contractRows.value[index]
-  if (!row) return
-  const n = index + 1
-  const items: Array<{ itemId: string; data: { remark: string | null } }> = []
-  for (const field of ALL_FIELDS) {
-    const val = row[field]
-    const strVal = val != null && val !== '' && val !== 0 ? String(val) : null
-    items.push({ itemId: `L3-con-${n}-${field}`, data: { remark: strVal } })
-  }
-  formData.saveBatch(items)
+function _persist(): void {
+  formData.debouncedSave('L3-L3-6-rows', { remark: JSON.stringify(contractRows.value) })
+}
+
+function saveRow(_index: number): void {
+  _persist()
 }
 
 // ─── Field update ────────────────────────────────────────────────────────────
@@ -641,18 +631,7 @@ async function handleAddRow(): Promise<void> {
 
 function handleRemoveRow(index: number): void {
   contractRows.value.splice(index, 1)
-  // Re-save all rows to update indices
-  const items: Array<{ itemId: string; data: { remark: string | null } }> = []
-  for (let i = 0; i < contractRows.value.length; i++) {
-    const row = contractRows.value[i]
-    const n = i + 1
-    for (const field of ALL_FIELDS) {
-      const val = row[field]
-      const strVal = val != null && val !== '' && val !== 0 ? String(val) : null
-      items.push({ itemId: `L3-con-${n}-${field}`, data: { remark: strVal } })
-    }
-  }
-  formData.saveBatch(items)
+  _persist()
 }
 
 // ─── OCR Upload ──────────────────────────────────────────────────────────────

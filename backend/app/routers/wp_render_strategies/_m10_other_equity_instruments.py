@@ -106,17 +106,19 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict[str, Any]:
         "end_balance": 0,
     }
     try:
-        active_filter = get_active_filter(ctx.project_id)
+        active_filter = await get_active_filter(
+            ctx.db, TbBalance.__table__, ctx.project_id, ctx.year or 0
+        )
         stmt = (
             sa.select(
-                TbBalance.begin_balance,
+                TbBalance.opening_balance.label("begin_balance"),
                 TbBalance.debit_amount,
                 TbBalance.credit_amount,
-                TbBalance.end_balance,
+                TbBalance.closing_balance.label("end_balance"),
             )
             .where(
                 TbBalance.project_id == str(ctx.project_id),
-                TbBalance.standard_account_code == _M10_ACCOUNT_CODE,
+                TbBalance.account_code == _M10_ACCOUNT_CODE,
                 active_filter,
             )
             .limit(1)
@@ -148,18 +150,17 @@ async def render(ctx: RenderContext) -> dict[str, Any]:
         rows = (
             await ctx.db.execute(
                 sa.text(
-                    "SELECT item_id, conclusion, evidence, status "
+                    "SELECT item_id, conclusion, remark "
                     "FROM checklist_responses "
-                    "WHERE workpaper_id = :wid"
+                    "WHERE wp_id = :wid"
                 ),
-                {"wid": str(ctx.workpaper_id)},
+                {"wid": str(ctx.wp_id)},
             )
         ).fetchall()
         for r in rows:
             responses_snapshot[r.item_id] = {
                 "conclusion": r.conclusion,
-                "evidence": r.evidence,
-                "status": r.status,
+                "remark": r.remark,
             }
         # 提取审定数
         if _ADJUDICATED_ITEM_ID in responses_snapshot:

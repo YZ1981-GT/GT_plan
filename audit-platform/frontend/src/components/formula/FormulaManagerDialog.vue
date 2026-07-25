@@ -12,11 +12,12 @@
       <div class="gt-fm-sidebar">
         <div class="gt-fm-sidebar-title">数据源</div>
         <el-tree
+          ref="fmTreeRef"
           :data="treeData"
           :props="{ label: 'label', children: 'children' }"
           node-key="key"
           highlight-current
-          :default-expanded-keys="[]"
+          :default-expanded-keys="expandedKeys"
           :expand-on-click-node="false"
           draggable
           :allow-drop="allowTreeDrop"
@@ -171,7 +172,7 @@
         </div>
 
         <!-- 公式表格（报表/附注/底稿） -->
-        <el-table v-if="!isCrossCheckMode" ref="formulaTableRef" :data="filteredRows" size="small" border max-height="calc(100vh - 300px)" style="width: 100%"
+        <el-table v-if="!isCrossCheckMode" ref="formulaTableRef" class="gt-fm-main-table" :data="filteredRows" size="small" border max-height="calc(100vh - 300px)" style="width: 100%"
           :header-cell-style="{ background: '#edf3f9', fontSize: '12px', whiteSpace: 'nowrap' }"
           :row-class-name="getRowClassName"
           @selection-change="onSelectionChange"
@@ -543,7 +544,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, shallowRef, computed, watch } from 'vue'
+import { ref, shallowRef, computed, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { handleApiError } from '@/utils/errorHandler'
@@ -558,6 +559,7 @@ import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useAddressRegistry } from '@/stores/addressRegistry'
 import { useAcnr, type AcnrSheetEntry } from '@/services/acnr/useAcnr'
+import { wpCodeNaturalCompare, composeSheetLabelsForGroup } from '@/services/acnr/sheetDisplayName'
 import {
   useFormulaScopeCatalog,
   SCOPE_LABEL_MAP as SCOPE_CATALOG_LABEL_MAP,
@@ -673,6 +675,8 @@ async function onAutoGenerateReportFormulas() {
 }
 
 // ── 树形导航数据 ──
+const fmTreeRef = ref<any>(null)
+const expandedKeys = ref<string[]>([])
 const selectedNodeKey = ref('report_balance_sheet')
 const selectedPath = ref('报表 > 资产负债表')
 const fmTemplateType = ref('soe')
@@ -1024,7 +1028,8 @@ async function loadAcnrTree() {
   }
 }
 
-/** 从 ACNR sheet 列表按域构建 wp 子树（cycle → parent → sheet） */
+/** 从 ACNR sheet 列表按域构建 wp 子树（cycle → parent → sheet）；
+ *  显示名/排序/序号消歧统一走单一真源 composeSheetLabelsForGroup（sheetDisplayName.ts） */
 function buildWpDomainTree(sheets: AcnrSheetEntry[]) {
   const wpSheets = sheets.filter(s => s.domain === 'wp')
   // 按 cycle 分组
@@ -1034,9 +1039,9 @@ function buildWpDomainTree(sheets: AcnrSheetEntry[]) {
     if (!byCycle.has(c)) byCycle.set(c, [])
     byCycle.get(c)!.push(s)
   }
-  // 每个 cycle 下按 parent_wp_code 再分组
+  // 每个 cycle 下按 parent_wp_code 再分组（全部自然排序，避免 D10 排在 D2 前）
   const cycleNodes: any[] = []
-  for (const [cycle, cycleSheets] of [...byCycle.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+  for (const [cycle, cycleSheets] of [...byCycle.entries()].sort((a, b) => wpCodeNaturalCompare(a[0], b[0]))) {
     const byParent = new Map<string, AcnrSheetEntry[]>()
     for (const s of cycleSheets) {
       const p = s.parent_wp_code
@@ -1044,20 +1049,27 @@ function buildWpDomainTree(sheets: AcnrSheetEntry[]) {
       byParent.get(p)!.push(s)
     }
     const parentNodes = [...byParent.entries()]
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([parentCode, parentSheets]) => ({
-        key: `wp_${parentCode.toLowerCase()}`,
-        label: parentCode,
-        icon: '',
-        children: parentSheets
-          .sort((a, b) => (a.sheet_code || '').localeCompare(b.sheet_code || ''))
-          .map(s => ({
-            key: `wp_${s.sheet_code?.replace(/-/g, '_')?.toLowerCase() || s.addr_id}`,
-            label: `${s.sheet_code} ${s.sheet_name || ''}`.trim(),
-            icon: '',
-            _addrId: s.addr_id,
-          })),
-      }))
+      .sort((a, b) => wpCodeNaturalCompare(a[0], b[0]))
+      .map(([parentCode, parentSheets]) => {
+        const subjectAbbr = parentSheets.find(s => s.account_name)?.account_name || ''
+        const children = composeSheetLabelsForGroup(parentSheets).map(({ entry, label }) => ({
+          key: `wp_${entry.sheet_code?.replace(/-/g, '_')?.toLowerCase() || entry.addr_id}`,
+          label,
+          icon: '',
+          _addrId: entry.addr_id,
+          _wpCode: parentCode,               // 所属底稿(工作簿)编码，供 wp-id-by-code 解析 wp_id
+          _sheetCode: entry.sheet_code || '', // 具体 sheet 编码（如 E1-1），用于筛选该页公式
+        }))
+        return {
+          key: `wp_${parentCode.toLowerCase()}`,
+          // 父节点也带科目简称：如「D2 应收账款」，避免裸编码难辨识
+          label: subjectAbbr ? `${parentCode} ${subjectAbbr}` : parentCode,
+          icon: '',
+          children,
+          _wpCode: parentCode,
+          _sheetCode: '',
+        }
+      })
     cycleNodes.push({
       key: `wp_cycle_${cycle.toLowerCase()}`,
       label: CYCLE_LABEL_MAP[cycle.toUpperCase()] || `${cycle} 循环`,
@@ -1253,11 +1265,105 @@ const formulaResults = ref<Record<string, { value: number | null; trace: any[] }
 
 const notePresetFormulas = ref<any[]>([])
 
+// ── 底稿(wp)节点公式：从 GET /api/workpapers/{wp_id}/formulas 加载（含 wp_formula 网格公式、
+//    专属组件取数公式 surfaced、D-cycle 四表提取 extraction）。此前底稿节点无加载分支恒空。 ──
+const wpFormulaRows = ref<any[]>([])
+
+// ── tb_detail「科目明细」公式覆盖 + 自定义新增（持久化于 wizard_state.tb_detail_formulas）──
+const tbDetailOverrides = ref<Record<string, any>>({})
+const tbDetailAdded = ref<any[]>([])
+
+async function loadTbDetailFormulas() {
+  if (!props.projectId) return
+  try {
+    const data: any = await api.get(`/api/report-config/tb-detail-formulas/${props.projectId}`, {
+      _silent: true, validateStatus: (s: number) => s < 600,
+    } as any)
+    tbDetailOverrides.value = data?.overrides || {}
+    tbDetailAdded.value = Array.isArray(data?.added) ? data.added : []
+  } catch { /* silent */ }
+}
+
+async function persistTbDetailFormulas() {
+  if (!props.projectId) return
+  try {
+    await api.put(`/api/report-config/tb-detail-formulas/${props.projectId}`, {
+      overrides: tbDetailOverrides.value,
+      added: tbDetailAdded.value,
+    }, { validateStatus: (s: number) => s < 600 })
+  } catch (e) { handleApiError(e, '保存失败') }
+}
+const wpFormulaLoading = ref(false)
+const selectedWpCode = ref('')
+const selectedWpSheetCode = ref('')
+
+async function loadWpFormulas(wpCode: string, sheetCode: string) {
+  wpFormulaRows.value = []
+  if (!props.projectId || !wpCode) return
+  wpFormulaLoading.value = true
+  try {
+    // 1) wp_code → wp_id
+    const idResp: any = await api.get('/api/custom-query/wp-id-by-code', {
+      params: { project_id: props.projectId, wp_code: wpCode },
+      _silent: true, validateStatus: (s: number) => s < 600,
+    } as any)
+    const wpId = idResp?.wp_id || idResp?.data?.wp_id
+    if (!wpId) return
+    // 2) 加载该底稿全部公式
+    const data: any = await api.get(`/api/workpapers/${wpId}/formulas`, {
+      _silent: true, validateStatus: (s: number) => s < 600,
+    } as any)
+    const rows: any[] = []
+    for (const it of (data?.items || [])) {
+      rows.push({
+        id: it.id, row_code: it.target_cell || it.sheet_name || '', row_name: it.sheet_name || '',
+        formula: it.formula || it.expression || '', formula_category: it.formula_category || '取数',
+        formula_description: it.formula_description || '', formula_source: '底稿公式(wp_formula)',
+      })
+    }
+    // surfaced 按选中 sheet 过滤：条目带 sheet_codes（归属 sheet 列表）时，仅在选中该 sheet
+    // 时显示；无 sheet_codes（工作簿级）恒显示；未选具体 sheet（父节点）显示全部。
+    for (const s of (data?.surfaced || [])) {
+      const scs = s.sheet_codes
+      if (sheetCode && Array.isArray(scs) && scs.length && !scs.includes(sheetCode)) continue
+      rows.push({ ...s })
+    }
+    const ex = data?.extraction
+    for (const b of (ex?.tierA || [])) {
+      rows.push({
+        id: b.id || `tierA-${b.target_cell || rows.length}`, row_code: b.target_cell || '', row_name: b.label || '',
+        formula: b.expression || '', formula_category: '取数',
+        formula_description: b.semantic || b.note || '', formula_source: '四表提取(Tier A)',
+      })
+    }
+    for (const b of (ex?.tierB || [])) {
+      rows.push({
+        id: `tierB-${b.anchor || rows.length}`, readonly: true, row_code: b.anchor || '', row_name: b.label || '',
+        formula: b.description || b.expression || '', formula_category: '只读溯源',
+        formula_description: b.semantic || '', formula_source: 'Tier B 溯源',
+      })
+    }
+    // 防御：任何缺 id 的只读行补稳定 id，避免 editingId(null)===row.id(null) 误触发编辑输入框（公式列变空）
+    wpFormulaRows.value = rows.map((r, i) => (r.id == null ? { ...r, id: `wpf-${i}` } : r))
+  } catch { /* silent */ }
+  finally { wpFormulaLoading.value = false }
+}
+
 async function loadRowsForNode(nodeKey: string) {
-  // 试算平衡表节点：tb_detail 用 props.rows，tb_summary 加载 report_config
-  if (nodeKey === 'tb_detail') {
-    // 科目明细数据来自 props.rows，不需要额外加载
+  // 底稿(wp)节点：解析 wp_id → 加载该底稿取数公式（含专属组件 surfaced）
+  if (nodeKey.startsWith('wp_') && selectedWpCode.value) {
+    await loadWpFormulas(selectedWpCode.value, selectedWpSheetCode.value)
     return
+  }
+  // 试算平衡表节点：tb_detail 用 props.rows + 加载覆盖/自定义；tb_summary 加载 report_config
+  if (nodeKey === 'tb_detail') {
+    // 科目明细预设来自 props.rows，另加载用户覆盖 + 自定义新增
+    loadTbDetailFormulas()
+    return
+  }
+  if (nodeKey === 'tb_summary') {
+    // 加载资产负债表的 report_config 作为试算平衡表行次
+    nodeKey = 'report_balance_sheet'
   }
   if (nodeKey === 'tb_summary') {
     // 加载资产负债表的 report_config 作为试算平衡表行次
@@ -1284,6 +1390,45 @@ async function loadRowsForNode(nodeKey: string) {
     } catch { /* ignore */ }
     finally { loadingData.value = false }
   }
+}
+
+/** 在树数据中递归查找目标 key 的祖先链（含该节点自身），未找到返回 []。 */
+function findNodePath(nodes: any[], key: string, trail: any[] = []): any[] {
+  for (const n of nodes || []) {
+    const nextTrail = [...trail, n]
+    if (n.key === key) return nextTrail
+    if (n.children?.length) {
+      const found = findNodePath(n.children, key, nextTrail)
+      if (found.length) return found
+    }
+  }
+  return []
+}
+
+/**
+ * 从 sessionStorage `gt-formula-target-node` 读取目标节点（由外部入口如底稿页
+ * openFormulaManager 写入，如 wp_e1_1），打开弹窗后自动展开祖先 + 选中 + 加载其公式，
+ * 让用户从审定表点「公式管理」直接落到该底稿 sheet 节点，无需再手动切换。
+ */
+async function applyTargetNode() {
+  let target = ''
+  try { target = sessionStorage.getItem('gt-formula-target-node') || '' } catch { /* ignore */ }
+  if (!target) return
+  try { sessionStorage.removeItem('gt-formula-target-node') } catch { /* ignore */ }
+  // 底稿域树来自 ACNR catalog，需先加载完成（idempotent，已加载则立即返回）
+  await loadAcnrTree()
+  await nextTick()
+  const path = findNodePath(treeData.value, target)
+  if (!path.length) return  // 未匹配（如附注/程序表 sheet_code 不对应）→ 保持默认，不打断
+  const node = path[path.length - 1]
+  const isLeaf = !node.children || node.children.length === 0
+  // 叶子 → 展开到父；父节点 → 展开自身使子节点可见
+  const toExpand = isLeaf ? path.slice(0, -1) : path
+  expandedKeys.value = [...new Set([...expandedKeys.value, ...toExpand.map((n) => n.key)])]
+  await nextTick()
+  try { fmTreeRef.value?.setCurrentKey(target) } catch { /* ignore */ }
+  // 叶子节点触发与 onTreeNodeClick 一致的选择逻辑（设 selectedWpCode/SheetCode + 加载公式）
+  if (isLeaf) onTreeNodeClick(node)
 }
 
 // 初始加载当前报表的数据
@@ -1315,6 +1460,8 @@ watch(visible, async (v) => {
       allRowsMap.value[rt] = props.rows
       selectedNodeKey.value = `report_${rt}`
     }
+    // 外部入口指定目标节点（如底稿页跳转 wp_e1_1）→ 自动展开+选中+加载公式
+    applyTargetNode()
   }
 })
 
@@ -1346,6 +1493,8 @@ function onTreeNodeClick(data: any) {
       }
     } else if (data.key.startsWith('wp_')) {
       selectedPath.value = `底稿 > ${data.label}`
+      selectedWpCode.value = data._wpCode || ''
+      selectedWpSheetCode.value = data._sheetCode || ''
     } else if (data.key.startsWith('consol_')) {
       selectedPath.value = `合并报表 > ${data.label}`
     } else if (data.key.startsWith('cross_')) {
@@ -1359,27 +1508,43 @@ function onTreeNodeClick(data: any) {
 const currentRows = computed(() => {
   // 试算平衡表节点
   if (selectedNodeKey.value === 'tb_detail') {
-    // 科目明细：显示科目→报表行次的映射公式
-    // R14.6: 候选地址源优先走 Req16 store facade（ACNR-backed）tbAddresses，
-    // 空/未加载时回退 props.rows（strangler-fig，无回归）。
-    if (addrStore.loaded && addrStore.tbAddresses.length > 0) {
-      return addrStore.tbAddresses.map((e) => ({
-        row_code: e.account_code || '',
-        row_name: e.label || '',
-        formula: `TB('${e.account_code || ''}','期末余额')`,
-        formula_category: '取数',
-        formula_description: '从余额表取期末余额',
+    // 科目明细：按科目生成 TB() 取数预设（分类默认「自动运算」），叠加用户覆盖 + 自定义新增
+    // 覆盖/新增持久化于 wizard_state.tb_detail_formulas，避免预设不对且支持二次编辑。
+    // R14.6: 候选地址源优先走 Req16 store facade（ACNR-backed）tbAddresses，空/未加载时回退 props.rows。
+    const ov = tbDetailOverrides.value
+    const base = (addrStore.loaded && addrStore.tbAddresses.length > 0)
+      ? addrStore.tbAddresses.map((e) => ({ code: e.account_code || '', name: e.label || '', computed: undefined as any }))
+      : (props.rows || []).map((r: any) => ({ code: r.standard_account_code || '', name: r.account_name || '', computed: r.unadjusted_amount }))
+    const rows: any[] = base.map((b) => {
+      const o = ov[b.code]
+      return {
+        id: `tbd-${b.code}`,
+        row_code: b.code,
+        row_name: b.name,
+        formula: (o && o.formula != null) ? o.formula : `TB('${b.code}','期末余额')`,
+        formula_category: (o && o.formula_category) ? o.formula_category : 'auto_calc',
+        formula_description: (o && o.formula_description != null) ? o.formula_description : '从余额表取期末余额',
+        _computed_value: b.computed,
+        _tbDetail: true,
+        _overridden: !!o,
+      }
+    })
+    // 追加用户自定义新增行
+    for (let i = 0; i < tbDetailAdded.value.length; i++) {
+      const a = tbDetailAdded.value[i]
+      rows.push({
+        id: a.row_code ? `tbd-add-${a.row_code}` : `tbd-add-${i}`,
+        row_code: a.row_code || '',
+        row_name: a.row_name || '',
+        formula: a.formula || '',
+        formula_category: a.formula_category || 'auto_calc',
+        formula_description: a.formula_description || '',
         _computed_value: undefined,
-      }))
+        _tbDetail: true,
+        _tbAdded: true,
+      })
     }
-    return (props.rows || []).map((r: any) => ({
-      row_code: r.standard_account_code || '',
-      row_name: r.account_name || '',
-      formula: `TB('${r.standard_account_code}','期末余额')`,
-      formula_category: '取数',
-      formula_description: '从余额表取期末余额',
-      _computed_value: r.unadjusted_amount,
-    }))
+    return rows
   }
   if (selectedNodeKey.value === 'tb_summary') {
     // 试算平衡表：显示 report_config 的行次公式
@@ -1446,6 +1611,10 @@ const currentRows = computed(() => {
   // 合并报表节点：显示对应表样的行结构
   if (selectedNodeKey.value.startsWith('consol_')) {
     return allRowsMap.value[selectedNodeKey.value] || consolSheetRows(selectedNodeKey.value)
+  }
+  // 底稿(wp)节点：显示该底稿取数公式（wp_formula + 专属组件 surfaced + 四表提取）
+  if (selectedNodeKey.value.startsWith('wp_')) {
+    return wpFormulaRows.value
   }
   return []
 })
@@ -1800,6 +1969,32 @@ async function onFormulaEditSave(data: { formula: string; category: string; desc
   row.formula_category = data.category
   row.formula_description = data.description
 
+  // tb_detail 科目明细：覆盖默认预设 / 自定义新增 → 持久化 wizard_state.tb_detail_formulas
+  if (selectedNodeKey.value === 'tb_detail') {
+    const cat = data.category || 'auto_calc'
+    if (row._isNew) {
+      if (!data.formula) return
+      tbDetailAdded.value.push({
+        row_code: row.row_code, row_name: row.row_name,
+        formula: data.formula, formula_category: cat, formula_description: data.description,
+      })
+      row._isNew = false
+    } else if (row._tbAdded) {
+      const t = tbDetailAdded.value.find((a: any) => a.row_code === row.row_code)
+      if (t) { t.formula = data.formula; t.formula_category = cat; t.formula_description = data.description }
+    } else {
+      // 覆盖某科目默认预设
+      tbDetailOverrides.value[row.row_code] = {
+        row_code: row.row_code, row_name: row.row_name,
+        formula: data.formula, formula_category: cat, formula_description: data.description,
+      }
+    }
+    await persistTbDetailFormulas()
+    ElMessage.success('公式已保存')
+    emit('saved')
+    return
+  }
+
   if (row._isNew) {
     // 新增公式行——添加到当前列表并尝试保存到后端
     if (data.formula) {
@@ -1872,6 +2067,9 @@ function categoryTagType(cat: string | null): '' | 'success' | 'warning' | 'info
   if (cat === 'auto_calc') return 'primary'
   if (cat === 'logic_check') return 'warning'
   if (cat === 'reasonability') return 'info'
+  if (cat === '取数') return 'success'   // 跨 sheet / 四表库取数
+  if (cat === '计算') return 'primary'   // 表间计算公式
+  if (cat === '只读溯源') return 'info'
   return ''
 }
 
@@ -1879,7 +2077,9 @@ function categoryLabel(cat: string | null) {
   if (cat === 'auto_calc') return '自动运算'
   if (cat === 'logic_check') return '逻辑审核'
   if (cat === 'reasonability') return '合理性'
-  return '未分类'
+  // 专属组件 surfacing 分类（取数/计算/只读溯源）原样显示，不再回退"未分类"
+  if (cat === '取数' || cat === '计算' || cat === '只读溯源') return cat
+  return cat || '未分类'
 }
 
 async function onApplyFormulas() {
@@ -2067,7 +2267,8 @@ function onAddFormulaRow() {
     row_code: `CUSTOM-${(currentRows.value?.length || 0) + 1}`,
     row_name: '自定义公式',
     formula: '',
-    formula_category: 'logic_check',
+    // 用户要求：分类默认为自动运算类型
+    formula_category: 'auto_calc',
     formula_description: '',
     _isNew: true,
   }
@@ -2347,6 +2548,17 @@ function onHistoryRollbackApplied(rowCode: string, formula: string) {
   text-transform: uppercase;
   letter-spacing: 1px;
 }
+/* 主公式表格统一 12 号字（用户要求：公式管理中心字号 12） */
+.gt-fm-main-table :deep(.el-table__cell) {
+  font-size: 12px;
+}
+.gt-fm-main-table :deep(.cell),
+.gt-fm-main-table :deep(.cell code),
+.gt-fm-main-table :deep(.el-input__inner),
+.gt-fm-main-table :deep(.el-tag) {
+  font-size: 12px !important;
+}
+
 .gt-fm-tree {
   background: transparent;
   --el-tree-node-hover-bg-color: #e8f0f8;

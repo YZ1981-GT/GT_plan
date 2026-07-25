@@ -76,13 +76,16 @@
  * 完成度 / 适用性 N/A（利息分支互斥、减值迹象、附注版本）
  * Spec: Task 4.1 | Requirements: 1.2
  */
-import { computed, inject, type Ref } from 'vue'
+import { computed, inject, ref, defineAsyncComponent, type Ref } from 'vue'
 import {
   resolveH2SheetStatus,
   summarizeH2IndexProgress,
   type H2SheetStatus,
 } from '../../composables/h2IndexCompletion'
 import type { H2C7PrerequisiteState } from '../../composables/useH2C7Prerequisite'
+import GtCycleDirExtras from '../../GtCycleDirExtras.vue'
+
+const H2PreparationHandbookDialog = defineAsyncComponent(() => import('../H2PreparationHandbookDialog.vue'))
 
 const props = defineProps<{
   wpId: string
@@ -171,6 +174,19 @@ function statusTagType(status: H2SheetStatus): 'success' | 'info' | 'warning' {
 
 function handleNavigate(row: SheetEntry) {
   emit('navigate-sheet', row.sheetName)
+}
+
+// ─── E1 标准加法式增强：目录卡 + 结论看板 + 本循环 grid ───────────────────
+/** H2 导航机制为 emit('navigate-sheet')，navValue = sheetName。 */
+const dirSheets = computed(() =>
+  SHEET_DEFS.map((d) => ({ code: d.code, navValue: d.sheetName, name: d.name })),
+)
+
+const handbookVisible = ref(false)
+const handbookTab = ref<'preparation' | 'usage'>('preparation')
+function openHandbook(tab: 'preparation' | 'usage') {
+  handbookTab.value = tab
+  handbookVisible.value = true
 }
 </script>
 

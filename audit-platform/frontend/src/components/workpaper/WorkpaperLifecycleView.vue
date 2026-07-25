@@ -54,7 +54,10 @@
             <el-tag size="small" :type="tailorStats.tailored > 0 ? 'success' : 'info'">
               {{ tailorStats.tailored }}/{{ tailorStats.total }} 已裁剪
             </el-tag>
-            <el-button type="primary" size="small" @click="goToTailor" style="margin-left: auto">
+            <el-button size="small" @click="showModuleHandbook = true" style="margin-left: auto">
+              <el-icon style="margin-right: 4px"><Reading /></el-icon>使用手册
+            </el-button>
+            <el-button type="primary" size="small" @click="goToTailor">
               <el-icon style="margin-right: 4px"><Setting /></el-icon>配置裁剪
             </el-button>
           </div>
@@ -143,24 +146,60 @@
             </el-tag>
           </div>
           <el-progress :percentage="composeStats.percent" :stroke-width="8" style="margin-bottom: 12px" />
+          <!-- 呼应「程序裁剪 → 委派」：说明当前底稿范围与可见性 -->
+          <el-alert type="info" :closable="false" show-icon style="margin-bottom: 8px">
+            <template #title>
+              <span class="gt-wp-lc-vis-hint">
+                按<b>审计循环 → 科目底稿</b>分层展示。裁剪掉的程序不会生成底稿；被委派人登录后<b>仅能看到分配给自己的底稿</b>（服务端强制可见性）。
+              </span>
+            </template>
+          </el-alert>
           <div class="gt-wp-lc-filter-row">
             <el-radio-group v-model="composeFilter" size="small">
               <el-radio-button value="all">全部 ({{ composeStats.total }})</el-radio-button>
               <el-radio-button value="mine">我的 ({{ composeStats.mine }})</el-radio-button>
             </el-radio-group>
+            <div class="gt-wp-lc-tree-tools">
+              <el-input
+                v-model="composeSearch"
+                size="small"
+                placeholder="搜索编码/名称"
+                clearable
+                style="width: 180px"
+              />
+              <el-button link size="small" @click="setComposeExpanded(true)">展开全部</el-button>
+              <el-button link size="small" @click="setComposeExpanded(false)">收起全部</el-button>
+            </div>
           </div>
           <div class="gt-wp-lc-list">
-            <div
-              v-for="w in filteredComposeList"
-              :key="w.id"
-              class="gt-wp-lc-list-item"
-              @click="emit('open-workpaper', w.id)"
+            <el-tree
+              v-if="composeTreeData.length"
+              ref="composeTreeRef"
+              class="gt-wp-lc-tree"
+              :data="composeTreeData"
+              node-key="id"
+              :props="{ label: 'name', children: 'children' }"
+              :default-expanded-keys="composeExpandedKeys"
+              :filter-node-method="filterComposeNode"
+              :expand-on-click-node="false"
+              @node-click="onComposeNodeClick"
             >
-              <span class="gt-wp-lc-li-code">{{ w.wp_code }}</span>
-              <span class="gt-wp-lc-li-name">{{ w.wp_name }}</span>
-              <el-tag size="small" :type="composeStatusType(w.status)">{{ composeStatusLabel(w.status) }}</el-tag>
-            </div>
-            <div v-if="filteredComposeList.length === 0" class="gt-wp-lc-empty">暂无编制中底稿</div>
+              <template #default="{ data }">
+                <div class="gt-wp-lc-tree-node" :class="{ 'is-openable': !!data.wpId }">
+                  <span v-if="data.code" class="gt-wp-lc-li-code" :class="{ 'is-cycle': data.isCycle }">{{ data.code }}</span>
+                  <span class="gt-wp-lc-li-name">{{ data.name }}</span>
+                  <span v-if="data.isCycle || data.isGroup" class="gt-wp-lc-tree-count">
+                    {{ data.doneCount }}/{{ data.leafCount }}
+                  </span>
+                  <el-tag
+                    v-if="data.wpId"
+                    size="small"
+                    :type="composeStatusType(data.status)"
+                  >{{ composeStatusLabel(data.status) }}</el-tag>
+                </div>
+              </template>
+            </el-tree>
+            <div v-else class="gt-wp-lc-empty">暂无编制中底稿</div>
           </div>
         </div>
 
@@ -236,14 +275,18 @@
         </div>
       </div>
     </div>
+
+    <!-- 底稿编制模块使用手册 -->
+    <WorkpaperModuleHandbookDialog v-model="showModuleHandbook" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Setting } from '@element-plus/icons-vue'
+import { Setting, Reading } from '@element-plus/icons-vue'
+import WorkpaperModuleHandbookDialog from './WorkpaperModuleHandbookDialog.vue'
 import http from '@/utils/http'
 import { handleApiError } from '@/utils/errorHandler'
 import { useAuthStore } from '@/stores/auth'
@@ -274,6 +317,9 @@ const emit = defineEmits<{
 
 const router = useRouter()
 const authStore = useAuthStore()
+
+// 使用手册弹窗
+const showModuleHandbook = ref(false)
 
 // 6 阶段定义
 const stages = computed(() => [
@@ -484,12 +530,143 @@ const composeStatus = computed<string>(() => {
   return composeStats.value.completed > 0 ? 'in_progress' : 'not_started'
 })
 
-const filteredComposeList = computed(() => {
-  const list = composeFilter.value === 'mine'
+// 编制阶段来源（按「全部 / 我的」过滤；不截断，交给树形结构分层折叠）
+const composeSource = computed(() =>
+  composeFilter.value === 'mine'
     ? props.workpapers.filter(w => w.assigned_to === authStore.userId)
     : props.workpapers
-  return list.slice(0, 30)
+)
+
+// ─── 树形结构：审计循环 → 科目底稿 → 子底稿 ─────────────────────────────────────
+const CYCLE_NAMES: Record<string, string> = {
+  A: '报表与调整', B: '计划', C: '控制测试', D: '收入循环', E: '货币资金',
+  F: '采购存货', G: '投资', H: '固定资产', I: '无形资产', J: '职工薪酬',
+  K: '管理费用', L: '筹资', M: '股东权益', N: '税费', S: '专项程序',
+}
+const CYCLE_ORDER = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'S']
+
+interface ComposeTreeNode {
+  id: string
+  code: string
+  name: string
+  wpId?: string
+  status?: string
+  isCycle?: boolean
+  isGroup?: boolean
+  leafCount?: number
+  doneCount?: number
+  children?: ComposeTreeNode[]
+}
+
+/** 循环前缀（编码首个字母段，如 A1→A / D2-1→D） */
+function cycleKeyOf(code: string): string {
+  return (code.match(/^[A-Za-z]+/)?.[0] || '#').toUpperCase()
+}
+
+/** 科目基础编码（首字母+数字段，如 A1-11→A1 / A10-1→A10 / A11→A11） */
+function baseCodeOf(code: string): string {
+  return code.match(/^([A-Za-z]+\d+)/)?.[1] || code
+}
+
+/** 排序键：主编号×10000 + 次编号（A1→10000 / A10→100000 / A1-11→10011） */
+function codeSortKey(code: string): number {
+  const nums = code.match(/\d+/g) || []
+  return parseInt(nums[0] || '0', 10) * 10000 + parseInt(nums[1] || '0', 10)
+}
+
+function collectLeafWps(node: ComposeTreeNode): ComposeTreeNode[] {
+  const out: ComposeTreeNode[] = []
+  if (node.wpId) out.push(node)
+  for (const c of node.children || []) out.push(...collectLeafWps(c))
+  return out
+}
+
+const composeTreeData = computed<ComposeTreeNode[]>(() => {
+  interface CycleAcc { node: ComposeTreeNode; bases: Map<string, ComposeTreeNode> }
+  const cycleMap = new Map<string, CycleAcc>()
+
+  for (const w of composeSource.value) {
+    const code = w.wp_code || ''
+    if (!code) continue
+    const cyc = cycleKeyOf(code)
+    if (!cycleMap.has(cyc)) {
+      cycleMap.set(cyc, {
+        node: { id: 'cyc:' + cyc, code: cyc, name: CYCLE_NAMES[cyc] || '其他', isCycle: true, children: [] },
+        bases: new Map(),
+      })
+    }
+    const acc = cycleMap.get(cyc)!
+    const base = baseCodeOf(code)
+    if (!acc.bases.has(base)) {
+      acc.bases.set(base, { id: 'base:' + cyc + ':' + base, code: base, name: base, isGroup: true, children: [] })
+    }
+    const bnode = acc.bases.get(base)!
+    if (code === base) {
+      // 该底稿即基础科目本身 → 组节点可直接打开
+      bnode.wpId = w.id
+      bnode.name = w.wp_name || base
+      bnode.status = w.status
+    } else {
+      bnode.children!.push({ id: 'wp:' + w.id, code, name: w.wp_name || '', wpId: w.id, status: w.status })
+    }
+  }
+
+  const sortedCycles = Array.from(cycleMap.keys()).sort((a, b) => {
+    const ia = CYCLE_ORDER.indexOf(a); const ib = CYCLE_ORDER.indexOf(b)
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || a.localeCompare(b)
+  })
+
+  const result: ComposeTreeNode[] = []
+  for (const cyc of sortedCycles) {
+    const acc = cycleMap.get(cyc)!
+    const bases = Array.from(acc.bases.values())
+      .filter(b => b.wpId || (b.children && b.children.length))
+      .sort((a, b) => codeSortKey(a.code) - codeSortKey(b.code) || a.code.localeCompare(b.code))
+    for (const b of bases) {
+      b.children!.sort((x, y) => codeSortKey(x.code) - codeSortKey(y.code) || x.code.localeCompare(y.code))
+      const leaves = collectLeafWps(b)
+      b.leafCount = leaves.length
+      b.doneCount = leaves.filter(l => COMPOSE_DONE.has(l.status || '')).length
+      // 无子底稿时不显示展开箭头（children 置空）
+      if (!b.children!.length) delete b.children
+      acc.node.children!.push(b)
+    }
+    if (!acc.node.children!.length) continue
+    const cLeaves = acc.node.children!.flatMap(collectLeafWps)
+    acc.node.leafCount = cLeaves.length
+    acc.node.doneCount = cLeaves.filter(l => COMPOSE_DONE.has(l.status || '')).length
+    result.push(acc.node)
+  }
+  return result
 })
+
+// 默认展开循环层
+const composeExpandedKeys = computed(() => composeTreeData.value.map(n => n.id))
+
+const composeTreeRef = ref<any>(null)
+const composeSearch = ref('')
+
+watch(composeSearch, (v) => {
+  composeTreeRef.value?.filter(v)
+})
+
+function filterComposeNode(value: string, data: ComposeTreeNode): boolean {
+  if (!value) return true
+  const kw = value.toLowerCase()
+  return (data.code || '').toLowerCase().includes(kw) || (data.name || '').toLowerCase().includes(kw)
+}
+
+function onComposeNodeClick(data: ComposeTreeNode) {
+  if (data.wpId) emit('open-workpaper', data.wpId)
+}
+
+function setComposeExpanded(expanded: boolean) {
+  const store = composeTreeRef.value?.store
+  if (!store?.nodesMap) return
+  for (const node of Object.values(store.nodesMap) as any[]) {
+    node.expanded = expanded
+  }
+}
 
 const COMPOSE_LABEL_MAP: Record<string, string> = {
   draft: '待编',
@@ -717,7 +894,26 @@ onMounted(async () => {
 .gt-wp-lc-rec-list { list-style: none; padding: 0; margin: 0; }
 .gt-wp-lc-rec-list li { display: flex; align-items: center; gap: 6px; padding: 4px 0; font-size: var(--wp-font-size, 13px); }
 .gt-wp-lc-rec-name { color: var(--gt-color-text-primary); }
-.gt-wp-lc-filter-row { margin-bottom: 12px; }
+.gt-wp-lc-filter-row { margin-bottom: 12px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.gt-wp-lc-tree-tools { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.gt-wp-lc-vis-hint { font-size: 12px; line-height: 1.5; }
+
+/* 编制树形结构 */
+.gt-wp-lc-tree { background: transparent; --el-tree-node-hover-bg-color: var(--gt-color-primary-bg, #f8f5ff); }
+.gt-wp-lc-tree :deep(.el-tree-node__content) { height: 34px; border-radius: 6px; }
+.gt-wp-lc-tree-node {
+  display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; padding-right: 8px;
+}
+.gt-wp-lc-tree-node.is-openable { cursor: pointer; }
+.gt-wp-lc-tree-node.is-openable:hover .gt-wp-lc-li-name { color: var(--gt-color-primary); }
+.gt-wp-lc-li-code.is-cycle {
+  background: var(--gt-color-primary); color: #fff; padding: 1px 8px; border-radius: 4px;
+  min-width: auto; font-size: 12px;
+}
+.gt-wp-lc-tree-count {
+  font-size: 11px; color: var(--gt-color-text-tertiary);
+  background: var(--gt-color-bg, #f0f0f0); border-radius: 10px; padding: 1px 8px; white-space: nowrap;
+}
 
 /* 底稿列表 */
 .gt-wp-lc-list { max-height: 360px; overflow-y: auto; }

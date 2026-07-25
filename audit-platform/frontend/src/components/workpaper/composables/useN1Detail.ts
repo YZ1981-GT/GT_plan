@@ -111,6 +111,42 @@ export interface UseN1DetailOptions {
 const ITEM_PREFIX = 'N1-2-detail'
 let _nextId = 1
 
+/**
+ * 源模板 N1-2 明细表默认项目清单（含类别映射，对齐致同 N1-2 A11~A40）
+ * 项目组根据被审计单位税收情况增减，此处提供源模板全量 29 项作为初始种子。
+ */
+export const N1_DEFAULT_DETAIL_ITEMS: Array<{ itemName: string; category: string }> = [
+  { itemName: '交易性金融资产（公允价值与初始账面成本差异）', category: '公允价值变动' },
+  { itemName: '应收账款（坏账准备）', category: '资产减值准备' },
+  { itemName: '其他应收款（坏账准备）', category: '资产减值准备' },
+  { itemName: '存货（跌价准备）', category: '资产减值准备' },
+  { itemName: '应收款项融资（公允价值与经实际利率法摊销后账面金额的差异）', category: '公允价值变动' },
+  { itemName: '合同资产（减值准备）', category: '资产减值准备' },
+  { itemName: '其他债权投资（公允价值与经实际利率法摊销后账面金额的差异）', category: '公允价值变动' },
+  { itemName: '其他权益工具投资（公允价值与初始账面成本差异）', category: '公允价值变动' },
+  { itemName: '债权投资（减值准备）', category: '资产减值准备' },
+  { itemName: '长期股权投资（减值准备）', category: '资产减值准备' },
+  { itemName: '投资性房地产（公允价值与账面差异）', category: '公允价值变动' },
+  { itemName: '投资性房地产（折旧）', category: '其他' },
+  { itemName: '固定资产（减值准备）', category: '资产减值准备' },
+  { itemName: '固定资产折旧（年限、残值）', category: '其他' },
+  { itemName: '在建工程（减值准备）', category: '资产减值准备' },
+  { itemName: '使用权资产（减值准备）', category: '资产减值准备' },
+  { itemName: '无形资产（减值准备、摊销）', category: '资产减值准备' },
+  { itemName: '无形资产（研发费用资本化）', category: '其他' },
+  { itemName: '开办费（摊销方法）', category: '其他' },
+  { itemName: '交易性金融负债（公允价值与账面差异）', category: '公允价值变动' },
+  { itemName: '应付职工薪酬（已计提未支付）', category: '其他' },
+  { itemName: '应付职工薪酬（预计辞退福利费）', category: '其他' },
+  { itemName: '预提费用', category: '其他' },
+  { itemName: '递延收益', category: '其他' },
+  { itemName: '预计负债（预计产品保修费用等）', category: '其他' },
+  { itemName: '收入（预收款项）', category: '其他' },
+  { itemName: '销售费用（广告费和业务宣传费）', category: '其他' },
+  { itemName: '可用以后年度税前利润弥补的亏损', category: '可抵扣亏损' },
+  { itemName: '除上述项目以外的其他', category: '其他' },
+]
+
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useN1Detail(options: UseN1DetailOptions) {
@@ -239,6 +275,35 @@ export function useN1Detail(options: UseN1DetailOptions) {
     _persistRows()
   }
 
+  /**
+   * 预置源模板 29 项常见暂时性差异项目（仅在当前为空时生效，避免覆盖已录数据）。
+   * 对齐致同 N1-2 明细表默认项目清单。
+   */
+  function seedDefaultRows(): void {
+    if (rows.value.length > 0) return
+    for (const item of N1_DEFAULT_DETAIL_ITEMS) {
+      rows.value.push({
+        id: `row-${_nextId++}`,
+        itemName: item.itemName,
+        category: item.category,
+        bookValue: 0,
+        taxBase: 0,
+        beginDiff: 0,
+        beginTaxRate: 0.25,
+        beginAje: 0,
+        beginRje: 0,
+        endDiff: 0,
+        endTaxRate: 0.25,
+        endAje: 0,
+        endRje: 0,
+        recognized: 0,
+        reversed: 0,
+        remark: '',
+      })
+    }
+    _persistRows()
+  }
+
   /** 更新行字段 */
   function updateRow(index: number, field: keyof Omit<N1DetailRow, 'id'>, value: any): void {
     if (index < 0 || index >= rows.value.length) return
@@ -265,6 +330,7 @@ export function useN1Detail(options: UseN1DetailOptions) {
     addRow,
     removeRow,
     updateRow,
+    seedDefaultRows,
     totals,
     categoryTotals,
     stats,

@@ -1,21 +1,7 @@
 <template>
   <div class="m10-tab-detail">
-    <!-- ═══ 双模式切换 (el-segmented HTML/OO) ═══ -->
-    <el-segmented
-      v-model="dualModeValue"
-      :options="dualMode.modeOptions.value"
-      size="small"
-      class="dual-mode-switcher"
-      @change="(val: any) => dualMode.switchMode(val)"
-    />
-
-    <!-- OnlyOffice 降级模式 -->
-    <template v-if="dualMode.isOnlyOffice.value">
-      <GtOnlyOfficeSheet :wp-id="props.wpId" sheet-name="M10-2" style="height:100%;min-height:600px" />
-    </template>
-
-    <!-- HTML 结构化模式 -->
-    <template v-else>
+    <!-- HTML 结构化模式（双模式已上移至入口级 GtM10OtherEquityInstruments，避免双重切换栏） -->
+    <template>
       <!-- ═══ 标题 + 操作栏 ═══ -->
       <div class="section-header">
         <div class="section-header-left">
@@ -708,15 +694,12 @@
  *
  * 科目：4003 其他权益工具（**贷方/权益类！期末=期初+贷方-借方**）
  */
-import { computed, defineAsyncComponent, inject, onMounted, ref, watch } from 'vue'
+import { computed, inject, onMounted, ref, watch } from 'vue'
 import { Plus, Check } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useM10FormData } from '../../composables/useM10FormData'
 import { useM10Detail, M10_DETAIL_TABS, type M10DetailRow, type M10DetailTab, type M10InstrumentType } from '../../composables/useM10Detail'
 import { useM10ImportExport } from '../../composables/useM10ImportExport'
-import { useM10DualMode } from '../../composables/useM10DualMode'
-
-const GtOnlyOfficeSheet = defineAsyncComponent(() => import('../../GtOnlyOfficeSheet.vue'))
 
 const props = defineProps<{
   wpId: string
@@ -742,10 +725,6 @@ const importExport = useM10ImportExport({
   wpId: computed(() => props.wpId),
 })
 
-const dualMode = useM10DualMode({
-  wpId: computed(() => props.wpId),
-})
-
 // ─── 区段Tab状态 ─────────────────────────────────────────────────────────────
 
 const activeTabValue = computed({
@@ -757,13 +736,6 @@ const tabSegmentOptions = M10_DETAIL_TABS.map(t => ({
   label: t.label,
   value: t.key,
 }))
-
-// ─── 双模式状态 ──────────────────────────────────────────────────────────────
-
-const dualModeValue = computed({
-  get: () => dualMode.mode.value,
-  set: (val: string) => dualMode.switchMode(val as any),
-})
 
 // ─── 跨sheet交叉验证（与M10-1审定表） ────────────────────────────────────────
 

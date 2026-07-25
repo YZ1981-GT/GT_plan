@@ -54,9 +54,66 @@ class ProcedureService:
 
         return result
 
+    @staticmethod
+    def _expand_range_wp_code(code: str) -> list[str]:
+        """将区间型 wp_code（如 ``D2-1至D2-4``）展开为构成底稿编码 ``[D2-1, D2-2, D2-3, D2-4]``。
+
+        LEAP 合并程序把多张连号底稿并成一行（编码用 ``起至终`` 表示），该区间串在
+        ``wp_index`` 中无对应单一底稿 → wp_id 回填失败 → 前端显示"未生成"。展开后可回退到
+        首张已生成底稿（控制台实际入口位置）。非区间码返回 ``[]``。
+        """
+        import re
+        if "至" not in code:
+            return []
+        left, _, right = code.partition("至")
+        m1 = re.match(r"^(.*-)(\d+)$", left.strip())
+        m2 = re.match(r"^(.*-)(\d+)$", right.strip())
+        if not m1 or not m2:
+            return []
+        prefix, start = m1.group(1), int(m1.group(2))
+        prefix2, end = m2.group(1), int(m2.group(2))
+        if prefix != prefix2 or end < start:
+            return []
+        return [f"{prefix}{n}" for n in range(start, end + 1)]
+
+    @staticmethod
+    def _parent_subject_code(code: str) -> str | None:
+        """取科目级母编码：``D2-5``/``D2-6至D2-13`` → ``D2``；``D4-1至D4-4`` → ``D4``。
+
+        LEAP 合并/子程序（``D2-6至D2-13`` 等）若无对应构成底稿，回退到科目级母底稿
+        （``D2``/``D4``，与 ``D0``/``D1``/``D3`` 同级），进入该循环真实程序表控制台。
+        """
+        import re
+        left = code.partition("至")[0].strip()
+        m = re.match(r"^([A-Za-z]+\d+)-", left)
+        return m.group(1) if m else None
+
     async def _resolve_wp_ids(self, project_id: UUID, wp_codes: set[str]) -> dict[str, str]:
-        """按 wp_code 查本项目 working_paper 的 wp_id（JOIN wp_index）。"""
+        """按 wp_code 查本项目 working_paper 的 wp_id（JOIN wp_index）。
+
+        解析优先级（控制台实际入口位置）：
+        1. 精确匹配 wp_code；
+        2. 区间码（``D2-1至D2-4``）→ 首张已生成的构成底稿（``D2-1``）；
+        3. 子/区间码无构成底稿 → 科目级母底稿（``D2``/``D4``）。
+        任一级命中即用，全部落空才保留 None（真正"未生成"）。
+        """
         from app.models.workpaper_models import WorkingPaper, WpIndex
+
+        # 展开区间码 + 收集母编码，一并查询（精确码 + 构成码 + 母码）
+        expanded: dict[str, list[str]] = {}
+        parents: dict[str, str] = {}
+        query_codes: set[str] = set()
+        for code in wp_codes:
+            query_codes.add(code)
+            parts = self._expand_range_wp_code(code)
+            if parts:
+                expanded[code] = parts
+                query_codes.update(parts)
+            parent = self._parent_subject_code(code)
+            if parent:
+                parents[code] = parent
+                query_codes.add(parent)
+
         q = (
             sa.select(WpIndex.wp_code, WorkingPaper.id)
             .join(WorkingPaper, WorkingPaper.wp_index_id == WpIndex.id)
@@ -64,11 +121,31 @@ class ProcedureService:
                 WorkingPaper.project_id == project_id,
                 WorkingPaper.is_deleted == False,  # noqa: E712
                 WpIndex.is_deleted == False,  # noqa: E712
-                WpIndex.wp_code.in_(wp_codes),
+                WpIndex.wp_code.in_(query_codes),
             )
         )
         rows = (await self.db.execute(q)).all()
-        return {code: str(wid) for code, wid in rows}
+        code_to_id = {code: str(wid) for code, wid in rows}
+
+        result: dict[str, str] = {}
+        for code in wp_codes:
+            if code in code_to_id:
+                result[code] = code_to_id[code]
+                continue
+            # 区间码：取首张已生成底稿（构成码顺序）
+            matched = False
+            for part in expanded.get(code, []):
+                if part in code_to_id:
+                    result[code] = code_to_id[part]
+                    matched = True
+                    break
+            if matched:
+                continue
+            # 回退科目级母底稿（进入该循环程序表控制台）
+            parent = parents.get(code)
+            if parent and parent in code_to_id:
+                result[code] = code_to_id[parent]
+        return result
 
     async def _resolve_staff_names(self, staff_ids: set[str]) -> dict[str, str]:
         """按 staff_id 查 staff_members.name。"""
@@ -209,25 +286,78 @@ class ProcedureService:
         await self.db.flush()
         return updated
 
+    async def _existing_custom_codes(
+        self, project_id: UUID, cycle: str
+    ) -> set[str]:
+        """收集该项目下已占用的编码（用于查重 / 生成唯一编号）。
+
+        合并两个来源，避免 WpIndex 唯一约束 (project_id, wp_code) 冲突：
+        - ProcedureInstance.procedure_code / wp_code（**含已软删**，编号永不复用）
+        - WpIndex.wp_code（自定义程序会创建 WpIndex 占位）
+        """
+        from app.models.workpaper_models import WpIndex
+
+        codes: set[str] = set()
+        # ProcedureInstance：含已删（防止软删后复用编号造成撞库）
+        pi_rows = (await self.db.execute(
+            sa.select(
+                ProcedureInstance.procedure_code, ProcedureInstance.wp_code
+            ).where(ProcedureInstance.project_id == project_id)
+        )).all()
+        for pc, wc in pi_rows:
+            if pc:
+                codes.add(pc)
+            if wc:
+                codes.add(wc)
+        # WpIndex：全部（唯一约束按 project_id+wp_code，无软删列区分）
+        wi_rows = (await self.db.execute(
+            sa.select(WpIndex.wp_code).where(WpIndex.project_id == project_id)
+        )).scalars().all()
+        for wc in wi_rows:
+            if wc:
+                codes.add(wc)
+        return codes
+
+    @staticmethod
+    def _next_custom_code(cycle: str, existing: set[str]) -> str:
+        """基于现有编码的最大序号生成 {cycle}-C{n:02d}，序号永不复用。
+
+        扫描形如 ``{cycle}-C<digits>`` 的现有编码取最大数字后 +1，避免
+        「软删后 COUNT 回退 → 复用编号 → 撞库」的碰撞。
+        """
+        import re
+
+        prefix = f"{cycle}-C"
+        max_seq = 0
+        pat = re.compile(rf"^{re.escape(prefix)}(\d+)$")
+        for code in existing:
+            m = pat.match(code or "")
+            if m:
+                max_seq = max(max_seq, int(m.group(1)))
+        seq = max_seq + 1
+        # 唯一性兜底循环（防边缘：非标准命名占用了目标编码）
+        candidate = f"{prefix}{seq:02d}"
+        while candidate in existing:
+            seq += 1
+            candidate = f"{prefix}{seq:02d}"
+        return candidate
+
     async def add_custom(self, project_id: UUID, cycle: str, data: dict) -> dict:
         """新增自定义程序步骤
 
-        procedure_code 为 NOT NULL 列；前端可能传 None（key 存在但值为 None），
-        `.get(k, default)` 不会回退 default，故此处显式 `or` 兜底 + 自动编号去重。
+        - 用户手填编码 → 先查重（含 WpIndex + 已软删），冲突抛 ValueError（路由映射 409）。
+        - 未填 → 基于现有最大序号生成 {cycle}-C{n}（序号永不复用，避免软删/并发撞库）。
+        procedure_code 为 NOT NULL 列。
         """
-        # 显式兜底：None / 空串都回退到自动生成编码
+        existing = await self._existing_custom_codes(project_id, cycle)
+
         proc_code = (data.get("procedure_code") or "").strip()
-        if not proc_code:
-            # 统计已有自定义程序数，生成 {cycle}-C{序号}（如 D-C01）
-            existing = (await self.db.execute(
-                sa.select(sa.func.count()).select_from(ProcedureInstance).where(
-                    ProcedureInstance.project_id == project_id,
-                    ProcedureInstance.audit_cycle == cycle,
-                    ProcedureInstance.is_custom == True,  # noqa: E712
-                    ProcedureInstance.is_deleted == False,  # noqa: E712
-                )
-            )).scalar() or 0
-            proc_code = f"{cycle}-C{existing + 1:02d}"
+        if proc_code:
+            # 用户手填 → 查重，冲突返回友好错误（避免 WpIndex 唯一约束原始 500）
+            if proc_code in existing:
+                raise ValueError(f"程序编码 {proc_code} 已存在，请换一个编码")
+        else:
+            proc_code = self._next_custom_code(cycle, existing)
 
         pi = ProcedureInstance(
             project_id=project_id,
@@ -241,6 +371,42 @@ class ProcedureService:
         self.db.add(pi)
         await self.db.flush()
         return self._to_dict(pi)
+
+    async def delete_custom(self, project_id: UUID, proc_id: UUID) -> bool:
+        """软删自定义程序 + 一并清理 WpIndex 占位（保持前后端一致）。
+
+        仅允许删除 is_custom=True 的程序（模板程序不可删，只能裁剪）。
+        返回 True 表示删除成功，False 表示未找到 / 非自定义。
+        """
+        from app.models.workpaper_models import WpIndex
+
+        pi = (await self.db.execute(
+            sa.select(ProcedureInstance).where(
+                ProcedureInstance.id == proc_id,
+                ProcedureInstance.project_id == project_id,
+                ProcedureInstance.is_deleted == False,  # noqa: E712
+            )
+        )).scalar_one_or_none()
+        if pi is None or not pi.is_custom:
+            return False
+
+        pi.is_deleted = True
+        # 软删 WpIndex 占位（不硬删：WorkingPaper.wp_index_id 是 NOT NULL FK，
+        # 已上传文件时硬删会违反外键）。wp_code 保留 → 唯一约束(无is_deleted过滤)
+        # 仍占位 + _existing_custom_codes 仍计入 → 编号不复用，零撞库。
+        wp_code = pi.wp_code or pi.procedure_code
+        if wp_code:
+            await self.db.execute(
+                sa.update(WpIndex)
+                .where(
+                    WpIndex.project_id == project_id,
+                    WpIndex.wp_code == wp_code,
+                    WpIndex.is_deleted == False,  # noqa: E712
+                )
+                .values(is_deleted=True)
+            )
+        await self.db.flush()
+        return True
 
     async def assign_procedures(
         self,

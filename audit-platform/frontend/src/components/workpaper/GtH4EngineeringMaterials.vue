@@ -5,8 +5,8 @@
     </div>
 
     <template v-else>
-      <!-- 顶部工具栏（双模式切换） -->
-      <div class="h4-header-toolbar">
+      <!-- 顶部工具栏（双模式切换）— 目录页隐藏 -->
+      <div v-if="currentSheet !== 'H4'" class="h4-header-toolbar">
         <el-segmented
           v-model="currentMode"
           :options="modeOptions"

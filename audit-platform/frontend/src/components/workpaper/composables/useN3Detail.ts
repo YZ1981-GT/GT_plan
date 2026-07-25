@@ -92,6 +92,23 @@ function generateRowId(): string {
   return `row-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
+/**
+ * 源模板 N3-2 明细表默认 10 项应纳税暂时性差异项目（含类别映射，对齐致同 N3-2 A11~A20）
+ * category 对应 N3-1 审定表 5 类（评估增值/公允价值变动/使用权资产/购入摊销年限大于税法规定的资产/其他）
+ */
+export const N3_DEFAULT_DETAIL_ITEMS: Array<{ itemName: string; category: string }> = [
+  { itemName: '非同一控制企业合并资产评估增值', category: '评估增值' },
+  { itemName: '使用权资产', category: '使用权资产' },
+  { itemName: '交易性金融资产（公允价值与初始账面成本差异）', category: '公允价值变动' },
+  { itemName: '其他权益工具投资（公允价值与初始账面成本差异）', category: '公允价值变动' },
+  { itemName: '计入其他综合收益的应收款项融资公允价值变动', category: '公允价值变动' },
+  { itemName: '计入其他综合收益的其他债权投资公允价值变动', category: '公允价值变动' },
+  { itemName: '投资性房地产（公允价值与账面差异）', category: '公允价值变动' },
+  { itemName: '交易性金融负债（公允价值与账面差异）', category: '公允价值变动' },
+  { itemName: '购入摊销年限大于税法规定的资产', category: '购入摊销年限大于税法规定的资产' },
+  { itemName: '除上述项目以外的其他', category: '其他' },
+]
+
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export interface UseN3DetailOptions {
@@ -220,6 +237,31 @@ export function useN3Detail(options: UseN3DetailOptions) {
   }
 
   /**
+   * 预置源模板 N3-2 明细表 10 项常见应纳税暂时性差异项目（仅当前为空时生效，不覆盖已录数据）。
+   * 对齐致同 N3-2 明细表默认项目清单，category 映射 N3-1 审定表 5 类。
+   */
+  async function seedDefaultRows(): Promise<void> {
+    const stored = getField('2', 'rows') || []
+    const raw: any[] = Array.isArray(stored) ? [...stored] : []
+    if (raw.length > 0) return
+    for (const item of N3_DEFAULT_DETAIL_ITEMS) {
+      raw.push({
+        id: generateRowId(),
+        itemName: item.itemName,
+        category: item.category,
+        bookValue: 0,
+        taxBase: 0,
+        taxRate: 0.25,
+        beginDtl: 0,
+        recognized: 0,
+        reversed: 0,
+        remark: '',
+      })
+    }
+    await saveField('2', 'rows', raw)
+  }
+
+  /**
    * 删除指定行
    */
   async function removeRow(rowId: string): Promise<void> {
@@ -282,6 +324,7 @@ export function useN3Detail(options: UseN3DetailOptions) {
     specialRowIds,
     categoryTotals,
     addRow,
+    seedDefaultRows,
     removeRow,
     updateRow,
     syncSummary,

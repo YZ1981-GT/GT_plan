@@ -59,6 +59,27 @@ async def refresh_from_workpapers(
     return result
 
 
+@router.post("/{project_id}/{year}/{note_section}/refresh-from-workpaper")
+async def refresh_section_from_workpaper(
+    project_id: UUID,
+    year: int,
+    note_section: str,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """只重算单个章节的科目数据（当前页面刷新）。
+
+    与项目级 refresh-from-workpapers 区别：后端仅重算 note_section 本节，
+    使「刷新」按钮的前后端行为一致（只动当前节，避免全量写库→前端只重载
+    当前节造成的其它章节前后端不一致）。
+    """
+    svc = NoteWpMappingService(db)
+    result = await svc.refresh_section_from_workpapers(project_id, year, note_section)
+    await db.commit()
+    result["cells_updated"] = result.get("refreshed", 0)
+    return result
+
+
 class ToggleModeRequest(BaseModel):
     row_label: str
     col_index: int

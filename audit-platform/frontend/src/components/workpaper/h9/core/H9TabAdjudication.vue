@@ -17,6 +17,9 @@
     <!-- 工具栏 -->
     <div class="tab-toolbar">
       <div class="toolbar-left">
+        <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
+          <el-icon><Download /></el-icon>带入调整
+        </el-button>
         <el-dropdown v-if="!isReadonly" trigger="click" @command="handleFillFromDetail">
           <el-button size="small" type="primary">从明细带入 ▾</el-button>
           <template #dropdown>
@@ -340,8 +343,18 @@
         <li>净额变动率超过 30% 时须在审计说明中写明主要原因（模板红字要求）</li>
         <li>CAS21：H9初始确认≈H8初始计量-直接费用+激励（±1元）；H9-1 审定合计应与 H9-2 明细合计勾稽</li>
         <li>回写TB后自动发布 substantive:adjudicated 事件</li>
+        <li>「带入调整」：从集中登记按科目 2205 拉取调整分录，逐笔分配到租赁负债原值行的 AJE/RJE，带入后审定数自动更新并联动附注</li>
       </ul>
     </details>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="2205 租赁负债"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
@@ -364,9 +377,13 @@
  */
 import { ref, toRef, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Download } from '@element-plus/icons-vue'
 import http from '@/utils/http'
 import { useH9Adjudication, type H9AdjudicationRow } from '../../composables/useH9Adjudication'
 import { useH9CrossSheet } from '../../composables/useH9CrossSheet'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
@@ -413,6 +430,35 @@ const {
   detailTotal,
 } = useH9CrossSheet(allResponsesRef)
 const h8Linkage = computed(() => h9VsH8Linkage.value)
+
+// ─── 从集中登记带入调整（2205 租赁负债原值，负债贷方；分列 AJE/RJE，作用于原值行） ───
+const bringInRows = computed(() =>
+  liabilityRows.value.map((r) => ({
+    rowKey: r.rowId,
+    name: r.name,
+    aje: Number(r.aje) || 0,
+    rje: Number(r.rje) || 0,
+  })),
+)
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: toRef(props, 'projectId') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '2205',
+  direction: 'credit',
+  subjectCode: '2205',
+  wpCode: 'H9',
+  subjectLabel: '租赁负债(2205)',
+  rows: bringInRows,
+  updateCell: (rowKey: string, field: any, value: number) =>
+    updateCell(rowKey, field === 'rje' ? 'rje' : 'aje', value),
+  totalAudited: () => liabilitySubtotal.value.audited,
+})
 
 // H9-4 → H9-1 AJE/RJE 联动
 function _onAdjustmentCreated(e: Event): void {

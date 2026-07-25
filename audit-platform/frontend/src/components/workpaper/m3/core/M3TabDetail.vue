@@ -21,7 +21,7 @@
         <el-button size="small" :disabled="isReadonly" type="primary" @click="handleAddRow">
           <el-icon><Plus /></el-icon> 新增批次
         </el-button>
-        <el-button size="small" @click="handleAI('detail')">
+        <el-button size="small" :loading="aiLoading === 'detail'" :disabled="isReadonly" @click="handleAI('detail')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
         <el-button size="small" @click="handleReview">
@@ -358,10 +358,11 @@
  */
 import { computed, inject, onMounted, ref, watch } from 'vue'
 import { Plus, MagicStick, Check } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useM3FormData } from '../../composables/useM3FormData'
 import { useM3Detail, type M3DetailRow, type M3DetailSegment } from '../../composables/useM3Detail'
 import { useM3ImportExport, type M3ImportableSheet } from '../../composables/useM3ImportExport'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 
 const props = defineProps<{
   wpId: string
@@ -374,6 +375,8 @@ const emit = defineEmits<{
 }>()
 
 const openReviewDialog = inject<((sectionId: string, sectionLabel?: string) => void) | null>('openReviewDialog', null)
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
 
 // ─── FormData + Composables ──────────────────────────────────────────────────
 
@@ -457,7 +460,27 @@ function handleImportExport(command: string) {
   }
 }
 
-function handleAI(_section: string) { /* AI辅助待集成 */ }
+async function handleAI(section: string) {
+  if (props.isReadonly) return
+  aiLoading.value = section
+  try {
+    const context: Record<string, string> = {
+      科目: '4002 库存股（权益备抵类·借方，明细表 M3-2 按回购批次列示）',
+      期末金额合计: fmtAmount(detail.totalEndAmount.value),
+      期末股数合计: fmtNumber(detail.totalEndShares.value),
+      回购金额合计: fmtAmount(detail.totalRepurchaseAmount.value),
+      注销金额合计: fmtAmount(detail.totalCancelAmount.value),
+      批次数: String(detail.computedRows.value.length),
+    }
+    const text = await generateAiText({ section: `m3-detail-${section}`, context, existingContent: '' })
+    if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+    ElMessageBox.alert(text, 'AI 辅助建议', { confirmButtonText: '知道了' }).catch(() => {})
+  } catch {
+    ElMessage.warning('AI 生成失败，请稍后重试')
+  } finally {
+    aiLoading.value = ''
+  }
+}
 function handleReview() { openReviewDialog?.('M3-2-detail', '库存股明细表') }
 
 // ─── Format helpers ──────────────────────────────────────────────────────────

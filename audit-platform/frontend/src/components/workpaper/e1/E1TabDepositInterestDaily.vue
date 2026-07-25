@@ -19,6 +19,7 @@ import type { UseE1BaseOptions } from '../composables/useE1Adjudication'
 import E1IpoSheetChrome from './E1IpoSheetChrome.vue'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { amountFormatter, amountParser } from '../composables/wpAmountInput'
 
 const props = defineProps<{
   wpId: string
@@ -398,6 +399,9 @@ async function handleImport(file: File): Promise<boolean> {
                       :model-value="dayBalances(row)[a.id] || 0"
                       :disabled="isReadonly"
                       :controls="false"
+                      :precision="2"
+                      :formatter="amountFormatter"
+                      :parser="amountParser"
                       size="small"
                       style="width: 100%"
                       @change="(v: number) => setBalance(row, a.id, v ?? 0)"
@@ -467,6 +471,9 @@ async function handleImport(file: File): Promise<boolean> {
                   :model-value="pack.bookInterest"
                   :disabled="isReadonly"
                   :controls="false"
+                  :precision="2"
+                  :formatter="amountFormatter"
+                  :parser="amountParser"
                   size="small"
                   style="width: 100%"
                   @change="(v: number) => setBookInterest(v ?? 0)"

@@ -52,6 +52,9 @@
         <el-tag size="small" type="warning" effect="plain">损益类·发生额</el-tag>
       </div>
       <div class="header-actions">
+        <el-button size="small" type="warning" plain :disabled="isReadonly" :loading="adjPull.loading.value" @click="openBringInAdjustment">
+          <el-icon><Download /></el-icon> 带入调整
+        </el-button>
         <el-button size="small" type="primary" text @click="handleAiAssist">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
@@ -321,8 +324,18 @@
         <li>审定完成后点击"回写TB"将发生额回写trial_balance（6117）</li>
         <li>合计行应与K10-2明细表合计一致（差额为零）；下方并列显示与试算平衡表(6117)勾稽差额</li>
         <li>与日常活动相关→其他收益(6117)；与日常活动无关→营业外收入(6301,K12)</li>
+        <li>「带入调整」：按科目6117拉取调整分录，逐笔选目标来源行累加到 AJE/RJE，带入后自动联动披露/附注</li>
       </ul>
     </details>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="6117 其他收益"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
@@ -344,10 +357,13 @@
  * - 每个section AI辅助按钮
  */
 import { computed, inject, toRef, defineAsyncComponent } from 'vue'
-import { InfoFilled, MagicStick } from '@element-plus/icons-vue'
+import { InfoFilled, MagicStick, Download } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { useK10Adjudication, type K10AdjRow } from '../../composables/useK10Adjudication'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 
 const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
@@ -377,6 +393,20 @@ const adjudication = useK10Adjudication({
   wpId: toRef(props, 'wpId'),
   isReadonly: toRef(props, 'isReadonly'),
   onSave: (itemId, value) => emit('save', itemId, value),
+})
+
+// ─── 从集中登记带入调整（6117 其他收益，损益贷方） ────────────────────────────
+const { adjPull, visible: bringInVisible, rowOptions: bringInRowOptions, open: openBringInAdjustment, apply: onBringInApply } = useAdjudicationBringIn({
+  projectId: toRef(props, 'projectId') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '6117',
+  direction: 'credit', // 损益贷方（收益）：净发生额 = 贷 − 借
+  subjectCode: '6117',
+  wpCode: 'K10',
+  subjectLabel: '其他收益(6117)',
+  rows: adjudication.rows,
+  updateCell: adjudication.updateCell,
+  totalAudited: () => adjudication.totalRow.value.audited,
 })
 
 // ─── Table Data (rows + total) ───────────────────────────────────────────────

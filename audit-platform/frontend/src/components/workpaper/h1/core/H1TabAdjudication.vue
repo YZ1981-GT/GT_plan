@@ -30,6 +30,36 @@
       >
         从 H1-3 按科目分摊
       </el-button>
+      <el-button
+        v-if="!isReadonly"
+        size="small"
+        type="primary"
+        plain
+        :loading="adjPullCost.loading.value"
+        @click="openBringInCost"
+      >
+        <el-icon><Download /></el-icon>带入调整(原值)
+      </el-button>
+      <el-button
+        v-if="!isReadonly"
+        size="small"
+        type="primary"
+        plain
+        :loading="adjPullDep.loading.value"
+        @click="openBringInDep"
+      >
+        <el-icon><Download /></el-icon>带入调整(累计折旧)
+      </el-button>
+      <el-button
+        v-if="!isReadonly"
+        size="small"
+        type="primary"
+        plain
+        :loading="adjPullImpair.loading.value"
+        @click="openBringInImpair"
+      >
+        <el-icon><Download /></el-icon>带入调整(减值)
+      </el-button>
       <el-button size="small" link type="default" @click="handleReview('H1-1')">💬 复核</el-button>
     </div>
 
@@ -620,17 +650,43 @@
         <li>结构对齐源模板：原值 → 累计折旧 → 减值准备 → 净值（含变动额/率）</li>
         <li>「从TB子科目预填」按 1601/1602/1603 子科目名称映射五类未审数（仅填空行；可强制覆盖）</li>
         <li>「从 H1-3 按科目分摊」按 1601/1602/1603 + 名称关键词写入各分类 AJE/RJE</li>
+        <li>「带入调整(原值/累计折旧/减值)」：从集中登记按科目 1601/1602/1603 拉取调整分录，逐笔分配到各分类的 AJE/RJE（原值借方净额、折旧/减值贷方净额），带入后审定数自动更新并联动附注</li>
         <li>净值变动说明与 H1-6 分析表共用键，双向联动</li>
         <li>净值变动率≥{{ CHANGE_RATE_THRESHOLD }}% 须在说明事项(1)或分类说明中解释</li>
         <li>「确认审定」回写 1601/1602/1603 并发布 EventBus</li>
       </ul>
     </details>
+
+    <AdjudicationBringInDialog
+      v-model="bringInCostVisible"
+      :matches="adjPullCost.matches.value"
+      :row-options="bringInCostRowOptions"
+      subject-label="1601 固定资产原值"
+      :loading="adjPullCost.loading.value"
+      @apply="onBringInCostApply"
+    />
+    <AdjudicationBringInDialog
+      v-model="bringInDepVisible"
+      :matches="adjPullDep.matches.value"
+      :row-options="bringInDepRowOptions"
+      subject-label="1602 累计折旧"
+      :loading="adjPullDep.loading.value"
+      @apply="onBringInDepApply"
+    />
+    <AdjudicationBringInDialog
+      v-model="bringInImpairVisible"
+      :matches="adjPullImpair.matches.value"
+      :row-options="bringInImpairRowOptions"
+      subject-label="1603 减值准备"
+      :loading="adjPullImpair.loading.value"
+      @apply="onBringInImpairApply"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, inject, toRef } from 'vue'
-import { MagicStick } from '@element-plus/icons-vue'
+import { MagicStick, Download } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import { eventBus } from '@/utils/eventBus'
@@ -640,6 +696,9 @@ import {
   type AdjudicationRow,
 } from '../../composables/useH1Adjudication'
 import { useH1CrossSheet } from '../../composables/useH1CrossSheet'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
@@ -769,6 +828,79 @@ const impairDisplayRows = computed(() => [
   ...impairRows.value.filter((r) => !r.isSubtotal),
   { ...impairSubtotal.value },
 ])
+
+// ─── 从集中登记带入调整（三科目：1601原值[资产借]/1602累计折旧[备抵贷]/1603减值[备抵贷]；带入AJE/RJE） ───
+const bringInCostRows = computed(() =>
+  costRows.value
+    .filter((r) => !r.isSubtotal)
+    .map((r) => ({ rowKey: r.rowId, name: r.category, aje: r.aje, rje: r.rje })),
+)
+const {
+  adjPull: adjPullCost,
+  visible: bringInCostVisible,
+  rowOptions: bringInCostRowOptions,
+  open: openBringInCost,
+  apply: onBringInCostApply,
+} = useAdjudicationBringIn({
+  projectId: toRef(props, 'projectId') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '1601',
+  direction: 'debit',
+  subjectCode: '1601',
+  wpCode: 'H1',
+  subjectLabel: '固定资产原值(1601)',
+  rows: bringInCostRows,
+  updateCell: (rowKey: string, field: any, value: number) => updateCell('cost', rowKey, field, value),
+  totalAudited: () => costSubtotal.value.audited,
+})
+
+const bringInDepRows = computed(() =>
+  depRows.value
+    .filter((r) => !r.isSubtotal)
+    .map((r) => ({ rowKey: r.rowId, name: r.category, aje: r.aje, rje: r.rje })),
+)
+const {
+  adjPull: adjPullDep,
+  visible: bringInDepVisible,
+  rowOptions: bringInDepRowOptions,
+  open: openBringInDep,
+  apply: onBringInDepApply,
+} = useAdjudicationBringIn({
+  projectId: toRef(props, 'projectId') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '1602',
+  direction: 'credit',
+  subjectCode: '1602',
+  wpCode: 'H1',
+  subjectLabel: '累计折旧(1602)',
+  rows: bringInDepRows,
+  updateCell: (rowKey: string, field: any, value: number) => updateCell('dep', rowKey, field, value),
+  totalAudited: () => depSubtotal.value.audited,
+})
+
+const bringInImpairRows = computed(() =>
+  impairRows.value
+    .filter((r) => !r.isSubtotal)
+    .map((r) => ({ rowKey: r.rowId, name: r.category, aje: r.aje, rje: r.rje })),
+)
+const {
+  adjPull: adjPullImpair,
+  visible: bringInImpairVisible,
+  rowOptions: bringInImpairRowOptions,
+  open: openBringInImpair,
+  apply: onBringInImpairApply,
+} = useAdjudicationBringIn({
+  projectId: toRef(props, 'projectId') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '1603',
+  direction: 'credit',
+  subjectCode: '1603',
+  wpCode: 'H1',
+  subjectLabel: '减值准备(1603)',
+  rows: bringInImpairRows,
+  updateCell: (rowKey: string, field: any, value: number) => updateCell('impair', rowKey, field, value),
+  totalAudited: () => impairSubtotal.value.audited,
+})
 
 const fluctuationPlaceholder = computed(() => {
   if (!significantNetChanges.value.length) {

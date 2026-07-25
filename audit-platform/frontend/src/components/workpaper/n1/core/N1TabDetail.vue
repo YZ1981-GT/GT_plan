@@ -268,6 +268,11 @@
       <!-- ═══ 新增行按钮 ═══ -->
       <div v-if="!isReadonly" class="add-row-bar">
         <el-button size="small" type="primary" @click="handleAddRow">+ 新增可抵扣暂时性差异项目</el-button>
+        <el-button
+          v-if="computedRows.length === 0"
+          size="small"
+          @click="handleSeedDefaults"
+        >预置源模板常见项目（29项）</el-button>
       </div>
 
       <!-- ═══ 编制提示（折叠底部） ═══ -->
@@ -370,6 +375,7 @@ const {
   addRow,
   removeRow,
   updateRow,
+  seedDefaultRows,
   totals,
   stats,
 } = useN1Detail({
@@ -393,8 +399,8 @@ const {
 // ─── 交叉验证差异（与N1-1审定表） ────────────────────────────────────────────
 
 const crossValidationDiff = computed(() => {
-  // N1-1审定表期末递延税资产合计存储在 allResponses
-  const adjItem = allResponsesRef.value.get('N1-1-end-balance-total')
+  // N1-1审定表期末审定合计存储在 allResponses（useN1Adjudication._persistTotals 写 N1-1-total-audited）
+  const adjItem = allResponsesRef.value.get('N1-1-total-audited')
   if (!adjItem?.conclusion && !adjItem?.remark) return 0
   let adjTotal = 0
   try {
@@ -444,6 +450,22 @@ async function handleAddRow() {
     )
     addRow(itemName, '其他')
     ElMessage.success(`已新增：${itemName}`)
+  } catch {
+    // 用户取消
+  }
+}
+
+// ─── 预置源模板常见项目 ──────────────────────────────────────────────────────
+
+async function handleSeedDefaults() {
+  try {
+    await ElMessageBox.confirm(
+      '将预置致同源模板 29 项常见暂时性差异项目（金额为0，可按被审计单位税收情况增减）。仅在当前明细为空时生效。',
+      '预置常见项目',
+      { type: 'info', confirmButtonText: '预置', cancelButtonText: '取消' },
+    )
+    seedDefaultRows()
+    ElMessage.success('已预置源模板常见项目')
   } catch {
     // 用户取消
   }

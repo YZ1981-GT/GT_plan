@@ -1,8 +1,11 @@
 <template>
   <div class="deliverable-center">
     <div class="deliverable-center__header">
-      <h2>交付件管理中心</h2>
-      <p class="deliverable-center__subtitle">选择性导出 · 版本管理 · 在线预览 · 报告正文生成</p>
+      <el-icon class="deliverable-center__header-icon"><FolderOpened /></el-icon>
+      <div>
+        <h2>交付件管理中心</h2>
+        <p class="deliverable-center__subtitle">选择性导出 · 版本管理 · 在线预览 · 报告正文生成</p>
+      </div>
     </div>
 
     <CompletenessBanner :project-id="projectId" :year="year" />
@@ -27,6 +30,7 @@
       v-if="selectedItem"
       :task-id="selectedItem.task_id"
       :status="selectedItem.status"
+      :file-name="selectedItem.file_name"
       :can-submit="selectedItem.status === 'editing'"
       :can-approve="selectedItem.status === 'pending_approval'"
       :loading="approvalLoading"
@@ -41,6 +45,7 @@
       <DeliverableGroupList
         :grouped="grouped"
         :expanded-task-id="expandedTaskId"
+        :selected-task-id="selectedItem?.task_id || null"
         @toggle-versions="toggleVersions"
         @preview="openPreview"
         @download="downloadItem"
@@ -65,6 +70,14 @@
       doc-type="audit_report"
       @close="showExportDialog = false"
       @confirm="onExportConfirm"
+    />
+
+    <DisclosureNotesSelectionDialog
+      v-model:visible="notesDialogVisible"
+      :project-id="projectId"
+      :year="year"
+      :submitting="generating"
+      @confirm="onNotesSelectionConfirm"
     />
 
     <DeliverablePreview
@@ -172,6 +185,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { FolderOpened } from '@element-plus/icons-vue'
 import { downloadFile } from '@/utils/http'
 import ApprovalPanel from '@/components/deliverable/ApprovalPanel.vue'
 import CompletenessBanner from '@/components/deliverable/CompletenessBanner.vue'
@@ -180,10 +194,12 @@ import DeliverableToolbar from '@/components/deliverable/DeliverableToolbar.vue'
 import DeliverableGroupList from '@/components/deliverable/DeliverableGroupList.vue'
 import DeliverableVersionList from '@/components/deliverable/DeliverableVersionList.vue'
 import DeliverableExportDialog from '@/components/deliverable/DeliverableExportDialog.vue'
+import DisclosureNotesSelectionDialog from '@/components/deliverable/DisclosureNotesSelectionDialog.vue'
 import DeliverablePreview from '@/components/deliverable/DeliverablePreview.vue'
 import OptionalSectionDialog from '@/components/deliverable/OptionalSectionDialog.vue'
 import {
   deliverableDownloadUrl,
+  deliverableGuidanceDownloadUrl,
   fetchDeliverables,
   fetchVersionChain,
   fetchCompleteness,
@@ -250,6 +266,7 @@ const filterKeyword = ref('')
 const expandedTaskId = ref<string | null>(null)
 const versionChain = ref<DeliverableVersion[]>([])
 const showExportDialog = ref(false)
+const notesDialogVisible = ref(false)
 const showGenerateReport = ref(false)
 const showGenerateReports = ref(false)
 const financialReportDataMode = ref<'audited' | 'unadjusted'>('audited')
@@ -347,16 +364,21 @@ function downloadItem(item: DeliverableItem) {
 }
 
 /**
- * 下载「编制参考版」（含内部 ##NOTE## 提示的 guidance 副本，§13.2）。
- * 仅供项目组编制参考，不可对外出具。
- * 注：后端 guidance 下载专用端点尚未提供（confirm 已落盘 with_notes_v{n}.docx，
- * 路径记录在 report_body_json.guidance_version_path，但暂无认证下载路由）。
- * 此处先以「即将上线」提示占位，待后端补 guidance 下载端点后改为
- * downloadFile（axios blob + Bearer，禁用 window.open）。
- * TODO(audit-report-template-integration §13.2): 接入 guidance 认证下载端点
+ * 下载「编制参考版」（含内部 ##NOTE## 提示的 with_notes 副本，§13.2）。
+ * 仅供项目组编制参考，不可对外出具。走 axios blob 认证下载（downloadFile 内部
+ * 带 Bearer，404 时提示重新生成）。
  */
-function downloadGuidanceVersion(_item: DeliverableItem) {
-  ElMessage.info('编制参考版下载即将上线（仅供项目组编制参考，不可对外出具）')
+async function downloadGuidanceVersion(item: DeliverableItem) {
+  const url = deliverableGuidanceDownloadUrl(projectId.value, item.task_id, item.version_no)
+  try {
+    await downloadFile(url, {
+      fileName: `审计报告正文（编制参考版）_v${item.version_no}.docx`,
+      silent: true,
+    })
+    ElMessage.info('编制参考版仅供项目组编制参考，不可对外出具')
+  } catch {
+    ElMessage.warning('编制参考版不存在，该版本可能由旧流程生成，请重新生成报告正文')
+  }
 }
 
 async function confirmDeleteItem(item: DeliverableItem) {
@@ -457,11 +479,23 @@ async function confirmGenerateReports() {
   }
 }
 
-async function goGenerateNotes() {
+function goGenerateNotes() {
+  // 权限门控保留在打开前；不再直接调渲染接口，改为弹出章节选择对话框
   if (!guardGenerate('notes')) return
+  notesDialogVisible.value = true
+}
+
+/**
+ * 附注选择对话框「确认生成」回调：以用户勾选的 selected_sections 生成交付 docx。
+ * 不传 template_type（后端从 Project.template_type 权威解析变体）。
+ */
+async function onNotesSelectionConfirm({ selectedSections }: { selectedSections: string[] }) {
   generating.value = true
   try {
-    const res = await renderDisclosureNotes(projectId.value, { year: year.value })
+    const res = await renderDisclosureNotes(projectId.value, {
+      year: year.value,
+      selected_sections: selectedSections,
+    })
     if (res.platform_persist_failed) {
       ElMessage.warning('平台留存失败，请从版本链重新下载')
     } else {
@@ -469,6 +503,7 @@ async function goGenerateNotes() {
     }
     downloadFile(deliverableDownloadUrl(projectId.value, res.task_id, res.version_no), { fileName: `disclosure_notes_${year.value}.docx` })
     await loadList()
+    notesDialogVisible.value = false
   } catch {
     ElMessage.error('生成附注失败')
   } finally {
@@ -664,12 +699,29 @@ onMounted(loadList)
 .deliverable-center {
   padding: 20px 24px;
 }
+.deliverable-center__header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+.deliverable-center__header-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  font-size: 24px;
+  color: var(--el-color-primary);
+  background: var(--el-color-primary-light-9);
+  border-radius: 10px;
+}
 .deliverable-center__header h2 {
-  margin: 0 0 4px;
+  margin: 0 0 2px;
   font-size: 20px;
 }
 .deliverable-center__subtitle {
-  margin: 0 0 16px;
+  margin: 0;
   color: var(--el-text-color-secondary);
   font-size: 13px;
 }

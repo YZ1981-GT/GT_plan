@@ -1,133 +1,123 @@
 <template>
   <div class="l2-tab-index">
-    <!-- ═══ 项目信息区 ═══ -->
-    <el-card shadow="never" class="l2-project-info">
-      <div class="info-grid">
-        <div class="info-item">
-          <span class="info-label">被审计单位</span>
-          <span class="info-value">{{ projectInfo.clientName || '—' }}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">截止日</span>
-          <span class="info-value">{{ projectInfo.cutoffDate || '—' }}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">编制人</span>
-          <span class="info-value">{{ projectInfo.preparer || '—' }}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">复核人</span>
-          <span class="info-value">{{ projectInfo.reviewer || '—' }}</span>
-        </div>
-      </div>
-    </el-card>
+    <!-- 编制信息由页面级头部统一渲染，此处不重复 -->
 
-    <!-- ═══ 蓝色渐变操作引导区 ═══ -->
-    <div class="l2-guide">
-      <div class="l2-guide-header">
-        <el-icon><InfoFilled /></el-icon>
-        <span>操作步骤引导</span>
+    <!-- ═══ 目录卡（标题 + 复核 + 编制/使用手册 + 进度条 → 跨表结论口径 → 编制提示） ═══ -->
+    <div class="l2-dir">
+      <div class="index-header">
+        <h3 class="title">L2 应付利息底稿目录</h3>
+        <GtReviewTrigger section-id="L2-index-directory" />
+        <div class="handbook-btns">
+          <el-button size="small" type="primary" plain @click="openHandbook('preparation')">📖 编制手册</el-button>
+          <el-button size="small" @click="openHandbook('usage')">使用手册</el-button>
+        </div>
+        <div class="progress-wrap">
+          <span>编制进度 {{ completedCount }}/{{ totalCount }}</span>
+          <el-progress :percentage="progressPercent" :stroke-width="10" />
+        </div>
       </div>
-      <div class="l2-guide-steps">
-        <div class="step-item">
-          <span class="step-num">①</span>
-          <span class="step-text">填写审定表（L2-1）确认应付利息余额</span>
+
+      <L2PreparationHandbookDialog v-model="handbookVisible" :initial-tab="handbookTab" />
+
+      <div class="conclusion-board" data-testid="l2-conclusion-board">
+        <div class="board-head">
+          <strong>跨表结论口径</strong>
+          <el-tag size="small" :type="conclusionWorstType">{{ conclusionWorstLabel }}</el-tag>
+          <span class="board-meta">已填 {{ conclusionFilledCount }}/{{ conclusionSheets.length }}</span>
         </div>
-        <div class="step-item">
-          <span class="step-num">②</span>
-          <span class="step-text">录入明细（L2-2）按借款/债券来源列示</span>
+        <div class="board-tags">
+          <el-tag
+            v-for="c in conclusionSheets"
+            :key="c.code"
+            size="small"
+            class="concl-tag clickable"
+            :type="c.filled ? 'success' : 'info'"
+            effect="plain"
+            @click="emit('navigate', c.sheetKey)"
+          >
+            {{ c.code }} {{ c.filled ? '已填' : '未填' }}
+          </el-tag>
         </div>
-        <div class="step-item">
-          <span class="step-num">③</span>
-          <span class="step-text">核对L1/L3利息测算与账面计提差异</span>
-        </div>
-        <div class="step-item">
-          <span class="step-num">④</span>
-          <span class="step-text">完成检查表（L2-4）形成审计结论</span>
+        <p v-if="conclusionHasUnfilled" class="board-hint">存在未填审计结论，请点击标签跳转补全审计说明与结论。</p>
+      </div>
+
+      <details class="methodology-hint">
+        <summary>编制提示</summary>
+        <ul>
+          <li>应付利息为<strong>负债类贷方科目</strong>（2231）：期末 = 期初 + 贷方（计提）− 借方（支付）</li>
+          <li>审定表按<strong>借款来源</strong>（分期付息长借利息/企业债券/短借/优先股永续债/其他）分类，双期列示（期初/期末各未审、账项调整、重分类、审定）</li>
+          <li>本期计提与 <strong>L1-5 短期借款利息测算 / L3 长期借款利息测算</strong> 联动核对，差异逐笔说明</li>
+          <li>L2-4 应付利息检查表（凭证级）核对计提/支付凭证，检查比例本期发生额来自 L2-2 明细</li>
+          <li>审定合计（按来源）回写 TB(2231) 并驱动附注披露；各表填妥"审计说明或结论"后目录标签转为"已填"</li>
+        </ul>
+      </details>
+    </div>
+
+    <!-- ═══ 底稿架构（4 阶段泳道） ═══ -->
+    <div class="l2-arch">
+      <div class="arch-header">
+        <h4 class="arch-title">底稿架构</h4>
+        <span class="arch-hint">点击卡片可跳转至对应底稿</span>
+      </div>
+      <GtBArchitectureTree
+        :wp-id="wpId"
+        :project-id="projectId"
+        :active-sheet="''"
+        :html-data="archHtmlData"
+        @navigate="handleNavigate"
+      />
+    </div>
+
+    <!-- ═══ 本循环底稿目录（L 循环其他科目，可跳转） ═══ -->
+    <div v-if="cycleWorkpapers.length" class="l2-cycle">
+      <div class="cycle-header">
+        <h4 class="cycle-title">本循环底稿目录</h4>
+        <span class="cycle-hint">点击可跳转至同循环其他底稿（灰色表示尚未生成）</span>
+      </div>
+      <div class="cycle-grid">
+        <div
+          v-for="wp in cycleWorkpapers"
+          :key="wp.wp_code"
+          class="cycle-card"
+          :class="{ 'is-current': wp.is_current, 'is-disabled': !wp.wp_id }"
+          @click="onCycleCardClick(wp)"
+        >
+          <div class="cycle-card-top">
+            <span class="cycle-code">{{ wp.wp_code }}</span>
+            <el-tag v-if="wp.is_current" size="small" effect="plain" class="cycle-current-tag">当前</el-tag>
+          </div>
+          <span class="cycle-name" :title="wp.wp_name">{{ wp.wp_name }}</span>
         </div>
       </div>
     </div>
-
-    <!-- ═══ 总体进度 ═══ -->
-    <div class="l2-progress-section">
-      <div class="progress-info">
-        <span>编制进度</span>
-        <span class="progress-text">{{ completedCount }} / {{ totalCount }} ({{ progressPercent }}%)</span>
-      </div>
-      <el-progress :percentage="progressPercent" :stroke-width="8" :show-text="false" />
-    </div>
-
-    <!-- ═══ 底稿目录表格 ═══ -->
-    <el-card shadow="never" class="l2-index-card">
-      <template #header>
-        <span class="card-title">L2 应付利息底稿目录</span>
-      </template>
-      <el-table
-        :data="sheetRows"
-        border
-        size="small"
-        highlight-current-row
-        style="width: 100%"
-        :row-class-name="getRowClassName"
-        @row-click="handleRowClick"
-      >
-        <el-table-column prop="seq" label="序号" width="60" align="center" />
-        <el-table-column prop="name" label="内容" min-width="260">
-          <template #default="{ row }">
-            <span class="sheet-name-link">{{ row.name }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="索引号" width="100" align="center">
-          <template #default="{ row }">
-            <GtIndexChip v-if="row.code && row.code !== '—'" :value="row.code" />
-            <span v-else class="no-index">—</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="完成进度" width="140" align="center">
-          <template #default="{ row }">
-            <el-progress
-              :percentage="row.progress"
-              :stroke-width="6"
-              :show-text="false"
-              :color="getProgressColor(row.progress)"
-              style="width: 80px; display: inline-block"
-            />
-            <span class="progress-label">{{ row.progress }}%</span>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
-
-    <!-- ═══ 编制提示（折叠） ═══ -->
-    <details class="l2-details-tip">
-      <summary>编制提示</summary>
-      <ul>
-        <li>应付利息为<strong>负债类贷方科目</strong>：期末 = 期初 + 贷方（计提）− 借方（支付）</li>
-        <li>应付利息汇聚 L1 短期借款、L3 长期借款、L4 应付债券的利息计提</li>
-        <li>计提核对：将 L1/L3 利息测算与账面计提对比，差异需逐笔说明</li>
-        <li>本期计提额联动 L8 财务费用（利息支出）</li>
-        <li>附注披露根据企业类型（国企/上市公司）自动切换模板</li>
-      </ul>
-    </details>
   </div>
 </template>
 
 <script setup lang="ts">
 /**
- * L2TabIndex — L2 应付利息底稿目录
+ * L2TabIndex.vue — L2 应付利息底稿目录（严格镜像 L1/E1 标准）
  *
- * 7 行 sheet 目录列表 + 进度条。
- * 点击行 emit navigate 事件（由 GtL2InterestPayable 监听切换 sheetName）。
- * 引导区 4 步：审定表 → 明细 → 计提核对 → 检查表。
+ * 结构：目录卡（标题+复核+编制/使用手册+进度→跨表结论口径→编制提示）
+ *       + 底稿架构 4 阶段泳道（GtBArchitectureTree）+ 本循环底稿目录 grid。
+ * 编制信息由页面级头部渲染，此处不重复。自包含：自行拉取 checklist-responses。
  *
- * Requirements: 1.2
+ * 负债类贷方科目（2231 应付利息）— 期末=期初+贷方(计提)−借方(支付)；审定按来源
+ * (分期付息长借/企业债券/短借/优先股永续债/其他)双期，本期计提与 L1-5/L3 利息测算联动，
+ * 联动 L8 财务费用。
+ *
+ * 🔴 L2 各表审计说明/结论存储键为编码式（L2-L2-1-/L2-L2-2-/L2-L2-4-），
+ *    非缩写式；calcSheetProgress 用真实前缀。
  */
-import { computed } from 'vue'
-import { InfoFilled } from '@element-plus/icons-vue'
-import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
+import { computed, ref, onMounted, defineAsyncComponent } from 'vue'
+import { useRouter } from 'vue-router'
+import http from '@/utils/http'
+import { loadCycleWorkpaperCards, type CycleWpCard } from '@/services/cycleDirectory'
+import GtReviewTrigger from '../../GtReviewTrigger.vue'
+import GtBArchitectureTree from '../../GtBArchitectureTree.vue'
+
+const L2PreparationHandbookDialog = defineAsyncComponent(() => import('../L2PreparationHandbookDialog.vue'))
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
-
 const props = defineProps<{
   wpId: string
   projectId: string
@@ -138,292 +128,212 @@ const emit = defineEmits<{
   (e: 'navigate', sheetName: string): void
 }>()
 
-// ─── Sheet 目录行定义 ────────────────────────────────────────────────────────
+const router = useRouter()
 
-interface SheetRow {
-  seq: number
-  name: string
-  code: string
-  /** sheetName（传给父组件用于 v-if 分发） */
-  sheetKey: string
-  progress: number
+// ─── 编制/使用手册弹窗 ─────────────────────────────────────────────────────────
+const handbookVisible = ref(false)
+const handbookTab = ref<'preparation' | 'usage'>('preparation')
+function openHandbook(tab: 'preparation' | 'usage') {
+  handbookTab.value = tab
+  handbookVisible.value = true
 }
 
-/**
- * 7 行 sheet 目录（底稿目录自身不出现在列表中）。
- * 进度条默认 0%，后续集成时根据 checklist_responses 数据填充。
- */
-const sheetRows = computed<SheetRow[]>(() => [
-  {
-    seq: 1,
-    name: '应付利息实质性程序表L2A',
-    code: 'L2A',
-    sheetKey: '应付利息实质性程序表L2A',
-    progress: 0,
-  },
-  {
-    seq: 2,
-    name: '审定表L2-1',
-    code: 'L2-1',
-    sheetKey: '审定表L2-1',
-    progress: 0,
-  },
-  {
-    seq: 3,
-    name: '附注披露（国企）信息',
-    code: '—',
-    sheetKey: '附注披露信息核对（国企）',
-    progress: 0,
-  },
-  {
-    seq: 4,
-    name: '附注披露（上市公司）信息',
-    code: '—',
-    sheetKey: '附注披露信息核对（上市公司）',
-    progress: 0,
-  },
-  {
-    seq: 5,
-    name: '明细表L2-2',
-    code: 'L2-2',
-    sheetKey: '明细表L2-2',
-    progress: 0,
-  },
-  {
-    seq: 6,
-    name: '应付利息调整分录汇总L2-3',
-    code: 'L2-3',
-    sheetKey: '应付利息调整分录汇总L2-3',
-    progress: 0,
-  },
-  {
-    seq: 7,
-    name: '应付利息检查表L2-4',
-    code: 'L2-4',
-    sheetKey: '应付利息检查表L2-4',
-    progress: 0,
-  },
+// ─── 自包含：拉取本底稿 checklist-responses（主入口不持有 allResponses） ─────────
+const responses = ref<Map<string, any>>(new Map())
+onMounted(async () => {
+  if (!props.wpId) return
+  try {
+    const res: any = await http.get(`/api/workpapers/${props.wpId}/checklist-responses`)
+    const list = res?.data?.items ?? res?.items ?? res?.data ?? res
+    const map = new Map<string, any>()
+    if (Array.isArray(list)) {
+      for (const it of list) {
+        if (it?.item_id) map.set(it.item_id, it)
+      }
+    }
+    responses.value = map
+  } catch {
+    /* silent：拉取失败则看板全显未填 */
+  }
+})
+
+// ─── Sheet 行定义 ─────────────────────────────────────────────────────────────
+interface SheetRow {
+  name: string
+  code: string
+  sheetKey: string
+  progress: number
+  /** 审计说明/结论存储键前缀（编码式，仅结论核心表有） */
+  conclPrefix?: string
+}
+
+/** 按 responses 中以指定前缀存储的字段数计算完成度。 */
+function calcSheetProgress(prefix: string, expectedFields: number): number {
+  const map = responses.value
+  if (!map || map.size === 0) return 0
+  let count = 0
+  for (const key of map.keys()) {
+    if (key.startsWith(prefix)) count++
+  }
+  if (count === 0) return 0
+  if (count >= expectedFields) return 100
+  return Math.min(Math.round((count / expectedFields) * 100), 99)
+}
+
+const allSheets = computed<SheetRow[]>(() => [
+  { name: '应付利息实质性程序表', code: 'L2A', sheetKey: '应付利息实质性程序表L2A', progress: calcSheetProgress('L2-L2A-', 5) },
+  { name: '审定表（按来源：分期付息长借/企业债券/短借/优先股永续债/其他，双期）', code: 'L2-1', sheetKey: '审定表L2-1', progress: calcSheetProgress('L2-L2-1-', 6), conclPrefix: 'L2-L2-1-' },
+  { name: '明细表（按借款/债券来源逐笔）', code: 'L2-2', sheetKey: '明细表L2-2', progress: calcSheetProgress('L2-L2-2-', 4), conclPrefix: 'L2-L2-2-' },
+  { name: '应付利息调整分录汇总', code: 'L2-3', sheetKey: '应付利息调整分录汇总L2-3', progress: calcSheetProgress('L2-L2-3-', 2) },
+  { name: '应付利息检查表（凭证级）', code: 'L2-4', sheetKey: '应付利息检查表L2-4', progress: calcSheetProgress('L2-L2-4-', 4), conclPrefix: 'L2-L2-4-' },
+  { name: '附注披露信息核对（上市公司）', code: '附注上市', sheetKey: '附注披露信息核对（上市公司）', progress: calcSheetProgress('L2-disclosure-listed-', 3) },
+  { name: '附注披露信息核对（国企）', code: '附注国企', sheetKey: '附注披露信息核对（国企）', progress: calcSheetProgress('L2-disclosure-soe-', 3) },
 ])
 
 // ─── 进度计算 ─────────────────────────────────────────────────────────────────
-
-const totalCount = computed(() => sheetRows.value.length)
-
-const completedCount = computed(() =>
-  sheetRows.value.filter(r => r.progress >= 100).length,
-)
-
+const totalCount = computed(() => allSheets.value.length)
+const completedCount = computed(() => allSheets.value.filter(r => r.progress >= 100).length)
 const progressPercent = computed(() => {
   if (totalCount.value === 0) return 0
-  const avgProgress = sheetRows.value.reduce((sum, r) => sum + r.progress, 0) / totalCount.value
-  return Math.round(avgProgress)
+  const avg = allSheets.value.reduce((sum, r) => sum + r.progress, 0) / totalCount.value
+  return Math.round(avg)
 })
 
-// ─── 项目信息（简单版：默认占位，后续集成时从 render-config 填充） ──────────
-
-const projectInfo = computed(() => ({
-  clientName: '',
-  cutoffDate: '',
-  preparer: '',
-  reviewer: '',
+// ─── 底稿架构泳道（GtBArchitectureTree 数据源） ───────────────────────────────
+const COMPONENT_TYPE_MAP: Record<string, string> = {
+  L2A: 'a-program-console',
+  '附注上市': 'c-note-table',
+  '附注国企': 'c-note-table',
+}
+function sheetStatus(progress: number): string {
+  if (progress >= 100) return 'completed'
+  if (progress > 0) return 'in_progress'
+  return 'pending'
+}
+const archHtmlData = computed(() => ({
+  navigation_rows: allSheets.value.map((s, i) => ({
+    seq: i + 1,
+    content: s.sheetKey,
+    sheet_name: s.sheetKey,
+    index_ref: s.code,
+    component_type: COMPONENT_TYPE_MAP[s.code] ?? 'd-form-table',
+    status: sheetStatus(s.progress),
+  })),
 }))
 
+// ─── 跨表结论口径看板 ─────────────────────────────────────────────────────────
+/** 有审计结论/说明的核心表（审定/明细/检查类；程序表、调整分录、附注不计入） */
+const L2_CONCLUSION_CODES = new Set(['L2-1', 'L2-2', 'L2-4'])
+
+/**
+ * 按各表真实 conclPrefix（编码式）判定审计说明/结论是否已填。
+ * key 含 conclPrefix 且匹配 /conclusion|audit-note|note/ 且文本非空即为已填；
+ * L2 各前缀互不为前缀（L2-L2-1-/L2-L2-2-/L2-L2-4-），无兄弟重叠。
+ */
+function isConclusionFilled(conclPrefix: string): boolean {
+  const map = responses.value
+  if (!map?.size) return false
+  for (const [key, val] of map.entries()) {
+    if (!key.includes(conclPrefix)) continue
+    if (!/conclusion|audit-note|note/i.test(key)) continue
+    const text = (val?.remark ?? val?.conclusion ?? '') as string
+    if (typeof text === 'string' && text.trim().length > 0) return true
+  }
+  return false
+}
+
+const conclusionSheets = computed(() =>
+  allSheets.value
+    .filter(s => s.conclPrefix && L2_CONCLUSION_CODES.has(s.code))
+    .map(s => ({ code: s.code, sheetKey: s.sheetKey, filled: isConclusionFilled(s.conclPrefix as string) })),
+)
+const conclusionFilledCount = computed(() => conclusionSheets.value.filter(c => c.filled).length)
+const conclusionHasUnfilled = computed(() => conclusionSheets.value.some(c => !c.filled))
+const conclusionWorstLabel = computed(() => {
+  if (conclusionFilledCount.value === 0) return '结论未填'
+  if (conclusionHasUnfilled.value) return `结论未齐 ${conclusionSheets.value.length - conclusionFilledCount.value} 项`
+  return '总体已齐'
+})
+const conclusionWorstType = computed<'success' | 'warning' | 'info'>(() => {
+  if (conclusionFilledCount.value === 0) return 'info'
+  if (conclusionHasUnfilled.value) return 'warning'
+  return 'success'
+})
+
 // ─── 交互 ────────────────────────────────────────────────────────────────────
-
-function handleRowClick(row: SheetRow) {
-  if (props.isReadonly && row.progress === 0) return
-  emit('navigate', row.sheetKey)
+function handleNavigate(sheetName: string) {
+  if (sheetName) emit('navigate', sheetName)
 }
 
-function getRowClassName({ row }: { row: SheetRow }): string {
-  return row.progress >= 100 ? 'completed-row' : ''
+// ─── 本循环底稿目录（L 循环其他科目，跨底稿跳转；canonical 源模板过滤污染） ───
+const cycleWorkpapers = ref<CycleWpCard[]>([])
+async function loadCycleWorkpapers(): Promise<void> {
+  cycleWorkpapers.value = await loadCycleWorkpaperCards(props.projectId, 'L', props.wpId)
 }
-
-function getProgressColor(percent: number): string {
-  if (percent >= 100) return '#67c23a'
-  if (percent >= 50) return '#409eff'
-  return '#e6e8eb'
+function onCycleCardClick(wp: CycleWpCard): void {
+  if (!wp.wp_id || wp.is_current || !props.projectId) return
+  router.push({ name: 'WorkpaperEditor', params: { projectId: props.projectId, wpId: wp.wp_id } })
 }
+onMounted(loadCycleWorkpapers)
 </script>
 
 <style scoped>
 .l2-tab-index {
-  padding: 12px;
+  padding: 16px;
   font-size: var(--wp-font-size, 13px);
 }
 
-/* ─── 项目信息区 ─── */
-.l2-project-info {
-  margin-bottom: 16px;
-}
-
-.info-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px 32px;
-}
-
-.info-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.info-label {
-  font-size: var(--wp-font-size, 13px);
-  color: #909399;
-  white-space: nowrap;
-}
-
-.info-value {
-  font-size: var(--wp-font-size, 13px);
-  font-weight: 500;
-  color: #303133;
-}
-
-/* ─── 蓝色渐变引导区 ─── */
-.l2-guide {
-  background: linear-gradient(135deg, #e8f4fd 0%, #d6eaf8 100%);
-  border: 1px solid #b3d9f2;
-  border-radius: 8px;
-  padding: 14px 20px;
-  margin-bottom: 16px;
-}
-
-.l2-guide-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-weight: 500;
-  color: #1a73e8;
-  margin-bottom: 10px;
-  font-size: var(--wp-font-size, 13px);
-}
-
-.l2-guide-steps {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px 24px;
-}
-
-.step-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: var(--wp-font-size, 13px);
-  color: #374151;
-}
-
-.step-num {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: #1a73e8;
-  color: #fff;
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.step-text {
-  font-size: var(--wp-font-size, 13px);
-}
-
-/* ─── 进度条区 ─── */
-.l2-progress-section {
-  margin-bottom: 16px;
-  padding: 12px 16px;
+/* ─── 目录卡 ─── */
+.l2-dir { margin-bottom: 20px; }
+.index-header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
+.title { margin: 0; font-size: 16px; font-weight: 600; color: #303133; }
+.handbook-btns { display: flex; gap: 6px; }
+.progress-wrap { flex: 1; min-width: 200px; }
+.conclusion-board {
+  margin-bottom: 12px;
+  padding: 10px 12px;
   background: #f5f7fa;
   border-radius: 6px;
+  border-left: 3px solid #409eff;
 }
+.board-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.board-meta { font-size: 12px; color: #909399; }
+.board-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.concl-tag.clickable { cursor: pointer; }
+.board-hint { margin: 8px 0 0; font-size: 12px; color: #e6a23c; }
+.methodology-hint { margin-top: 12px; font-size: 12px; color: #606266; }
+.methodology-hint summary { cursor: pointer; font-weight: 500; color: #303133; }
+.methodology-hint ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
 
-.progress-info {
+/* ─── 底稿架构 ─── */
+.l2-arch { margin-top: 16px; }
+.arch-header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
+.arch-title { margin: 0; font-size: 16px; font-weight: 600; color: #303133; }
+.arch-hint { font-size: 12px; color: #909399; }
+
+/* ─── 本循环底稿目录 ─── */
+.l2-cycle { margin-top: 28px; }
+.cycle-header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
+.cycle-title { margin: 0; font-size: 16px; font-weight: 600; color: #303133; }
+.cycle-hint { font-size: 12px; color: #909399; }
+.cycle-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+.cycle-card {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-  font-size: var(--wp-font-size, 13px);
-  color: #606266;
-}
-
-.progress-text {
-  font-weight: 600;
-  color: #303133;
-}
-
-/* ─── 目录卡片 ─── */
-.l2-index-card {
-  margin-bottom: 16px;
-}
-
-.card-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #303133;
-}
-
-.sheet-name-link {
-  color: #1a73e8;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--gt-color-border-purple, #e8e4f0);
+  border-radius: 8px;
+  background: #fff;
   cursor: pointer;
-  font-size: var(--wp-font-size, 13px);
+  transition: all 0.2s;
 }
-
-.sheet-name-link:hover {
-  text-decoration: underline;
-}
-
-.no-index {
-  color: #c0c4cc;
-  font-size: var(--wp-font-size, 13px);
-}
-
-.progress-label {
-  display: inline-block;
-  margin-left: 8px;
-  font-size: 12px;
-  color: #909399;
-  width: 32px;
-}
-
-:deep(.completed-row) {
-  background-color: #f0f9eb !important;
-}
-
-:deep(.el-table) {
-  font-size: var(--wp-font-size, 13px);
-}
-
-:deep(.el-table .el-table__row) {
-  cursor: pointer;
-}
-
-:deep(.el-table .el-table__row:hover) {
-  background-color: #ecf5ff !important;
-}
-
-/* ─── 编制提示折叠 ─── */
-.l2-details-tip {
-  margin-top: 12px;
-  padding: 12px 16px;
-  background: #fafafa;
-  border: 1px solid #ebeef5;
-  border-radius: 6px;
-  font-size: var(--wp-font-size, 13px);
-  color: #606266;
-}
-
-.l2-details-tip summary {
-  cursor: pointer;
-  font-weight: 500;
-  color: #303133;
-  margin-bottom: 8px;
-}
-
-.l2-details-tip ul {
-  padding-left: 20px;
-  margin: 8px 0 0;
-  line-height: 1.8;
-}
+.cycle-card:hover { border-color: var(--gt-color-primary, #4b2d77); box-shadow: 0 2px 8px rgba(75, 45, 119, 0.12); transform: translateY(-2px); }
+.cycle-card.is-current { border-color: var(--gt-color-primary, #4b2d77); background: var(--gt-color-primary-bg, #f4f0fa); box-shadow: 0 0 0 1px var(--gt-color-primary, #4b2d77); cursor: default; }
+.cycle-card.is-disabled { opacity: 0.5; cursor: not-allowed; }
+.cycle-card.is-disabled:hover { border-color: var(--gt-color-border-purple, #e8e4f0); box-shadow: none; transform: none; }
+.cycle-card-top { display: flex; align-items: center; gap: 6px; }
+.cycle-code { font-size: var(--wp-font-size, 13px); font-weight: 700; color: var(--gt-color-primary, #4b2d77); }
+.cycle-current-tag { margin-left: auto; }
+.cycle-name { font-size: var(--wp-font-size, 13px); line-height: 1.4; color: #303133; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 </style>

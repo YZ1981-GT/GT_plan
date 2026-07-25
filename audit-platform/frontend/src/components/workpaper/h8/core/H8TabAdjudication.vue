@@ -7,6 +7,7 @@
         <p>2. 列组：期初/期末 × 未审·账项调整·审定 + 本期审定与上期审定比较（变动额/率）。审定=未审+账项调整。</p>
         <p>3. 默认分类：房屋及建筑物 / 机器设备 / 运输设备 / 办公设备 / 其他设备；可从 H8-3 回写期末账项调整（1901/1902 按未审权重分摊）。</p>
         <p>4. 变动率≥{{ CHANGE_RATE_THRESHOLD }}% 须在说明(1)解释；说明(2)(3)分别覆盖简化处理与转租；与 TB 差异行核对后回写试算表。</p>
+        <p>5.「带入调整」：从集中登记按科目 1901 拉取调整分录，逐笔分配到原值分类行的期末账项调整，带入后审定数自动更新并联动附注。</p>
         <p class="excel-tip">提示：账项调整应与 H8-3 / 调整分录模块勾稽；CAS21 初始计量须与 H9 勾稽（使用权资产=H9+直接费用−激励）。</p>
       </div>
     </details>
@@ -21,6 +22,15 @@
 
     <div class="tab-toolbar">
       <div class="toolbar-left">
+        <el-button
+          size="small"
+          type="primary"
+          plain
+          :loading="adjPull.loading.value"
+          @click="openBringInAdjustment"
+        >
+          <el-icon><Download /></el-icon>带入调整
+        </el-button>
         <el-button
           v-if="!isReadonly"
           size="small"
@@ -445,6 +455,15 @@
         @change="saveConclusionLocal"
       />
     </el-card>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="1901 使用权资产"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
@@ -455,12 +474,16 @@
  */
 import { ref, computed, toRef, inject, reactive, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Download } from '@element-plus/icons-vue'
 import {
   useH8Adjudication,
   CHANGE_RATE_THRESHOLD,
   type H8AdjBlock,
 } from '../../composables/useH8Adjudication'
 import { useH8CrossSheet } from '../../composables/useH8CrossSheet'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
@@ -546,6 +569,36 @@ const blocks = computed(() => [
   { key: 'dep' as H8AdjBlock, title: '二、累计折旧（科目1902·备抵）', rows: depDisplayRows.value },
   { key: 'impair' as H8AdjBlock, title: '三、减值准备（科目1903·备抵）', rows: impairDisplayRows.value },
 ])
+
+// ─── 从集中登记带入调整（1901 使用权资产原值，资产借方；双期单一账项调整列，作用于期末） ───
+const bringInRows = computed(() =>
+  costDisplayRows.value
+    .filter((r: any) => !r.isSubtotal)
+    .map((r: any) => ({ rowKey: r.rowId, name: r.category, aje: 0, rje: 0 })),
+)
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: toRef(props, 'projectId') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '1901',
+  direction: 'debit',
+  subjectCode: '1901',
+  wpCode: 'H8',
+  subjectLabel: '使用权资产(1901)',
+  rows: bringInRows,
+  // 单一「账项调整」列（审定=未审+账项调整）：aje/rje 净额均累加至原值行期末账项调整（增量累加）
+  updateCell: (rowKey: string, _field: any, value: number) => {
+    const row = costDisplayRows.value.find((r: any) => r.rowId === rowKey && !r.isSubtotal)
+    const live = Number(row?.endAdjustment) || 0
+    updateCell('cost', rowKey, 'endAdjustment', Math.round((live + value) * 100) / 100)
+  },
+  totalAudited: () => netAudited.value,
+})
 
 const auditNoteLocal = ref(auditNote.value)
 const auditConclusionLocal = ref(auditConclusion.value)

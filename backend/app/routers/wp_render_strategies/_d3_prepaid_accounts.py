@@ -12,9 +12,19 @@ import logging
 
 import sqlalchemy as sa
 
+from app.core.config import settings
+from app.services.d_cycle_extraction.presets import resolve_effective
+from app.services.d_cycle_extraction.tier_a_seed import (
+    seed_tier_a_reconciliation,
+)
+from app.services.wp_formula_eval_service import evaluate_wp_formula_expression
+
 from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
+
+# D3 wp_code base（Tier A 提取公式 / 锚点登记 key）
+_D3_WP_CODE = "D3"
 
 
 async def render(ctx: RenderContext) -> dict | None:
@@ -128,10 +138,60 @@ async def render(ctx: RenderContext) -> dict | None:
         "soe": "soe" in standards,
     }
 
-    return {
+    html_data: dict = {
         "sections": sections,
         "adjudication_config": adjudication_config,
         "project_context": project_context,
         "disclosure_visibility": disclosure_visibility,
         "responses_snapshot": responses_snapshot,
     }
+
+    # ─── Tier B 四表库审定表预填（D3：宁缺勿造 R3.4，ADDITIVE，灰度开关控制）───────
+    # spec: d-cycle-four-table-extraction-formulas (Task 5.2 / R1.1 R2.3 R3.4 R7.1 R7.2
+    #        / Property 9)
+    #
+    # 【宁缺勿造决策】D3-1 审定表按**双区块固定分类**（一、按性质：预收销售固定资产款 /
+    # 土地使用权款 / 合同不成立时已收取的对价 / 其他；二、按账龄：账龄配置段），未审数由
+    # **D3-2 明细（`D3-det-rows`）经 cross-sheet 按性质 / 账龄 SUMIF 聚合**填入
+    # （`useD3Adjudication` natureAggregation / agingByKey），非从 tb_balance 叶子直接填。
+    # trial_balance / tb_balance 2203 预收账款**只有科目总额、无「性质 / 账龄」组合维度**
+    # （分类是审计判断，非科目结构）→ 无法把 TB 干净映射到审定表分类行。故 D3 render
+    # **不返回 adjudication_prefill**（不臆造分类行未审数 = 诚实的部分覆盖，对齐 R3.4）。
+    #
+    # D3 四表库数据的正确落点（均为既有链路，本 render 不重复介入，手工优先精度）：
+    #   * D3-1 `D3-adj-trial-balance-amount`（2203 总额，TB↔账龄合计核对行，同为 D3-2
+    #     明细核对标量）—— 注册为 Tier A **可编辑**公式 `TB('2203','期末余额')`
+    #     （d_cycle_extraction_presets.json，公式管理面板可查可编，求值经 get_active_filter
+    #     与 Tier B 同口径，seed 到该锚点）。本 render 不重复 seed（不与 Tier A 求值路径竞争）。
+    #   * D3-1 分类行未审 ← D3-2 明细 **SUMIF 聚合**（`useD3Adjudication`，按性质 / 账龄），
+    #     非四表库直接可填。
+    #   * D3-2 明细 ← `tb_aux_balance` 2203 按**客户维度**归集（`importFromAuxBalance`
+    #     → `/d3/import-aux-balance`，Tier B 复杂归集）—— 前端既有一键取数，非单条公式，
+    #     本 render 不介入、不与之冲突。
+    #
+    # → 因此 D3 render 输出在开关开/关时**逐字节等价**（不新增 adjudication_prefill 或任何键，
+    #   Property 9 天然成立，零回归）。保留此显式分支为决策文档锚点：未来若 D3-1 结构支持
+    #   叶子明细行、或出现可干净映射的四表库维度，可在此接入 Tier B seed。
+    if settings.D_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED:
+        logger.debug(
+            "D3 render: 宁缺勿造（R3.4）— 无干净 TB→审定表分类行映射（性质/账龄固定分类），"
+            "不发 adjudication_prefill（wp_id=%s）",
+            wp_id,
+        )
+        # ─── Tier A 公式驱动 TB 核对行 transient seed（P0-1 主机制）──────────────
+        # spec: d-cycle-tier-a-writeback-detail-seed R3（决策1/3 / Property 6/7/10/11/13）
+        # 用 resolve_effective 的有效 Tier A 公式（默认 TB('2203','期末余额')）求值 transient
+        # seed 单标量 TB↔账龄合计核对行锚点 D3-adj-trial-balance-amount 进 responses_snapshot
+        # （不落库；手工优先；disabled 跳过；写对字段 remark；fail-open）。主开关关 → 零回归。
+        try:
+            await seed_tier_a_reconciliation(
+                ctx,
+                _D3_WP_CODE,
+                responses_snapshot,
+                resolve_effective=resolve_effective,
+                evaluate_wp_formula_expression=evaluate_wp_formula_expression,
+            )
+        except Exception as e:  # noqa: BLE001 — 兜底 fail-open，不阻断 render
+            logger.warning("D3 render: Tier A seed 兜底异常（fail-open）: %s", e)
+
+    return html_data

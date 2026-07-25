@@ -53,7 +53,7 @@ _SHEET_HEADERS: dict[str, list[str]] = {
     "L3-2": [
         "借款银行", "借款合同号", "借款类型", "起始日", "到期日",
         "年利率", "币种", "期初余额", "本期借入", "本期归还",
-        "期末余额", "一年内到期金额", "担保方式", "担保物", "备注",
+        "期末余额", "一年内到期金额", "担保方式", "担保物", "担保价值", "用途", "备注",
     ],
     "L3-4": [
         "授信银行", "授信额度", "已用额度", "征信借款余额",
@@ -61,13 +61,13 @@ _SHEET_HEADERS: dict[str, list[str]] = {
     ],
     "L3-5": [
         "借款合同号", "借款银行", "本金", "年利率",
-        "计息起始日", "计息终止日", "计息天数",
-        "测算利息", "账载利息", "差异", "备注",
+        "计息起始日", "计息终止日", "账载利息", "备注",
     ],
     "L3-6": [
-        "借款合同号", "借款银行", "借款金额", "借款日期", "到期日",
-        "年利率", "还款方式", "担保方式", "担保物描述",
-        "担保物权属", "担保金额", "违约条款", "备注",
+        "借款合同号", "借款单位", "贷款银行", "借款金额", "起始日期", "到期日期",
+        "借款期限(月)", "币种", "利率类型", "年利率", "调整方式", "计息基础",
+        "还款计划", "担保方式", "保证人", "抵质押物", "担保金额",
+        "提前还款条件", "逾期罚则", "交叉违约", "财务承诺",
     ],
     "L3-7": [
         "借款合同号", "借款银行", "借款金额", "到期日",
@@ -84,13 +84,14 @@ _SHEET_HEADERS: dict[str, list[str]] = {
 # 中文列名 → JSON 字段名 映射表
 _FIELD_MAPS: dict[str, dict[str, str]] = {
     "L3-2": {
-        "借款银行": "bankName", "借款合同号": "contractNo",
+        "借款银行": "bank", "借款合同号": "contractNo",
         "借款类型": "loanType", "起始日": "startDate",
         "到期日": "dueDate", "年利率": "annualRate",
-        "币种": "currency", "期初余额": "openingBalance",
+        "币种": "currency", "期初余额": "beginning",
         "本期借入": "borrowed", "本期归还": "repaid",
-        "期末余额": "endingBalance", "一年内到期金额": "currentPortion",
-        "担保方式": "guaranteeType", "担保物": "collateral",
+        "期末余额": "endBalance", "一年内到期金额": "currentPortion",
+        "担保方式": "guaranteeType", "担保物": "pledgeAsset",
+        "担保价值": "pledgeValue", "用途": "purpose",
         "备注": "remark",
     },
     "L3-4": {
@@ -101,21 +102,23 @@ _FIELD_MAPS: dict[str, dict[str, str]] = {
         "备注": "remark",
     },
     "L3-5": {
-        "借款合同号": "contractNo", "借款银行": "bankName",
+        "借款合同号": "contractNo", "借款银行": "bank",
         "本金": "principal", "年利率": "annualRate",
-        "计息起始日": "interestStartDate", "计息终止日": "interestEndDate",
-        "计息天数": "days", "测算利息": "calculatedInterest",
-        "账载利息": "bookedInterest", "差异": "difference",
-        "备注": "remark",
+        "计息起始日": "loanStart", "计息终止日": "loanEnd",
+        "账载利息": "bookedInterest", "备注": "remark",
     },
     "L3-6": {
-        "借款合同号": "contractNo", "借款银行": "bankName",
-        "借款金额": "loanAmount", "借款日期": "loanDate",
-        "到期日": "dueDate", "年利率": "annualRate",
-        "还款方式": "repaymentMethod", "担保方式": "guaranteeType",
-        "担保物描述": "collateralDesc", "担保物权属": "collateralOwnership",
-        "担保金额": "guaranteeAmount", "违约条款": "defaultClause",
-        "备注": "remark",
+        "借款合同号": "contractNo", "借款单位": "borrower",
+        "贷款银行": "lender", "借款金额": "loanAmount",
+        "起始日期": "startDate", "到期日期": "endDate",
+        "借款期限(月)": "term", "币种": "currency",
+        "利率类型": "rateType", "年利率": "annualRate",
+        "调整方式": "adjustMethod", "计息基础": "interestBasis",
+        "还款计划": "repaymentPlan", "担保方式": "guaranteeType",
+        "保证人": "guarantor", "抵质押物": "pledgeAsset",
+        "担保金额": "guaranteeAmount", "提前还款条件": "prepaymentCondition",
+        "逾期罚则": "overduePenalty", "交叉违约": "crossDefault",
+        "财务承诺": "financialCovenant",
     },
     "L3-7": {
         "借款合同号": "contractNo", "借款银行": "bankName",
@@ -136,20 +139,20 @@ _FIELD_MAPS: dict[str, dict[str, str]] = {
 
 # 各sheet中应解析为数值的字段
 _NUMERIC_FIELDS: dict[str, set[str]] = {
-    "L3-2": {"openingBalance", "borrowed", "repaid", "endingBalance", "currentPortion", "annualRate"},
+    "L3-2": {"beginning", "borrowed", "repaid", "endBalance", "currentPortion", "annualRate", "pledgeValue"},
     "L3-4": {"creditLimit", "usedCredit", "creditBalance", "bookBalance", "difference"},
-    "L3-5": {"principal", "annualRate", "days", "calculatedInterest", "bookedInterest", "difference"},
-    "L3-6": {"loanAmount", "annualRate", "guaranteeAmount"},
+    "L3-5": {"principal", "annualRate", "bookedInterest"},
+    "L3-6": {"loanAmount", "term", "annualRate", "guaranteeAmount"},
     "L3-7": {"loanAmount", "overdueDays", "overdueAmount"},
     "L3-8": {"bookValue", "appraisalValue", "guaranteedLoan", "pledgeRatio"},
 }
 
 # checklist_responses item_id 映射
 _SHEET_ITEM_ID: dict[str, str] = {
-    "L3-2": "L3-detail-rows",
+    "L3-2": "L3-L3-2-rows",
     "L3-4": "L3-credit-check-rows",
-    "L3-5": "L3-interest-calc-rows",
-    "L3-6": "L3-contract-check-rows",
+    "L3-5": "L3-L3-5-rows",
+    "L3-6": "L3-L3-6-rows",
     "L3-7": "L3-overdue-check-rows",
     "L3-8": "L3-pledge-check-rows",
 }
@@ -457,14 +460,24 @@ async def l3_import_data(
     item_id = _SHEET_ITEM_ID[sheet]
     json_str = json.dumps(parsed_rows, ensure_ascii=False)
 
+    # project_id 为 NOT NULL：即使命中 ON CONFLICT 也会在 INSERT 阶段校验 NOT NULL，
+    # 故必须提供 project_id（从 working_paper 反查），否则导入恒 500。
+    pid_result = await db.execute(
+        sa.text("SELECT project_id FROM working_paper WHERE id = :wp_id LIMIT 1"),
+        {"wp_id": wp_id},
+    )
+    pid_row = pid_result.fetchone()
+    project_id = str(pid_row.project_id) if pid_row and pid_row.project_id else None
+
     await db.execute(
         sa.text(
-            "INSERT INTO checklist_responses (id, wp_id, item_id, remark) "
-            "VALUES (:id, :wp_id, :item_id, :remark) "
+            "INSERT INTO checklist_responses (id, project_id, wp_id, item_id, remark) "
+            "VALUES (:id, :project_id, :wp_id, :item_id, :remark) "
             "ON CONFLICT (wp_id, item_id) DO UPDATE SET remark = :remark"
         ),
         {
             "id": str(uuid4()),
+            "project_id": project_id,
             "wp_id": wp_id,
             "item_id": item_id,
             "remark": json_str,

@@ -18,6 +18,9 @@
     <div class="section-head">
       <h3 class="sheet-title">G3-1 应收股利审定表</h3>
       <div class="head-actions tab-toolbar">
+        <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
+          <el-icon><Download /></el-icon>带入调整
+        </el-button>
         <el-button size="small" :disabled="isReadonly" @click="adj.addRow()">＋ 新增被投资方</el-button>
         <el-button size="small" :disabled="isReadonly" @click="onSyncFromDetail">从 G3-2 汇总</el-button>
         <el-button size="small" :disabled="isReadonly || !projectId" :loading="tbLoading" @click="onFetchTb">
@@ -417,18 +420,31 @@
         <p>4. 变动额/变动率按期末审定 vs 期初审定自动计算；|变动率|&gt;30% 须填原因分析并在审计说明中展开。</p>
         <p>5. 特别风险关注：关联方分红与资金占用、异常或复杂交易、重大会计估计（减值）。证据索引链至 G3-2/G3-4/G3-5/G3-3。</p>
         <p>6. 合计行审定金额应与试算平衡表数(1131)核对一致；可点「取试算 1131」；审定变更自动回写试算。G3-3「确认调整」后净调整落入「账项调整汇总」期末 AJE/RJE，并联动调整分录模块。</p>
+        <p>7. 「带入调整」：可从集中登记按科目 1131 拉取调整分录，逐笔分配到各被投资方行的期末 AJE/RJE，带入后审定数自动更新并联动附注。</p>
         <p class="cas-basis">CAS 依据：《中国注册会计师审计准则第 1301 号——审计证据》、《中国注册会计师审计准则第 1323 号——关联方》、《企业会计准则第 2 号——长期股权投资》及相关减值规定。</p>
       </div>
     </details>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="1131 应收股利"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, toRef, inject } from 'vue'
-import { Delete } from '@element-plus/icons-vue'
+import { Delete, Download } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useG3Adjudication } from '../composables/useG3Adjudication'
 import type { G3AdjudicationRow } from '../composables/useG3Adjudication'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { useAdjudicationBringIn } from '../composables/useAdjudicationBringIn'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import GtIndexChip from '../GtIndexChip.vue'
 import G3ImportExportDropdown from './G3ImportExportDropdown.vue'
 import G3AuditTextCards from './G3AuditTextCards.vue'
@@ -454,6 +470,30 @@ const adj = useG3Adjudication({
   allResponses: toRef(props, 'allResponses'),
   isReadonly: toRef(props, 'isReadonly'),
   auditYear: toRef(props, 'auditYear'),
+})
+
+// ─── 从集中登记带入调整（1131 应收股利，资产借方；带入期末 AJE/RJE） ────────────
+const bringInRows = computed(() =>
+  adj.dataRows.value.map((r) => ({ rowKey: r.id, name: r.investeeName, aje: r.closingAJE, rje: r.closingRJE })),
+)
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: toRef(props, 'projectId') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '1131',
+  direction: 'debit',
+  subjectCode: '1131',
+  wpCode: 'G3',
+  subjectLabel: '应收股利(1131)',
+  rows: bringInRows,
+  updateCell: (rowKey: string, field: any, value: number) =>
+    adj.updateCell(rowKey, field === 'rje' ? 'closingRJE' : 'closingAJE', value),
+  totalAudited: () => adj.subtotalRow.value.closingAdjusted,
 })
 
 /** 期初 AJE/RJE 默认收起，减少「期初也会调」的误导 */

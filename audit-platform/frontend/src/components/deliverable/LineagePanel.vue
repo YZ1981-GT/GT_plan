@@ -34,16 +34,57 @@
       </el-button>
     </div>
 
+    <!-- 手动章节溯源（章节列表来自后端 section-states，不依赖 OnlyOffice；允许手动输入兜底旧交付物） -->
+    <div v-if="!noAnchorAvailable" class="lineage-panel__manual">
+      <el-select
+        v-model="manualInput"
+        filterable
+        allow-create
+        clearable
+        default-first-option
+        size="small"
+        placeholder="选择或输入章节号溯源"
+        class="lineage-panel__manual-select"
+        @change="onManualTrace"
+      >
+        <el-option
+          v-for="opt in sectionOptions"
+          :key="opt.code"
+          :value="opt.code"
+          :label="opt.code"
+        >
+          <span class="lineage-panel__opt-code">{{ opt.code }}</span>
+          <el-tag
+            v-if="opt.isStale"
+            size="small"
+            type="warning"
+            effect="light"
+            class="lineage-panel__opt-stale"
+          >
+            已变更
+          </el-tag>
+        </el-option>
+      </el-select>
+      <el-button
+        size="small"
+        :loading="loading"
+        class="lineage-panel__manual-btn"
+        @click="onManualTrace"
+      >
+        溯源
+      </el-button>
+    </div>
+
     <!-- 无锚点降级提示（需求 3.5） -->
     <div v-if="noAnchorAvailable" class="lineage-panel__no-anchor">
       <el-icon class="lineage-panel__no-anchor-icon"><InfoFilled /></el-icon>
       <span>该出品物版本不支持溯源，请重新生成</span>
     </div>
 
-    <!-- 未选中章节（提示用户选中） -->
+    <!-- 未选中章节（提示用户输入章节号） -->
     <div v-else-if="!currentSectionCode && !noAnchorAvailable" class="lineage-panel__hint">
       <el-icon><Document /></el-icon>
-      <span>请在文档中选中章节以查看溯源信息</span>
+      <span>请在上方输入章节号后点「溯源」，查看该章节的数据来源</span>
     </div>
 
     <!-- 加载中 -->
@@ -163,11 +204,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, onUnmounted } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
 import { InfoFilled, Document, Right } from '@element-plus/icons-vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import type { LinkageContract, TargetType } from '@/types/linkageContract'
-import { useDeliverableLineage, sectionCodeFromAnchor } from '@/composables/useDeliverableLineage'
+import {
+  useDeliverableLineage,
+  anchorNameFromSectionCode,
+} from '@/composables/useDeliverableLineage'
 import { subscribeProjectEvent } from '@/services/sse/projectEventStream'
 import { api } from '@/services/apiProxy'
 
@@ -177,8 +221,6 @@ const TERMINAL_STATUSES = ['signed', 'confirmed', 'archived'] as const
 const props = defineProps<{
   projectId: string
   wordExportTaskId: string
-  /** OnlyOffice 编辑器实例引用，用于获取书签信息 */
-  editorInstance?: any
   /** 是否明确无锚点（旧版本出品物，由父组件判定） */
   hasNoAnchors?: boolean
   /** 出品物当前状态（用于终态检测，需求 11.4） */
@@ -204,6 +246,46 @@ const {
 
 /** 是否为无锚点状态（旧版本出品物，需求 3.5） */
 const noAnchorAvailable = ref(false)
+
+/** 手动溯源输入（章节号，如「五、1」） */
+const manualInput = ref('')
+
+/** 章节下拉候选（来自后端 section-states，含 stale 标记） */
+interface SectionOption {
+  code: string
+  isStale: boolean
+}
+const sectionOptions = ref<SectionOption[]>([])
+
+/**
+ * 加载本交付物的章节列表（section-states 端点），供手动溯源下拉选择。
+ * 后端权威、与 OnlyOffice 无关；fail-open：拿不到时下拉为空，仍可手动输入章节号（allow-create）。
+ */
+async function loadSections(): Promise<void> {
+  if (!props.projectId || !props.wordExportTaskId) return
+  try {
+    const url = `/api/projects/${props.projectId}/deliverables/${props.wordExportTaskId}/section-states`
+    const data = await api.get<{ sections: Array<{ section_code: string; is_stale: boolean }> }>(url)
+    sectionOptions.value = (data?.sections || [])
+      .filter((s) => s.section_code)
+      .map((s) => ({ code: s.section_code, isStale: !!s.is_stale }))
+  } catch {
+    sectionOptions.value = []
+  }
+}
+
+/**
+ * 手动章节溯源：审计师输入/选择章节号后直接调 trace 端点（后端按 section_code 查询，
+ * 不依赖 OnlyOffice 连接器/书签，必然可用）。currentSectionCode 是 composable 返回的
+ * 响应式 ref，设置 .value 即驱动「当前章节」展示与刷新工具栏。
+ */
+async function onManualTrace(): Promise<void> {
+  const code = manualInput.value.trim()
+  if (!code) return
+  noAnchorAvailable.value = false
+  currentSectionCode.value = code
+  await traceSection(code)
+}
 
 /** 终态检测（需求 11.4） */
 const isTerminalState = computed(() => {
@@ -367,12 +449,15 @@ const _lineageSub = subscribeProjectEvent(
   props.projectId,
   'LINKAGE_STALE_CHANGED',
   () => {
-    // 当前章节可能变 stale → 刷新溯源徽标
+    // 当前章节可能变 stale → 刷新溯源徽标 + 刷新下拉 stale 标记
     if (currentSectionCode.value) {
       traceSection(currentSectionCode.value)
     }
+    loadSections()
   },
 )
+
+onMounted(loadSections)
 function closeSSE(): void {
   _lineageSub.close()
 }
@@ -391,6 +476,18 @@ function onBookmarkDetected(anchorName: string): void {
     return
   }
   noAnchorAvailable.value = false
+  // 优先与已加载的权威章节列表精确匹配：避免 anchor→section_code 逆映射对多分隔符
+  // 章节（如「五、12·1」→ sec_五_12_1 → 无法还原·）失真，并天然忽略非本文档的杂散 Tag。
+  const match = sectionOptions.value.find(
+    (o) => anchorNameFromSectionCode(o.code) === anchorName,
+  )
+  if (match) {
+    currentSectionCode.value = match.code
+    manualInput.value = match.code // 同步下拉，反映当前光标所在章节
+    traceSection(match.code)
+    return
+  }
+  // 回退：未加载章节列表或未匹配到 → 逆映射解析（单顿号章节可靠）
   traceFromAnchor(anchorName)
 }
 
@@ -441,6 +538,31 @@ defineExpose({
 
 .lineage-panel__refresh-btn {
   color: var(--gt-color-primary, #4b2d77);
+}
+
+.lineage-panel__manual {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+}
+
+.lineage-panel__manual-select {
+  flex: 1;
+  min-width: 0;
+}
+
+.lineage-panel__manual-btn {
+  flex-shrink: 0;
+}
+
+.lineage-panel__opt-code {
+  font-variant-numeric: tabular-nums;
+}
+
+.lineage-panel__opt-stale {
+  margin-left: 8px;
 }
 
 .lineage-panel__no-anchor {

@@ -84,7 +84,7 @@
             <div v-else class="gt-wp-side-placeholder">请先选择底稿</div>
           </el-tab-pane>
           <el-tab-pane label="公式" name="formulas" lazy>
-            <FormulaStatusPanel v-if="wpId" :project-id="projectId" :wp-id="wpId" />
+            <FormulaStatusPanel v-if="wpId" :project-id="projectId" :wp-id="wpId" :year="currentYear" />
             <div v-else class="gt-wp-side-placeholder">请先选择底稿</div>
           </el-tab-pane>
           <el-tab-pane name="review-marks" lazy>

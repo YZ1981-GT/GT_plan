@@ -27,6 +27,13 @@ from app.services.acnr.catalog import (
     lookup,
 )
 from app.services.acnr.resolver import full_resolve, resolve_instance
+from app.services.acnr.overlay import (
+    apply_project_overlay,
+    remove_project_overlay,
+    ensure_cache_loaded,
+    OverlayPatch,
+)
+from app.services.acnr.overlay_repository import OverlayRevisionConflict
 
 
 # ─── Request/Response Models ──────────────────────────────────────────────────
@@ -499,3 +506,153 @@ async def acnr_metrics(
 
     metrics = get_acnr_metrics()
     return metrics.get_aggregated_metrics()
+
+
+# ─── Overlay 变更受控入口（R10 — 开放 UI）────────────────────────────────────
+# 项目级 overlay（sheet 别名/绑定/自定义补丁）的读/写/删 HTTP 端点。
+# 写路径经 apply_project_overlay：capability 校验（manager/partner/signing_partner/
+# admin）+ 原子 ON CONFLICT upsert + 可选 CAS（expected_revision）+ 同事务 outbox
+# （dispatcher 至少一次投递失效 → durable epoch + SSE 广播）。
+# 高并发（数千并发编辑者）安全性由 CAS 乐观并发 + uq_overlay_identity 唯一约束 +
+# 单飞缓存加载保证：冲突返回 409，调用方带最新 revision 重试，不静默覆盖。
+
+
+class AcnrOverlayResponse(BaseModel):
+    """单条 overlay 序列化响应。"""
+
+    project_id: str
+    addr_id: str
+    overlay_type: str
+    overrides: dict
+    reason: str = ""
+    owner: str = ""
+    expires_at: Optional[str] = None
+    wp_id: Optional[str] = None
+    revision: int = 1
+
+
+class AcnrOverlayApplyRequest(BaseModel):
+    """POST /api/acnr/overlay 请求体。"""
+
+    project_id: str
+    addr_id: str
+    overrides: dict
+    overlay_type: str = "cust"
+    reason: str = ""
+    owner: str = ""
+    expires_at: Optional[str] = None
+    wp_id: Optional[str] = None
+    # 乐观并发：提供则 CAS（仅当当前 revision == expected 才更新，冲突 409）。
+    # 并发编辑同一 overlay 时防静默覆盖。
+    expected_revision: Optional[int] = None
+
+
+class AcnrOverlayRemoveRequest(BaseModel):
+    """DELETE /api/acnr/overlay 请求体。"""
+
+    project_id: str
+    addr_id: str
+    overlay_type: str = "cust"
+
+
+def _serialize_overlay(patch: OverlayPatch) -> dict:
+    return {
+        "project_id": patch.project_id,
+        "addr_id": patch.addr_id,
+        "overlay_type": patch.overlay_type,
+        "overrides": patch.overrides,
+        "reason": patch.reason,
+        "owner": patch.owner,
+        "expires_at": patch.expires_at,
+        "wp_id": patch.wp_id,
+        "revision": patch.revision,
+    }
+
+
+@router.get("/overlay")
+async def acnr_overlay_list(
+    project_id: str = Query(..., description="项目 UUID"),
+    _user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """列出项目全部 overlay（read-through：内存缓存缺失时从 PG 加载）。
+
+    Requirements: R10, Req-3.1（项目访问校验）
+    """
+    await check_project_access(_user, project_id, db)
+    patches = await ensure_cache_loaded(db, project_id)
+    return [_serialize_overlay(p) for p in patches.values()]
+
+
+@router.post("/overlay")
+async def acnr_overlay_apply(
+    body: AcnrOverlayApplyRequest,
+    _user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """创建/更新项目 overlay（受控写入口）。
+
+    - capability 校验（manager/partner/signing_partner/admin）→ 不足 403
+    - 原子 upsert + 可选 CAS（expected_revision）→ 冲突 409（并发编辑防覆盖）
+    - 同事务写 outbox → dispatcher 至少一次投递失效
+
+    Requirements: R10, R8（CAS 并发安全）, Req-3.1
+    """
+    await check_project_access(_user, body.project_id, db)
+    try:
+        patch = await apply_project_overlay(
+            db,
+            body.project_id,
+            body.addr_id,
+            body.overrides,
+            actor=_user,
+            wp_id=body.wp_id,
+            reason=body.reason,
+            owner=body.owner or getattr(_user, "username", "") or "",
+            expires_at=body.expires_at,
+            overlay_type=body.overlay_type,
+            expected_revision=body.expected_revision,
+        )
+        await db.commit()
+    except OverlayRevisionConflict as exc:
+        await db.rollback()
+        # 并发编辑冲突：调用方应重新拉取最新 revision 后重试
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except HTTPException:
+        await db.rollback()
+        raise
+    except Exception as exc:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail=f"overlay 写入失败: {exc!s}") from exc
+
+    return _serialize_overlay(patch)
+
+
+@router.delete("/overlay")
+async def acnr_overlay_remove(
+    body: AcnrOverlayRemoveRequest,
+    _user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """删除项目 overlay（受控删除入口）。
+
+    Requirements: R10, Req-3.1
+    """
+    await check_project_access(_user, body.project_id, db)
+    try:
+        deleted = await remove_project_overlay(
+            db,
+            body.project_id,
+            body.addr_id,
+            actor=_user,
+            overlay_type=body.overlay_type,
+        )
+        await db.commit()
+    except HTTPException:
+        await db.rollback()
+        raise
+    except Exception as exc:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail=f"overlay 删除失败: {exc!s}") from exc
+
+    return {"deleted": deleted, "addr_id": body.addr_id}

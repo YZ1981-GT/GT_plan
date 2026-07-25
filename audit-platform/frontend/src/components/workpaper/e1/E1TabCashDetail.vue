@@ -24,6 +24,7 @@ import type { UseE1BaseOptions } from '../composables/useE1Adjudication'
 import GtIndexChip from '../GtIndexChip.vue'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { amountFormatter, amountParser } from '../composables/wpAmountInput'
 import { Setting } from '@element-plus/icons-vue'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -278,6 +279,9 @@ onMounted(() => {
                 :model-value="row.opening"
                 :disabled="isReadonly"
                 :controls="false"
+                :precision="2"
+                :formatter="amountFormatter"
+                :parser="amountParser"
                 size="small"
                 @change="(val: number | undefined) => updateCell(row.id, 'opening', val ?? 0)"
               />
@@ -291,6 +295,9 @@ onMounted(() => {
                 :model-value="row.increase"
                 :disabled="isReadonly"
                 :controls="false"
+                :precision="2"
+                :formatter="amountFormatter"
+                :parser="amountParser"
                 size="small"
                 @change="(val: number | undefined) => updateCell(row.id, 'increase', val ?? 0)"
               />
@@ -304,6 +311,9 @@ onMounted(() => {
                 :model-value="row.decrease"
                 :disabled="isReadonly"
                 :controls="false"
+                :precision="2"
+                :formatter="amountFormatter"
+                :parser="amountParser"
                 size="small"
                 @change="(val: number | undefined) => updateCell(row.id, 'decrease', val ?? 0)"
               />
@@ -345,6 +355,9 @@ onMounted(() => {
                 :model-value="row.adjustment"
                 :disabled="isReadonly"
                 :controls="false"
+                :precision="2"
+                :formatter="amountFormatter"
+                :parser="amountParser"
                 size="small"
                 @change="(val: number | undefined) => updateCell(row.id, 'adjustment', val ?? 0)"
               />
@@ -404,6 +417,9 @@ onMounted(() => {
             :model-value="overseasAmount"
             :disabled="isReadonly"
             :controls="false"
+            :precision="2"
+            :formatter="amountFormatter"
+            :parser="amountParser"
             size="small"
             @change="saveOverseasAmount"
           />

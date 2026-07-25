@@ -16,8 +16,12 @@
  */
 import { ref, reactive, computed, inject, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Download } from '@element-plus/icons-vue'
 import type { GenerateWorkpaperAiText } from '../composables/useWorkpaperScaffold'
 import GtIndexChip from '../GtIndexChip.vue'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
+import { useAdjudicationBringIn } from '../composables/useAdjudicationBringIn'
+import { useAuditContext } from '@/composables/useAuditContext'
 
 interface RespItem { item_id: string; conclusion: string | null; remark: string | null }
 
@@ -266,6 +270,35 @@ function scheduleSave() {
   props.saveImmediate(items)
 }
 
+// ─── 从集中登记带入调整（2221 长期应付职工薪酬，负债贷方；带入期末调整 endAje，单一调整列） ───
+const bringInRows = computed(() =>
+  mainRows.map((r) => ({ rowKey: r.key, name: r.label, aje: 0, rje: 0 })),
+)
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: computed(() => props.projectId) as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '2221',
+  direction: 'credit',
+  subjectCode: '2221',
+  wpCode: 'J2',
+  subjectLabel: '长期应付职工薪酬(2221)',
+  rows: bringInRows,
+  // 单一「账项调整」列：净额累加至期末调整 endAje（mutate reactive + scheduleSave）
+  updateCell: (rowKey: string, _field: any, value: number) => {
+    const row = mainRows.find((r) => r.key === rowKey)
+    if (!row) return
+    row.endAje = Math.round((n(row.endAje) + value) * 100) / 100
+    scheduleSave()
+  },
+  totalAudited: () => mainTotal.value.endAudited,
+})
+
 onMounted(load)
 watch(() => props.allResponses, load, { deep: false })
 </script>
@@ -275,6 +308,9 @@ watch(() => props.allResponses, load, { deep: false })
     <!-- 双模式切换 -->
     <div class="mode-bar">
       <el-segmented v-model="mode" :options="[{ label: 'HTML', value: 'html' }, { label: 'OnlyOffice', value: 'oo' }]" size="small" />
+      <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
+        <el-icon><Download /></el-icon>带入调整
+      </el-button>
       <span class="chip-wrap"><GtIndexChip value="wp:J2-2" :context-project-id="projectId" /></span>
     </div>
 
@@ -516,8 +552,18 @@ watch(() => props.allResponses, load, { deep: false })
         <p>3. 灰底"审定数/净负债"列为自动计算列，不可手动编辑。</p>
         <p>4. 精算假设与敏感性分析须利用管理层的精算专家工作（ISA 620），关注折现率、死亡率、工资增长率的合理性。</p>
         <p>5. 审定期末合计回写试算平衡表科目 2221，并与明细表(J2-2)、计提检查表(J2-4)勾稽一致。</p>
+        <p>6.「带入调整」：可从集中登记按科目 2221 拉取调整分录，逐笔分配到各行期末账项调整，带入后审定数自动更新并联动附注。</p>
       </div>
     </details>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="2221 长期应付职工薪酬"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 

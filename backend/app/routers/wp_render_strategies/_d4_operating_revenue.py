@@ -12,9 +12,19 @@ import logging
 
 import sqlalchemy as sa
 
+from app.core.config import settings
+from app.services.d_cycle_extraction.presets import resolve_effective
+from app.services.d_cycle_extraction.tier_a_seed import (
+    seed_tier_a_reconciliation,
+)
+from app.services.wp_formula_eval_service import evaluate_wp_formula_expression
+
 from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
+
+# D4 wp_code base（Tier A 提取公式 / 锚点登记 key）
+_D4_WP_CODE = "D4"
 
 # IPO/舞弊组可见性关键字
 _IPO_KEYWORDS = ("ipo", "listed", "neeq", "restructuring", "fraud_risk")
@@ -185,9 +195,56 @@ async def render(ctx: RenderContext) -> dict | None:
     except Exception as e:  # noqa: BLE001
         logger.warning("D4 render: project context 查询失败: %s", e)
 
-    return {
+    html_data = {
         "sections": sections,
         "visible_groups": visible_groups,
         "project_context": project_context,
         "responses_snapshot": responses_snapshot,
     }
+
+    # ─── Tier B 四表库审定表预填（D4：宁缺勿造 R3.4，ADDITIVE，灰度开关控制）───────
+    # spec: d-cycle-four-table-extraction-formulas (R1.1 / R2.3 / R3.4 / R7.1 / R7.2
+    #        / Property 9)
+    #
+    # 【宁缺勿造决策】D4-1 审定表主营/其他收入明细行按**产品/项目**（`D4-1-adj-rows`），
+    # 由 D4-2 主营明细（`D4-2-rows`，序时账 6001 贷方按产品×月归集）+ D4-3 其他明细
+    # （`D4-3-rows`）经 SUMIF 聚合派生（useD4Adjudication mainRevenueByProduct）；而
+    # trial_balance / tb_balance 的 6001/6051 **只有科目总额、无产品/项目维度**（产品是
+    # 序时账明细维度，非科目结构）→ 无法把 TB 干净映射到明细行 → D4 render **不返回
+    # adjudication_prefill**（不臆造明细行 = 诚实部分覆盖，对齐 R3.4）。
+    #
+    # D4 四表库数据的正确落点（均为既有链路，本 render 不介入，手工优先精度）：
+    #   * D4-1 `D4-1-adj-tb-6001`/`D4-1-adj-tb-6051`（6001 主营/6051 其他审定发生额，
+    #     TB↔审定小计核对标量）—— 注册为 Tier A **可编辑**公式 TB('6001','审定数')/
+    #     TB('6051','审定数')（d_cycle_extraction_presets.json，公式管理面板可查可编，
+    #     求值经 get_active_filter 与 Tier B 同口径）。
+    #   * D4-2 主营明细 ← **序时账 6001 贷方按产品×月归集**（d4_ledger_monthly_by_product
+    #     resolver，前端「从序时账取数」，Tier B 复杂归集）—— 非单条公式，本 render 不介入。
+    #
+    # → 因此 D4 render 输出在开关开/关时**逐字节等价**（不新增任何键，Property 9 天然成立，
+    #   零回归）。收入类 occurrence 若未来 6001 出现产品级子科目、且可干净映射，可在此接入
+    #   Tier B seed（build_d_adjudication_prefill mode='occurrence'）。
+    if settings.D_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED:
+        logger.debug(
+            "D4 render: 宁缺勿造（R3.4）— 无干净 TB→审定表明细行映射（收入按产品/项目 "
+            "SUMIF from D4-2/D4-3），不发 adjudication_prefill（wp_id=%s）",
+            wp_id,
+        )
+        # ─── Tier A 公式驱动 TB 核对行 transient seed（P0-1 主机制，D4 双标量）────────
+        # spec: d-cycle-tier-a-writeback-detail-seed R3（决策1/3 / Property 6/7/10/11/13）
+        # D4 是**双标量**：resolve_effective 返回两条绑定——D4-1-adj-tb-6001（TB('6001','审定数')
+        # 主营）+ D4-1-adj-tb-6051（TB('6051','审定数') 其他），共享助手的锚点遍历天然覆盖两条，
+        # 各自 transient seed 进 responses_snapshot（不落库；手工优先；disabled 跳过；写对字段
+        # remark；fail-open，单条求值失败不影响另一条）。主开关关（默认）→ 不 seed，零回归。
+        try:
+            await seed_tier_a_reconciliation(
+                ctx,
+                _D4_WP_CODE,
+                responses_snapshot,
+                resolve_effective=resolve_effective,
+                evaluate_wp_formula_expression=evaluate_wp_formula_expression,
+            )
+        except Exception as e:  # noqa: BLE001 — 兜底 fail-open，不阻断 render
+            logger.warning("D4 render: Tier A seed 兜底异常（fail-open）: %s", e)
+
+    return html_data

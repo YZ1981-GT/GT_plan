@@ -7,6 +7,25 @@
         <el-button size="small" type="success" :disabled="isReadonly || !isBalanced" @click="handleSaveWriteback">
           保存&amp;回写
         </el-button>
+        <el-button
+          size="small"
+          type="primary"
+          plain
+          :loading="centralSyncing"
+          :disabled="isReadonly || !isBalanced || entries.length === 0"
+          @click="syncToCentral"
+          title="把本页调整分录汇聚到集中调整登记，供合伙人跨循环审阅"
+        >
+          同步到集中登记
+        </el-button>
+        <el-tag
+          v-if="centralStatus?.review_status"
+          size="small"
+          :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
+          :title="centralStatus.rejection_reason || ''"
+        >
+          集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
+        </el-tag>
         <el-button v-if="!isReadonly && pendingAbnormalCount > 0" size="small" type="warning" plain @click="importFromK44Abnormal">
           从K4-4异常带入（{{ pendingAbnormalCount }}笔）
         </el-button>
@@ -202,6 +221,8 @@ import http from '@/utils/http'
 import { useK4ImportExport } from '@/components/workpaper/composables/useK4ImportExport'
 import type { WorkpaperRuntimeContext } from '../../composables/useWorkpaperScaffold'
 import { WorkpaperRuntimeContextKey } from '../../composables/useWorkpaperScaffold'
+import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
+import { useAuditContext } from '@/composables/useAuditContext'
 
 const K4_ACCOUNT_CODE = '2245'
 const ITEM_PREFIX = 'K4-3-adj'
@@ -258,9 +279,30 @@ const totalCredits = computed(() => entries.value.reduce((sum, e) => sum + (e.cr
 const balanceDiff = computed(() => totalDebits.value - totalCredits.value)
 const isBalanced = computed(() => Math.abs(balanceDiff.value) < 0.005)
 
+// ═══ 同步到集中调整登记（workpaper-adjustment-centralization） ═══
+const { year: auditYear } = useAuditContext()
+const { centralStatus, syncing: centralSyncing, syncToCentral, refreshStatus } = useAdjustmentCentralSync({
+  projectId: () => props.projectId,
+  year: auditYear,
+  wpId: () => props.wpId,
+  wpCode: 'K4',
+  itemId: `${ITEM_PREFIX}-entries`,
+  buildLineItems: () => entries.value.map(e => ({
+    standard_account_code: e.accountCode || undefined,
+    account_name: e.accountName,
+    debit_amount: e.debitAmount,
+    credit_amount: e.creditAmount,
+  })),
+  buildMeta: () => ({
+    description: entries.value.find(e => e.summary)?.summary || 'K4 其他流动负债调整',
+    adjustmentType: entries.value.length > 0 && entries.value.every(e => e.entryType === 'RJE') ? 'rje' : 'aje',
+  }),
+})
+
 // ═══ 初始化加载 ═══
 onMounted(() => {
   loadFromResponses()
+  refreshStatus()
 })
 
 function loadFromResponses(): void {

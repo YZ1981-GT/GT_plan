@@ -126,6 +126,18 @@
         >
           保存并回写 I4-1
         </el-button>
+        <el-button
+          v-if="!isReadonly"
+          size="small"
+          type="primary"
+          plain
+          :loading="centralSyncing"
+          :disabled="!state.isBalanced.value || state.rows.value.length === 0"
+          title="把本页调整分录汇聚到集中调整登记，供合伙人跨循环审阅"
+          @click="syncToCentral"
+        >
+          同步到集中登记
+        </el-button>
         <el-button size="small" @click="emit('navigate-sheet', 'I4-1')">← 审定表</el-button>
         <el-button size="small" @click="emit('navigate-sheet', 'I4-2')">明细表 →</el-button>
         <el-button size="small" @click="emit('navigate-sheet', 'I4-5')">针对性检查 →</el-button>
@@ -139,6 +151,14 @@
         <span class="chip-wrap"><GtIndexChip value="wp:I4-3" :context-project-id="projectId" /></span>
         <span class="chip-wrap"><GtIndexChip value="wp:A13" :context-project-id="projectId" /></span>
         <el-button size="small" type="default" link @click="openReview('I4-3')">💬 复核</el-button>
+        <el-tag
+          v-if="centralStatus?.review_status"
+          size="small"
+          :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
+          :title="centralStatus.rejection_reason || ''"
+        >
+          集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
+        </el-tag>
       </div>
     </div>
 
@@ -391,9 +411,11 @@
  * I4TabAdjustment.vue — I4-3 长期待摊费用调整分录汇总
  * 对齐致同 Excel 列结构；逻辑层 useI4Adjustment
  */
-import { computed, inject, ref, toRef } from 'vue'
+import { computed, inject, ref, toRef, onMounted, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI4Adjustment } from '../../composables/useI4Adjustment'
+import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
+import { useAuditContext } from '@/composables/useAuditContext'
 import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
@@ -422,6 +444,28 @@ const state = useI4Adjustment({
   auditYear: toRef(props, 'year'),
   onSave: (itemId, value) => emit('save', itemId, value),
 })
+
+// ─── 同步到集中调整登记（workpaper-adjustment-centralization） ───
+const { year: centralYear } = useAuditContext()
+const { centralStatus, syncing: centralSyncing, syncToCentral, refreshStatus } = useAdjustmentCentralSync({
+  projectId: toRef(props, 'projectId') as Ref<string>,
+  year: centralYear,
+  wpId: toRef(props, 'wpId') as Ref<string>,
+  wpCode: 'I4',
+  itemId: 'I4-3-rows',
+  buildLineItems: () => state.rows.value.map((r) => ({
+    standard_account_code: r.accountCode || undefined,
+    account_name: r.accountName,
+    report_line_code: r.reportItem || undefined,
+    debit_amount: r.debitAmount,
+    credit_amount: r.creditAmount,
+  })),
+  buildMeta: () => ({
+    description: state.rows.value.find((r) => r.description)?.description || 'I4 长期待摊费用调整',
+    adjustmentType: state.rows.value.length > 0 && state.rows.value.every((r) => r.category === '报表调整') ? 'rje' : 'aje',
+  }),
+})
+onMounted(() => refreshStatus())
 
 const hasLtpaNet = computed(() =>
   Math.abs(state.ltpaAjeNet.value) > 0.005 || Math.abs(state.ltpaRjeNet.value) > 0.005,

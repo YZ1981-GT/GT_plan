@@ -8,6 +8,7 @@
         <p>2. 期初数应与上年末审定数一致；未审数取自试算表（科目 1503 投资性房地产 / 1504 累计折旧），审定数 = 未审 + AJE + RJE。</p>
         <p>3. 计量模式在成本模式与公允价值模式之间选择（CAS3）：成本模式计提折旧与减值；公允价值模式不计提折旧、以公允价值调整账面价值，请切换至公允价值版本。</p>
         <p>4. 关注三角勾稽是否平衡（期初 + 增加 − 减少 ± 转换 = 期末）。</p>
+        <p>5.「带入调整(原值/折旧/减值)」：从集中登记按科目 1503/1504/1505 拉取调整分录，逐笔分配到各分类的 AJE/RJE（原值借方净额、折旧/减值贷方净额），带入后审定数自动更新并联动附注。</p>
       </div>
     </details>
 
@@ -36,6 +37,15 @@
         @click="onFillTransferFromH36"
       >
         {{ hasTransferDiff ? '从 H3-6 回填转换' : '转换已勾稽' }}
+      </el-button>
+      <el-button size="small" type="primary" plain :disabled="isReadonly" :loading="adjPullCost.loading.value" @click="openBringInCost">
+        <el-icon><Download /></el-icon>带入调整(原值)
+      </el-button>
+      <el-button size="small" type="primary" plain :disabled="isReadonly" :loading="adjPullDep.loading.value" @click="openBringInDep">
+        <el-icon><Download /></el-icon>带入调整(折旧)
+      </el-button>
+      <el-button size="small" type="primary" plain :disabled="isReadonly" :loading="adjPullImpair.loading.value" @click="openBringInImpair">
+        <el-icon><Download /></el-icon>带入调整(减值)
       </el-button>
       <span class="chip-wrap"><GtIndexChip value="wp:H3-1" :context-project-id="projectId" /></span>
       <el-tag size="small" type="info">共 {{ originalRows.length }} 行</el-tag>
@@ -327,6 +337,31 @@
         <el-tag size="small" class="nav-chip" @click="emit('navigate-sheet', 'H3-6 互转审核')">H3-6 互转审核</el-tag>
       </div>
     </el-card>
+
+    <AdjudicationBringInDialog
+      v-model="bringInCostVisible"
+      :matches="adjPullCost.matches.value"
+      :row-options="bringInCostRowOptions"
+      subject-label="1503 投资性房地产原值"
+      :loading="adjPullCost.loading.value"
+      @apply="onBringInCostApply"
+    />
+    <AdjudicationBringInDialog
+      v-model="bringInDepVisible"
+      :matches="adjPullDep.matches.value"
+      :row-options="bringInDepRowOptions"
+      subject-label="1504 累计折旧"
+      :loading="adjPullDep.loading.value"
+      @apply="onBringInDepApply"
+    />
+    <AdjudicationBringInDialog
+      v-model="bringInImpairVisible"
+      :matches="adjPullImpair.matches.value"
+      :row-options="bringInImpairRowOptions"
+      subject-label="1505 减值准备"
+      :loading="adjPullImpair.loading.value"
+      @apply="onBringInImpairApply"
+    />
   </div>
 </template>
 
@@ -336,12 +371,16 @@
  * 双区块(原值+折旧)+三角勾稽+TB回写+AI+💬复核+GtIndexChip→H3-6
  */
 import { ref, computed, inject, toRef, onMounted, watch } from 'vue'
+import { Download } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useH3AdjudicationCost } from '../../composables/useH3AdjudicationCost'
 import type { H3CostOriginalRow, H3CostDepRow, H3CostImpairRow } from '../../composables/useH3AdjudicationCost'
 import type { H3FillDiffRow, H3FillMode } from '../../composables/h3FillFromDetail'
 import { useH3FormData } from '../../composables/useH3FormData'
 import { useH3CrossSheet } from '../../composables/useH3CrossSheet'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
@@ -373,6 +412,73 @@ const {
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
   getValue, setValue, saveImmediate,
+})
+
+// ─── 从集中登记带入调整（三科目：1503原值[资产借]/1504累计折旧[备抵贷]/1505减值[备抵贷]；带入AJE/RJE） ───
+const bringInCostRows = computed(() =>
+  originalRows.value.map((r) => ({ rowKey: r.rowId, name: r.category, aje: r.aje, rje: r.rje })),
+)
+const {
+  adjPull: adjPullCost,
+  visible: bringInCostVisible,
+  rowOptions: bringInCostRowOptions,
+  open: openBringInCost,
+  apply: onBringInCostApply,
+} = useAdjudicationBringIn({
+  projectId: toRef(props, 'projectId') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '1503',
+  direction: 'debit',
+  subjectCode: '1503',
+  wpCode: 'H3',
+  subjectLabel: '投资性房地产原值(1503)',
+  rows: bringInCostRows,
+  updateCell: (rowKey: string, field: any, value: number) => updateOriginalCell(rowKey, field, value),
+  totalAudited: () => originalTotal.value.audited,
+})
+
+const bringInDepRows = computed(() =>
+  depRows.value.map((r) => ({ rowKey: r.rowId, name: r.category, aje: r.aje, rje: r.rje })),
+)
+const {
+  adjPull: adjPullDep,
+  visible: bringInDepVisible,
+  rowOptions: bringInDepRowOptions,
+  open: openBringInDep,
+  apply: onBringInDepApply,
+} = useAdjudicationBringIn({
+  projectId: toRef(props, 'projectId') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '1504',
+  direction: 'credit',
+  subjectCode: '1504',
+  wpCode: 'H3',
+  subjectLabel: '累计折旧(1504)',
+  rows: bringInDepRows,
+  updateCell: (rowKey: string, field: any, value: number) => updateDepCell(rowKey, field, value),
+  totalAudited: () => depTotal.value.audited,
+})
+
+const bringInImpairRows = computed(() =>
+  impairRows.value.map((r) => ({ rowKey: r.rowId, name: r.category, aje: r.aje, rje: r.rje })),
+)
+const {
+  adjPull: adjPullImpair,
+  visible: bringInImpairVisible,
+  rowOptions: bringInImpairRowOptions,
+  open: openBringInImpair,
+  apply: onBringInImpairApply,
+} = useAdjudicationBringIn({
+  projectId: toRef(props, 'projectId') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '1505',
+  direction: 'credit',
+  subjectCode: '1505',
+  wpCode: 'H3',
+  subjectLabel: '减值准备(1505)',
+  rows: bringInImpairRows,
+  updateCell: (rowKey: string, field: any, value: number) => updateImpairCell(rowKey, field, value),
+  totalAudited: () => impairTotal.value.audited,
 })
 
 const fillDialogVisible = ref(false)

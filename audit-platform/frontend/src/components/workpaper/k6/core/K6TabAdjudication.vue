@@ -213,6 +213,12 @@
       >
         从K6-3带入AJE/RJE
       </el-button>
+      <el-button size="small" type="warning" plain :disabled="isReadonly" :loading="assetAdjPull.loading.value" @click="openAssetBringIn">
+        <el-icon><Download /></el-icon> 带入调整(资产1481)
+      </el-button>
+      <el-button size="small" type="warning" plain :disabled="isReadonly" :loading="liabAdjPull.loading.value" @click="openLiabBringIn">
+        <el-icon><Download /></el-icon> 带入调整(负债2605)
+      </el-button>
       <span class="tb-hint">
         资产审定合计: {{ fmtAmt(getAssetAuditedTotal()) }} |
         负债审定合计: {{ fmtAmt(getLiabilityAuditedTotal()) }}
@@ -287,8 +293,26 @@
         <li>三角勾稽：期末(公式) 应与 审定数 一致或差异合理</li>
         <li>减值列仅资产区块使用（CAS42孰低法）</li>
         <li>回写TB分别写入1481(资产)和2605(负债)</li>
+        <li>「带入调整」：资产(1481)/负债(2605)各按科目拉取调整分录，逐笔选目标行累加到 AJE/RJE，带入后自动联动披露/附注</li>
       </ul>
     </details>
+
+    <AdjudicationBringInDialog
+      v-model="assetBringInVisible"
+      :matches="assetAdjPull.matches.value"
+      :row-options="assetBringInRowOptions"
+      subject-label="1481 持有待售资产"
+      :loading="assetAdjPull.loading.value"
+      @apply="onAssetBringInApply"
+    />
+    <AdjudicationBringInDialog
+      v-model="liabBringInVisible"
+      :matches="liabAdjPull.matches.value"
+      :row-options="liabBringInRowOptions"
+      subject-label="2605 持有待售负债"
+      :loading="liabAdjPull.loading.value"
+      @apply="onLiabBringInApply"
+    />
   </div>
 </template>
 
@@ -310,10 +334,13 @@
  * - AI按钮 section标题右侧
  * - 方法论上下文(琥珀色左边线+浅黄背景)
  */
-import { ref, computed, inject } from 'vue'
+import { ref, computed, inject, toRef } from 'vue'
 import { ElMessage } from 'element-plus'
-import { MagicStick, View, Upload, QuestionFilled } from '@element-plus/icons-vue'
+import { MagicStick, View, Upload, QuestionFilled, Download } from '@element-plus/icons-vue'
 import { useK6Adjudication, type K6AdjRow, type K6AdjSection } from '../../composables/useK6Adjudication'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import http from '@/utils/http'
 
 const props = defineProps<{
@@ -351,6 +378,48 @@ const {
 })
 
 const publishing = ref(false)
+
+// ─── 从集中登记带入调整（K6 双科目：资产1481借方 + 负债2605贷方，两独立流） ─────
+const assetSectionRows = computed(() => adjudicationSections.value.find(s => s.sectionKey === 'asset')?.rows ?? [])
+const liabSectionRows = computed(() => adjudicationSections.value.find(s => s.sectionKey === 'liability')?.rows ?? [])
+
+const {
+  adjPull: assetAdjPull,
+  visible: assetBringInVisible,
+  rowOptions: assetBringInRowOptions,
+  open: openAssetBringIn,
+  apply: onAssetBringInApply,
+} = useAdjudicationBringIn({
+  projectId: toRef(props, 'projectId') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '1481',
+  direction: 'debit', // 持有待售资产（借方）：净发生额 = 借 − 贷
+  subjectCode: '1481',
+  wpCode: 'K6',
+  subjectLabel: '持有待售资产(1481)',
+  rows: computed(() => assetSectionRows.value.map(r => ({ rowKey: r.rowKey, name: r.label, aje: r.aje, rje: r.rje }))),
+  updateCell: (rowKey: string, field: any, value: number) => onFieldChange('asset', rowKey, field, value),
+  totalAudited: () => getAssetAuditedTotal(),
+})
+
+const {
+  adjPull: liabAdjPull,
+  visible: liabBringInVisible,
+  rowOptions: liabBringInRowOptions,
+  open: openLiabBringIn,
+  apply: onLiabBringInApply,
+} = useAdjudicationBringIn({
+  projectId: toRef(props, 'projectId') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '2605',
+  direction: 'credit', // 持有待售负债（贷方）：净发生额 = 贷 − 借
+  subjectCode: '2605',
+  wpCode: 'K6',
+  subjectLabel: '持有待售负债(2605)',
+  rows: computed(() => liabSectionRows.value.map(r => ({ rowKey: r.rowKey, name: r.label, aje: r.aje, rje: r.rje }))),
+  updateCell: (rowKey: string, field: any, value: number) => onFieldChange('liability', rowKey, field, value),
+  totalAudited: () => getLiabilityAuditedTotal(),
+})
 
 // ─── Display rows (data + subtotal appended) ─────────────────────────────────
 

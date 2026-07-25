@@ -36,6 +36,25 @@
         >
           确认调整
         </el-button>
+        <el-button
+          size="small"
+          type="primary"
+          plain
+          :loading="centralSyncing"
+          :disabled="isReadonly || !adj.isBalanced.value || adj.rows.value.length === 0"
+          title="把本页调整分录汇聚到集中调整登记，供合伙人跨循环审阅"
+          @click="syncToCentral"
+        >
+          同步到集中登记
+        </el-button>
+        <el-tag
+          v-if="centralStatus?.review_status"
+          size="small"
+          :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
+          :title="centralStatus.rejection_reason || ''"
+        >
+          集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
+        </el-tag>
         <span v-if="adj.lastSyncMsg.value" class="sync-msg">{{ adj.lastSyncMsg.value }}</span>
       </div>
       <div class="toolbar-right">
@@ -260,6 +279,8 @@
 import { ref, toRef, onMounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useG11Adjustment } from '../../composables/useG11Adjustment'
+import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
+import { useAuditContext } from '@/composables/useAuditContext'
 import { useG11DetailAnalysis } from '../../composables/useG11DetailAnalysis'
 import { G11_ADJUDICATION_WRITEBACK_OPTIONS } from '../../composables/g11AccountMatch'
 import { dispatchG11OfferDisclosurePull } from '../../composables/g11DisclosureSync'
@@ -322,6 +343,28 @@ const adj = useG11Adjustment({
   auditYear: auditYearRef,
   applyAdjustmentToDetail: (byRow) => detail.applyAdjustmentByRow(byRow),
 })
+
+// ─── 同步到集中调整登记（workpaper-adjustment-centralization） ───
+const { year: centralYear } = useAuditContext()
+const { centralStatus, syncing: centralSyncing, syncToCentral, refreshStatus } = useAdjustmentCentralSync({
+  projectId,
+  year: centralYear,
+  wpId: () => props.wpId,
+  wpCode: 'G11',
+  itemId: 'G11-3-rows',
+  buildLineItems: () => adj.rows.value.map((r) => ({
+    standard_account_code: r.accountCode || undefined,
+    account_name: r.accountName,
+    report_line_code: r.reportItem || undefined,
+    debit_amount: r.debitAmount,
+    credit_amount: r.creditAmount,
+  })),
+  buildMeta: () => ({
+    description: adj.rows.value.find((r) => r.description)?.description || 'G11 投资收益调整',
+    adjustmentType: adj.rows.value.length > 0 && adj.rows.value.every((r) => r.category === '报表调整') ? 'rje' : 'aje',
+  }),
+})
+onMounted(() => refreshStatus())
 
 async function onSyncFromModule() {
   const n = await adj.syncFromAdjustmentModule()

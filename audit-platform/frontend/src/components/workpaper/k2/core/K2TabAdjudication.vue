@@ -23,6 +23,9 @@
         <div class="section-title">
           <span>K2-1 其他流动资产审定表</span>
           <div class="title-actions">
+            <el-button size="small" type="warning" plain :disabled="isReadonly" :loading="adjPull.loading.value" @click="openBringInAdjustment">
+              <el-icon><Download /></el-icon> 带入调整
+            </el-button>
             <el-button size="small" type="primary" link @click="handleAiGenerate('adj-overall')">
               <el-icon><MagicStick /></el-icon> AI说明
             </el-button>
@@ -259,8 +262,18 @@
         <li>变动率=（审定-上期审定）/ |上期审定|，上期为0则显示"-"</li>
         <li>跨Sheet验证：K2-1合计应与K2-2明细表合计一致</li>
         <li>"确认审定"将回写trial_balance(1231)并发布EventBus事件通知附注刷新</li>
+        <li>「带入调整」：按科目1231拉取调整分录，逐笔选目标分类行累加到 AJE/RJE，带入后自动联动披露/附注</li>
       </ul>
     </details>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="1231 其他流动资产"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
@@ -283,12 +296,15 @@
  * - Section标题行右侧 AI + 复核按钮
  */
 import { ref, computed, inject, toRef } from 'vue'
-import { MagicStick, CircleCheck, WarningFilled } from '@element-plus/icons-vue'
+import { MagicStick, CircleCheck, WarningFilled, Download } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
 import { eventBus } from '@/utils/eventBus'
 import { useK2Adjudication, type K2AdjRow } from '../../composables/useK2Adjudication'
 import { useK2CrossSheet } from '../../composables/useK2CrossSheet'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 
 // ─── Props / Emits ────────────────────────────────────────────────────────────
 
@@ -327,6 +343,20 @@ const {
 })
 
 const { adjudicationVsDetail } = useK2CrossSheet(allResponsesRef as any)
+
+// ─── 从集中登记带入调整（1231 其他流动资产，资产借方） ────────────────────────
+const { adjPull, visible: bringInVisible, rowOptions: bringInRowOptions, open: openBringInAdjustment, apply: onBringInApply } = useAdjudicationBringIn({
+  projectId: toRef(props, 'projectId') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '1231',
+  direction: 'debit', // 资产借方：净发生额 = 借 − 贷
+  subjectCode: '1231',
+  wpCode: 'K2',
+  subjectLabel: '其他流动资产(1231)',
+  rows: computed(() => rows.value.map(r => ({ rowKey: r.rowKey, name: r.label, aje: r.aje, rje: r.rje }))),
+  updateCell: (rowKey: string, field: any, value: number) => updateField(rowKey, field, value),
+  totalAudited: () => subtotalRow.value.audited,
+})
 
 // ─── Local State ──────────────────────────────────────────────────────────────
 

@@ -3,6 +3,8 @@
 import { ref, watch, toRef, inject, type Ref } from 'vue'
 import { useF3Adjustment } from '../composables/useF3Adjustment'
 import { useF3AiGenerate } from '../composables/useF3AiGenerate'
+import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../composables/useAdjustmentCentralSync'
+import { useAuditContext } from '@/composables/useAuditContext'
 import F3ImportExportToolbar from './F3ImportExportToolbar.vue'
 import F3SheetAttachments from './F3SheetAttachments.vue'
 import GtIndexChip from '../GtIndexChip.vue'
@@ -27,6 +29,27 @@ const { rows, debitTotal, creditTotal, balanceDiff, isBalanced, addRow, removeRo
   allResponses: toRef(props, 'allResponses') as Ref<Map<string, any>>,
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
 })
+
+// ─── 同步到集中调整登记 ─────────────────────────────────────────────
+const { year: centralYear } = useAuditContext()
+const { centralStatus, syncing: centralSyncing, syncToCentral, refreshStatus } = useAdjustmentCentralSync({
+  projectId: () => props.projectId,
+  year: centralYear,
+  wpId: () => props.wpId,
+  wpCode: 'F3',
+  itemId: 'F3-3-rows',
+  buildLineItems: () => rows.value.map((r) => ({
+    standard_account_code: r.accountCode || undefined,
+    account_name: r.accountName || undefined,
+    debit_amount: r.debitAmount,
+    credit_amount: r.creditAmount,
+  })),
+  buildMeta: () => ({
+    description: rows.value.find((r) => r.summary)?.summary || 'F3 应付票据调整',
+    adjustmentType: rows.value.length > 0 && rows.value.every((r) => r.entryType === 'RJE') ? 'rje' : 'aje',
+  }),
+})
+refreshStatus()
 
 const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF3AiGenerate(
   toRef(props, 'wpId') as Ref<string>,
@@ -95,6 +118,21 @@ async function runAdjAi(section: 'adjustment-note' | 'adjustment-conclusion'): P
     <div class="tab-toolbar">
       <div class="toolbar-left">
         <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">+ 新增分录</el-button>
+        <el-button
+          size="small"
+          type="primary"
+          plain
+          :loading="centralSyncing"
+          :disabled="isReadonly || !isBalanced || rows.length === 0"
+          @click="syncToCentral"
+          title="把本页调整分录汇聚到集中调整登记，供合伙人跨循环审阅"
+        >同步到集中登记</el-button>
+        <el-tag
+          v-if="centralStatus?.review_status"
+          size="small"
+          :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
+          :title="centralStatus.rejection_reason || ''"
+        >集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}</el-tag>
       </div>
       <div class="toolbar-right">
         <F3ImportExportToolbar :wp-id="wpId" :project-id="projectId" sheet="F3-3" :disabled="isReadonly" @imported="onImported" />

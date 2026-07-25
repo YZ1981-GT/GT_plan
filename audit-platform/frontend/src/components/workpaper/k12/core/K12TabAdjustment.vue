@@ -29,6 +29,25 @@
         >
           保存并发布
         </el-button>
+        <el-button
+          size="small"
+          type="primary"
+          plain
+          :loading="centralSyncing"
+          :disabled="props.isReadonly || !adjustment.currentBalance.value.isBalanced || adjustment.filteredEntries.value.length === 0"
+          @click="syncToCentral"
+          title="把本页调整分录汇聚到集中调整登记，供合伙人跨循环审阅"
+        >
+          同步到集中登记
+        </el-button>
+        <el-tag
+          v-if="centralStatus?.review_status"
+          size="small"
+          :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
+          :title="centralStatus.rejection_reason || ''"
+        >
+          集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
+        </el-tag>
       </div>
     </div>
 
@@ -245,6 +264,8 @@ import { useK12FormData } from '../../composables/useK12FormData'
 import { useK12Adjustment } from '../../composables/useK12Adjustment'
 import { generateK12AiText } from '../../composables/useK12AiText'
 import { eventBus } from '@/utils/eventBus'
+import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
+import { useAuditContext } from '@/composables/useAuditContext'
 
 const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
 const GtReviewTrigger = defineAsyncComponent(() => import('../../GtReviewTrigger.vue'))
@@ -272,6 +293,26 @@ const formData = useK12FormData({
 })
 
 const adjustment = useK12Adjustment(formData)
+
+// ─── 同步到集中调整登记（workpaper-adjustment-centralization） ──────────
+const { year: auditYear } = useAuditContext()
+const { centralStatus, syncing: centralSyncing, syncToCentral, refreshStatus } = useAdjustmentCentralSync({
+  projectId: () => props.projectId,
+  year: auditYear,
+  wpId: () => props.wpId,
+  wpCode: 'K12',
+  itemId: () => `K12-adj-${adjustment.activeType.value}`,
+  buildLineItems: () => adjustment.filteredEntries.value.map(e => ({
+    standard_account_code: e.accountCode || undefined,
+    account_name: e.accountName,
+    debit_amount: e.debitAmount,
+    credit_amount: e.creditAmount,
+  })),
+  buildMeta: () => ({
+    description: adjustment.filteredEntries.value.find(e => e.description)?.description || 'K12 营业外收入调整',
+    adjustmentType: adjustment.activeType.value === 'RJE' ? 'rje' : 'aje',
+  }),
+})
 
 // ─── UI State ────────────────────────────────────────────────────────────────
 
@@ -384,6 +425,7 @@ async function handleAI(_section: string): Promise<void> {
 onMounted(async () => {
   await formData.selfLoad()
   adjustment.restoreEntries()
+  refreshStatus()
 })
 </script>
 

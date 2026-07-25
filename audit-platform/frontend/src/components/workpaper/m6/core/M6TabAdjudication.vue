@@ -1,6 +1,6 @@
 <template>
   <div class="m6-tab-adjudication">
-    <!-- ═══ 标题 + DualMode + AI/复核 ═══ -->
+    <!-- ═══ 标题 + AI/复核 ═══ -->
     <div class="section-header">
       <div class="section-header-left">
         <el-button text size="small" @click="$emit('navigate', '底稿目录')">← 返回目录</el-button>
@@ -10,13 +10,10 @@
         </el-tag>
       </div>
       <div class="section-header-right">
-        <el-segmented
-          v-model="dualMode.mode.value"
-          :options="dualMode.modeOptions.value"
-          size="small"
-          @change="(val: any) => dualMode.switchMode(val)"
-        />
-        <el-button size="small" @click="handleAI('adjudication')">
+        <el-button size="small" type="primary" plain :loading="adjPull.loading.value" :disabled="isReadonly" @click="openBringInAdjustment">
+          <el-icon><Download /></el-icon> 带入调整
+        </el-button>
+        <el-button size="small" :loading="aiLoading === 'adjudication'" :disabled="isReadonly" @click="handleAI('adjudication')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
         <el-button size="small" @click="handleReview">
@@ -297,7 +294,7 @@
       <template #header>
         <div class="section-header">
           <span class="card-title">原因分析及审计说明</span>
-          <el-button size="small" @click="handleAI('auditNote')">
+          <el-button size="small" :loading="aiLoading === 'auditNote'" :disabled="isReadonly" @click="handleAI('auditNote')">
             <el-icon><MagicStick /></el-icon> AI辅助
           </el-button>
         </div>
@@ -324,8 +321,18 @@
         <li>审定数 = 未审数 + AJE（账项调整） + RJE（重分类调整）</li>
         <li>审定数变化自动回写 TB（科目 4104）并通知 M5/M1 联动组件</li>
         <li>合计行应与明细表 M6-2 的期末未分配利润一致（交叉验证）</li>
+        <li>「带入调整」：从集中登记按科目 4104 拉取调整分录，逐笔分配到各利润分配项目行的 AJE/RJE，带入后审定数自动更新并联动附注</li>
       </ul>
     </details>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="4104 未分配利润"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
@@ -341,24 +348,28 @@
  * 与M6-2明细交叉验证
  */
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
-import { ElMessageBox } from 'element-plus'
-import { MagicStick, Check } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { MagicStick, Check, Download } from '@element-plus/icons-vue'
 import { useM6FormData } from '../../composables/useM6FormData'
-import { useM6DualMode } from '../../composables/useM6DualMode'
 import {
   useM6Adjudication,
   type M6AdjudicationRow,
 } from '../../composables/useM6Adjudication'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import { useAuditContext } from '@/composables/useAuditContext'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import { eventBus } from '@/utils/eventBus'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{ wpId: string; projectId: string; isReadonly: boolean }>()
 const emit = defineEmits<{ (e: 'navigate', sheetName: string): void; (e: 'save'): void }>()
 
 const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', () => {})
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
 
 const formData = useM6FormData({ wpId: computed(() => props.wpId), projectId: computed(() => props.projectId) })
-const dualMode = useM6DualMode({ wpId: computed(() => props.wpId) })
 const rows = ref<M6AdjudicationRow[]>([])
 
 const {
@@ -366,6 +377,38 @@ const {
   addRow, removeRow, updateRow: composableUpdateRow, saveAndWriteback,
   subscribeDisclosure,
 } = useM6Adjudication(formData, rows)
+
+// ─── 从集中登记带入调整（4104 未分配利润，权益贷方；单期 aje/rje，利润分配项目行） ───
+const bringInRows = computed(() =>
+  computedRows.value.map((r) => ({
+    rowKey: r.key,
+    name: r.itemName || '利润分配项目',
+    aje: r.aje ?? 0,
+    rje: r.rje ?? 0,
+  })),
+)
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: computed(() => props.projectId) as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '4104',
+  direction: 'credit',
+  subjectCode: '4104',
+  wpCode: 'M6',
+  subjectLabel: '未分配利润(4104)',
+  rows: bringInRows,
+  updateCell: (rowKey: string, field: any, value: number) => {
+    const idx = rows.value.findIndex((r) => r.key === rowKey)
+    if (idx < 0) return
+    composableUpdateRow(idx, field === 'aje' ? 'aje' : 'rje', value)
+  },
+  totalAudited: () => totalRow.value.audited,
+})
 
 // ─── 表格数据：数据行 + 合计行 ──────────────────────────────────────────────
 interface TableRow extends M6AdjudicationRow { _rowType?: 'data' | 'total' }
@@ -440,7 +483,30 @@ function saveAuditNote() {
   formData.debouncedSave('M6-1-auditNote', { remark: auditNote.value || null })
 }
 
-function handleAI(_section: string) { /* AI钩子 */ }
+async function handleAI(section: string) {
+  if (props.isReadonly) return
+  aiLoading.value = section
+  try {
+    const context: Record<string, string> = {
+      科目: '4104 利润分配-未分配利润 / 审定表（M6-1，权益类贷方）',
+      合计期初: fmtAmount(totalRow.value.beginning),
+      合计贷方发生: fmtAmount(totalRow.value.creditAmount),
+      合计借方发生: fmtAmount(totalRow.value.debitAmount),
+      合计期末: fmtAmount(totalRow.value.endBalance),
+      合计未审: fmtAmount(totalRow.value.unadjusted),
+      合计AJE: fmtAmount(totalRow.value.aje),
+      合计RJE: fmtAmount(totalRow.value.rje),
+      合计审定: fmtAmount(totalRow.value.audited),
+      与试算表差异: fmtAmount(totalRow.value.tbDiff),
+      变动率: (totalChangeRate.value * 100).toFixed(1) + '%',
+      项目数: String(computedRows.value.length),
+    }
+    const text = await generateAiText({ section: `m6-adjudication-${section}`, context, existingContent: auditNote.value })
+    if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+    auditNote.value = text
+    saveAuditNote()
+  } catch { ElMessage.warning('AI 生成失败，请稍后重试') } finally { aiLoading.value = '' }
+}
 function handleReview() { openReviewDialog?.('M6-1-adjudication', '未分配利润审定表') }
 
 // ─── EventBus ────────────────────────────────────────────────────────────────

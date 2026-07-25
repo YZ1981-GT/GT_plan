@@ -10,7 +10,7 @@ export {
   trialBalance, adjustments, materiality, misstatements,
   sampling, aging, ledger, accountChart, accountMapping,
   reportLineMapping, columnMappings, dataLifecycle, importIntelligence,
-  ledgerImportValidationRules, tAccounts, formula, formulaAuditLog, dataValidation, fineChecks,
+  ledgerImportValidationRules, tAccounts, formula, formulaAuditLog, dataValidation, fineChecks, auditChecks,
 } from './accounting'
 
 export {
@@ -55,7 +55,7 @@ import {
   trialBalance, adjustments, materiality, misstatements,
   sampling, aging, ledger, accountChart, accountMapping,
   reportLineMapping, columnMappings, dataLifecycle, importIntelligence,
-  ledgerImportValidationRules, tAccounts, formula, formulaAuditLog, dataValidation, fineChecks,
+  ledgerImportValidationRules, tAccounts, formula, formulaAuditLog, dataValidation, fineChecks, auditChecks,
 } from './accounting'
 import {
   reports, reportConfig, reportMapping, noteTemplates, noteCustomTemplate, consolNoteSections,
@@ -102,7 +102,7 @@ export const API = {
   attachments, ledger, tAccounts, sharedConfig, customTemplates,
   templateLibrary, reportFormatTemplates, excelHtml, importIntelligence,
   addressRegistry, workHours, workHourEntries, aging, regulatory, aiPlugins, gtCoding,
-  dataValidation, fineChecks, projectIssues, ledgerImportValidationRules,
+  dataValidation, fineChecks, auditChecks, projectIssues, ledgerImportValidationRules,
   accountChart, accountMapping, reportLineMapping, columnMappings, dataLifecycle, independenceDeclarations,
   admin, my, partner, qcDashboard, qcRules, qcInspections, qcCases,
   qcAnnualReports, qcAuditLogCompliance, qcArchiveReadiness,

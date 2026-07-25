@@ -3,6 +3,9 @@
     <div class="g9-toolbar tab-toolbar">
       <h3 class="g9-title">G9-1 其他非流动金融资产审定表</h3>
       <div class="g9-actions">
+        <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
+          <el-icon><Download /></el-icon>带入调整
+        </el-button>
         <GtIndexChip value="wp:G9-1" />
         <el-tag size="small" type="info">共 {{ adjRowCount }} 行</el-tag>
         <GtReviewTrigger section-id="G9-1-adjudication" />
@@ -27,6 +30,7 @@
         <p><b>公式：</b>审定数 = 未审 + AJE + RJE；变动额 = 期末审定 − 期初审定；变动率 = 变动额 / 期初审定。</p>
         <p><b>分析要求：</b>|变动率|&gt;20% 时原因分析必填；审计说明中对 |变动率|&gt;30% 的项目重点说明增减原因（对齐模板「审计说明」）。</p>
         <p><b>交易性判定（编制说明）：</b>近期出售或回购、集中管理且存在短期获利模式、衍生工具（财务担保合同及有效套期工具除外）。持有方判断权益工具投资时遵循 CAS 22 / CAS 37。</p>
+        <p><b>带入调整：</b>可从集中登记按科目 1519 拉取调整分录，逐笔分配到各分组行的期末账项(AJE)/重分类(RJE)调整，带入后审定数自动更新并联动附注。</p>
       </div>
     </details>
 
@@ -234,17 +238,30 @@
       note-hint="覆盖分组审定、TB 勾稽、AJE/RJE 影响及重大波动原因。"
       :related-context="{ 行数: adjRowCount, TB差异: adj.variance.value, 变动额: adj.totalRow.value.changeAmount }"
     />
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="1519 其他非流动金融资产"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, toRef, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Download } from '@element-plus/icons-vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import GtReviewDot from '../../GtReviewDot.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import G9AuditTextCards from '../G9AuditTextCards.vue'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import { useG9Adjudication } from '../../composables/useG9Adjudication'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import { useAuditContext } from '@/composables/useAuditContext'
 import { G9_ADJUDICATION_ITEMS, G9_GROUP_LABELS, G9_ACCOUNT_ALIASES } from '../../composables/g9Constants'
 import { g9AccountLabel } from '../../composables/g9AccountMatch'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
@@ -265,6 +282,30 @@ const adj = useG9Adjudication({
   allResponses: computed(() => props.allResponses),
   debouncedSave: props.debouncedSave,
   isReadonly: computed(() => props.isReadonly),
+})
+
+// ─── 从集中登记带入调整（1519 其他非流动金融资产，资产借方；带入期末 AJE/RJE） ───
+const bringInRows = computed(() =>
+  adj.dataRows.value.map((r) => ({ rowKey: r.rowKey, name: r.label, aje: r.closingAJE, rje: r.closingRJE })),
+)
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: toRef(props, 'projectId') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '1519',
+  direction: 'debit',
+  subjectCode: '1519',
+  wpCode: 'G9',
+  subjectLabel: '其他非流动金融资产(1519)',
+  rows: bringInRows,
+  updateCell: (rowKey: string, field: any, value: number) =>
+    adj.updateField(rowKey, field === 'rje' ? 'closingRJE' : 'closingAJE', value),
+  totalAudited: () => adj.totalRow.value.closingAdjusted,
 })
 
 const noteProxy = computed({

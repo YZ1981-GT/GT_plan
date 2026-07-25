@@ -11,6 +11,8 @@ import { ref, reactive, computed, inject, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { GenerateWorkpaperAiText } from '../composables/useWorkpaperScaffold'
 import GtIndexChip from '../GtIndexChip.vue'
+import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '@/components/workpaper/composables/useAdjustmentCentralSync'
+import { useAuditContext } from '@/composables/useAuditContext'
 
 interface RespItem { item_id: string; conclusion: string | null; remark: string | null }
 const props = defineProps<{
@@ -48,6 +50,32 @@ const totalDebit = computed(() => entries.reduce((s, e) => s + n(e.debitAmount),
 const totalCredit = computed(() => entries.reduce((s, e) => s + n(e.creditAmount), 0))
 const isBalanced = computed(() => Math.abs(totalDebit.value - totalCredit.value) < 0.01)
 const balanceDiff = computed(() => totalDebit.value - totalCredit.value)
+
+// ── 同步到集中登记 ────────────────────────────────────────────────────────────
+const { year: auditYear } = useAuditContext()
+const {
+  centralStatus,
+  syncing: centralSyncing,
+  syncToCentral,
+  refreshStatus,
+} = useAdjustmentCentralSync({
+  projectId: () => props.projectId,
+  year: auditYear,
+  wpId: () => props.wpId,
+  wpCode: 'J2',
+  itemId: 'J2-3-entries',
+  buildLineItems: () => entries.map((e) => ({
+    account_name: e.accountName,
+    report_line_code: e.reportItem || undefined,
+    debit_amount: e.debitAmount,
+    credit_amount: e.creditAmount,
+  })),
+  buildMeta: () => ({
+    description: entries.find((e) => e.description)?.description || 'J2 调整',
+    adjustmentType: entries.every((e) => e.category === '报表调整') ? 'rje' : 'aje',
+  }),
+})
+void refreshStatus()
 
 function addEntry() {
   if (isReadonly.value) return
@@ -155,6 +183,25 @@ watch(() => props.allResponses, load, { deep: false })
         <span class="balance-item">贷方合计：<strong>{{ fmt(totalCredit) }}</strong></span>
         <el-tag v-if="isBalanced" type="success" size="small">借贷平衡</el-tag>
         <el-tag v-else type="danger" size="small">不平衡 差异{{ fmt(balanceDiff) }}</el-tag>
+        <el-button
+          size="small"
+          type="primary"
+          plain
+          :loading="centralSyncing"
+          :disabled="isReadonly || !isBalanced || entries.length === 0"
+          title="把本页调整分录汇聚到集中调整登记，供合伙人跨循环审阅"
+          @click="syncToCentral"
+        >
+          同步到集中登记
+        </el-button>
+        <el-tag
+          v-if="centralStatus?.review_status"
+          size="small"
+          :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
+          :title="centralStatus.rejection_reason || ''"
+        >
+          集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
+        </el-tag>
       </div>
     </div>
 

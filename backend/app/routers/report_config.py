@@ -657,3 +657,97 @@ async def execute_formulas_batch(
         pass  # 日志记录失败不影响主流程
 
     return {"results": results, "row_values": {k: float(v) for k, v in row_values.items()}}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 试算表「科目明细」公式（tb_detail）项目级覆盖 + 自定义新增
+#
+# 背景：公式管理中心「试算平衡表 > 科目明细」节点原为按科目动态生成
+# TB('科目','期末余额') 只读预设，无法二次编辑/新增，预设不对时无从修正。
+# 现改为：默认预设仍自动生成（分类=自动运算），但支持用户覆盖某科目公式、
+# 或新增自定义公式行，持久化到 project.wizard_state.tb_detail_formulas。
+#
+# 复用 aging_config 的 wizard_state JSONB 项目级存储范式（无新表/迁移）。
+# ─────────────────────────────────────────────────────────────────────────────
+
+from pydantic import BaseModel as _TbBaseModel  # noqa: E402
+from app.models.core import Project as _TbProject  # noqa: E402
+
+
+class TbDetailFormulaItem(_TbBaseModel):
+    row_code: str
+    row_name: str | None = None
+    formula: str | None = None
+    # 用户要求：分类默认为自动运算类型
+    formula_category: str | None = "auto_calc"
+    formula_description: str | None = None
+
+
+class TbDetailFormulasPayload(_TbBaseModel):
+    # overrides：科目编码 → 覆盖项（覆盖默认 TB() 预设）
+    overrides: dict[str, TbDetailFormulaItem] = {}
+    # added：用户新增的自定义公式行
+    added: list[TbDetailFormulaItem] = []
+
+
+async def _tb_get_project_or_404(db: AsyncSession, project_id: UUID) -> _TbProject:
+    result = await db.execute(select(_TbProject).where(_TbProject.id == project_id))
+    project = result.scalar_one_or_none()
+    if project is None:
+        raise HTTPException(status_code=404, detail="项目不存在")
+    return project
+
+
+@router.get("/tb-detail-formulas/{project_id}")
+async def get_tb_detail_formulas(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """读取试算表科目明细公式的项目级覆盖 + 自定义新增。
+
+    返回 {overrides: {code: {...}}, added: [{...}]}；无配置时返回空结构。
+    """
+    project = await _tb_get_project_or_404(db, project_id)
+    ws = project.wizard_state or {}
+    cfg = ws.get("tb_detail_formulas") or {}
+    return {
+        "overrides": cfg.get("overrides") or {},
+        "added": cfg.get("added") or [],
+    }
+
+
+@router.put("/tb-detail-formulas/{project_id}")
+async def save_tb_detail_formulas(
+    project_id: UUID,
+    body: TbDetailFormulasPayload,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(
+        require_role(["admin", "partner", "signing_partner", "manager"])
+    ),
+):
+    """保存试算表科目明细公式覆盖 + 自定义新增到 wizard_state.tb_detail_formulas。
+
+    铁律：合并写入 wizard_state（不覆盖其他字段）。
+    """
+    from sqlalchemy.orm.attributes import flag_modified
+
+    project = await _tb_get_project_or_404(db, project_id)
+
+    overrides = {
+        code: item.model_dump() for code, item in (body.overrides or {}).items()
+    }
+    added = [item.model_dump() for item in (body.added or [])]
+
+    ws = dict(project.wizard_state) if project.wizard_state else {}
+    ws["tb_detail_formulas"] = {"overrides": overrides, "added": added}
+    project.wizard_state = ws
+    flag_modified(project, "wizard_state")
+
+    await db.flush()
+    await db.commit()
+    return {
+        "overrides": overrides,
+        "added": added,
+        "message": "科目明细公式已保存",
+    }

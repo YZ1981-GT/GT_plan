@@ -125,6 +125,12 @@
       </el-table-column>
       <el-table-column prop="affected_account_code" label="科目编码" width="120" />
       <el-table-column prop="affected_account_name" label="科目名称" width="140" show-overflow-tooltip />
+      <el-table-column label="来源底稿" width="110" align="center">
+        <template #default="{ row }">
+          <el-tag v-if="row.source_wp_code" size="small" type="info">{{ row.source_wp_code }}</el-tag>
+          <span v-else style="color: var(--gt-color-text-placeholder, #c0c4cc)">—</span>
+        </template>
+      </el-table-column>
       <el-table-column label="金额" width="130" align="right">
         <template #default="{ row }">
           <GtAmountCell :value="row.misstatement_amount" :clickable="true" @click="penetrate.toLedger(row.affected_account_code)" />

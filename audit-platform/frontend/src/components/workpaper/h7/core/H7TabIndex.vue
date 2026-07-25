@@ -1,5 +1,18 @@
 <template>
   <div class="h7-tab-index">
+    <!-- E1 标准加法式增强：目录卡 + 结论看板 + 本循环 grid -->
+    <GtCycleDirExtras
+      wp-code="H7"
+      cycle-letter="H"
+      :wp-id="props.wpId"
+      :project-id="props.projectId"
+      :all-responses="props.allResponses"
+      :sheets="dirSheets"
+      @navigate="onDirNavigate"
+      @open-handbook="openHandbook"
+    />
+    <H7PreparationHandbookDialog v-model="handbookVisible" :initial-tab="handbookTab" />
+
     <!-- 行业标识 + 计量模式 -->
     <div class="h7-index-header">
       <el-tag type="success" size="small">
@@ -57,9 +70,12 @@
  * Spec: .kiro/specs/h7-biological-assets/ Task 4.1
  * Requirements: 1.2
  */
-import { computed } from 'vue'
+import { computed, ref, defineAsyncComponent } from 'vue'
 import { Check, Close } from '@element-plus/icons-vue'
 import { useH7MeasurementModel, type MeasurementModelType } from '../../composables/useH7MeasurementModel'
+
+const GtCycleDirExtras = defineAsyncComponent(() => import('../../GtCycleDirExtras.vue'))
+const H7PreparationHandbookDialog = defineAsyncComponent(() => import('../H7PreparationHandbookDialog.vue'))
 
 const props = defineProps<{
   wpId: string
@@ -73,6 +89,27 @@ const props = defineProps<{
 const emit = defineEmits<{
   'navigate-sheet': [sheetName: string]
 }>()
+
+// ─── E1 标准加法式增强：目录卡 + 结论看板 + 本循环 grid（GtCycleDirExtras） ───
+const dirSheets = computed(() => {
+  const seen = new Set<string>()
+  const out: { code: string; navValue: string; name: string }[] = []
+  for (const s of ALL_SHEETS) {
+    if (seen.has(s.code)) continue
+    seen.add(s.code)
+    out.push({ code: s.code, navValue: s.sheetName, name: s.name })
+  }
+  return out
+})
+function onDirNavigate(navValue: string) {
+  emit('navigate-sheet', navValue)
+}
+const handbookVisible = ref(false)
+const handbookTab = ref<'preparation' | 'usage'>('preparation')
+function openHandbook(tab: 'preparation' | 'usage') {
+  handbookTab.value = tab
+  handbookVisible.value = true
+}
 
 const industryLabel = computed(() => {
   const map: Record<string, string> = {

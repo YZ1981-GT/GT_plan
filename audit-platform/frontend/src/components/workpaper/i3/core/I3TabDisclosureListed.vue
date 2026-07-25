@@ -15,6 +15,7 @@
           :disabled="isReadonly || !projectId"
           @click="syncToNotes"
         >同步到附注</el-button>
+        <el-button size="small" type="primary" plain :disabled="!projectId" @click="jumpToNote('listed')">↩ 跳转回附注</el-button>
         <el-button size="small" type="default" text @click="handleReview('disc-listed')">💬复核</el-button>
       </div>
     </div>
@@ -489,6 +490,8 @@
 <script setup lang="ts">
 import { ref, computed, inject, toRef, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useRouter } from 'vue-router'
+import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
 import GtIndexChip from '../../GtIndexChip.vue'
@@ -515,6 +518,13 @@ const emit = defineEmits<{
 }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const router = useRouter()
+// 跳转回附注模块（披露表 → 附注为单向推送；此处仅导航，方便相互编辑确认）
+function jumpToNote(target: DisclosureVariant): void {
+  const route = buildNoteJumpRoute(props.projectId || '', 'I3', target)
+  if (!route) { ElMessage.warning('未找到对应的附注章节'); return }
+  router.push(route)
+}
 const allResponsesRef = computed(() => props.allResponses)
 const noteTarget = resolveI3NoteSectionTarget('listed')
 const isSyncing = ref(false)

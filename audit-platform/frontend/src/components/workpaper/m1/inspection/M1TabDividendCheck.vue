@@ -212,7 +212,7 @@
       <template #header>
         <div class="card-header-row">
           <span class="card-title">四、审计说明 — 检查比例</span>
-          <el-button size="small" @click="handleAiGenerate"><el-icon><MagicStick /></el-icon> AI辅助</el-button>
+          <el-button size="small" :loading="aiLoading" :disabled="isReadonly" @click="handleAiGenerate"><el-icon><MagicStick /></el-icon> AI辅助</el-button>
         </div>
       </template>
       <el-table :data="m1CheckRatios" border size="small" class="ratio-table">
@@ -289,8 +289,10 @@
  */
 import { ref, computed, inject, onMounted, onUnmounted, reactive, defineAsyncComponent } from 'vue'
 import { MagicStick, Setting } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import { useK1VoucherCheck, type K1VoucherRow } from '../../composables/useK1VoucherCheck'
 import { useM1FormData } from '../../composables/useM1FormData'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import { eventBus } from '@/utils/eventBus'
 
 const GtVoucherSamplingEngine = defineAsyncComponent(() => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'))
@@ -307,6 +309,7 @@ const emit = defineEmits<{
 }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
 const isReadonly = computed(() => props.isReadonly)
 const year = computed(() => props.year ?? new Date().getFullYear())
 
@@ -478,35 +481,24 @@ function abnormalRowClass({ row }: { row: K1VoucherRow }): string {
   return row.abnormal ? 'abnormal-row' : ''
 }
 
-function handleAiGenerate() {
+async function handleAiGenerate() {
+  if (isReadonly.value) return
   aiLoading.value = true
-  import('@/utils/http').then(async ({ default: h }) => {
-    try {
-      const res = await h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
-        section: 'm1-6-voucher-check',
-        prompt: '请基于应付股利凭证检查表数据，分析检查比例和异常凭证，给出审计建议',
-        context: {
-          section: 'm1-6-voucher-check',
-          wpId: String(props.wpId),
-          occurrenceCount: String(occurrenceRows.value.length),
-          debitChecked: String(occurrenceDebitChecked.value),
-          creditChecked: String(occurrenceCreditChecked.value),
-          abnormalCount: String(abnormalRows.value.length),
-          debitCoverage: String(debitCoveragePercent.value.toFixed(1)),
-          creditCoverage: String(creditCoveragePercent.value.toFixed(1)),
-        },
-      })
-      const content = res?.data?.content || res?.content || ''
-      if (content && !auditNote.value) {
-        auditNote.value = content
-        persist()
-      }
-    } catch {
-      // AI生成失败静默
-    } finally {
-      aiLoading.value = false
+  try {
+    const context: Record<string, string> = {
+      科目: '2232 应付股利 / 凭证检查表（M1-6）',
+      凭证笔数: String(occurrenceRows.value.length),
+      本期借方检查: fmtAmt(occurrenceDebitChecked.value),
+      本期贷方检查: fmtAmt(occurrenceCreditChecked.value),
+      异常笔数: String(abnormalRows.value.length),
+      借方覆盖率: debitCoveragePercent.value.toFixed(1) + '%',
+      贷方覆盖率: creditCoveragePercent.value.toFixed(1) + '%',
     }
-  })
+    const text = await generateAiText({ section: 'm1-6-voucher-check', context, existingContent: auditNote.value })
+    if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+    auditNote.value = text
+    persist()
+  } catch { ElMessage.warning('AI 生成失败，请稍后重试') } finally { aiLoading.value = false }
 }
 
 function handleReview() { openReviewDialog('M1-6-voucher-check') }

@@ -63,6 +63,8 @@ class UnadjustedMisstatementService:
             misstatement_type=data.misstatement_type,
             management_reason=data.management_reason,
             auditor_evaluation=data.auditor_evaluation,
+            # 溯源：底稿推送错报时携带来源底稿编码（A13 反查来源）
+            source_wp_code=data.source_wp_code,
             created_by=created_by,
         )
         # F50 / Sprint 8.19: 错报创建时绑定当前 active dataset
@@ -559,6 +561,7 @@ class UnadjustedMisstatementService:
             misstatement_type=row.misstatement_type,
             management_reason=row.management_reason,
             auditor_evaluation=row.auditor_evaluation,
+            source_wp_code=getattr(row, "source_wp_code", None),
             is_carried_forward=row.is_carried_forward,
             prior_year_id=row.prior_year_id,
             created_by=row.created_by,

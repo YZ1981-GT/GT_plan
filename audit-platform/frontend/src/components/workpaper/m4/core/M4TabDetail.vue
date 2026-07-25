@@ -10,12 +10,6 @@
         </el-tag>
       </div>
       <div class="section-header-right">
-        <el-segmented
-          v-model="dualMode.mode.value"
-          :options="dualMode.modeOptions.value"
-          size="small"
-          @change="(val: any) => dualMode.switchMode(val)"
-        />
         <!-- 导入导出三级 el-dropdown -->
         <el-dropdown trigger="click" @command="handleImportExportCommand">
           <el-button size="small">
@@ -29,7 +23,7 @@
             </el-dropdown-menu>
           </template>
         </el-dropdown>
-        <el-button size="small" @click="handleAI('detail')">
+        <el-button size="small" :loading="aiLoading === 'detail'" @click="handleAI('detail')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
         <el-button size="small" @click="handleReview">
@@ -328,7 +322,7 @@
       <template #header>
         <div class="section-header">
           <span class="card-title">审计说明</span>
-          <el-button size="small" @click="handleAI('detailNote')">
+          <el-button size="small" :loading="aiLoading === 'detailNote'" @click="handleAI('detailNote')">
             <el-icon><MagicStick /></el-icon> AI辅助
           </el-button>
         </div>
@@ -387,13 +381,14 @@
  * - 公式列：虚线下划线 + cursor:help + tooltip来源
  * - 表格字体13px
  *
- * Uses: useM4Detail + useM4FormData + useM4ImportExport + useM4DualMode
+ * Uses: useM4Detail + useM4FormData + useM4ImportExport
+ * 双模式(HTML/OO)由入口 GtM4CapitalReserve 统一承载（useM4EntryDualMode）
  */
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { MagicStick, Check, Plus, ArrowDown } from '@element-plus/icons-vue'
 import { useM4FormData } from '../../composables/useM4FormData'
-import { useM4DualMode } from '../../composables/useM4DualMode'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import { useM4ImportExport } from '../../composables/useM4ImportExport'
 import {
   useM4Detail,
@@ -421,18 +416,14 @@ const emit = defineEmits<{
 // ─── Inject ──────────────────────────────────────────────────────────────────
 
 const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', () => {})
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
 
 // ─── FormData ────────────────────────────────────────────────────────────────
 
 const formData = useM4FormData({
   wpId: computed(() => props.wpId),
   projectId: computed(() => props.projectId),
-})
-
-// ─── DualMode ────────────────────────────────────────────────────────────────
-
-const dualMode = useM4DualMode({
-  wpId: computed(() => props.wpId),
 })
 
 // ─── ImportExport ────────────────────────────────────────────────────────────
@@ -655,8 +646,31 @@ function saveAuditNote(): void {
   formData.debouncedSave('M4-M4-2-auditNote', { remark: auditNote.value || null })
 }
 
-function handleAI(_section: string): void {
-  // AI辅助钩子（集成时实现）
+async function handleAI(section: string): Promise<void> {
+  if (props.isReadonly) return
+  aiLoading.value = section
+  try {
+    const context: Record<string, string> = {
+      科目: '4002 资本公积（权益类贷方）',
+      当前区段: activeSegmentLabel.value,
+      当前区段小计审定期末: fmtAmount(activeSubtotal.value.auditedEnd),
+      资本溢价小计审定期末: fmtAmount(premiumSubtotal.value.auditedEnd),
+      其他资本公积小计审定期末: fmtAmount(otherSubtotal.value.auditedEnd),
+      合计审定期末: fmtAmount(grandTotal.value.auditedEnd),
+    }
+    const existing = auditNote.value
+    const text = await generateAiText({ section: `m4-detail-${section}`, context, existingContent: existing })
+    if (!text) {
+      ElMessage.warning('AI 未生成内容，请稍后重试')
+      return
+    }
+    auditNote.value = text
+    saveAuditNote()
+  } catch {
+    ElMessage.warning('AI 生成失败，请稍后重试')
+  } finally {
+    aiLoading.value = ''
+  }
 }
 
 function handleReview(): void {

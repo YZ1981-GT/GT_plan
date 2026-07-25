@@ -7,7 +7,7 @@
       :closable="false"
       show-icon
     >
-      回函率 {{ (coverage?.reply_coverage ?? 0).toFixed(1) }}%，低于80%，证据可能不足
+      回函覆盖率 {{ (coverage?.reply_coverage ?? 0).toFixed(1) }}%，低于80%，证据可能不足
     </el-alert>
     <el-alert
       v-else-if="coverage?.warn_level === 'warn'"
@@ -17,10 +17,19 @@
     >
       函证覆盖率 {{ (coverage?.confirmation_coverage ?? 0).toFixed(1) }}%，低于50%，请关注
     </el-alert>
+    <!-- population 缺失：函证覆盖率未参与预警 -->
+    <el-alert
+      v-if="coverage && coverage.population_available === false"
+      type="info"
+      :closable="false"
+      show-icon
+    >
+      函证覆盖率因缺科目总体金额（试算表审定总额）未参与预警，当前预警仅基于回函覆盖率
+    </el-alert>
 
     <!-- 覆盖率进度 -->
     <div class="confirmation-dashboard__rates">
-      <el-tooltip content="回函覆盖率 = 已收到回函金额 / 函证发出总金额 × 100%（建议 ≥ 80%）" placement="top">
+      <el-tooltip content="回函覆盖率 = 已回函笔数 / 已发函笔数 × 100%（建议 ≥ 80%）" placement="top">
         <div class="confirmation-dashboard__rate-item">
           <span>回函覆盖率</span>
           <el-progress
@@ -29,13 +38,26 @@
           />
         </div>
       </el-tooltip>
-      <el-tooltip content="函证覆盖率 = 函证发出金额 / 科目总体金额 × 100%（建议 ≥ 50%）" placement="top">
+      <el-tooltip content="函证覆盖率 = 发函总额 / 科目审定总额(TB) × 100%（建议 ≥ 50%）" placement="top">
         <div class="confirmation-dashboard__rate-item">
           <span>函证覆盖率</span>
           <el-progress
-            :percentage="Math.min(coverage?.confirmation_coverage ?? 0, 100)"
-            :color="rateColor(coverage?.confirmation_coverage ?? 0, 50)"
+            v-if="coverage?.population_available && coverage?.confirmation_coverage != null"
+            :percentage="Math.min(coverage.confirmation_coverage, 100)"
+            :color="rateColor(coverage.confirmation_coverage, 50)"
           />
+          <span v-else class="confirmation-dashboard__na">需科目总体金额（TB）</span>
+        </div>
+      </el-tooltip>
+      <el-tooltip content="确认覆盖率 =（回函确认 + 替代确认金额）/ 科目审定总额(TB) × 100%" placement="top">
+        <div class="confirmation-dashboard__rate-item">
+          <span>确认覆盖率</span>
+          <el-progress
+            v-if="coverage?.population_available && coverage?.confirmed_coverage != null"
+            :percentage="Math.min(coverage.confirmed_coverage, 100)"
+            :color="rateColor(coverage.confirmed_coverage, 50)"
+          />
+          <span v-else class="confirmation-dashboard__na">需科目总体金额（TB）</span>
         </div>
       </el-tooltip>
     </div>
@@ -105,5 +127,10 @@ function rateColor(pct: number, threshold: number): string {
 .confirmation-dashboard__rate-item span {
   font-size: var(--wp-font-size, 13px);
   white-space: nowrap;
+}
+.confirmation-dashboard__na {
+  color: var(--el-text-color-placeholder, #a8abb2);
+  font-size: 12px;
+  font-style: italic;
 }
 </style>

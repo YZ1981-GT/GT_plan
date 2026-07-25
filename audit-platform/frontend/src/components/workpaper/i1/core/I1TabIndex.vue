@@ -1,129 +1,119 @@
 <template>
   <div class="i1-tab-index">
-    <!-- 顶部引导区 -->
-    <div class="guide-area">
-      <div class="guide-grid">
-        <div class="guide-step"><span class="step-num">①</span> 审定表(I1-1)确认TB取数→三科目三角勾稽→审定回写(1701+1702+1703)</div>
-        <div class="guide-step"><span class="step-num">②</span> 明细表(I1-2)逐项登记56列→4区段Tab→交叉核对审定表</div>
-        <div class="guide-step"><span class="step-num">③</span> 检查表(I1-4~8)政策/增加/减少/寿命/权属逐项核验</div>
-        <div class="guide-step"><span class="step-num">④</span> 摊销(I1-9~11)分配分析+分支选择器(含/不含减值)</div>
-        <div class="guide-step"><span class="step-num">⑤</span> 减值(I1-12~13)减值测试+DCF可收回金额模型</div>
-        <div class="guide-step"><span class="step-num">⑥</span> 附注披露(上市/国企)自动取数+AI辅助生成</div>
+    <!-- 编制信息由页面级头部统一渲染，此处不重复 -->
+
+    <!-- ═══ 目录卡（标题 + 复核 + 编制/使用手册 + 进度条 → 跨表结论口径 → 编制提示） ═══ -->
+    <div class="i1-dir">
+      <div class="index-header">
+        <h3 class="title">I1 无形资产底稿目录</h3>
+        <GtReviewTrigger section-id="I1-index-directory" />
+        <div class="handbook-btns">
+          <el-button size="small" type="primary" plain @click="openHandbook('preparation')">📖 编制手册</el-button>
+          <el-button size="small" @click="openHandbook('usage')">使用手册</el-button>
+        </div>
+        <div class="progress-wrap">
+          <span>编制进度 {{ completedCount }}/{{ totalCount }}</span>
+          <el-progress :percentage="progressPercent" :stroke-width="10" />
+        </div>
       </div>
+
+      <I1PreparationHandbookDialog v-model="handbookVisible" :initial-tab="handbookTab" />
+
+      <div class="conclusion-board" data-testid="i1-conclusion-board">
+        <div class="board-head">
+          <strong>跨表结论口径</strong>
+          <el-tag size="small" :type="conclusionWorstType">{{ conclusionWorstLabel }}</el-tag>
+          <span class="board-meta">已填 {{ conclusionFilledCount }}/{{ conclusionSheets.length }}</span>
+        </div>
+        <div class="board-tags">
+          <el-tag
+            v-for="c in conclusionSheets"
+            :key="c.code"
+            size="small"
+            class="concl-tag clickable"
+            :type="c.filled ? 'success' : 'info'"
+            effect="plain"
+            @click="emit('navigate-sheet', c.sheetKey)"
+          >
+            {{ c.code }} {{ c.filled ? '已填' : '未填' }}
+          </el-tag>
+        </div>
+        <p v-if="conclusionHasUnfilled" class="board-hint">存在未填审计结论，请点击标签跳转补全审计说明与结论。</p>
+      </div>
+
+      <details class="methodology-hint">
+        <summary>编制提示</summary>
+        <ul>
+          <li>三科目三角勾稽：<strong>账面净值 = 原值(1701) − 累计摊销(1702) − 减值准备(1703)</strong>；1701 资产借方(期末=期初+借−贷)，1702/1703 备抵贷方(期末=期初+贷−借)</li>
+          <li>推荐工作流：I1A 程序 → I1-2 明细 → I1-4/7/8 政策·寿命·权属 → I1-9 分配 + I1-10/11 摊销测算 → I1-12/13 减值 → I1-5/6 增减 → I1-3 调整回写 I1-1 → 附注披露</li>
+          <li>摊销测算双分支：I1-10（不含减值）与 I1-11（含减值）二选一，结果与 I1-9 分配去向配平</li>
+          <li>审定合计回写 TB(1701/1702/1703) 并驱动附注披露；各表填妥"审计说明或结论"后目录标签转为"已填"</li>
+        </ul>
+      </details>
     </div>
 
-    <!-- 统计摘要卡片 -->
-    <div class="stats-summary">
-      <div class="stat-item stat-completed">
-        <span class="stat-value">{{ stats.completed }}</span>
-        <span class="stat-label">已复核</span>
+    <!-- ═══ 底稿架构（4 阶段泳道） ═══ -->
+    <div class="i1-arch">
+      <div class="arch-header">
+        <h4 class="arch-title">底稿架构</h4>
+        <span class="arch-hint">点击卡片可跳转至对应底稿</span>
       </div>
-      <div class="stat-item stat-inprogress">
-        <span class="stat-value">{{ stats.inProgress }}</span>
-        <span class="stat-label">编制中</span>
-      </div>
-      <div class="stat-item stat-pending">
-        <span class="stat-value">{{ stats.pending }}</span>
-        <span class="stat-label">未编制</span>
-      </div>
-      <div class="stat-item stat-total">
-        <span class="stat-value">{{ completionPct }}%</span>
-        <span class="stat-label">总进度</span>
-      </div>
+      <GtBArchitectureTree
+        :wp-id="wpId"
+        :project-id="projectId"
+        :active-sheet="''"
+        :html-data="archHtmlData"
+        @navigate="handleNavigate"
+      />
     </div>
 
-    <!-- 编制校验汇总 -->
-    <el-card v-if="prepIssues.length" shadow="never" class="prep-card">
-      <template #header>
-        <div class="section-title">
-          <span>编制校验汇总</span>
-          <el-tag size="small" type="warning">{{ prepIssues.length }} 项待处理</el-tag>
+    <!-- ═══ 本循环底稿目录（I 循环其他科目，可跳转） ═══ -->
+    <div v-if="cycleWorkpapers.length" class="i1-cycle">
+      <div class="cycle-header">
+        <h4 class="cycle-title">本循环底稿目录</h4>
+        <span class="cycle-hint">点击可跳转至同循环其他底稿（灰色表示尚未生成）</span>
+      </div>
+      <div class="cycle-grid">
+        <div
+          v-for="wp in cycleWorkpapers"
+          :key="wp.wp_code"
+          class="cycle-card"
+          :class="{ 'is-current': wp.is_current, 'is-disabled': !wp.wp_id }"
+          @click="onCycleCardClick(wp)"
+        >
+          <div class="cycle-card-top">
+            <span class="cycle-code">{{ wp.wp_code }}</span>
+            <el-tag v-if="wp.is_current" size="small" effect="plain" class="cycle-current-tag">当前</el-tag>
+          </div>
+          <span class="cycle-name" :title="wp.wp_name">{{ wp.wp_name }}</span>
         </div>
-      </template>
-      <ul class="prep-list">
-        <li v-for="(issue, idx) in prepIssues" :key="idx">
-          <el-tag size="small" class="prep-code" @click="handleNavigateByCode(issue.code)">{{ issue.code }}</el-tag>
-          {{ issue.message }}
-        </li>
-      </ul>
-    </el-card>
-    <el-alert
-      v-else
-      type="success"
-      :closable="false"
-      show-icon
-      title="编制校验：暂无跨表阻断项（I1-1 重大变动说明 / I1-7 询问 / I1-9 配平）"
-      class="prep-ok"
-    />
-
-    <!-- 底稿目录表 -->
-    <el-card shadow="never" class="index-card">
-      <template #header>
-        <div class="section-title">
-          <span>底稿目录（共 {{ sheets.length }} 个Sheet）</span>
-          <span class="completion-text">完成度 {{ stats.completed + stats.inProgress }}/{{ sheets.length }}</span>
-        </div>
-      </template>
-      <el-progress :percentage="completionPct" :stroke-width="8" class="completion-bar" />
-      <el-table :data="sheets" stripe size="small" class="index-table" @row-click="handleNavigate">
-        <el-table-column prop="seq" label="序号" width="50" align="center" />
-        <el-table-column prop="code" label="底稿编码" width="100" />
-        <el-table-column prop="name" label="名称" min-width="200">
-          <template #default="{ row }">
-            <span class="sheet-link">{{ row.name }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="状态" width="90" align="center">
-          <template #default="{ row }">
-            <el-tag :type="statusTagType(row.status)" size="small">
-              {{ row.status }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="进度" width="140" align="center">
-          <template #default="{ row }">
-            <el-progress
-              :percentage="row.progress"
-              :stroke-width="6"
-              :color="progressColor(row.progress)"
-              :show-text="true"
-              :text-inside="false"
-            />
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="80" align="center">
-          <template #default="{ row }">
-            <el-button type="primary" link size="small" @click.stop="handleNavigate(row)">
-              进入
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
-
-    <!-- 编制提示 -->
-    <details class="compile-hint">
-      <summary>编制提示</summary>
-      <ul>
-        <li>建议按序号顺序编制：审定表→明细表→调整分录→检查表→摊销→减值→附注</li>
-        <li>审定表完成后自动回写TB科目1701(无形资产)/1702(累计摊销)/1703(减值准备)</li>
-        <li>公式方向：1701为资产类(期末=期初+借-贷)；1702/1703为备抵类(期末=期初+贷-借)</li>
-        <li>I1-10/I1-11摊销测算有2个分支(不含减值/含减值)，根据是否存在减值选择</li>
-        <li>I1-5增加检查可接收I2开发支出的资本化转入联动</li>
-        <li>附注有上市版/国企版，根据projectContext.business_category自动判断</li>
-      </ul>
-    </details>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 /**
- * I1TabIndex.vue — I1 无形资产底稿目录（进度条+18行+统计摘要）
- * 18个sheet目录导航 + 三态状态(未编制/编制中/已复核) + 进度条 + 点击导航
- * Spec: Task 4.1 | Requirements: 1.1-1.10
+ * I1TabIndex.vue — I1 无形资产底稿目录（严格镜像 K1/L1/E1 标准）
+ *
+ * 结构：目录卡（标题+复核+编制/使用手册+进度→跨表结论口径→编制提示）
+ *       + 底稿架构 4 阶段泳道（GtBArchitectureTree）+ 本循环底稿目录 grid。
+ * 编制信息由页面级头部渲染，此处不重复。消费主入口传入的 allResponses，emit navigate-sheet。
+ *
+ * 三科目三角勾稽（1701 无形资产 / 1702 累计摊销 / 1703 减值准备）：净值=原值−摊销−减值。
+ *
+ * 🔴 I1 各表审计说明/结论 item_id 前缀经实证：审定表 I1-1 用 I1-adj-（I1-adj-audit-note/-audit-conclusion），
+ *    其余 sheet 用 I1-{N}-（-audit-note/-audit-conclusion/-conclusion/-note）；conclPrefix 携真实前缀。
  */
-import { computed } from 'vue'
+import { computed, ref, onMounted, defineAsyncComponent } from 'vue'
+import { useRouter } from 'vue-router'
+import { loadCycleWorkpaperCards, type CycleWpCard } from '@/services/cycleDirectory'
+import GtReviewTrigger from '../../GtReviewTrigger.vue'
+import GtBArchitectureTree from '../../GtBArchitectureTree.vue'
 
+const I1PreparationHandbookDialog = defineAsyncComponent(() => import('../I1PreparationHandbookDialog.vue'))
+
+// ─── Props / Emits ───────────────────────────────────────────────────────────
 const props = defineProps<{
   wpId: string
   projectId: string
@@ -135,227 +125,206 @@ const emit = defineEmits<{
   (e: 'navigate-sheet', sheetName: string): void
 }>()
 
-type SheetStatus = '未编制' | '编制中' | '已复核'
+const router = useRouter()
 
-interface SheetEntry {
-  seq: number
-  code: string
+// ─── 编制/使用手册弹窗 ─────────────────────────────────────────────────────────
+const handbookVisible = ref(false)
+const handbookTab = ref<'preparation' | 'usage'>('preparation')
+function openHandbook(tab: 'preparation' | 'usage') {
+  handbookTab.value = tab
+  handbookVisible.value = true
+}
+
+// ─── Sheet 行定义 ─────────────────────────────────────────────────────────────
+interface SheetRow {
   name: string
-  status: SheetStatus
-  progress: number
-  sheetName: string
+  code: string
+  sheetKey: string
+  /** 数据 item_id 前缀（用于进度计算） */
+  prefix: string
+  /** 审计说明/结论存储键前缀（仅结论核心表有） */
+  conclPrefix?: string
 }
 
-/** 18 sheets from the I1 intangible assets workpaper */
-const SHEET_DEFS: { seq: number; code: string; name: string; sheetName: string; fields: string[] }[] = [
-  { seq: 1, code: 'Tab_Index', name: '底稿目录', sheetName: 'Tab_Index 底稿目录', fields: [] },
-  { seq: 2, code: 'I1A', name: '实质性程序表', sheetName: 'Procedure_Table_I1A 实质性程序表', fields: ['I1A-'] },
-  { seq: 3, code: 'I1-1', name: '审定表', sheetName: 'Adjudication_I1 审定表', fields: ['I1-adj-', 'I1-tb-', 'I1-1-'] },
-  { seq: 4, code: 'I1-2', name: '明细表', sheetName: 'Detail_I1_2 明细表', fields: ['I1-2-'] },
-  { seq: 5, code: 'I1-3', name: '调整分录', sheetName: 'Adjustment_I1_3 调整分录', fields: ['I1-3-'] },
-  { seq: 6, code: 'I1-4', name: '政策检查', sheetName: 'Policy_Check_I1_4 政策检查', fields: ['I1-4-'] },
-  { seq: 7, code: 'I1-5', name: '增加检查', sheetName: 'Addition_Check_I1_5 增加检查', fields: ['I1-5-'] },
-  { seq: 8, code: 'I1-6', name: '减少明细', sheetName: 'Disposal_Check_I1_6 减少明细', fields: ['I1-6-'] },
-  { seq: 9, code: 'I1-7', name: '使用寿命检查', sheetName: 'UsefulLife_Check_I1_7 使用寿命检查', fields: ['I1-7-'] },
-  { seq: 10, code: 'I1-8', name: '权属检查', sheetName: 'Title_Check_I1_8 权属检查', fields: ['I1-8-'] },
-  { seq: 11, code: 'I1-9', name: '摊销分配', sheetName: 'Amortization_Alloc_I1_9 摊销分配', fields: ['I1-9-'] },
-  { seq: 12, code: 'I1-10', name: '摊销不含减值', sheetName: 'Amortization_NoImpair_I1_10 摊销不含减值', fields: ['I1-10-'] },
-  { seq: 13, code: 'I1-11', name: '摊销含减值', sheetName: 'Amortization_WithImpair_I1_11 摊销含减值', fields: ['I1-11-'] },
-  { seq: 14, code: 'I1-12', name: '减值测试', sheetName: 'Impairment_Test_I1_12 减值测试', fields: ['I1-12-'] },
-  { seq: 15, code: 'I1-13', name: '可收回金额', sheetName: 'Recoverable_Test_I1_13 可收回金额', fields: ['I1-13-'] },
-  { seq: 16, code: 'I1-disc-L', name: '附注上市', sheetName: 'Disclosure_Listed 附注上市', fields: ['I1-disc-L-'] },
-  { seq: 17, code: 'I1-disc-S', name: '附注国企', sheetName: 'Disclosure_SOE 附注国企', fields: ['I1-disc-S-'] },
-  { seq: 18, code: 'I1-spare', name: '备用/空白', sheetName: '备用', fields: [] },
-]
-
-/** Determine per-sheet status from checklist_responses */
-function _getSheetStatus(fields: string[]): { status: SheetStatus; progress: number } {
-  if (fields.length === 0) return { status: '未编制', progress: 0 }
-
-  let totalFields = 0
-  let filledFields = 0
-  let hasReview = false
-
-  for (const [key, value] of props.allResponses) {
-    for (const prefix of fields) {
-      if (key.startsWith(prefix)) {
-        totalFields++
-        if (value !== null && value !== undefined && value !== '') {
-          filledFields++
-        }
-        if (key.includes('-review') && value) {
-          hasReview = true
-        }
-      }
-    }
+/** 按 responses 中以指定前缀存储的字段数计算完成度。 */
+function calcSheetProgress(prefix: string, expectedFields: number): number {
+  const map = props.allResponses
+  if (!map || map.size === 0) return 0
+  let count = 0
+  for (const [key, val] of map.entries()) {
+    if (!key.startsWith(prefix)) continue
+    const text = (val?.remark ?? val?.conclusion ?? '') as any
+    if (text != null && String(text).trim().length > 0) count++
   }
-
-  if (totalFields === 0) return { status: '未编制', progress: 0 }
-
-  const progress = Math.round((filledFields / totalFields) * 100)
-
-  if (hasReview && progress >= 90) return { status: '已复核', progress: 100 }
-  if (filledFields > 0) return { status: '编制中', progress }
-  return { status: '未编制', progress: 0 }
+  if (count === 0) return 0
+  if (count >= expectedFields) return 100
+  return Math.min(Math.round((count / expectedFields) * 100), 99)
 }
 
-const sheets = computed<SheetEntry[]>(() => {
-  return SHEET_DEFS.map((def) => {
-    const { status, progress } = _getSheetStatus(def.fields)
-    return {
-      seq: def.seq,
-      code: def.code,
-      name: def.name,
-      status,
-      progress,
-      sheetName: def.sheetName,
-    }
-  })
+const allSheets = computed<SheetRow[]>(() => [
+  { name: '无形资产实质性程序表', code: 'I1A', sheetKey: '无形资产实质性程序表I1A', prefix: 'I1A-' },
+  { name: '审定表（原值/累计摊销/减值三科目）', code: 'I1-1', sheetKey: '审定表I1', prefix: 'I1-adj-', conclPrefix: 'I1-adj-' },
+  { name: '明细表（逐项登记）', code: 'I1-2', sheetKey: '明细表I1-2', prefix: 'I1-2-', conclPrefix: 'I1-2-' },
+  { name: '调整分录汇总', code: 'I1-3', sheetKey: '调整分录汇总I1-3', prefix: 'I1-3-' },
+  { name: '摊销减值政策检查表', code: 'I1-4', sheetKey: '无形资产摊销减值政策检查表I1-4', prefix: 'I1-4-', conclPrefix: 'I1-4-' },
+  { name: '增加检查表', code: 'I1-5', sheetKey: '无形资产增加检查表I1-5', prefix: 'I1-5-', conclPrefix: 'I1-5-' },
+  { name: '减少明细表', code: 'I1-6', sheetKey: '无形资产减少明细表I1-6', prefix: 'I1-6-', conclPrefix: 'I1-6-' },
+  { name: '使用寿命检查表', code: 'I1-7', sheetKey: '使用寿命检查表I1-7', prefix: 'I1-7-', conclPrefix: 'I1-7-' },
+  { name: '权属检查表', code: 'I1-8', sheetKey: '无形资产权属检查表I1-8', prefix: 'I1-8-', conclPrefix: 'I1-8-' },
+  { name: '摊销分配分析表', code: 'I1-9', sheetKey: '摊销分配分析表I1-9', prefix: 'I1-9-', conclPrefix: 'I1-9-' },
+  { name: '摊销测算表（不含减值）', code: 'I1-10', sheetKey: '摊销测算表（不含减值）I1-10', prefix: 'I1-10-', conclPrefix: 'I1-10-' },
+  { name: '摊销测算表（含减值）', code: 'I1-11', sheetKey: '摊销测算表（含减值）I1-11', prefix: 'I1-11-', conclPrefix: 'I1-11-' },
+  { name: '减值准备测试表', code: 'I1-12', sheetKey: '减值准备测试表I1-12', prefix: 'I1-12-', conclPrefix: 'I1-12-' },
+  { name: '可收回金额测试（DCF）', code: 'I1-13', sheetKey: '可收回金额测试I1-13', prefix: 'I1-13-', conclPrefix: 'I1-13-' },
+  { name: '附注披露信息（上市公司）', code: '附注上市', sheetKey: '附注披露信息（上市公司）', prefix: 'I1-disc-L-' },
+  { name: '附注披露信息（国有企业）', code: '附注国企', sheetKey: '附注披露信息（国有企业）', prefix: 'I1-disc-S-' },
+])
+
+// ─── 进度计算 ─────────────────────────────────────────────────────────────────
+const totalCount = computed(() => allSheets.value.length)
+const completedCount = computed(() => allSheets.value.filter(r => calcSheetProgress(r.prefix, 3) >= 100).length)
+const progressPercent = computed(() => {
+  if (totalCount.value === 0) return 0
+  const avg = allSheets.value.reduce((sum, r) => sum + calcSheetProgress(r.prefix, 3), 0) / totalCount.value
+  return Math.round(avg)
 })
 
-const stats = computed(() => {
-  const list = sheets.value
-  return {
-    completed: list.filter((s) => s.status === '已复核').length,
-    inProgress: list.filter((s) => s.status === '编制中').length,
-    pending: list.filter((s) => s.status === '未编制').length,
+// ─── 底稿架构泳道（GtBArchitectureTree 数据源） ───────────────────────────────
+const COMPONENT_TYPE_MAP: Record<string, string> = {
+  I1A: 'a-program-console',
+  '附注上市': 'c-note-table',
+  '附注国企': 'c-note-table',
+}
+function sheetStatus(progress: number): string {
+  if (progress >= 100) return 'completed'
+  if (progress > 0) return 'in_progress'
+  return 'pending'
+}
+const archHtmlData = computed(() => ({
+  navigation_rows: allSheets.value.map((s, i) => ({
+    seq: i + 1,
+    content: s.sheetKey,
+    sheet_name: s.sheetKey,
+    index_ref: s.code,
+    component_type: COMPONENT_TYPE_MAP[s.code] ?? 'd-form-table',
+    status: sheetStatus(calcSheetProgress(s.prefix, 3)),
+  })),
+}))
+
+// ─── 跨表结论口径看板 ─────────────────────────────────────────────────────────
+/** 有审计结论/说明的核心表（程序表、调整分录、附注不计入） */
+const I1_CONCLUSION_CODES = new Set([
+  'I1-1', 'I1-2', 'I1-4', 'I1-5', 'I1-6', 'I1-7', 'I1-8', 'I1-9', 'I1-10', 'I1-11', 'I1-12', 'I1-13',
+])
+
+/**
+ * 按各表真实 conclPrefix 判定审计说明/结论是否已填。
+ * key 含 conclPrefix 且匹配 /conclusion|audit-note|note/ 且文本非空即为已填。
+ */
+function isConclusionFilled(conclPrefix: string): boolean {
+  const map = props.allResponses
+  if (!map?.size) return false
+  for (const [key, val] of map.entries()) {
+    if (!key.includes(conclPrefix)) continue
+    if (!/conclusion|audit-note|note/i.test(key)) continue
+    const text = (val?.remark ?? val?.conclusion ?? '') as string
+    if (typeof text === 'string' && text.trim().length > 0) return true
   }
+  return false
+}
+
+const conclusionSheets = computed(() =>
+  allSheets.value
+    .filter(s => s.conclPrefix && I1_CONCLUSION_CODES.has(s.code))
+    .map(s => ({ code: s.code, sheetKey: s.sheetKey, filled: isConclusionFilled(s.conclPrefix as string) })),
+)
+const conclusionFilledCount = computed(() => conclusionSheets.value.filter(c => c.filled).length)
+const conclusionHasUnfilled = computed(() => conclusionSheets.value.some(c => !c.filled))
+const conclusionWorstLabel = computed(() => {
+  if (conclusionFilledCount.value === 0) return '结论未填'
+  if (conclusionHasUnfilled.value) return `结论未齐 ${conclusionSheets.value.length - conclusionFilledCount.value} 项`
+  return '总体已齐'
+})
+const conclusionWorstType = computed<'success' | 'warning' | 'info'>(() => {
+  if (conclusionFilledCount.value === 0) return 'info'
+  if (conclusionHasUnfilled.value) return 'warning'
+  return 'success'
 })
 
-const completionPct = computed(() => {
-  const total = sheets.value.length
-  if (total === 0) return 0
-  const progressSum = sheets.value.reduce((sum, s) => sum + s.progress, 0)
-  return Math.round(progressSum / total)
-})
-
-function _parseJson(itemId: string): any {
-  const item = props.allResponses.get(itemId)
-  if (!item) return null
-  const raw = item.remark ?? item.conclusion
-  if (!raw) return null
-  try { return typeof raw === 'string' ? JSON.parse(raw) : raw } catch { return null }
+// ─── 交互 ────────────────────────────────────────────────────────────────────
+function handleNavigate(sheetName: string) {
+  if (sheetName) emit('navigate-sheet', sheetName)
 }
 
-/** 跨表编制校验：I1-1 重大变动未说明 / I1-7 询问 / I1-9 未配平 */
-const prepIssues = computed(() => {
-  const issues: Array<{ code: string; message: string }> = []
-
-  const qual = _parseJson('I1-adj-qual-notes')
-  const lifeRows = _parseJson('I1-7-rows')
-  const inquiry = _parseJson('I1-7-inquiry-rows')
-  if (Array.isArray(lifeRows)) {
-    const indef = lifeRows.filter((r: any) =>
-      r.isIndefinite === 'Y' || r.isIndefinite === true || Number(r.usefulLifeMonths) <= 0,
-    )
-    if (indef.length) {
-      const missingBasis = indef.filter((r: any) => !String(r.indefiniteJudgmentBasis || '').trim())
-      if (missingBasis.length) {
-        issues.push({ code: 'I1-7', message: `${missingBasis.length} 项不确定寿命缺少判断依据` })
-      }
-      const inquiryList = Array.isArray(inquiry) ? inquiry : []
-      const unanswered = indef.filter((r: any) => {
-        const q = inquiryList.find((x: any) => x.name === r.name)
-        return !q
-          || (!q.identifiedFiniteFactors && !q.continuedOriginalUse && !String(q.findings || '').trim())
-      })
-      if (unanswered.length) {
-        issues.push({ code: 'I1-7', message: `${unanswered.length} 项不确定寿命尚未完成管理层询问` })
-      }
-      if (!String(qual?.indefiniteLife || '').trim()) {
-        issues.push({ code: 'I1', message: `有 ${indef.length} 项不确定寿命，审定表说明事项(2)尚未填写` })
-      }
-    }
-  }
-
-  const allocRows = _parseJson('I1-9-rows')
-  if (Array.isArray(allocRows) && allocRows.length) {
-    let unbalanced = 0
-    for (const r of allocRows) {
-      const sum =
-        Number(r.productionCost || 0) + Number(r.manufacturingCost || 0)
-        + Number(r.sellingExpense || 0) + Number(r.managementExpense || 0)
-        + Number(r.rdExpense || 0) + Number(r.otherExpense || 0)
-      if (Math.abs(sum - Number(r.totalAmort || 0)) >= 0.01) unbalanced++
-    }
-    if (unbalanced) {
-      issues.push({ code: 'I1-9', message: `${unbalanced} 行摊销分配未配平` })
-    }
-  }
-
-  return issues
-})
-
-function statusTagType(status: SheetStatus): 'success' | 'warning' | 'info' {
-  switch (status) {
-    case '已复核': return 'success'
-    case '编制中': return 'warning'
-    case '未编制': return 'info'
-  }
+// ─── 本循环底稿目录（I 循环其他科目，跨底稿跳转；canonical 源模板过滤污染） ───
+const cycleWorkpapers = ref<CycleWpCard[]>([])
+async function loadCycleWorkpapers(): Promise<void> {
+  cycleWorkpapers.value = await loadCycleWorkpaperCards(props.projectId, 'I', props.wpId)
 }
-
-function progressColor(pct: number): string {
-  if (pct >= 90) return '#67c23a'
-  if (pct >= 50) return '#e6a23c'
-  return '#909399'
+function onCycleCardClick(wp: CycleWpCard): void {
+  if (!wp.wp_id || wp.is_current || !props.projectId) return
+  router.push({ name: 'WorkpaperEditor', params: { projectId: props.projectId, wpId: wp.wp_id } })
 }
-
-function handleNavigate(row: SheetEntry) {
-  emit('navigate-sheet', row.sheetName)
-}
-
-function handleNavigateByCode(code: string) {
-  const hit = sheets.value.find((s) => s.code === code || s.code.startsWith(code))
-  if (hit) emit('navigate-sheet', hit.sheetName)
-  else emit('navigate-sheet', code)
-}
+onMounted(loadCycleWorkpapers)
 </script>
 
 <style scoped>
-.i1-tab-index { padding: 16px; font-size: var(--wp-font-size, 13px); }
-
-/* 引导区 */
-.guide-area {
-  background: linear-gradient(135deg, #e8f4fd 0%, #d4ecfb 100%);
-  border-radius: 8px; padding: 16px; margin-bottom: 16px;
+.i1-tab-index {
+  padding: 16px;
+  font-size: var(--wp-font-size, 13px);
 }
-.guide-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.guide-step { display: flex; align-items: center; gap: 6px; font-size: var(--wp-font-size, 13px); }
-.step-num { font-weight: 700; color: var(--el-color-primary); min-width: 20px; }
 
-/* 统计摘要 */
-.stats-summary {
-  display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
-  margin-bottom: 16px;
+/* ─── 目录卡 ─── */
+.i1-dir { margin-bottom: 20px; }
+.index-header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
+.title { margin: 0; font-size: 16px; font-weight: 600; color: #303133; }
+.handbook-btns { display: flex; gap: 6px; }
+.progress-wrap { flex: 1; min-width: 200px; }
+.conclusion-board {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  background: #f5f7fa;
+  border-radius: 6px;
+  border-left: 3px solid #409eff;
 }
-.stat-item {
-  display: flex; flex-direction: column; align-items: center;
-  padding: 12px 8px; border-radius: 8px; background: #f5f7fa;
+.board-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.board-meta { font-size: 12px; color: #909399; }
+.board-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.concl-tag.clickable { cursor: pointer; }
+.board-hint { margin: 8px 0 0; font-size: 12px; color: #e6a23c; }
+.methodology-hint { margin-top: 12px; font-size: 12px; color: #606266; }
+.methodology-hint summary { cursor: pointer; font-weight: 500; color: #303133; }
+.methodology-hint ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
+
+/* ─── 底稿架构 ─── */
+.i1-arch { margin-top: 16px; }
+.arch-header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
+.arch-title { margin: 0; font-size: 16px; font-weight: 600; color: #303133; }
+.arch-hint { font-size: 12px; color: #909399; }
+
+/* ─── 本循环底稿目录 ─── */
+.i1-cycle { margin-top: 28px; }
+.cycle-header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
+.cycle-title { margin: 0; font-size: 16px; font-weight: 600; color: #303133; }
+.cycle-hint { font-size: 12px; color: #909399; }
+.cycle-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+.cycle-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--gt-color-border-purple, #e8e4f0);
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.2s;
 }
-.stat-value { font-size: 24px; font-weight: 700; line-height: 1.2; }
-.stat-label { font-size: 12px; color: var(--el-text-color-secondary); margin-top: 4px; }
-.stat-completed .stat-value { color: #67c23a; }
-.stat-inprogress .stat-value { color: #e6a23c; }
-.stat-pending .stat-value { color: #909399; }
-.stat-total .stat-value { color: var(--el-color-primary); }
-
-.prep-card { margin-bottom: 16px; }
-.prep-ok { margin-bottom: 16px; }
-.prep-list { margin: 0; padding-left: 4px; list-style: none; }
-.prep-list li { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 12px; }
-.prep-code { cursor: pointer; }
-
-/* 目录卡片 */
-.section-title { display: flex; align-items: center; justify-content: space-between; }
-.completion-text { font-size: 12px; color: var(--el-text-color-secondary); }
-.completion-bar { margin-bottom: 12px; }
-.index-card { margin-bottom: 16px; }
-.index-table { font-size: var(--wp-font-size, 13px); cursor: pointer; }
-.sheet-link { color: var(--el-color-primary); }
-.sheet-link:hover { text-decoration: underline; }
-
-/* 编制提示 */
-.compile-hint { margin-top: 12px; font-size: 12px; color: var(--el-text-color-secondary); }
-.compile-hint summary { cursor: pointer; font-weight: 500; }
-.compile-hint ul { padding-left: 20px; margin-top: 8px; }
+.cycle-card:hover { border-color: var(--gt-color-primary, #4b2d77); box-shadow: 0 2px 8px rgba(75, 45, 119, 0.12); transform: translateY(-2px); }
+.cycle-card.is-current { border-color: var(--gt-color-primary, #4b2d77); background: var(--gt-color-primary-bg, #f4f0fa); box-shadow: 0 0 0 1px var(--gt-color-primary, #4b2d77); cursor: default; }
+.cycle-card.is-disabled { opacity: 0.5; cursor: not-allowed; }
+.cycle-card.is-disabled:hover { border-color: var(--gt-color-border-purple, #e8e4f0); box-shadow: none; transform: none; }
+.cycle-card-top { display: flex; align-items: center; gap: 6px; }
+.cycle-code { font-size: var(--wp-font-size, 13px); font-weight: 700; color: var(--gt-color-primary, #4b2d77); }
+.cycle-current-tag { margin-left: auto; }
+.cycle-name { font-size: var(--wp-font-size, 13px); line-height: 1.4; color: #303133; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 </style>

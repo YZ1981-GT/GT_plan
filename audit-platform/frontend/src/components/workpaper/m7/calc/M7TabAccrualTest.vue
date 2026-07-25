@@ -8,7 +8,7 @@
         <GtIndexChip value="wp:M7-2" :context-project-id="projectId" />
       </div>
       <div class="section-header-right">
-        <el-button size="small" @click="handleAI('accrualTest')">
+        <el-button size="small" :loading="aiLoading === 'accrualTest'" @click="handleAI('accrualTest')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
         <el-button size="small" @click="handleReview">
@@ -291,7 +291,7 @@
       <template #header>
         <div class="section-header">
           <span class="card-title">计提测试结论及说明</span>
-          <el-button size="small" @click="handleAI('conclusion')">
+          <el-button size="small" :loading="aiLoading === 'conclusion'" @click="handleAI('conclusion')">
             <el-icon><MagicStick /></el-icon> AI辅助
           </el-button>
         </div>
@@ -340,10 +340,12 @@
  * 安全生产费计提（贷方增加）：借:生产成本/管理费用 贷:专项储备
  */
 import { computed, inject, onMounted, ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import { MagicStick, Check } from '@element-plus/icons-vue'
 import { useM7FormData } from '../../composables/useM7FormData'
 import { useM7AccrualTest, INDUSTRY_CATEGORIES, type AccrualBasis } from '../../composables/useM7AccrualTest'
 import GtIndexChip from '../../GtIndexChip.vue'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 
 const props = defineProps<{
   wpId: string
@@ -356,6 +358,8 @@ const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => vo
   'openReviewDialog',
   () => {},
 )
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
 
 // ─── Composable 初始化 ───────────────────────────────────────────────────────
 const formData = useM7FormData({
@@ -407,7 +411,24 @@ function fmtAmount(val: number): string {
 }
 
 // ─── Actions ─────────────────────────────────────────────────────────────────
-function handleAI(_section: string) { /* AI钩子 — Phase 6 集成 */ }
+async function handleAI(section: string): Promise<void> {
+  if (props.isReadonly) return
+  aiLoading.value = section
+  try {
+    const context: Record<string, string> = {
+      科目: '4201 专项储备 / 计提测试 M7-4',
+      行业分类: localIndustry.value || '未选择',
+      计提基础: localBasis.value === 'output' ? '按产量分档' : '按营业收入',
+      应计提: fmtAmount(accrualTest.estimated.value),
+      账面计提: fmtAmount(accrualTest.booked.value),
+      计提差异: fmtAmount(accrualTest.diff.value),
+    }
+    const text = await generateAiText({ section: `m7-accrual-test-${section}`, context, existingContent: auditNote.value })
+    if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+    auditNote.value = text
+    saveAuditNote()
+  } catch { ElMessage.warning('AI 生成失败，请稍后重试') } finally { aiLoading.value = '' }
+}
 function handleReview() {
   openReviewDialog?.('M7-4-accrual-test', '专项储备计提测试')
 }

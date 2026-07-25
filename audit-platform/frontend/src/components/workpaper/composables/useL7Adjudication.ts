@@ -87,7 +87,33 @@ export function useL7Adjudication(
   formData: ReturnType<typeof useL7FormData>,
   rows: { value: L7AdjudicationRow[] },
 ) {
-  const { writebackTB, saveBatch, debouncedSave } = formData
+  const { allResponses, writebackTB, saveBatch, debouncedSave } = formData
+
+  // ─── 0. Hydration（读回 per-row 完整数据；此前 onMounted 只 loadData 无 restore → 刷新丢失） ──
+  let _hydratedOnce = false
+  function hydrate(): void {
+    let any = false
+    for (let i = 0; i < rows.value.length; i++) {
+      const resp = allResponses.value.get(`L7-L7-1-row-${i + 1}-data`)
+      if (!resp?.remark) continue
+      try {
+        const p = JSON.parse(resp.remark)
+        Object.assign(rows.value[i], {
+          itemName: p.itemName ?? rows.value[i].itemName,
+          beginUnadjusted: Number(p.beginUnadjusted) || 0,
+          beginAje: Number(p.beginAje) || 0,
+          beginRje: Number(p.beginRje) || 0,
+          endUnadjusted: Number(p.endUnadjusted) || 0,
+          endAje: Number(p.endAje) || 0,
+          endRje: Number(p.endRje) || 0,
+        })
+        any = true
+      } catch { /* ignore */ }
+    }
+    if (any) _hydratedOnce = true
+  }
+  hydrate()
+  watch(allResponses, () => { if (!_hydratedOnce) hydrate() })
 
   // ─── 1. 计算属性：公式列自动计算 ──────────────────────────────────────
 

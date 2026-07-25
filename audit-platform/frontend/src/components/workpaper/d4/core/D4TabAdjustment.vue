@@ -11,6 +11,8 @@ import { ref, computed, inject, toRef, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useD4Adjustment, type D4AdjustmentRow } from '../../composables/useD4Adjustment'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
+import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
+import { useAuditContext } from '@/composables/useAuditContext'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 
@@ -72,6 +74,27 @@ function handlePushToA13() {
   if (ids.length === 0) return
   pushToA13(ids)
 }
+
+// ─── 同步到集中调整登记（workpaper-adjustment-centralization） ──────────
+const { year: auditYear } = useAuditContext()
+const { centralStatus, syncing, syncToCentral, refreshStatus } = useAdjustmentCentralSync({
+  projectId: toRef(props, 'projectId') as Ref<string>,
+  year: auditYear,
+  wpId: toRef(props, 'wpId') as Ref<string>,
+  wpCode: 'D4',
+  itemId: 'D4-4-rows',
+  buildLineItems: () => rows.value.map(r => ({
+    account_name: r.accountName,
+    report_line_code: r.reportItem || undefined,
+    debit_amount: r.debitAmount,
+    credit_amount: r.creditAmount,
+  })),
+  buildMeta: () => ({
+    description: rows.value.find(r => r.description)?.description || 'D4 营业收入调整',
+    adjustmentType: rows.value.length > 0 && rows.value.every(r => r.category === '报表调整') ? 'rje' : 'aje',
+  }),
+})
+refreshStatus()
 
 // ─── 分类选项 ─────────────────────────────────────────────────────────
 const categoryOptions = [
@@ -204,6 +227,26 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
         >
           确认调整
         </el-button>
+        <el-button
+          size="small"
+          type="primary"
+          plain
+          :loading="syncing"
+          :disabled="isReadonly || !isBalanced || rows.length === 0"
+          @click="syncToCentral"
+          title="把本页调整分录汇聚到集中调整登记，供合伙人跨循环审阅"
+        >
+          同步到集中登记
+        </el-button>
+        <el-tag
+          v-if="centralStatus?.review_status"
+          size="small"
+          :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
+          :title="centralStatus.rejection_reason || ''"
+        >
+          集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
+          <template v-if="centralStatus.adjustment_no"> · {{ centralStatus.adjustment_no }}</template>
+        </el-tag>
       </div>
     </div>
 

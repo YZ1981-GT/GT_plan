@@ -27,6 +27,21 @@
     <div class="tab-toolbar">
       <div class="toolbar-left">
         <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">+ 新增行</el-button>
+        <el-button
+          size="small"
+          type="primary"
+          plain
+          :loading="centralSyncing"
+          :disabled="isReadonly || !isBalanced || rows.length === 0"
+          @click="syncToCentral"
+          title="把本页调整分录汇聚到集中调整登记，供合伙人跨循环审阅"
+        >同步到集中登记</el-button>
+        <el-tag
+          v-if="centralStatus?.review_status"
+          size="small"
+          :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
+          :title="centralStatus.rejection_reason || ''"
+        >集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}</el-tag>
         <CycleImportExportDropdown v-if="ieCtx" :wp-id="wpId" :api-prefix="ieCtx.apiPrefix" :sheet="ieCtx.sheet"
           :disabled="isReadonly" @imported="$emit('imported')" />
       </div>
@@ -162,6 +177,8 @@
 import { ref, computed, inject, toRef, watch, onBeforeUnmount, type Ref } from 'vue'
 import { parseNum, calcSubtotal, isDebitCreditBalanced } from '../composables/useF5CosOfFormulaEngine'
 import { useF5AiGenerate } from '../composables/useF5AiGenerate'
+import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../composables/useAdjustmentCentralSync'
+import { useAuditContext } from '@/composables/useAuditContext'
 import { resolveImportExportSheet, isImportExportSheet } from '../shared/cycleImportExportRegistry'
 import CycleImportExportDropdown from '../shared/CycleImportExportDropdown.vue'
 import F5SheetAttachments from './F5SheetAttachments.vue'
@@ -263,6 +280,27 @@ watch(() => allResponsesRef.value.get(STORAGE_KEY)?.remark, () => {
 const totalDebit = computed(() => calcSubtotal(rows.value.map((r) => parseNum(r.debitAmount))))
 const totalCredit = computed(() => calcSubtotal(rows.value.map((r) => parseNum(r.creditAmount))))
 const isBalanced = computed(() => isDebitCreditBalanced(rows.value.map((r) => parseNum(r.debitAmount)), rows.value.map((r) => parseNum(r.creditAmount))))
+
+// ─── 同步到集中调整登记 ─────────────────────────────────────────────
+const { year: centralYear } = useAuditContext()
+const { centralStatus, syncing: centralSyncing, syncToCentral, refreshStatus } = useAdjustmentCentralSync({
+  projectId: () => props.projectId || '',
+  year: centralYear,
+  wpId: () => props.wpId,
+  wpCode: 'F5',
+  itemId: STORAGE_KEY,
+  buildLineItems: () => rows.value.map((r) => ({
+    standard_account_code: r.accountCode || undefined,
+    account_name: r.accountName || undefined,
+    debit_amount: parseNum(r.debitAmount),
+    credit_amount: parseNum(r.creditAmount),
+  })),
+  buildMeta: () => ({
+    description: rows.value.find((r) => r.summary)?.summary || 'F5 营业成本调整',
+    adjustmentType: rows.value.length > 0 && rows.value.every((r) => r.entryType === 'RJE') ? 'rje' : 'aje',
+  }),
+})
+refreshStatus()
 
 const ieCtx = computed(() => (isImportExportSheet('f5', 'F5-4') ? resolveImportExportSheet('f5', 'F5-4') : null))
 

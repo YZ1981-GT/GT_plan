@@ -36,6 +36,14 @@
           @click="syncToNotes"
         >同步到附注</el-button>
         <el-button
+          size="small"
+          type="primary"
+          plain
+          :disabled="!projectId"
+          data-testid="g11-disclosure-jump-note"
+          @click="jumpToNote(variant)"
+        >↩ 跳转回附注</el-button>
+        <el-button
           v-if="!isReadonly"
           size="small"
           type="primary"
@@ -261,7 +269,9 @@
 
 <script setup lang="ts">
 import { ref, toRef, onMounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import { useG11Disclosure } from '../../composables/useG11Disclosure'
 import { isG11DisclosureLeaf } from '../../composables/g11SchemaRows'
 import { buildG11SyncPayloads } from '../../composables/g11DisclosureSyncPayload'
@@ -301,6 +311,14 @@ const auditNote = ref('')
 const auditConclusion = ref('')
 const isSyncing = ref(false)
 const noteSectionId = computed(() => G11_NOTE_SECTION[props.variant])
+
+const router = useRouter()
+// 跳转回附注模块（披露表 → 附注为单向推送；此处仅导航，方便相互编辑确认）
+function jumpToNote(target: DisclosureVariant): void {
+  const route = buildNoteJumpRoute(props.projectId || '', 'G11', target)
+  if (!route) { ElMessage.warning('未找到对应的附注章节'); return }
+  router.push(route)
+}
 
 async function syncToNotes(): Promise<void> {
   if (isSyncing.value || props.isReadonly || !props.projectId || !props.wpId) return

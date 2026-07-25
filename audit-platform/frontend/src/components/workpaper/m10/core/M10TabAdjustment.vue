@@ -31,6 +31,8 @@
         >
           保存并发布
         </el-button>
+        <el-button size="small" type="primary" plain :loading="centralSyncing" :disabled="!adjustment.currentBalance.value.isBalanced || adjustment.filteredEntries.value.length === 0" @click="syncToCentral" title="把当前类型调整分录汇聚到集中调整登记，供合伙人跨循环审阅">同步到集中登记</el-button>
+        <el-tag v-if="centralStatus?.review_status" size="small" :type="centralStatus.review_status==='approved'?'success':(centralStatus.review_status==='rejected'?'danger':'info')" :title="centralStatus.rejection_reason||''">集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status]||centralStatus.review_status }}</el-tag>
       </div>
     </div>
 
@@ -251,11 +253,14 @@
  * - 双向同步M10-1审定表
  * - 科目4003 其他权益工具: 贷方增加=调增, 借方减少=调减
  */
-import { computed, inject, onMounted, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { computed, inject, onMounted, ref, toRef, watch, type Ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, Check } from '@element-plus/icons-vue'
 import { useM10FormData } from '../../composables/useM10FormData'
 import { useM10Adjustment } from '../../composables/useM10Adjustment'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
+import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '@/components/workpaper/composables/useAdjustmentCentralSync'
+import { useAuditContext } from '@/composables/useAuditContext'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -284,6 +289,27 @@ const formData = useM10FormData({
 // ─── Adjustment composable ───────────────────────────────────────────────────
 
 const adjustment = useM10Adjustment(formData)
+
+// ─── 同步到集中调整登记（workpaper-adjustment-centralization） ─────────────────
+const { year: auditYear } = useAuditContext()
+const { centralStatus, syncing: centralSyncing, syncToCentral, refreshStatus } = useAdjustmentCentralSync({
+  projectId: toRef(props, 'projectId') as Ref<string>,
+  year: auditYear,
+  wpId: toRef(props, 'wpId') as Ref<string>,
+  wpCode: 'M10',
+  itemId: () => `M10-adj-${adjustment.activeType.value}`,
+  buildLineItems: () => adjustment.filteredEntries.value.map(e => ({
+    account_name: e.accountName,
+    report_line_code: e.reportItem || undefined,
+    debit_amount: e.debitAmount,
+    credit_amount: e.creditAmount,
+  })),
+  buildMeta: () => ({
+    description: adjustment.filteredEntries.value.find(e => e.description)?.description || 'M10 调整（' + adjustment.activeType.value + '）',
+    adjustmentType: adjustment.activeType.value === 'RJE' ? 'rje' : 'aje',
+  }),
+})
+watch(adjustment.activeType, () => refreshStatus())
 
 // ─── el-segmented options ────────────────────────────────────────────────────
 
@@ -333,8 +359,33 @@ async function handleSave(): Promise<void> {
   }
 }
 
-function handleAI(_section: string) {
-  // AI辅助钩子（Phase 6集成）
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
+
+async function handleAI(section: string) {
+  if (props.isReadonly) return
+  aiLoading.value = section
+  let text = ''
+  try {
+    const bal = adjustment.currentBalance.value
+    const entriesCtx = adjustment.filteredEntries.value
+      .map(e => `${e.description || '调整'}: ${e.accountName} 借${fmtAmount(e.debitAmount)}/贷${fmtAmount(e.creditAmount)} [${e.category || ''}]`)
+      .join('；') || '（暂无调整分录）'
+    const context: Record<string, string> = {
+      科目: '4003 其他权益工具 / 调整分录汇总（M10-3）',
+      调整类型: adjustment.activeType.value,
+      调整分录: entriesCtx,
+      借方合计: fmtAmount(bal.totalDebit),
+      贷方合计: fmtAmount(bal.totalCredit),
+      借贷平衡: bal.isBalanced ? '平衡' : `不平衡差异${fmtAmount(bal.diff)}`,
+    }
+    text = await generateAiText({ section: `m10-adjustment-${section}`, context })
+  } catch {
+    ElMessage.warning('AI 生成失败，请稍后重试'); aiLoading.value = ''; return
+  }
+  aiLoading.value = ''
+  if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+  ElMessageBox.alert(text, 'AI 辅助 — 调整分录分析建议', { confirmButtonText: '知道了' }).catch(() => { /* 用户关闭 */ })
 }
 
 function handleReview() {
@@ -394,6 +445,7 @@ function restoreEntries(): void {
 onMounted(async () => {
   await formData.loadData()
   restoreEntries()
+  refreshStatus()
 })
 </script>
 

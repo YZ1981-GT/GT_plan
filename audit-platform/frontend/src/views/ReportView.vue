@@ -59,6 +59,14 @@
         </template>
       </GtPageHeader>
 
+      <!-- 工作流进度条 -->
+      <WorkflowProgress
+        :project-id="projectId"
+        :year="selectedYear"
+        @step-action="onWorkflowStepAction"
+        @next-action="onWorkflowNext"
+      />
+
       <!-- 归档横幅 -->
       <ArchivedBanner />
       <ConsolLockedBanner />
@@ -608,6 +616,7 @@ import { setupPasteListener, pasteToSelection } from '@/composables/useCopyPaste
 import { useAuditContext } from '@/composables/useAuditContext'
 import ArchivedBanner from '@/components/common/ArchivedBanner.vue'
 import ConsolLockedBanner from '@/components/common/ConsolLockedBanner.vue'
+import WorkflowProgress from '@/components/common/WorkflowProgress.vue'
 import ConflictBanner from '@/components/conflict/ConflictBanner.vue'
 import ConflictResolutionPanel from '@/components/conflict/ConflictResolutionPanel.vue'
 import TrustScorePanel from '@/components/trust/TrustScorePanel.vue'
@@ -630,6 +639,23 @@ import DocAiChatPanel from '@/components/DocAiChatPanel.vue'
 const route = useRoute()
 const router = useRouter()
 const { canEdit, onContextChange } = useAuditContext()
+
+/** 工作流进度条：导入/映射等步骤跳转到试算表页操作 */
+function onWorkflowStepAction(action: string) {
+  if (!projectId.value) return
+  if (action === 'import' || action === 'mapping') {
+    router.push(`/projects/${projectId.value}/trial-balance`)
+  }
+}
+
+/** 工作流进度条「生成报表」下一步：当前已在报表页，直接触发生成（避免跳同路由无反应） */
+function onWorkflowNext() {
+  if (isEqcrRole.value) {
+    ElMessage.info('EQCR 复核角色为只读，无法生成报表')
+    return
+  }
+  onGenerate()
+}
 
 // EQCR 只读访问 (Requirements: 17.1-17.4)
 const authStore = useAuthStore()

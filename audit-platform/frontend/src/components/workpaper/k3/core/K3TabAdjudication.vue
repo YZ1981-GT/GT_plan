@@ -23,6 +23,9 @@
         <div class="section-title">
           <span>一、按性质分类</span>
           <div class="title-actions">
+            <el-button size="small" type="warning" plain :disabled="isReadonly" :loading="adjPull.loading.value" @click="openBringInAdjustment">
+              <el-icon><Download /></el-icon> 带入调整
+            </el-button>
             <el-button size="small" type="primary" link @click="handleAiGenerate('adj-nature')">
               <el-icon><MagicStick /></el-icon> AI说明
             </el-button>
@@ -305,8 +308,18 @@
         <li>按性质分类合计应等于按账龄分类合计（交叉验证）</li>
         <li>审计重点为<strong>完整性认定</strong>（负债易少计）→ 反向截止（期后偿付倒查未入账负债）</li>
         <li>"确认审定"将回写trial_balance(2241)并发布EventBus事件通知附注刷新</li>
+        <li>「带入调整」：按科目2241拉取调整分录，逐笔选<strong>按性质</strong>目标行累加到 AJE/RJE；带入后如触发"性质合计≠账龄合计"提示，请在"二、按账龄分类"对应行同步反映该调整（两维度为同一余额的两种分类视图）</li>
       </ul>
     </details>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="2241 其他应付款（按性质）"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
@@ -332,11 +345,14 @@
  * ⚠️ 负债类！期末=期初+贷方-借方（与资产类相反）
  */
 import { ref, computed, inject, toRef, watch } from 'vue'
-import { MagicStick } from '@element-plus/icons-vue'
+import { MagicStick, Download } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useK3Adjudication, type K3AdjRow } from '../../composables/useK3Adjudication'
 import { useK3FormData } from '../../composables/useK3FormData'
 import { useAgingConfig } from '@/composables/useAgingConfig'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import http from '@/utils/http'
 
 const props = defineProps<{
@@ -384,6 +400,22 @@ const { writebackTB, debouncedSave } = useK3FormData({
 const tableMaxHeight = 480
 const publishing = ref(false)
 const isReadonly = computed(() => props.isReadonly)
+
+// ─── 从集中登记带入调整（2241 其他应付款，负债贷方；带入"按性质"主维度） ────────
+// K3 为双维度（性质 AND 账龄）表示同一 2241 余额；带入至性质主维度（与手工录入一致），
+// 若触发"性质合计≠账龄合计"提示，审计师需在账龄维度同步反映（既有交叉校验保障）。
+const { adjPull, visible: bringInVisible, rowOptions: bringInRowOptions, open: openBringInAdjustment, apply: onBringInApply } = useAdjudicationBringIn({
+  projectId: toRef(props, 'projectId') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '2241',
+  direction: 'credit', // 负债贷方：净发生额 = 贷 − 借
+  subjectCode: '2241',
+  wpCode: 'K3',
+  subjectLabel: '其他应付款(2241·按性质)',
+  rows: computed(() => byNatureRows.value.map(r => ({ rowKey: r.rowKey, name: r.label, aje: r.aje, rje: r.rje }))),
+  updateCell: (rowKey: string, field: any, value: number) => onFieldChange('nature', rowKey, field, value),
+  totalAudited: () => natureSubtotal.value.audited,
+})
 
 // ─── Display rows (with subtotal appended) ───────────────────────────────────
 

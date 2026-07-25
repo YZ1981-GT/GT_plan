@@ -53,6 +53,22 @@ export interface AdjudicationRow {
   isEditable: boolean
   isDeduction: boolean
   rowType: 'dynamic' | 'subtotal' | 'deduction' | 'block_total' | 'tb' | 'diff'
+  /** 该行由四表库审定表预填（adjudication_prefill）自动取数，本会话内标注（Tier B / R2.1）。 */
+  isFourTableSeed?: boolean
+}
+
+/**
+ * 四表库审定表预填行（render 返回的 `adjudication_prefill` 元素）。
+ * spec: d-cycle-four-table-extraction-formulas —— D6 仅 block1（原值）四表可填，
+ * `opening_balance`/`closing_balance` 映射 block1 原值行的期初/期末未审数。
+ */
+export interface AdjudicationPrefillRow {
+  code: string
+  name: string
+  opening_balance: number
+  closing_balance: number
+  block?: string
+  source?: string
 }
 
 export interface AdjudicationBlock {
@@ -71,6 +87,12 @@ export interface UseD6AdjudicationOptions {
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
   wpId: Ref<string>
   projectId: Ref<string>
+  /**
+   * 四表库审定表预填种子（render 返回的 `adjudication_prefill`）。
+   * 灰度开关关闭 / block1 已有数据时后端不下发（undefined），前端零回归。
+   * spec: d-cycle-four-table-extraction-formulas (R2.1/2.2/2.3, Property 2/9/11)
+   */
+  adjudicationPrefill?: Ref<AdjudicationPrefillRow[] | undefined>
 }
 
 // ─── Block Configuration ─────────────────────────────────────────────────────
@@ -169,7 +191,7 @@ function buildRow(params: {
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useD6Adjudication(options: UseD6AdjudicationOptions) {
-  const { allResponses, crossSheet, saveImmediate, debouncedSave, wpId, projectId } = options
+  const { allResponses, crossSheet, saveImmediate, debouncedSave, wpId, projectId, adjudicationPrefill } = options
 
   // ─── Audit Notes ───────────────────────────────────────────────────────────
 
@@ -241,6 +263,109 @@ export function useD6Adjudication(options: UseD6AdjudicationOptions) {
   }
 
   watch(allResponses, _loadRowKeys, { immediate: true })
+
+  // ─── Tier B 四表库审定表预填（自动取数）─────────────────────────────────────
+  // spec: d-cycle-four-table-extraction-formulas (R2.1/2.2/2.3, Property 2/9/11)
+  // 本会话内被四表库预填种子创建的 block1 行键（用于「自动取数」标注，
+  // 非持久化——reload 后 block1 已填、后端不再下发 prefill，标注自然消失）。
+  const fourTableSeededKeys = ref<Set<string>>(new Set())
+  let _prefillSeeded = false
+
+  /**
+   * 镜像后端 `_block1_has_user_data`：block1（原值）锚点是否已有用户/既有一键取数录入。
+   * rowKeys 清单非空，或任一 per-field 期初/期末未审非空 → 视为已填（手工优先）。
+   */
+  function _block1HasUserData(): boolean {
+    const map = allResponses.value
+    const rowKeysStr = getStrFromResponse(map, 'D6-1-adj-block1-rowKeys')
+    if (rowKeysStr && safeParseArray(rowKeysStr).length > 0) return true
+    for (const [itemId, val] of map.entries()) {
+      if (!itemId.startsWith('D6-1-adj-block1-')) continue
+      if (itemId === 'D6-1-adj-block1-rowKeys') continue
+      if (itemId.endsWith('-priorUnadjusted') || itemId.endsWith('-currentUnadjusted')) {
+        if ((val?.remark ?? '').trim()) return true
+      }
+    }
+    return false
+  }
+
+  /**
+   * 消费 `adjudication_prefill`：block1 原值无持久化行/值、且无 D6-2 明细聚合时，
+   * 从四表库叶子子科目建行、seed 期初/期末未审（priorUnadjusted=期初余额，
+   * currentUnadjusted=期末余额），标注自动取数（isFourTableSeed）。
+   *
+   * 手工优先（Property 2）：block1 已有用户/一键取数（`_block1HasUserData`）
+   * 或既有明细导入聚合（`crossSheet.originalValueAggregation` 非空）时不 seed，不覆盖。
+   * seed 走正常保存路径持久化（rowKeys 用 saveImmediate、字段用 debouncedSave，
+   * 与 addDynamicRow/updateCell 一致），编辑后即成普通值；后续 render 见 block1 已填
+   * 不再下发 prefill，故不会重复 seed。整个过程仅执行一次（`_prefillSeeded` 守卫）。
+   */
+  function _maybeSeedFromPrefill(): void {
+    if (_prefillSeeded) return
+    const prefill = adjudicationPrefill?.value
+    if (!prefill || prefill.length === 0) return
+
+    // 手工优先：block1 已有持久化行/值（后端通常也已省略 prefill）
+    if (_block1HasUserData()) { _prefillSeeded = true; return }
+    // 既有明细导入优先：D6-2 明细已聚合出原值行 → 视为已填，不 seed（R2.3）
+    if (Object.keys(crossSheet.originalValueAggregation.value).length > 0) {
+      _prefillSeeded = true
+      return
+    }
+
+    const block1Prefill = prefill.filter(r => (r.block ?? 'block1') === 'block1')
+    if (block1Prefill.length === 0) { _prefillSeeded = true; return }
+
+    const map = allResponses.value
+    const newKeys: string[] = []
+    const seen = new Set<string>()
+    for (const row of block1Prefill) {
+      // 一行一叶子子科目：名称作为 rowKey/label（与 crossSheet 聚合 key 语义一致）
+      const rowKey = (row.name || row.code || '').trim()
+      if (!rowKey || seen.has(rowKey)) continue
+      seen.add(rowKey)
+      newKeys.push(rowKey)
+      const prefix = `D6-1-adj-block1-${rowKey}`
+      map.set(`${prefix}-priorUnadjusted`, {
+        item_id: `${prefix}-priorUnadjusted`, conclusion: null, remark: String(row.opening_balance ?? 0),
+      })
+      map.set(`${prefix}-currentUnadjusted`, {
+        item_id: `${prefix}-currentUnadjusted`, conclusion: null, remark: String(row.closing_balance ?? 0),
+      })
+    }
+
+    if (newKeys.length === 0) { _prefillSeeded = true; return }
+
+    const rowKeysItemId = 'D6-1-adj-block1-rowKeys'
+    const rowKeysRemark = JSON.stringify(newKeys)
+    map.set(rowKeysItemId, { item_id: rowKeysItemId, conclusion: null, remark: rowKeysRemark })
+
+    // 先置守卫再触发响应式，避免 watch 重入重复 seed
+    _prefillSeeded = true
+    fourTableSeededKeys.value = new Set(newKeys)
+    block1RowKeys.value = [...newKeys]
+    allResponses.value = new Map(map)
+
+    // 走正常保存路径持久化（不新造键；rowKeys 结构性即时保存、字段值 debounce 保存）
+    void saveImmediate(rowKeysItemId, { remark: rowKeysRemark })
+    for (const rowKey of newKeys) {
+      const prefix = `D6-1-adj-block1-${rowKey}`
+      debouncedSave(`${prefix}-priorUnadjusted`, {
+        remark: allResponses.value.get(`${prefix}-priorUnadjusted`)?.remark ?? '0',
+      })
+      debouncedSave(`${prefix}-currentUnadjusted`, {
+        remark: allResponses.value.get(`${prefix}-currentUnadjusted`)?.remark ?? '0',
+      })
+    }
+  }
+
+  // 触发 seed：allResponses 加载完成（父组件 isLoading 门控保证挂载时已加载）或
+  // prefill 到达时尝试一次；条件不满足时 no-op（灰度关/无 prefill → 零回归 Property 9）。
+  watch(
+    [allResponses, () => adjudicationPrefill?.value],
+    () => _maybeSeedFromPrefill(),
+    { immediate: true },
+  )
 
   // ─── Block Building Logic ──────────────────────────────────────────────────
 
@@ -381,14 +506,19 @@ export function useD6Adjudication(options: UseD6AdjudicationOptions) {
       return row
     })
 
-    const subtotalRow = _buildSubtotalRow(dynamicRows, config.subtotalLabel)
+    // 标注四表库自动取数行（本会话内 seed 的 block1 行）
+    const taggedRows = dynamicRows.map(r =>
+      fourTableSeededKeys.value.has(r.rowKey) ? { ...r, isFourTableSeed: true } : r,
+    )
+
+    const subtotalRow = _buildSubtotalRow(taggedRows, config.subtotalLabel)
     const deductionRow = _buildDeductionRow('block1', config.deductionLabel)
     const blockTotalRow = _buildBlockTotalRow(subtotalRow, deductionRow, config.totalLabel)
 
     return {
       blockKey: config.blockKey,
       blockTitle: config.blockTitle,
-      rows: dynamicRows,
+      rows: taggedRows,
       subtotalRow,
       deductionRow,
       blockTotalRow,

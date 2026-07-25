@@ -43,7 +43,7 @@
             <el-button size="small" :disabled="isReadonly" type="primary" @click="handleAddRepurchaseRow">
               <el-icon><Plus /></el-icon> 新增
             </el-button>
-            <el-button size="small" @click="handleAI('repurchase-check')">
+            <el-button size="small" :loading="aiLoading === 'repurchase-check'" :disabled="isReadonly" @click="handleAI('repurchase-check')">
               <el-icon><MagicStick /></el-icon> AI
             </el-button>
           </div>
@@ -170,7 +170,7 @@
             <el-button size="small" type="warning" :disabled="isReadonly" @click="handlePublishCancellation">
               联动M2/M4
             </el-button>
-            <el-button size="small" @click="handleAI('cancel-check')">
+            <el-button size="small" :loading="aiLoading === 'cancel-check'" :disabled="isReadonly" @click="handleAI('cancel-check')">
               <el-icon><MagicStick /></el-icon> AI
             </el-button>
           </div>
@@ -326,7 +326,7 @@
       <template #header>
         <div class="card-header">
           <span>核对清单与审计结论</span>
-          <el-button size="small" @click="handleAI('conclusion')">
+          <el-button size="small" :loading="aiLoading === 'conclusion'" :disabled="isReadonly" @click="handleAI('conclusion')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </div>
@@ -398,12 +398,13 @@
  *
  * 科目：4002 库存股（**借方/权益备抵类！**）
  */
-import { computed, inject, onMounted, defineAsyncComponent } from 'vue'
+import { computed, inject, onMounted, ref, defineAsyncComponent } from 'vue'
 import { Plus, MagicStick, Check } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useM3FormData } from '../../composables/useM3FormData'
 import { useM3TreasuryCheck } from '../../composables/useM3TreasuryCheck'
 import { useM3ImportExport, type M3ImportableSheet } from '../../composables/useM3ImportExport'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 
 const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
 
@@ -418,6 +419,8 @@ const emit = defineEmits<{
 }>()
 
 const openReviewDialog = inject<((sectionId: string, sectionLabel?: string) => void) | null>('openReviewDialog', null)
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
 
 // ─── FormData + Composables ──────────────────────────────────────────────────
 
@@ -502,7 +505,31 @@ function handleImportExport(command: string) {
   }
 }
 
-function handleAI(_section: string) { /* AI辅助待集成 */ }
+async function handleAI(section: string) {
+  if (props.isReadonly) return
+  aiLoading.value = section
+  try {
+    const context: Record<string, string> = {
+      科目: '4002 库存股（权益备抵类·借方，检查表 M3-5 回购/注销核对）',
+      回购金额合计: fmtAmount(check.repurchaseTotal.value),
+      注销金额合计: fmtAmount(check.cancelTotal.value),
+      存在未处理冲减差额: check.hasUnresolvedDiff.value ? '是' : '否',
+    }
+    if (section === 'conclusion') {
+      const text = await generateAiText({ section: 'm3-treasury-check-conclusion', context, existingContent: check.conclusion.value })
+      if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+      check.setConclusion(text)
+    } else {
+      const text = await generateAiText({ section: `m3-treasury-check-${section}`, context, existingContent: '' })
+      if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+      ElMessageBox.alert(text, 'AI 辅助建议', { confirmButtonText: '知道了' }).catch(() => {})
+    }
+  } catch {
+    ElMessage.warning('AI 生成失败，请稍后重试')
+  } finally {
+    aiLoading.value = ''
+  }
+}
 function handleReview() { openReviewDialog?.('M3-5-treasury-check', '库存股检查表') }
 
 // ─── Format helpers ──────────────────────────────────────────────────────────

@@ -2,203 +2,186 @@
  * useL3OverdueCheck — L3-7 逾期贷款检查 composable
  *
  * Spec: .kiro/specs/l3-long-term-loans/
- * Task: 3.4
- * Requirements: 7.1-7.3
+ * 2026-07 复盘重建：
+ * - 🔴 P0 修复：改为 JSON-array 存储（item_id `L3-overdue-check-rows`，与后端导入导出一致）
+ *   + 从 allResponses hydrate（此前 rows 为组件本地 ref([]) 从不加载 → 刷新数据丢失 + 导入导出断裂）
+ * - 逾期天数 = 报告日 − 到期日（>0 为逾期），橙/深橙/红分级高亮
+ * - 🆕 逾期比例 = 逾期金额合计 / 长期借款审定数（对齐源模板，联动 L3-1）
+ * - 五级风险分类（正常/关注/次级/可疑/损失）
  *
- * 职责：
- * - 逾期天数 = 报告日 - 到期日（>0 为逾期）
- * - 橙色/红色分级高亮（30天内橙色, >90天红色）
- * - 逾期统计汇总
+ * 存储字段（后端 _FIELD_MAPS['L3-7']）：contractNo/bankName/loanAmount/dueDate/reportDate/
+ *   overdueDays/overdueAmount/isExtended/extendedDueDate/riskAssessment/remark
+ * 组件内部字段保持 bank/riskEvaluation（模板兼容），序列化时映射后端字段名。
  */
-import { computed, type ComputedRef } from 'vue'
+import { computed, ref, watch, type ComputedRef, type Ref } from 'vue'
 import { calcOverdueDays } from '@/composables/useL3InterestEngine'
 import { calcSubtotal } from '@/composables/useL3FormulaEngine'
-import type { useL3FormData } from '@/components/workpaper/composables/useL3FormData'
+import type { useL3FormData, ChecklistResponse } from '@/components/workpaper/composables/useL3FormData'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-/** 逾期风险等级 */
 export type L3OverdueLevel = 'none' | 'low' | 'medium' | 'high'
 
-/** 逾期检查行原始数据 */
 export interface L3OverdueCheckRow {
-  /** 借款合同号 */
   contractNo: string
-  /** 借款银行 */
   bank: string
-  /** 到期日 (YYYY-MM-DD) */
   dueDate: string
-  /** 逾期天数（公式列） */
   overdueDays: number
-  /** 逾期金额 */
   overdueAmount: number
-  /** 是否展期 */
   isExtended: string
-  /** 风险评价 */
   riskEvaluation: string
+  loanAmount?: number
+  extendedDueDate?: string
+  remark?: string
 }
 
-/** 逾期检查计算结果行 */
 export interface L3OverdueCheckComputed extends L3OverdueCheckRow {
-  /** 计算后的逾期天数（正值=逾期，负值/0=未逾期） */
   computedOverdueDays: number
-  /** 逾期风险等级（用于高亮：橙/红） */
   overdueLevel: L3OverdueLevel
-  /** 是否逾期（天数>0） */
   isOverdue: boolean
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-/** 逾期等级阈值 */
-const OVERDUE_LOW_DAYS = 30    // ≤30天：橙色（关注）
-const OVERDUE_HIGH_DAYS = 90   // >90天：红色（高风险）
+const OVERDUE_LOW_DAYS = 30
+const OVERDUE_HIGH_DAYS = 90
+const ITEM_ROWS = 'L3-overdue-check-rows'
+/** L3-1 审定表期末审定合计（useL3Adjudication 同步写入） */
+const ITEM_L3_1_AUDITED = 'L3-L3-1-adjudication-total'
+
+// ─── 内部字段 ↔ 后端字段 映射 ────────────────────────────────────────────────
+
+function toBackend(row: L3OverdueCheckRow, reportDate: string): Record<string, any> {
+  return {
+    contractNo: row.contractNo || '',
+    bankName: row.bank || '',
+    loanAmount: row.loanAmount || 0,
+    dueDate: row.dueDate || '',
+    reportDate,
+    overdueDays: calcOverdueDays(row.dueDate, reportDate),
+    overdueAmount: row.overdueAmount || 0,
+    isExtended: row.isExtended || '',
+    extendedDueDate: row.extendedDueDate || '',
+    riskAssessment: row.riskEvaluation || '',
+    remark: row.remark || '',
+  }
+}
+
+function fromBackend(o: any): L3OverdueCheckRow {
+  return {
+    contractNo: o.contractNo ?? '',
+    bank: o.bankName ?? o.bank ?? '',
+    dueDate: o.dueDate ?? '',
+    overdueDays: Number(o.overdueDays) || 0,
+    overdueAmount: Number(o.overdueAmount) || 0,
+    isExtended: o.isExtended ?? '',
+    riskEvaluation: o.riskAssessment ?? o.riskEvaluation ?? '',
+    loanAmount: Number(o.loanAmount) || 0,
+    extendedDueDate: o.extendedDueDate ?? '',
+    remark: o.remark ?? '',
+  }
+}
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
-/**
- * L3-7 逾期贷款检查业务逻辑
- *
- * @param formData 由调用方传入的 useL3FormData 实例
- * @param overdueRows reactive ref of overdue check rows
- * @param reportDate 报告期截止日 (YYYY-MM-DD)
- */
 export function useL3OverdueCheck(
   formData: ReturnType<typeof useL3FormData>,
-  overdueRows: { value: L3OverdueCheckRow[] },
   reportDate: string,
 ) {
-  const { debouncedSave } = formData
+  const { allResponses, debouncedSave } = formData
+  const rows: Ref<L3OverdueCheckRow[]> = ref([])
 
-  // ─── 1. 计算属性：每行逾期天数+等级 ──────────────────────────────────
+  function hydrate(): void {
+    const raw = allResponses.value.get(ITEM_ROWS)?.remark
+    if (!raw) return
+    try {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) rows.value = parsed.map(fromBackend)
+    } catch { /* ignore */ }
+  }
+  hydrate()
+  watch(
+    () => allResponses.value.get(ITEM_ROWS)?.remark,
+    (v) => { if (v && rows.value.length === 0) hydrate() },
+  )
 
-  /** 各行自动计算逾期天数并分级 */
-  const computedRows: ComputedRef<L3OverdueCheckComputed[]> = computed(() => {
-    return overdueRows.value.map(row => {
+  function persist(): void {
+    debouncedSave(ITEM_ROWS, { remark: JSON.stringify(rows.value.map(r => toBackend(r, reportDate))) } as Partial<ChecklistResponse>)
+  }
+
+  // ─── 计算：逾期天数+等级 ─────────────────────────────────────────────────
+  const computedRows: ComputedRef<L3OverdueCheckComputed[]> = computed(() =>
+    rows.value.map(row => {
       const computedOverdueDays = calcOverdueDays(row.dueDate, reportDate)
       const isOverdue = computedOverdueDays > 0
-
-      // 分级：橙/红
       let overdueLevel: L3OverdueLevel = 'none'
       if (isOverdue) {
-        if (computedOverdueDays <= OVERDUE_LOW_DAYS) {
-          overdueLevel = 'low'
-        } else if (computedOverdueDays <= OVERDUE_HIGH_DAYS) {
-          overdueLevel = 'medium'
-        } else {
-          overdueLevel = 'high'
-        }
+        if (computedOverdueDays <= OVERDUE_LOW_DAYS) overdueLevel = 'low'
+        else if (computedOverdueDays <= OVERDUE_HIGH_DAYS) overdueLevel = 'medium'
+        else overdueLevel = 'high'
       }
+      return { ...row, computedOverdueDays, overdueLevel, isOverdue }
+    }),
+  )
 
-      return {
-        ...row,
-        computedOverdueDays,
-        overdueLevel,
-        isOverdue,
-      }
-    })
+  // ─── 统计 ────────────────────────────────────────────────────────────────
+  const overdueCount = computed(() => computedRows.value.filter(r => r.isOverdue).length)
+  const totalOverdueAmount = computed(() =>
+    parseFloat(calcSubtotal(computedRows.value.filter(r => r.isOverdue).map(r => r.overdueAmount)).toFixed(2)))
+  const overdueSummary = computed<Record<L3OverdueLevel, number>>(() => {
+    const s: Record<L3OverdueLevel, number> = { none: 0, low: 0, medium: 0, high: 0 }
+    for (const row of computedRows.value) s[row.overdueLevel]++
+    return s
   })
 
-  // ─── 2. 统计 ──────────────────────────────────────────────────────────
-
-  /** 逾期笔数 */
-  const overdueCount: ComputedRef<number> = computed(() => {
-    return computedRows.value.filter(r => r.isOverdue).length
+  // ─── 🆕 逾期比例 = 逾期金额合计 / 长期借款审定数（源模板核心指标，联动 L3-1） ───
+  const l3AuditedTotal = computed(() => {
+    const raw = allResponses.value.get(ITEM_L3_1_AUDITED)?.remark
+    const n = Number(raw)
+    return Number.isFinite(n) ? n : 0
+  })
+  const overdueRatio = computed(() => {
+    const base = l3AuditedTotal.value
+    if (!base || base === 0) return null   // null → UI 显示 "—"（审定数未填）
+    return parseFloat(((totalOverdueAmount.value / base) * 100).toFixed(2))
   })
 
-  /** 逾期金额合计 */
-  const totalOverdueAmount: ComputedRef<number> = computed(() => {
-    return parseFloat(
-      calcSubtotal(
-        computedRows.value.filter(r => r.isOverdue).map(r => r.overdueAmount),
-      ).toFixed(2),
-    )
-  })
-
-  /** 按等级分组统计 */
-  const overdueSummary: ComputedRef<Record<L3OverdueLevel, number>> = computed(() => {
-    const summary: Record<L3OverdueLevel, number> = { none: 0, low: 0, medium: 0, high: 0 }
-    for (const row of computedRows.value) {
-      summary[row.overdueLevel]++
-    }
-    return summary
-  })
-
-  // ─── 3. 行操作 ────────────────────────────────────────────────────────
-
-  /** 更新某行字段 */
+  // ─── 行操作 ──────────────────────────────────────────────────────────────
   function updateRow(index: number, field: keyof L3OverdueCheckRow, value: string | number): void {
-    if (index < 0 || index >= overdueRows.value.length) return
-    const row = overdueRows.value[index] as any
-    row[field] = value
-
-    // 如果修改了到期日，重算逾期天数
+    if (index < 0 || index >= rows.value.length) return
+    ;(rows.value[index] as any)[field] = value
     if (field === 'dueDate') {
-      row.overdueDays = calcOverdueDays(value as string, reportDate)
+      rows.value[index].overdueDays = calcOverdueDays(value as string, reportDate)
     }
-
-    _triggerSave(index)
+    persist()
   }
 
-  /** 新增逾期检查行 */
   function addRow(contractNo: string, bank?: string): void {
-    const newRow: L3OverdueCheckRow = {
-      contractNo,
-      bank: bank || '',
-      dueDate: '',
-      overdueDays: 0,
-      overdueAmount: 0,
-      isExtended: '',
-      riskEvaluation: '',
-    }
-    overdueRows.value.push(newRow)
-    _triggerSave(overdueRows.value.length - 1)
+    rows.value.push({
+      contractNo, bank: bank || '', dueDate: '', overdueDays: 0, overdueAmount: 0,
+      isExtended: '', riskEvaluation: '', loanAmount: 0, extendedDueDate: '', remark: '',
+    })
+    persist()
   }
 
-  /** 删除行 */
   function removeRow(index: number): void {
-    if (index < 0 || index >= overdueRows.value.length) return
-    overdueRows.value.splice(index, 1)
-    _triggerSaveAll()
+    if (index < 0 || index >= rows.value.length) return
+    rows.value.splice(index, 1)
+    persist()
   }
-
-  // ─── 4. 保存触发 ──────────────────────────────────────────────────────
-
-  function _triggerSave(rowIndex: number): void {
-    const row = overdueRows.value[rowIndex]
-    if (!row) return
-    const n = rowIndex + 1
-    const fields: (keyof L3OverdueCheckRow)[] = [
-      'contractNo', 'bank', 'dueDate', 'overdueDays',
-      'overdueAmount', 'isExtended', 'riskEvaluation',
-    ]
-    for (const field of fields) {
-      const val = (row as any)[field]
-      debouncedSave(`L3-ovd-${n}-${field}`, {
-        remark: val != null && val !== '' && val !== 0 ? String(val) : null,
-      })
-    }
-  }
-
-  function _triggerSaveAll(): void {
-    for (let i = 0; i < overdueRows.value.length; i++) {
-      _triggerSave(i)
-    }
-  }
-
-  // ─── Return ────────────────────────────────────────────────────────────
 
   return {
-    // 计算
+    rows,
     computedRows,
     overdueCount,
     totalOverdueAmount,
     overdueSummary,
-
-    // 行操作
+    l3AuditedTotal,
+    overdueRatio,
     addRow,
     removeRow,
     updateRow,
+    hydrate,
   }
 }
 

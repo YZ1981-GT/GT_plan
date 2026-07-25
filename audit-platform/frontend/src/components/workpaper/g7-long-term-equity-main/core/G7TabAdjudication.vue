@@ -4,6 +4,12 @@
     <div class="section-head">
       <h3 class="sheet-title">G7-1 长期股权投资审定表</h3>
       <div class="head-actions">
+        <el-button size="small" type="primary" plain :loading="adjPullGross.loading.value" @click="openBringInGross">
+          <el-icon><Download /></el-icon>带入调整(原值)
+        </el-button>
+        <el-button size="small" type="primary" plain :loading="adjPullImpair.loading.value" @click="openBringInImpair">
+          <el-icon><Download /></el-icon>带入调整(减值)
+        </el-button>
         <el-button size="small" type="primary" :disabled="isReadonly || !isDirty" :loading="saving" @click="saveAll">
           保存
         </el-button>
@@ -344,8 +350,26 @@
         <p>4. 勾稽：投资合计 ↔ TB1511；减值准备 ↔ TB1512；净值 ↔ 1511−1512</p>
         <p>5. 回写：1511 回写投资合计审定（原值），1512 回写减值准备审定</p>
         <p>6. |变动率|超过20%需填写原因分析（橙色高亮）</p>
+        <p>7. 「带入调整(原值)」：从集中登记按科目 1511 拉取调整分录，逐笔分配到子公司/合营/联营各投资明细行的期末 AJE/RJE；「带入调整(减值)」按科目 1512 分配到减值明细行，带入后审定数自动更新并联动附注。</p>
       </div>
     </details>
+
+    <AdjudicationBringInDialog
+      v-model="bringInGrossVisible"
+      :matches="adjPullGross.matches.value"
+      :row-options="bringInGrossRowOptions"
+      subject-label="1511 长期股权投资原值"
+      :loading="adjPullGross.loading.value"
+      @apply="onBringInGrossApply"
+    />
+    <AdjudicationBringInDialog
+      v-model="bringInImpairVisible"
+      :matches="adjPullImpair.matches.value"
+      :row-options="bringInImpairRowOptions"
+      subject-label="1512 长期股权投资减值准备"
+      :loading="adjPullImpair.loading.value"
+      @apply="onBringInImpairApply"
+    />
   </div>
 </template>
 
@@ -370,7 +394,7 @@
  * - 监听 g7:adjustment-writeback 回写期末 AJE/RJE
  */
 import { ref, reactive, computed, watch, inject, onMounted, onBeforeUnmount } from 'vue'
-import { ArrowDown } from '@element-plus/icons-vue'
+import { ArrowDown, Download } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { parseNum, calcAdjustedAmount, calcChangeRate, calcDebitBalance } from '../../composables/useG7FormulaEngine'
 import {
@@ -379,6 +403,9 @@ import {
   type G7EquityRow,
   type G7ImpairmentRow,
 } from '../../composables/g7DetailModel'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { api } from '@/services/apiProxy'
 
@@ -652,6 +679,72 @@ function updateCell(groupId: string, rowIdx: number, field: string, value: numbe
   isDirty.value = true
   schedulePersist()
 }
+
+// ─── 从集中登记带入调整（双科目：1511 原值[借方] + 1512 减值准备[贷方备抵]；带入期末 AJE/RJE） ───
+// 目标行 rowKey 编码为 `${groupId}::${rowIdx}`，桥接到自建 groups 的 updateCell(groupId, idx, field, v)
+const bringInRowsGross = computed(() => {
+  const out: Array<{ rowKey: string; name: string; aje: number; rje: number }> = []
+  for (const gid of ['subsidiary', 'joint_venture', 'associate']) {
+    const g = groups.find((x) => x.id === gid)
+    if (!g) continue
+    g.rows.forEach((r, idx) => {
+      if (r._isSubtotal) return
+      out.push({ rowKey: `${gid}::${idx}`, name: r.item, aje: r.closingAJE, rje: r.closingRJE })
+    })
+  }
+  return out
+})
+const bringInRowsImpair = computed(() => {
+  const g = groups.find((x) => x.id === 'impairment')
+  if (!g) return []
+  const out: Array<{ rowKey: string; name: string; aje: number; rje: number }> = []
+  g.rows.forEach((r, idx) => {
+    if (r._isSubtotal) return
+    out.push({ rowKey: `impairment::${idx}`, name: r.item, aje: r.closingAJE, rje: r.closingRJE })
+  })
+  return out
+})
+function bringInUpdateCell(rowKey: string, field: any, value: number): void {
+  const [gid, idxStr] = rowKey.split('::')
+  updateCell(gid, Number(idxStr), field === 'rje' ? 'closingRJE' : 'closingAJE', value)
+}
+const {
+  adjPull: adjPullGross,
+  visible: bringInGrossVisible,
+  rowOptions: bringInGrossRowOptions,
+  open: openBringInGross,
+  apply: onBringInGrossApply,
+} = useAdjudicationBringIn({
+  projectId: computed(() => props.projectId) as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '1511',
+  direction: 'debit',
+  subjectCode: '1511',
+  wpCode: 'G7',
+  subjectLabel: '长期股权投资原值(1511)',
+  rows: bringInRowsGross,
+  updateCell: bringInUpdateCell,
+  totalAudited: () => investmentTotalRow.value.closingAdjusted,
+})
+const {
+  adjPull: adjPullImpair,
+  visible: bringInImpairVisible,
+  rowOptions: bringInImpairRowOptions,
+  open: openBringInImpair,
+  apply: onBringInImpairApply,
+} = useAdjudicationBringIn({
+  projectId: computed(() => props.projectId) as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '1512',
+  direction: 'credit',
+  subjectCode: '1512',
+  wpCode: 'G7',
+  subjectLabel: '长期股权投资减值准备(1512)',
+  rows: bringInRowsImpair,
+  updateCell: bringInUpdateCell,
+  totalAudited: () =>
+    calcGroupSubtotal(groups.find((g) => g.id === 'impairment')?.rows ?? []).closingAdjusted,
+})
 
 function recalcRow(row: AdjRow): void {
   row.openingAdjusted = calcAdjustedAmount(

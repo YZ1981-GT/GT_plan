@@ -34,7 +34,7 @@
         <div class="card-header">
           <span>核对清单</span>
           <div class="card-header-right">
-            <el-button size="small" @click="handleAI('checklist')">
+            <el-button size="small" :loading="aiLoading === 'checklist'" :disabled="isReadonly" @click="handleAI('checklist')">
               <el-icon><MagicStick /></el-icon> AI辅助
             </el-button>
           </div>
@@ -87,7 +87,7 @@
         <div class="card-header">
           <span>审计结论</span>
           <div class="card-header-right">
-            <el-button size="small" @click="handleAI('conclusion')">
+            <el-button size="small" :loading="aiLoading === 'conclusion'" :disabled="isReadonly" @click="handleAI('conclusion')">
               <el-icon><MagicStick /></el-icon> AI辅助
             </el-button>
           </div>
@@ -141,8 +141,10 @@
  * 核对关注：法定计提合规 / 任意计提决议 / 转增合规 / 弥补亏损决议 / M5-4/M5-2勾稽
  */
 import { computed, inject, onMounted, reactive, ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, Check } from '@element-plus/icons-vue'
 import { useM5FormData } from '../../composables/useM5FormData'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -170,6 +172,8 @@ const openReviewDialog = inject<((sectionId: string, sectionLabel?: string) => v
   'openReviewDialog',
   null,
 )
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
 
 // ─── FormData ────────────────────────────────────────────────────────────────
 
@@ -230,8 +234,28 @@ function _saveChecklist() {
 
 // ─── Handlers ────────────────────────────────────────────────────────────────
 
-function handleAI(_section: string) {
-  /* AI辅助待集成 */
+async function handleAI(section: string) {
+  if (props.isReadonly) return
+  aiLoading.value = section
+  try {
+    const passedCount = checklist.filter((i) => i.passed === true).length
+    const failedCount = checklist.filter((i) => i.passed === false).length
+    const context: Record<string, string> = {
+      科目: '4101 盈余公积（权益类贷方）',
+      核对项总数: String(checklist.length),
+      通过项: String(passedCount),
+      不通过项: String(failedCount),
+      不通过明细: failedItems.value.map((f) => f.label).join('；') || '无',
+    }
+    const text = await generateAiText({
+      section: `m5-reserve-check-${section}`,
+      context,
+      existingContent: section === 'conclusion' ? conclusion.value : '',
+    })
+    if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+    if (section === 'conclusion') setConclusion(text)
+    else ElMessageBox.alert(text, 'AI 辅助建议', { confirmButtonText: '知道了' }).catch(() => {})
+  } catch { ElMessage.warning('AI 生成失败，请稍后重试') } finally { aiLoading.value = '' }
 }
 
 function handleReview() {

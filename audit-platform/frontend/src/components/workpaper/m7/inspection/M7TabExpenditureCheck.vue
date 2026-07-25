@@ -61,7 +61,7 @@
             <el-button v-if="!isReadonly" size="small" type="primary" plain @click="addRow('capital')">
               + 新增
             </el-button>
-            <el-button size="small" @click="handleAI('capital')">
+            <el-button size="small" :loading="aiLoading === 'capital'" @click="handleAI('capital')">
               <el-icon><MagicStick /></el-icon> AI辅助
             </el-button>
             <el-button size="small" @click="openReviewDialog?.('M7-5-capital', '资本性支出检查')">💬 复核</el-button>
@@ -164,7 +164,7 @@
             <el-button v-if="!isReadonly" size="small" type="primary" plain @click="addRow('expense')">
               + 新增
             </el-button>
-            <el-button size="small" @click="handleAI('expense')">
+            <el-button size="small" :loading="aiLoading === 'expense'" @click="handleAI('expense')">
               <el-icon><MagicStick /></el-icon> AI辅助
             </el-button>
             <el-button size="small" @click="openReviewDialog?.('M7-5-expense', '费用性支出检查')">💬 复核</el-button>
@@ -260,7 +260,7 @@
         <div class="card-header">
           <span class="card-title-text">检查比例核算</span>
           <div class="card-header-right">
-            <el-button size="small" @click="handleAI('ratio')">
+            <el-button size="small" :loading="aiLoading === 'ratio'" @click="handleAI('ratio')">
               <el-icon><MagicStick /></el-icon> AI辅助
             </el-button>
           </div>
@@ -291,7 +291,7 @@
         <div class="card-header">
           <span class="card-title-text">核对清单</span>
           <div class="card-header-right">
-            <el-button size="small" @click="handleAI('checklist')">
+            <el-button size="small" :loading="aiLoading === 'checklist'" @click="handleAI('checklist')">
               <el-icon><MagicStick /></el-icon> AI辅助
             </el-button>
             <el-button size="small" @click="openReviewDialog?.('M7-5-checklist', '核对清单')">💬 复核</el-button>
@@ -345,7 +345,7 @@
         <div class="card-header">
           <span class="card-title-text">审计结论</span>
           <div class="card-header-right">
-            <el-button size="small" @click="handleAI('conclusion')">
+            <el-button size="small" :loading="aiLoading === 'conclusion'" @click="handleAI('conclusion')">
               <el-icon><MagicStick /></el-icon> AI辅助
             </el-button>
             <el-button size="small" @click="openReviewDialog?.('M7-5-conclusion', '审计结论')">💬 复核</el-button>
@@ -406,9 +406,11 @@
  * 使用支出在借方减少：费用化直接冲减 / 资本化转固定资产同时冲减
  */
 import { computed, inject, onMounted, reactive, ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, Check } from '@element-plus/icons-vue'
 import { useM7FormData } from '../../composables/useM7FormData'
 import GtIndexChip from '../../GtIndexChip.vue'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -449,6 +451,8 @@ const openReviewDialog = inject<((sectionId: string, sectionLabel?: string) => v
   'openReviewDialog',
   null,
 )
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
 
 // ─── FormData ────────────────────────────────────────────────────────────────
 
@@ -597,8 +601,27 @@ function _saveChecklist() {
 
 // ─── Handlers ────────────────────────────────────────────────────────────────
 
-function handleAI(_section: string) {
-  /* AI辅助待集成（Phase 6/7） */
+async function handleAI(section: string): Promise<void> {
+  if (props.isReadonly) return
+  aiLoading.value = section
+  try {
+    const context: Record<string, string> = {
+      科目: '4201 专项储备 / 支出检查 M7-5',
+      资本性支出笔数: String(capitalRows.value.length),
+      资本性支出合计: fmtAmount(capitalTotal.value),
+      费用性支出笔数: String(expenseRows.value.length),
+      费用性支出合计: fmtAmount(expenseTotal.value),
+      核对环节: section,
+    }
+    const existing = section === 'conclusion' ? conclusion.value : ''
+    const text = await generateAiText({ section: `m7-expenditure-${section}`, context, existingContent: existing })
+    if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+    if (section === 'conclusion') {
+      setConclusion(text)
+    } else {
+      ElMessageBox.alert(text, 'AI 辅助建议', { confirmButtonText: '知道了' }).catch(() => {})
+    }
+  } catch { ElMessage.warning('AI 生成失败，请稍后重试') } finally { aiLoading.value = '' }
 }
 
 function handleReview() {

@@ -14,6 +14,7 @@
           :loading="isSyncing"
           @click="syncToNotes"
         >同步到附注（八、72）</el-button>
+        <el-button size="small" type="primary" plain :disabled="!projectId" @click="jumpToNote('soe')">↩ 跳转回附注（八、72）</el-button>
         <el-button size="small" :loading="dis.aiLoading.value" :disabled="isReadonly"
           @click="dis.generateAiConclusion()">🤖 AI辅助</el-button>
         <el-button size="small" :disabled="isReadonly" @click="dis.syncFromDetail()">从明细同步</el-button>
@@ -113,6 +114,8 @@
 <script setup lang="ts">
 import { ref, toRef, computed } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useRouter } from 'vue-router'
+import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import { useG13Disclosure } from '../composables/useG13Disclosure'
 import { G13_ACCOUNT_CODE, G13_DISCLOSURE_FORMULA_MAP } from '../composables/g13Constants'
 import { buildG13SyncPayloads } from '../composables/g13DisclosureSyncPayload'
@@ -144,6 +147,14 @@ const dis = useG13Disclosure({
 const isSyncing = ref(false)
 const soeNoteSection = G13_SOE_NOTE_SECTION
 const noteChip = computed(() => `Note:${soeNoteSection}`)
+
+const router = useRouter()
+// 跳转回附注模块（披露表 → 附注为单向推送；此处仅导航，方便相互编辑确认）
+function jumpToNote(target: DisclosureVariant): void {
+  const route = buildNoteJumpRoute(props.projectId || '', 'G13', target)
+  if (!route) { ElMessage.warning('未找到对应的附注章节'); return }
+  router.push(route)
+}
 
 async function syncToNotes(): Promise<void> {
   if (isSyncing.value || props.isReadonly || !props.projectId || !props.wpId) return

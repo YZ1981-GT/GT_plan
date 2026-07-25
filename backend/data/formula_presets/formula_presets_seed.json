@@ -316,15 +316,21 @@
     {
       "page_key": "report:balance_sheet",
       "target_cell": "BS-002",
-      "expression": "TB('1001', '期末余额')",
+      "expression": "TB('1001', '期末余额') + TB('1002', '期末余额') + TB('1012', '期末余额')",
       "formula_type": "auto_calc",
       "refs": [
         {
           "formula_ref": "TB('1001')"
+        },
+        {
+          "formula_ref": "TB('1002')"
+        },
+        {
+          "formula_ref": "TB('1012')"
         }
       ],
       "source": "bs_preset_generator",
-      "description": "货币资金 — 取试算表科目 1001 期末余额"
+      "description": "货币资金 — 取试算表科目 1001 库存现金 + 1002 银行存款 + 1012 其他货币资金 期末余额（与 report_config / report_account_mapping BS-002 口径一致）"
     },
     {
       "page_key": "report:balance_sheet",

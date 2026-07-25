@@ -8,7 +8,7 @@
         <el-tag type="success" size="small">国企</el-tag>
       </div>
       <div class="section-header-right">
-        <el-button size="small" @click="handleAI('disclosure-soe')">
+        <el-button size="small" :loading="aiLoading === 'disclosure-soe'" :disabled="isReadonly" @click="handleAI('disclosure-soe')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
         <el-button size="small" @click="handleReview">
@@ -32,7 +32,7 @@
       <template #header>
         <div class="card-header">
           <span>未分配利润变动明细（国企格式）</span>
-          <el-button size="small" @click="handleAI('section-movement')">
+          <el-button size="small" :loading="aiLoading === 'section-movement'" :disabled="isReadonly" @click="handleAI('section-movement')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </div>
@@ -131,7 +131,7 @@
       <template #header>
         <div class="card-header">
           <span>一般风险准备及转增资本说明</span>
-          <el-button size="small" @click="handleAI('section-risk-reserve')">
+          <el-button size="small" :loading="aiLoading === 'section-risk-reserve'" :disabled="isReadonly" @click="handleAI('section-risk-reserve')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </div>
@@ -151,7 +151,7 @@
       <template #header>
         <div class="card-header">
           <span>国有资本经营收益分配说明</span>
-          <el-button size="small" @click="handleAI('section-soe-distribution')">
+          <el-button size="small" :loading="aiLoading === 'section-soe-distribution'" :disabled="isReadonly" @click="handleAI('section-soe-distribution')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </div>
@@ -197,9 +197,11 @@
  * - inject openReviewDialog
  */
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, Check } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
 import { useM6FormData } from '../../composables/useM6FormData'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -214,6 +216,8 @@ const emit = defineEmits<{
 }>()
 
 const openReviewDialog = inject<((sectionId: string, sectionLabel?: string) => void) | null>('openReviewDialog', null)
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
 
 // ─── FormData ───────────────────────────────────────────────────────────────
 
@@ -323,8 +327,34 @@ function handleSoeDistributionNoteChange() {
   formData.debouncedSave('M6-disclosure-soe-distribution', { remark: soeDistributionNote.value || null })
 }
 
-function handleAI(_section: string) {
-  // AI辅助钩子（后续集成）
+async function handleAI(section: string) {
+  if (props.isReadonly) return
+  aiLoading.value = section
+  try {
+    const endRow = movementRows.value.find(r => r.key === 'end-retained')
+    const context: Record<string, string> = {
+      科目: '4104 利润分配-未分配利润 / 附注披露（国有企业）',
+      期末未分配利润: fmtAmount(endRow?.endBalance ?? 0),
+    }
+    if (section === 'section-risk-reserve') {
+      const text = await generateAiText({ section: 'm6-disclosure-soe-risk-reserve', context, existingContent: riskReserveNote.value })
+      if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+      riskReserveNote.value = text
+      handleRiskReserveNoteChange()
+      return
+    }
+    if (section === 'section-soe-distribution') {
+      const text = await generateAiText({ section: 'm6-disclosure-soe-distribution', context, existingContent: soeDistributionNote.value })
+      if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+      soeDistributionNote.value = text
+      handleSoeDistributionNoteChange()
+      return
+    }
+    // 无对应文本区（整体披露/变动表说明）→ 弹窗展示建议
+    const text = await generateAiText({ section: `m6-disclosure-soe-${section}`, context, existingContent: '' })
+    if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+    ElMessageBox.alert(text, 'AI 辅助建议', { confirmButtonText: '知道了' }).catch(() => {})
+  } catch { ElMessage.warning('AI 生成失败，请稍后重试') } finally { aiLoading.value = '' }
 }
 
 function handleReview() {

@@ -5,7 +5,7 @@
     </div>
 
     <template v-else>
-      <div v-if="isHtmlSheet" class="i4-header-toolbar">
+      <div v-if="isHtmlSheet && currentSheet !== 'I4'" class="i4-header-toolbar">
         <el-segmented
           v-if="dualMode.isOoAvailable.value"
           v-model="dualMode.currentMode.value"

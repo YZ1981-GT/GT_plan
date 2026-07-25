@@ -3,6 +3,9 @@
     <div class="g11-toolbar">
       <h3 class="g11-title">G11-1 投资收益审定表</h3>
       <div class="g11-actions">
+        <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
+          <el-icon><Download /></el-icon>带入调整
+        </el-button>
         <G11ImportExportDropdown :wp-id="wpId" sheet="G11-1" @imported="emit('imported')" />
         <GtReviewTrigger section-id="G11-1-adjudication" />
         <el-button size="small" :loading="adj.aiLoading.value" :disabled="isReadonly" @click="adj.generateAiAnalysis()">🤖 AI</el-button>
@@ -45,6 +48,7 @@
       <div class="guidance-content">
         <p>科目 6111 投资收益（损益类/贷方），列为本期数与上期数比较，取发生额非余额递推。</p>
         <p>审定数 = 未审数 + 账项调整；|变动率|&gt;20% 时原因分析必填。</p>
+        <p>「带入调整」：可从集中登记按科目 6111 拉取调整分录，逐笔分配到各行本期调整，带入后审定数自动更新并联动附注。</p>
       </div>
     </details>
 
@@ -181,18 +185,31 @@
         <el-table-column label="索引提示" prop="indexHint" width="88" />
       </el-table>
     </details>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="6111 投资收益"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { inject, toRef, ref } from 'vue'
+import { computed, inject, toRef, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Download } from '@element-plus/icons-vue'
 import { useG11Adjudication } from '../../composables/useG11Adjudication'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import { useAuditContext } from '@/composables/useAuditContext'
 import { dispatchG11OfferDisclosurePull } from '../../composables/g11DisclosureSync'
 import { G11_AUDIT_GUIDANCE_ROWS } from '../../composables/g11Constants'
 import { resolveG11SheetLabel } from '../../composables/g11SheetLabels'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import G11ImportExportDropdown from '../G11ImportExportDropdown.vue'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtReviewDot from '../../GtReviewDot.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
@@ -218,6 +235,34 @@ const adj = useG11Adjudication({
   allResponses: toRef(props, 'allResponses'),
   isReadonly: toRef(props, 'isReadonly'),
   debouncedSave: props.debouncedSave,
+})
+
+// ─── 从集中登记带入调整（6111 投资收益，损益贷方；带入本期调整，单一调整列） ───
+const bringInRows = computed(() =>
+  adj.dataRows.value.map((r) => ({ rowKey: r.rowKey, name: r.label, aje: 0, rje: 0 })),
+)
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: toRef(props, 'projectId') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '6111',
+  direction: 'credit',
+  subjectCode: '6111',
+  wpCode: 'G11',
+  subjectLabel: '投资收益(6111)',
+  rows: bringInRows,
+  // 单一「调整」列：aje/rje 净额均累加至本期调整（读取实时值做增量累加）
+  updateCell: (rowKey: string, _field: any, value: number) => {
+    const row = adj.dataRows.value.find((r) => r.rowKey === rowKey)
+    const live = row?.currentAdjustment ?? 0
+    adj.updateField(rowKey, 'currentAdjustment', Math.round((live + value) * 100) / 100)
+  },
+  totalAudited: () => adj.totalRow.value.currentAudited,
 })
 
 const publishLoading = ref(false)

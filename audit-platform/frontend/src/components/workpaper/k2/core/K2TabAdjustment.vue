@@ -7,6 +7,25 @@
         <el-button size="small" type="success" :disabled="isReadonly || !isBalanced" @click="handleSaveWriteback">
           保存&amp;回写
         </el-button>
+        <el-button
+          size="small"
+          type="primary"
+          plain
+          :loading="centralSyncing"
+          :disabled="isReadonly || !isBalanced || entries.length === 0"
+          @click="syncToCentral"
+          title="把本页调整分录汇聚到集中调整登记，供合伙人跨循环审阅"
+        >
+          同步到集中登记
+        </el-button>
+        <el-tag
+          v-if="centralStatus?.review_status"
+          size="small"
+          :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
+          :title="centralStatus.rejection_reason || ''"
+        >
+          集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
+        </el-tag>
         <el-dropdown trigger="click" size="small" @command="handleIECommand">
           <el-button size="small">导入导出 ▾</el-button>
           <template #dropdown>
@@ -172,6 +191,8 @@ import { ref, computed, inject, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
+import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
+import { useAuditContext } from '@/composables/useAuditContext'
 
 const K2_ACCOUNT_CODE = '1231'
 const ITEM_PREFIX = 'K2-3-adj'
@@ -212,10 +233,31 @@ const totalCredits = computed(() => entries.value.reduce((sum, e) => sum + (e.cr
 const balanceDiff = computed(() => totalDebits.value - totalCredits.value)
 const isBalanced = computed(() => Math.abs(balanceDiff.value) < 0.005)
 
+// ═══ 同步到集中调整登记（workpaper-adjustment-centralization） ═══
+const { year: auditYear } = useAuditContext()
+const { centralStatus, syncing: centralSyncing, syncToCentral, refreshStatus } = useAdjustmentCentralSync({
+  projectId: () => props.projectId,
+  year: auditYear,
+  wpId: () => props.wpId,
+  wpCode: 'K2',
+  itemId: `${ITEM_PREFIX}-entries`,
+  buildLineItems: () => entries.value.flatMap(e => {
+    const items: any[] = []
+    if (e.debitAccount || (e.debitAmount || 0) !== 0) items.push({ account_name: e.debitAccount, debit_amount: e.debitAmount || 0, credit_amount: 0 })
+    if (e.creditAccount || (e.creditAmount || 0) !== 0) items.push({ account_name: e.creditAccount, debit_amount: 0, credit_amount: e.creditAmount || 0 })
+    return items
+  }),
+  buildMeta: () => ({
+    description: entries.value.find(e => e.summary)?.summary || 'K2 其他流动资产调整',
+    adjustmentType: entries.value.length > 0 && entries.value.every(e => e.entryType === 'RJE') ? 'rje' : 'aje',
+  }),
+})
+
 // ═══ 初始化加载 ═══
 onMounted(() => {
   loadFromResponses()
   loadAuditNoteConclusion()
+  refreshStatus()
   // 订阅K2-5/K2-6推送的建议AJE
   eventBus.on('adjustment:created', handleSuggestedAjeFromUpstream)
 })

@@ -1,214 +1,284 @@
 /**
- * useL3Adjudication — L3-1 审定表 composable
+ * useL3Adjudication — L3-1 长期借款审定表 composable
  *
- * Spec: .kiro/specs/l3-long-term-loans/
- * Task: 3.4
- * Requirements: 2.1-2.7
+ * 对齐致同源模板「审定表L3-1」结构（2026-07 复盘重建）：
+ * - 分类行（源模板 4 类：质押借款/抵押借款/保证借款/信用借款 + 合计）
+ * - 双期结构：期初数(未审/账项调整/重分类/审定/减一年内到期/披露审定) + 期末数(同)
+ * - 变动分析：本期未审 vs 期初未审(变动额/率) + 本期审定 vs 期初审定(变动额/率)
+ * - 原因分析（每行文本）
+ * - 审计说明（增减原因/已到期未偿还/抵押质押/关联方保证）+ 审计结论
+ * - 从 L3-2 明细带入（SUMIF 等价按借款类型聚合）
+ * - TB回写（科目 2501，期末审定合计）+ EventBus 'substantive:adjudicated'
  *
- * 职责：
- * - 负债类贷方期末计算：endBalance = beginning + credit - debit
- * - 审定数计算：audited = unadjusted + aje + rje
- * - 分类小计（按借款类型分类）
- * - 单列"其中：一年内到期"
- * - TB回写触发（科目2501）+ EventBus publish 'substantive:adjudicated'
+ * 科目：2501 长期借款（贷方/负债类）：审定 = 未审 + 账项调整 + 重分类调整
+ *   披露审定数 = 审定数 − 减：一年内到期的长期借款（流动/非流动重分类）
+ *
+ * ⚠️ 旧版为单期 roll-forward（期初/贷方/借方/期末），与源模板双期变动分析结构不符；
+ *    且旧版 inject('l3FormData')/('l3AdjudicationData') 无 provide → 崩溃/不 hydrate。
+ *    本次重建为源模板结构 + 自 formData.allResponses hydrate。
  */
-import { computed, watch, type ComputedRef } from 'vue'
+import { computed, watch, onBeforeUnmount, type ComputedRef } from 'vue'
 import { eventBus } from '@/utils/eventBus'
-import {
-  calcAuditedAmount,
-  calcLiabilityEndBalance,
-  calcSubtotal,
-} from '@/composables/useL3FormulaEngine'
-import type { useL3FormData } from '@/components/workpaper/composables/useL3FormData'
+import type { useL3FormData, ChecklistResponse } from '@/components/workpaper/composables/useL3FormData'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-/** 审定表分类行数据（可编辑原始字段） */
-export interface L3AdjudicationCategory {
-  name: string
-  beginning: number
-  creditAmount: number
-  debitAmount: number
-  endBalance: number
-  currentPortion: number
-  unadjusted: number
-  aje: number
-  rje: number
-  audited: number
+export interface L3AdjRow {
+  rowKey: string
+  label: string
+  isEditable: boolean
+  // 期初数
+  beginUnadjusted: number
+  beginAje: number
+  beginRje: number
+  beginAudited: number      // = beginUnadjusted + beginAje + beginRje
+  beginCurrent: number      // 减：期初一年内到期
+  beginDisclosed: number    // = beginAudited - beginCurrent
+  // 期末数
+  endUnadjusted: number
+  endAje: number
+  endRje: number
+  endAudited: number        // = endUnadjusted + endAje + endRje
+  endCurrent: number        // 减：期末一年内到期
+  endDisclosed: number      // = endAudited - endCurrent
+  // 变动分析
+  unadjChange: number       // = endUnadjusted - beginUnadjusted
+  unadjRate: number
+  auditedChange: number     // = endAudited - beginAudited
+  auditedRate: number
+  // 原因分析
+  reason: string
 }
 
-/** 审定表分类计算结果 */
-export interface L3AdjudicationComputed {
-  name: string
-  beginning: number
-  creditAmount: number
-  debitAmount: number
-  endBalance: number
-  currentPortion: number
-  unadjusted: number
-  aje: number
-  rje: number
-  audited: number
+// ─── Constants ───────────────────────────────────────────────────────────────
+
+/** 分类行定义（对齐源模板 A7~A10） */
+export const L3_SOURCE_ROWS = [
+  { rowKey: 'pledge', label: '质押借款' },
+  { rowKey: 'mortgage', label: '抵押借款' },
+  { rowKey: 'guarantee', label: '保证借款' },
+  { rowKey: 'credit', label: '信用借款' },
+] as const
+
+const PREFIX = 'L3-L3-1'
+
+/** 明细借款类型 → 审定表 rowKey 关键词映射 */
+function loanTypeToRowKey(loanType: string): string {
+  const s = loanType || ''
+  if (s.includes('质押')) return 'pledge'
+  if (s.includes('抵押')) return 'mortgage'
+  if (s.includes('保证')) return 'guarantee'
+  if (s.includes('信用')) return 'credit'
+  return 'credit'
 }
 
-/** 审定表合计行 */
-export interface L3AdjudicationTotal {
-  beginning: number
-  credit: number
-  debit: number
-  end: number
-  currentPortion: number
-  unadjusted: number
-  aje: number
-  rje: number
-  audited: number
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function makeItemId(rowKey: string, field: string): string {
+  return `${PREFIX}-${rowKey}-${field}`
+}
+
+function parseNum(v: any): number {
+  if (v == null) return 0
+  const n = Number(v)
+  return Number.isFinite(n) ? n : 0
+}
+
+function getNum(responses: Map<string, ChecklistResponse>, itemId: string): number {
+  return parseNum(responses.get(itemId)?.remark)
+}
+
+function getStr(responses: Map<string, ChecklistResponse>, itemId: string): string {
+  return responses.get(itemId)?.remark ?? ''
+}
+
+function calcRate(base: number, change: number): number {
+  if (base === 0) return change === 0 ? 0 : (change > 0 ? 1 : -1)
+  return change / base
+}
+
+function buildRow(
+  def: { rowKey: string; label: string },
+  responses: Map<string, ChecklistResponse>,
+): L3AdjRow {
+  const beginUnadjusted = getNum(responses, makeItemId(def.rowKey, 'beginUnadjusted'))
+  const beginAje = getNum(responses, makeItemId(def.rowKey, 'beginAje'))
+  const beginRje = getNum(responses, makeItemId(def.rowKey, 'beginRje'))
+  const beginCurrent = getNum(responses, makeItemId(def.rowKey, 'beginCurrent'))
+  const endUnadjusted = getNum(responses, makeItemId(def.rowKey, 'endUnadjusted'))
+  const endAje = getNum(responses, makeItemId(def.rowKey, 'endAje'))
+  const endRje = getNum(responses, makeItemId(def.rowKey, 'endRje'))
+  const endCurrent = getNum(responses, makeItemId(def.rowKey, 'endCurrent'))
+  const reason = getStr(responses, makeItemId(def.rowKey, 'reason'))
+
+  const beginAudited = beginUnadjusted + beginAje + beginRje
+  const endAudited = endUnadjusted + endAje + endRje
+  const unadjChange = endUnadjusted - beginUnadjusted
+  const auditedChange = endAudited - beginAudited
+
+  return {
+    rowKey: def.rowKey,
+    label: def.label,
+    isEditable: true,
+    beginUnadjusted, beginAje, beginRje,
+    beginAudited,
+    beginCurrent,
+    beginDisclosed: beginAudited - beginCurrent,
+    endUnadjusted, endAje, endRje,
+    endAudited,
+    endCurrent,
+    endDisclosed: endAudited - endCurrent,
+    unadjChange,
+    unadjRate: calcRate(beginUnadjusted, unadjChange),
+    auditedChange,
+    auditedRate: calcRate(beginAudited, auditedChange),
+    reason,
+  }
+}
+
+function buildTotalRow(rows: L3AdjRow[]): L3AdjRow {
+  const sum = (f: (r: L3AdjRow) => number) => rows.reduce((s, r) => s + f(r), 0)
+  const beginUnadjusted = sum(r => r.beginUnadjusted)
+  const beginAje = sum(r => r.beginAje)
+  const beginRje = sum(r => r.beginRje)
+  const beginCurrent = sum(r => r.beginCurrent)
+  const endUnadjusted = sum(r => r.endUnadjusted)
+  const endAje = sum(r => r.endAje)
+  const endRje = sum(r => r.endRje)
+  const endCurrent = sum(r => r.endCurrent)
+  const beginAudited = beginUnadjusted + beginAje + beginRje
+  const endAudited = endUnadjusted + endAje + endRje
+  const unadjChange = endUnadjusted - beginUnadjusted
+  const auditedChange = endAudited - beginAudited
+
+  return {
+    rowKey: '__total__',
+    label: '合计',
+    isEditable: false,
+    beginUnadjusted, beginAje, beginRje,
+    beginAudited,
+    beginCurrent,
+    beginDisclosed: beginAudited - beginCurrent,
+    endUnadjusted, endAje, endRje,
+    endAudited,
+    endCurrent,
+    endDisclosed: endAudited - endCurrent,
+    unadjChange,
+    unadjRate: calcRate(beginUnadjusted, unadjChange),
+    auditedChange,
+    auditedRate: calcRate(beginAudited, auditedChange),
+    reason: '',
+  }
 }
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
-/**
- * L3-1 审定表业务逻辑
- *
- * @param formData 由调用方传入的 useL3FormData 实例
- * @param adjudicationData reactive data containing categories
- */
-export function useL3Adjudication(formData: ReturnType<typeof useL3FormData>, adjudicationData: {
-  categories: L3AdjudicationCategory[]
-  total: L3AdjudicationTotal
-}) {
-  const { writebackTB, saveBatch } = formData
+export function useL3Adjudication(formData: ReturnType<typeof useL3FormData>) {
+  const { allResponses, saveField, debouncedSave, writebackTB } = formData
 
-  // ─── 1. 计算属性：每行 endBalance + audited ─────────────────────────────
+  // ─── Rows ────────────────────────────────────────────────────────────────
 
-  /** 审定表各分类行（公式列自动计算） */
-  const computedCategories: ComputedRef<L3AdjudicationComputed[]> = computed(() => {
-    return adjudicationData.categories.map(cat => ({
-      name: cat.name,
-      beginning: cat.beginning,
-      creditAmount: cat.creditAmount,
-      debitAmount: cat.debitAmount,
-      // 负债类贷方：期末 = 期初 + 贷方 - 借方
-      endBalance: calcLiabilityEndBalance(cat.beginning, cat.creditAmount, cat.debitAmount),
-      currentPortion: cat.currentPortion,
-      unadjusted: cat.unadjusted,
-      aje: cat.aje,
-      rje: cat.rje,
-      // 审定数 = 未审 + AJE + RJE
-      audited: calcAuditedAmount(cat.unadjusted, cat.aje, cat.rje),
-    }))
-  })
-
-  // ─── 2. 合计行 ─────────────────────────────────────────────────────────
-
-  /** 合计行（Σ 各分类） */
-  const total: ComputedRef<L3AdjudicationTotal> = computed(() => {
-    const cats = computedCategories.value
-    return {
-      beginning: calcSubtotal(cats.map(c => c.beginning)),
-      credit: calcSubtotal(cats.map(c => c.creditAmount)),
-      debit: calcSubtotal(cats.map(c => c.debitAmount)),
-      end: calcSubtotal(cats.map(c => c.endBalance)),
-      currentPortion: calcSubtotal(cats.map(c => c.currentPortion)),
-      unadjusted: calcSubtotal(cats.map(c => c.unadjusted)),
-      aje: calcSubtotal(cats.map(c => c.aje)),
-      rje: calcSubtotal(cats.map(c => c.rje)),
-      audited: calcSubtotal(cats.map(c => c.audited)),
-    }
-  })
-
-  // ─── 3. 行操作 ─────────────────────────────────────────────────────────
-
-  /**
-   * 更新某分类的可编辑字段
-   * 公式列(endBalance/audited)自动由computed刷新
-   */
-  function updateCategory(
-    index: number,
-    field: 'beginning' | 'creditAmount' | 'debitAmount' | 'currentPortion' | 'unadjusted' | 'aje' | 'rje',
-    value: number,
-  ): void {
-    const categories = adjudicationData.categories
-    if (index < 0 || index >= categories.length) return
-
-    categories[index][field] = value
-
-    // 同步计算公式列到 formData（供持久化）
-    const cat = categories[index]
-    cat.endBalance = calcLiabilityEndBalance(cat.beginning, cat.creditAmount, cat.debitAmount)
-    cat.audited = calcAuditedAmount(cat.unadjusted, cat.aje, cat.rje)
-
-    // 重算合计
-    _syncTotal()
-  }
-
-  /** 同步合计到 formData state */
-  function _syncTotal(): void {
-    const cats = adjudicationData.categories
-    adjudicationData.total = {
-      beginning: calcSubtotal(cats.map(c => c.beginning)),
-      credit: calcSubtotal(cats.map(c => c.creditAmount)),
-      debit: calcSubtotal(cats.map(c => c.debitAmount)),
-      end: calcSubtotal(cats.map(c => c.endBalance)),
-      currentPortion: calcSubtotal(cats.map(c => c.currentPortion)),
-      unadjusted: calcSubtotal(cats.map(c => c.unadjusted)),
-      aje: calcSubtotal(cats.map(c => c.aje)),
-      rje: calcSubtotal(cats.map(c => c.rje)),
-      audited: calcSubtotal(cats.map(c => c.audited)),
-    }
-  }
-
-  // ─── 4. TB回写 + EventBus ──────────────────────────────────────────────
-
-  /**
-   * 保存审定表并触发TB回写 + EventBus
-   * - 回写 trial_balance 科目 2501
-   * - publish 'substantive:adjudicated'
-   */
-  async function saveAndWriteback(): Promise<void> {
-    // 序列化审定表行
-    const items = adjudicationData.categories.map((cat, i) => {
-      const n = i + 1
-      return [
-        { itemId: `L3-adj-${n}-endBalance`, data: { remark: String(cat.endBalance) } },
-        { itemId: `L3-adj-${n}-audited`, data: { remark: String(cat.audited) } },
-        { itemId: `L3-adj-${n}-currentPortion`, data: { remark: String(cat.currentPortion) } },
-      ]
-    }).flat()
-
-    await saveBatch(items)
-
-    // TB回写（科目2501长期借款）
-    const auditedTotal = total.value.audited
-    await writebackTB(auditedTotal)
-
-    // EventBus publish（writebackTB内部已发布，此处为冗余保障）
-    eventBus.emit('substantive:adjudicated', {
-      accountCode: '2501',
-      auditedAmount: auditedTotal,
-      wpCode: 'L3',
-      timestamp: Date.now(),
-    })
-  }
-
-  // ─── 5. 审定数变化监听 → 自动回写 ─────────────────────────────────────
-
-  /** 监听审定数变化，自动触发回写 */
-  watch(
-    () => total.value.audited,
-    async (newVal, oldVal) => {
-      if (oldVal !== undefined && newVal !== oldVal) {
-        await saveAndWriteback()
-      }
-    },
+  const rows: ComputedRef<L3AdjRow[]> = computed(() =>
+    L3_SOURCE_ROWS.map(def => buildRow(def, allResponses.value)),
   )
 
-  // ─── Return ────────────────────────────────────────────────────────────
+  const totalRow: ComputedRef<L3AdjRow> = computed(() => buildTotalRow(rows.value))
+
+  const totalAuditedAmount: ComputedRef<number> = computed(() => totalRow.value.endAudited)
+
+  // 同步期末审定合计到 allResponses 供跨sheet消费（useL3CrossSheet.adjudicationVsDetail）
+  watch(totalAuditedAmount, (val) => {
+    allResponses.value.set('L3-L3-1-adjudication-total', {
+      item_id: 'L3-L3-1-adjudication-total',
+      conclusion: null,
+      remark: String(val),
+    })
+  }, { immediate: true })
+
+  // ─── 审计说明 / 结论 ────────────────────────────────────────────────────
+
+  const noteChange = computed(() => getStr(allResponses.value, `${PREFIX}-note-change`))
+  const noteOverdue = computed(() => getStr(allResponses.value, `${PREFIX}-note-overdue`))
+  const notePledge = computed(() => getStr(allResponses.value, `${PREFIX}-note-pledge`))
+  const noteGuarantee = computed(() => getStr(allResponses.value, `${PREFIX}-note-guarantee`))
+  const conclusion = computed(() => getStr(allResponses.value, `${PREFIX}-conclusion`))
+
+  function updateNote(field: 'note-change' | 'note-overdue' | 'note-pledge' | 'note-guarantee' | 'conclusion', value: string): void {
+    debouncedSave(`${PREFIX}-${field}`, { remark: value })
+  }
+
+  // ─── updateCell ────────────────────────────────────────────────────────
+
+  function updateCell(rowKey: string, field: string, value: number | string): void {
+    const itemId = makeItemId(rowKey, field)
+    const strValue = typeof value === 'number' ? String(value) : value
+    debouncedSave(itemId, { remark: strValue })
+  }
+
+  // ─── 从 L3-2 明细带入（SUMIF 等价按借款类型聚合） ──────────────────────
+
+  /** @returns 带入的分类数 */
+  function importFromDetail(): number {
+    const detailResp = allResponses.value.get('L3-L3-2-rows')
+    if (!detailResp?.remark) return 0
+    let detailRows: any[] = []
+    try {
+      const parsed = JSON.parse(detailResp.remark)
+      detailRows = Array.isArray(parsed) ? parsed : []
+    } catch {
+      return 0
+    }
+    if (detailRows.length === 0) return 0
+
+    const agg: Record<string, { beginUnadj: number; endUnadj: number; endCurrent: number }> = {}
+    for (const r of detailRows) {
+      const key = loanTypeToRowKey(r.loanType)
+      if (!agg[key]) agg[key] = { beginUnadj: 0, endUnadj: 0, endCurrent: 0 }
+      agg[key].beginUnadj += parseNum(r.beginning)
+      agg[key].endUnadj += parseNum(r.endBalance)
+      agg[key].endCurrent += parseNum(r.currentPortion)
+    }
+
+    let count = 0
+    for (const [rowKey, v] of Object.entries(agg)) {
+      updateCell(rowKey, 'beginUnadjusted', v.beginUnadj)
+      updateCell(rowKey, 'endUnadjusted', v.endUnadj)
+      updateCell(rowKey, 'endCurrent', v.endCurrent)
+      count++
+    }
+    return count
+  }
+
+  // ─── TB回写 ──────────────────────────────────────────────────────────────
+
+  async function submitAdjudication(): Promise<void> {
+    const amount = totalAuditedAmount.value
+    await writebackTB(amount)
+    await saveField('L3-L3-1-adjudication-total', { remark: String(amount) })
+  }
+
+  // ─── EventBus（明细/调整变化 → allResponses 自动响应） ─────────────────
+
+  function onAdjustmentCreated(): void { /* rows computed 自动响应 allResponses 变化 */ }
+  eventBus.on('adjustment:created', onAdjustmentCreated)
+  onBeforeUnmount(() => {
+    eventBus.off('adjustment:created', onAdjustmentCreated)
+  })
 
   return {
-    computedCategories,
-    total,
-    updateCategory,
-    saveAndWriteback,
+    rows,
+    totalRow,
+    totalAuditedAmount,
+    noteChange,
+    noteOverdue,
+    notePledge,
+    noteGuarantee,
+    conclusion,
+    updateNote,
+    updateCell,
+    importFromDetail,
+    submitAdjudication,
+    L3_SOURCE_ROWS,
   }
 }
 

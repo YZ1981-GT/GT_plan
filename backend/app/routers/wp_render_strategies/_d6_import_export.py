@@ -26,6 +26,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import User
+from app.services.d_cycle_extraction.detail_aggregation import (
+    aggregate_d6_detail_rows,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -374,53 +377,15 @@ async def d6_import_aux_balance(
 
     project_id = str(wp_row.project_id)
 
-    aux_result = await db.execute(
-        sa.text("""
-            SELECT aux_name,
-                   COALESCE(SUM(CASE WHEN period_type = 'opening' THEN balance ELSE 0 END), 0) AS prior_balance,
-                   COALESCE(SUM(CASE WHEN period_type = 'closing' THEN balance ELSE 0 END), 0) AS current_balance
-            FROM tb_aux_balance
-            WHERE project_id = :pid
-              AND account_code = '1402'
-              AND is_deleted = false
-            GROUP BY aux_name
-            ORDER BY aux_name
-        """),
-        {"pid": project_id},
+    # 🔴 归集抽取为可复用纯函数（Wave 0 / Task 1.3 块 C-2 / 决策4）：
+    #   端点委托 `aggregate_d6_detail_rows`（查询 + 纯行构建），行为逐字节不变；
+    #   同一入口供 P0-2 render 自动 seed（Wave 5）按名调用，不新造第 3 套四表库读取。
+    rows_data: list[dict] = await aggregate_d6_detail_rows(
+        db, project_id, row_limit=_ROW_LIMIT
     )
-    aux_rows = aux_result.fetchall()
 
-    if not aux_rows:
+    if not rows_data:
         return {"ok": True, "imported_count": 0, "message": "未找到科目1402的辅助余额数据"}
-
-    # 构建 D6-2 行数据
-    rows_data: list[dict] = []
-    for idx, aux_row in enumerate(aux_rows[:_ROW_LIMIT], 1):
-        prior_bal = float(aux_row.prior_balance)
-        current_bal = float(aux_row.current_balance)
-        rows_data.append({
-            "rowId": str(uuid4()),
-            "seqNo": idx,
-            "contractName": aux_row.aux_name or "",
-            "contractType": "工程施工",
-            "customerName": aux_row.aux_name or "",
-            "companyCode": "",
-            "relatedPartyType": "非关联方",
-            "priorUnadjusted": prior_bal,
-            "priorAje": 0, "priorRje": 0,
-            "priorAudited": prior_bal,
-            "agePrior1y": prior_bal, "agePrior1to2y": 0, "agePrior2to3y": 0, "agePrior3yAbove": 0,
-            "debitAmount": 0, "creditAmount": 0,
-            "endUnadjusted": current_bal,
-            "endAje": 0, "endRje": 0,
-            "endAudited": current_bal,
-            "ageEnd1y": current_bal, "ageEnd1to2y": 0, "ageEnd2to3y": 0, "ageEnd3yAbove": 0,
-            "receivableWithin1y": current_bal, "receivableAbove1y": 0,
-            "isInConstructionPeriod": "否",
-            "creditRiskGroup": "业务类型组合",
-            "isConfirmed": "否",
-            "postPeriodSettlement": 0,
-        })
 
     # Merge模式：保留已有行，追加新客户
     item_id = "D6-2-rows"

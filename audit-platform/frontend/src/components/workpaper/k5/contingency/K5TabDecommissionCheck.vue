@@ -441,7 +441,7 @@ import { ref, toRef, computed, onMounted } from 'vue'
 import { Plus, Delete, MagicStick, WarningFilled, InfoFilled, ArrowDown } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useK5Decommission } from '../../composables/useK5Decommission'
-import GtIndexChip from '../../shared/GtIndexChip.vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 import type { Ref } from 'vue'
 

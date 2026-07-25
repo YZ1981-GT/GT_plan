@@ -21,7 +21,7 @@
             </el-dropdown-menu>
           </template>
         </el-dropdown>
-        <el-button size="small" @click="handleAI('detail')">
+        <el-button size="small" :loading="aiLoading === 'detail'" :disabled="isReadonly" @click="handleAI('detail')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
         <el-button size="small" @click="handleReview">
@@ -328,7 +328,7 @@
       <template #header>
         <div class="section-header">
           <span class="card-title">审计说明</span>
-          <el-button size="small" @click="handleAI('auditNote')">
+          <el-button size="small" :loading="aiLoading === 'auditNote'" :disabled="isReadonly" @click="handleAI('auditNote')">
             <el-icon><MagicStick /></el-icon> AI辅助
           </el-button>
         </div>
@@ -378,6 +378,7 @@ import {
   type M1DetailSegment,
 } from '../../composables/useM1Detail'
 import { useM1ImportExport } from '../../composables/useM1ImportExport'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 
 const props = defineProps<{
   wpId: string
@@ -390,6 +391,8 @@ const emit = defineEmits<{
 }>()
 
 const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', () => {})
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
 
 // ─── FormData + Composables ──────────────────────────────────────────────────
 
@@ -540,14 +543,23 @@ function handleImportExport(command: string) {
   }
 }
 
-function handleAI(section: string) {
-  import('@/utils/http').then(({ default: h }) => {
-    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
-      section: `m1-detail-${section}`,
-      prompt: `请基于应付股利底稿"${section}"区段数据，给出审计分析建议`,
-      context: { section, wpId: props.wpId },
-    }).catch(() => {})
-  })
+async function handleAI(section: string) {
+  if (props.isReadonly) return
+  aiLoading.value = section
+  try {
+    const context: Record<string, string> = {
+      科目: '2232 应付股利 / 明细表（M1-2 按股东列示）',
+      期初合计: fmtAmount(totalBeginBalance.value),
+      本期宣告合计: fmtAmount(totalDeclared.value),
+      本期支付合计: fmtAmount(totalPaid.value),
+      期末合计: fmtAmount(totalEndBalance.value),
+      股东数: String(computedRows.value.length),
+    }
+    const text = await generateAiText({ section: `m1-detail-${section}`, context, existingContent: auditNote.value })
+    if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+    auditNote.value = text
+    saveAuditNote()
+  } catch { ElMessage.warning('AI 生成失败，请稍后重试') } finally { aiLoading.value = '' }
 }
 function handleReview() { openReviewDialog?.('M1-2-detail', '明细表') }
 

@@ -128,7 +128,10 @@ vi.mock('@/composables/useEditorMode', () => ({
   useEditorMode: () => ({
     componentType: ref('univer'),
     useHtmlRenderer: ref(false),
-    wpClassification: { load: vi.fn().mockResolvedValue(undefined) },
+    wpClassification: {
+      load: vi.fn().mockResolvedValue(undefined),
+      componentType: ref('skip'),
+    },
     fetchComponentType: vi.fn().mockResolvedValue(undefined),
   }),
 }))

@@ -14,6 +14,7 @@
           :loading="isSyncing"
           @click="syncToNotes"
         >同步到附注</el-button>
+        <el-button size="small" type="primary" plain :disabled="!projectId" @click="jumpToNote(variant)">↩ 跳转回附注</el-button>
         <el-button
           v-if="!isReadonly"
           size="small"
@@ -585,6 +586,8 @@
 <script setup lang="ts">
 import { computed, ref, toRef, watch, inject } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useRouter } from 'vue-router'
+import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import { useG10Disclosure } from '../../composables/useG10Disclosure'
 import {
   buildG10ListedSyncPayloads,
@@ -654,6 +657,14 @@ watch(auditConclusion, (v) => {
 const noteSectionId = computed(() => G10_NOTE_SECTION[props.variant].trading)
 const noteChip = computed(() => `Note:${noteSectionId.value}`)
 const isSyncing = ref(false)
+
+const router = useRouter()
+// 跳转回附注模块（披露表 → 附注为单向推送；此处仅导航，方便相互编辑确认）
+function jumpToNote(target: DisclosureVariant): void {
+  const route = buildNoteJumpRoute(props.projectId, 'G10', target)
+  if (!route) { ElMessage.warning('未找到对应的附注章节'); return }
+  router.push(route)
+}
 
 async function syncToNotes() {
   if (isSyncing.value || props.isReadonly || !props.projectId || !props.wpId) return

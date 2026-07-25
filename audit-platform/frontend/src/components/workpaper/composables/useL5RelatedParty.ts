@@ -12,10 +12,13 @@
  *
  * 科目：2701 长期应付款 + 未确认融资费用 → 净额
  */
-import { computed, ref, type ComputedRef, type Ref } from 'vue'
+import { computed, ref, watch, type ComputedRef, type Ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { calcNetPayable, calcSubtotal } from './useL5FormulaEngine'
-import type { useL5FormData } from './useL5FormData'
+import type { useL5FormData, ChecklistResponse } from './useL5FormData'
+
+/** 🔴 P0 修复：JSON 存储键（此前无 hydration + 保存仅序列化字段子集 → 刷新数据丢失） */
+const ITEM_ROWS = 'L5-L5-6-related-party-rows'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -69,7 +72,22 @@ export function useL5RelatedParty(
   formData: ReturnType<typeof useL5FormData>,
   relatedPartyRows: Ref<L5RelatedPartyRow[]>,
 ) {
-  const { debouncedSave } = formData
+  const { allResponses, debouncedSave } = formData
+
+  // ─── 0. Hydration ────────────────────────────────────────────────────
+  function hydrate(): void {
+    const raw = allResponses.value.get(ITEM_ROWS)?.remark
+    if (!raw) return
+    try {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) relatedPartyRows.value = parsed
+    } catch { /* ignore */ }
+  }
+  hydrate()
+  watch(
+    () => allResponses.value.get(ITEM_ROWS)?.remark,
+    (v) => { if (v && relatedPartyRows.value.length === 0) hydrate() },
+  )
 
   // ─── 1. 计算属性 ──────────────────────────────────────────────────────
 
@@ -180,18 +198,12 @@ export function useL5RelatedParty(
   // ─── 4. 保存触发 ──────────────────────────────────────────────────────
 
   function _triggerSave(): void {
-    debouncedSave('L5-L5-6-related-party-rows', {
-      remark: JSON.stringify(relatedPartyRows.value.map(r => ({
-        key: r.key,
-        partyName: r.partyName,
-        relationship: r.relationship,
-        payableBalance: r.payableBalance,
-        unrecognizedBalance: r.unrecognizedBalance,
-        netBalance: calcNetPayable(r.payableBalance, r.unrecognizedBalance),
-        transactionAmount: r.transactionAmount,
-        fairnessLevel: r.fairnessLevel,
-      }))),
-    })
+    // 序列化完整行数据（含所有字段）+ 保证 netBalance 新鲜，供持久化+CrossSheet勾稽
+    const payload = relatedPartyRows.value.map(r => ({
+      ...r,
+      netBalance: calcNetPayable(r.payableBalance, r.unrecognizedBalance),
+    }))
+    debouncedSave(ITEM_ROWS, { remark: JSON.stringify(payload) } as Partial<ChecklistResponse>)
   }
 
   // ─── Return ────────────────────────────────────────────────────────────

@@ -18,8 +18,8 @@
         </span>
       </div>
 
-      <!-- 顶部工具栏（双模式切换） -->
-      <div class="h6-header-toolbar">
+      <!-- 顶部工具栏（双模式切换）— 目录页隐藏 -->
+      <div v-if="currentSheet !== 'H6'" class="h6-header-toolbar">
         <el-segmented
           v-model="currentMode"
           :options="modeOptions"

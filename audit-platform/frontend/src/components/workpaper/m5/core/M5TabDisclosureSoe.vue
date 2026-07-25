@@ -8,7 +8,7 @@
         <el-tag type="success" size="small">国企</el-tag>
       </div>
       <div class="section-header-right">
-        <el-button size="small" @click="handleAI('disclosure-soe')">
+        <el-button size="small" :loading="aiLoading === 'disclosure-soe'" :disabled="isReadonly" @click="handleAI('disclosure-soe')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
         <el-button size="small" @click="handleReview">
@@ -32,7 +32,7 @@
       <template #header>
         <div class="card-header">
           <span>盈余公积变动明细（国有企业）</span>
-          <el-button size="small" @click="handleAI('section-detail')">
+          <el-button size="small" :loading="aiLoading === 'section-detail'" :disabled="isReadonly" @click="handleAI('section-detail')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </div>
@@ -117,7 +117,7 @@
       <template #header>
         <div class="card-header">
           <span>法定盈余公积变动说明</span>
-          <el-button size="small" @click="handleAI('section-statutory-note')">
+          <el-button size="small" :loading="aiLoading === 'section-statutory-note'" :disabled="isReadonly" @click="handleAI('section-statutory-note')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </div>
@@ -137,7 +137,7 @@
       <template #header>
         <div class="card-header">
           <span>任意盈余公积变动说明</span>
-          <el-button size="small" @click="handleAI('section-discretionary-note')">
+          <el-button size="small" :loading="aiLoading === 'section-discretionary-note'" :disabled="isReadonly" @click="handleAI('section-discretionary-note')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </div>
@@ -157,7 +157,7 @@
       <template #header>
         <div class="card-header">
           <span>国有企业专项披露</span>
-          <el-button size="small" @click="handleAI('section-soe-special')">
+          <el-button size="small" :loading="aiLoading === 'section-soe-special'" :disabled="isReadonly" @click="handleAI('section-soe-special')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </div>
@@ -204,10 +204,12 @@
  * - 企业类型由主入口 GtM5SurplusReserve.vue 的 sheetName 分发决定
  */
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, Check } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
 import { useM5FormData } from '../../composables/useM5FormData'
 import { calcEquityEndBalance } from '../../composables/useM5FormulaEngine'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -224,6 +226,8 @@ const emit = defineEmits<{
 // ─── Inject ──────────────────────────────────────────────────────────────────
 
 const openReviewDialog = inject<((sectionId: string, sectionLabel?: string) => void) | null>('openReviewDialog', null)
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
 
 // ─── FormData ────────────────────────────────────────────────────────────────
 
@@ -300,7 +304,31 @@ function handleSoeSpecialNoteChange() {
   formData.debouncedSave('M5-disclosure-soe-special-note', { remark: soeSpecialNote.value || null })
 }
 
-function handleAI(_section: string) {}
+async function handleAI(section: string) {
+  if (props.isReadonly) return
+  aiLoading.value = section
+  try {
+    const totalRow = disclosureRows.value.find(r => r._isTotal)
+    const context: Record<string, string> = {
+      科目: '4101 盈余公积（权益类贷方）',
+      企业类型: '国有企业',
+      期初合计: fmtAmount(totalRow?.beginBalance ?? 0),
+      本期增加合计: fmtAmount(totalRow?.increase ?? 0),
+      本期减少合计: fmtAmount(totalRow?.decrease ?? 0),
+      期末合计: fmtAmount(totalRow?.endBalance ?? 0),
+    }
+    let existing = ''
+    if (section === 'section-statutory-note') existing = statutoryNote.value
+    else if (section === 'section-discretionary-note') existing = discretionaryNote.value
+    else if (section === 'section-soe-special') existing = soeSpecialNote.value
+    const text = await generateAiText({ section: `m5-disclosure-soe-${section}`, context, existingContent: existing })
+    if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+    if (section === 'section-statutory-note') { statutoryNote.value = text; handleStatutoryNoteChange() }
+    else if (section === 'section-discretionary-note') { discretionaryNote.value = text; handleDiscretionaryNoteChange() }
+    else if (section === 'section-soe-special') { soeSpecialNote.value = text; handleSoeSpecialNoteChange() }
+    else ElMessageBox.alert(text, 'AI 辅助建议', { confirmButtonText: '知道了' }).catch(() => {})
+  } catch { ElMessage.warning('AI 生成失败，请稍后重试') } finally { aiLoading.value = '' }
+}
 
 function handleReview() {
   openReviewDialog?.('M5-disclosure-soe', '盈余公积附注（国企）')

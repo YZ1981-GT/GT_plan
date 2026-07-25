@@ -15,9 +15,19 @@ import logging
 
 import sqlalchemy as sa
 
+from app.core.config import settings
+from app.services.d_cycle_extraction.presets import resolve_effective
+from app.services.d_cycle_extraction.tier_a_seed import (
+    seed_tier_a_reconciliation,
+)
+from app.services.wp_formula_eval_service import evaluate_wp_formula_expression
+
 from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
+
+# D2 wp_code base（Tier A 提取公式 / 锚点登记 key）
+_D2_WP_CODE = "D2"
 
 
 async def render(ctx: RenderContext) -> dict | None:
@@ -89,8 +99,56 @@ async def render(ctx: RenderContext) -> dict | None:
     except Exception as e:  # noqa: BLE001
         logger.warning("D2 render: related_parties 查询失败: %s", e)
 
-    return {
+    html_data: dict = {
         "sheet_name": ctx.classification.sheet_name if ctx.classification else "",
         "project_context": project_context,
         "responses_snapshot": responses_snapshot,
     }
+
+    # ─── Tier B 四表库审定表预填（D2：宁缺勿造 R3.4，ADDITIVE，灰度开关控制）───────
+    # spec: d-cycle-four-table-extraction-formulas (R1.1 / R2.3 / R3.4 / R7.1 / R7.2
+    #        / Property 9)
+    #
+    # 【宁缺勿造决策】D2-1 审定表按**信用风险组合方式**固定三分类行（单项计提 /
+    # 账龄组合 / 客户类型组合），而 trial_balance / tb_balance 的 1122 应收账款
+    # **只有科目总额、无信用风险组合维度**（分类是审计判断，非科目结构）→ 无法把
+    # TB 叶子子科目干净映射到分类行。故 D2 render **不返回 adjudication_prefill**
+    # （不臆造分类行未审数 = 诚实的部分覆盖，对齐 R3.4）。
+    #
+    # D2 四表库数据的正确落点（均为既有链路，本 render 不重复介入，手工优先精度）：
+    #   * D2-1 `D2-adj-tb-amount`（1122 总额，TB↔审定核对行）—— 已由前端
+    #     `useD2FormData.loadAll` 从 trial_balance 1122 seed；并注册为 Tier A **可编辑**
+    #     公式 `TB('1122','期末余额')`（d_cycle_extraction_presets.json，公式管理面板
+    #     可查可编，求值经 get_active_filter 与 Tier B 同口径）。本 render 不重复 seed。
+    #   * D2-1 分类行未审 ← D2-2 明细 **SUMIF 聚合**（`useD2Adjudication`，按信用风险
+    #     组合方式），非四表库直接可填。
+    #   * D2-2 明细 ← `tb_aux_balance` 1122 按**客户维度**归集（`importFromAuxBalance`，
+    #     Tier B 复杂归集）+ 序时账期后回款（`importPostPaymentFromLedger`）—— 前端既有
+    #     一键取数，非单条公式，本 render 不介入、不与之冲突。
+    #
+    # → 因此 D2 render 输出在开关开/关时**逐字节等价**（不新增 adjudication_prefill
+    #   或任何键，Property 9 天然成立，零回归）。保留此显式分支为决策文档锚点：未来若
+    #   D2-1 结构支持叶子明细行、或出现可干净映射的四表库维度，可在此接入 Tier B seed。
+    if settings.D_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED:
+        logger.debug(
+            "D2 render: 宁缺勿造（R3.4）— 无干净 TB→审定表分类行映射，"
+            "不发 adjudication_prefill（wp_id=%s）",
+            wp_id,
+        )
+        # ─── Tier A 公式驱动 TB 核对行 transient seed（P0-1 主机制）──────────────
+        # spec: d-cycle-tier-a-writeback-detail-seed R3（决策1/3 / Property 6/7/10/11/13）
+        # 用 resolve_effective 的有效 Tier A 公式（默认 TB('1122','期末余额')）求值 transient
+        # seed 单标量 TB 核对行锚点 D2-adj-tb-amount 进 responses_snapshot（不落库；手工优先；
+        # disabled 跳过；写对字段 remark；fail-open）。主开关关（默认）→ 不 seed，零回归。
+        try:
+            await seed_tier_a_reconciliation(
+                ctx,
+                _D2_WP_CODE,
+                responses_snapshot,
+                resolve_effective=resolve_effective,
+                evaluate_wp_formula_expression=evaluate_wp_formula_expression,
+            )
+        except Exception as e:  # noqa: BLE001 — 兜底 fail-open，不阻断 render
+            logger.warning("D2 render: Tier A seed 兜底异常（fail-open）: %s", e)
+
+    return html_data

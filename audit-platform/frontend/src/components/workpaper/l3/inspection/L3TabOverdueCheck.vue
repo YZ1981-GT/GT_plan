@@ -240,6 +240,21 @@
           <span class="summary-value">{{ overdueSummary.none }} 笔</span>
         </div>
       </div>
+      <!-- 逾期比例（源模板核心：逾期金额 / 长期借款审定数，联动 L3-1） -->
+      <div class="ratio-row">
+        <div class="ratio-item">
+          <span class="summary-label">长期借款审定数（取自 L3-1）</span>
+          <span class="summary-value">{{ fmtAmount(l3AuditedTotal) }}</span>
+        </div>
+        <div class="ratio-item">
+          <el-tooltip content="逾期比例 = 逾期金额合计 / 长期借款审定数" placement="top">
+            <span class="summary-label formula-col-header">逾期比例</span>
+          </el-tooltip>
+          <span :class="['summary-value', { 'diff-warning': overdueRatio != null && overdueRatio > 0 }]">
+            {{ overdueRatio == null ? '—（审定数未填）' : overdueRatio.toFixed(2) + '%' }}
+          </span>
+        </div>
+      </div>
     </div>
 
     <!-- ═══ 叙述式结论区（textarea autosize + AI辅助） ═══ -->
@@ -305,7 +320,7 @@
  * Task: 4.5
  * Requirements: 7.1-7.3
  */
-import { inject, ref, toRef } from 'vue'
+import { inject, ref, toRef, watch } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { useL3OverdueCheck, type L3OverdueCheckRow } from '@/composables/useL3OverdueCheck'
 import { useL3ImportExport } from '@/composables/useL3ImportExport'
@@ -332,21 +347,20 @@ const formData = inject<ReturnType<typeof useL3FormData>>('l3FormData')!
 const currentYear = new Date().getFullYear()
 const reportDateStr = `${currentYear}-12-31`
 
-// ─── Reactive rows ───────────────────────────────────────────────────────────
-
-const overdueRows = ref<L3OverdueCheckRow[]>([])
-
-// ─── Composable ──────────────────────────────────────────────────────────────
+// ─── Composable（rows 由 composable 内部从 allResponses hydrate，JSON存储 L3-overdue-check-rows） ───
 
 const {
+  rows: overdueRows,
   computedRows,
   overdueCount,
   totalOverdueAmount,
   overdueSummary,
+  l3AuditedTotal,
+  overdueRatio,
   addRow,
   removeRow,
   updateRow,
-} = useL3OverdueCheck(formData, overdueRows, reportDateStr)
+} = useL3OverdueCheck(formData, reportDateStr)
 
 // ─── Composable: 导入导出 ────────────────────────────────────────────────────
 
@@ -363,7 +377,11 @@ const {
 
 // ─── 结论区 ──────────────────────────────────────────────────────────────────
 
-const conclusion = ref('')
+const conclusion = ref(formData.allResponses.value.get('L3-ovd-conclusion')?.remark ?? '')
+watch(
+  () => formData.allResponses.value.get('L3-ovd-conclusion')?.remark,
+  (v) => { if (v != null && !conclusion.value) conclusion.value = v },
+)
 
 function handleConclusionChange(val: string): void {
   conclusion.value = val
@@ -377,7 +395,7 @@ async function handleAiConclusion(): Promise<void> {
     const res = await (await import('@/utils/http')).default.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
       section: 'overdue-check-conclusion',
       prompt: '请基于逾期贷款检查情况，生成审计结论（包含逾期原因分析、风险评估、后续措施建议）',
-      context: { rowCount: overdueRows.value.length },
+      context: { rowCount: String(overdueRows.value.length) },
     })
     const content = res.data?.data?.content
     if (content) { conclusion.value = content; handleConclusionChange(content) }
@@ -638,6 +656,21 @@ function fmtAmount(val: number | null | undefined): string {
 }
 
 .summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ratio-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed #d9ecff;
+}
+
+.ratio-item {
   display: flex;
   flex-direction: column;
   gap: 4px;

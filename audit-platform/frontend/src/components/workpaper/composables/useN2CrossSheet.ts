@@ -138,6 +138,22 @@ function safeParseRows<T>(jsonStr: string | null | undefined): T[] {
   }
 }
 
+/**
+ * 税种名称归一化（供 N4 联动匹配）。消除 N2/N4 命名分歧：
+ * 城市维护建设税/城建税 → 城建税；土地使用税/城镇土地使用税 → 土地使用税；
+ * 车船牌照税/车船使用税/车船税 → 车船税；企业所得税/所得税 → 企业所得税；未交增值税/增值税 → 增值税。
+ * 输出名与 useN4CrossSheet.TAX_TYPES / _normalizeTaxName 对齐（车船税/土地使用税/城建税作 N4 侧规范名）。
+ */
+function _normalizeTaxNameForN4(name: string): string {
+  const s = String(name ?? '').trim()
+  if (s === '城建税' || s === '城市维护建设税') return '城建税'
+  if (s === '土地使用税' || s === '城镇土地使用税') return '土地使用税'
+  if (s === '车船税' || s === '车船使用税' || s === '车船牌照税') return '车船税'
+  if (s === '企业所得税' || s === '所得税') return '企业所得税'
+  if (s === '增值税' || s === '未交增值税') return '增值税'
+  return s
+}
+
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 /**
@@ -160,15 +176,33 @@ export function useN2CrossSheet(allResponses: Ref<Map<string, ChecklistResponse>
    * - N2-2 明细表行数据: item_id "N2-2-rows"（conclusion=JSON数组）
    */
   const adjudicationVsDetail: ComputedRef<AdjudicationVsDetailResult> = computed(() => {
-    // 审定表期末合计
-    const adjTotal = getResponseNum(allResponses.value, 'N2-1-end-balance-total')
+    // 审定表期末合计。
+    // 🔴 优先直接从 N2-1-adjudication-rows 现算（负债类 期末=期初+贷-借），使勾稽始终实时；
+    //    仅当无行数据时回退已持久化的 N2-1-end-balance-total（saveAndSync 在回写时写入）。
+    const adjResp = allResponses.value.get('N2-1-adjudication-rows')
+    const adjRows = safeParseRows<{ beginning?: number; creditAmount?: number; debitAmount?: number; endBalance?: number }>(adjResp?.conclusion)
+    let adjTotal = 0
+    if (adjRows.length > 0) {
+      for (const row of adjRows) {
+        adjTotal += row.endBalance != null
+          ? parseNum(row.endBalance)
+          : parseNum(row.beginning) + parseNum(row.creditAmount) - parseNum(row.debitAmount)
+      }
+    } else {
+      adjTotal = getResponseNum(allResponses.value, 'N2-1-end-balance-total')
+    }
 
-    // 明细表各行期末余额汇总
+    // 明细表各行期末余额汇总。
+    // 🔴 N2-2-rows 存储的是原始录入字段（beginning/accrual/payment），不含计算列 endBalance，
+    //    故不能直接读 row.endBalance（恒 undefined→0），须按负债类公式 期末=期初+计提(贷)-缴纳(借) 现算。
     const detailResp = allResponses.value.get('N2-2-rows')
-    const detailRows = safeParseRows<{ endBalance?: number }>(detailResp?.conclusion)
+    const detailRows = safeParseRows<{ beginning?: number; accrual?: number; payment?: number; endBalance?: number }>(detailResp?.conclusion)
     let detailTotal = 0
     for (const row of detailRows) {
-      detailTotal += parseNum(row.endBalance)
+      const endBalance = row.endBalance != null
+        ? parseNum(row.endBalance)
+        : parseNum(row.beginning) + parseNum(row.accrual) - parseNum(row.payment)
+      detailTotal += endBalance
     }
 
     const diff = parseFloat((adjTotal - detailTotal).toFixed(2))
@@ -245,28 +279,22 @@ export function useN2CrossSheet(allResponses: Ref<Map<string, ChecklistResponse>
   // ─── 4. accrualToN4 — 各税种计提额 → N4税金及附加 ─────────────────────
 
   /**
-   * 汇总N2各税种本期计提金额，供N4税金及附加核对。
-   * 仅计入税金及附加的税费(城建/教育/房产/土地使用/印花/土增)，
-   * 不含增值税（增值税不在税金及附加科目）。
+   * 汇总N2各税种本期计提金额（本期贷方发生额 creditAmount），供N4税金及附加核对。
+   * 只输出计入税金及附加的税费（不含增值税/所得税等不进 6403 的税种），并归一化税种名。
    *
-   * 数据来源：
-   * - N2-1 各税种本期计提: item_id "N2-1-{税种英文}-accrual"
+   * 🔴 数据来源修正：useN2Adjudication 存储整行数组于 "N2-1-adjudication-rows"（不写 per-tax
+   *    "N2-1-{税种}-accrual"），故须从行数组现算，否则读 per-tax 键恒 0 → N4↔N2 勾稽全断。
    */
   const accrualToN4: ComputedRef<AccrualToN4Item[]> = computed(() => {
-    const accrualKeys: Record<string, string> = {
-      '城建税': 'N2-1-urban-maintenance-accrual',
-      '教育费附加': 'N2-1-education-surcharge-accrual',
-      '地方教育附加': 'N2-1-local-education-accrual',
-      '房产税': 'N2-1-property-tax-accrual',
-      '土地使用税': 'N2-1-land-use-tax-accrual',
-      '印花税': 'N2-1-stamp-tax-accrual',
-      '土地增值税': 'N2-1-lvt-accrual',
-    }
-
+    // 不进入税金及附加(6403)的税种（增值税/所得税等），排除
+    const EXCLUDED = new Set(['增值税', '企业所得税', '代扣代缴外国企业所得税', '代扣代缴个人所得税', '其他'])
+    const resp = allResponses.value.get('N2-1-adjudication-rows')
+    const rows = safeParseRows<{ taxType?: string; creditAmount?: number }>(resp?.conclusion)
     const items: AccrualToN4Item[] = []
-    for (const [tax, itemId] of Object.entries(accrualKeys)) {
-      const amount = getResponseNum(allResponses.value, itemId)
-      items.push({ tax, amount })
+    for (const row of rows) {
+      const tax = _normalizeTaxNameForN4(String(row.taxType ?? ''))
+      if (!tax || EXCLUDED.has(tax)) continue
+      items.push({ tax, amount: parseNum(row.creditAmount) })
     }
     return items
   })

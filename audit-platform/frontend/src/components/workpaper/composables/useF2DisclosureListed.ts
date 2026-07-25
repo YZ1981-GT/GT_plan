@@ -537,7 +537,8 @@ export function useF2DisclosureListed(options: {
     debounceSave()
     try {
       window.dispatchEvent(new CustomEvent('disclosure:note-text-updated', {
-        detail: { wpCode: 'F2', section, text: val },
+        // 存货 listed → 五、9（note_template_variant_matrix）
+        detail: { wpCode: 'F2', accountCode: '1405', section, sectionIds: ['五、9'], text: val },
       }))
     } catch { /* silent */ }
   }

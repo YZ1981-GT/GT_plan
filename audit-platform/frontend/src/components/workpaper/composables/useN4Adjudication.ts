@@ -76,6 +76,9 @@ const ITEM_PREFIX = 'N4-1'
 const ROWS_KEY = `${ITEM_PREFIX}-rows`
 
 /** 默认审定表10税种行 */
+// 默认审定表税种行。命名与顺序沿用 N4 模块全局约定（城镇土地使用税/车船税），
+// 须与 useN4Detail / useN4CrossSheet(N2 勾稽按名匹配) / 附注三处保持一致，切勿单独改名或改序。
+// 覆盖源模板 N4-1 全部税种（消费税/城市维护建设税/教育费附加/资源税/房产税/土地使用税/车船使用税/印花税）+ 地方教育附加。
 const DEFAULT_TAX_TYPES: Array<{ taxType: string }> = [
   { taxType: '消费税' },
   { taxType: '城市维护建设税' },

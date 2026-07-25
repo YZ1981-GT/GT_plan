@@ -169,6 +169,24 @@
             <span v-else class="formula-cell">{{ fmtNum(row.priorAmount) }}</span>
           </template>
         </el-table-column>
+        <el-table-column label="调整联动" width="150" align="center">
+          <template #default="{ row }">
+            <template v-if="adjCountFor(row.accountCode) > 0">
+              <el-tag
+                size="small" type="warning" effect="plain"
+                style="cursor: pointer"
+                title="点击跳转到集中调整分录"
+                @click="jumpFirstAdjustment(row.accountCode)"
+              >受 {{ adjCountFor(row.accountCode) }} 笔调整影响</el-tag>
+              <el-button
+                v-if="row.isEditable" link size="small" type="primary"
+                :disabled="isReadonly" style="margin-left: 4px"
+                @click="openBringIn(row)"
+              >带入</el-button>
+            </template>
+            <span v-else style="color: var(--el-text-color-placeholder)">—</span>
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="60" align="center" fixed="right">
           <template #default="{ row }">
             <el-button
@@ -320,8 +338,17 @@
         <li>合计行应与K9-1审定表合计保持一致（交叉勾稽）</li>
         <li>变动率&gt;±30%需在"波动说明"列填写原因</li>
         <li>可点「从 I1-9 取摊销」回填本表「无形资产摊销」行（来自 I1-9-alloc-totals）</li>
+        <li><strong>调整联动</strong>：明细行标注"受 N 笔调整影响"可跳转集中调整；点「带入」把调整金额（单行/多选合计/全部求和）带入本行 AJE/RJE 列</li>
       </ul>
     </details>
+
+    <!-- 调整分录带入弹窗（adjustment-collaboration-and-propagation Part B） -->
+    <AdjustmentBringInDialog
+      v-model="bringInVisible"
+      :matches="bringInMatches"
+      :account-label="bringInRow ? `${bringInRow.accountCode || ''} ${bringInRow.accountName || ''}` : ''"
+      @bring-in="onBringIn"
+    />
   </div>
 </template>
 
@@ -345,6 +372,9 @@ import { useK9Detail, DETAIL_TABS, type K9DetailTabKey } from '../../composables
 import { useK9ImportExport } from '../../composables/useK9ImportExport'
 import { pullI1AmortIntoExpenseDetail } from '../../composables/expenseWpI1AmortPull'
 import { generateK9AiText } from '../../composables/useK9AiText'
+import { useAdjustmentDetailPropagation } from '../../composables/useAdjustmentDetailPropagation'
+import AdjustmentBringInDialog, { type BringInPayload } from '@/components/adjustment/AdjustmentBringInDialog.vue'
+import { useAuditContext } from '@/composables/useAuditContext'
 
 const props = defineProps<{
   wpId: string
@@ -420,6 +450,38 @@ const { exportTemplate, exportData, importData } = useK9ImportExport({
 // ─── 表格数据 ────────────────────────────────────────────────────────────────
 
 const tableData = computed(() => rows.value)
+
+// ─── Part B：调整分录 → 明细行联动（标注/跳转/带入） ─────────────────────────
+const { year: auditYear } = useAuditContext()
+const propagation = useAdjustmentDetailPropagation({
+  projectId: toRef(props, 'projectId') as Ref<string>,
+  year: auditYear as unknown as Ref<number>,
+})
+const bringInVisible = ref(false)
+const bringInRow = ref<any>(null)
+const bringInMatches = computed(() => propagation.matchByAccount(bringInRow.value?.accountCode || ''))
+/** 已带入来源引用（session 级，供 UI 提示；金额本身写入 AJE/RJE 列持久化） */
+const adjBroughtIn = reactive<Record<string, string[]>>({})
+
+function adjCountFor(accountCode: string): number {
+  return propagation.countForRow(accountCode || '')
+}
+function jumpFirstAdjustment(accountCode: string): void {
+  const m = propagation.matchByAccount(accountCode || '')
+  if (m.length) propagation.jumpToAdjustment(m[0].entry_group_id)
+}
+function openBringIn(row: any): void {
+  bringInRow.value = row
+  bringInVisible.value = true
+}
+function onBringIn(payload: BringInPayload): void {
+  const row = bringInRow.value
+  if (!row) return
+  const field = payload.adjustmentType === 'rje' ? 'rje' : 'aje'
+  handleCellChange(row.rowKey, field, payload.amount)
+  adjBroughtIn[row.rowKey] = payload.sourceEntryRefs
+  ElMessage.success(`已带入 ${payload.lineCount} 笔调整（净额 ${payload.amount.toFixed(2)}）至 ${field.toUpperCase()} 列`)
+}
 
 const CHANGE_RATE_THRESHOLD = 0.3
 
@@ -552,6 +614,7 @@ function resetColumnPrefs(): void {
 onMounted(() => {
   loadFluctuationSummary()
   loadColumnPrefs()
+  propagation.load()
 })
 
 // ─── Row class ───────────────────────────────────────────────────────────────

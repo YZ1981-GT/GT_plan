@@ -22,6 +22,7 @@ import type {
   ConfirmationPayload,
   ConfirmationCoverageMetrics,
 } from '../confirmationTypes'
+import { isConfirmationInFlight } from '../coordination/emitConfirmationCompleted'
 
 // ─── ID 生成工具（不依赖 uuid 库） ──────────────────────────────────────────
 
@@ -36,6 +37,12 @@ export interface UseConfirmationDataProps {
   htmlData: () => any
   /** 是否只读 */
   readonly: boolean
+  /**
+   * 科目审定总额(TB population)，作为函证/确认覆盖率分母。
+   * 由后端 render 注入 htmlData.project_context.population_amount，前端只读。
+   * 返回 null 或 ≤0 表示不可用 → 覆盖率显示为「不可用」(Skip-on-missing)。
+   */
+  population?: () => number | null
 }
 
 // ─── 返回接口 ────────────────────────────────────────────────────────────────
@@ -280,9 +287,13 @@ export function useConfirmationData(props: UseConfirmationDataProps): UseConfirm
   // ─── Task 2.8: 覆盖率质量指标 ─────────────────────────────────────────────
 
   const coverageMetrics = computed<ConfirmationCoverageMetrics>(() => {
-    const totalCount = rows.value.length
+    // 已发函笔数：复用在途语义（send_date/is_replied/match_status/confirmation_method 任一）
+    const sentRows = rows.value.filter(isConfirmationInFlight)
+    const sentCount = sentRows.length
     const repliedCount = rows.value.filter((r) => r.is_replied).length
-    const totalAmount = rows.value.reduce((sum, r) => sum + (r.amount ?? 0), 0)
+    // 发函总额 = 已发函行账面金额之和
+    const sentAmount = sentRows.reduce((sum, r) => sum + (r.amount ?? 0), 0)
+    // 已确认金额（回函确认 + 替代确认）
     const confirmedTotal = rows.value.reduce((sum, r) => {
       const confirmed = r._overridden
         ? (r.confirmed_amount ?? 0)
@@ -290,26 +301,31 @@ export function useConfirmationData(props: UseConfirmationDataProps): UseConfirm
       return sum + confirmed
     }, 0)
 
-    // 覆盖率计算（防除零）
-    const confirmationCoverage = totalAmount > 0
-      ? (confirmedTotal / totalAmount) * 100
-      : 0
-    const replyCoverage = totalCount > 0
-      ? (repliedCount / totalCount) * 100
-      : 0
+    // 科目审定总额（population）：作为函证/确认覆盖率分母；缺失或 ≤0 → 覆盖率不可用（Skip-on-missing）
+    const population = props.population?.() ?? null
+    const popValid = population != null && population > 0
 
-    // 预警等级判定
+    // 函证覆盖率 = 发函总额 / 科目审定总额；确认覆盖率 = 已确认 / 科目审定总额
+    const confirmationCoverage = popValid ? (sentAmount / (population as number)) * 100 : null
+    const confirmedCoverage = popValid ? (confirmedTotal / (population as number)) * 100 : null
+    // 回函覆盖率 = 已回函笔数 / 已发函笔数（笔数口径，与公式面板一致；防除零）
+    const replyCoverage = sentCount > 0 ? (repliedCount / sentCount) * 100 : 0
+
+    // 预警等级：回函不足优先 danger；回函达标但函证覆盖率(population 可用时)不足 → warn；
+    // population 缺失时函证覆盖率不参与预警，仅由回函率决定。
     let warnLevel: 'ok' | 'warn' | 'danger' = 'ok'
     if (replyCoverage < 80) {
       warnLevel = 'danger'
-    } else if (confirmationCoverage < 50) {
+    } else if (confirmationCoverage != null && confirmationCoverage < 50) {
       warnLevel = 'warn'
     }
 
     return {
       confirmation_coverage: confirmationCoverage,
+      confirmed_coverage: confirmedCoverage,
       reply_coverage: replyCoverage,
       warn_level: warnLevel,
+      population_available: popValid,
     }
   })
 

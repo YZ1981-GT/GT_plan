@@ -323,14 +323,18 @@
  * Task: 4.4
  * Requirements: 4.1-4.5
  */
-import { ref, computed, onMounted, toRef } from 'vue'
+import { ref, computed, inject, onMounted, toRef } from 'vue'
 import { CircleCheck, CircleClose, WarningFilled } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { fmtAmount } from '@/utils/formatters'
 import { useM10FormData } from '../../composables/useM10FormData'
 import { useM10ClassificationCheck, M10_JUDGMENT_DIMENSIONS } from '../../composables/useM10ClassificationCheck'
 import type { M10JudgmentDimension } from '../../composables/useM10ClassificationCheck'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
+
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -386,8 +390,46 @@ function handleOverallConclusionChange(val: string): void {
 
 // ─── AI assist (placeholder) ─────────────────────────────────────────────────
 
-function handleAI(sectionId: string): void {
-  ElMessage.info(`AI辅助分析：${sectionId}（功能开发中）`)
+async function handleAI(sectionId: string): Promise<void> {
+  if (isReadonly.value) return
+  aiLoading.value = sectionId
+  try {
+    const s = cc.summary.value
+    const context: Record<string, string> = {
+      科目: '4003 其他权益工具 / 负债与权益区分检查表（M10-4，CAS37）',
+      工具总数: String(s.totalInstruments),
+      权益工具数: String(s.equityCount),
+      金融负债数: String(s.liabilityCount),
+      待判定数: String(s.pendingCount),
+      权益部分合计: fmtAmount(s.totalEquityAmount),
+      负债部分合计: fmtAmount(s.totalLiabilityAmount),
+      工具总额: fmtAmount(s.totalAmount),
+      金额守恒: s.allConsistent ? '全部守恒' : '存在不一致',
+    }
+    // overall-conclusion → 综合审计结论 textarea；conclusion-{key} → 单工具结论；其余（维度/表头）→ 顾问式弹窗
+    if (sectionId === 'overall-conclusion') {
+      const text = await generateAiText({ section: 'm10-4-overall-conclusion', context, existingContent: overallConclusion.value })
+      if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+      overallConclusion.value = text
+      handleOverallConclusionChange(text)
+    } else if (sectionId.startsWith('conclusion-')) {
+      const instrumentKey = sectionId.slice('conclusion-'.length)
+      const inst = cc.computedJudgments.value.find(i => i.instrumentKey === instrumentKey)
+      const instCtx: Record<string, string> = {
+        ...context,
+        工具名称: inst?.instrumentName || '未命名工具',
+        分类结论: inst?.classification === 'equity' ? '权益工具' : inst?.classification === 'liability' ? '金融负债' : '待判定',
+        工具金额: fmtAmount(inst?.totalAmount ?? 0),
+      }
+      const text = await generateAiText({ section: 'm10-4-instrument-conclusion', context: instCtx, existingContent: inst?.conclusion || '' })
+      if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+      cc.updateConclusion(instrumentKey, text)
+    } else {
+      const text = await generateAiText({ section: `m10-4-${sectionId}`, context })
+      if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+      ElMessageBox.alert(text, 'AI 辅助 — 负债权益区分建议', { confirmButtonText: '知道了' }).catch(() => { /* 用户关闭 */ })
+    }
+  } catch { ElMessage.warning('AI 生成失败，请稍后重试') } finally { aiLoading.value = '' }
 }
 
 // ─── Load data ───────────────────────────────────────────────────────────────

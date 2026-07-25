@@ -28,6 +28,14 @@
       <div class="toolbar-right">
         <span class="chip-wrap"><GtIndexChip value="wp:H9-4" :context-project-id="props.projectId" /></span>
         <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+        <el-tag
+          v-if="centralStatus?.review_status"
+          size="small"
+          :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
+          :title="centralStatus.rejection_reason || ''"
+        >
+          集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
+        </el-tag>
       </div>
     </div>
 
@@ -131,6 +139,17 @@
     <div class="action-bar" v-if="!props.isReadonly">
       <el-button size="small" @click="handleAddRow">+ 新增调整分录</el-button>
       <el-button size="small" type="primary" @click="handleSave" :loading="saving">保存</el-button>
+      <el-button
+        size="small"
+        type="primary"
+        plain
+        :loading="centralSyncing"
+        :disabled="!balanceCheck.isBalanced || rows.length === 0"
+        title="把本页调整分录汇聚到集中调整登记，供合伙人跨循环审阅"
+        @click="syncToCentral"
+      >
+        同步到集中登记
+      </el-button>
       <el-dropdown trigger="click" @command="handleImportExport" style="margin-left: 8px">
         <el-button size="small">导入导出 ▾</el-button>
         <template #dropdown>
@@ -201,10 +220,12 @@
  * Spec: .kiro/specs/h9-lease-liabilities/ Task 4.5
  * Requirements: 5.1-5.4
  */
-import { ref, computed, inject, toRef } from 'vue'
+import { ref, computed, inject, toRef, onMounted, type Ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { useH9Adjustment } from '../../composables/useH9Adjustment'
 import { useH9ImportExport } from '../../composables/useH9ImportExport'
+import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
+import { useAuditContext } from '@/composables/useAuditContext'
 import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
@@ -246,6 +267,27 @@ const importExport = useH9ImportExport({
   sheetCode: 'H9-4',
   onImported: async () => { await h9ReloadAll() },
 })
+
+// ─── 同步到集中调整登记（workpaper-adjustment-centralization） ───
+const { year: centralYear } = useAuditContext()
+const { centralStatus, syncing: centralSyncing, syncToCentral, refreshStatus } = useAdjustmentCentralSync({
+  projectId: toRef(props, 'projectId') as Ref<string>,
+  year: centralYear,
+  wpId: toRef(props, 'wpId') as Ref<string>,
+  wpCode: 'H9',
+  itemId: 'H9-5-rows',
+  buildLineItems: () => rows.value.map((e: any) => ({
+    standard_account_code: e.accountCode || undefined,
+    account_name: e.accountName,
+    debit_amount: e.debitAmount,
+    credit_amount: e.creditAmount,
+  })),
+  buildMeta: () => ({
+    description: rows.value.find((e: any) => e.description)?.description || 'H9 租赁负债调整',
+    adjustmentType: rows.value.length > 0 && rows.value.every((e: any) => e.category === 'RJE') ? 'rje' : 'aje',
+  }),
+})
+onMounted(() => refreshStatus())
 
 // ─── Audit Note / Conclusion ─────────────────────────────────────────────────
 const auditNote = ref('')

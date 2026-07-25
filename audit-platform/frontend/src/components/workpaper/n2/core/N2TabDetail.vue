@@ -251,6 +251,7 @@
     <!-- ═══ 新增行 ═══ -->
     <div v-if="!isReadonly" class="add-row-bar">
       <el-button size="small" @click="handleAddRow">+ 新增税种明细行</el-button>
+      <el-button v-if="rows.length === 0" size="small" @click="handleSeedDefaults">预置源模板常见税种（13项）</el-button>
     </div>
 
     <!-- ═══ 编制提示（折叠底部） ═══ -->
@@ -337,6 +338,7 @@ const {
   summary,
   diffRowIds,
   addRow,
+  seedDefaultRows,
   removeRow,
   updateRow,
   syncSummary,
@@ -411,6 +413,23 @@ async function handleAddRow() {
     )
     await addRow(taxType, subItem || '')
     ElMessage.success(`已新增：${taxType} - ${subItem || '(无子目)'}`)
+  } catch {
+    // 用户取消
+  }
+}
+
+// ─── 预置源模板常见税种 ──────────────────────────────────────────────────────
+
+async function handleSeedDefaults() {
+  try {
+    await ElMessageBox.confirm(
+      '将预置致同源模板 N2-2 的 13 类标准税种（金额为0，可按被审计单位税收情况增减）。仅在当前明细为空时生效。',
+      '预置常见税种',
+      { type: 'info', confirmButtonText: '预置', cancelButtonText: '取消' },
+    )
+    await seedDefaultRows()
+    await syncSummary()
+    ElMessage.success('已预置源模板常见税种')
   } catch {
     // 用户取消
   }

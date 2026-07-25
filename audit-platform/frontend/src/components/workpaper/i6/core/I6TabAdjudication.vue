@@ -68,6 +68,9 @@
       <div class="block-header">
         <span class="block-title">研发费用审定表（I6-1）</span>
         <div class="block-actions">
+          <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
+            <el-icon><Download /></el-icon>带入调整
+          </el-button>
           <el-button size="small" type="primary" plain :disabled="isReadonly" @click="adj.syncFromDetail(false)">
             从 I6-2 取数
           </el-button>
@@ -252,17 +255,31 @@
         <li>合计行为各类别加总；TB数据行为试算表6602未审发生额；差异=合计本期审定−TB数据。</li>
         <li>回写TB后发布 <code>substantive:adjudicated</code>，驱动附注披露表自动刷新。</li>
         <li>附注同步目标：上市 §五、66 / 国企 §八、67「研发费用（按费用性质列示）」。</li>
+        <li>「带入调整」：从集中登记按科目 6602 拉取调整分录，逐笔分配到各费用类别的本期 AJE/RJE，带入后审定数自动更新并联动附注。</li>
       </ol>
     </details>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="6602 研发费用"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, inject } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Download } from '@element-plus/icons-vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { useI6Adjudication, type I6AdjudicationRow } from '../../composables/useI6Adjudication'
 import { resolveI6DisclosureVisibility } from '../../composables/i6ApplicableSheets'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import { useAuditContext } from '@/composables/useAuditContext'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 
 const props = defineProps<{
   wpId: string
@@ -293,6 +310,30 @@ const linkagePanel = adj.linkagePanel
 const tbUnadjusted = adj.tbUnadjusted
 const tbDifference = adj.tbDifference
 const detailCrossValidation = adj.detailCrossValidation
+
+// ─── 从集中登记带入调整（6602 研发费用，损益借方；带入本期 AJE/RJE） ───
+const bringInRows = computed(() =>
+  adj.rows.value.map((r) => ({ rowKey: r.rowId, name: r.类别, aje: r.本期AJE, rje: r.本期RJE })),
+)
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: computed(() => props.projectId) as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '6602',
+  direction: 'debit',
+  subjectCode: '6602',
+  wpCode: 'I6',
+  subjectLabel: '研发费用(6602)',
+  rows: bringInRows,
+  updateCell: (rowKey: string, field: any, value: number) =>
+    adj.updateCell(rowKey, field === 'rje' ? '本期RJE' : '本期AJE', value),
+  totalAudited: () => totalRow.value.本期审定,
+})
 
 const discVis = computed(() => resolveI6DisclosureVisibility(props.applicableStandards))
 

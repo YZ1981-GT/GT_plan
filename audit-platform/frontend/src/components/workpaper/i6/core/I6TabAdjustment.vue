@@ -98,6 +98,18 @@
         >
           保存并回写 I6-1
         </el-button>
+        <el-button
+          v-if="!isReadonly"
+          size="small"
+          type="primary"
+          plain
+          :loading="centralSyncing"
+          :disabled="!state.isBalanced.value || state.rows.value.length === 0"
+          title="把本页调整分录汇聚到集中调整登记，供合伙人跨循环审阅"
+          @click="syncToCentral"
+        >
+          同步到集中登记
+        </el-button>
         <el-dropdown v-if="!isReadonly" size="small" trigger="click" @command="handleImportExport">
           <el-button size="small">
             导入导出 <el-icon class="el-icon--right"><ArrowDown /></el-icon>
@@ -122,6 +134,14 @@
         <span class="chip-wrap"><GtIndexChip value="wp:I6-3" :context-project-id="projectId" /></span>
         <span class="chip-wrap"><GtIndexChip value="A13" @click="emit('navigate-sheet', 'A13')" /></span>
         <el-button size="small" type="default" link @click="openReview('I6-3')">复核</el-button>
+        <el-tag
+          v-if="centralStatus?.review_status"
+          size="small"
+          :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
+          :title="centralStatus.rejection_reason || ''"
+        >
+          集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
+        </el-tag>
       </div>
     </div>
 
@@ -321,12 +341,13 @@
  * I6TabAdjustment.vue — I6-3 研发费用调整分录汇总
  * 对齐致同 Excel + 中央调整分录模块双向联动 + I6-1 回写 + A13
  */
-import { computed, inject, ref, toRef } from 'vue'
+import { computed, inject, ref, toRef, onMounted } from 'vue'
 import { ArrowDown } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 import { useI6Adjustment, resolveI6AuditYear } from '../../composables/useI6Adjustment'
+import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
 import { I6_DETAIL_DEFAULT_CATEGORIES } from '../../composables/useI6Detail'
 
 const props = defineProps<{
@@ -360,6 +381,27 @@ const state = useI6Adjustment({
   auditYear,
   onSave: (itemId, value) => emit('save', itemId, value),
 })
+
+// ─── 同步到集中调整登记（workpaper-adjustment-centralization） ───
+const { centralStatus, syncing: centralSyncing, syncToCentral, refreshStatus } = useAdjustmentCentralSync({
+  projectId: toRef(props, 'projectId'),
+  year: auditYear,
+  wpId: toRef(props, 'wpId'),
+  wpCode: 'I6',
+  itemId: 'I6-3-rows',
+  buildLineItems: () => state.rows.value.map((r) => ({
+    standard_account_code: r.accountCode || undefined,
+    account_name: r.accountName,
+    report_line_code: r.reportItem || undefined,
+    debit_amount: r.debitAmount,
+    credit_amount: r.creditAmount,
+  })),
+  buildMeta: () => ({
+    description: state.rows.value.find((r) => r.description)?.description || 'I6 研发费用调整',
+    adjustmentType: state.rows.value.length > 0 && state.rows.value.every((r) => r.category === '报表调整') ? 'rje' : 'aje',
+  }),
+})
+onMounted(() => refreshStatus())
 
 const selectedRowIds = ref<string[]>([])
 

@@ -15,6 +15,9 @@
     <div class="section-header">
       <h3>K7-1 递延收益审定表</h3>
       <div class="header-actions">
+        <el-button size="small" type="warning" plain :disabled="isReadonly" :loading="adjPull.loading.value" @click="openBringInAdjustment">
+          <el-icon><Download /></el-icon> 带入调整
+        </el-button>
         <el-button size="small" type="primary" plain @click="handleAiGenerate">
           <el-icon><MagicStick /></el-icon> AI审计说明
         </el-button>
@@ -315,8 +318,18 @@
         <li>与收益相关：补偿以后期间→分期；补偿已发生→一次性计入当期损益</li>
         <li>三角勾稽：审定合计应等于K7-2明细表期末合计</li>
         <li>回写TB(2401)后自动发布substantive:adjudicated事件通知附注刷新</li>
+        <li>「带入调整」：按科目2401拉取调整分录，逐笔选目标项目行累加到 AJE/RJE，带入后自动联动披露/附注</li>
       </ul>
     </details>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="2401 递延收益"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
@@ -335,9 +348,12 @@
  * ⚠️ 负债类！期末=期初+收到(贷方增加)-分摊(借方减少)
  */
 import { computed, inject, toRef, type Ref } from 'vue'
-import { MagicStick, CircleCheckFilled, WarningFilled } from '@element-plus/icons-vue'
+import { MagicStick, CircleCheckFilled, WarningFilled, Download } from '@element-plus/icons-vue'
 import { ElMessageBox } from 'element-plus'
 import { useK7Adjudication, type K7AdjRow } from '../../composables/useK7Adjudication'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 
 const props = defineProps<{
   wpId: string
@@ -378,6 +394,20 @@ const {
 
 // Local ref binding for textarea v-model
 const auditConclusionLocal = auditConclusion
+
+// ─── 从集中登记带入调整（2401 递延收益，负债贷方） ────────────────────────────
+const { adjPull, visible: bringInVisible, rowOptions: bringInRowOptions, open: openBringInAdjustment, apply: onBringInApply } = useAdjudicationBringIn({
+  projectId: toRef(props, 'projectId') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '2401',
+  direction: 'credit', // 负债贷方：净发生额 = 贷 − 借
+  subjectCode: '2401',
+  wpCode: 'K7',
+  subjectLabel: '递延收益(2401)',
+  rows: computed(() => [...assetRelatedRows.value, ...incomeRelatedRows.value].map(r => ({ rowKey: r.rowKey, name: r.project, aje: r.aje, rje: r.rje }))),
+  updateCell: (rowKey: string, field: any, value: number) => adj.updateCell(rowKey, field, value),
+  totalAudited: () => grandTotal.value.audited,
+})
 
 // ─── 表格数据（含小计行标记） ─────────────────────────────────────────────────
 

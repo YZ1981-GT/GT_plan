@@ -80,6 +80,7 @@
         v-else-if="currentSheet === 'L1-5'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
+        :year="props.year"
         :is-readonly="isReadonly"
         @navigate="handleNavigate"
       />
@@ -96,6 +97,7 @@
         v-else-if="currentSheet === 'L1-7'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
+        :year="props.year"
         :is-readonly="isReadonly"
         @navigate="handleNavigate"
       />

@@ -3,6 +3,9 @@
     <div class="section-head">
       <h3 class="sheet-title">G4-1 债权投资审定表</h3>
       <div class="head-actions tab-toolbar">
+        <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
+          <el-icon><Download /></el-icon>带入调整
+        </el-button>
         <span class="chip-wrap"><GtIndexChip value="wp:G4-2" :context-project-id="props.projectId" /></span>
         <span class="chip-wrap"><GtIndexChip value="wp:G4-3" :context-project-id="props.projectId" /></span>
         <el-button size="small" @click="openReviewDialog('G4-1-adjudication')">💬复核</el-button>
@@ -34,6 +37,7 @@
         <li>净值叶子＝对应原值审定−减值审定；各层「××小计」＝小计−一年内到期的部分。</li>
         <li>G4-3「保存&amp;回写」后，1501/1502 净调整写入原值·按组合计提坏账准备行。</li>
         <li>差异数＝债权投资净值合计期末审定−试算平衡表数，应为 0。</li>
+        <li>「带入调整」：可从集中登记按科目 1501 拉取调整分录，逐笔分配到各原值/减值明细行的期末账项调整，带入后审定数自动更新并联动附注。</li>
       </ul>
     </details>
 
@@ -174,6 +178,15 @@
       conclusion-placeholder="审计结论..."
       conclusion-hint="评价科目 1501 审定结果。"
     />
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="1501 债权投资"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
@@ -182,9 +195,13 @@
  * G4TabAdjudication.vue — 对齐 Excel《审定表G4-1》列/行结构（参照 G1-1）
  */
 import { ref, computed, toRef, inject, onMounted, watch } from 'vue'
+import { Download } from '@element-plus/icons-vue'
 import { useG4MainAdjudication } from '../../composables/useG4MainAdjudication'
 import type { G4AdjudicationRow } from '../../composables/useG4MainAdjudication'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import G4AuditTextCards from '../G4AuditTextCards.vue'
 
@@ -240,6 +257,32 @@ const adj = useG4MainAdjudication({
   projectId: toRef(props, 'projectId') as any,
   allResponses,
   isReadonly: toRef(props, 'isReadonly') as any,
+})
+
+// ─── 从集中登记带入调整（1501 债权投资，资产借方；带入期末账项调整，单列合并 AJE/RJE） ───
+const bringInRows = computed(() =>
+  adj.rows.value
+    .filter((r) => r.editable && r.kind === 'leaf')
+    .map((r) => ({ rowKey: r.rowKey, name: r.label, aje: r.closingAdjustment, rje: r.closingAdjustment })),
+)
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: toRef(props, 'projectId') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '1501',
+  direction: 'debit',
+  subjectCode: '1501',
+  wpCode: 'G4',
+  subjectLabel: '债权投资(1501)',
+  rows: bringInRows,
+  updateCell: (rowKey: string, _field: any, value: number) =>
+    adj.updateCell(rowKey, 'closingAdjustment', value),
+  totalAudited: () => adj.amortizedCostRow.value?.closingAudited ?? 0,
 })
 
 onMounted(() => {

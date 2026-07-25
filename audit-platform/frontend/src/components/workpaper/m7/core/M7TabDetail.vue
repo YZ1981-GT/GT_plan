@@ -33,7 +33,7 @@
             </el-dropdown-menu>
           </template>
         </el-dropdown>
-        <el-button size="small" @click="handleAI('detail')">
+        <el-button size="small" :loading="aiLoading === 'detail'" @click="handleAI('detail')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
         <el-button size="small" @click="handleReview">
@@ -328,7 +328,7 @@
  */
 import { computed, inject, onMounted, ref } from 'vue'
 import { Plus, MagicStick, Check } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useM7FormData } from '../../composables/useM7FormData'
 import {
   useM7Detail,
@@ -338,6 +338,7 @@ import {
 } from '../../composables/useM7Detail'
 import { useM7ImportExport } from '../../composables/useM7ImportExport'
 import { useM7CrossSheet } from '../../composables/useM7CrossSheet'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 
 const props = defineProps<{
   wpId: string
@@ -350,6 +351,8 @@ const emit = defineEmits<{
 }>()
 
 const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', () => {})
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
 
 // ─── FormData + Composables ──────────────────────────────────────────────────
 
@@ -438,8 +441,22 @@ function handleImportExport(command: string) {
   }
 }
 
-function handleAI(_section: string) {
-  // AI辅助功能待Phase6集成
+async function handleAI(section: string): Promise<void> {
+  if (props.isReadonly) return
+  aiLoading.value = section
+  try {
+    const context: Record<string, string> = {
+      科目: '4201 专项储备（权益类·贷方）/ 明细表 M7-2',
+      审定期末合计: fmtAmount(totals.value.auditedEnd),
+      审定计提合计: fmtAmount(totals.value.auditedAccrual),
+      审定使用合计: fmtAmount(totals.value.auditedUsage),
+      项目数: String(computedRows.value.length),
+      '与M7-1核对': crossSheetMatch.value ? '一致' : `差额 ${fmtAmount(crossSheetDiff.value)}`,
+    }
+    const text = await generateAiText({ section: `m7-detail-${section}`, context })
+    if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+    ElMessageBox.alert(text, 'AI 辅助建议', { confirmButtonText: '知道了' }).catch(() => {})
+  } catch { ElMessage.warning('AI 生成失败，请稍后重试') } finally { aiLoading.value = '' }
 }
 
 function handleReview() {

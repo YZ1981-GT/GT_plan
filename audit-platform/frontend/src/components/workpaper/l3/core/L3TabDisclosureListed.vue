@@ -1,168 +1,78 @@
 <template>
   <div class="l3-tab-disclosure-listed">
-    <!-- ═══ 返回目录 + 标题 + AI辅助 ═══ -->
+    <!-- ═══ 返回目录 + 标题 ═══ -->
     <div class="disclosure-header">
       <div class="disclosure-header-left">
-        <el-button text size="small" @click="$emit('navigate', '底稿目录')">
-          ← 返回目录
-        </el-button>
+        <el-button text size="small" @click="$emit('navigate', '底稿目录')">← 返回目录</el-button>
         <h3 class="disclosure-title">附注披露信息核对（上市公司）</h3>
       </div>
-      <div class="disclosure-header-right">
-        <el-button
-          size="small"
-          :disabled="isReadonly"
-          @click="handleAiAssist"
-        >
-          🤖 AI辅助
-        </el-button>
-      </div>
     </div>
 
-    <!-- ═══ 方法论上下文（琥珀色） ═══ -->
+    <!-- ═══ 方法论上下文 ═══ -->
     <div class="methodology-context">
       <div class="methodology-text">
-        <strong>上市公司长期借款附注披露要求：</strong>
-        按借款类型（信用/保证/抵押/质押）分类列示长期借款余额，
-        包含期初余额、本期增加、本期减少、期末余额、利率区间、到期日等。
-        需单独披露一年内到期的长期借款金额及逾期借款情况。
-        披露数据应与审定表L3-1交叉验证一致。
+        <strong>上市公司长期借款附注披露：</strong>
+        按担保方式（质押/抵押/保证/信用借款）分类列示期末余额、上年年末余额及利率区间，
+        <strong>合计 = 小计 − 减一年内到期的长期借款</strong>（一年内到期部分单独列示于流动负债）。
+        数据自 L3-2 明细按类型聚合（只读），审定变化时自动刷新。
       </div>
     </div>
 
-    <!-- ═══ Section: 长期借款明细 ═══ -->
+    <!-- ═══ 主表：长期借款分类 ═══ -->
     <div class="disclosure-section">
-      <div class="section-header">
-        <span class="section-title">一、长期借款明细</span>
-        <el-button
-          size="small"
-          :disabled="isReadonly"
-          @click="handleSectionAi('detail')"
-        >
-          🤖 AI辅助
-        </el-button>
-      </div>
-      <el-input
-        v-model="sections.detail"
-        type="textarea"
-        :autosize="{ minRows: 4, maxRows: 12 }"
-        placeholder="按借款类型分类列示长期借款余额明细：包括借款银行、币种、年利率、起始日、到期日、期初余额、期末余额、一年内到期金额等..."
-        :disabled="isReadonly"
-        @input="handleSectionChange('detail')"
-      />
+      <div class="section-header"><span class="section-title">① 长期借款（按担保方式分类）</span></div>
+      <el-table :data="classificationRows" border size="small" style="width: 100%" :row-class-name="rowClass">
+        <el-table-column prop="label" label="项目" min-width="200">
+          <template #default="{ row }"><span :class="{ 'row-bold': row.isTotal || row.isSubtotal }">{{ row.label }}</span></template>
+        </el-table-column>
+        <el-table-column label="期末余额" min-width="140" align="right">
+          <template #default="{ row }">{{ fmtAmount(row.endAmount) }}</template>
+        </el-table-column>
+        <el-table-column label="利率区间" min-width="130">
+          <template #default="{ row }">
+            <el-input v-if="row.rateEditable && !isReadonly" :model-value="rateRange(row.rowKey, 'end')" size="small" placeholder="如3.5%~4.2%" @input="(v: string) => updateRate(row.rowKey, 'end', v)" />
+            <span v-else>{{ row.rateEditable ? (rateRange(row.rowKey, 'end') || '-') : '' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="上年年末余额" min-width="140" align="right">
+          <template #default="{ row }">{{ fmtAmount(row.priorAmount) }}</template>
+        </el-table-column>
+        <el-table-column label="利率区间" min-width="130">
+          <template #default="{ row }">
+            <el-input v-if="row.rateEditable && !isReadonly" :model-value="rateRange(row.rowKey, 'prior')" size="small" placeholder="如3.5%~4.2%" @input="(v: string) => updateRate(row.rowKey, 'prior', v)" />
+            <span v-else>{{ row.rateEditable ? (rateRange(row.rowKey, 'prior') || '-') : '' }}</span>
+          </template>
+        </el-table-column>
+      </el-table>
     </div>
 
-    <!-- ═══ Section: 利率说明 ═══ -->
+    <!-- ═══ 财产抵押质押说明 ═══ -->
     <div class="disclosure-section">
-      <div class="section-header">
-        <span class="section-title">二、利率说明</span>
-        <el-button
-          size="small"
-          :disabled="isReadonly"
-          @click="handleSectionAi('rate')"
-        >
-          🤖 AI辅助
-        </el-button>
-      </div>
-      <el-input
-        v-model="sections.rate"
-        type="textarea"
-        :autosize="{ minRows: 3, maxRows: 8 }"
-        placeholder="长期借款利率区间说明：如固定利率X%~Y%、浮动利率LPR+X基点等..."
-        :disabled="isReadonly"
-        @input="handleSectionChange('rate')"
-      />
+      <div class="section-header"><span class="section-title">说明：公司用于抵押、质押的财产</span></div>
+      <el-input :model-value="propertyNote" type="textarea" :autosize="{ minRows: 2 }" :readonly="isReadonly" placeholder="说明公司用于抵押、质押的财产情况（可关联 L3-8 抵质押资产检查）..." @input="(v: string) => updateNote('property-note', v)" />
     </div>
 
-    <!-- ═══ Section: 担保说明 ═══ -->
+    <!-- ═══ (1) 一年内到期的长期借款 ═══ -->
     <div class="disclosure-section">
-      <div class="section-header">
-        <span class="section-title">三、担保说明</span>
-        <el-button
-          size="small"
-          :disabled="isReadonly"
-          @click="handleSectionAi('guarantee')"
-        >
-          🤖 AI辅助
-        </el-button>
-      </div>
-      <el-input
-        v-model="sections.guarantee"
-        type="textarea"
-        :autosize="{ minRows: 3, maxRows: 8 }"
-        placeholder="抵押/质押/保证借款担保情况：担保物名称、账面价值、担保比例、保证人等..."
-        :disabled="isReadonly"
-        @input="handleSectionChange('guarantee')"
-      />
-    </div>
-
-    <!-- ═══ Section: 一年内到期说明 ═══ -->
-    <div class="disclosure-section">
-      <div class="section-header">
-        <span class="section-title">四、一年内到期说明</span>
-        <el-button
-          size="small"
-          :disabled="isReadonly"
-          @click="handleSectionAi('currentPortion')"
-        >
-          🤖 AI辅助
-        </el-button>
-      </div>
-      <el-input
-        v-model="sections.currentPortion"
-        type="textarea"
-        :autosize="{ minRows: 3, maxRows: 8 }"
-        placeholder="一年内到期的长期借款明细：已重分类至一年内到期的非流动负债的金额、对应合同及到期安排..."
-        :disabled="isReadonly"
-        @input="handleSectionChange('currentPortion')"
-      />
-    </div>
-
-    <!-- ═══ Section: 逾期说明 ═══ -->
-    <div class="disclosure-section">
-      <div class="section-header">
-        <span class="section-title">五、逾期说明</span>
-        <el-button
-          size="small"
-          :disabled="isReadonly"
-          @click="handleSectionAi('overdue')"
-        >
-          🤖 AI辅助
-        </el-button>
-      </div>
-      <el-input
-        v-model="sections.overdue"
-        type="textarea"
-        :autosize="{ minRows: 3, maxRows: 8 }"
-        placeholder="逾期长期借款情况（如有）：逾期金额、逾期天数、逾期原因及后续安排..."
-        :disabled="isReadonly"
-        @input="handleSectionChange('overdue')"
-      />
+      <div class="section-header"><span class="section-title">（1）一年内到期的长期借款</span></div>
+      <el-table :data="currentPortionRows" border size="small" style="width: 100%" :row-class-name="cpRowClass">
+        <el-table-column prop="label" label="项目" min-width="200">
+          <template #default="{ row }"><span :class="{ 'row-bold': row.isTotal }">{{ row.label }}</span></template>
+        </el-table-column>
+        <el-table-column label="期末余额" min-width="150" align="right">
+          <template #default="{ row }">{{ fmtAmount(row.endAmount) }}</template>
+        </el-table-column>
+        <el-table-column label="上年年末余额" min-width="150" align="right">
+          <template #default="{ row }">{{ fmtAmount(row.priorAmount) }}</template>
+        </el-table-column>
+      </el-table>
     </div>
 
     <!-- ═══ 审计结论 ═══ -->
     <div class="conclusion-section">
       <el-card shadow="never">
-        <template #header>
-          <div class="conclusion-header">
-            <span>审计结论</span>
-            <el-button
-              size="small"
-              :disabled="isReadonly"
-              @click="handleAiConclusion"
-            >
-              🤖 AI生成结论
-            </el-button>
-          </div>
-        </template>
-        <el-input
-          v-model="conclusionText"
-          type="textarea"
-          :autosize="{ minRows: 3, maxRows: 8 }"
-          placeholder="请输入附注披露核对结论..."
-          :disabled="isReadonly"
-          @input="handleConclusionChange"
-        />
+        <template #header><span class="conclusion-title">审计结论</span></template>
+        <el-input :model-value="conclusion" type="textarea" :autosize="{ minRows: 3 }" :readonly="isReadonly" placeholder="附注披露核对结论：披露分类/金额/利率/担保是否完整准确，与审定表 L3-1 是否一致..." @input="(v: string) => updateNote('conclusion', v)" />
       </el-card>
     </div>
 
@@ -170,12 +80,11 @@
     <details class="l3-details-tip">
       <summary>编制提示</summary>
       <ul>
-        <li><strong>披露范围</strong>：上市公司须分类列示长期借款明细，包含利率、担保、到期日等</li>
-        <li><strong>一年内到期</strong>：将于资产负债表日起一年内到期的部分单独列示</li>
-        <li><strong>逾期披露</strong>：逾期未偿还的长期借款须单独披露金额及原因</li>
-        <li><strong>利率区间</strong>：同类借款利率不一致时须披露利率区间</li>
-        <li><strong>担保物</strong>：抵押/质押借款须披露担保物及评估价值</li>
-        <li><strong>交叉验证</strong>：附注合计应与审定表L3-1期末余额一致</li>
+        <li><strong>分类固定行</strong>：质押/抵押/保证/信用借款 + 小计 − 减一年内到期 = 合计，对齐源模板</li>
+        <li><strong>数据来源</strong>：从 L3-2 明细按借款类型 SUMIF 聚合，期末=审定期末，上年年末=审定期初，只读</li>
+        <li><strong>利率区间</strong>：同类借款利率不一致时按行手工填列利率区间</li>
+        <li><strong>合计口径</strong>：合计 = 小计 − 一年内到期（一年内到期在流动负债单独列示，见（1）子表）</li>
+        <li><strong>交叉验证</strong>：合计应与审定表 L3-1 期末披露审定数一致</li>
       </ul>
     </details>
   </div>
@@ -183,25 +92,18 @@
 
 <script setup lang="ts">
 /**
- * L3TabDisclosureListed — 附注披露信息核对（上市公司）
+ * L3TabDisclosureListed — 附注披露信息核对（上市公司，源模板重建）
  *
- * 功能：
- * - 上市公司长期借款附注模板
- * - textarea sections: 长期借款明细/利率说明/担保说明/一年内到期说明/逾期说明
- * - 每个section标题行右侧AI辅助按钮
- * - subscribe 'substantive:adjudicated' 事件刷新
- * - inject l3FormData
+ * - 分类固定行（质押/抵押/保证/信用借款）+ 小计 − 减一年内到期 = 合计 + 利率区间
+ * - (1) 一年内到期的长期借款 子表 + 财产抵押质押说明 + 审计结论
+ * - 数据从 L3-2 明细按类型聚合（只读），订阅 substantive:adjudicated 自动刷新
  *
- * Spec: .kiro/specs/l3-long-term-loans/
- * Task: 4.7
- * Requirements: 9.2
+ * 科目：2501 长期借款（贷方/负债类）
  */
-import { inject, onMounted, onUnmounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { inject, onMounted, onUnmounted } from 'vue'
 import type { useL3FormData } from '@/components/workpaper/composables/useL3FormData'
+import { useL3Disclosure, type L3DisclosureRow, type L3CurrentPortionRow } from '@/components/workpaper/composables/useL3Disclosure'
 import { eventBus } from '@/utils/eventBus'
-
-// ─── Props / Emits ───────────────────────────────────────────────────────────
 
 defineProps<{
   wpId: string
@@ -209,117 +111,44 @@ defineProps<{
   isReadonly: boolean
 }>()
 
-defineEmits<{
-  (e: 'navigate', sheetName: string): void
-}>()
-
-// ─── Inject formData ─────────────────────────────────────────────────────────
+defineEmits<{ (e: 'navigate', sheetName: string): void }>()
 
 const formData = inject<ReturnType<typeof useL3FormData>>('l3FormData')!
 
-// ─── State ───────────────────────────────────────────────────────────────────
+const {
+  classificationRows,
+  currentPortionRows,
+  rateRange,
+  updateRate,
+  propertyNote,
+  conclusion,
+  updateNote,
+} = useL3Disclosure(formData.allResponses, formData.debouncedSave, 'listed')
 
-const sections = reactive({
-  detail: '',
-  rate: '',
-  guarantee: '',
-  currentPortion: '',
-  overdue: '',
-})
-
-const conclusionText = ref('')
-
-// ─── Section Key Map ─────────────────────────────────────────────────────────
-
-const SECTION_KEYS: Record<string, string> = {
-  detail: 'L3-disclosure-listed-detail',
-  rate: 'L3-disclosure-listed-rate',
-  guarantee: 'L3-disclosure-listed-guarantee',
-  currentPortion: 'L3-disclosure-listed-current-portion',
-  overdue: 'L3-disclosure-listed-overdue',
+function handleAdjudicatedRefresh(): void {
+  formData.loadData()
 }
-
-const CONCLUSION_KEY = 'L3-disclosure-listed-conclusion'
-
-// ─── 字段变更保存 ────────────────────────────────────────────────────────────
-
-function handleSectionChange(key: keyof typeof sections) {
-  const itemId = SECTION_KEYS[key]
-  if (!itemId) return
-  formData.debouncedSave(itemId, { remark: sections[key] || null })
-}
-
-function handleConclusionChange() {
-  formData.debouncedSave(CONCLUSION_KEY, { remark: conclusionText.value || null })
-}
-
-// ─── AI辅助 ──────────────────────────────────────────────────────────────────
-
-async function handleAiAssist() {
-  try {
-    const res = await (await import('@/utils/http')).default.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
-      section: 'l3-disclosure-listed',
-      prompt: '请基于长期借款附注披露（上市公司）数据，检查披露完整性并给出审计建议',
-      context: { wpId: props.wpId },
-    })
-    if (res.data?.data?.content) ElMessage.success('AI建议已生成')
-  } catch { ElMessage.info('AI辅助暂不可用') }
-}
-
-async function handleSectionAi(section: string) {
-  try {
-    const res = await (await import('@/utils/http')).default.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
-      section: `l3-disclosure-${section}`,
-      prompt: `请对长期借款附注"${section}"区段给出披露合规性审计建议`,
-      context: { section },
-    })
-    if (res.data?.data?.content) ElMessage.success(`${section} AI建议已生成`)
-  } catch { ElMessage.info('AI辅助暂不可用') }
-}
-
-async function handleAiConclusion() {
-  try {
-    const res = await (await import('@/utils/http')).default.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
-      section: 'l3-disclosure-conclusion',
-      prompt: '请基于长期借款附注检查情况，生成审计结论',
-      context: { wpId: props.wpId },
-    })
-    if (res.data?.data?.content) ElMessage.success('AI结论已生成')
-  } catch { ElMessage.info('AI辅助暂不可用') }
-}
-
-// ─── EventBus 订阅：审定变更后刷新 ──────────────────────────────────────────
-
-function handleAdjudicatedRefresh() {
-  loadDisclosureData()
-}
-
 onMounted(() => {
   eventBus.on('substantive:adjudicated', handleAdjudicatedRefresh)
-  loadDisclosureData()
 })
-
 onUnmounted(() => {
   eventBus.off('substantive:adjudicated', handleAdjudicatedRefresh)
 })
 
-// ─── 加载数据 ────────────────────────────────────────────────────────────────
+function rowClass({ row }: { row: L3DisclosureRow }): string {
+  if (row.isTotal) return 'total-row'
+  if (row.isSubtotal) return 'subtotal-row'
+  if (row.isDeduction) return 'deduct-row'
+  return ''
+}
+function cpRowClass({ row }: { row: L3CurrentPortionRow }): string {
+  return row.isTotal ? 'total-row' : ''
+}
 
-function loadDisclosureData() {
-  // 从 allResponses 中恢复
-  const responses = formData.allResponses.value
-
-  for (const [key, itemId] of Object.entries(SECTION_KEYS)) {
-    const resp = responses.get(itemId)
-    if (resp?.remark) {
-      ;(sections as any)[key] = resp.remark
-    }
-  }
-
-  const conclusionResp = responses.get(CONCLUSION_KEY)
-  if (conclusionResp?.remark) {
-    conclusionText.value = conclusionResp.remark
-  }
+function fmtAmount(val: number | null | undefined): string {
+  if (val == null || val === 0) return '-'
+  if (val < 0) return `(${Math.abs(val).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
+  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 </script>
 
@@ -329,90 +158,38 @@ function loadDisclosureData() {
   font-size: var(--wp-font-size, 13px);
 }
 
-/* ─── 头部 ─── */
-.disclosure-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-}
+.disclosure-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.disclosure-header-left { display: flex; align-items: center; gap: 12px; }
+.disclosure-title { font-size: 15px; font-weight: 600; color: #303133; margin: 0; }
 
-.disclosure-header-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.disclosure-header-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.disclosure-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: #303133;
-  margin: 0;
-}
-
-/* ─── 方法论上下文（琥珀色左边线+浅黄背景） ─── */
 .methodology-context {
-  border-left: 4px solid #e6a23c;
-  background: #fdf6ec;
+  border-left: 4px solid #f59e0b;
+  background: #fffbeb;
   padding: 10px 14px;
   border-radius: 0 6px 6px 0;
   margin-bottom: 16px;
   font-size: var(--wp-font-size, 13px);
-  color: #5a4e3a;
+  color: #78350f;
   line-height: 1.6;
 }
+.methodology-text strong { color: #b45309; }
 
-.methodology-text strong {
-  color: #b88230;
-}
+.disclosure-section { margin-bottom: 18px; }
+.section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; padding: 6px 10px; background: #f5f7fa; border-radius: 4px; }
+.section-title { font-weight: 600; font-size: var(--wp-font-size, 13px); color: #303133; }
 
-/* ─── Section 区块 ─── */
-.disclosure-section {
-  margin-bottom: 18px;
-}
+.row-bold { font-weight: 700; }
+:deep(.total-row) { background-color: #f0f9eb !important; font-weight: 700; }
+:deep(.subtotal-row) { background-color: #fafafa !important; font-weight: 600; }
+:deep(.deduct-row) { color: #e6a23c; }
 
-.section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-  padding: 6px 10px;
-  background: #f5f7fa;
-  border-radius: 4px;
-}
+.conclusion-section { margin-top: 16px; }
+.conclusion-title { font-size: 14px; font-weight: 600; }
 
-.section-title {
-  font-weight: 600;
-  font-size: var(--wp-font-size, 13px);
-  color: #303133;
-}
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
+:deep(.el-table th .cell) { font-size: var(--wp-font-size, 13px); font-weight: 600; }
+:deep(.el-textarea__inner) { font-size: var(--wp-font-size, 13px); line-height: 1.6; }
 
-/* ─── 结论区 ─── */
-.conclusion-section {
-  margin-top: 16px;
-}
-
-.conclusion-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 14px;
-  font-weight: 600;
-}
-
-/* ─── 表格统一13px字体 ─── */
-:deep(.el-textarea__inner) {
-  font-size: var(--wp-font-size, 13px);
-  line-height: 1.6;
-}
-
-/* ─── 编制提示折叠 ─── */
 .l3-details-tip {
   margin-top: 16px;
   padding: 12px 16px;
@@ -422,17 +199,6 @@ function loadDisclosureData() {
   font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
-
-.l3-details-tip summary {
-  cursor: pointer;
-  font-weight: 500;
-  color: #303133;
-  margin-bottom: 8px;
-}
-
-.l3-details-tip ul {
-  padding-left: 20px;
-  margin: 8px 0 0;
-  line-height: 1.8;
-}
+.l3-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; margin-bottom: 8px; }
+.l3-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
 </style>

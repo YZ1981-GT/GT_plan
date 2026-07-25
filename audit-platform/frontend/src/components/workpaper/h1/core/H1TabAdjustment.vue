@@ -41,6 +41,18 @@
         >
           推送账项调整
         </el-button>
+        <el-button
+          v-if="!isReadonly"
+          size="small"
+          type="primary"
+          plain
+          :loading="centralSyncing"
+          :disabled="!state.isBalanced.value || state.rows.value.length === 0"
+          title="把本页调整分录汇聚到集中调整登记，供合伙人跨循环审阅"
+          @click="syncToCentral"
+        >
+          同步到集中登记
+        </el-button>
       </div>
       <div class="toolbar-right">
         <el-tag size="small" type="info" effect="plain">共 {{ state.rows.value.length }} 行</el-tag>
@@ -53,6 +65,14 @@
         <span class="chip-wrap"><GtIndexChip value="wp:H1-3" :validate="false" /></span>
         <span class="chip-wrap"><GtIndexChip value="wp:H1-1" :validate="false" /></span>
         <span class="chip-wrap"><GtIndexChip value="wp:A13" :context-project-id="projectId" /></span>
+        <el-tag
+          v-if="centralStatus?.review_status"
+          size="small"
+          :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
+          :title="centralStatus.rejection_reason || ''"
+        >
+          集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
+        </el-tag>
       </div>
     </div>
 
@@ -261,9 +281,11 @@
  * H1TabAdjustment.vue — H1-3 固定资产调整分录汇总表
  * 对齐 Excel 列结构 + G14/F1 工具栏范式 + 持久化落库
  */
-import { ref, computed, toRef, inject, onMounted } from 'vue'
+import { ref, computed, toRef, inject, onMounted, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useH1Adjustment } from '../../composables/useH1Adjustment'
+import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
+import { useAuditContext } from '@/composables/useAuditContext'
 // @ts-ignore
 import GtIndexChip from '../../GtIndexChip.vue'
 
@@ -305,6 +327,27 @@ const state = useH1Adjustment(
   allResponsesRef as any,
   { onSave: (itemId, value) => saveResponse(itemId, value) },
 )
+
+// ─── 同步到集中调整登记（workpaper-adjustment-centralization） ───
+const { year: centralYear } = useAuditContext()
+const { centralStatus, syncing: centralSyncing, syncToCentral, refreshStatus } = useAdjustmentCentralSync({
+  projectId: toRef(props, 'projectId') as Ref<string>,
+  year: centralYear,
+  wpId: toRef(props, 'wpId') as Ref<string>,
+  wpCode: 'H1',
+  itemId: 'H1-3-rows',
+  buildLineItems: () => state.rows.value.map((e: any) => ({
+    standard_account_code: e.accountCode || undefined,
+    account_name: e.accountName,
+    debit_amount: e.debitAmount,
+    credit_amount: e.creditAmount,
+  })),
+  buildMeta: () => ({
+    description: state.rows.value.find((e: any) => e.description)?.description || 'H1 固定资产调整',
+    adjustmentType: state.rows.value.length > 0 && state.rows.value.every((e: any) => e.category === '报表调整') ? 'rje' : 'aje',
+  }),
+})
+onMounted(() => refreshStatus())
 
 function onSelectionChange(selection: any[]) {
   selectedRowIds.value = selection.map((r: any) => r.rowId)

@@ -143,9 +143,10 @@
  * - 版本追踪: useVersionTrail(autoSnapshot)
  * - 复核对话: provide openReviewDialog → 子组件 inject
  */
-import { ref, computed, inject, onMounted, provide, defineAsyncComponent } from 'vue'
-import http from '@/utils/http'
+import { ref, computed, inject, onMounted, provide, defineAsyncComponent, toRef } from 'vue'
 import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './composables/useWorkpaperScaffold'
+import { useL3FormData } from './composables/useL3FormData'
+import { useL3CrossSheet } from './composables/useL3CrossSheet'
 
 // ─── Lazy-loaded child components ────────────────────────────────────────────
 
@@ -230,22 +231,29 @@ const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKe
 const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', () => {})
 provide('scheduleAutoSnapshot', () => runtime?.version.scheduleAutoSnapshot())
 
+// ─── 🔴 P0 修复：provide 共享 formData + 跨sheet勾稽（此前缺失致全部子tab inject('l3FormData')崩溃） ───
+// 全部 L3 子组件（审定/明细/附注/检查/利息/调整）均 inject('l3FormData')!，
+// 原 GtL3 从未 provide → formData undefined → 每个 tab setup 阶段崩溃（ErrorBoundary）。
+const formData = useL3FormData({
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+})
+provide('l3FormData', formData)
+
+// 跨sheet勾稽（审定表 vs 明细表 / 征信 vs 明细）供子组件 inject
+const crossSheet = useL3CrossSheet(formData.allResponses)
+provide('adjudicationVsDetail', crossSheet.adjudicationVsDetail)
+provide('l3CrossSheet', crossSheet)
+
 // ─── selfLoad ────────────────────────────────────────────────────────────────
 
 async function selfLoad() {
-  if (props.htmlData) {
-    // 从 props 提供的数据初始化
-    isLoading.value = false
-    return
-  }
-
-  // 当 htmlData 为空时（bundle 内嵌场景），自行加载 render-config
+  // 加载共享 formData（selfLoad render-config + checklist-responses），子组件经 inject 共享该实例
   try {
-    await http.get(`/api/workpapers/${props.wpId}/render-config`, { _silent: true } as any)
+    await formData.loadData()
   } catch (err) {
-    console.warn('[GtL3LongTermLoans] selfLoad failed:', err)
+    console.warn('[GtL3LongTermLoans] formData.loadData failed:', err)
   }
-
   isLoading.value = false
 }
 

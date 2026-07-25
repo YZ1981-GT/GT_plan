@@ -107,10 +107,13 @@ export function useN5DeferredReconcile(options: UseN5DeferredReconcileOptions) {
   }
 
   function _onLiabilityUpdated(payload: any) {
-    const data = payload as DeferredTaxChangePayload
-    n3LiabilityChange.value = parseNum(data.periodChange)
+    const data = payload as any
+    // 🔴 N3(useN3CrossSheet.publishDeferredTaxLiabilityUpdated) 发布字段为 change（非 periodChange），
+    //    兼容读取避免负债本期变动恒 0。
+    const change = parseNum(data?.change ?? data?.periodChange)
+    n3LiabilityChange.value = change
     // 持久化到 checklist_responses
-    saveField('8', 'n3-liability-change', data.periodChange)
+    saveField('8', 'n3-liability-change', change)
   }
 
   // EventBus 订阅/取消订阅

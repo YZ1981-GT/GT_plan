@@ -151,19 +151,14 @@
         :readonly="isReadonly"
       />
       <template v-else-if="currentSheet === '底稿目录'">
-        <div class="g5-index-toolbar">
-          <el-button size="small" type="primary" plain @click="openHandbook('preparation')">
-            📖 编制手册
-          </el-button>
-          <el-button size="small" @click="openHandbook('usage')">使用手册</el-button>
-        </div>
         <GCycleBIndexExtras
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :sheet-name="props.sheetName"
           :wp-code="props.wpCode"
-          :html-data="props.htmlData"
+          :html-data="directoryHtmlData"
           :available-sheets="availableSheets"
+          :all-responses="formData.allResponses.value"
         />
         <G5SheetStatusBar :all-responses="formData.allResponses.value" />
       </template>
@@ -193,6 +188,7 @@ import { ref, computed, onMounted, onBeforeUnmount, provide, inject, defineAsync
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useG5DualMode } from './composables/useG5DualMode'
 import { useG5LonRecFormData, G5FormDataKey } from './composables/useG5LonRecFormData'
+import { buildDirectoryHtmlData } from './composables/gCycleIndexRouting'
 import { useG5PriorYearRollForward } from './composables/useG5PriorYearRollForward'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import type { ChecklistResponse } from './composables/useF1FormData'
@@ -333,6 +329,11 @@ const availableSheets = computed(() => {
   // 保证底稿目录架构树非空
   return Object.keys(formData.sheetCache.value).map(sheet_name => ({ sheet_name }))
 })
+
+/** 目录页传给 GCycleBIndexExtras 的 htmlData：从 sheetCache 补全 cycle_workpapers（本循环底稿目录 grid） */
+const directoryHtmlData = computed(() =>
+  buildDirectoryHtmlData(props.htmlData, formData.sheetCache.value),
+)
 
 function onDirectoryJump(code: string): void {
   emit('navigate-sheet', code)

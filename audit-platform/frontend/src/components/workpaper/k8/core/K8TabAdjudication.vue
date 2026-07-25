@@ -17,6 +17,9 @@
       <h3>K8-1 销售费用审定表</h3>
       <div class="header-actions">
         <GtIndexChip value="K8-2" :context-project-id="props.projectId" />
+        <el-button size="small" type="warning" plain :disabled="isReadonly" :loading="adjPull.loading.value" @click="openBringInAdjustment">
+          <el-icon><Download /></el-icon> 带入调整
+        </el-button>
         <el-button size="small" type="warning" plain :disabled="isReadonly" @click="handlePullFromDetail">
           从 K8-2 带入
         </el-button>
@@ -288,8 +291,18 @@
         <li>同比变动率 = (审定 − 上期) / |上期|，变动率 > ±30% 红色预警需说明原因</li>
         <li>审定合计应与K8-2明细表各项目合计一致（交叉勾稽）</li>
         <li>完成后TB回写6601发生额，发布 substantive:adjudicated 事件通知附注</li>
+        <li>「带入调整」：按科目6601拉取调整分录，逐笔选目标费用行累加到 AJE/RJE，带入后自动联动披露/附注</li>
       </ul>
     </details>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="6601 销售费用"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
@@ -308,9 +321,12 @@
  */
 import { computed, inject, toRef, defineAsyncComponent, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { MagicStick, CircleCheckFilled, WarningFilled, ChatDotSquare } from '@element-plus/icons-vue'
+import { MagicStick, CircleCheckFilled, WarningFilled, ChatDotSquare, Download } from '@element-plus/icons-vue'
 import { useK8Adjudication, type K8AdjRow } from '../../composables/useK8Adjudication'
 import { useK8AiGenerate } from '../../composables/useK8AiGenerate'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 
 const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
 
@@ -354,6 +370,20 @@ const {
   onSave: (itemId: string, value: any) => {
     emit('save', itemId, value)
   },
+})
+
+// ─── 从集中登记带入调整（6601 销售费用，损益借方） ────────────────────────────
+const { adjPull, visible: bringInVisible, rowOptions: bringInRowOptions, open: openBringInAdjustment, apply: onBringInApply } = useAdjudicationBringIn({
+  projectId: toRef(props, 'projectId') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '6601',
+  direction: 'debit', // 损益借方（费用）：净发生额 = 借 − 贷
+  subjectCode: '6601',
+  wpCode: 'K8',
+  subjectLabel: '销售费用(6601)',
+  rows,
+  updateCell,
+  totalAudited: () => totalRow.value.audited,
 })
 
 // ─── 表格数据 ────────────────────────────────────────────────────────────────

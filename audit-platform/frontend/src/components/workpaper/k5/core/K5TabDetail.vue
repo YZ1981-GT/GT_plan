@@ -358,7 +358,7 @@ import { ref, toRef, computed, onMounted } from 'vue'
 import { Plus, Delete, ArrowDown, MagicStick } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useK5Detail, LIKELIHOOD_COLOR_MAP } from '../../composables/useK5Detail'
-import GtIndexChip from '../../shared/GtIndexChip.vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 import type { Ref } from 'vue'
 

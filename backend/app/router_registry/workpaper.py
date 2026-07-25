@@ -85,6 +85,7 @@ def register_workpaper_routers(app: FastAPI) -> None:
     from app.routers.wp_structure import router as wp_structure
     from app.routers.wp_manuals import router as wp_manuals
     from app.routers.wp_fine_rules import router as wp_fine_rules
+    from app.routers.audit_check import router as audit_check
     from app.routers.wp_offline import router as wp_offline
     from app.routers.wp_audit_flow_graph import router as wp_audit_flow_graph
     from app.routers.wp_sheet_lock import router as wp_sheet_lock
@@ -317,6 +318,7 @@ def register_workpaper_routers(app: FastAPI) -> None:
     from app.routers.workpaper_summaries import router as workpaper_summaries
     from app.routers.wp_render_registry import router as wp_render_registry
     from app.routers.wp_onlyoffice_router import router as wp_onlyoffice
+    from app.routers.wp_onlyoffice_router import public_router as wp_onlyoffice_public
     from app.routers.cutoff_sampling import router as cutoff_sampling
     from app.routers.voucher_sampling import router as voucher_sampling
     from app.routers.formula_scope_query import router as formula_scope_query
@@ -336,7 +338,7 @@ def register_workpaper_routers(app: FastAPI) -> None:
         # ── 辅助组 ──
         "程序管理": [wp_procedures, wp_procedure_trim, wp_step_mapping, wp_evidence],
         "AI与辅助": [wp_ai, wp_ai_confirm, wp_chat, wp_explanation, b14_ai_generate, a171_ai_generate, a177_ai_generate, a176_docx_sync, d1_ai_generate, d2_ai_generate, d2_derecognition, d3_ai_generate, d4_ai_generate, d4_contract_ocr, d5_ai_generate, d6_ai_generate, d7_ai_generate, f1_ai_generate, f2_ai_generate, f2_contract_ocr, f2_val_ai_generate, f2_val_contract_ocr, f2_spe_ai_generate, f2_spe_contract_ocr, f2_st_ai_generate, f2_st_plan_sync, f2_st_summary_sync, f2_st_contract_ocr, f3_ai_generate, f3_contract_ocr, f4_ai_generate, f4_contract_ocr, f5_ai_generate, f5_contract_ocr, g0_ai_generate, h0_ai_generate, k0_ai_generate, l0_ai_generate, g1_ai_generate, g1_contract_ocr, g2_ai_generate, g3_ai_generate, g4_main_ai_generate, g4_sppi_ai_generate, g4_ecl_ai_generate, g5_ai_generate, g6_main_ai_generate, g6_sppi_ai_generate, g6_ecl_ai_generate, g7_main_ai_generate, g7_method_ai_generate, g7_sub_ai_generate, g8_ai_generate, g8_contract_ocr, g9_ai_generate, g9_contract_ocr, g10_ai_generate, g10_contract_ocr, g11_ai_generate, g11_contract_ocr, g12_ai_generate, g13_ai_generate, g14_ai_generate, h10_ai_generate, h1_ai_generate, h1_depreciation, h1_property_ocr, h1_stocktake_summary_ocr, h1_stocktake_plan_export, h2_ai_generate, h2_interest_cap, h3_ai_generate, h3_transfer_engine, h3_property_ocr, h3_contract_ocr, i1_ai_generate, i1_amortization, i2_ai_generate, i2_capitalization, i3_ai_generate, i3_dcf_engine, i4_ai_generate, i5_ai_generate, i6_ai_generate, k1_ai_generate, k2_ai_generate, k3_ai_generate, k4_ai_generate, k5_ai_generate, k6_ai_generate, k7_ai_generate, k8_ai_generate, k9_ai_generate, k10_ai_generate, k11_ai_generate, k12_ai_generate, k13_ai_generate, j1_ai_generate, j2_ai_generate, j3_ai_generate],
-        "其他": [qc, wp_storage, wp_download, wp_export_import, wp_template_copy, workpaper_summary, process_record, review_conversations, annotations, background_jobs, excel_html, wp_structure, wp_manuals, wp_fine_rules, wp_offline, wp_audit_flow_graph, wp_sheet_lock, standard_conversion, attachment_lineage, wp_functional_actions, issue_hints, workpaper_summaries, wp_render_registry],
+        "其他": [qc, wp_storage, wp_download, wp_export_import, wp_template_copy, workpaper_summary, process_record, review_conversations, annotations, background_jobs, excel_html, wp_structure, wp_manuals, wp_fine_rules, audit_check, wp_offline, wp_audit_flow_graph, wp_sheet_lock, standard_conversion, attachment_lineage, wp_functional_actions, issue_hints, workpaper_summaries, wp_render_registry],
         "科目工作包": [account_packages],
     }
 
@@ -361,3 +363,10 @@ def register_workpaper_routers(app: FastAPI) -> None:
                 app.include_router(r, tags=[tag], dependencies=[_Depends(dedicated_wp_gate)])
             else:
                 app.include_router(r, tags=[tag])
+
+    # 🔴 OnlyOffice 公共/机对机端点（health + wopi/contents + onlyoffice-callback）显式脱离
+    # 上面的自动加 gate 循环：这些端点或无鉴权（health），或由 DocServer 用自带签名 token 自校验
+    # （wopi/contents 的 ?token= editor_read JWT、callback 的 OnlyOffice JWT），DocServer 不发用户
+    # Bearer。若经 dedicated_wp_gate 的 get_current_user 会恒 401 → 文档下载/保存失败（-4）。
+    # 虽含 {wp_id} 路由（router_has_wp_id_route=True），也必须无 gate 注册。端点自身 JWT 校验完整。
+    app.include_router(wp_onlyoffice_public, tags=["渲染"])

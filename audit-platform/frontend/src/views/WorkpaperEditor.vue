@@ -48,6 +48,7 @@
         ref="wpRendererRef"
         v-if="useHtmlRenderer"
         :wp-id="wpId"
+        :initial-sheet="initialSheetFromQuery"
         @save-success="onChildSaved"
         @saved-notify="onChildSaved"
         @trigger-procedure-trimming-suggestion="onHtmlTrimmingSuggestion"
@@ -390,6 +391,7 @@ import { eventBus, type WorkpaperSavedPayload } from '@/utils/eventBus'
 import { ElMessage } from 'element-plus'
 import { handleApiError } from '@/utils/errorHandler'
 import { useAuditContext } from '@/composables/useAuditContext'
+import { useA13MisstatementBridge } from '@/composables/useA13MisstatementBridge'
 import { useStaleRefresh } from '@/composables/useStaleRefresh'
 import { useCycleType } from '@/composables/useCycleType'
 import { useEditorMode } from '@/composables/useEditorMode'
@@ -432,6 +434,13 @@ const router = useRouter()
 const { canEdit } = useAuditContext()
 const projectId = computed(() => route.params.projectId as string)
 const wpId = computed(() => route.params.wpId as string)
+// 深链 ?sheet= 初始激活底稿页签（无 ?cell= 的纯 Tab 导航，如附注→披露表跳转）。
+// GtWpRenderer 仅 initialSheet + locate-cell 事件切页；此前未接线导致纯 ?sheet= 被忽略回退底稿目录。
+const initialSheetFromQuery = computed<string | undefined>(() => {
+  const q = route.query.sheet
+  const v = Array.isArray(q) ? q[0] : q
+  return v ? String(v) : undefined
+})
 
 // ─── P0-6.1: ProjectContext + PermissionMatrix facade ────────────────────────
 const projectStore = useProjectStore()
@@ -440,6 +449,10 @@ const projectContext = computed(() => projectStore.currentProjectContext)
 const { can: canOp, whyCannot } = usePermissionMatrix()
 // DEPRECATED: 旧 canEdit 仍保留，后续逐步替换为 canOp('wp:edit')
 
+
+// ─── A13 错报推送桥：底稿"推送错报至A13错报汇总"事件的唯一消费者 ──────────────
+// 各底稿子组件 emit('a13:push-misstatement') → 本桥归一化后写入未更正错报汇总表 + 溯源。
+useA13MisstatementBridge()
 
 // ─── useStaleRefresh：试算表/调整变更后提示底稿数据可能过时 ──────────────────
 const wpStaleRefresh = useStaleRefresh(projectId, {
@@ -988,20 +1001,27 @@ onMounted(() => {
   ;(async () => {
     await fetchComponentType()
 
+    // 先加载归类：detail 端点不返回 component_type（fetchComponentType 会回退成 'univer'），
+    // 函证枢纽等的真实 componentType 需由归类结果派生（derive_component_type 应用
+    // _WP_CODE_OVERRIDE，E0/D0/F0/G0/H0/K0/L0 → confirmation-hub）。必须在下面的重定向
+    // 判定之前完成，否则 confirmation-hub 无法识别。
+    try {
+      await wpClassification.load()
+    } catch { /* 静默：归类失败回退到 Univer/子编辑器路径 */ }
+
     // D0/E0/F0/G0/H0/K0/L0 等函证枢纽不属于底稿编辑器。
     // confirmation-hub 故意不注册进 HTML_RENDERER_ROUTE_SET；若不在此重定向，
     // 会错误落入 Univer 路径并显示「加载底稿失败 (canceled)」。
-    if (componentType.value === 'confirmation-hub') {
+    if (
+      componentType.value === 'confirmation-hub' ||
+      wpClassification.componentType?.value === 'confirmation-hub'
+    ) {
       await router.replace({
         name: 'ConfirmationHub',
         params: { projectId: projectId.value },
       })
       return
     }
-
-    try {
-      await wpClassification.load()
-    } catch { /* 静默：归类失败回退到 Univer/子编辑器路径 */ }
 
     if (useHtmlRenderer.value) {
       loading.value = false

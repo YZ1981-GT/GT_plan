@@ -7,6 +7,7 @@ import type { UseE1BaseOptions } from '../composables/useE1Adjudication'
 import GtIndexChip from '../GtIndexChip.vue'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { amountFormatter, amountParser } from '../composables/wpAmountInput'
 
 const props = defineProps<{
   wpId: string; projectId: string; allResponses: Map<string, any>
@@ -98,7 +99,7 @@ function handleFillFromAdj(): void {
           <el-table-column label="本期金额" min-width="135" align="right" class-name="auto-calc-col"><template #default="{ row }">{{ displayPrefs.fmtAmount(row.endingAmount) }}</template></el-table-column>
           <el-table-column label="本期结构比" width="105" align="center" class-name="auto-calc-col"><template #default="{ row }">{{ structureRatio(row) }}</template></el-table-column>
           <el-table-column v-for="period in (['prior','prior2'] as AnalysisPeriod[])" :key="period" :label="period === 'prior' ? '上期金额' : '前期金额'" min-width="140" align="right">
-            <template #default="{ row }"><el-input-number :model-value="rowAmount(row, period)" :disabled="isReadonly" :controls="false" size="small" @change="(v: number) => updateLegacyPeriod(row, period, v ?? 0)" /></template>
+            <template #default="{ row }"><el-input-number :model-value="rowAmount(row, period)" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small" @change="(v: number) => updateLegacyPeriod(row, period, v ?? 0)" /></template>
           </el-table-column>
           <el-table-column label="本期变动率" width="110" align="center" class-name="auto-calc-col"><template #default="{ row }"><span :class="{ danger: analysis.isRateExceeding(row) }">{{ fmtRate(row.changeRate) }}</span></template></el-table-column>
           <el-table-column label="变动原因" min-width="260"><template #default="{ row }"><div class="ai-cell"><el-input type="textarea" :autosize="{ minRows: 2 }" :model-value="row.varianceNote" :disabled="isReadonly" @change="(v: string) => analysis.updateCell(row.itemKey, 'varianceNote', v)" /><el-button text type="primary" :disabled="isReadonly" :loading="isGenerating('analysis-reason')" @click="aiReason(row.itemName, row.varianceNote, row, v => analysis.updateCell(row.itemKey, 'varianceNote', v))">🤖</el-button></div></template></el-table-column>
@@ -107,8 +108,8 @@ function handleFillFromAdj(): void {
       <el-tab-pane label="其他货币资金七类" name="other">
         <el-table :data="analysis.otherFundRows.value" border stripe size="small">
           <el-table-column prop="name" label="项目" min-width="150" fixed="left" />
-          <el-table-column v-for="period in (['current','prior','prior2'] as AnalysisPeriod[])" :key="period" :label="period === 'current' ? '本期金额' : period === 'prior' ? '上期金额' : '前期金额'" min-width="135">
-            <template #default="{ row }"><el-input-number :model-value="row[period]" :disabled="isReadonly" :controls="false" size="small" @change="(v: number) => analysis.updateOtherFund(row.key, period, v ?? 0)" /></template>
+          <el-table-column v-for="period in (['current','prior','prior2'] as AnalysisPeriod[])" :key="period" :label="period === 'current' ? '本期金额' : period === 'prior' ? '上期金额' : '前期金额'" min-width="135" align="right">
+            <template #default="{ row }"><el-input-number :model-value="row[period]" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small" @change="(v: number) => analysis.updateOtherFund(row.key, period, v ?? 0)" /></template>
           </el-table-column>
           <el-table-column label="变动原因" min-width="260"><template #default="{ row }"><div class="ai-cell"><el-input type="textarea" :autosize="{ minRows: 2 }" :model-value="row.reason" :disabled="isReadonly" @change="(v: string) => analysis.updateOtherFund(row.key, 'reason', v)" /><el-button text type="primary" :disabled="isReadonly" :loading="isGenerating('analysis-reason')" @click="aiReason(row.name, row.reason, row, v => analysis.updateOtherFund(row.key, 'reason', v))">🤖</el-button></div></template></el-table-column>
         </el-table>
@@ -119,13 +120,13 @@ function handleFillFromAdj(): void {
         <h4>比例输入与跨表值</h4>
         <el-table :data="analysis.metricRows.value" border size="small">
           <el-table-column prop="name" label="输入项目" min-width="170" />
-          <el-table-column v-for="period in (['current','prior','prior2'] as AnalysisPeriod[])" :key="period" :label="period === 'current' ? '本期' : period === 'prior' ? '上期' : '前期'" min-width="150">
-            <template #default="{ row }"><el-input-number :model-value="row[period]" :disabled="isReadonly" :controls="false" size="small" @change="(v: number) => analysis.updateMetric(row.key, period, v ?? 0)" /></template>
+          <el-table-column v-for="period in (['current','prior','prior2'] as AnalysisPeriod[])" :key="period" :label="period === 'current' ? '本期' : period === 'prior' ? '上期' : '前期'" min-width="150" align="right">
+            <template #default="{ row }"><el-input-number :model-value="row[period]" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small" @change="(v: number) => analysis.updateMetric(row.key, period, v ?? 0)" /></template>
           </el-table-column>
         </el-table>
         <div class="thresholds">
-          <label>货币资金高位阈值<el-input-number :model-value="analysis.cashThreshold.value" :disabled="isReadonly" :controls="false" @change="(v: number) => analysis.updateThreshold('cashThreshold', v ?? 0)" /></label>
-          <label>贷款总额高位阈值<el-input-number :model-value="analysis.loanThreshold.value" :disabled="isReadonly" :controls="false" @change="(v: number) => analysis.updateThreshold('loanThreshold', v ?? 0)" /></label>
+          <label>货币资金高位阈值<el-input-number :model-value="analysis.cashThreshold.value" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" @change="(v: number) => analysis.updateThreshold('cashThreshold', v ?? 0)" /></label>
+          <label>贷款总额高位阈值<el-input-number :model-value="analysis.loanThreshold.value" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" @change="(v: number) => analysis.updateThreshold('loanThreshold', v ?? 0)" /></label>
           <label>银行存款集中度阈值<el-input-number :model-value="analysis.concentrationThreshold.value" :disabled="isReadonly" :controls="false" :min="0" :max="1" :step="0.05" :precision="2" @change="(v: number) => analysis.updateThreshold('concentrationThreshold', v ?? 0)" /></label>
         </div>
         <el-table :data="analysis.ratioRows.value" border stripe size="small">
@@ -143,7 +144,7 @@ function handleFillFromAdj(): void {
       <el-tab-pane label="月度变动" name="monthly">
         <el-table :data="analysis.monthlyRows.value" border stripe size="small">
           <el-table-column label="月份" width="70"><template #default="{ row }">{{ row.month }}月</template></el-table-column>
-          <el-table-column v-for="field in ['opening','increase','decrease']" :key="field" :label="field === 'opening' ? '期初余额' : field === 'increase' ? '本期增加' : '本期减少'" min-width="135"><template #default="{ row }"><el-input-number :model-value="row[field]" :disabled="isReadonly" :controls="false" size="small" @change="(v: number) => analysis.updateMonthly(row.month, field as any, v ?? 0)" /></template></el-table-column>
+          <el-table-column v-for="field in ['opening','increase','decrease']" :key="field" :label="field === 'opening' ? '期初余额' : field === 'increase' ? '本期增加' : '本期减少'" min-width="135" align="right"><template #default="{ row }"><el-input-number :model-value="row[field]" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small" @change="(v: number) => analysis.updateMonthly(row.month, field as any, v ?? 0)" /></template></el-table-column>
           <el-table-column label="期末余额" min-width="130" class-name="auto-calc-col"><template #default="{ row }">{{ displayPrefs.fmtAmount(row.ending) }}</template></el-table-column>
           <el-table-column label="月均余额" min-width="130" class-name="auto-calc-col"><template #default="{ row }">{{ displayPrefs.fmtAmount(row.average) }}</template></el-table-column>
           <el-table-column label="分析说明" min-width="230"><template #default="{ row }"><el-input :model-value="row.note" :disabled="isReadonly" @change="(v: string) => analysis.updateMonthly(row.month, 'note', v)" /></template></el-table-column>
@@ -153,7 +154,7 @@ function handleFillFromAdj(): void {
         <el-table :data="analysis.bankRows.value" border stripe size="small">
           <el-table-column prop="name" label="银行类型" min-width="130" />
           <el-table-column label="账户数量" width="110"><template #default="{ row }"><el-input-number :model-value="row.accountCount" :disabled="isReadonly" :controls="false" :min="0" size="small" @change="(v: number) => analysis.updateBank(row.key, 'accountCount', v ?? 0)" /></template></el-table-column>
-          <el-table-column v-for="field in ['ending','opening']" :key="field" :label="field === 'ending' ? '期末余额' : '期初余额'" min-width="140"><template #default="{ row }"><el-input-number :model-value="row[field]" :disabled="isReadonly" :controls="false" size="small" @change="(v: number) => analysis.updateBank(row.key, field, v ?? 0)" /></template></el-table-column>
+          <el-table-column v-for="field in ['ending','opening']" :key="field" :label="field === 'ending' ? '期末余额' : '期初余额'" min-width="140" align="right"><template #default="{ row }"><el-input-number :model-value="row[field]" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small" @change="(v: number) => analysis.updateBank(row.key, field, v ?? 0)" /></template></el-table-column>
           <el-table-column label="占比" width="95" class-name="auto-calc-col"><template #default="{ row }">{{ fmtRate(row.ratio) }}</template></el-table-column>
           <el-table-column label="变动" min-width="125" class-name="auto-calc-col"><template #default="{ row }">{{ displayPrefs.fmtAmount(row.change) }}</template></el-table-column>
           <el-table-column label="变动分析" min-width="220"><template #default="{ row }"><el-input :model-value="row.note" :disabled="isReadonly" @change="(v: string) => analysis.updateBank(row.key, 'note', v)" /></template></el-table-column>
@@ -163,7 +164,7 @@ function handleFillFromAdj(): void {
       <el-tab-pane label="资金质量" name="quality">
         <el-table :data="analysis.qualityRows.value" border stripe size="small">
           <el-table-column prop="name" label="分析项目" min-width="150" />
-          <el-table-column v-for="field in ['ending','opening']" :key="field" :label="field === 'ending' ? '期末金额' : '期初金额'" min-width="150"><template #default="{ row }"><el-input-number :model-value="row[field]" :disabled="isReadonly" :controls="false" size="small" @change="(v: number) => analysis.updateQuality(row.key, field, v ?? 0)" /></template></el-table-column>
+          <el-table-column v-for="field in ['ending','opening']" :key="field" :label="field === 'ending' ? '期末金额' : '期初金额'" min-width="150" align="right"><template #default="{ row }"><el-input-number :model-value="row[field]" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small" @change="(v: number) => analysis.updateQuality(row.key, field, v ?? 0)" /></template></el-table-column>
           <el-table-column label="占比" width="100" class-name="auto-calc-col"><template #default="{ row }">{{ fmtRate(row.ratio) }}</template></el-table-column>
           <el-table-column label="分析结论" min-width="280"><template #default="{ row }"><div class="ai-cell"><el-input :model-value="row.conclusion" :disabled="isReadonly" @change="(v: string) => analysis.updateQuality(row.key, 'conclusion', v)" /><el-button text type="primary" :disabled="isReadonly" :loading="isGenerating('analysis-reason')" @click="aiReason(row.name, row.conclusion, row, v => analysis.updateQuality(row.key, 'conclusion', v))">🤖</el-button></div></template></el-table-column>
         </el-table>
@@ -173,7 +174,7 @@ function handleFillFromAdj(): void {
         <div class="section-actions"><el-button type="primary" size="small" :disabled="isReadonly" @click="analysis.addAnomaly">+ 新增异常</el-button></div>
         <el-table :data="analysis.anomalyRows.value" border stripe size="small">
           <el-table-column label="异常项目" min-width="150"><template #default="{ row }"><el-input :model-value="row.item" :disabled="isReadonly" @change="(v: string) => analysis.updateAnomaly(row.id, 'item', v)" /></template></el-table-column>
-          <el-table-column label="金额" min-width="130"><template #default="{ row }"><el-input-number :model-value="row.amount" :disabled="isReadonly" :controls="false" size="small" @change="(v: number) => analysis.updateAnomaly(row.id, 'amount', v ?? 0)" /></template></el-table-column>
+          <el-table-column label="金额" min-width="130" align="right"><template #default="{ row }"><el-input-number :model-value="row.amount" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small" @change="(v: number) => analysis.updateAnomaly(row.id, 'amount', v ?? 0)" /></template></el-table-column>
           <el-table-column label="原因分析" min-width="230"><template #default="{ row }"><div class="ai-cell"><el-input :model-value="row.reason" :disabled="isReadonly" @change="(v: string) => analysis.updateAnomaly(row.id, 'reason', v)" /><el-button text type="primary" :disabled="isReadonly" :loading="isGenerating('analysis-reason')" @click="aiReason(row.item || '异常项目', row.reason, row, v => analysis.updateAnomaly(row.id, 'reason', v))">🤖</el-button></div></template></el-table-column>
           <el-table-column label="风险评估" min-width="180"><template #default="{ row }"><el-input :model-value="row.risk" :disabled="isReadonly" @change="(v: string) => analysis.updateAnomaly(row.id, 'risk', v)" /></template></el-table-column>
           <el-table-column label="应对措施" min-width="180"><template #default="{ row }"><el-input :model-value="row.response" :disabled="isReadonly" @change="(v: string) => analysis.updateAnomaly(row.id, 'response', v)" /></template></el-table-column>

@@ -8,6 +8,7 @@
         <p>3. 合计 = 主营小计 + 其他小计；分别与本期/上期试算平衡表数核对，差异 = 审定 − 试算。</p>
         <p>4. 审计说明须写明主营业务成本本期较上期增减；变动比例超过 30% 的品种须说明主要原因。结论评价结转完整性与准确性。</p>
         <p>5. 审定完成后「发布审定数」回写试算，并供 F5-7 成本倒轧等下游底稿消费；「同步F5-4调整」将 6401 相关 AJE/RJE 净额写入主营汇总行。</p>
+        <p>6. 「带入调整」：可从集中登记按科目 6401 拉取调整分录，逐笔分配到主营业务成本品种行的本期账项/重分类调整，带入后审定数自动更新并联动附注。</p>
       </div>
     </details>
 
@@ -30,6 +31,9 @@
         <span class="chip-wrap"><GtIndexChip value="wp:F5-4" :context-project-id="projectIdStr" /></span>
       </div>
       <div class="toolbar-right">
+        <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
+          <el-icon><Download /></el-icon>带入调整
+        </el-button>
         <el-button size="small" :disabled="isReadonly" @click="handleSync">
           从F5-2引用品种
           <el-badge v-if="adj.pendingSyncCount.value" :value="adj.pendingSyncCount.value" class="sync-badge" />
@@ -335,6 +339,15 @@
         />
       </div>
     </el-card>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="6401 营业成本"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
@@ -345,11 +358,15 @@
  */
 import { ref, computed, inject, toRef, watch, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Download } from '@element-plus/icons-vue'
 import { useF5Adjudication } from '../composables/useF5Adjudication'
 import { useF5AiGenerate } from '../composables/useF5AiGenerate'
+import { useAdjudicationBringIn } from '../composables/useAdjudicationBringIn'
+import { useAuditContext } from '@/composables/useAuditContext'
 import type { ChecklistResponse } from '../composables/useF1FormData'
 import F5SheetAttachments from './F5SheetAttachments.vue'
 import GtIndexChip from '../GtIndexChip.vue'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -371,6 +388,30 @@ const adj = useF5Adjudication({
 })
 
 const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF5AiGenerate(wpIdRef)
+
+// ─── 从集中登记带入调整（6401 营业成本，损益借方；带入主营业务成本行的本期 AJE/RJE） ───
+const bringInRows = computed(() =>
+  adj.mainBusinessRows.value.map((r) => ({ rowKey: r.rowKey, name: r.label, aje: r.currentAje, rje: r.currentRje })),
+)
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: projectIdRef as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '6401',
+  direction: 'debit',
+  subjectCode: '6401',
+  wpCode: 'F5',
+  subjectLabel: '营业成本(6401)',
+  rows: bringInRows,
+  updateCell: (rowKey: string, field: any, value: number) =>
+    adj.updateCell('main', rowKey, field === 'rje' ? 'currentRje' : 'currentAje', value),
+  totalAudited: () => adj.grandTotal.value.currentAdjusted,
+})
 
 const tbInput = ref(adj.trialBalanceAmount.value)
 const priorTbInput = ref(adj.priorTrialBalanceAmount.value)

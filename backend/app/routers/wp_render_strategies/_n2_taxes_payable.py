@@ -84,14 +84,14 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict[str, Any]:
         active_filter = get_active_filter(ctx.project_id)
         stmt = (
             sa.select(
-                TbBalance.begin_balance,
+                TbBalance.opening_balance.label("begin_balance"),
                 TbBalance.debit_amount,
                 TbBalance.credit_amount,
-                TbBalance.end_balance,
+                TbBalance.closing_balance.label("end_balance"),
             )
             .where(
                 TbBalance.project_id == str(ctx.project_id),
-                TbBalance.standard_account_code == _N2_ACCOUNT_CODE,
+                TbBalance.account_code == _N2_ACCOUNT_CODE,
                 active_filter,
             )
             .limit(1)

@@ -27,6 +27,7 @@ import {
   type ProjectEventSubscription,
 } from '@/services/sse/projectEventStream'
 import { isValidUri, isValidIndexRef } from './resolveUri'
+import { composeSheetLabelsForGroup } from './sheetDisplayName'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -39,6 +40,10 @@ export interface AcnrSheetEntry {
   sheet_code: string
   sheet_name: string
   sheet_name_aliases?: string[]
+  /** 科目简称（取父底稿，如 D2→应收账款）— 后端从 wp_account_mapping 补充 */
+  account_name?: string
+  /** 规范底稿名（取本 sheet_code，如 D2-1→应收账款审定表）— 后端从 wp_account_mapping 补充 */
+  mapped_sheet_name?: string
   component_type?: string
   class_code?: string
   functional_type?: string
@@ -122,7 +127,35 @@ const ACNR_PATHS = {
   resolveBatch: '/api/acnr/resolve-batch',
   resolveInstance: '/api/acnr/resolve-instance',
   lookup: '/api/acnr/lookup',
+  overlay: '/api/acnr/overlay',
 } as const
+
+/** 项目级 overlay 条目（GET/POST /api/acnr/overlay） */
+export interface AcnrOverlay {
+  project_id: string
+  addr_id: string
+  overlay_type: string
+  overrides: Record<string, unknown>
+  reason?: string
+  owner?: string
+  expires_at?: string | null
+  wp_id?: string | null
+  revision: number
+}
+
+/** overlay 写入参数 */
+export interface AcnrOverlayApply {
+  project_id: string
+  addr_id: string
+  overrides: Record<string, unknown>
+  overlay_type?: string
+  reason?: string
+  owner?: string
+  expires_at?: string | null
+  wp_id?: string | null
+  /** 乐观并发：提供则 CAS，冲突返回 409（并发编辑防覆盖） */
+  expected_revision?: number
+}
 
 // ─── Module-level Cache (singleton across all useAcnr() instances) ────────────
 
@@ -672,20 +705,22 @@ export function useAcnr(projectId?: string) {
       groups.get(key)!.push(s)
     }
 
-    // 构建树
+    // 构建树（显示名走单一真源 composeSheetLabelsForGroup，与公式管理树一致）
     const tree: AcnrTreeNode[] = []
     for (const [parentCode, sheetsInGroup] of groups) {
+      const subjectAbbr = sheetsInGroup.find((s) => s.account_name)?.account_name || ''
       const parentNode: AcnrTreeNode = {
-        label: parentCode,
+        // 父节点带科目简称（如「D2 应收账款」），value 仍用 parentCode 不变
+        label: subjectAbbr ? `${parentCode} ${subjectAbbr}` : parentCode,
         value: parentCode,
         type: 'sheet',
         addrId: parentCode,
-        children: sheetsInGroup.map((s) => ({
-          label: s.sheet_name || s.sheet_code,
-          value: s.addr_id,
+        children: composeSheetLabelsForGroup(sheetsInGroup).map(({ entry, label }) => ({
+          label,
+          value: entry.addr_id,
           type: 'sheet' as const,
-          addrId: s.addr_id,
-          meta: s,
+          addrId: entry.addr_id,
+          meta: entry,
           // cells 子节点按需懒加载
           children: undefined,
         })),
@@ -708,6 +743,41 @@ export function useAcnr(projectId?: string) {
       addrId: c.addr_id,
       meta: c,
     }))
+  }
+
+  // ─── Overlay 管理（受控变更入口 UI）──────────────────────────────────────
+
+  /** 列出项目全部 overlay（GET /api/acnr/overlay） */
+  async function listOverlays(pid: string): Promise<AcnrOverlay[]> {
+    if (!pid) return []
+    try {
+      const { data } = await http.get(ACNR_PATHS.overlay, { params: { project_id: pid } })
+      return Array.isArray(data) ? data : (data?.items ?? [])
+    } catch (e) {
+      console.warn('[useAcnr] listOverlays 失败', e)
+      return []
+    }
+  }
+
+  /**
+   * 创建/更新 overlay（POST /api/acnr/overlay）。
+   * 传 expected_revision 启用 CAS：并发编辑冲突时后端返回 409（抛错，调用方重新拉取重试）。
+   */
+  async function applyOverlay(payload: AcnrOverlayApply): Promise<AcnrOverlay> {
+    const { data } = await http.post(ACNR_PATHS.overlay, payload)
+    return data as AcnrOverlay
+  }
+
+  /** 删除 overlay（DELETE /api/acnr/overlay） */
+  async function removeOverlay(
+    pid: string,
+    addrId: string,
+    overlayType = 'cust',
+  ): Promise<boolean> {
+    const { data } = await http.delete(ACNR_PATHS.overlay, {
+      data: { project_id: pid, addr_id: addrId, overlay_type: overlayType },
+    })
+    return !!(data?.deleted)
   }
 
   // ─── 缓存管理 ────────────────────────────────────────────────────────────────
@@ -742,6 +812,10 @@ export function useAcnr(projectId?: string) {
     // 树构建
     buildAddressTree,
     loadCellNodes,
+    // Overlay 管理（受控变更入口 UI）
+    listOverlays,
+    applyOverlay,
+    removeOverlay,
     // 缓存管理
     clearCache,
     getEpoch,

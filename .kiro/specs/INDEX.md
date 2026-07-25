@@ -1,9 +1,9 @@
 # 致同审计作业平台 — Spec 开发索引
 
-**最后更新**：2026-07-19
+**最后更新**：2026-07-25
 **当前分支**：`work/2026-05-30-wp-specs`
-**统计**：Active 1 / Archived 409 = 总计 410
-**最高迁移**：**V122**（以 `migration_status` 实测为准）
+**统计**：Active 1 / Archived 435 = 总计 436
+**最高迁移**：**V124**（以 `migration_status` 实测为准）
 **技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer
 
 ---
@@ -26,29 +26,27 @@
 
 ## 一、Active Specs
 
-> 注：本表随会话增量登记，统计数可能滞后；以 `.kiro/specs/` 目录实际为准。
+新建 spec 放 `.kiro/specs/{name}/`。
 
 | Spec | 说明 | 状态 |
 |------|------|------|
-| `acnr-invalidation-overlay-hardening` | ACNR SSE 实时失效三重断链 + Overlay 持久化并发治理（唯一约束/原子upsert/治理字段持久化/revision-CAS/cache-after-commit/受控入口）+ durable epoch/outbox 跨worker失效抗Redis故障 | **全部完成 8/8 波**（V122 已应用/drift=0；后端 424+9 测试、前端 41 vitest、Playwright 全栈 round-trip 实测通过）；待 commit 后归档 |
-| `voucher-sampling-hardening` | 抽凭引擎第二/三批：DB级全量抽样框（消除总体前1万条选择偏差）+总体完整性独立数据源+抽样单位显式化+回填日志原子化+批次状态机(batch_id/幂等/乐观锁/撤销唯一/CHECK/FK迁移)+后端方法学单一真源+voucher-extract·sampling-execute收敛+服务端授权校验+真实操作者+核心算法权威向量PBT+LIKE元字符转义 | 三件套完成（requirements-first），tasks 全 `[ ]` 未执行；14需求(2可选)+22正确性属性+8波依赖图；新迁移取号前查 migration_status；边界：不碰截止路径(归 cutoff-test-architecture-convergence) |
-| `frontend-sse-connection-consolidation` | 前端 `/events/stream` 连接去重：单例 Project_Event_Stream_Bus（每项目一条共享 SSE，按事件名 fan-out）；ThreeColumnLayout/useAcnr/ConsolidationIndex/LineagePanel 从各自建连接迁为订阅总线；鉴权统一 Authorization header（附带修复 LineagePanel 预存在 401）；纯前端不改后端 | **全部完成 8/8 波**（Playwright 实测连接 2→1；前端 78 测试绿+守卫 2；纯前端无迁移）；待 commit 后归档 |
+| `confirmation-attachment-ocr-linkage` | 函证台账回函证据链（发函件/回函件上传+OCR识别比对+自动匹配+人工确认回填+状态撤回）；三件套齐，M0-M4 分波 | 待执行（tasks 全 `[ ]`） |
 
 ---
 
-## 二、已归档 Spec（408个，15 分类）
+## 二、已归档 Spec（435个，15 分类）
 
 ```
 _archive/
 ├── 01-phase-foundation/              24
 ├── 02-workpaper-cycles/              16
 ├── 03-refinement-rounds/              9
-├── 04-infra/                          1
-├── 04-infra-architecture/            34
-├── 05-business-features/            187  (+2: workhour-entry-frontend, workhour-table-unification)
-├── 06-engineering-governance/        12
+├── 04-infra/                          2
+├── 04-infra-architecture/            36
+├── 05-business-features/            205
+├── 06-engineering-governance/        13
 ├── 07-workpaper-slimdown/            22
-├── 08-disclosure-notes/               7
+├── 08-disclosure-notes/              12
 ├── 09-consolidation-phases/           4
 ├── 10-A~S-workpaper-all-cycles-complete/ 31
 ├── 11-confirmation-d0-module/        10
@@ -56,6 +54,52 @@ _archive/
 ├── 13-2026-06-29-batch/              33
 └── 99-superseded/                     4
 ```
+
+### 最近归档（2026-07-25，活跃 spec 全部收尾归档）
+
+**→ 05-business-features（+7）**
+
+| Spec | 说明 |
+|------|------|
+| d-cycle-four-table-extraction-formulas | 四表库→D1-D7 底稿自动提取填充 + 公式管理可查可编（Tier B 复用 `_build_adjudication_prefill` / Tier A 可编辑标量；灰度默认关；160 测试绿+7 契约守卫；D6 真 seed 其余宁缺勿造） |
+| d-cycle-tier-a-writeback-detail-seed | 前置 spec P0 增量：Tier A 编辑真生效（保存跳 parsed_data+返回 evaluated_value 不落库 + GET value + render transient TB核对行 seed 主机制，D1-D7 全铺）+ P0-2 明细维度归集 render transient seed（子开关 D6-2 试点）；332 测试绿+G6/G7/G8 守卫 |
+| adjustment-collaboration-and-propagation | 调整分录多人协作接力（V125 两表+协作锁+复用 NotificationService）+ 明细表联动带入（Part B 无新表读时匹配，K8-2/K9-2 试点）；64 后端+18 前端测试绿 |
+| deliverable-lineage-content-control | 交付 docx 章节内容控件化（Block Content Control Tag=`sec_xxx`）+ OnlyOffice 连接器真·光标跟随溯源；灰度+auto-follow 默认关；26 后端+32 前端测试绿（6* 连接器 live 验证 env-gated 留待） |
+| balance-import-annual-column-semantics | 余额表导入年度优先+月度兜底（识别层区分年初/期初+本年累计 / 分类层年度=key月度=recommended / 转换层 `_first_decimal` 年度优先）；711 测试绿含 Property 1-15 PBT+三源契约守卫 |
+| audit-check-review-gate-hardening | 「审计检查」升级为复核收口 gate（双通道写单一缓存 S1-S5 后端算+S6 前端上报 / 聚合运行时校验源复用口径不新造 / 通过率区分已判定vs未覆盖 / V126 签认只提示不阻断 / 零回归）；后端 475+前端 31 测试+P1-P14 全覆盖；**Playwright E2E 6 流程全绿（0ec33ac9）** |
+| ledger-raw-extra-column-display | 账套导入非关键列进 `raw_extra` 后凭证/序时账/辅助明细查询作额外列显示（后端单一 helper `_attach_extra_fields`+前端动态列 el-table/v2/凭证明细）；复制 [object Object] 修复+列显隐⚙；后端 31+前端 29 测试绿+Playwright 真实数据通过 |
+
+**→ 08-disclosure-notes（+1）**
+
+| Spec | 说明 |
+|------|------|
+| disclosure-notes-selective-generation | 「生成附注」弹窗按附注实时树勾选章节+一键预设（只勾有数据科目）；唯一后端改动=树节点加 `has_data`（与 `_has_content` 收敛共享 `note_content_utils` helper）；导出零改动；后端 15+前端 8 测试绿+live 契约验证 |
+
+### 最近归档（2026-07-24，全循环复盘收尾 + 基础设施加固）
+
+**→ 05-business-features（+3）**
+
+| Spec | 说明 |
+|------|------|
+| confirmation-coverage-single-source | 函证覆盖率口径修正（TB population 为分母+单一真源+死端点移除+孤儿组件清理） |
+| workpaper-adjustment-centralization | 底稿调整→集中登记汇聚（V124+AdjustmentSyncService+全81循环接入+origin过滤防TB双计+a13死事件修复） |
+| voucher-sampling-hardening | 抽凭引擎加固（DB级全量抽样框+方法学单一真源+批次状态机+服务端授权+LIKE转义，已push独立分支） |
+
+**→ 06-engineering-governance（+1）**
+
+| Spec | 说明 |
+|------|------|
+| attachment-ocr-ai-evidence-governance-hardening | 附件/OCR/AI/证据治理加固（65/66 任务；发布门 9 绿 + capacity 6000VU 待专用环境） |
+
+**→ 08-disclosure-notes（+4）**
+
+| Spec | 说明 |
+|------|------|
+| disclosure-table-sync-convergence | 披露表列头随 `_columns` 携带 + 后端单点投影（43/43 覆盖守卫 --strict 绿，全迁移 F2/F3/H9/H10/G/H/I/K/F1+GtCNoteTable） |
+| d7-contract-liabilities-enhancement | D7 合同负债动态账龄全链路 + 调整分录按性质/账龄路由（13/13，复用 D3 机制零平行实现） |
+| disclosure-note-formula-and-report-sync | 附注公式求值+报表→附注真同步+校验preset加载修复（20/20，灰度默认关零回归） |
+| disclosure-note-validation-completion | 附注校验6 executor落地+ValidationContext数据装配（11类型全实现，Skip优于误报） |
+| disclosure-note-knowledge-ai-enrichment | 附注RAG知识库接入AI正文生成（10/11，Task11前置不满足如实未做） |
 
 ### 最近归档（2026-07-19，工时模块重构）
 

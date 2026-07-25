@@ -21,6 +21,7 @@
           :disabled="isReadonly || !projectId"
           @click="disc.syncToNotes()"
         >同步到附注 {{ disc.noteTarget.value.sectionId }}</el-button>
+        <el-button size="small" type="primary" plain :disabled="!projectId" @click="jumpToNote('listed')">↩ 跳转回附注</el-button>
         <el-button size="small" type="default" text @click="handleReview('category')">💬</el-button>
       </div>
     </div>
@@ -180,6 +181,8 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useRouter } from 'vue-router'
+import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { useI6Disclosure, type I6DisclosureRow } from '../../composables/useI6Disclosure'
 
@@ -192,6 +195,14 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{ 'save': [itemId: string, value: any] }>()
+
+const router = useRouter()
+// 跳转回附注模块（披露表 → 附注为单向推送；此处仅导航，方便相互编辑确认）
+function jumpToNote(target: DisclosureVariant): void {
+  const route = buildNoteJumpRoute(props.projectId || '', 'I6', target)
+  if (!route) { ElMessage.warning('未找到对应的附注章节'); return }
+  router.push(route)
+}
 
 const variant = ref<'listed'>('listed')
 const disc = useI6Disclosure(

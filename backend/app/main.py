@@ -90,6 +90,22 @@ async def lifespan(app: FastAPI):
     from app.services.acnr.invalidation_outbox import get_dispatcher as _get_acnr_dispatcher
     _get_acnr_dispatcher().start()
 
+    # ACNR catalog 快照 GC（P2-1：启动清理无引用旧快照，防无界增长；best-effort 不阻断）
+    import logging as _gc_log
+    _gc_logger = _gc_log.getLogger("audit_platform")
+    try:
+        from app.services.acnr.catalog_snapshot_gc import run_db_aware_gc as _acnr_run_gc
+
+        _gc_report = await _acnr_run_gc(keep_recent=10)
+        _gc_logger.info(
+            "ACNR snapshot GC: total=%s deleted=%s status=%s",
+            _gc_report.get("total_snapshots"),
+            len(_gc_report.get("deleted", [])),
+            _gc_report.get("reference_status"),
+        )
+    except Exception as _gc_exc:
+        _gc_logger.warning("ACNR snapshot GC (startup) failed (non-blocking): %s", _gc_exc)
+
     stop_event = asyncio.Event()
     tasks = _start_workers(stop_event)
 

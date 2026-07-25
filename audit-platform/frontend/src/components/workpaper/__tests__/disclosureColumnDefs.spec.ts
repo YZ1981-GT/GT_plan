@@ -3,7 +3,7 @@
  * spec: disclosure-table-sync-convergence Task 2.2（P2~P8 关键用例镜像后端）
  */
 import { describe, it, expect } from 'vitest'
-import { defineColumns, projectSubTablesClient } from '../composables/disclosureColumnDefs'
+import { defineColumns, projectSubTablesClient, deriveLegacyTableHeaders } from '../composables/disclosureColumnDefs'
 
 function makeTd(withColumns = true, source = 'workpaper') {
   const td: Record<string, any> = {
@@ -160,5 +160,51 @@ describe('defineColumns', () => {
     expect(cols[0].is_label).toBe(true)
     expect(cols[1].format).toBe('amount')
     expect(cols[1].is_label).toBeUndefined()
+  })
+})
+
+describe('deriveLegacyTableHeaders', () => {
+  const row = (label: string, values: any[], semantics: (string | null)[]) => ({
+    label,
+    values,
+    _cell_meta: Object.fromEntries(semantics.map((s, i) => [String(i), { semantic: s }])),
+  })
+
+  it('货币资金式两列 → [项目, 期末余额, 上年年末余额]', () => {
+    const td = { headers: [], rows: [row('库存现金', [376.73, null], ['closing_balance', 'prior_year_value'])] }
+    expect(deriveLegacyTableHeaders(td)).toEqual(['项目', '期末余额', '上年年末余额'])
+  })
+
+  it('变动表四列 期初/增/减/期末', () => {
+    const td = { headers: [], rows: [row('A', [1, 2, 3, 4], ['opening_balance', 'current_year_increase', 'current_year_decrease', 'closing_balance'])] }
+    expect(deriveLegacyTableHeaders(td)).toEqual(['项目', '期初余额', '本期增加', '本期减少', '期末余额'])
+  })
+
+  it('无语义值列 → 空标签但列保留', () => {
+    const td = { headers: [], rows: [row('X', [1, 2], ['closing_balance', null])] }
+    expect(deriveLegacyTableHeaders(td)).toEqual(['项目', '期末余额', ''])
+  })
+
+  it('无 _cell_meta 按 values 长度出空标签列头', () => {
+    expect(deriveLegacyTableHeaders({ headers: [], rows: [{ label: 'X', values: [1, 2] }] })).toEqual(['项目', '', ''])
+  })
+
+  it('无值列 → 仅标签列', () => {
+    expect(deriveLegacyTableHeaders({ headers: [], rows: [{ label: '条款', values: [] }] })).toEqual(['项目'])
+  })
+
+  it('已有表头不改动 → null', () => {
+    expect(deriveLegacyTableHeaders({ headers: ['项目', '金额'], rows: [row('A', [1], ['cost'])] })).toBeNull()
+  })
+
+  it('多表/空行/非对象 → null', () => {
+    expect(deriveLegacyTableHeaders({ headers: [], _tables: [{}], rows: [row('A', [1], ['cost'])] })).toBeNull()
+    expect(deriveLegacyTableHeaders({ headers: [], rows: [] })).toBeNull()
+    expect(deriveLegacyTableHeaders(null)).toBeNull()
+  })
+
+  it('列数取所有行最大 values 长度', () => {
+    const td = { headers: [], rows: [{ label: 'A', values: [1] }, row('B', [1, 2, 3], ['cost', 'closing_balance', 'prior_year_value'])] }
+    expect(deriveLegacyTableHeaders(td)).toEqual(['项目', '成本', '期末余额', '上年年末余额'])
   })
 })

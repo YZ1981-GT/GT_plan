@@ -8,7 +8,7 @@
         <el-tag type="success" size="small">国企</el-tag>
       </div>
       <div class="section-header-right">
-        <el-button size="small" @click="handleAI('disclosure-soe')">
+        <el-button size="small" :loading="aiLoading === 'disclosure-soe'" :disabled="isReadonly" @click="handleAI('disclosure-soe')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
         <el-button size="small" @click="handleReview">
@@ -32,7 +32,7 @@
       <template #header>
         <div class="card-header">
           <span>一、以后不能重分类进损益的其他综合收益</span>
-          <el-button size="small" @click="handleAI('section-non-reclass')">
+          <el-button size="small" :loading="aiLoading === 'section-non-reclass'" :disabled="isReadonly" @click="handleAI('section-non-reclass')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </div>
@@ -124,7 +124,7 @@
       <template #header>
         <div class="card-header">
           <span>二、以后将重分类进损益的其他综合收益</span>
-          <el-button size="small" @click="handleAI('section-reclass')">
+          <el-button size="small" :loading="aiLoading === 'section-reclass'" :disabled="isReadonly" @click="handleAI('section-reclass')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </div>
@@ -216,7 +216,7 @@
       <template #header>
         <div class="card-header">
           <span>三、其他综合收益合计</span>
-          <el-button size="small" @click="handleAI('section-total')">
+          <el-button size="small" :loading="aiLoading === 'section-total'" :disabled="isReadonly" @click="handleAI('section-total')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </div>
@@ -236,7 +236,7 @@
       <template #header>
         <div class="card-header">
           <span>四、国有资本相关其他综合收益说明</span>
-          <el-button size="small" @click="handleAI('section-soe-capital')">
+          <el-button size="small" :loading="aiLoading === 'section-soe-capital'" :disabled="isReadonly" @click="handleAI('section-soe-capital')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </div>
@@ -256,7 +256,7 @@
       <template #header>
         <div class="card-header">
           <span>五、OCI转出至损益/留存收益说明</span>
-          <el-button size="small" @click="handleAI('section-transfer')">
+          <el-button size="small" :loading="aiLoading === 'section-transfer'" :disabled="isReadonly" @click="handleAI('section-transfer')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </div>
@@ -276,7 +276,7 @@
       <template #header>
         <div class="card-header">
           <span>六、审计结论</span>
-          <el-button size="small" @click="handleAI('section-conclusion')">
+          <el-button size="small" :loading="aiLoading === 'section-conclusion'" :disabled="isReadonly" @click="handleAI('section-conclusion')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </div>
@@ -324,10 +324,12 @@
  * - autosize textarea for 文本段
  */
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, Check } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
 import { useM9FormData } from '../../composables/useM9FormData'
 import { calcAfterTaxNet } from '../../composables/useM9OciEngine'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 
 const props = defineProps<{
   wpId: string
@@ -340,6 +342,8 @@ const emit = defineEmits<{
 }>()
 
 const openReviewDialog = inject<((sectionId: string, sectionLabel?: string) => void) | null>('openReviewDialog', null)
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
 
 // ─── FormData ───────────────────────────────────────────────────────────────
 
@@ -442,7 +446,31 @@ function handleConclusionNoteChange() {
   formData.debouncedSave('M9-disclosure-soe-conclusion', { remark: conclusionNote.value || null })
 }
 
-function handleAI(_section: string) {}
+const SOE_NOTE_TARGETS: Record<string, { get: () => string; set: (v: string) => void; save: () => void }> = {
+  'section-soe-capital': { get: () => soeCapitalNote.value, set: (v) => { soeCapitalNote.value = v }, save: handleSoeCapitalNoteChange },
+  'section-transfer': { get: () => transferNote.value, set: (v) => { transferNote.value = v }, save: handleTransferNoteChange },
+  'section-conclusion': { get: () => conclusionNote.value, set: (v) => { conclusionNote.value = v }, save: handleConclusionNoteChange },
+}
+
+async function handleAI(section: string): Promise<void> {
+  if (props.isReadonly) return
+  aiLoading.value = section
+  try {
+    const context: Record<string, string> = {
+      科目: '4103 其他综合收益 / 附注披露（国有企业，67×21）',
+      不可重分类税后合计: fmtAmount(nonReclassNetTotal.value),
+      可重分类税后合计: fmtAmount(reclassNetTotal.value),
+      不可重分类期末合计: fmtAmount(nonReclassEndTotal.value),
+      可重分类期末合计: fmtAmount(reclassEndTotal.value),
+      OCI期末余额合计: fmtAmount(nonReclassEndTotal.value + reclassEndTotal.value),
+    }
+    const target = SOE_NOTE_TARGETS[section]
+    const text = await generateAiText({ section: `m9-disclosure-soe-${section}`, context, existingContent: target ? target.get() : '' })
+    if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+    if (target) { target.set(text); target.save() }
+    else { ElMessageBox.alert(text, 'AI 辅助建议', { confirmButtonText: '知道了' }).catch(() => {}) }
+  } catch { ElMessage.warning('AI 生成失败，请稍后重试') } finally { aiLoading.value = '' }
+}
 function handleReview() { openReviewDialog?.('M9-disclosure-soe', '附注披露（国企）') }
 
 function fmtAmount(val: number): string {

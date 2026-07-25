@@ -3,6 +3,9 @@
     <div class="section-head">
       <h3 class="sheet-title">G6-1 其他债权投资审定表</h3>
       <div class="head-actions tab-toolbar">
+        <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
+          <el-icon><Download /></el-icon>带入调整
+        </el-button>
         <span class="chip-wrap"><GtIndexChip value="wp:G6-1" :context-project-id="props.projectId" /></span>
         <span class="chip-wrap"><GtIndexChip value="wp:G6-2" :context-project-id="props.projectId" /></span>
         <span class="chip-wrap"><GtIndexChip value="wp:G6-3" :context-project-id="props.projectId" /></span>
@@ -64,6 +67,7 @@
         <li>一年内到期：成本一年内＋利息一年内；账面价值一年内到期＝账面一年内−减值一年内；与 G6-2 到期分类一致。</li>
         <li>差异数（账面价值合计 − 试算 1503）应为 0；非零时先查 G6-4 是否已回写、G6-2/G6-3 是否已同步。</li>
         <li>分类结论关注顶部 G6-7/G6-8 回写摘要；非 FVOCI-Debt 预期分类时须在说明中评价影响。</li>
+        <li>「带入调整」：可从集中登记按科目 1503 拉取调整分录，逐笔分配到各成本/利息调整/减值明细行的期末账项调整，带入后审定数自动更新并联动附注。</li>
       </ul>
     </details>
 
@@ -222,6 +226,15 @@
         <p>4. 操作路径提示：G6-2 提供明细与一年内到期拆分；G6-3/G6-12 提供减值；G6-4「保存并回写」后刷新本表账项调整列；附注表从本表审定带入。</p>
       </div>
     </details>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="1503 其他债权投资"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
@@ -235,9 +248,13 @@
  * - 变动率阈值 30%；试算差异嵌在表内（与 G4 一致）
  */
 import { ref, computed, toRef, inject, watch } from 'vue'
+import { Download } from '@element-plus/icons-vue'
 import { useG6MainAdjudication } from '../../composables/useG6MainAdjudication'
 import type { G6AdjudicationRow } from '../../composables/useG6MainAdjudication'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import { G6_CHANGE_RATE_THRESHOLD } from '../../composables/g6AdjudicationItems'
 import {
   G6_CLASSIFICATION_SUMMARY_KEY,
@@ -273,6 +290,32 @@ const adj = useG6MainAdjudication({
   allResponses,
   isReadonly,
   htmlData: toRef(props, 'htmlData'),
+})
+
+// ─── 从集中登记带入调整（1503 其他债权投资，资产借方；带入期末账项调整，单列合并 AJE/RJE） ───
+const bringInRows = computed(() =>
+  adj.rows.value
+    .filter((r) => r.editable && r.kind === 'leaf')
+    .map((r) => ({ rowKey: r.rowKey, name: r.label, aje: r.closingAdjustment, rje: r.closingAdjustment })),
+)
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: toRef(props, 'projectId') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '1503',
+  direction: 'debit',
+  subjectCode: '1503',
+  wpCode: 'G6',
+  subjectLabel: '其他债权投资(1503)',
+  rows: bringInRows,
+  updateCell: (rowKey: string, _field: any, value: number) =>
+    adj.updateCell(rowKey, 'closingAdjustment', value),
+  totalAudited: () => adj.carryingNetRow.value?.closingAudited ?? 0,
 })
 
 const classificationSummary = computed(() =>

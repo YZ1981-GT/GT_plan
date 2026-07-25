@@ -14,10 +14,13 @@
  *
  * 科目：未确认融资费用（借方/负债备抵类！期末=期初+借方-贷方）
  */
-import { computed, ref, type ComputedRef, type Ref } from 'vue'
+import { computed, ref, watch, type ComputedRef, type Ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { calcContraLiabilityEndBalance, calcSubtotal } from './useL5FormulaEngine'
-import type { useL5FormData } from './useL5FormData'
+import type { useL5FormData, ChecklistResponse } from './useL5FormData'
+
+/** 🔴 P0 修复：JSON 存储键（此前无 hydration + 保存仅序列化字段子集 → 刷新数据丢失） */
+const ITEM_ROWS = 'L5-L5-3-rows'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -109,7 +112,22 @@ export function useL5UnrecognizedDetail(
   formData: ReturnType<typeof useL5FormData>,
   unrecognizedRows: Ref<L5UnrecognizedRow[]>,
 ) {
-  const { debouncedSave } = formData
+  const { allResponses, debouncedSave } = formData
+
+  // ─── 0. Hydration ────────────────────────────────────────────────────
+  function hydrate(): void {
+    const raw = allResponses.value.get(ITEM_ROWS)?.remark
+    if (!raw) return
+    try {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) unrecognizedRows.value = parsed
+    } catch { /* ignore */ }
+  }
+  hydrate()
+  watch(
+    () => allResponses.value.get(ITEM_ROWS)?.remark,
+    (v) => { if (v && unrecognizedRows.value.length === 0) hydrate() },
+  )
 
   // ─── 1. 区段Tab状态 ────────────────────────────────────────────────────
 
@@ -252,17 +270,12 @@ export function useL5UnrecognizedDetail(
   // ─── 5. 保存触发 ──────────────────────────────────────────────────────
 
   function _triggerSave(): void {
-    // 序列化为JSON供CrossSheet勾稽
-    debouncedSave('L5-L5-3-rows', {
-      remark: JSON.stringify(unrecognizedRows.value.map(r => ({
-        key: r.key,
-        payableName: r.payableName,
-        unrecognizedBalance: r.initialUnrecognized - r.cumulativeAmortization,
-        initialUnrecognized: r.initialUnrecognized,
-        cumulativeAmortization: r.cumulativeAmortization,
-        periodAmortization: r.periodAmortization,
-      }))),
-    })
+    // 序列化完整行数据（含所有字段）+ 保证 unrecognizedBalance 新鲜，供持久化+CrossSheet勾稽
+    const payload = unrecognizedRows.value.map(r => ({
+      ...r,
+      unrecognizedBalance: r.initialUnrecognized - r.cumulativeAmortization,
+    }))
+    debouncedSave(ITEM_ROWS, { remark: JSON.stringify(payload) } as Partial<ChecklistResponse>)
   }
 
   // ─── Return ────────────────────────────────────────────────────────────

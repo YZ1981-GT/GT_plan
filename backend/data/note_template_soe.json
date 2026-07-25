@@ -2251,18 +2251,21 @@
             {
               "label": "银行存款",
               "account_codes": [
-                "1002",
-                "1012"
+                "1002"
               ],
               "row_type": "data"
             },
             {
               "label": "其他货币资金",
-              "row_type": "data"
+              "row_type": "data",
+              "account_codes": [
+                "1012"
+              ]
             },
             {
               "label": "数字货币",
-              "row_type": "data"
+              "row_type": "data",
+              "account_codes": []
             },
             {
               "label": "合计",
@@ -2271,7 +2274,8 @@
             },
             {
               "label": "其中：存放在境外的款项总额",
-              "row_type": "data"
+              "row_type": "data",
+              "account_codes": []
             }
           ]
         },
@@ -2285,27 +2289,33 @@
           "rows": [
             {
               "label": "银行承兑汇票保证金",
-              "row_type": "data"
+              "row_type": "data",
+              "account_codes": []
             },
             {
               "label": "信用证保证金",
-              "row_type": "data"
+              "row_type": "data",
+              "account_codes": []
             },
             {
               "label": "履约保证金",
-              "row_type": "data"
+              "row_type": "data",
+              "account_codes": []
             },
             {
               "label": "用于担保的定期存款或通知存款",
-              "row_type": "data"
+              "row_type": "data",
+              "account_codes": []
             },
             {
               "label": "放在境外且资金汇回受到限制的款项",
-              "row_type": "data"
+              "row_type": "data",
+              "account_codes": []
             },
             {
               "label": "金融企业法定存款准备金或备付金",
-              "row_type": "data"
+              "row_type": "data",
+              "account_codes": []
             }
           ]
         }
@@ -2346,30 +2356,37 @@
           "rows": [
             {
               "label": "分类以公允价值计量且其变动计入当期损益的金融资产",
+              "account_codes": [],
               "row_type": "data"
             },
             {
               "label": "其中：债务工具投资",
+              "account_codes": [],
               "row_type": "data"
             },
             {
               "label": "权益工具投资",
+              "account_codes": [],
               "row_type": "data"
             },
             {
               "label": "其他",
+              "account_codes": [],
               "row_type": "data"
             },
             {
               "label": "指定为以公允价值计量且其变动计入当期损益的金融资产",
+              "account_codes": [],
               "row_type": "data"
             },
             {
               "label": "其中：债务工具投资",
+              "account_codes": [],
               "row_type": "data"
             },
             {
               "label": "其他",
+              "account_codes": [],
               "row_type": "data"
             },
             {
@@ -2446,21 +2463,23 @@
           "name": "应收票据分类",
           "headers": [
             "票据种类",
-            "期末数",
-            "期初数"
+            "期末账面余额",
+            "期末坏账准备",
+            "期末账面价值",
+            "期初账面余额",
+            "期初坏账准备",
+            "期初账面价值"
           ],
           "rows": [
             {
-              "label": "票据种类",
-              "row_type": "header_label"
-            },
-            {
               "label": "银行承兑汇票",
-              "row_type": "data"
+              "row_type": "data",
+              "account_codes": []
             },
             {
               "label": "商业承兑汇票",
-              "row_type": "data"
+              "row_type": "data",
+              "account_codes": []
             },
             {
               "label": "合计",
@@ -2470,28 +2489,25 @@
           ]
         },
         {
-          "name": "按坏账准备计提方法分类披露应收票据",
+          "name": "按坏账准备计提方法分类披露应收票据（期末数）",
           "headers": [
             "类别",
-            "期末数"
+            "账面余额金额",
+            "账面余额比例(%)",
+            "坏账准备金额",
+            "预期信用损失率(%)",
+            "账面价值"
           ],
           "rows": [
             {
-              "label": "类别",
-              "row_type": "header_label"
-            },
-            {
-              "label": "类别",
-              "row_type": "header_label"
-            },
-            {
               "label": "按单项计提坏账准备",
-              "row_type": "data"
+              "row_type": "data",
+              "account_codes": []
             },
             {
               "label": "按组合计提坏账准备",
-              "is_total": true,
-              "row_type": "total"
+              "row_type": "data",
+              "account_codes": []
             },
             {
               "label": "合计",
@@ -2501,28 +2517,25 @@
           ]
         },
         {
-          "name": "按坏账准备计提方法分类披露应收票据（续）",
+          "name": "按坏账准备计提方法分类披露应收票据（续：期初数）",
           "headers": [
             "类别",
-            "期初数"
+            "账面余额金额",
+            "账面余额比例(%)",
+            "坏账准备金额",
+            "预期信用损失率(%)",
+            "账面价值"
           ],
           "rows": [
             {
-              "label": "类别",
-              "row_type": "header_label"
-            },
-            {
-              "label": "类别",
-              "row_type": "header_label"
-            },
-            {
               "label": "按单项计提坏账准备",
-              "row_type": "data"
+              "row_type": "data",
+              "account_codes": []
             },
             {
               "label": "按组合计提坏账准备",
-              "is_total": true,
-              "row_type": "total"
+              "row_type": "data",
+              "account_codes": []
             },
             {
               "label": "合计",
@@ -2534,13 +2547,17 @@
         {
           "name": "按单项计提坏账准备的应收票据",
           "headers": [
-            "承兑人名称",
-            "期末数"
+            "名称",
+            "账面余额",
+            "坏账准备",
+            "预期信用损失率(%)",
+            "计提理由"
           ],
           "rows": [
             {
-              "label": "承兑人名称",
-              "row_type": "header_label"
+              "label": "可无限量添加行",
+              "row_type": "data",
+              "account_codes": []
             },
             {
               "label": "合计",
@@ -2552,39 +2569,41 @@
         {
           "name": "按组合计提坏账准备的应收票据",
           "headers": [
-            "承兑人名称",
-            "期末数"
+            "名称",
+            "账面余额",
+            "坏账准备",
+            "预期信用损失率(%)"
           ],
           "rows": [
             {
-              "label": "承兑人名称",
-              "row_type": "header_label"
-            },
-            {
-              "label": "商业承兑汇票小计",
-              "is_total": true,
-              "row_type": "subtotal"
+              "label": "商业承兑汇票小计：",
+              "row_type": "data",
+              "account_codes": []
             },
             {
               "label": "出票人类型或账龄",
-              "row_type": "data"
+              "row_type": "data",
+              "account_codes": []
             },
             {
               "label": "……",
-              "row_type": "data"
+              "row_type": "data",
+              "account_codes": []
             },
             {
-              "label": "银行承兑汇票小计",
-              "is_total": true,
-              "row_type": "subtotal"
+              "label": "银行承兑汇票小计：",
+              "row_type": "data",
+              "account_codes": []
             },
             {
               "label": "出票人类型或账龄",
-              "row_type": "data"
+              "row_type": "data",
+              "account_codes": []
             },
             {
               "label": "……",
-              "row_type": "data"
+              "row_type": "data",
+              "account_codes": []
             },
             {
               "label": "合计",
@@ -2598,26 +2617,27 @@
           "headers": [
             "类别",
             "期初数",
-            "本期变动情况",
+            "本期计提",
+            "本期收回或转回",
+            "本期核销",
+            "本期其他变动",
             "期末数"
           ],
           "rows": [
             {
-              "label": "类别",
-              "row_type": "header_label"
-            },
-            {
               "label": "单项计提预期信用损失的应收票据",
-              "row_type": "data"
+              "row_type": "data",
+              "account_codes": []
             },
             {
               "label": "按组合计提预期信用损失的应收票据",
-              "is_total": true,
-              "row_type": "total"
+              "row_type": "data",
+              "account_codes": []
             },
             {
               "label": "其中：",
-              "row_type": "data"
+              "row_type": "data",
+              "account_codes": []
             },
             {
               "label": "合计",
@@ -2627,15 +2647,19 @@
           ]
         },
         {
-          "name": "其中，本期转回或收回金额重要的应收票据坏账准备",
+          "name": "本期转回或收回金额重要的应收票据坏账准备",
           "headers": [
-            "承兑人名称",
+            "债务人名称",
             "转回或收回金额",
-            "转回或收回方式",
-            "转回<br/>原因",
-            "备注"
+            "转回或收回前累计已计提坏账准备金额",
+            "转回或收回原因、方式"
           ],
           "rows": [
+            {
+              "label": "可无限量添加行",
+              "row_type": "data",
+              "account_codes": []
+            },
             {
               "label": "合计",
               "is_total": true,
@@ -2646,17 +2670,19 @@
         {
           "name": "期末已质押的应收票据",
           "headers": [
-            "票据种类",
+            "种类",
             "期末已质押金额"
           ],
           "rows": [
             {
-              "label": "银行承兑汇票",
-              "row_type": "data"
+              "label": "银行承兑票据",
+              "row_type": "data",
+              "account_codes": []
             },
             {
-              "label": "商业承兑汇票",
-              "row_type": "data"
+              "label": "商业承兑票据",
+              "row_type": "data",
+              "account_codes": []
             },
             {
               "label": "合计",
@@ -2666,20 +2692,22 @@
           ]
         },
         {
-          "name": "期末已背书或贴现且在资产负债表日尚未到期的应收票据",
+          "name": "期末已背书或贴现但尚未到期的应收票据",
           "headers": [
-            "票据种类",
+            "种类",
             "期末终止确认金额",
             "期末未终止确认金额"
           ],
           "rows": [
             {
-              "label": "银行承兑汇票",
-              "row_type": "data"
+              "label": "银行承兑票据",
+              "row_type": "data",
+              "account_codes": []
             },
             {
-              "label": "商业承兑汇票",
-              "row_type": "data"
+              "label": "商业承兑票据",
+              "row_type": "data",
+              "account_codes": []
             },
             {
               "label": "合计",
@@ -2689,19 +2717,16 @@
           ]
         },
         {
-          "name": "期末因出票人未履约而转为应收账款的票据",
+          "name": "期末因出票人未履约而其转为应收账款的票据",
           "headers": [
-            "票据种类",
+            "种类",
             "期末转应收账款金额"
           ],
           "rows": [
             {
-              "label": "银行承兑汇票",
-              "row_type": "data"
-            },
-            {
-              "label": "商业承兑汇票",
-              "row_type": "data"
+              "label": "商业承兑票据",
+              "row_type": "data",
+              "account_codes": []
             },
             {
               "label": "合计",
@@ -2719,19 +2744,20 @@
           "rows": [
             {
               "label": "实际核销的应收票据",
-              "row_type": "data"
+              "row_type": "data",
+              "account_codes": []
             }
           ]
         },
         {
-          "name": "应收票据（表12）",
+          "name": "重要的应收票据核销情况",
           "headers": [
             "单位名称",
-            "应收票据<br/>性质",
+            "应收票据的性质",
             "核销金额",
             "核销原因",
-            "履行的<br/>核销程序",
-            "是否因关联交易产生"
+            "履行的核销程序",
+            "是否由关联交易产生"
           ],
           "rows": [
             {
@@ -2743,14 +2769,12 @@
         }
       ],
       "text_sections": [
-        "应收票据分类",
-        "坏账准备计提情况",
-        "#### 按坏账准备计提方法分类披露应收票据",
-        "本期计提、收回或转回的应收票据坏账准备情况",
-        "期末已质押的应收票据",
-        "期末已背书或贴现且在资产负债表日尚未到期的应收票据",
-        "期末因出票人未履约而转为应收账款的票据",
-        "本期实际核销的应收票据"
+        "按组合计提坏账准备的应收票据",
+        "【提示：此处披露未逾期的应收票据计提的坏账准备。若票据逾期，则应转入应收账款并计提坏账准备，账龄应连续计算。】",
+        "期末已背书或贴现但尚未到期的应收票据",
+        "【提示：证监会《2014年上市公司年报会计监管报告》，对已背书或贴现且尚未到期的银行承兑汇票予以终止确认后，需在财务报表中补充披露终止确认的票据以及对票据被追索时可能存在的支付风险予以清晰说明。参考披露：用于贴现的银行承兑汇票是由信用等级较高的银行承兑，信用风险和延期付款风险很小，并且票据相关的利率风险已转移给银行，可以判断票据所有权上的主要风险和报酬已经转移，故终止确认。或：用于贴现的银行承兑汇票是由信用等级不高的银行承兑，贴现不影响追索权，票据相关的信用风险和延期付款风险仍没有转移，故未终止确认。】",
+        "重要的应收票据核销情况",
+        "（对于其中重要的应收票据，应逐项披露款项性质、核销原因、履行的核销程序及核销金额。实际核销的款项由关联交易产生的，应单独披露。）"
       ],
       "check_presets": [
         "LLM审核",

@@ -17,6 +17,11 @@ import {
   DISCLOSURE_GUIDANCE,
   type DisclosureVariant,
 } from '../composables/useD1Disclosure'
+import {
+  buildD1SyncPayload,
+  D1_NOTE_SECTION,
+  type D1DisclosureSnapshot,
+} from '../composables/d1NoteSectionMap'
 import type { ChecklistResponse } from '../composables/useD1FormData'
 import type { Ref } from 'vue'
 import GtIndexChip from '../GtIndexChip.vue'
@@ -38,6 +43,7 @@ const props = withDefaults(defineProps<{
 const sectionNotes = ref<Record<string, string>>({})
 const NOTE_SECTION_KEYS = ['top', 'pledged', 'endorsed', 'badDebtClass', 'writeOff'] as const
 const aiLoadingSection = ref<string>('')
+const isSyncing = ref(false)
 const openReviewDialog = inject<any>('openReviewDialog', null)
 
 function loadSectionNotes() {
@@ -438,6 +444,53 @@ function handleReview(sectionKey: string): void {
     },
   })
 }
+
+// ─── 同步到附注模块（底稿披露表 → 附注单向推送）─────────────────────────────────
+// 结构化表格 + 文本框（说明）内容一并同步到附注 五、4/八、4「应收票据」，
+// 保证附注模块表格与文本与披露表保持一致。
+async function syncToDisclosureNotes(): Promise<void> {
+  if (isSyncing.value || !props.projectId || props.isReadonly) return
+  isSyncing.value = true
+  try {
+    const snapshot: D1DisclosureSnapshot = {
+      summaryRows: categorySummaryRows.value as any,
+      summaryTotal: categorySummaryTotal.value as any,
+      pledgedRows: pledgedRows.value as any,
+      pledgedTotal: pledgedTotal.value as any,
+      endorsedRows: endorsedRows.value as any,
+      endorsedTotal: endorsedTotal.value as any,
+      transferRows: transferRows.value as any,
+      transferTotal: transferTotal.value as any,
+      classEndRows: classEndRows.value as any,
+      classPriorRows: classPriorRows.value as any,
+      writeOffAmount: writeOffAmount.value,
+      writeOffDetailRows: writeOffDetailRows.value as any,
+      notes: { ...sectionNotes.value },
+    }
+    const payload = buildD1SyncPayload(props.variant, props.wpId || '', null, snapshot)
+    const result: any = await http.post(
+      `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,
+      payload,
+    )
+    const data = result?.data ?? result
+    const rows = Number(data?.rows_synced ?? 0)
+    // 通知附注模块定向刷新（表格 + 文本框内容与披露表一致）
+    window.dispatchEvent(new CustomEvent('disclosure:note-text-updated', {
+      detail: {
+        wpCode: 'D1',
+        accountCode: '1121',
+        projectId: props.projectId,
+        section: props.variant,
+        sectionIds: [D1_NOTE_SECTION[props.variant]],
+      },
+    }))
+    ElMessage.success(`已同步 ${rows} 行到附注模块「${D1_NOTE_SECTION[props.variant]} 应收票据」`)
+  } catch {
+    ElMessage.warning('同步附注失败，请稍后重试')
+  } finally {
+    isSyncing.value = false
+  }
+}
 </script>
 
 <template>
@@ -462,16 +515,22 @@ function handleReview(sectionKey: string): void {
             <el-button size="small">导入数据</el-button>
           </el-upload>
         </el-button-group>
+        <el-button
+          type="primary"
+          plain
+          size="small"
+          :loading="isSyncing"
+          :disabled="isReadonly"
+          title="将披露表的表格与文本框内容同步到附注模块（五、4/八、4 应收票据）"
+          @click="syncToDisclosureNotes"
+        >同步到附注</el-button>
       </div>
     </div>
 
     <el-skeleton v-if="isLoading" :rows="10" animated />
     <template v-else>
-        <!-- Top guidance (SOE only — listed uses inline excel-tip below summary table) -->
-        <details v-if="variant === 'listed'" class="guidance-fold">
-          <summary>📋 编制提示</summary>
-          <p v-for="(t, i) in DISCLOSURE_GUIDANCE.top" :key="'top-'+i">{{ t }}</p>
-        </details>
+        <!-- 注：listed 版编制提示已内联在下方汇总表卡片的「说明」区（listed-top-note），
+             此处不再重复渲染，避免同一「📋 编制提示」出现两次。 -->
 
         <!-- Listed top summary table (Req 11 — Excel R6-11) -->
         <el-card v-if="variant === 'listed'" class="d1-section-card listed-top-summary" shadow="never">

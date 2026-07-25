@@ -15,6 +15,9 @@
     <div class="section-header">
       <h3>K5-1 预计负债审定表</h3>
       <div class="header-actions">
+        <el-button size="small" type="warning" plain :disabled="isReadonly" :loading="adjPull.loading.value" @click="openBringInAdjustment">
+          <el-icon><Download /></el-icon> 带入调整
+        </el-button>
         <el-button size="small" :disabled="isReadonly" @click="prefillFromTbSubAccounts">
           📊 从TB预填未审
         </el-button>
@@ -217,8 +220,18 @@
         <li>审定数 = 未审数 + AJE + RJE</li>
         <li>三角勾稽：审定合计应等于各类型行审定数之和</li>
         <li>各专项检查表期末应与对应类型行审定数一致</li>
+        <li>「带入调整」：按科目2701拉取调整分录，逐笔选目标类型行累加到 AJE/RJE，带入后自动联动披露/附注</li>
       </ul>
     </details>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="2701 预计负债"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
@@ -231,10 +244,13 @@
  * Requirements: 2.1-2.8
  */
 import { computed, toRef } from 'vue'
-import { MagicStick, CircleCheckFilled, WarningFilled } from '@element-plus/icons-vue'
+import { MagicStick, CircleCheckFilled, WarningFilled, Download } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useK5Adjudication } from '../../composables/useK5Adjudication'
-import GtIndexChip from '../../shared/GtIndexChip.vue'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
+import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 import type { K5TbData } from '../../composables/useK5FormData'
 import type { Ref } from 'vue'
@@ -273,6 +289,20 @@ const {
   saveResponse: async (field: string, value: any) => {
     emit('save', `K5-${field}`, value)
   },
+})
+
+// ─── 从集中登记带入调整（2701 预计负债，负债贷方） ────────────────────────────
+const { adjPull, visible: bringInVisible, rowOptions: bringInRowOptions, open: openBringInAdjustment, apply: onBringInApply } = useAdjudicationBringIn({
+  projectId: toRef(props, 'projectId') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '2701',
+  direction: 'credit', // 负债贷方：净发生额 = 贷 − 借
+  subjectCode: '2701',
+  wpCode: 'K5',
+  subjectLabel: '预计负债(2701)',
+  rows: computed(() => rows.value.map(r => ({ rowKey: r.rowKey, name: r.label, aje: r.aje, rje: r.rje }))),
+  updateCell: (rowKey: string, field: any, value: number) => handleCellChange(rowKey, field, value),
+  totalAudited: () => subtotalRow.value.audited,
 })
 
 // ─── 表格数据（类型行 + 合计 + 差异） ───────────────────────────────────────

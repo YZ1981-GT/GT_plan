@@ -453,7 +453,8 @@ const currentSheet = computed(() => {
 
 const showHtmlToolbar = computed(() => {
   const s = currentSheet.value
-  return s !== '' && currentMode.value !== 'onlyoffice'
+  // 目录 sheet（H1）不显示双模式工具栏（目录页无编辑对象）
+  return s !== '' && s !== 'H1' && currentMode.value !== 'onlyoffice'
 })
 
 // ─── selfLoad ────────────────────────────────────────────────────────────────

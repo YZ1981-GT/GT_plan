@@ -36,6 +36,12 @@
         <el-button type="primary" size="small" :disabled="isReadonly" @click="publishAdjudicated()">
           发布审定数
         </el-button>
+        <el-button size="small" plain :loading="grossPull.loading.value" :disabled="isReadonly" @click="openGrossBringIn">
+          <el-icon><Download /></el-icon>带入调整·原值
+        </el-button>
+        <el-button size="small" plain :loading="impairmentPull.loading.value" :disabled="isReadonly" @click="openImpairmentBringIn">
+          <el-icon><Download /></el-icon>带入调整·跌价
+        </el-button>
         <F2ReviewChip section-id="F2-1-gross" />
         <el-tag size="small" type="info">数据来源：F2-3~13 明细自动聚合至原值区</el-tag>
       </div>
@@ -141,17 +147,40 @@
         <el-input v-model="conclusion" type="textarea" :autosize="{ minRows: 2, maxRows: 5 }" :disabled="isReadonly" placeholder="请输入审计结论..." />
       </div>
     </el-card>
+
+    <AdjudicationBringInDialog
+      v-model="grossBringInVisible"
+      :matches="grossPull.matches.value"
+      :row-options="grossBringInRowOptions"
+      subject-label="存货原值（1401-1412）"
+      :loading="grossPull.loading.value"
+      @apply="(p) => applyBringIn('gross', p)"
+    />
+    <AdjudicationBringInDialog
+      v-model="impairmentBringInVisible"
+      :matches="impairmentPull.matches.value"
+      :row-options="impairmentBringInRowOptions"
+      subject-label="存货跌价准备（1471）"
+      :loading="impairmentPull.loading.value"
+      @apply="(p) => applyBringIn('impairment', p)"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, toRef, type Ref } from 'vue'
-import { useF2Adjudication } from '../../composables/useF2Adjudication'
+import { ref, computed, toRef, type Ref } from 'vue'
+import { ElMessage } from 'element-plus'
+import { Download } from '@element-plus/icons-vue'
+import { useF2Adjudication, type F2BlockKey } from '../../composables/useF2Adjudication'
 import { useF2AiGenerate } from '../../composables/useF2AiGenerate'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { useAdjudicationAdjustmentPull } from '../../composables/useAdjudicationAdjustmentPull'
+import { F2_ROW_KEY_ACCOUNT, F2_IMPAIRMENT_ACCOUNT } from '../../composables/useF2CrossSheet'
 import type { ChecklistResponse } from '../../composables/useF2FormData'
 import type { useF2CrossSheet } from '../../composables/useF2CrossSheet'
 import F2AdjudicationBlockTable from './F2AdjudicationBlockTable.vue'
 import F2ReviewChip from '../shared/F2ReviewChip.vue'
+import AdjudicationBringInDialog, { type AdjudicationAllocation } from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
@@ -210,6 +239,71 @@ async function generateConclusion() {
     'AI 生成 · 存货审计结论',
   )
   if (text) conclusion.value = text
+}
+
+// ─── 从集中登记带入调整（专门接入：原值 gross[存货科目 debit] + 跌价 impairment[1471 credit] 两独立实例） ─
+// F2 审定表"账项调整"为单列净额（非 AJE/RJE 双列），故不复用共享 helper.apply（双列快照会覆盖单列），
+// 改自包含 apply：弹窗已按目标行聚合，net = aje + rje 一次性累加到该行 adjustment（安全，无覆盖）。
+const GROSS_ACCOUNT_CODES = Object.values(F2_ROW_KEY_ACCOUNT).filter(c => c !== F2_IMPAIRMENT_ACCOUNT)
+const auditYear = useAuditContext().year as any
+
+const grossPull = useAdjudicationAdjustmentPull({
+  projectId: toRef(props, 'projectId') as any,
+  year: auditYear,
+  subjectPrefix: GROSS_ACCOUNT_CODES,
+  direction: 'debit',
+})
+const impairmentPull = useAdjudicationAdjustmentPull({
+  projectId: toRef(props, 'projectId') as any,
+  year: auditYear,
+  subjectPrefix: [F2_IMPAIRMENT_ACCOUNT],
+  direction: 'credit',
+})
+
+const grossBringInVisible = ref(false)
+const impairmentBringInVisible = ref(false)
+
+// 原值目标行=除跌价准备外的存货类别；跌价目标行=跌价准备单行
+const grossBringInRowOptions = computed(() =>
+  grossRows.value
+    .filter(r => r.rowKey !== 'impairment-provision')
+    .map(r => ({ rowKey: r.rowKey, name: r.label })),
+)
+const impairmentBringInRowOptions = computed(() =>
+  impairmentRows.value
+    .filter(r => r.rowKey === 'impairment-provision')
+    .map(r => ({ rowKey: r.rowKey, name: r.label })),
+)
+
+async function openGrossBringIn(): Promise<void> {
+  if (props.isReadonly) return
+  await grossPull.load()
+  if (!grossPull.matches.value.length) {
+    ElMessage.info('未找到命中存货原值科目的集中调整分录')
+    return
+  }
+  grossBringInVisible.value = true
+}
+async function openImpairmentBringIn(): Promise<void> {
+  if (props.isReadonly) return
+  await impairmentPull.load()
+  if (!impairmentPull.matches.value.length) {
+    ElMessage.info('未找到命中跌价准备(1471)的集中调整分录')
+    return
+  }
+  impairmentBringInVisible.value = true
+}
+
+function applyBringIn(block: F2BlockKey, payload: { allocations: AdjudicationAllocation[] }): void {
+  const rows = block === 'gross' ? grossRows.value : impairmentRows.value
+  for (const a of payload.allocations) {
+    const row = rows.find(r => r.rowKey === a.rowKey)
+    if (!row) continue
+    const net = (a.aje || 0) + (a.rje || 0)
+    if (net === 0) continue
+    updateCell(block, a.rowKey, 'adjustment', Math.round((row.adjustment + net) * 100) / 100)
+  }
+  ElMessage.success('已带入调整分录至账项调整列，点「发布审定数」后联动披露/附注（若 F2-14 已录调整分录将以其为准）')
 }
 </script>
 

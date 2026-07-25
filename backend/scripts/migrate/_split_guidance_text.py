@@ -65,9 +65,31 @@ async def _ensure_backup_table(session: AsyncSession) -> None:
             year INT NOT NULL,
             note_section TEXT NOT NULL,
             source_text_content TEXT NOT NULL,
+            source_guidance_text TEXT,
             backed_up_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )
     """))
+    # 兼容早期无 source_guidance_text 列的备份表（幂等）
+    await session.execute(sa_text(
+        f"ALTER TABLE {BACKUP_TABLE} ADD COLUMN IF NOT EXISTS source_guidance_text TEXT"
+    ))
+
+
+def _merge_guidance(existing: str | None, extracted: str | None) -> str | None:
+    """合并既有 guidance_text 与从正文新抽取的指引，保留既有（避免覆盖丢失）。
+
+    既有指引（如生成时已分流的单行 `（…披露）`）与本次从 text_content 抽取的多行
+    `【提示…】` 块通常不相交，直接以 ``\\n\\n`` 拼接；去重完全一致的段落。
+    """
+    parts: list[str] = []
+    for chunk in (existing, extracted):
+        if not chunk:
+            continue
+        for seg in str(chunk).split("\n\n"):
+            seg_norm = seg.strip()
+            if seg_norm and seg_norm not in {p.strip() for p in parts}:
+                parts.append(seg)
+    return "\n\n".join(parts) if parts else None
 
 
 async def _backup_nonempty(session: AsyncSession, project: str) -> int:
@@ -187,8 +209,10 @@ async def cmd_execute(session: AsyncSession, project: str, confirm: bool) -> Non
         await session.execute(
             sa_text(f"""
                 INSERT INTO {BACKUP_TABLE}
-                    (note_id, project_id, year, note_section, source_text_content)
-                VALUES (:note_id, :project_id, :year, :note_section, :source_text_content)
+                    (note_id, project_id, year, note_section,
+                     source_text_content, source_guidance_text)
+                VALUES (:note_id, :project_id, :year, :note_section,
+                        :source_text_content, :source_guidance_text)
             """),
             {
                 "note_id": note.id,
@@ -196,9 +220,11 @@ async def cmd_execute(session: AsyncSession, project: str, confirm: bool) -> Non
                 "year": note.year,
                 "note_section": note.note_section,
                 "source_text_content": note.text_content,
+                "source_guidance_text": note.guidance_text,
             },
         )
-        note.guidance_text = guidance or None
+        # 保留既有 guidance_text（生成时已分流的指引），合并本次新抽取的指引块
+        note.guidance_text = _merge_guidance(note.guidance_text, guidance)
         note.text_content = remaining or None
         changed.append(ChangedSection(
             project_id=note.project_id,
@@ -225,7 +251,7 @@ async def cmd_rollback(session: AsyncSession, project: str) -> None:
         sa_text(f"""
             UPDATE disclosure_notes d
             SET text_content = b.source_text_content,
-                guidance_text = NULL
+                guidance_text = b.source_guidance_text
             FROM {BACKUP_TABLE} b
             WHERE {where}
         """),

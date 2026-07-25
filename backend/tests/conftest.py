@@ -60,6 +60,10 @@ import app.models.extension_models  # noqa: E402, F401
 import app.models.gt_coding_models  # noqa: E402, F401
 import app.models.t_account_models  # noqa: E402, F401
 import app.models.attachment_models  # noqa: E402, F401
+# 证据治理模型（含 ServiceIdentity）——必须在 attachment_models 之后注册，
+# 因 attachments.actor_service_identity_id FK → service_identities，否则
+# create_all 解析 FK 失败（NoReferencedTableError），阻断全套 DB 集成测试。
+import app.models.evidence_governance_models  # noqa: E402, F401
 import app.models.phase13_models  # noqa: E402, F401  — Phase 13: Word导出
 import app.models.phase10_models  # noqa: E402, F401  — Phase 10: 批注/报告溯源（R1 QC 依赖）
 import app.models.phase12_models  # noqa: E402, F401  — Phase 12: AI generation 等

@@ -1,16 +1,28 @@
 <template>
   <span v-if="canStartAiReview" class="wp-ai-review-toolbar">
-    <el-button
-      v-if="sheetName"
-      size="small"
-      :loading="reviewing"
-      @click="onCurrentSheetAiReview"
+    <el-tooltip
+      placement="top"
+      :show-after="300"
+      content="仅对当前打开的这一张底稿页（如审定表 E1-1）执行 AI 复核，即时给出本页勾稽与风险提示"
     >
-      本页AI复核
-    </el-button>
-    <el-button size="small" @click="reviewDialogVisible = true">
-      批量AI复核
-    </el-button>
+      <el-button
+        v-if="sheetName"
+        size="small"
+        :loading="reviewing"
+        @click="onCurrentSheetAiReview"
+      >
+        本页AI复核
+      </el-button>
+    </el-tooltip>
+    <el-tooltip
+      placement="top"
+      :show-after="300"
+      content="对整本底稿（该科目下全部子表：审定表/明细表/检查表/附注等）批量 AI 复核，在弹窗中逐张汇总复核结果"
+    >
+      <el-button size="small" @click="reviewDialogVisible = true">
+        批量AI复核
+      </el-button>
+    </el-tooltip>
 
     <el-dialog
       v-model="reviewDialogVisible"

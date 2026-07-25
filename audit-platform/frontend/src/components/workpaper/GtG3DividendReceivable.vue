@@ -128,19 +128,14 @@
 
       <!-- 底稿目录：对齐 G1 目录页，显示泳道卡片 -->
       <template v-else-if="currentSheet === '底稿目录'">
-        <div class="g3-index-toolbar">
-          <el-button size="small" type="primary" plain @click="openHandbook('preparation')">
-            📖 编制手册
-          </el-button>
-          <el-button size="small" @click="openHandbook('usage')">使用手册</el-button>
-        </div>
         <GCycleBIndexExtras
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :sheet-name="props.sheetName"
           :wp-code="props.wpCode"
-          :html-data="props.htmlData"
+          :html-data="directoryHtmlData"
           :available-sheets="availableSheets"
+          :all-responses="formData.allResponses.value"
         />
       </template>
 
@@ -179,6 +174,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, provide, inject, defineAsyncComponent } from 'vue'
 import { useG3FormData } from './composables/useG3FormData'
 import { useG3DualMode } from './composables/useG3DualMode'
+import { buildDirectoryHtmlData } from './composables/gCycleIndexRouting'
 import { eventBus } from '@/utils/eventBus'
 import { G3SaveItemsKey, G3WritebackTbKey, G3DetailRevisionKey } from './composables/g3InternalKeys'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
@@ -262,6 +258,11 @@ const availableSheets = computed(() => {
   // 保证底稿目录架构树非空
   return Object.keys(formData.sheetCache.value).map(sheet_name => ({ sheet_name }))
 })
+
+/** 目录页传给 GCycleBIndexExtras 的 htmlData：从 sheetCache 补全 cycle_workpapers（本循环底稿目录 grid） */
+const directoryHtmlData = computed(() =>
+  buildDirectoryHtmlData(props.htmlData, formData.sheetCache.value),
+)
 
 /** 与 G2 对齐：兼容 note-listed / 附注披露信息（上市公司）等模板名 */
 const currentSheet = computed(() => {

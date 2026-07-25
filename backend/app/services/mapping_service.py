@@ -44,16 +44,18 @@ async def _client_account_filters(
     db: AsyncSession,
     year: int | None = None,
 ) -> list[Any]:
-    filters: list[Any] = [
+    # 🔴 不按 dataset_id 过滤：account_chart 唯一约束 uq_account_chart_project_code_source
+    # = (project_id, account_code, source)，client 科目为项目全局唯一（每个 code 仅一行，
+    # 不含 dataset/year 维度）。四表重新导入产生新 active dataset 后，既有 client 科目行
+    # 仍 tag 着旧(superseded) dataset_id 且无法在新 dataset 上重建（唯一约束禁止分身）。
+    # 若此处按 active dataset_id 过滤，会把这些"全局唯一但 tag 旧 dataset"的科目排除 →
+    # auto_match/auto_suggest 看到 0 客户科目 → 静默产不出映射（dataset-stranding bug）。
+    # year 参数保留仅为签名兼容，不再用于 dataset 过滤。
+    return [
         AccountChart.project_id == project_id,
         AccountChart.source == AccountSource.client,
         AccountChart.is_deleted == False,  # noqa: E712
     ]
-    if year is not None:
-        active_dataset_id = await DatasetService.get_active_dataset_id(db, project_id, year)
-        if active_dataset_id is not None:
-            filters.append(AccountChart.dataset_id == active_dataset_id)
-    return filters
 
 
 async def _resolve_event_year(
@@ -239,7 +241,9 @@ async def _generate_client_accounts_from_balance(
         name = row.account_name or code
         cat = _infer_category_canonical(code, name)  # 编码+名称双保险（AccountCategory 枚举）
 
-        # 检查是否已存在
+        # 检查是否已存在（account_chart 唯一约束 uq_account_chart_project_code_source
+        # = (project_id, account_code, source)，不含 dataset_id → client 科目为项目全局
+        # 唯一，禁止按 dataset 分身；此处 dataset 无关地跳过已存在行，避免唯一约束冲突）。
         existing = await db.execute(
             select(AccountChart.id).where(
                 AccountChart.project_id == project_id,
@@ -358,6 +362,11 @@ async def auto_match(
     total_client = await _count_client_accounts(project_id, db, year=year)
     if total_client == 0:
         await _generate_client_accounts_from_balance(project_id, db, year=year)
+        # 重新统计：生成客户科目后 total_client 必须刷新，否则下方标准科目
+        # 补充生成的启发式 (std_count < total_client // 5) 会因 total_client 仍为 0
+        # 而恒不触发 → 标准科目空 → auto_suggest 返回空 → 静默产不出映射
+        # （真·全新单次导入且未预加载标准科目表时的隐性 bug）。
+        total_client = await _count_client_accounts(project_id, db, year=year)
 
     # 检查是否有标准科目，不足则从客户科目的一级编码自动生成
     # 注意：可能有其他流程（如报表映射模板）预写入少量 standard 科目，

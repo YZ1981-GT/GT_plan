@@ -23,6 +23,9 @@
         <div class="section-title">
           <span>K4-1 其他流动负债审定表</span>
           <div class="title-actions">
+            <el-button size="small" type="warning" plain :disabled="isReadonly" :loading="adjPull.loading.value" @click="openBringInAdjustment">
+              <el-icon><Download /></el-icon> 带入调整
+            </el-button>
             <el-button size="small" type="primary" link @click="handleAiGenerate('adj-main')">
               <el-icon><MagicStick /></el-icon> AI说明
             </el-button>
@@ -225,8 +228,18 @@
         <li>审计重点为<strong>完整性认定</strong>（负债易少计）→ 反向截止（期后偿付倒查未入账负债）</li>
         <li>"确认审定"将回写trial_balance(2245)并发布EventBus事件通知附注刷新</li>
         <li>明细表（K4-2）合计应与本表审定数一致</li>
+        <li>「带入调整」：按科目2245拉取调整分录，逐笔选目标分类行累加到 AJE/RJE，带入后自动联动披露/附注</li>
       </ul>
     </details>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="2245 其他流动负债"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
@@ -251,12 +264,15 @@
  * ⚠️ 负债类！期末=期初+贷方-借方（与资产类相反）
  */
 import { ref, computed, inject, toRef } from 'vue'
-import { MagicStick } from '@element-plus/icons-vue'
+import { MagicStick, Download } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
 import { useK4Adjudication, type K4AdjRow } from '../../composables/useK4Adjudication'
 import { useK4FormData } from '../../composables/useK4FormData'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import type { WorkpaperRuntimeContext } from '../../composables/useWorkpaperScaffold'
 import { WorkpaperRuntimeContextKey } from '../../composables/useWorkpaperScaffold'
 
@@ -298,6 +314,20 @@ const { writebackTB, debouncedSave } = useK4FormData({
 
 const publishing = ref(false)
 const isReadonly = computed(() => props.isReadonly)
+
+// ─── 从集中登记带入调整（2245 其他流动负债，负债贷方） ────────────────────────
+const { adjPull, visible: bringInVisible, rowOptions: bringInRowOptions, open: openBringInAdjustment, apply: onBringInApply } = useAdjudicationBringIn({
+  projectId: toRef(props, 'projectId') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '2245',
+  direction: 'credit', // 负债贷方：净发生额 = 贷 − 借
+  subjectCode: '2245',
+  wpCode: 'K4',
+  subjectLabel: '其他流动负债(2245)',
+  rows: computed(() => rows.value.map(r => ({ rowKey: r.rowKey, name: r.label, aje: r.aje, rje: r.rje }))),
+  updateCell: (rowKey: string, field: any, value: number) => onFieldChange(rowKey, field, value),
+  totalAudited: () => subtotalRow.value.audited,
+})
 
 // ─── Display rows (data + subtotal appended) ─────────────────────────────────
 

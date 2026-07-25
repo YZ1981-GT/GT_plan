@@ -246,8 +246,11 @@ export function useN5CrossSheet(
    * - N5-8 递延所得税: item_id "N5-8-deferredExpense"（conclusion=递延所得税费用金额）
    */
   const adjudicationVsCalc: ComputedRef<AdjudicationVsCalcResult> = computed(() => {
-    const current = getResponseNum(allResponses.value, 'N5-4-currentTax')
-    const deferred = getResponseNum(allResponses.value, 'N5-8-deferredExpense')
+    // 🔴 N5-4/N5-8 通过 syncCurrentTaxToAdjudication/syncDeferredExpenseToAdjudication 将计算结果
+    //    回填至审定表 sheet（item_id "N5-1-current-tax" / "N5-1-deferred-tax"），
+    //    而非 "N5-4-currentTax" / "N5-8-deferredExpense"（从不写入）。读回填键才有值。
+    const current = getResponseNum(allResponses.value, 'N5-1-current-tax')
+    const deferred = getResponseNum(allResponses.value, 'N5-1-deferred-tax')
     const total = parseFloat((current + deferred).toFixed(2))
 
     return { current, deferred, total }
@@ -366,11 +369,12 @@ export function useN5CrossSheet(
       )
       const responses: any[] = Array.isArray(res) ? res : (res?.data ?? [])
 
-      // N1的期初/期末余额→本期变动
-      const beginResp = responses.find((r: any) => r.item_id === 'N1-1-begin-balance')
-      const endResp = responses.find((r: any) => r.item_id === 'N1-1-end-balance-total')
-      const begin = parseNum(beginResp?.conclusion)
-      const end = parseNum(endResp?.conclusion)
+      // 🔴 N1的期初/期末审定合计 → 本期变动。useN1Adjudication._persistTotals 写
+      //    "N1-1-total-begin"/"N1-1-total-audited"（存于 remark 字段），非 begin-balance/end-balance-total。
+      const beginResp = responses.find((r: any) => r.item_id === 'N1-1-total-begin')
+      const endResp = responses.find((r: any) => r.item_id === 'N1-1-total-audited')
+      const begin = parseNum(beginResp?.remark ?? beginResp?.conclusion)
+      const end = parseNum(endResp?.remark ?? endResp?.conclusion)
       if (begin !== 0 || end !== 0) {
         _n1Change.value = parseFloat((end - begin).toFixed(2))
         _persistCrossData('N5-cross-n1-change', _n1Change.value)
@@ -396,13 +400,15 @@ export function useN5CrossSheet(
       )
       const responses: any[] = Array.isArray(res) ? res : (res?.data ?? [])
 
-      // N3的期初/期末余额→本期变动
-      const beginResp = responses.find((r: any) => r.item_id === 'N3-1-begin-balance')
+      // 🔴 N3递延所得税负债本期变动额。useN3Adjudication.saveAndSync 写 "N3-1-change-total"
+      //    （期末审定−期初审定，存于 conclusion），直接取用；回退按 end-begin 现算。
+      const changeResp = responses.find((r: any) => r.item_id === 'N3-1-change-total')
       const endResp = responses.find((r: any) => r.item_id === 'N3-1-end-balance-total')
-      const begin = parseNum(beginResp?.conclusion)
-      const end = parseNum(endResp?.conclusion)
-      if (begin !== 0 || end !== 0) {
-        _n3Change.value = parseFloat((end - begin).toFixed(2))
+      if (changeResp && (changeResp.conclusion != null || changeResp.remark != null)) {
+        _n3Change.value = parseNum(changeResp.conclusion ?? changeResp.remark)
+        _persistCrossData('N5-cross-n3-change', _n3Change.value)
+      } else if (endResp) {
+        _n3Change.value = parseNum(endResp.conclusion ?? endResp.remark)
         _persistCrossData('N5-cross-n3-change', _n3Change.value)
       }
     } catch {

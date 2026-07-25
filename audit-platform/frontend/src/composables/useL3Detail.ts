@@ -231,7 +231,7 @@ export function useL3Detail(
       }
 
       detailRows.value.push(newRow)
-      _triggerSave(detailRows.value.length - 1)
+      _persist()
     } catch {
       // 用户取消
     }
@@ -241,7 +241,7 @@ export function useL3Detail(
   function removeRow(index: number): void {
     if (index < 0 || index >= detailRows.value.length) return
     detailRows.value.splice(index, 1)
-    _triggerSaveAll()
+    _persist()
   }
 
   /** 更新某行某字段 */
@@ -260,32 +260,18 @@ export function useL3Detail(
       row.currentPortion = calcCurrentPortion(row.dueDate, reportDate, row.endBalance)
     }
 
-    _triggerSave(index)
+    _persist()
   }
 
   // ─── 5. 保存触发 ──────────────────────────────────────────────────────
+  //
+  // 🔴 P0 修复（2026-07）：统一 JSON-array 存储 item_id `L3-L3-2-rows`（与 L3TabDetail 组件
+  // hydrate、useL3Disclosure 聚合、useL3Adjudication.importFromDetail、useL3CrossSheet 全部读同一键 + 内部字段名一致）。
+  // 此前用 flat per-field keys `L3-det-{n}-{field}` 保存 → 4 个消费者全部读不到 →
+  // 刷新数据丢失 + "从L3-2带入" 空 + 附注聚合空 + 交叉验证失效。
 
-  function _triggerSave(rowIndex: number): void {
-    const row = detailRows.value[rowIndex]
-    if (!row) return
-    const n = rowIndex + 1
-    const fields: (keyof L3DetailRow)[] = [
-      'bank', 'contractNo', 'loanType', 'startDate', 'dueDate', 'annualRate',
-      'beginning', 'borrowed', 'repaid', 'endBalance', 'currentPortion',
-      'guaranteeType', 'pledgeAsset', 'pledgeValue', 'purpose', 'currency', 'remark',
-    ]
-    for (const field of fields) {
-      const val = (row as any)[field]
-      debouncedSave(`L3-det-${n}-${field}`, {
-        remark: val != null && val !== '' && val !== 0 ? String(val) : null,
-      })
-    }
-  }
-
-  function _triggerSaveAll(): void {
-    for (let i = 0; i < detailRows.value.length; i++) {
-      _triggerSave(i)
-    }
+  function _persist(): void {
+    debouncedSave('L3-L3-2-rows', { remark: JSON.stringify(detailRows.value) })
   }
 
   // ─── Return ────────────────────────────────────────────────────────────

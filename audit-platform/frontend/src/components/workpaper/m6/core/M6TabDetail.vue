@@ -30,7 +30,7 @@
       </div>
     </div>
 
-    <!-- ═══ 标题 + DualMode + 导入导出 + AI/复核 ═══ -->
+    <!-- ═══ 标题 + 导入导出 + AI/复核 ═══ -->
     <div class="section-header">
       <div class="section-header-left">
         <el-button text size="small" @click="$emit('navigate', '底稿目录')">← 返回目录</el-button>
@@ -40,12 +40,6 @@
         </el-tag>
       </div>
       <div class="section-header-right">
-        <el-segmented
-          v-model="dualMode.mode.value"
-          :options="dualMode.modeOptions.value"
-          size="small"
-          @change="(val: any) => dualMode.switchMode(val)"
-        />
         <el-dropdown trigger="click" @command="handleImportExport">
           <el-button size="small">
             导入导出 <el-icon class="el-icon--right"><ArrowDown /></el-icon>
@@ -58,7 +52,7 @@
             </el-dropdown-menu>
           </template>
         </el-dropdown>
-        <el-button size="small" @click="handleAI('detail')">
+        <el-button size="small" :loading="aiLoading === 'detail'" :disabled="isReadonly" @click="handleAI('detail')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
         <el-button size="small" @click="handleReview">
@@ -291,7 +285,7 @@
       <template #header>
         <div class="section-header">
           <span class="card-title">明细表审计说明</span>
-          <el-button size="small" @click="handleAI('detailNote')"><el-icon><MagicStick /></el-icon> AI辅助</el-button>
+          <el-button size="small" :loading="aiLoading === 'detailNote'" :disabled="isReadonly" @click="handleAI('detailNote')"><el-icon><MagicStick /></el-icon> AI辅助</el-button>
         </div>
       </template>
       <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" placeholder="请填写利润分配结转明细表审计说明..." :disabled="isReadonly" @change="saveAuditNote" />
@@ -336,20 +330,21 @@ import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { MagicStick, Check, ArrowDown } from '@element-plus/icons-vue'
 import { useM6FormData } from '../../composables/useM6FormData'
-import { useM6DualMode } from '../../composables/useM6DualMode'
 import { useM6ImportExport } from '../../composables/useM6ImportExport'
 import { useM6Detail, type M6DetailRow, type M6DetailCategory } from '../../composables/useM6Detail'
 import { eventBus } from '@/utils/eventBus'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{ wpId: string; projectId: string; isReadonly: boolean }>()
 const emit = defineEmits<{ (e: 'navigate', sheetName: string): void; (e: 'save'): void }>()
 
 const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', () => {})
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
 
 // ─── Composables ─────────────────────────────────────────────────────────────
 const formData = useM6FormData({ wpId: computed(() => props.wpId), projectId: computed(() => props.projectId) })
-const dualMode = useM6DualMode({ wpId: computed(() => props.wpId) })
 const importExport = useM6ImportExport({ wpId: computed(() => props.wpId), projectId: computed(() => props.projectId) })
 
 const detailRows = ref<M6DetailRow[]>([])
@@ -555,7 +550,28 @@ function saveAuditNote() {
 }
 
 // ─── AI + 复核 ───────────────────────────────────────────────────────────────
-function handleAI(_section: string) { /* AI辅助钩子 */ }
+async function handleAI(section: string) {
+  if (props.isReadonly) return
+  aiLoading.value = section
+  try {
+    const s = distributionSummary.value
+    const context: Record<string, string> = {
+      科目: '4104 利润分配-未分配利润 / 明细表（M6-2 利润分配结转公式链）',
+      期初未分配利润: fmtAmount(s.retainedBeginning),
+      可供分配利润: fmtAmount(s.distributable),
+      提取盈余公积: fmtAmount(s.totalSurplus),
+      股利分配: fmtAmount(s.totalDividend),
+      期末未分配利润: fmtAmount(s.retainedEnd),
+      'M5盈余公积联动一致': surplusLinkageDiff.value.isConsistent ? '一致' : `差异${fmtAmount(surplusLinkageDiff.value.diff)}`,
+      'M1股利联动一致': dividendLinkageDiff.value.isConsistent ? '一致' : `差异${fmtAmount(dividendLinkageDiff.value.diff)}`,
+      '与M6-1交叉验证': crossValidation.value.isMatch ? '一致' : `差异${fmtAmount(crossValidation.value.diff)}`,
+    }
+    const text = await generateAiText({ section: `m6-detail-${section}`, context, existingContent: auditNote.value })
+    if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+    auditNote.value = text
+    saveAuditNote()
+  } catch { ElMessage.warning('AI 生成失败，请稍后重试') } finally { aiLoading.value = '' }
+}
 function handleReview() { openReviewDialog?.('M6-2-detail', '利润分配结转明细表') }
 
 // ─── 导入导出 ────────────────────────────────────────────────────────────────

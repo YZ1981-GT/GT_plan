@@ -11,10 +11,69 @@ import json
 import logging
 import os
 from difflib import SequenceMatcher
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+
+@lru_cache(maxsize=1)
+def _wp_name_index() -> dict[str, dict[str, str]]:
+    """构建 {wp_code: {account_name, wp_name}} 索引，源自 wp_account_mapping.json。
+
+    用于为 sheet 目录补充「科目简称」(account_name) 与「规范底稿名」(wp_name)，
+    使导航树/选字段树可用「科目简称 + 名称」区分重名 sheet（如 D2 全部子表
+    catalog 名重复为「应收账款实质性程序表」）。降级：加载失败返回空 dict 不阻断。
+    """
+    try:
+        from app.services.wp_mapping_service import _load_mappings
+
+        idx: dict[str, dict[str, str]] = {}
+        for m in _load_mappings():
+            code = m.get("wp_code")
+            if not code:
+                continue
+            idx[code] = {
+                "account_name": m.get("account_name") or m.get("wp_name") or "",
+                "wp_name": m.get("wp_name") or "",
+            }
+        return idx
+    except Exception as exc:  # pragma: no cover - 降级不阻断
+        logger.warning("build wp_name_index failed: %s", exc)
+        return {}
+
+
+# 按文件 mtime 缓存 sheet_display_names.json（重生成后无需重启即生效）
+_SHEET_DISPLAY_CACHE: dict[str, dict[str, str]] = {}
+
+
+def _sheet_display_names() -> dict[str, str]:
+    """{sheet_code: 规范底稿名} 索引，源自 sheet_display_names.json。
+
+    权威真源为 workpaper_sheet_classification（每张 sheet 真实 tab 名以自身
+    wp_code 结尾）；用 scripts/gen_sheet_display_names.py 生成。作为
+    wp_account_mapping 的兜底，补齐重名占位 sheet（如 D2-7~13/D4-14~36）的
+    可区分名称。按 mtime 缓存：JSON 重生成后自动生效，无需重启。
+    降级：文件缺失/加载失败返回空 dict 不阻断。
+    """
+    try:
+        fp = Path(__file__).resolve().parents[3] / "data" / "acnr" / "sheet_display_names.json"
+        if not fp.exists():
+            return {}
+        key = str(fp.stat().st_mtime_ns)
+        cached = _SHEET_DISPLAY_CACHE.get(key)
+        if cached is not None:
+            return cached
+        with open(fp, encoding="utf-8") as f:
+            data = json.load(f)
+        data = data if isinstance(data, dict) else {}
+        _SHEET_DISPLAY_CACHE.clear()  # 仅保留最新 mtime
+        _SHEET_DISPLAY_CACHE[key] = data
+        return data
+    except Exception as exc:  # pragma: no cover - 降级不阻断
+        logger.warning("load sheet_display_names failed: %s", exc)
+        return {}
 
 
 # ─── 异常定义 ──────────────────────────────────────────────────────────────────
@@ -175,6 +234,25 @@ def list_sheets(
         result = [s for s in result if s.get("cycle", "").upper() == cycle.upper()]
     if import_export_only:
         result = [s for s in result if s.get("import_export", {}).get("enabled")]
+
+    # 附加「科目简称」(account_name，取父底稿) 与「规范底稿名」(mapped_sheet_name，
+    # 取本 sheet_code)，供前端组建可区分的显示名。返回浅拷贝避免污染 catalog 缓存。
+    # mapped_sheet_name 优先 wp_account_mapping 的策管名，兜底 classification 真名。
+    name_idx = _wp_name_index()
+    disp_names = _sheet_display_names()
+    if name_idx or disp_names:
+        enriched: list[dict] = []
+        for s in result:
+            sheet_code = s.get("sheet_code") or ""
+            parent_meta = name_idx.get(s.get("parent_wp_code") or "", {})
+            sheet_meta = name_idx.get(sheet_code, {})
+            account_name = parent_meta.get("account_name") or sheet_meta.get("account_name") or ""
+            mapped_name = sheet_meta.get("wp_name") or disp_names.get(sheet_code) or ""
+            if account_name or mapped_name:
+                enriched.append({**s, "account_name": account_name, "mapped_sheet_name": mapped_name})
+            else:
+                enriched.append(s)
+        return enriched
 
     return result
 

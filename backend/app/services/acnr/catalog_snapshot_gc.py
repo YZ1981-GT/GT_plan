@@ -222,3 +222,52 @@ def cleanup_stale_snapshots(
     )
 
     return report
+
+
+# ─── DB-aware GC 入口（P2-1：真清理，查 projects.registry_version）───────────
+
+
+def query_referenced_versions() -> set[str]:
+    """获取被归档项目锁定引用的 registry_version 集合。
+
+    🔴 registry_version 真源是 immutability._project_registry_versions（M1 阶段内存
+    dict，由项目归档流程 record_project_registry_version 写入），**不是** projects 表列
+    （该列不存在）。故此处从内存归档集读取。
+
+    ⚠️ 内存 dict 非跨进程/重启持久 —— 冷启动为空。GC 因此以 keep_recent 为主要保护
+    （保留最近 N 版），仅额外保护本进程已记录的归档项目锁定版本。当快照真正开始累积
+    且需跨进程精确引用保护时，registry_version 应落库（DB 列 / 专表），届时改为查库。
+    """
+    from app.services.acnr.immutability import list_archived_projects
+
+    return {v for v in list_archived_projects().values() if v}
+
+
+async def run_db_aware_gc(
+    session: Any = None,
+    *,
+    keep_recent: int = 10,
+    dry_run: bool = False,
+) -> dict[str, Any]:
+    """快照 GC 真清理入口（P2-1）：查归档项目锁定版本得引用集 → 删无引用旧快照。
+
+    与「同步 cleanup_stale_snapshots 无 override → fail-closed 不删」的区别：本函数先取
+    真实引用集（reference_status=verified），再删除「非最近 keep_recent 且未被任何归档
+    项目锁定引用」的快照，防止 catalog_snapshots/ 无界增长。
+
+    session 参数保留用于向后兼容/未来落库查询；当前引用集取自内存归档集（见
+    query_referenced_versions）。供 lifespan 启动一次 + CLI 调用。
+    """
+    try:
+        refs = query_referenced_versions()
+    except Exception as exc:
+        logger.warning(
+            "run_db_aware_gc: 获取 referenced versions 失败 → fail-closed 不删除: %s", exc
+        )
+        return cleanup_stale_snapshots(
+            keep_recent=keep_recent, referenced_versions=None, dry_run=dry_run
+        )
+
+    return cleanup_stale_snapshots(
+        keep_recent=keep_recent, referenced_versions=refs, dry_run=dry_run
+    )

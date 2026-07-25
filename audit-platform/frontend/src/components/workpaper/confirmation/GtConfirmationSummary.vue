@@ -215,9 +215,17 @@ const isNewFormat = computed(() => props.htmlData?._format === 'confirmation-v1'
 
 // ─── 数据核心 ────────────────────────────────────────────────────────────────
 
+// 科目审定总额(TB population)：后端 render 注入 project_context.population_amount（前端只读）
+// 作为函证/确认覆盖率分母；缺失时覆盖率显示为「不可用」(Skip-on-missing)
+const populationAmount = computed<number | null>(() => {
+  const p = props.htmlData?.project_context?.population_amount
+  return typeof p === 'number' && p > 0 ? p : null
+})
+
 const data = useConfirmationData({
   htmlData: () => props.htmlData,
   readonly: props.readonly,
+  population: () => populationAmount.value,
 })
 
 const viewMode = useViewMode()
@@ -257,9 +265,9 @@ const showFormulaDialog = ref(false)
 const formulaRules = [
   { field: '可确认金额', formula: '相符→函证金额；不符→回函金额；消极式未回函→函证金额；积极式未回函→替代确认金额', source: '自动计算' },
   { field: '差异金额', formula: '= 函证金额 - 回函金额（相符时强制为0）', source: '自动计算' },
-  { field: '确认覆盖率', formula: '= (回函确认 + 替代确认) / 科目账面余额 × 100%', source: '看板汇总' },
-  { field: '回函覆盖率', formula: '= 已回函笔数 / 已发函笔数 × 100%', source: '看板汇总' },
-  { field: '函证覆盖率', formula: '= 发函总额 / 科目账面余额 × 100%', source: '看板汇总' },
+  { field: '确认覆盖率', formula: '= (回函确认 + 替代确认) / 函证发出总额 × 100%', source: '看板汇总' },
+  { field: '回函率', formula: '= 已回函笔数 / 已发函笔数 × 100%', source: '看板汇总' },
+  { field: '函证覆盖率（科目总体）', formula: '= 函证发出总额 / 科目审定总额 × 100%（需接入试算表审定总额，暂未计算）', source: '待接入 TB' },
 ]
 const crossRefRules = [
   { field: '函证金额', target: 'TB 试算表', rule: '应与科目审定余额(audited_amount)核对一致' },

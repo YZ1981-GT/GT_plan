@@ -327,6 +327,56 @@
       </div>
     </div>
 
+    <!-- ═══ 审计说明 ═══ -->
+    <el-card class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header">
+          <span>审计说明</span>
+          <el-button
+            v-if="!isReadonly"
+            size="small"
+            type="primary"
+            plain
+            :loading="aiNoteLoading"
+            @click="handleAiNote"
+          >🤖 AI 辅助</el-button>
+        </div>
+      </template>
+      <el-input
+        :model-value="note"
+        type="textarea"
+        :autosize="{ minRows: 5 }"
+        :disabled="isReadonly"
+        placeholder="对短期借款利息进行测算并检查会计处理是否正确。说明测算利息与账载利息差异的原因（利率变动/计息天数/资本化划分等），差异重大的应进一步核查。"
+        @input="onNoteInput"
+      />
+    </el-card>
+
+    <!-- ═══ 审计结论 ═══ -->
+    <el-card class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header">
+          <span>审计结论</span>
+          <el-button
+            v-if="!isReadonly"
+            size="small"
+            type="primary"
+            plain
+            :loading="aiConclusionLoading"
+            @click="handleAiConclusion"
+          >🤖 AI 辅助</el-button>
+        </div>
+      </template>
+      <el-input
+        :model-value="conclusion"
+        type="textarea"
+        :autosize="{ minRows: 3 }"
+        :disabled="isReadonly"
+        placeholder="参考：A.利息测算与账载相符，未见异常。 B.存在差异事项应作调整。 C.无法获取充分证据，不可确认。"
+        @input="onConclusionInput"
+      />
+    </el-card>
+
     <!-- ═══ 编制提示（折叠） ═══ -->
     <details class="l1-details-tip">
       <summary>编制提示</summary>
@@ -355,11 +405,12 @@
  * Task: 4.4
  * Requirements: 4.1-4.7
  */
-import { computed, inject, ref, watch, type Ref } from 'vue'
+import { computed, inject, onMounted, ref, toRef, watch, type Ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
 import type { useL1FormData } from '@/composables/useL1FormData'
 import type { InterestCalcRow } from '@/composables/useL1FormData'
+import { useL1AiNote } from '@/composables/useL1AiNote'
 import { useL1InterestCalc, type InterestCalcComputed } from '@/composables/useL1InterestCalc'
 import {
   calcStartDate,
@@ -372,6 +423,7 @@ import {
 const props = defineProps<{
   wpId: string
   projectId: string
+  year?: number
   isReadonly: boolean
 }>()
 
@@ -383,11 +435,11 @@ defineEmits<{
 
 const formData = inject<ReturnType<typeof useL1FormData>>('l1FormData')!
 
-// ─── 报告期日期（从 formData 或默认取当年） ──────────────────────────────────
-
-const currentYear = new Date().getFullYear()
-const reportStart = ref<Date>(new Date(currentYear, 0, 1))  // 1月1日
-const reportEnd = ref<Date>(new Date(currentYear, 11, 31)) // 12月31日
+// ─── 报告期日期（优先取项目审计年度，回退当前年） ──────────────────────────
+// 🔴 不能硬编码 new Date().getFullYear()：审计次年编制底稿时会取错报告期。
+const auditYear = computed(() => props.year || new Date().getFullYear())
+const reportStart = computed<Date>(() => new Date(auditYear.value, 0, 1))  // 1月1日
+const reportEnd = computed<Date>(() => new Date(auditYear.value, 11, 31)) // 12月31日
 
 // ─── Composable: 利息测算业务逻辑 ───────────────────────────────────────────
 
@@ -494,6 +546,32 @@ async function handleAddRow(): Promise<void> {
 function handleRemoveRow(index: number): void {
   removeRow(index)
 }
+
+// ─── 审计说明 + 审计结论（AI 辅助） ─────────────────────────────────────────
+
+const {
+  note, conclusion, aiNoteLoading, aiConclusionLoading,
+  load: loadNote, onNoteInput, onConclusionInput, generateNote, generateConclusion,
+} = useL1AiNote(formData, toRef(props, 'wpId'), 'int', toRef(props, 'isReadonly'))
+
+function _aiContext() {
+  return {
+    测算利息合计: totalCalculatedInterest.value,
+    账载利息合计: totalBookedInterest.value,
+    总差异: totalDiff.value,
+    差异笔数: warningCount.value,
+  }
+}
+function handleAiNote() {
+  generateNote('请基于利息测算表数据撰写审计说明，重点分析测算利息与账载利息差异原因。', _aiContext())
+}
+function handleAiConclusion() {
+  generateConclusion('请基于短期借款利息测算情况生成审计结论。', _aiContext())
+}
+
+onMounted(() => {
+  loadNote()
+})
 
 // ─── Watch: 利息变化时自动发布联动事件 ───────────────────────────────────────
 
@@ -704,6 +782,21 @@ function fmtAmount(val: number | null | undefined): string {
 
 .cross-wp-label {
   color: #909399;
+}
+
+/* ─── 审计说明/结论卡片 ─── */
+.opinion-card {
+  margin-top: 16px;
+}
+.opinion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+  font-size: var(--wp-font-size, 13px);
+}
+.opinion-card :deep(.el-textarea__inner) {
+  font-size: var(--wp-font-size, 13px);
 }
 
 /* ─── 编制提示折叠 ─── */

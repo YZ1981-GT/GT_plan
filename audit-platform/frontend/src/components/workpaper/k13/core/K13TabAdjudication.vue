@@ -57,6 +57,9 @@
             </el-tag>
           </div>
           <div class="section-actions">
+            <el-button size="small" type="warning" plain :disabled="props.isReadonly" :loading="adjPull.loading.value" @click="openBringInAdjustment">
+              <el-icon><Download /></el-icon> 带入调整
+            </el-button>
             <el-button size="small" @click="handleAI('adjudication')">
               <el-icon><MagicStick /></el-icon> AI辅助
             </el-button>
@@ -342,8 +345,18 @@
         <li>K13-1审定合计应与K13-2明细合计一致，差异时显示红色告警badge</li>
         <li>回写操作将审定发生额写入试算表科目6711</li>
         <li>注意核查税前扣除性：捐赠支出(12%限额)、罚款滞纳金(不可扣除)等</li>
+        <li>「带入调整」：按科目6711拉取调整分录，逐笔选目标去向行累加到 AJE/RJE，带入后自动联动披露/附注</li>
       </ul>
     </details>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="6711 营业外支出"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
@@ -360,10 +373,13 @@
  */
 import { ref, inject, defineAsyncComponent, watch, toRef, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { MagicStick } from '@element-plus/icons-vue'
+import { MagicStick, Download } from '@element-plus/icons-vue'
 import http from '@/utils/http'
 import { useK13Adjudication } from '../../composables/useK13Adjudication'
 import { generateK13AiText } from '../../composables/useK13AiText'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import { eventBus } from '@/utils/eventBus'
 
 const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
@@ -398,6 +414,20 @@ const adjudication = useK13Adjudication({
   isReadonly: computed(() => props.isReadonly),
   onSave: (itemId: string, value: any) => emit('save', itemId, value),
   writebackTB: handleWritebackTBInternal,
+})
+
+// ─── 从集中登记带入调整（6711 营业外支出，损益借方） ───────────────────────────
+const { adjPull, visible: bringInVisible, rowOptions: bringInRowOptions, open: openBringInAdjustment, apply: onBringInApply } = useAdjudicationBringIn({
+  projectId: toRef(props, 'projectId') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '6711',
+  direction: 'debit', // 损益借方：净发生额 = 借 − 贷
+  subjectCode: '6711',
+  wpCode: 'K13',
+  subjectLabel: '营业外支出(6711)',
+  rows: adjudication.rows,
+  updateCell: adjudication.updateCell,
+  totalAudited: () => adjudication.totalRow.value.audited,
 })
 
 // ─── State ───────────────────────────────────────────────────────────────────

@@ -427,7 +427,7 @@
  * Task: 4.3
  * Requirements: 3.1-3.6
  */
-import { computed, inject, ref, type Ref } from 'vue'
+import { computed, inject, ref, watch, type Ref } from 'vue'
 import type { useL3FormData } from '@/components/workpaper/composables/useL3FormData'
 import { useL3Detail, L3_DETAIL_SEGMENTS, type L3DetailRow } from '@/composables/useL3Detail'
 import { useL3ImportExport } from '@/composables/useL3ImportExport'
@@ -472,6 +472,11 @@ function _loadRowsFromResponses(): void {
 
 // 初始加载
 _loadRowsFromResponses()
+// allResponses 异步加载完成后再水合一次（首次 mount 时 loadData 可能未返回）
+watch(
+  () => formData.allResponses.value.get('L3-L3-2-rows')?.remark,
+  (v) => { if (v && detailRows.value.length === 0) _loadRowsFromResponses() },
+)
 
 // ─── 报告日（从 allResponses 或默认取年末） ──────────────────────────────────
 

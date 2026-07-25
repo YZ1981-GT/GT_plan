@@ -222,7 +222,32 @@
       </div>
     </div>
 
-    <!-- ═══ 叙述式结论区（textarea autosize + AI辅助） ═══ -->
+    <!-- ═══ 审计说明 ═══ -->
+    <el-card class="conclusion-card" shadow="never">
+      <template #header>
+        <div class="conclusion-header">
+          <span>审计说明</span>
+          <el-button
+            v-if="!isReadonly"
+            size="small"
+            type="primary"
+            plain
+            :loading="aiNoteLoading"
+            @click="handleAiNote"
+          >🤖 AI 辅助</el-button>
+        </div>
+      </template>
+      <el-input
+        :model-value="note"
+        type="textarea"
+        :autosize="{ minRows: 4, maxRows: 8 }"
+        :disabled="isReadonly"
+        placeholder="记录征信报告获取与核对过程、差异原因分析（承兑/信用证保证金等）、借款人担保信息及其他关注事项。"
+        @input="onNoteInput"
+      />
+    </el-card>
+
+    <!-- ═══ 审计结论区（textarea autosize + AI辅助） ═══ -->
     <el-card class="conclusion-card" shadow="never">
       <template #header>
         <div class="conclusion-header">
@@ -230,21 +255,20 @@
           <el-button
             v-if="!isReadonly"
             size="small"
-            type="warning"
+            type="primary"
             plain
+            :loading="aiConclusionLoading"
             @click="handleAiConclusion"
-          >
-            AI 辅助
-          </el-button>
+          >🤖 AI 辅助</el-button>
         </div>
       </template>
       <el-input
-        v-model="conclusion"
+        :model-value="conclusion"
         type="textarea"
         :autosize="{ minRows: 3, maxRows: 8 }"
         :disabled="isReadonly"
         placeholder="根据征信核对结果，填写审计结论..."
-        @input="handleConclusionChange"
+        @input="onConclusionInput"
       />
     </el-card>
 
@@ -275,11 +299,12 @@
  * Task: 4.5
  * Requirements: 5.1-5.5
  */
-import { inject, ref } from 'vue'
+import { inject, onMounted, toRef } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import type { useL1FormData } from '@/composables/useL1FormData'
 import type { CreditCheckRow } from '@/composables/useL1FormData'
 import { useL1CreditCheck } from '@/composables/useL1CreditCheck'
+import { useL1AiNote } from '@/composables/useL1AiNote'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -311,23 +336,32 @@ const {
   updateRow,
 } = useL1CreditCheck(formData)
 
-// ─── 结论区 ──────────────────────────────────────────────────────────────────
+// ─── 审计说明 + 审计结论（AI 辅助，统一 useL1AiNote：修复刷新丢失+真实AI） ───
 
-const conclusion = ref('')
+const {
+  note, conclusion, aiNoteLoading, aiConclusionLoading,
+  load: loadNote, onNoteInput, onConclusionInput, generateNote, generateConclusion,
+} = useL1AiNote(formData, toRef(props, 'wpId'), 'cred', toRef(props, 'isReadonly'))
 
-function handleConclusionChange(val: string): void {
-  conclusion.value = val
-  formData.debounceSave([{
-    item_id: 'L1-cred-conclusion',
-    conclusion: val || null,
-    remark: null,
-  }])
+function _aiContext() {
+  return {
+    征信余额合计: totalCreditBalance.value,
+    账面余额合计: totalBookBalance.value,
+    差异合计: totalDiff.value,
+    差异行数: warningCount.value,
+    待说明行数: pendingExplanationCount.value,
+  }
+}
+function handleAiNote() {
+  generateNote('请基于征信报告核对情况撰写审计说明，重点分析征信余额与账面余额差异原因。', _aiContext())
+}
+function handleAiConclusion() {
+  generateConclusion('请基于征信报告核对结果生成审计结论，确认银行借款完整性。', _aiContext())
 }
 
-async function handleAiConclusion(): Promise<void> {
-  // AI辅助生成结论（placeholder - 调 /ai-generate 端点）
-  ElMessageBox.alert('AI辅助结论生成功能即将上线', '提示')
-}
+onMounted(() => {
+  loadNote()
+})
 
 // ─── 字段编辑处理 ────────────────────────────────────────────────────────────
 

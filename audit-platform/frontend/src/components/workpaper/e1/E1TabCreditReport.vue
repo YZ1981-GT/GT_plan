@@ -17,6 +17,7 @@ import { ref, computed, inject, toRef, watch, onMounted, onBeforeUnmount } from 
 import GtIndexChip from '../GtIndexChip.vue'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { amountFormatter, amountParser } from '../composables/wpAmountInput'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -333,14 +334,14 @@ onBeforeUnmount(() => {
         <el-table-column label="征信金额" width="150" align="right">
           <template #default="{ row }">
             <el-input-number :model-value="(row as CheckRow).creditAmount" :disabled="isReadonly"
-              :controls="false" size="small"
+              :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small"
               @change="(val: number) => updateCheckCell(row.id, 'creditAmount', val ?? 0)" />
           </template>
         </el-table-column>
         <el-table-column label="账面金额" width="150" align="right">
           <template #default="{ row }">
             <el-input-number :model-value="(row as CheckRow).bookAmount" :disabled="isReadonly"
-              :controls="false" size="small"
+              :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small"
               @change="(val: number) => updateCheckCell(row.id, 'bookAmount', val ?? 0)" />
           </template>
         </el-table-column>

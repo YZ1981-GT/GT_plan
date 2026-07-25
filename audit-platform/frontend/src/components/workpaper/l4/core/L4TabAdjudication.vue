@@ -1,15 +1,16 @@
 <template>
   <div class="l4-tab-adjudication">
-    <!-- ═══ 标题 + AI/复核按钮 ═══ -->
+    <!-- ═══ 标题 + 带入/复核按钮 ═══ -->
     <div class="section-header">
       <div class="section-header-left">
         <el-button text size="small" @click="$emit('navigate', '底稿目录')">← 返回目录</el-button>
         <h3 class="section-title">L4-1 应付债券审定表</h3>
       </div>
       <div class="section-header-right">
-        <el-button size="small" @click="handleAI('adjudication')">
-          <el-icon><MagicStick /></el-icon> AI辅助
+        <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
+          <el-icon><Download /></el-icon>带入调整
         </el-button>
+        <el-button v-if="!isReadonly" size="small" type="warning" plain @click="handleImportFromDetail">从 L4-2 明细带入</el-button>
         <el-button size="small" @click="handleReview">
           <el-icon><Check /></el-icon> 复核
         </el-button>
@@ -24,211 +25,233 @@
         <li><b>存在：</b>记录的应付债券在资产负债表日确实存在；</li>
         <li><b>义务：</b>应付债券确为被审计单位的义务；</li>
         <li><b>计价与分摊：</b>应付债券以恰当金额（摊余成本）列示；</li>
-        <li><b>列报与披露：</b>应付债券已恰当列报和充分披露。</li>
+        <li><b>列报与披露：</b>应付债券已恰当列报和充分披露（一年内到期部分重分类至流动负债）。</li>
       </ol>
     </el-alert>
 
-    <!-- ═══ 方法论上下文（琥珀色左边线+浅黄背景） ═══ -->
+    <!-- ═══ 方法论上下文 ═══ -->
     <div class="methodology-context">
       <div class="methodology-text">
-        <strong>应付债券为负债类贷方科目（2502）：</strong>
-        期末余额 = 期初 + 贷方发生额（发行/利息调整增加） − 借方发生额（兑付/减少）。
-        审定数 = 未审数 + AJE + RJE。各品种（普通债券/可转换债券）下分"成本/利息调整/应计利息"三项+品种小计。
+        <strong>双期审定结构（负债类贷方 2502）：</strong>
+        期初数、期末数各按「未审数 → 账项调整 → 重分类调整 → 审定数」列示，审定数 = 未审 + 账项调整 + 重分类调整；
+        最终审定数 = 审定数 − 一年内到期的应付债券（重分类至流动负债）。各品种（普通/可转换）下分 成本/利息调整/应计利息 + 品种小计。
+        变动率超 30% 需在原因分析栏说明。
       </div>
     </div>
 
-    <!-- ═══ 审定表主体 ═══ -->
+    <!-- ═══ 审定表主体（双期结构，分组表头） ═══ -->
     <el-table
-      :data="tableData"
+      :data="displayRows"
       border
       size="small"
       style="width: 100%"
       :row-class-name="getRowClassName"
-      show-summary
-      :summary-method="getSummaries"
     >
-      <!-- 项目（品种+子项） -->
-      <el-table-column prop="label" label="项目" min-width="160" fixed>
+      <el-table-column prop="label" label="项目" min-width="150" fixed>
         <template #default="{ row }">
           <span :class="{ 'row-bold': row.isSubtotal }">{{ row.label }}</span>
         </template>
       </el-table-column>
 
-      <!-- 期初 -->
-      <el-table-column label="期初" width="120" align="right">
-        <template #default="{ row }">
-          <template v-if="row.isEditable && !isReadonly">
-            <el-input-number
-              :model-value="row.beginning"
-              :controls="false"
-              size="small"
-              style="width: 100%"
-              @change="(val: number | undefined) => onCellChange(row.rowIndex, 'beginning', val ?? 0)"
-            />
+      <!-- 期初数 -->
+      <el-table-column label="期初数" align="center">
+        <el-table-column label="未审数" width="105" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="row.isEditable && !isReadonly" :model-value="row.beginUnadjusted" :controls="false" size="small" style="width:100%" @change="(v:number|undefined)=>onCell(row.rowKey,'beginUnadjusted',v??0)" />
+            <span v-else>{{ fmt(row.beginUnadjusted) }}</span>
           </template>
-          <span v-else>{{ fmtAmount(row.beginning) }}</span>
-        </template>
-      </el-table-column>
-
-      <!-- 贷方发生（发行+利息调整） -->
-      <el-table-column label="贷方发生" width="130" align="right">
-        <template #default="{ row }">
-          <template v-if="row.isEditable && !isReadonly">
-            <el-input-number
-              :model-value="row.creditAmount"
-              :controls="false"
-              size="small"
-              style="width: 100%"
-              @change="(val: number | undefined) => onCellChange(row.rowIndex, 'creditAmount', val ?? 0)"
-            />
+        </el-table-column>
+        <el-table-column label="账项调整" width="95" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="row.isEditable && !isReadonly" :model-value="row.beginAje" :controls="false" size="small" style="width:100%" @change="(v:number|undefined)=>onCell(row.rowKey,'beginAje',v??0)" />
+            <span v-else>{{ fmt(row.beginAje) }}</span>
           </template>
-          <span v-else>{{ fmtAmount(row.creditAmount) }}</span>
-        </template>
-      </el-table-column>
-
-      <!-- 借方发生（兑付） -->
-      <el-table-column label="借方发生" width="130" align="right">
-        <template #default="{ row }">
-          <template v-if="row.isEditable && !isReadonly">
-            <el-input-number
-              :model-value="row.debitAmount"
-              :controls="false"
-              size="small"
-              style="width: 100%"
-              @change="(val: number | undefined) => onCellChange(row.rowIndex, 'debitAmount', val ?? 0)"
-            />
+        </el-table-column>
+        <el-table-column label="重分类调整" width="95" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="row.isEditable && !isReadonly" :model-value="row.beginRje" :controls="false" size="small" style="width:100%" @change="(v:number|undefined)=>onCell(row.rowKey,'beginRje',v??0)" />
+            <span v-else>{{ fmt(row.beginRje) }}</span>
           </template>
-          <span v-else>{{ fmtAmount(row.debitAmount) }}</span>
-        </template>
-      </el-table-column>
-
-      <!-- 期末（公式列） -->
-      <el-table-column label="期末" width="120" align="right">
-        <template #header>
-          <el-tooltip content="期初 + 贷方 − 借方（负债类贷方！）" placement="top">
-            <span class="formula-col-header">期末</span>
-          </el-tooltip>
-        </template>
-        <template #default="{ row }">
-          <span class="formula-value">{{ fmtAmount(row.endBalance) }}</span>
-        </template>
-      </el-table-column>
-
-      <!-- 未审数 -->
-      <el-table-column label="未审数" width="120" align="right">
-        <template #default="{ row }">
-          <template v-if="row.isEditable && !isReadonly">
-            <el-input-number
-              :model-value="row.unadjusted"
-              :controls="false"
-              size="small"
-              style="width: 100%"
-              @change="(val: number | undefined) => onCellChange(row.rowIndex, 'unadjusted', val ?? 0)"
-            />
+        </el-table-column>
+        <el-table-column label="审定数" width="105" align="right">
+          <template #header><el-tooltip content="期初审定数 = 未审 + 账项调整 + 重分类调整" placement="top"><span class="formula-col-header">审定数</span></el-tooltip></template>
+          <template #default="{ row }"><span class="formula-value">{{ fmt(row.beginAudited) }}</span></template>
+        </el-table-column>
+        <el-table-column label="减一年内到期" width="105" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="row.isEditable && !isReadonly" :model-value="row.beginCurrent" :controls="false" size="small" style="width:100%" @change="(v:number|undefined)=>onCell(row.rowKey,'beginCurrent',v??0)" />
+            <span v-else>{{ fmt(row.beginCurrent) }}</span>
           </template>
-          <span v-else>{{ fmtAmount(row.unadjusted) }}</span>
-        </template>
+        </el-table-column>
+        <el-table-column label="最终审定数" width="105" align="right">
+          <template #header><el-tooltip content="最终审定数 = 审定数 − 一年内到期" placement="top"><span class="formula-col-header">最终审定数</span></el-tooltip></template>
+          <template #default="{ row }"><span class="formula-value">{{ fmt(row.beginDisclosed) }}</span></template>
+        </el-table-column>
       </el-table-column>
 
-      <!-- AJE -->
-      <el-table-column label="AJE" width="110" align="right">
-        <template #default="{ row }">
-          <template v-if="row.isEditable && !isReadonly">
-            <el-input-number
-              :model-value="row.aje"
-              :controls="false"
-              size="small"
-              style="width: 100%"
-              @change="(val: number | undefined) => onCellChange(row.rowIndex, 'aje', val ?? 0)"
-            />
+      <!-- 期末数 -->
+      <el-table-column label="期末数" align="center">
+        <el-table-column label="未审数" width="105" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="row.isEditable && !isReadonly" :model-value="row.endUnadjusted" :controls="false" size="small" style="width:100%" @change="(v:number|undefined)=>onCell(row.rowKey,'endUnadjusted',v??0)" />
+            <span v-else>{{ fmt(row.endUnadjusted) }}</span>
           </template>
-          <span v-else>{{ fmtAmount(row.aje) }}</span>
-        </template>
-      </el-table-column>
-
-      <!-- RJE -->
-      <el-table-column label="RJE" width="110" align="right">
-        <template #default="{ row }">
-          <template v-if="row.isEditable && !isReadonly">
-            <el-input-number
-              :model-value="row.rje"
-              :controls="false"
-              size="small"
-              style="width: 100%"
-              @change="(val: number | undefined) => onCellChange(row.rowIndex, 'rje', val ?? 0)"
-            />
+        </el-table-column>
+        <el-table-column label="账项调整" width="95" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="row.isEditable && !isReadonly" :model-value="row.endAje" :controls="false" size="small" style="width:100%" @change="(v:number|undefined)=>onCell(row.rowKey,'endAje',v??0)" />
+            <span v-else>{{ fmt(row.endAje) }}</span>
           </template>
-          <span v-else>{{ fmtAmount(row.rje) }}</span>
-        </template>
+        </el-table-column>
+        <el-table-column label="重分类调整" width="95" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="row.isEditable && !isReadonly" :model-value="row.endRje" :controls="false" size="small" style="width:100%" @change="(v:number|undefined)=>onCell(row.rowKey,'endRje',v??0)" />
+            <span v-else>{{ fmt(row.endRje) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="审定数" width="105" align="right">
+          <template #header><el-tooltip content="期末审定数 = 未审 + 账项调整 + 重分类调整（回写 TB 2502）" placement="top"><span class="formula-col-header">审定数</span></el-tooltip></template>
+          <template #default="{ row }"><span class="formula-value">{{ fmt(row.endAudited) }}</span></template>
+        </el-table-column>
+        <el-table-column label="减一年内到期" width="105" align="right">
+          <template #default="{ row }">
+            <el-input-number v-if="row.isEditable && !isReadonly" :model-value="row.endCurrent" :controls="false" size="small" style="width:100%" @change="(v:number|undefined)=>onCell(row.rowKey,'endCurrent',v??0)" />
+            <span v-else>{{ fmt(row.endCurrent) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="最终审定数" width="105" align="right">
+          <template #header><el-tooltip content="最终审定数 = 审定数 − 一年内到期" placement="top"><span class="formula-col-header">最终审定数</span></el-tooltip></template>
+          <template #default="{ row }"><span class="formula-value">{{ fmt(row.endDisclosed) }}</span></template>
+        </el-table-column>
       </el-table-column>
 
-      <!-- 审定数（公式列） -->
-      <el-table-column label="审定数" width="120" align="right">
-        <template #header>
-          <el-tooltip content="未审 + AJE + RJE" placement="top">
-            <span class="formula-col-header">审定数</span>
-          </el-tooltip>
-        </template>
+      <!-- 本期未审较期初 -->
+      <el-table-column label="本期未审较期初" align="center">
+        <el-table-column label="变动额" width="105" align="right">
+          <template #default="{ row }"><span class="formula-value" :class="chg(row.unadjChange)">{{ fmt(row.unadjChange) }}</span></template>
+        </el-table-column>
+        <el-table-column label="变动率" width="85" align="right">
+          <template #default="{ row }"><span class="formula-value" :class="{ 'text-warning': Math.abs(row.unadjRate) > 0.3 }">{{ fmtRate(row.unadjRate) }}</span></template>
+        </el-table-column>
+      </el-table-column>
+
+      <!-- 本期审定较期初 -->
+      <el-table-column label="本期审定较期初" align="center">
+        <el-table-column label="变动额" width="105" align="right">
+          <template #default="{ row }"><span class="formula-value" :class="chg(row.auditedChange)">{{ fmt(row.auditedChange) }}</span></template>
+        </el-table-column>
+        <el-table-column label="变动率" width="85" align="right">
+          <template #default="{ row }"><span class="formula-value" :class="{ 'text-warning': Math.abs(row.auditedRate) > 0.3 }">{{ fmtRate(row.auditedRate) }}</span></template>
+        </el-table-column>
+      </el-table-column>
+
+      <!-- 原因分析 -->
+      <el-table-column label="原因分析" min-width="150">
         <template #default="{ row }">
-          <span class="formula-value">{{ fmtAmount(row.audited) }}</span>
+          <el-input v-if="row.isEditable && !isReadonly" :model-value="row.reason" size="small" placeholder="变动率超30%需说明" @input="(v:string)=>onCell(row.rowKey,'reason',v)" />
+          <span v-else>{{ row.reason || '-' }}</span>
         </template>
       </el-table-column>
     </el-table>
 
+    <!-- 合计行 -->
+    <el-table :data="[totalRow]" border size="small" style="width:100%;margin-top:-1px" :show-header="false" class="total-table">
+      <el-table-column prop="label" min-width="150" fixed><template #default="{ row }"><b>{{ row.label }}</b></template></el-table-column>
+      <el-table-column width="105" align="right"><template #default="{ row }"><b>{{ fmt(row.beginUnadjusted) }}</b></template></el-table-column>
+      <el-table-column width="95" align="right"><template #default="{ row }"><b>{{ fmt(row.beginAje) }}</b></template></el-table-column>
+      <el-table-column width="95" align="right"><template #default="{ row }"><b>{{ fmt(row.beginRje) }}</b></template></el-table-column>
+      <el-table-column width="105" align="right"><template #default="{ row }"><b>{{ fmt(row.beginAudited) }}</b></template></el-table-column>
+      <el-table-column width="105" align="right"><template #default="{ row }"><b>{{ fmt(row.beginCurrent) }}</b></template></el-table-column>
+      <el-table-column width="105" align="right"><template #default="{ row }"><b>{{ fmt(row.beginDisclosed) }}</b></template></el-table-column>
+      <el-table-column width="105" align="right"><template #default="{ row }"><b>{{ fmt(row.endUnadjusted) }}</b></template></el-table-column>
+      <el-table-column width="95" align="right"><template #default="{ row }"><b>{{ fmt(row.endAje) }}</b></template></el-table-column>
+      <el-table-column width="95" align="right"><template #default="{ row }"><b>{{ fmt(row.endRje) }}</b></template></el-table-column>
+      <el-table-column width="105" align="right"><template #default="{ row }"><b>{{ fmt(row.endAudited) }}</b></template></el-table-column>
+      <el-table-column width="105" align="right"><template #default="{ row }"><b>{{ fmt(row.endCurrent) }}</b></template></el-table-column>
+      <el-table-column width="105" align="right"><template #default="{ row }"><b>{{ fmt(row.endDisclosed) }}</b></template></el-table-column>
+      <el-table-column width="105" align="right"><template #default="{ row }"><b>{{ fmt(row.unadjChange) }}</b></template></el-table-column>
+      <el-table-column width="85" align="right"><template #default="{ row }"><b>{{ fmtRate(row.unadjRate) }}</b></template></el-table-column>
+      <el-table-column width="105" align="right"><template #default="{ row }"><b>{{ fmt(row.auditedChange) }}</b></template></el-table-column>
+      <el-table-column width="85" align="right"><template #default="{ row }"><b>{{ fmtRate(row.auditedRate) }}</b></template></el-table-column>
+      <el-table-column min-width="150" />
+    </el-table>
+
     <!-- ═══ 交叉验证区 ═══ -->
     <div class="cross-check-section">
-      <span class="cross-check-label">与明细表L4-2交叉验证：</span>
-      <el-tag :type="crossCheckOk ? 'success' : 'danger'" size="small">
-        {{ crossCheckOk ? '✓ 一致' : '✗ 差异 ' + crossCheckDiff.toFixed(2) + ' 元' }}
+      <span class="cross-check-label">L4-1 期末审定合计 vs L4-2 明细期末摊余成本合计：</span>
+      <el-tag :type="crossCheck.isMatch ? 'success' : 'danger'" size="small">
+        {{ crossCheck.isMatch ? '✓ 一致' : '✗ 差异 ' + fmt(crossCheck.diff) + ' 元' }}
       </el-tag>
     </div>
 
-    <!-- ═══ 审计说明（el-card包裹） ═══ -->
+    <!-- ═══ 审计说明 ═══ -->
     <el-card shadow="never" class="audit-note-card">
       <template #header>
         <div class="section-header">
           <span class="card-title">审计说明</span>
-          <el-button size="small" @click="handleAI('auditNote')">
+          <el-button size="small" :loading="aiLoading" :disabled="isReadonly" @click="handleAiNote">
             <el-icon><MagicStick /></el-icon> AI辅助
           </el-button>
         </div>
       </template>
-      <el-input
-        v-model="auditNote"
-        type="textarea"
-        :autosize="{ minRows: 3, maxRows: 8 }"
-        placeholder="请填写审定表审计说明..."
-        :disabled="isReadonly"
-        @change="saveAuditNote"
-      />
+      <el-input :model-value="auditNote" type="textarea" :autosize="{ minRows: 4, maxRows: 10 }"
+        :placeholder="NOTE_PLACEHOLDER" :disabled="isReadonly" @input="(v:string)=>updateText('note', v)" />
+    </el-card>
+
+    <!-- ═══ 审计结论 ═══ -->
+    <el-card shadow="never" class="audit-note-card">
+      <template #header><div class="section-header"><span class="card-title">审计结论</span></div></template>
+      <el-input :model-value="conclusion" type="textarea" :autosize="{ minRows: 3 }"
+        placeholder="参考：A.未见异常。 B.除上述重大不符事项应作为调整事项予以调整外，其余未见异常。 C.由于存在重大未调整事项，不可确认。"
+        :disabled="isReadonly" @input="(v:string)=>updateText('conclusion', v)" />
     </el-card>
 
     <!-- ═══ 编制提示（折叠） ═══ -->
     <details class="l4-details-tip">
       <summary>编制提示</summary>
       <ul>
-        <li>负债类贷方科目：期末 = 期初 + 贷方 − 借方</li>
-        <li>各品种下分：成本（面值）/ 利息调整（溢折价摊销余额）/ 应计利息（到期一次还本付息累计）</li>
-        <li>品种小计 = 成本 + 利息调整 + 应计利息</li>
-        <li>审定数变化自动回写 TB（科目2502）并通知附注组件</li>
+        <li>双期结构：期初数/期末数各含未审、账项调整、重分类调整、审定数、减一年内到期、最终审定数</li>
+        <li>各品种（普通/可转换）下分 成本（面值）/ 利息调整（溢折价摊销余额）/ 应计利息 + 品种小计</li>
+        <li>可从明细表 L4-2 按品种×子项聚合带入期初/期末未审摊余成本</li>
+        <li>最终审定数 = 审定数 − 一年内到期（重分类至流动负债，供披露）</li>
+        <li>期末审定合计自动回写 TB（科目2502）并通知附注组件</li>
+        <li>带入调整：可从集中登记按科目 2502 拉取调整分录，逐笔分配到各品种×子项叶子行的期末账项/重分类调整，带入后审定数自动更新并联动附注</li>
       </ul>
     </details>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="2502 应付债券"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 /**
- * L4TabAdjudication — L4-1 应付债券审定表
+ * L4TabAdjudication — L4-1 应付债券审定表（双期结构，2026-07 复盘重建）
  *
- * Requirements: 2.1-2.7
- * - 负债类单区块：品种(普通/可转换)×子项(成本/利息调整/应计利息/小计)
- * - 公式列：endBalance = 期初+贷方-借方, audited = 未审+AJE+RJE
- * - TB回写(2502) + EventBus 'substantive:adjudicated'
+ * 对齐致同源模板：期初数/期末数各(未审/账项调整/重分类/审定/减一年内到期/最终审定)
+ * + 本期未审较期初(变动额/率) + 本期审定较期初(变动额/率) + 原因分析。
+ * 品种×子项：普通/可转换 × 成本/利息调整/应计利息 + 品种小计 + 合计。
+ * - 自 formData.allResponses hydrate（修旧版本地 reactive 归零+不持久化的数据丢失）
+ * - 从 L4-2 明细带入 + 与 L4-2 期末摊余成本交叉验证
+ * - 期末审定合计回写 TB 2502 + EventBus 'substantive:adjudicated'
  */
-import { computed, inject, onMounted, reactive, ref } from 'vue'
-import { MagicStick, Check } from '@element-plus/icons-vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { MagicStick, Check, Download } from '@element-plus/icons-vue'
+import { inject } from 'vue'
+import http from '@/utils/http'
 import { useL4FormData } from '../../composables/useL4FormData'
-import { useL4Adjudication, type L4AdjudicationRow } from '../../composables/useL4Adjudication'
+import { useL4Adjudication } from '../../composables/useL4Adjudication'
+import { useL4CrossSheet } from '../../composables/useL4CrossSheet'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import { useAuditContext } from '@/composables/useAuditContext'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -238,131 +261,149 @@ const props = defineProps<{
   isReadonly: boolean
 }>()
 
-const emit = defineEmits<{
+defineEmits<{
   (e: 'navigate', sheetName: string): void
 }>()
 
-// ─── Inject ──────────────────────────────────────────────────────────────────
-
 const openReviewDialog = inject<() => void>('openReviewDialog', () => {})
 
-// ─── FormData ────────────────────────────────────────────────────────────────
+// ─── FormData + composables ──────────────────────────────────────────────────
 
 const formData = useL4FormData({
   wpId: computed(() => props.wpId),
   projectId: computed(() => props.projectId),
 })
 
-// ─── 审定表行数据 ─────────────────────────────────────────────────────────────
+const {
+  displayRows, totalRow, totalAuditedAmount,
+  auditNote, conclusion, updateText, updateCell, importFromDetail, submitAdjudication,
+} = useL4Adjudication(formData)
 
-const adjudicationData = reactive({
-  rows: [
-    { variety: '普通债券', subItem: '成本', beginning: 0, creditAmount: 0, debitAmount: 0, endBalance: 0, unadjusted: 0, aje: 0, rje: 0, audited: 0 },
-    { variety: '普通债券', subItem: '利息调整', beginning: 0, creditAmount: 0, debitAmount: 0, endBalance: 0, unadjusted: 0, aje: 0, rje: 0, audited: 0 },
-    { variety: '普通债券', subItem: '应计利息', beginning: 0, creditAmount: 0, debitAmount: 0, endBalance: 0, unadjusted: 0, aje: 0, rje: 0, audited: 0 },
-    { variety: '普通债券', subItem: '小计', beginning: 0, creditAmount: 0, debitAmount: 0, endBalance: 0, unadjusted: 0, aje: 0, rje: 0, audited: 0 },
-    { variety: '可转换债券', subItem: '成本', beginning: 0, creditAmount: 0, debitAmount: 0, endBalance: 0, unadjusted: 0, aje: 0, rje: 0, audited: 0 },
-    { variety: '可转换债券', subItem: '利息调整', beginning: 0, creditAmount: 0, debitAmount: 0, endBalance: 0, unadjusted: 0, aje: 0, rje: 0, audited: 0 },
-    { variety: '可转换债券', subItem: '应计利息', beginning: 0, creditAmount: 0, debitAmount: 0, endBalance: 0, unadjusted: 0, aje: 0, rje: 0, audited: 0 },
-    { variety: '可转换债券', subItem: '小计', beginning: 0, creditAmount: 0, debitAmount: 0, endBalance: 0, unadjusted: 0, aje: 0, rje: 0, audited: 0 },
-  ] as L4AdjudicationRow[],
-  total: { beginning: 0, credit: 0, debit: 0, end: 0, unadjusted: 0, aje: 0, rje: 0, audited: 0 },
+const { adjudicationVsDetail } = useL4CrossSheet(formData.allResponses)
+const crossCheck = computed(() => adjudicationVsDetail.value)
+
+// ─── 从集中登记带入调整（2502 应付债券，负债贷方；双列 endAje/endRje，仅叶子行不含小计） ───
+const bringInRows = computed(() =>
+  displayRows.value
+    .filter((r) => r.isEditable && !r.isSubtotal)
+    .map((r) => ({ rowKey: r.rowKey, name: r.label, aje: r.endAje ?? 0, rje: r.endRje ?? 0 })),
+)
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: computed(() => props.projectId) as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '2502',
+  direction: 'credit',
+  subjectCode: '2502',
+  wpCode: 'L4',
+  subjectLabel: '应付债券(2502)',
+  rows: bringInRows,
+  updateCell: (rowKey: string, field: any, value: number) =>
+    updateCell(rowKey, field === 'rje' ? 'endRje' : 'endAje', value),
+  totalAudited: () => totalRow.value.endAudited,
 })
 
-const { computedRows, varietySubtotals, total, updateRow, saveAndWriteback } = useL4Adjudication(formData, adjudicationData)
+// ─── 编辑 ────────────────────────────────────────────────────────────────────
 
-// ─── 表格数据渲染 ─────────────────────────────────────────────────────────────
-
-interface TableRow {
-  label: string
-  rowIndex: number
-  beginning: number
-  creditAmount: number
-  debitAmount: number
-  endBalance: number
-  unadjusted: number
-  aje: number
-  rje: number
-  audited: number
-  isEditable: boolean
-  isSubtotal: boolean
+function onCell(rowKey: string, field: string, value: number | string): void {
+  updateCell(rowKey, field as any, value)
 }
 
-const tableData = computed<TableRow[]>(() => {
-  const rows = computedRows.value
-  return rows.map((r, i) => ({
-    label: r.subItem === '小计' ? `${r.variety}（小计）` : `${r.variety}—${r.subItem}`,
-    rowIndex: i,
-    beginning: r.beginning,
-    creditAmount: r.creditAmount,
-    debitAmount: r.debitAmount,
-    endBalance: r.endBalance,
-    unadjusted: r.unadjusted,
-    aje: r.aje,
-    rje: r.rje,
-    audited: r.audited,
-    isEditable: r.subItem !== '小计',
-    isSubtotal: r.subItem === '小计',
-  }))
-})
+// ─── 从明细带入 ──────────────────────────────────────────────────────────────
 
-// ─── 合计行 ───────────────────────────────────────────────────────────────────
-
-function getSummaries({ columns }: { columns: any[] }) {
-  const sums: string[] = []
-  const t = total.value
-  columns.forEach((col: any, index: number) => {
-    if (index === 0) { sums[index] = '合计'; return }
-    const vals = [t.beginning, t.credit, t.debit, t.end, t.unadjusted, t.aje, t.rje, t.audited]
-    sums[index] = fmtAmount(vals[index - 1] ?? 0)
-  })
-  return sums
+async function handleImportFromDetail() {
+  try {
+    await ElMessageBox.confirm(
+      '将按品种×子项从明细表 L4-2 聚合期初/期末未审摊余成本带入审定表，覆盖对应行未审数（账项调整/重分类调整保留）。是否继续？',
+      '从 L4-2 明细带入',
+      { confirmButtonText: '带入', cancelButtonText: '取消', type: 'warning' },
+    )
+    const count = importFromDetail()
+    if (count > 0) ElMessage.success(`已带入 ${count} 行`)
+    else ElMessage.info('明细表暂无数据可带入')
+  } catch { /* 取消 */ }
 }
 
-// ─── 交叉验证 ─────────────────────────────────────────────────────────────────
+// ─── 审计说明 AI ─────────────────────────────────────────────────────────────
 
-const crossCheckDiff = ref(0)
-const crossCheckOk = computed(() => Math.abs(crossCheckDiff.value) <= 0.01)
+const NOTE_PLACEHOLDER =
+  '（1）应付债券期末余额较期初增减及主要原因（比例超30%需说明）。\n' +
+  '（2）各品种债券的发行、计息、兑付情况；一年内到期的应付债券重分类至流动负债的情况。\n' +
+  '（3）利息调整（溢折价）摊销与实际利率法测算核对情况。\n' +
+  '（4）可转换债券负债/权益成分拆分及后续计量情况。'
 
-// ─── 审计说明 ─────────────────────────────────────────────────────────────────
+const aiLoading = ref(false)
 
-const auditNote = ref('')
-
-function saveAuditNote() {
-  formData.debouncedSave('L4-1-auditNote', { remark: auditNote.value || null })
-}
-
-// ─── 操作 ─────────────────────────────────────────────────────────────────────
-
-function onCellChange(rowIndex: number, field: 'beginning' | 'creditAmount' | 'debitAmount' | 'unadjusted' | 'aje' | 'rje', value: number) {
-  updateRow(rowIndex, field, value)
-}
-
-function handleAI(section: string) {
-  import('@/utils/http').then(({ default: h }) => {
-    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
-      section: `l4-adjudication-${section}`,
-      prompt: `请基于应付债券审定表"${section}"区段数据，给出审计分析建议`,
-      context: { section, wpId: props.wpId },
-    }).catch(() => {})
-  })
+async function handleAiNote() {
+  if (props.isReadonly) return
+  aiLoading.value = true
+  try {
+    const t = totalRow.value
+    const context: Record<string, string> = {
+      期末审定合计: String(t.endAudited),
+      期初审定合计: String(t.beginAudited),
+      变动额: String(t.auditedChange),
+      变动率百分比: (t.auditedRate * 100).toFixed(2),
+      一年内到期合计: String(t.endCurrent),
+    }
+    const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: 'L4-1-note',
+      prompt: '请基于应付债券审定表数据撰写审计说明，覆盖：①期末较期初增减及原因②各品种发行/计息/兑付及一年内到期重分类③利息调整摊销④可转换债券负债/权益拆分。',
+      existingContent: auditNote.value,
+      context,
+    })
+    const content = (res.data?.data ?? res.data)?.content
+    if (content) updateText('note', content)
+    else ElMessage.info('AI 未返回内容，请手动撰写')
+  } catch {
+    ElMessage.info('AI 辅助暂不可用，请手动撰写')
+  } finally {
+    aiLoading.value = false
+  }
 }
 
 function handleReview() {
   openReviewDialog?.()
 }
 
-function getRowClassName({ row }: { row: TableRow }) {
-  if (row.isSubtotal) return 'subtotal-row'
-  return ''
+// ─── TB 回写（期末审定合计变化 → 自动回写） ─────────────────────────────────
+
+watch(totalAuditedAmount, async (newVal, oldVal) => {
+  if (props.isReadonly) return
+  if (oldVal !== undefined && newVal !== oldVal) {
+    await submitAdjudication()
+  }
+})
+
+// ─── 行样式 ──────────────────────────────────────────────────────────────────
+
+function getRowClassName({ row }: { row: { isSubtotal: boolean } }): string {
+  return row.isSubtotal ? 'subtotal-row' : ''
 }
 
-function fmtAmount(val: number): string {
-  if (val === 0) return '—'
+// ─── 格式化 ──────────────────────────────────────────────────────────────────
+
+function fmt(val: number | null | undefined): string {
+  if (val == null || val === 0) return '-'
+  if (val < 0) return `(${Math.abs(val).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
   return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-// ─── 加载 ─────────────────────────────────────────────────────────────────────
+function fmtRate(val: number | null | undefined): string {
+  if (val == null || val === 0) return '-'
+  return `${(val * 100).toFixed(2)}%`
+}
+
+function chg(val: number): Record<string, boolean> {
+  return { 'text-danger': val < 0, 'text-success': val > 0 }
+}
+
+// ─── 加载 ────────────────────────────────────────────────────────────────────
 
 onMounted(async () => {
   await formData.loadData()
@@ -382,61 +423,31 @@ onMounted(async () => {
   margin-bottom: 12px;
 }
 
-.section-header-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
+.section-header-left { display: flex; align-items: center; gap: 8px; }
+.section-header-right { display: flex; align-items: center; gap: 8px; }
 
-.section-header-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.section-title {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 600;
-  color: #303133;
-}
+.section-title { margin: 0; font-size: 15px; font-weight: 600; color: #303133; }
 
 .methodology-context {
-  border-left: 4px solid #e6a23c;
-  background: #fdf6ec;
-  padding: 12px 16px;
+  border-left: 4px solid #f59e0b;
+  background: #fffbeb;
+  padding: 10px 14px;
   border-radius: 0 6px 6px 0;
   margin-bottom: 16px;
 }
 
-.methodology-text {
-  font-size: var(--wp-font-size, 13px);
-  color: #6b5900;
-  line-height: 1.6;
-}
+.methodology-text { font-size: var(--wp-font-size, 13px); color: #78350f; line-height: 1.6; }
+.methodology-text strong { color: #b45309; }
 
-.formula-col-header {
-  border-bottom: 1px dashed #909399;
-  cursor: help;
-}
+.formula-col-header { border-bottom: 1px dashed #909399; cursor: help; }
+.formula-value { color: #409eff; font-weight: 500; }
+.row-bold { font-weight: 600; }
 
-.formula-value {
-  color: #409eff;
-  font-weight: 500;
-}
+:deep(.subtotal-row) { background-color: #f5f7fa !important; font-weight: 600; }
+.total-table :deep(.el-table__row) { background-color: #f0f9eb !important; }
 
-.row-bold {
-  font-weight: 600;
-}
-
-:deep(.subtotal-row) {
-  background-color: #f5f7fa !important;
-  font-weight: 600;
-}
-
-:deep(.el-table) {
-  font-size: var(--wp-font-size, 13px);
-}
+:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
+:deep(.el-table th .cell) { font-size: var(--wp-font-size, 13px); font-weight: 600; }
 
 .cross-check-section {
   margin: 12px 0;
@@ -445,20 +456,15 @@ onMounted(async () => {
   gap: 8px;
   font-size: var(--wp-font-size, 13px);
 }
+.cross-check-label { color: #606266; }
 
-.cross-check-label {
-  color: #606266;
-}
+.text-danger { color: #f56c6c; }
+.text-success { color: #67c23a; }
+.text-warning { color: #e6a23c; font-weight: 600; }
 
-.audit-note-card {
-  margin-top: 16px;
-}
-
-.card-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #303133;
-}
+.audit-note-card { margin-top: 16px; }
+.card-title { font-size: 14px; font-weight: 600; color: #303133; }
+.audit-note-card :deep(.el-textarea__inner) { font-size: var(--wp-font-size, 13px); }
 
 .l4-details-tip {
   margin-top: 16px;
@@ -469,18 +475,8 @@ onMounted(async () => {
   font-size: var(--wp-font-size, 13px);
   color: #606266;
 }
-
-.l4-details-tip summary {
-  cursor: pointer;
-  font-weight: 500;
-  color: #303133;
-}
-
-.l4-details-tip ul {
-  padding-left: 20px;
-  margin: 8px 0 0;
-  line-height: 1.8;
-}
+.l4-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; }
+.l4-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
 
 .audit-objective { margin-bottom: 12px; }
 .audit-objective :deep(.el-alert__content) { padding: 2px 0; }

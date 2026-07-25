@@ -92,6 +92,26 @@
         >
           保存并回写 K1-1
         </el-button>
+        <el-button
+          v-if="!isReadonly"
+          size="small"
+          type="primary"
+          plain
+          :loading="centralSyncing"
+          :disabled="!state.isBalanced.value || state.rows.value.length === 0"
+          @click="syncToCentral"
+          title="把本页调整分录汇聚到集中调整登记，供合伙人跨循环审阅"
+        >
+          同步到集中登记
+        </el-button>
+        <el-tag
+          v-if="centralStatus?.review_status"
+          size="small"
+          :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
+          :title="centralStatus.rejection_reason || ''"
+        >
+          集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
+        </el-tag>
         <el-button size="small" @click="openReview">💬复核</el-button>
       </div>
       <div class="toolbar-right">
@@ -307,6 +327,7 @@ import { applyK14NetsToK11 } from '../../composables/k1AdjK11Writeback'
 import { useK1ImportExport } from '../../composables/useK1ImportExport'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { WorkpaperRuntimeContextKey } from '../../composables/useWorkpaperScaffold'
+import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
 
 const props = defineProps<{
   wpId: string
@@ -352,6 +373,27 @@ const state = useK1Adjustment({
   onSyncToK11: () =>
     applyK14NetsToK11(props.allResponses, (itemId, value) => emit('save', itemId, value)),
 })
+
+// ─── 同步到集中调整登记（workpaper-adjustment-centralization） ──────────
+const { centralStatus, syncing: centralSyncing, syncToCentral, refreshStatus } = useAdjustmentCentralSync({
+  projectId: () => props.projectId,
+  year: () => Number(auditYear.value) || new Date().getFullYear(),
+  wpId: () => props.wpId,
+  wpCode: 'K1',
+  itemId: 'K1-4-adj-entries',
+  buildLineItems: () => state.rows.value.map((r: any) => ({
+    standard_account_code: r.accountCode || undefined,
+    account_name: r.accountName,
+    report_line_code: r.reportItem || undefined,
+    debit_amount: r.debitAmount,
+    credit_amount: r.creditAmount,
+  })),
+  buildMeta: () => ({
+    description: state.rows.value.find((r: any) => r.description)?.description || 'K1 其他应收款调整',
+    adjustmentType: state.rows.value.length > 0 && state.rows.value.every((r: any) => r.category === '报表调整') ? 'rje' : 'aje',
+  }),
+})
+refreshStatus()
 
 const auditNote = computed({
   get: () => state.auditNote.value,

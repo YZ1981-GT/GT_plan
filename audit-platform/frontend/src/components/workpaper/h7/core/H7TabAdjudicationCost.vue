@@ -10,6 +10,9 @@
 
     <!-- 工具栏 -->
     <div class="tab-toolbar">
+      <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
+        <el-icon><Download /></el-icon>带入调整
+      </el-button>
       <span class="chip-wrap"><GtIndexChip value="wp:H7-1" :context-project-id="projectId" /></span>
       <el-tag size="small" type="info">成本模式 · 共 3 区块</el-tag>
     </div>
@@ -219,8 +222,18 @@
         <li>四.净值=原值审定-累计折旧审定-减值准备审定。</li>
         <li>审定数=未审数+AJE+RJE，未审数从试算表(1621)自动取入(只读)。</li>
         <li>"确认审定"将回写 trial_balance(1621) 并发布 substantive:adjudicated 事件供附注刷新。</li>
+        <li>"带入调整"：从集中登记按科目 1621 拉取调整分录，逐笔分配到原值/累计折旧/减值行的调整列，带入后审定数自动更新并联动附注。</li>
       </ul>
     </details>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="1621 生产性生物资产（成本模式）"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
@@ -236,11 +249,15 @@
  */
 import { ref, computed, onMounted, inject, toRef } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Download } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
 import { useProjectStore } from '@/stores/project'
+import { useAuditContext } from '@/composables/useAuditContext'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { useH7AdjudicationCost } from '../../composables/useH7AdjudicationCost'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 
 const projectStore = useProjectStore()
 
@@ -281,6 +298,41 @@ function auditedOf(r: AdjRow): number { return num(r.unadjusted) + num(r.aje) + 
 const netValueAudited = computed(() =>
   auditedOf(origRow.value) - (contraEnd(depRow.value) + num(depRow.value.aje)) - (contraEnd(impRow.value) + num(impRow.value.aje)),
 )
+
+// ─── 从集中登记带入调整（1621 生产性生物资产，资产借方；单一调整列累加到各行 AJE） ───
+const bringInRows = computed(() => [
+  { rowKey: 'orig', name: origRow.value.category, aje: 0, rje: 0 },
+  { rowKey: 'dep', name: depRow.value.category, aje: 0, rje: 0 },
+  { rowKey: 'imp', name: impRow.value.category, aje: 0, rje: 0 },
+])
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: toRef(props, 'projectId') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '1621',
+  direction: 'debit',
+  subjectCode: '1621',
+  wpCode: 'H7',
+  subjectLabel: '生产性生物资产(1621)',
+  rows: bringInRows,
+  // 成本模式：原值/累计折旧/减值审定口径均含 aje（净值=原值审定−累计折旧审定−减值审定），
+  // aje/rje 净额统一累加到目标行 aje 列（读取实时值做增量累加，避免 rje 静默丢失）。
+  updateCell: (rowKey: string, _field: any, value: number) => {
+    const target = rowKey === 'orig' ? origRow : rowKey === 'dep' ? depRow : rowKey === 'imp' ? impRow : null
+    if (!target) return
+    const live = num(target.value.aje)
+    target.value.aje = Math.round((live + value) * 100) / 100
+    if (rowKey === 'orig') void persist('H7-1-cost-orig', origRow.value)
+    else if (rowKey === 'dep') void persist('H7-1-cost-dep', depRow.value)
+    else void persist('H7-1-cost-imp', impRow.value)
+  },
+  totalAudited: () => netValueAudited.value,
+})
 
 // ─── 种子 + 持久化 ─────────────────────────────────────────
 function seedRow(itemId: string, target: { value: AdjRow }) {

@@ -10,6 +10,9 @@
           :disabled="isReadonly"
           @imported="emit('imported')"
         />
+        <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
+          <el-icon><Download /></el-icon>带入调整
+        </el-button>
         <el-button size="small" :disabled="isReadonly" :loading="syncing" @click="onSyncSupporting">
           从 G2-2/G2-3 汇总未审
         </el-button>
@@ -39,6 +42,7 @@
         <li>原值/坏账按「单项计提 / 按组合计提」展开；小计与净值自动汇总。</li>
         <li>审定＝本账数＋账项调整；变动额／变动率自动计算；|变动率|&gt;{{ Math.round(G2_CHANGE_RATE_THRESHOLD * 100) }}% 时差异分析必填。</li>
         <li>合计（净值）应与试算平衡表 1132 勾稽，差异为 0；可点「取试算 1132」。</li>
+        <li>「带入调整」：可从集中登记按科目 1132 拉取调整分录，逐笔分配到各原值/坏账明细行的期末账项调整，带入后审定数自动更新并联动附注。</li>
       </ul>
     </details>
 
@@ -196,17 +200,30 @@
       note-hint="覆盖原值/坏账/净值审定、变动分析、长期挂账及试算勾稽。"
       conclusion-hint="按 A/B/C 口径评价科目 1132 审定结果。"
     />
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="1132 应收利息"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, toRef, computed, inject } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Download } from '@element-plus/icons-vue'
 import {
   useG2Adjudication,
   G2_CHANGE_RATE_THRESHOLD,
   type G2AdjEditableField,
 } from '../composables/useG2Adjudication'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { useAdjudicationBringIn } from '../composables/useAdjudicationBringIn'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import GtIndexChip from '../GtIndexChip.vue'
 import G2ImportExportDropdown from './G2ImportExportDropdown.vue'
 import G2AuditTextCards from './G2AuditTextCards.vue'
@@ -236,6 +253,32 @@ const rows = computed(() => adj.dataRows.value)
 const syncing = ref(false)
 const tbLoading = ref(false)
 const tableMaxHeight = 520
+
+// ─── 从集中登记带入调整（1132 应收利息，资产借方；带入期末账项调整，单列合并 AJE/RJE） ───
+const bringInRows = computed(() =>
+  adj.dataRows.value
+    .filter((r) => r.editable && r.kind === 'leaf')
+    .map((r) => ({ rowKey: r.rowKey, name: r.label, aje: r.closingAdjustment, rje: r.closingAdjustment })),
+)
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: toRef(props, 'projectId', '') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '1132',
+  direction: 'debit',
+  subjectCode: '1132',
+  wpCode: 'G2',
+  subjectLabel: '应收利息(1132)',
+  rows: bringInRows,
+  updateCell: (rowKey: string, _field: any, value: number) =>
+    adj.updateField(rowKey, 'closingAdjustment', value),
+  totalAudited: () => adj.subtotalRow.value.closingAudited,
+})
 
 function onSyncSupporting() {
   syncing.value = true

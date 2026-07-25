@@ -10,6 +10,9 @@
     <!-- 双模式切换 -->
     <div class="mode-bar">
       <el-segmented v-model="mode" :options="['HTML', 'OnlyOffice']" size="small" />
+      <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
+        <el-icon><Download /></el-icon>带入调整
+      </el-button>
       <span class="chip-wrap"><GtIndexChip value="wp:J1-1" :context-project-id="projectId" /></span>
       <el-tag size="small" type="info">共 {{ groups.length }} 组分类</el-tag>
     </div>
@@ -206,15 +209,29 @@
         <p>3. 本期审定数与上期审定数变动率超过 30% 自动标红，须在原因分析栏说明。</p>
         <p>4. 审定合计应与明细表（J1-2）、试算平衡表科目 2211 期末余额勾稽一致。</p>
         <p>5. 辞退福利为动态行，根据实际辞退计划增减行。</p>
+        <p>6.「带入调整」：可从集中登记按科目 2211 拉取调整分录，逐笔分配到各分类行期末调整，带入后审定数自动更新并联动附注。</p>
       </div>
     </details>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="2211 应付职工薪酬"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { Download } from '@element-plus/icons-vue'
 import { useJ1Adjudication, type AdjudicationRow } from '@/composables/workpaper/j1/useJ1Adjudication'
 import GtIndexChip from '../../GtIndexChip.vue'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import { useAuditContext } from '@/composables/useAuditContext'
 
 const props = defineProps<{
   wpId: string
@@ -227,6 +244,34 @@ const isReadonly = props.isReadonly ?? false
 const mode = ref('HTML')
 const htmlDataRef = ref(props.htmlData || {})
 const { rows, groups, grandTotal, initFromHtmlData, updateRow } = useJ1Adjudication(htmlDataRef)
+
+// ─── 从集中登记带入调整（2211 应付职工薪酬，负债贷方；带入期末调整 endAje，单一调整列） ───
+const bringInRows = computed(() =>
+  rows.value.map((r) => ({ rowKey: r.id, name: r.label, aje: 0, rje: 0 })),
+)
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: computed(() => props.projectId) as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '2211',
+  direction: 'credit',
+  subjectCode: '2211',
+  wpCode: 'J1',
+  subjectLabel: '应付职工薪酬(2211)',
+  rows: bringInRows,
+  // 单一「调整」列：aje/rje 净额均累加至期末调整 endAje（读取实时值做增量累加）
+  updateCell: (rowKey: string, _field: any, value: number) => {
+    const row = rows.value.find((r) => r.id === rowKey)
+    const live = row?.endAje ?? 0
+    updateRow(rowKey, 'endAje', Math.round((live + value) * 100) / 100)
+  },
+  totalAudited: () => grandTotal.value.endAudited,
+})
 
 /** 试算平衡表勾稽 */
 const tbBalance = ref(0)

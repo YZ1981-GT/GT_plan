@@ -12425,6 +12425,102 @@
           "refinancing"
         ]
       }
+    },
+    {
+      "wp_code": "A13-2",
+      "cycle": "A",
+      "wp_name": "未更正的列报和披露错报",
+      "audit_cycle": "A",
+      "must_have": false,
+      "file_format": "xlsx",
+      "account_codes": [],
+      "account_name": "",
+      "report_row": null,
+      "note_section": null
+    },
+    {
+      "wp_code": "A13-3",
+      "cycle": "A",
+      "wp_name": "评价识别出的错报",
+      "audit_cycle": "A",
+      "must_have": false,
+      "file_format": "xlsx",
+      "account_codes": [],
+      "account_name": "",
+      "report_row": null,
+      "note_section": null
+    },
+    {
+      "wp_code": "A13-4",
+      "cycle": "A",
+      "wp_name": "评价错报的性质",
+      "audit_cycle": "A",
+      "must_have": false,
+      "file_format": "xlsx",
+      "account_codes": [],
+      "account_name": "",
+      "report_row": null,
+      "note_section": null
+    },
+    {
+      "wp_code": "A13-5",
+      "cycle": "A",
+      "wp_name": "对错报的沟通",
+      "audit_cycle": "A",
+      "must_have": false,
+      "file_format": "docx",
+      "account_codes": [],
+      "account_name": "",
+      "report_row": null,
+      "note_section": null
+    },
+    {
+      "wp_code": "B22A",
+      "cycle": "B",
+      "wp_name": "了解企业层面控制",
+      "audit_cycle": "B",
+      "must_have": true,
+      "file_format": "xlsx",
+      "account_codes": [],
+      "account_name": "",
+      "report_row": null,
+      "note_section": null
+    },
+    {
+      "wp_code": "B30-2",
+      "cycle": "B",
+      "wp_name": "组成部分重要性及审计范围",
+      "audit_cycle": "B",
+      "must_have": false,
+      "file_format": "xlsx",
+      "account_codes": [],
+      "account_name": "",
+      "report_row": null,
+      "note_section": null
+    },
+    {
+      "wp_code": "S32",
+      "cycle": "S",
+      "wp_name": "IPO审计专项核查",
+      "audit_cycle": "S",
+      "must_have": false,
+      "file_format": "xlsx",
+      "account_codes": [],
+      "account_name": "",
+      "report_row": null,
+      "note_section": null
+    },
+    {
+      "wp_code": "S35",
+      "cycle": "S",
+      "wp_name": "再融资审计专项",
+      "audit_cycle": "S",
+      "must_have": false,
+      "file_format": "xlsx",
+      "account_codes": [],
+      "account_name": "",
+      "report_row": null,
+      "note_section": null
     }
   ]
 }

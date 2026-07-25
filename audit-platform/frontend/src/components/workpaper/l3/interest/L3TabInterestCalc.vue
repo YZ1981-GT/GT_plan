@@ -318,7 +318,7 @@
  * Task: 4.4
  * Requirements: 4.1-4.6
  */
-import { computed, inject, ref, toRef } from 'vue'
+import { computed, inject, ref, toRef, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
 import { useL3InterestCalc, type L3InterestCalcRow } from '@/composables/useL3InterestCalc'
@@ -342,8 +342,24 @@ defineEmits<{
 const formData = inject<ReturnType<typeof useL3FormData>>('l3FormData')!
 
 // ─── Reactive interest rows (data source) ────────────────────────────────────
+// 🔴 P0 修复：从 allResponses hydrate（JSON存储 L3-L3-5-rows）；此前无 hydration → 刷新数据全丢
 
 const interestRows = ref<L3InterestCalcRow[]>([])
+
+function _loadInterestRows(): void {
+  const resp = formData.allResponses.value.get('L3-L3-5-rows')
+  if (resp?.remark) {
+    try {
+      const parsed = JSON.parse(resp.remark)
+      if (Array.isArray(parsed)) { interestRows.value = parsed; return }
+    } catch { /* ignore */ }
+  }
+}
+_loadInterestRows()
+watch(
+  () => formData.allResponses.value.get('L3-L3-5-rows')?.remark,
+  (v) => { if (v && interestRows.value.length === 0) _loadInterestRows() },
+)
 
 // ─── 报告期（默认当年） ──────────────────────────────────────────────────────
 

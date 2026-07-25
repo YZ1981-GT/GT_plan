@@ -9,7 +9,7 @@
         </el-tag>
       </div>
       <div class="section-header-right">
-        <el-button size="small" @click="handleAI('disclosure-listed')">
+        <el-button size="small" :loading="aiLoading === 'disclosure-listed'" @click="handleAI('disclosure-listed')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
         <el-button size="small" @click="handleReview">
@@ -68,7 +68,7 @@
       <template #header>
         <div class="card-header-row">
           <span class="card-title">披露说明</span>
-          <el-button size="small" @click="handleAI('disclosure-note')">
+          <el-button size="small" :loading="aiLoading === 'disclosure-note'" @click="handleAI('disclosure-note')">
             <el-icon><MagicStick /></el-icon> AI辅助
           </el-button>
         </div>
@@ -109,14 +109,18 @@
  * - 组件卸载时 off 清理
  */
 import { computed, inject, onMounted, ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import { MagicStick, Check } from '@element-plus/icons-vue'
 import { useM7FormData } from '../../composables/useM7FormData'
 import { useNoteAutoFill } from '../../composables/useNoteAutoFill'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 
 const props = defineProps<{ wpId: string; projectId: string; isReadonly: boolean }>()
 
 // ─── Inject复核对话 ──────────────────────────────────────────────────────────
 const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', () => {})
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
 
 // ─── Composables ─────────────────────────────────────────────────────────────
 const formData = useM7FormData({ wpId: computed(() => props.wpId), projectId: computed(() => props.projectId) })
@@ -188,7 +192,23 @@ function saveDisclosureNote(): void {
 }
 
 // ─── UI handlers ─────────────────────────────────────────────────────────────
-function handleAI(_section: string): void { /* AI辅助钩子 */ }
+async function handleAI(section: string): Promise<void> {
+  if (props.isReadonly) return
+  aiLoading.value = section
+  try {
+    const context: Record<string, string> = {
+      科目: '4201 专项储备 / 附注披露（上市公司）',
+      安全生产费期末: fmtAmount(disclosureRows.value[0]?.endBalance ?? 0),
+      维简费期末: fmtAmount(disclosureRows.value[1]?.endBalance ?? 0),
+      其他专项储备期末: fmtAmount(disclosureRows.value[2]?.endBalance ?? 0),
+      合计期末: fmtAmount(disclosureRows.value[3]?.endBalance ?? 0),
+    }
+    const text = await generateAiText({ section: `m7-disclosure-listed-${section}`, context, existingContent: disclosureNote.value })
+    if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+    disclosureNote.value = text
+    saveDisclosureNote()
+  } catch { ElMessage.warning('AI 生成失败，请稍后重试') } finally { aiLoading.value = '' }
+}
 function handleReview(): void { openReviewDialog?.('M7-disclosure-listed', '附注披露-上市公司') }
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────

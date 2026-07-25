@@ -36,11 +36,14 @@ __all__ = [
 
 CRITICAL_COLUMNS: dict[str, list[set[str]]] = {
     "balance": [
-        # account_code 必须，加上以下任一组合：
-        # opening_balance OR closing_balance OR (debit_amount + credit_amount)
+        # account_code 必须，加上以下任一组合（月度列 + 年度/分列变体，任一满足即过）：
         {"account_code", "opening_balance"},
         {"account_code", "closing_balance"},
         {"account_code", "debit_amount", "credit_amount"},
+        # 年度/分列变体（避免年度分列表被硬拦，R2.5）：
+        {"account_code", "year_opening_debit", "year_opening_credit"},
+        {"account_code", "closing_debit", "closing_credit"},
+        {"account_code", "year_debit", "year_credit"},
     ],
     "ledger": [
         # voucher_date + account_code + (debit_amount OR credit_amount OR amount)

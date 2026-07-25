@@ -8,7 +8,7 @@
         <el-tag type="primary" size="small">上市·万股</el-tag>
       </div>
       <div class="section-header-right">
-        <el-button size="small" @click="handleAI('disclosure-listed')">
+        <el-button size="small" :loading="aiLoading === 'disclosure-listed'" :disabled="isReadonly" @click="handleAI('disclosure-listed')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
         <el-button size="small" @click="handleReview">
@@ -31,7 +31,7 @@
       <template #header>
         <div class="card-header">
           <span>股本变动明细（单位：万股）</span>
-          <el-button size="small" @click="handleAI('section-capital-change')">
+          <el-button size="small" :loading="aiLoading === 'section-capital-change'" :disabled="isReadonly" @click="handleAI('section-capital-change')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </div>
@@ -100,7 +100,7 @@
       <template #header>
         <div class="card-header">
           <span>限售股份说明</span>
-          <el-button size="small" @click="handleAI('section-restricted')">
+          <el-button size="small" :loading="aiLoading === 'section-restricted'" :disabled="isReadonly" @click="handleAI('section-restricted')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </div>
@@ -120,7 +120,7 @@
       <template #header>
         <div class="card-header">
           <span>股本变动原因说明</span>
-          <el-button size="small" @click="handleAI('section-reason')">
+          <el-button size="small" :loading="aiLoading === 'section-reason'" :disabled="isReadonly" @click="handleAI('section-reason')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </div>
@@ -140,7 +140,7 @@
       <template #header>
         <div class="card-header">
           <span>与每股收益计算相关说明</span>
-          <el-button size="small" @click="handleAI('section-eps')">
+          <el-button size="small" :loading="aiLoading === 'section-eps'" :disabled="isReadonly" @click="handleAI('section-eps')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </div>
@@ -187,7 +187,9 @@
  */
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
 import { MagicStick, Check } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import { useM2FormData } from '../../composables/useM2FormData'
 
 const props = defineProps<{
@@ -201,6 +203,8 @@ const emit = defineEmits<{
 }>()
 
 const openReviewDialog = inject<((sectionId: string, sectionLabel?: string) => void) | null>('openReviewDialog', null)
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
 
 // ─── FormData ───────────────────────────────────────────────────────────────
 
@@ -268,7 +272,46 @@ function handleNoteChange(section: string, value: string) {
   formData.debouncedSave(`M2-disclosure-listed-${section}`, { remark: value || null })
 }
 
-function handleAI(_section: string) { /* AI辅助待集成 */ }
+// section → { ref, 持久化key } 映射
+const AI_TARGETS: Record<string, { get: () => string; set: (v: string) => void; key: string }> = {
+  'section-restricted': { get: () => restrictedNote.value, set: (v) => (restrictedNote.value = v), key: 'restricted' },
+  'section-reason': { get: () => changeReasonNote.value, set: (v) => (changeReasonNote.value = v), key: 'change-reason' },
+  'section-eps': { get: () => epsNote.value, set: (v) => (epsNote.value = v), key: 'eps' },
+  // 顶部/股本变动明细（表格无独立文本区）→ 归入"股本变动原因说明"
+  'disclosure-listed': { get: () => changeReasonNote.value, set: (v) => (changeReasonNote.value = v), key: 'change-reason' },
+  'section-capital-change': { get: () => changeReasonNote.value, set: (v) => (changeReasonNote.value = v), key: 'change-reason' },
+}
+
+function buildContext(): Record<string, string> {
+  const totalRow = capitalChangeRows.value.find((r) => r.item.includes('股份总数'))
+  return {
+    披露类型: '上市公司股本附注（单位：万股）',
+    科目: '4001 股本',
+    期末股份总数万股: totalRow ? fmtShares(totalRow.endShares) : '—',
+    本期增加万股: totalRow ? fmtShares(totalRow.increaseShares) : '—',
+    本期减少万股: totalRow ? fmtShares(totalRow.decreaseShares) : '—',
+  }
+}
+
+async function handleAI(section: string) {
+  if (props.isReadonly) return
+  const target = AI_TARGETS[section] || AI_TARGETS['disclosure-listed']
+  aiLoading.value = section
+  try {
+    const text = await generateAiText({
+      section: `m2-disclosure-listed-${target.key}`,
+      context: buildContext(),
+      existingContent: target.get(),
+    })
+    if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+    target.set(text)
+    handleNoteChange(target.key, text)
+  } catch {
+    ElMessage.warning('AI 生成失败，请稍后重试')
+  } finally {
+    aiLoading.value = ''
+  }
+}
 function handleReview() { openReviewDialog?.('M2-disclosure-listed', '附注披露（上市）') }
 
 function fmtShares(val: number): string {

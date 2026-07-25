@@ -32,7 +32,11 @@
 
     <!-- 工具栏 -->
     <div class="tab-toolbar">
-      <div class="toolbar-left"></div>
+      <div class="toolbar-left">
+        <el-button size="small" type="primary" plain :loading="adjPull.loading.value" :disabled="isReadonly" @click="openBringInAdjustment">
+          <el-icon><Download /></el-icon>带入调整
+        </el-button>
+      </div>
       <div class="toolbar-right">
         <el-dropdown size="small" trigger="click">
           <el-button size="small">导入导出 ▾</el-button>
@@ -288,6 +292,15 @@
         />
       </div>
     </el-card>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="2205 合同负债"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
 </div>
 </template>
 
@@ -299,11 +312,14 @@
  * Requirements: 2.1-2.9, 3.4, 3.6, 4.1-4.7, 17.1-17.3, 19.1, 20.1, 21.1-21.5, 22.1-22.4
  */
 import { computed, inject, toRef, ref, type Ref } from 'vue'
-import { InfoFilled } from '@element-plus/icons-vue'
+import { InfoFilled, Download } from '@element-plus/icons-vue'
 import { useD7Adjudication, type AdjudicationRow } from '../composables/useD7Adjudication'
 import { useD7ImportExport } from '../composables/useD7ImportExport'
 import { useD7AiGenerate } from '../composables/useD7AiGenerate'
 import { isChangeRateExceeding } from '../composables/useD7FormulaEngine'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { useAdjudicationBringIn } from '../composables/useAdjudicationBringIn'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import type { ChecklistResponse } from '../composables/useD7FormData'
 import type useD7CrossSheet from '../composables/useD7CrossSheet'
 
@@ -359,6 +375,32 @@ const {
 const { generateAndConfirm, aiAvailable, loading: aiLoading } = useD7AiGenerate(toRef(props, 'wpId'))
 
 const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务暂不可用')
+
+// ─── 从集中登记带入调整（2205 合同负债，负债贷方；带入按性质分类行期末 AJE/RJE） ─
+const bringInRows = computed(() =>
+  natureRows.value
+    .filter(r => r.rowType === 'detail' && r.isEditable)
+    .map(r => ({ rowKey: r.rowKey, name: r.label, aje: r.currentAje, rje: r.currentRje })),
+)
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: toRef(props, 'projectId') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '2205',
+  direction: 'credit',
+  subjectCode: '2205',
+  wpCode: 'D7',
+  subjectLabel: '合同负债(2205)',
+  rows: bringInRows,
+  updateCell: (rowKey: string, field: any, value: number) =>
+    updateCell(rowKey, field === 'rje' ? 'currentRje' : 'currentAje', value),
+  totalAudited: () => natureRows.value.find(r => r.rowKey === 'contract-liability-total')?.currentAudited ?? 0,
+})
 
 async function genExplanation() {
   if (props.isReadonly) return

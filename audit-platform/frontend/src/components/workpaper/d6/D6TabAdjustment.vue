@@ -72,6 +72,21 @@
       >
         确认调整
       </el-button>
+      <el-button
+        size="small"
+        type="primary"
+        plain
+        :loading="centralSyncing"
+        :disabled="isReadonly || !isBalanced || rows.length === 0"
+        @click="syncToCentral"
+        title="把本页调整分录汇聚到集中调整登记，供合伙人跨循环审阅"
+      >同步到集中登记</el-button>
+      <el-tag
+        v-if="centralStatus?.review_status"
+        size="small"
+        :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
+        :title="centralStatus.rejection_reason || ''"
+      >集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}</el-tag>
       <span class="chip-wrap"><GtIndexChip value="wp:D6-1" :context-project-id="projectId" /></span>
       <span class="chip-wrap"><GtIndexChip value="wp:A13" :context-project-id="projectId" /></span>
     </div>
@@ -300,6 +315,8 @@ import { computed, ref, inject, toRef, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useD6Adjustment } from '../composables/useD6Adjustment'
 import { useD6ImportExport } from '../composables/useD6ImportExport'
+import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../composables/useAdjustmentCentralSync'
+import { useAuditContext } from '@/composables/useAuditContext'
 import type { ChecklistResponse } from '../composables/useD6FormData'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
 import GtIndexChip from '../GtIndexChip.vue'
@@ -336,6 +353,27 @@ const {
   saveImmediate: props.saveImmediate,
   debouncedSave: props.debouncedSave,
 })
+
+// ─── 同步到集中调整登记 ─────────────────────────────────────────────
+const { year: centralYear } = useAuditContext()
+const { centralStatus, syncing: centralSyncing, syncToCentral, refreshStatus } = useAdjustmentCentralSync({
+  projectId: () => props.projectId,
+  year: centralYear,
+  wpId: () => props.wpId,
+  wpCode: 'D6',
+  itemId: 'D6-4-rows',
+  buildLineItems: () => rows.value.map((r) => ({
+    account_name: r.accountName,
+    report_line_code: r.reportItem || undefined,
+    debit_amount: r.debitAmount,
+    credit_amount: r.creditAmount,
+  })),
+  buildMeta: () => ({
+    description: rows.value.find((r) => r.description)?.description || 'D6 合同资产调整',
+    adjustmentType: rows.value.length > 0 && rows.value.every((r) => r.category === '报表调整') ? 'rje' : 'aje',
+  }),
+})
+refreshStatus()
 
 // ─── 导入导出（参照 D4-4） ────────────────────────────────────────────
 const wpIdRef = computed(() => props.wpId) as unknown as Ref<string>

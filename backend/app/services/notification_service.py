@@ -73,6 +73,9 @@ class NotificationService:
                     if metadata and "object_id" in metadata
                     else None
                 ),
+                # 持久化完整 metadata（DB 列 "metadata"）→ 前端 getNotificationJumpRoute
+                # 据此构造深链（如 project_id + object_id）。此前未写入导致点击通知无法跳转。
+                notification_metadata=metadata or None,
                 is_read=False,
             )
             session.add(notification)

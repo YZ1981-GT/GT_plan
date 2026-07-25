@@ -23,6 +23,7 @@ import { useE1AiGenerate } from '../composables/useE1AiGenerate'
 import GtIndexChip from '../GtIndexChip.vue'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { amountFormatter, amountParser } from '../composables/wpAmountInput'
 import { Setting } from '@element-plus/icons-vue'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -420,17 +421,17 @@ function resetDigColDefaults(): void {
           </el-table-column>
           <el-table-column v-if="isDigColVisible('opening')" label="期初" width="110" align="right">
             <template #default="{ row }">
-              <el-input-number :model-value="row.opening" :disabled="isReadonly" :controls="false" size="small" @change="(v: number | undefined) => updateCell(row.id, 'opening', v ?? 0)" />
+              <el-input-number :model-value="row.opening" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small" @change="(v: number | undefined) => updateCell(row.id, 'opening', v ?? 0)" />
             </template>
           </el-table-column>
           <el-table-column v-if="isDigColVisible('increase')" label="增加" width="110" align="right">
             <template #default="{ row }">
-              <el-input-number :model-value="row.increase" :disabled="isReadonly" :controls="false" size="small" @change="(v: number | undefined) => updateCell(row.id, 'increase', v ?? 0)" />
+              <el-input-number :model-value="row.increase" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small" @change="(v: number | undefined) => updateCell(row.id, 'increase', v ?? 0)" />
             </template>
           </el-table-column>
           <el-table-column v-if="isDigColVisible('decrease')" label="减少" width="110" align="right">
             <template #default="{ row }">
-              <el-input-number :model-value="row.decrease" :disabled="isReadonly" :controls="false" size="small" @change="(v: number | undefined) => updateCell(row.id, 'decrease', v ?? 0)" />
+              <el-input-number :model-value="row.decrease" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small" @change="(v: number | undefined) => updateCell(row.id, 'decrease', v ?? 0)" />
             </template>
           </el-table-column>
           <el-table-column label="期末原币" width="110" align="right" class-name="auto-calc-col">
@@ -441,7 +442,7 @@ function resetDigColDefaults(): void {
           </el-table-column>
           <el-table-column v-if="isDigColVisible('adjustment')" label="账项调整" width="110" align="right">
             <template #default="{ row }">
-              <el-input-number :model-value="row.adjustment" :disabled="isReadonly" :controls="false" size="small" @change="(v: number | undefined) => updateCell(row.id, 'adjustment', v ?? 0)" />
+              <el-input-number :model-value="row.adjustment" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small" @change="(v: number | undefined) => updateCell(row.id, 'adjustment', v ?? 0)" />
             </template>
           </el-table-column>
           <el-table-column label="审定原币" width="110" align="right" class-name="auto-calc-col">
@@ -452,7 +453,7 @@ function resetDigColDefaults(): void {
           </el-table-column>
           <el-table-column v-if="isDigColVisible('queryBalance')" label="查询余额" width="110" align="right">
             <template #default="{ row }">
-              <el-input-number :model-value="row.queryBalance" :disabled="isReadonly" :controls="false" size="small" @change="(v: number | undefined) => updateCell(row.id, 'queryBalance', v ?? 0)" />
+              <el-input-number :model-value="row.queryBalance" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small" @change="(v: number | undefined) => updateCell(row.id, 'queryBalance', v ?? 0)" />
             </template>
           </el-table-column>
           <el-table-column label="差异" width="110" align="right">

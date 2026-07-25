@@ -1,6 +1,9 @@
 <template>
 <div class="d3-adjudication">
   <div class="import-export-bar">
+    <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
+      <el-icon><Download /></el-icon>带入调整
+    </el-button>
     <el-button-group size="small">
       <el-button @click="onExportTemplate">导出模板</el-button>
       <el-button @click="onExportData">导出数据</el-button>
@@ -204,6 +207,15 @@
       </div>
     </template>
   </el-skeleton>
+
+  <AdjudicationBringInDialog
+    v-model="bringInVisible"
+    :matches="adjPull.matches.value"
+    :row-options="bringInRowOptions"
+    subject-label="2203 预收账款"
+    :loading="adjPull.loading.value"
+    @apply="onBringInApply"
+  />
 </div>
 </template>
 
@@ -213,10 +225,14 @@
  * 双区块(按性质+按账龄) + 变动率高亮 + 跨sheet取数 + 审计说明/结论
  */
 import { computed, inject, toRef, type Ref } from 'vue'
+import { Download } from '@element-plus/icons-vue'
 import { isChangeRateExceeding } from '../composables/useD3FormulaEngine'
 import { useD3Adjudication } from '../composables/useD3Adjudication'
 import { useD3AiGenerate } from '../composables/useD3AiGenerate'
 import { useD3TabImportExport } from '../composables/useD3TabImportExport'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { useAdjudicationBringIn } from '../composables/useAdjudicationBringIn'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import type { useD3CrossSheet } from '../composables/useD3CrossSheet'
 import type { ChecklistResponse } from '../composables/useD3FormData'
 
@@ -262,6 +278,38 @@ const {
 const { generateAndConfirm, aiAvailable, loading: aiLoading } = useD3AiGenerate(wpIdRef)
 
 const { onExportTemplate, onExportData, onImportFile } = useD3TabImportExport(wpIdRef, 'D3-1')
+
+// ─── 从集中登记带入调整（2203 预收账款，负债贷方；双维度→带入性质主维度，带入期末 AJE/RJE） ─
+// D3 为双维度（性质 AND 账龄）表示同一 2203 余额；带入至性质主维度（与手工录入一致），
+// 若触发"性质合计≠账龄合计"提示，审计师需在账龄维度同步反映（既有交叉校验保障）。
+const bringInRows = computed(() =>
+  (sections.value[0]?.rows ?? []).map((r) => ({
+    rowKey: r.rowKey,
+    name: r.label,
+    aje: r.currentAje,
+    rje: r.currentRje,
+  })),
+)
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: projectIdRef as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '2203',
+  direction: 'credit',
+  subjectCode: '2203',
+  wpCode: 'D3',
+  subjectLabel: '预收账款(2203)',
+  rows: bringInRows,
+  updateCell: (rowKey: string, field: any, value: number) =>
+    updateCell(rowKey, field === 'rje' ? 'currentRje' : 'currentAje', value),
+  totalAudited: () =>
+    sections.value[1]?.subtotalRow?.currentAudited ?? sections.value[0]?.subtotalRow?.currentAudited ?? 0,
+})
 
 async function genAgingReason() {
   if (props.isReadonly) return

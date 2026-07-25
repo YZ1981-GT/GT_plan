@@ -32,6 +32,7 @@
       <el-button size="small" type="success" :loading="disc.isSyncing.value" :disabled="isReadonly" @click="disc.syncToNotes()">
         同步到附注 {{ disc.noteTarget.value.sectionId }}
       </el-button>
+      <el-button size="small" type="primary" plain :disabled="!projectId" @click="jumpToNote('soe')">↩ 跳转回附注</el-button>
       <el-button size="small" type="primary" :disabled="isReadonly" @click="handleAdd">+ 新增项目</el-button>
       <el-tag size="small" type="info">目标章节 {{ disc.noteTarget.value.chipValue }}</el-tag>
       <span v-if="disc.reconcileDiff.value != null" class="reconcile">
@@ -210,6 +211,8 @@
  */
 import { computed, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useRouter } from 'vue-router'
+import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import { useI4Disclosure } from '../../composables/useI4Disclosure'
 
 const props = defineProps<{
@@ -224,6 +227,14 @@ const emit = defineEmits<{
   'navigate-sheet': [sheetName: string]
   'save': [itemId: string, value: any]
 }>()
+
+const router = useRouter()
+// 跳转回附注模块（披露表 → 附注为单向推送；此处仅导航，方便相互编辑确认）
+function jumpToNote(target: DisclosureVariant): void {
+  const route = buildNoteJumpRoute(props.projectId || '', 'I4', target)
+  if (!route) { ElMessage.warning('未找到对应的附注章节'); return }
+  router.push(route)
+}
 
 const variant = ref<'soe'>('soe')
 const disc = useI4Disclosure(

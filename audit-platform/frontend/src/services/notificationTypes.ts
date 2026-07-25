@@ -38,6 +38,11 @@ export const NOTIFICATION_TYPES = {
   PROCEDURE_TASK_REVIEWER_MISSING: 'procedure_task.reviewer_missing',
   PROCEDURE_TASK_DELEGATION_BATCH: 'procedure_task.delegation_batch',
   PROCEDURE_REVIEW_MESSAGE: 'procedure_review_message',
+  // ── adjustment-collaboration-and-propagation：调整分录协作接力（与后端 notification_types.py 同步）──
+  ADJ_COLLAB_ASSIGNED: 'adjustment_collaboration.assigned',
+  ADJ_COLLAB_CONTRIBUTED: 'adjustment_collaboration.contributed',
+  ADJ_COLLAB_CONFIRMED: 'adjustment_collaboration.confirmed',
+  ADJ_COLLAB_REJECTED: 'adjustment_collaboration.rejected',
 } as const
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[keyof typeof NOTIFICATION_TYPES]
@@ -68,6 +73,11 @@ export const NOTIFICATION_LABELS: Record<NotificationType, string> = {
   [NOTIFICATION_TYPES.PROCEDURE_TASK_REVIEWER_MISSING]: '缺少操作复核人',
   [NOTIFICATION_TYPES.PROCEDURE_TASK_DELEGATION_BATCH]: '程序任务批量委派',
   [NOTIFICATION_TYPES.PROCEDURE_REVIEW_MESSAGE]: '程序复核消息',
+  // 调整分录协作接力
+  [NOTIFICATION_TYPES.ADJ_COLLAB_ASSIGNED]: '调整分录协作转派',
+  [NOTIFICATION_TYPES.ADJ_COLLAB_CONTRIBUTED]: '协作补充已提交',
+  [NOTIFICATION_TYPES.ADJ_COLLAB_CONFIRMED]: '协作已确认',
+  [NOTIFICATION_TYPES.ADJ_COLLAB_REJECTED]: '协作已退回',
 }
 
 // ── 跳转规则 ──────────────────────────────────────────────────
@@ -125,6 +135,18 @@ export const NOTIFICATION_JUMP_ROUTES: Record<string, (meta: Record<string, any>
   // reviewer_missing / 批量委派摘要 → 我的程序任务页（批量摘要带 batch/project/filter）
   [NOTIFICATION_TYPES.PROCEDURE_TASK_REVIEWER_MISSING]: (m) => myProceduresRoute(m),
   [NOTIFICATION_TYPES.PROCEDURE_TASK_DELEGATION_BATCH]: (m) => myProceduresRoute(m),
+  // ── 调整分录协作接力 → 集中调整页并按 ?group= 定位该分录组（打开协作对话框）──
+  // metadata：project_id + object_id(entry_group_id)（后端 _notify 已补 project_id）。
+  [NOTIFICATION_TYPES.ADJ_COLLAB_ASSIGNED]: (m) => adjCollabRoute(m),
+  [NOTIFICATION_TYPES.ADJ_COLLAB_CONTRIBUTED]: (m) => adjCollabRoute(m),
+  [NOTIFICATION_TYPES.ADJ_COLLAB_CONFIRMED]: (m) => adjCollabRoute(m),
+  [NOTIFICATION_TYPES.ADJ_COLLAB_REJECTED]: (m) => adjCollabRoute(m),
+}
+
+/** 调整分录协作通知 → 集中调整页 + ?group=（Adjustments.vue 消费定位/开协作对话框）。 */
+function adjCollabRoute(m: Record<string, any>): string {
+  if (!m.project_id) return ''
+  return `/projects/${m.project_id}/adjustments${buildQuery({ group: m.object_id })}`
 }
 
 /** 拼接 query（跳过空值），返回 `?a=b&c=d` 或空串。 */

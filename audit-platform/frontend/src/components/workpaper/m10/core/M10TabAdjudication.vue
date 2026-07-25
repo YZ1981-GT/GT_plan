@@ -10,12 +10,9 @@
         </el-tag>
       </div>
       <div class="section-header-right">
-        <el-segmented
-          v-model="dualMode.mode.value"
-          :options="dualMode.modeOptions.value"
-          size="small"
-          @change="(val: any) => dualMode.switchMode(val)"
-        />
+        <el-button size="small" type="primary" plain :loading="adjPull.loading.value" :disabled="isReadonly" @click="openBringInAdjustment">
+          <el-icon><Download /></el-icon> 带入调整
+        </el-button>
         <el-button size="small" @click="handleAI('adjudication')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
@@ -431,8 +428,18 @@
         <li>审定数变化自动回写 TB（科目 4003）并通知附注组件</li>
         <li>合计行应与明细表M10-2的合计一致（交叉验证）</li>
         <li>如有工具被CAS37判定为负债，应从M10移出计入负债科目（参见M10-4区分检查表）</li>
+        <li>「带入调整」：从集中登记按科目 4003 拉取调整分录，逐笔分配到各工具组项目行的 AJE/RJE，带入后审定数自动更新并联动附注</li>
       </ul>
     </details>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="4003 其他权益工具"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
@@ -446,10 +453,10 @@
  * 与M10-2明细表交叉验证（绿勾/红警）
  */
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
-import { ElMessageBox } from 'element-plus'
-import { MagicStick, Check, CircleCheck, WarningFilled } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { MagicStick, Check, CircleCheck, WarningFilled, Download } from '@element-plus/icons-vue'
 import { useM10FormData } from '../../composables/useM10FormData'
-import { useM10DualMode } from '../../composables/useM10DualMode'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import {
   useM10Adjudication,
   type M10AdjudicationRow,
@@ -457,6 +464,9 @@ import {
   M10_INSTRUMENT_GROUPS,
 } from '../../composables/useM10Adjudication'
 import { useM10CrossSheet } from '../../composables/useM10CrossSheet'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import { useAuditContext } from '@/composables/useAuditContext'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import { fmtAmount } from '@/utils/formatters'
 import { eventBus } from '@/utils/eventBus'
 
@@ -468,7 +478,8 @@ const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => vo
 // ─── Composables ─────────────────────────────────────────────────────────────
 
 const formData = useM10FormData({ wpId: computed(() => props.wpId), projectId: computed(() => props.projectId) })
-const dualMode = useM10DualMode({ wpId: computed(() => props.wpId) })
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
 const rows = ref<M10AdjudicationRow[]>([])
 
 const {
@@ -488,6 +499,38 @@ const {
 } = useM10Adjudication(formData, rows)
 
 const { adjudicationVsDetail: crossValidation } = useM10CrossSheet(formData.allResponses)
+
+// ─── 从集中登记带入调整（4003 其他权益工具，权益贷方；单期 aje/rje，三组工具行） ───
+const bringInRows = computed(() =>
+  computedRows.value.map((r) => ({
+    rowKey: r.key,
+    name: r.itemName || '权益工具项目',
+    aje: r.aje ?? 0,
+    rje: r.rje ?? 0,
+  })),
+)
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: computed(() => props.projectId) as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '4003',
+  direction: 'credit',
+  subjectCode: '4003',
+  wpCode: 'M10',
+  subjectLabel: '其他权益工具(4003)',
+  rows: bringInRows,
+  updateCell: (rowKey: string, field: any, value: number) => {
+    const idx = rows.value.findIndex((r) => r.key === rowKey)
+    if (idx < 0) return
+    composableUpdateRow(idx, field === 'aje' ? 'aje' : 'rje', value)
+  },
+  totalAudited: () => totalRow.value.audited,
+})
 
 // ─── 原因分析存储 ────────────────────────────────────────────────────────────
 
@@ -606,7 +649,24 @@ function saveAuditNote() {
   formData.debouncedSave('M10-1-auditNote', { remark: auditNote.value || null })
 }
 
-function handleAI(_section: string) { /* AI辅助钩子 — Phase 6 集成 */ }
+async function handleAI(section: string) {
+  if (isReadonly.value) return
+  aiLoading.value = section
+  try {
+    const t: any = (totalRow as any)?.value ?? {}
+    const context: Record<string, string> = {
+      科目: '4003 其他权益工具 / 审定表（M10-1 权益类贷方）',
+      区段: section,
+      期初审定合计: fmtAmount(Number(t.beginAudited) || 0),
+      期末审定合计: fmtAmount(Number(t.endAudited) || 0),
+      变动额: fmtAmount(Number(t.varianceAmount) || 0),
+    }
+    const text = await generateAiText({ section: `m10-adjudication-${section}`, context, existingContent: auditNote.value })
+    if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+    auditNote.value = text
+    saveAuditNote()
+  } catch { ElMessage.warning('AI 生成失败，请稍后重试') } finally { aiLoading.value = '' }
+}
 function handleReview() { openReviewDialog?.('M10-1-adjudication', '其他权益工具审定表') }
 
 // ─── EventBus ────────────────────────────────────────────────────────────────

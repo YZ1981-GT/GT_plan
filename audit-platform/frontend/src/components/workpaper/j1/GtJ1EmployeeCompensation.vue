@@ -9,6 +9,7 @@
     <template v-else>
       <!-- 底稿目录 -->
       <J1TabIndex v-if="currentSheet === 'J1-index'"
+        :wp-id="wpId" :project-id="projectId"
         :all-responses="allResponses" :is-readonly="isReadonly ?? false" />
       <!-- J1A 程序表（整册专属组件内分发，对齐 H1A/L1A） -->
       <CycleTabProcedure

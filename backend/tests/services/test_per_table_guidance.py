@@ -174,3 +174,58 @@ def test_match_fallback_out_of_range_returns_none():
     names = ["表A", "表B"]
     # 游标已在末尾，+1 越界 → None
     assert _match_title_to_table_idx("完全不相关标题文字", names, 1) is None
+
+
+# ---------------------------------------------------------------------------
+def test_plain_table_name_lines_routed_as_titles_not_body():
+    """应收票据 五、4：text_sections 含与 tables[].name 精确相等的**无编号纯文本**
+    子表标题（非 # 非编号），须被判为标题（不进可编辑正文），仅保留真实叙述。
+
+    修复「提示内容漏进正文文本框」——此前 _is_table_title_paragraph 只认 #/编号标题，
+    这些纯文本表名标题漏进 substantive。
+    """
+    from app.services.disclosure_engine import classify_template_content
+
+    text_sections = [
+        "如果法律上认定供应链票据属于《商业汇票承兑、贴现与再贴现管理办法》"
+        "（中国人民银行中国银行保险监督管理委员会令〔2022〕第4号）的范围、"
+        "具备《票据法》规定的要件",
+        "期末本公司已质押的应收票据",
+        "期末本公司已背书或贴现但尚未到期的应收票据",
+        "期末本公司因出票人未履约而将其转应收账款的票据",
+        "按坏账计提方法分类",
+        "本期计提、收回或转回的坏账准备情况",
+        "本期实际核销的应收票据情况",
+    ]
+    tables = [
+        {"name": "应收票据"},
+        {"name": "期末本公司已质押的应收票据"},
+        {"name": "期末本公司已背书或贴现但尚未到期的应收票据"},
+        {"name": "期末本公司因出票人未履约而将其转应收账款的票据"},
+        {"name": "按坏账计提方法分类"},
+        {"name": "本期计提、收回或转回的坏账准备情况"},
+        {"name": "本期实际核销的应收票据情况"},
+    ]
+
+    substantive, section_guidance, per_table = classify_template_content(
+        text_sections, None, tables,
+    )
+
+    # 6 个表名标题不得漏进正文
+    for title in text_sections[1:]:
+        assert not (substantive and title in substantive), f"表名标题漏进正文: {title}"
+    # 仅保留真实叙述句
+    assert substantive is not None
+    assert substantive.startswith("如果法律上认定供应链票据")
+
+
+def test_plain_table_name_exact_only_not_substring():
+    """精确等于才判标题；含表名子串的实质正文不被误吞（保守，避免误删正文）。"""
+    from app.services.disclosure_engine import classify_template_content
+
+    tables = [{"name": "货币资金"}, {"name": "受限制的货币资金明细"}]
+    text_sections = [
+        "本公司货币资金主要为银行存款，不存在使用受限情况。",  # 含"货币资金"子串但非表名 → 正文
+    ]
+    substantive, _guidance, _per = classify_template_content(text_sections, None, tables)
+    assert substantive == "本公司货币资金主要为银行存款，不存在使用受限情况。"

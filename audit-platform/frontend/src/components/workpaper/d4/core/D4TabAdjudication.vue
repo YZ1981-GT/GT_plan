@@ -9,9 +9,13 @@
  * Requirements: 2.1-2.10, 19.1, 21.1
  */
 import { computed, ref, inject, toRef, type Ref } from 'vue'
+import { Download } from '@element-plus/icons-vue'
 import { useD4Adjudication, type AdjudicationRow, type AdjudicationSection } from '../../composables/useD4Adjudication'
 import { isChangeRateExceeding } from '../../composables/useD4FormulaEngine'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
@@ -79,6 +83,39 @@ const {
   projectId: toRef(props, 'projectId') as Ref<string>,
   allResponses: toRef(props, 'allResponses') as Ref<Map<string, any>>,
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
+})
+
+// ─── 从集中登记带入调整（6001+6051 营业收入，损益贷方；带入期末 AJE/RJE） ────────
+// 仅可编辑手工行（非 D4-2/D4-3 跨表行）可作为带入目标；如无可编辑行，审计师需先"添加产品行"。
+const bringInRows = computed(() => {
+  const out: { rowKey: string; name: string; aje: number; rje: number }[] = []
+  for (const sec of sections.value) {
+    for (const r of sec.rows) {
+      if (r.isEditable && !r.isFromCrossSheet) {
+        out.push({ rowKey: r.rowKey, name: r.label || '(未命名)', aje: r.currentAje, rje: r.currentRje })
+      }
+    }
+  }
+  return out
+})
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: toRef(props, 'projectId') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: ['6001', '6051'],
+  direction: 'credit',
+  subjectCode: '6001',
+  wpCode: 'D4',
+  subjectLabel: '营业收入(6001/6051)',
+  rows: bringInRows,
+  updateCell: (rowKey: string, field: any, value: number) =>
+    updateCell(rowKey, field === 'rje' ? 'currentRje' : 'currentAje', value),
+  totalAudited: () => grandTotalRow.value.currentAudited,
 })
 
 // ─── 变动率计算（基于审定数） ───────────────────────────────────────────
@@ -175,6 +212,9 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
 <template>
   <div class="d4-tab-adjudication">
     <div class="import-export-bar">
+      <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
+        <el-icon><Download /></el-icon>带入调整
+      </el-button>
       <el-button-group size="small">
         <el-button @click="onExportTemplate">导出模板</el-button>
         <el-button @click="onExportData">导出数据</el-button>
@@ -494,6 +534,15 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
         <p>提示2: 针对被近一个会计年度经审计营业收入低于3亿元（沪深主板）/1亿元（科创板、创业板）和净利润及扣除非经常性损益后的净利润均为正值的公司，会计师事务所应当对其日常经营性营业收入扣除情况出具专项核查意见。项目组需完成营业收入扣除情况及相关信息核查表（查看模板）。</p>
       </div>
     </details>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="6001/6051 营业收入"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 

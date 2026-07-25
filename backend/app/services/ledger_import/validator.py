@@ -162,6 +162,11 @@ _AMOUNT_FIELDS: set[str] = {
     "opening_credit",
     "closing_debit",
     "closing_credit",
+    # 年度维度金额列（年初/本年累计）——与月度列同为金额字段，值非空须可解析为数值
+    "year_opening_debit",
+    "year_opening_credit",
+    "year_debit",
+    "year_credit",
 }
 
 # 日期类字段名集合
@@ -295,12 +300,18 @@ def validate_l1(
             "debit_amount", "credit_amount",
             "opening_debit", "opening_credit",
             "closing_debit", "closing_credit",
+            # 年度维度金额列：一份余额表可能只有年度列或只有月度列，
+            # 故年度列也纳入"允许全空"的互斥组，避免缺年度列时整行被误跳过。
+            "year_opening_debit", "year_opening_credit",
+            "year_debit", "year_credit",
         },
         "aux_balance": {
             "opening_balance", "closing_balance",
             "debit_amount", "credit_amount",
             "opening_debit", "opening_credit",
             "closing_debit", "closing_credit",
+            "year_opening_debit", "year_opening_credit",
+            "year_debit", "year_credit",
         },
     }
     exclusive_pair = _EXCLUSIVE_KEY_PAIRS.get(table_type, set())

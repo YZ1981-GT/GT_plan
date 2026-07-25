@@ -243,19 +243,30 @@ async def sample_voucher(
 async def list_sampled_vouchers(
     project_id: UUID,
     year: int = Query(...),
+    working_paper_id: UUID | None = Query(
+        None, description="按目标底稿过滤（挂凭到底稿联动，底稿凭证检查拉取自己挂入的凭证）"
+    ),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
-    """抽样凭证清单"""
+    """抽样凭证清单。
+
+    可选 ``working_paper_id`` 过滤：底稿的凭证检查表据此只拉取「挂凭到底稿」挂到
+    自己的凭证（与序时账手工挂凭联动）。
+    """
     import sqlalchemy as sa
     from app.models.workpaper_models import SampledVoucher
 
+    conds = [
+        SampledVoucher.project_id == project_id,
+        SampledVoucher.year == year,
+        SampledVoucher.is_deleted == sa.false(),
+    ]
+    if working_paper_id is not None:
+        conds.append(SampledVoucher.working_paper_id == working_paper_id)
+
     result = await db.execute(
-        sa.select(SampledVoucher).where(
-            SampledVoucher.project_id == project_id,
-            SampledVoucher.year == year,
-            SampledVoucher.is_deleted == sa.false(),
-        ).order_by(SampledVoucher.sampled_at.desc())
+        sa.select(SampledVoucher).where(*conds).order_by(SampledVoucher.sampled_at.desc())
     )
     rows = result.scalars().all()
     return {
@@ -799,18 +810,31 @@ async def export_ledger_excel(
         where.append(tbl.c.voucher_date <= date_to)
     stmt = (
         sa.select(tbl.c.voucher_date, tbl.c.voucher_no, tbl.c.summary,
-                   tbl.c.debit_amount, tbl.c.credit_amount, tbl.c.counterpart_account)
+                   tbl.c.debit_amount, tbl.c.credit_amount, tbl.c.counterpart_account,
+                   tbl.c.raw_extra)
         .where(*where).order_by(tbl.c.voucher_date, tbl.c.voucher_no)
     )
     result = await db.execute(stmt)
-    rows = result.fetchall()
+    # raw_extra 展开为 extra_fields（过滤 _ 前缀系统标记），与前端/查询口径一致
+    from app.services.ledger_penetration_service import _attach_extra_fields
+    rows = _attach_extra_fields([dict(r._mapping) for r in result.fetchall()])
+
+    # 本次导出所有行的 extra_fields 键并集（保持首次出现顺序）
+    extra_cols: list[str] = []
+    _seen_extra: set = set()
+    for r in rows:
+        for k in r["extra_fields"]:
+            if k not in _seen_extra:
+                _seen_extra.add(k)
+                extra_cols.append(k)
 
     wb = openpyxl.Workbook()
     ws = wb.active
     acct_label = account_code.replace('*', '')
     ws.title = f"序时账_{acct_label}"
 
-    headers = ["日期", "凭证号", "摘要", "借方", "贷方", "余额", "对方科目"]
+    # 固定列 + raw_extra 业务额外列（并集为空则与原导出完全一致，零回归）
+    headers = ["日期", "凭证号", "摘要", "借方", "贷方", "余额", "对方科目"] + extra_cols
     header_font = Font(bold=True)
     header_fill = PatternFill(start_color="F0ECF7", end_color="F0ECF7", fill_type="solid")
     for col, h in enumerate(headers, 1):
@@ -838,11 +862,11 @@ async def export_ledger_excel(
     excel_row = 3
 
     for row in rows:
-        vd = row[0]
+        vd = row["voucher_date"]
         vd_str = vd.isoformat() if hasattr(vd, 'isoformat') else str(vd or '')
         month = vd_str[:7]
-        d = float(row[3] or 0)
-        c = float(row[4] or 0)
+        d = float(row["debit_amount"] or 0)
+        c = float(row["credit_amount"] or 0)
         balance += d - c
         month_debit += d
         month_credit += c
@@ -865,12 +889,18 @@ async def export_ledger_excel(
             last_month = month
 
         ws.cell(excel_row, 1, vd_str)
-        ws.cell(excel_row, 2, row[1])
-        ws.cell(excel_row, 3, row[2])
+        ws.cell(excel_row, 2, row["voucher_no"])
+        ws.cell(excel_row, 3, row["summary"])
         ws.cell(excel_row, 4, d if d else None)
         ws.cell(excel_row, 5, c if c else None)
         ws.cell(excel_row, 6, balance)
-        ws.cell(excel_row, 7, row[5])
+        ws.cell(excel_row, 7, row["counterpart_account"])
+        # 对方科目列之后按额外列顺序写入 extra_fields（缺失写空）
+        for offset, k in enumerate(extra_cols):
+            val = row["extra_fields"].get(k, "")
+            if isinstance(val, (dict, list)):
+                val = str(val)
+            ws.cell(excel_row, 8 + offset, val)
         excel_row += 1
 
     # 最后一个月的小计
@@ -883,7 +913,7 @@ async def export_ledger_excel(
             ws.cell(excel_row, col).font = subtotal_font
             ws.cell(excel_row, col).fill = subtotal_fill
 
-    widths = [12, 12, 30, 16, 16, 16, 16]
+    widths = [12, 12, 30, 16, 16, 16, 16] + [18] * len(extra_cols)
     for col, w in enumerate(widths, 1):
         ws.column_dimensions[openpyxl.utils.get_column_letter(col)].width = w
 

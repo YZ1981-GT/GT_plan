@@ -61,6 +61,23 @@
       </el-descriptions>
     </div>
 
+    <!-- ─── E1 货币资金：跨表结论口径卡片（追加于底稿架构上方，不改动既有架构树/循环网格） ─── -->
+    <E1TabDirectory
+      v-if="isE1Series"
+      :wp-id="wpId"
+      :available-sheets="htmlData?.navigation_rows"
+      @navigate="handleNavigate"
+    />
+
+    <!-- ─── D~N 各科目：通用目录卡（复核+编制/使用手册+进度+跨表结论口径，追加于底稿架构上方） ─── -->
+    <GtCycleDirectoryCard
+      v-if="showCycleDirCard"
+      :wp-id="wpId"
+      :wp-code="currentWpCode"
+      :available-sheets="htmlData?.navigation_rows"
+      @navigate="handleNavigate"
+    />
+
     <!-- ─── B60 总体审计策略专属组件（章节结构化 + 子底稿双模式/结构化 + 工时表切页） ─── -->
     <GtB60Bundle
       v-if="isB60Series"
@@ -125,6 +142,8 @@ import { useRoute, useRouter } from 'vue-router'
 import GtBArchitectureTree from '@/components/workpaper/GtBArchitectureTree.vue'
 
 const GtB60Bundle = defineAsyncComponent(() => import('./b60/GtB60Bundle.vue'))
+const E1TabDirectory = defineAsyncComponent(() => import('./e1/E1TabDirectory.vue'))
+const GtCycleDirectoryCard = defineAsyncComponent(() => import('./GtCycleDirectoryCard.vue'))
 
 // ─── Types ───
 interface NavigationRow {
@@ -196,6 +215,17 @@ const currentWpCode = computed<string>(() => {
 })
 // B60「总体审计策略及具体审计计划」是多文件底稿（1 xlsx + 9 docx）
 const isB60Series = computed<boolean>(() => currentWpCode.value === 'B60')
+// E1 货币资金：目录页在底稿架构上方追加「跨表结论口径」卡片
+const isE1Series = computed<boolean>(() => currentWpCode.value === 'E1')
+// D~N 各科目：目录页在底稿架构上方追加通用「目录卡（复核+手册+进度+跨表结论口径）」
+// （E1 用专属 E1TabDirectory；K 循环走专属 GtK{n} 不经 GtBIndex；A/B/C 规划类不加）
+const CYCLE_DIR_CARD_LETTERS = new Set(['D', 'F', 'G', 'H', 'I', 'J', 'L', 'M', 'N'])
+const showCycleDirCard = computed<boolean>(() => {
+  const code = currentWpCode.value || ''
+  if (isE1Series.value || isB60Series.value) return false
+  const m = /^([A-N])\d+$/.exec(code)
+  return !!m && CYCLE_DIR_CARD_LETTERS.has(m[1])
+})
 // B60-* 子底稿 wp_id 映射（从 cycle_workpapers 派生，供 GtB60Bundle 在线编辑取子底稿 wp）
 const b60SubWpIdMap = computed<Record<string, string>>(() => {
   const map: Record<string, string> = {}

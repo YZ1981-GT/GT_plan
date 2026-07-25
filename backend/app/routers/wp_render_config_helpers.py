@@ -54,6 +54,82 @@ def _confirmation_initial_data(component_type: str) -> dict:
     return {"_format": fmt, "rows": [], "sampling": {}, "notes": {}, "conclusion": {}}
 
 
+# ─── 函证覆盖率 population（科目审定总额）解析与注入 ──────────────────────────
+# 中文科目名 → TB 标准科目编码前缀（confirmation 相关科目 canonical 子集）
+_ACCOUNT_TYPE_TO_CODE_PREFIX: dict[str, str] = {
+    "库存现金": "1001", "银行存款": "1002", "其他货币资金": "1012",
+    "应收票据": "1121", "应收账款": "1122", "预付账款": "1123",
+    "其他应收款": "1221", "长期应收款": "1531",
+    "应付票据": "2201", "应付账款": "2202", "预收账款": "2203",
+    "其他应付款": "2241", "合同负债": "2203",
+    "短期借款": "2001", "长期借款": "2501",
+}
+
+
+async def _resolve_confirmation_population(
+    db: AsyncSession,
+    project_id: UUID | str,
+    year: int | None,
+    rows: list[dict],
+) -> float | None:
+    """从函证行的科目类型解析科目审定总额（Σ 相关科目 trial_balance 审定）。
+
+    - 中文科目名（account_type）→ 编码前缀 → SUM(audited_amount) LIKE '前缀%'。
+    - 每前缀净额取绝对值后累加（科目账面余额量级；trial_balance v2 本为自然正数，abs 为安全兜底）。
+    - 无法映射任一前缀 / year 缺失 / SUM 为 0 → None（Skip-on-missing，不臆测、不返回 0 冒充）。
+    - 查询异常 → None（fail-open，不阻断渲染）。
+    """
+    if not rows or year is None:
+        return None
+    types = {str(r.get("account_type") or "").strip() for r in rows if isinstance(r, dict)}
+    prefixes = {p for t in types if (p := _ACCOUNT_TYPE_TO_CODE_PREFIX.get(t))}
+    if not prefixes:
+        return None
+    total = 0.0
+    matched = False
+    try:
+        for prefix in prefixes:
+            result = await db.execute(
+                sa.text(
+                    "SELECT SUM(audited_amount) AS s FROM trial_balance "
+                    "WHERE project_id = :pid AND year = :year AND is_deleted = false "
+                    "AND standard_account_code LIKE :pat"
+                ),
+                {"pid": str(project_id), "year": year, "pat": f"{prefix}%"},
+            )
+            s = result.scalar()
+            if s is not None:
+                matched = True
+                total += abs(float(s))
+    except Exception:  # noqa: BLE001 — 取数失败不阻断渲染
+        return None
+    if not matched or total <= 0:
+        return None
+    return total
+
+
+async def _inject_confirmation_population(
+    db: AsyncSession,
+    project_id: UUID | str,
+    year: int | None,
+    sheet_html_data: dict,
+) -> None:
+    """向 confirmation-summary 的 htmlData 加法式注入 project_context.population_amount。
+
+    - 仅处理含 confirmation-v1 rows 的 dict；不改 rows/_format/其它字段（additive）。
+    - population 不可解析 → 注入 null（前端据此显示"不可用"，不用 0 冒充）。
+    """
+    if not isinstance(sheet_html_data, dict):
+        return
+    rows = sheet_html_data.get("rows")
+    population = await _resolve_confirmation_population(
+        db, project_id, year, rows if isinstance(rows, list) else []
+    )
+    ctx = sheet_html_data.setdefault("project_context", {})
+    if isinstance(ctx, dict):
+        ctx["population_amount"] = population
+
+
 # 标准底稿编号判定：统一使用 ACNR grammar_v1 的 STANDARD_WP_CODE_RE (R12.2)
 # 旧版 [A-I]\d 已修正为 [A-S]\d，覆盖 J~S 循环（R12.4, R12.5）
 from app.services.acnr.grammar import is_standard_wp_code as _is_standard_wp_code_fn

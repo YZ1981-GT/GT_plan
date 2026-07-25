@@ -25,6 +25,7 @@
             <el-button size="small" type="primary" link @click="generateAI('disclosure-listed')">
               <el-icon><MagicStick /></el-icon>AI辅助
             </el-button>
+            <el-button size="small" type="primary" plain :disabled="!projectId" @click="jumpToNote('listed')">↩ 跳转回附注</el-button>
           </div>
         </div>
       </template>
@@ -150,6 +151,8 @@ import { ElMessage } from 'element-plus'
 import { Refresh, MagicStick } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
 import { generateK13AiText } from '../../composables/useK13AiText'
+import { useRouter } from 'vue-router'
+import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 
 const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
 
@@ -165,6 +168,14 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'save', itemId: string, value: any): void
 }>()
+
+const router = useRouter()
+// 跳转回附注模块（披露表 → 附注为单向推送；此处仅导航，方便相互编辑确认）
+function jumpToNote(target: DisclosureVariant): void {
+  const route = buildNoteJumpRoute(props.projectId || '', 'K13', target)
+  if (!route) { ElMessage.warning('未找到对应的附注章节'); return }
+  router.push(route)
+}
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 

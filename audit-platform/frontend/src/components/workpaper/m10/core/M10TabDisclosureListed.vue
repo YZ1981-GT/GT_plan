@@ -220,8 +220,10 @@
  */
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
 import { MagicStick, Check } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import { useM10FormData } from '../../composables/useM10FormData'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import { calcEquityEndBalance } from '../../composables/useM10FormulaEngine'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
@@ -321,7 +323,41 @@ function handleOtherDisclosureChange() {
   formData.debouncedSave('M10-disclosure-listed-other-disclosure', { remark: otherDisclosure.value || null })
 }
 
-function handleAI(_section: string) {}
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
+
+async function handleAI(section: string) {
+  if (props.isReadonly) return
+  aiLoading.value = section
+  try {
+    const totalRow = instrumentRows.value.find(r => r._isTotal)
+    const context: Record<string, string> = {
+      科目: '4003 其他权益工具 / 附注披露信息（上市公司）',
+      区段: section,
+      期末余额合计: fmtAmount(totalRow?.endBalance ?? 0),
+      本期发行合计: fmtAmount(totalRow?.issuance ?? 0),
+      本期赎回合计: fmtAmount(totalRow?.redemption ?? 0),
+      利息股息合计: fmtAmount(totalRow?.interestDividend ?? 0),
+    }
+    if (section === 'section-terms-summary') {
+      const text = await generateAiText({ section: 'm10-disclosure-listed-terms', context, existingContent: termsSummary.value })
+      if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+      termsSummary.value = text; handleTermsSummaryChange()
+    } else if (section === 'section-distribution') {
+      const text = await generateAiText({ section: 'm10-disclosure-listed-distribution', context, existingContent: distributionNote.value })
+      if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+      distributionNote.value = text; handleDistributionNoteChange()
+    } else if (section === 'section-other') {
+      const text = await generateAiText({ section: 'm10-disclosure-listed-other', context, existingContent: otherDisclosure.value })
+      if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+      otherDisclosure.value = text; handleOtherDisclosureChange()
+    } else {
+      const text = await generateAiText({ section: `m10-disclosure-listed-${section}`, context })
+      if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+      ElMessageBox.alert(text, 'AI 辅助 — 其他权益工具附注建议', { confirmButtonText: '知道了' }).catch(() => { /* 用户关闭 */ })
+    }
+  } catch { ElMessage.warning('AI 生成失败，请稍后重试') } finally { aiLoading.value = '' }
+}
 
 function handleReview() {
   openReviewDialog?.('M10-disclosure-listed', '其他权益工具附注（上市）')

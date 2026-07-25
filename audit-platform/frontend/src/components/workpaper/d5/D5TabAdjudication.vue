@@ -21,7 +21,11 @@
 
     <!-- 工具栏 -->
     <div class="tab-toolbar">
-      <div class="toolbar-left"></div>
+      <div class="toolbar-left">
+        <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
+          <el-icon><Download /></el-icon>带入调整
+        </el-button>
+      </div>
       <div class="toolbar-right">
         <el-dropdown size="small" trigger="click" :disabled="isReadonly">
           <el-button size="small">导入导出 ▾</el-button>
@@ -213,6 +217,15 @@
         />
       </div>
     </el-card>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="1124 应收款项融资"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
 </div>
 </template>
 
@@ -228,11 +241,14 @@
  * Requirements: 2.1-2.8, 3.4, 3.6, 3.7, 10.4-10.6
  */
 import { ref, computed, inject, toRef, type Ref } from 'vue'
-import { InfoFilled } from '@element-plus/icons-vue'
+import { InfoFilled, Download } from '@element-plus/icons-vue'
 import { isChangeRateExceeding } from '../composables/useD5FormulaEngine'
 import { useD5Adjudication } from '../composables/useD5Adjudication'
 import { useD5AiGenerate } from '../composables/useD5AiGenerate'
 import { useD5TabImportExport } from '../composables/useD5TabImportExport'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { useAdjudicationBringIn } from '../composables/useAdjudicationBringIn'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import type { useD5CrossSheet } from '../composables/useD5CrossSheet'
 import type { ChecklistResponse } from '../composables/useD5FormData'
 
@@ -279,6 +295,34 @@ const {
 const displayRows = computed(() =>
   rows.value.filter(r => r.rowKey !== 'trial-balance' && r.rowKey !== 'difference'),
 )
+
+// ─── 从集中登记带入调整（1124 应收款项融资，资产借方；带入期末 AJE/RJE） ──────────
+// 带入目标为应收票据/应收账款两个组件行（OCI 变动/小计/合计等派生行不作为目标）。
+const D5_BRING_IN_ROWS = ['notes-receivable', 'accounts-receivable']
+const bringInRows = computed(() =>
+  rows.value
+    .filter((r) => D5_BRING_IN_ROWS.includes(r.rowKey))
+    .map((r) => ({ rowKey: r.rowKey, name: r.label, aje: r.currentAje, rje: r.currentRje })),
+)
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: toRef(props, 'projectId') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '1124',
+  direction: 'debit',
+  subjectCode: '1124',
+  wpCode: 'D5',
+  subjectLabel: '应收款项融资(1124)',
+  rows: bringInRows,
+  updateCell: (rowKey: string, field: any, value: number) =>
+    updateCell(rowKey, field === 'rje' ? 'currentRje' : 'currentAje', value),
+  totalAudited: () => rows.value.find((r) => r.rowKey === 'fv-total')?.currentAudited ?? 0,
+})
 
 const { generateAndConfirm, aiAvailable, loading: aiLoading } = useD5AiGenerate(toRef(props, 'wpId'))
 

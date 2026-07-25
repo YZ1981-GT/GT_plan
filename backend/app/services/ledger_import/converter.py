@@ -61,6 +61,20 @@ def safe_decimal(val) -> Optional[Decimal]:
         return None
 
 
+def _first_decimal(*vals) -> Optional[Decimal]:
+    """按顺序返回首个可解析为 Decimal 的值（``Decimal(0)`` 视为有值），全缺返回 None。
+
+    🔴 禁用 ``or`` 做取数优先级选择：``Decimal(0)`` 是合法余额/发生额但 falsy，
+    ``x or y`` 会把 0 误判为缺失跳到兜底。空串 / None / 不可解析 → 视为缺失，
+    落到下一个候选（如年度列为空时兜底月度列）。
+    """
+    for v in vals:
+        d = safe_decimal(v)
+        if d is not None:
+            return d
+    return None
+
+
 def parse_date_val(val) -> Optional[date]:
     """解析日期值，支持多种格式 + datetime 对象。"""
     if val is None:
@@ -349,16 +363,12 @@ def convert_balance_rows(
         account_name = str(row.get("account_name", "")).strip() or None
         company_code = str(row.get("company_code", "")).strip() or default_company
 
-        # ── 期初 ──
-        od = safe_decimal(row.get("opening_debit"))
-        oc = safe_decimal(row.get("opening_credit"))
+        # ── 期初：年度优先（年初 → 期初分列），月度兜底 ──
+        # 年度审计口径：优先取年初借/贷（year_opening_*），缺失才用期初借/贷（月度）。
+        od = _first_decimal(row.get("year_opening_debit"), row.get("opening_debit"))
+        oc = _first_decimal(row.get("year_opening_credit"), row.get("opening_credit"))
         opening_bal = safe_decimal(row.get("opening_balance"))
         opening_dir = row.get("opening_direction") or row.get("direction")
-
-        # 年初余额作为备选
-        if od is None and oc is None and opening_bal is None:
-            od = safe_decimal(row.get("year_opening_debit"))
-            oc = safe_decimal(row.get("year_opening_credit"))
 
         # 方向来源（需求 5.3/5.4）：借贷分列优先标 split_columns，
         # 显式方向列标 explicit_direction，否则留空交由类别推断兜底。
@@ -422,8 +432,9 @@ def convert_balance_rows(
             closing_source_mode = None
             closing_source_direction = None
 
-        debit_amount = safe_decimal(row.get("debit_amount"))
-        credit_amount = safe_decimal(row.get("credit_amount"))
+        # ── 发生额：本年累计优先（year_debit/credit），本期兜底 ──
+        debit_amount = _first_decimal(row.get("year_debit"), row.get("debit_amount"))
+        credit_amount = _first_decimal(row.get("year_credit"), row.get("credit_amount"))
 
         # ── 辅助维度 ──
         aux_dim_str = str(row.get("aux_dimensions", "")).strip()

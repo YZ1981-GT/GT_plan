@@ -87,7 +87,7 @@
                 </div>
               </el-tooltip>
               <el-tooltip content="查看和编辑审计底稿（需先生成底稿）" placement="top">
-                <div class="gt-quick-btn" @click="goTo('workpapers')">
+                <div class="gt-quick-btn" @click="goTo('workpapers', { view: 'lifecycle' })">
                   <el-icon :size="20" color="var(--gt-color-primary-light)"><Document /></el-icon>
                   <span>底稿</span>
                 </div>
@@ -832,11 +832,11 @@ watch(() => props.project?.id, async (newId) => {
   }
 }, { immediate: true })
 
-function goTo(page: string) {
+function goTo(page: string, extraQuery?: Record<string, string>) {
   if (!props.project) return
   router.push({
     path: `/projects/${props.project.id}/${page}`,
-    query: { year: String(projectYear.value) },
+    query: { year: String(projectYear.value), ...extraQuery },
   })
 }
 

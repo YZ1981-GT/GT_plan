@@ -11,6 +11,7 @@
  */
 import { ref, computed, inject, toRef, onMounted, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Download } from '@element-plus/icons-vue'
 import {
   useD1Adjudication,
   type AdjudicationDetailRow,
@@ -21,6 +22,9 @@ import type { ChecklistResponse } from '../composables/useD1FormData'
 import GtReviewDot from '../GtReviewDot.vue'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
 import { useD1TabImportExport } from '../composables/useD1TabImportExport'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { useAdjudicationBringIn } from '../composables/useAdjudicationBringIn'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import http from '@/utils/http'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
@@ -71,6 +75,36 @@ const {
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
   openReviewDialog: openReviewDialog ?? undefined,
   tbSeedAmount: computed(() => props.tbSeedAmount ?? 0) as Ref<number>,
+})
+
+// ─── 从集中登记带入调整（1121 应收票据，资产借方；带入期末 AJE/RJE） ─────────────
+const bringInRows = computed(() => {
+  const gross = adjudicationSections.value.find((s) => s.sectionKey === 'gross')
+  return (gross?.rows ?? []).map((r) => ({
+    rowKey: r.rowKey,
+    name: r.label,
+    aje: r.currentAje,
+    rje: r.currentRje,
+  }))
+})
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: toRef(props, 'projectId') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '1121',
+  direction: 'debit',
+  subjectCode: '1121',
+  wpCode: 'D1',
+  subjectLabel: '应收票据(1121)',
+  rows: bringInRows,
+  updateCell: (rowKey: string, field: any, value: number) =>
+    updateCell(rowKey, field === 'rje' ? 'current-rje' : 'current-aje', value),
+  totalAudited: () => trialBalanceDiff.value.auditedAmount,
 })
 
 // ─── Loading & Active Threads ────────────────────────────────────────────────
@@ -176,6 +210,9 @@ async function handleAiConclusion() {
     <div class="tab-header">
       <h4>审定表 D1-1</h4>
       <div class="toolbar-right">
+        <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
+          <el-icon><Download /></el-icon>带入调整
+        </el-button>
         <el-button size="small" @click="onExportTemplate">导出模板</el-button>
         <el-button size="small" @click="onExportData">导出数据</el-button>
         <el-upload :show-file-list="false" accept=".xlsx" :before-upload="onImportFile">
@@ -390,6 +427,15 @@ async function handleAiConclusion() {
         </div>
       </div>
     </template>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="1121 应收票据"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 

@@ -235,7 +235,8 @@ async def test_apply_history_reuse_hits_within_window(db_session: AsyncSession) 
     assert mapped["科目编码"].confidence >= 90
 
     assert mapped["借方金额"].standard_field == "debit_amount"
-    assert mapped["借方金额"].column_tier == "key"
+    # 年度语义：本期借方（月度维度）为推荐列（spec balance-import-annual-column-semantics R2.2）
+    assert mapped["借方金额"].column_tier == "recommended"
 
     # detection_evidence 带上命中信息
     evidence = result.files[0].sheets[0].detection_evidence

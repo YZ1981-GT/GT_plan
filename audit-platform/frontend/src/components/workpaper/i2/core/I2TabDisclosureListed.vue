@@ -16,6 +16,7 @@
           data-testid="i2-listed-sync-notes"
           @click="syncToNotes"
         >同步到附注</el-button>
+        <el-button size="small" type="primary" plain :disabled="!projectId" @click="jumpToNote('listed')">↩ 跳转回附注</el-button>
         <el-button size="small" type="success" :disabled="isReadonly" @click="handleSave">保存</el-button>
         <el-button size="small" type="default" text @click="handleReview">复核</el-button>
       </div>
@@ -289,6 +290,8 @@
 <script setup lang="ts">
 import { ref, toRef, inject } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useRouter } from 'vue-router'
+import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { useI2Disclosure } from '../../composables/useI2Disclosure'
 import { buildI2ListedSyncPayloads } from '../../composables/i2DisclosureSyncPayload'
@@ -307,6 +310,14 @@ const props = defineProps<{
 
 const emit = defineEmits<{ save: []; 'navigate-sheet': [sheetName: string] }>()
 const openReviewDialog = inject<(section: string) => void>('openReviewDialog', () => {})
+
+const router = useRouter()
+// 跳转回附注模块（披露表 → 附注为单向推送；此处仅导航，方便相互编辑确认）
+function jumpToNote(target: DisclosureVariant): void {
+  const route = buildNoteJumpRoute(props.projectId || '', 'I2', target)
+  if (!route) { ElMessage.warning('未找到对应的附注章节'); return }
+  router.push(route)
+}
 
 const isSyncing = ref(false)
 const allResponsesRef = toRef(props, 'allResponses')

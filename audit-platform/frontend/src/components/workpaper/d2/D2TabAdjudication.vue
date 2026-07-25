@@ -4,12 +4,16 @@
  * 按 Excel 模板恢复区块样式，并支持账龄段枚举口径（3年段 / 5年段 / 自定义）
  */
 import { computed, inject, ref, toRef, watch, type Ref } from 'vue'
+import { Download } from '@element-plus/icons-vue'
 import { useD2Adjudication, type AdjudicationRow } from '../composables/useD2Adjudication'
 import { useD2CrossSheet } from '../composables/useD2CrossSheet'
 import { useD2AiGenerate } from '../composables/useD2AiGenerate'
 import { useD2TabImportExport } from '../composables/useD2TabImportExport'
 import { getChangeRate } from '../composables/useD2FormulaEngine'
 import { useD2SaveInject } from '../composables/useD2SaveInject'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { useAdjudicationBringIn } from '../composables/useAdjudicationBringIn'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import GtIndexChip from '../GtIndexChip.vue'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
@@ -46,6 +50,32 @@ const {
 } = useD2Adjudication(baseOpts)
 
 const crossSheet = useD2CrossSheet({ allResponses: toRef(props, 'allResponses') as Ref<Map<string, any>> })
+
+// ─── 从集中登记带入调整（1122 应收账款，资产借方；带入期末 AJE/RJE） ────────────
+const bringInRows = computed(() =>
+  adjudicationRows.value
+    .filter((r) => r.rowKey !== 'total')
+    .map((r) => ({ rowKey: r.rowKey, name: r.label, aje: r.currentAje, rje: r.currentRje })),
+)
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: toRef(props, 'projectId') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '1122',
+  direction: 'debit',
+  subjectCode: '1122',
+  wpCode: 'D2',
+  subjectLabel: '应收账款(1122)',
+  rows: bringInRows,
+  updateCell: (rowKey: string, field: any, value: number) =>
+    updateCell(rowKey, field === 'rje' ? 'current-rje' : 'current-aje', value),
+  totalAudited: () => totalRow.value.currentAudited,
+})
 
 const { generateAndConfirm, aiAvailable } = useD2AiGenerate(toRef(props, 'wpId'))
 
@@ -516,6 +546,9 @@ async function onAiNote(section: 'adj-note' | 'adj-conclusion'): Promise<void> {
       <h4>应收账款审定表 D2-1</h4>
       <GtReviewTrigger section-id="D2-adj-header" />
       <div class="toolbar-right">
+        <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
+          <el-icon><Download /></el-icon>带入调整
+        </el-button>
         <el-button size="small" @click="onExportTemplate">导出模板</el-button>
         <el-button size="small" @click="onExportData">导出数据</el-button>
         <el-upload :show-file-list="false" accept=".xlsx" :before-upload="onImportFile">
@@ -745,6 +778,15 @@ async function onAiNote(section: 'adj-note' | 'adj-conclusion'): Promise<void> {
         </el-col>
       </el-row>
     </div>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="1122 应收账款"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 

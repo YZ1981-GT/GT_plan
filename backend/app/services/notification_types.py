@@ -51,6 +51,20 @@ PROCEDURE_TASK_DELEGATION_BATCH = "procedure_task.delegation_batch"
 # 程序行复核对话消息（comment/reply 共用一种消息类型，Req 8.7）
 PROCEDURE_REVIEW_MESSAGE = "procedure_review_message"
 
+# ── adjustment-collaboration-and-propagation：调整分录协作接力 ──
+# 跳转由 metadata.object_type='adjustment_collaboration' + object_id=entry_group_id 驱动。
+ADJ_COLLAB_ASSIGNED = "adjustment_collaboration.assigned"
+ADJ_COLLAB_CONTRIBUTED = "adjustment_collaboration.contributed"
+ADJ_COLLAB_CONFIRMED = "adjustment_collaboration.confirmed"
+ADJ_COLLAB_REJECTED = "adjustment_collaboration.rejected"
+
+ADJ_COLLAB_NOTIFICATION_TYPES = [
+    ADJ_COLLAB_ASSIGNED,
+    ADJ_COLLAB_CONTRIBUTED,
+    ADJ_COLLAB_CONFIRMED,
+    ADJ_COLLAB_REJECTED,
+]
+
 # 程序行任务通知类型集合（供前后端同步契约测试校验一致性）。
 PROCEDURE_TASK_NOTIFICATION_TYPES = [
     PROCEDURE_TASK_ASSIGNED,
@@ -183,6 +197,11 @@ ALL_NOTIFICATION_TYPES = [
     PROCEDURE_TASK_REVIEWER_MISSING,
     PROCEDURE_TASK_DELEGATION_BATCH,
     PROCEDURE_REVIEW_MESSAGE,
+    # adjustment-collaboration-and-propagation
+    ADJ_COLLAB_ASSIGNED,
+    ADJ_COLLAB_CONTRIBUTED,
+    ADJ_COLLAB_CONFIRMED,
+    ADJ_COLLAB_REJECTED,
 ]
 
 

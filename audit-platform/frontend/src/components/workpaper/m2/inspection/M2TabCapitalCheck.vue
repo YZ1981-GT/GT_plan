@@ -26,7 +26,7 @@
     <div class="section-head">
       <h3 class="sheet-title">M2-5 实收资本（股本）检查表</h3>
       <div class="head-actions">
-        <el-button size="small" type="primary" link @click="handleAiGenerate">
+        <el-button size="small" type="primary" link :loading="aiLoading === 'note'" :disabled="isReadonly" @click="handleAiGenerate('note')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
         <el-button size="small" @click="handleReview">💬 复核</el-button>
@@ -218,7 +218,7 @@
       <template #header>
         <div class="card-header-row">
           <span class="card-title">五、审计结论</span>
-          <el-button size="small" @click="handleAiGenerate">
+          <el-button size="small" :loading="aiLoading === 'conclusion'" :disabled="isReadonly" @click="handleAiGenerate('conclusion')">
             <el-icon><MagicStick /></el-icon> AI辅助
           </el-button>
         </div>
@@ -273,6 +273,8 @@
  */
 import { ref, computed, inject, onMounted, defineAsyncComponent } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import { useK1VoucherCheck, type K1VoucherRow, type K1CheckRatioRow } from '../../composables/useK1VoucherCheck'
 import { useM2FormData } from '../../composables/useM2FormData'
 
@@ -286,6 +288,8 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ (e: 'navigate', sheetName: string): void }>()
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
 
 const year = computed(() => props.year ?? new Date().getFullYear())
 
@@ -380,7 +384,29 @@ function abnormalRowClass({ row }: { row: K1VoucherRow }): string { return row.a
 
 // ─── AI + 复核 ───────────────────────────────────────────────────────────────
 
-function handleAiGenerate() { /* AI辅助待集成 */ }
+async function handleAiGenerate(target: 'note' | 'conclusion' = 'conclusion') {
+  if (props.isReadonly) return
+  aiLoading.value = target
+  try {
+    const context: Record<string, string> = {
+      科目: '4001 实收资本/股本（凭证级检查表）',
+      本期增加金额: fmtAmt(criteria.value.endBalance),
+      贷方增资检查金额: fmtAmt(occurrenceCreditChecked.value),
+      借方减资检查金额: fmtAmt(occurrenceDebitChecked.value),
+      检查凭证笔数: String(occurrenceRows.value.length),
+      异常凭证笔数: String(abnormalRows.value.length),
+    }
+    const existing = target === 'note' ? auditNote.value : conclusion.value
+    const text = await generateAiText({ section: `m2-5-voucher-check-${target}`, context, existingContent: existing })
+    if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+    if (target === 'note') auditNote.value = text; else conclusion.value = text
+    persist()
+  } catch {
+    ElMessage.warning('AI 生成失败，请稍后重试')
+  } finally {
+    aiLoading.value = ''
+  }
+}
 function handleReview() { openReviewDialog?.('M2-5-voucher-check') }
 </script>
 

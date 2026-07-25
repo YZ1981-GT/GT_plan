@@ -16,12 +16,18 @@
  * Requirements: 15.1-15.6
  */
 import { ref, computed, inject, toRef, watch, onBeforeUnmount, type Ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import GtIndexChip from '../GtIndexChip.vue'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useE1AiGenerate } from '../composables/useE1AiGenerate'
 import { eventBus } from '@/utils/eventBus'
+import http from '@/utils/http'
+import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
+import { buildE1SyncPayload, E1_NOTE_SECTION, type E1DisclosureSnapshot } from '../composables/e1NoteSectionMap'
+import { amountFormatter, amountParser } from '../composables/wpAmountInput'
+import { useAuditContext } from '@/composables/useAuditContext'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -40,6 +46,21 @@ const props = defineProps<{
 
 const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 const { generateText, isGenerating } = useE1AiGenerate(toRef(props, 'wpId') as Ref<string>)
+const router = useRouter()
+// 审计年度（单一真源 projectStore），用于同步到附注时定位正确年度的附注记录，
+// 避免后端按服务器当前年默认导致同步到错误年度的附注（附注模块显示审计年度记录）。
+const { year: auditYear } = useAuditContext()
+
+// 跳转回附注模块（披露表 → 附注为单向推送；此处仅导航，方便相互编辑确认）
+// 上市→五、1 / 国企→八、1，可自由切换上市↔国企
+function jumpToNote(target: DisclosureVariant): void {
+  const route = buildNoteJumpRoute(props.projectId, 'E1', target)
+  if (!route) {
+    ElMessage.warning('未找到对应的货币资金附注章节')
+    return
+  }
+  router.push(route)
+}
 
 type DisclosureVariant = 'listed' | 'soe'
 
@@ -109,30 +130,42 @@ function loadOpenings(): void {
 }
 loadOpenings()
 
-const disclosureRows = computed<DisclosureRow[]>(() => {
+// 单项期末数：从审定表跨sheet审定数（E1-adj-total-{code}）只读取数
+function effEnding(item: { crossKey: string }): number {
+  if (!item.crossKey) return 0
+  return Number(props.allResponses.get(item.crossKey)?.remark) || 0
+}
+// 单项期初数：手工覆盖优先（openingMap 显式含该 key），否则自动预填审定表期初审定数
+// （E1-adj-total-{code}-opening，本年期初=上年年末）。仅在 openingMap 未显式设置时预填。
+function effOpening(item: { key: string; crossKey: string }): number {
+  if (item.key in openingMap.value) return Number(openingMap.value[item.key]) || 0
+  if (item.crossKey) return Number(props.allResponses.get(`${item.crossKey}-opening`)?.remark) || 0
+  return 0
+}
+// 某项期初是否自动预填（无手工覆盖且有科目映射且预填值非0）——供 UI 标注
+function isOpeningPrefilled(item: { key: string; crossKey: string }): boolean {
+  return !(item.key in openingMap.value) && !!item.crossKey
+    && (Number(props.allResponses.get(`${item.crossKey}-opening`)?.remark) || 0) !== 0
+}
+
+const disclosureRows = computed<(DisclosureRow & { openingPrefilled: boolean })[]>(() => {
   const items = disclosureItems.value
   return items.map(item => {
-    let endingAmount = 0
-    if (item.crossKey) {
-      const resp = props.allResponses.get(item.crossKey)
-      endingAmount = Number(resp?.remark) || 0
-    }
+    let endingAmount = effEnding(item)
+    let openingAmount = effOpening(item)
     // Total row: sum of above items (excluding overseas)
     if (item.key === 'total') {
-      endingAmount = items
-        .filter(i => !['total', 'overseas'].includes(i.key))
-        .reduce((sum, i) => {
-          if (!i.crossKey) return sum
-          const r = props.allResponses.get(i.crossKey)
-          return sum + (Number(r?.remark) || 0)
-        }, 0)
+      const subs = items.filter(i => !['total', 'overseas'].includes(i.key))
+      endingAmount = subs.reduce((sum, i) => sum + effEnding(i), 0)
+      openingAmount = subs.reduce((sum, i) => sum + effOpening(i), 0)
     }
     return {
       key: item.key,
       label: item.label,
       crossKey: item.crossKey,
       endingAmount,
-      openingAmount: openingMap.value[item.key] || 0,
+      openingAmount,
+      openingPrefilled: item.key === 'total' ? false : isOpeningPrefilled(item),
     }
   })
 })
@@ -159,7 +192,9 @@ interface ForeignCurrencyRow {
 
 const SIMPLE_CURRENCIES = ['美元', '日元', '澳元', '欧元']
 const DETAILED_CURRENCIES = ['人民币', '美元', '日元', '澳元', '欧元']
-const DETAILED_PROJECTS = ['库存现金', '银行存款', '财务公司存款', '其他货币资金']
+// 对齐源模板「附注披露信息(上市公司)」外币性质货币资金项目分组（库存现金/银行存款/
+// 银行存款中：财务公司存款/其他货币资金），详细版为源模板标准结构。
+const DETAILED_PROJECTS = ['库存现金', '银行存款', '银行存款中：财务公司存款', '其他货币资金']
 
 function createCurrencyRow(groupId: string, currency: string, suffix: string): ForeignCurrencyRow {
   const isRmb = currency === '人民币'
@@ -204,7 +239,9 @@ function createDefaultForeignRows(mode: ForeignCurrencyMode): ForeignCurrencyRow
   })
 }
 
-const foreignCurrencyMode = ref<ForeignCurrencyMode>('simple')
+// 默认「详细版」：源模板「附注披露信息(上市公司)」外币表即按 库存现金/银行存款/
+// 银行存款中：财务公司存款/其他货币资金 × 人民币/美元/日元/澳元/欧元 逐项列示。
+const foreignCurrencyMode = ref<ForeignCurrencyMode>('detailed')
 const simpleForeignCurrencyRows = ref<ForeignCurrencyRow[]>([])
 const detailedForeignCurrencyRows = ref<ForeignCurrencyRow[]>([])
 const foreignCurrencyRows = computed(() =>
@@ -241,7 +278,7 @@ function normalizeForeignRows(rows: any[]): ForeignCurrencyRow[] {
 }
 
 function loadForeignCurrency(): void {
-  foreignCurrencyMode.value = 'simple'
+  foreignCurrencyMode.value = 'detailed'
   simpleForeignCurrencyRows.value = createDefaultForeignRows('simple')
   detailedForeignCurrencyRows.value = createDefaultForeignRows('detailed')
   const resp = props.allResponses.get(`${storagePrefix.value}-foreign-currency`)
@@ -295,13 +332,18 @@ function groupRmb(row: ForeignCurrencyRow, field: 'endRmb' | 'openRmb'): number 
     .reduce((sum, item) => sum + item[field], 0)
 }
 
-function foreignCurrencySummary({ columns, data }: any): string[] {
-  const leafRows = (data as ForeignCurrencyRow[]).filter(row => !row.isGroup)
-  return columns.map((column: any, index: number) => {
+// 合计行：按列序号汇总叶子行（嵌套表头列无 prop，故按 index 映射；折算率列不合计）。
+// 列序：0项目 1期末原币 2期末折算率 3期末人民币 4期初原币 5期初折算率 6期初人民币
+const FC_SUMMARY_FIELD_BY_INDEX: Record<number, ForeignAmountField> = {
+  1: 'endForeign', 3: 'endRmb', 4: 'openForeign', 6: 'openRmb',
+}
+function foreignCurrencySummary({ columns }: any): string[] {
+  const leafRows = foreignCurrencyRows.value.filter(row => !row.isGroup)
+  return columns.map((_column: any, index: number) => {
     if (index === 0) return '合 计'
-    const prop = column.property as ForeignAmountField
-    if (!['endForeign', 'endRmb', 'openForeign', 'openRmb'].includes(prop)) return ''
-    const total = leafRows.reduce((sum, row) => sum + (Number(row[prop]) || 0), 0)
+    const field = FC_SUMMARY_FIELD_BY_INDEX[index]
+    if (!field) return ''
+    const total = leafRows.reduce((sum, row) => sum + (Number(row[field]) || 0), 0)
     return total ? displayPrefs.fmtAmount(total) : '-'
   })
 }
@@ -659,6 +701,67 @@ async function generateAuditText(kind: 'note' | 'conclusion'): Promise<void> {
   else updateAuditConclusion(text)
 }
 
+// ─── 同步到附注（结构化表格 + 文本框内容 → 附注 五、1/八、1「货币资金」）──────────
+// 保证附注模块表格与文本与披露表保持一致（单向推送，走 sync_from_workpaper）。
+const isSyncing = ref(false)
+
+async function syncToDisclosureNotes(): Promise<void> {
+  if (isSyncing.value || !props.projectId || props.isReadonly) return
+  isSyncing.value = true
+  try {
+    // 先落盘披露表数据，确保跨sheet审定数/期初/说明为最新
+    persistAll()
+    const snapshot: E1DisclosureSnapshot = {
+      mainRows: disclosureRows.value.map(r => ({
+        key: r.key,
+        label: r.label,
+        endingAmount: r.endingAmount,
+        openingAmount: r.openingAmount,
+      })),
+      restrictedRows: variant.value === 'soe'
+        ? restrictedRows.value.map(r => ({
+            item: r.item,
+            openingAmount: r.openingAmount,
+            endingAmount: r.endingAmount,
+            reason: r.reason,
+          }))
+        : undefined,
+      noteText: noteText.value,
+    }
+    const payload = buildE1SyncPayload(variant.value, props.wpId || '', null, snapshot)
+    // 显式携带审计年度，定位到项目审计年度的附注记录（否则后端默认取服务器当前年）
+    const yr = Number(auditYear.value) || undefined
+    const resp: any = await http.post(
+      `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,
+      yr ? { ...payload, year: yr } : payload,
+    )
+    // http.post 解析为 AxiosResponse（响应拦截器已把 {code,data} 信封解包到 resp.data）；
+    // 结果字段（success/section_id）在 resp.data 上，不能直接读 resp（否则恒 undefined→误报"返回异常"）。
+    const data = resp?.data ?? resp
+    const sectionId = E1_NOTE_SECTION[variant.value]
+    if (data && (data.success || data.section_id)) {
+      ElMessage.success(`已同步到附注「${sectionId} 货币资金」`)
+      // 通知附注模块刷新（若正打开该章节）
+      eventBus.emit('disclosure:note-text-updated', {
+        wpCode: 'E1',
+        variant: variant.value,
+        accountCode: '1001',
+        projectId: props.projectId,
+        sectionIds: [sectionId],
+        timestamp: Date.now(),
+      })
+    } else {
+      ElMessage.warning('同步附注返回异常')
+    }
+  } catch (err: any) {
+    // 重复点击被请求去重取消（axios cancel / ERR_CANCELED）：首个请求仍在进行，静默忽略不吓用户
+    if (err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError' || err?.__CANCEL__) return
+    ElMessage.warning('同步附注失败，请稍后重试')
+  } finally {
+    isSyncing.value = false
+  }
+}
+
 // ─── Cleanup ─────────────────────────────────────────────────────────────────
 
 onBeforeUnmount(() => {
@@ -672,7 +775,7 @@ onBeforeUnmount(() => {
     <details class="guidance-details">
       <summary>📋 编制提示</summary>
       <div class="guidance-content">
-        <p>1. 期末数取自 E1-1 审定表各科目审定数（跨sheet自动取数，灰色底纹列不可手工录入）。</p>
+        <p>1. 期末数取自 E1-1 审定表各科目审定数（跨sheet自动取数，灰色底纹列不可手工录入）；期初数（上年年末余额）自动预填审定表期初审定数（标「预填」，可手工覆盖为上年附注数）。</p>
         <p>2. 上市公司版：列示库存现金/银行存款/存放财务公司/其他货币资金/应计利息/数字货币。</p>
         <p>3. 国企版：额外列示受限制货币资金明细（保证金/担保存款/境外受限）。</p>
         <p>4. 境外存款需说明汇率中间价参考来源；数字货币列报参照准则解释15号资金集中管理。</p>
@@ -690,6 +793,33 @@ onBeforeUnmount(() => {
     <!-- 工具栏：OnlyOffice 入口已由上层统一提供，此处仅保留结构化披露工具 -->
     <div class="tab-toolbar">
       <div class="toolbar-right">
+        <!-- 同步到附注：结构化表格 + 文本框内容 → 附注 五、1/八、1「货币资金」，保证附注与披露表一致 -->
+        <el-button
+          type="success"
+          size="small"
+          class="sync-btn"
+          :loading="isSyncing"
+          :disabled="isReadonly"
+          :title="`将披露表的表格与文本框内容同步到附注模块（${variant === 'soe' ? '八、1' : '五、1'} 货币资金）`"
+          @click="syncToDisclosureNotes"
+        >同步到附注</el-button>
+        <!-- 跳转回附注：默认按当前版本对应（上市↔五、1 / 国企↔八、1），下拉可自由切换上市/国企 -->
+        <el-dropdown
+          split-button
+          type="primary"
+          size="small"
+          trigger="click"
+          @click="jumpToNote(variant)"
+          @command="jumpToNote"
+        >
+          ↩ 跳转回附注（{{ variant === 'soe' ? '八、1' : '五、1' }}）
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="listed">上市版附注（五、1）</el-dropdown-item>
+              <el-dropdown-item command="soe">国企版附注（八、1）</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
         <el-tag size="small" type="info">{{ variant === 'soe' ? '国企附注' : '上市公司附注' }}</el-tag>
         <span class="chip-wrap"><GtIndexChip value="wp:E1-1" :context-project-id="projectId" /></span>
       </div>
@@ -707,15 +837,23 @@ onBeforeUnmount(() => {
             <span class="computed-cell">{{ displayPrefs.fmtAmount(row.endingAmount) }}</span>
           </template>
         </el-table-column>
-        <el-table-column :label="openingLabel" width="180" align="right">
+        <el-table-column :label="openingLabel" width="200" align="right">
           <template #default="{ row }">
-            <el-input-number
-              :model-value="row.openingAmount"
-              :disabled="isReadonly"
-              :controls="false"
-              size="small"
-              @change="(val: number) => updateOpening(row.key, val ?? 0)"
-            />
+            <span v-if="row.key === 'total'" class="computed-cell font-bold">{{ displayPrefs.fmtAmount(row.openingAmount) }}</span>
+            <div v-else class="opening-cell">
+              <el-tooltip v-if="row.openingPrefilled" content="已自动预填审定表期初审定数（本年期初=上年年末），可手工覆盖" placement="top">
+                <el-tag size="small" type="success" effect="plain" class="prefill-tag">预填</el-tag>
+              </el-tooltip>
+              <el-input
+                :model-value="row.openingAmount"
+                :disabled="isReadonly"
+                :formatter="amountFormatter"
+                :parser="amountParser"
+                size="small"
+                class="amt-input"
+                @change="(val: string) => updateOpening(row.key, Number(val) || 0)"
+              />
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -727,16 +865,33 @@ onBeforeUnmount(() => {
           <span class="amber-icon">📌</span>
           <span class="amber-text">（提示：(1) 截止202X年12月31日，人民币对汇率中间价按中国人民银行公布的汇率折算。(2) 本集团不存在抵押、质押或冻结以及存放在境外且资金汇回受到限制的款项。）</span>
         </div>
-        <el-table :data="foreignCurrencyRows" border size="small" style="width:100%; max-width:900px" show-summary :summary-method="foreignCurrencySummary">
-          <el-table-column prop="item" label="项 目" width="180" fixed>
+        <!-- 版本切换：详细版=源模板结构（库存现金/银行存款/银行存款中：财务公司存款/其他货币资金 × 币种）；简版=货币资金合计 × 币种 -->
+        <div class="fc-toolbar">
+          <el-segmented
+            :model-value="foreignCurrencyMode"
+            :options="[{ label: '详细版（按项目）', value: 'detailed' }, { label: '简版（合计）', value: 'simple' }]"
+            size="small"
+            :disabled="isReadonly"
+            @change="(v: string) => updateForeignMode(v as 'simple' | 'detailed')"
+          />
+          <el-button size="small" type="primary" plain :disabled="isReadonly" @click="addFcProject">+ 新增项目</el-button>
+        </div>
+        <el-table :data="foreignCurrencyRows" border size="small" style="width:100%; max-width:1000px" show-summary :summary-method="foreignCurrencySummary">
+          <el-table-column prop="item" label="项 目" width="200" fixed>
             <template #default="{ row }">
-              <span :class="{ 'font-bold': row.isGroup, 'indent-row': row.indent }">{{ row.item }}</span>
+              <div class="fc-item-cell">
+                <span :class="{ 'font-bold': row.isGroup, 'indent-row': row.indent }">{{ row.item }}</span>
+                <span v-if="!isReadonly" class="fc-item-ops">
+                  <el-button v-if="row.isGroup" link type="primary" size="small" @click="addFcCurrency(row.id)">+币种</el-button>
+                  <el-button link type="danger" size="small" @click="removeFcRow(row)">删</el-button>
+                </span>
+              </div>
             </template>
           </el-table-column>
           <el-table-column label="期末数" align="center">
-            <el-table-column label="外币金额" width="120" align="right">
+            <el-table-column label="原币金额" width="120" align="right">
               <template #default="{ row }">
-                <el-input-number v-if="!row.isGroup && !isReadonly" :model-value="row.endForeign" :controls="false" size="small" style="width:100%" @change="(v: number) => updateFcCell(row.id, 'endForeign', v ?? 0)" />
+                <el-input v-if="!row.isGroup && !isReadonly" :model-value="row.endForeign" :formatter="amountFormatter" :parser="amountParser" size="small" class="amt-input" style="width:100%" @change="(v: string) => updateFcCell(row.id, 'endForeign', Number(v) || 0)" />
                 <span v-else>{{ row.endForeign ? displayPrefs.fmtAmount(row.endForeign) : '-' }}</span>
               </template>
             </el-table-column>
@@ -748,14 +903,14 @@ onBeforeUnmount(() => {
             </el-table-column>
             <el-table-column label="人民币金额" width="130" align="right" class-name="auto-calc-col">
               <template #default="{ row }">
-                <span class="computed-cell">{{ row.endRmb ? displayPrefs.fmtAmount(row.endRmb) : '-' }}</span>
+                <span class="computed-cell">{{ (row.isGroup ? groupRmb(row, 'endRmb') : row.endRmb) ? displayPrefs.fmtAmount(row.isGroup ? groupRmb(row, 'endRmb') : row.endRmb) : '-' }}</span>
               </template>
             </el-table-column>
           </el-table-column>
           <el-table-column label="期初数" align="center">
-            <el-table-column label="外币金额" width="120" align="right">
+            <el-table-column label="原币金额" width="120" align="right">
               <template #default="{ row }">
-                <el-input-number v-if="!row.isGroup && !isReadonly" :model-value="row.openForeign" :controls="false" size="small" style="width:100%" @change="(v: number) => updateFcCell(row.id, 'openForeign', v ?? 0)" />
+                <el-input v-if="!row.isGroup && !isReadonly" :model-value="row.openForeign" :formatter="amountFormatter" :parser="amountParser" size="small" class="amt-input" style="width:100%" @change="(v: string) => updateFcCell(row.id, 'openForeign', Number(v) || 0)" />
                 <span v-else>{{ row.openForeign ? displayPrefs.fmtAmount(row.openForeign) : '-' }}</span>
               </template>
             </el-table-column>
@@ -767,7 +922,7 @@ onBeforeUnmount(() => {
             </el-table-column>
             <el-table-column label="人民币金额" width="130" align="right" class-name="auto-calc-col">
               <template #default="{ row }">
-                <span class="computed-cell">{{ row.openRmb ? displayPrefs.fmtAmount(row.openRmb) : '-' }}</span>
+                <span class="computed-cell">{{ (row.isGroup ? groupRmb(row, 'openRmb') : row.openRmb) ? displayPrefs.fmtAmount(row.isGroup ? groupRmb(row, 'openRmb') : row.openRmb) : '-' }}</span>
               </template>
             </el-table-column>
           </el-table-column>
@@ -790,16 +945,18 @@ onBeforeUnmount(() => {
           </el-table-column>
           <el-table-column label="年初余额" width="150" align="right">
             <template #default="{ row }">
-              <el-input-number :model-value="row.openingAmount" :disabled="isReadonly"
-                :controls="false" size="small" style="width:100%"
-                @change="(val: number) => updateRestrictedCell(row.id, 'openingAmount', val ?? 0)" />
+              <el-input :model-value="row.openingAmount" :disabled="isReadonly"
+                :formatter="amountFormatter" :parser="amountParser"
+                size="small" class="amt-input" style="width:100%"
+                @change="(val: string) => updateRestrictedCell(row.id, 'openingAmount', Number(val) || 0)" />
             </template>
           </el-table-column>
           <el-table-column label="期末余额" width="150" align="right">
             <template #default="{ row }">
-              <el-input-number :model-value="row.endingAmount" :disabled="isReadonly"
-                :controls="false" size="small" style="width:100%"
-                @change="(val: number) => updateRestrictedCell(row.id, 'endingAmount', val ?? 0)" />
+              <el-input :model-value="row.endingAmount" :disabled="isReadonly"
+                :formatter="amountFormatter" :parser="amountParser"
+                size="small" class="amt-input" style="width:100%"
+                @change="(val: string) => updateRestrictedCell(row.id, 'endingAmount', Number(val) || 0)" />
             </template>
           </el-table-column>
           <el-table-column label="受限原因" min-width="160">
@@ -896,6 +1053,25 @@ onBeforeUnmount(() => {
   align-items: center;
 }
 .chip-wrap { display: inline-flex; align-items: center; }
+/* 金额输入统一右对齐（千分符+两位由 amountFormatter 提供），折算率等 el-input-number 亦右对齐 */
+.e1-tab-disclosure :deep(.amt-input .el-input__inner),
+.e1-tab-disclosure :deep(.el-input-number .el-input__inner) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+/* 同步到附注按钮：实心绿底+白字，避免浅绿底浅绿字低对比"看不清" */
+.e1-tab-disclosure :deep(.sync-btn) {
+  background-color: var(--el-color-success, #28a745);
+  border-color: var(--el-color-success, #28a745);
+  color: #fff;
+}
+.e1-tab-disclosure :deep(.sync-btn span) { color: #fff; }
+.e1-tab-disclosure :deep(.sync-btn:hover),
+.e1-tab-disclosure :deep(.sync-btn:focus) {
+  background-color: var(--el-color-success-light-3, #4cb85f);
+  border-color: var(--el-color-success-light-3, #4cb85f);
+  color: #fff;
+}
 :deep(.auto-calc-col) {
   background-color: #f5f7fa !important;
 }
@@ -933,6 +1109,12 @@ onBeforeUnmount(() => {
 .amber-context .amber-icon { flex-shrink: 0; }
 .amber-context .amber-text { flex: 1; }
 .indent-row { padding-left: 16px; }
+.opening-cell { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+.opening-cell .prefill-tag { flex-shrink: 0; cursor: help; }
+.fc-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.fc-item-cell { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.fc-item-ops { display: inline-flex; align-items: center; gap: 2px; flex-shrink: 0; }
+.fc-item-ops :deep(.el-button.is-link) { padding: 0 2px; height: auto; }
 :deep(.auto-calc-col) { background-color: #f5f7fa !important; }
 .computed-cell { color: #909399; }
 .opinion-card {

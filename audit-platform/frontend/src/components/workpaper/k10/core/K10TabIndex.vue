@@ -1,74 +1,121 @@
 <template>
   <div class="k10-tab-index">
-    <!-- ═══ 总体进度 ═══ -->
-    <div class="progress-bar-section">
-      <div class="progress-info">
-        <span>编制进度</span>
-        <span class="progress-text">{{ completedCount }} / {{ applicableCount }} ({{ progressPercent }}%)</span>
+    <!-- 编制信息由页面级头部统一渲染，此处不重复 -->
+
+    <!-- ═══ 目录卡（标题 + 复核 + 编制/使用手册 + 进度条 → 跨表结论口径 → 编制提示） ═══ -->
+    <div class="k10-dir">
+      <div class="index-header">
+        <h3 class="title">K10 底稿目录</h3>
+        <GtReviewTrigger section-id="K10-index-directory" />
+        <div class="handbook-btns">
+          <el-button size="small" type="primary" plain @click="openHandbook('preparation')">📖 编制手册</el-button>
+          <el-button size="small" @click="openHandbook('usage')">使用手册</el-button>
+        </div>
+        <div class="progress-wrap">
+          <span>编制进度 {{ completedCount }}/{{ totalCount }}</span>
+          <el-progress :percentage="progressPercent" :stroke-width="10" />
+        </div>
       </div>
-      <el-progress :percentage="progressPercent" :stroke-width="8" :show-text="false" />
+
+      <K10PreparationHandbookDialog v-model="handbookVisible" :initial-tab="handbookTab" />
+
+      <div class="conclusion-board" data-testid="k10-conclusion-board">
+        <div class="board-head">
+          <strong>跨表结论口径</strong>
+          <el-tag size="small" :type="conclusionWorstType">{{ conclusionWorstLabel }}</el-tag>
+          <span class="board-meta">已填 {{ conclusionFilledCount }}/{{ conclusionSheets.length }}</span>
+        </div>
+        <div class="board-tags">
+          <el-tag
+            v-for="c in conclusionSheets"
+            :key="c.code"
+            size="small"
+            class="concl-tag clickable"
+            :type="c.filled ? 'success' : 'info'"
+            effect="plain"
+            @click="emit('navigate-sheet', c.sheetKey)"
+          >
+            {{ c.code }} {{ c.filled ? '已填' : '未填' }}
+          </el-tag>
+        </div>
+        <p v-if="conclusionHasUnfilled" class="board-hint">存在未填审计结论，请点击标签跳转补全审计说明与结论。</p>
+      </div>
+
+      <details class="methodology-hint">
+        <summary>编制提示</summary>
+        <ul>
+          <li>其他收益为<strong>损益类贷方科目</strong>（6117）：取本期<strong>贷方发生额</strong>累计（贷方 = 收益增加），非期末余额</li>
+          <li>其他收益仅指与日常活动相关的政府补助；与日常活动无关计入营业外收入（6301，K12 底稿）</li>
+          <li>政府补助核对（K10-4）：直接计入 + 递延分摊 → 与 K7 递延收益(2401)本期分摊一致性校验</li>
+          <li>审定数 = 未审数 + AJE + RJE；审定发生额回写试算平衡表 6117；调整分录联动 A13</li>
+          <li>K10-2 明细合计应与 K10-1 审定表一致；各表填妥"审计说明或结论"后目录标签转为"已填"</li>
+        </ul>
+      </details>
     </div>
 
-    <!-- ═══ 蓝色渐变操作引导区 ═══ -->
-    <div class="k10-guide">
-      <div class="k10-guide-header">
-        <el-icon><InfoFilled /></el-icon>
-        <span>操作步骤引导</span>
+    <!-- ═══ 底稿架构（4 阶段泳道） ═══ -->
+    <div class="k10-arch">
+      <div class="arch-header">
+        <h4 class="arch-title">底稿架构</h4>
+        <span class="arch-hint">点击卡片可跳转至对应底稿</span>
       </div>
-      <div class="k10-guide-steps">
-        <div class="step-item"><span class="step-num">①</span><span class="step-text">填写明细表（K10-2）逐笔登记其他收益补助项目明细</span></div>
-        <div class="step-item"><span class="step-num">②</span><span class="step-text">填写审定表（K10-1）确认发生额 → TB回写6117</span></div>
-        <div class="step-item"><span class="step-num">③</span><span class="step-text">录入调整分录（K10-3）管理AJE/RJE → 联动A13</span></div>
-        <div class="step-item"><span class="step-num">④</span><span class="step-text">完成政府补助核对（K10-4）与K7递延收益分摊一致性校验</span></div>
-        <div class="step-item"><span class="step-num">⑤</span><span class="step-text">完成应收补助检查（K10-5）确认收款权利及确认时点</span></div>
-        <div class="step-item"><span class="step-num">⑥</span><span class="step-text">完成综合检查（K10-6）核实分类正确性与合规性</span></div>
-      </div>
+      <GtBArchitectureTree
+        :wp-id="wpId"
+        :project-id="projectId"
+        :active-sheet="''"
+        :html-data="archHtmlData"
+        @navigate="handleNavigate"
+      />
     </div>
 
-    <!-- ═══ 底稿架构（4 阶段泳道卡片，对齐 D4/b-index 范式） ═══ -->
-    <div class="index-header">
-      <h4 class="index-title">底稿架构</h4>
-      <span class="index-hint">点击卡片可跳转至对应底稿</span>
+    <!-- ═══ 本循环底稿目录（K 循环其他科目，可跳转） ═══ -->
+    <div v-if="cycleWorkpapers.length" class="k10-cycle">
+      <div class="cycle-header">
+        <h4 class="cycle-title">本循环底稿目录</h4>
+        <span class="cycle-hint">点击可跳转至同循环其他底稿（灰色表示尚未生成）</span>
+      </div>
+      <div class="cycle-grid">
+        <div
+          v-for="wp in cycleWorkpapers"
+          :key="wp.wp_code"
+          class="cycle-card"
+          :class="{ 'is-current': wp.is_current, 'is-disabled': !wp.wp_id }"
+          @click="onCycleCardClick(wp)"
+        >
+          <div class="cycle-card-top">
+            <span class="cycle-code">{{ wp.wp_code }}</span>
+            <el-tag v-if="wp.is_current" size="small" effect="plain" class="cycle-current-tag">当前</el-tag>
+          </div>
+          <span class="cycle-name" :title="wp.wp_name">{{ wp.wp_name }}</span>
+        </div>
+      </div>
     </div>
-    <GtBArchitectureTree
-      :active-sheet="''"
-      :html-data="archHtmlData"
-      @navigate="handleNavigate"
-    />
-
-    <!-- ═══ 编制提示 ═══ -->
-    <details class="compile-hint">
-      <summary>📋 编制提示</summary>
-      <ul>
-        <li>K10为损益类科目（6117其他收益），取本期贷方发生额累计（贷方=收益增加），非期末余额</li>
-        <li>其他收益指与日常活动相关的政府补助（即征即退/财政贴息/研发补助/稳岗补贴等）</li>
-        <li>与日常活动无关的政府补助计入营业外收入（6301），属K12底稿</li>
-        <li>政府补助核对（K10-4）：直接计入+递延分摊 → 与K7递延收益(2401)本期分摊一致性校验</li>
-        <li>审定数=未审数+AJE+RJE；调整分录联动A13</li>
-        <li>附注按补助类型分别披露其他收益金额</li>
-      </ul>
-    </details>
   </div>
 </template>
 
 <script setup lang="ts">
 /**
- * K10TabIndex.vue — K10 其他收益底稿目录（对齐 D4/b-index 底稿架构范式）
+ * K10TabIndex.vue — K10 其他收益底稿目录（严格镜像 E1 标准）
  *
- * 复用 GtBArchitectureTree（4 阶段泳道卡片：审计计划/科目审定/实质性程序/披露与调整），
- * 由 K10 各 sheet 构造 navigation_rows 喂入。点击卡片 → emit('navigate-sheet', 完整sheet名)
- * → GtK10OtherIncome 转发 → GtWpRenderer 按 sheet_name.includes 匹配。
+ * 结构：目录卡（标题+复核+编制/使用手册+进度→跨表结论口径→编制提示）
+ *       + 底稿架构 4 阶段泳道（GtBArchitectureTree）+ 本循环底稿目录 grid。
+ * 编制信息由页面级头部渲染，此处不重复。
+ *
+ * 损益类科目（6117其他收益）— 贷方=收益增加，取发生额非余额。
  */
-import { computed, type Ref } from 'vue'
-import { defineAsyncComponent } from 'vue'
-import { InfoFilled } from '@element-plus/icons-vue'
+import { computed, ref, onMounted, defineAsyncComponent } from 'vue'
+import { useRouter } from 'vue-router'
+import { loadCycleWorkpaperCards, type CycleWpCard } from '@/services/cycleDirectory'
+import GtReviewTrigger from '../../GtReviewTrigger.vue'
+import GtBArchitectureTree from '../../GtBArchitectureTree.vue'
 
-const GtBArchitectureTree = defineAsyncComponent(() => import('../../GtBArchitectureTree.vue'))
+const K10PreparationHandbookDialog = defineAsyncComponent(() => import('../K10PreparationHandbookDialog.vue'))
 
+// ─── Props / Emits ───────────────────────────────────────────────────────────
 const props = defineProps<{
   wpId: string
   projectId: string
-  allResponses: Map<string, any> | Ref<Map<string, any>>
+  allResponses: Map<string, any>
   isReadonly: boolean
 }>()
 
@@ -76,103 +123,195 @@ const emit = defineEmits<{
   (e: 'navigate-sheet', sheetName: string): void
 }>()
 
-interface NavRow {
-  content: string
-  index_ref: string
-  component_type: string
+const router = useRouter()
+
+// ─── 编制/使用手册弹窗 ─────────────────────────────────────────────────────────
+const handbookVisible = ref(false)
+const handbookTab = ref<'preparation' | 'usage'>('preparation')
+function openHandbook(tab: 'preparation' | 'usage') {
+  handbookTab.value = tab
+  handbookVisible.value = true
+}
+
+// ─── Sheet 行定义 ─────────────────────────────────────────────────────────────
+interface SheetRow {
+  seq: number
+  name: string
+  code: string
+  sheetKey: string
+  group: 'core' | 'inspection' | 'disclosure'
   progressKeys: string[]
+  progress: number
 }
 
-/** K10 各 sheet → navigation_rows（content=完整 sheet 名，供 includes 匹配）。
- *  component_type + 名称关键词 决定 GtBArchitectureTree 的阶段归类。 */
-const NAV_ROWS: NavRow[] = [
-  { content: '其他收益实质性程序表K10A', index_ref: 'K10A', component_type: 'a-program-console', progressKeys: ['K10-K10A-'] },
-  { content: '审定表K10-1', index_ref: 'K10-1', component_type: 'd-form-table', progressKeys: ['K10-1-rows'] },
-  { content: '明细表K10-2', index_ref: 'K10-2', component_type: 'd-form-table', progressKeys: ['K10-2-detail-rows'] },
-  { content: '调整分录汇总K10-3', index_ref: 'K10-3', component_type: 'd-form-table', progressKeys: ['K10-3-entries'] },
-  { content: '政府补助核对表K10-4', index_ref: 'K10-4', component_type: 'd-form-table', progressKeys: ['K10-4-rows'] },
-  { content: '应收政府补助检查表K10-5', index_ref: 'K10-5', component_type: 'd-form-table', progressKeys: ['K10-5-'] },
-  { content: '其他收益检查表K10-6', index_ref: 'K10-6', component_type: 'd-form-table', progressKeys: ['K10-6-'] },
-  { content: '附注披露信息（上市公司）', index_ref: 'K10-附注上市', component_type: 'c-note-table', progressKeys: ['K10-disc-listed-'] },
-  { content: '附注披露信息（国有企业）', index_ref: 'K10-附注国企', component_type: 'c-note-table', progressKeys: ['K10-disc-soe-'] },
-]
-
-function getResponses(): Map<string, any> {
-  const r = props.allResponses
-  if (r instanceof Map) return r
-  return (r as any)?.value ?? new Map()
-}
-
-function rowStatus(row: NavRow): string {
-  if (row.progressKeys.length === 0) return ''
-  const map = getResponses()
-  if (!map || map.size === 0) return 'pending'
+/** 按 K10 真实存储 key（JSON-array 单键 / 前缀）计算完成度（二值：有数据→100，无→0）。 */
+function calcSheetProgress(progressKeys: string[]): number {
+  const map = props.allResponses
+  if (!map || map.size === 0) return 0
   const keys = [...map.keys()]
-  const hasData = row.progressKeys.some(pk => map.has(pk) || keys.some(k => k.startsWith(pk)))
-  return hasData ? 'completed' : 'pending'
+  const hasData = progressKeys.some(pk => map.has(pk) || keys.some(k => k.startsWith(pk)))
+  return hasData ? 100 : 0
 }
 
-/** 喂给 GtBArchitectureTree 的 htmlData.navigation_rows */
+const allSheets = computed<SheetRow[]>(() => {
+  const rows: Omit<SheetRow, 'progress'>[] = [
+    { seq: 1, name: '实质性程序表', code: 'K10A', sheetKey: '其他收益实质性程序表K10A', group: 'core', progressKeys: ['K10-K10A-'] },
+    { seq: 2, name: '审定表', code: 'K10-1', sheetKey: '审定表K10-1', group: 'core', progressKeys: ['K10-1-rows'] },
+    { seq: 3, name: '明细表', code: 'K10-2', sheetKey: '明细表K10-2', group: 'core', progressKeys: ['K10-2-detail-rows'] },
+    { seq: 4, name: '调整分录汇总', code: 'K10-3', sheetKey: '调整分录汇总K10-3', group: 'core', progressKeys: ['K10-3-entries'] },
+    { seq: 5, name: '政府补助核对表', code: 'K10-4', sheetKey: '政府补助核对表K10-4', group: 'inspection', progressKeys: ['K10-4-rows'] },
+    { seq: 6, name: '应收政府补助检查表', code: 'K10-5', sheetKey: '应收政府补助检查表K10-5', group: 'inspection', progressKeys: ['K10-5-'] },
+    { seq: 7, name: '其他收益检查表', code: 'K10-6', sheetKey: '其他收益检查表K10-6', group: 'inspection', progressKeys: ['K10-6-'] },
+    { seq: 8, name: '附注披露信息（上市公司）', code: '附注上市', sheetKey: '附注披露信息（上市公司）', group: 'disclosure', progressKeys: ['K10-disc-listed-'] },
+    { seq: 9, name: '附注披露信息（国有企业）', code: '附注国企', sheetKey: '附注披露信息（国有企业）', group: 'disclosure', progressKeys: ['K10-disc-soe-'] },
+  ]
+  return rows.map(r => ({ ...r, progress: calcSheetProgress(r.progressKeys) }))
+})
+
+// ─── 进度计算 ─────────────────────────────────────────────────────────────────
+const totalCount = computed(() => allSheets.value.length)
+const completedCount = computed(() => allSheets.value.filter(r => r.progress >= 100).length)
+const progressPercent = computed(() => {
+  if (totalCount.value === 0) return 0
+  const avg = allSheets.value.reduce((sum, r) => sum + r.progress, 0) / totalCount.value
+  return Math.round(avg)
+})
+
+// ─── 底稿架构泳道（GtBArchitectureTree 数据源） ───────────────────────────────
+const COMPONENT_TYPE_MAP: Record<string, string> = {
+  K10A: 'a-program-console',
+  '附注上市': 'c-note-table',
+  '附注国企': 'c-note-table',
+}
+function sheetStatus(progress: number): string {
+  if (progress >= 100) return 'completed'
+  if (progress > 0) return 'in_progress'
+  return 'pending'
+}
 const archHtmlData = computed(() => ({
-  navigation_rows: NAV_ROWS.map((r, i) => ({
+  navigation_rows: allSheets.value.map((s, i) => ({
     seq: i + 1,
-    content: r.content,
-    sheet_name: r.content,
-    index_ref: r.index_ref,
-    component_type: r.component_type,
-    status: rowStatus(r),
+    content: s.sheetKey,
+    sheet_name: s.sheetKey,
+    index_ref: s.code,
+    component_type: COMPONENT_TYPE_MAP[s.code] ?? 'd-form-table',
+    status: sheetStatus(s.progress),
   })),
 }))
 
-// ─── 编制进度 ────────────────────────────────────────────────────────────────
-const progressRows = computed(() => NAV_ROWS.filter(r => r.progressKeys.length > 0))
-const completedCount = computed(() => progressRows.value.filter(r => rowStatus(r) === 'completed').length)
-const applicableCount = computed(() => progressRows.value.length)
-const progressPercent = computed(() =>
-  applicableCount.value === 0 ? 0 : Math.round((completedCount.value / applicableCount.value) * 100),
-)
+// ─── 跨表结论口径看板 ─────────────────────────────────────────────────────────
+/** 有审计结论/说明的 sheet（K10A 程序表、K10-3 调整分录、附注、目录本身不计入） */
+const K10_CONCLUSION_CODES = new Set(['K10-1', 'K10-2', 'K10-4', 'K10-5', 'K10-6'])
 
-function handleNavigate(sheetName: string): void {
+/** includes(`${code}-`) 兼容不同存储前缀深度，尾部连字符保证边界安全。 */
+function isConclusionFilled(code: string): boolean {
+  const map = props.allResponses
+  if (!map?.size) return false
+  const token = `${code}-`
+  for (const [key, val] of map.entries()) {
+    if (!key.includes(token)) continue
+    if (!/conclusion|audit-note/i.test(key)) continue
+    const text = (val?.remark ?? val?.conclusion ?? '') as string
+    if (typeof text === 'string' && text.trim().length > 0) return true
+  }
+  return false
+}
+
+const conclusionSheets = computed(() =>
+  allSheets.value
+    .filter(s => K10_CONCLUSION_CODES.has(s.code))
+    .map(s => ({ code: s.code, sheetKey: s.sheetKey, filled: isConclusionFilled(s.code) })),
+)
+const conclusionFilledCount = computed(() => conclusionSheets.value.filter(c => c.filled).length)
+const conclusionHasUnfilled = computed(() => conclusionSheets.value.some(c => !c.filled))
+const conclusionWorstLabel = computed(() => {
+  if (conclusionFilledCount.value === 0) return '结论未填'
+  if (conclusionHasUnfilled.value) return `结论未齐 ${conclusionSheets.value.length - conclusionFilledCount.value} 项`
+  return '总体已齐'
+})
+const conclusionWorstType = computed<'success' | 'warning' | 'info'>(() => {
+  if (conclusionFilledCount.value === 0) return 'info'
+  if (conclusionHasUnfilled.value) return 'warning'
+  return 'success'
+})
+
+// ─── 交互 ────────────────────────────────────────────────────────────────────
+function handleNavigate(sheetName: string) {
   if (sheetName) emit('navigate-sheet', sheetName)
 }
+
+// ─── 本循环底稿目录（K 循环其他科目，跨底稿跳转；canonical 源模板过滤污染） ───
+const cycleWorkpapers = ref<CycleWpCard[]>([])
+
+async function loadCycleWorkpapers(): Promise<void> {
+  cycleWorkpapers.value = await loadCycleWorkpaperCards(props.projectId, 'K', props.wpId)
+}
+
+function onCycleCardClick(wp: CycleWpCard): void {
+  if (!wp.wp_id || wp.is_current || !props.projectId) return
+  router.push({ name: 'WorkpaperEditor', params: { projectId: props.projectId, wpId: wp.wp_id } })
+}
+
+onMounted(loadCycleWorkpapers)
 </script>
 
 <style scoped>
-.k10-tab-index { padding: 12px; font-size: var(--wp-font-size, 13px); }
+.k10-tab-index {
+  padding: 16px;
+  font-size: var(--wp-font-size, 13px);
+}
 
-.progress-bar-section {
-  margin-bottom: 16px; padding: 12px 16px;
-  background: #f5f7fa; border-radius: 6px;
+/* ─── 目录卡 ─── */
+.k10-dir { margin-bottom: 20px; }
+.index-header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
+.title { margin: 0; font-size: 16px; font-weight: 600; color: #303133; }
+.handbook-btns { display: flex; gap: 6px; }
+.progress-wrap { flex: 1; min-width: 200px; }
+.conclusion-board {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  background: #f5f7fa;
+  border-radius: 6px;
+  border-left: 3px solid #409eff;
 }
-.progress-info {
-  display: flex; justify-content: space-between; align-items: center;
-  margin-bottom: 8px; font-size: var(--wp-font-size, 13px); color: #606266;
-}
-.progress-text { font-weight: 600; color: #303133; }
+.board-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.board-meta { font-size: 12px; color: #909399; }
+.board-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.concl-tag.clickable { cursor: pointer; }
+.board-hint { margin: 8px 0 0; font-size: 12px; color: #e6a23c; }
+.methodology-hint { margin-top: 12px; font-size: 12px; color: #606266; }
+.methodology-hint summary { cursor: pointer; font-weight: 500; color: #303133; }
+.methodology-hint ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
 
-.k10-guide {
-  margin-bottom: 16px; padding: 14px 18px;
-  background: linear-gradient(135deg, #e8f4fd 0%, #d1ecf9 100%);
-  border-radius: 8px; border-left: 4px solid #409eff;
-}
-.k10-guide-header {
-  display: flex; align-items: center; gap: 6px;
-  font-weight: 600; color: #303133; margin-bottom: 10px;
-}
-.k10-guide-steps { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; }
-.step-item { display: flex; align-items: flex-start; gap: 6px; }
-.step-num { color: #409eff; font-weight: 700; min-width: 18px; }
-.step-text { color: #606266; line-height: 1.5; }
+/* ─── 底稿架构 ─── */
+.k10-arch { margin-top: 16px; }
+.arch-header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
+.arch-title { margin: 0; font-size: 16px; font-weight: 600; color: #303133; }
+.arch-hint { font-size: 12px; color: #909399; }
 
-.index-header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
-.index-title { margin: 0; font-size: 16px; font-weight: 600; color: #303133; }
-.index-hint { font-size: 12px; color: #909399; }
-
-.compile-hint {
-  margin-top: 16px; padding: 10px 14px;
-  background: #fafafa; border-radius: 6px;
-  font-size: 12px; color: #606266;
+/* ─── 本循环底稿目录 ─── */
+.k10-cycle { margin-top: 28px; }
+.cycle-header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
+.cycle-title { margin: 0; font-size: 16px; font-weight: 600; color: #303133; }
+.cycle-hint { font-size: 12px; color: #909399; }
+.cycle-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+.cycle-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--gt-color-border-purple, #e8e4f0);
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.2s;
 }
-.compile-hint summary { cursor: pointer; font-weight: 500; margin-bottom: 6px; }
-.compile-hint ul { padding-left: 20px; margin: 0; line-height: 1.8; }
+.cycle-card:hover { border-color: var(--gt-color-primary, #4b2d77); box-shadow: 0 2px 8px rgba(75, 45, 119, 0.12); transform: translateY(-2px); }
+.cycle-card.is-current { border-color: var(--gt-color-primary, #4b2d77); background: var(--gt-color-primary-bg, #f4f0fa); box-shadow: 0 0 0 1px var(--gt-color-primary, #4b2d77); cursor: default; }
+.cycle-card.is-disabled { opacity: 0.5; cursor: not-allowed; }
+.cycle-card.is-disabled:hover { border-color: var(--gt-color-border-purple, #e8e4f0); box-shadow: none; transform: none; }
+.cycle-card-top { display: flex; align-items: center; gap: 6px; }
+.cycle-code { font-size: var(--wp-font-size, 13px); font-weight: 700; color: var(--gt-color-primary, #4b2d77); }
+.cycle-current-tag { margin-left: auto; }
+.cycle-name { font-size: var(--wp-font-size, 13px); line-height: 1.4; color: #303133; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 </style>

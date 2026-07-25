@@ -5,16 +5,7 @@
     </div>
 
     <template v-else>
-      <div v-if="isHtmlSheet" class="k5-header-toolbar">
-        <GtWpAiReviewToolbar
-          :wp-id="props.wpId"
-          :project-id="props.projectId"
-          wp-code-prefix="K5"
-          :sheet-name="props.sheetName"
-          :year="props.year"
-          label="预计负债"
-          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
-        />
+      <div v-if="isHtmlSheet && currentSheet !== 'K5'" class="k5-header-toolbar">
         <el-segmented
           v-if="dualMode.isOoAvailable.value"
           v-model="dualMode.currentMode.value"
@@ -199,8 +190,6 @@ import {
 } from './composables/useWorkpaperScaffold'
 import { collectK5Responses, toK5PersistencePatch } from './k5/k5Persistence'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
-import GtWpAiReviewToolbar from './review/GtWpAiReviewToolbar.vue'
-
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 

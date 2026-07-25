@@ -1,135 +1,117 @@
 <template>
   <div class="n1-tab-index">
-    <!-- ═══ 顶部标识头 ═══ -->
-    <div class="n1-header-bar">
-      <span class="header-code">底稿编码 N1</span>
-      <span class="header-sep">|</span>
-      <span class="header-subject">科目 1811 递延所得税资产</span>
-      <span class="header-sep">|</span>
-      <span class="header-direction">资产类 / 借方</span>
-    </div>
+    <!-- 编制信息由页面级头部统一渲染，此处不重复 -->
 
-    <!-- ═══ 资产类借方科目醒目标注 ═══ -->
-    <div class="n1-asset-badge">
-      <el-icon><WarningFilled /></el-icon>
-      <span>递延所得税资产为资产类借方科目（期末 = 期初 + 借方 − 贷方），核心引擎：可抵扣暂时性差异 × 适用税率</span>
-    </div>
-
-    <!-- ═══ 蓝色渐变操作引导区 ═══ -->
-    <div class="n1-guide">
-      <div class="n1-guide-header">
-        <el-icon><InfoFilled /></el-icon>
-        <span>操作步骤引导</span>
-      </div>
-      <div class="n1-guide-steps">
-        <div class="step-item">
-          <span class="step-num">①</span>
-          <span class="step-text">填写审定表（N1-1）确认递延所得税资产期末余额（资产类：期初+借方−贷方）</span>
+    <!-- ═══ 目录卡（标题 + 复核 + 编制/使用手册 + 进度条 → 跨表结论口径 → 编制提示） ═══ -->
+    <div class="n1-dir">
+      <div class="index-header">
+        <h3 class="title">N1 底稿目录</h3>
+        <GtReviewTrigger section-id="N1-index-directory" />
+        <div class="handbook-btns">
+          <el-button size="small" type="primary" plain @click="openHandbook('preparation')">📖 编制手册</el-button>
+          <el-button size="small" @click="openHandbook('usage')">使用手册</el-button>
         </div>
-        <div class="step-item">
-          <span class="step-num">②</span>
-          <span class="step-text">录入明细（N1-2）按暂时性差异项目逐项列示确认额</span>
-        </div>
-        <div class="step-item">
-          <span class="step-num">③</span>
-          <span class="step-text">完成测算表（N1-4）暂时性差异×税率 + 亏损检查（N1-5）充足性判断</span>
-        </div>
-        <div class="step-item">
-          <span class="step-num">④</span>
-          <span class="step-text">调整分录（N1-3）+ 附注披露 + 核对N3递延税负债/N5递延税费用</span>
+        <div class="progress-wrap">
+          <span>编制进度 {{ completedCount }}/{{ totalCount }}</span>
+          <el-progress :percentage="progressPercent" :stroke-width="10" />
         </div>
       </div>
-    </div>
 
-    <!-- ═══ 总体进度 ═══ -->
-    <div class="n1-progress-section">
-      <div class="progress-info">
-        <span>编制进度</span>
-        <span class="progress-text">{{ completedCount }} / {{ totalCount }} ({{ progressPercent }}%)</span>
+      <N1PreparationHandbookDialog v-model="handbookVisible" :initial-tab="handbookTab" />
+
+      <div class="conclusion-board" data-testid="n1-conclusion-board">
+        <div class="board-head">
+          <strong>跨表结论口径</strong>
+          <el-tag size="small" :type="conclusionWorstType">{{ conclusionWorstLabel }}</el-tag>
+          <span class="board-meta">已填 {{ conclusionFilledCount }}/{{ conclusionSheets.length }}</span>
+        </div>
+        <div class="board-tags">
+          <el-tag
+            v-for="c in conclusionSheets"
+            :key="c.code"
+            size="small"
+            class="concl-tag clickable"
+            :type="c.filled ? 'success' : 'info'"
+            effect="plain"
+            @click="emit('navigate', c.sheetKey)"
+          >
+            {{ c.code }} {{ c.filled ? '已填' : '未填' }}
+          </el-tag>
+        </div>
+        <p v-if="conclusionHasUnfilled" class="board-hint">存在未填审计结论，请点击标签跳转补全审计说明与结论。</p>
       </div>
-      <el-progress :percentage="progressPercent" :stroke-width="8" :show-text="false" />
+
+      <details class="methodology-hint">
+        <summary>编制提示</summary>
+        <ul>
+          <li>递延所得税资产为<strong>资产类借方科目</strong>（1811）：期末 = 期初 + 借方 − 贷方（取期末余额，非发生额）</li>
+          <li>核心引擎 N1-4 测算：可抵扣暂时性差异 × 适用税率 → 递延税资产；应纳税暂时性差异 → 递延税负债（N3）分列</li>
+          <li>可弥补亏损确认（谨慎性）：可确认额 = min(未弥补亏损, 预计未来应纳税所得额) × 税率</li>
+          <li>审定期末回写 TB(1811)；本期变动额（期末−期初）供 N5 递延所得税费用核对；各表填妥"审计说明或结论"后目录标签转为"已填"</li>
+        </ul>
+      </details>
     </div>
 
-    <!-- ═══ 底稿目录表格 ═══ -->
-    <el-card shadow="never" class="n1-index-card">
-      <template #header>
-        <span class="card-title">致同会计师事务所 / 递延所得税资产底稿</span>
-      </template>
-      <el-table
-        :data="sheetRows"
-        border
-        size="small"
-        highlight-current-row
-        style="width: 100%"
-        :row-class-name="getRowClassName"
-        @row-click="handleRowClick"
-      >
-        <el-table-column prop="seq" label="序号" width="60" align="center" />
-        <el-table-column prop="name" label="内容" min-width="240">
-          <template #default="{ row }">
-            <span class="sheet-name-link">{{ row.name }}</span>
-            <el-tag v-if="row.isCore" size="small" type="danger" class="core-tag">核心</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="code" label="索引号" width="100" align="center" />
-        <el-table-column label="进度" width="140" align="center">
-          <template #default="{ row }">
-            <el-progress
-              :percentage="row.progress"
-              :stroke-width="6"
-              :show-text="false"
-              :color="getProgressColor(row.progress)"
-              style="width: 80px; display: inline-block"
-            />
-            <span class="progress-label">{{ row.progress }}%</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="联动状态" width="100" align="center">
-          <template #default="{ row }">
-            <span v-if="row.linkageStatus === 'matched'" class="linkage-badge linkage-ok">✓</span>
-            <span v-else-if="row.linkageStatus === 'diff'" class="linkage-badge linkage-warn">⚠</span>
-            <span v-else class="linkage-badge linkage-na">—</span>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
+    <!-- ═══ 底稿架构（4 阶段泳道） ═══ -->
+    <div class="n1-arch">
+      <div class="arch-header">
+        <h4 class="arch-title">底稿架构</h4>
+        <span class="arch-hint">点击卡片可跳转至对应底稿</span>
+      </div>
+      <GtBArchitectureTree
+        :wp-id="wpId"
+        :project-id="projectId"
+        :active-sheet="''"
+        :html-data="archHtmlData"
+        @navigate="handleNavigate"
+      />
+    </div>
 
-    <!-- ═══ 编制提示（折叠） ═══ -->
-    <details class="n1-details-tip">
-      <summary>编制提示</summary>
-      <ul>
-        <li>递延所得税资产（1811）为<strong>资产类借方科目</strong>：期末 = 期初 + 本期借方 − 本期贷方</li>
-        <li>核心公式：递延所得税资产 = 可抵扣暂时性差异 × 适用税率</li>
-        <li>可弥补亏损确认：可确认额 = min(未弥补亏损, 预计未来应纳税所得额) × 税率</li>
-        <li>N1-4测算表同源产出递延税资产（归N1）和递延税负债（归N3），不能抵销的分列</li>
-        <li>递延税资产本期变动额（期末−期初）供N5-8递延所得税费用核对</li>
-        <li>弥补期限：一般企业5年，高新/科技型中小企业10年</li>
-        <li>审定数变化后回写 trial_balance 科目1811期末余额</li>
-        <li>调整分录需保持借贷平衡，通过 EventBus 同步更新审定表</li>
-      </ul>
-    </details>
+    <!-- ═══ 本循环底稿目录（N 循环其他科目，可跳转） ═══ -->
+    <div v-if="cycleWorkpapers.length" class="n1-cycle">
+      <div class="cycle-header">
+        <h4 class="cycle-title">本循环底稿目录</h4>
+        <span class="cycle-hint">点击可跳转至同循环其他底稿（灰色表示尚未生成）</span>
+      </div>
+      <div class="cycle-grid">
+        <div
+          v-for="wp in cycleWorkpapers"
+          :key="wp.wp_code"
+          class="cycle-card"
+          :class="{ 'is-current': wp.is_current, 'is-disabled': !wp.wp_id }"
+          @click="onCycleCardClick(wp)"
+        >
+          <div class="cycle-card-top">
+            <span class="cycle-code">{{ wp.wp_code }}</span>
+            <el-tag v-if="wp.is_current" size="small" effect="plain" class="cycle-current-tag">当前</el-tag>
+          </div>
+          <span class="cycle-name" :title="wp.wp_name">{{ wp.wp_name }}</span>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 /**
- * N1TabIndex — N1 递延所得税资产底稿目录
+ * N1TabIndex.vue — N1 递延所得税资产底稿目录（严格镜像 E1 标准）
  *
- * 8 行 sheet 目录（序号 | 内容 | 索引号 | 进度 | 联动状态）。
- * 点击行 emit navigate 事件（由 GtN1DeferredTaxAssets 监听切换 sheetName）。
- * 引导区 4 步：审定表(资产类期末) → 明细(暂时性差异) → 测算+亏损 → 调整+附注+联动N3/N5。
- * 醒目标注"递延所得税资产为资产类借方科目"。
- * 联动状态列：从 useN1CrossSheet 获取各sheet勾稽状态。
+ * 结构：目录卡（标题+复核+编制/使用手册+进度→跨表结论口径→编制提示）
+ *       + 底稿架构 4 阶段泳道（GtBArchitectureTree）+ 本循环底稿目录 grid。
+ * 编制信息由页面级头部渲染，此处不重复。自包含：自行拉取 checklist-responses。
  *
- * Requirements: 1.2
+ * 资产类借方科目（1811 递延所得税资产）— 取期末余额非发生额。
  */
-import { computed, ref } from 'vue'
-import { InfoFilled, WarningFilled } from '@element-plus/icons-vue'
-import { useN1CrossSheet } from '../../composables/useN1CrossSheet'
-import type { ChecklistResponse } from '../../composables/useN1FormData'
+import { computed, ref, onMounted, defineAsyncComponent } from 'vue'
+import { useRouter } from 'vue-router'
+import http from '@/utils/http'
+import { loadCycleWorkpaperCards, type CycleWpCard } from '@/services/cycleDirectory'
+import GtReviewTrigger from '../../GtReviewTrigger.vue'
+import GtBArchitectureTree from '../../GtBArchitectureTree.vue'
+
+const N1PreparationHandbookDialog = defineAsyncComponent(() => import('../N1PreparationHandbookDialog.vue'))
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
-
 const props = defineProps<{
   wpId: string
   projectId: string
@@ -140,392 +122,208 @@ const emit = defineEmits<{
   (e: 'navigate', sheetName: string): void
 }>()
 
-// ─── CrossSheet 联动（占位 Map，后续集成时注入真实 allResponses） ──────────
+const router = useRouter()
 
-const allResponses = ref<Map<string, ChecklistResponse>>(new Map())
-const { adjudicationVsDetail, adjudicationVsCalcTable } = useN1CrossSheet(allResponses)
-
-// ─── Sheet 目录行定义 ────────────────────────────────────────────────────────
-
-type LinkageStatus = 'matched' | 'diff' | 'none'
-
-interface SheetRow {
-  seq: number
-  name: string
-  code: string
-  /** sheetName（传给父组件用于 v-if 分发） */
-  sheetKey: string
-  progress: number
-  /** 是否核心sheet */
-  isCore: boolean
-  /** 联动状态 */
-  linkageStatus: LinkageStatus
+// ─── 编制/使用手册弹窗 ─────────────────────────────────────────────────────────
+const handbookVisible = ref(false)
+const handbookTab = ref<'preparation' | 'usage'>('preparation')
+function openHandbook(tab: 'preparation' | 'usage') {
+  handbookTab.value = tab
+  handbookVisible.value = true
 }
 
-/**
- * 8 行 sheet 目录（对应源模板 N1 递延所得税资产底稿）。
- * 进度条默认 0%，后续集成时根据 checklist_responses 数据填充。
- * 联动状态从 useN1CrossSheet 获取（审定↔明细、审定↔测算勾稽）。
- */
-const sheetRows = computed<SheetRow[]>(() => {
-  // 联动状态：N1-1需要同时与N1-2和N1-4勾稽
-  const n1_1Linkage: LinkageStatus =
-    adjudicationVsDetail.value.isMatch && adjudicationVsCalcTable.value.isMatch
-      ? 'matched'
-      : (allResponses.value.size > 0 ? 'diff' : 'none')
-
-  const n1_2Linkage: LinkageStatus =
-    adjudicationVsDetail.value.isMatch
-      ? 'matched'
-      : (allResponses.value.size > 0 ? 'diff' : 'none')
-
-  const n1_4Linkage: LinkageStatus =
-    adjudicationVsCalcTable.value.isMatch
-      ? 'matched'
-      : (allResponses.value.size > 0 ? 'diff' : 'none')
-
-  return [
-    {
-      seq: 1,
-      name: '递延所得税资产审计程序表',
-      code: 'N1A',
-      sheetKey: '递延所得税资产审计程序表N1A',
-      progress: 0,
-      isCore: false,
-      linkageStatus: 'none',
-    },
-    {
-      seq: 2,
-      name: '递延所得税资产审定表',
-      code: 'N1-1',
-      sheetKey: '审定表N1-1',
-      progress: 0,
-      isCore: true,
-      linkageStatus: n1_1Linkage,
-    },
-    {
-      seq: 3,
-      name: '附注披露信息（上市公司）',
-      code: '',
-      sheetKey: '附注披露信息（上市公司）',
-      progress: 0,
-      isCore: false,
-      linkageStatus: 'none',
-    },
-    {
-      seq: 4,
-      name: '附注披露信息（国企）',
-      code: '',
-      sheetKey: '附注披露信息（国企）',
-      progress: 0,
-      isCore: false,
-      linkageStatus: 'none',
-    },
-    {
-      seq: 5,
-      name: '递延所得税资产明细表',
-      code: 'N1-2',
-      sheetKey: '明细表N1-2',
-      progress: 0,
-      isCore: true,
-      linkageStatus: n1_2Linkage,
-    },
-    {
-      seq: 6,
-      name: '调整分录汇总',
-      code: 'N1-3',
-      sheetKey: '调整分录汇总N1-3',
-      progress: 0,
-      isCore: false,
-      linkageStatus: 'none',
-    },
-    {
-      seq: 7,
-      name: '递延所得税资产（负债）测算表',
-      code: 'N1-4',
-      sheetKey: '测算表N1-4',
-      progress: 0,
-      isCore: true,
-      linkageStatus: n1_4Linkage,
-    },
-    {
-      seq: 8,
-      name: '可用以后年度税前利润弥补的亏损检查表',
-      code: 'N1-5',
-      sheetKey: '亏损检查表N1-5',
-      progress: 0,
-      isCore: false,
-      linkageStatus: 'none',
-    },
-  ]
+// ─── 自包含：拉取本底稿 checklist-responses（主入口不持有 allResponses） ─────────
+const responses = ref<Map<string, any>>(new Map())
+onMounted(async () => {
+  if (!props.wpId) return
+  try {
+    const res: any = await http.get(`/api/workpapers/${props.wpId}/checklist-responses`)
+    const list = res?.data?.items ?? res?.items ?? res?.data ?? res
+    const map = new Map<string, any>()
+    if (Array.isArray(list)) {
+      for (const it of list) {
+        if (it?.item_id) map.set(it.item_id, it)
+      }
+    }
+    responses.value = map
+  } catch {
+    /* silent：拉取失败则看板全显未填 */
+  }
 })
 
+// ─── Sheet 行定义 ─────────────────────────────────────────────────────────────
+interface SheetRow {
+  name: string
+  code: string
+  sheetKey: string
+  progress: number
+}
+
+/** 按 responses 中以指定前缀存储的字段数计算完成度。 */
+function calcSheetProgress(prefix: string, expectedFields: number): number {
+  const map = responses.value
+  if (!map || map.size === 0) return 0
+  let count = 0
+  for (const key of map.keys()) {
+    if (key.startsWith(prefix)) count++
+  }
+  if (count === 0) return 0
+  if (count >= expectedFields) return 100
+  return Math.min(Math.round((count / expectedFields) * 100), 99)
+}
+
+const allSheets = computed<SheetRow[]>(() => [
+  { name: '递延所得税资产审计程序表', code: 'N1A', sheetKey: '递延所得税资产审计程序表N1A', progress: calcSheetProgress('N1-N1A-', 5) },
+  { name: '审定表', code: 'N1-1', sheetKey: '审定表N1-1', progress: calcSheetProgress('N1-1-', 8) },
+  { name: '明细表', code: 'N1-2', sheetKey: '明细表N1-2', progress: calcSheetProgress('N1-2-', 6) },
+  { name: '调整分录汇总', code: 'N1-3', sheetKey: '调整分录汇总N1-3', progress: calcSheetProgress('N1-3-', 4) },
+  { name: '递延所得税资产（负债）测算表', code: 'N1-4', sheetKey: '测算表N1-4', progress: calcSheetProgress('N1-4-', 6) },
+  { name: '可用以后年度税前利润弥补的亏损检查表', code: 'N1-5', sheetKey: '亏损检查表N1-5', progress: calcSheetProgress('N1-5-', 4) },
+  { name: '附注披露信息（上市公司）', code: '附注上市', sheetKey: '附注披露信息（上市公司）', progress: calcSheetProgress('N1-disclosure-listed-', 3) },
+  { name: '附注披露信息（国企）', code: '附注国企', sheetKey: '附注披露信息（国企）', progress: calcSheetProgress('N1-disclosure-soe-', 3) },
+])
+
 // ─── 进度计算 ─────────────────────────────────────────────────────────────────
-
-const totalCount = computed(() => sheetRows.value.length)
-
-const completedCount = computed(() =>
-  sheetRows.value.filter(r => r.progress >= 100).length,
-)
-
+const totalCount = computed(() => allSheets.value.length)
+const completedCount = computed(() => allSheets.value.filter(r => r.progress >= 100).length)
 const progressPercent = computed(() => {
   if (totalCount.value === 0) return 0
-  const avgProgress = sheetRows.value.reduce((sum, r) => sum + r.progress, 0) / totalCount.value
-  return Math.round(avgProgress)
+  const avg = allSheets.value.reduce((sum, r) => sum + r.progress, 0) / totalCount.value
+  return Math.round(avg)
+})
+
+// ─── 底稿架构泳道（GtBArchitectureTree 数据源） ───────────────────────────────
+const COMPONENT_TYPE_MAP: Record<string, string> = {
+  N1A: 'a-program-console',
+  '附注上市': 'c-note-table',
+  '附注国企': 'c-note-table',
+}
+function sheetStatus(progress: number): string {
+  if (progress >= 100) return 'completed'
+  if (progress > 0) return 'in_progress'
+  return 'pending'
+}
+const archHtmlData = computed(() => ({
+  navigation_rows: allSheets.value.map((s, i) => ({
+    seq: i + 1,
+    content: s.sheetKey,
+    sheet_name: s.sheetKey,
+    index_ref: s.code,
+    component_type: COMPONENT_TYPE_MAP[s.code] ?? 'd-form-table',
+    status: sheetStatus(s.progress),
+  })),
+}))
+
+// ─── 跨表结论口径看板 ─────────────────────────────────────────────────────────
+/** 有审计结论/说明的 sheet（程序表、调整分录、附注、目录本身不计入） */
+const N1_CONCLUSION_CODES = new Set(['N1-1', 'N1-2', 'N1-4', 'N1-5'])
+
+/** includes(`${code}-`) 兼容不同存储前缀深度，尾部连字符保证边界安全。 */
+function isConclusionFilled(code: string): boolean {
+  const map = responses.value
+  if (!map?.size) return false
+  const token = `${code}-`
+  for (const [key, val] of map.entries()) {
+    if (!key.includes(token)) continue
+    if (!/conclusion|audit-note|note/i.test(key)) continue
+    const text = (val?.remark ?? val?.conclusion ?? '') as string
+    if (typeof text === 'string' && text.trim().length > 0) return true
+  }
+  return false
+}
+
+const conclusionSheets = computed(() =>
+  allSheets.value
+    .filter(s => N1_CONCLUSION_CODES.has(s.code))
+    .map(s => ({ code: s.code, sheetKey: s.sheetKey, filled: isConclusionFilled(s.code) })),
+)
+const conclusionFilledCount = computed(() => conclusionSheets.value.filter(c => c.filled).length)
+const conclusionHasUnfilled = computed(() => conclusionSheets.value.some(c => !c.filled))
+const conclusionWorstLabel = computed(() => {
+  if (conclusionFilledCount.value === 0) return '结论未填'
+  if (conclusionHasUnfilled.value) return `结论未齐 ${conclusionSheets.value.length - conclusionFilledCount.value} 项`
+  return '总体已齐'
+})
+const conclusionWorstType = computed<'success' | 'warning' | 'info'>(() => {
+  if (conclusionFilledCount.value === 0) return 'info'
+  if (conclusionHasUnfilled.value) return 'warning'
+  return 'success'
 })
 
 // ─── 交互 ────────────────────────────────────────────────────────────────────
-
-function handleRowClick(row: SheetRow) {
-  if (props.isReadonly && row.progress === 0) return
-  emit('navigate', row.sheetKey)
+function handleNavigate(sheetName: string) {
+  if (sheetName) emit('navigate', sheetName)
 }
 
-function getRowClassName({ row }: { row: SheetRow }): string {
-  return row.progress >= 100 ? 'completed-row' : ''
+// ─── 本循环底稿目录（N 循环其他科目，跨底稿跳转；canonical 源模板过滤污染） ───
+const cycleWorkpapers = ref<CycleWpCard[]>([])
+async function loadCycleWorkpapers(): Promise<void> {
+  cycleWorkpapers.value = await loadCycleWorkpaperCards(props.projectId, 'N', props.wpId)
 }
-
-function getProgressColor(percent: number): string {
-  if (percent >= 100) return '#67c23a'
-  if (percent >= 50) return '#409eff'
-  return '#e6e8eb'
+function onCycleCardClick(wp: CycleWpCard): void {
+  if (!wp.wp_id || wp.is_current || !props.projectId) return
+  router.push({ name: 'WorkpaperEditor', params: { projectId: props.projectId, wpId: wp.wp_id } })
 }
+onMounted(loadCycleWorkpapers)
 </script>
 
 <style scoped>
 .n1-tab-index {
-  padding: 12px;
+  padding: 16px;
   font-size: var(--wp-font-size, 13px);
 }
 
-/* ─── 顶部标识头 ─── */
-.n1-header-bar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
-  margin-bottom: 16px;
+/* ─── 目录卡 ─── */
+.n1-dir { margin-bottom: 20px; }
+.index-header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
+.title { margin: 0; font-size: 16px; font-weight: 600; color: #303133; }
+.handbook-btns { display: flex; gap: 6px; }
+.progress-wrap { flex: 1; min-width: 200px; }
+.conclusion-board {
+  margin-bottom: 12px;
+  padding: 10px 12px;
   background: #f5f7fa;
-  border: 1px solid #dcdfe6;
   border-radius: 6px;
-  font-size: var(--wp-font-size, 13px);
+  border-left: 3px solid #409eff;
 }
+.board-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.board-meta { font-size: 12px; color: #909399; }
+.board-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.concl-tag.clickable { cursor: pointer; }
+.board-hint { margin: 8px 0 0; font-size: 12px; color: #e6a23c; }
+.methodology-hint { margin-top: 12px; font-size: 12px; color: #606266; }
+.methodology-hint summary { cursor: pointer; font-weight: 500; color: #303133; }
+.methodology-hint ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
 
-.header-code {
-  font-weight: 600;
-  color: #303133;
-}
+/* ─── 底稿架构 ─── */
+.n1-arch { margin-top: 16px; }
+.arch-header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
+.arch-title { margin: 0; font-size: 16px; font-weight: 600; color: #303133; }
+.arch-hint { font-size: 12px; color: #909399; }
 
-.header-sep {
-  color: #c0c4cc;
-}
-
-.header-subject {
-  color: #606266;
-}
-
-.header-direction {
-  font-weight: 500;
-  color: #e6a23c;
-}
-
-/* ─── 资产类借方科目醒目标注 ─── */
-.n1-asset-badge {
+/* ─── 本循环底稿目录 ─── */
+.n1-cycle { margin-top: 28px; }
+.cycle-header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
+.cycle-title { margin: 0; font-size: 16px; font-weight: 600; color: #303133; }
+.cycle-hint { font-size: 12px; color: #909399; }
+.cycle-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+.cycle-card {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  margin-bottom: 16px;
-  background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
-  border: 1px solid #ffb74d;
-  border-left: 4px solid #f57c00;
-  border-radius: 6px;
-  font-size: var(--wp-font-size, 13px);
-  font-weight: 500;
-  color: #e65100;
-}
-
-.n1-asset-badge .el-icon {
-  font-size: 16px;
-  color: #f57c00;
-  flex-shrink: 0;
-}
-
-/* ─── 蓝色渐变引导区 ─── */
-.n1-guide {
-  background: linear-gradient(135deg, #e8f4fd 0%, #d6eaf8 100%);
-  border: 1px solid #b3d9f2;
-  border-radius: 8px;
-  padding: 14px 20px;
-  margin-bottom: 16px;
-}
-
-.n1-guide-header {
-  display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 6px;
-  font-weight: 500;
-  color: #1a73e8;
-  margin-bottom: 10px;
-  font-size: var(--wp-font-size, 13px);
-}
-
-.n1-guide-steps {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px 24px;
-}
-
-.step-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: var(--wp-font-size, 13px);
-  color: #374151;
-}
-
-.step-num {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: #1a73e8;
-  color: #fff;
-  font-size: 11px;
-  font-weight: 600;
-  flex-shrink: 0;
-}
-
-.step-text {
-  font-size: var(--wp-font-size, 13px);
-}
-
-/* ─── 进度条区 ─── */
-.n1-progress-section {
-  margin-bottom: 16px;
-  padding: 12px 16px;
-  background: #f5f7fa;
-  border-radius: 6px;
-}
-
-.progress-info {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-  font-size: var(--wp-font-size, 13px);
-  color: #606266;
-}
-
-.progress-text {
-  font-weight: 600;
-  color: #303133;
-}
-
-/* ─── 目录卡片 ─── */
-.n1-index-card {
-  margin-bottom: 16px;
-}
-
-.card-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #303133;
-}
-
-.sheet-name-link {
-  color: #1a73e8;
+  padding: 10px 12px;
+  border: 1px solid var(--gt-color-border-purple, #e8e4f0);
+  border-radius: 8px;
+  background: #fff;
   cursor: pointer;
-  font-size: var(--wp-font-size, 13px);
+  transition: all 0.2s;
 }
-
-.sheet-name-link:hover {
-  text-decoration: underline;
-}
-
-.core-tag {
-  margin-left: 8px;
-  font-size: 11px;
-  vertical-align: middle;
-}
-
-.progress-label {
-  display: inline-block;
-  margin-left: 8px;
-  font-size: 12px;
-  color: #909399;
-  width: 32px;
-}
-
-/* ─── 联动状态 badge ─── */
-.linkage-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  font-size: var(--wp-font-size, 13px);
-  font-weight: 600;
-}
-
-.linkage-ok {
-  background: #e8f5e9;
-  color: #43a047;
-  border: 1px solid #a5d6a7;
-}
-
-.linkage-warn {
-  background: #fff3e0;
-  color: #e65100;
-  border: 1px solid #ffcc80;
-}
-
-.linkage-na {
-  background: #f5f5f5;
-  color: #bdbdbd;
-  border: 1px solid #e0e0e0;
-}
-
-:deep(.completed-row) {
-  background-color: #f0f9eb !important;
-}
-
-:deep(.el-table) {
-  font-size: var(--wp-font-size, 13px);
-}
-
-:deep(.el-table .el-table__row) {
-  cursor: pointer;
-}
-
-:deep(.el-table .el-table__row:hover) {
-  background-color: #ecf5ff !important;
-}
-
-/* ─── 编制提示折叠 ─── */
-.n1-details-tip {
-  margin-top: 12px;
-  padding: 12px 16px;
-  background: #fafafa;
-  border: 1px solid #ebeef5;
-  border-radius: 6px;
-  font-size: var(--wp-font-size, 13px);
-  color: #606266;
-}
-
-.n1-details-tip summary {
-  cursor: pointer;
-  font-weight: 500;
-  color: #303133;
-  margin-bottom: 8px;
-}
-
-.n1-details-tip ul {
-  padding-left: 20px;
-  margin: 8px 0 0;
-  line-height: 1.8;
-}
+.cycle-card:hover { border-color: var(--gt-color-primary, #4b2d77); box-shadow: 0 2px 8px rgba(75, 45, 119, 0.12); transform: translateY(-2px); }
+.cycle-card.is-current { border-color: var(--gt-color-primary, #4b2d77); background: var(--gt-color-primary-bg, #f4f0fa); box-shadow: 0 0 0 1px var(--gt-color-primary, #4b2d77); cursor: default; }
+.cycle-card.is-disabled { opacity: 0.5; cursor: not-allowed; }
+.cycle-card.is-disabled:hover { border-color: var(--gt-color-border-purple, #e8e4f0); box-shadow: none; transform: none; }
+.cycle-card-top { display: flex; align-items: center; gap: 6px; }
+.cycle-code { font-size: var(--wp-font-size, 13px); font-weight: 700; color: var(--gt-color-primary, #4b2d77); }
+.cycle-current-tag { margin-left: auto; }
+.cycle-name { font-size: var(--wp-font-size, 13px); line-height: 1.4; color: #303133; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 </style>

@@ -14,13 +14,18 @@
 
     <!-- 根据外层 GtWpRenderer 传入的 sheetName 分发到对应子组件 -->
     <template v-else>
-      <!-- 双模式切换（HTML / OnlyOffice） -->
+      <!-- 双模式切换（结构化 / OnlyOffice，健康门控"拉取成功才切"） -->
       <div v-if="currentSheet !== 'index' && currentSheet !== 'procedure'" class="mode-toggle-bar">
-        <el-segmented v-model="viewMode" :options="modeOptions" size="small" />
+        <el-segmented
+          :model-value="dualMode.mode.value"
+          :options="modeToggleOptions"
+          size="small"
+          @change="dualMode.switchMode"
+        />
       </div>
 
       <!-- HTML 结构化模式 -->
-      <template v-if="viewMode === 'html'">
+      <template v-if="dualMode.mode.value === 'html'">
         <!-- M8 底稿目录 -->
         <M8TabIndex
           v-if="currentSheet === 'index'"
@@ -95,11 +100,11 @@
         />
       </template>
 
-      <!-- OnlyOffice 原始模式 -->
+      <!-- OnlyOffice 在线编辑模式 -->
       <GtOnlyOfficeSheet
         v-else
         :wp-id="props.wpId"
-        :sheet-name="props.sheetName"
+        :sheet-name="dualMode.resolveOoSheetName()"
         style="height: 100%; min-height: 600px"
       />
     </template>
@@ -128,9 +133,10 @@
  * - 版本追踪: useVersionTrail(autoSnapshot)
  * - 复核对话: provide openReviewDialog → 子组件 inject
  */
-import { ref, computed, inject, onMounted, onBeforeUnmount, provide, defineAsyncComponent } from 'vue'
+import { ref, computed, inject, onMounted, onBeforeUnmount, provide, toRef, defineAsyncComponent } from 'vue'
 import http from '@/utils/http'
 import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './composables/useWorkpaperScaffold'
+import { useM8EntryDualMode } from './composables/useM8EntryDualMode'
 
 // ─── Lazy-loaded child components ────────────────────────────────────────────
 
@@ -179,14 +185,6 @@ function handleNavigate(sheetName: string) {
 
 const isLoading = ref(true)
 const isReadonly = computed(() => !!props.readonly)
-
-// ─── 双模式切换 ──────────────────────────────────────────────────────────────
-
-const viewMode = ref<'html' | 'oo'>('html')
-const modeOptions = [
-  { label: '结构化', value: 'html' },
-  { label: 'OnlyOffice', value: 'oo' },
-]
 
 // ─── 行业守卫（金融企业适用性） ──────────────────────────────────────────────
 
@@ -254,6 +252,26 @@ const currentSheet = computed(() => {
   // 未匹配（Q8A修订前/针对性测试删除/会计规定辅助等）→ OO fallback
   return name
 })
+
+// ─── 双模式（HTML ↔ OnlyOffice，健康门控"拉取成功才切"，对齐 M1/D4 范式） ───
+// index/procedure 不参与双模式；其余 HTML sheet 上方显示 segmented 切换栏。
+const dualMode = useM8EntryDualMode({
+  wpId: toRef(props, 'wpId') as any,
+  currentSheet,
+  reloadAllResponses: async () => {
+    // 各子组件在 mount 时自加载各自 formData；此处仅重跑 render-config 预热。
+    await selfLoad()
+  },
+})
+
+const modeToggleOptions = computed(() => [
+  { label: '结构化', value: 'html' as const },
+  {
+    label: dualMode.ooAvailable.value ? 'OnlyOffice（拉取成功）' : 'OnlyOffice（不可用）',
+    value: 'onlyoffice' as const,
+    disabled: !dualMode.ooAvailable.value,
+  },
+])
 
 // ─── Runtime Boundary（GtWpRenderer 统一提供 版本/复核/AI/displayPrefs + 挂真实 Host） ───
 // 复核对话与版本历史由 Runtime Boundary 统一 provide('openReviewDialog') + version 承载，

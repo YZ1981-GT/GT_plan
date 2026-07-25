@@ -14,6 +14,8 @@
         <el-button size="small" @click="handleReview">
           <el-icon><ChatDotSquare /></el-icon>复核
         </el-button>
+        <el-button size="small" type="primary" plain :loading="centralSyncing" :disabled="isReadonly || !isBalanced || entries.length === 0" @click="syncToCentral" title="把本页调整分录汇聚到集中调整登记，供合伙人跨循环审阅">同步到集中登记</el-button>
+        <el-tag v-if="centralStatus?.review_status" size="small" :type="centralStatus.review_status==='approved'?'success':(centralStatus.review_status==='rejected'?'danger':'info')" :title="centralStatus.rejection_reason||''">集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status]||centralStatus.review_status }}</el-tag>
       </div>
     </div>
 
@@ -144,6 +146,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, ChatDotSquare } from '@element-plus/icons-vue'
 import { useN5FormData } from '../../composables/useN5FormData'
 import { eventBus } from '@/utils/eventBus'
+import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '@/components/workpaper/composables/useAdjustmentCentralSync'
+import { useAuditContext } from '@/composables/useAuditContext'
 
 const props = defineProps<{
   allResponses: Map<string, any>
@@ -179,6 +183,27 @@ const totalCredit = computed(() => entries.value.reduce((s, e) => s + (e.credit 
 const balanceDiff = computed(() => totalDebit.value - totalCredit.value)
 const isBalanced = computed(() => Math.abs(balanceDiff.value) < 0.01)
 
+// ─── 集中登记同步 ────────────────────────────────────────────────────────────
+
+const { year: auditYear } = useAuditContext()
+const { centralStatus, syncing: centralSyncing, syncToCentral, refreshStatus } = useAdjustmentCentralSync({
+  projectId: () => props.projectId,
+  year: auditYear,
+  wpId: () => props.wpId,
+  wpCode: 'N5',
+  itemId: 'N5-3-entries',
+  buildLineItems: () => entries.value.map((e: any) => ({
+    account_name: e.accountName,
+    standard_account_code: e.accountCode || undefined,
+    debit_amount: e.debit,
+    credit_amount: e.credit,
+  })),
+  buildMeta: () => ({
+    description: entries.value.find((e: any) => e.description)?.description || 'N5 所得税费用调整',
+    adjustmentType: 'aje',
+  }),
+})
+
 // ─── 数据加载 ────────────────────────────────────────────────────────────────
 
 onMounted(async () => {
@@ -187,6 +212,7 @@ onMounted(async () => {
   if (saved && Array.isArray(saved)) entries.value = saved
   auditNotes.value = formData.getField('3', 'audit-notes') ?? ''
   auditConclusion.value = formData.getField('3', 'audit-conclusion') ?? ''
+  refreshStatus()
 })
 
 // ─── 新增分录 ────────────────────────────────────────────────────────────────

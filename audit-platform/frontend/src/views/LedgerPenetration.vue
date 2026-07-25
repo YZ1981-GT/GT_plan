@@ -409,6 +409,23 @@
         <el-button size="small" @click="loadLedger" :loading="loading">刷新</el-button>
         <el-button size="small" plain @click="copySelectedRows" :disabled="selectedRows.length === 0" title="复制选中行到剪贴板">复制选中</el-button>
         <el-button size="small" plain @click="exportLedgerExcel">导出Excel</el-button>
+        <el-popover v-if="ledgerExtraAllKeys.length" placement="bottom-end" :width="220" trigger="click">
+          <template #reference>
+            <el-button size="small" plain title="额外列显隐设置">⚙ 额外列</el-button>
+          </template>
+          <div class="gt-extra-col-prefs">
+            <div class="gt-extra-col-prefs__head">
+              <span>额外列显隐</span>
+              <el-button size="small" text type="primary" @click="showAllExtraCols">全显</el-button>
+            </div>
+            <el-checkbox
+              v-for="k in ledgerExtraAllKeys"
+              :key="k"
+              :model-value="!hiddenExtraCols.has(k)"
+              @change="(v) => toggleExtraCol(k, v as boolean)"
+            >{{ k }}</el-checkbox>
+          </div>
+        </el-popover>
         <el-button size="small" plain @click="toggleFullscreen" :title="isFullscreen ? '退出全屏' : '全屏查看'">{{ isFullscreen ? '退出全屏' : '全屏' }}</el-button>
       </div>
       <!-- V3 Req 12.2.1: 虚拟滚动模式（数据量 > 1000 行时自动切换 el-table-v2） -->
@@ -495,6 +512,19 @@
             <GtAmountCell :value="row.balance" />
           </template>
         </el-table-column>
+        <!-- 非关键列（导入时保留的 raw_extra 业务字段）动态列 -->
+        <el-table-column
+          v-for="k in ledgerExtraColumns"
+          :key="`ef-${k}`"
+          :label="k"
+          :prop="`extra_fields.${k}`"
+          min-width="120"
+          show-overflow-tooltip
+          class-name="gt-ef-col"
+          label-class-name="gt-ef-col-hd"
+        >
+          <template #default="{ row }"><span class="gt-ef-cell">{{ fmtExtraCell(row.extra_fields?.[k]) }}</span></template>
+        </el-table-column>
       </el-table>
       <!-- 明细账已全量加载（运行余额/月小计需跨整账计算），≤1000 行用普通表，
            >1000 行自动切虚拟滚动；不再做服务端分页（按页算余额会错）。 -->
@@ -507,7 +537,25 @@
         <el-tag type="info" size="small">凭证 {{ currentVoucher }}</el-tag>
         <el-button size="small" plain @click="copyCurrentVoucher" title="复制本凭证所有分录到剪贴板">复制本凭证</el-button>
         <el-button size="small" type="primary" plain @click="sampleCurrentVoucher" title="将本凭证标记为抽样凭证">抽中本凭证</el-button>
+        <el-button size="small" type="warning" plain @click="attachCurrentVoucher" title="将本凭证挂入某张底稿的凭证检查表">挂凭到底稿</el-button>
         <el-button size="small" plain @click="copySelectedRows()" :disabled="selectedRows.length === 0" title="复制选中行到剪贴板">复制选中</el-button>
+        <el-popover v-if="voucherExtraAllKeys.length" placement="bottom-end" :width="220" trigger="click">
+          <template #reference>
+            <el-button size="small" plain title="额外列显隐设置">⚙ 额外列</el-button>
+          </template>
+          <div class="gt-extra-col-prefs">
+            <div class="gt-extra-col-prefs__head">
+              <span>额外列显隐</span>
+              <el-button size="small" text type="primary" @click="showAllExtraCols">全显</el-button>
+            </div>
+            <el-checkbox
+              v-for="k in voucherExtraAllKeys"
+              :key="k"
+              :model-value="!hiddenExtraCols.has(k)"
+              @change="(v) => toggleExtraCol(k, v as boolean)"
+            >{{ k }}</el-checkbox>
+          </div>
+        </el-popover>
         <el-button size="small" plain @click="toggleFullscreen" :title="isFullscreen ? '退出全屏' : '全屏查看'">{{ isFullscreen ? '退出全屏' : '全屏' }}</el-button>
       </div>
       <el-table
@@ -533,6 +581,19 @@
         </el-table-column>
         <el-table-column prop="summary" label="摘要" min-width="200" show-overflow-tooltip>
           <template #default="{ row }"><span class="gt-amt">{{ row.summary }}</span></template>
+        </el-table-column>
+        <!-- 非关键列（导入时保留的 raw_extra 业务字段）动态列 -->
+        <el-table-column
+          v-for="k in voucherExtraColumns"
+          :key="`ef-${k}`"
+          :label="k"
+          :prop="`extra_fields.${k}`"
+          min-width="120"
+          show-overflow-tooltip
+          class-name="gt-ef-col"
+          label-class-name="gt-ef-col-hd"
+        >
+          <template #default="{ row }"><span class="gt-ef-cell">{{ fmtExtraCell(row.extra_fields?.[k]) }}</span></template>
         </el-table-column>
       </el-table>
     </template>
@@ -576,6 +637,23 @@
         <el-tag type="info" size="small">{{ currentAccount }} / {{ currentAuxCode }} 辅助明细</el-tag>
         <el-button size="small" @click="loadAuxLedger" :loading="loading">刷新</el-button>
         <el-button size="small" plain @click="copySelectedRows" :disabled="selectedRows.length === 0" title="复制选中行到剪贴板">复制选中</el-button>
+        <el-popover v-if="auxLedgerExtraAllKeys.length" placement="bottom-end" :width="220" trigger="click">
+          <template #reference>
+            <el-button size="small" plain title="额外列显隐设置">⚙ 额外列</el-button>
+          </template>
+          <div class="gt-extra-col-prefs">
+            <div class="gt-extra-col-prefs__head">
+              <span>额外列显隐</span>
+              <el-button size="small" text type="primary" @click="showAllExtraCols">全显</el-button>
+            </div>
+            <el-checkbox
+              v-for="k in auxLedgerExtraAllKeys"
+              :key="k"
+              :model-value="!hiddenExtraCols.has(k)"
+              @change="(v) => toggleExtraCol(k, v as boolean)"
+            >{{ k }}</el-checkbox>
+          </div>
+        </el-popover>
         <el-button size="small" plain @click="toggleFullscreen" :title="isFullscreen ? '退出全屏' : '全屏查看'">{{ isFullscreen ? '退出全屏' : '全屏' }}</el-button>
       </div>
       <el-table
@@ -614,6 +692,19 @@
             <GtAmountCell :value="row.balance" />
           </template>
         </el-table-column>
+        <!-- 非关键列（导入时保留的 raw_extra 业务字段）动态列 -->
+        <el-table-column
+          v-for="k in auxLedgerExtraColumns"
+          :key="`ef-${k}`"
+          :label="k"
+          :prop="`extra_fields.${k}`"
+          min-width="120"
+          show-overflow-tooltip
+          class-name="gt-ef-col"
+          label-class-name="gt-ef-col-hd"
+        >
+          <template #default="{ row }"><span class="gt-ef-cell">{{ fmtExtraCell(row.extra_fields?.[k]) }}</span></template>
+        </el-table-column>
       </el-table>
       <!-- 辅助明细账已全量加载（运行余额/月小计需跨整账计算），不再做服务端分页。 -->
     </template>
@@ -636,10 +727,18 @@
       </div>
       <div class="gt-context-menu__item gt-context-menu__divider" />
       <div class="gt-context-menu__item" @click="onContextAction('voucher')">
-        抽凭到底稿（开发中）
+        挂凭到底稿
       </div>
     </div>
   </Teleport>
+
+  <!-- ── 挂凭到底稿弹窗 ── -->
+  <AttachVoucherToWpDialog
+    v-model="attachDialogVisible"
+    :project-id="projectId"
+    :year="year"
+    :vouchers="attachVouchers"
+  />
 
   <!-- ── 智能导入弹窗 ── -->
   <el-dialog
@@ -1027,7 +1126,9 @@ import { useFullscreen } from '@/composables/useFullscreen'
 import { useDecimalCalc } from '@/composables/useDecimalCalc'
 import { numericSortMethod } from '@/utils/numericSort'
 import { buildLedgerDisplay, buildLedgerFilteredDisplay } from '@/utils/ledgerDisplay'
+import { buildExtraColumns, buildClipboardTable, fmtExtraCell } from '@/views/ledgerExtraColumns'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
+import AttachVoucherToWpDialog from '@/views/ledger/AttachVoucherToWpDialog.vue'
 // Domain-split composables (platform-global-hardening Req 6.1/6.3)
 import { useLedgerImport } from '@/views/composables/useLedgerImport'
 import { useLedgerBalance, resolveDir as _resolveDir, balanceTip as _balanceTip } from '@/views/composables/useLedgerBalance'
@@ -2084,21 +2185,60 @@ function onContextAction(action: string) {
   } else if (action === 'copy') {
     copySelectedRows(row)
   } else if (action === 'voucher') {
-    // TODO: 抽凭联动到底稿（后续实现）
+    openAttachToWorkpaper(row)
   }
 }
+
+// ── 挂凭到底稿（序时账 ↔ 底稿凭证检查联动）──
+const attachDialogVisible = ref(false)
+const attachVouchers = ref<Array<{ voucherNo: string; accountCode?: string | null }>>([])
+
+/** 从当前行/选中行/当前凭证收集待挂凭证并打开弹窗 */
+function openAttachToWorkpaper(fallbackRow?: any) {
+  // 候选行：优先选中行 → 回退右键行；凭证层则用当前凭证
+  const pool: any[] = selectedRows.value.length > 0
+    ? selectedRows.value
+    : (fallbackRow ? [fallbackRow] : [])
+
+  const seen = new Set<string>()
+  const list: Array<{ voucherNo: string; accountCode?: string | null }> = []
+  for (const r of pool) {
+    const vno = String(r?.voucher_no || '').trim()
+    if (!vno || seen.has(vno)) continue
+    seen.add(vno)
+    list.push({ voucherNo: vno, accountCode: r?.account_code || currentAccount.value || null })
+  }
+  // 凭证层：右键行无 voucher_no 时用当前凭证兜底
+  if (list.length === 0 && currentLevel.value === 'voucher' && currentVoucher.value) {
+    list.push({ voucherNo: currentVoucher.value, accountCode: currentAccount.value || null })
+  }
+
+  if (list.length === 0) {
+    ElMessage.warning('请在明细账/凭证层选择带凭证号的行后再挂凭')
+    return
+  }
+  attachVouchers.value = list
+  attachDialogVisible.value = true
+}
+
+/** 挂凭到当前凭证（凭证层工具栏按钮） */
+function attachCurrentVoucher() {
+  if (!currentVoucher.value) {
+    ElMessage.warning('请先穿透到某张凭证')
+    return
+  }
+  attachVouchers.value = [{ voucherNo: currentVoucher.value, accountCode: currentAccount.value || null }]
+  attachDialogVisible.value = true
+}
+
+/** 复制/导出排除的内部字段（含 raw_extra / extra_fields 对象本身，避免 [object Object]）。 */
+const COPY_EXCLUDE_KEYS = ['_type', '_isGroup', '_isSubtotal', '_tree_key', '_hasChildren', 'children', 'id', 'project_id', 'dataset_id', 'is_deleted', 'company_code', 'currency_code', 'raw_extra', 'extra_fields']
 
 /** 复制选中行到剪贴板（Tab 分隔，可直接粘贴到 Excel） */
 function copySelectedRows(fallbackRow?: any) {
   const rows = selectedRows.value.length > 0 ? selectedRows.value : (fallbackRow ? [fallbackRow] : [])
   if (rows.length === 0) return
-  // 提取可见字段（排除内部字段）
-  const excludeKeys = new Set(['_type', '_isGroup', '_isSubtotal', '_tree_key', '_hasChildren', 'children', 'id', 'project_id', 'dataset_id', 'is_deleted', 'company_code', 'currency_code', 'raw_extra'])
-  const keys = Object.keys(rows[0]).filter(k => !excludeKeys.has(k) && !k.startsWith('_'))
-  const lines = rows.map(r => keys.map(k => {
-    const v = r[k]
-    return v == null ? '' : String(v)
-  }).join('\t'))
+  const { lines } = buildClipboardTable(rows, COPY_EXCLUDE_KEYS)
   const text = lines.join('\n')
   navigator.clipboard?.writeText(text).then(() => {
     ElMessage.success(`已复制 ${rows.length} 行`)
@@ -2112,14 +2252,7 @@ function copyCurrentVoucher() {
     ElMessage.warning('本凭证无分录可复制')
     return
   }
-  const excludeKeys = new Set(['_type', '_isGroup', '_isSubtotal', '_tree_key', '_hasChildren', 'children', 'id', 'project_id', 'dataset_id', 'is_deleted', 'company_code', 'currency_code', 'raw_extra'])
-  const keys = Object.keys(rows[0]).filter(k => !excludeKeys.has(k) && !k.startsWith('_'))
-  // 表头 + 数据行
-  const header = keys.join('\t')
-  const lines = rows.map(r => keys.map(k => {
-    const v = r[k]
-    return v == null ? '' : String(v)
-  }).join('\t'))
+  const { header, lines } = buildClipboardTable(rows, COPY_EXCLUDE_KEYS)
   const text = [header, ...lines].join('\n')
   navigator.clipboard?.writeText(text).then(() => {
     ElMessage.success(`已复制凭证 ${currentVoucher.value} 共 ${rows.length} 条分录`)
@@ -2227,6 +2360,20 @@ const ledgerVirtualColumns = computed(() => {
     makeResizableCol('debit_amount', '借方', w.debit_amount, sortKey, { align: 'right', cellRenderer: amountCellRenderer }),
     makeResizableCol('credit_amount', '贷方', w.credit_amount, sortKey, { align: 'right', cellRenderer: amountCellRenderer }),
     makeResizableCol('balance', '余额', w.balance, sortKey, { align: 'right', cellRenderer: amountCellRenderer }),
+    // 非关键列（导入时保留的 raw_extra 业务字段）动态列：固定列（余额）后追加；空数组自然不产出
+    ...ledgerExtraColumns.value.map((k) =>
+      makeResizableCol(`ef_${k}`, k, w[`ef_${k}`] ?? 140, sortKey, {
+        // 额外列纯展示：不排序（避免 onLedgerColumnSort 传入 buildLedgerFilteredDisplay 不认的 key）
+        sortable: false,
+        // 额外列视觉区分（Task 8.3*）：与固定列不同底色 class
+        class: 'gt-ef-vcell',
+        headerClass: 'gt-ef-vcell-hd',
+        // el-table-v2 的 dataKey 浅取字段不解析点路径，必须用 cellRenderer 从 rowData.extra_fields 取值渲染为文本；
+        // 合成行（期初/月小计）无 extra_fields → fmtExtraCell(undefined) 返回空；非标量值 JSON.stringify（Task 8.3*）
+        cellRenderer: ({ rowData }: any) =>
+          h('span', { class: 'gt-amt gt-ef-cell' }, fmtExtraCell(rowData?.extra_fields?.[k])),
+      }),
+    ),
   ]
   return cols
 })
@@ -2405,12 +2552,57 @@ const ledgerVirtualDisplay = computed(() =>
   }),
 )
 
+/**
+ * 额外列（extra_fields 业务键）显隐偏好：存「隐藏键集合」到 localStorage（新键默认显示）。
+ * 序时账/凭证/辅助明细三处表格共用同一可见集合（Task 8.1*）。
+ */
+const EXTRA_COL_PREFS_KEY = 'ledger-extra-column-prefs'
+const hiddenExtraCols = ref<Set<string>>(new Set())
+try {
+  const raw = localStorage.getItem(EXTRA_COL_PREFS_KEY)
+  if (raw) hiddenExtraCols.value = new Set(JSON.parse(raw))
+} catch { /* ignore corrupt prefs */ }
+function persistExtraColPrefs() {
+  try { localStorage.setItem(EXTRA_COL_PREFS_KEY, JSON.stringify([...hiddenExtraCols.value])) } catch { /* ignore */ }
+}
+/** 过滤掉被隐藏的额外列键（默认全显）。 */
+function visibleExtra(keys: string[]): string[] {
+  return hiddenExtraCols.value.size === 0 ? keys : keys.filter((k) => !hiddenExtraCols.value.has(k))
+}
+/** 切换某额外列显隐并持久化。 */
+function toggleExtraCol(key: string, visible: boolean) {
+  const next = new Set(hiddenExtraCols.value)
+  if (visible) next.delete(key)
+  else next.add(key)
+  hiddenExtraCols.value = next
+  persistExtraColPrefs()
+}
+/** 全部额外列显示（清空隐藏集合）。 */
+function showAllExtraCols() {
+  hiddenExtraCols.value = new Set()
+  persistExtraColPrefs()
+}
+
+/** 序时账明细「非关键列」全部键（未过滤，供 ⚙ 显隐设置列表）。 */
+const ledgerExtraAllKeys = computed(() => buildExtraColumns(ledgerItems.value))
+/** 序时账明细「非关键列」动态列：键并集经显隐过滤（固定列后追加，空则不追加）。 */
+const ledgerExtraColumns = computed(() => visibleExtra(ledgerExtraAllKeys.value))
+
 const voucherItems = ref<any[]>([])
+/** 凭证明细「非关键列」全部键（未过滤，供 ⚙ 显隐设置列表）。 */
+const voucherExtraAllKeys = computed(() => buildExtraColumns(voucherItems.value))
+/** 凭证明细「非关键列」动态列：键并集经显隐过滤（固定列后追加，空则不追加）。 */
+const voucherExtraColumns = computed(() => visibleExtra(voucherExtraAllKeys.value))
 const auxBalanceItems = ref<any[]>([])
 const auxLedgerItems = ref<any[]>([])
 const auxLedgerTotal = ref(0)
 
 /** 辅助明细账增强显示：期初行 + 每笔余额 + 月小计行 */
+/** 辅助明细账「非关键列」全部键（未过滤，供 ⚙ 显隐设置列表）。 */
+const auxLedgerExtraAllKeys = computed(() => buildExtraColumns(auxLedgerItems.value))
+/** 辅助明细账「非关键列」动态列：键并集经显隐过滤（固定列后追加，空则不追加）。 */
+const auxLedgerExtraColumns = computed(() => visibleExtra(auxLedgerExtraAllKeys.value))
+
 const auxLedgerDisplay = computed(() =>
   buildLedgerDisplay(auxLedgerItems.value, currentAuxOpening.value, {
     syntheticExtra: { aux_name: '', account_code: '' },
@@ -3965,6 +4157,46 @@ onBeforeUnmount(() => {
   font-size: var(--gt-font-size-xs);
   color: var(--gt-color-info);
   line-height: 1.5;
+}
+
+/* 额外列（extra_fields 业务字段）视觉区分 —— 与固定列不同底色，标识为「扩展」列（Task 8.3*） */
+:deep(.gt-ef-col-hd) {
+  background: var(--gt-color-fill-light, #f5f7fa) !important;
+  color: var(--gt-color-info, #909399) !important;
+}
+:deep(.gt-ef-col) {
+  background: var(--gt-color-fill-lighter, #fafcff) !important;
+}
+.gt-ef-cell {
+  color: var(--gt-color-text-regular, #606266);
+}
+/* el-table-v2 虚拟滚动额外列表头/单元格视觉区分 */
+:deep(.gt-ef-vcell-hd) {
+  background: var(--gt-color-fill-light, #f5f7fa);
+  color: var(--gt-color-info, #909399);
+}
+:deep(.gt-ef-vcell) {
+  background: var(--gt-color-fill-lighter, #fafcff);
+}
+
+/* 额外列显隐设置 popover（Task 8.1*） */
+.gt-extra-col-prefs {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.gt-extra-col-prefs__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--gt-font-size-sm, 13px);
+  font-weight: 600;
+  color: var(--gt-color-text-primary);
+  padding-bottom: 6px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--gt-color-border-lighter, #ebeef5);
 }
 </style>
 

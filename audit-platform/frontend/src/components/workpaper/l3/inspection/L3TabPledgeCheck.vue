@@ -113,6 +113,23 @@
         </template>
       </el-table-column>
 
+      <!-- 评估价值（源模板/后端字段 appraisalValue） -->
+      <el-table-column prop="appraisalValue" label="评估价值" min-width="130" align="right">
+        <template #default="{ row, $index }">
+          <template v-if="!isReadonly">
+            <el-input-number
+              :model-value="row.appraisalValue"
+              :controls="false"
+              :precision="2"
+              size="small"
+              style="width: 100%"
+              @change="(val: number | undefined) => handleFieldChange($index, 'appraisalValue', val ?? 0)"
+            />
+          </template>
+          <span v-else>{{ fmtAmount(row.appraisalValue) }}</span>
+        </template>
+      </el-table-column>
+
       <!-- 担保借款 -->
       <el-table-column prop="guaranteedLoan" label="担保借款" min-width="130" align="right">
         <template #default="{ row, $index }">
@@ -190,8 +207,8 @@
           <span class="summary-value">{{ fmtAmount(totalGuaranteedLoan) }}</span>
         </div>
         <div class="summary-item">
-          <span class="summary-label">总资产价值</span>
-          <span class="summary-value">{{ fmtAmount(totalBookValue) }}</span>
+          <span class="summary-label">总账面价值 / 总评估价值</span>
+          <span class="summary-value">{{ fmtAmount(totalBookValue) }} / {{ fmtAmount(totalAppraisalValue) }}</span>
         </div>
         <div class="summary-item">
           <span class="summary-label">综合担保比例</span>
@@ -271,7 +288,7 @@
  * Task: 4.5
  * Requirements: 7.4-7.5
  */
-import { inject, ref, toRef } from 'vue'
+import { inject, ref, toRef, watch } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { useL3PledgeCheck, type L3PledgeCheckRow } from '@/composables/useL3PledgeCheck'
 import { useL3ImportExport } from '@/composables/useL3ImportExport'
@@ -293,22 +310,20 @@ defineEmits<{
 
 const formData = inject<ReturnType<typeof useL3FormData>>('l3FormData')!
 
-// ─── Reactive rows ───────────────────────────────────────────────────────────
-
-const pledgeRows = ref<L3PledgeCheckRow[]>([])
-
-// ─── Composable: 业务逻辑 ────────────────────────────────────────────────────
+// ─── Composable（rows 由 composable 内部从 allResponses hydrate，JSON存储 L3-pledge-check-rows） ───
 
 const {
+  rows: pledgeRows,
   computedRows,
   totalGuaranteedLoan,
   totalBookValue,
+  totalAppraisalValue,
   overallRatio,
   warningCount,
   addRow,
   removeRow,
   updateRow,
-} = useL3PledgeCheck(formData, pledgeRows)
+} = useL3PledgeCheck(formData)
 
 // ─── Composable: 导入导出 ────────────────────────────────────────────────────
 
@@ -325,7 +340,11 @@ const {
 
 // ─── 结论区 ──────────────────────────────────────────────────────────────────
 
-const conclusion = ref('')
+const conclusion = ref(formData.allResponses.value.get('L3-plg-conclusion')?.remark ?? '')
+watch(
+  () => formData.allResponses.value.get('L3-plg-conclusion')?.remark,
+  (v) => { if (v != null && !conclusion.value) conclusion.value = v },
+)
 
 function handleConclusionChange(val: string): void {
   conclusion.value = val
@@ -339,7 +358,7 @@ async function handleAiConclusion(): Promise<void> {
     const res = await (await import('@/utils/http')).default.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
       section: 'pledge-check-conclusion',
       prompt: '请基于抵质押资产检查情况，生成审计结论（包含权属确认、价值充分性、有效性判断）',
-      context: { rowCount: pledgeRows.value.length },
+      context: { rowCount: String(pledgeRows.value.length) },
     })
     const content = res.data?.data?.content
     if (content) { conclusion.value = content; handleConclusionChange(content) }

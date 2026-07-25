@@ -8,7 +8,7 @@
     <!-- 根据外层 GtWpRenderer 传入的 sheetName 分发到对应子组件 -->
     <template v-else>
       <!-- ─── 工具栏：双模式（六大集成标准，版本历史由 Runtime Boundary 统一 GtWpToolbar 提供） ─── -->
-      <div v-if="isHtmlSheet" class="n1-toolbar">
+      <div v-if="isHtmlSheet && currentSheet !== 'index'" class="n1-toolbar">
         <el-segmented
           v-model="dualMode.mode.value"
           :options="dualMode.modeOptions.value"

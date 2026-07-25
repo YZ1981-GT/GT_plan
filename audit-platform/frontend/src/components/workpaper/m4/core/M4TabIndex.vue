@@ -1,150 +1,118 @@
 <template>
   <div class="m4-tab-index">
-    <!-- ═══ 项目信息区 ═══ -->
-    <el-card shadow="never" class="m4-project-info">
-      <div class="info-grid">
-        <div class="info-item">
-          <span class="info-label">被审计单位</span>
-          <span class="info-value">{{ projectInfo.clientName || '—' }}</span>
+    <!-- 编制信息由页面级头部统一渲染，此处不重复 -->
+
+    <!-- ═══ 目录卡（标题 + 复核 + 编制/使用手册 + 进度条 → 跨表结论口径 → 编制提示） ═══ -->
+    <div class="m4-dir">
+      <div class="index-header">
+        <h3 class="title">M4 底稿目录</h3>
+        <GtReviewTrigger section-id="M4-index-directory" />
+        <div class="handbook-btns">
+          <el-button size="small" type="primary" plain @click="openHandbook('preparation')">📖 编制手册</el-button>
+          <el-button size="small" @click="openHandbook('usage')">使用手册</el-button>
         </div>
-        <div class="info-item">
-          <span class="info-label">截止日</span>
-          <span class="info-value">{{ projectInfo.cutoffDate || '—' }}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">编制人</span>
-          <span class="info-value">{{ projectInfo.preparer || '—' }}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">编制日期</span>
-          <span class="info-value">{{ projectInfo.prepareDate || '—' }}</span>
+        <div class="progress-wrap">
+          <span>编制进度 {{ completedCount }}/{{ totalCount }}</span>
+          <el-progress :percentage="progressPercent" :stroke-width="10" />
         </div>
       </div>
-    </el-card>
 
-    <!-- ═══ 权益类贷方科目醒目标注 ═══ -->
-    <div class="m4-equity-badge">
-      <el-icon><WarningFilled /></el-icon>
-      <span>资本公积为权益类贷方科目（期末 = 期初 + 贷方 − 借方），含资本溢价 + 其他资本公积双区块</span>
+      <M4PreparationHandbookDialog v-model="handbookVisible" :initial-tab="handbookTab" />
+
+      <div class="conclusion-board" data-testid="m4-conclusion-board">
+        <div class="board-head">
+          <strong>跨表结论口径</strong>
+          <el-tag size="small" :type="conclusionWorstType">{{ conclusionWorstLabel }}</el-tag>
+          <span class="board-meta">已填 {{ conclusionFilledCount }}/{{ conclusionSheets.length }}</span>
+        </div>
+        <div class="board-tags">
+          <el-tag
+            v-for="c in conclusionSheets"
+            :key="c.code"
+            size="small"
+            class="concl-tag clickable"
+            :type="c.filled ? 'success' : 'info'"
+            effect="plain"
+            @click="emit('navigate', c.sheetKey)"
+          >
+            {{ c.code }} {{ c.filled ? '已填' : '未填' }}
+          </el-tag>
+        </div>
+        <p v-if="conclusionHasUnfilled" class="board-hint">存在未填审计结论，请点击标签跳转补全审计说明与结论。</p>
+      </div>
+
+      <details class="methodology-hint">
+        <summary>编制提示</summary>
+        <ul>
+          <li>资本公积为<strong>权益类贷方科目</strong>（4002）：期末 = 期初 + 贷方（增加）− 借方（转增资本/弥补亏损）</li>
+          <li>明细表 M4-2 分资本溢价、其他资本公积两大区块，与审定表 M4-1 合计交叉核对</li>
+          <li>J3 股份支付权益结算 → 其他资本公积；M2 外币投资折算差异 → 资本溢价</li>
+          <li>M4-4 检查：资本溢价、其他资本公积形成依据充分合规</li>
+          <li>审定合计回写 TB(4002) 并驱动附注披露；各表填妥"审计说明或结论"后目录标签转为"已填"</li>
+        </ul>
+      </details>
     </div>
 
-    <!-- ═══ 蓝色渐变操作引导区 ═══ -->
-    <div class="m4-guide">
-      <div class="m4-guide-header">
-        <el-icon><InfoFilled /></el-icon>
-        <span>操作步骤引导</span>
+    <!-- ═══ 底稿架构（4 阶段泳道） ═══ -->
+    <div class="m4-arch">
+      <div class="arch-header">
+        <h4 class="arch-title">底稿架构</h4>
+        <span class="arch-hint">点击卡片可跳转至对应底稿</span>
       </div>
-      <div class="m4-guide-steps">
-        <div class="step-item">
-          <span class="step-num">①</span>
-          <span class="step-text">填写审定表（M4-1）确认资本公积余额（双区块：资本溢价 + 其他资本公积）</span>
-        </div>
-        <div class="step-item">
-          <span class="step-num">②</span>
-          <span class="step-text">录入明细（M4-2）按来源列示资本公积增减变动</span>
-        </div>
-        <div class="step-item">
-          <span class="step-num">③</span>
-          <span class="step-text">核对J3股份支付权益结算 + M2外币折算差异联动</span>
-        </div>
-        <div class="step-item">
-          <span class="step-num">④</span>
-          <span class="step-text">完成检查表（M4-4）+ 调整分录（M4-3）+ 附注披露</span>
+      <GtBArchitectureTree
+        :wp-id="wpId"
+        :project-id="projectId"
+        :active-sheet="''"
+        :html-data="archHtmlData"
+        @navigate="handleNavigate"
+      />
+    </div>
+
+    <!-- ═══ 本循环底稿目录（M 循环其他科目，可跳转） ═══ -->
+    <div v-if="cycleWorkpapers.length" class="m4-cycle">
+      <div class="cycle-header">
+        <h4 class="cycle-title">本循环底稿目录</h4>
+        <span class="cycle-hint">点击可跳转至同循环其他底稿（灰色表示尚未生成）</span>
+      </div>
+      <div class="cycle-grid">
+        <div
+          v-for="wp in cycleWorkpapers"
+          :key="wp.wp_code"
+          class="cycle-card"
+          :class="{ 'is-current': wp.is_current, 'is-disabled': !wp.wp_id }"
+          @click="onCycleCardClick(wp)"
+        >
+          <div class="cycle-card-top">
+            <span class="cycle-code">{{ wp.wp_code }}</span>
+            <el-tag v-if="wp.is_current" size="small" effect="plain" class="cycle-current-tag">当前</el-tag>
+          </div>
+          <span class="cycle-name" :title="wp.wp_name">{{ wp.wp_name }}</span>
         </div>
       </div>
     </div>
-
-    <!-- ═══ 总体进度 ═══ -->
-    <div class="m4-progress-section">
-      <div class="progress-info">
-        <span>编制进度</span>
-        <span class="progress-text">{{ completedCount }} / {{ totalCount }} ({{ progressPercent }}%)</span>
-      </div>
-      <el-progress :percentage="progressPercent" :stroke-width="8" :show-text="false" />
-    </div>
-
-    <!-- ═══ 底稿目录表格 ═══ -->
-    <el-card shadow="never" class="m4-index-card">
-      <template #header>
-        <span class="card-title">致同会计师事务所 / 资本公积底稿</span>
-      </template>
-      <el-table
-        :data="sheetRows"
-        border
-        size="small"
-        highlight-current-row
-        style="width: 100%"
-        :row-class-name="getRowClassName"
-        @row-click="handleRowClick"
-      >
-        <el-table-column prop="seq" label="序号" width="60" align="center" />
-        <el-table-column prop="indexCode" label="底稿编码" width="90" align="center" />
-        <el-table-column prop="name" label="底稿名称" min-width="260">
-          <template #default="{ row }">
-            <span class="sheet-name-link">{{ row.name }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="完成状态" width="140" align="center">
-          <template #default="{ row }">
-            <el-progress
-              :percentage="row.progress"
-              :stroke-width="6"
-              :show-text="false"
-              :color="getProgressColor(row.progress)"
-              style="width: 80px; display: inline-block"
-            />
-            <span class="progress-label">{{ row.progress }}%</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="80" align="center">
-          <template #default="{ row }">
-            <el-button
-              type="primary"
-              link
-              size="small"
-              @click.stop="handleNavigate(row)"
-            >
-              进入
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
-
-    <!-- ═══ 编制提示（折叠） ═══ -->
-    <details class="m4-details-tip">
-      <summary>编制提示</summary>
-      <ul>
-        <li>资本公积（4002）为<strong>权益类贷方科目</strong>：期末 = 期初 + 贷方（增加）− 借方（减少）</li>
-        <li>资本公积分<strong>资本溢价（股本溢价）</strong>与<strong>其他资本公积</strong>两大类，审定表与明细表均分双区块</li>
-        <li>其他资本公积来源：股份支付权益结算(J3)、外币折算差异(M2)、权益法调整等</li>
-        <li>M4-2 明细表按来源项目列示，每项记录：期初 + 本期增加 + 本期减少 + 期末 + 变动原因</li>
-        <li>J3股份支付权益结算：等待期确认金额计入其他资本公积，需与J3底稿交叉核对</li>
-        <li>M2外币出资折算差异：境外出资按汇率折算差额计入资本溢价，需与M2底稿一致</li>
-        <li>明细表合计需与审定表交叉验证</li>
-        <li>调整分录需保持借贷平衡，通过 EventBus 同步更新审定表</li>
-      </ul>
-    </details>
   </div>
 </template>
 
 <script setup lang="ts">
 /**
- * M4TabIndex — M4 资本公积底稿目录
+ * M4TabIndex.vue — M4 资本公积底稿目录（严格镜像 N5 标准）
  *
- * 7 行 sheet 目录列表（序号 | 底稿编码 | 底稿名称 | 完成状态）。
- * 跳过 GT_Custom（config/hidden）。
- * 点击行 emit navigate 事件（由 GtM4CapitalReserve 监听切换 sheetName）。
- * 引导区 4 步：审定表(双区块) → 明细(按来源) → J3/M2联动核对 → 检查表+调整+附注。
- * 醒目标注"资本公积为权益类贷方科目"。
+ * 结构：目录卡（标题+复核+编制/使用手册+进度→跨表结论口径→编制提示）
+ *       + 底稿架构 4 阶段泳道（GtBArchitectureTree）+ 本循环底稿目录 grid。
+ * 编制信息由页面级头部渲染，此处不重复。自包含：自行拉取 checklist-responses。
  *
- * Requirements: 1.2
+ * 权益类贷方科目（4002 资本公积）— 期末=期初+贷方−借方；资本溢价+其他资本公积双区块。
  */
-import { computed } from 'vue'
-import { InfoFilled, WarningFilled } from '@element-plus/icons-vue'
+import { computed, ref, onMounted, defineAsyncComponent } from 'vue'
+import { useRouter } from 'vue-router'
+import http from '@/utils/http'
+import { loadCycleWorkpaperCards, type CycleWpCard } from '@/services/cycleDirectory'
+import GtReviewTrigger from '../../GtReviewTrigger.vue'
+import GtBArchitectureTree from '../../GtBArchitectureTree.vue'
+
+const M4PreparationHandbookDialog = defineAsyncComponent(() => import('../M4PreparationHandbookDialog.vue'))
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
-
 const props = defineProps<{
   wpId: string
   projectId: string
@@ -155,314 +123,208 @@ const emit = defineEmits<{
   (e: 'navigate', sheetName: string): void
 }>()
 
-// ─── Sheet 目录行定义 ────────────────────────────────────────────────────────
+const router = useRouter()
 
+// ─── 编制/使用手册弹窗 ─────────────────────────────────────────────────────────
+const handbookVisible = ref(false)
+const handbookTab = ref<'preparation' | 'usage'>('preparation')
+function openHandbook(tab: 'preparation' | 'usage') {
+  handbookTab.value = tab
+  handbookVisible.value = true
+}
+
+// ─── 自包含：拉取本底稿 checklist-responses（主入口不持有 allResponses） ─────────
+const responses = ref<Map<string, any>>(new Map())
+onMounted(async () => {
+  if (!props.wpId) return
+  try {
+    const res: any = await http.get(`/api/workpapers/${props.wpId}/checklist-responses`)
+    const list = res?.data?.items ?? res?.items ?? res?.data ?? res
+    const map = new Map<string, any>()
+    if (Array.isArray(list)) {
+      for (const it of list) {
+        if (it?.item_id) map.set(it.item_id, it)
+      }
+    }
+    responses.value = map
+  } catch {
+    /* silent：拉取失败则看板全显未填 */
+  }
+})
+
+// ─── Sheet 行定义 ─────────────────────────────────────────────────────────────
 interface SheetRow {
-  seq: number
   name: string
-  indexCode: string
-  /** sheetName（传给父组件用于 v-if 分发） */
+  code: string
   sheetKey: string
   progress: number
 }
 
-/**
- * 7 行 sheet 目录（对应源模板 M4 底稿目录，跳过 GT_Custom）。
- * 进度条默认 0%，后续集成时根据 checklist_responses 数据填充。
- */
-const sheetRows = computed<SheetRow[]>(() => [
-  {
-    seq: 1,
-    name: '资本公积实质性程序表',
-    indexCode: 'M4A',
-    sheetKey: '资本公积实质性程序表 M4A',
-    progress: 0,
-  },
-  {
-    seq: 2,
-    name: '审定表',
-    indexCode: 'M4-1',
-    sheetKey: '审定表M4-1',
-    progress: 0,
-  },
-  {
-    seq: 3,
-    name: '附注披露信息（上市公司）',
-    indexCode: '',
-    sheetKey: '附注披露信息（上市公司）',
-    progress: 0,
-  },
-  {
-    seq: 4,
-    name: '附注披露信息（国有企业）',
-    indexCode: '',
-    sheetKey: '附注披露信息（国有企业）',
-    progress: 0,
-  },
-  {
-    seq: 5,
-    name: '明细表',
-    indexCode: 'M4-2',
-    sheetKey: '明细表M4-2',
-    progress: 0,
-  },
-  {
-    seq: 6,
-    name: '调整分录汇总',
-    indexCode: 'M4-3',
-    sheetKey: '调整分录汇总M4-3',
-    progress: 0,
-  },
-  {
-    seq: 7,
-    name: '资本公积检查表',
-    indexCode: 'M4-4',
-    sheetKey: '资本公积检查表M4-4',
-    progress: 0,
-  },
+/** 按 responses 中以指定前缀存储的字段数计算完成度。 */
+function calcSheetProgress(prefix: string, expectedFields: number): number {
+  const map = responses.value
+  if (!map || map.size === 0) return 0
+  let count = 0
+  for (const key of map.keys()) {
+    if (key.startsWith(prefix)) count++
+  }
+  if (count === 0) return 0
+  if (count >= expectedFields) return 100
+  return Math.min(Math.round((count / expectedFields) * 100), 99)
+}
+
+const allSheets = computed<SheetRow[]>(() => [
+  { name: '资本公积实质性程序表', code: 'M4A', sheetKey: '资本公积实质性程序表 M4A', progress: calcSheetProgress('M4-M4A-', 5) },
+  { name: '审定表', code: 'M4-1', sheetKey: '审定表M4-1', progress: calcSheetProgress('M4-1-', 6) },
+  { name: '明细表', code: 'M4-2', sheetKey: '明细表M4-2', progress: calcSheetProgress('M4-2-', 4) },
+  { name: '调整分录汇总', code: 'M4-3', sheetKey: '调整分录汇总M4-3', progress: calcSheetProgress('M4-3-', 4) },
+  { name: '资本公积检查表', code: 'M4-4', sheetKey: '资本公积检查表M4-4', progress: calcSheetProgress('M4-4-', 4) },
+  { name: '附注披露信息（上市公司）', code: '附注上市', sheetKey: '附注披露信息（上市公司）', progress: calcSheetProgress('M4-disclosure-listed-', 3) },
+  { name: '附注披露信息（国有企业）', code: '附注国企', sheetKey: '附注披露信息（国有企业）', progress: calcSheetProgress('M4-disclosure-soe-', 3) },
 ])
 
 // ─── 进度计算 ─────────────────────────────────────────────────────────────────
-
-const totalCount = computed(() => sheetRows.value.length)
-
-const completedCount = computed(() =>
-  sheetRows.value.filter(r => r.progress >= 100).length,
-)
-
+const totalCount = computed(() => allSheets.value.length)
+const completedCount = computed(() => allSheets.value.filter(r => r.progress >= 100).length)
 const progressPercent = computed(() => {
   if (totalCount.value === 0) return 0
-  const avgProgress = sheetRows.value.reduce((sum, r) => sum + r.progress, 0) / totalCount.value
-  return Math.round(avgProgress)
+  const avg = allSheets.value.reduce((sum, r) => sum + r.progress, 0) / totalCount.value
+  return Math.round(avg)
 })
 
-// ─── 项目信息（简单版：默认占位，后续集成时从 render-config 填充） ──────────
-
-const projectInfo = computed(() => ({
-  clientName: '',
-  cutoffDate: '',
-  preparer: '',
-  prepareDate: '',
+// ─── 底稿架构泳道（GtBArchitectureTree 数据源） ───────────────────────────────
+const COMPONENT_TYPE_MAP: Record<string, string> = {
+  M4A: 'a-program-console',
+  '附注上市': 'c-note-table',
+  '附注国企': 'c-note-table',
+}
+function sheetStatus(progress: number): string {
+  if (progress >= 100) return 'completed'
+  if (progress > 0) return 'in_progress'
+  return 'pending'
+}
+const archHtmlData = computed(() => ({
+  navigation_rows: allSheets.value.map((s, i) => ({
+    seq: i + 1,
+    content: s.sheetKey,
+    sheet_name: s.sheetKey,
+    index_ref: s.code,
+    component_type: COMPONENT_TYPE_MAP[s.code] ?? 'd-form-table',
+    status: sheetStatus(s.progress),
+  })),
 }))
 
+// ─── 跨表结论口径看板 ─────────────────────────────────────────────────────────
+/** 有审计结论/说明的 sheet（程序表、调整分录、附注不计入；审定/明细/测算/检查计入） */
+const M4_CONCLUSION_CODES = new Set(['M4-1', 'M4-2', 'M4-4'])
+
+function isConclusionFilled(code: string): boolean {
+  const map = responses.value
+  if (!map?.size) return false
+  const token = `${code}-`
+  const longer = Array.from(M4_CONCLUSION_CODES).filter(c => c !== code && c.startsWith(token))
+  for (const [key, val] of map.entries()) {
+    if (!key.includes(token)) continue
+    if (longer.some(lc => key.includes(`${lc}-`))) continue
+    if (!/conclusion|audit-note|note/i.test(key)) continue
+    const text = (val?.remark ?? val?.conclusion ?? '') as string
+    if (typeof text === 'string' && text.trim().length > 0) return true
+  }
+  return false
+}
+
+const conclusionSheets = computed(() =>
+  allSheets.value
+    .filter(s => M4_CONCLUSION_CODES.has(s.code))
+    .map(s => ({ code: s.code, sheetKey: s.sheetKey, filled: isConclusionFilled(s.code) })),
+)
+const conclusionFilledCount = computed(() => conclusionSheets.value.filter(c => c.filled).length)
+const conclusionHasUnfilled = computed(() => conclusionSheets.value.some(c => !c.filled))
+const conclusionWorstLabel = computed(() => {
+  if (conclusionFilledCount.value === 0) return '结论未填'
+  if (conclusionHasUnfilled.value) return `结论未齐 ${conclusionSheets.value.length - conclusionFilledCount.value} 项`
+  return '总体已齐'
+})
+const conclusionWorstType = computed<'success' | 'warning' | 'info'>(() => {
+  if (conclusionFilledCount.value === 0) return 'info'
+  if (conclusionHasUnfilled.value) return 'warning'
+  return 'success'
+})
+
 // ─── 交互 ────────────────────────────────────────────────────────────────────
-
-function handleRowClick(row: SheetRow) {
-  if (props.isReadonly && row.progress === 0) return
-  emit('navigate', row.sheetKey)
+function handleNavigate(sheetName: string) {
+  if (sheetName) emit('navigate', sheetName)
 }
 
-function handleNavigate(row: SheetRow) {
-  emit('navigate', row.sheetKey)
+// ─── 本循环底稿目录（M 循环其他科目，跨底稿跳转；canonical 源模板过滤污染） ───
+const cycleWorkpapers = ref<CycleWpCard[]>([])
+async function loadCycleWorkpapers(): Promise<void> {
+  cycleWorkpapers.value = await loadCycleWorkpaperCards(props.projectId, 'M', props.wpId)
 }
-
-function getRowClassName({ row }: { row: SheetRow }): string {
-  return row.progress >= 100 ? 'completed-row' : ''
+function onCycleCardClick(wp: CycleWpCard): void {
+  if (!wp.wp_id || wp.is_current || !props.projectId) return
+  router.push({ name: 'WorkpaperEditor', params: { projectId: props.projectId, wpId: wp.wp_id } })
 }
-
-function getProgressColor(percent: number): string {
-  if (percent >= 100) return '#67c23a'
-  if (percent >= 50) return '#409eff'
-  return '#e6e8eb'
-}
+onMounted(loadCycleWorkpapers)
 </script>
 
 <style scoped>
 .m4-tab-index {
-  padding: 12px;
+  padding: 16px;
   font-size: var(--wp-font-size, 13px);
 }
 
-/* ─── 项目信息区 ─── */
-.m4-project-info {
-  margin-bottom: 16px;
-}
-
-.info-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px 32px;
-}
-
-.info-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.info-label {
-  font-size: var(--wp-font-size, 13px);
-  color: #909399;
-  white-space: nowrap;
-}
-
-.info-value {
-  font-size: var(--wp-font-size, 13px);
-  font-weight: 500;
-  color: #303133;
-}
-
-/* ─── 权益类贷方科目醒目标注 ─── */
-.m4-equity-badge {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  margin-bottom: 16px;
-  background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
-  border: 1px solid #81c784;
-  border-left: 4px solid #43a047;
-  border-radius: 6px;
-  font-size: var(--wp-font-size, 13px);
-  font-weight: 500;
-  color: #2e7d32;
-}
-
-.m4-equity-badge .el-icon {
-  font-size: 16px;
-  color: #43a047;
-  flex-shrink: 0;
-}
-
-/* ─── 蓝色渐变引导区 ─── */
-.m4-guide {
-  background: linear-gradient(135deg, #e8f4fd 0%, #d6eaf8 100%);
-  border: 1px solid #b3d9f2;
-  border-radius: 8px;
-  padding: 14px 20px;
-  margin-bottom: 16px;
-}
-
-.m4-guide-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-weight: 500;
-  color: #1a73e8;
-  margin-bottom: 10px;
-  font-size: var(--wp-font-size, 13px);
-}
-
-.m4-guide-steps {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px 24px;
-}
-
-.step-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: var(--wp-font-size, 13px);
-  color: #374151;
-}
-
-.step-num {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: #1a73e8;
-  color: #fff;
-  font-size: 11px;
-  font-weight: 600;
-  flex-shrink: 0;
-}
-
-.step-text {
-  font-size: var(--wp-font-size, 13px);
-}
-
-/* ─── 进度条区 ─── */
-.m4-progress-section {
-  margin-bottom: 16px;
-  padding: 12px 16px;
+/* ─── 目录卡 ─── */
+.m4-dir { margin-bottom: 20px; }
+.index-header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
+.title { margin: 0; font-size: 16px; font-weight: 600; color: #303133; }
+.handbook-btns { display: flex; gap: 6px; }
+.progress-wrap { flex: 1; min-width: 200px; }
+.conclusion-board {
+  margin-bottom: 12px;
+  padding: 10px 12px;
   background: #f5f7fa;
   border-radius: 6px;
+  border-left: 3px solid #409eff;
 }
+.board-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.board-meta { font-size: 12px; color: #909399; }
+.board-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.concl-tag.clickable { cursor: pointer; }
+.board-hint { margin: 8px 0 0; font-size: 12px; color: #e6a23c; }
+.methodology-hint { margin-top: 12px; font-size: 12px; color: #606266; }
+.methodology-hint summary { cursor: pointer; font-weight: 500; color: #303133; }
+.methodology-hint ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
 
-.progress-info {
+/* ─── 底稿架构 ─── */
+.m4-arch { margin-top: 16px; }
+.arch-header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
+.arch-title { margin: 0; font-size: 16px; font-weight: 600; color: #303133; }
+.arch-hint { font-size: 12px; color: #909399; }
+
+/* ─── 本循环底稿目录 ─── */
+.m4-cycle { margin-top: 28px; }
+.cycle-header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
+.cycle-title { margin: 0; font-size: 16px; font-weight: 600; color: #303133; }
+.cycle-hint { font-size: 12px; color: #909399; }
+.cycle-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+.cycle-card {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-  font-size: var(--wp-font-size, 13px);
-  color: #606266;
-}
-
-.progress-text {
-  font-weight: 600;
-  color: #303133;
-}
-
-/* ─── 目录卡片 ─── */
-.m4-index-card {
-  margin-bottom: 16px;
-}
-
-.card-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #303133;
-}
-
-.sheet-name-link {
-  color: #1a73e8;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--gt-color-border-purple, #e8e4f0);
+  border-radius: 8px;
+  background: #fff;
   cursor: pointer;
-  font-size: var(--wp-font-size, 13px);
+  transition: all 0.2s;
 }
-
-.sheet-name-link:hover {
-  text-decoration: underline;
-}
-
-.progress-label {
-  display: inline-block;
-  margin-left: 8px;
-  font-size: 12px;
-  color: #909399;
-  width: 32px;
-}
-
-:deep(.completed-row) {
-  background-color: #f0f9eb !important;
-}
-
-:deep(.el-table) {
-  font-size: var(--wp-font-size, 13px);
-}
-
-:deep(.el-table .el-table__row) {
-  cursor: pointer;
-}
-
-:deep(.el-table .el-table__row:hover) {
-  background-color: #ecf5ff !important;
-}
-
-/* ─── 编制提示折叠 ─── */
-.m4-details-tip {
-  margin-top: 12px;
-  padding: 12px 16px;
-  background: #fafafa;
-  border: 1px solid #ebeef5;
-  border-radius: 6px;
-  font-size: var(--wp-font-size, 13px);
-  color: #606266;
-}
-
-.m4-details-tip summary {
-  cursor: pointer;
-  font-weight: 500;
-  color: #303133;
-  margin-bottom: 8px;
-}
-
-.m4-details-tip ul {
-  padding-left: 20px;
-  margin: 8px 0 0;
-  line-height: 1.8;
-}
+.cycle-card:hover { border-color: var(--gt-color-primary, #4b2d77); box-shadow: 0 2px 8px rgba(75, 45, 119, 0.12); transform: translateY(-2px); }
+.cycle-card.is-current { border-color: var(--gt-color-primary, #4b2d77); background: var(--gt-color-primary-bg, #f4f0fa); box-shadow: 0 0 0 1px var(--gt-color-primary, #4b2d77); cursor: default; }
+.cycle-card.is-disabled { opacity: 0.5; cursor: not-allowed; }
+.cycle-card.is-disabled:hover { border-color: var(--gt-color-border-purple, #e8e4f0); box-shadow: none; transform: none; }
+.cycle-card-top { display: flex; align-items: center; gap: 6px; }
+.cycle-code { font-size: var(--wp-font-size, 13px); font-weight: 700; color: var(--gt-color-primary, #4b2d77); }
+.cycle-current-tag { margin-left: auto; }
+.cycle-name { font-size: var(--wp-font-size, 13px); line-height: 1.4; color: #303133; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 </style>

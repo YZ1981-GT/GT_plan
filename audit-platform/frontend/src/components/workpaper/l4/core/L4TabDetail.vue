@@ -70,6 +70,15 @@
 
       <!-- 基础信息区段 -->
       <template v-if="activeSegment === 'basic'">
+        <el-table-column label="品种" min-width="120">
+          <template #default="{ row, $index }">
+            <el-select v-if="!isReadonly" :model-value="row.variety || '普通债券'" size="small" style="width:100%" @change="(val: string) => handleUpdate($index, 'variety', val)">
+              <el-option label="普通债券" value="普通债券" />
+              <el-option label="可转换债券" value="可转换债券" />
+            </el-select>
+            <span v-else>{{ row.variety || '普通债券' }}</span>
+          </template>
+        </el-table-column>
         <el-table-column label="发行日" min-width="120">
           <template #default="{ row, $index }">
             <el-date-picker v-if="!isReadonly" :model-value="row.issueDate" type="date" size="small" value-format="YYYY-MM-DD" style="width:100%" @change="(val: string) => handleUpdate($index, 'issueDate', val)" />
@@ -431,6 +440,9 @@ function fmtAmount(val: number): string {
 
 onMounted(async () => {
   await formData.loadData()
+  // hydrate 审计说明（此前 auditNote 保存但从不回读）
+  const note = formData.allResponses.value.get('L4-2-auditNote')?.remark
+  if (note != null) auditNote.value = note
 })
 </script>
 

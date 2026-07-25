@@ -2,186 +2,158 @@
  * useL3PledgeCheck — L3-8 抵质押资产检查 composable
  *
  * Spec: .kiro/specs/l3-long-term-loans/
- * Task: 3.4
- * Requirements: 7.4-7.5
+ * 2026-07 复盘重建：
+ * - 🔴 P0 修复：改为 JSON-array 存储（item_id `L3-pledge-check-rows`，与后端导入导出一致）
+ *   + 从 allResponses hydrate（此前 rows 为组件本地 ref([]) 从不加载 → 刷新数据丢失 + 导入导出断裂）
+ * - 担保比例 = 担保借款 / 账面价值 × 100%，>100% 红色警告（担保不足）
+ * - 🆕 评估价值列（对齐源模板/后端字段 appraisalValue）
  *
- * 职责：
- * - 担保比例 = 担保借款/账面价值×100%
- * - 担保覆盖率统计
- * - 行操作 + 持久化
+ * 存储字段（后端 _FIELD_MAPS['L3-8']）：assetName/assetType/bookValue/appraisalValue/
+ *   guaranteedLoan/pledgeRatio/ownershipProof/isRestricted/registrationDate/remark
+ * 组件内部字段保持 ownershipVerified（模板兼容），序列化时映射后端字段名。
  */
-import { computed, type ComputedRef } from 'vue'
+import { computed, ref, watch, type ComputedRef, type Ref } from 'vue'
 import { calcPledgeRatio, calcSubtotal } from '@/composables/useL3FormulaEngine'
-import type { useL3FormData } from '@/components/workpaper/composables/useL3FormData'
+import type { useL3FormData, ChecklistResponse } from '@/components/workpaper/composables/useL3FormData'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-/** 抵质押检查行原始数据 */
 export interface L3PledgeCheckRow {
-  /** 抵质押资产名称 */
   assetName: string
-  /** 资产类型 */
   assetType: string
-  /** 账面价值 */
   bookValue: number
-  /** 担保借款额 */
+  appraisalValue: number
   guaranteedLoan: number
-  /** 担保比例（公式列） */
   pledgeRatio: number
-  /** 权属核验结果 */
   ownershipVerified: string
-  /** 评估日期 */
   appraisalDate: string
-  /** 备注 */
   remark: string
 }
 
-/** 抵质押检查计算结果行 */
 export interface L3PledgeCheckComputed extends L3PledgeCheckRow {
-  /** 计算后的担保比例 */
   computedRatio: number
-  /** 比例是否异常（>100% 贷款超过资产价值） */
   hasRatioWarning: boolean
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-/** 担保比例警告阈值（超过100%说明贷款超过资产价值） */
 const RATIO_WARNING_THRESHOLD = 100
+const ITEM_ROWS = 'L3-pledge-check-rows'
+
+// ─── 内部字段 ↔ 后端字段 映射 ────────────────────────────────────────────────
+
+function toBackend(row: L3PledgeCheckRow): Record<string, any> {
+  return {
+    assetName: row.assetName || '',
+    assetType: row.assetType || '',
+    bookValue: row.bookValue || 0,
+    appraisalValue: row.appraisalValue || 0,
+    guaranteedLoan: row.guaranteedLoan || 0,
+    pledgeRatio: parseFloat(calcPledgeRatio(row.guaranteedLoan, row.bookValue).toFixed(2)),
+    ownershipProof: row.ownershipVerified || '',
+    isRestricted: '',
+    registrationDate: row.appraisalDate || '',
+    remark: row.remark || '',
+  }
+}
+
+function fromBackend(o: any): L3PledgeCheckRow {
+  return {
+    assetName: o.assetName ?? '',
+    assetType: o.assetType ?? '',
+    bookValue: Number(o.bookValue) || 0,
+    appraisalValue: Number(o.appraisalValue) || 0,
+    guaranteedLoan: Number(o.guaranteedLoan) || 0,
+    pledgeRatio: Number(o.pledgeRatio) || 0,
+    ownershipVerified: o.ownershipProof ?? o.ownershipVerified ?? '',
+    appraisalDate: o.registrationDate ?? o.appraisalDate ?? '',
+    remark: o.remark ?? '',
+  }
+}
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
-/**
- * L3-8 抵质押资产检查业务逻辑
- *
- * @param formData 由调用方传入的 useL3FormData 实例
- * @param pledgeRows reactive ref of pledge check rows
- */
-export function useL3PledgeCheck(
-  formData: ReturnType<typeof useL3FormData>,
-  pledgeRows: { value: L3PledgeCheckRow[] },
-) {
-  const { debouncedSave } = formData
+export function useL3PledgeCheck(formData: ReturnType<typeof useL3FormData>) {
+  const { allResponses, debouncedSave } = formData
+  const rows: Ref<L3PledgeCheckRow[]> = ref([])
 
-  // ─── 1. 计算属性：每行担保比例 ────────────────────────────────────────
+  function hydrate(): void {
+    const raw = allResponses.value.get(ITEM_ROWS)?.remark
+    if (!raw) return
+    try {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) rows.value = parsed.map(fromBackend)
+    } catch { /* ignore */ }
+  }
+  hydrate()
+  watch(
+    () => allResponses.value.get(ITEM_ROWS)?.remark,
+    (v) => { if (v && rows.value.length === 0) hydrate() },
+  )
 
-  /** 各行自动计算担保比例 */
-  const computedRows: ComputedRef<L3PledgeCheckComputed[]> = computed(() => {
-    return pledgeRows.value.map(row => {
+  function persist(): void {
+    debouncedSave(ITEM_ROWS, { remark: JSON.stringify(rows.value.map(toBackend)) } as Partial<ChecklistResponse>)
+  }
+
+  // ─── 计算：每行担保比例 ──────────────────────────────────────────────────
+  const computedRows: ComputedRef<L3PledgeCheckComputed[]> = computed(() =>
+    rows.value.map(row => {
       const computedRatio = calcPledgeRatio(row.guaranteedLoan, row.bookValue)
       return {
         ...row,
         computedRatio: parseFloat(computedRatio.toFixed(2)),
         hasRatioWarning: computedRatio > RATIO_WARNING_THRESHOLD,
       }
-    })
-  })
+    }),
+  )
 
-  // ─── 2. 统计 ──────────────────────────────────────────────────────────
+  // ─── 统计 ────────────────────────────────────────────────────────────────
+  const totalGuaranteedLoan = computed(() =>
+    parseFloat(calcSubtotal(rows.value.map(r => r.guaranteedLoan)).toFixed(2)))
+  const totalBookValue = computed(() =>
+    parseFloat(calcSubtotal(rows.value.map(r => r.bookValue)).toFixed(2)))
+  const totalAppraisalValue = computed(() =>
+    parseFloat(calcSubtotal(rows.value.map(r => r.appraisalValue)).toFixed(2)))
+  const overallRatio = computed(() =>
+    parseFloat(calcPledgeRatio(totalGuaranteedLoan.value, totalBookValue.value).toFixed(2)))
+  const warningCount = computed(() => computedRows.value.filter(r => r.hasRatioWarning).length)
 
-  /** 担保借款总额 */
-  const totalGuaranteedLoan: ComputedRef<number> = computed(() => {
-    return parseFloat(
-      calcSubtotal(pledgeRows.value.map(r => r.guaranteedLoan)).toFixed(2),
-    )
-  })
-
-  /** 资产账面价值总额 */
-  const totalBookValue: ComputedRef<number> = computed(() => {
-    return parseFloat(
-      calcSubtotal(pledgeRows.value.map(r => r.bookValue)).toFixed(2),
-    )
-  })
-
-  /** 综合担保比例（总担保借款/总资产价值） */
-  const overallRatio: ComputedRef<number> = computed(() => {
-    return parseFloat(
-      calcPledgeRatio(totalGuaranteedLoan.value, totalBookValue.value).toFixed(2),
-    )
-  })
-
-  /** 超标行数 */
-  const warningCount: ComputedRef<number> = computed(() => {
-    return computedRows.value.filter(r => r.hasRatioWarning).length
-  })
-
-  // ─── 3. 行操作 ────────────────────────────────────────────────────────
-
-  /** 更新某行字段 */
+  // ─── 行操作 ──────────────────────────────────────────────────────────────
   function updateRow(index: number, field: keyof L3PledgeCheckRow, value: string | number): void {
-    if (index < 0 || index >= pledgeRows.value.length) return
-    const row = pledgeRows.value[index] as any
-    row[field] = value
-
-    // 如果修改了金额字段，重算比例
+    if (index < 0 || index >= rows.value.length) return
+    ;(rows.value[index] as any)[field] = value
     if (field === 'guaranteedLoan' || field === 'bookValue') {
-      row.pledgeRatio = calcPledgeRatio(row.guaranteedLoan, row.bookValue)
+      rows.value[index].pledgeRatio = calcPledgeRatio(rows.value[index].guaranteedLoan, rows.value[index].bookValue)
     }
-
-    _triggerSave(index)
+    persist()
   }
 
-  /** 新增抵质押检查行 */
   function addRow(assetName: string): void {
-    const newRow: L3PledgeCheckRow = {
-      assetName,
-      assetType: '',
-      bookValue: 0,
-      guaranteedLoan: 0,
-      pledgeRatio: 0,
-      ownershipVerified: '',
-      appraisalDate: '',
-      remark: '',
-    }
-    pledgeRows.value.push(newRow)
-    _triggerSave(pledgeRows.value.length - 1)
+    rows.value.push({
+      assetName, assetType: '', bookValue: 0, appraisalValue: 0, guaranteedLoan: 0,
+      pledgeRatio: 0, ownershipVerified: '', appraisalDate: '', remark: '',
+    })
+    persist()
   }
 
-  /** 删除行 */
   function removeRow(index: number): void {
-    if (index < 0 || index >= pledgeRows.value.length) return
-    pledgeRows.value.splice(index, 1)
-    _triggerSaveAll()
+    if (index < 0 || index >= rows.value.length) return
+    rows.value.splice(index, 1)
+    persist()
   }
-
-  // ─── 4. 保存触发 ──────────────────────────────────────────────────────
-
-  function _triggerSave(rowIndex: number): void {
-    const row = pledgeRows.value[rowIndex]
-    if (!row) return
-    const n = rowIndex + 1
-    const fields: (keyof L3PledgeCheckRow)[] = [
-      'assetName', 'assetType', 'bookValue', 'guaranteedLoan',
-      'pledgeRatio', 'ownershipVerified', 'appraisalDate', 'remark',
-    ]
-    for (const field of fields) {
-      const val = (row as any)[field]
-      debouncedSave(`L3-plg-${n}-${field}`, {
-        remark: val != null && val !== '' && val !== 0 ? String(val) : null,
-      })
-    }
-  }
-
-  function _triggerSaveAll(): void {
-    for (let i = 0; i < pledgeRows.value.length; i++) {
-      _triggerSave(i)
-    }
-  }
-
-  // ─── Return ────────────────────────────────────────────────────────────
 
   return {
-    // 计算
+    rows,
     computedRows,
     totalGuaranteedLoan,
     totalBookValue,
+    totalAppraisalValue,
     overallRatio,
     warningCount,
-
-    // 行操作
     addRow,
     removeRow,
     updateRow,
+    hydrate,
   }
 }
 

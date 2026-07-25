@@ -92,10 +92,14 @@ export function useL1CrossSheet(
    * 差额 = 审定表total.end - Σ(明细行.endBalance)
    */
   const adjudicationVsDetail: ComputedRef<AdjudicationVsDetailResult> = computed(() => {
-    // 审定表合计（取 total.end）
-    const adjTotal = adjudicationData.value.total.end
+    // 审定表期末未审合计（Σ 各分类 endUnadjusted）
+    // 源模板：审定表 F 列(期末未审) = SUMIF(明细表 K 列 期末余额未审)，故与明细期末余额同口径比较
+    let adjTotal = 0
+    for (const cat of adjudicationData.value.categories) {
+      adjTotal += cat.endUnadjusted
+    }
 
-    // 明细表合计（Σ endBalance）
+    // 明细表合计（Σ endBalance = 期末余额未审）
     let detailTotal = 0
     for (const row of detailRows.value) {
       detailTotal += row.endBalance

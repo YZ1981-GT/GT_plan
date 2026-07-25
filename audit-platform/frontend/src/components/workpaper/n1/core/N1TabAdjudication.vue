@@ -65,6 +65,9 @@
               <el-tag type="success" size="small" class="asset-tag">资产类·借方</el-tag>
             </div>
             <div class="section-actions">
+              <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
+                <el-icon><Download /></el-icon> 带入调整
+              </el-button>
               <el-button size="small" @click="handleAI('adjudication')">
                 <el-icon><MagicStick /></el-icon> AI辅助
               </el-button>
@@ -330,8 +333,19 @@
           <li>本期变动额（期末−期初）供N5递延所得税费用核对</li>
           <li>"回写审定数"将合计审定数回写至试算表（科目1811期末余额）</li>
           <li>N1-4测算表同源产出递延税资产（归N1）和递延税负债（归N3），不能抵销的分列</li>
+          <li>「带入调整」：按科目1811拉取调整分录，逐笔选目标差异项目行累加到期末 AJE/RJE，带入后自动联动披露与附注</li>
         </ul>
       </details>
+
+      <!-- ═══ 带入调整 弹窗 ═══ -->
+      <AdjudicationBringInDialog
+        v-model="bringInVisible"
+        :matches="adjPull.matches.value"
+        :row-options="bringInRowOptions"
+        subject-label="1811 递延所得税资产"
+        :loading="adjPull.loading.value"
+        @apply="onBringInApply"
+      />
     </template>
   </div>
 </template>
@@ -357,9 +371,9 @@
  *
  * 科目：1811 递延所得税资产（**借方/资产类**！期末余额=期初+借-贷）
  */
-import { ref, inject, onMounted, toRef } from 'vue'
+import { ref, computed, inject, onMounted, toRef } from 'vue'
 import { ElMessage } from 'element-plus'
-import { WarningFilled, MagicStick, ChatDotSquare } from '@element-plus/icons-vue'
+import { WarningFilled, MagicStick, ChatDotSquare, Download } from '@element-plus/icons-vue'
 // @ts-ignore
 import GtIndexChip from '../../GtIndexChip.vue'
 // @ts-ignore
@@ -368,6 +382,9 @@ import { useN1FormData } from '../../composables/useN1FormData'
 import { useN1Adjudication } from '../../composables/useN1Adjudication'
 import { useN1CrossSheet } from '../../composables/useN1CrossSheet'
 import { useN1DualMode } from '../../composables/useN1DualMode'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -398,6 +415,32 @@ const adjudication = useN1Adjudication({
   allResponses: formData.allResponses,
   formData,
   crossSheet,
+})
+
+// ─── 带入调整（adjustment-collaboration-and-propagation） ─────────────────────
+// 递延所得税资产为双期结构，带入调整作用于「期末」AJE/RJE 列（endAje/endRje），
+// 逐笔分配到目标暂时性差异项目行。updateRow 用数字 index。
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: projectIdRef as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '1811',
+  direction: 'debit', // 资产借方：净发生额 = 借 − 贷
+  subjectCode: '1811',
+  wpCode: 'N1',
+  subjectLabel: '递延所得税资产(1811)',
+  rows: computed(() => adjudication.rows.value.map((r) => ({ rowKey: r.category, name: r.category, aje: r.endAje, rje: r.endRje }))),
+  updateCell: (rowKey: string, field: any, value: number) => {
+    const idx = adjudication.rows.value.findIndex((r) => r.category === rowKey)
+    if (idx < 0) return
+    adjudication.updateRow(idx, field === 'rje' ? 'endRje' : 'endAje', value)
+  },
+  totalAudited: () => adjudication.totals.value.endAudited,
 })
 
 // ─── State ───────────────────────────────────────────────────────────────────

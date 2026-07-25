@@ -523,7 +523,7 @@ watch(visible, (v) => {
 })
 
 function addFormula() {
-  formulas.value.push({ expression: '', category: 'logic_check', description: '', _checked: false })
+  formulas.value.push({ expression: '', category: 'auto_calc', description: '', _checked: false })
 }
 
 const checkedCount = computed(() => formulas.value.filter((f: any) => f._checked).length)

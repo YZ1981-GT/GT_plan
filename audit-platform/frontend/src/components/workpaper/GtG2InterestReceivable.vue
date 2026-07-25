@@ -167,19 +167,14 @@
 
       <!-- 底稿目录（对齐 G1：泳道卡片） -->
       <template v-else-if="currentSheet === '底稿目录'">
-        <div class="g2-index-toolbar">
-          <el-button size="small" type="primary" plain @click="openHandbook('preparation')">
-            📖 编制手册
-          </el-button>
-          <el-button size="small" @click="openHandbook('usage')">使用手册</el-button>
-        </div>
         <GCycleBIndexExtras
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :sheet-name="props.sheetName"
           :wp-code="props.wpCode"
-          :html-data="props.htmlData"
+          :html-data="directoryHtmlData"
           :available-sheets="availableSheets"
+          :all-responses="allResponsesRef"
         />
       </template>
 
@@ -215,6 +210,7 @@ import { ref, computed, onMounted, onBeforeUnmount, provide, inject, defineAsync
 import { useG2IntRecFormData } from './composables/useG2IntRecFormData'
 import { useG2DualMode, type G2RenderMode } from './composables/useG2DualMode'
 import { extractG2SheetCode, buildG2FallbackSheets } from './composables/g2SheetLabels'
+import { buildDirectoryHtmlData } from './composables/gCycleIndexRouting'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInjections'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
@@ -303,6 +299,11 @@ const availableSheets = computed(() => {
   // 对齐 D4：仍无数据时用静态映射兜底，保证目录与 OO 解析有可用 sheet 名
   return buildG2FallbackSheets()
 })
+
+/** 目录页传给 GCycleBIndexExtras 的 htmlData：从 sheetCache 补全 cycle_workpapers（本循环底稿目录 grid） */
+const directoryHtmlData = computed(() =>
+  buildDirectoryHtmlData(props.htmlData, formData.sheetCache.value),
+)
 
 const dualMode = useG2DualMode({
   wpId: wpIdRef,

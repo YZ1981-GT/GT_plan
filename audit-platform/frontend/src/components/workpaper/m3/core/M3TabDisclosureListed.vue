@@ -8,7 +8,7 @@
         <el-tag type="primary" size="small">库存股·上市</el-tag>
       </div>
       <div class="section-header-right">
-        <el-button size="small" @click="handleAI('disclosure-listed')">
+        <el-button size="small" :loading="aiLoading === 'disclosure-listed'" :disabled="isReadonly" @click="handleAI('disclosure-listed')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
         <el-button size="small" @click="handleReview">
@@ -36,7 +36,7 @@
             <el-button size="small" type="primary" :disabled="isReadonly" @click="handlePullFromAdjudication">
               从审定表/明细表带入
             </el-button>
-            <el-button size="small" @click="handleAI('section-treasury-change')">
+            <el-button size="small" :loading="aiLoading === 'section-treasury-change'" :disabled="isReadonly" @click="handleAI('section-treasury-change')">
               <el-icon><MagicStick /></el-icon> AI
             </el-button>
           </div>
@@ -101,7 +101,7 @@
       <template #header>
         <div class="card-header">
           <span>回购目的及用途说明</span>
-          <el-button size="small" @click="handleAI('section-purpose')">
+          <el-button size="small" :loading="aiLoading === 'section-purpose'" :disabled="isReadonly" @click="handleAI('section-purpose')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </div>
@@ -121,7 +121,7 @@
       <template #header>
         <div class="card-header">
           <span>回购方案执行情况</span>
-          <el-button size="small" @click="handleAI('section-execution')">
+          <el-button size="small" :loading="aiLoading === 'section-execution'" :disabled="isReadonly" @click="handleAI('section-execution')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </div>
@@ -141,7 +141,7 @@
       <template #header>
         <div class="card-header">
           <span>对所有者权益的影响说明</span>
-          <el-button size="small" @click="handleAI('section-equity-impact')">
+          <el-button size="small" :loading="aiLoading === 'section-equity-impact'" :disabled="isReadonly" @click="handleAI('section-equity-impact')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </div>
@@ -187,10 +187,12 @@
  * 科目：4002 库存股（**借方/权益备抵类！**）
  */
 import { computed, inject, onMounted, onUnmounted, ref, watch } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, Check } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
 import { useM3FormData } from '../../composables/useM3FormData'
 import { calcContraEquityEndBalance } from '../../composables/useM3FormulaEngine'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 
 const props = defineProps<{
   wpId: string
@@ -203,6 +205,8 @@ const emit = defineEmits<{
 }>()
 
 const openReviewDialog = inject<((sectionId: string, sectionLabel?: string) => void) | null>('openReviewDialog', null)
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
 
 // ─── FormData ───────────────────────────────────────────────────────────────
 
@@ -322,7 +326,39 @@ function _parseNum(v: any): number {
   return Number.isFinite(n) ? n : 0
 }
 
-function handleAI(_section: string) { /* AI辅助待集成 */ }
+async function handleAI(section: string) {
+  if (props.isReadonly) return
+  aiLoading.value = section
+  try {
+    const sumRow = treasuryChangeRows.value[0]
+    const context: Record<string, string> = {
+      科目: '4002 库存股（权益备抵类·借方，附注披露-上市公司）',
+      期初金额: fmtAmount(sumRow?.beginAmount || 0),
+      本期回购增加: fmtAmount(sumRow?.repurchaseIncrease || 0),
+      本期注销减少: fmtAmount(sumRow?.cancelDecrease || 0),
+      期末金额: fmtAmount(sumRow?.endAmount || 0),
+    }
+    let target: 'purpose' | 'execution' | 'equity-impact' | '' = ''
+    if (section === 'section-purpose') target = 'purpose'
+    else if (section === 'section-execution') target = 'execution'
+    else if (section === 'section-equity-impact') target = 'equity-impact'
+    const existing =
+      target === 'purpose' ? purposeNote.value
+      : target === 'execution' ? executionNote.value
+      : target === 'equity-impact' ? equityImpactNote.value
+      : ''
+    const text = await generateAiText({ section: `m3-disclosure-listed-${section}`, context, existingContent: existing })
+    if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+    if (target === 'purpose') { purposeNote.value = text; handleNoteChange('purpose', text) }
+    else if (target === 'execution') { executionNote.value = text; handleNoteChange('execution', text) }
+    else if (target === 'equity-impact') { equityImpactNote.value = text; handleNoteChange('equity-impact', text) }
+    else { ElMessageBox.alert(text, 'AI 辅助建议', { confirmButtonText: '知道了' }).catch(() => {}) }
+  } catch {
+    ElMessage.warning('AI 生成失败，请稍后重试')
+  } finally {
+    aiLoading.value = ''
+  }
+}
 function handleReview() { openReviewDialog?.('M3-disclosure-listed', '附注披露（上市）') }
 
 function fmtAmount(val: number): string {

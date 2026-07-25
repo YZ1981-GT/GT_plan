@@ -369,6 +369,56 @@
       </el-table-column>
     </el-table>
 
+    <!-- ═══ 审计说明 ═══ -->
+    <el-card class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header">
+          <span>审计说明</span>
+          <el-button
+            v-if="!isReadonly"
+            size="small"
+            type="primary"
+            plain
+            :loading="aiNoteLoading"
+            @click="handleAiNote"
+          >🤖 AI 辅助</el-button>
+        </div>
+      </template>
+      <el-input
+        :model-value="note"
+        type="textarea"
+        :autosize="{ minRows: 5 }"
+        :disabled="isReadonly"
+        placeholder="核对合同金额/利率/期限与账面是否一致；确认担保有效性；如存在违反债务协议约定或条款情况，确定其影响及额外执行的程序（书面豁免/补签合同等），并评估对持续经营的影响。"
+        @input="onNoteInput"
+      />
+    </el-card>
+
+    <!-- ═══ 审计结论 ═══ -->
+    <el-card class="opinion-card" shadow="never">
+      <template #header>
+        <div class="opinion-header">
+          <span>审计结论</span>
+          <el-button
+            v-if="!isReadonly"
+            size="small"
+            type="primary"
+            plain
+            :loading="aiConclusionLoading"
+            @click="handleAiConclusion"
+          >🤖 AI 辅助</el-button>
+        </div>
+      </template>
+      <el-input
+        :model-value="conclusion"
+        type="textarea"
+        :autosize="{ minRows: 3 }"
+        :disabled="isReadonly"
+        placeholder="参考：A.合同要素与账面相符，未见异常。 B.存在需关注事项（如违约/条款不一致）。 C.无法获取充分证据，不可确认。"
+        @input="onConclusionInput"
+      />
+    </el-card>
+
     <!-- ═══ 编制提示（折叠） ═══ -->
     <details class="l1-details-tip">
       <summary>编制提示</summary>
@@ -398,10 +448,11 @@
  * Task: 4.6
  * Requirements: 7.1-7.2
  */
-import { inject, ref, reactive, computed, onMounted } from 'vue'
+import { inject, ref, reactive, computed, onMounted, toRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import type { useL1FormData, ChecklistItem } from '@/composables/useL1FormData'
+import { useL1AiNote } from '@/composables/useL1AiNote'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -439,11 +490,19 @@ const activeSegment = ref('basic')
 // ─── 列设置（⚙ popover）────────────────────────────────────────────────────
 const CONTRACT_COL_PREFS_KEY = 'l1-6-column-prefs'
 interface ColPref { key: string; label: string; visible: boolean }
+/** 字段中文标签（避免 popover 显示英文字段名） */
+const FIELD_LABELS: Record<string, string> = {
+  contractNo: '合同号', borrower: '贷款单位', lender: '贷款银行', loanAmount: '贷款金额',
+  startDate: '起始日', endDate: '到期日', term: '期限(月)', currency: '币种',
+  rateType: '利率类型', annualRate: '年利率', adjustMethod: '调整方式', interestBasis: '计息基准',
+  guaranteeType: '担保方式', guarantor: '担保人/物', pledgeAsset: '抵质押物', guaranteeAmount: '担保金额',
+  prepaymentCondition: '提前还款条件', overduePenalty: '逾期罚则', crossDefault: '交叉违约',
+}
 const contractColDefs: Record<string, ColPref[]> = reactive({
-  basic: CONTRACT_SEGMENTS[0].fields.map(f => ({ key: f, label: f, visible: true })),
-  rate: CONTRACT_SEGMENTS[1].fields.map(f => ({ key: f, label: f, visible: true })),
-  guarantee: CONTRACT_SEGMENTS[2].fields.map(f => ({ key: f, label: f, visible: true })),
-  default: CONTRACT_SEGMENTS[3].fields.map(f => ({ key: f, label: f, visible: true })),
+  basic: CONTRACT_SEGMENTS[0].fields.map(f => ({ key: f, label: FIELD_LABELS[f] || f, visible: true })),
+  rate: CONTRACT_SEGMENTS[1].fields.map(f => ({ key: f, label: FIELD_LABELS[f] || f, visible: true })),
+  guarantee: CONTRACT_SEGMENTS[2].fields.map(f => ({ key: f, label: FIELD_LABELS[f] || f, visible: true })),
+  default: CONTRACT_SEGMENTS[3].fields.map(f => ({ key: f, label: FIELD_LABELS[f] || f, visible: true })),
 })
 const currentSegCols = computed(() => contractColDefs[activeSegment.value] || [])
 function persistContractColPrefs(): void {
@@ -515,12 +574,13 @@ const contractRows = ref<ContractRow[]>([])
 
 function loadFromFormData(): void {
   // Parse L1-con-{n}-{field} items
+  // 🔴 必须用 getItemsByPrefix 从已加载的原始 responses 恢复，
+  //    不能用 serializeAll()（仅含结构化 sheet 字段，不含 L1-con-* → 刷新后合同数据丢失）。
   const pattern = /^L1-con-(\d+)-(\w+)$/
   const rows: ContractRow[] = []
 
-  // Access internal responses if available, otherwise start empty
   try {
-    const allItems = formData.serializeAll()
+    const allItems = formData.getItemsByPrefix('L1-con-')
     for (const item of allItems) {
       const match = item.item_id.match(pattern)
       if (!match) continue
@@ -541,8 +601,29 @@ function loadFromFormData(): void {
   contractRows.value = rows.length > 0 ? rows : []
 }
 
+// ─── 审计说明 + 审计结论（AI 辅助） ─────────────────────────────────────────
+
+const {
+  note, conclusion, aiNoteLoading, aiConclusionLoading,
+  load: loadNote, onNoteInput, onConclusionInput, generateNote, generateConclusion,
+} = useL1AiNote(formData, toRef(props, 'wpId'), 'con', toRef(props, 'isReadonly'))
+
+function _aiContext() {
+  return {
+    合同笔数: contractRows.value.length,
+    合同金额合计: contractRows.value.reduce((s, r) => s + (r.loanAmount || 0), 0),
+  }
+}
+function handleAiNote() {
+  generateNote('请基于贷款合同检查情况撰写审计说明，覆盖合同要素核对、担保有效性、违约条款影响。', _aiContext())
+}
+function handleAiConclusion() {
+  generateConclusion('请基于贷款合同检查情况生成审计结论。', _aiContext())
+}
+
 onMounted(() => {
   loadFromFormData()
+  loadNote()
 })
 
 // ─── Persistence ─────────────────────────────────────────────────────────────
@@ -767,6 +848,15 @@ function fmtAmount(val: number | null | undefined): string {
   margin: 8px 0 0;
   line-height: 1.8;
 }
+.opinion-card { margin-top: 16px; }
+.opinion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+  font-size: var(--wp-font-size, 13px);
+}
+.opinion-card :deep(.el-textarea__inner) { font-size: var(--wp-font-size, 13px); }
 .col-prefs { max-height: 280px; overflow-y: auto; }
 .col-prefs-title { font-weight: 600; margin-bottom: 6px; font-size: 13px; }
 .col-prefs :deep(.el-checkbox) { display: block; margin-bottom: 3px; }

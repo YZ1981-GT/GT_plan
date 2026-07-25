@@ -5,8 +5,11 @@
  * 4 阶段泳道：审计计划 / 科目审定 / 实质性程序 / 披露与调整
  * 点击卡片 → inject('jumpToSection') → GtH1 emit navigate-sheet
  */
-import { computed, inject } from 'vue'
+import { computed, inject, ref, defineAsyncComponent } from 'vue'
 import GtBArchitectureTree from '../../GtBArchitectureTree.vue'
+import GtCycleDirExtras from '../../GtCycleDirExtras.vue'
+
+const H1PreparationHandbookDialog = defineAsyncComponent(() => import('../H1PreparationHandbookDialog.vue'))
 
 const props = defineProps<{
   wpId?: string
@@ -90,10 +93,36 @@ const progressPercent = computed(() =>
 function handleNavigate(sheetName: string) {
   if (jumpToSection && sheetName) jumpToSection(sheetName)
 }
+
+// ─── E1 标准加法式增强：目录卡 + 结论看板 + 本循环 grid ───────────────────
+/** 结论看板/跳转值：H1 导航机制为 inject('jumpToSection')，navValue = 完整 sheet 名（content）。 */
+const dirSheets = computed(() =>
+  NAV_ROWS.map((r) => ({ code: r.index_ref, navValue: r.content, name: r.content })),
+)
+
+const handbookVisible = ref(false)
+const handbookTab = ref<'preparation' | 'usage'>('preparation')
+function openHandbook(tab: 'preparation' | 'usage') {
+  handbookTab.value = tab
+  handbookVisible.value = true
+}
 </script>
 
 <template>
   <div class="h1-tab-index">
+    <!-- E1 标准加法式增强：目录卡 + 结论看板 + 本循环 grid -->
+    <GtCycleDirExtras
+      wp-code="H1"
+      cycle-letter="H"
+      :wp-id="props.wpId"
+      :project-id="props.projectId"
+      :all-responses="props.allResponses"
+      :sheets="dirSheets"
+      @navigate="handleNavigate"
+      @open-handbook="openHandbook"
+    />
+    <H1PreparationHandbookDialog v-model="handbookVisible" :initial-tab="handbookTab" />
+
     <el-alert
       type="info"
       :closable="false"

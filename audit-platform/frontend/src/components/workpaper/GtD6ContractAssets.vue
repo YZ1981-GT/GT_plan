@@ -58,6 +58,7 @@
           :save-immediate="saveImmediateWithSnapshot"
           :debounced-save="debouncedSave"
           :cross-sheet="crossSheet"
+          :adjudication-prefill="props.htmlData?.adjudication_prefill"
         />
 
         <D6TabDetail
@@ -318,7 +319,7 @@ const KNOWN_HTML_SHEETS = new Set([
 ])
 
 const showModeToolbar = computed(() =>
-  currentSheet.value !== 'skip' && KNOWN_HTML_SHEETS.has(currentSheet.value),
+  currentSheet.value !== 'skip' && currentSheet.value !== 'D6' && KNOWN_HTML_SHEETS.has(currentSheet.value),
 )
 
 const dualMode = useD6EntryDualMode({

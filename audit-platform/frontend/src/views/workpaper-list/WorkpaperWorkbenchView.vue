@@ -356,28 +356,81 @@
       </div>
     </div>
 
-    <!-- 列表视图（默认） -->
-    <div v-else class="gt-wp-list-default">
-      <el-table :data="pagedWorkbenchData" stripe border style="width: 100%" max-height="calc(100vh - 280px)" class="gt-compact-table gt-tb-font-md" @row-click="onWorkbenchRowClick" @selection-change="onTableSelectionChange">
-        <el-table-column type="selection" width="40" />
-        <el-table-column prop="wp_code" label="编码" min-width="90" :sort-method="wpCodeSort" sortable resizable />
-        <el-table-column prop="wp_name" label="底稿名称" min-width="220" show-overflow-tooltip resizable />
-        <el-table-column prop="cycle_name" label="循环" min-width="110" show-overflow-tooltip resizable />
-        <el-table-column prop="status_label" label="状态" min-width="90" resizable>
-          <template #default="{ row }">
-            <el-tag :type="row.status_type" size="small">{{ row.status_label }}</el-tag>
+    <!-- 列表视图（默认）：左循环树导航 + 右底稿表格 -->
+    <div v-else class="gt-wp-list-split">
+      <!-- 左栏：审计循环树导航 -->
+      <aside class="gt-wp-list-nav">
+        <div class="gt-wp-list-nav__head">审计循环</div>
+        <div
+          class="gt-wp-list-nav__item gt-wp-list-nav__item--all"
+          :class="{ 'is-active': listSelectedCycle === '' }"
+          @click="selectListCycle('')"
+        >
+          <span class="gt-wp-list-nav__badge gt-wp-list-nav__badge--all">全</span>
+          <span class="gt-wp-list-nav__name">全部底稿</span>
+          <span class="gt-wp-list-nav__count">{{ listDoneCount }}/{{ workbenchTableData.length }}</span>
+        </div>
+        <div
+          v-for="c in listCycleNav"
+          :key="c.code"
+          class="gt-wp-list-nav__item"
+          :class="{ 'is-active': listSelectedCycle === c.code }"
+          @click="selectListCycle(c.code)"
+        >
+          <span class="gt-wp-list-nav__badge" :style="{ background: c.color }">{{ c.code }}</span>
+          <span class="gt-wp-list-nav__name">{{ c.name }}</span>
+          <span class="gt-wp-list-nav__count">{{ c.doneCount }}/{{ c.items.length }}</span>
+          <el-progress
+            class="gt-wp-list-nav__progress"
+            :percentage="c.percent"
+            :stroke-width="4"
+            :show-text="false"
+            :color="c.percent === 100 ? '#67C23A' : c.color"
+          />
+        </div>
+      </aside>
+
+      <!-- 右栏：底稿表格 -->
+      <section class="gt-wp-list-main">
+        <div class="gt-wp-list-main__head">
+          <span class="gt-wp-list-main__title">
+            {{ listSelectedCycle ? (cycleNameMap[listSelectedCycle] || listSelectedCycle) : '全部底稿' }}
+          </span>
+          <el-tag size="small" type="info" effect="plain" round>共 {{ listTotal }} 张</el-tag>
+        </div>
+        <el-table
+          :data="listPaged"
+          style="width: 100%"
+          max-height="calc(100vh - 300px)"
+          class="gt-compact-table gt-tb-font-md gt-wp-list-table"
+          @row-click="onWorkbenchRowClick"
+          @selection-change="onTableSelectionChange"
+        >
+          <el-table-column type="selection" width="40" />
+          <el-table-column prop="wp_code" label="编码" min-width="90" :sort-method="wpCodeSort" sortable resizable />
+          <el-table-column prop="wp_name" label="底稿名称" min-width="220" show-overflow-tooltip resizable />
+          <el-table-column v-if="!listSelectedCycle" prop="cycle_name" label="循环" min-width="100" show-overflow-tooltip resizable />
+          <el-table-column prop="status_label" label="状态" min-width="90" resizable>
+            <template #default="{ row }">
+              <el-tag :type="row.status_type" size="small">{{ row.status_label }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="assignee_name" label="编制人" min-width="90" resizable>
+            <template #default="{ row }">{{ row.assignee_name || '—' }}</template>
+          </el-table-column>
+          <el-table-column label="操作" width="130" fixed="right">
+            <template #default="{ row }">
+              <GtRowActions :actions="getWpRowActions(row)" :max-visible="2" @action="(key: string) => handleWpRowAction(key, row)" />
+            </template>
+          </el-table-column>
+          <template #empty>
+            <el-empty description="该循环暂无底稿" :image-size="80" />
           </template>
-        </el-table-column>
-        <el-table-column prop="assignee_name" label="编制人" min-width="90" resizable />
-        <el-table-column label="操作" width="130" fixed="right">
-          <template #default="{ row }">
-            <GtRowActions :actions="getWpRowActions(row)" :max-visible="2" @action="(key: string) => handleWpRowAction(key, row)" />
-          </template>
-        </el-table-column>
-      </el-table>
-      <div class="gt-pagination" v-if="wbTotal > wbPageSize" style="margin-top: 12px; display: flex; justify-content: flex-end;">
-        <el-pagination v-model:current-page="wbPage" :page-size="wbPageSize" :total="wbTotal" layout="total, prev, pager, next" background small />
-      </div>
+        </el-table>
+        <div class="gt-pagination" v-if="listTotal > wbPageSize" style="margin-top: 12px; display: flex; justify-content: flex-end;">
+          <el-pagination v-model:current-page="wbPage" :page-size="wbPageSize" :total="listTotal" layout="total, prev, pager, next" background small />
+        </div>
+      </section>
     </div>
   </div>
 </template>
@@ -567,6 +620,36 @@ const pagedWorkbenchData = computed(() => {
   return workbenchTableData.value.slice(start, start + wbPageSize.value)
 
 })
+
+// ─── 列表视图：左循环树导航 + 右表格（master-detail） ──────────────────────────
+const listSelectedCycle = ref<string>('') // '' = 全部
+
+/** 左栏循环导航：复用 groupedWorkbenchData（含 code/name/color/items/doneCount/percent） */
+const listCycleNav = computed(() => groupedWorkbenchData.value)
+
+/** 全部底稿已完成数（左栏「全部」项进度） */
+const listDoneCount = computed(() =>
+  workbenchTableData.value.filter(i => COMPLETED_STATUSES.has(i.status)).length
+)
+
+/** 右栏数据：按选中循环过滤 */
+const listTableData = computed(() => {
+  if (!listSelectedCycle.value) return workbenchTableData.value
+  return workbenchTableData.value.filter(
+    i => (i.wp_code || '?')[0].toUpperCase() === listSelectedCycle.value
+  )
+})
+const listTotal = computed(() => listTableData.value.length)
+const listPaged = computed(() => {
+  const start = (wbPage.value - 1) * wbPageSize.value
+  return listTableData.value.slice(start, start + wbPageSize.value)
+})
+
+/** 选中循环（再次点击同一循环取消选中回到全部） */
+function selectListCycle(code: string) {
+  listSelectedCycle.value = listSelectedCycle.value === code ? '' : code
+  wbPage.value = 1
+}
 
 // ─── 按循环分组目录数据 ────────────────────────────────────────────────────────
 const expandedCycleGroups = reactive<Record<string, boolean>>({})
@@ -1145,17 +1228,139 @@ function onGuideWpClick(wpCode: string) {
   cursor: pointer;
 }
 
-/* ─── 默认列表视图 ─── */
-.gt-wp-list-default {
+/* ─── 默认列表视图：两栏（左循环树 + 右表格） ─── */
+.gt-wp-list-split {
   flex: 1;
   min-height: 0;
+  display: flex;
+  gap: 14px;
 }
-.gt-wp-list-default :deep(.el-table) {
+
+/* 左栏：循环树导航 */
+.gt-wp-list-nav {
+  flex: 0 0 240px;
+  width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 8px;
+  background: var(--el-bg-color, #fff);
+  border: 1px solid var(--gt-color-border-lighter, #ebeef5);
+  border-radius: 10px;
+  overflow-y: auto;
+  max-height: calc(100vh - 260px);
+}
+.gt-wp-list-nav__head {
+  font-size: var(--gt-font-size-sm, 12px);
+  font-weight: 600;
+  color: var(--gt-color-text-secondary, #909399);
+  padding: 4px 8px 8px;
+  letter-spacing: 0.5px;
+}
+.gt-wp-list-nav__item {
+  display: grid;
+  grid-template-columns: 26px 1fr auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 4px;
+  padding: 8px 10px;
   border-radius: 8px;
-  overflow: hidden;
-}
-.gt-wp-list-default :deep(.el-table__row) {
   cursor: pointer;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+  border: 1px solid transparent;
+}
+.gt-wp-list-nav__item:hover {
+  background: var(--gt-color-primary-light, #f0ecf7);
+}
+.gt-wp-list-nav__item.is-active {
+  background: var(--gt-color-primary-light, #f0ecf7);
+  border-color: var(--gt-color-primary, #4b2d77);
+  box-shadow: 0 0 0 1px var(--gt-color-primary, #4b2d77) inset;
+}
+.gt-wp-list-nav__item--all {
+  grid-template-rows: auto;
+  margin-bottom: 4px;
+  border-bottom: 1px dashed var(--gt-color-border-lighter, #ebeef5);
+  border-radius: 8px 8px 0 0;
+}
+.gt-wp-list-nav__badge {
+  grid-row: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  font-size: var(--gt-font-size-sm, 12px);
+  font-weight: 700;
+  color: #fff;
+  background: var(--gt-color-primary, #4b2d77);
+  border-radius: 6px;
+}
+.gt-wp-list-nav__badge--all {
+  background: var(--gt-color-text-secondary, #909399);
+}
+.gt-wp-list-nav__name {
+  grid-row: 1;
+  font-size: var(--gt-font-size-base, 13px);
+  font-weight: 500;
+  color: var(--gt-color-text-primary, #303133);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gt-wp-list-nav__count {
+  grid-row: 1;
+  font-size: var(--gt-font-size-xs, 11px);
+  color: var(--gt-color-text-secondary, #909399);
+  white-space: nowrap;
+}
+.gt-wp-list-nav__progress {
+  grid-row: 2;
+  grid-column: 2 / 4;
+}
+
+/* 右栏：底稿表格 */
+.gt-wp-list-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--el-bg-color, #fff);
+  border: 1px solid var(--gt-color-border-lighter, #ebeef5);
+  border-radius: 10px;
+  padding: 8px 12px 12px;
+}
+.gt-wp-list-main__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 2px 10px;
+}
+.gt-wp-list-main__title {
+  font-size: var(--gt-font-size-md, 14px);
+  font-weight: 600;
+  color: var(--gt-color-text-primary, #303133);
+}
+/* 无边框表格：去 Excel 格子感 */
+.gt-wp-list-table :deep(.el-table__row) {
+  cursor: pointer;
+}
+.gt-wp-list-table :deep(.el-table--border),
+.gt-wp-list-table :deep(td.el-table__cell),
+.gt-wp-list-table :deep(th.el-table__cell) {
+  border-right: none;
+}
+
+@media (max-width: 900px) {
+  .gt-wp-list-split {
+    flex-direction: column;
+  }
+  .gt-wp-list-nav {
+    flex: none;
+    width: 100%;
+    max-height: 220px;
+  }
 }
 
 /* ─── 手册视图样式（从 18344aca 恢复） ─── */

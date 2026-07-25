@@ -25,6 +25,9 @@ import {
 import { fmtDateTime as _fmtDateTime } from '@/utils/formatters'
 
 const STORAGE_KEY = 'gt_display_prefs'
+// 偏好版本：v2 起平台金额单位默认「元」（此前误默认为「万元」）。
+// 版本升级时对旧持久化做一次性迁移，将遗留的默认「万元」归一到「元」。
+const PREFS_VERSION = 2
 
 /** 表格密度 */
 export type TableDensity = 'compact' | 'default' | 'comfortable'
@@ -53,7 +56,7 @@ interface DisplayPrefsData {
 }
 
 const DEFAULTS: DisplayPrefsData = {
-  amountUnit: 'wan',
+  amountUnit: 'yuan',   // 平台铁律：所有数值默认「元」（不是万元）
   fontSize: 'sm',
   showZero: false,
   decimals: 2,
@@ -66,13 +69,22 @@ const DEFAULTS: DisplayPrefsData = {
 function loadFromStorage(): DisplayPrefsData {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) return { ...DEFAULTS, ...JSON.parse(raw) }
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<DisplayPrefsData> & { _v?: number }
+      const merged = { ...DEFAULTS, ...parsed }
+      // 一次性迁移：v2 起平台默认「元」；将旧版本遗留的默认「万元」归一到「元」
+      if ((parsed._v ?? 1) < PREFS_VERSION) {
+        if (parsed.amountUnit === 'wan') merged.amountUnit = 'yuan'
+        saveToStorage(merged)
+      }
+      return merged
+    }
   } catch { /* ignore */ }
   return { ...DEFAULTS }
 }
 
 function saveToStorage(data: DisplayPrefsData) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...data, _v: PREFS_VERSION }))
 }
 
 export const useDisplayPrefsStore = defineStore('displayPrefs', () => {

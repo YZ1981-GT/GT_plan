@@ -98,6 +98,18 @@
         >
           保存并回写 I1
         </el-button>
+        <el-button
+          v-if="!isReadonly"
+          size="small"
+          type="primary"
+          plain
+          :loading="centralSyncing"
+          :disabled="!state.isBalanced.value || state.rows.value.length === 0"
+          title="把本页调整分录汇聚到集中调整登记，供合伙人跨循环审阅"
+          @click="syncToCentral"
+        >
+          同步到集中登记
+        </el-button>
         <el-dropdown
           v-if="!isReadonly"
           size="small"
@@ -125,6 +137,14 @@
         <span class="chip-wrap"><GtIndexChip value="wp:I1" :validate="false" /></span>
         <span class="chip-wrap"><GtIndexChip value="wp:A13" :context-project-id="projectId" /></span>
         <el-button size="small" type="default" link @click="openReview('I1-3')">💬 复核</el-button>
+        <el-tag
+          v-if="centralStatus?.review_status"
+          size="small"
+          :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
+          :title="centralStatus.rejection_reason || ''"
+        >
+          集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
+        </el-tag>
       </div>
     </div>
 
@@ -322,10 +342,11 @@
  * I1TabAdjustment.vue — I1-3 调整分录汇总
  * 对齐源 xlsx + H8-3 范式：中央调整模块双向联动 + EventBus + A13
  */
-import { computed, inject, ref, toRef } from 'vue'
+import { computed, inject, ref, toRef, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { useI1Adjustment, resolveI1AuditYear } from '../../composables/useI1Adjustment'
+import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
 import { useI1ImportExport } from '../../composables/useI1ImportExport'
 import { WorkpaperRuntimeContextKey } from '../../composables/useWorkpaperScaffold'
 
@@ -365,6 +386,27 @@ const state = useI1Adjustment({
   auditYear,
   onSave: (itemId, value) => emit('save', itemId, value),
 })
+
+// ─── 同步到集中调整登记（workpaper-adjustment-centralization） ───
+const { centralStatus, syncing: centralSyncing, syncToCentral, refreshStatus } = useAdjustmentCentralSync({
+  projectId: toRef(props, 'projectId'),
+  year: auditYear,
+  wpId: toRef(props, 'wpId'),
+  wpCode: 'I1',
+  itemId: 'I1-3-rows',
+  buildLineItems: () => state.rows.value.map((r) => ({
+    standard_account_code: r.accountCode || undefined,
+    account_name: r.accountName,
+    report_line_code: r.reportItem || undefined,
+    debit_amount: r.debitAmount,
+    credit_amount: r.creditAmount,
+  })),
+  buildMeta: () => ({
+    description: state.rows.value.find((r) => r.description)?.description || 'I1 无形资产调整',
+    adjustmentType: state.rows.value.length > 0 && state.rows.value.every((r) => r.category === '报表调整') ? 'rje' : 'aje',
+  }),
+})
+onMounted(() => refreshStatus())
 
 const { importing, exporting, exportTemplate, exportData, importData } = useI1ImportExport({
   wpId: toRef(props, 'wpId'),

@@ -28,26 +28,30 @@ export interface ChecklistItem {
   wp_ref?: string | null
 }
 
-/** 审定表分类行 */
+/**
+ * 审定表分类行（对齐致同源模板「审定表L1-1」双期结构）
+ *
+ * 源模板：期初数(未审/账项调整/重分类/审定) + 期末数(未审/账项调整/重分类/审定)
+ *        + 本期未审vs上期审定(变动额/率) + 本期审定vs上期审定(变动额/率) + 原因分析
+ * 仅存储可编辑字段；审定数/变动额/变动率为派生列，由 useL1Adjudication computed 计算。
+ */
 export interface AdjudicationCategory {
-  name: string           // 借款分类（信用/保证/抵押/质押）
-  beginning: number      // 期初
-  creditAmount: number   // 贷方（借入）
-  debitAmount: number    // 借方（归还）
-  endBalance: number     // 期末=期初+贷-借
-  unadjusted: number     // 未审数
-  aje: number            // AJE
-  rje: number            // RJE
-  audited: number        // 审定数
+  name: string            // 借款分类（信用/抵押/保证/质押）
+  // 期初数
+  beginUnadjusted: number // 期初未审数
+  beginAje: number        // 期初账项调整
+  beginRje: number        // 期初重分类调整
+  // 期末数
+  endUnadjusted: number   // 期末未审数
+  endAje: number          // 期末账项调整
+  endRje: number          // 期末重分类调整
+  // 原因分析
+  reason: string
 }
 
 /** 审定表状态 */
 export interface AdjudicationState {
   categories: AdjudicationCategory[]
-  total: {
-    beginning: number; credit: number; debit: number; end: number
-    unadjusted: number; aje: number; rje: number; audited: number
-  }
 }
 
 /** 明细表行 */
@@ -119,19 +123,21 @@ export interface PledgeCheckRow {
 
 const DEBOUNCE_MS = 2000
 
-/** 默认审定表分类 */
-const DEFAULT_CATEGORIES = ['信用借款', '保证借款', '抵押借款', '质押借款']
+/** 默认审定表分类（对齐源模板 A7~A10 顺序：信用/抵押/保证/质押） */
+const DEFAULT_CATEGORIES = ['信用借款', '抵押借款', '保证借款', '质押借款']
+
+function createEmptyCategory(name: string): AdjudicationCategory {
+  return {
+    name,
+    beginUnadjusted: 0, beginAje: 0, beginRje: 0,
+    endUnadjusted: 0, endAje: 0, endRje: 0,
+    reason: '',
+  }
+}
 
 function createEmptyAdjudicationState(): AdjudicationState {
   return {
-    categories: DEFAULT_CATEGORIES.map(name => ({
-      name, beginning: 0, creditAmount: 0, debitAmount: 0,
-      endBalance: 0, unadjusted: 0, aje: 0, rje: 0, audited: 0,
-    })),
-    total: {
-      beginning: 0, credit: 0, debit: 0, end: 0,
-      unadjusted: 0, aje: 0, rje: 0, audited: 0,
-    },
+    categories: DEFAULT_CATEGORIES.map(createEmptyCategory),
   }
 }
 
@@ -198,6 +204,12 @@ export function useL1FormData(
 
   // ─── Parse helpers ─────────────────────────────────────────────────────────
 
+  /** 审定表双期字段（仅可编辑列，派生列由 composable 计算） */
+  const ADJ_NUM_FIELDS = [
+    'beginUnadjusted', 'beginAje', 'beginRje',
+    'endUnadjusted', 'endAje', 'endRje',
+  ] as const
+
   function _parseAdjudication(map: Map<string, ChecklistItem>): void {
     // item_id: L1-adj-{categoryIndex}-{field}
     const categories: AdjudicationCategory[] = []
@@ -210,49 +222,20 @@ export function useL1FormData(
       const field = match[2]
 
       while (categories.length < idx) {
-        categories.push({
-          name: DEFAULT_CATEGORIES[categories.length] || '',
-          beginning: 0, creditAmount: 0, debitAmount: 0,
-          endBalance: 0, unadjusted: 0, aje: 0, rje: 0, audited: 0,
-        })
+        categories.push(createEmptyCategory(DEFAULT_CATEGORIES[categories.length] || ''))
       }
-      const cat = categories[idx - 1]
+      const cat = categories[idx - 1] as any
       const val = item.remark || item.conclusion || ''
       if (field === 'name') cat.name = val
-      else if (field === 'beginning') cat.beginning = parseFloat(val) || 0
-      else if (field === 'creditAmount') cat.creditAmount = parseFloat(val) || 0
-      else if (field === 'debitAmount') cat.debitAmount = parseFloat(val) || 0
-      else if (field === 'endBalance') cat.endBalance = parseFloat(val) || 0
-      else if (field === 'unadjusted') cat.unadjusted = parseFloat(val) || 0
-      else if (field === 'aje') cat.aje = parseFloat(val) || 0
-      else if (field === 'rje') cat.rje = parseFloat(val) || 0
-      else if (field === 'audited') cat.audited = parseFloat(val) || 0
+      else if (field === 'reason') cat.reason = val
+      else if ((ADJ_NUM_FIELDS as readonly string[]).includes(field)) cat[field] = parseFloat(val) || 0
     }
 
     if (categories.length === 0) {
       adjudicationData.value = createEmptyAdjudicationState()
     } else {
-      adjudicationData.value = {
-        categories,
-        total: _calcTotal(categories),
-      }
+      adjudicationData.value = { categories }
     }
-  }
-
-  function _calcTotal(categories: AdjudicationCategory[]): AdjudicationState['total'] {
-    let beginning = 0, credit = 0, debit = 0, end = 0
-    let unadjusted = 0, aje = 0, rje = 0, audited = 0
-    for (const cat of categories) {
-      beginning += cat.beginning
-      credit += cat.creditAmount
-      debit += cat.debitAmount
-      end += cat.endBalance
-      unadjusted += cat.unadjusted
-      aje += cat.aje
-      rje += cat.rje
-      audited += cat.audited
-    }
-    return { beginning, credit, debit, end, unadjusted, aje, rje, audited }
   }
 
   function _parseDynamicRows<T>(
@@ -448,18 +431,14 @@ export function useL1FormData(
   function serializeAll(): ChecklistItem[] {
     const items: ChecklistItem[] = []
 
-    // ─── Adjudication: L1-adj-{n}-{field} ───
+    // ─── Adjudication: L1-adj-{n}-{field}（双期结构） ───
     for (let i = 0; i < adjudicationData.value.categories.length; i++) {
-      const cat = adjudicationData.value.categories[i]
+      const cat = adjudicationData.value.categories[i] as any
       const n = i + 1
-      const numFields: Array<[string, number]> = [
-        ['beginning', cat.beginning], ['creditAmount', cat.creditAmount],
-        ['debitAmount', cat.debitAmount], ['endBalance', cat.endBalance],
-        ['unadjusted', cat.unadjusted], ['aje', cat.aje],
-        ['rje', cat.rje], ['audited', cat.audited],
-      ]
       items.push({ item_id: `L1-adj-${n}-name`, conclusion: null, remark: cat.name || null })
-      for (const [field, value] of numFields) {
+      items.push({ item_id: `L1-adj-${n}-reason`, conclusion: null, remark: cat.reason || null })
+      for (const field of ADJ_NUM_FIELDS) {
+        const value = cat[field]
         items.push({
           item_id: `L1-adj-${n}-${field}`,
           conclusion: null,
@@ -545,6 +524,22 @@ export function useL1FormData(
     return item?.remark ?? null
   }
 
+  // ─── getItemsByPrefix (按前缀取全部已加载 items) ─────────────────────────────
+
+  /**
+   * 返回全部 item_id 以 prefix 开头的已加载 ChecklistItem。
+   * 用于检查表/合同检查等「自持久化」子组件按 item_id 前缀恢复动态行，
+   * 避免误用 serializeAll()（仅含 adj/det/int/cred/ovd/plg 结构化字段，
+   * 不含 L1-chk 前缀 / L1-con 前缀等自定义 item_id → 刷新后数据丢失）。
+   */
+  function getItemsByPrefix(prefix: string): ChecklistItem[] {
+    const out: ChecklistItem[] = []
+    for (const [id, item] of _allResponses.value) {
+      if (id.startsWith(prefix)) out.push(item)
+    }
+    return out
+  }
+
   // ─── Return ────────────────────────────────────────────────────────────────
 
   return {
@@ -563,6 +558,7 @@ export function useL1FormData(
     writebackTB,
     serializeAll,
     getItemValue,
+    getItemsByPrefix,
   }
 }
 

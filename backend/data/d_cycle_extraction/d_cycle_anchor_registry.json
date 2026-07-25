@@ -1,0 +1,128 @@
+{
+  "_meta": {
+    "spec": ".kiro/specs/d-cycle-four-table-extraction-formulas/",
+    "task": "1.2 锚点发现 (Wave 0)",
+    "description": "D-cycle 审定表/明细表真实 checklist_responses item_id 锚点集（从前端专属组件 composable 反查，非臆造）。Tier B 预填 seed 目标 / Tier A 公式 target_cell 必须 ∈ 对应 wp_code 的锚点集（known_anchors），否则拒绝（Property 8，防静默写空）。",
+    "entry_kinds": {
+      "exact": "普通字符串 = 精确 item_id 锚点（精确相等匹配）",
+      "pattern": "以 're:' 前缀开头 = 已锚定的正则（用于动态 rowKey 的 per-field 键，如 D6-1-adj-block1-{rowKey}-currentUnadjusted，rowKey 可含连字符）"
+    },
+    "row_field_schema_doc": "见同目录 README.md（D6-2-rows / D2-detail-rows 的行级字段 schema）",
+    "verified_from": [
+      "audit-platform/frontend/src/components/workpaper/composables/useD6Adjudication.ts",
+      "audit-platform/frontend/src/components/workpaper/composables/useD6Detail.ts",
+      "audit-platform/frontend/src/components/workpaper/composables/useD2Adjudication.ts",
+      "audit-platform/frontend/src/components/workpaper/composables/useD2Detail.ts",
+      "audit-platform/frontend/src/components/workpaper/composables/useD1Adjudication.ts",
+      "audit-platform/frontend/src/components/workpaper/composables/useD1DetailCategory.ts",
+      "audit-platform/frontend/src/components/workpaper/composables/useD1DetailCustomer.ts",
+      "audit-platform/frontend/src/components/workpaper/composables/useD3Adjudication.ts",
+      "audit-platform/frontend/src/components/workpaper/composables/useD3Detail.ts",
+      "audit-platform/frontend/src/components/workpaper/composables/useD4Adjudication.ts",
+      "audit-platform/frontend/src/components/workpaper/composables/useD4RevenueDetail.ts",
+      "audit-platform/frontend/src/components/workpaper/composables/useD4OtherRevenue.ts",
+      "audit-platform/frontend/src/components/workpaper/composables/useD5Adjudication.ts",
+      "audit-platform/frontend/src/components/workpaper/composables/useD5Detail.ts",
+      "audit-platform/frontend/src/components/workpaper/composables/useD7Adjudication.ts",
+      "audit-platform/frontend/src/components/workpaper/composables/useD7Detail.ts"
+    ],
+    "coverage_note": "本登记表覆盖 D6/D2（Wave 0/4）+ D1/D3（Wave 4 / Task 5.2）+ D4/D5/D7（Wave 5 / Task 6，审定表 + 明细表锚点，从各自 composable 反查）。各循环其它 sheet（坏账 D2-3 / ECL D2-9 / 减值 D6-3 等）在后续 Wave 从各自 composable 反查后追加。禁止臆造。"
+  },
+  "_seed_fields": {
+    "spec": ".kiro/specs/d-cycle-tier-a-writeback-detail-seed/",
+    "task": "1.3 前置核实（块 B/C-1 / 决策2 写对字段） (Wave 0)",
+    "description": "各 Tier A TB核对行锚点，render transient seed 应写入的 responses_snapshot 字段（remark vs conclusion）——从前端 composable 实际读取路径逐锚点反查（决策2 / R3.7）。render seed 必须写入该字段，否则前端读不到 = 假 seed（memory 有 L1 因存 conclusion 但读 remark 导致 round-trip 断裂先例）。",
+    "verification_finding": "全部 Tier A TB核对行锚点前端一致读取 `remark` 字段——D6/D3/D5/D7 经 `allResponses.get(itemId)?.remark`（含 useD6Adjudication/useD7Adjudication 的 getNumFromResponse 读 .remark）、D1/D2 经 getVal(itemId).remark、D4 经 allResponses.get(itemId)?.remark。且 useD2FormData.loadAll seed D2-adj-tb-amount 时即写 {conclusion:null, remark: String(tbAmount)}，佐证 remark 是权威读取字段。故本增量所有 Tier A transient seed 一律写入 remark 字段。",
+    "verified_from": [
+      "useD6Adjudication.ts:getNumFromResponse → map.get('D6-1-tb-amount')?.remark",
+      "useD2Adjudication.ts → getVal('D2-adj-tb-amount').remark",
+      "useD1Adjudication.ts → getVal('D1-adj-tb-amount').remark",
+      "useD3Adjudication.ts → allResponses.get('D3-adj-trial-balance-amount')?.remark",
+      "useD4Adjudication.ts → allResponses.get('D4-1-adj-tb-6001'/'D4-1-adj-tb-6051')?.remark",
+      "useD5Adjudication.ts → allResponses.get('D5-1-tb-amount')?.remark",
+      "useD7Adjudication.ts:resolveTbCurrentAudited → allResponses.get('D7-1-adj-aging-trial-balance-currentAudited')?.remark"
+    ],
+    "map": {
+      "D6": { "D6-1-tb-amount": "remark" },
+      "D2": { "D2-adj-tb-amount": "remark" },
+      "D1": { "D1-adj-tb-amount": "remark" },
+      "D3": { "D3-adj-trial-balance-amount": "remark" },
+      "D4": { "D4-1-adj-tb-6001": "remark", "D4-1-adj-tb-6051": "remark" },
+      "D5": { "D5-1-tb-amount": "remark" },
+      "D7": { "D7-1-adj-aging-trial-balance-currentAudited": "remark", "D7-1-adj-aging-trial-balance-priorAudited": "remark" }
+    }
+  },
+  "_detail_aggregation": {
+    "spec": ".kiro/specs/d-cycle-tier-a-writeback-detail-seed/",
+    "task": "1.3 前置核实（块 C-2 / 决策4 D6-2 aux 归集形态） (Wave 0)",
+    "description": "P0-2 明细表维度归集 render 自动 seed 试点（D6-2）的既有归集形态核实结论（R4.3/R4.4）。",
+    "finding": "D6-2 明细表 tb_aux_balance 1402 客户/合同维度归集原本【仅内联于 HTTP handler】_d6_import_export.py::d6_import_aux_balance（原始 SQL GROUP BY aux_name + 行构建循环），无可复用后端函数。按 R4.4 / 决策4（B）已【抽取为纯函数 + 可复用入口】（不改原端点行为，端点改为委托）。",
+    "reusable_entry": "app.services.d_cycle_extraction.detail_aggregation.aggregate_d6_detail_rows(db, project_id, row_limit=500) → list[D6-2 行 dict]（供 Wave 5 Task 5.1 render seed 按名调用）",
+    "pure_function": "app.services.d_cycle_extraction.detail_aggregation.build_d6_detail_rows_from_aux(aux_entries, row_limit=500, row_id_factory=None) → list[dict]（无 I/O，可单测；单测见 tests/d_cycle_extraction/test_d6_detail_aggregation.py）",
+    "endpoint_behavior": "原 /api/workpapers/{wp_id}/d6/import-aux-balance 逐字节不变（查询口径、行 schema、merge/persist、返回结构），仅内部委托 aggregate_d6_detail_rows。",
+    "store_key": "D6-2-rows（remark 字段，JSON 数组）"
+  },
+  "D6": [
+    "D6-1-tb-amount",
+    "D6-1-note-explanation",
+    "D6-1-note-impairmentEval",
+    "D6-1-note-longTermReason",
+    "D6-1-note-conclusion",
+    "D6-1-adj-block1-rowKeys",
+    "D6-1-adj-block2-rowKeys",
+    "re:^D6-1-adj-block1-.+-(priorUnadjusted|priorAje|priorRje|currentUnadjusted|currentAje|currentRje|reasonAnalysis)$",
+    "re:^D6-1-adj-block2-.+-(priorUnadjusted|priorAje|priorRje|currentUnadjusted|currentAje|currentRje|reasonAnalysis)$",
+    "D6-2-rows"
+  ],
+  "D2": [
+    "D2-adj-tb-amount",
+    "D2-adj-total-aje",
+    "D2-adj-total-rje",
+    "D2-adj-confirm-summary",
+    "re:^D2-adj-(individual|aging|customer-type)-(prior-unadjusted|prior-aje|prior-rje|current-unadjusted|current-aje|current-rje|reason)$",
+    "D2-detail-rows"
+  ],
+  "D1": [
+    "D1-adj-tb-amount",
+    "D1-adj-note",
+    "D1-adj-conclusion",
+    "re:^D1-adj-(gross|bd)-(bank|commercial)-(prior-unadj|prior-aje|prior-rje|current-unadj|current-aje|current-rje|reason)$",
+    "D1-cat-rows",
+    "D1-cust-rows",
+    "D1-bd-individual-rows",
+    "D1-bd-portfolio-rows"
+  ],
+  "D3": [
+    "D3-adj-trial-balance-amount",
+    "D3-adj-note-aging-reason",
+    "D3-adj-note-change-analysis",
+    "D3-adj-note-conclusion",
+    "re:^D3-adj-(nature|aging)-.+-(priorUnadjusted|priorAje|priorRje|currentUnadjusted|currentAje|currentRje|reasonAnalysis)$",
+    "D3-det-rows"
+  ],
+  "D4": [
+    "D4-1-adj-rows",
+    "D4-1-adj-tb-6001",
+    "D4-1-adj-tb-6051",
+    "D4-1-adj-note",
+    "D4-1-adj-conclusion",
+    "D4-2-rows",
+    "D4-3-rows"
+  ],
+  "D5": [
+    "D5-1-tb-amount",
+    "D5-1-note-explanation",
+    "D5-1-note-conclusion",
+    "re:^D5-1-adj-(notes-receivable|accounts-receivable)-(priorUnadjusted|priorAje|priorRje|currentUnadjusted|currentAje|currentRje)$",
+    "D5-2-rows"
+  ],
+  "D7": [
+    "D7-1-adj-aging-trial-balance-currentAudited",
+    "D7-1-adj-aging-trial-balance-priorAudited",
+    "D7-1-note-explanation",
+    "D7-1-note-conclusion",
+    "D7-1-note-aging-explanation",
+    "re:^D7-1-adj-(nature|aging)-.+-(priorUnadjusted|priorAje|priorRje|currentUnadjusted|currentAje|currentRje|reasonAnalysis)$",
+    "D7-2-rows"
+  ]
+}

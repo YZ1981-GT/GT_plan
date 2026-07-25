@@ -1,155 +1,118 @@
 <template>
   <div class="m3-tab-index">
-    <!-- ═══ 项目信息区 ═══ -->
-    <el-card shadow="never" class="m3-project-info">
-      <div class="info-grid">
-        <div class="info-item">
-          <span class="info-label">被审计单位</span>
-          <span class="info-value">{{ projectInfo.clientName || '—' }}</span>
+    <!-- 编制信息由页面级头部统一渲染，此处不重复 -->
+
+    <!-- ═══ 目录卡（标题 + 复核 + 编制/使用手册 + 进度条 → 跨表结论口径 → 编制提示） ═══ -->
+    <div class="m3-dir">
+      <div class="index-header">
+        <h3 class="title">M3 底稿目录</h3>
+        <GtReviewTrigger section-id="M3-index-directory" />
+        <div class="handbook-btns">
+          <el-button size="small" type="primary" plain @click="openHandbook('preparation')">📖 编制手册</el-button>
+          <el-button size="small" @click="openHandbook('usage')">使用手册</el-button>
         </div>
-        <div class="info-item">
-          <span class="info-label">截止日</span>
-          <span class="info-value">{{ projectInfo.cutoffDate || '—' }}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">编制人</span>
-          <span class="info-value">{{ projectInfo.preparer || '—' }}</span>
-        </div>
-        <div class="info-item">
-          <span class="info-label">编制日期</span>
-          <span class="info-value">{{ projectInfo.prepareDate || '—' }}</span>
+        <div class="progress-wrap">
+          <span>编制进度 {{ completedCount }}/{{ totalCount }}</span>
+          <el-progress :percentage="progressPercent" :stroke-width="10" />
         </div>
       </div>
-    </el-card>
 
-    <!-- ═══ 权益备抵借方醒目标注 ═══ -->
-    <div class="m3-contra-badge">
-      <el-icon><WarningFilled /></el-icon>
-      <span>库存股为权益备抵，借方余额（期末 = 期初 + 借方 − 贷方，与其他权益类方向相反）</span>
+      <M3PreparationHandbookDialog v-model="handbookVisible" :initial-tab="handbookTab" />
+
+      <div class="conclusion-board" data-testid="m3-conclusion-board">
+        <div class="board-head">
+          <strong>跨表结论口径</strong>
+          <el-tag size="small" :type="conclusionWorstType">{{ conclusionWorstLabel }}</el-tag>
+          <span class="board-meta">已填 {{ conclusionFilledCount }}/{{ conclusionSheets.length }}</span>
+        </div>
+        <div class="board-tags">
+          <el-tag
+            v-for="c in conclusionSheets"
+            :key="c.code"
+            size="small"
+            class="concl-tag clickable"
+            :type="c.filled ? 'success' : 'info'"
+            effect="plain"
+            @click="emit('navigate', c.sheetKey)"
+          >
+            {{ c.code }} {{ c.filled ? '已填' : '未填' }}
+          </el-tag>
+        </div>
+        <p v-if="conclusionHasUnfilled" class="board-hint">存在未填审计结论，请点击标签跳转补全审计说明与结论。</p>
+      </div>
+
+      <details class="methodology-hint">
+        <summary>编制提示</summary>
+        <ul>
+          <li>库存股为<strong>权益备抵借方科目</strong>（4002）：期末 = 期初 + 借方（回购）− 贷方（注销/再售），<strong>方向与其他 M 权益类相反</strong></li>
+          <li>明细表 M3-2 按回购批次列示成本与数量，与审定表 M3-1 合计交叉核对</li>
+          <li>M3-4 外币投资汇率测算：外币回购按汇率折算本位币</li>
+          <li>M3-5 检查：回购决议、注销/再售冲减处理（冲减 M2 实收资本、M4 资本公积）</li>
+          <li>库存股主要为上市公司业务，仅提供上市公司附注；审定合计回写 TB(4002)；各表填妥"审计说明或结论"后目录标签转为"已填"</li>
+        </ul>
+      </details>
     </div>
 
-    <!-- ═══ 蓝色渐变操作引导区 ═══ -->
-    <div class="m3-guide">
-      <div class="m3-guide-header">
-        <el-icon><InfoFilled /></el-icon>
-        <span>操作步骤引导</span>
+    <!-- ═══ 底稿架构（4 阶段泳道） ═══ -->
+    <div class="m3-arch">
+      <div class="arch-header">
+        <h4 class="arch-title">底稿架构</h4>
+        <span class="arch-hint">点击卡片可跳转至对应底稿</span>
       </div>
-      <div class="m3-guide-steps">
-        <div class="step-item">
-          <span class="step-num">①</span>
-          <span class="step-text">填写审定表（M3-1）确认库存股科目余额（借方/权益备抵类！）</span>
-        </div>
-        <div class="step-item">
-          <span class="step-num">②</span>
-          <span class="step-text">录入明细（M3-2）按回购批次列示库存股增减变动</span>
-        </div>
-        <div class="step-item">
-          <span class="step-num">③</span>
-          <span class="step-text">外币回购折算（M3-4）+ 回购/注销核对检查表（M3-5）</span>
-        </div>
-        <div class="step-item">
-          <span class="step-num">④</span>
-          <span class="step-text">完成调整分录（M3-3）+ 附注披露（上市公司）</span>
+      <GtBArchitectureTree
+        :wp-id="wpId"
+        :project-id="projectId"
+        :active-sheet="''"
+        :html-data="archHtmlData"
+        @navigate="handleNavigate"
+      />
+    </div>
+
+    <!-- ═══ 本循环底稿目录（M 循环其他科目，可跳转） ═══ -->
+    <div v-if="cycleWorkpapers.length" class="m3-cycle">
+      <div class="cycle-header">
+        <h4 class="cycle-title">本循环底稿目录</h4>
+        <span class="cycle-hint">点击可跳转至同循环其他底稿（灰色表示尚未生成）</span>
+      </div>
+      <div class="cycle-grid">
+        <div
+          v-for="wp in cycleWorkpapers"
+          :key="wp.wp_code"
+          class="cycle-card"
+          :class="{ 'is-current': wp.is_current, 'is-disabled': !wp.wp_id }"
+          @click="onCycleCardClick(wp)"
+        >
+          <div class="cycle-card-top">
+            <span class="cycle-code">{{ wp.wp_code }}</span>
+            <el-tag v-if="wp.is_current" size="small" effect="plain" class="cycle-current-tag">当前</el-tag>
+          </div>
+          <span class="cycle-name" :title="wp.wp_name">{{ wp.wp_name }}</span>
         </div>
       </div>
     </div>
-
-    <!-- ═══ 总体进度 ═══ -->
-    <div class="m3-progress-section">
-      <div class="progress-info">
-        <span>编制进度</span>
-        <span class="progress-text">{{ completedCount }} / {{ totalCount }} ({{ progressPercent }}%)</span>
-      </div>
-      <el-progress :percentage="progressPercent" :stroke-width="8" :show-text="false" />
-    </div>
-
-    <!-- ═══ 底稿目录表格 ═══ -->
-    <el-card shadow="never" class="m3-index-card">
-      <template #header>
-        <span class="card-title">致同会计师事务所 / 库存股底稿</span>
-      </template>
-      <el-table
-        :data="sheetRows"
-        border
-        size="small"
-        highlight-current-row
-        style="width: 100%"
-        :row-class-name="getRowClassName"
-        @row-click="handleRowClick"
-      >
-        <el-table-column prop="seq" label="序号" width="60" align="center" />
-        <el-table-column prop="name" label="内容" min-width="260">
-          <template #default="{ row }">
-            <span class="sheet-name-link">{{ row.name }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="indexCode" label="索引号" width="80" align="center" />
-        <el-table-column prop="remark" label="备注" min-width="120">
-          <template #default="{ row }">
-            <span class="remark-text">{{ row.remark || '' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="进度" width="140" align="center">
-          <template #default="{ row }">
-            <el-progress
-              :percentage="row.progress"
-              :stroke-width="6"
-              :show-text="false"
-              :color="getProgressColor(row.progress)"
-              style="width: 80px; display: inline-block"
-            />
-            <span class="progress-label">{{ row.progress }}%</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="80" align="center">
-          <template #default="{ row }">
-            <el-button
-              type="primary"
-              link
-              size="small"
-              @click.stop="handleNavigate(row)"
-            >
-              进入
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
-
-    <!-- ═══ 编制提示（折叠） ═══ -->
-    <details class="m3-details-tip">
-      <summary>编制提示</summary>
-      <ul>
-        <li>库存股（4002）为<strong>权益备抵类借方科目</strong>：期末 = 期初 + 借方（回购）− 贷方（注销/再售）</li>
-        <li>与 M2/M4/M5/M6 等权益类方向<strong>完全相反</strong>——回购在借方增加库存股，注销/再售在贷方减少库存股</li>
-        <li>M3-2 明细表按回购批次列示，每批次记录：回购日期/股数/单价/金额 + 注销股数/期末余额</li>
-        <li>M3-4 外币回购折算：境外回购以外币计价，按回购日汇率折算本位币</li>
-        <li>M3-5 回购/注销核对：回购金额 = 股数 × 单价；注销冲减 = 实收资本(M2) + 资本公积(M4)</li>
-        <li>注销冲减差额 ≠ 0 时需冲减盈余公积 / 未分配利润</li>
-        <li>明细表合计需与审定表交叉验证</li>
-        <li>调整分录需保持借贷平衡，通过 EventBus 同步更新审定表</li>
-      </ul>
-    </details>
   </div>
 </template>
 
 <script setup lang="ts">
 /**
- * M3TabIndex — M3 库存股底稿目录
+ * M3TabIndex.vue — M3 库存股底稿目录（严格镜像 N5 标准）
  *
- * 8 行 sheet 目录列表（序号 | 内容 | 索引号 | 备注）+ 进度条。
- * 点击行 emit navigate 事件（由 GtM3TreasuryStock 监听切换 sheetName）。
- * 引导区 4 步：审定表 → 明细(按回购批次) → 外币回购/检查表 → 调整+附注。
- * 醒目标注"库存股为权益备抵，借方余额"。
+ * 结构：目录卡（标题+复核+编制/使用手册+进度→跨表结论口径→编制提示）
+ *       + 底稿架构 4 阶段泳道（GtBArchitectureTree）+ 本循环底稿目录 grid。
+ * 编制信息由页面级头部渲染，此处不重复。自包含：自行拉取 checklist-responses。
  *
- * Requirements: 1.2
+ * 权益备抵借方科目（4002 库存股）— 期末=期初+借方−贷方（方向与其他 M 权益类相反）。仅上市公司附注。
  */
-import { computed, onMounted, ref } from 'vue'
-import { InfoFilled, WarningFilled } from '@element-plus/icons-vue'
-import { useM3FormData } from '../../composables/useM3FormData'
+import { computed, ref, onMounted, defineAsyncComponent } from 'vue'
+import { useRouter } from 'vue-router'
+import http from '@/utils/http'
+import { loadCycleWorkpaperCards, type CycleWpCard } from '@/services/cycleDirectory'
+import GtReviewTrigger from '../../GtReviewTrigger.vue'
+import GtBArchitectureTree from '../../GtBArchitectureTree.vue'
+
+const M3PreparationHandbookDialog = defineAsyncComponent(() => import('../M3PreparationHandbookDialog.vue'))
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
-
 const props = defineProps<{
   wpId: string
   projectId: string
@@ -160,380 +123,207 @@ const emit = defineEmits<{
   (e: 'navigate', sheetName: string): void
 }>()
 
-// ─── FormData (for progress calculation) ─────────────────────────────────────
+const router = useRouter()
 
-const formData = useM3FormData({
-  wpId: computed(() => props.wpId),
-  projectId: computed(() => props.projectId),
+// ─── 编制/使用手册弹窗 ─────────────────────────────────────────────────────────
+const handbookVisible = ref(false)
+const handbookTab = ref<'preparation' | 'usage'>('preparation')
+function openHandbook(tab: 'preparation' | 'usage') {
+  handbookTab.value = tab
+  handbookVisible.value = true
+}
+
+// ─── 自包含：拉取本底稿 checklist-responses（主入口不持有 allResponses） ─────────
+const responses = ref<Map<string, any>>(new Map())
+onMounted(async () => {
+  if (!props.wpId) return
+  try {
+    const res: any = await http.get(`/api/workpapers/${props.wpId}/checklist-responses`)
+    const list = res?.data?.items ?? res?.items ?? res?.data ?? res
+    const map = new Map<string, any>()
+    if (Array.isArray(list)) {
+      for (const it of list) {
+        if (it?.item_id) map.set(it.item_id, it)
+      }
+    }
+    responses.value = map
+  } catch {
+    /* silent：拉取失败则看板全显未填 */
+  }
 })
 
-const dataLoaded = ref(false)
-// ─── Sheet 目录行定义 ────────────────────────────────────────────────────────
-
+// ─── Sheet 行定义 ─────────────────────────────────────────────────────────────
 interface SheetRow {
-  seq: number
   name: string
-  indexCode: string
-  remark: string
-  /** sheetName（传给父组件用于 v-if 分发） */
+  code: string
   sheetKey: string
   progress: number
 }
 
-/**
- * 8 行 sheet 目录（对应源模板 M3 底稿目录）。
- * 进度根据 allResponses 中对应 item_id 前缀的数据有无计算。
- */
-const sheetRows = computed<SheetRow[]>(() => [
-  {
-    seq: 1,
-    name: '库存股实质性程序表',
-    indexCode: 'M3A',
-    remark: '程序表（复用）',
-    sheetKey: '库存股实质性程序表 M3A',
-    progress: _calcSheetProgress('M3A'),
-  },
-  {
-    seq: 2,
-    name: '审定表',
-    indexCode: 'M3-1',
-    remark: '权益备抵借方',
-    sheetKey: '审定表M3-1',
-    progress: _calcSheetProgress('M3-1'),
-  },
-  {
-    seq: 3,
-    name: '附注披露信息（上市公司）',
-    indexCode: 'M3-1',
-    remark: '',
-    sheetKey: '附注披露信息（上市公司）',
-    progress: _calcSheetProgress('disclosure-listed'),
-  },
-  {
-    seq: 4,
-    name: '明细表',
-    indexCode: 'M3-2',
-    remark: '按回购批次列示',
-    sheetKey: '明细表M3-2',
-    progress: _calcSheetProgress('M3-2'),
-  },
-  {
-    seq: 5,
-    name: '调整分录汇总',
-    indexCode: 'M3-3',
-    remark: '借贷平衡',
-    sheetKey: '调整分录汇总M3-3',
-    progress: _calcSheetProgress('M3-3'),
-  },
-  {
-    seq: 6,
-    name: '外币投资汇率测算表',
-    indexCode: 'M3-4',
-    remark: '外币回购折算',
-    sheetKey: '外币投资汇率测算表M3-4',
-    progress: _calcSheetProgress('M3-4'),
-  },
-  {
-    seq: 7,
-    name: '库存股检查表',
-    indexCode: 'M3-5',
-    remark: '回购/注销核对',
-    sheetKey: '库存股检查表M3-5',
-    progress: _calcSheetProgress('M3-5'),
-  },
-])
-
-/**
- * 根据 allResponses 中对应 sheet 前缀的 item 数量判断进度。
- * 简单策略：有数据item≥1=50%；有审计说明/结论=100%；无=0%
- */
-function _calcSheetProgress(sheetKey: string): number {
-  if (!dataLoaded.value) return 0
-  const responses = formData.allResponses.value
-  let hasData = false
-  let hasConclusion = false
-  const prefix = `M3-${sheetKey}`
-
-  for (const [key, resp] of responses) {
-    if (key.startsWith(prefix) || key.startsWith(`M3-M3-${sheetKey.replace('M3-', '')}`)) {
-      if (resp.remark || resp.conclusion) {
-        hasData = true
-        if (key.includes('conclusion') || key.includes('Conclusion') || key.includes('auditNote')) {
-          hasConclusion = true
-        }
-      }
-    }
+/** 按 responses 中以指定前缀存储的字段数计算完成度。 */
+function calcSheetProgress(prefix: string, expectedFields: number): number {
+  const map = responses.value
+  if (!map || map.size === 0) return 0
+  let count = 0
+  for (const key of map.keys()) {
+    if (key.startsWith(prefix)) count++
   }
-
-  // 特殊: M3-2 full-data
-  if (sheetKey === 'M3-2') {
-    const fullData = responses.get('M3-M3-2-full-data')
-    if (fullData?.remark) hasData = true
-  }
-
-  if (hasConclusion) return 100
-  if (hasData) return 50
-  return 0
+  if (count === 0) return 0
+  if (count >= expectedFields) return 100
+  return Math.min(Math.round((count / expectedFields) * 100), 99)
 }
 
+const allSheets = computed<SheetRow[]>(() => [
+  { name: '库存股实质性程序表', code: 'M3A', sheetKey: ' 库存股实质性程序表 M3A', progress: calcSheetProgress('M3-M3A-', 5) },
+  { name: '审定表', code: 'M3-1', sheetKey: '审定表M3-1', progress: calcSheetProgress('M3-1-', 6) },
+  { name: '明细表', code: 'M3-2', sheetKey: '明细表M3-2', progress: calcSheetProgress('M3-2-', 4) },
+  { name: '调整分录汇总', code: 'M3-3', sheetKey: '调整分录汇总M3-3', progress: calcSheetProgress('M3-3-', 4) },
+  { name: '外币投资汇率测算表', code: 'M3-4', sheetKey: '外币投资汇率测算表M3-4', progress: calcSheetProgress('M3-4-', 4) },
+  { name: '库存股检查表', code: 'M3-5', sheetKey: '库存股检查表M3-5', progress: calcSheetProgress('M3-5-', 4) },
+  { name: '附注披露信息（上市公司）', code: '附注上市', sheetKey: '附注披露信息（上市公司）', progress: calcSheetProgress('M3-disclosure-listed-', 3) },
+])
+
 // ─── 进度计算 ─────────────────────────────────────────────────────────────────
-
-const totalCount = computed(() => sheetRows.value.length)
-
-const completedCount = computed(() =>
-  sheetRows.value.filter(r => r.progress >= 100).length,
-)
-
+const totalCount = computed(() => allSheets.value.length)
+const completedCount = computed(() => allSheets.value.filter(r => r.progress >= 100).length)
 const progressPercent = computed(() => {
   if (totalCount.value === 0) return 0
-  const avgProgress = sheetRows.value.reduce((sum, r) => sum + r.progress, 0) / totalCount.value
-  return Math.round(avgProgress)
+  const avg = allSheets.value.reduce((sum, r) => sum + r.progress, 0) / totalCount.value
+  return Math.round(avg)
 })
 
-// ─── 项目信息（从 allResponses 或 render-config htmlData 读取） ──────────
+// ─── 底稿架构泳道（GtBArchitectureTree 数据源） ───────────────────────────────
+const COMPONENT_TYPE_MAP: Record<string, string> = {
+  M3A: 'a-program-console',
+  '附注上市': 'c-note-table',
+}
+function sheetStatus(progress: number): string {
+  if (progress >= 100) return 'completed'
+  if (progress > 0) return 'in_progress'
+  return 'pending'
+}
+const archHtmlData = computed(() => ({
+  navigation_rows: allSheets.value.map((s, i) => ({
+    seq: i + 1,
+    content: s.sheetKey,
+    sheet_name: s.sheetKey,
+    index_ref: s.code,
+    component_type: COMPONENT_TYPE_MAP[s.code] ?? 'd-form-table',
+    status: sheetStatus(s.progress),
+  })),
+}))
 
-const projectInfo = computed(() => {
-  // 尝试从已知的 render-config 种子数据获取
-  const clientResp = formData.allResponses.value.get('M3-project-client-name')
-  const yearResp = formData.allResponses.value.get('M3-project-audit-year')
-  return {
-    clientName: clientResp?.remark || '',
-    cutoffDate: yearResp?.remark ? `${yearResp.remark}-12-31` : '',
-    preparer: '',
-    prepareDate: '',
+// ─── 跨表结论口径看板 ─────────────────────────────────────────────────────────
+/** 有审计结论/说明的 sheet（程序表、调整分录、附注不计入；审定/明细/测算/检查计入） */
+const M3_CONCLUSION_CODES = new Set(['M3-1', 'M3-2', 'M3-4', 'M3-5'])
+
+function isConclusionFilled(code: string): boolean {
+  const map = responses.value
+  if (!map?.size) return false
+  const token = `${code}-`
+  const longer = Array.from(M3_CONCLUSION_CODES).filter(c => c !== code && c.startsWith(token))
+  for (const [key, val] of map.entries()) {
+    if (!key.includes(token)) continue
+    if (longer.some(lc => key.includes(`${lc}-`))) continue
+    if (!/conclusion|audit-note|note/i.test(key)) continue
+    const text = (val?.remark ?? val?.conclusion ?? '') as string
+    if (typeof text === 'string' && text.trim().length > 0) return true
   }
+  return false
+}
+
+const conclusionSheets = computed(() =>
+  allSheets.value
+    .filter(s => M3_CONCLUSION_CODES.has(s.code))
+    .map(s => ({ code: s.code, sheetKey: s.sheetKey, filled: isConclusionFilled(s.code) })),
+)
+const conclusionFilledCount = computed(() => conclusionSheets.value.filter(c => c.filled).length)
+const conclusionHasUnfilled = computed(() => conclusionSheets.value.some(c => !c.filled))
+const conclusionWorstLabel = computed(() => {
+  if (conclusionFilledCount.value === 0) return '结论未填'
+  if (conclusionHasUnfilled.value) return `结论未齐 ${conclusionSheets.value.length - conclusionFilledCount.value} 项`
+  return '总体已齐'
+})
+const conclusionWorstType = computed<'success' | 'warning' | 'info'>(() => {
+  if (conclusionFilledCount.value === 0) return 'info'
+  if (conclusionHasUnfilled.value) return 'warning'
+  return 'success'
 })
 
 // ─── 交互 ────────────────────────────────────────────────────────────────────
-
-function handleRowClick(row: SheetRow) {
-  if (props.isReadonly && row.progress === 0) return
-  emit('navigate', row.sheetKey)
+function handleNavigate(sheetName: string) {
+  if (sheetName) emit('navigate', sheetName)
 }
 
-function handleNavigate(row: SheetRow) {
-  emit('navigate', row.sheetKey)
+// ─── 本循环底稿目录（M 循环其他科目，跨底稿跳转；canonical 源模板过滤污染） ───
+const cycleWorkpapers = ref<CycleWpCard[]>([])
+async function loadCycleWorkpapers(): Promise<void> {
+  cycleWorkpapers.value = await loadCycleWorkpaperCards(props.projectId, 'M', props.wpId)
 }
-
-function getRowClassName({ row }: { row: SheetRow }): string {
-  return row.progress >= 100 ? 'completed-row' : ''
+function onCycleCardClick(wp: CycleWpCard): void {
+  if (!wp.wp_id || wp.is_current || !props.projectId) return
+  router.push({ name: 'WorkpaperEditor', params: { projectId: props.projectId, wpId: wp.wp_id } })
 }
-
-function getProgressColor(percent: number): string {
-  if (percent >= 100) return '#67c23a'
-  if (percent >= 50) return '#409eff'
-  return '#e6e8eb'
-}
-
-// ─── Lifecycle ───────────────────────────────────────────────────────────────
-
-onMounted(async () => {
-  await formData.loadData()
-  dataLoaded.value = true
-})
+onMounted(loadCycleWorkpapers)
 </script>
 
 <style scoped>
 .m3-tab-index {
-  padding: 12px;
+  padding: 16px;
   font-size: var(--wp-font-size, 13px);
 }
 
-/* ─── 项目信息区 ─── */
-.m3-project-info {
-  margin-bottom: 16px;
-}
-
-.info-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px 32px;
-}
-
-.info-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.info-label {
-  font-size: var(--wp-font-size, 13px);
-  color: #909399;
-  white-space: nowrap;
-}
-
-.info-value {
-  font-size: var(--wp-font-size, 13px);
-  font-weight: 500;
-  color: #303133;
-}
-
-/* ─── 权益备抵借方醒目标注 ─── */
-.m3-contra-badge {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  margin-bottom: 16px;
-  background: linear-gradient(135deg, #fef3cd 0%, #fdeeba 100%);
-  border: 1px solid #f5c542;
-  border-left: 4px solid #e6a817;
-  border-radius: 6px;
-  font-size: var(--wp-font-size, 13px);
-  font-weight: 500;
-  color: #856404;
-}
-
-.m3-contra-badge .el-icon {
-  font-size: 16px;
-  color: #e6a817;
-  flex-shrink: 0;
-}
-
-/* ─── 蓝色渐变引导区 ─── */
-.m3-guide {
-  background: linear-gradient(135deg, #e8f4fd 0%, #d6eaf8 100%);
-  border: 1px solid #b3d9f2;
-  border-radius: 8px;
-  padding: 14px 20px;
-  margin-bottom: 16px;
-}
-
-.m3-guide-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-weight: 500;
-  color: #1a73e8;
-  margin-bottom: 10px;
-  font-size: var(--wp-font-size, 13px);
-}
-
-.m3-guide-steps {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px 24px;
-}
-
-.step-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: var(--wp-font-size, 13px);
-  color: #374151;
-}
-
-.step-num {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: #1a73e8;
-  color: #fff;
-  font-size: 11px;
-  font-weight: 600;
-  flex-shrink: 0;
-}
-
-.step-text {
-  font-size: var(--wp-font-size, 13px);
-}
-
-/* ─── 进度条区 ─── */
-.m3-progress-section {
-  margin-bottom: 16px;
-  padding: 12px 16px;
+/* ─── 目录卡 ─── */
+.m3-dir { margin-bottom: 20px; }
+.index-header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
+.title { margin: 0; font-size: 16px; font-weight: 600; color: #303133; }
+.handbook-btns { display: flex; gap: 6px; }
+.progress-wrap { flex: 1; min-width: 200px; }
+.conclusion-board {
+  margin-bottom: 12px;
+  padding: 10px 12px;
   background: #f5f7fa;
   border-radius: 6px;
+  border-left: 3px solid #409eff;
 }
+.board-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.board-meta { font-size: 12px; color: #909399; }
+.board-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.concl-tag.clickable { cursor: pointer; }
+.board-hint { margin: 8px 0 0; font-size: 12px; color: #e6a23c; }
+.methodology-hint { margin-top: 12px; font-size: 12px; color: #606266; }
+.methodology-hint summary { cursor: pointer; font-weight: 500; color: #303133; }
+.methodology-hint ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
 
-.progress-info {
+/* ─── 底稿架构 ─── */
+.m3-arch { margin-top: 16px; }
+.arch-header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
+.arch-title { margin: 0; font-size: 16px; font-weight: 600; color: #303133; }
+.arch-hint { font-size: 12px; color: #909399; }
+
+/* ─── 本循环底稿目录 ─── */
+.m3-cycle { margin-top: 28px; }
+.cycle-header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
+.cycle-title { margin: 0; font-size: 16px; font-weight: 600; color: #303133; }
+.cycle-hint { font-size: 12px; color: #909399; }
+.cycle-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+.cycle-card {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-  font-size: var(--wp-font-size, 13px);
-  color: #606266;
-}
-
-.progress-text {
-  font-weight: 600;
-  color: #303133;
-}
-
-/* ─── 目录卡片 ─── */
-.m3-index-card {
-  margin-bottom: 16px;
-}
-
-.card-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #303133;
-}
-
-.sheet-name-link {
-  color: #1a73e8;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--gt-color-border-purple, #e8e4f0);
+  border-radius: 8px;
+  background: #fff;
   cursor: pointer;
-  font-size: var(--wp-font-size, 13px);
+  transition: all 0.2s;
 }
-
-.sheet-name-link:hover {
-  text-decoration: underline;
-}
-
-.remark-text {
-  font-size: 12px;
-  color: #909399;
-}
-
-.progress-label {
-  display: inline-block;
-  margin-left: 8px;
-  font-size: 12px;
-  color: #909399;
-  width: 32px;
-}
-
-:deep(.completed-row) {
-  background-color: #f0f9eb !important;
-}
-
-:deep(.el-table) {
-  font-size: var(--wp-font-size, 13px);
-}
-
-:deep(.el-table .el-table__row) {
-  cursor: pointer;
-}
-
-:deep(.el-table .el-table__row:hover) {
-  background-color: #ecf5ff !important;
-}
-
-/* ─── 编制提示折叠 ─── */
-.m3-details-tip {
-  margin-top: 12px;
-  padding: 12px 16px;
-  background: #fafafa;
-  border: 1px solid #ebeef5;
-  border-radius: 6px;
-  font-size: var(--wp-font-size, 13px);
-  color: #606266;
-}
-
-.m3-details-tip summary {
-  cursor: pointer;
-  font-weight: 500;
-  color: #303133;
-  margin-bottom: 8px;
-}
-
-.m3-details-tip ul {
-  padding-left: 20px;
-  margin: 8px 0 0;
-  line-height: 1.8;
-}
+.cycle-card:hover { border-color: var(--gt-color-primary, #4b2d77); box-shadow: 0 2px 8px rgba(75, 45, 119, 0.12); transform: translateY(-2px); }
+.cycle-card.is-current { border-color: var(--gt-color-primary, #4b2d77); background: var(--gt-color-primary-bg, #f4f0fa); box-shadow: 0 0 0 1px var(--gt-color-primary, #4b2d77); cursor: default; }
+.cycle-card.is-disabled { opacity: 0.5; cursor: not-allowed; }
+.cycle-card.is-disabled:hover { border-color: var(--gt-color-border-purple, #e8e4f0); box-shadow: none; transform: none; }
+.cycle-card-top { display: flex; align-items: center; gap: 6px; }
+.cycle-code { font-size: var(--wp-font-size, 13px); font-weight: 700; color: var(--gt-color-primary, #4b2d77); }
+.cycle-current-tag { margin-left: auto; }
+.cycle-name { font-size: var(--wp-font-size, 13px); line-height: 1.4; color: #303133; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 </style>

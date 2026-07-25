@@ -43,6 +43,58 @@ class BatchSubmitRequest(BaseModel):
     wp_ids: list[str]
 
 
+def _kanban_column_for(status: str) -> str:
+    """底稿状态 → 看板列 key（单一映射，供分组与按人聚合共用）。"""
+    if status in ("not_started",):
+        return "not_started"
+    if status in ("under_review", "review_level1", "review_level2"):
+        return "under_review"
+    if status in ("review_passed", "archived"):
+        return "completed"
+    # draft / edit_complete / 其余未知状态 → 编制中
+    return "in_progress"
+
+
+async def _resolve_user_names(db: AsyncSession, user_ids: set[str]) -> dict[str, str]:
+    """批量解析 user_id → 显示名（StaffMember.staff_name 优先，回退 User.username）。
+
+    fail-open：任一查询异常返回已解析部分，不阻断看板。
+    """
+    from app.models.staff_models import StaffMember
+
+    def _as_uuid(v):
+        try:
+            return UUID(str(v))
+        except Exception:
+            return None
+
+    ids = [g for g in (_as_uuid(u) for u in user_ids) if g]
+    name_map: dict[str, str] = {}
+    if not ids:
+        return name_map
+    # StaffMember.name 优先（人员库显示名）；两条查询各自 fail-open，互不影响
+    try:
+        sr = await db.execute(
+            sa.select(StaffMember.user_id, StaffMember.name).where(
+                StaffMember.user_id.in_(ids),
+                StaffMember.is_deleted == sa.false(),
+            )
+        )
+        for uid, sname in sr.all():
+            if uid and sname:
+                name_map[str(uid)] = sname
+    except Exception:  # noqa: BLE001 — 人员库解析失败不影响看板主体
+        pass
+    try:
+        ur = await db.execute(sa.select(User.id, User.username).where(User.id.in_(ids)))
+        for uid, uname in ur.all():
+            if uname:
+                name_map.setdefault(str(uid), uname)
+    except Exception:  # noqa: BLE001
+        pass
+    return name_map
+
+
 @router.get("/working-papers-kanban")
 async def get_workpapers_kanban(
     project_id: UUID,
@@ -50,11 +102,34 @@ async def get_workpapers_kanban(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
-    """底稿看板视图 — 按状态分组统计
+    """底稿看板视图 — 按状态分组 + 按人聚合（服务端强制可见性隔离）。
 
-    返回4列看板数据：待编制 / 编制中 / 待复核 / 已通过
-    每列包含底稿列表（编号/名称/负责人/天数）
+    - 可见性：复用 ``VisibilityRoleClassifier`` + ``VisibilityQueryService`` 的可见集
+      （admin/partner/manager 看全部；restricted 角色只看被委派/主编/复核的底稿），
+      与列表端点口径一致，避免看板越权可见（procedure-delegation-visibility-isolation）。
+    - 按状态：4 列 待编制 / 编制中 / 待复核 / 已通过，卡片含编制人/复核人姓名。
+    - 按人：``by_assignee`` 每位编制人各列数量 + 完成率 + 逾期占位，供负责人查看每人完成情况。
     """
+    from app.services.wp_visibility import VisibilityRoleClassifier
+    from app.services.wp_visibility.visibility_query import VisibilityQueryService
+
+    # ① 服务端角色分类 → 可见 wp_index 集合（与列表端点同源）
+    context = await VisibilityRoleClassifier(db).classify(current_user, project_id)
+    visible_ids = await VisibilityQueryService(db).visible_wp_index_ids(context)
+
+    kanban: dict[str, list] = {
+        "not_started": [],   # 待编制
+        "in_progress": [],   # 编制中
+        "under_review": [],  # 待复核
+        "completed": [],     # 已通过
+    }
+
+    if not visible_ids:
+        stats = {k: 0 for k in kanban}
+        stats["total"] = 0
+        stats["completion_rate"] = 0.0
+        return {"kanban": kanban, "stats": stats, "by_assignee": []}
+
     query = sa.select(WpIndex, WorkingPaper).outerjoin(
         WorkingPaper, sa.and_(
             WorkingPaper.wp_index_id == WpIndex.id,
@@ -63,6 +138,7 @@ async def get_workpapers_kanban(
     ).where(
         WpIndex.project_id == project_id,
         WpIndex.is_deleted == sa.false(),
+        WpIndex.id.in_(list(visible_ids)),
     )
     if audit_cycle:
         query = query.where(WpIndex.audit_cycle == audit_cycle)
@@ -71,42 +147,63 @@ async def get_workpapers_kanban(
     result = await db.execute(query)
     rows = result.all()
 
-    kanban = {
-        "not_started": [],   # 待编制
-        "in_progress": [],   # 编制中
-        "under_review": [],  # 待复核
-        "completed": [],     # 已通过
-    }
+    # 先收集所有 user_id 供批量人名解析（编制人 + 复核人）
+    user_ids: set[str] = set()
+    for _idx_row, wp in rows:
+        if wp and wp.assigned_to:
+            user_ids.add(str(wp.assigned_to))
+        if wp and getattr(wp, "reviewer", None):
+            user_ids.add(str(wp.reviewer))
+    name_map = await _resolve_user_names(db, user_ids)
+
+    # 按人聚合累加器：key=assignee user_id 或 None（未分配）
+    _EMPTY = lambda: {"not_started": 0, "in_progress": 0, "under_review": 0, "completed": 0}
+    by_assignee: dict[str | None, dict] = {}
 
     for idx_row, wp in rows:
         status = wp.status.value if wp and wp.status else "not_started"
+        col = _kanban_column_for(status)
+        assignee = str(wp.assigned_to) if wp and wp.assigned_to else None
+        reviewer = str(wp.reviewer) if wp and getattr(wp, "reviewer", None) else None
         item = {
             "wp_id": str(wp.id) if wp else None,
             "wp_code": idx_row.wp_code,
             "wp_name": idx_row.wp_name,
             "audit_cycle": idx_row.audit_cycle,
             "status": status,
-            "assigned_to": str(wp.assigned_to) if wp and wp.assigned_to else None,
-            "reviewer": str(wp.reviewer) if wp and hasattr(wp, 'reviewer') and wp.reviewer else None,
+            "assigned_to": assignee,
+            "assigned_to_name": name_map.get(assignee) if assignee else None,
+            "reviewer": reviewer,
+            "reviewer_name": name_map.get(reviewer) if reviewer else None,
         }
+        kanban[col].append(item)
 
-        if status in ("not_started",):
-            kanban["not_started"].append(item)
-        elif status in ("draft", "edit_complete"):
-            kanban["in_progress"].append(item)
-        elif status in ("under_review", "review_level1", "review_level2"):
-            kanban["under_review"].append(item)
-        elif status in ("review_passed", "archived"):
-            kanban["completed"].append(item)
-        else:
-            kanban["in_progress"].append(item)
+        bucket = by_assignee.setdefault(assignee, _EMPTY())
+        bucket[col] += 1
 
-    # 统计
+    # 统计（按状态）
     stats = {k: len(v) for k, v in kanban.items()}
     stats["total"] = sum(stats.values())
     stats["completion_rate"] = round(stats["completed"] / max(stats["total"], 1) * 100, 1)
 
-    return {"kanban": kanban, "stats": stats}
+    # 按人视图：每人各列数量 + 完成率（负责人查看每人完成情况）
+    assignee_rows = []
+    for uid, cnt in by_assignee.items():
+        total = cnt["not_started"] + cnt["in_progress"] + cnt["under_review"] + cnt["completed"]
+        assignee_rows.append({
+            "user_id": uid,
+            "name": (name_map.get(uid) if uid else None) or ("未分配" if uid is None else uid[:8]),
+            "not_started": cnt["not_started"],
+            "in_progress": cnt["in_progress"],
+            "under_review": cnt["under_review"],
+            "completed": cnt["completed"],
+            "total": total,
+            "completion_rate": round(cnt["completed"] / max(total, 1) * 100, 1),
+        })
+    # 已分配的人排前面（按完成率降序），未分配殿后
+    assignee_rows.sort(key=lambda r: (r["user_id"] is None, -r["completion_rate"], -r["total"]))
+
+    return {"kanban": kanban, "stats": stats, "by_assignee": assignee_rows}
 
 
 @router.post("/working-papers/batch-assign")

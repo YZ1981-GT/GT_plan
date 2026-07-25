@@ -25,6 +25,7 @@ import type { UseE1BaseOptions } from '../composables/useE1Adjudication'
 import GtIndexChip from '../GtIndexChip.vue'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { amountFormatter, amountParser } from '../composables/wpAmountInput'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -263,7 +264,7 @@ async function generateAuditConclusion(): Promise<void> {
           <el-table-column label="原币金额" width="130" align="right">
             <template #default="{ row }">
               <el-input-number :model-value="asAccrued(row).fcAmount" :disabled="isReadonly"
-                :controls="false" size="small"
+                :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small"
                 @change="(val: number) => updateCell(row.id, 'fcAmount', val ?? 0)" />
             </template>
           </el-table-column>

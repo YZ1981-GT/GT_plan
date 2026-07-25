@@ -32,7 +32,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { api } from '@/services/apiProxy'
 
 interface StepInfo {
@@ -58,6 +58,7 @@ const props = defineProps<{
 }>()
 
 const router = useRouter()
+const route = useRoute()
 
 const loaded = ref(false)
 const currentStep = ref(0)
@@ -112,7 +113,10 @@ async function fetchStatus() {
   }
 }
 
-const emit = defineEmits<{ (e: 'step-action', action: string): void }>()
+const emit = defineEmits<{
+  (e: 'step-action', action: string): void
+  (e: 'next-action', action: NextAction): void
+}>()
 
 function onStepClick(step: typeof steps[number]) {
   if (!props.projectId) return
@@ -125,9 +129,14 @@ function onStepClick(step: typeof steps[number]) {
 }
 
 function onNext() {
-  if (nextAction.value?.route) {
-    router.push(nextAction.value.route)
+  const action = nextAction.value
+  if (!action?.route) return
+  // 目标路由即当前页时，router.push 到同一路由无反应 → 交给宿主页面执行实际动作（如「生成报表」触发生成）
+  if (route.path === action.route) {
+    emit('next-action', action)
+    return
   }
+  router.push(action.route)
 }
 
 onMounted(() => {

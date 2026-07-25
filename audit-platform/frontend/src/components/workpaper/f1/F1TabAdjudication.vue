@@ -10,6 +10,7 @@
           <p>2. 浅蓝底纹单元格由 F1-2 明细表聚合取数，灰色底纹列为审定数（期初/期末审定）自动计算列。</p>
           <p>3. 账龄超过1年的预付账款须说明未结转原因并与 F1-5 长期检查勾稽一致。</p>
           <p>4. 审定合计应与试算平衡表核对一致，差异须查明并通过 F1-3 调整分录处理。</p>
+          <p>5. 「带入调整」：可从集中登记按科目 1123 拉取调整分录，逐笔分配到账龄行的期末账项/重分类调整，带入后审定数自动更新并联动附注。</p>
         </div>
       </details>
 
@@ -25,6 +26,9 @@
       <div class="tab-toolbar">
         <div class="toolbar-left"></div>
         <div class="toolbar-right">
+          <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
+            <el-icon><Download /></el-icon>带入调整
+          </el-button>
           <span class="chip-wrap"><GtIndexChip value="wp:F1-2" :context-project-id="projectId" /></span>
           <span class="chip-wrap"><GtIndexChip value="wp:F1-5" :context-project-id="projectId" /></span>
           <el-button v-if="openReviewDialog" size="small" @click="openReview">复核</el-button>
@@ -241,6 +245,15 @@
       </el-card>
     </template>
   </el-skeleton>
+
+  <AdjudicationBringInDialog
+    v-model="bringInVisible"
+    :matches="adjPull.matches.value"
+    :row-options="bringInRowOptions"
+    subject-label="1123 预付账款"
+    :loading="adjPull.loading.value"
+    @apply="onBringInApply"
+  />
 </div>
 </template>
 
@@ -251,14 +264,18 @@
  */
 import { computed, inject, toRef, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Download } from '@element-plus/icons-vue'
 import { isChangeRateExceeding } from '../composables/useF1FormulaEngine'
 import { useF1Adjudication } from '../composables/useF1Adjudication'
 import { useF1AiGenerate } from '../composables/useF1AiGenerate'
+import { useAdjudicationBringIn } from '../composables/useAdjudicationBringIn'
+import { useAuditContext } from '@/composables/useAuditContext'
 import type { useF1CrossSheet } from '../composables/useF1CrossSheet'
 import type { ChecklistResponse } from '../composables/useF1FormData'
 
 // @ts-ignore - GtIndexChip may not have type declarations
 import GtIndexChip from '../GtIndexChip.vue'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import F1SheetAttachments from './F1SheetAttachments.vue'
 
 const props = defineProps<{
@@ -299,6 +316,32 @@ const {
 })
 
 const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF1AiGenerate(wpIdRef)
+
+// ─── 从集中登记带入调整（1123 预付账款，资产借方；带入账龄主维度的期末 AJE/RJE） ──────
+const bringInRows = computed(() => {
+  const aging = sections.value[1]
+  if (!aging) return []
+  return aging.rows.map((r) => ({ rowKey: r.rowKey, name: r.label, aje: r.currentAje, rje: r.currentRje }))
+})
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: toRef(props, 'projectId') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '1123',
+  direction: 'debit',
+  subjectCode: '1123',
+  wpCode: 'F1',
+  subjectLabel: '预付账款(1123)',
+  rows: bringInRows,
+  updateCell: (rowKey: string, field: any, value: number) =>
+    updateCell(rowKey, field === 'rje' ? 'currentRje' : 'currentAje', value),
+  totalAudited: () => sections.value[1]?.subtotalRow.currentAudited ?? 0,
+})
 
 // ─── Formatting helpers ─────────────────────────────────────────────────────
 

@@ -46,6 +46,25 @@
       >
         推送 A13
       </el-button>
+      <el-button
+        size="small"
+        type="primary"
+        plain
+        :loading="centralSyncing"
+        :disabled="isReadonly || !adj.isBalanced.value || adj.rows.value.length === 0"
+        title="把本页调整分录汇聚到集中调整登记，供合伙人跨循环审阅"
+        @click="syncToCentral"
+      >
+        同步到集中登记
+      </el-button>
+      <el-tag
+        v-if="centralStatus?.review_status"
+        size="small"
+        :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
+        :title="centralStatus.rejection_reason || ''"
+      >
+        集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
+      </el-tag>
       <el-tag size="small" type="info" effect="plain" data-testid="g13-adjustment-count">
         共 {{ adj.rows.value.length }} 行
       </el-tag>
@@ -297,6 +316,8 @@
 import { ref, toRef, computed, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useG13Adjustment } from '../composables/useG13Adjustment'
+import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../composables/useAdjustmentCentralSync'
+import { useAuditContext } from '@/composables/useAuditContext'
 import { useG13Detail } from '../composables/useG13Detail'
 import { G13_BELONG_ACCOUNT_LABELS } from '../composables/g13Constants'
 import type { G13AdjustmentWritebackMap } from '../composables/g13AdjStorage'
@@ -383,6 +404,28 @@ const adj = useG13Adjustment({
   auditYear: auditYearRef,
   applyAdjustmentToDetail: applyByBelong,
 })
+
+// ─── 同步到集中调整登记（workpaper-adjustment-centralization） ───
+const { year: centralYear } = useAuditContext()
+const { centralStatus, syncing: centralSyncing, syncToCentral, refreshStatus } = useAdjustmentCentralSync({
+  projectId: projectIdRef,
+  year: centralYear,
+  wpId: () => props.wpId,
+  wpCode: 'G13',
+  itemId: 'G13-3-rows',
+  buildLineItems: () => adj.rows.value.map((r) => ({
+    standard_account_code: r.accountCode || undefined,
+    account_name: r.accountName,
+    report_line_code: r.reportItem || undefined,
+    debit_amount: r.debitAmount,
+    credit_amount: r.creditAmount,
+  })),
+  buildMeta: () => ({
+    description: adj.rows.value.find((r) => r.description)?.description || 'G13 公允价值变动收益调整',
+    adjustmentType: adj.rows.value.length > 0 && adj.rows.value.every((r) => r.category === '报表调整') ? 'rje' : 'aje',
+  }),
+})
+onMounted(() => refreshStatus())
 
 async function onSyncFromModule(): Promise<void> {
   const n = await adj.syncFromAdjustmentModule()

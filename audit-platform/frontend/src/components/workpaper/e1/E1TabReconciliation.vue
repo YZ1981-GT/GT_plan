@@ -12,6 +12,7 @@ import {
 import { useE1AiGenerate } from '../composables/useE1AiGenerate'
 import type { UseE1BaseOptions } from '../composables/useE1Adjudication'
 import GtIndexChip from '../GtIndexChip.vue'
+import { amountFormatter, amountParser } from '../composables/wpAmountInput'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
@@ -220,6 +221,9 @@ function updateItem(
                     :model-value="row.bookBalance"
                     :disabled="isReadonly"
                     :controls="false"
+                    :precision="2"
+                    :formatter="amountFormatter"
+                    :parser="amountParser"
                     size="small"
                     @change="(value: number | undefined) => updateCell(row.id, 'bookBalance', value ?? 0)"
                   />
@@ -246,6 +250,9 @@ function updateItem(
                     :model-value="row.statementBalance"
                     :disabled="isReadonly"
                     :controls="false"
+                    :precision="2"
+                    :formatter="amountFormatter"
+                    :parser="amountParser"
                     size="small"
                     @change="(value: number | undefined) => updateCell(row.id, 'statementBalance', value ?? 0)"
                   />
@@ -309,7 +316,7 @@ function updateItem(
                     </el-table-column>
                     <el-table-column label="金额（元）" width="145" align="right">
                       <template #default="{ row: item }">
-                        <el-input-number :model-value="item.amount" :disabled="isReadonly" :controls="false" @change="value => updateItem(row.id, category.key, item.id, 'amount', value ?? 0)" />
+                        <el-input-number :model-value="item.amount" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" @change="value => updateItem(row.id, category.key, item.id, 'amount', value ?? 0)" />
                       </template>
                     </el-table-column>
                     <el-table-column label="报表日后处理" width="120" align="center">

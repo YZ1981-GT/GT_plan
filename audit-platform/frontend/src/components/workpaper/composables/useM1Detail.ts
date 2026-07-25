@@ -312,6 +312,15 @@ export function useM1Detail(
     debouncedSave('M1-M1-2-totalEndBalance', {
       remark: String(totalEndBalance.value),
     })
+    // 🔴 修复：同步写整包 full-data（M1TabDetail._restoreRows 读此键；此前从不写 → 刷新明细全丢）
+    _syncFullData()
+  }
+
+  /** 同步写整包 full-data（保证 _restoreRows 读取路径一致，完整行序列化避免字段丢失） */
+  function _syncFullData(): void {
+    debouncedSave('M1-M1-2-full-data', {
+      remark: JSON.stringify(detailRows.value),
+    })
   }
 
   function _triggerSaveAll(): void {

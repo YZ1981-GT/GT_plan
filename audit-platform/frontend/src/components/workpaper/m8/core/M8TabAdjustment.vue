@@ -8,13 +8,7 @@
         <el-tag type="warning" effect="dark" size="small">借贷平衡</el-tag>
       </div>
       <div class="section-header-right">
-        <el-segmented
-          v-model="dualMode.mode.value"
-          :options="dualMode.modeOptions.value"
-          size="small"
-          @change="(val: any) => dualMode.switchMode(val)"
-        />
-        <el-button size="small" @click="handleAI('adjustment')">
+        <el-button size="small" :loading="aiLoading === 'adjustment'" @click="handleAI('adjustment')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
         <el-button size="small" @click="handleReview">
@@ -233,6 +227,8 @@
       >
         保存并同步M8-1
       </el-button>
+      <el-button size="small" type="primary" plain :loading="centralSyncing" :disabled="!adjustment.currentBalance.value.isBalanced || adjustment.filteredEntries.value.length === 0" @click="syncToCentral" title="把当前类型调整分录汇聚到集中调整登记，供合伙人跨循环审阅">同步到集中登记</el-button>
+      <el-tag v-if="centralStatus?.review_status" size="small" :type="centralStatus.review_status==='approved'?'success':(centralStatus.review_status==='rejected'?'danger':'info')" :title="centralStatus.rejection_reason||''">集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status]||centralStatus.review_status }}</el-tag>
     </div>
 
     <!-- ═══ 4104净影响 ═══ -->
@@ -250,7 +246,7 @@
       <template #header>
         <div class="card-header">
           <span class="card-title">调整分录说明</span>
-          <el-button size="small" @click="handleAI('adjustment-note')">
+          <el-button size="small" :loading="aiLoading === 'adjustment-note'" @click="handleAI('adjustment-note')">
             <el-icon><MagicStick /></el-icon> AI辅助
           </el-button>
         </div>
@@ -304,34 +300,58 @@
  * - EventBus publish 'adjustment:created' when saved
  * - Sync AJE/RJE amounts back to M8-1
  *
- * Composables: useM8FormData + useM8Adjustment + useM8DualMode + useVersionTrail
+ * Composables: useM8FormData + useM8Adjustment + useVersionTrail（双模式由主入口统一承载）
  */
-import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
-import { ElMessageBox } from 'element-plus'
+import { computed, inject, onMounted, onUnmounted, ref, toRef, watch, type Ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, Check } from '@element-plus/icons-vue'
 import { useM8FormData } from '../../composables/useM8FormData'
-import { useM8DualMode } from '../../composables/useM8DualMode'
 import { useM8Adjustment } from '../../composables/useM8Adjustment'
 import { useVersionTrail } from '../../composables/useVersionTrail'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import { eventBus } from '@/utils/eventBus'
+import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '@/components/workpaper/composables/useAdjustmentCentralSync'
+import { useAuditContext } from '@/composables/useAuditContext'
 
 const props = defineProps<{ wpId: string; projectId: string; isReadonly: boolean }>()
 const emit = defineEmits<{ (e: 'navigate', sheetName: string): void; (e: 'save'): void }>()
 
-// ─── Inject复核对话 ──────────────────────────────────────────────────────────
+// ─── Inject复核对话 + AI ─────────────────────────────────────────────────────
 const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', () => {})
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
 
 // ─── Composables ─────────────────────────────────────────────────────────────
 const formData = useM8FormData({
   wpId: computed(() => props.wpId),
   projectId: computed(() => props.projectId),
 })
-const dualMode = useM8DualMode({ wpId: computed(() => props.wpId) })
 const adjustment = useM8Adjustment(formData)
 const versionTrail = useVersionTrail({
   projectId: computed(() => props.projectId),
   workpaperId: computed(() => props.wpId),
 })
+
+// ─── 同步到集中调整登记（workpaper-adjustment-centralization） ─────────────────
+const { year: auditYear } = useAuditContext()
+const { centralStatus, syncing: centralSyncing, syncToCentral, refreshStatus } = useAdjustmentCentralSync({
+  projectId: toRef(props, 'projectId') as Ref<string>,
+  year: auditYear,
+  wpId: toRef(props, 'wpId') as Ref<string>,
+  wpCode: 'M8',
+  itemId: () => `M8-adj-${adjustment.activeType.value}`,
+  buildLineItems: () => adjustment.filteredEntries.value.map(e => ({
+    account_name: e.accountName,
+    report_line_code: e.reportItem || undefined,
+    debit_amount: e.debitAmount,
+    credit_amount: e.creditAmount,
+  })),
+  buildMeta: () => ({
+    description: adjustment.filteredEntries.value.find(e => e.description)?.description || 'M8 调整（' + adjustment.activeType.value + '）',
+    adjustmentType: adjustment.activeType.value === 'RJE' ? 'rje' : 'aje',
+  }),
+})
+watch(adjustment.activeType, () => refreshStatus())
 
 // ─── UI State ────────────────────────────────────────────────────────────────
 const isSaving = ref(false)
@@ -410,7 +430,28 @@ function saveAdjustmentNote(): void {
   formData.debouncedSave('M8-3-adjustmentNote', { remark: adjustmentNote.value || null })
 }
 
-function handleAI(_section: string): void { /* AI辅助钩子 */ }
+async function handleAI(section: string): Promise<void> {
+  if (props.isReadonly) return
+  aiLoading.value = section
+  try {
+    const b = adjustment.currentBalance.value
+    const context: Record<string, string> = {
+      科目: '4104 一般风险准备（权益类/贷方）',
+      底稿: 'M8-3 一般风险准备调整分录汇总',
+      当前类型: adjustment.activeType.value,
+      借方合计: fmtAmount(b.totalDebit),
+      贷方合计: fmtAmount(b.totalCredit),
+      借贷差额: fmtAmount(b.diff),
+      是否平衡: b.isBalanced ? '平衡' : '不平衡',
+      'AJE对4104净影响': fmtAmount(adjustment.ajeNet4104.value),
+      'RJE对4104净影响': fmtAmount(adjustment.rjeNet4104.value),
+    }
+    const text = await generateAiText({ section: `m8-adjustment-${section}`, context, existingContent: adjustmentNote.value })
+    if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+    adjustmentNote.value = text
+    saveAdjustmentNote()
+  } catch { ElMessage.warning('AI 生成失败，请稍后重试') } finally { aiLoading.value = '' }
+}
 function handleReview(): void { openReviewDialog?.('M8-3-adjustment', '调整分录汇总') }
 
 function getRowClassName(): string { return '' }
@@ -432,6 +473,8 @@ onMounted(async () => {
 
   // EventBus订阅
   unsubAdjudicated = adjustment.subscribeAdjudicated(onAdjudicatedRefresh)
+
+  refreshStatus()
 })
 
 onUnmounted(() => {

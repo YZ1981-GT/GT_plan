@@ -12,7 +12,7 @@
         :template-options="deTemplateOptions"
         :badges="[
           { value: noteList.length + ' 个章节' },
-          { label: '金额单位', value: displayPrefs.unitSuffix },
+          { label: '金额单位', value: noteUnitSuffix },
         ]"
         @unit-change="onProjectChange"
         @year-change="(v: number) => { selectedYear = v; onYearChange() }"
@@ -31,8 +31,11 @@
             <div class="gt-de-actions-row">
               <!-- 数据操作 -->
               <el-button-group v-if="!isEqcrRole" size="small">
-                <el-tooltip content="从底稿同步最新数据到附注" placement="bottom" :show-after="400">
+                <el-tooltip content="从底稿同步最新数据到当前附注章节" placement="bottom" :show-after="400">
                   <el-button @click="onRefreshFromWP" :loading="refreshLoading">🔄 刷新</el-button>
+                </el-tooltip>
+                <el-tooltip content="从底稿披露表起，刷新全部附注主要项目下的科目数据" placement="bottom" :show-after="400">
+                  <el-button @click="onRefreshAll" :loading="refreshAllLoading">🔁 全部刷新</el-button>
                 </el-tooltip>
                 <el-tooltip content="根据模板生成全部附注章节" placement="bottom" :show-after="400">
                   <el-button @click="onGenerate" :loading="genLoading">📝 生成</el-button>
@@ -65,45 +68,70 @@
                   <el-button :type="numbering.state.value.scope === 'consolidated' ? 'primary' : ''" @click="onScopeChange('consolidated')">合并</el-button>
                 </el-tooltip>
               </el-button-group>
-              <!-- AI -->
-              <el-button-group size="small">
-                <el-tooltip content="AI 智能建议" placement="bottom" :show-after="400">
-                  <el-button @click="showAiPanel = true">🤖 AI</el-button>
-                </el-tooltip>
-                <el-tooltip content="与 AI 对话" placement="bottom" :show-after="400">
-                  <el-button @click="showDocAiChat = true">💬 对话</el-button>
-                </el-tooltip>
-              </el-button-group>
+              <!-- AI 助手（合并全局 AI 入口：建议 / 对话 / 批量预填充；当前章节填充见章节内按钮） -->
+              <el-dropdown trigger="click" size="small">
+                <el-button size="small" :loading="batchAiFillLoading">🤖 AI 助手 ▾</el-button>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item v-if="!isEqcrRole" :disabled="batchAiFillLoading" @click="openBatchAiFill" title="对空/草稿章节一键 AI 预填充（逐章确认采纳，不自动写库）">📚 批量预填充（空/草稿章节）</el-dropdown-item>
+                    <el-dropdown-item @click="showDocAiChat = true" title="与 AI 对话">💬 AI 对话</el-dropdown-item>
+                    <el-dropdown-item @click="showAiPanel = true" title="AI 智能建议">🧠 AI 智能建议</el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
               <!-- 公式管理 -->
               <el-tooltip content="配置附注取数公式规则" placement="bottom" :show-after="400">
                 <el-button size="small" @click="showNoteFormulaManager = true">⚙️ 公式管理</el-button>
+              </el-tooltip>
+              <!-- 金额单位（附注模块级，默认元） -->
+              <el-tooltip content="附注金额展示单位（默认元，仅影响附注模块）" placement="bottom" :show-after="400">
+                <el-select
+                  :model-value="noteUnit"
+                  size="small"
+                  style="width: 96px"
+                  aria-label="附注金额单位"
+                  @change="onNoteUnitChange"
+                >
+                  <el-option v-for="opt in displayPrefs.unitOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+                </el-select>
               </el-tooltip>
               <!-- 全屏 -->
               <el-tooltip :content="deFullscreen ? '退出全屏（ESC）' : '全屏查看'" placement="bottom" :show-after="400">
                 <el-button size="small" @click="toggleDeFullscreen()">{{ deFullscreen ? '↙ 退出' : '↗ 全屏' }}</el-button>
               </el-tooltip>
-              <!-- 更多操作下拉 -->
+              <!-- 导入导出（集中所有输出/导入入口） -->
               <el-dropdown trigger="click" size="small">
-                <el-button size="small">更多 ▾</el-button>
+                <el-button size="small">📤 导入导出 ▾</el-button>
                 <template #dropdown>
                   <el-dropdown-menu>
-                    <el-dropdown-item @click="showParagraphVars = true" title="段落变量（自动替换占位符）">✏️ 段落变量</el-dropdown-item>
-                    <el-dropdown-item @click="showNoteMappingDialog = true" title="国企↔上市附注模板转换规则">🔄 国企↔上市转换</el-dropdown-item>
-                    <el-dropdown-item @click="showGroupBaseline = true" title="集团基线管理：应用/保存/对比集团统一附注模板结构，确保子企业附注章节一致">🏢 集团基线</el-dropdown-item>
-                    <el-dropdown-item divided @click="onExportWithConfirm" title="导出 Word 格式附注文档">📤 导出 Word</el-dropdown-item>
+                    <el-dropdown-item @click="onExportWithConfirm" title="导出 Word 格式附注文档">📤 导出 Word</el-dropdown-item>
                     <el-dropdown-item @click="showPrintPreview = true" title="打印预览当前附注">🖨️ 打印预览</el-dropdown-item>
-                    <el-dropdown-item @click="showNoteImport = true" title="导入外部 Excel 附注数据（通用格式）">📥 Excel 导入</el-dropdown-item>
+                    <el-dropdown-item divided @click="showNoteImport = true" title="导入外部 Excel 附注数据（通用格式）">📥 Excel 导入</el-dropdown-item>
                     <el-dropdown-item @click="showOfflineExport = true" title="导出系统格式离线编辑包（可再导回）">📦 离线导出</el-dropdown-item>
                     <el-dropdown-item @click="showOfflineImport = true" title="导入系统导出的离线编辑包">📥 离线导入</el-dropdown-item>
                   </el-dropdown-menu>
                 </template>
               </el-dropdown>
+              <!-- 更多操作下拉（其余配置项） -->
+              <el-dropdown trigger="click" size="small">
+                <el-button size="small">更多 ▾</el-button>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item @click="showParagraphVars = true" title="段落变量（自动替换占位符）">✏️ 段落变量</el-dropdown-item>
+                    <el-dropdown-item @click="showGroupBaseline = true" title="集团基线管理：应用/保存/对比集团统一附注模板结构，确保子企业附注章节一致">🏢 集团基线</el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+              <!-- 模板组：保存/引用模板 + 国企↔上市转换规则 -->
               <SharedTemplatePicker
                 config-type="note_template"
                 :project-id="projectId"
                 :get-config-data="getNoteTemplateConfigData"
                 @applied="onNoteTemplateApplied"
               />
+              <el-tooltip content="国企↔上市附注模板转换规则" placement="bottom" :show-after="400">
+                <el-button size="small" @click="showNoteMappingDialog = true">🔄 国企↔上市转换</el-button>
+              </el-tooltip>
               <el-button v-if="isEqcrRole" size="small" type="info">📋 只读副本</el-button>
             </div>
           </template>
@@ -318,6 +346,14 @@
               <span class="gt-de-section-account" v-if="currentNote.account_name && currentNote.account_name !== currentNote.section_title">{{ currentNote.account_name }}</span>
             </div>
             <div style="display: flex; gap: 6px; align-items: center;">
+              <template v-if="!isEqcrRole && (currentNote.content_type === 'text' || currentNote.content_type === 'mixed')">
+                <el-tooltip content="参照知识库文档由 AI 起草本章节正文草稿" placement="bottom" :show-after="400">
+                  <el-button size="small" @click="openNoteAiFill('ai')">🤖 AI 填充</el-button>
+                </el-tooltip>
+                <el-tooltip content="仅检索知识库参照原文片段供人工引用" placement="bottom" :show-after="400">
+                  <el-button size="small" @click="openNoteAiFill('reference')">📎 参照文档填充</el-button>
+                </el-tooltip>
+              </template>
               <el-tag :type="currentNote.status === 'confirmed' ? 'success' : 'info'" size="small">
                 {{ currentNote.status === 'confirmed' ? '已确认' : '草稿' }}
               </el-tag>
@@ -334,10 +370,18 @@
             <div
               v-if="currentNote.content_type === 'table' && showGuidance"
               class="gt-guidance-bar"
+              :class="{ 'is-collapsed': !isGuidanceExpanded }"
             >
-              <el-icon><InfoFilled /></el-icon>
-              <span class="gt-guidance-text">{{ activeTableGuidance }}</span>
-              <el-icon class="gt-guidance-close" @click="dismissGuidance" title="关闭提示"><Close /></el-icon>
+              <div class="gt-guidance-head" @click="toggleGuidanceExpand" :title="isGuidanceExpanded ? '收起编制说明' : '展开编制说明'">
+                <el-icon><InfoFilled /></el-icon>
+                <span class="gt-guidance-title">编制说明（仅供参考）</span>
+                <el-icon class="gt-guidance-caret">
+                  <component :is="isGuidanceExpanded ? ArrowDown : ArrowRight" />
+                </el-icon>
+                <span class="gt-guidance-spacer" />
+                <el-icon class="gt-guidance-close" @click.stop="dismissGuidance" title="关闭提示"><Close /></el-icon>
+              </div>
+              <div v-show="isGuidanceExpanded" class="gt-guidance-text">{{ activeTableGuidance }}</div>
             </div>
             <div v-if="currentNote.content_type === 'table' || currentNote.content_type === 'mixed'">
               <!-- 多表格Tab + 导出开关 -->
@@ -413,13 +457,13 @@
                           role="gridcell"
                           tabindex="0"
                           :aria-label="`${(activeTableData.headers || [])[Number(hiRaw)] || '列'} 行${$index + 1}：${getCellValue(row, Number(hiRaw) - 1) ?? '空'}`">
-                          <GtAmountCell :value="getCellValue(row, Number(hiRaw) - 1)" />
+                          <GtAmountCell :value="getCellValue(row, Number(hiRaw) - 1)" :unit="noteUnit" />
                         </span>
                         <span v-else-if="row.is_total" :class="['gt-amt', { 'gt-formula-mismatch': isFormulaMismatch(row, Number(hiRaw) - 1) }]">
-                          <GtAmountCell :value="getCellValue(row, Number(hiRaw) - 1)" />
+                          <GtAmountCell :value="getCellValue(row, Number(hiRaw) - 1)" :unit="noteUnit" />
                         </span>
                         <span v-else :class="['gt-amt', { 'total-val': row.is_total }]">
-                          <GtAmountCell :value="getCellValue(row, Number(hiRaw) - 1)" />
+                          <GtAmountCell :value="getCellValue(row, Number(hiRaw) - 1)" :unit="noteUnit" />
                         </span>
                         <span v-if="getCellMode(row, Number(hiRaw) - 1) === 'auto'" class="gt-cell-source gt-cell-trace-trigger" title="点击追溯来源" @click.stop="onAutoCellTraceClick($index, Number(hiRaw) - 1, $event)">📊</span>
                         <span v-else-if="getCellMode(row, Number(hiRaw) - 1) === 'manual'" class="gt-cell-manual" title="手动编辑">✏️</span>
@@ -466,10 +510,18 @@
               <div
                 v-if="showGuidance"
                 class="gt-guidance-bar"
+                :class="{ 'is-collapsed': !isGuidanceExpanded }"
               >
-                <el-icon><InfoFilled /></el-icon>
-                <span class="gt-guidance-text">{{ activeTableGuidance }}</span>
-                <el-icon class="gt-guidance-close" @click="dismissGuidance" title="关闭提示"><Close /></el-icon>
+                <div class="gt-guidance-head" @click="toggleGuidanceExpand" :title="isGuidanceExpanded ? '收起编制说明' : '展开编制说明'">
+                  <el-icon><InfoFilled /></el-icon>
+                  <span class="gt-guidance-title">编制说明（仅供参考）</span>
+                  <el-icon class="gt-guidance-caret">
+                    <component :is="isGuidanceExpanded ? ArrowDown : ArrowRight" />
+                  </el-icon>
+                  <span class="gt-guidance-spacer" />
+                  <el-icon class="gt-guidance-close" @click.stop="dismissGuidance" title="关闭提示"><Close /></el-icon>
+                </div>
+                <div v-show="isGuidanceExpanded" class="gt-guidance-text">{{ activeTableGuidance }}</div>
               </div>
               <!-- 增强富文本编辑器：支持标题/加粗/斜体/列表/表格/缩进/颜色/占位符/源码/字数 -->
               <NoteRichTextEditor
@@ -909,6 +961,61 @@
   <!-- 知识库文档选择弹窗 [R3.7] -->
   <KnowledgePickerDialog v-model:visible="knowledgePickerVisible" />
 
+  <!-- 附注 AI 填充 / 参照文档填充（知识库 RAG） -->
+  <NoteAiFillDialog
+    v-if="currentNote"
+    v-model:visible="noteAiFillVisible"
+    :project-id="projectId"
+    :year="year"
+    :note-section="currentNote.note_section"
+    :section-title="currentNote.section_title || currentNote.note_section"
+    :locked="!!getSectionLock(currentNote.note_section)"
+    :initial-mode="noteAiFillMode"
+    @adopted="onNoteAiFillAdopted"
+  />
+
+  <!-- 一键批量 AI 预填充结果面板 -->
+  <el-dialog v-model="batchResultVisible" title="一键 AI 预填充结果" width="640px" append-to-body>
+    <div class="gt-de-batch-summary">
+      共 {{ batchResults.length }} 章：
+      <el-tag type="success" size="small">生成 {{ batchGenerated }}</el-tag>
+      <el-tag type="warning" size="small">降级 {{ batchDegraded }}</el-tag>
+      <el-tag type="info" size="small">跳过 {{ batchSkipped }}</el-tag>
+      <span class="gt-de-batch-hint">逐章确认采纳，不会自动写入正文</span>
+    </div>
+    <el-table :data="batchResults" size="small" max-height="420" border style="font-size: 13px">
+      <el-table-column label="章节" min-width="160">
+        <template #default="{ row }">{{ batchTitle(row.note_section) }}</template>
+      </el-table-column>
+      <el-table-column label="状态" width="90" align="center">
+        <template #default="{ row }">
+          <el-tag :type="row.status === 'generated' ? 'success' : (row.status === 'degraded' ? 'warning' : 'info')" size="small">
+            {{ row.status === 'generated' ? '已生成' : (row.status === 'degraded' ? '降级' : '跳过') }}
+          </el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="草稿预览" min-width="220">
+        <template #default="{ row }">
+          <span class="gt-de-batch-preview">{{ (row.text || '').slice(0, 60) || '（无草稿）' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" width="100" align="center">
+        <template #default="{ row }">
+          <el-button
+            v-if="row.status !== 'skipped'"
+            size="small"
+            link
+            type="primary"
+            @click="goAdoptSection(row.note_section)"
+          >去采纳</el-button>
+        </template>
+      </el-table-column>
+    </el-table>
+    <template #footer>
+      <el-button size="small" @click="batchResultVisible = false">关闭</el-button>
+    </template>
+  </el-dialog>
+
   <!-- 打印预览 (Req 41.1-41.5) -->
   <NotesPrintPreview
     :visible="showPrintPreview"
@@ -956,12 +1063,12 @@ import { resolveActiveTableGuidance, isGuidanceVisible, guidanceDismissKey } fro
 import WorkflowProgress from '@/components/common/WorkflowProgress.vue'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useTableSearch } from '@/composables/useTableSearch'
-import { fmtAmount } from '@/utils/formatters'
+import { fmtAmount, unitLabel, type AmountUnit } from '@/utils/formatters'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import SelectionBar from '@/components/common/SelectionBar.vue'
 import TableSearchBar from '@/components/common/TableSearchBar.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { InfoFilled, Close } from '@element-plus/icons-vue'
+import { InfoFilled, Close, ArrowDown, ArrowRight } from '@element-plus/icons-vue'
 import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
 import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
 import StructureEditor from '@/components/formula/StructureEditor.vue'
@@ -993,6 +1100,8 @@ import { knowledgePickerVisible } from '@/composables/useKnowledge'
 import { useAutoSave } from '@/composables/useAutoSave'
 import { withLoading } from '@/composables/useLoading'
 import KnowledgePickerDialog from '@/components/common/KnowledgePickerDialog.vue'
+import NoteAiFillDialog from '@/components/disclosure/NoteAiFillDialog.vue'
+import http from '@/utils/http'
 import { useEditingLock } from '@/composables/useEditingLock'
 import { useWorkpaperAutoSave } from '@/composables/useWorkpaperAutoSave'
 import { useProjectEvents } from '@/composables/useProjectEvents'
@@ -1015,7 +1124,7 @@ import { useNoteDetail } from '@/views/composables/useNoteDetail'
 import { useNotePersist } from '@/views/composables/useNotePersist'
 import { useNoteRefresh } from '@/views/composables/useNoteRefresh'
 import { resolveNoteDisclosureJumpTarget } from '@/views/composables/noteDisclosureJump'
-import { projectSubTablesClient } from '@/components/workpaper/composables/disclosureColumnDefs'
+import { projectSubTablesClient, deriveLegacyTableHeaders } from '@/components/workpaper/composables/disclosureColumnDefs'
 import { useAcnr } from '@/services/acnr'
 import { useNoteTemplate } from '@/views/composables/useNoteTemplate'
 import { useNoteExport } from '@/views/composables/useNoteExport'
@@ -1418,6 +1527,53 @@ const {
   onAiContinueWrite, onAiRewriteOpen, onAiRewriteConfirm,
   onAiGeneratePolicy, onAiGenerateAnalysis, onPickKnowledge, clearKnowledgeContext, getSelectedText,
 } = useNoteAi({ projectId, year, templateType, currentNote, editor })
+
+// ── 附注知识库 RAG AI 填充（disclosure-note-knowledge-ai-enrichment / Task 9）──
+const noteAiFillVisible = ref(false)
+const noteAiFillMode = ref<'ai' | 'reference'>('ai')
+function openNoteAiFill(mode: 'ai' | 'reference') {
+  if (!currentNote.value?.note_section) return
+  noteAiFillMode.value = mode
+  noteAiFillVisible.value = true
+}
+async function onNoteAiFillAdopted() {
+  if (currentNote.value?.note_section) {
+    await fetchDetailFresh(currentNote.value.note_section)
+  }
+}
+
+// 一键批量 AI 预填充
+const batchAiFillLoading = ref(false)
+const batchResultVisible = ref(false)
+const batchResults = ref<Array<{ note_section: string; status: string; text: string | null; citations: any[] }>>([])
+const batchGenerated = computed(() => batchResults.value.filter(r => r.status === 'generated').length)
+const batchDegraded = computed(() => batchResults.value.filter(r => r.status === 'degraded').length)
+const batchSkipped = computed(() => batchResults.value.filter(r => r.status === 'skipped').length)
+function batchTitle(section: string): string {
+  const n = noteList.value.find((x: any) => x.note_section === section)
+  return (n as any)?.title || (n as any)?.section_title || (n as any)?.label || section
+}
+async function openBatchAiFill() {
+  batchAiFillLoading.value = true
+  try {
+    const res = await http.post(
+      `/api/disclosure-notes/${projectId.value}/${year.value}/batch-ai-fill`,
+      {},
+    )
+    const data = res.data || {}
+    batchResults.value = Array.isArray(data.results) ? data.results : []
+    batchResultVisible.value = true
+  } catch {
+    ElMessage.error('批量预填充失败，请稍后重试')
+  } finally {
+    batchAiFillLoading.value = false
+  }
+}
+async function goAdoptSection(section: string) {
+  batchResultVisible.value = false
+  await fetchDetail(section)
+  openNoteAiFill('ai')
+}
 // 单位切换（侧边栏）
 
 
@@ -1438,8 +1594,14 @@ const currentNoteTables = computed(() => {
     return clientProjected
   }
   // 旧格式：单表格
-  if (td.headers && td.rows) {
-    return [{ name: currentNote.value.section_title, headers: td.headers, rows: td.rows }]
+  if (td.rows) {
+    // 表头补齐兜底：headers 为空（[]）但行携 _cell_meta 语义时派生可渲染表头，
+    // 修复 el-table 零列坍缩（"附注表格只有一行"）。后端 note_header_projector 亦在
+    // 读时补齐；此处保证后端未生效/其它加载路径时渲染一致。
+    const headers = (Array.isArray(td.headers) && td.headers.length > 0)
+      ? td.headers
+      : (deriveLegacyTableHeaders(td) || td.headers || [])
+    return [{ name: currentNote.value.section_title, headers, rows: td.rows }]
   }
   return []
 })
@@ -1467,6 +1629,19 @@ const showGuidance = computed(() =>
 function dismissGuidance() {
   const sec = currentNote.value?.note_section
   if (sec) dismissedGuidance.add(guidanceDismissKey(sec, activeTableTab.value))
+}
+
+// 编制说明默认折叠：仅当用户展开的 `note_section:tabIdx` 才展示正文（各 Tab 独立记忆）
+const expandedGuidance = reactive(new Set<string>())
+const isGuidanceExpanded = computed(() =>
+  expandedGuidance.has(
+    guidanceDismissKey(currentNote.value?.note_section, activeTableTab.value),
+  ),
+)
+function toggleGuidanceExpand() {
+  const key = guidanceDismissKey(currentNote.value?.note_section, activeTableTab.value)
+  if (expandedGuidance.has(key)) expandedGuidance.delete(key)
+  else expandedGuidance.add(key)
 }
 
 // 多表导出开关：跟踪哪些表格启用导出（indices）
@@ -1596,8 +1771,8 @@ function isFormulaMismatch(row: any, colIdx: number): boolean {
 
 // ── 刷新功能（useNoteRefresh composable）──
 const {
-  refreshLoading, syncError,
-  onRefreshFromWP, onManualRefresh, onStaleRecalc,
+  refreshLoading, refreshAllLoading, syncError,
+  onRefreshFromWP, onRefreshAll, onManualRefresh, onStaleRecalc,
   showRefreshResultMessage, onWorkpaperSaved, onDisclosureNoteTextUpdated,
 } = useNoteRefresh({
   projectId,
@@ -1606,6 +1781,7 @@ const {
   fetchDetail: fetchDetailFresh,  // 刷新后必须绕过缓存
   fetchTree,
   staleRecalc: () => stale.recalc(),
+  invalidateAllCache: () => invalidateDetailCache(),  // 全部刷新：清空全部章节缓存
 })
 
 const { resolveInstance: acnrResolveInstance } = useAcnr()
@@ -1632,8 +1808,35 @@ function jumpToLastSyncWorkpaper(): void {
 async function jumpToDisclosureSheet(): Promise<void> {
   const target = disclosureJumpTarget.value
   const wpFamily = target?.wpCode ?? 'G7'
+  const wpFamilyLabelMap: Record<string, string> = {
+    D1: '应收票据',
+    E1: '货币资金',
+    F1: '预付款项',
+    F2: '存货',
+    G1: '交易性金融资产',
+    G7: '长期股权投资',
+    G10: '交易性金融负债',
+    G11: '投资收益',
+    G13: '公允价值变动收益',
+    G14: '信用减值损失',
+    H1: '固定资产',
+    H2: '在建工程',
+    H8: '使用权资产',
+    H9: '租赁负债',
+    H10: '资产处置收益',
+    I1: '无形资产',
+    I2: '开发支出',
+    I3: '商誉',
+    I4: '长期待摊费用',
+    I5: '其他非流动资产',
+    I6: '研发费用',
+    K1: '其他应收款',
+    K11: '资产减值损失',
+    K13: '营业外支出',
+  }
+  const wpFamilyLabel = wpFamilyLabelMap[wpFamily] ?? wpFamily
   if (!target || !projectId.value) {
-    ElMessage.warning(`当前章节未关联${wpFamily === 'G10' ? '交易性金融负债' : '长期股权投资'}披露表`)
+    ElMessage.warning(`当前章节未关联${wpFamilyLabel}披露表`)
     return
   }
   jumpingDisclosure.value = true
@@ -1945,6 +2148,63 @@ async function onNodeClick(node: TreeNode) {
   })()
 }
 
+/**
+ * 把跳转传入的目标章节解析为 noteList 中实际存在的精确 note_section。
+ * 纯编号章节（五、7 / 八、70）只精确匹配（禁前缀模糊：八、7 会误配 八、70）；
+ * 关键词标题章节（三、信用减值损失…）容忍生成时标题截断（DB 存 `三、信用减值损失（损`），
+ * 做前缀双向模糊。解析失败回退原值（不会更差）。
+ */
+function resolveSectionInList(target: string): string {
+  const t = String(target || '').trim()
+  if (!t) return t
+  const list: any[] = noteList.value || []
+  const exact = list.find((n: any) => String(n?.note_section || '') === t)
+  if (exact) return exact.note_section
+  // 纯编号（如 五、7 / 八、70）：不做前缀模糊，避免 八、7 误配 八、70
+  if (/^[一二三四五六七八九十]+、\d+$/.test(t)) return t
+  const pfx = list.find((n: any) => {
+    const s = String(n?.note_section || '')
+    return !!s && (s.startsWith(t) || t.startsWith(s))
+  })
+  return pfx ? pfx.note_section : t
+}
+
+/** 递归查找 note_section 对应的叶子节点 id（treeData 分组结构） */
+function _findTreeNodeIdBySection(nodes: TreeNode[], section: string): string | null {
+  for (const n of nodes) {
+    if (!n.isGroup && n.data?.note_section === section) return n.id
+    if (n.children?.length) {
+      const found = _findTreeNodeIdBySection(n.children, section)
+      if (found) return found
+    }
+  }
+  return null
+}
+
+/**
+ * 左侧章节树定位：展开祖先分组 + 高亮当前节点 + 滚动到可视区。
+ * 用于程序化导航（四栏跨页 / 披露表反向跳转）——普通点击由 el-tree 内部维护 current，
+ * 但 fetchDetail 走程序化路径不会设置 el-tree 的 currentKey/展开/滚动。
+ */
+async function locateTreeNode(section: string) {
+  await nextTick()
+  const tree: any = noteTreeRef.value
+  if (!tree) return
+  const id = _findTreeNodeIdBySection(treeData.value, section)
+  if (!id) return
+  try {
+    // 先展开祖先分组节点（setCurrentKey 不会自动展开祖先）
+    const nodeObj = tree.store?.nodesMap?.[id]
+    let p = nodeObj?.parent
+    while (p && p.level > 0) { p.expanded = true; p = p.parent }
+    tree.setCurrentKey(id)
+    await nextTick()
+    // 滚动到当前高亮节点
+    const el = tree.$el?.querySelector('.el-tree-node.is-current') as HTMLElement | null
+    el?.scrollIntoView?.({ block: 'center', behavior: 'smooth' })
+  } catch { /* 定位失败不影响右侧已加载内容 */ }
+}
+
 // ─── 章节详情缓存 + hover 预取 ─────────────────────────────────────────────────
 const _detailCache = new Map<string, any>()
 let _prefetchTimer: ReturnType<typeof setTimeout> | null = null
@@ -2055,9 +2315,28 @@ async function handleTemplateChange(value: string) {
 }
 
 const onValidate = withLoading(validateLoading, async () => {
-  await validateDisclosureNotes(projectId.value, year.value)
-  validationFindings.value = await getValidationResults(projectId.value, year.value)
-  ElMessage.success(`校验完成，发现 ${validationFindings.value.length} 项`)
+  try {
+    const tt = templateType.value === 'listed' || templateType.value === 'soe'
+      ? templateType.value
+      : undefined
+    await validateDisclosureNotes(projectId.value, year.value, tt)
+    validationFindings.value = await getValidationResults(projectId.value, year.value)
+    if (validationFindings.value.length === 0) {
+      ElMessage.success('校验完成，未发现需处理的问题')
+    } else {
+      ElMessage.warning(`校验完成，发现 ${validationFindings.value.length} 项，请查看右侧校验结果`)
+    }
+  } catch (e: any) {
+    // 校验失败不得崩溃整页；清空结果并提示（区分 404「无结果」与其他错误）
+    validationFindings.value = []
+    const status = e?.response?.status
+    const msg = e?.response?.data?.detail || e?.response?.data?.message || e?.message || ''
+    if (status === 404) {
+      ElMessage.info('校验完成，未发现需处理的问题')
+    } else {
+      ElMessage.error('校验失败' + (msg ? '：' + msg : ''))
+    }
+  }
 })
 
 // ── 保存功能（useNotePersist composable）──
@@ -2160,6 +2439,7 @@ async function onCatalogNoteSelect({ noteSection }: { noteSection: string }) {
   const previousSection = currentNote.value?.note_section || ''
   try {
     await fetchDetail(noteSection)
+    await locateTreeNode(noteSection)  // 左侧树形同步定位（展开祖先 + 高亮 + 滚动）
   } catch {
     ElMessage.error('章节加载失败')
     // 失败回退：通知 catalog 恢复之前的高亮
@@ -2186,16 +2466,33 @@ onMounted(async () => {
   // Task 5.2: 监听四栏目录附注章节点击
   eventBus.on('catalog:note-select', onCatalogNoteSelect)
   await loadProjectTemplateConfig()
+  // 反向跳转（披露表 → 附注）：URL 指定 noteTemplate 时强制上市/国企视图（支持自由切换上市↔国企）
+  const qTemplate = route.query.noteTemplate as string | undefined
+  if (qTemplate === 'listed' || qTemplate === 'soe') {
+    templateType.value = qTemplate
+  }
   await fetchTree()
   // 如果没有附注数据，自动从模板生成
   if (noteList.value.length === 0) {
     await onGenerate()
   }
-  // Task 5.1: 从 URL query.section 自动定位章节（四栏跨页面导航）
+  // Task 5.1: 从 URL query.section 自动定位章节（四栏跨页面导航 / 披露表反向跳转）
   const targetSection = route.query.section as string | undefined
   if (targetSection && noteList.value.length > 0) {
-    await fetchDetail(targetSection)
-    router.replace({ query: { ...route.query, section: undefined } })
+    // 反向跳转可能传入关键词标题（如损益类 三、信用减值损失），DB 实际章节可能被截断
+    // （三、信用减值损失（损），需解析为 noteList 中的精确 note_section 再定位。
+    const resolvedSection = resolveSectionInList(targetSection)
+    await fetchDetail(resolvedSection)
+    await locateTreeNode(resolvedSection)  // 左侧树形定位：展开祖先分组 + 高亮 + 滚动到可视区
+    // 🔴 用 history.replaceState 清理 URL query，禁止用 router.replace：
+    // DefaultLayout 的 router-view 以 :key="fullPath"（含 query）渲染，router.replace 改 query
+    // 会触发整页重挂载 → 刚 fetchDetail 选中的 currentNote 被清空 → 回到「请选择附注章节」。
+    try {
+      const url = new URL(window.location.href)
+      url.searchParams.delete('section')
+      url.searchParams.delete('noteTemplate')
+      window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash)
+    } catch { /* 清理 URL 失败不影响已选中章节 */ }
   }
   // R8-S2-14：关闭浏览器/刷新前警告
   window.addEventListener('beforeunload', onBeforeUnload)
@@ -2285,6 +2582,23 @@ deCtx.setupTableDrag(deTableRef, (rowIdx: number, colIdx: number) => {
 const deComments = useCellComments(() => projectId.value, () => year.value, 'disclosure')
 
 const displayPrefs = useDisplayPrefsStore()
+
+// ─── 附注模块金额单位（模块级，默认「元」，不污染全局 displayPrefs） ──────────
+// 附注属财务报表呈现，惯例以「元」披露；用独立 localStorage 键，可在附注内切换。
+const NOTE_UNIT_STORAGE_KEY = 'gt_note_amount_unit'
+function loadNoteUnit(): AmountUnit {
+  try {
+    const raw = localStorage.getItem(NOTE_UNIT_STORAGE_KEY)
+    if (raw === 'yuan' || raw === 'wan' || raw === 'qian') return raw
+  } catch { /* ignore */ }
+  return 'yuan'
+}
+const noteUnit = ref<AmountUnit>(loadNoteUnit())
+const noteUnitSuffix = computed(() => unitLabel(noteUnit.value))
+function onNoteUnitChange(v: AmountUnit) {
+  noteUnit.value = v
+  try { localStorage.setItem(NOTE_UNIT_STORAGE_KEY, v) } catch { /* ignore */ }
+}
 
 // ─── 表格内搜索（Ctrl+F） ──────────────────────────────────────────────────
 const deSearch = useTableSearch(

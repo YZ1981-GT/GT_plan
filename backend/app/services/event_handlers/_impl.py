@@ -81,6 +81,120 @@ def _make_tb_handler(method_name: str):
     )
 
 
+async def _auto_map_on_dataset_activated(payload: "EventPayload") -> None:
+    """四表入库激活后自动串联「加载标准科目表 → 科目映射(auto_match)」。
+
+    背景：四表入库 pipeline 只落 tb_balance/tb_aux/tb_ledger 并激活数据集，
+    不自动建客户科目表/科目映射/试算表。若用户导入后直接做报表映射（未先手动
+    「科目映射→自动匹配」），trial_balance 为空 → 报表映射只出 fixBadDebt 的 1231。
+
+    本 handler 让"四表入库即可用"：auto_match 会
+    - 若 client 科目表(account_chart source=client)在 active dataset 上缺失，
+      从 active tb_balance 重建（含重新导入后新 dataset 的自愈）；
+    - 若标准科目不足，用已加载的预设标准科目表或从 client 一级编码补齐；
+    - 生成 account_mapping，并发布 MAPPING_CHANGED → on_mapping_changed 重算生成
+      trial_balance。
+
+    幂等：auto_match 跳过已存在映射、load_standard_template 增量加载；对每次
+    激活（含重新导入）安全可重跑。best-effort：失败只记日志，绝不影响导入激活主流程。
+    """
+    if not payload.project_id or not payload.year:
+        return
+    try:
+        from app.core.database import async_session
+        from app.services import account_chart_service, mapping_service
+        async with async_session() as db:
+            # 1. 加载预设标准科目表（增量幂等，提供 CAS 标准科目作映射目标）
+            try:
+                await account_chart_service.load_standard_template(
+                    payload.project_id, "enterprise", db
+                )
+            except Exception as e:  # noqa: BLE001
+                logger.warning("[auto-map] load_standard_template 失败(继续 auto_match): %s", e)
+            # 2. 自动匹配 客户→标准（内部按需从 tb_balance 重建客户科目、从客户补标准科目，
+            #    保存 account_mapping 并触发 MAPPING_CHANGED → 重算 trial_balance）
+            result = await mapping_service.auto_match(payload.project_id, db, year=payload.year)
+            logger.info(
+                "[auto-map] LEDGER_DATASET_ACTIVATED 自动科目映射完成: project=%s year=%s result=%s",
+                payload.project_id, payload.year, getattr(result, "saved", result),
+            )
+    except Exception as e:  # noqa: BLE001
+        logger.warning(
+            "[auto-map] LEDGER_DATASET_ACTIVATED 自动科目映射失败(不影响导入): project=%s year=%s err=%s",
+            payload.project_id, payload.year, e,
+        )
+
+
+async def _advance_project_status_on_dataset_activated(payload: "EventPayload") -> None:
+    """账套入库激活后把项目状态从 计划中/已创建 自动推进到 执行中。
+
+    背景：project.status 仅由项目向导设为 planning，此前平台无任何逻辑在导入账套后
+    推进状态，导致项目卡片永久停在"计划中"（UI 提示文案 DetailProjectPanel/ProjectTreeNode
+    承诺"导入账套+科目映射完成后自动推进执行阶段"，但实现一直缺失）。账套入库激活
+    (LEDGER_DATASET_ACTIVATED) 是进入执行阶段的明确里程碑（科目映射由 _auto_map_on_dataset_activated
+    幂等跟进），故在此单点推进。
+
+    幂等 & 安全：仅当 status ∈ {created, planning} 时推进到 execution，绝不覆盖
+    execution/completion/reporting/archived（不回退已推进或已完成的项目）。
+    best-effort：失败只记日志，绝不影响导入激活主流程。
+    """
+    if not payload.project_id:
+        return
+    try:
+        import sqlalchemy as sa
+
+        from app.core.database import async_session
+        from app.models.base import ProjectStatus
+        from app.models.core import Project
+
+        async with async_session() as db:
+            proj = (
+                await db.execute(sa.select(Project).where(Project.id == payload.project_id))
+            ).scalar_one_or_none()
+            if proj is None:
+                return
+            cur = proj.status.value if hasattr(proj.status, "value") else proj.status
+            if cur not in ("created", "planning"):
+                return
+            proj.status = ProjectStatus.execution
+            await db.commit()  # 主目标：状态一定落库
+            logger.info(
+                "[status-advance] LEDGER_DATASET_ACTIVATED 项目状态 %s → execution: project=%s",
+                cur, payload.project_id,
+            )
+            # 审计留痕(best-effort)：写 status_change 审计日志，供 dashboard 时间线
+            # (_get_stage_timestamps 按 action_type=status_change + payload.new_status 推断
+            # 阶段进入时间 entered_at)。失败只记日志，不回退已提交的状态推进。
+            try:
+                from app.services.audit_log_helper import append_audit_log
+
+                await append_audit_log(db, {
+                    "user_id": None,  # 系统自动推进，无操作用户
+                    "project_id": payload.project_id,
+                    "action": "status_change",
+                    "resource_type": "project",
+                    "resource_id": str(payload.project_id),
+                    "details": {
+                        "new_status": "execution",
+                        "previous_status": cur,
+                        "trigger": "ledger_dataset_activated",
+                        "year": payload.year,
+                    },
+                })
+                await db.commit()
+            except Exception as ae:  # noqa: BLE001
+                await db.rollback()
+                logger.warning(
+                    "[status-advance] 状态推进审计留痕失败(状态已推进): project=%s err=%s",
+                    payload.project_id, ae,
+                )
+    except Exception as e:  # noqa: BLE001
+        logger.warning(
+            "[status-advance] LEDGER_DATASET_ACTIVATED 项目状态推进失败(不影响导入): project=%s err=%s",
+            payload.project_id, e,
+        )
+
+
 def subscribe_many(bus: "EventBus", subscriptions: list[tuple]) -> None:
     """批量注册事件处理器，减少重复的 bus.subscribe() 调用。
 
@@ -113,6 +227,18 @@ def register_event_handlers() -> None:
     event_bus.subscribe(
         EventType.LEDGER_DATASET_ACTIVATED,
         _make_tb_handler("on_data_imported"),
+    )
+    # 四表入库激活后自动串联 科目映射(auto_match) → 生成 trial_balance，
+    # 使"入库即可用"（无需手动先做科目映射）。best-effort，失败不影响导入。
+    event_bus.subscribe(
+        EventType.LEDGER_DATASET_ACTIVATED,
+        _auto_map_on_dataset_activated,
+    )
+    # 账套入库激活后把项目状态 计划中/已创建 → 执行中（幂等，不回退已完成项目）。
+    # best-effort，失败不影响导入。
+    event_bus.subscribe(
+        EventType.LEDGER_DATASET_ACTIVATED,
+        _advance_project_status_on_dataset_activated,
     )
     event_bus.subscribe(
         EventType.LEDGER_DATASET_ROLLED_BACK,

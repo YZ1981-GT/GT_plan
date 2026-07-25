@@ -61,7 +61,8 @@ describe('LineagePanel.vue', () => {
   it('未选中章节时显示提示文案', () => {
     const wrapper = mount(LineagePanel, { props: baseProps })
     expect(wrapper.find('.lineage-panel__hint').exists()).toBe(true)
-    expect(wrapper.text()).toContain('请在文档中选中章节以查看溯源信息')
+    // 提示文案已随手动章节溯源改造修正（不再误导为"文档中选中"）
+    expect(wrapper.text()).toContain('请在上方输入章节号后点「溯源」')
   })
 
   it('无锚点时显示降级提示（需求 3.5）', () => {

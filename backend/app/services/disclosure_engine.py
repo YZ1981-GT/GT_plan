@@ -197,6 +197,59 @@ def _is_table_title_paragraph(para: str) -> bool:
     return bool(_NUMBERED_TITLE_RE.match(s))
 
 
+def _paragraph_matches_table_name(para: str, table_names: list[str]) -> bool:
+    """段落是否**精确等于**某张表名（去掉 markdown # 前缀后比较）。
+
+    模板 text_sections 常把子表标题写成与 tables[].name 完全一致的**无编号纯文本**
+    行（如 应收票据 五、4 的「期末本公司已质押的应收票据」），`_is_table_title_paragraph`
+    只认 # / 编号标题会漏判 → 这些标题行漏进可编辑正文。此处用**精确等于**判定
+    （保守，不用包含匹配，避免误吞含表名子串的实质正文）。
+    """
+    s = (para or "").lstrip("#").strip()
+    if not s:
+        return False
+    return any(bool(n) and s == n.strip() for n in table_names)
+
+
+# 括号配对表：跨段/跨行的多段指引块（如 `【提示：` 起、`…】` 止）需先合并为
+# 单一段落，`is_guidance_paragraph`（要求首尾同段成对）才能正确判为指引。
+_BRACKET_OPEN_TO_CLOSE = {"【": "】", "（": "）", "(": ")", "《": "》"}
+_BRACKET_OPEN_CHARS = tuple(_BRACKET_OPEN_TO_CLOSE.keys())
+
+
+def _bracket_unbalanced(text: str) -> bool:
+    """任一开括号数量多于其对应闭括号 → 该文本内的括号块尚未闭合。"""
+    return any(
+        text.count(o) > text.count(c) for o, c in _BRACKET_OPEN_TO_CLOSE.items()
+    )
+
+
+def _merge_bracket_blocks(paragraphs: list[str]) -> list[str]:
+    """合并被拆成多段/多行的括号指引块（`【提示：` … `…】`）为单一段落。
+
+    仅当某段以开括号（【（(《）起且自身未闭合时才启动合并，持续吸纳后续段落
+    直至括号配平；配平后作为一个段落输出。若始终未闭合（模板残缺），退回逐段
+    原样输出（不吞并后续正文，保持零回归）。已配平/普通正文段落原样透传。
+    """
+    merged: list[str] = []
+    buf: list[str] = []
+    for para in paragraphs:
+        if buf:
+            buf.append(para)
+            if not _bracket_unbalanced("\n".join(buf)):
+                merged.append("\n".join(buf))
+                buf = []
+            continue
+        stripped = (para or "").strip()
+        if stripped.startswith(_BRACKET_OPEN_CHARS) and _bracket_unbalanced(para):
+            buf = [para]
+        else:
+            merged.append(para)
+    if buf:                        # 未闭合：逐段原样输出（不合并、不吞后文）
+        merged.extend(buf)
+    return merged
+
+
 def _flatten_paragraphs(
     text_sections: list[str] | None,
     text_template: str | None,
@@ -266,7 +319,7 @@ def classify_template_content(
     向后兼容：旧调用方不传 tables → per_table_guidance={}，所有指引归
     section_guidance（行为同旧）。
     """
-    paragraphs = _flatten_paragraphs(text_sections, text_template)
+    paragraphs = _merge_bracket_blocks(_flatten_paragraphs(text_sections, text_template))
     table_names = [(t.get("name") or "").strip() for t in (tables or [])]
     multi_table = len(table_names) > 1
 
@@ -282,8 +335,10 @@ def classify_template_content(
             else:
                 section_guidance_parts.append(para)
             continue
-        if _is_table_title_paragraph(para):
+        if _is_table_title_paragraph(para) or _paragraph_matches_table_name(para, table_names):
             # 标题行：推进游标到匹配的 table_idx（标题行本身不进任何输出）
+            # 含两类：① # / 编号标题（_is_table_title_paragraph）
+            #        ② 与 tables[].name 精确相等的无编号纯文本标题（_paragraph_matches_table_name）
             if multi_table:
                 idx = _match_title_to_table_idx(para, table_names, current_idx)
                 if idx is not None:
@@ -310,7 +365,7 @@ def identify_guidance(text_content: str) -> tuple[str, str] | None:
     """
     if not text_content or not str(text_content).strip():
         return None
-    segments = text_content.split("\n\n")
+    segments = _merge_bracket_blocks(text_content.split("\n\n"))
     guidance_segments: list[str] = []
     remaining_segments: list[str] = []
     any_hit = False
@@ -1720,6 +1775,12 @@ class DisclosureEngine:
 
             headers = td.get("headers") or []
             num_value_cols = max(0, len(headers) - 1)
+            # legacy 表 headers 常为空（表头读时由 _cell_meta 语义投影），此时
+            # 从行 values 长度推断值列数，否则 num_value_cols=0 使刷新彻底 no-op。
+            if num_value_cols == 0:
+                for _r in rows:
+                    if isinstance(_r, dict) and isinstance(_r.get("values"), list):
+                        num_value_cols = max(num_value_cols, len(_r["values"]))
 
             # 更新 ctx section_number
             ctx["section_number"] = section
@@ -1747,11 +1808,7 @@ class DisclosureEngine:
                     for col_idx in range(min(num_value_cols, len(values))):
                         mode = cell_modes.get(str(col_idx), "auto")
 
-                        # skip_manual: 仅处理 auto 单元格
-                        if skip_manual and mode != "auto":
-                            continue
-
-                        # 从 binding 获取 cell 定义
+                        # 从 binding 获取 cell 定义（先解析，供 legacy 判定使用）
                         cell_binding = self._resolve_cell_binding(
                             label, col_idx, binding_rows, header_normalize,
                             cell_meta,
@@ -1759,6 +1816,18 @@ class DisclosureEngine:
                         if cell_binding is None:
                             # 无 binding → 无法重算，跳过
                             continue
+
+                        # skip_manual: 仅处理 auto 单元格；但兼容 legacy——老生成器把
+                        # 本应自动的单元格硬编码为 manual（无用户手工值），binding 声明
+                        # auto 且该格从无用户值时，按 auto 重算并归一为 auto。
+                        legacy_refill = False
+                        if skip_manual and mode != "auto":
+                            if self._is_legacy_auto_cell(
+                                row, col_idx, mode, cell_binding, cell_meta, values,
+                            ):
+                                legacy_refill = True
+                            else:
+                                continue
 
                         # Wave2：公式家族（sum/report/aging）由 resolve_formula 承载
                         # （dispatch_resolver 未注册），受灰度开关约束。
@@ -1783,6 +1852,10 @@ class DisclosureEngine:
 
                         # 写回
                         values[col_idx] = new_val
+                        # legacy 单元格重算后归一为 auto，使后续刷新走正常自动路径
+                        if legacy_refill:
+                            cell_modes[str(col_idx)] = "auto"
+                            row["_cell_modes"] = cell_modes
                         section_touched = True
                         report.cells_updated += 1
                         report.records.append(CellRefillRecord(
@@ -1813,6 +1886,36 @@ class DisclosureEngine:
         await self.db.flush()
 
         return report
+
+    @staticmethod
+    def _is_legacy_auto_cell(
+        row: dict,
+        col_idx: int,
+        mode: str,
+        cell_binding: dict,
+        cell_meta: dict,
+        values: list,
+    ) -> bool:
+        """判定 legacy 单元格是否应按 auto 重算（供 refill_sections 兼容老数据）。
+
+        仅当全部满足才返回 True（否则尊重用户手工/锁定态）：
+          - 存储态 mode == "manual"（locked 绝不重算）
+          - row 标记 ``_legacy_row``（老生成器产物，manual 非用户意图）
+          - binding 声明该格 mode 为 auto（缺省视为 auto）
+          - _cell_meta[col].manual_value 为 None（该格从无用户手工输入）
+          - 当前值为空（None / 空串）——已有值不覆盖
+        """
+        if mode != "manual":
+            return False
+        if not row.get("_legacy_row"):
+            return False
+        if (cell_binding.get("mode") or "auto") != "auto":
+            return False
+        slot = cell_meta.get(str(col_idx))
+        if isinstance(slot, dict) and slot.get("manual_value") is not None:
+            return False
+        cur = values[col_idx] if col_idx < len(values) else None
+        return cur is None or cur == ""
 
     @staticmethod
     def _resolve_cell_binding(
@@ -1898,6 +2001,11 @@ class DisclosureEngine:
             .order_by(DisclosureNote.sort_order)
         )
         notes = result.scalars().all()
+        # has_data：与 NoteWordExporter._has_content 收敛为同一共享 helper
+        # （note_content_utils.note_has_data，单一真源），防"附注树标记≠Word 导出结果"漂移
+        # （spec disclosure-notes-selective-generation Req2）。is_empty(not_applicable)→false。
+        from app.services.note_content_utils import note_has_data
+
         return [
             {
                 "id": str(n.id),
@@ -1907,6 +2015,7 @@ class DisclosureEngine:
                 "content_type": n.content_type.value if n.content_type else None,
                 "status": "not_applicable" if n.is_empty else (n.status.value if n.status else "draft"),
                 "sort_order": n.sort_order,
+                "has_data": note_has_data(n),
             }
             for n in notes
         ]

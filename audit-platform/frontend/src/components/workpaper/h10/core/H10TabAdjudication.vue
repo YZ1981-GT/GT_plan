@@ -3,6 +3,9 @@
     <div class="h10-toolbar">
       <h3 class="h10-title">H10-1 资产处置损益审定表</h3>
       <div class="h10-actions">
+        <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
+          <el-icon><Download /></el-icon>带入调整
+        </el-button>
         <el-button size="small" :disabled="isReadonly" data-testid="h10-fill-from-detail" @click="onFillFromDetail">从明细带入</el-button>
         <el-button size="small" :loading="cross.h6PullLoading.value" data-testid="h10-h6-cross-btn" @click="onRefreshH6">勾稽 H6</el-button>
         <GtReviewTrigger section-id="H10-1-adjudication" />
@@ -38,6 +41,7 @@
         <p>科目 6115 资产处置损益（损益类/贷方），取<strong>发生额</strong>（贷方-借方），非期末余额。</p>
         <p>推荐：先编 H10-2 明细 → 点「从明细带入」汇总至未审数（保留 AJE/RJE）→ 核对 TB。</p>
         <p>审定数 = 未审数 + AJE + RJE；|变动率|&gt;20% 时原因分析必填。分类含试运行销售损益。</p>
+        <p>「带入调整」：从集中登记按科目 6115 拉取调整分录，逐笔分配到各分类行的 AJE/RJE，带入后审定数自动更新并联动附注。</p>
       </div>
     </details>
 
@@ -166,15 +170,28 @@
       <el-input :model-value="adj.auditConclusion.value" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }"
         :disabled="isReadonly" @update:model-value="adj.updateAuditConclusion" />
     </el-card>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="6115 资产处置损益"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { inject, toRef, ref, onMounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Download } from '@element-plus/icons-vue'
 import { useH10Adjudication } from '../../composables/useH10Adjudication'
 import { useH10CrossSheet } from '../../composables/useH10CrossSheet'
 import { resolveH10SheetLabel } from '../../composables/h10SheetLabels'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtReviewDot from '../../GtReviewDot.vue'
@@ -207,6 +224,36 @@ const adj = useH10Adjudication({
 const cross = useH10CrossSheet({
   allResponses: toRef(props, 'allResponses'),
   projectId: toRef(props, 'projectId'),
+})
+
+// ─── 从集中登记带入调整（6115 资产处置损益，损益贷方发生额；分列 AJE/RJE，作用于本期） ───
+const bringInRows = computed(() => {
+  const out: Array<{ rowKey: string; name: string; aje: number; rje: number }> = []
+  for (const g of adj.groupedRows.value) {
+    for (const r of g.rows) {
+      out.push({ rowKey: r.rowKey, name: r.label, aje: Number(r.currentAje) || 0, rje: Number(r.currentRje) || 0 })
+    }
+  }
+  return out
+})
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: toRef(props, 'projectId') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '6115',
+  direction: 'credit',
+  subjectCode: '6115',
+  wpCode: 'H10',
+  subjectLabel: '资产处置损益(6115)',
+  rows: bringInRows,
+  updateCell: (rowKey: string, field: any, value: number) =>
+    adj.updateField(rowKey, field === 'rje' ? 'currentRje' : 'currentAje', value),
+  totalAudited: () => adj.totalRow.value.currentAudited,
 })
 
 const trialAuditedAbs = computed(() => {

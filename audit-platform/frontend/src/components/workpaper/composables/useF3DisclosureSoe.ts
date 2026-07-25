@@ -98,7 +98,8 @@ export function useF3DisclosureSoe(options: {
     debounceSave()
     try {
       window.dispatchEvent(new CustomEvent('disclosure:note-text-updated', {
-        detail: { wpCode: 'F3', section: 'soe', text: val },
+        // 应付票据 soe → 八、36（note_template_variant_matrix）
+        detail: { wpCode: 'F3', accountCode: '2201', section: 'soe', sectionIds: ['八、36'], text: val },
       }))
     } catch { /* silent */ }
   })

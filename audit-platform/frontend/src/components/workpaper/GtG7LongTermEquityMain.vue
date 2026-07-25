@@ -103,6 +103,7 @@
           :wp-code="'G7'"
           :html-data="resolvedHtmlData ?? undefined"
           :available-sheets="availableSheets"
+          :all-responses="g7AllResponses"
         />
       </template>
 

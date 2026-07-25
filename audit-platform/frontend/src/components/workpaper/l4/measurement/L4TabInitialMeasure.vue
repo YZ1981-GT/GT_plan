@@ -275,6 +275,8 @@ function fmtAmount(val: number): string {
 
 onMounted(async () => {
   await formData.loadData()
+  const note = formData.allResponses.value.get('L4-6-auditNote')?.remark
+  if (note != null) auditNote.value = note
 })
 </script>
 

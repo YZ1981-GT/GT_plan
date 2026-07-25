@@ -8,7 +8,7 @@
         <el-tag type="primary" size="small">上市</el-tag>
       </div>
       <div class="section-header-right">
-        <el-button size="small" @click="handleAI('disclosure-listed')">
+        <el-button size="small" :loading="aiLoading === 'disclosure-listed'" :disabled="isReadonly" @click="handleAI('disclosure-listed')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
         <el-button size="small" @click="handleReview">
@@ -31,7 +31,7 @@
       <template #header>
         <div class="card-header">
           <span>应付股利（利润）明细</span>
-          <el-button size="small" @click="handleAI('section-detail')">
+          <el-button size="small" :loading="aiLoading === 'section-detail'" :disabled="isReadonly" @click="handleAI('section-detail')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </div>
@@ -72,7 +72,7 @@
       <template #header>
         <div class="card-header">
           <span>超过1年未支付的重大应付股利说明</span>
-          <el-button size="small" @click="handleAI('section-overdue')">
+          <el-button size="small" :loading="aiLoading === 'section-overdue'" :disabled="isReadonly" @click="handleAI('section-overdue')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </div>
@@ -92,7 +92,7 @@
       <template #header>
         <div class="card-header">
           <span>分红政策及执行情况</span>
-          <el-button size="small" @click="handleAI('section-policy')">
+          <el-button size="small" :loading="aiLoading === 'section-policy'" :disabled="isReadonly" @click="handleAI('section-policy')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </div>
@@ -112,7 +112,7 @@
       <template #header>
         <div class="card-header">
           <span>本年利润分配方案</span>
-          <el-button size="small" @click="handleAI('section-plan')">
+          <el-button size="small" :loading="aiLoading === 'section-plan'" :disabled="isReadonly" @click="handleAI('section-plan')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </div>
@@ -156,8 +156,10 @@
  */
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
 import { Check } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import { useM1FormData } from '../../composables/useM1FormData'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 
 const props = defineProps<{
   wpId: string
@@ -170,6 +172,8 @@ const emit = defineEmits<{
 }>()
 
 const openReviewDialog = inject<((sectionId: string, sectionLabel?: string) => void) | null>('openReviewDialog', null)
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
 
 // ─── FormData ───────────────────────────────────────────────────────────────
 
@@ -218,14 +222,29 @@ function handleConclusionChange() {
   formData.debouncedSave('M1-disc-listed-conclusion', { remark: disclosureConclusion.value || null })
 }
 
-function handleAI(section: string) {
-  import('@/utils/http').then(({ default: h }) => {
-    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
-      section: `m1-disclosure-listed-${section}`,
-      prompt: `请基于应付股利底稿"${section}"区段数据，给出审计分析建议`,
-      context: { section, wpId: props.wpId },
-    }).catch(() => {})
-  })
+async function handleAI(section: string) {
+  if (props.isReadonly) return
+  aiLoading.value = section
+  try {
+    // 按区段回填对应文本框：overdue/policy/plan；header/detail 默认回填分红政策
+    let target: 'overdue' | 'policy' | 'plan' = 'policy'
+    if (section.includes('overdue')) target = 'overdue'
+    else if (section.includes('policy')) target = 'policy'
+    else if (section.includes('plan')) target = 'plan'
+    const existing = target === 'overdue' ? overdueNote.value : target === 'plan' ? planNote.value : policyNote.value
+    const totalRow = detailRows.value.find(r => r.item === '合计')
+    const context: Record<string, string> = {
+      科目: '2232 应付股利 / 附注披露信息（上市公司）',
+      区段: section,
+      期末数合计: fmtAmount(totalRow?.endAmount ?? 0),
+      上年年末数合计: fmtAmount(totalRow?.priorYearEnd ?? 0),
+    }
+    const text = await generateAiText({ section: `m1-disclosure-listed-${section}`, context, existingContent: existing })
+    if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+    if (target === 'overdue') { overdueNote.value = text; handleOverdueNoteChange() }
+    else if (target === 'plan') { planNote.value = text; handlePlanNoteChange() }
+    else { policyNote.value = text; handlePolicyNoteChange() }
+  } catch { ElMessage.warning('AI 生成失败，请稍后重试') } finally { aiLoading.value = '' }
 }
 function handleReview() { openReviewDialog?.('M1-disclosure-listed', '附注披露（上市）') }
 

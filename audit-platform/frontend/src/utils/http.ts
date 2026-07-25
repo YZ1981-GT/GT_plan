@@ -488,12 +488,16 @@ export async function downloadFile(
     data?: any
     params?: Record<string, any>
     fileName?: string
+    /** 抑制全局错误 toast，由调用方自行处理（如预期的 404） */
+    silent?: boolean
   },
 ) {
   const method = options?.method ?? 'get'
+  const cfg: any = { params: options?.params, responseType: 'blob' }
+  if (options?.silent) cfg._silent = true
   const response = method === 'post'
-    ? await http.post(url, options?.data ?? null, { params: options?.params, responseType: 'blob' })
-    : await http.get(url, { params: options?.params, responseType: 'blob' })
+    ? await http.post(url, options?.data ?? null, cfg)
+    : await http.get(url, cfg)
 
   const contentDisposition = response.headers?.['content-disposition'] as string | undefined
   const resolvedFileName = extractFileNameFromDisposition(contentDisposition, options?.fileName || 'download')

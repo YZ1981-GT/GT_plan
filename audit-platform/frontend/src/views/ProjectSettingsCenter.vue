@@ -174,6 +174,19 @@
             <p v-if="!canManageMembers" class="settings-panel__desc" style="margin-top: 8px;">
               仅项目经理及以上角色可修改账龄段配置。
             </p>
+
+            <div class="settings-config-card" style="margin-top: 12px;">
+              <div class="settings-config-card__info">
+                <div class="settings-config-card__name">ACNR 地址 Overlay</div>
+                <div class="settings-config-card__desc">
+                  项目级地址坐标名称库补丁：sheet 别名 / 实例绑定 / 自定义覆盖。
+                  写入经乐观并发（CAS）保护，支持多人并发编辑。
+                </div>
+              </div>
+              <el-button type="primary" size="small" @click="openAcnrOverlays">
+                管理 Overlay
+              </el-button>
+            </div>
           </div>
         </el-tab-pane>
 
@@ -216,7 +229,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import GtPageShell from '@/components/common/GtPageShell.vue'
 import ProjectContextBar from '@/components/common/ProjectContextBar.vue'
 import AgingConfigDialog from '@/components/workpaper/AgingConfigDialog.vue'
@@ -228,8 +241,13 @@ import { api } from '@/services/apiProxy'
 defineOptions({ name: 'ProjectSettingsCenter' })
 
 const route = useRoute()
+const router = useRouter()
 const projectStore = useProjectStore()
 const { can, whyCannot, currentRole } = usePermissionMatrix()
+
+function openAcnrOverlays() {
+  router.push({ name: 'AcnrOverlayManager', params: { projectId: projectId.value } })
+}
 
 const projectId = computed(() => route.params.projectId as string)
 const ctx = computed(() => projectStore.currentProjectContext)

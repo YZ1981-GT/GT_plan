@@ -4,9 +4,6 @@
     <div class="detail-header">
       <h3 class="detail-title">L2-2 应付利息明细表</h3>
       <div class="detail-header-actions">
-        <el-button type="primary" text size="small" @click="handleAI">
-          <el-icon><MagicStick /></el-icon> AI
-        </el-button>
         <el-button
           v-if="!isReadonly"
           type="primary"
@@ -158,6 +155,20 @@
               <span v-else :class="{ 'row-bold': row.rowId === '__subtotal__' }">
                 {{ row.contractName }}
               </span>
+            </template>
+          </el-table-column>
+
+          <el-table-column prop="creditor" label="债权人名称" min-width="130">
+            <template #default="{ row }">
+              <template v-if="row.rowId !== '__subtotal__' && !isReadonly">
+                <el-input
+                  :model-value="row.creditor"
+                  size="small"
+                  placeholder="债权人"
+                  @change="(val: string) => updateCell(row.rowId, 'creditor', val)"
+                />
+              </template>
+              <span v-else>{{ row.creditor || '-' }}</span>
             </template>
           </el-table-column>
 
@@ -579,6 +590,33 @@
       逾期笔数：{{ overdueRows.length }} 笔，逾期金额合计：{{ fmtAmount(overdueTotal) }}
     </div>
 
+    <!-- ═══ 明细分析说明（AI辅助） ═══ -->
+    <el-card shadow="never" class="detail-note-card">
+      <template #header>
+        <div class="detail-note-header">
+          <span class="detail-note-title">明细分析说明</span>
+          <el-button
+            v-if="!isReadonly"
+            size="small"
+            type="warning"
+            plain
+            :loading="aiLoading"
+            @click="handleAI"
+          >
+            🤖 AI辅助
+          </el-button>
+        </div>
+      </template>
+      <el-input
+        :model-value="detailNote"
+        type="textarea"
+        :autosize="{ minRows: 3 }"
+        :readonly="isReadonly"
+        placeholder="记录明细分析：计提合理性（与L1/L3测算对比）、逾期风险、异常关注点..."
+        @input="(v: string) => updateDetailNote(v)"
+      />
+    </el-card>
+
     <!-- ═══ 编制提示（折叠） ═══ -->
     <details class="l2-details-tip">
       <summary>编制提示</summary>
@@ -614,9 +652,9 @@
  *
  * 科目：2231 应付利息（贷方/负债类！）
  */
-import { computed, inject, toRef } from 'vue'
+import { computed, ref, inject, toRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Plus, ArrowDown, MagicStick, WarningFilled } from '@element-plus/icons-vue'
+import { Search, Plus, ArrowDown, WarningFilled } from '@element-plus/icons-vue'
 import { useL2FormData } from '../../composables/useL2FormData'
 import { useL2Detail, SOURCE_OPTIONS, type DetailRow, type AreaGroup } from '../../composables/useL2Detail'
 import { useL2CrossSheet } from '../../composables/useL2CrossSheet'
@@ -797,27 +835,52 @@ function triggerFileInput(): void {
   input.click()
 }
 
+// ─── 明细分析说明（持久化 + AI辅助） ────────────────────────────────────────
+
+const DETAIL_NOTE_ITEM = 'L2-L2-2-note'
+
+const detailNote = computed(() => allResponses.value.get(DETAIL_NOTE_ITEM)?.remark || '')
+
+function updateDetailNote(v: string): void {
+  debouncedSave(DETAIL_NOTE_ITEM, { remark: v })
+}
+
 // ─── AI辅助 ──────────────────────────────────────────────────────────────────
 
+const aiLoading = ref(false)
+
 async function handleAI(): Promise<void> {
+  aiLoading.value = true
   try {
-    const context = {
-      rowCount: rows.value.length,
-      totalAccrued: rows.value.reduce((s, r) => s + (r.accrued || 0), 0),
-      totalPaid: rows.value.reduce((s, r) => s + (r.paid || 0), 0),
-      overdueCount: overdueRows.value.length,
-      l1Estimated: l1EstimatedInterest.value,
-      l3Estimated: l3EstimatedInterest.value,
+    // context 值必须全部为字符串，否则后端 422
+    const context: Record<string, string> = {
+      明细笔数: String(rows.value.length),
+      本期计提合计: String(rows.value.reduce((s, r) => s + (r.accrued || 0), 0)),
+      本期支付合计: String(rows.value.reduce((s, r) => s + (r.paid || 0), 0)),
+      逾期笔数: String(overdueRows.value.length),
+      L1利息测算: String(l1EstimatedInterest.value),
+      L3利息测算: String(l3EstimatedInterest.value),
     }
-    const res = await (await import('@/utils/http')).default.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
-      section: 'interest-payable-detail',
-      prompt: '请基于应付利息明细表数据，分析计提合理性（与L1/L3测算对比）、逾期风险及审计关注点',
-      context,
-    })
-    const content = res.data?.data?.content
-    if (content) ElMessage.success('AI分析已生成，请查看审计说明区域')
+    const res = await (await import('@/utils/http')).default.post(
+      `/api/workpapers/${props.wpId}/ai/generate-text`,
+      {
+        section: 'interest-payable-detail',
+        prompt: '请基于应付利息明细表数据，分析计提合理性（与L1/L3测算对比）、逾期风险及审计关注点',
+        context,
+        existingContent: detailNote.value,
+      },
+    )
+    const content = res.data?.data?.content || res.data?.content
+    if (content) {
+      updateDetailNote(content)
+      ElMessage.success('AI分析已生成')
+    } else {
+      ElMessage.info('AI辅助暂不可用')
+    }
   } catch {
     ElMessage.info('AI辅助暂不可用，请手动分析')
+  } finally {
+    aiLoading.value = false
   }
 }
 
@@ -1013,6 +1076,23 @@ function fmtAmount(val: number | null | undefined): string {
 :deep(.el-table th .cell) {
   font-size: var(--wp-font-size, 13px);
   font-weight: 600;
+}
+
+/* ─── 明细分析说明卡片 ─── */
+.detail-note-card {
+  margin-bottom: 12px;
+}
+
+.detail-note-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.detail-note-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: #303133;
 }
 
 /* ─── 编制提示折叠 ─── */

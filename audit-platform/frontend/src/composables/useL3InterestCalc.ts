@@ -170,7 +170,7 @@ export function useL3InterestCalc(
     if (index < 0 || index >= interestRows.value.length) return
     const row = interestRows.value[index] as any
     row[field] = value
-    _triggerSave(index)
+    _persist()
   }
 
   /** 新增利息测算行 */
@@ -185,14 +185,14 @@ export function useL3InterestCalc(
       bookedInterest: 0,
     }
     interestRows.value.push(newRow)
-    _triggerSave(interestRows.value.length - 1)
+    _persist()
   }
 
   /** 删除行 */
   function removeRow(index: number): void {
     if (index < 0 || index >= interestRows.value.length) return
     interestRows.value.splice(index, 1)
-    _triggerSaveAll()
+    _persist()
   }
 
   // ─── 5. EventBus: publish 'l3:interest-calculated' ────────────────────
@@ -218,27 +218,12 @@ export function useL3InterestCalc(
   }
 
   // ─── 6. 保存触发 ──────────────────────────────────────────────────────
+  //
+  // 🔴 P0 修复（2026-07）：统一 JSON-array 存储 item_id `L3-L3-5-rows`。
+  // 此前用 flat per-field keys `L3-int-{n}-{field}` 且组件无 hydration → 刷新数据全丢。
 
-  function _triggerSave(rowIndex: number): void {
-    const row = interestRows.value[rowIndex]
-    if (!row) return
-    const n = rowIndex + 1
-    const fields: (keyof L3InterestCalcRow)[] = [
-      'contractNo', 'bank', 'principal', 'annualRate',
-      'loanStart', 'loanEnd', 'bookedInterest',
-    ]
-    for (const field of fields) {
-      const val = (row as any)[field]
-      debouncedSave(`L3-int-${n}-${field}`, {
-        remark: val != null && val !== '' && val !== 0 ? String(val) : null,
-      })
-    }
-  }
-
-  function _triggerSaveAll(): void {
-    for (let i = 0; i < interestRows.value.length; i++) {
-      _triggerSave(i)
-    }
+  function _persist(): void {
+    debouncedSave('L3-L3-5-rows', { remark: JSON.stringify(interestRows.value) })
   }
 
   // ─── Return ────────────────────────────────────────────────────────────

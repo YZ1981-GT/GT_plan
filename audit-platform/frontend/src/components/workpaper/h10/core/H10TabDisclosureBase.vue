@@ -13,6 +13,7 @@
           :loading="isSyncing"
           @click="syncToNotes"
         >同步到附注</el-button>
+        <el-button size="small" type="primary" plain :disabled="!projectId" @click="jumpToNote(variant)">↩ 跳转回附注</el-button>
         <el-button size="small" :disabled="isReadonly" data-testid="h10-disclosure-pull-adj" @click="dis.pullFromAdjudication()">
           从审定表带入
         </el-button>
@@ -198,6 +199,8 @@
 <script setup lang="ts">
 import { ref, toRef, computed, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useRouter } from 'vue-router'
+import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import { useH10Disclosure } from '../../composables/useH10Disclosure'
 import { buildH10SyncPayloads } from '../../composables/h10DisclosureSyncPayload'
 import { H10_NOTE_SECTION } from '../../composables/h10NoteSectionMap'
@@ -228,6 +231,14 @@ const dis = useH10Disclosure({
 const isSyncing = ref(false)
 const noteSectionId = H10_NOTE_SECTION[props.variant]
 const noteChip = computed(() => `Note:${noteSectionId}`)
+
+const router = useRouter()
+// 跳转回附注模块（披露表 → 附注为单向推送；此处仅导航，方便相互编辑确认）
+function jumpToNote(target: DisclosureVariant): void {
+  const route = buildNoteJumpRoute(props.projectId || '', 'H10', target)
+  if (!route) { ElMessage.warning('未找到对应的附注章节'); return }
+  router.push(route)
+}
 const reconcileAlertType = computed(() => {
   const d = dis.reconcileDiff.value
   if (d == null) return 'success'

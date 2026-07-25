@@ -36,7 +36,7 @@
             <el-button size="small" :disabled="isReadonly" type="primary" @click="handleAddVoucherRow">
               <el-icon><Plus /></el-icon> 新增
             </el-button>
-            <el-button size="small" @click="handleAI('voucher-check')">
+            <el-button size="small" :loading="aiLoading === 'voucher-check'" @click="handleAI('voucher-check')">
               <el-icon><MagicStick /></el-icon> AI
             </el-button>
           </div>
@@ -197,7 +197,7 @@
           <span>J3 股份支付确认差异核对</span>
           <div class="card-header-right">
             <GtIndexChip value="J3" label="→J3股份支付" />
-            <el-button size="small" @click="handleAI('share-based')">
+            <el-button size="small" :loading="aiLoading === 'share-based'" @click="handleAI('share-based')">
               <el-icon><MagicStick /></el-icon> AI
             </el-button>
           </div>
@@ -267,7 +267,7 @@
       <template #header>
         <div class="card-header">
           <span>核对清单</span>
-          <el-button size="small" @click="handleAI('checklist')">
+          <el-button size="small" :loading="aiLoading === 'checklist'" @click="handleAI('checklist')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </div>
@@ -298,7 +298,7 @@
       <template #header>
         <div class="card-header">
           <span>审计结论</span>
-          <el-button size="small" @click="handleAI('conclusion')">
+          <el-button size="small" :loading="aiLoading === 'conclusion'" @click="handleAI('conclusion')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </div>
@@ -350,9 +350,11 @@
  * 科目：4002 资本公积（**贷方/权益类！**）
  * 检查关注：增加凭证（贷方：溢价/股份支付/外币折算）+ 减少凭证（借方：转增/弥补）
  */
-import { computed, inject, onMounted, defineAsyncComponent } from 'vue'
+import { computed, inject, onMounted, ref, defineAsyncComponent } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, MagicStick, Check } from '@element-plus/icons-vue'
 import { useM4FormData } from '../../composables/useM4FormData'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import { useM4ReserveCheck } from '../../composables/useM4ReserveCheck'
 
 const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
@@ -375,6 +377,8 @@ const openReviewDialog = inject<((sectionId: string, sectionLabel?: string) => v
   'openReviewDialog',
   null,
 )
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
 
 // ─── FormData + Composables ──────────────────────────────────────────────────
 
@@ -418,8 +422,44 @@ function handleAddVoucherRow() {
   check.addVoucherRow()
 }
 
-function handleAI(_section: string) {
-  /* AI辅助待集成 */
+async function handleAI(section: string) {
+  if (props.isReadonly) return
+  aiLoading.value = section
+  try {
+    const context: Record<string, string> = {
+      科目: '4002 资本公积（权益类贷方）',
+      检查金额合计: fmtAmount(check.totalCheckAmount.value),
+      本期发生额: fmtAmount(check.checkRatio.value.periodAmount),
+      检查覆盖率: check.checkRatio.value.ratio !== null
+        ? (check.checkRatio.value.ratio * 100).toFixed(1) + '%'
+        : '—',
+      J3确认金额: fmtAmount(check.j3EquitySettled.value),
+      账面其他资本公积增加: fmtAmount(check.bookedOtherIncrease.value),
+      股份支付确认差异: fmtAmount(check.shareBasedCheck.value.diff),
+    }
+    // 审计结论 → 回填 conclusion textarea
+    if (section === 'conclusion') {
+      const existing = check.conclusion.value
+      const text = await generateAiText({ section: `m4-reserve-check-${section}`, context, existingContent: existing })
+      if (!text) {
+        ElMessage.warning('AI 未生成内容，请稍后重试')
+        return
+      }
+      check.setConclusion(text)
+      return
+    }
+    // voucher-check / share-based / checklist 无 textarea → 建议弹窗
+    const text = await generateAiText({ section: `m4-reserve-check-${section}`, context })
+    if (!text) {
+      ElMessage.warning('AI 未生成内容，请稍后重试')
+      return
+    }
+    ElMessageBox.alert(text, 'AI 辅助建议', { confirmButtonText: '知道了' }).catch(() => {})
+  } catch {
+    ElMessage.warning('AI 生成失败，请稍后重试')
+  } finally {
+    aiLoading.value = ''
+  }
 }
 
 function handleReview() {

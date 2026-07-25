@@ -51,13 +51,13 @@
           <span class="chip-wrap"><GtIndexChip value="wp:G1-1" /></span>
           <span class="hint">期末/上年年末应对齐 G1-1 账面余额（公允价值）</span>
         </div>
-        <el-table :data="classificationRows" border size="small" :row-class-name="amountRowClass" max-height="480">
+        <el-table :data="classificationRows" border size="small" class="amount-table" :row-class-name="amountRowClass" max-height="480">
           <el-table-column label="项目" min-width="280">
             <template #default="{ row }">
               <span :style="{ paddingLeft: `${(row.indent || 0) * 14}px` }" :class="{ strong: row.kind !== 'leaf' }">{{ row.label }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="期末余额" width="130" align="right">
+          <el-table-column label="期末余额" min-width="150" align="right">
             <template #default="{ row }">
               <el-input-number
                 v-if="row.kind === 'leaf' && !isReadonly"
@@ -70,7 +70,7 @@
               <span v-else>{{ fmt(row.endAmount) }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="上年年末余额" width="130" align="right">
+          <el-table-column label="上年年末余额" min-width="150" align="right">
             <template #default="{ row }">
               <el-input-number
                 v-if="row.kind === 'leaf' && !isReadonly"
@@ -110,12 +110,29 @@
       <el-tab-pane label="② 衍生工具" name="derivative">
         <div class="tab-toolbar">
           <el-switch v-model="derivativeApplicable" :disabled="isReadonly" active-text="衍生业务重要，单独披露" />
+          <!-- 跳转回附注（默认上市 五、3，下拉可切国企 八、3）-->
+          <el-dropdown
+            split-button
+            type="primary"
+            size="small"
+            trigger="click"
+            @click="jumpDerivativeToNote('listed')"
+            @command="jumpDerivativeToNote"
+          >
+            ↩ 跳转回附注（五、3）
+            <template #dropdown>
+              <el-dropdown-menu>
+                <el-dropdown-item command="listed">上市版附注（五、3）</el-dropdown-item>
+                <el-dropdown-item command="soe">国企版附注（八、3）</el-dropdown-item>
+              </el-dropdown-menu>
+            </template>
+          </el-dropdown>
           <span class="chip-wrap"><GtIndexChip value="wp:G1-14" /></span>
         </div>
         <template v-if="derivativeApplicable">
-          <el-table :data="derivativeRows" border size="small" :row-class-name="amountRowClass" max-height="360">
+          <el-table :data="derivativeRows" border size="small" class="amount-table" :row-class-name="amountRowClass" max-height="360">
             <el-table-column label="项目" min-width="200" prop="label" />
-            <el-table-column label="期末余额" width="130" align="right">
+            <el-table-column label="期末余额" min-width="150" align="right">
               <template #default="{ row }">
                 <el-input-number
                   v-if="row.kind === 'leaf' && !isReadonly"
@@ -128,7 +145,7 @@
                 <span v-else>{{ fmt(row.endAmount) }}</span>
               </template>
             </el-table-column>
-            <el-table-column label="上年年末余额" width="130" align="right">
+            <el-table-column label="上年年末余额" min-width="150" align="right">
               <template #default="{ row }">
                 <el-input-number
                   v-if="row.kind === 'leaf' && !isReadonly"
@@ -447,6 +464,8 @@
 
 <script setup lang="ts">
 import { computed, toRef, ref, inject } from 'vue'
+import { useRouter } from 'vue-router'
+import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { useG1DisclosureListed } from '../../composables/useG1DisclosureListed'
@@ -468,6 +487,19 @@ const props = defineProps<{
 
 const wpId = computed(() => props.wpId ?? '')
 const projectId = computed(() => props.projectId ?? '')
+const router = useRouter()
+
+// 跳转回附注模块「衍生金融资产」（披露表 → 附注为单向推送；此处仅导航方便相互编辑确认）
+// 上市默认→五、3，下拉可切国企↔八、3
+function jumpDerivativeToNote(target: DisclosureVariant): void {
+  const route = buildNoteJumpRoute(projectId.value, 'G1_DERIVATIVE', target)
+  if (!route) {
+    ElMessage.warning('未找到对应的衍生金融资产附注章节')
+    return
+  }
+  router.push(route)
+}
+
 const noteSectionId = G1_NOTE_SECTION.listed.trading
 const noteChip = `Note:${noteSectionId}`
 const techniqueOptions = G1_VALUATION_TECHNIQUE_OPTIONS
@@ -579,4 +611,10 @@ async function syncToNotes() {
 .formula { border-bottom: 1px dashed #909399; }
 :deep(.row-header) { background: #f4f0fa !important; }
 :deep(.row-subtotal) { background: #f0f2f5 !important; font-weight: 600; }
+:deep(.el-table) { font-size: 13px; }
+:deep(.el-table th),
+:deep(.el-table td),
+:deep(.el-table .cell) { font-size: 13px; }
+/* 项目 + 金额列（分类/衍生）宽表：限制整体宽度，避免在超宽容器里项目列被拉伸出大片空白、金额列被挤到右侧 */
+.amount-table { max-width: 760px; }
 </style>

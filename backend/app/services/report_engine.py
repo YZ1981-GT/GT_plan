@@ -539,6 +539,8 @@ class ReportFormulaParser:
         self._use_unadjusted = False  # Phase 9: 未审模式标志
         # Cache: standard_account_code -> TrialBalance row
         self._tb_cache: dict[str, TrialBalance | None] = {}
+        # 前缀聚合缓存：父科目码 -> 该科目及其所有子科目行列表（口径根治，2026-07）
+        self._tb_prefix_cache: dict[str, list[TrialBalance]] = {}
         # A1/A2：可注入金额解析器。None → 默认走内部 trial_balance 取数（单体行为 100% 不变，R1）；
         # 注入 ConsolTrialResolver 时 TB()/SUM_TB() 改走 consol_trial.consol_amount（合并）。
         self.resolver = resolver
@@ -559,31 +561,64 @@ class ReportFormulaParser:
         self._tb_cache[account_code] = row
         return row
 
+    async def _get_tb_rows_prefix(self, account_code: str) -> list[TrialBalance]:
+        """取「科目及其所有子科目」行（前缀聚合口径）。
+
+        标准科目码是层级前缀关系（如 2221 应交税费 → 222102 应交消费税），
+        `LIKE 'code%'` 精确覆盖该科目及全部后代，且已验证报表配置无前缀重叠。
+        """
+        cached = self._tb_prefix_cache.get(account_code)
+        if cached is not None:
+            return cached
+        result = await self.db.execute(
+            sa.select(TrialBalance).where(
+                TrialBalance.project_id == self.project_id,
+                TrialBalance.year == self.year,
+                TrialBalance.standard_account_code.like(f"{account_code}%"),
+                TrialBalance.is_deleted == sa.false(),
+            )
+        )
+        rows = list(result.scalars().all())
+        self._tb_prefix_cache[account_code] = rows
+        for r in rows:
+            self._tb_cache[r.standard_account_code] = r
+        return rows
+
     async def _resolve_tb(self, account_code: str, column_name: str) -> Decimal:
-        """解析 TB('account_code','column_name') → Decimal 值"""
+        """解析 TB('account_code','column_name') → Decimal 值。
+
+        口径根治（2026-07）：单体 trial_balance 路径按「科目及其所有子科目」前缀聚合，
+        使 TB('2221') 自动含子级标准码（如 222102 应交消费税），避免客户映射到合法子级
+        标准码时报表父行漏计。已验证 4 套标准 report_config 无前缀重叠、无 5+ 位子码直接
+        引用 → 不会重复计算。resolver 注入路径（合并 ConsolTrialResolver）语义完全不变（R1）。
+        """
         # A1/A2：注入了 resolver（如 ConsolTrialResolver）时改走注入数据源
         if self.resolver is not None:
             return await self.resolver.resolve_tb(account_code, column_name)
-        row = await self._get_tb_row(account_code)
-        if row is None:
+
+        rows = await self._get_tb_rows_prefix(account_code)
+        if not rows:
             return Decimal("0")
 
-        # Phase 9: 未审模式下，审定数列替换为未审数列
-        if self._use_unadjusted and column_name in ("期末余额", "审定数"):
-            return row.unadjusted_amount or Decimal("0")
-
         field = _COLUMN_MAP.get(column_name)
-        if field is None:
+        # Phase 9 未审模式：期末/审定列直接取未审数（无需列名映射）
+        unadjusted_end = self._use_unadjusted and column_name in ("期末余额", "审定数")
+        if not unadjusted_end and field is None:
             logger.warning("Unknown column name: %s", column_name)
             return Decimal("0")
 
-        if field == "_period_amount":
-            amount = (row.unadjusted_amount or Decimal("0")) if self._use_unadjusted else (row.audited_amount or Decimal("0"))
-            opening = row.opening_balance or Decimal("0")
-            return amount - opening
-
-        val = getattr(row, field, None)
-        return val if val is not None else Decimal("0")
+        total = Decimal("0")
+        for row in rows:
+            if unadjusted_end:
+                total += row.unadjusted_amount or Decimal("0")
+            elif field == "_period_amount":
+                amount = (row.unadjusted_amount or Decimal("0")) if self._use_unadjusted else (row.audited_amount or Decimal("0"))
+                opening = row.opening_balance or Decimal("0")
+                total += amount - opening
+            else:
+                val = getattr(row, field, None)
+                total += val if val is not None else Decimal("0")
+        return total
 
     async def _resolve_sum_tb(self, code_range: str, column_name: str) -> Decimal:
         """解析 SUM_TB('start~end','column_name') → Decimal 值"""

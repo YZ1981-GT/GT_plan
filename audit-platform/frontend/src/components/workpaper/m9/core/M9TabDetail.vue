@@ -10,13 +10,7 @@
         </el-tag>
       </div>
       <div class="section-header-right">
-        <el-segmented
-          v-model="dualMode.mode.value"
-          :options="dualMode.modeOptions.value"
-          size="small"
-          @change="(val: any) => dualMode.switchMode(val)"
-        />
-        <el-button size="small" @click="handleAI('detail')">
+        <el-button size="small" :loading="aiLoading === 'detail'" :disabled="isReadonly" @click="handleAI('detail')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
         <el-button size="small" @click="handleReview">
@@ -548,10 +542,11 @@
  * 46×30结构，34公式
  */
 import { computed, inject, onMounted, ref } from 'vue'
+import { ElMessageBox, ElMessage } from 'element-plus'
 import { MagicStick, Check, InfoFilled } from '@element-plus/icons-vue'
 import { useM9FormData } from '../../composables/useM9FormData'
-import { useM9DualMode } from '../../composables/useM9DualMode'
 import { useM9ImportExport } from '../../composables/useM9ImportExport'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import {
   useM9Detail,
   M9_DETAIL_SEGMENTS,
@@ -577,13 +572,14 @@ const emit = defineEmits<{
 
 // ─── Inject ──────────────────────────────────────────────────────────────────
 const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', () => {})
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
 
 // ─── Composables ─────────────────────────────────────────────────────────────
 const formData = useM9FormData({
   wpId: computed(() => props.wpId),
   projectId: computed(() => props.projectId),
 })
-const dualMode = useM9DualMode({ wpId: computed(() => props.wpId) })
 const ie = useM9ImportExport({
   wpId: computed(() => props.wpId),
   projectId: computed(() => props.projectId),
@@ -708,9 +704,26 @@ async function onImportFile(f: { raw?: File } | File): Promise<void> {
 }
 
 // ─── AI辅助 + 复核 ──────────────────────────────────────────────────────────
-function handleAI(sectionId: string): void {
-  // AI辅助入口（由主入口统一处理）
-  openReviewDialog?.(`M9-2-ai-${sectionId}`, `M9-2 明细表 AI辅助`)
+async function handleAI(sectionId: string): Promise<void> {
+  if (props.isReadonly) return
+  aiLoading.value = sectionId
+  try {
+    const context: Record<string, string> = {
+      科目: '4103 其他综合收益 / 明细表（M9-2 OCI分项·税后净额）',
+      期初合计: fmtAmount(detail.totals.value.beginning),
+      本期税前发生合计: fmtAmount(detail.totals.value.preTaxAmount),
+      所得税影响合计: fmtAmount(detail.totals.value.taxEffect),
+      税后净额合计: fmtAmount(detail.totals.value.afterTaxNet),
+      期末合计: fmtAmount(detail.totals.value.endBalance),
+      审定期末合计: fmtAmount(detail.totals.value.auditedEnd),
+      不可重分类审定合计: fmtAmount(detail.nonReclassTotal.value),
+      可重分类审定合计: fmtAmount(detail.reclassTotal.value),
+      '与M9-1审定核对': '明细审定期末合计应与审定表M9-1一致',
+    }
+    const text = await generateAiText({ section: `m9-detail-${sectionId}`, context, existingContent: '' })
+    if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+    ElMessageBox.alert(text, 'AI 辅助建议', { confirmButtonText: '知道了' }).catch(() => {})
+  } catch { ElMessage.warning('AI 生成失败，请稍后重试') } finally { aiLoading.value = '' }
 }
 
 function handleReview(): void {

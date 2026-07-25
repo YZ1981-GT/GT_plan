@@ -3,6 +3,9 @@
     <div class="section-head">
       <h3 class="sheet-title">G5-1 长期应收款审定表</h3>
       <div class="head-actions tab-toolbar">
+        <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
+          <el-icon><Download /></el-icon>带入调整
+        </el-button>
         <GtIndexChip value="wp:G5-1" />
         <G5ImportExportDropdown
           :wp-id="props.wpId"
@@ -45,6 +48,7 @@
         <li>「从 G5-2/G5-3 汇总未审」：原值按业务类型归集；一年内优先用 G5-2「1年内到期」勾选；坏账按单项/组合细分归集。</li>
         <li>G5-4「确认调整」后，净 AJE/RJE 回写至「业务类型组合」期末调整列；审定净额自动回写试算 1531。</li>
         <li>可「取试算 1531」拉取核对参考；导入导出按行键 round-trip。</li>
+        <li>「带入调整」：可从集中登记按科目 1531 拉取调整分录，逐笔分配到各余额/坏账明细行的期末账项/重分类调整，带入后审定净额自动更新并联动附注。</li>
       </ul>
     </details>
 
@@ -210,17 +214,30 @@
       @update:note="saveAuditNote"
       @update:conclusion="saveAuditConclusion"
     />
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="1531 长期应收款"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, toRef, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Download } from '@element-plus/icons-vue'
 import {
   useG5Adjudication,
   G5_CHANGE_RATE_THRESHOLD,
   type G5AdjudicationRow,
 } from '../../composables/useG5Adjudication'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import { useInjectedG5FormData } from '../../composables/useG5LonRecFormData'
 import {
   aggregateGrossFromG52,
@@ -254,6 +271,32 @@ const adjudication = useG5Adjudication({
   isReadonly: readonlyRef,
   allResponses: g5Notes.allResponses,
   debouncedSave: g5Notes.debouncedSave,
+})
+
+// ─── 从集中登记带入调整（1531 长期应收款，资产借方；带入期末 AJE/RJE） ────────────
+const bringInRows = computed(() =>
+  adjudication.rows.value
+    .filter((r) => r.editable && r.kind === 'leaf')
+    .map((r) => ({ rowKey: r.rowKey, name: r.label, aje: r.closingAJE, rje: r.closingRJE })),
+)
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: toRef(props, 'projectId') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '1531',
+  direction: 'debit',
+  subjectCode: '1531',
+  wpCode: 'G5',
+  subjectLabel: '长期应收款(1531)',
+  rows: bringInRows,
+  updateCell: (rowKey: string, field: any, value: number) =>
+    adjudication.updateField(rowKey, field === 'rje' ? 'closingRJE' : 'closingAJE', value),
+  totalAudited: () => adjudication.adjudicatedAmount.value,
 })
 
 const auditNote = ref('')

@@ -13,7 +13,7 @@
  *
  * 科目：2502 应付债券（贷方/负债类）
  */
-import { computed, ref, type ComputedRef, type Ref } from 'vue'
+import { computed, ref, watch, type ComputedRef, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   calcInitialAmount,
@@ -21,7 +21,10 @@ import {
   calcSubtotal,
 } from './useL4FormulaEngine'
 import { solveEIR } from './useL4EIREngine'
-import type { useL4FormData } from './useL4FormData'
+import type { useL4FormData, ChecklistResponse } from './useL4FormData'
+
+/** 🔴 P0 修复：JSON-array 存储（此前 flat keys `L4-6-row-{n}-{field}` 无 hydration → 刷新数据丢失） */
+const ITEM_ROWS = 'L4-6-rows'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -68,10 +71,29 @@ export function useL4InitialMeasure(
   formData: ReturnType<typeof useL4FormData>,
   measureRows: Ref<L4InitialMeasureRow[]>,
 ) {
-  const { debouncedSave } = formData
+  const { allResponses, debouncedSave } = formData
 
   /** IRR求解中状态 */
   const isSolvingEIR = ref(false)
+
+  // ─── 0. Hydration ────────────────────────────────────────────────────
+  function hydrate(): void {
+    const raw = allResponses.value.get(ITEM_ROWS)?.remark
+    if (!raw) return
+    try {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) measureRows.value = parsed
+    } catch { /* ignore */ }
+  }
+  hydrate()
+  watch(
+    () => allResponses.value.get(ITEM_ROWS)?.remark,
+    (v) => { if (v && measureRows.value.length === 0) hydrate() },
+  )
+
+  function _persist(): void {
+    debouncedSave(ITEM_ROWS, { remark: JSON.stringify(measureRows.value) } as Partial<ChecklistResponse>)
+  }
 
   // ─── 1. 计算属性 ──────────────────────────────────────────────────────
 
@@ -150,7 +172,7 @@ export function useL4InitialMeasure(
       if (eir > 0) {
         row.effectiveRate = Math.round(eir * 1e8) / 1e8 // 保留8位小数
         row.isEirSolved = true
-        _triggerSave(rowIndex)
+        _persist()
         ElMessage.success(`实际利率已求解：${(eir * 100).toFixed(4)}%`)
       } else {
         ElMessage.warning('IRR未收敛，请手动输入实际利率')
@@ -174,7 +196,7 @@ export function useL4InitialMeasure(
       row.premiumDiscount = calcPremiumDiscount(row.initialAmount, row.faceValue)
     }
 
-    _triggerSave(index)
+    _persist()
   }
 
   /**
@@ -184,25 +206,6 @@ export function useL4InitialMeasure(
     const row = measureRows.value[rowIndex]
     if (!row) return 0
     return calcInitialAmount(row.issuePrice, row.transactionCost)
-  }
-
-  // ─── 5. 保存触发 ──────────────────────────────────────────────────────
-
-  function _triggerSave(rowIndex: number): void {
-    const row = measureRows.value[rowIndex]
-    if (!row) return
-    const n = rowIndex + 1
-    const fields: (keyof L4InitialMeasureRow)[] = [
-      'bondName', 'faceValue', 'issuePrice', 'transactionCost',
-      'initialAmount', 'premiumDiscount', 'couponRate', 'periods',
-      'paymentType', 'effectiveRate', 'isEirSolved',
-    ]
-    for (const field of fields) {
-      const val = (row as any)[field]
-      debouncedSave(`L4-6-row-${n}-${field}`, {
-        remark: val != null && val !== '' && val !== 0 && val !== false ? String(val) : null,
-      })
-    }
   }
 
   // ─── Return ────────────────────────────────────────────────────────────

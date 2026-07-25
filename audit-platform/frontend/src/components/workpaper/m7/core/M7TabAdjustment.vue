@@ -13,7 +13,7 @@
           size="small"
           @change="handleTypeSwitch"
         />
-        <el-button size="small" @click="handleAI('adjustment')">
+        <el-button size="small" :loading="aiLoading === 'adjustment'" @click="handleAI('adjustment')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
         <el-button size="small" @click="handleReview">
@@ -105,6 +105,8 @@
       >
         保存并发布
       </el-button>
+      <el-button size="small" type="primary" plain :loading="centralSyncing" :disabled="!currentBalance.isBalanced || filteredEntries.length === 0" @click="syncToCentral" title="把当前类型调整分录汇聚到集中调整登记，供合伙人跨循环审阅">同步到集中登记</el-button>
+      <el-tag v-if="centralStatus?.review_status" size="small" :type="centralStatus.review_status==='approved'?'success':(centralStatus.review_status==='rejected'?'danger':'info')" :title="centralStatus.rejection_reason||''">集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status]||centralStatus.review_status }}</el-tag>
       <span v-if="!currentBalance.isBalanced" class="balance-warning">借贷不平衡，无法发布</span>
     </div>
 
@@ -146,15 +148,21 @@
  * - subscribe 'substantive:adjudicated' → 双向同步M7-1审定表
  * - 组件卸载时 off 清理
  */
-import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
+import { computed, inject, onMounted, onUnmounted, ref, toRef, watch, type Ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, Check } from '@element-plus/icons-vue'
 import { useM7FormData } from '../../composables/useM7FormData'
 import { useM7Adjustment, type M7AdjustmentType } from '../../composables/useM7Adjustment'
+import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '@/components/workpaper/composables/useAdjustmentCentralSync'
+import { useAuditContext } from '@/composables/useAuditContext'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 
 const props = defineProps<{ wpId: string; projectId: string; isReadonly: boolean }>()
 
 // ─── Inject复核对话 ──────────────────────────────────────────────────────────
 const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', () => {})
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
 
 // ─── Composables ─────────────────────────────────────────────────────────────
 const formData = useM7FormData({ wpId: computed(() => props.wpId), projectId: computed(() => props.projectId) })
@@ -174,6 +182,27 @@ const {
   saveAndPublish,
   subscribeAdjudicated,
 } = useM7Adjustment(formData)
+
+// ─── 同步到集中调整登记（workpaper-adjustment-centralization） ─────────────────
+const { year: auditYear } = useAuditContext()
+const { centralStatus, syncing: centralSyncing, syncToCentral, refreshStatus } = useAdjustmentCentralSync({
+  projectId: toRef(props, 'projectId') as Ref<string>,
+  year: auditYear,
+  wpId: toRef(props, 'wpId') as Ref<string>,
+  wpCode: 'M7',
+  itemId: () => `M7-adj-${activeType.value}`,
+  buildLineItems: () => filteredEntries.value.map(e => ({
+    account_name: e.accountName,
+    report_line_code: e.reportItem || undefined,
+    debit_amount: e.debitAmount,
+    credit_amount: e.creditAmount,
+  })),
+  buildMeta: () => ({
+    description: filteredEntries.value.find(e => e.description)?.description || 'M7 调整（' + activeType.value + '）',
+    adjustmentType: activeType.value === 'RJE' ? 'rje' : 'aje',
+  }),
+})
+watch(activeType, () => refreshStatus())
 
 // ─── State ───────────────────────────────────────────────────────────────────
 const isSaving = ref(false)
@@ -223,7 +252,24 @@ async function handleSaveAndPublish(): Promise<void> {
 }
 
 // ─── UI handlers ─────────────────────────────────────────────────────────────
-function handleAI(_section: string): void { /* AI辅助钩子 */ }
+async function handleAI(section: string): Promise<void> {
+  if (props.isReadonly) return
+  aiLoading.value = section
+  try {
+    const context: Record<string, string> = {
+      科目: '4201 专项储备（权益类·贷方）/ 调整分录 M7-3',
+      调整类型: activeType.value,
+      借方合计: fmtAmount(currentBalance.value.totalDebit),
+      贷方合计: fmtAmount(currentBalance.value.totalCredit),
+      借贷平衡: currentBalance.value.isBalanced ? '已平衡' : `差额 ${fmtAmount(currentBalance.value.diff)}`,
+      AJE对4201净影响: fmtAmount(ajeNet4201.value),
+      RJE对4201净影响: fmtAmount(rjeNet4201.value),
+    }
+    const text = await generateAiText({ section: `m7-adjustment-${section}`, context })
+    if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+    ElMessageBox.alert(text, 'AI 辅助建议', { confirmButtonText: '知道了' }).catch(() => {})
+  } catch { ElMessage.warning('AI 生成失败，请稍后重试') } finally { aiLoading.value = '' }
+}
 function handleReview(): void { openReviewDialog?.('M7-3-adjustment', '调整分录') }
 
 // ─── EventBus: subscribe 'substantive:adjudicated' → 双向同步 ────────────────
@@ -239,6 +285,8 @@ onMounted(async () => {
   unsubAdjudicated = subscribeAdjudicated((_payload: any) => {
     // M7-1审定数变化时，可做UI刷新提示等
   })
+
+  refreshStatus()
 })
 
 onUnmounted(() => {

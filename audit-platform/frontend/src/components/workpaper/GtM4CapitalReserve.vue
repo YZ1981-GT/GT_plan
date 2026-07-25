@@ -15,7 +15,7 @@
         :is-readonly="isReadonly"
         @navigate="handleNavigate"
       />
-      <!-- 程序表 M4A（复用 GtAProgramConsole） -->
+      <!-- 程序表 M4A（复用 GtAProgramConsole，不参与双模式） -->
       <GtAProgramConsole
         v-else-if="currentSheet === 'procedure'"
         :wp-id="props.wpId"
@@ -24,61 +24,84 @@
         :html-data="{ programs: [], schema: { columns: [], rows: [] } }"
         :readonly="isReadonly"
       />
-      <!-- M4-1 审定表（权益类贷方！期末=期初+贷方-借方） -->
-      <M4TabAdjudication
-        v-else-if="currentSheet === 'M4-1'"
-        :wp-id="props.wpId"
-        :project-id="props.projectId"
-        :is-readonly="isReadonly"
-        @navigate="handleNavigate"
-      />
-      <!-- M4-2 明细表（资本溢价+其他资本公积，24列区段Tab） -->
-      <M4TabDetail
-        v-else-if="currentSheet === 'M4-2'"
-        :wp-id="props.wpId"
-        :project-id="props.projectId"
-        :is-readonly="isReadonly"
-        @navigate="handleNavigate"
-      />
-      <!-- M4-3 调整分录汇总（借贷平衡） -->
-      <M4TabAdjustment
-        v-else-if="currentSheet === 'M4-3'"
-        :wp-id="props.wpId"
-        :project-id="props.projectId"
-        :is-readonly="isReadonly"
-        @navigate="handleNavigate"
-      />
-      <!-- M4-4 资本公积检查表 -->
-      <M4TabReserveCheck
-        v-else-if="currentSheet === 'M4-4'"
-        :wp-id="props.wpId"
-        :project-id="props.projectId"
-        :is-readonly="isReadonly"
-        @navigate="handleNavigate"
-      />
-      <!-- 附注披露信息（上市公司） -->
-      <M4TabDisclosureListed
-        v-else-if="currentSheet === 'disclosure-listed'"
-        :wp-id="props.wpId"
-        :project-id="props.projectId"
-        :is-readonly="isReadonly"
-        @navigate="handleNavigate"
-      />
-      <!-- 附注披露信息（国有企业） -->
-      <M4TabDisclosureSoe
-        v-else-if="currentSheet === 'disclosure-soe'"
-        :wp-id="props.wpId"
-        :project-id="props.projectId"
-        :is-readonly="isReadonly"
-        @navigate="handleNavigate"
-      />
-      <!-- OnlyOffice fallback: 未迁移 sheet / 会计规定辅助 -->
-      <GtOnlyOfficeSheet
-        v-else
-        :wp-id="props.wpId"
-        :sheet-name="props.sheetName"
-        style="height: 100%; min-height: 600px"
-      />
+      <!-- 其余 HTML sheet：结构化 / OnlyOffice 双模式切换（健康门控） -->
+      <template v-else>
+        <div class="mode-toggle-bar">
+          <el-segmented
+            :model-value="dualMode.mode.value"
+            :options="modeToggleOptions"
+            size="small"
+            @change="dualMode.switchMode"
+          />
+        </div>
+
+        <!-- 结构化视图（HTML sheet 分支） -->
+        <template v-if="dualMode.mode.value === 'html'">
+          <!-- M4-1 审定表（权益类贷方！期末=期初+贷方-借方） -->
+          <M4TabAdjudication
+            v-if="currentSheet === 'M4-1'"
+            :wp-id="props.wpId"
+            :project-id="props.projectId"
+            :is-readonly="isReadonly"
+            @navigate="handleNavigate"
+          />
+          <!-- M4-2 明细表（资本溢价+其他资本公积，24列区段Tab） -->
+          <M4TabDetail
+            v-else-if="currentSheet === 'M4-2'"
+            :wp-id="props.wpId"
+            :project-id="props.projectId"
+            :is-readonly="isReadonly"
+            @navigate="handleNavigate"
+          />
+          <!-- M4-3 调整分录汇总（借贷平衡） -->
+          <M4TabAdjustment
+            v-else-if="currentSheet === 'M4-3'"
+            :wp-id="props.wpId"
+            :project-id="props.projectId"
+            :is-readonly="isReadonly"
+            @navigate="handleNavigate"
+          />
+          <!-- M4-4 资本公积检查表 -->
+          <M4TabReserveCheck
+            v-else-if="currentSheet === 'M4-4'"
+            :wp-id="props.wpId"
+            :project-id="props.projectId"
+            :is-readonly="isReadonly"
+            @navigate="handleNavigate"
+          />
+          <!-- 附注披露信息（上市公司） -->
+          <M4TabDisclosureListed
+            v-else-if="currentSheet === 'disclosure-listed'"
+            :wp-id="props.wpId"
+            :project-id="props.projectId"
+            :is-readonly="isReadonly"
+            @navigate="handleNavigate"
+          />
+          <!-- 附注披露信息（国有企业） -->
+          <M4TabDisclosureSoe
+            v-else-if="currentSheet === 'disclosure-soe'"
+            :wp-id="props.wpId"
+            :project-id="props.projectId"
+            :is-readonly="isReadonly"
+            @navigate="handleNavigate"
+          />
+          <!-- OnlyOffice fallback: 未迁移 sheet / 会计规定辅助 -->
+          <GtOnlyOfficeSheet
+            v-else
+            :wp-id="props.wpId"
+            :sheet-name="props.sheetName"
+            style="height: 100%; min-height: 600px"
+          />
+        </template>
+
+        <!-- OnlyOffice 在线编辑模式 -->
+        <GtOnlyOfficeSheet
+          v-else
+          :wp-id="props.wpId"
+          :sheet-name="dualMode.resolveOoSheetName()"
+          style="height: 100%; min-height: 600px"
+        />
+      </template>
     </template>
 
   </div>
@@ -104,9 +127,10 @@
  * - 版本追踪: useVersionTrail(autoSnapshot)
  * - 复核对话: provide openReviewDialog → 子组件 inject
  */
-import { ref, computed, inject, onMounted, provide, defineAsyncComponent } from 'vue'
+import { ref, computed, inject, onMounted, provide, toRef, defineAsyncComponent } from 'vue'
 import http from '@/utils/http'
 import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './composables/useWorkpaperScaffold'
+import { useM4EntryDualMode } from './composables/useM4EntryDualMode'
 
 // ─── Lazy-loaded child components ────────────────────────────────────────────
 
@@ -196,6 +220,26 @@ const currentSheet = computed(() => {
   return name
 })
 
+// ─── 双模式（HTML ↔ OnlyOffice，健康门控"拉取成功才切"，对齐 D4/M1 范式） ───
+// index/procedure 不参与双模式；其余 HTML sheet 上方显示 segmented 切换栏。
+const dualMode = useM4EntryDualMode({
+  wpId: toRef(props, 'wpId') as any,
+  currentSheet,
+  reloadAllResponses: async () => {
+    // 各子组件在 mount 时自加载各自 formData；此处仅重跑 render-config 预热。
+    await selfLoad()
+  },
+})
+
+const modeToggleOptions = computed(() => [
+  { label: '结构化', value: 'html' as const },
+  {
+    label: dualMode.ooAvailable.value ? 'OnlyOffice（拉取成功）' : 'OnlyOffice（不可用）',
+    value: 'onlyoffice' as const,
+    disabled: !dualMode.ooAvailable.value,
+  },
+])
+
 // ─── Runtime Boundary（GtWpRenderer 统一提供 版本/复核/AI/displayPrefs + 挂真实 Host） ───
 // 复核对话与版本历史由 Runtime Boundary 统一 provide('openReviewDialog') + version 承载，
 // 本主入口不再本地 new GtReviewDialog / useWorkpaperVersionToolbar（避免重复 provider/Host）。
@@ -235,5 +279,11 @@ onMounted(() => {
 
 .loading-container {
   padding: 24px;
+}
+
+.mode-toggle-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
 }
 </style>

@@ -1,5 +1,18 @@
 <template>
   <div class="h5-tab-index">
+    <!-- E1 标准加法式增强：目录卡 + 结论看板 + 本循环 grid -->
+    <GtCycleDirExtras
+      wp-code="H5"
+      cycle-letter="H"
+      :wp-id="props.wpId"
+      :project-id="props.projectId"
+      :all-responses="props.allResponses"
+      :sheets="dirSheets"
+      @navigate="onDirNavigate"
+      @open-handbook="openHandbook"
+    />
+    <H5PreparationHandbookDialog v-model="handbookVisible" :initial-tab="handbookTab" />
+
     <!-- 顶部引导区 -->
     <div class="guide-area">
       <div class="guide-grid">
@@ -66,9 +79,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent } from 'vue'
+import { computed, ref, defineAsyncComponent } from 'vue'
 
 const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
+const GtCycleDirExtras = defineAsyncComponent(() => import('../../GtCycleDirExtras.vue'))
+const H5PreparationHandbookDialog = defineAsyncComponent(() => import('../H5PreparationHandbookDialog.vue'))
 
 const emit = defineEmits<{
   'navigate-sheet': [sheetName: string]
@@ -162,6 +177,20 @@ function _getReviewer(code: string): string {
 
 function handleNavigate(row: SheetEntry) {
   emit('navigate-sheet', row.code)
+}
+
+// ─── E1 标准加法式增强：目录卡 + 结论看板 + 本循环 grid（GtCycleDirExtras） ───
+const dirSheets = computed(() =>
+  sheetDefs.map((d) => ({ code: d.code, navValue: d.code, name: d.name })),
+)
+function onDirNavigate(navValue: string) {
+  emit('navigate-sheet', navValue)
+}
+const handbookVisible = ref(false)
+const handbookTab = ref<'preparation' | 'usage'>('preparation')
+function openHandbook(tab: 'preparation' | 'usage') {
+  handbookTab.value = tab
+  handbookVisible.value = true
 }
 </script>
 

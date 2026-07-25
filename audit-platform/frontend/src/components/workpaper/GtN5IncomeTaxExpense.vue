@@ -2,7 +2,7 @@
   <div class="n5-income-tax-expense">
     <div v-if="isLoading" class="loading-container"><el-skeleton :rows="8" animated /></div>
     <template v-else>
-      <div v-if="isHtmlSheet" class="n5-income-tax-expense-toolbar">
+      <div v-if="isHtmlSheet && currentSheet !== 'N5' && currentSheet !== '底稿目录'" class="n5-income-tax-expense-toolbar">
         <el-segmented
           v-model="dualMode.currentMode.value"
           :options="dualMode.modeOptions"

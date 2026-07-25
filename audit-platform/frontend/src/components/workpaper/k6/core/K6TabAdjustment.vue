@@ -14,6 +14,25 @@
             </el-dropdown-menu>
           </template>
         </el-dropdown>
+        <el-button
+          size="small"
+          type="primary"
+          plain
+          :loading="centralSyncing"
+          :disabled="isReadonly || !isBalanced || entries.length === 0"
+          @click="syncToCentral"
+          title="把本页调整分录汇聚到集中调整登记，供合伙人跨循环审阅"
+        >
+          同步到集中登记
+        </el-button>
+        <el-tag
+          v-if="centralStatus?.review_status"
+          size="small"
+          :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
+          :title="centralStatus.rejection_reason || ''"
+        >
+          集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
+        </el-tag>
         <el-button size="small" @click="openReviewDialog('K6-3-adjustment')">💬复核</el-button>
       </div>
     </div>
@@ -220,6 +239,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Delete } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
 import { useK6ImportExport } from '@/components/workpaper/composables/useK6ImportExport'
+import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '@/components/workpaper/composables/useAdjustmentCentralSync'
+import { useAuditContext } from '@/composables/useAuditContext'
 
 const K6_ACCOUNT_CODE_ASSET = '1481'  // 持有待售资产
 const K6_ACCOUNT_CODE_LIAB = '2605'   // 持有待售负债
@@ -270,6 +291,26 @@ const totalDebits = computed(() => entries.value.reduce((sum, e) => sum + (e.deb
 const totalCredits = computed(() => entries.value.reduce((sum, e) => sum + (e.creditAmount || 0), 0))
 const balanceDiff = computed(() => totalDebits.value - totalCredits.value)
 const isBalanced = computed(() => Math.abs(balanceDiff.value) < 0.005)
+
+// ═══ 同步到集中调整登记（workpaper-adjustment-centralization） ═══
+const { year: auditYear } = useAuditContext()
+const { centralStatus, syncing: centralSyncing, syncToCentral, refreshStatus } = useAdjustmentCentralSync({
+  projectId: () => props.projectId,
+  year: auditYear,
+  wpId: () => props.wpId,
+  wpCode: 'K6',
+  itemId: `${ITEM_PREFIX}-entries`,
+  buildLineItems: () => entries.value.map(e => ({
+    standard_account_code: e.accountCode || undefined,
+    account_name: e.accountName,
+    debit_amount: e.debitAmount,
+    credit_amount: e.creditAmount,
+  })),
+  buildMeta: () => ({
+    description: entries.value.find(e => e.summary)?.summary || 'K6 持有待售调整',
+    adjustmentType: entries.value.length > 0 && entries.value.every(e => e.entryType === 'RJE') ? 'rje' : 'aje',
+  }),
+})
 
 // ═══ 上游建议AJE（来自K6-5减值/K6-7不再满足） ═══
 interface SuggestedAje {
@@ -324,6 +365,7 @@ function importSuggestions(): void {
 // ═══ 初始化加载 ═══
 onMounted(() => {
   loadFromResponses()
+  refreshStatus()
 })
 
 function loadFromResponses(): void {

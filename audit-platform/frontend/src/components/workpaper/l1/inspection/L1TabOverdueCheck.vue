@@ -224,7 +224,32 @@
       </div>
     </div>
 
-    <!-- ═══ 叙述式结论区 ═══ -->
+    <!-- ═══ 审计说明 ═══ -->
+    <el-card class="conclusion-card" shadow="never">
+      <template #header>
+        <div class="conclusion-header">
+          <span>审计说明</span>
+          <el-button
+            v-if="!isReadonly"
+            size="small"
+            type="primary"
+            plain
+            :loading="aiNoteLoading"
+            @click="handleAiNote"
+          >🤖 AI 辅助</el-button>
+        </div>
+      </template>
+      <el-input
+        :model-value="note"
+        type="textarea"
+        :autosize="{ minRows: 4, maxRows: 8 }"
+        :disabled="isReadonly"
+        placeholder="关注未办理转期手续是否引发诉讼（取得诉状）；分析逾期借款占全部借款比例及对持续经营的影响；说明未按期偿还原因与预计还款期。"
+        @input="onNoteInput"
+      />
+    </el-card>
+
+    <!-- ═══ 审计结论区 ═══ -->
     <el-card class="conclusion-card" shadow="never">
       <template #header>
         <div class="conclusion-header">
@@ -232,21 +257,20 @@
           <el-button
             v-if="!isReadonly"
             size="small"
-            type="warning"
+            type="primary"
             plain
+            :loading="aiConclusionLoading"
             @click="handleAiConclusion"
-          >
-            AI 辅助
-          </el-button>
+          >🤖 AI 辅助</el-button>
         </div>
       </template>
       <el-input
-        v-model="conclusion"
+        :model-value="conclusion"
         type="textarea"
         :autosize="{ minRows: 3, maxRows: 8 }"
         :disabled="isReadonly"
         placeholder="根据逾期检查结果，填写审计结论..."
-        @input="handleConclusionChange"
+        @input="onConclusionInput"
       />
     </el-card>
 
@@ -276,17 +300,19 @@
  * Task: 4.5
  * Requirements: 6.1-6.3
  */
-import { inject, ref, type Ref } from 'vue'
+import { computed, inject, onMounted, toRef } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import type { useL1FormData } from '@/composables/useL1FormData'
 import type { OverdueCheckRow } from '@/composables/useL1FormData'
 import { useL1OverdueCheck, type OverdueLevel } from '@/composables/useL1OverdueCheck'
+import { useL1AiNote } from '@/composables/useL1AiNote'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
 const props = defineProps<{
   wpId: string
   projectId: string
+  year?: number
   isReadonly: boolean
 }>()
 
@@ -298,11 +324,10 @@ defineEmits<{
 
 const formData = inject<ReturnType<typeof useL1FormData>>('l1FormData')!
 
-// ─── 报告期截止日（默认当年12月31日） ────────────────────────────────────────
-
-const currentYear = new Date().getFullYear()
-const reportDate: Ref<Date> = ref(new Date(currentYear, 11, 31))
-const reportDateStr = `${currentYear}-12-31`
+// ─── 报告期截止日（优先取项目审计年度，回退当前年） ──────────────────────────
+const auditYear = computed(() => props.year || new Date().getFullYear())
+const reportDate = computed<Date>(() => new Date(auditYear.value, 11, 31))
+const reportDateStr = computed(() => `${auditYear.value}-12-31`)
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -316,22 +341,30 @@ const {
   updateRow,
 } = useL1OverdueCheck(formData, reportDate)
 
-// ─── 结论区 ──────────────────────────────────────────────────────────────────
+// ─── 审计说明 + 审计结论（AI 辅助，统一 useL1AiNote：修复刷新丢失+真实AI） ───
 
-const conclusion = ref('')
+const {
+  note, conclusion, aiNoteLoading, aiConclusionLoading,
+  load: loadNote, onNoteInput, onConclusionInput, generateNote, generateConclusion,
+} = useL1AiNote(formData, toRef(props, 'wpId'), 'ovd', toRef(props, 'isReadonly'))
 
-function handleConclusionChange(val: string): void {
-  conclusion.value = val
-  formData.debounceSave([{
-    item_id: 'L1-ovd-conclusion',
-    conclusion: val || null,
-    remark: null,
-  }])
+function _aiContext() {
+  return {
+    逾期笔数: overdueCount.value,
+    逾期金额合计: totalOverdueAmount.value,
+    等级分布: `低${overdueSummary.value.low}/中${overdueSummary.value.medium}/高${overdueSummary.value.high}`,
+  }
+}
+function handleAiNote() {
+  generateNote('请基于逾期贷款检查情况撰写审计说明，覆盖逾期比例、诉讼风险、对持续经营的影响。', _aiContext())
+}
+function handleAiConclusion() {
+  generateConclusion('请基于逾期贷款检查结果生成审计结论。', _aiContext())
 }
 
-async function handleAiConclusion(): Promise<void> {
-  ElMessageBox.alert('AI辅助结论生成功能即将上线', '提示')
-}
+onMounted(() => {
+  loadNote()
+})
 
 // ─── 字段编辑处理 ────────────────────────────────────────────────────────────
 

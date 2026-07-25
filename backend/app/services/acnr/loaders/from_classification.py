@@ -173,8 +173,8 @@ def load_sheet_skeletons_from_classification(
     results: list[SheetCatalogEntry] = []
 
     for wp_code, recs in grouped.items():
-        # 选代表记录：优先级 — 非占位非GT_Custom > 非占位 > 任意
-        representative = _pick_representative(recs)
+        # 选代表记录：优先「名称以自身编码结尾」的本 tab > 非占位非GT_Custom > 非占位 > 任意
+        representative = _pick_representative(recs, wp_code)
 
         sheet_name = representative["sheet_name"]
         class_code = representative["class_code"]
@@ -236,10 +236,33 @@ _CLASS_PRIORITY: dict[str, int] = {
 }
 
 
-def _pick_representative(recs: list[dict[str, str]]) -> dict[str, str]:
+def _ends_with_code(sheet_name: str, wp_code: str) -> bool:
+    """sheet_name 是否以自身 wp_code 结尾（该 sheet 的真实 tab 名，允许编码前有空格）。
+
+    整 token 匹配：编码前必须是串首或非字母数字/连字符，避免 D2-1 误配 …D2-10。
+    """
+    if not sheet_name or not wp_code:
+        return False
+    name = sheet_name.strip().upper()
+    code = wp_code.strip().upper()
+    if not name.endswith(code):
+        return False
+    prefix_char = name[: -len(code)][-1:] if len(name) > len(code) else ""
+    # 编码前若是 ASCII 字母/数字/连字符，说明命中的是更长编码的尾部（非独立编码 token）→ 不算
+    # 中文等非 ASCII 前缀是描述名的一部分，允许（str.isalnum() 对 CJK 也为 True，故须限 ASCII）
+    if prefix_char and prefix_char.isascii() and (prefix_char.isalnum() or prefix_char == "-"):
+        return False
+    return True
+
+
+def _pick_representative(recs: list[dict[str, str]], wp_code: str = "") -> dict[str, str]:
     """从同 wp_code 的多条记录中选出最具业务含义的代表。
 
-    优先级：class_code 优先级表 > 非 GT_Custom > 第一条
+    优先级：名称以自身编码结尾的本 tab（真实名） > class_code 优先级表 > 非 GT_Custom > 第一条。
+
+    classification 把整个工作簿的全部 Tab 都挂在每个 wp_code 下，仅按 class_code
+    优先级会选中兄弟 sheet 的占位名（如 D2-10 选到「附注披露信息(上市公司）D2-1」）。
+    优先「名称以自身编码结尾」可命中该 sheet 的真实 tab（如「预期信用损失的计量测试D2-10」）。
     """
     # 过滤掉 GT_Custom 和 占位（如果有其他选择）
     meaningful = [
@@ -248,6 +271,13 @@ def _pick_representative(recs: list[dict[str, str]]) -> dict[str, str]:
     ]
 
     candidates = meaningful if meaningful else recs
+
+    # 优先：名称以自身编码结尾的记录（本 tab 真实名）；多条则仍按 class_code 优先级
+    if wp_code:
+        self_named = [r for r in candidates if _ends_with_code(r["sheet_name"], wp_code)]
+        if self_named:
+            self_named.sort(key=lambda r: _CLASS_PRIORITY.get(r["class_code"], 50))
+            return self_named[0]
 
     # 按 class_code 优先级排序
     candidates.sort(key=lambda r: _CLASS_PRIORITY.get(r["class_code"], 50))

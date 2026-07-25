@@ -9,6 +9,8 @@
         <h3 class="adj-title">L3-3 调整分录汇总</h3>
       </div>
       <div class="adj-header-right">
+        <el-button size="small" type="primary" plain :loading="centralSyncing" :disabled="isReadonly || !currentBalance.isBalanced || filteredEntries.length === 0" @click="syncToCentral" title="把本页调整分录汇聚到集中调整登记，供合伙人跨循环审阅">同步到集中登记</el-button>
+        <el-tag v-if="centralStatus?.review_status" size="small" :type="centralStatus.review_status==='approved'?'success':(centralStatus.review_status==='rejected'?'danger':'info')" :title="centralStatus.rejection_reason||''">集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status]||centralStatus.review_status }}</el-tag>
         <el-button
           v-if="activeType === 'RJE'"
           size="small"
@@ -253,14 +255,16 @@
  * Task: 4.7
  * Requirements: 5.2, 9.1
  */
-import { computed, inject } from 'vue'
+import { computed, inject, watch, toRef, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { useL3FormData } from '@/components/workpaper/composables/useL3FormData'
 import { useL3Adjustment, type L3AdjustmentType } from '@/composables/useL3Adjustment'
+import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '@/components/workpaper/composables/useAdjustmentCentralSync'
+import { useAuditContext } from '@/composables/useAuditContext'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
-defineProps<{
+const props = defineProps<{
   wpId: string
   projectId: string
   isReadonly: boolean
@@ -290,6 +294,37 @@ const {
   generateReclassRJE,
   saveAndPublish,
 } = useL3Adjustment(formData)
+
+// ─── 同步到集中调整登记 ───────────────────────────────────────────────────────
+
+const { year: auditYear } = useAuditContext()
+const {
+  centralStatus,
+  syncing: centralSyncing,
+  syncToCentral,
+  refreshStatus,
+} = useAdjustmentCentralSync({
+  projectId: toRef(props, 'projectId') as Ref<string>,
+  year: auditYear,
+  wpId: toRef(props, 'wpId') as Ref<string>,
+  wpCode: 'L3',
+  itemId: () => `L3-adj-${activeType.value}`,
+  buildLineItems: () =>
+    filteredEntries.value.map((e: any) => ({
+      standard_account_code: e.accountCode || undefined,
+      account_name: e.accountName,
+      debit_amount: e.debitAmount,
+      credit_amount: e.creditAmount,
+    })),
+  buildMeta: () => ({
+    description:
+      filteredEntries.value.find((e: any) => e.description)?.description ||
+      `L3 长期借款调整（${activeType.value}）`,
+    adjustmentType: activeType.value === 'RJE' ? 'rje' : 'aje',
+  }),
+})
+watch(activeType, () => refreshStatus())
+refreshStatus()
 
 // ─── Tab 切换选项 ────────────────────────────────────────────────────────────
 

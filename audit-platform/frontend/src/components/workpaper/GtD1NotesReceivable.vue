@@ -680,7 +680,8 @@ const useOnlyOfficeFallback = computed(() => {
 
 const showModeToolbar = computed(() =>
 
-  KNOWN_HTML_SHEETS.has(currentSheet.value) && !useOnlyOfficeFallback.value,
+  KNOWN_HTML_SHEETS.has(currentSheet.value) && !useOnlyOfficeFallback.value
+  && currentSheet.value !== 'directory' && currentSheet.value !== 'D1' && currentSheet.value !== 'skip',
 
 )
 

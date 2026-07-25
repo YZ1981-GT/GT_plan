@@ -887,26 +887,22 @@ async def resolve_prior_year_note(
     - field=='text'（历史行为，不受开关约束、不回归）：返回上年文本；
       dict 缓存取 .text、旧扁平缓存直接返回字符串。
     - field=='value'：按 section + 坐标(+table_index) 从上年 table 反查单元格金额；
-      仅新 dict 缓存 + 开关开启时生效；无表 / 坐标不存在 / 旧扁平缓存 → None。
+      仅新 dict 缓存 + 开关开启时生效；无表 / 坐标不存在 / 旧扁平缓存 → 走期初余额回退。
 
-    上年无数据一律静默返回 None — 不阻塞（Req2.2）。
+    value 模式回退：上年年末余额 = 本年期初余额（会计恒等式），当无上年附注单元格
+    数据时，按 binding.account_codes 从试算表期初余额（trial_balance opening）取数
+    —— 数据源回退（非公式），不受 DISCLOSURE_NOTE_FORMULA_ENABLED 约束；无科目码
+    （手工行）保持 None 原行为。
+
+    上年无数据且无科目码一律静默返回 None — 不阻塞（Req2.2）。
     """
-    cache = ctx.get("_prior_notes_cache") or {}
-    if not cache:
-        return None
+    field = binding.get("field") or "value"
 
     section = binding.get("section") or binding.get("note_section")
     if not isinstance(section, str) or not section:
-        # 没指定章节 — 调用方应该传 section_number 进 ctx
         section = ctx.get("section_number")
-        if not isinstance(section, str) or not section:
-            return None
-
-    raw = cache.get(section)
-    if raw is None:
-        return None
-
-    field = binding.get("field") or "value"
+    cache = ctx.get("_prior_notes_cache") or {}
+    raw = cache.get(section) if isinstance(section, str) and section else None
 
     if field == "text":
         # 兼容旧扁平字符串缓存 + 新 dict 缓存（text 模式不回归、不受开关约束）
@@ -917,13 +913,42 @@ async def resolve_prior_year_note(
             return t if isinstance(t, str) else None
         return None
 
-    # value 模式：单元格级反查（新行为，受开关控制 = 关闭时零回归 Req8.3/8.4）
-    if not _formula_enabled():
+    # value 模式：优先上年附注单元格反查（新行为，受开关控制 = 关闭时零回归 Req8.3/8.4）
+    if _formula_enabled() and isinstance(raw, dict):
+        prior_val = _cell_value_from_table(raw.get("table"), binding)
+        if prior_val is not None:
+            return prior_val
+
+    # 回退：上年年末余额 = 本年期初余额 = 试算表期初余额（trial_balance opening）
+    return _opening_balance_from_tb(binding, ctx)
+
+
+def _opening_balance_from_tb(
+    binding: dict[str, Any],
+    ctx: dict[str, Any],
+) -> float | None:
+    """上年年末余额 = 本年期初余额：按 account_codes 从 ctx['_tb_cache'] 汇总期初余额.
+
+    数据源回退（非公式），供 resolve_prior_year_note 在无上年附注单元格数据时使用。
+    无科目码 / 缓存未预热 / 无命中 → None（保持手工行原行为）。
+    """
+    codes = _safe_account_codes(binding)
+    if not codes:
         return None
-    if not isinstance(raw, dict):
-        # 旧扁平字符串缓存无单元格数据
+    tb_cache = ctx.get("_tb_cache") or {}
+    if not tb_cache:
         return None
-    return _cell_value_from_table(raw.get("table"), binding)
+    values: list[float] = []
+    for code in codes:
+        entry = tb_cache.get(code)
+        if not isinstance(entry, dict):
+            continue
+        v = _to_float(entry.get("opening"))
+        if v is not None:
+            values.append(v)
+    if not values:
+        return None
+    return _aggregate(values, binding.get("agg") or "sum")
 
 
 # ---------------------------------------------------------------------------

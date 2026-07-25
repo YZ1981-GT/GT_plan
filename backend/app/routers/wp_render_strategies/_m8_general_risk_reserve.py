@@ -23,7 +23,7 @@ from typing import Any
 
 import sqlalchemy as sa
 
-from app.models.audit_platform_models import TbBalance
+from app.models.audit_platform_models import TrialBalance
 
 from ._context import RenderContext
 
@@ -75,16 +75,16 @@ async def render(ctx: RenderContext) -> dict[str, Any]:
     try:
         stmt = (
             sa.select(
-                TbBalance.standard_account_code,
-                TbBalance.unadjusted_amount,
-                TbBalance.aje_adjustment,
-                TbBalance.rje_adjustment,
-                TbBalance.audited_amount,
+                TrialBalance.standard_account_code,
+                TrialBalance.unadjusted_amount,
+                TrialBalance.aje_adjustment,
+                TrialBalance.rje_adjustment,
+                TrialBalance.audited_amount,
             )
             .where(
-                TbBalance.project_id == str(project_id),
-                TbBalance.standard_account_code.like(f"{_M8_ACCOUNT_CODE}%"),
-                TbBalance.is_deleted == sa.false(),
+                TrialBalance.project_id == str(project_id),
+                TrialBalance.standard_account_code.like(f"{_M8_ACCOUNT_CODE}%"),
+                TrialBalance.is_deleted == sa.false(),
             )
         )
         result = await db.execute(stmt)

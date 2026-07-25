@@ -103,6 +103,18 @@ def _load_index() -> list[dict]:
     return _index_cache
 
 
+def _code_prefix_boundary_ok(filename: str, wp_code: str) -> bool:
+    """filename 以 wp_code 开头，且 wp_code 之后紧跟的不是数字。
+
+    避免「E1-2」误命中「E1-26至E1-32...」（字符串前缀碰撞：E1-2 是 E1-26 的前缀）。
+    仍允许 `-`/空白/「至」/中文/字母后缀（如 D2→D2-1至D2-4、A9→A9-1、E1→E1-14）。
+    """
+    if not filename.startswith(wp_code):
+        return False
+    rest = filename[len(wp_code):]
+    return not rest[:1].isdigit()
+
+
 def find_template_file(wp_code: str) -> Path | None:
     """根据 wp_code 查找主模板文件
 
@@ -135,14 +147,14 @@ def find_template_file(wp_code: str) -> Path | None:
     prefix = wp_code[0]
     template_subdir = TEMPLATES_DIR / prefix
     if template_subdir.exists():
-        # 优先含"审定表"
+        # 优先含"审定表"（边界匹配：wp_code 后不得紧跟数字，避免 E1-2 命中 E1-26）
         for f in sorted(template_subdir.iterdir()):
-            if f.name.startswith(wp_code) and f.suffix.lower() in (".xlsx", ".xlsm"):
+            if _code_prefix_boundary_ok(f.name, wp_code) and f.suffix.lower() in (".xlsx", ".xlsm"):
                 if "审定表" in f.name or "常规程序" in f.name:
                     return f
         # 其次最短文件名
         for f in sorted(template_subdir.iterdir(), key=lambda x: len(x.name)):
-            if f.name.startswith(wp_code) and f.suffix.lower() in (".xlsx", ".xlsm"):
+            if _code_prefix_boundary_ok(f.name, wp_code) and f.suffix.lower() in (".xlsx", ".xlsm"):
                 return f
 
         # 子表回退：如 D2-2 找不到，尝试包含范围式命名的文件（D2-1至D2-4）

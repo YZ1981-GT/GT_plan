@@ -21,7 +21,7 @@
             </el-dropdown-menu>
           </template>
         </el-dropdown>
-        <el-button size="small" @click="handleAI('general')">
+        <el-button size="small" :loading="aiLoading === 'general'" :disabled="isReadonly" @click="handleAI('general')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
         <el-button size="small" @click="handleReview">
@@ -234,7 +234,7 @@
       <template #header>
         <div class="section-header">
           <span class="card-title">审计说明</span>
-          <el-button size="small" @click="handleAI('auditNote')">
+          <el-button size="small" :loading="aiLoading === 'auditNote'" :disabled="isReadonly" @click="handleAI('auditNote')">
             <el-icon><MagicStick /></el-icon> AI辅助
           </el-button>
         </div>
@@ -291,6 +291,7 @@ import GtIndexChip from '../../GtIndexChip.vue'
 import { useM1FormData } from '../../composables/useM1FormData'
 import { useM1ImportExport } from '../../composables/useM1ImportExport'
 import { calcDeclaredDividend, calcDeclareDiff } from '../../composables/useM1DividendEngine'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import { eventBus } from '@/utils/eventBus'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
@@ -306,6 +307,8 @@ const emit = defineEmits<{
 }>()
 
 const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', () => {})
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -499,30 +502,22 @@ function handleImportExport(command: string): void {
   }
 }
 
-function handleAI(section: string = 'general'): void {
-  import('@/utils/http').then(async ({ default: h }) => {
-    try {
-      const res = await h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
-        section: `m1-dividend-calc-${section}`,
-        prompt: '请基于应付股利测算表数据，分析各股东宣告差异及原因，给出审计建议',
-        context: {
-          section: String(section),
-          wpId: String(props.wpId),
-          totalDeclared: String(totalDeclared.value),
-          totalBooked: String(totalBooked.value),
-          totalDiff: String(totalDeclareDiff.value),
-          shareholderCount: String(rows.value.length),
-        },
-      })
-      const content = res?.data?.content || res?.content || ''
-      if (content && !auditNote.value) {
-        auditNote.value = content
-        saveAuditNote()
-      }
-    } catch {
-      // AI生成失败静默
+async function handleAI(section: string = 'general'): Promise<void> {
+  if (props.isReadonly) return
+  aiLoading.value = section
+  try {
+    const context: Record<string, string> = {
+      科目: '2232 应付股利 / 测算表（M1-5 应付股利利润测算）',
+      应宣告合计: fmtAmount(totalDeclared.value),
+      账面宣告合计: fmtAmount(totalBooked.value),
+      差异合计: fmtAmount(totalDeclareDiff.value),
+      股东数: String(rows.value.length),
     }
-  })
+    const text = await generateAiText({ section: `m1-dividend-calc-${section}`, context, existingContent: auditNote.value })
+    if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+    auditNote.value = text
+    saveAuditNote()
+  } catch { ElMessage.warning('AI 生成失败，请稍后重试') } finally { aiLoading.value = '' }
 }
 function handleReview(): void { openReviewDialog?.('M1-5-dividend-calc', '股利测算表') }
 

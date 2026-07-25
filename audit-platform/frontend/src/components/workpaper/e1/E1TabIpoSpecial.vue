@@ -24,6 +24,7 @@ import type { UseE1BaseOptions } from '../composables/useE1Adjudication'
 import GtIndexChip from '../GtIndexChip.vue'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { amountFormatter, amountParser, isAmountColumn } from '../composables/wpAmountInput'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -269,6 +270,9 @@ function formatCellValue(row: any, col: ColumnDef): string {
                 :model-value="row[col.key]"
                 :disabled="isReadonly"
                 :controls="false"
+                :precision="isAmountColumn(col) ? 2 : undefined"
+                :formatter="isAmountColumn(col) ? amountFormatter : undefined"
+                :parser="isAmountColumn(col) ? amountParser : undefined"
                 size="small"
                 @change="(val: number) => updateCell(row.id, col.key, val ?? 0)"
               />

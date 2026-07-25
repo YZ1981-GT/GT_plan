@@ -1,8 +1,10 @@
 <script setup lang="ts">
 /** F2TabDisclosureSoe — 附注披露（国企），对齐源模板结构 */
 import { ref, toRef, type Ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import { useF2DisclosureSoe } from '../../composables/useF2DisclosureSoe'
 import {
   buildF2SoeSubTableData,
@@ -40,6 +42,14 @@ const {
 
 const isSyncing = ref(false)
 const noteSectionId = F2_NOTE_SECTION.soe
+
+const router = useRouter()
+// 跳转回附注模块（披露表 → 附注为单向推送；此处仅导航，方便相互编辑确认）
+function jumpToNote(target: DisclosureVariant): void {
+  const route = buildNoteJumpRoute(props.projectId || '', 'F2', target)
+  if (!route) { ElMessage.warning('未找到对应的附注章节'); return }
+  router.push(route)
+}
 
 async function syncToDisclosureNotes(): Promise<void> {
   if (isSyncing.value || !props.projectId || props.isReadonly) return
@@ -97,6 +107,7 @@ async function syncToDisclosureNotes(): Promise<void> {
           <el-button size="small" type="primary" plain :loading="isSyncing" :disabled="isReadonly" @click="syncToDisclosureNotes">
             同步到附注
           </el-button>
+          <el-button size="small" type="primary" plain :disabled="!projectId" @click="jumpToNote('soe')">↩ 跳转回附注</el-button>
         </div>
         <div class="toolbar-right">
           <span class="chip-wrap"><GtIndexChip value="wp:F2-1" :context-project-id="projectId" /></span>

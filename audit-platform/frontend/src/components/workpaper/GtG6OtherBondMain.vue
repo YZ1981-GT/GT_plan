@@ -121,6 +121,7 @@
           :wp-code="'G6'"
           :html-data="directoryHtmlData"
           :available-sheets="availableSheets"
+          :all-responses="formData.allResponses.value"
         />
       </template>
 

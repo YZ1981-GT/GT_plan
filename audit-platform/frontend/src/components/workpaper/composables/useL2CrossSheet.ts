@@ -144,12 +144,12 @@ export function useL2CrossSheet(allResponses: Ref<Map<string, ChecklistResponse>
     const adjResp = allResponses.value.get('L2-L2-1-adjudication-total')
     const adjTotal = parseNum(adjResp?.remark)
 
-    // 明细表合计：从行数据汇总期末应付
+    // 明细表合计：从行数据汇总期末审定（audited）；无 audited 回退期末应付 endBalance
     const detailResp = allResponses.value.get('L2-L2-2-rows')
-    const detailRows = safeParseRows<{ endBalance?: number }>(detailResp?.remark)
+    const detailRows = safeParseRows<{ endBalance?: number; audited?: number }>(detailResp?.remark)
     let detailTotal = 0
     for (const row of detailRows) {
-      detailTotal += parseNum(row.endBalance)
+      detailTotal += parseNum(row.audited != null ? row.audited : row.endBalance)
     }
 
     const diff = parseFloat((adjTotal - detailTotal).toFixed(2))

@@ -303,7 +303,7 @@
  * Task: 4.5
  * Requirements: 6.1-6.5
  */
-import { inject, ref, toRef } from 'vue'
+import { inject, ref, toRef, watch } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { useL3CreditCheck, type L3CreditCheckRow } from '@/composables/useL3CreditCheck'
 import { useL3ImportExport } from '@/composables/useL3ImportExport'
@@ -325,13 +325,10 @@ defineEmits<{
 
 const formData = inject<ReturnType<typeof useL3FormData>>('l3FormData')!
 
-// ─── Reactive rows ───────────────────────────────────────────────────────────
-
-const creditCheckRows = ref<L3CreditCheckRow[]>([])
-
-// ─── Composable ──────────────────────────────────────────────────────────────
+// ─── Composable（rows 由 composable 内部从 allResponses hydrate，JSON存储 L3-credit-check-rows） ───
 
 const {
+  rows: creditCheckRows,
   computedRows,
   totalCreditBalance,
   totalBookBalance,
@@ -342,7 +339,7 @@ const {
   addRow,
   removeRow,
   updateRow,
-} = useL3CreditCheck(formData, creditCheckRows)
+} = useL3CreditCheck(formData)
 
 // ─── Composable: 导入导出 ────────────────────────────────────────────────────
 
@@ -357,9 +354,13 @@ const {
   importData,
 } = useL3ImportExport(wpIdRef, projectIdRef)
 
-// ─── 结论区 ──────────────────────────────────────────────────────────────────
+// ─── 结论区（从 allResponses hydrate） ───────────────────────────────────────
 
-const conclusion = ref('')
+const conclusion = ref(formData.allResponses.value.get('L3-cred-conclusion')?.remark ?? '')
+watch(
+  () => formData.allResponses.value.get('L3-cred-conclusion')?.remark,
+  (v) => { if (v != null && !conclusion.value) conclusion.value = v },
+)
 
 function handleConclusionChange(val: string): void {
   conclusion.value = val
@@ -373,7 +374,7 @@ async function handleAiConclusion(): Promise<void> {
     const res = await (await import('@/utils/http')).default.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
       section: 'credit-check-conclusion',
       prompt: '请基于征信报告核对情况，生成审计结论（包含余额一致性、差异说明、信用风险评估）',
-      context: { rowCount: creditRows.value.length },
+      context: { rowCount: String(creditCheckRows.value.length) },
     })
     const content = res.data?.data?.content
     if (content) { conclusion.value = content; handleConclusionChange(content) }

@@ -120,12 +120,40 @@ export interface AccountOption {
 
 export async function listAdjustments(
   projectId: string, year: number,
-  opts?: { adjustment_type?: string; review_status?: string; page?: number; page_size?: number }
+  opts?: { adjustment_type?: string; review_status?: string; origin?: string; page?: number; page_size?: number }
 ) {
   const { data } = await http.get(P_adj.list(projectId), {
     params: { year, ...opts },
   })
   return data
+}
+
+/** 底稿调整分录组 → 集中登记（workpaper-adjustment-centralization） */
+export async function syncAdjustmentFromWorkpaper(projectId: string, body: {
+  year: number
+  wp_id: string
+  item_id: string
+  source_wp_code: string
+  description?: string
+  adjustment_type: 'aje' | 'rje'
+  company_code?: string
+  line_items: Array<{
+    standard_account_code?: string; account_name?: string; report_line_code?: string
+    debit_amount: number; credit_amount: number
+  }>
+}) {
+  const { data } = await http.post(P_adj.syncFromWorkpaper(projectId), body)
+  return data
+}
+
+/** 按 source_ref 回流集中登记复核状态（底稿侧只读展示） */
+export async function getAdjustmentBySourceRef(projectId: string, sourceRef: string) {
+  const { data } = await http.get(P_adj.bySourceRef(projectId), { params: { source_ref: sourceRef } })
+  return data as {
+    entry_group_id?: string; adjustment_no?: string; adjustment_type?: string
+    review_status?: string; rejection_reason?: string | null; source_wp_code?: string
+    collaboration_status?: string | null
+  }
 }
 
 export async function createAdjustment(projectId: string, body: {
@@ -143,6 +171,64 @@ export async function createAdjustment(projectId: string, body: {
 
 export async function batchCommitAdjustments(projectId: string, year: number) {
   const { data } = await http.post(P_adj.batchCommit(projectId), null, { params: { year } })
+  return data
+}
+
+// ── 调整分录协作接力（adjustment-collaboration-and-propagation） ──
+
+export interface AdjCollabLineItem {
+  standard_account_code?: string; account_name?: string; report_line_code?: string
+  debit_amount: number; credit_amount: number
+}
+
+/** 转派/重派分录组给项目成员补充 */
+export async function assignAdjustmentCollaboration(
+  projectId: string, entryGroupId: string, body: { assignee_id: string; year: number; note?: string }
+) {
+  const { data } = await http.post(P_adj.collabAssign(projectId, entryGroupId), body)
+  return data
+}
+
+/** 分录组当前协作 + 事件时间线 */
+export async function getGroupCollaboration(projectId: string, entryGroupId: string) {
+  const { data } = await http.get(P_adj.collabByGroup(projectId, entryGroupId))
+  return data as {
+    collaboration: null | {
+      id: string; entry_group_id: string; status: string; round: number
+      initiator_id: string; assignee_id: string; note?: string | null; rejection_reason?: string | null
+    }
+    timeline: Array<{ id: string; event_type: string; actor_id: string; payload: any; created_at: string | null }>
+  }
+}
+
+/** 被指派人待办 */
+export async function getCollaborationInbox(projectId: string) {
+  const { data } = await http.get(P_adj.collabInbox(projectId))
+  return data as Array<{
+    id: string; entry_group_id: string; status: string; round: number
+    initiator_id: string; note?: string | null; updated_at: string | null
+  }>
+}
+
+export async function acknowledgeCollaboration(projectId: string, cid: string) {
+  const { data } = await http.post(P_adj.collabAcknowledge(projectId, cid))
+  return data
+}
+
+export async function contributeCollaboration(
+  projectId: string, cid: string, body: { line_items: AdjCollabLineItem[]; note?: string }
+) {
+  const { data } = await http.post(P_adj.collabContribute(projectId, cid), body)
+  return data
+}
+
+export async function confirmCollaboration(projectId: string, cid: string) {
+  const { data } = await http.post(P_adj.collabConfirm(projectId, cid))
+  return data
+}
+
+export async function rejectCollaboration(projectId: string, cid: string, reason: string) {
+  const { data } = await http.post(P_adj.collabReject(projectId, cid), { reason })
   return data
 }
 
@@ -289,6 +375,7 @@ export interface MisstatementItem {
   misstatement_type: string
   management_reason: string | null
   auditor_evaluation: string | null
+  source_wp_code?: string | null
   is_carried_forward: boolean
   prior_year_id: string | null
   created_by: string | null
@@ -559,14 +646,23 @@ export async function updateDisclosureNote(noteId: string, body: Record<string, 
   return data
 }
 
-export async function validateDisclosureNotes(projectId: string, year: number) {
-  const { data } = await http.post(P_dn.validate(projectId, year))
+export async function validateDisclosureNotes(
+  projectId: string,
+  year: number,
+  templateType?: 'soe' | 'listed',
+) {
+  // 后端仅接受 soe/listed（决定预设公式集）；custom 等其他值不传，用后端默认
+  const url = P_dn.validate(projectId, year)
+  const finalUrl = templateType ? `${url}?template_type=${templateType}` : url
+  const { data } = await http.post(finalUrl)
   return data
 }
 
 export async function getValidationResults(projectId: string, year: number): Promise<NoteValidationFinding[]> {
   const { data } = await http.get(P_dn.validationResults(projectId, year))
-  return data
+  // 后端返回 { findings: [...] } 结构化对象；兼容直接返回数组的旧形态
+  if (Array.isArray(data)) return data
+  return (data?.findings ?? []) as NoteValidationFinding[]
 }
 
 // ─── Audit Report (审计报告) ───

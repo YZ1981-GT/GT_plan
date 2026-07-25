@@ -19,6 +19,9 @@ import E1KeyPersonFlowOcrConfirmDialog, {
 } from './E1KeyPersonFlowOcrConfirmDialog.vue'
 import E1IpoSheetChrome from './E1IpoSheetChrome.vue'
 import http from '@/utils/http'
+import { amountFormatter, amountParser } from '../composables/wpAmountInput'
+import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 const props = defineProps<{
   wpId: string
@@ -32,6 +35,7 @@ const props = defineProps<{
 }>()
 
 const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
+const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 
 const options: UseE1BaseOptions = {
   wpId: toRef(props, 'wpId') as unknown as Ref<string>,
@@ -120,10 +124,6 @@ const conclusionTemplates = [
     text: '因存在与被审计单位或客商的大额异常往来、其他共同交易对手往来等情形，已扩大核查范围，结果见审计说明；提示项目组关注关联方占用及体外循环风险。',
   },
 ]
-
-function fmtAmt(v: number): string {
-  return Number(v || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
 
 function isHitRow(r: KeyPersonTxnRow): boolean {
   return r.isAuditee === '是'
@@ -504,13 +504,13 @@ async function onRemovePerson(): Promise<void> {
             </el-table-column>
             <el-table-column label="收入金额" width="110" align="right">
               <template #default="{ row }">
-                <el-input-number :model-value="row.income" :disabled="isReadonly" :controls="false" size="small" style="width: 100%"
+                <el-input-number :model-value="row.income" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small" style="width: 100%"
                   @change="(v: number) => updateRow(row.id, 'income', v ?? 0)" />
               </template>
             </el-table-column>
             <el-table-column label="支出金额" width="110" align="right">
               <template #default="{ row }">
-                <el-input-number :model-value="row.expense" :disabled="isReadonly" :controls="false" size="small" style="width: 100%"
+                <el-input-number :model-value="row.expense" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small" style="width: 100%"
                   @change="(v: number) => updateRow(row.id, 'expense', v ?? 0)" />
               </template>
             </el-table-column>
@@ -587,7 +587,7 @@ async function onRemovePerson(): Promise<void> {
           />
         </div>
         <p class="sum-line">
-          合计 · 收入 {{ fmtAmt(totals.income) }} / 支出 {{ fmtAmt(totals.expense) }}
+          合计 · 收入 {{ displayPrefs.fmtAmount(totals.income) }} / 支出 {{ displayPrefs.fmtAmount(totals.expense) }}
           · 当前命中 {{ totals.hitCount }} / {{ totals.rowCount }}
         </p>
 

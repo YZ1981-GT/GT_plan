@@ -15,6 +15,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useJ1ImportExport } from '@/composables/workpaper/j1/useJ1ImportExport'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
+import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '@/components/workpaper/composables/useAdjustmentCentralSync'
+import { useAuditContext } from '@/composables/useAuditContext'
 
 const props = defineProps<{
   wpId: string
@@ -129,6 +131,32 @@ const debitTotal = computed(() => rows.value.reduce((s, r) => s + r.debitAmount,
 const creditTotal = computed(() => rows.value.reduce((s, r) => s + r.creditAmount, 0))
 const balanceDiff = computed(() => debitTotal.value - creditTotal.value)
 const isBalanced = computed(() => Math.abs(balanceDiff.value) < 0.005)
+
+// ─── 同步到集中登记 ───────────────────────────────────────────────────
+const { year: auditYear } = useAuditContext()
+const {
+  centralStatus,
+  syncing: centralSyncing,
+  syncToCentral,
+  refreshStatus,
+} = useAdjustmentCentralSync({
+  projectId: () => props.projectId,
+  year: auditYear,
+  wpId: () => props.wpId,
+  wpCode: 'J1',
+  itemId: 'J1-3-adjustment-rows',
+  buildLineItems: () => rows.value.map((r: any) => ({
+    account_name: r.accountName,
+    report_line_code: r.reportItem || undefined,
+    debit_amount: r.debitAmount,
+    credit_amount: r.creditAmount,
+  })),
+  buildMeta: () => ({
+    description: rows.value.find((r: any) => r.description)?.description || 'J1 调整',
+    adjustmentType: rows.value.every((r: any) => r.category === '报表调整') ? 'rje' : 'aje',
+  }),
+})
+void refreshStatus()
 
 // ─── 推送A13 ──────────────────────────────────────────────────────────
 const selectedRows = ref<AdjRow[]>([])
@@ -292,6 +320,25 @@ function fmtAmount(v: number): string {
         >
           确认调整
         </el-button>
+        <el-button
+          size="small"
+          type="primary"
+          plain
+          :loading="centralSyncing"
+          :disabled="isReadonly || !isBalanced || rows.length === 0"
+          title="把本页调整分录汇聚到集中调整登记，供合伙人跨循环审阅"
+          @click="syncToCentral"
+        >
+          同步到集中登记
+        </el-button>
+        <el-tag
+          v-if="centralStatus?.review_status"
+          size="small"
+          :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
+          :title="centralStatus.rejection_reason || ''"
+        >
+          集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
+        </el-tag>
       </div>
     </div>
 

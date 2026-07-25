@@ -12,9 +12,19 @@ import logging
 
 import sqlalchemy as sa
 
+from app.core.config import settings
+from app.services.d_cycle_extraction.presets import resolve_effective
+from app.services.d_cycle_extraction.tier_a_seed import (
+    seed_tier_a_reconciliation,
+)
+from app.services.wp_formula_eval_service import evaluate_wp_formula_expression
+
 from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
+
+# D5 wp_code base（Tier A 提取公式 / 锚点登记 key）
+_D5_WP_CODE = "D5"
 
 
 async def render(ctx: RenderContext) -> dict | None:
@@ -196,7 +206,7 @@ async def render(ctx: RenderContext) -> dict | None:
         "soe": "soe" in standards,
     }
 
-    return {
+    html_data = {
         "sections": sections,
         "adjudication_config": adjudication_config,
         "detail_columns": detail_columns,
@@ -205,3 +215,46 @@ async def render(ctx: RenderContext) -> dict | None:
         "disclosure_visibility": disclosure_visibility,
         "responses_snapshot": responses_snapshot,
     }
+
+    # ─── Tier B 四表库审定表预填（D5：宁缺勿造 R3.4，ADDITIVE，灰度开关控制）───────
+    # spec: d-cycle-four-table-extraction-formulas (R1.1 / R2.3 / R3.4 / R7.1 / R7.2
+    #        / Property 9)
+    #
+    # 【宁缺勿造决策】D5-1 审定表两固定分类行（应收票据/应收账款），未审数由 D5-2 明细
+    # （`D5-2-rows`）按类别 SUMIF 聚合派生（useD5Adjudication categoryAggregation）；而
+    # trial_balance / tb_balance 的 1124 **只有科目总额、无「应收票据/应收账款」类别拆分** →
+    # 无法把 TB 干净映射到分类行 → D5 render **不返回 adjudication_prefill**（不臆造分类行
+    # 未审数 = 诚实部分覆盖，对齐 R3.4）。OCI 公允价值变动减项来自 D5-4 测算，非四表库。
+    #
+    # D5 四表库数据的正确落点（均为既有链路，本 render 不介入，手工优先精度）：
+    #   * D5-1 `D5-1-tb-amount`（1124 总额，试算平衡表数核对行）—— 已由前端从 render
+    #     project_context.tb_amount seed；注册为 Tier A **可编辑**公式 TB('1124','期末余额')
+    #     （公式管理面板可查可编，求值经 get_active_filter 与 Tier B 同口径）。
+    #   * D5-2 明细 ← tb_aux_balance 1124 按**类别维度**归集 + 序时账期后兑现（Tier B 复杂
+    #     归集）—— 非单条公式，本 render 不介入、不冲突。
+    #
+    # → 因此 D5 render 输出在开关开/关时**逐字节等价**（不新增任何键，Property 9 天然成立，
+    #   零回归）。
+    if settings.D_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED:
+        logger.debug(
+            "D5 render: 宁缺勿造（R3.4）— 无干净 TB→审定表分类行映射（应收票据/应收账款 "
+            "SUMIF from D5-2），不发 adjudication_prefill（wp_id=%s）",
+            wp_id,
+        )
+        # ─── Tier A 公式驱动 TB 核对行 transient seed（P0-1 主机制）──────────────
+        # spec: d-cycle-tier-a-writeback-detail-seed R3（决策1/3 / Property 6/7/10/11/13）
+        # 用 resolve_effective 的有效 Tier A 公式（默认 TB('1124','期末余额')）求值 transient
+        # seed 单标量 试算平衡表数核对行锚点 D5-1-tb-amount 进 responses_snapshot（不落库；
+        # 手工优先；disabled 跳过；写对字段 remark；fail-open）。主开关关（默认）→ 不 seed，零回归。
+        try:
+            await seed_tier_a_reconciliation(
+                ctx,
+                _D5_WP_CODE,
+                responses_snapshot,
+                resolve_effective=resolve_effective,
+                evaluate_wp_formula_expression=evaluate_wp_formula_expression,
+            )
+        except Exception as e:  # noqa: BLE001 — 兜底 fail-open，不阻断 render
+            logger.warning("D5 render: Tier A seed 兜底异常（fail-open）: %s", e)
+
+    return html_data

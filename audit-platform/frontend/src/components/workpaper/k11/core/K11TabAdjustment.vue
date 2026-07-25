@@ -15,6 +15,25 @@
           </template>
         </el-dropdown>
         <GtReviewTrigger section-id="K11-3-adjustment" label="💬 复核" />
+        <el-button
+          size="small"
+          type="primary"
+          plain
+          :loading="centralSyncing"
+          :disabled="isReadonly || !isBalanced || entries.length === 0"
+          @click="syncToCentral"
+          title="把本页调整分录汇聚到集中调整登记，供合伙人跨循环审阅"
+        >
+          同步到集中登记
+        </el-button>
+        <el-tag
+          v-if="centralStatus?.review_status"
+          size="small"
+          :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
+          :title="centralStatus.rejection_reason || ''"
+        >
+          集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
+        </el-tag>
       </div>
     </div>
 
@@ -234,6 +253,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import { useK11ImportExport } from '../../composables/useK11ImportExport'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
+import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
+import { useAuditContext } from '@/composables/useAuditContext'
 
 const K11_ACCOUNT_CODE = '6701'
 const ITEM_PREFIX = 'K11-3-adj'
@@ -308,8 +329,28 @@ const rjeTotal = computed(() =>
     .reduce((sum, e) => sum + ((e.debitAmount || 0) - (e.creditAmount || 0)), 0),
 )
 
+// ═══ 同步到集中调整登记（workpaper-adjustment-centralization） ═══
+const { year: auditYear } = useAuditContext()
+const { centralStatus, syncing: centralSyncing, syncToCentral, refreshStatus } = useAdjustmentCentralSync({
+  projectId: () => props.projectId,
+  year: auditYear,
+  wpId: () => props.wpId,
+  wpCode: 'K11',
+  itemId: `${ITEM_PREFIX}-entries`,
+  buildLineItems: () => entries.value.map(e => ({
+    account_name: e.accountName,
+    report_line_code: e.reportItem || undefined,
+    debit_amount: e.debitAmount,
+    credit_amount: e.creditAmount,
+  })),
+  buildMeta: () => ({
+    description: entries.value.find(e => e.description)?.description || 'K11 资产减值损失调整',
+    adjustmentType: entries.value.length > 0 && entries.value.every(e => e.category === '报表调整') ? 'rje' : 'aje',
+  }),
+})
+
 // ═══ 初始化加载 ═══
-onMounted(() => { loadFromResponses() })
+onMounted(() => { loadFromResponses(); refreshStatus() })
 
 function loadFromResponses(): void {
   const saved = props.allResponses.get(`${ITEM_PREFIX}-entries`)

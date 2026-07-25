@@ -191,7 +191,32 @@
       </div>
     </div>
 
-    <!-- ═══ 叙述式结论区 ═══ -->
+    <!-- ═══ 审计说明 ═══ -->
+    <el-card class="conclusion-card" shadow="never">
+      <template #header>
+        <div class="conclusion-header">
+          <span>审计说明</span>
+          <el-button
+            v-if="!isReadonly"
+            size="small"
+            type="primary"
+            plain
+            :loading="aiNoteLoading"
+            @click="handleAiNote"
+          >🤖 AI 辅助</el-button>
+        </div>
+      </template>
+      <el-input
+        :model-value="note"
+        type="textarea"
+        :autosize="{ minRows: 4, maxRows: 8 }"
+        :disabled="isReadonly"
+        placeholder="记录抵质押资产权属核验过程（证书原件检查）、评估价值时效性、是否存在重复抵押；说明担保比例超限情况及影响。"
+        @input="onNoteInput"
+      />
+    </el-card>
+
+    <!-- ═══ 审计结论区 ═══ -->
     <el-card class="conclusion-card" shadow="never">
       <template #header>
         <div class="conclusion-header">
@@ -199,21 +224,20 @@
           <el-button
             v-if="!isReadonly"
             size="small"
-            type="warning"
+            type="primary"
             plain
+            :loading="aiConclusionLoading"
             @click="handleAiConclusion"
-          >
-            AI 辅助
-          </el-button>
+          >🤖 AI 辅助</el-button>
         </div>
       </template>
       <el-input
-        v-model="conclusion"
+        :model-value="conclusion"
         type="textarea"
         :autosize="{ minRows: 3, maxRows: 8 }"
         :disabled="isReadonly"
         placeholder="根据抵质押资产检查结果，填写审计结论..."
-        @input="handleConclusionChange"
+        @input="onConclusionInput"
       />
     </el-card>
 
@@ -243,11 +267,12 @@
  * Task: 4.5
  * Requirements: 6.4-6.5
  */
-import { inject, ref } from 'vue'
+import { inject, onMounted, toRef } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import type { useL1FormData } from '@/composables/useL1FormData'
 import type { PledgeCheckRow } from '@/composables/useL1FormData'
 import { useL1PledgeCheck } from '@/composables/useL1PledgeCheck'
+import { useL1AiNote } from '@/composables/useL1AiNote'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -278,22 +303,31 @@ const {
   updateRow,
 } = useL1PledgeCheck(formData)
 
-// ─── 结论区 ──────────────────────────────────────────────────────────────────
+// ─── 审计说明 + 审计结论（AI 辅助，统一 useL1AiNote：修复刷新丢失+真实AI） ───
 
-const conclusion = ref('')
+const {
+  note, conclusion, aiNoteLoading, aiConclusionLoading,
+  load: loadNote, onNoteInput, onConclusionInput, generateNote, generateConclusion,
+} = useL1AiNote(formData, toRef(props, 'wpId'), 'plg', toRef(props, 'isReadonly'))
 
-function handleConclusionChange(val: string): void {
-  conclusion.value = val
-  formData.debounceSave([{
-    item_id: 'L1-plg-conclusion',
-    conclusion: val || null,
-    remark: null,
-  }])
+function _aiContext() {
+  return {
+    账面价值合计: totalBookValue.value,
+    担保借款合计: totalGuaranteedLoan.value,
+    综合担保比例: overallPledgeRatio.value.toFixed(2) + '%',
+    超限行数: warningCount.value,
+  }
+}
+function handleAiNote() {
+  generateNote('请基于抵质押资产检查情况撰写审计说明，覆盖权属核验、评估时效、重复抵押、担保比例超限。', _aiContext())
+}
+function handleAiConclusion() {
+  generateConclusion('请基于抵质押资产检查结果生成审计结论。', _aiContext())
 }
 
-async function handleAiConclusion(): Promise<void> {
-  ElMessageBox.alert('AI辅助结论生成功能即将上线', '提示')
-}
+onMounted(() => {
+  loadNote()
+})
 
 // ─── 字段编辑处理 ────────────────────────────────────────────────────────────
 

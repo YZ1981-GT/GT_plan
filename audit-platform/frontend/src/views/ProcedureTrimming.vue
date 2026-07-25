@@ -7,11 +7,14 @@
         <el-tag size="small" type="info">{{ projectId.slice(0, 8) }}</el-tag>
       </div>
       <div class="gt-proc-toolbar__right">
-        <el-button size="small" @click="resetAll">🔄 恢复初始</el-button>
-        <el-button size="small" @click="showRefDialog = true">📋 参照其他项目</el-button>
-        <el-button size="small" type="warning" @click="onSmartTrim">🤖 一键智能裁剪</el-button>
-        <el-button size="small" @click="openDelegateWizard">🎯 程序委派向导</el-button>
-        <el-button size="small" type="primary" @click="saveTrim" :loading="saving">💾 保存粗裁</el-button>
+        <el-tag v-if="!canManage" size="small" type="info">只读（仅项目经理可裁剪/委派）</el-tag>
+        <template v-else>
+          <el-button size="small" @click="resetAll">🔄 恢复初始</el-button>
+          <el-button size="small" @click="openRefDialog">📋 参照其他项目</el-button>
+          <el-button size="small" type="warning" @click="onSmartTrim">🤖 一键智能裁剪</el-button>
+          <el-button size="small" @click="openDelegateWizard">🎯 程序委派向导</el-button>
+          <el-button size="small" type="primary" @click="saveTrim(true)" :loading="saving">💾 保存粗裁</el-button>
+        </template>
       </div>
     </div>
 
@@ -44,20 +47,22 @@
         <div class="gt-proc-stat-card__num" style="color: var(--gt-color-success)">{{ progressStats.custom }}</div>
         <div class="gt-proc-stat-card__label">自定义新增</div>
       </div>
-      <div class="gt-proc-stat-card gt-proc-stat-card--progress">
-        <el-progress
-          type="circle"
-          :percentage="progressStats.total > 0 ? Math.round(progressStats.execute / progressStats.total * 100) : 0"
-          :width="50"
-          :stroke-width="5"
-        />
-        <div class="gt-proc-stat-card__label">执行率</div>
-      </div>
+      <el-tooltip content="执行率 = 保留执行 / 总程序（本页粗裁口径，非底稿完成率）" placement="top">
+        <div class="gt-proc-stat-card gt-proc-stat-card--progress">
+          <el-progress
+            type="circle"
+            :percentage="progressStats.total > 0 ? Math.round(progressStats.execute / progressStats.total * 100) : 0"
+            :width="50"
+            :stroke-width="5"
+          />
+          <div class="gt-proc-stat-card__label">执行率</div>
+        </div>
+      </el-tooltip>
     </div>
 
     <!-- 循环 Tab -->
     <div class="gt-proc-cycle-bar">
-      <el-tabs v-model="activeCycle" @tab-change="loadProcedures" class="gt-proc-tabs">
+      <el-tabs v-model="activeCycle" :before-leave="onCycleBeforeLeave" @tab-change="loadProcedures" class="gt-proc-tabs">
         <el-tab-pane v-for="c in cycles" :key="c.code" :label="c.label" :name="c.code" />
       </el-tabs>
     </div>
@@ -65,7 +70,7 @@
     <!-- 表格工具栏 -->
     <div class="gt-proc-table-toolbar">
       <span class="gt-proc-table-toolbar__label">{{ activeCycle }} 循环 · {{ filteredProcedures.length }} 个程序</span>
-      <div class="gt-proc-table-toolbar__actions">
+      <div v-if="canManage" class="gt-proc-table-toolbar__actions">
         <el-button size="small" type="primary" text @click="batchSetAll('execute')">✓ 全部执行</el-button>
         <el-button size="small" type="danger" text @click="batchSetAll('not_applicable')">✗ 全部不适用</el-button>
         <el-divider direction="vertical" />
@@ -94,6 +99,7 @@
               inactive-text="裁剪"
               :active-value="true"
               :inactive-value="false"
+              :disabled="!canManage"
               @change="onApplicableChange(row)"
               inline-prompt
               style="--el-switch-on-color: var(--gt-color-primary); --el-switch-off-color: var(--gt-color-coral)"
@@ -108,11 +114,12 @@
               placeholder="填写裁剪理由..."
               size="small"
               clearable
+              :disabled="!canManage"
             />
             <span v-else class="gt-proc-text-muted">—</span>
           </template>
         </el-table-column>
-        <el-table-column prop="wp_code" label="关联底稿" width="100" resizable />
+        <el-table-column prop="wp_code" label="关联底稿" min-width="140" resizable show-overflow-tooltip class-name="gt-proc-wpcode-col" />
         <el-table-column width="160" align="center">
           <template #header>
             <el-tooltip content="粗裁层：底稿主编（WorkingPaper.assigned_to）。程序执行人/操作复核人在底稿程序表控制台按行细裁委派。" placement="top">
@@ -127,6 +134,7 @@
               size="small"
               clearable
               filterable
+              :disabled="!canManage"
               style="width: 100%"
               @change="onAssigneeChange(row)"
             >
@@ -165,7 +173,7 @@
             >
               <el-button size="small" text disabled>未生成</el-button>
             </el-tooltip>
-            <el-button v-if="row.is_custom" size="small" text type="danger" @click="removeCustom(row)">删除</el-button>
+            <el-button v-if="row.is_custom && canManage" size="small" text type="danger" @click="removeCustom(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -245,14 +253,13 @@
     <!-- 智能裁剪确认弹窗 -->
     <el-dialog append-to-body v-model="showSmartTrimDialog" title="智能裁剪" width="560px">
       <p style="font-size: 13px; color: var(--gt-color-text-secondary); margin-bottom: 12px">
-        系统将根据以下规则自动裁剪不适用的程序：
+        系统依据<strong>试算表科目余额</strong>自动裁剪无数据的科目程序（有数据的科目一律保留，宁松勿紧）：
       </p>
       <ul class="gt-proc-smart-rules">
-        <li><strong>保留</strong>：A 完成阶段 / S 专项程序（必须执行）</li>
-        <li><strong>保留</strong>：标记为"必须"的程序（is_mandatory）</li>
-        <li><strong>保留</strong>：已有执行进度的程序（进行中/已完成）</li>
-        <li><strong>保留</strong>：已手动设置裁剪理由的程序</li>
-        <li><strong>裁剪</strong>：B/C/D~N 中"非必须 + 未开始 + 无手动理由"的程序</li>
+        <li><strong>裁剪</strong>：D~N 实质性循环中，<strong>试算表无科目数据（无余额 / 未发生）</strong>的循环所属程序</li>
+        <li><strong>保留</strong>：试算表<strong>有数据</strong>的科目循环（有余额即全部保留，供逐条细裁）</li>
+        <li><strong>保留</strong>：A 完成阶段 / S 专项 / B 计划 / C 控制测试（非科目余额驱动，不按数据裁剪）</li>
+        <li><strong>保留</strong>：标记"必须"（is_mandatory）/ 已有执行进度 / 已手动设置理由的程序</li>
       </ul>
 
       <!-- 裁剪范围选择 -->
@@ -271,7 +278,7 @@
       </div>
 
       <p style="font-size: 12px; color: var(--gt-color-text-tertiary); margin-top: 8px">
-        💡 裁剪后可逐条检查并恢复，重要循环（如收入/货币资金）的穿行测试建议手动恢复
+        💡 依据试算表判断：仅裁"无数据"科目对应程序，有数据科目全部保留。需先导入试算表；裁剪后可逐条恢复。
       </p>
       <template #footer>
         <el-button @click="showSmartTrimDialog = false">取消</el-button>
@@ -348,7 +355,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   getProcedures, updateProcedureTrim, initProcedures,
@@ -360,6 +367,12 @@ import { listAssignments } from '@/services/staffApi'
 import { ROLE_TERMS, newRequestId } from '@/components/workpaper/composables/procedureConsoleOverlay'
 import http from '@/utils/http'
 import { handleApiError } from '@/utils/errorHandler'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
+
+// 权限：仅项目经理+（admin/partner/manager）可裁剪/委派/新增/删除；其余角色只读
+const { currentRole } = usePermissionMatrix()
+const canManage = computed(() => ['admin', 'partner', 'manager'].includes(currentRole.value))
 
 // 统一中文术语（需求 14.1）
 const TERMS = {
@@ -374,6 +387,10 @@ const TERMS = {
 const route = useRoute()
 const router = useRouter()
 const projectId = computed(() => route.params.projectId as string)
+const { year } = useAuditContext()
+
+// 科目余额驱动的实质性循环（按试算表科目有无数据判断裁剪；B/C 为计划/控制类非科目余额驱动，A/S 恒保留）
+const DATA_DRIVEN_CYCLES = new Set(['D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N'])
 
 const cycles = [
   { code: 'B', label: 'B 初步业务' }, { code: 'C', label: 'C 控制测试' },
@@ -416,6 +433,19 @@ const progressStats = computed(() => {
   return { total, execute, trimmed, custom }
 })
 
+// 脏检查：适用性 / 裁剪理由 相对初始快照是否有未保存修改（委派人即时持久化，不计入）
+const isDirty = computed(() => {
+  const orig = new Map(originalSnapshot.map((o: any) => [o.id, o]))
+  for (const p of procedures.value) {
+    const o = orig.get(p.id)
+    if (!o) return true // 新增行（未保存）
+    if (Boolean(p._applicable) !== Boolean(o._applicable)) return true
+    if ((p.skip_reason || '').trim() !== (o.skip_reason || '').trim()) return true
+  }
+  // 数量变化（删除/新增）
+  return procedures.value.length !== originalSnapshot.length
+})
+
 // 加载程序列表
 async function loadProcedures() {
   loading.value = true
@@ -443,22 +473,39 @@ function onApplicableChange(row: any) {
   if (row._applicable) row.skip_reason = ''
 }
 
-// 恢复初始状态
-function resetAll() {
-  ElMessageBox.confirm('确定恢复到初始状态？所有未保存的修改将丢失。', '恢复初始', {
-    confirmButtonText: '确定恢复',
-    cancelButtonText: '取消',
-    type: 'warning',
-  }).then(() => {
-    procedures.value = JSON.parse(JSON.stringify(originalSnapshot))
-    statsFilter.value = ''
-    ElMessage.success('已恢复初始状态')
-  }).catch(() => {})
+// 恢复初始状态（含回滚已即时持久化的委派人，避免内存与 DB 不一致）
+async function resetAll() {
+  try {
+    await ElMessageBox.confirm('确定恢复到初始状态？所有未保存的修改将丢失（已委派的底稿主编也会一并还原）。', '恢复初始', {
+      confirmButtonText: '确定恢复',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+  } catch {
+    return
+  }
+  // 回滚已持久化的委派：对比初始快照，assigned_to 变化的行调后端还原
+  const origById = new Map(originalSnapshot.map((o: any) => [o.id, o]))
+  const changedAssignees = procedures.value.filter(p => {
+    const o = origById.get(p.id)
+    return o && (o.assigned_to || null) !== (p.assigned_to || null)
+  })
+  for (const p of changedAssignees) {
+    const o: any = origById.get(p.id)
+    try {
+      await assignProcedures(projectId.value, [{ procedure_id: p.id, staff_id: o.assigned_to || null }])
+    } catch (e: any) {
+      handleApiError(e, '还原委派')
+    }
+  }
+  procedures.value = JSON.parse(JSON.stringify(originalSnapshot))
+  statsFilter.value = ''
+  ElMessage.success('已恢复初始状态')
 }
 
-// 批量设置
+// 批量设置（作用于当前筛选后的可见行；无筛选时即全部）
 function batchSetAll(status: 'execute' | 'not_applicable') {
-  for (const p of procedures.value) {
+  for (const p of filteredProcedures.value) {
     p._applicable = status === 'execute'
     p.status = status
     if (status === 'execute') p.skip_reason = ''
@@ -466,20 +513,45 @@ function batchSetAll(status: 'execute' | 'not_applicable') {
 }
 
 // 保存裁剪
-async function saveTrim() {
-  // 检查裁剪的程序是否都填了理由
+// promptDelegate=true（点击「保存粗裁」按钮）保存成功后弹窗确认是否前往人员委派界面；
+// 智能裁剪等内部调用传 false，不打断流程
+async function saveTrim(promptDelegate = false) {
+  // 裁剪理由必填（审计轨迹合规：裁剪必须记录理由）→ 缺失则阻断保存并定位
   const noReason = procedures.value.filter(p => !p._applicable && !p.skip_reason?.trim())
   if (noReason.length > 0) {
-    ElMessage.warning(`${noReason.length} 个裁剪程序未填写理由，建议补充`)
+    ElMessage.error(`${noReason.length} 个裁剪程序未填写理由，裁剪须记录审计轨迹，请补充后再保存`)
+    statsFilter.value = 'trimmed' // 定位到已裁剪项便于补填
+    return
   }
   saving.value = true
+  let ok = false
   try {
     await updateProcedureTrim(projectId.value, activeCycle.value,
       procedures.value.map(p => ({ id: p.id, status: p._applicable ? 'execute' : 'not_applicable', skip_reason: p.skip_reason })))
+    // 保存成功 → 刷新初始快照，isDirty 归位
+    originalSnapshot = JSON.parse(JSON.stringify(procedures.value))
     ElMessage.success('裁剪已保存，保留执行的程序已加入待执行底稿库')
+    ok = true
   } catch (e: any) {
     handleApiError(e, '保存裁剪')
   } finally { saving.value = false }
+
+  // 保存成功且来自按钮点击 → 确认后跳转人员委派（委派矩阵）界面
+  // 确认框放在 try/finally 之外，避免"取消"被 handleApiError 误判为保存失败
+  if (ok && promptDelegate) {
+    try {
+      await ElMessageBox.confirm(
+        '粗裁已保存。是否前往「人员委派」界面，将保留执行的程序委派给审计人员？',
+        '前往人员委派',
+        { type: 'success', confirmButtonText: '前往委派', cancelButtonText: '暂不' },
+      )
+      router.push({
+        name: 'WorkpaperList',
+        params: { projectId: projectId.value },
+        query: { view: 'matrix' },
+      })
+    } catch { /* 用户选择"暂不"，留在当前页 */ }
+  }
 }
 
 // 新增自定义程序
@@ -539,13 +611,16 @@ async function submitCustomProcedure() {
       const { data: result } = await http.post(
         `/api/projects/${projectId.value}/procedures/${activeCycle.value}/custom-with-template?${params}`,
       )
-      procedures.value.push({
+      const addedRow = {
         ...result,
         _applicable: true,
         is_custom: true,
         procedure_name: name,
         procedure_code: result.wp_code || customForm.value.code,
-      })
+      }
+      procedures.value.push(addedRow)
+      // 自定义程序已即时持久化 → 同步初始快照，避免 isDirty 误报
+      originalSnapshot.push(JSON.parse(JSON.stringify(addedRow)))
 
       // 上传文件到底稿存储（如果有 wp_index_id）
       if (result.wp_index_id && customForm.value.fileList[0]?.raw) {
@@ -570,17 +645,50 @@ async function submitCustomProcedure() {
         procedure_name: name,
         procedure_code: customForm.value.code || undefined,
       })
-      procedures.value.push({ ...newProc, _applicable: true, is_custom: true })
+      const addedRow = { ...newProc, _applicable: true, is_custom: true }
+      procedures.value.push(addedRow)
+      // 自定义程序已即时持久化 → 同步初始快照，避免 isDirty 误报
+      originalSnapshot.push(JSON.parse(JSON.stringify(addedRow)))
       ElMessage.success('已添加自定义程序（无模板文件，可稍后在底稿列表中上传）')
     }
     showAddCustomDialog.value = false
   } catch (e: any) { handleApiError(e, '新增程序') }
 }
 
-// 删除自定义程序
-function removeCustom(row: any) {
-  const idx = procedures.value.indexOf(row)
-  if (idx >= 0) procedures.value.splice(idx, 1)
+// 删除自定义程序（调后端软删 + 清理 WpIndex，成功后再移除本地行）
+async function removeCustom(row: any) {
+  const doRemoveLocal = () => {
+    const idx = procedures.value.indexOf(row)
+    if (idx >= 0) procedures.value.splice(idx, 1)
+    // 删除已即时持久化 → 同步移除初始快照条目，避免 isDirty 误报
+    if (row?.id) {
+      const si = originalSnapshot.findIndex((o: any) => o.id === row.id)
+      if (si >= 0) originalSnapshot.splice(si, 1)
+    }
+  }
+  // 未落库的临时行（无 id）直接移除
+  if (!row?.id) {
+    doRemoveLocal()
+    return
+  }
+  try {
+    await ElMessageBox.confirm(
+      `确认删除自定义程序「${row.procedure_name || row.procedure_code || ''}」？`,
+      '删除确认',
+      { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' },
+    )
+  } catch {
+    return // 用户取消
+  }
+  try {
+    await http.delete(
+      `/api/projects/${projectId.value}/procedures/${activeCycle.value}/custom/${row.id}`,
+    )
+    doRemoveLocal()
+    ElMessage.success('已删除自定义程序')
+  } catch (e: any) {
+    handleApiError(e, '删除自定义程序')
+  }
 }
 
 // 加载项目团队成员（委派候选人）
@@ -646,45 +754,174 @@ async function confirmSmartTrim() {
     targetCycles = new Set(cycles.filter(c => c.code !== 'A' && c.code !== 'S').map(c => c.code))
   }
 
-  const protectedCycles = new Set(['A', 'S'])
-  let trimCount = 0
-  let keepCount = 0
-
-  for (const p of procedures.value) {
-    // 判断该程序属于哪个循环
-    const cycleCode = (p.procedure_code || p.wp_code || '').charAt(0).toUpperCase()
-
-    // 不在目标范围内的跳过
-    if (!targetCycles.has(cycleCode)) continue
-    // 跳过已手动裁剪的
-    if (!p._applicable) continue
-    // 跳过必须程序
-    if (p.is_mandatory) { keepCount++; continue }
-    // 跳过 A/S 类
-    if (protectedCycles.has(cycleCode)) { keepCount++; continue }
-    // 跳过已有执行进度的
-    if (p.execution_status === 'in_progress' || p.execution_status === 'completed' || p.execution_status === 'reviewed') {
-      keepCount++; continue
-    }
-    // 跳过已手动设置理由的
-    if (p.skip_reason) continue
-
-    // 符合裁剪条件
-    p._applicable = false
-    p.status = 'not_applicable'
-    p.skip_reason = `智能裁剪：${cycleCode}循环该程序非必须，可根据风险评估结果决定是否恢复`
-    trimCount++
+  // 核心判据：从试算表读取有数据（非零余额/已发生）的科目及其业务循环。
+  // 只裁"该循环在试算表中完全无科目数据"的 D~N 程序，有数据的科目循环一律保留。
+  let accounts: { name: string; amount: number; cycle: string }[] = []
+  let scopeLoadFailed = false
+  try {
+    const resp: any = await http.get('/api/b50/scope-accounts', {
+      params: { project_id: projectId.value, year: year.value },
+    })
+    const env = resp?.data
+    const payload = env?.data ?? env
+    accounts = Array.isArray(payload?.accounts) ? payload.accounts : []
+  } catch {
+    scopeLoadFailed = true
   }
 
-  showSmartTrimDialog.value = false
+  // 安全兜底：拿不到任何试算表科目（未导入/查询失败）时禁止裁剪，避免误把所有循环当"无数据"全裁光
+  if (scopeLoadFailed || accounts.length === 0) {
+    showSmartTrimDialog.value = false
+    ElMessageBox.alert(
+      scopeLoadFailed
+        ? '未能读取试算表数据，无法按"科目有无数据"智能裁剪。请稍后重试或手动裁剪。'
+        : '试算表暂无科目数据（可能尚未导入试算表）。智能裁剪依据科目余额判断，已取消本次裁剪，请先导入试算表或手动裁剪。',
+      '无法智能裁剪',
+      { type: 'warning', confirmButtonText: '知道了' },
+    ).catch(() => {})
+    return
+  }
+
+  // 有非零余额（含损益已发生额）的实质性循环集合
+  const cyclesWithData = new Set<string>()
+  for (const a of accounts) {
+    const c = (a.cycle || '').toUpperCase()
+    if (DATA_DRIVEN_CYCLES.has(c)) cyclesWithData.add(c)
+  }
+
+  // 科目底稿级数据可用性（registry 覆盖的 wp_code 前缀，如 D2/E1），比循环级更精确：
+  // 同一循环内 D2(应收账款)有数据、D3(预收账款)无数据可分别判定；未覆盖的退回循环级
+  const subjectWithData = new Set<string>()
+  const subjectNoData = new Set<string>()
+  try {
+    const av: any = await http.get(
+      `/api/projects/${projectId.value}/procedure-scope/data-availability`,
+      { params: { year: year.value } },
+    )
+    const sp = av?.data?.data ?? av?.data ?? {}
+    for (const w of (sp.subject_with_data || [])) subjectWithData.add(String(w).toUpperCase())
+    for (const w of (sp.subject_no_data || [])) subjectNoData.add(String(w).toUpperCase())
+  } catch { /* 科目级不可用时静默降级到循环级 */ }
+
+  const protectedCycles = new Set(['A', 'S'])
+
+  // 单个程序裁剪决策（纯函数，跨循环复用）。返回裁剪理由或 null（保留）。
+  // scope 由调用方保证（当前循环 / 跨循环各自迭代），此处不再判 targetCycles。
+  const decide = (p: any): string | null => {
+    const cc = (p.procedure_code || p.wp_code || '').charAt(0).toUpperCase()
+    const applicable = p._applicable !== undefined
+      ? p._applicable
+      : (p.status !== 'not_applicable' && p.status !== 'skip')
+    if (!applicable) return null // 已裁剪
+    if (p.is_mandatory) return null // 必须程序
+    if (protectedCycles.has(cc)) return null // A/S 保护
+    if (['in_progress', 'completed', 'reviewed'].includes(p.execution_status)) return null // 有进度
+    if (p.skip_reason) return null // 已手动设置理由
+    if (!DATA_DRIVEN_CYCLES.has(cc)) return null // B/C 非科目余额驱动 → 保留
+    // 科目底稿级优先：registry 覆盖的科目按标准科目码判断（如 D2 无数据可裁而 D3 有数据保留）
+    const prefix = (p.wp_code || p.procedure_code || '').toUpperCase().match(/^([A-Z]+\d+)/)?.[1] || ''
+    if (subjectWithData.has(prefix)) return null // 该科目在试算表有数据 → 保留
+    if (subjectNoData.has(prefix)) {
+      return `智能裁剪：${prefix} 科目在试算表中无数据（无余额/未发生），如实际存在业务可手动恢复`
+    }
+    // registry 未覆盖该科目 → 退回业务循环级判断
+    if (cyclesWithData.has(cc)) return null // 循环有数据 → 保留
+    return `智能裁剪：${cc} 循环在试算表中无科目数据（无余额/未发生），如实际存在业务可手动恢复`
+  }
+
   const scopeLabel = smartTrimScope.value === 'all' ? '全部循环' :
     smartTrimScope.value === 'current' ? `${activeCycle.value} 循环` :
     `${smartTrimCycles.value.join('/')} 循环`
-  if (trimCount > 0) {
-    ElMessage.success(`[${scopeLabel}] 已智能裁剪 ${trimCount} 个程序（保留 ${keepCount} 个必须/进行中程序），请检查后保存`)
-  } else {
-    ElMessage.info(`[${scopeLabel}] 未发现可裁剪的程序`)
+
+  // ── 当前循环：内存应用，用户复核后点「保存粗裁」──
+  if (smartTrimScope.value === 'current') {
+    let trimCount = 0
+    let keepCount = 0
+    for (const p of procedures.value) {
+      const reason = decide(p)
+      if (reason) {
+        p._applicable = false
+        p.status = 'not_applicable'
+        p.skip_reason = reason
+        trimCount++
+      } else if (p._applicable) {
+        keepCount++
+      }
+    }
+    showSmartTrimDialog.value = false
+    if (trimCount > 0) {
+      ElMessage.success(`[${scopeLabel}] 已裁剪 ${trimCount} 个"试算表无数据"科目的程序（保留 ${keepCount} 个），请检查后保存`)
+    } else {
+      ElMessage.info(`[${scopeLabel}] 无可裁剪程序：所涉科目在试算表中均有数据或均为必须/进行中`)
+    }
+    return
   }
+
+  // ── 跨循环（全部 / 自定义）：真拉取每个目标循环 + 直接持久化 ──
+  // 当前循环若有未保存修改，跨循环会重载覆盖，先要求处理
+  if (isDirty.value) {
+    try {
+      await ElMessageBox.confirm(
+        '当前循环有未保存的粗裁修改。跨循环智能裁剪会直接保存各循环并刷新当前循环，未保存修改将丢失。是否先保存当前循环再继续？',
+        '未保存修改',
+        { type: 'warning', confirmButtonText: '保存并继续', cancelButtonText: '取消' },
+      )
+      await saveTrim()
+      if (isDirty.value) return // saveTrim 因缺理由被阻断
+    } catch {
+      return
+    }
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      `将对 ${targetCycles.size} 个循环执行智能裁剪并【直接保存】，结果立即生效。是否继续？`,
+      '跨循环智能裁剪',
+      { type: 'warning', confirmButtonText: '确认裁剪并保存', cancelButtonText: '取消' },
+    )
+  } catch {
+    return
+  }
+
+  showSmartTrimDialog.value = false
+  loading.value = true
+  let totalTrim = 0
+  let totalKeep = 0
+  const failedCycles: string[] = []
+  try {
+    for (const cyc of targetCycles) {
+      try {
+        let procs = await getProcedures(projectId.value, cyc)
+        if (!procs || procs.length === 0) {
+          procs = await initProcedures(projectId.value, cyc)
+        }
+        const items = (procs || []).map((p: any) => {
+          const reason = decide(p)
+          if (reason) {
+            totalTrim++
+            return { id: p.id, status: 'not_applicable', skip_reason: reason }
+          }
+          const keepApplicable = p.status !== 'not_applicable' && p.status !== 'skip'
+          if (keepApplicable) totalKeep++
+          return { id: p.id, status: p.status || 'execute', skip_reason: p.skip_reason || '' }
+        }).filter((it: any) => it.id)
+        if (items.length > 0) {
+          await updateProcedureTrim(projectId.value, cyc, items)
+        }
+      } catch {
+        failedCycles.push(cyc)
+      }
+    }
+  } finally {
+    loading.value = false
+  }
+
+  await loadProcedures() // 刷新当前循环显示
+
+  let msg = `[${scopeLabel}] 已智能裁剪并保存 ${totalTrim} 个"试算表无数据"科目程序（保留 ${totalKeep} 个）`
+  if (failedCycles.length > 0) msg += `；${failedCycles.join('/')} 循环处理失败`
+  if (totalTrim > 0) ElMessage.success(msg)
+  else ElMessage.info(`[${scopeLabel}] 未发现可裁剪的程序${failedCycles.length ? `（${failedCycles.join('/')} 失败）` : ''}`)
 }
 
 // 参照其他项目
@@ -732,6 +969,11 @@ function wizardBody() {
 async function runDelegatePreview() {
   if (!delegateWizard.value.assigneeId) {
     ElMessage.warning('请选择程序执行人')
+    return
+  }
+  // SOD 自审防护：程序执行人不得同时为操作复核人
+  if (delegateWizard.value.reviewerId && delegateWizard.value.reviewerId === delegateWizard.value.assigneeId) {
+    ElMessage.error('程序执行人与操作复核人不能为同一人（职责分离），请调整')
     return
   }
   delegateWizard.value.loading = true
@@ -782,13 +1024,51 @@ async function runDelegateApply() {
   }
 }
 
-onMounted(async () => {
-  await loadProcedures()
-  await loadTeamMembers()
+// 循环 Tab 切换前脏检查（有未保存粗裁修改时确认）
+async function onCycleBeforeLeave(_activeName: string, oldActiveName: string): Promise<boolean> {
+  if (!oldActiveName || !isDirty.value) return true
+  try {
+    await ElMessageBox.confirm(
+      '当前循环有未保存的粗裁修改（适用性 / 裁剪理由），切换循环将丢失。是否放弃修改并切换？',
+      '未保存修改',
+      { type: 'warning', confirmButtonText: '放弃并切换', cancelButtonText: '取消' },
+    )
+    return true
+  } catch {
+    return false // 用户取消 → 阻止切换
+  }
+}
+
+// 路由离开守卫：有未保存修改时确认
+onBeforeRouteLeave(async () => {
+  if (!isDirty.value) return true
+  try {
+    await ElMessageBox.confirm(
+      '当前循环有未保存的粗裁修改，离开将丢失。是否放弃修改并离开？',
+      '未保存修改',
+      { type: 'warning', confirmButtonText: '放弃并离开', cancelButtonText: '留在本页' },
+    )
+    return true
+  } catch {
+    return false
+  }
+})
+
+// 参照其他项目：弹窗打开时才懒加载项目列表（避免页面挂载即全量拉取）
+const projectsLoaded = ref(false)
+async function openRefDialog() {
+  showRefDialog.value = true
+  if (projectsLoaded.value) return
   try {
     const list = await listProjects()
     projectOptions.value = Array.isArray(list) ? list : []
+    projectsLoaded.value = true
   } catch { /* 静默 */ }
+}
+
+onMounted(async () => {
+  await loadProcedures()
+  await loadTeamMembers()
 })
 </script>
 
@@ -847,7 +1127,20 @@ onMounted(async () => {
   border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.03);
   overflow: hidden;
 }
+/* 红框表格统一 13px（Element Plus 表头/单元格默认 14px，需显式覆盖） */
+.gt-proc-table-wrap :deep(.el-table),
+.gt-proc-table-wrap :deep(.el-table th.el-table__cell),
+.gt-proc-table-wrap :deep(.el-table td.el-table__cell),
+.gt-proc-table-wrap :deep(.el-table .cell) {
+  font-size: 13px;
+}
 .gt-proc-text-muted { color: var(--gt-color-text-placeholder); font-size: 12px; }
+
+/* 关联底稿列：区间编码（如 D2-6至D2-13）单行显示，不换行 */
+:deep(.gt-proc-wpcode-col .cell) {
+  white-space: nowrap;
+  font-size: 12px;
+}
 
 /* 底部提示 */
 .gt-proc-footer-tip {

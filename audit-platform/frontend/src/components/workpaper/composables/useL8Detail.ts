@@ -290,6 +290,10 @@ export function useL8Detail(
     debouncedSave('L8-2-netFinExpense', {
       remark: String(totalPeriodAudited.value),
     })
+    // 🔴 修复：保存完整行到 L8-2-full-data（组件 _restoreRows 读此键；此前从不写 → 刷新数据全丢）
+    debouncedSave('L8-2-full-data', {
+      remark: JSON.stringify(detailRows.value),
+    })
   }
 
   function _triggerSaveAll(): void {

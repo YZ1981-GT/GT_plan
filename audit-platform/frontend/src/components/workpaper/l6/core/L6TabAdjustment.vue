@@ -21,6 +21,8 @@
         >
           保存并发布
         </el-button>
+        <el-button size="small" type="primary" plain :loading="centralSyncing" :disabled="isReadonly || !currentBalance.isBalanced || filteredEntries.length === 0" @click="syncToCentral" title="把本页调整分录汇聚到集中调整登记，供合伙人跨循环审阅">同步到集中登记</el-button>
+        <el-tag v-if="centralStatus?.review_status" size="small" :type="centralStatus.review_status==='approved'?'success':(centralStatus.review_status==='rejected'?'danger':'info')" :title="centralStatus.rejection_reason||''">集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status]||centralStatus.review_status }}</el-tag>
         <el-button size="small" @click="handleAI('adjustment')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
@@ -155,10 +157,12 @@
  * - 动态行：新增/删除
  * - Uses: useL6Adjustment + useL6FormData
  */
-import { computed, inject, onMounted } from 'vue'
+import { computed, inject, onMounted, watch, toRef, type Ref } from 'vue'
 import { Plus, MagicStick, Check } from '@element-plus/icons-vue'
 import { useL6FormData } from '../../composables/useL6FormData'
 import { useL6Adjustment, type L6AdjustmentEntry } from '../../composables/useL6Adjustment'
+import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '@/components/workpaper/composables/useAdjustmentCentralSync'
+import { useAuditContext } from '@/composables/useAuditContext'
 
 const props = defineProps<{
   wpId: string
@@ -195,6 +199,36 @@ const {
   saveAndPublish,
 } = useL6Adjustment(formData)
 
+// ─── 同步到集中调整登记 ───────────────────────────────────────────────────────
+
+const { year: auditYear } = useAuditContext()
+const {
+  centralStatus,
+  syncing: centralSyncing,
+  syncToCentral,
+  refreshStatus,
+} = useAdjustmentCentralSync({
+  projectId: toRef(props, 'projectId') as Ref<string>,
+  year: auditYear,
+  wpId: toRef(props, 'wpId') as Ref<string>,
+  wpCode: 'L6',
+  itemId: () => `L6-adj-${activeType.value}`,
+  buildLineItems: () =>
+    filteredEntries.value.map((e: any) => ({
+      account_name: e.accountName,
+      report_line_code: e.reportItem || undefined,
+      debit_amount: e.debitAmount,
+      credit_amount: e.creditAmount,
+    })),
+  buildMeta: () => ({
+    description:
+      filteredEntries.value.find((e: any) => e.description)?.description ||
+      `L6 专项应付款调整（${activeType.value}）`,
+    adjustmentType: activeType.value === 'RJE' ? 'rje' : 'aje',
+  }),
+})
+watch(activeType, () => refreshStatus())
+
 const typeOptions = [
   { label: 'AJE 审计调整', value: 'AJE' },
   { label: 'RJE 重分类', value: 'RJE' },
@@ -226,6 +260,7 @@ function fmtAmount(val: number): string {
 
 onMounted(async () => {
   await formData.loadData()
+  refreshStatus()
 })
 </script>
 

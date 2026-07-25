@@ -15,6 +15,9 @@
     <div class="section-header">
       <h3>K11-1 资产减值损失审定表</h3>
       <div class="header-actions">
+        <el-button size="small" type="warning" plain :disabled="isReadonly" :loading="adjPull.loading.value" @click="openBringInAdjustment">
+          <el-icon><Download /></el-icon> 带入调整
+        </el-button>
         <el-button size="small" type="primary" plain :loading="aiGenerating" @click="handleAiGenerate">
           <el-icon v-if="!aiGenerating"><MagicStick /></el-icon> AI审计说明
         </el-button>
@@ -331,8 +334,18 @@
         <li>各来源行GtIndexChip可跳转对应减值源底稿（F2/H1/I1/I3/H2/G7/H4/H8/H3）</li>
         <li>审定合计应与K11-2明细表各项目发生额合计一致（交叉勾稽）</li>
         <li>完成后TB回写6701发生额，发布 substantive:adjudicated 事件通知附注</li>
+        <li>「带入调整」：按科目6701拉取调整分录，逐笔选目标减值类别行累加到 AJE/RJE，带入后自动联动披露/附注</li>
       </ul>
     </details>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="6701 资产减值损失"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
@@ -351,10 +364,14 @@
  * Spec: .kiro/specs/k11-asset-impairment-loss/ | Task: 4.2
  * Requirements: 2.1-2.8
  */
-import { computed, toRef, type Ref } from 'vue'
-import { MagicStick, CircleCheckFilled, WarningFilled } from '@element-plus/icons-vue'
+import { computed, toRef, watch, onMounted, type Ref } from 'vue'
+import { MagicStick, CircleCheckFilled, WarningFilled, Download } from '@element-plus/icons-vue'
 import { useK11Adjudication, type K11AdjRow } from '../../composables/useK11Adjudication'
 import { useK11AiGenerate } from '../../composables/useK11AiGenerate'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { useAuditCheckReport, type AuditCheckItemInput } from '@/composables/useAuditCheckReport'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 
@@ -397,6 +414,20 @@ const {
   },
 })
 
+// ─── 从集中登记带入调整（6701 资产减值损失，损益借方） ────────────────────────
+const { adjPull, visible: bringInVisible, rowOptions: bringInRowOptions, open: openBringInAdjustment, apply: onBringInApply } = useAdjudicationBringIn({
+  projectId: toRef(props, 'projectId') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '6701',
+  direction: 'debit', // 损益借方（损失）：净发生额 = 借 − 贷
+  subjectCode: '6701',
+  wpCode: 'K11',
+  subjectLabel: '资产减值损失(6701)',
+  rows,
+  updateCell,
+  totalAudited: () => totalRow.value.audited,
+})
+
 // ─── 表格数据 ────────────────────────────────────────────────────────────────
 
 const tableData = computed(() => rows.value)
@@ -414,6 +445,63 @@ const tbReconcile = computed(() => {
     isMatch: Math.abs(diff) < 0.01,
   }
 })
+
+// ─── 运行时勾稽上报「审计检查」面板（Task 4.3，旁路增强，失败静默）──────────────
+// items 全部来自本表已有 computed（tbReconcile / adjustmentReconcile），不新造判定；
+// passed 三态：一致→true，不一致→false，缺数据/未判定→null（不误判 true）。
+const { reportAuditChecks } = useAuditCheckReport()
+
+function buildTbReconItems(): AuditCheckItemInput[] {
+  const r = tbReconcile.value
+  return [{
+    code: 'K11-1-vs-TB-6701',
+    severity: 'warning',
+    check_type: 'balance',
+    description: '审定合计与试算表 6701 审定发生额核对',
+    message: r.hasTb
+      ? (r.isMatch ? '审定合计与试算表 6701 一致' : `审定合计 ${fmtNum(r.adjAudited)} 与试算表 6701 差异 ${fmtNum(r.diff)}`)
+      : '试算表无 6701 审定发生额，暂不比较',
+    passed: r.hasTb ? r.isMatch : null,
+    actual: r.adjAudited,
+    expected: r.tbAudited,
+    diff: r.diff,
+    sheet_hint: 'K11-1',
+  }]
+}
+
+function buildAdjustmentReconItems(): AuditCheckItemInput[] {
+  const r = adjustmentReconcile.value
+  const actual = r.ajeInTable + r.rjeInTable
+  const expected = r.ajeFromEntries + r.rjeFromEntries
+  return [{
+    code: 'K11-1-vs-K11-3-adjustment',
+    severity: 'warning',
+    check_type: 'reconciliation',
+    description: '审定表 AJE/RJE 与 K11-3 调整分录合计勾稽',
+    message: r.hasK113
+      ? (r.isMatch ? 'AJE/RJE 与 K11-3 调整分录一致' : `AJE 差 ${fmtNum(r.ajeDiff)}、RJE 差 ${fmtNum(r.rjeDiff)}`)
+      : 'K11-3 无调整分录，暂不比较',
+    passed: r.hasK113 ? r.isMatch : null,
+    actual,
+    expected,
+    diff: actual - expected,
+    sheet_hint: 'K11-1',
+  }]
+}
+
+let reportTimer: ReturnType<typeof setTimeout> | null = null
+function scheduleAuditCheckReport(): void {
+  if (props.isReadonly) return
+  if (reportTimer) clearTimeout(reportTimer)
+  reportTimer = setTimeout(() => {
+    void reportAuditChecks(props.projectId, props.wpId, 'tb_recon', buildTbReconItems())
+    void reportAuditChecks(props.projectId, props.wpId, 'adjustment_recon', buildAdjustmentReconItems())
+  }, 1500)
+}
+
+// 保存成功后（勾稽 computed 随 allResponses / 编辑变化）debounce 上报
+watch([tbReconcile, adjustmentReconcile], () => scheduleAuditCheckReport())
+onMounted(() => scheduleAuditCheckReport())
 
 /** 变动率>±30%异常判定 */
 const CHANGE_RATE_THRESHOLD = 0.3

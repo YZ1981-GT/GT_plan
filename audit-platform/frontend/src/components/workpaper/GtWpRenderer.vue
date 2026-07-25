@@ -117,7 +117,9 @@
         </el-tabs>
       </div>
 
-      <!-- 统一功能工具栏（所有底稿类型共享，a1-dashboard 自管工具栏跳过） -->
+      <!-- 统一功能工具栏（所有底稿类型共享，a1-dashboard 自管工具栏跳过）。
+           AI 底稿复核（本页/批量）放入工具栏中间插槽，占用左右按钮之间的空档，
+           全底稿统一入口覆盖 A~S 全部循环；权限门控 manager/partner/qc/admin。 -->
       <GtWpToolbar
         v-if="componentType !== 'a1-dashboard'"
         :fullscreen="isWpFullscreen"
@@ -127,24 +129,18 @@
         @import-data="onImportData"
         @add-row="onAddRow"
         @toggle-fullscreen="isWpFullscreen = !isWpFullscreen"
-      />
-
-      <!-- AI 底稿复核（本页/批量）：全底稿统一入口，覆盖 A~S 全部循环。
-           后端 /api/workpapers/{id}/review 按 wp_code+sheet_name 加载 sheet-level 提示词
-           并注入 cycle_review_context 勾稽上下文；权限门控 manager/partner/qc/admin。 -->
-      <div
-        v-if="componentType !== 'a1-dashboard' && activeSheetName"
-        class="gt-wp-renderer__ai-review-bar"
       >
-        <GtWpAiReviewToolbar
-          :wp-id="wpId"
-          :project-id="renderConfig?.project_id ?? ''"
-          :wp-code-prefix="renderConfig?.wp_code ?? ''"
-          :sheet-name="activeSheetName"
-          :year="preparationYear"
-          @navigate-sheet="onChildNavigateSheet"
-        />
-      </div>
+        <template v-if="activeSheetName" #center>
+          <GtWpAiReviewToolbar
+            :wp-id="wpId"
+            :project-id="renderConfig?.project_id ?? ''"
+            :wp-code-prefix="renderConfig?.wp_code ?? ''"
+            :sheet-name="activeSheetName"
+            :year="preparationYear"
+            @navigate-sheet="onChildNavigateSheet"
+          />
+        </template>
+      </GtWpToolbar>
 
       <!-- 内容区域 -->
       <div class="gt-wp-renderer__content">

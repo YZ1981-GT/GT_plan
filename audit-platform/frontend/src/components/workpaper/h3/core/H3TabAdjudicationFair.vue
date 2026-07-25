@@ -8,6 +8,7 @@
         <p>2. 公允价值模式下不计提折旧与减值（CAS3）；公允价值变动计入当期损益。</p>
         <p>3. 未审数取自试算表（科目 1503），审定数 = 未审 + AJE + RJE；采用公允价值模式须满足有活跃交易市场且可获取同类价格信息。</p>
         <p>4. 若企业采用成本模式，请切换至成本模式版本填报。</p>
+        <p>5.「带入调整」：从集中登记按科目 1503 拉取调整分录（资产借方净额=借−贷），逐笔分配到各分类的 AJE/RJE，带入后审定数自动更新并联动附注。</p>
       </div>
     </details>
 
@@ -36,6 +37,9 @@
         @click="onFillTransferFromH36"
       >
         {{ hasTransferDiff ? '从 H3-6 回填转换' : '转换已勾稽' }}
+      </el-button>
+      <el-button size="small" type="primary" plain :disabled="isReadonly" :loading="adjPull.loading.value" @click="openBringInAdjustment">
+        <el-icon><Download /></el-icon>带入调整
       </el-button>
       <span class="chip-wrap"><GtIndexChip value="wp:H3-1" :context-project-id="projectId" /></span>
       <el-tag v-if="h38Reconcile.matched" size="small" type="success">H3-8勾稽一致</el-tag>
@@ -244,6 +248,15 @@
       </template>
       <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" placeholder="填写审计结论：A、未见异常。B、除上述调整事项外未见异常。C、存在重大未调整事项（或审计范围受限），不可确认。" :disabled="isReadonly" @change="saveAuditConclusion" />
     </el-card>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="1503 投资性房地产（公允价值模式）"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
@@ -253,11 +266,15 @@
  * 单区块公允+公允变动+TB回写+AI+💬复核
  */
 import { ref, computed, inject, toRef, onMounted, watch } from 'vue'
+import { Download } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useH3AdjudicationFair } from '../../composables/useH3AdjudicationFair'
 import type { H3FillDiffRow, H3FillMode } from '../../composables/h3FillFromDetail'
 import { useH3FormData } from '../../composables/useH3FormData'
 import { useH3CrossSheet } from '../../composables/useH3CrossSheet'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
@@ -294,6 +311,29 @@ const {
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
   getValue, setValue, saveImmediate,
+})
+
+// ─── 从集中登记带入调整（1503 投资性房地产，公允价值模式，资产借方；带入AJE/RJE） ───
+const bringInRows = computed(() =>
+  fairRows.value.map((r) => ({ rowKey: r.rowId, name: r.category, aje: r.aje, rje: r.rje })),
+)
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: toRef(props, 'projectId') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '1503',
+  direction: 'debit',
+  subjectCode: '1503',
+  wpCode: 'H3',
+  subjectLabel: '投资性房地产(1503·公允)',
+  rows: bringInRows,
+  updateCell: (rowKey: string, field: any, value: number) => updateFairCell(rowKey, field, value),
+  totalAudited: () => fairTotal.value.audited,
 })
 
 const fillDialogVisible = ref(false)

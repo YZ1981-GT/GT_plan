@@ -32,6 +32,7 @@
           :disabled="isReadonly"
           @click="syncToDisclosureNotes"
         >同步到附注</el-button>
+        <el-button size="small" type="primary" plain :disabled="!projectId" @click="jumpToNote('listed')">↩ 跳转回附注</el-button>
         <el-button size="small" text type="primary" @click="showGuide = true">使用手册</el-button>
       </div>
       <div class="toolbar-right">
@@ -249,8 +250,10 @@
 
 <script setup lang="ts">
 import { computed, ref, toRef, type Ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import { useF1DisclosureListed } from '../composables/useF1DisclosureListed'
 import {
   buildF1ListedSubTableData,
@@ -279,6 +282,14 @@ const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<strin
 const noteSectionId = F1_NOTE_SECTION.listed
 const showGuide = ref(false)
 const isSyncing = ref(false)
+
+const router = useRouter()
+// 跳转回附注模块（披露表 → 附注为单向推送；此处仅导航，方便相互编辑确认）
+function jumpToNote(target: DisclosureVariant): void {
+  const route = buildNoteJumpRoute(props.projectId || '', 'F1', target)
+  if (!route) { ElMessage.warning('未找到对应的附注章节'); return }
+  router.push(route)
+}
 
 const {
   isApplicable,

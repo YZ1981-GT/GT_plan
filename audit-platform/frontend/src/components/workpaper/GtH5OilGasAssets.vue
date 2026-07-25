@@ -12,7 +12,7 @@
     />
 
     <template v-else>
-      <div v-if="showHtmlToolbar" class="h5-header-toolbar">
+      <div v-if="showHtmlToolbar && currentSheet !== 'H5'" class="h5-header-toolbar">
         <el-segmented
           v-model="currentMode"
           :options="modeOptions"

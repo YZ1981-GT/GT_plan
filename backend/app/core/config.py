@@ -190,6 +190,12 @@ class Settings(BaseSettings):
     # 当 wp_ai_service 升级真实接入 LLM 后改为 True，前端 is_llm_stub 字段自动反映
     WP_AI_SERVICE_ENABLED: bool = False
 
+    # 交付物章节内容控件化（deliverable-lineage-content-control spec）
+    # True = 生成审计报告正文/附注 docx 时为每节注入 Block Content Control（Tag=sec_xxx，
+    # 与 bookmark 并存），供前端 OnlyOffice 连接器实现真·光标跟随溯源。
+    # 默认 False = 不注入内容控件，生成的 docx 与引入前逐字节等价（零回归）。
+    DELIVERABLE_LINEAGE_CONTENT_CONTROL_ENABLED: bool = False
+
     # 向量存储后端切换（pgtext=现状降级 | pgvector=原生向量列+ivfflat）
     # 默认 pgtext（安全，现有行为不变）；pgvector 需 V043 迁移 + CREATE EXTENSION vector
     VECTOR_STORE_BACKEND: str = "pgtext"
@@ -290,6 +296,26 @@ class Settings(BaseSettings):
     # True = 严格：全部 findings（含 warning）逐条返回。上线平稳后可置 True。
     # 不影响 findings 的产生与持久化，仅影响 validate_all 响应的 findings 明细呈现粒度。
     DISCLOSURE_NOTE_VALIDATION_STRICT: bool = False
+
+    # --- d-cycle-four-table-extraction-formulas ---
+    # D1–D7 四表库（trial_balance/tb_balance/tb_ledger/tb_aux_balance）→ 审定表自动提取
+    # 填充（Tier B `_build_adjudication_prefill` 预填）+ Tier A 可编辑提取公式的灰度开关。
+    # 默认 False = 零回归：D1–D7 render 不调 prefill、不返 adjudication_prefill、公式管理面板
+    # 不列 Tier A 预设 → render 逐字节等价当前链路（保留既有 tb_amount 核对行/手工一键取数/
+    # 明细导入导出/审定 TB 核对/附注联动不变）。置 True 才启用 Tier B 预填 + Tier A 公式。
+    # 任一环取数异常一律 fail-open（该循环返空 prefill / tb_amount=0 等不变），不阻断 render。
+    # D6/D2 试点验证后再铺 D1/D3/D4/D5/D7，单循环可回退。
+    D_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED: bool = False
+
+    # --- d-cycle-tier-a-writeback-detail-seed（前置 spec 的增量，P0-2 子开关）---
+    # 门控「明细表维度归集 render 自动 seed」（P0-2 / Requirement 4）——打开 D-cycle 明细表
+    # 且明细行完全空时，调既有后端归集（tb_aux_balance 客户/合同维度、序时账期后归集）
+    # transient seed 明细行进 render 返回（detail_prefill，不落库、手工优先、fail-open）。
+    # 默认 False = 零回归：明细表不自动 seed，仍由前端手工「一键取数」按钮驱动。
+    # **生效条件 = 主开关 D_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED ∧ 本子开关**（被主开关 AND）——
+    # 故可"发 P0-1、压 P0-2"实现真正独立灰度与回退（主开关关则本子开关无效）。
+    # P0-1（Tier A 真生效）与 P0-2（本子开关）代码路径独立，其一失败不牵连其二。
+    D_CYCLE_DETAIL_SEED_ENABLED: bool = False
 
     model_config = SettingsConfigDict(env_file=_env_file, extra="ignore")
 

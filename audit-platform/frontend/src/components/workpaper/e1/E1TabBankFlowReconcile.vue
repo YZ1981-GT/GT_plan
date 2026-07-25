@@ -25,6 +25,7 @@ import E1StatementOcrConfirmDialog, {
 import GtVoucherSamplingEngine from '../voucher-sampling/GtVoucherSamplingEngine.vue'
 import E1IpoSheetChrome from './E1IpoSheetChrome.vue'
 import http from '@/utils/http'
+import { amountFormatter, amountParser } from '../composables/wpAmountInput'
 
 const props = defineProps<{
   wpId: string
@@ -480,19 +481,19 @@ function checkSums(side: 'bookToBank' | 'bankToBook') {
               <el-table-column label="银行对账单/流水" align="center">
                 <el-table-column label="收入" width="110" align="right">
                   <template #default="{ row }">
-                    <el-input-number :model-value="row.stmtIncome" :disabled="isReadonly" :controls="false" size="small" style="width: 100%"
+                    <el-input-number :model-value="row.stmtIncome" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small" style="width: 100%"
                       @change="(v: number) => updateMonthly(row.month, 'stmtIncome', v ?? 0)" />
                   </template>
                 </el-table-column>
                 <el-table-column label="支出" width="110" align="right">
                   <template #default="{ row }">
-                    <el-input-number :model-value="row.stmtExpense" :disabled="isReadonly" :controls="false" size="small" style="width: 100%"
+                    <el-input-number :model-value="row.stmtExpense" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small" style="width: 100%"
                       @change="(v: number) => updateMonthly(row.month, 'stmtExpense', v ?? 0)" />
                   </template>
                 </el-table-column>
                 <el-table-column label="余额" width="110" align="right">
                   <template #default="{ row }">
-                    <el-input-number :model-value="row.stmtBalance" :disabled="isReadonly" :controls="false" size="small" style="width: 100%"
+                    <el-input-number :model-value="row.stmtBalance" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small" style="width: 100%"
                       @change="(v: number) => updateMonthly(row.month, 'stmtBalance', v ?? 0)" />
                   </template>
                 </el-table-column>
@@ -500,19 +501,19 @@ function checkSums(side: 'bookToBank' | 'bankToBook') {
               <el-table-column label="银行日记账" align="center">
                 <el-table-column label="借方发生额" width="110" align="right">
                   <template #default="{ row }">
-                    <el-input-number :model-value="row.journalDebit" :disabled="isReadonly" :controls="false" size="small" style="width: 100%"
+                    <el-input-number :model-value="row.journalDebit" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small" style="width: 100%"
                       @change="(v: number) => updateMonthly(row.month, 'journalDebit', v ?? 0)" />
                   </template>
                 </el-table-column>
                 <el-table-column label="贷方发生额" width="110" align="right">
                   <template #default="{ row }">
-                    <el-input-number :model-value="row.journalCredit" :disabled="isReadonly" :controls="false" size="small" style="width: 100%"
+                    <el-input-number :model-value="row.journalCredit" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small" style="width: 100%"
                       @change="(v: number) => updateMonthly(row.month, 'journalCredit', v ?? 0)" />
                   </template>
                 </el-table-column>
                 <el-table-column label="余额" width="110" align="right">
                   <template #default="{ row }">
-                    <el-input-number :model-value="row.journalBalance" :disabled="isReadonly" :controls="false" size="small" style="width: 100%"
+                    <el-input-number :model-value="row.journalBalance" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small" style="width: 100%"
                       @change="(v: number) => updateMonthly(row.month, 'journalBalance', v ?? 0)" />
                   </template>
                 </el-table-column>
@@ -586,7 +587,7 @@ function checkSums(side: 'bookToBank' | 'bankToBook') {
                   </el-table-column>
                   <el-table-column label="金额" width="100" align="right">
                     <template #default="{ row }">
-                      <el-input-number :model-value="row.amount" :disabled="isReadonly" :controls="false" size="small" style="width: 100%"
+                      <el-input-number :model-value="row.amount" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small" style="width: 100%"
                         @change="(v: number) => updateStatementLine(row.id, 'amount', v ?? 0)" />
                     </template>
                   </el-table-column>
@@ -641,13 +642,13 @@ function checkSums(side: 'bookToBank' | 'bankToBook') {
                   </el-table-column>
                   <el-table-column label="借方" width="90" align="right">
                     <template #default="{ row }">
-                      <el-input-number :model-value="row.debit" :disabled="isReadonly" :controls="false" size="small" style="width: 100%"
+                      <el-input-number :model-value="row.debit" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small" style="width: 100%"
                         @change="(v: number) => updateJournalLine(row.id, 'debit', v ?? 0)" />
                     </template>
                   </el-table-column>
                   <el-table-column label="贷方" width="90" align="right">
                     <template #default="{ row }">
-                      <el-input-number :model-value="row.credit" :disabled="isReadonly" :controls="false" size="small" style="width: 100%"
+                      <el-input-number :model-value="row.credit" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small" style="width: 100%"
                         @change="(v: number) => updateJournalLine(row.id, 'credit', v ?? 0)" />
                     </template>
                   </el-table-column>
@@ -680,6 +681,9 @@ function checkSums(side: 'bookToBank' | 'bankToBook') {
                 :model-value="pack.largeThresholdBookToBank"
                 :disabled="isReadonly"
                 :controls="false"
+                :precision="2"
+                :formatter="amountFormatter"
+                :parser="amountParser"
                 size="small"
                 style="width: 140px"
                 @change="(v: number) => setThreshold('bookToBank', v ?? 0)"
@@ -730,13 +734,13 @@ function checkSums(side: 'bookToBank' | 'bankToBook') {
                   </el-table-column>
                   <el-table-column label="借方" width="95" align="right">
                     <template #default="{ row }">
-                      <el-input-number :model-value="row.debit" :disabled="isReadonly" :controls="false" size="small" style="width: 100%"
+                      <el-input-number :model-value="row.debit" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small" style="width: 100%"
                         @change="(v: number) => updateCheckRow('bookToBank', row.id, 'debit', v ?? 0)" />
                     </template>
                   </el-table-column>
                   <el-table-column label="贷方" width="95" align="right">
                     <template #default="{ row }">
-                      <el-input-number :model-value="row.credit" :disabled="isReadonly" :controls="false" size="small" style="width: 100%"
+                      <el-input-number :model-value="row.credit" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small" style="width: 100%"
                         @change="(v: number) => updateCheckRow('bookToBank', row.id, 'credit', v ?? 0)" />
                     </template>
                   </el-table-column>
@@ -762,7 +766,7 @@ function checkSums(side: 'bookToBank' | 'bankToBook') {
                   </el-table-column>
                   <el-table-column label="金额" width="95" align="right">
                     <template #default="{ row }">
-                      <el-input-number :model-value="row.stmtAmount" :disabled="isReadonly" :controls="false" size="small" style="width: 100%"
+                      <el-input-number :model-value="row.stmtAmount" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small" style="width: 100%"
                         @change="(v: number) => updateCheckRow('bookToBank', row.id, 'stmtAmount', v ?? 0)" />
                     </template>
                   </el-table-column>
@@ -829,6 +833,9 @@ function checkSums(side: 'bookToBank' | 'bankToBook') {
                 :model-value="pack.largeThresholdBankToBook"
                 :disabled="isReadonly"
                 :controls="false"
+                :precision="2"
+                :formatter="amountFormatter"
+                :parser="amountParser"
                 size="small"
                 style="width: 140px"
                 @change="(v: number) => setThreshold('bankToBook', v ?? 0)"
@@ -873,7 +880,7 @@ function checkSums(side: 'bookToBank' | 'bankToBook') {
                   </el-table-column>
                   <el-table-column label="金额" width="95" align="right">
                     <template #default="{ row }">
-                      <el-input-number :model-value="row.stmtAmount" :disabled="isReadonly" :controls="false" size="small" style="width: 100%"
+                      <el-input-number :model-value="row.stmtAmount" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small" style="width: 100%"
                         @change="(v: number) => updateCheckRow('bankToBook', row.id, 'stmtAmount', v ?? 0)" />
                     </template>
                   </el-table-column>
@@ -905,13 +912,13 @@ function checkSums(side: 'bookToBank' | 'bankToBook') {
                   </el-table-column>
                   <el-table-column label="借方" width="95" align="right">
                     <template #default="{ row }">
-                      <el-input-number :model-value="row.debit" :disabled="isReadonly" :controls="false" size="small" style="width: 100%"
+                      <el-input-number :model-value="row.debit" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small" style="width: 100%"
                         @change="(v: number) => updateCheckRow('bankToBook', row.id, 'debit', v ?? 0)" />
                     </template>
                   </el-table-column>
                   <el-table-column label="贷方" width="95" align="right">
                     <template #default="{ row }">
-                      <el-input-number :model-value="row.credit" :disabled="isReadonly" :controls="false" size="small" style="width: 100%"
+                      <el-input-number :model-value="row.credit" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small" style="width: 100%"
                         @change="(v: number) => updateCheckRow('bankToBook', row.id, 'credit', v ?? 0)" />
                     </template>
                   </el-table-column>

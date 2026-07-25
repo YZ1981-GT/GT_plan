@@ -20,6 +20,7 @@
         >
           同步至附注
         </el-button>
+        <el-button size="small" type="primary" plain :disabled="!projectId" @click="jumpToNote('listed')">↩ 跳转回附注</el-button>
         <el-button size="small" @click="handleReview('K1-disclosure-listed')">💬复核</el-button>
       </div>
     </div>
@@ -543,6 +544,9 @@
  * 账龄枚举 THREE_YEAR / FIVE_YEAR / CUSTOM；联动附注模块 sync-from-workpaper
  */
 import { computed, inject, toRef } from 'vue'
+import { ElMessage } from 'element-plus'
+import { useRouter } from 'vue-router'
+import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import { useK1DisclosureListed } from '../../composables/useK1DisclosureListed'
 import { useK1DisclosureTrace } from '../../composables/k1DisclosureTrace'
 import K1DisclosureTracePanel from './K1DisclosureTracePanel.vue'
@@ -561,6 +565,14 @@ const emit = defineEmits<{
 }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+
+const router = useRouter()
+// 跳转回附注模块（披露表 → 附注为单向推送；此处仅导航，方便相互编辑确认）
+function jumpToNote(target: DisclosureVariant): void {
+  const route = buildNoteJumpRoute(props.projectId || '', 'K1', target)
+  if (!route) { ElMessage.warning('未找到对应的附注章节'); return }
+  router.push(route)
+}
 
 const disc = useK1DisclosureListed({
   wpId: toRef(props, 'wpId'),

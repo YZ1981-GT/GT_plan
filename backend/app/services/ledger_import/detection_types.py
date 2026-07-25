@@ -56,11 +56,13 @@ ColumnTier = Literal["key", "recommended", "extra"]
 
 KEY_COLUMNS: dict[TableType, set[str]] = {
     "balance": {
+        # 年度维度为关键列（年度审计口径）；月度列(期初/本期)为 recommended，见 RECOMMENDED_COLUMNS
         "account_code",
-        "opening_balance",
+        "year_opening_debit",
+        "year_opening_credit",
+        "year_debit",
+        "year_credit",
         "closing_balance",
-        "debit_amount",
-        "credit_amount",
     },
     "ledger": {
         "voucher_date",
@@ -98,8 +100,14 @@ RECOMMENDED_COLUMNS: dict[TableType, set[str]] = {
         "company_code",
         "currency_code",
         "accounting_period",
+        # 期初（月度维度，推荐；缺年度列时经替代组兜底满足要求）
+        "opening_balance",
         "opening_debit",
         "opening_credit",
+        # 本期发生额（月度维度，推荐）
+        "debit_amount",
+        "credit_amount",
+        # 期末分列（推荐；无 closing_balance 净额时经组合替代提升为 key）
         "closing_debit",
         "closing_credit",
         "aux_dimensions",

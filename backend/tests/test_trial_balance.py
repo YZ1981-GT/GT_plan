@@ -264,6 +264,73 @@ async def test_recalc_leaf_only_no_parent_child_double_count(
     assert tb_map["1122"].unadjusted_amount == Decimal("600")
 
 
+@pytest.mark.asyncio
+async def test_recalc_unmapped_leaf_inherits_parent_mapping(
+    db_session: AsyncSession, seeded_db
+):
+    """未映射叶子继承最近已映射父科目的标准码（映射口径根治回归）。
+
+    回归：auto_match 常出现「父科目已映射、部分子科目漏映射」——如
+    1651 使用权资产→1641 已映射，但叶子 1651.02 使用权资产_房屋及建筑物 漏映射。
+    原实现 INNER JOIN 精确匹配会静默丢弃漏映射叶子 → 报表资产≠负债+权益。
+    修复后：叶子按「最长前缀匹配」继承祖先映射（1651.02 → 祖先 1651 → 1641）。
+    """
+    pid = seeded_db
+    db_session.add(
+        AccountChart(
+            project_id=pid, account_code="1641", account_name="使用权资产",
+            direction=AccountDirection.debit, level=1,
+            category=AccountCategory.asset, source=AccountSource.standard,
+        )
+    )
+    # 仅父科目 1651 有映射；两个叶子子科目其中 1651.02 漏映射
+    db_session.add_all([
+        AccountMapping(
+            project_id=pid, original_account_code="1651",
+            original_account_name="使用权资产", standard_account_code="1641",
+            mapping_type=MappingType.auto_exact, created_by=FAKE_USER_ID,
+        ),
+        AccountMapping(
+            project_id=pid, original_account_code="1651.01",
+            original_account_name="使用权资产_土地", standard_account_code="1641",
+            mapping_type=MappingType.auto_fuzzy, created_by=FAKE_USER_ID,
+        ),
+        # 注意：1651.02 故意不加映射，验证其继承父级 1651→1641
+    ])
+    db_session.add_all([
+        TbBalance(
+            project_id=pid, year=2025, company_code="001", level=1,
+            account_code="1651", account_name="使用权资产",
+            opening_balance=Decimal("0"), closing_balance=Decimal("300"),
+            opening_direction="debit", closing_direction="debit",
+        ),
+        TbBalance(
+            project_id=pid, year=2025, company_code="001", level=2,
+            account_code="1651.01", account_name="使用权资产_土地",
+            opening_balance=Decimal("0"), closing_balance=Decimal("100"),
+            opening_direction="debit", closing_direction="debit",
+        ),
+        TbBalance(
+            project_id=pid, year=2025, company_code="001", level=2,
+            account_code="1651.02", account_name="使用权资产_房屋及建筑物",
+            opening_balance=Decimal("0"), closing_balance=Decimal("200"),
+            opening_direction="debit", closing_direction="debit",
+        ),
+    ])
+    await db_session.commit()
+
+    svc = TrialBalanceService(db_session)
+    await svc.recalc_unadjusted(pid, 2025)
+    await db_session.commit()
+
+    rows = await svc.get_trial_balance(pid, 2025)
+    tb_map = {r.standard_account_code: r for r in rows}
+    # 叶子 1651.01(100) + 1651.02(200，继承父映射) = 300 归入标准科目 1641，
+    # 修复前 1651.02 被丢弃只得 100。
+    assert "1641" in tb_map
+    assert tb_map["1641"].unadjusted_amount == Decimal("300")
+
+
 # ===== 调整列重算 =====
 
 @pytest.mark.asyncio

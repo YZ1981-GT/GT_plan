@@ -12,10 +12,15 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_role
 from app.services.procedure_service import ProcedureService
+from app.services.procedure_trim_scope import resolve_subject_data_availability
 
 router = APIRouter(prefix="/api/projects", tags=["procedures"])
+
+# 新增/删除自定义程序 = 项目经理+（系统 admin/partner/signing_partner/manager）。
+# 审计助理(auditor)/qc/eqcr 不得新增自定义程序（设计：项目经理新增自定义程序）。
+_DELEGATOR_ROLES = ["admin", "partner", "signing_partner", "manager"]
 
 
 class TrimItem(BaseModel):
@@ -42,6 +47,19 @@ class BatchApplyRequest(BaseModel):
     target_project_ids: list[str]
 
 
+@router.get("/{project_id}/procedure-scope/data-availability")
+async def get_procedure_data_availability(
+    project_id: UUID,
+    year: int = Query(..., description="审计年度"),
+    db: AsyncSession = Depends(get_db), user=Depends(get_current_user),
+):
+    """科目/循环数据可用性，供智能裁剪精确到科目底稿级。
+
+    独立路径段 `procedure-scope`，避免被 `/procedures/{cycle}` 捕获。
+    """
+    return await resolve_subject_data_availability(db, project_id, year)
+
+
 @router.get("/{project_id}/procedures/{cycle}")
 async def get_procedures(
     project_id: UUID, cycle: str,
@@ -65,7 +83,8 @@ async def init_procedures(
 @router.put("/{project_id}/procedures/{cycle}/trim")
 async def save_trim(
     project_id: UUID, cycle: str, data: TrimRequest,
-    db: AsyncSession = Depends(get_db), user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_role(_DELEGATOR_ROLES)),
 ):
     svc = ProcedureService(db)
     count = await svc.save_trim(project_id, cycle, [i.model_dump() for i in data.items])
@@ -121,12 +140,31 @@ async def save_trim(
 @router.post("/{project_id}/procedures/{cycle}/custom")
 async def add_custom(
     project_id: UUID, cycle: str, data: CustomProcedureRequest,
-    db: AsyncSession = Depends(get_db), user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_role(_DELEGATOR_ROLES)),
 ):
     svc = ProcedureService(db)
-    result = await svc.add_custom(project_id, cycle, data.model_dump())
+    try:
+        result = await svc.add_custom(project_id, cycle, data.model_dump())
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
     await db.commit()
     return result
+
+
+@router.delete("/{project_id}/procedures/{cycle}/custom/{proc_id}")
+async def delete_custom_procedure(
+    project_id: UUID, cycle: str, proc_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_role(_DELEGATOR_ROLES)),
+):
+    """删除自定义程序（软删 ProcedureInstance + 清理 WpIndex 占位）。"""
+    svc = ProcedureService(db)
+    ok = await svc.delete_custom(project_id, proc_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="未找到该自定义程序或不可删除")
+    await db.commit()
+    return {"deleted": True, "id": str(proc_id)}
 
 
 @router.post("/{project_id}/procedures/{cycle}/custom-with-template")
@@ -134,37 +172,29 @@ async def add_custom_with_template(
     project_id: UUID,
     cycle: str,
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_role(_DELEGATOR_ROLES)),
     procedure_name: str = Query(...),
     procedure_code: str | None = Query(None),
 ):
     """新增自定义程序 + 上传底稿模板文件（multipart）.
 
     文件通过后续的 upload 步骤上传，此接口先创建程序记录和 wp_index 占位。
+    编码生成/查重统一走 ``svc.add_custom``（基于最大序号，避免软删/并发撞库）。
     """
     from app.models.workpaper_models import WpIndex, WpStatus
 
     svc = ProcedureService(db)
 
-    # 生成 wp_code（如 CUSTOM-D-001）
-    import sqlalchemy as sa
-    from app.models.procedure_models import ProcedureInstance
-    existing_count = (await db.execute(
-        sa.select(sa.func.count()).select_from(ProcedureInstance).where(
-            ProcedureInstance.project_id == project_id,
-            ProcedureInstance.audit_cycle == cycle,
-            ProcedureInstance.is_custom == True,  # noqa: E712
-            ProcedureInstance.is_deleted == False,  # noqa: E712
-        )
-    )).scalar() or 0
-    wp_code = procedure_code or f"{cycle}-C{existing_count + 1:02d}"
+    # 创建 ProcedureInstance（add_custom 负责健壮编号 + 用户填码查重）
+    try:
+        result = await svc.add_custom(project_id, cycle, {
+            "procedure_name": procedure_name,
+            "procedure_code": procedure_code,  # None → 自动生成；有值 → 查重
+        })
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
 
-    # 创建 ProcedureInstance
-    result = await svc.add_custom(project_id, cycle, {
-        "procedure_name": procedure_name,
-        "procedure_code": wp_code,
-        "wp_code": wp_code,
-    })
+    wp_code = result.get("wp_code") or result.get("procedure_code")
 
     # 创建 wp_index 占位记录（后续上传文件时关联）
     wp_idx = WpIndex(
@@ -458,7 +488,8 @@ async def download_blank_template(
 @router.put("/{project_id}/procedures/assign")
 async def assign_procedures(
     project_id: UUID, data: AssignRequest,
-    db: AsyncSession = Depends(get_db), user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_role(_DELEGATOR_ROLES)),
 ):
     from app.services.wp_visibility.delegation_transaction import DelegationError
 
@@ -488,7 +519,8 @@ async def get_trim_scheme(
 async def apply_scheme(
     project_id: UUID, cycle: str,
     source_project_id: UUID = Query(...),
-    db: AsyncSession = Depends(get_db), user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_role(_DELEGATOR_ROLES)),
 ):
     svc = ProcedureService(db)
     count = await svc.apply_scheme(project_id, cycle, source_project_id)
@@ -499,7 +531,8 @@ async def apply_scheme(
 @router.post("/{project_id}/procedures/{cycle}/batch-apply")
 async def batch_apply(
     project_id: UUID, cycle: str, data: BatchApplyRequest,
-    db: AsyncSession = Depends(get_db), user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_role(_DELEGATOR_ROLES)),
 ):
     svc = ProcedureService(db)
     result = await svc.batch_apply(project_id, cycle, [UUID(t) for t in data.target_project_ids])

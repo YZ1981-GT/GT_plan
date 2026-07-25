@@ -18,6 +18,7 @@ from uuid import UUID
 
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -29,7 +30,6 @@ from app.models.report_schemas import (
     DisclosureNoteGenerateRequest,
     DisclosureNoteUpdate,
     NoteValidationFindingConfirm,
-    NoteValidationResponse,
 )
 from app.services.disclosure_engine import DisclosureEngine
 from app.services.note_validation_engine import NoteValidationEngine
@@ -130,12 +130,24 @@ async def get_validation_results(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_project_access("readonly")),
 ):
-    """获取最新校验结果"""
+    """获取最新校验结果。
+
+    `get_latest_results` 返回 `{project_id,year,total_rules,passed,failed,findings}`
+    结构化 dict。尚未校验或本次校验 0 规则/0 发现（result 为 None）时，返回空结果
+    （200，findings=[]），前端显示"未发现问题"而非把 404 冒泡崩溃整页。
+    """
     engine = NoteValidationEngine(db)
     result = await engine.get_latest_results(project_id, year)
     if result is None:
-        raise HTTPException(status_code=404, detail="校验结果不存在，请先执行校验")
-    return NoteValidationResponse.model_validate(result)
+        return {
+            "project_id": str(project_id),
+            "year": year,
+            "total_rules": 0,
+            "passed": 0,
+            "failed": 0,
+            "findings": [],
+        }
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -266,6 +278,21 @@ async def get_note_detail(
         import logging as _logging
         _logging.getLogger(__name__).warning(
             "get_note_detail: sub_table projection failed section=%s", note_section,
+            exc_info=True,
+        )
+    # 读时补齐表头（不写库）：legacy 单表 headers 为空但行携 _cell_meta 语义时，
+    # 派生可渲染表头，修复前端 el-table 零列坍缩（"附注表格只有一行"）。
+    # 前端整表保存时派生表头随之落库，实现自愈。
+    try:
+        from app.services.note_header_projector import project_headers
+
+        with_headers = project_headers(detail.table_data)
+        if with_headers is not None:
+            detail.table_data = with_headers
+    except Exception:  # pragma: no cover - 派生失败降级不阻断读取
+        import logging as _logging
+        _logging.getLogger(__name__).warning(
+            "get_note_detail: header projection failed section=%s", note_section,
             exc_info=True,
         )
     return detail
@@ -437,6 +464,27 @@ async def validate_notes(
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"校验执行失败: {str(e)}")
+
+
+@router.get("/{project_id}/{year}/formula-health")
+async def formula_health(
+    project_id: UUID,
+    year: int,
+    template_type: str = "soe",
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """附注公式/校验管线健康度诊断（只读，不跑规则、不写库）。
+
+    把"哪些管线真正生效 / 哪些休眠"显性化（P0-B）：附注 binding/inline 规则/report
+    绑定计数 + preset 规则数 + linkage 配置条目 + 三条管线激活标志。
+    """
+    if template_type not in ("soe", "listed"):
+        raise HTTPException(status_code=400, detail="template_type 必须是 soe 或 listed")
+    engine = NoteValidationEngine(db)
+    return await engine.diagnose_formula_health(
+        project_id, year, template_type=template_type
+    )
 
 
 @router.put("/findings/{validation_id}/confirm")
@@ -785,3 +833,190 @@ async def note_linkage_one_click_preview(
 
     svc = WpNoteLinkageService(db)
     return await svc.one_click_fetch(project_id=project_id, year=year)
+
+
+# ---------------------------------------------------------------------------
+# 附注知识库 RAG + AI 正文预填（disclosure-note-knowledge-ai-enrichment / Task 7）
+#   POST /{project_id}/{year}/{note_section}/ai-fill —— 单章节 AI 填充 / 参照文档填充预览
+#   POST /{project_id}/{year}/batch-ai-fill          —— 一键批量预填充空/草稿章节
+# 两端点均**不落库**（Property 11：绝不写 DisclosureNote.text_content）；采纳走既有
+# /api/ai-chat/adopt 确认流，落库仅写 text_content（substantive），不碰 guidance_text（Req5.2）。
+# ---------------------------------------------------------------------------
+
+
+class NoteAiFillRequest(BaseModel):
+    """单章节 AI 填充请求（字段均可选）。"""
+
+    doc_filter: list[UUID] | None = None  # 指定参照的知识库文档 id 范围；空=项目+Global_KB
+    reference_only: bool = False  # True=只返回检索片段供人工引用，不调 LLM 生成（Req4.5）
+
+
+class NoteBatchAiFillRequest(BaseModel):
+    """一键批量 AI 预填充请求。"""
+
+    doc_filter: list[UUID] | None = None
+
+
+def _citation_to_dict(c) -> dict:
+    """把 Citation dataclass 序列化为响应 dict（含 is_stale 索引新鲜度标记）。"""
+    return {
+        "document_name": getattr(c, "document_name", None),
+        "folder_path": getattr(c, "folder_path", None),
+        "snippet": getattr(c, "snippet", ""),
+        "score": getattr(c, "score", 0.0),
+        "source_id": getattr(c, "source_id", ""),
+        "is_stale": bool(getattr(c, "is_stale", False)),
+    }
+
+
+@router.post("/{project_id}/{year}/{note_section}/ai-fill")
+async def ai_fill_note_section(
+    project_id: UUID,
+    year: int,
+    note_section: str,
+    body: NoteAiFillRequest | None = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """单章节 AI 填充 / 参照文档填充（**不落库**，仅返回预览供采纳，Property 11）。
+
+    行为：查该 section 的 section_title/account_name（缺失则用 note_section 兜底），
+    调 `NoteKnowledgeEnricher.generate_note_text`（RAG 检索→反幻觉起草 或 reference_only 仅回片段）。
+
+    resp: ``{ text, citations:[{document_name, folder_path, snippet, score, source_id, is_stale}],
+              degraded, skipped_docs }``
+    - skipped_docs：doc_filter 中不存在/已删（无权）被跳过的文档 id；无则空（不 500，Req4.3）。
+    - 无命中/检索或 LLM 降级 → degraded=true（前端据此提示"已用通用生成"，Req3.4）。
+    """
+    from app.models.knowledge_models import KnowledgeDocument
+    from app.services.note_knowledge_enricher import NoteKnowledgeEnricher
+
+    req = body or NoteAiFillRequest()
+
+    # 查该 section 的 section_title / account_name（缺失则用 note_section 兜底）
+    row = (
+        await db.execute(
+            sa.select(
+                DisclosureNote.section_title, DisclosureNote.account_name
+            ).where(
+                DisclosureNote.project_id == project_id,
+                DisclosureNote.year == year,
+                DisclosureNote.note_section == note_section,
+                DisclosureNote.is_deleted == sa.false(),
+            )
+        )
+    ).one_or_none()
+    section_title = (row[0] if row else None) or note_section
+    account_name = (row[1] if row else None) or ""
+
+    # 权限跳过文档：doc_filter 中不存在/已删的文档 → skipped_docs（不将其纳入上下文，不 500）
+    skipped_docs: list[str] = []
+    if req.doc_filter:
+        active = (
+            await db.execute(
+                sa.select(KnowledgeDocument.id).where(
+                    KnowledgeDocument.id.in_(req.doc_filter),
+                    KnowledgeDocument.is_deleted == sa.false(),
+                )
+            )
+        ).scalars().all()
+        active_ids = {str(d) for d in active}
+        skipped_docs = [str(d) for d in req.doc_filter if str(d) not in active_ids]
+
+    enricher = NoteKnowledgeEnricher(db)
+    draft = await enricher.generate_note_text(
+        project_id,
+        year,
+        note_section,
+        section_title,
+        account_name,
+        user=current_user,
+        doc_filter=req.doc_filter,
+        reference_only=req.reference_only,
+    )
+    return {
+        "text": draft.text,
+        "citations": [_citation_to_dict(c) for c in draft.citations],
+        "degraded": draft.degraded,
+        "skipped_docs": skipped_docs,
+    }
+
+
+@router.post("/{project_id}/{year}/batch-ai-fill")
+async def batch_ai_fill_notes(
+    project_id: UUID,
+    year: int,
+    body: NoteBatchAiFillRequest | None = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """一键批量预填充空/草稿章节（**不落库**，逐章结果供前端确认采纳，Req10）。
+
+    行为：查该 project/year 所有"文字为空或 status=draft"且未锁定/无 manual_override（`is_local_override`）
+    的章节，构造 sections 列表调 `NoteKnowledgeEnricher.batch_prefill`（单章 try/except 隔离降级，Property 12）。
+
+    resp: ``{ results:[{note_section, status, text, citations}], generated, degraded, skipped }``
+    """
+    from app.services.note_knowledge_enricher import NoteKnowledgeEnricher
+
+    req = body or NoteBatchAiFillRequest()
+
+    rows = (
+        await db.execute(
+            sa.select(DisclosureNote)
+            .where(
+                DisclosureNote.project_id == project_id,
+                DisclosureNote.year == year,
+                DisclosureNote.is_deleted == sa.false(),
+                DisclosureNote.is_local_override == sa.false(),
+                sa.or_(
+                    DisclosureNote.text_content.is_(None),
+                    sa.func.length(sa.func.trim(DisclosureNote.text_content)) == 0,
+                    DisclosureNote.status == NoteStatus.draft,
+                ),
+            )
+            .order_by(DisclosureNote.sort_order)
+        )
+    ).scalars().all()
+
+    sections = [
+        {
+            "note_section": n.note_section,
+            "section_title": n.section_title or n.note_section,
+            "account_name": n.account_name or "",
+            "account_code": None,
+            "audit_area": None,
+            "text_content": n.text_content,
+            "is_draft": n.status == NoteStatus.draft,
+            "manual_override": n.is_local_override,
+        }
+        for n in rows
+    ]
+
+    enricher = NoteKnowledgeEnricher(db)
+    raw_results = await enricher.batch_prefill(
+        project_id,
+        year,
+        sections,
+        user=current_user,
+        doc_filter=req.doc_filter,
+    )
+
+    results = [
+        {
+            "note_section": r.get("note_section"),
+            "status": r.get("status"),
+            "text": r.get("text"),
+            "citations": [_citation_to_dict(c) for c in (r.get("citations") or [])],
+        }
+        for r in raw_results
+    ]
+    generated = sum(1 for r in results if r["status"] == "generated")
+    degraded = sum(1 for r in results if r["status"] == "degraded")
+    skipped = sum(1 for r in results if r["status"] == "skipped")
+    return {
+        "results": results,
+        "generated": generated,
+        "degraded": degraded,
+        "skipped": skipped,
+    }

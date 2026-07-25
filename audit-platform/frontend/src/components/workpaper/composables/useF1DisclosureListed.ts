@@ -298,7 +298,9 @@ export function useF1DisclosureListed(options: UseF1DisclosureListedOptions) {
     debouncedSave(`${PREFIX}note-3`, { remark: val })
     try {
       window.dispatchEvent(new CustomEvent('disclosure:note-text-updated', {
-        detail: { wpCode: 'F1', section: 'listed-3', text: val },
+        // sectionIds=附注章节号（权威 note_template_variant_matrix：预付款项 listed 五、7）
+        // → useNoteRefresh 定向刷新当前查看的附注节
+        detail: { wpCode: 'F1', accountCode: '1123', section: 'listed-3', sectionIds: ['五、7'], text: val },
       }))
     } catch { /* silent */ }
   })

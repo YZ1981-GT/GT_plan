@@ -130,3 +130,83 @@ export function projectSubTablesClient(tableData: Record<string, any> | null | u
   }
   return tables
 }
+
+/**
+ * legacy 单表表头补齐（前端兜底）
+ *
+ * 历史生成的部分附注 `table_data` 出现 `headers: []`（空）但 `rows` 非空——
+ * 每行携 `values` + `_cell_meta[colIdx].semantic` 列语义却无表头，导致 el-table
+ * 零列坍缩（"附注表格只有一行"）。后端 `note_header_projector` 已在 get_note_detail
+ * 读时补齐；本函数为前端兜底（后端未生效/其它加载路径时保证渲染一致）。
+ *
+ * 语义→中文标签与后端 `note_header_projector._SEMANTIC_LABEL` 保持一致，禁止漂移。
+ */
+const LEGACY_HEADER_SEMANTIC_LABEL: Record<string, string> = {
+  closing_balance: '期末余额',
+  opening_balance: '期初余额',
+  prior_year_value: '上年年末余额',
+  current_year_increase: '本期增加',
+  current_year_decrease: '本期减少',
+  current_year_provision: '本期计提',
+  current_period_acquisition: '本期购置',
+  current_period_disposal: '本期处置',
+  current_period_writeoff: '本期核销',
+  current_period_recover: '本期收回',
+  original_value: '原值',
+  accumulated_depreciation: '累计折旧/摊销',
+  impairment_provision: '减值准备',
+  carrying_value: '账面价值',
+  provision_ratio: '计提比例',
+  cost: '成本',
+  fair_value: '公允价值',
+  category_subtotal: '小计',
+  aging_bucket_within_1y: '1年以内',
+  aging_bucket_1_2y: '1-2年',
+  aging_bucket_2_3y: '2-3年',
+  aging_bucket_3_5y: '3-5年',
+  aging_bucket_over_5y: '5年以上',
+  // manual_text / formula_result → 空标签（列仍渲染）
+}
+
+function valueLen(row: any): number {
+  return row && typeof row === 'object' && Array.isArray(row.values) ? row.values.length : 0
+}
+
+function semanticForCol(rows: any[], colIdx: number): string | null {
+  const key = String(colIdx)
+  for (const r of rows) {
+    if (!r || typeof r !== 'object') continue
+    const cm = r._cell_meta
+    if (!cm || typeof cm !== 'object') continue
+    const meta = cm[key]
+    if (meta && typeof meta === 'object' && typeof meta.semantic === 'string' && meta.semantic) {
+      return meta.semantic
+    }
+  }
+  return null
+}
+
+/**
+ * legacy 单表 `headers` 为空时从行 `_cell_meta` 语义派生表头。
+ * @returns null=不适用（沿用原 headers）；string[]=派生表头（首列"项目"+各值列语义标签）
+ */
+export function deriveLegacyTableHeaders(tableData: Record<string, any> | null | undefined): string[] | null {
+  if (!tableData || typeof tableData !== 'object' || Array.isArray(tableData)) return null
+  if (tableData._tables) return null // 多表已投影
+  const rows = tableData.rows
+  if (!Array.isArray(rows) || rows.length === 0) return null
+  const headers = tableData.headers
+  if (Array.isArray(headers) && headers.length > 0) return null // 已有表头
+
+  const numValueCols = rows.reduce((m: number, r: any) => Math.max(m, valueLen(r)), 0)
+  if (numValueCols === 0) {
+    const hasLabel = rows.some((r: any) => r && typeof r === 'object' && 'label' in r)
+    return hasLabel ? ['项目'] : null
+  }
+  const derived = ['项目']
+  for (let i = 0; i < numValueCols; i++) {
+    const sem = semanticForCol(rows, i)
+    derived.push(LEGACY_HEADER_SEMANTIC_LABEL[sem ?? ''] ?? '')
+  }
+  return derived
+}

@@ -72,6 +72,16 @@
             </el-tag>
           </div>
           <div class="section-actions">
+            <el-button
+              size="small"
+              type="warning"
+              plain
+              :disabled="props.isReadonly"
+              :loading="adjPull.loading.value"
+              @click="openBringInAdjustment"
+            >
+              <el-icon><Download /></el-icon> 带入调整
+            </el-button>
             <el-button size="small" :loading="aiLoading" @click="handleAI('adjudication')">
               <el-icon><MagicStick /></el-icon> AI辅助
             </el-button>
@@ -369,8 +379,19 @@
         <li>K12-1审定合计应与K12-2明细合计一致，差异时显示红色告警badge</li>
         <li>回写操作将审定发生额写入试算表科目6301，并发布 substantive:adjudicated 联动附注</li>
         <li>与日常活动无关的利得计入营业外收入(6301)；与日常活动相关计入其他收益(6117/K10)</li>
+        <li>「带入调整」：按科目6301拉取调整分录，逐笔选目标分类行累加到 AJE/RJE，带入后自动联动披露表与附注</li>
       </ul>
     </details>
+
+    <!-- ═══ 从集中登记带入调整 弹窗（K12 试点） ═══ -->
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="6301 营业外收入"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
@@ -387,10 +408,13 @@
  */
 import { ref, defineAsyncComponent, watch, toRef, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { MagicStick } from '@element-plus/icons-vue'
+import { MagicStick, Download } from '@element-plus/icons-vue'
 import http from '@/utils/http'
 import { useK12Adjudication } from '../../composables/useK12Adjudication'
 import { generateK12AiText } from '../../composables/useK12AiText'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import { eventBus } from '@/utils/eventBus'
 
 const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
@@ -424,6 +448,22 @@ const adjudication = useK12Adjudication({
   isReadonly: computed(() => props.isReadonly),
   onSave: (itemId: string, value: any) => emit('save', itemId, value),
   writebackTB: handleWritebackTBInternal,
+})
+
+// ─── 从集中登记带入调整（K12 试点，adjustment-collaboration-and-propagation） ──
+// 审定表按科目(6301)拉取集中调整分录，逐笔分配到目标分类行的 AJE/RJE 列（累加）。
+// 带入后 writeback → substantive:adjudicated → 披露表 + 附注自动刷新。
+const { adjPull, visible: bringInVisible, rowOptions: bringInRowOptions, open: openBringInAdjustment, apply: onBringInApply } = useAdjudicationBringIn({
+  projectId: toRef(props, 'projectId') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '6301',
+  direction: 'credit', // 损益贷方：净发生额 = 贷 − 借
+  subjectCode: '6301',
+  wpCode: 'K12',
+  subjectLabel: '营业外收入(6301)',
+  rows: adjudication.rows,
+  updateCell: adjudication.updateCell,
+  totalAudited: () => adjudication.totalRow.value.audited,
 })
 
 // ─── State ───────────────────────────────────────────────────────────────────

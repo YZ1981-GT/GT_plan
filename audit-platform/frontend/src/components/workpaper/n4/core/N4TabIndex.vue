@@ -1,524 +1,333 @@
 <template>
   <div class="n4-tab-index">
-    <!-- ═══ 顶部标识头 ═══ -->
-    <div class="n4-header-bar">
-      <span class="header-code">底稿编码 N4</span>
-      <span class="header-sep">|</span>
-      <span class="header-subject">科目 6403 税金及附加</span>
-      <span class="header-sep">|</span>
-      <span class="header-direction">损益类 / 借方 / 取本期发生额</span>
-    </div>
+    <!-- 编制信息由页面级头部统一渲染，此处不重复 -->
 
-    <!-- ═══ 损益类科目醒目标注 ═══ -->
-    <div class="n4-expense-badge">
-      <el-icon><WarningFilled /></el-icon>
-      <span>税金及附加(6403)为损益类借方科目，取本期发生额（借方发生−贷方发生），非期末余额。覆盖消费税/城建税/教育费附加/房产税/土地使用税/车船税/印花税/资源税等。</span>
-    </div>
-
-    <!-- ═══ 蓝色渐变操作引导区 ═══ -->
-    <div class="n4-guide">
-      <div class="n4-guide-header">
-        <el-icon><InfoFilled /></el-icon>
-        <span>操作步骤引导</span>
-      </div>
-      <div class="n4-guide-steps">
-        <div class="step-item">
-          <span class="step-num">①</span>
-          <span class="step-text">填写明细表(N4-2)逐笔登记各税种计税依据与发生额</span>
+    <!-- ═══ 目录卡（标题 + 复核 + 编制/使用手册 + 进度条 → 跨表结论口径 → 编制提示） ═══ -->
+    <div class="n4-dir">
+      <div class="index-header">
+        <h3 class="title">N4 底稿目录</h3>
+        <GtReviewTrigger section-id="N4-index-directory" />
+        <div class="handbook-btns">
+          <el-button size="small" type="primary" plain @click="openHandbook('preparation')">📖 编制手册</el-button>
+          <el-button size="small" @click="openHandbook('usage')">使用手册</el-button>
         </div>
-        <div class="step-item">
-          <span class="step-num">②</span>
-          <span class="step-text">完成审定表(N4-1)确认各税种审定发生额 → TB回写6403</span>
-        </div>
-        <div class="step-item">
-          <span class="step-num">③</span>
-          <span class="step-text">录入调整分录(N4-3)管理AJE/RJE → 联动A13</span>
-        </div>
-        <div class="step-item">
-          <span class="step-num">④</span>
-          <span class="step-text">核对N2计提对应：各税种费用确认 = N2应交税费计提额</span>
+        <div class="progress-wrap">
+          <span>编制进度 {{ completedCount }}/{{ totalCount }}</span>
+          <el-progress :percentage="progressPercent" :stroke-width="10" />
         </div>
       </div>
+
+      <N4PreparationHandbookDialog v-model="handbookVisible" :initial-tab="handbookTab" />
+
+      <div class="conclusion-board" data-testid="n4-conclusion-board">
+        <div class="board-head">
+          <strong>跨表结论口径</strong>
+          <el-tag size="small" :type="conclusionWorstType">{{ conclusionWorstLabel }}</el-tag>
+          <span class="board-meta">已填 {{ conclusionFilledCount }}/{{ conclusionSheets.length }}</span>
+        </div>
+        <div class="board-tags">
+          <el-tag
+            v-for="c in conclusionSheets"
+            :key="c.code"
+            size="small"
+            class="concl-tag clickable"
+            :type="c.filled ? 'success' : 'info'"
+            effect="plain"
+            @click="emit('navigate', c.sheetKey)"
+          >
+            {{ c.code }} {{ c.filled ? '已填' : '未填' }}
+          </el-tag>
+        </div>
+        <p v-if="conclusionHasUnfilled" class="board-hint">存在未填审计结论，请点击标签跳转补全审计说明与结论。</p>
+      </div>
+
+      <details class="methodology-hint">
+        <summary>编制提示</summary>
+        <ul>
+          <li>税金及附加为<strong>损益类借方科目</strong>（6403）：取本期发生额（借方发生 − 贷方发生），非期末余额</li>
+          <li>覆盖税种：消费税/城建税及附加/房产税/土地使用税/车船税/印花税/资源税等</li>
+          <li>核心勾稽：N4 各税种费用确认 = N2 应交税费对应税种本期计提额</li>
+          <li>城建税及附加计税依据 =（增值税 + 消费税），城建税 7%/5%/1% + 教育费附加 3% + 地方教育附加 2%</li>
+          <li>审定 = 未审 + AJE + RJE；合计回写 TB(6403 发生额) 并进利润表"税金及附加"行；各表填妥"审计说明或结论"后目录标签转为"已填"</li>
+        </ul>
+      </details>
     </div>
 
-    <!-- ═══ 各税种统计仪表板 ═══ -->
-    <div class="n4-dashboard">
-      <div class="dashboard-header">
-        <span class="dashboard-title">各税种统计仪表板</span>
-        <el-tag size="small" :type="adjudicationVsDetail.isMatch ? 'success' : 'danger'" effect="light">
-          {{ adjudicationVsDetail.isMatch ? '审定=明细 ✓' : `差异 ${fmtAmount(adjudicationVsDetail.diff)}` }}
-        </el-tag>
+    <!-- ═══ 底稿架构（4 阶段泳道） ═══ -->
+    <div class="n4-arch">
+      <div class="arch-header">
+        <h4 class="arch-title">底稿架构</h4>
+        <span class="arch-hint">点击卡片可跳转至对应底稿</span>
       </div>
-      <div class="dashboard-grid">
+      <GtBArchitectureTree
+        :wp-id="wpId"
+        :project-id="projectId"
+        :active-sheet="''"
+        :html-data="archHtmlData"
+        @navigate="handleNavigate"
+      />
+    </div>
+
+    <!-- ═══ 本循环底稿目录（N 循环其他科目，可跳转） ═══ -->
+    <div v-if="cycleWorkpapers.length" class="n4-cycle">
+      <div class="cycle-header">
+        <h4 class="cycle-title">本循环底稿目录</h4>
+        <span class="cycle-hint">点击可跳转至同循环其他底稿（灰色表示尚未生成）</span>
+      </div>
+      <div class="cycle-grid">
         <div
-          v-for="item in taxDashboard"
-          :key="item.tax"
-          :class="['dashboard-card', item.hasDiff ? 'card-diff' : '']"
+          v-for="wp in cycleWorkpapers"
+          :key="wp.wp_code"
+          class="cycle-card"
+          :class="{ 'is-current': wp.is_current, 'is-disabled': !wp.wp_id }"
+          @click="onCycleCardClick(wp)"
         >
-          <div class="card-tax-name">{{ item.tax }}</div>
-          <div class="card-amounts">
-            <div class="card-row">
-              <span class="card-label">本期</span>
-              <span class="card-value">{{ fmtAmount(item.currentAmount) }}</span>
-            </div>
-            <div class="card-row">
-              <span class="card-label">上期</span>
-              <span class="card-value card-prior">{{ fmtAmount(item.priorAmount) }}</span>
-            </div>
-            <div class="card-row">
-              <span class="card-label">同比</span>
-              <span :class="['card-value', item.yoyChange > 0 ? 'card-up' : item.yoyChange < 0 ? 'card-down' : '']">
-                {{ fmtYoy(item.yoyChange) }}
-              </span>
-            </div>
+          <div class="cycle-card-top">
+            <span class="cycle-code">{{ wp.wp_code }}</span>
+            <el-tag v-if="wp.is_current" size="small" effect="plain" class="cycle-current-tag">当前</el-tag>
           </div>
-          <div v-if="item.hasDiff" class="card-diff-badge">N2差异</div>
+          <span class="cycle-name" :title="wp.wp_name">{{ wp.wp_name }}</span>
         </div>
       </div>
     </div>
-
-    <!-- ═══ 跨底稿联动状态 ═══ -->
-    <div class="n4-linkage-panel">
-      <div class="linkage-title">跨底稿联动状态</div>
-      <div class="linkage-items">
-        <div class="linkage-item">
-          <GtIndexChip value="N4-1" :context-project-id="props.projectId" />
-          <span class="linkage-desc">↔ N4-2 审定vs明细</span>
-          <span :class="['linkage-status', adjudicationVsDetail.isMatch ? 'linked' : (adjudicationVsDetail.diff !== 0 ? 'diff' : 'pending')]">
-            {{ adjudicationVsDetail.isMatch ? '✓ 一致' : (adjudicationVsDetail.diff !== 0 ? '⚠ 差异' : '○ 待编制') }}
-          </span>
-        </div>
-        <div class="linkage-item">
-          <GtIndexChip value="N2" :context-project-id="props.projectId" />
-          <span class="linkage-desc">N2计提额对应</span>
-          <span :class="['linkage-status', n2LinkageStatus === 'matched' ? 'linked' : (n2LinkageStatus === 'diff' ? 'diff' : 'pending')]">
-            {{ n2LinkageStatus === 'matched' ? '✓ 费用=计提' : (n2LinkageStatus === 'diff' ? '⚠ 不一致' : '○ N2未编制') }}
-          </span>
-        </div>
-        <div class="linkage-item">
-          <GtIndexChip value="TB" :context-project-id="props.projectId" />
-          <span class="linkage-desc">TB回写(6403发生额)</span>
-          <span :class="['linkage-status', tbWritebackStatus ? 'linked' : 'pending']">
-            {{ tbWritebackStatus ? '✓ 已回写' : '○ 待审定' }}
-          </span>
-        </div>
-      </div>
-    </div>
-
-    <!-- ═══ 总体进度 ═══ -->
-    <div class="n4-progress-section">
-      <div class="progress-info">
-        <span>编制进度</span>
-        <span class="progress-text">{{ completedCount }} / {{ effectiveTotal }} 已完成 ({{ progressPercent }}%)</span>
-      </div>
-      <el-progress :percentage="progressPercent" :stroke-width="8" :show-text="false" />
-    </div>
-
-    <!-- ═══ 底稿目录表格（9行） ═══ -->
-    <el-card shadow="never" class="n4-index-card">
-      <template #header>
-        <span class="card-title">致同会计师事务所 / 税金及附加底稿</span>
-      </template>
-      <el-table
-        :data="sheetRows"
-        border
-        size="small"
-        highlight-current-row
-        style="width: 100%"
-        :row-class-name="getRowClassName"
-        @row-click="handleRowClick"
-      >
-        <el-table-column prop="seq" label="序号" width="60" align="center" />
-        <el-table-column prop="name" label="内容" min-width="280">
-          <template #default="{ row }">
-            <span :class="row.skip ? 'sheet-name-skip' : 'sheet-name-link'">
-              <span v-if="row.skip">⏭️ </span>{{ row.name }}
-            </span>
-            <el-tag v-if="row.isCore" size="small" type="danger" class="core-tag">核心</el-tag>
-            <el-tag v-if="row.skip" size="small" type="info" class="skip-tag">Skip</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="索引号" width="100" align="center">
-          <template #default="{ row }">
-            <GtIndexChip v-if="row.code" :value="row.code" :context-project-id="props.projectId" />
-            <span v-else class="no-index">—</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="进度" width="140" align="center">
-          <template #default="{ row }">
-            <template v-if="!row.skip">
-              <el-progress
-                :percentage="row.progress"
-                :stroke-width="6"
-                :show-text="false"
-                :color="getProgressColor(row.progress)"
-                style="width: 80px; display: inline-block"
-              />
-              <span class="progress-label">{{ row.progress }}%</span>
-            </template>
-            <span v-else class="skip-label">—</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="联动" width="80" align="center">
-          <template #default="{ row }">
-            <span v-if="row.linkageStatus === 'matched'" class="linkage-badge linkage-ok">✓</span>
-            <span v-else-if="row.linkageStatus === 'diff'" class="linkage-badge linkage-warn">⚠</span>
-            <span v-else class="linkage-badge linkage-na">—</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="80" align="center">
-          <template #default="{ row }">
-            <el-button v-if="!row.skip" type="primary" link size="small" @click.stop="handleNavigate(row)">进入</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
-
-    <!-- ═══ 跨底稿引用 ═══ -->
-    <div class="n4-cross-refs">
-      <span class="cross-refs-label">关联底稿：</span>
-      <GtIndexChip value="N4A" :context-project-id="props.projectId" />
-      <GtIndexChip value="N2" :context-project-id="props.projectId" />
-      <GtIndexChip value="A13" :context-project-id="props.projectId" />
-      <GtIndexChip value="TB" :context-project-id="props.projectId" />
-    </div>
-
-    <!-- ═══ 编制提示（折叠） ═══ -->
-    <details class="n4-details-tip">
-      <summary>📋 编制提示</summary>
-      <ul>
-        <li>税金及附加(6403)为<strong>损益类借方科目</strong>，取本期发生额（借方发生−贷方发生）</li>
-        <li>覆盖税种：消费税/城建税/教育费附加/地方教育附加/房产税/土地使用税/车船税/印花税/资源税</li>
-        <li>城建税及附加=(增值税+消费税)×税率(7%/5%/1%+3%+2%)</li>
-        <li>核心勾稽：N4费用确认 = N2应交税费对应税种本期计提额</li>
-        <li>审定数=未审数+AJE+RJE；调整分录联动A13</li>
-        <li>O2A原底稿为辅助参考，标记Skip走OnlyOffice fallback</li>
-      </ul>
-    </details>
   </div>
 </template>
 
 <script setup lang="ts">
 /**
- * N4TabIndex — N4 税金及附加底稿目录
+ * N4TabIndex.vue — N4 税金及附加底稿目录（严格镜像 N1 标准）
  *
- * 9行sheet目录（O2A标记skip）。有效sheet 7个，进度条展示完成度。
- * 各税种统计仪表板：各税种本期/上期/同比+N2差异标红。
- * 联动状态：N4-1↔N4-2一致性 + N4↔N2计提对应 + TB回写状态。
- * 点击行 emit navigate-sheet 事件切换 sheetName。
+ * 结构：目录卡（标题+复核+编制/使用手册+进度→跨表结论口径→编制提示）
+ *       + 底稿架构 4 阶段泳道（GtBArchitectureTree）+ 本循环底稿目录 grid。
+ * 编制信息由页面级头部渲染，此处不重复。自包含：自行拉取 checklist-responses。
  *
- * Spec: .kiro/specs/n4-taxes-and-surcharges/ Task 4.1
- * Requirements: 1.2, 1.11
+ * 损益类借方科目（6403 税金及附加）— 取本期发生额，各税种费用确认核对 N2 计提额。
  */
-import { computed, type Ref } from 'vue'
-import { InfoFilled, WarningFilled } from '@element-plus/icons-vue'
-import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
-import { useN4CrossSheet, TAX_TYPES } from '../../composables/useN4CrossSheet'
+import { computed, ref, onMounted, defineAsyncComponent } from 'vue'
+import { useRouter } from 'vue-router'
+import http from '@/utils/http'
+import { loadCycleWorkpaperCards, type CycleWpCard } from '@/services/cycleDirectory'
+import GtReviewTrigger from '../../GtReviewTrigger.vue'
+import GtBArchitectureTree from '../../GtBArchitectureTree.vue'
+
+const N4PreparationHandbookDialog = defineAsyncComponent(() => import('../N4PreparationHandbookDialog.vue'))
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
-
 const props = defineProps<{
-  allResponses: Map<string, any>
   wpId: string
   projectId: string
-  isReadonly?: boolean
+  isReadonly: boolean
 }>()
 
 const emit = defineEmits<{
-  (e: 'navigate-sheet', sheetName: string): void
+  (e: 'navigate', sheetName: string): void
 }>()
 
-// ─── CrossSheet composable ───────────────────────────────────────────────────
+const router = useRouter()
 
-const allResponsesRef = computed(() => props.allResponses)
-const wpIdRef = computed(() => props.wpId) as Ref<string>
-const projectIdRef = computed(() => props.projectId) as Ref<string>
+// ─── 编制/使用手册弹窗 ─────────────────────────────────────────────────────────
+const handbookVisible = ref(false)
+const handbookTab = ref<'preparation' | 'usage'>('preparation')
+function openHandbook(tab: 'preparation' | 'usage') {
+  handbookTab.value = tab
+  handbookVisible.value = true
+}
 
-const {
-  adjudicationVsDetail,
-  n4VsN2Accrual,
-  toIncomeStatement,
-  taxDiffHighlights,
-} = useN4CrossSheet(allResponsesRef, { wpId: wpIdRef, projectId: projectIdRef })
+// ─── 自包含：拉取本底稿 checklist-responses（主入口不持有 allResponses） ─────────
+const responses = ref<Map<string, any>>(new Map())
+onMounted(async () => {
+  if (!props.wpId) return
+  try {
+    const res: any = await http.get(`/api/workpapers/${props.wpId}/checklist-responses`)
+    const list = res?.data?.items ?? res?.items ?? res?.data ?? res
+    const map = new Map<string, any>()
+    if (Array.isArray(list)) {
+      for (const it of list) {
+        if (it?.item_id) map.set(it.item_id, it)
+      }
+    }
+    responses.value = map
+  } catch {
+    /* silent：拉取失败则看板全显未填 */
+  }
+})
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-type LinkageStatus = 'matched' | 'diff' | 'none'
-
+// ─── Sheet 行定义 ─────────────────────────────────────────────────────────────
 interface SheetRow {
-  seq: number
   name: string
   code: string
   sheetKey: string
   progress: number
-  isCore: boolean
-  skip: boolean
-  linkageStatus: LinkageStatus
 }
 
-interface TaxDashboardItem {
-  tax: string
-  currentAmount: number
-  priorAmount: number
-  yoyChange: number
-  hasDiff: boolean
-}
-
-// ─── Helper: 从 allResponses 取数 ───────────────────────────────────────────
-
-function parseNum(val: any): number {
-  if (val == null || val === '' || val === '—') return 0
-  const n = Number(val)
-  return isNaN(n) ? 0 : n
-}
-
-function getResponseValue(itemId: string): number {
-  const resp = props.allResponses.get(itemId)
-  return parseNum(resp?.conclusion)
-}
-
-// ─── 各税种统计仪表板数据 ────────────────────────────────────────────────────
-
-const taxDashboard = computed<TaxDashboardItem[]>(() => {
-  return TAX_TYPES.map((tax) => {
-    const currentAmount = getResponseValue(`N4-1-${tax}-audited`)
-    const priorAmount = getResponseValue(`N4-1-${tax}-prior`)
-    const yoyChange = priorAmount !== 0
-      ? (currentAmount - priorAmount) / Math.abs(priorAmount)
-      : (currentAmount !== 0 ? 1 : 0)
-    const hasDiff = taxDiffHighlights.value.get(tax) ?? false
-    return { tax, currentAmount, priorAmount, yoyChange, hasDiff }
-  })
-})
-
-// ─── N2联动状态 ──────────────────────────────────────────────────────────────
-
-const n2LinkageStatus = computed<'matched' | 'diff' | 'pending'>(() => {
-  const items = n4VsN2Accrual.value
-  // 如果所有计提额都为0 → N2未编制
-  const hasAnyAccrual = items.some(i => i.accrual !== 0)
-  if (!hasAnyAccrual) return 'pending'
-  // 如果有任何差异
-  const hasDiff = items.some(i => Math.abs(i.diff) >= 0.01)
-  return hasDiff ? 'diff' : 'matched'
-})
-
-// ─── TB回写状态 ──────────────────────────────────────────────────────────────
-
-const tbWritebackStatus = computed<boolean>(() => {
-  return toIncomeStatement.value.amount !== 0
-})
-
-// ─── Sheet 目录行定义（9行，O2A skip） ──────────────────────────────────────
-
-const sheetRows = computed<SheetRow[]>(() => {
-  return [
-    { seq: 1, name: '底稿目录', code: 'N4', sheetKey: '底稿目录', progress: 100, isCore: false, skip: false, linkageStatus: 'none' },
-    { seq: 2, name: '税金及附加审计程序表 N4A', code: 'N4A', sheetKey: 'N4A', progress: getSheetProgress('N4A'), isCore: false, skip: false, linkageStatus: 'none' },
-    { seq: 3, name: '税金及附加审定表 N4-1', code: 'N4-1', sheetKey: 'N4-1', progress: getSheetProgress('N4-1'), isCore: true, skip: false, linkageStatus: getAdjLinkageStatus() },
-    { seq: 4, name: '税金及附加明细表 N4-2', code: 'N4-2', sheetKey: 'N4-2', progress: getSheetProgress('N4-2'), isCore: true, skip: false, linkageStatus: getDetailLinkageStatus() },
-    { seq: 5, name: '调整分录汇总 N4-3', code: 'N4-3', sheetKey: 'N4-3', progress: getSheetProgress('N4-3'), isCore: false, skip: false, linkageStatus: 'none' },
-    { seq: 6, name: '附注披露信息（上市公司）', code: '', sheetKey: '附注上市', progress: getSheetProgress('附注上市'), isCore: false, skip: false, linkageStatus: 'none' },
-    { seq: 7, name: '附注披露信息（国有企业）', code: '', sheetKey: '附注国企', progress: getSheetProgress('附注国企'), isCore: false, skip: false, linkageStatus: 'none' },
-    { seq: 8, name: 'O2A原底稿', code: 'O2A', sheetKey: 'O2A-skip', progress: 0, isCore: false, skip: true, linkageStatus: 'none' },
-    { seq: 9, name: 'GT_Custom配置', code: '', sheetKey: 'GT_Custom', progress: 0, isCore: false, skip: true, linkageStatus: 'none' },
-  ]
-})
-
-function getAdjLinkageStatus(): LinkageStatus {
-  if (adjudicationVsDetail.value.isMatch && toIncomeStatement.value.amount !== 0) return 'matched'
-  if (!adjudicationVsDetail.value.isMatch && adjudicationVsDetail.value.diff !== 0) return 'diff'
-  return 'none'
-}
-
-function getDetailLinkageStatus(): LinkageStatus {
-  if (adjudicationVsDetail.value.isMatch && toIncomeStatement.value.amount !== 0) return 'matched'
-  if (!adjudicationVsDetail.value.isMatch && adjudicationVsDetail.value.diff !== 0) return 'diff'
-  return 'none'
-}
-
-// ─── 进度计算 ────────────────────────────────────────────────────────────────
-
-function getSheetProgress(code: string): number {
-  if (props.allResponses.size === 0) return 0
-  const prefixMap: Record<string, string> = {
-    'N4A': 'N4-N4A-',
-    'N4-1': 'N4-1-',
-    'N4-2': 'N4-2-',
-    'N4-3': 'N4-3-',
-    '附注上市': 'N4-disclosure-listed-',
-    '附注国企': 'N4-disclosure-soe-',
+/** 按 responses 中以指定前缀存储的字段数计算完成度。 */
+function calcSheetProgress(prefix: string, expectedFields: number): number {
+  const map = responses.value
+  if (!map || map.size === 0) return 0
+  let count = 0
+  for (const key of map.keys()) {
+    if (key.startsWith(prefix)) count++
   }
-  const prefix = prefixMap[code]
-  if (!prefix) return 0
-  let filled = 0
-  let total = 0
-  for (const [key] of props.allResponses) {
-    if (key.startsWith(prefix)) {
-      total++
-      const val = props.allResponses.get(key)
-      if (val?.conclusion != null && val.conclusion !== '' && val.conclusion !== '0') filled++
-    }
-  }
-  if (total === 0) return 0
-  return Math.round((filled / total) * 100)
+  if (count === 0) return 0
+  if (count >= expectedFields) return 100
+  return Math.min(Math.round((count / expectedFields) * 100), 99)
 }
 
-const effectiveSheets = computed(() => sheetRows.value.filter(r => !r.skip))
-const effectiveTotal = computed(() => effectiveSheets.value.length)
-const completedCount = computed(() => effectiveSheets.value.filter(r => r.progress >= 100).length)
+const allSheets = computed<SheetRow[]>(() => [
+  { name: '税金及附加实质性程序表', code: 'N4A', sheetKey: '税金及附加审计程序表N4A', progress: calcSheetProgress('N4-N4A-', 5) },
+  { name: '审定表', code: 'N4-1', sheetKey: '税金及附加审定表N4-1', progress: calcSheetProgress('N4-1-', 8) },
+  { name: '明细表', code: 'N4-2', sheetKey: '税金及附加明细表N4-2', progress: calcSheetProgress('N4-2-', 6) },
+  { name: '调整分录汇总', code: 'N4-3', sheetKey: '调整分录汇总表N4-3', progress: calcSheetProgress('N4-3-', 4) },
+  { name: '附注披露信息（上市公司）', code: '附注上市', sheetKey: '附注披露信息（上市公司）', progress: calcSheetProgress('N4-disclosure-listed-', 3) },
+  { name: '附注披露信息（国企）', code: '附注国企', sheetKey: '附注披露信息（国企）', progress: calcSheetProgress('N4-disclosure-soe-', 3) },
+])
+
+// ─── 进度计算 ─────────────────────────────────────────────────────────────────
+const totalCount = computed(() => allSheets.value.length)
+const completedCount = computed(() => allSheets.value.filter(r => r.progress >= 100).length)
 const progressPercent = computed(() => {
-  if (effectiveTotal.value === 0) return 0
-  const avg = effectiveSheets.value.reduce((s, r) => s + r.progress, 0) / effectiveTotal.value
+  if (totalCount.value === 0) return 0
+  const avg = allSheets.value.reduce((sum, r) => sum + r.progress, 0) / totalCount.value
   return Math.round(avg)
 })
 
+// ─── 底稿架构泳道（GtBArchitectureTree 数据源） ───────────────────────────────
+const COMPONENT_TYPE_MAP: Record<string, string> = {
+  N4A: 'a-program-console',
+  '附注上市': 'c-note-table',
+  '附注国企': 'c-note-table',
+}
+function sheetStatus(progress: number): string {
+  if (progress >= 100) return 'completed'
+  if (progress > 0) return 'in_progress'
+  return 'pending'
+}
+const archHtmlData = computed(() => ({
+  navigation_rows: allSheets.value.map((s, i) => ({
+    seq: i + 1,
+    content: s.sheetKey,
+    sheet_name: s.sheetKey,
+    index_ref: s.code,
+    component_type: COMPONENT_TYPE_MAP[s.code] ?? 'd-form-table',
+    status: sheetStatus(s.progress),
+  })),
+}))
+
+// ─── 跨表结论口径看板 ─────────────────────────────────────────────────────────
+/** 有审计结论/说明的 sheet（程序表、调整分录、附注不计入；审定/明细计入） */
+const N4_CONCLUSION_CODES = new Set(['N4-1', 'N4-2'])
+
+/**
+ * includes(`${code}-`) 兼容不同存储前缀深度，尾部连字符保证边界安全；
+ * 并排除更长兄弟编码（如 N5-6 的 N5-6-1/N5-6-2）误算——本科目无重叠，作统一防御。
+ */
+function isConclusionFilled(code: string): boolean {
+  const map = responses.value
+  if (!map?.size) return false
+  const token = `${code}-`
+  const longer = Array.from(N4_CONCLUSION_CODES).filter(c => c !== code && c.startsWith(token))
+  for (const [key, val] of map.entries()) {
+    if (!key.includes(token)) continue
+    if (longer.some(lc => key.includes(`${lc}-`))) continue
+    if (!/conclusion|audit-note|note/i.test(key)) continue
+    const text = (val?.remark ?? val?.conclusion ?? '') as string
+    if (typeof text === 'string' && text.trim().length > 0) return true
+  }
+  return false
+}
+
+const conclusionSheets = computed(() =>
+  allSheets.value
+    .filter(s => N4_CONCLUSION_CODES.has(s.code))
+    .map(s => ({ code: s.code, sheetKey: s.sheetKey, filled: isConclusionFilled(s.code) })),
+)
+const conclusionFilledCount = computed(() => conclusionSheets.value.filter(c => c.filled).length)
+const conclusionHasUnfilled = computed(() => conclusionSheets.value.some(c => !c.filled))
+const conclusionWorstLabel = computed(() => {
+  if (conclusionFilledCount.value === 0) return '结论未填'
+  if (conclusionHasUnfilled.value) return `结论未齐 ${conclusionSheets.value.length - conclusionFilledCount.value} 项`
+  return '总体已齐'
+})
+const conclusionWorstType = computed<'success' | 'warning' | 'info'>(() => {
+  if (conclusionFilledCount.value === 0) return 'info'
+  if (conclusionHasUnfilled.value) return 'warning'
+  return 'success'
+})
+
 // ─── 交互 ────────────────────────────────────────────────────────────────────
-
-function handleRowClick(row: SheetRow) {
-  if (row.skip) return
-  emit('navigate-sheet', row.sheetKey)
+function handleNavigate(sheetName: string) {
+  if (sheetName) emit('navigate', sheetName)
 }
 
-function handleNavigate(row: SheetRow) {
-  emit('navigate-sheet', row.sheetKey)
+// ─── 本循环底稿目录（N 循环其他科目，跨底稿跳转；canonical 源模板过滤污染） ───
+const cycleWorkpapers = ref<CycleWpCard[]>([])
+async function loadCycleWorkpapers(): Promise<void> {
+  cycleWorkpapers.value = await loadCycleWorkpaperCards(props.projectId, 'N', props.wpId)
 }
-
-function getRowClassName({ row }: { row: SheetRow }): string {
-  if (row.skip) return 'skip-row'
-  if (row.progress >= 100) return 'completed-row'
-  return ''
+function onCycleCardClick(wp: CycleWpCard): void {
+  if (!wp.wp_id || wp.is_current || !props.projectId) return
+  router.push({ name: 'WorkpaperEditor', params: { projectId: props.projectId, wpId: wp.wp_id } })
 }
-
-function getProgressColor(percent: number): string {
-  if (percent >= 100) return '#67c23a'
-  if (percent >= 50) return '#409eff'
-  if (percent > 0) return '#e6a23c'
-  return '#e6e8eb'
-}
-
-// ─── 格式化 ──────────────────────────────────────────────────────────────────
-
-function fmtAmount(val: number | null | undefined): string {
-  if (val == null || val === 0) return '—'
-  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
-
-function fmtYoy(val: number): string {
-  if (val === 0) return '—'
-  const sign = val > 0 ? '↑' : '↓'
-  return `${sign} ${(Math.abs(val) * 100).toFixed(1)}%`
-}
+onMounted(loadCycleWorkpapers)
 </script>
 
 <style scoped>
-.n4-tab-index { padding: 12px; font-size: var(--wp-font-size, 13px); }
-
-.n4-header-bar {
-  display: flex; align-items: center; gap: 12px;
-  padding: 10px 16px; margin-bottom: 16px;
-  background: #f5f7fa; border: 1px solid #dcdfe6; border-radius: 6px; font-size: var(--wp-font-size, 13px);
-}
-.header-code { font-weight: 600; color: #303133; }
-.header-sep { color: #c0c4cc; }
-.header-subject { color: #606266; }
-.header-direction { font-weight: 500; color: #e6a23c; }
-
-.n4-expense-badge {
-  display: flex; align-items: center; gap: 8px;
-  padding: 10px 16px; margin-bottom: 16px;
-  background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
-  border: 1px solid #ffcc80; border-left: 4px solid #f57c00;
-  border-radius: 6px; font-size: var(--wp-font-size, 13px); font-weight: 500; color: #e65100;
-}
-.n4-expense-badge .el-icon { font-size: 16px; color: #f57c00; flex-shrink: 0; }
-
-.n4-guide {
-  background: linear-gradient(135deg, #e8f4fd 0%, #d6eaf8 100%);
-  border: 1px solid #b3d9f2; border-radius: 8px; padding: 14px 20px; margin-bottom: 16px;
-}
-.n4-guide-header { display: flex; align-items: center; gap: 6px; font-weight: 500; color: #1a73e8; margin-bottom: 10px; font-size: var(--wp-font-size, 13px); }
-.n4-guide-steps { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 24px; }
-.step-item { display: flex; align-items: center; gap: 8px; font-size: var(--wp-font-size, 13px); color: #374151; }
-.step-num { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: #1a73e8; color: #fff; font-size: 11px; font-weight: 600; flex-shrink: 0; }
-
-/* ═══ 仪表板 ═══ */
-.n4-dashboard { margin-bottom: 16px; padding: 14px 16px; background: #fafbfc; border: 1px solid #ebeef5; border-radius: 8px; }
-.dashboard-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-.dashboard-title { font-size: 14px; font-weight: 600; color: #303133; }
-.dashboard-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
-@media (max-width: 1200px) { .dashboard-grid { grid-template-columns: repeat(3, 1fr); } }
-@media (max-width: 768px) { .dashboard-grid { grid-template-columns: repeat(2, 1fr); } }
-.dashboard-card {
-  padding: 10px 12px; border-radius: 6px;
-  background: #fff; border: 1px solid #ebeef5;
-  position: relative; transition: box-shadow 0.2s;
-}
-.dashboard-card:hover { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06); }
-.dashboard-card.card-diff { border-color: #f56c6c; background: #fef0f0; }
-.card-tax-name { font-size: 12px; font-weight: 600; color: #606266; margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.card-amounts { display: flex; flex-direction: column; gap: 3px; }
-.card-row { display: flex; justify-content: space-between; align-items: center; }
-.card-label { font-size: 11px; color: #909399; }
-.card-value { font-size: 12px; font-weight: 500; color: #303133; }
-.card-prior { color: #909399; }
-.card-up { color: #e6a23c; }
-.card-down { color: #67c23a; }
-.card-diff-badge {
-  position: absolute; top: 4px; right: 4px;
-  font-size: 10px; padding: 1px 4px; border-radius: 3px;
-  background: #f56c6c; color: #fff; font-weight: 500;
+.n4-tab-index {
+  padding: 16px;
+  font-size: var(--wp-font-size, 13px);
 }
 
-/* ═══ 联动面板 ═══ */
-.n4-linkage-panel { margin-bottom: 16px; padding: 14px 16px; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 8px; }
-.linkage-title { font-size: var(--wp-font-size, 13px); font-weight: 500; color: #0369a1; margin-bottom: 10px; }
-.linkage-items { display: flex; flex-wrap: wrap; gap: 10px; }
-.linkage-item { display: flex; align-items: center; gap: 8px; padding: 6px 12px; background: #fff; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12px; }
-.linkage-desc { color: #606266; }
-.linkage-status { font-weight: 500; font-size: 11px; }
-.linkage-status.linked { color: #43a047; }
-.linkage-status.diff { color: #e6a23c; }
-.linkage-status.pending { color: #9e9e9e; }
-
-/* ═══ 进度条 ═══ */
-.n4-progress-section { margin-bottom: 16px; padding: 12px 16px; background: #f5f7fa; border-radius: 6px; }
-.progress-info { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; font-size: var(--wp-font-size, 13px); color: #606266; }
-.progress-text { font-weight: 600; color: #303133; }
-
-/* ═══ 目录卡片 ═══ */
-.n4-index-card { margin-bottom: 16px; }
-.card-title { font-size: 14px; font-weight: 600; color: #303133; }
-.sheet-name-link { color: #1a73e8; cursor: pointer; font-size: var(--wp-font-size, 13px); }
-.sheet-name-link:hover { text-decoration: underline; }
-.sheet-name-skip { color: #c0c4cc; font-size: var(--wp-font-size, 13px); text-decoration: line-through; }
-.no-index { color: #c0c4cc; }
-.core-tag, .skip-tag { margin-left: 8px; font-size: 11px; vertical-align: middle; }
-.progress-label { display: inline-block; margin-left: 8px; font-size: 12px; color: #909399; width: 32px; }
-.skip-label { font-size: 12px; color: #c0c4cc; font-style: italic; }
-
-.linkage-badge { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; font-size: var(--wp-font-size, 13px); font-weight: 600; }
-.linkage-ok { background: #e8f5e9; color: #43a047; border: 1px solid #a5d6a7; }
-.linkage-warn { background: #fff3e0; color: #e65100; border: 1px solid #ffcc80; }
-.linkage-na { background: #f5f5f5; color: #bdbdbd; border: 1px solid #e0e0e0; }
-
-/* ═══ 跨底稿引用 ═══ */
-.n4-cross-refs {
-  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-  margin-bottom: 16px; padding: 8px 12px; background: #f5f7fa; border-radius: 6px;
+/* ─── 目录卡 ─── */
+.n4-dir { margin-bottom: 20px; }
+.index-header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
+.title { margin: 0; font-size: 16px; font-weight: 600; color: #303133; }
+.handbook-btns { display: flex; gap: 6px; }
+.progress-wrap { flex: 1; min-width: 200px; }
+.conclusion-board {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  background: #f5f7fa;
+  border-radius: 6px;
+  border-left: 3px solid #409eff;
 }
-.cross-refs-label { color: #909399; font-size: 12px; white-space: nowrap; }
+.board-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.board-meta { font-size: 12px; color: #909399; }
+.board-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.concl-tag.clickable { cursor: pointer; }
+.board-hint { margin: 8px 0 0; font-size: 12px; color: #e6a23c; }
+.methodology-hint { margin-top: 12px; font-size: 12px; color: #606266; }
+.methodology-hint summary { cursor: pointer; font-weight: 500; color: #303133; }
+.methodology-hint ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
 
-/* ═══ 行样式 ═══ */
-:deep(.skip-row) { background-color: #f9f9f9 !important; opacity: 0.6; }
-:deep(.skip-row:hover) { cursor: not-allowed !important; }
-:deep(.completed-row) { background-color: #f0f9eb !important; }
-:deep(.el-table) { font-size: var(--wp-font-size, 13px); }
-:deep(.el-table .el-table__row) { cursor: pointer; }
-:deep(.el-table .el-table__row:hover) { background-color: #ecf5ff !important; }
+/* ─── 底稿架构 ─── */
+.n4-arch { margin-top: 16px; }
+.arch-header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
+.arch-title { margin: 0; font-size: 16px; font-weight: 600; color: #303133; }
+.arch-hint { font-size: 12px; color: #909399; }
 
-/* ═══ 编制提示 ═══ */
-.n4-details-tip { margin-top: 12px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
-.n4-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; margin-bottom: 8px; }
-.n4-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
+/* ─── 本循环底稿目录 ─── */
+.n4-cycle { margin-top: 28px; }
+.cycle-header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
+.cycle-title { margin: 0; font-size: 16px; font-weight: 600; color: #303133; }
+.cycle-hint { font-size: 12px; color: #909399; }
+.cycle-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+.cycle-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--gt-color-border-purple, #e8e4f0);
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.cycle-card:hover { border-color: var(--gt-color-primary, #4b2d77); box-shadow: 0 2px 8px rgba(75, 45, 119, 0.12); transform: translateY(-2px); }
+.cycle-card.is-current { border-color: var(--gt-color-primary, #4b2d77); background: var(--gt-color-primary-bg, #f4f0fa); box-shadow: 0 0 0 1px var(--gt-color-primary, #4b2d77); cursor: default; }
+.cycle-card.is-disabled { opacity: 0.5; cursor: not-allowed; }
+.cycle-card.is-disabled:hover { border-color: var(--gt-color-border-purple, #e8e4f0); box-shadow: none; transform: none; }
+.cycle-card-top { display: flex; align-items: center; gap: 6px; }
+.cycle-code { font-size: var(--wp-font-size, 13px); font-weight: 700; color: var(--gt-color-primary, #4b2d77); }
+.cycle-current-tag { margin-left: auto; }
+.cycle-name { font-size: var(--wp-font-size, 13px); line-height: 1.4; color: #303133; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 </style>

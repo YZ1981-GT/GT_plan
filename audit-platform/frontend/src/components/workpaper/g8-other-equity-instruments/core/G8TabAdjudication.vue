@@ -6,6 +6,9 @@
         <p class="sheet-sub">科目 1503 · 审定 = 未审 + 账项调整 · 与 TB / G8-2 / G8-3 / G8-4 勾稽</p>
       </div>
       <div class="g8-actions">
+        <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
+          <el-icon><Download /></el-icon>带入调整
+        </el-button>
         <el-button
           v-if="!isReadonly"
           size="small"
@@ -30,6 +33,7 @@
         <p>2. 编制顺序：G8-2 明细取账面 →「从 G8-2 带入未审」→ G8-3 调整回写期末调整（默认写入「{{ adj.writebackRowKey }}」行）→ 刷新 TB 勾稽 → 核对 G8-4 公允合计。</p>
         <p>3. |变动率|&gt;20% 时原因分析必填；试算表差异、明细/公允勾稽异常须追查后再发布审定数。</p>
         <p>4. 公允价值变动计入 OCI，不经损益；处置时累计 OCI 可转留存收益。</p>
+        <p>5.「带入调整」：可从集中登记按科目 1503 拉取调整分录，逐笔分配到各行期末调整，带入后审定数自动更新并联动附注。</p>
       </div>
     </details>
 
@@ -244,6 +248,15 @@
         缺失原因行数: adj.missingReasonCount.value,
       }"
     />
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="1503 其他权益工具投资"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
@@ -254,11 +267,15 @@
  */
 import { computed, inject, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Download } from '@element-plus/icons-vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import GtReviewDot from '../../GtReviewDot.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import G8AuditTextCards from '../G8AuditTextCards.vue'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import { useG8Adjudication } from '../../composables/useG8Adjudication'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import { useAuditContext } from '@/composables/useAuditContext'
 import { jumpToG8Sheet } from '../../composables/g8CrossHelpers'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 
@@ -279,6 +296,34 @@ const adj = useG8Adjudication({
   allResponses: computed(() => props.allResponses),
   debouncedSave: props.debouncedSave,
   isReadonly: computed(() => props.isReadonly),
+})
+
+// ─── 从集中登记带入调整（1503 其他权益工具投资，资产借方；带入期末调整，单一调整列） ───
+const bringInRows = computed(() =>
+  adj.dataRows.value.map((r) => ({ rowKey: r.rowKey, name: r.label, aje: 0, rje: 0 })),
+)
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: computed(() => props.projectId) as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '1503',
+  direction: 'debit',
+  subjectCode: '1503',
+  wpCode: 'G8',
+  subjectLabel: '其他权益工具投资(1503)',
+  rows: bringInRows,
+  // 单一「调整」列：aje/rje 净额均累加至期末调整（读取实时值做增量累加）
+  updateCell: (rowKey: string, _field: any, value: number) => {
+    const row = adj.dataRows.value.find((r) => r.rowKey === rowKey)
+    const live = row?.closingAdjustment ?? 0
+    adj.updateField(rowKey, 'closingAdjustment', Math.round((live + value) * 100) / 100)
+  },
+  totalAudited: () => adj.totalRow.value.closingAdjusted,
 })
 
 const noteProxy = computed({

@@ -315,6 +315,50 @@ async def download_version(
     return FileResponse(path=str(file_path), filename=file_path.name, media_type=media)
 
 
+@router.get("/{task_id}/versions/{version_no}/guidance-download")
+async def download_guidance_version(
+    project_id: UUID,
+    task_id: UUID,
+    version_no: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """下载「编制参考版」（含内部 ##NOTE## 提示的 with_notes 副本，§13.2）。
+
+    仅供项目组编制参考，不可对外出具。权限与正式版下载相同（download）。
+    文件在 confirm 阶段落盘为 ``with_notes_v{version_no}.docx``，与正式版
+    位于同一交付件目录，故按 task_id + version_no 定位（每个版本各有一份）。
+    """
+    svc = DeliverableService(db)
+    task = await svc.get_task(task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="交付物不存在")
+    _ensure_task_belongs(task, project_id)
+    await _guard_action(
+        db, current_user, project_id, DeliverableAction.download, task_status=task.status
+    )
+
+    # 编制参考版仅审计报告正文有
+    if task.doc_type != WordExportDocType.audit_report.value:
+        raise HTTPException(status_code=404, detail="该交付物无编制参考版")
+
+    guidance_path = svc._deliverable_dir(project_id, task_id) / f"with_notes_v{version_no}.docx"
+    if not guidance_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="编制参考版不存在（该版本可能由旧流程生成，请重新生成报告正文）",
+        )
+
+    filename = f"审计报告正文（编制参考版）_v{version_no}.docx"
+    return FileResponse(
+        path=str(guidance_path),
+        filename=filename,
+        media_type=(
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        ),
+    )
+
+
 @router.get("/{task_id}/versions/{version_no}/preview-url")
 async def preview_version(
     project_id: UUID,
@@ -401,6 +445,12 @@ async def preview_report_body(
     except ValueError as e:
         # 模板缺失 → 422（请求合法但所需资源不可用）
         raise HTTPException(status_code=422, detail=str(e)) from e
+    except KeyError as e:
+        # manifest 无对应 opinion_type/variant/subtype → 422（清晰报错，非 500）
+        raise HTTPException(
+            status_code=422,
+            detail=f"报告模板不支持该组合（{e}）。请确认审计意见类型/企业类型是否受支持。",
+        ) from e
     await db.commit()
     return ReportBodyPreviewResponse(
         preview_session_id=result.preview_session_id,
@@ -456,6 +506,11 @@ async def confirm_report_body(
         if "不存在" in msg or "已过期" in msg or "缺失" in msg:
             raise HTTPException(status_code=404, detail=msg) from e
         raise HTTPException(status_code=422, detail=msg) from e
+    except KeyError as e:
+        raise HTTPException(
+            status_code=422,
+            detail=f"报告模板不支持该组合（{e}）。请确认审计意见类型/企业类型是否受支持。",
+        ) from e
     await db.commit()
     return ReportBodyConfirmResponse(
         task_id=result.task_id,
@@ -608,26 +663,42 @@ async def render_disclosure_notes(
 
     await _guard_action(db, current_user, project_id, DeliverableAction.export)
     dsvc = DeliverableService(db)
-    task, _ = await dsvc.export_or_new_deliverable(
-        project_id,
-        WordExportDocType.disclosure_notes.value,
-        body.template_type,
-        current_user.id,
-    )
-    task.selected_sections = body.selected_sections
-    await db.flush()
 
     from app.models.core import Project
-    from app.services.note_section_catalog import normalize_report_scope
+    from app.services.note_section_catalog import (
+        normalize_report_scope,
+        normalize_template_type,
+    )
 
+    # 🔴 附注变体必须与 DB 附注生成时的口径一致：DB notes 的 section_code 前缀
+    # （国企版=四、/ 上市版=三、）由 Project.template_type 决定；导出模板 variant 若
+    # 不匹配，则 {{section:code}}/{{table:code:N}} 占位符全部匹配失败 → 原始标记泄漏
+    # 进交付文档（用户所见"乱"）。故以 Project.template_type 为权威源（与附注编辑器
+    # / 附注生成 / 章节编号端点一致），而非 body.template_type（交付件中心默认 "soe"）。
     proj_row = (
         await db.execute(
-            sa.select(Project.report_scope).where(
+            sa.select(Project.template_type, Project.report_scope).where(
                 Project.id == project_id,
                 Project.is_deleted == sa.false(),
             )
         )
-    ).scalar_one_or_none()
+    ).one_or_none()
+    proj_template_type = proj_row[0] if proj_row else None
+    proj_report_scope = proj_row[1] if proj_row else None
+    effective_template_type = normalize_template_type(
+        proj_template_type or body.template_type
+    )
+
+    task, _ = await dsvc.export_or_new_deliverable(
+        project_id,
+        WordExportDocType.disclosure_notes.value,
+        effective_template_type,
+        current_user.id,
+    )
+    task.selected_sections = body.selected_sections
+    # 复用既有 task 时同步 variant 元数据，避免残留旧默认 "soe" 造成困惑
+    task.template_type = effective_template_type
+    await db.flush()
 
     exporter = NoteWordExporter(db)
     # 附注导出模式灰度（task 10.4）：
@@ -644,8 +715,10 @@ async def render_disclosure_notes(
     buf = await exporter.export(
         project_id,
         body.year,
-        template_type=body.template_type,
-        report_scope=normalize_report_scope(proj_row if isinstance(proj_row, str) else None),
+        template_type=effective_template_type,
+        report_scope=normalize_report_scope(
+            proj_report_scope if isinstance(proj_report_scope, str) else None
+        ),
         sections=body.selected_sections,
         mode=export_mode,
         # 交付导出（Req 18.1/18.3）：公式解析为静态值兜底守卫

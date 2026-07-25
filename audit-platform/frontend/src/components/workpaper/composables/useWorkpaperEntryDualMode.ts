@@ -4,6 +4,7 @@
  * 各 cycle 通过 resolveOoSheetName 注入 sheet 名解析逻辑。
  */
 import { ref, onMounted, type Ref } from 'vue'
+import http from '@/utils/http'
 
 export type WorkpaperRenderMode = 'html' | 'onlyoffice'
 
@@ -20,13 +21,14 @@ export function useWorkpaperEntryDualMode(options: {
   async function checkOOHealth(): Promise<boolean> {
     checking.value = true
     try {
-      const response = await fetch('/api/workpapers/onlyoffice/health')
-      if (!response.ok) {
-        ooAvailable.value = false
-        return false
-      }
-      const result = await response.json()
-      const healthy = result.data?.healthy ?? result.healthy ?? false
+      // 🔴 该端点受 dedicated_wp_gate（router-level get_current_user）拦截：
+      //    裸 fetch 无 Authorization 头 → 401 Not authenticated → ooAvailable 恒 false → "OO不可用"。
+      //    必须用带鉴权的 http（axios 拦截器注入 Bearer token），认证通过后 gate 对无 wp_id 的
+      //    /onlyoffice/health 静态路径 no-op 放行，端点正常返回 healthy。
+      const res = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
+      // 兼容 axios 原始响应 与 拦截器已解包信封 两种形态
+      const result = (res as any)?.data?.data ?? (res as any)?.data ?? {}
+      const healthy = result?.data?.healthy ?? result?.healthy ?? false
       ooAvailable.value = !!healthy
       return ooAvailable.value
     } catch {

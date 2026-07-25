@@ -7,6 +7,9 @@
         <h3 class="section-title">L6-1 专项应付款审定表</h3>
       </div>
       <div class="section-header-right">
+        <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
+          <el-icon><Download /></el-icon> 带入调整
+        </el-button>
         <el-segmented
           v-model="dualMode.mode.value"
           :options="dualMode.modeOptions.value"
@@ -296,11 +299,21 @@
         <li>变动率 = IF(期初=0且变动=0, 0, IF(期初=0且变动>0, 100%, 变动额/期初))</li>
         <li>各项目从明细表L6-2引用，合计行自动汇总</li>
         <li>审定合计变化自动回写TB（科目2601）并通知附注组件</li>
+        <li>「带入调整」：可从集中登记按科目 2601 拉取调整分录，逐笔分配到各专项项目行的期末账项/重分类调整，带入后审定数自动更新并联动附注</li>
       </ul>
     </details>
 
     <!-- 隐藏的文件上传 -->
     <input ref="fileInputRef" type="file" accept=".xlsx,.xls" style="display: none" @change="onFileSelected" />
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="2601 专项应付款"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
@@ -320,7 +333,7 @@
  */
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { MagicStick, Check } from '@element-plus/icons-vue'
+import { MagicStick, Check, Download } from '@element-plus/icons-vue'
 import { fmtAmount } from '@/utils/formatters'
 import { useL6FormData } from '../../composables/useL6FormData'
 import { useL6DualMode } from '../../composables/useL6DualMode'
@@ -329,6 +342,9 @@ import {
   useL6Adjudication,
   type L6AdjudicationRow,
 } from '../../composables/useL6Adjudication'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import { useAuditContext } from '@/composables/useAuditContext'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -386,6 +402,32 @@ const {
   saveAndWriteback,
   subscribeDisclosure,
 } = useL6Adjudication(formData, adjudicationRows)
+
+// ─── 从集中登记带入调整（2601 专项应付款，负债贷方；带入期末 AJE/RJE） ───────────
+const bringInRows = computed(() =>
+  computedRows.value.map((r) => ({ rowKey: r.key, name: r.project || '(未命名专项)', aje: r.endAje, rje: r.endRje })),
+)
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: computed(() => props.projectId) as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '2601',
+  direction: 'credit',
+  subjectCode: '2601',
+  wpCode: 'L6',
+  subjectLabel: '专项应付款(2601)',
+  rows: bringInRows,
+  updateCell: (rowKey: string, field: any, value: number) => {
+    const i = adjudicationRows.value.findIndex((r) => r.key === rowKey)
+    if (i >= 0) updateRow(i, field === 'rje' ? 'endRje' : 'endAje', value)
+  },
+  totalAudited: () => totalRow.value.endAudited,
+})
 
 // ─── UI State ────────────────────────────────────────────────────────────────
 

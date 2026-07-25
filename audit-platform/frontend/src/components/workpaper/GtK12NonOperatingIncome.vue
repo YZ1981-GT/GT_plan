@@ -5,7 +5,7 @@
     </div>
 
     <template v-else>
-      <div v-if="isHtmlSheet" class="k12-header-toolbar">
+      <div v-if="isHtmlSheet && currentSheet !== 'K12'" class="k12-header-toolbar">
         <!-- 一律绑定 :model-value（非 v-model）：切 OO 前必须 config 拉取成功，switchMode 内才置 currentMode -->
         <el-segmented
           v-if="dualMode.isOoAvailable.value"

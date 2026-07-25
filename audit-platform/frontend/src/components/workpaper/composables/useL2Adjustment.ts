@@ -38,11 +38,22 @@ export interface AdjustmentEntry {
   debitAmount: number
   /** 贷方金额 */
   creditAmount: number
-  /** 摘要/说明 */
+  /** 调整事项说明（源模板 A 列） */
   description: string
+  /** 类别（报表调整/账项调整/其他，源模板 B 列） */
+  category: string
+  /** 报表项目（源模板 C 列） */
+  reportItem: string
+  /** 附注项目（源模板 E 列） */
+  noteItem: string
+  /** 索引（源模板 I 列） */
+  indexRef: string
   /** 创建时间 */
   createdAt: string
 }
+
+/** 类别选项（对齐源模板 B 列） */
+export const ADJ_CATEGORY_OPTIONS = ['报表调整', '账项调整', '其他'] as const
 
 /** 借贷平衡结果 */
 export interface BalanceCheckResult {
@@ -103,6 +114,10 @@ function normalizeEntry(raw: any): AdjustmentEntry {
     debitAmount: parseNum(raw.debitAmount),
     creditAmount: parseNum(raw.creditAmount),
     description: raw.description || '',
+    category: raw.category || (raw.entryType === 'RJE' ? '报表调整' : '账项调整'),
+    reportItem: raw.reportItem || '',
+    noteItem: raw.noteItem || '',
+    indexRef: raw.indexRef || '',
     createdAt: raw.createdAt || new Date().toISOString(),
   }
 }
@@ -226,11 +241,15 @@ export function useL2Adjustment(options: UseL2AdjustmentOptions) {
       entryId: generateEntryId(),
       entryType: type,
       seqNo: sameTypeEntries.length + 1,
-      accountCode: '',
-      accountName: '',
+      accountCode: '2231',
+      accountName: '应付利息',
       debitAmount: 0,
       creditAmount: 0,
       description: '',
+      category: type === 'RJE' ? '报表调整' : '账项调整',
+      reportItem: '',
+      noteItem: '',
+      indexRef: '',
       createdAt: new Date().toISOString(),
     }
 
@@ -288,10 +307,19 @@ export function useL2Adjustment(options: UseL2AdjustmentOptions) {
     eventBus.emit('adjustment:created')
   }
 
+  // ─── 审计说明 / 结论 ────────────────────────────────────────────────────
+
+  const auditNote = computed(() => allResponses.value.get('L2-L2-3-note')?.remark ?? '')
+  const auditConclusion = computed(() => allResponses.value.get('L2-L2-3-conclusion')?.remark ?? '')
+
+  function updateNote(field: 'note' | 'conclusion', value: string): void {
+    debouncedSave(`L2-L2-3-${field}`, { remark: value })
+  }
+
   // ─── submitAdjustment（提交/同步） ─────────────────────────────────────
 
   /**
-   * 提交调整分录（校验平衡性后保存并通知审定表）
+   * 提交调整分录（校验平衡性后保存并通知审定表 + 推送 A13 错报）
    */
   async function submitAdjustment(): Promise<boolean> {
     const check = currentBalanceCheck.value
@@ -302,6 +330,23 @@ export function useL2Adjustment(options: UseL2AdjustmentOptions) {
 
     // 持久化
     await saveField(ITEM_ID_ENTRIES, { remark: JSON.stringify(entries.value) })
+
+    // 推送 A13 错报（AJE 视为错报候选）
+    const ajeItems = ajeEntries.value.filter(e => e.debitAmount > 0 || e.creditAmount > 0)
+    if (ajeItems.length > 0) {
+      eventBus.emit('a13:push-misstatement', {
+        wpCode: 'L2',
+        source: 'L2-3',
+        items: ajeItems.map(e => ({
+          description: e.description || e.accountName,
+          accountName: e.accountName,
+          debit: e.debitAmount,
+          credit: e.creditAmount,
+          indexRef: e.indexRef,
+        })),
+        timestamp: Date.now(),
+      } as any)
+    }
 
     ElMessage.success('调整分录已保存')
     return true
@@ -323,12 +368,18 @@ export function useL2Adjustment(options: UseL2AdjustmentOptions) {
     // 审定表联动
     ajeNetAmount,
     rjeNetAmount,
+    // 审计说明/结论
+    auditNote,
+    auditConclusion,
+    updateNote,
     // 操作
     addEntry,
     removeEntry,
     updateEntry,
     submitAdjustment,
     publishAdjustmentCreated,
+    // 常量
+    ADJ_CATEGORY_OPTIONS,
   }
 }
 

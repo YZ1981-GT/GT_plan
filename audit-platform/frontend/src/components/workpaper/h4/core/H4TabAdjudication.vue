@@ -7,6 +7,7 @@
         <p>2. 审定数=未审数+账项调整；净值=原值−减值；期初审定应与上年末审定数一致。</p>
         <p>3. 优先「从 H4-2 回填分类」带入未审/调整；H4-3 确认后「回写期末账项调整」（1605 净额按未审权重分摊）。</p>
         <p>4. 净值变动率≥{{ state.CHANGE_RATE_THRESHOLD }}% 须在审计说明(1)解释；与报表核对填入(3)。在建工程可「带入(H2/TB)」，重大变动可一键写入说明/附注。</p>
+        <p>5.「带入调整」：从集中登记按科目 1605 拉取调整分录（资产借方净额=借−贷），逐笔分配到各分类的期末账项调整（增量累加），带入后审定数自动更新并联动附注。</p>
       </div>
     </details>
 
@@ -52,6 +53,16 @@
           @click="handleApplySignificantNote"
         >
           重大变动→说明(1)
+        </el-button>
+        <el-button
+          v-if="!props.isReadonly"
+          size="small"
+          type="primary"
+          plain
+          :loading="adjPull.loading.value"
+          @click="openBringInAdjustment"
+        >
+          <el-icon><Download /></el-icon>带入调整
         </el-button>
         <el-tag size="small" type="info" effect="plain">
           TB·1605 未审 {{ fmtAmt(state.tbUnadjusted.value) }} / 审定 {{ fmtAmt(state.tbAudited.value) }}
@@ -370,6 +381,15 @@
         确认审定 → 回写TB(1605)
       </el-button>
     </div>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="1605 工程物资"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
@@ -379,6 +399,7 @@
  * 对齐致同 Excel：期初/期末×未审·账项调整·审定 + 变动额/率；三段+报表核对+结构化说明
  */
 import { ref, computed, inject, toRef, defineComponent, h, onMounted, onUnmounted, type Ref } from 'vue'
+import { Download } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox, ElTable, ElTableColumn, ElInputNumber, ElButton } from 'element-plus'
 import http from '@/utils/http'
 import { useAcnr } from '@/services/acnr/useAcnr'
@@ -387,6 +408,9 @@ import {
   type H4AdjudicationRow,
 } from '../../composables/useH4Adjudication'
 import { useH4CrossSheet } from '../../composables/useH4CrossSheet'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
@@ -434,6 +458,34 @@ const state = useH4Adjudication({
 })
 
 const crossSheet = useH4CrossSheet(allResponsesRef as any)
+
+// ─── 从集中登记带入调整（1605 工程物资，资产借方；单一账项调整列→带入期末账项调整，增量累加） ───
+const bringInRows = computed(() =>
+  state.originalRows.value.map((r) => ({ rowKey: r.rowId, name: r.name, aje: 0, rje: 0 })),
+)
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: toRef(props, 'projectId') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '1605',
+  direction: 'debit',
+  subjectCode: '1605',
+  wpCode: 'H4',
+  subjectLabel: '工程物资(1605)',
+  rows: bringInRows,
+  // 单一账项调整列：忽略 field，读期末账项调整实时值增量累加
+  updateCell: (rowKey: string, _field: any, value: number) => {
+    const r = state.originalRows.value.find((x) => x.rowId === rowKey)
+    const cur = Number(r?.endAdjustment) || 0
+    state.updateCell(rowKey, 'endAdjustment', cur + value)
+  },
+  totalAudited: () => state.originalTotal.value.endAudited,
+})
 
 const originalDisplayRows = computed(() => [
   ...state.originalRows.value,

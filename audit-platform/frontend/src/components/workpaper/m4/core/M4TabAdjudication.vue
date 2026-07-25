@@ -10,13 +10,10 @@
         </el-tag>
       </div>
       <div class="section-header-right">
-        <el-segmented
-          v-model="dualMode.mode.value"
-          :options="dualMode.modeOptions.value"
-          size="small"
-          @change="(val: any) => dualMode.switchMode(val)"
-        />
-        <el-button size="small" @click="handleAI('adjudication')">
+        <el-button size="small" type="primary" plain :loading="adjPull.loading.value" :disabled="isReadonly" @click="openBringInAdjustment">
+          <el-icon><Download /></el-icon> 带入调整
+        </el-button>
+        <el-button size="small" :loading="aiLoading === 'adjudication'" @click="handleAI('adjudication')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
         <el-button size="small" @click="handleReview">
@@ -458,7 +455,7 @@
       <template #header>
         <div class="section-header">
           <span class="card-title">审计说明</span>
-          <el-button size="small" @click="handleAI('auditNote')">
+          <el-button size="small" :loading="aiLoading === 'auditNote'" @click="handleAI('auditNote')">
             <el-icon><MagicStick /></el-icon> AI辅助
           </el-button>
         </div>
@@ -485,8 +482,18 @@
         <li>其他资本公积区块：股份支付权益结算(J3)、外币折算差异(M2)、权益法调整等</li>
         <li>审定数变化自动回写 TB（科目 4002）并通知附注组件</li>
         <li>合计行应与明细表M4-2的合计一致（交叉验证）</li>
+        <li>「带入调整」：从集中登记按科目 4002 拉取调整分录，逐笔分配到各区块项目行的 AJE/RJE，带入后审定数自动更新并联动附注</li>
       </ul>
     </details>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="4002 资本公积"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
@@ -503,7 +510,7 @@
  * - 权益类贷方期末校验: 期末=期初+贷方-借方
  * - TB回写: 审定数变化 → writebackTB(4002)
  * - EventBus: publish 'substantive:adjudicated' on save
- * - el-segmented 双模式(HTML/OO) at top using useM4DualMode
+ * - 双模式(HTML/OO)由入口 GtM4CapitalReserve 统一承载（useM4EntryDualMode），本 tab 不再自带 segmented
  * - 复核按钮 (inject openReviewDialog)
  * - AI辅助 section title right-aligned button
  * - Table font-size 13px
@@ -515,15 +522,18 @@
  * 与M3库存股（借方/权益备抵类）方向完全相反！
  */
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
-import { ElMessageBox } from 'element-plus'
-import { MagicStick, Check } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { MagicStick, Check, Download } from '@element-plus/icons-vue'
 import { useM4FormData } from '../../composables/useM4FormData'
-import { useM4DualMode } from '../../composables/useM4DualMode'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import {
   useM4Adjudication,
   type M4AdjudicationRow,
   type M4AdjudicationBlock,
 } from '../../composables/useM4Adjudication'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import { useAuditContext } from '@/composables/useAuditContext'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import { eventBus } from '@/utils/eventBus'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
@@ -542,18 +552,14 @@ const emit = defineEmits<{
 // ─── Inject ──────────────────────────────────────────────────────────────────
 
 const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', () => {})
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
 
 // ─── FormData ────────────────────────────────────────────────────────────────
 
 const formData = useM4FormData({
   wpId: computed(() => props.wpId),
   projectId: computed(() => props.projectId),
-})
-
-// ─── DualMode ────────────────────────────────────────────────────────────────
-
-const dualMode = useM4DualMode({
-  wpId: computed(() => props.wpId),
 })
 
 // ─── 审定表行数据（双区块：premium + other） ─────────────────────────────────
@@ -575,6 +581,38 @@ const {
   saveAndWriteback,
   subscribeDisclosure,
 } = useM4Adjudication(formData, rows)
+
+// ─── 从集中登记带入调整（4002 资本公积，权益贷方；单期 aje/rje，双区块项目行） ───
+const bringInRows = computed(() =>
+  computedRows.value.map((r) => ({
+    rowKey: r.key,
+    name: r.itemName || (r.block === 'premium' ? '资本溢价项目' : '其他资本公积项目'),
+    aje: r.aje ?? 0,
+    rje: r.rje ?? 0,
+  })),
+)
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: computed(() => props.projectId) as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '4002',
+  direction: 'credit',
+  subjectCode: '4002',
+  wpCode: 'M4',
+  subjectLabel: '资本公积(4002)',
+  rows: bringInRows,
+  updateCell: (rowKey: string, field: any, value: number) => {
+    const idx = rows.value.findIndex((r) => r.key === rowKey)
+    if (idx < 0) return
+    composableUpdateRow(idx, field === 'aje' ? 'aje' : 'rje', value)
+  },
+  totalAudited: () => totalRow.value.audited,
+})
 
 // ─── 表格数据：按区块拆分 + 小计行 ──────────────────────────────────────────
 
@@ -742,8 +780,35 @@ function saveAuditNote() {
   formData.debouncedSave('M4-M4-1-auditNote', { remark: auditNote.value || null })
 }
 
-function handleAI(_section: string) {
-  // AI辅助钩子（集成时实现）
+async function handleAI(section: string) {
+  if (props.isReadonly) return
+  aiLoading.value = section
+  try {
+    const context: Record<string, string> = {
+      科目: '4002 资本公积（权益类贷方）',
+      资本溢价小计审定: fmtAmount(premiumSubtotal.value.audited),
+      其他资本公积小计审定: fmtAmount(otherSubtotal.value.audited),
+      合计审定: fmtAmount(totalRow.value.audited),
+      期末校验: equityEndCheck.value.isMatch
+        ? '期末=期初+贷方−借方（一致）'
+        : `期末与期初+贷方−借方差异 ${fmtAmount(equityEndCheck.value.diff)}`,
+      变动率: periodChange.value.changeRate !== null
+        ? (periodChange.value.changeRate * 100).toFixed(1) + '%'
+        : '—',
+    }
+    const existing = auditNote.value
+    const text = await generateAiText({ section: `m4-adjudication-${section}`, context, existingContent: existing })
+    if (!text) {
+      ElMessage.warning('AI 未生成内容，请稍后重试')
+      return
+    }
+    auditNote.value = text
+    saveAuditNote()
+  } catch {
+    ElMessage.warning('AI 生成失败，请稍后重试')
+  } finally {
+    aiLoading.value = ''
+  }
 }
 
 function handleReview() {

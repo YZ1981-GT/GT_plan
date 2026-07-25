@@ -52,6 +52,12 @@ class TransitionRequest(BaseModel):
     reply_amount: float | None = Field(None, description="回函金额（可选）")
 
 
+class ReverseRequest(BaseModel):
+    """撤回请求"""
+    target_status: str = Field(..., description="撤回目标状态（须严格早于当前）")
+    reason: str | None = Field(None, description="撤回原因（可选，记入留痕）")
+
+
 # ─── Endpoints ─────────────────────────────────────────────────────────────
 
 
@@ -68,62 +74,34 @@ async def list_confirmations(
     return {"items": items, "total": len(items)}
 
 
-@router.get("/stats")
-async def confirmation_stats(
+@router.get("/candidates")
+async def list_confirmation_candidates(
     project_id: str,
+    confirm_type: str,
+    year: int | None = None,
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    """#10: 函证覆盖率统计（供 Dashboard 概况卡片）
+    """从底稿（辅助余额表）提取指定类型的候选函证对象，供「从底稿导入」批量创建。
 
-    Returns:
-        total_count: 总笔数
-        sent_count: 已发函
-        replied_count: 已回函（returned/matched/discrepancy）
-        matched_count: 相符
-        discrepancy_count: 差异
-        total_book_amount: 账面总额
-        confirmed_amount: 已确认金额
-        reply_rate: 回函率 (%)
-        confirmation_coverage: 函证覆盖率 (%) — confirmed / book
-        warn_level: ok / warn / danger
+    注意：本路由须在 ``/{confirmation_id}`` 之前注册，避免 "candidates" 被当作 ID。
     """
     pid = uuid.UUID(project_id)
-    items = await confirmation_service.list_confirmations(db, pid)
+    if year is None:
+        from app.services.project_audit_year import fetch_project_audit_year
+        year = await fetch_project_audit_year(db, pid) or 0
+    items = await confirmation_service.list_confirmation_candidates(
+        db, pid, confirm_type, year
+    )
     await db.commit()
+    return {"items": items, "total": len(items)}
 
-    total_count = len(items)
-    sent_count = sum(1 for i in items if i.get("status") != "pending")
-    terminal_statuses = {"returned", "matched", "discrepancy"}
-    replied_count = sum(1 for i in items if i.get("status") in terminal_statuses)
-    matched_count = sum(1 for i in items if i.get("status") == "matched")
-    discrepancy_count = sum(1 for i in items if i.get("status") == "discrepancy")
 
-    total_book = sum(float(i.get("book_amount") or 0) for i in items)
-    total_confirmed = sum(float(i.get("confirmed_amount") or 0) for i in items if i.get("status") in ("matched", "discrepancy"))
-
-    reply_rate = round((replied_count / sent_count * 100), 1) if sent_count > 0 else 0
-    coverage = round((total_confirmed / total_book * 100), 1) if total_book > 0 else 0
-
-    # 预警等级：覆盖率<50% danger，50-80% warn，>80% ok
-    warn_level = "ok"
-    if coverage < 50:
-        warn_level = "danger"
-    elif coverage < 80:
-        warn_level = "warn"
-
-    return {
-        "total_count": total_count,
-        "sent_count": sent_count,
-        "replied_count": replied_count,
-        "matched_count": matched_count,
-        "discrepancy_count": discrepancy_count,
-        "total_book_amount": total_book,
-        "confirmed_amount": total_confirmed,
-        "reply_rate": reply_rate,
-        "confirmation_coverage": coverage,
-        "warn_level": warn_level,
-    }
+# NOTE: 原 GET /stats（confirmation_stats）已移除（confirmation-coverage-single-source spec）。
+# 该端点零前端消费者、字段名 reply_rate/confirmation_coverage 与前端 ConfirmationCoverageMetrics
+# 口径不一致（分母用 total_book 而非科目审定总额 TB population），属死端点 + 双算发散。
+# 覆盖率唯一权威口径收敛到前端 useConfirmationData.coverageMetrics（以 TB population 为分母）。
+# 如未来需服务端聚合，另起接 population 的实现，勿复活此死端点口径。
 
 
 @router.post("")
@@ -244,6 +222,49 @@ async def transition_confirmation(
                 )
             except Exception:
                 pass  # 事件发布失败不阻断状态推进
+
+    await db.commit()
+    return result
+
+
+# ─── M1 撤回端点（confirmation-attachment-ocr-linkage）──────────────────────
+
+
+@router.post("/{confirmation_id}/reverse")
+async def reverse_confirmation(
+    project_id: str,
+    confirmation_id: str,
+    body: ReverseRequest,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """撤回函证状态（反向回退，支持一步退到底至待发函）。
+
+    权限：撤回终态（当前 matched/discrepancy）要求现场经理及以上；
+    相邻非终态撤回允许编辑权。
+    """
+    cid = uuid.UUID(confirmation_id)
+
+    # 先查当前状态判权限（终态撤回要求 manager+）
+    current_record = await confirmation_service.get_confirmation(db, cid)
+    current_status = current_record.get("status", "")
+    if current_status in ("matched", "discrepancy"):
+        # 终态撤回：现场经理及以上
+        from app.deps import require_role
+        require_role(user, ["admin", "partner", "signing_partner", "manager"])
+
+    actor_id = getattr(user, "id", None)
+    try:
+        result = await confirmation_service.reverse_status(
+            db, cid, body.target_status,
+            reason=body.reason,
+            actor_user_id=actor_id,
+        )
+    except ValueError as e:
+        msg = str(e)
+        if "不存在" in msg:
+            raise HTTPException(status_code=404, detail=msg)
+        raise HTTPException(status_code=400, detail=msg)
 
     await db.commit()
     return result

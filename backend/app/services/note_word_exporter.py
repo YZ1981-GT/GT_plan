@@ -35,7 +35,12 @@ from docx.oxml.parser import parse_xml
 from docx.shared import Cm, Pt, RGBColor, Emu
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.models.report_models import DisclosureNote
+from app.services.note_content_utils import (
+    effective_table_data as _shared_effective_table_data,
+    note_has_data as _shared_note_has_data,
+)
 from app.services.note_section_catalog import (
     build_variant_key,
     detect_heading_level,
@@ -359,6 +364,47 @@ def _load_section_code_index(variant_key: str) -> list[dict[str, Any]]:
     entry = variants.get(variant_key, {})
     sections = entry.get("sections", [])
     return [s for s in sections if isinstance(s, dict)]
+
+
+# 模板填充后残留的 note 占位符（未匹配章节/表格），交付前必须清除，禁止泄漏进文档
+_RESIDUAL_NOTE_PLACEHOLDER_RE = re.compile(r"\{\{(?:section|table|seq):[^}]*\}\}")
+
+
+def _strip_residual_note_placeholders(doc: Document) -> int:
+    """清除模板填充后残留的 ``{{section:..}}`` / ``{{table:..}}`` / ``{{seq:..}}`` 占位符.
+
+    防御网：当某章节在模板中有占位符但 DB 无匹配 note（或 variant 口径不一致）时，
+    占位符不会被 ``_fill_section_block`` 替换 → 交付文档出现原始标记（用户所见"乱"）。
+    本函数在标记清理阶段扫描全部段落（含表格单元格 + 嵌套表格），把残留占位符抹除，
+    保证交付文档永不出现 ``{{...}}`` 原始 token。返回处理的段落数。
+    """
+    touched = 0
+
+    def _scrub_para(para) -> None:
+        nonlocal touched
+        txt = para.text or ""
+        if not _RESIDUAL_NOTE_PLACEHOLDER_RE.search(txt):
+            return
+        new_text = _RESIDUAL_NOTE_PLACEHOLDER_RE.sub("", txt)
+        para.clear()
+        if new_text.strip():
+            run = para.add_run(new_text)
+            _set_run_font(run)
+        touched += 1
+
+    def _scrub_tables(tables) -> None:
+        for tbl in tables:
+            for row in tbl.rows:
+                for cell in row.cells:
+                    for para in cell.paragraphs:
+                        _scrub_para(para)
+                    if cell.tables:  # 嵌套表格递归
+                        _scrub_tables(cell.tables)
+
+    for para in doc.paragraphs:
+        _scrub_para(para)
+    _scrub_tables(doc.tables)
+    return touched
 
 
 def _new_document() -> Document:
@@ -839,8 +885,34 @@ class NoteWordExporter:
         )
         self._fill_seq_placeholders(doc, kept_codes, seq_numbers)
 
+        # 6.5 内容控件化（灰度 DELIVERABLE_LINEAGE_CONTENT_CONTROL_ENABLED）：
+        # 为每节「标记之间的内部内容」注入 Block Content Control（Tag=sec_xxx，与 note
+        # bookmark 并存），供前端 OnlyOffice 连接器实现真·光标跟随溯源。
+        # 必须在 step7 标记清理前、seq 填充后；只包内部内容，开闭标记留 body 级供 step7 清理。
+        # 关闭时完全跳过 → 输出与引入前逐字节等价（零回归）。
+        if settings.DELIVERABLE_LINEAGE_CONTENT_CONTROL_ENABLED:
+            try:
+                from app.services.content_control_injector import (
+                    inject_content_controls_for_blocks,
+                )
+
+                inject_content_controls_for_blocks(doc, scan_section_blocks(doc))
+            except Exception:  # noqa: BLE001 — 注入失败不阻断导出
+                logger.warning(
+                    "content control injection failed, skipped", exc_info=True
+                )
+
         # 7. 清理残留标记
         remove_section_markers(doc)
+        # 7.5 防御网：清除任何未被填充的 {{section/table/seq:..}} 占位符（未匹配章节
+        #     / variant 口径不一致等边界），保证交付文档永不泄漏原始 token。
+        leaked = _strip_residual_note_placeholders(doc)
+        if leaked:
+            logger.warning(
+                "note_word_exporter: 清除 %d 处残留占位符段落（存在未匹配章节，"
+                "请核对 Project.template_type 与附注生成口径是否一致）",
+                leaked,
+            )
 
         # 8. 输出
         output = BytesIO()
@@ -903,37 +975,37 @@ class NoteWordExporter:
         """返回投影后的 table_data：workpaper 来源记录把 sub_table_data + _sub_table_columns
         投影为 _tables 后与模块渲染一致（spec disclosure-table-sync-convergence Req1.2/Property12）。
 
-        非 workpaper 来源 / 投影为空 → 原样返回 table_data（Req6.2，导出行为不变）。
-        投影失败降级不阻断导出（Error Handling）。
+        委托到共享纯函数 ``note_content_utils.effective_table_data``（单一真源，与
+        ``disclosure_engine`` 的 ``has_data`` 判定同口径，防漂移）。非 workpaper 来源 /
+        投影为空 → 原样返回 table_data（导出行为不变）；投影失败降级不阻断导出。
         """
-        td = getattr(note, "table_data", None)
-        if not isinstance(td, dict):
-            return td
-        try:
-            from app.services.note_sub_table_projector import project_sub_tables
-
-            projected = project_sub_tables(td)
-            if projected:
-                return {**td, "_tables": projected}
-        except Exception:  # pragma: no cover - 投影失败回退既有 _tables/rows
-            import logging as _logging
-            _logging.getLogger(__name__).warning(
-                "note_word_exporter: sub_table projection failed, fallback to existing tables",
-                exc_info=True,
-            )
-        return td
+        return _shared_effective_table_data(getattr(note, "table_data", None))
 
     def _note_tables(self, note: DisclosureNote) -> list[dict]:
         """返回 note 的表列表（多表 _tables 数组优先，降级单表）.
-        
+
         过滤掉 export_enabled=false 的表格（用户可在前端选择哪些表导出）。
         workpaper 来源记录先经投影得到 _tables（与模块渲染一致）。
+
+        🔴 空表头补齐（与前端 get_note_detail 读时投影一致）：历史生成/模板绑定合并
+        路径产出的部分 table_data 出现 ``headers: []`` 但 rows 非空（每行带 values +
+        ``_cell_meta[col].semantic`` 列语义）。``_render_table`` 遇空表头直接 return →
+        科目注释"有数据却空白"。此处对每张表调 ``project_headers`` 从行语义派生中文表头，
+        使数据列可渲染（读时派生，不改存量；与前端 note_header_projector 同一纯函数）。
         """
+        from app.services.note_header_projector import project_headers
+
         td = self._effective_table_data(note)
         if not isinstance(td, dict):
             return []
         tables = td.get("_tables") or [td]
-        return [t for t in tables if isinstance(t, dict) and t.get("export_enabled", True)]
+        result: list[dict] = []
+        for t in tables:
+            if not isinstance(t, dict) or not t.get("export_enabled", True):
+                continue
+            projected = project_headers(t)
+            result.append(projected if projected is not None else t)
+        return result
 
     def _render_table_at(self, doc: Document, anchor_para, table_data: dict) -> None:
         """在 anchor 段落处渲染表格（复用 _render_table，再把表移动到锚点位置）."""
@@ -1081,32 +1153,13 @@ class NoteWordExporter:
     def _has_content(self, note: DisclosureNote) -> bool:
         """Check if a note section has any content.
 
-        Sprint 0 / Task 0.3 P0 修复：也识别 table_data._tables 数组中的多表内容
+        委托到共享纯函数 ``note_content_utils.note_has_data``（单一真源，与
+        ``disclosure_engine.get_notes_tree`` 的 ``has_data`` 标记同口径，防"树标记≠导出结果"
+        漂移；spec disclosure-notes-selective-generation）。判定逻辑与原实现逐字节等价，
+        额外前置 ``is_empty``(not_applicable) 短路返回 False——与 ``should_skip_empty_section``
+        对 is_empty 章节的处理一致（is_empty=本期无此项业务，视为无内容）。
         """
-        if note.text_content and note.text_content.strip():
-            return True
-        if not note.table_data or not isinstance(note.table_data, dict):
-            return False
-
-        # 收集所有要检查的表（多表 _tables 数组 + 单表降级）；workpaper 来源先投影
-        etd = self._effective_table_data(note) or {}
-        tables_to_check = etd.get("_tables") or [etd]
-
-        for tbl in tables_to_check:
-            if not isinstance(tbl, dict):
-                continue
-            rows = tbl.get("rows", [])
-            for row in rows:
-                values = row.get("values", [])
-                cells = row.get("cells", values)
-                for cell in cells:
-                    if isinstance(cell, dict):
-                        val = cell.get("value", cell.get("manual_value", 0))
-                    else:
-                        val = cell
-                    if val and val != 0 and val != "0" and val != "-":
-                        return True
-        return False
+        return _shared_note_has_data(note)
 
     def _note_to_skip_dict(self, note: DisclosureNote) -> dict:
         """将 DisclosureNote ORM 转为 should_skip_empty_section 所需 dict 形状.

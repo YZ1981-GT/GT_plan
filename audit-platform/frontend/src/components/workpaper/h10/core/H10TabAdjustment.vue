@@ -5,6 +5,26 @@
       <div class="head-actions">
         <H10ImportExportDropdown :wp-id="wpId" sheet="H10-3" @imported="emit('imported')" />
         <GtReviewTrigger section-id="H10-3-adjustment" />
+        <el-button
+          v-if="!isReadonly"
+          size="small"
+          type="primary"
+          plain
+          :loading="centralSyncing"
+          :disabled="!adj.isBalanced.value || adj.rows.value.length === 0"
+          title="把本页调整分录汇聚到集中调整登记，供合伙人跨循环审阅"
+          @click="syncToCentral"
+        >
+          同步到集中登记
+        </el-button>
+        <el-tag
+          v-if="centralStatus?.review_status"
+          size="small"
+          :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
+          :title="centralStatus.rejection_reason || ''"
+        >
+          集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
+        </el-tag>
         <el-button size="small" type="primary" plain :disabled="isReadonly" @click="adj.addRow()">+ 新增</el-button>
       </div>
     </div>
@@ -117,8 +137,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, toRef, onMounted } from 'vue'
+import { ref, computed, toRef, onMounted, type Ref } from 'vue'
 import { useH10Adjustment } from '../../composables/useH10Adjustment'
+import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
+import { useAuditContext } from '@/composables/useAuditContext'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import H10ImportExportDropdown from '../H10ImportExportDropdown.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
@@ -140,6 +162,28 @@ const adj = useH10Adjustment({
 
 const debitTotal = computed(() => adj.rows.value.reduce((s, r) => s + (r.debitAmount || 0), 0))
 const creditTotal = computed(() => adj.rows.value.reduce((s, r) => s + (r.creditAmount || 0), 0))
+
+// ─── 同步到集中调整登记（workpaper-adjustment-centralization） ───
+// H10 无 projectId prop，从审计上下文取 projectId / year
+const { projectId: centralProjectId, year: centralYear } = useAuditContext()
+const { centralStatus, syncing: centralSyncing, syncToCentral, refreshStatus } = useAdjustmentCentralSync({
+  projectId: centralProjectId,
+  year: centralYear,
+  wpId: toRef(props, 'wpId') as Ref<string>,
+  wpCode: 'H10',
+  itemId: 'H10-adjustment-rows',
+  buildLineItems: () => adj.rows.value.map((e: any) => ({
+    standard_account_code: e.accountCode || undefined,
+    account_name: e.accountName,
+    debit_amount: e.debitAmount,
+    credit_amount: e.creditAmount,
+  })),
+  buildMeta: () => ({
+    description: adj.rows.value.find((e: any) => e.summary)?.summary || 'H10 资产处置损益调整',
+    adjustmentType: adj.rows.value.length > 0 && adj.rows.value.every((e: any) => e.entryType === 'RJE') ? 'rje' : 'aje',
+  }),
+})
+onMounted(() => refreshStatus())
 
 const NOTE_KEY = 'H10-3-adjustment-audit-note'
 const CONCLUSION_KEY = 'H10-3-adjustment-audit-conclusion'

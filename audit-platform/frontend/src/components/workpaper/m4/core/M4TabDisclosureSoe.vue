@@ -8,7 +8,7 @@
         <el-tag type="success" size="small">国企</el-tag>
       </div>
       <div class="section-header-right">
-        <el-button size="small" @click="handleAI('disclosure-soe')">
+        <el-button size="small" :loading="aiLoading === 'disclosure-soe'" @click="handleAI('disclosure-soe')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
         <el-button size="small" @click="handleReview">
@@ -32,7 +32,7 @@
       <template #header>
         <div class="card-header">
           <span>资本公积变动明细（国有企业）</span>
-          <el-button size="small" @click="handleAI('section-detail')">
+          <el-button size="small" :loading="aiLoading === 'section-detail'" @click="handleAI('section-detail')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </div>
@@ -107,7 +107,7 @@
       <template #header>
         <div class="card-header">
           <span>国有资本溢价变动说明</span>
-          <el-button size="small" @click="handleAI('section-soe-premium')">
+          <el-button size="small" :loading="aiLoading === 'section-soe-premium'" @click="handleAI('section-soe-premium')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </div>
@@ -127,7 +127,7 @@
       <template #header>
         <div class="card-header">
           <span>其他资本公积变动说明</span>
-          <el-button size="small" @click="handleAI('section-other-note')">
+          <el-button size="small" :loading="aiLoading === 'section-other-note'" @click="handleAI('section-other-note')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </div>
@@ -172,9 +172,11 @@
  * - AI辅助 per section title
  */
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, Check } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
 import { useM4FormData } from '../../composables/useM4FormData'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import { calcEquityEndBalance } from '../../composables/useM4FormulaEngine'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
@@ -192,6 +194,8 @@ const emit = defineEmits<{
 // ─── Inject ──────────────────────────────────────────────────────────────────
 
 const openReviewDialog = inject<((sectionId: string, sectionLabel?: string) => void) | null>('openReviewDialog', null)
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
 
 // ─── FormData ────────────────────────────────────────────────────────────────
 
@@ -263,7 +267,49 @@ function handleOtherNoteChange() {
   formData.debouncedSave('M4-disclosure-soe-other-note', { remark: otherNote.value || null })
 }
 
-function handleAI(_section: string) {}
+async function handleAI(section: string) {
+  if (props.isReadonly) return
+  aiLoading.value = section
+  try {
+    const totalRow = disclosureRows.value.find(r => r._isTotal)
+    const context: Record<string, string> = {
+      科目: '4002 资本公积（权益类贷方）',
+      披露口径: '国有企业',
+      期末余额合计: fmtAmount(totalRow?.endBalance ?? 0),
+      本期增加合计: fmtAmount(totalRow?.increase ?? 0),
+      本期减少合计: fmtAmount(totalRow?.decrease ?? 0),
+    }
+    // section-detail 为表格（无 textarea）→ 建议弹窗
+    if (section === 'section-detail') {
+      const text = await generateAiText({ section: `m4-disclosure-soe-${section}`, context })
+      if (!text) {
+        ElMessage.warning('AI 未生成内容，请稍后重试')
+        return
+      }
+      ElMessageBox.alert(text, 'AI 辅助建议', { confirmButtonText: '知道了' }).catch(() => {})
+      return
+    }
+    // 其余 section 回填对应 textarea（'section-other-note' → 其他；其余 → 国有资本溢价）
+    const targetOther = section === 'section-other-note'
+    const existing = targetOther ? otherNote.value : soePremiumNote.value
+    const text = await generateAiText({ section: `m4-disclosure-soe-${section}`, context, existingContent: existing })
+    if (!text) {
+      ElMessage.warning('AI 未生成内容，请稍后重试')
+      return
+    }
+    if (targetOther) {
+      otherNote.value = text
+      handleOtherNoteChange()
+    } else {
+      soePremiumNote.value = text
+      handleSoePremiumNoteChange()
+    }
+  } catch {
+    ElMessage.warning('AI 生成失败，请稍后重试')
+  } finally {
+    aiLoading.value = ''
+  }
+}
 
 function handleReview() {
   openReviewDialog?.('M4-disclosure-soe', '附注披露（国企）')

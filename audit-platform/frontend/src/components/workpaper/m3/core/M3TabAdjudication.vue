@@ -10,13 +10,10 @@
         </el-tag>
       </div>
       <div class="section-header-right">
-        <el-segmented
-          v-model="dualMode.mode.value"
-          :options="dualMode.modeOptions.value"
-          size="small"
-          @change="(val: any) => dualMode.switchMode(val)"
-        />
-        <el-button size="small" @click="handleAI('adjudication')">
+        <el-button size="small" type="primary" plain :loading="adjPull.loading.value" :disabled="isReadonly" @click="openBringInAdjustment">
+          <el-icon><Download /></el-icon> 带入调整
+        </el-button>
+        <el-button size="small" :loading="aiLoading === 'adjudication'" :disabled="isReadonly" @click="handleAI('adjudication')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
         <el-button size="small" @click="handleReview">
@@ -269,7 +266,7 @@
       <template #header>
         <div class="section-header">
           <span class="card-title">审计说明</span>
-          <el-button size="small" @click="handleAI('auditNote')">
+          <el-button size="small" :loading="aiLoading === 'auditNote'" :disabled="isReadonly" @click="handleAI('auditNote')">
             <el-icon><MagicStick /></el-icon> AI辅助
           </el-button>
         </div>
@@ -289,7 +286,7 @@
       <template #header>
         <div class="section-header">
           <span class="card-title">审计结论</span>
-          <el-button size="small" @click="handleAI('auditConclusion')">
+          <el-button size="small" :loading="aiLoading === 'auditConclusion'" :disabled="isReadonly" @click="handleAI('auditConclusion')">
             <el-icon><MagicStick /></el-icon> AI辅助
           </el-button>
         </div>
@@ -315,8 +312,18 @@
         <li>小计行按批次分类自动汇总，合计行汇总全部批次</li>
         <li>审定数变化自动回写 TB（科目 4002）并通知附注组件</li>
         <li>期末校验：期末审定 应等于 期初 + 借方(回购) − 贷方(注销/再售)</li>
+        <li>「带入调整」：从集中登记按科目 4002 拉取调整分录（库存股为借方，净额=借−贷），逐笔分配到各回购批次行的 AJE/RJE，带入后审定数自动更新并联动附注</li>
       </ul>
     </details>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="4002 库存股"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
@@ -333,7 +340,7 @@
  * - 权益备抵校验: 期末=期初+借方-贷方（借方余额！）
  * - TB回写: 审定数变化 → writebackTB(4002)
  * - EventBus: publish 'substantive:adjudicated' on save
- * - el-segmented 双模式(HTML/OO) at top using useM3DualMode
+ * - 双模式(HTML/OO) 由入口 GtM3TreasuryStock 统一提供（entry 级），本 tab 不再自建
  * - 复核按钮 (inject openReviewDialog)
  * - AI辅助 section title right-aligned button
  * - Table font-size 13px
@@ -344,14 +351,17 @@
  * 回购股份在借方增加库存股，注销/再售在贷方减少库存股（与其他M权益类方向相反！）
  */
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
-import { ElMessageBox } from 'element-plus'
-import { MagicStick, Check } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { MagicStick, Check, Download } from '@element-plus/icons-vue'
 import { useM3FormData } from '../../composables/useM3FormData'
-import { useM3DualMode } from '../../composables/useM3DualMode'
 import {
   useM3Adjudication,
   type M3AdjudicationRow,
 } from '../../composables/useM3Adjudication'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import { useAuditContext } from '@/composables/useAuditContext'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import { eventBus } from '@/utils/eventBus'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
@@ -370,18 +380,14 @@ const emit = defineEmits<{
 // ─── Inject ──────────────────────────────────────────────────────────────────
 
 const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', () => {})
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
 
 // ─── FormData ────────────────────────────────────────────────────────────────
 
 const formData = useM3FormData({
   wpId: computed(() => props.wpId),
   projectId: computed(() => props.projectId),
-})
-
-// ─── DualMode ────────────────────────────────────────────────────────────────
-
-const dualMode = useM3DualMode({
-  wpId: computed(() => props.wpId),
 })
 
 // ─── 审定表行数据（动态按回购批次分类行） ────────────────────────────────────────
@@ -400,6 +406,38 @@ const {
   updateRow: composableUpdateRow,
   saveAndWriteback,
 } = useM3Adjudication(formData, rows)
+
+// ─── 从集中登记带入调整（4002 库存股，权益备抵借方 debit；单期 aje/rje，按回购批次行） ───
+const bringInRows = computed(() =>
+  rawComputedRows.value.map((r) => ({
+    rowKey: r.key,
+    name: r.batchName || '回购批次',
+    aje: r.aje ?? 0,
+    rje: r.rje ?? 0,
+  })),
+)
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: computed(() => props.projectId) as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '4002',
+  direction: 'debit',
+  subjectCode: '4002',
+  wpCode: 'M3',
+  subjectLabel: '库存股(4002)',
+  rows: bringInRows,
+  updateCell: (rowKey: string, field: any, value: number) => {
+    const idx = rows.value.findIndex((r) => r.key === rowKey)
+    if (idx < 0) return
+    composableUpdateRow(idx, field === 'aje' ? 'aje' : 'rje', value)
+  },
+  totalAudited: () => totalRow.value.audited,
+})
 
 // ─── 表格数据：数据行 + 小计行 + 合计行 ─────────────────────────────────────
 
@@ -656,8 +694,40 @@ function saveAuditConclusion() {
   formData.debouncedSave('M3-M3-1-auditConclusion', { remark: auditConclusion.value || null })
 }
 
-function handleAI(_section: string) {
-  // AI辅助钩子（集成时实现）
+async function handleAI(section: string) {
+  if (props.isReadonly) return
+  aiLoading.value = section
+  try {
+    const total = totalRow.value
+    const context: Record<string, string> = {
+      科目: '4002 库存股（权益备抵类·借方余额）',
+      期初合计: fmtAmount(total.beginning),
+      借方发生合计: fmtAmount(total.debitAmount),
+      贷方发生合计: fmtAmount(total.creditAmount),
+      期末合计: fmtAmount(total.endBalance),
+      未审合计: fmtAmount(total.unadjusted),
+      审定合计: fmtAmount(total.audited),
+      回购批次数: String(rawComputedRows.value.length),
+      期末校验: contraEquityCheck.value.isMatch
+        ? '一致'
+        : `差异${fmtAmount(contraEquityCheck.value.diff)}`,
+    }
+    const isConclusion = section === 'auditConclusion'
+    const existing = isConclusion ? auditConclusion.value : auditNote.value
+    const text = await generateAiText({ section: `m3-adjudication-${section}`, context, existingContent: existing })
+    if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+    if (isConclusion) {
+      auditConclusion.value = text
+      saveAuditConclusion()
+    } else {
+      auditNote.value = text
+      saveAuditNote()
+    }
+  } catch {
+    ElMessage.warning('AI 生成失败，请稍后重试')
+  } finally {
+    aiLoading.value = ''
+  }
 }
 
 function handleReview() {

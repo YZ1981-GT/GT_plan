@@ -6,6 +6,7 @@ import { useE1AiGenerate } from '../composables/useE1AiGenerate'
 import { useE1ImportExport } from '../composables/useE1ImportExport'
 import type { UseE1BaseOptions } from '../composables/useE1Adjudication'
 import GtIndexChip from '../GtIndexChip.vue'
+import { amountFormatter, amountParser } from '../composables/wpAmountInput'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
@@ -107,13 +108,13 @@ async function aiLongText(kind: 'note' | 'conclusion'): Promise<void> {
         <el-table :data="interest.monthlyMatrix.value" border stripe size="small" max-height="620">
           <el-table-column label="月份" width="70" fixed="left"><template #default="{ row }">{{ row.month }}月</template></el-table-column>
           <el-table-column v-for="account in interest.accounts.value" :key="account.id" :label="`${account.depositType}｜${account.bank || '未填银行'}｜${account.accountNo}`">
-            <el-table-column label="月均余额" width="145"><template #default="{ row }"><el-input-number :model-value="row.accounts[account.id]?.balance || 0" :disabled="isReadonly" :controls="false" size="small" @change="(v: number) => interest.updateMonthlyCell(account.id, row.month, 'balance', v ?? 0)" /></template></el-table-column>
-            <el-table-column label="账面利息" width="135"><template #default="{ row }"><el-input-number :model-value="row.accounts[account.id]?.bookInterest || 0" :disabled="isReadonly" :controls="false" size="small" @change="(v: number) => interest.updateMonthlyCell(account.id, row.month, 'bookInterest', v ?? 0)" /></template></el-table-column>
-            <el-table-column label="测算利息" width="135" class-name="auto-calc-col"><template #default="{ row }">{{ displayPrefs.fmtAmount(row.accounts[account.id]?.calculatedInterest || 0) }}</template></el-table-column>
+            <el-table-column label="月均余额" width="145" align="right"><template #default="{ row }"><el-input-number :model-value="row.accounts[account.id]?.balance || 0" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small" @change="(v: number) => interest.updateMonthlyCell(account.id, row.month, 'balance', v ?? 0)" /></template></el-table-column>
+            <el-table-column label="账面利息" width="135" align="right"><template #default="{ row }"><el-input-number :model-value="row.accounts[account.id]?.bookInterest || 0" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small" @change="(v: number) => interest.updateMonthlyCell(account.id, row.month, 'bookInterest', v ?? 0)" /></template></el-table-column>
+            <el-table-column label="测算利息" width="135" align="right" class-name="auto-calc-col"><template #default="{ row }">{{ displayPrefs.fmtAmount(row.accounts[account.id]?.calculatedInterest || 0) }}</template></el-table-column>
           </el-table-column>
-          <el-table-column label="测算合计" width="140" fixed="right" class-name="auto-calc-col"><template #default="{ row }">{{ displayPrefs.fmtAmount(row.totalCalculated) }}</template></el-table-column>
-          <el-table-column label="账面合计" width="140" fixed="right" class-name="auto-calc-col"><template #default="{ row }">{{ displayPrefs.fmtAmount(row.totalBook) }}</template></el-table-column>
-          <el-table-column label="差异" width="135" fixed="right" class-name="auto-calc-col"><template #default="{ row }"><span :class="{ danger: Math.abs(row.diff) > 0.005 }">{{ displayPrefs.fmtAmount(row.diff) }}</span></template></el-table-column>
+          <el-table-column label="测算合计" width="140" align="right" fixed="right" class-name="auto-calc-col"><template #default="{ row }">{{ displayPrefs.fmtAmount(row.totalCalculated) }}</template></el-table-column>
+          <el-table-column label="账面合计" width="140" align="right" fixed="right" class-name="auto-calc-col"><template #default="{ row }">{{ displayPrefs.fmtAmount(row.totalBook) }}</template></el-table-column>
+          <el-table-column label="差异" width="135" align="right" fixed="right" class-name="auto-calc-col"><template #default="{ row }"><span :class="{ danger: Math.abs(row.diff) > 0.005 }">{{ displayPrefs.fmtAmount(row.diff) }}</span></template></el-table-column>
         </el-table>
         <el-descriptions :column="3" border class="summary"><el-descriptions-item label="测算利息合计">{{ displayPrefs.fmtAmount(interest.totalCalculated.value) }}</el-descriptions-item><el-descriptions-item label="账面利息合计">{{ displayPrefs.fmtAmount(interest.totalBookInterest.value) }}</el-descriptions-item><el-descriptions-item label="差异"><span :class="{ danger: Math.abs(interest.monthlySummary.value.diff) > 0.005 }">{{ displayPrefs.fmtAmount(interest.monthlySummary.value.diff) }}</span></el-descriptions-item></el-descriptions>
       </el-tab-pane>
@@ -121,9 +122,9 @@ async function aiLongText(kind: 'note' | 'conclusion'): Promise<void> {
       <el-tab-pane label="利息结构" name="structure">
         <el-table :data="interest.interestStructureRows.value" border stripe size="small">
           <el-table-column prop="name" label="项目" min-width="150" />
-          <el-table-column label="本期金额" min-width="135" class-name="auto-calc-col"><template #default="{ row }">{{ displayPrefs.fmtAmount(row.current) }}</template></el-table-column>
-          <el-table-column label="上期金额" min-width="140"><template #default="{ row }"><el-input-number :model-value="row.prior" :disabled="isReadonly" :controls="false" size="small" @change="(v: number) => interest.updateStructure(row.key, 'prior', v ?? 0)" /></template></el-table-column>
-          <el-table-column label="变动金额" min-width="135" class-name="auto-calc-col"><template #default="{ row }">{{ displayPrefs.fmtAmount(row.change) }}</template></el-table-column>
+          <el-table-column label="本期金额" min-width="135" align="right" class-name="auto-calc-col"><template #default="{ row }">{{ displayPrefs.fmtAmount(row.current) }}</template></el-table-column>
+          <el-table-column label="上期金额" min-width="140" align="right"><template #default="{ row }"><el-input-number :model-value="row.prior" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small" @change="(v: number) => interest.updateStructure(row.key, 'prior', v ?? 0)" /></template></el-table-column>
+          <el-table-column label="变动金额" min-width="135" align="right" class-name="auto-calc-col"><template #default="{ row }">{{ displayPrefs.fmtAmount(row.change) }}</template></el-table-column>
           <el-table-column label="变动率" width="100" class-name="auto-calc-col"><template #default="{ row }">{{ fmtRate(row.changeRate) }}</template></el-table-column>
           <el-table-column label="分析说明" min-width="270"><template #default="{ row }"><div class="ai-cell"><el-input :model-value="row.note" :disabled="isReadonly" @change="(v: string) => interest.updateStructure(row.key, 'note', v)" /><el-button text type="primary" :disabled="isReadonly" :loading="isGenerating('interest-analysis-reason')" @click="aiReason(row.name, row.note, row, v => interest.updateStructure(row.key, 'note', v))">🤖</el-button></div></template></el-table-column>
         </el-table>
@@ -142,7 +143,7 @@ async function aiLongText(kind: 'note' | 'conclusion'): Promise<void> {
       <el-tab-pane label="异常分析" name="anomalies">
         <el-table :data="interest.anomalyRows.value" border stripe size="small">
           <el-table-column prop="item" label="异常项目" min-width="150" />
-          <el-table-column label="金额" width="145"><template #default="{ row }"><el-input-number :model-value="row.amount" :disabled="isReadonly" :controls="false" size="small" @change="(v: number) => interest.updateAnomaly(row.key, 'amount', v ?? 0)" /></template></el-table-column>
+          <el-table-column label="金额" width="145" align="right"><template #default="{ row }"><el-input-number :model-value="row.amount" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small" @change="(v: number) => interest.updateAnomaly(row.key, 'amount', v ?? 0)" /></template></el-table-column>
           <el-table-column label="原因分析" min-width="240"><template #default="{ row }"><div class="ai-cell"><el-input :model-value="row.reason" :disabled="isReadonly" @change="(v: string) => interest.updateAnomaly(row.key, 'reason', v)" /><el-button text type="primary" :disabled="isReadonly" :loading="isGenerating('interest-analysis-reason')" @click="aiReason(row.item, row.reason, row, v => interest.updateAnomaly(row.key, 'reason', v))">🤖</el-button></div></template></el-table-column>
           <el-table-column label="风险评估" min-width="180"><template #default="{ row }"><el-input :model-value="row.risk" :disabled="isReadonly" @change="(v: string) => interest.updateAnomaly(row.key, 'risk', v)" /></template></el-table-column>
           <el-table-column label="应对措施" min-width="180"><template #default="{ row }"><el-input :model-value="row.response" :disabled="isReadonly" @change="(v: string) => interest.updateAnomaly(row.key, 'response', v)" /></template></el-table-column>

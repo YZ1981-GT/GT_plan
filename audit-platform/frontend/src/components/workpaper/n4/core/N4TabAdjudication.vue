@@ -22,6 +22,9 @@
         <el-tag type="warning" size="small">损益类·借方·取发生额</el-tag>
       </div>
       <div class="section-actions">
+        <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
+          <el-icon><Download /></el-icon>带入调整
+        </el-button>
         <el-button size="small" @click="handleAiAssist">
           <el-icon><MagicStick /></el-icon>AI辅助
         </el-button>
@@ -244,8 +247,19 @@
         <li>N4-1审定合计应与N4-2明细合计一致（交叉验证）</li>
         <li>各税种费用确认额应与N2应交税费计提额一致（费用确认=计提）</li>
         <li>"保存审定"回写试算表（科目6403，本期发生额口径）并通知A利润表勾稽</li>
+        <li>「带入调整」：按科目6403拉取调整分录，逐笔选目标税种行累加到 AJE/RJE，带入后自动联动披露与附注</li>
       </ul>
     </details>
+
+    <!-- ═══ 带入调整 弹窗 ═══ -->
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="6403 税金及附加"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
@@ -260,10 +274,13 @@
  */
 import { ref, computed, inject, onMounted, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { MagicStick, ChatDotSquare } from '@element-plus/icons-vue'
+import { MagicStick, ChatDotSquare, Download } from '@element-plus/icons-vue'
 import { useN4FormData } from '../../composables/useN4FormData'
 import { useN4Adjudication, type N4AdjRow } from '../../composables/useN4Adjudication'
 import { useN4CrossSheet } from '../../composables/useN4CrossSheet'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import { api } from '@/services/apiProxy'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
 
@@ -301,6 +318,27 @@ const adjudication = useN4Adjudication({
 })
 
 const crossSheet = useN4CrossSheet(allResponsesRef, { wpId: wpIdRef, projectId: projectIdRef })
+
+// ─── 带入调整（adjustment-collaboration-and-propagation） ─────────────────────
+// 审定表按科目(6403)拉取调整分录，逐笔分配到目标税种行的 AJE/RJE 列（累加）。
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: projectIdRef as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '6403',
+  direction: 'debit', // 损益借方：净发生额 = 借 − 贷
+  subjectCode: '6403',
+  wpCode: 'N4',
+  subjectLabel: '税金及附加(6403)',
+  rows: computed(() => adjudication.rows.value.map((r) => ({ rowKey: r.rowKey, name: r.taxType, aje: r.aje, rje: r.rje }))),
+  updateCell: (rowKey: string, field: any, value: number) => adjudication.updateCell(rowKey, field, value),
+  totalAudited: () => adjudication.totalRow.value.audited,
+})
 
 // ─── Local state ─────────────────────────────────────────────────────────────
 

@@ -19,6 +19,7 @@ import type { UseE1BaseOptions } from '../composables/useE1Adjudication'
 import GtIndexChip from '../GtIndexChip.vue'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { amountFormatter, amountParser } from '../composables/wpAmountInput'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -328,6 +329,9 @@ onMounted(() => {
                 :model-value="asCert(row).amount"
                 :disabled="isReadonly"
                 :controls="false"
+                :precision="2"
+                :formatter="amountFormatter"
+                :parser="amountParser"
                 size="small"
                 @change="(val: number) => updateCell(row.id, 'amount', val ?? 0)"
               />

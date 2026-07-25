@@ -27,6 +27,18 @@ export const adjustments = {
   convertToMisstatement: (pid: string, groupId: string) => `/api/projects/${pid}/adjustments/${groupId}/convert-to-misstatement`,
   /** AdjustmentImpactPreview 实时影响预览（POST line_items[]） */
   previewImpact: (pid: string) => `/api/projects/${pid}/adjustments/preview-impact`,
+  /** 底稿调整汇聚到集中登记（workpaper-adjustment-centralization） */
+  syncFromWorkpaper: (pid: string) => `/api/projects/${pid}/adjustments/sync-from-workpaper`,
+  /** 按 source_ref 回流集中登记复核状态 */
+  bySourceRef: (pid: string) => `/api/projects/${pid}/adjustments/by-source-ref`,
+  // ── 协作接力（adjustment-collaboration-and-propagation） ──
+  collabAssign: (pid: string, groupId: string) => `/api/projects/${pid}/adjustments/${groupId}/collaboration/assign`,
+  collabByGroup: (pid: string, groupId: string) => `/api/projects/${pid}/adjustments/${groupId}/collaboration`,
+  collabInbox: (pid: string) => `/api/projects/${pid}/adjustments/collaboration/inbox`,
+  collabAcknowledge: (pid: string, cid: string) => `/api/projects/${pid}/adjustments/collaboration/${cid}/acknowledge`,
+  collabContribute: (pid: string, cid: string) => `/api/projects/${pid}/adjustments/collaboration/${cid}/contribute`,
+  collabConfirm: (pid: string, cid: string) => `/api/projects/${pid}/adjustments/collaboration/${cid}/confirm`,
+  collabReject: (pid: string, cid: string) => `/api/projects/${pid}/adjustments/collaboration/${cid}/reject`,
 } as const
 
 // ─── 重要性 ─────────────────────────────────────────────────────────────────
@@ -83,6 +95,10 @@ export const ledger = {
   entries: (pid: string, code: string) => `/api/projects/${pid}/ledger/entries/${encodeURIComponent(code)}`,
   openingBalance: (pid: string, code: string) => `/api/projects/${pid}/ledger/opening-balance/${encodeURIComponent(code)}`,
   voucher: (pid: string, voucherNo: string) => `/api/projects/${pid}/ledger/voucher/${encodeURIComponent(voucherNo)}`,
+  // 挂凭到底稿（序时账 ↔ 底稿凭证检查联动）
+  sampleVoucher: (pid: string) => `/api/projects/${pid}/ledger/sample-voucher`,
+  sampledVouchers: (pid: string) => `/api/projects/${pid}/ledger/sampled-vouchers`,
+  sampledVoucherDelete: (pid: string, id: string) => `/api/projects/${pid}/ledger/sampled-vouchers/${encodeURIComponent(id)}`,
   years: (pid: string) => `/api/projects/${pid}/ledger/years`,
   validate: (pid: string) => `/api/projects/${pid}/ledger/validate`,
   smartPreview: (pid: string) => `/api/projects/${pid}/ledger/smart-preview`,
@@ -236,4 +252,17 @@ export const dataValidation = {
 
 export const fineChecks = {
   summary: (pid: string) => `/api/projects/${pid}/fine-checks/summary`,
+} as const
+
+// ─── 审计检查复核（audit-check-review-gate-hardening） ────────────────────────
+
+export const auditChecks = {
+  /** 合并后的统一检查项 + 新鲜度 + 项目汇总（升级版，替代 fineChecks.summary） */
+  summary: (pid: string) => `/api/projects/${pid}/audit-checks/summary`,
+  /** 主动触发审计检查重算（body 可选 { wp_id } 单张，不传重算项目全部） */
+  recompute: (pid: string) => `/api/projects/${pid}/audit-checks/recompute`,
+  /** 复核签认（POST 记录一次 / GET 读最近一次；只提示不阻断） */
+  signoff: (pid: string) => `/api/projects/${pid}/audit-checks/signoff`,
+  /** 导出审计检查结果为 xlsx（RFC5987 中文名，留痕） */
+  export: (pid: string) => `/api/projects/${pid}/audit-checks/export`,
 } as const

@@ -371,9 +371,13 @@ export function useD6Disclosure(options: UseD6DisclosureOptions) {
         if (newTexts[key] !== (oldTexts?.[key] || '')) {
           debouncedSave(key, { remark: newTexts[key] })
           // Emit EventBus for disclosure note text update
+          // 合同资产附注章节（note_template_variant_matrix：listed 五、10 / soe 八、11）
+          // 按 key 含 'soe' 派生对应章节 → useNoteRefresh 定向刷新
           eventBus.emit('disclosure:note-text-updated' as any, {
             wpCode: 'D6',
+            accountCode: '1402',
             section: key,
+            sectionIds: [key.includes('soe') ? '八、11' : '五、10'],
             text: newTexts[key],
           })
           // sync-from-workpaper signal for DisclosureEditor subscription

@@ -6,10 +6,14 @@
  */
 import { computed, inject, toRef, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Download } from '@element-plus/icons-vue'
 import { useF3Adjudication } from '../composables/useF3Adjudication'
 import type { F3AdjudicationRow } from '../composables/useF3Adjudication'
 import { useF3AiGenerate, type F3AiSection } from '../composables/useF3AiGenerate'
+import { useAdjudicationBringIn } from '../composables/useAdjudicationBringIn'
+import { useAuditContext } from '@/composables/useAuditContext'
 import GtIndexChip from '../GtIndexChip.vue'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import F3SheetAttachments from './F3SheetAttachments.vue'
 
 const props = defineProps<{
@@ -47,6 +51,31 @@ const {
 })
 
 const hasDifference = computed(() => Math.abs(differenceRow.value) > 0.005)
+
+// ─── 从集中登记带入调整（2201 应付票据，负债贷方；带入期末 AJE/RJE） ──────────────
+const bringInRows = computed(() =>
+  dataRows.value.map((r) => ({ rowKey: r.rowKey, name: r.label, aje: r.closingAje, rje: r.closingRje })),
+)
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: toRef(props, 'projectId') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '2201',
+  direction: 'credit',
+  subjectCode: '2201',
+  wpCode: 'F3',
+  subjectLabel: '应付票据(2201)',
+  rows: bringInRows,
+  updateCell: (rowKey: string, field: any, value: number) =>
+    updateCell(rowKey, field === 'rje' ? 'closingRje' : 'closingAje', value),
+  totalAudited: () => subtotalRow.value.closingAdjusted,
+})
+
 const {
   aiAvailable,
   loading: aiLoading,
@@ -157,6 +186,7 @@ function confirmAdjudication() {
         <p>2. 区分银行承兑汇票与商业承兑汇票分别列示；关注已到期未兑付票据是否转应付账款。</p>
         <p>3. 浅蓝背景为 F3-2 明细表自动取数，灰底虚线列为公式列（审定 = 未审 + 账项调整 + 重分类），不可手工编辑。</p>
         <p>4. 关联方开具/承兑的票据及保证金存款受限情况应在附注充分披露；差异≠0 时标红，确认审定后回写试算表。</p>
+        <p>5. 「带入调整」：可从集中登记按科目 2201 拉取调整分录，逐笔分配到各承兑类别行的期末账项/重分类调整，带入后审定数自动更新并联动附注。</p>
       </div>
     </details>
 
@@ -181,6 +211,9 @@ function confirmAdjudication() {
         <el-button size="small" type="primary" :disabled="isReadonly" @click="confirmAdjudication">确认审定（回写TB）</el-button>
       </div>
       <div class="toolbar-right">
+        <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
+          <el-icon><Download /></el-icon>带入调整
+        </el-button>
         <span class="chip-wrap"><GtIndexChip value="wp:F3-2" :context-project-id="projectId" /></span>
         <el-tag size="small" type="info">共 {{ dataRows.length }} 行</el-tag>
       </div>
@@ -368,6 +401,15 @@ function confirmAdjudication() {
         />
       </div>
     </el-card>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="2201 应付票据"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 

@@ -99,10 +99,6 @@
 
       <div v-else-if="currentSheet === 'directory'" class="g-cycle-tab-index-page">
         <div class="g4-index-toolbar">
-          <el-button size="small" type="primary" plain @click="openHandbook('preparation')">
-            📖 编制手册
-          </el-button>
-          <el-button size="small" @click="openHandbook('usage')">使用手册</el-button>
           <el-button size="small" type="primary" plain @click="openVersionHistory()">
             版本历史
           </el-button>
@@ -118,6 +114,7 @@
           :wp-code="'G4'"
           :html-data="directoryHtmlData"
           :available-sheets="availableSheets"
+          :all-responses="suiteResponses || new Map()"
         />
       </div>
 

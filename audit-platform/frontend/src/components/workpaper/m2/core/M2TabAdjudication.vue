@@ -7,13 +7,10 @@
         <h3 class="section-title">M2-1 实收资本（股本）审定表</h3>
       </div>
       <div class="section-header-right">
-        <el-segmented
-          v-model="dualMode.mode.value"
-          :options="dualMode.modeOptions.value"
-          size="small"
-          @change="(val: any) => dualMode.switchMode(val)"
-        />
-        <el-button size="small" @click="handleAI('adjudication')">
+        <el-button size="small" type="primary" plain :loading="adjPull.loading.value" :disabled="isReadonly" @click="openBringInAdjustment">
+          <el-icon><Download /></el-icon> 带入调整
+        </el-button>
+        <el-button size="small" :loading="aiLoading" :disabled="isReadonly" @click="handleAI('adjudication')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
         <el-button size="small" @click="handleReview">
@@ -363,7 +360,7 @@
       <template #header>
         <div class="section-header">
           <span class="card-title">审计说明</span>
-          <el-button size="small" @click="handleAI('auditNote')">
+          <el-button size="small" :loading="aiLoading" :disabled="isReadonly" @click="handleAI('auditNote')">
             <el-icon><MagicStick /></el-icon> AI辅助
           </el-button>
         </div>
@@ -394,8 +391,18 @@
         <li>审定数变化自动回写 TB（科目 4001）并通知附注组件</li>
         <li>增资→贷方增加（贷记实收资本）；减资→借方减少（借记实收资本）</li>
         <li>期末校验：期末审定 应等于 期初审定 + 贷方(增资) − 借方(减资)</li>
+        <li>「带入调整」：从集中登记按科目 4001 拉取调整分录，逐笔分配到各出资人行的期末 AJE/RJE，带入后审定数自动更新并联动附注</li>
       </ul>
     </details>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="4001 实收资本/股本"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
@@ -425,14 +432,17 @@
  * 增资在贷方增加，减资在借方减少
  */
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
-import { ElMessageBox } from 'element-plus'
-import { MagicStick, Check } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { MagicStick, Check, Download } from '@element-plus/icons-vue'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import { useM2FormData } from '../../composables/useM2FormData'
-import { useM2DualMode } from '../../composables/useM2DualMode'
 import {
   useM2Adjudication,
   type M2AdjudicationRow,
 } from '../../composables/useM2Adjudication'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import { useAuditContext } from '@/composables/useAuditContext'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import { eventBus } from '@/utils/eventBus'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
@@ -450,6 +460,8 @@ const emit = defineEmits<{
 // ─── Inject ──────────────────────────────────────────────────────────────────
 
 const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', () => {})
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref(false)
 
 // ─── FormData ────────────────────────────────────────────────────────────────
 
@@ -458,11 +470,7 @@ const formData = useM2FormData({
   projectId: computed(() => props.projectId),
 })
 
-// ─── DualMode ────────────────────────────────────────────────────────────────
 
-const dualMode = useM2DualMode({
-  wpId: computed(() => props.wpId),
-})
 
 // ─── 审定表行数据（动态按出资人分类行） ────────────────────────────────────────
 
@@ -479,6 +487,38 @@ const {
   updateRow: composableUpdateRow,
   saveAndWriteback,
 } = useM2Adjudication(formData, rows)
+
+// ─── 从集中登记带入调整（4001 实收资本/股本，权益贷方；双列 endAje/endRje，动态出资人行） ───
+const bringInRows = computed(() =>
+  rawComputedRows.value.map((r) => ({
+    rowKey: r.key,
+    name: r.investorName || '出资人',
+    aje: r.endAje ?? 0,
+    rje: r.endRje ?? 0,
+  })),
+)
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: computed(() => props.projectId) as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '4001',
+  direction: 'credit',
+  subjectCode: '4001',
+  wpCode: 'M2',
+  subjectLabel: '实收资本/股本(4001)',
+  rows: bringInRows,
+  updateCell: (rowKey: string, field: any, value: number) => {
+    const idx = rows.value.findIndex((r) => r.key === rowKey)
+    if (idx < 0) return
+    composableUpdateRow(idx, field === 'aje' ? 'endAje' : 'endRje', value)
+  },
+  totalAudited: () => totalRow.value.endAudited,
+})
 
 // ─── 备注行独立存储 ─────────────────────────────────────────────────────────
 
@@ -640,8 +680,29 @@ function saveAuditNote() {
   formData.debouncedSave('M2-M2-1-auditNote', { remark: auditNote.value || null })
 }
 
-function handleAI(_section: string) {
-  // AI辅助钩子（集成时实现）
+async function handleAI(_section: string) {
+  if (props.isReadonly) return
+  aiLoading.value = true
+  try {
+    const total = totalRow.value
+    const context: Record<string, string> = {
+      科目: '4001 实收资本/股本（权益类贷方）',
+      期初审定合计: fmtAmount(total.beginAudited),
+      期末审定合计: fmtAmount(total.endAudited),
+      本期贷方增资合计: fmtAmount(total.creditAmount),
+      本期借方减资合计: fmtAmount(total.debitAmount),
+      变动额: fmtAmount(total.varianceAmount),
+      变动率: fmtPercent(total.varianceRate),
+    }
+    const text = await generateAiText({ section: 'm2-adjudication-note', context, existingContent: auditNote.value })
+    if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+    auditNote.value = text
+    saveAuditNote()
+  } catch {
+    ElMessage.warning('AI 生成失败，请稍后重试')
+  } finally {
+    aiLoading.value = false
+  }
 }
 
 function handleReview() {

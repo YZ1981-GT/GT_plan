@@ -1,5 +1,18 @@
 <template>
   <div class="h9-tab-index" data-testid="h9-tab-index">
+    <!-- E1 标准加法式增强：目录卡 + 结论看板 + 本循环 grid -->
+    <GtCycleDirExtras
+      wp-code="H9"
+      cycle-letter="H"
+      :wp-id="props.wpId"
+      :project-id="props.projectId"
+      :all-responses="props.allResponses"
+      :sheets="dirSheets"
+      @navigate="onDirNavigate"
+      @open-handbook="openHandbook"
+    />
+    <H9PreparationHandbookDialog v-model="handbookVisible" :initial-tab="handbookTab" />
+
     <div
       class="h8-linkage-indicator"
       :class="linkageClass"
@@ -85,8 +98,11 @@
  * H9TabIndex — 租赁负债底稿目录
  * 对齐源 xlsx 目录 + 披露/摊销/关联衍生视图
  */
-import { computed } from 'vue'
+import { computed, ref, defineAsyncComponent } from 'vue'
 import GtIndexChip from '../../GtIndexChip.vue'
+import GtCycleDirExtras from '../../GtCycleDirExtras.vue'
+
+const H9PreparationHandbookDialog = defineAsyncComponent(() => import('../H9PreparationHandbookDialog.vue'))
 
 const props = defineProps<{
   wpId: string
@@ -178,6 +194,20 @@ function _hasData(code: string): boolean {
 
 function handleNavigate(row: SheetEntry) {
   emit('navigate-sheet', row.sheetName)
+}
+
+// ─── E1 标准加法式增强：目录卡 + 结论看板 + 本循环 grid（GtCycleDirExtras） ───
+const dirSheets = computed(() =>
+  sheets.value.map((s) => ({ code: s.code, navValue: s.sheetName, name: s.name })),
+)
+function onDirNavigate(navValue: string) {
+  emit('navigate-sheet', navValue)
+}
+const handbookVisible = ref(false)
+const handbookTab = ref<'preparation' | 'usage'>('preparation')
+function openHandbook(tab: 'preparation' | 'usage') {
+  handbookTab.value = tab
+  handbookVisible.value = true
 }
 </script>
 

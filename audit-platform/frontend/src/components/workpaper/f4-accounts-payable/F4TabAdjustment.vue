@@ -8,6 +8,8 @@
 import { inject, toRef, ref, computed, watch, onMounted, onBeforeUnmount, type Ref } from 'vue'
 import { parseNum, calcSubtotal } from '../composables/useF4AccPayFormulaEngine'
 import { useF4AiGenerate } from '../composables/useF4AiGenerate'
+import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../composables/useAdjustmentCentralSync'
+import { useAuditContext } from '@/composables/useAuditContext'
 import type { ChecklistResponse } from '../composables/useF4FormData'
 import F4ImportExportToolbar from './F4ImportExportToolbar.vue'
 import F4SheetAttachments from './F4SheetAttachments.vue'
@@ -91,6 +93,27 @@ watch(() => (props.allResponses as Map<string, any>).get(STORAGE_KEY)?.remark, (
 const totalDebit = computed(() => calcSubtotal(rows.value.map((r) => r.debitAmount)))
 const totalCredit = computed(() => calcSubtotal(rows.value.map((r) => r.creditAmount)))
 const isBalanced = computed(() => Math.abs(totalDebit.value - totalCredit.value) < 0.01)
+
+// ─── 同步到集中调整登记 ─────────────────────────────────────────────
+const { year: centralYear } = useAuditContext()
+const { centralStatus, syncing: centralSyncing, syncToCentral, refreshStatus } = useAdjustmentCentralSync({
+  projectId: () => props.projectId,
+  year: centralYear,
+  wpId: () => props.wpId,
+  wpCode: 'F4',
+  itemId: STORAGE_KEY,
+  buildLineItems: () => rows.value.map((r) => ({
+    standard_account_code: r.accountCode || undefined,
+    account_name: r.accountName || undefined,
+    debit_amount: r.debitAmount,
+    credit_amount: r.creditAmount,
+  })),
+  buildMeta: () => ({
+    description: rows.value.find((r) => r.summary)?.summary || 'F4 应付账款调整',
+    adjustmentType: 'aje',
+  }),
+})
+refreshStatus()
 
 // ─── 操作 ────────────────────────────────────────────────────────────────────
 
@@ -215,6 +238,21 @@ onMounted(() => {
     <div class="section-toolbar">
       <div class="toolbar-left">
         <el-button size="small" :disabled="isReadonly" @click="addRow">+ 新增行</el-button>
+        <el-button
+          size="small"
+          type="primary"
+          plain
+          :loading="centralSyncing"
+          :disabled="isReadonly || !isBalanced || rows.length === 0"
+          @click="syncToCentral"
+          title="把本页调整分录汇聚到集中调整登记，供合伙人跨循环审阅"
+        >同步到集中登记</el-button>
+        <el-tag
+          v-if="centralStatus?.review_status"
+          size="small"
+          :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
+          :title="centralStatus.rejection_reason || ''"
+        >集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}</el-tag>
       </div>
       <div class="toolbar-right">
         <F4ImportExportToolbar

@@ -119,6 +119,9 @@
     </el-card>
 
     <div class="action-bar">
+      <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
+        <el-icon><Download /></el-icon>带入调整
+      </el-button>
       <el-button size="small" type="primary" plain :disabled="isReadonly" @click="handleSeedI32">从 I3-2 带入</el-button>
       <el-button size="small" plain :disabled="isReadonly" @click="handleSyncI33">从 I3-3 同步调整</el-button>
       <el-button size="small" plain :disabled="isReadonly" @click="handleSyncI36">从 I3-6 同步减值</el-button>
@@ -399,8 +402,18 @@
         <li>账项调整从 I3-3 同步（仅 1711）；本期减值可从 I3-6 同步或沿用明细本期减值。</li>
         <li>期末＝期初＋增加−减少；净额＝原值−累计减值；二者应一致。差异行与 TB 须为 0。</li>
         <li>商誉不摊销、减值不可转回；保存后回写 TB 1711 并通知附注。</li>
+        <li>「带入调整」：从集中登记按科目 1711 拉取调整分录，逐笔分配到各被投资单位的 AJE/RJE，带入后审定数自动更新并联动附注。</li>
       </ol>
     </details>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="1711 商誉"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
@@ -412,7 +425,11 @@ import {
   type I3AdjudicationRow,
 } from '../../composables/useI3Adjudication'
 import { useI3CrossSheet } from '../../composables/useI3CrossSheet'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { Download } from '@element-plus/icons-vue'
 import GtIndexChip from '../../GtIndexChip.vue'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import I3SheetImportExport from '../shared/I3SheetImportExport.vue'
 
 const props = defineProps<{
@@ -468,6 +485,29 @@ const {
     onSave: (itemId: string, value: any) => emit('save', itemId, value),
   },
 )
+
+// ─── 从集中登记带入调整（1711 商誉，资产借方；带入 AJE/RJE） ───
+const bringInRows = computed(() =>
+  rows.value.map((r) => ({ rowKey: r.rowId, name: r.investee, aje: r.aje, rje: r.rje })),
+)
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: computed(() => props.projectId) as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '1711',
+  direction: 'debit',
+  subjectCode: '1711',
+  wpCode: 'I3',
+  subjectLabel: '商誉(1711)',
+  rows: bringInRows,
+  updateCell: (rowKey: string, field: any, value: number) => updateCell(rowKey, field, value),
+  totalAudited: () => subtotals.value.audited,
+})
 
 const layerRows = computed(() => {
   const L = layerSummary.value

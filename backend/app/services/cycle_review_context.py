@@ -31,6 +31,11 @@ logger = logging.getLogger(__name__)
 
 _TOLERANCE = 0.01  # 金额容差（元）
 
+# finding severity（对齐 design AuditCheckItem severity 取值，避免耦合 audit_check.models）
+_SEV_BLOCKING = "blocking"
+_SEV_WARNING = "warning"
+_SEV_INFO = "info"
+
 
 # ---------------------------------------------------------------------------
 # 循环勾稽配置
@@ -294,11 +299,31 @@ async def _get_project_year(wp_id: str) -> tuple[str | None, int | None]:
 # ---------------------------------------------------------------------------
 
 
-async def build_cycle_reconciliation_context(wp_id: str, wp_code: str) -> str:
-    """构建 K/N 循环勾稽上下文文本；不在注册表或无数据时返回空串。"""
+@dataclass
+class _CycleReconData:
+    """文本版与结构化版共用的中间计算结果（单一判定口径的唯一数据源）。"""
+
+    cycle: str
+    cfg: CycleReconConfig
+    audited_total: float
+    detail_total: float
+    has_detail: bool
+    tb: dict[str, float] | None  # {"unadjusted", "audited"} 或 None（无 TB 数据）
+
+
+async def _compute_cycle_reconciliation(
+    wp_id: str, wp_code: str
+) -> _CycleReconData | None:
+    """读 checklist + 算审定合计/明细合计/TB —— 文本版与结构化版共用核心。
+
+    不在注册表返回 None；checklist 读取异常返回 None（fail-open）。
+    此处集中「读 checklist + 算审定/明细/TB + 判定所需数据」，
+    `build_cycle_reconciliation_context`（文本）与
+    `build_cycle_reconciliation_findings`（结构化）都调用它，杜绝两套口径。
+    """
     cycle = extract_cycle_code(wp_code)
     if not cycle or cycle not in _REGISTRY:
-        return ""
+        return None
     cfg = _REGISTRY[cycle]
 
     # 1. 读 checklist_responses
@@ -314,8 +339,8 @@ async def build_cycle_reconciliation_context(wp_id: str, wp_code: str) -> str:
                 )
             ).fetchall()
     except Exception as e:  # noqa: BLE001
-        logger.warning("build_cycle_reconciliation_context checklist read failed: %s", e)
-        return ""
+        logger.warning("_compute_cycle_reconciliation checklist read failed: %s", e)
+        return None
 
     by_id: dict[str, dict[str, Any]] = {
         r[0]: {"remark": r[1], "conclusion": r[2]} for r in rows
@@ -343,6 +368,24 @@ async def build_cycle_reconciliation_context(wp_id: str, wp_code: str) -> str:
     tb: dict[str, float] | None = None
     if project_id and year:
         tb = await _fetch_tb_amounts(project_id, year, cfg.account_codes)
+
+    return _CycleReconData(
+        cycle=cycle,
+        cfg=cfg,
+        audited_total=audited_total,
+        detail_total=detail_total,
+        has_detail=has_detail,
+        tb=tb,
+    )
+
+
+def _format_cycle_recon_text(data: _CycleReconData) -> str:
+    """把中间计算结果格式化为 AI 复核 prompt 文本（纯函数，与结构化版同源数据）。"""
+    cfg = data.cfg
+    audited_total = data.audited_total
+    detail_total = data.detail_total
+    has_detail = data.has_detail
+    tb = data.tb
 
     # 若既无审定/明细数据、也无 TB → 无可注入内容
     if audited_total == 0 and not has_detail and not tb:
@@ -435,6 +478,175 @@ async def build_cycle_reconciliation_context(wp_id: str, wp_code: str) -> str:
     return "\n".join(lines)
 
 
+def _map_cycle_recon_findings(data: _CycleReconData) -> list[dict]:
+    """把中间计算结果映射为结构化 finding 列表（纯函数，与文本版同源数据）。
+
+    与 `_format_cycle_recon_text` 共用同一 `_CycleReconData` + 同一容差 `_TOLERANCE`
+    + 同一平衡判定，保证结构化 finding 的 passed/diff 与文本版平衡/不平衡结论一致。
+    """
+    cfg = data.cfg
+    cycle = data.cycle
+    audited_total = data.audited_total
+    detail_total = data.detail_total
+    has_detail = data.has_detail
+    tb = data.tb
+
+    # 与文本版同门槛：既无审定/明细数据、也无 TB → 无 finding
+    if audited_total == 0 and not has_detail and not tb:
+        return []
+
+    amount_kind = "审定发生额" if cfg.is_occurrence else "审定期末余额"
+    findings: list[dict] = []
+
+    # ── 审定表 ↔ 明细表（cross_ref / warning）────────────────────────
+    if audited_total or has_detail:
+        if has_detail and audited_total:
+            diff = round(audited_total - detail_total, 2)
+            ok = abs(diff) < _TOLERANCE
+            findings.append({
+                "code": f"{cycle}-RECON-DETAIL",
+                "passed": ok,
+                "actual": round(audited_total, 2),
+                "expected": round(detail_total, 2),
+                "diff": diff,
+                "message": (
+                    f"审定表↔{cfg.detail_label}：审定合计 {_fmt(audited_total)} vs "
+                    f"{cfg.detail_label}合计 {_fmt(detail_total)}，差异 {_fmt(diff)}"
+                    + ("（平衡）" if ok else "（不平衡，须追查漏项或计算偏差）")
+                ),
+                "severity": _SEV_WARNING,
+                "check_type": "cross_ref",
+            })
+        else:
+            # 缺一侧数据 → 未覆盖（passed=None）
+            present = "审定表" if audited_total else cfg.detail_label
+            findings.append({
+                "code": f"{cycle}-RECON-DETAIL",
+                "passed": None,
+                "actual": round(audited_total, 2) if audited_total else None,
+                "expected": round(detail_total, 2) if has_detail else None,
+                "diff": None,
+                "message": (
+                    f"审定表↔{cfg.detail_label}：仅一侧有数据（{present}），"
+                    "无法完成双侧勾稽"
+                ),
+                "severity": _SEV_WARNING,
+                "check_type": "cross_ref",
+            })
+
+    # ── 审定表 ↔ 试算表（balance / blocking）+ 未审→审定幅度（analysis / info）──
+    if tb is not None:
+        tb_unadj = tb["unadjusted"]
+        tb_audited = tb["audited"]
+        # 审定合计 ↔ TB 审定
+        if tb_audited and audited_total:
+            tb_diff = round(audited_total - tb_audited, 2)
+            ok = abs(tb_diff) < _TOLERANCE
+            findings.append({
+                "code": f"{cycle}-RECON-TB",
+                "passed": ok,
+                "actual": round(audited_total, 2),
+                "expected": round(tb_audited, 2),
+                "diff": tb_diff,
+                "message": (
+                    f"审定表↔试算表({'/'.join(cfg.account_codes)})：审定合计 "
+                    f"{_fmt(audited_total)} vs 试算表{amount_kind} {_fmt(tb_audited)}，"
+                    f"差异 {_fmt(tb_diff)}"
+                    + ("（一致）" if ok else "（不一致，审定回写可能未执行或已过期）")
+                ),
+                "severity": _SEV_BLOCKING,
+                "check_type": "balance",
+            })
+        elif tb_audited or audited_total:
+            # 缺一侧（审定表未填 或 TB 尚未回写）→ 未覆盖（passed=None）
+            present = "审定表" if audited_total else "试算表"
+            findings.append({
+                "code": f"{cycle}-RECON-TB",
+                "passed": None,
+                "actual": round(audited_total, 2) if audited_total else None,
+                "expected": round(tb_audited, 2) if tb_audited else None,
+                "diff": None,
+                "message": (
+                    f"审定表↔试算表({'/'.join(cfg.account_codes)})：仅一侧有数据"
+                    f"（{present}），无法核对回写一致性"
+                ),
+                "severity": _SEV_BLOCKING,
+                "check_type": "balance",
+            })
+        # 未审→审定 调整幅度（信息项，恒 passed=None）
+        if tb_audited:
+            adj_delta = round(tb_audited - tb_unadj, 2)
+            findings.append({
+                "code": f"{cycle}-RECON-ADJ",
+                "passed": None,
+                "actual": round(tb_audited, 2),
+                "expected": round(tb_unadj, 2),
+                "diff": adj_delta,
+                "message": (
+                    f"试算表{cfg.label}：未审 {_fmt(tb_unadj)} → 审定 {_fmt(tb_audited)}，"
+                    f"调整净额 {_fmt(adj_delta)}"
+                ),
+                "severity": _SEV_INFO,
+                "check_type": "analysis",
+            })
+        elif tb_unadj:
+            findings.append({
+                "code": f"{cycle}-RECON-ADJ",
+                "passed": None,
+                "actual": None,
+                "expected": round(tb_unadj, 2),
+                "diff": None,
+                "message": (
+                    f"试算表{cfg.label}未审 {_fmt(tb_unadj)}"
+                    "（审定额尚未回写，暂不比较调整幅度）"
+                ),
+                "severity": _SEV_INFO,
+                "check_type": "analysis",
+            })
+
+    return findings
+
+
+async def build_cycle_reconciliation_context(wp_id: str, wp_code: str) -> str:
+    """构建 K/N 循环勾稽上下文文本；不在注册表或无数据时返回空串。
+
+    重构为「共用核心 `_compute_cycle_reconciliation` + 文本格式化
+    `_format_cycle_recon_text`」，与结构化版 `build_cycle_reconciliation_findings`
+    共用同一 `_REGISTRY`、同一取数、同一判定逻辑，文本输出与重构前等价。
+    """
+    data = await _compute_cycle_reconciliation(wp_id, wp_code)
+    if data is None:
+        return ""
+    return _format_cycle_recon_text(data)
+
+
+async def build_cycle_reconciliation_findings(wp_id: str, wp_code: str) -> list[dict]:
+    """结构化版勾稽产出：与 `build_cycle_reconciliation_context` 共用同一 `_REGISTRY`
+    与计算（`_compute_cycle_reconciliation`），返回结构化 finding 列表。
+
+    返回 `[{code, passed, actual, expected, diff, message, severity, check_type}, ...]`，
+    覆盖三类 finding：
+      · 审定表↔明细表（code `{cycle}-RECON-DETAIL`，cross_ref / warning）
+      · 审定表↔试算表（code `{cycle}-RECON-TB`，balance / blocking —— 回写一致性关键）
+      · 未审→审定幅度（code `{cycle}-RECON-ADJ`，analysis / info，恒 passed=None）
+
+    单一判定口径（Property 5 / Req4.2）：与文本版共用 `_TOLERANCE` 与平衡判定。
+      · passed：审定↔明细、审定↔TB 双侧数据齐全时 abs(diff)<_TOLERANCE→True 否则 False；
+        缺一侧→None（未覆盖）；未审→审定幅度为信息项恒 None。
+    fail-open：不在注册表 / 无数据返回 []（与文本版一致），异常返回 []。
+    """
+    try:
+        data = await _compute_cycle_reconciliation(wp_id, wp_code)
+    except Exception as e:  # noqa: BLE001 — fail-open，绝不阻断聚合
+        logger.warning(
+            "build_cycle_reconciliation_findings failed (%s): %s", wp_code, e
+        )
+        return []
+    if data is None:
+        return []
+    return _map_cycle_recon_findings(data)
+
+
 # ---------------------------------------------------------------------------
 # 统一分发器（复核端点唯一入口）
 # ---------------------------------------------------------------------------
@@ -468,6 +680,7 @@ def append_reconciliation_to_user_prompt(user_prompt: str, recon_context: str) -
 __all__ = [
     "CycleReconConfig",
     "build_cycle_reconciliation_context",
+    "build_cycle_reconciliation_findings",
     "build_review_reconciliation_context",
     "append_reconciliation_to_user_prompt",
     "extract_cycle_code",

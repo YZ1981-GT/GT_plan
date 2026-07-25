@@ -81,29 +81,74 @@ class TrialBalanceService:
         )
 
         # 1. 汇总查询：客户余额 → 映射 → 标准科目（仅叶子节点）
-        agg_q = (
-            sa.select(
-                mp.c.standard_account_code,
-                sa.func.coalesce(sa.func.sum(bal.c.closing_balance), 0).label("total_closing"),
-                sa.func.coalesce(sa.func.sum(bal.c.opening_balance), 0).label("total_opening"),
-            )
-            .select_from(
-                bal.join(
-                    mp,
-                    sa.and_(
-                        mp.c.project_id == bal.c.project_id,
-                        mp.c.original_account_code == bal.c.account_code,
-                        mp.c.is_deleted == sa.false(),
+        # 🔴 方向符号修复：tb_balance.closing_balance/opening_balance 在部分账套里存的是
+        #    "无符号绝对值"(贷方也是正数)，方向在 closing_direction/opening_direction 里。
+        #    若直接 SUM(closing_balance) 再对贷方类 abs()，同一父科目下"借方性质挂账"
+        #    (如 其他应付款-应付利润，direction='debit') 会被同号累加而非冲减 → 负债/资产虚增、
+        #    资产≠负债+权益。这里按方向归一到"借正贷负"有符号口径再求和：
+        #      debit  → +ABS(balance)   credit → -ABS(balance)   方向缺失 → 原值(兼容已有符号存储)。
+        #    下游 `if direction=='credit': closing=abs(closing)` 不变即自洽。
+        signed_closing = sa.case(
+            (bal.c.closing_direction == "credit", -sa.func.abs(bal.c.closing_balance)),
+            (bal.c.closing_direction == "debit", sa.func.abs(bal.c.closing_balance)),
+            else_=bal.c.closing_balance,
+        )
+        signed_opening = sa.case(
+            (bal.c.opening_direction == "credit", -sa.func.abs(bal.c.opening_balance)),
+            (bal.c.opening_direction == "debit", sa.func.abs(bal.c.opening_balance)),
+            else_=bal.c.opening_balance,
+        )
+
+        # 🔴 映射口径根治（2026-07）：未映射叶子继承最近已映射父科目标准码。
+        #    根因：account_mapping 由 auto_match 生成，常出现「父科目已映射、部分子科目漏映射」
+        #    （如 1651 使用权资产→1641 已映射，但叶子 1651.02 使用权资产_房屋及建筑物 漏映射）。
+        #    原实现用 INNER JOIN 精确匹配 original_account_code == account_code，漏映射叶子被
+        #    静默丢弃 → 丢的资产≠丢的负债 → 报表资产≠负债+权益。
+        #    修复：按「最长前缀匹配」解析每个叶子的标准码——叶子自身有映射用自身，否则回退到
+        #    最近的已映射祖先（1651.02 → 祖先 1651 → 1641）。账户层级下子科目天然属于父科目
+        #    同一标准科目，此继承会计正确；无任何已映射祖先的叶子仍返回 NULL（保持原丢弃行为）。
+        mp_anc = AccountMapping.__table__.alias("mp_anc")
+
+        def _resolved_std_subq():
+            return (
+                sa.select(mp_anc.c.standard_account_code)
+                .where(
+                    mp_anc.c.project_id == bal.c.project_id,
+                    mp_anc.c.is_deleted == sa.false(),
+                    sa.or_(
+                        bal.c.account_code == mp_anc.c.original_account_code,
+                        bal.c.account_code.like(mp_anc.c.original_account_code.concat(".%")),
                     ),
                 )
+                .order_by(sa.func.length(mp_anc.c.original_account_code).desc())
+                .limit(1)
+                .correlate(bal)
+                .scalar_subquery()
             )
+
+        agg_sub = (
+            sa.select(
+                _resolved_std_subq().label("std"),
+                signed_closing.label("sc"),
+                signed_opening.label("so"),
+            )
+            .select_from(bal)
             .where(balance_filter)
             .where(leaf_cond)
-            .group_by(mp.c.standard_account_code)
+        ).subquery("agg_sub")
+
+        agg_q = (
+            sa.select(
+                agg_sub.c.std.label("standard_account_code"),
+                sa.func.coalesce(sa.func.sum(agg_sub.c.sc), 0).label("total_closing"),
+                sa.func.coalesce(sa.func.sum(agg_sub.c.so), 0).label("total_opening"),
+            )
+            .where(agg_sub.c.std.isnot(None))
+            .group_by(agg_sub.c.std)
         )
 
         if account_codes:
-            agg_q = agg_q.where(mp.c.standard_account_code.in_(account_codes))
+            agg_q = agg_q.where(agg_sub.c.std.in_(account_codes))
 
         result = await self.db.execute(agg_q)
         agg_rows = {r.standard_account_code: r for r in result.fetchall()}
@@ -111,28 +156,28 @@ class TrialBalanceService:
         # 1b. 损益类科目额外汇总本期发生额（debit_amount - credit_amount）
         # 损益类期末余额通常为 0（已结转），审计需要看本期发生额
         # 同样只取叶子节点，避免父子科目发生额重复累加。
-        period_agg_q = (
+        period_sub = (
             sa.select(
-                mp.c.standard_account_code,
-                sa.func.coalesce(sa.func.sum(bal.c.debit_amount), 0).label("total_debit"),
-                sa.func.coalesce(sa.func.sum(bal.c.credit_amount), 0).label("total_credit"),
+                _resolved_std_subq().label("std"),
+                bal.c.debit_amount.label("dr"),
+                bal.c.credit_amount.label("cr"),
             )
-            .select_from(
-                bal.join(
-                    mp,
-                    sa.and_(
-                        mp.c.project_id == bal.c.project_id,
-                        mp.c.original_account_code == bal.c.account_code,
-                        mp.c.is_deleted == sa.false(),
-                    ),
-                )
-            )
+            .select_from(bal)
             .where(balance_filter)
             .where(leaf_cond)
-            .group_by(mp.c.standard_account_code)
+        ).subquery("period_sub")
+
+        period_agg_q = (
+            sa.select(
+                period_sub.c.std.label("standard_account_code"),
+                sa.func.coalesce(sa.func.sum(period_sub.c.dr), 0).label("total_debit"),
+                sa.func.coalesce(sa.func.sum(period_sub.c.cr), 0).label("total_credit"),
+            )
+            .where(period_sub.c.std.isnot(None))
+            .group_by(period_sub.c.std)
         )
         if account_codes:
-            period_agg_q = period_agg_q.where(mp.c.standard_account_code.in_(account_codes))
+            period_agg_q = period_agg_q.where(period_sub.c.std.in_(account_codes))
 
         period_result = await self.db.execute(period_agg_q)
         period_rows = {r.standard_account_code: r for r in period_result.fetchall()}
@@ -296,6 +341,10 @@ class TrialBalanceService:
                 adj.c.project_id == project_id,
                 adj.c.year == year,
                 adj.c.is_deleted == sa.false(),
+                # V124 / workpaper-adjustment-centralization Req4.2：
+                # 仅计入 manual（含历史 NULL）来源，排除 workpaper 来源——底稿调整已由
+                # 审定表 writeback 体现于 audited_amount，若此处再计入 aje_adjustment 会双计。
+                sa.or_(adj.c.origin.is_(None), adj.c.origin != "workpaper"),
             )
             .group_by(adj.c.account_code, adj.c.adjustment_type)
         )

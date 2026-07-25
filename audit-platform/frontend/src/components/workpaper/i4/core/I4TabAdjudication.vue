@@ -135,6 +135,9 @@
     </el-card>
 
     <div class="action-bar">
+      <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
+        <el-icon><Download /></el-icon>带入调整
+      </el-button>
       <el-button size="small" type="primary" plain :disabled="isReadonly" @click="seedFromI42">从 I4-2 带入</el-button>
       <el-button size="small" plain :disabled="isReadonly" @click="syncFromI43">从 I4-3 同步调整</el-button>
       <el-button size="small" plain :disabled="isReadonly" @click="syncAmortFromI46">从 I4-6/7 同步摊销</el-button>
@@ -409,8 +412,18 @@
         <li>摊销直接冲减账面余额（无单独备抵科目）：期末＝期初＋增加−摊销−减少；科目 1801。</li>
         <li>一年内摊销完毕的部分：一般应重分类至「一年内到期的非流动资产」；但以摊销为后续计量的长期待摊费用，因其自然消耗过程，通常<strong>不要求</strong>仅因剩余摊销期不足一年而重分类（见注释）。</li>
         <li>明细合计、摊销测算、调整分录应与本表勾稽；TB 差异须为 0 后方可回写。</li>
+        <li>「带入调整」：从集中登记按科目 1801 拉取调整分录，逐笔分配到各项目的 AJE/RJE，带入后审定数自动更新并联动附注。</li>
       </ol>
     </details>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="1801 长期待摊费用"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
@@ -422,7 +435,11 @@ import {
   I4_CONCLUSION_OPTIONS,
   type I4AdjudicationRow,
 } from '../../composables/useI4Adjudication'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { Download } from '@element-plus/icons-vue'
 import GtIndexChip from '../../GtIndexChip.vue'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 
 const props = defineProps<{
   wpId: string
@@ -477,6 +494,29 @@ const {
     onSave: (itemId: string, value: any) => emit('save', itemId, value),
   },
 )
+
+// ─── 从集中登记带入调整（1801 长期待摊费用，资产借方；带入 AJE/RJE） ───
+const bringInRows = computed(() =>
+  rows.value.map((r) => ({ rowKey: r.rowId, name: r.projectName, aje: r.aje, rje: r.rje })),
+)
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: computed(() => props.projectId) as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '1801',
+  direction: 'debit',
+  subjectCode: '1801',
+  wpCode: 'I4',
+  subjectLabel: '长期待摊费用(1801)',
+  rows: bringInRows,
+  updateCell: (rowKey: string, field: any, value: number) => updateCell(rowKey, field, value),
+  totalAudited: () => subtotals.value.audited,
+})
 
 const leadMatrixRows = computed(() => {
   const L = excelLead.value

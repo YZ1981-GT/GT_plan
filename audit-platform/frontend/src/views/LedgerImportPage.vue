@@ -1,6 +1,8 @@
 <template>
   <div class="ledger-import-page">
-    <GtPageHeader title="账套导入" :show-back="true" />
+    <GtPageHeader title="账套导入" :show-back="true">
+      <el-button class="guide-btn" @click="guideVisible = true">📖 使用文档</el-button>
+    </GtPageHeader>
 
     <!-- 步骤条 -->
     <el-steps :active="currentStep" finish-status="success" class="import-steps">
@@ -70,6 +72,9 @@
       v-model:visible="errorDialogVisible"
       :errors="importErrors"
     />
+
+    <!-- 使用文档弹窗 -->
+    <LedgerImportGuideDialog v-model="guideVisible" />
   </div>
 </template>
 
@@ -83,6 +88,10 @@ import ColumnMappingEditor from '@/components/ledger-import/ColumnMappingEditor.
 import ImportProgress from '@/components/ledger-import/ImportProgress.vue'
 import ErrorDialog from '@/components/ledger-import/ErrorDialog.vue'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
+import { defineAsyncComponent } from 'vue'
+const LedgerImportGuideDialog = defineAsyncComponent(
+  () => import('@/components/ledger-import/LedgerImportGuideDialog.vue'),
+)
 import type {
   LedgerDetectionResult,
   SheetDetection,
@@ -98,6 +107,7 @@ const projectId = route.params.projectId as string
 // ─── State ──────────────────────────────────────────────────────────────────
 
 const currentStep = ref(0)
+const guideVisible = ref(false)
 const detectionResult = ref<LedgerDetectionResult | null>(null)
 const confirmedSheets = ref<SheetDetection[]>([])
 const forceSubmitFlag = ref(false)
@@ -217,6 +227,20 @@ function onMoveToBackground() {
   padding: 24px 32px;
   max-width: 960px;
   margin: 0 auto;
+}
+
+/* 顶部横幅右侧「使用文档」按钮：默认插槽 + margin-left:auto 推右，白底主色字适配紫色横幅 */
+.guide-btn {
+  margin-left: auto;
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--gt-color-primary, #4b2d77);
+  border: none;
+  font-weight: 600;
+}
+.guide-btn:hover,
+.guide-btn:focus {
+  background: #fff;
+  color: var(--gt-color-primary, #4b2d77);
 }
 
 .import-steps {

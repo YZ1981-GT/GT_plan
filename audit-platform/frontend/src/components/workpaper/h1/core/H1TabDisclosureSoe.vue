@@ -13,6 +13,7 @@
         <el-button size="small" type="primary" plain :loading="isSyncing" :disabled="isReadonly || !projectId" @click="syncToNotes">
           同步到附注
         </el-button>
+        <el-button size="small" type="primary" plain :disabled="!projectId" @click="jumpToNote('soe')">↩ 跳转回附注（八、22）</el-button>
         <el-button size="small" :disabled="isReadonly" :loading="isPulling" @click="pullFromSheets">
           从底稿取数
         </el-button>
@@ -373,6 +374,8 @@
  */
 import { reactive, computed, watch, inject, ref, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useRouter } from 'vue-router'
+import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
 import GtIndexChip from '../../GtIndexChip.vue'
@@ -428,6 +431,14 @@ const props = defineProps<{
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
+
+const router = useRouter()
+// 跳转回附注模块（披露表 → 附注为单向推送；此处仅导航，方便相互编辑确认）
+function jumpToNote(target: DisclosureVariant): void {
+  const route = buildNoteJumpRoute(props.projectId, 'H1', target)
+  if (!route) { ElMessage.warning('未找到对应的附注章节'); return }
+  router.push(route)
+}
 
 const noteSectionId = H1_NOTE_SECTION.soe
 const noteChip = `Note:${noteSectionId}`

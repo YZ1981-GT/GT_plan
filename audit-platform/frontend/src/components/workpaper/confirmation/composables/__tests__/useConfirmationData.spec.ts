@@ -37,11 +37,16 @@ function makeRow(overrides: Partial<ConfirmationRow> = {}): ConfirmationRow {
   }
 }
 
-function setup(rows: ConfirmationRow[] = [], extra: Record<string, any> = {}) {
+function setup(
+  rows: ConfirmationRow[] = [],
+  extra: Record<string, any> = {},
+  population: number | null = null,
+) {
   const data = ref(createHtmlData(rows, extra))
   const composable = useConfirmationData({
     htmlData: () => data.value,
     readonly: false,
+    population: () => population,
   })
   return { composable, data }
 }
@@ -258,8 +263,9 @@ describe('useConfirmationData - computeConfirmedAmount', () => {
 // ─── coverageMetrics & warn_level（Task 2.8） ─────────────────────────────────
 
 describe('useConfirmationData - coverageMetrics', () => {
-  it('回函率 < 80% → danger', () => {
-    // 10 行中只有 7 行回函 = 70% < 80%
+  // P5: 回函覆盖率 = 已回函笔数 / 已发函笔数（笔数口径）
+  it('回函覆盖率 < 80% → danger（笔数口径 repliedCount/sentCount）', () => {
+    // 10 行全已发函（带 confirmation_method），仅 7 行回函 = 70% < 80%
     const rows = Array.from({ length: 10 }, (_, i) =>
       makeRow({
         _row_id: `r${i}`,
@@ -270,15 +276,31 @@ describe('useConfirmationData - coverageMetrics', () => {
         confirmation_method: '积极式',
       })
     )
-    const { composable } = setup(rows)
+    const { composable } = setup(rows, {}, 10000)
     const metrics = composable.coverageMetrics.value
 
-    expect(metrics.reply_coverage).toBe(70)
+    expect(metrics.reply_coverage).toBe(70) // 7/10（sentCount=10 全在途）
     expect(metrics.warn_level).toBe('danger')
   })
 
-  it('回函率 >= 80% 且覆盖率 < 50% → warn', () => {
-    // 10 行全回函（reply=100%），但 confirmed 只有少量
+  // P6: 已发函笔数用在途语义，非 rows.length（未发函行不计入分母）
+  it('未发函行不计入已发函笔数（sentCount 用在途语义）', () => {
+    const rows = [
+      // 已发函且回函
+      makeRow({ _row_id: 'a', amount: 1000, is_replied: true, match_status: '相符' }),
+      makeRow({ _row_id: 'b', amount: 1000, is_replied: true, match_status: '相符' }),
+      // 未发函（无任何在途信号）→ 不计入 sentCount 分母
+      makeRow({ _row_id: 'c', amount: 1000 }),
+    ]
+    const { composable } = setup(rows, {}, 100000)
+    const metrics = composable.coverageMetrics.value
+    // sentCount=2, replied=2 → 100%（而非 2/3=66.7 的总笔数口径）
+    expect(metrics.reply_coverage).toBe(100)
+  })
+
+  // P1/P3/P9: population 可用时函证/确认覆盖率以 population 为分母
+  it('回函达标但函证覆盖率 < 50% → warn（population 分母）', () => {
+    // 10 行全回函，发函总额=100000；population=250000 → 函证覆盖率=40% < 50%
     const rows = Array.from({ length: 10 }, (_, i) =>
       makeRow({
         _row_id: `r${i}`,
@@ -286,20 +308,20 @@ describe('useConfirmationData - coverageMetrics', () => {
         amount: 10000,
         is_replied: true,
         match_status: '不符',
-        // reply_amount 很小，使确认金额 < 50% 总额
         reply_amount: i < 4 ? 10000 : 0,
       })
     )
-    const { composable } = setup(rows)
+    const { composable } = setup(rows, {}, 250000)
     const metrics = composable.coverageMetrics.value
 
     expect(metrics.reply_coverage).toBe(100)
-    // confirmed = 4*10000 = 40000, total = 100000, coverage = 40%
-    expect(metrics.confirmation_coverage).toBe(40)
+    expect(metrics.confirmation_coverage).toBe(40) // 100000/250000
+    expect(metrics.confirmed_coverage).toBe(16)    // 40000/250000
+    expect(metrics.population_available).toBe(true)
     expect(metrics.warn_level).toBe('warn')
   })
 
-  it('回函率 >= 80% 且覆盖率 >= 50% → ok', () => {
+  it('回函达标且函证覆盖率 >= 50% → ok', () => {
     const rows = Array.from({ length: 10 }, (_, i) =>
       makeRow({
         _row_id: `r${i}`,
@@ -309,7 +331,8 @@ describe('useConfirmationData - coverageMetrics', () => {
         match_status: '相符',
       })
     )
-    const { composable } = setup(rows)
+    // 发函总额=10000；population=10000 → 函证覆盖率=100%
+    const { composable } = setup(rows, {}, 10000)
     const metrics = composable.coverageMetrics.value
 
     expect(metrics.reply_coverage).toBe(100)
@@ -317,12 +340,53 @@ describe('useConfirmationData - coverageMetrics', () => {
     expect(metrics.warn_level).toBe('ok')
   })
 
-  it('空行列表不除零', () => {
-    const { composable } = setup([])
+  // P2: population 缺失 → 覆盖率 null 且不误导，warn_level 仅由回函率决定
+  it('population 缺失 → 函证/确认覆盖率为 null，population_available=false', () => {
+    const rows = Array.from({ length: 5 }, (_, i) =>
+      makeRow({ _row_id: `r${i}`, amount: 1000, is_replied: true, match_status: '相符' })
+    )
+    const { composable } = setup(rows, {}, null) // 无 population
     const metrics = composable.coverageMetrics.value
-    expect(metrics.confirmation_coverage).toBe(0)
-    expect(metrics.reply_coverage).toBe(0)
-    expect(metrics.warn_level).toBe('danger') // 0% < 80% → danger
+
+    expect(metrics.confirmation_coverage).toBeNull()
+    expect(metrics.confirmed_coverage).toBeNull()
+    expect(metrics.population_available).toBe(false)
+    expect(metrics.reply_coverage).toBe(100) // 回函率仍算
+    expect(metrics.warn_level).toBe('ok')    // 仅由回函率决定（100≥80）
+  })
+
+  it('population 缺失 + 回函率不足 → 仍 danger（仅由回函率决定）', () => {
+    const rows = Array.from({ length: 10 }, (_, i) =>
+      makeRow({
+        _row_id: `r${i}`,
+        amount: 1000,
+        is_replied: i < 5,
+        match_status: i < 5 ? '相符' : '未回函',
+        confirmation_method: '积极式',
+      })
+    )
+    const { composable } = setup(rows, {}, null)
+    const metrics = composable.coverageMetrics.value
+    expect(metrics.confirmation_coverage).toBeNull()
+    expect(metrics.reply_coverage).toBe(50)
+    expect(metrics.warn_level).toBe('danger')
+  })
+
+  it('population <= 0 视为不可用', () => {
+    const rows = [makeRow({ amount: 1000, is_replied: true, match_status: '相符' })]
+    const { composable } = setup(rows, {}, 0)
+    const metrics = composable.coverageMetrics.value
+    expect(metrics.confirmation_coverage).toBeNull()
+    expect(metrics.population_available).toBe(false)
+  })
+
+  // P5 除零 + P2 空态
+  it('空行列表不除零', () => {
+    const { composable } = setup([], {}, 10000)
+    const metrics = composable.coverageMetrics.value
+    expect(metrics.confirmation_coverage).toBe(0) // 发函总额 0 / population = 0
+    expect(metrics.reply_coverage).toBe(0)         // sentCount=0 → 0
+    expect(metrics.warn_level).toBe('danger')      // 回函率 0 < 80
   })
 })
 

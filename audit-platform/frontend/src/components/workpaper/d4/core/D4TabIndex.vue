@@ -8,11 +8,16 @@
  *
  * Requirements: 31.1-31.5
  */
-import { computed, inject, onMounted } from 'vue'
+import { computed, inject, onMounted, ref, defineAsyncComponent } from 'vue'
+import { useRouter } from 'vue-router'
 import { resolveD4SheetLabel } from '../../composables/d4SheetLabels'
 import { useAcnrCatalogIndex } from '../../composables/useAcnrCatalogIndex'
 import { parseIndexRef } from '@/utils/parseIndexRef'
 import GtIndexChip from '../../GtIndexChip.vue'
+import GtReviewTrigger from '../../GtReviewTrigger.vue'
+import { loadCycleWorkpaperCards, type CycleWpCard } from '@/services/cycleDirectory'
+
+const D4PreparationHandbookDialog = defineAsyncComponent(() => import('../D4PreparationHandbookDialog.vue'))
 
 const props = defineProps<{
   wpId: string
@@ -100,9 +105,64 @@ const indexRows = computed<IndexRow[]>(() => {
 // 显示名称从 ACNR catalog 取（Req 18.1）；catalog 空/失败 → 回退硬编码 name（Req 18.7）。
 const { catalogIndex, loadCatalogIndex } = useAcnrCatalogIndex()
 
+const router = useRouter()
+const cycleWorkpapers = ref<CycleWpCard[]>([])
+async function loadCycleWorkpapers(): Promise<void> {
+  cycleWorkpapers.value = await loadCycleWorkpaperCards(props.projectId, 'D', props.wpId)
+}
+function onCycleCardClick(wp: CycleWpCard): void {
+  if (!wp.wp_id || wp.is_current || !props.projectId) return
+  router.push({ name: 'WorkpaperEditor', params: { projectId: props.projectId, wpId: wp.wp_id } })
+}
+
 onMounted(() => {
   loadCatalogIndex('D')
+  void loadCycleWorkpapers()
 })
+
+// ─── 编制/使用手册弹窗 ─────────────────────────────────────────────────
+const handbookVisible = ref(false)
+const handbookTab = ref<'preparation' | 'usage'>('preparation')
+function openHandbook(tab: 'preparation' | 'usage') {
+  handbookTab.value = tab
+  handbookVisible.value = true
+}
+
+// ─── 跨表结论口径看板（审定/明细/检查类，排除程序表/附注/调整分录/不适用）───
+const jumpToSectionFn = inject<((sheetName: string) => void) | null>('jumpToSection', null)
+function isConclusionFilled(code: string): boolean {
+  const map = props.allResponses instanceof Map ? props.allResponses : (props.allResponses as any)?.value ?? new Map()
+  if (!map?.size) return false
+  const token = `${code}-`
+  for (const [key, val] of map.entries()) {
+    if (!key.includes(token)) continue
+    if (!/conclusion|audit-note|note/i.test(key)) continue
+    const text = (val?.remark ?? val?.conclusion ?? '') as string
+    if (typeof text === 'string' && text.trim().length > 0) return true
+  }
+  return false
+}
+const CONCLUSION_RE = /^D4-\d+$/
+const conclusionSheets = computed(() =>
+  displayRows.value
+    .filter(r => r.applicable && CONCLUSION_RE.test(r.code) && !/调整分录/.test(r.name))
+    .map(r => ({ code: r.code, sheetKey: resolveD4SheetLabel(r.code, props.availableSheets), filled: isConclusionFilled(r.code) })),
+)
+const conclusionFilledCount = computed(() => conclusionSheets.value.filter(c => c.filled).length)
+const conclusionHasUnfilled = computed(() => conclusionSheets.value.some(c => !c.filled))
+const conclusionWorstLabel = computed(() => {
+  if (conclusionFilledCount.value === 0) return '结论未填'
+  if (conclusionHasUnfilled.value) return `结论未齐 ${conclusionSheets.value.length - conclusionFilledCount.value} 项`
+  return '总体已齐'
+})
+const conclusionWorstType = computed<'success' | 'warning' | 'info'>(() => {
+  if (conclusionFilledCount.value === 0) return 'info'
+  if (conclusionHasUnfilled.value) return 'warning'
+  return 'success'
+})
+function jumpConclusion(sheetKey: string) {
+  if (jumpToSectionFn && sheetKey) jumpToSectionFn(sheetKey)
+}
 
 interface DisplayRow extends IndexRow {
   addrId?: string
@@ -165,6 +225,18 @@ function indexRowClassName({ row }: { row: IndexRow }): string {
 
 <template>
   <div class="d4-tab-index">
+    <!-- 目录卡头部（标题 + 复核 + 编制/使用手册） -->
+    <div class="dir-header">
+      <h3 class="dir-title">D4 底稿目录</h3>
+      <GtReviewTrigger section-id="D4-index-directory" />
+      <div class="handbook-btns">
+        <el-button size="small" type="primary" plain @click="openHandbook('preparation')">📖 编制手册</el-button>
+        <el-button size="small" @click="openHandbook('usage')">使用手册</el-button>
+      </div>
+    </div>
+
+    <D4PreparationHandbookDialog v-model="handbookVisible" :initial-tab="handbookTab" />
+
     <!-- 进度条 -->
     <div class="progress-bar-section">
       <div class="progress-info">
@@ -172,6 +244,29 @@ function indexRowClassName({ row }: { row: IndexRow }): string {
         <span class="progress-text">{{ completedCount }} / {{ applicableCount }} ({{ progressPercent }}%)</span>
       </div>
       <el-progress :percentage="progressPercent" :stroke-width="8" :show-text="false" />
+    </div>
+
+    <!-- 跨表结论口径看板 -->
+    <div class="conclusion-board">
+      <div class="board-head">
+        <strong>跨表结论口径</strong>
+        <el-tag size="small" :type="conclusionWorstType">{{ conclusionWorstLabel }}</el-tag>
+        <span class="board-meta">已填 {{ conclusionFilledCount }}/{{ conclusionSheets.length }}</span>
+      </div>
+      <div class="board-tags">
+        <el-tag
+          v-for="c in conclusionSheets"
+          :key="c.code"
+          size="small"
+          class="concl-tag clickable"
+          :type="c.filled ? 'success' : 'info'"
+          effect="plain"
+          @click="jumpConclusion(c.sheetKey)"
+        >
+          {{ c.code }} {{ c.filled ? '已填' : '未填' }}
+        </el-tag>
+      </div>
+      <p v-if="conclusionHasUnfilled" class="board-hint">存在未填审计结论，请点击标签跳转补全审计说明与结论。</p>
     </div>
 
     <!-- 目录表 -->
@@ -212,6 +307,34 @@ function indexRowClassName({ row }: { row: IndexRow }): string {
         </template>
       </el-table-column>
     </el-table>
+
+    <details class="methodology-hint">
+      <summary>编制提示</summary>
+      <p>推荐工作流：D4A 程序表 → D4-2/D4-3 明细（可从序时账取数）→ 发生/截止/完整性检查 + 分析程序 → D4-4 调整分录 → 确认回写 D4-1 → 勾稽 TB(6001/6051)/利润表 → 附注。IPO/舞弊组、出口核对按项目性质适用。</p>
+    </details>
+
+    <!-- 本循环底稿目录（D 循环其他科目，可跳转） -->
+    <div v-if="cycleWorkpapers.length" class="cycle-section">
+      <div class="cycle-header">
+        <h4 class="cycle-title">本循环底稿目录</h4>
+        <span class="cycle-hint">点击可跳转至同循环其他底稿（灰色表示尚未生成）</span>
+      </div>
+      <div class="cycle-grid">
+        <div
+          v-for="wp in cycleWorkpapers"
+          :key="wp.wp_code"
+          class="cycle-card"
+          :class="{ 'is-current': wp.is_current, 'is-disabled': !wp.wp_id }"
+          @click="onCycleCardClick(wp)"
+        >
+          <div class="cycle-card-top">
+            <span class="cycle-code">{{ wp.wp_code }}</span>
+            <el-tag v-if="wp.is_current" size="small" effect="plain" class="cycle-current-tag">当前</el-tag>
+          </div>
+          <span class="cycle-name" :title="wp.wp_name">{{ wp.wp_name }}</span>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -257,4 +380,30 @@ function indexRowClassName({ row }: { row: IndexRow }): string {
   background-color: #fafafa !important;
   color: #c0c4cc;
 }
+.dir-header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.dir-title { margin: 0; font-size: 16px; font-weight: 600; color: #303133; }
+.handbook-btns { display: flex; gap: 6px; }
+.conclusion-board { margin: 0 0 16px; padding: 10px 12px; background: #f5f7fa; border-radius: 6px; border-left: 3px solid #409eff; }
+.board-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.board-head strong { font-size: 13px; color: #303133; }
+.board-meta { font-size: 12px; color: #909399; }
+.board-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.concl-tag.clickable { cursor: pointer; }
+.board-hint { margin: 8px 0 0; font-size: 12px; color: #e6a23c; }
+.methodology-hint { margin-top: 16px; padding: 10px 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 0 4px 4px 0; font-size: var(--wp-font-size, 13px); color: #606266; }
+.methodology-hint summary { cursor: pointer; font-weight: 500; color: #409eff; }
+.cycle-section { margin-top: 24px; }
+.cycle-header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
+.cycle-title { margin: 0; font-size: 16px; font-weight: 600; color: #303133; }
+.cycle-hint { font-size: 12px; color: #909399; }
+.cycle-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+.cycle-card { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px solid var(--gt-color-border-purple, #e8e4f0); border-radius: 8px; background: #fff; cursor: pointer; transition: all 0.2s; }
+.cycle-card:hover { border-color: var(--gt-color-primary, #4b2d77); box-shadow: 0 2px 8px rgba(75, 45, 119, 0.12); transform: translateY(-2px); }
+.cycle-card.is-current { border-color: var(--gt-color-primary, #4b2d77); background: var(--gt-color-primary-bg, #f4f0fa); box-shadow: 0 0 0 1px var(--gt-color-primary, #4b2d77); cursor: default; }
+.cycle-card.is-disabled { opacity: 0.5; cursor: not-allowed; }
+.cycle-card.is-disabled:hover { border-color: var(--gt-color-border-purple, #e8e4f0); box-shadow: none; transform: none; }
+.cycle-card-top { display: flex; align-items: center; gap: 6px; }
+.cycle-code { font-size: var(--wp-font-size, 13px); font-weight: 700; color: var(--gt-color-primary, #4b2d77); }
+.cycle-current-tag { margin-left: auto; }
+.cycle-name { font-size: var(--wp-font-size, 13px); line-height: 1.4; color: #303133; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 </style>

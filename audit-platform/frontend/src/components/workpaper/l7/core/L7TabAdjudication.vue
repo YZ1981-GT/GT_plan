@@ -7,6 +7,9 @@
         <h3 class="section-title">L7-1 其他非流动负债审定表</h3>
       </div>
       <div class="section-header-right">
+        <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
+          <el-icon><Download /></el-icon> 带入调整
+        </el-button>
         <el-segmented
           v-model="dualMode.mode.value"
           :options="dualMode.modeOptions.value"
@@ -269,8 +272,18 @@
         <li>合计行自动汇总各项目行数据</li>
         <li>TB核对行自动从试算表取数，用于校验录入正确性</li>
         <li>审定数变化自动回写 TB（科目 2801）并通知附注组件</li>
+        <li>「带入调整」：可从集中登记按科目 2801 拉取调整分录，逐笔分配到各项目行的期末账项/重分类调整，带入后审定数自动更新并联动附注</li>
       </ul>
     </details>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="2801 其他非流动负债"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
@@ -295,7 +308,7 @@
  * 科目：2801 其他非流动负债（贷方/负债类！期末=期初+贷方-借方）
  */
 import { computed, inject, onMounted, onUnmounted, reactive, ref } from 'vue'
-import { MagicStick, Check } from '@element-plus/icons-vue'
+import { MagicStick, Check, Download } from '@element-plus/icons-vue'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
 import { useL7FormData } from '../../composables/useL7FormData'
 import { useL7DualMode } from '../../composables/useL7DualMode'
@@ -303,6 +316,9 @@ import {
   useL7Adjudication,
   type L7AdjudicationRow,
 } from '../../composables/useL7Adjudication'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import { useAuditContext } from '@/composables/useAuditContext'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import { eventBus } from '@/utils/eventBus'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
@@ -426,6 +442,32 @@ function updateRow(index: number, field: string, value: string | number): void {
   composableUpdateRow(index, field as any, value)
 }
 
+// ─── 从集中登记带入调整（2801 其他非流动负债，负债贷方；带入期末 AJE/RJE） ─────────
+const bringInRows = computed(() =>
+  rawComputedRows.value.map((r) => ({ rowKey: r.key, name: r.itemName || '(未命名项目)', aje: r.endAje, rje: r.endRje })),
+)
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: computed(() => props.projectId) as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '2801',
+  direction: 'credit',
+  subjectCode: '2801',
+  wpCode: 'L7',
+  subjectLabel: '其他非流动负债(2801)',
+  rows: bringInRows,
+  updateCell: (rowKey: string, field: any, value: number) => {
+    const i = rows.value.findIndex((r) => r.key === rowKey)
+    if (i >= 0) updateRow(i, field === 'rje' ? 'endRje' : 'endAje', value)
+  },
+  totalAudited: () => totalRow.value.endAudited,
+})
+
 // ─── UI State ────────────────────────────────────────────────────────────────
 
 const isSaving = ref(false)
@@ -483,6 +525,9 @@ function handleAdjustmentCreated() {
 
 onMounted(async () => {
   await formData.loadData()
+  // 恢复审计说明（此前保存但从不回读）
+  const note = formData.allResponses.value.get('L7-L7-1-auditNote')?.remark
+  if (note != null) auditNote.value = note
   // 订阅调整分录创建事件
   eventBus.on('adjustment:created' as any, handleAdjustmentCreated)
   eventBus.on('substantive:adjudicated' as any, handleAdjustmentCreated)

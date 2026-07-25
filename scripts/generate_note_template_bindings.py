@@ -209,6 +209,18 @@ def _build_cell_binding(
         "mode": "manual",
     }
 
+    # 依赖科目码的自动取数语义，若无科目码 → 手工（不产出空科目求和的假值）。
+    # 明细行无单一科目映射（如 货币资金 的 存放财务公司款项/存款应计利息/
+    # 数字货币/其中境外/各类保证金）应由审计师手工填或从底稿同步。
+    _ACCOUNT_DEPENDENT = (
+        {"closing_balance", "opening_balance", "prior_year_value"}
+        | set(_AGING_BUCKET_NAMES)
+        | set(_TB_AUDITED_SEMANTICS)
+    )
+    if semantic in _ACCOUNT_DEPENDENT and not account_codes:
+        base["todo"] = "待审计师手工填或从底稿同步（无科目码自动映射）"
+        return base
+
     if semantic == "closing_balance":
         base.update(
             source="trial_balance",
@@ -273,10 +285,16 @@ def _build_cell_binding(
 def _row_account_codes(
     row: dict[str, Any], section_codes: list[str]
 ) -> list[str]:
-    """行级 account_codes 优先，否则用 section 级并集."""
-    row_codes = row.get("account_codes")
-    if isinstance(row_codes, list) and row_codes:
-        return [c for c in row_codes if c]
+    """行级 account_codes 优先，否则用 section 级并集.
+
+    显式 ``account_codes: []``（键存在但空）视为"手工行"——不退化成 section
+    并集（避免明细行被填成全科目求和，如 货币资金 各子项）。仅当行**完全没有**
+    ``account_codes`` 键时才回退 section 并集（保留旧行为，零回归）。
+    """
+    if "account_codes" in row:
+        row_codes = row.get("account_codes")
+        if isinstance(row_codes, list):
+            return [c for c in row_codes if c]
     return list(section_codes)
 
 

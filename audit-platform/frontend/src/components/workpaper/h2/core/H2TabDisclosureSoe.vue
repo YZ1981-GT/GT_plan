@@ -20,6 +20,7 @@
           data-testid="h2-disclosure-soe-sync"
           @click="syncToNotes"
         >同步到附注</el-button>
+        <el-button size="small" type="primary" plain :disabled="!projectId" @click="jumpToNote('soe')">↩ 跳转回附注</el-button>
         <span class="chip-wrap"><GtIndexChip value="wp:H2-1" :context-project-id="projectId" /></span>
         <span class="chip-wrap"><GtIndexChip value="wp:H2-2" :context-project-id="projectId" /></span>
         <span class="chip-wrap"><GtIndexChip :value="`Note:${noteSectionId}`" :context-project-id="projectId" /></span>
@@ -298,6 +299,8 @@ import { ref, reactive, computed, inject, watch, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import { api } from '@/services/apiProxy'
+import { useRouter } from 'vue-router'
+import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import { H2_NOTE_SECTION } from '../../composables/h2NoteSectionMap'
@@ -328,6 +331,14 @@ const props = defineProps<{
   allResponses: Map<string, any>
   isReadonly: boolean
 }>()
+
+const router = useRouter()
+// 跳转回附注模块（披露表 → 附注为单向推送；此处仅导航，方便相互编辑确认）
+function jumpToNote(target: DisclosureVariant): void {
+  const route = buildNoteJumpRoute(props.projectId || '', 'H2', target)
+  if (!route) { ElMessage.warning('未找到对应的附注章节'); return }
+  router.push(route)
+}
 
 const isReadonly = computed(() => props.isReadonly)
 const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})

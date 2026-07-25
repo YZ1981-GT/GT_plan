@@ -21,7 +21,9 @@
         >
           保存并发布
         </el-button>
-        <el-button size="small" @click="handleAI('adjustment')">
+        <el-button size="small" type="primary" plain :loading="centralSyncing" :disabled="isReadonly || !currentBalance.isBalanced || filteredEntries.length === 0" @click="syncToCentral" title="把当前类型调整分录汇聚到集中调整登记，供合伙人跨循环审阅">同步到集中登记</el-button>
+        <el-tag v-if="centralStatus?.review_status" size="small" :type="centralStatus.review_status==='approved'?'success':(centralStatus.review_status==='rejected'?'danger':'info')" :title="centralStatus.rejection_reason||''">集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status]||centralStatus.review_status }}</el-tag>
+        <el-button size="small" :loading="aiLoading" :disabled="isReadonly" @click="handleAI('adjustment')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
         <el-button size="small" @click="handleReview">
@@ -186,6 +188,26 @@
       </el-descriptions>
     </div>
 
+    <!-- ═══ 调整说明 ═══ -->
+    <el-card shadow="never" class="adjustment-note-card">
+      <template #header>
+        <div class="card-header">
+          <span class="card-title">调整说明</span>
+          <el-button size="small" :loading="aiLoading" :disabled="isReadonly" @click="handleAI('adjustment')">
+            <el-icon><MagicStick /></el-icon> AI辅助
+          </el-button>
+        </div>
+      </template>
+      <el-input
+        v-model="adjustmentNote"
+        type="textarea"
+        :autosize="{ minRows: 3, maxRows: 8 }"
+        :disabled="isReadonly"
+        placeholder="说明本期调整分录的事项、依据及对实收资本(4001)的影响，或点击 AI 辅助生成..."
+        @change="saveAdjustmentNote"
+      />
+    </el-card>
+
     <!-- ═══ 编制提示 ═══ -->
     <details class="m2-details-tip">
       <summary>编制提示</summary>
@@ -216,10 +238,14 @@
  * - 双向同步M2-1审定表
  * - Uses useM2Adjustment composable
  */
-import { computed, inject, onMounted } from 'vue'
+import { computed, inject, onMounted, ref, toRef, watch, type Ref } from 'vue'
 import { Plus, MagicStick, Check } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import { useM2FormData } from '../../composables/useM2FormData'
 import { useM2Adjustment, type M2AdjustmentEntry } from '../../composables/useM2Adjustment'
+import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '@/components/workpaper/composables/useAdjustmentCentralSync'
+import { useAuditContext } from '@/composables/useAuditContext'
 
 const props = defineProps<{
   wpId: string
@@ -232,6 +258,9 @@ const emit = defineEmits<{
 }>()
 
 const openReviewDialog = inject<((sectionId: string, sectionLabel?: string) => void) | null>('openReviewDialog', null)
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref(false)
+const adjustmentNote = ref('')
 
 // ─── FormData + Composable ──────────────────────────────────────────────────
 
@@ -252,6 +281,27 @@ const {
   saveAndPublish,
 } = useM2Adjustment(formData)
 
+// ─── 同步到集中调整登记（workpaper-adjustment-centralization） ─────────────────
+const { year: auditYear } = useAuditContext()
+const { centralStatus, syncing: centralSyncing, syncToCentral, refreshStatus } = useAdjustmentCentralSync({
+  projectId: toRef(props, 'projectId') as Ref<string>,
+  year: auditYear,
+  wpId: toRef(props, 'wpId') as Ref<string>,
+  wpCode: 'M2',
+  itemId: () => `M2-adj-${activeType.value}`,
+  buildLineItems: () => filteredEntries.value.map(e => ({
+    account_name: e.accountName,
+    report_line_code: e.reportItem || undefined,
+    debit_amount: e.debitAmount,
+    credit_amount: e.creditAmount,
+  })),
+  buildMeta: () => ({
+    description: filteredEntries.value.find(e => e.description)?.description || 'M2 调整（' + activeType.value + '）',
+    adjustmentType: activeType.value === 'RJE' ? 'rje' : 'aje',
+  }),
+})
+watch(activeType, () => refreshStatus())
+
 const typeOptions = [
   { label: 'AJE 审计调整', value: 'AJE' },
   { label: 'RJE 重分类', value: 'RJE' },
@@ -265,7 +315,35 @@ function handleUpdateEntry(index: number, field: keyof M2AdjustmentEntry, value:
   updateEntry(index, field, value)
 }
 async function handleSaveAndPublish() { await saveAndPublish() }
-function handleAI(_section: string) { /* AI辅助待集成 */ }
+
+async function handleAI(_section: string) {
+  if (props.isReadonly) return
+  aiLoading.value = true
+  try {
+    const bal = currentBalance.value
+    const context: Record<string, string> = {
+      科目: '4001 实收资本/股本（调整分录）',
+      调整类型: activeType.value,
+      分录笔数: String(filteredEntries.value.length),
+      借方合计: fmtAmount(bal.totalDebit),
+      贷方合计: fmtAmount(bal.totalCredit),
+      是否借贷平衡: bal.isBalanced ? '是' : '否',
+      AJE对4001净影响: fmtAmount(ajeNet4001.value),
+      RJE对4001净影响: fmtAmount(rjeNet4001.value),
+    }
+    const text = await generateAiText({ section: 'm2-3-adjustment-note', context, existingContent: adjustmentNote.value })
+    if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+    adjustmentNote.value = text
+    saveAdjustmentNote()
+  } catch {
+    ElMessage.warning('AI 生成失败，请稍后重试')
+  } finally {
+    aiLoading.value = false
+  }
+}
+function saveAdjustmentNote() {
+  formData.debouncedSave('M2-M2-3-adjustment-note', { remark: adjustmentNote.value || null })
+}
 function handleReview() { openReviewDialog?.('M2-3-adjustment', '调整分录') }
 
 function fmtAmount(val: number): string {
@@ -277,6 +355,9 @@ function fmtAmount(val: number): string {
 
 onMounted(async () => {
   await formData.loadData()
+  refreshStatus()
+  const noteResp = formData.allResponses.value.get('M2-M2-3-adjustment-note')
+  if (noteResp?.remark) adjustmentNote.value = noteResp.remark
 })
 </script>
 
@@ -296,6 +377,9 @@ onMounted(async () => {
 .diff-warning { font-weight: 600; }
 .balanced-text { font-weight: 600; }
 .impact-area { margin-top: 12px; }
+.adjustment-note-card { margin-top: 16px; }
+.adjustment-note-card .card-header { display: flex; align-items: center; justify-content: space-between; }
+.adjustment-note-card .card-title { font-size: 14px; font-weight: 600; color: #303133; }
 .m2-details-tip { margin-top: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
 .m2-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; }
 .m2-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }

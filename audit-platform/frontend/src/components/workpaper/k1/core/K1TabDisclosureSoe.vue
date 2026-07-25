@@ -17,6 +17,7 @@
         >
           同步至附注
         </el-button>
+        <el-button size="small" type="primary" plain :disabled="!projectId" @click="jumpToNote('soe')">↩ 跳转回附注</el-button>
         <el-button size="small" @click="openReviewDialog('K1-disclosure-soe')">💬 复核</el-button>
       </div>
     </div>
@@ -405,6 +406,9 @@
 
 <script setup lang="ts">
 import { ref, computed, inject, toRef, defineComponent, h } from 'vue'
+import { ElMessage } from 'element-plus'
+import { useRouter } from 'vue-router'
+import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { useK1DisclosureSoe } from '../../composables/useK1DisclosureSoe'
 import { useK1DisclosureTrace } from '../../composables/k1DisclosureTrace'
@@ -443,6 +447,14 @@ const emit = defineEmits<{
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 const allResponsesRef = computed(() => props.allResponses)
+
+const router = useRouter()
+// 跳转回附注模块（披露表 → 附注为单向推送；此处仅导航，方便相互编辑确认）
+function jumpToNote(target: DisclosureVariant): void {
+  const route = buildNoteJumpRoute(props.projectId || '', 'K1', target)
+  if (!route) { ElMessage.warning('未找到对应的附注章节'); return }
+  router.push(route)
+}
 const activeSections = ref(['aging', 'method', 'ecl', 'balanceStage', 'top5'])
 
 const dis = useK1DisclosureSoe({

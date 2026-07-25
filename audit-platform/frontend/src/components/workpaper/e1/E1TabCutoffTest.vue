@@ -26,6 +26,7 @@ import GtIndexChip from '../GtIndexChip.vue'
 import GtCutoffAutoSampling from '../cutoff/GtCutoffAutoSampling.vue'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { amountFormatter, amountParser } from '../composables/wpAmountInput'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -267,7 +268,7 @@ function saveAuditConclusion(val: string): void {
           <el-table-column label="金额" width="150" align="right">
             <template #default="{ row }">
               <el-input-number :model-value="row.amount" :disabled="isReadonly"
-                :controls="false" size="small"
+                :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small"
                 @change="(val: number) => updateCell(row.id, 'amount', val ?? 0)" />
             </template>
           </el-table-column>

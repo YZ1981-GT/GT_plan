@@ -2,7 +2,7 @@
   <div class="n3-deferred-tax-liabilities">
     <div v-if="isLoading" class="loading-container"><el-skeleton :rows="8" animated /></div>
     <template v-else>
-      <div v-if="isHtmlSheet" class="n3-deferred-tax-liabilities-toolbar">
+      <div v-if="isHtmlSheet && currentSheet !== 'N3' && currentSheet !== '底稿目录'" class="n3-deferred-tax-liabilities-toolbar">
         <el-segmented
           v-model="renderMode"
           :options="modeOptions"

@@ -376,6 +376,12 @@ export async function refreshDisclosureFromWorkpapers(projectId: string, year: n
   return data as RefreshFromWorkpapersResult
 }
 
+/** 只重算单个章节（当前页面刷新）— 后端仅动该节，前后端一致 */
+export async function refreshDisclosureSection(projectId: string, year: number, section: string): Promise<RefreshFromWorkpapersResult> {
+  const { data } = await http.post(P_dn.refreshSectionFromWorkpaper(projectId, year, section))
+  return data as RefreshFromWorkpapersResult
+}
+
 /**
  * 获取附注章节的 auto_pull 联动取数结果。
  * 原生 http 调用，手动解 {code,message,data} 信封取 body.data（铁律）。

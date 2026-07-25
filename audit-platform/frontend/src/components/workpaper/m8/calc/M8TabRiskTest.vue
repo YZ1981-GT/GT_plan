@@ -10,13 +10,7 @@
         </el-tag>
       </div>
       <div class="section-header-right">
-        <el-segmented
-          v-model="dualMode.mode.value"
-          :options="dualMode.modeOptions.value"
-          size="small"
-          @change="(val: any) => dualMode.switchMode(val)"
-        />
-        <el-button size="small" @click="handleAI('risk-test')">
+        <el-button size="small" :loading="aiLoading === 'risk-test'" @click="handleAI('risk-test')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
         <el-button size="small" @click="handleReview">
@@ -305,9 +299,9 @@
  * 科目：4104 一般风险准备（**贷方/权益类！金融企业专属**）
  */
 import { computed, inject, onMounted, ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, Check } from '@element-plus/icons-vue'
 import { useM8FormData } from '../../composables/useM8FormData'
-import { useM8DualMode } from '../../composables/useM8DualMode'
 import {
   useM8RiskTest,
   DEFAULT_RISK_RATE,
@@ -315,19 +309,21 @@ import {
   type M8RiskTestRow,
 } from '../../composables/useM8RiskTest'
 import { useVersionTrail } from '../../composables/useVersionTrail'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 
 const props = defineProps<{ wpId: string; projectId: string; isReadonly: boolean }>()
 const emit = defineEmits<{ (e: 'navigate', sheetName: string): void; (e: 'save'): void }>()
 
-// ─── Inject复核对话 ──────────────────────────────────────────────────────────
+// ─── Inject复核对话 + AI ─────────────────────────────────────────────────────
 const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', () => {})
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
 
 // ─── Composables ─────────────────────────────────────────────────────────────
 const formData = useM8FormData({
   wpId: computed(() => props.wpId),
   projectId: computed(() => props.projectId),
 })
-const dualMode = useM8DualMode({ wpId: computed(() => props.wpId) })
 
 const testRows = ref<M8RiskTestRow[]>([])
 const riskTest = useM8RiskTest(formData, testRows)
@@ -413,8 +409,25 @@ function fmtAmount(val: number | undefined | null): string {
 }
 
 // ─── AI / 复核 ───────────────────────────────────────────────────────────────
-function handleAI(_section: string): void {
-  /* AI辅助钩子：后续集成 */
+async function handleAI(section: string): Promise<void> {
+  if (props.isReadonly) return
+  aiLoading.value = section
+  try {
+    const t = riskTest.totalRow.value
+    const adequacy = riskTest.provisionAdequacy.value
+    const context: Record<string, string> = {
+      科目: '4104 一般风险准备（权益类/贷方，金融企业专属）',
+      底稿: 'M8-4 一般风险准备计提测试表',
+      合计本期计提: fmtAmount(t.currentProvision),
+      合计应计金额: fmtAmount(t.estimatedAmount),
+      差异: fmtAmount(t.diff),
+      计提充足性: adequacy.isAdequate ? '计提充足' : '计提不足',
+      计提不足项目数: String(riskTest.insufficientRows.value.length),
+    }
+    const text = await generateAiText({ section: `m8-risktest-${section}`, context, existingContent: '' })
+    if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+    ElMessageBox.alert(text, 'AI 辅助建议', { confirmButtonText: '知道了' }).catch(() => {})
+  } catch { ElMessage.warning('AI 生成失败，请稍后重试') } finally { aiLoading.value = '' }
 }
 
 function handleReview(): void {

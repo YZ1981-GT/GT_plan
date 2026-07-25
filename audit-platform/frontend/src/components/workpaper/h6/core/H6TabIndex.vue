@@ -1,5 +1,18 @@
 <template>
   <div class="h6-tab-index">
+    <!-- E1 标准加法式增强：目录卡 + 结论看板 + 本循环 grid -->
+    <GtCycleDirExtras
+      wp-code="H6"
+      cycle-letter="H"
+      :wp-id="props.wpId"
+      :project-id="props.projectId"
+      :all-responses="props.allResponses"
+      :sheets="dirSheets"
+      @navigate="onDirNavigate"
+      @open-handbook="openHandbook"
+    />
+    <H6PreparationHandbookDialog v-model="handbookVisible" :initial-tab="handbookTab" />
+
     <!-- 过渡科目状态指示 -->
     <div
       class="transit-status-indicator"
@@ -74,8 +87,11 @@
  * 8行sheet列表+进度条+过渡科目状态指示
  * Spec: Task 4.1 | Requirements: 1.2, 6.1
  */
-import { computed } from 'vue'
+import { computed, ref, defineAsyncComponent } from 'vue'
 import GtIndexChip from '../../GtIndexChip.vue'
+import GtCycleDirExtras from '../../GtCycleDirExtras.vue'
+
+const H6PreparationHandbookDialog = defineAsyncComponent(() => import('../H6PreparationHandbookDialog.vue'))
 
 const props = defineProps<{
   wpId: string
@@ -135,6 +151,20 @@ function _hasData(code: string): boolean {
 
 function handleNavigate(row: SheetEntry) {
   emit('navigate-sheet', row.sheetName)
+}
+
+// ─── E1 标准加法式增强：目录卡 + 结论看板 + 本循环 grid（GtCycleDirExtras） ───
+const dirSheets = computed(() =>
+  sheets.value.map((s) => ({ code: s.code, navValue: s.sheetName, name: s.name })),
+)
+function onDirNavigate(navValue: string) {
+  emit('navigate-sheet', navValue)
+}
+const handbookVisible = ref(false)
+const handbookTab = ref<'preparation' | 'usage'>('preparation')
+function openHandbook(tab: 'preparation' | 'usage') {
+  handbookTab.value = tab
+  handbookVisible.value = true
 }
 </script>
 

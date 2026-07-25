@@ -8,7 +8,7 @@
         <el-tag type="success" size="small">国企</el-tag>
       </div>
       <div class="section-header-right">
-        <el-button size="small" @click="handleAI('disclosure-soe')">
+        <el-button size="small" :loading="aiLoading === 'disclosure-soe'" @click="handleAI('disclosure-soe')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
         <el-button size="small" @click="handleReview">
@@ -32,7 +32,7 @@
       <template #header>
         <div class="card-header">
           <span>一般风险准备变动表（国有企业）</span>
-          <el-button size="small" @click="handleAI('section-movement')">
+          <el-button size="small" :loading="aiLoading === 'section-movement'" @click="handleAI('section-movement')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </div>
@@ -127,7 +127,7 @@
       <template #header>
         <div class="card-header">
           <span>附注说明</span>
-          <el-button size="small" @click="handleAI('section-note')">
+          <el-button size="small" :loading="aiLoading === 'section-note'" @click="handleAI('section-note')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </div>
@@ -147,7 +147,7 @@
       <template #header>
         <div class="card-header">
           <span>国有金融企业特殊披露要求</span>
-          <el-button size="small" @click="handleAI('section-soe-special')">
+          <el-button size="small" :loading="aiLoading === 'section-soe-special'" @click="handleAI('section-soe-special')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </div>
@@ -195,28 +195,30 @@
  * 3 data rows + 1 total row (SUM)
  * Subscribe to EventBus 'substantive:adjudicated' to refresh data
  *
- * Composables: useM8FormData + useM8DualMode + useVersionTrail
+ * Composables: useM8FormData + useVersionTrail（双模式由主入口统一承载）
  */
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import { MagicStick, Check } from '@element-plus/icons-vue'
 import { useM8FormData } from '../../composables/useM8FormData'
-import { useM8DualMode } from '../../composables/useM8DualMode'
 import { useVersionTrail } from '../../composables/useVersionTrail'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import { eventBus } from '@/utils/eventBus'
 import { calcEquityEndBalance, calcSubtotal } from '../../composables/useM8FormulaEngine'
 
 const props = defineProps<{ wpId: string; projectId: string; isReadonly: boolean }>()
 const emit = defineEmits<{ (e: 'navigate', sheetName: string): void }>()
 
-// ─── Inject复核对话 ──────────────────────────────────────────────────────────
+// ─── Inject复核对话 + AI ─────────────────────────────────────────────────────
 const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', () => {})
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
 
 // ─── Composables ─────────────────────────────────────────────────────────────
 const formData = useM8FormData({
   wpId: computed(() => props.wpId),
   projectId: computed(() => props.projectId),
 })
-const dualMode = useM8DualMode({ wpId: computed(() => props.wpId) })
 const versionTrail = useVersionTrail({
   projectId: computed(() => props.projectId),
   workpaperId: computed(() => props.wpId),
@@ -299,7 +301,27 @@ function handleSoeSpecialNoteChange(): void {
   formData.debouncedSave('M8-disclosure-soe-special', { remark: soeSpecialNote.value || null })
 }
 
-function handleAI(_section: string): void { /* AI辅助钩子 */ }
+async function handleAI(section: string): Promise<void> {
+  if (props.isReadonly) return
+  aiLoading.value = section
+  try {
+    const total = tableRows.value.find(r => r._rowType === 'total')
+    const context: Record<string, string> = {
+      科目: '4104 一般风险准备（权益类/贷方）',
+      底稿: 'M8 附注披露信息（国有企业）',
+      期初余额合计: fmtAmount(total?.beginBalance ?? 0),
+      本期增加合计: fmtAmount(total?.currentIncrease ?? 0),
+      本期减少合计: fmtAmount(total?.currentDecrease ?? 0),
+      期末余额合计: fmtAmount(total?.endBalance ?? 0),
+    }
+    const isSpecial = section === 'section-soe-special'
+    const existing = isSpecial ? soeSpecialNote.value : disclosureNote.value
+    const text = await generateAiText({ section: `m8-disclosure-soe-${section}`, context, existingContent: existing })
+    if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+    if (isSpecial) { soeSpecialNote.value = text; handleSoeSpecialNoteChange() }
+    else { disclosureNote.value = text; handleNoteChange() }
+  } catch { ElMessage.warning('AI 生成失败，请稍后重试') } finally { aiLoading.value = '' }
+}
 function handleReview(): void { openReviewDialog?.('M8-disclosure-soe', '附注披露（国企）') }
 
 function getRowClassName({ row }: { row: TableRow; rowIndex: number }): string {

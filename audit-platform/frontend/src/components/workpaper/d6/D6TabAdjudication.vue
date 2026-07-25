@@ -24,7 +24,11 @@
 
     <!-- 工具栏 -->
     <div class="tab-toolbar">
-      <div class="toolbar-left"></div>
+      <div class="toolbar-left">
+        <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
+          <el-icon><Download /></el-icon>带入调整
+        </el-button>
+      </div>
       <div class="toolbar-right">
         <span class="chip-wrap"><GtIndexChip value="wp:D6-2" :context-project-id="projectId" /></span>
         <span class="chip-wrap"><GtIndexChip value="wp:D6-3" :context-project-id="projectId" /></span>
@@ -66,6 +70,13 @@
               <el-tooltip v-if="row.isFromCrossSheet" content="跨sheet自动取数" placement="top">
                 <el-icon style="margin-left:4px;color:#409eff"><InfoFilled /></el-icon>
               </el-tooltip>
+              <el-tag
+                v-if="row.isFourTableSeed"
+                size="small"
+                type="success"
+                effect="plain"
+                style="margin-left:4px"
+              >自动取数</el-tag>
             </span>
           </template>
         </el-table-column>
@@ -327,6 +338,15 @@
       </div>
     </el-card>
   </template>
+
+  <AdjudicationBringInDialog
+    v-model="bringInVisible"
+    :matches="adjPull.matches.value"
+    :row-options="bringInRowOptions"
+    subject-label="1402 合同资产"
+    :loading="adjPull.loading.value"
+    @apply="onBringInApply"
+  />
 </div>
 </template>
 
@@ -345,10 +365,13 @@
  * Requirements: 2.1-2.10, 4.1-4.7, 26.1-26.6
  */
 import { ref, computed, inject, toRef, type Ref } from 'vue'
-import { InfoFilled } from '@element-plus/icons-vue'
-import { useD6Adjudication, type AdjudicationBlock, type AdjudicationRow } from '../composables/useD6Adjudication'
+import { InfoFilled, Download } from '@element-plus/icons-vue'
+import { useD6Adjudication, type AdjudicationBlock, type AdjudicationRow, type AdjudicationPrefillRow } from '../composables/useD6Adjudication'
 import { useD6AiGenerate } from '../composables/useD6AiGenerate'
 import { isChangeRateExceeding } from '../composables/useD6FormulaEngine'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { useAdjudicationBringIn } from '../composables/useAdjudicationBringIn'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import type { ChecklistResponse } from '../composables/useD6FormData'
 import type useD6CrossSheet from '../composables/useD6CrossSheet'
 
@@ -365,9 +388,12 @@ const props = defineProps<{
   saveImmediate: (itemId: string, data: Partial<ChecklistResponse>) => Promise<void>
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
   crossSheet: ReturnType<typeof useD6CrossSheet>
+  /** 四表库审定表预填（render 的 html_data.adjudication_prefill；灰度关/已填时为空）。 */
+  adjudicationPrefill?: AdjudicationPrefillRow[]
 }>()
 
 const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
+const adjudicationPrefillRef = toRef(props, 'adjudicationPrefill') as unknown as Ref<AdjudicationPrefillRow[] | undefined>
 
 // ─── Inject ──────────────────────────────────────────────────────────────────
 
@@ -391,11 +417,39 @@ const {
   saveImmediate: props.saveImmediate,
   debouncedSave: props.debouncedSave,
   crossSheet: props.crossSheet,
+  adjudicationPrefill: adjudicationPrefillRef,
 })
 
 const { generateAndConfirm, aiAvailable, loading: aiLoading } = useD6AiGenerate(toRef(props, 'wpId'))
 
 const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务暂不可用')
+
+// ─── 从集中登记带入调整（1402 合同资产，资产借方；带入区块一原值 dynamic 行期末 AJE/RJE） ─
+const bringInRows = computed(() => {
+  const block1 = blocks.value.find((b) => b.blockKey === 'block1')
+  return (block1?.rows ?? [])
+    .filter((r) => r.rowType === 'dynamic' && r.isEditable)
+    .map((r) => ({ rowKey: r.rowKey, name: r.label, aje: r.currentAje, rje: r.currentRje }))
+})
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: toRef(props, 'projectId') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '1402',
+  direction: 'debit',
+  subjectCode: '1402',
+  wpCode: 'D6',
+  subjectLabel: '合同资产(1402)',
+  rows: bringInRows,
+  updateCell: (rowKey: string, field: any, value: number) =>
+    updateCell('block1', rowKey, field === 'rje' ? 'currentRje' : 'currentAje', value),
+  totalAudited: () => blocks.value.find((b) => b.blockKey === 'block3')?.blockTotalRow.currentAudited ?? 0,
+})
 
 async function genExplanation() {
   if (props.isReadonly) return

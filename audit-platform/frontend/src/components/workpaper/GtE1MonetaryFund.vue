@@ -19,18 +19,35 @@
           show-icon
         />
       </template>
-      <div v-if="isProcedureSheet" class="e1-mode-toolbar">
+      <!-- 双模式 + 版本历史 + 编制/使用手册（对齐 G1，所有 E1 底稿通用） -->
+      <div class="e1-mode-toolbar">
         <el-segmented
-          v-model="procedureDualMode.currentMode.value"
-          :options="procedureDualMode.modeOptions"
+          v-model="dualMode.currentMode.value"
+          :options="dualMode.modeOptions.value"
           size="small"
-          @change="procedureDualMode.onModeChange"
+          @change="dualMode.onModeChange"
         />
-        <el-tag v-if="!procedureDualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
+        <span class="e1-mode-divider" aria-hidden="true"></span>
+        <el-button size="small" @click="openFormulaManager()">公式管理</el-button>
+        <el-button size="small" @click="openHandbook('preparation')">📖 编制手册</el-button>
+        <el-button size="small" @click="openHandbook('usage')">使用手册</el-button>
+        <el-tag v-if="!dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
       </div>
 
+      <!-- 四表取数（公式管理）面板：现金/银行/账户清单明细 sheet（仅结构化视图） -->
+      <E1FourTableSourcePanel
+        v-if="dualMode.currentMode.value === 'html' && showFtPanel && ftSources.length"
+        :sources="ftSources"
+        :as-of="ftAsOf"
+        :is-readonly="isReadonly"
+        :has-manual-data="ftHasManualData"
+        @re-extract="reExtractFromFourTable"
+      />
+
+      <!-- 在线编辑模式：任意 sheet 用真实 sheet_name 渲染 OnlyOffice -->
       <GtOnlyOfficeSheet
-        v-if="isProcedureSheet && procedureDualMode.currentMode.value === 'onlyoffice'"
+        v-if="dualMode.currentMode.value === 'onlyoffice'"
+        :key="props.sheetName || ''"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
@@ -38,8 +55,10 @@
         style="height: calc(100vh - 180px)"
       />
 
+      <!-- 结构化视图：按 sheet 分发到专属子组件 -->
+      <template v-else>
       <CycleTabProcedure
-        v-else-if="currentSheet === 'E1A'"
+        v-if="currentSheet === 'E1A'"
         sheet-code="E1A"
         :html-data="props.htmlData"
         :wp-id="props.wpId"
@@ -109,9 +128,12 @@
         :readonly="isReadonly"
         style="height: calc(100vh - 180px)"
       />
+      </template>
     </template>
 
     <!-- 版本链 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载 -->
+    <!-- E1 编制/使用手册弹窗（对齐 G1） -->
+    <E1PreparationHandbookDialog v-model="handbookVisible" :initial-tab="handbookTab" />
   </div>
 </template>
 
@@ -128,9 +150,19 @@
 import { ref, computed, onMounted, provide, toRef, inject, defineAsyncComponent } from 'vue'
 import type { Ref } from 'vue'
 import http from '@/utils/http'
+import { eventBus } from '@/utils/eventBus'
 import { useG1DualMode } from './composables/useG1DualMode'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
+import E1FourTableSourcePanel from './e1/E1FourTableSourcePanel.vue'
+import E1PreparationHandbookDialog from './e1/E1PreparationHandbookDialog.vue'
+import {
+  normalizePrefill,
+  buildCashSeedRows,
+  buildBankSeedRows,
+  buildAccountListSeedRows,
+  buildCrossSheetSeeds,
+} from './composables/e1FourTablePrefill'
 
 // ─── Lazy-loaded child components ────────────────────────────────────────────
 
@@ -177,7 +209,123 @@ const isLoading = ref(false)
 const isReadonly = computed(() => !!props.readonly)
 const wpIdRef = computed(() => props.wpId)
 const bsDate = ref('')
+
+// ─── 编制/使用手册弹窗（对齐 G1）───────────────────────────────────────────────
+const handbookVisible = ref(false)
+const handbookTab = ref<'preparation' | 'usage'>('preparation')
+function openHandbook(tab: 'preparation' | 'usage' = 'preparation') {
+  handbookTab.value = tab
+  handbookVisible.value = true
+}
+
+// ─── 公式管理（打开平台全局公式管理中心，定位到本底稿 E1）───────────────────
+// 由 ThreeColumnLayout 顶层挂载的全局 FormulaManagerDialog 响应 `open-formula-manager`。
+function openFormulaManager() {
+  const base = (props.wpCode || 'E1').split('-')[0].toLowerCase()
+  const sheet = currentSheet.value || ''
+  // 具体 sheet（如 E1-1）→ 定位到该 sheet 叶子节点 wp_e1_1；非编码 sheet（附注/程序表）→ 回退父节点 wp_e1
+  const nodeKey = /^[A-Za-z]+\d+-\d+$/.test(sheet)
+    ? `wp_${sheet.replace(/-/g, '_').toLowerCase()}`
+    : `wp_${base}`
+  eventBus.emit('open-formula-manager', { nodeKey })
+}
 const allResponses: Ref<Map<string, any>> = ref(new Map())
+
+// ─── 四表取数（公式管理）───────────────────────────────────────────────────
+const fourTablePrefill = computed(() => normalizePrefill(props.htmlData?.four_table_prefill))
+const ftAsOf = computed(() => String((fourTablePrefill.value.meta as any)?.as_of || bsDate.value || ''))
+
+/** 是否显示四表取数面板（现金/银行/账户清单明细 sheet） */
+const showFtPanel = computed(() => ['E1-2', 'E1-3', 'E1-10'].includes(currentSheet.value))
+/** 当前 sheet 对应的四表来源行 */
+const ftSources = computed(() => {
+  if (currentSheet.value === 'E1-2') return fourTablePrefill.value.cash
+  if (currentSheet.value === 'E1-3') return [...fourTablePrefill.value.bank, ...fourTablePrefill.value.other]
+  if (currentSheet.value === 'E1-10') return fourTablePrefill.value.bank
+  return []
+})
+/** 当前 sheet 是否已有持久化编制数据（决定重新取数是否提示覆盖） */
+const ftRowsKey = computed(() => {
+  if (currentSheet.value === 'E1-2') return 'E1-cash-detail-rows'
+  if (currentSheet.value === 'E1-3') return 'E1-bank-detail-rows'
+  if (currentSheet.value === 'E1-10') return 'E1-account-list-rows'
+  return ''
+})
+const ftHasManualData = computed(() => !!ftRowsKey.value && allResponses.value.has(ftRowsKey.value))
+
+function seedRowsKey(key: string, rows: Record<string, unknown>[] | null): void {
+  if (!rows || !rows.length) return
+  if (allResponses.value.has(key)) return // persist-first：已有数据不覆盖
+  allResponses.value.set(key, { item_id: key, conclusion: null, remark: JSON.stringify(rows) })
+}
+
+/** 在无持久化数据时，从四表预填种子填充明细行 + 跨 sheet 聚合键（仅内存，不落库）。 */
+function seedFromFourTable(): void {
+  const p = fourTablePrefill.value
+  const cashSeed = buildCashSeedRows(p)
+  const bankSeed = buildBankSeedRows(p)
+  const acctSeed = buildAccountListSeedRows(p)
+  seedRowsKey('E1-cash-detail-rows', cashSeed)
+  seedRowsKey('E1-bank-detail-rows', bankSeed)
+  seedRowsKey('E1-account-list-rows', acctSeed)
+  // 跨 sheet 聚合键：仅当键缺失时种子（供 E1-1 审定表在未打开明细 tab 时直接取数）。
+  // 注：明细行持久化时，composable 已一并持久化对应聚合键 → 此处 has() 守卫自然跳过。
+  for (const { itemId, remark } of buildCrossSheetSeeds(p)) {
+    if (!allResponses.value.has(itemId)) {
+      allResponses.value.set(itemId, { item_id: itemId, conclusion: null, remark })
+    }
+  }
+  // 🔴 修复历史不一致：现金明细行(E1-cash-detail-rows)有数据但聚合键被存为陈旧 0
+  //（早期"打开空表→写聚合0→再种子行"竞态所致）→ E1-1 审定表读到 0 → 现金缺失 → 差异恒为现金额。
+  // 从持久化的明细行权威重算聚合，仅当聚合陈旧为 0/空而行合计非 0 时纠正（不覆盖 E1-2 中的真实编辑）。
+  reconcileCashAggregateFromRows()
+}
+
+/** 从持久化的现金明细行重算 E1-cash-detail 聚合键（未审期初/期末），修复陈旧 0 聚合。 */
+function reconcileCashAggregateFromRows(): void {
+  const rowsResp = allResponses.value.get('E1-cash-detail-rows')
+  if (!rowsResp?.remark) return
+  let parsed: any[]
+  try { parsed = JSON.parse(rowsResp.remark) } catch { return }
+  if (!Array.isArray(parsed) || parsed.length === 0) return
+  const num = (v: any): number => { const n = parseFloat(String(v ?? '')); return isFinite(n) ? n : 0 }
+  let opening = 0, ending = 0
+  for (const r of parsed) {
+    const op = num(r.opening), inc = num(r.increase), dec = num(r.decrease)
+    const fx = num(r.fxRate) || 1
+    opening += op
+    ending += (op + inc - dec) * fx   // 未审期末（人民币）= (期初+增-减)×汇率，与 useE1CashDetail.recalcRow 一致
+  }
+  const corrections: Array<{ item_id: string; conclusion: null; remark: string }> = []
+  const fix = (key: string, val: number): void => {
+    const cur = allResponses.value.get(key)
+    const curNum = cur ? parseFloat(String(cur.remark ?? '')) : NaN
+    if (Math.abs(val) >= 0.005 && (!cur || !isFinite(curNum) || Math.abs(curNum) < 0.005)) {
+      allResponses.value.set(key, { item_id: key, conclusion: null, remark: String(val) })
+      corrections.push({ item_id: key, conclusion: null, remark: String(val) })
+    }
+  }
+  fix('E1-cash-detail-opening-unaudited', opening)
+  fix('E1-cash-detail-total-unaudited', ending)
+  if (corrections.length && !isReadonly.value) {
+    saveImmediate(corrections).catch(() => { /* silent：纠正持久化失败不阻断显示 */ })
+  }
+}
+
+/** 重新从四表取数：以四表库最新数据覆盖当前 sheet 明细行并持久化。 */
+async function reExtractFromFourTable(): Promise<void> {
+  if (isReadonly.value) return
+  const p = fourTablePrefill.value
+  const key = ftRowsKey.value
+  let rows: Record<string, unknown>[] | null = null
+  if (currentSheet.value === 'E1-2') rows = buildCashSeedRows(p)
+  else if (currentSheet.value === 'E1-3') rows = buildBankSeedRows(p)
+  else if (currentSheet.value === 'E1-10') rows = buildAccountListSeedRows(p)
+  if (!key || !rows || !rows.length) return
+  const item = { item_id: key, conclusion: null, remark: JSON.stringify(rows) }
+  allResponses.value.set(key, item) // 触发 composable watch 重载
+  await saveImmediate([item])
+}
 
 // ─── P2#13: 全局告警面板 ─────────────────────────────────────────────────────
 
@@ -185,9 +333,18 @@ const globalAlerts = computed(() => {
   const alerts: Array<{ type: 'warning' | 'info' | 'success'; message: string }> = []
 
   // ① 审定合计 vs TB 差异
-  const totalAudited = parseFloat(allResponses.value.get('E1-adj-total-1001')?.remark || '0')
-    + parseFloat(allResponses.value.get('E1-adj-total-1002')?.remark || '0')
-    + parseFloat(allResponses.value.get('E1-adj-total-1012')?.remark || '0')
+  // 🔴 审定合计从跨sheet未审聚合键+账项调整实时计算（与 useE1Adjudication.writebackTrialBalance 的
+  // 1001/1002/1012 归组口径一致），而非读 E1-adj-total-*（那些仅在审定表 flushSave 后才写，
+  // 审定表未编辑时为 0 → 误报「审定合计 0.00 ≠ TB数」）。writeback 键非 0 时优先用（已编辑场景）。
+  const _num = (k: string) => parseFloat(allResponses.value.get(k)?.remark || '0') || 0
+  const _adj = (k: string) => _num(`E1-adjustment-by-item-${k}-ending`)
+  const _wb = _num('E1-adj-total-1001') + _num('E1-adj-total-1002') + _num('E1-adj-total-1012')
+  const _computed =
+    (_num('E1-cash-detail-total-unaudited') + _adj('cash'))                                  // 1001
+    + (_num('E1-bank-detail-principal-total-unaudited') + _adj('bank_principal'))            // 1002
+    + (_num('E1-bank-detail-other-total-unaudited') + _num('E1-digital-total-unaudited')      // 1012
+       + _adj('other_mf') + _adj('digital'))
+  const totalAudited = Math.abs(_wb) > 0.005 ? _wb : _computed
   const tbAmount = parseFloat(allResponses.value.get('E1-adj-tb-amount-ending')?.remark || '0')
   if (tbAmount && Math.abs(totalAudited - tbAmount) > 1) {
     alerts.push({ type: 'warning', message: `E1-1 审定合计 ${totalAudited.toFixed(2)} ≠ TB数 ${tbAmount.toFixed(2)}，差异 ${(totalAudited - tbAmount).toFixed(2)}` })
@@ -258,12 +415,7 @@ const currentSheet = computed(() => {
   return name
 })
 
-const isProcedureSheet = computed(() => {
-  const s = currentSheet.value
-  return s === 'E1A' || s === 'E26A'
-})
-
-const procedureDualMode = useG1DualMode({ wpId: wpIdRef })
+const dualMode = useG1DualMode({ wpId: wpIdRef })
 
 /**
  * E1-3 双 variant: sheetName 含"仅人民币"→rmb，含"人民币及外币"→multi
@@ -286,15 +438,23 @@ const ipoSheetCode = computed<string | null>(() => {
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 
 onMounted(() => {
-  if (props.htmlData?.projectContext) {
-    bsDate.value = props.htmlData.projectContext.bs_date || ''
-    // P0#1: Seed TB amount from render strategy into allResponses for E1-1 consumption
-    const tbAmount = props.htmlData.projectContext.tb_amount
-    if (tbAmount && !allResponses.value.has('E1-adj-tb-amount-ending')) {
+  // 🔴 后端 render 返回 html_data.project_context（snake_case）；此前误读 projectContext(camelCase)
+  // 导致整个 seeding 块被静默跳过 → E1-1 审定表「试算平衡表数」恒空 → 差异 = 全额审定合计。
+  const pctx: any = (props.htmlData as any)?.project_context ?? (props.htmlData as any)?.projectContext
+  if (pctx) {
+    bsDate.value = pctx.bs_date || ''
+    // 期末 TB（trial_balance 审定，科目 1001/1002/1012 汇总）
+    const tbEnding = pctx.tb_amount
+    if (tbEnding && !allResponses.value.has('E1-adj-tb-amount-ending')) {
       allResponses.value.set('E1-adj-tb-amount-ending', {
-        item_id: 'E1-adj-tb-amount-ending',
-        conclusion: null,
-        remark: String(tbAmount),
+        item_id: 'E1-adj-tb-amount-ending', conclusion: null, remark: String(tbEnding),
+      })
+    }
+    // 期初 TB（tb_balance 期初余额叶子合计），供审定表期初核对；此前从不 seed → 期初差异恒为全额
+    const tbOpening = pctx.tb_amount_opening
+    if (tbOpening && !allResponses.value.has('E1-adj-tb-amount-opening')) {
+      allResponses.value.set('E1-adj-tb-amount-opening', {
+        item_id: 'E1-adj-tb-amount-opening', conclusion: null, remark: String(tbOpening),
       })
     }
   }
@@ -310,12 +470,31 @@ onMounted(() => {
       })
     }
   }
+  // 四表取数：无持久化数据时从四表库种子填充明细行 + 跨 sheet 聚合键（persist-first）
+  seedFromFourTable()
 })
 </script>
 
 <style scoped>
 .e1-monetary-fund {
   padding: 12px;
+}
+
+/* ─── 模块级数值列规范（参照 E1-1 审定表）：所有子 tab 的表格统一生效 ───
+   1) 右对齐数值列一律千分符+两位小数（由各 tab 的 displayPrefs.fmtAmount / 输入框 formatter 保证）
+   2) 数值列防折行：单行显示 + 等宽数字（tabular-nums）对齐
+   3) 数值字号比正文小 1 号（13→12px），仍放不下时最小 11px；文本列不受影响
+   :deep 从主入口穿透到全部子 tab 的 el-table，无需逐个组件重复。 */
+.e1-monetary-fund :deep(.el-table td.is-right .cell) {
+  white-space: nowrap !important;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px !important;
+}
+/* 数值列内的输入框同样单行 + 等宽数字（千分符较长时不换行） */
+.e1-monetary-fund :deep(.el-table td.is-right .cell .el-input__inner),
+.e1-monetary-fund :deep(.el-table td.is-right .cell .el-input-number) {
+  font-variant-numeric: tabular-nums;
+  font-size: 12px !important;
 }
 
 .loading-container {
@@ -327,5 +506,38 @@ onMounted(() => {
   gap: 8px;
   align-items: center;
   margin-bottom: 8px;
+}
+/* 视图切换器与操作按钮之间的分隔线（避免「编制手册」等按钮被误当作切换页签） */
+.e1-mode-divider {
+  display: inline-block;
+  width: 1px;
+  height: 20px;
+  background: #dcdfe6;
+  margin: 0 4px;
+}
+/* 修复双模式页签看不清：给切换器加清晰边框「页框」，选中项深紫底+白字（原主题选中 pill 背景透明→白字浮在浅色上不可读） */
+.e1-mode-toolbar :deep(.el-segmented) {
+  --el-segmented-item-selected-bg-color: var(--gt-color-primary, #4b2d77);
+  --el-segmented-item-selected-color: #ffffff;
+  --el-segmented-item-hover-bg-color: rgba(75, 45, 119, 0.08);
+  background-color: #f0edf7;        /* 浅紫灰轨道底，让整个切换器「页框」可辨 */
+  border: 1px solid #cfc4e6;        /* 明确边框 */
+  border-radius: 6px;
+  padding: 2px;
+  font-size: 13px;
+}
+.e1-mode-toolbar :deep(.el-segmented__item-selected) {
+  background-color: var(--gt-color-primary, #4b2d77) !important;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(75, 45, 119, 0.35);   /* 选中 pill 阴影强化立体感 */
+}
+.e1-mode-toolbar :deep(.el-segmented__item.is-selected),
+.e1-mode-toolbar :deep(.el-segmented__item.is-selected .el-segmented__item-label) {
+  color: #ffffff !important;
+  font-weight: 600;                 /* 选中态加粗，白字更清晰 */
+}
+.e1-mode-toolbar :deep(.el-segmented__item:not(.is-selected)),
+.e1-mode-toolbar :deep(.el-segmented__item:not(.is-selected) .el-segmented__item-label) {
+  color: #4b2d77 !important;        /* 未选用深紫字，浅紫轨道上清晰 */
 }
 </style>

@@ -6,10 +6,11 @@
  */
 import { ref, type Ref, type ComputedRef } from 'vue'
 import { ElMessage } from 'element-plus'
-import { refreshDisclosureFromWorkpapers, type RefreshFromWorkpapersResult } from '@/services/commonApi'
+import { refreshDisclosureFromWorkpapers, refreshDisclosureSection, type RefreshFromWorkpapersResult } from '@/services/commonApi'
 import { handleApiError } from '@/utils/errorHandler'
 // 复用「跳转至披露表」的同一套章节判定函数，消除跳转/刷新两套硬编码映射漂移（单一真源）
 import {
+  isD1NotesReceivableNoteSection,
   isG14CreditImpairmentNoteSection,
   isH1FixedAssetNoteSection,
   isH8RouNoteSection,
@@ -25,12 +26,16 @@ export interface UseNoteRefreshOptions {
   fetchDetail: (noteSection: string) => Promise<void>
   fetchTree: () => Promise<void>
   staleRecalc: () => Promise<void>
+  /** 清空全部章节详情缓存（「全部刷新」用，使所有章节都反映最新科目数据而非仅当前节） */
+  invalidateAllCache?: () => void
 }
 
 export interface UseNoteRefreshReturn {
   refreshLoading: Ref<boolean>
+  refreshAllLoading: Ref<boolean>
   syncError: Ref<boolean>
   onRefreshFromWP: () => Promise<void>
+  onRefreshAll: () => Promise<void>
   onManualRefresh: () => Promise<void>
   onStaleRecalc: () => Promise<void>
   showRefreshResultMessage: (result: RefreshFromWorkpapersResult) => void
@@ -39,9 +44,10 @@ export interface UseNoteRefreshReturn {
 }
 
 export function useNoteRefresh(options: UseNoteRefreshOptions): UseNoteRefreshReturn {
-  const { projectId, year, currentNote, fetchDetail, fetchTree, staleRecalc } = options
+  const { projectId, year, currentNote, fetchDetail, fetchTree, staleRecalc, invalidateAllCache } = options
 
   const refreshLoading = ref(false)
+  const refreshAllLoading = ref(false)
   const syncError = ref(false)
   let syncDebounceTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -105,14 +111,48 @@ export function useNoteRefresh(options: UseNoteRefreshOptions): UseNoteRefreshRe
     })
   }
 
+  /**
+   * 刷新（当前页面级）— 只重算并重载「当前正在查看的章节」。
+   *
+   * 后端只重算该节（refresh_section_from_workpaper），前端也只重载该节，
+   * 前后端一致；不再全量写库导致其它章节 DB 新、前端缓存旧的不一致。
+   * 需刷新全部章节请用「全部刷新」(onRefreshAll)。
+   */
   async function onRefreshFromWP() {
+    const section = currentNote.value?.note_section
+    if (!section) {
+      ElMessage({ type: 'info', message: '请先选择要刷新的附注章节', duration: 3000, customClass: 'gt-msg-purple' })
+      return
+    }
     refreshLoading.value = true
     try {
-      const result = await refreshDisclosureFromWorkpapers(projectId.value, year.value)
+      const result = await refreshDisclosureSection(projectId.value, year.value, section)
       showRefreshResultMessage(result)
-      if (currentNote.value) await fetchDetail(currentNote.value.note_section)
+      await fetchDetail(section)
     } catch (e) { handleApiError(e, '刷新附注') }
     finally { refreshLoading.value = false }
+  }
+
+  /**
+   * 全部刷新 — 从底稿披露表起，刷新更新「全部」附注主要项目下的科目数据。
+   *
+   * 后端项目级重算（refill_sections）本就覆盖所有映射章节；此处在其基础上
+   * 清空全部章节缓存 + 重拉整棵章节树 + 重载当前节，使每个附注章节（非仅当前节）
+   * 都立即反映最新科目数据。
+   */
+  async function onRefreshAll() {
+    refreshAllLoading.value = true
+    try {
+      const result = await refreshDisclosureFromWorkpapers(projectId.value, year.value)
+      // 清空全部章节详情缓存，避免其它已缓存章节仍显示旧数据
+      invalidateAllCache?.()
+      // 重拉章节树（含各章节完成度/stale 标记）
+      await fetchTree()
+      // 重载当前正在查看的章节详情
+      if (currentNote.value) await fetchDetail(currentNote.value.note_section)
+      showRefreshResultMessage(result)
+    } catch (e) { handleApiError(e, '全部刷新附注') }
+    finally { refreshAllLoading.value = false }
   }
 
   async function onManualRefresh() {
@@ -202,22 +242,25 @@ export function useNoteRefresh(options: UseNoteRefreshOptions): UseNoteRefreshRe
         || current === '五、31'
         || current === '八、32'
       )
-    // 6701 资产减值损失（K11）：关键词 / 五、73(上市) / 五、75(国企)
+    // 6701 资产减值损失（K11）：上市三、资产减值损失(关键词) / 国企 八、74
     const isK11Impair = String(payload.accountCode || '') === '6701'
       && (
         current.includes('资产减值损失')
-        || current.startsWith('五、73')
-        || current.startsWith('五、75')
+        || current.startsWith('八、74')
       )
-    // 6711 营业外支出（K13）：关键词（区别于营业外收入 6301）
+    // 6711 营业外支出（K13）：上市三、营业外支出(关键词) / 国企 八、77（区别于营业外收入 6301）
     const isK13NonOpExp = String(payload.accountCode || '') === '6711'
-      && current.includes('营业外支出')
+      && (
+        current.includes('营业外支出')
+        || current.startsWith('八、77')
+      )
     // 兜底：补齐跳转侧支持但刷新侧此前缺失的 6 族（G14/H1/H8/H9/H10/I1）。
     // 复用 noteDisclosureJump 的章节判定（单一真源），当载荷携带 accountCode（=某底稿披露已变更）
     // 且当前正查看的附注节匹配上述任一披露族时兜底刷新；重取当前节详情幂等无害。
     const hasAccountCode = !!String(payload.accountCode || '').trim()
     const matchesDisclosureFamily = hasAccountCode && (
-      isG14CreditImpairmentNoteSection(current)
+      isD1NotesReceivableNoteSection(current)
+      || isG14CreditImpairmentNoteSection(current)
       || isH1FixedAssetNoteSection(current)
       || isH8RouNoteSection(current)
       || isH9LeaseLiabilityNoteSection(current)
@@ -241,8 +284,10 @@ export function useNoteRefresh(options: UseNoteRefreshOptions): UseNoteRefreshRe
 
   return {
     refreshLoading,
+    refreshAllLoading,
     syncError,
     onRefreshFromWP,
+    onRefreshAll,
     onManualRefresh,
     onStaleRecalc,
     showRefreshResultMessage,

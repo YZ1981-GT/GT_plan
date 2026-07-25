@@ -14,6 +14,26 @@
       <span class="chip-wrap"><GtIndexChip value="wp:H7-3" :context-project-id="projectId" /></span>
       <el-tag size="small" type="info">共 {{ rows.length }} 笔</el-tag>
       <el-tag size="small" :type="isBalanced ? 'success' : 'danger'">{{ isBalanced ? '借贷平衡' : '借贷不平衡' }}</el-tag>
+      <el-button
+        v-if="!isReadonly"
+        size="small"
+        type="primary"
+        plain
+        :loading="centralSyncing"
+        :disabled="!isBalanced || rows.length === 0"
+        title="把本页调整分录汇聚到集中调整登记，供合伙人跨循环审阅"
+        @click="syncToCentral"
+      >
+        同步到集中登记
+      </el-button>
+      <el-tag
+        v-if="centralStatus?.review_status"
+        size="small"
+        :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
+        :title="centralStatus.rejection_reason || ''"
+      >
+        集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
+      </el-tag>
     </div>
 
     <el-table :data="displayRows" border stripe size="small" class="adj-table">
@@ -116,11 +136,13 @@
  *
  * Spec: .kiro/specs/h7-biological-assets/  Requirements: 调整分录汇总
  */
-import { ref, computed, onMounted, inject, toRef } from 'vue'
+import { ref, computed, onMounted, inject, toRef, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { useH7Adjustment } from '../../composables/useH7Adjustment'
+import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
+import { useAuditContext } from '@/composables/useAuditContext'
 
 const props = defineProps<{
   wpId: string
@@ -157,6 +179,27 @@ const subtotalRow = computed<AdjEntry>(() => ({
   debit: totalDebit.value, credit: totalCredit.value, isSubtotal: true,
 }))
 const displayRows = computed(() => [...rows.value, subtotalRow.value])
+
+// ─── 同步到集中调整登记（workpaper-adjustment-centralization） ───
+const { year: centralYear } = useAuditContext()
+const { centralStatus, syncing: centralSyncing, syncToCentral, refreshStatus } = useAdjustmentCentralSync({
+  projectId: toRef(props, 'projectId') as Ref<string>,
+  year: centralYear,
+  wpId: toRef(props, 'wpId') as Ref<string>,
+  wpCode: 'H7',
+  itemId: 'H7-3-rows',
+  buildLineItems: () => rows.value.map((e) => ({
+    standard_account_code: e.accountCode || undefined,
+    account_name: e.accountName,
+    debit_amount: e.debit,
+    credit_amount: e.credit,
+  })),
+  buildMeta: () => ({
+    description: rows.value.find((e) => e.summary)?.summary || 'H7 生产性生物资产调整',
+    adjustmentType: rows.value.length > 0 && rows.value.every((e) => e.type === 'RJE') ? 'rje' : 'aje',
+  }),
+})
+onMounted(() => refreshStatus())
 
 async function loadOwn() {
   try {

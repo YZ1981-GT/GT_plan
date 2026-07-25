@@ -14,10 +14,13 @@
  *
  * 科目：2701 长期应付款（贷方/负债类！期末=期初+贷方-借方）
  */
-import { computed, ref, type ComputedRef, type Ref } from 'vue'
+import { computed, ref, watch, type ComputedRef, type Ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { calcLiabilityEndBalance, calcSubtotal } from './useL5FormulaEngine'
-import type { useL5FormData } from './useL5FormData'
+import type { useL5FormData, ChecklistResponse } from './useL5FormData'
+
+/** 🔴 P0 修复：JSON 存储键（此前组件无 hydration + 保存仅序列化字段子集 → 刷新数据丢失/大部分字段丢失） */
+const ITEM_ROWS = 'L5-L5-2-rows'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -105,7 +108,22 @@ export function useL5Detail(
   formData: ReturnType<typeof useL5FormData>,
   detailRows: Ref<L5DetailRow[]>,
 ) {
-  const { debouncedSave } = formData
+  const { allResponses, debouncedSave } = formData
+
+  // ─── 0. Hydration（从 allResponses 解析完整行 JSON） ─────────────────────
+  function hydrate(): void {
+    const raw = allResponses.value.get(ITEM_ROWS)?.remark
+    if (!raw) return
+    try {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) detailRows.value = parsed
+    } catch { /* ignore */ }
+  }
+  hydrate()
+  watch(
+    () => allResponses.value.get(ITEM_ROWS)?.remark,
+    (v) => { if (v && detailRows.value.length === 0) hydrate() },
+  )
 
   // ─── 1. 区段Tab状态 ────────────────────────────────────────────────────
 
@@ -216,24 +234,17 @@ export function useL5Detail(
 
   // ─── 4. 保存触发 ──────────────────────────────────────────────────────
 
-  function _triggerSave(rowIndex: number): void {
-    const row = detailRows.value[rowIndex]
-    if (!row) return
-    // 将整个行数据序列化为JSON供持久化+CrossSheet勾稽
-    debouncedSave('L5-L5-2-rows', {
-      remark: JSON.stringify(detailRows.value.map(r => ({
-        key: r.key,
-        payableName: r.payableName,
-        endBalance: calcLiabilityEndBalance(r.beginning, r.periodIncrease, r.periodRepayment),
-        beginning: r.beginning,
-        periodIncrease: r.periodIncrease,
-        periodRepayment: r.periodRepayment,
-      }))),
-    })
+  function _triggerSave(_rowIndex?: number): void {
+    // 序列化完整行数据（含所有字段）+ 保证 endBalance 新鲜，供持久化+CrossSheet勾稽
+    const payload = detailRows.value.map(r => ({
+      ...r,
+      endBalance: calcLiabilityEndBalance(r.beginning, r.periodIncrease, r.periodRepayment),
+    }))
+    debouncedSave(ITEM_ROWS, { remark: JSON.stringify(payload) } as Partial<ChecklistResponse>)
   }
 
   function _triggerSaveAll(): void {
-    _triggerSave(0)
+    _triggerSave()
   }
 
   // ─── Return ────────────────────────────────────────────────────────────

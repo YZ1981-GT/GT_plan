@@ -10,13 +10,10 @@
         </el-tag>
       </div>
       <div class="section-header-right">
-        <el-segmented
-          v-model="dualMode.mode.value"
-          :options="dualMode.modeOptions.value"
-          size="small"
-          @change="(val: any) => dualMode.switchMode(val)"
-        />
-        <el-button size="small" @click="handleAI('adjudication')">
+        <el-button size="small" type="primary" plain :loading="adjPull.loading.value" :disabled="isReadonly" @click="openBringInAdjustment">
+          <el-icon><Download /></el-icon> 带入调整
+        </el-button>
+        <el-button size="small" :loading="aiLoading === 'adjudication'" :disabled="isReadonly" @click="handleAI('adjudication')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
         <el-button size="small" @click="handleReview">
@@ -284,7 +281,7 @@
       <template #header>
         <div class="section-header">
           <span class="card-title">原因分析及审计说明</span>
-          <el-button size="small" @click="handleAI('auditNote')"><el-icon><MagicStick /></el-icon> AI辅助</el-button>
+          <el-button size="small" :loading="aiLoading === 'auditNote'" :disabled="isReadonly" @click="handleAI('auditNote')"><el-icon><MagicStick /></el-icon> AI辅助</el-button>
         </div>
       </template>
       <el-input v-model="auditNote" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" placeholder="请填写盈余公积审定表审计说明..." :disabled="isReadonly" @change="saveAuditNote" />
@@ -301,8 +298,18 @@
         <li>双区块展示：法定盈余公积 + 任意盈余公积</li>
         <li>审定数变化自动回写 TB（科目 4101）并通知附注组件</li>
         <li>合计行应与明细表M5-2的合计一致（交叉验证）</li>
+        <li>「带入调整」：从集中登记按科目 4101 拉取调整分录，逐笔分配到各区块项目行的 AJE/RJE，带入后审定数自动更新并联动附注</li>
       </ul>
     </details>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="4101 盈余公积"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
@@ -314,15 +321,18 @@
  * 公式列虚线下划线+cursor:help+tooltip
  */
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
-import { ElMessageBox } from 'element-plus'
-import { MagicStick, Check } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { MagicStick, Check, Download } from '@element-plus/icons-vue'
 import { useM5FormData } from '../../composables/useM5FormData'
-import { useM5DualMode } from '../../composables/useM5DualMode'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import {
   useM5Adjudication,
   type M5AdjudicationRow,
   type M5AdjudicationBlock,
 } from '../../composables/useM5Adjudication'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import { useAuditContext } from '@/composables/useAuditContext'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import { eventBus } from '@/utils/eventBus'
 
 const props = defineProps<{ wpId: string; projectId: string; isReadonly: boolean }>()
@@ -331,7 +341,8 @@ const emit = defineEmits<{ (e: 'navigate', sheetName: string): void; (e: 'save')
 const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', () => {})
 
 const formData = useM5FormData({ wpId: computed(() => props.wpId), projectId: computed(() => props.projectId) })
-const dualMode = useM5DualMode({ wpId: computed(() => props.wpId) })
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
 const rows = ref<M5AdjudicationRow[]>([])
 
 const {
@@ -339,6 +350,38 @@ const {
   totalChangeRate, equityEndCheck, addRow, removeRow,
   updateRow: composableUpdateRow, saveAndWriteback, subscribeDisclosure,
 } = useM5Adjudication(formData, rows)
+
+// ─── 从集中登记带入调整（4101 盈余公积，权益贷方；单期 aje/rje，双区块项目行） ───
+const bringInRows = computed(() =>
+  computedRows.value.map((r) => ({
+    rowKey: r.key,
+    name: r.itemName || (r.block === 'statutory' ? '法定盈余公积项目' : '任意盈余公积项目'),
+    aje: r.aje ?? 0,
+    rje: r.rje ?? 0,
+  })),
+)
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: computed(() => props.projectId) as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '4101',
+  direction: 'credit',
+  subjectCode: '4101',
+  wpCode: 'M5',
+  subjectLabel: '盈余公积(4101)',
+  rows: bringInRows,
+  updateCell: (rowKey: string, field: any, value: number) => {
+    const idx = rows.value.findIndex((r) => r.key === rowKey)
+    if (idx < 0) return
+    composableUpdateRow(idx, field === 'aje' ? 'aje' : 'rje', value)
+  },
+  totalAudited: () => totalRow.value.audited,
+})
 
 // ─── 表格数据：按区块拆分 + 小计行 ──────────────────────────────────────────
 interface TableRow extends M5AdjudicationRow { _rowType?: 'data' | 'subtotal' }
@@ -432,7 +475,24 @@ async function handleSave() {
   try { await saveAndWriteback(); emit('save') } finally { isSaving.value = false }
 }
 function saveAuditNote() { formData.debouncedSave('M5-1-auditNote', { remark: auditNote.value || null }) }
-function handleAI(_section: string) { /* AI钩子 */ }
+async function handleAI(section: string) {
+  if (props.isReadonly) return
+  aiLoading.value = section
+  try {
+    const context: Record<string, string> = {
+      科目: '4101 盈余公积（权益类贷方）',
+      法定小计审定: fmtAmount(statutorySubtotal.value.audited),
+      任意小计审定: fmtAmount(discretionarySubtotal.value.audited),
+      合计审定: fmtAmount(totalRow.value.audited),
+      变动率: (totalChangeRate.value * 100).toFixed(1) + '%',
+      期末校验: equityEndCheck.value.isMatch ? '平衡' : '不平衡',
+    }
+    const text = await generateAiText({ section: `m5-adjudication-${section}`, context, existingContent: auditNote.value })
+    if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+    auditNote.value = text
+    saveAuditNote()
+  } catch { ElMessage.warning('AI 生成失败，请稍后重试') } finally { aiLoading.value = '' }
+}
 function handleReview() { openReviewDialog?.('M5-1-adjudication', '盈余公积审定表') }
 
 // ─── EventBus ────────────────────────────────────────────────────────────────

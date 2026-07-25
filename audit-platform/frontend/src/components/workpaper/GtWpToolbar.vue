@@ -17,6 +17,10 @@
         <el-icon><Upload /></el-icon> 导入
       </el-button>
     </div>
+    <!-- 中间插槽：放 AI 复核工具栏（本页/批量），占用左右按钮之间的空档 -->
+    <div v-if="$slots.center" class="gt-wp-toolbar__center">
+      <slot name="center" />
+    </div>
     <div class="gt-wp-toolbar__right">
       <el-button size="small" @click="$emit('add-row')">
         <el-icon><Plus /></el-icon> 增行
@@ -60,7 +64,8 @@ defineEmits<{
   flex-shrink: 0;
 }
 .gt-wp-toolbar__left,
-.gt-wp-toolbar__right {
+.gt-wp-toolbar__right,
+.gt-wp-toolbar__center {
   display: flex;
   gap: 6px;
   align-items: center;

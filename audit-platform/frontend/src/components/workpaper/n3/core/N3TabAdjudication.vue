@@ -23,6 +23,9 @@
         <el-tag type="danger" size="small" class="liability-tag">负债类·贷方</el-tag>
       </div>
       <div class="section-actions">
+        <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
+          <el-icon><Download /></el-icon>带入调整
+        </el-button>
         <el-button size="small" @click="handleAiAssist">
           <el-icon><MagicStick /></el-icon>AI辅助
         </el-button>
@@ -338,8 +341,19 @@
         <li>N3-2明细表各项目期末递延税负债合计应与本表审定合计一致</li>
         <li>本期变动额（期末−期初）供N5递延所得税费用核对</li>
         <li>"回写审定数"将合计审定数回写至试算表（科目2901期末余额）</li>
+        <li>「带入调整」：按科目2901拉取调整分录，逐笔选目标差异项目行累加到 AJE/RJE，带入后自动联动披露与附注</li>
       </ul>
     </details>
+
+    <!-- ═══ 带入调整 弹窗 ═══ -->
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="2901 递延所得税负债"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
@@ -364,12 +378,15 @@
  */
 import { ref, computed, inject, watch, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { MagicStick, ChatDotSquare, WarningFilled } from '@element-plus/icons-vue'
+import { MagicStick, ChatDotSquare, WarningFilled, Download } from '@element-plus/icons-vue'
 // @ts-ignore
 import GtIndexChip from '../../GtIndexChip.vue'
 import { useN3FormData } from '../../composables/useN3FormData'
 import { useN3Adjudication, type N3DiffCategory } from '../../composables/useN3Adjudication'
 import { useN3CrossSheet } from '../../composables/useN3CrossSheet'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import { eventBus } from '@/utils/eventBus'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -426,6 +443,27 @@ const {
   deferredTaxChange,
   publishDeferredTaxLiabilityUpdated,
 } = useN3CrossSheet(allResponsesRef)
+
+// ─── 带入调整（adjustment-collaboration-and-propagation） ─────────────────────
+// 审定表按科目(2901)拉取调整分录，逐笔分配到目标差异项目行的 AJE/RJE 列（累加）。
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: projectIdRef as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '2901',
+  direction: 'credit', // 负债贷方：净发生额 = 贷 − 借
+  subjectCode: '2901',
+  wpCode: 'N3',
+  subjectLabel: '递延所得税负债(2901)',
+  rows: computed(() => rows.value.map((r) => ({ rowKey: r.category, name: r.category, aje: r.aje, rje: r.rje }))),
+  updateCell: (rowKey: string, field: any, value: number) => { void updateRow(rowKey as N3DiffCategory, field, value) },
+  totalAudited: () => total.value.audited,
+})
 
 // ─── 审计说明/结论 ───────────────────────────────────────────────────────────
 

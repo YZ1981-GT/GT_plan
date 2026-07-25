@@ -1,5 +1,18 @@
 <template>
   <div class="h3-tab-index">
+    <!-- E1 标准加法式增强：目录卡 + 结论看板 + 本循环 grid -->
+    <GtCycleDirExtras
+      wp-code="H3"
+      cycle-letter="H"
+      :wp-id="props.wpId"
+      :project-id="props.projectId"
+      :all-responses="props.allResponses"
+      :sheets="dirSheets"
+      @navigate="onDirNavigate"
+      @open-handbook="openHandbook"
+    />
+    <H3PreparationHandbookDialog v-model="handbookVisible" :initial-tab="handbookTab" />
+
     <!-- 顶部引导区 -->
     <div class="guide-area">
       <div class="guide-grid">
@@ -77,7 +90,10 @@
  * 22行进度条 + 完成状态 + 计量模式标识 + 点击导航
  * Spec: Task 4.1 | Requirements: 1
  */
-import { computed } from 'vue'
+import { computed, ref, defineAsyncComponent } from 'vue'
+import GtCycleDirExtras from '../../GtCycleDirExtras.vue'
+
+const H3PreparationHandbookDialog = defineAsyncComponent(() => import('../H3PreparationHandbookDialog.vue'))
 
 const props = defineProps<{
   wpId: string
@@ -137,6 +153,20 @@ function _hasData(code: string): boolean {
 
 function handleNavigate(row: SheetEntry) {
   emit('navigate-sheet', row.sheetName)
+}
+
+// ─── E1 标准加法式增强：目录卡 + 结论看板 + 本循环 grid（GtCycleDirExtras） ───
+const dirSheets = computed(() =>
+  sheets.value.map((s) => ({ code: s.code, navValue: s.sheetName, name: s.name })),
+)
+function onDirNavigate(navValue: string) {
+  emit('navigate-sheet', navValue)
+}
+const handbookVisible = ref(false)
+const handbookTab = ref<'preparation' | 'usage'>('preparation')
+function openHandbook(tab: 'preparation' | 'usage') {
+  handbookTab.value = tab
+  handbookVisible.value = true
 }
 </script>
 

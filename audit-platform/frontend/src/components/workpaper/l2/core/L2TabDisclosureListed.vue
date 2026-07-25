@@ -1,106 +1,55 @@
 <template>
   <div class="l2-tab-disclosure-listed">
-    <!-- ═══ 方法论上下文（琥珀色左边线+浅黄背景） ═══ -->
+    <!-- ═══ 方法论上下文 ═══ -->
     <div class="methodology-context">
       <div class="methodology-text">
         <strong>附注披露（上市公司）规范：</strong>
-        按CAS 30/上市公司信息披露准则，列示应付利息分类汇总及逾期利息明细。
-        数据来源于L2-2明细表审定数，审定变化时自动刷新（EventBus订阅）。
+        按 CAS 30 / 上市公司信息披露准则，按利息来源分类列示应付利息期末余额与上年年末余额，
+        并披露重要的逾期未付利息（借款单位/逾期金额/逾期原因）。数据自 L2-2 明细表审定数按类别聚合，
+        审定变化时自动刷新（EventBus订阅）。
       </div>
     </div>
 
-    <!-- ════════════════════════════════════════════════════════════════════ -->
-    <!-- Section ① 应付利息分类汇总（按来源） -->
-    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <!-- ═══ Section ① 应付利息分类列示 ═══ -->
     <div class="disclosure-section">
       <div class="section-header">
-        <h4 class="section-title">① 应付利息分类汇总（按来源）</h4>
-        <el-button
-          v-if="!isReadonly"
-          type="primary"
-          text
-          size="small"
-          @click="handleReview('source-summary')"
-        >
-          复核
-        </el-button>
+        <h4 class="section-title">① 应付利息（按来源分类）</h4>
+        <el-button v-if="!isReadonly" type="primary" text size="small" @click="handleReview('classification')">复核</el-button>
       </div>
 
-      <el-table
-        :data="sourceSummaryData"
-        border
-        size="small"
-        style="width: 100%"
-        show-summary
-        :summary-method="getSourceSummary"
-      >
-        <el-table-column prop="source" label="利息来源" min-width="160" />
-        <el-table-column label="审定期末" min-width="130" align="right">
+      <el-table :data="disclosureTableData" border size="small" style="width: 100%" :row-class-name="rowClass">
+        <el-table-column prop="label" label="项目" min-width="240">
           <template #default="{ row }">
-            {{ fmtAmount(row.auditedEnd) }}
+            <span :class="{ 'row-bold': row.isTotal, 'row-indent': row.isSub }">{{ row.label }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="审定期初" min-width="130" align="right">
-          <template #default="{ row }">
-            {{ fmtAmount(row.auditedBegin) }}
-          </template>
+        <el-table-column label="期末余额" min-width="160" align="right">
+          <template #default="{ row }">{{ fmtAmount(row.endAmount) }}</template>
         </el-table-column>
-        <el-table-column label="变动额" min-width="130" align="right">
-          <template #header>
-            <el-tooltip content="变动额 = 审定期末 − 审定期初" placement="top">
-              <span class="formula-col-header">变动额</span>
-            </el-tooltip>
-          </template>
-          <template #default="{ row }">
-            <el-tooltip content="变动额 = 审定期末 − 审定期初" placement="top">
-              <span class="formula-cell">{{ fmtAmount(row.change) }}</span>
-            </el-tooltip>
-          </template>
+        <el-table-column label="上年年末余额" min-width="160" align="right">
+          <template #default="{ row }">{{ fmtAmount(row.priorAmount) }}</template>
         </el-table-column>
       </el-table>
     </div>
 
-    <!-- ════════════════════════════════════════════════════════════════════ -->
-    <!-- Section ② 逾期利息明细 -->
-    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <!-- ═══ Section ② 重要的逾期未付利息 ═══ -->
     <div class="disclosure-section">
       <div class="section-header">
-        <h4 class="section-title">② 逾期利息明细</h4>
-        <el-button
-          v-if="!isReadonly"
-          type="primary"
-          text
-          size="small"
-          @click="handleReview('overdue-detail')"
-        >
-          复核
-        </el-button>
+        <h4 class="section-title">② 重要的逾期未付利息</h4>
+        <el-button v-if="!isReadonly" type="primary" text size="small" @click="handleReview('overdue')">复核</el-button>
       </div>
 
-      <template v-if="overdueData.length > 0">
-        <el-table
-          :data="overdueData"
-          border
-          size="small"
-          style="width: 100%"
-        >
-          <el-table-column prop="contractName" label="借款名称" min-width="180" />
-          <el-table-column label="逾期金额" min-width="130" align="right">
-            <template #default="{ row }">
-              {{ fmtAmount(row.overdueAmount) }}
-            </template>
+      <template v-if="overdueRows.length > 0">
+        <el-table :data="overdueRows" border size="small" style="width: 100%">
+          <el-table-column prop="borrower" label="借款单位" min-width="200" />
+          <el-table-column label="逾期金额" min-width="150" align="right">
+            <template #default="{ row }">{{ fmtAmount(row.overdueAmount) }}</template>
           </el-table-column>
-          <el-table-column prop="overdueReason" label="逾期原因" min-width="200" />
-          <el-table-column label="逾期月数" min-width="90" align="center">
-            <template #default="{ row }">
-              {{ row.overdueMonths > 0 ? `${row.overdueMonths}个月` : '-' }}
-            </template>
-          </el-table-column>
-          <el-table-column prop="source" label="借款类别" min-width="120" />
+          <el-table-column prop="overdueReason" label="逾期原因" min-width="220" />
         </el-table>
       </template>
       <template v-else>
-        <el-empty description="无逾期利息" :image-size="60" />
+        <el-empty description="无重要逾期未付利息" :image-size="60" />
       </template>
     </div>
 
@@ -108,11 +57,10 @@
     <details class="l2-details-tip">
       <summary>编制提示</summary>
       <ul>
-        <li><strong>数据来源</strong>：附注数据自动从L2-2明细表审定结果提取，只读展示</li>
-        <li><strong>分类汇总</strong>：按借款来源（短期借款/长期借款/应付债券）汇总审定期末/期初</li>
-        <li><strong>逾期利息</strong>：从L2-2中逾期标记行(isOverdue)提取，需在明细表标注逾期</li>
-        <li><strong>自动刷新</strong>：L2-1审定表提交后自动刷新附注数据（EventBus订阅）</li>
-        <li><strong>披露格式</strong>：上市公司需额外披露逾期原因及是否涉及诉讼担保</li>
+        <li><strong>分类固定行</strong>：分期付息长借利息/企业债券/短借/优先股永续债（工具1/2）/其他/合计，对齐源模板</li>
+        <li><strong>数据来源</strong>：从 L2-2 明细按类别 SUMIF 聚合，期末=审定期末，上年年末=审定期初，只读展示</li>
+        <li><strong>逾期利息</strong>：从 L2-2 逾期标记行（isOverdue）提取借款单位/逾期金额/逾期原因</li>
+        <li><strong>自动刷新</strong>：L2-1 审定表提交后自动刷新（EventBus 订阅 substantive:adjudicated）</li>
       </ul>
     </details>
   </div>
@@ -120,28 +68,19 @@
 
 <script setup lang="ts">
 /**
- * L2TabDisclosureListed — L2 附注披露信息（上市公司）
+ * L2TabDisclosureListed — L2 附注披露信息（上市公司，源模板重建）
  *
- * 功能：
- * - Section ① 应付利息分类汇总（按来源）
- * - Section ② 逾期利息明细
- * - 数据来源于 L2-2 明细表（只读展示）
- * - Subscribe 'substantive:adjudicated' EventBus → refresh display
- * - inject openReviewDialog
- *
- * Spec: .kiro/specs/l2-interest-payable/
- * Task: 4.5
- * Requirements: 5.4, 5.5
+ * - 分类固定行（源模板 5 类 + 优先股[工具1/2] + 其他 + 合计）：期末余额 / 上年年末余额
+ * - 重要的逾期未付利息表（借款单位/逾期金额/逾期原因）
+ * - 数据从 L2-2 明细按类别聚合（只读），订阅 substantive:adjudicated 自动刷新
  *
  * 科目：2231 应付利息（贷方/负债类）
  */
-import { computed, ref, inject, toRef, onUnmounted } from 'vue'
+import { inject, toRef, onUnmounted } from 'vue'
 import { useL2FormData } from '../../composables/useL2FormData'
-import { useL2Detail, type DetailRow } from '../../composables/useL2Detail'
-import { calcSubtotal } from '../../composables/useL2FormulaEngine'
+import { useL2Disclosure } from '../../composables/useL2Disclosure'
 import { eventBus } from '@/utils/eventBus'
-
-// ─── Props ───────────────────────────────────────────────────────────────────
+import type { DisclosureRow } from '../../composables/useL2Disclosure'
 
 const props = defineProps<{
   wpId: string
@@ -149,135 +88,42 @@ const props = defineProps<{
   isReadonly: boolean
 }>()
 
-// ─── Inject openReviewDialog ─────────────────────────────────────────────────
+const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', () => {})
 
-const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>(
-  'openReviewDialog',
-  () => {},
-)
-
-// ─── Composable: useL2FormData ───────────────────────────────────────────────
-
-const {
-  allResponses,
-  isLoading,
-  loadData,
-  saveField,
-  debouncedSave,
-} = useL2FormData({
+const { allResponses, loadData } = useL2FormData({
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
 })
-
-// 加载数据
 loadData()
 
-// ─── Composable: useL2Detail（提取明细数据） ─────────────────────────────────
+const { disclosureTableData, overdueRows } = useL2Disclosure(allResponses)
 
-const {
-  rows: detailRows,
-  overdueRows,
-} = useL2Detail({
-  allResponses,
-  wpId: toRef(props, 'wpId'),
-  projectId: toRef(props, 'projectId'),
-  debouncedSave,
-  saveField,
-})
-
-// ─── Section ①: 按来源分类汇总 ──────────────────────────────────────────────
-
-interface SourceSummaryRow {
-  source: string
-  auditedEnd: number
-  auditedBegin: number
-  change: number
-}
-
-const sourceSummaryData = computed<SourceSummaryRow[]>(() => {
-  const grouped: Record<string, { auditedEnd: number; auditedBegin: number }> = {}
-
-  for (const row of detailRows.value) {
-    const key = row.source || '未分类'
-    if (!grouped[key]) {
-      grouped[key] = { auditedEnd: 0, auditedBegin: 0 }
-    }
-    grouped[key].auditedEnd += row.audited || 0
-    grouped[key].auditedBegin += row.adjustedBegin || 0
-  }
-
-  return Object.entries(grouped).map(([source, data]) => ({
-    source,
-    auditedEnd: data.auditedEnd,
-    auditedBegin: data.auditedBegin,
-    change: data.auditedEnd - data.auditedBegin,
-  }))
-})
-
-/** 自定义合计行 */
-function getSourceSummary({ columns, data }: { columns: any[]; data: SourceSummaryRow[] }) {
-  const sums: string[] = []
-  columns.forEach((_col: any, index: number) => {
-    if (index === 0) {
-      sums[index] = '合计'
-      return
-    }
-    const key = index === 1 ? 'auditedEnd' : index === 2 ? 'auditedBegin' : 'change'
-    const total = calcSubtotal(data.map(row => (row as any)[key] ?? 0))
-    sums[index] = fmtAmount(total)
-  })
-  return sums
-}
-
-// ─── Section ②: 逾期利息明细 ────────────────────────────────────────────────
-
-interface OverdueDisplayRow {
-  contractName: string
-  overdueAmount: number
-  overdueReason: string
-  overdueMonths: number
-  source: string
-}
-
-const overdueData = computed<OverdueDisplayRow[]>(() => {
-  return overdueRows.value.map(row => ({
-    contractName: row.contractName || '-',
-    overdueAmount: row.endBalance,
-    overdueReason: row.overdueReason || '-',
-    overdueMonths: row.overdueMonths,
-    source: row.source || '-',
-  }))
-})
-
-// ─── EventBus: subscribe 'substantive:adjudicated' → refresh ─────────────────
-
+// ─── EventBus: 审定变化刷新 ──────────────────────────────────────────────────
 function handleAdjudicatedEvent(): void {
   loadData()
 }
-
 eventBus.on('substantive:adjudicated', handleAdjudicatedEvent)
-
 onUnmounted(() => {
   eventBus.off('substantive:adjudicated', handleAdjudicatedEvent)
 })
 
-// ─── 复核 ────────────────────────────────────────────────────────────────────
+function rowClass({ row }: { row: DisclosureRow }): string {
+  if (row.isTotal) return 'total-row'
+  if (row.rowKey === 'preferred-perpetual') return 'agg-row'
+  return ''
+}
 
 function handleReview(section: string): void {
   const labels: Record<string, string> = {
-    'source-summary': 'L2附注-利息分类汇总（上市）',
-    'overdue-detail': 'L2附注-逾期利息明细（上市）',
+    classification: 'L2附注-应付利息分类（上市）',
+    overdue: 'L2附注-逾期未付利息（上市）',
   }
   openReviewDialog(`L2-disclosure-listed-${section}`, labels[section] || section)
 }
 
-// ─── 金额格式化 ──────────────────────────────────────────────────────────────
-
 function fmtAmount(val: number | null | undefined): string {
   if (val == null || val === 0) return '-'
-  if (val < 0) {
-    return `(${Math.abs(val).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
-  }
+  if (val < 0) return `(${Math.abs(val).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
   return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 </script>
@@ -288,28 +134,25 @@ function fmtAmount(val: number | null | undefined): string {
   font-size: var(--wp-font-size, 13px);
 }
 
-/* ─── 方法论上下文（琥珀色左边线+浅黄背景） ─── */
 .methodology-context {
-  border-left: 4px solid #e6a23c;
-  background: #fdf6ec;
+  border-left: 4px solid #f59e0b;
+  background: #fffbeb;
   padding: 10px 14px;
   border-radius: 0 6px 6px 0;
   margin-bottom: 14px;
   font-size: var(--wp-font-size, 13px);
-  color: #5a4e3a;
+  color: #78350f;
   line-height: 1.6;
 }
 
 .methodology-text strong {
-  color: #b88230;
+  color: #b45309;
 }
 
-/* ─── Disclosure Section ─── */
 .disclosure-section {
   margin-bottom: 20px;
 }
 
-/* ─── Section标题行 + 复核按钮右对齐 ─── */
 .section-header {
   display: flex;
   align-items: center;
@@ -324,22 +167,25 @@ function fmtAmount(val: number | null | undefined): string {
   margin: 0;
 }
 
-/* ─── 公式列表头（虚线下划线 + cursor:help） ─── */
-.formula-col-header {
-  border-bottom: 1px dashed #909399;
-  cursor: help;
-  padding-bottom: 1px;
+.row-bold {
+  font-weight: 700;
 }
 
-/* ─── 公式列单元格（虚线下划线 + cursor:help） ─── */
-.formula-cell {
-  border-bottom: 1px dashed #c0c4cc;
-  cursor: help;
-  padding-bottom: 1px;
-  display: inline-block;
+.row-indent {
+  padding-left: 20px;
+  color: #909399;
 }
 
-/* ─── 表格统一13px字体 ─── */
+:deep(.total-row) {
+  background-color: #f0f9eb !important;
+  font-weight: 700;
+}
+
+:deep(.agg-row) {
+  background-color: #fafafa !important;
+  font-weight: 600;
+}
+
 :deep(.el-table) {
   font-size: var(--wp-font-size, 13px);
 }
@@ -349,7 +195,6 @@ function fmtAmount(val: number | null | undefined): string {
   font-weight: 600;
 }
 
-/* ─── 编制提示折叠 ─── */
 .l2-details-tip {
   margin-top: 16px;
   padding: 12px 16px;

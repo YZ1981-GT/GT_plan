@@ -43,6 +43,15 @@
     <!-- 工具栏 -->
     <div class="tab-toolbar">
       <div class="toolbar-left">
+        <el-button size="small" type="primary" plain :loading="adjPullCost.loading.value" @click="openBringInCost">
+          <el-icon><Download /></el-icon>带入调整(原值)
+        </el-button>
+        <el-button size="small" type="primary" plain :loading="adjPullAmort.loading.value" @click="openBringInAmort">
+          <el-icon><Download /></el-icon>带入调整(摊销)
+        </el-button>
+        <el-button size="small" type="primary" plain :loading="adjPullImpair.loading.value" @click="openBringInImpair">
+          <el-icon><Download /></el-icon>带入调整(减值)
+        </el-button>
         <el-dropdown v-if="!isReadonly" trigger="click" @command="handleFillFromDetail">
           <el-button size="small">从 I1-2 带入 ▾</el-button>
           <template #dropdown>
@@ -767,8 +776,34 @@
         <li>净值变动率≥{{ CHANGE_RATE_THRESHOLD }}% 须在说明事项(1)或分类说明中解释</li>
         <li>结论模板：A 无异常确认 / B 调整后确认 / C 重大未调整或范围受限不能确认</li>
         <li>「确认审定」回写 TB 1701/1702/1703 并发布 substantive:adjudicated</li>
+        <li>「带入调整(原值/摊销/减值)」：从集中登记按科目 1701/1702/1703 拉取调整分录，逐笔分配到各分类行的 AJE/RJE，带入后审定数自动更新并联动附注</li>
       </ul>
     </details>
+
+    <AdjudicationBringInDialog
+      v-model="bringInCostVisible"
+      :matches="adjPullCost.matches.value"
+      :row-options="bringInCostRowOptions"
+      subject-label="1701 无形资产原值"
+      :loading="adjPullCost.loading.value"
+      @apply="onBringInCostApply"
+    />
+    <AdjudicationBringInDialog
+      v-model="bringInAmortVisible"
+      :matches="adjPullAmort.matches.value"
+      :row-options="bringInAmortRowOptions"
+      subject-label="1702 累计摊销"
+      :loading="adjPullAmort.loading.value"
+      @apply="onBringInAmortApply"
+    />
+    <AdjudicationBringInDialog
+      v-model="bringInImpairVisible"
+      :matches="adjPullImpair.matches.value"
+      :row-options="bringInImpairRowOptions"
+      subject-label="1703 减值准备"
+      :loading="adjPullImpair.loading.value"
+      @apply="onBringInImpairApply"
+    />
   </div>
 </template>
 
@@ -778,8 +813,12 @@ import { ElMessage } from 'element-plus'
 import { useI1Adjudication, type I1BlockType, type I1AdjudicationRow, type I1NetValueRow } from '../../composables/useI1Adjudication'
 import { useI1CrossSheet } from '../../composables/useI1CrossSheet'
 import { useI1ImportExport } from '../../composables/useI1ImportExport'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import { useAuditContext } from '@/composables/useAuditContext'
 import { eventBus } from '@/utils/eventBus'
+import { Download } from '@element-plus/icons-vue'
 import GtIndexChip from '../../GtIndexChip.vue'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -856,6 +895,71 @@ const {
 )
 
 const publishing = ref(false)
+
+// ─── 从集中登记带入调整（三科目：1701原值[资产借方] / 1702累计摊销[备抵credit] / 1703减值准备[备抵credit]；带入期末 AJE/RJE） ───
+const bringInCostRows = computed(() =>
+  costRows.value.filter((r) => !r.isSubtotal).map((r) => ({ rowKey: r.rowId, name: r.category, aje: r.aje, rje: r.rje })),
+)
+const bringInAmortRows = computed(() =>
+  amortRows.value.filter((r) => !r.isSubtotal).map((r) => ({ rowKey: r.rowId, name: r.category, aje: r.aje, rje: r.rje })),
+)
+const bringInImpairRows = computed(() =>
+  impairmentRows.value.filter((r) => !r.isSubtotal).map((r) => ({ rowKey: r.rowId, name: r.category, aje: r.aje, rje: r.rje })),
+)
+const {
+  adjPull: adjPullCost,
+  visible: bringInCostVisible,
+  rowOptions: bringInCostRowOptions,
+  open: openBringInCost,
+  apply: onBringInCostApply,
+} = useAdjudicationBringIn({
+  projectId: computed(() => props.projectId) as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '1701',
+  direction: 'debit',
+  subjectCode: '1701',
+  wpCode: 'I1',
+  subjectLabel: '无形资产原值(1701)',
+  rows: bringInCostRows,
+  updateCell: (rowKey: string, field: any, value: number) => updateCell('cost', rowKey, field, value),
+  totalAudited: () => costSubtotal.value.audited,
+})
+const {
+  adjPull: adjPullAmort,
+  visible: bringInAmortVisible,
+  rowOptions: bringInAmortRowOptions,
+  open: openBringInAmort,
+  apply: onBringInAmortApply,
+} = useAdjudicationBringIn({
+  projectId: computed(() => props.projectId) as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '1702',
+  direction: 'credit',
+  subjectCode: '1702',
+  wpCode: 'I1',
+  subjectLabel: '累计摊销(1702)',
+  rows: bringInAmortRows,
+  updateCell: (rowKey: string, field: any, value: number) => updateCell('amort', rowKey, field, value),
+  totalAudited: () => amortSubtotal.value.audited,
+})
+const {
+  adjPull: adjPullImpair,
+  visible: bringInImpairVisible,
+  rowOptions: bringInImpairRowOptions,
+  open: openBringInImpair,
+  apply: onBringInImpairApply,
+} = useAdjudicationBringIn({
+  projectId: computed(() => props.projectId) as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '1703',
+  direction: 'credit',
+  subjectCode: '1703',
+  wpCode: 'I1',
+  subjectLabel: '减值准备(1703)',
+  rows: bringInImpairRows,
+  updateCell: (rowKey: string, field: any, value: number) => updateCell('impairment', rowKey, field, value),
+  totalAudited: () => impairmentSubtotal.value.audited,
+})
 
 const { adjustmentNets } = useI1CrossSheet(toRef(props, 'allResponses'))
 const i13Nets = computed(() => adjustmentNets.value)

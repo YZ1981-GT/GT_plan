@@ -1,50 +1,71 @@
 /**
- * useL1Adjudication — L1-1 审定表 composable
+ * useL1Adjudication — L1-1 短期借款审定表 composable（双期结构，2026-07 复盘重建）
  *
- * Spec: .kiro/specs/l1-short-term-loans/
- * Task: 3.4
- * Requirements: 2.1-2.7
+ * 对齐致同源模板「审定表L1-1」：
+ * - 分类行（源模板 4 类：信用/抵押/保证/质押 + 合计）
+ * - 双期结构：期初数(未审/账项调整/重分类/审定) + 期末数(未审/账项调整/重分类/审定)
+ * - 变动分析：本期未审 vs 期初未审(变动额/率) + 本期审定 vs 期初审定(变动额/率)
+ * - 原因分析（每行文本）
+ * - 从 L1-2 明细带入（SUMIF 等价按借款类型聚合期初/期末未审）
+ * - TB回写（科目 2001，期末审定合计）+ EventBus 'substantive:adjudicated'
  *
- * 职责：
- * - 负债类贷方期末计算：endBalance = beginning + credit - debit
- * - 审定数计算：audited = unadjusted + aje + rje
- * - 分类小计（信用/保证/抵押/质押）
- * - TB回写触发（科目2001）+ EventBus publish
+ * 科目：2001 短期借款（贷方/负债类）：审定 = 未审 + 账项调整 + 重分类调整
+ *
+ * ⚠️ 旧版为单期 roll-forward（期初/贷方/借方/期末 + 单期未审/AJE/RJE），
+ *    与源模板双期变动分析结构不符（缺期初审定分解/变动额率/原因分析）。
+ *    本次重建为源模板双期结构。明细表 L1-2 仍保留 roll-forward（期末=期初+贷-借）。
  */
 import { computed, watch, type ComputedRef } from 'vue'
 import { eventBus } from '@/utils/eventBus'
-import {
-  calcAuditedAmount,
-  calcLiabilityEndBalance,
-  calcSubtotal,
-} from '@/composables/useL1FormulaEngine'
+import { calcSubtotal } from '@/composables/useL1FormulaEngine'
 import type { useL1FormData } from '@/composables/useL1FormData'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-/** 审定表分类计算结果 */
+/** 审定表分类计算结果（含派生列） */
 export interface AdjudicationComputed {
   name: string
-  beginning: number
-  creditAmount: number
-  debitAmount: number
-  endBalance: number
-  unadjusted: number
-  aje: number
-  rje: number
-  audited: number
+  // 期初数
+  beginUnadjusted: number
+  beginAje: number
+  beginRje: number
+  beginAudited: number      // = beginUnadjusted + beginAje + beginRje
+  // 期末数
+  endUnadjusted: number
+  endAje: number
+  endRje: number
+  endAudited: number        // = endUnadjusted + endAje + endRje
+  // 变动分析
+  unadjChange: number       // = endUnadjusted - beginUnadjusted
+  unadjRate: number
+  auditedChange: number     // = endAudited - beginAudited
+  auditedRate: number
+  // 原因分析
+  reason: string
 }
 
 /** 审定表合计行 */
 export interface AdjudicationTotal {
-  beginning: number
-  credit: number
-  debit: number
-  end: number
-  unadjusted: number
-  aje: number
-  rje: number
-  audited: number
+  beginUnadjusted: number
+  beginAje: number
+  beginRje: number
+  beginAudited: number
+  endUnadjusted: number
+  endAje: number
+  endRje: number
+  endAudited: number
+  unadjChange: number
+  unadjRate: number
+  auditedChange: number
+  auditedRate: number
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/** 变动率（base=0 时：无变动→0，正向→1，负向→-1） */
+function calcRate(base: number, change: number): number {
+  if (base === 0) return change === 0 ? 0 : (change > 0 ? 1 : -1)
+  return change / base
 }
 
 // ─── Composable ──────────────────────────────────────────────────────────────
@@ -55,114 +76,148 @@ export interface AdjudicationTotal {
  * @param formData 由调用方传入的 useL1FormData 实例
  */
 export function useL1Adjudication(formData: ReturnType<typeof useL1FormData>) {
-  const { adjudicationData, saveImmediate, writebackTB } = formData
+  const { adjudicationData, detailRows, saveImmediate, writebackTB } = formData
 
-  // ─── 1. 计算属性：每行 endBalance + audited ─────────────────────────────
+  // ─── 1. 计算属性：每行派生列 ───────────────────────────────────────────
 
-  /** 审定表各分类行（公式列自动计算） */
   const computedCategories: ComputedRef<AdjudicationComputed[]> = computed(() => {
-    return adjudicationData.value.categories.map(cat => ({
-      name: cat.name,
-      beginning: cat.beginning,
-      creditAmount: cat.creditAmount,
-      debitAmount: cat.debitAmount,
-      // 负债类贷方：期末 = 期初 + 贷方 - 借方
-      endBalance: calcLiabilityEndBalance(cat.beginning, cat.creditAmount, cat.debitAmount),
-      unadjusted: cat.unadjusted,
-      aje: cat.aje,
-      rje: cat.rje,
-      // 审定数 = 未审 + AJE + RJE
-      audited: calcAuditedAmount(cat.unadjusted, cat.aje, cat.rje),
-    }))
+    return adjudicationData.value.categories.map(cat => {
+      const beginAudited = cat.beginUnadjusted + cat.beginAje + cat.beginRje
+      const endAudited = cat.endUnadjusted + cat.endAje + cat.endRje
+      const unadjChange = cat.endUnadjusted - cat.beginUnadjusted
+      const auditedChange = endAudited - beginAudited
+      return {
+        name: cat.name,
+        beginUnadjusted: cat.beginUnadjusted,
+        beginAje: cat.beginAje,
+        beginRje: cat.beginRje,
+        beginAudited,
+        endUnadjusted: cat.endUnadjusted,
+        endAje: cat.endAje,
+        endRje: cat.endRje,
+        endAudited,
+        unadjChange,
+        unadjRate: calcRate(cat.beginUnadjusted, unadjChange),
+        auditedChange,
+        auditedRate: calcRate(beginAudited, auditedChange),
+        reason: cat.reason,
+      }
+    })
   })
 
   // ─── 2. 合计行 ─────────────────────────────────────────────────────────
 
-  /** 合计行（Σ 各分类） */
   const total: ComputedRef<AdjudicationTotal> = computed(() => {
     const cats = computedCategories.value
+    const beginUnadjusted = calcSubtotal(cats.map(c => c.beginUnadjusted))
+    const beginAje = calcSubtotal(cats.map(c => c.beginAje))
+    const beginRje = calcSubtotal(cats.map(c => c.beginRje))
+    const beginAudited = calcSubtotal(cats.map(c => c.beginAudited))
+    const endUnadjusted = calcSubtotal(cats.map(c => c.endUnadjusted))
+    const endAje = calcSubtotal(cats.map(c => c.endAje))
+    const endRje = calcSubtotal(cats.map(c => c.endRje))
+    const endAudited = calcSubtotal(cats.map(c => c.endAudited))
+    const unadjChange = endUnadjusted - beginUnadjusted
+    const auditedChange = endAudited - beginAudited
     return {
-      beginning: calcSubtotal(cats.map(c => c.beginning)),
-      credit: calcSubtotal(cats.map(c => c.creditAmount)),
-      debit: calcSubtotal(cats.map(c => c.debitAmount)),
-      end: calcSubtotal(cats.map(c => c.endBalance)),
-      unadjusted: calcSubtotal(cats.map(c => c.unadjusted)),
-      aje: calcSubtotal(cats.map(c => c.aje)),
-      rje: calcSubtotal(cats.map(c => c.rje)),
-      audited: calcSubtotal(cats.map(c => c.audited)),
+      beginUnadjusted, beginAje, beginRje, beginAudited,
+      endUnadjusted, endAje, endRje, endAudited,
+      unadjChange,
+      unadjRate: calcRate(beginUnadjusted, unadjChange),
+      auditedChange,
+      auditedRate: calcRate(beginAudited, auditedChange),
     }
   })
 
+  /** 期末审定合计（供跨sheet/逾期表L1-7/TB回写消费） */
+  const totalAuditedAmount: ComputedRef<number> = computed(() => total.value.endAudited)
+
   // ─── 3. 行操作 ─────────────────────────────────────────────────────────
 
-  /**
-   * 更新某分类的可编辑字段
-   * 公式列(endBalance/audited)自动由computed刷新，无需手动设置
-   */
-  function updateCategory(
-    index: number,
-    field: 'beginning' | 'creditAmount' | 'debitAmount' | 'unadjusted' | 'aje' | 'rje',
-    value: number,
-  ): void {
+  type EditableField = 'beginUnadjusted' | 'beginAje' | 'beginRje'
+    | 'endUnadjusted' | 'endAje' | 'endRje'
+
+  /** 更新某分类的可编辑数值字段（派生列由 computed 自动刷新） */
+  function updateCategory(index: number, field: EditableField, value: number): void {
     const categories = adjudicationData.value.categories
     if (index < 0 || index >= categories.length) return
-
     categories[index][field] = value
-
-    // 同步计算公式列到 formData（供持久化）
-    const cat = categories[index]
-    cat.endBalance = calcLiabilityEndBalance(cat.beginning, cat.creditAmount, cat.debitAmount)
-    cat.audited = calcAuditedAmount(cat.unadjusted, cat.aje, cat.rje)
-
-    // 重算合计
-    _syncTotal()
   }
 
-  /** 同步合计到 formData state */
-  function _syncTotal(): void {
-    const cats = adjudicationData.value.categories
-    adjudicationData.value.total = {
-      beginning: calcSubtotal(cats.map(c => c.beginning)),
-      credit: calcSubtotal(cats.map(c => c.creditAmount)),
-      debit: calcSubtotal(cats.map(c => c.debitAmount)),
-      end: calcSubtotal(cats.map(c => c.endBalance)),
-      unadjusted: calcSubtotal(cats.map(c => c.unadjusted)),
-      aje: calcSubtotal(cats.map(c => c.aje)),
-      rje: calcSubtotal(cats.map(c => c.rje)),
-      audited: calcSubtotal(cats.map(c => c.audited)),
-    }
+  /** 更新原因分析文本 */
+  function updateReason(index: number, value: string): void {
+    const categories = adjudicationData.value.categories
+    if (index < 0 || index >= categories.length) return
+    categories[index].reason = value
   }
 
-  // ─── 4. TB回写 + EventBus ──────────────────────────────────────────────
+  // ─── 4. 从 L1-2 明细带入（SUMIF 等价按借款类型聚合） ──────────────────
+
+  /** 借款种类关键词 → 审定表分类 name 映射 */
+  function _loanTypeToCategoryName(loanType: string): string {
+    const s = loanType || ''
+    if (s.includes('质押')) return '质押借款'
+    if (s.includes('抵押')) return '抵押借款'
+    if (s.includes('保证')) return '保证借款'
+    if (s.includes('信用')) return '信用借款'
+    return '信用借款'
+  }
 
   /**
-   * 保存审定表并触发TB回写 + EventBus
-   * - 回写 trial_balance 科目 2001
-   * - publish 'substantive:adjudicated'
+   * 从 L1-2 明细按借款种类聚合期初/期末未审数带入审定表。
+   * @returns 命中并更新的分类数
+   */
+  function importFromDetail(): number {
+    const rows = detailRows.value
+    if (!rows || rows.length === 0) return 0
+
+    const agg: Record<string, { begin: number; end: number }> = {}
+    for (const r of rows) {
+      const name = _loanTypeToCategoryName(r.loanType)
+      if (!agg[name]) agg[name] = { begin: 0, end: 0 }
+      agg[name].begin += Number(r.beginning) || 0
+      // 明细期末未审 = 期初 + 贷 - 借（负债类 roll-forward）
+      const end = (Number(r.beginning) || 0) + (Number(r.creditAmount) || 0) - (Number(r.debitAmount) || 0)
+      agg[name].end += end
+    }
+
+    let count = 0
+    const categories = adjudicationData.value.categories
+    for (const cat of categories) {
+      const v = agg[cat.name]
+      if (!v) continue
+      cat.beginUnadjusted = v.begin
+      cat.endUnadjusted = v.end
+      count++
+    }
+    return count
+  }
+
+  // ─── 5. TB回写 + EventBus ──────────────────────────────────────────────
+
+  /**
+   * 保存审定表并触发TB回写 + EventBus。
+   * 序列化「可编辑输入字段」（beginUnadjusted/beginAje/beginRje/endUnadjusted/endAje/endRje/reason），
+   * 派生列由 computedCategories 重算，无需持久化。
    */
   async function saveAndWriteback(): Promise<void> {
-    // 序列化审定表行：必须持久化「可编辑输入字段」，否则刷新后公式列
-    // （endBalance/audited 由 computedCategories 重算）会回落为 0（Round_Trip 失败）。
-    // _parseAdjudication 已支持解析全部字段，此处补齐 beginning/credit/debit/unadjusted/aje/rje。
     const items = adjudicationData.value.categories.map((cat, i) => {
       const n = i + 1
       return [
-        { item_id: `L1-adj-${n}-beginning`, conclusion: null, remark: String(cat.beginning) },
-        { item_id: `L1-adj-${n}-creditAmount`, conclusion: null, remark: String(cat.creditAmount) },
-        { item_id: `L1-adj-${n}-debitAmount`, conclusion: null, remark: String(cat.debitAmount) },
-        { item_id: `L1-adj-${n}-unadjusted`, conclusion: null, remark: String(cat.unadjusted) },
-        { item_id: `L1-adj-${n}-aje`, conclusion: null, remark: String(cat.aje) },
-        { item_id: `L1-adj-${n}-rje`, conclusion: null, remark: String(cat.rje) },
-        // 公式列（只读，供跨表勾稽/回读参考）
-        { item_id: `L1-adj-${n}-endBalance`, conclusion: null, remark: String(cat.endBalance) },
-        { item_id: `L1-adj-${n}-audited`, conclusion: null, remark: String(cat.audited) },
+        { item_id: `L1-adj-${n}-beginUnadjusted`, conclusion: null, remark: String(cat.beginUnadjusted) },
+        { item_id: `L1-adj-${n}-beginAje`, conclusion: null, remark: String(cat.beginAje) },
+        { item_id: `L1-adj-${n}-beginRje`, conclusion: null, remark: String(cat.beginRje) },
+        { item_id: `L1-adj-${n}-endUnadjusted`, conclusion: null, remark: String(cat.endUnadjusted) },
+        { item_id: `L1-adj-${n}-endAje`, conclusion: null, remark: String(cat.endAje) },
+        { item_id: `L1-adj-${n}-endRje`, conclusion: null, remark: String(cat.endRje) },
+        { item_id: `L1-adj-${n}-reason`, conclusion: null, remark: cat.reason || null },
       ]
     }).flat()
 
     await saveImmediate(items)
 
-    // TB回写
-    const auditedTotal = total.value.audited
+    // TB回写（期末审定合计）
+    const auditedTotal = total.value.endAudited
     await writebackTB(auditedTotal)
 
     // EventBus publish
@@ -174,16 +229,11 @@ export function useL1Adjudication(formData: ReturnType<typeof useL1FormData>) {
     })
   }
 
-  // ─── 5. 审定数变化监听 → 自动回写 ─────────────────────────────────────
+  // ─── 6. 可编辑字段变化监听 → 自动保存 + 回写 ──────────────────────────
 
-  /**
-   * 监听全部可编辑字段变化，自动触发保存 + 回写。
-   * 不能只监听 audited：编辑 期初/贷方/借方 只改 endBalance 不改 audited，
-   * 若仅监听 audited 这些字段永不落库（Round_Trip 失败）。
-   */
   const _editableSignature = computed(() =>
     adjudicationData.value.categories
-      .map(c => `${c.beginning}|${c.creditAmount}|${c.debitAmount}|${c.unadjusted}|${c.aje}|${c.rje}`)
+      .map(c => `${c.beginUnadjusted}|${c.beginAje}|${c.beginRje}|${c.endUnadjusted}|${c.endAje}|${c.endRje}|${c.reason}`)
       .join(';'),
   )
   watch(_editableSignature, async (newVal, oldVal) => {
@@ -197,7 +247,10 @@ export function useL1Adjudication(formData: ReturnType<typeof useL1FormData>) {
   return {
     computedCategories,
     total,
+    totalAuditedAmount,
     updateCategory,
+    updateReason,
+    importFromDetail,
     saveAndWriteback,
   }
 }

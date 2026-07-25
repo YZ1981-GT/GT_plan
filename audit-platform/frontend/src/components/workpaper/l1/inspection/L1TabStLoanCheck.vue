@@ -203,8 +203,10 @@ function loadFromFormData(): void {
   }))
 
   // Try to load saved results from checklist_responses
+  // 🔴 用 getItemsByPrefix 从原始 responses 恢复，不能用 serializeAll()
+  //    （其仅含结构化 sheet 字段，不含 L1-chk-* → 刷新后检查结果丢失）。
   try {
-    const allItems = formData.serializeAll()
+    const allItems = formData.getItemsByPrefix('L1-chk-')
     for (const item of allItems) {
       // Pattern: L1-chk-{n}-result or L1-chk-{n}-remark
       const match = item.item_id.match(/^L1-chk-(\d+)-(result|remark)$/)
@@ -265,13 +267,17 @@ function handleConclusionInput(val: string): void {
 
 async function handleAiConclusion(): Promise<void> {
   try {
-    const context = {
-      totalItems: checklistItems.value.length,
-      passCount: passCount.value,
-      failCount: failCount.value,
-      naCount: naCount.value,
-      pendingCount: pendingCount.value,
-      failItems: checklistItems.value.filter(i => i.result === '不符合').map(i => ({ content: i.content, remark: i.remark })),
+    // 🔴 /ai/generate-text 的 context 类型是 dict[str,str]，值必须为字符串（否则 422）
+    const context: Record<string, string> = {
+      检查项总数: String(checklistItems.value.length),
+      符合: String(passCount.value),
+      不符合: String(failCount.value),
+      不适用: String(naCount.value),
+      待确认: String(pendingCount.value),
+      不符合事项: checklistItems.value
+        .filter(i => i.result === '不符合')
+        .map(i => `${i.content}（${i.remark || '无备注'}）`)
+        .join('；'),
     }
     const res = await (await import('@/utils/http')).default.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
       section: 'st-loan-check-conclusion',

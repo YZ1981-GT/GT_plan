@@ -21,7 +21,7 @@
             </el-dropdown-menu>
           </template>
         </el-dropdown>
-        <el-button size="small" @click="handleAI">
+        <el-button size="small" :loading="aiLoading" :disabled="isReadonly" @click="handleAI">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
         <el-button size="small" @click="handleReview">
@@ -200,7 +200,7 @@
       <template #header>
         <div class="opinion-header">
           <span class="card-title">三、审计说明</span>
-          <el-button size="small" @click="handleAI">
+          <el-button size="small" :loading="aiLoading" :disabled="isReadonly" @click="handleAI">
             <el-icon><MagicStick /></el-icon> AI辅助
           </el-button>
         </div>
@@ -269,6 +269,7 @@ import { computed, inject, onMounted, ref, watch } from 'vue'
 import { Plus, MagicStick, Check, Warning } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import { useM2FormData } from '../../composables/useM2FormData'
 import { useM2ImportExport } from '../../composables/useM2ImportExport'
 import { calcFxConverted, calcFxDiff } from '../../composables/useM2FxEngine'
@@ -286,6 +287,8 @@ const emit = defineEmits<{
 }>()
 
 const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', () => {})
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref(false)
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -448,7 +451,29 @@ function handleImportExport(command: string): void {
   }
 }
 
-function handleAI(): void { /* AI辅助待集成 */ }
+async function handleAI(): Promise<void> {
+  if (props.isReadonly) return
+  aiLoading.value = true
+  try {
+    const context: Record<string, string> = {
+      科目: '4001 实收资本/股本（外币出资折算）',
+      外币出资人数: String(rows.value.length),
+      折算本位币合计: fmtAmount(totalConverted.value),
+      账面本位币合计: fmtAmount(totalBooked.value),
+      折算差异合计: fmtAmount(totalFxDiff.value),
+      差异阈值: String(fxThreshold.value),
+      是否超阈值: Math.abs(totalFxDiff.value) > fxThreshold.value ? '是' : '否',
+    }
+    const text = await generateAiText({ section: 'm2-4-fx-note', context, existingContent: auditNote.value })
+    if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+    auditNote.value = text
+    persistNote()
+  } catch {
+    ElMessage.warning('AI 生成失败，请稍后重试')
+  } finally {
+    aiLoading.value = false
+  }
+}
 function handleReview(): void { openReviewDialog?.('M2-4-fx-invest', '外币投资汇率测算表') }
 
 // ─── Format ──────────────────────────────────────────────────────────────────

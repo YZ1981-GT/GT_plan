@@ -10,12 +10,6 @@
         </el-tag>
       </div>
       <div class="section-header-right">
-        <el-segmented
-          v-model="dualMode.mode.value"
-          :options="dualMode.modeOptions.value"
-          size="small"
-          @change="(val: any) => dualMode.switchMode(val)"
-        />
         <el-dropdown trigger="click" @command="handleImportExport">
           <el-button size="small">
             导入导出 <el-icon class="el-icon--right"><ArrowDown /></el-icon>
@@ -28,7 +22,7 @@
             </el-dropdown-menu>
           </template>
         </el-dropdown>
-        <el-button size="small" @click="handleAI('detail')">
+        <el-button size="small" :loading="aiLoading === 'detail'" @click="handleAI('detail')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
         <el-button size="small" @click="handleReview">
@@ -400,26 +394,27 @@
  * 科目：4104 一般风险准备（**贷方/权益类！期末=期初+贷方-借方**）
  */
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
-import { ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, Check, ArrowDown } from '@element-plus/icons-vue'
 import { useM8FormData } from '../../composables/useM8FormData'
-import { useM8DualMode } from '../../composables/useM8DualMode'
 import { useM8Detail, M8_DETAIL_DEFAULT_ITEMS, type M8DetailRow } from '../../composables/useM8Detail'
 import { useM8ImportExport } from '../../composables/useM8ImportExport'
 import { useVersionTrail } from '../../composables/useVersionTrail'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 
 const props = defineProps<{ wpId: string; projectId: string; isReadonly: boolean }>()
 const emit = defineEmits<{ (e: 'navigate', sheetName: string): void; (e: 'save'): void }>()
 
-// ─── Inject复核对话 ──────────────────────────────────────────────────────────
+// ─── Inject复核对话 + AI ─────────────────────────────────────────────────────
 const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', () => {})
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
 
 // ─── Composables ─────────────────────────────────────────────────────────────
 const formData = useM8FormData({
   wpId: computed(() => props.wpId),
   projectId: computed(() => props.projectId),
 })
-const dualMode = useM8DualMode({ wpId: computed(() => props.wpId) })
 
 const detailRows = ref<M8DetailRow[]>([])
 const detail = useM8Detail(formData, detailRows)
@@ -549,8 +544,24 @@ function fmtAmount(val: number | undefined | null): string {
 }
 
 // ─── AI / 复核 ───────────────────────────────────────────────────────────────
-function handleAI(_section: string): void {
-  /* AI辅助钩子：后续集成 */
+async function handleAI(section: string): Promise<void> {
+  if (props.isReadonly) return
+  aiLoading.value = section
+  try {
+    const t = detail.totals.value
+    const context: Record<string, string> = {
+      科目: '4104 一般风险准备（权益类/贷方）',
+      底稿: 'M8-2 一般风险准备明细表',
+      审定期初合计: fmtAmount(t.auditedBegin),
+      审定增加合计: fmtAmount(t.auditedIncrease),
+      审定减少合计: fmtAmount(t.auditedDecrease),
+      审定期末合计: fmtAmount(t.auditedEnd),
+      明细行数: String(detailRows.value.length),
+    }
+    const text = await generateAiText({ section: `m8-detail-${section}`, context, existingContent: '' })
+    if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+    ElMessageBox.alert(text, 'AI 辅助建议', { confirmButtonText: '知道了' }).catch(() => {})
+  } catch { ElMessage.warning('AI 生成失败，请稍后重试') } finally { aiLoading.value = '' }
 }
 
 function handleReview(): void {

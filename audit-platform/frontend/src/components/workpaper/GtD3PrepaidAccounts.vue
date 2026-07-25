@@ -259,7 +259,10 @@ const KNOWN_HTML_SHEETS = new Set([
   '附注上市', '附注国企',
 ])
 
-const showModeToolbar = computed(() => KNOWN_HTML_SHEETS.has(currentSheet.value))
+const showModeToolbar = computed(() =>
+  currentSheet.value !== 'directory' && currentSheet.value !== 'D3' && currentSheet.value !== 'skip'
+  && KNOWN_HTML_SHEETS.has(currentSheet.value),
+)
 
 const dualMode = useD3EntryDualMode({
   wpId: toRef(props, 'wpId'),

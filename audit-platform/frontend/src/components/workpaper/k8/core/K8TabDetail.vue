@@ -149,6 +149,15 @@
             <span v-else class="formula-cell">{{ fmtNum(row.rje) }}</span>
           </template>
         </el-table-column>
+        <el-table-column label="调整联动" width="150" align="center">
+          <template #default="{ row }">
+            <template v-if="adjCountFor(row.accountCode) > 0">
+              <el-tag size="small" type="warning" effect="plain" style="cursor: pointer" title="点击跳转到集中调整分录" @click="jumpFirstAdjustment(row.accountCode)">受 {{ adjCountFor(row.accountCode) }} 笔调整影响</el-tag>
+              <el-button v-if="row.isEditable" link size="small" type="primary" :disabled="isReadonly" style="margin-left: 4px" @click="openBringIn(row)">带入</el-button>
+            </template>
+            <span v-else style="color: var(--el-text-color-placeholder)">—</span>
+          </template>
+        </el-table-column>
         <el-table-column label="本期审定金额" width="120" align="right">
           <template #default="{ row }">
             <el-tooltip content="公式：本期未审+账项调整+重分类调整" placement="top">
@@ -325,8 +334,17 @@
         <li>变动率&gt;±30%需在"波动分析"列填写原因</li>
         <li>「占收入比」分母取自 K8-4 实质性分析录入的营业收入（未录入则显示"—"）</li>
         <li>可点「从 I1-9 取摊销」回填本表「无形资产摊销/折旧及摊销」行</li>
+        <li><strong>调整联动</strong>：审定区段明细行标注"受 N 笔调整影响"可跳转集中调整；点「带入」把调整金额（单行/多选合计/全部求和）带入本行 账项调整/重分类调整 列</li>
       </ul>
     </details>
+
+    <!-- 调整分录带入弹窗（adjustment-collaboration-and-propagation Part B） -->
+    <AdjustmentBringInDialog
+      v-model="bringInVisible"
+      :matches="bringInMatches"
+      :account-label="bringInRow ? `${bringInRow.accountCode || ''} ${bringInRow.accountName || ''}` : ''"
+      @bring-in="onBringIn"
+    />
   </div>
 </template>
 
@@ -341,7 +359,7 @@
  * Spec: .kiro/specs/k8-selling-expenses/ | Task: 4.3
  * Requirements: 3.1-3.4
  */
-import { computed, inject, ref, toRef, watch, type Ref } from 'vue'
+import { computed, inject, reactive, onMounted, ref, toRef, watch, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, ChatDotSquare, ArrowDown, Plus, Delete } from '@element-plus/icons-vue'
 import { defineAsyncComponent } from 'vue'
@@ -350,6 +368,9 @@ import { useK8ImportExport } from '../../composables/useK8ImportExport'
 import { useK8AiGenerate } from '../../composables/useK8AiGenerate'
 import { pullI1AmortIntoExpenseDetail } from '../../composables/expenseWpI1AmortPull'
 import { pullExpenseLedgerMonthly } from '../../composables/expenseLedgerMonthlyPull'
+import { useAdjustmentDetailPropagation } from '../../composables/useAdjustmentDetailPropagation'
+import AdjustmentBringInDialog, { type BringInPayload } from '@/components/adjustment/AdjustmentBringInDialog.vue'
+import { useAuditContext } from '@/composables/useAuditContext'
 
 const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
 
@@ -439,6 +460,32 @@ const { exportTemplate, exportData, importData } = useK8ImportExport({
   projectId: toRef(props, 'projectId') as Ref<string>,
   sheetCode: 'K8-2',
 })
+
+// ─── Part B：调整分录 → 明细行联动（标注/跳转/带入） ─────────────────────────
+const { year: k8AuditYear } = useAuditContext()
+const propagation = useAdjustmentDetailPropagation({
+  projectId: toRef(props, 'projectId') as Ref<string>,
+  year: k8AuditYear as unknown as Ref<number>,
+})
+const bringInVisible = ref(false)
+const bringInRow = ref<any>(null)
+const bringInMatches = computed(() => propagation.matchByAccount(bringInRow.value?.accountCode || ''))
+const adjBroughtIn = reactive<Record<string, string[]>>({})
+function adjCountFor(accountCode: string): number { return propagation.countForRow(accountCode || '') }
+function jumpFirstAdjustment(accountCode: string): void {
+  const m = propagation.matchByAccount(accountCode || '')
+  if (m.length) propagation.jumpToAdjustment(m[0].entry_group_id)
+}
+function openBringIn(row: any): void { bringInRow.value = row; bringInVisible.value = true }
+function onBringIn(payload: BringInPayload): void {
+  const row = bringInRow.value
+  if (!row) return
+  const field = payload.adjustmentType === 'rje' ? 'rje' : 'aje'
+  handleCellChange(row.rowKey, field, payload.amount)
+  adjBroughtIn[row.rowKey] = payload.sourceEntryRefs
+  ElMessage.success(`已带入 ${payload.lineCount} 笔调整（净额 ${payload.amount.toFixed(2)}）至 ${field === 'rje' ? '重分类调整' : '账项调整'} 列`)
+}
+onMounted(() => { propagation.load() })
 
 const tableData = computed(() => rows.value)
 const CHANGE_RATE_THRESHOLD = 0.3

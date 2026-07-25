@@ -418,6 +418,8 @@ export function useM2Detail(
     debouncedSave('M2-M2-2-listed-totalEnd', {
       remark: String(listedTotalEndShares.value),
     })
+    // 🔴 修复：同步写整包 full-data（M2TabDetail._restoreRows 读此键；此前从不写 → 刷新明细全丢）
+    debouncedSave('M2-M2-2-listed-full-data', { remark: JSON.stringify(listedRows.value) })
   }
 
   function _triggerSaveUnlisted(rowIndex: number): void {
@@ -445,6 +447,8 @@ export function useM2Detail(
     debouncedSave('M2-M2-2-unlisted-totalEnd', {
       remark: String(unlistedTotalEndAmount.value),
     })
+    // 🔴 修复：同步写整包 full-data（M2TabDetail._restoreRows 读此键；此前从不写 → 刷新明细全丢）
+    debouncedSave('M2-M2-2-unlisted-full-data', { remark: JSON.stringify(unlistedRows.value) })
   }
 
   function _triggerSaveAllListed(): void {

@@ -32,6 +32,25 @@
         >
           💾 保存并回写K9-1
         </el-button>
+        <el-button
+          size="small"
+          type="primary"
+          plain
+          :loading="centralSyncing"
+          :disabled="isReadonly || !isBalanced || entries.length === 0"
+          @click="syncToCentral"
+          title="把本页调整分录汇聚到集中调整登记，供合伙人跨循环审阅"
+        >
+          同步到集中登记
+        </el-button>
+        <el-tag
+          v-if="centralStatus?.review_status"
+          size="small"
+          :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
+          :title="centralStatus.rejection_reason || ''"
+        >
+          集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
+        </el-tag>
       </div>
     </div>
 
@@ -199,6 +218,8 @@ import { MagicStick } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
 import { useK9ImportExport } from '../../composables/useK9ImportExport'
 import { generateK9AiText } from '../../composables/useK9AiText'
+import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
+import { useAuditContext } from '@/composables/useAuditContext'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 
@@ -276,8 +297,29 @@ const rjeTotal = computed(() =>
     .reduce((sum, e) => sum + ((e.debitAmount || 0) - (e.creditAmount || 0)), 0),
 )
 
+// ═══ 同步到集中调整登记（workpaper-adjustment-centralization） ═══
+const { year: auditYear } = useAuditContext()
+const { centralStatus, syncing: centralSyncing, syncToCentral, refreshStatus } = useAdjustmentCentralSync({
+  projectId: toRef(props, 'projectId') as Ref<string>,
+  year: auditYear,
+  wpId: toRef(props, 'wpId') as Ref<string>,
+  wpCode: 'K9',
+  itemId: `${ITEM_PREFIX}-entries`,
+  buildLineItems: () => entries.value.map(e => ({
+    standard_account_code: e.accountName === '管理费用' ? K9_ACCOUNT_CODE : undefined,
+    account_name: e.accountName,
+    report_line_code: e.reportItem || undefined,
+    debit_amount: e.debitAmount,
+    credit_amount: e.creditAmount,
+  })),
+  buildMeta: () => ({
+    description: entries.value.find(e => e.description)?.description || 'K9 管理费用调整',
+    adjustmentType: entries.value.length > 0 && entries.value.every(e => e.category === '报表调整') ? 'rje' : 'aje',
+  }),
+})
+
 // ═══ 初始化加载 ═══
-onMounted(() => { loadFromResponses() })
+onMounted(() => { loadFromResponses(); refreshStatus() })
 
 function loadFromResponses(): void {
   const saved = props.allResponses.get(`${ITEM_PREFIX}-entries`)

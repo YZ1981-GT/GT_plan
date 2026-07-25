@@ -325,9 +325,15 @@ export function useD7Disclosure(options: UseD7DisclosureOptions) {
       if (newTexts[key] !== (oldTexts?.[key] || '')) {
         debouncedSave(key, { remark: newTexts[key] })
         // Emit EventBus for disclosure note text update
+        // 合同负债附注章节（note_template_variant_matrix：listed 五、39 / soe 八、39）
         try {
           eventBus.emit('disclosure:note-text-updated', {
-            wpCode: 'D7', section: key, text: newTexts[key], timestamp: Date.now(),
+            wpCode: 'D7',
+            accountCode: '2205',
+            section: key,
+            sectionIds: [key.includes('soe') ? '八、39' : '五、39'],
+            text: newTexts[key],
+            timestamp: Date.now(),
           })
         } catch { /* non-blocking */ }
       }

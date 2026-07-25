@@ -104,6 +104,7 @@
           :wp-code="props.wpCode"
           :html-data="props.htmlData"
           :available-sheets="availableSheets"
+          :all-responses="formData.allResponses.value"
           :show-architecture="false"
         />
       </div>

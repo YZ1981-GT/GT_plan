@@ -26,6 +26,7 @@ import type { UseE1BaseOptions } from '../composables/useE1Adjudication'
 import GtIndexChip from '../GtIndexChip.vue'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { amountFormatter, amountParser } from '../composables/wpAmountInput'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -484,6 +485,9 @@ function asFx(row: any): FxCountRow { return row }
                   :model-value="asFx(row).fcAmount"
                   :disabled="isReadonly"
                   :controls="false"
+                  :precision="2"
+                  :formatter="amountFormatter"
+                  :parser="amountParser"
                   size="small"
                   @change="(val: number) => updateCell(row.id, 'fcAmount', val ?? 0)"
                 />
@@ -535,6 +539,9 @@ function asFx(row: any): FxCountRow { return row }
                 :model-value="rmbSummary.reportDateBookBalance"
                 :disabled="isReadonly"
                 :controls="false"
+                :precision="2"
+                :formatter="amountFormatter"
+                :parser="amountParser"
                 size="small"
                 @change="(val: number) => updateRollForward('reportDateBookBalance', val)"
               />
@@ -544,6 +551,9 @@ function asFx(row: any): FxCountRow { return row }
                 :model-value="rmbSummary.cumulativeIncome"
                 :disabled="isReadonly"
                 :controls="false"
+                :precision="2"
+                :formatter="amountFormatter"
+                :parser="amountParser"
                 size="small"
                 @change="(val: number) => updateRollForward('cumulativeIncome', val)"
               />
@@ -553,6 +563,9 @@ function asFx(row: any): FxCountRow { return row }
                 :model-value="rmbSummary.cumulativeExpense"
                 :disabled="isReadonly"
                 :controls="false"
+                :precision="2"
+                :formatter="amountFormatter"
+                :parser="amountParser"
                 size="small"
                 @change="(val: number) => updateRollForward('cumulativeExpense', val)"
               />
@@ -567,6 +580,9 @@ function asFx(row: any): FxCountRow { return row }
                 :model-value="rmbSummary.receiptVoucherUnposted"
                 :disabled="isReadonly"
                 :controls="false"
+                :precision="2"
+                :formatter="amountFormatter"
+                :parser="amountParser"
                 size="small"
                 @change="(val: number) => updateRollForward('receiptVoucherUnposted', val)"
               />
@@ -576,6 +592,9 @@ function asFx(row: any): FxCountRow { return row }
                 :model-value="rmbSummary.paymentVoucherUnposted"
                 :disabled="isReadonly"
                 :controls="false"
+                :precision="2"
+                :formatter="amountFormatter"
+                :parser="amountParser"
                 size="small"
                 @change="(val: number) => updateRollForward('paymentVoucherUnposted', val)"
               />
@@ -585,6 +604,9 @@ function asFx(row: any): FxCountRow { return row }
                 :model-value="rmbSummary.unvoucheredIncome"
                 :disabled="isReadonly"
                 :controls="false"
+                :precision="2"
+                :formatter="amountFormatter"
+                :parser="amountParser"
                 size="small"
                 @change="(val: number) => updateRollForward('unvoucheredIncome', val)"
               />
@@ -594,6 +616,9 @@ function asFx(row: any): FxCountRow { return row }
                 :model-value="rmbSummary.unvoucheredExpense"
                 :disabled="isReadonly"
                 :controls="false"
+                :precision="2"
+                :formatter="amountFormatter"
+                :parser="amountParser"
                 size="small"
                 @change="(val: number) => updateRollForward('unvoucheredExpense', val)"
               />
@@ -640,6 +665,9 @@ function asFx(row: any): FxCountRow { return row }
                   :model-value="rmbSummary.reportDateForeignBookBalance"
                   :disabled="isReadonly"
                   :controls="false"
+                  :precision="2"
+                  :formatter="amountFormatter"
+                  :parser="amountParser"
                   size="small"
                   @change="(val: number) => updateRollForward('reportDateForeignBookBalance', val)"
                 />

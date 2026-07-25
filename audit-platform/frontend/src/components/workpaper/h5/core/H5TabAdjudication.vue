@@ -6,6 +6,12 @@
     <!-- 工具栏 -->
     <div class="tab-toolbar">
       <div class="toolbar-right">
+        <el-button v-if="!isReadonly" size="small" type="primary" plain :loading="adjPullCost.loading.value" @click="openBringInCost">
+          <el-icon><Download /></el-icon>带入调整(原值)
+        </el-button>
+        <el-button v-if="!isReadonly" size="small" type="primary" plain :loading="adjPullDepletion.loading.value" @click="openBringInDepletion">
+          <el-icon><Download /></el-icon>带入调整(累计折耗)
+        </el-button>
         <span class="chip-wrap"><GtIndexChip value="wp:H5-1" :context-project-id="projectId" /></span>
       </div>
     </div>
@@ -292,17 +298,38 @@
         <li>审定数=未审数+AJE+RJE，未审数从TB自动取入(只读)</li>
         <li>"确认审定"将回写trial_balance并发布EventBus事件</li>
         <li>折耗核心方法：单位产量法（产量÷预计可采储量×可折耗金额）</li>
+        <li>「带入调整(原值/累计折耗)」：从集中登记按科目 1631/1632 拉取调整分录，逐笔分配到各分类的 AJE/RJE（原值借方净额、折耗贷方净额），带入后审定数自动更新并联动附注</li>
       </ul>
     </details>
+
+    <AdjudicationBringInDialog
+      v-model="bringInCostVisible"
+      :matches="adjPullCost.matches.value"
+      :row-options="bringInCostRowOptions"
+      subject-label="1631 油气资产原值"
+      :loading="adjPullCost.loading.value"
+      @apply="onBringInCostApply"
+    />
+    <AdjudicationBringInDialog
+      v-model="bringInDepletionVisible"
+      :matches="adjPullDepletion.matches.value"
+      :row-options="bringInDepletionRowOptions"
+      subject-label="1632 累计折耗"
+      :loading="adjPullDepletion.loading.value"
+      @apply="onBringInDepletionApply"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, inject, toRef } from 'vue'
-import { MagicStick } from '@element-plus/icons-vue'
+import { MagicStick, Download } from '@element-plus/icons-vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { useH5Adjudication } from '../../composables/useH5Adjudication'
 import { useH5FormData } from '../../composables/useH5FormData'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import { eventBus } from '@/utils/eventBus'
 
 const props = defineProps<{
@@ -353,6 +380,55 @@ const impairmentDisplayRows = computed(() => {
   const rows = [...state.impairmentRows.value]
   rows.push({ ...state.impairmentSubtotal.value })
   return rows
+})
+
+// ─── 从集中登记带入调整（双科目：1631原值[资产借]/1632累计折耗[备抵贷]；减值准备无独立科目码不接） ───
+const bringInCostRows = computed(() =>
+  state.costRows.value
+    .filter((r) => !r.isSubtotal)
+    .map((r) => ({ rowKey: r.rowId, name: r.category, aje: r.aje, rje: r.rje })),
+)
+const {
+  adjPull: adjPullCost,
+  visible: bringInCostVisible,
+  rowOptions: bringInCostRowOptions,
+  open: openBringInCost,
+  apply: onBringInCostApply,
+} = useAdjudicationBringIn({
+  projectId: toRef(props, 'projectId') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '1631',
+  direction: 'debit',
+  subjectCode: '1631',
+  wpCode: 'H5',
+  subjectLabel: '油气资产原值(1631)',
+  rows: bringInCostRows,
+  updateCell: (rowKey: string, field: any, value: number) => state.updateCell('cost', rowKey, field, value),
+  totalAudited: () => state.costSubtotal.value.audited,
+})
+
+const bringInDepletionRows = computed(() =>
+  state.depletionRows.value
+    .filter((r) => !r.isSubtotal)
+    .map((r) => ({ rowKey: r.rowId, name: r.category, aje: r.aje, rje: r.rje })),
+)
+const {
+  adjPull: adjPullDepletion,
+  visible: bringInDepletionVisible,
+  rowOptions: bringInDepletionRowOptions,
+  open: openBringInDepletion,
+  apply: onBringInDepletionApply,
+} = useAdjudicationBringIn({
+  projectId: toRef(props, 'projectId') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '1632',
+  direction: 'credit',
+  subjectCode: '1632',
+  wpCode: 'H5',
+  subjectLabel: '累计折耗(1632)',
+  rows: bringInDepletionRows,
+  updateCell: (rowKey: string, field: any, value: number) => state.updateCell('depletion', rowKey, field, value),
+  totalAudited: () => state.depletionSubtotal.value.audited,
 })
 
 type BlockType = 'cost' | 'depletion' | 'impairment'

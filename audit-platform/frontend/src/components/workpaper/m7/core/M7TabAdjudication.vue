@@ -1,6 +1,6 @@
 <template>
   <div class="m7-tab-adjudication">
-    <!-- ═══ 标题 + DualMode + AI/复核 ═══ -->
+    <!-- ═══ 标题 + AI/复核 ═══ -->
     <div class="section-header">
       <div class="section-header-left">
         <el-button text size="small" @click="$emit('navigate', '底稿目录')">← 返回目录</el-button>
@@ -10,13 +10,10 @@
         </el-tag>
       </div>
       <div class="section-header-right">
-        <el-segmented
-          v-model="dualMode.mode.value"
-          :options="dualMode.modeOptions.value"
-          size="small"
-          @change="(val: any) => dualMode.switchMode(val)"
-        />
-        <el-button size="small" @click="handleAI('adjudication')">
+        <el-button size="small" type="primary" plain :loading="adjPull.loading.value" :disabled="isReadonly" @click="openBringInAdjustment">
+          <el-icon><Download /></el-icon> 带入调整
+        </el-button>
+        <el-button size="small" :loading="aiLoading === 'adjudication'" @click="handleAI('adjudication')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
         <el-button size="small" @click="handleReview">
@@ -243,7 +240,7 @@
       <template #header>
         <div class="section-header">
           <span class="card-title">审计结论</span>
-          <el-button size="small" @click="handleAI('conclusion')">
+          <el-button size="small" :loading="aiLoading === 'conclusion'" @click="handleAI('conclusion')">
             <el-icon><MagicStick /></el-icon> AI辅助
           </el-button>
         </div>
@@ -270,8 +267,18 @@
         <li>审定数变化自动回写 TB（科目 4201）并通知附注组件</li>
         <li>合计行应与M7-2明细表合计一致（交叉验证）</li>
         <li>分类：安全生产费 / 维简费 / 其他专项储备</li>
+        <li>「带入调整」：从集中登记按科目 4201 拉取调整分录，逐笔分配到各项目行的 AJE/RJE，带入后审定数自动更新并联动附注</li>
       </ul>
     </details>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="4201 专项储备"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
@@ -289,7 +296,7 @@
  * - Font 13px, formula columns with dashed underline + cursor:help + tooltip
  * - TB回写(4201) on 审定数变化
  * - EventBus 'substantive:adjudicated' publish
- * - el-segmented 双模式 (HTML/OO) via useM7DualMode
+ * - 双模式 (HTML/OO) 由入口 GtM7SpecialReserve 统一承载（本 tab 不再自建 segmented）
  * - 方法论上下文琥珀色块 (权益类贷方方向说明)
  * - el-card for 审计结论区
  * - Section标题行右侧AI辅助按钮 + 复核对话按钮
@@ -297,16 +304,19 @@
  * - Version trail integration (useVersionTrail)
  */
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
-import { ElMessageBox } from 'element-plus'
-import { MagicStick, Check } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { MagicStick, Check, Download } from '@element-plus/icons-vue'
 import { useM7FormData } from '../../composables/useM7FormData'
-import { useM7DualMode } from '../../composables/useM7DualMode'
 import {
   useM7Adjudication,
   type M7AdjudicationRow,
   type M7RowCategory,
 } from '../../composables/useM7Adjudication'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import { useAuditContext } from '@/composables/useAuditContext'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import { useVersionTrail } from '../../composables/useVersionTrail'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import { eventBus } from '@/utils/eventBus'
 
 const props = defineProps<{ wpId: string; projectId: string; isReadonly: boolean }>()
@@ -314,10 +324,11 @@ const emit = defineEmits<{ (e: 'navigate', sheetName: string): void; (e: 'save')
 
 // ─── Inject复核对话 ──────────────────────────────────────────────────────────
 const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', () => {})
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
 
 // ─── Composables ─────────────────────────────────────────────────────────────
 const formData = useM7FormData({ wpId: computed(() => props.wpId), projectId: computed(() => props.projectId) })
-const dualMode = useM7DualMode({ wpId: computed(() => props.wpId) })
 const rows = ref<M7AdjudicationRow[]>([])
 
 const {
@@ -335,6 +346,38 @@ const {
   subscribeAdjudicated,
   subscribeDisclosure,
 } = useM7Adjudication(formData, rows)
+
+// ─── 从集中登记带入调整（4201 专项储备，权益贷方；单期 aje/rje，按类别项目行） ───
+const bringInRows = computed(() =>
+  computedRows.value.map((r) => ({
+    rowKey: r.key,
+    name: r.itemName || '专项储备项目',
+    aje: r.aje ?? 0,
+    rje: r.rje ?? 0,
+  })),
+)
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: computed(() => props.projectId) as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '4201',
+  direction: 'credit',
+  subjectCode: '4201',
+  wpCode: 'M7',
+  subjectLabel: '专项储备(4201)',
+  rows: bringInRows,
+  updateCell: (rowKey: string, field: any, value: number) => {
+    const idx = rows.value.findIndex((r) => r.key === rowKey)
+    if (idx < 0) return
+    composableUpdateRow(idx, field === 'aje' ? 'aje' : 'rje', value)
+  },
+  totalAudited: () => totalRow.value.audited,
+})
 
 // Version trail (autoSnapshot on save)
 const versionTrail = useVersionTrail({ projectId: computed(() => props.projectId), workpaperId: computed(() => props.wpId) })
@@ -493,7 +536,28 @@ function saveAuditConclusion(): void {
   formData.debouncedSave('M7-1-auditConclusion', { remark: auditConclusion.value || null })
 }
 
-function handleAI(_section: string): void { /* AI辅助钩子：后续集成 */ }
+async function handleAI(section: string): Promise<void> {
+  if (props.isReadonly) return
+  aiLoading.value = section
+  try {
+    const context: Record<string, string> = {
+      科目: '4201 专项储备（权益类·贷方）/ 审定表 M7-1',
+      合计审定: fmtAmount(totalRow.value.audited),
+      期末校验: equityEndCheck.value.isMatch ? '平衡' : `差异 ${fmtAmount(equityEndCheck.value.diff)}`,
+      安全生产费小计: fmtAmount(safetyProductionSubtotal.value.audited),
+      维简费小计: fmtAmount(maintenanceSubtotal.value.audited),
+      其他专项储备小计: fmtAmount(otherSubtotal.value.audited),
+    }
+    const text = await generateAiText({ section: `m7-adjudication-${section}`, context, existingContent: auditConclusion.value })
+    if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+    if (section === 'conclusion') {
+      auditConclusion.value = text
+      saveAuditConclusion()
+    } else {
+      ElMessageBox.alert(text, 'AI 辅助建议', { confirmButtonText: '知道了' }).catch(() => {})
+    }
+  } catch { ElMessage.warning('AI 生成失败，请稍后重试') } finally { aiLoading.value = '' }
+}
 function handleReview(): void { openReviewDialog?.('M7-1-adjudication', '专项储备审定表') }
 
 // ─── EventBus + Lifecycle ────────────────────────────────────────────────────

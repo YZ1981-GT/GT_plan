@@ -113,16 +113,23 @@ export function useL4CrossSheet(allResponses: Ref<Map<string, ChecklistResponse>
    * - L4-2 明细表行数据存于 item_id: "L4-L4-2-rows"（remark=JSON数组，各行auditedAmount）
    */
   const adjudicationVsDetail: ComputedRef<AdjudicationVsDetailResult> = computed(() => {
-    // 审定表合计：从 allResponses 读取审定表审定数合计
+    // 审定表期末审定合计（useL4Adjudication 写入 L4-L4-1-adjudication-total）
     const adjResp = allResponses.value.get('L4-L4-1-adjudication-total')
     const adjTotal = parseNum(adjResp?.remark)
 
-    // 明细表合计：从行数据汇总各行审定数
-    const detailResp = allResponses.value.get('L4-L4-2-rows')
-    const detailRows = safeParseRows<{ auditedAmount?: number }>(detailResp?.remark)
+    // 明细表合计：L4-2 明细行（useL4Detail 存 'L4-2-rows'）各行期末摊余成本合计
+    // 期末摊余成本 = 期末成本 + 期末利息调整 + 期末应计利息（负债类 期末=期初+贷-借）
+    const detailResp = allResponses.value.get('L4-2-rows')
+    const detailRows = safeParseRows<{
+      beginCostPrincipal?: number; creditIssue?: number; debitRedemption?: number
+      beginCostInterestAdj?: number; creditInterestAdj?: number; debitInterestAdj?: number
+      endCostAccrued?: number
+    }>(detailResp?.remark)
     let detailTotal = 0
     for (const row of detailRows) {
-      detailTotal += parseNum(row.auditedAmount)
+      const endPrincipal = parseNum(row.beginCostPrincipal) + parseNum(row.creditIssue) - parseNum(row.debitRedemption)
+      const endInterestAdj = parseNum(row.beginCostInterestAdj) + parseNum(row.creditInterestAdj) - parseNum(row.debitInterestAdj)
+      detailTotal += endPrincipal + endInterestAdj + parseNum(row.endCostAccrued)
     }
 
     const diff = parseFloat((adjTotal - detailTotal).toFixed(2))

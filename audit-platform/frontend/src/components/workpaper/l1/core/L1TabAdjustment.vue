@@ -17,6 +17,25 @@
         >
           保存并发布
         </el-button>
+        <el-button
+          size="small"
+          type="primary"
+          plain
+          :loading="centralSyncing"
+          :disabled="isReadonly || !currentBalance.isBalanced || filteredEntries.length === 0"
+          @click="syncToCentral"
+          title="把当前类型（AJE/RJE）调整分录汇聚到集中调整登记，供合伙人跨循环审阅"
+        >
+          同步到集中登记
+        </el-button>
+        <el-tag
+          v-if="centralStatus?.review_status"
+          size="small"
+          :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
+          :title="centralStatus.rejection_reason || ''"
+        >
+          集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
+        </el-tag>
       </div>
     </div>
 
@@ -239,14 +258,16 @@
  * Task: 4.7
  * Requirements: 8.1
  */
-import { computed, inject } from 'vue'
+import { computed, inject, toRef, watch, onMounted, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import type { useL1FormData } from '@/composables/useL1FormData'
 import { useL1Adjustment, type AdjustmentType } from '@/composables/useL1Adjustment'
+import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '@/components/workpaper/composables/useAdjustmentCentralSync'
+import { useAuditContext } from '@/composables/useAuditContext'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
-defineProps<{
+const props = defineProps<{
   wpId: string
   projectId: string
   isReadonly: boolean
@@ -275,6 +296,29 @@ const {
   switchType,
   saveAndPublish,
 } = useL1Adjustment(formData)
+
+// ─── 同步到集中调整登记（workpaper-adjustment-centralization） ─────────────────
+// L1 已按类型分离（activeType AJE/RJE），故按当前类型作为一个平衡分录组汇聚。
+const { year: auditYear } = useAuditContext()
+const { centralStatus, syncing: centralSyncing, syncToCentral, refreshStatus } = useAdjustmentCentralSync({
+  projectId: toRef(props, 'projectId') as Ref<string>,
+  year: auditYear,
+  wpId: toRef(props, 'wpId') as Ref<string>,
+  wpCode: 'L1',
+  itemId: () => `L1-adj-${activeType.value}`,
+  buildLineItems: () => filteredEntries.value.map(e => ({
+    standard_account_code: e.accountCode || undefined,
+    account_name: e.accountName,
+    debit_amount: e.debitAmount,
+    credit_amount: e.creditAmount,
+  })),
+  buildMeta: () => ({
+    description: filteredEntries.value.find(e => e.description)?.description || `L1 短期借款调整（${activeType.value}）`,
+    adjustmentType: activeType.value === 'RJE' ? 'rje' : 'aje',
+  }),
+})
+watch(activeType, () => refreshStatus())
+onMounted(() => refreshStatus())
 
 // ─── Tab 切换选项 ────────────────────────────────────────────────────────────
 

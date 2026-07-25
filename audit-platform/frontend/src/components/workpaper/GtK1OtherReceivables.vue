@@ -5,16 +5,8 @@
     </div>
 
     <template v-else>
-      <div v-if="isHtmlSheet" class="k1-header-toolbar">
-        <GtWpAiReviewToolbar
-          :wp-id="props.wpId"
-          :project-id="props.projectId"
-          wp-code-prefix="K1"
-          :sheet-name="props.sheetName"
-          :year="props.year"
-          label="其他应收款"
-          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
-        />
+      <!-- 目录页(currentSheet==='K1')不显示 AI复核/双模式工具栏（无复核对象+不需双模式） -->
+      <div v-if="isHtmlSheet && currentSheet !== 'K1'" class="k1-header-toolbar">
         <el-segmented
           v-if="dualMode.isOoAvailable.value"
           v-model="dualMode.currentMode.value"
@@ -266,8 +258,6 @@ import { createK1RowNavigation, K1RowNavigationKey } from './composables/useK1Ro
 import { resolveK1BsDate } from './composables/k1PostPaymentFromLedger'
 import type { K1AdjudicationPrefill } from './composables/useK1Adjudication'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
-import GtWpAiReviewToolbar from './review/GtWpAiReviewToolbar.vue'
-
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 

@@ -80,6 +80,18 @@
         >
           推送账项调整→A13
         </el-button>
+        <el-button
+          v-if="!isReadonly"
+          size="small"
+          type="primary"
+          plain
+          :loading="centralSyncing"
+          :disabled="!state.isBalanced.value || state.rows.value.length === 0"
+          title="把本页调整分录汇聚到集中调整登记，供合伙人跨循环审阅"
+          @click="syncToCentral"
+        >
+          同步到集中登记
+        </el-button>
       </div>
       <div class="toolbar-right">
         <el-tag size="small" type="info" effect="plain">共 {{ state.rows.value.length }} 行</el-tag>
@@ -93,6 +105,14 @@
         <span class="chip-wrap"><GtIndexChip value="wp:H2-1" :validate="false" /></span>
         <span class="chip-wrap"><GtIndexChip value="wp:A13" :context-project-id="projectId" /></span>
         <el-button size="small" circle @click="openReview('H2-3')">💬</el-button>
+        <el-tag
+          v-if="centralStatus?.review_status"
+          size="small"
+          :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
+          :title="centralStatus.rejection_reason || ''"
+        >
+          集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
+        </el-tag>
       </div>
     </div>
 
@@ -314,9 +334,11 @@
  * H2TabAdjustment.vue — H2-3 在建工程调整分录汇总表
  * 对齐 Excel 列结构 + 调整分录模块双向联动 + A13 / H2-1
  */
-import { ref, computed, toRef, inject, onMounted } from 'vue'
+import { ref, computed, toRef, inject, onMounted, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useH2Adjustment } from '../../composables/useH2Adjustment'
+import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
+import { useAuditContext } from '@/composables/useAuditContext'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { WorkpaperRuntimeContextKey } from '../../composables/useWorkpaperScaffold'
 
@@ -356,6 +378,27 @@ const state = useH2Adjustment({
     saveResponse(itemId, value)
   },
 })
+
+// ─── 同步到集中调整登记（workpaper-adjustment-centralization） ───
+const { year: centralYear } = useAuditContext()
+const { centralStatus, syncing: centralSyncing, syncToCentral, refreshStatus } = useAdjustmentCentralSync({
+  projectId: toRef(props, 'projectId') as Ref<string>,
+  year: centralYear,
+  wpId: toRef(props, 'wpId') as Ref<string>,
+  wpCode: 'H2',
+  itemId: 'H2-3-rows',
+  buildLineItems: () => state.rows.value.map((e: any) => ({
+    standard_account_code: e.accountCode || undefined,
+    account_name: e.accountName,
+    debit_amount: e.debitAmount,
+    credit_amount: e.creditAmount,
+  })),
+  buildMeta: () => ({
+    description: state.rows.value.find((e: any) => e.description)?.description || 'H2 在建工程调整',
+    adjustmentType: state.rows.value.length > 0 && state.rows.value.every((e: any) => e.category === '报表调整') ? 'rje' : 'aje',
+  }),
+})
+onMounted(() => refreshStatus())
 
 const NOTE_KEY = 'H2-3-audit-note'
 const CONCLUSION_KEY = 'H2-3-audit-conclusion'

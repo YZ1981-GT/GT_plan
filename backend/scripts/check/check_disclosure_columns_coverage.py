@@ -75,6 +75,8 @@ COLUMN_BUILDERS = (
     "buildH6SoeSyncPayloads",      # H6 固定资产清理 soe
     "buildH8ListedSyncPayloads",   # H8 使用权资产 listed
     "buildH8SoeSyncPayloads",      # H8 使用权资产 soe
+    "buildD1SyncPayload",          # D1 应收票据（listed+soe，按 variant 附 columns）
+    "buildE1SyncPayload",          # E1 货币资金（listed+soe，按 variant 附 columns）
 )
 _BUILDER_RE = re.compile(r"build[A-Z]\w*Columns\b")
 _COLUMNS_FIELD_RE = re.compile(r"\bcolumns\s*:")

@@ -3,6 +3,9 @@
     <div class="section-head">
       <h3 class="sheet-title">G1-1 交易性金融资产审定表</h3>
       <div class="head-actions tab-toolbar">
+        <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
+          <el-icon><Download /></el-icon>带入调整
+        </el-button>
         <G1ImportExportDropdown
           v-if="wpId"
           :wp-id="wpId"
@@ -90,6 +93,7 @@
         <li>每层按「交易性 / 划分为 FVTPL / 指定为 FVTPL」× 品种明细展开；分类行与小计自动汇总。</li>
         <li>审定＝未审＋账项调整；变动额／变动率自动计算；|变动率|&gt;{{ Math.round(G1_CHANGE_RATE_THRESHOLD * 100) }}% 时原因分析必填。</li>
         <li>账面余额合计（减一年以上到期）应与试算平衡表 1501 勾稽，差异为 0。</li>
+        <li>「带入调整」：可从集中登记按科目 1501 拉取调整分录，逐笔分配到各成本/公允价值明细行的期末账项调整，带入后审定数自动更新并联动附注。</li>
       </ul>
     </details>
 
@@ -238,14 +242,27 @@
       note-hint="评价投资成本、累计公允价值变动、分类列报及与试算表勾稽。"
       conclusion-hint="按 A/B/C 口径评价科目 1501 列报是否公允。"
     />
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="1501 交易性金融资产"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, toRef, inject, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Download } from '@element-plus/icons-vue'
 import { useG1Adjudication } from '../../composables/useG1Adjudication'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import G1AuditTextCards from '../G1AuditTextCards.vue'
 import G1ImportExportDropdown from '../G1ImportExportDropdown.vue'
@@ -284,6 +301,35 @@ const {
   debouncedSave: props.debouncedSave,
   isReadonly: toRef(props, 'isReadonly'),
   htmlData: toRef(props, 'htmlData'),
+})
+
+// ─── 从集中登记带入调整（1501 交易性金融资产，资产借方；带入期末账项调整，单列合并 AJE/RJE） ───
+const bringInRows = computed(() =>
+  rows.value
+    .filter((r) => r.editable && (r.section === 'cost' || r.section === 'fv'))
+    .map((r) => ({ rowKey: r.rowKey, name: r.label, aje: r.closingAdjustment, rje: r.closingAdjustment })),
+)
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: (() =>
+    props.htmlData?.project_context?.project_id
+    ?? props.htmlData?.projectContext?.project_id
+    ?? '') as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '1501',
+  direction: 'debit',
+  subjectCode: '1501',
+  wpCode: 'G1',
+  subjectLabel: '交易性金融资产(1501)',
+  rows: bringInRows,
+  updateCell: (rowKey: string, _field: any, value: number) =>
+    updateField(rowKey, 'closingAdjustment', value),
+  totalAudited: () => totalRow.value.closingAudited,
 })
 
 const allocVisible = ref(false)

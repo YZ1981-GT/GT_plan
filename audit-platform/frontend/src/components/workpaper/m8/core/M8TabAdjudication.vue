@@ -10,13 +10,10 @@
         </el-tag>
       </div>
       <div class="section-header-right">
-        <el-segmented
-          v-model="dualMode.mode.value"
-          :options="dualMode.modeOptions.value"
-          size="small"
-          @change="(val: any) => dualMode.switchMode(val)"
-        />
-        <el-button size="small" @click="handleAI('adjudication')">
+        <el-button size="small" type="primary" plain :loading="adjPull.loading.value" :disabled="isReadonly" @click="openBringInAdjustment">
+          <el-icon><Download /></el-icon> 带入调整
+        </el-button>
+        <el-button size="small" :loading="aiLoading === 'adjudication'" @click="handleAI('adjudication')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
         <el-button size="small" @click="handleReview">
@@ -258,7 +255,7 @@
       <template #header>
         <div class="section-header">
           <span class="card-title">审计结论</span>
-          <el-button size="small" @click="handleAI('conclusion')">
+          <el-button size="small" :loading="aiLoading === 'conclusion'" @click="handleAI('conclusion')">
             <el-icon><MagicStick /></el-icon> AI辅助
           </el-button>
         </div>
@@ -286,8 +283,18 @@
         <li>本表数据从M8-2明细表自动引用（Row 7-12），合计行SUM(B7:B12)</li>
         <li>Row 14: 上期审定数；Row 15: 差异 = 合计 − 上期审定数</li>
         <li>审定数变化自动回写 TB（科目 4104）并通知附注组件</li>
+        <li>「带入调整」：从集中登记按科目 4104 拉取调整分录，逐笔分配到各明细行的期末 AJE/RJE，带入后审定数自动更新并联动附注</li>
       </ul>
     </details>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="4104 一般风险准备"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
@@ -308,7 +315,7 @@
  * - Font 13px, formula columns with dashed underline + cursor:help + tooltip
  * - TB回写(4104) on 审定数变化
  * - EventBus 'substantive:adjudicated' publish
- * - el-segmented 双模式 (HTML/OO) via useM8DualMode
+ * - 双模式 (HTML/OO) 由主入口 GtM8GeneralRiskReserve 统一承载（本 tab 仅结构化）
  * - 方法论上下文琥珀色块 (权益类贷方方向说明)
  * - el-card for 审计结论区
  * - Section标题行右侧AI辅助按钮 + 复核对话按钮
@@ -316,31 +323,68 @@
  * - Version trail integration (useVersionTrail)
  */
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
-import { MagicStick, Check } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import { MagicStick, Check, Download } from '@element-plus/icons-vue'
 import { useM8FormData } from '../../composables/useM8FormData'
-import { useM8DualMode } from '../../composables/useM8DualMode'
 import {
   useM8Adjudication,
   type M8AdjudicationRow,
 } from '../../composables/useM8Adjudication'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import { useAuditContext } from '@/composables/useAuditContext'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import { useVersionTrail } from '../../composables/useVersionTrail'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import { eventBus } from '@/utils/eventBus'
 
 const props = defineProps<{ wpId: string; projectId: string; isReadonly: boolean }>()
 const emit = defineEmits<{ (e: 'navigate', sheetName: string): void; (e: 'save'): void }>()
 
-// ─── Inject复核对话 ──────────────────────────────────────────────────────────
+// ─── Inject复核对话 + AI ─────────────────────────────────────────────────────
 const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', () => {})
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
 
 // ─── Composables ─────────────────────────────────────────────────────────────
 const formData = useM8FormData({
   wpId: computed(() => props.wpId),
   projectId: computed(() => props.projectId),
 })
-const dualMode = useM8DualMode({ wpId: computed(() => props.wpId) })
 const rows = ref<M8AdjudicationRow[]>([])
 
 const adjudication = useM8Adjudication(formData, rows)
+
+// ─── 从集中登记带入调整（4104 一般风险准备，权益贷方；双列 endAje/endRje，固定明细行） ───
+const bringInRows = computed(() =>
+  adjudication.computedRows.value.map((r) => ({
+    rowKey: r.key,
+    name: r.itemName || '一般风险准备项目',
+    aje: r.endAje ?? 0,
+    rje: r.endRje ?? 0,
+  })),
+)
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: computed(() => props.projectId) as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '4104',
+  direction: 'credit',
+  subjectCode: '4104',
+  wpCode: 'M8',
+  subjectLabel: '一般风险准备(4104)',
+  rows: bringInRows,
+  updateCell: (rowKey: string, field: any, value: number) => {
+    const idx = rows.value.findIndex((r) => r.key === rowKey)
+    if (idx < 0) return
+    adjudication.updateRow(idx, field === 'aje' ? 'endAje' : 'endRje', value)
+  },
+  totalAudited: () => adjudication.totalRow.value.endAudited,
+})
 
 // Version trail (autoSnapshot on save)
 const versionTrail = useVersionTrail({
@@ -480,8 +524,25 @@ function saveAuditConclusion(): void {
   formData.debouncedSave('M8-1-auditConclusion', { remark: auditConclusion.value || null })
 }
 
-function handleAI(_section: string): void {
-  /* AI辅助钩子：后续集成 */
+async function handleAI(section: string): Promise<void> {
+  if (props.isReadonly) return
+  aiLoading.value = section
+  try {
+    const t = adjudication.totalRow.value
+    const context: Record<string, string> = {
+      科目: '4104 一般风险准备（权益类/贷方）',
+      底稿: 'M8-1 一般风险准备审定表',
+      期初审定合计: fmtAmount(t.beginAudited),
+      期末审定合计: fmtAmount(t.endAudited),
+      变动额: fmtAmount(t.changeAmount),
+      变动率: t.changeRate !== 0 ? (t.changeRate * 100).toFixed(1) + '%' : '0%',
+      'M8-2交叉验证': crossValidation.value.isMatch ? '一致' : `差异${fmtAmount(crossValidation.value.diff)}`,
+    }
+    const text = await generateAiText({ section: `m8-adjudication-${section}`, context, existingContent: auditConclusion.value })
+    if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+    auditConclusion.value = text
+    saveAuditConclusion()
+  } catch { ElMessage.warning('AI 生成失败，请稍后重试') } finally { aiLoading.value = '' }
 }
 
 function handleReview(): void {

@@ -320,7 +320,8 @@ export function useF1DisclosureSoe(options: UseF1DisclosureSoeOptions) {
     debouncedSave(`${PREFIX}note-3`, { remark: val })
     try {
       window.dispatchEvent(new CustomEvent('disclosure:note-text-updated', {
-        detail: { wpCode: 'F1', section: 'soe-3', text: val },
+        // 预付款项 soe → 八、7（note_template_variant_matrix）
+        detail: { wpCode: 'F1', accountCode: '1123', section: 'soe-3', sectionIds: ['八、7'], text: val },
       }))
     } catch { /* silent */ }
   })

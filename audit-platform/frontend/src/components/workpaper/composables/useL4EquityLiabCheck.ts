@@ -15,14 +15,17 @@
  *   先按市场利率折现确定负债成分（NPV），
  *   剩余归权益成分（发行总额-负债成分）。
  */
-import { computed, ref, type ComputedRef, type Ref } from 'vue'
+import { computed, ref, watch, type ComputedRef, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   calcLiabilityComponent,
   calcEquityComponent,
 } from './useL4EquityLiabEngine'
 import { calcSubtotal } from './useL4FormulaEngine'
-import type { useL4FormData } from './useL4FormData'
+import type { useL4FormData, ChecklistResponse } from './useL4FormData'
+
+/** 🔴 P0 修复：JSON-array 存储（此前 flat keys `L4-5-row-{n}-{field}` 无 hydration → 刷新数据丢失） */
+const ITEM_ROWS = 'L4-5-rows'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -76,7 +79,26 @@ export function useL4EquityLiabCheck(
   formData: ReturnType<typeof useL4FormData>,
   checkRows: Ref<L4EquityLiabRow[]>,
 ) {
-  const { debouncedSave } = formData
+  const { allResponses, debouncedSave } = formData
+
+  // ─── 0. Hydration ────────────────────────────────────────────────────
+  function hydrate(): void {
+    const raw = allResponses.value.get(ITEM_ROWS)?.remark
+    if (!raw) return
+    try {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) checkRows.value = parsed
+    } catch { /* ignore */ }
+  }
+  hydrate()
+  watch(
+    () => allResponses.value.get(ITEM_ROWS)?.remark,
+    (v) => { if (v && checkRows.value.length === 0) hydrate() },
+  )
+
+  function _persist(): void {
+    debouncedSave(ITEM_ROWS, { remark: JSON.stringify(checkRows.value) } as Partial<ChecklistResponse>)
+  }
 
   // ─── 1. 计算属性：负债/权益成分 ───────────────────────────────────────
 
@@ -143,14 +165,14 @@ export function useL4EquityLiabCheck(
       row.isAbnormal = row.equityComponent < 0
     }
 
-    _triggerSave(index)
+    _persist()
   }
 
   /** 执行分拆计算（触发所有行重算+异常检查） */
   function executeClassification(): void {
     // 重算由 computedRows 自动完成，此处仅做异常检查+保存
     checkAbnormals()
-    _triggerSaveAll()
+    _persist()
   }
 
   // ─── 5. 工具方法 ──────────────────────────────────────────────────────
@@ -175,31 +197,6 @@ export function useL4EquityLiabCheck(
     }
 
     return cashFlows
-  }
-
-  // ─── 6. 保存触发 ──────────────────────────────────────────────────────
-
-  function _triggerSave(rowIndex: number): void {
-    const row = checkRows.value[rowIndex]
-    if (!row) return
-    const n = rowIndex + 1
-    const fields: (keyof L4EquityLiabRow)[] = [
-      'instrumentName', 'contractTerms', 'totalProceeds', 'faceValue',
-      'couponRate', 'marketRate', 'periods', 'paymentType',
-      'liabilityComponent', 'equityComponent', 'classificationBasis', 'isAbnormal',
-    ]
-    for (const field of fields) {
-      const val = (row as any)[field]
-      debouncedSave(`L4-5-row-${n}-${field}`, {
-        remark: val != null && val !== '' && val !== 0 && val !== false ? String(val) : null,
-      })
-    }
-  }
-
-  function _triggerSaveAll(): void {
-    for (let i = 0; i < checkRows.value.length; i++) {
-      _triggerSave(i)
-    }
   }
 
   // ─── Return ────────────────────────────────────────────────────────────

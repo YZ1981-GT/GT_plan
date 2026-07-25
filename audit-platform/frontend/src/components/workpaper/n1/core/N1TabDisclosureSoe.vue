@@ -420,11 +420,11 @@ const recognizedDetailRows = computed<RecognizedDetailRow[]>(() => {
     } catch { /* fallback */ }
   }
 
-  // 默认分类
+  // 默认分类（对齐源模板附注(1)已确认递延所得税资产 7 类）
   if (rows.length === 0) {
     const defaultCategories = [
-      '资产减值准备', '可弥补亏损', '预提费用/预计负债',
-      '递延收益', '公允价值变动', '坏账准备', '固定资产折旧差异', '其他',
+      '资产减值准备', '可抵扣亏损', '内部交易未实现利润',
+      '公允价值变动', '租赁负债', '购入摊销年限小于税法规定的资产', '其他',
     ]
     rows = defaultCategories.map(item => ({
       item, bookValue: 0, taxBase: 0, deductibleDiff: 0,

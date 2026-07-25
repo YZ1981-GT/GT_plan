@@ -8,7 +8,7 @@
         <el-tag type="primary" size="small">上市</el-tag>
       </div>
       <div class="section-header-right">
-        <el-button size="small" @click="handleAI('disclosure-listed')">
+        <el-button size="small" :loading="aiLoading === 'disclosure-listed'" :disabled="isReadonly" @click="handleAI('disclosure-listed')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
         <el-button size="small" @click="handleReview">
@@ -32,7 +32,7 @@
       <template #header>
         <div class="card-header">
           <span>未分配利润变动明细</span>
-          <el-button size="small" @click="handleAI('section-movement')">
+          <el-button size="small" :loading="aiLoading === 'section-movement'" :disabled="isReadonly" @click="handleAI('section-movement')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </div>
@@ -85,7 +85,7 @@
       <template #header>
         <div class="card-header">
           <span>会计政策变更/前期差错更正说明</span>
-          <el-button size="small" @click="handleAI('section-policy-change')">
+          <el-button size="small" :loading="aiLoading === 'section-policy-change'" :disabled="isReadonly" @click="handleAI('section-policy-change')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </div>
@@ -105,7 +105,7 @@
       <template #header>
         <div class="card-header">
           <span>利润分配方案</span>
-          <el-button size="small" @click="handleAI('section-distribution-plan')">
+          <el-button size="small" :loading="aiLoading === 'section-distribution-plan'" :disabled="isReadonly" @click="handleAI('section-distribution-plan')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </div>
@@ -125,7 +125,7 @@
       <template #header>
         <div class="card-header">
           <span>子公司盈余公积转入母公司未分配利润说明</span>
-          <el-button size="small" @click="handleAI('section-subsidiary')">
+          <el-button size="small" :loading="aiLoading === 'section-subsidiary'" :disabled="isReadonly" @click="handleAI('section-subsidiary')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </div>
@@ -171,9 +171,11 @@
  * - inject openReviewDialog
  */
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, Check } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
 import { useM6FormData } from '../../composables/useM6FormData'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -188,6 +190,8 @@ const emit = defineEmits<{
 }>()
 
 const openReviewDialog = inject<((sectionId: string, sectionLabel?: string) => void) | null>('openReviewDialog', null)
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
 
 // ─── FormData ───────────────────────────────────────────────────────────────
 
@@ -305,8 +309,46 @@ function handleSubsidiaryNoteChange() {
   formData.debouncedSave('M6-disclosure-listed-subsidiary', { remark: subsidiaryNote.value || null })
 }
 
-function handleAI(_section: string) {
-  // AI辅助钩子（后续集成）
+function _endRetained(field: 'currentPeriod' | 'priorPeriod'): number {
+  return movementRows.value.find(r => r.key === 'end-retained')?.[field] ?? 0
+}
+
+async function handleAI(section: string) {
+  if (props.isReadonly) return
+  aiLoading.value = section
+  try {
+    const context: Record<string, string> = {
+      科目: '4104 利润分配-未分配利润 / 附注披露（上市公司）',
+      本期期末未分配利润: fmtAmount(_endRetained('currentPeriod')),
+      上期期末未分配利润: fmtAmount(_endRetained('priorPeriod')),
+    }
+    // 各文本区分别回填
+    if (section === 'section-policy-change') {
+      const text = await generateAiText({ section: 'm6-disclosure-listed-policy-change', context, existingContent: policyChangeNote.value })
+      if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+      policyChangeNote.value = text
+      handlePolicyChangeNoteChange()
+      return
+    }
+    if (section === 'section-distribution-plan') {
+      const text = await generateAiText({ section: 'm6-disclosure-listed-distribution-plan', context, existingContent: distributionPlanNote.value })
+      if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+      distributionPlanNote.value = text
+      handleDistributionPlanNoteChange()
+      return
+    }
+    if (section === 'section-subsidiary') {
+      const text = await generateAiText({ section: 'm6-disclosure-listed-subsidiary', context, existingContent: subsidiaryNote.value })
+      if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+      subsidiaryNote.value = text
+      handleSubsidiaryNoteChange()
+      return
+    }
+    // 无对应文本区（整体披露/变动表说明）→ 弹窗展示建议
+    const text = await generateAiText({ section: `m6-disclosure-listed-${section}`, context, existingContent: '' })
+    if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+    ElMessageBox.alert(text, 'AI 辅助建议', { confirmButtonText: '知道了' }).catch(() => {})
+  } catch { ElMessage.warning('AI 生成失败，请稍后重试') } finally { aiLoading.value = '' }
 }
 
 function handleReview() {

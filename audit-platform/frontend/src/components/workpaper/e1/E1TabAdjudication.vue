@@ -302,7 +302,7 @@ function getRowClass({ row }: { row: AdjRow }): string {
           </el-table-column>
 
           <!-- 原因分析 -->
-          <el-table-column label="原因分析" min-width="220">
+          <el-table-column label="原因分析" min-width="220" class-name="variance-note-col">
             <template #default="{ row }">
               <div v-if="['total', 'tb_amount'].includes(row.itemKey)" class="readonly-cell">
                 {{ row.varianceNote || '-' }}
@@ -416,6 +416,20 @@ function getRowClass({ row }: { row: AdjRow }): string {
 }
 .e1-tab-adjudication :deep(.el-table .cell) {
   font-size: var(--wp-font-size, 13px) !important;
+}
+/* 🔴 数值列(右对齐)防折行：金额一律单行显示；数值字号调小到 12px（比正文小1号，
+   14 位数如 -18,241,563.19 在 130px 列内单行可容）+ 等宽数字对齐。文本列(原因分析)保持换行。 */
+.e1-tab-adjudication :deep(.el-table td.is-right .cell) {
+  white-space: nowrap !important;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px !important;
+}
+/* 🔴 原因分析列字号统一 12px（含只读文本、textarea 输入、AI 按钮） */
+.e1-tab-adjudication :deep(.el-table td.variance-note-col .cell),
+.e1-tab-adjudication :deep(.el-table td.variance-note-col .cell .el-textarea__inner),
+.e1-tab-adjudication :deep(.el-table td.variance-note-col .cell .readonly-cell),
+.e1-tab-adjudication :deep(.el-table td.variance-note-col .cell .note-cell) {
+  font-size: 12px !important;
 }
 .guidance-details {
   margin-bottom: 12px;

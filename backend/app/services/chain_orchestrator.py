@@ -639,6 +639,7 @@ class ChainOrchestrator:
         matched_codes = matched_primary  # for downstream code compatibility
 
         # 6. Build wp_code → name lookup (also build subtable name list per primary)
+        from app.services.wp_name_source import resolve_wp_name
         code_name_map = {m["wp_code"]: m.get("wp_name", "") for m in mappings}
 
         # 7. Generate workpapers (with template file copy + metadata link)
@@ -679,7 +680,7 @@ class ChainOrchestrator:
                 if existing_id:
                     continue
 
-                wp_name = code_name_map.get(code) or f"底稿{code}"
+                wp_name = resolve_wp_name(code, code_name_map.get(code))
 
                 # Resolve cycle: prefer metadata's cycle, fallback to first letter of code
                 meta = meta_map.get(code, {})
@@ -776,7 +777,7 @@ class ChainOrchestrator:
                     if existing.scalar_one_or_none():
                         continue
 
-                    sub_name = code_name_map.get(sub_code) or f"底稿{sub_code}"
+                    sub_name = resolve_wp_name(sub_code, code_name_map.get(sub_code))
                     cycle = primary_code[0] if primary_code and primary_code[0].isalpha() else None
 
                     sub_wp_index = WpIndex(

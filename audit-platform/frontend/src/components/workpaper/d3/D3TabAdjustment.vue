@@ -6,6 +6,21 @@
     <el-button size="small" :disabled="isReadonly || selectedRowIds.length === 0" @click="pushToA13">
       推送至A13（{{ selectedRowIds.length }}条）
     </el-button>
+    <el-button
+      size="small"
+      type="primary"
+      plain
+      :loading="centralSyncing"
+      :disabled="isReadonly || !isBalanced || rows.length === 0"
+      @click="syncToCentral"
+      title="把本页调整分录汇聚到集中调整登记，供合伙人跨循环审阅"
+    >同步到集中登记</el-button>
+    <el-tag
+      v-if="centralStatus?.review_status"
+      size="small"
+      :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
+      :title="centralStatus.rejection_reason || ''"
+    >集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}</el-tag>
     <el-button-group size="small" style="margin-left: auto">
       <el-button @click="onExportTemplate">导出模板</el-button>
       <el-button @click="onExportData">导出数据</el-button>
@@ -123,6 +138,8 @@
 import { computed, ref, toRef, type Ref } from 'vue'
 import { useD3Adjustment } from '../composables/useD3Adjustment'
 import { useD3TabImportExport } from '../composables/useD3TabImportExport'
+import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../composables/useAdjustmentCentralSync'
+import { useAuditContext } from '@/composables/useAuditContext'
 import type { ChecklistResponse } from '../composables/useD3FormData'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
 
@@ -162,6 +179,27 @@ const {
 })
 
 const { onExportTemplate, onExportData, onImportFile } = useD3TabImportExport(wpIdRef, 'D3-3')
+
+// ─── 同步到集中调整登记 ─────────────────────────────────────────────
+const { year: centralYear } = useAuditContext()
+const { centralStatus, syncing: centralSyncing, syncToCentral, refreshStatus } = useAdjustmentCentralSync({
+  projectId: () => props.projectId,
+  year: centralYear,
+  wpId: () => props.wpId,
+  wpCode: 'D3',
+  itemId: 'D3-aje-rows',
+  buildLineItems: () => rows.value.map((r) => ({
+    account_name: r.accountName,
+    report_line_code: r.reportItem || undefined,
+    debit_amount: r.debitAmount,
+    credit_amount: r.creditAmount,
+  })),
+  buildMeta: () => ({
+    description: rows.value.find((r) => r.description)?.description || 'D3 预付账款调整',
+    adjustmentType: rows.value.length > 0 && rows.value.every((r) => r.category === '报表调整' || r.category === '重分类调整') ? 'rje' : 'aje',
+  }),
+})
+refreshStatus()
 
 function onSelectionChange(selection: any[]) {
   selectedRowIds.value = selection.map((r: any) => r.rowId)

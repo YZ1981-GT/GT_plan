@@ -21,6 +21,8 @@
         >
           保存并发布
         </el-button>
+        <el-button size="small" type="primary" plain :loading="centralSyncing" :disabled="isReadonly || !currentBalance.isBalanced || filteredEntries.length === 0" @click="syncToCentral" title="把本页调整分录汇聚到集中调整登记，供合伙人跨循环审阅">同步到集中登记</el-button>
+        <el-tag v-if="centralStatus?.review_status" size="small" :type="centralStatus.review_status==='approved'?'success':(centralStatus.review_status==='rejected'?'danger':'info')" :title="centralStatus.rejection_reason||''">集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status]||centralStatus.review_status }}</el-tag>
         <el-button size="small" @click="handleAI('adjustment')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
@@ -120,10 +122,12 @@
  * L5TabAdjustment — L5-4 调整分录（借贷平衡）
  * Requirements: 5.3
  */
-import { computed, inject, onMounted } from 'vue'
+import { computed, inject, onMounted, watch, toRef, type Ref } from 'vue'
 import { Plus, MagicStick, Check } from '@element-plus/icons-vue'
 import { useL5FormData } from '../../composables/useL5FormData'
 import { useL5Adjustment, type L5AdjustmentEntry, type L5AdjustmentType } from '../../composables/useL5Adjustment'
+import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '@/components/workpaper/composables/useAdjustmentCentralSync'
+import { useAuditContext } from '@/composables/useAuditContext'
 
 const props = defineProps<{
   wpId: string
@@ -162,6 +166,36 @@ const {
   saveAndPublish,
 } = useL5Adjustment(formData)
 
+// ─── 同步到集中调整登记 ───────────────────────────────────────────────────────
+
+const { year: auditYear } = useAuditContext()
+const {
+  centralStatus,
+  syncing: centralSyncing,
+  syncToCentral,
+  refreshStatus,
+} = useAdjustmentCentralSync({
+  projectId: toRef(props, 'projectId') as Ref<string>,
+  year: auditYear,
+  wpId: toRef(props, 'wpId') as Ref<string>,
+  wpCode: 'L5',
+  itemId: () => `L5-adj-${activeType.value}`,
+  buildLineItems: () =>
+    filteredEntries.value.map((e: any) => ({
+      standard_account_code: e.accountCode || undefined,
+      account_name: e.accountName,
+      debit_amount: e.debitAmount,
+      credit_amount: e.creditAmount,
+    })),
+  buildMeta: () => ({
+    description:
+      filteredEntries.value.find((e: any) => e.description)?.description ||
+      `L5 长期应付款调整（${activeType.value}）`,
+    adjustmentType: activeType.value === 'RJE' ? 'rje' : 'aje',
+  }),
+})
+watch(activeType, () => refreshStatus())
+
 const typeOptions = [
   { label: 'AJE 审计调整', value: 'AJE' },
   { label: 'RJE 重分类', value: 'RJE' },
@@ -193,6 +227,7 @@ function fmtAmount(val: number): string {
 
 onMounted(async () => {
   await formData.loadData()
+  refreshStatus()
 })
 </script>
 

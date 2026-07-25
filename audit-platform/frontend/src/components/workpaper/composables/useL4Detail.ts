@@ -14,10 +14,13 @@
  *
  * 科目：2502 应付债券（贷方/负债类）
  */
-import { computed, ref, type ComputedRef, type Ref } from 'vue'
+import { computed, ref, watch, type ComputedRef, type Ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { calcLiabilityEndBalance, calcSubtotal } from './useL4FormulaEngine'
-import type { useL4FormData } from './useL4FormData'
+import type { useL4FormData, ChecklistResponse } from './useL4FormData'
+
+/** 🔴 P0 修复：JSON-array 存储 item_id（此前 flat keys `L4-2-row-{n}-{field}` 且组件无 hydration → 刷新数据全丢） */
+const ITEM_ROWS = 'L4-2-rows'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -27,6 +30,8 @@ export interface L4DetailRow {
   key: string
   /** 债券名称 */
   bondName: string
+  /** 品种：普通债券 | 可转换债券（供审定表 L4-1 按品种聚合带入；默认普通债券） */
+  variety?: '普通债券' | '可转换债券'
   /** 发行日期 */
   issueDate: string
   /** 到期日期 */
@@ -133,7 +138,26 @@ export function useL4Detail(
   formData: ReturnType<typeof useL4FormData>,
   detailRows: Ref<L4DetailRow[]>,
 ) {
-  const { debouncedSave } = formData
+  const { allResponses, debouncedSave } = formData
+
+  // ─── 0. Hydration（从 allResponses 解析 JSON） ───────────────────────────
+  function hydrate(): void {
+    const raw = allResponses.value.get(ITEM_ROWS)?.remark
+    if (!raw) return
+    try {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) detailRows.value = parsed
+    } catch { /* ignore */ }
+  }
+  hydrate()
+  watch(
+    () => allResponses.value.get(ITEM_ROWS)?.remark,
+    (v) => { if (v && detailRows.value.length === 0) hydrate() },
+  )
+
+  function _persist(): void {
+    debouncedSave(ITEM_ROWS, { remark: JSON.stringify(detailRows.value) } as Partial<ChecklistResponse>)
+  }
 
   // ─── 1. 区段Tab状态（行同步：切换Tab不影响行选择） ───────────────────────
 
@@ -200,6 +224,7 @@ export function useL4Detail(
       const newRow: L4DetailRow = {
         key,
         bondName: bondName?.trim() || '',
+        variety: '普通债券',
         issueDate: '',
         maturityDate: '',
         faceValue: 0,
@@ -230,7 +255,7 @@ export function useL4Detail(
       }
 
       detailRows.value.push(newRow)
-      _triggerSave(detailRows.value.length - 1)
+      _persist()
     } catch {
       // 用户取消
     }
@@ -240,7 +265,7 @@ export function useL4Detail(
   function removeRow(index: number): void {
     if (index < 0 || index >= detailRows.value.length) return
     detailRows.value.splice(index, 1)
-    _triggerSaveAll()
+    _persist()
   }
 
   /** 更新某行某字段 */
@@ -257,36 +282,7 @@ export function useL4Detail(
       row.endCostInterestAdj = calcLiabilityEndBalance(row.beginCostInterestAdj, row.creditInterestAdj, row.debitInterestAdj)
     }
 
-    _triggerSave(index)
-  }
-
-  // ─── 4. 保存触发 ──────────────────────────────────────────────────────
-
-  function _triggerSave(rowIndex: number): void {
-    const row = detailRows.value[rowIndex]
-    if (!row) return
-    const n = rowIndex + 1
-    const fields: (keyof L4DetailRow)[] = [
-      'bondName', 'issueDate', 'maturityDate', 'faceValue', 'couponRate',
-      'effectiveRate', 'paymentType', 'issuePrice', 'transactionCost',
-      'beginCostPrincipal', 'beginCostInterestAdj', 'beginCostAccrued',
-      'creditIssue', 'creditInterestAdj', 'debitRedemption', 'debitInterestAdj',
-      'endCostPrincipal', 'endCostInterestAdj', 'endCostAccrued',
-      'couponInterest', 'interestExpense', 'amortization',
-      'redemptionDate', 'redemptionAmount', 'isRedeemed', 'remark',
-    ]
-    for (const field of fields) {
-      const val = (row as any)[field]
-      debouncedSave(`L4-2-row-${n}-${field}`, {
-        remark: val != null && val !== '' && val !== 0 && val !== false ? String(val) : null,
-      })
-    }
-  }
-
-  function _triggerSaveAll(): void {
-    for (let i = 0; i < detailRows.value.length; i++) {
-      _triggerSave(i)
-    }
+    _persist()
   }
 
   // ─── Return ────────────────────────────────────────────────────────────

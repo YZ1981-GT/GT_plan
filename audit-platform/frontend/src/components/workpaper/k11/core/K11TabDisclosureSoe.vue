@@ -6,6 +6,7 @@
       <div class="header-actions">
         <el-button size="small" type="primary" plain :loading="aiGenerating" @click="handleAiGenerate"><el-icon v-if="!aiGenerating"><MagicStick /></el-icon> AI辅助</el-button>
         <GtReviewTrigger section-id="K11-disclosure-soe" label="💬 复核" />
+        <el-button size="small" type="primary" plain :disabled="!projectId" @click="jumpToNote('soe')">↩ 跳转回附注</el-button>
       </div>
     </div>
 
@@ -127,6 +128,9 @@ import { eventBus } from '@/utils/eventBus'
 import { normalizeImpairmentCategory } from '../../composables/useK11Adjudication'
 import { useK11AiGenerate } from '../../composables/useK11AiGenerate'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
+import { ElMessage } from 'element-plus'
+import { useRouter } from 'vue-router'
+import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 
 const ABNORMAL_THRESHOLD = 0.3
 
@@ -140,6 +144,14 @@ const props = defineProps<{
 const emit = defineEmits<{ (e: 'save', itemId: string, value: any): void }>()
 
 const { generating: aiGenerating, generate: aiGenerate } = useK11AiGenerate({ wpId: () => props.wpId })
+
+const router = useRouter()
+// 跳转回附注模块（披露表 → 附注为单向推送；此处仅导航，方便相互编辑确认）
+function jumpToNote(target: DisclosureVariant): void {
+  const route = buildNoteJumpRoute(props.projectId || '', 'K11', target)
+  if (!route) { ElMessage.warning('未找到对应的附注章节'); return }
+  router.push(route)
+}
 
 // ─── 数据模型 ────────────────────────────────────────────────────────────────
 

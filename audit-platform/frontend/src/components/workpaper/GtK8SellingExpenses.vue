@@ -5,7 +5,7 @@
     </div>
 
     <template v-else>
-      <div v-if="isHtmlSheet" class="k8-header-toolbar">
+      <div v-if="isHtmlSheet && currentSheet !== 'K8'" class="k8-header-toolbar">
         <el-segmented
           :model-value="dualMode.currentMode.value"
           :options="dualMode.modeOptions.value"

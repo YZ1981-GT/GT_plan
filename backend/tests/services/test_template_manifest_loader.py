@@ -50,6 +50,26 @@ def test_resolve_report_body_disclaimer_all(loader: TemplateManifestLoader):
     assert "1.4.1" in entry.rel_path.name
 
 
+def test_resolve_report_body_emphasis_alias_maps_to_unqualified(
+    loader: TemplateManifestLoader,
+):
+    """回归：unqualified_with_emphasis（强调事项段=可选段，非独立模板族）应归一到
+    unqualified 模板族，不得抛 KeyError（此前导致「生成报告正文预览失败」500）。"""
+    emphasis = loader.resolve_report_body("unqualified_with_emphasis", "type_c", "simple")
+    plain = loader.resolve_report_body("unqualified", "type_c", "simple")
+    assert emphasis.rel_path == plain.rel_path
+    assert emphasis.exists
+
+
+def test_resolve_report_body_none_variant_defaults_simple(
+    loader: TemplateManifestLoader,
+):
+    """回归：variant 显式传 None 应兜底为 simple，不得抛 KeyError。"""
+    entry = loader.resolve_report_body("unqualified", "type_c", None)  # type: ignore[arg-type]
+    simple = loader.resolve_report_body("unqualified", "type_c", "simple")
+    assert entry.rel_path == simple.rel_path
+
+
 def test_resolve_report_body_scope_consolidated_vs_standalone(
     loader: TemplateManifestLoader,
 ):

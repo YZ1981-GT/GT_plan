@@ -19,6 +19,25 @@
         >
           确认调整
         </el-button>
+        <el-button
+          size="small"
+          type="primary"
+          plain
+          :loading="centralSyncing"
+          :disabled="!!props.readonly || !adj.isBalanced.value || adj.entries.value.length === 0"
+          title="把本页调整分录汇聚到集中调整登记，供合伙人跨循环审阅"
+          @click="syncToCentral"
+        >
+          同步到集中登记
+        </el-button>
+        <el-tag
+          v-if="centralStatus?.review_status"
+          size="small"
+          :type="centralStatus.review_status === 'approved' ? 'success' : (centralStatus.review_status === 'rejected' ? 'danger' : 'info')"
+          :title="centralStatus.rejection_reason || ''"
+        >
+          集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
+        </el-tag>
         <GtReviewTrigger section-id="g5-4-adjustment" />
       </div>
     </div>
@@ -228,6 +247,8 @@
 import { ref, toRef, computed, onMounted } from 'vue'
 import { useG5Adjustment } from '../../composables/useG5Adjustment'
 import { useInjectedG5FormData } from '../../composables/useG5LonRecFormData'
+import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
+import { useAuditContext } from '@/composables/useAuditContext'
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import G5ImportExportDropdown from '../G5ImportExportDropdown.vue'
@@ -251,6 +272,28 @@ const adj = useG5Adjustment({
   saveImmediate: g5Notes.saveImmediate,
   isReadonly: readonlyRef,
 })
+
+// ─── 同步到集中调整登记（workpaper-adjustment-centralization） ───
+const { year: centralYear } = useAuditContext()
+const { centralStatus, syncing: centralSyncing, syncToCentral, refreshStatus } = useAdjustmentCentralSync({
+  projectId: () => props.projectId,
+  year: centralYear,
+  wpId: () => props.wpId,
+  wpCode: 'G5',
+  itemId: 'G5-4-rows',
+  buildLineItems: () => adj.entries.value.map((r) => ({
+    standard_account_code: r.accountCode || undefined,
+    account_name: r.accountName,
+    report_line_code: r.reportItem || undefined,
+    debit_amount: r.debitAmount,
+    credit_amount: r.creditAmount,
+  })),
+  buildMeta: () => ({
+    description: adj.entries.value.find((r) => r.description)?.description || 'G5 长期应收款调整',
+    adjustmentType: adj.entries.value.length > 0 && adj.entries.value.every((r) => r.category === '报表调整') ? 'rje' : 'aje',
+  }),
+})
+onMounted(() => refreshStatus())
 
 const auditNote = ref('')
 const auditConclusion = ref('')

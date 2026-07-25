@@ -8,7 +8,7 @@
         <GtIndexChip value="M6" :context-project-id="projectId" />
       </div>
       <div class="section-header-right">
-        <el-button size="small" @click="handleAI('accrualTest')">
+        <el-button size="small" :loading="aiLoading === 'accrualTest'" :disabled="isReadonly" @click="handleAI('accrualTest')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
         <el-button size="small" @click="handleReview">
@@ -254,7 +254,7 @@
       <template #header>
         <div class="section-header">
           <span class="card-title">计提检查结论及说明</span>
-          <el-button size="small" @click="handleAI('conclusion')">
+          <el-button size="small" :loading="aiLoading === 'conclusion'" :disabled="isReadonly" @click="handleAI('conclusion')">
             <el-icon><MagicStick /></el-icon> AI辅助
           </el-button>
         </div>
@@ -301,9 +301,11 @@
  * 科目：4101 盈余公积（贷方/权益类）
  */
 import { computed, inject, onMounted, ref, watch } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, Check } from '@element-plus/icons-vue'
 import { useM5FormData } from '../../composables/useM5FormData'
 import { useM5AccrualTest } from '../../composables/useM5AccrualTest'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
@@ -317,6 +319,8 @@ const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => vo
   'openReviewDialog',
   () => {},
 )
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
 
 // ─── Composable 初始化 ───────────────────────────────────────────────────────
 const formData = useM5FormData({
@@ -403,7 +407,33 @@ function fmtAmount(val: number): string {
 }
 
 // ─── Actions ─────────────────────────────────────────────────────────────────
-function handleAI(_section: string) { /* AI钩子 */ }
+async function handleAI(section: string) {
+  if (props.isReadonly) return
+  aiLoading.value = section
+  try {
+    const t = accrualTest.testData.value
+    const context: Record<string, string> = {
+      科目: '4101 盈余公积（权益类贷方）',
+      净利润: fmtAmount(t.netProfit),
+      弥补以前年度亏损: fmtAmount(t.priorLossOffset),
+      计提基数: fmtAmount(t.accrualBase),
+      法定应计提: fmtAmount(t.statutoryEstimated),
+      法定账面计提: fmtAmount(t.statutoryBooked),
+      法定差异: fmtAmount(t.statutoryDiff),
+      任意应计提: fmtAmount(t.discretionaryEstimated),
+      合计差异: fmtAmount(t.totalDiff),
+      是否达50上限: accrualTest.ceilingReached.value ? '已达（可不再计提）' : '未达（须继续计提）',
+    }
+    const text = await generateAiText({
+      section: `m5-accrual-test-${section}`,
+      context,
+      existingContent: section === 'conclusion' ? auditNote.value : '',
+    })
+    if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+    if (section === 'conclusion') { auditNote.value = text; saveAuditNote() }
+    else ElMessageBox.alert(text, 'AI 辅助建议', { confirmButtonText: '知道了' }).catch(() => {})
+  } catch { ElMessage.warning('AI 生成失败，请稍后重试') } finally { aiLoading.value = '' }
+}
 function handleReview() {
   openReviewDialog?.('M5-4-accrual-test', '盈余公积计提检查')
 }

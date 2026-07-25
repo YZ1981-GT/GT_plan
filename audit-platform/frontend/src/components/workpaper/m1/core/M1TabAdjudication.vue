@@ -7,13 +7,10 @@
         <h3 class="section-title">M1-1 应付股利审定表</h3>
       </div>
       <div class="section-header-right">
-        <el-segmented
-          v-model="dualMode.mode.value"
-          :options="dualMode.modeOptions.value"
-          size="small"
-          @change="(val: any) => dualMode.switchMode(val)"
-        />
-        <el-button size="small" @click="handleAI('adjudication')">
+        <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
+          <el-icon><Download /></el-icon> 带入调整
+        </el-button>
+        <el-button size="small" :loading="aiLoading === 'adjudication'" :disabled="isReadonly" @click="handleAI('adjudication')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
         <el-button size="small" @click="handleReview">
@@ -271,7 +268,7 @@
       <template #header>
         <div class="section-header">
           <span class="card-title">审计说明</span>
-          <el-button size="small" @click="handleAI('auditNote')">
+          <el-button size="small" :loading="aiLoading === 'auditNote'" :disabled="isReadonly" @click="handleAI('auditNote')">
             <el-icon><MagicStick /></el-icon> AI辅助
           </el-button>
         </div>
@@ -297,8 +294,18 @@
         <li>小计行自动汇总各股东行数据</li>
         <li>审定数变化自动回写 TB（科目 2232）并通知附注组件</li>
         <li>宣告分配→贷方增加；实际支付→借方减少</li>
+        <li>带入调整：可从集中登记按科目 2232 拉取调整分录，逐笔分配到各股东行期末AJE/RJE，带入后审定数自动更新并联动附注</li>
       </ul>
     </details>
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="2232 应付股利"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
@@ -324,15 +331,18 @@
  * 宣告分配在贷方增加，实际支付在借方减少
  */
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
-import { ElMessageBox } from 'element-plus'
-import { MagicStick, Check } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { MagicStick, Check, Download } from '@element-plus/icons-vue'
 import { useM1FormData } from '../../composables/useM1FormData'
-import { useM1DualMode } from '../../composables/useM1DualMode'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import {
   useM1Adjudication,
   type M1AdjudicationRow,
 } from '../../composables/useM1Adjudication'
 import { eventBus } from '@/utils/eventBus'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import { useAuditContext } from '@/composables/useAuditContext'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -349,18 +359,14 @@ const emit = defineEmits<{
 // ─── Inject ──────────────────────────────────────────────────────────────────
 
 const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', () => {})
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref('')
 
 // ─── FormData ────────────────────────────────────────────────────────────────
 
 const formData = useM1FormData({
   wpId: computed(() => props.wpId),
   projectId: computed(() => props.projectId),
-})
-
-// ─── DualMode ────────────────────────────────────────────────────────────────
-
-const dualMode = useM1DualMode({
-  wpId: computed(() => props.wpId),
 })
 
 // ─── 审定表行数据（动态按股东分类行） ────────────────────────────────────────
@@ -377,6 +383,37 @@ const {
   updateRow: composableUpdateRow,
   saveAndWriteback,
 } = useM1Adjudication(formData, rows)
+
+// ─── 从集中登记带入调整（2232 应付股利，负债贷方；双列 endAje/endRje，动态股东行） ───
+const bringInRows = computed(() =>
+  rawComputedRows.value.map((r, idx) => ({
+    rowKey: String(idx),
+    name: r.shareholderName || `股东${idx + 1}`,
+    aje: r.endAje ?? 0,
+    rje: r.endRje ?? 0,
+  })),
+)
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: computed(() => props.projectId) as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '2232',
+  direction: 'credit',
+  subjectCode: '2232',
+  wpCode: 'M1',
+  subjectLabel: '应付股利(2232)',
+  rows: bringInRows,
+  updateCell: (rowKey: string, field: any, value: number) => {
+    const idx = Number(rowKey)
+    updateRow(idx, field === 'aje' ? 'endAje' : 'endRje', value)
+  },
+  totalAudited: () => totalRow.value.endAudited,
+})
 
 // ─── 合计行 + TB核对行 → 拼装为表格数据 ────────────────────────────────────────
 
@@ -506,14 +543,24 @@ function saveAuditNote() {
   formData.debouncedSave('M1-M1-1-auditNote', { remark: auditNote.value || null })
 }
 
-function handleAI(section: string) {
-  import('@/utils/http').then(({ default: h }) => {
-    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
-      section: `m1-adjudication-${section}`,
-      prompt: `请基于应付股利底稿"${section}"区段数据，给出审计分析建议`,
-      context: { section, wpId: props.wpId },
-    }).catch(() => {})
-  })
+async function handleAI(section: string) {
+  if (props.isReadonly) return
+  aiLoading.value = section
+  try {
+    const t = totalRow.value
+    const context: Record<string, string> = {
+      科目: '2232 应付股利 / 审定表（M1-1 负债类贷方，按股东分类）',
+      期初审定合计: fmtAmount(t.beginAudited),
+      期末审定合计: fmtAmount(t.endAudited),
+      变动额: fmtAmount(t.varianceAmount),
+      变动率: fmtPercent(t.varianceRate),
+      股东数: String(rows.value.length),
+    }
+    const text = await generateAiText({ section: `m1-adjudication-${section}`, context, existingContent: auditNote.value })
+    if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+    auditNote.value = text
+    saveAuditNote()
+  } catch { ElMessage.warning('AI 生成失败，请稍后重试') } finally { aiLoading.value = '' }
 }
 
 function handleReview() {

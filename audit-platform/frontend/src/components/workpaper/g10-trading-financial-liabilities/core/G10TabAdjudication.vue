@@ -3,6 +3,9 @@
     <div class="g10-toolbar tab-toolbar">
       <h3 class="g10-title">G10-1 交易性金融负债审定表</h3>
       <div class="g10-actions">
+        <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
+          <el-icon><Download /></el-icon>带入调整
+        </el-button>
         <GtIndexChip value="wp:G10-1" />
         <el-tag size="small" type="info">共 {{ adjRowCount }} 行</el-tag>
         <GtReviewTrigger section-id="G10-1-adjudication" />
@@ -42,6 +45,7 @@
         <p><b>勾稽关系：</b>各分项 (三) = (一) + (二)；试算平衡表数与 (三) 账面余额合计比对；G10-2 明细合计应与 (三) 一致。</p>
         <p><b>公式：</b>审定数 = 未审 + AJE + RJE；变动额 = 期末审定 − 期初审定；变动率 = 变动额 / |期初审定|。</p>
         <p><b>分析要求：</b>|变动率|&gt;20% 时原因分析必填；审计说明中对 |变动率|&gt;30% 的项目重点说明增减原因（对齐模板「审计说明」）。</p>
+        <p><b>带入调整：</b>可从集中登记按科目 2101 拉取调整分录，逐笔分配到 (三)账面余额各行的期末账项(AJE)/重分类(RJE)调整，带入后审定数自动更新并联动附注。</p>
       </div>
     </details>
 
@@ -251,18 +255,31 @@
       conclusion-placeholder="填写审计结论：A、未见异常。B、除上述重大不符事项应作为调整事项予以调整外，其余未见异常。C、由于存在重大未调整事项或审计范围受限，不可确认。"
       :related-context="{ 试算表差异: adj.variance.value, 明细勾稽差异: adj.detailCrossVariance.value, 三部分勾稽: adj.threePartMismatches.value.length }"
     />
+
+    <AdjudicationBringInDialog
+      v-model="bringInVisible"
+      :matches="adjPull.matches.value"
+      :row-options="bringInRowOptions"
+      subject-label="2101 交易性金融负债"
+      :loading="adjPull.loading.value"
+      @apply="onBringInApply"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, inject } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Download } from '@element-plus/icons-vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import GtReviewDot from '../../GtReviewDot.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import G10AuditTextCards from '../G10AuditTextCards.vue'
 import G10ImportExportDropdown from '../G10ImportExportDropdown.vue'
+import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import { useG10Adjudication } from '../../composables/useG10Adjudication'
+import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import { useAuditContext } from '@/composables/useAuditContext'
 import {
   confirmNavigateToSheet,
   dispatchProcedureFocus,
@@ -300,6 +317,33 @@ const adj = useG10Adjudication({
 const adjRowCount = computed(() =>
   adj.groupedRows.value.reduce((n, g) => n + g.rows.length, 0),
 )
+
+// ─── 从集中登记带入调整（2101 交易性金融负债，负债贷方；带入期末 AJE/RJE） ───
+// 仅面向 (三)账面余额组(book_fv)——该组驱动审定合计与 TB 勾稽。
+const bringInRows = computed(() =>
+  adj.dataRows.value
+    .filter((r) => r.group === 'book_fv')
+    .map((r) => ({ rowKey: r.rowKey, name: r.label, aje: r.closingAJE, rje: r.closingRJE })),
+)
+const {
+  adjPull,
+  visible: bringInVisible,
+  rowOptions: bringInRowOptions,
+  open: openBringInAdjustment,
+  apply: onBringInApply,
+} = useAdjudicationBringIn({
+  projectId: computed(() => props.projectId) as any,
+  year: useAuditContext().year as any,
+  subjectPrefix: '2101',
+  direction: 'credit',
+  subjectCode: '2101',
+  wpCode: 'G10',
+  subjectLabel: '交易性金融负债(2101)',
+  rows: bringInRows,
+  updateCell: (rowKey: string, field: any, value: number) =>
+    adj.updateField(rowKey, field === 'rje' ? 'closingRJE' : 'closingAJE', value),
+  totalAudited: () => adj.totalRow.value.closingAdjusted,
+})
 
 const accountLabel = computed(() => g10AccountLabel(adj.tbResolvedCode.value))
 const aliasHint = G10_ACCOUNT_ALIASES.join('/')

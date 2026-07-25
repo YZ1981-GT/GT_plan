@@ -8,12 +8,6 @@
         <el-tag type="warning" size="small">双版本·区段Tab·动态行</el-tag>
       </div>
       <div class="section-header-right">
-        <el-segmented
-          v-model="dualMode.mode.value"
-          :options="dualMode.modeOptions.value"
-          size="small"
-          @change="(val: any) => dualMode.switchMode(val)"
-        />
         <el-dropdown :disabled="isReadonly" @command="handleImportExport" trigger="click">
           <el-button size="small">导入导出 ▾</el-button>
           <template #dropdown>
@@ -24,7 +18,7 @@
             </el-dropdown-menu>
           </template>
         </el-dropdown>
-        <el-button size="small" @click="handleAI('detail')">
+        <el-button size="small" :loading="aiLoading" :disabled="isReadonly" @click="handleAI('detail')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
         <el-button size="small" @click="handleReview">
@@ -85,6 +79,26 @@
       :detail="detail"
     />
 
+    <!-- ═══ 明细分析说明 ═══ -->
+    <el-card shadow="never" class="detail-note-card">
+      <template #header>
+        <div class="card-header">
+          <span class="card-title">明细分析说明</span>
+          <el-button size="small" :loading="aiLoading" :disabled="isReadonly" @click="handleAI('detail')">
+            <el-icon><MagicStick /></el-icon> AI辅助
+          </el-button>
+        </div>
+      </template>
+      <el-input
+        v-model="detailNote"
+        type="textarea"
+        :autosize="{ minRows: 3, maxRows: 8 }"
+        :disabled="isReadonly"
+        placeholder="概述股本/出资结构及本期变动情况、明细与审定表勾稽结果等，或点击 AI 辅助生成..."
+        @change="saveDetailNote"
+      />
+    </el-card>
+
     <!-- ═══ 跨底稿联动（cross_wp_ref GtIndexChip） ═══ -->
     <div class="cross-wp-links">
       <span class="cross-wp-label">cross_wp_ref 关联底稿：</span>
@@ -138,8 +152,8 @@ import {
   type M2DetailListedRow,
   type M2DetailUnlistedRow,
 } from '../../composables/useM2Detail'
-import { useM2DualMode } from '../../composables/useM2DualMode'
 import { useM2ImportExport, type M2ImportableSheet } from '../../composables/useM2ImportExport'
+import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 
 const props = defineProps<{
   wpId: string
@@ -152,6 +166,9 @@ const emit = defineEmits<{
 }>()
 
 const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', () => {})
+const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
+const aiLoading = ref(false)
+const detailNote = ref('')
 
 // ─── FormData + Composables ──────────────────────────────────────────────────
 
@@ -164,10 +181,6 @@ const listedRows = ref<M2DetailListedRow[]>([])
 const unlistedRows = ref<M2DetailUnlistedRow[]>([])
 
 const detail = useM2Detail(formData, listedRows, unlistedRows)
-
-const dualMode = useM2DualMode({
-  wpId: computed(() => props.wpId),
-})
 
 const { exportTemplate, exportData, importData } = useM2ImportExport({
   wpId: computed(() => props.wpId),
@@ -238,7 +251,33 @@ function handleImportExport(command: string) {
 
 // ─── AI / Review ─────────────────────────────────────────────────────────────
 
-function handleAI(_section: string) { /* AI辅助待集成 */ }
+async function handleAI(_section: string) {
+  if (props.isReadonly) return
+  aiLoading.value = true
+  try {
+    const cv = crossValidation.value
+    const detailTotal = adjudicationEndAudited.value + (cv?.diff ?? 0)
+    const context: Record<string, string> = {
+      科目: '4001 实收资本/股本明细表',
+      版本: activeBranch.value === 'listed' ? '上市公司版（股份）' : '非上市公司版（出资）',
+      明细期末合计: fmtAmount(detailTotal),
+      审定表期末: fmtAmount(adjudicationEndAudited.value),
+      与审定表差额: cv ? fmtAmount(cv.diff ?? 0) : '—',
+      是否勾稽一致: cv ? (cv.isMatch ? '是' : '否') : '—',
+    }
+    const text = await generateAiText({ section: 'm2-2-detail-note', context, existingContent: detailNote.value })
+    if (!text) { ElMessage.warning('AI 未生成内容，请稍后重试'); return }
+    detailNote.value = text
+    saveDetailNote()
+  } catch {
+    ElMessage.warning('AI 生成失败，请稍后重试')
+  } finally {
+    aiLoading.value = false
+  }
+}
+function saveDetailNote() {
+  formData.debouncedSave('M2-M2-2-detail-note', { remark: detailNote.value || null })
+}
 function handleReview() { openReviewDialog?.('M2-2-detail', '明细表') }
 
 // ─── Format ──────────────────────────────────────────────────────────────────
@@ -253,6 +292,8 @@ function fmtAmount(val: number): string {
 onMounted(async () => {
   await formData.loadData()
   _restoreRows()
+  const noteResp = formData.allResponses.value.get('M2-M2-2-detail-note')
+  if (noteResp?.remark) detailNote.value = noteResp.remark
 })
 
 function _restoreRows() {
@@ -290,6 +331,9 @@ function _restoreRows() {
 .methodology-context { border-left: 4px solid #e6a23c; background: #fdf6ec; padding: 12px 16px; border-radius: 0 6px 6px 0; margin-bottom: 16px; }
 .methodology-text { font-size: var(--wp-font-size, 13px); color: #6b5900; line-height: 1.6; }
 .cross-sheet-alert { margin-bottom: 12px; }
+.detail-note-card { margin-top: 16px; }
+.detail-note-card .card-header { display: flex; align-items: center; justify-content: space-between; }
+.detail-note-card .card-title { font-size: 14px; font-weight: 600; color: #303133; }
 .cross-wp-links { display: flex; align-items: center; gap: 8px; margin-top: 16px; padding: 10px 14px; background: #f0f9ff; border: 1px solid #d9ecff; border-radius: 6px; flex-wrap: wrap; }
 .cross-wp-label { font-size: 12px; color: #409eff; font-weight: 500; }
 .cross-wp-desc { font-size: 12px; color: #909399; }
