@@ -129,6 +129,23 @@
         @toggle-fullscreen="isWpFullscreen = !isWpFullscreen"
       />
 
+      <!-- AI 底稿复核（本页/批量）：全底稿统一入口，覆盖 A~S 全部循环。
+           后端 /api/workpapers/{id}/review 按 wp_code+sheet_name 加载 sheet-level 提示词
+           并注入 cycle_review_context 勾稽上下文；权限门控 manager/partner/qc/admin。 -->
+      <div
+        v-if="componentType !== 'a1-dashboard' && activeSheetName"
+        class="gt-wp-renderer__ai-review-bar"
+      >
+        <GtWpAiReviewToolbar
+          :wp-id="wpId"
+          :project-id="renderConfig?.project_id ?? ''"
+          :wp-code-prefix="renderConfig?.wp_code ?? ''"
+          :sheet-name="activeSheetName"
+          :year="preparationYear"
+          @navigate-sheet="onChildNavigateSheet"
+        />
+      </div>
+
       <!-- 内容区域 -->
       <div class="gt-wp-renderer__content">
       <!-- 注册表分发：HTML 类组件（A/B/C/D 5 种/E/H 共 10 种 componentType） -->
@@ -281,6 +298,7 @@ import SkippedSheetPlaceholder from '@/components/workpaper/SkippedSheetPlacehol
 import GtGridSheet from '@/components/workpaper/GtGridSheet.vue'
 import GtOnlyOfficeSheet from './GtOnlyOfficeSheet.vue'
 import GtWpToolbar from '@/components/workpaper/GtWpToolbar.vue'
+import GtWpAiReviewToolbar from './review/GtWpAiReviewToolbar.vue'
 import GtWpPreparationHeader from '@/components/workpaper/GtWpPreparationHeader.vue'
 import GtWorkpaperRuntimeHosts from '@/components/workpaper/GtWorkpaperRuntimeHosts.vue'
 import GtBArchitectureTree from '@/components/workpaper/GtBArchitectureTree.vue'
@@ -453,8 +471,15 @@ const activeSheetName = computed<string>({
     }
     // 否则匹配 initialSheet
     if (props.initialSheet) {
-      const matched = sheets.find(s => s.sheet_name === props.initialSheet)
-      if (matched) return matched.sheet_name
+      const target = props.initialSheet
+      const exact = sheets.find(s => s.sheet_name === target)
+      if (exact) return exact.sheet_name
+      // 兜底：initialSheet 传的是底稿编码（如 K9-3/D4-4）时——来源底稿跳转仅有 wp_id+item_id
+      // 前缀编码、无法得知中文 sheet 全名——匹配名称以该编码结尾/包含该编码的 sheet。
+      // 仅在精确匹配失败时启用，附注等传全名的调用方不受影响（精确恒先命中）。
+      const byCode = sheets.find(s => s.sheet_name.endsWith(target))
+        || sheets.find(s => s.sheet_name.includes(target))
+      if (byCode) return byCode.sheet_name
     }
     // 兜底：第一个非 skip 的 sheet
     return visibleSheets.value[0]?.sheet_name ?? sheets[0].sheet_name

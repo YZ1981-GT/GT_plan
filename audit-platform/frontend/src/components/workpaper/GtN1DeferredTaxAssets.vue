@@ -9,15 +9,6 @@
     <template v-else>
       <!-- ─── 工具栏：双模式（六大集成标准，版本历史由 Runtime Boundary 统一 GtWpToolbar 提供） ─── -->
       <div v-if="isHtmlSheet" class="n1-toolbar">
-        <GtWpAiReviewToolbar
-          :wp-id="props.wpId"
-          :project-id="props.projectId"
-          wp-code-prefix="N1"
-          :sheet-name="props.sheetName"
-          :year="props.year"
-          label="递延所得税资产"
-          @navigate-sheet="handleNavigate"
-        />
         <el-segmented
           v-model="dualMode.mode.value"
           :options="dualMode.modeOptions.value"
@@ -150,8 +141,6 @@ import http from '@/utils/http'
 import { eventBus } from '@/utils/eventBus'
 import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './composables/useWorkpaperScaffold'
 import { useN1DualMode } from './composables/useN1DualMode'
-import GtWpAiReviewToolbar from './review/GtWpAiReviewToolbar.vue'
-
 // ─── Lazy-loaded child components ────────────────────────────────────────────
 
 // Core

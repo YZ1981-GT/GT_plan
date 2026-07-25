@@ -3,14 +3,6 @@
     <div v-if="isLoading" class="loading-container"><el-skeleton :rows="8" animated /></div>
     <template v-else>
       <div v-if="isHtmlSheet" class="n3-deferred-tax-liabilities-toolbar">
-        <GtWpAiReviewToolbar
-          :wp-id="props.wpId"
-          :project-id="props.projectId"
-          wp-code-prefix="N3"
-          :sheet-name="props.sheetName"
-          label="递延所得税负债"
-          @navigate-sheet="handleNavigate"
-        />
         <el-segmented
           v-model="renderMode"
           :options="modeOptions"
@@ -127,8 +119,6 @@ import { Loading } from '@element-plus/icons-vue'
 import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './composables/useWorkpaperScaffold'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
-import GtWpAiReviewToolbar from './review/GtWpAiReviewToolbar.vue'
-
 // ─── defineAsyncComponent lazy 加载子组件 ────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 const N3TabIndex = defineAsyncComponent(() => import('./n3/core/N3TabIndex.vue'))

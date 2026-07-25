@@ -6,15 +6,6 @@
 
     <template v-else>
       <div v-if="isHtmlSheet" class="k8-header-toolbar">
-        <GtWpAiReviewToolbar
-          :wp-id="props.wpId"
-          :project-id="props.projectId"
-          wp-code-prefix="K8"
-          :sheet-name="props.sheetName"
-          :year="props.year"
-          label="销售费用"
-          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
-        />
         <el-segmented
           :model-value="dualMode.currentMode.value"
           :options="dualMode.modeOptions.value"
@@ -254,8 +245,6 @@ const K8TabSellingCheck = defineAsyncComponent(() => import('./k8/inspection/K8T
 
 // ─── 双模式 composable ──────────────────────────────────────────────────────
 import { useK8DualMode } from './composables/useK8DualMode'
-import GtWpAiReviewToolbar from './review/GtWpAiReviewToolbar.vue'
-
 // ─── Props & Emits ───────────────────────────────────────────────────────────
 const props = defineProps<{
   wpId: string
