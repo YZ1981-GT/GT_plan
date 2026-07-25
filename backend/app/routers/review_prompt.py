@@ -196,15 +196,13 @@ async def review_workpaper(wp_id: UUID, body: ReviewRequest | None = None):
     prompt_service = ReviewPromptService()
     prompt_result = prompt_service.load_prompt(wp_code, sheet_name)
 
-    # 3. 获取底稿内容 + D2 勾稽上下文
+    # 3. 获取底稿内容 + 跨底稿勾稽上下文（D2 专用富勾稽 / K/N 通用勾稽，统一分发）
     workpaper_content = await _get_workpaper_content(wp_id, sheet_name)
-    recon_context = ""
-    if (wp_code or "").upper().startswith("D2"):
-        from app.services.d2_review_context import (
-            append_reconciliation_to_user_prompt,
-            build_d2_reconciliation_context,
-        )
-        recon_context = await build_d2_reconciliation_context(str(wp_id))
+    from app.services.cycle_review_context import (
+        append_reconciliation_to_user_prompt,
+        build_review_reconciliation_context,
+    )
+    recon_context = await build_review_reconciliation_context(str(wp_id), wp_code)
 
     # 4. 构建 LLM 消息并调用
     system_prompt = (
@@ -231,7 +229,6 @@ async def review_workpaper(wp_id: UUID, body: ReviewRequest | None = None):
     )
     user_prompt = f"以下是需要复核的底稿内容：\n\n{workpaper_content}"
     if recon_context:
-        from app.services.d2_review_context import append_reconciliation_to_user_prompt
         user_prompt = append_reconciliation_to_user_prompt(user_prompt, recon_context)
 
     raw_response = await _call_llm(system_prompt, user_prompt)

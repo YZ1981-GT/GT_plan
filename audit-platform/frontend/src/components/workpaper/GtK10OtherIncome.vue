@@ -6,6 +6,15 @@
 
     <template v-else>
       <div v-if="isHtmlSheet" class="k10-header-toolbar">
+        <GtWpAiReviewToolbar
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          wp-code-prefix="K10"
+          :sheet-name="props.sheetName"
+          :year="props.year"
+          label="其他收益"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
+        />
         <!-- 一向绑定 :model-value（非 v-model）：切 OO 前必须 config 拉取成功，switchMode 内才置 currentMode -->
         <el-segmented
           v-if="dualMode.isOoAvailable.value"
@@ -172,6 +181,7 @@ import {
 } from './composables/useWorkpaperScaffold'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useK10DualMode } from './composables/useK10DualMode'
+import GtWpAiReviewToolbar from './review/GtWpAiReviewToolbar.vue'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))

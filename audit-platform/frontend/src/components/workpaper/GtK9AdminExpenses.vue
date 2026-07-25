@@ -18,6 +18,15 @@
         <el-tag v-else-if="dualMode.checking.value" size="small" type="info">OnlyOffice 检测中…</el-tag>
         <el-tag v-else-if="!dualMode.isOoAvailable.value" size="small" type="info">OnlyOffice 不可用（仅结构化视图）</el-tag>
         <el-tag v-else size="small" type="success">OnlyOffice 就绪</el-tag>
+        <GtWpAiReviewToolbar
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          wp-code-prefix="K9"
+          :sheet-name="props.sheetName"
+          :year="props.year"
+          label="管理费用"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
+        />
       </div>
 
       <!-- OnlyOffice 模式 -->
@@ -216,6 +225,7 @@ import {
 import { useK9DualMode } from './composables/useK9DualMode'
 import { useK9CrossSheet } from './composables/useK9CrossSheet'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
+import GtWpAiReviewToolbar from './review/GtWpAiReviewToolbar.vue'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))

@@ -3,6 +3,14 @@
     <div v-if="isLoading" class="loading-container"><el-skeleton :rows="8" animated /></div>
     <template v-else>
       <div v-if="isHtmlSheet" class="n4-taxes-and-surcharges-toolbar">
+        <GtWpAiReviewToolbar
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          wp-code-prefix="N4"
+          :sheet-name="props.sheetName"
+          label="税金及附加"
+          @navigate-sheet="handleNavigate"
+        />
         <el-segmented
           v-model="dualMode.currentMode.value"
           :options="dualMode.modeOptions"
@@ -135,6 +143,7 @@ import { ref, computed, inject, onMounted, onBeforeUnmount, provide, defineAsync
 import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './composables/useWorkpaperScaffold'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
+import GtWpAiReviewToolbar from './review/GtWpAiReviewToolbar.vue'
 
 // ─── defineAsyncComponent lazy 加载子组件 ────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))

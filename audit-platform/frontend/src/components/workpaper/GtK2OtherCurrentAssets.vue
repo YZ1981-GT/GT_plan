@@ -6,6 +6,15 @@
 
     <template v-else>
       <div v-if="isHtmlSheet" class="k2-header-toolbar">
+        <GtWpAiReviewToolbar
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          wp-code-prefix="K2"
+          :sheet-name="props.sheetName"
+          :year="props.year"
+          label="其他流动资产"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
+        />
         <el-segmented
           v-if="dualMode.isOoAvailable.value"
           v-model="dualMode.currentMode.value"
@@ -175,6 +184,7 @@ import {
   type WorkpaperRuntimeContext,
 } from './composables/useWorkpaperScaffold'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
+import GtWpAiReviewToolbar from './review/GtWpAiReviewToolbar.vue'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))

@@ -399,15 +399,13 @@ class BatchReviewService:
             # 1. 加载提示词
             prompt_result = self._prompt_service.load_prompt(wp_code, sheet_name)
 
-            # 2. 获取底稿内容 + D2 勾稽上下文
+            # 2. 获取底稿内容 + 跨底稿勾稽上下文（D2 富勾稽 / K/N 通用勾稽，统一分发）
             workpaper_content = await self._get_workpaper_content(wp_id, sheet_name)
-            recon_context = ""
-            if (wp_code or "").upper().startswith("D2"):
-                from app.services.d2_review_context import (
-                    append_reconciliation_to_user_prompt,
-                    build_d2_reconciliation_context,
-                )
-                recon_context = await build_d2_reconciliation_context(wp_id)
+            from app.services.cycle_review_context import (
+                append_reconciliation_to_user_prompt,
+                build_review_reconciliation_context,
+            )
+            recon_context = await build_review_reconciliation_context(wp_id, wp_code)
 
             # 3. 调用 LLM
             system_prompt = (

@@ -187,6 +187,34 @@ class ReviewPromptService:
 
         return None
 
+    def _resolve_note_suffix(self, wp_code: str, sheet_name: str | None) -> str | None:
+        """按 wp_code 前缀派生附注 sheet 的提示词后缀（对全部循环通用）。
+
+        "附注上市"/"附注（上市公司）K8"/"附注(上市)" → {prefix}-note-listed
+        "附注国企"/"附注（国企）"                    → {prefix}-note-soe
+        非附注 sheet 返回 None（交由 resolve_sheet_suffix 处理）。
+        """
+        if not sheet_name or not wp_code:
+            return None
+        lower = sheet_name.lower()
+        if not (
+            "附注" in sheet_name
+            or "披露" in sheet_name
+            or "note" in lower
+            or "disclosure" in lower
+        ):
+            return None
+        prefix_match = re.match(r"([A-Z]\d+)", wp_code, re.IGNORECASE)
+        if not prefix_match:
+            return None
+        prefix = prefix_match.group(1).upper()
+        if "国企" in sheet_name or "soe" in lower:
+            return f"{prefix}-note-soe"
+        if "上市" in sheet_name or "listed" in lower:
+            return f"{prefix}-note-listed"
+        # 单一附注（无上市/国企变体，如 N3）默认按 note-listed
+        return f"{prefix}-note-listed"
+
     # ------------------------------------------------------------------
     # Task 2.2: load_prompt
     # ------------------------------------------------------------------
@@ -209,7 +237,12 @@ class ReviewPromptService:
         """
         # Level 1: Sheet-level prompt
         if sheet_name:
-            suffix = self.resolve_sheet_suffix(sheet_name)
+            # 附注 sheet 名（"附注上市"/"附注（国企）"等）不含底稿编码，
+            # 无法由 resolve_sheet_suffix 提取，故按 wp_code 前缀派生
+            # {prefix}-note-listed / {prefix}-note-soe（对全部循环通用，
+            # 与 D2 既有的 _SHEET_NAME_ALIASES 行为一致且向后兼容）。
+            suffix = self._resolve_note_suffix(wp_code, sheet_name) or \
+                self.resolve_sheet_suffix(sheet_name)
             if suffix:
                 cycle_letter = wp_code[0].upper() if wp_code else ""
                 sheet_path = self._base_dir / cycle_letter / f"{suffix}.md"

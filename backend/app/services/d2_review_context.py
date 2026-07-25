@@ -41,6 +41,79 @@ def _fmt(n: float) -> str:
     return f"{n:,.2f}"
 
 
+# D2-2 明细行信用风险分类 → D2-1 审定表行 key（与前端 useD2CrossSheet SUMIF 对齐）
+_D2_CLASSIFICATION_MAP: dict[str, str] = {
+    "单项计提": "individual",
+    "账龄组合": "aging",
+    "客户类型组合": "customer-type",
+}
+
+
+def _sumif_detail(detail_rows: list[dict], classification: str, field: str) -> float:
+    """对明细行按信用风险分类求和某字段（复现前端 sumif）。"""
+    total = 0.0
+    for row in detail_rows:
+        cls = str(
+            row.get("creditRiskClassification")
+            or row.get("credit_risk_classification")
+            or row.get("AI")
+            or ""
+        )
+        if cls == classification:
+            total += _parse_num(row.get(field))
+    return total
+
+
+def _d2_audited_total(by_id: dict[str, str | None], detail_rows: list[dict]) -> float:
+    """D2-1 审定合计：审定表分项优先，缺失时回退明细 SUMIF（与前端一致）。
+
+    修复：原实现仅在 D2-adj-* 分项非空时才计入，导致「明细已填但审定表未手工填」
+    场景下 adj_total=0，误报「审定表无数据」/假不平衡。前端 adjudicationForDisclosure
+    对每个分项在 adj 字段为空时回退 SUMIF(detail)，此处对齐。
+    """
+    total = 0.0
+    for cn_cls, row_key in _D2_CLASSIFICATION_MAP.items():
+        unadj = _parse_num(by_id.get(f"D2-adj-{row_key}-current-unadjusted"))
+        if unadj == 0:
+            unadj = _sumif_detail(detail_rows, cn_cls, "currentUnadjusted")
+        aje = _parse_num(by_id.get(f"D2-adj-{row_key}-current-aje"))
+        if aje == 0:
+            aje = _sumif_detail(detail_rows, cn_cls, "currentAje")
+        rje = _parse_num(by_id.get(f"D2-adj-{row_key}-current-rje"))
+        if rje == 0:
+            rje = _sumif_detail(detail_rows, cn_cls, "currentRje")
+        total += unadj + aje + rje
+    return total
+
+
+async def _fetch_tb_1122(wp_id: str) -> float | None:
+    """从 trial_balance 查 1122 应收账款审定额（DB 权威，v2 正数口径）。"""
+    try:
+        async with async_session() as db:
+            row = (
+                await db.execute(
+                    text(
+                        "SELECT SUM(t.audited_amount) AS audited "
+                        "FROM trial_balance t "
+                        "JOIN working_paper wp ON wp.project_id = t.project_id "
+                        "JOIN projects p ON p.id = t.project_id "
+                        "WHERE wp.id = :wp_id AND wp.is_deleted = false "
+                        "AND t.is_deleted = false "
+                        "AND t.year = COALESCE(p.audit_year, "
+                        "EXTRACT(YEAR FROM p.audit_period_end)::int) "
+                        "AND t.standard_account_code LIKE '1122%'"
+                    ),
+                    {"wp_id": str(wp_id)},
+                )
+            ).first()
+    except Exception as e:  # noqa: BLE001
+        logger.warning("_fetch_tb_1122 failed: %s", e)
+        return None
+    if row and row.audited is not None:
+        return float(row.audited)
+    return None
+
+
 async def build_d2_reconciliation_context(wp_id: str) -> str:
     """构建 D2 勾稽上下文文本；非 D2 或无数据时返回空串。"""
     try:
@@ -79,15 +152,8 @@ async def build_d2_reconciliation_context(wp_id: str) -> str:
             or row.get("audited")
         )
 
-    # ── D2-1 审定合计（三类加总）──
-    adj_total = 0.0
-    for row_key in ("individual", "aging", "customer-type"):
-        unadj = _parse_num(by_id.get(f"D2-adj-{row_key}-current-unadjusted"))
-        aje = _parse_num(by_id.get(f"D2-adj-{row_key}-current-aje"))
-        rje = _parse_num(by_id.get(f"D2-adj-{row_key}-current-rje"))
-        # 若无分项，尝试从明细聚合字段推断（无则跳过）
-        if unadj or aje or rje:
-            adj_total += unadj + aje + rje
+    # ── D2-1 审定合计（三类加总，分项缺失回退明细 SUMIF，与前端一致）──
+    adj_total = _d2_audited_total(by_id, detail_rows)
 
     # 若审定分项全空，尝试用明细合计作为一侧
     if detail_total or adj_total:
@@ -113,14 +179,16 @@ async def build_d2_reconciliation_context(wp_id: str) -> str:
                     f"D2-1 与 D2-2 合计差异 {_fmt(diff)} 元，须追查原因"
                 )
 
-    # ── D2-2 vs TB ──
-    tb_amount = _parse_num(by_id.get("D2-adj-tb-amount"))
+    # ── D2-2 vs TB(1122) —— 优先 DB 权威审定额，回退持久化 D2-adj-tb-amount ──
+    tb_amount = await _fetch_tb_1122(wp_id)
+    if tb_amount is None or tb_amount == 0:
+        tb_amount = _parse_num(by_id.get("D2-adj-tb-amount"))
     if tb_amount and detail_total:
-        tb_diff = detail_total - tb_amount
+        tb_diff = round(detail_total - tb_amount, 2)
         ok = abs(tb_diff) < _TOLERANCE
         status = "✓ 平衡" if ok else "✗ 不平衡"
         lines.append(
-            f"- D2-2↔TB(1122): 明细合计 {_fmt(detail_total)} vs TB {_fmt(tb_amount)}，"
+            f"- D2-2↔TB(1122): 明细合计 {_fmt(detail_total)} vs 试算表审定 {_fmt(tb_amount)}，"
             f"差异 {_fmt(tb_diff)} → {status}"
         )
         if not ok:
