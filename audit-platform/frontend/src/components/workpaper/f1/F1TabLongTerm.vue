@@ -214,7 +214,7 @@ import { ElMessage } from 'element-plus'
 import { useF1LongTerm } from '../composables/useF1LongTerm'
 import { useF1AiGenerate } from '../composables/useF1AiGenerate'
 import { useF1ImportExport, type F1ImportSheet } from '../composables/useWorkpaperImportExport'
-import { useAgingConfig } from '@/composables/useAgingConfig'
+import { useAgingConfig, segmentsToBands, type AgingSegment } from '@/composables/useAgingConfig'
 import { ADJUDICATION_LABEL_BY_SEGMENT_KEY } from '../composables/agingPresets'
 import type { useF1CrossSheet } from '../composables/useF1CrossSheet'
 import type { ChecklistResponse } from '../composables/useF1FormData'
@@ -237,7 +237,14 @@ const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<strin
 const wpIdRef = toRef(props, 'wpId') as Ref<string>
 const projectIdRef = toRef(props, 'projectId') as Ref<string>
 
-const { bands } = useAgingConfig(projectIdRef, 'F1')
+// 账龄口径优先用 F1 单一真源（主入口 provide，含表级枚举覆盖），回退项目级配置
+const injectedAgingSegments = inject<Ref<AgingSegment[]> | null>('f1AgingSegments', null)
+const { bands: projectBands } = useAgingConfig(projectIdRef, 'F1')
+const bands = computed(() =>
+  injectedAgingSegments?.value?.length
+    ? segmentsToBands(injectedAgingSegments.value, 'F1')
+    : projectBands.value,
+)
 
 /** 超1年账龄选项（排除 1年以内）；标签与 F1-1 审定表枚举一致 */
 const agingOptions = computed(() => {

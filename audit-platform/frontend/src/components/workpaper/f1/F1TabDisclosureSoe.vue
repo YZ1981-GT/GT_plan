@@ -326,6 +326,8 @@ const props = withDefaults(defineProps<{
   isReadonly: boolean
   crossSheet: ReturnType<typeof useF1CrossSheet>
   applicableStandards?: string[]
+  /** 审计年度（附注同步显式传 year，避免后端回退服务器自然年写错年度） */
+  year?: number
   saveImmediate: (itemId: string, data: Partial<ChecklistResponse>) => Promise<void>
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
 }>(), {
@@ -414,6 +416,7 @@ async function syncToDisclosureNotes() {
     props.wpId,
     props.applicableStandards,
     buildF1SoeSubTableData(getSyncSnapshot()),
+    props.year,
   )
   if (!payload) {
     ElMessage.warning('当前项目准则不适用国企附注同步')

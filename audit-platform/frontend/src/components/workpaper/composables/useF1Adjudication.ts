@@ -17,7 +17,8 @@
  * Requirements: 1.1-1.8, 2.1-2.8, 3.1-3.7, 18.1
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
-import { useAgingConfig, PRESET_SEGMENTS } from '@/composables/useAgingConfig'
+import { useAgingConfig, PRESET_SEGMENTS, type AgingSegment } from '@/composables/useAgingConfig'
+import { eventBus } from '@/utils/eventBus'
 import {
   AGING_ROWS_3YEAR,
   resolveAdjudicationAgingRows,
@@ -77,6 +78,11 @@ export interface UseF1AdjudicationOptions {
   isReadonly: Ref<boolean>
   /** 后端 render 提供的 1123 试算数（审定/未审），无持久化时作只读回退 seed */
   tbAmountSeed?: Ref<number>
+  /**
+   * F1 账龄口径（由主入口注入的单一真源，含表级枚举覆盖）。
+   * 未注入时回退项目级 useAgingConfig（兼容旧调用）。
+   */
+  agingSegments?: Ref<AgingSegment[]> | ComputedRef<AgingSegment[]>
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -115,6 +121,15 @@ function getResponseStr(allResponses: Map<string, ChecklistResponse>, itemId: st
   return allResponses.get(itemId)?.remark || ''
 }
 
+/** 是否存在手工录入（键存在且非空串；`0` 视为有效手工值） */
+function hasManualEntry(
+  allResponses: Map<string, ChecklistResponse>,
+  itemId: string,
+): boolean {
+  const raw = allResponses.get(itemId)?.remark
+  return raw !== undefined && raw !== null && String(raw).trim() !== ''
+}
+
 function buildRow(
   section: string,
   rowKey: string,
@@ -122,16 +137,27 @@ function buildRow(
   allResponses: Map<string, ChecklistResponse>,
   crossSheetCurrent: number,
   crossSheetPrior: number,
+  hasDetail: boolean,
 ): AdjudicationRow {
-  const manualPrior = getResponseNum(allResponses, makeItemId(section, rowKey, 'priorUnadjusted'))
-  const priorUnadjusted = crossSheetPrior !== 0 ? crossSheetPrior : manualPrior
+  // 🔴 persist-first：手工录入优先，明细聚合仅作未录入时的自动带入（seed）。
+  //   旧逻辑 `cross !== 0 ? cross : manual` 有两个坑：
+  //   ① 明细有数时手工修正被静默忽略（无法按分类调整）；
+  //   ② 明细真为 0（全部核销）时回退到手工旧值 → 显示幽灵数。
+  const priorItemId = makeItemId(section, rowKey, 'priorUnadjusted')
+  const manualPrior = getResponseNum(allResponses, priorItemId)
+  const priorUnadjusted = hasManualEntry(allResponses, priorItemId)
+    ? manualPrior
+    : (hasDetail ? crossSheetPrior : manualPrior)
   const priorAje = getResponseNum(allResponses, makeItemId(section, rowKey, 'priorAje'))
   const priorRje = getResponseNum(allResponses, makeItemId(section, rowKey, 'priorRje'))
 
   // Current: crossSheet fills currentUnadjusted (from F1-2), or manual edit.
   // 审定 AJE/RJE 为 F1-1 逐行手填；与 F1-3 调整分录的一致性由 adjustmentReconcile 校验。
-  const manualCurrent = getResponseNum(allResponses, makeItemId(section, rowKey, 'currentUnadjusted'))
-  const currentUnadjusted = crossSheetCurrent !== 0 ? crossSheetCurrent : manualCurrent
+  const currentItemId = makeItemId(section, rowKey, 'currentUnadjusted')
+  const manualCurrent = getResponseNum(allResponses, currentItemId)
+  const currentUnadjusted = hasManualEntry(allResponses, currentItemId)
+    ? manualCurrent
+    : (hasDetail ? crossSheetCurrent : manualCurrent)
   const currentAje = getResponseNum(allResponses, makeItemId(section, rowKey, 'currentAje'))
   const currentRje = getResponseNum(allResponses, makeItemId(section, rowKey, 'currentRje'))
 
@@ -141,7 +167,10 @@ function buildRow(
   const changeRate = calcChangeRate(priorAudited, currentAudited)
   const reasonAnalysis = getResponseStr(allResponses, makeItemId(section, rowKey, 'reasonAnalysis'))
 
-  const isFromCrossSheet = crossSheetCurrent !== 0 || crossSheetPrior !== 0
+  const isFromCrossSheet =
+    hasDetail
+    && !hasManualEntry(allResponses, currentItemId)
+    && (crossSheetCurrent !== 0 || crossSheetPrior !== 0)
 
   return {
     rowKey,
@@ -196,12 +225,22 @@ function buildSubtotalRow(rows: AdjudicationRow[], label: string): AdjudicationR
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useF1Adjudication(options: UseF1AdjudicationOptions) {
-  const { allResponses, wpId, projectId, saveImmediate, debouncedSave, crossSheet, isReadonly, tbAmountSeed } = options
+  const {
+    allResponses, wpId, projectId, saveImmediate, debouncedSave, crossSheet, isReadonly,
+    tbAmountSeed, agingSegments,
+  } = options
 
   let _debounceTimer: ReturnType<typeof setTimeout> | null = null
 
-  // 项目级账龄配置（F1 默认 THREE_YEAR；可切换 FIVE_YEAR / CUSTOM）
-  const { segments } = useAgingConfig(projectId, 'F1')
+  // 🔴 账龄口径必须与 F1-2 明细表一致（含表级枚举覆盖）：优先用注入的单一真源，
+  // 未注入才回退项目级配置（否则表级切 5 年段时审定表读不到 y3to4/y4to5/over5，
+  // 3 年以上金额在审定表与附注凭空消失、性质≠账龄假告警）。
+  const { segments: projectAgingSegments } = useAgingConfig(projectId, 'F1')
+  const segments: ComputedRef<AgingSegment[]> = computed(() => {
+    const injected = agingSegments?.value
+    if (injected?.length) return injected
+    return projectAgingSegments.value
+  })
 
   const agingRowDefs: ComputedRef<AgingRowDef[]> = computed(() => {
     const segs = segments.value.length ? segments.value : PRESET_SEGMENTS.THREE_YEAR
@@ -214,11 +253,13 @@ export function useF1Adjudication(options: UseF1AdjudicationOptions) {
     const responses = allResponses.value
     const natureAgg = crossSheet.natureAggregation.value
     const agingAgg = crossSheet.agingAggregation.value
+    // F1-2 明细是否已编制：决定「明细聚合」还是「手工值」作为未录入时的来源
+    const hasDetail = (crossSheet.detailRowCount?.value ?? 0) > 0
 
     // === 区块一：按性质分类 ===
     const natureRows: AdjudicationRow[] = NATURE_ROWS.map(({ rowKey, label }) => {
       const aggData = natureAgg[label] || { current: 0, prior: 0 }
-      return buildRow('nature', rowKey, label, responses, aggData.current, aggData.prior)
+      return buildRow('nature', rowKey, label, responses, aggData.current, aggData.prior, hasDetail)
     })
 
     const natureSubtotal = buildSubtotalRow(natureRows, '合计')
@@ -227,7 +268,7 @@ export function useF1Adjudication(options: UseF1AdjudicationOptions) {
     const agingRows: AdjudicationRow[] = agingRowDefs.value.map(({ rowKey, label }) => {
       const crossCurrent = parseNum(agingAgg[rowKey])
       const crossPrior = parseNum(agingAgg[`prior_${rowKey}`])
-      return buildRow('aging', rowKey, label, responses, crossCurrent, crossPrior)
+      return buildRow('aging', rowKey, label, responses, crossCurrent, crossPrior, hasDetail)
     })
 
     const agingSubtotal = buildSubtotalRow(agingRows, '合计')
@@ -397,10 +438,14 @@ export function useF1Adjudication(options: UseF1AdjudicationOptions) {
       wpCode: 'F1',
       accountCode: '1123',
       auditedAmount,
+      // 兼容读 adjudicatedAmount 的历史消费者（G/D 循环 window 侧口径）
+      adjudicatedAmount: auditedAmount,
+      timestamp: Date.now(),
     }
 
+    // 统一走 eventBus（crossWpEventBridge 双向桥接，window 侧历史监听者不受影响）
     try {
-      window.dispatchEvent(new CustomEvent('substantive:adjudicated', { detail: payload }))
+      eventBus.emit('substantive:adjudicated', payload as any)
     } catch { /* silent */ }
 
     if (projectId.value) {

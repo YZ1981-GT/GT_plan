@@ -176,7 +176,8 @@ export function useF1CrossSheet(options: UseF1CrossSheetOptions) {
     const segs = agingSegments.value
     const byDay = segs.filter(s => s.dayFrom >= OVER_ONE_YEAR_DAY_FROM).map(s => s.key)
     if (byDay.length) return byDay
-    return segs.filter(s => s.key !== 'within1').map(s => s.key)
+    // 自定义段（dayFrom 未维护，全 0）：首段视为最短账龄，其余段计入「超 1 年」
+    return segs.slice(1).map(s => s.key)
   })
 
   /** 将原始行转为公式引擎所需的 DetailRowForFormula 结构 */
@@ -220,7 +221,15 @@ export function useF1CrossSheet(options: UseF1CrossSheetOptions) {
    * 返回：{ [segmentKey]: current, prior_${segmentKey}: prior }
    */
   const agingAggregation: ComputedRef<Record<string, number>> = computed(() => {
-    const keys = collectAgingKeys(detailRows.value)
+    // 🔴 键集合 = 当前生效账龄段 ∪ 明细行实际键：
+    //   保证 F1-1 审定表/附注按当前枚举段（3年/5年/自定义）读到每一段（缺段返 0 而非 undefined），
+    //   同时不丢弃明细里尚未 remap 的历史段（避免金额在切换瞬间消失）。
+    const keys = Array.from(
+      new Set([
+        ...agingSegments.value.map(s => s.key),
+        ...collectAgingKeys(detailRows.value),
+      ]),
+    )
     const currentAging = aggregateByAging(detailRowsForFormula.value, keys)
 
     const result: Record<string, number> = { ...currentAging }
@@ -297,17 +306,20 @@ export function useF1CrossSheet(options: UseF1CrossSheetOptions) {
   })
 
   /**
-   * adjustmentTotals: 从F1-3行汇总 AJE/RJE 金额
+   * adjustmentTotals: 从F1-3行汇总 AJE/RJE 净额
    * category='账项调整' → AJE
    * category='重分类调整' → RJE
-   * 金额取 debitAmount（借方调整=增加审定数）
+   *
+   * 🔴 预付账款(1123)是资产借方科目：借方调整=调增审定数、贷方调整=调减审定数，
+   * 故取**净额 debitAmount − creditAmount**（此前只累加 debitAmount，贷方调减被整段
+   * 丢弃 → F1-1「审定调整 vs F1-3 汇总」勾稽口径错、调减分录永远对不上）。
    */
   const adjustmentTotals: ComputedRef<{ ajeTotal: number; rjeTotal: number }> = computed(() => {
     let ajeTotal = 0
     let rjeTotal = 0
 
     for (const row of adjustmentRows.value) {
-      const amount = parseNum(row.debitAmount)
+      const amount = parseNum(row.debitAmount) - parseNum(row.creditAmount)
       if (row.category === '账项调整') {
         ajeTotal += amount
       } else if (row.category === '重分类调整') {
@@ -359,11 +371,15 @@ export function useF1CrossSheet(options: UseF1CrossSheetOptions) {
 
   // ─── Return ────────────────────────────────────────────────────────────
 
+  /** F1-2 明细行数（>0 表示明细已编制：审定表据此决定是否用聚合值 seed 空白行） */
+  const detailRowCount: ComputedRef<number> = computed(() => detailRows.value.length)
+
   return {
     // F1-2 → F1-1 聚合
     natureAggregation,
     agingAggregation,
     agingSegments,
+    detailRowCount,
     // F1-2 → F1-5 筛选
     longTermRows,
     // F1-2 → F1-6 筛选

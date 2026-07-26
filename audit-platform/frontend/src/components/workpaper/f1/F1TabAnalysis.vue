@@ -365,7 +365,7 @@
 /**
  * F1TabAnalysis.vue — F1-4 实质性分析表（对齐 Excel）
  */
-import { computed, reactive, toRef, type Ref } from 'vue'
+import { computed, inject, reactive, toRef, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { isChangeRateExceeding } from '../composables/useF1FormulaEngine'
 import {
@@ -377,7 +377,7 @@ import {
 import { useF1AiGenerate } from '../composables/useF1AiGenerate'
 import type { useF1CrossSheet } from '../composables/useF1CrossSheet'
 import type { ChecklistResponse } from '../composables/useF1FormData'
-import { useAgingConfig } from '@/composables/useAgingConfig'
+import { useAgingConfig, segmentsToBands, type AgingSegment } from '@/composables/useAgingConfig'
 import { ADJUDICATION_LABEL_BY_SEGMENT_KEY } from '../composables/agingPresets'
 
 // @ts-ignore
@@ -400,7 +400,14 @@ const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<strin
 const wpIdRef = toRef(props, 'wpId') as Ref<string>
 const projectIdRef = toRef(props, 'projectId') as Ref<string>
 
-const { bands } = useAgingConfig(projectIdRef, 'F1')
+// 账龄口径优先用 F1 单一真源（主入口 provide，含表级枚举覆盖），回退项目级配置
+const injectedAgingSegments = inject<Ref<AgingSegment[]> | null>('f1AgingSegments', null)
+const { bands: projectBands } = useAgingConfig(projectIdRef, 'F1')
+const bands = computed(() =>
+  injectedAgingSegments?.value?.length
+    ? segmentsToBands(injectedAgingSegments.value, 'F1')
+    : projectBands.value,
+)
 const agingOptions = computed(() => {
   const labels = bands.value.map((b) => ADJUDICATION_LABEL_BY_SEGMENT_KEY[b.key] || b.label)
   return labels.length ? labels : ['1年以内(含1年)', '1至2年(含2年)', '2至3年(含3年)', '3年以上']

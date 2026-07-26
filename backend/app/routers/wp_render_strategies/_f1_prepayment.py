@@ -20,24 +20,42 @@ logger = logging.getLogger(__name__)
 _F1_TB_PREFIXES = ("1123", "1401", "2202")
 
 
+def _is_leaf(code: str, all_codes: set[str]) -> bool:
+    """叶子科目判定：不存在以 code 为前缀的其它科目码（防父子双算）."""
+    return not any(other != code and other.startswith(code) for other in all_codes)
+
+
 async def _fetch_f1_tb_context(ctx: RenderContext) -> dict[str, float]:
-    """从 tb_balance 取 1123(预付)/1401(存货)/2202(应付) 期末余额（v1 借正贷负口径）."""
+    """从 tb_balance 取 1123(预付)/1401(存货)/2202(应付) 期末余额（v1 借正贷负口径）.
+
+    🔴 四表库铁律：tb_balance 存多级子科目（1123 / 1123.01 / 1123.01.01），
+    父子同时累加会双算 → **仅汇总叶子科目**；并把科目过滤下推到 SQL，避免全表扫描。
+    """
     balances: dict[str, float] = {}
     try:
         active_filter = await get_active_filter(
             ctx.db, TbBalance.__table__, ctx.project_id, ctx.year or 0
         )
+        prefix_filter = sa.or_(
+            *[TbBalance.account_code.like(f"{p}%") for p in _F1_TB_PREFIXES]
+        )
         result = await ctx.db.execute(
             sa.select(
                 TbBalance.account_code,
                 TbBalance.closing_balance,
-            ).where(active_filter)
+            ).where(sa.and_(active_filter, prefix_filter))
         )
-        for row in result.fetchall():
-            code = (row.account_code or "").strip()
+        rows = [
+            ((row.account_code or "").strip(), float(row.closing_balance or 0))
+            for row in result.fetchall()
+        ]
+        all_codes = {code for code, _ in rows if code}
+        for code, amount in rows:
+            if not code or not _is_leaf(code, all_codes):
+                continue
             for prefix in _F1_TB_PREFIXES:
                 if code == prefix or code.startswith(prefix):
-                    balances[prefix] = balances.get(prefix, 0.0) + float(row.closing_balance or 0)
+                    balances[prefix] = balances.get(prefix, 0.0) + amount
                     break
     except Exception as e:  # noqa: BLE001
         logger.warning("F1 render: tb_balance 取数失败: %s", e)
@@ -48,17 +66,34 @@ async def _fetch_f1_tb_context(ctx: RenderContext) -> dict[str, float]:
     return balances
 
 
-async def _fetch_f1_1123_audited(ctx: RenderContext) -> float | None:
-    """从 trial_balance(v2 正数口径) 取 1123 审定数(无则未审数)，供 F1-1 试算核对预填."""
+async def _resolve_prepaid_codes(ctx: RenderContext) -> list[str]:
+    """预付款项报表行(BS-008)的源科目编号：参照 report_config 规则映射，回退 1123.
+
+    企业自定义口径（预付拆到其它科目）时，审定表 TB 核对随报表映射走，不硬编码前缀。
+    """
+    from app.services.report_account_mapping import resolve_report_line_account_codes
+
+    return await resolve_report_line_account_codes(
+        ctx.db, ctx.project_id, "BS-008", fallback=["1123"]
+    )
+
+
+async def _fetch_f1_1123_audited(
+    ctx: RenderContext, codes: list[str]
+) -> float | None:
+    """从 trial_balance(v2 正数口径) 取预付款项审定数(无则未审数)，供 F1-1 试算核对预填."""
+    from app.services.report_account_mapping import build_trial_balance_code_filter
+
+    where_clause, params = build_trial_balance_code_filter(codes)
     try:
         result = await ctx.db.execute(
             sa.text(
                 "SELECT unadjusted_amount, audited_amount "
                 "FROM trial_balance "
                 "WHERE project_id = :pid AND year = :year AND is_deleted = false "
-                "AND standard_account_code LIKE '1123%'"
+                f"AND {where_clause}"
             ),
-            {"pid": str(ctx.project_id), "year": ctx.year},
+            {"pid": str(ctx.project_id), "year": ctx.year, **params},
         )
         audited = 0.0
         unadjusted = 0.0
@@ -143,8 +178,10 @@ async def render(ctx: RenderContext) -> dict | None:
         # F1-4 跨循环取数（tb_balance 期末余额；应付取绝对值供正数展示）
         "inventory_balance_current": 0.0,
         "payable_balance_current": 0.0,
-        # F1-1 试算核对预填（1123 审定/未审；组件只读回退 seed）
+        # F1-1 试算核对预填（预付款项审定/未审；组件只读回退 seed）
         "prepaid_tb_amount": 0.0,
+        # TB 核对科目来源（report_config BS-008 规则映射解析结果，供溯源展示）
+        "tb_source_codes": [],
     }
 
     try:
@@ -212,7 +249,9 @@ async def render(ctx: RenderContext) -> dict | None:
     # 前端 allResponses 来自 checklist-responses 端点（非本 responses_snapshot），故同时：
     #  ① 注入 responses_snapshot（供确有消费该键的路径使用）
     #  ② 放入 project_context.prepaid_tb_amount 供 F1-1 组件作只读回退 seed（不覆盖手工录入）
-    seed_tb = await _fetch_f1_1123_audited(ctx)
+    prepaid_codes = await _resolve_prepaid_codes(ctx)
+    project_context["tb_source_codes"] = prepaid_codes
+    seed_tb = await _fetch_f1_1123_audited(ctx, prepaid_codes)
     if seed_tb is None:
         seed_tb = tb_balances.get("1123")
     if seed_tb is not None and abs(seed_tb) > 1e-9:

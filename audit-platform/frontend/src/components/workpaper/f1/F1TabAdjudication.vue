@@ -277,6 +277,7 @@ import type { ChecklistResponse } from '../composables/useF1FormData'
 import GtIndexChip from '../GtIndexChip.vue'
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import F1SheetAttachments from './F1SheetAttachments.vue'
+import type { AgingSegment } from '@/composables/useAgingConfig'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -288,6 +289,8 @@ const props = defineProps<{
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
   /** 后端 render 提供的 1123 试算数（只读回退 seed） */
   tbAmountSeed?: number
+  /** F1 账龄口径单一真源（主入口注入，含表级枚举覆盖） */
+  agingSegments?: AgingSegment[]
 }>()
 
 const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
@@ -313,6 +316,7 @@ const {
   crossSheet: props.crossSheet,
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
   tbAmountSeed: computed(() => props.tbAmountSeed ?? 0) as unknown as Ref<number>,
+  agingSegments: computed(() => props.agingSegments ?? []) as unknown as Ref<AgingSegment[]>,
 })
 
 const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF1AiGenerate(wpIdRef)

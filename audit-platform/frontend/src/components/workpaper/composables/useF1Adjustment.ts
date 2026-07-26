@@ -214,7 +214,8 @@ export function useF1Adjustment(options: UseF1AdjustmentOptions) {
     eventBus.emit('adjustment:created', {
       wpCode: 'F1',
       entryType,
-      amount: parseNum(row.debitAmount),
+      // 资产借方科目：净额 = 借方调增 − 贷方调减
+      amount: parseNum(row.debitAmount) - parseNum(row.creditAmount),
       accountCode: '1123',
       timestamp: Date.now(),
     } as any)

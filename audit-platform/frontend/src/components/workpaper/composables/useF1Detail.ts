@@ -25,9 +25,10 @@ import {
 } from './useF1FormulaEngine'
 import { api } from '@/services/apiProxy'
 import type { ChecklistResponse } from './useF1FormData'
-import { useAgingConfig, PRESET_SEGMENTS, type AgingSegment, type AgingPreset } from '@/composables/useAgingConfig'
+import { type AgingSegment, type AgingPreset } from '@/composables/useAgingConfig'
 import { migrateD3F1Keys, remapRowAgingData, type AgingData } from '@/composables/useAgingMigration'
 import { ADJUDICATION_LABEL_BY_SEGMENT_KEY } from './agingPresets'
+import { useF1AgingScope, type F1AgingScope } from './useF1AgingScope'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -65,36 +66,18 @@ export interface UseF1DetailOptions {
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
   isReadonly: Ref<boolean>
   relatedParties: Ref<string[]>
+  /**
+   * F1 账龄口径单一真源（由主入口装配后注入，与审定表/附注/长期/关联方共享）。
+   * 未注入时内部自建（向后兼容单独挂载明细表的场景）。
+   */
+  agingScope?: F1AgingScope
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const ITEM_ID_ROWS = 'F1-det-rows'
 const ITEM_ID_TB_AMOUNT = 'F1-adj-trial-balance-amount'
-/** 明细表账龄口径覆盖（THREE_YEAR / FIVE_YEAR / CUSTOM）；空则跟随项目 aging 配置 */
-const ITEM_ID_AGING_PRESET = 'F1-det-aging-preset'
-const ITEM_ID_AGING_CUSTOM = 'F1-det-aging-custom-segments'
 const AGING_TOLERANCE = 0.01
-
-function labelsToCustomSegments(labels: string[]): AgingSegment[] {
-  return labels.map((label, i) => ({
-    key: `custom-${i}`,
-    label,
-    dayFrom: 0,
-    dayTo: null,
-  }))
-}
-
-function parseCustomLabels(raw: string | null | undefined): string[] {
-  if (!raw) return []
-  try {
-    const parsed = JSON.parse(raw)
-    if (!Array.isArray(parsed)) return []
-    return parsed.map((x) => String(x || '').trim()).filter(Boolean)
-  } catch {
-    return []
-  }
-}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -270,53 +253,20 @@ export function useF1Detail(options: UseF1DetailOptions) {
 
   const eventListeners: Array<{ event: string; handler: (e: Event) => void }> = []
 
-  const { segments: projectSegments, preset: projectPreset } = useAgingConfig(projectId, 'F1')
-
-  /** 表级账龄枚举覆盖；空字符串表示跟随项目配置 */
-  const sheetAgingPreset = ref<'' | AgingPreset>('')
-  const customSegments = ref<AgingSegment[]>([])
-
-  watch(
-    () => allResponses.value.get(ITEM_ID_AGING_PRESET)?.remark,
-    (v) => {
-      const raw = String(v || '').trim().toUpperCase()
-      sheetAgingPreset.value =
-        raw === 'THREE_YEAR' || raw === 'FIVE_YEAR' || raw === 'CUSTOM' ? (raw as AgingPreset) : ''
-    },
-    { immediate: true },
-  )
-
-  watch(
-    () => allResponses.value.get(ITEM_ID_AGING_CUSTOM)?.remark,
-    (v) => {
-      const labels = parseCustomLabels(v)
-      customSegments.value = labels.length >= 2 ? labelsToCustomSegments(labels) : []
-    },
-    { immediate: true },
-  )
-
-  const agingPreset: ComputedRef<AgingPreset> = computed(() => {
-    if (sheetAgingPreset.value) return sheetAgingPreset.value
-    const p = projectPreset.value
-    if (p === 'THREE_YEAR' || p === 'FIVE_YEAR' || p === 'CUSTOM') return p
-    return 'THREE_YEAR'
+  /**
+   * 账龄口径：优先用主入口注入的 F1 单一真源（与审定表/附注/长期/关联方共享），
+   * 未注入时内部自建（明细表单独挂载的兼容路径）。
+   */
+  const agingScope: F1AgingScope = options.agingScope ?? useF1AgingScope({
+    allResponses,
+    projectId,
+    debouncedSave,
+    isReadonly,
   })
 
-  /** 有效账龄段：表级枚举优先，否则项目配置，兜底 3 年段 */
-  const segments: ComputedRef<AgingSegment[]> = computed(() => {
-    if (sheetAgingPreset.value === 'CUSTOM') {
-      if (customSegments.value.length >= 2) return customSegments.value
-      if (projectPreset.value === 'CUSTOM' && projectSegments.value.length >= 2) {
-        return projectSegments.value
-      }
-      return PRESET_SEGMENTS.THREE_YEAR
-    }
-    if (sheetAgingPreset.value === 'THREE_YEAR' || sheetAgingPreset.value === 'FIVE_YEAR') {
-      return PRESET_SEGMENTS[sheetAgingPreset.value]
-    }
-    if (projectSegments.value.length) return projectSegments.value
-    return PRESET_SEGMENTS.THREE_YEAR
-  })
+  const agingPreset: ComputedRef<AgingPreset> = agingScope.preset
+  const customSegments = agingScope.customSegments
+  const segments: ComputedRef<AgingSegment[]> = agingScope.segments
 
   /** 列定义：使用审定表同口径枚举标签（含N年） */
   const bands = computed(() =>
@@ -493,17 +443,25 @@ export function useF1Detail(options: UseF1DetailOptions) {
     return matchRelatedPartyPure(name, relatedParties.value)
   }
 
+  /**
+   * 从 tb_aux_balance（科目 1123，按往来单位维度）归集导入。
+   *
+   * 后端按当前账龄口径构建完整行（agingPrior/agingCurrent/agingAudited 落首段）
+   * 并已 merge 落库；此处把新增行并入本地 rows 保持界面即时一致。
+   */
   async function importFromAuxBalance(): Promise<void> {
     if (!wpId.value) return
     try {
-      const res = await api.post(
+      const res: any = await api.post(
         `/api/workpapers/${wpId.value}/f1/import-aux-balance`,
         { project_id: projectId.value },
       )
-      const importedRows: any[] = Array.isArray(res) ? res : (res?.data ?? res?.rows ?? [])
+      const body = res?.data ?? res
+      const importedRows: any[] = Array.isArray(body) ? body : (body?.rows ?? [])
+      const serverMessage: string = String(body?.message || '')
 
       if (importedRows.length === 0) {
-        ElMessage.info('未找到科目1123的辅助余额数据')
+        ElMessage.info(serverMessage || '未找到科目1123的辅助余额数据')
         return
       }
 
@@ -515,20 +473,18 @@ export function useF1Detail(options: UseF1DetailOptions) {
         if (!name) continue
 
         if (existingMap.has(name)) {
+          // 已有单位：只刷新四表库来源列（期初/借/贷），不覆盖审计师录入的账龄与调整
           const existing = existingMap.get(name)!
           existing.priorUnadjusted = parseNum(imported.priorUnadjusted ?? imported.prior_unadjusted)
           existing.credit = parseNum(imported.credit)
           existing.debit = parseNum(imported.debit)
           existingMap.set(name, recalcRowFormulas(existing))
         } else {
-          const newRow = normalizeRow({
-            rowId: generateRowId(),
-            customerName: name,
-            companyCode: imported.companyCode || imported.company_code || '',
-            priorUnadjusted: imported.priorUnadjusted ?? imported.prior_unadjusted ?? 0,
-            credit: imported.credit ?? 0,
-            debit: imported.debit ?? 0,
-          }, segments.value)
+          // 新单位：后端已按当前账龄口径构建整行（账龄落首段），整行接入
+          const newRow = normalizeRow(
+            { ...imported, rowId: imported.rowId || generateRowId() },
+            segments.value,
+          )
           existingMap.set(name, recalcRowFormulas(newRow))
           newCount++
         }
@@ -536,7 +492,7 @@ export function useF1Detail(options: UseF1DetailOptions) {
 
       rows.value = Array.from(existingMap.values())
       persistRows()
-      ElMessage.success(`成功导入${importedRows.length}行数据，${newCount}个新客户`)
+      ElMessage.success(serverMessage || `成功导入${importedRows.length}行数据，${newCount}个新客户`)
     } catch {
       ElMessage.error('从辅助余额表导入失败，请稍后重试')
     }
@@ -554,24 +510,9 @@ export function useF1Detail(options: UseF1DetailOptions) {
    */
   function setAgingPreset(preset: AgingPreset, customLabels?: string[]): boolean {
     if (isReadonly.value) return false
-    let segs: AgingSegment[]
-    if (preset === 'CUSTOM') {
-      const labels = (customLabels || customSegments.value.map((s) => s.label))
-        .map((x) => String(x || '').trim())
-        .filter(Boolean)
-      if (labels.length < 2) return false
-      segs = labelsToCustomSegments(labels.slice(0, 10))
-      sheetAgingPreset.value = 'CUSTOM'
-      customSegments.value = segs
-      debouncedSave(ITEM_ID_AGING_PRESET, { remark: 'CUSTOM' })
-      debouncedSave(ITEM_ID_AGING_CUSTOM, { remark: JSON.stringify(labels.slice(0, 10)) })
-    } else {
-      segs = PRESET_SEGMENTS[preset] || PRESET_SEGMENTS.THREE_YEAR
-      sheetAgingPreset.value = preset
-      customSegments.value = []
-      debouncedSave(ITEM_ID_AGING_PRESET, { remark: preset })
-      debouncedSave(ITEM_ID_AGING_CUSTOM, { remark: '[]' })
-    }
+    if (!agingScope.setPreset(preset, customLabels)) return false
+    // scope.segments 为 computed（切换后即时反映），据此 remap 已有行的账龄字段
+    const segs = segments.value
     rows.value = rows.value.map(row =>
       recalcRowFormulas(remapRowAgingData(row, segs, true) as DetailRow),
     )
@@ -619,7 +560,7 @@ export function useF1Detail(options: UseF1DetailOptions) {
 
   const agingConfigHandler = () => {
     // 表级覆盖存在时不跟随项目全局变更
-    if (sheetAgingPreset.value) return
+    if (agingScope.hasSheetOverride.value) return
     if (!segments.value.length) return
     rows.value = rows.value.map(row =>
       remapRowAgingData(row, segments.value, true) as DetailRow,

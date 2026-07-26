@@ -17,6 +17,12 @@ export interface F1SyncFromWorkpaperPayload {
   sheet_name: string
   section_id: string
   current_standard: string
+  /**
+   * 审计年度（显式传入，不依赖后端兜底）。
+   * 后端 `_resolve_target_year` 优先用 payload.year，其次 projects.audit_year，
+   * 最后才是服务器自然年 —— 显式传 year 可避免跨年场景写到错误年度的附注。
+   */
+  year?: number
   sub_table_data: Record<string, Record<string, unknown>[]>
   /** 列头元数据（disclosure-table-sync-convergence）：label 取自 F1TabDisclosure el-table-column（多级表头扁平合并） */
   columns?: Record<string, ColumnDef[]>
@@ -297,9 +303,10 @@ export function buildF1SyncPayload(
   wpId: string,
   applicableStandards: readonly string[] | null | undefined,
   subTableData: Record<string, Record<string, unknown>[]>,
+  year?: number | null,
 ): F1SyncFromWorkpaperPayload | null {
   if (!isF1DisclosureApplicable(variant, applicableStandards)) return null
-  return {
+  const payload: F1SyncFromWorkpaperPayload = {
     wp_id: wpId,
     sheet_name: F1_DISCLOSURE_SHEET_NAME[variant],
     section_id: F1_NOTE_SECTION[variant],
@@ -307,4 +314,7 @@ export function buildF1SyncPayload(
     sub_table_data: subTableData,
     columns: variant === 'listed' ? F1_LISTED_COLUMNS : F1_SOE_COLUMNS,
   }
+  const y = Number(year ?? 0)
+  if (y > 0) payload.year = y
+  return payload
 }

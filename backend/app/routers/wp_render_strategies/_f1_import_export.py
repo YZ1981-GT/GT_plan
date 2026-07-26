@@ -1,12 +1,14 @@
-﻿"""F1 预付账款 — 导入导出（列结构对齐 HTML 底稿）."""
+"""F1 预付账款 — 导入导出（列结构对齐 HTML 底稿）."""
 
 from __future__ import annotations
 
 import io
+import json
 import logging
-from typing import Any
+from typing import Any, Callable, Iterable, Sequence
 from uuid import uuid4
 
+import sqlalchemy as sa
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -559,7 +561,7 @@ async def f1_export_template(
     _validate_sheet(sheet)
     # F1-2 明细表：账龄列头按项目账龄配置动态生成（三期：期初/期末未审/期末审定）
     if sheet == "F1-2":
-        segments = await resolve_aging_segments(db, wp_id, "F1")
+        segments = await _resolve_f1_segments(db, wp_id)
         headers = _f1_2_dynamic_headers(segments)
     else:
         headers = _headers(sheet)
@@ -582,7 +584,7 @@ async def f1_export_data(
     # F1-2 明细表：账龄列头/值按项目账龄配置动态生成（三期）
     f1_2_segments: list[Any] = []
     if sheet == "F1-2":
-        f1_2_segments = await resolve_aging_segments(db, wp_id, "F1")
+        f1_2_segments = await _resolve_f1_segments(db, wp_id)
         headers = _f1_2_dynamic_headers(f1_2_segments)
     else:
         headers = _headers(sheet)
@@ -616,7 +618,7 @@ async def f1_import_data(
     f1_2_segments: list[Any] = []
     skipped_columns: list[str] = []
     if sheet == "F1-2":
-        f1_2_segments = await resolve_aging_segments(db, wp_id, "F1")
+        f1_2_segments = await _resolve_f1_segments(db, wp_id)
         # 「对方单位名称」与 Excel「债权人名称」二选一即可
         headers = [h for h in _F1_2_BASE_HEADERS if h != "对方单位名称"]
     elif sheet == "F1-5":
@@ -683,4 +685,309 @@ async def f1_import_data(
         out["warnings"] = [
             f"以下账龄列未匹配当前账龄配置，已跳过: {', '.join(skipped_columns)}"
         ]
+    return out
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# F1 账龄口径解析（表级枚举覆盖 > 项目配置 > 科目默认 THREE_YEAR）
+#
+# 前端 useF1Detail 支持**表级**账龄枚举覆盖（3年段/5年段/自定义），持久化于
+# checklist_responses：
+#   - `F1-det-aging-preset`           = THREE_YEAR | FIVE_YEAR | CUSTOM
+#   - `F1-det-aging-custom-segments`  = JSON 字符串数组（自定义段标签，2-10 段）
+# 导入导出列头必须与前端当前口径一致，否则导出模板列头与行数据 key 不匹配、
+# 导入时账龄列按 label 匹配失败被整段跳过。
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_F1_AGING_PRESET_ITEM_ID = "F1-det-aging-preset"
+_F1_AGING_CUSTOM_ITEM_ID = "F1-det-aging-custom-segments"
+
+
+def build_f1_custom_segments(labels: Iterable[Any]) -> list[Any]:
+    """纯函数：自定义段标签列表 → AgingSegment 列表（key 与前端 `custom-{i}` 一致）。"""
+    from app.services.aging_config_service import AgingSegment
+
+    segs: list[Any] = []
+    for i, raw in enumerate(labels):
+        label = str(raw or "").strip()
+        if not label:
+            continue
+        segs.append(AgingSegment(key=f"custom-{i}", label=label, dayFrom=0, dayTo=None))
+        if len(segs) >= 10:
+            break
+    return segs
+
+
+async def _resolve_f1_segments(db: AsyncSession, wp_id: str) -> list[Any]:
+    """F1 有效账龄段：表级枚举覆盖优先，否则项目级配置（异常兜底 THREE_YEAR）。"""
+    from app.services.aging_config_service import AgingPreset, resolve_segments
+
+    try:
+        result = await db.execute(
+            sa.text(
+                "SELECT item_id, remark FROM checklist_responses "
+                "WHERE wp_id = :wp_id AND item_id IN (:p, :c)"
+            ),
+            {"wp_id": wp_id, "p": _F1_AGING_PRESET_ITEM_ID, "c": _F1_AGING_CUSTOM_ITEM_ID},
+        )
+        raw: dict[str, str] = {r.item_id: (r.remark or "") for r in result.fetchall()}
+        preset_raw = (raw.get(_F1_AGING_PRESET_ITEM_ID) or "").strip().upper()
+        if preset_raw in ("THREE_YEAR", "FIVE_YEAR"):
+            return resolve_segments(AgingPreset(preset_raw), None)
+        if preset_raw == "CUSTOM":
+            labels = json.loads(raw.get(_F1_AGING_CUSTOM_ITEM_ID) or "[]")
+            segs = build_f1_custom_segments(labels if isinstance(labels, list) else [])
+            if len(segs) >= 2:
+                return segs
+            # 自定义段不足 2 段：视为未生效，回退项目配置
+    except Exception as e:  # noqa: BLE001 — 表级覆盖读取失败不阻断导入导出
+        logger.warning("F1 表级账龄覆盖解析失败 wp_id=%s: %s", wp_id, e)
+        try:
+            await db.rollback()
+        except Exception:
+            pass
+    return await resolve_aging_segments(db, wp_id, "F1")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# F1-2 明细表 ← tb_aux_balance（科目 1123 预付账款，按往来单位维度归集）
+#
+# 🔴 与 D3/D5/D6/D7 的历史 aux 导入实现不同：本实现使用 tb_aux_balance 的**真实列**
+#   （opening_balance / debit_amount / credit_amount / closing_balance），
+#   并遵守两条四表库铁律：
+#     ① 数据集版本：经 `get_active_filter` 只取 active dataset（禁裸 is_deleted）；
+#     ② aux 维度冗余：同一科目同一余额会在多个 aux_type（如「客户」「成本中心」）
+#        各存一份，必须**锁定单一 aux_type** 后再归集，否则金额双算。
+#   另：账套里 1123 通常落在子科目（1123.01/1123.03/…），故用前缀匹配而非精确等值。
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_AUX_ACCOUNT_PREFIX = "1123"
+# 往来单位维度优先关键词（命中则优先作为归集维度）
+_AUX_TYPE_PREFERRED_KEYWORDS = ("客户", "供应商", "往来", "单位", "个人", "职员", "员工")
+
+
+def pick_aux_type(
+    candidates: Iterable[tuple[str, int, float]],
+) -> str | None:
+    """纯函数：从 `(aux_type, 行数, 余额绝对值合计)` 候选中挑唯一归集维度。
+
+    优先含往来单位关键词的维度；其次余额合计更大者；再次行数更多者。
+    无候选返回 None。
+    """
+    items = [(str(t or ""), int(n or 0), float(amt or 0)) for t, n, amt in candidates]
+    if not items:
+        return None
+    preferred = [
+        it for it in items
+        if any(kw in it[0] for kw in _AUX_TYPE_PREFERRED_KEYWORDS)
+    ]
+    pool = preferred or items
+    pool.sort(key=lambda it: (abs(it[2]), it[1], it[0]), reverse=True)
+    return pool[0][0]
+
+
+def build_f1_detail_rows_from_aux(
+    aux_entries: Iterable[Sequence],
+    segments: list[Any],
+    *,
+    row_limit: int = ROW_LIMIT,
+    row_id_factory: Callable[[], str] | None = None,
+) -> list[dict]:
+    """纯函数：1123 辅助余额归集结果 → F1-2 明细行（账龄按当前枚举段，落首段）。
+
+    Args:
+        aux_entries: 每项按位置解构为 `(aux_name, opening, debit, credit, closing)`。
+        segments: 当前有效账龄段（表级覆盖/项目配置），行内 aging 字段按其 key 建桶。
+        row_limit: 行数上限（超出截断）。
+        row_id_factory: rowId 工厂（默认 uuid4；单测可注入确定性工厂）。
+
+    账龄不臆造：辅助余额表无账龄维度，故金额整笔落**首段**（通常「1年以内」）并在
+    端点返回 message 提示审计师按实际账龄调整（前端 `allocateAging` 可一键改档）。
+    """
+    make_row_id = row_id_factory or (lambda: str(uuid4()))
+    seg_keys = [str(getattr(s, "key", "") or "") for s in segments]
+    seg_keys = [k for k in seg_keys if k]
+    first_key = seg_keys[0] if seg_keys else "within1"
+
+    def _aging(amount: float) -> dict[str, float]:
+        bucket = {k: 0.0 for k in (seg_keys or [first_key])}
+        bucket[first_key] = amount
+        return bucket
+
+    rows: list[dict] = []
+    for entry in list(aux_entries)[:row_limit]:
+        name = str(entry[0] or "").strip()
+        if not name:
+            continue
+        opening = safe_float(entry[1])
+        debit = safe_float(entry[2])
+        credit = safe_float(entry[3])
+        closing_raw = safe_float(entry[4])
+        end_balance = round(opening + debit - credit, 2)
+        # 期末优先用账套 closing（含账套自身结转口径），缺失时用滚存值
+        end_unadjusted = closing_raw if abs(closing_raw) > 1e-9 else end_balance
+        rows.append({
+            "rowId": make_row_id(),
+            "customerName": name,
+            "companyCode": "",
+            "nature": "",
+            "relationType": "非关联方",
+            "priorUnadjusted": opening,
+            "priorAdjustment": 0,
+            "priorReclass": 0,
+            "priorAudited": opening,
+            "agingPrior": _aging(opening),
+            "debit": debit,
+            "credit": credit,
+            "endBalance": end_balance,
+            "entityReclass": 0,
+            "endUnadjusted": end_unadjusted,
+            "agingCurrent": _aging(end_unadjusted),
+            "endAje": 0,
+            "endRje": 0,
+            "endAudited": end_unadjusted,
+            "agingAudited": _aging(end_unadjusted),
+            "isConfirmed": "",
+            "postPeriodSettlement": 0,
+            "remark": "由辅助余额表(1123)导入",
+        })
+    return rows
+
+
+async def aggregate_f1_detail_rows_from_aux(
+    db: AsyncSession,
+    project_id: str,
+    year: int,
+    segments: list[Any],
+    *,
+    row_limit: int = ROW_LIMIT,
+    row_id_factory: Callable[[], str] | None = None,
+) -> tuple[list[dict], str | None, int]:
+    """可复用入口：tb_aux_balance 1123 按单一 aux_type 归集 → F1-2 行。
+
+    Returns:
+        `(rows, aux_type, total_units)`；无数据时 `([], None, 0)`。
+        `total_units` 为归集出的往来单位总数（可能 > len(rows)，即被 row_limit 截断）。
+    """
+    from app.models.audit_platform_models import TbAuxBalance
+    from app.services.dataset_query import get_active_filter
+
+    active_filter = await get_active_filter(db, TbAuxBalance.__table__, project_id, year)
+    base_where = sa.and_(
+        active_filter,
+        TbAuxBalance.account_code.like(f"{_AUX_ACCOUNT_PREFIX}%"),
+    )
+
+    # ① 先定维度（防 aux_type 冗余双算）
+    type_rows = (
+        await db.execute(
+            sa.select(
+                TbAuxBalance.aux_type,
+                sa.func.count().label("n"),
+                sa.func.coalesce(
+                    sa.func.sum(sa.func.abs(sa.func.coalesce(TbAuxBalance.closing_balance, 0))), 0
+                ).label("amt"),
+            )
+            .where(base_where)
+            .group_by(TbAuxBalance.aux_type)
+        )
+    ).fetchall()
+    aux_type = pick_aux_type([(r.aux_type, r.n, r.amt) for r in type_rows])
+    if not aux_type:
+        return [], None, 0
+
+    # ② 锁定维度后按往来单位名称归集
+    agg_rows = (
+        await db.execute(
+            sa.select(
+                TbAuxBalance.aux_name,
+                sa.func.coalesce(sa.func.sum(TbAuxBalance.opening_balance), 0).label("opening"),
+                sa.func.coalesce(sa.func.sum(TbAuxBalance.debit_amount), 0).label("debit"),
+                sa.func.coalesce(sa.func.sum(TbAuxBalance.credit_amount), 0).label("credit"),
+                sa.func.coalesce(sa.func.sum(TbAuxBalance.closing_balance), 0).label("closing"),
+            )
+            .where(sa.and_(base_where, TbAuxBalance.aux_type == aux_type))
+            .group_by(TbAuxBalance.aux_name)
+            .order_by(TbAuxBalance.aux_name)
+        )
+    ).fetchall()
+
+    entries = [
+        (r.aux_name, r.opening, r.debit, r.credit, r.closing) for r in agg_rows
+    ]
+    rows = build_f1_detail_rows_from_aux(
+        entries, segments, row_limit=row_limit, row_id_factory=row_id_factory
+    )
+    return rows, aux_type, len(entries)
+
+
+@router.post("/api/workpapers/{wp_id}/f1/import-aux-balance")
+async def f1_import_aux_balance(
+    wp_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    """从 tb_aux_balance（科目 1123，按往来单位维度）归集导入 F1-2 明细表。
+
+    merge 语义：已存在的往来单位名称不重复导入（手工录入优先，不覆盖）。
+    """
+    wp_row = (
+        await db.execute(
+            sa.text(
+                "SELECT wp.project_id, p.audit_year "
+                "FROM working_paper wp JOIN projects p ON p.id = wp.project_id "
+                "WHERE wp.id = :wp_id"
+            ),
+            {"wp_id": wp_id},
+        )
+    ).fetchone()
+    if not wp_row:
+        raise HTTPException(404, "底稿不存在")
+
+    project_id = str(wp_row.project_id)
+    year = int(wp_row.audit_year or 0)
+
+    segments = await _resolve_f1_segments(db, wp_id)
+    rows_data, aux_type, total_units = await aggregate_f1_detail_rows_from_aux(
+        db, project_id, year, segments
+    )
+
+    if not rows_data:
+        return {
+            "ok": True,
+            "imported_count": 0,
+            "rows": [],
+            "message": "未找到科目1123的辅助余额数据",
+        }
+
+    item_id = _SHEET_ITEM_ID["F1-2"]
+    existing_rows = await load_json_rows(db, wp_id, item_id, field="remark")
+    existing_names = {
+        str((r or {}).get("customerName", "")).strip() for r in existing_rows
+    }
+    new_rows = [r for r in rows_data if r["customerName"] not in existing_names]
+    merged = list(existing_rows) + new_rows
+
+    await upsert_json_rows(db, wp_id, item_id, merged, field="remark")
+
+    first_label = ""
+    if segments:
+        first_label = str(getattr(segments[0], "label", "") or "")
+    truncated = total_units > len(rows_data)
+    msg = (
+        f"从辅助余额表(1123·{aux_type})归集 {total_units} 个往来单位，"
+        f"新增 {len(new_rows)} 行；账龄已整笔落「{first_label}」，请按实际账龄调整。"
+    )
+    out: dict[str, Any] = {
+        "ok": True,
+        "imported_count": len(new_rows),
+        "total_rows": len(merged),
+        "total_units": total_units,
+        "aux_type": aux_type,
+        "rows": new_rows,
+    }
+    if truncated:
+        out["truncated"] = True
+        msg += f" 超过 {len(rows_data)} 行上限已截断，请按重要性补录其余单位。"
+    out["message"] = msg
     return out

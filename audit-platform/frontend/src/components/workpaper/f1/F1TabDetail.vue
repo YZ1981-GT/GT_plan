@@ -456,6 +456,7 @@ import type { ChecklistResponse } from '../composables/useF1FormData'
 // @ts-ignore - GtIndexChip may not have type declarations
 import GtIndexChip from '../GtIndexChip.vue'
 import F1SheetAttachments from './F1SheetAttachments.vue'
+import type { F1AgingScope } from '../composables/useF1AgingScope'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -464,6 +465,8 @@ const props = defineProps<{
   isReadonly: boolean
   saveImmediate: (itemId: string, data: Partial<ChecklistResponse>) => Promise<void>
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
+  /** F1 账龄口径单一真源（主入口注入；未传则内部自建，兼容单独挂载） */
+  agingScope?: F1AgingScope
 }>()
 
 const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
@@ -540,6 +543,7 @@ const {
   debouncedSave: props.debouncedSave,
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
   relatedParties,
+  agingScope: props.agingScope,
 })
 
 const showCustomDialog = ref(false)

@@ -45,6 +45,7 @@
           :debounced-save="debouncedSave"
           :cross-sheet="crossSheet"
           :tb-amount-seed="f1TbAmountSeed"
+          :aging-segments="f1AgingSegments"
         />
 
         <F1TabDetail
@@ -55,6 +56,7 @@
           :is-readonly="isReadonly"
           :save-immediate="saveImmediate"
           :debounced-save="debouncedSave"
+          :aging-scope="agingScope"
         />
 
         <F1TabAdjustment
@@ -118,6 +120,7 @@
           :all-responses="allResponses"
           :wp-id="wpIdRef"
           :project-id="projectIdRef"
+          :year="props.year"
           :is-readonly="isReadonly"
           :save-immediate="saveImmediate"
           :debounced-save="debouncedSave"
@@ -130,6 +133,7 @@
           :all-responses="allResponses"
           :wp-id="wpIdRef"
           :project-id="projectIdRef"
+          :year="props.year"
           :is-readonly="isReadonly"
           :save-immediate="saveImmediate"
           :debounced-save="debouncedSave"
@@ -172,7 +176,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, provide, inject, defineAsyncComponent } from 'vue'
 import { useF1FormData } from './composables/useF1FormData'
 import { useF1CrossSheet } from './composables/useF1CrossSheet'
-import { useAgingConfig } from '@/composables/useAgingConfig'
+import { useF1AgingScope } from './composables/useF1AgingScope'
 import { useF1DualMode } from './composables/useF1DualMode'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
@@ -290,7 +294,20 @@ const saveImmediate = versionToolbar.wrapSaveImmediate(rawSaveImmediate)
 provide('f1VersionTrailRef', versionTrailRef)
 provide('f1OpenVersionHistory', openVersionHistory)
 
-const { segments: f1AgingSegments } = useAgingConfig(projectIdRef, 'F1')
+/**
+ * 🔴 F1 账龄口径单一真源（表级枚举覆盖 > 项目配置 > 3年段）。
+ * 一处装配后注入 crossSheet / 审定表 / 附注 / F1-4 / F1-5 / F1-6，
+ * 避免明细表切 5 年段后审定表与附注仍按 3 年段（3 年以上金额丢失、超 1 年筛选漏行）。
+ */
+const agingScope = useF1AgingScope({
+  allResponses,
+  projectId: projectIdRef,
+  debouncedSave,
+  isReadonly,
+})
+const f1AgingSegments = agingScope.segments
+provide('f1AgingScope', agingScope)
+provide('f1AgingSegments', f1AgingSegments)
 const crossSheet = useF1CrossSheet({ allResponses, segments: f1AgingSegments })
 
 const dualMode = useF1DualMode({
