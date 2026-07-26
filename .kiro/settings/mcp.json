@@ -136,7 +136,8 @@
         "container_logs",
         "container_stats",
         "list_images",
-        "exec_command"
+        "exec_command",
+        "restart_container"
       ]
     },
     "context7": {
