@@ -36,6 +36,9 @@
         <el-tag size="small" type="info">{{ departments.length }} 个部门</el-tag>
       </div>
       <div class="toolbar-right">
+        <el-button size="small" type="warning" plain :disabled="isReadonly" :loading="ledgerPullLoading" @click="pullMonthlyFromLedger">
+          📥从序时账取数（2211贷方按月）
+        </el-button>
         <el-dropdown size="small" trigger="click">
           <el-button size="small">导入导出 ▾</el-button>
           <template #dropdown>
@@ -210,6 +213,8 @@ import { ref, computed, toRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useJ1MonthlyAnalysis } from '@/composables/workpaper/j1/useJ1MonthlyAnalysis'
 import { useJ1ImportExport } from '@/composables/workpaper/j1/useJ1ImportExport'
+import { pullExpenseLedgerMonthly } from '../../composables/expenseLedgerMonthlyPull'
+import { useAuditContext } from '@/composables/useAuditContext'
 import GtIndexChip from '../../GtIndexChip.vue'
 import MonthlyBlockTable from './MonthlyBlockTable.vue'
 import http from '@/utils/http'
@@ -275,6 +280,53 @@ function triggerImport() {
   input.type = 'file'; input.accept = '.xlsx,.xls'
   input.onchange = (e) => { const f = (e.target as HTMLInputElement).files?.[0]; if (f) importData('monthly', f) }
   input.click()
+}
+
+// ─── 从序时账按月取数（2211 贷方→月度分析各月直接回填） ──────────────────
+const auditCtx = useAuditContext()
+const ledgerPullLoading = ref(false)
+
+function normLabelForMatch(s: unknown): string {
+  return String(s ?? '').replace(/[\s\u3000]/g, '').replace(/^其中[:：]/, '').replace(/^\d+[.．、]/, '').replace(/^[一二三四五六七八九十]+[、.．]/, '')
+}
+
+async function pullMonthlyFromLedger() {
+  if (isReadonly.value) return
+  const year = Number(auditCtx.year?.value || new Date().getFullYear())
+  try {
+    await ElMessageBox.confirm(
+      `将从序时账拉取 ${year} 年度科目 2211（应付职工薪酬）的贷方发生额按明细科目×月汇总，直接回填月度分析表各月列。是否继续？`,
+      '📥从序时账取数（2211贷方按月）',
+      { confirmButtonText: '取数', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch { return }
+  ledgerPullLoading.value = true
+  try {
+    const res = await pullExpenseLedgerMonthly(props.projectId, '2211', year)
+    if (!res.ok) { ElMessage.warning(res.message); return }
+    // 月度分析表：按 accountName 匹配 departments，各月贷方（取反，负债贷方为计提）回填
+    let matched = 0
+    for (const pulled of res.rows) {
+      const pk = normLabelForMatch(pulled.accountName)
+      if (!pk) continue
+      const deptIdx = departments.value.findIndex(d => {
+        const dk = normLabelForMatch(d)
+        return dk === pk || (dk.length >= 3 && pk.length >= 3 && (dk.includes(pk) || pk.includes(dk)))
+      })
+      if (deptIdx >= 0) {
+        const dept = departments.value[deptIdx]
+        for (let mi = 0; mi < 12; mi++) {
+          // expenseLedgerMonthlyPull 按借-贷聚合；2211负债科目贷方为负数→取反得正数计提
+          const val = pulled.months[mi] < 0 ? -pulled.months[mi] : pulled.months[mi]
+          if (Math.abs(val) > 0.005) {
+            updateCell('currentAccrual', dept, mi, val)
+          }
+        }
+        matched++
+      }
+    }
+    ElMessage.success(`${res.message}，匹配回填 ${matched} 个部门/项目的月度数据`)
+  } finally { ledgerPullLoading.value = false }
 }
 
 function fmtAmount(v: number): string {

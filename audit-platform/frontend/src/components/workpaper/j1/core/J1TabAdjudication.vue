@@ -9,15 +9,21 @@
 
     <!-- 双模式切换 -->
     <div class="mode-bar">
-      <el-segmented v-model="mode" :options="['HTML', 'OnlyOffice']" size="small" />
       <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
         <el-icon><Download /></el-icon>带入调整
+      </el-button>
+      <el-button size="small" type="warning" plain :disabled="isReadonly" @click="pullFromDetailWithConfirm">
+        从 J1-2 明细带入未审数
+      </el-button>
+      <el-button size="small" type="success" plain :disabled="isReadonly" :loading="writebackLoading"
+        @click="writebackTB">
+        回写试算平衡表（2211）
       </el-button>
       <span class="chip-wrap"><GtIndexChip value="wp:J1-1" :context-project-id="projectId" /></span>
       <el-tag size="small" type="info">共 {{ groups.length }} 组分类</el-tag>
     </div>
 
-    <template v-if="mode === 'HTML'">
+    <template v-if="true">
       <!-- 各分类分组 -->
       <el-card v-for="group in groups" :key="group.category" shadow="never" class="group-card">
         <template #header>
@@ -152,7 +158,7 @@
       <div class="tb-reconcile">
         <table class="tb-reconcile-table">
           <tr>
-            <td class="tb-label">试算平衡表数</td>
+            <td class="tb-label">试算平衡表审定数</td>
             <td class="tb-value">{{ fmtAmount(tbBalance) }}</td>
             <td class="tb-label" style="padding-left: 32px;">期初审定</td>
             <td class="tb-value">{{ fmtAmount(grandTotal.beginAudited) }}</td>
@@ -160,11 +166,21 @@
             <td class="tb-value">{{ fmtAmount(grandTotal.endAudited) }}</td>
           </tr>
           <tr>
-            <td class="tb-label">差异数</td>
+            <td class="tb-label">差异数（审定）</td>
             <td class="tb-value" :class="{ 'text-danger': Math.abs(tbDiff) > 0.01 }">{{ fmtAmount(tbDiff) }}</td>
             <td colspan="4">
               <el-tag v-if="Math.abs(tbDiff) < 0.01" type="success" size="small">✓ 勾稽一致</el-tag>
-              <el-tag v-else type="danger" size="small">✕ 存在差异，请核查</el-tag>
+              <el-tag v-else type="danger" size="small">✕ 存在差异，请核查或回写</el-tag>
+            </td>
+          </tr>
+          <tr>
+            <td class="tb-label">试算平衡表未审数</td>
+            <td class="tb-value">{{ fmtAmount(tbUnadjusted) }}</td>
+            <td class="tb-label" style="padding-left: 32px;">期末未审合计</td>
+            <td class="tb-value">{{ fmtAmount(grandTotal.endUnadj) }}</td>
+            <td class="tb-label" style="padding-left: 32px;">差异数（未审）</td>
+            <td class="tb-value" :class="{ 'text-danger': Math.abs(tbUnadjDiff) > 0.01 }">
+              {{ fmtAmount(tbUnadjDiff) }}
             </td>
           </tr>
         </table>
@@ -195,11 +211,6 @@
       </el-card>
     </template>
 
-    <!-- OnlyOffice降级 -->
-    <div v-else class="oo-placeholder">
-      <el-empty description="OnlyOffice 模式（审定表J1-1）" />
-    </div>
-
     <!-- 编制提示 -->
     <details class="guidance-details">
       <summary>📋 编制提示</summary>
@@ -210,6 +221,8 @@
         <p>4. 审定合计应与明细表（J1-2）、试算平衡表科目 2211 期末余额勾稽一致。</p>
         <p>5. 辞退福利为动态行，根据实际辞退计划增减行。</p>
         <p>6.「带入调整」：可从集中登记按科目 2211 拉取调整分录，逐笔分配到各分类行期末调整，带入后审定数自动更新并联动附注。</p>
+        <p>7.「从 J1-2 明细带入未审数」：按明细表项目清单重建行，未审期末=期初+本期增加−本期减少；同名行的账项调整与原因分析保留。</p>
+        <p>8.「回写试算平衡表（2211）」：以期末审定合计回写 trial_balance 审定数，并发布审定事件联动附注与报表。回写后「差异数（审定）」应为 0；「差异数（未审）」用于核对明细未审数与账面。</p>
       </div>
     </details>
 
@@ -225,25 +238,41 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, type Ref } from 'vue'
 import { Download } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { eventBus } from '@/utils/eventBus'
 import { useJ1Adjudication, type AdjudicationRow } from '@/composables/workpaper/j1/useJ1Adjudication'
 import GtIndexChip from '../../GtIndexChip.vue'
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
 import { useAuditContext } from '@/composables/useAuditContext'
 
+interface ChecklistItem { item_id: string; conclusion: string | null; remark: string | null }
+
 const props = defineProps<{
   wpId: string
   projectId: string
   htmlData?: Record<string, unknown> | null
+  allResponses?: Map<string, ChecklistItem>
   isReadonly?: boolean
+  saveImmediate?: (items: ChecklistItem[]) => Promise<void>
 }>()
 
 const isReadonly = props.isReadonly ?? false
-const mode = ref('HTML')
 const htmlDataRef = ref(props.htmlData || {})
-const { rows, groups, grandTotal, initFromHtmlData, updateRow } = useJ1Adjudication(htmlDataRef)
+const allResponsesRef = computed(() => props.allResponses ?? new Map<string, ChecklistItem>()) as unknown as Ref<Map<string, ChecklistItem>>
+
+/** 默认落库：主入口未传 saveImmediate 时自行 PUT（避免静默丢数据） */
+async function defaultSave(items: ChecklistItem[]): Promise<void> {
+  const http = (await import('@/utils/http')).default
+  await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, { items })
+}
+
+const { rows, groups, grandTotal, init, updateRow, commitRows, pullFromDetail } = useJ1Adjudication(htmlDataRef, {
+  allResponses: allResponsesRef,
+  saveImmediate: (items) => (props.saveImmediate ?? defaultSave)(items),
+})
 
 // ─── 从集中登记带入调整（2211 应付职工薪酬，负债贷方；带入期末调整 endAje，单一调整列） ───
 const bringInRows = computed(() =>
@@ -275,7 +304,68 @@ const {
 
 /** 试算平衡表勾稽 */
 const tbBalance = ref(0)
+const tbUnadjusted = ref(0)
 const tbDiff = computed(() => grandTotal.value.endAudited - tbBalance.value)
+const tbUnadjDiff = computed(() => grandTotal.value.endUnadj - tbUnadjusted.value)
+
+/** 从 J1-2 明细带入未审数（覆盖行清单，保留同名行的调整/原因分析） */
+async function pullFromDetailWithConfirm() {
+  if (isReadonly) return
+  try {
+    await ElMessageBox.confirm(
+      '将按 J1-2 明细表的项目清单重建审定表行，未审期初/期末数取明细未审数（期末=期初+增加−减少）。同名行的账项调整与原因分析将保留，其余手工行会被覆盖。是否继续？',
+      '从 J1-2 明细带入',
+      { confirmButtonText: '带入', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return
+  }
+  const { rowCount, matched } = pullFromDetail()
+  if (rowCount === 0) {
+    ElMessage.warning('未从 J1-2 明细表取到数据，请先编制明细表')
+    return
+  }
+  ElMessage.success(`已带入 ${rowCount} 行（其中 ${matched} 行沿用既有调整）`)
+}
+
+/** 审定合计回写试算平衡表 2211 + 发布审定事件（联动附注/报表） */
+const writebackLoading = ref(false)
+async function writebackTB() {
+  if (isReadonly) return
+  const amount = grandTotal.value.endAudited
+  try {
+    await ElMessageBox.confirm(
+      `将以期末审定合计 ${fmtAmount(amount)} 回写试算平衡表科目 2211（应付职工薪酬）的审定数。是否继续？`,
+      '回写试算平衡表',
+      { confirmButtonText: '回写', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return
+  }
+  writebackLoading.value = true
+  try {
+    const http = (await import('@/utils/http')).default
+    await http.put(`/api/projects/${props.projectId}/trial-balance/writeback`, {
+      account_code: '2211',
+      audited_amount: amount,
+    })
+    tbBalance.value = amount
+    eventBus.emit('substantive:adjudicated', {
+      wpCode: 'J1',
+      accountCode: '2211',
+      auditedAmount: amount,
+      begin_audited: grandTotal.value.beginAudited,
+      end_audited: amount,
+      projectId: props.projectId,
+      timestamp: Date.now(),
+    })
+    ElMessage.success('已回写试算平衡表（科目 2211）')
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || '回写失败，请确认试算表已导入科目 2211')
+  } finally {
+    writebackLoading.value = false
+  }
+}
 
 /** 审计说明 / 结论 */
 const NOTE_KEY = 'J1-adjudication-audit-note'
@@ -294,26 +384,38 @@ function onCurrentRowChange(category: string, row: AdjudicationRow | null) {
 }
 
 onMounted(() => {
-  if (props.htmlData) initFromHtmlData(props.htmlData)
-  else initFromHtmlData({})
+  // 优先共享 allResponses 的持久化行，回退 htmlData（含后端 tb_balance 预填）
+  init(props.htmlData || {})
   // 恢复试算平衡表数
   if (props.htmlData?.tb_data) {
     const tb = props.htmlData.tb_data as Record<string, number>
     tbBalance.value = tb.audited_amount || 0
+    tbUnadjusted.value = tb.unadjusted_amount || 0
   }
-  // 恢复审计说明/结论
-  const responses = props.htmlData?.responses_snapshot as Record<string, { remark?: string }> | undefined
-  if (responses) {
-    if (responses[NOTE_KEY]?.remark) auditNote.value = responses[NOTE_KEY].remark
-    if (responses[CONCLUSION_KEY]?.remark) auditConclusion.value = responses[CONCLUSION_KEY].remark
-  }
+  // 恢复审计说明/结论：共享 Map 优先，回退 render 快照
+  const stored = props.allResponses
+  const snapshot = props.htmlData?.responses_snapshot as Record<string, { remark?: string }> | undefined
+  auditNote.value = stored?.get(NOTE_KEY)?.remark || snapshot?.[NOTE_KEY]?.remark || ''
+  auditConclusion.value = stored?.get(CONCLUSION_KEY)?.remark || snapshot?.[CONCLUSION_KEY]?.remark || ''
 })
 
+/** 审计说明/结论落库（历史实现只赋值 ref → 刷新即丢） */
+function saveOpinion() {
+  if (isReadonly) return
+  const items: ChecklistItem[] = [
+    { item_id: NOTE_KEY, conclusion: null, remark: auditNote.value },
+    { item_id: CONCLUSION_KEY, conclusion: null, remark: auditConclusion.value },
+  ]
+  items.forEach(it => props.allResponses?.set(it.item_id, it))
+  ;(props.saveImmediate ?? defaultSave)(items).catch(() => { /* 主入口统一提示 */ })
+}
 function saveAuditNote(val: string) {
   auditNote.value = val
+  saveOpinion()
 }
 function saveAuditConclusion(val: string) {
   auditConclusion.value = val
+  saveOpinion()
 }
 
 /** AI辅助生成 */
@@ -327,12 +429,15 @@ async function aiGenerate(section: 'note' | 'conclusion') {
     if (text) {
       if (section === 'note') auditNote.value = text
       else auditConclusion.value = text
+      saveOpinion()
     }
   } catch { /* 降级：AI不可用时静默 */ }
 }
 
-function onCellChange(row: AdjudicationRow) {
-  updateRow(row.id, 'beginUnadj', row.beginUnadj)
+/** 单元格变更：v-model 已改行对象 → 重算派生列并落库（不再只改内存） */
+function onCellChange(_row: AdjudicationRow) {
+  if (isReadonly) return
+  commitRows()
 }
 
 function addRowToCategory(category: string) {
@@ -345,6 +450,7 @@ function addRowToCategory(category: string) {
     endUnadj: 0, endAje: 0, endAudited: 0,
     unadjVsPriorDiff: 0, unadjVsPriorRate: 0,
     auditedVsPriorDiff: 0, auditedVsPriorRate: 0,
+    changeDiff: 0, changeRate: 0,
     analysis: '',
   }
   // 插入到选中行的下一行；未选中则追加到该分类末尾
@@ -353,6 +459,7 @@ function addRowToCategory(category: string) {
     const idx = rows.value.findIndex(r => r.id === selectedRow.id)
     if (idx >= 0) {
       rows.value.splice(idx + 1, 0, newRow)
+      commitRows()
       return
     }
   }
@@ -363,11 +470,15 @@ function addRowToCategory(category: string) {
   } else {
     rows.value.push(newRow)
   }
+  commitRows()
 }
 
 function removeRow(id: string) {
   const idx = rows.value.findIndex(r => r.id === id)
-  if (idx >= 0) rows.value.splice(idx, 1)
+  if (idx >= 0) {
+    rows.value.splice(idx, 1)
+    commitRows()
+  }
 }
 
 function fmtAmount(val: number | null | undefined): string {

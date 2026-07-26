@@ -17,10 +17,36 @@
 
     <!-- 工具栏 -->
     <div class="mode-bar">
-      <el-segmented v-model="mode" :options="['HTML', 'OnlyOffice']" size="small" />
       <span class="chip-wrap"><GtIndexChip value="wp:J1-1" :context-project-id="projectId" /></span>
       <el-tag size="small" type="info">共 {{ totalRowCount }} 行</el-tag>
+      <el-popover trigger="click" width="280" placement="bottom-start">
+        <template #reference>
+          <el-button size="small" circle title="列设置">⚙</el-button>
+        </template>
+        <div class="j1-col-prefs">
+          <div style="margin-bottom:8px;">
+            <el-button v-for="(p, pName) in colPrefs.PRESETS" :key="pName" size="small"
+              :type="colPrefs.currentPreset.value === pName ? 'primary' : ''" @click="colPrefs.setPreset(pName as any)">
+              {{ p.label }}
+            </el-button>
+          </div>
+          <el-checkbox :model-value="false" @change="colPrefs.hideEmptyColumns()">隐藏空列</el-checkbox>
+          <el-divider style="margin:8px 0;" />
+          <div v-for="group in colPrefs.COLUMN_GROUPS" :key="group.name" style="margin-bottom:6px;">
+            <div style="font-weight:600;font-size:12px;color:#909399;margin-bottom:2px;">{{ group.name }}</div>
+            <el-checkbox v-for="col in group.columns" :key="col.key" :model-value="colPrefs.isVisible(col.key)"
+              @change="colPrefs.toggleColumn(col.key)" style="display:block;margin-left:0;">
+              {{ col.label }}
+            </el-checkbox>
+          </div>
+          <el-divider style="margin:8px 0;" />
+          <el-button size="small" @click="colPrefs.resetToDefault()">重置默认</el-button>
+        </div>
+      </el-popover>
       <div class="ml-auto" style="display:flex;gap:8px;align-items:center;">
+        <el-button size="small" type="warning" plain :disabled="isReadonly" :loading="ledgerPullLoading" @click="pullFromLedgerMonthly">
+          📥从序时账取数（2211贷方按月）
+        </el-button>
         <el-dropdown trigger="click">
           <el-button size="small">导入导出 ▾</el-button>
           <template #dropdown>
@@ -34,7 +60,7 @@
       </div>
     </div>
 
-    <template v-if="mode === 'HTML'">
+    <template v-if="true">
       <!-- 分区1: 短期薪酬 -->
       <J1DetailSection
         :title="J1_SECTIONS[0].title"
@@ -42,6 +68,7 @@
         :total-row="shortTermTotal"
         :is-dynamic="false"
         :is-readonly="isReadonly"
+        :hidden-columns="colPrefs.hiddenKeys.value"
         section-key="shortTerm"
         @update-cell="(rowId, field, val) => updateCell('shortTerm', rowId, field, val)"
       />
@@ -53,6 +80,7 @@
         :total-row="postEmploymentTotal"
         :is-dynamic="false"
         :is-readonly="isReadonly"
+        :hidden-columns="colPrefs.hiddenKeys.value"
         section-key="postEmployment"
         @update-cell="(rowId, field, val) => updateCell('postEmployment', rowId, field, val)"
       />
@@ -64,6 +92,7 @@
         :total-row="severanceTotal"
         :is-dynamic="true"
         :is-readonly="isReadonly"
+        :hidden-columns="colPrefs.hiddenKeys.value"
         section-key="severance"
         @update-cell="(rowId, field, val) => updateCell('severance', rowId, field, val)"
         @add-row="addRow('severance')"
@@ -138,10 +167,6 @@
       </el-card>
     </template>
 
-    <div v-else class="oo-placeholder">
-      <el-empty description="OnlyOffice 模式（明细表J1-2）" />
-    </div>
-
     <!-- 编制提示 -->
     <details class="guidance-details">
       <summary>📋 编制提示</summary>
@@ -161,12 +186,15 @@
 
 <script setup lang="ts">
 import { ref, computed, toRef, onMounted, onBeforeUnmount } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useJ1Detail, J1_SECTIONS } from '@/composables/workpaper/j1/useJ1Detail'
 import { useJ1ImportExport } from '@/composables/workpaper/j1/useJ1ImportExport'
+import { pullExpenseLedgerMonthly, type MonthlyByAccount } from '../../composables/expenseLedgerMonthlyPull'
+import { useAuditContext } from '@/composables/useAuditContext'
 import http from '@/utils/http'
 import GtIndexChip from '../../GtIndexChip.vue'
 import J1DetailSection from './J1DetailSection.vue'
+import { useJ1DetailColumnPrefs } from '@/composables/workpaper/j1/useJ1DetailColumnPrefs'
 
 const props = defineProps<{
   wpId: string
@@ -209,12 +237,13 @@ const {
   isReadonly: toRef(props, 'isReadonly') as any || ref(false),
 })
 
-const mode = ref('HTML')
 const { exportTemplate, exportData, importData } = useJ1ImportExport(props.wpId)
 
 const totalRowCount = computed(() =>
   shortTermRows.value.length + postEmploymentRows.value.length + severanceRows.value.length
 )
+
+const colPrefs = useJ1DetailColumnPrefs(shortTermRows)
 
 function fmtNum(val: number): string {
   if (val === 0) return '-'
@@ -230,6 +259,59 @@ function triggerImport() {
     if (file) importData('detail', file)
   }
   input.click()
+}
+
+// ─── 从序时账按月取数（2211 贷方=本期增加=贷方计提） ─────────────────────
+const auditCtx = useAuditContext()
+const ledgerPullLoading = ref(false)
+
+function normLabelForMatch(s: unknown): string {
+  return String(s ?? '').replace(/[\s\u3000]/g, '').replace(/^其中[:：]/, '').replace(/^\d+[.．、]/, '').replace(/^[一二三四五六七八九十]+[、.．]/, '')
+}
+
+async function pullFromLedgerMonthly() {
+  if (isReadonly.value) return
+  const year = Number(auditCtx.year?.value || new Date().getFullYear())
+  try {
+    await ElMessageBox.confirm(
+      `将从序时账拉取 ${year} 年度科目 2211（应付职工薪酬）的贷方发生额，按明细科目名×月汇总。匹配到的明细行将填入各月贷方=本期增加（只填非零月），不改期初/减少/调整。是否继续？`,
+      '📥从序时账取数（2211贷方按月）',
+      { confirmButtonText: '取数', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch { return }
+  ledgerPullLoading.value = true
+  try {
+    const res = await pullExpenseLedgerMonthly(props.projectId, '2211', year)
+    if (!res.ok) { ElMessage.warning(res.message); return }
+    // 按 accountName 匹配已有明细行（J1-2 行 label）填 unadjIncrease
+    let matched = 0
+    const allSectionRows = [
+      { key: 'shortTerm' as const, rows: shortTermRows },
+      { key: 'postEmployment' as const, rows: postEmploymentRows },
+      { key: 'severance' as const, rows: severanceRows },
+    ]
+    for (const pulled of res.rows) {
+      const pk = normLabelForMatch(pulled.accountName)
+      if (!pk) continue
+      // 只取贷方年合计（负债贷方=本期增加）：expenseLedgerMonthlyPull 返借-贷，但2211贷方=计提
+      // 故取绝对值或取反（该函数按借-贷聚合,对负债科目贷方为负,取反得正数计提额）
+      const annualCredit = pulled.months.reduce((s, m) => s + m, 0)
+      const creditTotal = annualCredit < 0 ? -annualCredit : annualCredit
+      if (Math.abs(creditTotal) < 0.005) continue
+      for (const { key, rows } of allSectionRows) {
+        const idx = rows.value.findIndex(r => {
+          const rk = normLabelForMatch(r.label)
+          return rk === pk || (rk.length >= 3 && pk.length >= 3 && (rk.includes(pk) || pk.includes(rk)))
+        })
+        if (idx >= 0) {
+          updateCell(key, rows.value[idx].id, 'unadjIncrease', creditTotal)
+          matched++
+          break
+        }
+      }
+    }
+    ElMessage.success(`${res.message}，匹配填入 ${matched} 行的「本期增加」`)
+  } finally { ledgerPullLoading.value = false }
 }
 
 // ─── AI 辅助生成 ────────────────────────────────────────────────────────────

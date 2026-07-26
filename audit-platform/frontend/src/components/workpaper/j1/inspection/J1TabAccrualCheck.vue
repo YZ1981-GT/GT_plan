@@ -2,6 +2,9 @@
   <div class="j1-tab-accrual">
     <!-- 顶部工具栏 -->
     <div class="ie-toolbar">
+      <el-button size="small" type="success" plain :disabled="isReadonly" :loading="bringInLoading" @click="bringInFromJ12">
+        📋从 J1-2 带入已计提数
+      </el-button>
       <el-dropdown size="small" trigger="click">
         <el-button size="small">导入导出 ▾</el-button>
         <template #dropdown>
@@ -96,7 +99,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, toRef } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'
 import AccrualTable from './AccrualTable.vue'
 import { useJ1ImportExport } from '@/composables/workpaper/j1/useJ1ImportExport'
@@ -231,6 +234,67 @@ if (savedQ) {
 const auditConclusion = ref(allResponsesRef.value.get(KEYS.conclusion)?.remark || '')
 
 function saveOpinion() { scheduleSave() }
+
+// ─── 从 J1-2 带入已计提数 ──────────────────────────────────────────────────
+const bringInLoading = ref(false)
+
+function normLabel(s: string): string {
+  return s.replace(/[\s\u3000]/g, '').replace(/^其中[:：]/, '').replace(/^\d+[.．、]/, '').replace(/^[一二三四五六七八九十]+[、.．]/, '')
+}
+
+async function bringInFromJ12() {
+  if (isReadonly.value) return
+  try {
+    await ElMessageBox.confirm(
+      '将从 J1-2 明细表各分区读取「本期增加（贷方=计提额）」，按项目名匹配填入对应行的「实际计提数」。已有值将被覆盖。是否继续？',
+      '📋从 J1-2 带入已计提数',
+      { confirmButtonText: '带入', cancelButtonText: '取消', type: 'info' }
+    )
+  } catch { return }
+  bringInLoading.value = true
+  try {
+    const DETAIL_KEYS = ['J1-2-detail-shortTerm', 'J1-2-detail-postEmployment', 'J1-2-detail-severance']
+    const detailRows: Array<{ label: string; unadjIncrease: number }> = []
+    for (const key of DETAIL_KEYS) {
+      const raw = allResponsesRef.value.get(key)?.remark
+      if (!raw) continue
+      try {
+        const arr = JSON.parse(raw)
+        if (Array.isArray(arr)) {
+          for (const r of arr) {
+            if (r.label && typeof r.unadjIncrease === 'number' && Math.abs(r.unadjIncrease) > 0.005) {
+              detailRows.push({ label: r.label, unadjIncrease: r.unadjIncrease })
+            }
+          }
+        }
+      } catch { /* skip parse errors */ }
+    }
+    if (detailRows.length === 0) {
+      ElMessage.warning('未从 J1-2 明细表获取到有效数据，请先编制明细表')
+      bringInLoading.value = false
+      return
+    }
+    let matched = 0
+    const allRows = [shortTermRows, postEmploymentRows]
+    for (const detail of detailRows) {
+      const dk = normLabel(detail.label)
+      if (!dk) continue
+      for (const rowsRef of allRows) {
+        const idx = rowsRef.value.findIndex(r => {
+          const rk = normLabel(r.label)
+          return rk === dk || (rk.length >= 2 && dk.length >= 2 && (rk.includes(dk) || dk.includes(rk)))
+        })
+        if (idx >= 0) {
+          const section = rowsRef === shortTermRows ? 'shortTerm' : 'postEmployment'
+          updateCell(section, rowsRef.value[idx].id, 'actual', detail.unadjIncrease)
+          matched++
+          break
+        }
+      }
+    }
+    ElMessage.success(`已从 J1-2 带入 ${matched} 项已计提数（共 ${detailRows.length} 条明细数据）`)
+  } finally { bringInLoading.value = false }
+}
 
 // ─── 导入导出 ───────────────────────────────────────────────────────────
 const { exportTemplate, exportData, importData } = useJ1ImportExport(props.wpId)

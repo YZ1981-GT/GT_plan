@@ -5,8 +5,20 @@
       <el-skeleton :rows="8" animated />
     </div>
 
-    <!-- 根据外层 GtWpRenderer 传入的 sheetName 分发到对应子组件 -->
-    <template v-else>
+    <!-- dual mode bar (only non-index sheets) -->
+    <div v-if="!isLoading && isHtmlSheet" class="j1-dual-mode-bar">
+      <el-segmented :model-value="dualMode.mode.value === 'html' ? 'HTML' : 'OnlyOffice'" @change="(v: any) => dualMode.switchMode(v === 'HTML' ? 'html' : 'onlyoffice')" :options="['HTML', 'OnlyOffice']" size="small" />
+      <el-tag v-if="dualMode.ooAvailable.value" size="small" type="success">OnlyOffice 就绪</el-tag>
+      <el-tag v-else-if="dualMode.checking.value" size="small" type="info">检测中...</el-tag>
+      <el-tag v-else size="small" type="warning">仅结构化视图</el-tag>
+    </div>
+
+    <!-- OO branch -->
+    <GtOnlyOfficeSheet v-if="!isLoading && isHtmlSheet && dualMode.mode.value === 'onlyoffice'"
+      :wp-id="wpId" :project-id="projectId" :sheet-name="dualMode.resolveOoSheetName()" :readonly="isReadonly" />
+
+    <!-- HTML branch: original child dispatch -->
+    <template v-else-if="!isLoading">
       <!-- 底稿目录 -->
       <J1TabIndex v-if="currentSheet === 'J1-index'"
         :wp-id="wpId" :project-id="projectId"
@@ -22,7 +34,8 @@
       />
       <!-- J1-1 审定表 -->
       <J1TabAdjudication v-else-if="currentSheet === 'J1-1'"
-        :wp-id="wpId" :project-id="projectId" :html-data="htmlData" :is-readonly="isReadonly" />
+        :wp-id="wpId" :project-id="projectId" :html-data="htmlData"
+        :all-responses="allResponses" :is-readonly="isReadonly" :save-immediate="handleChildSave" />
       <!-- J1-2 明细表 -->
       <J1TabDetail v-else-if="currentSheet === 'J1-2'"
         :wp-id="wpId" :project-id="projectId" :html-data="htmlData"
@@ -58,10 +71,12 @@
         :wp-id="wpId" :project-id="projectId" :html-data="htmlData" :is-readonly="isReadonly" />
       <!-- 附注（上市公司） -->
       <J1TabDisclosureListed v-else-if="currentSheet === 'J1附注(上市)'"
-        :wp-id="wpId" :project-id="projectId" :html-data="htmlData" />
+        :wp-id="wpId" :project-id="projectId" :html-data="htmlData"
+        :all-responses="allResponses" :is-readonly="isReadonly" :save-immediate="handleChildSave" />
       <!-- 附注（国有企业） -->
       <J1TabDisclosureSoe v-else-if="currentSheet === 'J1附注(国企)'"
-        :wp-id="wpId" :project-id="projectId" :html-data="htmlData" />
+        :wp-id="wpId" :project-id="projectId" :html-data="htmlData"
+        :all-responses="allResponses" :is-readonly="isReadonly" :save-immediate="handleChildSave" />
       <!-- IPO企业薪酬审计提示（只读注意事项） -->
       <J1TabIpoTips v-else-if="currentSheet === 'IPO-tips'"
         :wp-id="wpId" :project-id="projectId" :html-data="htmlData" />
@@ -90,7 +105,10 @@ import {
 } from '@/composables/workpaper/useChecklistPersistence'
 import { collectChecklistResponses } from '@/composables/workpaper/checklistPersistenceHelpers'
 import { WorkpaperRuntimeContextKey } from '../composables/useWorkpaperScaffold'
+import { useWorkpaperReviewThreads } from '../composables/useWorkpaperReviewThreads'
 import CycleTabProcedure from '../shared/CycleTabProcedure.vue'
+import { useWorkpaperEntryDualMode } from '../composables/useWorkpaperEntryDualMode'
+import GtOnlyOfficeSheet from '../GtOnlyOfficeSheet.vue'
 
 // ── defineAsyncComponent lazy 加载 ──────────────────────────────────────────
 const J1TabIndex = defineAsyncComponent(() => import('./core/J1TabIndex.vue'))
@@ -127,6 +145,11 @@ const emit = defineEmits<{
 /** 目录页跳转（对齐 D4 目录页范式）：J1TabIndex inject 调用 → 切换到目标 sheet */
 provide('jumpToSection', (sheetName: string) => emit('navigate-sheet', sheetName))
 
+/** 复核圆点：子 tab 的 GtReviewTrigger 通过 inject 取得蓝/红点 */
+const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(toRef(props, 'wpId'))
+provide('getThreadDot', getThreadDot)
+provide('getRowDot', getRowDot)
+
 const isLoading = ref(true)
 
 /** 当前 sheet 名（从 props.sheetName 提取） */
@@ -140,6 +163,13 @@ const currentSheet = computed(() => {
   if (sn.includes('国有') || sn.includes('国企')) return 'J1附注(国企)'
   if (sn.includes('目录')) return 'J1-index'
   return sn
+})
+
+const isHtmlSheet = computed(() => currentSheet.value !== 'J1-index')
+
+const dualMode = useWorkpaperEntryDualMode({
+  reloadAllResponses: async () => { await selfLoad() },
+  resolveOoSheetName: () => props.sheetName || '',
 })
 
 // ─── Runtime Boundary + Persistence Adapter ─────────────────────────────────
@@ -214,5 +244,12 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   min-height: 300px;
+}
+.j1-dual-mode-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 0 16px;
 }
 </style>

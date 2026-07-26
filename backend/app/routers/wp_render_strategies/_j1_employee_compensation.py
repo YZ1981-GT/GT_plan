@@ -170,7 +170,10 @@ async def render(ctx: RenderContext) -> dict | None:
         logger.warning("J1 render checklist read failed: %s", e)
 
     # ─── 解析审定表数据 ───────────────────────────────────────────────────
-    adjudication_rows = _extract_json(responses_snapshot, "J1-adjudication-data", [])
+    # J1-1-rows 是前端 useJ1Adjudication 的持久化键（新）；J1-adjudication-data 为历史键。
+    adjudication_rows = _extract_json(responses_snapshot, "J1-1-rows", [])
+    if not adjudication_rows:
+        adjudication_rows = _extract_json(responses_snapshot, "J1-adjudication-data", [])
     # 无持久化审定数据 → 从 tb_balance 2211 明细子科目预填项目实际余额（期初/期末未审数）
     if not adjudication_rows:
         adjudication_rows = await _build_adjudication_prefill(ctx)
@@ -222,13 +225,22 @@ async def render(ctx: RenderContext) -> dict | None:
 
 
 def _extract_json(responses: dict, key: str, default):
-    """从 responses 中解析 JSON 数据."""
+    """从 responses 中解析 JSON 数据.
+
+    🔴 checklist_responses 无 content 列，业务 JSON 一律存 remark（前端各 tab 统一如此）。
+    历史实现只读 raw["content"] → 所有 *_rows 恒为空；此处以 remark 为准并保留 content 兼容。
+    """
     raw = responses.get(key, {})
-    if raw and raw.get("content"):
+    if not raw:
+        return default
+    for field in ("remark", "content"):
+        val = raw.get(field)
+        if not val:
+            continue
         try:
-            return json.loads(raw["content"])
+            return json.loads(val)
         except (json.JSONDecodeError, TypeError):
-            pass
+            continue
     return default
 
 

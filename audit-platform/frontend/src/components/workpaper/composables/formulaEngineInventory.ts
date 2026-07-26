@@ -182,7 +182,6 @@ const EXPLICIT_ENTRIES: Array<Pick<FormulaEngineInventoryEntry, 'composable' | '
   { composable: 'useJ3FormulaEngine', filePath: 'src/composables/workpaper/j3/useJ3FormulaEngine.ts', kind: 'formula-engine' },
   // 跨表勾稽：src/composables 下的独立 CrossSheet
   { composable: 'useL1CrossSheet', filePath: 'src/composables/useL1CrossSheet.ts', kind: 'cross-sheet' },
-  { composable: 'useJ1CrossSheet', filePath: 'src/composables/workpaper/j1/useJ1CrossSheet.ts', kind: 'cross-sheet' },
   { composable: 'useJ2CrossSheet', filePath: 'src/composables/workpaper/j2/useJ2CrossSheet.ts', kind: 'cross-sheet' },
   { composable: 'useJ3CrossSheet', filePath: 'src/composables/workpaper/j3/useJ3CrossSheet.ts', kind: 'cross-sheet' },
 ]

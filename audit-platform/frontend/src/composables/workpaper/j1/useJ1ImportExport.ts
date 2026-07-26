@@ -53,8 +53,11 @@ export function useJ1ImportExport(wpId: string) {
     try {
       const formData = new FormData()
       formData.append('file', file)
-      formData.append('sheet_type', sheetType)
-      await http.post(`/api/workpapers/${wpId}/j1/import-data`, formData)
+      // 🔴 后端 sheet_type 是 Query 参数（不是 Form 字段）；只塞 FormData 会让后端恒用默认
+      // "detail" 解析 → 从 J1-6/J1-7 等页导入会被当明细表解析。必须走 params。
+      await http.post(`/api/workpapers/${wpId}/j1/import-data`, formData, {
+        params: { sheet_type: sheetType },
+      })
       ElMessage.success('数据导入成功')
       return true
     } catch (e) {

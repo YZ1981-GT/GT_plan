@@ -17,6 +17,7 @@ import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '@/components/workpaper/composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
+import { eventBus } from '@/utils/eventBus'
 
 const props = defineProps<{
   wpId: string
@@ -162,25 +163,56 @@ void refreshStatus()
 const selectedRows = ref<AdjRow[]>([])
 function handleSelectionChange(selection: AdjRow[]) { selectedRows.value = selection }
 
-async function pushToA13() {
+/**
+ * 推送错报至 A13 未更正错报汇总。
+ * 🔴 历史实现调 `POST /workpapers/{id}/push-to-a13` —— 该端点后端不存在（恒 404，
+ *    catch 里只弹「推送失败」）。平台标准是 eventBus `a13:push-misstatement`，
+ *    由挂在 WorkpaperEditor 的 useA13MisstatementBridge 唯一消费者写入
+ *    unadjusted_misstatements（含 source_wp_code 溯源）。
+ */
+function pushToA13() {
   if (selectedRows.value.length === 0) return
-  try {
-    await http.post(`/api/workpapers/${props.wpId}/push-to-a13`, {
-      entries: selectedRows.value.map(r => ({
-        description: r.description, category: r.category,
-        accountName: r.accountName, debitAmount: r.debitAmount,
-        creditAmount: r.creditAmount, source: 'J1-3',
-      })),
-    })
-    ElMessage.success(`已推送 ${selectedRows.value.length} 笔至 A13`)
-  } catch { ElMessage.warning('推送失败') }
+  eventBus.emit('a13:push-misstatement', {
+    wpCode: 'J1-3',
+    accountCode: '2211',
+    accountName: '应付职工薪酬',
+    projectId: props.projectId,
+    source: 'J1-3',
+    items: selectedRows.value.map(r => ({
+      description: `${r.description || '应付职工薪酬调整'}（${r.category}${r.accountName ? '：' + r.accountName : ''}）`,
+      debitAmount: r.debitAmount,
+      creditAmount: r.creditAmount,
+      indexRef: r.indexRef,
+    })),
+    timestamp: Date.now(),
+  } as any)
 }
 
 // ─── 确认调整 ─────────────────────────────────────────────────────────
-async function publishAdjustment() {
+/**
+ * 确认调整：落库 + 发 `adjustment:created` 刷新信号（历史实现只弹一句
+ * 「将同步至审定表J1-1」但不发任何事件、也不写 J1-1 → 承诺未兑现）。
+ * 审定表侧走「带入调整」从集中登记逐笔分配（避免与本事件双算）。
+ */
+function publishAdjustment() {
   if (!isBalanced.value || rows.value.length === 0) return
   persistRows()
-  ElMessage.success('调整分录已确认，将同步至审定表J1-1')
+  const ajeTotal = rows.value
+    .filter(r => r.category !== '报表调整')
+    .reduce((s, r) => s + r.debitAmount - r.creditAmount, 0)
+  const rjeTotal = rows.value
+    .filter(r => r.category === '报表调整')
+    .reduce((s, r) => s + r.debitAmount - r.creditAmount, 0)
+  eventBus.emit('adjustment:created', {
+    wpCode: 'J1-3',
+    accountCode: '2211',
+    projectId: props.projectId,
+    entryCount: rows.value.length,
+    ajeTotal,
+    rjeTotal,
+    timestamp: Date.now(),
+  } as any)
+  ElMessage.success('调整分录已确认（可在审定表 J1-1 用「带入调整」逐笔分配到分类行）')
 }
 
 // ─── 导入导出 ─────────────────────────────────────────────────────────

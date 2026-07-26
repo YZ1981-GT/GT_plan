@@ -35,7 +35,7 @@ from app.deps import get_current_user
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["j1-import-export"])
 
-SHEET_TYPES = {"detail", "accrual", "allocation", "general", "non_monetary", "severance", "monthly", "voucher", "industry"}
+SHEET_TYPES = {"detail", "accrual", "allocation", "general", "non_monetary", "severance", "monthly", "voucher", "industry", "adjustment"}
 
 # ─── J1-2 明细表 14 列定义 ────────────────────────────────────────────────────
 
@@ -595,6 +595,8 @@ async def export_template(
         wb = _build_nonmonetary_wb()
     elif sheet_type == "severance":
         wb = _build_severance_wb()
+    elif sheet_type == "adjustment":
+        wb = _build_adjustment_wb()
     else:
         wb = Workbook()
         ws = wb.active
@@ -715,6 +717,11 @@ async def export_data(
             "J1-10-policy", "J1-10-plan", "J1-10-condition", "J1-10-note", "J1-10-conclusion",
         ])
         wb = _build_severance_wb(items)
+    elif sheet_type == "adjustment":
+        items = await _fetch_items(db, wp_id, [
+            "J1-3-adjustment-rows", "J1-3-note", "J1-3-conclusion",
+        ])
+        wb = _build_adjustment_wb(items)
     else:
         # 检查表类 - 走原有逻辑
         item_id = f"J1-{sheet_type}-data"
@@ -778,6 +785,7 @@ async def import_data(
             "(3)辞退福利": "severance",
         }
         total_imported = 0
+        pending_items: list[tuple[str, str]] = []
         for sheet_name, stor_key in section_map.items():
             if sheet_name not in wb.sheetnames:
                 continue
@@ -809,18 +817,12 @@ async def import_data(
                 total_imported += 1
 
             if rows:
-                item_id = f"J1-2-detail-{stor_key}"
-                serialized = json.dumps(rows, ensure_ascii=False)
-                await db.execute(
-                    sa.text(
-                        "INSERT INTO checklist_responses (wp_id, item_id, remark) "
-                        "VALUES (:wp_id, :iid, :remark) "
-                        "ON CONFLICT (wp_id, item_id) DO UPDATE SET remark = :remark"
-                    ),
-                    {"wp_id": wp_id, "iid": item_id, "remark": serialized},
+                pending_items.append(
+                    (f"J1-2-detail-{stor_key}", json.dumps(rows, ensure_ascii=False))
                 )
 
-        await db.commit()
+        # 统一经 _upsert_items 落库（自动补 project_id NOT NULL + commit）
+        await _upsert_items(db, wp_id, pending_items)
         return {"imported_count": total_imported, "sheet_type": sheet_type}
     elif sheet_type == "monthly":
         # 导入月度分析
@@ -899,32 +901,20 @@ async def import_data(
                 existing_raw = {}
             existing_raw.update(result_data)
 
-            serialized = json.dumps(existing_raw, ensure_ascii=False)
-            await db.execute(
-                sa.text(
-                    "INSERT INTO checklist_responses (wp_id, item_id, remark) "
-                    "VALUES (:wp_id, :iid, :remark) "
-                    "ON CONFLICT (wp_id, item_id) DO UPDATE SET remark = :remark"
-                ),
-                {"wp_id": wp_id, "iid": "J1-4-monthly-analysis", "remark": serialized},
-            )
+            pending: list[tuple[str, str]] = [
+                ("J1-4-monthly-analysis", json.dumps(existing_raw, ensure_ascii=False))
+            ]
             # 更新部门列表
             all_depts = set()
             for field in ["currentAccrual", "currentHeadcount", "priorAccrual", "priorHeadcount"]:
                 if field in existing_raw and isinstance(existing_raw[field], dict):
                     all_depts.update(existing_raw[field].keys())
             if all_depts:
-                dept_serialized = json.dumps(sorted(all_depts), ensure_ascii=False)
-                await db.execute(
-                    sa.text(
-                        "INSERT INTO checklist_responses (wp_id, item_id, remark) "
-                        "VALUES (:wp_id, :iid, :remark) "
-                        "ON CONFLICT (wp_id, item_id) DO UPDATE SET remark = :remark"
-                    ),
-                    {"wp_id": wp_id, "iid": "J1-4-departments", "remark": dept_serialized},
+                pending.append(
+                    ("J1-4-departments", json.dumps(sorted(all_depts), ensure_ascii=False))
                 )
+            await _upsert_items(db, wp_id, pending)
 
-        await db.commit()
         return {"imported_count": total_imported, "sheet_type": sheet_type}
     elif sheet_type == "voucher":
         # 导入 J1-8 凭证检查三区（贷方检查/借方检查/期后支付）
@@ -1079,6 +1069,23 @@ async def import_data(
             items.append(("J1-10-conclusion", str(kv.get("审计结论") or "")))
         await _upsert_items(db, wp_id, items)
         return {"imported_count": total, "sheet_type": sheet_type}
+    elif sheet_type == "adjustment":
+        items, total = [], 0
+        if "调整分录" in wb.sheetnames:
+            rows = _sheet_to_rows(wb["调整分录"], J13_ADJ_COLS)
+            # 前端行模型需要 rowId；导入时补稳定 id（前端 loadRows 兜底也会补）
+            for i, r in enumerate(rows):
+                r.setdefault("rowId", f"j1adj-import-{i + 1}")
+                if not str(r.get("category") or "").strip():
+                    r["category"] = "账项调整"
+            items.append(("J1-3-adjustment-rows", json.dumps(rows, ensure_ascii=False)))
+            total += len(rows)
+        if "审计说明与结论" in wb.sheetnames:
+            kv = _kv_read(wb["审计说明与结论"])
+            items.append(("J1-3-note", str(kv.get("审计说明") or "")))
+            items.append(("J1-3-conclusion", str(kv.get("审计结论") or "")))
+        await _upsert_items(db, wp_id, items)
+        return {"imported_count": total, "sheet_type": sheet_type}
     else:
         # 检查表类 — 原有逻辑
         ws = wb.active
@@ -1093,15 +1100,9 @@ async def import_data(
                 imported_rows.append(row_dict)
 
         item_id = f"J1-{sheet_type}-data"
-        await db.execute(
-            sa.text(
-                "INSERT INTO checklist_responses (wp_id, item_id, remark) "
-                "VALUES (:wp_id, :iid, :remark) "
-                "ON CONFLICT (wp_id, item_id) DO UPDATE SET remark = :remark"
-            ),
-            {"wp_id": wp_id, "iid": item_id, "remark": json.dumps(imported_rows, ensure_ascii=False)},
+        await _upsert_items(
+            db, wp_id, [(item_id, json.dumps(imported_rows, ensure_ascii=False))]
         )
-        await db.commit()
         return {"imported_count": len(imported_rows), "sheet_type": sheet_type}
 
 
@@ -1355,6 +1356,47 @@ def _build_allocation_wb(data: dict | None = None) -> Workbook:
         "  1. 「是否分区标题」列填「是」表示分组标题行（如「(1)短期薪酬」），其余留空",
         "  2. 「层级」列 0/1 控制缩进",
         "  3. 分配合计应与实际计提数勾稽一致，差异≠0需填差异原因",
+    ])
+    return wb
+
+
+# ─── J1-3 调整分录汇总表 ──────────────────────────────────────────────────────
+# 列定义与前端 J1TabAdjustment 的 AdjRow 字段严格对齐（rowId 前端生成不导入）
+J13_ADJ_COLS = [
+    ("description", "调整事项说明", False),
+    ("category", "类别", False),
+    ("reportItem", "报表项目", False),
+    ("accountName", "科目名称", False),
+    ("noteItem", "附注项目", False),
+    ("debitAmount", "借方金额", True),
+    ("creditAmount", "贷方金额", True),
+    ("indexRef", "索引", False),
+    ("remark", "备注", False),
+]
+
+
+def _build_adjustment_wb(data: dict | None = None) -> Workbook:
+    """构建 J1-3 调整分录汇总表工作簿（调整分录 + 审计说明与结论 + 编制说明）."""
+    data = data or {}
+    wb = Workbook()
+    wb.remove(wb.active)
+    _rows_to_sheet(
+        wb.create_sheet("调整分录"),
+        J13_ADJ_COLS,
+        _parse_json_array(data.get("J1-3-adjustment-rows")),
+    )
+    _kv_sheet(wb.create_sheet("审计说明与结论"), [
+        ("审计说明", data.get("J1-3-note") or ""),
+        ("审计结论", data.get("J1-3-conclusion") or ""),
+    ])
+    _note_sheet(wb.create_sheet("编制说明"), "J1-3 调整分录汇总表 — 编制说明", [
+        "", "一、sheet结构",
+        "  调整分录：调整事项说明/类别/报表项目/科目名称/附注项目/借方金额/贷方金额/索引/备注",
+        "  审计说明与结论：审计说明、审计结论 key-value",
+        "", "二、导入说明",
+        "  1. 「类别」列填「账项调整」「报表调整」或「其他」；账项调整/其他归 AJE，报表调整归 RJE",
+        "  2. 借方合计应等于贷方合计，不平衡时页面无法确认调整",
+        "  3. 整行全空自动跳过；仅列示与应付职工薪酬(2211)相关的审计调整",
     ])
     return wb
 
