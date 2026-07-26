@@ -15,19 +15,68 @@ from app.models.report_models import DisclosureNote
 
 logger = logging.getLogger(__name__)
 
-# 默认附注-底稿映射（章节编号 → 底稿编号前缀）
-DEFAULT_WP_MAPPING = {
-    "五、1": "E1",    # 货币资金
-    "五、2": "E2",    # 应收票据
-    "五、3": "D1",    # 应收账款
-    "五、6": "F1",    # 存货
-    "五、7": "G1",    # 长期股权投资
-    "五、9": "H1",    # 固定资产
-    "五、12": "I1",   # 无形资产
-    "五、16": "L1",   # 短期借款
-    "五、19": "J1",   # 应付职工薪酬
-    "五、29": "D1",   # 营业收入
+# ─── 附注章节 → 底稿编号映射 ────────────────────────────────────────────────
+# 权威真源：backend/data/note_workpaper_sync_registry.json（由
+# scripts/gen_note_wp_sync_registry.py 从前端 *NoteSectionMap.ts 生成）。
+# 早期硬编码 DEFAULT_WP_MAPPING 的编号与 wp_code 双重错乱（如 "五、2"→"E2"[不存在]、
+# "五、3"→"D1"[应收账款实为 D2/五、5]、"五、9"→"H1"[固定资产实为 五、22]），
+# 被 note_validation_executors（完整性）/ note_stale_service（stale 标记）/
+# disclosure_notes（schema 反查）三处直接消费 → 校验/标记/取数按错误映射进行。
+# 现改为从 registry 派生 section→wp_code（listed + soe 双编号，权威），
+# registry 不可用时 fail-open 回退旧值（保 import 不崩，极端情况行为=改动前）。
+
+# 旧硬编码（错乱，仅作 registry 不可用时的 fail-open 回退，勿再据此判断）
+_LEGACY_DEFAULT_WP_MAPPING = {
+    "五、1": "E1",
+    "五、2": "E2",
+    "五、3": "D1",
+    "五、6": "F1",
+    "五、7": "G1",
+    "五、9": "H1",
+    "五、12": "I1",
+    "五、16": "L1",
+    "五、19": "J1",
+    "五、29": "D1",
 }
+
+
+def _build_default_wp_mapping() -> dict[str, str]:
+    """从权威 registry 派生 ``note_section → wp_code``（listed+soe 双编号，首个赢）。
+
+    与 note_readiness_service.section_workpaper_map 同源（同一 JSON），此处产出
+    单值形态（section→wp_code）供 stale/completeness/schema 三处消费者直接使用。
+    读取失败 → fail-open 回退 _LEGACY_DEFAULT_WP_MAPPING（保底不崩）。
+    """
+    try:
+        import json
+        from pathlib import Path
+
+        p = (
+            Path(__file__).resolve().parent.parent.parent
+            / "data"
+            / "note_workpaper_sync_registry.json"
+        )
+        raw = json.loads(p.read_text(encoding="utf-8"))
+        out: dict[str, str] = {}
+        for e in raw.get("entries", []):
+            if not isinstance(e, dict):
+                continue
+            code = str(e.get("wp_code") or "").strip()
+            if not code:
+                continue
+            for key in ("listed", "soe"):
+                sec = e.get(key)
+                if isinstance(sec, str) and sec.strip():
+                    out.setdefault(sec.strip(), code)  # 首个赢，避免一 section 多 wp 覆盖
+        if out:
+            return out
+    except Exception:  # pragma: no cover — registry 缺失/损坏时安全降级
+        logger.warning("note_wp_mapping: registry unavailable, using legacy fallback")
+    return dict(_LEGACY_DEFAULT_WP_MAPPING)
+
+
+# 默认附注-底稿映射（章节编号 → 底稿编号），派生自权威 registry
+DEFAULT_WP_MAPPING = _build_default_wp_mapping()
 
 
 class NoteWpMappingService:
