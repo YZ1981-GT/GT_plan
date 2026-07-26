@@ -119,9 +119,10 @@
  * - 版本追踪: useVersionTrail(autoSnapshot)
  * - 复核对话: provide openReviewDialog → 子组件 inject
  */
-import { ref, computed, inject, onMounted, provide, defineAsyncComponent } from 'vue'
+import { ref, computed, inject, onMounted, provide, defineAsyncComponent, toRef } from 'vue'
 import http from '@/utils/http'
 import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './composables/useWorkpaperScaffold'
+import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 
 // ─── Lazy-loaded child components ────────────────────────────────────────────
 
@@ -201,6 +202,11 @@ const currentSheet = computed(() => {
 // 本主入口不再本地 new GtReviewDialog / useWorkpaperVersionToolbar（避免重复 provider/Host）。
 const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
 provide('scheduleAutoSnapshot', () => runtime?.version.scheduleAutoSnapshot())
+
+// ─── 复核圆点（子组件 GtReviewTrigger 依赖） ───
+const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(toRef(props, 'wpId'))
+provide('getThreadDot', getThreadDot)
+provide('getRowDot', getRowDot)
 
 // ─── selfLoad ────────────────────────────────────────────────────────────────
 

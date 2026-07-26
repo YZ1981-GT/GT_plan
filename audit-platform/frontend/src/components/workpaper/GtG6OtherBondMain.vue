@@ -152,6 +152,7 @@ import { useG6MainFormData } from './composables/useG6MainFormData'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import type { ChecklistResponse } from './composables/useF1FormData'
 import { matchG6SaveItemsEvent } from './composables/g6CrossHelpers'
+import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 
 // ─── defineAsyncComponent 懒加载所有子组件 ───────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
@@ -286,6 +287,10 @@ const directoryHtmlData = computed(() => {
 provide('g6VersionTrailRef', versionTrailRef)
 provide('g6OpenVersionHistory', openVersionHistory)
 provide('reloadWorkpaperData', () => formData.loadAll())
+
+const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(wpIdRef)
+provide('getThreadDot', getThreadDot)
+provide('getRowDot', getRowDot)
 
 /** 目录页跳转：G6TabDirectory inject('jumpToSection') → navigate-sheet → GtWpRenderer */
 const emit = defineEmits<{ 'navigate-sheet': [sheetName: string] }>()

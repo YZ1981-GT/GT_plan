@@ -215,6 +215,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, inject, defineAsyncComponent } from 'vue'
 import { useF2FormData, type ChecklistResponse } from './composables/useF2FormData'
 import { useF2CrossSheet } from './composables/useF2CrossSheet'
+import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useF2DualMode } from './composables/useF2DualMode'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { getF2DetailConfig } from './f2/detail/f2DetailSheetConfigs'
@@ -336,6 +337,11 @@ const useGridFallback = computed(() => {
 
 // openReviewDialog 由 Runtime Boundary(GtWpRenderer) 统一 provide（真实复核对话）
 provide('reloadWorkpaperData', () => formData.loadAll())
+
+// ─── 复核圆点 ─────────────────────────────────────────────────────────────────
+const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(toRef(props, 'wpId'))
+provide('getThreadDot', getThreadDot)
+provide('getRowDot', getRowDot)
 
 async function handleF2SaveItems(e: Event): Promise<void> {
   const items = (e as CustomEvent<{ items: ChecklistResponse[] }>).detail?.items

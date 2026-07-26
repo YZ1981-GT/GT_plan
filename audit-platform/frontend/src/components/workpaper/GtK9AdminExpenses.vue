@@ -204,9 +204,10 @@
  * Spec: .kiro/specs/k9-admin-expenses/ Task 1.1
  * Requirements: 1.1-1.10
  */
-import { ref, computed, onMounted, onBeforeUnmount, inject, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, inject, defineAsyncComponent, toRef, provide } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
+import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useChecklistPersistence } from '@/composables/workpaper/useChecklistPersistence'
 import { collectChecklistResponses, toChecklistPatch } from '@/composables/workpaper/checklistPersistenceHelpers'
 import {
@@ -371,6 +372,11 @@ async function selfLoad(): Promise<void> {
     isLoading.value = false
   }
 }
+
+// 复核圆点
+const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(toRef(props, 'wpId'))
+provide('getThreadDot', getThreadDot)
+provide('getRowDot', getRowDot)
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 onBeforeUnmount(() => { void persistence.flush().catch(() => undefined) })

@@ -26,6 +26,9 @@ from typing import Any
 
 import sqlalchemy as sa
 
+from app.models.audit_platform_models import TbLedger
+from app.services.dataset_query import get_active_filter
+
 from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
@@ -101,23 +104,20 @@ async def _get_occurrence_from_ledger(
     debit_total = 0.0
     credit_total = 0.0
     try:
-        result = await db.execute(
-            sa.text("""
-                SELECT
-                    COALESCE(SUM(debit_amount), 0) AS debit_total,
-                    COALESCE(SUM(credit_amount), 0) AS credit_total
-                FROM tb_ledger
-                WHERE project_id = :pid
-                  AND year = :year
-                  AND account_code LIKE :code_prefix
-                  AND is_deleted = false
-            """),
-            {
-                "pid": str(project_id),
-                "year": year,
-                "code_prefix": f"{account_code}%",
-            },
+        active_filter = await get_active_filter(
+            db, TbLedger.__table__, project_id, year
         )
+        tbl = TbLedger.__table__
+        stmt = sa.select(
+            sa.func.coalesce(sa.func.sum(tbl.c.debit_amount), 0).label("debit_total"),
+            sa.func.coalesce(sa.func.sum(tbl.c.credit_amount), 0).label("credit_total"),
+        ).where(
+            sa.and_(
+                active_filter,
+                tbl.c.account_code.like(f"{account_code}%"),
+            )
+        )
+        result = await db.execute(stmt)
         row = result.fetchone()
         if row:
             debit_total = float(row.debit_total or 0)

@@ -60,7 +60,7 @@ export function useH6ImportExport(options: UseH6ImportExportOptions) {
       const response = await http.post(
         `/api/workpapers/${wpId.value}/h6/export-template`,
         null,
-        { params: { sheet_name: sheet }, responseType: 'blob' },
+        { params: { sheet }, responseType: 'blob' },
       )
       const filename = _parseFilename(response) || `H6_${sheet}_模板.xlsx`
       _downloadBlob(response.data, filename)
@@ -81,7 +81,7 @@ export function useH6ImportExport(options: UseH6ImportExportOptions) {
       const response = await http.post(
         `/api/workpapers/${wpId.value}/h6/export-data`,
         null,
-        { params: { sheet_name: sheet }, responseType: 'blob' },
+        { params: { sheet }, responseType: 'blob' },
       )
       const filename = _parseFilename(response) || `H6_${sheet}_数据.xlsx`
       _downloadBlob(response.data, filename)
@@ -114,7 +114,7 @@ export function useH6ImportExport(options: UseH6ImportExportOptions) {
         `/api/workpapers/${wpId.value}/h6/import-data`,
         formData,
         {
-          params: { sheet_name: sheet },
+          params: { sheet },
           headers: { 'Content-Type': 'multipart/form-data' },
         },
       )

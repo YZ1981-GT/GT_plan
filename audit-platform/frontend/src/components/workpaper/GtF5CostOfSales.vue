@@ -153,6 +153,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, provide, inject, defineAsyncComponent } from 'vue'
 import { useF5CosSalFormData } from './composables/useF5CosSalFormData'
 import { useF5CosOfDualMode } from './composables/useF5CosOfDualMode'
+import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useF5CrossSheet } from './composables/useF5CrossSheet'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
@@ -249,6 +250,11 @@ async function onImported() {
 
 // openReviewDialog 由 Runtime Boundary(GtWpRenderer) 统一 provide（真实复核对话）
 provide('reloadWorkpaperData', () => formData.loadAll())
+
+// ─── 复核圆点 ─────────────────────────────────────────────────────────────────
+const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(wpIdRef)
+provide('getThreadDot', getThreadDot)
+provide('getRowDot', getRowDot)
 
 // ─── 监听 f5:save-items → 保存 + autoSnapshot ───────────────────────────────
 async function handleF5SaveItems(e: Event): Promise<void> {

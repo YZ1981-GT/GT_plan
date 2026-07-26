@@ -148,6 +148,7 @@ import { useG4MainAdjustment, type AdjustmentEntry } from './composables/useG4Ma
 import { useG4PriorYearRollForward } from './composables/useG4PriorYearRollForward'
 import { fetchG4SuiteResponseMap } from './composables/g4CrossHelpers'
 import { buildDirectoryHtmlData } from './composables/gCycleIndexRouting'
+import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 
@@ -334,6 +335,10 @@ const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => und
 provide('g4VersionTrailRef', versionTrailRef)
 provide('g4OpenVersionHistory', openVersionHistory)
 provide('reloadWorkpaperData', () => formData.loadAll())
+
+const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(wpIdRef)
+provide('getThreadDot', getThreadDot)
+provide('getRowDot', getRowDot)
 
 /** 目录页跳转：G4TabDirectory inject('jumpToSection') → navigate-sheet → GtWpRenderer */
 const emit = defineEmits<{ 'navigate-sheet': [sheetName: string] }>()

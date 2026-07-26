@@ -160,6 +160,7 @@ import { extractG9SheetCode } from './composables/g9SheetLabels'
 import { G9_ACCOUNT_CODE } from './composables/g9Constants'
 import { parseNum } from './composables/useG9FormulaEngine'
 import type { ChecklistResponse } from './composables/useF1FormData'
+import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 
 const G9TabProcedure = defineAsyncComponent(() => import('./g9-other-noncurrent-financial/core/G9TabProcedure.vue'))
 const G9TabAdjudication = defineAsyncComponent(() => import('./g9-other-noncurrent-financial/core/G9TabAdjudication.vue'))
@@ -209,6 +210,10 @@ const auditYear = computed(() => {
 
 provide('g9VersionTrailRef', versionTrailRef)
 provide('g9OpenVersionHistory', openVersionHistory)
+
+const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(wpIdRef)
+provide('getThreadDot', getThreadDot)
+provide('getRowDot', getRowDot)
 
 const currentSheet = computed(() => extractG9SheetCode(props.sheetName || props.wpCode || ''))
 

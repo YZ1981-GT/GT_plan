@@ -178,6 +178,7 @@ import { buildDirectoryHtmlData } from './composables/gCycleIndexRouting'
 import { eventBus } from '@/utils/eventBus'
 import { G3SaveItemsKey, G3WritebackTbKey, G3DetailRevisionKey } from './composables/g3InternalKeys'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
+import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 import type { ChecklistResponse } from './composables/useF1FormData'
 
@@ -240,6 +241,10 @@ const runtime = inject(WorkpaperRuntimeContextKey, null)
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
 // 再提供一层：保证 G3 子树能拿到 Runtime Boundary 的复核入口（缺省 null，Tab 侧 v-if）
 provide('openReviewDialog', openReviewDialog)
+
+const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(wpIdRef)
+provide('getThreadDot', getThreadDot)
+provide('getRowDot', getRowDot)
 
 const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
 const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)

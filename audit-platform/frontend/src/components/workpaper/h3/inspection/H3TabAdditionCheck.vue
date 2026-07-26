@@ -727,6 +727,7 @@ import { isTitleCertTraceSource } from '../../composables/h3AdditionTitleLink'
 import type { TitleRow } from '../../composables/h3TitleRowModel'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
+import { generateH3AI, h3AiLoading } from '../useH3AiGenerate'
 
 const GtVoucherSamplingEngine = defineAsyncComponent(() => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'))
 
@@ -942,8 +943,9 @@ function fmtAmt(v: number): string {
   return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-function generateAI(section: string) {
-  window.dispatchEvent(new CustomEvent('ai:generate', { detail: { section, wpId: props.wpId } }))
+const _h3AiLoading = h3AiLoading
+async function generateAI(section: string) {
+  await generateH3AI(props.wpId, section)
 }
 function openReview(section: string) { openReviewDialog(section) }
 function navigateTo(sheet: string) { emit('navigate-sheet', sheet) }

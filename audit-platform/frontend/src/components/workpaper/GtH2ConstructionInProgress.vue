@@ -5,7 +5,8 @@
     </div>
 
     <template v-else>
-      <div v-if="showHtmlToolbar && currentSheet !== 'H2'" class="h2-header-toolbar">
+      <!-- 双模式切换器（OO 模式也需可见，否则无法切回结构化） -->
+      <div v-if="showModeSwitch" class="h2-header-toolbar">
         <el-segmented
           :model-value="currentMode"
           :options="modeOptions"
@@ -389,7 +390,7 @@ const {
   currentMode,
   modeOptions,
   isOoAvailable,
-  onModeChange,
+  onModeChange: _rawH2ModeChange,
   healthTag,
   onOoLoadFailed,
 } = useH2DualMode({
@@ -399,6 +400,17 @@ const {
   autoSave: async () => { /* trigger version snapshot */ },
   reloadAll: async () => { await selfLoad() },
 })
+
+/** C1: 目录/程序表不支持在线编辑(仅阻止切 OO 方向) */
+function onModeChange(val: string | number | boolean): void {
+  if (val === 'onlyoffice') {
+    const s = currentSheet.value
+    if (s === 'H2' || s.endsWith('A')) {
+      return
+    }
+  }
+  _rawH2ModeChange(val)
+}
 
 // ─── 导入导出 useH2ImportExport (Task 6.3) ───────────────────────────────────
 const importExport = useH2ImportExport({
@@ -430,6 +442,12 @@ const showHtmlToolbar = computed(() => {
   return s !== '' && currentMode.value !== 'onlyoffice'
 })
 
+/** 双模式切换器是否可见（OO 模式也需要，否则无法切回结构化） */
+const showModeSwitch = computed(() => {
+  const s = currentSheet.value
+  return s !== '' && s !== 'H2'
+})
+
 // ─── selfLoad ────────────────────────────────────────────────────────────────
 /** 合并一个 responses 对象（{item_id: {...}}）到目标 Map */
 function _mergeResponses(map: Map<string, any>, src: any): void {
@@ -449,7 +467,7 @@ async function selfLoad(): Promise<void> {
       if (map.size > 0) allResponses.value = map
     } else {
       // selfLoad: 自行调用 render-config
-      const res = await http.get(`/workpapers/${props.wpId}/render-config`, {
+      const res = await http.get(`/api/workpapers/${props.wpId}/render-config`, {
         params: { force_component_type: 'h2-construction-in-progress' },
         _silent: true,
       } as any)
@@ -509,6 +527,12 @@ function persistResponse(
 // openReviewDialog 由 Runtime Boundary(GtWpRenderer) 统一 provide，子组件 inject 命中祖先
 provide('allResponses', allResponses)
 provide('saveResponse', persistResponse)
+
+// 复核圆点：GtReviewTrigger 依赖 getThreadDot/getRowDot 才渲染蓝/红点
+import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
+const { getThreadDot: h2GetThreadDot, getRowDot: h2GetRowDot } = useWorkpaperReviewThreads(toRef(props, 'wpId'))
+provide('getThreadDot', h2GetThreadDot)
+provide('getRowDot', h2GetRowDot)
 
 const disclosureStd = useH2ApplicableStandards({
   projectId: toRef(props, 'projectId'),

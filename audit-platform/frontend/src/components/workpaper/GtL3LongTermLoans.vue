@@ -145,6 +145,7 @@
  */
 import { ref, computed, inject, onMounted, provide, defineAsyncComponent, toRef } from 'vue'
 import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './composables/useWorkpaperScaffold'
+import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useL3FormData } from './composables/useL3FormData'
 import { useL3CrossSheet } from './composables/useL3CrossSheet'
 
@@ -230,6 +231,11 @@ const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKe
 // 子组件 @open-review 事件复用 Runtime Boundary 的真实复核对话。
 const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', () => {})
 provide('scheduleAutoSnapshot', () => runtime?.version.scheduleAutoSnapshot())
+
+// ─── 复核圆点（子组件 GtReviewTrigger 依赖） ───
+const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(toRef(props, 'wpId'))
+provide('getThreadDot', getThreadDot)
+provide('getRowDot', getRowDot)
 
 // ─── 🔴 P0 修复：provide 共享 formData + 跨sheet勾稽（此前缺失致全部子tab inject('l3FormData')崩溃） ───
 // 全部 L3 子组件（审定/明细/附注/检查/利息/调整）均 inject('l3FormData')!，

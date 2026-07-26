@@ -5,9 +5,10 @@
       <div v-if="currentSheet !== '底稿目录'" class="g2-interest-receivable-toolbar">
         <el-segmented
           v-if="isHtmlSheet"
-          v-model="renderMode"
+          :model-value="renderMode"
           :options="renderModeOptions"
           size="small"
+          @change="(v: any) => dualMode.switchMode(v)"
         />
         <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
         <el-button size="small" type="primary" plain @click="openHandbook('preparation')">
@@ -213,6 +214,7 @@ import { extractG2SheetCode, buildG2FallbackSheets } from './composables/g2Sheet
 import { buildDirectoryHtmlData } from './composables/gCycleIndexRouting'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInjections'
+import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 import type { ChecklistResponse } from './composables/useF1FormData'
 
@@ -280,6 +282,10 @@ const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => und
 
 provide('g2VersionTrailRef', versionTrailRef)
 provide('g2OpenVersionHistory', openVersionHistory)
+
+const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(wpIdRef)
+provide('getThreadDot', getThreadDot)
+provide('getRowDot', getRowDot)
 
 /** 与 G1 对齐：sheetName → 内部分发编码（含底稿目录 / 附注） */
 const currentSheet = computed(() => extractG2SheetCode(props.sheetName || props.wpCode || ''))

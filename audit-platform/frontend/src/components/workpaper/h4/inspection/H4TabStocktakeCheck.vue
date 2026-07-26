@@ -370,6 +370,7 @@
  */
 import { ref, computed, toRef, inject } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import http from '@/utils/http'
 import { useH4Stocktake } from '../../composables/useH4Stocktake'
 import { useH4ImportExport } from '../../composables/useH4ImportExport'
 import {
@@ -486,8 +487,27 @@ async function onFileSelected(ev: Event) {
   ElMessageBox.alert('导入完成。若页面未刷新，请切换 sheet 后返回查看。', '提示')
 }
 
-function generateAI(section: string) {
-  window.dispatchEvent(new CustomEvent('ai:generate', { detail: { section, wpId: props.wpId } }))
+const aiLoading = ref(false)
+async function generateAI(section: string) {
+  if (aiLoading.value) return
+  aiLoading.value = true
+  try {
+    const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section,
+      context: { wpCode: 'H4', sheet: 'H4-6 盘点检查表', section },
+      existingContent: '',
+    })
+    const text = res.data?.data?.text ?? res.data?.text ?? ''
+    if (text) {
+      ElMessageBox.alert(text, 'AI 辅助建议', { confirmButtonText: '关闭' }).catch(() => {})
+    } else {
+      ElMessage.warning('AI 暂无建议')
+    }
+  } catch {
+    ElMessage.warning('AI 生成失败，请稍后重试')
+  } finally {
+    aiLoading.value = false
+  }
 }
 function openReview(section: string) { openReviewDialog(section) }
 

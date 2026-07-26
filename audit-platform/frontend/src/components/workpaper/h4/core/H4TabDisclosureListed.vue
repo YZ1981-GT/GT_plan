@@ -123,6 +123,7 @@
  */
 import { ref, reactive, computed, inject, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import http from '@/utils/http'
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import {
@@ -134,6 +135,10 @@ import {
   type H4ListedMaterialRow,
 } from '../../composables/h4ListedDisclosureModel'
 import { useH4Disclosure } from '../../composables/useH4Disclosure'
+import { H2_NOTE_SECTION } from '../../composables/h2NoteSectionMap'
+import { buildH4ListedSyncPayloads } from '../../composables/h4DisclosureSyncPayload'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { eventBus } from '@/utils/eventBus'
 
 const props = defineProps<{
   wpId: string
@@ -152,6 +157,43 @@ const materials = reactive<H4ListedMaterialRow[]>(createDefaultH4ListedMaterials
 const noteText = ref('')
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 let unsubscribe: (() => void) | null = null
+
+// ─── 同步到附注所需变量（修复原模板引用未定义标识） ─────────────────────────
+const noteSectionId = H2_NOTE_SECTION.listed  // 五、23（与 H2 共用子表按 key 合并）
+const isSyncing = ref(false)
+const { year: auditYear } = useAuditContext()
+
+async function syncToNotes() {
+  if (isSyncing.value || isReadonly.value) return
+  isSyncing.value = true
+  try {
+    const payloads = buildH4ListedSyncPayloads(props.wpId, null, {
+      materials: [...materials],
+      noteText: noteText.value,
+    })
+    if (!payloads.length) {
+      ElMessage.warning('不适用同步（当前变体非上市）')
+      return
+    }
+    for (const payload of payloads) {
+      await http.post(
+        `/api/projects/${props.projectId}/disclosure-notes/${auditYear?.value || ''}/sync-from-workpaper`,
+        { ...payload, year: auditYear?.value },
+      )
+    }
+    eventBus.emit('disclosure:note-text-updated', {
+      wpCode: 'H4',
+      accountCode: '1605',
+      projectId: props.projectId,
+      sectionIds: [noteSectionId],
+    })
+    ElMessage.success('已同步到附注（五、23 工程物资子表）')
+  } catch (e: any) {
+    ElMessage.error(`同步失败: ${e?.message || e}`)
+  } finally {
+    isSyncing.value = false
+  }
+}
 
 const materialsDisplay = computed(() => buildH4ListedMaterialsDisplay(materials))
 const crossWarnings = computed(() => listedCrossCheck(materials))

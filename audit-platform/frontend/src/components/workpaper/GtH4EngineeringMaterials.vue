@@ -322,7 +322,7 @@ async function bootstrapLoad(): Promise<void> {
 // ─── provide for child components ────────────────────────────────────────────
 provide('allResponses', allResponses)
 provide('h4TbValues', tbValues)
-provide('h4WritebackTB', writebackTrialBalance)
+
 
 const runtime = inject(WorkpaperRuntimeContextKey, null)
 const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
@@ -343,6 +343,12 @@ function persistResponse(itemId: string, value: any): void {
   void saveResponse(itemId, value).then(() => { scheduleAutoSnapshot() })
 }
 provide('saveResponse', persistResponse)
+
+// 复核圆点：GtReviewTrigger 依赖 getThreadDot/getRowDot 才渲染蓝/红点
+import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
+const { getThreadDot: h4GetThreadDot, getRowDot: h4GetRowDot } = useWorkpaperReviewThreads(toRef(props, 'wpId'))
+provide('getThreadDot', h4GetThreadDot)
+provide('getRowDot', h4GetRowDot)
 
 // ─── CrossSheet 勾稽引擎（供全局告警 + 子组件消费） ────────────────────────────
 const crossSheet = useH4CrossSheet(allResponses)

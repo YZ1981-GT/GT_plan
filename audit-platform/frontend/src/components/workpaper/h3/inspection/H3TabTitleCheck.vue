@@ -455,6 +455,7 @@ import ItemAttachment from '../../ItemAttachment.vue'
 import http from '@/utils/http'
 import { pullL1PledgeForH3, pullL3PledgeForH3, buildH3MortgageReconcile } from '../../composables/h3MortgageReconcile'
 import type { MortgageReconcileResult } from '../../composables/h3MortgageReconcile'
+import { generateH3AI, h3AiLoading } from '../useH3AiGenerate'
 
 const props = defineProps<{
   wpId: string
@@ -764,8 +765,9 @@ async function handleTitleOcr(row: TitleRow) {
   input.click()
 }
 
-function generateAI(section: string) {
-  window.dispatchEvent(new CustomEvent('ai:generate', { detail: { section, wpId: props.wpId } }))
+const _h3AiLoading = h3AiLoading
+async function generateAI(section: string) {
+  await generateH3AI(props.wpId, section)
 }
 function openReview(section: string) { openReviewDialog(section) }
 </script>

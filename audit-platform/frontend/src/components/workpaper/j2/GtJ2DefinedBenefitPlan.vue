@@ -109,6 +109,7 @@ import {
   type ChecklistResponse,
 } from '@/composables/workpaper/useChecklistPersistence'
 import { WorkpaperRuntimeContextKey } from '../composables/useWorkpaperScaffold'
+import { useWorkpaperReviewThreads } from '../composables/useWorkpaperReviewThreads'
 
 // ── defineAsyncComponent lazy loading ───────────────────────────────────────
 const J2TabIndex = defineAsyncComponent(() => import('./J2TabIndex.vue'))
@@ -140,6 +141,11 @@ const runtime = inject(WorkpaperRuntimeContextKey, null)
 
 // 目录页跳转：J2TabIndex inject('jumpToSection') → 转发为 navigate-sheet 交 GtWpRenderer 切页
 provide('jumpToSection', (sheetName: string) => emit('navigate-sheet', sheetName))
+
+// 复核圆点：子 tab 的 GtReviewTrigger 通过 inject 取得蓝/红点
+const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(toRef(props, 'wpId'))
+provide('getThreadDot', getThreadDot)
+provide('getRowDot', getRowDot)
 
 /** 当前 sheet 名（从 props.sheetName 提取） */
 const currentSheet = computed(() => {

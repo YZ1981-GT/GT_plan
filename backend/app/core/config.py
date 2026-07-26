@@ -325,7 +325,7 @@ class Settings(BaseSettings):
     # 任一取数环节异常一律 fail-open（该段返空 / available=False），不阻断 render。
     # 宁缺勿造边界（已实证）：tb_aux_balance 无资产卡片维度 → 不做卡片级明细；
     # tb_ledger 1602 对方科目填充率约 9% 且凭证为合并记账 → 折旧费用归属不自动归集。
-    H1_FOUR_TABLE_EXTRACTION_ENABLED: bool = False
+    H1_FOUR_TABLE_EXTRACTION_ENABLED: bool = True
 
     # --- h4-four-table-extraction ---
     # H4 工程物资四表取数灰度开关：H4-2 明细从 tb_balance 1605 叶子自动种子、
@@ -333,7 +333,12 @@ class Settings(BaseSettings):
     # H4-5 减少检查↔H2 在建工程跨底稿勾稽。
     # 默认 False = 零回归：render 不输出 detail_prefill/tb_source_codes/h4_extraction_enabled，
     # 既有功能逐字节不变。任一取数环节异常一律 fail-open 不阻断 render。
-    H4_FOUR_TABLE_EXTRACTION_ENABLED: bool = False
+    H4_FOUR_TABLE_EXTRACTION_ENABLED: bool = True
+
+    # --- h2-four-table-extraction ---
+    # H2 在建工程四表取数灰度开关：H2-2 明细从 tb_balance 1604 叶子自动种子。
+    # 默认 True = render 输出 detail_prefill 供前端 Persist_First 种子。
+    H2_FOUR_TABLE_EXTRACTION_ENABLED: bool = True
 
     model_config = SettingsConfigDict(env_file=_env_file, extra="ignore")
 

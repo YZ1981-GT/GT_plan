@@ -9,7 +9,7 @@
     <template v-else>
       <div v-if="isProcedureSheet" class="l2-procedure-toolbar">
         <el-segmented
-          v-model="procedureDualMode.currentMode.value"
+          :model-value="procedureDualMode.currentMode.value"
           :options="procedureDualMode.modeOptions.value"
           size="small"
           @change="procedureDualMode.onModeChange"
@@ -115,6 +115,7 @@
 import { ref, computed, inject, onMounted, provide, defineAsyncComponent, toRef } from 'vue'
 import http from '@/utils/http'
 import { useCycleHtmlOoDualMode } from './composables/useCycleHtmlOoDualMode'
+import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './composables/useWorkpaperScaffold'
 
@@ -194,6 +195,11 @@ const procedureDualMode = useCycleHtmlOoDualMode({
 // 本主入口不再本地 useWorkpaperReviewProvide / useWorkpaperVersionToolbar（避免重复 provider/Host）。
 const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
 provide('scheduleAutoSnapshot', () => runtime?.version.scheduleAutoSnapshot())
+
+// ─── 复核圆点（子组件 GtReviewTrigger 依赖） ───
+const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(toRef(props, 'wpId'))
+provide('getThreadDot', getThreadDot)
+provide('getRowDot', getRowDot)
 
 // ─── selfLoad ────────────────────────────────────────────────────────────────
 

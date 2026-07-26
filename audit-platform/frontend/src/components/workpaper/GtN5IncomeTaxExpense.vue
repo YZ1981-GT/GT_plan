@@ -205,6 +205,7 @@
  */
 import { ref, computed, inject, onMounted, onBeforeUnmount, provide, defineAsyncComponent } from 'vue'
 import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './composables/useWorkpaperScaffold'
+import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
 // ─── defineAsyncComponent lazy 加载子组件 ────────────────────────────────────
@@ -347,6 +348,11 @@ async function selfLoad(): Promise<void> {
 
 provide('reloadWorkpaperData', selfLoad)
 provide('n5Year', yearRef)
+
+// ─── 复核圆点（GtReviewDot 依赖 getThreadDot/getRowDot；Runtime Boundary 只 provide openReviewDialog） ───
+const reviewThreads = useWorkpaperReviewThreads(wpIdRef)
+provide('getThreadDot', reviewThreads.getThreadDot)
+provide('getRowDot', reviewThreads.getRowDot)
 
 // ─── 审定表预填 + 版本快照 ──────────────────────────────────────────────────
 const adjudicationPrefill = ref<any>(null)

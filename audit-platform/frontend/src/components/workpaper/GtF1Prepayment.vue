@@ -176,6 +176,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, provide, inject, defineAsyncComponent } from 'vue'
 import { useF1FormData } from './composables/useF1FormData'
 import { useF1CrossSheet } from './composables/useF1CrossSheet'
+import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useF1AgingScope } from './composables/useF1AgingScope'
 import { useF1DualMode } from './composables/useF1DualMode'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
@@ -317,6 +318,11 @@ const dualMode = useF1DualMode({
 })
 
 provide('reloadWorkpaperData', loadAll)
+
+// ─── 复核圆点 ─────────────────────────────────────────────────────────────────
+const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(wpIdRef)
+provide('getThreadDot', getThreadDot)
+provide('getRowDot', getRowDot)
 
 function handleF1Writeback(e: Event): void {
   const d = (e as CustomEvent<{ accountCode?: string; auditedAmount?: number }>).detail

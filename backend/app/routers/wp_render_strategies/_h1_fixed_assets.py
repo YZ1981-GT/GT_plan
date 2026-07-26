@@ -11,7 +11,7 @@ import re
 import sqlalchemy as sa
 
 from app.core.config import settings
-from app.models.audit_platform_models import TbBalance, TbLedger
+from app.models.audit_platform_models import TbBalance, TbLedger, TrialBalance
 from app.services.dataset_query import get_active_filter
 
 from ._context import RenderContext
@@ -493,18 +493,22 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict:
         logger.warning("H1 TB balance fetch failed: %s", e)
 
     try:
+        tb_filter = await get_active_filter(
+            ctx.db, TrialBalance.__table__, ctx.project_id, ctx.year
+        )
         result = await ctx.db.execute(
-            sa.text("""
-                SELECT standard_account_code, unadjusted_amount, audited_amount
-                FROM trial_balance
-                WHERE project_id = :pid AND year = :year AND is_deleted = false
-                  AND (
-                    standard_account_code LIKE '1601%'
-                    OR standard_account_code LIKE '1602%'
-                    OR standard_account_code LIKE '1603%'
-                  )
-            """),
-            {"pid": str(ctx.project_id), "year": ctx.year},
+            sa.select(
+                TrialBalance.standard_account_code,
+                TrialBalance.unadjusted_amount,
+                TrialBalance.audited_amount,
+            ).where(
+                tb_filter,
+                sa.or_(
+                    TrialBalance.standard_account_code.like("1601%"),
+                    TrialBalance.standard_account_code.like("1602%"),
+                    TrialBalance.standard_account_code.like("1603%"),
+                ),
+            )
         )
         tbal_rows = list(result.fetchall())
         tbal_leaves = _leaf_codes({(r.standard_account_code or "").strip() for r in tbal_rows})

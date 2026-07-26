@@ -1180,6 +1180,7 @@ _K1_SPECS: dict[str, dict[str, Any]] = {
     },
     "K1-2": {
         "item_id": "K1-2-rows",
+        "storage_field": "remark",
         "title": "K1-2 其他应收款明细表",
         "headers": _K1_2_HEADERS,
         "field_keys": _K1_2_KEYS,
@@ -1221,6 +1222,7 @@ _K1_SPECS: dict[str, dict[str, Any]] = {
     },
     "K1-5": {
         "item_id": "K1-5-rows",
+        "storage_field": "remark",
         "title": "K1-5 大额其他应收款情况分析表",
         "headers": _K1_5_HEADERS,
         "field_keys": _K1_5_KEYS,
@@ -1250,6 +1252,7 @@ _K1_SPECS: dict[str, dict[str, Any]] = {
     },
     "K1-7": {
         "item_id": "K1-7-rows",
+        "storage_field": "remark",
         "title": "K1-7 三阶段划分检查表",
         "headers": _K1_7_HEADERS,
         "field_keys": _K1_7_KEYS,
@@ -1263,6 +1266,7 @@ _K1_SPECS: dict[str, dict[str, Any]] = {
     },
     "K1-8": {
         "item_id": "K1-8-rows",
+        "storage_field": "remark",
         "title": "K1-8 坏账准备测算（账龄+ECL合并宽表）",
         "headers": _K1_8_HEADERS,
         "field_keys": _K1_8_KEYS,

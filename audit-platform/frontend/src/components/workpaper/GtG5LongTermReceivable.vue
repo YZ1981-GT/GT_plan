@@ -14,9 +14,10 @@
       <div class="g5-long-term-receivable-toolbar">
         <el-segmented
           v-if="isHtmlSheet"
-          v-model="renderMode"
+          :model-value="renderMode"
           :options="dualMode.modeOptions"
           size="small"
+          @change="(v: any) => dualMode.switchMode(v)"
         />
         <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
         <el-button size="small" type="primary" plain @click="openHandbook('preparation')">
@@ -193,6 +194,7 @@ import { useG5PriorYearRollForward } from './composables/useG5PriorYearRollForwa
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import type { ChecklistResponse } from './composables/useF1FormData'
 import { extractG5SheetCode, resolveG5SheetLabel } from './composables/g5SheetLabels'
+import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 const G5TabProcedure = defineAsyncComponent(() => import('./g5-long-term-receivable/core/G5TabProcedure.vue'))
@@ -313,6 +315,10 @@ const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => und
 provide('g5VersionTrailRef', versionTrailRef)
 provide('g5OpenVersionHistory', openVersionHistory)
 provide('reloadWorkpaperData', () => formData.loadAll())
+
+const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(wpIdRef)
+provide('getThreadDot', getThreadDot)
+provide('getRowDot', getRowDot)
 
 const handbookVisible = ref(false)
 const handbookTab = ref<'preparation' | 'usage'>('preparation')

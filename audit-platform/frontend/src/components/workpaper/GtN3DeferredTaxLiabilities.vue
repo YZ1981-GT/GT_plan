@@ -4,7 +4,7 @@
     <template v-else>
       <div v-if="isHtmlSheet && currentSheet !== 'N3' && currentSheet !== '底稿目录'" class="n3-deferred-tax-liabilities-toolbar">
         <el-segmented
-          v-model="renderMode"
+          :model-value="renderMode"
           :options="modeOptions"
           size="small"
           @change="onModeChange"
@@ -117,6 +117,7 @@
 import { ref, computed, inject, onMounted, onBeforeUnmount, provide, defineAsyncComponent } from 'vue'
 import { Loading } from '@element-plus/icons-vue'
 import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './composables/useWorkpaperScaffold'
+import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
 // ─── defineAsyncComponent lazy 加载子组件 ────────────────────────────────────
@@ -184,6 +185,8 @@ async function checkOoHealth(): Promise<void> {
 }
 
 function onModeChange(val: string | number | boolean): void {
+  if (val === 'onlyoffice' && !ooHealthy.value) return
+  renderMode.value = val as 'html' | 'onlyoffice'
   if (val === 'html') {
     selfLoad()
   }
@@ -244,6 +247,11 @@ async function selfLoad(): Promise<void> {
 
 // 复核对话由 Runtime Boundary 统一 provide('openReviewDialog') + 挂真实 Host（删除 console 桩）。
 provide('reloadWorkpaperData', selfLoad)
+
+// ─── 复核圆点（GtReviewDot 依赖 getThreadDot/getRowDot；Runtime Boundary 只 provide openReviewDialog） ───
+const reviewThreads = useWorkpaperReviewThreads(wpIdRef)
+provide('getThreadDot', reviewThreads.getThreadDot)
+provide('getRowDot', reviewThreads.getRowDot)
 
 // ─── 生命周期 ────────────────────────────────────────────────────────────────
 onMounted(async () => {

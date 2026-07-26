@@ -117,6 +117,7 @@ import { ref, reactive, computed, inject, toRef, onMounted } from 'vue'
 import { useH3PolicyCheck } from '../../composables/useH3PolicyCheck'
 import { useH3FormData } from '../../composables/useH3FormData'
 import GtIndexChip from '../../GtIndexChip.vue'
+import { generateH3AI, h3AiLoading } from '../useH3AiGenerate'
 
 const props = defineProps<{
   wpId: string
@@ -194,8 +195,9 @@ function saveAuditConclusion(val: string) {
   void saveImmediate(CONCLUSION_KEY, val)
 }
 
-function generateAI(section: string) {
-  window.dispatchEvent(new CustomEvent('ai:generate', { detail: { section: `H3-4-${section}`, wpId: props.wpId } }))
+const _h3AiLoading = h3AiLoading
+async function generateAI(section: string) {
+  await generateH3AI(props.wpId, `H3-4-${section}`)
 }
 function openReview(section: string) { openReviewDialog(`H3-4-${section}`) }
 </script>

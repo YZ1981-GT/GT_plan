@@ -335,6 +335,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useH3Impairment, H3_10_ASSET_CATEGORIES, type ImpairmentCalcRow } from '../../composables/useH3Impairment'
 import { useH3FormData } from '../../composables/useH3FormData'
 import GtIndexChip from '../../GtIndexChip.vue'
+import { generateH3AI, h3AiLoading } from '../useH3AiGenerate'
 
 const props = defineProps<{
   wpId: string
@@ -472,8 +473,9 @@ function fmtAmt(val: number | null | undefined): string {
   return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-function generateAI(section: string) {
-  window.dispatchEvent(new CustomEvent('ai:generate', { detail: { section, wpId: props.wpId } }))
+const _h3AiLoading = h3AiLoading
+async function generateAI(section: string) {
+  await generateH3AI(props.wpId, section)
 }
 
 function openReview(section: string) { openReviewDialog(section) }

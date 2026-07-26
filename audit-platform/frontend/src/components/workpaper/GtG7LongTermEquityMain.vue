@@ -138,6 +138,7 @@ import { ref, computed, onMounted, onBeforeUnmount, provide, inject, defineAsync
 import { useG7DualMode } from './composables/useG7DualMode'
 import { useG7FormData } from './composables/useG7FormData'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
+import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 
 const G7_ACCOUNT_CODE = '1511'
 const G7_IMPAIRMENT_CODE = '1512'
@@ -259,6 +260,10 @@ const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => und
 
 provide('g7VersionTrailRef', versionTrailRef)
 provide('g7OpenVersionHistory', openVersionHistory)
+
+const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(wpIdRef)
+provide('getThreadDot', getThreadDot)
+provide('getRowDot', getRowDot)
 
 /** 目录页跳转：G7TabDirectory inject('jumpToSection') → emit('navigate-sheet') → GtWpRenderer */
 const emit = defineEmits<{ 'navigate-sheet': [sheetName: string] }>()

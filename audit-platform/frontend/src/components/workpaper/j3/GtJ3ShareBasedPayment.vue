@@ -79,7 +79,7 @@
  *
  * Spec: .kiro/specs/j3-share-based-payment/
  */
-import { computed, ref, onMounted, onBeforeUnmount, defineAsyncComponent, toRef, inject, watch } from 'vue'
+import { computed, ref, onMounted, onBeforeUnmount, defineAsyncComponent, toRef, inject, provide, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   useChecklistPersistence,
@@ -87,6 +87,7 @@ import {
 } from '@/composables/workpaper/useChecklistPersistence'
 import { collectChecklistResponses } from '@/composables/workpaper/checklistPersistenceHelpers'
 import { WorkpaperRuntimeContextKey } from '../composables/useWorkpaperScaffold'
+import { useWorkpaperReviewThreads } from '../composables/useWorkpaperReviewThreads'
 import CycleTabProcedure from '../shared/CycleTabProcedure.vue'
 
 // defineAsyncComponent 懒加载
@@ -134,6 +135,11 @@ const persistence = useChecklistPersistence({
   onSaved: () => runtime?.version.scheduleAutoSnapshot(),
 })
 const allResponses = persistence.responses
+
+// 复核圆点：子 tab 的 GtReviewTrigger 通过 inject 取得蓝/红点
+const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(toRef(props, 'wpId'))
+provide('getThreadDot', getThreadDot)
+provide('getRowDot', getRowDot)
 
 async function selfLoad(): Promise<void> {
   const snapshot = collectChecklistResponses(

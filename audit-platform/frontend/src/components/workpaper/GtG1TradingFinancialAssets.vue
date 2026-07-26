@@ -5,9 +5,10 @@
       <div v-if="currentSheet !== '底稿目录'" class="g1-toolbar">
         <el-segmented
           v-if="isHtmlSheet"
-          v-model="renderMode"
+          :model-value="renderMode"
           :options="renderModeOptions"
           size="small"
+          @change="(v: any) => dualMode.switchMode(v)"
         />
         <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
         <el-button size="small" type="primary" plain @click="openHandbook('preparation')">
@@ -275,6 +276,7 @@ import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInje
 import { extractG1SheetCode } from './composables/g1SheetLabels'
 import { buildDirectoryHtmlData } from './composables/gCycleIndexRouting'
 import { useG1ImportExport, resolveG1ImportableSheet } from './composables/useG1ImportExport'
+import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 import G1TabAdjudication from './g1-trading-financial-assets/core/G1TabAdjudication.vue'
 import G1TabFairValueTest from './g1-trading-financial-assets/valuation/G1TabFairValueTest.vue'
@@ -347,6 +349,10 @@ const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => und
 
 provide('g1VersionTrailRef', versionTrailRef)
 provide('g1OpenVersionHistory', openVersionHistory)
+
+const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(wpIdRef)
+provide('getThreadDot', getThreadDot)
+provide('getRowDot', getRowDot)
 
 const formData = useG1TraFinFormData({
   wpId: wpIdRef,

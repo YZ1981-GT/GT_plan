@@ -36,6 +36,7 @@
       <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
       <el-tag v-if="hasMaterialDiff" size="small" type="warning">存在审定差异 {{ fmtAmt(subtotalRow.bookValueDiff) }}</el-tag>
       <el-tag v-else-if="rows.length" size="small" type="success">未审=审定净值</el-tag>
+      <el-button size="small" type="warning" plain :loading="ledgerPulling" @click="handlePullFromLedger">📥从序时账取数</el-button>
     </div>
 
     <!-- H4-1 勾稽 -->
@@ -496,6 +497,7 @@ import http from '@/utils/http'
 import { useH4Detail, type H4DetailTab } from '../../composables/useH4Detail'
 import { useH4ImportExport } from '../../composables/useH4ImportExport'
 import { useH4CrossSheet } from '../../composables/useH4CrossSheet'
+import { pullAssetMovementFromLedger } from '../../composables/assetLedgerMovementPull'
 import GtIndexChip from '../../GtIndexChip.vue'
 
 const AGING_OPTS = ['1年以内', '1-2年', '2-3年', '3年以上']
@@ -541,6 +543,50 @@ const importExport = useH4ImportExport({
 const auditNote = ref('')
 const auditConclusion = ref('')
 const aiLoading = ref(false)
+
+// ─── 从序时账取数（资产类科目1605 借方=增加 贷方=减少）────────────────────────
+const ledgerPulling = ref(false)
+async function handlePullFromLedger() {
+  const year = new Date().getFullYear() - 1
+  ledgerPulling.value = true
+  try {
+    const result = await pullAssetMovementFromLedger(props.projectId, year, '1605')
+    if (!result.ok) {
+      ElMessageBox.alert(result.message, '取数提示', { type: 'warning' })
+      return
+    }
+    const fmtN = (n: number) => n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    await ElMessageBox.confirm(
+      `从序时账聚合 ${result.rows.length} 个明细科目：\n合计增加 ${fmtN(result.totalIncrease)}，合计减少 ${fmtN(result.totalDecrease)}\n\n确认填入明细表？（只填空值不覆盖已有数据）`,
+      '📥 从序时账取数预览',
+      { confirmButtonText: '填入', cancelButtonText: '取消', type: 'info' },
+    )
+    let matched = 0
+    for (const item of result.rows) {
+      const existing = rows.value.find(
+        (r) => r.name === item.name || r.name.includes(item.name) || item.name.includes(r.name),
+      )
+      if (existing) {
+        // H4 增加=purchaseAmount（采购）+otherIncrease；填入 purchaseAmount 主入口
+        if (!existing.purchaseAmount && !existing.otherIncrease && item.increase > 0.005) {
+          updateCell(existing.rowId, 'purchaseAmount', item.increase)
+          matched++
+        }
+        // H4 减少=usageAmount+returnAmount+scrapAmount+otherDecrease；填入 usageAmount 主入口
+        if (!existing.usageAmount && !existing.otherDecrease && item.decrease > 0.005) {
+          updateCell(existing.rowId, 'usageAmount', item.decrease)
+          matched++
+        }
+      }
+    }
+    ElMessageBox.alert(`已匹配填入 ${matched} 个字段`, '取数完成', { type: 'success' })
+  } catch (e: any) {
+    if (e === 'cancel' || e?.toString?.().includes('cancel')) return
+    ElMessageBox.alert(String(e?.message || e), '取数失败', { type: 'error' })
+  } finally {
+    ledgerPulling.value = false
+  }
+}
 
 function saveAuditNote() {
   saveResponse('H4-2-note', auditNote.value)

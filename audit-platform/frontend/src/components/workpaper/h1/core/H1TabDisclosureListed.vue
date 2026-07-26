@@ -471,7 +471,7 @@
  * H1TabDisclosureListed — 附注披露信息（上市公司）
  * 读源模板 93 行精确重建；与附注模块五、22 联动。
  */
-import { ref, reactive, computed, inject, watch, onMounted } from 'vue'
+import { ref, reactive, computed, inject, watch, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
@@ -1163,6 +1163,13 @@ async function syncToNotes() {
 
 onMounted(load)
 watch(() => props.allResponses, load, { deep: false })
+
+// 审定表发布后自动刷新披露取数（H1-1 substantive:adjudicated → 重新 load）
+function _onAdjudicated(payload: any) {
+  if (payload?.wpCode === 'H1' || payload?.accountCode === '1601') load()
+}
+eventBus.on('substantive:adjudicated', _onAdjudicated)
+onBeforeUnmount(() => { eventBus.off('substantive:adjudicated', _onAdjudicated) })
 </script>
 
 <style scoped>

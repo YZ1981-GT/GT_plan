@@ -439,6 +439,7 @@ import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
 import { buildH3SyncPayload, H3_NOTE_SECTION } from '../../composables/h3NoteSectionMap'
 import { buildNoteJumpRoute } from '@/views/composables/noteDisclosureReverseJump'
+import { generateH3AI, h3AiLoading } from '../useH3AiGenerate'
 
 const props = defineProps<{
   wpId: string
@@ -595,8 +596,9 @@ function jumpToNote() {
   else ElMessage.info('无法定位附注章节')
 }
 
-function generateAI(section: string) {
-  window.dispatchEvent(new CustomEvent('ai:generate', { detail: { section: `H3-disc-L-${section}`, wpId: props.wpId } }))
+const _h3AiLoading = h3AiLoading
+async function generateAI(section: string) {
+  await generateH3AI(props.wpId, section)
 }
 </script>
 

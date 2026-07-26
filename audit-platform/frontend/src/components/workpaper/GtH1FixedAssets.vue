@@ -5,7 +5,8 @@
     </div>
 
     <template v-else>
-      <div v-if="showHtmlToolbar" class="h1-header-toolbar">
+      <!-- 双模式切换器（OO 模式也需可见，否则无法切回结构化） -->
+      <div v-if="showModeSwitch" class="h1-mode-switch-bar">
         <el-segmented
           :model-value="currentMode"
           :options="modeOptions"
@@ -419,9 +420,21 @@ const dual = useH1DualMode({
 })
 const currentMode = dual.currentMode
 const modeOptions = dual.modeOptions
-const onModeChange = dual.onModeChange
+const _rawOnModeChange = dual.onModeChange
 const isOoAvailable = dual.isOoAvailable
 const ooChecking = dual.checking
+
+/** C1: 目录/程序表不支持在线编辑 */
+function onModeChange(val: string | number | boolean): void {
+  if (val === 'onlyoffice') {
+    const s = currentSheet.value
+    if (s === 'H1' || s.endsWith('A')) {
+      // 目录/程序表不切 OO
+      return
+    }
+  }
+  _rawOnModeChange(val)
+}
 
 /** 资产负债表日：供 H1-17 年检过期判定等 */
 const h1PeriodEnd = computed(() => {
@@ -504,8 +517,15 @@ const currentSheet = computed(() => {
 
 const showHtmlToolbar = computed(() => {
   const s = currentSheet.value
-  // 目录 sheet（H1）不显示双模式工具栏（目录页无编辑对象）
+  // 目录 sheet（H1）不显示工具栏（目录页无编辑对象）
+  // 注：el-segmented 切换器独立于此 v-if，确保 OO 模式也能切回
   return s !== '' && s !== 'H1' && currentMode.value !== 'onlyoffice'
+})
+
+/** 双模式切换器是否可见（OO 模式也需要，否则无法切回结构化） */
+const showModeSwitch = computed(() => {
+  const s = currentSheet.value
+  return s !== '' && s !== 'H1'
 })
 
 // ─── selfLoad ────────────────────────────────────────────────────────────────
@@ -525,7 +545,7 @@ async function selfLoad(): Promise<void> {
       _mergeResponses(map, props.htmlData.responses_snapshot)
       if (map.size > 0) allResponses.value = map
     } else {
-      const res = await http.get(`/workpapers/${props.wpId}/render-config`, {
+      const res = await http.get(`/api/workpapers/${props.wpId}/render-config`, {
         params: { force_component_type: 'h1-fixed-assets' },
         _silent: true,
       } as any)
@@ -596,6 +616,12 @@ function persistResponse(
 // openReviewDialog 由 Runtime Boundary(GtWpRenderer) 统一 provide，子组件 inject 命中祖先
 provide('allResponses', allResponses)
 provide('saveResponse', persistResponse)
+
+// 复核圆点：GtReviewTrigger 依赖 getThreadDot/getRowDot 才渲染蓝/红点
+import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
+const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(toRef(props, 'wpId'))
+provide('getThreadDot', getThreadDot)
+provide('getRowDot', getRowDot)
 
 function onDepBranchChange(b: 'A' | 'B' | 'C') {
   if (b === 'A' || b === 'B' || b === 'C') {

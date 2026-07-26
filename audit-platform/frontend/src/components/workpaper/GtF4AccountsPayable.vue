@@ -168,6 +168,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, provide, inject, defineAsyncComponent } from 'vue'
 import { useF4FormData, type ChecklistResponse } from './composables/useF4FormData'
 import { useF4DualMode } from './composables/useF4DualMode'
+import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import {
   useAgingConfig,
@@ -293,6 +294,11 @@ async function onImported() {
 }
 
 provide('reloadWorkpaperData', () => formData.loadAll())
+
+// ─── 复核圆点 ─────────────────────────────────────────────────────────────────
+const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(wpIdRef)
+provide('getThreadDot', getThreadDot)
+provide('getRowDot', getRowDot)
 
 async function handleF4SaveItems(e: Event): Promise<void> {
   const items = (e as CustomEvent<{ items: ChecklistResponse[] }>).detail?.items

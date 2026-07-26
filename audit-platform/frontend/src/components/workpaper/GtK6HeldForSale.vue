@@ -178,9 +178,10 @@
  * Spec: .kiro/specs/k6-held-for-sale/ Task 1.1
  * Requirements: 1.1-1.10
  */
-import { ref, computed, onMounted, onBeforeUnmount, provide, inject, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, provide, inject, defineAsyncComponent, toRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
+import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { eventBus } from '@/utils/eventBus'
 import { useChecklistPersistence } from '@/composables/workpaper/useChecklistPersistence'
 import { collectChecklistResponses, toChecklistPatch } from '@/composables/workpaper/checklistPersistenceHelpers'
@@ -444,6 +445,11 @@ async function selfLoad(): Promise<void> {
 // 复核对话由 Runtime Boundary（GtWpRenderer + GtWorkpaperRuntimeHosts）统一 provide/挂载；
 // 此处仅保留 K6 业务专属的审定回写 provide。
 provide('k6WritebackTB', writebackTB)
+
+// 复核圆点
+const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(toRef(props, 'wpId'))
+provide('getThreadDot', getThreadDot)
+provide('getRowDot', getRowDot)
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 onBeforeUnmount(() => { void persistence.flush().catch(() => undefined) })

@@ -289,6 +289,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, inject, defineAsyncComponent } from 'vue'
 
 import { useF3FormData, type ChecklistResponse } from './composables/useF3FormData'
+import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 
 import { useF3CrossSheet } from './composables/useF3CrossSheet'
 
@@ -465,7 +466,10 @@ const auditYear = computed(() => {
 
 provide('reloadWorkpaperData', () => formData.loadAll())
 
-
+// ─── 复核圆点 ─────────────────────────────────────────────────────────────────
+const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(toRef(props, 'wpId'))
+provide('getThreadDot', getThreadDot)
+provide('getRowDot', getRowDot)
 
 async function handleF3SaveItems(e: Event): Promise<void> {
 

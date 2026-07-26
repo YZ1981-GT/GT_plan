@@ -450,6 +450,15 @@ const state = useH4Adjudication({
     saveResponse(itemId, value)
   },
   onWritebackTB: async (amount: number) => {
+    // 真实回写 trial_balance（端点按 LIKE 前缀匹配子科目）
+    try {
+      await http.put(`/api/projects/${props.projectId}/trial-balance/writeback`, {
+        account_code: '1605',
+        audited_amount: amount,
+      })
+    } catch (e: any) {
+      ElMessage.warning(`TB回写请求失败: ${e?.message || e}`)
+    }
     window.dispatchEvent(new CustomEvent('substantive:adjudicated', {
       detail: { wpCode: 'H4', accountCode: '1605', auditedAmount: amount },
     }))

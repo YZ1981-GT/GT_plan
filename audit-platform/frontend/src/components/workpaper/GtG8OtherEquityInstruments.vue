@@ -167,6 +167,7 @@ import { extractG8SheetCode } from './composables/g8SheetLabels'
 import { G8_ACCOUNT_CODE } from './composables/g8Constants'
 import { parseNum } from './composables/useG8FormulaEngine'
 import type { ChecklistResponse } from './composables/useF1FormData'
+import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 
 const G8TabProcedure = defineAsyncComponent(() => import('./g8-other-equity-instruments/core/G8TabProcedure.vue'))
 const G8TabAdjudication = defineAsyncComponent(() => import('./g8-other-equity-instruments/core/G8TabAdjudication.vue'))
@@ -217,6 +218,10 @@ const auditYear = computed(() => {
 provide('g8VersionTrailRef', versionTrailRef)
 provide('g8OpenVersionHistory', openVersionHistory)
 provide('reloadWorkpaperData', () => formData.loadAll())
+
+const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(wpIdRef)
+provide('getThreadDot', getThreadDot)
+provide('getRowDot', getRowDot)
 
 const currentSheet = computed(() => extractG8SheetCode(props.sheetName || props.wpCode || ''))
 

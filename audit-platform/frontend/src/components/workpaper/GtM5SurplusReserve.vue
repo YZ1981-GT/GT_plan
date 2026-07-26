@@ -139,6 +139,7 @@ import { ref, computed, inject, onMounted, onBeforeUnmount, provide, toRef, defi
 import http from '@/utils/http'
 import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './composables/useWorkpaperScaffold'
 import { useM5EntryDualMode } from './composables/useM5EntryDualMode'
+import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 
 // ─── Lazy-loaded child components ────────────────────────────────────────────
 
@@ -257,6 +258,11 @@ const modeToggleOptions = computed(() => [
 // 本主入口不再本地 new GtReviewDialog / useWorkpaperVersionToolbar（避免重复 provider/Host）。
 const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
 provide('scheduleAutoSnapshot', () => runtime?.version.scheduleAutoSnapshot())
+
+// 复核圆点（GtReviewTrigger/GtReviewDot 消费）
+const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(toRef(props, 'wpId'))
+provide('getThreadDot', getThreadDot)
+provide('getRowDot', getRowDot)
 
 // ─── 监听 m5:save-items → 保存后自动快照（版本链能力来自 Runtime Boundary） ──
 

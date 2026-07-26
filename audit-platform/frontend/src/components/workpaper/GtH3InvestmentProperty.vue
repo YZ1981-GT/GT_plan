@@ -465,7 +465,7 @@ async function selfLoad(): Promise<void> {
       }
     } else {
       // selfLoad: 自行调用 render-config
-      const res = await http.get(`/workpapers/${props.wpId}/render-config`, {
+      const res = await http.get(`/api/workpapers/${props.wpId}/render-config`, {
         params: { force_component_type: 'h3-investment-property' },
         _silent: true,
       } as any)
@@ -497,6 +497,12 @@ async function selfLoad(): Promise<void> {
 // openReviewDialog 由 Runtime Boundary(GtWpRenderer) 统一 provide，子组件 inject 命中祖先
 provide('measurementModel', measurementModel)
 provide('allResponses', allResponses)
+
+// 复核圆点：GtReviewTrigger 依赖 getThreadDot/getRowDot 才渲染蓝/红点
+import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
+const { getThreadDot: h3GetThreadDot, getRowDot: h3GetRowDot } = useWorkpaperReviewThreads(toRef(props, 'wpId'))
+provide('getThreadDot', h3GetThreadDot)
+provide('getRowDot', h3GetRowDot)
 
 const h3RowNav = createH3RowNavigation((sheetName) => emit('navigate-sheet', sheetName))
 provide(H3RowNavigationKey, h3RowNav)

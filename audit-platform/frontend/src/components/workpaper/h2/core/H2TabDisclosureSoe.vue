@@ -295,7 +295,7 @@
  * H2TabDisclosureSoe — 附注披露信息（国有企业）
  * 对齐源 xlsx 列结构；动态插行；同步附注八、23
  */
-import { ref, reactive, computed, inject, watch, onMounted } from 'vue'
+import { ref, reactive, computed, inject, watch, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import { api } from '@/services/apiProxy'
@@ -628,6 +628,13 @@ async function syncToNotes() {
 
 onMounted(load)
 watch(() => props.allResponses, load, { deep: false })
+
+// A3: 订阅 substantive:adjudicated 刷新披露数据
+const _onAdjudicated = (payload: any) => {
+  if (payload?.wpCode === 'H2' || payload?.accountCode === '1604') load()
+}
+eventBus.on('substantive:adjudicated', _onAdjudicated)
+onBeforeUnmount(() => { eventBus.off('substantive:adjudicated', _onAdjudicated) })
 </script>
 
 <style scoped>

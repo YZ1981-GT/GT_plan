@@ -97,18 +97,24 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict:
     except Exception as e:  # noqa: BLE001
         logger.warning("I1 TB balance fetch failed: %s", e)
 
-    # 从 trial_balance 取未审数+审定数
+    # 从 trial_balance 取未审数+审定数（ORM + get_active_filter 口径统一）
     try:
+        tb_filter = await get_active_filter(
+            ctx.db, TrialBalance.__table__, ctx.project_id, ctx.year
+        )
         result = await ctx.db.execute(
-            sa.text("""
-                SELECT standard_account_code, unadjusted_amount, audited_amount
-                FROM trial_balance
-                WHERE project_id = :pid AND year = :year AND is_deleted = false
-                  AND (standard_account_code LIKE '1701%'
-                       OR standard_account_code LIKE '1702%'
-                       OR standard_account_code LIKE '1703%')
-            """),
-            {"pid": str(ctx.project_id), "year": ctx.year},
+            sa.select(
+                TrialBalance.standard_account_code,
+                TrialBalance.unadjusted_amount,
+                TrialBalance.audited_amount,
+            ).where(
+                tb_filter,
+                sa.or_(
+                    TrialBalance.standard_account_code.like("1701%"),
+                    TrialBalance.standard_account_code.like("1702%"),
+                    TrialBalance.standard_account_code.like("1703%"),
+                ),
+            )
         )
         for row in result.fetchall():
             code = (row.standard_account_code or "").strip()

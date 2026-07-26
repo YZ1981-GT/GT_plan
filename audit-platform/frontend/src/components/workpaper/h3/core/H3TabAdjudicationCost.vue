@@ -384,6 +384,7 @@ import { useAuditContext } from '@/composables/useAuditContext'
 import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
+import { generateH3AI, h3AiLoading } from '../useH3AiGenerate'
 
 const props = defineProps<{
   wpId: string
@@ -655,8 +656,9 @@ function getImpairSummary({ columns }: { columns: any[] }) {
   })
 }
 
-function generateAI(section: string) {
-  window.dispatchEvent(new CustomEvent('ai:generate', { detail: { section, wpId: props.wpId } }))
+const _h3AiLoading = h3AiLoading
+async function generateAI(section: string) {
+  await generateH3AI(props.wpId, section)
 }
 function openReview(section: string) { openReviewDialog(section) }
 </script>

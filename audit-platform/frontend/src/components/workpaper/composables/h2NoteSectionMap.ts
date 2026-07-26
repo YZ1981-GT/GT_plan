@@ -105,8 +105,10 @@ export function resolveH2NoteSectionTarget(
 export function isH2CipNoteSection(noteSection: string): boolean {
   const s = String(noteSection || '').trim()
   if (!s) return false
-  if (s === H2_NOTE_SECTION.soe || s.startsWith('八、23')) return true
-  if (s === H2_NOTE_SECTION.listed || s.startsWith('五、23')) return true
+  // 精确匹配章节号（禁 startsWith 防五、23 误伤五、230~239 潜在风险）
+  if (s === H2_NOTE_SECTION.soe || s === '八、23') return true
+  if (s === H2_NOTE_SECTION.listed || s === '五、23') return true
+  // 关键词匹配（DB 中 listed 章节标题可能是"在建工程"含描述）
   if (s === '在建工程' || (s.includes('在建工程') && !s.includes('工程物资'))) return true
   return false
 }

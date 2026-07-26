@@ -114,7 +114,7 @@ def _compute_transit_status(tb_values: dict) -> dict:
 
 
 async def render(ctx: RenderContext) -> dict | None:
-    """H6固定资产清理渲染策略：allResponses + tb_values + transit_status + sheets."""
+    """H6固定资产清理渲染策略：allResponses + tb_values + transit_status + project_context + sheets."""
     responses_snapshot: dict = {}
     try:
         result = await ctx.db.execute(
@@ -135,12 +135,40 @@ async def render(ctx: RenderContext) -> dict | None:
     tb_values = await _fetch_tb_data(ctx)
     transit_status = _compute_transit_status(tb_values)
 
+    # 加载 project_context（template_type + report_scope 供前端附注变体判定）
+    project_context: dict = {}
+    try:
+        result = await ctx.db.execute(
+            sa.text("""
+                SELECT p.client_name, p.audit_year, p.template_type, p.report_scope
+                FROM working_paper wp
+                JOIN projects p ON wp.project_id = p.id
+                WHERE wp.id = :wp_id
+            """),
+            {"wp_id": str(ctx.wp_id)},
+        )
+        row = result.fetchone()
+        if row:
+            project_context["client_name"] = row.client_name or ""
+            project_context["audit_year"] = str(row.audit_year) if row.audit_year else ""
+            project_context["template_type"] = (
+                str(row.template_type.value) if hasattr(row.template_type, "value")
+                else (str(row.template_type) if row.template_type else "")
+            )
+            project_context["report_scope"] = (
+                str(row.report_scope.value) if hasattr(row.report_scope, "value")
+                else (str(row.report_scope) if row.report_scope else "")
+            )
+    except Exception as e:  # noqa: BLE001
+        logger.warning("H6 project context load failed: %s", e)
+
     return {
         "component_type": "h6-asset-disposal-clearing",
         "account_codes": ["1606"],
         "responses_snapshot": responses_snapshot,
         "tb_values": tb_values,
         "transit_status": transit_status,
+        "project_context": project_context,
         "prefix": "H6",
         "sheets": H6_SHEETS,
         "meta": {"sheet_count": 8, "wp_code": "H6"},

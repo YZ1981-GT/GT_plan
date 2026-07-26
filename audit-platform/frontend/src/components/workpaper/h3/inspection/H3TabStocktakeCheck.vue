@@ -370,6 +370,7 @@ import { useStickySectionNav } from '../../composables/useStickySectionNav'
 import GtIndexChip from '../../GtIndexChip.vue'
 import ItemAttachment from '../../ItemAttachment.vue'
 import H3CheckDirectionTable from './H3CheckDirectionTable.vue'
+import { generateH3AI, h3AiLoading } from '../useH3AiGenerate'
 
 const props = defineProps<{
   wpId: string
@@ -476,8 +477,9 @@ async function onFileSelected(ev: Event) {
   ElMessageBox.alert('导入完成。若页面未刷新，请切换 sheet 后返回查看。', '提示')
 }
 
-function generateAI(section: string) {
-  window.dispatchEvent(new CustomEvent('ai:generate', { detail: { section, wpId: props.wpId } }))
+const _h3AiLoading = h3AiLoading
+async function generateAI(section: string) {
+  await generateH3AI(props.wpId, section)
 }
 function openReview(section: string) { openReviewDialog(section) }
 

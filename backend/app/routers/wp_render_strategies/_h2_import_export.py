@@ -456,6 +456,9 @@ _cycle_router = create_cycle_import_export_router(
     tag="h2-import-export",
     api_prefix="h2",
     specs=_H2_SPECS,
+    # H2 自定义端点(H2-2)已双写 remark+conclusion；cycle router 按 remark 权威写入，
+    # 导出侧有 remark↔conclusion fallback 兼容历史。
+    storage_field="remark",
 )
 
 router = APIRouter(tags=["h2-import-export"])

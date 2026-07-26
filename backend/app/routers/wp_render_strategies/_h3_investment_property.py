@@ -133,12 +133,14 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict:
 
 
 async def _load_project_context(ctx: RenderContext) -> dict:
-    """加载项目上下文（客户名/审计年度/适用准则）."""
+    """加载项目上下文（客户名/审计年度/适用准则/模板变体）."""
     project_ctx: dict = {}
     try:
         result = await ctx.db.execute(
             sa.text("""
-                SELECT p.client_name, p.audit_year, p.business_category, p.applicable_standard_v2 AS applicable_standards
+                SELECT p.client_name, p.audit_year, p.business_category,
+                       p.applicable_standard_v2 AS applicable_standards,
+                       p.template_type, p.report_scope
                 FROM working_paper wp
                 JOIN projects p ON wp.project_id = p.id
                 WHERE wp.id = :wp_id
@@ -151,6 +153,14 @@ async def _load_project_context(ctx: RenderContext) -> dict:
             project_ctx["audit_year"] = str(row.audit_year) if row.audit_year else ""
             project_ctx["business_category"] = row.business_category or ""
             project_ctx["applicable_standards"] = row.applicable_standards or ""
+            project_ctx["template_type"] = (
+                str(row.template_type.value) if hasattr(row.template_type, "value")
+                else (str(row.template_type) if row.template_type else "")
+            )
+            project_ctx["report_scope"] = (
+                str(row.report_scope.value) if hasattr(row.report_scope, "value")
+                else (str(row.report_scope) if row.report_scope else "")
+            )
     except Exception as e:  # noqa: BLE001
         logger.warning("H3 project context load failed: %s", e)
     return project_ctx

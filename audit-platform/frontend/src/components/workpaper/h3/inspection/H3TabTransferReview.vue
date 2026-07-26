@@ -302,6 +302,7 @@ import { useH3FormData } from '../../composables/useH3FormData'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { pullH1TransferForH3, pullH2TransferForH3, buildH3TransferReconcile } from '../../composables/h3TransferReconcile'
 import type { TransferReconcileResult } from '../../composables/h3TransferReconcile'
+import { generateH3AI, h3AiLoading } from '../useH3AiGenerate'
 
 const DIRECTION_LABELS: Record<TransferDirection, string> = {
   selfToInvest: '自用→投资',
@@ -418,8 +419,9 @@ function fmtNum(v: number): string {
   return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-function generateAI(section: string) {
-  window.dispatchEvent(new CustomEvent('ai:generate', { detail: { section, wpId: props.wpId } }))
+const _h3AiLoading = h3AiLoading
+async function generateAI(section: string) {
+  await generateH3AI(props.wpId, section)
 }
 function openReview(section: string) { openReviewDialog(section) }
 

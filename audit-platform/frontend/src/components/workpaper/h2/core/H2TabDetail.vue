@@ -38,6 +38,7 @@
     <div class="toolbar" v-if="!isReadonly">
       <el-button size="small" type="primary" @click="handleAddRow">+ 新增工程</el-button>
       <el-button size="small" @click="handleRemoveSelected" :disabled="!selectedRowId">删除选中</el-button>
+      <el-button size="small" type="warning" plain :loading="ledgerPulling" @click="handlePullFromLedger">📥从序时账取数</el-button>
       <el-dropdown trigger="click" @command="handleExportCmd">
         <el-button size="small" :loading="ie.importing.value">导入导出 ▾</el-button>
         <template #dropdown>
@@ -494,6 +495,7 @@ import {
   type H2DetailRow,
 } from '../../composables/useH2Detail'
 import { useH2ImportExport } from '../../composables/useH2ImportExport'
+import { pullAssetMovementFromLedger } from '../../composables/assetLedgerMovementPull'
 import {
   H2_LISTED_ITEM,
   mapMortgagedDetailToRows,
@@ -538,6 +540,50 @@ const ie = useH2ImportExport({
 const mortgagedCount = computed(() =>
   state.rows.value.filter((r) => r.isMortgaged === 'Y').length,
 )
+
+// ─── 从序时账取数（资产类科目1604 借方=增加 贷方=减少）────────────────────────
+const ledgerPulling = ref(false)
+async function handlePullFromLedger() {
+  const year = new Date().getFullYear() - 1
+  ledgerPulling.value = true
+  try {
+    const result = await pullAssetMovementFromLedger(props.projectId, year, '1604')
+    if (!result.ok) {
+      ElMessageBox.alert(result.message, '取数提示', { type: 'warning' })
+      return
+    }
+    const fmtN = (n: number) => n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    await ElMessageBox.confirm(
+      `从序时账聚合 ${result.rows.length} 个明细科目：\n合计增加 ${fmtN(result.totalIncrease)}，合计减少 ${fmtN(result.totalDecrease)}\n\n确认填入明细表？（只填空值不覆盖已有数据）`,
+      '📥 从序时账取数预览',
+      { confirmButtonText: '填入', cancelButtonText: '取消', type: 'info' },
+    )
+    let matched = 0
+    for (const item of result.rows) {
+      const existing = state.rows.value.find(
+        (r) => r.name === item.name || r.name.includes(item.name) || item.name.includes(r.name),
+      )
+      if (existing) {
+        // H2 增加合计 = increaseTotal（公式列），手工列= increaseMaterial 等；填入 increaseMaterial 作为主增加入口
+        if (!existing.increaseMaterial && !existing.increaseOther && item.increase > 0.005) {
+          state.updateCell(existing.rowId, 'increaseOther', item.increase)
+          matched++
+        }
+        // H2 减少 = decrease（其他减少，非转固）
+        if (!existing.decrease && item.decrease > 0.005) {
+          state.updateCell(existing.rowId, 'decrease', item.decrease)
+          matched++
+        }
+      }
+    }
+    ElMessageBox.alert(`已匹配填入 ${matched} 个字段`, '取数完成', { type: 'success' })
+  } catch (e: any) {
+    if (e === 'cancel' || e?.toString?.().includes('cancel')) return
+    ElMessageBox.alert(String(e?.message || e), '取数失败', { type: 'error' })
+  } finally {
+    ledgerPulling.value = false
+  }
+}
 
 type DisplayRow = H2DetailRow & { isTotal?: boolean }
 

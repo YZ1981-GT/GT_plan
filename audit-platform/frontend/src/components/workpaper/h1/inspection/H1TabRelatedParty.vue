@@ -805,16 +805,34 @@ function fillNoteDraft() {
   ElMessage.success('已填入异常摘要草稿')
 }
 
-function generateAI() {
-  const draft = buildRelatedPartyNoteDraft()
-  window.dispatchEvent(new CustomEvent('ai:generate', {
-    detail: {
+const aiLoading = ref(false)
+async function generateAI() {
+  if (aiLoading.value) return
+  aiLoading.value = true
+  try {
+    const draft = buildRelatedPartyNoteDraft()
+    const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
       section: 'H1-18',
-      wpId: props.wpId,
-      existingContent: auditNoteText.value,
-      relatedContext: draft,
-    },
-  }))
+      context: {
+        wpCode: 'H1',
+        sheet: 'H1-18 关联交易检查表',
+        relatedContext: String(draft || ''),
+      },
+      existingContent: auditNoteText.value || '',
+    })
+    const text = res.data?.data?.text ?? res.data?.text ?? ''
+    if (text) {
+      auditNoteText.value = text
+      saveNote()
+      ElMessage.success('AI 已生成关联交易审计说明')
+    } else {
+      ElMessage.warning('AI 暂无建议')
+    }
+  } catch {
+    ElMessage.warning('AI 生成失败，请稍后重试')
+  } finally {
+    aiLoading.value = false
+  }
 }
 
 async function handleImportExport(cmd: string) {

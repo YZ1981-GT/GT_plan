@@ -112,19 +112,24 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict:
     except Exception as e:  # noqa: BLE001
         logger.warning("H2 TB balance fetch failed: %s", e)
 
-    # 从trial_balance取未审数/审定数（1604 + 1605）
+    # 从trial_balance取未审数/审定数（1604 + 1605）— 使用 ORM 模型 + get_active_filter 确保
+    # 只读 active dataset（与 tb_balance 段口径一致），避免裸 is_deleted 漏读 superseded 行。
     try:
+        tb_filter = await get_active_filter(
+            ctx.db, TrialBalance.__table__, ctx.project_id, ctx.year
+        )
         result = await ctx.db.execute(
-            sa.text("""
-                SELECT standard_account_code, unadjusted_amount, audited_amount
-                FROM trial_balance
-                WHERE project_id = :pid AND year = :year AND is_deleted = false
-                  AND (
-                    standard_account_code LIKE '1604%'
-                    OR standard_account_code LIKE '1605%'
-                  )
-            """),
-            {"pid": str(ctx.project_id), "year": ctx.year},
+            sa.select(
+                TrialBalance.standard_account_code,
+                TrialBalance.unadjusted_amount,
+                TrialBalance.audited_amount,
+            ).where(
+                tb_filter,
+                sa.or_(
+                    TrialBalance.standard_account_code.like("1604%"),
+                    TrialBalance.standard_account_code.like("1605%"),
+                ),
+            )
         )
         for row in result.fetchall():
             code = (row.standard_account_code or "").strip()
@@ -200,6 +205,7 @@ async def _build_h2_detail_prefill(ctx: RenderContext) -> list[dict]:
         result = await ctx.db.execute(
             sa.select(
                 TbBalance.account_code,
+                TbBalance.account_name,
                 TbBalance.opening_balance,
                 TbBalance.closing_balance,
             ).where(active_filter)
@@ -221,7 +227,7 @@ async def _build_h2_detail_prefill(ctx: RenderContext) -> list[dict]:
             closing = abs(float(row.closing_balance or 0))
             if opening < 0.005 and closing < 0.005:
                 continue
-            name = code[4:].lstrip(".") if len(code) > 4 else code
+            name = (row.account_name or "").strip() or (code[4:].lstrip(".") if len(code) > 4 else code)
             prefill.append({"name": name, "cipBegin": opening, "cipEnd": closing, "category": "自动种子"})
         return prefill
     except Exception as e:  # noqa: BLE001
@@ -250,7 +256,13 @@ async def render(ctx: RenderContext) -> dict | None:
 
     tb_values = await _fetch_tb_data(ctx)
     project_context = await _load_project_context(ctx)
-    detail_prefill = await _build_h2_detail_prefill(ctx)
+
+    # 灰度门控：H2_FOUR_TABLE_EXTRACTION_ENABLED 控制是否输出 detail_prefill
+    from app.core.config import settings
+    if settings.H2_FOUR_TABLE_EXTRACTION_ENABLED:
+        detail_prefill = await _build_h2_detail_prefill(ctx)
+    else:
+        detail_prefill = []
 
     return {
         "component_type": "h2-construction-in-progress",

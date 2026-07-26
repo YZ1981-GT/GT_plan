@@ -166,9 +166,10 @@
  * Spec: .kiro/specs/k2-other-current-assets/ Task 1.1
  * Requirements: 1.1-1.10
  */
-import { ref, computed, onMounted, onBeforeUnmount, inject, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, inject, defineAsyncComponent, toRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
+import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useChecklistPersistence } from '@/composables/workpaper/useChecklistPersistence'
 import { collectChecklistResponses, toChecklistPatch } from '@/composables/workpaper/checklistPersistenceHelpers'
 import {
@@ -235,6 +236,11 @@ const openReviewDialog = (sectionId: string) => {
 }
 provide('openReviewDialog', openReviewDialog)
 provide('scheduleAutoSnapshot', scheduleAutoSnapshot)
+
+// 复核圆点
+const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(toRef(props, 'wpId'))
+provide('getThreadDot', getThreadDot)
+provide('getRowDot', getRowDot)
 
 // ─── 双模式 (OO 健康检查 + el-segmented) ────────────────────────────────────
 const dualMode = (() => {

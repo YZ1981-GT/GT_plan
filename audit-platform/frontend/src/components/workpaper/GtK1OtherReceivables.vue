@@ -245,9 +245,10 @@
  * Spec: .kiro/specs/k1-other-receivables/ Task 1.1
  * Requirements: 1.1-1.10
  */
-import { ref, computed, onMounted, onBeforeUnmount, inject, defineAsyncComponent, provide } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, inject, defineAsyncComponent, provide, toRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
+import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useChecklistPersistence } from '@/composables/workpaper/useChecklistPersistence'
 import { collectChecklistResponses, toChecklistPatch } from '@/composables/workpaper/checklistPersistenceHelpers'
 import {
@@ -301,6 +302,11 @@ const emit = defineEmits<{
 
 const k1RowNav = createK1RowNavigation((sheetName) => emit('navigate-sheet', sheetName))
 provide(K1RowNavigationKey, k1RowNav)
+
+// 复核圆点
+const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(toRef(props, 'wpId'))
+provide('getThreadDot', getThreadDot)
+provide('getRowDot', getRowDot)
 
 // ─── State ───────────────────────────────────────────────────────────────────
 const isReadonly = computed(() => !!props.readonly)
