@@ -999,11 +999,19 @@ class NoteWordExporter:
         if not isinstance(td, dict):
             return []
         tables = td.get("_tables") or [td]
+        section_number = getattr(note, "note_section", None)
+        source_template = getattr(note, "source_template", None)
         result: list[dict] = []
-        for t in tables:
+        for idx, t in enumerate(tables):
             if not isinstance(t, dict) or not t.get("export_enabled", True):
                 continue
-            projected = project_headers(t)
+            # 模板表头优先（列数匹配才套用），语义派生兜底 —— 与模块渲染同一纯函数
+            projected = project_headers(
+                t,
+                section_number=section_number,
+                source_template=source_template,
+                table_index=idx,
+            )
             result.append(projected if projected is not None else t)
         return result
 

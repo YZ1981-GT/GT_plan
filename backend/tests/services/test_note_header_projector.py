@@ -105,3 +105,78 @@ def test_max_value_len_across_rows():
     assert derive_headers_for_legacy_table(td) == [
         "项目", "成本", "期末余额", "上年年末余额",
     ]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 模板表头优先（修：损益类表头空 + 语义派生标签用错）
+#
+# 用户报「五、63 税金及附加」表头第二列空、第三列显示"上年年末余额"：DB 里
+# headers=[]，legacy 行语义为 manual_text(→空) + prior_year_value(→上年年末余额)，
+# 而模板权威表头是「项目/本期发生额/上期发生额」。语义无法区分资产负债类与
+# 损益类，故模板优先、语义派生仅兜底。
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def test_template_headers_preferred_for_income_statement_note():
+    """五、63 税金及附加（listed）：模板表头取代语义派生的错误标签。"""
+    td = {
+        "headers": [],
+        "rows": [
+            _row("消费税", [None, None], ["manual_text", "prior_year_value"]),
+            _row("印花税", [None, None], ["manual_text", "prior_year_value"]),
+        ],
+    }
+    # 不传上下文 → 旧行为（空 + 上年年末余额），正是用户看到的错误表头
+    assert derive_headers_for_legacy_table(td) == ["项目", "", "上年年末余额"]
+    # 传 section + variant → 模板权威表头
+    assert derive_headers_for_legacy_table(
+        td, section_number="五、63", source_template="listed"
+    ) == ["项目", "本期发生额", "上期发生额"]
+
+
+def test_template_headers_column_count_mismatch_falls_back():
+    """列数与模板不符 → 不套用模板（防列错位），回退语义派生。"""
+    td = {
+        "headers": [],
+        "rows": [_row("消费税", [None], ["closing_balance"])],  # 只有 1 个值列
+    }
+    assert (
+        derive_headers_for_legacy_table(
+            td, section_number="五、63", source_template="listed"
+        )
+        == ["项目", "期末余额"]
+    )
+
+
+def test_template_headers_unknown_section_or_variant_falls_back():
+    td = {"headers": [], "rows": [_row("A", [1, 2], ["closing_balance", "prior_year_value"])]}
+    for kwargs in (
+        {"section_number": "五、9999", "source_template": "listed"},
+        {"section_number": "五、63", "source_template": "unknown_variant"},
+        {"section_number": None, "source_template": "listed"},
+    ):
+        assert derive_headers_for_legacy_table(td, **kwargs) == [
+            "项目", "期末余额", "上年年末余额",
+        ]
+
+
+def test_template_headers_soe_variant():
+    """国企版同章节（八、64 营业收入、营业成本）表头取自 soe 模板。"""
+    from app.services.note_header_projector import template_headers_for
+
+    headers = template_headers_for("八、63", "soe")
+    assert headers is None or isinstance(headers, list)  # 章节存在性由模板决定
+    # 明确存在的损益章节：八、65 销售费用
+    h = template_headers_for("八、65", "soe")
+    assert h is not None and h[0] == "项目"
+
+
+def test_project_headers_passes_context_through():
+    td = {
+        "headers": [],
+        "rows": [_row("消费税", [None, None], ["manual_text", "prior_year_value"])],
+    }
+    out = project_headers(td, section_number="五、63", source_template="listed")
+    assert out is not None
+    assert out["headers"] == ["项目", "本期发生额", "上期发生额"]
+    assert td["headers"] == []  # 纯函数不改入参
