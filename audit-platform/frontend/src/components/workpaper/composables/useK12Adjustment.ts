@@ -71,8 +71,19 @@ const BALANCE_THRESHOLD = 0.01
 const ACCOUNT_CODE = '6301'
 /** 底稿编码 */
 const WP_CODE = 'K12'
-/** item_id 前缀 */
+/** item_id 前缀（legacy per-field 键仍用它做回退读） */
 const ITEM_PREFIX = 'K12-3'
+/**
+ * 单一存储键（JSON 数组，存 remark 列）
+ *
+ * spec: adjustment-import-export-contract / Task 3.1
+ * 迁移前为 per-field 键 `K12-3-entry-{n}-{field}`，与后端导入导出（写 `K12-3-rows` JSON 数组）
+ * 结构级不匹配 → 底稿通道导入的数据前端永远读不到。现收敛为单键 JSON 数组：
+ *   - 写：只写 ROWS_KEY（不再写 per-field 键）
+ *   - 读：优先解析 ROWS_KEY；为空/解析失败 → 回退 per-field 重建（历史数据不丢），
+ *         重建后首次保存自然收敛为 JSON；旧 per-field 键不主动删除
+ */
+export const K12_ADJ_ROWS_KEY = 'K12-3-rows'
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -231,22 +242,8 @@ export function useK12Adjustment(formData: ReturnType<typeof useK12FormData>) {
       return // 不平衡时不允许发布
     }
 
-    // 批量保存到 checklist_responses
-    const items = entries.value.map((entry, i) => {
-      const n = i + 1
-      return [
-        { itemId: `${ITEM_PREFIX}-entry-${n}-type`, value: entry.type },
-        { itemId: `${ITEM_PREFIX}-entry-${n}-desc`, value: entry.description || null },
-        { itemId: `${ITEM_PREFIX}-entry-${n}-code`, value: entry.accountCode || null },
-        { itemId: `${ITEM_PREFIX}-entry-${n}-name`, value: entry.accountName || null },
-        { itemId: `${ITEM_PREFIX}-entry-${n}-debit`, value: entry.debitAmount ? String(entry.debitAmount) : null },
-        { itemId: `${ITEM_PREFIX}-entry-${n}-credit`, value: entry.creditAmount ? String(entry.creditAmount) : null },
-        { itemId: `${ITEM_PREFIX}-entry-${n}-ref`, value: entry.refIndex || null },
-        { itemId: `${ITEM_PREFIX}-entry-${n}-remark`, value: entry.remark || null },
-      ]
-    }).flat()
-
-    await saveBatch(items)
+    // 保存到 checklist_responses（单键 JSON 数组，与后端导入导出同结构）
+    await saveBatch([{ itemId: K12_ADJ_ROWS_KEY, value: _serializeEntries() }])
 
     // EventBus publish 'adjustment:created'
     // ⚠️ 此事件触发两个下游：
@@ -267,9 +264,49 @@ export function useK12Adjustment(formData: ReturnType<typeof useK12FormData>) {
 
   /**
    * 从 checklist_responses 恢复已保存的分录行
-   * item_id 格式: K12-3-entry-{n}-{field}
+   *
+   * 优先读单键 JSON 数组（K12-3-rows，与后端导入导出同结构）；
+   * 为空或解析失败 → 回退 legacy per-field 键 `K12-3-entry-{n}-{field}` 重建（历史数据不丢）。
    */
   function restoreEntries(): void {
+    const raw = formData.allResponses.value.get(K12_ADJ_ROWS_KEY)?.remark
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw)
+        const rows = Array.isArray(parsed)
+          ? parsed
+          : (Array.isArray(parsed?.rows) ? parsed.rows : null)
+        if (rows && rows.length) {
+          entries.value.push(...rows.map((r: any, i: number) => _normalizeEntry(r, i)))
+          return
+        }
+        if (rows) return // 显式空数组：用户已清空，不再回退旧 per-field 数据
+      } catch {
+        // JSON 解析失败 → 回退 per-field 重建，绝不清空用户数据
+        console.warn('[useK12Adjustment] K12-3-rows JSON 解析失败，回退 per-field 重建')
+      }
+    }
+    _restoreLegacyEntries()
+  }
+
+  /** 单行归一（导入/历史数据可能缺字段或类型为字符串） */
+  function _normalizeEntry(r: any, i: number): K12AdjustmentEntry {
+    const rawType = String(r?.type ?? '').toUpperCase()
+    return {
+      index: Number(r?.index) || i + 1,
+      type: (rawType === 'RJE' ? 'RJE' : 'AJE') as K12AdjustmentType,
+      description: String(r?.description ?? ''),
+      accountCode: String(r?.accountCode ?? ''),
+      accountName: String(r?.accountName ?? ''),
+      debitAmount: Number(r?.debitAmount) || 0,
+      creditAmount: Number(r?.creditAmount) || 0,
+      refIndex: String(r?.refIndex ?? ''),
+      remark: String(r?.remark ?? ''),
+    }
+  }
+
+  /** legacy 回退：per-field 键 `K12-3-entry-{n}-{field}` 重建 */
+  function _restoreLegacyEntries(): void {
     const prefix = `${ITEM_PREFIX}-entry-`
     let maxIdx = 0
 
@@ -310,29 +347,26 @@ export function useK12Adjustment(formData: ReturnType<typeof useK12FormData>) {
 
   // ─── 6. 保存触发 ──────────────────────────────────────────────────────
 
-  function _triggerSave(rowIndex: number): void {
-    const entry = entries.value[rowIndex]
-    if (!entry) return
-    const n = rowIndex + 1
-    const pairs: [string, string | null][] = [
-      [`${ITEM_PREFIX}-entry-${n}-type`, entry.type],
-      [`${ITEM_PREFIX}-entry-${n}-desc`, entry.description || null],
-      [`${ITEM_PREFIX}-entry-${n}-code`, entry.accountCode || null],
-      [`${ITEM_PREFIX}-entry-${n}-name`, entry.accountName || null],
-      [`${ITEM_PREFIX}-entry-${n}-debit`, entry.debitAmount ? String(entry.debitAmount) : null],
-      [`${ITEM_PREFIX}-entry-${n}-credit`, entry.creditAmount ? String(entry.creditAmount) : null],
-      [`${ITEM_PREFIX}-entry-${n}-ref`, entry.refIndex || null],
-      [`${ITEM_PREFIX}-entry-${n}-remark`, entry.remark || null],
-    ]
-    for (const [itemId, remark] of pairs) {
-      debouncedSave(itemId, { item_id: itemId, conclusion: null, remark })
-    }
+  /** 序列化全部分录为 JSON 字符串（与后端 K12-3 Sheet_Spec field_keys 同字段名） */
+  function _serializeEntries(): string {
+    return JSON.stringify(entries.value.map((e) => ({ ...e })))
+  }
+
+  /** 持久化：只写单键 JSON 数组（不再写 legacy per-field 键） */
+  function _persistEntries(): void {
+    debouncedSave(K12_ADJ_ROWS_KEY, {
+      item_id: K12_ADJ_ROWS_KEY,
+      conclusion: null,
+      remark: _serializeEntries(),
+    })
+  }
+
+  function _triggerSave(_rowIndex: number): void {
+    _persistEntries()
   }
 
   function _triggerSaveAll(): void {
-    for (let i = 0; i < entries.value.length; i++) {
-      _triggerSave(i)
-    }
+    _persistEntries()
   }
 
   // ─── Return ────────────────────────────────────────────────────────────

@@ -32,15 +32,18 @@ _K4_2_KEYS = [
 ]
 
 # ────────────────────────────────────────────────────────────
-# K4-3 调整分录汇总（10列）
+# K4-3 调整分录汇总（12列）
+# 列集合对齐前端 K4TabAdjustment 行模型（adjustment_ie_contract.json / Task 2.2）：
+#   去掉前端不存在的 noteRef/voucherNo，补 entryNo（编号）/offsetAccount（对方科目）/
+#   preparedBy（编制人）/source（来源）
 # ────────────────────────────────────────────────────────────
 _K4_3_HEADERS = [
-    "序号", "分录类型", "摘要", "科目代码", "科目名称",
-    "借方金额", "贷方金额", "附注说明", "凭证号", "备注",
+    "序号", "编号", "分录类型", "摘要", "科目代码", "科目名称", "对方科目",
+    "借方金额", "贷方金额", "编制人", "来源", "备注",
 ]
 _K4_3_KEYS = [
-    "seq", "entryType", "summary", "accountCode", "accountName",
-    "debitAmount", "creditAmount", "noteRef", "voucherNo", "remark",
+    "seq", "entryNo", "entryType", "summary", "accountCode", "accountName", "offsetAccount",
+    "debitAmount", "creditAmount", "preparedBy", "source", "remark",
 ]
 
 # ────────────────────────────────────────────────────────────
@@ -65,14 +68,17 @@ _K4_SPECS: dict[str, dict[str, Any]] = {
         ],
     },
     "K4-3": {
-        "item_id": "K4-3-rows",
+        # item_id / storage_field 对齐前端持久化键（K4TabAdjustment: ITEM_PREFIX='K4-3-adj' + '-entries'，写 remark 列）
+        "item_id": "K4-3-adj-entries",
+        "storage_field": "remark",
         "title": "K4-3 其他流动负债调整分录汇总",
         "headers": _K4_3_HEADERS,
         "field_keys": _K4_3_KEYS,
         "guidance": [
             "K4-3 调整分录 编制说明",
             "",
-            "10列：序号/分录类型(AJE/RJE)/摘要/科目代码/科目名称/借方金额/贷方金额/附注说明/凭证号/备注。",
+            "12列：序号/编号/分录类型(AJE/RJE)/摘要/科目代码/科目名称/对方科目/借方金额/贷方金额/编制人/来源/备注。",
+            "编号形如 K4-AJE-001；来源填 手工 / K4-4 / 导入。",
             "借贷必须平衡：∑借方 = ∑贷方。",
             "分录类型填 AJE（审计调整）或 RJE（重分类调整）。",
             "金额单位：元。",

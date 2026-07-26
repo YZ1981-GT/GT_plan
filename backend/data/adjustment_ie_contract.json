@@ -1,0 +1,1521 @@
+{
+  "_description": "调整分录导入导出契约清单 —— 双侧守卫（spec adjustment-import-export-contract Wave 3 的 Task 4.1 后端守卫 / Task 4.2 前端 vitest 守卫）的唯一真源。后端测试读不到前端 .vue，前端 vitest 读不到 Python `_SPECS`，故两侧各自对照本文件断言：任一侧改动而未同步本文件即 CI 失败。本文件只描述契约，不含任何业务数据。",
+  "_source": "字段值以【前端实测为准】——item_id / storage_field / field_keys 一律抄前端调整 tab 的真实持久化键与行模型字段名（不新造前端键）；后端 Sheet_Spec 向前端对齐（Design 决策 1、tasks.md Notes「对齐方向铁律」）。唯一例外：K12-3 由用户拍板改前端存储结构（per-field → JSON 数组），见该条 notes。",
+  "_iron_rules": [
+    "三重键必须同时对齐：item_id + storage_field + field_keys。工厂 create_cycle_import_export_router 的 storage_field 默认值是 \"conclusion\"，而前端一律 emit('save', key, { remark: ... })；只改 item_id 仍写错列（最隐蔽的 Orphan_Key 形态）。",
+    "不启用 dual_write：双写会让 conclusion 残留半新副本形成第二真源。历史落在 `KX-3-rows/conclusion` 的数据是 Orphan_Key（前端从未读到），不迁移。",
+    "field_keys 是【对齐完成后的期望值】，即 Property 9 的断言基准；frontend_row_model 记前端行模型全部字段，frontend_extra_fields 记「前端有、导出列未覆盖」的已知 Property 10 缺口（登记但不参与 Property 9 断言，避免守卫假失败）。",
+    "Round_Trip 验收必须验到「前端读取键（item_id 的 storage_field 列）有值」这一层，接口 200 不算通过。"
+  ],
+  "_verification": {
+    "verified_at": "2026-07-26",
+    "method": "grep 复核前端各调整 tab 的 ITEM_PREFIX / ROWS_KEY / ITEM_KEY 常量 + persistEntries/loadFromResponses 的 emit('save', key, { remark }) 与 allResponses.get(key)?.remark 实际读写列 + 行模型 interface 字段；后端复核各 `_SPECS[sheet]` 的 item_id / storage_field（含 router 级 storage_field 参数与工厂默认值）/ headers / field_keys。",
+    "notes": [
+      "前端 useAdjustmentCentralSync 的 `itemId` 是【中央同步 source_ref 的组成部分】，多数循环等于持久化键，但 G 循环不等（例：G8 中央同步 itemId='G8-3-rows'，真实持久化键是 'G8-adjustment-rows'）。故本清单一律以 persist/load 代码为准，不以 central-sync itemId 为准。",
+      "已核实 `_cycle_import_export_common.is_numeric_field_key` 当前已包含 `debit` / `credit`（G1 专属数值字段集合），且 `debitAmount` / `creditAmount` 经 \"Amount\" in key 命中；K2-3 的 `debitAccount` / `creditAccount` 是文本，正确地不在数值白名单内。tasks.md 2.5 对本波新增字段可能是 no-op，实施时以该函数当时真实内容为准。"
+    ]
+  },
+  "sheets": {
+    "K1-4": {
+      "cycle": "K1",
+      "item_id": "K1-4-adj-entries",
+      "storage_field": "remark",
+      "field_keys": [
+        "description",
+        "category",
+        "reportItem",
+        "accountCode",
+        "accountName",
+        "noteItem",
+        "debitAmount",
+        "creditAmount",
+        "indexRef",
+        "remark"
+      ],
+      "frontend_source": "composables/useK1Adjustment.ts: ROWS_KEY = 'K1-4-adj-entries'（K1AdjustmentRow）",
+      "frontend_row_model": [
+        "seq",
+        "description",
+        "category",
+        "entryType",
+        "reportItem",
+        "accountCode",
+        "accountName",
+        "noteItem",
+        "debitAmount",
+        "creditAmount",
+        "indexRef",
+        "remark",
+        "sourceKind",
+        "sourceGroupId"
+      ],
+      "frontend_extra_fields": [
+        "seq",
+        "entryType",
+        "sourceKind",
+        "sourceGroupId"
+      ],
+      "frontend_extra_reason": "seq 为行序重排的显示序号（导入按行序重建）；entryType 由 category 派生；sourceKind/sourceGroupId 为跨表推送来源标记，均非用户可填列，不进导出。",
+      "backend_current": {
+        "spec_registered": true,
+        "item_id": "K1-4-adj-entries",
+        "storage_field_declared": "remark",
+        "storage_field_effective": "remark",
+        "field_keys": [
+          "description",
+          "category",
+          "reportItem",
+          "accountCode",
+          "accountName",
+          "noteItem",
+          "debitAmount",
+          "creditAmount",
+          "indexRef",
+          "remark"
+        ]
+      },
+      "status": "aligned",
+      "aligns_in_task": "2.7",
+      "drift_dimensions": [],
+      "notes": "✅ Wave 1 已对齐（Task 2.7）：item_id 与 field_keys 已一致；仅 storage_field 未声明取工厂默认 conclusion，而前端（useK1Adjustment / K1-7·K1-12 推送）读写 remark。Task 2.7 只加 storage_field，item_id/headers/field_keys 一律不动。"
+    },
+    "K2-3": {
+      "cycle": "K2",
+      "item_id": "K2-3-adj-entries",
+      "storage_field": "remark",
+      "field_keys": [
+        "seq",
+        "entryType",
+        "summary",
+        "debitAccount",
+        "debitAmount",
+        "creditAccount",
+        "creditAmount",
+        "preparedBy"
+      ],
+      "frontend_source": "k2/core/K2TabAdjustment.vue: ITEM_PREFIX = 'K2-3-adj' + '-entries'；persistEntries → emit('save', `${ITEM_PREFIX}-entries`, { remark: JSON.stringify(entries) })；loadFromResponses 读 saved.remark ?? saved.value",
+      "frontend_row_model": [
+        "seq",
+        "entryType",
+        "summary",
+        "debitAccount",
+        "debitAmount",
+        "creditAccount",
+        "creditAmount",
+        "preparedBy"
+      ],
+      "frontend_extra_fields": [],
+      "backend_current": {
+        "spec_registered": true,
+        "item_id": "K2-3-adj-entries",
+        "storage_field_declared": "remark",
+        "storage_field_effective": "remark",
+        "field_keys": [
+          "seq",
+          "entryType",
+          "summary",
+          "debitAccount",
+          "debitAmount",
+          "creditAccount",
+          "creditAmount",
+          "preparedBy"
+        ]
+      },
+      "status": "aligned",
+      "aligns_in_task": "2.4",
+      "drift_dimensions": [],
+      "notes": "✅ Wave 1 已对齐（Task 2.4）：`_K2_SPECS` 无 K2-3 条目 → 前端点导入导出报「不支持的 sheet」（R5.5 的注册遗漏）。K2-3 是【借贷科目分列】结构（debitAccount/creditAccount 各一列），与其余 6 张单科目行不同构，不得照抄 K3-3。行模型无 remark 列。debitAccount/creditAccount 是文本不得进数值白名单。"
+    },
+    "K3-3": {
+      "cycle": "K3",
+      "item_id": "K3-3-adj-entries",
+      "storage_field": "remark",
+      "field_keys": [
+        "seq",
+        "entryType",
+        "summary",
+        "accountCode",
+        "accountName",
+        "debitAmount",
+        "creditAmount",
+        "preparedBy",
+        "remark"
+      ],
+      "frontend_source": "k3/core/K3TabAdjustment.vue: ITEM_PREFIX = 'K3-3-adj' + '-entries'；persistEntries → emit('save', `${ITEM_PREFIX}-entries`, { remark: data }) 并同步 allResponses.set(..., { conclusion: null, remark: data })",
+      "frontend_row_model": [
+        "seq",
+        "entryType",
+        "accountCode",
+        "accountName",
+        "debitAmount",
+        "creditAmount",
+        "summary",
+        "preparedBy",
+        "remark"
+      ],
+      "frontend_extra_fields": [],
+      "backend_current": {
+        "spec_registered": true,
+        "item_id": "K3-3-adj-entries",
+        "storage_field_declared": "remark",
+        "storage_field_effective": "remark",
+        "field_keys": [
+          "seq",
+          "entryType",
+          "summary",
+          "accountCode",
+          "accountName",
+          "debitAmount",
+          "creditAmount",
+          "preparedBy",
+          "remark"
+        ]
+      },
+      "status": "aligned",
+      "aligns_in_task": "2.2",
+      "drift_dimensions": [],
+      "notes": "✅ Wave 1 已对齐（Task 2.2）：后端多 noteRef（附注说明）/voucherNo（凭证号）两列前端行模型不存在；前端多 preparedBy（编制人）后端缺。"
+    },
+    "K4-3": {
+      "cycle": "K4",
+      "item_id": "K4-3-adj-entries",
+      "storage_field": "remark",
+      "field_keys": [
+        "seq",
+        "entryNo",
+        "entryType",
+        "summary",
+        "accountCode",
+        "accountName",
+        "offsetAccount",
+        "debitAmount",
+        "creditAmount",
+        "preparedBy",
+        "source",
+        "remark"
+      ],
+      "frontend_source": "k4/core/K4TabAdjustment.vue: ITEM_PREFIX = 'K4-3-adj' + '-entries'；persistEntries → emit('save', `${ITEM_PREFIX}-entries`, { remark: JSON.stringify(entries) })",
+      "frontend_row_model": [
+        "seq",
+        "entryNo",
+        "entryType",
+        "accountCode",
+        "accountName",
+        "offsetAccount",
+        "debitAmount",
+        "creditAmount",
+        "summary",
+        "preparedBy",
+        "source",
+        "remark"
+      ],
+      "frontend_extra_fields": [],
+      "backend_current": {
+        "spec_registered": true,
+        "item_id": "K4-3-adj-entries",
+        "storage_field_declared": "remark",
+        "storage_field_effective": "remark",
+        "field_keys": [
+          "seq",
+          "entryNo",
+          "entryType",
+          "summary",
+          "accountCode",
+          "accountName",
+          "offsetAccount",
+          "debitAmount",
+          "creditAmount",
+          "preparedBy",
+          "source",
+          "remark"
+        ]
+      },
+      "status": "aligned",
+      "aligns_in_task": "2.2",
+      "drift_dimensions": [],
+      "notes": "✅ Wave 1 已对齐（Task 2.2）：后端多 noteRef/voucherNo；前端多 entryNo（编号 K4-AJE-001）/offsetAccount（对方科目）/preparedBy（编制人）/source（来源：手工/K4-4/导入），均为用户可填列，须补导出列并在导入时写回（R5.3）。"
+    },
+    "K5-3": {
+      "cycle": "K5",
+      "item_id": "K5-3-entries",
+      "storage_field": "remark",
+      "field_keys": [
+        "seq",
+        "entryType",
+        "summary",
+        "accountCode",
+        "accountName",
+        "debit",
+        "credit",
+        "indexRef"
+      ],
+      "frontend_source": "k5/core/K5TabAdjustment.vue: 字面量 'K5-3-entries'（无 adj 段）；persistEntries → emit('save', 'K5-3-entries', { remark: JSON.stringify(entries) })；loadSavedData 读 saved.remark",
+      "frontend_row_model": [
+        "seq",
+        "entryType",
+        "accountCode",
+        "accountName",
+        "summary",
+        "debit",
+        "credit",
+        "indexRef"
+      ],
+      "frontend_extra_fields": [],
+      "backend_current": {
+        "spec_registered": true,
+        "item_id": "K5-3-entries",
+        "storage_field_declared": "remark",
+        "storage_field_effective": "remark",
+        "field_keys": [
+          "seq",
+          "entryType",
+          "summary",
+          "accountCode",
+          "accountName",
+          "debit",
+          "credit",
+          "indexRef"
+        ]
+      },
+      "status": "aligned",
+      "aligns_in_task": "2.2",
+      "drift_dimensions": [],
+      "notes": "✅ Wave 1 已对齐（Task 2.2）：item_id 无 adj 段（K5-3-entries 而非 K5-3-adj-entries），是 7 张中唯一命名例外。金额键前端是 debit/credit（非 debitAmount/creditAmount）——若不对齐则导入后借贷金额不参与界面借贷平衡校验（R5.4）。前端行模型无 remark 列；后端多 noteRef/voucherNo。已核实 debit/credit 在 is_numeric_field_key 白名单内。"
+    },
+    "K6-3": {
+      "cycle": "K6",
+      "item_id": "K6-3-adj-entries",
+      "storage_field": "remark",
+      "field_keys": [
+        "seq",
+        "entryType",
+        "summary",
+        "accountCode",
+        "accountName",
+        "debitAmount",
+        "creditAmount",
+        "preparedBy",
+        "remark"
+      ],
+      "frontend_source": "k6/core/K6TabAdjustment.vue: ITEM_PREFIX = 'K6-3-adj' + '-entries'；persistEntries → emit('save', `${ITEM_PREFIX}-entries`, { remark: JSON.stringify(entries) })",
+      "frontend_row_model": [
+        "seq",
+        "entryType",
+        "accountCode",
+        "accountName",
+        "debitAmount",
+        "creditAmount",
+        "summary",
+        "preparedBy",
+        "remark"
+      ],
+      "frontend_extra_fields": [],
+      "backend_current": {
+        "spec_registered": true,
+        "item_id": "K6-3-adj-entries",
+        "storage_field_declared": "remark",
+        "storage_field_effective": "remark",
+        "field_keys": [
+          "seq",
+          "entryType",
+          "summary",
+          "accountCode",
+          "accountName",
+          "debitAmount",
+          "creditAmount",
+          "preparedBy",
+          "remark"
+        ]
+      },
+      "status": "aligned",
+      "aligns_in_task": "2.7",
+      "drift_dimensions": [],
+      "notes": "✅ Wave 1 已对齐（Task 2.7）：item_id 与 field_keys 已完全一致（field_keys 与前端行模型同集合、仅顺序按 headers 语序）；仅 storage_field 取工厂默认 conclusion 而前端读写 remark（K6TabAdjustment.persistEntries 写 remark，读 remark ?? value）。"
+    },
+    "K7-3": {
+      "cycle": "K7",
+      "item_id": "K7-3-adj-entries",
+      "storage_field": "remark",
+      "field_keys": [
+        "seq",
+        "entryType",
+        "summary",
+        "reportItem",
+        "accountName",
+        "noteItem",
+        "debitAmount",
+        "creditAmount",
+        "indexRef",
+        "remark"
+      ],
+      "frontend_source": "k7/core/K7TabAdjustment.vue: ITEM_PREFIX = 'K7-3-adj' + '-entries'；persistEntries → emit('save', `${ITEM_PREFIX}-entries`, { remark: JSON.stringify(entries) })；loadFromResponses 读 saved?.remark ?? saved?.value",
+      "frontend_row_model": [
+        "seq",
+        "entryType",
+        "summary",
+        "reportItem",
+        "accountName",
+        "noteItem",
+        "debitAmount",
+        "creditAmount",
+        "indexRef",
+        "remark"
+      ],
+      "frontend_extra_fields": [],
+      "backend_current": {
+        "spec_registered": true,
+        "item_id": "K7-3-adj-entries",
+        "storage_field_declared": "remark",
+        "storage_field_effective": "remark",
+        "field_keys": [
+          "seq",
+          "entryType",
+          "summary",
+          "reportItem",
+          "accountName",
+          "noteItem",
+          "debitAmount",
+          "creditAmount",
+          "indexRef",
+          "remark"
+        ]
+      },
+      "status": "aligned",
+      "aligns_in_task": "2.2",
+      "drift_dimensions": [],
+      "notes": "✅ Wave 1 已对齐（Task 2.2）：列结构不同构：后端 accountCode/noteRef/voucherNo 三列前端不存在，前端用 reportItem（报表项目）/noteItem（附注项目）/indexRef（索引）。前端行模型无 accountCode（K7 只按科目名称+报表项目组织）。"
+    },
+    "K8-3": {
+      "cycle": "K8",
+      "item_id": "K8-3-adj-entries",
+      "storage_field": "remark",
+      "field_keys": [
+        "summary",
+        "category",
+        "reportItem",
+        "accountName",
+        "noteItem",
+        "debitAmount",
+        "creditAmount",
+        "indexRef",
+        "remark"
+      ],
+      "frontend_source": "k8/core/K8TabAdjustment.vue: ITEM_PREFIX = 'K8-3-adj' + '-entries'；persistEntries → emit('save', `${ITEM_PREFIX}-entries`, { remark: JSON.stringify(entries) })；loadFromResponses 读 saved?.remark",
+      "frontend_row_model": [
+        "seq",
+        "category",
+        "summary",
+        "reportItem",
+        "accountName",
+        "noteItem",
+        "debitAmount",
+        "creditAmount",
+        "indexRef",
+        "remark"
+      ],
+      "frontend_extra_fields": [
+        "seq"
+      ],
+      "frontend_extra_reason": "seq 为行序重排的显示序号，导入按行序重建。",
+      "backend_current": {
+        "spec_registered": true,
+        "item_id": "K8-3-adj-entries",
+        "storage_field_declared": "remark",
+        "storage_field_effective": "remark",
+        "field_keys": [
+          "summary",
+          "category",
+          "reportItem",
+          "accountName",
+          "noteItem",
+          "debitAmount",
+          "creditAmount",
+          "indexRef",
+          "remark"
+        ]
+      },
+      "status": "aligned",
+      "aligns_in_task": "2.3",
+      "drift_dimensions": [],
+      "notes": "✅ Wave 1 已对齐（Task 2.3）：后端 description（调整事项说明）+ summary（摘要）双列，而前端行模型只有单 summary 担任「调整事项说明」→ 导出后用户填的「调整事项说明」列（description）在前端永远读不到。对齐后「调整事项说明」列绑 summary，删 description 列。⚠️ design 施工表称「后端 entryType 缺失、前端用 category」与实测不符：后端 `_K8_3_KEYS` 已含 category 且无 entryType，category 枚举（报表调整/账项调整/其他）两侧一致，无需改动——K8-3 的唯一 field_keys 真差异是 description/summary 双列。前端有 legacyTypeToCategory 兼容旧 entryType 数据，导入侧不需要该列。"
+    },
+    "K9-3": {
+      "cycle": "K9",
+      "item_id": "K9-3-adj-entries",
+      "storage_field": "remark",
+      "field_keys": [
+        "description",
+        "category",
+        "reportItem",
+        "accountName",
+        "noteItem",
+        "summary",
+        "debitAmount",
+        "creditAmount",
+        "indexRef",
+        "remark"
+      ],
+      "frontend_source": "k9/core/K9TabAdjustment.vue: ITEM_PREFIX = 'K9-3-adj' + '-entries'；persistEntries → emit('save', `${ITEM_PREFIX}-entries`, { remark: JSON.stringify(entries) })",
+      "frontend_row_model": [
+        "seq",
+        "description",
+        "category",
+        "reportItem",
+        "accountName",
+        "noteItem",
+        "summary",
+        "debitAmount",
+        "creditAmount",
+        "indexRef",
+        "remark"
+      ],
+      "frontend_extra_fields": [
+        "seq"
+      ],
+      "frontend_extra_reason": "seq 为行序重排的显示序号，导入按行序重建。",
+      "backend_current": {
+        "spec_registered": true,
+        "item_id": "K9-3-adj-entries",
+        "storage_field_declared": "remark",
+        "storage_field_effective": "remark",
+        "field_keys": [
+          "description",
+          "category",
+          "reportItem",
+          "accountName",
+          "noteItem",
+          "summary",
+          "debitAmount",
+          "creditAmount",
+          "indexRef",
+          "remark"
+        ]
+      },
+      "status": "aligned",
+      "aligns_in_task": null,
+      "drift_dimensions": [],
+      "notes": "三维全对齐（spec 显式 storage_field=\"remark\"）。Property 13 要求其导入导出产物与落库键逐字节不变，本波不得改动。"
+    },
+    "K11-3": {
+      "cycle": "K11",
+      "item_id": "K11-3-adj-entries",
+      "storage_field": "remark",
+      "field_keys": [
+        "description",
+        "category",
+        "reportItem",
+        "accountName",
+        "noteItem",
+        "summary",
+        "debitAmount",
+        "creditAmount",
+        "indexRef",
+        "remark"
+      ],
+      "frontend_source": "k11/core/K11TabAdjustment.vue: ITEM_PREFIX = 'K11-3-adj' + '-entries'；persistEntries → emit('save', `${ITEM_PREFIX}-entries`, { remark: JSON.stringify(entries) })",
+      "frontend_row_model": [
+        "seq",
+        "description",
+        "category",
+        "reportItem",
+        "accountName",
+        "noteItem",
+        "summary",
+        "debitAmount",
+        "creditAmount",
+        "indexRef",
+        "remark"
+      ],
+      "frontend_extra_fields": [
+        "seq"
+      ],
+      "frontend_extra_reason": "seq 为行序重排的显示序号，导入按行序重建。",
+      "backend_current": {
+        "spec_registered": true,
+        "item_id": "K11-3-adj-entries",
+        "storage_field_declared": null,
+        "storage_field_effective": "remark",
+        "field_keys": [
+          "description",
+          "category",
+          "reportItem",
+          "accountName",
+          "noteItem",
+          "summary",
+          "debitAmount",
+          "creditAmount",
+          "indexRef",
+          "remark"
+        ]
+      },
+      "status": "aligned",
+      "aligns_in_task": null,
+      "drift_dimensions": [],
+      "notes": "storage_field 由 router 级参数 create_cycle_import_export_router(..., storage_field=\"remark\") 提供（非 spec 内声明），守卫须按【有效值】比较而非只看 spec 字典。次要观察（Property 13 逐字节不变，故本波不改）：`_K11_3_HEADERS` 第 6 列字面量是占位「……」而对应 field_key 是 summary，建议后续规范化为「摘要」。"
+    },
+    "K12-3": {
+      "cycle": "K12",
+      "item_id": "K12-3-rows",
+      "storage_field": "remark",
+      "field_keys": [
+        "index",
+        "type",
+        "description",
+        "accountCode",
+        "accountName",
+        "debitAmount",
+        "creditAmount",
+        "refIndex",
+        "remark"
+      ],
+      "frontend_source": "composables/useK12Adjustment.ts: K12_ADJ_ROWS_KEY = 'K12-3-rows'（单一 JSON 数组存 remark；_restoreLegacyEntries 回退旧 per-field `K12-3-entry-{n}-{field}`）",
+      "frontend_row_model": [
+        "index",
+        "type",
+        "description",
+        "accountCode",
+        "accountName",
+        "debitAmount",
+        "creditAmount",
+        "refIndex",
+        "remark"
+      ],
+      "frontend_extra_fields": [],
+      "backend_current": {
+        "spec_registered": true,
+        "item_id": "K12-3-rows",
+        "storage_field_declared": "remark",
+        "storage_field_effective": "remark",
+        "field_keys": [
+          "index",
+          "type",
+          "description",
+          "accountCode",
+          "accountName",
+          "debitAmount",
+          "creditAmount",
+          "refIndex",
+          "remark"
+        ]
+      },
+      "status": "aligned",
+      "aligns_in_task": "3.1+3.2",
+      "drift_dimensions": [],
+      "notes": "✅ Wave 2 已对齐（Task 3.1+3.2）：唯一改前端存储结构的例外（用户已定：前端迁 JSON 数组 + per-field 回退读，历史数据不丢，旧 per-field 键不主动删除）。item_id 字面量后端已是 'K12-3-rows'，但结构级不匹配（后端写 JSON 数组、前端读 per-field 键）。后端 field_keys 另有错位列 category/reportItem/noteItem/summary/indexRef（前端行模型不存在），须改为前端行模型字段并把索引列绑 refIndex（非 indexRef）。前端行模型的 index 是序号列（tasks.md 3.2 明列，导入可按行序重建）。"
+    },
+    "K13-3": {
+      "cycle": "K13",
+      "item_id": "K13-3-adj-entries",
+      "storage_field": "remark",
+      "field_keys": [
+        "type",
+        "description",
+        "category",
+        "reportItem",
+        "accountName",
+        "noteItem",
+        "debitAmount",
+        "creditAmount",
+        "refIndex",
+        "remark"
+      ],
+      "frontend_source": "composables/useK13Adjustment.ts: ITEM_KEY = 'K13-3-adj-entries'（单一 JSON 数组存 remark；_restoreLegacyEntries 兼容旧 per-field `K13-3-entry-{n}-{field}`）",
+      "frontend_row_model": [
+        "index",
+        "type",
+        "category",
+        "description",
+        "reportItem",
+        "accountName",
+        "noteItem",
+        "debitAmount",
+        "creditAmount",
+        "refIndex",
+        "remark"
+      ],
+      "frontend_extra_fields": [
+        "index"
+      ],
+      "frontend_extra_reason": "index 为序号列，导入按行序重建。",
+      "backend_current": {
+        "spec_registered": true,
+        "item_id": "K13-3-adj-entries",
+        "storage_field_declared": "remark",
+        "storage_field_effective": "remark",
+        "field_keys": [
+          "type",
+          "description",
+          "category",
+          "reportItem",
+          "accountName",
+          "noteItem",
+          "debitAmount",
+          "creditAmount",
+          "refIndex",
+          "remark"
+        ]
+      },
+      "status": "aligned",
+      "aligns_in_task": null,
+      "drift_dimensions": [],
+      "notes": "三维全对齐。K13-3 用 refIndex（其余源模板 10 列型用 indexRef）且首列多 type（AJE/RJE），是两处命名/列集合不统一但已两侧一致，Property 13 要求逐字节不变，本波不改。"
+    },
+    "I5-3": {
+      "cycle": "I5",
+      "item_id": "I5-3-rows",
+      "storage_field": "remark",
+      "field_keys": [
+        "description",
+        "category",
+        "reportItem",
+        "accountName",
+        "noteItem",
+        "summary",
+        "debitAmount",
+        "creditAmount",
+        "indexRef",
+        "remark"
+      ],
+      "frontend_source": "composables/useI5Adjustment.ts: ROWS_KEY = 'I5-3-rows'（I5AdjustmentRow）",
+      "frontend_row_model": [
+        "seq",
+        "description",
+        "category",
+        "entryType",
+        "reportItem",
+        "accountCode",
+        "accountName",
+        "noteItem",
+        "debitAmount",
+        "creditAmount",
+        "indexRef",
+        "remark",
+        "projectName"
+      ],
+      "frontend_extra_fields": [
+        "seq",
+        "entryType",
+        "accountCode",
+        "projectName"
+      ],
+      "frontend_extra_reason": "seq 序号列 / entryType 由 category 派生（entryTypeFromCategory）；accountCode 与 projectName（供 I5-1/I5-2 精确匹配）是【用户可填但导出列未覆盖】的已知 Property 10 缺口 —— Task 2.7 只改 storage_field（headers/field_keys 一律不动），故本条 field_keys 保持后端现值作为 Property 9 断言基准，该缺口另行处理不隐藏。",
+      "backend_current": {
+        "spec_registered": true,
+        "item_id": "I5-3-rows",
+        "storage_field_declared": "remark",
+        "storage_field_effective": "remark",
+        "field_keys": [
+          "description",
+          "category",
+          "reportItem",
+          "accountName",
+          "noteItem",
+          "summary",
+          "debitAmount",
+          "creditAmount",
+          "indexRef",
+          "remark"
+        ]
+      },
+      "status": "aligned",
+      "aligns_in_task": "2.7",
+      "drift_dimensions": [],
+      "notes": "✅ Wave 1 已对齐（Task 2.7）：item_id 一致；仅 storage_field 取工厂默认 conclusion 而前端（useI5Adjustment / useI5CrossSheet）读写 remark。"
+    },
+    "I6-3": {
+      "cycle": "I6",
+      "item_id": "I6-3-rows",
+      "storage_field": "remark",
+      "field_keys": [
+        "description",
+        "category",
+        "reportItem",
+        "accountName",
+        "noteItem",
+        "summary",
+        "debitAmount",
+        "creditAmount",
+        "indexRef",
+        "remark"
+      ],
+      "frontend_source": "composables/useI6Adjustment.ts: ROWS_KEY = 'I6-3-rows'（I6AdjustmentRow）",
+      "frontend_row_model": [
+        "seq",
+        "description",
+        "category",
+        "entryType",
+        "reportItem",
+        "accountCode",
+        "accountName",
+        "noteItem",
+        "debitAmount",
+        "creditAmount",
+        "indexRef",
+        "remark"
+      ],
+      "frontend_extra_fields": [
+        "seq",
+        "entryType",
+        "accountCode"
+      ],
+      "frontend_extra_reason": "seq 序号列 / entryType 由 category 派生；accountCode 是【用户可填但导出列未覆盖】的已知 Property 10 缺口，同 I5-3 处理口径。",
+      "backend_current": {
+        "spec_registered": true,
+        "item_id": "I6-3-rows",
+        "storage_field_declared": "remark",
+        "storage_field_effective": "remark",
+        "field_keys": [
+          "description",
+          "category",
+          "reportItem",
+          "accountName",
+          "noteItem",
+          "summary",
+          "debitAmount",
+          "creditAmount",
+          "indexRef",
+          "remark"
+        ]
+      },
+      "status": "aligned",
+      "aligns_in_task": "2.7",
+      "drift_dimensions": [],
+      "notes": "✅ Wave 1 已对齐（Task 2.7）：item_id 一致；仅 storage_field 取工厂默认 conclusion 而前端（useI6Adjustment / i6AdjDraftHelpers）读写 remark。"
+    }
+  },
+  "exempt": {
+    "_exempt_kinds": {
+      "out_of_scope_backend_registered": "后端已注册调整 sheet，但 design 施工表未列、不在本 spec Wave 1/2 施工范围；已记录实测观测值供后续 spec 使用。不参与 Property 9 断言。",
+      "no_backend_spec": "前端存在调整分录持久化键，但后端无对应调整 sheet 的导入导出 Sheet_Spec（该 sheet 不支持底稿通道导入导出）→ 无 Orphan_Key 风险，故豁免。",
+      "not_cycle_ie_factory": "不走 create_cycle_import_export_router 数据驱动工厂（自建 router / 独立字段映射体系），三重键契约不适用。",
+      "not_cycle_ie_factory_key_shared": "前端调整键由 bespoke 自建 IE router（D/G4 等，非 create_cycle_import_export_router 工厂）以同名键字面量读写 → 该模块自带字段映射体系，本 spec 的工厂式三重键契约不适用；已记录后端命中模块供后续 spec 核查其 storage_field/字段映射。"
+    },
+    "H1-3": {
+      "kind": "out_of_scope_backend_registered",
+      "reason": "本 spec 范围外（design 施工表未列）。实测：后端 _H1_SPECS['H1-3'].item_id='H1-3-rows'（与前端 useH1Adjustment 持久化键一致），但未声明 storage_field 且 h1 router 未传 → 有效值 conclusion，而前端 useH1CrossSheet / useH1Adjudication 读 remark → 与 K1-4/K6-3/I5-3/I6-3 同款第三种 Orphan_Key。建议后续 spec 一并加 storage_field=\"remark\"。",
+      "observed": {
+        "backend_item_id": "H1-3-rows",
+        "backend_storage_field_effective": "conclusion",
+        "frontend_key": "H1-3-rows",
+        "frontend_field": "remark"
+      }
+    },
+    "H2-3": {
+      "kind": "out_of_scope_backend_registered",
+      "reason": "本 spec 范围外。实测同 H1-3：后端 item_id='H2-3-rows' 一致，storage_field 未声明（h2 的 _cycle_router 亦未传）→ conclusion，前端 useH2Adjustment(ROWS_KEY='H2-3-rows') / useH2CrossSheet 读 remark。",
+      "observed": {
+        "backend_item_id": "H2-3-rows",
+        "backend_storage_field_effective": "conclusion",
+        "frontend_key": "H2-3-rows",
+        "frontend_field": "remark"
+      }
+    },
+    "H3-3": {
+      "kind": "out_of_scope_backend_registered",
+      "reason": "本 spec 范围外。实测：后端 item_id='H3-3-rows'，storage_field 未声明 → conclusion（同文件 H3-5 各变体反而显式声明了 remark，故 H3-3 大概率是漏声明）。前端读写列待逐一核实后再对齐。",
+      "observed": {
+        "backend_item_id": "H3-3-rows",
+        "backend_storage_field_effective": "conclusion"
+      }
+    },
+    "H4-3": {
+      "kind": "out_of_scope_backend_registered",
+      "reason": "本 spec 范围外。实测：后端 item_id='H4-3-rows' 一致，storage_field 未声明 → conclusion；前端 useH4Adjustment(ROWS_KEY='H4-3-rows') / useH4CrossSheet / h4AdjustmentDraftPush 读 remark。",
+      "observed": {
+        "backend_item_id": "H4-3-rows",
+        "backend_storage_field_effective": "conclusion",
+        "frontend_key": "H4-3-rows",
+        "frontend_field": "remark"
+      }
+    },
+    "H6-3": {
+      "kind": "out_of_scope_backend_registered",
+      "reason": "本 spec 范围外。实测：后端 item_id='H6-3-rows' 一致，storage_field 未声明 → conclusion；前端 useH6Adjustment(ROWS_KEY='H6-3-rows') 写 remark，useH6CrossSheet 读 remark ?? conclusion（双读兼容）。",
+      "observed": {
+        "backend_item_id": "H6-3-rows",
+        "backend_storage_field_effective": "conclusion",
+        "frontend_key": "H6-3-rows",
+        "frontend_field": "remark"
+      }
+    },
+    "H8-3": {
+      "kind": "out_of_scope_backend_registered",
+      "reason": "本 spec 范围外。实测三维疑似已对齐：后端 item_id='H8-3-rows' + 显式 storage_field=\"remark\"（另有 dual_write=True）。",
+      "observed": {
+        "backend_item_id": "H8-3-rows",
+        "backend_storage_field_effective": "remark",
+        "frontend_key": "H8-3-rows"
+      }
+    },
+    "H10-3": {
+      "kind": "out_of_scope_backend_registered",
+      "reason": "本 spec 范围外。实测：后端 item_id='H10-aje-rows'（与 G 循环同族命名），前端亦以 *-aje-rows 为持久化键，item_id 维度无漂移；storage_field 待核。",
+      "observed": {
+        "backend_item_id": "H10-aje-rows"
+      }
+    },
+    "I1-3": {
+      "kind": "out_of_scope_backend_registered",
+      "reason": "本 spec 范围外。实测：后端 item_id='I1-3-rows' 一致，storage_field 未声明且 i1 router 未传 → conclusion；前端 useI1Adjustment(ROWS_KEY='I1-3-rows') / useI1CrossSheet / useI1Adjudication 读 remark → 同款第三种 Orphan_Key。",
+      "observed": {
+        "backend_item_id": "I1-3-rows",
+        "backend_storage_field_effective": "conclusion",
+        "frontend_key": "I1-3-rows",
+        "frontend_field": "remark"
+      }
+    },
+    "I3-3": {
+      "kind": "out_of_scope_backend_registered",
+      "reason": "本 spec 范围外。实测三维疑似已对齐：后端 item_id='I3-3-rows' + 显式 storage_field=\"remark\"（dual_write=True）；前端 useI3Adjustment(ROWS_KEY='I3-3-rows') 读 remark。",
+      "observed": {
+        "backend_item_id": "I3-3-rows",
+        "backend_storage_field_effective": "remark",
+        "frontend_key": "I3-3-rows",
+        "frontend_field": "remark"
+      }
+    },
+    "G1-3": {
+      "kind": "out_of_scope_backend_registered",
+      "reason": "本 spec 范围外。实测后端 item_id='G1-3-rows'；storage_field 待核。",
+      "observed": {
+        "backend_item_id": "G1-3-rows"
+      }
+    },
+    "G2-4": {
+      "kind": "out_of_scope_backend_registered",
+      "reason": "本 spec 范围外（G2 的调整 sheet 编号是 -4 非 -3）。实测后端 item_id='G2-4-rows'。",
+      "observed": {
+        "backend_item_id": "G2-4-rows"
+      }
+    },
+    "G3-3": {
+      "kind": "out_of_scope_backend_registered",
+      "reason": "本 spec 范围外。实测后端 item_id='G3-3-adjustment-rows'，前端 useG3Adjustment 以 G3_ADJUSTMENT_ROWS_KEY 为主键并把 'G3-3-adjustment-rows' 作 LEGACY_STORAGE_KEY 兼容读 → 后端指向的是前端 legacy 键，需核实主键是否已改名。",
+      "observed": {
+        "backend_item_id": "G3-3-adjustment-rows",
+        "frontend_note": "前端 LEGACY_STORAGE_KEY = 'G3-3-adjustment-rows'，主键为 G3_ADJUSTMENT_ROWS_KEY 常量"
+      }
+    },
+    "G5-4": {
+      "kind": "out_of_scope_backend_registered",
+      "reason": "本 spec 范围外（G5 的调整 sheet 编号是 -4）。实测后端 item_id='G5-4-rows'。",
+      "observed": {
+        "backend_item_id": "G5-4-rows"
+      }
+    },
+    "G8-3": {
+      "kind": "out_of_scope_backend_registered",
+      "reason": "本 spec 范围外。实测 item_id 维度无漂移：后端 'G8-adjustment-rows' == 前端 useG8Adjustment.ITEM_ID_ROWS / g8CrossHelpers.G8_ADJ_KEY（读 remark）。⚠️ 该 sheet 的 useAdjustmentCentralSync itemId 是 'G8-3-rows'（中央同步 source_ref 标识，非持久化键），勿据此误判漂移。",
+      "observed": {
+        "backend_item_id": "G8-adjustment-rows",
+        "frontend_key": "G8-adjustment-rows",
+        "frontend_field": "remark"
+      }
+    },
+    "G9-3": {
+      "kind": "out_of_scope_backend_registered",
+      "reason": "本 spec 范围外。实测三维疑似已对齐：后端 item_id='G9-adjustment-rows' + router 级 storage_field=\"remark\"；前端 useG9Adjustment.ITEM_ID_ROWS='G9-adjustment-rows' 读 remark。",
+      "observed": {
+        "backend_item_id": "G9-adjustment-rows",
+        "backend_storage_field_effective": "remark",
+        "frontend_key": "G9-adjustment-rows",
+        "frontend_field": "remark"
+      }
+    },
+    "G10-3": {
+      "kind": "out_of_scope_backend_registered",
+      "reason": "本 spec 范围外。实测三维疑似已对齐：后端 item_id='G10-aje-rows' + router 级 storage_field=\"remark\"；前端 useG10Adjustment.ITEM_ID_ROWS / g10AdjStorage.G10_AJE_ROWS_KEY 同名，读写 remark。",
+      "observed": {
+        "backend_item_id": "G10-aje-rows",
+        "backend_storage_field_effective": "remark",
+        "frontend_key": "G10-aje-rows",
+        "frontend_field": "remark"
+      }
+    },
+    "G11-3": {
+      "kind": "out_of_scope_backend_registered",
+      "reason": "本 spec 范围外。实测：后端 item_id='G11-aje-rows' 与前端 useG11Adjustment.ITEM_ID_ROWS 一致；g11 使用自建端点并以 sp.get('storage_field','remark') 取值（默认 remark）。",
+      "observed": {
+        "backend_item_id": "G11-aje-rows",
+        "backend_storage_field_effective": "remark",
+        "frontend_key": "G11-aje-rows"
+      }
+    },
+    "G12-3": {
+      "kind": "out_of_scope_backend_registered",
+      "reason": "本 spec 范围外。实测三维疑似已对齐：后端 item_id='G12-aje-rows' + router 级 storage_field=\"remark\"；前端 useG12Adjustment.ITEM_ID / g12VoucherCross.G12_AJE_KEY 同名，读 remark。",
+      "observed": {
+        "backend_item_id": "G12-aje-rows",
+        "backend_storage_field_effective": "remark",
+        "frontend_key": "G12-aje-rows",
+        "frontend_field": "remark"
+      }
+    },
+    "G13-3": {
+      "kind": "out_of_scope_backend_registered",
+      "reason": "本 spec 范围外。实测三维疑似已对齐：后端 item_id='G13-aje-rows' + router 级 storage_field=\"remark\"；前端 useG13Adjustment.ITEM_ID_ROWS / g13FvCrossHelpers.G13_AJE_ITEM_ID 同名。",
+      "observed": {
+        "backend_item_id": "G13-aje-rows",
+        "backend_storage_field_effective": "remark",
+        "frontend_key": "G13-aje-rows"
+      }
+    },
+    "G14-3": {
+      "kind": "out_of_scope_backend_registered",
+      "reason": "本 spec 范围外。实测三维疑似已对齐：后端 item_id='G14-aje-rows' + router 级 storage_field=\"remark\"；前端 useG14Adjustment.ITEM_ID_ROWS 同名。",
+      "observed": {
+        "backend_item_id": "G14-aje-rows",
+        "backend_storage_field_effective": "remark",
+        "frontend_key": "G14-aje-rows"
+      }
+    },
+    "F3-3": {
+      "kind": "out_of_scope_backend_registered",
+      "reason": "本 spec 范围外。f3 使用自建 router 且模块级 _STORAGE_FIELD = \"remark\"（不走工厂默认），后端 item_id='F3-3-rows'。",
+      "observed": {
+        "backend_item_id": "F3-3-rows",
+        "backend_storage_field_effective": "remark"
+      }
+    },
+    "F4-3": {
+      "kind": "out_of_scope_backend_registered",
+      "reason": "本 spec 范围外。实测后端 item_id='F4-3-rows' + router 级 storage_field=\"remark\"（注释明写「F4 前端动态行统一写入 remark」）。",
+      "observed": {
+        "backend_item_id": "F4-3-rows",
+        "backend_storage_field_effective": "remark"
+      }
+    },
+    "F5-4": {
+      "kind": "out_of_scope_backend_registered",
+      "reason": "本 spec 范围外（F5 的调整 sheet 编号是 -4）。实测后端 item_id='F5-4-rows' + router 级 storage_field=\"remark\"。",
+      "observed": {
+        "backend_item_id": "F5-4-rows",
+        "backend_storage_field_effective": "remark"
+      }
+    },
+    "F2-14": {
+      "kind": "not_cycle_ie_factory",
+      "reason": "F2 存货 IE 走自有 sheet kind 分派（_F2_SHEETS['F2-14'] = {kind:'adjustment'}），不使用工厂的 item_id/storage_field/field_keys 三元组，三重键契约不适用。",
+      "observed": {
+        "backend_spec": "_F2_SHEETS['F2-14'] kind=adjustment（无 item_id 字段）"
+      }
+    },
+    "E1-5": {
+      "kind": "not_cycle_ie_factory",
+      "reason": "E1 货币资金 IE 使用独立的 _FIELD_MAPS（中文列名 → canonical 字段）+ _FORMULA_FIELDS/_NUMERIC_FIELDS/_LEGACY_EXPORT_ALIASES 体系，非工厂 _SPECS，三重键契约不适用。E1-5 调整分录列已按 debit/credit/indexNo 映射。",
+      "observed": {
+        "backend_spec": "_e1_import_export._FIELD_MAPS['E1-5']"
+      }
+    },
+    "D4-4": {
+      "kind": "no_backend_spec",
+      "reason": "前端 useD4Adjustment 持久化 'D4-4-rows'，但 D 循环后端 IE 未注册调整 sheet Sheet_Spec → 不经底稿导入通道写入，无 Orphan_Key 风险。",
+      "observed": {
+        "frontend_key": "D4-4-rows"
+      }
+    },
+    "G6-4": {
+      "kind": "no_backend_spec",
+      "reason": "前端存在调整持久化键（G6TabAdjustment），后端 G6 IE 未注册调整 sheet。",
+      "observed": {
+        "frontend_key": "G6-4-rows"
+      }
+    },
+    "G7-3": {
+      "kind": "no_backend_spec",
+      "reason": "前端 G7TabAdjustment ROWS_KEY='G7-3-rows'，后端 G7 IE 未注册调整 sheet。",
+      "observed": {
+        "frontend_key": "G7-3-rows"
+      }
+    },
+    "H5-3": {
+      "kind": "no_backend_spec",
+      "reason": "前端 H5TabAdjustment 持久化 'H5-3-entries'，后端 H5 IE 未注册调整 sheet。",
+      "observed": {
+        "frontend_key": "H5-3-entries"
+      }
+    },
+    "H7-3": {
+      "kind": "no_backend_spec",
+      "reason": "前端 H7TabAdjustment 自持久化 'H7-3-rows'，后端 H7 IE 未注册调整 sheet。",
+      "observed": {
+        "frontend_key": "H7-3-rows"
+      }
+    },
+    "I2-3": {
+      "kind": "no_backend_spec",
+      "reason": "前端 I2TabAdjustment 'I2-3-rows'，后端 I2 IE 未注册调整 sheet。",
+      "observed": {
+        "frontend_key": "I2-3-rows"
+      }
+    },
+    "I4-3": {
+      "kind": "no_backend_spec",
+      "reason": "前端 I4TabAdjustment 'I4-3-rows'，后端 I4 IE 未注册调整 sheet。",
+      "observed": {
+        "frontend_key": "I4-3-rows"
+      }
+    },
+    "J1-3": {
+      "kind": "no_backend_spec",
+      "reason": "前端 J1TabAdjustment STORAGE_KEY='J1-3-adjustment-rows'（自持久化），后端 J1 IE 未注册调整 sheet。",
+      "observed": {
+        "frontend_key": "J1-3-adjustment-rows"
+      }
+    },
+    "J2-3": {
+      "kind": "no_backend_spec",
+      "reason": "前端 J2TabAdjustment KEY.entries='J2-3-entries'（存 remark，复用父 GtJ2 saveImmediate），后端 J2 IE 未注册调整 sheet。",
+      "observed": {
+        "frontend_key": "J2-3-entries"
+      }
+    },
+    "K10-3": {
+      "kind": "no_backend_spec",
+      "reason": "前端 K10TabAdjustment 'K10-3-entries'，_K10_SPECS 未注册 K10-3。",
+      "observed": {
+        "frontend_key": "K10-3-entries"
+      }
+    },
+    "L8-3": {
+      "kind": "no_backend_spec",
+      "reason": "前端 L8TabAdjustment 'L8-3-entries-data'（读 remark），L 循环后端 IE 未注册调整 sheet。",
+      "observed": {
+        "frontend_key": "L8-3-entries-data",
+        "frontend_field": "remark"
+      }
+    },
+    "N1-3": {
+      "kind": "no_backend_spec",
+      "reason": "前端 N1TabAdjustment 'N1-3-entries' 且读写 conclusion 列（与多数循环相反），N 循环后端 IE 未注册调整 sheet。",
+      "observed": {
+        "frontend_key": "N1-3-entries",
+        "frontend_field": "conclusion"
+      }
+    },
+    "N2-3": {
+      "kind": "no_backend_spec",
+      "reason": "前端 N2TabAdjustment 'N2-3-entries'（conclusion 列），后端未注册。",
+      "observed": {
+        "frontend_key": "N2-3-entries",
+        "frontend_field": "conclusion"
+      }
+    },
+    "N3-3": {
+      "kind": "no_backend_spec",
+      "reason": "前端 N3TabAdjustment 'N3-3-entries'（conclusion 列），后端未注册。",
+      "observed": {
+        "frontend_key": "N3-3-entries",
+        "frontend_field": "conclusion"
+      }
+    },
+    "N4-3": {
+      "kind": "no_backend_spec",
+      "reason": "前端 N4TabAdjustment 'N4-3-entries'（经 formData.saveResponse），后端未注册。",
+      "observed": {
+        "frontend_key": "N4-3-entries"
+      }
+    },
+    "N5-3": {
+      "kind": "no_backend_spec",
+      "reason": "前端 N5TabAdjustment 'N5-3-entries'，后端未注册。",
+      "observed": {
+        "frontend_key": "N5-3-entries"
+      }
+    },
+    "D1": {
+      "kind": "no_backend_spec",
+      "reason": "前端存在调整分录持久化键，但全部 *_import_export.py 均未出现该 sheet / 键字面量 → 该 sheet 无底稿通道导入导出，无 Orphan_Key 风险，故豁免。",
+      "observed": {
+        "frontend_keys": [
+          "D1-adj-bank-acceptance-aje-dr",
+          "D1-adj-bank-acceptance-rje-dr",
+          "D1-adjustment",
+          "D1-adjustment-header",
+          "D1-entry-rows"
+        ],
+        "frontend_files": [
+          "src/components/workpaper/composables/useD1Adjustment.ts",
+          "src/components/workpaper/d1/D1TabAdjustment.vue"
+        ],
+        "backend_key_hits": {},
+        "backend_sheet_modules": []
+      }
+    },
+    "D2": {
+      "kind": "not_cycle_ie_factory_key_shared",
+      "reason": "本 spec 范围外（bespoke 自建 router）。实测后端 _d2_import_export.py 源码内出现同名键字面量 ['D2-entry-rows']，字段映射与 storage_field 由该模块自行处理，不走工厂三重键契约。",
+      "observed": {
+        "frontend_keys": [
+          "D2-adjustment",
+          "D2-adjustment-header",
+          "D2-entry-rows"
+        ],
+        "frontend_files": [
+          "src/components/workpaper/composables/useD2Adjustment.ts",
+          "src/components/workpaper/d2/D2TabAdjustment.vue"
+        ],
+        "backend_key_hits": {
+          "D2-entry-rows": [
+            "_d2_import_export.py"
+          ]
+        },
+        "backend_sheet_modules": []
+      }
+    },
+    "D3": {
+      "kind": "not_cycle_ie_factory_key_shared",
+      "reason": "本 spec 范围外（bespoke 自建 router）。实测后端 _d3_import_export.py 源码内出现同名键字面量 ['D3-aje-rows']，字段映射与 storage_field 由该模块自行处理，不走工厂三重键契约。",
+      "observed": {
+        "frontend_keys": [
+          "D3-aje-header",
+          "D3-aje-rows"
+        ],
+        "frontend_files": [
+          "src/components/workpaper/composables/useD3Adjustment.ts",
+          "src/components/workpaper/d3/D3TabAdjustment.vue"
+        ],
+        "backend_key_hits": {
+          "D3-aje-rows": [
+            "_d3_import_export.py"
+          ]
+        },
+        "backend_sheet_modules": [
+          "_d3_import_export.py"
+        ]
+      }
+    },
+    "D5-3": {
+      "kind": "not_cycle_ie_factory_key_shared",
+      "reason": "本 spec 范围外（bespoke 自建 router）。实测后端 _d5_import_export.py 源码内出现同名键字面量 ['D5-3-rows']，字段映射与 storage_field 由该模块自行处理，不走工厂三重键契约。",
+      "observed": {
+        "frontend_keys": [
+          "D5-3-rows"
+        ],
+        "frontend_files": [
+          "src/components/workpaper/composables/useD5Adjustment.ts",
+          "src/components/workpaper/d5/D5TabAdjustment.vue"
+        ],
+        "backend_key_hits": {
+          "D5-3-rows": [
+            "_d5_import_export.py"
+          ]
+        },
+        "backend_sheet_modules": [
+          "_d5_import_export.py"
+        ]
+      }
+    },
+    "D6-4": {
+      "kind": "no_backend_spec",
+      "reason": "前端存在调整分录持久化键，但全部 *_import_export.py 均未出现该 sheet / 键字面量 → 该 sheet 无底稿通道导入导出，无 Orphan_Key 风险，故豁免。",
+      "observed": {
+        "frontend_keys": [
+          "D6-4-rows"
+        ],
+        "frontend_files": [
+          "src/components/workpaper/composables/useD6Adjustment.ts",
+          "src/components/workpaper/d6/D6TabAdjustment.vue"
+        ],
+        "backend_key_hits": {},
+        "backend_sheet_modules": []
+      }
+    },
+    "D7-3": {
+      "kind": "not_cycle_ie_factory_key_shared",
+      "reason": "本 spec 范围外（bespoke 自建 router）。实测后端 _d7_import_export.py 源码内出现同名键字面量 ['D7-3-rows']，字段映射与 storage_field 由该模块自行处理，不走工厂三重键契约。",
+      "observed": {
+        "frontend_keys": [
+          "D7-3-rows"
+        ],
+        "frontend_files": [
+          "src/components/workpaper/composables/useD7Adjustment.ts",
+          "src/components/workpaper/d7/D7TabAdjustment.vue"
+        ],
+        "backend_key_hits": {
+          "D7-3-rows": [
+            "_d7_import_export.py"
+          ]
+        },
+        "backend_sheet_modules": [
+          "_d7_import_export.py"
+        ]
+      }
+    },
+    "F1": {
+      "kind": "not_cycle_ie_factory",
+      "reason": "本 spec 范围外（bespoke 自建 router）。实测后端 _f1_import_export.py 支持该 sheet，但未出现前端调整键字面量（该 sheet 的调整分录可能不在其导入导出范围内）；不走工厂三重键契约。",
+      "observed": {
+        "frontend_keys": [
+          "F1-adjustment-audit-conclusion",
+          "F1-adjustment-audit-note",
+          "F1-aje-rows"
+        ],
+        "frontend_files": [
+          "src/components/workpaper/composables/useF1Adjustment.ts",
+          "src/components/workpaper/f1/F1TabAdjustment.vue"
+        ],
+        "backend_key_hits": {},
+        "backend_sheet_modules": [
+          "_f1_import_export.py"
+        ]
+      }
+    },
+    "G4-3": {
+      "kind": "not_cycle_ie_factory_key_shared",
+      "reason": "本 spec 范围外（bespoke 自建 router）。实测后端 _g4_bond_investment_main_import_export.py 源码内出现同名键字面量 ['G4-3-rows']，字段映射与 storage_field 由该模块自行处理，不走工厂三重键契约。",
+      "observed": {
+        "frontend_keys": [
+          "G4-3-adjustment",
+          "G4-3-adjustment-audit-conclusion",
+          "G4-3-adjustment-audit-note",
+          "G4-3-rows"
+        ],
+        "frontend_files": [
+          "src/components/workpaper/g4-bond-investment-main/core/G4TabAdjustment.vue"
+        ],
+        "backend_key_hits": {
+          "G4-3-rows": [
+            "_g4_bond_investment_main_import_export.py"
+          ]
+        },
+        "backend_sheet_modules": [
+          "_g4_bond_investment_main_import_export.py"
+        ]
+      }
+    },
+    "H9-4": {
+      "kind": "no_backend_spec",
+      "reason": "前端存在调整分录持久化键，但全部 *_import_export.py 均未出现该 sheet / 键字面量 → 该 sheet 无底稿通道导入导出，无 Orphan_Key 风险，故豁免。",
+      "observed": {
+        "frontend_keys": [
+          "H9-4-adjustment",
+          "H9-4-aje-net",
+          "H9-4-rje-net",
+          "H9-4-rows"
+        ],
+        "frontend_files": [
+          "src/components/workpaper/composables/useH9Adjustment.ts",
+          "src/components/workpaper/h9/core/H9TabAdjustment.vue"
+        ],
+        "backend_key_hits": {},
+        "backend_sheet_modules": []
+      }
+    },
+    "H9-5": {
+      "kind": "no_backend_spec",
+      "reason": "前端存在调整分录持久化键，但全部 *_import_export.py 均未出现该 sheet / 键字面量 → 该 sheet 无底稿通道导入导出，无 Orphan_Key 风险，故豁免。",
+      "observed": {
+        "frontend_keys": [
+          "H9-5-aje-net",
+          "H9-5-rje-net",
+          "H9-5-rows"
+        ],
+        "frontend_files": [
+          "src/components/workpaper/composables/useH9Adjustment.ts",
+          "src/components/workpaper/h9/core/H9TabAdjustment.vue"
+        ],
+        "backend_key_hits": {},
+        "backend_sheet_modules": []
+      }
+    },
+    "L2": {
+      "kind": "no_backend_spec",
+      "reason": "前端存在调整分录持久化键，但全部 *_import_export.py 均未出现该 sheet / 键字面量 → 该 sheet 无底稿通道导入导出，无 Orphan_Key 风险，故豁免。",
+      "observed": {
+        "frontend_keys": [
+          "L2-L2-3-entries"
+        ],
+        "frontend_files": [
+          "src/components/workpaper/composables/useL2Adjustment.ts"
+        ],
+        "backend_key_hits": {},
+        "backend_sheet_modules": []
+      }
+    },
+    "L2-3": {
+      "kind": "no_backend_spec",
+      "reason": "前端存在调整分录持久化键，但全部 *_import_export.py 均未出现该 sheet / 键字面量 → 该 sheet 无底稿通道导入导出，无 Orphan_Key 风险，故豁免。",
+      "observed": {
+        "frontend_keys": [
+          "L2-3-adjustment"
+        ],
+        "frontend_files": [
+          "src/components/workpaper/l2/core/L2TabAdjustment.vue"
+        ],
+        "backend_key_hits": {},
+        "backend_sheet_modules": []
+      }
+    },
+    "L7-3": {
+      "kind": "no_backend_spec",
+      "reason": "前端存在调整分录持久化键，但全部 *_import_export.py 均未出现该 sheet / 键字面量 → 该 sheet 无底稿通道导入导出，无 Orphan_Key 风险，故豁免。",
+      "observed": {
+        "frontend_keys": [
+          "L7-3-adjustment"
+        ],
+        "frontend_files": [
+          "src/components/workpaper/l7/core/L7TabAdjustment.vue"
+        ],
+        "backend_key_hits": {},
+        "backend_sheet_modules": []
+      }
+    },
+    "M1-3": {
+      "kind": "no_backend_spec",
+      "reason": "前端存在调整分录持久化键，但全部 *_import_export.py 均未出现该 sheet / 键字面量 → 该 sheet 无底稿通道导入导出，无 Orphan_Key 风险，故豁免。",
+      "observed": {
+        "frontend_keys": [
+          "M1-3-adjustment"
+        ],
+        "frontend_files": [
+          "src/components/workpaper/m1/core/M1TabAdjustment.vue"
+        ],
+        "backend_key_hits": {},
+        "backend_sheet_modules": []
+      }
+    },
+    "M10-3": {
+      "kind": "no_backend_spec",
+      "reason": "前端存在调整分录持久化键，但全部 *_import_export.py 均未出现该 sheet / 键字面量 → 该 sheet 无底稿通道导入导出，无 Orphan_Key 风险，故豁免。",
+      "observed": {
+        "frontend_keys": [
+          "M10-3-adjustment"
+        ],
+        "frontend_files": [
+          "src/components/workpaper/m10/core/M10TabAdjustment.vue"
+        ],
+        "backend_key_hits": {},
+        "backend_sheet_modules": []
+      }
+    },
+    "M2": {
+      "kind": "no_backend_spec",
+      "reason": "前端存在调整分录持久化键，但全部 *_import_export.py 均未出现该 sheet / 键字面量 → 该 sheet 无底稿通道导入导出，无 Orphan_Key 风险，故豁免。",
+      "observed": {
+        "frontend_keys": [
+          "M2-M2-3-adjustment-note"
+        ],
+        "frontend_files": [
+          "src/components/workpaper/m2/core/M2TabAdjustment.vue"
+        ],
+        "backend_key_hits": {},
+        "backend_sheet_modules": []
+      }
+    },
+    "M2-3": {
+      "kind": "no_backend_spec",
+      "reason": "前端存在调整分录持久化键，但全部 *_import_export.py 均未出现该 sheet / 键字面量 → 该 sheet 无底稿通道导入导出，无 Orphan_Key 风险，故豁免。",
+      "observed": {
+        "frontend_keys": [
+          "M2-3-adjustment"
+        ],
+        "frontend_files": [
+          "src/components/workpaper/m2/core/M2TabAdjustment.vue"
+        ],
+        "backend_key_hits": {},
+        "backend_sheet_modules": []
+      }
+    },
+    "M3-3": {
+      "kind": "no_backend_spec",
+      "reason": "前端存在调整分录持久化键，但全部 *_import_export.py 均未出现该 sheet / 键字面量 → 该 sheet 无底稿通道导入导出，无 Orphan_Key 风险，故豁免。",
+      "observed": {
+        "frontend_keys": [
+          "M3-3-adjustment"
+        ],
+        "frontend_files": [
+          "src/components/workpaper/m3/core/M3TabAdjustment.vue"
+        ],
+        "backend_key_hits": {},
+        "backend_sheet_modules": []
+      }
+    },
+    "M4-3": {
+      "kind": "no_backend_spec",
+      "reason": "前端存在调整分录持久化键，但全部 *_import_export.py 均未出现该 sheet / 键字面量 → 该 sheet 无底稿通道导入导出，无 Orphan_Key 风险，故豁免。",
+      "observed": {
+        "frontend_keys": [
+          "M4-3-adjustment"
+        ],
+        "frontend_files": [
+          "src/components/workpaper/m4/core/M4TabAdjustment.vue"
+        ],
+        "backend_key_hits": {},
+        "backend_sheet_modules": []
+      }
+    },
+    "M5-3": {
+      "kind": "no_backend_spec",
+      "reason": "前端存在调整分录持久化键，但全部 *_import_export.py 均未出现该 sheet / 键字面量 → 该 sheet 无底稿通道导入导出，无 Orphan_Key 风险，故豁免。",
+      "observed": {
+        "frontend_keys": [
+          "M5-3-adjustment"
+        ],
+        "frontend_files": [
+          "src/components/workpaper/m5/core/M5TabAdjustment.vue"
+        ],
+        "backend_key_hits": {},
+        "backend_sheet_modules": []
+      }
+    },
+    "M6-3": {
+      "kind": "no_backend_spec",
+      "reason": "前端存在调整分录持久化键，但全部 *_import_export.py 均未出现该 sheet / 键字面量 → 该 sheet 无底稿通道导入导出，无 Orphan_Key 风险，故豁免。",
+      "observed": {
+        "frontend_keys": [
+          "M6-3-adjustment"
+        ],
+        "frontend_files": [
+          "src/components/workpaper/m6/core/M6TabAdjustment.vue"
+        ],
+        "backend_key_hits": {},
+        "backend_sheet_modules": []
+      }
+    },
+    "M7-3": {
+      "kind": "no_backend_spec",
+      "reason": "前端存在调整分录持久化键，但全部 *_import_export.py 均未出现该 sheet / 键字面量 → 该 sheet 无底稿通道导入导出，无 Orphan_Key 风险，故豁免。",
+      "observed": {
+        "frontend_keys": [
+          "M7-3-adjustment"
+        ],
+        "frontend_files": [
+          "src/components/workpaper/m7/core/M7TabAdjustment.vue"
+        ],
+        "backend_key_hits": {},
+        "backend_sheet_modules": []
+      }
+    },
+    "M8-3": {
+      "kind": "no_backend_spec",
+      "reason": "前端存在调整分录持久化键，但全部 *_import_export.py 均未出现该 sheet / 键字面量 → 该 sheet 无底稿通道导入导出，无 Orphan_Key 风险，故豁免。",
+      "observed": {
+        "frontend_keys": [
+          "M8-3-adjustment",
+          "M8-3-adjustmentNote"
+        ],
+        "frontend_files": [
+          "src/components/workpaper/m8/core/M8TabAdjustment.vue"
+        ],
+        "backend_key_hits": {},
+        "backend_sheet_modules": []
+      }
+    },
+    "M9-3": {
+      "kind": "no_backend_spec",
+      "reason": "前端存在调整分录持久化键，但全部 *_import_export.py 均未出现该 sheet / 键字面量 → 该 sheet 无底稿通道导入导出，无 Orphan_Key 风险，故豁免。",
+      "observed": {
+        "frontend_keys": [
+          "M9-3-adjustment"
+        ],
+        "frontend_files": [
+          "src/components/workpaper/m9/core/M9TabAdjustment.vue"
+        ],
+        "backend_key_hits": {},
+        "backend_sheet_modules": []
+      }
+    }
+  },
+  "_exempt_completion_note": "本 exempt 段已登记：全部后端已注册的调整 sheet（out_of_scope_backend_registered / not_cycle_ie_factory）+ 已 grep 核实的无后端 spec 前端调整 tab。前端调整 tab 总量约 81 张（D/E/F/G/H/I/J/K/L/M/N 各循环），D1-D3/D5-D7、L1-L7、M1-M10 等尚未逐一登记 —— Wave 3 Task 4.3 的 Property 11 守卫应以【前端调整 tab 遍历】为源，遇到未登记 sheet 即失败（这正是预期行为），届时按同款 kind 补登记，不得为通过守卫而放宽遍历口径。"
+}

@@ -113,13 +113,23 @@ async def import_data(
         }
 
     # 2. 解析（复用已读取的 file_bytes，不再重新读文件）
-    rows = parse_import_data(import_type, content)
+    parse_stats: dict = {}
+    rows = parse_import_data(import_type, content, stats=parse_stats)
+    # 模板内置示例行被跳过的行数：以独立口径回报，不计入 failed（R2.3）
+    example_skipped = int(parse_stats.get("example_skipped") or 0)
+    # 类型来源：sheet 名兜底行数 / 列值与 sheet 名冲突行（以列为准，仅提示不阻断，R3.2 / R3.3）
+    type_inferred_from_sheet = int(parse_stats.get("type_inferred_from_sheet") or 0)
+    type_source_conflicts = list(parse_stats.get("type_source_conflicts") or [])
     if not rows:
-        return {
+        empty_resp = {
             "success": False,
-            "message": "文件中没有有效数据",
+            "message": "文件中没有有效数据"
+                       + (f"（已跳过 {example_skipped} 行模板示例）" if example_skipped else ""),
             "validation": validation.to_dict(),
         }
+        if example_skipped:
+            empty_resp["example_skipped_count"] = example_skipped
+        return empty_resp
 
     # 3. 事务保护：分发到业务服务入库
     try:
@@ -143,17 +153,31 @@ async def import_data(
         raise HTTPException(status_code=500, detail=f"导入失败: {e}")
 
     label = IMPORT_TYPE_LABELS.get(import_type, import_type.value)
-    return {
+    resp = {
         "success": True,
         "message": f"成功导入 {result['imported']} 条{label}数据"
                    + (f"，{result['skipped']} 条跳过" if result.get("skipped") else "")
-                   + (f"，{result['failed']} 条失败" if result.get("failed") else ""),
+                   + (f"，{result['failed']} 条失败" if result.get("failed") else "")
+                   + (f"，{example_skipped} 行模板示例跳过" if example_skipped else ""),
         "imported_count": result["imported"],
         "skipped_count": result.get("skipped", 0),
         "failed_count": result.get("failed", 0),
         "failed_rows": result.get("failed_rows", [])[:20],
         "validation": validation.to_dict(),
     }
+    # 仅在真有示例行被跳过时附带：保持既有响应结构逐字节不变（与 skipped_rows 同款策略）
+    if example_skipped:
+        resp["example_skipped_count"] = example_skipped
+    # 同款「非空才带」策略：类型 sheet 名兜底 / 类型来源冲突提示
+    if type_inferred_from_sheet:
+        resp["type_inferred_from_sheet"] = type_inferred_from_sheet
+        resp["message"] += f"，{type_inferred_from_sheet} 行按 sheet 名推断调整类型"
+    if type_source_conflicts:
+        resp["type_source_conflicts"] = type_source_conflicts[:20]
+        resp["message"] += (
+            f"，{len(type_source_conflicts)} 行「类型」列与 sheet 名不一致（已以列值为准）"
+        )
+    return resp
 
 
 async def _read_upload(file: UploadFile) -> bytes:
@@ -190,7 +214,7 @@ async def _dispatch_import(
     y = year or 2025
 
     if import_type == ImportType.adjustments:
-        return await _import_adjustments(rows, _require_project(), y, user, db)
+        return await _import_adjustments(rows, _require_project(), y, user, db, mode=mode)
     elif import_type == ImportType.report:
         return await _import_report(rows, _require_project(), y, sub_type, db)
     elif import_type == ImportType.disclosure_note:
@@ -226,6 +250,7 @@ def _safe_int(val: any, default: int = 0) -> int:
 
 async def _import_adjustments(
     rows: list[dict], project_id: UUID, year: int, user: User, db: AsyncSession,
+    *, mode: str = "append",
 ) -> dict:
     """导入调整分录 — 按 编号 分组合并明细行,调 create_entry 创建分录组.
 
@@ -235,6 +260,17 @@ async def _import_adjustments(
 
     兼容旧字段名 (向后兼容):
       - 分录编号 / 调整类型 / 借方科目代码 / 借方科目名称 / 借方金额 等
+
+    导入模式 (spec: adjustment-import-export-contract / 决策 3):
+      - ``append`` (默认): 逐字节保持既有行为 — 只追加,不触碰既有分录.
+      - ``overwrite``: 按**文件内的编号** by-key upsert —— 文件里有的编号覆盖(软删旧组
+        + 建新组并把编号钉为文件编号,使重复上传同一文件幂等),文件里没有的编号保留.
+        绝不清空全年 manual 分录 (``origin='manual'`` 混含"中央导入产生"与"用户在中央页
+        手工新建",按年度清空会不可逆误删后者).
+        以下情形跳过并计入 ``skipped`` + ``skipped_rows``(附可读原因):
+          已审批(approved) / 存在活跃协作 / ``origin='workpaper'``(底稿同步来源).
+      - 非法 mode 值降级为 ``append``(不抛 500).
+      未填编号的行(``__auto_*`` 分组)无 by-key 键,在两种模式下均为追加.
     """
     from collections import defaultdict
     from decimal import Decimal as _Dec
@@ -243,9 +279,15 @@ async def _import_adjustments(
         AdjustmentCreate, AdjustmentLineItem,
     )
     from app.models.audit_platform_models import (
-        AdjustmentType, AccountChart, AccountSource,
+        Adjustment, AdjustmentType, AccountChart, AccountSource, ReviewStatus,
     )
-    from sqlalchemy import select as sa_select
+    from sqlalchemy import select as sa_select, update as sa_update
+
+    # 模式归一（自校验，不抛异常：非法值降级为 append）
+    mode_norm = str(mode or "append").strip().lower()
+    if mode_norm not in ("append", "overwrite"):
+        logger.warning("调整分录导入收到非法 mode=%r，降级为 append", mode)
+        mode_norm = "append"
 
     svc = AdjustmentService(db)
 
@@ -437,6 +479,52 @@ async def _import_adjustments(
 
     # ─── Step 2: 每组调 create_entry 写入 ─────────────────
     imported, failed, failed_rows = 0, 0, []
+    skipped, skipped_rows = 0, []
+
+    # ── overwrite 模式的 by-key 覆盖判定（决策 3）────────────
+    async def _active_group_by_no(adj_no: str) -> list:
+        """查同 project + year + 编号 的未软删分录行（同组多行共享编号）。"""
+        q = sa_select(Adjustment).where(
+            Adjustment.project_id == project_id,
+            Adjustment.year == year,
+            Adjustment.adjustment_no == adj_no,
+            Adjustment.is_deleted == False,  # noqa: E712
+        )
+        return list((await db.execute(q)).scalars().all())
+
+    async def _resolve_overwrite(adj_no: str) -> tuple[str, str | None, object | None]:
+        """返回 (action, reason, entry_group_id)：action ∈ create / skip / replace"""
+        existing = await _active_group_by_no(adj_no)
+        if not existing:
+            return "create", None, None
+        head = existing[0]
+        if head.review_status == ReviewStatus.approved:
+            return "skip", "该编号已在集中登记复核通过（approved），需先撤回复核方可覆盖", None
+        from app.services.adjustment_collaboration_service import (
+            has_active_collaboration,
+        )
+        if await has_active_collaboration(db, project_id, head.entry_group_id):
+            return "skip", "该编号存在进行中的协作补充，需待协作确认/退回后方可覆盖", None
+        if (head.origin or "manual") == "workpaper":
+            return "skip", "该编号来自底稿同步（origin=workpaper），请在来源底稿修改后重新同步", None
+        return "replace", None, head.entry_group_id
+
+    async def _pin_adjustment_no(entry_group_id, adj_no: str) -> None:
+        """覆盖模式把新建分录组的编号钉为文件编号，使重复导入 by-key 幂等。
+
+        create_entry 的 _next_adjustment_no 是"计数+1"自动编号（且计入已软删组），
+        不落文件编号；不钉住则每次覆盖都产生新编号 → 下次导入匹配不上 → 不幂等。
+        """
+        await db.execute(
+            sa_update(Adjustment)
+            .where(
+                Adjustment.entry_group_id == entry_group_id,
+                Adjustment.is_deleted == False,  # noqa: E712
+            )
+            .values(adjustment_no=adj_no)
+            .execution_options(synchronize_session=False)
+        )
+        await db.flush()
 
     # 改进 A: 预校验科目并产出友好错误信息 (在调 create_entry 前先扫一遍)
     def _build_friendly_error(g: dict, base_error: str) -> str:
@@ -463,7 +551,23 @@ async def _import_adjustments(
         return base_error
 
     for adj_no, g in groups.items():
+        keyed = mode_norm == "overwrite" and not adj_no.startswith("__auto_")
         try:
+            if keyed:
+                action, reason, replace_group_id = await _resolve_overwrite(adj_no)
+                if action == "skip":
+                    skipped += 1
+                    skipped_rows.append({
+                        "row": g["lines"][0]["row_idx"] if g["lines"] else 0,
+                        "adj_no": adj_no,
+                        "rows_in_group": [ln["row_idx"] for ln in g["lines"]],
+                        "reason": reason,
+                    })
+                    continue
+                if action == "replace":
+                    # 复用既有删除路径（软删 + 发 ADJUSTMENT_DELETED 触发试算表重算）
+                    await svc.delete_entry(project_id, replace_group_id)
+
             line_items = [
                 AdjustmentLineItem(
                     standard_account_code=ln["code"],
@@ -480,7 +584,9 @@ async def _import_adjustments(
                 description=g["description"] or "",
                 line_items=line_items,
             )
-            await svc.create_entry(project_id, data, user.id)
+            created = await svc.create_entry(project_id, data, user.id)
+            if keyed:
+                await _pin_adjustment_no(created.entry_group_id, adj_no)
             imported += 1
         except Exception as e:
             failed += 1
@@ -494,12 +600,16 @@ async def _import_adjustments(
             })
             logger.warning("调整分录导入分录组 %s 失败: %s", adj_no, e)
 
-    return {
+    out = {
         "imported": imported,
-        "skipped": 0,
+        "skipped": skipped,
         "failed": failed,
         "failed_rows": failed_rows,
     }
+    # 仅在真有跳过项时附带原因清单：保持 append 路径返回结构逐字节不变（Property 2）
+    if skipped_rows:
+        out["skipped_rows"] = skipped_rows
+    return out
 
 
 async def _import_report(

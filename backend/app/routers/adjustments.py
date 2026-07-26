@@ -1344,7 +1344,9 @@ def _adj_to_dict(adj) -> dict:
 def _write_adj_sheet(ws, entries, adj_type: str):
     from openpyxl.styles import Font, Alignment, PatternFill
 
-    headers = ["编号", "摘要", "科目编码", "科目名称", "借方金额", "贷方金额", "来源"]
+    # 「类型」列插在「编号」之后（与富模板列序一致）：使导出的汇总改完可直接导回，
+    # 不再依赖 sheet 名隐含类型（spec adjustment-import-export-contract 决策 5 / R3.1）。
+    headers = ["编号", "类型", "摘要", "科目编码", "科目名称", "借方金额", "贷方金额", "来源"]
     header_fill = PatternFill(start_color="F4F0FA", end_color="F4F0FA", fill_type="solid")
     header_font = Font(bold=True, size=11)
 
@@ -1373,43 +1375,47 @@ def _write_adj_sheet(ws, entries, adj_type: str):
             if not line_items:
                 # 无明细行时输出汇总行
                 ws.cell(row=row_idx, column=1, value=adj.get("adjustment_no", ""))
-                ws.cell(row=row_idx, column=2, value=adj.get("description", ""))
-                ws.cell(row=row_idx, column=3, value="")
+                ws.cell(row=row_idx, column=2, value=adj_type)
+                ws.cell(row=row_idx, column=3, value=adj.get("description", ""))
                 ws.cell(row=row_idx, column=4, value="")
-                ws.cell(row=row_idx, column=5, value=float(adj.get("total_debit") or 0))
-                ws.cell(row=row_idx, column=6, value=float(adj.get("total_credit") or 0))
-                ws.cell(row=row_idx, column=7, value=origin_label)
+                ws.cell(row=row_idx, column=5, value="")
+                ws.cell(row=row_idx, column=6, value=float(adj.get("total_debit") or 0))
+                ws.cell(row=row_idx, column=7, value=float(adj.get("total_credit") or 0))
+                ws.cell(row=row_idx, column=8, value=origin_label)
                 row_idx += 1
             else:
                 for li in line_items:
                     ws.cell(row=row_idx, column=1, value=adj.get("adjustment_no", ""))
-                    ws.cell(row=row_idx, column=2, value=adj.get("description", ""))
-                    ws.cell(row=row_idx, column=3, value=li.get("standard_account_code", ""))
-                    ws.cell(row=row_idx, column=4, value=li.get("account_name", ""))
-                    ws.cell(row=row_idx, column=5, value=float(li.get("debit_amount") or 0))
-                    ws.cell(row=row_idx, column=6, value=float(li.get("credit_amount") or 0))
-                    ws.cell(row=row_idx, column=7, value=origin_label)
+                    ws.cell(row=row_idx, column=2, value=adj_type)
+                    ws.cell(row=row_idx, column=3, value=adj.get("description", ""))
+                    ws.cell(row=row_idx, column=4, value=li.get("standard_account_code", ""))
+                    ws.cell(row=row_idx, column=5, value=li.get("account_name", ""))
+                    ws.cell(row=row_idx, column=6, value=float(li.get("debit_amount") or 0))
+                    ws.cell(row=row_idx, column=7, value=float(li.get("credit_amount") or 0))
+                    ws.cell(row=row_idx, column=8, value=origin_label)
                     row_idx += 1
         else:
             # 扁平模式兼容
             d = _adj_to_dict(adj)
             ws.cell(row=row_idx, column=1, value=d["adjustment_no"])
-            ws.cell(row=row_idx, column=2, value=d["description"])
-            ws.cell(row=row_idx, column=3, value=d["account_code"])
-            ws.cell(row=row_idx, column=4, value=d["account_name"])
-            ws.cell(row=row_idx, column=5, value=float(d["debit_amount"] or 0))
-            ws.cell(row=row_idx, column=6, value=float(d["credit_amount"] or 0))
-            ws.cell(row=row_idx, column=7, value=_origin_label(d) if isinstance(d, dict) else "手工")
+            ws.cell(row=row_idx, column=2, value=adj_type)
+            ws.cell(row=row_idx, column=3, value=d["description"])
+            ws.cell(row=row_idx, column=4, value=d["account_code"])
+            ws.cell(row=row_idx, column=5, value=d["account_name"])
+            ws.cell(row=row_idx, column=6, value=float(d["debit_amount"] or 0))
+            ws.cell(row=row_idx, column=7, value=float(d["credit_amount"] or 0))
+            ws.cell(row=row_idx, column=8, value=_origin_label(d) if isinstance(d, dict) else "手工")
             row_idx += 1
 
     # 列宽
     ws.column_dimensions["A"].width = 14
-    ws.column_dimensions["B"].width = 30
-    ws.column_dimensions["C"].width = 14
-    ws.column_dimensions["D"].width = 20
-    ws.column_dimensions["E"].width = 16
+    ws.column_dimensions["B"].width = 8
+    ws.column_dimensions["C"].width = 30
+    ws.column_dimensions["D"].width = 14
+    ws.column_dimensions["E"].width = 20
     ws.column_dimensions["F"].width = 16
-    ws.column_dimensions["G"].width = 14
+    ws.column_dimensions["G"].width = 16
+    ws.column_dimensions["H"].width = 14
 
 
 # R10 Spec B / Sprint 3.2.3 — 调整分录组关联底稿

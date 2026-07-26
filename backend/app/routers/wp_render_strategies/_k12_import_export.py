@@ -48,15 +48,17 @@ _K12_2_KEYS = [
     "isOccasional", "taxTreatment", "conclusion", "auditProcedure", "indexRef", "remark",
 ]
 
-# ─── K12-3 调整分录汇总（10列，标准借贷平衡） ────────────────────────────────
-
+# ─── K12-3 调整分录汇总（9列，标准借贷平衡） ─────────────────────────────────
+# 列集合对齐前端 K12AdjustmentEntry 行模型（adjustment_ie_contract.json / Task 3.2）：
+#   去掉前端不存在的 category/reportItem/noteItem/summary/indexRef 错位列，
+#   补 index（序号）/type（AJE/RJE），索引列绑 refIndex（非 indexRef）
 _K12_3_HEADERS = [
-    "调整事项说明", "类别", "报表项目", "科目名称", "附注项目",
-    "摘要", "借方调整金额", "贷方调整金额", "索引", "备注",
+    "序号", "类型", "调整事项说明", "科目编码", "科目名称",
+    "借方调整金额", "贷方调整金额", "索引", "备注",
 ]
 _K12_3_KEYS = [
-    "description", "category", "reportItem", "accountName", "noteItem",
-    "summary", "debitAmount", "creditAmount", "indexRef", "remark",
+    "index", "type", "description", "accountCode", "accountName",
+    "debitAmount", "creditAmount", "refIndex", "remark",
 ]
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -96,7 +98,9 @@ _K12_SPECS: dict[str, dict[str, Any]] = {
         ],
     },
     "K12-3": {
+        # 前端 useK12Adjustment 已迁为单键 JSON 数组 'K12-3-rows'（remark 列），两侧结构一致（Task 3.1/3.2）
         "item_id": "K12-3-rows",
+        "storage_field": "remark",
         "title": "调整分录汇总K12-3（标准借贷平衡）",
         "headers": _K12_3_HEADERS,
         "field_keys": _K12_3_KEYS,
@@ -104,8 +108,8 @@ _K12_SPECS: dict[str, dict[str, Any]] = {
             "K12-3 营业外收入调整分录汇总 编制说明",
             "",
             "记录本期所有审计调整分录（AJE）和重分类分录（RJE）。",
-            "类别：报表调整/账项调整/其他。",
-            "借贷平衡：Σ借方调整金额 = Σ贷方调整金额。",
+            "9列：序号/类型(AJE/RJE)/调整事项说明/科目编码/科目名称/借方调整金额/贷方调整金额/索引/备注。",
+            "借贷平衡：Σ借方调整金额 = Σ贷方调整金额（按类型分别平衡）。",
             "调整分录联动审定表K12-1的AJE/RJE列。",
             "",
             "注意：6301为损益类贷方科目：",

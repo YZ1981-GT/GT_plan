@@ -82,6 +82,8 @@ _I5_SPECS: dict[str, dict[str, Any]] = {
     },
     "I5-3": {
         "item_id": "I5-3-rows",
+        # 前端 useI5Adjustment / useI5CrossSheet 读写 remark 列，工厂默认 conclusion 会写错列（Task 2.7）
+        "storage_field": "remark",
         "title": "调整分录汇总I5-3（标准借贷平衡）",
         "headers": _I5_3_HEADERS,
         "field_keys": _I5_3_KEYS,

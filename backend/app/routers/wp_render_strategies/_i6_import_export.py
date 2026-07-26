@@ -147,6 +147,8 @@ _I6_SPECS: dict[str, dict[str, Any]] = {
     },
     "I6-3": {
         "item_id": "I6-3-rows",
+        # 前端 useI6Adjustment / i6AdjDraftHelpers 读写 remark 列，工厂默认 conclusion 会写错列（Task 2.7）
+        "storage_field": "remark",
         "title": "调整分录汇总I6-3（标准借贷平衡）",
         "headers": _I6_3_HEADERS,
         "field_keys": _I6_3_KEYS,

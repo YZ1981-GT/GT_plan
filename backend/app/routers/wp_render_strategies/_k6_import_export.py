@@ -131,6 +131,8 @@ _K6_SPECS: dict[str, dict[str, Any]] = {
     "K6-3": {
         # 前端 K6TabAdjustment 持久化键为 K6-3-adj-entries（AdjustmentEntry[]）
         "item_id": "K6-3-adj-entries",
+        # 前端 K6TabAdjustment 读写 remark 列，工厂默认 conclusion 会写错列（Task 2.7）
+        "storage_field": "remark",
         "title": "K6-3 持有待售调整分录汇总",
         "headers": _K6_3_HEADERS,
         "field_keys": _K6_3_KEYS,

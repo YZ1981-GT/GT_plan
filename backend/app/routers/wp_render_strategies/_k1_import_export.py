@@ -1205,6 +1205,8 @@ _K1_SPECS: dict[str, dict[str, Any]] = {
     },
     "K1-4": {
         "item_id": "K1-4-adj-entries",
+        # 前端 useK1Adjustment（及 K1-7/K1-12 推送）读写 remark 列，工厂默认 conclusion 会写错列（Task 2.7）
+        "storage_field": "remark",
         "title": "K1-4 其他应收款调整分录汇总表",
         "headers": _K1_4_HEADERS,
         "field_keys": _K1_4_KEYS,

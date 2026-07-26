@@ -33,15 +33,17 @@ _K5_2_KEYS = [
 ]
 
 # ────────────────────────────────────────────────────────────
-# K5-3 调整分录汇总（10列）
+# K5-3 调整分录汇总（8列）
+# 列集合对齐前端 K5TabAdjustment 行模型（adjustment_ie_contract.json / Task 2.2）：
+#   金额键是 debit/credit（非 debitAmount/creditAmount）；无 remark 列；索引列为 indexRef
 # ────────────────────────────────────────────────────────────
 _K5_3_HEADERS = [
     "序号", "分录类型", "摘要", "科目代码", "科目名称",
-    "借方金额", "贷方金额", "附注说明", "凭证号", "备注",
+    "借方金额", "贷方金额", "索引",
 ]
 _K5_3_KEYS = [
     "seq", "entryType", "summary", "accountCode", "accountName",
-    "debitAmount", "creditAmount", "noteRef", "voucherNo", "remark",
+    "debit", "credit", "indexRef",
 ]
 
 # ────────────────────────────────────────────────────────────
@@ -108,14 +110,16 @@ _K5_SPECS: dict[str, dict[str, Any]] = {
         ],
     },
     "K5-3": {
-        "item_id": "K5-3-rows",
+        # item_id / storage_field 对齐前端持久化键（K5TabAdjustment 用字面量 'K5-3-entries'，无 adj 段，写 remark 列）
+        "item_id": "K5-3-entries",
+        "storage_field": "remark",
         "title": "K5-3 预计负债调整分录汇总",
         "headers": _K5_3_HEADERS,
         "field_keys": _K5_3_KEYS,
         "guidance": [
             "K5-3 调整分录 编制说明",
             "",
-            "10列：序号/分录类型(AJE/RJE)/摘要/科目代码/科目名称/借方金额/贷方金额/附注说明/凭证号/备注。",
+            "8列：序号/分录类型(AJE/RJE)/摘要/科目代码/科目名称/借方金额/贷方金额/索引。",
             "借贷必须平衡：∑借方 = ∑贷方。",
             "分录类型填 AJE（审计调整）或 RJE（重分类调整）。",
             "金额单位：元。",

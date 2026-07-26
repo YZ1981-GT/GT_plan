@@ -39,15 +39,17 @@ _K8_2_KEYS = [
     "revenueRatio", "fluctuationNote", "checkConclusion", "remark",
 ]
 
-# ─── K8-3 调整分录汇总（10列） ───────────────────────────────────────────────
-
+# ─── K8-3 调整分录汇总（9列） ────────────────────────────────────────────────
+# 列集合对齐前端 K8TabAdjustment 行模型（adjustment_ie_contract.json / Task 2.3）：
+#   前端只有单 summary 担任「调整事项说明」→ 消除后端 description + summary 双列，
+#   「调整事项说明」列直接绑 summary（否则用户填的该列在前端永远读不到）
 _K8_3_HEADERS = [
     "调整事项说明", "类别", "报表项目", "科目名称", "附注项目",
-    "摘要", "借方调整金额", "贷方调整金额", "索引", "备注",
+    "借方调整金额", "贷方调整金额", "索引", "备注",
 ]
 _K8_3_KEYS = [
-    "description", "category", "reportItem", "accountName", "noteItem",
-    "summary", "debitAmount", "creditAmount", "indexRef", "remark",
+    "summary", "category", "reportItem", "accountName", "noteItem",
+    "debitAmount", "creditAmount", "indexRef", "remark",
 ]
 
 # ─── K8-5 合同检查表 ─────────────────────────────────────────────────────────
@@ -115,7 +117,10 @@ _K8_SPECS: dict[str, dict[str, Any]] = {
         ],
     },
     "K8-3": {
-        "item_id": "K8-3-rows",
+        # item_id / storage_field 对齐前端持久化键（K8TabAdjustment: ITEM_PREFIX='K8-3-adj' + '-entries'，写 remark 列；
+        # K8TabDetail / K8TabContractCheck 亦直写该键）
+        "item_id": "K8-3-adj-entries",
+        "storage_field": "remark",
         "title": "调整分录汇总K8-3（标准借贷平衡）",
         "headers": _K8_3_HEADERS,
         "field_keys": _K8_3_KEYS,
