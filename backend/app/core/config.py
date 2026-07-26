@@ -317,6 +317,24 @@ class Settings(BaseSettings):
     # P0-1（Tier A 真生效）与 P0-2（本子开关）代码路径独立，其一失败不牵连其二。
     D_CYCLE_DETAIL_SEED_ENABLED: bool = False
 
+    # --- h1-four-table-extraction ---
+    # H1 固定资产四表取数扩展的灰度开关：H1-2 明细**分类级**取数（tb_balance 叶子）、
+    # 明细增减 ↔ 序时账（tb_ledger 1601 借/贷合计）核对、折旧账面数取数与对方科目可用性探测。
+    # 默认 False = 零回归：H1 render 不输出 `h1_four_table_prefill`，前端无取数入口，
+    # 既有 H1-1 分类预填（adjudication_category_prefill）/ tb_values / 各 H1-x 内部带入不变。
+    # 任一取数环节异常一律 fail-open（该段返空 / available=False），不阻断 render。
+    # 宁缺勿造边界（已实证）：tb_aux_balance 无资产卡片维度 → 不做卡片级明细；
+    # tb_ledger 1602 对方科目填充率约 9% 且凭证为合并记账 → 折旧费用归属不自动归集。
+    H1_FOUR_TABLE_EXTRACTION_ENABLED: bool = False
+
+    # --- h4-four-table-extraction ---
+    # H4 工程物资四表取数灰度开关：H4-2 明细从 tb_balance 1605 叶子自动种子、
+    # H4-1 审定表 TB 核对走 report_account_mapping 规则映射、H4-6 盘点覆盖率分母自动带入、
+    # H4-5 减少检查↔H2 在建工程跨底稿勾稽。
+    # 默认 False = 零回归：render 不输出 detail_prefill/tb_source_codes/h4_extraction_enabled，
+    # 既有功能逐字节不变。任一取数环节异常一律 fail-open 不阻断 render。
+    H4_FOUR_TABLE_EXTRACTION_ENABLED: bool = False
+
     model_config = SettingsConfigDict(env_file=_env_file, extra="ignore")
 
     @model_validator(mode="after")

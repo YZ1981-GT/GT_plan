@@ -108,19 +108,36 @@ class TestAllowedTransitionsBaseline:
                     f"现状不应存在反向/同级边 {src}->{tgt}（撤回能力尚未引入）"
                 )
 
-    def test_status_rank_not_yet_defined(self):
-        """撤回能力（Task 2.1）才引入 ``_STATUS_RANK``；当前基线尚不存在。"""
-        assert not hasattr(confirmation_service, "_STATUS_RANK"), (
-            "基线阶段 _STATUS_RANK 不应存在；若已存在说明撤回能力已引入，需更新 characterization 基线"
-        )
+    def test_status_rank_exact_values(self):
+        """锁定 ``_STATUS_RANK`` 精确值（M1 撤回能力引入）。"""
+        from app.services.confirmation_service import _STATUS_RANK
+        assert _STATUS_RANK == {
+            "pending": 0,
+            "sent": 1,
+            "returned": 2,
+            "matched": 3,
+            "discrepancy": 3,
+        }
 
-    def test_reversal_targets_not_yet_defined(self):
-        """同理，撤回目标表 ``_REVERSAL_TARGETS`` 亦尚未引入。"""
-        assert not hasattr(confirmation_service, "_REVERSAL_TARGETS")
+    def test_reversal_targets_exact_values(self):
+        """锁定 ``_REVERSAL_TARGETS`` 精确值（一步退到底，pending 不可再退）。"""
+        from app.services.confirmation_service import _REVERSAL_TARGETS
+        assert _REVERSAL_TARGETS == {
+            "pending": set(),
+            "sent": {"pending"},
+            "returned": {"sent", "pending"},
+            "matched": {"returned", "sent", "pending"},
+            "discrepancy": {"returned", "sent", "pending"},
+        }
 
-    def test_reverse_status_fn_not_yet_defined(self):
-        """撤回服务函数 ``reverse_status`` 尚未引入（M1 才加）。"""
-        assert not hasattr(confirmation_service, "reverse_status")
+    def test_reversal_targets_consistent_with_rank(self):
+        """撤回目标必须 rank 严格低于当前状态（单调回退不变量）。"""
+        from app.services.confirmation_service import _STATUS_RANK, _REVERSAL_TARGETS
+        for src, targets in _REVERSAL_TARGETS.items():
+            for tgt in targets:
+                assert _STATUS_RANK[tgt] < _STATUS_RANK[src], (
+                    f"撤回目标 {tgt}(rank {_STATUS_RANK[tgt]}) 不低于当前 {src}(rank {_STATUS_RANK[src]})"
+                )
 
 
 # ════════════════════════════════════════════════════════════════════════════

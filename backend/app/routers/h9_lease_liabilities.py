@@ -490,15 +490,26 @@ async def h9_import_data(
     item_id = _SHEET_ITEM_ID[sheet]
     json_str = json.dumps(parsed_rows, ensure_ascii=False)
 
+    # 查 project_id（checklist_responses.project_id 为 NOT NULL）
+    pid_result = await db.execute(
+        sa.text("SELECT project_id FROM working_paper WHERE id = :wp_id LIMIT 1"),
+        {"wp_id": wp_id},
+    )
+    pid_row = pid_result.fetchone()
+    if not pid_row:
+        raise HTTPException(404, "底稿不存在")
+    project_id = str(pid_row[0])
+
     await db.execute(
         sa.text(
-            "INSERT INTO checklist_responses (id, wp_id, item_id, remark) "
-            "VALUES (:id, :wp_id, :item_id, :remark) "
+            "INSERT INTO checklist_responses (id, wp_id, project_id, item_id, remark) "
+            "VALUES (:id, :wp_id, :project_id, :item_id, :remark) "
             "ON CONFLICT (wp_id, item_id) DO UPDATE SET remark = :remark"
         ),
         {
             "id": str(uuid4()),
             "wp_id": wp_id,
+            "project_id": project_id,
             "item_id": item_id,
             "remark": json_str,
         },

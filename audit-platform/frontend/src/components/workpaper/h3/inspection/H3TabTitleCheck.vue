@@ -407,6 +407,32 @@
       </template>
       <el-input :model-value="auditConclusion" type="textarea" :autosize="{ minRows: 3 }" placeholder="A、权属完整合法。B、除下列事项外未见异常。C、存在权属瑕疵或限制，需披露。" :disabled="isReadonly" @change="saveAuditConclusion" />
     </el-card>
+
+    <!-- 勾稽 L1/L3 借款抵押 -->
+    <el-card shadow="never" style="margin-top:16px">
+      <template #header>
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <span style="font-weight:600;font-size:13px">勾稽 L1/L3 借款抵押</span>
+          <div style="display:flex;gap:8px;align-items:center">
+            <el-tag v-if="mortgageReconcileStatus === 'ok'" type="success" size="small">一致</el-tag>
+            <el-tag v-else-if="mortgageReconcileStatus === 'warning'" type="warning" size="small">存在差异</el-tag>
+            <el-tag v-else type="info" size="small">对方数据不可用</el-tag>
+            <el-button size="small" :loading="mortgageLoading" @click="loadMortgageReconcile">勾稽 L1/L3</el-button>
+          </div>
+        </div>
+      </template>
+      <div v-if="mortgageReconcileData" style="display:flex;gap:24px;font-size:13px;padding:8px 0">
+        <div>H3 已抵押合计：<b>{{ fmtMortgage(mortgageReconcileData.h3RestrictedTotal) }}</b></div>
+        <div>L1+L3 合计：<b>{{ mortgageReconcileData.lTotal != null ? fmtMortgage(mortgageReconcileData.lTotal) : '—' }}</b></div>
+        <div v-if="mortgageReconcileData.diff != null">
+          差异：<b :style="{ color: Math.abs(mortgageReconcileData.diff) > 1 ? 'var(--el-color-warning)' : '' }">{{ fmtMortgage(mortgageReconcileData.diff) }}</b>
+        </div>
+      </div>
+      <div style="margin-top:8px;display:flex;gap:8px">
+        <GtIndexChip value="wp:L1" :context-project-id="projectId" />
+        <GtIndexChip value="wp:L3" :context-project-id="projectId" />
+      </div>
+    </el-card>
   </div>
 </template>
 
@@ -427,6 +453,8 @@ import { normalizeTraceRow } from '../../composables/h3AdditionCheckModel'
 import GtIndexChip from '../../GtIndexChip.vue'
 import ItemAttachment from '../../ItemAttachment.vue'
 import http from '@/utils/http'
+import { pullL1PledgeForH3, pullL3PledgeForH3, buildH3MortgageReconcile } from '../../composables/h3MortgageReconcile'
+import type { MortgageReconcileResult } from '../../composables/h3MortgageReconcile'
 
 const props = defineProps<{
   wpId: string
@@ -542,6 +570,38 @@ function initAuditeeName(): void {
     onAuditeeChange(fromCtx)
     applyAuditee()
   }
+}
+
+// ─── 勾稽 L1/L3 抵押 ─────────────────────────────────────────────────────────
+const mortgageLoading = ref(false)
+const mortgageReconcileData = ref<MortgageReconcileResult | null>(null)
+const mortgageReconcileStatus = computed(() => mortgageReconcileData.value?.status ?? 'unavailable')
+
+const h3RestrictedTotal = computed(() => {
+  const rawItem = props.allResponses.get('H3-12-title-rows')
+  const raw = rawItem?.remark || ''
+  let rows: any[] = []
+  try { const p = JSON.parse(raw); rows = Array.isArray(p) ? p : (p?.rows || []) } catch { /* */ }
+  return rows
+    .filter(r => r.isRestricted === true || r.isRestricted === 'true' || r.isRestricted === '是')
+    .reduce((sum: number, r: any) => sum + (Number(r.mortgageValue) || Number(r.bookValue) || 0), 0)
+})
+
+async function loadMortgageReconcile() {
+  mortgageLoading.value = true
+  try {
+    const l1 = await pullL1PledgeForH3(props.projectId)
+    const l3 = await pullL3PledgeForH3(props.projectId)
+    mortgageReconcileData.value = buildH3MortgageReconcile(h3RestrictedTotal.value, l1, l3)
+  } catch {
+    mortgageReconcileData.value = null
+  } finally {
+    mortgageLoading.value = false
+  }
+}
+
+function fmtMortgage(v: number): string {
+  return v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 onMounted(() => {

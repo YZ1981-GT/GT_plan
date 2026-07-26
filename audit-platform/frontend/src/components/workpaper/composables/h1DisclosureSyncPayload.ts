@@ -228,10 +228,16 @@ export function buildH1SoeSubTableData(state: H1SoeDisclosureState): Record<stri
   }
 }
 
+/** 可选覆盖项：current_standard 以项目 template_type + report_scope 为权威 */
+export interface H1SyncOptions {
+  currentStandard?: string
+}
+
 export function buildH1SoeSyncPayload(
   wpId: string,
   applicableStandards: readonly string[] | null | undefined,
   state: H1SoeDisclosureState,
+  opts?: H1SyncOptions,
 ): H1SyncFromWorkpaperPayload | null {
   const variant: H1DisclosureVariant = 'soe'
   const target = resolveH1NoteSectionTarget(variant, applicableStandards)
@@ -241,7 +247,7 @@ export function buildH1SoeSyncPayload(
     wp_id: wpId,
     sheet_name: H1_DISCLOSURE_SHEET_NAME.soe,
     section_id: target.sectionId,
-    current_standard: target.currentStandard,
+    current_standard: opts?.currentStandard || target.currentStandard,
     sub_table_data: buildH1SoeSubTableData(state),
     columns: H1_SOE_COLUMNS,
   }
@@ -430,13 +436,14 @@ export function buildH1SyncPayload(
   wpId: string,
   applicableStandards: readonly string[] | null | undefined,
   subTableData: Record<string, Record<string, unknown>[]>,
+  opts?: H1SyncOptions,
 ): H1SyncFromWorkpaperPayload | null {
   if (!isH1DisclosureApplicable(variant, applicableStandards)) return null
   return {
     wp_id: wpId,
     sheet_name: H1_DISCLOSURE_SHEET_NAME[variant],
     section_id: H1_NOTE_SECTION[variant],
-    current_standard: resolveH1CurrentStandard(variant, applicableStandards),
+    current_standard: opts?.currentStandard || resolveH1CurrentStandard(variant, applicableStandards),
     sub_table_data: subTableData,
   }
 }
@@ -445,8 +452,11 @@ export function buildH1ListedSyncPayloads(
   wpId: string,
   applicableStandards: readonly string[] | null | undefined,
   snap: H1ListedSyncSnapshot,
+  opts?: H1SyncOptions,
 ): H1SyncFromWorkpaperPayload[] {
-  const payload = buildH1SyncPayload('listed', wpId, applicableStandards, buildH1ListedSubTableData(snap))
+  const payload = buildH1SyncPayload(
+    'listed', wpId, applicableStandards, buildH1ListedSubTableData(snap), opts,
+  )
   if (!payload) return []
   payload.columns = buildH1ListedColumns(snap)
   return [payload]

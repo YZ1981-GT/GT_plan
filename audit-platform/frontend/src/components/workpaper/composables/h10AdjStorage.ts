@@ -90,6 +90,85 @@ export function aggregateH10AdjustmentAjeRje(
   return { rowKey, currentAje, currentRje }
 }
 
+/**
+ * 按对方科目/摘要推断每笔调整应归入哪个审定分类行。
+ * 推断规则（对方科目前缀优先 → 摘要关键词 → 默认 fixed_asset_disposal）：
+ */
+const _COUNTER_ACCOUNT_TO_ROW: Array<[string, string]> = [
+  ['1604', 'construction_disposal'],    // 在建工程
+  ['1701', 'intangible_disposal'],      // 无形资产
+  ['1702', 'intangible_disposal'],      // 累计摊销
+  ['1901', 'rou_disposal'],             // 使用权资产
+  ['1631', 'oil_gas_disposal'],         // 油气资产
+  ['1632', 'oil_gas_disposal'],         // 累计折耗
+  ['1621', 'productive_bio_disposal'],  // 生产性生物资产
+  ['1481', 'hfs_disposal'],             // 持有待售资产
+  ['1601', 'fixed_asset_disposal'],     // 固定资产
+  ['1602', 'fixed_asset_disposal'],     // 累计折旧
+]
+
+const _KEYWORD_TO_ROW: Array<[string, string]> = [
+  ['在建工程', 'construction_disposal'],
+  ['无形资产', 'intangible_disposal'],
+  ['使用权', 'rou_disposal'],
+  ['油气', 'oil_gas_disposal'],
+  ['生物资产', 'productive_bio_disposal'],
+  ['持有待售', 'hfs_disposal'],
+  ['债务重组', 'debt_restructuring_disposal'],
+  ['非货币', 'non_monetary_exchange'],
+  ['试运行', 'trial_operation_sales'],
+]
+
+export interface H10AdjEntryWithContext extends H10AdjustmentEntryLike {
+  summary?: string
+  counterAccountCode?: string
+  /** 用户显式指定的目标行（优先级最高） */
+  targetRowKey?: string
+}
+
+/** 推断单笔调整分录应归入的审定分类行 */
+export function inferH10AdjTargetRow(entry: H10AdjEntryWithContext): string {
+  // 用户显式指定优先
+  if (entry.targetRowKey && H10_ADJUDICATION_ITEMS.some(d => d.rowKey === entry.targetRowKey)) {
+    return entry.targetRowKey
+  }
+  // 对方科目前缀匹配
+  const counter = String(entry.counterAccountCode ?? '').trim()
+  if (counter) {
+    for (const [prefix, rowKey] of _COUNTER_ACCOUNT_TO_ROW) {
+      if (counter.startsWith(prefix)) return rowKey
+    }
+  }
+  // 摘要关键词匹配
+  const summary = String(entry.summary ?? '').toLowerCase()
+  if (summary) {
+    for (const [kw, rowKey] of _KEYWORD_TO_ROW) {
+      if (summary.includes(kw)) return rowKey
+    }
+  }
+  return H10_ADJ_WRITEBACK_ROW_KEY
+}
+
+/** 分组聚合：按推断的目标行分别汇总 AJE/RJE 净额 */
+export function aggregateH10AdjustmentByRow(
+  rows: H10AdjEntryWithContext[],
+): H10AdjustmentWriteback[] {
+  const grouped: Record<string, { aje: number; rje: number }> = {}
+  for (const row of rows) {
+    if (!String(row.accountCode ?? '6115').startsWith('6115')) continue
+    const targetRow = inferH10AdjTargetRow(row)
+    if (!grouped[targetRow]) grouped[targetRow] = { aje: 0, rje: 0 }
+    const net = parseNum(row.creditAmount) - parseNum(row.debitAmount)
+    if (row.entryType === 'RJE') grouped[targetRow].rje += net
+    else grouped[targetRow].aje += net
+  }
+  return Object.entries(grouped).map(([rowKey, { aje, rje }]) => ({
+    rowKey,
+    currentAje: aje,
+    currentRje: rje,
+  }))
+}
+
 export function applyH10AdjustmentWriteback(
   store: H10AdjRowStore,
   writeback: H10AdjustmentWriteback,

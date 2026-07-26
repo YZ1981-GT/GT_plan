@@ -300,6 +300,8 @@ export function useH9FinanceCost(params: {
     onSave(ROWS_KEY, toPersist)
     onSave(TOTAL_END_KEY, totalRow.value.auditedEnd)
     onSave('H9-3-detail-total-audited', totalRow.value.finalAudited || totalRow.value.auditedEnd)
+    // 跨表键：贷方确认合计（本期利息费用=实际利率法摊销），供 CrossSheet 勾稽摊销表
+    onSave('H9-3-credit-total', totalRow.value.creditDecrease)
   }
 
   // ─── Return ────────────────────────────────────────────────────────────────

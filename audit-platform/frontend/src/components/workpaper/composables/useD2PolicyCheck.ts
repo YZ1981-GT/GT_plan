@@ -13,8 +13,9 @@
  *
  * Requirements: 8.1, 8.2, 8.3, 8.4, 8.5
  */
-import { ref, computed, watch, onBeforeUnmount, inject, type ComputedRef } from 'vue'
+import { ref, computed, watch, onBeforeUnmount, inject, type ComputedRef, type Ref } from 'vue'
 import { calculateExpectedLossRate } from './useD2FormulaEngine'
+import type { AgingSegment } from '@/composables/useAgingConfig'
 import type { UseD2BaseOptions } from './useD2Adjudication'
 import { D2_SAVE_ITEMS_KEY, type D2SaveItemsFn } from './d2InjectionKeys'
 
@@ -218,25 +219,18 @@ export function useD2PolicyCheck(options: UseD2BaseOptions & { agingBands?: Comp
   // ─── 改进3: provide/inject 保存 ──────────────────────────────────────────
   const injectedSave = inject<D2SaveItemsFn | undefined>(D2_SAVE_ITEMS_KEY, undefined)
 
-  // ─── 改进1: 动态账龄段（联动 useAgingConfig） ────────────────────────────
+  /**
+   * 账龄段（枚举账龄：3年段/5年段/自定义）单一真源：
+   * 调用方显式传入 > 主入口 provide 的项目账龄配置段 > 5 年段预设兜底。
+   * 已删除「读 D2-1 审定表 D2-adj-aging-mode + 硬编码 一年以内/一到二年」的第二套口径。
+   */
+  const injectedAgingSegments = inject<Ref<AgingSegment[]> | null>('d2AgingSegments', null)
   const resolvedAgingBands = computed(() => {
     if (externalBands?.value && externalBands.value.length > 0) {
       return externalBands.value
     }
-    // 回退：从 D2-1 审定表的账龄模式读取
-    const mode = allResponses.value.get('D2-adj-aging-mode')?.remark || '5y'
-    if (mode === '3y') return ['一年以内', '一到二年', '二到三年', '三年以上']
-    if (mode === 'custom') {
-      const json = allResponses.value.get('D2-adj-aging-custom-bands')?.remark
-      if (json) {
-        try {
-          const parsed = JSON.parse(json)
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            return parsed.map((b: any) => b.label || '未命名')
-          }
-        } catch { /* fallback */ }
-      }
-    }
+    const segs = injectedAgingSegments?.value
+    if (Array.isArray(segs) && segs.length > 0) return segs.map((seg) => seg.label)
     return DEFAULT_AGING_BANDS
   })
 

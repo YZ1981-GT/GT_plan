@@ -8,10 +8,22 @@
  * 4. 比较本期与上期审定数，自动计算变动额、变动率并分析重大变动；
  * 5. 期末数按源表逻辑从 F4-2 明细表汇总，期初/期末分别与试算平衡表勾稽。
  */
-import { computed, onBeforeUnmount, ref, watch, type ComputedRef, type Ref } from 'vue'
+import { computed, inject, onBeforeUnmount, ref, watch, type ComputedRef, type Ref } from 'vue'
 import { calcAdjustedAmount, calcCreditBalance, calcSubtotal, parseNum } from './useF4AccPayFormulaEngine'
 import type { ChecklistResponse } from './useF4FormData'
 import { eventBus } from '@/utils/eventBus'
+import {
+  PRESET_SEGMENTS,
+  useAgingConfig,
+  DEFAULT_SUBJECT_PRESETS,
+  type AgingSegment,
+} from '@/composables/useAgingConfig'
+import {
+  F4_RESIDUAL_ROW_KEY,
+  F4_RESIDUAL_ROW_LABEL,
+  f4AgingRowKey,
+  f4AgingValue,
+} from './f4AgingModel'
 
 export type F4AdjudicationSection = 'nature' | 'aging'
 
@@ -65,13 +77,39 @@ export const F4_NATURE_DEFAULTS: StoredF4AdjRow[] = [
   createStoredRow('other', '其他'),
 ]
 
+/**
+ * 3 年段（迁移前固定 4 档 + 残差行）默认行，作为账龄配置未加载时的回退常量。
+ * 段驱动请用 `buildF4AgingDefaults(segments)`。
+ */
 export const F4_AGING_DEFAULTS: StoredF4AdjRow[] = [
   createStoredRow('within1year', '1年以内（含1年）'),
   createStoredRow('1to2year', '1至2年（含2年）'),
   createStoredRow('2to3year', '2至3年（含3年）'),
   createStoredRow('3yearplus', '3年以上'),
-  createStoredRow('aging-other', '其他/未分类'),
+  createStoredRow(F4_RESIDUAL_ROW_KEY, F4_RESIDUAL_ROW_LABEL),
 ]
+
+/** 3 年段下的段 key → 迁移前 label（保持零回归文案） */
+const LEGACY_AGING_LABEL: Record<string, string> = {
+  within1year: '1年以内（含1年）',
+  '1to2year': '1至2年（含2年）',
+  '2to3year': '2至3年（含3年）',
+  '3yearplus': '3年以上',
+}
+
+/**
+ * 按账龄段生成 F4-1「按账龄」区块默认行：
+ * rowKey 走 `LEGACY_AGING_ROWKEY`（3 年段沿用既有存储键，零数据迁移），末尾恒为残差行。
+ */
+export function buildF4AgingDefaults(segments: readonly AgingSegment[]): StoredF4AdjRow[] {
+  const segs = segments?.length ? segments : (PRESET_SEGMENTS.THREE_YEAR as AgingSegment[])
+  const rows = segs.map((seg) => {
+    const rowKey = f4AgingRowKey(String(seg.key))
+    return createStoredRow(rowKey, LEGACY_AGING_LABEL[rowKey] ?? seg.label)
+  })
+  rows.push(createStoredRow(F4_RESIDUAL_ROW_KEY, F4_RESIDUAL_ROW_LABEL))
+  return rows
+}
 
 const NATURE_STORAGE_KEY = 'F4-1-adj-nature-rows'
 const AGING_STORAGE_KEY = 'F4-1-adj-aging-rows'
@@ -239,7 +277,11 @@ function addAggregate(
  * - 按账龄：未审账龄取 F4-2 四段账龄，审定账龄取四段审定账龄，
  *   AJE = 审定账龄 - 未审账龄 - RJE（与源表 G=I-F-H 一致）。
  */
-export function aggregateF4Detail(value: string | null | undefined): F4DetailAggregation {
+export function aggregateF4Detail(
+  value: string | null | undefined,
+  segments?: readonly AgingSegment[],
+): F4DetailAggregation {
+  const segs = (segments?.length ? segments : PRESET_SEGMENTS.THREE_YEAR) as AgingSegment[]
   const rows = safeJsonArray(value)
   const meaningful = rows.filter((raw) =>
     String(raw?.creditor ?? '').trim()
@@ -250,7 +292,9 @@ export function aggregateF4Detail(value: string | null | undefined): F4DetailAgg
     || parseNum(raw?.closingAdjusted ?? raw?.adjustedBalance ?? raw?.auditedBalance),
   )
   const nature = emptyAggregate(F4_NATURE_DEFAULTS.map((row) => row.rowKey))
-  const aging = emptyAggregate(F4_AGING_DEFAULTS.map((row) => row.rowKey))
+  const segKeys = segs.map((seg) => String(seg.key))
+  const agingRowKeys = segKeys.map(f4AgingRowKey)
+  const aging = emptyAggregate([...agingRowKeys, F4_RESIDUAL_ROW_KEY])
   let openingAdjusted = 0
   let closingAdjusted = 0
 
@@ -283,19 +327,21 @@ export function aggregateF4Detail(value: string | null | undefined): F4DetailAgg
     closingAdjusted += audited
     addAggregate(nature[classifyNature(raw?.paymentNature ?? raw?.nature)], closing, aje, rje)
 
-    const unadjustedBuckets = [
-      parseNum(raw?.unadjustedAgingLt1 ?? raw?.aging1Year ?? raw?.agingLt1),
-      parseNum(raw?.unadjustedAging1to2 ?? raw?.aging1to2Year ?? raw?.aging1to2),
-      parseNum(raw?.unadjustedAging2to3 ?? raw?.aging2to3Year ?? raw?.aging2to3),
-      parseNum(raw?.unadjustedAgingGt3 ?? raw?.aging3YearPlus ?? raw?.agingGt3),
-    ]
-    const auditedBuckets = [
-      parseNum(raw?.auditedAgingLt1 ?? raw?.adjustedAging1),
-      parseNum(raw?.auditedAging1to2 ?? raw?.adjustedAging2),
-      parseNum(raw?.auditedAging2to3 ?? raw?.adjustedAging3),
-      parseNum(raw?.auditedAgingGt3 ?? raw?.adjustedAging4),
-    ]
-    const bucketKeys = ['within1year', '1to2year', '2to3year', '3yearplus']
+    // 账龄按生效段读取：nested 优先，缺该段键回退迁移前扁平字段/更早别名
+    const legacyRaw = {
+      ...raw,
+      unadjustedAgingLt1: raw?.unadjustedAgingLt1 ?? raw?.aging1Year ?? raw?.agingLt1,
+      unadjustedAging1to2: raw?.unadjustedAging1to2 ?? raw?.aging1to2Year ?? raw?.aging1to2,
+      unadjustedAging2to3: raw?.unadjustedAging2to3 ?? raw?.aging2to3Year ?? raw?.aging2to3,
+      unadjustedAgingGt3: raw?.unadjustedAgingGt3 ?? raw?.aging3YearPlus ?? raw?.agingGt3,
+      auditedAgingLt1: raw?.auditedAgingLt1 ?? raw?.adjustedAging1,
+      auditedAging1to2: raw?.auditedAging1to2 ?? raw?.adjustedAging2,
+      auditedAging2to3: raw?.auditedAging2to3 ?? raw?.adjustedAging3,
+      auditedAgingGt3: raw?.auditedAgingGt3 ?? raw?.adjustedAging4,
+    }
+    const unadjustedBuckets = segKeys.map((key) => f4AgingValue(legacyRaw, 'current', key))
+    const auditedBuckets = segKeys.map((key) => f4AgingValue(legacyRaw, 'audited', key))
+    const bucketKeys = agingRowKeys
     const unadjustedTotal = calcSubtotal(unadjustedBuckets)
     const auditedTotal = calcSubtotal(auditedBuckets)
     const hasAuditedBuckets = auditedBuckets.some((amount) => Math.abs(amount) >= BALANCE_TOLERANCE)
@@ -310,7 +356,7 @@ export function aggregateF4Detail(value: string | null | undefined): F4DetailAgg
     const closingResidual = closing - unadjustedTotal
     const auditedResidual = audited - (hasAuditedBuckets ? auditedTotal : unadjustedTotal)
     addAggregate(
-      aging['aging-other'],
+      aging[F4_RESIDUAL_ROW_KEY],
       closingResidual,
       auditedResidual - closingResidual - rowRjeTotal,
       rowRjeTotal,
@@ -351,6 +397,17 @@ export function useF4Adjudication(options: UseF4AdjudicationOptions) {
   const auditNote = ref('')
   const auditConclusion = ref('')
 
+  // ─── 账龄段（主入口 provide 优先，其次自加载，最后 F4 默认预设） ────────────
+  const injectedSegments = inject<Ref<AgingSegment[]> | null>('f4AgingSegments', null)
+  const ownConfig = injectedSegments ? null : useAgingConfig(projectId, 'F4')
+  const segments: ComputedRef<AgingSegment[]> = computed(() => {
+    const raw = injectedSegments?.value ?? ownConfig?.segments.value ?? []
+    return raw.length
+      ? raw
+      : (PRESET_SEGMENTS[DEFAULT_SUBJECT_PRESETS.F4 ?? 'THREE_YEAR'] as AgingSegment[])
+  })
+  const agingDefaults = computed(() => buildF4AgingDefaults(segments.value))
+
   function loadRows(): void {
     natureStored.value = migrateF4AdjRows(
       allResponses.value.get(NATURE_STORAGE_KEY)?.remark,
@@ -358,7 +415,7 @@ export function useF4Adjudication(options: UseF4AdjudicationOptions) {
     )
     agingStored.value = migrateF4AdjRows(
       allResponses.value.get(AGING_STORAGE_KEY)?.remark,
-      F4_AGING_DEFAULTS,
+      agingDefaults.value,
     )
   }
 
@@ -373,8 +430,24 @@ export function useF4Adjudication(options: UseF4AdjudicationOptions) {
     { immediate: true },
   )
 
+  // 账龄段变化：同 rowKey 保金额 / 新段补 0 / 废弃段丢弃，并持久化一次（Property 3）
+  watch(
+    () => agingDefaults.value.map((row) => row.rowKey).join('|'),
+    (next, prev) => {
+      if (!prev || next === prev) return
+      if (!agingStored.value.length) return
+      const byKey = new Map(agingStored.value.map((row) => [row.rowKey, row]))
+      agingStored.value = agingDefaults.value.map((item) => ({
+        ...item,
+        ...(byKey.get(item.rowKey) ?? {}),
+        label: item.label,
+      }))
+      if (!readonly.value) persistRows('aging')
+    },
+  )
+
   const detailAggregation = computed(() =>
-    aggregateF4Detail(allResponses.value.get(DETAIL_STORAGE_KEY)?.remark),
+    aggregateF4Detail(allResponses.value.get(DETAIL_STORAGE_KEY)?.remark, segments.value),
   )
   const natureDataRows: ComputedRef<F4AdjudicationRow[]> = computed(() =>
     natureStored.value.map((row) => computeF4AdjudicationRow(
@@ -584,6 +657,7 @@ export function useF4Adjudication(options: UseF4AdjudicationOptions) {
   })
 
   return {
+    segments,
     natureDataRows,
     natureSubtotalRow,
     agingDataRows,

@@ -211,19 +211,33 @@ class TestF4ImportExport:
                 f"{key}: headers({len(spec['headers'])}) != field_keys({len(spec['field_keys'])})"
             )
 
-    def test_f4_2_spec_matches_source_27_columns(self):
-        """F4-2导入导出严格对应源表A:AA，无旧版自造字段."""
+    def test_f4_2_spec_base_columns_plus_dynamic_aging(self):
+        """F4-2 = 源表基础列（19）+ 项目账龄配置动态账龄列（f4-aging-enum-unification Task 6.2）。
+
+        3 年段下动态账龄列为 2×4 = 8 列，与迁移前源表 A:AA 的 27 列总数一致（19+8=27）。
+        """
+        from app.routers.wp_render_strategies._cycle_import_export_common import (
+            build_aging_headers,
+            subject_aging_periods,
+        )
         from app.routers.wp_render_strategies._f4_import_export import _F4_SPECS
+        from app.services import aging_config_service as acs
 
         spec = _F4_SPECS["F4-2"]
-        assert len(spec["headers"]) == 27
+        assert len(spec["headers"]) == 19
         assert spec["headers"][:4] == ["债权人名称", "公司代码", "关联方类型", "款项性质"]
-        assert spec["headers"][13:17] == [
-            "未审账龄-1年以下", "未审账龄-1～2年", "未审账龄-2～3年", "未审账龄-3年以上",
-        ]
-        assert spec["headers"][20:24] == [
-            "审定账龄-1年以下", "审定账龄-1～2年", "审定账龄-2～3年", "审定账龄-3年以上",
-        ]
+        # 基础列不再含静态账龄列
+        assert all("账龄" not in h for h in spec["headers"])
+        aging = spec["aging"]
+        assert aging["subject"] == "F4"
+
+        three = acs.resolve_segments(acs.AgingPreset.THREE_YEAR, None)
+        aging_headers = build_aging_headers(three, subject_aging_periods("F4"))
+        # 3 年段零回归对照：19 基础列 + 8 账龄列 = 迁移前 27 列
+        assert len(spec["headers"]) + len(aging_headers) == 27
+        assert aging_headers[0] == "1年以内(期末未审)"
+        assert aging_headers[-1] == "3年以上(期末审定)"
+
         assert "confirmationResult" not in spec["field_keys"]
         assert "subsequentPaymentDate" not in spec["field_keys"]
         assert "indexRef" not in spec["field_keys"]

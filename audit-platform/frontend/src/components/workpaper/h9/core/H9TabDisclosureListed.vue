@@ -31,6 +31,9 @@
         >
           同步到附注
         </el-button>
+        <el-button size="small" type="warning" plain :loading="isSyncing" :disabled="isReadonly || !projectId" @click="handlePullAndSync">
+          取数并同步
+        </el-button>
         <el-button size="small" type="primary" plain :disabled="!projectId" @click="jumpToNote('listed')">↩ 跳转回附注（五、47）</el-button>
         <el-button size="small" type="primary" plain @click="emit('open-ai', 'disclosure-listed')">AI 辅助</el-button>
         <el-button size="small" @click="emit('open-review', 'disclosure-listed')">复核</el-button>
@@ -299,6 +302,17 @@ function onInterestNoteEdit(v: string) {
 function handlePull() {
   const res = pullFromSources()
   ElMessage.success(res.message)
+}
+
+/** 取数并同步：一键完成「从审定/明细取数」+「同步到附注」 */
+async function handlePullAndSync() {
+  const res = pullFromSources()
+  if (res.message.includes('未找到')) {
+    ElMessage.warning(res.message)
+    return
+  }
+  ElMessage.success(res.message + '，正在同步到附注...')
+  await syncToNotes()
 }
 
 async function syncToNotes() {

@@ -22,8 +22,9 @@
  *
  * Requirements: 4.1-4.6, 5.1-5.5, 6.1-6.5, 14.1-14.5, 18.1-18.3, 18.5, 18.7
  */
-import { inject, toRef, ref, type Ref } from 'vue'
+import { inject, toRef, ref, computed, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useAgingConfig, PRESET_SEGMENTS } from '@/composables/useAgingConfig'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useD1RelatedPartyCheck } from '../composables/useD1RelatedPartyCheck'
@@ -89,6 +90,14 @@ const {
       .catch(() => { /* silent */ })
   },
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
+})
+
+/** 账龄下拉选项 = 项目账龄配置段（枚举账龄：3年段 / 5年段 / 自定义），仍允许自定义输入。 */
+const { segments: d1AgingSegments } = useAgingConfig(toRef(props, 'projectId') as Ref<string>, 'D1')
+const agingBandLabels = computed<string[]>(() => {
+  const list = d1AgingSegments.value
+  if (Array.isArray(list) && list.length > 0) return list.map((seg) => seg.label)
+  return PRESET_SEGMENTS.FIVE_YEAR.map((seg) => seg.label)
 })
 
 // ─── Formatters ──────────────────────────────────────────────────────────────
@@ -329,16 +338,23 @@ async function generateAuditConclusionWithAI() {
           </template>
         </el-table-column>
 
-        <!-- I: 账龄 -->
-        <el-table-column label="账龄" min-width="100">
+        <!-- I: 账龄（枚举账龄：项目账龄配置段，可自定义） -->
+        <el-table-column label="账龄" min-width="130">
           <template #default="{ row }: { row: RelatedPartyRow }">
-            <el-input
+            <el-select
               :model-value="row.agingInfo"
               size="small"
-              placeholder="账龄"
+              filterable
+              allow-create
+              default-first-option
+              clearable
+              style="width:100%"
+              placeholder="选择账龄段"
               :disabled="isReadonly"
               @change="(v: string) => updateRow(row.id, 'agingInfo', v || '')"
-            />
+            >
+              <el-option v-for="label in agingBandLabels" :key="label" :label="label" :value="label" />
+            </el-select>
           </template>
         </el-table-column>
 

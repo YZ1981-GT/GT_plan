@@ -85,7 +85,20 @@
 
     <div class="action-bar" v-if="!isReadonly">
       <el-button size="small" @click="handleAddRow">+ 新增增加项</el-button>
+      <el-button size="small" type="primary" plain @click="samplingVisible = true">🎲 抽凭引擎</el-button>
     </div>
+
+    <!-- 抽凭引擎 -->
+    <el-dialog v-model="samplingVisible" title="H5-7 增加检查 — 抽凭引擎" width="85%" destroy-on-close>
+      <GtVoucherSamplingEngine
+        account-code="1631"
+        phase="final"
+        :workpaper-id="wpId"
+        :project-id="projectId"
+        :year="samplingYear"
+        @filled="onSampleFilled"
+      />
+    </el-dialog>
 
     <el-card shadow="never" class="note-card">
       <template #header><div class="section-title"><span>审计说明</span></div></template>
@@ -110,18 +123,37 @@
 </template>
 
 <script setup lang="ts">
-import { computed, inject, toRef } from 'vue'
+import { ref, computed, inject, toRef } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import GtIndexChip from '../../GtIndexChip.vue'
+import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
 import { useH5AdditionCheck } from '../../composables/useH5AdditionCheck'
 import { useH5FormData } from '../../composables/useH5FormData'
+import { useAuditContext } from '@/composables/useAuditContext'
 
-const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean }>()
+const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean; year?: number }>()
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 const allResponsesRef = computed(() => props.allResponses)
 const formData = useH5FormData({ wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId') })
 const state = useH5AdditionCheck({ allResponses: allResponsesRef as any, wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId'), onSave: (itemId: string, value: any) => formData.setResponse(itemId, value) })
+
+// ─── 抽凭引擎 ────────────────────────────────────────────────────────────────
+const samplingVisible = ref(false)
+const { year: auditYear } = useAuditContext()
+const samplingYear = computed(() => props.year || auditYear.value || new Date().getFullYear())
+
+function onSampleFilled(payload: any): void {
+  const samples = payload?.samples ?? []
+  for (const s of samples) {
+    state.addRow(s.summary || s.counterpartAccount || '抽凭样本', {
+      voucherNo: s.voucherNo || '',
+      amount: s.debitAmount || s.creditAmount || 0,
+      conclusion: '',
+    })
+  }
+  samplingVisible.value = false
+}
 
 async function handleAddRow() {
   const { value } = await ElMessageBox.prompt('请输入资产名称', '新增增加项', { confirmButtonText: '确定', cancelButtonText: '取消' })

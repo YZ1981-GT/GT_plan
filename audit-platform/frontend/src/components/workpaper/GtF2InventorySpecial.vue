@@ -4,7 +4,7 @@
     <template v-else>
       <div v-if="showHtmlToolbar" class="f2-spe-toolbar">
         <el-segmented
-          v-model="dualMode.currentMode.value"
+          :model-value="dualMode.currentMode.value"
           :options="dualMode.modeOptions"
           size="small"
           @change="dualMode.onModeChange"

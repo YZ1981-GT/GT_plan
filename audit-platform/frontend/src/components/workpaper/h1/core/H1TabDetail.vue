@@ -10,6 +10,32 @@
       </ol>
     </el-alert>
 
+    <!-- 四表取数来源面板（灰度关闭时 prefill 为 null，面板不渲染） -->
+    <H1FourTableSourcePanel
+      :prefill="fourTablePrefill"
+      :is-readonly="isReadonly"
+      :has-manual-data="rows.length > 0"
+      @re-extract="onReExtractFromFourTable"
+    />
+
+    <!-- 本期增减 vs 序时账核对（只读告警，Req2；序时账不可用时显示"未取到"） -->
+    <el-alert
+      v-if="fourTablePrefill && movementReconcile.available"
+      :type="movementReconcile.hasDiff ? 'warning' : 'success'"
+      :closable="false" show-icon style="margin-bottom:12px"
+    >
+      <template #title>
+        <span style="font-weight:600">本期增减 ↔ 序时账 1601 核对</span>
+      </template>
+      <div style="font-size:12px;line-height:1.6">
+        {{ movementReconcile.message }}
+        <span style="margin-left:8px;color:#909399">
+          （明细增加 {{ fmtAmt(movementReconcile.detailIncrease) }} vs 序时账 {{ fmtAmt(movementReconcile.ledgerIncrease) }}；
+          明细减少 {{ fmtAmt(movementReconcile.detailDecrease) }} vs 序时账 {{ fmtAmt(movementReconcile.ledgerDecrease) }}）
+        </span>
+      </div>
+    </el-alert>
+
     <!-- 工具栏 -->
     <div class="tab-toolbar">
       <GtIndexChip value="wp:H1-2" :context-project-id="projectId" />
@@ -517,6 +543,12 @@ import {
   H1_2_CATEGORY_OPTIONS,
 } from '../../composables/useH1Detail'
 import GtIndexChip from '../../GtIndexChip.vue'
+import H1FourTableSourcePanel from './H1FourTableSourcePanel.vue'
+import {
+  buildMovementReconcile,
+  type H1FourTablePrefill,
+} from '../../composables/h1FourTablePrefill'
+import type { Ref } from 'vue'
 
 const props = defineProps<{
   wpId: string
@@ -527,6 +559,14 @@ const props = defineProps<{
 
 const allResponsesRef = computed(() => props.allResponses)
 const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
+
+// ─── 四表取数（主入口 GtH1FixedAssets provide）────────────────────────────────
+const fourTablePrefillRef = inject<Ref<H1FourTablePrefill | null>>('h1FourTablePrefill', undefined)
+const fourTablePrefill = computed(() => fourTablePrefillRef?.value ?? null)
+const seedDetailFromFourTable = inject<(force?: boolean) => number>('h1SeedDetailFromFourTable', undefined)
+function onReExtractFromFourTable() {
+  seedDetailFromFourTable?.(true)
+}
 
 const NOTE_KEY = 'H1-2-audit-note'
 const CONCLUSION_KEY = 'H1-2-audit-conclusion'
@@ -577,6 +617,11 @@ const {
   toRef(props, 'projectId'),
   allResponsesRef as any,
   { onSave: (itemId, value) => saveResponse(itemId, value) },
+)
+
+/** 本期原值增减 vs 序时账 1601 发生额（只读核对，Req2.4 不自动改数） */
+const movementReconcile = computed(() =>
+  buildMovementReconcile(rows.value, fourTablePrefill.value?.ledger_movement),
 )
 
 /** 金额输入子组件，减少模板重复 */

@@ -335,7 +335,7 @@ export function useH6FormData(params: {
 
     try {
       const res = await api.get(`/api/projects/${projectId.value}/trial-balance`, {
-        params: { account_prefix: ACCOUNT_CODE_1606 },
+        params: { account_prefix: ACCOUNT_CODE_1606, year: renderMeta.value?.year || undefined },
         _silent: true,
       } as any)
       const list: any[] = Array.isArray(res?.data ?? res) ? (res?.data ?? res) : (res?.data?.items ?? [])

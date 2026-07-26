@@ -21,10 +21,14 @@
       <!-- 顶部工具栏（双模式切换）— 目录页隐藏 -->
       <div v-if="currentSheet !== 'H9'" class="h9-header-toolbar">
         <el-segmented
-          v-model="currentMode"
+          :model-value="currentMode"
           :options="modeOptions"
+          @change="switchMode"
           size="small"
         />
+        <el-tag v-if="ooHealthChecking" size="small" type="info">检测中...</el-tag>
+        <el-tag v-else-if="isOoAvailable" size="small" type="success">OnlyOffice 拉取成功</el-tag>
+        <el-tag v-else size="small" type="warning">仅结构化视图</el-tag>
       </div>
 
       <!-- OnlyOffice 模式 -->
@@ -98,6 +102,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :year="props.year"
           @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
@@ -236,12 +241,35 @@ const h8LinkageStatus = computed(() => {
   }
 })
 
-// ─── 双模式切换（后续由 useH9DualMode composable 替代） ─────────────────────
+// ─── 双模式切换（拉取成功才允许切 OnlyOffice） ──────────────────────────────
 const currentMode = ref<'html' | 'onlyoffice'>('html')
-const modeOptions = [
+const isOoAvailable = ref(false)
+const ooHealthChecking = ref(true)
+
+const modeOptions = computed(() => [
   { label: '结构化视图', value: 'html' },
-  { label: '在线编辑', value: 'onlyoffice' },
-]
+  { label: '在线编辑', value: 'onlyoffice', disabled: !isOoAvailable.value },
+])
+
+/** 健康检查（拉取成功才解锁在线编辑） */
+async function checkOoHealth() {
+  ooHealthChecking.value = true
+  try {
+    const res = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
+    const data = res?.data ?? res
+    isOoAvailable.value = !!(data?.healthy ?? data?.data?.healthy)
+  } catch {
+    isOoAvailable.value = false
+  } finally {
+    ooHealthChecking.value = false
+  }
+}
+
+/** 切换模式：OO 不可用时阻断 */
+function switchMode(val: 'html' | 'onlyoffice') {
+  if (val === 'onlyoffice' && !isOoAvailable.value) return
+  currentMode.value = val
+}
 
 // ─── sheetName → 编码提取 ────────────────────────────────────────────────────
 const currentSheet = computed(() => {
@@ -420,6 +448,7 @@ function _handleTbUpdated(_payload?: unknown): void {
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 onMounted(() => {
   void selfLoad()
+  void checkOoHealth()
   // Subscribe: TB / 审定更新（经 crossWpEventBridge 双通道）
   window.addEventListener('tb:updated', _handleTbUpdated)
   window.addEventListener('substantive:adjudicated', _handleTbUpdated)

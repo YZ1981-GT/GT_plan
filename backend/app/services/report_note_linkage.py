@@ -281,5 +281,89 @@ class ReportNoteLinkage:
                     config.append(t)
         return binding if binding else config
 
+    # ------------------------------------------------------------------
+    # 只读诊断（spec disclosure-note-formula-data-population Task 5.1 / Req4）
+    # ------------------------------------------------------------------
+
+    def diagnose_missing_write_linkage(
+        self,
+        notes: list[Any],
+        *,
+        cross_check_sections: set[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        """列出「有报表↔附注勾稽关系但无写值 linkage」的章节（**只读**，不写入）。
+
+        决策 1（用户已拍板）：报表↔附注只做校验不做写值 → 某章节
+        ``cells_updated=0`` 是**正确行为**而非失败。本诊断把它显性化，供逐节人工
+        评估是否确需写值映射（若需，按 ``report_note_linkage.json`` 的 ``_rules``
+        逐节增量维护，**禁止批量臆造**）。
+
+        Args:
+            notes: 该项目/年度的附注对象列表（需有 ``note_section`` / ``table_data``）
+            cross_check_sections: 存在勾稽关系的章节集合；缺省时从预设库
+                （``note:{章节}`` 的 ``logic_check`` 条目）读取，fail-open。
+
+        Returns:
+            每项 ``{note_section, has_cross_check, write_linkage_targets,
+            binding_targets, config_targets, reason}``；只呈现不修改任何数据。
+        """
+        if cross_check_sections is None:
+            cross_check_sections = self._load_cross_check_sections()
+
+        out: list[dict[str, Any]] = []
+        for note in notes or []:
+            section = getattr(note, "note_section", None)
+            if not isinstance(section, str) or not section:
+                continue
+            binding_targets = self._iter_binding_targets(note)
+            config_targets = self._iter_config_targets(note)
+            total = len(binding_targets) + len(config_targets)
+            has_cc = section in cross_check_sections
+            if total > 0 or not has_cc:
+                continue
+            out.append(
+                {
+                    "note_section": section,
+                    "has_cross_check": True,
+                    "write_linkage_targets": 0,
+                    "binding_targets": 0,
+                    "config_targets": 0,
+                    "reason": (
+                        "该章节有报表↔附注勾稽（logic_check）但无写值 linkage："
+                        "按决策 1 报表不回写附注，cells_updated=0 属正确行为；"
+                        "如确需写值请按源模板/审计口径逐节增量维护"
+                        " report_note_linkage.json"
+                    ),
+                }
+            )
+        return out
+
+    @staticmethod
+    def _load_cross_check_sections() -> set[str]:
+        """从预设库取存在报表↔附注勾稽的附注章节集合（fail-open 返回空集）。"""
+        try:
+            from app.services.formula_management.preset_library import (
+                build_preset_library,
+            )
+
+            entries, _stats = build_preset_library()
+        except Exception as err:  # pragma: no cover — 预设库不可用时安全降级
+            logger.warning(
+                "ReportNoteLinkage: load preset library failed (%s); "
+                "cross-check sections unknown",
+                err,
+            )
+            return set()
+
+        out: set[str] = set()
+        for e in entries:
+            page_key = getattr(e, "page_key", "") or ""
+            if not page_key.startswith("note:"):
+                continue
+            if getattr(e, "formula_type", "") != "logic_check":
+                continue
+            out.add(page_key[len("note:") :])
+        return out
+
 
 __all__ = ["ReportNoteLinkage", "LinkTarget"]

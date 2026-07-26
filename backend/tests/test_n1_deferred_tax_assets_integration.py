@@ -431,3 +431,524 @@ class TestE2EFlow:
         # Step 7: N5递延税费用核对
         period_change = end_balance - begin  # 300万
         assert period_change == 3_000_000
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Section 9: 导入导出 Sheet_Spec 三重键契约（防串表 / 防 Orphan_Key）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestN1ImportExportSheetSpecContract:
+    """N1 导入导出 spec 必须覆盖全部挂了「导入导出 ▾」的 sheet，且三重键与前端一致。
+
+    背景（真实缺陷）：N1-4/N1-5 页面挂了导入导出按钮但后端只注册 N1-2，
+    前端调用又漏传 sheet → 落到 Query 默认值 "N1-2"
+    → 在测算表/亏损表导出到的是明细表数据、导入会覆盖 N1-2 明细行（串表 + 数据破坏）。
+    """
+
+    @pytest.mark.parametrize("sheet", ["N1-2", "N1-4", "N1-5"])
+    def test_sheet_registered_in_all_maps(self, sheet: str):
+        """每个受支持 sheet 在 headers/field_map/item_id/storage_field/row-id 五张表齐备"""
+        from app.routers.n1_deferred_tax_assets import (
+            _FIELD_MAPS,
+            _SHEET_HEADERS,
+            _SHEET_ITEM_ID,
+            _SHEET_ROW_ID_PREFIX,
+            _SHEET_STORAGE_FIELD,
+            _SUPPORTED_SHEETS,
+        )
+
+        assert sheet in _SUPPORTED_SHEETS
+        assert sheet in _SHEET_HEADERS and _SHEET_HEADERS[sheet]
+        assert sheet in _FIELD_MAPS and _FIELD_MAPS[sheet]
+        assert sheet in _SHEET_ITEM_ID
+        assert sheet in _SHEET_STORAGE_FIELD
+        assert sheet in _SHEET_ROW_ID_PREFIX
+        # headers 与 field_map 一一对应（导出按 headers 取 field，漏项会导出空列）
+        assert set(_SHEET_HEADERS[sheet]) == set(_FIELD_MAPS[sheet].keys())
+
+    def test_item_id_matches_frontend_storage_key(self):
+        """item_id 必须等于前端 composable 的持久化键（写错 = 导入后前端读不到）"""
+        from app.routers.n1_deferred_tax_assets import _SHEET_ITEM_ID
+
+        assert _SHEET_ITEM_ID["N1-2"] == "N1-2-detail-rows"   # useN1Detail
+        assert _SHEET_ITEM_ID["N1-4"] == "N1-4-calc-rows"     # useN1CalcTable
+        assert _SHEET_ITEM_ID["N1-5"] == "N1-5-rows"           # useN1LossCheck（新键，spec n1-loss-check-source-alignment）
+
+    def test_storage_field_is_conclusion(self):
+        """N1 三张动态行表前端均把行数组 JSON 存在 conclusion 列"""
+        from app.routers.n1_deferred_tax_assets import _SHEET_STORAGE_FIELD
+
+        assert set(_SHEET_STORAGE_FIELD.values()) == {"conclusion"}
+
+    def test_field_keys_match_frontend_row_models(self):
+        """field_keys 必须是前端行模型字段名（否则导入后字段读不出）"""
+        from app.routers.n1_deferred_tax_assets import _FIELD_MAPS
+
+        assert set(_FIELD_MAPS["N1-4"].values()) == {
+            "itemName", "bookValue", "taxBase", "taxRate",
+            "assetCounterAccount", "assetBookBalance",
+            "liabilityCounterAccount", "liabilityBookBalance",
+        }
+        assert set(_FIELD_MAPS["N1-5"].values()) == {
+            "expiryYear", "priorUnrecognized", "bookAmount", "auditAdjustment",
+            "recognizedAmount", "taxRate", "basis", "sufficient",
+            "sourceOperating", "sourceTemporaryDiff", "sourceOther",
+            "indexRef", "remark",
+        }
+
+    def test_unsupported_sheet_rejected(self):
+        """未注册 sheet 必须 400，不得静默落到默认 sheet"""
+        from fastapi import HTTPException
+
+        from app.routers.n1_deferred_tax_assets import _validate_sheet
+
+        with pytest.raises(HTTPException) as exc:
+            _validate_sheet("N1-1")
+        assert exc.value.status_code == 400
+
+    def test_parse_row_uses_sheet_specific_id_prefix_and_int_years(self):
+        """行 id 前缀按 sheet 生成（对齐前端 addRow），年度解析为 int 不带 .0"""
+        from app.routers.n1_deferred_tax_assets import _parse_row, _SHEET_HEADERS
+
+        # N1-5 新模型列（spec n1-loss-check-source-alignment Task 5.1）
+        headers = _SHEET_HEADERS["N1-5"]
+        row = (
+            2027,      # 到期年度
+            50000,     # 上期不确认
+            200000,    # 本期账面金额
+            -10000,    # 本期审计调整
+            120000,    # 确认金额
+            0.25,      # 适用税率
+            "预计未来所得额充足",  # 依据
+            "是",      # 到期前是否有足够的应纳税所得额
+            "√",       # 其中：来源于生产经营所得
+            "",        # 其中：来源于暂时性差异
+            "否",      # 其中：来源于其他原因
+            "N1-4",    # 检查底稿索引
+            "高新10年", # 备注
+        )
+        parsed = _parse_row("N1-5", row, headers, seq=1)
+
+        assert parsed["id"] == "loss-1"
+        assert parsed["expiryYear"] == 2027 and isinstance(parsed["expiryYear"], int)
+        assert parsed["priorUnrecognized"] == 50000.0
+        assert parsed["bookAmount"] == 200000.0
+        assert parsed["auditAdjustment"] == -10000.0
+        assert parsed["recognizedAmount"] == 120000.0
+        assert parsed["taxRate"] == 0.25
+        assert parsed["basis"] == "预计未来所得额充足"
+        assert parsed["sufficient"] == "yes"
+        assert parsed["sourceOperating"] is True
+        assert parsed["sourceTemporaryDiff"] is False
+        assert parsed["sourceOther"] is False
+        assert parsed["indexRef"] == "N1-4"
+        assert parsed["remark"] == "高新10年"
+        # Property 11: 派生列不出现在解析结果里
+        assert "auditedAmount" not in parsed
+        assert "unrecognizedAmount" not in parsed
+        assert "recognizableAsset" not in parsed
+
+        calc_headers = [
+            "项目名称", "账面价值", "计税基础", "适用税率",
+            "递延税资产对方科目", "递延所得税资产期末账面余额",
+            "递延税负债对方科目", "递延所得税负债期末账面余额",
+        ]
+        calc_parsed = _parse_row(
+            "N1-4",
+            ("存货跌价准备", 1_000_000, 1_500_000, 0.25, "6711", 125_000, "", 0),
+            calc_headers,
+            seq=2,
+        )
+        assert calc_parsed["id"] == "calc-2"
+        assert calc_parsed["taxBase"] == 1_500_000.0
+        assert calc_parsed["assetCounterAccount"] == "6711"
+
+    def test_round_trip_export_then_parse_preserves_fields(self):
+        """导出行 → 解析回来字段逐一还原（Round_Trip 字段完备性）"""
+        from app.routers.n1_deferred_tax_assets import (
+            _FIELD_MAPS,
+            _SHEET_HEADERS,
+            _export_row,
+            _parse_row,
+        )
+
+        data = {
+            "id": "calc-1",
+            "itemName": "固定资产减值准备",
+            "bookValue": 900_000.0,
+            "taxBase": 1_000_000.0,
+            "taxRate": 0.25,
+            "assetCounterAccount": "6711",
+            "assetBookBalance": 20_000.0,
+            "liabilityCounterAccount": "",
+            "liabilityBookBalance": 0.0,
+        }
+        exported = _export_row("N1-4", data)
+        parsed = _parse_row("N1-4", tuple(exported), _SHEET_HEADERS["N1-4"], seq=1)
+        for field in _FIELD_MAPS["N1-4"].values():
+            assert parsed[field] == data[field], field
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Section 10: 改造前 IE 现状基线冻结 (Task 1.2, Req 7.2, 8.1)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestN1IECurrentStateBaseline:
+    """冻结改造前后端 N1 IE 现状基线（characterization test）。
+
+    本组测试在改造 N1-5 之前锁定当前状态，确保：
+    1. _SUPPORTED_SHEETS 当前含 N1-2/N1-4/N1-5 三张表
+    2. 每张表在五张配置映射（headers/field_maps/item_id/storage_field/row_id_prefix）齐备
+    3. 每张 item_id 与前端读取键一致
+    4. 所有 storage_field 为 'conclusion'
+
+    改造后 N1-5 的 item_id 将从 'N1-5-loss-rows' 变为 'N1-5-rows'。
+    本测试冻结改造前状态，改造时需显式更新本组断言（记录为 basis 改变）。
+
+    Spec: .kiro/specs/n1-loss-check-source-alignment Task 1.2
+    Requirements: 7.2, 8.1
+    """
+
+    def test_supported_sheets_exact_set(self):
+        """_SUPPORTED_SHEETS 当前精确包含三张表（改造前基线）"""
+        from app.routers.n1_deferred_tax_assets import _SUPPORTED_SHEETS
+
+        assert _SUPPORTED_SHEETS == {"N1-2", "N1-4", "N1-5"}
+
+    @pytest.mark.parametrize("sheet", ["N1-2", "N1-4", "N1-5"])
+    def test_five_config_maps_complete_for_each_sheet(self, sheet: str):
+        """每张 sheet 的五张配置映射（headers/field_maps/item_id/storage_field/row_id_prefix）齐备"""
+        from app.routers.n1_deferred_tax_assets import (
+            _FIELD_MAPS,
+            _SHEET_HEADERS,
+            _SHEET_ITEM_ID,
+            _SHEET_ROW_ID_PREFIX,
+            _SHEET_STORAGE_FIELD,
+            _SUPPORTED_SHEETS,
+        )
+
+        assert sheet in _SUPPORTED_SHEETS, f"{sheet} 不在 _SUPPORTED_SHEETS"
+        assert sheet in _SHEET_HEADERS and len(_SHEET_HEADERS[sheet]) > 0
+        assert sheet in _FIELD_MAPS and len(_FIELD_MAPS[sheet]) > 0
+        assert sheet in _SHEET_ITEM_ID and _SHEET_ITEM_ID[sheet]
+        assert sheet in _SHEET_STORAGE_FIELD and _SHEET_STORAGE_FIELD[sheet]
+        assert sheet in _SHEET_ROW_ID_PREFIX and _SHEET_ROW_ID_PREFIX[sheet]
+
+    def test_item_id_matches_frontend_reading_key_baseline(self):
+        """item_id 与前端读取键精确一致（改造后快照）
+
+        N1-5 已从 'N1-5-loss-rows' 改为 'N1-5-rows'（spec n1-loss-check-source-alignment Task 5.1）。
+        此断言记录为 basis 改变（Req 8.4）。
+        """
+        from app.routers.n1_deferred_tax_assets import _SHEET_ITEM_ID
+
+        # 改造后精确值快照（basis 改变：N1-5 item_id 'N1-5-loss-rows' → 'N1-5-rows'）
+        expected = {
+            "N1-2": "N1-2-detail-rows",
+            "N1-4": "N1-4-calc-rows",
+            "N1-5": "N1-5-rows",
+        }
+        assert _SHEET_ITEM_ID == expected
+
+    def test_all_storage_fields_are_conclusion(self):
+        """所有 sheet 的 storage_field 均为 'conclusion'"""
+        from app.routers.n1_deferred_tax_assets import _SHEET_STORAGE_FIELD
+
+        for sheet, field in _SHEET_STORAGE_FIELD.items():
+            assert field == "conclusion", (
+                f"{sheet} 的 storage_field 应为 'conclusion'，实际为 '{field}'"
+            )
+
+    def test_row_id_prefix_baseline(self):
+        """行 id 前缀冻结（前端 addRow 用此前缀生成行 id）"""
+        from app.routers.n1_deferred_tax_assets import _SHEET_ROW_ID_PREFIX
+
+        expected = {
+            "N1-2": "row",
+            "N1-4": "calc",
+            "N1-5": "loss",
+        }
+        assert _SHEET_ROW_ID_PREFIX == expected
+
+    def test_headers_and_field_maps_consistent(self):
+        """每张表的 headers 集合 == field_maps 键集合（防导出空列/导入漏字段）"""
+        from app.routers.n1_deferred_tax_assets import _FIELD_MAPS, _SHEET_HEADERS
+
+        for sheet in ("N1-2", "N1-4", "N1-5"):
+            assert set(_SHEET_HEADERS[sheet]) == set(_FIELD_MAPS[sheet].keys()), (
+                f"{sheet}: headers 与 field_maps 键不一致"
+            )
+
+    def test_n1_5_current_item_id_is_loss_rows(self):
+        """N1-5 改造前 item_id 是 'N1-5-loss-rows'（非新键 'N1-5-rows'）
+
+        这是改造的关键变更点：改造后将变为 'N1-5-rows'。
+        本断言在改造落地前必须通过，改造后需显式更新。
+        """
+        from app.routers.n1_deferred_tax_assets import _SHEET_ITEM_ID
+
+        # 改造已落地（spec n1-loss-check-source-alignment）：新模型键为 N1-5-rows；
+        # 旧键 N1-5-loss-rows 仅由前端 n1LossMigration 只读迁移，不再作为 IE 目标键。
+        assert _SHEET_ITEM_ID["N1-5"] == "N1-5-rows"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Section 11: N1-5 IE 契约与 Round_Trip 测试 (Property 11, Task 5.2)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestN1_5_RoundTrip_Property11:
+    """N1-5 IE Round_Trip 字段逐字对应 (Property 11).
+
+    **Validates: Requirements 7.1, 7.2, 7.3, 7.4**
+
+    验证 Task 5.1 改造后的 N1-5 亏损检查表 IE 契约：
+    1. headers 与 field_keys 一致（长度相等 + 集合相等）
+    2. item_id === 'N1-5-rows'
+    3. expiryYear 为 int（不出现 2023.0）
+    4. sufficient ∈ {'yes','no',''}；来源三标记为 bool
+    5. 派生列不出现在解析结果里
+    6. _export_row → _parse_row 逐字段相等（Round_Trip）
+    """
+
+    # ─── 1. headers 与 field_keys 一致 ────────────────────────────────────────
+
+    def test_headers_length_matches_field_maps_keys(self):
+        """_SHEET_HEADERS['N1-5'] 长度 == _FIELD_MAPS['N1-5'] 键数"""
+        from app.routers.n1_deferred_tax_assets import _FIELD_MAPS, _SHEET_HEADERS
+
+        headers = _SHEET_HEADERS["N1-5"]
+        field_map = _FIELD_MAPS["N1-5"]
+        assert len(headers) == len(field_map), (
+            f"headers 有 {len(headers)} 列，field_map 有 {len(field_map)} 键"
+        )
+
+    def test_headers_set_equals_field_maps_keys_set(self):
+        """_SHEET_HEADERS['N1-5'] 集合 == _FIELD_MAPS['N1-5'].keys() 集合"""
+        from app.routers.n1_deferred_tax_assets import _FIELD_MAPS, _SHEET_HEADERS
+
+        headers_set = set(_SHEET_HEADERS["N1-5"])
+        keys_set = set(_FIELD_MAPS["N1-5"].keys())
+        assert headers_set == keys_set, (
+            f"差异: headers 多 {headers_set - keys_set}, field_map 多 {keys_set - headers_set}"
+        )
+
+    # ─── 2. item_id === 'N1-5-rows' ──────────────────────────────────────────
+
+    def test_item_id_is_n1_5_rows(self):
+        """_SHEET_ITEM_ID['N1-5'] == 'N1-5-rows'（改造后新键）"""
+        from app.routers.n1_deferred_tax_assets import _SHEET_ITEM_ID
+
+        assert _SHEET_ITEM_ID["N1-5"] == "N1-5-rows"
+
+    # ─── 3. expiryYear 为 int ─────────────────────────────────────────────────
+
+    def test_expiry_year_parsed_as_int(self):
+        """expiryYear 解析为 int（不出现 2023.0 浮点）"""
+        from app.routers.n1_deferred_tax_assets import _SHEET_HEADERS, _parse_row
+
+        headers = _SHEET_HEADERS["N1-5"]
+        row = (2023, 100000, 500000, 50000, 300000, 0.25, "充足", "是",
+               "√", "", "√", "wp:N1-4", "测试备注")
+        parsed = _parse_row("N1-5", row, headers, seq=1)
+        assert parsed["expiryYear"] == 2023
+        assert isinstance(parsed["expiryYear"], int)
+        # 确认不是 float
+        assert not isinstance(parsed["expiryYear"], float)
+
+    def test_expiry_year_in_int_fields(self):
+        """expiryYear 在 _INT_FIELDS['N1-5'] 中注册"""
+        from app.routers.n1_deferred_tax_assets import _INT_FIELDS
+
+        assert "N1-5" in _INT_FIELDS
+        assert "expiryYear" in _INT_FIELDS["N1-5"]
+
+    # ─── 4. sufficient / 来源三标记类型 ───────────────────────────────────────
+
+    def test_sufficient_parsed_to_yes_no_empty(self):
+        """sufficient 解析为 'yes'/'no'/''"""
+        from app.routers.n1_deferred_tax_assets import _SHEET_HEADERS, _parse_row
+
+        headers = _SHEET_HEADERS["N1-5"]
+
+        # "是" → 'yes'
+        row_yes = (2024, 0, 100000, 0, 80000, 0.25, "", "是", "", "", "", "", "")
+        parsed_yes = _parse_row("N1-5", row_yes, headers, seq=1)
+        assert parsed_yes["sufficient"] == "yes"
+
+        # "否" → 'no'
+        row_no = (2024, 0, 100000, 0, 0, 0.25, "", "否", "", "", "", "", "")
+        parsed_no = _parse_row("N1-5", row_no, headers, seq=2)
+        assert parsed_no["sufficient"] == "no"
+
+        # 空 → ''
+        row_empty = (2024, 0, 100000, 0, 0, 0.25, "", "", "", "", "", "", "")
+        parsed_empty = _parse_row("N1-5", row_empty, headers, seq=3)
+        assert parsed_empty["sufficient"] == ""
+
+    def test_source_flags_parsed_as_bool(self):
+        """sourceOperating/sourceTemporaryDiff/sourceOther 解析为 bool"""
+        from app.routers.n1_deferred_tax_assets import _SHEET_HEADERS, _parse_row
+
+        headers = _SHEET_HEADERS["N1-5"]
+
+        # "√" 或 "是" → True
+        row = (2025, 0, 200000, 10000, 150000, 0.25, "测试", "是",
+               "√", "是", "", "", "")
+        parsed = _parse_row("N1-5", row, headers, seq=1)
+        assert parsed["sourceOperating"] is True
+        assert isinstance(parsed["sourceOperating"], bool)
+        assert parsed["sourceTemporaryDiff"] is True
+        assert isinstance(parsed["sourceTemporaryDiff"], bool)
+        assert parsed["sourceOther"] is False
+        assert isinstance(parsed["sourceOther"], bool)
+
+    # ─── 5. 派生列不出现在解析结果里 ──────────────────────────────────────────
+
+    def test_derived_fields_not_in_parsed_result(self):
+        """auditedAmount / unrecognizedAmount / recognizableAsset 不在解析结果中"""
+        from app.routers.n1_deferred_tax_assets import _SHEET_HEADERS, _parse_row
+
+        headers = _SHEET_HEADERS["N1-5"]
+        row = (2024, 50000, 300000, 20000, 200000, 0.25, "充足", "是",
+               "√", "", "", "wp:N1-4", "")
+        parsed = _parse_row("N1-5", row, headers, seq=1)
+
+        # 派生列不应出现
+        derived_fields = {"auditedAmount", "unrecognizedAmount", "recognizableAsset"}
+        actual_keys = set(parsed.keys())
+        intersection = derived_fields & actual_keys
+        assert not intersection, f"派生列不应出现在解析结果中: {intersection}"
+
+    # ─── 6. Round_Trip: _export_row → _parse_row 逐字段相等 ──────────────────
+
+    def test_round_trip_all_fields_equal(self):
+        """构造 N1-5 完整行 → _export_row → _parse_row → 逐字段相等"""
+        from app.routers.n1_deferred_tax_assets import (
+            _FIELD_MAPS,
+            _SHEET_HEADERS,
+            _export_row,
+            _parse_row,
+        )
+
+        # 构造完整行数据（所有可编辑字段）
+        original = {
+            "id": "loss-1",
+            "expiryYear": 2025,
+            "priorUnrecognized": 150000.0,
+            "bookAmount": 800000.0,
+            "auditAdjustment": -30000.0,
+            "recognizedAmount": 500000.0,
+            "taxRate": 0.25,
+            "basis": "预计未来五年有足够应纳税所得额",
+            "sufficient": "yes",
+            "sourceOperating": True,
+            "sourceTemporaryDiff": False,
+            "sourceOther": True,
+            "indexRef": "wp:N1-4",
+            "remark": "高新技术企业",
+        }
+
+        # 导出
+        exported = _export_row("N1-5", original)
+        assert len(exported) == len(_SHEET_HEADERS["N1-5"])
+
+        # 解析回来
+        parsed = _parse_row("N1-5", tuple(exported), _SHEET_HEADERS["N1-5"], seq=1)
+
+        # 逐字段对比（排除 id，因 _parse_row 重新生成 id）
+        for field in _FIELD_MAPS["N1-5"].values():
+            assert parsed[field] == original[field], (
+                f"字段 '{field}' Round_Trip 不一致: "
+                f"原始={original[field]!r}, 解析={parsed[field]!r}"
+            )
+
+    def test_round_trip_with_empty_optional_fields(self):
+        """Round_Trip：可选字段为空时也能正确往返"""
+        from app.routers.n1_deferred_tax_assets import (
+            _FIELD_MAPS,
+            _SHEET_HEADERS,
+            _export_row,
+            _parse_row,
+        )
+
+        original = {
+            "id": "loss-2",
+            "expiryYear": 2026,
+            "priorUnrecognized": 0.0,
+            "bookAmount": 200000.0,
+            "auditAdjustment": 0.0,
+            "recognizedAmount": 0.0,
+            "taxRate": 0.15,
+            "basis": "",
+            "sufficient": "",
+            "sourceOperating": False,
+            "sourceTemporaryDiff": False,
+            "sourceOther": False,
+            "indexRef": "",
+            "remark": "",
+        }
+
+        exported = _export_row("N1-5", original)
+        parsed = _parse_row("N1-5", tuple(exported), _SHEET_HEADERS["N1-5"], seq=2)
+
+        for field in _FIELD_MAPS["N1-5"].values():
+            assert parsed[field] == original[field], (
+                f"字段 '{field}' 空值 Round_Trip 不一致: "
+                f"原始={original[field]!r}, 解析={parsed[field]!r}"
+            )
+
+    def test_round_trip_expiry_year_stays_int(self):
+        """Round_Trip 后 expiryYear 仍为 int（不被 safe_float 转成 2025.0）"""
+        from app.routers.n1_deferred_tax_assets import (
+            _SHEET_HEADERS,
+            _export_row,
+            _parse_row,
+        )
+
+        original = {
+            "id": "loss-3",
+            "expiryYear": 2028,
+            "priorUnrecognized": 0.0,
+            "bookAmount": 100000.0,
+            "auditAdjustment": 0.0,
+            "recognizedAmount": 50000.0,
+            "taxRate": 0.25,
+            "basis": "",
+            "sufficient": "no",
+            "sourceOperating": False,
+            "sourceTemporaryDiff": True,
+            "sourceOther": False,
+            "indexRef": "",
+            "remark": "",
+        }
+
+        exported = _export_row("N1-5", original)
+        parsed = _parse_row("N1-5", tuple(exported), _SHEET_HEADERS["N1-5"], seq=3)
+
+        assert parsed["expiryYear"] == 2028
+        assert isinstance(parsed["expiryYear"], int)
+
+    # ─── 7. 前端调用方回归断言 ────────────────────────────────────────────────
+
+    def test_frontend_explicit_sheet_n1_5(self):
+        """前端调用方应显式传 sheet='N1-5'（回归断言：不再落到默认 'N1-2'）
+
+        验证 _SUPPORTED_SHEETS 包含 'N1-5' 且后端能独立校验该 sheet。
+        前端 useN1ImportExport 应显式传 sheet='N1-5' 不依赖后端 Query 默认值。
+        """
+        from app.routers.n1_deferred_tax_assets import _SUPPORTED_SHEETS, _validate_sheet
+
+        # N1-5 已注册
+        assert "N1-5" in _SUPPORTED_SHEETS
+
+        # 调 _validate_sheet('N1-5') 不抛异常
+        _validate_sheet("N1-5")  # 不应 raise
+
+    def test_n1_5_headers_count_is_13(self):
+        """N1-5 表头恰好 13 列（源模板对齐：到期年度~备注）"""
+        from app.routers.n1_deferred_tax_assets import _SHEET_HEADERS
+
+        assert len(_SHEET_HEADERS["N1-5"]) == 13

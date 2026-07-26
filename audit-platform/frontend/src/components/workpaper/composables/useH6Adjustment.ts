@@ -488,7 +488,8 @@ export function useH6Adjustment(params: {
       ajeTotals: ajeTotals.value,
       rjeTotals: rjeTotals.value,
     }
-    onPublishEvent?.('adjustment:created', payload)
+    // 统一走 eventBus.emit（crossWpEventBridge 自动桥接到 window 供旧消费者）
+    // 不再直接 onPublishEvent 避免双投双触发
     try {
       eventBus.emit('adjustment:created', {
         wpCode: WP_CODE,
@@ -534,7 +535,7 @@ export function useH6Adjustment(params: {
       credit: r.creditAmount,
       indexRef: r.indexRef || 'H6-3',
     }))
-    onPublishEvent?.('adjustment:push-to-a13', { wp_code: WP_CODE, entries: items })
+    // 统一走 eventBus（crossWpEventBridge 桥接 window），删除 onPublishEvent 双投
     try {
       eventBus.emit('a13:push-misstatement', {
         items,

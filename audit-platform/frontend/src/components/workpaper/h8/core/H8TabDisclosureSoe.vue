@@ -30,6 +30,7 @@
           同步到附注
         </el-button>
         <el-button size="small" type="primary" plain :disabled="!projectId" @click="jumpToNote('soe')">↩ 跳转回附注（八、26）</el-button>
+        <el-button size="small" :disabled="!projectId" @click="checkNoteConsistency(false)">✅ 校对附注</el-button>
         <el-button size="small" type="primary" plain @click="emit('open-ai', 'disclosure-soe')">AI 辅助</el-button>
         <el-button size="small" @click="emit('open-review', 'disclosure-soe')">复核</el-button>
         <span class="chip-wrap"><GtIndexChip value="wp:H8-1" :context-project-id="projectId" /></span>
@@ -38,6 +39,20 @@
         <span class="chip-wrap"><GtIndexChip :value="`Note:${noteSectionId}`" :context-project-id="projectId" /></span>
       </div>
     </div>
+
+    <!-- 校对附注结果 -->
+    <el-alert
+      v-if="noteCheckState === 'ok'"
+      type="success" :closable="true" show-icon style="margin-bottom: 8px"
+    >{{ noteCheckMessage }}</el-alert>
+    <el-alert
+      v-else-if="noteCheckState === 'diff'"
+      type="warning" :closable="false" show-icon style="margin-bottom: 8px"
+    >{{ noteCheckMessage }}</el-alert>
+    <el-alert
+      v-else-if="noteCheckState === 'missing'"
+      type="info" :closable="true" show-icon style="margin-bottom: 8px"
+    >{{ noteCheckMessage }}</el-alert>
 
     <section v-for="block in layers" :key="block.layer" class="block">
       <h3 class="block-title">{{ layerTitle(block.layer) }}</h3>
@@ -281,6 +296,7 @@ async function syncToNotes() {
     }
     eventBus.emit('disclosure:note-text-updated' as any, {
       projectId: props.projectId,
+      accountCode: '1901',
       sectionIds: [noteSectionId],
       wpId: props.wpId,
       sheet: payloads[0].sheet_name,
@@ -290,6 +306,67 @@ async function syncToNotes() {
     ElMessage.warning('同步附注失败，请稍后重试')
   } finally {
     isSyncing.value = false
+  }
+}
+
+// ─── P2-⑪ 校对附注（只读比对披露表合计 vs 附注当前数据） ──────────────────────
+const noteCheckState = ref<'idle' | 'loading' | 'ok' | 'diff' | 'missing' | 'error'>('idle')
+const noteCheckMessage = ref('')
+
+async function checkNoteConsistency(silent = false) {
+  if (!props.projectId) return
+  noteCheckState.value = 'loading'
+  try {
+    const year = new Date().getFullYear()
+    const res: any = await api.get(
+      `/api/disclosure-notes/${props.projectId}/${year}/${noteSectionId}`,
+      { _silent: true } as any,
+    )
+    const detail = res?.data ?? res
+    if (!detail || !detail.note_section) {
+      noteCheckState.value = 'missing'
+      noteCheckMessage.value = `附注「${noteSectionId}」尚未生成`
+      if (!silent) ElMessage.info(noteCheckMessage.value)
+      return
+    }
+    const tables = detail._tables || (detail.table_data ? [detail.table_data] : [])
+    let noteTotal: number | null = null
+    for (const tbl of tables) {
+      const totalRow = (tbl.rows || []).find((r: any) => r.is_total)
+      if (totalRow?.values?.length) {
+        noteTotal = Number(totalRow.values[0]) || 0
+        break
+      }
+    }
+    if (noteTotal == null) {
+      noteCheckState.value = 'ok'
+      noteCheckMessage.value = '附注无合计行可比对'
+      if (!silent) ElMessage.info(noteCheckMessage.value)
+      return
+    }
+    // 国企版合计=5层叶子行期末余额之和（account面值层期末=期初+增-减）
+    let localTotal = 0
+    for (const block of layers.value) {
+      for (const row of block.items) {
+        if (!row.isSubtotal) {
+          localTotal += (Number(row.begin) || 0) + (Number(row.increase) || 0) - (Number(row.decrease) || 0)
+        }
+      }
+    }
+    const diff = Math.round((localTotal - noteTotal) * 100) / 100
+    if (Math.abs(diff) <= 1) {
+      noteCheckState.value = 'ok'
+      noteCheckMessage.value = `与附注「${noteSectionId}」核对一致`
+      if (!silent) ElMessage.success(noteCheckMessage.value)
+    } else {
+      noteCheckState.value = 'diff'
+      noteCheckMessage.value = `与附注「${noteSectionId}」不一致，差额 ${diff.toLocaleString('zh-CN', { minimumFractionDigits: 2 })} 元`
+      if (!silent) ElMessage.warning(noteCheckMessage.value)
+    }
+  } catch {
+    noteCheckState.value = 'error'
+    noteCheckMessage.value = '校对附注异常'
+    if (!silent) ElMessage.warning(noteCheckMessage.value)
   }
 }
 </script>

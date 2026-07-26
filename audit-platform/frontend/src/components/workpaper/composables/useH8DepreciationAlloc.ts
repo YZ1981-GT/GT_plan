@@ -684,6 +684,12 @@ export function useH8DepreciationAlloc(params: {
       remark: r.remark,
     })))
     onSave?.(ALLOC_TOTAL_KEY, colTotals.value.allocSum)
+    // P1-⑧ 写逐费用列合计供 K8/K9/D5/F2/I6 跨底稿取数
+    onSave?.('H8-9-alloc-selling', String(colTotals.value.selling))
+    onSave?.('H8-9-alloc-admin', String(colTotals.value.admin))
+    onSave?.('H8-9-alloc-operatingCost', String(colTotals.value.operatingCost))
+    onSave?.('H8-9-alloc-manufacturing', String(colTotals.value.manufacturing))
+    onSave?.('H8-9-alloc-rd', String(colTotals.value.rd))
   }
 
   // ─── Init ──────────────────────────────────────────────────────────────────

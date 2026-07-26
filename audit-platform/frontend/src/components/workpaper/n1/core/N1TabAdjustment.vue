@@ -1,9 +1,6 @@
 <template>
   <div class="n1-tab-adjustment">
-    <!-- ═══ 双模式切换 ═══ -->
-    <div class="n1-mode-bar">
-      <el-segmented v-model="dualMode.mode.value" :options="dualMode.modeOptions.value" @change="dualMode.switchMode" />
-    </div>
+    <!-- 双模式切换栏由入口 GtN1DeferredTaxAssets 统一渲染（避免双层切换栏 + 两个实例状态不同步） -->
 
     <template v-if="dualMode.isOnlyOffice.value">
       <GtOnlyOfficeSheet :wp-id="wpId" :project-id="projectId" sheet-name="调整分录汇总N1-3" style="height: 100%; min-height: 600px" />
@@ -30,9 +27,7 @@
           <el-button size="small" @click="handleAI('adjustment')">
             <el-icon><MagicStick /></el-icon> AI辅助
           </el-button>
-          <el-button size="small" @click="openReview?.('N1-3-调整分录')">
-            <el-icon><ChatDotSquare /></el-icon> 复核
-          </el-button>
+          <GtReviewTrigger section-id="N1-3-调整分录" label="💬 复核" />
         </div>
       </div>
 
@@ -300,11 +295,14 @@
  * 科目：1811 递延所得税资产（借方/资产类！）
  * 净影响计算：借方-贷方（资产类借增贷减，与N3负债类相反！）
  */
-import { ref, computed, inject, onMounted, toRef, watch } from 'vue'
+import { ref, computed, onMounted, toRef, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { MagicStick, ChatDotSquare, WarningFilled } from '@element-plus/icons-vue'
+import { MagicStick, WarningFilled } from '@element-plus/icons-vue'
+// @ts-ignore
+import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import { useN1FormData } from '../../composables/useN1FormData'
 import { useN1DualMode } from '../../composables/useN1DualMode'
+import { generateN1Text } from '../../composables/useN1AiText'
 import { eventBus } from '@/utils/eventBus'
 import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '@/components/workpaper/composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
@@ -315,22 +313,22 @@ const props = defineProps<{
   wpId: string
   projectId: string
   isReadonly?: boolean
+  /** 审计年度（集中登记同步/TB 兜底取数用） */
+  year?: number
 }>()
 
-// ─── Inject ──────────────────────────────────────────────────────────────────
-
-const openReview = inject<((section: string) => void) | undefined>(
-  'openReviewDialog',
-  undefined,
-)
-
 // ─── Composables ─────────────────────────────────────────────────────────────
+// 复核入口改用 GtReviewTrigger（自带蓝/红点，内部 inject openReviewDialog）
 
 const wpIdRef = toRef(props, 'wpId')
 const projectIdRef = toRef(props, 'projectId')
 
 const dualMode = useN1DualMode({ wpId: wpIdRef })
-const formData = useN1FormData({ wpId: wpIdRef, projectId: projectIdRef })
+const formData = useN1FormData({
+  wpId: wpIdRef,
+  projectId: projectIdRef,
+  year: computed(() => props.year || undefined),
+})
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -367,6 +365,7 @@ const DEFAULT_ACCOUNT_NAME = '递延所得税资产'
 const activeType = ref<AdjustmentType>('AJE')
 const entries = ref<AdjustmentEntry[]>([])
 const isReadonly = computed(() => props.isReadonly ?? false)
+const aiLoading = ref(false)
 
 // ─── Tab选项 ─────────────────────────────────────────────────────────────────
 
@@ -531,6 +530,10 @@ function handleFieldChange(filteredIndex: number, field: string, value: string |
 
 function _autoPersist() {
   formData.debouncedSave('N1-3-entries', { conclusion: JSON.stringify(entries.value) })
+  // 同步 AJE/RJE 净影响（供 N1-1 审定表勾稽读取）：
+  // 铁律——不能只在「保存并发布」时写，否则审定表侧勾稽长期陈旧。
+  formData.debouncedSave('N1-1-aje-net', { conclusion: String(ajeNetAmount.value) })
+  formData.debouncedSave('N1-1-rje-net', { conclusion: String(rjeNetAmount.value) })
 }
 
 // ─── 保存并发布（核心：借贷平衡校验+EventBus+双向同步N1-1） ─────────────────
@@ -563,14 +566,34 @@ async function handleSaveAndPublish() {
 
 // ─── AI辅助 / 复核 ──────────────────────────────────────────────────────────
 
-function handleAI(section: string) {
-  import('@/utils/http').then(({ default: h }) => {
-    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
-      section: `n1-adjustment-${section}`,
-      prompt: `请基于递延所得税资产底稿"${section}"区段数据，给出审计分析建议`,
-      context: { section, wpId: props.wpId },
-    }).catch(() => {})
-  })
+/**
+ * AI 辅助（真取回并展示）。调整分录表无说明字段，用顾问式弹窗呈现建议。
+ * context 值全部转字符串（后端 dict[str,str]，数字会 422）。
+ */
+async function handleAI(_section: string) {
+  if (aiLoading.value) return
+  aiLoading.value = true
+  try {
+    const b = currentBalance.value
+    const text = await generateN1Text({
+      wpId: props.wpId,
+      section: `n1-adjustment-${activeType.value.toLowerCase()}`,
+      prompt:
+        '请基于递延所得税资产调整分录（科目1811，资产类借增贷减）给出复核建议：分录方向与类别是否恰当、是否需同步到 N1-1 审定表期末 AJE/RJE、对递延所得税费用（N5）的影响。',
+      context: {
+        调整类型: activeType.value,
+        分录笔数: String(filteredEntries.value.length),
+        借方合计: String(b.totalDebit),
+        贷方合计: String(b.totalCredit),
+        借贷差额: String(b.diff),
+        是否平衡: b.isBalanced ? '是' : '否',
+      },
+    })
+    if (!text) return
+    await ElMessageBox.alert(text, 'AI 调整分录复核建议', { confirmButtonText: '知道了' }).catch(() => {})
+  } finally {
+    aiLoading.value = false
+  }
 }
 
 // ─── 格式化金额 ──────────────────────────────────────────────────────────────

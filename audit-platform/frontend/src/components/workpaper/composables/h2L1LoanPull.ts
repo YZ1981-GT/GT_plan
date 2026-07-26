@@ -120,7 +120,15 @@ export async function pullL1LoansForH2(projectId: string): Promise<L1LoanPullRes
 
   try {
     const responses = await loadResponses(l1WpId)
-    const rows = reconstructL1InterestRows(responses).filter((r) => r.principal > 0)
+
+    // 优先从 L1-L1-5-rows JSON 数组读取（L1 利息测算已改为 JSON 存储）
+    let rows = reconstructFromJsonKey(responses)
+    // 回退：从旧 flat keys L1-int-{n}-{field} 重建
+    if (rows.length === 0) {
+      rows = reconstructL1InterestRows(responses)
+    }
+    rows = rows.filter((r) => r.principal > 0)
+
     if (rows.length === 0) {
       return {
         ...base,
@@ -139,6 +147,45 @@ export async function pullL1LoansForH2(projectId: string): Promise<L1LoanPullRes
     }
   } catch (e: any) {
     return { ...base, status: 'error', message: e?.message || '拉取 L1 失败', l1WpId }
+  }
+}
+
+/**
+ * 从 L1-L1-5-rows JSON 数组重建（L1 改 JSON 存储后的新格式）。
+ * checklist_responses 里 item_id='L1-L1-5-rows' 的 remark 字段存 JSON 数组。
+ */
+function reconstructFromJsonKey(responses: any[]): L1LoanRow[] {
+  const entry = responses.find(
+    (r: any) => r?.item_id === 'L1-L1-5-rows',
+  )
+  if (!entry) return []
+  const raw = entry.remark ?? entry.conclusion
+  if (!raw || typeof raw !== 'string') return []
+  try {
+    const arr = JSON.parse(raw)
+    if (!Array.isArray(arr)) return []
+    const rows: L1LoanRow[] = []
+    for (const item of arr) {
+      if (!item || typeof item !== 'object') continue
+      const principal = parseNum(item.principal ?? item.loanAmount)
+      const bank = String(item.bank ?? item.lender ?? '')
+      const contractNo = String(item.contractNo ?? '')
+      if (principal === 0 && !bank && !contractNo) continue
+      rows.push({
+        bank,
+        contractNo,
+        principal,
+        rate: parseNum(item.rate ?? item.annualRate),
+        days: parseNum(item.days ?? item.interestDays),
+        calculatedInterest: parseNum(item.calculatedInterest ?? item.expectedInterest),
+        bookedInterest: parseNum(item.bookedInterest ?? item.accountedInterest ?? item.actualInterest),
+        loanStart: String(item.loanStart ?? item.startDate ?? ''),
+        loanEnd: String(item.loanEnd ?? item.endDate ?? ''),
+      })
+    }
+    return rows
+  } catch {
+    return []
   }
 }
 

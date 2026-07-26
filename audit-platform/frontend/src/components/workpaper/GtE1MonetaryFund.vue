@@ -22,7 +22,7 @@
       <!-- 双模式 + 版本历史 + 编制/使用手册（对齐 G1，所有 E1 底稿通用） -->
       <div class="e1-mode-toolbar">
         <el-segmented
-          v-model="dualMode.currentMode.value"
+          :model-value="dualMode.currentMode.value"
           :options="dualMode.modeOptions.value"
           size="small"
           @change="dualMode.onModeChange"

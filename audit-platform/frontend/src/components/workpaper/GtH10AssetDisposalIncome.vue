@@ -2,25 +2,27 @@
   <div class="h10-asset-disposal-income">
     <div v-if="isLoading" class="loading-container"><el-skeleton :rows="8" animated /></div>
     <template v-else>
-      <div v-if="currentSheet !== '底稿目录'" class="h10-toolbar">
+      <div v-if="isHtmlSheet && currentSheet !== '底稿目录'" class="h10-toolbar">
         <el-segmented
-          v-if="isHtmlSheet"
-          v-model="dualMode.currentMode.value"
-          :options="dualMode.modeOptions"
+          :model-value="dualMode.currentMode.value"
+          :options="dualMode.modeOptions.value"
           size="small"
           @change="dualMode.onModeChange"
         />
         <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
-        <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
+        <el-tag v-if="dualMode.ooConfigReady.value" size="small" type="success">OnlyOffice 拉取成功</el-tag>
+        <el-tag v-else-if="dualMode.fetchingConfig.value" size="small" type="info">拉取中…</el-tag>
+        <el-tag v-else-if="!dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
       </div>
 
       <GtOnlyOfficeSheet
-        v-if="isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'"
+        v-if="isHtmlSheet && currentSheet !== '底稿目录' && dualMode.currentMode.value === 'onlyoffice'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
         :readonly="isReadonly"
         style="height: calc(100vh - 180px)"
+        @fallback="dualMode.onOoLoadFailed"
       />
 
       <H10TabProcedure
@@ -208,7 +210,7 @@ const isHtmlSheet = computed(() => {
   return ['H10A', 'H10-1', 'H10-2', 'H10-3', 'H10-4', '底稿目录'].includes(s) || s.startsWith('附注')
 })
 
-const dualMode = useH10DualMode({ wpId: wpIdRef, reloadAll: () => formData.loadAll() })
+const dualMode = useH10DualMode({ wpId: wpIdRef, projectId: projectIdRef, reloadAll: () => formData.loadAll() })
 const useGridFallback = computed(() => !!currentSheet.value && !isHtmlSheet.value)
 
 function onDebouncedSave(itemId: string, data: Partial<ChecklistResponse>) {

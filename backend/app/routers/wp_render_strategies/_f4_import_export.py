@@ -9,6 +9,23 @@ from ._cycle_import_export_common import create_cycle_import_export_router
 _ADJ_HEADERS = ["序号", "分录类型", "日期", "摘要", "科目代码", "科目名称", "借方金额", "贷方金额", "编制人", "备注"]
 _ADJ_KEYS = ["seq", "entryType", "date", "summary", "accountCode", "accountName", "debitAmount", "creditAmount", "preparer", "remark"]
 
+# F4-2 基础列（非账龄列）；账龄列由项目账龄配置动态追加（f4-aging-enum-unification Task 6.2）
+_F4_2_BASE_HEADERS = [
+    "债权人名称", "公司代码", "关联方类型", "款项性质",
+    "期初未审余额", "期初账项调整", "期初重分类调整", "期初审定余额",
+    "借方发生", "贷方发生", "期末余额", "被审计单位重分类调整", "期末未审余额",
+    "账项调整", "重分类调整", "审定数",
+    "是否函证", "期后付款", "备注",
+]
+_F4_2_BASE_KEYS = [
+    "creditor", "companyCode", "relatedPartyType", "paymentNature",
+    "openingUnadjusted", "openingAje", "openingRje", "openingAdjusted",
+    "currentDebit", "currentCredit", "closingBalance",
+    "entityReclassification", "closingUnadjusted",
+    "closingAje", "closingRje", "closingAdjusted",
+    "isConfirmed", "subsequentPayment", "remark",
+]
+
 _F4_SPECS: dict[str, dict[str, Any]] = {
     "F4-1-nature": {
         "item_id": "F4-1-adj-nature-rows",
@@ -51,36 +68,28 @@ _F4_SPECS: dict[str, dict[str, Any]] = {
     },
     "F4-2": {
         "item_id": "F4-2-rows",
-        "title": "F4-2 应付账款明细表（源表A:AA 27列）",
-        "headers": [
-            "债权人名称", "公司代码", "关联方类型", "款项性质",
-            "期初未审余额", "期初账项调整", "期初重分类调整", "期初审定余额",
-            "借方发生", "贷方发生", "期末余额", "被审计单位重分类调整", "期末未审余额",
-            "未审账龄-1年以下", "未审账龄-1～2年", "未审账龄-2～3年", "未审账龄-3年以上",
-            "账项调整", "重分类调整", "审定数",
-            "审定账龄-1年以下", "审定账龄-1～2年", "审定账龄-2～3年", "审定账龄-3年以上",
-            "是否函证", "期后付款", "备注",
-        ],
-        "field_keys": [
-            "creditor", "companyCode", "relatedPartyType", "paymentNature",
-            "openingUnadjusted", "openingAje", "openingRje", "openingAdjusted",
-            "currentDebit", "currentCredit", "closingBalance",
-            "entityReclassification", "closingUnadjusted",
-            "unadjustedAgingLt1", "unadjustedAging1to2", "unadjustedAging2to3", "unadjustedAgingGt3",
-            "closingAje", "closingRje", "closingAdjusted",
-            "auditedAgingLt1", "auditedAging1to2", "auditedAging2to3", "auditedAgingGt3",
-            "isConfirmed", "subsequentPayment", "remark",
-        ],
+        "title": "F4-2 应付账款明细表（基础列 + 动态账龄列）",
+        "headers": _F4_2_BASE_HEADERS,
+        "field_keys": _F4_2_BASE_KEYS,
+        # 账龄列按项目账龄配置（3年段/5年段/自定义）动态生成，期间 = 期末未审 + 期末审定
+        "aging": {
+            "subject": "F4",
+            "base_headers": _F4_2_BASE_HEADERS,
+            "base_field_keys": _F4_2_BASE_KEYS,
+        },
         "guidance": [
             "F4-2 明细表 编制说明",
             "",
-            "1. 列顺序严格对应源表A:AA；公式列可留空，导入后由系统重算。",
-            "2. 关联方类型：合并范围内关联方、合并范围外关联方、非关联方。",
-            "3. 款项性质：货款、工程款、设备款、服务费、其他。",
-            "4. 期初审定=期初未审+期初AJE+期初RJE；期末余额=期初未审+贷方-借方。",
-            "5. 期末未审=期末余额+被审计单位重分类；审定数=期末未审+AJE+RJE。",
-            "6. 未审账龄四档合计应等于期末未审余额；审定账龄四档合计应等于审定数。",
-            "7. 账龄超过1年的大额款项应在备注中说明未偿还或未结转原因及期后偿还情况。",
+            "1. 基础列对应源表 A:M 与 R:T、Y:AA；账龄列按**项目账龄配置**动态追加在末尾。",
+            "2. 账龄列头格式为 `{账龄段}(期末未审)` 与 `{账龄段}(期末审定)`；",
+            "   段来自项目账龄配置（3年段/5年段/自定义），未配置时为 3 年段（1年以内/1-2年/2-3年/3年以上）。",
+            "3. 不属于当前账龄配置的账龄列在导入时会被跳过并提示，不会静默丢数。",
+            "4. 关联方类型：合并范围内关联方、合并范围外关联方、非关联方。",
+            "5. 款项性质：货款、工程款、设备款、服务费、其他。",
+            "6. 期初审定=期初未审+期初AJE+期初RJE；期末余额=期初未审+贷方-借方。",
+            "7. 期末未审=期末余额+被审计单位重分类；审定数=期末未审+AJE+RJE。",
+            "8. 未审账龄各段合计应等于期末未审余额；审定账龄各段合计应等于审定数。",
+            "9. 账龄超过1年的大额款项应在备注中说明未偿还或未结转原因及期后偿还情况。",
         ],
     },
     "F4-3": {

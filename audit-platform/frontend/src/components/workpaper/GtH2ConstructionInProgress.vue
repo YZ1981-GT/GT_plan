@@ -5,13 +5,16 @@
     </div>
 
     <template v-else>
-      <div v-if="showHtmlToolbar" class="h2-header-toolbar">
+      <div v-if="showHtmlToolbar && currentSheet !== 'H2'" class="h2-header-toolbar">
         <el-segmented
-          v-model="currentMode"
+          :model-value="currentMode"
           :options="modeOptions"
           size="small"
           @change="onModeChange"
         />
+        <span v-if="healthTag" class="h2-oo-tag" :class="`h2-oo-tag--${healthTag.type}`">
+          {{ healthTag.text }}
+        </span>
       </div>
 
       <!-- OnlyOffice 模式 -->
@@ -22,6 +25,7 @@
         :sheet-name="props.sheetName || ''"
         :readonly="isReadonly"
         style="height: calc(100vh - 180px)"
+        @fallback="onOoLoadFailed"
       />
 
       <!-- HTML 结构化视图 -->
@@ -386,8 +390,12 @@ const {
   modeOptions,
   isOoAvailable,
   onModeChange,
+  healthTag,
+  onOoLoadFailed,
 } = useH2DualMode({
   wpId: toRef(props, 'wpId') as any,
+  projectId: toRef(props, 'projectId') as any,
+  sheetName: computed(() => props.sheetName || '') as any,
   autoSave: async () => { /* trigger version snapshot */ },
   reloadAll: async () => { await selfLoad() },
 })
@@ -563,9 +571,39 @@ const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => und
 provide('h2VersionTrailRef', versionTrailRef)
 provide('h2OpenVersionHistory', openVersionHistory)
 
+// ─── Task 4.2: Persist_First 种子（从后端 detail_prefill 种子 H2-2 明细行） ─────
+function _seedDetailFromPrefill(): void {
+  const detailKey = 'H2-2-rows'
+  const existing = allResponses.value.get(detailKey)
+  const hasExisting = existing && (
+    (typeof existing.remark === 'string' && existing.remark.trim() && existing.remark !== '[]')
+    || (typeof existing.conclusion === 'string' && existing.conclusion.trim() && existing.conclusion !== '[]')
+  )
+  if (hasExisting) return // Persist_First: 已有手工数据不覆盖
+
+  const prefill = props.htmlData?.detail_prefill
+  if (!Array.isArray(prefill) || prefill.length === 0) return
+
+  const seedRows = prefill.map((p: any, i: number) => ({
+    rowId: `seed-${i}`,
+    name: String(p.name || ''),
+    cipBegin: Number(p.cipBegin) || 0,
+    cipEnd: Number(p.cipEnd) || 0,
+    category: String(p.category || '自动种子'),
+  }))
+  // 内存态写入 allResponses（不落库），composable 的 watch 会自动消费
+  const next = new Map(allResponses.value)
+  next.set(detailKey, { item_id: detailKey, remark: JSON.stringify(seedRows), conclusion: null })
+  allResponses.value = next
+}
+
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 onMounted(() => {
-  void selfLoad().then(() => disclosureStd.loadFromProject())
+  void selfLoad().then(() => {
+    disclosureStd.loadFromProject()
+    // Task 4.2: Persist_First 种子 — 从后端 detail_prefill 种子 H2-2 明细行（仅空时）
+    _seedDetailFromPrefill()
+  })
 })
 </script>
 
@@ -580,9 +618,18 @@ onMounted(() => {
 .h2-header-toolbar {
   display: flex;
   align-items: center;
+  gap: 12px;
   padding: 8px 16px;
   border-bottom: 1px solid var(--el-border-color-lighter);
 }
+.h2-oo-tag {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+.h2-oo-tag--success { color: #67c23a; background: #f0f9eb; }
+.h2-oo-tag--info { color: #909399; background: #f4f4f5; }
+.h2-oo-tag--warning { color: #e6a23c; background: #fdf6ec; }
 .interest-cap-branch-selector {
   display: flex;
   align-items: center;

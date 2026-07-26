@@ -423,4 +423,12 @@ _H1_SPECS: dict[str, dict[str, Any]] = {
     },
 }
 
-router = create_cycle_import_export_router(tag="h1-import-export", api_prefix="h1", specs=_H1_SPECS)
+router = create_cycle_import_export_router(
+    tag="h1-import-export",
+    api_prefix="h1",
+    specs=_H1_SPECS,
+    # 前端 H1 各 composable 以 remark 为权威存储字段（useH1Detail._loadRows 只读 remark），
+    # 工厂默认 conclusion 会导致"导入成功但读不到 / 导出恒空"。导出侧有 remark↔conclusion
+    # fallback，历史存 conclusion 的数据仍可导出。
+    storage_field="remark",
+)

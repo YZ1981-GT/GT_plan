@@ -19,7 +19,7 @@
  *
  * 科目：1811 递延所得税资产（**借方/资产类**！期末余额=期初+借-贷）
  */
-import { ref, computed, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import {
   calcDeductibleDiff,
   calcTaxableDiff,
@@ -116,6 +116,21 @@ export function useN1CalcTable(options: UseN1CalcTableOptions) {
     }
     return []
   }
+
+  // ─── 1b. 异步 hydrate（loadData 完成后 allResponses 才有数据） ───────────
+  let _hydrated = false
+
+  watch(
+    allResponses,
+    () => {
+      if (_hydrated) return
+      const stored = allResponses.value.get(`${ITEM_PREFIX}-rows`)
+      if (!stored?.conclusion) return
+      if (rows.value.length === 0) rows.value = _loadRows()
+      _hydrated = true
+    },
+    { immediate: true },
+  )
 
   // ─── 2. 计算属性：公式列自动计算 ──────────────────────────────────────────
 

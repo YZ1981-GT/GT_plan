@@ -479,7 +479,11 @@ import { eventBus } from '@/utils/eventBus'
 import { api } from '@/services/apiProxy'
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
-import { H1_NOTE_SECTION } from '../../composables/h1NoteSectionMap'
+import {
+  H1_NOTE_SECTION,
+  resolveH1CurrentStandardFromProject,
+  resolveH1VariantFromTemplateType,
+} from '../../composables/h1NoteSectionMap'
 import { buildH1ListedSyncPayloads, type H1ListedSyncSnapshot } from '../../composables/h1DisclosureSyncPayload'
 import { pullH6ClearingForH1Listed } from '../../composables/h1SoeClearingH6Pull'
 import {
@@ -536,7 +540,17 @@ const props = defineProps<{
   projectId: string
   allResponses: Map<string, any>
   isReadonly: boolean
+  /** 项目附注口径（权威变体源，来自 projects.template_type） */
+  templateType?: string
+  /** 报表范围（standalone|consolidated，来自 projects.report_scope） */
+  reportScope?: string
 }>()
+
+/** 项目实际附注口径；与本 tab（上市）不一致时禁止同步，避免污染国企体系章节 */
+const projectVariant = computed(() => resolveH1VariantFromTemplateType(props.templateType))
+const variantMismatch = computed(
+  () => !!projectVariant.value && projectVariant.value !== 'listed',
+)
 
 const isReadonly = computed(() => props.isReadonly)
 const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
@@ -1116,8 +1130,14 @@ function getSnapshot(): H1ListedSyncSnapshot {
 
 async function syncToNotes() {
   if (isSyncing.value || isReadonly.value || !props.projectId || !props.wpId) return
+  if (variantMismatch.value) {
+    ElMessage.warning('本项目附注口径为国有企业，请在「附注披露信息（国有企业）」页同步（上市章节与国企章节不可混用）')
+    return
+  }
   persistAll()
-  const payloads = buildH1ListedSyncPayloads(props.wpId, [], getSnapshot())
+  const payloads = buildH1ListedSyncPayloads(props.wpId, [], getSnapshot(), {
+    currentStandard: resolveH1CurrentStandardFromProject('listed', props.templateType, props.reportScope),
+  })
   if (!payloads.length) {
     ElMessage.warning('当前不适用上市附注同步')
     return

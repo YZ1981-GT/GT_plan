@@ -279,6 +279,121 @@ export function migrateD7FlatToNested(raw: any): D3F1DetailRowV2 {
   return result as D3F1DetailRowV2
 }
 
+// ─── F4 扁平→nested 迁移函数（2-period：期末未审 + 期末审定，8 字段） ─────────
+
+/**
+ * F4 旧固定 4 档扁平字段 → { period, segmentKey } 映射。
+ *
+ * F4 应付账款明细（F4-2）历史数据以 `unadjustedAging*`（期末未审账龄，N:Q 列）与
+ * `auditedAging*`（期末审定账龄，U:X 列）扁平字段存储，**没有期初账龄**，
+ * 故 period 只有 current（期末未审）/ audited（期末审定），映射到 THREE_YEAR 段 key。
+ */
+export const F4_FLAT_TO_SEGMENT: Record<string, { period: 'current' | 'audited'; segmentKey: string }> = {
+  // ── current (期末未审账龄 N:Q) ──
+  unadjustedAgingLt1: { period: 'current', segmentKey: 'within1' },
+  unadjustedAging1to2: { period: 'current', segmentKey: 'y1to2' },
+  unadjustedAging2to3: { period: 'current', segmentKey: 'y2to3' },
+  unadjustedAgingGt3: { period: 'current', segmentKey: 'over3' },
+  // ── audited (期末审定账龄 U:X) ──
+  auditedAgingLt1: { period: 'audited', segmentKey: 'within1' },
+  auditedAging1to2: { period: 'audited', segmentKey: 'y1to2' },
+  auditedAging2to3: { period: 'audited', segmentKey: 'y2to3' },
+  auditedAgingGt3: { period: 'audited', segmentKey: 'over3' },
+}
+
+/** 所有 F4 旧扁平字段名集合（含更早别名，用于检测与清理） */
+export const F4_FLAT_KEYS = new Set(Object.keys(F4_FLAT_TO_SEGMENT))
+
+/**
+ * F4 更早期别名（迁移前 `migrateF4DetailRows` 已兼容的历史字段名）。
+ * 仅在对应规范字段缺失时作为回退，不参与输出清理集合以外的行为。
+ */
+const F4_LEGACY_ALIASES: Record<string, string[]> = {
+  unadjustedAgingLt1: ['aging1Year', 'agingLt1'],
+  unadjustedAging1to2: ['aging1to2Year', 'aging1to2'],
+  unadjustedAging2to3: ['aging2to3Year', 'aging2to3'],
+  unadjustedAgingGt3: ['aging3YearPlus', 'agingGt3'],
+  auditedAgingLt1: ['adjustedAging1'],
+  auditedAging1to2: ['adjustedAging2'],
+  auditedAging2to3: ['adjustedAging3'],
+  auditedAgingGt3: ['adjustedAging4'],
+}
+
+/** 检测一行是否为 F4 旧扁平格式（存在任意规范扁平字段或其历史别名）。 */
+export function isLegacyF4Format(raw: any): boolean {
+  if (!raw || typeof raw !== 'object') return false
+  for (const key of F4_FLAT_KEYS) {
+    if (key in raw) return true
+  }
+  for (const aliases of Object.values(F4_LEGACY_ALIASES)) {
+    for (const alias of aliases) {
+      if (alias in raw) return true
+    }
+  }
+  return false
+}
+
+/**
+ * 将 F4 旧扁平格式行迁移为 nested keyed 结构（agingCurrent / agingAudited）。
+ *
+ * 规则（对齐 D7 同款薄封装）：
+ * - 行已含非空 nested agingCurrent/agingAudited → **以 nested 为准，忽略扁平字段**
+ * - 仅含扁平字段（含历史别名）→ 映射到 THREE_YEAR 段 key
+ * - 输出不再含 F4 扁平字段 key 与历史别名 key（序列化干净）
+ *
+ * 迁移后应再经 `remapRowAgingData(_, segments, false)` 对齐当前项目账龄配置段。
+ */
+export function migrateF4FlatToNested(raw: any): D3F1DetailRowV2 {
+  const result: any = {}
+  const aliasKeys = new Set<string>()
+  for (const aliases of Object.values(F4_LEGACY_ALIASES)) {
+    for (const alias of aliases) aliasKeys.add(alias)
+  }
+
+  for (const key of Object.keys(raw ?? {})) {
+    if (!F4_FLAT_KEYS.has(key) && !aliasKeys.has(key)) {
+      result[key] = raw[key]
+    }
+  }
+
+  const nestedCurrent = (raw?.agingCurrent && typeof raw.agingCurrent === 'object') ? raw.agingCurrent : null
+  const nestedAudited = (raw?.agingAudited && typeof raw.agingAudited === 'object') ? raw.agingAudited : null
+  const hasNested = (nestedCurrent && Object.keys(nestedCurrent).length > 0)
+    || (nestedAudited && Object.keys(nestedAudited).length > 0)
+
+  const agingCurrent: AgingData = {}
+  const agingAudited: AgingData = {}
+
+  if (hasNested) {
+    if (nestedCurrent) {
+      for (const [k, v] of Object.entries(nestedCurrent)) agingCurrent[k] = _toNumber(v)
+    }
+    if (nestedAudited) {
+      for (const [k, v] of Object.entries(nestedAudited)) agingAudited[k] = _toNumber(v)
+    }
+  } else {
+    for (const [flatKey, mapping] of Object.entries(F4_FLAT_TO_SEGMENT)) {
+      let value = raw?.[flatKey]
+      if (value == null) {
+        for (const alias of F4_LEGACY_ALIASES[flatKey] ?? []) {
+          if (raw?.[alias] != null) {
+            value = raw[alias]
+            break
+          }
+        }
+      }
+      const num = _toNumber(value)
+      if (mapping.period === 'current') agingCurrent[mapping.segmentKey] = num
+      else agingAudited[mapping.segmentKey] = num
+    }
+  }
+
+  result.agingCurrent = agingCurrent
+  result.agingAudited = agingAudited
+
+  return result as D3F1DetailRowV2
+}
+
 // ─── 配置变更数据保留逻辑 ─────────────────────────────────────────────────────
 
 /**

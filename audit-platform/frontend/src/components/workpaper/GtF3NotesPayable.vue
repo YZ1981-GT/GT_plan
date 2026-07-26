@@ -16,7 +16,7 @@
 
         <el-segmented
 
-          v-model="dualMode.currentMode.value"
+          :model-value="dualMode.currentMode.value"
 
           :options="dualMode.modeOptions"
 

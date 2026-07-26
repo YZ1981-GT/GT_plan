@@ -265,6 +265,18 @@ export function useH5Adjudication(opts: {
     onSave?.(`${ITEM_PREFIX}-cost-rows`, costRows.value.filter((r) => !r.isSubtotal))
     onSave?.(`${ITEM_PREFIX}-depletion-rows`, depletionRows.value.filter((r) => !r.isSubtotal))
     onSave?.(`${ITEM_PREFIX}-impairment-rows`, impairmentRows.value.filter((r) => !r.isSubtotal))
+    // 写跨表聚合键供 useH5CrossSheet 消费（修 dead-key：crossSheet 消费端读这些键）
+    _syncCrossSheetKeys()
+  }
+
+  /** 写跨sheet消费端读取的聚合键（审定表→crossSheet→UI告警） */
+  function _syncCrossSheetKeys(): void {
+    const cs = costSubtotal.value
+    const ds = depletionSubtotal.value
+    onSave?.('H5-1-cost-total', cs.audited)
+    onSave?.('H5-1-cost-debit', cs.debit)
+    onSave?.('H5-1-cost-credit', cs.credit)
+    onSave?.('H5-1-depletion-credit', ds.credit)
   }
 
   function saveNote(note: string): void { auditNote.value = note; onSave?.(`${ITEM_PREFIX}-audit-note`, note) }

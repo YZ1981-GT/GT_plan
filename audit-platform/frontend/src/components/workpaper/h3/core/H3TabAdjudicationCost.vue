@@ -374,6 +374,8 @@ import { ref, computed, inject, toRef, onMounted, watch } from 'vue'
 import { Download } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useH3AdjudicationCost } from '../../composables/useH3AdjudicationCost'
+import http from '@/utils/http'
+import { eventBus } from '@/utils/eventBus'
 import type { H3CostOriginalRow, H3CostDepRow, H3CostImpairRow } from '../../composables/useH3AdjudicationCost'
 import type { H3FillDiffRow, H3FillMode } from '../../composables/h3FillFromDetail'
 import { useH3FormData } from '../../composables/useH3FormData'
@@ -582,12 +584,49 @@ function saveAuditConclusion(val: string) {
 
 function onOrigCellChange(row: H3CostOriginalRow, field: keyof H3CostOriginalRow) {
   updateOriginalCell(row.rowId, field, (row as any)[field])
+  debouncedWritebackTb()
 }
 function onDepCellChange(row: H3CostDepRow, field: keyof H3CostDepRow) {
   updateDepCell(row.rowId, field, (row as any)[field])
+  debouncedWritebackTb()
 }
 function onImpairCellChange(row: H3CostImpairRow, field: keyof H3CostImpairRow) {
   updateImpairCell(row.rowId, field, (row as any)[field])
+  debouncedWritebackTb()
+}
+
+// ─── TB 回写 + 发布 substantive:adjudicated ────────────────────────────────
+let _wbTimer: ReturnType<typeof setTimeout> | null = null
+function debouncedWritebackTb() {
+  if (_wbTimer) clearTimeout(_wbTimer)
+  _wbTimer = setTimeout(() => { void writebackTrialBalance() }, 1500)
+}
+
+async function writebackTrialBalance() {
+  try {
+    const costAudited = originalTotal.value.audited ?? 0
+    const depAudited = depTotal.value.audited ?? 0
+    // 回写 1503 投资性房地产原值（借方审定数）
+    await http.put(`/api/projects/${props.projectId}/trial-balance/writeback`, {
+      account_code: '1503',
+      audited_amount: costAudited,
+    })
+    // 回写 1504 累计折旧（贷方备抵审定数，绝对值）
+    await http.put(`/api/projects/${props.projectId}/trial-balance/writeback`, {
+      account_code: '1504',
+      audited_amount: depAudited,
+    })
+    // 发布审定事件联动附注/公式管理/A13
+    eventBus.emit('substantive:adjudicated', {
+      wpCode: 'H3',
+      accountCode: '1503',
+      auditedAmount: costAudited - depAudited,
+      adjudicatedAmount: costAudited - depAudited,
+      timestamp: Date.now(),
+    })
+  } catch (e) {
+    console.warn('[H3-1 Cost] TB writeback failed:', e)
+  }
 }
 
 function fmtNum(v: number): string {

@@ -31,6 +31,9 @@
         >
           同步到附注
         </el-button>
+        <el-button size="small" type="warning" plain :loading="isSyncing" :disabled="isReadonly || !projectId" @click="handlePullAndSync">
+          取数并同步
+        </el-button>
         <el-button size="small" type="primary" plain :disabled="!projectId" @click="jumpToNote('soe')">↩ 跳转回附注（八、52）</el-button>
         <el-button size="small" type="primary" plain @click="emit('open-ai', 'disclosure-soe')">AI 辅助</el-button>
         <el-button size="small" @click="emit('open-review', 'disclosure-soe')">复核</el-button>
@@ -201,6 +204,17 @@ function rowClass({ row }: { row: H9SoeDisplayRow }) {
 function handlePull() {
   const res = pullFromSources()
   ElMessage.success(res.message)
+}
+
+/** 取数并同步：一键完成「从审定/明细取数」+「同步到附注」 */
+async function handlePullAndSync() {
+  const res = pullFromSources()
+  if (res.message.includes('未找到')) {
+    ElMessage.warning(res.message)
+    return
+  }
+  ElMessage.success(res.message + '，正在同步到附注...')
+  await syncToNotes()
 }
 
 async function syncToNotes() {

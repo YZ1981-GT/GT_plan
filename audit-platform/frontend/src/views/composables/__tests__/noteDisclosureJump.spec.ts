@@ -16,6 +16,9 @@ import {
   K11_DISCLOSURE_SHEET_SOE,
   K13_DISCLOSURE_SHEET_LISTED,
   K13_DISCLOSURE_SHEET_SOE,
+  N1_DISCLOSURE_SHEET_LISTED,
+  N1_DISCLOSURE_SHEET_SOE,
+  isN1DeferredTaxNoteSection,
   isD1NotesReceivableNoteSection,
   isDerivativeFinancialAssetNoteSection,
   isE1MonetaryFundNoteSection,
@@ -467,5 +470,57 @@ describe('noteDisclosureJump · 9 个专有章节科目', () => {
     expect(resolveNoteDisclosureJumpTarget({ note_section: '五、23' })?.wpCode).toBe('H2')
     expect(resolveNoteDisclosureJumpTarget({ note_section: '五、26' })?.wpCode).toBe('I1')
     expect(resolveNoteDisclosureJumpTarget({ note_section: '五、27' })?.wpCode).toBe('I2')
+  })
+})
+
+// ── N1 递延所得税资产（五、30 / 八、31，与 N3 共用章节，默认落 N1） ──
+describe('noteDisclosureJump · N1 递延所得税资产', () => {
+  it('detects N1 note sections（精确匹配，不误伤 五、3 衍生金融资产）', () => {
+    expect(isN1DeferredTaxNoteSection('五、30')).toBe(true)
+    expect(isN1DeferredTaxNoteSection('八、31')).toBe(true)
+    expect(isN1DeferredTaxNoteSection('递延所得税资产和递延所得税负债')).toBe(true)
+    // 🔴 精确匹配：不得与 五、3（衍生金融资产）/ 八、3 混淆，也不吞 五、300 类未来章节
+    expect(isN1DeferredTaxNoteSection('五、3')).toBe(false)
+    expect(isN1DeferredTaxNoteSection('八、3')).toBe(false)
+    expect(isN1DeferredTaxNoteSection('五、31')).toBe(false)  // 五、31 = I5 其他非流动资产
+    expect(isN1DeferredTaxNoteSection('八、32')).toBe(false)  // 八、32 = I5 soe
+    expect(isN1DeferredTaxNoteSection('五、300')).toBe(false)
+  })
+
+  it('infers N1 listed disclosure from 五、30', () => {
+    const target = resolveNoteDisclosureJumpTarget({
+      note_section: '五、30',
+      last_sync_wp_id: 'wp-n1',
+    })
+    expect(target?.wpCode).toBe('N1')
+    expect(target?.variant).toBe('listed')
+    expect(target?.sheet).toBe(N1_DISCLOSURE_SHEET_LISTED)
+    expect(target?.wpId).toBe('wp-n1')
+  })
+
+  it('infers N1 SOE disclosure from 八、31', () => {
+    const target = resolveNoteDisclosureJumpTarget({
+      note_section: '八、31',
+      source_template: 'soe',
+    })
+    expect(target?.wpCode).toBe('N1')
+    expect(target?.variant).toBe('soe')
+    expect(target?.sheet).toBe(N1_DISCLOSURE_SHEET_SOE)
+  })
+
+  it('N1 五、30 不被通用披露 sheet 名回退抢占', () => {
+    // 各循环披露 sheet 同名，须靠章节号精确命中
+    expect(resolveNoteDisclosureJumpTarget({
+      note_section: '五、30',
+      table_data: { _last_sync_sheet: '附注披露信息（上市公司）' },
+    })?.wpCode).toBe('N1')
+  })
+
+  it('N1 不抢占相邻章节（五、3 衍生=G1 / 五、31=I5 / 八、32=I5）', () => {
+    expect(resolveNoteDisclosureJumpTarget({ note_section: '五、3' })?.wpCode).toBe('G1')
+    expect(resolveNoteDisclosureJumpTarget({ note_section: '五、31' })?.wpCode).toBe('I5')
+    expect(resolveNoteDisclosureJumpTarget({
+      note_section: '八、32', source_template: 'soe',
+    })?.wpCode).toBe('I5')
   })
 })

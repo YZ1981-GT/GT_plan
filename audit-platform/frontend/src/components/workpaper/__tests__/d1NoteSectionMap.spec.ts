@@ -87,12 +87,128 @@ describe('d1NoteSectionMap', () => {
     expect(p.sub_table_data['期末已背书或贴现但尚未到期的应收票据']).toBeDefined()
     expect(p.sub_table_data['期末因出票人未履约而将其转应收账款的票据']).toBeDefined()
     expect(p.sub_table_data['按坏账计提方法分类（期末余额）']).toBeDefined()
-    expect(p.sub_table_data['按坏账计提方法分类（上年年末余额）']).toBeDefined()
+    expect(p.sub_table_data['按坏账计提方法分类（续：上年年末余额）']).toBeDefined()
     expect(p.sub_table_data['本期实际核销的应收票据情况']).toBeDefined()
     // 每张表都有对应列头
     for (const key of Object.keys(p.sub_table_data)) {
       if (key.startsWith('_')) continue
       expect(p.columns[key], `${key} 缺列头`).toBeDefined()
     }
+  })
+
+  it('listed 覆盖模板 14 张表（含单项/组合/变动/转回/核销逐项）', () => {
+    const p = buildD1SyncPayload('listed', 'wp-1', null, snap())
+    const keys = Object.keys(p.sub_table_data).filter(k => !k.startsWith('_'))
+    expect(keys).toHaveLength(14)
+    for (const name of [
+      '按单项计提坏账准备的应收票据（期末余额）',
+      '按单项计提坏账准备的应收票据（续：上年年末余额）',
+      '组合计提项目：银行承兑汇票',
+      '组合计提项目：商业承兑汇票',
+      '本期计提、收回或转回的坏账准备情况',
+      '本期转回或收回金额重要的坏账准备',
+      '重要的应收票据核销情况（逐项披露）',
+    ]) {
+      expect(p.sub_table_data[name], `${name} 未推送`).toBeDefined()
+      expect(p.columns[name], `${name} 缺列头`).toBeDefined()
+    }
+  })
+
+  it('listed 坏账准备变动表纵向 7 行（项目/坏账准备金额）', () => {
+    const p = buildD1SyncPayload('listed', 'wp-1', null, snap({
+      movementTotal: { priorBalance: 8, provision: 10, reversal: 1, writeOff: 2, transfer: 0, other: 0, endBalance: 15 },
+    }))
+    const rows = p.sub_table_data['本期计提、收回或转回的坏账准备情况'] as any[]
+    expect(rows).toHaveLength(7)
+    expect(rows[0]).toMatchObject({ label: '上年年末数', amount: 8 })
+    expect(rows[6]).toMatchObject({ label: '期末数', amount: 15, is_total: true })
+    expect(p.columns['本期计提、收回或转回的坏账准备情况'].map(c => c.label)).toEqual(['项目', '坏账准备金额'])
+  })
+
+  it('soe 表名与模板一致（期初口径 + 组合单表 + 变动多列）', () => {
+    const p = buildD1SyncPayload('soe', 'wp-2', null, snap({
+      soeMovementRows: [{ label: '合计', priorBalance: 1, provision: 2, reversal: 0, writeOff: 0, transfer: 0, other: 0, endBalance: 3 }],
+    }))
+    const keys = Object.keys(p.sub_table_data).filter(k => !k.startsWith('_'))
+    expect(keys).toHaveLength(12)
+    expect(p.sub_table_data['按坏账准备计提方法分类披露应收票据（期末数）']).toBeDefined()
+    expect(p.sub_table_data['按坏账准备计提方法分类披露应收票据（续：期初数）']).toBeDefined()
+    expect(p.sub_table_data['按组合计提坏账准备的应收票据']).toBeDefined()
+    expect(p.sub_table_data['期末因出票人未履约而其转为应收账款的票据']).toBeDefined()
+    expect(p.sub_table_data['本期实际核销的应收票据']).toBeDefined()
+    // 国企主表用期初口径列头
+    expect(p.columns['应收票据分类'].map(c => c.label)).toContain('期初账面余额')
+    const mv = p.sub_table_data['本期计提、收回或转回的应收票据坏账准备情况'] as any[]
+    expect(mv[0]).toMatchObject({ label: '合计', prior_balance: 1, end_balance: 3, is_total: true })
+  })
+
+  it('组合计提明细按名称合并期末/上年末，缺失侧为 0', () => {
+    const p = buildD1SyncPayload('listed', 'wp-1', null, snap({
+      bankPortfolioEndRows: [{ drawerTypeOrAging: '1年以内', balance: 100, provision: 1, lossRate: 0.01 }],
+      bankPortfolioPriorRows: [{ drawerTypeOrAging: '1至2年', balance: 50, provision: 2, lossRate: 0.04 }],
+    }))
+    const rows = p.sub_table_data['组合计提项目：银行承兑汇票'] as any[]
+    expect(rows).toHaveLength(3) // 1年以内 + 1至2年 + 合计
+    expect(rows[0]).toMatchObject({ label: '1年以内', end_balance: 100, prior_balance: 0 })
+    expect(rows[1]).toMatchObject({ label: '1至2年', end_balance: 0, prior_balance: 50 })
+    expect(rows[2]).toMatchObject({ label: '合计', end_balance: 100, prior_balance: 50, is_total: true })
+  })
+
+  it('比率列同步为百分数（与披露表 fmtPct 口径一致，附注表头带 %）', () => {
+    const p = buildD1SyncPayload('listed', 'wp-1', null, snap({
+      classDisplayEndRows: [{ label: '按单项计提坏账准备', balance: 1000, ratio: 0.25, provision: 10, lossRate: 0.01, bookValue: 990 }],
+      individualEndRows: [{ name: 'A公司', balance: 100, provision: 5, lossRate: 0.05, basis: '' }],
+      bankPortfolioEndRows: [{ drawerTypeOrAging: '1年以内', balance: 100, provision: 2, lossRate: 0.02 }],
+    }))
+    const cls = (p.sub_table_data['按坏账计提方法分类（期末余额）'] as any[])[0]
+    expect(cls).toMatchObject({ ratio: 25, loss_rate: 1 })
+    const ind = (p.sub_table_data['按单项计提坏账准备的应收票据（期末余额）'] as any[])[0]
+    expect(ind).toMatchObject({ loss_rate: 5 })
+    const pf = (p.sub_table_data['组合计提项目：银行承兑汇票'] as any[])[0]
+    expect(pf).toMatchObject({ end_loss_rate: 2 })
+  })
+
+  it('披露 sheet 名使用底稿真实 tab 名（全角括号）', () => {
+    expect(D1_DISCLOSURE_SHEET_NAME.listed).toBe('附注披露信息（上市公司）')
+    expect(D1_DISCLOSURE_SHEET_NAME.soe).toBe('附注披露信息（国企）')
+  })
+
+  it('转回或收回表：上市 5 列 / 国企 4 列（各按自身模板，不互相硬套）', () => {
+    const reversalRows = [
+      { companyName: 'A公司', reversalReason: '客户回款', originalMethod: '银行转账', reversalBasis: '累计已计提 12', amount: 100 },
+    ]
+    const listed = buildD1SyncPayload('listed', 'wp-1', null, snap({ reversalRows } as any))
+    const lc = listed.columns['本期转回或收回金额重要的坏账准备'].map((c) => c.label)
+    expect(lc).toEqual(['单位名称', '转回原因', '收回方式', '原确定坏账准备的依据', '转回或收回金额'])
+    const lr = (listed.sub_table_data['本期转回或收回金额重要的坏账准备'] as any[])[0]
+    expect(lr).toMatchObject({ label: 'A公司', recovery_method: '银行转账', original_basis: '累计已计提 12', amount: 100 })
+
+    const soe = buildD1SyncPayload('soe', 'wp-2', null, snap({ reversalRows } as any))
+    const sc = soe.columns['本期转回或收回金额重要的应收票据坏账准备'].map((c) => c.label)
+    expect(sc).toEqual([
+      '债务人名称',
+      '转回或收回金额',
+      '转回或收回前累计已计提坏账准备金额',
+      '转回或收回原因、方式',
+    ])
+    const sr = (soe.sub_table_data['本期转回或收回金额重要的应收票据坏账准备'] as any[])[0]
+    expect(sr).toMatchObject({
+      label: 'A公司',
+      amount: 100,
+      cumulative_provision: '累计已计提 12',
+      reason_method: '客户回款',
+    })
+  })
+
+  it('核销逐项披露列头按变体措辞（模板逐字）', () => {
+    const rows = [{ companyName: 'B公司', noteType: '货款', amount: 20, reason: '无法收回', procedure: '已审批', relatedPartyFlag: '否' }]
+    const listed = buildD1SyncPayload('listed', 'wp-1', null, snap({ writeOffDetailRows: rows } as any))
+    expect(listed.columns['重要的应收票据核销情况（逐项披露）'].map((c) => c.label)).toEqual([
+      '单位名称', '应收票据性质', '核销金额', '核销原因', '履行的核销程序', '款项是否由关联交易产生',
+    ])
+    const soe = buildD1SyncPayload('soe', 'wp-2', null, snap({ writeOffDetailRows: rows } as any))
+    expect(soe.columns['重要的应收票据核销情况'].map((c) => c.label)).toEqual([
+      '单位名称', '应收票据的性质', '核销金额', '核销原因', '履行的核销程序', '是否由关联交易产生',
+    ])
   })
 })

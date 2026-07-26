@@ -116,6 +116,8 @@ const props = defineProps<{
   wpId: string
   projectId: string
   isReadonly: boolean
+  /** 审计年度（主入口统一下发，本页暂未使用，声明以避免 extraneous prop） */
+  year?: number
 }>()
 
 const emit = defineEmits<{

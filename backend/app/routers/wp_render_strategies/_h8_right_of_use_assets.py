@@ -100,16 +100,20 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict:
     except Exception as e:  # noqa: BLE001
         logger.warning("H8 TB balance fetch failed: %s", e)
 
-    # 从 trial_balance 取未审数+审定数
+    # 从 trial_balance 取未审数+审定数（使用 get_active_filter 保证数据集版本一致）
     try:
+        tb_active_filter = await get_active_filter(
+            ctx.db, TrialBalance.__table__, ctx.project_id, ctx.year
+        )
         result = await ctx.db.execute(
-            sa.text("""
-                SELECT standard_account_code, unadjusted_amount, audited_amount
-                FROM trial_balance
-                WHERE project_id = :pid AND year = :year AND is_deleted = false
-                  AND standard_account_code LIKE '1901%'
-            """),
-            {"pid": str(ctx.project_id), "year": ctx.year},
+            sa.select(
+                TrialBalance.standard_account_code,
+                TrialBalance.unadjusted_amount,
+                TrialBalance.audited_amount,
+            ).where(
+                tb_active_filter,
+                TrialBalance.standard_account_code.startswith("1901"),
+            )
         )
         for row in result.fetchall():
             code = (row.standard_account_code or "").strip()
@@ -122,6 +126,84 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict:
         logger.warning("H8 trial_balance fetch failed: %s", e)
 
     return tb
+
+
+async def _build_h8_detail_prefill(ctx: RenderContext) -> list[dict[str, Any]]:
+    """从 tb_balance 叶子子科目为 H8-2 明细表种子预填.
+
+    仅取 1901 下叶子科目（code 不是任何其它 code 的前缀）且非全零行。
+    资产类（借方正）：期初=opening_balance，本期增加=debit，本期减少=credit，期末=closing_balance。
+    H8 明细表按合同驱动，但如果账套有 1901 多级子科目（如 1901.01 房屋/1901.02 设备），
+    则可为审计师预填初始数据减少手工录入——仅当 H8-2-rows 空时种子填入，手工优先。
+    """
+    prefill: list[dict[str, Any]] = []
+    try:
+        active_filter = await get_active_filter(
+            ctx.db, TbBalance.__table__, ctx.project_id, ctx.year
+        )
+        result = await ctx.db.execute(
+            sa.select(
+                TbBalance.account_code,
+                TbBalance.account_name,
+                TbBalance.opening_balance,
+                TbBalance.closing_balance,
+                TbBalance.debit_amount,
+                TbBalance.credit_amount,
+            ).where(
+                active_filter,
+                TbBalance.account_code.startswith("1901"),
+            )
+        )
+        rows = result.fetchall()
+        if not rows:
+            return []
+
+        # 收集所有 code
+        all_codes = {(r.account_code or "").strip() for r in rows}
+
+        for row in rows:
+            code = (row.account_code or "").strip()
+            if not code or code == "1901":
+                continue  # 跳过父级汇总
+
+            # 叶子判定：该 code 不是任何其它 code 的前缀
+            is_leaf = not any(
+                other_code != code and other_code.startswith(code)
+                for other_code in all_codes
+            )
+            if not is_leaf:
+                continue
+
+            # 跳过累计折旧子科目（>=6位的190101/190102等属于备抵）
+            if len(code) >= 6 and code[:4] == "1901":
+                # 190101 等明确是折旧子科目
+                name_lower = (row.account_name or "").lower()
+                if "折旧" in name_lower or "摊销" in name_lower or "减值" in name_lower:
+                    continue
+
+            opening = float(row.opening_balance or 0)
+            closing = float(row.closing_balance or 0)
+            debit = float(row.debit_amount or 0)
+            credit = float(row.credit_amount or 0)
+
+            # 跳过全零行
+            if abs(opening) < 0.005 and abs(closing) < 0.005 and abs(debit) < 0.005 and abs(credit) < 0.005:
+                continue
+
+            prefill.append({
+                "account_code": code,
+                "account_name": row.account_name or code,
+                "opening": opening,
+                "closing": closing,
+                "debit": debit,       # 本期增加（资产借方=增加）
+                "credit": credit,     # 本期减少（资产借方科目贷方=减少）
+                "source": f"TB('{code}','期末余额')",
+            })
+
+    except Exception as e:  # noqa: BLE001
+        logger.warning("H8 detail prefill from tb_balance failed: %s", e)
+
+    return prefill
 
 
 async def _fetch_h9_linkage(ctx: RenderContext) -> dict[str, Any]:
@@ -141,7 +223,12 @@ async def _fetch_h9_linkage(ctx: RenderContext) -> dict[str, Any]:
 
     # 从 H9 checklist_responses 获取初始计量数据
     try:
-        # 查H9审定表中的租赁负债初始确认金额
+        # H9 初始确认金额：优先精确键，回退模糊
+        _H9_INITIAL_KEYS = [
+            'H9-1-initial-liability-total',
+            'H9-initial-measurement-total',
+            'H9-1-liability-total',
+        ]
         result = await ctx.db.execute(
             sa.text("""
                 SELECT cr.item_id, cr.conclusion, cr.remark
@@ -159,30 +246,54 @@ async def _fetch_h9_linkage(ctx: RenderContext) -> dict[str, Any]:
         rows = result.fetchall()
         if rows:
             h9_data["h9_available"] = True
-            # 查找H9初始确认金额(通常存在H9-1-initial-total之类的item_id)
-            for row in rows:
-                item_id = row.item_id or ""
-                if "initial" in item_id.lower() or "初始" in (row.remark or ""):
+            # 精确键优先（按优先级逐个查找）
+            rows_by_id = {(r.item_id or "").strip(): r for r in rows}
+            found_h9 = False
+            for key in _H9_INITIAL_KEYS:
+                if key in rows_by_id:
                     try:
-                        h9_data["h9_initial"] = float(row.conclusion or 0)
+                        val = float(rows_by_id[key].remark or rows_by_id[key].conclusion or 0)
+                        if val != 0:
+                            h9_data["h9_initial"] = val
+                            found_h9 = True
+                            break
                     except (ValueError, TypeError):
                         pass
+            # 回退模糊匹配（兼容旧项目键命名不一致）
+            if not found_h9:
+                for row in rows:
+                    item_id = row.item_id or ""
+                    if "initial" in item_id.lower() and "total" in item_id.lower():
+                        try:
+                            val = float(row.remark or row.conclusion or 0)
+                            if val != 0:
+                                h9_data["h9_initial"] = val
+                                break
+                        except (ValueError, TypeError):
+                            pass
 
-        # 获取H8初始计量值
+        # 获取H8初始计量值（精确键优先）
+        _H8_INITIAL_KEYS = [
+            'H8-6-initial-measurement-total',
+            'H8-2-initial-total',
+        ]
         h8_result = await ctx.db.execute(
             sa.text("""
-                SELECT item_id, conclusion FROM checklist_responses
+                SELECT item_id, conclusion, remark FROM checklist_responses
                 WHERE wp_id = :wp_id
                   AND (item_id LIKE 'H8-6-initial%' OR item_id LIKE 'H8-2-initial%')
                 LIMIT 50
             """),
             {"wp_id": str(ctx.wp_id)},
         )
-        for row in h8_result.fetchall():
-            item_id = row.item_id or ""
-            if "total" in item_id or "入账" in item_id:
+        h8_rows_by_id = {(r.item_id or "").strip(): r for r in h8_result.fetchall()}
+        for key in _H8_INITIAL_KEYS:
+            if key in h8_rows_by_id:
                 try:
-                    h8_data["h8_initial"] = float(row.conclusion or 0)
+                    val = float(h8_rows_by_id[key].remark or h8_rows_by_id[key].conclusion or 0)
+                    if val != 0:
+                        h9_data["h8_initial"] = val
+                        break
                 except (ValueError, TypeError):
                     pass
 
@@ -357,6 +468,51 @@ async def _check_simplified_leases(ctx: RenderContext) -> dict[str, Any]:
     return simplified
 
 
+async def _load_project_context(ctx: RenderContext) -> dict[str, Any]:
+    """加载项目上下文供前端消费（关联方/截止日/客户名/审计年度）."""
+    project_context: dict[str, Any] = {
+        "client_name": "",
+        "audit_year": ctx.year,
+        "bs_date": f"{ctx.year}-12-31",
+        "related_parties": [],
+        "template_type": "",
+    }
+
+    try:
+        # 客户名+模板类型从 projects 表获取
+        result = await ctx.db.execute(
+            sa.text("SELECT project_name, template_type FROM projects WHERE id = :pid"),
+            {"pid": str(ctx.project_id)},
+        )
+        row = result.fetchone()
+        if row:
+            project_context["client_name"] = row.project_name or ""
+            project_context["template_type"] = row.template_type or ""
+    except Exception as e:  # noqa: BLE001
+        logger.warning("H8 project name fetch failed: %s", e)
+
+    try:
+        # 关联方清单
+        result = await ctx.db.execute(
+            sa.text(
+                "SELECT name, relation_type, is_controlled_by_same_party "
+                "FROM related_party_registry "
+                "WHERE project_id = :pid AND is_deleted = false"
+            ),
+            {"pid": str(ctx.project_id)},
+        )
+        for row in result.fetchall():
+            project_context["related_parties"].append({
+                "name": row.name or "",
+                "relation_type": row.relation_type or "",
+                "is_controlled_by_same_party": bool(row.is_controlled_by_same_party),
+            })
+    except Exception as e:  # noqa: BLE001
+        logger.warning("H8 related parties fetch failed: %s", e)
+
+    return project_context
+
+
 async def render(ctx: RenderContext) -> dict | None:
     """H8使用权资产渲染策略.
 
@@ -400,11 +556,19 @@ async def render(ctx: RenderContext) -> dict | None:
     # 5. 简化处理租赁检查
     simplified_leases = await _check_simplified_leases(ctx)
 
+    # 6. 项目上下文（前端关联方检查/截止日/AI等消费）
+    project_context = await _load_project_context(ctx)
+
+    # 7. H8-2 明细表种子预填（叶子子科目，仅有子科目时产出）
+    detail_prefill = await _build_h8_detail_prefill(ctx)
+
     return {
         "component_type": "h8-right-of-use-assets",
         "account_codes": ["1901"],
         "responses_snapshot": responses_snapshot,
+        "project_context": project_context,
         "tb_values": tb_values,
+        "detail_prefill": detail_prefill,
         "h9_linkage": h9_linkage,
         "cas21_validation": cas21_validation,
         "simplified_leases": simplified_leases,

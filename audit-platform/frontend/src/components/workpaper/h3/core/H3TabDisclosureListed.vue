@@ -10,6 +10,14 @@
       <div class="mode-badge" :class="measurementModel === 'cost' ? 'mode-cost' : 'mode-fair'">
         {{ measurementModel === 'cost' ? '成本模式' : '公允价值模式' }}
       </div>
+      <div class="header-actions" style="display:flex;gap:8px;margin-left:auto">
+        <el-button size="small" type="success" :loading="syncLoading" :disabled="isReadonly" @click="syncToDisclosureNotes">
+          同步到附注
+        </el-button>
+        <el-button size="small" type="primary" plain @click="jumpToNote">
+          ↩ 跳转回附注（五、21）
+        </el-button>
+      </div>
     </div>
 
     <el-alert
@@ -423,10 +431,14 @@
  */
 import { ref, computed, inject, toRef } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useRouter } from 'vue-router'
 import { useH3Disclosure } from '../../composables/useH3Disclosure'
 import { useH3FormData } from '../../composables/useH3FormData'
 import { useH3CrossSheet } from '../../composables/useH3CrossSheet'
 import { eventBus } from '@/utils/eventBus'
+import http from '@/utils/http'
+import { buildH3SyncPayload, H3_NOTE_SECTION } from '../../composables/h3NoteSectionMap'
+import { buildNoteJumpRoute } from '@/views/composables/noteDisclosureReverseJump'
 
 const props = defineProps<{
   wpId: string
@@ -473,7 +485,14 @@ function onImportFvFromH38() {
 
 // ─── 发布文本更新事件 ─────────────────────────────────────────────────────────
 function publishNoteTextUpdated(key: string) {
-  eventBus.emit('disclosure:note-text-updated', { wpCode: 'H3', section: key, timestamp: Date.now() })
+  eventBus.emit('disclosure:note-text-updated', {
+    wpCode: 'H3',
+    section: key,
+    accountCode: '1503',
+    projectId: props.projectId,
+    sectionIds: ['投资性房地产', '五、21', '八、22'],
+    timestamp: Date.now(),
+  })
 }
 
 // ─── 行级操作 ────────────────────────────────────────────────────────────────
@@ -540,6 +559,40 @@ const crossCheckWarnings = computed((): string[] => {
 function fmtNum(v: number): string {
   if (v === 0) return '-'
   return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+// ─── 同步到附注 + 跳转回附注 ────────────────────────────────────────────────
+const router = useRouter()
+const syncLoading = ref(false)
+
+async function syncToDisclosureNotes() {
+  syncLoading.value = true
+  try {
+    const payload = buildH3SyncPayload({
+      variant: 'listed',
+      measurementModel: props.measurementModel,
+      costOriginalRows: getSectionRows('cost-original'),
+      costDepRows: getSectionRows('cost-dep'),
+      costImpairRows: getSectionRows('cost-impair'),
+      fairChangeRows: getSectionRows('fair-change'),
+      sectionTexts: { ...sectionTexts },
+      projectId: props.projectId,
+      wpId: props.wpId,
+    })
+    await http.post(`/api/disclosure-notes/${props.projectId}/sync-from-workpaper`, payload)
+    ElMessage.success('已同步到附注（上市 五、21）')
+    publishNoteTextUpdated('sync-listed')
+  } catch (e: any) {
+    ElMessage.error('同步失败：' + (e?.response?.data?.message || e?.message || '未知错误'))
+  } finally {
+    syncLoading.value = false
+  }
+}
+
+function jumpToNote() {
+  const route = buildNoteJumpRoute(props.projectId, 'H3', 'listed')
+  if (route) router.push(route)
+  else ElMessage.info('无法定位附注章节')
 }
 
 function generateAI(section: string) {

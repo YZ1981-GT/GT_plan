@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import uuid
 from typing import Any
+from urllib.parse import quote
 
 import pytest
 import httpx
@@ -38,6 +39,7 @@ TEST_YEAR = 2025
 # 用于测试的合成 note_section（不与真实数据冲突）
 LISTED_TEST_SECTION = "E2E_LISTED_TEST_五、99"
 SOE_TEST_SECTION = "E2E_SOE_TEST_八、99"
+DEGRADE_TEST_SECTION = "E2E_DEGRADE_TEST_五、98"
 
 # 合成 wp_id（仅作同步载荷标识，不需要真实存在的底稿）
 SYNTHETIC_WP_ID = str(uuid.uuid4())
@@ -124,15 +126,24 @@ def _cleanup_sync(
     headers: dict,
     project_id: str,
     section_id: str,
-    current_standard: str,
+    current_standard: str = "",
 ) -> None:
-    """清理：发送空载荷同步恢复原状（空载荷 no-op 不清表，Req 8.1）。
+    """清理：软删本次 E2E 合成章节。
 
-    实际清理策略：发送一个已知不包含 sub_table_data 的同步，
-    或直接依赖 section_id 是合成的不影响真实数据。
-    由于我们用合成 section_id，真实数据不受影响，无需特殊清理。
+    合成 section_id 虽不覆盖真实章节，但同步会在**真实项目**的
+    disclosure_notes 里落下真实行，残留后会出现在审计师的附注章节树与
+    Word 导出候选里（曾实测残留 E2E_LISTED_TEST_五、99 等 3 条）。
+    因此必须真清理，不能只依赖"合成 id 不冲突"。
     """
-    pass  # 合成 section_id 不与真实数据冲突，无需清理
+    try:
+        client.delete(
+            f"{BASE_URL}/disclosure-notes/{project_id}/{TEST_YEAR}"
+            f"/sections/{quote(section_id, safe='')}",
+            headers=headers,
+            timeout=15.0,
+        )
+    except Exception:  # noqa: BLE001 — 清理失败不应让测试结果失真
+        pass
 
 
 # ─── Tests ────────────────────────────────────────────────────────────────────
@@ -162,6 +173,15 @@ def live_session():
         "project_id": project_id,
         "token": token,
     }
+
+    # ── teardown：清理本次 E2E 在真实项目里落下的合成章节 ──────────────
+    # 不清理会残留在审计师的附注章节树与 Word 导出候选里（曾实测残留 3 条）。
+    for section in (
+        LISTED_TEST_SECTION,
+        SOE_TEST_SECTION,
+        DEGRADE_TEST_SECTION,
+    ):
+        _cleanup_sync(client, headers, project_id, section)
     client.close()
 
 
@@ -509,7 +529,7 @@ class TestDisclosureTableSyncE2E:
         """
         ctx = live_session
         client, headers, pid = ctx["client"], ctx["headers"], ctx["project_id"]
-        degrade_section = "E2E_DEGRADE_TEST_五、98"
+        degrade_section = DEGRADE_TEST_SECTION
 
         # 发送有 sub_table_data 但无 _columns 的载荷
         payload = {

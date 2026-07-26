@@ -3,7 +3,6 @@
 import { inject, toRef, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
-  F4_RELATED_AGING_OPTIONS,
   F4_RELATED_PRICING_OPTIONS,
   F4_RELATED_RELATIONSHIPS,
   useF4RelatedParty,
@@ -28,6 +27,7 @@ const {
   summary,
   filledCount,
   pendingSyncCount,
+  agingOptions,
   auditNote,
   auditConclusion,
   loadRows,
@@ -283,7 +283,7 @@ async function generateAuditConclusion(): Promise<void> {
               clearable
               @change="(value: string) => updateCell(row.rowId, 'aging', value)"
             >
-              <el-option v-for="option in F4_RELATED_AGING_OPTIONS" :key="option" :label="option" :value="option" />
+              <el-option v-for="option in agingOptions" :key="option" :label="option" :value="option" />
             </el-select>
             <span v-else>{{ row.aging }}</span>
           </template>

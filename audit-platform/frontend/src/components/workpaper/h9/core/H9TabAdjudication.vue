@@ -379,6 +379,7 @@ import { ref, toRef, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download } from '@element-plus/icons-vue'
 import http from '@/utils/http'
+import { eventBus } from '@/utils/eventBus'
 import { useH9Adjudication, type H9AdjudicationRow } from '../../composables/useH9Adjudication'
 import { useH9CrossSheet } from '../../composables/useH9CrossSheet'
 import { useAuditContext } from '@/composables/useAuditContext'
@@ -461,8 +462,8 @@ const {
 })
 
 // H9-4 → H9-1 AJE/RJE 联动
-function _onAdjustmentCreated(e: Event): void {
-  const detail = (e as CustomEvent)?.detail || {}
+function _onAdjustmentCreated(payload: any): void {
+  const detail = payload?.detail ?? payload ?? {}
   if (detail.wpCode && detail.wpCode !== 'H9') return
   const res = syncAjeRjeFromAdjustment(
     Number(detail.ajeNet) || 0,
@@ -472,10 +473,10 @@ function _onAdjustmentCreated(e: Event): void {
 }
 
 onMounted(() => {
-  window.addEventListener('adjustment:created', _onAdjustmentCreated)
+  eventBus.on('adjustment:created', _onAdjustmentCreated)
 })
 onBeforeUnmount(() => {
-  window.removeEventListener('adjustment:created', _onAdjustmentCreated)
+  eventBus.off('adjustment:created', _onAdjustmentCreated)
 })
 
 // Sync local text refs

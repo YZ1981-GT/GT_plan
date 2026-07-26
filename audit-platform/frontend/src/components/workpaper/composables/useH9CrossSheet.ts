@@ -224,6 +224,85 @@ export function useH9CrossSheet(allResponses: Ref<Map<string, any>>) {
   })
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // 5. maturityWarnings — 合同到期/重分类提醒
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /** 到期日预警：识别需要关注的合同 */
+  const maturityWarnings = computed<Array<{ lessor: string; type: string; amount: number }>>(() => {
+    const map = allResponses.value
+    const rawRows = map.get('H9-2-rows')
+    let rows: any[] = []
+    if (rawRows) {
+      const remark = rawRows.remark ?? rawRows.conclusion
+      if (remark) {
+        try { rows = JSON.parse(remark) } catch { /* empty */ }
+      }
+    }
+    if (!Array.isArray(rows)) return []
+
+    const warnings: Array<{ lessor: string; type: string; amount: number }> = []
+    for (const r of rows) {
+      const lessor = String(r.lessor || '未命名')
+      const auditedEnd = Number(r.auditedEnd || r.endBalance || 0)
+      const within1Y = Number(r.dueWithin1Y || 0)
+      const isTerminated = r.isTerminated === '是' || r.terminatedFromH8
+
+      // 已终止但仍有余额 → 须确认终止确认是否完成
+      if (isTerminated && auditedEnd > 1) {
+        warnings.push({ lessor, type: '已终止仍有余额', amount: auditedEnd })
+      }
+      // 一年内到期金额 > 0 但未做重分类 → 提醒重分类
+      const reclass = Number(r.reclassification || 0)
+      if (within1Y > 0 && reclass === 0 && auditedEnd > 1) {
+        warnings.push({ lessor, type: '一年内到期未重分类', amount: within1Y })
+      }
+      // 整笔到期（dueWithin1Y = auditedEnd 且 due1To2Y+2To3Y+Over3Y = 0）→ 即将到期
+      const longTerm = Number(r.due1To2Y || 0) + Number(r.due2To3Y || 0) + Number(r.dueOver3Y || 0)
+      if (within1Y > 0 && longTerm === 0 && auditedEnd > 1 && !isTerminated) {
+        warnings.push({ lessor, type: '合同即将到期（全额一年内）', amount: auditedEnd })
+      }
+    }
+    return warnings
+  })
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 4. financeCostVsAmortization — H9-3贷方确认合计 vs 摊销表本期利息
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * H9-3 未确认融资费用本期贷方确认金额（=实际利率法摊销=利息费用）
+   * 与摊销表本期利息应相等（CAS21：两者是同一笔利息的两个视角）。
+   *
+   * 公式：diff = H9-3贷方确认合计 - 摊销表本期利息
+   * isMatch: |diff| <= 1
+   */
+  const financeCostVsAmortization: ComputedRef<CrossSheetCheck> = computed(() => {
+    const map = allResponses.value
+    // H9-3 本期贷方确认合计（利息费用确认）
+    const h93CreditTotal = _getResponseNumAny(map, [
+      'H9-3-credit-total',
+      'H9-3-total-credit-decrease',
+    ])
+    // 摊销表本期利息
+    const amortInterest = map.has('H9-amort-current-interest')
+      ? _getResponseNum(map, 'H9-amort-current-interest')
+      : _getResponseNum(map, 'H9-amort-total-interest')
+    const diff = h93CreditTotal - amortInterest
+    return {
+      diff,
+      isMatch: Math.abs(diff) <= 1,
+    }
+  })
+
+  /** H9-3 贷方确认合计 */
+  const financeCostCreditTotal = computed<number>(() => {
+    return _getResponseNumAny(allResponses.value, [
+      'H9-3-credit-total',
+      'H9-3-total-credit-decrease',
+    ])
+  })
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // Return
   // ═══════════════════════════════════════════════════════════════════════════
 
@@ -234,11 +313,16 @@ export function useH9CrossSheet(allResponses: Ref<Map<string, any>>) {
     h9VsH8Linkage,
     // H9-4摊销表利息合计 vs H9-1本期利息（Req 4.8）
     amortizationVsAdjudication,
+    // H9-3贷方确认 vs 摊销表本期利息（CAS21双视角一致性）
+    financeCostVsAmortization,
+    // 合同到期/重分类预警
+    maturityWarnings,
     // 辅助 computed（供子组件直接使用）
     adjudicationTotal,
     detailTotal,
     amortInterestTotal,
     adjInterestExpense,
+    financeCostCreditTotal,
     h9InitialRecognition,
   }
 }

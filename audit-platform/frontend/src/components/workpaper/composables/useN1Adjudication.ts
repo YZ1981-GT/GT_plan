@@ -15,7 +15,7 @@
  *
  * 科目：1811 递延所得税资产（**借方/资产类**！期末余额=期初+借-贷）
  */
-import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, nextTick, type Ref, type ComputedRef } from 'vue'
 import {
   calcAuditedAmount,
   calcAssetEndBalance,
@@ -23,6 +23,7 @@ import {
   calcChangeProportion,
   parseNum,
 } from './useN1FormulaEngine'
+import { deriveDisclosureDetailRows, deriveDisclosureLossRows } from './useN1DisclosureSource'
 import type { useN1FormData } from './useN1FormData'
 import type { useN1CrossSheet } from './useN1CrossSheet'
 
@@ -149,6 +150,42 @@ export function useN1Adjudication(options: UseN1AdjudicationOptions) {
     }
   }
 
+  // ─── 1b. 异步 hydrate（formData.loadData 是异步，setup 阶段 allResponses 为空） ───
+  // 铁律：rows 在 setup 同步初始化时 allResponses 尚未加载完成，
+  //       必须在 allResponses 首次填充后重新 hydrate，否则刷新后数据全空、
+  //       且用户一编辑就以空值覆盖持久化（数据丢失）。
+  let _hydrated = false
+  /** hydrate 期间抑制 TB 自动回写（避免用刚加载的值触发回写+事件） */
+  let _suppressWriteback = true
+
+  function _hasStoredRows(): boolean {
+    for (let i = 0; i < N1_ADJUDICATION_CATEGORIES.length; i++) {
+      if (allResponses.value.get(`${ITEM_PREFIX}-${i}`)?.conclusion) return true
+    }
+    return false
+  }
+
+  watch(
+    allResponses,
+    () => {
+      if (_hydrated) return
+      if (!_hasStoredRows()) return
+      rows.value = _initRows()
+      _hydrated = true
+      // hydrate 后同步一次合计（供 crossSheet / 下游 N5 读取）
+      _syncTotals()
+      nextTick(() => {
+        _suppressWriteback = false
+      })
+    },
+    { immediate: true },
+  )
+
+  // 无历史数据（新底稿）时也应放开自动回写
+  nextTick(() => {
+    if (!_hydrated) _suppressWriteback = false
+  })
+
   // ─── 2. 计算属性：公式列自动计算 ──────────────────────────────────────────
 
   const computedRows: ComputedRef<N1AdjudicationComputed[]> = computed(() => {
@@ -189,7 +226,123 @@ export function useN1Adjudication(options: UseN1AdjudicationOptions) {
     }
   })
 
+  // ─── 3b. 与试算平衡表核对（科目1811 期末余额） ──────────────────────────
+
+  /**
+   * 审定合计 vs 试算平衡表（tb_balance 科目1811 期末余额）。
+   *
+   * 铁律：审定表必须有「试算平衡表数 / 差异数」核对，否则回写 TB 没有反向校验。
+   * TB 种子来源：后端 render-config 的 html_data.trial_balance（active dataset + 叶子口径）。
+   */
+  const tbReconcile: ComputedRef<{
+    tbEndBalance: number
+    auditedEndTotal: number
+    diff: number
+    isMatch: boolean
+    hasTb: boolean
+  }> = computed(() => {
+    const tbEndBalance = parseNum(formData.tbSeed.value?.endBalance)
+    const auditedEndTotal = totals.value.endAudited
+    const diff = parseFloat((auditedEndTotal - tbEndBalance).toFixed(2))
+    return {
+      tbEndBalance,
+      auditedEndTotal,
+      diff,
+      isMatch: Math.abs(diff) < 0.01,
+      // TB 未取到数（全 0）时不产生误导性告警
+      hasTb: tbEndBalance !== 0,
+    }
+  })
+
   // ─── 4. 行操作 ─────────────────────────────────────────────────────────
+
+  /**
+   * 从 N1-2 明细表带入未审数（按暂时性差异分类聚合），保留手工 AJE/RJE。
+   *
+   * 口径：期初未审 = Σ(期初暂时性差异×期初税率)，期末未审 = Σ(期末可抵扣差异×期末税率)，
+   * 与 N1-2 明细同一 engine（useN1DisclosureSource.deriveDisclosureDetailRows）。
+   * 明细分类不属于审定表 7 类时归入「其他」。
+   *
+   * @returns 带入的明细行数（0 表示 N1-2 无数据）
+   */
+  function pullFromDetail(): number {
+    const detailRows = deriveDisclosureDetailRows(allResponses.value)
+    if (detailRows.length === 0) return 0
+
+    const beginByCat = new Map<string, number>()
+    const endByCat = new Map<string, number>()
+    for (const r of detailRows) {
+      const cat = (N1_ADJUDICATION_CATEGORIES as string[]).includes(r.category)
+        ? r.category
+        : '其他'
+      beginByCat.set(cat, (beginByCat.get(cat) ?? 0) + r.beginDeferredTax)
+      endByCat.set(cat, (endByCat.get(cat) ?? 0) + r.endDeferredTax)
+    }
+
+    // 🔴 只覆盖「明细表里确实出现过的分类」。
+    // 此前无条件写 0：明细未涉及的分类（如租赁负债/购入摊销年限小于税法规定的资产）
+    // 上手工录入的未审数会被静默清零（确认框只说覆盖未审数，未提示清零）。
+    rows.value.forEach((row, i) => {
+      const touched = beginByCat.has(row.category) || endByCat.has(row.category)
+      if (!touched) return
+      row.beginUnadjusted = parseFloat((beginByCat.get(row.category) ?? 0).toFixed(2))
+      row.endUnadjusted = parseFloat((endByCat.get(row.category) ?? 0).toFixed(2))
+      _persistRow(i)
+    })
+    _syncTotals()
+    return detailRows.length
+  }
+
+  /**
+   * 从 N1-5 亏损检查表带入「可抵扣亏损」分类行的期末未审数（= 可确认递延所得税资产合计）。
+   *
+   * 🔴 只写该一行，不动其他分类（不清零）；届满行由 N1-5 侧判定后不产生可确认额。
+   * 审定表口径是「递延所得税资产金额」，故带入的是可确认递延税资产而非亏损本金。
+   *
+   * @param auditYear 审计年度（届满判定用，禁用当前自然年）
+   * @returns 带入金额；N1-5 无数据时返回 null（调用方据此提示）
+   */
+  function pullLossFromN15(auditYear: number): number | null {
+    // 优先读新键 N1-5-rows（新模型 useN1LossCheck，spec n1-loss-check-source-alignment Task 6.2）
+    const newKeyEntry = allResponses.value.get('N1-5-rows')
+    let v2Rows: any[] = []
+    if (newKeyEntry) {
+      const raw = typeof newKeyEntry === 'string' ? newKeyEntry : newKeyEntry?.conclusion
+      if (typeof raw === 'string' && raw) {
+        try { v2Rows = JSON.parse(raw) } catch { /* fall through */ }
+      }
+      if (!Array.isArray(v2Rows)) v2Rows = []
+    }
+
+    let recognizable: number
+    if (v2Rows.length > 0) {
+      // 新模型：Σ effectiveRecognized × taxRate（非届满行）
+      let total = 0
+      for (const row of v2Rows) {
+        const expiryYear = Number(row.expiryYear) || 0
+        if (expiryYear < auditYear) continue // expired → effectiveRecognized = 0
+        const recognized = Number(row.recognizedAmount) || 0
+        const taxRate = Number(row.taxRate) || 0.25
+        total += recognized * taxRate
+      }
+      recognizable = parseFloat(total.toFixed(2))
+    } else {
+      // 回退旧键（legacy 兼容）
+      const lossRows = deriveDisclosureLossRows(allResponses.value, auditYear)
+      if (lossRows.length === 0) return null
+      recognizable = parseFloat(
+        lossRows.reduce((s, r) => s + parseNum(r.recognizableAsset), 0).toFixed(2),
+      )
+    }
+
+    if (recognizable <= 0 && v2Rows.length === 0) return null
+    const idx = rows.value.findIndex((r) => r.category === '可抵扣亏损')
+    if (idx < 0) return null
+    rows.value[idx].endUnadjusted = recognizable
+    _persistRow(idx)
+    _syncTotals()
+    return recognizable
+  }
 
   /** 更新行可编辑字段 */
   function updateRow(
@@ -224,12 +377,23 @@ export function useN1Adjudication(options: UseN1AdjudicationOptions) {
 
   // ─── 5. 审计结论 + 说明 ────────────────────────────────────────────────
 
-  const auditConclusion = ref<string>(
-    allResponses.value.get('N1-1-conclusion')?.conclusion || '',
-  )
-  const auditNotes = ref<string>(
-    allResponses.value.get('N1-1-notes')?.remark || '',
-  )
+  /**
+   * 审计说明 / 结论。
+   *
+   * 🔴 键必须与组件保存路径一致：组件用 `formData.setField('1','audit-notes'|'audit-conclusion')`
+   * → item_id `N1-1-audit-notes` / `N1-1-audit-conclusion`（conclusion 列）。
+   * 此前这里读 `N1-1-notes`(remark) / `N1-1-conclusion`(conclusion) —— 与写入键不同，
+   * 导致刷新后审计说明/结论恒空，且一编辑就以空值覆盖。旧键作向后兼容回退。
+   */
+  function _readNote(field: 'audit-notes' | 'audit-conclusion', legacyKey: string, legacyCol: 'conclusion' | 'remark'): string {
+    const v = formData.getField('1', field)
+    if (v != null && String(v) !== '') return String(v)
+    const legacy = allResponses.value.get(legacyKey)
+    return (legacyCol === 'remark' ? legacy?.remark : legacy?.conclusion) || ''
+  }
+
+  const auditConclusion = ref<string>(_readNote('audit-conclusion', 'N1-1-conclusion', 'conclusion'))
+  const auditNotes = ref<string>(_readNote('audit-notes', 'N1-1-notes', 'remark'))
 
   // ─── 6. 持久化 ─────────────────────────────────────────────────────────
 
@@ -241,21 +405,42 @@ export function useN1Adjudication(options: UseN1AdjudicationOptions) {
     })
   }
 
-  /** 持久化合计（供 crossSheet 读取） */
-  function _persistTotals(): void {
-    formData.saveField('N1-1-total-audited', { remark: String(totals.value.endAudited) })
-    formData.saveField('N1-1-total-begin', { remark: String(totals.value.beginAudited) })
+  /**
+   * 同步合计到 allResponses（供 crossSheet / 附注 / N5 读取）。
+   *
+   * 铁律：不能只在「期末审定合计变化」时写——只改期初列、或首次加载后
+   * 从未编辑时，下游读到的 total 会陈旧/缺失，导致交叉验证出现假差异。
+   * 故改为 rows 任意变化即同步（debounce 合并写）。
+   */
+  function _syncTotals(): void {
+    formData.debouncedSave('N1-1-total-audited', { remark: String(totals.value.endAudited) })
+    formData.debouncedSave('N1-1-total-begin', { remark: String(totals.value.beginAudited) })
   }
+
+  watch(rows, () => _syncTotals(), { deep: true })
 
   // ─── 7. TB回写触发（审定数变化） ───────────────────────────────────────
 
+  /**
+   * 审定合计变化 → 回写 trial_balance。
+   *
+   * 🔴 去抖 2s：逐格录入时 endAudited 每敲一下就变，原实现每次变化立即 PUT
+   *    → 一次录入产生数十次 TB 回写请求（且中间态是不完整数字）。
+   *    去抖后只回写"停手后的稳定值"；显式「回写试算表」按钮仍走 formData.writebackTB。
+   */
+  const _WRITEBACK_DEBOUNCE_MS = 2000
+  let _writebackTimer: ReturnType<typeof setTimeout> | null = null
+
   watch(
     () => totals.value.endAudited,
-    async (newVal, oldVal) => {
-      if (oldVal !== undefined && newVal !== oldVal) {
-        _persistTotals()
-        await formData.writebackTB(newVal)
-      }
+    (newVal, oldVal) => {
+      if (_suppressWriteback) return
+      if (oldVal === undefined || newVal === oldVal) return
+      if (_writebackTimer) clearTimeout(_writebackTimer)
+      _writebackTimer = setTimeout(() => {
+        _writebackTimer = null
+        void formData.writebackTB(newVal)
+      }, _WRITEBACK_DEBOUNCE_MS)
     },
   )
 
@@ -264,6 +449,9 @@ export function useN1Adjudication(options: UseN1AdjudicationOptions) {
   return {
     rows: computedRows,
     totals,
+    tbReconcile,
+    pullFromDetail,
+    pullLossFromN15,
     addAdjustment,
     removeAdjustment,
     updateRow,

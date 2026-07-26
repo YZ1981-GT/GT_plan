@@ -756,17 +756,32 @@ async def _resolve_formula_sum(
     row_values: dict[str, Decimal] = {}
     terms: list[str] = []
     for c in cells:
-        if not isinstance(c, str) or not c:
+        # 项写法：str（原样，视为 '+'）或 {"cell": str, "sign": "+"|"-"}
+        # —— 带符号扩展（Req9.1/9.2），纯字符串写法逐字节保留原行为。
+        if isinstance(c, str):
+            coord, sign = c, "+"
+        elif isinstance(c, dict):
+            coord = c.get("cell")
+            sign = c.get("sign") or "+"
+            if not isinstance(coord, str) or sign not in ("+", "-"):
+                continue
+        else:
             continue
-        v = _current_cell_value(ctx, c)
+        if not coord:
+            continue
+        v = _current_cell_value(ctx, coord)
         if v is None:
             continue
-        row_values[c] = Decimal(str(v))
-        terms.append(f"ROW('{c}')")
+        row_values[coord] = Decimal(str(v))
+        ref = f"ROW('{coord}')"
+        if not terms:
+            terms.append(ref if sign == "+" else f"-{ref}")
+        else:
+            terms.append(f"{sign} {ref}")
     if not terms:
         return None
 
-    formula = " + ".join(terms)
+    formula = " ".join(terms)
     from app.services.formula_parse_utils import evaluate_formula
 
     with warnings.catch_warnings():
@@ -844,19 +859,25 @@ async def resolve_formula(
         return None
 
     source = binding.get("source")
+    # 子类型分派（spec disclosure-note-formula-data-population 决策 3）：
+    # binding 写 ``source='formula'``（已在 VALID_SOURCES / json valid_sources 内，
+    # 不新增枚举值）+ ``formula_kind='sum'|'report'|'aging'|'prior_year_note'``。
+    # 旧写法（``source`` 直接是 sum/report/aging）逐字节保留，向后兼容。
+    kind = binding.get("formula_kind") or binding.get("kind") or source
     try:
-        if source == "sum":
+        if kind == "sum":
             return await _resolve_formula_sum(binding, ctx)
-        if source == "report":
+        if kind == "report":
             return _resolve_formula_report(binding, ctx)
-        if source == "aging":
+        if kind == "aging":
             return _resolve_formula_aging(binding, ctx)
-        if source == "prior_year_note":
+        if kind == "prior_year_note":
             return await resolve_prior_year_note(binding, ctx)
     except Exception as err:
         logger.warning(
-            "resolve_formula source=%s raised %s; returning None (fail-open)",
+            "resolve_formula source=%s kind=%s raised %s; returning None (fail-open)",
             source,
+            kind,
             err,
         )
         return None

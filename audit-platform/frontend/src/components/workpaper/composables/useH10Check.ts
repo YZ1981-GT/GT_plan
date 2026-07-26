@@ -28,7 +28,7 @@ export interface H10CheckRow {
 const ITEM_ID_ROWS = 'H10-check-rows'
 const ITEM_ID_SAMPLE_META = 'H10-4-check-sample-meta'
 
-/** 建议最低抽查比例（相对 H10-2 明细行数） */
+/** 建议最低抽查比例（相对 H10-2 明细行数）。可由 project_context.h10_check_sample_ratio 覆盖（B15 联动） */
 export const H10_CHECK_MIN_SAMPLE_RATIO = 0.2
 
 const CHECK_FIELDS: Array<keyof H10CheckRow> = [

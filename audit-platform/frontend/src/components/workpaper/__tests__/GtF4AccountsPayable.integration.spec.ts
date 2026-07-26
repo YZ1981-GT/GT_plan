@@ -540,14 +540,18 @@ describe('F4 集成: 导入导出 spec 完整性', () => {
     }
   })
 
-  it('F4-2 spec 有27个 headers（明细表全列）', () => {
-    const f4_2_match = content.match(/"F4-2":\s*\{[^}]*?"headers":\s*\[([\s\S]*?)\]/m)
-    expect(f4_2_match).not.toBeNull()
-    if (f4_2_match) {
-      const headerStr = f4_2_match[1]
-      const headerCount = (headerStr.match(/"/g) || []).length / 2
-      expect(headerCount).toBe(27)
-    }
+  it('F4-2 spec 基础列19列 + 动态账龄列（3年段共27列，与迁移前一致）', () => {
+    // 账龄枚举统一后，F4-2 headers = 基础列常量 + 项目账龄配置动态生成的账龄列
+    expect(content).toContain('"headers": _F4_2_BASE_HEADERS')
+    const baseMatch = content.match(/_F4_2_BASE_HEADERS\s*=\s*\[([\s\S]*?)\]/m)
+    expect(baseMatch).not.toBeNull()
+    const baseCount = ((baseMatch?.[1] ?? '').match(/"/g) || []).length / 2
+    expect(baseCount).toBe(19)
+    // 零回归对照：3 年段（4 段）× 2 期间（期末未审 / 期末审定）= 8 账龄列 → 19 + 8 = 27
+    expect(baseCount + 4 * 2).toBe(27)
+    const agingMatch = content.match(/"F4-2":[\s\S]*?"aging":\s*\{([\s\S]*?)\}/m)
+    expect(agingMatch).not.toBeNull()
+    expect(agingMatch?.[1]).toContain('"subject": "F4"')
   })
 
   it('F4-5 spec 有11个 headers（长期挂账检查表）', () => {

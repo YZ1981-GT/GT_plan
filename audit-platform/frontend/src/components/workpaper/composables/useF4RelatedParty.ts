@@ -4,10 +4,17 @@
  * 源表逻辑：识别关联方 → 核对期初与借贷发生额 → 计算期末余额 →
  * 检查账龄、定价政策、交易性质和期后付款 → 评价披露与未识别关联方风险。
  */
-import { computed, onBeforeUnmount, ref, watch, type ComputedRef, type Ref } from 'vue'
+import { computed, inject, onBeforeUnmount, ref, watch, type ComputedRef, type Ref } from 'vue'
 import { calcConcentration, calcCreditBalance, calcSubtotal, parseNum } from './useF4AccPayFormulaEngine'
 import { computeF4DetailRow, migrateF4DetailRows } from './useF4Detail'
 import { readRowJson, type ChecklistResponse } from './useF4FormData'
+import {
+  PRESET_SEGMENTS,
+  useAgingConfig,
+  DEFAULT_SUBJECT_PRESETS,
+  type AgingSegment,
+} from '@/composables/useAgingConfig'
+import { f4AgingLabel, f4AgingValue } from './f4AgingModel'
 
 export const F4_RELATED_RELATIONSHIPS = [
   '实际控制人',
@@ -20,6 +27,10 @@ export const F4_RELATED_RELATIONSHIPS = [
   '其他关联方',
 ] as const
 
+/**
+ * @deprecated 账龄档位改由项目账龄配置驱动（`buildF4RelatedAgingOptions(segments)`）；
+ * 本常量仅保留为 3 年段回退与旧调用方兼容。
+ */
 export const F4_RELATED_AGING_OPTIONS = ['1年以内', '1～2年', '2～3年', '3年以上'] as const
 export const F4_RELATED_PRICING_OPTIONS = ['市场定价', '协议定价', '成本加成', '参考第三方价格', '政府定价', '其他'] as const
 
@@ -169,16 +180,26 @@ export function migrateF4RelatedPartyRows(
   }
 }
 
-function agingLabels(amounts: number[]): string {
-  return F4_RELATED_AGING_OPTIONS
-    .filter((_, index) => Math.abs(amounts[index]) >= TOLERANCE)
+function agingLabels(amounts: number[], labels: readonly string[]): string {
+  return labels
+    .filter((_, index) => Math.abs(amounts[index] ?? 0) >= TOLERANCE)
     .join('、')
 }
 
-/** 从F4-2提取已标识的关联方明细，并按实际债权人名称归集。 */
+/** 关联方检查表账龄候选（= 项目账龄配置生效段 label） */
+export function buildF4RelatedAgingOptions(segments: readonly AgingSegment[]): string[] {
+  const segs = segments?.length ? segments : (PRESET_SEGMENTS.THREE_YEAR as AgingSegment[])
+  return segs.map(f4AgingLabel)
+}
+
+/** 从F4-2提取已标识的关联方明细，并按实际债权人名称归集（账龄段驱动）。 */
 export function extractF4RelatedPartyCandidates(
   value: string | null | undefined,
+  segments?: readonly AgingSegment[],
 ): F4RelatedPartyCandidate[] {
+  const segs = (segments?.length ? segments : PRESET_SEGMENTS.THREE_YEAR) as AgingSegment[]
+  const segKeys = segs.map((seg) => String(seg.key))
+  const segLabels = segs.map(f4AgingLabel)
   const grouped = new Map<string, {
     rowIds: string[]
     partyName: string
@@ -192,7 +213,7 @@ export function extractF4RelatedPartyCandidates(
     postPaymentAmount: number
   }>()
 
-  for (const row of migrateF4DetailRows(value).map(computeF4DetailRow)) {
+  for (const row of migrateF4DetailRows(value, segs).map((r) => computeF4DetailRow(r, segs))) {
     const partyName = row.creditor.trim()
     const relationship = row.relatedPartyType.trim()
     if (!partyName || !relationship || relationship === '非关联方') continue
@@ -205,7 +226,7 @@ export function extractF4RelatedPartyCandidates(
       currentDebit: 0,
       currentCredit: 0,
       sourceClosingBalance: 0,
-      aging: [0, 0, 0, 0],
+      aging: segKeys.map(() => 0),
       natures: new Set<string>(),
       postPaymentAmount: 0,
     }
@@ -215,10 +236,9 @@ export function extractF4RelatedPartyCandidates(
     target.currentDebit += row.currentDebit
     target.currentCredit += row.currentCredit
     target.sourceClosingBalance += row.closingAdjusted
-    target.aging[0] += row.auditedAgingLt1
-    target.aging[1] += row.auditedAging1to2
-    target.aging[2] += row.auditedAging2to3
-    target.aging[3] += row.auditedAgingGt3
+    segKeys.forEach((key, index) => {
+      target.aging[index] += f4AgingValue(row, 'audited', key)
+    })
     if (row.paymentNature) target.natures.add(row.paymentNature)
     target.postPaymentAmount += row.subsequentPayment
     grouped.set(key, target)
@@ -237,7 +257,7 @@ export function extractF4RelatedPartyCandidates(
       currentDebit: row.currentDebit,
       currentCredit: row.currentCredit,
       sourceClosingBalance: row.sourceClosingBalance,
-      aging: agingLabels(row.aging),
+      aging: agingLabels(row.aging, segLabels),
       transactionNature: [...row.natures].join('、'),
       postPaymentAmount: row.postPaymentAmount,
     }))
@@ -350,8 +370,20 @@ export function useF4RelatedParty(options: UseF4RelatedPartyOptions) {
     { immediate: true },
   )
 
+  // ─── 账龄段（主入口 provide 优先） ──────────────────────────────────────────
+  const injectedSegments = inject<Ref<AgingSegment[]> | null>('f4AgingSegments', null)
+  const ownAgingConfig = injectedSegments ? null : useAgingConfig(options.projectId, 'F4')
+  const segments: ComputedRef<AgingSegment[]> = computed(() => {
+    const raw = injectedSegments?.value ?? ownAgingConfig?.segments.value ?? []
+    return raw.length
+      ? raw
+      : (PRESET_SEGMENTS[DEFAULT_SUBJECT_PRESETS.F4 ?? 'THREE_YEAR'] as AgingSegment[])
+  })
+  /** 账龄下拉候选（= 生效段 label） */
+  const agingOptions = computed(() => buildF4RelatedAgingOptions(segments.value))
+
   const detailCandidates = computed(() =>
-    extractF4RelatedPartyCandidates(readRowJson(allResponses.value.get(DETAIL_KEY))),
+    extractF4RelatedPartyCandidates(readRowJson(allResponses.value.get(DETAIL_KEY)), segments.value),
   )
   watch(
     () => readRowJson(allResponses.value.get(DETAIL_KEY)),
@@ -538,6 +570,8 @@ export function useF4RelatedParty(options: UseF4RelatedPartyOptions) {
     totalClosing,
     filledCount,
     pendingSyncCount,
+    segments,
+    agingOptions,
     auditNote,
     auditConclusion,
     loadRows,

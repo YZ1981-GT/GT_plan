@@ -124,4 +124,6 @@ _H6_SPECS: dict[str, dict[str, Any]] = {
 
 router = create_cycle_import_export_router(
     tag="h6-import-export", api_prefix="h6", specs=_H6_SPECS,
+    # 前端以 remark 为权威存储字段；工厂默认 conclusion 会导致导入读不到/导出恒空。
+    storage_field="remark",
 )

@@ -8,24 +8,29 @@
     <!-- 根据外层 GtWpRenderer 传入的 sheetName 分发到对应子组件 -->
     <template v-else>
       <!-- ─── 工具栏：双模式（六大集成标准，版本历史由 Runtime Boundary 统一 GtWpToolbar 提供） ─── -->
-      <div v-if="isHtmlSheet && currentSheet !== 'index'" class="n1-toolbar">
+      <div v-if="isSwitchableSheet" class="n1-toolbar">
+        <!-- 🔴 铁律：:model-value + @change，禁用 v-model（v-model 会先改值使 switchMode 守卫短路） -->
         <el-segmented
-          v-model="dualMode.mode.value"
+          :model-value="dualMode.mode.value"
           :options="dualMode.modeOptions.value"
           size="small"
-          @change="(val: any) => dualMode.switchMode(val)"
+          @change="(val: any) => dualMode.switchMode(val, props.sheetName || '')"
         />
-        <el-tag v-if="!dualMode.isOOHealthy.value" size="small" type="warning">OO不可用</el-tag>
+        <el-tag v-if="dualMode.fetchingConfig.value" size="small" type="info">正在拉取 OnlyOffice 文档…</el-tag>
+        <el-tag v-else-if="!dualMode.isOOHealthy.value" size="small" type="warning">OO不可用（仅结构化视图）</el-tag>
+        <el-tag v-else-if="dualMode.ooConfigReady.value" size="small" type="success">OnlyOffice 拉取成功</el-tag>
+        <el-tag v-else size="small" type="success" effect="plain">OnlyOffice 就绪</el-tag>
       </div>
 
-      <!-- 双模式：HTML sheet 切到 OnlyOffice -->
+      <!-- 双模式：HTML sheet 切到 OnlyOffice（目录页不参与，否则切过 OO 后目录被顶掉且无处切回） -->
       <GtOnlyOfficeSheet
-        v-if="isHtmlSheet && dualMode.isOnlyOffice.value"
+        v-if="isSwitchableSheet && dualMode.isOnlyOffice.value"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
         :readonly="isReadonly"
         style="height: calc(100vh - 180px)"
+        @fallback="dualMode.onOoLoadFailed"
       />
 
       <!-- N1 底稿目录 -->
@@ -34,6 +39,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        :year="effectiveYear"
         @navigate="handleNavigate"
       />
       <!-- 程序表 N1A（复用 GtAProgramConsole） -->
@@ -51,6 +57,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        :year="effectiveYear"
         @navigate="handleNavigate"
       />
       <!-- 附注披露信息（上市公司） -->
@@ -59,6 +66,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        :year="effectiveYear"
         @navigate="handleNavigate"
       />
       <!-- 附注披露信息（国企） -->
@@ -67,6 +75,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        :year="effectiveYear"
         @navigate="handleNavigate"
       />
       <!-- N1-2 明细表（14列14公式，按暂时性差异项目明细） -->
@@ -75,6 +84,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        :year="effectiveYear"
         @navigate="handleNavigate"
       />
       <!-- N1-3 调整分录汇总 -->
@@ -83,6 +93,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        :year="effectiveYear"
         @navigate="handleNavigate"
       />
       <!-- N1-4 递延所得税资产（负债）测算表（63×15，21公式，核心引擎） -->
@@ -91,6 +102,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        :year="effectiveYear"
         @navigate="handleNavigate"
       />
       <!-- N1-5 可用以后年度税前利润弥补的亏损检查表 -->
@@ -99,7 +111,10 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        :year="effectiveYear"
+        :view-mode="dualMode.isMatrix.value ? 'matrix' : 'structured'"
         @navigate="handleNavigate"
+        @exit-matrix="dualMode.switchMode('structured')"
       />
       <!-- OnlyOffice fallback: 未迁移 sheet / 参考辅助 -->
       <GtOnlyOfficeSheet
@@ -141,6 +156,7 @@ import http from '@/utils/http'
 import { eventBus } from '@/utils/eventBus'
 import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './composables/useWorkpaperScaffold'
 import { useN1DualMode } from './composables/useN1DualMode'
+import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 // ─── Lazy-loaded child components ────────────────────────────────────────────
 
 // Core
@@ -189,6 +205,18 @@ function handleNavigate(sheetName: string) {
 
 const isLoading = ref(true)
 const isReadonly = computed(() => !!props.readonly)
+
+/**
+ * 审计年度：props.year 优先，回退 htmlData.project_context.audit_year。
+ * 铁律：亏损弥补期限届满/剩余年限判断依赖审计年度，不能用 new Date() 当前年
+ * （2026 年做 2025 年报会整体偏一年）。
+ */
+const effectiveYear = computed<number | undefined>(() => {
+  if (props.year) return props.year
+  const raw = (props.htmlData as any)?.project_context?.audit_year
+  const parsed = Number(raw)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined
+})
 
 // ─── sheetName → 子组件分发 ──────────────────────────────────────────────────
 
@@ -242,15 +270,33 @@ const wpIdRef = computed(() => props.wpId)
 // ─── provide scheduleAutoSnapshot → 子组件保存后触发自动快照（版本链来自 Runtime Boundary） ─────
 provide('scheduleAutoSnapshot', () => runtime?.version.scheduleAutoSnapshot())
 
+// ─── 复核圆点（GtReviewDot 依赖 getThreadDot/getRowDot；Runtime Boundary 只 provide openReviewDialog） ───
+const reviewThreads = useWorkpaperReviewThreads(wpIdRef)
+provide('getThreadDot', reviewThreads.getThreadDot)
+provide('getRowDot', reviewThreads.getRowDot)
+
 // ─── 双模式 useN1DualMode（结构化/矩阵/OnlyOffice）─────────────────────────
 
-const dualMode = useN1DualMode({ wpId: wpIdRef })
+/**
+ * 矩阵视图（行 × 判断项核对矩阵，平台 J1-8/D2-7 语义）在 N1 中只有 N1-5 亏损检查表符合：
+ * 弥补期限届满 / 预计应纳税所得额是否充足 / 确认依据是否已填。其余 sheet 是纯数值表不提供该选项。
+ */
+const supportsMatrix = computed(() => currentSheet.value === 'N1-5')
 
-/** N1-1~N1-5 + 附注 为 HTML 专属组件渲染的 sheet（支持双模式切换）；N1A/GT_Custom 走 OO */
+const dualMode = useN1DualMode({ wpId: wpIdRef, supportsMatrix })
+
+/** N1-1~N1-5 + 附注 为 HTML 专属组件渲染的 sheet；N1A/GT_Custom 走 OO */
 const isHtmlSheet = computed(() => {
   const s = currentSheet.value
   return /^N1-\d+$/.test(s) || s === 'index' || s === 'disclosure-listed' || s === 'disclosure-soe'
 })
+
+/**
+ * 支持双模式切换的 sheet = HTML sheet 且非底稿目录。
+ * 🔴 目录页必须排除：mode 是入口级共享状态，若目录也走 OO 分支，
+ * 从 N1-1 切到在线编辑后点「底稿目录」会渲染 OnlyOffice（且该页无工具栏可切回）。
+ */
+const isSwitchableSheet = computed(() => isHtmlSheet.value && currentSheet.value !== 'index')
 
 // ─── 监听 n1:save-items → 保存后自动快照 ────────────────────────────────────
 

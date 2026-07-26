@@ -326,11 +326,9 @@ export function useH10Adjudication(opts: {
       projectId: opts.projectId.value,
       timestamp: Date.now(),
     }
+    // 只走 eventBus，crossWpEventBridge 自动桥接到 window（消除双投）
     try {
       eventBus.emit('substantive:adjudicated', payload as any)
-    } catch { /* silent */ }
-    try {
-      window.dispatchEvent(new CustomEvent('substantive:adjudicated', { detail: payload }))
     } catch { /* silent */ }
   }
 

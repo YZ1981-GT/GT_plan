@@ -4,6 +4,7 @@
  * 按 Excel 模板恢复区块样式，并支持账龄段枚举口径（3年段 / 5年段 / 自定义）
  */
 import { computed, inject, ref, toRef, watch, type Ref } from 'vue'
+import { PRESET_SEGMENTS, type AgingPreset, type AgingSegment } from '@/composables/useAgingConfig'
 import { Download } from '@element-plus/icons-vue'
 import { useD2Adjudication, type AdjudicationRow } from '../composables/useD2Adjudication'
 import { useD2CrossSheet } from '../composables/useD2CrossSheet'
@@ -180,13 +181,6 @@ function toMainRow(
   }
 }
 
-interface AgingBandDef {
-  key: string
-  label: string
-  keys: string[]
-}
-
-type AgingMode = '3y' | '5y' | 'custom'
 
 const provisionRows = computed<SectionRow[]>(() => {
   const bd = crossSheet.badDebtByCategory.value
@@ -315,142 +309,39 @@ const excelMainRows = computed<ExcelMainRow[]>(() => {
   ]
 })
 
-const BASE_AGING_OPTIONS = [
-  { key: 'within3m', label: '0-3个月' },
-  { key: 'within6m', label: '0-6个月' },
-  { key: 'm3to6', label: '3-6个月' },
-  { key: 'm3to12', label: '3个月-1年' },
-  { key: 'm6to12', label: '6个月-1年' },
-  { key: 'within1Year', label: '1年以内' },
-  { key: 'y1to2', label: '1-2年' },
-  { key: 'y2to3', label: '2-3年' },
-  { key: 'y3to4', label: '3-4年' },
-  { key: 'y4to5', label: '4-5年' },
-  { key: 'y3to5', label: '3-5年' },
-  { key: 'over3', label: '3年以上' },
-  { key: 'over5', label: '5年以上' },
-] as const
+/**
+ * 账龄段（枚举账龄：3年段 / 5年段 / 自定义）统一取自**项目账龄配置**，
+ * 由主入口 provide('d2AgingSegments')；本 tab 不再自建 3y/5y/custom 第二套口径
+ * （旧实现 key 用 within1Year、label 用「一年以内」，与 D2-2 明细/披露/ECL 全对不上）。
+ * 项目账龄配置入口：项目设置中心 → 底稿配置 → 账龄配置。
+ */
+const injectedAgingSegments = inject<Ref<AgingSegment[]> | null>('d2AgingSegments', null)
+const injectedAgingPreset = inject<Ref<AgingPreset> | null>('d2AgingPreset', null)
 
-const AGING_PRESET_3Y: AgingBandDef[] = [
-  { key: 'within1Year', label: '一年以内', keys: ['within1Year'] },
-  { key: 'y1to2', label: '一到二年', keys: ['y1to2'] },
-  { key: 'y2to3', label: '二到三年', keys: ['y2to3'] },
-  { key: 'over3', label: '三年以上', keys: ['y3to4', 'y4to5', 'over5'] },
-]
+const agingSegments = computed<AgingSegment[]>(() => {
+  const list = injectedAgingSegments?.value
+  if (Array.isArray(list) && list.length > 0) return list
+  return PRESET_SEGMENTS.FIVE_YEAR
+})
 
-const AGING_PRESET_5Y: AgingBandDef[] = [
-  { key: 'within1Year', label: '1年以内', keys: ['within1Year'] },
-  { key: 'y1to2', label: '1-2年', keys: ['y1to2'] },
-  { key: 'y2to3', label: '2-3年', keys: ['y2to3'] },
-  { key: 'y3to4', label: '3-4年', keys: ['y3to4'] },
-  { key: 'y4to5', label: '4-5年', keys: ['y4to5'] },
-  { key: 'over5', label: '5年以上', keys: ['over5'] },
-]
-
-const agingMode = ref<AgingMode>('5y')
-const customAgingBands = ref<AgingBandDef[]>([])
-
-function sumBandValue(source: Record<string, number>, keys: string[]): number {
-  return keys.reduce((s, key) => s + (Number(source[key]) || 0), 0)
+const AGING_PRESET_LABEL: Record<string, string> = {
+  THREE_YEAR: '3 年段',
+  FIVE_YEAR: '5 年段',
+  CUSTOM: '自定义',
 }
+const agingPresetLabel = computed(() => AGING_PRESET_LABEL[injectedAgingPreset?.value ?? 'FIVE_YEAR'] ?? '5 年段')
 
-function normalizeCustomBands(raw: any): AgingBandDef[] {
-  if (!Array.isArray(raw)) return []
-  return raw
-    .map((it, idx) => {
-      const label = String(it?.label || '').trim()
-      const keys = Array.isArray(it?.keys)
-        ? it.keys
-          .map((k: unknown) => String(k))
-          .filter((k: string) => BASE_AGING_OPTIONS.some((op) => op.key === k))
-        : []
-      return {
-        key: String(it?.key || `custom-${idx + 1}`),
-        label: label || `自定义账龄${idx + 1}`,
-        keys: keys.length ? keys : ['within1Year'],
-      }
-    })
-    .filter((it) => it.label)
+/** 归一化账龄标签用于匹配 D2-3 旧数据（「一年以内」↔「1年以内」等中文数字/全角差异）。 */
+function normalizeAgingLabel(label: string): string {
+  return String(label ?? '')
+    .replace(/[（）()\s]/g, '')
+    .replace(/[一二三四五六七八九十]/g, (ch) => String('一二三四五六七八九十'.indexOf(ch) + 1))
+    .replace(/[到至]/g, '-')
+    .replace(/年以上/g, '年+')
 }
-
-function getAgingBandsByMode(): AgingBandDef[] {
-  if (agingMode.value === '3y') return AGING_PRESET_3Y
-  if (agingMode.value === '5y') return AGING_PRESET_5Y
-  return customAgingBands.value.length ? customAgingBands.value : AGING_PRESET_5Y
-}
-
-function saveAgingMode(mode: AgingMode): void {
-  agingMode.value = mode
-  const item = { item_id: 'D2-adj-aging-mode', conclusion: null, remark: mode }
-  props.allResponses.set(item.item_id, item)
-  void saveItems([item])
-}
-
-function saveCustomAgingBands(): void {
-  const payload = JSON.stringify(customAgingBands.value)
-  const item = { item_id: 'D2-adj-aging-custom-bands', conclusion: null, remark: payload }
-  props.allResponses.set(item.item_id, item)
-  void saveItems([item])
-}
-
-function onCustomLabelChange(index: number, value: string): void {
-  const target = customAgingBands.value[index]
-  if (!target) return
-  target.label = value
-  saveCustomAgingBands()
-}
-
-function onCustomKeysChange(index: number, keys: string[]): void {
-  const target = customAgingBands.value[index]
-  if (!target) return
-  target.keys = keys.length ? [...keys] : ['within1Year']
-  saveCustomAgingBands()
-}
-
-function addCustomBand(): void {
-  const nextIndex = customAgingBands.value.length + 1
-  customAgingBands.value.push({
-    key: `custom-${Date.now()}`,
-    label: `自定义账龄${nextIndex}`,
-    keys: ['within1Year'],
-  })
-  saveCustomAgingBands()
-}
-
-function removeCustomBand(index: number): void {
-  if (customAgingBands.value.length <= 1) return
-  customAgingBands.value.splice(index, 1)
-  saveCustomAgingBands()
-}
-
-watch(
-  () => props.allResponses.get('D2-adj-aging-mode')?.remark,
-  (remark) => {
-    if (remark === '3y' || remark === '5y' || remark === 'custom') {
-      agingMode.value = remark
-    }
-  },
-  { immediate: true },
-)
-
-watch(
-  () => props.allResponses.get('D2-adj-aging-custom-bands')?.remark,
-  (remark) => {
-    if (!remark) {
-      customAgingBands.value = []
-      return
-    }
-    try {
-      customAgingBands.value = normalizeCustomBands(JSON.parse(remark))
-    } catch {
-      customAgingBands.value = []
-    }
-  },
-  { immediate: true },
-)
 
 const agingTableRows = computed(() => {
-  const bands = getAgingBandsByMode()
+  const segments = agingSegments.value
   const source = crossSheet.agingFromDetail.value.audited as Record<string, number>
   const bdRows = (() => {
     try {
@@ -463,24 +354,21 @@ const agingTableRows = computed(() => {
     }
   })()
 
-  function resolveBdAmount(def: AgingBandDef): number {
-    const total = bdRows.reduce((sum: number, row: any) => {
-      const label = String(row?.label || '')
-      const hit = def.keys.some((k) => {
-        const keyLabel = BASE_AGING_OPTIONS.find((b) => b.key === k)?.label || ''
-        if (k === 'over5') return label.includes('5年以上') || label.includes('五年以上')
-        return keyLabel && label.includes(keyLabel)
-      })
+  /** D2-3 账龄组合子行按标签匹配（含旧措辞兼容） */
+  function resolveBdAmount(seg: AgingSegment): number {
+    const target = normalizeAgingLabel(seg.label)
+    return bdRows.reduce((sum: number, row: any) => {
+      const label = normalizeAgingLabel(row?.label)
+      const hit = Boolean(label) && (label.includes(target) || target.includes(label))
       return hit ? sum + (Number(row?.currentAudited) || 0) : sum
     }, 0)
-    return total
   }
 
-  return bands.map((def) => {
-    const gross = sumBandValue(source, def.keys)
-    const provision = resolveBdAmount(def)
+  return segments.map((seg) => {
+    const gross = Number(source[seg.key]) || 0
+    const provision = resolveBdAmount(seg)
     return {
-      label: def.label,
+      label: seg.label,
       gross,
       provision,
       net: gross - provision,
@@ -641,72 +529,24 @@ async function onAiNote(section: 'adj-note' | 'adj-conclusion'): Promise<void> {
             <div class="section-title">（一）账龄组合列示（联动枚举口径）</div>
             <div class="aging-mode-tools">
               <span class="aging-mode-label">账龄段口径：</span>
-              <el-select
-                :model-value="agingMode"
-                size="small"
-                style="width: 140px"
-                :disabled="isReadonly"
-                @change="(v: AgingMode) => saveAgingMode(v)"
-              >
-                <el-option label="3年段" value="3y" />
-                <el-option label="5年段" value="5y" />
-                <el-option label="自定义" value="custom" />
-              </el-select>
+              <el-tag size="small" type="primary" effect="plain">{{ agingPresetLabel }}</el-tag>
+              <el-tag size="small" type="info" effect="plain">{{ agingSegments.map(s => s.label).join(' / ') }}</el-tag>
             </div>
           </div>
 
           <el-alert type="info" :closable="true" class="aging-usage-hint">
             <template #title>
-              <span style="font-weight:500">使用说明</span>
+              <span style="font-weight:500">账龄段口径说明</span>
             </template>
             <template #default>
               <ul style="margin:4px 0 0;padding-left:18px;font-size:12px;line-height:1.8;color:#606266">
-                <li>选择"3年段"或"5年段"可快速切换预设账龄分段方案</li>
-                <li>选择"自定义"后可自由增减账龄段：点击"+ 新增账龄段"添加，点击"删除"移除</li>
-                <li>左侧可自由命名（如"0-3个月"），右侧选择对应区间（如"0-3个月"、"3个月-1年"、"3年以上"等）</li>
-                <li>修改后自动保存，D2-2/D2-3/ECL 等关联底稿的账龄列头同步变化</li>
+                <li>账龄段统一由<b>项目账龄配置</b>决定，三种枚举：<b>3 年段 / 5 年段 / 自定义</b></li>
+                <li>修改入口：项目设置中心 → 底稿配置 → 账龄配置（需项目经理及以上权限）</li>
+                <li>保存后 D2-1 审定表、D2-2 明细、D2-3 坏账、D2-5 分析、ECL/政策检查、附注披露表账龄列头与取数口径同步变化</li>
+                <li>本表账龄组合原值取自 D2-2 明细表期末审定账龄；坏账准备取自 D2-3 账龄组合子行</li>
               </ul>
             </template>
           </el-alert>
-
-          <div v-if="agingMode === 'custom'" class="custom-aging-editor">
-            <div
-              v-for="(band, idx) in customAgingBands"
-              :key="band.key"
-              class="custom-aging-row"
-            >
-              <el-input
-                :model-value="band.label"
-                size="small"
-                :disabled="isReadonly"
-                placeholder="如：0-3个月、3个月以上"
-                style="width: 170px"
-                @input="(v: string) => onCustomLabelChange(idx, v)"
-              />
-              <el-select
-                :model-value="band.keys[0] || ''"
-                size="small"
-                filterable
-                allow-create
-                clearable
-                style="width: 200px"
-                :disabled="isReadonly"
-                placeholder="选择或输入账龄区间"
-                @change="(v: string) => onCustomKeysChange(idx, v ? [v] : [])"
-              >
-                <el-option
-                  v-for="opt in BASE_AGING_OPTIONS"
-                  :key="opt.key"
-                  :label="opt.label"
-                  :value="opt.key"
-                />
-              </el-select>
-              <el-button size="small" text type="danger" :disabled="isReadonly" @click="removeCustomBand(idx)">
-                删除
-              </el-button>
-            </div>
-            <el-button size="small" :disabled="isReadonly" @click="addCustomBand">+ 新增账龄段</el-button>
-          </div>
 
           <el-table :data="agingTableRows" border size="small" style="max-width: 760px">
             <el-table-column prop="label" label="账龄段" width="180" />

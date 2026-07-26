@@ -12,8 +12,9 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_role
 from app.services import confirmation_service
+from app.services import confirmation_evidence_service
 
 router = APIRouter(prefix="/projects/{project_id}/confirmations", tags=["函证管理"])
 
@@ -67,9 +68,26 @@ async def list_confirmations(
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    """获取项目函证列表"""
+    """获取项目函证列表（含批量附件计数：outbound_count/inbound_count）"""
     pid = uuid.UUID(project_id)
     items = await confirmation_service.list_confirmations(db, pid)
+
+    # 批量查询附件计数（单次 GROUP BY 免 N+1）
+    confirmation_ids = [uuid.UUID(item["id"]) for item in items if item.get("id")]
+    if confirmation_ids:
+        counts = await confirmation_evidence_service.list_attachment_counts(
+            db, confirmation_ids
+        )
+        for item in items:
+            cid_str = item.get("id", "")
+            item_counts = counts.get(cid_str, {"outbound": 0, "inbound": 0})
+            item["outbound_count"] = item_counts["outbound"]
+            item["inbound_count"] = item_counts["inbound"]
+    else:
+        for item in items:
+            item["outbound_count"] = 0
+            item["inbound_count"] = 0
+
     await db.commit()
     return {"items": items, "total": len(items)}
 
@@ -245,13 +263,23 @@ async def reverse_confirmation(
     """
     cid = uuid.UUID(confirmation_id)
 
+    # 1. 权限校验 OUTSIDE try（HTTPException 不被通用 except 吞成 500）
     # 先查当前状态判权限（终态撤回要求 manager+）
-    current_record = await confirmation_service.get_confirmation(db, cid)
+    try:
+        current_record = await confirmation_service.get_confirmation(db, cid)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="函证记录不存在")
     current_status = current_record.get("status", "")
+
     if current_status in ("matched", "discrepancy"):
-        # 终态撤回：现场经理及以上
-        from app.deps import require_role
-        require_role(user, ["admin", "partner", "signing_partner", "manager"])
+        # 终态撤回：现场经理及以上（manager/partner/signing_partner/admin）
+        user_role = getattr(user, "role", None)
+        role_val = user_role.value if hasattr(user_role, "value") else str(user_role or "")
+        if role_val not in _MANAGER_PLUS_ROLES:
+            raise HTTPException(
+                status_code=403,
+                detail="撤回终态（相符/差异）需现场经理及以上权限",
+            )
 
     actor_id = getattr(user, "id", None)
     try:
@@ -435,3 +463,313 @@ async def batch_sync_confirmations(
 
     await db.commit()
     return result.model_dump()
+
+
+# ─── M2 附件链端点（confirmation-attachment-ocr-linkage）──────────────────────
+
+# 编辑权：沿用平台既有编辑角色集
+_EDIT_ROLES = ["admin", "manager", "partner", "signing_partner", "field_staff"]
+
+# 现场经理及以上（撤回终态/改结论）
+_MANAGER_PLUS_ROLES = ["admin", "manager", "partner", "signing_partner"]
+
+
+class ApplyReplyRequest(BaseModel):
+    """人工确认回填请求"""
+    attachment_id: str = Field(..., description="源回函件附件 ID")
+    confirmed_amount: float = Field(..., description="确认的回函金额（人工修正优先）")
+    reply_date: str | None = Field(None, description="回函日期 ISO 格式")
+    target_status: str = Field(..., description="目标状态：matched 或 discrepancy（用户确认）")
+
+
+class LinkAttachmentRequest(BaseModel):
+    """挂附件请求"""
+    attachment_id: str = Field(..., description="附件 UUID")
+    role: str = Field(..., description="附件角色：outbound(发函件) 或 inbound(回函件)")
+    paired_outbound_id: str | None = Field(
+        None,
+        description="回函件配对的发函件 attachment_id（role=inbound 多份发函件时必填）",
+    )
+
+
+@router.post("/{confirmation_id}/attachments")
+async def link_attachment(
+    project_id: str,
+    confirmation_id: str,
+    body: LinkAttachmentRequest,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_role(_EDIT_ROLES)),
+):
+    """挂附件到函证记录。
+
+    - role='outbound'：直接创建挂载
+    - role='inbound'：强校验必有已挂的 outbound 发函件（单份自动配对，多份须指定）
+    """
+    cid = uuid.UUID(confirmation_id)
+    attachment_id = uuid.UUID(body.attachment_id)
+    paired = uuid.UUID(body.paired_outbound_id) if body.paired_outbound_id else None
+    actor_user_id = getattr(user, "id", None)
+
+    # 权限校验在 require_role（置于 try 外），业务校验在 service
+    try:
+        link = await confirmation_evidence_service.link_attachment(
+            db,
+            confirmation_id=cid,
+            attachment_id=attachment_id,
+            role=body.role,
+            paired_outbound_id=paired,
+            actor_user_id=actor_user_id,
+        )
+    except ValueError as e:
+        msg = str(e)
+        if "不存在" in msg:
+            raise HTTPException(status_code=404, detail=msg)
+        raise HTTPException(status_code=400, detail=msg)
+
+    await db.commit()
+    return {
+        "link_id": str(link.id),
+        "confirmation_id": str(link.confirmation_id),
+        "attachment_id": str(link.attachment_id),
+        "role": link.role,
+        "paired_outbound_attachment_id": (
+            str(link.paired_outbound_attachment_id)
+            if link.paired_outbound_attachment_id else None
+        ),
+        "match_status": link.match_status,
+    }
+
+
+@router.delete("/{confirmation_id}/attachments/{link_id}")
+async def unlink_attachment(
+    project_id: str,
+    confirmation_id: str,
+    link_id: str,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_role(_EDIT_ROLES)),
+):
+    """解绑附件（清 reference/删 link，不物理删附件，留痕）。"""
+    lid = uuid.UUID(link_id)
+    actor_user_id = getattr(user, "id", None)
+
+    try:
+        await confirmation_evidence_service.unlink_attachment(
+            db,
+            link_id=lid,
+            actor_user_id=actor_user_id,
+        )
+    except ValueError as e:
+        msg = str(e)
+        if "不存在" in msg:
+            raise HTTPException(status_code=404, detail=msg)
+        raise HTTPException(status_code=400, detail=msg)
+
+    await db.commit()
+    return {"success": True, "link_id": str(lid)}
+
+
+@router.get("/{confirmation_id}/attachments")
+async def list_attachments(
+    project_id: str,
+    confirmation_id: str,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """列出某笔函证关联的全部附件（发函件 + 回函件，含角色/配对/OCR状态/文件信息）。"""
+    cid = uuid.UUID(confirmation_id)
+
+    items = await confirmation_evidence_service.list_attachments(db, cid)
+    await db.commit()
+    return {"items": items, "total": len(items)}
+
+
+# ─── M3 OCR 比对 + 回填端点（confirmation-attachment-ocr-linkage）─────────────
+
+
+@router.post("/attachments/{attachment_id}/extract-compare")
+async def extract_and_compare(
+    project_id: str,
+    attachment_id: str,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_role(_EDIT_ROLES)),
+):
+    """OCR 识别回函件 + 与所属函证 book_amount 比对。
+
+    - 调 extract_confirmation_reply（算法不改）抽取回函金额/日期/主体
+    - 比对：|diff| ≤ 0.01 → matched，否则 discrepancy，任一缺失 → low_confidence
+    - 主体名称不符 → counterparty_mismatch 预警
+    - 结果仅写 attachment.ocr_fields_cache（governed=False），不落库 confirmations
+
+    权限：编辑权
+    """
+    # 权限校验置于 try 外（require_role 已完成），下面是业务逻辑
+    aid = uuid.UUID(attachment_id)
+
+    try:
+        result = await confirmation_evidence_service.extract_and_compare(
+            db, attachment_id=aid
+        )
+    except ValueError as e:
+        msg = str(e)
+        if "不存在" in msg:
+            raise HTTPException(status_code=404, detail=msg)
+        raise HTTPException(status_code=400, detail=msg)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"OCR 识别异常: {str(e)}")
+
+    await db.commit()
+    return result
+
+
+@router.post("/{confirmation_id}/apply-reply")
+async def apply_reply(
+    project_id: str,
+    confirmation_id: str,
+    body: ApplyReplyRequest,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_role(_MANAGER_PLUS_ROLES)),
+):
+    """人工确认后回填台账（写 confirmed_amount / reply_date / diff_amount / status）。
+
+    - 人工修正值优先于 OCR 原值
+    - 差异容差内建议 matched、容差外建议 discrepancy（仅建议，最终由入参 target_status 定）
+    - 写 confirmation_action_log（OCR 原值 + 最终落库值双值留痕）
+    - 发布状态变化事件（复用 event_bus 下游刷新链）
+
+    权限：现场经理及以上（改结论）
+    """
+    # 权限校验置于 try 外（require_role 已完成）
+    cid = uuid.UUID(confirmation_id)
+    aid = uuid.UUID(body.attachment_id)
+    actor_user_id = getattr(user, "id", None)
+
+    try:
+        result = await confirmation_evidence_service.apply_reply(
+            db,
+            confirmation_id=cid,
+            attachment_id=aid,
+            confirmed_amount=body.confirmed_amount,
+            reply_date=body.reply_date,
+            target_status=body.target_status,
+            actor_user_id=actor_user_id,
+        )
+    except ValueError as e:
+        msg = str(e)
+        if "不存在" in msg:
+            raise HTTPException(status_code=404, detail=msg)
+        raise HTTPException(status_code=400, detail=msg)
+
+    await db.commit()
+    return result
+
+
+# ─── M4 自动匹配 + 人工匹配队列端点（confirmation-attachment-ocr-linkage）───
+
+
+class AutoMatchRequest(BaseModel):
+    """自动匹配请求"""
+    attachment_id: str = Field(..., description="回函件附件 ID")
+
+
+class AssignMatchRequest(BaseModel):
+    """人工指派请求"""
+    confirmation_id: str = Field(..., description="指派到的函证 ID")
+    paired_outbound_id: str | None = Field(
+        None,
+        description="配对的发函件 attachment_id（多份发函件时必填）",
+    )
+
+
+@router.post("/auto-match")
+async def auto_match(
+    project_id: str,
+    body: AutoMatchRequest,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_role(_EDIT_ROLES)),
+):
+    """批量/单件自动匹配回函件到函证记录。
+
+    按 OCR 主体名称 + 金额容差 + 可选函证编号匹配 status∈{sent,returned} 记录：
+    - 唯一命中 → 自动挂载 + 绑发函件 + match_status=auto
+    - 多义命中 → 返回候选列表，不挂载
+    - 无命中 → 入人工匹配队列（match_status=pending）
+
+    权限：编辑权
+    """
+    pid = uuid.UUID(project_id)
+    aid = uuid.UUID(body.attachment_id)
+    actor_user_id = getattr(user, "id", None)
+
+    try:
+        result = await confirmation_evidence_service.auto_match(
+            db,
+            project_id=pid,
+            attachment_id=aid,
+            actor_user_id=actor_user_id,
+        )
+    except ValueError as e:
+        msg = str(e)
+        if "不存在" in msg:
+            raise HTTPException(status_code=404, detail=msg)
+        raise HTTPException(status_code=400, detail=msg)
+
+    await db.commit()
+    return result
+
+
+@router.get("/match-queue")
+async def list_match_queue(
+    project_id: str,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """列出项目下待人工指派的回函件（人工匹配队列）。
+
+    包含未匹配成功的回函件附件，供审计师手动指派到具体函证记录。
+
+    权限：只读（get_current_user）
+    """
+    pid = uuid.UUID(project_id)
+
+    items = await confirmation_evidence_service.list_match_queue(db, pid)
+    await db.commit()
+    return {"items": items, "total": len(items)}
+
+
+@router.post("/match-queue/{attachment_id}/assign")
+async def assign_match(
+    project_id: str,
+    attachment_id: str,
+    body: AssignMatchRequest,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_role(_EDIT_ROLES)),
+):
+    """人工把队列中的回函件指派到指定函证 + 绑发函件。
+
+    - 如有既有 pending link → 更新其 confirmation_id / paired / match_status
+    - 如无既有 link → 创建新 link（match_status=assigned）
+    - 写 action_log（action='match_assign'）留痕
+
+    权限：编辑权
+    """
+    aid = uuid.UUID(attachment_id)
+    cid = uuid.UUID(body.confirmation_id)
+    paired = uuid.UUID(body.paired_outbound_id) if body.paired_outbound_id else None
+    actor_user_id = getattr(user, "id", None)
+
+    try:
+        result = await confirmation_evidence_service.assign_match(
+            db,
+            attachment_id=aid,
+            confirmation_id=cid,
+            paired_outbound_id=paired,
+            actor_user_id=actor_user_id,
+        )
+    except ValueError as e:
+        msg = str(e)
+        if "不存在" in msg:
+            raise HTTPException(status_code=404, detail=msg)
+        raise HTTPException(status_code=400, detail=msg)
+
+    await db.commit()
+    return result

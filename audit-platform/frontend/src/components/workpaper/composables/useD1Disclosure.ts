@@ -252,6 +252,34 @@ export function useD1Disclosure(options: UseD1DisclosureOptions) {
     target.value.push(row)
     persistRows(key, target.value)
   }
+  /**
+   * 按**项目账龄配置段**（枚举账龄：3年段 / 5年段 / 自定义）批量生成组合计提行。
+   * 仅补齐缺失段（按名称去重，不覆盖已录入行与金额），返回新增行数。
+   * 附注模板国企版组合分表行本就是账龄段（1年以内（含1年）/1至2年/…），故此处按段生成而非手打。
+   */
+  function fillPortfolioAgingBands(
+    type: 'bank' | 'commercial',
+    period: 'end' | 'prior',
+    segmentLabels: readonly string[],
+  ): number {
+    const key = `${type === 'bank' ? 'bank' : 'commercial'}-portfolio-${period}-rows`
+    const target = type === 'bank'
+      ? (period === 'end' ? bankPortfolioEndRows : bankPortfolioPriorRows)
+      : (period === 'end' ? commercialPortfolioEndRows : commercialPortfolioPriorRows)
+    const existing = new Set(target.value.map(r => String(r.drawerTypeOrAging || '').trim()).filter(Boolean))
+    const added: PortfolioDetailRow[] = []
+    for (const label of segmentLabels) {
+      const name = String(label || '').trim()
+      if (!name || existing.has(name)) continue
+      added.push({ rowId: genId('pf'), rowType: 'dynamic', drawerTypeOrAging: name, isFixed: false, balance: 0, provision: 0, lossRate: 0 })
+      existing.add(name)
+    }
+    if (added.length === 0) return 0
+    target.value = [...target.value, ...added]
+    persistRows(key, target.value)
+    return added.length
+  }
+
   function removePortfolioRow(rowId: string, type: 'bank' | 'commercial', period: 'end' | 'prior'): void {
     const key = `${type === 'bank' ? 'bank' : 'commercial'}-portfolio-${period}-rows`
     const target = type === 'bank' ? (period === 'end' ? bankPortfolioEndRows : bankPortfolioPriorRows) : (period === 'end' ? commercialPortfolioEndRows : commercialPortfolioPriorRows)
@@ -459,7 +487,7 @@ export function useD1Disclosure(options: UseD1DisclosureOptions) {
     classEndRows, classEndTotal, classPriorRows, classPriorTotal,
     individualEndRows, individualPriorRows, addIndividualRow, removeIndividualRow,
     bankPortfolioEndRows, bankPortfolioPriorRows, commercialPortfolioEndRows, commercialPortfolioPriorRows,
-    addPortfolioRow, removePortfolioRow,
+    addPortfolioRow, removePortfolioRow, fillPortfolioAgingBands,
     // Movement
     movementRows, movementTotal, reversalDetailRows, reversalDetailTotal, addReversalRow, removeReversalRow,
     // Write-off

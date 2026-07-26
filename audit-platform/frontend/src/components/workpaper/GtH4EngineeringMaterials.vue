@@ -8,7 +8,7 @@
       <!-- 顶部工具栏（双模式切换）— 目录页隐藏 -->
       <div v-if="currentSheet !== 'H4'" class="h4-header-toolbar">
         <el-segmented
-          v-model="currentMode"
+          :model-value="currentMode"
           :options="modeOptions"
           size="small"
           :disabled="!isOoAvailable && currentMode === 'html'"
@@ -205,10 +205,13 @@
  * Spec: .kiro/specs/h4-engineering-materials/ Task 1.1
  * Requirements: 1.1, 1.2, 1.6, 1.7, 1.8, 1.9
  */
-import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, inject, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, inject, defineAsyncComponent, nextTick } from 'vue'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useH4FormData } from './composables/useH4FormData'
 import { useH4DualMode } from './composables/useH4DualMode'
+import { useH4CrossSheet } from './composables/useH4CrossSheet'
+import { buildH4DetailSeedRows } from './composables/h4DetailPrefill'
+import { eventBus } from '@/utils/eventBus'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
@@ -341,8 +344,41 @@ function persistResponse(itemId: string, value: any): void {
 }
 provide('saveResponse', persistResponse)
 
+// ─── CrossSheet 勾稽引擎（供全局告警 + 子组件消费） ────────────────────────────
+const crossSheet = useH4CrossSheet(allResponses)
+provide('h4CrossSheet', crossSheet)
+
+// ─── 全局勾稽告警（主入口顶部展示，排除正在查看的对应 tab） ──────────────────
+const globalAlerts = computed(() => {
+  const alerts: Array<{ type: string; msg: string }> = []
+  const sheet = currentSheet.value
+  // 审定↔明细勾稽（H4-2 tab 内已显示，主入口排除）
+  if (sheet !== 'H4-2') {
+    const avd = crossSheet.adjudicationVsDetail.value
+    if (!avd.isMatch && (crossSheet.adjudicationTotals.value.adjudicatedTotal !== 0 || crossSheet.detailTotal.value !== 0)) {
+      alerts.push({ type: 'warning', msg: `H4-1 审定合计与 H4-2 明细合计差异 ${avd.diff.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}` })
+    }
+  }
+  return alerts
+})
+
 onMounted(() => {
-  void bootstrapLoad()
+  void bootstrapLoad().then(() => {
+    // #2: 种子接线 — 灰度开启时从 detail_prefill 自动种子 H4-2 明细
+    nextTick(() => {
+      const prefill = props.htmlData?.detail_prefill
+      const existingRemark = allResponses.value.get('H4-2-rows')?.remark
+      const seedRows = buildH4DetailSeedRows(prefill, existingRemark)
+      if (seedRows) {
+        // 内存态写入（未编辑不落库，composable 的 watch 会消费）
+        allResponses.value.set('H4-2-rows', {
+          item_id: 'H4-2-rows',
+          remark: JSON.stringify(seedRows),
+          conclusion: null,
+        })
+      }
+    })
+  })
   window.addEventListener('tb:updated', _handleTbUpdated)
   window.addEventListener('substantive:adjudicated', _handleTbUpdated)
 })

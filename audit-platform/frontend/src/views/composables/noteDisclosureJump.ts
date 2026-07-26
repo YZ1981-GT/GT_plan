@@ -27,6 +27,11 @@ export const G1_DISCLOSURE_SHEET_SOE = '附注披露信息（国企）'
 export const G10_DISCLOSURE_SHEET_LISTED = '附注披露信息（上市公司）'
 export const G10_DISCLOSURE_SHEET_SOE = '附注披露信息（国企）'
 
+// J1 应付职工薪酬 披露 sheet：底稿实际 tab 名为「附注披露信息（上市公司）」/「附注披露信息（国有企业）」
+// （全角括号，见 workpaper_sheet_classification wp_code=J1，与 D1 同款命名）。靠章节号区分 J1。
+export const J1_DISCLOSURE_SHEET_LISTED = '附注披露信息（上市公司）'
+export const J1_DISCLOSURE_SHEET_SOE = '附注披露信息（国有企业）'
+
 export const G13_DISCLOSURE_SHEET_LISTED = '附注披露信息（上市公司）'
 export const G13_DISCLOSURE_SHEET_SOE = '附注披露信息（国企）'
 
@@ -44,6 +49,9 @@ export const H9_DISCLOSURE_SHEET_SOE = '附注披露信息（国企）'
 
 export const H10_DISCLOSURE_SHEET_LISTED = '附注披露信息（上市公司）'
 export const H10_DISCLOSURE_SHEET_SOE = '附注披露信息（国有企业）'
+
+export const H5_DISCLOSURE_SHEET_LISTED = '' // 上市版无独立油气资产章节
+export const H5_DISCLOSURE_SHEET_SOE = '附注披露信息（国有企业）'
 
 export const I1_DISCLOSURE_SHEET_LISTED = '附注披露信息（上市公司）'
 export const I1_DISCLOSURE_SHEET_SOE = '附注披露信息（国有企业）'
@@ -88,6 +96,12 @@ export const I6_DISCLOSURE_SHEET_SOE = '附注披露（国有企业）'
 export const K1_DISCLOSURE_SHEET_LISTED = '附注披露信息(上市公司）'
 export const K1_DISCLOSURE_SHEET_SOE = '附注披露信息（国企）'
 
+// N1 递延所得税资产（全角括号，实测 workpaper_sheet_classification wp_code=N1）。
+// 该章节由 N1/N3 共用，正向跳转默认落 N1（spec n1-disclosure-note-linkage · Decision 2）；
+// N3 若将来补披露表，可在此加 N3 常量与备选入口。
+export const N1_DISCLOSURE_SHEET_LISTED = '附注披露信息（上市公司）'
+export const N1_DISCLOSURE_SHEET_SOE = '附注披露信息（国企）'
+
 export interface NoteDisclosureJumpTarget {
   /** 底稿 sheet 名（传给 ?sheet=） */
   sheet: string
@@ -98,7 +112,7 @@ export interface NoteDisclosureJumpTarget {
   /** 推断依据说明 */
   reason: string
   /** 底稿族代码（ACNR 回退解析） */
-  wpCode?: 'D1' | 'E1' | 'F1' | 'F2' | 'G1' | 'G7' | 'G10' | 'G11' | 'G13' | 'G14' | 'H1' | 'H2' | 'H8' | 'H9' | 'H10' | 'I1' | 'I2' | 'I3' | 'I4' | 'I5' | 'I6' | 'K1' | 'K11' | 'K13'
+  wpCode?: 'D1' | 'E1' | 'F1' | 'F2' | 'G1' | 'G7' | 'G10' | 'G11' | 'G13' | 'G14' | 'H1' | 'H2' | 'H3' | 'H8' | 'H9' | 'H10' | 'I1' | 'I2' | 'I3' | 'I4' | 'I5' | 'I6' | 'J1' | 'K1' | 'K11' | 'K13' | 'N1'
 }
 
 function asRecord(raw: unknown): Record<string, unknown> | null {
@@ -115,6 +129,34 @@ export function isE1MonetaryFundNoteSection(noteSection: string): boolean {
   if (!s) return false
   if (s === '五、1' || s === '八、1') return true
   if (s === '货币资金') return true
+  return false
+}
+
+/**
+ * 是否 J1 应付职工薪酬相关附注节（五、40 / 八、40）。
+ * 权威 note_template_variant_matrix.json · ying_fu_zhi_gong_xin_chou。
+ * 须**精确===**匹配（禁 startsWith：'五、4' 是应收票据 D1；'五、40x' 不存在但防御性排除）。
+ */
+export function isJ1EmployeeBenefitsNoteSection(noteSection: string): boolean {
+  const s = String(noteSection || '').trim()
+  if (!s) return false
+  if (s === '五、40' || s === '八、40') return true
+  if (s.includes('应付职工薪酬')) return true
+  return false
+}
+
+/**
+ * 是否像 N1 递延所得税资产相关附注节（五、30 / 八、31）。
+ * 权威 note_template_variant_matrix.json · di_yan_suo_de_shui_zi_chan_he_di_yan_suo_de。
+ * 须**精确**匹配（禁 startsWith：'五、3' 是衍生金融资产、'八、3' 亦然；
+ * 反之 '五、30' 用 startsWith 会误吞将来的 五、300 类章节）。
+ * 该章节 N1（资产）与 N3（负债）共用，跳转默认落 N1。
+ */
+export function isN1DeferredTaxNoteSection(noteSection: string): boolean {
+  const s = String(noteSection || '').trim()
+  if (!s) return false
+  if (s === '五、30' || s === '八、31') return true
+  if (s === '递延所得税资产和递延所得税负债' || s === '递延所得税资产与递延所得税负债') return true
   return false
 }
 
@@ -201,14 +243,48 @@ export function isG7EquityNoteSection(noteSection: string): boolean {
   return false
 }
 
-/** 是否像 H1 固定资产相关附注节 */
+/**
+ * 是否像 H1 固定资产相关附注节（listed 五、22 / soe 八、22，纯编号精确匹配）。
+ * 注意「五、15」是其他债权投资，绝不可命中固定资产（曾误列，会把该章节跳到 H1 披露表）。
+ */
 export function isH1FixedAssetNoteSection(noteSection: string): boolean {
   const s = String(noteSection || '').trim()
   if (!s) return false
-  if (s === '五、15' || s.startsWith('五、15')) return true
-  if (s === '五、22' || s.startsWith('五、22')) return true
-  if (s === '八、22' || s.startsWith('八、22')) return true
+  if (s === '五、22' || s === '八、22') return true
   if (s === '固定资产' || (s.includes('固定资产') && !s.includes('清理') && !s.includes('在建'))) return true
+  return false
+}
+
+/**
+ * 是否像 H3 投资性房地产相关附注节（五、21 / 八、22）。
+ * 权威 note_template_variant_matrix.json · tou_zi_xing_fang_di_chan：上市→五、21，国企→八、22。
+ * 单/双位数字须**精确===**匹配（五、21 禁 startsWith，防误伤五、210 类未来章节）。
+ * 关键词"投资性房地产"兜底。
+ */
+export function isH3InvestmentPropertyNoteSection(noteSection: string): boolean {
+  const s = String(noteSection || '').trim()
+  if (!s) return false
+  if (s === '五、21' || s === '八、22') return true
+  if (s === '投资性房地产' || (s.includes('投资性房地产') && !s.includes('累计折旧'))) return true
+  return false
+}
+
+// H3 投资性房地产 披露 sheet：底稿实际 tab 名为「附注披露信息（上市公司）」/「附注披露信息（国有企业）」
+// （全角括号，见 workpaper_sheet_classification wp_code=H3）。靠章节号（五、21/八、22）区分归属。
+export const H3_DISCLOSURE_SHEET_LISTED = '附注披露信息（上市公司）'
+export const H3_DISCLOSURE_SHEET_SOE = '附注披露信息（国有企业）'
+
+/**
+ * 是否像 H5 油气资产相关附注节（八、25 国企专属）。
+ * 权威 note_template_variant_matrix.json · you_qi_zi_chan：soe→八、25，listed→null（上市无独立油气章节）。
+ * 精确匹配 === 禁 startsWith（八、25 ≠ 八、2）。
+ * 关键词"油气资产"兜底。
+ */
+export function isH5OilGasAssetNoteSection(noteSection: string): boolean {
+  const s = String(noteSection || '').trim()
+  if (!s) return false
+  if (s === '八、25') return true
+  if (s === '油气资产' || (s.includes('油气资产') && !s.includes('折耗'))) return true
   return false
 }
 
@@ -429,6 +505,17 @@ export function resolveNoteDisclosureJumpTarget(note: unknown): NoteDisclosureJu
     }
   }
 
+  if (isH3InvestmentPropertyNoteSection(section)) {
+    const variant = section.startsWith('八') || std.startsWith('soe') ? 'soe' : 'listed'
+    return {
+      sheet: variant === 'listed' ? H3_DISCLOSURE_SHEET_LISTED : H3_DISCLOSURE_SHEET_SOE,
+      wpId,
+      variant,
+      reason: `章节 ${section}`,
+      wpCode: 'H3' as any,
+    }
+  }
+
   if (isH1FixedAssetNoteSection(section)) {
     const variant = section.startsWith('八') || std.startsWith('soe') ? 'soe' : 'listed'
     return {
@@ -473,6 +560,19 @@ export function resolveNoteDisclosureJumpTarget(note: unknown): NoteDisclosureJu
       variant,
       reason: `章节 ${section}`,
       wpCode: 'H10',
+    }
+  }
+
+  // H5 油气资产（八、25 国企专属，上市无独立章节）— 行业限定底稿 oil_gas/mining
+  if (isH5OilGasAssetNoteSection(section)) {
+    // 油气资产仅国企有独立章节，上市版不跳转
+    if (!section.startsWith('八') && !std.startsWith('soe')) return null
+    return {
+      sheet: H5_DISCLOSURE_SHEET_SOE,
+      wpId,
+      variant: 'soe',
+      reason: `章节 ${section}`,
+      wpCode: 'H5',
     }
   }
 
@@ -597,6 +697,19 @@ export function resolveNoteDisclosureJumpTarget(note: unknown): NoteDisclosureJu
     }
   }
 
+  // N1 递延所得税资产（五、30 / 八、31，与 N3 共用章节，默认落 N1）——sheet 名为通用
+  // 「附注披露信息（上市公司/国企）」，须在通用回退之前靠章节号精确命中。
+  if (isN1DeferredTaxNoteSection(section)) {
+    const variant = section.startsWith('八') || std.startsWith('soe') ? 'soe' : 'listed'
+    return {
+      sheet: variant === 'listed' ? N1_DISCLOSURE_SHEET_LISTED : N1_DISCLOSURE_SHEET_SOE,
+      wpId,
+      variant,
+      reason: `章节 ${section || '递延所得税资产'}`,
+      wpCode: 'N1',
+    }
+  }
+
   // E1 货币资金（五、1 / 八、1）——sheet 名（附注上市/附注国企）与 G1/G10 相同，
   // 须在 syncedSheet.includes('附注上市') 回退之前，靠章节号精确命中（五、1 exact，不误伤五、18=G7）。
   if (isE1MonetaryFundNoteSection(section)) {
@@ -607,6 +720,18 @@ export function resolveNoteDisclosureJumpTarget(note: unknown): NoteDisclosureJu
       variant,
       reason: `章节 ${section || '货币资金'}`,
       wpCode: 'E1',
+    }
+  }
+
+  // J1 应付职工薪酬（五、40 / 八、40）——精确匹配（禁 startsWith：五、4 是应收票据、五、400 不存在）
+  if (isJ1EmployeeBenefitsNoteSection(section)) {
+    const variant = section.startsWith('八') || std.startsWith('soe') ? 'soe' : 'listed'
+    return {
+      sheet: variant === 'listed' ? J1_DISCLOSURE_SHEET_LISTED : J1_DISCLOSURE_SHEET_SOE,
+      wpId,
+      variant,
+      reason: `章节 ${section || '应付职工薪酬'}`,
+      wpCode: 'J1',
     }
   }
 

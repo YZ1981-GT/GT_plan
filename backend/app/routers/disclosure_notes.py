@@ -14,6 +14,7 @@ Validates: Requirements 4.1-4.11, 5.1-5.5
 
 from __future__ import annotations
 
+import logging
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -33,6 +34,8 @@ from app.models.report_schemas import (
 )
 from app.services.disclosure_engine import DisclosureEngine
 from app.services.note_validation_engine import NoteValidationEngine
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/api/disclosure-notes",
@@ -359,7 +362,8 @@ async def delete_section(
     if not note:
         raise HTTPException(status_code=404, detail="章节不存在")
     note.is_deleted = True
-    await db.flush()
+    # get_db 不自动 commit：只 flush 会在会话关闭时回滚，删除从不落库（刷新后章节复现）
+    await db.commit()
     return {"ok": True}
 
 
@@ -390,7 +394,8 @@ async def patch_section(
             note.is_empty = True
         else:
             note.is_empty = False
-    await db.flush()
+    # get_db 不自动 commit：只 flush 会在会话关闭时回滚，状态变更从不落库
+    await db.commit()
     status_val = "not_applicable" if note.is_empty else (note.status.value if note.status else "draft")
     return {"ok": True, "status": status_val}
 
@@ -438,7 +443,8 @@ async def restore_section(
     if not note:
         raise HTTPException(status_code=404, detail="章节不存在或未被删除")
     note.is_deleted = False
-    await db.flush()
+    # get_db 不自动 commit：只 flush 会在会话关闭时回滚，恢复从不落库
+    await db.commit()
     return {"ok": True}
 
 
@@ -482,9 +488,35 @@ async def formula_health(
     if template_type not in ("soe", "listed"):
         raise HTTPException(status_code=400, detail="template_type 必须是 soe 或 listed")
     engine = NoteValidationEngine(db)
-    return await engine.diagnose_formula_health(
+    health = await engine.diagnose_formula_health(
         project_id, year, template_type=template_type
     )
+    # 附加只读诊断（spec disclosure-note-formula-data-population Task 5.1）：
+    # 「有报表↔附注勾稽但无写值 linkage」的章节 —— cells_updated=0 属正确行为
+    # （决策 1：报表↔附注只做校验不做写值），此处只呈现不写入。fail-open。
+    try:
+        from app.services.report_note_linkage import ReportNoteLinkage
+
+        notes = (
+            (
+                await db.execute(
+                    sa.select(DisclosureNote).where(
+                        DisclosureNote.project_id == project_id,
+                        DisclosureNote.year == year,
+                        DisclosureNote.is_deleted == sa.false(),
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        missing = ReportNoteLinkage().diagnose_missing_write_linkage(list(notes))
+        if isinstance(health, dict):
+            health["missing_write_linkage"] = missing
+            health["missing_write_linkage_count"] = len(missing)
+    except Exception as err:  # pragma: no cover — 诊断失败不影响健康度主体
+        logger.warning("formula_health: linkage diagnose failed: %s", err)
+    return health
 
 
 @router.put("/findings/{validation_id}/confirm")

@@ -20,14 +20,8 @@ Requirements: 4.1-4.6, 5.1-5.6, 8.1-8.4
 
 from __future__ import annotations
 
-import io
-import json
 import logging
 from typing import Any
-from uuid import uuid4
-
-from openpyxl import Workbook, load_workbook
-from openpyxl.styles import Alignment, Font, PatternFill
 
 logger = logging.getLogger(__name__)
 
@@ -317,11 +311,40 @@ def _parse_num(v: Any) -> float:
         return 0.0
 
 
-async def get_tb_balance_for_n1(project_id: str, db: Any) -> dict[str, Any]:
+async def _resolve_year(project_id: str, db: Any, year: int | None) -> int:
+    """解析审计年度：显式传入优先，否则取 projects.audit_year（缺失回退 0）。"""
+    if year is not None:
+        return int(year)
+    import sqlalchemy as sa
+
+    try:
+        row = (
+            await db.execute(
+                sa.text("SELECT audit_year FROM projects WHERE id = :pid"),
+                {"pid": str(project_id)},
+            )
+        ).fetchone()
+        if row and row.audit_year:
+            return int(row.audit_year)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("N1 service: 审计年度解析失败 project_id=%s: %s", project_id, e)
+    return 0
+
+
+async def get_tb_balance_for_n1(
+    project_id: str, db: Any, year: int | None = None
+) -> dict[str, Any]:
     """从 tb_balance 取科目1811递延所得税资产余额数据（资产类/借方）
+
+    ⚠️ DEPRECATED（无调用方）：N1 的 TB 取数已由 render 策略
+    `wp_render_strategies/_n1_deferred_tax_assets.py` 直接完成并随 render-config 下发，
+    本函数无任何 router/服务调用方。保留仅为兼容外部脚本，勿在新代码中引用。
 
     资产类取数规则：从tb_balance取期末余额（direction=借）。
     期末余额 = 期初 + 本期借方 - 本期贷方。
+
+    ⚠️ tb_balance 真实列名为 opening_balance / closing_balance / account_code
+    （无 begin_balance / end_balance / standard_account_code）。
 
     Requirements: 8.2, 8.3
     """
@@ -342,17 +365,19 @@ async def get_tb_balance_for_n1(project_id: str, db: Any) -> dict[str, Any]:
     }
 
     try:
-        active_filter = get_active_filter(project_id)
+        resolved_year = await _resolve_year(project_id, db, year)
+        active_filter = await get_active_filter(
+            db, TbBalance.__table__, project_id, resolved_year
+        )
         stmt = (
             sa.select(
-                TbBalance.begin_balance,
+                TbBalance.opening_balance.label("begin_balance"),
                 TbBalance.debit_amount,
                 TbBalance.credit_amount,
-                TbBalance.end_balance,
+                TbBalance.closing_balance.label("end_balance"),
             )
             .where(
-                TbBalance.project_id == str(project_id),
-                TbBalance.standard_account_code == _N1_ACCOUNT_CODE,
+                TbBalance.account_code == _N1_ACCOUNT_CODE,
                 active_filter,
             )
             .limit(1)
@@ -371,24 +396,33 @@ async def get_tb_balance_for_n1(project_id: str, db: Any) -> dict[str, Any]:
 
 
 async def writeback_tb(
-    project_id: str, audited_amount: float, db: Any
+    project_id: str, audited_amount: float, db: Any, year: int | None = None
 ) -> dict[str, Any]:
     """回写审定数到 trial_balance（科目1811，期末余额，借方/资产类）
+
+    ⚠️ DEPRECATED（无调用方）：前端 N1-1 的 TB 回写走平台标准端点
+    `PUT /api/projects/{pid}/trial-balance/writeback`（trial_balance_service，
+    含数据集/口径/审计留痕）。本函数是绕过该服务的裸 SQL 旁路，无调用方，勿新引用。
+
+    ⚠️ trial_balance 是分年度存储，必须带 year 过滤（否则跨年度全表更新）。
 
     Requirements: 8.3
     """
     import sqlalchemy as sa
 
     try:
+        resolved_year = await _resolve_year(project_id, db, year)
         result = await db.execute(
             sa.text(
                 "UPDATE trial_balance "
                 "SET audited_amount = :amount "
-                "WHERE project_id = :pid AND standard_account_code = :code"
+                "WHERE project_id = :pid AND year = :year "
+                "AND standard_account_code = :code"
             ),
             {
                 "amount": audited_amount,
                 "pid": str(project_id),
+                "year": resolved_year,
                 "code": _N1_ACCOUNT_CODE,
             },
         )
@@ -409,8 +443,14 @@ async def writeback_tb(
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-async def get_cross_workpaper_totals(project_id: str, db: Any) -> dict[str, Any]:
+async def get_cross_workpaper_totals(
+    project_id: str, db: Any, year: int | None = None
+) -> dict[str, Any]:
     """跨底稿合计：N1资产部分 + N3负债部分
+
+    ⚠️ DEPRECATED（无调用方）：N1↔N3↔N5 的跨底稿合计已由前端
+    `useN1CrossSheet` / `useN5DeferredReconcile` 经 checklist_responses 键完成。
+    本函数无 router 调用方，勿在新代码中引用。
 
     从 tb_balance 获取 N1 资产数据和 N3 负债数据，
     供 N5 递延所得税费用核对行（N5-8）消费。
@@ -439,18 +479,20 @@ async def get_cross_workpaper_totals(project_id: str, db: Any) -> dict[str, Any]
     }
 
     try:
-        active_filter = get_active_filter(project_id)
+        resolved_year = await _resolve_year(project_id, db, year)
+        active_filter = await get_active_filter(
+            db, TbBalance.__table__, project_id, resolved_year
+        )
 
         # N1 递延所得税资产（科目1811，资产类借方）
         n1_row = (
             await db.execute(
                 sa.select(
-                    TbBalance.begin_balance,
-                    TbBalance.end_balance,
+                    TbBalance.opening_balance.label("begin_balance"),
+                    TbBalance.closing_balance.label("end_balance"),
                 )
                 .where(
-                    TbBalance.project_id == str(project_id),
-                    TbBalance.standard_account_code == _N1_ACCOUNT_CODE,
+                    TbBalance.account_code == _N1_ACCOUNT_CODE,
                     active_filter,
                 )
                 .limit(1)
@@ -468,12 +510,11 @@ async def get_cross_workpaper_totals(project_id: str, db: Any) -> dict[str, Any]
         n3_row = (
             await db.execute(
                 sa.select(
-                    TbBalance.begin_balance,
-                    TbBalance.end_balance,
+                    TbBalance.opening_balance.label("begin_balance"),
+                    TbBalance.closing_balance.label("end_balance"),
                 )
                 .where(
-                    TbBalance.project_id == str(project_id),
-                    TbBalance.standard_account_code == _N3_ACCOUNT_CODE,
+                    TbBalance.account_code == _N3_ACCOUNT_CODE,
                     active_filter,
                 )
                 .limit(1)
@@ -505,260 +546,9 @@ async def get_cross_workpaper_totals(project_id: str, db: Any) -> dict[str, Any]
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 导入导出配置
+# 导入导出
 # ═══════════════════════════════════════════════════════════════════════════════
-
-_ROW_LIMIT = 500
-
-# N1 各sheet导出配置（明细表N1-2为主要动态行导入导出目标）
-_SHEET_CONFIGS: dict[str, dict[str, Any]] = {
-    "N1-2": {
-        "title": "N1-2 明细表",
-        "headers": [
-            "序号", "可抵扣暂时性差异项目", "账面价值", "计税基础",
-            "可抵扣暂时性差异", "适用税率", "期初递延税资产",
-            "本期确认", "本期转回", "期末递延税资产",
-            "确认条件", "备注",
-        ],
-        "fields": [
-            "seq", "itemName", "bookValue", "taxBase",
-            "deductibleDiff", "taxRate", "beginDta",
-            "periodRecognized", "periodReversed", "endDta",
-            "recognitionCondition", "remark",
-        ],
-    },
-}
-
-_NUMERIC_FIELDS: set[str] = {
-    "bookValue", "taxBase", "deductibleDiff", "taxRate",
-    "beginDta", "periodRecognized", "periodReversed", "endDta",
-}
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# 导出辅助
-# ═══════════════════════════════════════════════════════════════════════════════
-
-
-def _style_header_row(ws: Any) -> None:
-    """给表头行设置样式"""
-    header_font = Font(bold=True, size=11)
-    header_fill = PatternFill(start_color="D9E1F2", end_color="D9E1F2", fill_type="solid")
-    header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
-
-    for cell in ws[1]:
-        cell.font = header_font
-        cell.fill = header_fill
-        cell.alignment = header_align
-        ws.column_dimensions[cell.column_letter].width = max(
-            len(str(cell.value or "")) * 2 + 4, 12
-        )
-    ws.freeze_panes = "A2"
-
-
-def _safe_str(val: Any) -> str:
-    if val is None:
-        return ""
-    return str(val).strip()
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# 导出模板
-# ═══════════════════════════════════════════════════════════════════════════════
-
-
-async def export_template(wp_id: str, db: Any, sheet: str | None = None) -> io.BytesIO:
-    """生成空白xlsx模板（N1-2明细表）
-
-    Sheet列表: N1-2(明细12列)
-
-    Requirements: 4.1
-    """
-    wb = Workbook()
-    wb.remove(wb.active)
-
-    configs_to_export = _SHEET_CONFIGS
-    if sheet and sheet in _SHEET_CONFIGS:
-        configs_to_export = {sheet: _SHEET_CONFIGS[sheet]}
-
-    for _sheet_key, config in configs_to_export.items():
-        ws = wb.create_sheet(title=config["title"][:31])
-        for col_idx, header in enumerate(config["headers"], 1):
-            ws.cell(row=1, column=col_idx, value=header)
-        _style_header_row(ws)
-
-    buffer = io.BytesIO()
-    wb.save(buffer)
-    buffer.seek(0)
-    return buffer
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# 导出数据
-# ═══════════════════════════════════════════════════════════════════════════════
-
-
-async def export_data(wp_id: str, db: Any, sheet: str | None = None) -> io.BytesIO:
-    """导出当前数据为xlsx（N1-2明细表）
-
-    从 checklist_responses 读取已保存的数据并填入xlsx。
-
-    Requirements: 4.1
-    """
-    import sqlalchemy as sa
-
-    wb = Workbook()
-    wb.remove(wb.active)
-
-    configs_to_export = _SHEET_CONFIGS
-    if sheet and sheet in _SHEET_CONFIGS:
-        configs_to_export = {sheet: _SHEET_CONFIGS[sheet]}
-
-    for sheet_key, config in configs_to_export.items():
-        ws = wb.create_sheet(title=config["title"][:31])
-        for col_idx, header in enumerate(config["headers"], 1):
-            ws.cell(row=1, column=col_idx, value=header)
-        _style_header_row(ws)
-
-        # 读取对应数据
-        item_id = f"N1-{sheet_key}-rows"
-        result = await db.execute(
-            sa.text(
-                "SELECT remark FROM checklist_responses "
-                "WHERE wp_id = :wp_id AND item_id = :item_id LIMIT 1"
-            ),
-            {"wp_id": wp_id, "item_id": item_id},
-        )
-        row = result.fetchone()
-        data_rows: list[dict] = []
-        if row and row.remark:
-            try:
-                data_rows = json.loads(row.remark)
-            except (json.JSONDecodeError, TypeError):
-                pass
-
-        for data_row in data_rows:
-            row_values = [data_row.get(f, "") or "" for f in config["fields"]]
-            ws.append(row_values)
-
-    buffer = io.BytesIO()
-    wb.save(buffer)
-    buffer.seek(0)
-    return buffer
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# 导入数据
-# ═══════════════════════════════════════════════════════════════════════════════
-
-
-async def import_data(
-    wp_id: str, file_content: bytes, db: Any, sheet: str | None = None
-) -> dict[str, Any]:
-    """解析上传的xlsx并写入checklist_responses
-
-    支持N1-2明细表导入。验证表头结构匹配。
-
-    Requirements: 4.1
-    """
-    import sqlalchemy as sa
-
-    if len(file_content) > 10 * 1024 * 1024:
-        raise ValueError("文件大小超过 10MB 限制")
-
-    try:
-        wb = load_workbook(io.BytesIO(file_content), read_only=True, data_only=True)
-    except Exception:
-        raise ValueError("无法解析xlsx文件")
-
-    imported_counts: dict[str, int] = {}
-    warnings: list[str] = []
-
-    for ws in wb.worksheets:
-        ws_title = ws.title.strip()
-
-        # 尝试匹配到配置
-        matched_config: dict[str, Any] | None = None
-        matched_key: str | None = None
-
-        for sheet_key, config in _SHEET_CONFIGS.items():
-            if config["title"][:31] == ws_title or sheet_key in ws_title:
-                matched_config = config
-                matched_key = sheet_key
-                break
-
-        if not matched_config or not matched_key:
-            continue
-
-        # 若指定了sheet，跳过不匹配的
-        if sheet and matched_key != sheet:
-            continue
-
-        # 读取表头
-        actual_headers: list[str] = []
-        for cell in next(ws.iter_rows(min_row=1, max_row=1)):
-            if cell.value is not None:
-                actual_headers.append(str(cell.value).strip())
-
-        # 校验表头结构
-        expected_headers = matched_config["headers"]
-        if actual_headers and actual_headers[:3] != expected_headers[:3]:
-            warnings.append(f"Sheet '{ws_title}' 表头结构不匹配，尝试按位置解析")
-
-        # 解析数据行
-        parsed_rows: list[dict] = []
-        for row_idx, row in enumerate(
-            ws.iter_rows(min_row=2, values_only=True), start=2
-        ):
-            if row_idx > _ROW_LIMIT + 1:
-                warnings.append(
-                    f"Sheet '{ws_title}' 超过 {_ROW_LIMIT} 行限制，已截断"
-                )
-                break
-            if all(cell is None or str(cell).strip() == "" for cell in row):
-                continue
-
-            row_data: dict[str, Any] = {"rowId": str(uuid4())}
-            fields = matched_config["fields"]
-            headers = matched_config["headers"]
-
-            for i, (header, field) in enumerate(zip(headers, fields)):
-                try:
-                    header_idx = actual_headers.index(header)
-                    raw_val = row[header_idx] if header_idx < len(row) else None
-                except (ValueError, IndexError):
-                    raw_val = row[i] if i < len(row) else None
-
-                if field in _NUMERIC_FIELDS:
-                    row_data[field] = _parse_num(raw_val)
-                else:
-                    row_data[field] = _safe_str(raw_val)
-
-            parsed_rows.append(row_data)
-
-        imported_counts[matched_key] = len(parsed_rows)
-
-        # 写入 checklist_responses
-        item_id = f"N1-{matched_key}-rows"
-        json_str = json.dumps(parsed_rows, ensure_ascii=False)
-        await db.execute(
-            sa.text(
-                "INSERT INTO checklist_responses (id, wp_id, item_id, remark) "
-                "VALUES (:id, :wp_id, :item_id, :remark) "
-                "ON CONFLICT (wp_id, item_id) DO UPDATE SET remark = :remark"
-            ),
-            {
-                "id": str(uuid4()),
-                "wp_id": wp_id,
-                "item_id": item_id,
-                "remark": json_str,
-            },
-        )
-
-    await db.flush()
-
-    return {
-        "imported_count": sum(imported_counts.values()),
-        "imported_counts": imported_counts,
-        "warnings": warnings,
-    }
+# N1-2 明细表的导入导出统一由 app/routers/n1_deferred_tax_assets.py 承载
+# （表头/字段/item_id/存储列与前端 useN1Detail 对齐）。
+# 此处原有第二套实现（item_id 拼成 "N1-N1-2-rows"、字段名与前端不一致、
+# INSERT 漏 project_id）为死代码且会误导后续维护，已删除。

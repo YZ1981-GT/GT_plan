@@ -8,17 +8,24 @@
  *    （债权单位名称/期末余额/未偿还原因），支持同步与手工行。
  * 披露文字通过 disclosure:note-text-updated(type='soe') 联动国企附注模块。
  */
-import { computed, onBeforeUnmount, ref, watch, type ComputedRef, type Ref } from 'vue'
+import { computed, inject, onBeforeUnmount, ref, watch, type ComputedRef, type Ref } from 'vue'
 import { parseNum, calcSubtotal } from './useF4AccPayFormulaEngine'
 import {
   aggregateF4Detail,
+  buildF4AgingDefaults,
   computeF4AdjudicationRow,
   migrateF4AdjRows,
-  F4_AGING_DEFAULTS,
   F4_NATURE_DEFAULTS,
 } from './useF4Adjudication'
 import { extractOverOneYearRows } from './useF4DisclosureListed'
 import type { ChecklistResponse } from './useF4FormData'
+import {
+  PRESET_SEGMENTS,
+  useAgingConfig,
+  DEFAULT_SUBJECT_PRESETS,
+  type AgingSegment,
+} from '@/composables/useAgingConfig'
+import { overOneYearRowKeys } from './f4AgingModel'
 
 export interface UseF4DisclosureSOEOptions {
   wpId: Ref<string>
@@ -89,6 +96,16 @@ export function useF4DisclosureSOE(options: UseF4DisclosureSOEOptions) {
   const importantStored = ref<StoredImportantRow[]>([])
   const disclosureText = ref('')
 
+  // ─── 账龄段（主入口 provide 优先） ──────────────────────────────────────────
+  const injectedSegments = inject<Ref<AgingSegment[]> | null>('f4AgingSegments', null)
+  const ownAgingConfig = injectedSegments ? null : useAgingConfig(options.projectId, 'F4')
+  const segments: ComputedRef<AgingSegment[]> = computed(() => {
+    const raw = injectedSegments?.value ?? ownAgingConfig?.segments.value ?? []
+    return raw.length
+      ? raw
+      : (PRESET_SEGMENTS[DEFAULT_SUBJECT_PRESETS.F4 ?? 'THREE_YEAR'] as AgingSegment[])
+  })
+
   watch(
     () => allResponses.value.get(IMPORTANT_ROWS_KEY)?.remark,
     (value) => {
@@ -107,8 +124,11 @@ export function useF4DisclosureSOE(options: UseF4DisclosureSOEOptions) {
 
   // ─── 按账龄披露：全联动F4-1按账龄分类 ────────────────────────────────────
   const agingRows: ComputedRef<F4SOEAgingDisclosureRow[]> = computed(() => {
-    const detail = aggregateF4Detail(allResponses.value.get(DETAIL_KEY)?.remark)
-    const stored = migrateF4AdjRows(allResponses.value.get(ADJ_AGING_KEY)?.remark, F4_AGING_DEFAULTS)
+    const detail = aggregateF4Detail(allResponses.value.get(DETAIL_KEY)?.remark, segments.value)
+    const stored = migrateF4AdjRows(
+      allResponses.value.get(ADJ_AGING_KEY)?.remark,
+      buildF4AgingDefaults(segments.value),
+    )
     return stored.map((row) => {
       const computed_ = computeF4AdjudicationRow(
         row,
@@ -148,7 +168,10 @@ export function useF4DisclosureSOE(options: UseF4DisclosureSOEOptions) {
 
   // ─── 账龄超过1年的重要应付账款：联动F4-5 ─────────────────────────────────
   const overOneYearSource = computed(() =>
-    extractOverOneYearRows(allResponses.value.get(LONG_OUTSTANDING_KEY)?.remark),
+    extractOverOneYearRows(
+      allResponses.value.get(LONG_OUTSTANDING_KEY)?.remark,
+      segments.value,
+    ),
   )
 
   const importantRows: ComputedRef<F4SOEImportantRow[]> = computed(() =>
@@ -174,14 +197,18 @@ export function useF4DisclosureSOE(options: UseF4DisclosureSOEOptions) {
     return overOneYearSource.value.filter((row) => !usedIds.has(row.rowId)).length
   })
 
-  /** 披露的1年以上账龄合计（来自按账龄区），用于与重要应付账款核对 */
-  const overOneYearAgingTotal = computed(() =>
-    calcSubtotal(
+  /**
+   * 披露的1年以上账龄合计（来自按账龄区），用于与重要应付账款核对。
+   * 「1 年以上」段由 `dayFrom >= 366` 派生（Property 4），**残差行 aging-other 不计入**（Property 5）。
+   */
+  const overOneYearAgingTotal = computed(() => {
+    const keys = new Set(overOneYearRowKeys(segments.value))
+    return calcSubtotal(
       agingRows.value
-        .filter((row) => row.rowKey !== 'within1year')
+        .filter((row) => keys.has(row.rowKey))
         .map((row) => row.closingBalance),
-    ),
-  )
+    )
+  })
 
   function syncFromLongOutstanding(): number {
     if (readonly.value) return 0
@@ -278,6 +305,7 @@ export function useF4DisclosureSOE(options: UseF4DisclosureSOEOptions) {
   })
 
   return {
+    segments,
     agingRows,
     agingClosingTotal,
     agingOpeningTotal,

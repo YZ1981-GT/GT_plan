@@ -75,11 +75,19 @@ async def _check_industry_applicability(ctx: RenderContext) -> tuple[bool, str]:
 
 
 async def _fetch_tb_data(ctx: RenderContext) -> dict:
-    """取科目1631+1632的期初/期末余额及未审数."""
+    """取科目1631+1632的期初/期末余额及未审数.
+
+    🔴 叶子过滤防父子双算：只汇总叶子科目（某code不是任何其它code前缀）。
+    """
     tb: dict[str, float] = {}
     try:
         active_filter = await get_active_filter(
             ctx.db, TbBalance.__table__, ctx.project_id, ctx.year
+        )
+        # 先拉全部 1631%/1632% 行
+        all_h5_filter = sa.or_(
+            TbBalance.account_code.like("1631%"),
+            TbBalance.account_code.like("1632%"),
         )
         result = await ctx.db.execute(
             sa.select(
@@ -88,10 +96,23 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict:
                 TbBalance.closing_balance,
                 TbBalance.debit_amount,
                 TbBalance.credit_amount,
-            ).where(active_filter)
+            ).where(sa.and_(active_filter, all_h5_filter))
         )
-        for row in result.fetchall():
+        rows_data = result.fetchall()
+
+        # 叶子判定：某 code 不是任何其它 code 的前缀
+        all_codes = {(r.account_code or "").strip() for r in rows_data}
+
+        def _is_leaf(code: str) -> bool:
+            for other in all_codes:
+                if other != code and other.startswith(code):
+                    return False
+            return True
+
+        for row in rows_data:
             code = (row.account_code or "").strip()
+            if not _is_leaf(code):
+                continue
             for prefix, (unadj_key, audited_key) in _H5_ACCOUNT_PREFIXES.items():
                 if code == prefix or code.startswith(prefix):
                     tb[f"{unadj_key}_opening"] = tb.get(f"{unadj_key}_opening", 0.0) + float(row.opening_balance or 0)

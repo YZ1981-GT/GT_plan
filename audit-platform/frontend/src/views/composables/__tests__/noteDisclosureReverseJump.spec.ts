@@ -144,11 +144,37 @@ describe('reverse map ↔ forward jump 一致性（single source of truth）', (
       ['K1', fwd.isK1OtherReceivableNoteSection],
       ['K11', fwd.isK11AssetImpairmentNoteSection],
       ['K13', fwd.isK13NonOperatingExpenseNoteSection],
+      ['N1', fwd.isN1DeferredTaxNoteSection],
     ]
     for (const [wp, pred] of checks) {
       const entry = DISCLOSURE_NOTE_SECTION_MAP[wp]
       expect(pred(entry.listed), `${wp} listed ${entry.listed}`).toBe(true)
       expect(pred(entry.soe), `${wp} soe ${entry.soe}`).toBe(true)
     }
+  })
+})
+
+// N1 递延所得税资产（与 N3 共用章节；反向仅导航，数据所有权见 spec Decision 1）
+describe('reverse jump · N1 递延所得税资产', () => {
+  it('maps N1 listed→五、30 soe→八、31 and builds routes', () => {
+    expect(DISCLOSURE_NOTE_SECTION_MAP.N1).toEqual({ listed: '五、30', soe: '八、31' })
+    expect((buildNoteJumpRoute('p1', 'N1', 'listed') as any).query)
+      .toEqual({ section: '五、30', noteTemplate: 'listed' })
+    expect((buildNoteJumpRoute('p1', 'N1', 'soe') as any).query)
+      .toEqual({ section: '八、31', noteTemplate: 'soe' })
+  })
+
+  it('携年度时带 year 参数；缺 projectId 返回 null', () => {
+    expect((buildNoteJumpRoute('p1', 'N1', 'soe', 2025) as any).query)
+      .toEqual({ section: '八、31', noteTemplate: 'soe', year: '2025' })
+    expect(buildNoteJumpRoute('', 'N1', 'listed')).toBeNull()
+  })
+
+  it('与 n1NoteSectionMap 的章节常量一致（单一真源）', async () => {
+    const { N1_NOTE_SECTION } = await import(
+      '@/components/workpaper/composables/n1NoteSectionMap'
+    )
+    expect(DISCLOSURE_NOTE_SECTION_MAP.N1.listed).toBe(N1_NOTE_SECTION.listed)
+    expect(DISCLOSURE_NOTE_SECTION_MAP.N1.soe).toBe(N1_NOTE_SECTION.soe)
   })
 })

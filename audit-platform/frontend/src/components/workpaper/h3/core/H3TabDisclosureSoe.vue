@@ -10,6 +10,14 @@
       <div class="mode-badge" :class="measurementModel === 'cost' ? 'mode-cost' : 'mode-fair'">
         {{ measurementModel === 'cost' ? '成本模式' : '公允价值模式' }}
       </div>
+      <div class="header-actions" style="display:flex;gap:8px;margin-left:auto">
+        <el-button size="small" type="success" :loading="syncLoading" :disabled="isReadonly" @click="syncToDisclosureNotes">
+          同步到附注
+        </el-button>
+        <el-button size="small" type="primary" plain @click="jumpToNote">
+          ↩ 跳转回附注（八、22）
+        </el-button>
+      </div>
     </div>
 
     <el-alert
@@ -559,10 +567,14 @@
  */
 import { ref, computed, inject, toRef } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useRouter } from 'vue-router'
 import { useH3Disclosure } from '../../composables/useH3Disclosure'
 import { useH3FormData } from '../../composables/useH3FormData'
 import { useH3CrossSheet } from '../../composables/useH3CrossSheet'
 import { eventBus } from '@/utils/eventBus'
+import http from '@/utils/http'
+import { buildH3SyncPayload, H3_NOTE_SECTION } from '../../composables/h3NoteSectionMap'
+import { buildNoteJumpRoute } from '@/views/composables/noteDisclosureReverseJump'
 
 const props = defineProps<{
   wpId: string
@@ -616,7 +628,48 @@ const fvHierarchyDiff = computed(() => {
 })
 
 function publishNoteTextUpdated(key: string) {
-  eventBus.emit('disclosure:note-text-updated', { wpCode: 'H3', section: key, timestamp: Date.now() })
+  eventBus.emit('disclosure:note-text-updated', {
+    wpCode: 'H3',
+    section: key,
+    accountCode: '1503',
+    projectId: props.projectId,
+    sectionIds: ['投资性房地产', '五、21', '八、22'],
+    timestamp: Date.now(),
+  })
+}
+
+// ─── 同步到附注 + 跳转回附注 ────────────────────────────────────────────────
+const router = useRouter()
+const syncLoading = ref(false)
+
+async function syncToDisclosureNotes() {
+  syncLoading.value = true
+  try {
+    const payload = buildH3SyncPayload({
+      variant: 'soe',
+      measurementModel: props.measurementModel,
+      costOriginalRows: getSectionRows('soe-cost'),
+      costDepRows: getSectionRows('soe-cost-dep'),
+      costImpairRows: getSectionRows('cost-impair'),
+      fairChangeRows: getSectionRows('soe-fair-change'),
+      sectionTexts: { ...sectionTexts },
+      projectId: props.projectId,
+      wpId: props.wpId,
+    })
+    await http.post(`/api/disclosure-notes/${props.projectId}/sync-from-workpaper`, payload)
+    ElMessage.success('已同步到附注（国企 八、22）')
+    publishNoteTextUpdated('sync-soe')
+  } catch (e: any) {
+    ElMessage.error('同步失败：' + (e?.response?.data?.message || e?.message || '未知错误'))
+  } finally {
+    syncLoading.value = false
+  }
+}
+
+function jumpToNote() {
+  const route = buildNoteJumpRoute(props.projectId, 'H3', 'soe')
+  if (route) router.push(route)
+  else ElMessage.info('无法定位附注章节')
 }
 
 function onRowChange(key: string, row: any) { updateRow(key, row) }

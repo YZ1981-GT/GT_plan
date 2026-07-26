@@ -142,6 +142,7 @@
         :project-id="props.projectId"
         :all-responses="allResponses"
         :is-readonly="isReadonly"
+        :variant="currentSheet === '附注国企' ? 'soe' : 'listed'"
       />
 
       <!-- 分析程序 -->
@@ -267,8 +268,9 @@
 /**
  * GtD2AccountsReceivable.vue — D2 应收账款底稿主入口
  */
-import { ref, computed, onMounted, onBeforeUnmount, provide, inject, toRef, defineAsyncComponent, nextTick } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, provide, inject, toRef, defineAsyncComponent, nextTick, type Ref } from 'vue'
 import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
+import { useAgingConfig } from '@/composables/useAgingConfig'
 import { useD2FormData, type ChecklistResponse } from './composables/useD2FormData'
 import { useD2CrossSheet } from './composables/useD2CrossSheet'
 import { useD2EntryDualMode, type D2RenderMode } from './composables/useD2EntryDualMode'
@@ -328,7 +330,15 @@ const formData = useD2FormData(toRef(props, 'wpId'), toRef(props, 'projectId'))
 const allResponses = computed(() => formData.allResponses.value)
 const saving = formData.saving
 
-const crossSheet = useD2CrossSheet({ allResponses })
+/**
+ * 项目账龄配置（枚举账龄：3年段 / 5年段 / 自定义）——D2 全部账龄口径的单一真源。
+ * 审定表/明细/分析/ECL/政策检查/披露表都消费这一份，禁止各 tab 自建段清单。
+ */
+const { segments: d2AgingSegments, preset: d2AgingPreset } = useAgingConfig(
+  toRef(props, 'projectId') as Ref<string>,
+  'D2',
+)
+const crossSheet = useD2CrossSheet({ allResponses, agingSegments: d2AgingSegments })
 
 // D2 只消费 GtWpRenderer 已初始化的版本能力，不再创建第二个 toolbar/Host。
 const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
@@ -434,6 +444,8 @@ provide('getThreadDot', getThreadDot)
 provide('getRowDot', getRowDot)
 
 provide('d2CrossSheet', crossSheet)
+provide('d2AgingSegments', d2AgingSegments)
+provide('d2AgingPreset', d2AgingPreset)
 provide('d2VersionTrailRef', runtime?.version.versionTrailRef)
 provide('d2OpenVersionHistory', openVersionHistory)
 

@@ -7,9 +7,12 @@ import { eventBus } from '@/utils/eventBus'
 import { H10_ACCOUNT_CODE } from './h10Constants'
 import {
   aggregateH10AdjustmentAjeRje,
+  aggregateH10AdjustmentByRow,
   applyH10AdjustmentWriteback,
   calcH10AdjustmentNet,
   parseH10AdjStore,
+  patchH10AdjRow,
+  type H10AdjRowStore,
 } from './h10AdjStorage'
 import { parseNum, isDebitCreditBalanced } from './useH10FormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
@@ -92,11 +95,28 @@ export function useH10Adjustment(opts: {
     const wb = aggregateH10AdjustmentAjeRje(list)
     opts.debouncedSave(H10_ADJ_OVERLAY_ID, { remark: JSON.stringify(wb) })
 
-    const store = parseH10AdjStore(opts.allResponses.value.get(ITEM_ID_ADJ_ROWS)?.remark)
-    const patched = applyH10AdjustmentWriteback(store, wb)
-    opts.debouncedSave(ITEM_ID_ADJ_ROWS, { remark: JSON.stringify(patched) })
+    // 按目标行分组回写（P1 智能推断：对方科目/摘要→分类行，不再全写 fixed_asset_disposal）
+    const grouped = aggregateH10AdjustmentByRow(list.map(r => ({
+      ...r,
+      summary: r.summary,
+      counterAccountCode: '', // TODO: 分录目前无对方科目字段，靠摘要推断
+    })))
+    let store: H10AdjRowStore = parseH10AdjStore(opts.allResponses.value.get(ITEM_ID_ADJ_ROWS)?.remark)
+    // 先清零所有行的 AJE/RJE（避免旧分配残留）
+    for (const key of Object.keys(store)) {
+      if (store[key]?.currentAje || store[key]?.currentRje) {
+        store = patchH10AdjRow(store, key, { currentAje: 0, currentRje: 0 })
+      }
+    }
+    // 按推断目标行分别写入
+    for (const g of grouped) {
+      store = patchH10AdjRow(store, g.rowKey, { currentAje: g.currentAje, currentRje: g.currentRje })
+    }
+    opts.debouncedSave(ITEM_ID_ADJ_ROWS, { remark: JSON.stringify(store) })
 
-    opts.applyAdjustmentToAdjudication?.(wb.currentAje, wb.currentRje)
+    const totalAje = grouped.reduce((s, g) => s + g.currentAje, 0)
+    const totalRje = grouped.reduce((s, g) => s + g.currentRje, 0)
+    opts.applyAdjustmentToAdjudication?.(totalAje, totalRje)
     publishAdjustmentEvents(list)
     try {
       window.dispatchEvent(new CustomEvent('h10:adjustment-writeback', { detail: wb }))
@@ -115,11 +135,9 @@ export function useH10Adjustment(opts: {
         accountName: '资产处置损益',
         description: `H10-3 ${entryType} 净额 ${amount}`,
       }
+      // 只走 eventBus，crossWpEventBridge 自动桥接 window（消除双投）
       try {
         eventBus.emit('adjustment:created', payload as any)
-      } catch { /* silent */ }
-      try {
-        window.dispatchEvent(new CustomEvent('adjustment:created', { detail: payload }))
       } catch { /* silent */ }
     }
     emitOne('AJE', wb.currentAje)

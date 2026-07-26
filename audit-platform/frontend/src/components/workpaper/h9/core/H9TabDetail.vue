@@ -16,7 +16,11 @@
 
     <!-- 工具栏 -->
     <div class="tab-toolbar">
-      <div class="toolbar-left"></div>
+      <div class="toolbar-left">
+        <el-button v-if="!isReadonly" size="small" type="warning" plain :loading="ledgerPulling" @click="handleLedgerPull">
+          📥 从序时账取数
+        </el-button>
+      </div>
       <div class="toolbar-right">
         <span class="chip-wrap"><GtIndexChip value="wp:H9-2" :context-project-id="props.projectId" /></span>
         <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
@@ -341,9 +345,10 @@
  * Requirements: 3.1-3.6
  */
 import { ref, toRef, inject } from 'vue'
-import { ElMessageBox } from 'element-plus'
+import { ElMessageBox, ElMessage } from 'element-plus'
 import { useH9Detail, type H9DetailRow } from '../../composables/useH9Detail'
 import { useH9ImportExport } from '../../composables/useH9ImportExport'
+import { fetchH9LedgerByLessor } from '../../composables/h9LedgerPull'
 import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
@@ -351,6 +356,7 @@ const props = defineProps<{
   projectId: string
   allResponses: Map<string, any>
   isReadonly: boolean
+  year?: number
 }>()
 
 const emit = defineEmits<{
@@ -418,6 +424,50 @@ async function handleAddRow() {
     confirmButtonText: '确认', cancelButtonText: '取消', inputPlaceholder: '如：XX房地产开发有限公司',
   })
   if (value) addRow(value)
+}
+
+// ─── 从序时账取数（科目2205按出租方聚合） ─────────────────────────────────
+const ledgerPulling = ref(false)
+
+async function handleLedgerPull() {
+  if (props.isReadonly || !props.projectId) return
+  ledgerPulling.value = true
+  try {
+    const year = props.year || new Date().getFullYear()
+    const ledgerRows = await fetchH9LedgerByLessor(props.projectId, year)
+    if (!ledgerRows.length) {
+      ElMessage.info('序时账中未找到科目2205的租赁相关分录，请确认试算表已导入')
+      return
+    }
+    const summary = `共找到 ${ledgerRows.length} 个出租方的租赁发生额数据（偿还/利息），是否合并到明细表？\n（仅填充空值，不覆盖已有数据）`
+    await ElMessageBox.confirm(summary, '从序时账取数', {
+      confirmButtonText: '合并', cancelButtonText: '取消', type: 'info',
+    })
+    const merged = mergeH9LedgerRows(rows.value, ledgerRows)
+    // 逐行通过 addRow/updateCell 方式合并（新行 addRow，已有行 updateCell）
+    for (const lr of ledgerRows) {
+      const nameKey = lr.lessor.trim().toLowerCase()
+      const existing = rows.value.find(r => String(r.lessor || '').trim().toLowerCase() === nameKey)
+      if (existing) {
+        // 仅填空值
+        if (!existing.repayment && lr.repayment) updateCell(existing.rowId, 'repayment', lr.repayment)
+        if (!existing.interestAccrued && lr.interestAccrued) updateCell(existing.rowId, 'interestAccrued', lr.interestAccrued)
+      } else {
+        // 新增行后设置字段
+        addRow(lr.lessor)
+        const newRow = rows.value[rows.value.length - 1]
+        if (newRow && lr.repayment) updateCell(newRow.rowId, 'repayment', lr.repayment)
+        if (newRow && lr.interestAccrued) updateCell(newRow.rowId, 'interestAccrued', lr.interestAccrued)
+      }
+    }
+    ElMessage.success(`已从序时账合并 ${ledgerRows.length} 个出租方数据`)
+  } catch (err: any) {
+    if (err !== 'cancel' && err?.message !== 'cancel') {
+      ElMessage.warning('从序时账取数失败，请稍后重试')
+    }
+  } finally {
+    ledgerPulling.value = false
+  }
 }
 
 function handleDelete(rowId: string) {

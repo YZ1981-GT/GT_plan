@@ -1,15 +1,16 @@
 /**
  * H1 固定资产披露表 ↔ 附注章节冻结映射
  *
- * 权威来源：
- * - 源 xlsx 上市表头「15、固定资产」→ 附注节「五、15」
- * - note_template_soe.json → section_number「八、22」固定资产
- * - note_template_listed 偶见「五、22」（历史编号），跳转时兼容识别
+ * 权威来源：`backend/data/note_template_variant_matrix.json`
+ *   account_key = gu_ding_zi_chan → listed_standalone/consolidated = 「五、22」，soe = 「八、22」
+ * DB 实证（disclosure_notes）：listed 的「五、22」= 固定资产；
+ *   listed 的「五、15」= **其他债权投资**（不可用于固定资产，误用会污染该章节）。
+ * 变体判定权威源 = projects.template_type + report_scope（applicable_standard_v2.entity_type 实测不可靠）。
  */
 export type H1DisclosureVariant = 'listed' | 'soe'
 
 export const H1_NOTE_SECTION = {
-  listed: '五、15',
+  listed: '五、22',
   soe: '八、22',
 } as const satisfies Record<H1DisclosureVariant, string>
 
@@ -94,13 +95,41 @@ export function resolveH1NoteSectionTarget(
   }
 }
 
+/**
+ * 是否像 H1 固定资产附注节。
+ * 纯编号一律**精确**匹配（禁 startsWith：五、22 ≠ 五、220；且「五、15」是其他债权投资不得命中）。
+ * 关键词兜底覆盖 soe 历史编号（五、9 / 四、固定资产 等 DB 实存变体）。
+ */
 export function isH1FixedAssetNoteSection(noteSection: string): boolean {
   const s = String(noteSection || '').trim()
   if (!s) return false
-  if (s === H1_NOTE_SECTION.soe || s.startsWith('八、22')) return true
-  if (s === H1_NOTE_SECTION.listed || s.startsWith('五、15')) return true
-  // 历史/模板编号兼容
-  if (s === '五、22' || s.startsWith('五、22')) return true
+  if (s === H1_NOTE_SECTION.soe || s === H1_NOTE_SECTION.listed) return true
   if (s === '固定资产' || (s.includes('固定资产') && !s.includes('清理') && !s.includes('在建'))) return true
   return false
+}
+
+/** 项目 template_type → 附注披露变体（权威变体源；未知返 null＝不做限制） */
+export function resolveH1VariantFromTemplateType(
+  templateType: string | null | undefined,
+): H1DisclosureVariant | null {
+  const t = String(templateType || '').trim().toLowerCase()
+  if (!t) return null
+  if (isListedStandard(t)) return 'listed'
+  if (isSoeStandard(t)) return 'soe'
+  return null
+}
+
+/**
+ * 由项目 template_type + report_scope 派生 current_standard（listed_standalone 等）。
+ * 变体不明时回退按 tab 自身 variant 的 standalone。
+ */
+export function resolveH1CurrentStandardFromProject(
+  variant: H1DisclosureVariant,
+  templateType: string | null | undefined,
+  reportScope: string | null | undefined,
+): string {
+  const base = resolveH1VariantFromTemplateType(templateType) ?? variant
+  const scope = String(reportScope || '').trim().toLowerCase()
+  const suffix = scope.includes('consol') ? 'consolidated' : 'standalone'
+  return `${base}_${suffix}`
 }

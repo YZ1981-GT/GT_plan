@@ -397,6 +397,10 @@ AGING_PERIOD_LABELS: dict[str, str] = {
 # 三期科目（含期末未审 current）：D2/K1/K3/G5/F1；两期科目（仅期初/期末审定）：D3
 _THREE_PERIOD_SUBJECTS = frozenset({"D2", "K1", "K3", "G5", "F1"})
 
+# 期末两期科目（期末未审 + 期末审定，**无期初账龄**）：F4 应付账款
+# （F4 源表 N:Q 为期末未审账龄、U:X 为期末审定账龄，落默认 [prior, audited] 会产错列头）
+_CLOSING_TWO_PERIOD_SUBJECTS = frozenset({"F4"})
+
 
 # 期间 key → DetailRow 中嵌套 aging 数据字段名
 _AGING_PERIOD_FIELD: dict[str, str] = {
@@ -410,10 +414,13 @@ def subject_aging_periods(subject: str) -> list[str]:
     """返回科目对应的账龄期间列表（有序）。
 
     - 三期科目（D2/K1/K3/G5/F1）：[prior, current, audited]
-    - 两期科目（D3）：[prior, audited]
+    - 期末两期科目（F4，无期初账龄）：[current, audited]
+    - 其余两期科目（D3）：[prior, audited]
     """
     if subject in _THREE_PERIOD_SUBJECTS:
         return ["prior", "current", "audited"]
+    if subject in _CLOSING_TWO_PERIOD_SUBJECTS:
+        return ["current", "audited"]
     return ["prior", "audited"]
 
 

@@ -10,7 +10,7 @@ import { useD2Analysis } from '../composables/useD2Analysis'
 import { useD2AiGenerate } from '../composables/useD2AiGenerate'
 import { useD2SaveInject } from '../composables/useD2SaveInject'
 import { useD2TabImportExport } from '../composables/useD2TabImportExport'
-import { useAgingConfig } from '@/composables/useAgingConfig'
+import { useAgingConfig, PRESET_SEGMENTS } from '@/composables/useAgingConfig'
 import type { useD2CrossSheet } from '../composables/useD2CrossSheet'
 import GtIndexChip from '../GtIndexChip.vue'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
@@ -61,28 +61,23 @@ function fmtRate(v: number): string {
 
 const crossSheet = inject<ReturnType<typeof useD2CrossSheet> | null>('d2CrossSheet', null)
 
+/**
+ * 账龄分布：手工录入优先；否则按**项目账龄配置段**（枚举账龄）从 D2-2 明细汇总。
+ * 段 key 由 crossSheet.agingFromDetail.segments 提供，无需 label→key 手工映射
+ * （旧映射表既有 3 套措辞，且「三年以上」映到不存在的 over3 → 3 年段项目金额恒 0）。
+ */
 const displayAging = computed(() => {
   if (indicators.value.agingDistribution.length > 0) return indicators.value.agingDistribution
-  const a = crossSheet?.agingFromDetail.value.audited
-  if (!a) {
-    // 无数据时按当前配置的账龄段显示空行
+  const src = crossSheet?.agingFromDetail.value
+  const segments = src?.segments ?? []
+  if (!src || segments.length === 0) {
     return agingBands.value.map(band => ({ band, amount: 0, ratio: 0 }))
   }
-  // 按配置的账龄段映射数据
-  const keyMap: Record<string, string> = {
-    '一年以内': 'within1Year', '1年以内': 'within1Year',
-    '一到二年': 'y1to2', '1-2年': 'y1to2',
-    '二到三年': 'y2to3', '2-3年': 'y2to3',
-    '三到四年': 'y3to4', '3-4年': 'y3to4',
-    '四到五年': 'y4to5', '4-5年': 'y4to5',
-    '五年以上': 'over5', '5年以上': 'over5',
-    '三年以上': 'over3',
-  }
-  const bands = agingBands.value.map(band => {
-    const key = keyMap[band]
-    const amount = key ? (a as any)[key] || 0 : 0
-    return { band, amount, ratio: 0 }
-  })
+  const bands = segments.map(seg => ({
+    band: seg.label,
+    amount: Number(src.audited?.[seg.key]) || 0,
+    ratio: 0,
+  }))
   const total = bands.reduce((s, b) => s + b.amount, 0)
   return bands.map(b => ({ ...b, ratio: total === 0 ? 0 : b.amount / total }))
 })
@@ -239,9 +234,7 @@ export interface AgingCompareRow {
   reason: string
 }
 
-const AGING_BANDS_DEFAULT = ['1年以内', '1-2年', '2-3年', '3-4年', '4-5年', '5年以上']
-const AGING_PRESET_3Y = ['一年以内', '一到二年', '二到三年', '三年以上']
-const AGING_PRESET_5Y = ['一年以内', '一到二年', '二到三年', '三到四年', '四到五年', '五年以上']
+const AGING_BANDS_DEFAULT = PRESET_SEGMENTS.FIVE_YEAR.map((seg) => seg.label)
 
 // 从项目设置的账龄配置获取账龄段（与D2-2明细表一致）
 const { segments: agingSegments, bands: agingConfigBands } = useAgingConfig(toRef(props, 'projectId'), 'D2')
@@ -253,28 +246,17 @@ function onAgingConfigChanged(): void {
 }
 window.addEventListener('aging-config:changed', onAgingConfigChanged)
 
+/**
+ * 账龄段标签 = 项目账龄配置（枚举账龄：3年段/5年段/自定义）单一真源。
+ * 已删除「从 D2-1 审定表 D2-adj-aging-mode 读取」的第二套口径（措辞与段 key 都与平台不一致）。
+ */
 const agingBands = computed(() => {
   // 触发依赖（aging-config:changed 事件时强制重算）
   void agingConfigVersion.value
-  // 优先使用项目账龄配置
   if (agingConfigBands.value && agingConfigBands.value.length > 0) {
     return agingConfigBands.value.map((b: any) => b.label || b.name || b)
   }
-  // 其次从D2-1审定表读
-  const mode = props.allResponses.get('D2-adj-aging-mode')?.remark || '5y'
-  if (mode === '3y') return AGING_PRESET_3Y
-  if (mode === 'custom') {
-    const json = props.allResponses.get('D2-adj-aging-custom-bands')?.remark
-    if (json) {
-      try {
-        const parsed = JSON.parse(json)
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.map((b: any) => b.label || '未命名')
-        }
-      } catch { /* fallback */ }
-    }
-  }
-  return AGING_PRESET_5Y
+  return PRESET_SEGMENTS.FIVE_YEAR.map((seg) => seg.label)
 })
 
 const agingCompareRows = ref<AgingCompareRow[]>([])

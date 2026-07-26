@@ -57,12 +57,17 @@ logger = logging.getLogger(__name__)
 # prior_year_note value 模式为单元格级取上年数）。数据源 source（trial_balance
 # 等）首遍已取数，不在此集合，evaluate_table 一律跳过不重复求值。
 FORMULA_FAMILY_SOURCES: frozenset[str] = frozenset(
-    {"sum", "report", "aging", "prior_year_note"}
+    {"sum", "report", "aging", "prior_year_note", "formula"}
 )
 
 # dispatch_resolver 未注册 sum/report/aging（Wave1 由 resolve_formula 直接承载），
 # 故这三者路由到 resolve_formula；其余（prior_year_note 等）走 dispatch_resolver。
-_RESOLVE_FORMULA_DIRECT: frozenset[str] = frozenset({"sum", "report", "aging"})
+# 'formula'（spec disclosure-note-formula-data-population 决策 3：source='formula'
+# + formula_kind 子类型）虽在 SOURCE_RESOLVERS 中，但同样直调 resolve_formula
+# 以复用其子类型分派。
+_RESOLVE_FORMULA_DIRECT: frozenset[str] = frozenset(
+    {"sum", "report", "aging", "formula"}
+)
 
 
 class NoteFormulaEvaluator:

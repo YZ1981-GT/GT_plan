@@ -20,6 +20,9 @@ export type D2AiSection =
   | 'bizmodel-note'
   | 'ecl-note'
   | 'baddebt-note'
+  // 附注披露（后端 _d2_ai_generate._SUPPORTED_SECTIONS 已支持）
+  | 'disclosure-note'
+  | 'disclosure-conclusion'
 
 export interface D2AiGenerateParams {
   section: D2AiSection

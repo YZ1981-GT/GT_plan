@@ -8,12 +8,28 @@
         <el-tag type="primary" size="small">上市 54×11</el-tag>
       </div>
       <div class="section-header-right">
+        <el-button
+          size="small"
+          type="success"
+          class="sync-btn"
+          :loading="syncing"
+          @click="syncToDisclosureNotes"
+        >
+          同步到附注（{{ N1_NOTE_SECTION.listed }}）
+        </el-button>
+        <el-dropdown split-button size="small" type="primary" @click="jumpToNote('listed')">
+          ↩ 跳转回附注（{{ N1_NOTE_SECTION.listed }}）
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item @click="jumpToNote('listed')">上市版（{{ N1_NOTE_SECTION.listed }}）</el-dropdown-item>
+              <el-dropdown-item @click="jumpToNote('soe')">国企版（{{ N1_NOTE_SECTION.soe }}）</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
         <el-button size="small" @click="handleAI('disclosure-listed')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
-        <el-button size="small" @click="handleReview">
-          <el-icon><Check /></el-icon> 复核
-        </el-button>
+        <GtReviewTrigger :section-id="`N1-附注上市-${N1_NOTE_SECTION.listed}`" label="💬 复核" />
       </div>
     </div>
 
@@ -202,31 +218,34 @@
           </el-button>
         </div>
       </template>
-      <el-table :data="lossExpiryRows" border size="small" style="width: 100%">
-        <el-table-column prop="year" label="亏损年度" width="100" align="center" />
-        <el-table-column label="亏损金额" width="140" align="right">
-          <template #default="{ row }">
-            <span>{{ fmtAmount(row.lossAmount) }}</span>
-          </template>
-        </el-table-column>
+      <!-- hasData=false 时提示待编制（Req 4.4） -->
+      <el-alert
+        v-if="!lossPayload.hasData"
+        type="info"
+        :closable="false"
+        show-icon
+        style="margin-bottom: 12px"
+      >
+        <template #title>
+          待 N1-5 编制
+        </template>
+        <template v-if="lossPayload.isLegacyEstimate" #default>
+          检测到旧版 N1-5 数据（推算值，非审计师确认／不确认录入），请完成 N1-5 新模型编制后刷新。
+        </template>
+      </el-alert>
+      <el-table v-if="lossExpiryRows.length > 0" :data="lossExpiryRows" border size="small" style="width: 100%">
         <el-table-column prop="expiryYear" label="到期年度" width="100" align="center" />
-        <el-table-column label="已弥补" width="130" align="right">
+        <el-table-column label="不确认金额" width="140" align="right">
           <template #default="{ row }">
-            <span>{{ fmtAmount(row.recovered) }}</span>
+            <span>{{ fmtAmount(row.unrecognized) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="未弥补" width="130" align="right">
+        <el-table-column label="上期不确认金额" width="140" align="right">
           <template #default="{ row }">
-            <span :class="{ 'warning-amount': row.isExpired }">{{ fmtAmount(row.unrecovered) }}</span>
+            <span>{{ fmtAmount(row.priorUnrecognized) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="是否到期" width="90" align="center">
-          <template #default="{ row }">
-            <el-tag :type="row.isExpired ? 'danger' : 'success'" size="small">
-              {{ row.isExpired ? '已到期' : '未到期' }}
-            </el-tag>
-          </template>
-        </el-table-column>
+        <el-table-column prop="reason" label="不确认原因/依据" min-width="200" />
       </el-table>
     </el-card>
 
@@ -254,6 +273,26 @@
           <span>N1-4测算表同源产出资产/负债两部分</span>
         </el-descriptions-item>
       </el-descriptions>
+    </el-card>
+
+    <!-- ═══ 披露说明与结论 ═══ -->
+    <el-card shadow="never" class="disclosure-card">
+      <template #header>
+        <div class="card-header">
+          <span>六、披露说明与结论</span>
+          <el-button size="small" @click="handleAI('conclusion')">
+            <el-icon><MagicStick /></el-icon> AI
+          </el-button>
+        </div>
+      </template>
+      <el-input
+        v-model="conclusionNote"
+        type="textarea"
+        :autosize="{ minRows: 3, maxRows: 8 }"
+        :disabled="isReadonly"
+        placeholder="说明递延所得税资产确认依据、未确认原因及披露完整性核对结论..."
+        @change="handleConclusionChange"
+      />
     </el-card>
 
     <!-- ═══ 编制提示 ═══ -->
@@ -292,12 +331,26 @@
  * - Publish 'disclosure:note-text-updated'
  * - AI辅助按钮 per section
  */
-import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
-import { Check } from '@element-plus/icons-vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import { MagicStick } from '@element-plus/icons-vue'
+// @ts-ignore
+import GtReviewTrigger from '../../GtReviewTrigger.vue'
+import http from '@/utils/http'
 import { eventBus } from '@/utils/eventBus'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import { useN1FormData } from '../../composables/useN1FormData'
 import { useN1CrossSheet } from '../../composables/useN1CrossSheet'
-import { calcAssetEndBalance } from '../../composables/useN1FormulaEngine'
+import { N1_NOTE_SECTION, buildN1SyncPayload } from '../../composables/n1NoteSectionMap'
+import { generateN1Text } from '../../composables/useN1AiText'
+import {
+  deriveDisclosureDetailRows,
+  deriveDisclosureLossRows,
+  deriveUnrecognizedFromLoss,
+  deriveUnrecognizedLossPayload,
+} from '../../composables/useN1DisclosureSource'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -305,15 +358,15 @@ const props = defineProps<{
   wpId: string
   projectId: string
   isReadonly: boolean
+  /** 审计年度（决定亏损弥补期限届满判断；缺省回退当前年） */
+  year?: number
 }>()
 
 const emit = defineEmits<{
   (e: 'navigate', sheetName: string): void
 }>()
 
-// ─── Inject ──────────────────────────────────────────────────────────────────
-
-const openReviewDialog = inject<((sectionId: string, sectionLabel?: string) => void) | null>('openReviewDialog', null)
+// 复核入口由 GtReviewTrigger 内部 inject('openReviewDialog') 承载，本组件不再自持
 
 // ─── FormData ────────────────────────────────────────────────────────────────
 
@@ -332,6 +385,7 @@ const deferredTaxChange = computed(() => crossSheet.deferredTaxChange.value)
 
 const isReadonly = computed(() => props.isReadonly ?? false)
 const conclusionNote = ref('')
+const aiLoading = ref(false)
 
 // ─── Section 1: 已确认递延所得税资产明细 (from N1-2 rows) ────────────────────
 
@@ -347,30 +401,16 @@ interface RecognizedRow {
 }
 
 const recognizedRows = computed<RecognizedRow[]>(() => {
-  const resp = formData.allResponses.value.get('N1-2-rows')
-  let rows: RecognizedRow[] = []
-
-  if (resp?.conclusion) {
-    try {
-      const parsed = JSON.parse(resp.conclusion)
-      if (Array.isArray(parsed)) {
-        rows = parsed.map((r: any) => {
-          const begin = Number(r.beginDeferredTaxAsset ?? r.beginBalance ?? 0)
-          const recognized = Number(r.currentRecognized ?? r.recognized ?? 0)
-          const reversed = Number(r.currentReversed ?? r.reversed ?? 0)
-          return {
-            item: r.item || r.projectName || '—',
-            deductibleDiff: Number(r.deductibleDiff ?? r.temporaryDifference ?? 0),
-            taxRate: Number(r.taxRate ?? r.applicableTaxRate ?? 0.25),
-            beginBalance: begin,
-            recognized,
-            reversed,
-            endBalance: calcAssetEndBalance(begin, recognized, reversed),
-          }
-        })
-      }
-    } catch { /* fallback empty */ }
-  }
+  // 从 N1-2 明细「原始行」派生（真源键 N1-2-detail-rows，派生金额用同一 engine 重算）
+  let rows: RecognizedRow[] = deriveDisclosureDetailRows(formData.allResponses.value).map((r) => ({
+    item: r.item,
+    deductibleDiff: r.deductibleDiff,
+    taxRate: r.taxRate,
+    beginBalance: r.beginBalance,
+    recognized: r.recognized,
+    reversed: r.reversed,
+    endBalance: r.endBalance,
+  }))
 
   // 若无数据，使用默认分类结构（对齐源模板附注(1)已确认递延所得税资产 7 类）
   if (rows.length === 0) {
@@ -443,24 +483,53 @@ const movementRows = computed<MovementRow[]>(() => {
 
 interface UnrecognizedRow {
   item: string
-  amount: number
-  unrecognizedAsset: number
+  amount: number | null
+  unrecognizedAsset: number | null
   reason: string
 }
 
+/** N1-5 新模型取数（Req 4.1 / 4.4 / 4.5） */
+const lossPayload = computed(() =>
+  deriveUnrecognizedLossPayload(formData.allResponses.value),
+)
+
 const unrecognizedRows = computed<UnrecognizedRow[]>(() => {
   const resp = formData.allResponses.value.get('N1-disclosure-listed-unrecognized')
+  let saved: UnrecognizedRow[] | null = null
   if (resp?.conclusion) {
     try {
       const parsed = JSON.parse(resp.conclusion)
-      if (Array.isArray(parsed)) return parsed
+      if (Array.isArray(parsed)) saved = parsed
     } catch { /* fallback */ }
   }
-  // 默认结构
-  return [
+
+  // 可弥补亏损未确认部分改由 deriveUnrecognizedLossPayload 供数（Req 4.1）
+  // hasData = false 时金额传 null（不写 0，buildN1SyncPayload 的 nz() 保证不塌 0）
+  const payload = lossPayload.value
+  const lossAmount: number | null = payload.hasData ? payload.totalUnrecognized : null
+  // 未确认递延税资产 ≈ 不确认金额 × 适用税率（默认 25%，与审定表一致）
+  const lossAsset: number | null = lossAmount != null
+    ? Math.round(lossAmount * 0.25 * 100) / 100
+    : null
+
+  const base: UnrecognizedRow[] = saved ?? [
     { item: '未确认的可抵扣暂时性差异', amount: 0, unrecognizedAsset: 0, reason: '' },
-    { item: '未确认的可弥补亏损', amount: 0, unrecognizedAsset: 0, reason: '' },
+    { item: '未确认的可弥补亏损', amount: null, unrecognizedAsset: null, reason: '' },
   ]
+
+  return base.map((r) =>
+    r.item.includes('可弥补亏损')
+      ? {
+          ...r,
+          // N1-5 新模型供数（Req 4.1）；hasData=false 时 null
+          amount: lossAmount,
+          unrecognizedAsset: lossAsset,
+          reason: payload.hasData && payload.rows.length > 0
+            ? payload.rows.map(lr => lr.reason).filter(Boolean).join('；') || r.reason
+            : r.reason,
+        }
+      : r,
+  )
 })
 
 function updateUnrecognizedReason(index: number, val: string) {
@@ -471,35 +540,23 @@ function updateUnrecognizedReason(index: number, val: string) {
   }
 }
 
-// ─── Section 4: 可弥补亏损到期明细 ───────────────────────────────────────────
+// ─── Section 4: 可弥补亏损到期明细（改由 deriveUnrecognizedLossPayload 供数）──
 
 interface LossExpiryRow {
-  year: string
-  lossAmount: number
   expiryYear: string
-  recovered: number
-  unrecovered: number
-  isExpired: boolean
+  unrecognized: number
+  priorUnrecognized: number
+  reason: string
 }
 
+/** 审计年度（决定弥补期限届满判断）：props.year 优先，回退当前年 */
+const auditYear = computed(() => props.year || new Date().getFullYear())
+
 const lossExpiryRows = computed<LossExpiryRow[]>(() => {
-  const resp = formData.allResponses.value.get('N1-5-loss-expiry-rows')
-  if (resp?.conclusion) {
-    try {
-      const parsed = JSON.parse(resp.conclusion)
-      if (Array.isArray(parsed)) {
-        return parsed.map((r: any) => ({
-          year: r.year || r.lossYear || '—',
-          lossAmount: Number(r.lossAmount ?? 0),
-          expiryYear: r.expiryYear || r.compensationDeadline || '—',
-          recovered: Number(r.recovered ?? r.compensated ?? 0),
-          unrecovered: Number(r.unrecovered ?? r.uncompensated ?? 0),
-          isExpired: Boolean(r.isExpired),
-        }))
-      }
-    } catch { /* fallback */ }
-  }
-  return []
+  // 新取数：deriveUnrecognizedLossPayload 按到期年度聚合不确认口径行（Req 4.1）
+  const payload = lossPayload.value
+  if (!payload.hasData) return []
+  return payload.rows
 })
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -520,30 +577,150 @@ function fmtPercent(val: number): string {
 
 // ─── Note changes + publish ──────────────────────────────────────────────────
 
-function handleConclusionChange() {
-  formData.debouncedSave('N1-disclosure-listed-conclusion', { remark: conclusionNote.value || null })
+/**
+ * 附注章节（权威源 note_template_variant_matrix.json）：
+ * 递延所得税资产和递延所得税负债 → 上市 五、30 / 国企 八、31（N1 与 N3 共节）。
+ * 载荷必须带 accountCode/projectId/sectionIds，否则附注模块 useNoteRefresh
+ * 的定向刷新匹配不到（只带 wpCode/section 命不中）。
+ */
+const N1_NOTE_SECTION_LISTED = N1_NOTE_SECTION.listed
+
+function _emitNoteUpdated(section: string, text?: string) {
   eventBus.emit('disclosure:note-text-updated', {
     wpCode: 'N1',
-    section: 'conclusion-listed',
+    section,
+    accountCode: '1811',
+    projectId: props.projectId,
+    sectionIds: [N1_NOTE_SECTION_LISTED],
+    ...(text !== undefined ? { text } : {}),
     timestamp: Date.now(),
-  })
+  } as any)
+}
+
+function handleConclusionChange() {
+  formData.debouncedSave('N1-disclosure-listed-conclusion', { remark: conclusionNote.value || null })
+  _emitNoteUpdated('conclusion-listed', conclusionNote.value)
+}
+
+// ─── 同步到附注（结构化推送，owner=N1，见 n1NoteSectionMap 顶部所有权说明） ──
+
+const router = useRouter()
+const auditCtx = useAuditContext()
+const syncing = ref(false)
+
+/** 推送年度：props.year 优先（父入口传审计年度），回退审计上下文；不依赖后端默认自然年 */
+const syncYear = computed(() => props.year || auditCtx.year.value || new Date().getFullYear())
+
+function buildSnapshot() {
+  const assetRows = recognizedRows.value
+    .filter((r) => !r._isTotal)
+    .map((r) => ({ item: r.item, endBalance: r.endBalance, priorBalance: r.beginBalance }))
+  // 负债段（业务上属 N3）：取 N1-4 测算表负债部分；取不到 → null（不填 0）
+  const liabEnd = n1ToN3.value.liabilityPart
+  return {
+    assetRows,
+    liabilitySubtotal: {
+      endBalance: liabEnd ? liabEnd : null,
+      priorBalance: null,
+    },
+    unrecognizedRows: unrecognizedRows.value.map((r) => ({ item: r.item, amount: r.amount })),
+    lossExpiryRows: lossExpiryRows.value.map((r) => ({
+      expiryYear: r.expiryYear,
+      unrecovered: r.unrecovered,
+    })),
+    notes: { conclusion: conclusionNote.value },
+  }
+}
+
+async function syncToDisclosureNotes() {
+  if (!props.projectId) {
+    ElMessage.warning('缺少项目上下文，无法同步')
+    return
+  }
+  syncing.value = true
+  try {
+    const payload = buildN1SyncPayload('listed', buildSnapshot(), {
+      wpId: props.wpId,
+      year: syncYear.value,
+    })
+    const resp: any = await http.post(
+      `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,
+      payload,
+    )
+    const data = resp?.data?.data ?? resp?.data
+    if (data?.success) {
+      ElMessage.success(
+        `已${data.created ? '新建' : '更新'}附注 ${data.section_id}：${data.rows_synced} 行`
+        + (data.texts_synced ? `，正文 ${data.texts_synced} 段` : ''),
+      )
+      if (!n1ToN3.value.liabilityPart) {
+        ElMessage.info('负债段暂无数据，待 N3 递延所得税负债编制后重新同步')
+      }
+      _emitNoteUpdated('sync-listed')
+    } else {
+      ElMessage.error('附注同步返回异常，请重试')
+    }
+  } catch (err: any) {
+    // 快速重复点击导致的请求取消不算失败
+    if (err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError' || err?.__CANCEL__) return
+    ElMessage.error(`附注同步失败：${err?.response?.data?.detail || err?.message || '未知错误'}`)
+  } finally {
+    syncing.value = false
+  }
+}
+
+/** 反向跳转：披露表 → 附注章节（仅导航，不改数据） */
+function jumpToNote(variant: DisclosureVariant) {
+  const route = buildNoteJumpRoute(props.projectId || '', 'N1', variant, syncYear.value)
+  if (!route) {
+    ElMessage.warning('缺少项目上下文，无法跳转附注')
+    return
+  }
+  router.push(route)
 }
 
 // ─── AI / 复核 ──────────────────────────────────────────────────────────────
 
-function handleAI(section: string) {
-  import('@/utils/http').then(({ default: h }) => {
-    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+/**
+ * AI 辅助（真回填）。
+ * - `conclusion` → 回填披露说明与结论并持久化；其余区段 → 顾问式弹窗
+ * - context 值全部转字符串（后端 dict[str,str]，此前传 wpId/对象导致 422 静默失败）
+ */
+async function handleAI(section: string) {
+  if (aiLoading.value) return
+  aiLoading.value = true
+  try {
+    const text = await generateN1Text({
+      wpId: props.wpId,
       section: `n1-disclosure-listed-${section}`,
-      prompt: `请基于递延所得税资产底稿"${section}"区段数据，给出审计分析建议`,
-      context: { section, wpId: props.wpId },
-    }).catch(() => {})
-  })
+      prompt:
+        section === 'conclusion'
+          ? '请撰写上市公司递延所得税资产附注披露说明与结论：确认依据、未确认递延所得税资产的可抵扣暂时性差异及可弥补亏损的原因、与审定表/明细表的勾稽是否一致、披露完整性。'
+          : `请基于递延所得税资产附注（上市公司）"${section}"区段数据给出披露复核建议（列示口径、抵销与分列、与底稿勾稽）。`,
+      context: {
+        章节: N1_NOTE_SECTION.listed,
+        审计年度: String(syncYear.value ?? ''),
+        递延税资产合计: String(n1ToN3.value.assetPart),
+        递延税负债合计: String(n1ToN3.value.liabilityPart),
+        本期变动额: String(deferredTaxChange.value.change),
+      },
+      existingContent: section === 'conclusion' ? conclusionNote.value : '',
+    })
+    if (!text) return
+    if (section === 'conclusion') {
+      conclusionNote.value = text
+      handleConclusionChange()
+      ElMessage.success('AI 已生成披露说明与结论')
+    } else {
+      const { ElMessageBox } = await import('element-plus')
+      await ElMessageBox.alert(text, 'AI 披露复核建议', { confirmButtonText: '知道了' }).catch(() => {})
+    }
+  } finally {
+    aiLoading.value = false
+  }
 }
 
-function handleReview() {
-  openReviewDialog?.('N1-disclosure-listed', '附注披露（上市）')
-}
+// 复核入口改用 GtReviewTrigger（自带蓝/红点，内部 inject openReviewDialog）
 
 // ─── 数据恢复 ────────────────────────────────────────────────────────────────
 
@@ -557,12 +734,7 @@ function restoreData(): void {
 function onAdjudicatedRefresh() {
   formData.loadData().then(() => {
     restoreData()
-    // Publish disclosure updated event
-    eventBus.emit('disclosure:note-text-updated', {
-      wpCode: 'N1',
-      section: 'auto-refresh-listed',
-      timestamp: Date.now(),
-    })
+    _emitNoteUpdated('auto-refresh-listed')
   })
 }
 

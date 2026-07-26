@@ -7,7 +7,7 @@
     <template v-else>
       <div v-if="showHtmlToolbar" class="i2-header-toolbar">
         <el-segmented
-          v-model="currentMode"
+          :model-value="currentMode"
           :options="modeOptions"
           size="small"
           @change="onModeChange"

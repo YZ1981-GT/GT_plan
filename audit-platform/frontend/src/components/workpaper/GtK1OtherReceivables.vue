@@ -9,7 +9,7 @@
       <div v-if="isHtmlSheet && currentSheet !== 'K1'" class="k1-header-toolbar">
         <el-segmented
           v-if="dualMode.isOoAvailable.value"
-          v-model="dualMode.currentMode.value"
+          :model-value="dualMode.currentMode.value"
           :options="dualMode.modeOptions"
           size="small"
           @change="dualMode.onModeChange"

@@ -62,8 +62,16 @@ def _alias_tb_keys(tb: dict[str, float]) -> dict[str, float]:
     return tb
 
 
+def _is_leaf(code: str, all_codes: set[str]) -> bool:
+    """判定该科目是否为叶子节点（不是任何其它科目的前缀）。防止父子双算。"""
+    for other in all_codes:
+        if other != code and other.startswith(code):
+            return False
+    return True
+
+
 async def _fetch_tb_data(ctx: RenderContext) -> dict:
-    """取科目1604/1605的期初/期末余额及未审数/审定数."""
+    """取科目1604/1605的期初/期末余额及未审数/审定数（只取叶子防双算）."""
     tb: dict[str, float] = {}
     try:
         active_filter = await get_active_filter(
@@ -78,8 +86,22 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict:
                 TbBalance.credit_amount,
             ).where(active_filter)
         )
-        for row in result.fetchall():
+        all_rows = result.fetchall()
+        # 收集 1604/1605 前缀下的全部科目码，用于叶子判定
+        h2_codes: set[str] = set()
+        for row in all_rows:
             code = (row.account_code or "").strip()
+            for prefix in _H2_ACCOUNT_PREFIXES:
+                if code == prefix or code.startswith(prefix):
+                    h2_codes.add(code)
+                    break
+        # 只累加叶子科目（防父子双算）
+        for row in all_rows:
+            code = (row.account_code or "").strip()
+            if code not in h2_codes:
+                continue
+            if not _is_leaf(code, h2_codes):
+                continue
             for prefix, (unadj_key, _audited_key) in _H2_ACCOUNT_PREFIXES.items():
                 if code == prefix or code.startswith(prefix):
                     tb[f"{unadj_key}_opening"] = tb.get(f"{unadj_key}_opening", 0.0) + float(row.opening_balance or 0)
@@ -169,6 +191,44 @@ async def _load_project_context(ctx: RenderContext) -> dict:
     return project_ctx
 
 
+async def _build_h2_detail_prefill(ctx: RenderContext) -> list[dict]:
+    """从 tb_balance 1604% 叶子科目构建 H2-2 明细行种子（Persist_First 由前端控制）。"""
+    try:
+        active_filter = await get_active_filter(
+            ctx.db, TbBalance.__table__, ctx.project_id, ctx.year
+        )
+        result = await ctx.db.execute(
+            sa.select(
+                TbBalance.account_code,
+                TbBalance.opening_balance,
+                TbBalance.closing_balance,
+            ).where(active_filter)
+        )
+        all_rows = result.fetchall()
+        codes_1604: set[str] = set()
+        for row in all_rows:
+            code = (row.account_code or "").strip()
+            if code == "1604" or code.startswith("1604"):
+                codes_1604.add(code)
+        prefill: list[dict] = []
+        for row in all_rows:
+            code = (row.account_code or "").strip()
+            if code not in codes_1604:
+                continue
+            if not _is_leaf(code, codes_1604):
+                continue
+            opening = abs(float(row.opening_balance or 0))
+            closing = abs(float(row.closing_balance or 0))
+            if opening < 0.005 and closing < 0.005:
+                continue
+            name = code[4:].lstrip(".") if len(code) > 4 else code
+            prefill.append({"name": name, "cipBegin": opening, "cipEnd": closing, "category": "自动种子"})
+        return prefill
+    except Exception as e:  # noqa: BLE001
+        logger.warning("H2 detail prefill failed: %s", e)
+        return []
+
+
 async def render(ctx: RenderContext) -> dict | None:
     """H2在建工程渲染策略：allResponses + projectContext + TB数据."""
     responses_snapshot: dict = {}
@@ -190,6 +250,7 @@ async def render(ctx: RenderContext) -> dict | None:
 
     tb_values = await _fetch_tb_data(ctx)
     project_context = await _load_project_context(ctx)
+    detail_prefill = await _build_h2_detail_prefill(ctx)
 
     return {
         "component_type": "h2-construction-in-progress",
@@ -197,6 +258,7 @@ async def render(ctx: RenderContext) -> dict | None:
         "responses_snapshot": responses_snapshot,
         "tb_values": tb_values,
         "project_context": project_context,
+        "detail_prefill": detail_prefill,
         "prefix": "H2",
         "sheets": H2_SHEETS,
     }

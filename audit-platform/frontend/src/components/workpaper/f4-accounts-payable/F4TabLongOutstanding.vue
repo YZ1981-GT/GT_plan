@@ -8,7 +8,6 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import { api } from '@/services/apiProxy'
 import {
-  F4_LONG_AGING_OPTIONS,
   F4_YES_NO_OPTIONS,
   useF4LongOutstanding,
   type F4LongOutstandingOcrFields,
@@ -35,6 +34,7 @@ const {
   summary,
   filledCount,
   pendingSyncCount,
+  agingOptions,
   auditNote,
   auditConclusion,
   loadRows,
@@ -323,7 +323,7 @@ async function uploadAndRecognize(file: File): Promise<void> {
               clearable
               @change="(value: string) => updateCell(row.rowId, 'aging', value)"
             >
-              <el-option v-for="option in F4_LONG_AGING_OPTIONS" :key="option" :label="option" :value="option" />
+              <el-option v-for="option in agingOptions" :key="option" :label="option" :value="option" />
             </el-select>
             <span v-else>{{ row.aging }}</span>
           </template>

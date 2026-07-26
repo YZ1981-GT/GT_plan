@@ -3,16 +3,16 @@
   "version": "2025-R1",
   "generated_by": "backend/scripts/seed/seed_formula_presets.py",
   "summary": {
-    "total_pages": 154,
-    "total_formulas": 2533,
+    "total_pages": 232,
+    "total_formulas": 3939,
     "by_scope": {
       "note": {
-        "pages": 59,
-        "formula_count": 1551
+        "pages": 131,
+        "formula_count": 2607
       },
       "report": {
-        "pages": 1,
-        "formula_count": 7
+        "pages": 7,
+        "formula_count": 357
       },
       "workpaper": {
         "pages": 94,
@@ -21,6 +21,105 @@
     }
   },
   "pages": [
+    {
+      "page_key": "note:三、在合营安排或联营",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 6,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:三、在未纳入合并财务",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 1,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:三、工程物资【不适用",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:三、现金流量表项目注",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:三、计入递延收益的政",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 18,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:三、采用净额法冲减相",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 6,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:三、金融资产转移",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 24,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:三、长期待摊费用",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 5,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:三、长期股权投资",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:三、预计负债",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:三、风险管理目标和政",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 4,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
     {
       "page_key": "note:五、0",
       "scope": "note",
@@ -34,306 +133,366 @@
       "page_key": "note:五、1",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 92,
+      "formula_count": 95,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、10",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 30,
+      "formula_count": 47,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、11",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 28,
+      "formula_count": 41,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、12",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 42,
+      "formula_count": 47,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、13",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 12,
+      "formula_count": 15,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、14",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 54,
+      "formula_count": 85,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、15",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 43,
+      "formula_count": 72,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、16",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 30,
+      "formula_count": 46,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、17",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 35,
+      "formula_count": 40,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、18",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 8,
+      "formula_count": 15,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、19",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 6,
+      "formula_count": 7,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、2",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 32,
+      "formula_count": 35,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、20",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 38,
+      "formula_count": 41,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、21",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 56,
+      "formula_count": 57,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、22",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 40,
+      "formula_count": 48,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、23",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 17,
+      "formula_count": 24,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、24",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 10,
+      "formula_count": 11,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、25",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 16,
+      "formula_count": 17,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、26",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 44,
+      "formula_count": 45,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、27",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 13,
+      "formula_count": 14,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、28",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 14,
+      "formula_count": 23,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、29",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 8,
+      "formula_count": 13,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、3",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 16,
+      "formula_count": 17,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、30",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 20,
+      "formula_count": 29,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、31",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 7,
+      "formula_count": 10,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、32",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 8,
+      "formula_count": 11,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、33",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 7,
+      "formula_count": 10,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、34",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 6,
+      "formula_count": 14,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、35",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 8,
+      "formula_count": 9,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、36",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 16,
+      "formula_count": 19,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、37",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 16,
+      "formula_count": 19,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、38",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 15,
+      "formula_count": 18,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、39",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 28,
+      "formula_count": 31,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、4",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 85,
+      "formula_count": 112,
       "sources": [
         "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check",
         "note_report_reconciliation"
       ]
     },
@@ -341,99 +500,121 @@
       "page_key": "note:五、40",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 12,
+      "formula_count": 48,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、41",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 40,
+      "formula_count": 43,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、42",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 6,
+      "formula_count": 15,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、43",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 31,
+      "formula_count": 36,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、44",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 6,
+      "formula_count": 9,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、45",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 8,
+      "formula_count": 13,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、46",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 18,
+      "formula_count": 25,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、47",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 9,
+      "formula_count": 12,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、48",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 20,
+      "formula_count": 25,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、49",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 28,
+      "formula_count": 34,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、5",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 90,
+      "formula_count": 110,
       "sources": [
         "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check",
         "note_report_reconciliation"
       ]
     },
@@ -441,126 +622,754 @@
       "page_key": "note:五、50",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 6,
+      "formula_count": 9,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、51",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 22,
+      "formula_count": 28,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、52",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 6,
+      "formula_count": 7,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、53",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 9,
+      "formula_count": 10,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、54",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 8,
+      "formula_count": 14,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、55",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 10,
+      "formula_count": 17,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、56",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 8,
+      "formula_count": 9,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、57",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 30,
+      "formula_count": 33,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、58",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 18,
+      "formula_count": 26,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、59",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 9,
+      "sources": [
+        "note_formula_derivation",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、6",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 27,
+      "formula_count": 33,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、60",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 1,
+      "sources": [
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、61",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 1,
+      "sources": [
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、7",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 40,
+      "formula_count": 45,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:五、71",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:五、74",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 4,
+      "sources": [
+        "note_formula_derivation"
       ]
     },
     {
       "page_key": "note:五、8",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 139,
+      "formula_count": 170,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
       ]
     },
     {
       "page_key": "note:五、9",
       "scope": "note",
       "preset_status": "presetted",
-      "formula_count": 56,
+      "formula_count": 67,
       "sources": [
-        "check_presets"
+        "check_presets",
+        "note_formula_derivation",
+        "note_report_cross_check"
+      ]
+    },
+    {
+      "page_key": "note:八、10",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 16,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、12",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 10,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、13",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、14",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、15",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 14,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、17",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 8,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、18",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 18,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、2",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、21",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 32,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、22",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 18,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、23",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 6,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、24",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 16,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、25",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 13,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、26",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 16,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、27",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 12,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、28",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 5,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、30",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、31",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 8,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、32",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、33",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、34",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 5,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、36",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、37",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、38",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、4",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 20,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、40",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 34,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、41",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、42",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 8,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、43",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 3,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、44",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、45",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、48",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、49",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 6,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、5",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 14,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、50",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、51",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 8,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、53",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 16,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、54",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 8,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、55",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、56",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 5,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、57",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、6",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、60",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 7,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、61",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 7,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、62",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 9,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、7",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 4,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、81",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 3,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、9",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 23,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:八、91",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 2,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:十二、其他应收款",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 23,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:十二、应收账款",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 14,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:十二、长期股权投资",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 15,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:十六、其他应收款",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 30,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:十六、应收票据",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 18,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:十六、应收账款",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 19,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "note:十六、长期股权投资",
+      "scope": "note",
+      "preset_status": "presetted",
+      "formula_count": 12,
+      "sources": [
+        "note_formula_derivation"
+      ]
+    },
+    {
+      "page_key": "report:balance_sheet",
+      "scope": "report",
+      "preset_status": "presetted",
+      "formula_count": 124,
+      "sources": [
+        "bs_preset_generator"
+      ]
+    },
+    {
+      "page_key": "report:cash_flow_statement",
+      "scope": "report",
+      "preset_status": "presetted",
+      "formula_count": 31,
+      "sources": [
+        "report_preset_generator"
+      ]
+    },
+    {
+      "page_key": "report:cash_flow_supplement",
+      "scope": "report",
+      "preset_status": "presetted",
+      "formula_count": 27,
+      "sources": [
+        "cfss_preset_generator"
       ]
     },
     {
       "page_key": "report:cross_check",
       "scope": "report",
       "preset_status": "presetted",
-      "formula_count": 7,
+      "formula_count": 93,
       "sources": [
+        "cross_check_generator",
         "report_cross_check"
+      ]
+    },
+    {
+      "page_key": "report:equity_statement",
+      "scope": "report",
+      "preset_status": "presetted",
+      "formula_count": 33,
+      "sources": [
+        "eq_preset_generator"
+      ]
+    },
+    {
+      "page_key": "report:impairment_provision",
+      "scope": "report",
+      "preset_status": "presetted",
+      "formula_count": 19,
+      "sources": [
+        "imp_preset_generator"
+      ]
+    },
+    {
+      "page_key": "report:income_statement",
+      "scope": "report",
+      "preset_status": "presetted",
+      "formula_count": 30,
+      "sources": [
+        "report_preset_generator"
       ]
     },
     {

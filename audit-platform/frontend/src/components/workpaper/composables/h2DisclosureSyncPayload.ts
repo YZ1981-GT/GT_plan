@@ -1,7 +1,23 @@
 /**
  * H2 披露 → disclosure_notes sync payload
- * - 上市：note_template_listed §五、23
- * - 国企：note_template_soe §八、23
+ * - 上市：note_template_listed §五、23（模板 tables 恰 6 张）
+ * - 国企：note_template_soe §八、23（模板 tables 恰 4 张）
+ *
+ * 契约（后端权威，勿改形状）：
+ * 1. `sub_table_data` 的行必须是 **keyed dict**，键与 `columns[key][].key` 一致——
+ *    `note_sub_table_projector.project_sub_tables` 按 `row.get(colDef.key)` 取值投影
+ *    为附注 `_tables`；若行改成 `{label, values:[]}` 数组形态，投影出的数据格全为
+ *    null（附注表格空白）。
+ * 2. 叙述正文必须放在 `sub_table_data['_note_texts']`（服务端 `_extract_note_texts`
+ *    pop 后写 `text_content`）；`SyncFromWorkpaperRequest` **没有**顶层 `_note_texts`
+ *    字段，放顶层会被 pydantic 静默丢弃。
+ * 3. 子表键 = 模板 `tables[].name`（逐字），列头 label 取自 H2TabDisclosure 既有
+ *    el-table-column（两级表头扁平合并）。
+ *
+ * 「所有权或使用权受限的在建工程（抵押/担保）」**不是** 五、23/八、23 的模板子表
+ * （模板 dump 核实：五、23 只有 6 张表、八、23 只有 4 张表，且 text_sections 无受限段；
+ * 受限资产是独立章节 listed 五、32 /  soe 八、93）。故抵押明细不作为子表推入 五、23
+ * （否则在附注里凭空多出模板没有的表 = 自造披露结构），改并入 `_note_texts` 叙述。
  */
 import {
   H2_DISCLOSURE_SHEET_NAME,
@@ -13,6 +29,7 @@ import {
   type H2DisclosureVariant,
 } from './h2NoteSectionMap'
 import {
+  buildMortgageNoteText,
   listedDetailNet,
   listedDetailSubtotal,
   listedImpairmentEnd,
@@ -78,6 +95,15 @@ export interface H2SoeSyncSnapshot {
 
 function nonEmptyLabel(label: string): boolean {
   return Boolean(String(label || '').trim())
+}
+
+/** 过滤空文本；全空则返回 `[]`（服务端 `_format_note_texts` 也会跳过空项，此处提前收敛） */
+function buildNoteTexts(
+  items: Array<{ section: string; title: string; text: string | null | undefined }>,
+): Array<{ section: string; title: string; text: string }> {
+  return items
+    .filter((it) => String(it.text || '').trim())
+    .map((it) => ({ section: it.section, title: it.title, text: String(it.text) }))
 }
 
 export function buildH2ListedSubTableData(state: H2ListedSyncSnapshot): Record<string, Record<string, unknown>[]> {
@@ -199,26 +225,11 @@ export function buildH2ListedSubTableData(state: H2ListedSyncSnapshot): Record<s
     is_total: true,
   })
 
-  const mortRows: Record<string, unknown>[] = (state.mortgage || [])
-    .filter((r) => nonEmptyLabel(r.name))
-    .map((r) => ({
-      label: r.name,
-      amount: num(r.amount),
-      end_balance: num(r.amount),
-      description: r.description || '',
-      remark: r.remark || '',
-    }))
-  if (mortRows.length) {
-    const mortTotal = mortRows.reduce((s, r) => s + num(r.amount), 0)
-    mortRows.push({
-      label: '合计',
-      amount: mortTotal,
-      end_balance: mortTotal,
-      description: '',
-      remark: '',
-      is_total: true,
-    })
-  }
+  // 受限（抵押/担保）在建工程：模板 五、23 无该子表（见文件头依据）→ 不产子表，
+  // 明细信息并入 `_note_texts` 叙述；审计师未填说明时按抵押明细自动生成一句。
+  const mortgageRows = (state.mortgage || []).filter((r) => nonEmptyLabel(r.name))
+  const mortgageNote = String(state.noteMortgage || '').trim()
+    || (mortgageRows.length ? buildMortgageNoteText(mortgageRows) : '')
 
   return {
     [H2_LISTED_SUBTABLE.summary]: summaryRows,
@@ -227,12 +238,11 @@ export function buildH2ListedSubTableData(state: H2ListedSyncSnapshot): Record<s
     [H2_LISTED_SUBTABLE.projectCont]: contRows,
     [H2_LISTED_SUBTABLE.impairment]: impRows,
     [H2_LISTED_SUBTABLE.materials]: matRows,
-    ...(mortRows.length ? { [H2_LISTED_SUBTABLE.restricted]: mortRows } : {}),
-    _note_texts: [
-      { section: 'listed-impairment', text: state.noteImpairment || '' },
-      { section: 'listed-fund-source', text: state.noteFundSource || '' },
-      { section: 'listed-mortgage', text: state.noteMortgage || '' },
-    ] as unknown as Record<string, unknown>[],
+    _note_texts: buildNoteTexts([
+      { section: 'listed-impairment', title: '在建工程减值情况说明', text: state.noteImpairment },
+      { section: 'listed-fund-source', title: '在建工程资金来源说明', text: state.noteFundSource },
+      { section: 'listed-mortgage', title: '所有权或使用权受限的在建工程', text: mortgageNote },
+    ]) as unknown as Record<string, unknown>[],
   }
 }
 
@@ -343,9 +353,9 @@ export function buildH2SoeSubTableData(state: H2SoeSyncSnapshot): Record<string,
     [H2_SOE_SUBTABLE.detail]: detailRows,
     [H2_SOE_SUBTABLE.projectMovement]: projRows,
     [H2_SOE_SUBTABLE.impairment]: impRows,
-    _note_texts: [
-      { section: 'soe-impairment', text: state.noteImpairment || '' },
-    ] as unknown as Record<string, unknown>[],
+    _note_texts: buildNoteTexts([
+      { section: 'soe-impairment', title: '本期计提在建工程减值准备情况说明', text: state.noteImpairment },
+    ]) as unknown as Record<string, unknown>[],
   }
 }
 
@@ -396,12 +406,8 @@ const H2_LISTED_COLUMNS: Record<string, ColumnDef[]> = {
     { key: 'end_balance', label: '期末余额', format: 'amount' },
     { key: 'prior_balance', label: '上年年末余额', format: 'amount' },
   ],
-  [H2_LISTED_SUBTABLE.restricted]: [
-    { key: 'label', label: '项目', is_label: true },
-    { key: 'amount', label: '金额', format: 'amount' },
-    { key: 'description', label: '说明' },
-    { key: 'remark', label: '备注' },
-  ],
+  // 注：无 restricted 条目——受限在建工程不是 五、23 子表（见文件头依据），
+  // columns 键集合必须与 sub_table_data 键集合一致（投影器按名匹配）。
 }
 
 const H2_SOE_TWO_LEVEL: ColumnDef[] = [
@@ -471,4 +477,40 @@ export function buildH2SoeSyncPayloads(
     sub_table_data: buildH2SoeSubTableData(state),
     columns: H2_SOE_COLUMNS,
   }]
+}
+
+// ─── 列头/载荷 具名导出（h2-disclosure-linkage-and-prefill spec Task 2.1 / 3.2）───
+// 列头 map 与上面两套 per-variant 定义同一真源（不复制、不漂移）。
+
+/** 上市 6 张子表列头（键 = 模板 tables[].name） */
+export function buildH2ListedColumns(): Record<string, ColumnDef[]> {
+  return H2_LISTED_COLUMNS
+}
+
+/** 国企 4 张子表列头（键 = 模板 tables[].name） */
+export function buildH2SoeColumns(): Record<string, ColumnDef[]> {
+  return H2_SOE_COLUMNS
+}
+
+/** `buildH2SyncPayload` 上下文（applicableStandards 为空数组/未传 = 不做适用性过滤） */
+export interface H2SyncContext {
+  wpId: string
+  applicableStandards?: readonly string[] | null
+}
+
+/**
+ * variant 分派薄封装：委托 `buildH2ListedSyncPayloads` / `buildH2SoeSyncPayloads`
+ * （唯一真源，生产组件与后端投影器契约以它们为准）。
+ *
+ * @returns 单条载荷；当前 variant 不适用（applicableStandards 与 variant 冲突）返回 null。
+ */
+export function buildH2SyncPayload(
+  variant: H2DisclosureVariant,
+  snapshot: H2ListedSyncSnapshot | H2SoeSyncSnapshot,
+  ctx: H2SyncContext,
+): H2SyncFromWorkpaperPayload | null {
+  const payloads = variant === 'listed'
+    ? buildH2ListedSyncPayloads(ctx.wpId, ctx.applicableStandards, snapshot as H2ListedSyncSnapshot)
+    : buildH2SoeSyncPayloads(ctx.wpId, ctx.applicableStandards, snapshot as H2SoeSyncSnapshot)
+  return payloads[0] ?? null
 }

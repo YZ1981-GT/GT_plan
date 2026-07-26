@@ -194,10 +194,9 @@ export function useAgingConfig(
   }
 
   function _applyDefault(): void {
-    // 默认：D3/F1/D7 使用 THREE_YEAR，其他使用 FIVE_YEAR
-    const defaultPreset: AgingPreset = (subject === 'D3' || subject === 'F1' || subject === 'D7')
-      ? 'THREE_YEAR'
-      : 'FIVE_YEAR'
+    // 默认：D3/F1/D7/F4 使用 THREE_YEAR，其他使用 FIVE_YEAR
+    // 🔴 必须与后端 aging_config_service.DEFAULT_SUBJECT_PRESETS 一致（否则前后端段数不同）
+    const defaultPreset: AgingPreset = DEFAULT_SUBJECT_PRESETS[subject ?? ''] ?? 'FIVE_YEAR'
     preset.value = defaultPreset
     segments.value = PRESET_SEGMENTS[defaultPreset]
   }
@@ -245,6 +244,25 @@ export function useAgingConfig(
 }
 
 // ─── 预设段定义（前端兜底，与后端保持一致） ──────────────────────────────────
+
+/**
+ * 科目默认账龄预设（与后端 `aging_config_service.DEFAULT_SUBJECT_PRESETS` 逐项一致）。
+ *
+ * 🔴 前后端必须同值：前端首帧/加载失败时用它兜底，后端项目未配置账龄时用它解析生效段；
+ *    两端不一致会导致同一底稿段数不同（列头与聚合口径分裂）。
+ * F4 应付账款：源模板为 4 档（1年以内/1-2/2-3/3年以上）→ THREE_YEAR。
+ */
+export const DEFAULT_SUBJECT_PRESETS: Record<string, AgingPreset> = {
+  D2: 'FIVE_YEAR',
+  K1: 'FIVE_YEAR',
+  K3: 'FIVE_YEAR',
+  G5: 'FIVE_YEAR',
+  D3: 'THREE_YEAR',
+  F1: 'THREE_YEAR',
+  G2: 'THREE_YEAR',
+  D7: 'THREE_YEAR',
+  F4: 'THREE_YEAR',
+}
 
 export const PRESET_SEGMENTS: Record<string, AgingSegment[]> = {
   THREE_YEAR: [

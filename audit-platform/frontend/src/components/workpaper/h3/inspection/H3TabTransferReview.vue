@@ -251,6 +251,41 @@
         placeholder="A、转换时点与金额处理恰当、转出转入平衡。B、除下列事项外未见异常。C、转换处理存在重大问题，不可确认。"
         :disabled="isReadonly" @change="saveAuditConclusion" />
     </el-card>
+
+    <!-- 勾稽 H1/H2 互转 -->
+    <el-card shadow="never" style="margin-top:16px">
+      <template #header>
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <span style="font-weight:600;font-size:13px">勾稽 H1/H2 互转</span>
+          <div style="display:flex;gap:8px;align-items:center">
+            <el-tag v-if="transferReconcileStatus === 'ok'" type="success" size="small">一致</el-tag>
+            <el-tag v-else-if="transferReconcileStatus === 'warning'" type="warning" size="small">存在差异</el-tag>
+            <el-tag v-else type="info" size="small">对方数据不可用</el-tag>
+            <el-button size="small" :loading="reconcileLoading" @click="loadTransferReconcile">勾稽 H1/H2</el-button>
+          </div>
+        </div>
+      </template>
+      <el-table v-if="transferReconcileData" :data="transferReconcileTableRows" border size="small" style="font-size:12px">
+        <el-table-column prop="direction" label="方向" width="180" />
+        <el-table-column label="H3 金额" align="right" width="140">
+          <template #default="{ row }">{{ fmtR(row.h3Value) }}</template>
+        </el-table-column>
+        <el-table-column label="对方金额" align="right" width="140">
+          <template #default="{ row }">{{ row.counterValue != null ? fmtR(row.counterValue) : '—' }}</template>
+        </el-table-column>
+        <el-table-column label="差异" align="right" width="120">
+          <template #default="{ row }">
+            <span :style="{ color: row.diff != null && Math.abs(row.diff) > 1 ? 'var(--el-color-warning)' : '' }">
+              {{ row.diff != null ? fmtR(row.diff) : '—' }}
+            </span>
+          </template>
+        </el-table-column>
+      </el-table>
+      <div style="margin-top:8px;display:flex;gap:8px">
+        <GtIndexChip value="wp:H1" :context-project-id="projectId" />
+        <GtIndexChip value="wp:H2" :context-project-id="projectId" />
+      </div>
+    </el-card>
   </div>
 </template>
 
@@ -265,6 +300,8 @@ import { useH3TransferReview, CATEGORY_LABELS } from '../../composables/useH3Tra
 import type { TransferDirection, H3TransferRow, AssetCategory } from '../../composables/useH3TransferReview'
 import { useH3FormData } from '../../composables/useH3FormData'
 import GtIndexChip from '../../GtIndexChip.vue'
+import { pullH1TransferForH3, pullH2TransferForH3, buildH3TransferReconcile } from '../../composables/h3TransferReconcile'
+import type { TransferReconcileResult } from '../../composables/h3TransferReconcile'
 
 const DIRECTION_LABELS: Record<TransferDirection, string> = {
   selfToInvest: '自用→投资',
@@ -308,6 +345,42 @@ const {
 
 const NOTE_KEY = 'H3-6-audit-note'
 const CONCLUSION_KEY = 'H3-6-audit-conclusion'
+
+// ─── 勾稽 H1/H2 互转 ────────────────────────────────────────────────────────
+const reconcileLoading = ref(false)
+const transferReconcileData = ref<TransferReconcileResult | null>(null)
+const transferReconcileStatus = computed(() => transferReconcileData.value?.status ?? 'unavailable')
+const transferReconcileTableRows = computed(() => {
+  const d = transferReconcileData.value
+  if (!d) return []
+  return [
+    { direction: '自用→投资(从H1转入)', h3Value: d.h3FromH1, counterValue: d.h1DisposalToInvest, diff: d.diffFromH1 },
+    { direction: '投资→自用(转出到H1)', h3Value: d.h3ToH1, counterValue: d.h1AdditionFromInvest, diff: d.diffToH1 },
+    { direction: '在建→投资(从H2转入)', h3Value: d.h3FromH2, counterValue: d.h2CipToInvest, diff: d.diffFromH2 },
+  ]
+})
+
+async function loadTransferReconcile() {
+  reconcileLoading.value = true
+  try {
+    const h1Data = await pullH1TransferForH3(props.projectId)
+    const h2Data = await pullH2TransferForH3(props.projectId)
+    const h3Summary = {
+      fromH1: totalSummary.value?.fromH1 ?? 0,
+      toH1: totalSummary.value?.toH1 ?? 0,
+      fromH2: totalSummary.value?.fromH2 ?? 0,
+    }
+    transferReconcileData.value = buildH3TransferReconcile(h3Summary, h1Data, h2Data)
+  } catch {
+    transferReconcileData.value = null
+  } finally {
+    reconcileLoading.value = false
+  }
+}
+
+function fmtR(v: number): string {
+  return v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
 const auditNote = ref('')
 const auditConclusion = ref('')
 

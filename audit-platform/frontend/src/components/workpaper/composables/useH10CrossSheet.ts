@@ -114,7 +114,7 @@ export function useH10CrossSheet(opts: {
     }
 
     const detailRows = safeParseArray(opts.allResponses.value.get('H10-detail-rows')?.remark)
-    const detailTotal = calcSubtotal(detailRows.map((r) => parseNum(r.disposalGainLoss)))
+    const detailTotal = calcSubtotal(detailRows.map((r) => parseNum(r.disposalGainLoss ?? r.disposalIncome)))
     const diff = adjudicationTotal - detailTotal
     return {
       diff,
@@ -169,7 +169,7 @@ export function useH10CrossSheet(opts: {
     for (const row of detailRows) {
       const wp = String(row.sourceWp ?? 'OTHER')
       if (wp === 'OTHER') continue
-      detailByWp[wp] = (detailByWp[wp] ?? 0) + parseNum(row.disposalGainLoss)
+      detailByWp[wp] = (detailByWp[wp] ?? 0) + parseNum(row.disposalGainLoss ?? row.disposalIncome)
     }
 
     const seen = new Set<string>()
@@ -206,7 +206,7 @@ export function useH10CrossSheet(opts: {
     const totals: Record<string, number> = {}
     for (const row of detailRows) {
       const wp = row.sourceWp || 'OTHER'
-      totals[wp] = (totals[wp] ?? 0) + parseNum(row.disposalGainLoss)
+      totals[wp] = (totals[wp] ?? 0) + parseNum(row.disposalGainLoss ?? row.disposalIncome)
     }
     return Object.entries(totals).map(([type, amount]) => ({
       type,

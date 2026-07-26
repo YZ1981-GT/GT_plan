@@ -24,6 +24,7 @@ import {
 } from '../composables/d1NoteSectionMap'
 import type { ChecklistResponse } from '../composables/useD1FormData'
 import type { Ref } from 'vue'
+import { useAgingConfig, PRESET_SEGMENTS } from '@/composables/useAgingConfig'
 import GtIndexChip from '../GtIndexChip.vue'
 import http from '@/utils/http'
 
@@ -97,7 +98,7 @@ const {
   individualEndRows, individualPriorRows, addIndividualRow, removeIndividualRow,
   bankPortfolioEndRows, bankPortfolioPriorRows,
   commercialPortfolioEndRows, commercialPortfolioPriorRows,
-  addPortfolioRow, removePortfolioRow,
+  addPortfolioRow, removePortfolioRow, fillPortfolioAgingBands,
   movementRows, movementTotal, reversalDetailRows, reversalDetailTotal,
   addReversalRow, removeReversalRow,
   writeOffAmount, writeOffDetailRows, writeOffDetailTotal,
@@ -112,6 +113,28 @@ const {
   saveImmediate: saveWithDebounce,
   isReadonly: isReadonlyRef,
 })
+
+// ─── 账龄枚举（3年段 / 5年段 / 自定义，项目账龄配置为唯一真源）────────────────
+// 国企版组合计提分表行本就是账龄段（附注模板 八、4「按组合计提坏账准备的应收票据」），
+// 故名称列改为按项目账龄段枚举点选（仍允许自定义出票人类型），并支持按段一键生成行。
+const { segments: d1AgingSegments, preset: d1AgingPreset } = useAgingConfig(projectIdRef, 'D1')
+const agingBandLabels = computed<string[]>(() => {
+  const list = d1AgingSegments.value
+  if (Array.isArray(list) && list.length > 0) return list.map((seg) => seg.label)
+  return PRESET_SEGMENTS.FIVE_YEAR.map((seg) => seg.label)
+})
+const AGING_PRESET_LABEL: Record<string, string> = {
+  THREE_YEAR: '3 年段',
+  FIVE_YEAR: '5 年段',
+  CUSTOM: '自定义',
+}
+const agingPresetLabel = computed(() => AGING_PRESET_LABEL[d1AgingPreset.value] ?? '5 年段')
+
+function onFillAgingBands(type: 'bank' | 'commercial'): void {
+  const added = fillPortfolioAgingBands(type, 'end', agingBandLabels.value)
+  if (added > 0) ElMessage.success(`已按账龄段补齐 ${added} 行`)
+  else ElMessage.info('账龄段已齐备，无需新增')
+}
 
 // ─── Formatters ──────────────────────────────────────────────────────────────
 
@@ -463,6 +486,37 @@ async function syncToDisclosureNotes(): Promise<void> {
       transferTotal: transferTotal.value as any,
       classEndRows: classEndRows.value as any,
       classPriorRows: classPriorRows.value as any,
+      // 披露表实际渲染的分类展开行（上市版含「其中：」与单项明细行，与附注模板行结构一致）
+      classDisplayEndRows: badDebtEndRowsForDisplay.value as any,
+      classDisplayPriorRows: badDebtPriorRowsForDisplay.value as any,
+      soeClassEndRows: soeClassEndRows.value as any,
+      soeClassPriorRows: soeClassPriorRows.value as any,
+      individualEndRows: individualEndRows.value as any,
+      individualPriorRows: individualPriorRows.value as any,
+      bankPortfolioEndRows: bankPortfolioEndRows.value as any,
+      bankPortfolioPriorRows: bankPortfolioPriorRows.value as any,
+      commercialPortfolioEndRows: commercialPortfolioEndRows.value as any,
+      commercialPortfolioPriorRows: commercialPortfolioPriorRows.value as any,
+      soePortfolioRows: soeAgingRows.value.map((r: any) => ({
+        name: r.name,
+        balance: r.balance,
+        provision: r.provision,
+        lossRate: r.lossRate,
+        isTotal: r.rowKind === 'summary',
+      })),
+      movementTotal: (props.variant === 'listed' ? listedMovementRow.value : movementTotal.value) as any,
+      soeMovementRows: soeMovementRowsForDisplay.value.map((r: any) => ({
+        label: r.label,
+        priorBalance: r.sourceRow?.priorBalance ?? 0,
+        provision: r.sourceRow?.provision ?? 0,
+        reversal: r.sourceRow?.reversal ?? 0,
+        writeOff: r.sourceRow?.writeOff ?? 0,
+        transfer: r.sourceRow?.transfer ?? 0,
+        other: r.sourceRow?.other ?? 0,
+        endBalance: r.sourceRow?.endBalance ?? 0,
+      })),
+      reversalRows: reversalDetailRows.value as any,
+      reversalTotal: reversalDetailTotal.value as any,
       writeOffAmount: writeOffAmount.value,
       writeOffDetailRows: writeOffDetailRows.value as any,
       notes: { ...sectionNotes.value },
@@ -854,9 +908,13 @@ async function syncToDisclosureNotes(): Promise<void> {
 
                 <div class="excel-hint">按账龄组合计提坏账准备的应收票据：</div>
                 <div class="table-frame">
-                  <div style="display:flex;gap:8px;margin-bottom:8px" v-if="!isReadonly">
+                  <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;flex-wrap:wrap" v-if="!isReadonly">
                     <el-button size="small" :icon="Plus" @click="addPortfolioRow('commercial', 'end')">在商业承兑汇票下添加行</el-button>
                     <el-button size="small" :icon="Plus" @click="addPortfolioRow('bank', 'end')">在银行承兑汇票下添加行</el-button>
+                    <el-divider direction="vertical" />
+                    <el-button size="small" type="primary" plain @click="onFillAgingBands('commercial')">商业承兑按账龄段生成</el-button>
+                    <el-button size="small" type="primary" plain @click="onFillAgingBands('bank')">银行承兑按账龄段生成</el-button>
+                    <el-tag size="small" type="info" effect="plain">账龄口径：{{ agingPresetLabel }}（{{ agingBandLabels.join(' / ') }}）</el-tag>
                   </div>
                   <el-table :data="soeAgingRows" row-key="rowId" border size="small" style="width:100%;margin-bottom:12px">
                     <el-table-column label="名称" min-width="280">
@@ -865,7 +923,20 @@ async function syncToDisclosureNotes(): Promise<void> {
                           <span :style="row.rowKind === 'summary' ? 'font-weight:600' : ''">{{ row.name }}</span>
                         </template>
                         <template v-else>
-                          <el-input :model-value="row.name" size="small" :disabled="isReadonly" placeholder="出票人类型或账龄" @input="(v:string)=>updateCell(`portfolio-${row.sourceType}-end`, row.rowId, 'drawerTypeOrAging', v)" />
+                          <el-select
+                            :model-value="row.name"
+                            size="small"
+                            filterable
+                            allow-create
+                            default-first-option
+                            clearable
+                            style="width:100%"
+                            :disabled="isReadonly"
+                            placeholder="选择账龄段（可自定义出票人类型）"
+                            @change="(v:string)=>updateCell(`portfolio-${row.sourceType}-end`, row.rowId, 'drawerTypeOrAging', v || '')"
+                          >
+                            <el-option v-for="label in agingBandLabels" :key="label" :label="label" :value="label" />
+                          </el-select>
                         </template>
                       </template>
                     </el-table-column>

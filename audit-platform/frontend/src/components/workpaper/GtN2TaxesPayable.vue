@@ -4,7 +4,7 @@
     <template v-else>
       <div v-if="isHtmlSheet && currentSheet !== 'N2' && currentSheet !== '底稿目录'" class="n2-taxes-payable-toolbar">
         <el-segmented
-          v-model="dualMode.currentMode.value"
+          :model-value="dualMode.currentMode.value"
           :options="dualMode.modeOptions"
           size="small"
           @change="dualMode.onModeChange"

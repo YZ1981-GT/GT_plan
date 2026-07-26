@@ -5,12 +5,14 @@
  * 1. 应付账款周转率（支付期）：采购成本口径 / 平均应付账款；
  * 2. 期末应付账款前十名：从F4-2按债权人归集并按期末审定数动态排序。
  */
-import { computed, onBeforeUnmount, ref, watch, type Ref } from 'vue'
+import { computed, inject, onBeforeUnmount, ref, watch, type Ref } from 'vue'
 import { parseNum, calcChangeAmount, calcChangeRate, calcSubtotal } from './useF4AccPayFormulaEngine'
 import {
   computeF4DetailRow,
   migrateF4DetailRows,
+  DEFAULT_F4_SEGMENTS,
 } from './useF4Detail'
+import type { AgingSegment } from '@/composables/useAgingConfig'
 import {
   aggregateF4Detail,
   computeF4AdjudicationRow,
@@ -170,8 +172,11 @@ export function calcF4PaymentDays(turnover: number | null): number | null {
 export function extractF4TopCreditors(
   value: string | null | undefined,
   limit = 10,
+  segments: readonly AgingSegment[] = DEFAULT_F4_SEGMENTS,
 ): Array<Omit<F4TopCreditorRow, 'reason' | 'isHighChange'>> {
-  const rows = migrateF4DetailRows(value).map(computeF4DetailRow)
+  const segs = segments?.length ? segments : DEFAULT_F4_SEGMENTS
+  const rows = migrateF4DetailRows(value, segs as AgingSegment[])
+    .map((stored) => computeF4DetailRow(stored, segs))
   const grouped = new Map<string, {
     rowIds: string[]
     creditor: string
@@ -220,6 +225,13 @@ export function useF4SubstantiveAnalysis(options: UseF4SubstantiveAnalysisOption
   const readonly = isReadonly ?? ref(false)
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
+  // 账龄段单一真源：优先主入口 provide 的项目账龄配置，未提供时回退 F4 默认预设
+  const injectedSegments = inject<Ref<AgingSegment[]> | null>('f4AgingSegments', null)
+  const segments = computed<AgingSegment[]>(() => {
+    const raw = injectedSegments?.value ?? []
+    return raw.length ? raw : DEFAULT_F4_SEGMENTS
+  })
+
   const turnoverStored = ref<StoredTurnover>(defaultTurnover())
   const creditorOverrides = ref<CreditorReasonOverride[]>([])
   const turnoverNote = ref('')
@@ -257,7 +269,7 @@ export function useF4SubstantiveAnalysis(options: UseF4SubstantiveAnalysisOption
   )
 
   const adjudicationTotals = computed(() => {
-    const detail = aggregateF4Detail(readRowJson(allResponses.value.get(DETAIL_KEY)))
+    const detail = aggregateF4Detail(readRowJson(allResponses.value.get(DETAIL_KEY)), segments.value)
     const rows = migrateF4AdjRows(
       readRowJson(allResponses.value.get(ADJ_NATURE_KEY)),
       F4_NATURE_DEFAULTS,
@@ -340,7 +352,7 @@ export function useF4SubstantiveAnalysis(options: UseF4SubstantiveAnalysisOption
 
   const topCreditors = computed<F4TopCreditorRow[]>(() => {
     const overrides = new Map(creditorOverrides.value.map((item) => [item.rowId, item.reason]))
-    return extractF4TopCreditors(readRowJson(allResponses.value.get(DETAIL_KEY))).map((row) => {
+    return extractF4TopCreditors(readRowJson(allResponses.value.get(DETAIL_KEY)), 10, segments.value).map((row) => {
       const reason = overrides.get(row.rowId) || row.sourcePaymentNature
       return {
         ...row,
@@ -450,6 +462,7 @@ export function useF4SubstantiveAnalysis(options: UseF4SubstantiveAnalysisOption
   })
 
   return {
+    segments,
     turnoverRows,
     topCreditors,
     creditorSubtotal,

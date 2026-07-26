@@ -72,7 +72,7 @@ describe('h6DisclosureModel', () => {
 })
 
 describe('h6DisclosureSyncPayload', () => {
-  it('builds listed sync to 五、15 with clearing subtable only', () => {
+  it('builds listed sync to 五、22（与 H1 固定资产同章节）with clearing subtable only', () => {
     const payloads = buildH6ListedSyncPayloads('wp-h6', [], {
       faEnd: 100,
       faPrior: 90,

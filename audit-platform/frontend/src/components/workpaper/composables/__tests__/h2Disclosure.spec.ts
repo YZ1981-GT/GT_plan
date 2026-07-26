@@ -112,7 +112,20 @@ describe('h2DisclosureSyncPayload', () => {
     expect(data[H2_LISTED_SUBTABLE.detail]?.some((r) => r.label === '车间改建')).toBe(true)
     expect(data[H2_LISTED_SUBTABLE.projectMovement]?.find((r) => r.is_total)?.end_balance).toBe(100)
     expect(data[H2_LISTED_SUBTABLE.projectCont]?.[0]?.fund_source).toBe('自筹')
-    expect(data[H2_LISTED_SUBTABLE.restricted]?.some((r) => r.label === '车间改建')).toBe(true)
+
+    // 受限（抵押/担保）在建工程不是 五、23 的模板子表：
+    // note_template_listed 五、23 恰 6 张表（在建工程/在建工程明细/重要在建工程项目变动情况/
+    // 变动情况（续）/在建工程减值准备情况/项  目），text_sections 亦无受限段；
+    // 受限资产是独立章节 五、32「所有权或使用权受到限制的资产」（国企对应 八、93）。
+    // 故抵押明细不产子表（否则附注 五、23 会凭空多出模板没有的表），改并入 _note_texts。
+    expect(data[H2_LISTED_SUBTABLE.restricted]).toBeUndefined()
+    const noteTexts = data._note_texts as unknown as Array<{ section: string; text: string }>
+    expect(noteTexts.find((t) => t.section === 'listed-mortgage')?.text).toContain('车间改建')
+
+    // 子表键集合 = 模板 6 张；columns 键必须与之一致（投影器按名匹配）
+    const tableKeys = Object.keys(data).filter((k) => !k.startsWith('_'))
+    expect(tableKeys).toHaveLength(6)
+    expect(Object.keys(payloads[0].columns ?? {}).sort()).toEqual(tableKeys.sort())
   })
 
   it('国企 sync 子表名对齐 note_template_soe', () => {

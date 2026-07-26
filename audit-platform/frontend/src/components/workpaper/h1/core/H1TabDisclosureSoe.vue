@@ -379,7 +379,11 @@ import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
 import GtIndexChip from '../../GtIndexChip.vue'
-import { H1_NOTE_SECTION } from '../../composables/h1NoteSectionMap'
+import {
+  H1_NOTE_SECTION,
+  resolveH1CurrentStandardFromProject,
+  resolveH1VariantFromTemplateType,
+} from '../../composables/h1NoteSectionMap'
 import { buildH1SoeSyncPayload } from '../../composables/h1DisclosureSyncPayload'
 import {
   buildSoeDisclosurePack,
@@ -427,7 +431,15 @@ const props = defineProps<{
   allResponses: Map<string, any>
   isReadonly: boolean
   applicableStandards?: string[]
+  /** 项目附注口径（权威变体源，来自 projects.template_type） */
+  templateType?: string
+  /** 报表范围（standalone|consolidated，来自 projects.report_scope） */
+  reportScope?: string
 }>()
+
+/** 项目实际附注口径；与本 tab（国企）不一致时禁止同步，避免污染上市体系章节 */
+const projectVariant = computed(() => resolveH1VariantFromTemplateType(props.templateType))
+const variantMismatch = computed(() => !!projectVariant.value && projectVariant.value !== 'soe')
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
@@ -749,6 +761,10 @@ onUnmounted(() => {
 
 async function syncToNotes() {
   if (isSyncing.value || !props.projectId || props.isReadonly) return
+  if (variantMismatch.value) {
+    ElMessage.warning('本项目附注口径为上市公司，请在「附注披露信息（上市公司）」页同步（国企章节与上市章节不可混用）')
+    return
+  }
   const payload = buildH1SoeSyncPayload(props.wpId, props.applicableStandards, {
     summary: { ...state.summary },
     layers: state.layers,
@@ -756,6 +772,8 @@ async function syncToNotes() {
     titleRows: state.titleRows,
     clearingRows: state.clearingRows,
     clearingNote: state.clearingNote,
+  }, {
+    currentStandard: resolveH1CurrentStandardFromProject('soe', props.templateType, props.reportScope),
   })
   if (!payload) {
     ElMessage.warning('当前项目准则不适用国企附注同步')

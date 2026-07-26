@@ -46,7 +46,7 @@ H3_SHEETS = [
 
 
 async def _fetch_tb_data(ctx: RenderContext) -> dict:
-    """取科目1503+1504的期初/期末余额及未审数."""
+    """取科目1503+1504的期初/期末余额及未审数（仅汇总叶子科目防双算）."""
     tb: dict[str, float] = {}
     try:
         active_filter = await get_active_filter(
@@ -61,7 +61,22 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict:
                 TbBalance.credit_amount,
             ).where(active_filter)
         )
-        for row in result.fetchall():
+        all_rows = result.fetchall()
+
+        # 只取叶子科目防止父子双算（叶子=该code不是任何其它code的前缀）
+        all_codes = {(r.account_code or "").strip() for r in all_rows}
+        relevant_rows = []
+        for row in all_rows:
+            code = (row.account_code or "").strip()
+            is_relevant = any(code == pfx or code.startswith(pfx) for pfx in _H3_ACCOUNT_PREFIXES)
+            if not is_relevant:
+                continue
+            # 叶子判定：没有其它 code 以本 code 为前缀
+            is_leaf = not any(c != code and c.startswith(code) for c in all_codes)
+            if is_leaf:
+                relevant_rows.append(row)
+
+        for row in relevant_rows:
             code = (row.account_code or "").strip()
             for prefix, (unadj_key, audited_key) in _H3_ACCOUNT_PREFIXES.items():
                 if code == prefix or code.startswith(prefix):
@@ -75,6 +90,9 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict:
 
     # 从trial_balance取未审数
     try:
+        active_filter_tb = await get_active_filter(
+            ctx.db, TrialBalance.__table__, ctx.project_id, ctx.year
+        ) if hasattr(TrialBalance, '__table__') else None
         result = await ctx.db.execute(
             sa.text("""
                 SELECT standard_account_code, unadjusted_amount, audited_amount
@@ -93,6 +111,23 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict:
                     break
     except Exception as e:  # noqa: BLE001
         logger.warning("H3 trial_balance fetch failed: %s", e)
+
+    # 从trial_balance取6051其他业务收入审定发生额（供前端租金勾稽）
+    try:
+        result = await ctx.db.execute(
+            sa.text("""
+                SELECT SUM(audited_amount) AS total
+                FROM trial_balance
+                WHERE project_id = :pid AND year = :year AND is_deleted = false
+                  AND standard_account_code LIKE '6051%'
+            """),
+            {"pid": str(ctx.project_id), "year": ctx.year},
+        )
+        row = result.fetchone()
+        tb["tb_6051_audited"] = float(row.total) if row and row.total else None
+    except Exception as e:  # noqa: BLE001
+        logger.warning("H3 tb_6051 fetch failed: %s", e)
+        tb["tb_6051_audited"] = None
 
     return tb
 
@@ -161,6 +196,9 @@ async def render(ctx: RenderContext) -> dict | None:
     tb_values = await _fetch_tb_data(ctx)
     project_context = await _load_project_context(ctx)
     measurement_model = await _load_measurement_model(ctx)
+
+    # 将 tb_6051_audited 从 tb_values 提升到 project_context（前端消费语义更清晰）
+    project_context["tb_6051_audited"] = tb_values.pop("tb_6051_audited", None)
 
     return {
         "component_type": "h3-investment-property",

@@ -15,9 +15,10 @@
  *
  * 科目：1811 递延所得税资产（**借方/资产类**！期末余额=期初+借-贷）
  */
-import { ref, computed, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import { calcDeferredTax, calcWeightedAvgRate } from './useN1DeferredTaxEngine'
 import { calcAuditedAmount, calcSubtotal, parseNum } from './useN1FormulaEngine'
+import { resolveDeductibleDiff } from './useN1DisclosureSource'
 import type { useN1FormData } from './useN1FormData'
 import type { N1AdjudicationCategory } from './useN1Adjudication'
 
@@ -73,6 +74,12 @@ export interface N1DetailComputed extends N1DetailRow {
   endDeferredTax: number
   /** 递延税资产期末审定 = endDeferredTax + endAje + endRje */
   endAudited: number
+  /** roll-forward 推导期末 = 期初审定 + 本期确认 − 本期转回 */
+  rollForwardEnd: number
+  /** roll-forward 差异 = 期末审定 − roll-forward 推导期末 */
+  rollForwardDiff: number
+  /** 是否存在 roll-forward 差异（已录确认/转回且差异>0.01） */
+  hasRollForwardDiff: boolean
 }
 
 /** 分类小计 */
@@ -109,6 +116,8 @@ export interface UseN1DetailOptions {
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const ITEM_PREFIX = 'N1-2-detail'
+/** N1-4 测算表行存储键（字段级带入的来源，源模板账面价值/计税基础在 N1-4） */
+const N1_CALC_ROWS_KEY = 'N1-4-calc-rows'
 let _nextId = 1
 
 /**
@@ -170,22 +179,64 @@ export function useN1Detail(options: UseN1DetailOptions) {
     return []
   }
 
+  // ─── 1b. 异步 hydrate（loadData 完成后 allResponses 才有数据） ───────────
+  // 铁律：setup 阶段 allResponses 为空，若不重新 hydrate 则刷新后明细全空，
+  //       且「预置源模板项目」的空表守卫失效会覆盖已录数据。
+  let _hydrated = false
+
+  watch(
+    allResponses,
+    () => {
+      if (_hydrated) return
+      const stored = allResponses.value.get(`${ITEM_PREFIX}-rows`)
+      if (!stored?.conclusion) return
+      // 仅当本地仍为空时接管（不覆盖用户已开始的编辑）
+      if (rows.value.length === 0) rows.value = _loadRows()
+      _hydrated = true
+    },
+    { immediate: true },
+  )
+
+  /** 存储中是否已有明细行（供 seed 守卫用，防止 hydrate 前误覆盖） */
+  function _hasStoredRows(): boolean {
+    const stored = allResponses.value.get(`${ITEM_PREFIX}-rows`)
+    if (!stored?.conclusion) return false
+    try {
+      const parsed = JSON.parse(stored.conclusion)
+      return Array.isArray(parsed) && parsed.length > 0
+    } catch {
+      return false
+    }
+  }
+
   // ─── 2. 计算属性：公式列自动计算 ──────────────────────────────────────────
 
   const computedRows: ComputedRef<N1DetailComputed[]> = computed(() => {
     return rows.value.map((row, i) => {
       const beginDeferredTax = Math.round(calcDeferredTax(row.beginDiff, row.beginTaxRate) * 100) / 100
-      // 可抵扣暂时性差异 = max(0, taxBase - bookValue)（资产项：账面＜计税基础时产生）
-      const deductibleDiff = row.taxBase - row.bookValue > 0 ? row.taxBase - row.bookValue : 0
+      // 可抵扣暂时性差异（期末）：口径收敛到 resolveDeductibleDiff（披露表共用同一函数）
+      // 铁律：期初用 beginDiff，期末优先用手工 endDiff，否则回退「计税基础−账面价值」，
+      //       否则用户填的期末差异列会成为死列，且披露侧会与明细侧口径漂移。
+      const deductibleDiff = resolveDeductibleDiff(row)
       const endDeferredTax = Math.round(calcDeferredTax(deductibleDiff, row.endTaxRate) * 100) / 100
+      const endAudited = calcAuditedAmount(endDeferredTax, row.endAje, row.endRje)
+      const beginAudited = calcAuditedAmount(beginDeferredTax, row.beginAje, row.beginRje)
+      // roll-forward 自校验：期末 = 期初 + 本期确认 − 本期转回（资产类借增贷减）
+      const rollForwardEnd = beginAudited + parseNum(row.recognized) - parseNum(row.reversed)
+      const rollForwardDiff = Math.round((endAudited - rollForwardEnd) * 100) / 100
       return {
         ...row,
         seq: i + 1,
         deductibleDiff,
         beginDeferredTax,
-        beginAudited: calcAuditedAmount(beginDeferredTax, row.beginAje, row.beginRje),
+        beginAudited,
         endDeferredTax,
-        endAudited: calcAuditedAmount(endDeferredTax, row.endAje, row.endRje),
+        endAudited,
+        rollForwardEnd: Math.round(rollForwardEnd * 100) / 100,
+        rollForwardDiff,
+        hasRollForwardDiff:
+          (parseNum(row.recognized) !== 0 || parseNum(row.reversed) !== 0) &&
+          Math.abs(rollForwardDiff) > 0.01,
       }
     })
   })
@@ -281,6 +332,8 @@ export function useN1Detail(options: UseN1DetailOptions) {
    */
   function seedDefaultRows(): void {
     if (rows.value.length > 0) return
+    // 双重守卫：存储中已有明细行时禁止 seed（防 hydrate 尚未完成即覆盖已录数据）
+    if (_hasStoredRows()) return
     for (const item of N1_DEFAULT_DETAIL_ITEMS) {
       rows.value.push({
         id: `row-${_nextId++}`,
@@ -311,6 +364,96 @@ export function useN1Detail(options: UseN1DetailOptions) {
     _persistRows()
   }
 
+  // ─── 6b. 从 N1-4 测算表字段级带入（账面价值/计税基础/期末税率） ──────────
+
+  interface CalcRowLike {
+    itemName?: string
+    bookValue?: number | string
+    taxBase?: number | string
+    taxRate?: number | string
+  }
+
+  function _readCalcRows(): CalcRowLike[] {
+    const stored = allResponses.value.get(N1_CALC_ROWS_KEY)
+    const raw = stored?.conclusion ?? stored?.remark
+    if (!raw) return []
+    try {
+      const parsed = JSON.parse(String(raw))
+      return Array.isArray(parsed) ? parsed : []
+    } catch {
+      return []
+    }
+  }
+
+  /**
+   * 从 N1-4 测算表按「项目名称」带入账面价值 / 计税基础 / 期末适用税率。
+   *
+   * 口径：源模板的账面价值与计税基础在测算表 N1-4 取得，明细表 N1-2 应引用其结果，
+   * 避免同一数据两处各录一遍（此前两表都要手打，且没有任何一致性提示）。
+   *
+   * 🔴 仅填空不覆盖：目标字段为 0（未录）时才写入；已录数据一律保留，
+   *    差异由 `calcTableMismatches` 提示人工判断。
+   */
+  function pullFromCalcTable(): { matched: number; filled: number } {
+    const calcRows = _readCalcRows()
+    if (calcRows.length === 0) return { matched: 0, filled: 0 }
+    const byName = new Map<string, CalcRowLike>()
+    for (const c of calcRows) {
+      const name = String(c.itemName ?? '').trim()
+      if (name) byName.set(name, c)
+    }
+
+    let matched = 0
+    let filled = 0
+    rows.value.forEach((row) => {
+      const src = byName.get(String(row.itemName ?? '').trim())
+      if (!src) return
+      matched += 1
+      if (parseNum(row.bookValue) === 0 && parseNum(src.bookValue) !== 0) {
+        row.bookValue = parseNum(src.bookValue)
+        filled += 1
+      }
+      if (parseNum(row.taxBase) === 0 && parseNum(src.taxBase) !== 0) {
+        row.taxBase = parseNum(src.taxBase)
+        filled += 1
+      }
+      if (parseNum(row.endTaxRate) === 0 && parseNum(src.taxRate) !== 0) {
+        row.endTaxRate = parseNum(src.taxRate)
+        filled += 1
+      }
+    })
+    if (filled > 0) _persistRows()
+    return { matched, filled }
+  }
+
+  /** N1-2 与 N1-4 同名项目的账面价值/计税基础不一致清单（两侧均非零且差额 > 0.01） */
+  const calcTableMismatches: ComputedRef<
+    Array<{ itemName: string; field: '账面价值' | '计税基础'; detailValue: number; calcValue: number }>
+  > = computed(() => {
+    const calcRows = _readCalcRows()
+    if (calcRows.length === 0) return []
+    const byName = new Map<string, CalcRowLike>()
+    for (const c of calcRows) {
+      const name = String(c.itemName ?? '').trim()
+      if (name) byName.set(name, c)
+    }
+    const out: Array<{ itemName: string; field: '账面价值' | '计税基础'; detailValue: number; calcValue: number }> = []
+    for (const row of rows.value) {
+      const src = byName.get(String(row.itemName ?? '').trim())
+      if (!src) continue
+      const pairs: Array<['账面价值' | '计税基础', number, number]> = [
+        ['账面价值', parseNum(row.bookValue), parseNum(src.bookValue)],
+        ['计税基础', parseNum(row.taxBase), parseNum(src.taxBase)],
+      ]
+      for (const [field, a, b] of pairs) {
+        if (a !== 0 && b !== 0 && Math.abs(a - b) > 0.01) {
+          out.push({ itemName: row.itemName, field, detailValue: a, calcValue: b })
+        }
+      }
+    }
+    return out
+  })
+
   // ─── 7. 持久化 ─────────────────────────────────────────────────────────
 
   function _persistRows(): void {
@@ -331,6 +474,8 @@ export function useN1Detail(options: UseN1DetailOptions) {
     removeRow,
     updateRow,
     seedDefaultRows,
+    pullFromCalcTable,
+    calcTableMismatches,
     totals,
     categoryTotals,
     stats,

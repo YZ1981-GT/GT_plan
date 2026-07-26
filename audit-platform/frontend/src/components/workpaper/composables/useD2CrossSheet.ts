@@ -17,11 +17,17 @@ import {
 } from './useD2FormulaEngine'
 import type { ChecklistResponse } from './useD2FormData'
 import type { DetailRow } from './useD2Detail'
+import { PRESET_SEGMENTS, type AgingSegment } from '@/composables/useAgingConfig'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface UseD2CrossSheetOptions {
   allResponses: Ref<Map<string, ChecklistResponse>>
+  /**
+   * 项目账龄配置段（3年段 / 5年段 / 自定义，来自 useAgingConfig）。
+   * 不传则回退 5 年段预设（与 useAgingConfig 对 D2 的默认预设一致）。
+   */
+  agingSegments?: Ref<AgingSegment[]>
 }
 
 /** D2-3 坏账准备行原始 JSON 结构 */
@@ -40,14 +46,11 @@ interface Ecl9RowRaw {
   difference?: number
 }
 
-export interface D2AgingBands {
-  within1Year: number
-  y1to2: number
-  y2to3: number
-  y3to4: number
-  y4to5: number
-  over5: number
-}
+/**
+ * 账龄段汇总：**键 = 项目账龄配置的段 key**（枚举账龄：3年段 / 5年段 / 自定义）。
+ * 不再是固定 6 段结构体——项目切 3 年段时键为 within1/y1to2/y2to3/over3。
+ */
+export type D2AgingBands = Record<string, number>
 
 export interface D2DisclosureSourceData {
   individual: { prior: number; current: number }
@@ -68,38 +71,67 @@ function safeParseRows<T>(jsonStr: string | null | undefined): T[] {
   }
 }
 
-function sumAgingBands(
-  rows: DetailRow[],
-  prefix: 'priorAging' | 'currentAging' | 'auditedAging',
+/** 账龄期间 → D2-2 明细行的 nested 容器字段 / legacy 扁平字段前缀。 */
+const AGING_PERIOD_FIELDS = {
+  prior: { nested: 'agingPrior', flat: 'priorAging' },
+  current: { nested: 'agingCurrent', flat: 'currentAging' },
+  audited: { nested: 'agingAudited', flat: 'auditedAging' },
+} as const
+
+export type D2AgingPeriod = keyof typeof AGING_PERIOD_FIELDS
+
+/**
+ * 段 key → legacy 扁平字段后缀（迁移前 D2-detail-rows 的 `{prefix}{suffix}`）。
+ * `over3`（3 年段的「3年以上」）在 legacy 里没有单一字段，须由 3-4/4-5/5年以上 三段相加，
+ * 这正是此前「3 年段项目的 3 年以上金额恒 0」的根因。
+ */
+const LEGACY_AGING_SUFFIX: Record<string, string[]> = {
+  within1: ['1Year'],
+  within1Year: ['1Year'],
+  y1to2: ['1to2'],
+  y2to3: ['2to3'],
+  y3to4: ['3to4'],
+  y4to5: ['4to5'],
+  over3: ['3to4', '4to5', 'Over5'],
+  over5: ['Over5'],
+}
+
+/**
+ * 取某行某期间某账龄段的金额：**nested keyed 优先**（aging-config 迁移后的存储形态），
+ * 无 nested 时回退 legacy 扁平字段（迁移前数据），两者都没有则 0。纯函数，可独立测试。
+ */
+export function agingCellValue(
+  row: Record<string, unknown>,
+  period: D2AgingPeriod,
+  segKey: string,
+): number {
+  const { nested, flat } = AGING_PERIOD_FIELDS[period]
+  const container = row?.[nested]
+  if (container && typeof container === 'object' && !Array.isArray(container)) {
+    const v = (container as Record<string, unknown>)[segKey]
+    if (v !== undefined && v !== null && v !== '') return parseNum(v)
+  }
+  const suffixes = LEGACY_AGING_SUFFIX[segKey]
+  if (!suffixes) return 0
+  return suffixes.reduce((s, sfx) => s + parseNum(row?.[`${flat}${sfx}`]), 0)
+}
+
+/**
+ * 按项目账龄配置段汇总 D2-2 明细账龄（枚举账龄单一口径）。
+ * 纯函数：段列表由调用方给定，键即段 key，不再硬编码 6 段。
+ */
+export function sumAgingBySegments(
+  rows: readonly Record<string, unknown>[],
+  period: D2AgingPeriod,
+  segments: readonly AgingSegment[],
 ): D2AgingBands {
-  const fields = [
-    `${prefix}1Year`,
-    `${prefix}1to2`,
-    `${prefix}2to3`,
-    `${prefix}3to4`,
-    `${prefix}4to5`,
-    `${prefix}Over5`,
-  ] as const
-
-  const result: D2AgingBands = {
-    within1Year: 0,
-    y1to2: 0,
-    y2to3: 0,
-    y3to4: 0,
-    y4to5: 0,
-    over5: 0,
-  }
-
-  const keys: (keyof D2AgingBands)[] = [
-    'within1Year', 'y1to2', 'y2to3', 'y3to4', 'y4to5', 'over5',
-  ]
-
+  const result: D2AgingBands = {}
+  for (const seg of segments) result[seg.key] = 0
   for (const row of rows) {
-    fields.forEach((field, i) => {
-      result[keys[i]] += parseNum((row as Record<string, unknown>)[field])
-    })
+    for (const seg of segments) {
+      result[seg.key] += agingCellValue(row, period, seg.key)
+    }
   }
-
   return result
 }
 
@@ -325,16 +357,26 @@ export function useD2CrossSheet(options: UseD2CrossSheetOptions) {
 
   // ─── D2-2 账龄段汇总 ───────────────────────────────────────────────────
 
+  /** 生效账龄段：项目账龄配置优先（3年段/5年段/自定义），未注入时回退 5 年段预设。 */
+  const effectiveAgingSegments: ComputedRef<AgingSegment[]> = computed(() => {
+    const list = options.agingSegments?.value
+    if (Array.isArray(list) && list.length > 0) return list
+    return PRESET_SEGMENTS.FIVE_YEAR
+  })
+
   const agingFromDetail: ComputedRef<{
     prior: D2AgingBands
     current: D2AgingBands
     audited: D2AgingBands
+    segments: AgingSegment[]
   }> = computed(() => {
-    const rows = detailRows.value
+    const rows = detailRows.value as unknown as Record<string, unknown>[]
+    const segments = effectiveAgingSegments.value
     return {
-      prior: sumAgingBands(rows, 'priorAging'),
-      current: sumAgingBands(rows, 'currentAging'),
-      audited: sumAgingBands(rows, 'auditedAging'),
+      prior: sumAgingBySegments(rows, 'prior', segments),
+      current: sumAgingBySegments(rows, 'current', segments),
+      audited: sumAgingBySegments(rows, 'audited', segments),
+      segments,
     }
   })
 
@@ -402,6 +444,7 @@ export function useD2CrossSheet(options: UseD2CrossSheetOptions) {
     badDebtTotal,
     eclSingleTotal,
     adjudicationForDisclosure,
+    agingSegments: effectiveAgingSegments,
     agingFromDetail,
     reconciliationDiff,
     eclVsBadDebtDiff,

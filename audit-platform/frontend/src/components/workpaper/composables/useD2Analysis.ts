@@ -70,17 +70,18 @@ export function useD2Analysis(options: UseD2BaseOptions) {
   const { allResponses, isReadonly } = options
   const d2CrossSheet = inject<ReturnType<typeof useD2CrossSheet> | null>('d2CrossSheet', null)
 
+  /**
+   * 账龄分布按**项目账龄配置段**（枚举账龄：3年段/5年段/自定义）生成，
+   * 段与标签均取自 crossSheet.agingFromDetail.segments，不再硬编码 6 段。
+   */
   function buildAgingFromCross(): AgingDistributionItem[] {
-    const bands = d2CrossSheet?.agingFromDetail.value.audited
-    if (!bands) return []
-    const items = [
-      { band: '1年以内', amount: bands.within1Year },
-      { band: '1-2年', amount: bands.y1to2 },
-      { band: '2-3年', amount: bands.y2to3 },
-      { band: '3-4年', amount: bands.y3to4 },
-      { band: '4-5年', amount: bands.y4to5 },
-      { band: '5年以上', amount: bands.over5 },
-    ]
+    const src = d2CrossSheet?.agingFromDetail.value
+    if (!src) return []
+    const segments = src.segments ?? []
+    const items = segments.map((seg) => ({
+      band: seg.label,
+      amount: parseNum(src.audited?.[seg.key]),
+    }))
     const total = items.reduce((s, i) => s + i.amount, 0)
     return items.map(i => ({ ...i, ratio: total ? i.amount / total : 0 }))
   }

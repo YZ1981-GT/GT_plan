@@ -577,6 +577,51 @@ export function useH6Detail(params: {
     onSave(SUBTOTAL_END_AUDITED_KEY, subtotalRow.value.endAudited)
   }
 
+  /**
+   * 从序时账(tb_ledger 1606)按明细科目名导入清理项目行。
+   * 同名覆盖余额列(beginUnadjusted=净余额, periodIncrease=借方, periodDecrease=贷方)，
+   * 缺失新增行，不覆盖手工已填的处置信息(收入/费用/状态)。
+   */
+  function importFromLedger(aggRows: Array<{
+    accountName: string
+    debitTotal: number
+    creditTotal: number
+    netBalance: number
+  }>): number {
+    let imported = 0
+    for (const agg of aggRows) {
+      if (!agg.accountName) continue
+      const existing = rows.value.find(
+        r => r.assetName === agg.accountName || r.assetName.includes(agg.accountName) || agg.accountName.includes(r.assetName),
+      )
+      if (existing) {
+        // 同名行：仅更新余额列（不覆盖处置信息）
+        existing.beginUnadjusted = existing.beginUnadjusted || agg.netBalance
+        existing.periodIncrease = agg.debitTotal
+        existing.periodDecrease = agg.creditTotal
+        _recalcBalance(existing)
+      } else {
+        // 新增行
+        const seq = rows.value.length + 1
+        const newRow = _normalizeRow({
+          assetName: agg.accountName,
+          seq,
+          beginUnadjusted: agg.netBalance,
+          periodIncrease: agg.debitTotal,
+          periodDecrease: agg.creditTotal,
+          remarks: '序时账导入',
+        }, seq - 1)
+        rows.value.push(newRow)
+      }
+      imported++
+    }
+    if (imported > 0) {
+      rows.value.forEach((r, i) => { r.seq = i + 1 })
+      _persist()
+    }
+    return imported
+  }
+
   return {
     rows,
     activeTab,
@@ -593,6 +638,7 @@ export function useH6Detail(params: {
     setActiveTab,
     createFromH1Disposal,
     syncBalanceFromNetBook,
+    importFromLedger,
     save,
     load,
   }

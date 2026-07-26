@@ -16,6 +16,7 @@
  * Requirements: 9.1-9.7, 10.1-10.7
  */
 import { ref, computed, watch, inject, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import type { AgingSegment } from '@/composables/useAgingConfig'
 import {
   parseNum,
   calculateProvision,
@@ -238,20 +239,16 @@ export function useD2Ecl(options: UseD2BaseOptions & { agingBands?: ComputedRef<
   // Fix 3: inject save
   const injectedSave = inject<D2SaveItemsFn | undefined>(D2_SAVE_ITEMS_KEY, undefined)
 
-  // Fix 1: 动态账龄段联动
+  /**
+   * 账龄段（枚举账龄：3年段/5年段/自定义）单一真源：
+   * 调用方显式传入 > 主入口 provide 的项目账龄配置段 > 5 年段预设兜底。
+   * 已删除「读 D2-1 审定表 D2-adj-aging-mode + 硬编码 一年以内/一到二年」的第二套口径。
+   */
+  const injectedAgingSegments = inject<Ref<AgingSegment[]> | null>('d2AgingSegments', null)
   const agingBands = computed(() => {
     if (externalBands?.value && externalBands.value.length > 0) return externalBands.value
-    const mode = allResponses.value.get('D2-adj-aging-mode')?.remark || '5y'
-    if (mode === '3y') return ['一年以内', '一到二年', '二到三年', '三年以上']
-    if (mode === 'custom') {
-      const json = allResponses.value.get('D2-adj-aging-custom-bands')?.remark
-      if (json) {
-        try {
-          const parsed = JSON.parse(json)
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed.map((b: any) => b.label || '未命名')
-        } catch { /* fallback */ }
-      }
-    }
+    const segs = injectedAgingSegments?.value
+    if (Array.isArray(segs) && segs.length > 0) return segs.map((seg) => seg.label)
     return DEFAULT_AGING_BANDS
   })
 

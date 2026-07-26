@@ -8,7 +8,7 @@
       <!-- 顶部工具栏（双模式切换+计量模式切换）— 目录页隐藏 -->
       <div v-if="currentSheet !== 'H3'" class="h3-header-toolbar">
         <el-segmented
-          v-model="currentMode"
+          :model-value="currentMode"
           :options="modeOptions"
           size="small"
           :disabled="!isOoAvailable && currentMode === 'html'"

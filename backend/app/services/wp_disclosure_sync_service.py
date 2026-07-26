@@ -9,15 +9,18 @@ Validates: Requirements US-3（C 类底稿 → 附注自动同步）
 
 from __future__ import annotations
 
+import json
 import logging
 from datetime import datetime, timezone
+from functools import lru_cache
+from pathlib import Path
 from typing import Any, Literal
 from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.core import User
+from app.models.core import Project, User
 from app.models.report_models import (
     ContentType,
     DisclosureNote,
@@ -105,7 +108,7 @@ def _format_note_texts(note_texts: list[dict[str, Any]]) -> str:
 
 
 def _derive_section_title(section_id: str) -> str:
-    """从 section_id 派生默认标题（用于新建场景）。
+    """从 section_id 派生默认标题（**纯字符串兜底**，模板查不到时才用）。
 
     Examples:
         "五-1-1 应收账款" → "应收账款"
@@ -119,11 +122,107 @@ def _derive_section_title(section_id: str) -> str:
     return section_id
 
 
+_DATA_DIR = Path(__file__).resolve().parents[2] / "data"
+
+
+@lru_cache(maxsize=4)
+def _template_section_meta(variant: str) -> dict[str, tuple[str, str]]:
+    """``section_number`` → ``(section_title, account_name)``（附注模板权威源）。
+
+    variant ∈ {"listed", "soe"}；文件缺失/损坏 → 返回空 dict（fail-open）。
+    """
+    path = _DATA_DIR / f"note_template_{variant}.json"
+    out: dict[str, tuple[str, str]] = {}
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as err:  # pragma: no cover - 环境异常
+        logger.warning("wp_disclosure_sync: load note_template_%s failed: %s", variant, err)
+        return out
+    for sec in doc.get("sections") or []:
+        if not isinstance(sec, dict):
+            continue
+        num = sec.get("section_number")
+        if not isinstance(num, str) or not num.strip():
+            continue
+        title = str(sec.get("section_title") or "").strip()
+        account = str(sec.get("account_name") or "").strip() or title
+        if title:
+            out[num.strip()] = (title, account)
+    return out
+
+
+def _resolve_section_meta(
+    section_id: str, source_template: SourceTemplate | None
+) -> tuple[str, str | None]:
+    """新建附注时的标题/科目名：**优先查附注模板**（按变体），否则字符串兜底。
+
+    旧实现直接用 ``section_id`` 当 ``section_title``（如 "五、36"），附注树/
+    Word 导出显示的是章节号而非中文标题。这里按 ``source_template`` 先查对应
+    变体模板，未命中再查另一变体（同一章节号两变体标题通常一致），最后兜底。
+    """
+    if not section_id:
+        return "", None
+    key = section_id.strip()
+    order = ("listed", "soe")
+    if source_template == SourceTemplate.soe:
+        order = ("soe", "listed")
+    for variant in order:
+        hit = _template_section_meta(variant).get(key)
+        if hit:
+            return hit[0], (hit[1] or None)
+    return _derive_section_title(section_id), None
+
+
 def _derive_year(payload_year: int | None) -> int:
-    """优先使用 payload 中的 year，否则取当前年（兜底）。"""
+    """纯兜底：优先使用 payload 中的 year，否则取当前自然年。
+
+    注意：**不要**在同步路径直接用它推导目标年度——服务器当前自然年
+    与项目审计年度通常不同（如 2026 年做 2025 年报审计），会把底稿推送
+    写到错误年度的附注记录上，审计师在附注模块（按审计年度渲染）永远看不到。
+    同步路径统一走 :func:`_resolve_target_year`（以 ``projects.audit_year`` 为权威）。
+    """
     if payload_year and isinstance(payload_year, int):
         return payload_year
     return datetime.now(timezone.utc).year
+
+
+async def _resolve_project_audit_year(
+    db: AsyncSession, project_id: UUID
+) -> int | None:
+    """读项目审计年度（权威源 ``projects.audit_year``）；取不到返回 None（fail-open）。"""
+    try:
+        result = await db.execute(
+            sa.select(Project.audit_year).where(
+                Project.id == project_id,
+                Project.is_deleted == sa.false(),
+            )
+        )
+        year = result.scalar_one_or_none()
+        if isinstance(year, int) and year > 0:
+            return year
+    except Exception as err:  # pragma: no cover - 查询异常时安全降级
+        logger.warning(
+            "resolve audit_year failed for project %s: %s; falling back",
+            project_id, err,
+        )
+    return None
+
+
+async def _resolve_target_year(
+    db: AsyncSession, project_id: UUID, payload_year: int | None
+) -> int:
+    """派生同步目标年度：payload 显式年度 > 项目审计年度 > 当前自然年（兜底）。
+
+    前端各披露组件历史上普遍不传 ``year``，此前会 fallback 到服务器当前自然年，
+    导致同步落到错误年度的附注（附注模块看不到）。此处以 ``projects.audit_year``
+    为权威，一处修复覆盖全部披露组件；前端显式传 year 仍优先。
+    """
+    if payload_year and isinstance(payload_year, int):
+        return payload_year
+    audit_year = await _resolve_project_audit_year(db, project_id)
+    if audit_year is not None:
+        return audit_year
+    return _derive_year(None)
 
 
 async def sync_from_workpaper(
@@ -174,7 +273,7 @@ async def sync_from_workpaper(
         raise ValueError("section_id 不能为空")
     section_id = section_id.strip()
 
-    target_year = _derive_year(year)
+    target_year = await _resolve_target_year(db, project_id, year)
     now = datetime.now(timezone.utc)
     clean_sub_table_data, note_texts = _extract_note_texts(sub_table_data)
     rows_synced = _count_rows_synced(clean_sub_table_data)
@@ -189,6 +288,30 @@ async def sync_from_workpaper(
     )
     result = await db.execute(stmt)
     note = result.scalar_one_or_none()
+
+    # 软删行复活：唯一索引 uq_disclosure_notes_project_year_section 建在
+    # (project_id, year, note_section) 上且**不含 is_deleted** → 被软删的章节
+    # 仍占用唯一键。若此处只查 active 行就走 INSERT，会撞唯一键 500
+    # （实测：审计师删除某章节后底稿再同步 → 附注同步失败 UniqueViolationError）。
+    # 故命中软删行时改为复活复用该行（视同"更新"，保留其 id 与既有 table_data）。
+    revived = False
+    if note is None:
+        deleted_stmt = sa.select(DisclosureNote).where(
+            DisclosureNote.project_id == project_id,
+            DisclosureNote.year == target_year,
+            DisclosureNote.note_section == section_id,
+            DisclosureNote.is_deleted == sa.true(),
+        )
+        deleted_result = await db.execute(deleted_stmt)
+        note = deleted_result.scalar_one_or_none()
+        if note is not None:
+            note.is_deleted = False
+            revived = True
+            logger.info(
+                "wp_disclosure_sync: revived soft-deleted disclosure_note "
+                "project=%s year=%s section=%s",
+                project_id, target_year, section_id,
+            )
 
     # 构建合并后的 table_data
     # 约定：按子表 key 浅合并 sub_table_data（同名 key 覆盖，未推送的 key 保留），
@@ -252,11 +375,15 @@ async def sync_from_workpaper(
                 source_template_value = SourceTemplate.listed
             elif cs.startswith("soe"):
                 source_template_value = SourceTemplate.soe
+        derived_title, derived_account = _resolve_section_meta(
+            section_id, source_template_value
+        )
         note = DisclosureNote(
             project_id=project_id,
             year=target_year,
             note_section=section_id,
-            section_title=_derive_section_title(section_id),
+            section_title=derived_title,
+            account_name=derived_account,
             content_type=content_type,
             table_data=new_table_data,
             text_content=formatted_texts or None,
@@ -346,6 +473,8 @@ async def sync_from_workpaper(
         "synced_at": now.isoformat(),
         "rows_synced": rows_synced,
         "created": created,
+        # additive：本次是否复活了被软删的同键章节（唯一键含软删行，见上方复活逻辑）
+        "revived": revived,
         "blocked_by_manual_override": blocked_by_manual_override,
         "texts_synced": len(note_texts),
     }
@@ -473,16 +602,33 @@ class WpDisclosureSyncService:
         section_id = mapping["section_id"]
         last_sync_at = mapping.get("last_sync_at")
 
-        # 2. 读 disclosure_notes 当前值
-        note = await self._get_note(db, project_id, section_id)
+        # 2. 读 disclosure_notes 当前值（按项目审计年度定位，避免跨年度串记录）
+        target_year = await _resolve_target_year(db, project_id, None)
+        note = await self._get_note(db, project_id, section_id, year=target_year)
 
         if note is None:
-            # 无现有记录 → 新建
+            # 软删行复活（唯一键 (project_id, year, note_section) 不含 is_deleted，
+            # 直接 INSERT 会撞键 500）；命中则复用该行走更新分支
+            revived_stmt = sa.select(DisclosureNote).where(
+                DisclosureNote.project_id == project_id,
+                DisclosureNote.year == target_year,
+                DisclosureNote.note_section == section_id,
+                DisclosureNote.is_deleted == sa.true(),
+            )
+            revived_result = await db.execute(revived_stmt)
+            note = revived_result.scalar_one_or_none()
+            if note is not None:
+                note.is_deleted = False
+
+        if note is None:
+            # 无现有记录 → 新建（标题/科目名优先查附注模板，避免用章节号当标题）
+            html_title, html_account = _resolve_section_meta(section_id, None)
             note = DisclosureNote(
                 project_id=project_id,
-                year=now.year,
+                year=target_year,
                 note_section=section_id,
-                section_title=_derive_section_title(section_id),
+                section_title=html_title,
+                account_name=html_account,
                 content_type=ContentType.table,
                 table_data=(
                     {"sub_table_data": sub_table_data, "_sub_table_columns": sub_table_columns}
@@ -616,14 +762,25 @@ class WpDisclosureSyncService:
         return None
 
     async def _get_note(
-        self, db: AsyncSession, project_id: UUID, section_id: str
+        self,
+        db: AsyncSession,
+        project_id: UUID,
+        section_id: str,
+        *,
+        year: int | None = None,
     ) -> DisclosureNote | None:
-        """读 disclosure_notes 当前值。"""
+        """读 disclosure_notes 当前值。
+
+        传 ``year`` 时按年度精确定位（同一 section 跨年度并存时避免
+        ``scalar_one_or_none`` 抛 MultipleResultsFound）；不传保持原行为。
+        """
         stmt = sa.select(DisclosureNote).where(
             DisclosureNote.project_id == project_id,
             DisclosureNote.note_section == section_id,
             DisclosureNote.is_deleted == sa.false(),
         )
+        if year is not None:
+            stmt = stmt.where(DisclosureNote.year == year)
         result = await db.execute(stmt)
         return result.scalar_one_or_none()
 

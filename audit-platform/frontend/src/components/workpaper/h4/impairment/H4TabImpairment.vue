@@ -79,7 +79,7 @@
     <div class="section-header mode-row">
       <span>减值测算表 H4-7</span>
       <el-segmented
-        v-model="dualMode.currentMode.value"
+        :model-value="dualMode.currentMode.value"
         :options="dualMode.modeOptions"
         size="small"
         @change="dualMode.onModeChange"
@@ -334,6 +334,7 @@ import { ElMessage } from 'element-plus'
 import { useH4Impairment, H4_MATERIAL_CATEGORIES } from '../../composables/useH4Impairment'
 import { useH4DualMode } from '../../composables/useH4DualMode'
 import GtIndexChip from '../../GtIndexChip.vue'
+import { eventBus } from '@/utils/eventBus'
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('../../GtOnlyOfficeSheet.vue'))
 
@@ -385,8 +386,19 @@ function handleImportConcerns() {
 
 function handlePushAje() {
   const res = state.pushAjeDraftToH43()
-  if (res.ok) ElMessage.success(res.message)
-  else ElMessage.warning(res.message)
+  if (res.ok) {
+    ElMessage.success(res.message)
+    // 推送减值信号到 K11 资产减值损失（对齐 F2/H1/H3/H8/I1 范式）
+    eventBus.emit('impairment:calculated', {
+      wpCode: 'H4',
+      supplement: state.totalSupplement.value,
+      totalRequiredProvision: state.totalRequiredProvision.value,
+      accountCode: '1605',
+      timestamp: Date.now(),
+    })
+  } else {
+    ElMessage.warning(res.message)
+  }
 }
 
 function handleDraftConclusion() {

@@ -330,6 +330,37 @@ describe('集成测试 — N1-5→N1-4 亏损可确认回填 (Req 5.5)', () => {
     })
     scope.stop()
   })
+
+  /**
+   * Property 12: 跨表键不回退
+   * 任一保存后 allResponses['N1-5-total-recognizable'].remark 等于 String(totals.recognizableAsset)，
+   * useN1CrossSheet.lossCheckToCalcTable 读到的值与 Property 4 一致。
+   *
+   * Validates: Requirements 5.1, 8.1
+   * Spec: n1-loss-check-source-alignment Task 7.1
+   */
+  it('Property 12: 跨表键 N1-5-total-recognizable 被 lossCheckToCalcTable 消费且值一致', () => {
+    // Property 4: recognizableAsset = effectiveRecognized × taxRate
+    // Σ recognizableAsset across non-expired rows → total
+    const recognized1 = 300000
+    const rate1 = 0.25
+    const recognized2 = 500000
+    const rate2 = 0.15
+    const expectedAsset = parseFloat((recognized1 * rate1 + recognized2 * rate2).toFixed(2))
+    // = 75000 + 75000 = 150000
+
+    const responses = createResponses([
+      ['N1-5-total-recognizable', null, String(expectedAsset)],
+    ])
+
+    const scope = effectScope()
+    scope.run(() => {
+      const { lossCheckToCalcTable } = useN1CrossSheet(responses)
+      // Property 12: crossSheet 读取值 === String(totals.recognizableAsset) 写入的值
+      expect(lossCheckToCalcTable.value.total).toBe(expectedAsset)
+    })
+    scope.stop()
+  })
 })
 
 // ═══════════════════════════════════════════════════════════════════════════════

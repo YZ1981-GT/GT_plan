@@ -21,7 +21,11 @@ import {
   buildH1ListedSubTableData,
   buildH1ListedSyncPayloads,
 } from '../h1DisclosureSyncPayload'
-import { H1_LISTED_SUBTABLE, H1_NOTE_SECTION } from '../h1NoteSectionMap'
+import {
+  H1_LISTED_SUBTABLE,
+  H1_NOTE_SECTION,
+  resolveH1CurrentStandardFromProject,
+} from '../h1NoteSectionMap'
 
 describe('h1ListedDisclosureModel — 已提足折旧仍在使用', () => {
   it('sumFullyDep sums original cost', () => {
@@ -138,7 +142,7 @@ describe('h1DisclosureSyncPayload', () => {
     expect(data._note_texts?.some((t) => t.section === 'gov-subsidy')).toBe(true)
   })
 
-  it('buildH1ListedSyncPayloads 目标五、15', () => {
+  it('buildH1ListedSyncPayloads 目标五、22（权威 note_template_variant_matrix；五、15 是其他债权投资）', () => {
     const payloads = buildH1ListedSyncPayloads('wp-1', ['listed_standalone'], {
       summary: createDefaultSummary(),
       categories: [],
@@ -156,6 +160,27 @@ describe('h1DisclosureSyncPayload', () => {
     expect(payloads).toHaveLength(1)
     expect(payloads[0].section_id).toBe(H1_NOTE_SECTION.listed)
     expect(payloads[0].sheet_name).toBe('附注披露信息（上市公司）')
-    expect(payloads[0].section_id).toBe('五、15')
+    expect(payloads[0].section_id).toBe('五、22')
+  })
+
+  it('current_standard 以项目 template_type + report_scope 为权威', () => {
+    const snap = {
+      summary: createDefaultSummary(),
+      categories: [],
+      movement: {},
+      idle: [],
+      leaseOut: [],
+      titleCert: [],
+      clearing: [],
+      govSubsidy: { amount: 0, text: '' },
+      noteImpairment: '',
+      noteMortgage: '',
+      noteSale: '',
+      noteClearing: '',
+    }
+    const p = buildH1ListedSyncPayloads('wp-1', [], snap, {
+      currentStandard: resolveH1CurrentStandardFromProject('listed', 'listed', 'consolidated'),
+    })
+    expect(p[0].current_standard).toBe('listed_consolidated')
   })
 })

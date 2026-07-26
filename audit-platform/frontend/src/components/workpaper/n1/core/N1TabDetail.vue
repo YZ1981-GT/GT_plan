@@ -1,13 +1,11 @@
 <template>
   <div class="n1-tab-detail">
-    <!-- ═══ 双模式切换 ═══ -->
-    <div class="n1-mode-bar">
-      <el-segmented v-model="dualMode.mode.value" :options="dualMode.modeOptions.value" @change="dualMode.switchMode" />
-    </div>
+    <!-- 双模式切换栏由入口 GtN1DeferredTaxAssets 统一渲染（避免双层切换栏 + 两个实例状态不同步） -->
 
     <!-- ═══ OnlyOffice 降级模式 ═══ -->
     <template v-if="dualMode.isOnlyOffice.value">
-      <GtOnlyOfficeSheet :wp-id="wpId" :project-id="projectId" sheet-name="明细表N1-2" style="height: 100%; min-height: 600px" />
+      <!-- 铁律：sheet-name 必须与源 xlsx tab 名完全一致 -->
+      <GtOnlyOfficeSheet :wp-id="wpId" :project-id="projectId" sheet-name="递延所得税资产明细表N1-2" style="height: 100%; min-height: 600px" />
     </template>
 
     <!-- ═══ 结构化 / 矩阵视图 ═══ -->
@@ -32,14 +30,33 @@
               </el-dropdown-menu>
             </template>
           </el-dropdown>
+          <el-button size="small" :disabled="isReadonly" @click="handlePullFromCalcTable">
+            从 N1-4 带入账面/计税基础
+          </el-button>
           <el-button size="small" @click="handleAiAssist">
             <el-icon><MagicStick /></el-icon> AI辅助
           </el-button>
-          <el-button size="small" @click="handleReview">
-            <el-icon><ChatDotSquare /></el-icon> 复核
-          </el-button>
+          <GtReviewTrigger section-id="N1-2-明细表" label="💬 复核" />
         </div>
       </div>
+
+      <!-- ═══ 与 N1-4 测算表一致性提示（同名项目账面价值/计税基础不一致） ═══ -->
+      <el-alert
+        v-if="calcTableMismatches.length > 0"
+        type="warning"
+        :closable="false"
+        show-icon
+        class="calc-mismatch-alert"
+      >
+        <template #title>
+          与 N1-4 测算表不一致（{{ calcTableMismatches.length }} 项），请核对后统一口径
+        </template>
+        <ul class="mismatch-list">
+          <li v-for="(m, i) in calcTableMismatches.slice(0, 8)" :key="i">
+            {{ m.itemName }} · {{ m.field }}：N1-2 {{ fmtAmount(m.detailValue) }} ／ N1-4 {{ fmtAmount(m.calcValue) }}
+          </li>
+        </ul>
+      </el-alert>
 
       <!-- ═══ 方法论上下文（琥珀色左边线+浅黄背景） ═══ -->
       <div class="methodology-context">
@@ -321,15 +338,18 @@
  *
  * 科目：1811 递延所得税资产（借方/资产类！期末=期初+借-贷）
  */
-import { ref, computed, inject } from 'vue'
+import { ref, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { MagicStick, ChatDotSquare, ArrowDown } from '@element-plus/icons-vue'
+import { MagicStick, ArrowDown } from '@element-plus/icons-vue'
 import { useN1FormData } from '../../composables/useN1FormData'
 import { useN1Detail } from '../../composables/useN1Detail'
 import { useN1ImportExport } from '../../composables/useN1ImportExport'
+import { generateN1Text } from '../../composables/useN1AiText'
 import { useN1DualMode } from '../../composables/useN1DualMode'
 import GtOnlyOfficeSheet from '@/components/workpaper/GtOnlyOfficeSheet.vue'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
+// @ts-ignore
+import GtReviewTrigger from '@/components/workpaper/GtReviewTrigger.vue'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -337,14 +357,9 @@ const props = defineProps<{
   wpId: string
   isReadonly?: boolean
   projectId?: string
+  /** 审计年度（TB 兜底取数用） */
+  year?: number
 }>()
-
-// ─── Inject 复核对话 ─────────────────────────────────────────────────────────
-
-const openReviewDialog = inject<((section: string) => void) | undefined>(
-  'openReviewDialog',
-  undefined,
-)
 
 // ─── Refs ────────────────────────────────────────────────────────────────────
 
@@ -352,6 +367,7 @@ const wpIdRef = computed(() => props.wpId)
 const projectIdRef = computed(() => props.projectId || '')
 const isReadonly = computed(() => props.isReadonly ?? false)
 const fileInputRef = ref<HTMLInputElement | null>(null)
+const aiLoading = ref(false)
 
 // ─── 双模式 ──────────────────────────────────────────────────────────────────
 
@@ -362,6 +378,7 @@ const dualMode = useN1DualMode({ wpId: wpIdRef })
 const formData = useN1FormData({
   wpId: wpIdRef,
   projectId: projectIdRef,
+  year: computed(() => props.year || undefined),
 })
 
 // ─── allResponses reactive wrapper ───────────────────────────────────────────
@@ -376,6 +393,8 @@ const {
   removeRow,
   updateRow,
   seedDefaultRows,
+  pullFromCalcTable,
+  calcTableMismatches,
   totals,
   stats,
 } = useN1Detail({
@@ -471,6 +490,30 @@ async function handleSeedDefaults() {
   }
 }
 
+// ─── 从 N1-4 测算表带入账面价值/计税基础/期末税率（仅填空） ────────────────────
+
+async function handlePullFromCalcTable() {
+  try {
+    await ElMessageBox.confirm(
+      '将按「项目名称」从 N1-4 测算表带入账面价值、计税基础、期末适用税率。已录入的数值不会被覆盖，不一致项会在上方提示。',
+      '从 N1-4 带入',
+      { type: 'info', confirmButtonText: '带入', cancelButtonText: '取消' },
+    )
+  } catch {
+    return
+  }
+  const { matched, filled } = pullFromCalcTable()
+  if (matched === 0) {
+    ElMessage.warning('N1-4 测算表暂无可匹配项目（请先编制 N1-4 或核对项目名称）')
+    return
+  }
+  if (filled === 0) {
+    ElMessage.info(`匹配 ${matched} 个项目，均已有数值，未做覆盖`)
+    return
+  }
+  ElMessage.success(`匹配 ${matched} 个项目，带入 ${filled} 个空值字段`)
+}
+
 // ─── 删除行 ──────────────────────────────────────────────────────────────────
 
 async function handleRemoveRow(index: number) {
@@ -513,23 +556,37 @@ async function handleFileSelected(event: Event) {
 
 // ─── AI辅助 / 复核 ──────────────────────────────────────────────────────────
 
-function handleAiAssist() {
-  import('@/utils/http').then(({ default: h }) => {
-    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+/**
+ * AI 辅助（真取回并展示）。明细表无说明字段，用顾问式弹窗呈现建议。
+ * context 值全部转字符串（后端 dict[str,str]，数字会 422）。
+ */
+async function handleAiAssist() {
+  if (aiLoading.value) return
+  aiLoading.value = true
+  try {
+    const s = stats.value
+    const t = totals.value
+    const text = await generateN1Text({
+      wpId: props.wpId,
       section: 'n1-detail',
-      prompt: '请基于递延所得税资产底稿数据，给出审计分析建议',
-      context: { wpId: props.wpId },
-    }).catch(() => {})
-  })
-}
-
-function handleReview() {
-  if (openReviewDialog) {
-    openReviewDialog('N1-2-明细表')
-  } else {
-    ElMessage.info('复核对话未配置')
+      prompt:
+        '请基于递延所得税资产明细表（按暂时性差异项目）的期初/期末暂时性差异、适用税率与递延税资产审定数，给出审计分析建议（项目完整性、税率适用、期末与期初变动合理性、与审定表勾稽）。',
+      context: {
+        差异项目数: String(s.itemCount),
+        期末可抵扣暂时性差异合计: String(s.totalDeductibleDiff),
+        期末递延税资产审定合计: String(s.totalDeferredTaxAsset),
+        加权平均税率: String(s.weightedAvgRate),
+        期初递延税资产审定合计: String(t.beginAudited),
+      },
+    })
+    if (!text) return
+    await ElMessageBox.alert(text, 'AI 辅助建议', { confirmButtonText: '知道了' }).catch(() => {})
+  } finally {
+    aiLoading.value = false
   }
 }
+
+// 复核入口改用 GtReviewTrigger（自带蓝/红点，内部 inject openReviewDialog）
 </script>
 
 <style scoped>
@@ -565,6 +622,17 @@ function handleReview() {
 
 .asset-tag {
   font-size: 11px;
+}
+
+.calc-mismatch-alert {
+  margin-bottom: 12px;
+}
+
+.mismatch-list {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.7;
 }
 
 .section-actions {

@@ -57,9 +57,11 @@ _SUPPORTED_SECTIONS = {
     "related-party-conclusion",
     "unrecorded-conclusion",
     "unrecorded-note",
+    "voucher-check",
     "voucher-check-note",
     "voucher-check-conclusion",
     "voucher-check-issue",
+    "financing-evaluation",
     "financing-note",
     "financing-conclusion",
     "disclosure-listed",
@@ -257,6 +259,10 @@ _SECTION_PROMPTS: dict[str, str] = {
         "C为存在重大披露遗漏或错报。只输出可直接填入底稿的结论正文。"
     ),
 }
+
+# 区块级别名：前端按整个区块请求时（不带 -note 后缀）复用该区块的说明提示词
+_SECTION_PROMPTS["voucher-check"] = _SECTION_PROMPTS["voucher-check-note"]
+_SECTION_PROMPTS["financing-evaluation"] = _SECTION_PROMPTS["financing-note"]
 
 
 @router.post("/api/workpapers/{wp_id}/f4/ai-generate")

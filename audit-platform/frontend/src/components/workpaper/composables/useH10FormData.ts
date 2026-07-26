@@ -184,6 +184,7 @@ export function useH10FormData(opts: { wpId: Ref<string>; projectId: Ref<string>
         assetType: payload.assetType ?? '固定资产',
         sourceWp: 'H6',
         disposalIncome: payload.disposalIncome,
+        disposalGainLoss: payload.disposalGainLoss ?? payload.disposalIncome ?? 0,
         originalCost: payload.netBookValue,
       },
     ]

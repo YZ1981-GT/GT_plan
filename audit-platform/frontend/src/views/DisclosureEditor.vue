@@ -1833,6 +1833,8 @@ async function jumpToDisclosureSheet(): Promise<void> {
     K1: '其他应收款',
     K11: '资产减值损失',
     K13: '营业外支出',
+    N1: '递延所得税资产',
+    J1: '应付职工薪酬',
   }
   const wpFamilyLabel = wpFamilyLabelMap[wpFamily] ?? wpFamily
   if (!target || !projectId.value) {

@@ -30,7 +30,10 @@ from ._context import RenderContext
 logger = logging.getLogger(__name__)
 
 _N1_ACCOUNT_CODE = "1811"
-_ADJUDICATED_ITEM_ID = "N1-1-adjudicated-amount"
+# 🔴 审定数真源键：前端 useN1Adjudication._syncTotals 写 `N1-1-total-audited` 的 remark 列。
+# 旧常量 `N1-1-adjudicated-amount`(conclusion) 前端从未写过 → adjudicated_amount 恒 None（死字段）。
+_ADJUDICATED_ITEM_ID = "N1-1-total-audited"
+_ADJUDICATED_LEGACY_ITEM_ID = "N1-1-adjudicated-amount"
 
 N1_SHEETS = [
     {"sheet_name": "底稿目录", "component_type": "n1-deferred-tax-assets"},
@@ -74,27 +77,47 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict[str, Any]:
         "end_balance": 0,
     }
     try:
-        active_filter = get_active_filter(ctx.project_id)
-        stmt = (
-            sa.select(
+        # 平台统一范式：await get_active_filter(db, Table.__table__, project_id, year)
+        active_filter = await get_active_filter(
+            ctx.db, TbBalance.__table__, ctx.project_id, ctx.year or 0
+        )
+        # ① 优先取科目级精确行（父级即科目总额，不与子科目双算）
+        exact_stmt = sa.select(
+            TbBalance.opening_balance.label("begin_balance"),
+            TbBalance.debit_amount,
+            TbBalance.credit_amount,
+            TbBalance.closing_balance.label("end_balance"),
+        ).where(
+            TbBalance.account_code == _N1_ACCOUNT_CODE,
+            active_filter,
+        )
+        rows = (await ctx.db.execute(exact_stmt)).fetchall()
+
+        # ② 无科目级行（客户按子科目挂账）→ 取叶子子科目聚合（排除父级本身，避免双算）
+        if not rows:
+            leaf_stmt = sa.select(
                 TbBalance.opening_balance.label("begin_balance"),
                 TbBalance.debit_amount,
                 TbBalance.credit_amount,
                 TbBalance.closing_balance.label("end_balance"),
-            )
-            .where(
-                TbBalance.project_id == str(ctx.project_id),
-                TbBalance.account_code == _N1_ACCOUNT_CODE,
+                TbBalance.account_code,
+            ).where(
+                TbBalance.account_code.like(f"{_N1_ACCOUNT_CODE}%"),
                 active_filter,
             )
-            .limit(1)
-        )
-        row = (await ctx.db.execute(stmt)).fetchone()
-        if row:
-            result["begin_balance"] = _parse_num(row.begin_balance)
-            result["debit_amount"] = _parse_num(row.debit_amount)
-            result["credit_amount"] = _parse_num(row.credit_amount)
-            result["end_balance"] = _parse_num(row.end_balance)
+            all_rows = (await ctx.db.execute(leaf_stmt)).fetchall()
+            codes = [r.account_code for r in all_rows]
+            rows = [
+                r
+                for r in all_rows
+                if not any(c != r.account_code and c.startswith(r.account_code) for c in codes)
+            ]
+
+        for row in rows:
+            result["begin_balance"] += _parse_num(row.begin_balance)
+            result["debit_amount"] += _parse_num(row.debit_amount)
+            result["credit_amount"] += _parse_num(row.credit_amount)
+            result["end_balance"] += _parse_num(row.end_balance)
     except Exception as e:  # noqa: BLE001
         logger.warning("N1 render: TB 取数失败: %s", e)
     return result
@@ -129,11 +152,18 @@ async def render(ctx: RenderContext) -> dict[str, Any]:
                 "conclusion": r.conclusion,
                 "remark": r.remark,
             }
-        # 提取审定数
-        if _ADJUDICATED_ITEM_ID in responses_snapshot:
-            raw_adj = responses_snapshot[_ADJUDICATED_ITEM_ID].get("conclusion")
+        # 提取审定数（真源 remark；旧键作向后兼容回退）
+        snap = responses_snapshot.get(_ADJUDICATED_ITEM_ID)
+        if snap is not None:
+            raw_adj = snap.get("remark") or snap.get("conclusion")
             if raw_adj is not None:
                 adjudicated_amount = _parse_num(raw_adj)
+        if adjudicated_amount is None:
+            legacy = responses_snapshot.get(_ADJUDICATED_LEGACY_ITEM_ID)
+            if legacy is not None:
+                raw_legacy = legacy.get("conclusion") or legacy.get("remark")
+                if raw_legacy is not None:
+                    adjudicated_amount = _parse_num(raw_legacy)
     except Exception as e:  # noqa: BLE001
         logger.warning("N1 render: checklist_responses 查询失败: %s", e)
 

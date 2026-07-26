@@ -1,13 +1,11 @@
 <template>
   <div class="n1-tab-calc-table">
-    <!-- ═══ 双模式切换 ═══ -->
-    <div class="n1-mode-bar">
-      <el-segmented v-model="dualMode.mode.value" :options="dualMode.modeOptions.value" @change="dualMode.switchMode" />
-    </div>
+    <!-- 双模式切换栏由入口 GtN1DeferredTaxAssets 统一渲染（避免双层切换栏 + 两个实例状态不同步） -->
 
     <!-- ═══ OnlyOffice 降级模式 ═══ -->
     <template v-if="dualMode.isOnlyOffice.value">
-      <GtOnlyOfficeSheet :wp-id="wpId" :project-id="projectId" sheet-name="测算表N1-4" style="height: 100%; min-height: 600px" />
+      <!-- 铁律：sheet-name 必须与源 xlsx tab 名完全一致 -->
+      <GtOnlyOfficeSheet :wp-id="wpId" :project-id="projectId" sheet-name="递延所得税资产（负债）测算表N1-4" style="height: 100%; min-height: 600px" />
     </template>
 
     <!-- ═══ 结构化视图 ═══ -->
@@ -59,6 +57,12 @@
               <el-button size="small" @click="handleRefreshFromDetail">
                 <el-icon><RefreshRight /></el-icon> 从N1-2刷新
               </el-button>
+              <el-button size="small" :disabled="isReadonly" @click="handlePullFromLossCheck">
+                从N1-5带入可弥补亏损
+              </el-button>
+              <el-button size="small" type="warning" plain :disabled="isReadonly" @click="handlePushDiffToAdjustment">
+                推送差异至N1-3
+              </el-button>
               <el-dropdown trigger="click" @command="handleImportExportCmd">
                 <el-button size="small">导入导出 ▾</el-button>
                 <template #dropdown>
@@ -72,9 +76,7 @@
               <el-button size="small" @click="handleAI('calc')">
                 <el-icon><MagicStick /></el-icon> AI辅助
               </el-button>
-              <el-button size="small" @click="openReview?.('N1-4-测算表')">
-                <el-icon><ChatDotSquare /></el-icon> 复核
-              </el-button>
+              <GtReviewTrigger section-id="N1-4-测算表" label="💬 复核" />
             </div>
           </div>
         </template>
@@ -424,9 +426,7 @@
               <el-button size="small" @click="handleAI('conclusion')">
                 <el-icon><MagicStick /></el-icon> AI辅助
               </el-button>
-              <el-button size="small" @click="openReview?.('N1-4-结论')">
-                <el-icon><ChatDotSquare /></el-icon> 复核
-              </el-button>
+              <GtReviewTrigger section-id="N1-4-结论" label="💬 复核" />
             </div>
           </div>
         </template>
@@ -496,11 +496,13 @@
  *
  * 科目：1811 递延所得税资产（**借方/资产类**！期末余额=期初+借-贷）
  */
-import { ref, computed, inject, onMounted, toRef } from 'vue'
+import { ref, computed, onMounted, onUnmounted, toRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { WarningFilled, MagicStick, ChatDotSquare, RefreshRight } from '@element-plus/icons-vue'
+import { WarningFilled, MagicStick, RefreshRight } from '@element-plus/icons-vue'
 // @ts-ignore
 import GtIndexChip from '../../GtIndexChip.vue'
+// @ts-ignore
+import GtReviewTrigger from '../../GtReviewTrigger.vue'
 // @ts-ignore
 import GtOnlyOfficeSheet from '../../GtOnlyOfficeSheet.vue'
 import { useN1FormData } from '../../composables/useN1FormData'
@@ -508,6 +510,8 @@ import { useN1CalcTable } from '../../composables/useN1CalcTable'
 import { useN1CrossSheet } from '../../composables/useN1CrossSheet'
 import { useN1DualMode } from '../../composables/useN1DualMode'
 import { useN1ImportExport } from '../../composables/useN1ImportExport'
+import { generateN1Text } from '../../composables/useN1AiText'
+import { deriveDisclosureLossRows } from '../../composables/useN1DisclosureSource'
 import { eventBus } from '@/utils/eventBus'
 import type { N1CalcTableComputed } from '../../composables/useN1CalcTable'
 
@@ -517,11 +521,12 @@ const props = defineProps<{
   wpId: string
   projectId: string
   isReadonly: boolean
+  /** 审计年度（TB 兜底取数用） */
+  year?: number
 }>()
 
-// ─── Inject 复核对话 ─────────────────────────────────────────────────────────
-
-const openReview = inject<(section: string) => void>('openReviewDialog', undefined)
+// ─── 复核入口 ────────────────────────────────────────────────────────────────
+// 改用 GtReviewTrigger（自带蓝/红点，内部 inject openReviewDialog）
 
 // ─── Composables ─────────────────────────────────────────────────────────────
 
@@ -529,7 +534,11 @@ const wpIdRef = toRef(props, 'wpId')
 const projectIdRef = toRef(props, 'projectId')
 
 const dualMode = useN1DualMode({ wpId: wpIdRef })
-const formData = useN1FormData({ wpId: wpIdRef, projectId: projectIdRef })
+const formData = useN1FormData({
+  wpId: wpIdRef,
+  projectId: projectIdRef,
+  year: computed(() => props.year || undefined),
+})
 const crossSheet = useN1CrossSheet(formData.allResponses)
 const importExport = useN1ImportExport({ wpId: wpIdRef, projectId: projectIdRef })
 
@@ -544,6 +553,7 @@ const calcTable = useN1CalcTable({
 
 const writebackAssetLoading = ref(false)
 const writebackLiabilityLoading = ref(false)
+const aiLoading = ref(false)
 const auditNotes = ref('')
 const auditConclusion = ref('')
 
@@ -561,6 +571,17 @@ const liabilityRows = computed<N1CalcTableComputed[]>(() =>
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 
+/**
+ * N1-5「回填 → N1-4/N1-1」发出的事件消费者。
+ *
+ * 🔴 此前 `loss-check:recognizable-updated` 无任何消费者（死 emit）：
+ *    N1-5 点回填后 N1-4 侧的可确认额提示不刷新，除非手工重进本 tab。
+ *    这里重新加载 checklist_responses 使 crossSheet.lossCheckToCalcTable 立即更新。
+ */
+function onLossRecognizableUpdated(): void {
+  void formData.loadData()
+}
+
 onMounted(async () => {
   await formData.loadData()
   // 恢复审计说明/结论
@@ -568,6 +589,11 @@ onMounted(async () => {
   if (notes) auditNotes.value = String(notes)
   const conclusion = formData.getField('4', 'audit-conclusion')
   if (conclusion) auditConclusion.value = String(conclusion)
+  eventBus.on('loss-check:recognizable-updated' as any, onLossRecognizableUpdated)
+})
+
+onUnmounted(() => {
+  eventBus.off('loss-check:recognizable-updated' as any, onLossRecognizableUpdated)
 })
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -675,6 +701,193 @@ function handleRefreshFromDetail() {
   }
 }
 
+// ─── 从 N1-5 带入可弥补亏损行 ────────────────────────────────────────────────
+
+const N1_LOSS_ITEM_NAME = '可用以后年度税前利润弥补的亏损'
+
+/**
+ * 从 N1-5 亏损检查表带入「可弥补亏损」测算行（新模型 N1-5-rows）。
+ *
+ * 口径：计税基础 = Σ effectiveRecognized（非届满行），账面价值 = 0
+ *      → 可抵扣暂时性差异即该金额；税率取 N1-5 加权税率。
+ * 🔴 仅填空不覆盖：已有该行且已录金额时确认后覆盖。
+ * 🔴 N1-5-total-recognizable 继续写入且与 Property 4 一致。
+ *
+ * Spec: n1-loss-check-source-alignment Task 6.1 / Req 5.1, 5.2
+ */
+async function handlePullFromLossCheck() {
+  // 优先读新键 N1-5-rows（新模型 useN1LossCheck）
+  const newKeyEntry = formData.allResponses.value.get('N1-5-rows')
+  let v2Rows: any[] = []
+  if (newKeyEntry) {
+    const raw = newKeyEntry?.conclusion ?? newKeyEntry
+    if (typeof raw === 'string' && raw) {
+      try { v2Rows = JSON.parse(raw) } catch { v2Rows = [] }
+    }
+    if (!Array.isArray(v2Rows)) v2Rows = []
+  }
+
+  if (v2Rows.length > 0) {
+    // 新模型取数：按源模板结构派生（同 useN1LossCheck 公式）
+    const year = props.year || new Date().getFullYear()
+    let base = 0
+    let asset = 0
+    for (const row of v2Rows) {
+      const expiryYear = Number(row.expiryYear) || 0
+      const isExpired = expiryYear < year
+      if (isExpired) continue
+      const bookAmount = Number(row.bookAmount) || 0
+      const auditAdjustment = Number(row.auditAdjustment) || 0
+      const auditedAmount = bookAmount + auditAdjustment
+      const recognizedAmount = Number(row.recognizedAmount) || 0
+      const effectiveRecognized = recognizedAmount // non-expired
+      const taxRate = Number(row.taxRate) || 0.25
+      base += effectiveRecognized
+      asset += effectiveRecognized * taxRate
+    }
+    base = parseFloat(base.toFixed(2))
+    asset = parseFloat(asset.toFixed(2))
+    if (base <= 0) {
+      ElMessage.warning('N1-5 无可确认的可弥补亏损（均已届满或确认额为 0）')
+      return
+    }
+    const rate = base > 0 ? parseFloat((asset / base).toFixed(4)) : 0.25
+    await _applyLossToCalcRow(base, rate)
+    return
+  }
+
+  // 回退旧键 N1-5-loss-rows（legacy 兼容）
+  const rows = deriveDisclosureLossRows(
+    formData.allResponses.value,
+    props.year || new Date().getFullYear(),
+  )
+  if (rows.length === 0) {
+    ElMessage.warning('N1-5 亏损检查表暂无数据，请先编制 N1-5')
+    return
+  }
+  let base = 0
+  let asset = 0
+  for (const r of rows) {
+    if (r.isExpired) continue
+    base += Math.min(r.unrecovered, r.futureTaxableIncome)
+    asset += r.recognizableAsset
+  }
+  base = parseFloat(base.toFixed(2))
+  if (base <= 0) {
+    ElMessage.warning('N1-5 无可确认的可弥补亏损（均已届满或预计应纳税所得额为 0）')
+    return
+  }
+  const rate = asset > 0 ? parseFloat((asset / base).toFixed(4)) : 0.25
+  await _applyLossToCalcRow(base, rate)
+}
+
+/** 应用可弥补亏损到 N1-4 测算行（仅填空不覆盖，确认后覆盖） */
+async function _applyLossToCalcRow(base: number, rate: number) {
+  const idx = calcTable.rows.value.findIndex((r) => r.itemName === N1_LOSS_ITEM_NAME)
+  if (idx >= 0) {
+    const existing = calcTable.rows.value[idx]
+    if (existing.taxBase !== 0 || existing.bookValue !== 0) {
+      try {
+        await ElMessageBox.confirm(
+          `「${N1_LOSS_ITEM_NAME}」已录入数值（计税基础 ${fmtAmt(existing.taxBase)}），是否用 N1-5 结果覆盖？`,
+          '覆盖确认',
+          { type: 'warning', confirmButtonText: '覆盖', cancelButtonText: '取消' },
+        )
+      } catch {
+        return
+      }
+    }
+    calcTable.updateRow(idx, 'bookValue', 0)
+    calcTable.updateRow(idx, 'taxBase', base)
+    calcTable.updateRow(idx, 'taxRate', rate)
+  } else {
+    calcTable.addRow(N1_LOSS_ITEM_NAME)
+    const newIdx = calcTable.rows.value.length - 1
+    calcTable.updateRow(newIdx, 'bookValue', 0)
+    calcTable.updateRow(newIdx, 'taxBase', base)
+    calcTable.updateRow(newIdx, 'taxRate', rate)
+  }
+  ElMessage.success(`已从 N1-5 带入可弥补亏损 ${fmtAmt(base)}（税率 ${fmtPercent(rate)}）`)
+}
+}
+
+// ─── 差异推送 N1-3 建议调整分录 ──────────────────────────────────────────────
+
+interface N1AdjustmentEntryLike {
+  id: string
+  type: 'AJE' | 'RJE'
+  description: string
+  category: string
+  reportItem: string
+  accountName: string
+  noteItem: string
+  debitAmount: number
+  creditAmount: number
+  refIndex: string
+  remark: string
+}
+
+const DIFF_PUSH_PREFIX = '【N1-4测算差异】'
+
+/** 应确认额 ≠ 账面余额的行 → N1-3 建议 AJE（去重追加，不覆盖已有分录） */
+async function handlePushDiffToAdjustment() {
+  const diffRows = calcTable.rows.value.filter((r) => Math.abs(r.assetDiff) > 0.01)
+  if (diffRows.length === 0) {
+    ElMessage.info('递延所得税资产应确认额与账面余额一致，无需生成调整分录')
+    return
+  }
+  try {
+    await ElMessageBox.confirm(
+      `将按 ${diffRows.length} 个差异项目生成 N1-3 建议调整分录（借/贷方向按差异正负确定），同名事项不重复追加。是否继续？`,
+      '推送差异至 N1-3',
+      { type: 'warning', confirmButtonText: '推送', cancelButtonText: '取消' },
+    )
+  } catch {
+    return
+  }
+
+  // 读取 N1-3 现有分录（键与 N1TabAdjustment 一致）
+  let entries: N1AdjustmentEntryLike[] = []
+  const stored = formData.allResponses.value.get('N1-3-entries')
+  if (stored?.conclusion) {
+    try {
+      const parsed = JSON.parse(stored.conclusion)
+      if (Array.isArray(parsed)) entries = parsed
+    } catch { /* 解析失败按空处理，不覆盖原始串 */ }
+  }
+  const existingDesc = new Set(entries.map((e) => String(e.description ?? '')))
+
+  let added = 0
+  for (const r of diffRows) {
+    const description = `${DIFF_PUSH_PREFIX}${r.itemName}`
+    if (existingDesc.has(description)) continue
+    const diff = parseFloat(r.assetDiff.toFixed(2))
+    entries.push({
+      id: `adj-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      type: 'AJE',
+      description,
+      category: '账项调整',
+      reportItem: '递延所得税资产',
+      accountName: '递延所得税资产',
+      noteItem: '递延所得税资产',
+      // 应确认 > 账面 → 补提（借递延所得税资产）；反之冲减（贷方）
+      debitAmount: diff > 0 ? diff : 0,
+      creditAmount: diff < 0 ? Math.abs(diff) : 0,
+      refIndex: 'N1-4',
+      remark: `测算应确认 ${fmtAmt(r.deferredTaxAsset)} − 账面 ${fmtAmt(r.assetBookBalance)}`,
+    })
+    existingDesc.add(description)
+    added += 1
+  }
+
+  if (added === 0) {
+    ElMessage.info('差异项目均已推送过，未新增分录')
+    return
+  }
+  await formData.saveField('N1-3-entries', { conclusion: JSON.stringify(entries) })
+  ElMessage.success(`已推送 ${added} 条建议调整分录至 N1-3（需在 N1-3 复核对方科目并配平）`)
+}
+
 // ─── 回填N1-1（递延税资产合计） ──────────────────────────────────────────────
 
 async function handleWritebackAsset() {
@@ -729,12 +942,13 @@ async function handlePublishToN3() {
 // ─── 导入导出命令 ────────────────────────────────────────────────────────────
 
 async function handleImportExportCmd(cmd: string) {
+  // 🔴 必须显式传 'N1-4'：后端 sheet 默认值是 N1-2，漏传会导出/覆盖 N1-2 明细表数据
   switch (cmd) {
     case 'export-template':
-      await importExport.exportTemplate()
+      await importExport.exportTemplate('N1-4')
       break
     case 'export-data':
-      await importExport.exportData()
+      await importExport.exportData('N1-4')
       break
     case 'import-data': {
       // 创建隐藏的文件输入触发文件选择
@@ -744,7 +958,7 @@ async function handleImportExportCmd(cmd: string) {
       input.onchange = async (e: Event) => {
         const file = (e.target as HTMLInputElement).files?.[0]
         if (file) {
-          await importExport.importData(file)
+          await importExport.importData(file, 'N1-4')
           // 导入后重新加载
           await formData.loadData()
         }
@@ -767,14 +981,46 @@ function handleConclusionSave() {
 
 // ─── AI辅助 ──────────────────────────────────────────────────────────────────
 
-function handleAI(section: string) {
-  import('@/utils/http').then(({ default: h }) => {
-    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+/**
+ * AI 辅助（真回填）。context 值全部转字符串（后端 dict[str,str]，数字会 422）。
+ */
+async function handleAI(section: string) {
+  if (aiLoading.value) return
+  aiLoading.value = true
+  try {
+    const t = calcTable.totals.value
+    const text = await generateN1Text({
+      wpId: props.wpId,
       section: `n1-calc-table-${section}`,
-      prompt: `请基于递延所得税资产底稿"${section}"区段数据，给出审计分析建议`,
-      context: { section, wpId: props.wpId },
-    }).catch(() => {})
-  })
+      prompt:
+        section === 'conclusion'
+          ? '请基于递延所得税资产（负债）测算结果，撰写审计结论（应确认额与账面额的差异是否需调整、抵销与列示是否恰当）。'
+          : '请基于账面价值与计税基础的测算数据，给出审计分析建议（暂时性差异性质判断、税率适用、应确认与账面差异原因）。',
+      context: {
+        可抵扣暂时性差异合计: String(t.deductibleDiff),
+        应纳税暂时性差异合计: String(t.taxableDiff),
+        应确认递延税资产合计: String(t.deferredTaxAsset),
+        应确认递延税负债合计: String(t.deferredTaxLiability),
+        递延税资产账面合计: String(t.assetBookBalance),
+        递延税负债账面合计: String(t.liabilityBookBalance),
+        资产差异合计: String(t.assetDiff),
+        负债差异合计: String(t.liabilityDiff),
+      },
+      existingContent: section === 'conclusion' ? auditConclusion.value : auditNotes.value,
+    })
+    if (!text) return
+    if (section === 'conclusion') {
+      auditConclusion.value = text
+      handleConclusionSave()
+      ElMessage.success('AI 已生成审计结论')
+    } else {
+      auditNotes.value = text
+      handleNotesSave()
+      ElMessage.success('AI 已生成审计说明')
+    }
+  } finally {
+    aiLoading.value = false
+  }
 }
 </script>
 

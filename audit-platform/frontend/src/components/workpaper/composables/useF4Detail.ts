@@ -8,17 +8,27 @@
  * T 审定数 = M期末未审 + R账项调整 + S重分类调整
  * N:Q 未审账龄合计应等于 M；U:X 审定账龄合计应等于 T。
  */
-import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, inject, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   parseNum,
   calcCreditBalance,
   calcAuditedAmount,
-  calcAgingTotal,
   calcAgingCrossCheck,
   calcSubtotal,
 } from './useF4AccPayFormulaEngine'
 import { readRowJson, type ChecklistResponse } from './useF4FormData'
+import { PRESET_SEGMENTS, useAgingConfig, type AgingSegment } from '@/composables/useAgingConfig'
+import { migrateF4FlatToNested, remapRowAgingData, type AgingData } from '@/composables/useAgingMigration'
+import {
+  aggregateAgingBySegments,
+  createEmptyF4Aging,
+  f4AgingValue,
+  projectLegacyFlatAging,
+  sumRowAging,
+  F4_AGING_FIELD,
+  type F4AgingPeriod,
+} from './f4AgingModel'
 
 // ─── 类型定义 ─────────────────────────────────────────────────────────────────
 
@@ -40,7 +50,8 @@ export interface APDetailRow {
   closingBalance: number
   entityReclassification: number
   closingUnadjusted: number
-  // N:Q 未审账龄
+  // N:Q 未审账龄（权威 = agingCurrent；以下扁平字段为 3 年段兼容派生，只读）
+  agingCurrent: AgingData
   unadjustedAgingLt1: number
   unadjustedAging1to2: number
   unadjustedAging2to3: number
@@ -50,7 +61,8 @@ export interface APDetailRow {
   closingAje: number
   closingRje: number
   closingAdjusted: number
-  // U:X 审定账龄
+  // U:X 审定账龄（权威 = agingAudited；以下扁平字段为兼容派生，只读）
+  agingAudited: AgingData
   auditedAgingLt1: number
   auditedAging1to2: number
   auditedAging2to3: number
@@ -87,6 +99,10 @@ export const F4_RELATED_PARTY_OPTIONS = [
 
 export const F4_PAYMENT_NATURE_OPTIONS = ['货款', '工程款', '设备款', '服务费', '其他'] as const
 export const F4_CONFIRMATION_OPTIONS = ['是', '否', '不适用'] as const
+/**
+ * @deprecated 账龄档位改由项目账龄配置（`useAgingConfig(projectId,'F4')`）动态提供，
+ * 本常量仅保留为 3 年段兼容别名映射（旧调用方 bucket → 段 key）。
+ */
 export const F4_AGING_BUCKET_OPTIONS = [
   { value: 'lt1', label: '1年以下' },
   { value: '1to2', label: '1～2年' },
@@ -94,6 +110,14 @@ export const F4_AGING_BUCKET_OPTIONS = [
   { value: 'gt3', label: '3年以上' },
 ] as const
 export type F4AgingBucket = typeof F4_AGING_BUCKET_OPTIONS[number]['value']
+
+/** 旧 bucket → 段 key（兼容 `allocateAging(rowId, stage, 'lt1')` 这类历史调用） */
+const LEGACY_BUCKET_TO_SEG: Record<string, string> = {
+  lt1: 'within1',
+  '1to2': 'y1to2',
+  '2to3': 'y2to3',
+  gt3: 'over3',
+}
 
 /** A:M 身份、期初及本期变动（13列） */
 export const F4_DETAIL_BASIC_COLUMNS: F4DetailColumn[] = [
@@ -122,6 +146,49 @@ export const F4_DETAIL_AGING_COLUMNS: F4DetailColumn[] = [
   { prop: 'subsequentPayment', label: '期后付款', group: 'other', minWidth: 115, editable: true, inputType: 'number' },
   { prop: 'remark', label: '备注', group: 'other', minWidth: 180, editable: true, inputType: 'text' },
 ]
+
+/** Y:AA 其他审计信息（3列，与账龄段无关） */
+export const F4_DETAIL_OTHER_COLUMNS: F4DetailColumn[] = [
+  { prop: 'isConfirmed', label: '是否函证', group: 'other', minWidth: 100, editable: true, inputType: 'select', options: F4_CONFIRMATION_OPTIONS },
+  { prop: 'subsequentPayment', label: '期后付款', group: 'other', minWidth: 115, editable: true, inputType: 'number' },
+  { prop: 'remark', label: '备注', group: 'other', minWidth: 180, editable: true, inputType: 'text' },
+]
+
+/** R:T 调整与审定（3列，与账龄段无关） */
+export const F4_DETAIL_ADJUST_COLUMNS: F4DetailColumn[] = [
+  { prop: 'closingAje', label: '账项调整', group: 'audit', minWidth: 110, editable: true, inputType: 'number' },
+  { prop: 'closingRje', label: '重分类调整', group: 'audit', minWidth: 120, editable: true, inputType: 'number' },
+  { prop: 'closingAdjusted', label: '审定数', group: 'audit', minWidth: 115, formula: '期末未审+AJE+RJE', editable: false },
+]
+
+/**
+ * 按项目账龄段动态生成「未审账龄 + 其他审计信息」列（取代固定 4 档）。
+ * prop 形如 `agingCurrent.within1`（nested 权威字段）。
+ */
+export function buildF4AgingColumns(segments: readonly AgingSegment[]): F4DetailColumn[] {
+  const agingCols: F4DetailColumn[] = (segments ?? []).map((seg) => ({
+    prop: `agingCurrent.${seg.key}`,
+    label: `未审账龄·${seg.label}`,
+    group: 'unadjusted-aging',
+    minWidth: 125,
+    editable: true,
+    inputType: 'number',
+  }))
+  return [...agingCols, ...F4_DETAIL_OTHER_COLUMNS]
+}
+
+/** 按项目账龄段动态生成「调整、审定及审定账龄」列 */
+export function buildF4AuditColumns(segments: readonly AgingSegment[]): F4DetailColumn[] {
+  const agingCols: F4DetailColumn[] = (segments ?? []).map((seg) => ({
+    prop: `agingAudited.${seg.key}`,
+    label: `审定账龄·${seg.label}`,
+    group: 'audit',
+    minWidth: 125,
+    editable: true,
+    inputType: 'number',
+  }))
+  return [...F4_DETAIL_ADJUST_COLUMNS, ...agingCols]
+}
 
 /** R:X 调整、审定及审定账龄（7列） */
 export const F4_DETAIL_AUDIT_COLUMNS: F4DetailColumn[] = [
@@ -155,20 +222,28 @@ export interface StoredAPDetailRow {
   currentDebit: number
   currentCredit: number
   entityReclassification: number
-  unadjustedAgingLt1: number
-  unadjustedAging1to2: number
-  unadjustedAging2to3: number
-  unadjustedAgingGt3: number
+  /** 期末未审账龄（nested keyed，权威） */
+  agingCurrent: AgingData
+  /** 期末审定账龄（nested keyed，权威） */
+  agingAudited: AgingData
   closingAje: number
   closingRje: number
-  auditedAgingLt1: number
-  auditedAging1to2: number
-  auditedAging2to3: number
-  auditedAgingGt3: number
   isConfirmed: string
   subsequentPayment: number
   remark: string
+  /** @deprecated 迁移前扁平账龄字段（只读兼容，序列化由 nested 派生） */
+  unadjustedAgingLt1?: number
+  unadjustedAging1to2?: number
+  unadjustedAging2to3?: number
+  unadjustedAgingGt3?: number
+  auditedAgingLt1?: number
+  auditedAging1to2?: number
+  auditedAging2to3?: number
+  auditedAgingGt3?: number
 }
+
+/** 迁移/计算的默认段（配置未加载时兜底，与 F4 默认预设 THREE_YEAR 一致） */
+export const DEFAULT_F4_SEGMENTS = PRESET_SEGMENTS.THREE_YEAR as AgingSegment[]
 
 export interface UseF4DetailOptions {
   wpId: Ref<string>
@@ -185,7 +260,7 @@ function generateRowId(): string {
   return `f4d-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`
 }
 
-function emptyStored(seq: number): StoredAPDetailRow {
+function emptyStored(seq: number, segments: readonly AgingSegment[] = DEFAULT_F4_SEGMENTS): StoredAPDetailRow {
   return {
     rowId: generateRowId(),
     seq,
@@ -199,23 +274,24 @@ function emptyStored(seq: number): StoredAPDetailRow {
     currentDebit: 0,
     currentCredit: 0,
     entityReclassification: 0,
-    unadjustedAgingLt1: 0,
-    unadjustedAging1to2: 0,
-    unadjustedAging2to3: 0,
-    unadjustedAgingGt3: 0,
+    agingCurrent: createEmptyF4Aging(segments),
+    agingAudited: createEmptyF4Aging(segments),
     closingAje: 0,
     closingRje: 0,
-    auditedAgingLt1: 0,
-    auditedAging1to2: 0,
-    auditedAging2to3: 0,
-    auditedAgingGt3: 0,
     isConfirmed: '',
     subsequentPayment: 0,
     remark: '',
   }
 }
 
-export function computeF4DetailRow(stored: StoredAPDetailRow): APDetailRow {
+export function computeF4DetailRow(
+  stored: StoredAPDetailRow,
+  segmentsArg: readonly AgingSegment[] = DEFAULT_F4_SEGMENTS,
+): APDetailRow {
+  // 防御：允许 `rows.map(computeF4DetailRow)` 这类把 index 当第二参传入的旧调用方
+  const segments: readonly AgingSegment[] = Array.isArray(segmentsArg) && segmentsArg.length
+    ? segmentsArg
+    : DEFAULT_F4_SEGMENTS
   const openingAdjusted = calcAuditedAmount(
     stored.openingUnadjusted,
     stored.openingAje,
@@ -228,25 +304,31 @@ export function computeF4DetailRow(stored: StoredAPDetailRow): APDetailRow {
     stored.currentDebit,
   )
   const closingUnadjusted = closingBalance + stored.entityReclassification
-  const unadjustedAgingTotal = calcAgingTotal(
-    stored.unadjustedAgingLt1,
-    stored.unadjustedAging1to2,
-    stored.unadjustedAging2to3,
-    stored.unadjustedAgingGt3,
-  )
+  const segKeys = (segments ?? DEFAULT_F4_SEGMENTS).map((s) => String(s.key))
+  // 账龄合计按**生效段**求和（nested 优先，缺该段键回退 legacy 扁平字段）
+  const unadjustedAgingTotal = sumRowAging(stored, 'current', segKeys)
   const closingAdjusted = calcAuditedAmount(
     closingUnadjusted,
     stored.closingAje,
     stored.closingRje,
   )
-  const auditedAgingTotal = calcAgingTotal(
-    stored.auditedAgingLt1,
-    stored.auditedAging1to2,
-    stored.auditedAging2to3,
-    stored.auditedAgingGt3,
-  )
+  const auditedAgingTotal = sumRowAging(stored, 'audited', segKeys)
+  // nested 权威值（补齐生效段，缺段回退 legacy 扁平）
+  const agingCurrent: AgingData = {}
+  const agingAudited: AgingData = {}
+  for (const key of segKeys) {
+    agingCurrent[key] = f4AgingValue(stored, 'current', key)
+    agingAudited[key] = f4AgingValue(stored, 'audited', key)
+  }
+  const flatCurrent = projectLegacyFlatAging({ agingCurrent }, 'current', segments ?? DEFAULT_F4_SEGMENTS)
+  const flatAudited = projectLegacyFlatAging({ agingAudited }, 'audited', segments ?? DEFAULT_F4_SEGMENTS)
   return {
     ...stored,
+    // 扁平字段为兼容派生（只读），nested 为权威
+    ...flatCurrent,
+    ...flatAudited,
+    agingCurrent,
+    agingAudited,
     openingAdjusted,
     closingBalance,
     closingUnadjusted,
@@ -268,39 +350,42 @@ function joinLegacyRemark(raw: any): string {
   return parts.filter(Boolean).join('；')
 }
 
-export function migrateF4DetailRows(jsonStr: string | null | undefined): StoredAPDetailRow[] {
+export function migrateF4DetailRows(
+  jsonStr: string | null | undefined,
+  segments: readonly AgingSegment[] = DEFAULT_F4_SEGMENTS,
+): StoredAPDetailRow[] {
   if (!jsonStr) return []
   try {
     const parsed = JSON.parse(jsonStr)
     if (!Array.isArray(parsed)) return []
-    return parsed.map((raw: any, i: number) => ({
-      ...emptyStored(i + 1),
-      rowId: raw.rowId || raw.id || generateRowId(),
-      seq: raw.seq ?? i + 1,
-      creditor: raw.creditor || '',
-      companyCode: raw.companyCode || '',
-      relatedPartyType: raw.relatedPartyType || '',
-      paymentNature: raw.paymentNature || '',
-      openingUnadjusted: parseNum(raw.openingUnadjusted ?? raw.openingAdjusted),
-      openingAje: parseNum(raw.openingAje),
-      openingRje: parseNum(raw.openingRje),
-      currentDebit: parseNum(raw.currentDebit ?? raw.debit),
-      currentCredit: parseNum(raw.currentCredit ?? raw.credit),
-      entityReclassification: parseNum(raw.entityReclassification),
-      unadjustedAgingLt1: parseNum(raw.unadjustedAgingLt1 ?? raw.aging1Year ?? raw.agingLt1),
-      unadjustedAging1to2: parseNum(raw.unadjustedAging1to2 ?? raw.aging1to2Year ?? raw.aging1to2),
-      unadjustedAging2to3: parseNum(raw.unadjustedAging2to3 ?? raw.aging2to3Year ?? raw.aging2to3),
-      unadjustedAgingGt3: parseNum(raw.unadjustedAgingGt3 ?? raw.aging3YearPlus ?? raw.agingGt3),
-      closingAje: parseNum(raw.closingAje ?? raw.ajeAdjustment ?? raw.aje),
-      closingRje: parseNum(raw.closingRje ?? raw.rjeReclassification ?? raw.rje),
-      auditedAgingLt1: parseNum(raw.auditedAgingLt1 ?? raw.adjustedAging1),
-      auditedAging1to2: parseNum(raw.auditedAging1to2 ?? raw.adjustedAging2),
-      auditedAging2to3: parseNum(raw.auditedAging2to3 ?? raw.adjustedAging3),
-      auditedAgingGt3: parseNum(raw.auditedAgingGt3 ?? raw.adjustedAging4),
-      isConfirmed: raw.isConfirmed || '',
-      subsequentPayment: parseNum(raw.subsequentPayment),
-      remark: joinLegacyRemark(raw),
-    }))
+    const segs = (segments?.length ? segments : DEFAULT_F4_SEGMENTS) as AgingSegment[]
+    return parsed.map((rawIn: any, i: number) => {
+      // 扁平 → nested（nested 优先）→ 对齐当前项目账龄段
+      const raw = remapRowAgingData(migrateF4FlatToNested(rawIn), segs, false) as any
+      return {
+        ...emptyStored(i + 1, segs),
+        rowId: raw.rowId || raw.id || generateRowId(),
+        seq: raw.seq ?? i + 1,
+        creditor: raw.creditor || '',
+        companyCode: raw.companyCode || '',
+        relatedPartyType: raw.relatedPartyType || '',
+        paymentNature: raw.paymentNature || '',
+        openingUnadjusted: parseNum(raw.openingUnadjusted ?? raw.openingAdjusted),
+        openingAje: parseNum(raw.openingAje),
+        openingRje: parseNum(raw.openingRje),
+        currentDebit: parseNum(raw.currentDebit ?? raw.debit),
+        currentCredit: parseNum(raw.currentCredit ?? raw.credit),
+        entityReclassification: parseNum(raw.entityReclassification),
+        // 账龄权威 = nested（迁移函数已完成扁平/别名 → nested 与段对齐）
+        agingCurrent: (raw.agingCurrent ?? createEmptyF4Aging(segs)) as AgingData,
+        agingAudited: (raw.agingAudited ?? createEmptyF4Aging(segs)) as AgingData,
+        closingAje: parseNum(raw.closingAje ?? raw.ajeAdjustment ?? raw.aje),
+        closingRje: parseNum(raw.closingRje ?? raw.rjeReclassification ?? raw.rje),
+        isConfirmed: raw.isConfirmed || '',
+        subsequentPayment: parseNum(raw.subsequentPayment),
+        remark: joinLegacyRemark(raw),
+      }
+    })
   } catch {
     return []
   }
@@ -317,20 +402,57 @@ export function useF4Detail(options: UseF4DetailOptions) {
   const storedData = ref<StoredAPDetailRow[]>([])
   const searchQuery = ref('')
 
+  // ─── 账龄段（单一真源：主入口 provide 优先，其次自行加载配置，最后 F4 默认预设） ──
+  const injectedSegments = inject<Ref<AgingSegment[]> | null>('f4AgingSegments', null)
+  const injectedPreset = inject<Ref<string> | null>('f4AgingPreset', null)
+  const ownConfig = injectedSegments ? null : useAgingConfig(options.projectId, 'F4')
+  /** 生效段（未加载/为空时回退 F4 默认预设，避免"先 4 档后跳变"，Property 13） */
+  const segments: ComputedRef<AgingSegment[]> = computed(() => {
+    const raw = injectedSegments?.value ?? ownConfig?.segments.value ?? []
+    return raw.length ? raw : DEFAULT_F4_SEGMENTS
+  })
+  const agingPreset = computed(() => injectedPreset?.value ?? ownConfig?.preset.value ?? 'THREE_YEAR')
+  const segKeys = computed(() => segments.value.map((seg) => String(seg.key)))
+
+  /** 按生效段动态生成的账龄列（取代固定 4 档） */
+  const agingColumns = computed<F4DetailColumn[]>(() => buildF4AgingColumns(segments.value))
+  const auditColumns = computed<F4DetailColumn[]>(() => buildF4AuditColumns(segments.value))
+  const allColumns = computed<F4DetailColumn[]>(() => {
+    const aging = agingColumns.value
+    const agingOnly = aging.slice(0, segments.value.length)
+    const others = aging.slice(segments.value.length)
+    return [...F4_DETAIL_BASIC_COLUMNS, ...agingOnly, ...auditColumns.value, ...others]
+  })
+
   // ─── 加载 ─────────────────────────────────────────────────────────────────
 
   function loadRows(): void {
-    storedData.value = migrateF4DetailRows(readRowJson(allResponses.value.get(STORAGE_KEY)))
-    if (storedData.value.length === 0) storedData.value = [emptyStored(1)]
+    storedData.value = migrateF4DetailRows(
+      readRowJson(allResponses.value.get(STORAGE_KEY)),
+      segments.value,
+    )
+    if (storedData.value.length === 0) storedData.value = [emptyStored(1, segments.value)]
   }
 
   watch(() => readRowJson(allResponses.value.get(STORAGE_KEY)), () => {
     if (storedData.value.length === 0) loadRows()
   }, { immediate: true })
 
+  // 账龄段变化：已有段保金额 / 新段补 0 / 废弃段丢弃（Property 3）
+  watch(segKeys, (next, prev) => {
+    if (!prev || next.join('|') === prev.join('|')) return
+    if (storedData.value.length === 0) return
+    storedData.value = storedData.value.map(
+      (row) => remapRowAgingData(row, segments.value, false) as StoredAPDetailRow,
+    )
+    if (!readonly.value) persistRows()
+  })
+
   // ─── 计算行 ───────────────────────────────────────────────────────────────
 
-  const rows: ComputedRef<APDetailRow[]> = computed(() => storedData.value.map(computeF4DetailRow))
+  const rows: ComputedRef<APDetailRow[]> = computed(() =>
+    storedData.value.map((row) => computeF4DetailRow(row, segments.value)),
+  )
 
   const filteredRows: ComputedRef<APDetailRow[]> = computed(() => {
     const q = searchQuery.value.trim().toLowerCase()
@@ -348,7 +470,7 @@ export function useF4Detail(options: UseF4DetailOptions) {
 
   const subtotalRow: ComputedRef<APDetailRow> = computed(() =>
     computeF4DetailRow({
-      ...emptyStored(0),
+      ...emptyStored(0, segments.value),
       rowId: 'subtotal',
       creditor: '合计',
       openingUnadjusted: calcSubtotal(rows.value.map((r) => r.openingUnadjusted)),
@@ -357,18 +479,13 @@ export function useF4Detail(options: UseF4DetailOptions) {
       currentDebit: calcSubtotal(rows.value.map((r) => r.currentDebit)),
       currentCredit: calcSubtotal(rows.value.map((r) => r.currentCredit)),
       entityReclassification: calcSubtotal(rows.value.map((r) => r.entityReclassification)),
-      unadjustedAgingLt1: calcSubtotal(rows.value.map((r) => r.unadjustedAgingLt1)),
-      unadjustedAging1to2: calcSubtotal(rows.value.map((r) => r.unadjustedAging1to2)),
-      unadjustedAging2to3: calcSubtotal(rows.value.map((r) => r.unadjustedAging2to3)),
-      unadjustedAgingGt3: calcSubtotal(rows.value.map((r) => r.unadjustedAgingGt3)),
+      // 账龄合计按生效段聚合（Property 1）
+      agingCurrent: aggregateAgingBySegments(rows.value, 'current', segKeys.value),
+      agingAudited: aggregateAgingBySegments(rows.value, 'audited', segKeys.value),
       closingAje: calcSubtotal(rows.value.map((r) => r.closingAje)),
       closingRje: calcSubtotal(rows.value.map((r) => r.closingRje)),
-      auditedAgingLt1: calcSubtotal(rows.value.map((r) => r.auditedAgingLt1)),
-      auditedAging1to2: calcSubtotal(rows.value.map((r) => r.auditedAging1to2)),
-      auditedAging2to3: calcSubtotal(rows.value.map((r) => r.auditedAging2to3)),
-      auditedAgingGt3: calcSubtotal(rows.value.map((r) => r.auditedAgingGt3)),
       subsequentPayment: calcSubtotal(rows.value.map((r) => r.subsequentPayment)),
-    }),
+    }, segments.value),
   )
 
   const filledCount = computed(() => rows.value.filter((row) =>
@@ -386,7 +503,7 @@ export function useF4Detail(options: UseF4DetailOptions) {
 
   function addRow(): void {
     if (readonly.value) return
-    storedData.value.push(emptyStored(storedData.value.length + 1))
+    storedData.value.push(emptyStored(storedData.value.length + 1, segments.value))
     persistRows()
   }
 
@@ -403,6 +520,15 @@ export function useF4Detail(options: UseF4DetailOptions) {
     if (readonly.value) return
     const row = storedData.value.find((r) => r.rowId === rowId)
     if (!row) return
+    // nested 账龄字段（prop 形如 `agingCurrent.within1`）
+    if (field.startsWith('agingCurrent.') || field.startsWith('agingAudited.')) {
+      const [group, segKey] = field.split('.')
+      const target = (row as any)[group] ?? {}
+      target[segKey] = parseNum(value)
+      ;(row as any)[group] = target
+      persistRows()
+      return
+    }
     const strFields = [
       'creditor', 'companyCode', 'relatedPartyType', 'paymentNature',
       'isConfirmed', 'remark',
@@ -412,28 +538,37 @@ export function useF4Detail(options: UseF4DetailOptions) {
     persistRows()
   }
 
+  /** 直接设置某期间某段账龄金额 */
+  function updateAging(
+    rowId: string,
+    period: F4AgingPeriod,
+    segKey: string,
+    value: unknown,
+  ): void {
+    updateCell(rowId, `${F4_AGING_FIELD[period]}.${segKey}`, value)
+  }
+
+  /**
+   * 把期末未审余额（或审定数）一键分配到指定账龄段：其余段清零。
+   * `segKeyOrBucket` 兼容历史 bucket 值（lt1/1to2/2to3/gt3）。
+   */
   function allocateAging(
     rowId: string,
     stage: 'unadjusted' | 'audited',
-    bucket: F4AgingBucket,
+    segKeyOrBucket: string,
   ): void {
     if (readonly.value) return
     const row = storedData.value.find((item) => item.rowId === rowId)
     if (!row) return
-    const fields = stage === 'unadjusted'
-      ? ['unadjustedAgingLt1', 'unadjustedAging1to2', 'unadjustedAging2to3', 'unadjustedAgingGt3'] as const
-      : ['auditedAgingLt1', 'auditedAging1to2', 'auditedAging2to3', 'auditedAgingGt3'] as const
-    const fieldByBucket: Record<F4AgingBucket, typeof fields[number]> = {
-      lt1: fields[0],
-      '1to2': fields[1],
-      '2to3': fields[2],
-      gt3: fields[3],
-    }
-    for (const field of fields) row[field] = 0
-    const computed = computeF4DetailRow(row)
-    row[fieldByBucket[bucket]] = stage === 'unadjusted'
-      ? computed.closingUnadjusted
-      : computed.closingAdjusted
+    const period: F4AgingPeriod = stage === 'unadjusted' ? 'current' : 'audited'
+    const field = F4_AGING_FIELD[period]
+    const segKey = LEGACY_BUCKET_TO_SEG[segKeyOrBucket] ?? segKeyOrBucket
+    if (!segKeys.value.includes(segKey)) return
+    const next: AgingData = {}
+    for (const key of segKeys.value) next[key] = 0
+    ;(row as any)[field] = next
+    const computedRow = computeF4DetailRow(row, segments.value)
+    next[segKey] = period === 'current' ? computedRow.closingUnadjusted : computedRow.closingAdjusted
     persistRows()
   }
 
@@ -548,7 +683,7 @@ export function useF4Detail(options: UseF4DetailOptions) {
       item_id: STORAGE_KEY,
       conclusion: null,
       // 同时存入公式快照，保证导出和F4-1联动无需重复猜测公式。
-      remark: JSON.stringify(storedData.value.map(computeF4DetailRow)),
+      remark: JSON.stringify(storedData.value.map((row) => computeF4DetailRow(row, segments.value))),
     })
     debounceSave()
   }
@@ -591,13 +726,18 @@ export function useF4Detail(options: UseF4DetailOptions) {
     addRow,
     removeRow,
     updateCell,
+    updateAging,
     allocateAging,
     importPostPaymentFromLedger,
     rowClassName,
+    // 账龄段（单一真源）
+    segments,
+    segKeys,
+    agingPreset,
     basicColumns: F4_DETAIL_BASIC_COLUMNS,
-    agingColumns: F4_DETAIL_AGING_COLUMNS,
-    auditColumns: F4_DETAIL_AUDIT_COLUMNS,
-    allColumns: F4_DETAIL_ALL_COLUMNS,
+    agingColumns,
+    auditColumns,
+    allColumns,
   }
 }
 

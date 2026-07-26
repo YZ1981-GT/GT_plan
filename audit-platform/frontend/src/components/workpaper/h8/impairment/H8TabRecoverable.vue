@@ -43,7 +43,7 @@
     <div class="section-header mode-row">
       <span>可收回金额测试表 H8-11</span>
       <el-segmented
-        v-model="dualMode.currentMode.value"
+        :model-value="dualMode.currentMode.value"
         :options="dualMode.modeOptions"
         size="small"
         @change="dualMode.onModeChange"

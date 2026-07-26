@@ -437,7 +437,7 @@
  * 对齐致同 Excel：期初/期末×未审·账项调整·审定 + 变动额/率；
  * 过渡科目期末=0 + H6-2/H6-3 回填 + 报表核对 + 结构化说明
  */
-import { ref, computed, inject, toRef, onMounted, onUnmounted } from 'vue'
+import { ref, computed, inject, toRef, onMounted, onUnmounted, type Ref } from 'vue'
 import { Download } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
@@ -465,22 +465,28 @@ const publishing = ref(false)
 const seedingFa = ref(false)
 const { resolveInstance } = useAcnr()
 
+// H10 跨底稿审定数（由主入口 GtH6 provide，经 h6H10Pull 异步拉取）
+const h10AmountInjected = inject<Ref<number>>('h10Amount', ref(0))
+
 const allResponsesRef = computed(() => props.allResponses)
 
 const state = useH6Adjudication({
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
   allResponses: allResponsesRef as any,
+  h10Amount: h10AmountInjected,
   onSave: (itemId: string, value: any) => saveResponse(itemId, value),
   onWritebackTB: async (amount: number) => {
-    window.dispatchEvent(new CustomEvent('substantive:adjudicated', {
-      detail: {
-        wpCode: 'H6',
-        accountCode: '1606',
-        auditedAmount: amount,
-        isTransitAccount: true,
-      },
-    }))
+    // 统一走 eventBus（crossWpEventBridge 自动桥接 window 供旧监听者）
+    const { eventBus } = await import('@/utils/eventBus')
+    eventBus.emit('substantive:adjudicated', {
+      wpCode: 'H6',
+      accountCode: '1606',
+      auditedAmount: amount,
+      adjudicatedAmount: amount,
+      isTransitAccount: true,
+      timestamp: Date.now(),
+    } as any)
   },
 })
 
@@ -516,6 +522,9 @@ const {
 })
 
 const h10HasData = computed(() => {
+  // 优先使用从 H10 跨底稿拉取的真实审定数（由主入口 provide）
+  if (h10AmountInjected.value !== 0) return true
+  // 回退：旧路径 allResponses 键（被 crossWpEventBridge 写入时可用）
   const h10Resp = props.allResponses.get('H10-disposal-income')
   return h10Resp != null && h10Resp.remark != null
 })

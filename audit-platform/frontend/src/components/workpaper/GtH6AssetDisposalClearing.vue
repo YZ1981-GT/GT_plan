@@ -21,7 +21,7 @@
       <!-- 顶部工具栏（双模式切换）— 目录页隐藏 -->
       <div v-if="currentSheet !== 'H6'" class="h6-header-toolbar">
         <el-segmented
-          v-model="currentMode"
+          :model-value="currentMode"
           :options="modeOptions"
           size="small"
           :disabled="!isOoAvailable && currentMode === 'html'"
@@ -155,9 +155,11 @@
 import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, inject, defineAsyncComponent } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
+import { eventBus } from '@/utils/eventBus'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useH6DualMode } from './composables/useH6DualMode'
 import { useH6CrossSheet } from './composables/useH6CrossSheet'
+import { useH6H10Pull } from './composables/h6H10Pull'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
@@ -201,6 +203,10 @@ const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => und
 
 // ─── 过渡科目状态（期末余额应为0）—— 走跨表引擎，正确读 remark 数值 ──────────
 const { transitAccountStatus } = useH6CrossSheet(allResponses)
+
+// ─── H10 跨底稿勾稽（拉取资产处置损益审定数供 H6-1 crossCheck） ──────────────
+const { h10Amount, loadH10 } = useH6H10Pull(toRef(props, 'projectId'))
+provide('h10Amount', h10Amount)
 
 // ─── 子组件 save 持久化（Bug C 修复：子 tab 此前仅写内存 Map，从不落库 → 刷新丢数据） ──
 // 子组件通过 inject('saveResponse') 调用；防抖 800ms 批量 PUT /checklist-responses。
@@ -426,9 +432,11 @@ function _handleDisposalSourceUpdated(_e: Event): void {
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 onMounted(() => {
   void selfLoad()
+  void loadH10()
   // Subscribe: TB updates → refresh H6-1 取数 when trial_balance changes externally
   window.addEventListener('tb:updated', _handleTbUpdated)
-  // Subscribe: 其他底稿审定数变更 → 刷新H6（仅1606科目相关）
+  // Subscribe: 其他底稿审定数变更 → 刷新H6（仅1606科目相关）—— eventBus + window 双通道兼容
+  eventBus.on('substantive:adjudicated', _handleSubstantiveAdjudicated as any)
   window.addEventListener('substantive:adjudicated', _handleTbUpdated)
   // Subscribe: H1-8减少检查处置完成 → 自动创建H6-2清理明细行 (Req 5.3)
   window.addEventListener('h1:disposal-completed', _handleDisposalInitiated)
@@ -438,6 +446,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('tb:updated', _handleTbUpdated)
+  eventBus.off('substantive:adjudicated', _handleSubstantiveAdjudicated as any)
   window.removeEventListener('substantive:adjudicated', _handleTbUpdated)
   window.removeEventListener('h1:disposal-completed', _handleDisposalInitiated)
   window.removeEventListener('disposal:source-updated', _handleDisposalSourceUpdated)
@@ -452,6 +461,13 @@ function _handleTbUpdated(e: Event) {
   const detail = (e as CustomEvent).detail
   // 仅在科目1606相关或无明确科目信息时刷新
   if (!detail || !detail.accountCode || detail.accountCode === '1606' || detail.wpCode === 'H6') {
+    void selfLoad()
+  }
+}
+
+/** eventBus 版 substantive:adjudicated handler（payload 非 CustomEvent 直接是对象） */
+function _handleSubstantiveAdjudicated(payload: any) {
+  if (!payload || !payload.accountCode || payload.accountCode === '1606' || payload.wpCode === 'H6') {
     void selfLoad()
   }
 }

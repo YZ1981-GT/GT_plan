@@ -38,6 +38,7 @@ export const DISCLOSURE_NOTE_SECTION_MAP: Record<string, NoteSectionVariants> = 
   // （章节号权威取自 note_template_variant_matrix.json，两变体均为精确编号章节）
   G10: { listed: '五、34', soe: '八、34' }, // 交易性金融负债
   H1: { listed: '五、22', soe: '八、22' }, // 固定资产
+  H3: { listed: '五、21', soe: '八、22' }, // 投资性房地产（注：国企版附注章节与固定资产同号八、22，靠内容区分）
   H8: { listed: '五、25', soe: '八、26' }, // 使用权资产
   H9: { listed: '五、47', soe: '八、52' }, // 租赁负债
   I1: { listed: '五、26', soe: '八、27' }, // 无形资产
@@ -57,9 +58,16 @@ export const DISCLOSURE_NOTE_SECTION_MAP: Record<string, NoteSectionVariants> = 
   I4: { listed: '五、29', soe: '八、30' }, // 长期待摊费用
   I6: { listed: '五、66', soe: '八、67' }, // 研发费用
   K1: { listed: '五、8', soe: '八、9' },   // 其他应收款
+  H5: { soe: '八、25' },                    // 油气资产（国企专属，上市无独立章节）
   // 损益类关键词标题（DB 可能截断，由 resolveSectionInList 模糊解析）
   K11: { listed: '三、资产减值损失', soe: '八、74' }, // 资产减值损失
   K13: { listed: '三、营业外支出', soe: '八、77' },   // 营业外支出
+  // N1 递延所得税资产（与 N3 递延所得税负债共用同一附注章节；正向跳转默认落 N1）。
+  // N3 若将来补披露表，可加 N3 条目指向同一章节号（导航共用，数据所有权见
+  // spec n1-disclosure-note-linkage · Decision 1）。
+  N1: { listed: '五、30', soe: '八、31' }, // 递延所得税资产（和递延所得税负债）
+  // J1 应付职工薪酬（五、40 / 八、40，J1 独占，不与 J2 共用；精确===匹配）
+  J1: { listed: '五、40', soe: '八、40' },
 }
 
 /** 解析某披露底稿 + 版本对应的附注章节号；无映射返回 null。 */

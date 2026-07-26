@@ -11,6 +11,7 @@
  * - Follow useH3DualMode pattern
  */
 import { ref, onMounted, type Ref } from 'vue'
+import http from '@/utils/http'
 
 export type H4RenderMode = 'html' | 'onlyoffice'
 
@@ -50,18 +51,13 @@ export function useH4DualMode(options: UseH4DualModeOptions) {
     } catch { /* ignore */ }
   }
 
-  /** OO 健康检查 — 双层兼容 health.data?.data?.healthy */
+  /** OO 健康检查 — 使用 http.get 带鉴权（对齐 K10/K12 范式） */
   async function checkOoHealth(): Promise<boolean> {
     checking.value = true
     try {
-      const response = await fetch('/api/workpapers/onlyoffice/health')
-      if (!response.ok) {
-        isOoAvailable.value = false
-        return false
-      }
-      const result = await response.json()
-      // 双层兼容: result.data?.data?.healthy 或 result.data?.healthy 或 result.healthy
-      const healthy = result.data?.data?.healthy ?? result.data?.healthy ?? result.healthy ?? false
+      const res = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
+      // 双层兼容: res.data?.healthy 或 res.healthy (http 拦截器已解包一层 {code,data})
+      const healthy = res?.data?.healthy ?? res?.healthy ?? false
       isOoAvailable.value = healthy
       return healthy
     } catch {

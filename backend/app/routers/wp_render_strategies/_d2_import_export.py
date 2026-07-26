@@ -46,8 +46,17 @@ router = APIRouter(prefix="/api/workpapers", tags=["D2导入导出"])
 
 # ─── Constants ────────────────────────────────────────────────────────────────
 
+from app.routers.wp_render_strategies._d2_disclosure_import_export import (
+    DISCLOSURE_SHEETS as _D2_DISCLOSURE_SHEETS,
+    export_disclosure_data as _export_disclosure_data,
+    export_disclosure_template as _export_disclosure_template,
+    import_disclosure_data as _import_disclosure_data,
+)
+
 VALID_SHEETS = frozenset({
-    'D2-1', 'D2-2', 'D2-3', 'D2-4', 'D2-5', 'D2-6', 'D2-7', 'D2-8', 'D2-9', 'D2-10', 'D2-11', 'D2-12', 'D2-13'
+    'D2-1', 'D2-2', 'D2-3', 'D2-4', 'D2-5', 'D2-6', 'D2-7', 'D2-8', 'D2-9', 'D2-10', 'D2-11', 'D2-12', 'D2-13',
+    # 附注披露页（多工作表工作簿，见 _d2_disclosure_import_export.py）
+    *_D2_DISCLOSURE_SHEETS.keys(),
 })
 
 MAX_IMPORT_ROWS = 500
@@ -1471,6 +1480,10 @@ async def export_template(
     """导出空白xlsx模板（含表头+格式）"""
     _validate_sheet(sheet)
 
+    # 附注披露页：多工作表工作簿（一表一 worksheet + 说明文本）
+    if sheet in _D2_DISCLOSURE_SHEETS:
+        return await _export_disclosure_template(wp_id, sheet, db)
+
     # D2-1 审定表：走动态生成器（多行合并表头+编制说明+行骨架）
     if sheet == 'D2-1':
         from app.services.adjudication_export_template_service import (
@@ -1525,6 +1538,8 @@ async def export_data(
     """导出含当前数据的xlsx"""
     _validate_sheet(sheet)
 
+    if sheet in _D2_DISCLOSURE_SHEETS:
+        return await _export_disclosure_data(wp_id, sheet, db)
     if sheet == 'D2-1':
         return await _export_d2_1_data(wp_id, db)
     if sheet == 'D2-5':
@@ -1587,6 +1602,10 @@ async def import_data(
         raise HTTPException(
             status_code=400, detail=f"无法解析xlsx文件: {str(e)}"
         )
+
+    # 附注披露页：多工作表（每张披露表一个 worksheet），不走单 sheet 解析
+    if sheet in _D2_DISCLOSURE_SHEETS:
+        return await _import_disclosure_data(wp_id, sheet, wb, db)
 
     # 按 sheet 名选取数据工作表（模板首个 sheet 是"编制说明"，不能用 wb.active）
     ws = _select_data_ws(wb, sheet)

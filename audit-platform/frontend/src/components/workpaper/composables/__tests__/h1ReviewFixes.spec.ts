@@ -12,7 +12,14 @@ import {
   toListedDisclosureCategoryLabel,
   toSoeDisclosureCategoryLabel,
 } from '../h1CategoryClassify'
-import { H1_NOTE_SECTION } from '../h1NoteSectionMap'
+import {
+  H1_NOTE_SECTION,
+  isH1FixedAssetNoteSection as isH1FixedAssetNoteSectionMap,
+  resolveH1CurrentStandardFromProject,
+  resolveH1VariantFromTemplateType,
+} from '../h1NoteSectionMap'
+import { isH1FixedAssetNoteSection } from '@/views/composables/noteDisclosureJump'
+import { DISCLOSURE_NOTE_SECTION_MAP } from '@/views/composables/noteDisclosureReverseJump'
 import { extractCycleProcedureSheetCode, ALL_CYCLE_PROCEDURE_SHEETS } from '../cycleProcedureSheets'
 import {
   readH12BranchRows,
@@ -50,9 +57,35 @@ describe('H1 P0/P1 guards', () => {
     expect(toSoeDisclosureCategoryLabel('运输设备')).toBe('运输工具')
   })
 
-  it('附注章节：上市五、15 / 国企八、22', () => {
-    expect(H1_NOTE_SECTION.listed).toBe('五、15')
+  it('附注章节：上市五、22 / 国企八、22', () => {
+    expect(H1_NOTE_SECTION.listed).toBe('五、22')
     expect(H1_NOTE_SECTION.soe).toBe('八、22')
+  })
+
+  it('单一真源：同步用章节号与反向跳转 map 完全一致', () => {
+    expect(DISCLOSURE_NOTE_SECTION_MAP.H1).toEqual({
+      listed: H1_NOTE_SECTION.listed,
+      soe: H1_NOTE_SECTION.soe,
+    })
+  })
+
+  it('五、15 是其他债权投资，不得被判定为固定资产节（两处判定同口径）', () => {
+    expect(isH1FixedAssetNoteSection('五、15')).toBe(false)
+    expect(isH1FixedAssetNoteSectionMap('五、15')).toBe(false)
+    expect(isH1FixedAssetNoteSection('五、22')).toBe(true)
+    expect(isH1FixedAssetNoteSectionMap('八、22')).toBe(true)
+    // 纯编号精确匹配：不得误伤 五、220 之类
+    expect(isH1FixedAssetNoteSection('五、220')).toBe(false)
+  })
+
+  it('披露变体：上市对上市 / 国企对国企（template_type 权威）', () => {
+    expect(resolveH1VariantFromTemplateType('listed')).toBe('listed')
+    expect(resolveH1VariantFromTemplateType('soe')).toBe('soe')
+    expect(resolveH1VariantFromTemplateType('')).toBeNull()
+    expect(resolveH1CurrentStandardFromProject('listed', 'listed', 'standalone')).toBe('listed_standalone')
+    expect(resolveH1CurrentStandardFromProject('soe', 'soe', 'consolidated')).toBe('soe_consolidated')
+    // 项目口径缺失时回退本 tab variant
+    expect(resolveH1CurrentStandardFromProject('soe', '', '')).toBe('soe_standalone')
   })
 })
 

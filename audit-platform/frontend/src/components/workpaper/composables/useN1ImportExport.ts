@@ -22,9 +22,16 @@ import http from '@/utils/http'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-/** N1 支持导入导出的 sheet（动态行表格） */
+/**
+ * N1 支持导入导出的 sheet（动态行表格）
+ *
+ * 🔴 铁律：调用方必须显式传 sheet。后端 `sheet` 是 Query 默认值 "N1-2"，
+ *    N1-4/N1-5 页面若不传 → 导出拿到明细表数据、导入会覆盖 N1-2 明细行（串表+数据破坏）。
+ */
 export type N1ImportableSheet =
   | 'N1-2'   // 明细表（按暂时性差异项目明细，动态行）
+  | 'N1-4'   // 测算表（账面价值/计税基础/税率/对方科目/账面余额，动态行）
+  | 'N1-5'   // 亏损检查表（各亏损年度，动态行）
 
 /** 导入结果 */
 export interface N1ImportResult {
@@ -46,6 +53,8 @@ export interface UseN1ImportExportOptions {
 /** N1 动态行sheet列表（仅这些支持导入导出） */
 export const N1_IMPORTABLE_SHEETS: { value: N1ImportableSheet; label: string }[] = [
   { value: 'N1-2', label: '明细表' },
+  { value: 'N1-4', label: '测算表' },
+  { value: 'N1-5', label: '亏损检查表' },
 ]
 
 /** API base path */

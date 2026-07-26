@@ -31,6 +31,14 @@ export interface N1ModeOption {
 export interface UseN1DualModeOptions {
   wpId: Ref<string>
   defaultMode?: N1RenderMode
+  /**
+   * 当前 sheet 是否支持「矩阵视图」（默认 false）。
+   *
+   * 平台矩阵视图语义（J1-8 / D2-7 已 proven）= 行 × 判断项的核对矩阵。
+   * N1 中只有 N1-5 亏损检查表属该语义（届满 / 所得额是否充足 / 依据是否已填），
+   * 其余 sheet 是纯数值表，呈现矩阵选项会变成"点了没反应"的死选项。
+   */
+  supportsMatrix?: Ref<boolean> | boolean
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -50,13 +58,21 @@ const OO_HEALTH_ENDPOINT = '/api/workpapers/onlyoffice/health'
  * @param options.defaultMode 默认模式（默认 structured）
  */
 export function useN1DualMode(options: UseN1DualModeOptions) {
-  const { wpId, defaultMode = 'structured' } = options
+  const { wpId, defaultMode = 'structured', supportsMatrix = false } = options
+
+  /** 当前 sheet 是否支持矩阵视图（reactive 或常量） */
+  const matrixSupported = computed<boolean>(() =>
+    typeof supportsMatrix === 'boolean' ? supportsMatrix : !!supportsMatrix.value,
+  )
 
   // ─── State ─────────────────────────────────────────────────────────────
 
   const mode = ref<N1RenderMode>(defaultMode)
   const isOOHealthy = ref<boolean>(false)
   const ooChecking = ref(false)
+  /** 切 OO 前预拉 onlyoffice-config 是否成功（"拉取成功才可切"的正向状态） */
+  const ooConfigReady = ref(false)
+  const fetchingConfig = ref(false)
 
   // ─── localStorage 持久化（按 wpId） ────────────────────────────────────
 
@@ -111,20 +127,55 @@ export function useN1DualMode(options: UseN1DualModeOptions) {
   // ─── Mode Switch ───────────────────────────────────────────────────────
 
   /**
-   * 切换渲染模式
-   * - OO 不可用时不允许切换到 onlyoffice
-   * - structured 和 matrix 始终可切换
+   * 切换渲染模式（平台"拉取成功才可切"标准）。
+   *
+   * 🔴 铁律：调用方 el-segmented 必须用 `:model-value` + `@change`，**禁用 v-model**。
+   * v-model 会先把 mode 改掉，使本函数首行 `newMode === mode.value` 短路 →
+   * 健康门控/config 预拉/localStorage 持久化全部失效。
+   *
+   * @param sheetName 目标 OnlyOffice sheet 名（传入则切 OO 前先预拉 config，拉取成功才切）
    */
-  function switchMode(newMode: N1RenderMode): void {
+  async function switchMode(newMode: N1RenderMode, sheetName?: string): Promise<void> {
     if (newMode === mode.value) return
 
-    // OO 不可用时不允许切换到 onlyoffice
-    if (newMode === 'onlyoffice' && !isOOHealthy.value) {
-      return
+    // 当前 sheet 不支持矩阵视图时不允许切到 matrix（防历史持久化值/误传）
+    if (newMode === 'matrix' && !matrixSupported.value) return
+
+    if (newMode === 'onlyoffice') {
+      // OO 不可用时不允许切换到 onlyoffice
+      if (!isOOHealthy.value) return
+      if (sheetName) {
+        fetchingConfig.value = true
+        try {
+          const res: any = await http.get(
+            `/api/workpapers/${wpId.value}/sheets/${encodeURIComponent(sheetName)}/onlyoffice-config`,
+            { _silent: true } as any,
+          )
+          const cfg = res?.data?.data ?? res?.data
+          if (!cfg) {
+            ooConfigReady.value = false
+            return // 拉取失败 → 保持结构化视图
+          }
+          ooConfigReady.value = true
+        } catch {
+          ooConfigReady.value = false
+          return
+        } finally {
+          fetchingConfig.value = false
+        }
+      }
     }
 
     mode.value = newMode
     _persistMode(newMode)
+  }
+
+  /** GtOnlyOfficeSheet @fallback：文档渲染/超时失败 → 回退结构化并标记不可用 */
+  function onOoLoadFailed(): void {
+    ooConfigReady.value = false
+    isOOHealthy.value = false
+    mode.value = 'structured'
+    _persistMode('structured')
   }
 
   // ─── Computed ──────────────────────────────────────────────────────────
@@ -138,12 +189,18 @@ export function useN1DualMode(options: UseN1DualModeOptions) {
   /** 当前是否 OnlyOffice 模式 */
   const isOnlyOffice = computed(() => mode.value === 'onlyoffice')
 
-  /** el-segmented 模式选项列表 */
-  const modeOptions = computed<N1ModeOption[]>(() => [
-    { label: '结构化视图', value: 'structured' },
-    { label: '矩阵视图', value: 'matrix' },
-    { label: '在线编辑', value: 'onlyoffice', disabled: !isOOHealthy.value },
-  ])
+  /**
+   * el-segmented 模式选项列表。
+   *
+   * 🔴「矩阵视图」只在支持该语义的 sheet 呈现（N1 目前仅 N1-5 亏损检查表：行 × 判断项核对矩阵）。
+   * 纯数值 sheet 不呈现该项，否则选了等于结构化视图 = 点了没反应的死选项。
+   */
+  const modeOptions = computed<N1ModeOption[]>(() => {
+    const opts: N1ModeOption[] = [{ label: '结构化视图', value: 'structured' }]
+    if (matrixSupported.value) opts.push({ label: '矩阵视图', value: 'matrix' })
+    opts.push({ label: '在线编辑', value: 'onlyoffice', disabled: !isOOHealthy.value })
+    return opts
+  })
 
   /** OO 不可用时的禁用 tooltip */
   const ooDisabledTooltip = computed(() => {
@@ -158,10 +215,12 @@ export function useN1DualMode(options: UseN1DualModeOptions) {
     // 健康检查
     await checkOOHealth()
 
-    // 恢复用户偏好（按 wpId 持久化）
+    // 恢复用户偏好（按 wpId 持久化）；matrix 仅在当前 sheet 支持时恢复，否则降级结构化
     const persisted = _loadPersistedMode()
-    if (persisted === 'structured' || persisted === 'matrix') {
-      mode.value = persisted
+    if (persisted === 'matrix') {
+      mode.value = matrixSupported.value ? 'matrix' : 'structured'
+    } else if (persisted === 'structured') {
+      mode.value = 'structured'
     } else if (persisted === 'onlyoffice' && isOOHealthy.value) {
       mode.value = 'onlyoffice'
     } else {
@@ -177,17 +236,21 @@ export function useN1DualMode(options: UseN1DualModeOptions) {
     mode,
     isOOHealthy,
     ooChecking,
+    ooConfigReady,
+    fetchingConfig,
 
     // 计算属性
     isStructured,
     isMatrix,
     isOnlyOffice,
+    matrixSupported,
     modeOptions,
     ooDisabledTooltip,
 
     // 操作
     switchMode,
     checkOOHealth,
+    onOoLoadFailed,
   }
 }
 

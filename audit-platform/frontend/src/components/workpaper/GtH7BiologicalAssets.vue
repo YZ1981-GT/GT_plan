@@ -14,7 +14,7 @@
     <template v-else>
       <div v-if="currentSheet !== 'H7'" class="h7-header-toolbar">
         <el-segmented
-          v-model="currentMode"
+          :model-value="currentMode"
           :options="modeOptions"
           size="small"
           @change="onModeChange"

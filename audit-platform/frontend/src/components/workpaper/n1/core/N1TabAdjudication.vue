@@ -1,13 +1,11 @@
 <template>
   <div class="n1-tab-adjudication">
-    <!-- ═══ 双模式切换 ═══ -->
-    <div class="n1-mode-bar">
-      <el-segmented v-model="dualMode.mode.value" :options="dualMode.modeOptions.value" @change="dualMode.switchMode" />
-    </div>
+    <!-- 双模式切换栏由入口 GtN1DeferredTaxAssets 统一渲染（避免双层切换栏 + 两个实例状态不同步） -->
 
     <!-- ═══ OnlyOffice 降级模式 ═══ -->
     <template v-if="dualMode.isOnlyOffice.value">
-      <GtOnlyOfficeSheet :wp-id="wpId" :project-id="projectId" sheet-name="审定表N1-1" style="height: 100%; min-height: 600px" />
+      <!-- 铁律：sheet-name 必须与源 xlsx tab 名完全一致，否则 OO 定位不到该 sheet -->
+      <GtOnlyOfficeSheet :wp-id="wpId" :project-id="projectId" sheet-name="递延所得税资产审定表N1-1" style="height: 100%; min-height: 600px" />
     </template>
 
     <!-- ═══ 结构化 / 矩阵视图 ═══ -->
@@ -65,15 +63,19 @@
               <el-tag type="success" size="small" class="asset-tag">资产类·借方</el-tag>
             </div>
             <div class="section-actions">
+              <el-button size="small" type="warning" plain :disabled="isReadonly" @click="handlePullFromDetail">
+                <el-icon><RefreshRight /></el-icon> 从N1-2带入未审数
+              </el-button>
+              <el-button size="small" type="warning" plain :disabled="isReadonly" @click="handlePullLossFromN15">
+                从N1-5带入可抵扣亏损
+              </el-button>
               <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
                 <el-icon><Download /></el-icon> 带入调整
               </el-button>
               <el-button size="small" @click="handleAI('adjudication')">
                 <el-icon><MagicStick /></el-icon> AI辅助
               </el-button>
-              <el-button size="small" @click="openReview?.('N1-1-审定表')">
-                <el-icon><ChatDotSquare /></el-icon> 复核
-              </el-button>
+              <GtReviewTrigger section-id="N1-1-审定表" label="💬 复核" />
             </div>
           </div>
         </template>
@@ -209,6 +211,32 @@
         </el-table>
       </el-card>
 
+      <!-- ═══ 与试算平衡表核对（科目1811 期末余额） ═══ -->
+      <div class="n1-tb-reconcile">
+        <div class="tb-row">
+          <span class="tb-label">试算平衡表数（1811 期末余额）：</span>
+          <span class="tb-value">{{ adjudication.tbReconcile.value.hasTb ? fmtAmt(adjudication.tbReconcile.value.tbEndBalance) : '未取到（试算表无该科目数据）' }}</span>
+        </div>
+        <div class="tb-row">
+          <span class="tb-label">审定合计（期末）：</span>
+          <span class="tb-value">{{ fmtAmt(adjudication.tbReconcile.value.auditedEndTotal) }}</span>
+        </div>
+        <div class="tb-row">
+          <span class="tb-label">差异数：</span>
+          <span :class="['tb-value', { negative: adjudication.tbReconcile.value.diff !== 0 }]">
+            {{ fmtAmt(adjudication.tbReconcile.value.diff) }}
+          </span>
+          <el-tag
+            v-if="adjudication.tbReconcile.value.hasTb"
+            :type="adjudication.tbReconcile.value.isMatch ? 'success' : 'danger'"
+            size="small"
+            effect="plain"
+          >
+            {{ adjudication.tbReconcile.value.isMatch ? '✓ 与试算平衡表一致' : '⚠ 与试算平衡表存在差异' }}
+          </el-tag>
+        </div>
+      </div>
+
       <!-- ═══ 交叉验证区 ═══ -->
       <div class="n1-cross-validation">
         <div class="cv-title">交叉验证</div>
@@ -227,6 +255,25 @@
             <span v-else class="cv-badge cv-badge-err">⚠ 差异 {{ fmtAmt(crossSheet.adjudicationVsCalcTable.value.diff) }}</span>
             <GtIndexChip value="N1-4" :context-project-id="projectId" />
           </div>
+          <!-- N1-1 期末AJE/RJE vs N1-3调整分录净影响 -->
+          <div
+            v-if="crossSheet.adjustmentReconcile.value.hasAdjustment"
+            class="cv-item"
+            :class="crossSheet.adjustmentReconcile.value.isMatch ? 'cv-match' : 'cv-diff'"
+          >
+            <span class="cv-label">N1-1期末AJE/RJE vs N1-3调整分录净影响</span>
+            <span v-if="crossSheet.adjustmentReconcile.value.isMatch" class="cv-badge cv-badge-ok">✓ 一致</span>
+            <span v-else class="cv-badge cv-badge-err">
+              ⚠ AJE差 {{ fmtAmt(crossSheet.adjustmentReconcile.value.ajeDiff) }} /
+              RJE差 {{ fmtAmt(crossSheet.adjustmentReconcile.value.rjeDiff) }}
+            </span>
+            <GtIndexChip value="N1-3" :context-project-id="projectId" />
+          </div>
+        </div>
+        <div v-if="crossSheet.adjustmentReconcile.value.hasAdjustment && !crossSheet.adjustmentReconcile.value.isMatch" class="cv-hint">
+          N1-3 已录调整分录（AJE {{ fmtAmt(crossSheet.adjustmentReconcile.value.adjustmentAje) }} /
+          RJE {{ fmtAmt(crossSheet.adjustmentReconcile.value.adjustmentRje) }}），
+          但尚未全额反映到本表期末 AJE/RJE 列。请用「带入调整」把净影响分配到具体差异项目行（不会自动累加，避免与手工录入双算）。
         </div>
       </div>
 
@@ -287,9 +334,7 @@
               <el-button size="small" @click="handleAI('conclusion')">
                 <el-icon><MagicStick /></el-icon> AI辅助
               </el-button>
-              <el-button size="small" @click="openReview?.('N1-1-结论')">
-                <el-icon><ChatDotSquare /></el-icon> 复核
-              </el-button>
+              <GtReviewTrigger section-id="N1-1-结论" label="💬 复核" />
             </div>
           </div>
         </template>
@@ -371,11 +416,14 @@
  *
  * 科目：1811 递延所得税资产（**借方/资产类**！期末余额=期初+借-贷）
  */
-import { ref, computed, inject, onMounted, toRef } from 'vue'
+import { ref, computed, onMounted, toRef } from 'vue'
 import { ElMessage } from 'element-plus'
-import { WarningFilled, MagicStick, ChatDotSquare, Download } from '@element-plus/icons-vue'
+import { WarningFilled, MagicStick, Download, RefreshRight } from '@element-plus/icons-vue'
+import { ElMessageBox } from 'element-plus'
 // @ts-ignore
 import GtIndexChip from '../../GtIndexChip.vue'
+// @ts-ignore
+import GtReviewTrigger from '../../GtReviewTrigger.vue'
 // @ts-ignore
 import GtOnlyOfficeSheet from '../../GtOnlyOfficeSheet.vue'
 import { useN1FormData } from '../../composables/useN1FormData'
@@ -384,6 +432,7 @@ import { useN1CrossSheet } from '../../composables/useN1CrossSheet'
 import { useN1DualMode } from '../../composables/useN1DualMode'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import { generateN1Text } from '../../composables/useN1AiText'
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
@@ -392,11 +441,12 @@ const props = defineProps<{
   wpId: string
   projectId: string
   isReadonly: boolean
+  /** 审计年度（TB 兜底取数需要；缺省由 useAuditContext 提供） */
+  year?: number
 }>()
 
-// ─── Inject 复核对话 ─────────────────────────────────────────────────────────
-
-const openReview = inject<(section: string) => void>('openReviewDialog', undefined)
+// ─── 复核入口 ────────────────────────────────────────────────────────────────
+// 改用 GtReviewTrigger（自带蓝/红点，内部 inject openReviewDialog）
 
 // ─── Composables ─────────────────────────────────────────────────────────────
 
@@ -405,9 +455,19 @@ const projectIdRef = toRef(props, 'projectId')
 
 const dualMode = useN1DualMode({ wpId: wpIdRef })
 
-const formData = useN1FormData({ wpId: wpIdRef, projectId: projectIdRef })
+const auditCtxYear = useAuditContext().year
+const effectiveYear = computed<number | undefined>(
+  () => props.year || (auditCtxYear as any)?.value || undefined,
+)
 
-const crossSheet = useN1CrossSheet(formData.allResponses)
+const formData = useN1FormData({ wpId: wpIdRef, projectId: projectIdRef, year: effectiveYear })
+
+// crossSheet 需要审定表 AJE/RJE 合计做与 N1-3 的勾稽；adjudication 在其后创建，
+// 故用惰性取值器（调用时 adjudication 已就绪）避免循环依赖。
+const crossSheet = useN1CrossSheet(formData.allResponses, () => ({
+  endAje: adjudication?.totals?.value?.endAje ?? 0,
+  endRje: adjudication?.totals?.value?.endRje ?? 0,
+}))
 
 const adjudication = useN1Adjudication({
   wpId: wpIdRef,
@@ -428,7 +488,7 @@ const {
   apply: onBringInApply,
 } = useAdjudicationBringIn({
   projectId: projectIdRef as any,
-  year: useAuditContext().year as any,
+  year: effectiveYear as any,
   subjectPrefix: '1811',
   direction: 'debit', // 资产借方：净发生额 = 借 − 贷
   subjectCode: '1811',
@@ -446,6 +506,7 @@ const {
 // ─── State ───────────────────────────────────────────────────────────────────
 
 const writebackLoading = ref(false)
+const aiLoading = ref(false)
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 
@@ -492,6 +553,57 @@ function getSummaries({ columns }: any) {
   return sums
 }
 
+// ─── 从 N1-2 明细带入未审数 ──────────────────────────────────────────────────
+
+async function handlePullFromDetail() {
+  try {
+    await ElMessageBox.confirm(
+      '将按暂时性差异分类，从 N1-2 明细表重算并覆盖对应分类的「期初/期末未审数」；'
+        + '明细表未涉及的分类保持原值不清零，AJE/RJE 与原因分析一并保留。是否继续？',
+      '从 N1-2 带入未审数',
+      { type: 'warning', confirmButtonText: '带入', cancelButtonText: '取消' },
+    )
+  } catch {
+    return
+  }
+  const count = adjudication.pullFromDetail()
+  if (count === 0) {
+    ElMessage.warning('N1-2 明细表暂无数据，请先在明细表录入暂时性差异项目')
+    return
+  }
+  ElMessage.success(`已从 N1-2 带入 ${count} 个明细项目（按分类聚合）`)
+}
+
+// ─── 从 N1-5 带入「可抵扣亏损」分类行 ────────────────────────────────────────
+
+/**
+ * 只写「可抵扣亏损」一行的期末未审数（= N1-5 可确认递延所得税资产合计），
+ * 其他分类不动（不清零）。届满亏损由 N1-5 侧判定后不产生可确认额。
+ */
+async function handlePullLossFromN15() {
+  try {
+    await ElMessageBox.confirm(
+      '将用 N1-5 亏损检查表的「可确认递延所得税资产合计」覆盖审定表「可抵扣亏损」一行的期末未审数；'
+        + '其他分类行不受影响。是否继续？',
+      '从 N1-5 带入可抵扣亏损',
+      { type: 'warning', confirmButtonText: '带入', cancelButtonText: '取消' },
+    )
+  } catch {
+    return
+  }
+  const auditYear = effectiveYear.value
+  if (!auditYear) {
+    ElMessage.warning('缺少审计年度，无法判断亏损弥补期限是否届满')
+    return
+  }
+  const amount = adjudication.pullLossFromN15(auditYear)
+  if (amount === null) {
+    ElMessage.warning('N1-5 亏损检查表暂无数据，请先在 N1-5 录入各到期年度亏损')
+    return
+  }
+  ElMessage.success(`已带入可确认递延所得税资产合计 ${amount.toLocaleString('zh-CN')}`)
+}
+
 // ─── TB回写 ──────────────────────────────────────────────────────────────────
 
 async function handleWritebackTB() {
@@ -519,14 +631,57 @@ function handleConclusionSave() {
 
 // ─── AI辅助 ──────────────────────────────────────────────────────────────────
 
-function handleAI(section: string) {
-  import('@/utils/http').then(({ default: h }) => {
-    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+/**
+ * AI 辅助（真回填）。
+ * - `conclusion` → 回填审计结论；`adjudication` → 回填审计说明；`reason` → 顾问式弹窗（行级列不整体覆盖）
+ * - context 值全部转字符串（后端 dict[str,str]，数字会 422）
+ */
+async function handleAI(section: string) {
+  if (aiLoading.value) return
+  aiLoading.value = true
+  try {
+    const t = adjudication.totals.value
+    const tb = adjudication.tbReconcile.value
+    const text = await generateN1Text({
+      wpId: props.wpId,
       section: `n1-adjudication-${section}`,
-      prompt: `请基于递延所得税资产底稿"${section}"区段数据，给出审计分析建议`,
-      context: { section, wpId: props.wpId },
-    }).catch(() => {})
-  })
+      prompt:
+        section === 'conclusion'
+          ? '请基于递延所得税资产审定表数据撰写审计结论（确认依据是否充分、与试算表核对是否一致、调整是否恰当）。'
+          : section === 'reason'
+            ? '请就递延所得税资产各类暂时性差异期末较期初的变动（尤其变动率超过30%的项目）给出原因分析要点。'
+            : '请基于递延所得税资产审定表的期初/期末审定数与变动情况，撰写审计说明（增减主要原因、超30%变动的解释）。',
+      context: {
+        期初审定合计: String(t.beginAudited),
+        期末审定合计: String(t.endAudited),
+        审定变动额: String(t.changeAudited),
+        期末AJE合计: String(t.endAje),
+        期末RJE合计: String(t.endRje),
+        试算表期末余额: String(tb.tbEndBalance),
+        与试算表差异: String(tb.diff),
+      },
+      existingContent:
+        section === 'conclusion'
+          ? adjudication.auditConclusion.value
+          : section === 'adjudication'
+            ? adjudication.auditNotes.value
+            : '',
+    })
+    if (!text) return
+    if (section === 'conclusion') {
+      adjudication.auditConclusion.value = text
+      handleConclusionSave()
+      ElMessage.success('AI 已生成审计结论')
+    } else if (section === 'adjudication') {
+      adjudication.auditNotes.value = text
+      handleNotesSave()
+      ElMessage.success('AI 已生成审计说明')
+    } else {
+      await ElMessageBox.alert(text, 'AI 原因分析建议', { confirmButtonText: '知道了' }).catch(() => {})
+    }
+  } finally {
+    aiLoading.value = false
+  }
 }
 </script>
 
@@ -729,6 +884,34 @@ function handleAI(section: string) {
   text-align: right;
 }
 
+/* ─── 与试算平衡表核对 ─── */
+.n1-tb-reconcile {
+  margin: 16px 0;
+  padding: 12px 16px;
+  background: #f5f7fa;
+  border: 1px solid #ebeef5;
+  border-left: 4px solid #409eff;
+  border-radius: 0 6px 6px 0;
+}
+
+.tb-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--wp-font-size, 13px);
+  line-height: 1.9;
+}
+
+.tb-label {
+  color: #606266;
+}
+
+.tb-value {
+  font-weight: 600;
+  color: #303133;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ─── 交叉验证区 ─── */
 .n1-cross-validation {
   margin-bottom: 16px;
@@ -786,6 +969,17 @@ function handleAI(section: string) {
 
 .cv-badge-err {
   color: #f56c6c;
+}
+
+.cv-hint {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #fdf6ec;
+  border-left: 3px solid #e6a23c;
+  border-radius: 0 4px 4px 0;
+  font-size: 12px;
+  color: #92400e;
+  line-height: 1.6;
 }
 
 /* ─── N3对应关系区 ─── */

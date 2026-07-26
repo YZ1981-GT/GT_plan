@@ -7,7 +7,7 @@
     <template v-else>
       <div v-if="isHtmlSheet && currentSheet !== 'K9'" class="k9-header-toolbar">
         <el-segmented
-          v-model="dualMode.currentMode.value"
+          :model-value="dualMode.currentMode.value"
           :options="dualMode.modeOptions.value"
           size="small"
           @change="dualMode.onModeChange"

@@ -15,6 +15,7 @@
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { eventBus } from '@/utils/eventBus'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -246,14 +247,13 @@ export function useH8FormData(params: {
       }
 
       // 发布 EventBus 事件通知其他底稿（附注/H9租赁负债/报表等）
-      window.dispatchEvent(new CustomEvent('substantive:adjudicated', {
-        detail: {
-          wpCode: 'H8',
-          accountCode: ACCOUNT_CODE_1901,
-          auditedAmount: auditedAmount1901,
-          auditedAmountAccDep: auditedAmountAccDep ?? null,
-        },
-      }))
+      eventBus.emit('substantive:adjudicated', {
+        wpCode: 'H8',
+        accountCode: ACCOUNT_CODE_1901,
+        auditedAmount: auditedAmount1901,
+        adjudicatedAmount: auditedAmount1901,
+        auditedAmountAccDep: auditedAmountAccDep ?? null,
+      })
     } catch {
       ElMessage.warning('审定数回写失败，请手动确认试算表数据')
     }

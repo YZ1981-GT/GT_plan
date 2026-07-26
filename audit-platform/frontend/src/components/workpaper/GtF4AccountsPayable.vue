@@ -4,7 +4,7 @@
     <template v-else>
       <div v-if="showHtmlToolbar" class="f4-accounts-payable-toolbar">
         <el-segmented
-          v-model="dualMode.currentMode.value"
+          :model-value="dualMode.currentMode.value"
           :options="dualMode.modeOptions"
           size="small"
           @change="dualMode.onModeChange"
@@ -169,6 +169,12 @@ import { ref, computed, onMounted, onBeforeUnmount, provide, inject, defineAsync
 import { useF4FormData, type ChecklistResponse } from './composables/useF4FormData'
 import { useF4DualMode } from './composables/useF4DualMode'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
+import {
+  useAgingConfig,
+  PRESET_SEGMENTS,
+  DEFAULT_SUBJECT_PRESETS,
+  type AgingSegment,
+} from '@/composables/useAgingConfig'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 import CycleImportExportDropdown from './shared/CycleImportExportDropdown.vue'
 import { isImportExportSheet, resolveImportExportSheet } from './shared/cycleImportExportRegistry'
@@ -247,6 +253,16 @@ provide('f4VersionTrailRef', versionTrailRef)
 provide('f4OpenVersionHistory', openVersionHistory)
 provide('f4BsDate', bsDate)
 provide('f4TbAmount', tbAmount)
+
+// ─── 账龄段：一处装配并 provide，各 tab 经 inject 共享（避免每 tab 各自请求、首帧段数跳变） ──
+const f4AgingConfig = useAgingConfig(computed(() => props.projectId), 'F4')
+const f4AgingSegments = computed<AgingSegment[]>(() =>
+  f4AgingConfig.segments.value.length
+    ? f4AgingConfig.segments.value
+    : (PRESET_SEGMENTS[DEFAULT_SUBJECT_PRESETS.F4 ?? 'THREE_YEAR'] as AgingSegment[]),
+)
+provide('f4AgingSegments', f4AgingSegments)
+provide('f4AgingPreset', computed(() => f4AgingConfig.preset.value))
 
 const currentSheet = computed(() => {
   const name = props.sheetName || props.wpCode || ''

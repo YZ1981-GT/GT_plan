@@ -7,7 +7,7 @@
     <template v-else>
       <div v-if="showHtmlToolbar" class="h1-header-toolbar">
         <el-segmented
-          v-model="currentMode"
+          :model-value="currentMode"
           :options="modeOptions"
           size="small"
           :disabled="ooChecking"
@@ -281,6 +281,8 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :template-type="projectTemplateType"
+          :report-scope="projectReportScope"
         />
 
         <!-- 附注披露（国企） -->
@@ -290,6 +292,8 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :template-type="projectTemplateType"
+          :report-scope="projectReportScope"
         />
 
         <!-- 未匹配 → OnlyOffice fallback -->
@@ -326,6 +330,12 @@ import { eventBus } from '@/utils/eventBus'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useH1CrossSheet } from './composables/useH1CrossSheet'
 import { useH1DualMode } from './composables/useH1DualMode'
+import {
+  buildDetailSeedRows,
+  shouldSeedDetailRows,
+  mergeSeedRows,
+  type H1FourTablePrefill,
+} from './composables/h1FourTablePrefill'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
@@ -424,6 +434,47 @@ const h1PeriodEnd = computed(() => {
     || ''
   ) as string
 })
+
+/**
+ * 附注披露口径（权威变体源 = projects.template_type / report_scope，由 render project_context 注入）。
+ * 上市披露表只能同步上市章节（五、22）、国企只能同步国企章节（八、22），不可混用。
+ */
+const projectTemplateType = computed(() => {
+  const ctx = props.htmlData?.project_context ?? props.htmlData?.projectContext ?? {}
+  return String(ctx.template_type ?? '')
+})
+const projectReportScope = computed(() => {
+  const ctx = props.htmlData?.project_context ?? props.htmlData?.projectContext ?? {}
+  return String(ctx.report_scope ?? '')
+})
+
+// ─── 四表取数（灰度 H1_FOUR_TABLE_EXTRACTION_ENABLED，关闭时载荷不存在）────────
+/** 后端 render 注入的四表取数载荷（明细/序时账增减/对方科目可用性） */
+const fourTablePrefill = computed<H1FourTablePrefill | null>(() => {
+  const hd: any = resolvedHtmlData.value || props.htmlData || {}
+  return (hd.h1_four_table_prefill ?? hd.h1FourTablePrefill ?? null) as H1FourTablePrefill | null
+})
+provide('h1FourTablePrefill', fourTablePrefill)
+
+/**
+ * 四表取数 → H1-2 种子行（Persist_First，Req1.3 / Req6.2）
+ * - 默认仅在 H1-2 明细为空时写入，绝不覆盖审计师已录数据
+ * - force=true（「重新取数」）覆盖取数行，保留手工新增行
+ */
+function seedDetailFromFourTable(force = false): number {
+  if (isReadonly.value) return 0
+  const seeds = buildDetailSeedRows(fourTablePrefill.value)
+  if (!seeds.length) return 0
+  const raw = allResponses.value.get('H1-2-rows')?.remark
+  if (!force) {
+    if (!shouldSeedDetailRows(raw)) return 0
+    persistResponse('H1-2-rows', seeds)
+    return seeds.length
+  }
+  persistResponse('H1-2-rows', mergeSeedRows(seeds, raw))
+  return seeds.length
+}
+provide('h1SeedDetailFromFourTable', seedDetailFromFourTable)
 
 /** 审计年度：优先 prop，其次从资产负债表日提取，最后回退当前年（供抽凭引擎） */
 const h1Year = computed(() => {
@@ -569,7 +620,7 @@ function _handleAdjudicatedRefresh(): void {
 }
 
 onMounted(() => {
-  void selfLoad()
+  void selfLoad().then(() => { seedDetailFromFourTable() })
   // 版本追踪：已集成 useVersionTrail — createSnapshot 由保存流程触发
 
   // 附注/取数联动：审定数变更或 TB 更新时刷新（P1 — 修 H1 附注刷新 double no-op）

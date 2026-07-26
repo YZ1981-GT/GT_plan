@@ -47,7 +47,7 @@ const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF4AiGenerate(
   toRef(props, 'wpId') as Ref<string>,
 )
 
-// 源表固定4个账龄区间；"其他/未分类"仅在有余额时展示（合计不受影响）
+// 账龄区间跟随项目账龄配置；"其他/未分类"（残差行）仅在有余额时展示（合计不受影响）
 const visibleAgingRows = computed(() =>
   agingRows.value.filter((row) =>
     row.rowKey !== 'aging-other'
@@ -128,7 +128,7 @@ onBeforeUnmount(() => window.removeEventListener('substantive:adjudicated', onAd
     <details class="guidance-details">
       <summary>📋 编制思路与联动逻辑</summary>
       <div class="guidance-content">
-        <p>1. 按账龄披露：1年以内、1至2年、2至3年、3年以上四档账龄自动取自F4-1审定表按账龄分类（期末余额=期末审定数、期初余额=期初审定数），本表不可直接改数。</p>
+        <p>1. 按账龄披露：账龄档位跟随<strong>项目账龄配置</strong>（3年段／5年段／自定义），各档自动取自F4-1审定表按账龄分类（期末余额=期末审定数、期初余额=期初审定数），本表不可直接改数；“1年以上”合计按段起始天数≥366派生，不含“其他/未分类”残差行。</p>
         <p>2. 账龄超过1年的重要应付账款：点击"从F4-5同步"自动带入长期挂账检查表中挂账超过1年的债权单位、期末余额及未偿还原因，也可手工补行。</p>
         <p>3. 按账龄披露合计与F4-1按性质审定合计交叉核对，不一致时红色预警；重要应付账款合计不应超过1年以上账龄的披露合计。</p>
         <p>4. 披露文字保存后自动联动国企附注模块（应付账款2202）。</p>

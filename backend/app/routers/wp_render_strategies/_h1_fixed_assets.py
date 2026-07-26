@@ -10,7 +10,8 @@ import re
 
 import sqlalchemy as sa
 
-from app.models.audit_platform_models import TbBalance
+from app.core.config import settings
+from app.models.audit_platform_models import TbBalance, TbLedger
 from app.services.dataset_query import get_active_filter
 
 from ._context import RenderContext
@@ -109,6 +110,15 @@ def _empty_amt() -> dict:
     return {"begin": 0.0, "debit": 0.0, "credit": 0.0, "end": 0.0, "unadjusted": 0.0}
 
 
+def _leaf_codes(codes: set[str]) -> set[str]:
+    """只保留叶子科目（某 code 不是任何其它 code 的前缀）。
+
+    tb_balance 同时存父级(1601)与子科目(1601.01…)，父子同时累加会双算一倍。
+    对齐 E1/K9 的 `_is_leaf` 铁律：只汇总叶子。
+    """
+    return {c for c in codes if not any(o != c and o.startswith(c) for o in codes)}
+
+
 async def _build_category_prefill(ctx: RenderContext) -> dict:
     """从 tb_balance 的 1601/1602/1603 子科目按分类聚合，供 H1-1 预填未审数。"""
     buckets: dict[str, dict] = {
@@ -132,8 +142,12 @@ async def _build_category_prefill(ctx: RenderContext) -> dict:
                 TbBalance.credit_amount,
             ).where(active_filter)
         )
-        for row in result.fetchall():
+        rows = [r for r in result.fetchall() if _classify_fa_block((r.account_code or "").strip())]
+        leaves = _leaf_codes({(r.account_code or "").strip() for r in rows})
+        for row in rows:
             code = (row.account_code or "").strip()
+            if code not in leaves:
+                continue  # 父级科目：由其子科目累加，跳过防双算
             block = _classify_fa_block(code)
             if not block:
                 continue
@@ -149,8 +163,10 @@ async def _build_category_prefill(ctx: RenderContext) -> dict:
             target = buckets[cat][block]
             begin = float(row.opening_balance or 0)
             end = float(row.closing_balance or 0)
-            debit = float(row.debit_amount or 0)
-            credit = float(row.credit_amount or 0)
+            # 发生额归一为非负：不同账套 tb_balance 对贷方类可能存负数（有符号）或正数（绝对值），
+            # 前端 calcContraEndBalance(begin, debit, credit) 期望正数发生额，否则期末与未审数对不上。
+            debit = abs(float(row.debit_amount or 0))
+            credit = abs(float(row.credit_amount or 0))
             begin_v = begin if block == "cost" else abs(begin)
             end_v = end if block == "cost" else abs(end)
             target["begin"] += begin_v
@@ -180,6 +196,267 @@ async def _build_category_prefill(ctx: RenderContext) -> dict:
     }
 
 
+"""折旧对方科目可用性阈值：填充率 ≥ 80% 才允许按对方科目（费用归属）自动归集。
+
+实证背景：某真实账套 1602 分录 1519 行中 counterpart_account 非空仅 135 行（≈9%），
+且凭证为多业务合并记账（按 voucher_no 归集会混入银行存款/应付账款等无关科目，
+金额远超当年折旧）→ 默认不提供自动归集，只如实说明原因（宁缺勿造）。
+"""
+_COUNTERPART_FILL_THRESHOLD = 0.8
+
+
+async def _probe_counterpart_availability(ctx: RenderContext) -> dict:
+    """探测折旧对方科目可用性（Req3.4）。
+
+    returns {"available": bool, "fill_rate": float, "total_lines": int, "reason": str}
+    """
+    try:
+        active_filter = await get_active_filter(
+            ctx.db, TbLedger.__table__, ctx.project_id, ctx.year
+        )
+        row = (
+            await ctx.db.execute(
+                sa.select(
+                    sa.func.count().label("total"),
+                    sa.func.count(
+                        sa.case(
+                            (
+                                sa.and_(
+                                    TbLedger.counterpart_account.isnot(None),
+                                    TbLedger.counterpart_account != "",
+                                ),
+                                1,
+                            )
+                        )
+                    ).label("filled"),
+                ).where(active_filter, TbLedger.account_code.like("1602%"))
+            )
+        ).fetchone()
+    except Exception as e:  # noqa: BLE001
+        logger.warning("H1 counterpart availability probe failed: %s", e)
+        return {
+            "available": False,
+            "fill_rate": 0.0,
+            "total_lines": 0,
+            "reason": "序时账折旧分录读取失败，无法判断对方科目可用性",
+        }
+
+    total = int(getattr(row, "total", 0) or 0)
+    filled = int(getattr(row, "filled", 0) or 0)
+    if total <= 0:
+        return {
+            "available": False,
+            "fill_rate": 0.0,
+            "total_lines": 0,
+            "reason": "序时账无累计折旧（1602）分录，无法按对方科目归集",
+        }
+
+    fill_rate = round(filled / total, 4)
+    if fill_rate >= _COUNTERPART_FILL_THRESHOLD:
+        return {
+            "available": True,
+            "fill_rate": fill_rate,
+            "total_lines": total,
+            "reason": "",
+        }
+    return {
+        "available": False,
+        "fill_rate": fill_rate,
+        "total_lines": total,
+        "reason": (
+            f"序时账未完整记录对方科目（填充率 {fill_rate:.0%}，共 {total} 条折旧分录），"
+            "且凭证多为合并记账，无法按费用归属自动归集；请人工核对或与对方底稿（K8/K9/I6/F2/F5）勾稽"
+        ),
+    }
+
+
+async def _build_h1_detail_prefill(ctx: RenderContext) -> dict:
+    """tb_balance 叶子科目 → H1-2 明细**分类级**取数载荷（Req1）。
+
+    每个叶子科目一行；发生额归一为非负；备抵段 begin/end 取绝对值。
+    Card_Level 字段（资产编号/取得日期/年限/残值率等）一律不产出——四表库无资产卡片
+    维度（tb_aux_balance 实证无该维度），由客户台账导入或手工补录（Req1.5 / Req8.1）。
+    """
+    empty = {"rows": [], "totals": {"cost": 0.0, "dep": 0.0, "impair": 0.0}, "source": "tb_balance"}
+    try:
+        active_filter = await get_active_filter(
+            ctx.db, TbBalance.__table__, ctx.project_id, ctx.year
+        )
+        result = await ctx.db.execute(
+            sa.select(
+                TbBalance.account_code,
+                TbBalance.account_name,
+                TbBalance.opening_balance,
+                TbBalance.closing_balance,
+                TbBalance.debit_amount,
+                TbBalance.credit_amount,
+            ).where(active_filter)
+        )
+        raw = [
+            r for r in result.fetchall()
+            if _classify_fa_block((r.account_code or "").strip())
+        ]
+    except Exception as e:  # noqa: BLE001
+        logger.warning("H1 detail prefill fetch failed: %s", e)
+        return empty
+
+    if not raw:
+        return empty
+
+    leaves = _leaf_codes({(r.account_code or "").strip() for r in raw})
+    # 按**分类**聚合成一行（原值 1601.0x 与折旧 1602.0x 是同类资产的两个侧面，
+    # 若按单个科目码拆行会产出"折旧行原值为 0"的错乱明细）。
+    by_cat: dict[str, dict] = {}
+    needs_review: set[str] = set()
+    for row in raw:
+        code = (row.account_code or "").strip()
+        if code not in leaves:
+            continue  # 父级科目：由子科目承载，跳过防双算
+        block = _classify_fa_block(code)
+        if not block:
+            continue
+        name = (row.account_name or "").strip()
+        cat = _classify_fa_category(code, name)
+        if cat == "其他设备":
+            s = re.sub(r"\s+", "", name)
+            has_keyword = bool(re.search(r"其他|未分类|低值|设备|机床|工具", s))
+            has_code = bool(re.match(r"^160[123][.\-]?0?[1-5]", code))
+            if not has_keyword and not has_code:
+                needs_review.add(code)
+        entry = by_cat.setdefault(
+            cat,
+            {
+                "category": cat,
+                "source_codes": [],
+                "cost": {"begin": 0.0, "debit": 0.0, "credit": 0.0, "end": 0.0},
+                "dep": {"begin": 0.0, "debit": 0.0, "credit": 0.0, "end": 0.0},
+                "impair": {"begin": 0.0, "debit": 0.0, "credit": 0.0, "end": 0.0},
+                "needs_review": False,
+            },
+        )
+        if code not in entry["source_codes"]:
+            entry["source_codes"].append(code)
+        begin = float(row.opening_balance or 0)
+        end = float(row.closing_balance or 0)
+        target = entry[block]
+        target["begin"] += begin if block == "cost" else abs(begin)
+        target["end"] += end if block == "cost" else abs(end)
+        target["debit"] += abs(float(row.debit_amount or 0))
+        target["credit"] += abs(float(row.credit_amount or 0))
+
+    rows = [by_cat[c] for c in _H1_FA_CATEGORIES if c in by_cat]
+    rows += [v for k, v in sorted(by_cat.items()) if k not in _H1_FA_CATEGORIES]
+    for r in rows:
+        r["source_codes"].sort()
+        r["formula"] = " + ".join(f"TB('{c}','期末余额')" for c in r["source_codes"])
+        if any(c in needs_review for c in r["source_codes"]):
+            r["needs_review"] = True
+    totals = {
+        "cost": sum(r["cost"]["end"] for r in rows),
+        "dep": sum(r["dep"]["end"] for r in rows),
+        "impair": sum(r["impair"]["end"] for r in rows),
+    }
+    return {"rows": rows, "totals": totals, "source": "tb_balance"}
+
+
+async def _build_h1_ledger_movement(ctx: RenderContext) -> dict:
+    """tb_ledger 1601 借/贷方合计（本期增加/减少），供 H1-2 增减核对（Req2）。
+
+    取不到分录时返回 available=False（前端显示"未取到"而非 0/一致）。
+    """
+    try:
+        active_filter = await get_active_filter(
+            ctx.db, TbLedger.__table__, ctx.project_id, ctx.year
+        )
+        row = (
+            await ctx.db.execute(
+                sa.select(
+                    sa.func.count().label("lines"),
+                    sa.func.coalesce(sa.func.sum(TbLedger.debit_amount), 0).label("debit_total"),
+                    sa.func.coalesce(sa.func.sum(TbLedger.credit_amount), 0).label("credit_total"),
+                ).where(active_filter, TbLedger.account_code.like("1601%"))
+            )
+        ).fetchone()
+    except Exception as e:  # noqa: BLE001
+        logger.warning("H1 ledger movement fetch failed: %s", e)
+        return {"available": False, "debit_total": 0.0, "credit_total": 0.0, "lines": 0}
+
+    lines = int(getattr(row, "lines", 0) or 0)
+    if lines <= 0:
+        return {"available": False, "debit_total": 0.0, "credit_total": 0.0, "lines": 0}
+    return {
+        "available": True,
+        "lines": lines,
+        "debit_total": abs(float(getattr(row, "debit_total", 0) or 0)),
+        "credit_total": abs(float(getattr(row, "credit_total", 0) or 0)),
+    }
+
+
+async def _build_h1_depreciation_movement(ctx: RenderContext) -> dict:
+    """tb_ledger 1602 贷方合计（本期折旧计提），供折旧 tab 账面折旧核对（Req3.1）。
+
+    折旧计提在 1602 贷方；取不到分录返回 available=False（前端显示"未取到"）。
+    """
+    try:
+        active_filter = await get_active_filter(
+            ctx.db, TbLedger.__table__, ctx.project_id, ctx.year
+        )
+        row = (
+            await ctx.db.execute(
+                sa.select(
+                    sa.func.count().label("lines"),
+                    sa.func.coalesce(sa.func.sum(TbLedger.credit_amount), 0).label("credit_total"),
+                ).where(active_filter, TbLedger.account_code.like("1602%"))
+            )
+        ).fetchone()
+    except Exception as e:  # noqa: BLE001
+        logger.warning("H1 depreciation movement fetch failed: %s", e)
+        return {"available": False, "provision_total": 0.0, "lines": 0}
+
+    lines = int(getattr(row, "lines", 0) or 0)
+    if lines <= 0:
+        return {"available": False, "provision_total": 0.0, "lines": 0}
+    return {
+        "available": True,
+        "lines": lines,
+        "provision_total": abs(float(getattr(row, "credit_total", 0) or 0)),
+    }
+
+
+async def _build_h1_four_table_prefill(ctx: RenderContext) -> dict:
+    """组装 H1 四表取数载荷（各段独立 fail-open，Req6.3）。"""
+    async def _safe(coro_fn, fallback):
+        try:
+            return await coro_fn(ctx)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("H1 four-table prefill section failed: %s", e)
+            return fallback
+
+    detail = await _safe(
+        _build_h1_detail_prefill,
+        {"rows": [], "totals": {"cost": 0.0, "dep": 0.0, "impair": 0.0}, "source": "tb_balance"},
+    )
+    ledger = await _safe(
+        _build_h1_ledger_movement,
+        {"available": False, "debit_total": 0.0, "credit_total": 0.0, "lines": 0},
+    )
+    depreciation = await _safe(
+        _build_h1_depreciation_movement,
+        {"available": False, "provision_total": 0.0, "lines": 0},
+    )
+    counterpart = await _safe(
+        _probe_counterpart_availability,
+        {"available": False, "fill_rate": 0.0, "total_lines": 0, "reason": "对方科目可用性探测失败"},
+    )
+    return {
+        "enabled": True,
+        "detail": detail,
+        "ledger_movement": ledger,
+        "depreciation": depreciation,
+        "counterpart": counterpart,
+    }
+
+
 async def _fetch_tb_data(ctx: RenderContext) -> dict:
     """取科目1601+1602+1603的期初/期末余额及未审数."""
     tb: dict[str, float] = {}
@@ -196,14 +473,21 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict:
                 TbBalance.credit_amount,
             ).where(active_filter)
         )
-        for row in result.fetchall():
+        tb_rows = [
+            r for r in result.fetchall()
+            if _classify_fa_block((r.account_code or "").strip())
+        ]
+        tb_leaves = _leaf_codes({(r.account_code or "").strip() for r in tb_rows})
+        for row in tb_rows:
             code = (row.account_code or "").strip()
+            if code not in tb_leaves:
+                continue  # 父级科目：只汇总叶子防双算
             for prefix, (unadj_key, _audited_key) in _H1_ACCOUNT_PREFIXES.items():
                 if code == prefix or code.startswith(prefix):
                     tb[f"{unadj_key}_opening"] = tb.get(f"{unadj_key}_opening", 0.0) + float(row.opening_balance or 0)
                     tb[f"{unadj_key}_closing"] = tb.get(f"{unadj_key}_closing", 0.0) + float(row.closing_balance or 0)
-                    tb[f"{unadj_key}_debit"] = tb.get(f"{unadj_key}_debit", 0.0) + float(row.debit_amount or 0)
-                    tb[f"{unadj_key}_credit"] = tb.get(f"{unadj_key}_credit", 0.0) + float(row.credit_amount or 0)
+                    tb[f"{unadj_key}_debit"] = tb.get(f"{unadj_key}_debit", 0.0) + abs(float(row.debit_amount or 0))
+                    tb[f"{unadj_key}_credit"] = tb.get(f"{unadj_key}_credit", 0.0) + abs(float(row.credit_amount or 0))
                     break
     except Exception as e:  # noqa: BLE001
         logger.warning("H1 TB balance fetch failed: %s", e)
@@ -222,8 +506,12 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict:
             """),
             {"pid": str(ctx.project_id), "year": ctx.year},
         )
-        for row in result.fetchall():
+        tbal_rows = list(result.fetchall())
+        tbal_leaves = _leaf_codes({(r.standard_account_code or "").strip() for r in tbal_rows})
+        for row in tbal_rows:
             code = (row.standard_account_code or "").strip()
+            if code not in tbal_leaves:
+                continue  # trial_balance 通常只到标准码级；含子级时只取叶子防双算
             for prefix, (unadj_key, audited_key) in _H1_ACCOUNT_PREFIXES.items():
                 if code == prefix or code.startswith(prefix):
                     tb[unadj_key] = tb.get(unadj_key, 0.0) + float(row.unadjusted_amount or 0)
@@ -249,7 +537,9 @@ async def _load_project_context(ctx: RenderContext) -> dict:
     try:
         result = await ctx.db.execute(
             sa.text("""
-                SELECT p.client_name, p.audit_year, p.business_category, p.applicable_standard_v2 AS applicable_standards
+                SELECT p.client_name, p.audit_year, p.business_category,
+                       p.applicable_standard_v2 AS applicable_standards,
+                       p.template_type, p.report_scope
                 FROM working_paper wp
                 JOIN projects p ON wp.project_id = p.id
                 WHERE wp.id = :wp_id
@@ -262,6 +552,16 @@ async def _load_project_context(ctx: RenderContext) -> dict:
             project_ctx["audit_year"] = str(row.audit_year) if row.audit_year else ""
             project_ctx["business_category"] = row.business_category or ""
             project_ctx["applicable_standards"] = row.applicable_standards or ""
+            # 附注披露变体权威源：projects.template_type(soe|listed) + report_scope(standalone|consolidated)
+            # 注意 applicable_standard_v2.entity_type 实测与 template_type 可能不一致，不作变体判定依据。
+            project_ctx["template_type"] = (
+                str(row.template_type.value) if hasattr(row.template_type, "value")
+                else (str(row.template_type) if row.template_type else "")
+            )
+            project_ctx["report_scope"] = (
+                str(row.report_scope.value) if hasattr(row.report_scope, "value")
+                else (str(row.report_scope) if row.report_scope else "")
+            )
     except Exception as e:  # noqa: BLE001
         logger.warning("H1 project context load failed: %s", e)
     return project_ctx
@@ -287,16 +587,56 @@ async def render(ctx: RenderContext) -> dict | None:
         logger.warning("H1 render responses load failed: %s", e)
 
     tb_values = await _fetch_tb_data(ctx)
+
+    # Wave 6: 审定表 TB 核对走报表行规则映射（Req5.1-5.3）
+    try:
+        from app.services.report_account_mapping import resolve_report_line_account_codes
+        # BS-024 固定资产（对齐 report_config 标准行次；项目级可覆盖口径）
+        h1_source_codes = await resolve_report_line_account_codes(
+            ctx.db, ctx.project_id, "BS-024", fallback=["1601", "1602", "1603"]
+        )
+    except Exception:  # noqa: BLE001
+        h1_source_codes = ["1601", "1602", "1603"]
     category_prefill = await _build_category_prefill(ctx)
     project_context = await _load_project_context(ctx)
 
-    return {
+    # Wave 5: 补充 related_parties + bs_date（Req4.1 — H1-18 关联方/H1-17 年检）
+    if "bs_date" not in project_context:
+        audit_year = project_context.get("audit_year", "")
+        project_context["bs_date"] = f"{audit_year}-12-31" if audit_year else ""
+    if "related_parties" not in project_context:
+        try:
+            rp_result = await ctx.db.execute(
+                sa.text(
+                    "SELECT name, relation_type FROM related_party_registry "
+                    "WHERE project_id = :pid AND is_deleted = false"
+                ),
+                {"pid": str(ctx.project_id)},
+            )
+            project_context["related_parties"] = [
+                {"name": r.name, "relation_type": r.relation_type or ""}
+                for r in rp_result.fetchall()
+            ]
+        except Exception:  # noqa: BLE001
+            project_context["related_parties"] = []
+
+    payload = {
         "component_type": "h1-fixed-assets",
         "account_codes": ["1601", "1602", "1603"],
         "responses_snapshot": responses_snapshot,
         "tb_values": tb_values,
         "adjudication_category_prefill": category_prefill,
         "project_context": project_context,
+        "tb_source_codes": h1_source_codes,
         "prefix": "H1",
         "sheets": H1_SHEETS,
     }
+
+    # 灰度：关闭时不输出任何取数字段（逐字节等价现状，Req6.1）
+    if getattr(settings, "H1_FOUR_TABLE_EXTRACTION_ENABLED", False):
+        try:
+            payload["h1_four_table_prefill"] = await _build_h1_four_table_prefill(ctx)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("H1 four-table prefill assembly failed: %s", e)
+
+    return payload

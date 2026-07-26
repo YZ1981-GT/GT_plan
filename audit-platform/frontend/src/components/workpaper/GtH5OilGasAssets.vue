@@ -14,11 +14,14 @@
     <template v-else>
       <div v-if="showHtmlToolbar && currentSheet !== 'H5'" class="h5-header-toolbar">
         <el-segmented
-          v-model="currentMode"
+          :model-value="currentMode"
           :options="modeOptions"
           size="small"
-          @change="onModeChange"
+          @change="switchMode"
         />
+        <span v-if="ooHealthStatus" class="h5-oo-tag" :class="'h5-oo-tag--' + ooHealthStatus">
+          {{ ooHealthStatus === 'ready' ? 'OnlyOffice 拉取成功' : ooHealthStatus === 'fetching' ? '正在拉取...' : ooHealthStatus === 'checking' ? '检测中...' : '仅结构化视图' }}
+        </span>
       </div>
 
       <!-- OnlyOffice 模式 -->
@@ -28,6 +31,7 @@
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
         :readonly="isReadonly"
+        @fallback="onOoLoadFailed"
         style="height: calc(100vh - 180px)"
       />
 
@@ -362,13 +366,61 @@ const isReadonly = computed(() => !!props.readonly)
 const isLoading = ref(true)
 const allResponses = ref<Map<string, any>>(new Map())
 const currentMode = ref<'html' | 'onlyoffice'>('html')
-const modeOptions = [
+const modeOptions = computed(() => [
   { label: '结构化视图', value: 'html' },
-  { label: '在线编辑', value: 'onlyoffice' },
-]
+  { label: '在线编辑', value: 'onlyoffice', disabled: !isOoAvailable.value },
+])
 const depletionBranch = ref<'noImpair' | 'withImpair'>('noImpair')
 
-/** 从 sheetName 提取编码 (H5/H5A/H5-1~H5-19/附注) */
+// ─── 双模式：拉取成功门控 ─────────────────────────────────────────────────
+const isOoAvailable = ref(false)
+const ooHealthStatus = ref<'checking' | 'ready' | 'fetching' | 'unavailable'>('checking')
+
+async function checkOoHealth(): Promise<void> {
+  ooHealthStatus.value = 'checking'
+  try {
+    const res = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
+    const data = res?.data?.data ?? res?.data ?? res
+    isOoAvailable.value = !!data?.healthy
+    ooHealthStatus.value = data?.healthy ? 'ready' : 'unavailable'
+  } catch {
+    isOoAvailable.value = false
+    ooHealthStatus.value = 'unavailable'
+  }
+}
+
+async function switchMode(mode: string | number): Promise<void> {
+  const target = mode as 'html' | 'onlyoffice'
+  if (target === currentMode.value) return
+  if (target === 'onlyoffice') {
+    if (!isOoAvailable.value) return
+    // 预拉 config 成功才切
+    ooHealthStatus.value = 'fetching'
+    try {
+      const sheetName = props.sheetName || ''
+      const res = await http.get(`/api/workpapers/${props.wpId}/sheets/${encodeURIComponent(sheetName)}/onlyoffice-config`, {
+        params: { project_id: props.projectId },
+        _silent: true,
+      } as any)
+      const config = res?.data?.data ?? res?.data
+      if (!config || Object.keys(config).length === 0) {
+        ooHealthStatus.value = 'unavailable'
+        return
+      }
+      ooHealthStatus.value = 'ready'
+    } catch {
+      ooHealthStatus.value = 'unavailable'
+      return
+    }
+  }
+  currentMode.value = target
+}
+
+function onOoLoadFailed(): void {
+  isOoAvailable.value = false
+  ooHealthStatus.value = 'unavailable'
+  currentMode.value = 'html'
+}
 const currentSheet = computed(() => {
   const name = props.sheetName || props.wpCode || ''
   // 附注匹配
@@ -389,10 +441,7 @@ const showHtmlToolbar = computed(() => {
   return currentSheet.value !== '' && currentMode.value !== 'onlyoffice'
 })
 
-// ─── 双模式切换 ──────────────────────────────────────────────────────────────
-function onModeChange(mode: string | number) {
-  currentMode.value = mode as 'html' | 'onlyoffice'
-}
+// ─── 双模式切换由 switchMode 处理 ────────────────────────────────────────────
 
 // ─── selfLoad ────────────────────────────────────────────────────────────────
 /** 合并一个 responses 对象（{item_id: {...}}）到目标 Map */
@@ -448,6 +497,7 @@ provide('h5OpenVersionHistory', openVersionHistory)
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 onMounted(() => {
   checkIndustryApplicability()
+  void checkOoHealth()
   void selfLoad()
 })
 </script>
@@ -469,6 +519,16 @@ onMounted(() => {
   padding: 8px 16px;
   border-bottom: 1px solid var(--el-border-color-lighter);
 }
+
+.h5-oo-tag {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+.h5-oo-tag--ready { background: #f0f9eb; color: #67c23a; }
+.h5-oo-tag--fetching { background: #fdf6ec; color: #e6a23c; }
+.h5-oo-tag--checking { background: #f4f4f5; color: #909399; }
+.h5-oo-tag--unavailable { background: #fef0f0; color: #f56c6c; }
 
 .depletion-branch-selector {
   padding: 8px 16px;

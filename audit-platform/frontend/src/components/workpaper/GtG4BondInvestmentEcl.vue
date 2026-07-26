@@ -14,7 +14,7 @@
       <div class="g4-bond-investment-ecl-toolbar">
         <el-segmented
           v-if="isHtmlSheet"
-          v-model="dualMode.currentMode.value"
+          :model-value="dualMode.currentMode.value"
           :options="dualMode.modeOptions"
           size="small"
           @change="dualMode.onModeChange"

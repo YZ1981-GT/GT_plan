@@ -15,7 +15,7 @@
       <div class="g7-equity-method-toolbar">
         <el-segmented
           v-if="isHtmlSheet"
-          v-model="dualMode.currentMode.value"
+          :model-value="dualMode.currentMode.value"
           :options="dualMode.modeOptions"
           size="small"
           @change="dualMode.onModeChange"

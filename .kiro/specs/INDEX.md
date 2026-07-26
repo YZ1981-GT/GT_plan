@@ -1,9 +1,9 @@
 # 致同审计作业平台 — Spec 开发索引
 
-**最后更新**：2026-07-25
+**最后更新**：2026-07-26
 **当前分支**：`work/2026-05-30-wp-specs`
-**统计**：Active 1 / Archived 435 = 总计 436
-**最高迁移**：**V124**（以 `migration_status` 实测为准）
+**统计**：Active 0 / Archived 448 = 总计 448
+**最高迁移**：**V127**（以 `migration_status` 实测为准）
 **技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer
 
 ---
@@ -28,13 +28,11 @@
 
 新建 spec 放 `.kiro/specs/{name}/`。
 
-| Spec | 说明 | 状态 |
-|------|------|------|
-| `confirmation-attachment-ocr-linkage` | 函证台账回函证据链（发函件/回函件上传+OCR识别比对+自动匹配+人工确认回填+状态撤回）；三件套齐，M0-M4 分波 | 待执行（tasks 全 `[ ]`） |
+当前无活跃 spec。全部已归档。
 
 ---
 
-## 二、已归档 Spec（435个，15 分类）
+## 二、已归档 Spec（448个，15 分类）
 
 ```
 _archive/
@@ -43,10 +41,10 @@ _archive/
 ├── 03-refinement-rounds/              9
 ├── 04-infra/                          2
 ├── 04-infra-architecture/            36
-├── 05-business-features/            205
+├── 05-business-features/            216
 ├── 06-engineering-governance/        13
 ├── 07-workpaper-slimdown/            22
-├── 08-disclosure-notes/              12
+├── 08-disclosure-notes/              14
 ├── 09-consolidation-phases/           4
 ├── 10-A~S-workpaper-all-cycles-complete/ 31
 ├── 11-confirmation-d0-module/        10
@@ -55,7 +53,32 @@ _archive/
 └── 99-superseded/                     4
 ```
 
-### 最近归档（2026-07-25，活跃 spec 全部收尾归档）
+### 最近归档（2026-07-26，13个已完成 spec 归档）
+
+**→ 05-business-features（+11）**
+
+| Spec | 说明 |
+|------|------|
+| adjustment-import-export-contract | 调整分录导入导出契约收敛（中央 overwrite by-key 幂等+示例行全等+汇总导出补类型列+7张底稿三重对齐 item_id/storage_field/field_keys+K12-3 JSON 迁移+双侧契约守卫；后端 265+前端 52 测试+live round-trip K3-3/中央三段 RESTORED_IDENTICAL）；已 commit `fb7921fc` |
+| adjustment-detail-account-code | 调整分录明细行 `detail_account_code` 可空列（V127 迁移+前端 effectiveCode 优先匹配+导入保留明细码+recalc 零影响契约；后端 68+前端 16 测试+HTTP round-trip 100101 落库）；已 commit `fb7921fc` |
+| h2-disclosure-linkage-and-prefill | H2 在建工程 P1 增强：披露表→附注结构化推送（buildH2SyncPayload 6/4 子表逐字对齐模板+12 vitest）+ 审定表从集中登记带入调整（1604 已接入+AdjudicationBringInDialog）+ H2-2 明细四表取数自动种子（后端 _build_h2_detail_prefill TB 叶子+Persist_First）+ H4 工程物资跨底稿勾稽（h2H4MaterialPull 纯函数）+ P0 四修（TB 叶子防双算+双模式 config 预拉+useNoteRefresh 1604+L1 JSON 键优先） |
+| n1-loss-check-source-alignment | N1-5 按源模板重建（到期年度行+本期数三列+确认/不确认拆分+依据+来源三选+索引）+ 附注五、30/八、31 未确认一节数据源打通（deriveUnrecognizedLossPayload）+ IE 新列对齐 + N1-4/N1-1 跨表带入；7波全绿含 7.3* live round-trip |
+| confirmation-attachment-ocr-linkage | 函证台账回函证据链（发函件/回函件上传+OCR识别比对+自动匹配+人工确认回填+状态撤回+一步退到底）；28/28 任务全绿 |
+| f4-aging-enum-unification | F4 应付账款账龄接入平台枚举单一真源（3年段/5年段/自定义）：F4-2 扁平→nested keyed+F4-1段驱动+残差行+后端动态列头；23/24（仅7.3* Playwright留待） |
+| h1-four-table-extraction | H1 固定资产四表取数扩展：H1-2 分类级 TB 叶子取数+明细增减↔序时账核对+折旧取数+related_parties注入+试算核对走规则映射；30/30 全绿 |
+| h3-cross-workpaper-reconciliation | H3 投资性房地产跨底稿勾稽增强；9/9 全绿 |
+| h4-four-table-extraction | H4 工程物资四表取数；10/10 全绿 |
+| h5-disclosure-note-linkage | H5 生产性生物资产/油气资产披露↔附注联动（五、xx/八、xx）；7/8（仅8* live留待） |
+| j1-disclosure-note-linkage | J1 应付职工薪酬披露表↔附注（五、40/八、40）结构化推送+正反向跳转+2211刷新+覆盖率守卫；12/12 全绿 |
+
+**→ 08-disclosure-notes（+2）**
+
+| Spec | 说明 |
+|------|------|
+| n1-disclosure-note-linkage | N1 递延所得税资产披露表↔附注（五、30/八、31）结构化推送+正反向跳转+2211 定向刷新+覆盖率守卫；N3 共用章节子表所有权方案 A（N1 独占四张表）；前端 288+后端 63 测试+live round-trip RESTORED_IDENTICAL |
+| disclosure-note-formula-data-population | 附注表内公式数据补全（formula binding 119 条+合计标注 393 行+预设 995 条+附注侧 logic_check 61 条+只读诊断 linkage 缺口+契约守卫）；371 测试+真实项目 round-trip PASS；灰度默认 False |
+
+### 上次归档（2026-07-25，活跃 spec 全部收尾归档）
 
 **→ 05-business-features（+7）**
 

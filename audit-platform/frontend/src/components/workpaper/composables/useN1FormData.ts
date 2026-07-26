@@ -39,6 +39,8 @@ export interface UseN1FormDataOptions {
   wpId: Ref<string>
   projectId: Ref<string>
   sheetName?: Ref<string> | string
+  /** 审计年度（/ledger/balance 端点 year 为必填，缺失会 422） */
+  year?: Ref<number | undefined>
 }
 
 /** TB种子数据（资产类科目1811：期初/借方/贷方/期末） */
@@ -62,7 +64,7 @@ const ACCOUNT_CODE = '1811' // 递延所得税资产（借方/资产类！取期
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useN1FormData(options: UseN1FormDataOptions) {
-  const { wpId, projectId } = options
+  const { wpId, projectId, year } = options
 
   const allResponses = ref<Map<string, ChecklistResponse>>(new Map())
   const isLoading = ref(false)
@@ -84,13 +86,36 @@ export function useN1FormData(options: UseN1FormDataOptions) {
   async function selfLoad(): Promise<void> {
     if (!wpId.value) return
     try {
-      await api.get(
+      const res: any = await api.get(
         `/api/workpapers/${wpId.value}/render-config?force_component_type=n1-deferred-tax-assets`,
         { _silent: true } as any,
       )
+      // 铁律：render-config 是 TB 取数的单一真源（后端 _n1_deferred_tax_assets.render
+      // 已按 active dataset + 叶子口径聚合科目1811），此前 selfLoad 把响应直接丢弃，
+      // 前端又另走 /ledger/balance（缺 year → 422）→ TB 种子恒 0。
+      _applyTbSeedFromRenderConfig(res)
     } catch {
       // selfLoad 失败不阻塞：组件仍可从 checklist_responses 加载数据
     }
+  }
+
+  /** 从 render-config 响应中提取 html_data.trial_balance 作为 TB 种子 */
+  function _applyTbSeedFromRenderConfig(res: any): boolean {
+    const cfg = res?.data ?? res
+    const sheets: any[] = cfg?.sheets ?? []
+    for (const s of sheets) {
+      const tb = s?.html_data?.trial_balance
+      if (tb) {
+        tbSeed.value = {
+          beginBalance: Number(tb.begin_balance) || 0,
+          debitAmount: Number(tb.debit_amount) || 0,
+          creditAmount: Number(tb.credit_amount) || 0,
+          endBalance: Number(tb.end_balance) || 0,
+        }
+        return true
+      }
+    }
+    return false
   }
 
   // ─── Load responses ────────────────────────────────────────────────────────
@@ -134,10 +159,14 @@ export function useN1FormData(options: UseN1FormDataOptions) {
    */
   async function loadTbSeed(): Promise<void> {
     if (!projectId.value) return
+    // ⚠️ /ledger/balance 的 year 为必填 Query，缺失直接 422。
+    // 无年度时不调用（TB 种子已由 selfLoad 从 render-config 取得）。
+    const yr = year?.value
+    if (!yr) return
     try {
       const data = await api.get(
         `/api/projects/${projectId.value}/ledger/balance`,
-        { params: { account_code: ACCOUNT_CODE } },
+        { params: { account_code: ACCOUNT_CODE, year: yr }, _silent: true } as any,
       )
       const rows: any[] = Array.isArray(data) ? data : (data?.data ?? [])
       // 找到1811科目行
@@ -149,24 +178,30 @@ export function useN1FormData(options: UseN1FormDataOptions) {
         // 资产类期末余额 = 期初 + 借方 - 贷方
         const endBalance = Number(row.end_balance) || (beginBalance + debitAmount - creditAmount)
         tbSeed.value = { beginBalance, debitAmount, creditAmount, endBalance }
-      } else {
-        tbSeed.value = { beginBalance: 0, debitAmount: 0, creditAmount: 0, endBalance: 0 }
       }
+      // 未匹配到科目行时保持既有种子（不清零，避免覆盖 render-config 已取到的值）
     } catch {
-      // tb_balance 无数据时不阻塞
-      tbSeed.value = { beginBalance: 0, debitAmount: 0, creditAmount: 0, endBalance: 0 }
+      // tb_balance 无数据/端点异常时不阻塞，保持既有种子
     }
+  }
+
+  /** TB 种子是否已有非零值（判断是否还需要走 API 兜底） */
+  function _hasTbSeed(): boolean {
+    const s = tbSeed.value
+    return !!(s.beginBalance || s.debitAmount || s.creditAmount || s.endBalance)
   }
 
   // ─── loadData（统一加载入口） ─────────────────────────────────────────────
 
   /**
-   * 统一加载入口：selfLoad + loadResponses + loadTbSeed 并行
+   * 统一加载入口：render-config（TB 单一真源）+ checklist_responses 并行，
+   * 仅当 render 未给出 TB 时才走 /ledger/balance 兜底（避免双源互相覆盖）。
    */
   async function loadData(): Promise<void> {
     isLoading.value = true
     try {
-      await Promise.all([selfLoad(), loadResponses(), loadTbSeed()])
+      await Promise.all([selfLoad(), loadResponses()])
+      if (!_hasTbSeed()) await loadTbSeed()
     } finally {
       isLoading.value = false
     }

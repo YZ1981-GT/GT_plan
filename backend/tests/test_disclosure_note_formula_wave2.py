@@ -429,6 +429,8 @@ class TestEngineHelperWiring:
 
 class TestConstants:
     def test_formula_family_sources(self):
+        # spec disclosure-note-formula-data-population 决策 3 追加 'formula'
+        # （binding 写 source='formula' + formula_kind 子类型，不新增 source 枚举）。
         assert FORMULA_FAMILY_SOURCES == frozenset(
-            {"sum", "report", "aging", "prior_year_note"}
+            {"sum", "report", "aging", "prior_year_note", "formula"}
         )

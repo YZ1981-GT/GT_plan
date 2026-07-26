@@ -74,16 +74,20 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict:
     except Exception as e:  # noqa: BLE001
         logger.warning("H6 TB balance fetch failed: %s", e)
 
-    # 从 trial_balance 取未审数+审定数
+    # 从 trial_balance 取未审数+审定数（使用 get_active_filter 对齐平台口径）
     try:
+        tb_active_filter = await get_active_filter(
+            ctx.db, TrialBalance.__table__, ctx.project_id, ctx.year
+        )
         result = await ctx.db.execute(
-            sa.text("""
-                SELECT standard_account_code, unadjusted_amount, audited_amount
-                FROM trial_balance
-                WHERE project_id = :pid AND year = :year AND is_deleted = false
-                  AND standard_account_code LIKE '1606%'
-            """),
-            {"pid": str(ctx.project_id), "year": ctx.year},
+            sa.select(
+                TrialBalance.standard_account_code,
+                TrialBalance.unadjusted_amount,
+                TrialBalance.audited_amount,
+            ).where(
+                tb_active_filter,
+                TrialBalance.standard_account_code.like("1606%"),
+            )
         )
         for row in result.fetchall():
             tb["unadjusted_amount"] = tb.get("unadjusted_amount", 0.0) + float(row.unadjusted_amount or 0)

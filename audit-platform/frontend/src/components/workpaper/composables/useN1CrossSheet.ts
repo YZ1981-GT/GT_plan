@@ -63,6 +63,26 @@ export interface DeferredTaxChangeResult {
   change: number
 }
 
+/** 审定表 AJE/RJE 合计 vs N1-3 调整分录净影响 勾稽结果 */
+export interface AdjustmentReconcileResult {
+  /** N1-3 AJE 净影响（借−贷，资产类借增贷减） */
+  adjustmentAje: number
+  /** N1-3 RJE 净影响 */
+  adjustmentRje: number
+  /** 审定表期末 AJE 合计 */
+  adjudicationAje: number
+  /** 审定表期末 RJE 合计 */
+  adjudicationRje: number
+  /** AJE 差额 = 审定表 − N1-3 */
+  ajeDiff: number
+  /** RJE 差额 = 审定表 − N1-3 */
+  rjeDiff: number
+  /** 是否一致（两侧差额均 < 阈值） */
+  isMatch: boolean
+  /** N1-3 是否已录调整分录（未录时不产生告警） */
+  hasAdjustment: boolean
+}
+
 /** 跨底稿引用定义 */
 export interface CrossWpReference {
   /** 目标底稿编码 */
@@ -85,7 +105,11 @@ const FLOAT_TOLERANCE = 0.01
  *
  * @param allResponses - 全部 checklist_responses（来自 useN1FormData）
  */
-export function useN1CrossSheet(allResponses: Ref<Map<string, ChecklistResponse>>) {
+export function useN1CrossSheet(
+  allResponses: Ref<Map<string, ChecklistResponse>>,
+  /** 审定表期末 AJE/RJE 合计取值器（由 N1-1 传入，用于与 N1-3 勾稽） */
+  adjudicationTotals?: () => { endAje: number; endRje: number },
+) {
   // ─── 1. adjudicationVsDetail — N1-1审定表合计 vs N1-2明细表合计 ─────────
 
   /**
@@ -195,6 +219,41 @@ export function useN1CrossSheet(allResponses: Ref<Map<string, ChecklistResponse>
     return { change }
   })
 
+  // ─── 6. adjustmentReconcile — N1-3调整分录净影响 vs N1-1审定表AJE/RJE ────
+
+  /**
+   * N1-3 调整分录汇总的 AJE/RJE 净影响 应= N1-1 审定表期末 AJE/RJE 合计。
+   *
+   * 数据来源：
+   * - N1-3 净影响: item_id "N1-1-aje-net" / "N1-1-rje-net"（N1-3 保存并发布时写入）
+   * - N1-1 审定表: 由调用方传入的 adjudicationTotals()
+   *
+   * 说明：不做自动累加（会与手工录入/带入调整双算），只做勾稽告警，
+   * 提示审计师用「带入调整」把净影响分配到具体差异项目行。
+   */
+  const adjustmentReconcile: ComputedRef<AdjustmentReconcileResult> = computed(() => {
+    const ajeResp = allResponses.value.get('N1-1-aje-net')
+    const rjeResp = allResponses.value.get('N1-1-rje-net')
+    // N1-3 用 setField 写入 → 值落在 conclusion（JSON.stringify 后的数字字符串）
+    const adjustmentAje = parseNum(ajeResp?.conclusion ?? ajeResp?.remark)
+    const adjustmentRje = parseNum(rjeResp?.conclusion ?? rjeResp?.remark)
+
+    const t = adjudicationTotals?.() ?? { endAje: 0, endRje: 0 }
+    const ajeDiff = parseFloat((t.endAje - adjustmentAje).toFixed(2))
+    const rjeDiff = parseFloat((t.endRje - adjustmentRje).toFixed(2))
+
+    return {
+      adjustmentAje,
+      adjustmentRje,
+      adjudicationAje: t.endAje,
+      adjudicationRje: t.endRje,
+      ajeDiff,
+      rjeDiff,
+      isMatch: Math.abs(ajeDiff) < FLOAT_TOLERANCE && Math.abs(rjeDiff) < FLOAT_TOLERANCE,
+      hasAdjustment: adjustmentAje !== 0 || adjustmentRje !== 0,
+    }
+  })
+
   // ─── 跨底稿引用定义 ────────────────────────────────────────────────────────
 
   /** N1 递延所得税资产 cross_wp_references */
@@ -223,6 +282,7 @@ export function useN1CrossSheet(allResponses: Ref<Map<string, ChecklistResponse>
     adjudicationVsDetail,
     adjudicationVsCalcTable,
     lossCheckToCalcTable,
+    adjustmentReconcile,
     // 跨底稿联动
     n1ToN3Correspondence,
     deferredTaxChange,

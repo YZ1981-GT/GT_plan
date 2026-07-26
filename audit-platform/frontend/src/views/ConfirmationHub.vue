@@ -15,6 +15,125 @@
       </div>
     </div>
 
+    <!-- 人工匹配队列（仅有待匹配回函件时显示） -->
+    <el-card v-if="matchQueue.length > 0" shadow="never" class="gt-match-queue-card">
+      <template #header>
+        <div class="gt-match-queue-header">
+          <div class="gt-match-queue-header__left">
+            <el-icon class="gt-match-queue-icon"><WarningFilled /></el-icon>
+            <span class="gt-match-queue-title">待人工匹配回函件</span>
+            <el-badge :value="matchQueue.length" type="warning" />
+          </div>
+          <el-button link type="primary" size="small" @click="matchQueueExpanded = !matchQueueExpanded">
+            {{ matchQueueExpanded ? '收起' : '展开' }}
+          </el-button>
+        </div>
+      </template>
+
+      <div v-show="matchQueueExpanded">
+        <el-table
+          :data="matchQueue"
+          size="small"
+          style="width:100%"
+          v-loading="matchQueueLoading"
+          :header-cell-style="{ background: '#fef9ed', color: '#606266', fontWeight: '600' }"
+        >
+          <el-table-column prop="filename" label="文件名" min-width="180" show-overflow-tooltip />
+          <el-table-column label="OCR 识别主体" min-width="160" show-overflow-tooltip>
+            <template #default="{ row }">
+              <span v-if="row.ocr_entity">{{ row.ocr_entity }}</span>
+              <span v-else class="gt-text-muted">未识别</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="OCR 金额" width="130" align="right">
+            <template #default="{ row }">
+              <GtAmountCell v-if="row.ocr_amount != null" :value="row.ocr_amount" />
+              <span v-else class="gt-text-muted">—</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="上传时间" width="150">
+            <template #default="{ row }">
+              <span class="gt-text-secondary">{{ formatTime(row.uploaded_at) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="候选/多义" width="180">
+            <template #default="{ row }">
+              <template v-if="row.candidates && row.candidates.length > 0">
+                <el-select
+                  v-model="row._selectedCandidate"
+                  size="small"
+                  placeholder="选择候选"
+                  style="width:160px"
+                  @change="onCandidateSelected(row)"
+                >
+                  <el-option
+                    v-for="(c, ci) in row.candidates"
+                    :key="ci"
+                    :label="`${c.counterparty} ¥${c.book_amount ?? ''}`"
+                    :value="c.confirmation_id"
+                  />
+                </el-select>
+              </template>
+              <span v-else class="gt-text-muted">无候选</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="指派到函证" min-width="220">
+            <template #default="{ row }">
+              <el-select
+                v-model="row._assignTarget"
+                size="small"
+                filterable
+                placeholder="选择函证对象"
+                style="width:100%"
+                @change="onAssignTargetChange(row)"
+              >
+                <el-option
+                  v-for="c in confirmations"
+                  :key="c.id"
+                  :label="`${c.counterparty}（${typeLabel(c.confirm_type)} ¥${c.book_amount ?? ''}）`"
+                  :value="c.id"
+                />
+              </el-select>
+            </template>
+          </el-table-column>
+          <el-table-column label="配对发函件" width="180">
+            <template #default="{ row }">
+              <template v-if="row._outboundOptions && row._outboundOptions.length > 1">
+                <el-select
+                  v-model="row._pairedOutbound"
+                  size="small"
+                  placeholder="选配对发函件"
+                  style="width:160px"
+                >
+                  <el-option
+                    v-for="o in row._outboundOptions"
+                    :key="o.id"
+                    :label="o.filename"
+                    :value="o.id"
+                  />
+                </el-select>
+              </template>
+              <template v-else-if="row._outboundOptions && row._outboundOptions.length === 1">
+                <span class="gt-text-secondary">{{ row._outboundOptions[0].filename }}</span>
+              </template>
+              <span v-else class="gt-text-muted">—</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="80" fixed="right">
+            <template #default="{ row }">
+              <el-button
+                type="primary"
+                size="small"
+                :disabled="!row._assignTarget"
+                :loading="row._assigning"
+                @click="handleAssign(row)"
+              >指派</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+    </el-card>
+
     <!-- 函证清单表格 -->
     <el-card shadow="never" class="gt-hub-card">
       <el-table
@@ -55,19 +174,46 @@
             <span v-else class="gt-text-muted">—</span>
           </template>
         </el-table-column>
+        <el-table-column label="发函件" width="80" align="center">
+          <template #default="{ row }">
+            <el-badge
+              v-if="row.outbound_count > 0"
+              :value="row.outbound_count"
+              type="primary"
+              class="gt-attach-badge"
+            />
+            <span v-else class="gt-text-muted">0</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="回函件" width="80" align="center">
+          <template #default="{ row }">
+            <el-badge
+              v-if="row.inbound_count > 0"
+              :value="row.inbound_count"
+              type="success"
+              class="gt-attach-badge"
+            />
+            <span v-else class="gt-text-muted">0</span>
+          </template>
+        </el-table-column>
         <el-table-column label="关联底稿" width="110" align="center">
           <template #default="{ row }">
             <el-button v-if="row.wp_id" link type="primary" size="small" @click.stop="gotoWp(row.wp_id)">查看</el-button>
             <span v-else class="gt-text-muted">—</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="188" fixed="right">
+        <el-table-column label="操作" width="270" fixed="right">
           <template #default="{ row }">
             <div class="gt-row-actions">
+              <el-button link type="primary" size="small" @click="openAttachmentDrawer(row)">附件</el-button>
               <el-button
                 v-if="nextStatus(row.status) || row.status === 'returned'"
                 link type="primary" size="small" @click="doTransition(row)"
               >{{ transitionLabel(row.status) }}</el-button>
+              <el-button
+                v-if="canReverse(row.status)"
+                link type="warning" size="small" @click="handleReverse(row)"
+              >撤回</el-button>
               <el-button link type="primary" size="small" @click="openEdit(row)">编辑</el-button>
               <el-button link type="danger" size="small" @click="onDelete(row)">删除</el-button>
             </div>
@@ -193,20 +339,31 @@
         <el-button @click="showReturnedChoice = false">取消</el-button>
       </template>
     </el-dialog>
+
+    <!-- 附件抽屉 -->
+    <ConfirmationAttachmentDrawer
+      v-model:visible="showAttachmentDrawer"
+      :confirmation-id="attachmentDrawerCid"
+      :project-id="projectId"
+      :counterparty-name="attachmentDrawerName"
+      @updated="onAttachmentUpdated"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { Download, Plus } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Download, Plus, WarningFilled } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
+import http from '@/utils/http'
 import { handleApiError } from '@/utils/errorHandler'
 import { confirmDelete } from '@/utils/confirm'
 import { eventBus } from '@/utils/eventBus'
 import { useProjectStore } from '@/stores/project'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
+import ConfirmationAttachmentDrawer from '@/components/workpaper/confirmation/ConfirmationAttachmentDrawer.vue'
 
 // ─── 数据 ───
 
@@ -221,6 +378,8 @@ interface ConfirmationItem {
   diff_note: string | null
   account_code: string | null
   wp_id: string | null
+  outbound_count?: number
+  inbound_count?: number
 }
 
 const route = useRoute()
@@ -345,6 +504,138 @@ async function handleImport() {
   }
 }
 
+// ─── 附件抽屉 ───
+
+const showAttachmentDrawer = ref(false)
+const attachmentDrawerCid = ref('')
+const attachmentDrawerName = ref('')
+
+function openAttachmentDrawer(row: ConfirmationItem) {
+  attachmentDrawerCid.value = row.id
+  attachmentDrawerName.value = row.counterparty
+  showAttachmentDrawer.value = true
+}
+
+function onAttachmentUpdated() {
+  // 附件变更后刷新台账列表（更新附件计数）
+  fetchList()
+}
+
+// ─── 人工匹配队列 ───
+
+interface MatchQueueItem {
+  attachment_id: string
+  filename: string
+  ocr_entity: string | null
+  ocr_amount: number | null
+  uploaded_at: string | null
+  candidates?: Array<{ confirmation_id: string; counterparty: string; book_amount: number | null; match_evidence?: any }>
+  // 前端 UI 交互状态
+  _assignTarget?: string
+  _pairedOutbound?: string
+  _outboundOptions?: Array<{ id: string; filename: string }>
+  _selectedCandidate?: string
+  _assigning?: boolean
+}
+
+const matchQueue = ref<MatchQueueItem[]>([])
+const matchQueueLoading = ref(false)
+const matchQueueExpanded = ref(true)
+
+function formatTime(dt: string | null): string {
+  if (!dt) return '—'
+  try {
+    const d = new Date(dt.endsWith('Z') ? dt : dt + 'Z')
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+  } catch {
+    return dt
+  }
+}
+
+async function fetchMatchQueue() {
+  matchQueueLoading.value = true
+  try {
+    const res = await api.get(`/api/projects/${projectId.value}/confirmations/match-queue`)
+    const items: MatchQueueItem[] = (res.items ?? res ?? []).map((item: any) => ({
+      ...item,
+      _assignTarget: item.candidates?.length === 1 ? item.candidates[0].confirmation_id : undefined,
+      _pairedOutbound: undefined,
+      _outboundOptions: undefined,
+      _selectedCandidate: item.candidates?.length === 1 ? item.candidates[0].confirmation_id : undefined,
+      _assigning: false,
+    }))
+    matchQueue.value = items
+  } catch {
+    // match-queue 端点可能尚未部署，静默降级
+    matchQueue.value = []
+  } finally {
+    matchQueueLoading.value = false
+  }
+}
+
+/** 当候选选择变化时，同步赋值给指派目标 */
+function onCandidateSelected(row: MatchQueueItem) {
+  if (row._selectedCandidate) {
+    row._assignTarget = row._selectedCandidate
+    onAssignTargetChange(row)
+  }
+}
+
+/** 当指派目标变化时，加载该函证的发函件列表供配对选择 */
+async function onAssignTargetChange(row: MatchQueueItem) {
+  row._pairedOutbound = undefined
+  row._outboundOptions = undefined
+  if (!row._assignTarget) return
+
+  try {
+    const res = await api.get(
+      `/api/projects/${projectId.value}/confirmations/${row._assignTarget}/attachments`,
+    )
+    const attachments: any[] = res.items ?? res ?? []
+    const outbounds = attachments.filter((a: any) => a.role === 'outbound')
+    row._outboundOptions = outbounds.map((a: any) => ({ id: a.attachment_id || a.id, filename: a.filename || a.file_name || '发函件' }))
+    // 单份发函件自动选中
+    if (row._outboundOptions.length === 1) {
+      row._pairedOutbound = row._outboundOptions[0].id
+    }
+  } catch {
+    row._outboundOptions = []
+  }
+}
+
+/** 执行指派：回函件 → 函证 + 配对发函件 */
+async function handleAssign(row: MatchQueueItem) {
+  if (!row._assignTarget) {
+    ElMessage.warning('请先选择要指派的函证对象')
+    return
+  }
+  // 如果有多份发函件但未选配对
+  if (row._outboundOptions && row._outboundOptions.length > 1 && !row._pairedOutbound) {
+    ElMessage.warning('该函证有多份发函件，请选择配对的发函件')
+    return
+  }
+
+  row._assigning = true
+  try {
+    await http.post(
+      `/api/projects/${projectId.value}/confirmations/match-queue/${row.attachment_id}/assign`,
+      {
+        confirmation_id: row._assignTarget,
+        paired_outbound_id: row._pairedOutbound || (row._outboundOptions?.[0]?.id) || undefined,
+      },
+    )
+    ElMessage.success('指派成功')
+    // 刷新队列和台账
+    await Promise.all([fetchMatchQueue(), fetchList()])
+  } catch (e: any) {
+    const msg = e?.response?.data?.detail || e?.response?.data?.message || '指派失败'
+    ElMessage.error(msg)
+  } finally {
+    row._assigning = false
+  }
+}
+
 // ─── 枚举映射 ───
 
 const TYPE_LABELS: Record<string, string> = {
@@ -355,6 +646,24 @@ const TYPE_LABELS: Record<string, string> = {
 }
 
 const STATUS_LABELS: Record<string, string> = {
+  pending: '待发函',
+  sent: '已发函',
+  returned: '已回函',
+  matched: '相符',
+  discrepancy: '差异',
+}
+
+// ─── 撤回常量 ───
+
+const REVERSAL_TARGETS: Record<string, string[]> = {
+  pending: [],
+  sent: ['pending'],
+  returned: ['sent', 'pending'],
+  matched: ['returned', 'sent', 'pending'],
+  discrepancy: ['returned', 'sent', 'pending'],
+}
+
+const STATUS_CN: Record<string, string> = {
   pending: '待发函',
   sent: '已发函',
   returned: '已回函',
@@ -454,6 +763,104 @@ async function executeTransition(row: ConfirmationItem, target: string) {
   }
 }
 
+// ─── 撤回逻辑 ───
+
+function canReverse(status: string): boolean {
+  const targets = REVERSAL_TARGETS[status]
+  return !!targets && targets.length > 0
+}
+
+/**
+ * 判断撤回操作是否跨过 returned 状态（影响已回填金额）。
+ * 当前状态为 returned/matched/discrepancy 且目标为 sent/pending 时触发。
+ */
+function reversalCrossesReturned(currentStatus: string, targetStatus: string): boolean {
+  const crossingStatuses = ['returned', 'matched', 'discrepancy']
+  const beforeReturned = ['sent', 'pending']
+  return crossingStatuses.includes(currentStatus) && beforeReturned.includes(targetStatus)
+}
+
+async function handleReverse(row: ConfirmationItem) {
+  const targets = REVERSAL_TARGETS[row.status]
+  if (!targets || targets.length === 0) return
+
+  // 构建 ElMessageBox 内容：目标状态单选 + 原因输入
+  const targetOptions = targets.map((s) => `<option value="${s}">${STATUS_CN[s] || s}</option>`).join('')
+  const htmlContent = `
+    <div style="font-size:13px;">
+      <div style="margin-bottom:12px;">
+        <label style="display:block;margin-bottom:6px;color:#606266;">撤回至目标状态</label>
+        <select id="gt-reverse-target" style="width:100%;padding:6px 10px;border:1px solid #dcdfe6;border-radius:4px;font-size:13px;">
+          ${targetOptions}
+        </select>
+      </div>
+      <div>
+        <label style="display:block;margin-bottom:6px;color:#606266;">撤回原因（选填）</label>
+        <textarea id="gt-reverse-reason" rows="3" placeholder="请输入撤回原因"
+          style="width:100%;padding:8px 10px;border:1px solid #dcdfe6;border-radius:4px;font-size:13px;resize:vertical;box-sizing:border-box;"
+        ></textarea>
+      </div>
+    </div>
+  `
+
+  try {
+    await ElMessageBox({
+      title: `撤回函证「${row.counterparty}」`,
+      dangerouslyUseHTMLString: true,
+      message: htmlContent,
+      confirmButtonText: '确认撤回',
+      cancelButtonText: '取消',
+      showCancelButton: true,
+      distinguishCancelAndClose: true,
+      beforeClose: async (action, instance, done) => {
+        if (action !== 'confirm') { done(); return }
+
+        const targetEl = document.getElementById('gt-reverse-target') as HTMLSelectElement | null
+        const reasonEl = document.getElementById('gt-reverse-reason') as HTMLTextAreaElement | null
+        const targetStatus = targetEl?.value || targets[0]
+        const reason = reasonEl?.value?.trim() || ''
+
+        // 如果撤回跨过 returned（影响已回填金额），二次确认
+        if (reversalCrossesReturned(row.status, targetStatus)) {
+          try {
+            await ElMessageBox.confirm(
+              '该操作将影响已登记的回函金额/差异，是否继续？',
+              '二次确认',
+              {
+                confirmButtonText: '继续撤回',
+                cancelButtonText: '取消',
+                type: 'warning',
+              },
+            )
+          } catch {
+            // 用户取消二次确认
+            return
+          }
+        }
+
+        // 执行撤回请求
+        instance.confirmButtonLoading = true
+        try {
+          await http.post(
+            `/api/projects/${projectId.value}/confirmations/${row.id}/reverse`,
+            { target_status: targetStatus, reason },
+          )
+          ElMessage.success(`已撤回至「${STATUS_CN[targetStatus] || targetStatus}」`)
+          done()
+          await fetchList()
+        } catch (e: any) {
+          const errMsg = e?.response?.data?.detail || e?.response?.data?.message || '撤回失败'
+          ElMessage.error(errMsg)
+        } finally {
+          instance.confirmButtonLoading = false
+        }
+      },
+    })
+  } catch {
+    // 用户取消/关闭弹窗
+  }
+}
+
 // ─── CRUD ───
 
 async function fetchList() {
@@ -531,6 +938,7 @@ function gotoWp(wpId: string) {
 
 onMounted(() => {
   fetchList()
+  fetchMatchQueue()
 })
 </script>
 
@@ -642,4 +1050,47 @@ onMounted(() => {
   font-size: 13px;
   color: var(--gt-color-text-secondary, #606266);
 }
+
+.gt-attach-badge :deep(.el-badge__content) {
+  font-size: 11px;
+}
+
+/* 人工匹配队列 */
+.gt-match-queue-card {
+  margin-bottom: 14px;
+  border: 1px solid #f5deb3;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.gt-match-queue-card :deep(.el-card__header) {
+  padding: 10px 16px;
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+  border-bottom: 1px solid #f5deb3;
+}
+.gt-match-queue-card :deep(.el-card__body) {
+  padding: 0;
+}
+.gt-match-queue-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.gt-match-queue-header__left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.gt-match-queue-icon {
+  color: #e6a23c;
+  font-size: 16px;
+}
+.gt-match-queue-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #78350f;
+}
+.gt-match-queue-card :deep(.el-table) { font-size: 13px; }
+.gt-match-queue-card :deep(.el-table th.el-table__cell) { font-size: 13px; }
+.gt-match-queue-card :deep(.el-table td.el-table__cell) { padding: 8px 0; }
+.gt-text-secondary { color: var(--gt-color-text-secondary, #606266); font-size: 13px; }
 </style>

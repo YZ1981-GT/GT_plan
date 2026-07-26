@@ -8,6 +8,8 @@
         <div class="section-title">
           <span>附注披露 — 国企版</span>
           <div class="title-actions">
+            <el-button size="small" type="success" :loading="syncing" :disabled="!hasAdjudicatedData" @click="syncToNote">同步到附注</el-button>
+            <el-button size="small" type="primary" plain @click="jumpToNote">↩ 跳转回附注（八、25）</el-button>
             <el-button size="small" type="default" link @click="handleReview('H5-disc-S')">💬 复核</el-button>
           </div>
         </div>
@@ -52,12 +54,21 @@
 
 <script setup lang="ts">
 import { ref, computed, inject, onMounted, onUnmounted, toRef } from 'vue'
+import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
+import http from '@/utils/http'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { buildH5SyncPayload, H5_NOTE_SECTION } from '../../composables/h5NoteSectionMap'
+import { buildNoteJumpRoute } from '@/views/composables/noteDisclosureReverseJump'
 
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean }>()
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const router = useRouter()
+const { year: auditYear } = useAuditContext()
 
 const soeDisclosureText = ref('')
+const syncing = ref(false)
 const adjudicatedData = ref<{ costAudited: number; depletionAudited: number; impairmentAudited: number; netValue: number } | null>(null)
 
 const hasAdjudicatedData = computed(() => adjudicatedData.value !== null || props.allResponses.has('H5-1-cost-rows'))
@@ -109,6 +120,50 @@ const summaryRows = computed(() => {
 })
 
 function handleReview(id: string) { openReviewDialog(id) }
+
+// ─── 同步到附注 ──────────────────────────────────────────────────────────────
+async function syncToNote(): Promise<void> {
+  const rows = summaryRows.value
+  if (rows.every((r) => r.endBalance === 0 && r.beginBalance === 0)) {
+    ElMessage.warning('请先填写披露数据')
+    return
+  }
+  syncing.value = true
+  try {
+    const year = auditYear.value || (new Date().getFullYear() - 1)
+    const payload = buildH5SyncPayload({
+      wpId: props.wpId,
+      projectId: props.projectId,
+      year,
+      summaryRows: rows.map((r) => ({
+        label: r.item,
+        values: [r.endBalance, r.beginBalance],
+        is_total: r.item === '油气资产净值',
+      })),
+      soeDisclosureText: soeDisclosureText.value,
+    })
+    await http.post(`/api/disclosure-notes/${props.projectId}/${year}/${H5_NOTE_SECTION.soe}/sync-from-workpaper`, payload)
+    ElMessage.success('已同步到附注（八、25 油气资产）')
+    eventBus.emit('disclosure:note-text-updated' as any, {
+      wpCode: 'H5',
+      accountCode: '1631',
+      projectId: props.projectId,
+      sectionIds: [H5_NOTE_SECTION.soe],
+    })
+  } catch (err: any) {
+    if (err?.code !== 'ERR_CANCELED' && err?.name !== 'CanceledError') {
+      ElMessage.error('同步失败')
+    }
+  } finally {
+    syncing.value = false
+  }
+}
+
+// ─── 跳转回附注 ──────────────────────────────────────────────────────────────
+function jumpToNote(): void {
+  const route = buildNoteJumpRoute(props.projectId, 'H5', 'soe')
+  if (route) router.push(route)
+}
 function fmtAmt(val: number | null | undefined): string { return val == null ? '-' : val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 </script>
 

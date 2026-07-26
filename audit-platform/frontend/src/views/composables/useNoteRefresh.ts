@@ -13,10 +13,13 @@ import {
   isD1NotesReceivableNoteSection,
   isG14CreditImpairmentNoteSection,
   isH1FixedAssetNoteSection,
+  isH5OilGasAssetNoteSection,
   isH8RouNoteSection,
   isH9LeaseLiabilityNoteSection,
   isH10AssetDisposalNoteSection,
   isI1IntangibleNoteSection,
+  isN1DeferredTaxNoteSection,
+  isH2CipNoteSection,
 } from './noteDisclosureJump'
 
 export interface UseNoteRefreshOptions {
@@ -254,6 +257,25 @@ export function useNoteRefresh(options: UseNoteRefreshOptions): UseNoteRefreshRe
         current.includes('营业外支出')
         || current.startsWith('八、77')
       )
+    // 1811 递延所得税资产（N1）：上市五、30 / 国企八、31（与 N3 共用章节）
+    const isN1DeferredTax = String(payload.accountCode || '') === '1811'
+      && isN1DeferredTaxNoteSection(current)
+    // 2211 应付职工薪酬（J1）：上市五、40 / 国企八、40（J1 独占）
+    const isJ1EmployeeBenefits = String(payload.accountCode || '') === '2211'
+      && (current === '五、40' || current === '八、40')
+    // 1604 在建工程（H2）：上市五、23 / 国企八、23
+    const isH2Cip = String(payload.accountCode || '') === '1604'
+      && isH2CipNoteSection(current)
+    // 1503 投资性房地产（H3）：上市五、21 / 国企八、22
+    const isH3InvestProp = String(payload.accountCode || '') === '1503'
+      && (
+        current === '五、21'
+        || current === '八、22'
+        || current.includes('投资性房地产')
+      )
+    // H5 油气资产（1631/1632）
+    const isH5OilGas = (String(payload.accountCode || '') === '1631' || String(payload.accountCode || '') === '1632')
+      && isH5OilGasAssetNoteSection(current)
     // 兜底：补齐跳转侧支持但刷新侧此前缺失的 6 族（G14/H1/H8/H9/H10/I1）。
     // 复用 noteDisclosureJump 的章节判定（单一真源），当载荷携带 accountCode（=某底稿披露已变更）
     // 且当前正查看的附注节匹配上述任一披露族时兜底刷新；重取当前节详情幂等无害。
@@ -262,6 +284,7 @@ export function useNoteRefresh(options: UseNoteRefreshOptions): UseNoteRefreshRe
       isD1NotesReceivableNoteSection(current)
       || isG14CreditImpairmentNoteSection(current)
       || isH1FixedAssetNoteSection(current)
+      || isH5OilGasAssetNoteSection(current)
       || isH8RouNoteSection(current)
       || isH9LeaseLiabilityNoteSection(current)
       || isH10AssetDisposalNoteSection(current)
@@ -269,7 +292,7 @@ export function useNoteRefresh(options: UseNoteRefreshOptions): UseNoteRefreshRe
     )
     if (
       !matched && !isG7Lte && !isG10Tfl && !isG13Fvc && !isI5Ona
-      && !isK11Impair && !isK13NonOpExp && !matchesDisclosureFamily
+      && !isK11Impair && !isK13NonOpExp && !isN1DeferredTax && !isJ1EmployeeBenefits && !isH2Cip && !isH3InvestProp && !isH5OilGas && !matchesDisclosureFamily
     ) return
 
     if (syncDebounceTimer) clearTimeout(syncDebounceTimer)

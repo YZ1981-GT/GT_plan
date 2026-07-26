@@ -86,7 +86,20 @@
 
     <div class="action-bar" v-if="!isReadonly">
       <el-button size="small" @click="handleAddRow">+ 新增减少项</el-button>
+      <el-button size="small" type="primary" plain @click="samplingVisible = true">🎲 抽凭引擎</el-button>
     </div>
+
+    <!-- 抽凭引擎 -->
+    <el-dialog v-model="samplingVisible" title="H5-8 减少检查 — 抽凭引擎" width="85%" destroy-on-close>
+      <GtVoucherSamplingEngine
+        account-code="1631"
+        phase="final"
+        :workpaper-id="wpId"
+        :project-id="projectId"
+        :year="samplingYear"
+        @filled="onSampleFilled"
+      />
+    </el-dialog>
 
     <el-card shadow="never" class="note-card">
       <template #header><div class="section-title"><span>审计说明</span></div></template>
@@ -111,14 +124,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent, inject, toRef } from 'vue'
+import { ref, computed, defineAsyncComponent, inject, toRef } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import { useH5DisposalCheck } from '../../composables/useH5DisposalCheck'
 import { useH5FormData } from '../../composables/useH5FormData'
+import { useAuditContext } from '@/composables/useAuditContext'
 
 const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
-const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean }>()
+const GtVoucherSamplingEngine = defineAsyncComponent(() => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'))
+const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean; year?: number }>()
 const emit = defineEmits<{ 'navigate-sheet': [sheetName: string] }>()
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 const allResponsesRef = computed(() => props.allResponses)
@@ -127,6 +142,22 @@ const state = useH5DisposalCheck({
   allResponses: allResponsesRef as any, wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId'),
   onSave: (itemId: string, value: any) => formData.setResponse(itemId, value), onNavigateSheet: (s) => emit('navigate-sheet', s),
 })
+
+// ─── 抽凭引擎 ────────────────────────────────────────────────────────────────
+const samplingVisible = ref(false)
+const { year: auditYear } = useAuditContext()
+const samplingYear = computed(() => props.year || auditYear.value || new Date().getFullYear())
+
+function onSampleFilled(payload: any): void {
+  const samples = payload?.samples ?? []
+  for (const s of samples) {
+    state.addRow(s.summary || s.counterpartAccount || '抽凭样本', {
+      voucherNo: s.voucherNo || '',
+      originalCost: s.creditAmount || s.debitAmount || 0,
+    })
+  }
+  samplingVisible.value = false
+}
 
 async function handleAddRow() {
   const { value } = await ElMessageBox.prompt('请输入资产名称', '新增减少项', { confirmButtonText: '确定', cancelButtonText: '取消' })

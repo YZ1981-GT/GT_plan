@@ -18,10 +18,25 @@
         </span>
       </div>
 
+      <!-- P1-⑦ 全局 TB 勾稽告警（排除审定表 tab 自带核对，仅其他 sheet 显示） -->
+      <el-alert
+        v-if="hasTbReconcileWarning && currentSheet !== 'H8-1'"
+        type="warning"
+        :closable="false"
+        show-icon
+        style="margin-bottom: 8px"
+      >
+        <template #title>
+          审定合计(净值) {{ adjNetAudited.toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }}
+          ≠ 试算平衡表(1901净额) {{ tbAuditedRou?.toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }}，
+          差异 {{ tbReconcileDiff?.toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }} 元
+        </template>
+      </el-alert>
+
       <!-- 顶部工具栏（双模式切换）— 目录页隐藏 -->
       <div v-if="currentSheet !== 'H8'" class="h8-header-toolbar">
         <el-segmented
-          v-model="currentMode"
+          :model-value="currentMode"
           :options="modeOptions"
           size="small"
         />
@@ -79,6 +94,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :applicable-standards="applicableStandards"
         />
 
         <!-- 附注披露信息（国有企业） -->
@@ -89,6 +105,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :applicable-standards="applicableStandards"
         />
 
         <!-- H8-2 明细表（源模板58列→原值/折旧/减值4区段） -->
@@ -311,7 +328,9 @@
  */
 import { ref, computed, watch, onMounted, onBeforeUnmount, provide, toRef, defineAsyncComponent, inject} from 'vue'
 import http from '@/utils/http'
+import { eventBus } from '@/utils/eventBus'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
+import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useH8CrossSheet } from './composables/useH8CrossSheet'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
@@ -409,12 +428,49 @@ const h9LinkageStatus = computed(() => {
   }
 })
 
+// ─── P1-⑤+⑦ TB 勾稽告警（审定合计 vs TB 1901 审定额） ─────────────────────────
+/** 从 htmlData.tb_values (render 策略产出) 读试算平衡表数 */
+const tbAuditedRou = computed<number | null>(() => {
+  const tv = props.htmlData?.tb_values
+  if (!tv) return null
+  const v = Number(tv.rou_asset_audited ?? 0) - Math.abs(Number(tv.rou_dep_audited ?? 0))
+  return v !== 0 || Number(tv.rou_asset_audited ?? 0) !== 0 ? v : null
+})
+
+/** 审定表 H8-1 净值审定合计（从跨表键读取） */
+const adjNetAudited = computed<number>(() => {
+  const raw = allResponses.value.get('H8-1-net-audited-total')
+  if (raw?.remark != null) return Number(raw.remark) || 0
+  if (raw?.conclusion != null) return Number(raw.conclusion) || 0
+  return 0
+})
+
+/** TB 核对差异（仅 TB 有值时才计算） */
+const tbReconcileDiff = computed<number | null>(() => {
+  if (tbAuditedRou.value == null) return null
+  return Math.round((adjNetAudited.value - tbAuditedRou.value) * 100) / 100
+})
+
+const hasTbReconcileWarning = computed(() =>
+  tbReconcileDiff.value != null && Math.abs(tbReconcileDiff.value) > 1,
+)
+
 // ─── 双模式切换 ──────────────────────────────────────────────────────────────
 const currentMode = ref<'html' | 'onlyoffice'>('html')
 const modeOptions = [
   { label: '结构化视图', value: 'html' },
   { label: '在线编辑', value: 'onlyoffice' },
 ]
+
+// ─── 项目适用准则（供披露表判定变体） ────────────────────────────────────────
+const applicableStandards = computed<string[]>(() => {
+  const pc = props.htmlData?.project_context
+  if (pc?.applicable_standards) return Array.isArray(pc.applicable_standards) ? pc.applicable_standards : [pc.applicable_standards]
+  // 回退从 template_type 派生
+  const tt = pc?.template_type
+  if (tt) return [`${tt}_standalone`]
+  return []
+})
 
 // ─── sheetName → 编码提取 ────────────────────────────────────────────────────
 const currentSheet = computed(() => {
@@ -464,6 +520,40 @@ async function selfLoad(): Promise<void> {
       const map = new Map<string, any>()
       _mergeResponses(map, props.htmlData.allResponses)
       _mergeResponses(map, props.htmlData.responses_snapshot)
+
+      // P1-⑤ 种子 TB 核对数据到 allResponses（仅无持久化时）
+      const tv = props.htmlData?.tb_values
+      if (tv) {
+        const tbSeedKey = 'H8-adj-tb-amount-ending'
+        if (!map.has(tbSeedKey)) {
+          const rouNet = Number(tv.rou_asset_closing ?? 0) - Math.abs(Number(tv.rou_dep_closing ?? 0))
+          map.set(tbSeedKey, { item_id: tbSeedKey, remark: String(rouNet), conclusion: null })
+        }
+        const tbSeedOpening = 'H8-adj-tb-amount-opening'
+        if (!map.has(tbSeedOpening)) {
+          const rouNetOpening = Number(tv.rou_asset_opening ?? 0) - Math.abs(Number(tv.rou_dep_opening ?? 0))
+          map.set(tbSeedOpening, { item_id: tbSeedOpening, remark: String(rouNetOpening), conclusion: null })
+        }
+      }
+
+      // P1-⑥ 明细表种子预填（从 tb_balance 叶子子科目，仅 H8-2-rows 空时填入）
+      const dp = props.htmlData?.detail_prefill
+      if (Array.isArray(dp) && dp.length > 0 && !map.has('H8-2-rows')) {
+        // 种子：按子科目名映射为 H8DetailRow 初始数据（不落库,仅内存态供 H8-2 加载时 seed）
+        const seedRows = dp.map((item: any, idx: number) => ({
+          rowId: `seed-${idx}`,
+          category: String(item.account_name || '').replace(/使用权资产[-—_·]?/, '').trim() || '未分类',
+          contractNo: '',
+          assetName: String(item.account_name || ''),
+          costBeginUnadj: Number(item.opening ?? 0),
+          costEndUnadj: Number(item.closing ?? 0),
+          costIncreaseUnadj: Number(item.debit ?? 0),
+          costDecreaseUnadj: Number(item.credit ?? 0),
+          _source: item.source || `TB('${item.account_code}')`,
+        }))
+        map.set('H8-2-detail-prefill', { item_id: 'H8-2-detail-prefill', remark: JSON.stringify(seedRows), conclusion: null })
+      }
+
       if (map.size > 0) allResponses.value = map
     } else {
       allResponses.value = await fetchResponsesFromServer()
@@ -510,10 +600,17 @@ function persistResponse(itemId: string, value: any): void {
 }
 
 // ─── provide for child components ────────────────────────────────────────────
-function openReviewDialog(sectionId: string, sectionLabel?: string): void {
-  console.log('[H8] openReviewDialog:', sectionId, sectionLabel)
-}
-provide('openReviewDialog', openReviewDialog)
+// 复核对话由 GtWpRenderer Runtime Boundary 统一 provide，此处 inject 后 re-provide
+// 使 H8 子 tab 的 GtReviewTrigger 正常工作
+const runtimeOpenReview = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', undefined)
+provide('openReviewDialog', runtimeOpenReview ?? (() => {}))
+
+// 复核圆点：useWorkpaperReviewThreads provide getThreadDot/getRowDot
+const wpIdRef = computed(() => props.wpId)
+const { getThreadDot, getRowDot } = useWorkpaperReviewThreads(wpIdRef)
+provide('getThreadDot', getThreadDot)
+provide('getRowDot', getRowDot)
+
 provide('allResponses', allResponses)
 provide('saveResponse', persistResponse)
 provide('h8ReloadAll', reloadFromServer)
@@ -526,18 +623,18 @@ const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => und
 provide('h8VersionTrailRef', versionTrailRef)
 provide('h8OpenVersionHistory', openVersionHistory)
 
-// ─── EventBus: H9联动 ───────────────────────────────────────────────────────
-function _handleH9Updated(_e: Event): void {
+// ─── EventBus: H9联动 + TB/审定数刷新 ───────────────────────────────────────
+function _handleH9Updated(): void {
   // H9租赁负债数据更新时刷新H8，保持联动数据同步
   void reloadFromServer()
 }
 
-function _handleH9PaymentUpdated(_e: Event): void {
+function _handleH9PaymentUpdated(): void {
   // H9付款计划/摊销表变更时刷新H8（影响折旧测算和初始计量校验）
   void reloadFromServer()
 }
 
-function _handleTbUpdated(_e: Event): void {
+function _handleTbUpdated(): void {
   // TB更新(科目1901相关)触发刷新
   void reloadFromServer()
 }
@@ -545,21 +642,18 @@ function _handleTbUpdated(_e: Event): void {
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 onMounted(() => {
   void selfLoad()
-  // Subscribe: TB updates
-  window.addEventListener('tb:updated', _handleTbUpdated)
-  // Subscribe: 审定数变更
-  window.addEventListener('substantive:adjudicated', _handleTbUpdated)
-  // Subscribe: H9租赁负债更新 → 刷新H8联动数据
-  window.addEventListener('h9:liability-updated', _handleH9Updated)
-  // Subscribe: H9付款计划/摊销表变更 → 刷新H8初始计量/折旧校验
-  window.addEventListener('h9:lease-payment-updated', _handleH9PaymentUpdated)
+  // Subscribe via eventBus（crossWpEventBridge 双向桥接 window↔eventBus）
+  eventBus.on('tb:updated', _handleTbUpdated)
+  eventBus.on('substantive:adjudicated', _handleTbUpdated)
+  eventBus.on('h9:liability-updated', _handleH9Updated)
+  eventBus.on('h9:lease-payment-updated', _handleH9PaymentUpdated)
 })
 
 onBeforeUnmount(() => {
-  window.removeEventListener('tb:updated', _handleTbUpdated)
-  window.removeEventListener('substantive:adjudicated', _handleTbUpdated)
-  window.removeEventListener('h9:liability-updated', _handleH9Updated)
-  window.removeEventListener('h9:lease-payment-updated', _handleH9PaymentUpdated)
+  eventBus.off('tb:updated', _handleTbUpdated)
+  eventBus.off('substantive:adjudicated', _handleTbUpdated)
+  eventBus.off('h9:liability-updated', _handleH9Updated)
+  eventBus.off('h9:lease-payment-updated', _handleH9PaymentUpdated)
   for (const t of _saveTimers.values()) clearTimeout(t)
 })
 </script>

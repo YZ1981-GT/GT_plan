@@ -7,11 +7,10 @@
 import { computed, inject, ref, toRef, watch, type Ref } from 'vue'
 import {
   useF4Detail,
-  F4_AGING_BUCKET_OPTIONS,
   type APDetailRow,
-  type F4AgingBucket,
   type F4DetailColumn,
 } from '../composables/useF4Detail'
+import { overOneYearKeys } from '../composables/f4AgingModel'
 import { useF4AiGenerate } from '../composables/useF4AiGenerate'
 import F4ImportExportToolbar from './F4ImportExportToolbar.vue'
 import F4SheetAttachments from './F4SheetAttachments.vue'
@@ -41,6 +40,9 @@ const {
   updateCell,
   allocateAging,
   rowClassName,
+  segments,
+  segKeys,
+  agingPreset,
   basicColumns,
   agingColumns,
   auditColumns,
@@ -72,7 +74,7 @@ const columnDialogVisible = ref(false)
 const COLUMN_PREF_KEY = 'gt:f4-2:visible-columns'
 
 function defaultVisibleColumns(): string[] {
-  return allColumns.map((column) => String(column.prop))
+  return allColumns.value.map((column) => String(column.prop))
 }
 
 function loadVisibleColumns(): string[] {
@@ -98,21 +100,30 @@ watch(visibleColumnProps, (value) => {
   try { localStorage.setItem(COLUMN_PREF_KEY, JSON.stringify(value)) } catch { /* ignore */ }
 }, { deep: true })
 
+// 账龄段变化会引入新的账龄列（prop 形如 agingCurrent.y3to4）：默认显示，避免被旧偏好隐藏
+watch(allColumns, (columns) => {
+  const known = new Set(visibleColumnProps.value)
+  const appended = columns
+    .map((column) => String(column.prop))
+    .filter((prop) => !known.has(prop) && prop.startsWith('aging'))
+  if (appended.length) visibleColumnProps.value = [...visibleColumnProps.value, ...appended]
+}, { immediate: true })
+
 const activeColumns = computed<F4DetailColumn[]>(() => {
   const source = viewMode.value === 'wide'
-    ? allColumns
+    ? allColumns.value
     : activeSegment.value === 'basic'
       ? basicColumns
       : activeSegment.value === 'aging'
         ? [
           ...basicColumns.slice(0, 4),
           basicColumns[basicColumns.length - 1],
-          ...agingColumns,
+          ...agingColumns.value,
         ]
         : [
           ...basicColumns.slice(0, 4),
           basicColumns[basicColumns.length - 1],
-          ...auditColumns,
+          ...auditColumns.value,
         ]
   return source.filter((column) => visibleColumnProps.value.includes(String(column.prop)))
 })
@@ -125,18 +136,33 @@ function isFormulaColumn(column: F4DetailColumn): boolean {
   return !!column.formula
 }
 
+/** 支持 nested 账龄 prop（`agingCurrent.within1`）的取值 */
+function cellValue(row: APDetailRow, prop: string): any {
+  if (prop.includes('.')) {
+    const [group, key] = prop.split('.')
+    return (row as any)[group]?.[key] ?? 0
+  }
+  return (row as any)[prop]
+}
+
 function displayValue(row: APDetailRow, prop: string): string {
-  const value = (row as any)[prop]
+  const value = cellValue(row, prop)
   if (typeof value === 'number') return fmtAmount(value)
   return String(value ?? '')
 }
 
 const useFixedHeight = computed(() => filteredRows.value.length > 35)
 
+// 「1 年以上」段由 dayFrom>=366 派生（禁硬编码档位）
+const overOneYearSegKeys = computed(() => overOneYearKeys(segments.value))
+function overOneYearAudited(row: APDetailRow): number {
+  return overOneYearSegKeys.value.reduce((sum, key) => sum + (row.agingAudited?.[key] ?? 0), 0)
+}
+
 // ─── 账龄枚举快捷分配 ────────────────────────────────────────────────────────
 function handleAgingCommand(rowId: string, command: string): void {
-  const [stage, bucket] = command.split(':') as ['unadjusted' | 'audited', F4AgingBucket]
-  allocateAging(rowId, stage, bucket)
+  const [stage, segKey] = command.split(':') as ['unadjusted' | 'audited', string]
+  allocateAging(rowId, stage, segKey)
 }
 
 // ─── 审计说明 / 结论及AI ─────────────────────────────────────────────────────
@@ -200,18 +226,10 @@ function aiContext(): Record<string, unknown> {
       subsequentPayment: subtotalRow.value.subsequentPayment,
     },
     aging: {
-      unadjusted: [
-        subtotalRow.value.unadjustedAgingLt1,
-        subtotalRow.value.unadjustedAging1to2,
-        subtotalRow.value.unadjustedAging2to3,
-        subtotalRow.value.unadjustedAgingGt3,
-      ],
-      audited: [
-        subtotalRow.value.auditedAgingLt1,
-        subtotalRow.value.auditedAging1to2,
-        subtotalRow.value.auditedAging2to3,
-        subtotalRow.value.auditedAgingGt3,
-      ],
+      preset: agingPreset.value,
+      segments: segments.value.map((seg) => seg.label),
+      unadjusted: segKeys.value.map((key) => subtotalRow.value.agingCurrent?.[key] ?? 0),
+      audited: segKeys.value.map((key) => subtotalRow.value.agingAudited?.[key] ?? 0),
       unadjustedMatches: !subtotalRow.value.unadjustedAgingMismatch,
       auditedMatches: !subtotalRow.value.auditedAgingMismatch,
     },
@@ -222,7 +240,7 @@ function aiContext(): Record<string, unknown> {
         || row.subsequentPaymentExceedsBalance
         || Math.abs(row.closingAje) >= 0.01
         || Math.abs(row.closingRje) >= 0.01
-        || Math.abs(row.auditedAgingGt3) >= 0.01,
+        || Math.abs(overOneYearAudited(row)) >= 0.01,
       )
       .slice(0, 30)
       .map((row) => ({
@@ -233,7 +251,7 @@ function aiContext(): Record<string, unknown> {
         closingAdjusted: row.closingAdjusted,
         closingAje: row.closingAje,
         closingRje: row.closingRje,
-        overThreeYears: row.auditedAgingGt3,
+        overOneYearAudited: overOneYearAudited(row),
         subsequentPayment: row.subsequentPayment,
         remark: row.remark,
       })),
@@ -263,7 +281,7 @@ async function runAi(section: 'detail-note' | 'detail-conclusion'): Promise<void
         <p>1. 按债权人逐户登记，身份字段采用源表枚举：关联方类型为“合并范围内关联方/合并范围外关联方/非关联方”，款项性质为“货款/工程款/设备款/服务费/其他”。</p>
         <p>2. 期初审定余额＝期初未审余额＋期初账项调整＋期初重分类调整；期末余额＝期初未审余额＋贷方发生－借方发生。</p>
         <p>3. 期末未审余额＝期末余额＋被审计单位重分类调整；审定数＝期末未审余额＋账项调整＋重分类调整。</p>
-        <p>4. 未审账龄四档合计必须等于期末未审余额，审定账龄四档合计必须等于审定数；可使用每行“账龄分配”按枚举档位将余额快捷填入。</p>
+        <p>4. 账龄档位取自<strong>项目账龄配置</strong>（3年段／5年段／自定义，当前生效：{{ segments.map(s => s.label).join(' / ') }}）；未审账龄各段合计必须等于期末未审余额，审定账龄各段合计必须等于审定数；可使用每行“账龄分配”按段将余额快捷填入。</p>
         <p>5. 账龄超过1年的大额款项应说明未偿还/未结转原因及期后偿还情况；3年以上款项、关联方款项、重大调整和期后付款超过期末余额的项目应重点关注。</p>
         <p>6. 支持全字段宽表、分段编辑、个性化列设置及与源表27列一致的导入导出；本表自动汇总联动F4-1审定表。</p>
       </div>
@@ -317,6 +335,7 @@ async function runAi(section: 'detail-note' | 'detail-conclusion'): Promise<void
           @imported="onImported"
         />
         <GtIndexChip value="wp:F4-1" :context-project-id="projectId" />
+        <el-tag size="small" type="warning">账龄 {{ segments.length }} 段</el-tag>
         <el-tag size="small" type="info">已填 {{ filledCount }} 笔</el-tag>
         <el-tag v-if="abnormalCount" size="small" type="danger">异常 {{ abnormalCount }} 笔</el-tag>
         <el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('f4-2-detail')">复核</el-button>
@@ -373,7 +392,7 @@ async function runAi(section: 'detail-note' | 'detail-conclusion'): Promise<void
         <template #default="{ row }">
           <el-select
             v-if="column.editable && !isReadonly && column.inputType === 'select'"
-            :model-value="(row as any)[column.prop]"
+            :model-value="cellValue(row, String(column.prop))"
             size="small"
             clearable
             filterable
@@ -388,7 +407,7 @@ async function runAi(section: 'detail-note' | 'detail-conclusion'): Promise<void
           </el-select>
           <el-input-number
             v-else-if="column.editable && !isReadonly && column.inputType === 'number'"
-            :model-value="(row as any)[column.prop]"
+            :model-value="cellValue(row, String(column.prop))"
             :controls="false"
             size="small"
             style="width:100%"
@@ -396,7 +415,7 @@ async function runAi(section: 'detail-note' | 'detail-conclusion'): Promise<void
           />
           <el-input
             v-else-if="column.editable && !isReadonly"
-            :model-value="(row as any)[column.prop]"
+            :model-value="cellValue(row, String(column.prop))"
             size="small"
             :type="column.prop === 'remark' ? 'textarea' : 'text'"
             :autosize="column.prop === 'remark' ? { minRows: 1, maxRows: 3 } : undefined"
@@ -427,16 +446,16 @@ async function runAi(section: 'detail-note' | 'detail-conclusion'): Promise<void
               <el-dropdown-menu>
                 <el-dropdown-item disabled>按期末未审余额分配</el-dropdown-item>
                 <el-dropdown-item
-                  v-for="bucket in F4_AGING_BUCKET_OPTIONS"
-                  :key="`u-${bucket.value}`"
-                  :command="`unadjusted:${bucket.value}`"
-                >{{ bucket.label }}</el-dropdown-item>
+                  v-for="seg in segments"
+                  :key="`u-${seg.key}`"
+                  :command="`unadjusted:${seg.key}`"
+                >{{ seg.label }}</el-dropdown-item>
                 <el-dropdown-item divided disabled>按审定数分配</el-dropdown-item>
                 <el-dropdown-item
-                  v-for="bucket in F4_AGING_BUCKET_OPTIONS"
-                  :key="`a-${bucket.value}`"
-                  :command="`audited:${bucket.value}`"
-                >{{ bucket.label }}</el-dropdown-item>
+                  v-for="seg in segments"
+                  :key="`a-${seg.key}`"
+                  :command="`audited:${seg.key}`"
+                >{{ seg.label }}</el-dropdown-item>
               </el-dropdown-menu>
             </template>
           </el-dropdown>

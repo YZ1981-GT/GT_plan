@@ -1757,128 +1757,181 @@ class DisclosureEngine:
                 report.text_only_sections.append(section)
                 continue
 
-            rows = td.get("rows")
-            if not rows or not isinstance(rows, list):
-                report.text_only_sections.append(section)
-                continue
-
-            # 4. 获取 binding
+            # 4. 获取 binding + 计算待刷新的表清单
             sec_binding = get_binding_for_section(section)
-            tables = (sec_binding.get("tables") or []) if sec_binding else []
-            table_binding = tables[0] if tables and isinstance(tables[0], dict) else {}
-            binding_rows = table_binding.get("rows") or {}
-            if not isinstance(binding_rows, dict):
-                binding_rows = {}
-            header_normalize = table_binding.get("header_normalize") or []
-            if not isinstance(header_normalize, list):
-                header_normalize = []
+            sec_tables = (sec_binding.get("tables") or []) if sec_binding else []
 
-            headers = td.get("headers") or []
-            num_value_cols = max(0, len(headers) - 1)
-            # legacy 表 headers 常为空（表头读时由 _cell_meta 语义投影），此时
-            # 从行 values 长度推断值列数，否则 num_value_cols=0 使刷新彻底 no-op。
-            if num_value_cols == 0:
-                for _r in rows:
-                    if isinstance(_r, dict) and isinstance(_r.get("values"), list):
-                        num_value_cols = max(num_value_cols, len(_r["values"]))
+            # 多表附注：前端 `currentNoteTables` 与 Word 导出都**优先渲染 `_tables`**，
+            # 而顶层 rows 只是生成时 `_tables[0]` 的镜像副本 → 旧实现只刷顶层 rows，
+            # 对多表附注等于「白刷」（用户看不到），且 table1..N 从不刷新、
+            # 只有 `_tables` 没有顶层 rows 的附注被整章跳过。改为逐表刷新。
+            nested = td.get("_tables")
+            targets: list[tuple[int, dict]] = []
+            if isinstance(nested, list) and nested:
+                for _ti, _tbl in enumerate(nested):
+                    if isinstance(_tbl, dict) and isinstance(_tbl.get("rows"), list):
+                        targets.append((_ti, _tbl))
+            if not targets:
+                _top_rows = td.get("rows")
+                if not _top_rows or not isinstance(_top_rows, list):
+                    report.text_only_sections.append(section)
+                    continue
+                targets.append((0, td))
 
             # 更新 ctx section_number
             ctx["section_number"] = section
             # Wave2：暴露当前 note table_data 供 sum source 反查兄弟单元格
+            #（含 `_tables`；resolver 侧按 binding.table_index / ctx.table_index 选表）
             ctx["table_data"] = td
 
             section_had_error = False
             section_touched = False
+            table0_touched = False
 
-            try:
-                for row_idx, row in enumerate(rows):
-                    if not isinstance(row, dict):
-                        continue
-                    if row.get("is_total"):
-                        continue  # 合计行由 _backfill_totals 处理
+            for table_index, table_obj in targets:
+                if section_had_error:
+                    break
+                rows = table_obj.get("rows") or []
+                table_binding = (
+                    sec_tables[table_index]
+                    if 0 <= table_index < len(sec_tables)
+                    and isinstance(sec_tables[table_index], dict)
+                    else {}
+                )
+                binding_rows = table_binding.get("rows") or {}
+                if not isinstance(binding_rows, dict):
+                    binding_rows = {}
+                header_normalize = table_binding.get("header_normalize") or []
+                if not isinstance(header_normalize, list):
+                    header_normalize = []
 
-                    values = row.get("values")
-                    if not isinstance(values, list):
-                        continue
+                headers = table_obj.get("headers") or []
+                num_value_cols = max(0, len(headers) - 1)
+                # legacy 表 headers 常为空（表头读时由 _cell_meta 语义投影），此时
+                # 从行 values 长度推断值列数，否则 num_value_cols=0 使刷新彻底 no-op。
+                if num_value_cols == 0:
+                    for _r in rows:
+                        if isinstance(_r, dict) and isinstance(_r.get("values"), list):
+                            num_value_cols = max(num_value_cols, len(_r["values"]))
 
-                    cell_modes = row.get("_cell_modes") or {}
-                    cell_meta = row.get("_cell_meta") or {}
-                    label = row.get("label", "")
+                ctx["table_index"] = table_index
+                table_touched = False
 
-                    for col_idx in range(min(num_value_cols, len(values))):
-                        mode = cell_modes.get(str(col_idx), "auto")
+                try:
+                    for row_idx, row in enumerate(rows):
+                        if not isinstance(row, dict):
+                            continue
+                        if row.get("is_total"):
+                            continue  # 合计行由 _backfill_totals 处理
 
-                        # 从 binding 获取 cell 定义（先解析，供 legacy 判定使用）
-                        cell_binding = self._resolve_cell_binding(
-                            label, col_idx, binding_rows, header_normalize,
-                            cell_meta,
-                        )
-                        if cell_binding is None:
-                            # 无 binding → 无法重算，跳过
+                        values = row.get("values")
+                        if not isinstance(values, list):
                             continue
 
-                        # skip_manual: 仅处理 auto 单元格；但兼容 legacy——老生成器把
-                        # 本应自动的单元格硬编码为 manual（无用户手工值），binding 声明
-                        # auto 且该格从无用户值时，按 auto 重算并归一为 auto。
-                        legacy_refill = False
-                        if skip_manual and mode != "auto":
-                            if self._is_legacy_auto_cell(
-                                row, col_idx, mode, cell_binding, cell_meta, values,
-                            ):
-                                legacy_refill = True
+                        cell_modes = row.get("_cell_modes") or {}
+                        cell_meta = row.get("_cell_meta") or {}
+                        label = row.get("label", "")
+
+                        for col_idx in range(min(num_value_cols, len(values))):
+                            mode = cell_modes.get(str(col_idx), "auto")
+
+                            # 从 binding 获取 cell 定义（先解析，供 legacy 判定使用）
+                            cell_binding = self._resolve_cell_binding(
+                                label, col_idx, binding_rows, header_normalize,
+                                cell_meta,
+                            )
+                            if cell_binding is None:
+                                # 无 binding → 无法重算，跳过
+                                continue
+
+                            # skip_manual: 仅处理 auto 单元格；但兼容 legacy——老生成器把
+                            # 本应自动的单元格硬编码为 manual（无用户手工值），binding 声明
+                            # auto 且该格从无用户值时，按 auto 重算并归一为 auto。
+                            legacy_refill = False
+                            if skip_manual and mode != "auto":
+                                if self._is_legacy_auto_cell(
+                                    row, col_idx, mode, cell_binding, cell_meta,
+                                    values,
+                                ):
+                                    legacy_refill = True
+                                else:
+                                    continue
+
+                            # Wave2：公式家族（sum/report/aging）由 resolve_formula 承载
+                            # （dispatch_resolver 未注册），受灰度开关约束。
+                            # 追加 'formula'：spec disclosure-note-formula-data-population
+                            # 决策 3 —— binding 写 source='formula' + formula_kind 子类型。
+                            _src = cell_binding.get("source")
+                            if _src in ("sum", "report", "aging", "formula"):
+                                if not settings.DISCLOSURE_NOTE_FORMULA_ENABLED:
+                                    # 开关关 → 旁路公式家族，绝不用 None 覆盖既有值（零回归）
+                                    continue
+                                new_val = await resolve_formula(cell_binding, ctx)
+                                if new_val is None:
+                                    # 缺数据不覆盖既有值（fail-open）
+                                    continue
                             else:
+                                # 调 dispatch_resolver（含 prior_year_note / 数据源）
+                                new_val = await dispatch_resolver(cell_binding, ctx)
+
+                            old_val = values[col_idx]
+
+                            # 比较 old vs new（规范化比较）
+                            if not self._values_differ(old_val, new_val):
                                 continue
 
-                        # Wave2：公式家族（sum/report/aging）由 resolve_formula 承载
-                        # （dispatch_resolver 未注册），受灰度开关约束。
-                        _src = cell_binding.get("source")
-                        if _src in ("sum", "report", "aging"):
-                            if not settings.DISCLOSURE_NOTE_FORMULA_ENABLED:
-                                # 开关关 → 旁路公式家族，绝不用 None 覆盖既有值（零回归）
-                                continue
-                            new_val = await resolve_formula(cell_binding, ctx)
-                            if new_val is None:
-                                # 缺数据不覆盖既有值（fail-open）
-                                continue
-                        else:
-                            # 调 dispatch_resolver（含 prior_year_note / 数据源）
-                            new_val = await dispatch_resolver(cell_binding, ctx)
+                            # 写回
+                            values[col_idx] = new_val
+                            # legacy 单元格重算后归一为 auto，使后续刷新走正常自动路径
+                            if legacy_refill:
+                                cell_modes[str(col_idx)] = "auto"
+                                row["_cell_modes"] = cell_modes
+                            table_touched = True
+                            section_touched = True
+                            report.cells_updated += 1
+                            report.records.append(CellRefillRecord(
+                                section=section,
+                                row_index=row_idx,
+                                col_index=col_idx,
+                                old_value=old_val,
+                                new_value=new_val,
+                            ))
 
-                        old_val = values[col_idx]
+                    # 重算合计行（逐表）
+                    if table_touched:
+                        self._backfill_totals(rows, num_value_cols)
+                        if table_index == 0:
+                            table0_touched = True
 
-                        # 比较 old vs new（规范化比较）
-                        if not self._values_differ(old_val, new_val):
-                            continue
-
-                        # 写回
-                        values[col_idx] = new_val
-                        # legacy 单元格重算后归一为 auto，使后续刷新走正常自动路径
-                        if legacy_refill:
-                            cell_modes[str(col_idx)] = "auto"
-                            row["_cell_modes"] = cell_modes
-                        section_touched = True
-                        report.cells_updated += 1
-                        report.records.append(CellRefillRecord(
-                            section=section,
-                            row_index=row_idx,
-                            col_index=col_idx,
-                            old_value=old_val,
-                            new_value=new_val,
-                        ))
-
-                # 重算合计行
-                if section_touched:
-                    self._backfill_totals(rows, num_value_cols)
-
-            except Exception as err:
-                section_had_error = True
-                report.errors.append(f"{section}: {err}")
-                logger.warning("refill_sections: section %s failed: %s", section, err)
+                except Exception as err:
+                    section_had_error = True
+                    report.errors.append(f"{section}: {err}")
+                    logger.warning(
+                        "refill_sections: section %s table %s failed: %s",
+                        section, table_index, err,
+                    )
 
             if section_had_error:
                 continue
 
             if section_touched:
+                # 多表附注：顶层 rows/headers/name 是生成时 `_tables[0]` 的镜像，
+                # table0 真被刷新时同步回去，避免"顶层旧 / _tables 新"两份不一致
+                # （前端与 Word 导出优先读 _tables，其它 legacy 读取方读顶层）。
+                # 仅在 table0 触碰时镜像：否则会用未变的 nested[0] 覆盖顶层
+                # （历史数据顶层可能被单独更新过），造成数据回退。
+                if (
+                    table0_touched
+                    and isinstance(nested, list)
+                    and nested
+                    and isinstance(nested[0], dict)
+                ):
+                    td["rows"] = nested[0].get("rows") or []
+                    _t0_headers = nested[0].get("headers")
+                    if isinstance(_t0_headers, list):
+                        td["headers"] = _t0_headers
+                    if nested[0].get("name") is not None:
+                        td["name"] = nested[0].get("name") or ""
                 flag_modified(note, "table_data")
                 report.sections_recomputed.append(section)
 

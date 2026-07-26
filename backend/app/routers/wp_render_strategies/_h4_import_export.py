@@ -199,4 +199,11 @@ _H4_SPECS: dict[str, dict[str, Any]] = {
     },
 }
 
-router = create_cycle_import_export_router(tag="h4-import-export", api_prefix="h4", specs=_H4_SPECS)
+router = create_cycle_import_export_router(
+    tag="h4-import-export",
+    api_prefix="h4",
+    specs=_H4_SPECS,
+    # 前端以 remark 为权威（useH4CrossSheet / useH4Disclosure 只读 remark）；
+    # 工厂默认 conclusion 会让跨表联动与披露取数读不到导入数据。
+    storage_field="remark",
+)

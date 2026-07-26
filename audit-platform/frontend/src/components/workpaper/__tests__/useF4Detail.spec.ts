@@ -98,10 +98,18 @@ describe('F4-2 旧数据迁移与账龄快捷分配', () => {
     }]))[0]
     expect(row.rowId).toBe('old-1')
     expect(row.openingUnadjusted).toBe(800)
-    expect(row.unadjustedAgingLt1).toBe(700)
+    // 账龄权威已迁到 nested（agingCurrent/agingAudited），序列化不再写扁平字段
+    expect(row.agingCurrent.within1).toBe(700)
+    expect(row.agingCurrent.y1to2).toBe(100)
     expect(row.closingAje).toBe(-50)
     expect(row.closingRje).toBe(20)
-    expect(row.auditedAgingLt1).toBe(670)
+    expect(row.agingAudited.within1).toBe(670)
+    // 3 年段零回归对照：兼容派生的扁平字段与迁移前期望值逐项相同
+    const computedRow = computeF4DetailRow(row)
+    expect(computedRow.unadjustedAgingLt1).toBe(700)
+    expect(computedRow.unadjustedAging1to2).toBe(100)
+    expect(computedRow.auditedAgingLt1).toBe(670)
+    expect(computedRow.auditedAging1to2).toBe(100)
     expect(row.remark).toContain('函证结果：回函相符')
     expect(row.remark).toContain('期后付款日期：2026-02-01')
     expect(row.remark).toContain('原索引：F4-8-1')

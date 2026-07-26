@@ -92,6 +92,9 @@ DEFAULT_SUBJECT_PRESETS: dict[str, AgingPreset] = {
     "F1": AgingPreset.THREE_YEAR,
     "G2": AgingPreset.THREE_YEAR,
     "D7": AgingPreset.THREE_YEAR,  # 合同负债：2-period，默认 THREE_YEAR
+    # 应付账款：源模板 4 档（1年以内/1-2/2-3/3年以上）→ THREE_YEAR；
+    # 🔴 必须与前端 useAgingConfig.DEFAULT_SUBJECT_PRESETS 一致
+    "F4": AgingPreset.THREE_YEAR,
 }
 
 

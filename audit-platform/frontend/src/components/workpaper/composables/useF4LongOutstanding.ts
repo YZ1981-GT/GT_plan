@@ -4,11 +4,22 @@
  * 源表字段：债权人、期末余额、账龄、经济业务说明、未偿还/未结转原因、
  * 是否无法支付、是否诉讼、支付计划、审定金额、支持性证据、备注。
  */
-import { computed, onBeforeUnmount, ref, watch, type ComputedRef, type Ref } from 'vue'
+import { computed, inject, onBeforeUnmount, ref, watch, type ComputedRef, type Ref } from 'vue'
 import { calcSubtotal, parseNum } from './useF4AccPayFormulaEngine'
 import { computeF4DetailRow, migrateF4DetailRows } from './useF4Detail'
 import { readRowJson, type ChecklistResponse } from './useF4FormData'
+import {
+  PRESET_SEGMENTS,
+  useAgingConfig,
+  DEFAULT_SUBJECT_PRESETS,
+  type AgingSegment,
+} from '@/composables/useAgingConfig'
+import { f4AgingLabel, f4AgingValue } from './f4AgingModel'
 
+/**
+ * @deprecated 账龄档位改由项目账龄配置驱动（`buildF4LongAgingOptions(segments)`）；
+ * 本常量仅保留为 3 年段回退与旧调用方兼容。
+ */
 export const F4_LONG_AGING_OPTIONS = ['1～2年', '2～3年', '3年以上'] as const
 export const F4_YES_NO_OPTIONS = ['是', '否', '不适用'] as const
 export const F4_DISPOSAL_CONCLUSIONS = [
@@ -180,17 +191,35 @@ export function migrateF4LongOutstandingRows(value: string | null | undefined): 
   }
 }
 
-function ageLabels(amounts: number[]): string {
-  const labels = ['1～2年', '2～3年', '3年以上']
-    .filter((_, index) => Math.abs(amounts[index]) >= TOLERANCE)
-  return labels.join('、')
+function ageLabels(amounts: number[], labels: readonly string[]): string {
+  return labels
+    .filter((_, index) => Math.abs(amounts[index] ?? 0) >= TOLERANCE)
+    .join('、')
 }
 
-/** 从F4-2提取包含1年以上账龄的实际债权人，并按名称归集。 */
+/** 「1 年以上」账龄段候选选项（dayFrom>=366，段驱动，取代硬编码 3 档） */
+export function buildF4LongAgingOptions(segments: readonly AgingSegment[]): string[] {
+  const segs = segments?.length ? segments : (PRESET_SEGMENTS.THREE_YEAR as AgingSegment[])
+  return segs.filter((seg) => Number(seg.dayFrom) >= 366).map(f4AgingLabel)
+}
+
+/** 「3 年以上」段 label 集合（用于风险提示，段驱动） */
+export function buildF4OverThreeLabels(segments: readonly AgingSegment[]): string[] {
+  const segs = segments?.length ? segments : (PRESET_SEGMENTS.THREE_YEAR as AgingSegment[])
+  return segs.filter((seg) => Number(seg.dayFrom) >= 1096).map(f4AgingLabel)
+}
+
+/** 从F4-2提取包含1年以上账龄的实际债权人，并按名称归集（账龄段驱动）。 */
 export function extractF4LongOutstandingCandidates(
   value: string | null | undefined,
+  segments?: readonly AgingSegment[],
 ): F4LongOutstandingCandidate[] {
-  const detailRows = migrateF4DetailRows(value).map(computeF4DetailRow)
+  const segs = (segments?.length ? segments : PRESET_SEGMENTS.THREE_YEAR) as AgingSegment[]
+  const detailRows = migrateF4DetailRows(value, segs).map((row) => computeF4DetailRow(row, segs))
+  // 「1 年以上」段由 dayFrom>=366 派生（Property 4），残差行不属段故不参与
+  const longSegs = segs.filter((seg) => Number(seg.dayFrom) >= 366)
+  const longKeys = longSegs.map((seg) => String(seg.key))
+  const longLabels = longSegs.map(f4AgingLabel)
   const grouped = new Map<string, {
     rowIds: string[]
     creditor: string
@@ -203,16 +232,8 @@ export function extractF4LongOutstandingCandidates(
   for (const row of detailRows) {
     const creditor = row.creditor.trim()
     if (!creditor) continue
-    const auditedBuckets = [
-      row.auditedAging1to2,
-      row.auditedAging2to3,
-      row.auditedAgingGt3,
-    ]
-    const unadjustedBuckets = [
-      row.unadjustedAging1to2,
-      row.unadjustedAging2to3,
-      row.unadjustedAgingGt3,
-    ]
+    const auditedBuckets = longKeys.map((key) => f4AgingValue(row, 'audited', key))
+    const unadjustedBuckets = longKeys.map((key) => f4AgingValue(row, 'current', key))
     const buckets = auditedBuckets.some((amount) => Math.abs(amount) >= TOLERANCE)
       ? auditedBuckets
       : unadjustedBuckets
@@ -224,7 +245,7 @@ export function extractF4LongOutstandingCandidates(
       creditor,
       closingBalance: 0,
       auditedAmount: 0,
-      longAging: [0, 0, 0],
+      longAging: longKeys.map(() => 0),
       descriptions: new Set<string>(),
     }
     target.rowIds.push(row.rowId)
@@ -244,7 +265,7 @@ export function extractF4LongOutstandingCandidates(
       sourceRowId: row.rowIds.sort().join('|'),
       creditor: row.creditor,
       closingBalance: row.closingBalance,
-      aging: ageLabels(row.longAging),
+      aging: ageLabels(row.longAging, longLabels),
       businessDescription: [...row.descriptions].join('、'),
       auditedAmount: row.auditedAmount,
     }))
@@ -253,14 +274,17 @@ export function extractF4LongOutstandingCandidates(
 function computeRow(
   stored: StoredLongOutstandingRow,
   source?: F4LongOutstandingCandidate,
+  overThreeLabels: readonly string[] = ['3年以上'],
 ): LongOutstandingRow {
   const creditor = source?.creditor ?? stored.creditor
   const closingBalance = source?.closingBalance ?? stored.closingBalance
   const aging = source?.aging ?? stored.aging
   const businessDescription = stored.businessDescription || source?.businessDescription || ''
   const auditedAmount = source?.auditedAmount ?? stored.auditedAmount
+  const labels = overThreeLabels.length ? overThreeLabels : ['3年以上']
+  const hasOverThree = labels.some((label) => aging.includes(label))
   const riskFlags: string[] = []
-  if (aging.includes('3年以上')) riskFlags.push('含3年以上账龄')
+  if (hasOverThree) riskFlags.push('含3年以上账龄')
   if (stored.unableToPay === '是') riskFlags.push('可能无法支付')
   else if (!stored.unableToPay) riskFlags.push('支付能力待判断')
   if (stored.litigation === '是') riskFlags.push('涉及诉讼')
@@ -272,7 +296,7 @@ function computeRow(
   if (Math.abs(adjustmentAmount) >= TOLERANCE) riskFlags.push('存在审计调整')
 
   let highlightLevel: LongOutstandingRow['highlightLevel'] = 'none'
-  if (stored.unableToPay === '是' || stored.litigation === '是' || aging.includes('3年以上')) {
+  if (stored.unableToPay === '是' || stored.litigation === '是' || hasOverThree) {
     highlightLevel = 'danger'
   } else if (riskFlags.length) {
     highlightLevel = 'warning'
@@ -333,8 +357,24 @@ export function useF4LongOutstanding(options: UseF4LongOutstandingOptions) {
     { immediate: true },
   )
 
+  // ─── 账龄段（主入口 provide 优先） ──────────────────────────────────────────
+  const injectedSegments = inject<Ref<AgingSegment[]> | null>('f4AgingSegments', null)
+  const ownConfig = injectedSegments ? null : useAgingConfig(options.projectId, 'F4')
+  const segments: ComputedRef<AgingSegment[]> = computed(() => {
+    const raw = injectedSegments?.value ?? ownConfig?.segments.value ?? []
+    return raw.length
+      ? raw
+      : (PRESET_SEGMENTS[DEFAULT_SUBJECT_PRESETS.F4 ?? 'THREE_YEAR'] as AgingSegment[])
+  })
+  /** 账龄下拉候选（1 年以上段，dayFrom>=366） */
+  const agingOptions = computed(() => buildF4LongAgingOptions(segments.value))
+  const overThreeLabels = computed(() => buildF4OverThreeLabels(segments.value))
+
   const detailCandidates = computed(() =>
-    extractF4LongOutstandingCandidates(readRowJson(allResponses.value.get(DETAIL_KEY))),
+    extractF4LongOutstandingCandidates(
+      readRowJson(allResponses.value.get(DETAIL_KEY)),
+      segments.value,
+    ),
   )
 
   const rows: ComputedRef<LongOutstandingRow[]> = computed(() =>
@@ -343,6 +383,7 @@ export function useF4LongOutstanding(options: UseF4LongOutstandingOptions) {
       stored.sourceRowId
         ? detailCandidates.value.find((source) => source.sourceRowId === stored.sourceRowId)
         : undefined,
+      overThreeLabels.value,
     )),
   )
   const filledCount = computed(() => rows.value.filter((row) =>
@@ -516,6 +557,8 @@ export function useF4LongOutstanding(options: UseF4LongOutstandingOptions) {
     summary,
     filledCount,
     pendingSyncCount,
+    segments,
+    agingOptions,
     auditNote,
     auditConclusion,
     loadRows,

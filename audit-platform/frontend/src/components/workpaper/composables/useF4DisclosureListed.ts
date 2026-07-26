@@ -16,6 +16,8 @@ import {
   F4_NATURE_DEFAULTS,
 } from './useF4Adjudication'
 import type { ChecklistResponse } from './useF4FormData'
+import { PRESET_SEGMENTS, type AgingSegment } from '@/composables/useAgingConfig'
+import { f4AgingLabel } from './f4AgingModel'
 
 export interface UseF4DisclosureListedOptions {
   wpId: Ref<string>
@@ -115,14 +117,22 @@ function parseAgingRows(value: string | null | undefined): StoredAgingRow[] {
   }))
 }
 
-/** F4-5 中账龄超过1年的行（含实时计算的挂账天数） */
-export function extractOverOneYearRows(value: string | null | undefined): Array<{
+/**
+ * F4-5 中账龄超过1年的行（含实时计算的挂账天数）。
+ * 账龄文本 → 天数推定按**生效段** label/dayFrom 派生（兼容迁移前固定 3 档文案）。
+ */
+export function extractOverOneYearRows(
+  value: string | null | undefined,
+  segments?: readonly AgingSegment[],
+): Array<{
   rowId: string
   creditor: string
   amount: number
   reason: string
   outstandingDays: number
 }> {
+  const segs = (segments?.length ? segments : PRESET_SEGMENTS.THREE_YEAR) as AgingSegment[]
+  const longSegs = segs.filter((seg) => Number(seg.dayFrom) >= 366)
   return safeJsonArray(value)
     .map((raw: any) => {
       let outstandingDays = 0
@@ -135,9 +145,22 @@ export function extractOverOneYearRows(value: string | null | undefined): Array<
       }
       // F4-5新源表直接记录账龄而非挂账起始日；保留推定天数仅用于兼容既有接口。
       const aging = String(raw?.aging ?? '')
-      if (!outstandingDays && aging.includes('3年以上')) outstandingDays = 1096
-      else if (!outstandingDays && aging.includes('2～3年')) outstandingDays = 731
-      else if (!outstandingDays && aging.includes('1～2年')) outstandingDays = 366
+      if (!outstandingDays && aging) {
+        // 段驱动：命中的超 1 年段中取 dayFrom 最大者
+        let best = 0
+        for (const seg of longSegs) {
+          const label = f4AgingLabel(seg)
+          if (label && aging.includes(label)) best = Math.max(best, Number(seg.dayFrom) || 0)
+          else if (seg.label && aging.includes(seg.label)) best = Math.max(best, Number(seg.dayFrom) || 0)
+        }
+        // 兼容迁移前固定 4 档文案（1～2年/2～3年/3年以上）
+        if (!best) {
+          if (aging.includes('3年以上')) best = 1096
+          else if (aging.includes('2～3年')) best = 731
+          else if (aging.includes('1～2年')) best = 366
+        }
+        outstandingDays = best
+      }
       return {
         rowId: String(raw?.rowId ?? ''),
         creditor: String(raw?.creditor ?? ''),
