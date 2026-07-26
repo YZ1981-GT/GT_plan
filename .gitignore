@@ -151,3 +151,8 @@ backend/app/_build_version.json
 # Evidence-governance quarantine store (must never be committed — may hold rejected/malicious upload bytes)
 quarantine_store/
 backend/quarantine_store/
+
+# OfficeCLI 本地二进制（31.8MB，不入库；由 tools/officecli/install.* 按版本锁+SHA256 拉取）
+tools/officecli/bin/
+tools/officecli/_poc*
+tools/officecli/_word_probe*

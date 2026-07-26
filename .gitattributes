@@ -1,0 +1,5 @@
+# Shell 脚本强制 LF。
+# 本仓库 core.autocrlf=true，Windows 上 checkout 会把 LF 转成 CRLF；
+# 带 CRLF 的 .sh 在 Git Bash / WSL / Linux 容器里会报 $'\r': command not found。
+# 仓库内全部 .sh 在 index 中本就是 LF，故此规则不产生行尾 churn，只保证 checkout 后仍是 LF。
+*.sh text eol=lf
