@@ -340,11 +340,11 @@ async def d5_import_aux_balance(
     aux_result = await db.execute(
         sa.text("""
             SELECT aux_name,
-                   COALESCE(SUM(CASE WHEN period_type = 'opening' THEN balance ELSE 0 END), 0) AS prior_balance,
-                   COALESCE(SUM(CASE WHEN period_type = 'closing' THEN balance ELSE 0 END), 0) AS current_balance
+                   COALESCE(SUM(opening_balance), 0) AS prior_balance,
+                   COALESCE(SUM(closing_balance), 0) AS current_balance
             FROM tb_aux_balance
             WHERE project_id = :pid
-              AND account_code = '1124'
+              AND account_code LIKE '1124%'
               AND is_deleted = false
             GROUP BY aux_name
             ORDER BY aux_name

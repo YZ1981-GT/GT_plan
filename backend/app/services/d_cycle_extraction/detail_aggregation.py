@@ -33,14 +33,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 DEFAULT_ROW_LIMIT = 500
 
 # tb_aux_balance 科目 1402 按客户/合同维度（aux_name）归集期初/期末余额。
-# 🔴 与原端点 `d6_import_aux_balance` 逐字节相同的 SQL（复用不新造）。
+# 真实列: opening_balance / closing_balance（无 period_type / balance 列）。
 _AUX_QUERY = """
     SELECT aux_name,
-           COALESCE(SUM(CASE WHEN period_type = 'opening' THEN balance ELSE 0 END), 0) AS prior_balance,
-           COALESCE(SUM(CASE WHEN period_type = 'closing' THEN balance ELSE 0 END), 0) AS current_balance
+           COALESCE(SUM(opening_balance), 0) AS prior_balance,
+           COALESCE(SUM(closing_balance), 0) AS current_balance
     FROM tb_aux_balance
     WHERE project_id = :pid
-      AND account_code = '1402'
+      AND account_code LIKE '1402%'
       AND is_deleted = false
     GROUP BY aux_name
     ORDER BY aux_name
