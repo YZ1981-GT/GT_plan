@@ -101,6 +101,10 @@ export const disclosureNotes = {
   update: (noteId: string) => `/api/disclosure-notes/${noteId}`,
   validate: (pid: string, year: number) => `/api/disclosure-notes/${pid}/${year}/validate`,
   validationResults: (pid: string, year: number) => `/api/disclosure-notes/${pid}/${year}/validation-results`,
+  // 附注联动复盘 P0-1：披露同步 / 校验就绪度看板（只读）
+  readiness: (pid: string, year: number) => `/api/disclosure-notes/${pid}/${year}/readiness`,
+  // 附注联动复盘 P0-2：某底稿对应附注章节的同步状态（底稿披露 sheet 状态条）
+  wpSyncStatus: (pid: string, year: number) => `/api/disclosure-notes/${pid}/${year}/wp-sync-status`,
   refreshFromWorkpapers: (pid: string, year: number) => `/api/disclosure-notes/${pid}/${year}/refresh-from-workpapers`,
   refreshSectionFromWorkpaper: (pid: string, year: number, section: string) => `/api/disclosure-notes/${pid}/${year}/${encodeURIComponent(section)}/refresh-from-workpaper`,
   autoPull: (pid: string, year: number, section: string) => `/api/disclosure-notes/${pid}/${year}/${encodeURIComponent(section)}/auto-pull`,

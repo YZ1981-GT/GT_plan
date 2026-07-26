@@ -144,6 +144,18 @@
 
       <!-- 内容区域 -->
       <div class="gt-wp-renderer__content">
+      <!--
+        附注联动复盘 P0-2：披露 sheet 顶部统一「附注同步状态条」。
+        一处接入覆盖全部循环的披露表（判据=sheet 名含附注披露/上市/国企 或 X-note-listed/soe），
+        解决"46 个 sync builder 就绪但生产零同步记录"的可见性缺口。只读，不代替页内同步按钮。
+      -->
+      <GtWpDisclosureSyncBar
+        v-if="isDisclosureSheet"
+        :project-id="renderConfig?.project_id ?? ''"
+        :year="preparationYear"
+        :wp-code="renderConfig?.wp_code ?? ''"
+        :sheet-name="activeSheetName"
+      />
       <!-- 注册表分发：HTML 类组件（A/B/C/D 5 种/E/H 共 10 种 componentType） -->
       <component
         v-if="rendererEntry"
@@ -295,6 +307,8 @@ import GtGridSheet from '@/components/workpaper/GtGridSheet.vue'
 import GtOnlyOfficeSheet from './GtOnlyOfficeSheet.vue'
 import GtWpToolbar from '@/components/workpaper/GtWpToolbar.vue'
 import GtWpAiReviewToolbar from './review/GtWpAiReviewToolbar.vue'
+import GtWpDisclosureSyncBar from './GtWpDisclosureSyncBar.vue'
+import { isDisclosureSheetName } from './composables/disclosureSyncBar'
 import GtWpPreparationHeader from '@/components/workpaper/GtWpPreparationHeader.vue'
 import GtWorkpaperRuntimeHosts from '@/components/workpaper/GtWorkpaperRuntimeHosts.vue'
 import GtBArchitectureTree from '@/components/workpaper/GtBArchitectureTree.vue'
@@ -527,6 +541,15 @@ const tabSheets = computed(() => {
 
 /** 当前是否为「完整Excel」合成页签 */
 const isWholeExcelTab = computed<boolean>(() => activeSheetName.value === WHOLE_EXCEL_TAB)
+
+/**
+ * 当前 sheet 是否为「附注披露表」（P0-2 同步状态条判据）。
+ * 各循环 sheet 命名不统一：附注披露信息（上市公司）/ 附注上市 / 附注国企 /
+ * F1-note-listed / G2-note-soe 等，故用宽正则；命中后由后端 registry 决定是否有映射。
+ */
+const isDisclosureSheet = computed<boolean>(() =>
+  isDisclosureSheetName(activeSheetName.value),
+)
 
 /** 是否为底稿目录页签（b-index 或 sheet 名含「底稿目录」；对齐后端 whole-excel 优先跳过目录） */
 function isIndexSheetTab(s: { sheet_name?: string; componentType?: string } | null | undefined): boolean {

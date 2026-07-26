@@ -250,24 +250,74 @@ class ReportNoteSyncService:
         return td, written, matched
 
     async def mark_notes_stale_for_report_change(
-        self, project_id: UUID, year: int
+        self,
+        project_id: UUID,
+        year: int,
+        *,
+        changed_row_codes: set[str] | None = None,
     ) -> int:
-        """报表行次变更时标记关联附注为 stale
+        """报表行次变更时标记**关联**附注为 stale（P0-3 粒度化）。
 
-        Returns: number of notes marked stale
+        历史实现是"一刀切全项目附注 is_stale=true"，实测某项目 181/181 全亮
+        → 标记退化成背景噪声。现按关联关系分级：
+
+        1. 经 ``ReportNoteLinkage`` 求每章节关联的报表行次（Cell_Binding + 配置）；
+           ``changed_row_codes`` 给出时只标命中交集的章节，否则标"有任何 REPORT
+           关联"的章节；``stale_source='report'``。
+        2. **全项目一个 linkage 目标都没有**（当前多数项目如此）→ 保守回退全量标记，
+           避免丢失提示；``stale_source='report_fallback'``（前端可据此弱化呈现）。
+
+        任何异常 fail-open：回退历史全量标记语义，不阻断调用方。
+
+        Returns: 被标记的章节数
         """
         try:
-            stmt = (
-                update(DisclosureNote)
-                .where(
-                    DisclosureNote.project_id == project_id,
-                    DisclosureNote.year == year,
-                    DisclosureNote.is_deleted == False,
-                )
-                .values(is_stale=True)
+            note_stmt = select(DisclosureNote).where(
+                DisclosureNote.project_id == project_id,
+                DisclosureNote.year == year,
+                DisclosureNote.is_deleted == False,
             )
-            result = await self.db.execute(stmt)
-            return result.rowcount
+            notes = (await self.db.execute(note_stmt)).scalars().all()
+            if not notes:
+                return 0
+
+            linkage = ReportNoteLinkage()
+            targeted: list[Any] = []
+            any_linkage = False
+            for note in notes:
+                rows = linkage.report_rows_for_note(note)
+                if rows:
+                    any_linkage = True
+                    if changed_row_codes is None or (rows & set(changed_row_codes)):
+                        targeted.append(note)
+
+            if any_linkage:
+                for note in targeted:
+                    note.is_stale = True
+                    note.stale_source = "report"
+                await self.db.flush()
+                return len(targeted)
+
+            # 无任何 linkage → 保守全量（历史语义），但标注为 fallback
+            for note in notes:
+                note.is_stale = True
+                note.stale_source = "report_fallback"
+            await self.db.flush()
+            return len(notes)
         except Exception as e:
             logger.warning("mark_notes_stale_for_report_change error: %s", e)
-            return 0
+            # fail-open：退回历史全量 UPDATE（不带来源标注）
+            try:
+                stmt = (
+                    update(DisclosureNote)
+                    .where(
+                        DisclosureNote.project_id == project_id,
+                        DisclosureNote.year == year,
+                        DisclosureNote.is_deleted == False,
+                    )
+                    .values(is_stale=True)
+                )
+                result = await self.db.execute(stmt)
+                return result.rowcount
+            except Exception:
+                return 0

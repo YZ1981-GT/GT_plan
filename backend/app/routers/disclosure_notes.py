@@ -68,6 +68,25 @@ async def get_format_config(
     }
 
 
+async def _run_validation_best_effort(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+    template_type: str | None = None,
+) -> dict | None:
+    """生成/刷新/同步后自动跑一次附注校验并落库（P0-4，fail-open）。
+
+    历史上校验只有用户手点「✅校验」才跑，导致 ``note_validation_results`` 长期 0 行、
+    11 个 executor 与 760/187 条预设全部空转。此处在写操作成功后补跑一次，
+    任何异常一律吞掉（回滚校验事务，不影响已提交的主操作）。
+
+    Returns: 校验摘要 dict（供响应 additive 携带）或 None（跳过/失败）。
+    """
+    from app.services.note_readiness_service import run_validation_best_effort
+
+    return await run_validation_best_effort(db, project_id, year, template_type)
+
+
 @router.post("/generate")
 async def generate_notes(
     data: DisclosureNoteGenerateRequest,
@@ -89,10 +108,16 @@ async def generate_notes(
             data.project_id, data.year, data.template_type,
         )
         await db.commit()
+        # P0-4（附注联动复盘）：生成后自动跑一次校验并落库，让 findings 在附注树上
+        # 可见（历史 note_validation_results 长期 0 行 = 校验能力空转）。fail-open。
+        validation = await _run_validation_best_effort(
+            db, data.project_id, data.year, data.template_type,
+        )
         return {
             "message": "附注生成成功",
             "note_count": len(results),
             "notes": results,
+            "validation": validation,
         }
     except HTTPException:
         await db.rollback()
@@ -123,7 +148,128 @@ async def get_notes_tree(
         if allowed_sections:
             tree = [n for n in tree if n.get("note_section") in allowed_sections]
 
+    # P0-4（附注联动复盘）：树节点携带最新一次校验的 findings 计数（additive），
+    # 使 error/warning 能直接打点在左侧章节树上，而不必点进右侧面板才看到。fail-open。
+    try:
+        from app.services.note_readiness_service import latest_findings_by_section
+
+        findings_map, _validated_at = await latest_findings_by_section(db, project_id, year)
+        if findings_map:
+            for node in tree:
+                f = findings_map.get(node.get("note_section") or "")
+                if f:
+                    node["findings"] = {
+                        "error": f.get("error", 0),
+                        "warning": f.get("warning", 0),
+                    }
+    except Exception as err:  # pragma: no cover — 附加信息失败不影响树
+        logger.warning("attach findings to notes tree skipped: %s", err)
+
     return tree
+
+
+@router.get("/{project_id}/{year}/readiness")
+async def get_notes_readiness(
+    project_id: UUID,
+    year: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """附注「披露同步 / 校验就绪度」看板（只读，附注联动复盘 P0-1）。
+
+    回答审计师最需要的三个问题：
+    - 哪些章节**应由底稿维护但从未同步过**（``needs_sync``，实测生产 0 条同步记录）
+    - 哪些章节**没有数据**（``has_data=false``，与 Word 导出同一 helper 判定）
+    - 哪些章节**有校验问题 / 上游已变更**（``findings`` / ``is_stale``）
+
+    ``wp_ids`` / ``wp_sheet`` 供前端直接跳转到对应底稿披露 sheet。
+    """
+    from app.services.note_readiness_service import build_readiness
+
+    data = await build_readiness(db, project_id, year)
+
+    # scope_cycles 过滤（与目录树一致：非 admin/partner 只看被分配循环的章节）
+    scope_cycles = await get_user_scope_cycles(current_user, project_id, db)
+    if scope_cycles is not None:
+        from app.services.mapping_service import get_sections_by_cycles
+
+        allowed_sections = await get_sections_by_cycles(project_id, scope_cycles)
+        if allowed_sections:
+            data["sections"] = [
+                s for s in data["sections"] if s.get("note_section") in allowed_sections
+            ]
+    return data
+
+
+@router.get("/{project_id}/{year}/wp-sync-status")
+async def get_wp_sync_status(
+    project_id: UUID,
+    year: int,
+    wp_code: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("readonly")),
+):
+    """某底稿对应附注章节的同步状态（只读，附注联动复盘 P0-2）。
+
+    供底稿披露 sheet 顶部统一状态条使用：告诉审计师"本页披露表是否已同步到附注、
+    上次同步于何时"。映射真源 = ``note_workpaper_sync_registry.json``。
+
+    Returns::
+
+        {"wp_code": "D1", "variants": [
+            {"variant": "listed", "note_section": "五、4", "exists": true,
+             "last_sync_at": "...", "last_sync_source": "workpaper", "has_data": true}
+        ]}
+    """
+    from app.services.note_content_utils import note_has_data
+    from app.services.note_readiness_service import _load_registry_entries
+
+    code = (wp_code or "").strip().upper()
+    entry = next(
+        (e for e in _load_registry_entries() if str(e.get("wp_code", "")).upper() == code),
+        None,
+    )
+    if entry is None:
+        return {"wp_code": code, "variants": []}
+
+    sections = {
+        v: entry.get(v)
+        for v in ("listed", "soe")
+        if isinstance(entry.get(v), str) and entry.get(v)
+    }
+    if not sections:
+        return {"wp_code": code, "variants": []}
+
+    notes = (
+        (
+            await db.execute(
+                sa.select(DisclosureNote).where(
+                    DisclosureNote.project_id == project_id,
+                    DisclosureNote.year == year,
+                    DisclosureNote.is_deleted == sa.false(),
+                    DisclosureNote.note_section.in_(list(sections.values())),
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    by_section = {n.note_section: n for n in notes}
+
+    variants = []
+    for variant, section in sections.items():
+        n = by_section.get(section)
+        variants.append(
+            {
+                "variant": variant,
+                "note_section": section,
+                "exists": n is not None,
+                "last_sync_at": n.last_sync_at.isoformat() if (n and n.last_sync_at) else None,
+                "last_sync_source": (n.last_sync_source if n else None),
+                "has_data": bool(note_has_data(n)) if n else False,
+            }
+        )
+    return {"wp_code": code, "variants": variants}
 
 
 @router.get("/{project_id}/{year}/validation-results")
@@ -289,7 +435,11 @@ async def get_note_detail(
     try:
         from app.services.note_header_projector import project_headers
 
-        with_headers = project_headers(detail.table_data)
+        with_headers = project_headers(
+            detail.table_data,
+            section_number=note_section,
+            source_template=getattr(note, "source_template", None),
+        )
         if with_headers is not None:
             detail.table_data = with_headers
     except Exception:  # pragma: no cover - 派生失败降级不阻断读取

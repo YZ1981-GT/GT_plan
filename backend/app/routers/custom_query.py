@@ -1242,8 +1242,117 @@ async def _query_tb_summary(db, pid, year, filters, limit):
     return {"rows": [], "columns": [], "total": 0}
 
 
+def _flatten_disclosure_note_rows(
+    note_section: str,
+    section_title: str,
+    source_template: str | None,
+    table_data: Any,
+    *,
+    max_rows_per_section: int = 100,
+) -> tuple[list[dict], list[str]]:
+    """把 ``disclosure_notes.table_data`` 展平为查询行（多表走 ``_tables``）。
+
+    表头缺失（legacy ``headers=[]``）时经 ``note_header_projector`` 读时派生
+    （模板优先 → 语义兜底），与附注模块/Word 导出同口径。
+    行支持两种形态：``{label, values:[...]}``（当前）与 ``[...]``（旧扁平）。
+    """
+    from app.services.note_header_projector import derive_headers_for_legacy_table
+
+    if not isinstance(table_data, dict):
+        return [], []
+
+    tables = table_data.get("_tables")
+    if isinstance(tables, list) and tables:
+        pairs = [(i, t) for i, t in enumerate(tables) if isinstance(t, dict)]
+    else:
+        pairs = [(0, table_data)]
+
+    out: list[dict] = []
+    columns: list[str] = []
+    for t_idx, tbl in pairs:
+        rows = tbl.get("rows")
+        if not isinstance(rows, list) or not rows:
+            continue
+        headers = tbl.get("headers")
+        if not (isinstance(headers, list) and headers):
+            headers = derive_headers_for_legacy_table(
+                tbl,
+                section_number=note_section,
+                source_template=source_template,
+                table_index=t_idx,
+            ) or []
+        headers = [str(h or "") for h in headers]
+        if not columns and headers:
+            columns = ["note_section", "section_title", "table_name"] + headers
+        table_name = str(tbl.get("name") or "")
+        for row in rows[:max_rows_per_section]:
+            if isinstance(row, dict):
+                cells = [row.get("label", "")] + list(row.get("values") or [])
+            elif isinstance(row, list):
+                cells = list(row)
+            else:
+                continue
+            obj: dict = {
+                "note_section": note_section,
+                "section_title": section_title,
+                "table_name": table_name,
+            }
+            for hi, h in enumerate(headers):
+                if h:
+                    obj[h] = cells[hi] if hi < len(cells) else ""
+            out.append(obj)
+    return out, columns
+
+
 async def _query_disclosure(db, pid, year, filters, limit):
-    section_id = filters.get("section_id", "")
+    """附注数据查询。
+
+    真源优先级修正：**单体附注 ``disclosure_notes`` 优先**（附注模块的真实数据），
+    无命中才回退合并附注 ``consol_note_data``（合并模块另一套存储）。
+    历史实现只查 consol_note_data，导致单体附注（生产主体数据）查不到。
+    """
+    section_id = str(filters.get("section_id", "") or "").strip()
+
+    # ── 第 1 真源：单体附注 disclosure_notes ─────────────────────────────
+    try:
+        if section_id:
+            note_res = await db.execute(
+                text(
+                    "SELECT note_section, section_title, source_template::text, table_data "
+                    "FROM disclosure_notes WHERE project_id = :pid AND year = :y "
+                    "AND is_deleted = false AND note_section = :sid"
+                ),
+                {"pid": pid, "y": year, "sid": section_id},
+            )
+        else:
+            note_res = await db.execute(
+                text(
+                    "SELECT note_section, section_title, source_template::text, table_data "
+                    "FROM disclosure_notes WHERE project_id = :pid AND year = :y "
+                    "AND is_deleted = false AND table_data IS NOT NULL "
+                    "ORDER BY sort_order NULLS LAST, note_section LIMIT :lim"
+                ),
+                {"pid": pid, "y": year, "lim": limit},
+            )
+        note_flat: list[dict] = []
+        note_cols: list[str] = []
+        for r in note_res.fetchall():
+            rows_part, cols_part = _flatten_disclosure_note_rows(
+                r[0] or "", r[1] or "", r[2], r[3],
+            )
+            if cols_part and not note_cols:
+                note_cols = cols_part
+            note_flat.extend(rows_part)
+        if note_flat:
+            return {
+                "rows": note_flat[:limit],
+                "columns": note_cols or ["note_section", "section_title", "table_name"],
+                "total": len(note_flat),
+            }
+    except Exception as err:  # fail-open：单体附注查询异常 → 回退合并附注
+        logger.warning("query disclosure_notes failed, fallback to consol: %s", err)
+
+    # ── 第 2 真源（回退）：合并附注 consol_note_data ─────────────────────
     if section_id:
         result = await db.execute(
             text("SELECT section_id, data FROM consol_note_data WHERE project_id = :pid AND year = :y AND section_id = :sid"),

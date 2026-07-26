@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.schemas._common import OptionalAmountDecimal
+from app.services.note_readiness_service import run_validation_best_effort
 from app.services.note_wp_mapping_service import NoteWpMappingService
 
 router = APIRouter(prefix="/api/disclosure-notes", tags=["note-wp-mapping"])
@@ -56,6 +57,8 @@ async def refresh_from_workpapers(
     # service 返回 refreshed=cells_updated（向后兼容旧键名），
     # 同时增加 cells_updated 明确语义供前端区分提示文案（Req 2.7, 2.8）
     result["cells_updated"] = result.get("refreshed", 0)
+    # P0-4（附注联动复盘）：刷新后自动补跑校验并落库（fail-open，不影响已提交刷新）
+    result["validation"] = await run_validation_best_effort(db, project_id, year)
     return result
 
 
@@ -77,6 +80,8 @@ async def refresh_section_from_workpaper(
     result = await svc.refresh_section_from_workpapers(project_id, year, note_section)
     await db.commit()
     result["cells_updated"] = result.get("refreshed", 0)
+    # P0-4：单章节刷新后同样自动补跑校验（fail-open）
+    result["validation"] = await run_validation_best_effort(db, project_id, year)
     return result
 
 

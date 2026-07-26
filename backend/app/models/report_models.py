@@ -363,6 +363,9 @@ class DisclosureNote(Base):
     is_stale: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
+    # V129（附注联动复盘 P0-3）：stale 来源标注，供前端提示与诊断区分
+    # report / report_fallback / workpaper / trial_balance；NULL=未标注（历史数据）
+    stale_source: Mapped[str | None] = mapped_column(String(32), nullable=True)
     # F50 / Sprint 8.16: 下游快照绑定（创建时绑定当前 active dataset）
     bound_dataset_id: Mapped[uuid.UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),

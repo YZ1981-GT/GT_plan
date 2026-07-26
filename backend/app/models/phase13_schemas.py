@@ -309,6 +309,9 @@ class DeliverableExportResponse(BaseModel):
     download_url: str
     platform_persist_failed: bool = False
     file_name: str | None = None
+    # 附注联动复盘 P1-3：出具前软闸门提示（不阻断导出，仅提醒）——
+    # 例如「N 个章节有对应底稿披露表但从未同步到附注」「M 个章节存在校验错误」。
+    warnings: list[str] = []
 
 
 class CompletenessResponse(BaseModel):

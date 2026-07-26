@@ -132,6 +132,12 @@
               <el-tooltip content="国企↔上市附注模板转换规则" placement="bottom" :show-after="400">
                 <el-button size="small" @click="showNoteMappingDialog = true">🔄 国企↔上市转换</el-button>
               </el-tooltip>
+              <!-- 附注联动复盘 P0-1：披露同步 / 校验就绪度看板 -->
+              <el-tooltip content="就绪度：哪些章节未从底稿同步 / 无数据 / 有校验问题" placement="bottom" :show-after="400">
+                <el-button size="small" type="primary" plain @click="showReadiness = true">
+                  📋 就绪度<span v-if="readinessAlertCount" class="gt-de-readiness-badge">{{ readinessAlertCount }}</span>
+                </el-button>
+              </el-tooltip>
               <el-button v-if="isEqcrRole" size="small" type="info">📋 只读副本</el-button>
             </div>
           </template>
@@ -242,6 +248,17 @@
                   </el-tooltip>
                 </span>
                 <span v-if="hasSectionValidationError(data.data?.note_section)" class="gt-de-tree-error-dot" title="校验失败">●</span>
+                <!-- P0-4：服务端最新一次校验的 findings 计数（生成/刷新/同步后自动跑） -->
+                <el-tooltip
+                  v-if="serverFindings(data.data)"
+                  :content="serverFindingsTip(data.data)"
+                  placement="right"
+                >
+                  <span
+                    class="gt-de-tree-findings"
+                    :class="{ 'is-error': (data.data?.findings?.error || 0) > 0 }"
+                  >{{ (data.data?.findings?.error || 0) || (data.data?.findings?.warning || 0) }}</span>
+                </el-tooltip>
                 <!-- Sprint 3 Task 3.6: 上游变更红点 -->
                 <el-tooltip
                   v-if="noteStale.isStale(data.data?.note_section)"
@@ -759,6 +776,14 @@
       :section-id="currentNote?.note_section || ''"
     />
 
+    <!-- 附注联动复盘 P0-1：披露同步 / 校验就绪度看板 -->
+    <NoteReadinessPanel
+      v-model:visible="showReadiness"
+      :project-id="projectId"
+      :year="year"
+      @select-section="onReadinessSelectSection"
+    />
+
     <!-- C.3.6: 集团基线对话框 -->
     <NoteGroupBaselineDialog
       v-model="showGroupBaseline"
@@ -1071,6 +1096,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { InfoFilled, Close, ArrowDown, ArrowRight } from '@element-plus/icons-vue'
 import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
 import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
+import NoteReadinessPanel from '@/components/disclosure/NoteReadinessPanel.vue'
 import StructureEditor from '@/components/formula/StructureEditor.vue'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import NoteRichTextEditor from '@/components/NoteRichTextEditor.vue'
@@ -1354,6 +1380,14 @@ function onScopeChange(scope: 'standalone' | 'consolidated' | 'both') {
 const validateLoading = ref(false)
 const detailLoading = ref(false)
 const showNoteFormulaManager = ref(false)
+// 附注联动复盘 P0-1：就绪度看板（未从底稿同步 / 无数据 / 校验问题）
+const showReadiness = ref(false)
+const readinessSummary = ref<{ never_synced: number; error_sections: number } | null>(null)
+const readinessAlertCount = computed(() => {
+  const s = readinessSummary.value
+  if (!s) return 0
+  return (s.never_synced || 0) + (s.error_sections || 0)
+})
 const showStructureEditor = ref(false)
 const showPrintPreview = ref(false)
 
@@ -2188,6 +2222,45 @@ function _findTreeNodeIdBySection(nodes: TreeNode[], section: string): string | 
  * 用于程序化导航（四栏跨页 / 披露表反向跳转）——普通点击由 el-tree 内部维护 current，
  * 但 fetchDetail 走程序化路径不会设置 el-tree 的 currentKey/展开/滚动。
  */
+/**
+ * 附注联动复盘 P0-1：拉就绪度摘要（工具栏徽标 = 未同步 + 校验错误章节数）。
+ * 只读、fail-open：失败仅不显示徽标。
+ */
+async function loadReadinessSummary() {
+  if (!projectId.value || !year.value) return
+  try {
+    const { getDisclosureReadiness } = await import('@/services/commonApi')
+    const data = await getDisclosureReadiness(projectId.value, year.value)
+    readinessSummary.value = {
+      never_synced: data?.summary?.never_synced || 0,
+      error_sections: data?.summary?.error_sections || 0,
+    }
+  } catch {
+    readinessSummary.value = null
+  }
+}
+
+/** P0-4：树节点是否有服务端 findings（来自 tree 端点 additive 字段） */
+function serverFindings(node: any): boolean {
+  const f = node?.findings
+  return !!f && ((f.error || 0) > 0 || (f.warning || 0) > 0)
+}
+
+function serverFindingsTip(node: any): string {
+  const f = node?.findings || {}
+  const parts: string[] = []
+  if (f.error) parts.push(`校验错误 ${f.error} 项`)
+  if (f.warning) parts.push(`校验提醒 ${f.warning} 项`)
+  return parts.length ? `${parts.join('，')}（点工具栏「✅ 校验」查看明细）` : ''
+}
+
+/** 就绪度看板「查看章节」→ 定位并加载该章节 */
+async function onReadinessSelectSection(section: string) {
+  const resolved = resolveSectionInList(section)
+  await fetchDetail(resolved)
+  await locateTreeNode(resolved)
+}
+
 async function locateTreeNode(section: string) {
   await nextTick()
   const tree: any = noteTreeRef.value
@@ -2496,6 +2569,8 @@ onMounted(async () => {
       window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash)
     } catch { /* 清理 URL 失败不影响已选中章节 */ }
   }
+  // 附注联动复盘 P0-1：拉一次就绪度摘要给工具栏徽标（fail-open，不阻断页面）
+  void loadReadinessSummary()
   // R8-S2-14：关闭浏览器/刷新前警告
   window.addEventListener('beforeunload', onBeforeUnload)
   // Sprint 3 Task 3.5/3.6: 全局点击关闭右键菜单

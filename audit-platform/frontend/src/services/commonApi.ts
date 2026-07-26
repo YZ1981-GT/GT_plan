@@ -382,6 +382,56 @@ export async function refreshDisclosureSection(projectId: string, year: number, 
   return data as RefreshFromWorkpapersResult
 }
 
+// ── 附注就绪度看板（附注联动复盘 P0-1，只读）──
+
+export interface NoteReadinessSection {
+  note_section: string
+  section_title: string
+  account_name: string
+  has_data: boolean
+  is_stale: boolean
+  stale_source: string | null
+  last_sync_at: string | null
+  last_sync_source: string | null
+  last_sync_wp_id: string | null
+  /** 该章节应由哪些底稿维护（生成自前端 *NoteSectionMap.ts 的注册表） */
+  wp_codes: string[]
+  /** wp_code → working_paper.id（仅已生成底稿，用于跳转） */
+  wp_ids: Record<string, string>
+  /** 底稿披露 sheet 真实 tab 名（跳转带 ?sheet=） */
+  wp_sheet: string | null
+  /** 有底稿映射但从未同步过 */
+  needs_sync: boolean
+  findings: { error: number; warning: number }
+}
+
+export interface NoteReadinessSummary {
+  total: number
+  with_data: number
+  empty: number
+  syncable: number
+  never_synced: number
+  stale: number
+  stale_report: number
+  error_sections: number
+  warning_sections: number
+  validated_at: string | null
+  validation_ran: boolean
+}
+
+export interface NoteReadinessResult {
+  summary: NoteReadinessSummary
+  sections: NoteReadinessSection[]
+}
+
+export async function getDisclosureReadiness(
+  projectId: string,
+  year: number,
+): Promise<NoteReadinessResult> {
+  const { data } = await http.get(P_dn.readiness(projectId, year))
+  return (data?.data ?? data) as NoteReadinessResult
+}
+
 /**
  * 获取附注章节的 auto_pull 联动取数结果。
  * 原生 http 调用，手动解 {code,message,data} 信封取 body.data（铁律）。

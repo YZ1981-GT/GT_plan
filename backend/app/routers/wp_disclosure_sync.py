@@ -124,6 +124,25 @@ class SyncBatchFromWorkpaperResponse(BaseModel):
 # ─── Endpoint ────────────────────────────────────────────────────────────────
 
 
+async def _autorun_validation(
+    db: AsyncSession, project_id: UUID, year: int | None
+) -> None:
+    """底稿同步后自动补跑附注校验（P0-4，fail-open，不改响应体）。
+
+    year 缺省时由 ``run_validation_best_effort`` 的调用方负责——此处按
+    ``projects.audit_year`` 权威解析（与同步端点同口径），解析失败则跳过。
+    """
+    try:
+        from app.services.note_readiness_service import run_validation_best_effort
+        from app.services.wp_disclosure_sync_service import _resolve_target_year
+
+        eff_year = await _resolve_target_year(db, project_id, year)
+        if eff_year:
+            await run_validation_best_effort(db, project_id, eff_year)
+    except Exception as err:  # pragma: no cover — 纯附加动作
+        logger.warning("autorun validation after sync skipped: %s", err)
+
+
 @router.post(
     "/{project_id}/disclosure-notes/sync-from-workpaper",
     response_model=SyncFromWorkpaperResponse,
@@ -168,6 +187,10 @@ async def sync_disclosure_from_workpaper(
             detail=f"附注同步失败: {exc}",
         ) from exc
 
+    # P0-4（附注联动复盘）：底稿同步成功（service 内已 commit）后自动补跑一次附注校验
+    # 并落库，使 findings 在附注树/看板上可见。fail-open，不影响已提交的同步结果。
+    await _autorun_validation(db, project_id, body.year)
+
     return SyncFromWorkpaperResponse(**result)
 
 
@@ -204,6 +227,8 @@ async def sync_disclosure_batch_from_workpaper(
             status_code=500,
             detail=f"附注批量同步失败: {exc}",
         ) from exc
+
+    await _autorun_validation(db, project_id, body.year)
 
     return SyncBatchFromWorkpaperResponse(**result)
 

@@ -501,6 +501,17 @@ async function onNotesSelectionConfirm({ selectedSections }: { selectedSections:
     } else {
       ElMessage.success('附注已生成并保存到交付中心')
     }
+    // 附注联动复盘 P1-3：出具前软闸门提示（后端返回，不阻断导出）
+    const warnings = (res as any)?.warnings as string[] | undefined
+    if (warnings?.length) {
+      const esc = (s: string) =>
+        s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      ElMessageBox.alert(
+        warnings.map(w => `• ${esc(w)}`).join('<br/>'),
+        '附注出具提醒（不影响本次导出）',
+        { confirmButtonText: '我知道了', type: 'warning', dangerouslyUseHTMLString: true },
+      ).catch(() => {})
+    }
     downloadFile(deliverableDownloadUrl(projectId.value, res.task_id, res.version_no), { fileName: `disclosure_notes_${year.value}.docx` })
     await loadList()
     notesDialogVisible.value = false
