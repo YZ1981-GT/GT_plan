@@ -32,8 +32,10 @@ vi.mock('@/services/auditPlatformApi', () => ({
 }))
 
 const mockRefresh = vi.fn()
+const mockRefreshSection = vi.fn()
 vi.mock('@/services/commonApi', () => ({
   refreshDisclosureFromWorkpapers: (...args: any[]) => mockRefresh(...args),
+  refreshDisclosureSection: (...args: any[]) => mockRefreshSection(...args),
   noteAiContinueWrite: vi.fn().mockResolvedValue({}),
   noteAiRewrite: vi.fn().mockResolvedValue({}),
   noteAiGeneratePolicy: vi.fn().mockResolvedValue({}),
@@ -324,17 +326,18 @@ describe('useNotePersist', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('useNoteRefresh', () => {
-  beforeEach(() => { mockRefresh.mockReset() })
+  beforeEach(() => { mockRefresh.mockReset(); mockRefreshSection.mockReset() })
 
-  it('onRefreshFromWP sets refreshLoading and calls API', async () => {
-    mockRefresh.mockResolvedValue({ refreshed: 2, total_notes: 5, sections_recomputed: [], text_only_sections: [], errors: [], cells_updated: 2 })
+  // 「刷新」是页面级（仅当前章节）：前后端范围一致，走 refreshDisclosureSection
+  it('onRefreshFromWP sets refreshLoading and calls section-level API', async () => {
+    mockRefreshSection.mockResolvedValue({ refreshed: 1, total_notes: 1, sections_recomputed: ['五、1'], text_only_sections: [], errors: [], cells_updated: 2 })
     const fetchDetail = vi.fn()
     const { onRefreshFromWP, refreshLoading } = useNoteRefresh({
       projectId: computed(() => 'proj-001'), year: computed(() => 2025),
       currentNote: ref({ note_section: '五、1' }), fetchDetail, fetchTree: vi.fn(), staleRecalc: vi.fn(),
     })
     await onRefreshFromWP()
-    expect(mockRefresh).toHaveBeenCalledWith('proj-001', 2025)
+    expect(mockRefreshSection).toHaveBeenCalledWith('proj-001', 2025, '五、1')
     expect(fetchDetail).toHaveBeenCalledWith('五、1')
     expect(refreshLoading.value).toBe(false)
   })

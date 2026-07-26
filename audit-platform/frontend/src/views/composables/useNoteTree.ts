@@ -97,14 +97,58 @@ const LISTED_LABELS: Record<string, string> = {
   '十六': '公司财务报表主要项目注释', '十七': '补充资料',
 }
 
-// 五章内按资产/负债/权益/损益/其他分组
-const SECTION_GROUPS: Record<string, { label: string; range: [number, number] }> = {
-  'asset': { label: '流动资产 + 非流动资产', range: [1, 15] },
-  'liability': { label: '流动负债 + 非流动负债', range: [16, 23] },
-  'equity': { label: '所有者权益', range: [24, 28] },
-  'income': { label: '损益类', range: [29, 35] },
-  'other': { label: '其他科目注释', range: [36, 79] },
-  'disclosure': { label: '补充披露事项', range: [80, 199] },
+// ─── 主表注释章内分组（资产/负债/权益/损益/其他） ────────────────────────────
+//
+// 🔴 区间必须按模板变体分别定义：上市版（五、N）与国企版（八、N）的章节顺序不同，
+// 用同一套区间会把资产类章节误归到「损益类」等父节点下。
+// 下列边界取自 `backend/data/note_template_{listed,soe}.json` 的 section_number/
+// section_title 实证（不臆造）：
+//   listed：1 货币资金…32 所有权或使用权受到限制的资产 | 33 短期借款…52 其他非流动负债
+//           | 53 股本…61 未分配利润 | 62 营业收入和营业成本…70 净敞口套期收益
+//           | 71 现金流量表补充资料…74 租赁
+//   soe   ：1 货币资金…32 其他非流动资产 | 33 短期借款…57 其他非流动负债
+//           | 58 实收资本…63 未分配利润 | 64 营业收入、营业成本…78 所得税费用
+//           | 79 归属于母公司所有者的其他综合收益…93 所有权和使用权受到限制的资产
+// 末组为 catch-all（上界极大），保证项目自建/超模板编号的章节不会在分组时丢失。
+interface SectionGroupDef {
+  key: string
+  label: string
+  range: [number, number]
+}
+
+const LISTED_SECTION_GROUPS: SectionGroupDef[] = [
+  { key: 'asset', label: '流动资产 + 非流动资产', range: [1, 32] },
+  { key: 'liability', label: '流动负债 + 非流动负债', range: [33, 52] },
+  { key: 'equity', label: '所有者权益', range: [53, 61] },
+  { key: 'income', label: '损益类', range: [62, 70] },
+  { key: 'other', label: '其他项目注释', range: [71, 74] },
+  { key: 'disclosure', label: '补充披露事项', range: [75, 9999] },
+]
+
+const SOE_SECTION_GROUPS: SectionGroupDef[] = [
+  { key: 'asset', label: '流动资产 + 非流动资产', range: [1, 32] },
+  { key: 'liability', label: '流动负债 + 非流动负债', range: [33, 57] },
+  { key: 'equity', label: '所有者权益', range: [58, 63] },
+  { key: 'income', label: '损益类', range: [64, 78] },
+  { key: 'other', label: '其他项目注释', range: [79, 93] },
+  { key: 'disclosure', label: '补充披露事项', range: [94, 9999] },
+]
+
+/** 按模板变体取主表注释章的分组定义（默认国企版，与 SOE_LABELS 缺省一致）。 */
+function sectionGroupsFor(templateType: string): SectionGroupDef[] {
+  return templateType === 'listed' ? LISTED_SECTION_GROUPS : SOE_SECTION_GROUPS
+}
+
+/**
+ * 解析 `五、29` / `八、45` 的章节序号；无法解析返回 null。
+ * 形如 `五、12·1` 取前段数字（保持既有行为）。
+ */
+function parseSectionOrdinal(noteSection: string, prefix: string): number | null {
+  const raw = (noteSection || '').replace(prefix, '')
+  const m = raw.match(/^\d+/)
+  if (!m) return null
+  const num = parseInt(m[0], 10)
+  return Number.isFinite(num) ? num : null
 }
 
 // 会计政策分组关键词
@@ -216,15 +260,27 @@ export function useNoteTree(options: UseNoteTreeOptions): UseNoteTreeReturn {
 
       // 报表注释（国企八/上市五）：按资产/负债/权益/损益分组
       } else if ((ch.prefix === '五' || ch.prefix === '八') && items.length > 10) {
+        // 按变体区间归组；每个节点恰好落入一个父节点，未匹配区间（含编号不可解析）
+        // 一律归入最后一组 catch-all，避免节点在分组时静默丢失。
+        const groupDefs = sectionGroupsFor(templateType.value)
+        const buckets = new Map<string, DisclosureNoteTreeItem[]>()
+        const fallbackKey = groupDefs[groupDefs.length - 1].key
+        for (const n of items) {
+          const num = parseSectionOrdinal(n.note_section, prefix)
+          const hit = num === null
+            ? undefined
+            : groupDefs.find(g => num >= g.range[0] && num <= g.range[1])
+          const key = hit?.key ?? fallbackKey
+          const list = buckets.get(key)
+          if (list) list.push(n)
+          else buckets.set(key, [n])
+        }
         const subChildren: TreeNode[] = []
-        for (const [gKey, gInfo] of Object.entries(SECTION_GROUPS)) {
-          const matched = items.filter(n => {
-            const num = parseInt(n.note_section.replace(prefix, ''))
-            return num >= gInfo.range[0] && num <= gInfo.range[1]
-          })
-          if (matched.length) {
+        for (const gInfo of groupDefs) {
+          const matched = buckets.get(gInfo.key)
+          if (matched?.length) {
             subChildren.push({
-              id: `group_${ch.prefix}_${gKey}`, label: gInfo.label, isGroup: true,
+              id: `group_${ch.prefix}_${gInfo.key}`, label: gInfo.label, isGroup: true,
               children: matched.map(makeNoteLeaf),
             })
           }

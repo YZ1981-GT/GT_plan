@@ -39,8 +39,10 @@ vi.mock('@/services/auditPlatformApi', () => ({
 }))
 
 const mockRefresh = vi.fn()
+const mockRefreshSection = vi.fn()
 vi.mock('@/services/commonApi', () => ({
   refreshDisclosureFromWorkpapers: (...args: any[]) => mockRefresh(...args),
+  refreshDisclosureSection: (...args: any[]) => mockRefreshSection(...args),
   noteAiContinueWrite: vi.fn().mockResolvedValue({}),
   noteAiRewrite: vi.fn().mockResolvedValue({}),
   noteAiGeneratePolicy: vi.fn().mockResolvedValue({}),
@@ -204,14 +206,18 @@ describe('DisclosureEditor Characterization — Save', () => {
 describe('DisclosureEditor Characterization — Refresh from WP', () => {
   beforeEach(() => {
     mockRefresh.mockReset()
-    mockRefresh.mockResolvedValue({
+    mockRefreshSection.mockReset()
+    const result = {
       refreshed: 3, total_notes: 10, sections_recomputed: ['五、1'],
       text_only_sections: [], errors: [], cells_updated: 3,
-    })
+    }
+    mockRefresh.mockResolvedValue(result)
+    mockRefreshSection.mockResolvedValue(result)
     mockGetDetail.mockResolvedValue({ id: 'n1', note_section: '五、1', table_data: {}, text_content: '' })
   })
 
-  it('onRefreshFromWP calls refreshDisclosureFromWorkpapers', async () => {
+  // 页面级「刷新」只重算当前章节（前后端范围一致）
+  it('onRefreshFromWP calls refreshDisclosureSection with current section', async () => {
     const { onRefreshFromWP } = useNoteRefresh({
       projectId: computed(() => 'proj-001'),
       year: computed(() => 2025),
@@ -221,7 +227,7 @@ describe('DisclosureEditor Characterization — Refresh from WP', () => {
       staleRecalc: vi.fn(),
     })
     await onRefreshFromWP()
-    expect(mockRefresh).toHaveBeenCalledWith('proj-001', 2025)
+    expect(mockRefreshSection).toHaveBeenCalledWith('proj-001', 2025, '五、1')
   })
 
   it('showRefreshResultMessage distinguishes cells_updated vs text_only', () => {
