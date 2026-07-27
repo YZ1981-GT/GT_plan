@@ -577,18 +577,6 @@ function persistAll(): void {
   props.allResponses.set(fcKey, items[items.length - 1])
 
   props.saveImmediate(items).catch(() => {})
-
-  // P2-14: 发布附注数据变化事件，供 DisclosureEditor 订阅刷新
-  eventBus.emit('disclosure:note-text-updated', {
-    wpCode: 'E1',
-    variant: variant.value,
-    projectId: props.projectId,
-    sectionIds: items.map((it: any) => it.item_id),
-    timestamp: Date.now(),
-  })
-
-  // 自动同步到附注（防抖/非阻塞/失败静默）
-  autoSync.scheduleAutoSync(syncToDisclosureNotes)
 }
 
 // ─── Handlers ────────────────────────────────────────────────────────────────
@@ -717,8 +705,6 @@ async function syncToDisclosureNotes(): Promise<void> {
   if (isSyncing.value || !props.projectId || props.isReadonly) return
   isSyncing.value = true
   try {
-    // 先落盘披露表数据，确保跨sheet审定数/期初/说明为最新
-    persistAll()
     const snapshot: E1DisclosureSnapshot = {
       mainRows: disclosureRows.value.map(r => ({
         key: r.key,
