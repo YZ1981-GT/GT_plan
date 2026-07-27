@@ -1,18 +1,52 @@
 <template>
   <div class="confirmation-full-grid">
+    <!-- 列显隐设置（宽表，Requirement 6.1） -->
+    <div v-if="!readonly" class="confirmation-full-grid__toolbar">
+      <el-popover placement="bottom-start" trigger="click" :width="300">
+        <template #reference>
+          <el-button size="small" plain>⚙ 列设置（{{ visibleColumns.length }}/{{ allColumns.length }}）</el-button>
+        </template>
+        <div class="confirmation-full-grid__prefs">
+          <div class="confirmation-full-grid__prefs-presets">
+            <el-button size="small" @click="applyPreset('all')">全部</el-button>
+            <el-button size="small" @click="applyPreset('core')">核心</el-button>
+            <el-button size="small" @click="applyPreset('nonEmpty')">隐藏空列</el-button>
+          </div>
+          <el-scrollbar max-height="320px">
+            <el-checkbox-group v-model="visibleKeys">
+              <div v-for="g in columnGroups" :key="g.group" class="confirmation-full-grid__prefs-group">
+                <div class="confirmation-full-grid__prefs-group-title">{{ g.label }}</div>
+                <el-checkbox
+                  v-for="col in g.cols"
+                  :key="col.key"
+                  :value="col.key"
+                  :disabled="col.fixed === 'left'"
+                >{{ col.label }}</el-checkbox>
+              </div>
+            </el-checkbox-group>
+          </el-scrollbar>
+        </div>
+      </el-popover>
+    </div>
+
     <div class="confirmation-full-grid__scroll">
       <table class="confirmation-full-grid__table">
         <colgroup>
-          <col v-for="col in columns" :key="col.field" :style="{ width: col.width + 'px' }" />
+          <col v-for="col in visibleColumns" :key="col.key" :style="colStyle(col)" />
         </colgroup>
         <thead>
           <tr class="confirmation-full-grid__group-header">
-            <th v-for="group in columnGroups" :key="group.label" :colspan="group.cols.length" :class="'group--' + group.color">
+            <th
+              v-for="(group, gi) in visibleColumnGroups"
+              :key="group.group"
+              :colspan="group.cols.length"
+              :class="'group--' + GROUP_COLOR[gi % GROUP_COLOR.length]"
+            >
               {{ group.label }}
             </th>
           </tr>
           <tr class="confirmation-full-grid__col-header">
-            <th v-for="col in columns" :key="col.field" :class="{ 'col--frozen': col.frozen }">
+            <th v-for="col in visibleColumns" :key="col.key" :class="{ 'col--frozen': col.fixed === 'left' }">
               {{ col.label }}
             </th>
           </tr>
@@ -20,49 +54,64 @@
         <tbody>
           <tr v-for="(row, idx) in rows" :key="row._row_id" :class="{ 'row--zebra': idx % 2 === 1 }">
             <td
-              v-for="col in columns"
-              :key="col.field"
+              v-for="col in visibleColumns"
+              :key="col.key"
               :class="[
-                { 'col--frozen': col.frozen },
-                { 'cell--empty': isEmpty(row, col.field) },
+                { 'col--frozen': col.fixed === 'left' },
+                { 'cell--empty': isEmpty(row, col.key) },
+                { 'cell--right': col.align === 'right' },
               ]"
             >
-              <!-- Readonly span -->
-              <span v-if="readonly || col.readonly">
+              <!-- Readonly / derived span -->
+              <span v-if="readonly || col.editable === false || col.derived">
                 {{ formatCell(row, col) }}
               </span>
-              <!-- Enum select -->
+              <!-- Select (match/一致性判定/相符情况) -->
               <el-select
-                v-else-if="col.type === 'enum'"
-                :model-value="(row as any)[col.field]"
+                v-else-if="col.kind === 'select'"
+                :model-value="(row as any)[col.key]"
                 size="small"
-                @update:model-value="(v: any) => $emit('update', row._row_id!, col.field, v)"
+                clearable
+                @update:model-value="(v: any) => $emit('update', row._row_id!, col.key, v)"
               >
-                <el-option v-for="opt in col.options" :key="opt" :label="opt" :value="opt" />
+                <el-option v-for="opt in optionsFor(col.key)" :key="opt.value" :label="opt.label" :value="opt.value" />
               </el-select>
-              <!-- Number input -->
+              <!-- Amount / number -->
               <el-input-number
-                v-else-if="col.type === 'number'"
-                :model-value="(row as any)[col.field]"
+                v-else-if="col.kind === 'amount' || col.kind === 'number'"
+                :model-value="(row as any)[col.key]"
                 size="small"
                 :controls="false"
-                :precision="2"
-                @update:model-value="(v: any) => $emit('update', row._row_id!, col.field, v)"
+                :precision="col.kind === 'amount' ? 2 : undefined"
+                @update:model-value="(v: any) => $emit('update', row._row_id!, col.key, v)"
               />
               <!-- Boolean -->
               <el-checkbox
-                v-else-if="col.type === 'boolean'"
-                :model-value="(row as any)[col.field]"
-                @update:model-value="(v: any) => $emit('update', row._row_id!, col.field, v)"
+                v-else-if="col.kind === 'bool'"
+                :model-value="(row as any)[col.key]"
+                @update:model-value="(v: any) => $emit('update', row._row_id!, col.key, v)"
+              />
+              <!-- Date -->
+              <el-date-picker
+                v-else-if="col.kind === 'date'"
+                :model-value="(row as any)[col.key]"
+                size="small"
+                type="date"
+                value-format="YYYY-MM-DD"
+                style="width: 100%"
+                @update:model-value="(v: any) => $emit('update', row._row_id!, col.key, v)"
               />
               <!-- Text input -->
               <el-input
                 v-else
-                :model-value="(row as any)[col.field]"
+                :model-value="(row as any)[col.key]"
                 size="small"
-                @update:model-value="(v: any) => $emit('update', row._row_id!, col.field, v)"
+                @update:model-value="(v: any) => $emit('update', row._row_id!, col.key, v)"
               />
             </td>
+          </tr>
+          <tr v-if="!rows.length">
+            <td :colspan="visibleColumns.length" class="confirmation-full-grid__empty">暂无数据</td>
           </tr>
         </tbody>
       </table>
@@ -71,78 +120,134 @@
 </template>
 
 <script setup lang="ts">
+import { ref, computed, watch } from 'vue'
 import type { ConfirmationRow } from './confirmationTypes'
+import {
+  resolveConfirmationColumns,
+  COLUMN_GROUP_LABELS,
+  CORE_COLUMN_KEYS,
+  type ColumnDef,
+  type ColumnGroup,
+  type ConfirmCycle,
+} from './confirmationColumnSpec'
 
-defineProps<{ rows: ConfirmationRow[]; readonly: boolean }>()
+const props = withDefaults(
+  defineProps<{ rows: ConfirmationRow[]; readonly: boolean; cycle?: ConfirmCycle }>(),
+  { cycle: 'D0' },
+)
 defineEmits<{ (e: 'update', rowId: string, field: string, value: any): void }>()
 
-interface ColumnDef {
-  field: string
-  label: string
-  width: number
-  type: 'text' | 'number' | 'enum' | 'boolean' | 'date'
-  frozen?: boolean
-  readonly?: boolean
-  options?: string[]
+const GROUP_COLOR = ['blue', 'green', 'orange', 'purple', 'teal']
+
+// 该枢纽全部列（BASE ∪ variant，配置驱动，Requirement 2.1）
+const allColumns = computed<ColumnDef[]>(() => resolveConfirmationColumns(props.cycle))
+
+// ─── 列显隐（localStorage 持久化，key 按枢纽，Requirement 6.1） ───────────────
+
+const prefsKey = computed(() => `confirmation-${props.cycle}-column-prefs`)
+const visibleKeys = ref<string[]>([])
+
+function loadPrefs() {
+  try {
+    const raw = localStorage.getItem(prefsKey.value)
+    if (raw) {
+      const saved = JSON.parse(raw) as string[]
+      const valid = new Set(allColumns.value.map((c) => c.key))
+      visibleKeys.value = saved.filter((k) => valid.has(k))
+      // 固定列强制可见
+      for (const c of allColumns.value) {
+        if (c.fixed === 'left' && !visibleKeys.value.includes(c.key)) visibleKeys.value.push(c.key)
+      }
+      if (visibleKeys.value.length) return
+    }
+  } catch { /* ignore */ }
+  visibleKeys.value = allColumns.value.map((c) => c.key) // 默认全部
 }
 
-interface ColumnGroup {
-  label: string
-  color: string
-  cols: ColumnDef[]
+watch(prefsKey, loadPrefs, { immediate: true })
+watch(visibleKeys, (v) => {
+  try { localStorage.setItem(prefsKey.value, JSON.stringify(v)) } catch { /* ignore */ }
+}, { deep: true })
+
+const visibleColumns = computed<ColumnDef[]>(() => {
+  const set = new Set(visibleKeys.value)
+  return allColumns.value.filter((c) => set.has(c.key))
+})
+
+function applyPreset(preset: 'all' | 'core' | 'nonEmpty') {
+  if (preset === 'all') {
+    visibleKeys.value = allColumns.value.map((c) => c.key)
+  } else if (preset === 'core') {
+    const core = new Set(CORE_COLUMN_KEYS)
+    visibleKeys.value = allColumns.value.filter((c) => core.has(c.key) || c.fixed === 'left').map((c) => c.key)
+  } else {
+    // 隐藏空列：保留固定列 + 有任一行非空的列
+    visibleKeys.value = allColumns.value
+      .filter((c) => c.fixed === 'left' || props.rows.some((r) => !isEmpty(r, c.key)))
+      .map((c) => c.key)
+  }
 }
 
-const columnGroups: ColumnGroup[] = [
-  { label: '基本信息', color: 'blue', cols: [
-    { field: 'seq', label: '序号', width: 50, type: 'number', readonly: true },
-    { field: 'confirm_index', label: '索引号', width: 90, type: 'text', frozen: true },
-    { field: 'entity_name', label: '被询证单位', width: 160, type: 'text' },
-    { field: 'entity_address', label: '地址', width: 160, type: 'text' },
-    { field: 'contact_person', label: '联系人', width: 80, type: 'text' },
-    { field: 'contact_phone', label: '联系电话', width: 110, type: 'text' },
-  ]},
-  { label: '函证信息', color: 'green', cols: [
-    { field: 'account_type', label: '科目', width: 100, type: 'enum', options: ['应收账款', '合同负债', '其他应收款', '预付账款', '应付账款', '其他应付款', '短期借款', '长期借款', '银行存款', '定期存款', '理财产品', '其他货币资金', '其他'] },
-    { field: 'amount', label: '函证金额', width: 110, type: 'number' },
-    { field: 'currency', label: '币种', width: 60, type: 'text' },
-    { field: 'confirmation_method', label: '函证方式', width: 80, type: 'enum', options: ['积极式', '消极式'] },
-    { field: 'send_date', label: '发函日期', width: 100, type: 'date' },
-  ]},
-  { label: '回函信息', color: 'orange', cols: [
-    { field: 'is_replied', label: '已回函', width: 60, type: 'boolean' },
-    { field: 'reply_date', label: '回函日期', width: 100, type: 'date' },
-    { field: 'reply_method', label: '回函方式', width: 90, type: 'enum', options: ['原件寄回', '传真', '电子邮件', '当面确认'] },
-    { field: 'reply_amount', label: '回函金额', width: 110, type: 'number' },
-    { field: 'match_status', label: '相符情况', width: 80, type: 'enum', options: ['相符', '不符', '未回函'] },
-  ]},
-  { label: '确认金额', color: 'purple', cols: [
-    { field: 'confirmed_amount', label: '可确认金额', width: 110, type: 'number', readonly: true },
-    { field: 'difference', label: '差异', width: 100, type: 'number', readonly: true },
-    { field: 'alt_confirmed', label: '替代确认', width: 100, type: 'number' },
-  ]},
-  { label: '关联信息', color: 'teal', cols: [
-    { field: 'diff_ref_index', label: '差异索引', width: 90, type: 'text' },
-    { field: 'alt_ref_index', label: '替代索引', width: 90, type: 'text' },
-    { field: 'electronic_reply', label: '电子回函', width: 70, type: 'boolean' },
-    { field: 'reliability_verified', label: '已验证', width: 60, type: 'boolean' },
-    { field: 'fraud_risk_flag', label: '舞弊标志', width: 70, type: 'boolean' },
-    { field: 'remark', label: '备注', width: 160, type: 'text' },
-    { field: '_source', label: '来源', width: 60, type: 'text', readonly: true },
-  ]},
+// ─── 分组表头（按 ColumnGroup 顺序） ─────────────────────────────────────────
+
+interface GridGroup { group: ColumnGroup; label: string; cols: ColumnDef[] }
+
+function buildGroups(cols: ColumnDef[]): GridGroup[] {
+  const order: ColumnGroup[] = ['send_info', 'reply_info', 'reply_amount', 'alternative', 'send_memo']
+  const groups: GridGroup[] = []
+  for (const g of order) {
+    const gc = cols.filter((c) => c.group === g)
+    if (gc.length) groups.push({ group: g, label: COLUMN_GROUP_LABELS[g], cols: gc })
+  }
+  return groups
+}
+
+const columnGroups = computed<GridGroup[]>(() => buildGroups(allColumns.value))
+const visibleColumnGroups = computed<GridGroup[]>(() => buildGroups(visibleColumns.value))
+
+// ─── 单元格渲染 ──────────────────────────────────────────────────────────────
+
+const MATCH_OPTIONS = [
+  { label: '相符', value: '相符' },
+  { label: '不符', value: '不符' },
+  { label: '未回函', value: '未回函' },
+]
+const CONSISTENCY_OPTIONS = [
+  { label: '一致', value: 'consistent' },
+  { label: '不一致', value: 'inconsistent' },
+  { label: '待核对', value: 'pending' },
 ]
 
-const columns: ColumnDef[] = columnGroups.flatMap(g => g.cols)
+function optionsFor(key: string): Array<{ label: string; value: string }> {
+  if (key === 'match_status') return MATCH_OPTIONS
+  // send_addr_match / send_reply_addr_match / term_match → 一致性判定
+  return CONSISTENCY_OPTIONS
+}
+
+function colStyle(col: ColumnDef): Record<string, string> {
+  const w = col.width ?? col.minWidth ?? 120
+  return { width: w + 'px' }
+}
 
 function isEmpty(row: ConfirmationRow, field: string): boolean {
   const val = (row as any)[field]
   return val == null || val === '' || val === false
 }
 
+const CONSISTENCY_LABEL: Record<string, string> = {
+  consistent: '一致',
+  inconsistent: '不一致',
+  pending: '待核对',
+}
+
 function formatCell(row: ConfirmationRow, col: ColumnDef): string {
-  const val = (row as any)[col.field]
+  const val = (row as any)[col.key]
   if (val == null || val === '') return ''
-  if (col.type === 'number') return typeof val === 'number' ? val.toLocaleString() : String(val)
-  if (col.type === 'boolean') return val ? '是' : '否'
+  if (col.kind === 'amount' || col.kind === 'number') {
+    return typeof val === 'number' ? val.toLocaleString() : String(val)
+  }
+  if (col.kind === 'bool') return val ? '是' : '否'
+  if (col.kind === 'select' && col.key !== 'match_status') return CONSISTENCY_LABEL[val] ?? String(val)
   return String(val)
 }
 </script>
@@ -150,6 +255,22 @@ function formatCell(row: ConfirmationRow, col: ColumnDef): string {
 <style scoped>
 .confirmation-full-grid {
   overflow: hidden;
+}
+.confirmation-full-grid__toolbar {
+  margin-bottom: 8px;
+}
+.confirmation-full-grid__prefs-presets {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.confirmation-full-grid__prefs-group {
+  margin-bottom: 8px;
+}
+.confirmation-full-grid__prefs-group-title {
+  font-size: 12px;
+  color: #909399;
+  margin-bottom: 2px;
 }
 
 .confirmation-full-grid__scroll {
@@ -169,6 +290,7 @@ function formatCell(row: ConfirmationRow, col: ColumnDef): string {
   border: 1px solid var(--el-border-color-lighter);
   padding: 4px 6px;
 }
+.confirmation-full-grid__table td.cell--right { text-align: right; }
 
 .confirmation-full-grid__group-header th {
   text-align: center;
@@ -201,6 +323,11 @@ function formatCell(row: ConfirmationRow, col: ColumnDef): string {
 
 .cell--empty {
   opacity: 0.4;
+}
+.confirmation-full-grid__empty {
+  text-align: center;
+  color: #909399;
+  padding: 16px;
 }
 
 .confirmation-full-grid__table .el-select,

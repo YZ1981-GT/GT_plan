@@ -52,6 +52,22 @@ export interface ReliabilityRow {
   /** 可靠性说明/备注 */
   reliability_note?: string
 
+  // ─── additive 补列（confirmation-shared-model-extension，Requirement 4.1） ─
+  // 全部可选，旧 reliability-v1 payload 读回时为 undefined。
+  // 已有等价字段复用不新增（confirm_index=函证索引号 / entity_name=被询证单位名称 /
+  //   reply_method=回函方式 / original_returned=是否寄回原件 / email_domain=邮箱域名）。
+
+  /** 是否项目组直接接收 — X0-7 回函可靠性核对（单一真源，Requirement 3.5） */
+  direct_received?: '是' | '否' | '不适用'
+  /** 传真信息及验证 — X0-7「传真信息及验证」 */
+  fax_info_verify?: string
+  /** 发函邮箱 — X0-7「发函邮箱」（与 email_domain 并存，双列口径） */
+  send_email?: string
+  /** 回函邮箱 — X0-7「回函邮箱」 */
+  reply_email?: string
+  /** 可靠性考虑文本 — X0-7「可靠性考虑」 */
+  reliability_consideration?: string
+
   // ─── 元数据 ─────────────────────────────────────────────────────────────
 
   /** 数据来源标识（auto/manual/import） */

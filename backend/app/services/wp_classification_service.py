@@ -167,6 +167,7 @@ VALID_COMPONENT_TYPES: set[str] = {
     "confirmation-alternative-k06",
     "confirmation-alternative-l05",
     "confirmation-diff-securities",
+    "confirmation-diff-nonsecurities",
     "f1-prepayment",
     "f2-inventory-main",
     "f2-inventory-special",

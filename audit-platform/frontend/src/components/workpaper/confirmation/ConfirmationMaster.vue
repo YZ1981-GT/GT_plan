@@ -18,6 +18,8 @@
         <el-button size="small" @click="$emit('import-data')">↑ 导入</el-button>
       </div>
     </div>
+    <!-- 列表视图=简表概览（核心列）；完整宽表全列见「完整表格」视图（ConfirmationFullGrid）；
+         点击行由下方 ConfirmationDetail 编辑全部字段（含 additive 补列） -->
     <el-table
       :data="rows"
       @selection-change="onSelectionChange"
@@ -33,9 +35,9 @@
       <el-table-column prop="confirm_index" label="索引号" min-width="70" />
       <el-table-column prop="entity_name" label="被询证单位" min-width="130" show-overflow-tooltip />
       <el-table-column prop="account_type" label="科目" min-width="80" />
-      <el-table-column prop="amount" label="函证金额" min-width="90" align="right">
+      <el-table-column prop="amount" label="函证金额" min-width="100" align="right">
         <template #default="{ row }">
-          {{ formatAmount(row.amount) }}
+          {{ fmtAmount(row.amount) }}
         </template>
       </el-table-column>
       <el-table-column prop="match_status" label="相符情况" min-width="70" align="center">
@@ -81,9 +83,10 @@ function onSelectionChange(selection: ConfirmationRow[]) {
   emit('update:selectedIds', selection.map((r) => r._row_id!))
 }
 
-function formatAmount(amount: number | undefined | null): string {
+/** 平台金额格式（千分符 + 两位小数），与 FullGrid/Detail 一致 */
+function fmtAmount(amount: number | undefined | null): string {
   if (amount == null) return '—'
-  return amount.toLocaleString() + '元'
+  return amount.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 </script>
 
@@ -107,6 +110,7 @@ function formatAmount(amount: number | undefined | null): string {
 
 .confirmation-master__table {
   width: 100%;
+  font-size: 13px;
 }
 
 /* 表头折行显示 */
@@ -127,5 +131,11 @@ function formatAmount(amount: number | undefined | null): string {
 
 .confirmation-master__table :deep(.el-table__body td .cell) {
   font-size: 12px;
+}
+
+/* 数值列等宽对齐+防折行 */
+.confirmation-master__table :deep(td.is-right .cell) {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 </style>

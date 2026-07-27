@@ -22,8 +22,30 @@ export interface CheckRow {
   is_abnormal?: string  // '是'/'否'
   /** 索引号 */
   ref_index?: string
+  /**
+   * 借贷方向（confirmation-alternative-structure-alignment 决策 1）。
+   * 仅 splitByDirection 区块（K0-5/K0-6/L0-5/G0-6 的「本期发生额」）使用；
+   * 旧行为 undefined → 渲染层归入「待归位」提示（Property 2，不猜方向）。
+   */
+  direction?: 'debit' | 'credit'
   /** 动态字段（各区块列结构不同，存为扁平 key-value） */
   [key: string]: any
+}
+
+/**
+ * L0-5 期初余额一致性核对（confirmation-alternative-structure-alignment 决策 2）。
+ * 源模板 L0-5 第 3 项「检查期初余额是否与上期期末余额一致」，单项核对（非动态行）。
+ * 作 payload 顶层字段，渲染为独立卡片。
+ */
+export interface OpeningConsistency {
+  /** 本期期初余额（可从平台取或手工） */
+  current_opening?: number
+  /** 上期期末余额 */
+  prior_closing?: number
+  /** 是否一致 */
+  is_consistent?: '一致' | '不一致' | '待核对'
+  /** 说明（判定不一致时要求填，Requirement 2.4） */
+  note?: string
 }
 
 // ─── 区块类型枚举 ───────────────────────────────────────────────────────────

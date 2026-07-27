@@ -319,11 +319,18 @@ describe('htmlRendererRegistry — 路由集合', () => {
     expect(HTML_COMPONENT_TYPE_SET.has('skip' as any)).toBe(false)
   })
 
-  it('HTML_RENDERER_ROUTE_SET = registry + skip', () => {
-    expect(HTML_RENDERER_ROUTE_SET.size).toBe(HTML_COMPONENT_TYPE_SET.size + 1)
+  it('HTML_RENDERER_ROUTE_SET = registry + skip + confirmation-hub', () => {
+    // 两个 placeholder 不在 registry 中但需走 GtWpRenderer：
+    // - skip：内部分支渲染 SkippedSheetPlaceholder
+    // - confirmation-hub：D0/E0/F0/G0/H0/K0/L0 函证枢纽的 workbook 级类型，
+    //   其各 sheet（X0A/X0-1~X0-8）自身 componentType 已注册，按 per-sheet 分发
+    expect(HTML_RENDERER_ROUTE_SET.size).toBe(HTML_COMPONENT_TYPE_SET.size + 2)
     expect(HTML_RENDERER_ROUTE_SET.has('a-program-console')).toBe(true)
     expect(HTML_RENDERER_ROUTE_SET.has('skip')).toBe(true)
+    expect(HTML_RENDERER_ROUTE_SET.has('confirmation-hub')).toBe(true)
     expect(HTML_RENDERER_ROUTE_SET.has('univer')).toBe(false)
+    // confirmation-hub 仍不在 registry（不渲染组件，仅路由判定）
+    expect(HTML_COMPONENT_TYPE_SET.has('confirmation-hub' as any)).toBe(false)
   })
 
   it('PLACEHOLDER_ICONS 含 univer + skip 不含 HTML 类', () => {

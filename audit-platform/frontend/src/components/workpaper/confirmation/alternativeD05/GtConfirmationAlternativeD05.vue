@@ -48,262 +48,26 @@
             {{ selectedCompany.entity_name || '请在上方表格填写公司名称' }} — 检查详情
           </div>
 
-          <!-- 抽样配置 -->
-          <div class="detail-section">
-            <div class="detail-section__header">一、样本选取标准与规模</div>
-            <el-form
-              :model="selectedCompany.sampling || {}"
-              label-width="100px"
-              size="small"
-              :disabled="readonly"
-            >
-              <el-row :gutter="12">
-                <el-col :span="12">
-                  <el-form-item label="测试范围">
-                    <el-input
-                      v-model="selectedCompany.sampling!.test_scope"
-                      type="textarea"
-                      :rows="2"
-                      placeholder="如合同负债借方发生额所有凭证共XX笔金额XX、贷方发生额所有凭证共XX笔金额XX"
-                      @change="markDirty"
-                    />
-                  </el-form-item>
-                </el-col>
-                <el-col :span="12">
-                  <el-form-item label="特定样本">
-                    <el-input
-                      v-model="selectedCompany.sampling!.specific_samples"
-                      type="textarea"
-                      :rows="2"
-                      placeholder="XX金额以上（大额）、关联方/关联交易形成的款项、XX异常款项全部测试，共XX笔"
-                      @change="markDirty"
-                    />
-                  </el-form-item>
-                </el-col>
-              </el-row>
-              <el-row :gutter="12">
-                <el-col :span="12">
-                  <el-form-item label="抽样总体">
-                    <el-input
-                      v-model="selectedCompany.sampling!.sampling_population"
-                      placeholder="测试总体扣除特定样本以外的样本，共XX笔、金额XX"
-                      @change="markDirty"
-                    />
-                  </el-form-item>
-                </el-col>
-                <el-col :span="12">
-                  <el-form-item label="样本量">
-                    <el-input
-                      v-model="selectedCompany.sampling!.sample_size"
-                      placeholder="抽取XX笔"
-                      @change="markDirty"
-                    />
-                  </el-form-item>
-                </el-col>
-              </el-row>
-              <el-row :gutter="12">
-                <el-col :span="12">
-                  <el-form-item label="抽样方法">
-                    <el-select
-                      v-model="selectedCompany.sampling!.sampling_method"
-                      placeholder="选择抽样方法"
-                      @change="markDirty"
-                    >
-                      <el-option value="随机选样" label="随机选样" />
-                      <el-option value="系统选样" label="系统选样" />
-                      <el-option value="货币单元抽样" label="货币单元抽样" />
-                      <el-option value="随意选样" label="随意选样（非统计抽样适用）" />
-                    </el-select>
-                  </el-form-item>
-                </el-col>
-                <el-col :span="12">
-                  <el-form-item label="抽样过程">
-                    <el-input
-                      v-model="selectedCompany.sampling!.sampling_process"
-                      type="textarea"
-                      :rows="2"
-                      placeholder="使用IDEA（XX抽样工具）选择XX数量占比XX%的样本进行测试"
-                      @change="markDirty"
-                    />
-                  </el-form-item>
-                </el-col>
-              </el-row>
-            </el-form>
-          </div>
-
-          <!-- 余额汇总 -->
-          <div class="detail-section">
-            <div class="detail-section__header">二、余额汇总与检查比例</div>
-            <div class="balance-cards">
-              <!-- 左卡：余额数据 -->
-              <div class="balance-card balance-card--data">
-                <div class="balance-card__title">余额数据</div>
-                <div class="balance-card__grid">
-                  <div class="balance-card__item">
-                    <span class="balance-card__label">函证项目</span>
-                    <el-input
-                      v-if="!readonly"
-                      v-model="selectedCompany.balance!.item_name"
-                      size="small"
-                      placeholder="合同负债"
-                      @change="markDirty"
-                    />
-                    <span v-else class="balance-card__value">{{ selectedCompany.balance?.item_name || '—' }}</span>
-                  </div>
-                  <div class="balance-card__item">
-                    <span class="balance-card__label">年初余额</span>
-                    <el-input
-                      v-if="!readonly"
-                      v-model.number="selectedCompany.balance!.opening_balance"
-                      type="number"
-                      size="small"
-                      @change="markDirty"
-                    />
-                    <span v-else class="balance-card__value balance-card__value--num">{{ formatAmount(selectedCompany.balance?.opening_balance) }}</span>
-                  </div>
-                  <div class="balance-card__item">
-                    <span class="balance-card__label">借方发生额</span>
-                    <el-input
-                      v-if="!readonly"
-                      v-model.number="selectedCompany.balance!.debit_amount"
-                      type="number"
-                      size="small"
-                      @change="markDirty"
-                    />
-                    <span v-else class="balance-card__value balance-card__value--num">{{ formatAmount(selectedCompany.balance?.debit_amount) }}</span>
-                  </div>
-                  <div class="balance-card__item">
-                    <span class="balance-card__label">贷方发生额</span>
-                    <el-input
-                      v-if="!readonly"
-                      v-model.number="selectedCompany.balance!.credit_amount"
-                      type="number"
-                      size="small"
-                      @change="markDirty"
-                    />
-                    <span v-else class="balance-card__value balance-card__value--num">{{ formatAmount(selectedCompany.balance?.credit_amount) }}</span>
-                  </div>
-                  <div class="balance-card__item">
-                    <span class="balance-card__label">期末余额</span>
-                    <el-input
-                      v-if="!readonly"
-                      v-model.number="selectedCompany.balance!.closing_balance"
-                      type="number"
-                      size="small"
-                      @change="markDirty"
-                    />
-                    <span v-else class="balance-card__value balance-card__value--num">{{ formatAmount(selectedCompany.balance?.closing_balance) }}</span>
-                  </div>
-                  <div class="balance-card__item">
-                    <span class="balance-card__label">本期销售金额</span>
-                    <el-input
-                      v-if="!readonly"
-                      v-model.number="selectedCompany.balance!.sales_amount"
-                      type="number"
-                      size="small"
-                      @change="markDirty"
-                    />
-                    <span v-else class="balance-card__value balance-card__value--num">{{ formatAmount(selectedCompany.balance?.sales_amount) }}</span>
-                  </div>
-                </div>
-              </div>
-              <!-- 右卡：检查比例指标 -->
-              <div class="balance-card balance-card--ratio">
-                <div class="balance-card__title">检查比例</div>
-                <div class="ratio-indicators">
-                  <div class="ratio-indicator">
-                    <div class="ratio-indicator__label">收款检查比例</div>
-                    <div class="ratio-indicator__value" :class="ratioClass(data.getCheckRatio(selectedCompany, 'receipt'))">
-                      {{ formatRatio(data.getCheckRatio(selectedCompany, 'receipt')) }}
-                    </div>
-                    <div class="ratio-indicator__desc">区块③收款合计 / 本期销售额</div>
-                  </div>
-                  <div class="ratio-indicator">
-                    <div class="ratio-indicator__label">出库检查比例</div>
-                    <div class="ratio-indicator__value" :class="ratioClass(data.getCheckRatio(selectedCompany, 'shipment'))">
-                      {{ formatRatio(data.getCheckRatio(selectedCompany, 'shipment')) }}
-                    </div>
-                    <div class="ratio-indicator__desc">区块④出库合计 / 本期销售额</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- 4 区块检查表 -->
-          <div class="detail-section">
-            <div class="detail-section__header">三、检查过程记录</div>
-            <CheckBlock
-              v-for="bt in blockTypes"
-              :key="bt"
-              :config="blockConfigs[bt]"
-              :rows="getBlockRows(selectedCompany, bt)"
-              :totals="data.getBlockTotal(selectedCompany, bt)"
-              :readonly="readonly"
-              @add-row="data.addBlockRow(selectedCompany._company_id!, bt)"
-              @delete-row="(rowId: string) => data.deleteBlockRow(selectedCompany!._company_id!, bt, rowId)"
-              @update-field="(rowId: string, field: string, val: any) => data.updateBlockField(selectedCompany!._company_id!, bt, rowId, field, val)"
-            />
-          </div>
-
-          <!-- 审计结论 -->
-          <div class="detail-section">
-            <div class="detail-section__header">
-              <span>四、审计说明与结论</span>
-              <el-button
-                v-if="!readonly"
-                type="primary"
-                size="small"
-                plain
-                :loading="aiLoading"
-                style="margin-left: auto"
-                @click="handleAiFill"
-              >
-                AI 智能填充
-              </el-button>
-            </div>
-            <el-form
-              :model="selectedCompany.conclusion || {}"
-              label-width="80px"
-              size="small"
-              :disabled="readonly"
-            >
-              <el-form-item label="审计说明">
-                <el-input
-                  v-model="selectedCompany.conclusion!.audit_note"
-                  type="textarea"
-                  :rows="3"
-                  placeholder="概述程序的测试情况、结果；拟调整事项及其调整分录、未调整事项及其影响。"
-                  @change="markDirty"
-                />
-              </el-form-item>
-              <el-form-item label="审计结论">
-                <el-radio-group v-model="selectedCompany.conclusion!.conclusion_type" @change="markDirty">
-                  <el-radio value="A">A - 替代程序结果支持余额</el-radio>
-                  <el-radio value="B">B - 部分事项待进一步确认</el-radio>
-                  <el-radio value="C">C - 存在重大异常需扩大程序</el-radio>
-                </el-radio-group>
-              </el-form-item>
-              <el-form-item v-if="selectedCompany.conclusion?.conclusion_type" label="结论文本">
-                <el-input
-                  v-model="selectedCompany.conclusion!.conclusion_text"
-                  type="textarea"
-                  :rows="2"
-                  @change="markDirty"
-                />
-              </el-form-item>
-              <!-- 异常未决提示 -->
-              <el-alert
-                v-if="data.hasAbnormal(selectedCompany)"
-                type="warning"
-                :closable="false"
-                show-icon
-                class="mt-8"
-              >
-                当前存在异常行，请确认是否需要调整或扩大替代程序范围。
-              </el-alert>
-            </el-form>
-          </div>
+          <AlternativeDetailPanel
+            :company="selectedCompany"
+            :readonly="readonly"
+            :block-types="blockTypes"
+            :block-configs="blockConfigs"
+            balance-field="sales_amount"
+            item-name-placeholder="合同负债"
+            sampling-scope-placeholder="如合同负债借方发生额所有凭证共XX笔金额XX、贷方发生额所有凭证共XX笔金额XX"
+            audit-note-placeholder="概述程序的测试情况、结果；拟调整事项及其调整分录、未调整事项及其影响。"
+            :ratios="detailRatios"
+            :ai-loading="aiLoading"
+            :get-block-total="data.getBlockTotal"
+            :get-check-ratio="(c, t) => data.getCheckRatio(c, t as 'receipt' | 'shipment')"
+            :add-block-row="data.addBlockRow"
+            :delete-block-row="data.deleteBlockRow"
+            :update-block-field="data.updateBlockField"
+            :has-abnormal="data.hasAbnormal"
+            @mark-dirty="markDirty"
+            @ai-fill="handleAiFill"
+          />
         </div>
       </template>
     </template>
@@ -337,14 +101,13 @@
 <script setup lang="ts">
 import { ref, computed, defineAsyncComponent, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
-import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useAlternativeData } from './composables/useAlternativeData'
 import type { AlternativeCompany, BlockType, CheckRow } from './alternativeD05Types'
 import { BLOCK_COLUMN_CONFIGS } from './blockColumnConfigs'
 
 import AlternativeD05Dashboard from './AlternativeD05Dashboard.vue'
 import AlternativeD05Master from './AlternativeD05Master.vue'
-import CheckBlock from './CheckBlock.vue'
+import AlternativeDetailPanel from './AlternativeDetailPanel.vue'
 
 const GtGridSheet = defineAsyncComponent(() => import('../../GtGridSheet.vue'))
 
@@ -368,7 +131,6 @@ const isNewFormat = computed(() => props.htmlData?._format === 'alternative-d05-
 
 // ─── 数据核心 ────────────────────────────────────────────────────────────────
 
-const prefs = useDisplayPrefsStore()
 const data = useAlternativeData({
   htmlData: () => props.htmlData,
   readonly: props.readonly,
@@ -378,6 +140,10 @@ const data = useAlternativeData({
 
 const blockTypes: BlockType[] = ['block1', 'block2', 'block3', 'block4']
 const blockConfigs = BLOCK_COLUMN_CONFIGS
+const detailRatios = [
+  { type: 'receipt', label: '收款检查比例', desc: '区块③收款合计 / 本期销售额' },
+  { type: 'shipment', label: '出库检查比例', desc: '区块④出库合计 / 本期销售额' },
+]
 
 // ─── 选中公司 ────────────────────────────────────────────────────────────────
 
@@ -708,23 +474,6 @@ function markDirty() {
   data.isDirty.value = true
 }
 
-function formatRatio(val: number | null): string {
-  if (val === null) return 'N/A'
-  return `${val.toFixed(1)}%`
-}
-
-function formatAmount(val: number | undefined | null): string {
-  if (val == null) return '—'
-  return prefs.fmt(val)
-}
-
-function ratioClass(val: number | null): string {
-  if (val === null) return 'ratio-indicator__value--na'
-  if (val >= 80) return 'ratio-indicator__value--good'
-  if (val >= 50) return 'ratio-indicator__value--warn'
-  return 'ratio-indicator__value--danger'
-}
-
 // 暴露给父组件通过 ref 调用（页面级工具栏转发）
 defineExpose({
   handleExportTemplate,
@@ -761,127 +510,10 @@ defineExpose({
   color: var(--el-text-color-primary);
 }
 
-.detail-section {
-  margin-bottom: 16px;
-}
-
-.detail-section__header {
-  font-size: var(--wp-font-size, 13px);
-  font-weight: 600;
-  margin-bottom: 8px;
-  padding: 4px 8px;
-  background: var(--el-fill-color-light);
-  border-radius: 3px;
-  display: flex;
-  align-items: center;
-}
-
 .ratio-display {
   font-weight: 700;
   color: var(--el-color-primary);
   font-size: 14px;
 }
 
-/* ─── 卡片式双栏：余额汇总与检查比例 ───────────────────────────────────── */
-
-.balance-cards {
-  display: grid;
-  grid-template-columns: 1fr 280px;
-  gap: 12px;
-}
-
-.balance-card {
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 6px;
-  padding: 12px 16px;
-  background: #fafbfc;
-}
-
-.balance-card__title {
-  font-size: 12px;
-  font-weight: 600;
-  color: #909399;
-  margin-bottom: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.balance-card__grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 10px 16px;
-}
-
-.balance-card__item {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.balance-card__label {
-  font-size: 11px;
-  color: #909399;
-}
-
-.balance-card__value {
-  font-size: var(--wp-font-size, 13px);
-  color: #303133;
-}
-
-.balance-card__value--num {
-  font-variant-numeric: tabular-nums;
-  font-weight: 500;
-}
-
-.balance-card--ratio {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  background: linear-gradient(135deg, #f5f0ff 0%, #eef2ff 100%);
-  border-color: #d9d0f0;
-}
-
-.ratio-indicators {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.ratio-indicator {
-  text-align: center;
-}
-
-.ratio-indicator__label {
-  font-size: 11px;
-  color: #606266;
-  margin-bottom: 4px;
-}
-
-.ratio-indicator__value {
-  font-size: 24px;
-  font-weight: 700;
-  line-height: 1.2;
-}
-
-.ratio-indicator__value--good { color: #67c23a; }
-.ratio-indicator__value--warn { color: #e6a23c; }
-.ratio-indicator__value--danger { color: #f56c6c; }
-.ratio-indicator__value--na { color: #c0c4cc; }
-
-.ratio-indicator__desc {
-  font-size: 10px;
-  color: #c0c4cc;
-  margin-top: 2px;
-}
-
-@media (max-width: 900px) {
-  .balance-cards {
-    grid-template-columns: 1fr;
-  }
-  .balance-card__grid {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-
-.mt-8 { margin-top: 8px; }
 </style>

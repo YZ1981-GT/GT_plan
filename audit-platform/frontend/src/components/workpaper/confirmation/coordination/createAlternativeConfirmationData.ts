@@ -91,6 +91,11 @@ export interface AltConfig {
   parseNum?: (v: any) => number
   /** 提供则工厂做 init+watch(deep)；不传则不 init（K06 自管 loadAll） */
   htmlData?: () => any
+  /**
+   * L05 标记：启用期初余额一致性核对（confirmation-alternative-structure-alignment 决策 2）。
+   * 工厂不据此改行为，仅供适配器/清单读取（opening_consistency 数据由适配器旁挂于 payload 顶层）。
+   */
+  opening_consistency_enabled?: boolean
 }
 
 // ─── 返回接口 ────────────────────────────────────────────────────────────────
@@ -113,6 +118,7 @@ export interface AltCoreReturn {
 
   // 计算
   getBlockTotal: (company: AlternativeCompany, blockType: BlockType) => Record<string, number>
+  getBlockTotalByDirection: (company: AlternativeCompany, blockType: BlockType, direction: 'debit' | 'credit') => Record<string, number>
   getRatio: (company: AlternativeCompany, key: string) => number | null
   getCompletionStatus: (company: AlternativeCompany) => { completed: number; total: number; rate: number }
   hasAbnormal: (company: AlternativeCompany) => boolean
@@ -301,6 +307,26 @@ export function createAlternativeConfirmationData(config: AltConfig): AltCoreRet
     return totals
   }
 
+  /**
+   * 按借贷方向分组小计（confirmation-alternative-structure-alignment 决策 1）。
+   * 仅累加该 direction 的行；getBlockTotal 全 block 合计不变。
+   * 无 direction 的行不计入任何方向小计（归入「待归位」）。
+   */
+  function getBlockTotalByDirection(
+    company: AlternativeCompany,
+    blockType: BlockType,
+    direction: 'debit' | 'credit',
+  ): Record<string, number> {
+    const rows = getBlockRows(company, blockType).filter((r) => r.direction === direction)
+    const fields = config.getSumFields(blockType)
+    const totals: Record<string, number> = {}
+    for (const field of fields) {
+      const amounts = rows.map((row) => parseNum(row[field]))
+      totals[field] = precise(calcTotal(amounts))
+    }
+    return totals
+  }
+
   // ─── 计算：检查比例（通用，按 config.ratios[key]） ────────────────────────
 
   function getRatio(company: AlternativeCompany, key: string): number | null {
@@ -416,6 +442,7 @@ export function createAlternativeConfirmationData(config: AltConfig): AltCoreRet
     updateBlockField,
 
     getBlockTotal,
+    getBlockTotalByDirection,
     getRatio,
     getCompletionStatus,
     hasAbnormal,

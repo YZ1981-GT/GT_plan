@@ -499,3 +499,32 @@ describe('useConfirmationData - initialization', () => {
     expect(composable.rows.value[0]._row_id).toBeTruthy()
   })
 })
+
+// ─── E0 重建：Summary_Sheet 承载五类账户（Task 3.2 / Property 13） ──────────
+
+describe('E0 accountTabs 动态派生（五类账户）', () => {
+  it('E0-1 五类账户 account_type 各派生一个页签（无需硬编码）', () => {
+    const rows = [
+      makeRow({ account_type: '银行存款', amount: 100 }),
+      makeRow({ account_type: '其他货币资金', amount: 200 }),
+      makeRow({ account_type: '短期借款', amount: 300 }),
+      makeRow({ account_type: '应付票据', amount: 400 }),
+      makeRow({ account_type: '理财产品', amount: 500 }),
+    ]
+    const { composable } = setup(rows)
+    const tabs = composable.accountTabs.value
+    expect(tabs).toHaveLength(5)
+    expect(tabs).toEqual(expect.arrayContaining([
+      '银行存款', '其他货币资金', '短期借款', '应付票据', '理财产品',
+    ]))
+  })
+
+  it('同类账户去重，只派生唯一页签', () => {
+    const rows = [
+      makeRow({ account_type: '银行存款', amount: 100 }),
+      makeRow({ account_type: '银行存款', amount: 200 }),
+    ]
+    const { composable } = setup(rows)
+    expect(composable.accountTabs.value).toEqual(['银行存款'])
+  })
+})

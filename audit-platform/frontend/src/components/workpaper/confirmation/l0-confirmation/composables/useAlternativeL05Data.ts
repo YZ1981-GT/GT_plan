@@ -85,6 +85,7 @@ export interface UseAlternativeL05DataReturn {
   updateBlockField: (companyId: string, blockType: BlockType, rowId: string, field: string, value: any) => void
   getBlockRows: (company: AlternativeCompany, blockType: BlockType) => CheckRow[]
   getBlockTotal: (company: AlternativeCompany, blockType: BlockType) => Record<string, number>
+  getBlockTotalByDirection: (company: AlternativeCompany, blockType: BlockType, direction: 'debit' | 'credit') => Record<string, number>
   getClosingBalance: (company: AlternativeCompany) => number
   getRepaymentRatio: (company: AlternativeCompany) => number
   getMortgageRatio: (company: AlternativeCompany) => number
@@ -245,6 +246,7 @@ export function useAlternativeL05Data(props: UseAlternativeL05DataProps): UseAlt
     updateBlockField: core.updateBlockField,
     getBlockRows,
     getBlockTotal: core.getBlockTotal,
+    getBlockTotalByDirection: core.getBlockTotalByDirection,
     getClosingBalance,
     getRepaymentRatio,
     getMortgageRatio,

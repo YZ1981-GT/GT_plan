@@ -1,0 +1,76 @@
+{
+  "_note": "E0 发函前清单四张 sheet 源模板真实列清单（契约守卫基准）。字段 field=业务 snake_case / label=源模板列名（与 E0.yaml 逐字一致）/ type=text|enum|date|number / render=amount（金额右对齐两位小数）/ enum=枚举点选项。source=e0-send-list-components spec Data Models + E0.yaml 逐列核对。",
+  "_source_wp_code": "E0",
+  "_source_template": "backend/wp_templates/E/E0 货币资金 - 函证（Leap应对措施-函证）.xlsx",
+  "sheets": {
+    "货币资金发函记录表E0-3": {
+      "cell_columns": {
+        "A": { "field": "account_subject", "label": "所属科目", "type": "text" },
+        "B": { "field": "index_no", "label": "索引号", "type": "text" },
+        "C": { "field": "report_date", "label": "报表截止日", "type": "date" },
+        "D": { "field": "bank_name", "label": "开户银行", "type": "text" },
+        "E": { "field": "is_confirm", "label": "是否函证", "type": "enum", "enum": ["是", "否"] },
+        "F": { "field": "account_holder", "label": "账户名称", "type": "text" },
+        "G": { "field": "bank_account", "label": "银行账号", "type": "text" },
+        "H": { "field": "currency", "label": "币种", "type": "text" },
+        "I": { "field": "interest_rate", "label": "利率(%)", "type": "number" },
+        "J": { "field": "account_type", "label": "账户类型", "type": "enum", "enum": ["基本存款账户", "一般存款账户", "专用存款账户", "临时存款账户", "其他"] },
+        "K": { "field": "balance_orig", "label": "账户余额（原币）", "type": "number", "render": "amount" },
+        "L": { "field": "is_pooling", "label": "是否属于资金归集（资金池或其他资金管理）账户", "type": "enum", "enum": ["是", "否"] },
+        "M": { "field": "start_date", "label": "起始日期", "type": "date" },
+        "N": { "field": "end_date", "label": "终止日期", "type": "date" },
+        "O": { "field": "has_restriction", "label": "是否存在冻结、担保或其他使用限制（如是，请注明）", "type": "enum", "enum": ["是", "否"] },
+        "P": { "field": "remark", "label": "备注", "type": "text" }
+      }
+    },
+    "借款发函记录表E0-4": {
+      "cell_columns": {
+        "A": { "field": "account_subject", "label": "所属科目", "type": "text" },
+        "B": { "field": "index_no", "label": "索引号", "type": "text" },
+        "C": { "field": "report_date", "label": "报表截止日", "type": "date" },
+        "D": { "field": "bank_name", "label": "开户银行", "type": "text" },
+        "E": { "field": "is_confirm", "label": "是否函证", "type": "enum", "enum": ["是", "否"] },
+        "F": { "field": "borrower", "label": "借款人名称", "type": "text" },
+        "G": { "field": "loan_account", "label": "借款账号", "type": "text" },
+        "H": { "field": "currency", "label": "币种", "type": "text" },
+        "I": { "field": "balance", "label": "余额", "type": "number", "render": "amount" },
+        "J": { "field": "loan_date", "label": "借款日期", "type": "date" },
+        "K": { "field": "maturity_date", "label": "到期日期", "type": "date" },
+        "L": { "field": "interest_rate", "label": "利率(%)", "type": "number" },
+        "M": { "field": "guarantor", "label": "抵(质)押品/担保人", "type": "text" },
+        "N": { "field": "remark", "label": "备注", "type": "text" },
+        "O": { "field": "loan_type", "label": "借款类型", "type": "enum", "enum": ["短期借款", "长期借款", "一年内到期的长期借款", "其他"] },
+        "P": { "field": "accrued_interest", "label": "期末应付利息", "type": "number", "render": "amount" }
+      }
+    },
+    "应付银行承兑汇票发函记录表E0-5": {
+      "cell_columns": {
+        "A": { "field": "index_no", "label": "索引号", "type": "text" },
+        "B": { "field": "report_date", "label": "报表截止日", "type": "date" },
+        "C": { "field": "bank_name", "label": "开户银行", "type": "text" },
+        "D": { "field": "bill_no", "label": "银行承兑汇票号码", "type": "text" },
+        "E": { "field": "settlement_account", "label": "结算账户账号", "type": "text" },
+        "F": { "field": "currency", "label": "币种", "type": "text" },
+        "G": { "field": "face_amount", "label": "票面金额", "type": "number", "render": "amount" },
+        "H": { "field": "issue_date", "label": "出票日", "type": "date" },
+        "I": { "field": "maturity_date", "label": "到期日", "type": "date" },
+        "J": { "field": "pledge", "label": "抵（质）押品", "type": "text" }
+      }
+    },
+    "理财产品发函记录表E0-6": {
+      "cell_columns": {
+        "A": { "field": "index_no", "label": "索引号", "type": "text" },
+        "B": { "field": "report_date", "label": "报表截止日", "type": "date" },
+        "C": { "field": "bank_recipient", "label": "开户行名称及收件人", "type": "text" },
+        "D": { "field": "product_name", "label": "产品名称", "type": "text" },
+        "E": { "field": "product_type", "label": "产品类型（封闭式/开放式）", "type": "enum", "enum": ["封闭式", "开放式"] },
+        "F": { "field": "currency", "label": "币种", "type": "text" },
+        "G": { "field": "holding_shares", "label": "持有份额", "type": "number" },
+        "H": { "field": "net_value", "label": "产品净值", "type": "number", "render": "amount" },
+        "I": { "field": "purchase_date", "label": "购买日", "type": "date" },
+        "J": { "field": "maturity_date", "label": "到期日", "type": "date" },
+        "K": { "field": "has_restriction", "label": "是否被用于担保或存在其他使用限制", "type": "enum", "enum": ["是", "否"] }
+      }
+    }
+  }
+}

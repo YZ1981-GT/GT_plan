@@ -19,7 +19,9 @@ const NON_REGISTRY_TYPES = new Set([
   'univer',           // Univer 表格兜底
   'skip',             // 跳过占位
   'redirect-materiality',  // B15 重定向标记，非渲染类型
-  'confirmation-hub',      // 函证管理，走独立模块路由非底稿渲染
+  // 函证枢纽 workbook 级类型（D0/E0/F0/G0/H0/K0/L0）：走 GtWpRenderer 但按 per-sheet
+  // componentType 分发（X0A/X0-1~X0-8 各自已注册），workbook 级本身不渲染组件。
+  'confirmation-hub',
 ])
 
 describe('componentType 前后端契约', () => {

@@ -242,8 +242,9 @@
           <!-- 4 区块检查表 -->
           <div class="detail-section">
             <div class="detail-section__header">三、检查过程记录</div>
+            <!-- 非 block3 区块：统一渲染 -->
             <CheckBlock
-              v-for="bt in blockTypes"
+              v-for="bt in blockTypes.filter(b => b !== 'block3')"
               :key="bt"
               :config="blockConfigs[bt]"
               :rows="getBlockRows(selectedCompany, bt)"
@@ -256,6 +257,47 @@
               @update-field="(rowId: string, field: string, val: any) => data.updateBlockField(selectedCompany!._company_id!, bt, rowId, field, val)"
               @ocr-upload="(rowId: string, file: File) => handleRowOcr(bt, rowId, file)"
             />
+            <!-- block3 本期发生额：借方/贷方两张表（confirmation-alternative-structure-alignment 决策 1） -->
+            <div class="split-direction-block">
+              <div class="split-direction-block__title">{{ blockConfigs.block3.title }}</div>
+              <el-alert
+                v-if="getBlockRows(selectedCompany, 'block3').some(r => !r.direction)"
+                type="warning" :closable="false" show-icon
+                style="margin-bottom:8px"
+              >
+                有 {{ getBlockRows(selectedCompany, 'block3').filter(r => !r.direction).length }} 行尚未指定借贷方向，请编辑行指定方向后归入对应表
+              </el-alert>
+              <div class="split-direction-block__sub">
+                <div class="split-direction-block__sub-title">借方发生额</div>
+                <CheckBlock
+                  :config="blockConfigs.block3"
+                  :rows="getBlockRows(selectedCompany, 'block3').filter(r => r.direction === 'debit')"
+                  :totals="data.getBlockTotalByDirection(selectedCompany, 'block3', 'debit')"
+                  :readonly="readonly"
+                  :enable-ocr="true"
+                  :ocr-loading-row-id="ocrLoadingRowId"
+                  @add-row="addDirectionRow('debit')"
+                  @delete-row="(rowId: string) => data.deleteBlockRow(selectedCompany!._company_id!, 'block3', rowId)"
+                  @update-field="(rowId: string, field: string, val: any) => data.updateBlockField(selectedCompany!._company_id!, 'block3', rowId, field, val)"
+                  @ocr-upload="(rowId: string, file: File) => handleRowOcr('block3', rowId, file)"
+                />
+              </div>
+              <div class="split-direction-block__sub">
+                <div class="split-direction-block__sub-title">贷方发生额</div>
+                <CheckBlock
+                  :config="blockConfigs.block3"
+                  :rows="getBlockRows(selectedCompany, 'block3').filter(r => r.direction === 'credit')"
+                  :totals="data.getBlockTotalByDirection(selectedCompany, 'block3', 'credit')"
+                  :readonly="readonly"
+                  :enable-ocr="true"
+                  :ocr-loading-row-id="ocrLoadingRowId"
+                  @add-row="addDirectionRow('credit')"
+                  @delete-row="(rowId: string) => data.deleteBlockRow(selectedCompany!._company_id!, 'block3', rowId)"
+                  @update-field="(rowId: string, field: string, val: any) => data.updateBlockField(selectedCompany!._company_id!, 'block3', rowId, field, val)"
+                  @ocr-upload="(rowId: string, file: File) => handleRowOcr('block3', rowId, file)"
+                />
+              </div>
+            </div>
           </div>
 
           <!-- 审计结论 -->
@@ -467,6 +509,16 @@ const selectedCompany = computed<AlternativeCompany | undefined>(() => {
 function getBlockRows(company: AlternativeCompany, blockType: BlockType): CheckRow[] {
   const key = `${blockType}_rows` as keyof AlternativeCompany
   return (company[key] as CheckRow[]) || []
+}
+
+/** block3 借贷拆表：新增行时带 direction（confirmation-alternative-structure-alignment） */
+function addDirectionRow(direction: 'debit' | 'credit') {
+  const company = selectedCompany.value
+  if (!company) return
+  const row = data.addBlockRow(company._company_id!, 'block3')
+  if (row) {
+    data.updateBlockField(company._company_id!, 'block3', row._row_id!, 'direction', direction)
+  }
 }
 
 function getCheckRatioForMaster(company: AlternativeCompany, type: 'receipt' | 'shipment') {

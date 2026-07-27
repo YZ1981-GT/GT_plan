@@ -223,6 +223,20 @@
         </template>
       </el-table-column>
 
+      <!-- 相关支持性证据（源模板 X0-4 第 9 列） -->
+      <el-table-column label="支持性证据" prop="support_evidence" min-width="140" show-overflow-tooltip>
+        <template #default="{ row }">
+          <el-input
+            v-if="!readonly"
+            :model-value="row.support_evidence"
+            size="small"
+            placeholder="相关支持性证据索引/说明"
+            @change="(val: string) => $emit('update', row._row_id, 'support_evidence', val)"
+          />
+          <span v-else>{{ row.support_evidence || '—' }}</span>
+        </template>
+      </el-table-column>
+
       <!-- 来源标识 -->
       <el-table-column label="来源" min-width="50" align="center">
         <template #default="{ row }">

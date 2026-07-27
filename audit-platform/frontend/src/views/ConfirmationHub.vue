@@ -196,10 +196,10 @@
             <span v-else class="gt-text-muted">0</span>
           </template>
         </el-table-column>
-        <el-table-column label="关联底稿" width="110" align="center">
+        <el-table-column label="关联底稿" width="130" align="center">
           <template #default="{ row }">
-            <el-button v-if="row.wp_id" link type="primary" size="small" @click.stop="gotoWp(row.wp_id)">查看</el-button>
-            <span v-else class="gt-text-muted">—</span>
+            <el-button v-if="row.wp_id" link type="primary" size="small" @click.stop="jumpToSourceSummary(row)">跳回汇总表</el-button>
+            <span v-else class="gt-text-muted" title="该函证记录未关联来源底稿（可能为台账手工新建）">—</span>
           </template>
         </el-table-column>
         <el-table-column label="操作" width="270" fixed="right">
@@ -934,6 +934,24 @@ async function onDelete(row: ConfirmationItem) {
 
 function gotoWp(wpId: string) {
   router.push(`/projects/${projectId.value}/workpapers/${wpId}`)
+}
+
+/**
+ * 跳回来源 Hub_Workbook 的 Summary_Sheet（R2.4/R2.5）。
+ * 台账记录的 wp_id 即同步时传入的枢纽底稿 id；用 sheet 关键词「函证结果汇总表」
+ * 让 GtWpRenderer 兜底匹配各循环的 X0-1，无需按 confirm_type 反推 cycle。
+ * 解析失败（wp_id 缺失）→ 明确提示，不静默跳底稿目录。
+ */
+function jumpToSourceSummary(row: ConfirmationItem) {
+  if (!row.wp_id) {
+    ElMessage.warning('该函证记录未关联来源底稿（可能为台账手工新建），无法跳转')
+    return
+  }
+  router.push({
+    name: 'WorkpaperEditor',
+    params: { projectId: projectId.value, wpId: row.wp_id },
+    query: { sheet: '函证结果汇总表' },
+  })
 }
 
 onMounted(() => {

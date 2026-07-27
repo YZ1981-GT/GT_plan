@@ -92,6 +92,33 @@
                 </el-select>
               </el-form-item>
             </el-col>
+            <el-col :span="12">
+              <el-form-item label="邮编">
+                <el-input :model-value="row.qcc_zipcode" :disabled="readonly" @update:model-value="(v) => emitUpdate('qcc_zipcode', v)" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="邮箱/传真">
+                <el-input :model-value="row.qcc_email_fax" :disabled="readonly" @update:model-value="(v) => emitUpdate('qcc_email_fax', v)" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="不一致说明合理">
+                <el-select :model-value="row.qcc_inconsistent_reasonable" :disabled="readonly" @update:model-value="(v) => emitUpdate('qcc_inconsistent_reasonable', v)" placeholder="请选择" clearable>
+                  <el-option label="合理" value="合理" /><el-option label="不合理" value="不合理" /><el-option label="不适用" value="不适用" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="支持文件索引">
+                <el-input :model-value="row.qcc_support_index" :disabled="readonly" @update:model-value="(v) => emitUpdate('qcc_support_index', v)" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="24">
+              <el-form-item label="企查查备注">
+                <el-input :model-value="row.qcc_remark" :disabled="readonly" type="textarea" :rows="2" @update:model-value="(v) => emitUpdate('qcc_remark', v)" />
+              </el-form-item>
+            </el-col>
           </el-row>
           <!-- Conditional: address mismatch verify fields -->
           <template v-if="row.address_match === 'inconsistent'">
@@ -230,12 +257,101 @@
           </el-row>
         </el-form>
       </el-collapse-item>
+
+      <!-- Stage 6: 回函核实（X0-2 回函核对记录块） -->
+      <el-collapse-item title="回函核实" name="reply_verify">
+        <el-form label-width="90px" size="small" class="entity-verify-detail__form">
+          <el-alert
+            type="info"
+            :closable="false"
+            show-icon
+            class="entity-verify-detail__x07-note"
+          >回函方式/是否原件/是否直接接收 以「回函可靠性核对（X0-7）」为唯一录入位置，此处只读引用。</el-alert>
+          <el-row :gutter="16">
+            <el-col :span="12">
+              <el-form-item label="是否原件">
+                <el-select :model-value="row.is_original" disabled placeholder="详见 X0-7">
+                  <el-option label="是" value="是" /><el-option label="否" value="否" /><el-option label="不适用" value="不适用" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="直接收到">
+                <el-select :model-value="row.direct_received" disabled placeholder="详见 X0-7">
+                  <el-option label="是" value="是" /><el-option label="否" value="否" /><el-option label="不适用" value="不适用" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="回函发出地址">
+                <el-input :model-value="row.reply_from_addr" :disabled="readonly" @update:model-value="(v) => emitUpdate('reply_from_addr', v)" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="回函寄件人">
+                <el-input :model-value="row.reply_sender" :disabled="readonly" @update:model-value="(v) => emitUpdate('reply_sender', v)" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="回函电话">
+                <el-input :model-value="row.reply_phone" :disabled="readonly" @update:model-value="(v) => emitUpdate('reply_phone', v)" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="单位名一致">
+                <el-select :model-value="row.reply_name_match" :disabled="readonly" @update:model-value="(v) => emitUpdate('reply_name_match', v)" placeholder="请选择" clearable>
+                  <el-option label="一致" value="consistent" /><el-option label="不一致" value="inconsistent" /><el-option label="不适用" value="pending" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="地址一致">
+                <el-select :model-value="row.reply_addr_match" :disabled="readonly" @update:model-value="(v) => emitUpdate('reply_addr_match', v)" placeholder="请选择" clearable>
+                  <el-option label="一致" value="consistent" /><el-option label="不一致" value="inconsistent" /><el-option label="不适用" value="pending" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="电话一致">
+                <el-select :model-value="row.reply_phone_match" :disabled="readonly" @update:model-value="(v) => emitUpdate('reply_phone_match', v)" placeholder="请选择" clearable>
+                  <el-option label="一致" value="consistent" /><el-option label="不一致" value="inconsistent" /><el-option label="不适用" value="pending" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+            <el-col :span="24">
+              <el-form-item :required="hasReplyInconsistency">
+                <template #label>
+                  <span :class="{ 'entity-verify-detail__required-label': hasReplyInconsistency }">不一致说明</span>
+                </template>
+                <el-input
+                  :model-value="row.reply_inconsistent_note"
+                  :disabled="readonly"
+                  type="textarea"
+                  :rows="2"
+                  :placeholder="hasReplyInconsistency ? '存在不一致项，请填写说明' : '如有不一致请说明'"
+                  @update:model-value="(v) => emitUpdate('reply_inconsistent_note', v)"
+                />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="核实证据索引">
+                <el-input :model-value="row.verify_evidence_index" :disabled="readonly" @update:model-value="(v) => emitUpdate('verify_evidence_index', v)" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="跟函控制索引">
+                <el-input :model-value="row.followup_control_index" :disabled="readonly" @update:model-value="(v) => emitUpdate('followup_control_index', v)" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </el-form>
+      </el-collapse-item>
     </el-collapse>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import type { EntityVerifyRow } from './entityVerifyTypes'
 import FieldHintIcon from './FieldHintIcon.vue'
 
@@ -249,7 +365,14 @@ const emit = defineEmits<{
   (e: 'update', field: string, value: any): void
 }>()
 
-const activeStages = ref<string[]>(['basic', 'qcc', 'send', 'reply'])
+const activeStages = ref<string[]>(['basic', 'qcc', 'send', 'reply', 'reply_verify'])
+
+/** 回函核实块三项一致性判定存在「不一致」时要求填说明（Property 7） */
+const hasReplyInconsistency = computed(() => {
+  const r = props.row
+  if (!r) return false
+  return [r.reply_name_match, r.reply_addr_match, r.reply_phone_match].includes('inconsistent')
+})
 
 function emitUpdate(field: string, value: any) {
   if (!props.readonly) {
@@ -272,5 +395,15 @@ function getDictOptions(dictKey: string): string[] {
 
 .entity-verify-detail__collapse {
   padding: 0 8px;
+}
+
+.entity-verify-detail__x07-note {
+  margin-bottom: 10px;
+}
+
+.entity-verify-detail__required-label::before {
+  content: '*';
+  color: var(--el-color-danger);
+  margin-right: 4px;
 }
 </style>

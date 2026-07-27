@@ -712,6 +712,9 @@ sheets:
   货币资金发函记录表E0-3:
     component_type: d-form-confirmation
     class_code: D-函证
+    _reviewed: true
+    _reviewed_at: '2026-07-26'
+    _reviewed_note: e0-send-list-components spec 人工审定源模板真实列（col_* → 业务 snake_case + 枚举/日期/金额语义）
     fixed_cells:
       A1: 致同会计师事务所
       A2: 货币资金发函信息表
@@ -723,69 +726,86 @@ sheets:
       start_row: 6
       end_row: dynamic
       header_row: 5
+      max_rows: 200
       columns:
         A:
-          field: col_a
+          field: account_subject
           type: text
           label: 所属科目
         B:
-          field: col_b
+          field: index_no
           type: text
           label: 索引号
         C:
-          field: col_c
-          type: text
+          field: report_date
+          type: date
           label: 报表截止日
         D:
-          field: col_d
+          field: bank_name
           type: text
           label: 开户银行
         E:
-          field: col_e
-          type: text
+          field: is_confirm
+          type: enum
+          enum:
+          - 是
+          - 否
           label: 是否函证
         F:
-          field: col_f
+          field: account_holder
           type: text
           label: 账户名称
         G:
-          field: col_g
+          field: bank_account
           type: text
           label: 银行账号
         H:
-          field: col_h
+          field: currency
           type: text
           label: 币种
         I:
-          field: col_i
-          type: text
+          field: interest_rate
+          type: number
           label: 利率(%)
         J:
-          field: col_j
-          type: text
+          field: account_type
+          type: enum
+          enum:
+          - 基本存款账户
+          - 一般存款账户
+          - 专用存款账户
+          - 临时存款账户
+          - 其他
           label: 账户类型
         K:
-          field: col_k
-          type: text
+          field: balance_orig
+          type: number
+          render: amount
           label: 账户余额（原币）
         L:
-          field: col_l
-          type: text
+          field: is_pooling
+          type: enum
+          enum:
+          - 是
+          - 否
           label: 是否属于资金归集（资金池或其他资金管理）账户
         M:
-          field: col_m
-          type: text
+          field: start_date
+          type: date
           label: 起始日期
         N:
-          field: col_n
-          type: text
+          field: end_date
+          type: date
           label: 终止日期
         O:
-          field: col_o
-          type: text
+          field: has_restriction
+          type: enum
+          enum:
+          - 是
+          - 否
           label: 是否存在冻结、担保或其他使用限制（如是，请注明）
         P:
-          field: col_p
+          field: remark
           type: text
           label: 备注
     static_text:
@@ -836,6 +856,9 @@ sheets:
   借款发函记录表E0-4:
     component_type: d-form-confirmation
     class_code: D-函证
+    _reviewed: true
+    _reviewed_at: '2026-07-26'
+    _reviewed_note: e0-send-list-components spec 人工审定源模板真实列（col_* → 业务 snake_case + 枚举/日期/金额语义）
     fixed_cells:
       A1: 致同会计师事务所
       A2: 借款发函记录表
@@ -847,70 +870,81 @@ sheets:
       start_row: 6
       end_row: dynamic
       header_row: 5
+      max_rows: 200
       columns:
         A:
-          field: col_a
+          field: account_subject
           type: text
           label: 所属科目
         B:
-          field: col_b
+          field: index_no
           type: text
           label: 索引号
         C:
-          field: col_c
-          type: text
+          field: report_date
+          type: date
           label: 报表截止日
         D:
-          field: col_d
+          field: bank_name
           type: text
           label: 开户银行
         E:
-          field: col_e
-          type: text
+          field: is_confirm
+          type: enum
+          enum:
+          - 是
+          - 否
           label: 是否函证
         F:
-          field: col_f
+          field: borrower
           type: text
           label: 借款人名称
         G:
-          field: col_g
+          field: loan_account
           type: text
           label: 借款账号
         H:
-          field: col_h
+          field: currency
           type: text
           label: 币种
         I:
-          field: col_i
-          type: text
+          field: balance
+          type: number
+          render: amount
           label: 余额
         J:
-          field: col_j
-          type: text
+          field: loan_date
+          type: date
           label: 借款日期
         K:
-          field: col_k
-          type: text
+          field: maturity_date
+          type: date
           label: 到期日期
         L:
-          field: col_l
-          type: text
+          field: interest_rate
+          type: number
           label: 利率(%)
         M:
-          field: col_m
+          field: guarantor
           type: text
           label: 抵(质)押品/担保人
         N:
-          field: col_n
+          field: remark
           type: text
           label: 备注
         O:
-          field: col_o
-          type: text
+          field: loan_type
+          type: enum
+          enum:
+          - 短期借款
+          - 长期借款
+          - 一年内到期的长期借款
+          - 其他
           label: 借款类型
         P:
-          field: col_p
-          type: text
+          field: accrued_interest
+          type: number
+          render: amount
           label: 期末应付利息
     static_text:
       rows:
@@ -937,6 +971,9 @@ sheets:
   应付银行承兑汇票发函记录表E0-5:
     component_type: d-form-confirmation
     class_code: D-函证
+    _reviewed: true
+    _reviewed_at: '2026-07-26'
+    _reviewed_note: e0-send-list-components spec 人工审定源模板真实列（col_* → 业务 snake_case + 枚举/日期/金额语义）
     fixed_cells:
       A1: 致同会计师事务所
       A2: 应付银行承兑汇票发函记录表
@@ -948,45 +985,47 @@ sheets:
       start_row: 6
       end_row: dynamic
       header_row: 5
+      max_rows: 200
       columns:
         A:
-          field: col_a
+          field: index_no
           type: text
           label: 索引号
         B:
-          field: col_b
-          type: text
+          field: report_date
+          type: date
           label: 报表截止日
         C:
-          field: col_c
+          field: bank_name
           type: text
           label: 开户银行
         D:
-          field: col_d
+          field: bill_no
           type: text
           label: 银行承兑汇票号码
         E:
-          field: col_e
+          field: settlement_account
           type: text
           label: 结算账户账号
         F:
-          field: col_f
+          field: currency
           type: text
           label: 币种
         G:
-          field: col_g
-          type: text
+          field: face_amount
+          type: number
+          render: amount
           label: 票面金额
         H:
-          field: col_h
-          type: text
+          field: issue_date
+          type: date
           label: 出票日
         I:
-          field: col_i
-          type: text
+          field: maturity_date
+          type: date
           label: 到期日
         J:
-          field: col_j
+          field: pledge
           type: text
           label: 抵（质）押品
     static_text:
@@ -1014,6 +1053,9 @@ sheets:
   理财产品发函记录表E0-6:
     component_type: d-form-confirmation
     class_code: D-函证
+    _reviewed: true
+    _reviewed_at: '2026-07-26'
+    _reviewed_note: e0-send-list-components spec 人工审定源模板真实列（col_* → 业务 snake_case + 枚举/日期/金额语义）
     fixed_cells:
       A1: 致同会计师事务所
       A2: 理财产品发函记录表
@@ -1025,50 +1067,58 @@ sheets:
       start_row: 6
       end_row: dynamic
       header_row: 5
+      max_rows: 200
       columns:
         A:
-          field: col_a
+          field: index_no
           type: text
           label: 索引号
         B:
-          field: col_b
-          type: text
+          field: report_date
+          type: date
           label: 报表截止日
         C:
-          field: col_c
+          field: bank_recipient
           type: text
           label: 开户行名称及收件人
         D:
-          field: col_d
+          field: product_name
           type: text
           label: 产品名称
         E:
-          field: col_e
-          type: text
+          field: product_type
+          type: enum
+          enum:
+          - 封闭式
+          - 开放式
           label: 产品类型（封闭式/开放式）
         F:
-          field: col_f
+          field: currency
           type: text
           label: 币种
         G:
-          field: col_g
-          type: text
+          field: holding_shares
+          type: number
           label: 持有份额
         H:
-          field: col_h
-          type: text
+          field: net_value
+          type: number
+          render: amount
           label: 产品净值
         I:
-          field: col_i
-          type: text
+          field: purchase_date
+          type: date
           label: 购买日
         J:
-          field: col_j
-          type: text
+          field: maturity_date
+          type: date
           label: 到期日
         K:
-          field: col_k
-          type: text
+          field: has_restriction
+          type: enum
+          enum:
+          - 是
+          - 否
           label: 是否被用于担保或存在其他使用限制
     static_text:
       rows:

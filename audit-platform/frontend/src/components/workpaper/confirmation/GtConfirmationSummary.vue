@@ -40,6 +40,12 @@
             <el-button v-if="!readonly" type="primary" @click="handleAdd">+ 新增函证对象</el-button>
             <el-button v-if="!readonly" @click="handleDownloadImportTemplate">下载导入模板</el-button>
             <el-button v-if="!readonly" @click="handleImportClick">从 Excel 导入</el-button>
+            <el-button
+              v-if="!readonly"
+              :loading="syncing"
+              title="将已发函/已回函的行同步到项目函证中心台账（供工作包摘要/覆盖率消费）"
+              @click="handleSyncHub"
+            >同步到函证中心</el-button>
           </div>
         </div>
       </div>
@@ -57,6 +63,19 @@
         <div class="gt-confirmation-summary__toolbar">
           <ConfirmationTabs :tabs="data.accountTabs.value" :active-tab="data.activeTab.value" @update:active-tab="data.activeTab.value = $event" />
           <div class="gt-confirmation-summary__toolbar-right">
+            <el-tag
+              v-if="syncStatusSummary.total > 0"
+              size="small"
+              :type="syncStatusSummary.unsynced === 0 ? 'success' : 'info'"
+              title="已同步=已回写函证中心台账标识的行；待同步=已进入函证程序但尚未同步的行"
+            >已同步 {{ syncStatusSummary.synced }} · 待同步 {{ syncStatusSummary.unsynced }}</el-tag>
+            <el-button
+              v-if="!readonly && isE0"
+              size="small"
+              :loading="importingLists"
+              title="从 E0-3~E0-6 发函清单筛「是否函证=是」的账户带入本汇总表"
+              @click="handleImportE0Lists"
+            >从发函清单带入</el-button>
             <el-button
               v-if="!readonly"
               size="small"
@@ -99,6 +118,7 @@
           <ConfirmationFullGrid
             :rows="data.filteredRows.value"
             :readonly="readonly"
+            :cycle="confirmCycle"
             @update="handleGridUpdate"
           />
         </template>
@@ -172,14 +192,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, defineAsyncComponent, onMounted, onUnmounted } from 'vue'
+import { ref, computed, defineAsyncComponent, onMounted, onUnmounted, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
 import { useConfirmationData } from './composables/useConfirmationData'
 import { useViewMode } from './composables/useViewMode'
-import { syncHubFromSummary, hubStatusToRowPatch } from './coordination/syncHubFromSummary'
-import { emitConfirmationCompletedFromSummary } from './coordination/emitConfirmationCompleted'
+import { syncHubFromSummary, hubStatusToRowPatch, accountTypeToHubType, rowToHubStatus } from './coordination/syncHubFromSummary'
+import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
+import { emitConfirmationCompletedFromSummary, isConfirmationInFlight } from './coordination/emitConfirmationCompleted'
+import { importE0ListsToSummary } from './coordination/importE0ListsToSummary'
 import type { ConfirmationRow } from './confirmationTypes'
 
 import ConfirmationDashboard from './ConfirmationDashboard.vue'
@@ -213,6 +235,19 @@ const emit = defineEmits<{
 const htmlDataRef = computed(() => props.htmlData)
 const isNewFormat = computed(() => props.htmlData?._format === 'confirmation-v1')
 
+// 枢纽标识（Cycle_Variant_Column 列集合选取，confirmation-shared-model-extension 决策 2）
+// 由 wpCode（D0-1/E0-1/…/L0-1）派生：取前缀字母+0 组，回退 D0。
+const confirmCycle = computed<import('./confirmationColumnSpec').ConfirmCycle>(() => {
+  const m = String(props.wpCode || '').match(/^([A-Z])0/)
+  const c = m ? (`${m[1]}0` as import('./confirmationColumnSpec').ConfirmCycle) : 'D0'
+  const valid: import('./confirmationColumnSpec').ConfirmCycle[] = ['D0', 'E0', 'F0', 'G0', 'H0', 'K0', 'L0']
+  return valid.includes(c) ? c : 'D0'
+})
+
+// E0（货币资金/借款）循环：提供「从发函清单（E0-3~E0-6）带入」入口
+const isE0 = computed(() => confirmCycle.value === 'E0')
+const importingLists = ref(false)
+
 // ─── 数据核心 ────────────────────────────────────────────────────────────────
 
 // 科目审定总额(TB population)：后端 render 注入 project_context.population_amount（前端只读）
@@ -230,6 +265,20 @@ const data = useConfirmationData({
 
 const viewMode = useViewMode()
 
+// P1-1: 保存后自动同步到函证中心台账（防抖/非阻塞/失败静默/只读gate）
+const autoSync = useDisclosureAutoSync({
+  isReadonly: () => props.readonly,
+  debounceMs: 2000,
+})
+
+// 同步状态可见（Task 4.2 / Property 20）：已同步=已回写 hubId 的行；
+// 待同步=已进入函证程序（已发函/已回函）但尚未持久化 hubId 的行。数据源为行上持久化的 _hub_confirmation_id。
+const syncStatusSummary = computed(() => {
+  const inFlight = data.rows.value.filter((r) => r.entity_name?.trim() && isConfirmationInFlight(r))
+  const synced = inFlight.filter((r) => !!r._hub_confirmation_id).length
+  return { total: inFlight.length, synced, unsynced: inFlight.length - synced }
+})
+
 // ─── UI 状态 ──────────────────────────────────────────────────────────────────
 
 const selectedIds = ref<string[]>([])
@@ -242,9 +291,7 @@ const hasInteracted = ref(false)
 
 // #3: 订阅 Hub 状态变更→反向刷新编制真源行（Hub 手动推进后同步回来）
 function _onConfirmationReceived(payload: { confirmationId?: string; accountCode?: string }) {
-  // Hub 推进到终态后触发——查找匹配行并补丁状态
-  // 因为此事件不带详细状态信息（仅 confirmationId），我们需从 Hub 重新拉取确认
-  // 简化方案：标记需刷新，下次 focus/save 时 re-sync
+  // Hub 推进到终态后触发——同会话即时刷新（加速）；持久化以 _backflowFromHub 为准。
   if (!payload?.confirmationId) return
   const row = data.rows.value.find(r => r._hub_confirmation_id === payload.confirmationId)
   if (row) {
@@ -252,12 +299,80 @@ function _onConfirmationReceived(payload: { confirmationId?: string; accountCode
     const patch = hubStatusToRowPatch('returned')
     Object.assign(row, patch)
   }
+  // 触发一次持久化拉取（拿到回函金额/终态，手工优先）
+  _backflowFromHub(true)
+}
+
+/**
+ * Reply_Backflow（R4.1/R4.5）：从后端台账拉取回函结果刷新本表行，不依赖同会话事件。
+ * - 匹配优先级：行的 _hub_confirmation_id > 对方名称（counterparty）
+ * - 手工优先（P8）：行已有审计师手工回函金额（reply_amount）时不覆盖，仅补状态标记
+ * - 持久化读取（P9）：跨会话打开也能读到台账最新回函
+ */
+let _backflowRan = false
+async function _backflowFromHub(force = false) {
+  if (!props.projectId) return
+  if (_backflowRan && !force) { /* onMounted 只跑一次；事件驱动 force=true */ }
+  try {
+    const res = await http.get<any>(
+      `/api/projects/${props.projectId}/confirmations`,
+      { _silent: true } as any,
+    )
+    const items: any[] = res?.items ?? res?.data?.items ?? []
+    if (!items.length) return
+    // 建索引：按 id 与按对方名称
+    const byId = new Map<string, any>()
+    const byName = new Map<string, any>()
+    for (const it of items) {
+      if (it.id) byId.set(String(it.id), it)
+      const name = String(it.counterparty || '').trim()
+      if (name && !byName.has(name)) byName.set(name, it)
+    }
+    let anyPatched = false
+    for (const row of data.rows.value) {
+      const hit = (row._hub_confirmation_id && byId.get(row._hub_confirmation_id))
+        || byName.get(String(row.entity_name || '').trim())
+      if (!hit) continue
+      const status = String(hit.status || '')
+      if (!['returned', 'matched', 'discrepancy'].includes(status)) continue
+      // 手工优先：行已有回函金额（审计师手填）则不覆盖金额，仅补状态标记
+      const hasManualReply = row.reply_amount != null && row.reply_amount !== '' && Number(row.reply_amount) !== 0
+      const patch = hubStatusToRowPatch(
+        status,
+        hasManualReply ? undefined : {
+          confirmed_amount: hit.confirmed_amount,
+          diff_amount: hit.diff_amount,
+        },
+      )
+      // 首次回填 hubId 映射（供后续幂等 + 状态显示）
+      if (!row._hub_confirmation_id && hit.id) row._hub_confirmation_id = String(hit.id)
+      for (const [k, v] of Object.entries(patch)) {
+        if (v === undefined) continue
+        if ((row as any)[k] !== v) { (row as any)[k] = v; anyPatched = true }
+      }
+    }
+    if (anyPatched) {
+      // 持久化刷新结果（不触发二次同步，供跨会话可读 P9）
+      emit('save', data.buildPayload())
+    }
+  } catch {
+    // 台账不可读时静默（不打扰用户）
+  } finally {
+    _backflowRan = true
+  }
 }
 onMounted(() => {
   eventBus.on('confirmation:received', _onConfirmationReceived)
+  // 打开时按持久化台账刷新回函结果（不依赖同会话事件）
+  if (data.rows.value.length > 0) _backflowFromHub()
 })
 onUnmounted(() => {
   eventBus.off('confirmation:received', _onConfirmationReceived)
+})
+
+// 清除待触发的自动同步定时器
+onBeforeUnmount(() => {
+  autoSync.cancelPending()
 })
 
 // 公式管理弹窗
@@ -476,16 +591,50 @@ async function handleSyncHub() {
 }
 
 /**
+ * E0 清单 → E0-1 带入（Task 3.3 / Property 14）：
+ * 从 E0-3~E0-6 发函清单筛「是否函证=是」的账户，按品种置 account_type，去重后建行。
+ * 复用既有 addRow + updateField 写入路径（不新造 confirmation-v1 写入实现）。
+ */
+async function handleImportE0Lists() {
+  if (!props.projectId) { ElMessage.warning('缺少项目上下文，无法带入'); return }
+  importingLists.value = true
+  try {
+    const res = await importE0ListsToSummary(props.projectId, data.rows.value)
+    if (!res.ok) {
+      ElMessage.warning('从发函清单带入失败：' + (res.message || '未知错误'))
+      return
+    }
+    if (res.candidates.length === 0) {
+      ElMessage.info(res.emptyReason || '无可带入项目')
+      return
+    }
+    hasInteracted.value = true
+    for (const c of res.candidates) {
+      const row = data.addRow()
+      if (c.entity_name) data.updateField(row._row_id!, 'entity_name', c.entity_name)
+      if (c.confirm_index) data.updateField(row._row_id!, 'confirm_index', c.confirm_index)
+      if (c.account_type) data.updateField(row._row_id!, 'account_type', c.account_type)
+      if (c.amount != null) data.updateField(row._row_id!, 'amount', c.amount)
+      ;(row as any)._source = 'auto'
+    }
+    handleSave()
+    ElMessage.success(`已从发函清单带入 ${res.candidates.length} 个账户`)
+  } catch (e: any) {
+    ElMessage.warning('从发函清单带入失败：' + (e?.message || '未知错误'))
+  } finally {
+    importingLists.value = false
+  }
+}
+
+/**
  * #1+#2+#4: 保存后自动同步 Hub（批量端点，单次 HTTP 替代 N+1）。
+ * 使用 useDisclosureAutoSync 统一封装：防抖 2s/非阻塞/失败静默/只读gate。
  * 同步成功后 hubId 写回 row._hub_confirmation_id → re-save 持久化映射。
  */
-let _syncTimer: ReturnType<typeof setTimeout> | null = null
-async function _autoSyncAfterSave() {
-  if (_syncTimer) clearTimeout(_syncTimer)
-  _syncTimer = setTimeout(async () => {
+function _triggerAutoSyncHub() {
+  if (!props.projectId) return
+  autoSync.scheduleAutoSync(async () => {
     if (syncing.value) return // 正在手动同步，跳过
-    const { isConfirmationInFlight } = await import('./coordination/emitConfirmationCompleted')
-    const { accountTypeToHubType, rowToHubStatus } = await import('./coordination/syncHubFromSummary')
     const candidates = data.rows.value.filter(
       (r) => r.entity_name?.trim() && isConfirmationInFlight(r),
     )
@@ -505,36 +654,32 @@ async function _autoSyncAfterSave() {
       hub_confirmation_id: r._hub_confirmation_id || undefined,
     }))
 
-    try {
-      const res = await http.post<any>(
-        `/api/projects/${props.projectId}/confirmations/batch-sync`,
-        {
-          items,
-          wp_id: props.wpId,
-          wp_code: cycleCode,
-          year: props.year ? Number(props.year) : undefined,
-        },
-        { _silent: true } as any,
-      )
-      // #2: 写回 hubId 到各行
-      const hubIds: Record<string, string> = res?.hub_ids || {}
-      let anyMapped = false
-      for (const row of candidates) {
-        const name = (row.entity_name || '').trim()
-        if (hubIds[name] && row._hub_confirmation_id !== hubIds[name]) {
-          row._hub_confirmation_id = hubIds[name]
-          anyMapped = true
-        }
+    const res = await http.post<any>(
+      `/api/projects/${props.projectId}/confirmations/batch-sync`,
+      {
+        items,
+        wp_id: props.wpId,
+        wp_code: cycleCode,
+        year: props.year ? Number(props.year) : undefined,
+      },
+      { _silent: true } as any,
+    )
+    // #2: 写回 hubId 到各行
+    const hubIds: Record<string, string> = res?.hub_ids || {}
+    let anyMapped = false
+    for (const row of candidates) {
+      const name = (row.entity_name || '').trim()
+      if (hubIds[name] && row._hub_confirmation_id !== hubIds[name]) {
+        row._hub_confirmation_id = hubIds[name]
+        anyMapped = true
       }
-      // re-save 持久化 hubId 映射（不触发二次同步）
-      if (anyMapped) {
-        const payload = data.buildPayload()
-        emit('save', payload)
-      }
-    } catch {
-      // 自动同步失败静默（不打扰用户，手动同步仍可用）
     }
-  }, 2000) // debounce 2s 避免连续保存频繁同步
+    // re-save 持久化 hubId 映射（不触发二次同步）
+    if (anyMapped) {
+      const payload = data.buildPayload()
+      emit('save', payload)
+    }
+  })
 }
 
 function handleSave() {
@@ -557,7 +702,7 @@ function handleSave() {
   })
   // #1+#2: 保存后自动同步到函证中心（非阻塞，hubId 回写后自动 re-save 持久化）
   if (props.projectId) {
-    _autoSyncAfterSave()
+    _triggerAutoSyncHub()
   }
 }
 

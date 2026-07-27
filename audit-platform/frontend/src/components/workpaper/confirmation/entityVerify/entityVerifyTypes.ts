@@ -52,6 +52,47 @@ export interface EntityVerifyRow {
   /** 反舞弊检测结果 */
   fraud_flags?: string[]
   row_status?: 'ok' | 'suspect' | 'fraud_flag'
+
+  // ─── additive 补列（confirmation-shared-model-extension，Requirement 3） ───
+  // 全部可选，旧 entity-verify-v1 payload 读回时为 undefined。
+  // Reply_Verification_Block（回函核实块）+ 企查查块缺列。
+  // 单一真源（决策 5/Property 8）：回函方式/是否原件/是否直接接收 以 X0-7 为唯一录入位置，
+  //   本表 is_original/direct_received 为只读引用（UI 层禁编辑，明示「详见 X0-7」）。
+
+  /** 是否原件（只读引用，权威在 X0-7）— X0-2 回函核实块 */
+  is_original?: '是' | '否' | '不适用'
+  /** 是否项目组直接收到（只读引用，权威在 X0-7）— X0-2 回函核实块 */
+  direct_received?: '是' | '否' | '不适用'
+  /** 回函发出地址 — X0-2 回函核实块 */
+  reply_from_addr?: string
+  /** 回函寄件人 — X0-2 回函核实块 */
+  reply_sender?: string
+  /** 回函电话 — X0-2 回函核实块 */
+  reply_phone?: string
+  /** 回函单位名称一致性 — X0-2（点选：是/否/不适用） */
+  reply_name_match?: 'consistent' | 'inconsistent' | 'pending'
+  /** 回函地址一致性 — X0-2 */
+  reply_addr_match?: 'consistent' | 'inconsistent' | 'pending'
+  /** 回函电话一致性 — X0-2 */
+  reply_phone_match?: 'consistent' | 'inconsistent' | 'pending'
+  /** 三项不一致说明（判定不一致时要求填，Requirement 3.4）— X0-2 */
+  reply_inconsistent_note?: string
+  /** 核实证据索引 — X0-2 */
+  verify_evidence_index?: string
+  /** 跟函控制过程索引 — X0-2 */
+  followup_control_index?: string
+
+  // ─── 企查查块缺列 ─────────────────────────────────────────────────────────
+  /** 企查查-邮编 — X0-2 企查查核对块 */
+  qcc_zipcode?: string
+  /** 企查查-邮箱/传真 — X0-2 企查查核对块 */
+  qcc_email_fax?: string
+  /** 企查查-不一致说明是否合理 — X0-2（合理/不合理） */
+  qcc_inconsistent_reasonable?: '合理' | '不合理' | '不适用'
+  /** 企查查-支持性文件索引 — X0-2 */
+  qcc_support_index?: string
+  /** 企查查-备注 — X0-2 */
+  qcc_remark?: string
 }
 
 /** D0-2 进度指标 */

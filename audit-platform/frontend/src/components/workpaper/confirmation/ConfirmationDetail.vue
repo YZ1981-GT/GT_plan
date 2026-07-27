@@ -106,6 +106,33 @@
               @update:model-value="(v) => emitUpdate('amount', v)"
             />
           </el-form-item>
+          <el-form-item label="选取样本目的">
+            <el-input
+              :model-value="row.sample_purpose"
+              :disabled="readonly"
+              @update:model-value="(v) => emitUpdate('sample_purpose', v)"
+            />
+          </el-form-item>
+          <el-form-item label="发函单号">
+            <el-input
+              :model-value="row.send_doc_no"
+              :disabled="readonly"
+              @update:model-value="(v) => emitUpdate('send_doc_no', v)"
+            />
+          </el-form-item>
+          <el-form-item label="收件地址核查">
+            <el-select
+              :model-value="row.send_addr_match"
+              :disabled="readonly"
+              @update:model-value="(v) => emitUpdate('send_addr_match', v)"
+              placeholder="是否一致"
+              clearable
+            >
+              <el-option label="一致" value="consistent" />
+              <el-option label="不一致" value="inconsistent" />
+              <el-option label="待核实" value="pending" />
+            </el-select>
+          </el-form-item>
         </el-form>
       </el-collapse-item>
 
@@ -161,6 +188,33 @@
               />
             </el-select>
           </el-form-item>
+          <el-form-item label="回函快递单号">
+            <el-input
+              :model-value="row.reply_courier_no"
+              :disabled="readonly"
+              @update:model-value="(v) => emitUpdate('reply_courier_no', v)"
+            />
+          </el-form-item>
+          <el-form-item label="回函发出地址">
+            <el-input
+              :model-value="row.reply_from_addr"
+              :disabled="readonly"
+              @update:model-value="(v) => emitUpdate('reply_from_addr', v)"
+            />
+          </el-form-item>
+          <el-form-item label="发函回函地址核查">
+            <el-select
+              :model-value="row.send_reply_addr_match"
+              :disabled="readonly"
+              @update:model-value="(v) => emitUpdate('send_reply_addr_match', v)"
+              placeholder="是否一致"
+              clearable
+            >
+              <el-option label="一致" value="consistent" />
+              <el-option label="不一致" value="inconsistent" />
+              <el-option label="待核实" value="pending" />
+            </el-select>
+          </el-form-item>
         </el-form>
       </el-collapse-item>
 
@@ -204,6 +258,22 @@
                 @click="$emit('jump-to-ref', row.diff_ref_index)"
               >跳转 →</el-button>
             </div>
+          </el-form-item>
+          <el-form-item label="是否替代程序">
+            <el-switch
+              :model-value="row.use_alternative"
+              :disabled="readonly"
+              @update:model-value="(v) => emitUpdate('use_alternative', v)"
+            />
+          </el-form-item>
+          <el-form-item v-if="row.use_alternative" label="替代不可确认">
+            <el-input-number
+              :model-value="row.alt_unconfirmed"
+              :disabled="readonly"
+              :precision="2"
+              :controls="false"
+              @update:model-value="(v) => emitUpdate('alt_unconfirmed', v)"
+            />
           </el-form-item>
           <el-form-item label="替代索引">
             <div class="confirmation-detail__ref-row">

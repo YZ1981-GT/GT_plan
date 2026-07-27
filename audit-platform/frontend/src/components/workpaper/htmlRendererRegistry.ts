@@ -79,6 +79,7 @@ export type HtmlComponentType =
   | 'confirmation-alternative-f05'
   | 'confirmation-alternative-f06'
   | 'confirmation-diff-securities'
+  | 'confirmation-diff-nonsecurities'
   | 'confirmation-alternative-g06'
   | 'confirmation-alternative-h05'
   | 'confirmation-alternative-k05'
@@ -320,6 +321,7 @@ const GtConfirmationAlternativeD06 = defineAsyncComponent(() => import('./confir
 const GtConfirmationAlternativeF05 = defineAsyncComponent(() => import('./confirmation/alternativeF05/GtConfirmationAlternativeF05.vue'))
 const GtConfirmationAlternativeF06 = defineAsyncComponent(() => import('./confirmation/alternativeF06/GtConfirmationAlternativeF06.vue'))
 const GtConfirmationDiffSecurities = defineAsyncComponent(() => import('./g0-confirmation/diffSecurities/GtConfirmationDiffSecurities.vue'))
+const GtG0DiffNonSecurities = defineAsyncComponent(() => import('./g0-confirmation/diffNonSecurities/GtG0DiffNonSecurities.vue'))
 const GtConfirmationAlternativeG06 = defineAsyncComponent(() => import('./g0-confirmation/alternativeG06/GtConfirmationAlternativeG06.vue'))
 const GtConfirmationAlternativeH05 = defineAsyncComponent(() => import('./confirmation/alternativeH05/GtConfirmationAlternativeH05.vue'))
 const GtConfirmationAlternativeK05 = defineAsyncComponent(() => import('./confirmation/alternativeK05/GtConfirmationAlternativeK05.vue'))
@@ -1167,6 +1169,14 @@ contextProps: 'form-type' as const,
     component: GtConfirmationDiffSecurities,
     icon: '📈',
     label: '证券差异核对',
+    emits: ['save'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'confirmation-diff-nonsecurities',
+    component: GtG0DiffNonSecurities,
+    icon: '🏦',
+    label: '非证券差异核对',
     emits: ['save'],
     contextProps: 'standard',
   },
@@ -2096,13 +2106,24 @@ export const HTML_COMPONENT_TYPE_SET: ReadonlySet<HtmlComponentType> = new Set(
 )
 
 /**
- * GtWpRenderer 路由集合（含 skip placeholder）。
+ * GtWpRenderer 路由集合（含 skip / confirmation-hub placeholder）。
  * 与 useEditorMode.HTML_COMPONENT_TYPES 一致：判定底稿是否应走 GtWpRenderer 而非 Univer。
- * skip 是占位符不在 registry 中，但仍由 GtWpRenderer 内部分支渲染 SkippedSheetPlaceholder。
+ *
+ * 集合内但不在 registry 中的两个 placeholder：
+ * - skip：由 GtWpRenderer 内部分支渲染 SkippedSheetPlaceholder。
+ * - confirmation-hub：D0/E0/F0/G0/H0/K0/L0 函证枢纽的 **workbook 级** componentType。
+ *   这些底稿是多 sheet 工作簿（底稿目录 / X0A 程序表 / X0-1 汇总 / X0-2~X0-8 各函证底稿），
+ *   每个 sheet 自身的 componentType 都已在 registry 注册（confirmation-summary /
+ *   confirmation-entity-verify / confirmation-followup / confirmation-diff-reconcile /
+ *   confirmation-diff-checklist / confirmation-alternative-* / confirmation-reliability /
+ *   confirmation-fraud-risk 等）。GtWpRenderer 按 **per-sheet** componentType 分发，
+ *   workbook 级 confirmation-hub 只用于判定"走 HTML 渲染器而非 Univer"，
+ *   因此无需（也不应）注册组件；函证管理中心台账由编辑器顶部入口按钮跳转承载。
  */
 export const HTML_RENDERER_ROUTE_SET: ReadonlySet<string> = new Set([
   ...HTML_COMPONENT_TYPE_SET,
   'skip',
+  'confirmation-hub',
 ])
 
 // ─── 工具函数 ────────────────────────────────────────────────────────────────

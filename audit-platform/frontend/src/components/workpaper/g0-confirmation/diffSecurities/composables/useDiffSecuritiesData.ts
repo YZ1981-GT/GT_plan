@@ -34,6 +34,21 @@ function recalcRow(row: SecuritiesDiffRow): SecuritiesDiffRow {
   }
 }
 
+/**
+ * migrateAdjust — 旧数据「是否需要调账」判断列迁移（Property 2）
+ *
+ * 源模板 G0-3·P「是否需要调账」是判断列（是/否/待定）。既有实现把它做成自由文本
+ * `adjustment_note`。迁移规则：`adjustment_note` 非空且 `need_adjust` 未设时，
+ * 映射 need_adjust='待定' 并**保留原文**（不丢，Requirement 1.3）。
+ * 已有 need_adjust 的行不动（幂等，二次读回不变）。
+ */
+export function migrateAdjust(row: SecuritiesDiffRow): SecuritiesDiffRow {
+  if (row.need_adjust) return row
+  const note = (row.adjustment_note ?? '').trim()
+  if (!note) return row
+  return { ...row, need_adjust: '待定' }
+}
+
 export interface UseDiffSecuritiesDataProps {
   htmlData: () => any
   readonly: boolean
@@ -65,7 +80,9 @@ export function useDiffSecuritiesData(props: UseDiffSecuritiesDataProps): UseDif
       auditNote.value = ''
       return
     }
-    rows.value = Array.isArray(data.rows) ? data.rows.map((r: SecuritiesDiffRow) => recalcRow(ensureRowId(r))) : []
+    rows.value = Array.isArray(data.rows)
+      ? data.rows.map((r: SecuritiesDiffRow) => recalcRow(migrateAdjust(ensureRowId(r))))
+      : []
     conclusion.value = data.conclusion || ''
     auditNote.value = data.audit_note || ''
     isDirty.value = false

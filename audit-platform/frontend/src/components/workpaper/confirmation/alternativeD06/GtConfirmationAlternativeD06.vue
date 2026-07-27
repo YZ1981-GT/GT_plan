@@ -318,6 +318,7 @@ import { ElMessage } from 'element-plus'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useAlternativeD06Data } from './composables/useAlternativeD06Data'
 import type { AlternativeCompany, BlockType, CheckRow } from '../alternativeD05/alternativeD05Types'
+import { importUnrepliedAsCompanies } from '../coordination/importFromSummary'
 import { BLOCK_COLUMN_CONFIGS_D06 } from './blockColumnConfigsD06'
 
 // 复用 D0-5 的 Dashboard 和 Master 组件
@@ -390,9 +391,19 @@ function handleDeleteCompany(companyId: string) {
   data.deleteCompany(companyId)
 }
 
-function handleImportD01() {
-  // TODO: 跨底稿引用获取 D0-1 未回函应收账款公司（待 dispatch persistence 接入）
-  ElMessage.info('从 D0-1 带入功能待跨底稿引用 API 接入后启用')
+async function handleImportD01() {
+  // 从 D0-1 函证结果汇总带入未回函应收账款单位（复用 coordination/importFromSummary）
+  const res = await importUnrepliedAsCompanies(props.projectId || '', 'D0-1', { defaultItemName: '应收账款' })
+  if (!res.ok) {
+    ElMessage.warning(res.reason === 'missing-summary' ? '未找到 D0-1 或尚未编制' : ('从 D0-1 带入失败：' + res.message))
+    return
+  }
+  if (res.companies.length === 0) {
+    ElMessage.info(res.emptyReason || '无未回函项目')
+    return
+  }
+  data.importCompanies(res.companies)
+  ElMessage.success(`已从 D0-1 带入 ${res.companies.length} 个未回函被函证单位`)
 }
 
 const importFileInput = ref<HTMLInputElement | null>(null)

@@ -127,6 +127,9 @@ export async function syncHubFromSummary(options: {
     return result
   }
 
+  // P2-1: 当 rows 为空/null 时直接跳过，不捏造不存在的 confirmation_id
+  if (!rows || !rows.length) return result
+
   const candidates = rows.filter(
     (r) => r.entity_name?.trim() && isConfirmationInFlight(r),
   )

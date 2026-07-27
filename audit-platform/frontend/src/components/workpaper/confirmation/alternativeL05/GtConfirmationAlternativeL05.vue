@@ -104,16 +104,73 @@
         </el-form>
       </el-card>
 
-      <!-- 4 区块检查表 -->
-      <el-card v-for="(block, idx) in BLOCKS_L05" :key="block.key" shadow="never" class="section-card block-card">
+      <!-- 期初余额一致性核对（源模板 L0-5 第3项；confirmation-alternative-structure-alignment 决策 2） -->
+      <el-card shadow="never" class="section-card">
+        <template #header>
+          <div class="card-header">
+            <span>期初余额一致性核对（检查期初余额是否与上期期末余额一致）</span>
+          </div>
+        </template>
+        <el-form label-width="140px" size="small" :disabled="readonly">
+          <el-row :gutter="16">
+            <el-col :span="8">
+              <el-form-item label="本期期初余额">
+                <el-input v-model="openingConsistency.current_opening" placeholder="可手工录入或从平台带入" @change="markDirty">
+                  <template #append>
+                    <el-button :disabled="readonly" @click="pullOpeningConsistency">带入</el-button>
+                  </template>
+                </el-input>
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="上期期末余额">
+                <el-input v-model="openingConsistency.prior_closing" placeholder="可手工录入或从平台带入" @change="markDirty" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="是否一致">
+                <el-select v-model="openingConsistency.is_consistent" placeholder="请判定" @change="markDirty" style="width:100%">
+                  <el-option label="一致" value="一致" />
+                  <el-option label="不一致" value="不一致" />
+                  <el-option label="待核对" value="待核对" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-alert
+            v-if="openingConsistencyNoteRequired"
+            type="error" :closable="false" show-icon
+            title="判定不一致时须填写说明" style="margin-bottom:8px"
+          />
+          <el-form-item label="说明">
+            <el-input
+              v-model="openingConsistency.note"
+              type="textarea" :autosize="{ minRows: 2 }"
+              placeholder="不一致时说明原因及处理"
+              @change="markDirty"
+            />
+          </el-form-item>
+        </el-form>
+      </el-card>
+
+      <!-- 4 区块检查表（block3 拆借方/贷方两表） -->
+      <el-card v-for="(block, idx) in BLOCKS_L05" :key="block.direction ? `${block.key}-${block.direction}` : block.key" shadow="never" class="section-card block-card">
         <template #header>
           <div class="card-header">
             <span>{{ block.title }}</span>
-            <el-button v-if="!readonly" size="small" type="primary" :icon="Plus" @click="handleAddRow(block.key)">新增行</el-button>
+            <el-button v-if="!readonly" size="small" type="primary" :icon="Plus" @click="handleAddRow(block.key, block.direction)">新增行</el-button>
           </div>
         </template>
+        <!-- 待归位提示：block3 借方表前展示无 direction 的既有行数（只显一次，避免借贷两表各提一次） -->
+        <el-alert
+          v-if="block.direction === 'debit' && getBlockRows(currentCompany, block.key).some(r => !r.direction)"
+          type="warning" :closable="false" show-icon
+          style="margin-bottom:8px"
+        >
+          有 {{ getBlockRows(currentCompany, block.key).filter(r => !r.direction).length }} 行尚未指定借贷方向，请编辑行指定方向后归入对应表
+        </el-alert>
         <el-table
-          :data="getBlockRows(currentCompany, block.key)"
+          :data="getBlockRowsForDisplay(currentCompany, block.key, block.direction)"
           border
           size="small"
           class="block-table"
@@ -199,7 +256,7 @@
         </el-table>
         <!-- 合计行 -->
         <div class="block-total">
-          合计：{{ formatBlockTotal(block.key) }}
+          合计：{{ formatBlockTotal(block.key, block.direction) }}
         </div>
       </el-card>
 
@@ -299,6 +356,51 @@ watch(
   { immediate: true },
 )
 
+// ─── 期初余额一致性核对（confirmation-alternative-structure-alignment 决策 2） ──
+// 挂公司级 company.opening_consistency（每被函证单位一份，随 company 持久化刷新回显）
+
+const openingConsistency = computed(() => {
+  const c = currentCompany.value
+  if (!c) return {} as Record<string, any>
+  if (!(c as any).opening_consistency) {
+    ;(c as any).opening_consistency = { is_consistent: '待核对' }
+  }
+  return (c as any).opening_consistency as {
+    current_opening?: any
+    prior_closing?: any
+    is_consistent?: string
+    note?: string
+  }
+})
+
+/** 判定不一致且未填说明 → 提示必填（Requirement 2.4） */
+const openingConsistencyNoteRequired = computed(() => {
+  const oc = openingConsistency.value
+  return oc.is_consistent === '不一致' && !String(oc.note ?? '').trim()
+})
+
+/** 从平台带入期初/上期期末余额；取不到则保持手工录入并明示（Requirement 2.3） */
+async function pullOpeningConsistency() {
+  const c = currentCompany.value
+  if (!c) return
+  try {
+    const res = await http.get(`/api/workpapers/${props.wpId}/l0/opening-balance`, {
+      params: { entity_name: c.entity_name, confirm_index: c.confirm_index },
+    })
+    const d = res.data?.data ?? res.data ?? {}
+    const oc = openingConsistency.value
+    if (d.current_opening != null) oc.current_opening = d.current_opening
+    if (d.prior_closing != null) oc.prior_closing = d.prior_closing
+    if (d.current_opening == null && d.prior_closing == null) {
+      ElMessage.info('平台未取到期初/上期期末余额，请手工录入')
+    } else {
+      markDirty()
+    }
+  } catch {
+    ElMessage.info('平台未取到期初/上期期末余额，请手工录入')
+  }
+}
+
 // ─── Import/Export ──────────────────────────────────────────────────────────
 
 const wpIdRef = computed(() => props.wpId)
@@ -337,9 +439,12 @@ interface BlockConfig {
   key: BlockType
   title: string
   evidenceCols: EvidenceCol[]
+  /** 借贷拆表标记（confirmation-alternative-structure-alignment 决策 1）：block3 本期借款拆借方/贷方两表 */
+  direction?: 'debit' | 'credit'
+  splitByDirection?: boolean
 }
 
-const BLOCKS_L05: BlockConfig[] = [
+const BLOCKS_L05_BASE: BlockConfig[] = [
   {
     key: 'block1',
     title: '①期后付款/还款检查',
@@ -368,6 +473,7 @@ const BLOCKS_L05: BlockConfig[] = [
   {
     key: 'block3',
     title: '③本期借款检查',
+    splitByDirection: true, // 源模板 L0-5 第③区块为借方(归还)/贷方(借入)两张表
     evidenceCols: [
       { key: 'loan_approval_date_no', label: '借款审批单日期编号', width: 150 },
       { key: 'loan_approved', label: '是否恰当审批', width: 110, type: 'select' },
@@ -391,10 +497,34 @@ const BLOCKS_L05: BlockConfig[] = [
   },
 ]
 
+/**
+ * 渲染用区块列表：block3（splitByDirection）展开为借方表 + 贷方表两个虚拟 block，
+ * 各带 direction 过滤（confirmation-alternative-structure-alignment 决策 1，渲染层拆表，数据仍单 block3）。
+ */
+const BLOCKS_L05 = computed<BlockConfig[]>(() => {
+  const out: BlockConfig[] = []
+  for (const b of BLOCKS_L05_BASE) {
+    if (b.splitByDirection) {
+      out.push({ ...b, title: `${b.title}（借方发生额）`, direction: 'debit' })
+      out.push({ ...b, title: `${b.title}（贷方发生额）`, direction: 'credit' })
+    } else {
+      out.push(b)
+    }
+  }
+  return out
+})
+
 // ─── Event handlers ─────────────────────────────────────────────────────────
 
 function getBlockRows(company: AlternativeCompany, blockType: BlockType): CheckRow[] {
   return data.getBlockRows(company, blockType)
+}
+
+/** 借贷拆表：按 direction 过滤展示行（无 direction 参数=全部；block3 借贷各只显对应方向） */
+function getBlockRowsForDisplay(company: AlternativeCompany, blockType: BlockType, direction?: 'debit' | 'credit'): CheckRow[] {
+  const rows = data.getBlockRows(company, blockType)
+  if (!direction) return rows
+  return rows.filter((r) => r.direction === direction)
 }
 
 function markDirty() {
@@ -437,9 +567,12 @@ async function handleImportFromSummary() {
   }
 }
 
-function handleAddRow(blockType: BlockType) {
+function handleAddRow(blockType: BlockType, direction?: 'debit' | 'credit') {
   if (!currentCompany.value?._company_id) return
-  data.addBlockRow(currentCompany.value._company_id, blockType)
+  const row = data.addBlockRow(currentCompany.value._company_id, blockType)
+  if (row && direction) {
+    data.updateBlockField(currentCompany.value._company_id, blockType, row._row_id!, 'direction', direction)
+  }
   markDirty()
 }
 
@@ -449,9 +582,12 @@ function handleDeleteRow(blockType: BlockType, rowId: string) {
   markDirty()
 }
 
-function formatBlockTotal(blockType: BlockType): string {
+function formatBlockTotal(blockType: BlockType, direction?: 'debit' | 'credit'): string {
   if (!currentCompany.value) return '—'
-  const totals = data.getBlockTotal(currentCompany.value, blockType)
+  // 借贷拆表时按方向小计，否则全 block 合计（confirmation-alternative-structure-alignment）
+  const totals = direction
+    ? data.getBlockTotalByDirection(currentCompany.value, blockType, direction)
+    : data.getBlockTotal(currentCompany.value, blockType)
   return Object.entries(totals)
     .map(([k, v]) => `${k}: ${v.toFixed(2)}`)
     .join(' | ')

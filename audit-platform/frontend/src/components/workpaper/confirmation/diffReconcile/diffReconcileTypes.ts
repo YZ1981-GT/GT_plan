@@ -41,6 +41,11 @@ export interface DiffReconcileRow {
   _source?: string
   /** 是否被用户覆盖 */
   _overridden?: boolean
+  /**
+   * 相关支持性证据 — 源模板 X0-4 第 9 列（confirmation-shared-model-extension，Requirement 4.3）。
+   * 可选字段，旧 diff-reconcile-v1 payload 读回时为 undefined。
+   */
+  support_evidence?: string
 }
 
 // ─── 按科目分组汇总 ──────────────────────────────────────────────────────────

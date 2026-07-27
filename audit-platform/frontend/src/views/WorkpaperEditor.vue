@@ -37,6 +37,16 @@
         <span class="gt-wp-editor-code">{{ wpDetail.wp_code }}</span>
         <span class="gt-wp-editor-name">{{ displayWpName }}</span>
         <div class="gt-wp-io-toolbar__actions">
+          <!-- 函证枢纽（D0/E0/F0/G0/H0/K0/L0）：底稿内逐 sheet 编制，台账由此入口跳转。 -->
+          <el-button
+            v-if="isConfirmationHubWorkbook"
+            size="small"
+            type="primary"
+            plain
+            @click="goConfirmationHub"
+          >
+            ✉️ 函证管理中心
+          </el-button>
           <el-button size="small" @click="onShowVersions">
             <el-icon><Clock /></el-icon> 版本历史
           </el-button>
@@ -537,6 +547,19 @@ const {
   fetchComponentType,
 } = useEditorMode({ wpId, projectId, wpDetail })
 
+// ─── 函证枢纽（D0/E0/F0/G0/H0/K0/L0） ──────────────────────────────────────
+// workbook 级 componentType 为 confirmation-hub：底稿在编辑器内按源模板逐 sheet 编制
+// （底稿目录 / X0A 程序表 / X0-1 汇总 / X0-2~X0-8），函证管理中心台账由入口按钮跳转，
+// 二者通过 X0-1「同步到函证中心」与回函 confirmation:received 事件双向联动。
+const isConfirmationHubWorkbook = computed<boolean>(() =>
+  componentType.value === 'confirmation-hub'
+  || wpClassification.componentType?.value === 'confirmation-hub',
+)
+
+function goConfirmationHub() {
+  router.push({ name: 'ConfirmationHub', params: { projectId: projectId.value } })
+}
+
 // ─── 循环类型 ────────────────────────────────────────────────────────────────
 const cycleType = useCycleType(wpDetail)
 const { isDCycle, isFCycle, isGCycle, isHCycle, isICycle, isKCycle, isLCycle, isMCycle, isNCycle } = cycleType
@@ -1003,25 +1026,18 @@ onMounted(() => {
 
     // 先加载归类：detail 端点不返回 component_type（fetchComponentType 会回退成 'univer'），
     // 函证枢纽等的真实 componentType 需由归类结果派生（derive_component_type 应用
-    // _WP_CODE_OVERRIDE，E0/D0/F0/G0/H0/K0/L0 → confirmation-hub）。必须在下面的重定向
-    // 判定之前完成，否则 confirmation-hub 无法识别。
+    // _WP_CODE_OVERRIDE，E0/D0/F0/G0/H0/K0/L0 → confirmation-hub）。必须在
+    // useHtmlRenderer 判定之前完成，否则 confirmation-hub 会落 Univer 路径。
     try {
       await wpClassification.load()
     } catch { /* 静默：归类失败回退到 Univer/子编辑器路径 */ }
 
-    // D0/E0/F0/G0/H0/K0/L0 等函证枢纽不属于底稿编辑器。
-    // confirmation-hub 故意不注册进 HTML_RENDERER_ROUTE_SET；若不在此重定向，
-    // 会错误落入 Univer 路径并显示「加载底稿失败 (canceled)」。
-    if (
-      componentType.value === 'confirmation-hub' ||
-      wpClassification.componentType?.value === 'confirmation-hub'
-    ) {
-      await router.replace({
-        name: 'ConfirmationHub',
-        params: { projectId: projectId.value },
-      })
-      return
-    }
+    // D0/E0/F0/G0/H0/K0/L0 函证枢纽：**不再整体重定向到函证管理中心**。
+    // 这些底稿是多 sheet 工作簿（底稿目录 / X0A 程序表 / X0-1 函证结果汇总 /
+    // X0-2 核实被函证单位 / X0-3 跟函过程控制 / X0-4 差异调节 / X0-5·X0-6 替代程序 /
+    // X0-7 回函可靠性 / X0-8 舞弊风险），每个 sheet 都有已注册的专属组件，
+    // 须在底稿编辑器内按源模板逐 sheet 编制；函证管理中心台账改由标题栏入口按钮跳转。
+    // （confirmation-hub 已加入 HTML_RENDERER_ROUTE_SET，故 useHtmlRenderer 为 true。）
 
     if (useHtmlRenderer.value) {
       loading.value = false

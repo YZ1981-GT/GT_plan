@@ -47,6 +47,7 @@
         </div>
         <div class="gt-confirmation-diff-securities__toolbar-right">
           <el-button v-if="!readonly" type="primary" size="small" @click="handleAdd">新增行</el-button>
+          <el-button v-if="!readonly" size="small" @click="handleImportFromG01">从 G0-1 带入</el-button>
           <el-button v-if="!readonly" type="success" size="small" :disabled="!data.isDirty.value" @click="handleSave">
             保存
           </el-button>
@@ -63,20 +64,29 @@
         :row-class-name="rowClassName"
         max-height="520"
       >
-        <el-table-column prop="seq" label="序号" width="55" align="center" />
-        <el-table-column label="证券名称" min-width="110">
+        <el-table-column prop="seq" label="序号" width="52" align="center" fixed="left" />
+        <!-- A 询证函索引号（关联 G0-1，可手工填/带入） -->
+        <el-table-column label="询证函索引号" width="120" fixed="left">
+          <template #default="{ row }">
+            <el-input v-if="!readonly" v-model="row.confirm_index" size="small" placeholder="关联G0-1" @change="updateField(row, 'confirm_index', row.confirm_index)" />
+            <span v-else>{{ row.confirm_index }}</span>
+          </template>
+        </el-table-column>
+        <!-- B 证券名称 -->
+        <el-table-column label="证券名称" min-width="110" fixed="left">
           <template #default="{ row }">
             <el-input v-if="!readonly" v-model="row.security_name" size="small" @change="updateField(row, 'security_name', row.security_name)" />
             <span v-else>{{ row.security_name }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="证券代码" width="100">
+        <!-- 源外增强：证券代码 / 证券类型（源模板无，保留不删） -->
+        <el-table-column label="证券代码" width="96">
           <template #default="{ row }">
             <el-input v-if="!readonly" v-model="row.security_code" size="small" @change="updateField(row, 'security_code', row.security_code)" />
             <span v-else>{{ row.security_code }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="证券类型" width="90">
+        <el-table-column label="证券类型" width="86">
           <template #default="{ row }">
             <el-select v-if="!readonly" v-model="row.security_type" size="small" @change="updateField(row, 'security_type', row.security_type)">
               <el-option label="股票" value="股票" />
@@ -87,57 +97,80 @@
             <span v-else>{{ row.security_type }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="回函持仓" width="95" align="right">
+        <!-- C 资金账号 / D 开户名称 -->
+        <el-table-column label="资金账号" width="110">
           <template #default="{ row }">
-            <el-input-number v-if="!readonly" v-model="row.confirmed_qty" size="small" :controls="false" @change="updateField(row, 'confirmed_qty', row.confirmed_qty)" />
-            <span v-else>{{ row.confirmed_qty }}</span>
+            <el-input v-if="!readonly" v-model="row.fund_account" size="small" @change="updateField(row, 'fund_account', row.fund_account)" />
+            <span v-else>{{ row.fund_account }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="账面持仓" width="95" align="right">
+        <el-table-column label="开户名称" min-width="110">
           <template #default="{ row }">
-            <el-input-number v-if="!readonly" v-model="row.booked_qty" size="small" :controls="false" @change="updateField(row, 'booked_qty', row.booked_qty)" />
-            <span v-else>{{ row.booked_qty }}</span>
+            <el-input v-if="!readonly" v-model="row.account_holder" size="small" @change="updateField(row, 'account_holder', row.account_holder)" />
+            <span v-else>{{ row.account_holder }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="数量差异" width="95" align="right">
-          <template #default="{ row }">
-            <span class="formula-cell" title="回函持仓 − 账面持仓">{{ row.qty_diff }}</span>
-          </template>
+        <!-- 账面（E 数量 / F 市价单价 / G 账面余额） -->
+        <el-table-column label="账面数（①）" align="center">
+          <el-table-column label="账面数量" width="92" align="right">
+            <template #default="{ row }">
+              <el-input-number v-if="!readonly" v-model="row.booked_qty" size="small" :controls="false" @change="updateField(row, 'booked_qty', row.booked_qty)" />
+              <span v-else>{{ row.booked_qty }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="账面市价(单价)" width="108" align="right">
+            <template #default="{ row }">
+              <el-input-number v-if="!readonly" v-model="row.booked_unit_fv" size="small" :controls="false" :precision="2" @change="updateField(row, 'booked_unit_fv', row.booked_unit_fv)" />
+              <span v-else>{{ row.booked_unit_fv }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="账面余额" width="104" align="right">
+            <template #default="{ row }">
+              <el-input-number v-if="!readonly" v-model="row.booked_market_value" size="small" :controls="false" :precision="2" @change="updateField(row, 'booked_market_value', row.booked_market_value)" />
+              <span v-else>{{ row.booked_market_value }}</span>
+            </template>
+          </el-table-column>
         </el-table-column>
-        <el-table-column label="回函单位公允值" width="110" align="right">
-          <template #default="{ row }">
-            <el-input-number v-if="!readonly" v-model="row.confirmed_unit_fv" size="small" :controls="false" :precision="2" @change="updateField(row, 'confirmed_unit_fv', row.confirmed_unit_fv)" />
-            <span v-else>{{ row.confirmed_unit_fv }}</span>
-          </template>
+        <!-- 回函（H 数量 / I 市价单价 / J 回函公允价值） -->
+        <el-table-column label="回函数（②）" align="center">
+          <el-table-column label="回函数量" width="92" align="right">
+            <template #default="{ row }">
+              <el-input-number v-if="!readonly" v-model="row.confirmed_qty" size="small" :controls="false" @change="updateField(row, 'confirmed_qty', row.confirmed_qty)" />
+              <span v-else>{{ row.confirmed_qty }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="回函市价(单价)" width="108" align="right">
+            <template #default="{ row }">
+              <el-input-number v-if="!readonly" v-model="row.confirmed_unit_fv" size="small" :controls="false" :precision="2" @change="updateField(row, 'confirmed_unit_fv', row.confirmed_unit_fv)" />
+              <span v-else>{{ row.confirmed_unit_fv }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="回函公允价值" width="104" align="right">
+            <template #default="{ row }">
+              <el-input-number v-if="!readonly" v-model="row.confirmed_market_value" size="small" :controls="false" :precision="2" @change="updateField(row, 'confirmed_market_value', row.confirmed_market_value)" />
+              <span v-else>{{ row.confirmed_market_value }}</span>
+            </template>
+          </el-table-column>
         </el-table-column>
-        <el-table-column label="账面单位公允值" width="110" align="right">
-          <template #default="{ row }">
-            <el-input-number v-if="!readonly" v-model="row.booked_unit_fv" size="small" :controls="false" :precision="2" @change="updateField(row, 'booked_unit_fv', row.booked_unit_fv)" />
-            <span v-else>{{ row.booked_unit_fv }}</span>
-          </template>
+        <!-- 差异（K 数量 / L 市价 / M 公允价值，②−①，只读派生） -->
+        <el-table-column label="差异（②−①）" align="center">
+          <el-table-column label="差异数量" width="88" align="right">
+            <template #default="{ row }">
+              <span class="formula-cell" title="回函数量 − 账面数量">{{ row.qty_diff }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="差异市价(单价)" width="104" align="right">
+            <template #default="{ row }">
+              <span class="formula-cell" title="回函市价 − 账面市价">{{ row.fv_diff }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="差异公允价值" width="100" align="right">
+            <template #default="{ row }">
+              <span class="formula-cell" title="回函公允价值 − 账面余额">{{ row.market_value_diff }}</span>
+            </template>
+          </el-table-column>
         </el-table-column>
-        <el-table-column label="公允价值差异" width="105" align="right">
-          <template #default="{ row }">
-            <span class="formula-cell" title="回函单位公允值 − 账面单位公允值">{{ row.fv_diff }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="回函总市值" width="105" align="right">
-          <template #default="{ row }">
-            <el-input-number v-if="!readonly" v-model="row.confirmed_market_value" size="small" :controls="false" :precision="2" @change="updateField(row, 'confirmed_market_value', row.confirmed_market_value)" />
-            <span v-else>{{ row.confirmed_market_value }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="账面总市值" width="105" align="right">
-          <template #default="{ row }">
-            <el-input-number v-if="!readonly" v-model="row.booked_market_value" size="small" :controls="false" :precision="2" @change="updateField(row, 'booked_market_value', row.booked_market_value)" />
-            <span v-else>{{ row.booked_market_value }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="市值差异" width="95" align="right">
-          <template #default="{ row }">
-            <span class="formula-cell" title="回函总市值 − 账面总市值">{{ row.market_value_diff }}</span>
-          </template>
-        </el-table-column>
+        <!-- N 差异原因 -->
         <el-table-column label="差异原因" min-width="130">
           <template #default="{ row }">
             <el-select v-if="!readonly" v-model="row.diff_reason" size="small" @change="updateField(row, 'diff_reason', row.diff_reason)">
@@ -149,25 +182,46 @@
             <span v-else>{{ row.diff_reason }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="调节事项" min-width="100">
+        <!-- O 相关支持性证据 -->
+        <el-table-column label="相关支持性证据" min-width="120">
+          <template #default="{ row }">
+            <el-input v-if="!readonly" v-model="row.support_evidence" size="small" @change="updateField(row, 'support_evidence', row.support_evidence)" />
+            <span v-else>{{ row.support_evidence }}</span>
+          </template>
+        </el-table-column>
+        <!-- P 是否需要调账（判断列，源模板 P） -->
+        <el-table-column label="是否需要调账" width="104" align="center">
+          <template #default="{ row }">
+            <el-select v-if="!readonly" v-model="row.need_adjust" size="small" placeholder="判断" @change="updateField(row, 'need_adjust', row.need_adjust)">
+              <el-option label="是" value="是" />
+              <el-option label="否" value="否" />
+              <el-option label="待定" value="待定" />
+            </el-select>
+            <span v-else>{{ row.need_adjust }}</span>
+          </template>
+        </el-table-column>
+        <!-- 源外增强：调账说明（原自由文本，need_adjust 的说明保留） -->
+        <el-table-column label="调账说明" min-width="110">
           <template #default="{ row }">
             <el-input v-if="!readonly" v-model="row.adjustment_note" size="small" @change="updateField(row, 'adjustment_note', row.adjustment_note)" />
             <span v-else>{{ row.adjustment_note }}</span>
           </template>
         </el-table-column>
+        <!-- 源外增强：核实结论 -->
         <el-table-column label="核实结论" min-width="100">
           <template #default="{ row }">
             <el-input v-if="!readonly" v-model="row.verify_conclusion" size="small" @change="updateField(row, 'verify_conclusion', row.verify_conclusion)" />
             <span v-else>{{ row.verify_conclusion }}</span>
           </template>
         </el-table-column>
+        <!-- Q 备注 -->
         <el-table-column label="备注" min-width="90">
           <template #default="{ row }">
             <el-input v-if="!readonly" v-model="row.remark" size="small" @change="updateField(row, 'remark', row.remark)" />
             <span v-else>{{ row.remark }}</span>
           </template>
         </el-table-column>
-        <el-table-column v-if="!readonly" label="操作" width="70" fixed="right">
+        <el-table-column v-if="!readonly" label="操作" width="64" fixed="right">
           <template #default="{ row }">
             <el-button type="danger" link size="small" @click="data.deleteRow(row._row_id!)">删除</el-button>
           </template>
@@ -248,6 +302,17 @@ function markDirty() {
 
 function handleAdd() {
   data.addRow()
+}
+
+/**
+ * 从 G0-1 带入询证函索引号（Req 1.5 / 3.1 / 3.4）。
+ * 跨底稿 G0-1 汇总数据未在本组件 props 内提供（平台跨 sheet 引用尚未统一接线，
+ * 共享 diffReconcile 的「从 X0-1 带入」亦为同款待接线状态）。
+ * 故此处不静默断链：提示以「询证函索引号」列手工填写关联 G0-1（Req 3.4 手工填索引）。
+ * 去重与映射逻辑已由 useG01ConfirmIndexImport 纯函数实现并单测（Property 8）。
+ */
+function handleImportFromG01() {
+  ElMessage.info('请在「询证函索引号」列手工填写以关联 G0-1（跨底稿自动带入待平台统一接线后启用）')
 }
 
 function handleSave() {

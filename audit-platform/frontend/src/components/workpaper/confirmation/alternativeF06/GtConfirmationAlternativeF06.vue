@@ -48,262 +48,27 @@
             {{ selectedCompany.entity_name || '未命名公司' }} — 检查详情
           </div>
 
-          <!-- 抽样配置 -->
-          <div class="detail-section">
-            <div class="detail-section__header">一、样本选取标准与规模</div>
-            <el-form
-              :model="selectedCompany.sampling || {}"
-              label-width="100px"
-              size="small"
-              :disabled="readonly"
-            >
-              <el-row :gutter="12">
-                <el-col :span="12">
-                  <el-form-item label="测试范围">
-                    <el-input
-                      v-model="selectedCompany.sampling!.test_scope"
-                      type="textarea"
-                      :rows="2"
-                      placeholder="如应付账款借方发生额所有凭证共XX笔金额XX、贷方发生额所有凭证共XX笔金额XX"
-                      @change="markDirty"
-                    />
-                  </el-form-item>
-                </el-col>
-                <el-col :span="12">
-                  <el-form-item label="特定样本">
-                    <el-input
-                      v-model="selectedCompany.sampling!.specific_samples"
-                      type="textarea"
-                      :rows="2"
-                      placeholder="XX金额以上（大额）、关联方/关联交易形成的款项、XX异常款项全部测试，共XX笔"
-                      @change="markDirty"
-                    />
-                  </el-form-item>
-                </el-col>
-              </el-row>
-              <el-row :gutter="12">
-                <el-col :span="12">
-                  <el-form-item label="抽样总体">
-                    <el-input
-                      v-model="selectedCompany.sampling!.sampling_population"
-                      placeholder="测试总体扣除特定样本以外的样本，共XX笔、金额XX"
-                      @change="markDirty"
-                    />
-                  </el-form-item>
-                </el-col>
-                <el-col :span="12">
-                  <el-form-item label="样本量">
-                    <el-input
-                      v-model="selectedCompany.sampling!.sample_size"
-                      placeholder="抽取XX笔"
-                      @change="markDirty"
-                    />
-                  </el-form-item>
-                </el-col>
-              </el-row>
-              <el-row :gutter="12">
-                <el-col :span="12">
-                  <el-form-item label="抽样方法">
-                    <el-select
-                      v-model="selectedCompany.sampling!.sampling_method"
-                      placeholder="选择抽样方法"
-                      @change="markDirty"
-                    >
-                      <el-option value="随机选样" label="随机选样" />
-                      <el-option value="系统选样" label="系统选样" />
-                      <el-option value="货币单元抽样" label="货币单元抽样" />
-                      <el-option value="随意选样" label="随意选样（非统计抽样适用）" />
-                    </el-select>
-                  </el-form-item>
-                </el-col>
-                <el-col :span="12">
-                  <el-form-item label="抽样过程">
-                    <el-input
-                      v-model="selectedCompany.sampling!.sampling_process"
-                      type="textarea"
-                      :rows="2"
-                      placeholder="使用IDEA（XX抽样工具）选择XX数量占比XX%的样本进行测试"
-                      @change="markDirty"
-                    />
-                  </el-form-item>
-                </el-col>
-              </el-row>
-            </el-form>
-          </div>
-
-          <!-- 余额汇总 -->
-          <div class="detail-section">
-            <div class="detail-section__header">二、余额汇总与检查比例</div>
-            <div class="balance-cards">
-              <!-- 左卡：余额数据 -->
-              <div class="balance-card balance-card--data">
-                <div class="balance-card__title">余额数据</div>
-                <div class="balance-card__grid">
-                  <div class="balance-card__item">
-                    <span class="balance-card__label">函证项目</span>
-                    <el-input
-                      v-if="!readonly"
-                      v-model="selectedCompany.balance!.item_name"
-                      size="small"
-                      placeholder="应付账款"
-                      @change="markDirty"
-                    />
-                    <span v-else class="balance-card__value">{{ selectedCompany.balance?.item_name || '—' }}</span>
-                  </div>
-                  <div class="balance-card__item">
-                    <span class="balance-card__label">年初余额</span>
-                    <el-input
-                      v-if="!readonly"
-                      v-model.number="selectedCompany.balance!.opening_balance"
-                      type="number"
-                      size="small"
-                      @change="markDirty"
-                    />
-                    <span v-else class="balance-card__value balance-card__value--num">{{ formatAmount(selectedCompany.balance?.opening_balance) }}</span>
-                  </div>
-                  <div class="balance-card__item">
-                    <span class="balance-card__label">借方发生额</span>
-                    <el-input
-                      v-if="!readonly"
-                      v-model.number="selectedCompany.balance!.debit_amount"
-                      type="number"
-                      size="small"
-                      @change="markDirty"
-                    />
-                    <span v-else class="balance-card__value balance-card__value--num">{{ formatAmount(selectedCompany.balance?.debit_amount) }}</span>
-                  </div>
-                  <div class="balance-card__item">
-                    <span class="balance-card__label">贷方发生额</span>
-                    <el-input
-                      v-if="!readonly"
-                      v-model.number="selectedCompany.balance!.credit_amount"
-                      type="number"
-                      size="small"
-                      @change="markDirty"
-                    />
-                    <span v-else class="balance-card__value balance-card__value--num">{{ formatAmount(selectedCompany.balance?.credit_amount) }}</span>
-                  </div>
-                  <div class="balance-card__item">
-                    <span class="balance-card__label">期末余额</span>
-                    <el-input
-                      v-if="!readonly"
-                      v-model.number="selectedCompany.balance!.closing_balance"
-                      type="number"
-                      size="small"
-                      @change="markDirty"
-                    />
-                    <span v-else class="balance-card__value balance-card__value--num">{{ formatAmount(selectedCompany.balance?.closing_balance) }}</span>
-                  </div>
-                  <div class="balance-card__item">
-                    <span class="balance-card__label">本期销售金额</span>
-                    <el-input
-                      v-if="!readonly"
-                      v-model.number="selectedCompany.balance!.purchase_amount"
-                      type="number"
-                      size="small"
-                      @change="markDirty"
-                    />
-                    <span v-else class="balance-card__value balance-card__value--num">{{ formatAmount(selectedCompany.balance?.purchase_amount) }}</span>
-                  </div>
-                </div>
-              </div>
-              <!-- 右卡：检查比例指标 -->
-              <div class="balance-card balance-card--ratio">
-                <div class="balance-card__title">检查比例</div>
-                <div class="ratio-indicators">
-                  <div class="ratio-indicator">
-                    <div class="ratio-indicator__label">付款检查比例</div>
-                    <div class="ratio-indicator__value" :class="ratioClass(data.getCheckRatio(selectedCompany, 'payment'))">
-                      {{ formatRatio(data.getCheckRatio(selectedCompany, 'payment')) }}
-                    </div>
-                    <div class="ratio-indicator__desc">区块④付款合计 / 本期采购额</div>
-                  </div>
-                  <div class="ratio-indicator">
-                    <div class="ratio-indicator__label">入库检查比例</div>
-                    <div class="ratio-indicator__value" :class="ratioClass(data.getCheckRatio(selectedCompany, 'inbound'))">
-                      {{ formatRatio(data.getCheckRatio(selectedCompany, 'inbound')) }}
-                    </div>
-                    <div class="ratio-indicator__desc">区块③入库合计 / 本期采购额</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- 4 区块检查表 -->
-          <div class="detail-section">
-            <div class="detail-section__header">三、检查过程记录</div>
-            <CheckBlock
-              v-for="bt in blockTypes"
-              :key="bt"
-              :config="blockConfigs[bt]"
-              :rows="getBlockRows(selectedCompany, bt)"
-              :totals="data.getBlockTotal(selectedCompany, bt)"
-              :readonly="readonly"
-              @add-row="data.addBlockRow(selectedCompany._company_id!, bt)"
-              @delete-row="(rowId: string) => data.deleteBlockRow(selectedCompany!._company_id!, bt, rowId)"
-              @update-field="(rowId: string, field: string, val: any) => data.updateBlockField(selectedCompany!._company_id!, bt, rowId, field, val)"
-            />
-          </div>
-
-          <!-- 审计结论 -->
-          <div class="detail-section">
-            <div class="detail-section__header">
-              <span>四、审计说明与结论</span>
-              <el-button
-                v-if="!readonly"
-                type="primary"
-                size="small"
-                plain
-                :loading="aiLoading"
-                style="margin-left: auto"
-                @click="handleAiFill"
-              >
-                AI 智能填充
-              </el-button>
-            </div>
-            <el-form
-              :model="selectedCompany.conclusion || {}"
-              label-width="80px"
-              size="small"
-              :disabled="readonly"
-            >
-              <el-form-item label="审计说明">
-                <el-input
-                  v-model="selectedCompany.conclusion!.audit_note"
-                  type="textarea"
-                  :rows="3"
-                  placeholder="概述：（1）程序的测试情况、结果；（2）拟调整事项及其调整分录、未调整事项及其影响，审计范围受到限制情况及其影响。"
-                  @change="markDirty"
-                />
-              </el-form-item>
-              <el-form-item label="审计结论">
-                <el-radio-group v-model="selectedCompany.conclusion!.conclusion_type" @change="markDirty">
-                  <el-radio value="A">A - 替代程序结果支持余额</el-radio>
-                  <el-radio value="B">B - 部分事项待进一步确认</el-radio>
-                  <el-radio value="C">C - 存在重大异常需扩大程序</el-radio>
-                </el-radio-group>
-              </el-form-item>
-              <el-form-item v-if="selectedCompany.conclusion?.conclusion_type" label="结论文本">
-                <el-input
-                  v-model="selectedCompany.conclusion!.conclusion_text"
-                  type="textarea"
-                  :rows="2"
-                  @change="markDirty"
-                />
-              </el-form-item>
-              <!-- 异常未决提示 -->
-              <el-alert
-                v-if="data.hasAbnormal(selectedCompany)"
-                type="warning"
-                :closable="false"
-                show-icon
-                class="mt-8"
-              >
-                当前存在异常行，请确认是否需要调整或扩大替代程序范围。
-              </el-alert>
-            </el-form>
-          </div>
+          <!-- 检查详情（抽样/余额/4区块/结论）复用共享 AlternativeDetailPanel（决策 5，不新造第二套） -->
+          <AlternativeDetailPanel
+            :company="selectedCompany"
+            :readonly="readonly"
+            :block-types="blockTypes"
+            :block-configs="blockConfigs"
+            balance-field="purchase_amount"
+            balance-field-label="本期销售金额"
+            item-name-placeholder="应付账款"
+            sampling-scope-placeholder="如应付账款借方发生额所有凭证共XX笔金额XX、贷方发生额所有凭证共XX笔金额XX"
+            :ratios="detailRatios"
+            :ai-loading="aiLoading"
+            :get-block-total="data.getBlockTotal"
+            :get-check-ratio="detailGetCheckRatio"
+            :add-block-row="data.addBlockRow"
+            :delete-block-row="data.deleteBlockRow"
+            :update-block-field="data.updateBlockField"
+            :has-abnormal="data.hasAbnormal"
+            @mark-dirty="markDirty"
+            @ai-fill="handleAiFill"
+          />
         </div>
       </template>
     </template>
@@ -318,20 +83,20 @@
 import { ref, computed, inject, defineAsyncComponent, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Clock } from '@element-plus/icons-vue'
-import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useAlternativeF06Data } from './composables/useAlternativeF06Data'
 import {
   WorkpaperRuntimeContextKey,
   type WorkpaperRuntimeContext,
 } from '../../composables/useWorkpaperScaffold'
 import type { AlternativeCompany, BlockType, CheckRow } from '../alternativeD05/alternativeD05Types'
+import { importUnrepliedAsCompanies } from '../coordination/importFromSummary'
 import { BLOCK_COLUMN_CONFIGS_F06 } from './blockColumnConfigsF06'
 
 // 复用 D0-5 的 Dashboard 和 Master 组件
 import AlternativeD05Dashboard from '../alternativeD05/AlternativeD05Dashboard.vue'
 import AlternativeD05Master from '../alternativeD05/AlternativeD05Master.vue'
-// 复用 D0-5 的 CheckBlock 组件
-import CheckBlock from '../alternativeD05/CheckBlock.vue'
+// 复用 D0-5 的检查详情共享面板（决策 5，不新造第二套）
+import AlternativeDetailPanel from '../alternativeD05/AlternativeDetailPanel.vue'
 
 const GtGridSheet = defineAsyncComponent(() => import('../../GtGridSheet.vue'))
 
@@ -355,7 +120,6 @@ const isNewFormat = computed(() => props.htmlData?._format === 'alternative-f06-
 
 // ─── 数据核心（D06 专属 composable） ─────────────────────────────────────────
 
-const prefs = useDisplayPrefsStore()
 const data = useAlternativeF06Data({
   htmlData: () => props.htmlData,
   readonly: props.readonly,
@@ -373,6 +137,14 @@ const openVersionHistory = () => runtime?.version.openVersionHistory()
 
 const blockTypes: BlockType[] = ['block1', 'block2', 'block3', 'block4']
 const blockConfigs = BLOCK_COLUMN_CONFIGS_F06
+
+// ─── 检查详情面板配置（余额字段/比例口径，F06：应付账款+付款/入库） ──────────
+const detailRatios = [
+  { type: 'payment', label: '付款检查比例', desc: '区块④付款合计 / 本期采购额' },
+  { type: 'inbound', label: '入库检查比例', desc: '区块③入库合计 / 本期采购额' },
+]
+const detailGetCheckRatio = (company: AlternativeCompany, type: string) =>
+  data.getCheckRatio(company, type as 'payment' | 'inbound')
 
 // ─── 选中公司 ────────────────────────────────────────────────────────────────
 
@@ -409,9 +181,19 @@ function handleDeleteCompany(companyId: string) {
   data.deleteCompany(companyId)
 }
 
-function handleImportF01() {
-  // TODO: 跨底稿引用获取 F0-1 未回函应付账款公司（待 dispatch persistence 接入）
-  ElMessage.info('从 F0-1 带入功能待跨底稿引用 API 接入后启用')
+async function handleImportF01() {
+  // 从 F0-1 函证结果汇总带入未回函应付账款单位（复用 coordination/importFromSummary）
+  const res = await importUnrepliedAsCompanies(props.projectId || '', 'F0-1', { defaultItemName: '应付账款' })
+  if (!res.ok) {
+    ElMessage.warning(res.reason === 'missing-summary' ? '未找到 F0-1 或尚未编制' : ('从 F0-1 带入失败：' + res.message))
+    return
+  }
+  if (res.companies.length === 0) {
+    ElMessage.info(res.emptyReason || '无未回函项目')
+    return
+  }
+  data.importCompanies(res.companies)
+  ElMessage.success(`已从 F0-1 带入 ${res.companies.length} 个未回函被函证单位`)
 }
 
 const importFileInput = ref<HTMLInputElement | null>(null)
@@ -670,23 +452,6 @@ function handleSave() {
 
 function markDirty() {
   data.isDirty.value = true
-}
-
-function formatRatio(val: number | null): string {
-  if (val === null) return 'N/A'
-  return `${val.toFixed(1)}%`
-}
-
-function formatAmount(val: number | undefined | null): string {
-  if (val == null) return '—'
-  return prefs.fmt(val)
-}
-
-function ratioClass(val: number | null): string {
-  if (val === null) return 'ratio-indicator__value--na'
-  if (val >= 80) return 'ratio-indicator__value--good'
-  if (val >= 50) return 'ratio-indicator__value--warn'
-  return 'ratio-indicator__value--danger'
 }
 
 // 暴露给父组件通过 ref 调用（页面级工具栏转发）

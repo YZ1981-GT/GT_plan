@@ -17,6 +17,13 @@
         <span class="gt-confirmation-alternative-k05__title">K0-5 其他应收款替代程序</span>
         <div class="gt-confirmation-alternative-k05__toolbar-right">
           <GtIndexChip value="K0-1" :context-project-id="projectId" />
+          <el-button
+            v-if="!readonly"
+            size="small"
+            :loading="importingK01"
+            title="从 K0-1 函证结果汇总带入未回函的其他应收款单位"
+            @click="handleImportK01"
+          >从 K0-1 带入</el-button>
           <!-- 导入导出下拉 -->
           <el-dropdown trigger="click" @command="handleIeCommand">
             <el-button size="small">导入导出 ▾</el-button>
@@ -122,8 +129,9 @@
           <!-- 4区块检查表 -->
           <div class="detail-section">
             <div class="detail-section__header">二、检查过程记录</div>
+            <!-- 非 block3 区块：统一渲染 -->
             <CheckBlock
-              v-for="bt in blockTypes"
+              v-for="bt in blockTypes.filter(b => b !== 'block3')"
               :key="bt"
               :config="blockConfigs[bt]"
               :rows="getBlockRows(selectedCompany, bt)"
@@ -137,6 +145,50 @@
               @update-field="(rowId: string, field: string, val: any) => data.updateBlockField(selectedCompany!._company_id!, bt, rowId, field, val)"
               @ocr-upload="(rowId: string, file: File) => handleRowOcr(bt, rowId, file)"
             />
+            <!-- block3 本期发生额：借方/贷方两张表（confirmation-alternative-structure-alignment 决策 1） -->
+            <div class="split-direction-block">
+              <div class="split-direction-block__title">{{ blockConfigs.block3.title }}</div>
+              <!-- 待归位提示：既有行无 direction -->
+              <el-alert
+                v-if="getBlockRows(selectedCompany, 'block3').some(r => !r.direction)"
+                type="warning" :closable="false" show-icon
+                style="margin-bottom:8px"
+              >
+                有 {{ getBlockRows(selectedCompany, 'block3').filter(r => !r.direction).length }} 行尚未指定借贷方向，请编辑行指定方向后归入对应表
+              </el-alert>
+              <!-- 借方表 -->
+              <div class="split-direction-block__sub">
+                <div class="split-direction-block__sub-title">借方发生额</div>
+                <CheckBlock
+                  :config="blockConfigs.block3"
+                  :rows="getBlockRows(selectedCompany, 'block3').filter(r => r.direction === 'debit')"
+                  :totals="data.getBlockTotalByDirection(selectedCompany, 'block3', 'debit')"
+                  :readonly="readonly"
+                  :enable-ocr="true"
+                  :ocr-loading-row-id="ocrLoadingRowId"
+                  @add-row="addDirectionRow('debit')"
+                  @delete-row="(rowId: string) => data.deleteBlockRow(selectedCompany!._company_id!, 'block3', rowId)"
+                  @update-field="(rowId: string, field: string, val: any) => data.updateBlockField(selectedCompany!._company_id!, 'block3', rowId, field, val)"
+                  @ocr-upload="(rowId: string, file: File) => handleRowOcr('block3', rowId, file)"
+                />
+              </div>
+              <!-- 贷方表 -->
+              <div class="split-direction-block__sub">
+                <div class="split-direction-block__sub-title">贷方发生额</div>
+                <CheckBlock
+                  :config="blockConfigs.block3"
+                  :rows="getBlockRows(selectedCompany, 'block3').filter(r => r.direction === 'credit')"
+                  :totals="data.getBlockTotalByDirection(selectedCompany, 'block3', 'credit')"
+                  :readonly="readonly"
+                  :enable-ocr="true"
+                  :ocr-loading-row-id="ocrLoadingRowId"
+                  @add-row="addDirectionRow('credit')"
+                  @delete-row="(rowId: string) => data.deleteBlockRow(selectedCompany!._company_id!, 'block3', rowId)"
+                  @update-field="(rowId: string, field: string, val: any) => data.updateBlockField(selectedCompany!._company_id!, 'block3', rowId, field, val)"
+                  @ocr-upload="(rowId: string, file: File) => handleRowOcr('block3', rowId, file)"
+                />
+              </div>
+            </div>
           </div>
 
           <!-- 审计说明与结论 -->
@@ -257,6 +309,16 @@ function reconcileDiffFn(row: CheckRow): number {
   return calcReconcileDiff(parseNum(row.self_balance), parseNum(row.other_balance))
 }
 
+/** block3 借贷拆表：新增行时带 direction（confirmation-alternative-structure-alignment） */
+function addDirectionRow(direction: 'debit' | 'credit') {
+  const company = selectedCompany.value
+  if (!company) return
+  const row = data.addBlockRow(company._company_id!, 'block3')
+  if (row) {
+    data.updateBlockField(company._company_id!, 'block3', row._row_id!, 'direction', direction)
+  }
+}
+
 // ─── 余额汇总 Rows ───────────────────────────────────────────────────────
 const balanceSummaryRows = computed(() => {
   const s = data.balanceSummary.value
@@ -367,7 +429,8 @@ async function handleAiFill() {
     const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
       section: 'alternative-audit-note',
       prompt: '根据K0-5其他应收款替代程序检查记录，生成审计说明和审计结论',
-      context: JSON.stringify(context),
+      // 后端 context 类型为 dict[str,str]：包一层 dict + 值转 JSON 字符串（直接传字符串会 422）
+      context: { 检查记录: JSON.stringify(context) },
       existingContent: company.conclusion?.audit_note || '',
     })
     const text = res.data?.data?.content || res.data?.content
@@ -379,6 +442,24 @@ async function handleAiFill() {
     }
   } catch { ElMessage.warning('AI生成失败，请稍后重试') }
   finally { aiLoading.value = false }
+}
+
+// ─── 从 K0-1 带入未回函单位（Unreplied_Pull，复用 composable importFromSummary） ───
+const importingK01 = ref(false)
+async function handleImportK01() {
+  importingK01.value = true
+  try {
+    const count = await data.importFromSummary()
+    if (count > 0) {
+      ElMessage.success(`已从 K0-1 带入 ${count} 个未回函被函证单位`)
+    } else {
+      ElMessage.info('无未回函项目')
+    }
+  } catch (e: any) {
+    ElMessage.warning('从 K0-1 带入失败：' + (e?.message || '未知错误'))
+  } finally {
+    importingK01.value = false
+  }
 }
 
 // ─── 导入导出 ─────────────────────────────────────────────────────────────

@@ -68,6 +68,55 @@ export interface ConfirmationRow {
   reliability_verified?: boolean
   /** 舞弊风险标志 */
   fraud_risk_flag?: boolean
+  /** 函证中心台账投影 id（syncHubFromSummary 写回，平台内部） */
+  _hub_confirmation_id?: string
+
+  // ─── additive 补列（confirmation-shared-model-extension） ─────────────────
+  // 全部可选字段，旧 confirmation-v1 payload 读回时为 undefined（Requirement 5.1/5.2）
+  // 每字段注释源模板出处（Requirement 8.2）；不进 syncHubFromSummary 映射（Property 2）
+
+  /** 选取样本目的 — 源模板 X0-1 首列 */
+  sample_purpose?: string
+  /** 发函单号 — 源模板 X0-1「发函单号」 */
+  send_doc_no?: string
+  /** 收件地址核查是否一致 — 源模板 X0-1「收件地址核查是否一致」 */
+  send_addr_match?: 'consistent' | 'inconsistent' | 'pending'
+  /** 回函快递单号 — 源模板 X0-1「回函快递单号」 */
+  reply_courier_no?: string
+  /** 回函发出地址 — 源模板 X0-1「回函发出地址」 */
+  reply_from_addr?: string
+  /** 发函地址与回函地址是否一致 — 源模板 X0-1「发函地址与回函地址是否一致」 */
+  send_reply_addr_match?: 'consistent' | 'inconsistent' | 'pending'
+  /** 是否采取替代程序 — 源模板 X0-1「是否采取替代程序」 */
+  use_alternative?: boolean
+  /** 替代后不可确认金额 — 源模板 X0-1「替代后不可确认金额」 */
+  alt_unconfirmed?: number
+
+  // ─── K0/L0 variant（源模板 5 段 28 列） ───────────────────────────────────
+  /** 发函询证纪要 — K0-1/L0-1「发函询证纪要」段 */
+  send_memo?: string
+  /** 行级审计结论 — K0-1/L0-1「审计结论」列 */
+  row_conclusion?: string
+
+  // ─── E0 variant（原币/本位币/汇率；amount/confirmed_amount 复用为本位币不改语义） ─
+  /** 账号或理财产品名称 — E0-1「账号或理财产品名称」 */
+  account_no?: string
+  /** 汇率 — E0-1「汇率」 */
+  fx_rate?: number
+  /** 发函金额（原币）— E0-1「发函金额（原币）」（amount 仍为本位币，参与覆盖率/差异计算） */
+  amount_orig?: number
+  /** 可确认金额（原币）— E0-1「可确认金额（原币）」（confirmed_amount 仍为本位币） */
+  confirmed_amount_orig?: number
+
+  // ─── H0 variant（金额或合同条款双口径的条款侧；amount 仍为 number 不改类型） ────
+  /** 账面合同条款 — H0-1「金额或合同条款」账面侧 */
+  term_book?: string
+  /** 回函合同条款 — H0-1「金额或合同条款」回函侧 */
+  term_reply?: string
+  /** 条款是否一致 — H0-1 条款一致性 */
+  term_match?: 'consistent' | 'inconsistent' | 'pending'
+  /** 条款差异说明 — H0-1 条款差异说明 */
+  term_note?: string
 }
 
 // ─── 看板指标（按科目大类聚合） ──────────────────────────────────────────────

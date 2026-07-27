@@ -1,7 +1,30 @@
 /**
  * useAlternativeG06Data — G0-6 投资循环替代程序数据 composable
+ *
+ * confirmation-alternative-structure-alignment Task 4.1（G06 纳入工厂 + 区块对齐源三区）：
+ * 本 composable 已迁移为 Shared_Core 工厂 `createAlternativeConfirmationData` 的薄适配器——
+ * 构造 G06 的 AltConfig + 调工厂 + 旁挂 G06 附加能力：
+ *   - getCheckRatio（对通用 getRatio 的命名别名，type 'payment'|'inbound'）
+ *   - updateBlockField 包装（block3 处置损益 disposal_gain / block4 股利差异 dividend_diff 公式重算）
+ *   - migrateLegacyBlocks（旧四并列区块 → 源三区 + 源外增强 的一次性数据迁移）
+ *   - getBlockTotalByDirection（借贷拆表小计，透传工厂）
+ *
+ * 区块结构（重构后，对齐源模板 G0-6）：
+ *   block1 = ①初始投资协议检查
+ *   block2 = ②本期发生额检查（借贷拆表）
+ *   block3 = ③期后出售/赎回检查（复用 trade_amount/disposal_gain）
+ *   block4 = ④源外增强（合并原持仓/股利/公允价值）
+ *
+ * 零回归约束：format = 'alternative-g06-v1'（不 bump），UseAlternativeG06DataReturn 原有签名不变，
+ * buildPayload 返回 AlternativeG06Payload，balance 附 inbound_check_ratio/payment_check_ratio。
+ *
+ * 【数据零丢失红线】：migrateLegacyBlocks 仅以 block1 持仓字段 / block2 股利字段作为旧结构判据
+ * （新结构 block1=investment_amount、block2=trade_amount 不含这些字段），**不**以 block4 的
+ * quote_source/valuation_model 作触发条件——因新结构 block4 合法持有这些字段，若据此触发会误清空
+ * 新公司的 block1/block2 数据。旧结构仅 block4（公允价值）有数据、block1/block2 空的公司无需迁移
+ * （其 block4 数据在新结构下已正确，block1/block2 空保持不变）。
  */
-import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+import { watch, type Ref, type ComputedRef } from 'vue'
 import type {
   AlternativeCompany,
   AlternativeD05Metrics,
@@ -11,14 +34,17 @@ import type {
 import type { AlternativeG06Payload } from '../alternativeG06Types'
 import { getSumFieldsG06 } from '../blockColumnConfigsG06'
 import { calcDisposalGain, calcDividendDiff } from '../../composables/useG0FormulaEngine'
+import { createAlternativeConfirmationData } from '../../../confirmation/coordination/createAlternativeConfirmationData'
 
-function generateId(): string {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8)
+function toNum(v: unknown): number {
+  const n = Number(v)
+  return Number.isFinite(n) ? n : 0
 }
 
-function precise(n: number): number {
-  return Math.round(n * 100) / 100
-}
+/** 旧结构 block1 持仓字段（新结构 block1=初始投资协议，不含这些） */
+const LEGACY_HOLDING_FIELDS = ['holding_variety', 'market_value', 'holding_qty', 'custody_confirm', 'stmt_date']
+/** 旧结构 block2 股利字段（新结构 block2=本期发生额，不含这些） */
+const LEGACY_DIVIDEND_FIELDS = ['dividend_receivable', 'dividend_per_share', 'received_amount', 'net_received', 'dividend_announce_date']
 
 export interface UseAlternativeG06DataProps {
   htmlData: () => any
@@ -37,268 +63,96 @@ export interface UseAlternativeG06DataReturn {
   deleteBlockRow: (companyId: string, blockType: BlockType, rowId: string) => void
   updateBlockField: (companyId: string, blockType: BlockType, rowId: string, field: string, value: any) => void
   getBlockTotal: (company: AlternativeCompany, blockType: BlockType) => Record<string, number>
+  getBlockTotalByDirection: (company: AlternativeCompany, blockType: BlockType, direction: 'debit' | 'credit') => Record<string, number>
   getCheckRatio: (company: AlternativeCompany, type: 'payment' | 'inbound') => number | null
   getCompletionStatus: (company: AlternativeCompany) => { completed: number; total: number; rate: number }
   hasAbnormal: (company: AlternativeCompany) => boolean
   metrics: ComputedRef<AlternativeD05Metrics>
   buildPayload: () => AlternativeG06Payload
-}
-
-function toNum(v: unknown): number {
-  const n = Number(v)
-  return Number.isFinite(n) ? n : 0
-}
-
-function applyBlockFormulas(blockType: BlockType, row: CheckRow) {
-  if (blockType === 'block2') {
-    row.dividend_diff = calcDividendDiff(
-      toNum(row.dividend_receivable),
-      toNum(row.net_received),
-      toNum(row.dividend_tax),
-    )
-  }
-  if (blockType === 'block3') {
-    row.disposal_gain = calcDisposalGain(
-      toNum(row.trade_amount),
-      toNum(row.original_cost),
-      toNum(row.fee),
-    )
-  }
+  _getBlockRows: (company: AlternativeCompany, blockType: BlockType) => CheckRow[]
 }
 
 export function useAlternativeG06Data(props: UseAlternativeG06DataProps): UseAlternativeG06DataReturn {
-  const companies = ref<AlternativeCompany[]>([])
-  const isDirty = ref(false)
-  const selectedCompanyId = ref<string | null>(null)
-
-  function initFromHtmlData(data: any) {
-    if (!data || data._format !== 'alternative-g06-v1') {
-      companies.value = []
-      return
-    }
-    companies.value = Array.isArray(data.companies) ? data.companies.map(ensureCompanyId) : []
-    isDirty.value = false
-  }
-
-  function ensureCompanyId(company: AlternativeCompany): AlternativeCompany {
-    return {
-      ...company,
-      _company_id: company._company_id || generateId(),
-      block1_rows: (company.block1_rows || []).map(ensureRowId),
-      block2_rows: (company.block2_rows || []).map(ensureRowId),
-      block3_rows: (company.block3_rows || []).map(ensureRowId),
-      block4_rows: (company.block4_rows || []).map(ensureRowId),
-    }
-  }
-
-  function ensureRowId(row: CheckRow): CheckRow {
-    if (!row._row_id) return { ...row, _row_id: generateId() }
-    return row
-  }
-
-  initFromHtmlData(props.htmlData())
-  watch(() => props.htmlData(), (newData) => { initFromHtmlData(newData) }, { deep: true })
-
-  function addCompany(partial?: Partial<AlternativeCompany>): AlternativeCompany {
-    const maxSeq = companies.value.reduce((max, c) => Math.max(max, c.seq ?? 0), 0)
-    const newCompany: AlternativeCompany = {
-      _company_id: generateId(),
-      seq: maxSeq + 1,
-      entity_name: '',
-      _source: 'manual',
-      sampling: {},
-      balance: { item_name: '交易性金融资产', investment_type: '交易性金融资产' },
-      block1_rows: [],
-      block2_rows: [],
-      block3_rows: [],
-      block4_rows: [],
-      conclusion: {},
-      ...partial,
-    }
-    companies.value.push(newCompany)
-    isDirty.value = true
-    return newCompany
-  }
-
-  function deleteCompany(companyId: string) {
-    companies.value = companies.value.filter((c) => c._company_id !== companyId)
-    if (selectedCompanyId.value === companyId) {
-      selectedCompanyId.value = companies.value[0]?._company_id ?? null
-    }
-    isDirty.value = true
-  }
-
-  function updateCompany(companyId: string, field: string, value: any) {
-    const company = companies.value.find((c) => c._company_id === companyId)
-    if (!company) return
-    ;(company as any)[field] = value
-    isDirty.value = true
-  }
-
-  function importCompanies(items: Partial<AlternativeCompany>[]) {
-    const existingIndexes = new Set(companies.value.map((c) => c.confirm_index).filter(Boolean))
-    const deduped = items.filter((item) => !item.confirm_index || !existingIndexes.has(item.confirm_index))
-    const maxSeq = companies.value.reduce((max, c) => Math.max(max, c.seq ?? 0), 0)
-    deduped.forEach((item, i) => {
-      companies.value.push({
-        _company_id: generateId(),
-        seq: maxSeq + i + 1,
-        entity_name: item.entity_name || '',
-        confirm_index: item.confirm_index,
-        _source: item._source || 'auto',
-        sampling: item.sampling || {},
-        balance: { item_name: '交易性金融资产', investment_type: '交易性金融资产', ...(item.balance || {}) },
-        block1_rows: [],
-        block2_rows: [],
-        block3_rows: [],
-        block4_rows: [],
-        conclusion: {},
-      })
-    })
-    isDirty.value = true
-  }
-
-  function getBlockRows(company: AlternativeCompany, blockType: BlockType): CheckRow[] {
-    const key = `${blockType}_rows` as keyof AlternativeCompany
-    return (company[key] as CheckRow[]) || []
-  }
-
-  function setBlockRows(company: AlternativeCompany, blockType: BlockType, rows: CheckRow[]) {
-    const key = `${blockType}_rows` as keyof AlternativeCompany
-    ;(company as any)[key] = rows
-  }
-
-  function addBlockRow(companyId: string, blockType: BlockType): CheckRow | undefined {
-    const company = companies.value.find((c) => c._company_id === companyId)
-    if (!company) return undefined
-    const rows = getBlockRows(company, blockType)
-    const maxSeq = rows.reduce((max, r) => Math.max(max, r.seq ?? 0), 0)
-    const newRow: CheckRow = { _row_id: generateId(), seq: maxSeq + 1, _source: 'manual', is_abnormal: '否' }
-    rows.push(newRow)
-    setBlockRows(company, blockType, rows)
-    isDirty.value = true
-    return newRow
-  }
-
-  function deleteBlockRow(companyId: string, blockType: BlockType, rowId: string) {
-    const company = companies.value.find((c) => c._company_id === companyId)
-    if (!company) return
-    setBlockRows(company, blockType, getBlockRows(company, blockType).filter((r) => r._row_id !== rowId))
-    isDirty.value = true
-  }
-
-  function updateBlockField(companyId: string, blockType: BlockType, rowId: string, field: string, value: any) {
-    const company = companies.value.find((c) => c._company_id === companyId)
-    if (!company) return
-    const row = getBlockRows(company, blockType).find((r) => r._row_id === rowId)
-    if (!row) return
-    row[field] = value
-    applyBlockFormulas(blockType, row)
-    isDirty.value = true
-  }
-
-  function getBlockTotal(company: AlternativeCompany, blockType: BlockType): Record<string, number> {
-    const rows = getBlockRows(company, blockType)
-    const fields = getSumFieldsG06(blockType)
-    const totals: Record<string, number> = {}
-    for (const field of fields) {
-      let sum = 0
-      for (const row of rows) {
-        const val = Number(row[field])
-        if (!isNaN(val)) sum += val
-      }
-      totals[field] = precise(sum)
-    }
-    return totals
-  }
-
-  function getClosingBalance(company: AlternativeCompany): number {
-    return Number(company.balance?.closing_balance ?? company.balance?.sales_amount ?? 0)
-  }
-
-  function getCheckRatio(company: AlternativeCompany, type: 'payment' | 'inbound'): number | null {
-    const base = getClosingBalance(company)
-    if (!base) return null
-    if (type === 'inbound') {
-      const totals = getBlockTotal(company, 'block1')
-      const sum = totals.market_value ?? totals.voucher_amount ?? 0
-      return precise((sum / base) * 100)
-    }
-    const totals = getBlockTotal(company, 'block2')
-    const sum = totals.received_amount ?? totals.dividend_receivable ?? 0
-    return precise((sum / base) * 100)
-  }
-
-  function getCompletionStatus(company: AlternativeCompany) {
-    const blocks: BlockType[] = ['block1', 'block2', 'block3', 'block4']
-    let completed = 0
-    for (const bt of blocks) {
-      if (getBlockRows(company, bt).length > 0) completed++
-    }
-    return { completed, total: 4, rate: Math.round((completed / 4) * 100) }
-  }
-
-  function hasAbnormal(company: AlternativeCompany): boolean {
-    for (const bt of ['block1', 'block2', 'block3', 'block4'] as BlockType[]) {
-      if (getBlockRows(company, bt).some((r) => r.is_abnormal === '是')) return true
-    }
-    return false
-  }
-
-  const metrics = computed<AlternativeD05Metrics>(() => {
-    let completedCount = 0
-    let abnormalCount = 0
-    const ratioDistribution: AlternativeD05Metrics['ratio_distribution'] = []
-    for (const company of companies.value) {
-      const status = getCompletionStatus(company)
-      if (status.completed === 4) completedCount++
-      if (hasAbnormal(company)) abnormalCount++
-      ratioDistribution.push({
-        entity_name: company.entity_name || '未命名',
-        receipt_ratio: getCheckRatio(company, 'payment'),
-        shipment_ratio: getCheckRatio(company, 'inbound'),
-      })
-    }
-    const total = companies.value.length
-    return {
-      total_companies: total,
-      completed_companies: completedCount,
-      abnormal_companies: abnormalCount,
-      ratio_distribution: ratioDistribution,
-      completion_rate: total > 0 ? Math.round((completedCount / total) * 100) : 0,
-    }
+  const core = createAlternativeConfirmationData({
+    format: 'alternative-g06-v1',
+    getSumFields: getSumFieldsG06,
+    defaultBalance: () => ({ item_name: '交易性金融资产', investment_type: '交易性金融资产' }),
+    baseAmount: (c: AlternativeCompany) =>
+      Number(c.balance?.closing_balance ?? c.balance?.sales_amount ?? 0),
+    // 两条命名比例——重构后持仓(market_value)/股利(received_amount/dividend_receivable)均迁至 block4，
+    // 故两条 ratio 的 block 都指向 block4 以保持比例语义
+    ratios: [
+      { key: 'inbound', block: 'block4', fields: ['market_value', 'voucher_amount'], payloadKey: 'inbound_check_ratio' },
+      { key: 'payment', block: 'block4', fields: ['received_amount', 'dividend_receivable'], payloadKey: 'payment_check_ratio' },
+    ],
+    emptyBase: 'null',
+    metricRatioKeys: { receipt: 'payment', shipment: 'inbound' },
+    htmlData: props.htmlData,
   })
 
-  function buildPayload(): AlternativeG06Payload {
-    return {
-      _format: 'alternative-g06-v1',
-      companies: companies.value.map((company) => ({
-        ...company,
-        balance: {
-          ...company.balance,
-          inbound_check_ratio: getCheckRatio(company, 'inbound'),
-          payment_check_ratio: getCheckRatio(company, 'payment'),
-        },
-      })),
+  // ─── 一次性旧结构数据迁移（旧四并列区块 → 源三区 + 源外增强） ─────────────
+
+  function migrateLegacyBlocks() {
+    for (const company of core.companies.value) {
+      if ((company as any)._g06_migrated) continue
+
+      const block1Rows = (company.block1_rows || []) as CheckRow[]
+      const block2Rows = (company.block2_rows || []) as CheckRow[]
+
+      const hasLegacyHolding = block1Rows.some((r) =>
+        LEGACY_HOLDING_FIELDS.some((f) => r[f] != null && r[f] !== ''),
+      )
+      const hasLegacyDividend = block2Rows.some((r) =>
+        LEGACY_DIVIDEND_FIELDS.some((f) => r[f] != null && r[f] !== ''),
+      )
+
+      // 无旧结构数据 → 无需迁移（block4 若已有公允价值数据，在新结构下本就正确）
+      if (!hasLegacyHolding && !hasLegacyDividend) continue
+
+      const block4Rows = (company.block4_rows || []) as CheckRow[]
+      // 旧 block1（持仓）+ 旧 block2（股利）追加到 block4（源外增强），旧 block4（公允价值）保留在前
+      company.block4_rows = [...block4Rows, ...block1Rows, ...block2Rows]
+      // 旧 block3（处置）原地保留（处置≈期后出售赎回，trade_amount/disposal_gain 复用）
+      // 清空 block1、block2（数据已搬 block4）
+      company.block1_rows = []
+      company.block2_rows = []
+      ;(company as any)._g06_migrated = true
     }
+  }
+
+  // 工厂已在构造时 initFromHtmlData 同步填充 companies；watch 覆盖 init + 后续 htmlData 变更。
+  // 迁移靠 _g06_migrated 标记保证只迁一次（幂等）。
+  watch(core.companies, () => migrateLegacyBlocks(), { immediate: true })
+
+  // ─── updateBlockField 包装：block3/block4 公式重算 ────────────────────────
+
+  function updateBlockField(companyId: string, blockType: BlockType, rowId: string, field: string, value: any) {
+    core.updateBlockField(companyId, blockType, rowId, field, value)
+    if (blockType !== 'block3' && blockType !== 'block4') return
+    const company = core.companies.value.find((c) => c._company_id === companyId)
+    if (!company) return
+    const row = core._getBlockRows(company, blockType).find((r) => r._row_id === rowId)
+    if (!row) return
+    if (blockType === 'block3') {
+      // 处置损益 = 成交金额 - 原始成本 - 手续费
+      row.disposal_gain = calcDisposalGain(toNum(row.trade_amount), toNum(row.original_cost), toNum(row.fee))
+    } else {
+      // 股利差异 = 应收股利 - 实收金额 - 红利税（股利已迁至 block4）
+      row.dividend_diff = calcDividendDiff(toNum(row.dividend_receivable), toNum(row.net_received), toNum(row.dividend_tax))
+    }
+  }
+
+  // ─── getCheckRatio 命名别名（type 'payment'|'inbound' → 通用 getRatio） ────
+
+  function getCheckRatio(company: AlternativeCompany, type: 'payment' | 'inbound'): number | null {
+    return core.getRatio(company, type)
   }
 
   return {
-    companies,
-    isDirty,
-    selectedCompanyId,
-    addCompany,
-    deleteCompany,
-    updateCompany,
-    importCompanies,
-    addBlockRow,
-    deleteBlockRow,
+    ...core,
     updateBlockField,
-    getBlockTotal,
     getCheckRatio,
-    getCompletionStatus,
-    hasAbnormal,
-    metrics,
-    buildPayload,
+    // 工厂 buildPayload 返回 {_format:string,...}，收窄为 AlternativeG06Payload
+    buildPayload: () => core.buildPayload() as AlternativeG06Payload,
   }
 }

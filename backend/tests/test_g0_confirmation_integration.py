@@ -37,7 +37,7 @@ _G0_EXPECTED_MAP = {
     "G0-2": "confirmation-entity-verify",
     "G0-3": "confirmation-followup",
     "G0-3S": "confirmation-diff-securities",
-    "G0-4": "confirmation-diff-reconcile",
+    "G0-4": "confirmation-diff-nonsecurities",
     "G0-6": "confirmation-alternative-g06",
     "G0-7": "confirmation-reliability",
     "G0-8": "confirmation-fraud-risk",
@@ -72,9 +72,9 @@ class TestG0OverridesMapping:
         )
 
     def test_securities_vs_nonsecurities_distinct(self, overrides):
-        """G0-3S(证券) 走专属组件，G0-4(非证券) 走 D0 通用，二者区分。"""
+        """G0-3S(证券) 与 G0-4(非证券) 各走专属三维组件，二者区分（g0-investment-diff-model）。"""
         assert overrides["G0-3S"] == "confirmation-diff-securities"
-        assert overrides["G0-4"] == "confirmation-diff-reconcile"
+        assert overrides["G0-4"] == "confirmation-diff-nonsecurities"
         assert overrides["G0-3S"] != overrides["G0-4"]
 
 
@@ -87,24 +87,28 @@ class TestG0RegistrationContract:
     """两个新建 componentType 完整注册。"""
 
     def test_valid_component_types(self):
-        """Req 4.1/4.2: 两个新 componentType 在 VALID_COMPONENT_TYPES。"""
+        """Req 4.1/4.2: 新 componentType 在 VALID_COMPONENT_TYPES。"""
         assert "confirmation-diff-securities" in VALID_COMPONENT_TYPES
+        assert "confirmation-diff-nonsecurities" in VALID_COMPONENT_TYPES
         assert "confirmation-alternative-g06" in VALID_COMPONENT_TYPES
 
     def test_renderer_dispatch_registered(self):
-        """Req 4.5: RENDERER_DISPATCH 有两个新策略。"""
+        """Req 4.5: RENDERER_DISPATCH 有新策略。"""
         from app.routers.wp_render_strategies import RENDERER_DISPATCH
 
         assert "confirmation-diff-securities" in RENDERER_DISPATCH
+        assert "confirmation-diff-nonsecurities" in RENDERER_DISPATCH
         assert "confirmation-alternative-g06" in RENDERER_DISPATCH
         assert callable(RENDERER_DISPATCH["confirmation-diff-securities"])
+        assert callable(RENDERER_DISPATCH["confirmation-diff-nonsecurities"])
         assert callable(RENDERER_DISPATCH["confirmation-alternative-g06"])
 
     def test_render_config_format_map(self):
-        """wp_render_config 初始格式映射含两个新类型。"""
+        """wp_render_config 初始格式映射含新类型。"""
         from app.routers.wp_render_config import _CONFIRMATION_FORMAT_MAP
 
         assert _CONFIRMATION_FORMAT_MAP.get("confirmation-diff-securities") == "diff-securities-v1"
+        assert _CONFIRMATION_FORMAT_MAP.get("confirmation-diff-nonsecurities") == "diff-nonsecurities-v1"
         assert _CONFIRMATION_FORMAT_MAP.get("confirmation-alternative-g06") == "alternative-g06-v1"
 
 

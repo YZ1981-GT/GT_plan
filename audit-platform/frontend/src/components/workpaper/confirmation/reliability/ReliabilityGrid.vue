@@ -128,6 +128,25 @@
           </el-tag>
         </template>
       </el-table-column>
+      <el-table-column label="直接接收" prop="direct_received" width="80" align="center">
+        <template #default="{ row }">
+          <el-select
+            v-if="!readonly"
+            :model-value="row.direct_received"
+            size="small"
+            clearable
+            placeholder="选择"
+            @change="(val: string) => $emit('update', row._row_id, 'direct_received', val)"
+          >
+            <el-option value="是" label="是" />
+            <el-option value="否" label="否" />
+            <el-option value="不适用" label="不适用" />
+          </el-select>
+          <el-tag v-else :type="row.direct_received === '是' ? 'success' : 'info'" size="small">
+            {{ row.direct_received || '—' }}
+          </el-tag>
+        </template>
+      </el-table-column>
 
       <!-- ═══ 验证组（条件列：寄回原件=否 展开，=是 灰掉） ═══ -->
       <el-table-column label="身份已确认" width="90" align="center">
@@ -278,6 +297,56 @@
             <span v-else>{{ row.reliability_note || '—' }}</span>
           </template>
           <span v-else class="reliability-grid__disabled">—</span>
+        </template>
+      </el-table-column>
+
+      <!-- ═══ 回函核实补充（X0-7 源模板列） ═══ -->
+      <el-table-column label="发函邮箱" prop="send_email" width="140" show-overflow-tooltip>
+        <template #default="{ row }">
+          <el-input
+            v-if="!readonly"
+            :model-value="row.send_email"
+            size="small"
+            placeholder="发函邮箱"
+            @change="(val: string) => $emit('update', row._row_id, 'send_email', val)"
+          />
+          <span v-else>{{ row.send_email || '—' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="回函邮箱" prop="reply_email" width="140" show-overflow-tooltip>
+        <template #default="{ row }">
+          <el-input
+            v-if="!readonly"
+            :model-value="row.reply_email"
+            size="small"
+            placeholder="回函邮箱"
+            @change="(val: string) => $emit('update', row._row_id, 'reply_email', val)"
+          />
+          <span v-else>{{ row.reply_email || '—' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="传真信息及验证" prop="fax_info_verify" min-width="140" show-overflow-tooltip>
+        <template #default="{ row }">
+          <el-input
+            v-if="!readonly"
+            :model-value="row.fax_info_verify"
+            size="small"
+            placeholder="传真号及验证过程"
+            @change="(val: string) => $emit('update', row._row_id, 'fax_info_verify', val)"
+          />
+          <span v-else>{{ row.fax_info_verify || '—' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="可靠性考虑" prop="reliability_consideration" min-width="160" show-overflow-tooltip>
+        <template #default="{ row }">
+          <el-input
+            v-if="!readonly"
+            :model-value="row.reliability_consideration"
+            size="small"
+            placeholder="对回函信息可靠性的考虑"
+            @change="(val: string) => $emit('update', row._row_id, 'reliability_consideration', val)"
+          />
+          <span v-else>{{ row.reliability_consideration || '—' }}</span>
         </template>
       </el-table-column>
 

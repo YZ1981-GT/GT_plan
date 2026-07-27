@@ -249,25 +249,26 @@
                     <div class="ratio-indicator__value" :class="ratioClass(data.getCheckRatio(selectedCompany, 'payment'))">
                       {{ formatRatio(data.getCheckRatio(selectedCompany, 'payment')) }}
                     </div>
-                    <div class="ratio-indicator__desc">区块②实收合计 / 期末余额</div>
+                    <div class="ratio-indicator__desc">区块④实收/应收股利 / 期末余额</div>
                   </div>
                   <div class="ratio-indicator">
                     <div class="ratio-indicator__label">持仓检查比例</div>
                     <div class="ratio-indicator__value" :class="ratioClass(data.getCheckRatio(selectedCompany, 'inbound'))">
                       {{ formatRatio(data.getCheckRatio(selectedCompany, 'inbound')) }}
                     </div>
-                    <div class="ratio-indicator__desc">区块①市值合计 / 期末余额</div>
+                    <div class="ratio-indicator__desc">区块④市值合计 / 期末余额</div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- 4 区块检查表 -->
+          <!-- 4 区块检查表：block1/block3/block4 统一渲染，block2 借贷拆表 -->
           <div class="detail-section">
             <div class="detail-section__header">三、检查过程记录</div>
+            <!-- 非 block2 统一渲染 -->
             <CheckBlock
-              v-for="bt in blockTypes"
+              v-for="bt in blockTypes.filter((b) => b !== 'block2')"
               :key="bt"
               :config="blockConfigs[bt]"
               :rows="getBlockRows(selectedCompany, bt)"
@@ -280,6 +281,50 @@
               @update-field="(rowId: string, field: string, val: any) => data.updateBlockField(selectedCompany!._company_id!, bt, rowId, field, val)"
               @ocr-upload="(rowId: string, file: File) => handleRowOcr(bt, rowId, file)"
             />
+            <!-- block2 本期发生额：借方/贷方两张表（confirmation-alternative-structure-alignment 决策 1） -->
+            <div class="split-direction-block">
+              <div class="split-direction-block__title">{{ blockConfigs.block2.title }}</div>
+              <!-- 待归位提示：既有行无 direction -->
+              <el-alert
+                v-if="getBlockRows(selectedCompany, 'block2').some((r) => !r.direction)"
+                type="warning" :closable="false" show-icon
+                style="margin-bottom:8px"
+              >
+                有 {{ getBlockRows(selectedCompany, 'block2').filter((r) => !r.direction).length }} 行尚未指定借贷方向，请编辑行指定方向后归入对应表
+              </el-alert>
+              <!-- 借方表 -->
+              <div class="split-direction-block__sub">
+                <div class="split-direction-block__sub-title">借方发生额</div>
+                <CheckBlock
+                  :config="blockConfigs.block2"
+                  :rows="getBlockRows(selectedCompany, 'block2').filter((r) => r.direction === 'debit')"
+                  :totals="data.getBlockTotalByDirection(selectedCompany, 'block2', 'debit')"
+                  :readonly="readonly"
+                  :enable-ocr="true"
+                  :ocr-loading-row-id="ocrLoadingRowId"
+                  @add-row="addDirectionRow('debit')"
+                  @delete-row="(rowId: string) => data.deleteBlockRow(selectedCompany!._company_id!, 'block2', rowId)"
+                  @update-field="(rowId: string, field: string, val: any) => data.updateBlockField(selectedCompany!._company_id!, 'block2', rowId, field, val)"
+                  @ocr-upload="(rowId: string, file: File) => handleRowOcr('block2', rowId, file)"
+                />
+              </div>
+              <!-- 贷方表 -->
+              <div class="split-direction-block__sub">
+                <div class="split-direction-block__sub-title">贷方发生额</div>
+                <CheckBlock
+                  :config="blockConfigs.block2"
+                  :rows="getBlockRows(selectedCompany, 'block2').filter((r) => r.direction === 'credit')"
+                  :totals="data.getBlockTotalByDirection(selectedCompany, 'block2', 'credit')"
+                  :readonly="readonly"
+                  :enable-ocr="true"
+                  :ocr-loading-row-id="ocrLoadingRowId"
+                  @add-row="addDirectionRow('credit')"
+                  @delete-row="(rowId: string) => data.deleteBlockRow(selectedCompany!._company_id!, 'block2', rowId)"
+                  @update-field="(rowId: string, field: string, val: any) => data.updateBlockField(selectedCompany!._company_id!, 'block2', rowId, field, val)"
+                  @ocr-upload="(rowId: string, file: File) => handleRowOcr('block2', rowId, file)"
+                />
+              </div>
+            </div>
           </div>
 
           <!-- 审计结论 -->
@@ -428,6 +473,16 @@ function getBlockRows(company: AlternativeCompany, blockType: BlockType): CheckR
 
 function getCheckRatioForMaster(company: AlternativeCompany, type: 'receipt' | 'shipment') {
   return data.getCheckRatio(company, type === 'receipt' ? 'payment' : 'inbound')
+}
+
+/** block2 本期发生额借贷拆表：新增行时带 direction（confirmation-alternative-structure-alignment） */
+function addDirectionRow(direction: 'debit' | 'credit') {
+  const company = selectedCompany.value
+  if (!company) return
+  const row = data.addBlockRow(company._company_id!, 'block2')
+  if (row) {
+    data.updateBlockField(company._company_id!, 'block2', row._row_id!, 'direction', direction)
+  }
 }
 
 // ─── 事件处理 ────────────────────────────────────────────────────────────────
@@ -583,10 +638,10 @@ async function handleExportExcel() {
 
     // Sheet 2~5: 4 区块列头
     const blockSheets: { key: string; name: string }[] = [
-      { key: 'block1', name: '①持仓证明' },
-      { key: 'block2', name: '②股利收入' },
-      { key: 'block3', name: '③处置收益' },
-      { key: 'block4', name: '④公允价值' },
+      { key: 'block1', name: '①初始投资协议' },
+      { key: 'block2', name: '②本期发生额' },
+      { key: 'block3', name: '③期后出售赎回' },
+      { key: 'block4', name: '④源外增强' },
     ]
     for (const { key, name } of blockSheets) {
       const cols = BLOCK_COLUMN_CONFIGS_G06[key].columns
@@ -656,10 +711,10 @@ async function handleExportData() {
 
     // 每个区块一个 Sheet
     const blockSheets: { key: BlockType; name: string }[] = [
-      { key: 'block1', name: '①持仓证明' },
-      { key: 'block2', name: '②股利收入' },
-      { key: 'block3', name: '③处置收益' },
-      { key: 'block4', name: '④公允价值' },
+      { key: 'block1', name: '①初始投资协议' },
+      { key: 'block2', name: '②本期发生额' },
+      { key: 'block3', name: '③期后出售赎回' },
+      { key: 'block4', name: '④源外增强' },
     ]
     for (const { key, name } of blockSheets) {
       const cols = BLOCK_COLUMN_CONFIGS_G06[key].columns
@@ -1075,4 +1130,31 @@ defineExpose({
 }
 
 .mt-8 { margin-top: 8px; }
+
+/* ─── block2 借贷拆表 ───────────────────────────────────────────────────── */
+.split-direction-block {
+  margin-top: 12px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 6px;
+  padding: 10px 12px;
+  background: #fafbfc;
+}
+
+.split-direction-block__title {
+  font-size: var(--wp-font-size, 13px);
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+  margin-bottom: 8px;
+}
+
+.split-direction-block__sub {
+  margin-top: 8px;
+}
+
+.split-direction-block__sub-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--el-color-primary);
+  margin-bottom: 4px;
+}
 </style>

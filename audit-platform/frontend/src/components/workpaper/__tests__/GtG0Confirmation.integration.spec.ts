@@ -227,15 +227,15 @@ describe('G0 集成: useAlternativeG06Data 四区块 CRUD + 合计', () => {
     expect(updated.disposal_gain).toBeCloseTo(29700, 2)
   })
 
-  it('block2 股利差异随 updateBlockField 自动计算', () => {
+  it('block4 股利差异随 updateBlockField 自动计算（源三区对齐后股利移入 block4 源外增强）', () => {
     const d = makeData()
     const c = d.addCompany()
-    const row = d.addBlockRow(c._company_id!, 'block2')!
-    d.updateBlockField(c._company_id!, 'block2', row._row_id!, 'dividend_receivable', 10000)
-    d.updateBlockField(c._company_id!, 'block2', row._row_id!, 'net_received', 7500)
-    d.updateBlockField(c._company_id!, 'block2', row._row_id!, 'dividend_tax', 2000)
+    const row = d.addBlockRow(c._company_id!, 'block4')!
+    d.updateBlockField(c._company_id!, 'block4', row._row_id!, 'dividend_receivable', 10000)
+    d.updateBlockField(c._company_id!, 'block4', row._row_id!, 'net_received', 7500)
+    d.updateBlockField(c._company_id!, 'block4', row._row_id!, 'dividend_tax', 2000)
 
-    const updated = d.companies.value[0].block2_rows![0]
+    const updated = d.companies.value[0].block4_rows![0]
     expect(updated.dividend_diff).toBeCloseTo(500, 2)
   })
 
@@ -246,20 +246,46 @@ describe('G0 集成: useAlternativeG06Data 四区块 CRUD + 合计', () => {
     const r2 = d.addBlockRow(c._company_id!, 'block1')!
     d.updateBlockField(c._company_id!, 'block1', r1._row_id!, 'voucher_amount', 1000)
     d.updateBlockField(c._company_id!, 'block1', r2._row_id!, 'voucher_amount', 2500)
-    d.updateBlockField(c._company_id!, 'block1', r1._row_id!, 'market_value', 5000)
-    d.updateBlockField(c._company_id!, 'block1', r2._row_id!, 'market_value', 3000)
+    d.updateBlockField(c._company_id!, 'block1', r1._row_id!, 'investment_amount', 5000)
+    d.updateBlockField(c._company_id!, 'block1', r2._row_id!, 'investment_amount', 3000)
 
     const total = d.getBlockTotal(d.companies.value[0], 'block1')
-    // block1 sumField：voucher_amount + market_value
+    // block1 sumField：voucher_amount + investment_amount（源三区对齐后 block1=①初始投资协议检查）
     expect(total.voucher_amount).toBeCloseTo(3500, 2)
-    expect(total.market_value).toBeCloseTo(8000, 2)
+    expect(total.investment_amount).toBeCloseTo(8000, 2)
   })
 
-  it('每区块 sumField 定义与列配置一致', () => {
+  it('getBlockTotalByDirection 按借贷方向分组累加 block2 本期发生额', () => {
+    const d = makeData()
+    const c = d.addCompany()
+    const rd = d.addBlockRow(c._company_id!, 'block2')!
+    d.updateBlockField(c._company_id!, 'block2', rd._row_id!, 'direction', 'debit')
+    d.updateBlockField(c._company_id!, 'block2', rd._row_id!, 'trade_amount', 1200)
+    const rc = d.addBlockRow(c._company_id!, 'block2')!
+    d.updateBlockField(c._company_id!, 'block2', rc._row_id!, 'direction', 'credit')
+    d.updateBlockField(c._company_id!, 'block2', rc._row_id!, 'trade_amount', 800)
+
+    const company = d.companies.value[0]
+    expect(d.getBlockTotalByDirection(company, 'block2', 'debit').trade_amount).toBeCloseTo(1200, 2)
+    expect(d.getBlockTotalByDirection(company, 'block2', 'credit').trade_amount).toBeCloseTo(800, 2)
+    // 全 block 合计 = 借+贷
+    expect(d.getBlockTotal(company, 'block2').trade_amount).toBeCloseTo(2000, 2)
+  })
+
+  it('每区块 sumField 定义与列配置一致（源三区对齐后新结构）', () => {
+    // block1 = ①初始投资协议检查
+    expect(getSumFieldsG06('block1')).toContain('investment_amount')
     expect(getSumFieldsG06('block1')).toContain('voucher_amount')
-    expect(getSumFieldsG06('block1')).toContain('market_value')
-    expect(getSumFieldsG06('block2')).toContain('dividend_receivable')
+    // block2 = ②本期发生额检查
+    expect(getSumFieldsG06('block2')).toContain('trade_amount')
+    expect(getSumFieldsG06('block2')).toContain('voucher_amount')
+    // block3 = ③期后出售/赎回检查
+    expect(getSumFieldsG06('block3')).toContain('disposal_amount')
     expect(getSumFieldsG06('block3')).toContain('trade_amount')
+    expect(getSumFieldsG06('block3')).toContain('voucher_amount')
+    // block4 = ④源外增强（保留原持仓/股利字段）
+    expect(getSumFieldsG06('block4')).toContain('market_value')
+    expect(getSumFieldsG06('block4')).toContain('dividend_receivable')
     // 4 区块均含记账凭证金额列
     for (const bt of blocks) {
       expect(getSumFieldsG06(bt)).toContain('voucher_amount')
