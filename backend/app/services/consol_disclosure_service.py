@@ -1150,7 +1150,10 @@ async def _persist_consol_sections_v2(
                 account_name=derived_account,
                 content_type=ContentType.table,
                 table_data={"rows": []},
-                source_template=SourceTemplate.consolidated,
+                # source_template 必为 soe|listed 枚举（SourceTemplate 无 consolidated 成员，
+                # 用它会 AttributeError；"合并"信号由 last_sync_source='consolidation' +
+                # source_project_id 承载，变体取父项目 meta_variant 保下游变体解析正确）。
+                source_template=meta_variant,
                 status=NoteStatus.draft,
                 source_project_id=parent_project_id,
                 consolidation_breakdown=breakdown,

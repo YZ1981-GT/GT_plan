@@ -174,6 +174,20 @@ def test_build_readiness_summary_counts():
     assert by_sec["五、999"]["wp_codes"] == []
 
 
+def test_build_readiness_stale_report_fallback_breakdown():
+    """Property 5 surface：summary 区分 stale_report（定向）vs stale_report_fallback（保守）。"""
+    notes = [
+        _note("五、1", stale=True, stale_source="report"),           # 定向
+        _note("五、2", stale=True, stale_source="report_fallback"),  # 保守
+        _note("五、3", stale=True, stale_source="report_fallback"),  # 保守
+        _note("五、4", stale=False),                                  # 非 stale
+    ]
+    s = asyncio.run(nrs.build_readiness(_ReadinessDb(notes), uuid4(), 2025))["summary"]
+    assert s["stale"] == 3
+    assert s["stale_report"] == 1
+    assert s["stale_report_fallback"] == 2
+
+
 # ---------------------------------------------------------------------------
 # P0-3 stale 粒度化
 # ---------------------------------------------------------------------------
@@ -238,10 +252,14 @@ def test_mark_stale_respects_changed_row_codes():
 
 
 def test_mark_stale_falls_back_to_all_when_no_linkage():
-    """全项目无任何 linkage 目标 → 保守全量标记，但来源标注为 fallback（可弱化呈现）。"""
+    """全项目无任何 linkage 目标 → 保守全量标记，但来源标注为 fallback（可弱化呈现）。
+
+    注：五、1/八、1 已 seed report_note_linkage.json（BS-002 货币资金定向），故此处
+    改用无 linkage 的章节（五、900/五、901）保持「全项目无 linkage」前提有效。
+    """
     from app.services.report_note_sync_service import ReportNoteSyncService
 
-    notes = [_linkage_note("五、1"), _linkage_note("五、4")]
+    notes = [_linkage_note("五、900"), _linkage_note("五、901")]
     db = _StaleDb(notes)
     n = asyncio.run(ReportNoteSyncService(db).mark_notes_stale_for_report_change(uuid4(), 2025))
     assert n == 2

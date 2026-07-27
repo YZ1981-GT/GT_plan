@@ -11,12 +11,57 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:  # 仅类型注解，运行时不 import，避免循环导入
     from app.models.report_models import DisclosureNote
 
 logger = logging.getLogger(__name__)
+
+
+# ── markdown 源头止血（spec disclosure-note-quality-completion R1）─────────────
+# 历史「生成附注」LLM 把 markdown 草稿（###/**/列表）写入 text_content，而附注富文本框
+# 按 HTML 渲染 → 显示字面 ###/**。此处在写入 text_content 前把 markdown 归一为纯文本
+# （去标记保文字），幂等（纯文本/HTML 原样返回）。前端渲染层另有 markdown→HTML 兜底。
+_MD_HEADING = re.compile(r"^\s{0,3}#{1,6}\s+", re.MULTILINE)          # 行首 # 标题标记
+_MD_LIST = re.compile(r"^\s{0,3}[-*+]\s+", re.MULTILINE)             # 行首 - * + 列表标记
+_MD_BOLD = re.compile(r"(\*\*|__)(.+?)\1", re.DOTALL)                # **bold** / __bold__
+_MD_ITALIC = re.compile(r"(?<![\*_])[\*_](?!\s)(.+?)(?<!\s)[\*_](?![\*_])", re.DOTALL)
+_MD_CODE = re.compile(r"`([^`]+)`")                                   # `code`
+_MD_LINK = re.compile(r"\[([^\]]+)\]\([^)]*\)")                       # [text](url)
+_MD_BLOCKQUOTE = re.compile(r"^\s{0,3}>\s?", re.MULTILINE)            # 行首 > 引用
+
+
+def sanitize_note_narrative(text: str | None) -> str:
+    """把附注叙述里的 markdown 语法归一为纯文本（去标记保文字），幂等。
+
+    - None/空 → ''
+    - 已是 HTML（strip 后以 '<' 开头）→ 原样返回（富文本框保存的内容，不二次处理）
+    - 否则去除 markdown 标记：标题 #/加粗 **/斜体 */行内 code `/链接 [](}/列表 -*+/引用 >
+    - 幂等：处理后不含 markdown 标记，二次处理结果不变
+    - 转换异常 → 原样返回（保底不丢内容）
+    """
+    if not text:
+        return ""
+    t = text.strip()
+    if not t:
+        return ""
+    if t.startswith("<"):  # 已是 HTML，原样保留
+        return text
+    try:
+        out = text
+        out = _MD_LINK.sub(r"\1", out)
+        out = _MD_BOLD.sub(r"\2", out)
+        out = _MD_CODE.sub(r"\1", out)
+        out = _MD_ITALIC.sub(r"\1", out)
+        out = _MD_HEADING.sub("", out)
+        out = _MD_LIST.sub("", out)
+        out = _MD_BLOCKQUOTE.sub("", out)
+        return out
+    except Exception:  # pragma: no cover - 保底不丢内容
+        logger.warning("sanitize_note_narrative failed, return original", exc_info=True)
+        return text
 
 
 def effective_table_data(table_data: Any) -> Any:
@@ -92,3 +137,6 @@ def note_has_data(note: "DisclosureNote") -> bool:
         )
         return False
     return False
+
+
+__all__ = ["effective_table_data", "note_has_data", "sanitize_note_narrative"]

@@ -222,6 +222,7 @@ async def build_readiness(
         "never_synced": 0,
         "stale": 0,
         "stale_report": 0,
+        "stale_report_fallback": 0,
         "error_sections": 0,
         "warning_sections": 0,
     }
@@ -245,8 +246,11 @@ async def build_readiness(
             summary["never_synced"] += 1
         if getattr(n, "is_stale", False):
             summary["stale"] += 1
-            if (getattr(n, "stale_source", None) or "") == "report":
-                summary["stale_report"] += 1
+            _ss = getattr(n, "stale_source", None) or ""
+            if _ss == "report":
+                summary["stale_report"] += 1  # 定向：linkage 命中，高置信
+            elif _ss == "report_fallback":
+                summary["stale_report_fallback"] += 1  # 保守：无 linkage，全量标记
         if f.get("error"):
             summary["error_sections"] += 1
         elif f.get("warning"):

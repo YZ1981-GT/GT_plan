@@ -21,10 +21,13 @@
           <div class="gt-nrp-stat-num">{{ summary.never_synced }}</div>
           <div class="gt-nrp-stat-label">未从底稿同步</div>
         </div>
-        <div class="gt-nrp-stat" :class="{ warn: summary.stale > 0 }">
-          <div class="gt-nrp-stat-num">{{ summary.stale }}</div>
-          <div class="gt-nrp-stat-label">上游已变更</div>
-        </div>
+        <el-tooltip placement="top" :content="`定向（关联变更，高置信）${summary.stale_report || 0} · 保守（无关联关系，全量提示）${summary.stale_report_fallback || 0}`">
+          <div class="gt-nrp-stat" :class="{ warn: summary.stale > 0 }">
+            <div class="gt-nrp-stat-num">{{ summary.stale }}</div>
+            <div class="gt-nrp-stat-label">上游已变更</div>
+            <div v-if="summary.stale > 0" class="gt-nrp-stat-sub">定向 {{ summary.stale_report || 0 }} / 保守 {{ summary.stale_report_fallback || 0 }}</div>
+          </div>
+        </el-tooltip>
         <div class="gt-nrp-stat" :class="{ danger: summary.error_sections > 0 }">
           <div class="gt-nrp-stat-num">{{ summary.error_sections }}</div>
           <div class="gt-nrp-stat-label">校验错误</div>
@@ -190,7 +193,7 @@ const loading = ref(false)
 const sections = ref<NoteReadinessSection[]>([])
 const summary = ref<NoteReadinessSummary>({
   total: 0, with_data: 0, empty: 0, syncable: 0, never_synced: 0,
-  stale: 0, stale_report: 0, error_sections: 0, warning_sections: 0,
+  stale: 0, stale_report: 0, stale_report_fallback: 0, error_sections: 0, warning_sections: 0,
   validated_at: null, validation_ran: false, formula_enabled: false,
 })
 const filterMode = ref<'all' | 'needs_sync' | 'empty' | 'issues' | 'stale'>('all')

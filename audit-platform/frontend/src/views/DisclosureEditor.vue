@@ -1163,6 +1163,27 @@ import NoteReadinessPanel from '@/components/disclosure/NoteReadinessPanel.vue'
 import StructureEditor from '@/components/formula/StructureEditor.vue'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import NoteRichTextEditor from '@/components/NoteRichTextEditor.vue'
+import { marked } from 'marked'
+import DOMPurify from 'dompurify'
+
+// 附注正文渲染：text_content 可能是 HTML（富文本框保存）或 markdown 纯文本
+// （历史「生成附注」LLM 草稿写入 ### / ** / 列表）。NoteRichTextEditor 按 HTML 渲染，
+// markdown 会显示成字面 ###/**。此处加载时将 markdown 归一为 HTML（幂等：HTML 原样返回），
+// 保存后即以 HTML 落库，逐步清除存量 markdown 残留。
+function renderNoteTextToHtml(raw: string | null | undefined): string {
+  if (!raw) return ''
+  const t = raw.trim()
+  if (!t) return ''
+  // 已是 HTML（富文本框保存的内容）→ 原样保留，不二次转换
+  if (t.startsWith('<')) return raw
+  try {
+    const html = marked.parse(t, { async: false, gfm: true, breaks: true }) as string
+    return DOMPurify.sanitize(html)
+  } catch {
+    // 转换失败降级为段落包裹（保底不丢内容）
+    return t.split(/\n\n+/).filter(Boolean).map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('')
+  }
+}
 import NotesPrintPreview from '@/components/notes/NotesPrintPreview.vue'
 import { refreshDisclosureFromWorkpapers, getProjectWizardState } from '@/services/commonApi'
 import { useEditor } from '@tiptap/vue-3'
@@ -2500,15 +2521,10 @@ async function fetchDetail(noteSection: string, bypassCache = false) {
     _detailCache.set(key, currentNote.value)
   }
 
-  textContent.value = currentNote.value.text_content || ''
+  // markdown 残留归一为 HTML（幂等），喂给 NoteRichTextEditor(v-model=textContent) 与 legacy editor
+  textContent.value = renderNoteTextToHtml(currentNote.value.text_content)
   if (editor.value) {
-    const raw = textContent.value
-    if (raw && !raw.startsWith('<')) {
-      const html = raw.split(/\n\n+/).filter(Boolean).map(p => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('')
-      editor.value.commands.setContent(html)
-    } else {
-      editor.value.commands.setContent(raw)
-    }
+    editor.value.commands.setContent(textContent.value || '')
   }
   // 并行加载上年数据
   try {

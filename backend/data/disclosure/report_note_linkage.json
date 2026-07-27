@@ -1,7 +1,12 @@
 {
   "_schema": "报表行→附注单元格 linkage 回退真源。格式: { report_row_code: [ { note_section, cell, table_index } ] }。cell 为 R{row}C{col}（1-based Excel 风格，如 R9C2）。以 _ 开头的键为元数据/示例，ReportNoteLinkage 加载时忽略。",
-  "_rules": "① 优先级低于附注单元格内嵌 REPORT Cell_Binding（就地绑定为单一真源）；仅覆盖模板未内嵌绑定的章节。② 禁止臆造大量报表行→附注单元格映射（映射错=写错披露）；按 note_section 逐节依据源模板/审计口径增量维护。③ 坐标非法/缺失自动跳过并记录，不写入非目标单元格。",
+  "_rules": "① 优先级低于附注单元格内嵌 REPORT Cell_Binding（就地绑定为单一真源）；仅覆盖模板未内嵌绑定的章节。② 禁止臆造大量报表行→附注单元格映射（映射错=写错披露）；按 note_section 逐节依据源模板/审计口径增量维护。③ 坐标非法/缺失自动跳过并记录，不写入非目标单元格。④ 按决策 1（报表↔附注只校验不写值），本表主要用于 stale 定向标记 + 报表行「关联附注」引用，不回写附注单元格。",
   "_example": [
     { "note_section": "五、22", "cell": "R9C2", "table_index": 0 }
+  ],
+  "_backlog": "逐节增量待办（禁批量臆造，每节须对照源模板核实报表行↔附注合计行的 R{row}C{col}）：BS-* 资产负债表行 ↔ 各资产负债类附注合计；IS-* 利润表行 ↔ 损益类附注。已 seed：BS-002 货币资金（五、1 合计 R7 / 八、1 合计 R5）。其余章节由审计口径逐节维护后追加。诊断入口：GET /api/disclosure-notes/{pid}/{year}/linkage-gaps。",
+  "BS-002": [
+    { "note_section": "五、1", "cell": "R7C2", "table_index": 0 },
+    { "note_section": "八、1", "cell": "R5C2", "table_index": 0 }
   ]
 }

@@ -1448,6 +1448,12 @@ class DisclosureEngine:
             if not text_content and substantive:
                 text_content = substantive
 
+            # R1 markdown 源头止血：LLM/上年/substantive 产出的 markdown 草稿在写入
+            # text_content 前归一为纯文本（去 ###/** 标记保文字），前端富文本框不再显字面 markdown。
+            if text_content:
+                from app.services.note_content_utils import sanitize_note_narrative
+                text_content = sanitize_note_narrative(text_content)
+
             if text_content and content_type_str == "table":
                 content_type_str = "mixed"  # 有正文就升级为 mixed
 

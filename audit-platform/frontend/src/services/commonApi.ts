@@ -413,6 +413,7 @@ export interface NoteReadinessSummary {
   never_synced: number
   stale: number
   stale_report: number
+  stale_report_fallback?: number
   error_sections: number
   warning_sections: number
   validated_at: string | null

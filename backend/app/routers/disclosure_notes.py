@@ -250,6 +250,42 @@ async def set_formula_gray(
     }
 
 
+@router.get("/{project_id}/{year}/linkage-gaps")
+async def get_linkage_gaps(
+    project_id: UUID,
+    year: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """只读诊断：列出「有报表↔附注勾稽但无写值 linkage」的章节（spec R5 / Task 5.1）。
+
+    委托 ``ReportNoteLinkage.diagnose_missing_write_linkage``，仅呈现不修改任何数据。
+    按决策 1（报表↔附注只校验不写值），``cells_updated=0`` 是正确行为；本端点把
+    「需人工评估是否逐节增量维护 linkage」的章节显性化，**不自动填 linkage**。
+    """
+    from app.models.report_models import DisclosureNote
+    from app.services.report_note_linkage import ReportNoteLinkage
+
+    notes = (
+        (
+            await db.execute(
+                sa.select(DisclosureNote).where(
+                    DisclosureNote.project_id == project_id,
+                    DisclosureNote.year == year,
+                    DisclosureNote.is_deleted == sa.false(),
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    try:
+        gaps = ReportNoteLinkage().diagnose_missing_write_linkage(list(notes))
+    except Exception:  # pragma: no cover - 诊断 fail-open 不阻断
+        gaps = []
+    return {"project_id": str(project_id), "year": year, "gaps": gaps, "count": len(gaps)}
+
+
 @router.post("/{project_id}/{year}/pull-from-workpapers")
 async def pull_from_workpapers(
     project_id: UUID,
