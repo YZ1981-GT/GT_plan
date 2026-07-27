@@ -23,6 +23,20 @@
         <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
       </div>
 
+      <!-- 合并联动 stale 常驻提示（Task 6.1） -->
+      <el-alert
+        v-if="linkageStale.stale.value"
+        type="warning"
+        :closable="false"
+        show-icon
+        class="g7-linkage-stale-banner"
+        title="合并侧联动结果已过期，请重新联动"
+        :description="linkageStale.staleSheets.value.length
+          ? `受影响：${linkageStale.staleSheets.value.join('、')}`
+          : ''"
+      />
+
+
       <!-- 双模式：HTML sheet 切到 OnlyOffice -->
       <GtOnlyOfficeSheet
         v-if="isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'"
@@ -139,6 +153,7 @@ import { useG7DualMode } from './composables/useG7DualMode'
 import { useG7FormData } from './composables/useG7FormData'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
+import { useG7ConsolLinkageEntry } from './composables/g7ConsolLinkageEntry'
 
 const G7_ACCOUNT_CODE = '1511'
 const G7_IMPAIRMENT_CODE = '1512'
@@ -292,6 +307,20 @@ const dualMode = useG7DualMode({
   },
 })
 
+// ─── 合并联动 stale 常驻提示（Task 6.1，只读；失败静默降级 Property 12）────
+const auditYear = computed<number>(() => {
+  const ctx = (resolvedHtmlData.value?.project_context ?? {}) as Record<string, any>
+  const y = ctx.audit_year ?? ctx.auditYear
+  if (y) return Number(y)
+  const bs = ctx.bs_date ?? ctx.bsDate
+  if (typeof bs === 'string' && bs.length >= 4) return Number(bs.slice(0, 4))
+  return new Date().getFullYear()
+})
+const linkageStale = useG7ConsolLinkageEntry(projectIdRef, auditYear)
+function handleLinkageChanged(): void {
+  void linkageStale.refreshStale()
+}
+
 /** 审定发布：仅保存后 writebackTb=true 才回写 TB；打开/编辑中的广播不改试算表 */
 function handleG7Adjudicated(e: Event): void {
   const detail = (e as CustomEvent<{
@@ -337,12 +366,15 @@ async function retrySelfLoad(): Promise<void> {
 // ─── 生命周期 ───────────────────────────────────────────────────────────────
 onMounted(async () => {
   window.addEventListener('substantive:adjudicated', handleG7Adjudicated)
+  window.addEventListener('g7:linkage-changed', handleLinkageChanged)
   await selfLoadInit()
   isLoading.value = false
+  void linkageStale.refreshStale()
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('substantive:adjudicated', handleG7Adjudicated)
+  window.removeEventListener('g7:linkage-changed', handleLinkageChanged)
 })
 </script>
 

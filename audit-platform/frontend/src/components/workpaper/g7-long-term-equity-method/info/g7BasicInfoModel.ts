@@ -339,6 +339,59 @@ export interface G7BasicInfoSyncSource {
   acquisitionMethod: string
 }
 
+/**
+ * 从合并范围（consol_scope）行转为 G7BasicInfoSyncSource[]。
+ * - is_included=false 的行跳过（不在合并范围的不带入）
+ * - company_name 为空的行跳过
+ * - ownership_ratio 百分数口径：0<v<=1 且全部<=1 时按小数换算
+ * - company_type 映射到 groupType 建议值（仅新增行使用）
+ * - inclusion_reason 映射到 acquisitionMethod（仅补空）
+ */
+export function sourcesFromConsolScope(
+  scopeRows: Array<Record<string, unknown>>,
+): G7BasicInfoSyncSource[] {
+  if (!Array.isArray(scopeRows) || !scopeRows.length) return []
+
+  // 判断比例口径：如果全部非空值都 <= 1 且 > 0，视为小数需换算
+  const ratioValues = scopeRows
+    .map(r => numberOrNull(r.ownership_ratio))
+    .filter((v): v is number => v != null && v > 0)
+  const allFraction = ratioValues.length > 0 && ratioValues.every(v => v <= 1)
+
+  const sources: G7BasicInfoSyncSource[] = []
+  for (const row of scopeRows) {
+    // is_included=false 跳过
+    if (row.is_included === false || row.is_included === 'false' || row.is_included === 0) continue
+
+    const name = stringValue(row.company_name)
+    if (!name) continue
+
+    const rawRatio = numberOrNull(row.ownership_ratio)
+    const directHoldingRatio = rawRatio != null
+      ? (allFraction ? toPercentRatio(rawRatio, { force: true }) : rawRatio)
+      : null
+
+    // company_type → groupType 建议值
+    const companyType = stringValue(row.company_type).toLowerCase()
+    let groupType: G7BasicInfoSyncSource['groupType'] = 'subsidiary'
+    if (companyType.includes('联营') || companyType.includes('associate')) {
+      groupType = 'associate'
+    } else if (companyType.includes('合营') || companyType.includes('joint_venture') || companyType.includes('joint venture')) {
+      groupType = 'joint_venture'
+    }
+
+    sources.push({
+      groupType,
+      investeeName: name,
+      directHoldingRatio,
+      votingRatio: directHoldingRatio, // 合并范围无独立表决权数据，默认同持股
+      investmentAmount: null, // 合并范围无投资额
+      acquisitionMethod: stringValue(row.inclusion_reason),
+    })
+  }
+  return sources
+}
+
 /** 从 G7-2 明细状态提取可同步到 G7-4 的被投资单位（不含共同经营）。 */
 export function sourcesFromG7DetailPayload(payload: unknown): G7BasicInfoSyncSource[] {
   const rows: Record<string, unknown>[] = Array.isArray(payload)

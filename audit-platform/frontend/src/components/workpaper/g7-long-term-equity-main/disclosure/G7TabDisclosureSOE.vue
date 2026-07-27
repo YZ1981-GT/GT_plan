@@ -43,6 +43,22 @@
         <span class="chip-wrap"><GtIndexChip value="wp:G7-14" :context-project-id="projectId" /></span>
         <span class="chip-wrap"><GtIndexChip value="wp:G7-16" :context-project-id="projectId" /></span>
         <span class="chip-wrap"><GtIndexChip value="Note:八、18" :context-project-id="projectId" /></span>
+        <el-dropdown
+          split-button
+          type="primary"
+          size="small"
+          :disabled="!projectId"
+          @click="jumpToNote('soe')"
+          @command="jumpToNote"
+        >
+          ↩ 跳转回附注（八、18）
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="soe">国企版（八、18 长期股权投资）</el-dropdown-item>
+              <el-dropdown-item command="listed">上市版（五、18 长期股权投资）</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
       </div>
     </div>
 
@@ -318,10 +334,16 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, toRef, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useRouter } from 'vue-router'
 import { api } from '@/services/apiProxy'
 import { useDecimalCalc } from '@/composables/useDecimalCalc'
+import {
+  buildNoteJumpRoute,
+  type DisclosureVariant,
+} from '@/views/composables/noteDisclosureReverseJump'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { useG7MainAiGenerate } from '../../composables/useG7MainAiGenerate'
 import {
   collectDisclosureTruncations,
@@ -390,7 +412,24 @@ const activeSections = ref<string[]>(
 const adjudicatedAmount = ref<number | null>(null)
 const wpIdRef = toRef(props, 'wpId')
 const { aiAvailable, loading: aiLoading, generateAndConfirm } = useG7MainAiGenerate(wpIdRef)
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 const { sum: decimalSum, sub: decimalSub } = useDecimalCalc()
+const router = useRouter()
+
+/** 反向跳转（仅导航，不改数据）：披露表 → 附注模块对应章节；「七、」各子节由区块内 Note 芯片跳转 */
+function jumpToNote(variant: DisclosureVariant = 'soe'): void {
+  const route = buildNoteJumpRoute(
+    props.projectId,
+    'G7',
+    variant,
+    resolveAuditYear(props.htmlData),
+  )
+  if (!route) {
+    ElMessage.warning('未能解析附注章节，请确认项目上下文')
+    return
+  }
+  void router.push(route)
+}
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 let sourceRefreshTimer: ReturnType<typeof setTimeout> | null = null
@@ -617,6 +656,7 @@ async function persist(): Promise<void> {
     }, { _silent: true } as any)
     hasLocalEdits = false
     savePhase.value = SAVE_PHASE.SAVED
+    autoSync.scheduleAutoSync(syncToDisclosureNotes)
     await refreshLoadedVersion()
   } catch (err: any) {
     const status = err?.response?.status
@@ -901,6 +941,7 @@ onBeforeUnmount(() => {
   if (saveTimer) clearTimeout(saveTimer)
   if (sourceRefreshTimer) clearTimeout(sourceRefreshTimer)
   if (savePhase.value === SAVE_PHASE.PENDING) void persist()
+  autoSync.cancelPending()
 })
 </script>
 

@@ -474,6 +474,54 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
             ("借贷平衡校验", "|Σ借方 − Σ贷方| < 0.01", "logic_check",
              "调整分录借贷平衡（isDebitCreditBalanced）", "useG7FormulaEngine"),
         ],
+        # G7-4 被投资单位基本信息（权益法组主数据；比例统一百分数 0~100）
+        "G7-4": [
+            ("合计持股比例", "直接持股比例 + 间接持股比例", "计算",
+             "holdingRatioTotal（两者均空→null）", "g7BasicInfoModel"),
+            ("被投资单位清单取数", "取自 G7-2 明细表被投资单位（不含共同经营）", "取数",
+             "syncG7BasicInfoFromSources（不删除 G7-4 已有、G7-2 无的单位）", "g7BasicInfoModel"),
+            ("持股比例与表决权差异", "合计持股比例 ≠ 表决权比例 → 须填差异原因", "logic_check",
+             "needsHoldingVotingReason（共同经营除外）", "g7BasicInfoModel"),
+            ("表决权不足半数仍控制", "子公司 且 表决权比例 < 50% → 须填控制原因", "logic_check",
+             "needsLessThanHalfControlReason（对应附注七、子节）", "g7BasicInfoModel"),
+            ("表决权过半未形成控制", "非子公司 且 表决权比例 > 50% → 须填未控制原因", "logic_check",
+             "needsMajorityNoControlReason（对应附注七、子节）", "g7BasicInfoModel"),
+        ],
+        # G7-5 被投资单位财务信息（合营、联营）
+        "G7-5": [
+            ("变动额", "本年金额 − 上年金额", "计算",
+             "calcFinancialChangeAmount", "g7FinancialInfoModel"),
+            ("变动率", "变动额 ÷ 上年金额", "计算",
+             "calcFinancialChangeRate（上年=0→null 避免除零）", "g7FinancialInfoModel"),
+            ("异常变动预警", "|变动率| > 50% → 橙色高亮", "logic_check",
+             "isFinancialRateWarning", "g7FinancialInfoModel"),
+            ("未审/待确认行统计", "Σ auditStatus ∈ {未审, 待确认} 的行数", "logic_check",
+             "countUnauditedFinancialRows（供 G7-14 口径提示）", "g7FinancialInfoModel"),
+            ("上年金额滚存", "上年金额 ← 上一年度本年金额", "取数",
+             "rollForwardFinancialPriorAmounts", "g7FinancialInfoModel"),
+        ],
+        # G7-6 被投资公司会计政策（差异 → G7-14 政策调整）
+        "G7-6": [
+            ("自动一致判定", "归一化(被投资方政策) = 归一化(投资方政策) → 一致", "计算",
+             "tryAutoConsistent（已判「不一致」/「不适用」不覆盖）", "G7TabAccountingPolicy"),
+            ("政策差异调整合计", "Σ 判定为「不一致」行的调整金额", "计算",
+             "summarize.totalAdj（按被投资单位分组汇总）", "G7TabAccountingPolicy"),
+            ("同步至 G7-14 政策调整", "各被投资方政策差异调整合计 → G7-14「会计政策调整」列", "取数",
+             "syncGroupToG714 / syncAllToG714（合计为 0 时跳过以免覆盖手工值）", "G7TabAccountingPolicy"),
+            ("被投资单位清单取数", "取自 G7-4 权益法被投资单位", "取数",
+             "syncGroupsFromG74（loadEquityInvestees）", "G7TabAccountingPolicy"),
+            ("不一致须填说明", "判定「不一致」且调整说明为空 → 阻止落库", "logic_check",
+             "persistRows 保存门禁", "G7TabAccountingPolicy"),
+        ],
+        # G7-7 投资初始确认判断（控制/共同控制/重大影响 → 后续测试路径）
+        "G7-7": [
+            ("后续测试路径推导", "控制+同一控制→G7-8；控制+非同一控制→G7-9；共同控制/重大影响→G7-13、G7-14", "计算",
+             "deriveG7ControlRoute", "g7ControlJudgmentModel"),
+            ("CAS33 三要素粗判", "权力/可变回报/运用权力影响回报 三区段均有「是」 → 控制", "logic_check",
+             "deriveControlTriadHint（仅提示，最终以综合判断结论为准）", "g7ControlJudgmentModel"),
+            ("综合判断完整性", "（六）综合判断各维度均须有判断结果 → 方可保存", "logic_check",
+             "validateQuestionnaireOverall / validateG7ControlJudgmentForSave", "g7ControlJudgmentModel"),
+        ],
         # G7-8 同控初始计量测试
         "G7-8": [
             ("同控初始投资成本", "被合并方账面净资产 × 持股比例", "计算",
@@ -508,6 +556,27 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
             ("处置损益", "处置对价 − 处置日账面 − 应收股利 + 可转损益OCI", "计算",
              "CAS2/CAS33 丧失控制权处置（calcDisposalGain）", "useG7SubFormulaEngine"),
         ],
+        # G7-12 处置检查（一揽子交易；多次交易累计后一并判断）
+        "G7-12": [
+            ("累计处置对价", "Σ 各次交易对价", "计算",
+             "syncRowFromSteps / calculatePackageRow.cumulativePrice", "g7DisposalPackageModel"),
+            ("累计处置比例", "Σ |各次股权变动比例|", "计算",
+             "calculatePackageRow.cumulativeShareChange", "g7DisposalPackageModel"),
+            ("剩余持股比例", "MAX(0, 原持股比例 − 累计处置比例)", "计算",
+             "calculatePackageRow.remainingRatio", "g7DisposalPackageModel"),
+            ("处置部分账面价值", "个别报表账面 × (累计处置比例 ÷ 原持股比例)", "计算",
+             "calculatePackageRow.disposedBookValue", "g7DisposalPackageModel"),
+            ("剩余股权重新计量利得", "剩余股权公允价值 − 剩余账面价值", "计算",
+             "calculatePackageRow.remeasurementGain", "g7DisposalPackageModel"),
+            ("个别报表处置损益", "重新计量利得 + 可转损益OCI（联营合营部分按处置比例）", "计算",
+             "calculatePackageRow.individualGain", "g7DisposalPackageModel"),
+            ("合并报表处置损益", "累计对价 + 剩余股权公允价值 − 合并层面净资产 − 商誉 + 可转损益OCI + 前期各次交易差额", "计算",
+             "CAS33 丧失控制权（calculatePackageRow.consolidatedGain）", "g7DisposalPackageModel"),
+            ("权益法追溯：盈余公积 / 期初未分配利润",
+             "权益法比例 × 处置前利润 × 盈余公积计提比例 / × (1 − 计提比例)", "计算",
+             "calculatePackageRow.surplusReserve / openingRetainedEarnings（比例缺省 10%）",
+             "g7DisposalPackageModel"),
+        ],
         # G7-13 投资成本测试（权益法初始）
         "G7-13": [
             ("初始投资成本", "支付对价 + 直接相关费用", "计算",
@@ -538,6 +607,23 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
              "calcUnrealizedProfit", "useG7EquityMethodFormulaEngine"),
             ("应抵销金额", "顺流:未实现利润全额 / 逆流:未实现利润 × 持股比例", "计算",
              "calcEliminationAmount", "useG7EquityMethodFormulaEngine"),
+        ],
+        # G7-16 未确认投资损失测试（CAS2 第44条超额亏损瀑布）
+        "G7-16": [
+            ("长期权益合计", "投资账面价值 + 长期应收款 + 其他长期权益 + 预计负债", "计算",
+             "recalcUnrecognizedLossRow.totalLongTermEquity", "g7UnrecognizedLossModel"),
+            ("超额亏损", "MAX(0, 应享累计亏损 − 长期权益合计)", "计算",
+             "recalcUnrecognizedLossRow.excessLoss", "g7UnrecognizedLossModel"),
+            ("超额亏损瀑布分配", "依次冲减：投资账面 → 长期应收 → 其他长期权益（预计负债须职业判断，不自动确认）", "计算",
+             "CAS2§44（allocateExcessLossWaterfall；手工锁定时不自动分配）", "g7UnrecognizedLossModel"),
+            ("未确认投资损失", "MAX(0, 超额亏损 − 已冲减投资 − 已冲减长期应收 − 已冲减其他权益 − 已确认预计负债)", "计算",
+             "recalcUnrecognizedLossRow.unrecognizedLoss", "g7UnrecognizedLossModel"),
+            ("本期变动", "期末未确认投资损失 − 上期累计未确认", "计算",
+             "recalcUnrecognizedLossRow.currentChange（手工覆盖时不重算）", "g7UnrecognizedLossModel"),
+            ("累计亏损取数", "取自 G7-5 被投资单位财务信息（累计亏损/未分配利润/净资产口径）", "取数",
+             "extractCumulativeLossFromG75", "g7UnrecognizedLossModel"),
+            ("冲减不得超过账面", "各项冲减金额 ≤ 对应长期权益账面价值；合计 ≤ 超额亏损", "logic_check",
+             "validateUnrecognizedLossRows", "g7UnrecognizedLossModel"),
         ],
         # G7-17 减值测试（CAS8）
         "G7-17": [

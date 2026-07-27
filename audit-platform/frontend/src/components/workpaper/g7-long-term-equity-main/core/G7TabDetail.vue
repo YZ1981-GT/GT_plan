@@ -17,6 +17,26 @@
           保存
         </el-button>
         <el-button
+          v-if="extractionEnabled && !isReadonly"
+          size="small"
+          type="success"
+          plain
+          :loading="auxLoading"
+          @click="handleAuxExtract"
+        >
+          从四表取数
+        </el-button>
+        <el-button
+          v-if="activeSection === 'equity' && !isReadonly"
+          size="small"
+          type="primary"
+          plain
+          :loading="equityPullLoading"
+          @click="handleEquityPull"
+        >
+          从 G7-14 带入期末余额
+        </el-button>
+        <el-button
           v-if="activeSection !== 'summary'"
           size="small"
           :disabled="isReadonly"
@@ -216,8 +236,56 @@
         <li>权益法“权益变动小计” = 损益调整 + 其他综合收益 + 其他权益变动。</li>
         <li>减值准备按每一被投资单位自动建行，基础信息与投资明细同步。</li>
         <li>导入原始“明细表G7-2”工作表时，系统按原模板坐标识别成本法、权益法和减值区块。</li>
+        <li>「从 G7-14 带入期末余额」：按被投资单位匹配 G7-14 权益法测算，逐户对照后按「只填空」写入权益法行的运动分量（期初/损益/OCI/其他权益/股利），期末由公式派生；已填单位不覆盖。</li>
       </ol>
     </details>
+
+    <!-- G7-14 → G7-2 权益法行 逐户对照带入弹窗（Decision 2） -->
+    <el-dialog
+      v-model="equityPullVisible"
+      title="从 G7-14 带入期末余额（逐户对照）"
+      width="720px"
+    >
+      <el-alert
+        type="info"
+        :closable="false"
+        show-icon
+        class="equity-pull-note"
+        title="带入目标为 G7-2 权益法行；「只填空」模式仅对运动分量为空的单位写入，已填单位保持不变。写入后期末余额由公式派生并与 G7-14 期末对照。"
+      />
+      <el-table :data="equityPullDiffs" border size="small" max-height="360">
+        <el-table-column label="被投资单位" prop="investeeName" min-width="160" />
+        <el-table-column label="G7-2 当前期末" align="right" width="130">
+          <template #default="{ row }">{{ fmtAmount(row.current) }}</template>
+        </el-table-column>
+        <el-table-column label="G7-14 期末" align="right" width="130">
+          <template #default="{ row }">{{ fmtAmount(row.incoming) }}</template>
+        </el-table-column>
+        <el-table-column label="差异" align="right" width="120">
+          <template #default="{ row }">
+            <span :class="{ 'diff-red': Math.abs(row.diff) > 0.01 }">{{ fmtAmount(row.diff) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" width="90" align="center">
+          <template #default="{ row }">
+            <el-tag size="small" :type="row.matched ? 'success' : 'info'">
+              {{ row.matched ? '已匹配' : '新建' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <el-button size="small" @click="equityPullVisible = false">取消</el-button>
+        <el-button
+          size="small"
+          type="primary"
+          :loading="equityPullLoading"
+          @click="confirmEquityPull"
+        >
+          确认带入（只填空）
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -238,6 +306,14 @@ import {
   type G7DetailState,
   type G7DetailStoredRow,
 } from '../../composables/g7DetailModel'
+import { mergeAuxRowsIntoDetail } from '../../composables/g7AuxExtraction'
+import {
+  pullG7_14ForDetail,
+  buildEquityPullDiff,
+  applyEquityPullToDetail,
+  type G7EquityClosingRow,
+  type G7EquityPullDiff,
+} from '../../composables/g7EquityMethodPullToDetail'
 import { api } from '@/services/apiProxy'
 
 const props = defineProps<{
@@ -264,6 +340,14 @@ const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog',
 const activeSection = ref<SectionKey>('cost')
 const activeLayer = ref<LayerKey>('basic')
 const state = reactive<G7DetailState>({ costRows: [], equityRows: [], impairmentRows: [] })
+const auxLoading = ref(false)
+// G7-14 跨册带入期末余额（Decision 2：目标 G7-2 权益法行）
+const equityPullVisible = ref(false)
+const equityPullLoading = ref(false)
+const equityPullDiffs = ref<G7EquityPullDiff[]>([])
+let equityPullSrc: G7EquityClosingRow[] = []
+// 灰度开关透出（render project_context）：关闭时「从四表取数」按钮隐藏
+const extractionEnabled = computed(() => !!props.htmlData?.project_context?.g7_extraction_enabled)
 const isDirty = ref(false)
 const saving = ref(false)
 const auditNote = ref('')
@@ -493,6 +577,74 @@ function updateField(row: G7DetailStoredRow, key: string, value: unknown): void 
   markDirty()
 }
 
+async function handleAuxExtract(): Promise<void> {
+  if (props.isReadonly || !props.wpId) return
+  auxLoading.value = true
+  try {
+    const res: any = await api.post(
+      `/api/workpapers/${props.wpId}/g7/import-aux-balance`,
+      {},
+      { params: { overwrite: false } } as any,
+    )
+    const data = res?.data ?? res ?? {}
+    if (data.enabled === false) {
+      ElMessage.info(data.message || '四表取数未启用')
+      return
+    }
+    const auxRows = Array.isArray(data.rows) ? data.rows : []
+    if (!auxRows.length) {
+      ElMessage.warning(data.message || '账套无被投资单位辅助余额（科目1511），请手工录入')
+      return
+    }
+    // 前端按 Persist_First 并入当前编辑态（后端已按同口径持久化，二者一致）
+    const merged = mergeAuxRowsIntoDetail(state, auxRows, { overwrite: false })
+    recalcAndPublish()
+    markDirty()
+    await saveRows(false)
+    ElMessage.success(
+      `${data.message || ''}（本地新增 ${merged.added} / 填空 ${merged.filled} 行；控制类型未取数，请按 G7-4 判断改段）`,
+    )
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || e?.message || '四表取数失败')
+  } finally {
+    auxLoading.value = false
+  }
+}
+
+/** 从 G7-14 权益法测算逐户拉取期末余额 → 对照弹窗（缺源安全，Property 10）。 */
+async function handleEquityPull(): Promise<void> {
+  if (props.isReadonly || !props.projectId) return
+  equityPullLoading.value = true
+  try {
+    const src = await pullG7_14ForDetail(props.projectId)
+    if (!src.length) {
+      ElMessage.warning('未获取到 G7-14 权益法测算数据（Method 组未实例化或无逐户明细）')
+      return
+    }
+    equityPullSrc = src
+    equityPullDiffs.value = buildEquityPullDiff(state, src)
+    equityPullVisible.value = true
+  } catch (e: any) {
+    ElMessage.error(e?.message || '从 G7-14 带入失败')
+  } finally {
+    equityPullLoading.value = false
+  }
+}
+
+/** 确认带入：Persist_First 写入 G7-2 权益法行，经 g7:detail-updated 传导至 G7-1。 */
+async function confirmEquityPull(): Promise<void> {
+  if (props.isReadonly || !equityPullSrc.length) {
+    equityPullVisible.value = false
+    return
+  }
+  const res = applyEquityPullToDetail(state, equityPullSrc, { overwrite: false })
+  recalcAndPublish()
+  markDirty()
+  await saveRows(false)
+  equityPullVisible.value = false
+  ElMessage.success(`已带入：新建 ${res.added} / 填空 ${res.filled} 行；已填 ${res.skipped} 行保持不变`)
+}
+
 async function handleAddRow(): Promise<void> {
   if (activeSection.value === 'impairment') {
     ElMessage.info('减值准备行由成本法、权益法明细自动生成')
@@ -678,6 +830,8 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .g7-detail { padding: 12px; font-size: var(--wp-font-size, 13px); }
+.diff-red { color: var(--el-color-danger); font-weight: 600; }
+.equity-pull-note { margin-bottom: 10px; }
 .section-head, .navigation-row, .layer-row, .card-header {
   display: flex;
   align-items: center;

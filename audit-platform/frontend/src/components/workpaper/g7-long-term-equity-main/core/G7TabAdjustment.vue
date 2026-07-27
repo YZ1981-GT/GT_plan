@@ -29,6 +29,16 @@
         >
           同步到集中登记
         </el-button>
+        <el-button
+          size="small"
+          type="warning"
+          plain
+          :disabled="isReadonly || a13PushableCount === 0"
+          :title="a13PushableCount === 0 ? '无可推送的调整分录（需已填金额且非建议草稿）' : `推送 ${a13PushableCount} 笔至 A13 未更正错报汇总`"
+          @click="pushToA13"
+        >
+          推送错报至 A13 ({{ a13PushableCount }})
+        </el-button>
         <el-tag
           v-if="centralStatus?.review_status"
           size="small"
@@ -722,6 +732,51 @@ async function persistAdjudicationWriteback(
     project_id: props.projectId || undefined,
     items: saveItems,
   }, { _silent: true } as any)
+}
+
+/**
+ * 可推送至 A13 的分录：已填金额且非「建议草稿」（未采纳的建议不构成错报）。
+ */
+const a13PushableEntries = computed(() =>
+  entries.value.filter(
+    (e) =>
+      !isSuggestedDraft(e)
+      && Math.max(Math.abs(parseNum(e.debitAmount)), Math.abs(parseNum(e.creditAmount))) > 0,
+  ),
+)
+const a13PushableCount = computed(() => a13PushableEntries.value.length)
+
+/**
+ * 推送未更正错报至 A13 汇总。
+ *
+ * 走平台唯一消费者 `useA13MisstatementBridge`（挂在 WorkpaperEditor，形态 B：
+ * `{ wpCode, accountCode, entries: [...] }`），由桥负责去重与落库；本表只负责
+ * 组装载荷，不直接写 misstatements。
+ */
+function pushToA13(): void {
+  if (props.isReadonly) return
+  const rows = a13PushableEntries.value
+  if (rows.length === 0) {
+    ElMessage.warning('无可推送的调整分录（需已填金额且非建议草稿）')
+    return
+  }
+  eventBus.emit('a13:push-misstatement', {
+    wpCode: 'G7-3',
+    accountCode: '1511',
+    accountName: '长期股权投资',
+    projectId: props.projectId,
+    source: 'G7-3 调整分录汇总',
+    entries: rows.map((e) => ({
+      description: e.description || e.summary || 'G7 长期股权投资调整',
+      accountCode: e.accountCode || '1511',
+      accountName: e.accountName || '长期股权投资',
+      debitAmount: parseNum(e.debitAmount),
+      creditAmount: parseNum(e.creditAmount),
+      indexRef: e.indexRef || 'G7-3',
+    })),
+    timestamp: Date.now(),
+  })
+  ElMessage.success(`已推送 ${rows.length} 笔至 A13 未更正错报汇总`)
 }
 
 function publishCreatedEvents(): void {

@@ -3,6 +3,12 @@
     <div class="index-header">
       <h3 class="title">G7 底稿目录</h3>
       <GtReviewTrigger section-id="G7-index-directory" />
+      <G7ConsolLinkageEntryDialog
+        v-if="projectId"
+        :project-id="projectId"
+        :year="auditYear"
+        :can-edit="canEditCtx"
+      />
       <div class="progress-wrap">
         <span>编制进度 {{ completedCount }}/{{ applicableRows.length }}</span>
         <el-progress :percentage="progressPct" :stroke-width="10" />
@@ -39,6 +45,18 @@
       <p v-if="hasWarnConclusions" class="board-hint">存在 B/C 口径或未填结论，请点击标签跳转补全说明。</p>
     </div>
 
+    <!-- 底稿架构 4 阶段泳道（G7 内部 sheet 导航） -->
+    <div class="g7-architecture">
+      <div class="g7-architecture__header">
+        <h4>底稿架构</h4>
+        <span class="g7-architecture__hint">点击卡片跳转到对应底稿</span>
+      </div>
+      <GtBArchitectureTree
+        :html-data="architectureHtmlData"
+        @navigate="goSheet"
+      />
+    </div>
+
     <!-- 编制提示 -->
     <details class="methodology-hint">
       <summary>编制提示</summary>
@@ -59,11 +77,20 @@
  */
 import { computed, inject } from 'vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
+import GtBArchitectureTree from '../../GtBArchitectureTree.vue'
+import G7ConsolLinkageEntryDialog from './G7ConsolLinkageEntryDialog.vue'
+import { useAuditContext } from '@/composables/useAuditContext'
 
 const props = defineProps<{
   allResponses: Map<string, any>
   availableSheets?: Array<{ sheet_name?: string }>
 }>()
+
+// 目录页无 projectId prop → 从审计上下文读取（供合并联动入口）
+const auditCtx = useAuditContext()
+const projectId = computed(() => auditCtx.projectId.value)
+const auditYear = computed(() => auditCtx.year.value)
+const canEditCtx = computed(() => auditCtx.canEdit.value)
 
 // ═══ 底稿全量清单（用于进度计算） ═══
 interface IndexRow {
@@ -92,10 +119,31 @@ const G7_INDEX_ROWS: IndexRow[] = [
   { code: 'G7-16', label: '未确认投资损失', applicable: true },
   { code: 'G7-17', label: '长期股权投资减值', applicable: true },
   { code: 'G7-18', label: '凭证检查表', applicable: true },
+  { code: 'G7-disc-listed', label: '附注披露信息（上市公司）', applicable: true },
+  { code: 'G7-disc-soe', label: '附注披露信息（国企）', applicable: true },
 ]
 
 // ═══ 进度计算 ═══
 const applicableRows = computed(() => G7_INDEX_ROWS.filter(r => r.applicable))
+
+// ═══ 底稿架构树数据（GtBArchitectureTree 需要 navigation_rows） ═══
+const architectureHtmlData = computed(() => {
+  const navigationRows = G7_INDEX_ROWS.map((row, i) => {
+    // 按功能确定 component_type → GtBArchitectureTree 分阶段
+    let componentType = 'd-form-table' // 默认→实质性程序
+    if (row.code === 'G7A') componentType = 'a-program-console' // → 审计计划
+    if (row.code === 'G7-3' || row.code.startsWith('G7-disc')) componentType = 'c-note-table' // → 披露与调整
+    return {
+      seq: i + 1,
+      content: row.label,
+      sheet_name: resolveSheetLabel(row.code),
+      index_ref: row.code,
+      component_type: componentType,
+      no_print: false,
+    }
+  })
+  return { navigation_rows: navigationRows }
+})
 
 function isSheetComplete(code: string): boolean {
   const map = props.allResponses
@@ -211,21 +259,23 @@ const G7_SHEET_LABEL_MAP: Record<string, string> = {
   'G7-1': '审定表G7-1',
   'G7-2': '明细表G7-2',
   'G7-3': '调整分录',
-  'G7-4': 'G7-4',
-  'G7-5': 'G7-5',
-  'G7-6': 'G7-6',
-  'G7-7': 'G7-7',
-  'G7-8': 'G7-8',
-  'G7-9': 'G7-9',
-  'G7-10': 'G7-10',
-  'G7-11': 'G7-11',
-  'G7-12': 'G7-12',
-  'G7-13': 'G7-13',
-  'G7-14': 'G7-14',
-  'G7-15': 'G7-15',
-  'G7-16': 'G7-16',
-  'G7-17': 'G7-17',
-  'G7-18': 'G7-18',
+  'G7-4': '被投资单位基本信息G7-4',
+  'G7-5': '被投资单位财务信息G7-5',
+  'G7-6': '会计政策一致性检查G7-6',
+  'G7-7': '投资初始确认判断G7-7',
+  'G7-8': '同一控制下企业合并G7-8',
+  'G7-9': '非同一控制下企业合并G7-9',
+  'G7-10': '后续计量检查G7-10',
+  'G7-11': '处置检查G7-11',
+  'G7-12': '一揽子处置G7-12',
+  'G7-13': '成本法后续计量测试G7-13',
+  'G7-14': '权益法核算测算G7-14',
+  'G7-15': '内部交易未实现损益G7-15',
+  'G7-16': '未确认投资损失G7-16',
+  'G7-17': '长期股权投资减值G7-17',
+  'G7-18': '凭证检查表G7-18',
+  'G7-disc-listed': '附注披露信息（上市公司）',
+  'G7-disc-soe': '附注披露信息（国企）',
   'G0': 'G0',
 }
 
@@ -267,4 +317,8 @@ function goSheet(code: string) {
 .concl-tag.clickable { cursor: pointer; }
 .board-hint { margin: 8px 0 0; font-size: 12px; color: #e6a23c; }
 .methodology-hint { margin-top: 12px; font-size: 12px; color: #606266; }
+.g7-architecture { margin-top: 16px; padding-top: 16px; border-top: 1px solid #e8e4f0; }
+.g7-architecture__header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
+.g7-architecture__header h4 { margin: 0; font-size: 16px; font-weight: 600; color: #303133; }
+.g7-architecture__hint { font-size: 12px; color: #909399; }
 </style>

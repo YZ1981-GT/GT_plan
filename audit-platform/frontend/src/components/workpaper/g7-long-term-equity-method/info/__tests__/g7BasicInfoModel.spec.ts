@@ -7,6 +7,7 @@ import {
   needsMajorityNoControlReason,
   normalizeG7BasicInfoRow,
   serializeG7BasicInfoRows,
+  sourcesFromConsolScope,
   sourcesFromG7DetailPayload,
   syncG7BasicInfoFromSources,
   toPercentRatio,
@@ -163,5 +164,93 @@ describe('G7-4 basic info model', () => {
   it('serializes ratioScale to prevent remigration', () => {
     const serialized = serializeG7BasicInfoRows([createG7BasicInfoRow('subsidiary', 1, '甲')])
     expect(serialized[0].ratioScale).toBe('percent')
+  })
+
+  describe('sourcesFromConsolScope (G7-4 从合并范围带入)', () => {
+    it('skips rows with is_included=false or empty name', () => {
+      const sources = sourcesFromConsolScope([
+        { company_name: '子公司A', ownership_ratio: 60, is_included: true },
+        { company_name: '被排除B', ownership_ratio: 30, is_included: false },
+        { company_name: '', ownership_ratio: 50, is_included: true },
+        { company_name: '  ', ownership_ratio: 40, is_included: true },
+        { company_name: '正常C', ownership_ratio: 80, is_included: true },
+      ])
+      expect(sources.map(s => s.investeeName)).toEqual(['子公司A', '正常C'])
+    })
+
+    it('converts ownership_ratio to percent when all values look like fractions', () => {
+      const sources = sourcesFromConsolScope([
+        { company_name: '甲公司', ownership_ratio: 0.6, is_included: true },
+        { company_name: '乙公司', ownership_ratio: 0.3, is_included: true },
+      ])
+      expect(sources[0].directHoldingRatio).toBe(60)
+      expect(sources[1].directHoldingRatio).toBe(30)
+    })
+
+    it('keeps ownership_ratio as-is when any value exceeds 1 (already percent)', () => {
+      const sources = sourcesFromConsolScope([
+        { company_name: '甲公司', ownership_ratio: 60, is_included: true },
+        { company_name: '乙公司', ownership_ratio: 30, is_included: true },
+      ])
+      expect(sources[0].directHoldingRatio).toBe(60)
+      expect(sources[1].directHoldingRatio).toBe(30)
+    })
+
+    it('maps company_type to groupType', () => {
+      const sources = sourcesFromConsolScope([
+        { company_name: '联营甲', company_type: '联营企业', ownership_ratio: 30, is_included: true },
+        { company_name: '合营乙', company_type: '合营企业', ownership_ratio: 50, is_included: true },
+        { company_name: '子公司丙', company_type: '子公司', ownership_ratio: 80, is_included: true },
+        { company_name: '无类型丁', ownership_ratio: 70, is_included: true },
+      ])
+      expect(sources[0].groupType).toBe('associate')
+      expect(sources[1].groupType).toBe('joint_venture')
+      expect(sources[2].groupType).toBe('subsidiary')
+      expect(sources[3].groupType).toBe('subsidiary') // default
+    })
+
+    it('does not delete existing G7-4 rows and does not overwrite filled fields (Property 13)', () => {
+      const existing = [
+        createG7BasicInfoRow('subsidiary', 1, '子公司A'),
+        createG7BasicInfoRow('joint_operation', 2, '共同经营X'), // 合并范围没有此行
+      ]
+      existing[0].directHoldingRatio = 55
+      existing[0].acquisitionMethod = '投资设立'
+
+      const scopeRows = [
+        { company_name: '子公司A', ownership_ratio: 60, is_included: true, inclusion_reason: '股权受让' },
+        { company_name: '新增子公司B', ownership_ratio: 80, is_included: true },
+      ]
+      const sources = sourcesFromConsolScope(scopeRows)
+      const result = syncG7BasicInfoFromSources(existing, sources)
+
+      // 不删除 G7-4 独有单位
+      expect(result.rows.map(r => r.investeeName).sort()).toEqual(['共同经营X', '子公司A', '新增子公司B'])
+      // 不覆盖已有值
+      const a = result.rows.find(r => r.investeeName === '子公司A')!
+      expect(a.directHoldingRatio).toBe(55) // 已有值不被覆盖
+      expect(a.acquisitionMethod).toBe('投资设立') // 已有值不被覆盖
+      // 新增行
+      const b = result.rows.find(r => r.investeeName === '新增子公司B')!
+      expect(b.directHoldingRatio).toBe(80)
+      expect(b.groupType).toBe('subsidiary')
+      expect(result.added).toBe(1)
+    })
+
+    it('serializes with ratioScale=percent after sync', () => {
+      const existing = [createG7BasicInfoRow('subsidiary', 1, '子公司A')]
+      const sources = sourcesFromConsolScope([
+        { company_name: '子公司A', ownership_ratio: 60, is_included: true },
+      ])
+      const result = syncG7BasicInfoFromSources(existing, sources)
+      const serialized = serializeG7BasicInfoRows(result.rows)
+      expect(serialized.every(r => r.ratioScale === 'percent')).toBe(true)
+    })
+
+    it('returns empty sources when given empty or invalid input', () => {
+      expect(sourcesFromConsolScope([])).toEqual([])
+      expect(sourcesFromConsolScope(null as any)).toEqual([])
+      expect(sourcesFromConsolScope(undefined as any)).toEqual([])
+    })
   })
 })

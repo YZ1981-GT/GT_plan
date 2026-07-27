@@ -36,6 +36,7 @@
         <span>比例统一按百分数填写，例如30表示30%。</span>
       </div>
       <div v-if="!isReadonly" class="summary-actions">
+        <el-button size="small" :loading="syncingConsolScope" @click="syncFromConsolScope">从合并范围带入</el-button>
         <el-button size="small" :loading="syncing" @click="syncFromG72">从 G7-2 同步名单</el-button>
       </div>
     </div>
@@ -374,6 +375,7 @@ import {
   normalizeG7BasicInfoRow,
   resequenceG7BasicInfoRows,
   serializeG7BasicInfoRows,
+  sourcesFromConsolScope,
   sourcesFromG7DetailPayload,
   syncG7BasicInfoFromSources,
   validateG7BasicInfoRows,
@@ -416,6 +418,7 @@ const auditNote = ref('')
 const auditConclusion = ref('')
 const fileInput = ref<HTMLInputElement | null>(null)
 const syncing = ref(false)
+const syncingConsolScope = ref(false)
 
 const validationIssues = computed(() => validateG7BasicInfoRows(rows))
 const errorCount = computed(() => validationIssues.value.filter(issue => issue.severity === 'error').length)
@@ -574,6 +577,48 @@ async function syncFromG72(): Promise<void> {
     ElMessage.error('从 G7-2 同步失败')
   } finally {
     syncing.value = false
+  }
+}
+
+async function syncFromConsolScope(): Promise<void> {
+  if (isReadonly.value || !props.projectId || syncingConsolScope.value) return
+  syncingConsolScope.value = true
+  try {
+    const year = props.htmlData?.project_context?.audit_year
+      ?? props.htmlData?.audit_year
+      ?? new Date().getFullYear()
+    const response = await api.get('/api/consolidation/scope', {
+      params: { project_id: props.projectId, year },
+      _silent: true,
+    } as any)
+    const scopeRows: Record<string, unknown>[] = Array.isArray(response)
+      ? response
+      : Array.isArray(response?.data)
+        ? response.data
+        : Array.isArray(response?.items)
+          ? response.items
+          : []
+    if (!scopeRows.length) {
+      ElMessage.warning('合并范围未维护，请先在合并模块维护合并范围')
+      return
+    }
+    const sources = sourcesFromConsolScope(scopeRows)
+    if (!sources.length) {
+      ElMessage.warning('合并范围中没有有效的主体（均已排除或名称为空）')
+      return
+    }
+    const result = syncG7BasicInfoFromSources(rows, sources)
+    rows.splice(0, rows.length, ...result.rows)
+    persistRows()
+    ElMessage.success(`已从合并范围带入：新增 ${result.added} 家，回填 ${result.filled} 项空字段`)
+  } catch (err: any) {
+    if (err?.response?.status === 404) {
+      ElMessage.warning('合并范围未维护，请先在合并模块维护合并范围')
+    } else {
+      ElMessage.error('从合并范围带入失败')
+    }
+  } finally {
+    syncingConsolScope.value = false
   }
 }
 

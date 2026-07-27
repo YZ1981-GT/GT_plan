@@ -24,6 +24,18 @@
         <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
       </div>
 
+      <!-- 本册无「底稿目录」sheet，用导航条提供目录/进度/手册入口 -->
+      <G7SheetNavBar
+        v-if="isHtmlSheet && dualMode.currentMode.value !== 'onlyoffice'"
+        :sheets="navSheets"
+        :current-code="sheetCode"
+        :wp-id="props.wpId"
+        :project-id="props.projectId"
+        title="G7 子公司组 · 底稿导航"
+        workflow-hint="建议顺序：G7-7 控制判断 → G7-8 同控初始计量 / G7-9 非同控初始计量 → G7-10 后续计量检查 → G7-11 处置（非一揽子）/ G7-12 处置（一揽子）→ G7-18 凭证检查（抽凭 1511）。初始计量与处置结果经合并联动进入合并工作底稿。"
+        @navigate="(s: string) => emit('navigate-sheet', s)"
+      />
+
       <!-- 双模式：HTML sheet 切到 OnlyOffice -->
       <GtOnlyOfficeSheet
         v-if="isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'"
@@ -86,6 +98,7 @@
  * Requirements: 1.1, 1.2, 1.4, 7.2
  */
 import { ref, computed, onMounted, inject, defineAsyncComponent, type Component } from 'vue'
+import G7SheetNavBar from './g7-shared/G7SheetNavBar.vue'
 import { useG7SubDualMode } from './composables/useG7SubDualMode'
 import { useG7SubFormData } from './composables/useG7SubFormData'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
@@ -122,6 +135,9 @@ const props = defineProps<{
   readonly?: boolean
 }>()
 
+/** 导航条点击 → 转发给 GtWpRenderer 切换 tab */
+const emit = defineEmits<{ 'navigate-sheet': [sheetName: string] }>()
+
 // ─── Reactive refs for composables ─────────────────────────────────────────
 const wpIdRef = computed(() => props.wpId)
 const projectIdRef = computed(() => props.projectId)
@@ -151,6 +167,31 @@ const isHtmlSheet = computed(() => !!activeComponent.value)
 
 /** 解析后的 htmlData（优先使用prop，fallback到selfLoad结果） */
 const resolvedHtmlData = computed(() => props.htmlData ?? selfLoadData.value)
+
+// ─── 导航条数据（优先用 render 返回的真实 sheetName，缺失时回退本地常量） ──────
+const FALLBACK_NAV_SHEETS: Array<{ code: string; sheetName: string; shortLabel: string }> = [
+  { code: 'G7-7', sheetName: '投资初始确认判断G7-7', shortLabel: '控制判断' },
+  { code: 'G7-8', sheetName: '子公司初始计量测试（同控）G7-8', shortLabel: '同控初始计量' },
+  { code: 'G7-9', sheetName: '非同一控制下企业合并G7-9', shortLabel: '非同控初始计量' },
+  { code: 'G7-10', sheetName: '后续计量检查G7-10', shortLabel: '后续计量' },
+  { code: 'G7-11', sheetName: '处置检查（非一揽子交易）G7-11', shortLabel: '处置(非一揽子)' },
+  { code: 'G7-12', sheetName: '处置检查（一揽子交易）G7-12', shortLabel: '处置(一揽子)' },
+  { code: 'G7-18', sheetName: '凭证检查表G7-18', shortLabel: '凭证检查' },
+]
+
+const navSheets = computed(() => {
+  const fromRender = ((props.htmlData ?? selfLoadData.value) as any)?.sheets
+  if (!Array.isArray(fromRender) || fromRender.length === 0) return FALLBACK_NAV_SHEETS
+  const byCode = new Map(FALLBACK_NAV_SHEETS.map((s) => [s.code, s]))
+  const mapped = fromRender
+    .filter((s: any) => SHEET_COMPONENT_MAP[String(s?.code || '')])
+    .map((s: any) => ({
+      code: String(s.code),
+      sheetName: String(s.sheetName || s.code),
+      shortLabel: byCode.get(String(s.code))?.shortLabel || String(s.code),
+    }))
+  return mapped.length ? mapped : FALLBACK_NAV_SHEETS
+})
 
 // ─── useG7SubFormData 用于selfLoad ──────────────────────────────────────────
 // ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ───

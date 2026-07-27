@@ -24,6 +24,18 @@
         <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
       </div>
 
+      <!-- 本册无「底稿目录」sheet，用导航条提供目录/进度/手册入口 -->
+      <G7SheetNavBar
+        v-if="isHtmlSheet && dualMode.currentMode.value !== 'onlyoffice'"
+        :sheets="navSheets"
+        :current-code="sheetCode"
+        :wp-id="props.wpId"
+        :project-id="props.projectId"
+        title="G7 权益法组 · 底稿导航"
+        workflow-hint="建议顺序：G7-4 基本信息 → G7-5 财务信息 → G7-6 会计政策差异 → G7-13 投资成本测试 → G7-14 权益法测算（可推 G7-3 建议分录）→ G7-15 内部交易抵销 → G7-16 未确认损失 → G7-17 减值测试（同步 G7-14 / 供 K11 减值来源）。"
+        @navigate="(s: string) => emit('navigate-sheet', s)"
+      />
+
       <!-- 双模式：HTML sheet 切到 OnlyOffice -->
       <GtOnlyOfficeSheet
         v-if="isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'"
@@ -80,6 +92,7 @@
  * Requirements: 1.1, 1.2, 1.4, 7.2
  */
 import { ref, computed, onMounted, inject, defineAsyncComponent, type Component } from 'vue'
+import G7SheetNavBar from './g7-shared/G7SheetNavBar.vue'
 import { useG7EquityMethodDualMode } from './composables/useG7EquityMethodDualMode'
 import { useG7EquityMethodFormData } from './composables/useG7EquityMethodFormData'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
@@ -118,6 +131,9 @@ const props = defineProps<{
   readonly?: boolean
 }>()
 
+/** 导航条点击 → 转发给 GtWpRenderer 切换 tab */
+const emit = defineEmits<{ 'navigate-sheet': [sheetName: string] }>()
+
 // ─── Reactive refs for composables ─────────────────────────────────────────
 const wpIdRef = computed(() => props.wpId)
 const projectIdRef = computed(() => props.projectId)
@@ -140,6 +156,32 @@ const sheetCode = computed(() => {
 // ─── Active component (v-if dispatch) ──────────────────────────────────────
 const activeComponent = computed(() => {
   return SHEET_COMPONENT_MAP[sheetCode.value] || null
+})
+
+// ─── 导航条数据（优先用 render 返回的真实 sheetName，缺失时回退本地常量） ──────
+const FALLBACK_NAV_SHEETS: Array<{ code: string; sheetName: string; shortLabel: string }> = [
+  { code: 'G7-4', sheetName: '被投资单位基本信息G7-4', shortLabel: '基本信息' },
+  { code: 'G7-5', sheetName: '被投资单位财务信息G7-5', shortLabel: '财务信息' },
+  { code: 'G7-6', sheetName: '被投资公司会计政策G7-6', shortLabel: '会计政策' },
+  { code: 'G7-13', sheetName: '投资成本测试表G7-13', shortLabel: '投资成本测试' },
+  { code: 'G7-14', sheetName: '权益法测算表G7-14', shortLabel: '权益法测算' },
+  { code: 'G7-15', sheetName: '内部交易抵销测算表G7-15', shortLabel: '内部交易抵销' },
+  { code: 'G7-16', sheetName: '未确认投资损失测试表G7-16', shortLabel: '未确认损失' },
+  { code: 'G7-17', sheetName: '减值测试表G7-17', shortLabel: '减值测试' },
+]
+
+const navSheets = computed(() => {
+  const fromRender = ((props.htmlData ?? selfLoadData.value) as any)?.sheets
+  if (!Array.isArray(fromRender) || fromRender.length === 0) return FALLBACK_NAV_SHEETS
+  const byCode = new Map(FALLBACK_NAV_SHEETS.map((s) => [s.code, s]))
+  const mapped = fromRender
+    .filter((s: any) => SHEET_COMPONENT_MAP[String(s?.code || '')])
+    .map((s: any) => ({
+      code: String(s.code),
+      sheetName: String(s.sheetName || s.code),
+      shortLabel: byCode.get(String(s.code))?.shortLabel || String(s.code),
+    }))
+  return mapped.length ? mapped : FALLBACK_NAV_SHEETS
 })
 
 /** 已匹配到HTML子组件的sheet（支持双模式切换） */

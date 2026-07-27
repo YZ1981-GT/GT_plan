@@ -711,3 +711,275 @@ async def g7_main_import_data(
         trunc = f"数据行数超过{ROW_LIMIT}行限制，已截断"
         out["warning"] = f"{out.get('warning')}；{trunc}" if out.get("warning") else trunc
     return out
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# G7-2 明细表 ← tb_aux_balance（科目 1511 长期股权投资，按被投资单位维度归集）
+#
+# 🔴 严格照 F1 `import-aux-balance` 实现（复用 F1 `pick_aux_type`），禁止照
+#   D3/D5/D6/D7 历史 aux 版本（其 SQL 引用不存在的列 period_type/balance，运行必 500）。
+#   两条四表库铁律：① `get_active_filter` 只取 active dataset；② 先锁定单一 aux_type
+#   再归集，防 aux 维度冗余双算。
+#
+# 宁缺勿造：辅助余额表无「控制类型」→ 一律落成本法段（section='cost'），由审计师按
+# G7-4 判断改段；无「持股比例」→ 比例列不取数（保持 0）；无 aux 数据 → 提示手工。
+# ═══════════════════════════════════════════════════════════════════════════════
+
+from typing import Callable, Iterable, Sequence  # noqa: E402
+
+_G7_AUX_ACCOUNT_PREFIX = "1511"
+
+
+def build_g7_detail_rows_from_aux(
+    aux_entries: Iterable[Sequence],
+    *,
+    aux_type: str = "",
+    row_limit: int = ROW_LIMIT,
+    row_id_factory: Callable[[], str] | None = None,
+) -> list[dict]:
+    """纯函数：1511 辅助余额归集结果 → G7-2 成本法行（section='cost'）。
+
+    Args:
+        aux_entries: 每项按位置解构 ``(aux_name, opening, debit, credit, closing)``。
+        aux_type: 归集维度名（写入来源串）。
+        row_limit: 行数上限（超出截断）。
+        row_id_factory: rowId 工厂（默认 uuid4；单测可注入确定性工厂）。
+
+    - 期末优先取账套 closing，缺失回退 opening+debit-credit（增加=借方，减少=贷方）；
+    - relationship 不臆造：aux 无控制类型 → 恒 section='cost'，审计师按 G7-4 改段；
+    - 每行 remark 写入来源溯源串（科目 + aux_type）。
+    """
+    make_row_id = row_id_factory or (lambda: str(uuid4()))
+    if aux_type:
+        note = f"由辅助余额表({_G7_AUX_ACCOUNT_PREFIX}·{aux_type})导入"
+    else:
+        note = f"由辅助余额表({_G7_AUX_ACCOUNT_PREFIX})导入"
+    rows: list[dict] = []
+    for entry in list(aux_entries)[:row_limit]:
+        name = str(entry[0] or "").strip()
+        if not name:
+            continue
+        opening = safe_float(entry[1])
+        debit = safe_float(entry[2])
+        credit = safe_float(entry[3])
+        closing_raw = safe_float(entry[4])
+        end_balance = round(opening + debit - credit, 2)
+        end_val = closing_raw if abs(closing_raw) > 1e-9 else end_balance
+        rows.append({
+            "id": make_row_id(),
+            "section": "cost",
+            "investeeName": name,
+            "initialInvestmentCost": 0,
+            "investmentRatio": 0,
+            "investmentDate": "",
+            "investmentMethod": "",
+            "cashDividend": 0,
+            "openingRatio": 0,
+            "openingAmount": opening,
+            "increaseRatio": 0,
+            "increaseAmount": debit,   # 资产借方增加
+            "increaseIndex": "",
+            "decreaseRatio": 0,
+            "decreaseAmount": credit,
+            "decreaseIndex": "",
+            "closingRatio": 0,
+            "closingAmount": end_val,  # 前端 recalcG7CostRow 会重算
+            "openingAje": 0,
+            "openingRje": 0,
+            "ajeIncrease": 0,
+            "ajeDecrease": 0,
+            "rjeIncrease": 0,
+            "rjeDecrease": 0,
+            "remark": note,
+        })
+    return rows
+
+
+async def aggregate_g7_detail_rows_from_aux(
+    db: AsyncSession,
+    project_id: str,
+    year: int,
+    *,
+    aux_type: str | None = None,
+    row_limit: int = ROW_LIMIT,
+    row_id_factory: Callable[[], str] | None = None,
+) -> tuple[list[dict], str | None, int, list[str]]:
+    """tb_aux_balance 1511 按单一 aux_type 归集 → G7-2 成本法行。
+
+    Returns:
+        ``(rows, 选定 aux_type, 归集单位数, 候选 aux_type 列表)``；无数据 ``([], None, 0, [])``。
+    """
+    import sqlalchemy as sa
+
+    from app.models.audit_platform_models import TbAuxBalance
+    from app.services.dataset_query import get_active_filter
+
+    from ._f1_import_export import pick_aux_type
+
+    active_filter = await get_active_filter(db, TbAuxBalance.__table__, project_id, year)
+    base_where = sa.and_(
+        active_filter,
+        TbAuxBalance.account_code.like(f"{_G7_AUX_ACCOUNT_PREFIX}%"),
+    )
+
+    # ① 先定维度（防 aux_type 冗余双算）
+    type_rows = (
+        await db.execute(
+            sa.select(
+                TbAuxBalance.aux_type,
+                sa.func.count().label("n"),
+                sa.func.coalesce(
+                    sa.func.sum(sa.func.abs(sa.func.coalesce(TbAuxBalance.closing_balance, 0))), 0
+                ).label("amt"),
+            )
+            .where(base_where)
+            .group_by(TbAuxBalance.aux_type)
+        )
+    ).fetchall()
+    candidates = [str(r.aux_type or "") for r in type_rows]
+    picked = aux_type or pick_aux_type([(r.aux_type, r.n, r.amt) for r in type_rows])
+    if not picked:
+        return [], None, 0, candidates
+
+    # ② 锁定维度后按被投资单位名称归集
+    agg_rows = (
+        await db.execute(
+            sa.select(
+                TbAuxBalance.aux_name,
+                sa.func.coalesce(sa.func.sum(TbAuxBalance.opening_balance), 0).label("opening"),
+                sa.func.coalesce(sa.func.sum(TbAuxBalance.debit_amount), 0).label("debit"),
+                sa.func.coalesce(sa.func.sum(TbAuxBalance.credit_amount), 0).label("credit"),
+                sa.func.coalesce(sa.func.sum(TbAuxBalance.closing_balance), 0).label("closing"),
+            )
+            .where(sa.and_(base_where, TbAuxBalance.aux_type == picked))
+            .group_by(TbAuxBalance.aux_name)
+            .order_by(TbAuxBalance.aux_name)
+        )
+    ).fetchall()
+    entries = [(r.aux_name, r.opening, r.debit, r.credit, r.closing) for r in agg_rows]
+    rows = build_g7_detail_rows_from_aux(
+        entries, aux_type=picked, row_limit=row_limit, row_id_factory=row_id_factory
+    )
+    return rows, picked, len(entries), candidates
+
+
+def _merge_g7_cost_rows(
+    existing: list[dict], incoming: list[dict], *, overwrite: bool
+) -> tuple[list[dict], int]:
+    """按 investeeName 把 aux 成本法行并入既有 G7-2 全量行（保留权益法/减值行）。
+
+    Persist_First：``overwrite=False`` 时已存在单位不覆盖；``overwrite=True`` 时按名
+    覆盖金额并计入影响行数。Returns ``(merged_full_rows, affected_count)``。
+    """
+    def _norm(name: object) -> str:
+        return str(name or "").strip().replace(" ", "").replace("　", "")
+
+    existing_cost_by_name: dict[str, dict] = {}
+    for r in existing:
+        if str((r or {}).get("section", "")) == "cost":
+            existing_cost_by_name[_norm((r or {}).get("investeeName"))] = r
+
+    affected = 0
+    merged = list(existing)
+    for inc in incoming:
+        key = _norm(inc.get("investeeName"))
+        if not key:
+            continue
+        if key in existing_cost_by_name:
+            if overwrite:
+                target = existing_cost_by_name[key]
+                for f in ("openingAmount", "increaseAmount", "decreaseAmount", "closingAmount"):
+                    target[f] = inc.get(f, target.get(f))
+                target["remark"] = inc.get("remark", target.get("remark"))
+                affected += 1
+            # Persist_First：不覆盖已存在单位
+        else:
+            merged.append(inc)
+            existing_cost_by_name[key] = inc
+            affected += 1
+    return merged, affected
+
+
+@router.post("/api/workpapers/{wp_id}/g7/import-aux-balance")
+async def g7_import_aux_balance(
+    wp_id: str,
+    overwrite: bool = Query(False),
+    aux_type: str | None = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    """从 tb_aux_balance（科目 1511，按被投资单位维度）归集导入 G7-2 明细表。
+
+    灰度关闭 → 直接返回 ``imported_count=0`` 且不触库不写入（Property 5）。
+    merge：按 investeeName 去重（Persist_First），保留权益法/减值行；查询异常 rollback
+    并返回 ``ok:True, imported_count:0``（不 500，不阻断底稿）。
+    """
+    from app.core.config import settings
+
+    if not settings.G7_FOUR_TABLE_EXTRACTION_ENABLED:
+        return {"ok": True, "enabled": False, "imported_count": 0, "rows": [],
+                "message": "四表取数未启用（G7_FOUR_TABLE_EXTRACTION_ENABLED=False）"}
+
+    import sqlalchemy as sa
+
+    wp_row = (
+        await db.execute(
+            sa.text(
+                "SELECT wp.project_id, p.audit_year "
+                "FROM working_paper wp JOIN projects p ON p.id = wp.project_id "
+                "WHERE wp.id = :wp_id"
+            ),
+            {"wp_id": wp_id},
+        )
+    ).fetchone()
+    if not wp_row:
+        raise HTTPException(404, "底稿不存在")
+
+    project_id = str(wp_row.project_id)
+    year = int(wp_row.audit_year or 0)
+
+    try:
+        rows_data, picked_type, total_units, candidates = await aggregate_g7_detail_rows_from_aux(
+            db, project_id, year, aux_type=aux_type
+        )
+    except Exception as e:  # noqa: BLE001 — 取数失败不阻断底稿
+        try:
+            await db.rollback()
+        except Exception:
+            pass
+        return {"ok": True, "enabled": True, "imported_count": 0, "rows": [],
+                "message": f"辅助余额取数失败：{e}"}
+
+    if not rows_data:
+        multi = len(candidates) > 1
+        msg = "账套无被投资单位辅助余额（科目1511），请手工录入"
+        if multi:
+            msg = f"科目1511存在多个辅助维度 {candidates}，请指定 aux_type 后重试"
+        return {"ok": True, "enabled": True, "imported_count": 0, "rows": [],
+                "aux_type": picked_type, "candidates": candidates, "message": msg}
+
+    item_id = _ITEM_IDS["G7-2"]
+    existing_rows = await load_json_rows(db, wp_id, item_id, field="conclusion")
+    merged, affected = _merge_g7_cost_rows(existing_rows, rows_data, overwrite=overwrite)
+    await upsert_json_rows(db, wp_id, item_id, merged, field="conclusion")
+
+    truncated = total_units > len(rows_data)
+    msg = (
+        f"从辅助余额表(1511·{picked_type})归集 {total_units} 个被投资单位，"
+        f"{'覆盖' if overwrite else '新增'} {affected} 行成本法明细（控制类型未取数，请按 G7-4 判断改段）。"
+    )
+    out: dict[str, Any] = {
+        "ok": True,
+        "enabled": True,
+        "imported_count": affected,
+        "total_rows": len(merged),
+        "total_units": total_units,
+        "aux_type": picked_type,
+        "candidates": candidates,
+        "rows": rows_data,
+    }
+    if truncated:
+        out["truncated"] = True
+        msg += f" 超过 {len(rows_data)} 行上限已截断。"
+    out["message"] = msg
+    return out

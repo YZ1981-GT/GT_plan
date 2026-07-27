@@ -1,7 +1,7 @@
 """G7 长期股权投资(权益法组) — 专属渲染策略.
 
 componentType: g7-long-term-equity-method
-科目 1401 长期股权投资（借方/资产类，权益法核算部分）。
+科目 1511 长期股权投资（借方/资产类，权益法核算部分）。
 
 覆盖 8 个 sheet（sheetName v-if dispatch 主入口 GtG7EquityMethod.vue 分发）：
     G7-4 被投资单位基本信息 / G7-5 被投资单位财务信息 /

@@ -4,6 +4,12 @@
     <div class="section-head">
       <h3 class="sheet-title">G7-1 长期股权投资审定表</h3>
       <div class="head-actions">
+        <G7ConsolLinkageEntryDialog
+          :project-id="props.projectId"
+          :year="auditYear"
+          :readonly="isReadonly"
+          :can-edit="canEditCtx"
+        />
         <el-button size="small" type="primary" plain :loading="adjPullGross.loading.value" @click="openBringInGross">
           <el-icon><Download /></el-icon>带入调整(原值)
         </el-button>
@@ -48,6 +54,105 @@
         <template v-else> ✗</template>
       </span>
     </div>
+
+    <!-- 投影说明（Decision 1：G7-1 行由 G7-2 明细自动投影） -->
+    <el-alert
+      type="info"
+      :closable="false"
+      show-icon
+      class="projection-note"
+      title="本表各行由 G7-2 明细表自动投影（含 AJE/RJE），请在 G7-2 修改被投资单位与金额；本表仅做审定汇总与核对。"
+    />
+
+    <!-- G7-1 账套分类合计核对卡片（只读，灰度开启时 render 注入 tb_leaf_categories） -->
+    <el-card v-if="leafCategories" shadow="never" class="leaf-reconcile-card" data-testid="g7-leaf-reconcile">
+      <template #header>
+        <span>账套分类合计核对（试算表 1511/1512 叶子科目）</span>
+      </template>
+      <div class="leaf-grid">
+        <span class="lg-item">投资成本 <b>{{ fmt(leafCategories.cost) }}</b></span>
+        <span class="lg-item">损益调整 <b>{{ fmt(leafCategories.profit_loss) }}</b></span>
+        <span class="lg-item">其他综合收益 <b>{{ fmt(leafCategories.oci) }}</b></span>
+        <span class="lg-item">其他权益变动 <b>{{ fmt(leafCategories.other_equity) }}</b></span>
+        <span class="lg-item">减值准备 <b>{{ fmt(leafCategories.impairment) }}</b></span>
+      </div>
+      <div class="leaf-recon-rows">
+        <div class="recon-row">
+          <span>原值分类合计（成本+损益+OCI+其他权益）：{{ fmt(categoryReconcile.grossLeaf) }}</span>
+          <span>投资合计未审期末：{{ fmt(categoryReconcile.grossAdj) }}</span>
+          <el-tag :type="Math.abs(categoryReconcile.grossDiff) > 0.01 ? 'danger' : 'success'" size="small">
+            差异 {{ fmt(categoryReconcile.grossDiff) }} {{ Math.abs(categoryReconcile.grossDiff) > 0.01 ? '✗' : '✓' }}
+          </el-tag>
+        </div>
+        <div class="recon-row">
+          <span>减值分类合计：{{ fmt(categoryReconcile.impairLeaf) }}</span>
+          <span>减值组未审期末：{{ fmt(categoryReconcile.impairAdj) }}</span>
+          <el-tag :type="Math.abs(categoryReconcile.impairDiff) > 0.01 ? 'danger' : 'success'" size="small">
+            差异 {{ fmt(categoryReconcile.impairDiff) }} {{ Math.abs(categoryReconcile.impairDiff) > 0.01 ? '✗' : '✓' }}
+          </el-tag>
+        </div>
+      </div>
+      <el-alert
+        v-if="Math.abs(categoryReconcile.grossDiff) > 0.01 || Math.abs(categoryReconcile.impairDiff) > 0.01"
+        type="warning"
+        :closable="false"
+        show-icon
+        class="recon-warn"
+        title="账套分类合计与审定表未审期末不一致，可能原因：分类归属差异（应在 G7-2 调整段别）、部分单位未纳入范围、账套科目未标准化。"
+      />
+      <div v-if="leafCategories.unmapped && leafCategories.unmapped.length" class="unmapped-leaf">
+        <span class="ul-label">未归类叶子科目（不计入任何分类）：</span>
+        <el-tag
+          v-for="u in leafCategories.unmapped"
+          :key="u.code"
+          size="small"
+          type="info"
+          effect="plain"
+        >{{ u.code }} {{ u.name }} {{ fmt(u.amount) }}</el-tag>
+      </div>
+    </el-card>
+
+    <!-- G7-14 权益法期末对照（只读，Decision 2：G7-1 不写值，逐户展示差异） -->
+    <el-card shadow="never" class="g714-diff-card" data-testid="g7-g714-diff">
+      <template #header>
+        <div class="g714-diff-head">
+          <span>G7-14 权益法期末对照（只读）</span>
+          <el-button size="small" :loading="g714DiffLoading" @click="loadG714Diff">
+            {{ g714DiffLoaded ? '重新对照' : '加载 G7-14 对照' }}
+          </el-button>
+        </div>
+      </template>
+      <el-alert
+        v-if="g714DiffLoaded && g714DiffMismatchCount > 0"
+        type="warning"
+        :closable="false"
+        show-icon
+        class="g714-warn"
+        :title="`有 ${g714DiffMismatchCount} 户权益法投资的 G7-1 审定期末与 G7-14 测算期末不一致，请在 G7-2 核对权益法运动分量。`"
+      />
+      <el-table v-if="g714DiffLoaded" :data="g714DiffRows" border size="small" max-height="320">
+        <el-table-column label="被投资单位" prop="investeeName" min-width="160" />
+        <el-table-column label="G7-1 审定期末" align="right" width="130">
+          <template #default="{ row }">{{ fmt(row.auditedClosing) }}</template>
+        </el-table-column>
+        <el-table-column label="G7-14 期末" align="right" width="130">
+          <template #default="{ row }">{{ fmt(row.g714Closing) }}</template>
+        </el-table-column>
+        <el-table-column label="差异(G7-14−G7-1)" align="right" width="140">
+          <template #default="{ row }">
+            <span :class="{ 'diff-red': Math.abs(row.variance) > 0.01 }">{{ fmt(row.variance) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" width="90" align="center">
+          <template #default="{ row }">
+            <el-tag size="small" :type="row.matched ? 'success' : 'info'">
+              {{ row.matched ? '已匹配' : 'G7-1 无此户' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+      </el-table>
+      <el-empty v-else description="点击「加载 G7-14 对照」查看权益法期末逐户差异（只读，不写审定表）" :image-size="60" />
+    </el-card>
 
     <!-- 工具栏 -->
     <div class="tab-toolbar">
@@ -407,6 +512,10 @@ import { useAuditContext } from '@/composables/useAuditContext'
 import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
+import G7ConsolLinkageEntryDialog from './G7ConsolLinkageEntryDialog.vue'
+import { pullG7_14ForDetail } from '../../composables/g7EquityMethodPullToDetail'
+import { calcClosingReconVariance } from '../../composables/useG7EquityMethodFormulaEngine'
+import { normalizeInvesteeKey } from '../../composables/g7EquityMethodCrossSheet'
 import { api } from '@/services/apiProxy'
 
 const props = defineProps<{
@@ -418,6 +527,11 @@ const props = defineProps<{
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 const isReadonly = computed(() => props.isReadonly)
+
+// 审计上下文（年度 / 可编辑）—— 供合并联动入口与既有带入调整复用
+const auditCtx = useAuditContext()
+const auditYear = computed(() => auditCtx.year.value)
+const canEditCtx = computed(() => auditCtx.canEdit.value)
 
 const STORAGE_KEY_PREFIX = 'g7-adjudication-collapse-'
 const DATA_KEY = 'G7-1-adjudication-data'
@@ -609,6 +723,30 @@ const netValueRow = computed(() => {
 })
 
 const tbNet = computed(() => Math.round((tbGross.value - tbImpairment.value) * 100) / 100)
+
+// 账套分类合计（render 注入 tb_leaf_categories；灰度关闭为 null → 隐藏核对卡片）
+interface G7LeafCategories {
+  cost: number; profit_loss: number; oci: number; other_equity: number
+  impairment: number; unmapped: Array<{ code: string; name: string; amount: number }>; source: string
+}
+const leafCategories = computed<G7LeafCategories | null>(() => {
+  const raw = (props.htmlData as any)?.tb_leaf_categories
+  return raw && typeof raw === 'object' ? (raw as G7LeafCategories) : null
+})
+/** 分类合计 vs 审定表未审期末（阈值/口径与 TB 核对一致：0.01、分位四舍五入） */
+const categoryReconcile = computed(() => {
+  const lc = leafCategories.value
+  const round2 = (n: number) => Math.round(n * 100) / 100
+  const grossLeaf = lc ? round2(lc.cost + lc.profit_loss + lc.oci + lc.other_equity) : 0
+  const grossAdj = round2(investmentTotalRow.value.closingUnadjusted)
+  const impairSub = calcGroupSubtotal(groups.find(g => g.id === 'impairment')?.rows ?? [])
+  const impairLeaf = lc ? round2(lc.impairment) : 0
+  const impairAdj = round2(impairSub.closingUnadjusted)
+  return {
+    grossLeaf, grossAdj, grossDiff: round2(grossLeaf - grossAdj),
+    impairLeaf, impairAdj, impairDiff: round2(impairLeaf - impairAdj),
+  }
+})
 const varianceGross = computed(() =>
   Math.round((investmentTotalRow.value.closingAdjusted - tbGross.value) * 100) / 100,
 )
@@ -630,6 +768,61 @@ const missingReasonCount = computed(() => {
   }
   return n
 })
+
+// ── G7-14 权益法期末对照（只读，Decision 2：G7-1 不写值，仅展示逐户差异）────
+interface G714DiffRow {
+  investeeName: string
+  auditedClosing: number  // G7-1 权益法行期末审定（投影自 G7-2）
+  g714Closing: number     // G7-14 期末余额
+  variance: number        // = G7-14 期末 − G7-1 审定期末（calcClosingReconVariance 口径 Q−R）
+  matched: boolean
+}
+const g714DiffRows = ref<G714DiffRow[]>([])
+const g714DiffLoading = ref(false)
+const g714DiffLoaded = ref(false)
+
+/** 拉 G7-14 逐户期末，与 G7-1 权益法组（合营+联营）逐户行对照（只读，缺源安全）。 */
+async function loadG714Diff(): Promise<void> {
+  if (!props.projectId) {
+    ElMessage.warning('缺少项目上下文，无法对照 G7-14')
+    return
+  }
+  g714DiffLoading.value = true
+  try {
+    const src = await pullG7_14ForDetail(props.projectId)
+    // G7-1 权益法逐户行（合营+联营组，排除小计）
+    const equityRows = [
+      ...(groups.find(g => g.id === 'joint_venture')?.rows ?? []),
+      ...(groups.find(g => g.id === 'associate')?.rows ?? []),
+    ].filter(r => !r._isSubtotal)
+    const byName = new Map(equityRows.map(r => [normalizeInvesteeKey(r.item), r]))
+    const out: G714DiffRow[] = []
+    const seen = new Set<string>()
+    for (const s of src) {
+      const key = normalizeInvesteeKey(s.investeeName)
+      seen.add(key)
+      const row = byName.get(key)
+      const audited = row ? Number(row.closingAdjusted || 0) : 0
+      out.push({
+        investeeName: s.investeeName,
+        auditedClosing: Math.round(audited * 100) / 100,
+        g714Closing: Math.round(s.closingAmount * 100) / 100,
+        variance: calcClosingReconVariance(s.closingAmount, audited),
+        matched: !!row,
+      })
+    }
+    g714DiffRows.value = out
+    g714DiffLoaded.value = true
+    if (!src.length) ElMessage.warning('未获取到 G7-14 权益法测算数据（Method 组未实例化或无逐户明细）')
+  } catch (e: any) {
+    ElMessage.error(e?.message || '对照 G7-14 失败')
+  } finally {
+    g714DiffLoading.value = false
+  }
+}
+const g714DiffMismatchCount = computed(() =>
+  g714DiffRows.value.filter(r => Math.abs(r.variance) > 0.01).length,
+)
 
 /** 发布 substantive:adjudicated；仅 writebackTb=true 时父组件回写 TB */
 function publishAdjudicated(opts?: { writebackTb?: boolean }): void {
@@ -1253,6 +1446,16 @@ onBeforeUnmount(() => {
 .toolbar-right { display: flex; gap: 6px; align-items: center; }
 .chip-wrap { display: inline-flex; align-items: center; }
 
+.projection-note { margin-bottom: 10px; }
+.leaf-reconcile-card { margin-bottom: 12px; font-size: 13px; }
+.leaf-grid { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 10px; }
+.leaf-grid .lg-item { color: #606266; }
+.leaf-grid .lg-item b { color: #303133; margin-left: 4px; }
+.leaf-recon-rows { display: flex; flex-direction: column; gap: 6px; }
+.recon-row { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.recon-warn { margin-top: 10px; }
+.unmapped-leaf { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-top: 10px; }
+.unmapped-leaf .ul-label { color: #909399; }
 .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .sheet-title { margin: 0; font-size: 15px; font-weight: 600; }
 .head-actions { display: flex; gap: 8px; }

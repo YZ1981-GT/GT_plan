@@ -12,6 +12,18 @@
         <span>当前为<b>总分汇总</b>模式：分公司为非独立法人，直接加总各分公司试算表即可，<b>无需填写以下抵销底稿</b>（合并数 = 各分公司本体加总）。如需母子合并请在顶部切换合并类型。</span>
       </template>
     </el-alert>
+    <!-- G7 合并联动 stale 常驻提示（Task 6.1；失败静默降级 Property 12） -->
+    <el-alert
+      v-if="linkageStale.stale.value"
+      type="warning"
+      :closable="false"
+      show-icon
+      class="cw-linkage-stale-notice"
+      title="G7 长期股权投资联动结果已过期，请从 G7 底稿重新联动或重新导入"
+      :description="linkageStale.staleSheets.value.length
+        ? `受影响底稿：${linkageStale.staleSheets.value.join('、')}`
+        : ''"
+    />
     <!-- 左侧：表样导航 -->
     <aside class="cw-nav" :style="{ width: navWidth + 'px' }">
       <div class="cw-nav-header">
@@ -129,6 +141,11 @@
       <InternalCashFlowSheet v-else-if="activeSheet === 'internal_cashflow'"
         :companies="companyColumns" @save="onSave('内部现金流抵消', $event)" @open-formula="onOpenFormula"
         @entries-changed="(e: any[]) => internalEntries.cashflow = e" />
+      <!-- G7 建议草稿（只读；由 G7 联动勾选建议后写入，不参与合并计算） -->
+      <G7SuggestionDraftSheet v-else-if="activeSheet === 'g7_suggestions'"
+        :rows="g7SuggestionDraft.rows" :note="g7SuggestionDraft.note"
+        :imported-at="g7SuggestionDraft.importedAt"
+        @goto-sheet="onGotoSheet" @refresh="loadAllData" />
     </main>
 
     <el-dialog v-model="g7LinkageVisible" title="G7 → 合并工作底稿联动" width="920px" destroy-on-close>
@@ -285,7 +302,9 @@
         </div>
 
         <div v-if="(g7LinkagePreview.suggestions?.length || 0) > 0" class="g7-linkage-mapping">
-          <div class="g7-linkage-title">建议草稿（G7-9/10/3/16，不自动入正式抵消）</div>
+          <div class="g7-linkage-title">
+            建议草稿（G7-3/6/9/10/13/15/16，不自动入正式抵消；确认后可在左侧「G7 建议草稿」查看）
+          </div>
           <el-table :data="g7LinkagePreview.suggestions" border size="small" max-height="240">
             <el-table-column width="52" align="center">
               <template #default="{ row }">
@@ -366,6 +385,7 @@ import {
   type G7LinkagePreview,
 } from '@/services/consolWorksheetDataApi'
 import { api } from '@/services/apiProxy'
+import { useG7ConsolLinkageEntry } from '@/components/workpaper/composables/g7ConsolLinkageEntry'
 import SubsidiaryInfoSheet from './SubsidiaryInfoSheet.vue'
 import InvestmentCostSheet from './InvestmentCostSheet.vue'
 import InvestmentEquitySheet from './InvestmentEquitySheet.vue'
@@ -380,6 +400,7 @@ import MinorityInterestSheet from './MinorityInterestSheet.vue'
 import InternalArApSheet from './InternalArApSheet.vue'
 import InternalTradeSheet from './InternalTradeSheet.vue'
 import InternalCashFlowSheet from './InternalCashFlowSheet.vue'
+import G7SuggestionDraftSheet from './G7SuggestionDraftSheet.vue'
 import { eventBus } from '@/utils/eventBus'
 import type { FormulaChangedPayload } from '@/utils/eventBus'
 import { handleApiError } from '@/utils/errorHandler'
@@ -574,6 +595,7 @@ const staticSheets = [
   { key: 'internal_arap', label: '内部往来抵消', desc: '债务方×债权方·账龄·坏账', icon: markRaw(Tickets), tag: '抵消', tagType: 'warning' as const },
   { key: 'internal_trade', label: '内部交易抵消', desc: '卖方×买方·未实现利润', icon: markRaw(Tickets), tag: '抵消', tagType: 'warning' as const },
   { key: 'internal_cashflow', label: '内部现金流抵消', desc: '按现金流量表项目配对', icon: markRaw(Tickets), tag: '抵消', tagType: 'warning' as const },
+  { key: 'g7_suggestions', label: 'G7 建议草稿', desc: '商誉/股比/调整分录建议·需复核', icon: markRaw(Tickets), tag: '草稿', tagType: 'warning' as const },
 ]
 
 // 从基本信息表提取有股比变动的企业，动态生成导航项
@@ -636,7 +658,7 @@ const navGroups = computed(() => [
   {
     key: 'g5', label: '合并抵消', step: '5',
     collapsed: groupCollapsed.g5,
-    sheets: sheetList.value.filter(s => ['elimination', 'capital'].includes(s.key)),
+    sheets: sheetList.value.filter(s => ['elimination', 'capital', 'g7_suggestions'].includes(s.key)),
   },
   {
     key: 'g6', label: '汇总核查', step: '✓',
@@ -651,6 +673,10 @@ const activeSheet = ref('info')
 const route = useRoute()
 const projectId = computed(() => route.params.projectId as string)
 const year = computed(() => Number(route.query.year) || new Date().getFullYear() - 1)
+
+// ─── G7 联动 stale 常驻提示（Task 6.1；失败静默降级 Property 12） ────────────
+const linkageStale = useG7ConsolLinkageEntry(projectId, year)
+
 const scopeCompanies = ref<{ name: string; code: string; ratio: number }[]>([])
 const g7LinkageVisible = ref(false)
 const g7LinkageLoading = ref(false)
@@ -661,6 +687,12 @@ const g7SelectedSheets = ref<string[]>(['info', 'cost', 'equity_inv', 'net_asset
 const g7Overwrite = ref(false)
 const g7EditableDiffs = ref<G7LinkageFieldDiff[]>([])
 const g7SuggestionSelected = reactive<Record<string, boolean>>({})
+/** 已写入的 G7 建议草稿（sheet_key='g7_suggestions'，只读展示，不参与合并计算） */
+const g7SuggestionDraft = reactive<{
+  rows: Record<string, any>[]
+  note: string
+  importedAt: string
+}>({ rows: [], note: '', importedAt: '' })
 
 /** 从 importable equity_inv 提取 G7-16 结构化备查字段 */
 const g7UnrecognizedMetaRows = computed(() => {
@@ -812,6 +844,8 @@ async function confirmG7Linkage() {
     })
     await Promise.all([loadAllData(), loadConsolScope()])
     g7LinkageVisible.value = false
+    // Task 6.1: 成功导入后刷新 stale 状态（Property 12：清除两侧提示）
+    void linkageStale.refreshStale()
     const imported = Object.values(result.imported || {}).reduce(
       (rowCount, currentCount) => rowCount + Number(currentCount || 0),
       0,
@@ -822,7 +856,7 @@ async function confirmG7Linkage() {
       ? `，范围同步 ${result.scope_synced} 家`
       : ''
     const draftNote = result.suggestions_applied
-      ? `，建议草稿 ${result.suggestions_applied} 条`
+      ? `，建议草稿 ${result.suggestions_applied} 条（见左侧「G7 建议草稿」）`
       : ''
     ElMessage.success(
       `G7 联动完成：导入 ${imported} 行${scopeNote}${draftNote}${skipped ? `，仍有 ${skipped} 个主体未匹配` : ''}`,
@@ -905,6 +939,11 @@ async function loadAllData() {
       if (saved.elimination.rows.cross) data.elimCross = saved.elimination.rows.cross
     }
     if (saved.capital?.rows) data.capitalReserve = saved.capital.rows
+    // G7 建议草稿（只读；由 G7 联动勾选建议写入）
+    const draft = saved.g7_suggestions
+    g7SuggestionDraft.rows = Array.isArray(draft?.rows) ? draft.rows : []
+    g7SuggestionDraft.note = typeof draft?.note === 'string' ? draft.note : ''
+    g7SuggestionDraft.importedAt = typeof draft?.imported_at === 'string' ? draft.imported_at : ''
     // 恢复动态股比变动表（share_change_1/2/3）
     for (const times of [1, 2, 3] as const) {
       const key = `share_change_${times}`
@@ -920,6 +959,8 @@ onMounted(async () => {
   eventBus.on('formula-changed', onFormulaChanged)
   // 从后端加载已保存的工作底稿数据
   await loadAllData()
+  // Task 6.1: 挂载时刷新 stale 状态（Property 12：失败静默降级）
+  void linkageStale.refreshStale()
 })
 onUnmounted(() => {
   eventBus.off('formula-changed', onFormulaChanged)

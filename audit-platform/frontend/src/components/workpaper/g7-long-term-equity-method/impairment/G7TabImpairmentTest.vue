@@ -930,6 +930,7 @@ function persistRows(): void {
       data: { conclusion: flatRows, remark: flatRows },
     },
   ])
+  const totalImpairment = sumImpairmentAmounts(rows.value)
   try {
     window.dispatchEvent(new CustomEvent(G7_IMPAIRMENT_UPDATED_EVENT, {
       detail: {
@@ -937,7 +938,20 @@ function persistRows(): void {
         wpId: props.wpId,
         itemIds: [ROWS_KEY, SECTION_KEY],
         rowCount: rows.value.length,
-        totalImpairment: sumImpairmentAmounts(rows.value),
+        totalImpairment,
+        timestamp: Date.now(),
+      },
+    }))
+    // K11 资产减值损失「长期股权投资减值」来源金额（GtK11AssetImpairmentLoss
+    // 的 handleImpairmentCalculated 按 detail.wpCode 在 SOURCE_WP_CODES 白名单
+    // 匹配，读 detail.totalRequiredProvision ?? detail.amount）
+    window.dispatchEvent(new CustomEvent('impairment:calculated', {
+      detail: {
+        wpCode: 'G7',
+        accountCode: '1512',
+        totalRequiredProvision: totalImpairment,
+        projectId: props.projectId,
+        wpId: props.wpId,
         timestamp: Date.now(),
       },
     }))

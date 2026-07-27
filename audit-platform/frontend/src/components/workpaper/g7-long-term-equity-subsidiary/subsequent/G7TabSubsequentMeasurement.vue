@@ -502,6 +502,16 @@
         <li>编号①~⑧在各区段内唯一；合并侧净资产须自购买日/合并日<strong>持续计算</strong>。</li>
       </ul>
     </details>
+
+    <G7VoucherSampleSection
+      :wp-id="wpId"
+      :project-id="projectId"
+      :is-readonly="isReadonly"
+      storage-key="G7-10-voucher-samples"
+      account-code="1511"
+      title="后续计量凭证抽查（G7-10）"
+      :html-data="htmlData"
+    />
   </div>
 </template>
 
@@ -535,6 +545,7 @@ import { useG7SubImportExport } from '../../composables/useG7SubImportExport'
 import { useG7SubFormData } from '../../composables/useG7SubFormData'
 import { WorkpaperRuntimeContextKey } from '../../composables/useWorkpaperScaffold'
 import GtIndexChip from '../../GtIndexChip.vue'
+import G7VoucherSampleSection from '../../g7-shared/G7VoucherSampleSection.vue'
 import http from '@/utils/http'
 import { extractG7AiText } from '../../composables/g7AiText'
 import { api } from '@/services/apiProxy'

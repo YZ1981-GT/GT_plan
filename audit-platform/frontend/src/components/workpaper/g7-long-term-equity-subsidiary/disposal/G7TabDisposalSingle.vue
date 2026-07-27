@@ -228,6 +228,16 @@
         <li>处置比例以小数填写（如 0.30 = 30%），范围 0～1</li>
       </ul>
     </details>
+
+    <G7VoucherSampleSection
+      :wp-id="wpId"
+      :project-id="projectId"
+      :is-readonly="isReadonly"
+      storage-key="G7-11-voucher-samples"
+      account-code="1511"
+      title="处置凭证抽查（G7-11）"
+      :html-data="htmlData"
+    />
   </div>
 </template>
 
@@ -243,6 +253,7 @@ import http from '@/utils/http'
 import { extractG7AiText } from '../../composables/g7AiText'
 import { api } from '@/services/apiProxy'
 import GtIndexChip from '../../GtIndexChip.vue'
+import G7VoucherSampleSection from '../../g7-shared/G7VoucherSampleSection.vue'
 import { useG7SubFormData } from '../../composables/useG7SubFormData'
 import { useG7SubImportExport } from '../../composables/useG7SubImportExport'
 import { WorkpaperRuntimeContextKey } from '../../composables/useWorkpaperScaffold'

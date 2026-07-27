@@ -267,6 +267,16 @@
       </ul>
     </details>
 
+    <G7VoucherSampleSection
+      :wp-id="wpId"
+      :project-id="projectId"
+      :is-readonly="isReadonly"
+      storage-key="G7-12-voucher-samples"
+      account-code="1511"
+      title="处置凭证抽查（G7-12）"
+      :html-data="htmlData"
+    />
+
     <input ref="fileInputRef" type="file" accept=".xlsx" class="hidden-input" @change="handleFileChange">
   </div>
 </template>
@@ -285,6 +295,7 @@ import { useG7SubFormData } from '../../composables/useG7SubFormData'
 import { useG7SubImportExport } from '../../composables/useG7SubImportExport'
 import { WorkpaperRuntimeContextKey } from '../../composables/useWorkpaperScaffold'
 import GtIndexChip from '../../GtIndexChip.vue'
+import G7VoucherSampleSection from '../../g7-shared/G7VoucherSampleSection.vue'
 import {
   PACKAGE_CRITERIA,
   calculatePackageRow,
