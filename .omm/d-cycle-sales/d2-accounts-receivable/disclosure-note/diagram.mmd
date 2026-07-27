@@ -1,0 +1,24 @@
+sequenceDiagram
+    participant U as 审计师
+    participant WP as D2披露表
+    participant API as wp_disclosure_sync_service
+    participant DB as disclosure_notes
+    participant NM as 附注模块 DisclosureEditor
+    participant WX as Word导出
+
+    U->>WP: 编辑 11 张子表 + 7 段说明
+    WP->>WP: 存 checklist_responses D2-disc-变体-*
+    U->>WP: 点「同步到附注」
+    API->>API: _resolve_target_year（payload year 优先，否则 projects.audit_year）
+    WP->>API: POST sync-from-workpaper（sub_table_data + columns + _note_texts + year）
+    API->>API: 子表浅合并，空载荷 no-op 不清表
+    API->>API: _note_texts pop 成 text_content
+    API->>DB: 写 table_data + _sub_table_columns + _source=workpaper
+    U->>NM: 打开附注 五、5 或 八、5
+    NM->>DB: GET note detail
+    DB-->>NM: note_sub_table_projector 投影 _tables
+    NM-->>U: 渲染扁平表头 + 正文
+    U->>WP: 点「校对附注」
+    WP->>DB: GET 附注现存合计
+    WP-->>U: ok / diff / missing 四态告警
+    U->>WX: 导出 Word（走同一投影 _effective_table_data）

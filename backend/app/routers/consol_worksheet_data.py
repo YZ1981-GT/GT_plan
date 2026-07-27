@@ -17,6 +17,7 @@ from app.services.g7_consol_linkage_service import (
     G7LinkageConfigError,
     G7LinkageConflictError,
     import_g7_linkage,
+    load_linkage_stale_state,
     preview_g7_linkage,
 )
 
@@ -56,6 +57,21 @@ class G7LinkageImportRequest(BaseModel):
     # None=整表填空合并；传列表则仅写入勾选字段（可为空列表）
     selected_diffs: list[G7LinkageDiffSelection] | None = None
     apply_suggestion_ids: list[str] = Field(default_factory=list)
+
+
+@router.get("/g7-linkage/{project_id}/{year}/stale")
+async def get_g7_linkage_stale(
+    project_id: UUID,
+    year: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_project_access("readonly")),
+):
+    """G7 联动 stale 只读薄端点（Task 6.1）。
+
+    仅委托既有 :func:`load_linkage_stale_state`，不含任何映射/计算逻辑，供
+    ConsolWorksheetTabs / GtG7LongTermEquityMain 两侧常驻提示消费。
+    """
+    return await load_linkage_stale_state(db, project_id, year)
 
 
 @router.get("/g7-linkage/{project_id}/{year}/preview")

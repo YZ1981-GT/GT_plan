@@ -101,7 +101,7 @@
             <template #label>💡 提示合理性 ({{ categoryCounts.reasonability }})</template>
           </el-tab-pane>
           <el-tab-pane name="no_formula">
-            <template #label>⬜ 未配置 ({{ currentRows.length - currentRows.filter(r => r.formula).length }})</template>
+            <template #label>⬜ 未配置 ({{ currentRows.filter(r => !r.formula && _rowNeedsFormula(r)).length }})</template>
           </el-tab-pane>
           <!-- E1 Sprint 2 Task 2.34: 用户自定义公式 Tab -->
           <el-tab-pane name="user_formulas">
@@ -1031,7 +1031,9 @@ async function loadAcnrTree() {
 /** 从 ACNR sheet 列表按域构建 wp 子树（cycle → parent → sheet）；
  *  显示名/排序/序号消歧统一走单一真源 composeSheetLabelsForGroup（sheetDisplayName.ts） */
 function buildWpDomainTree(sheets: AcnrSheetEntry[]) {
-  const wpSheets = sheets.filter(s => s.domain === 'wp')
+  // 过滤掉 sheet_code === parent_wp_code 的幻影条目（catalog 中"底稿自身作为子 sheet"的占位，
+  // 如 D1 parent 下有 sheet_code='D1' 与 sheet_code='D1-1' 重复，前者是冗余占位应排除）
+  const wpSheets = sheets.filter(s => s.domain === 'wp' && s.sheet_code !== s.parent_wp_code)
   // 按 cycle 分组
   const byCycle = new Map<string, AcnrSheetEntry[]>()
   for (const s of wpSheets) {
@@ -1272,6 +1274,8 @@ const wpFormulaRows = ref<any[]>([])
 // ── tb_detail「科目明细」公式覆盖 + 自定义新增（持久化于 wizard_state.tb_detail_formulas）──
 const tbDetailOverrides = ref<Record<string, any>>({})
 const tbDetailAdded = ref<any[]>([])
+// 第三级兜底：当 addrStore.tbAddresses 和 props.rows 都为空时，从 API 拉取试算表科目列表
+const tbDetailFallbackAccounts = ref<Array<{ code: string; name: string }>>([])
 
 async function loadTbDetailFormulas() {
   if (!props.projectId) return
@@ -1282,6 +1286,22 @@ async function loadTbDetailFormulas() {
     tbDetailOverrides.value = data?.overrides || {}
     tbDetailAdded.value = Array.isArray(data?.added) ? data.added : []
   } catch { /* silent */ }
+  // 当 addrStore.tbAddresses 和 props.rows 都为空时，从试算表 API 拉科目作兜底
+  if (!(addrStore.loaded && addrStore.tbAddresses.length > 0) && !(props.rows && props.rows.length > 0) && !tbDetailFallbackAccounts.value.length) {
+    try {
+      const tbData: any = await api.get(`/api/projects/${props.projectId}/trial-balance`, {
+        params: { year: props.year || new Date().getFullYear() },
+        _silent: true, validateStatus: (s: number) => s < 600,
+      } as any)
+      const items = Array.isArray(tbData) ? tbData : (tbData?.items || tbData?.data || [])
+      if (Array.isArray(items) && items.length) {
+        tbDetailFallbackAccounts.value = items.map((r: any) => ({
+          code: r.standard_account_code || r.account_code || '',
+          name: r.account_name || '',
+        })).filter((r: { code: string }) => r.code)
+      }
+    } catch { /* silent fallback */ }
+  }
 }
 
 async function persistTbDetailFormulas() {
@@ -1384,7 +1404,13 @@ async function loadRowsForNode(nodeKey: string) {
         params: { report_type: reportType, applicable_standard: standard },
         validateStatus: (s: number) => s < 600,
       })
-      const rows = data ?? []
+      const rows = (data ?? []) as any[]
+      // 有公式但无分类的行默认归为「自动运算」（这些行本就是从 TB 自动提数的预设公式）
+      for (const r of rows) {
+        if (r.formula && !r.formula_category) {
+          r.formula_category = 'auto_calc'
+        }
+      }
       allRowsMap.value[reportType] = rows
       allRowsMap.value[cacheKey] = rows
     } catch { /* ignore */ }
@@ -1448,8 +1474,19 @@ watch(visible, async (v) => {
     loadReportTypes()
     // 加载表间审核规则（项目级动态）
     loadCrossCheckItems()
-    // 用传入的 rows 作为当前报表的数据
-    if (props.rows?.length) {
+    if (props.scope === 'tb') {
+      // 试算表页打开 → 定位「科目明细」节点，用 TB() 预设 + 覆盖/自定义（props.rows 提供科目来源）。
+      // props.rows 是试算表行（standard_account_code/account_name），不是报表行次（无 row_code），
+      // 故不能走下方报表启发式（否则被误判为 report_balance_sheet 而公式列全空、树也定位不到）。
+      selectedNodeKey.value = 'tb_detail'
+      selectedPath.value = '试算平衡表 > 科目明细'
+      await loadTbDetailFormulas()
+      await nextTick()
+      expandedKeys.value = [...new Set([...expandedKeys.value, 'trial_balance'])]
+      await nextTick()
+      try { fmTreeRef.value?.setCurrentKey('tb_detail') } catch { /* ignore */ }
+    } else if (props.rows?.length) {
+      // 报表页传入 report_config 行次（row_code 如 BS-001）→ 定位对应报表节点
       const firstCode = props.rows[0]?.row_code || ''
       let rt = 'balance_sheet'
       if (firstCode.startsWith('IS-')) rt = 'income_statement'
@@ -1457,8 +1494,16 @@ watch(visible, async (v) => {
       else if (firstCode.startsWith('EQ-')) rt = 'equity_statement'
       else if (firstCode.startsWith('CFSS-')) rt = 'cash_flow_supplement'
       else if (firstCode.startsWith('IMP-')) rt = 'impairment_provision'
-      allRowsMap.value[rt] = props.rows
-      selectedNodeKey.value = `report_${rt}`
+      const nodeKey = `report_${rt}`
+      selectedNodeKey.value = nodeKey
+      selectedPath.value = `报表 > ${REPORT_SUBTYPE_LABELS_FALLBACK[rt] || rt}`
+      // 从 API 加载含公式的完整 report_config（props.rows 可能无 formula 字段）
+      await loadRowsForNode(nodeKey)
+      // 展开「报表」父节点 + 高亮当前报表类型节点
+      await nextTick()
+      expandedKeys.value = [...new Set([...expandedKeys.value, 'report'])]
+      await nextTick()
+      try { fmTreeRef.value?.setCurrentKey(nodeKey) } catch { /* ignore */ }
     }
     // 外部入口指定目标节点（如底稿页跳转 wp_e1_1）→ 自动展开+选中+加载公式
     applyTargetNode()
@@ -1511,10 +1556,13 @@ const currentRows = computed(() => {
     // 科目明细：按科目生成 TB() 取数预设（分类默认「自动运算」），叠加用户覆盖 + 自定义新增
     // 覆盖/新增持久化于 wizard_state.tb_detail_formulas，避免预设不对且支持二次编辑。
     // R14.6: 候选地址源优先走 Req16 store facade（ACNR-backed）tbAddresses，空/未加载时回退 props.rows。
+    // 第三级兜底：从 trial-balance API 拉取的科目列表（全局入口打开时 props.rows 为空）。
     const ov = tbDetailOverrides.value
     const base = (addrStore.loaded && addrStore.tbAddresses.length > 0)
       ? addrStore.tbAddresses.map((e) => ({ code: e.account_code || '', name: e.label || '', computed: undefined as any }))
-      : (props.rows || []).map((r: any) => ({ code: r.standard_account_code || '', name: r.account_name || '', computed: r.unadjusted_amount }))
+      : (props.rows && props.rows.length > 0)
+        ? props.rows.map((r: any) => ({ code: r.standard_account_code || '', name: r.account_name || '', computed: r.unadjusted_amount }))
+        : tbDetailFallbackAccounts.value.map((r) => ({ code: r.code, name: r.name, computed: undefined as any }))
     const rows: any[] = base.map((b) => {
       const o = ov[b.code]
       return {
@@ -1866,17 +1914,38 @@ const activeCategory = ref('all')
 // Sprint 5.10: URI search + health
 const uriSearchQuery = ref('')
 
+/**
+ * 判断报表行是否"需要公式"：标题行、「其中」补充披露行、占位行等不需要。
+ * 合计行有 is_total_row 标记但可能已配 ROW() 公式，不排除。
+ */
+function _rowNeedsFormula(r: any): boolean {
+  const name = (r.row_name || '').trim()
+  // 标题行：以冒号结尾（流动资产：/非流动资产：/流动负债：/二、投资活动产生的现金流量：）
+  if (name.endsWith('：') || name.endsWith(':')) return false
+  // 「其中」补充披露行（其中：应收股利/其中：原材料 等，仅展示无独立取数公式）
+  if (name.startsWith('其中：') || name.startsWith('其中:')) return false
+  // 「#其中」变体（部分模板用 # 标注补充行）
+  if (name.startsWith('#其中') || name.startsWith('＃其中')) return false
+  // △占位行（△买入返售金融资产 等，表示该行次对该企业可能不适用）
+  if (name.startsWith('△') || name.startsWith('-') || name.startsWith('—')) return false
+  // 纯占位/空名
+  if (!name) return false
+  return true
+}
+
 const healthPercent = computed(() => {
   const rows = currentRows.value
-  if (!rows.length) return 100
-  const withFormula = rows.filter(r => r.formula).length
-  return Math.round((withFormula / rows.length) * 100)
+  const meaningful = rows.filter(_rowNeedsFormula)
+  if (!meaningful.length) return 100
+  const withFormula = meaningful.filter(r => r.formula).length
+  return Math.round((withFormula / meaningful.length) * 100)
 })
 
 const healthDesc = computed(() => {
   const rows = currentRows.value
-  const withFormula = rows.filter(r => r.formula).length
-  return `${withFormula}/${rows.length} 已配置`
+  const meaningful = rows.filter(_rowNeedsFormula)
+  const withFormula = meaningful.filter(r => r.formula).length
+  return `${withFormula}/${meaningful.length} 已配置`
 })
 
 const filteredRows = computed(() => {
@@ -1893,7 +1962,7 @@ const filteredRows = computed(() => {
   }
 
   if (activeCategory.value === 'all') return rows
-  if (activeCategory.value === 'no_formula') return rows.filter(r => !r.formula)
+  if (activeCategory.value === 'no_formula') return rows.filter(r => !r.formula && _rowNeedsFormula(r))
   return rows.filter(r => r.formula && r.formula_category === activeCategory.value)
 })
 

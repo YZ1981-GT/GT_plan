@@ -42,6 +42,14 @@
       <el-form label-position="top">
         <!-- 循环多选 -->
         <el-form-item label="选择审计循环" required>
+          <el-checkbox
+            :model-value="selectedCycles.length === availableCycles.length"
+            :indeterminate="selectedCycles.length > 0 && selectedCycles.length < availableCycles.length"
+            @change="toggleSelectAll"
+            style="margin-bottom: 8px;"
+          >
+            全选/取消全选
+          </el-checkbox>
           <el-checkbox-group v-model="selectedCycles">
             <el-checkbox
               v-for="cycle in availableCycles"
@@ -88,6 +96,25 @@
           </el-checkbox>
         </el-form-item>
 
+        <!-- 增量导出（仅导出数据时显示） -->
+        <el-form-item v-if="currentAction === 'export-data'" label="增量导出">
+          <el-checkbox v-model="incrementalExport">
+            仅导出自上次导出后有变更的 Tab（跳过未修改的底稿）
+          </el-checkbox>
+        </el-form-item>
+
+        <!-- 密码保护（导出时显示） -->
+        <el-form-item v-if="currentAction !== 'import-data'" label="密码保护（可选）">
+          <el-input
+            v-model="exportPassword"
+            type="password"
+            placeholder="留空则不加密"
+            show-password
+            clearable
+            style="max-width: 300px;"
+          />
+        </el-form-item>
+
         <!-- 文件上传（仅导入时显示） -->
         <el-form-item
           v-if="currentAction === 'import-data'"
@@ -119,6 +146,12 @@
       <div v-if="loading" class="bulk-loading">
         <el-icon class="is-loading" :size="32"><Loading /></el-icon>
         <p>正在{{ actionLabel }}，请稍候...</p>
+        <el-progress
+          v-if="downloadProgress > 0"
+          :percentage="downloadProgress"
+          :stroke-width="10"
+          style="width: 80%; margin-top: 12px;"
+        />
         <WpBulkProgressBar
           :project-id="projectId"
           :label="actionLabel"
@@ -180,6 +213,7 @@ import {
   type ImportReport,
   type ConflictStrategy,
 } from '@/composables/useBulkTabImportExport'
+import http from '@/utils/http'
 import WpBulkImportReport from './WpBulkImportReport.vue'
 import WpBulkProgressBar from './WpBulkProgressBar.vue'
 
@@ -209,6 +243,7 @@ const {
   exportData,
   importData,
   loading,
+  downloadProgress,
 } = useBulkTabImportExport(projectIdRef)
 
 // ─── 步骤状态 ───
@@ -217,17 +252,25 @@ const currentAction = ref<BulkAction>('export-templates')
 
 // ─── 配置选项 ───
 const availableCycles = [
-  { code: 'D', name: '销售收入' },
-  { code: 'K', name: '管理' },
-  { code: 'F', name: '采购存货' },
-  { code: 'G', name: '投资' },
-  { code: 'H', name: '固定资产' },
+  { code: 'D', name: 'D 销售循环' },
+  { code: 'E', name: 'E 货币资金' },
+  { code: 'F', name: 'F 采购存货' },
+  { code: 'G', name: 'G 投资循环' },
+  { code: 'H', name: 'H 固定资产' },
+  { code: 'I', name: 'I 无形资产' },
+  { code: 'J', name: 'J 职工薪酬' },
+  { code: 'K', name: 'K 其他循环' },
+  { code: 'L', name: 'L 债务循环' },
+  { code: 'M', name: 'M 权益循环' },
+  { code: 'N', name: 'N 税项循环' },
 ]
 
-const selectedCycles = ref<string[]>(['D'])
+const selectedCycles = ref<string[]>(availableCycles.map(c => c.code))
 const conflictStrategy = ref<ConflictStrategy>('overwrite')
 const dryRun = ref(true)
-const onlyWithData = ref(false)
+const onlyWithData = ref(true)
+const incrementalExport = ref(false)
+const exportPassword = ref('')
 const uploadFile = ref<File | null>(null)
 const report = ref<ImportReport | null>(null)
 /** 异步任务 ID（同步端点无此值时进度条走不确定态） */
@@ -256,6 +299,14 @@ const canExecute = computed(() => {
 })
 
 // ─── 方法 ───
+function toggleSelectAll(checked: boolean | string | number) {
+  if (checked) {
+    selectedCycles.value = availableCycles.map(c => c.code)
+  } else {
+    selectedCycles.value = []
+  }
+}
+
 function selectAction(action: BulkAction) {
   currentAction.value = action
   step.value = 'options'
@@ -268,6 +319,26 @@ function selectAction(action: BulkAction) {
 
 function handleFileChange(file: UploadFile) {
   uploadFile.value = file.raw || null
+  if (file.raw && currentAction.value === 'import-data') {
+    // Auto-detect cycles from ZIP manifest (#16)
+    const formData = new FormData()
+    formData.append('file', file.raw)
+    http.post(
+      `/api/projects/${props.projectId}/bulk-tab/preview-manifest`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    ).then((res: any) => {
+      const data = res?.data ?? res
+      if (data?.cycles?.length) {
+        selectedCycles.value = data.cycles.filter(
+          (c: string) => availableCycles.some(ac => ac.code === c)
+        )
+        ElMessage.success(`已从 ZIP 识别 ${data.file_count} 张底稿，循环: ${selectedCycles.value.join(', ')}`)
+      }
+    }).catch(() => {
+      // Silent — manual selection still works
+    })
+  }
 }
 
 function handleFileRemove() {
@@ -287,7 +358,14 @@ async function handleExecute() {
         break
       }
       case 'export-data': {
-        await exportData(selectedCycles.value, onlyWithData.value)
+        // #29: Large export warning — auto-suggest async for >5 cycles
+        if (selectedCycles.value.length > 5) {
+          ElMessage.info({
+            message: `正在导出 ${selectedCycles.value.length} 个循环的全部数据，文件可能较大，请耐心等待...`,
+            duration: 5000,
+          })
+        }
+        await exportData(selectedCycles.value, onlyWithData.value, incrementalExport.value, exportPassword.value || undefined)
         emit('exported')
         break
       }

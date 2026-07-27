@@ -43,18 +43,21 @@ EXPECTED_PREFIXES: dict[str, list[str]] = {
         "g6-ecl", "g6-main", "g6-sppi", "g7-main", "g7-equity-method",
         "g7-sub", "g8", "g9", "g10", "g11", "g12", "g13", "g14",
     ],
-    "H": ["h0", "h1", "h2", "h3", "h4", "h6", "h8", "h10"],
+    "H": ["h0", "h1", "h2", "h3", "h4", "h5", "h6", "h7", "h8", "h9", "h10"],
     "K": [
         "k0", "k1", "k2", "k3", "k4", "k5", "k6", "k7", "k8", "k9",
         "k10", "k11", "k12", "k13",
     ],
 }
 
-# C/E/I/J/L wp_render_strategies 统一族（补齐，同构路径）；j3 异形单独 bespoke
+# C/E/I/J/L/M/N wp_render_strategies 统一族（补齐，同构路径）；j3 异形单独 bespoke
 EXPECTED_PREFIXES["CEIJL"] = [
     "c24-journal", "e1",
     "i1", "i2", "i3", "i4", "i5", "i6",
     "j1", "j2", "l0",
+    "l1", "l2", "l3", "l4", "l5", "l6", "l7", "l8",
+    "m1", "m2", "m3", "m4", "m5", "m6", "m7", "m8", "m9", "m10",
+    "n1", "n2", "n3", "n4", "n5",
 ]
 
 ALL_EXPECTED = [p for prefixes in EXPECTED_PREFIXES.values() for p in prefixes]

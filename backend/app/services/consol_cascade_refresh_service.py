@@ -197,9 +197,10 @@ async def refresh_all(
         _emit(progress_cb, STEP_REPORT, 5, TOTAL_STEPS, root_node_label, "error")
 
     # ---- 步骤 6：notes V2（下游步，feature flag 门控；失败记录后继续）--------
-    # 门控：CONSOL_NOTES_V2_ENABLED 存在则按其值；尚未定义（Task 3 才新增）时默认运行。
+    # 门控：CONSOL_NOTES_V2_ENABLED（config 定义为 False）；缺省 fallback 与 config
+    # 一致默认 False，避免属性缺失时误触发 V2 生成/落库（对齐 config + design §组件3）。
     _emit(progress_cb, STEP_NOTES, 6, TOTAL_STEPS, root_node_label, "running")
-    if getattr(settings, "CONSOL_NOTES_V2_ENABLED", True):
+    if getattr(settings, "CONSOL_NOTES_V2_ENABLED", False):
         try:
             await generate_full_consol_notes(db, parent_project_id, year)
             result.steps_completed.append(STEP_NOTES)

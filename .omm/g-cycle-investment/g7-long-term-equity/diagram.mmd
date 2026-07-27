@@ -1,0 +1,38 @@
+graph TD
+  subgraph main 入口
+    ADJU[G7-1 审定表<br/>保存且 writebackTb 才回写 TB]
+    DET[G7-2 明细]
+    ADJ[G7-3 调整分录]
+    IMP[G7-17 减值测试<br/>可收回=MAX 公允净额, 使用价值]
+    VC[G7-18 凭证检查 抽凭 1511]
+    LOSS[G7-16 未确认投资损失<br/>CAS2§44 瀑布：投资→长应收→其他权益]
+    DISC[G7 附注上市/国企 五、18 / 八、18]
+  end
+  subgraph method 入口
+    INV4[G7-4 被投资单位清单 + 持股比例]
+    FIN5[G7-5 被投资单位财务信息]
+    POL6[G7-6 会计政策差异]
+    EQ14[G7-14 权益法调整 枢纽]
+    COST13[G7-13 投资成本测试]
+  end
+  subgraph subsidiary 入口
+    SC8[G7-8 同控初始计量]
+    NC9[G7-9 非同控初始计量]
+    DISP10[G7-10 处置]
+    PKG12[G7-12 一揽子处置<br/>各次交易明细 + 累计]
+  end
+
+  INV4 --> FIN5 --> EQ14
+  POL6 -->|仅不一致项| EQ14
+  LOSS --> EQ14
+  IMP --> EQ14
+  EQ14 --> ADJU
+  COST13 -->|正差额商誉/负差额廉价购买| ADJ
+  ADJ --> ADJU
+  DET --> ADJU
+  VC --> DET
+  ADJU --> DISC
+  EQ14 -->|权益法投资收益| G11[G11 投资收益 6111]
+  IMP -->|长投减值| K11[K11 资产减值损失 6701]
+  SC8 & NC9 & DISP10 & PKG12 --> CONSOL[合并模块<br/>同控/非同控合并 · 少数股东权益]
+  FIN5 -->|× NCI%| CONSOL

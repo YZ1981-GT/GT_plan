@@ -35,6 +35,7 @@ _CONFIRMATION_FORMAT_MAP: dict[str, str] = {
     "confirmation-alternative-f05": "alternative-f05-v1",
     "confirmation-alternative-f06": "alternative-f06-v1",
     "confirmation-diff-securities": "diff-securities-v1",
+    "confirmation-diff-nonsecurities": "diff-nonsecurities-v1",
     "confirmation-alternative-g06": "alternative-g06-v1",
     "confirmation-alternative-h05": "alternative-h05-v1",
     "confirmation-alternative-k05": "alternative-k05-v1",

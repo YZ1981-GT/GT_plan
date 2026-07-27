@@ -1,0 +1,39 @@
+flowchart LR
+    LEDGER["tb_ledger 存货科目<br/>凭证级"]
+    ENGINE["GtVoucherSamplingEngine"]
+
+    subgraph V["F2 计价与减值"]
+        FIFO["计价测试 FIFO / 移动平均<br/>按日/按月计价表"]
+        STD["标准成本测试 + 月度差异"]
+        COST["成本归集<br/>生产成本 / 制造费用 / 直接人工"]
+        ALLOC["成本分配"]
+        PUR["采购入库检查<br/>+ F2PurchaseVoucherDialog"]
+        MAT["材料领用检查<br/>+ F2MaterialUsageVoucherDialog"]
+        SUB["委外加工检查<br/>+ F2SubcontractVoucherDialog"]
+        RELP["关联采购定价"]
+        IMP["跌价测试 成本 vs 可变现净值"]
+        REV["跌价转回"]
+        OBS["呆滞存货"]
+    end
+
+    ADJU["F2 审定表<br/>原值组 / 跌价组"]
+    ACC1471["科目 1471 跌价准备"]
+    F5["F5 营业成本"]
+    A13["A13 未更正错报"]
+
+    LEDGER --> PUR
+    LEDGER --> MAT
+    ENGINE --> PUR
+    ENGINE --> MAT
+    ENGINE --> SUB
+    FIFO -->|单位成本结论| COST
+    STD -->|差异分摊| COST
+    COST --> ALLOC --> ADJU
+    PUR -->|数量/金额勾稽异常| A13
+    SUB -->|收回≈发出+加工费<br/>计价差异| A13
+    OBS --> IMP
+    IMP --> ACC1471
+    REV --> ACC1471
+    ACC1471 -->|sumImpairmentAjeByRowKey| ADJU
+    ALLOC -->|结转| F5
+    RELP -.->|定价公允性| ADJU

@@ -86,30 +86,47 @@ class DataQualityService:
         return result.scalar() or 0
 
     async def _check_debit_credit_balance(self, project_id: UUID, year: int) -> dict:
-        """借贷平衡：所有科目期末借方合计 = 期末贷方合计
+        """借贷平衡：从 tb_balance v1 口径校验（与试算表页面同口径）。
 
-        使用 trial_balance 的 audited_amount 按 account_category 分组求和。
-        资产+费用类（asset/expense）余额为正=借方余额
-        负债+权益+收入类（liability/equity/revenue）余额为正=贷方余额
+        tb_balance.closing_balance 是 v1 口径（借正贷负），
+        正数=借方余额，负数=贷方余额。SUM 应≈0（完美平衡）。
+        使用 get_active_filter 确保只查活跃数据集。
         """
-        result = await self.db.execute(sa.text("""
-            SELECT
-                COALESCE(SUM(CASE WHEN account_category IN ('asset', 'expense') THEN audited_amount ELSE 0 END), 0) as debit_total,
-                COALESCE(SUM(CASE WHEN account_category IN ('liability', 'equity', 'revenue') THEN audited_amount ELSE 0 END), 0) as credit_total
-            FROM trial_balance
-            WHERE project_id = :pid AND year = :yr AND is_deleted = false
-        """), {"pid": project_id, "yr": year})
-        row = result.fetchone()
+        from app.models.audit_platform_models import TbBalance
+        from app.services.dataset_query import get_active_filter
+
+        tb = TbBalance.__table__
+        active_filter = await get_active_filter(self.db, tb, project_id, year)
+
+        # v1 口径：正数=借方，负数=贷方，只取一级科目（level=1）防子科目双算
+        result = await self.db.execute(
+            sa.select(
+                sa.func.coalesce(
+                    sa.func.sum(
+                        sa.case((tb.c.closing_balance > 0, tb.c.closing_balance), else_=sa.literal(0))
+                    ), 0
+                ).label("debit_total"),
+                sa.func.coalesce(
+                    sa.func.sum(
+                        sa.case((tb.c.closing_balance < 0, sa.func.abs(tb.c.closing_balance)), else_=sa.literal(0))
+                    ), 0
+                ).label("credit_total"),
+            ).where(
+                active_filter,
+                tb.c.level == 1,
+            )
+        )
+        row = result.first()
 
         if row is None:
             return {
                 "status": "warning",
-                "message": "试算表无数据，无法检查借贷平衡",
+                "message": "余额表无数据，无法检查借贷平衡",
                 "details": {},
             }
 
-        debit_total = Decimal(str(row[0] or 0))
-        credit_total = Decimal(str(row[1] or 0))
+        debit_total = Decimal(str(row.debit_total or 0))
+        credit_total = Decimal(str(row.credit_total or 0))
         diff = abs(debit_total - credit_total)
 
         if diff <= TOLERANCE:

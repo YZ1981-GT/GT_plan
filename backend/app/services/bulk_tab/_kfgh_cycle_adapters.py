@@ -139,6 +139,36 @@ _PREFIX_TO_MODULE: dict[str, str] = {
     "i6": "_i6_import_export",
     "j1": "_j1_import_export",
     "j2": "_j2_import_export",
+    # ── L 循环 ────────────────────────────────────────────────────────────
+    "l1": "_l1_import_export",
+    "l2": "_l2_import_export",
+    "l3": "_l3_import_export",
+    "l4": "_l4_import_export",
+    "l5": "_l5_import_export",
+    "l6": "_l6_import_export",
+    "l7": "_l7_import_export",
+    "l8": "_l8_import_export",
+    # ── M 循环 ────────────────────────────────────────────────────────────
+    "m1": "_m1_import_export",
+    "m2": "_m2_import_export",
+    "m3": "_m3_import_export",
+    "m4": "_m4_import_export",
+    "m5": "_m5_import_export",
+    "m6": "_m6_import_export",
+    "m7": "_m7_import_export",
+    "m8": "_m8_import_export",
+    "m9": "_m9_import_export",
+    "m10": "_m10_import_export",
+    # ── N 循环 ────────────────────────────────────────────────────────────
+    "n1": "_n1_import_export",
+    "n2": "_n2_import_export",
+    "n3": "_n3_import_export",
+    "n4": "_n4_import_export",
+    "n5": "_n5_import_export",
+    # ── H 补充 ────────────────────────────────────────────────────────────
+    "h5": "_h5_import_export",
+    "h7": "_h7_import_export",
+    "h9": "_h9_import_export",
     "l0": "_l0_confirmation_import_export",
 }
 

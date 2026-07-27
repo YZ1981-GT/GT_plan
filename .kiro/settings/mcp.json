@@ -104,7 +104,8 @@
       "autoApprove": [
         "get_file_contents",
         "get_latest_release",
-        "get_file_contents"
+        "get_file_contents",
+        "search_code"
       ]
     },
     "gt-plan": {

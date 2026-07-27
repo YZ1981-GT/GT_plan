@@ -1,0 +1,29 @@
+flowchart LR
+    TBB["tb_balance 1002 叶子<br/>账面有的账户"]
+    CLIENT["企业提供账户清单<br/>OCR 识别"]
+    CREDIT["E1-18/19 征信报告<br/>独立第三方"]
+    CONF["E0 银行函证"]
+    STMT["银行对账单"]
+
+    subgraph CHK["核对表"]
+        ACCT["E1-10 银行账户核对"]
+        COMMIT["E1-11 完整性承诺书"]
+        RECON["E1-6 余额调节表"]
+        BANK["E1-3 银行存款明细"]
+    end
+
+    ALERT["主入口全局告警<br/>疑似账外账户 N 个"]
+    FRAUD["E1-29 银行账户分析<br/>舞弊应对"]
+
+    TBB --> ACCT
+    CLIENT --> ACCT
+    CREDIT --> ACCT
+    CONF --> ACCT
+    ACCT -->|missingFromBankDetail<br/>清单有/账面无| ALERT
+    ACCT -->|missingFromAccountList<br/>账面有/清单无| ALERT
+    ACCT <-.->|双向差集| BANK
+    COMMIT -.->|管理层声明性证据| ACCT
+    STMT --> RECON
+    RECON -->|调节后余额 vs 账面| BANK
+    RECON -.->|reconciliationCrossCheck 差异告警| ALERT
+    ALERT --> FRAUD

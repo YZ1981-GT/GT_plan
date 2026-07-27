@@ -50,3 +50,4 @@ opentelemetry-exporter-otlp>=1.20,<2
 sqlfluff
 prometheus_client==0.25.0
 markitdown[all]==0.1.6  # 多格式文档→Markdown（知识库 RAG 输入，本地纯 Python 无远端）
+pyzipper==0.3.6  # AES-256 encrypted ZIP for password-protected bulk export

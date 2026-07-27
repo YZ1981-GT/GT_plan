@@ -173,6 +173,7 @@ function extractError(err: unknown, fallback: string): string {
 export function useBulkTabImportExport(projectId: Ref<string>) {
   const loading = ref(false)
   const error = ref<string | null>(null)
+  const downloadProgress = ref(0)
   let sseConnection: SSEConnection | null = null
 
   /** 当前是否正在执行操作 */
@@ -188,12 +189,21 @@ export function useBulkTabImportExport(projectId: Ref<string>) {
   async function exportTemplates(cycles?: string[]): Promise<void> {
     loading.value = true
     error.value = null
+    downloadProgress.value = 0
     try {
       const paths = buildPaths(projectId.value)
       const response = await http.post(
         paths.exportTemplates,
         { cycles: cycles || null },
-        { responseType: 'blob' },
+        {
+          responseType: 'blob',
+          timeout: 300000,  // 5 min timeout for large exports
+          onDownloadProgress: (evt: any) => {
+            if (evt.total) {
+              downloadProgress.value = Math.round((evt.loaded / evt.total) * 100)
+            }
+          },
+        },
       )
       const contentDisposition = response.headers?.['content-disposition'] as string | undefined
       const filename = parseFilename(contentDisposition, '底稿批量模板.zip')
@@ -206,6 +216,7 @@ export function useBulkTabImportExport(projectId: Ref<string>) {
       throw e
     } finally {
       loading.value = false
+      downloadProgress.value = 0
     }
   }
 
@@ -216,10 +227,18 @@ export function useBulkTabImportExport(projectId: Ref<string>) {
    * POST /api/projects/{project_id}/bulk-tab/export-data
    * @param cycles 可选循环筛选
    * @param onlyWithData 仅导出有数据的 Tab（跳过空表）
+   * @param incremental 增量导出（跳过未变更 Tab）
+   * @param password ZIP 密码保护（可选）
    */
-  async function exportData(cycles?: string[], onlyWithData?: boolean): Promise<void> {
+  async function exportData(
+    cycles?: string[],
+    onlyWithData?: boolean,
+    incremental?: boolean,
+    password?: string,
+  ): Promise<void> {
     loading.value = true
     error.value = null
+    downloadProgress.value = 0
     try {
       const paths = buildPaths(projectId.value)
       const response = await http.post(
@@ -227,8 +246,18 @@ export function useBulkTabImportExport(projectId: Ref<string>) {
         {
           cycles: cycles || null,
           only_with_data: onlyWithData ?? false,
+          incremental: incremental ?? false,
+          password: password || null,
         },
-        { responseType: 'blob' },
+        {
+          responseType: 'blob',
+          timeout: 300000,  // 5 min timeout for large exports
+          onDownloadProgress: (evt: any) => {
+            if (evt.total) {
+              downloadProgress.value = Math.round((evt.loaded / evt.total) * 100)
+            }
+          },
+        },
       )
       const contentDisposition = response.headers?.['content-disposition'] as string | undefined
       const filename = parseFilename(contentDisposition, '底稿批量数据.zip')
@@ -241,6 +270,7 @@ export function useBulkTabImportExport(projectId: Ref<string>) {
       throw e
     } finally {
       loading.value = false
+      downloadProgress.value = 0
     }
   }
 
@@ -382,6 +412,7 @@ export function useBulkTabImportExport(projectId: Ref<string>) {
     loading,
     error,
     busy,
+    downloadProgress,
     // 导出
     exportTemplates,
     exportData,

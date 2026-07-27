@@ -179,6 +179,45 @@ async def _generate_a_program_data(
     return result
 
 
+def resolve_program_template_code(sheet_name: str, wp_code: str) -> str:
+    """提取程序表 sheet 级编码，并在循环前缀不一致时优先尝试父码推导。
+
+    逻辑：
+    1. 从 sheet_name 正则提取编码（如 "函证程序表F0A" → "F0A"）
+    2. 若提取到的编码循环前缀与父 wp_code 循环前缀不同（如 F0A vs L0）,
+       优先尝试 "{wp_code}A"（如 "L0A"），get_template 命中则用之
+    3. get_template 未命中或循环前缀一致 → 返回原提取值
+    4. 提取失败 → 回退父 wp_code
+
+    保证零回归：同循环场景逐字不变；跨循环场景有模板才替换，否则回退原值（xlsx 兜底）。
+    """
+    import re as _re
+
+    extracted = wp_code  # default fallback
+    _m = _re.search(
+        r"([A-Z]\d+(?:-\d+)?[A-Z](?:-\d+)*|[A-Z]\d+[A-Z](?:-\d+)*|[A-Z]\d+-\d+[A-Z]?)",
+        sheet_name or "",
+    )
+    if _m:
+        extracted = _m.group(1)
+
+    # 解析循环前缀（字母+数字部分，如 F0/D2/L0）
+    extracted_prefix_m = _re.match(r"([A-Z]\d+)", extracted)
+    wp_code_prefix_m = _re.match(r"([A-Z]\d+)", wp_code)
+    extracted_prefix = extracted_prefix_m.group(1) if extracted_prefix_m else ""
+    wp_code_prefix = wp_code_prefix_m.group(1) if wp_code_prefix_m else ""
+
+    if extracted_prefix and wp_code_prefix and extracted_prefix != wp_code_prefix:
+        # 循环前缀不一致 → 优先尝试父码推导的 key
+        from app.services.procedure_table_auto_service import get_template
+        candidate = f"{wp_code}A"
+        if get_template(candidate) is not None:
+            return candidate
+        # 候选无模板 → 回退原提取值（xlsx 兜底零回归）
+
+    return extracted
+
+
 async def render(ctx: RenderContext) -> dict | None:
     """返回 sheet_html_data，None 表示不变（使用已有）。
 
@@ -207,12 +246,8 @@ async def render(ctx: RenderContext) -> dict | None:
 
     # 多文件聚合：程序表 sheet（如 D2 父码下的 "D2A 应收账款实质性程序表"）的
     # procedure_table 模板与模板文件应按 **sheet 级编码**（D2A）解析，而非父码 wp_code(D2)。
-    # 从 sheet 名提取程序表编码（如 D2A/D4A），提取不到回退父 wp_code。
-    import re as _re
-    _sheet_code = ctx.wp_code
-    _m = _re.search(r"([A-Z]\d+(?:-\d+)?[A-Z](?:-\d+)*|[A-Z]\d+[A-Z](?:-\d+)*|[A-Z]\d+-\d+[A-Z]?)", ctx.classification.sheet_name or "")
-    if _m:
-        _sheet_code = _m.group(1)
+    # 使用 resolve_program_template_code 处理循环前缀不一致的场景（如 L0 的 "函证程序表F0A" → "L0A"）。
+    _sheet_code = resolve_program_template_code(ctx.classification.sheet_name or "", ctx.wp_code)
     # 程序表内容来自 sheet 自己的来源模板（聚合 source_files），否则全局模板路径
     _src_files = [f for f in (getattr(ctx, "source_files", None) or []) if f]
     _file_path = _src_files[0] if _src_files else ctx.template_file_path

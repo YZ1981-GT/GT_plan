@@ -1,8 +1,10 @@
 /**
  * 截止测试样本量门槛 — 从项目 materiality 读取建议值
+ * 订阅 materiality:changed 事件自动刷新（三次复盘 Fix A）
  */
-import { ref, type Ref } from 'vue'
+import { ref, onBeforeUnmount, type Ref } from 'vue'
 import http from '@/utils/http'
+import { eventBus } from '@/utils/eventBus'
 
 export function useCutoffMaterialityHint(projectId: Ref<string>) {
   const suggestedThreshold = ref<number | null>(null)
@@ -26,6 +28,13 @@ export function useCutoffMaterialityHint(projectId: Ref<string>) {
     }
     return null
   }
+
+  // 订阅重要性变更事件，自动刷新门槛
+  function _onMaterialityChanged(payload: { projectId: string }) {
+    if (payload.projectId === projectId.value) fetchHint()
+  }
+  eventBus.on('materiality:changed', _onMaterialityChanged)
+  onBeforeUnmount(() => { eventBus.off('materiality:changed', _onMaterialityChanged) })
 
   return { suggestedThreshold, loading, fetchHint }
 }

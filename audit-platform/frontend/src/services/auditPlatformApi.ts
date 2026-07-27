@@ -348,9 +348,9 @@ export async function getMaterialityHistory(projectId: string, year: number) {
   return data
 }
 
-export async function getMaterialityBenchmark(projectId: string, year: number, benchmarkType: string) {
+export async function getMaterialityBenchmark(projectId: string, year: number, benchmarkType: string, calcBasis: string = 'unadjusted') {
   const { data } = await http.get(P_mat.benchmark(projectId), {
-    params: { year, benchmark_type: benchmarkType },
+    params: { year, benchmark_type: benchmarkType, calc_basis: calcBasis },
   })
   return data
 }

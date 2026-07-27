@@ -93,9 +93,17 @@ function suggestWpCode(): string {
   return ''
 }
 
+const loadError = ref('')
+
 async function loadWorkpapers(): Promise<void> {
   loading.value = true
+  loadError.value = ''
   try {
+    if (!props.projectId) {
+      loadError.value = '项目ID缺失，请从项目内页面打开'
+      wpOptions.value = []
+      return
+    }
     const collected: any[] = []
     let page = 1
     for (;;) {
@@ -108,10 +116,11 @@ async function loadWorkpapers(): Promise<void> {
     }
     const opts: WpOption[] = []
     for (const it of collected) {
-      const wpId = (it?.wp_id ?? it?.id ?? '') as string
+      // wp_id 可为 null（底稿未生成），此时用 wp_index_id 替代作为标识
+      // 挂凭目标只需底稿存在（wp_index 有记录），不强制文件已生成
+      const wpId = (it?.wp_id ?? it?.wp_index_id ?? it?.id ?? '') as string
       const code = String(it?.wp_code || '')
-      const generated = it?.wp_generated !== false
-      if (!wpId || !code || !generated) continue
+      if (!wpId || !code) continue
       opts.push({
         wp_id: wpId,
         wp_code: code,
@@ -121,14 +130,26 @@ async function loadWorkpapers(): Promise<void> {
     }
     wpOptions.value = opts
 
+    if (opts.length === 0) {
+      loadError.value = '该项目暂无底稿，请先在底稿管理中生成底稿'
+    }
+
     // 智能默认：按科目推断的建议底稿若已生成则预选
     const suggested = suggestWpCode()
     if (suggested) {
       const match = opts.find((o) => o.wp_code === suggested)
       if (match) selectedWpId.value = match.wp_id
     }
-  } catch {
+  } catch (err: any) {
     wpOptions.value = []
+    const status = err?.response?.status
+    if (status === 401 || status === 403) {
+      loadError.value = '权限不足，无法获取底稿列表'
+    } else if (status === 404) {
+      loadError.value = '项目不存在或无法访问'
+    } else {
+      loadError.value = '获取底稿列表失败，请检查网络后重试'
+    }
   } finally {
     loading.value = false
   }
@@ -225,6 +246,11 @@ async function confirm(): Promise<void> {
           :loading="loading"
           style="width: 100%"
         >
+          <template v-if="loadError" #empty>
+            <div style="padding: 10px 20px; color: #909399; font-size: 12px; text-align: center">
+              {{ loadError }}
+            </div>
+          </template>
           <el-option-group
             v-for="grp in groupedOptions"
             :key="grp.label"
@@ -238,6 +264,7 @@ async function confirm(): Promise<void> {
             />
           </el-option-group>
         </el-select>
+        <div v-if="loadError" class="error-hint">⚠️ {{ loadError }}</div>
       </div>
 
       <div class="attach-field">
@@ -294,5 +321,10 @@ async function confirm(): Promise<void> {
 .empty-hint {
   color: #909399;
   font-size: 12px;
+}
+.error-hint {
+  color: var(--el-color-warning);
+  font-size: 12px;
+  margin-top: 4px;
 }
 </style>

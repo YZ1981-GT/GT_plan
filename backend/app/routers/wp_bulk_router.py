@@ -15,11 +15,15 @@ Validates: Requirements 5.1, 5.2, 5.3, 5.4, 5.5, 6.1
 from __future__ import annotations
 
 import asyncio
+import io
 import json
 import logging
 from typing import Any
 from urllib.parse import quote
 from uuid import UUID
+
+# ─── Single-flight: prevent duplicate concurrent exports for same project (#33) ───
+_PROJECT_EXPORT_LOCKS: dict[str, asyncio.Lock] = {}
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
@@ -154,6 +158,9 @@ class ExportTemplatesRequest(BaseModel):
     cycles: list[str] | None = Field(
         default=None, description="审计循环多选（如 ['D','K']）；None/空 = 全部含 I/E 的循环"
     )
+    password: str | None = Field(
+        default=None, description="ZIP 密码保护（可选，留空则不加密）"
+    )
 
 
 class ExportDataRequest(BaseModel):
@@ -164,6 +171,12 @@ class ExportDataRequest(BaseModel):
     )
     only_with_data: bool = Field(
         default=False, description="仅导出有数据的 Tab（跳过空表），Req 3.3"
+    )
+    incremental: bool = Field(
+        default=False, description="增量导出：跳过自上次导出后未变更的 Tab（sha256 比对）"
+    )
+    password: str | None = Field(
+        default=None, description="ZIP 密码保护（可选，留空则不加密）"
     )
 
 
@@ -296,6 +309,41 @@ async def _require_manager_role(
 
 
 # ---------------------------------------------------------------------------
+# POST /preview-manifest — 从上传 ZIP 预览 manifest（#16 自动识别循环）
+# ---------------------------------------------------------------------------
+
+
+@router.post("/preview-manifest")
+async def preview_manifest(
+    project_id: UUID,
+    file: UploadFile = File(...),
+    _user: User = Depends(get_current_user),
+):
+    """Preview manifest.json from uploaded ZIP without importing."""
+    import zipfile
+
+    # Limit: only read first 100MB to prevent OOM
+    MAX_PREVIEW_SIZE = 100 * 1024 * 1024  # 100MB
+    content = await file.read(MAX_PREVIEW_SIZE + 1)
+    if len(content) > MAX_PREVIEW_SIZE:
+        return {"cycles": [], "file_count": 0, "mode": "", "exported_at": "", "warning": "文件过大，请手动选择循环"}
+
+    try:
+        with zipfile.ZipFile(io.BytesIO(content)) as zf:
+            if 'manifest.json' in zf.namelist():
+                manifest_data = json.loads(zf.read('manifest.json'))
+                return {
+                    "cycles": manifest_data.get("cycles", []),
+                    "file_count": len(manifest_data.get("files", [])),
+                    "mode": manifest_data.get("mode", ""),
+                    "exported_at": manifest_data.get("exported_at", ""),
+                }
+    except Exception:
+        pass
+    return {"cycles": [], "file_count": 0, "mode": "", "exported_at": ""}
+
+
+# ---------------------------------------------------------------------------
 # POST /export-templates — 批量导出模板 ZIP
 # ---------------------------------------------------------------------------
 
@@ -325,17 +373,27 @@ async def bulk_export_templates(
     except Exception:
         platform_version = ""
 
-    zip_buffer = await bulk_export_service.export(
-        db=db,
-        project_id=project_id,
-        cycles=body.cycles or None,
-        mode="template",
-        exported_by=current_user.username,
-        platform_version=platform_version,
-        audit_year=audit_year,
-        # Task 10 · manifest 只由可见集构建（Req 8.6/9）
-        visible_filter=make_bulk_visible_filter(db, current_user),
-    )
+    # ─── Single-flight per-project lock (#33) ─────────────────────────
+    _lock_key = str(project_id)
+    if _lock_key not in _PROJECT_EXPORT_LOCKS:
+        _PROJECT_EXPORT_LOCKS[_lock_key] = asyncio.Lock()
+    if _PROJECT_EXPORT_LOCKS[_lock_key].locked():
+        logger.info("bulk_export_templates: concurrent export already running for project %s, queuing", project_id)
+
+    async with _PROJECT_EXPORT_LOCKS[_lock_key]:
+        zip_buffer = await bulk_export_service.export(
+            db=db,
+            project_id=project_id,
+            cycles=body.cycles or None,
+            mode="template",
+            password=body.password or None,
+            exported_by=current_user.username,
+            platform_version=platform_version,
+            audit_year=audit_year,
+            # Task 10 · manifest 只由可见集构建（Req 8.6/9）
+            visible_filter=make_bulk_visible_filter(db, current_user),
+        )
+
     zip_buffer.seek(0)
 
     filename = _build_zip_filename(project, audit_year, "模板")
@@ -377,18 +435,29 @@ async def bulk_export_data(
     except Exception:
         platform_version = ""
 
-    zip_buffer = await bulk_export_service.export(
-        db=db,
-        project_id=project_id,
-        cycles=body.cycles or None,
-        mode="data",
-        only_with_data=body.only_with_data,
-        exported_by=current_user.username,
-        platform_version=platform_version,
-        audit_year=audit_year,
-        # Task 10 · manifest 只由可见集构建（Req 8.6/9）
-        visible_filter=make_bulk_visible_filter(db, current_user),
-    )
+    # ─── Single-flight per-project lock (#33) ─────────────────────────
+    _lock_key = str(project_id)
+    if _lock_key not in _PROJECT_EXPORT_LOCKS:
+        _PROJECT_EXPORT_LOCKS[_lock_key] = asyncio.Lock()
+    if _PROJECT_EXPORT_LOCKS[_lock_key].locked():
+        logger.info("bulk_export_data: concurrent export already running for project %s, queuing", project_id)
+
+    async with _PROJECT_EXPORT_LOCKS[_lock_key]:
+        zip_buffer = await bulk_export_service.export(
+            db=db,
+            project_id=project_id,
+            cycles=body.cycles or None,
+            mode="data",
+            only_with_data=body.only_with_data,
+            incremental=body.incremental,
+            password=body.password or None,
+            exported_by=current_user.username,
+            platform_version=platform_version,
+            audit_year=audit_year,
+            # Task 10 · manifest 只由可见集构建（Req 8.6/9）
+            visible_filter=make_bulk_visible_filter(db, current_user),
+        )
+
     zip_buffer.seek(0)
 
     filename = _build_zip_filename(project, audit_year, "数据")
@@ -441,6 +510,7 @@ async def bulk_export_templates_async(
         audit_year=audit_year,
         user_id=str(current_user.id),
         filename=filename,
+        password=body.password or None,
     )
     return AsyncTaskResponse(task_id=task_id)
 
@@ -471,6 +541,8 @@ async def bulk_export_data_async(
         audit_year=audit_year,
         user_id=str(current_user.id),
         filename=filename,
+        password=body.password or None,
+        incremental=body.incremental,
     )
     return AsyncTaskResponse(task_id=task_id)
 

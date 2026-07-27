@@ -96,7 +96,7 @@ from ._i4_long_term_prepaid import render as render_i4_long_term_prepaid
 from ._i5_other_noncurrent_assets import render as render_i5_other_noncurrent_assets
 from ._i6_research_development_expense import render as render_i6_research_development_expense
 from ._e1_monetary_fund import render as render_e1_monetary_fund
-from ._g0_confirmation import render_g0_diff_securities, render_g0_alternative
+from ._g0_confirmation import render_g0_diff_securities, render_g0_diff_nonsecurities, render_g0_alternative
 from ._h0_confirmation import render_h0_alternative
 from ._k0_confirmation import render_k0_alternative_k05, render_k0_alternative_k06
 from ._l0_confirmation import render_l0_alternative
@@ -254,6 +254,7 @@ RENDERER_DISPATCH: dict[str, Callable] = {
     "i5-other-noncurrent-assets": render_i5_other_noncurrent_assets,
     "i6-research-development-expense": render_i6_research_development_expense,
     "confirmation-diff-securities": render_g0_diff_securities,
+    "confirmation-diff-nonsecurities": render_g0_diff_nonsecurities,
     "confirmation-alternative-g06": render_g0_alternative,
     "confirmation-alternative-h05": render_h0_alternative,
     "confirmation-alternative-k05": render_k0_alternative_k05,

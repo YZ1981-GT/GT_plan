@@ -10,7 +10,10 @@ import uuid
 from datetime import datetime
 
 import sqlalchemy as sa
-from sqlalchemy import ForeignKey, Index, String, Text, func, text
+from sqlalchemy import (
+    ForeignKey, Index, Integer, Numeric, String, Text, UniqueConstraint, func, text,
+)
+from sqlalchemy import DateTime as SADateTime
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
@@ -1035,4 +1038,40 @@ class FormulaRuntimeOutbox(Base):
     __table_args__ = (
         Index("idx_outbox_run_id", "run_id"),
         Index("idx_outbox_undelivered", "delivered_at", postgresql_where=text("delivered_at IS NULL")),
+    )
+
+
+# ---------------------------------------------------------------------------
+# V130: 试算平衡表版本快照
+# ---------------------------------------------------------------------------
+
+
+class TrialBalanceSnapshot(Base):
+    """试算平衡表版本快照 - 记录每次审定表变更时的试算表完整状态"""
+
+    __tablename__ = "trial_balance_snapshots"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("projects.id"), nullable=False
+    )
+    year: Mapped[int] = mapped_column(Integer, nullable=False)
+    version_no: Mapped[int] = mapped_column(Integer, nullable=False)
+    trigger: Mapped[str] = mapped_column(String(30), nullable=False)
+    actor_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    snapshot_data: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    row_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    audited_total: Mapped[float | None] = mapped_column(Numeric, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    __table_args__ = (
+        UniqueConstraint("project_id", "year", "version_no", name="uq_tb_snapshot_version"),
+        Index("idx_tb_snapshots_project_year_time", "project_id", "year", created_at.desc()),
     )

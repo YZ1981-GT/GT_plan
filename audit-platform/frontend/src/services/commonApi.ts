@@ -417,6 +417,7 @@ export interface NoteReadinessSummary {
   warning_sections: number
   validated_at: string | null
   validation_ran: boolean
+  formula_enabled: boolean
 }
 
 export interface NoteReadinessResult {

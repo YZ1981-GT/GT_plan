@@ -1,0 +1,13 @@
+graph TD
+  Plan[监盘计划<br/>F2TabStocktakePlan] -->|AI 解析客户盘点计划| PlanAI[f2StocktakePlanAiParse]
+  Plan --> Proc[监盘程序<br/>F2TabStocktakeProcedure]
+  Q[盘点内控问卷<br/>Questionnaire + Dialog] --> Proc
+  Proc --> Sample[抽盘结果<br/>账面 vs 实盘]
+  Sample --> Recon[差异调节表<br/>Reconcile]
+  Recon -->|需调整| ADJ[F2 调整分录 AJE]
+  Sample --> Roll[倒轧表 Rollforward<br/>盘点日 ±期间收发 → 期末]
+  Roll --> ADJU[F2 审定表期末数<br/>存在性/完整性证据]
+  Recon --> Summary[监盘小结与结论]
+  Roll --> Summary
+  Sample -->|呆滞/毁损线索| VAL[valuation：呆滞存货 / 跌价测试]
+  Att[客户盘点表附件 + OCR] --> Sample

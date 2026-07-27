@@ -1,0 +1,44 @@
+flowchart LR
+    TB["trial_balance 1122"]
+    AUX["tb_aux_balance 1122<br/>客户维度"]
+    LEDGER["tb_ledger 1122<br/>次年贷方=期后回款"]
+    AGING["useAgingConfig<br/>3年段/5年段/自定义"]
+
+    subgraph D2["D2 应收账款"]
+        ADJU["D2TabAdjudication D2-1<br/>性质 + 账龄双维度"]
+        DET["D2TabDetail D2-2<br/>32 列 + nested 账龄"]
+        ADJ["D2TabAdjustment D2-3"]
+        BAD["D2TabBadDebt 坏账准备"]
+        ECL["D2TabEcl 三阶段/迁徙率"]
+        VC["D2TabVoucherCheck<br/>卡片/矩阵/在线编辑"]
+        CUT["D2TabCutoff 截止"]
+        PLG["D2TabPledgeCheck 质押+保理"]
+        WIZ["D2DerecognitionWizard<br/>终止确认 9 步/逐份合同"]
+        WOFF["D2TabWriteoffCheck 核销"]
+        RP["D2TabRelatedParty"]
+        POL["D2TabPolicyCheck"]
+        ANA["D2TabAnalysis"]
+        DISC["D2TabDisclosure<br/>+ D2DisclosureNoteBody"]
+    end
+
+    NOTE["附注 五、5 / 八、5"]
+    ADJC["adjustments 集中登记<br/>origin=workpaper"]
+    A13["A13 未更正错报"]
+    D0["D0 函证"]
+
+    AGING --> DET
+    AGING --> ADJU
+    AUX -->|import-aux-balance| DET
+    LEDGER -->|importPostPaymentFromLedger| DET
+    TB -.->|核对锚点 1122| ADJU
+    DET -->|sumAgingBySegments 聚合| ADJU
+    ECL --> BAD
+    BAD -->|计提/转回/核销| ADJU
+    ADJ -->|AJE/RJE| ADJU
+    ADJ -->|syncToCentral| ADJC
+    VC -->|异常凭证| A13
+    CUT -->|跨期| A13
+    PLG --> WIZ
+    ADJU -->|substantive:adjudicated| DISC
+    DISC -->|buildD2SyncPayload + _note_texts| NOTE
+    D0 -->|confirmation:received<br/>companyCode 优先匹配| DET

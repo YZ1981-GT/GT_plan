@@ -1,0 +1,31 @@
+flowchart LR
+    TB["trial_balance 1124"]
+    AUX["tb_aux_balance 1124"]
+    LEDGER["tb_ledger 1124<br/>次年贷方=期后实现"]
+
+    subgraph D5["D5 应收款项融资"]
+        IDX["D5TabIndex"]
+        PRC["D5TabProcedure D5A"]
+        ADJU["D5TabAdjudication D5-1"]
+        DET["D5TabDetail D5-2<br/>+ECL阶段+到期预警"]
+        ADJ["D5TabAdjustment"]
+        FV["D5TabFairValue<br/>公允价值/贴现利率合理性"]
+        DISC["D5TabDisclosure<br/>分类+减值+质押+背书贴现"]
+    end
+
+    D1["D1 应收票据<br/>D1-8 已贴现未终止确认"]
+    D0["D0 函证"]
+    NOTE["附注（上市/国企）"]
+    ENGINE["GtVoucherSamplingEngine 1124"]
+
+    AUX -->|import-aux-balance| DET
+    LEDGER -->|importPostRealizedFromLedger| DET
+    DET -->|SUMIF 带入| ADJU
+    FV -->|公允变动| ADJU
+    ADJ -->|AJE/RJE| ADJU
+    ADJU -->|writeback 1124| TB
+    ADJU -->|substantive:adjudicated| DISC
+    DISC --> NOTE
+    D1 <-.->|贴现/背书未终止确认勾稽<br/>d1D5FinancingPull| DET
+    D0 -->|confirmation:received<br/>回写 confirmAmount| DET
+    ENGINE --> DET

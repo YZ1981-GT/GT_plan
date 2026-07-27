@@ -8,9 +8,14 @@
           <div class="gt-detail-section">
             <div class="gt-title-row">
               <h3 class="gt-detail-title">{{ project.name }}</h3>
-              <el-button size="small" type="primary" @click="editProject">
-                <el-icon><Edit /></el-icon> 编辑
-              </el-button>
+              <div class="gt-title-row__actions">
+                <el-button size="small" @click="openPlatformGuide" style="background: rgba(255,255,255,.95); color: var(--el-color-primary); border-color: var(--el-color-primary-light-5);">
+                  📖 使用手册
+                </el-button>
+                <el-button size="small" type="primary" @click="editProject">
+                  <el-icon><Edit /></el-icon> 编辑
+                </el-button>
+              </div>
             </div>
             <el-descriptions :column="2" border size="small">
               <el-descriptions-item label="客户名称">{{ project.client_name || '-' }}</el-descriptions-item>
@@ -543,6 +548,9 @@
         <el-button @click="showTeamAssign = false">关闭</el-button>
       </template>
     </el-dialog>
+
+    <!-- 平台使用手册 -->
+    <PlatformUserGuideDialog ref="platformGuideRef" />
   </div>
 </template>
 
@@ -559,6 +567,7 @@ import { projects as P_proj, attachments as P_att, accountChart as P_ac, adjustm
 import { handleApiError } from '@/utils/errorHandler'
 import TeamAssignmentStep from '@/components/wizard/TeamAssignmentStep.vue'
 import GtStatusTag from '@/components/common/GtStatusTag.vue'
+import PlatformUserGuideDialog from '@/components/layout/PlatformUserGuideDialog.vue'
 import { useNavigationStack } from '@/composables/useNavigationStack'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
@@ -569,10 +578,15 @@ const prefs = useDisplayPrefsStore()
 const activeTab = ref('overview')
 const showTeamAssign = ref(false)
 const showAttUpload = ref(false)
+const platformGuideRef = ref<InstanceType<typeof PlatformUserGuideDialog> | null>(null)
 const attForm = ref({ wpCode: '', type: 'general' })
 const attFiles = ref<any[]>([])
 const attWpOptions = ref<{ label: string; value: string }[]>([])
 const projectYear = computed(() => Number(props.project?.audit_year) || new Date().getFullYear())
+
+function openPlatformGuide() {
+  platformGuideRef.value?.open()
+}
 
 // 项目状态悬停提示（当前阶段 + 后续步骤）
 const statusTooltip = computed(() => {
@@ -1230,6 +1244,9 @@ onUnmounted(() => { stopImportPoll() })
   margin-bottom: var(--gt-space-3);
 }
 .gt-title-row .gt-detail-title { margin-bottom: 0; }
+.gt-title-row__actions {
+  display: flex; align-items: center; gap: 8px;
+}
 .gt-section-label {
   font-size: var(--gt-font-size-sm); font-weight: 600;
   color: var(--gt-color-text-secondary); margin-bottom: var(--gt-space-2);

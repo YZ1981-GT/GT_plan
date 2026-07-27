@@ -261,6 +261,10 @@ def register_system_routers(app: FastAPI) -> None:
     from app.routers.time_machine import router as time_machine_router
     app.include_router(time_machine_router, tags=["时光机"])
 
+    # ═══ §126b. 试算表版本快照 ═══
+    from app.routers.tb_snapshot import router as tb_snapshot_router
+    app.include_router(tb_snapshot_router, tags=["trial-balance-snapshots"])
+
     # ═══ §127. 审计日志哈希链校验 ═══
     from app.routers.audit_logs import router as audit_logs_router
     app.include_router(audit_logs_router, prefix="/api", tags=["audit-logs"])

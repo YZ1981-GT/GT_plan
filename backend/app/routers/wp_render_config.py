@@ -165,6 +165,7 @@ _CONFIRMATION_COMPONENTS: set[str] = {
     "confirmation-alternative-f05",
     "confirmation-alternative-f06",
     "confirmation-diff-securities",
+    "confirmation-diff-nonsecurities",
     "confirmation-alternative-g06",
     "confirmation-alternative-h05",
     "confirmation-alternative-k05",

@@ -39,6 +39,7 @@ vi.mock('@/composables/useWpClassification', () => ({
 }))
 
 import { useEditorMode, HTML_COMPONENT_TYPES } from '../useEditorMode'
+import { HTML_COMPONENT_TYPE_SET } from '@/components/workpaper/htmlRendererRegistry'
 
 interface HarnessRefs {
   wpId: Ref<string>
@@ -60,8 +61,13 @@ function withSetup(refs: HarnessRefs) {
 }
 
 describe('useEditorMode - HTML_COMPONENT_TYPES allowlist', () => {
-  it('contains exactly 79 entries (HTML registry + skip)', () => {
-    expect(HTML_COMPONENT_TYPES.size).toBe(79)
+  // 数量随注册表增长，动态派生避免硬编码 stale（原写死 79 早已漂移）。
+  // = registry 条目数 + 2 个 placeholder（skip / confirmation-hub）。
+  it('equals HTML_RENDERER_ROUTE_SET (registry + skip + confirmation-hub)', () => {
+    expect(HTML_COMPONENT_TYPES.size).toBe(HTML_COMPONENT_TYPE_SET.size + 2)
+    expect(HTML_COMPONENT_TYPES.has('skip')).toBe(true)
+    // 函证枢纽 workbook 级类型须走 GtWpRenderer（否则落 Univer 路径报「加载底稿失败」）
+    expect(HTML_COMPONENT_TYPES.has('confirmation-hub')).toBe(true)
   })
 
   it('includes the documented HTML class types', () => {

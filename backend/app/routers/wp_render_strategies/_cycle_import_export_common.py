@@ -206,14 +206,49 @@ def parse_row_by_headers(
     return out
 
 
+def recalculate_computed_fields(rows: list[dict], computed_fields: dict[str, str] | None) -> list[dict]:
+    """Recalculate computed columns before export.
+
+    computed_fields format: {"target_field": "formula"}
+    Supported formulas: "a + b + ...", "a - b", "a * b", "a / b" (simple two-operand arithmetic)
+    """
+    if not computed_fields:
+        return rows
+    for row in rows:
+        for target, formula in computed_fields.items():
+            try:
+                formula = formula.strip()
+                if ' + ' in formula:
+                    parts = formula.split(' + ')
+                    val = sum(float(row.get(p.strip(), 0) or 0) for p in parts)
+                elif ' - ' in formula:
+                    parts = formula.split(' - ', 1)
+                    val = float(row.get(parts[0].strip(), 0) or 0) - float(row.get(parts[1].strip(), 0) or 0)
+                elif ' * ' in formula:
+                    parts = formula.split(' * ', 1)
+                    val = float(row.get(parts[0].strip(), 0) or 0) * float(row.get(parts[1].strip(), 0) or 0)
+                elif ' / ' in formula:
+                    parts = formula.split(' / ', 1)
+                    divisor = float(row.get(parts[1].strip(), 0) or 0)
+                    if divisor == 0:
+                        continue  # skip division by zero
+                    val = float(row.get(parts[0].strip(), 0) or 0) / divisor
+                else:
+                    continue
+                row[target] = round(val, 2)
+            except (ValueError, TypeError, ZeroDivisionError):
+                pass
+    return rows
+
+
 def export_row_by_keys(data: dict, field_keys: list[str]) -> list:
     row: list[Any] = []
     for key in field_keys:
         val = data.get(key)
-        if isinstance(val, float) or isinstance(val, int):
-            row.append(val)
-        elif val is None:
+        if val is None:
             row.append("")
+        elif isinstance(val, float) or isinstance(val, int):
+            row.append(round(val, 2))
         else:
             row.append(val)
     return row
@@ -744,6 +779,10 @@ def create_cycle_import_export_router(
         ws = wb[sheet]
         _seg_cache: dict = {}
         export_rows = rows if rows else []
+        # Recalculate computed fields before export (Improvement #4)
+        computed = sp.get("computed_fields")
+        if computed:
+            export_rows = recalculate_computed_fields(export_rows, computed)
         for d in export_rows:
             ws.append(await _export_row(sp, d, wp_id, db, _seg_cache))
         return workbook_to_response(wb, f"{sheet}_数据.xlsx")

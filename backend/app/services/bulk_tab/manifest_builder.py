@@ -160,6 +160,10 @@ def _make_short_label(sheet_name: str, sheet_code: str) -> str:
     label = _ILLEGAL_PATH_CHARS_RE.sub("_", label)
     label = re.sub(r"_+", "_", label).strip("_")
 
+    # 截断到 40 字符避免路径过长
+    if len(label) > 40:
+        label = label[:40].rstrip("_")
+
     return label or sheet_code
 
 

@@ -103,56 +103,27 @@
         </div>
       </div>
 
-      <!-- 中栏：数据源一览（ACNR 五域动态） -->
+      <!-- 中栏：数据源一览（复用公式管理中心左侧五域树结构） -->
       <div class="gt-fe-sources">
         <div class="gt-fe-section-title">📋 数据源一览</div>
         <div class="gt-fe-ref-panel">
-          <!-- 报表域 -->
-          <div class="gt-fe-ref-group">
-            <div class="gt-fe-ref-group-title" @click="toggleRefGroup('report')">
-              <span>{{ refGroupOpen.report ? '▼' : '▶' }} 📊 报表</span>
-              <span class="gt-fe-ref-count">{{ sourceReportItems.length }}</span>
-            </div>
-            <div v-show="refGroupOpen.report" class="gt-fe-ref-list">
-              <div v-for="item in sourceReportItems" :key="item.key" class="gt-fe-ref-row" @click="jumpToSource('report', item.key)">
-                <span class="gt-fe-ref-code">{{ item.code }}</span>{{ item.label }}
-              </div>
-            </div>
-          </div>
-          <!-- 附注域 -->
-          <div class="gt-fe-ref-group">
-            <div class="gt-fe-ref-group-title" @click="toggleRefGroup('note')">
-              <span>{{ refGroupOpen.note ? '▼' : '▶' }} 📝 附注</span>
-              <span class="gt-fe-ref-count">{{ sourceNoteItems.length }}</span>
-            </div>
-            <div v-show="refGroupOpen.note" class="gt-fe-ref-list">
-              <div v-for="item in sourceNoteItems" :key="item.key" class="gt-fe-ref-row" @click="jumpToSource('note', item.key)">
-                <span class="gt-fe-ref-code">{{ item.code }}</span>{{ item.label }}
-              </div>
-            </div>
-          </div>
-          <!-- 底稿域 -->
-          <div class="gt-fe-ref-group">
-            <div class="gt-fe-ref-group-title" @click="toggleRefGroup('wp')">
-              <span>{{ refGroupOpen.wp ? '▼' : '▶' }} 📋 底稿</span>
-              <span class="gt-fe-ref-count">{{ sourceWpItems.length }}</span>
-            </div>
-            <div v-show="refGroupOpen.wp" class="gt-fe-ref-list">
-              <div v-for="item in sourceWpItems" :key="item.key" class="gt-fe-ref-row" @click="jumpToSource('wp', item.key)">
-                <span class="gt-fe-ref-code">{{ item.code }}</span>{{ item.label }}
-              </div>
-            </div>
-          </div>
-          <!-- 试算表域 -->
-          <div class="gt-fe-ref-group">
-            <div class="gt-fe-ref-group-title" @click="toggleRefGroup('tb')">
-              <span>{{ refGroupOpen.tb ? '▼' : '▶' }} 📑 试算表</span>
-              <span class="gt-fe-ref-count">1</span>
-            </div>
-            <div v-show="refGroupOpen.tb" class="gt-fe-ref-list">
-              <div class="gt-fe-ref-row" @click="jumpToSource('tb', '')"><span class="gt-fe-ref-code">TB</span>打开试算表选择科目</div>
-            </div>
-          </div>
+          <el-tree
+            :data="sourceTreeData"
+            :props="{ label: 'label', children: 'children' }"
+            node-key="key"
+            :expand-on-click-node="true"
+            :default-expanded-keys="[]"
+            highlight-current
+            class="gt-fe-source-tree"
+            @node-click="onSourceNodeClick"
+          >
+            <template #default="{ node, data }">
+              <span class="gt-fe-tree-node">
+                <span>{{ data.icon || '' }} {{ node.label }}</span>
+                <span v-if="data._leafCount" class="gt-fe-ref-count">{{ data._leafCount }}</span>
+              </span>
+            </template>
+          </el-tree>
         </div>
       </div>
 
@@ -639,13 +610,21 @@ function openPickerForFunction(fn: string) {
 // ── 数据源一览跳转 ──
 function jumpToSource(type: string, key: string) {
   if (type === 'report') {
-    const labelMap: Record<string, string> = {
-      balance_sheet: '资产负债表', income_statement: '利润表',
-      cash_flow_statement: '现金流量表', equity_statement: '所有者权益变动表',
-      cash_flow_supplement: '现金流附表', impairment_provision: '资产减值准备表',
+    // _code 是短名(BS/IS/CFS...)，需映射为后端 report_type(balance_sheet/income_statement/...)
+    const codeToType: Record<string, string> = {
+      BS: 'balance_sheet', IS: 'income_statement',
+      CFS: 'cash_flow_statement', EQ: 'equity_statement',
+      CFSS: 'cash_flow_supplement', IMP: 'impairment_provision',
     }
+    const codeToLabel: Record<string, string> = {
+      BS: '资产负债表', IS: '利润表',
+      CFS: '现金流量表', EQ: '权益变动表',
+      CFSS: '现金流附表', IMP: '资产减值准备表',
+    }
+    const reportType = codeToType[key] || key
+    const label = codeToLabel[key] || key
     pickerFnType.value = 'ROW'
-    openSourceBrowserForReport(key, labelMap[key] || key)
+    openSourceBrowserForReport(reportType, label)
   } else if (type === 'note') {
     pickerFnType.value = 'NOTE'
     // 直接插入带科目名的引用模板
@@ -700,8 +679,9 @@ async function openSourceBrowserForReport(reportType: string, label: string) {
   }
   try {
     const standard = props.applicableStandard || 'soe_consolidated'
+    const pid = resolveProjectId()
     const resp = await api.get(P.reportConfig.list, {
-      params: { report_type: reportType, applicable_standard: standard },
+      params: { report_type: reportType, applicable_standard: standard, ...(pid ? { project_id: pid } : {}) },
       validateStatus: (s: number) => s < 600,
     })
     const rows = resp?.data ?? resp ?? []
@@ -730,11 +710,16 @@ async function openSourceBrowserForTB(fn: string) {
     return `TB('${code}','期末余额')`
   }
   try {
-    const resp = await api.get('/api/trial-balance', {
+    const pid = resolveProjectId()
+    const yr = resolveYear()
+    if (!pid) throw new Error('缺少项目ID')
+    const resp = await api.get(`/api/projects/${pid}/trial-balance`, {
+      params: { year: yr },
+      _silent: true,
       validateStatus: (s: number) => s < 600,
-    })
-    const rows = resp?.data ?? resp ?? []
-    sourceBrowserRows.value = rows.map((r: any) => ({
+    } as any)
+    const rows = resp?.items ?? resp?.data ?? resp ?? []
+    sourceBrowserRows.value = (Array.isArray(rows) ? rows : []).map((r: any) => ({
       row_code: r.standard_account_code || r.account_code || '',
       row_name: r.account_name || r.standard_account_name || '',
       indent_level: (r.level || 1) - 1,
@@ -759,13 +744,17 @@ async function openSourceBrowserForNote() {
     return `NOTE('${name}','合计','期末')`
   }
   try {
-    const resp = await api.get('/api/disclosure-notes/tree', {
+    const pid = resolveProjectId()
+    const yr = resolveYear()
+    if (!pid) throw new Error('缺少项目ID')
+    const resp = await api.get(`/api/projects/${pid}/disclosure-notes/${yr}/tree`, {
+      _silent: true,
       validateStatus: (s: number) => s < 600,
-    })
-    const items = resp?.data ?? resp ?? []
-    sourceBrowserRows.value = items.map((r: any) => ({
-      row_code: r.note_number || r.section_number || '',
-      row_name: r.title || r.section_title || '',
+    } as any)
+    const items = resp?.sections ?? resp?.data ?? resp ?? []
+    sourceBrowserRows.value = (Array.isArray(items) ? items : []).map((r: any) => ({
+      row_code: r.note_section || r.note_number || r.section_number || '',
+      row_name: r.section_title || r.title || r.note_section || '',
       indent_level: (r.level || 1) - 1,
       formula: '',
       _ref: sourceBrowserRefBuilder.value(r),
@@ -786,13 +775,15 @@ function resolveYear(): number {
 }
 
 async function loadWorkingPapersFallback() {
-  sourceBrowserTitle.value = '底稿列表（标准列）'
+  sourceBrowserTitle.value = '底稿列表'
   sourceBrowserRefBuilder.value = (r: any) => {
     const code = r.wp_code || r.row_code || ''
     return `WP('${code}','审定数')`
   }
   try {
-    const resp = await api.get('/api/working-papers')
+    const pid = resolveProjectId()
+    const url = pid ? `/api/projects/${pid}/working-papers` : '/api/working-papers'
+    const resp = await api.get(url, { _silent: true, validateStatus: (s: number) => s < 600 } as any)
     const items = (resp as any)?.items ?? (Array.isArray(resp) ? resp : [])
     sourceBrowserRows.value = items.map((r: any) => ({
       row_code: r.wp_code || '',
@@ -802,7 +793,7 @@ async function loadWorkingPapersFallback() {
       _ref: sourceBrowserRefBuilder.value(r),
     }))
     if (!sourceBrowserRows.value.length) {
-      ElMessage.info('地址注册表暂无条目，已回退底稿列表也为空')
+      ElMessage.info('当前项目暂无已生成的底稿')
     }
   } catch {
     sourceBrowserRows.value = []
@@ -836,33 +827,34 @@ async function loadWpFromLegacyRegistry() {
 // acnr-consumer-wiring Req 14.3/14.5：WP 源浏览改用 ACNR listCells，
 // pickerRowsSubsetOfRegistry 语义变为 subset-of-ACNR-listCells。
 async function openSourceBrowserForWP() {
-  sourceBrowserTitle.value = '底稿单元格'
+  sourceBrowserTitle.value = '底稿列表'
   sourceBrowserSearch.value = ''
   showSourceBrowser.value = true
   sourceBrowserLoading.value = true
   sourceBrowserRefBuilder.value = (r: any) =>
     r._ref || `WP('${r.row_code || ''}','审定数')`
   try {
-    // ACNR catalog：列出所有 WP sheet，逐 sheet 拉坐标锚点后拍平
+    // 优先从 ACNR catalog 构建底稿列表（sheet 级），带科目名显示
     const sheets = await acnr.listSheets()
     const wpSheets = sheets.filter(
-      (s) => !s.domain || s.domain.toLowerCase() === 'wp',
+      (s) => s.domain === 'wp' && s.sheet_code !== s.parent_wp_code,
     )
-    const cellLists = await Promise.all(
-      wpSheets.map((s) =>
-        acnr.listCells(s.parent_wp_code, s.sheet_code).catch(() => []),
-      ),
-    )
-    const allCells = cellLists.flat()
-    const rows = mapAcnrCellsToPickerRows(allCells)
-    if (rows.length) {
-      sourceBrowserRows.value = rows
+    if (wpSheets.length) {
+      sourceBrowserRows.value = wpSheets
+        .sort((a, b) => (a.sheet_code || '').localeCompare(b.sheet_code || ''))
+        .map((s) => ({
+          row_code: s.sheet_code || s.parent_wp_code || '',
+          row_name: s.mapped_sheet_name || s.account_name || s.sheet_name || '',
+          indent_level: 0,
+          formula: '',
+          _ref: `WP('${s.parent_wp_code || ''}','${s.sheet_code || ''}','审定数')`,
+        }))
       return
     }
-    // ACNR 空 → 回退 legacy 地址注册表 / 底稿列表
-    await loadWpFromLegacyRegistry()
+    // ACNR 空 → 回退项目底稿列表
+    await loadWorkingPapersFallback()
   } catch {
-    await loadWpFromLegacyRegistry()
+    await loadWorkingPapersFallback()
   } finally {
     sourceBrowserLoading.value = false
   }
@@ -902,11 +894,13 @@ function toggleRefGroup(key: string) {
   refGroupOpen.value[key] = !refGroupOpen.value[key]
 }
 
-// ── 数据源一览（ACNR 五域动态，项目级） ──
+// ── 数据源一览树形数据（与公式管理中心左侧树同结构） ──
 import { useAcnr, type AcnrSheetEntry } from '@/services/acnr/useAcnr'
+import { wpCodeNaturalCompare, composeSheetLabelsForGroup } from '@/services/acnr/sheetDisplayName'
 
 const acnrSourceSheets = shallowRef<AcnrSheetEntry[]>([])
 const acnrSourceLoaded = ref(false)
+const noteSourceChildren = ref<any[]>([])
 
 async function loadAcnrSources() {
   if (acnrSourceLoaded.value) return
@@ -915,76 +909,221 @@ async function loadAcnrSources() {
     acnrSourceSheets.value = await acnr.listSheets()
     acnrSourceLoaded.value = true
   } catch { /* 降级用静态 */ }
+  // 加载项目实际附注章节（带编号）
+  try {
+    const pid = props.projectId || resolveProjectId()
+    const yr = props.year || resolveYear()
+    if (pid && yr) {
+      const { getDisclosureNoteTree } = await import('@/services/auditPlatformApi')
+      const notes = await getDisclosureNoteTree(pid, Number(yr))
+      if (Array.isArray(notes) && notes.length) {
+        noteSourceChildren.value = buildNoteSourceTree(notes)
+      }
+    }
+  } catch { /* ignore */ }
 }
 
-// 报表域数据源（动态 + 静态降级）
-const REPORT_ITEMS_FALLBACK = [
-  { key: 'balance_sheet', code: 'BS', label: '资产负债表' },
-  { key: 'income_statement', code: 'IS', label: '利润表' },
-  { key: 'cash_flow_statement', code: 'CFS', label: '现金流量表' },
-  { key: 'equity_statement', code: 'EQ', label: '权益变动表' },
-  { key: 'cash_flow_supplement', code: 'CFSS', label: '现金流附表' },
-  { key: 'impairment_provision', code: 'IMP', label: '资产减值准备表' },
-]
-const sourceReportItems = computed(() => REPORT_ITEMS_FALLBACK)
-
-// 附注域数据源（从 ACNR note 域 sheet 动态取，降级到项目附注 API）
-const sourceNoteItems = computed(() => {
-  // 从 props.noteRows 或 ACNR 附注域动态构建
-  if (props.noteRows?.length) {
-    return props.noteRows.map((n: any) => ({
-      key: n.note_section || n.section_title || n.label,
-      code: (n.note_section || '').charAt(0) || '五',
-      label: n.section_title || n.label || n.note_section,
-    }))
+/** 从项目附注章节数据构建按大章分组的树（带编号如「五、1 货币资金」） */
+function buildNoteSourceTree(notes: any[]): any[] {
+  const chapterMap: Record<string, { label: string; children: any[] }> = {}
+  const chapterOrder = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十']
+  const chapterLabels: Record<string, string> = {
+    '一': '一、公司概况', '二': '二、编制基础', '三': '三、重要会计政策',
+    '四': '四、税项', '五': '五、报表科目注释', '六': '六、其他重要事项',
+    '七': '七、关联方', '八': '八、附注（国企版）', '九': '九、补充资料',
+    '十': '十、其他',
   }
-  // 降级：从 ACNR sheets 中筛 note 域
-  const noteSheets = acnrSourceSheets.value.filter(s => s.domain === 'note')
-  if (noteSheets.length) {
-    return noteSheets.map(s => ({ key: s.sheet_name || s.sheet_code, code: s.cycle || 'N', label: s.sheet_name || s.sheet_code }))
+  for (const sec of notes) {
+    const title = sec.section_title || sec.title || sec.note_section || ''
+    const sectionId = sec.note_section || sec.section_id || ''
+    const chapterMatch = sectionId.match(/^([一二三四五六七八九十]+)/)
+    const chapter = chapterMatch ? chapterMatch[1] : '其他'
+    if (!chapterMap[chapter]) {
+      chapterMap[chapter] = { label: chapterLabels[chapter] || `${chapter}、其他`, children: [] }
+    }
+    // 显示「五、1 货币资金」格式
+    const displayLabel = sectionId && title ? `${sectionId} ${title}` : title || sectionId
+    chapterMap[chapter].children.push({
+      key: `n_${sectionId.replace(/[、，。\s]/g, '_')}`,
+      label: displayLabel.length > 24 ? displayLabel.slice(0, 24) + '…' : displayLabel,
+      icon: '',
+      _type: 'note',
+      _code: title || sectionId,
+      _sectionId: sectionId,
+    })
   }
-  // 最终降级：静态常用附注
-  return [
-    { key: '货币资金', code: 'E', label: '货币资金' },
-    { key: '应收账款', code: 'D', label: '应收账款' },
-    { key: '存货', code: 'G', label: '存货' },
-    { key: '固定资产', code: 'H', label: '固定资产' },
-    { key: '无形资产', code: 'I', label: '无形资产' },
-    { key: '营业收入', code: 'D', label: '营业收入' },
-  ]
-})
+  const result: any[] = []
+  for (const ch of chapterOrder) {
+    if (chapterMap[ch]) {
+      result.push({
+        key: `n_ch_${ch}`,
+        label: chapterMap[ch].label,
+        icon: '',
+        children: chapterMap[ch].children,
+      })
+    }
+  }
+  if (chapterMap['其他']?.children.length) {
+    result.push({ key: 'n_ch_other', label: '其他', icon: '', children: chapterMap['其他'].children })
+  }
+  return result
+}
 
-// 底稿域数据源（从 ACNR wp 域动态取，按 parent_wp_code 去重）
-const sourceWpItems = computed(() => {
+const CYCLE_LABEL_MAP: Record<string, string> = {
+  A: 'A 完成阶段', B: 'B 计划了解', C: 'C 控制测试',
+  D: 'D 销售收入', E: 'E 货币资金', F: 'F 采购存货',
+  G: 'G 投资', H: 'H 固定资产', I: 'I 无形资产',
+  J: 'J 职工薪酬', K: 'K 管理费用', L: 'L 筹资',
+  M: 'M 股东权益', N: 'N 税费', S: 'S 专项',
+}
+
+/** 构建与公式管理中心左侧一致的五域树 */
+const sourceTreeData = computed(() => {
+  const tree: any[] = []
+
+  // 1. 试算平衡表域（对齐公式管理中心）
+  tree.push({
+    key: 'trial_balance', label: '试算平衡表', icon: '📑', children: [
+      { key: 'tb_detail', label: '科目明细', icon: '', _type: 'tb', _code: 'detail' },
+      { key: 'tb_summary', label: '试算平衡表', icon: '', _type: 'tb', _code: 'summary' },
+    ],
+  })
+
+  // 2. 报表域
+  tree.push({
+    key: 'report', label: '报表', icon: '📊', _leafCount: 6, children: [
+      { key: 'r_bs', label: '资产负债表', icon: '', _type: 'report', _code: 'BS' },
+      { key: 'r_is', label: '利润表', icon: '', _type: 'report', _code: 'IS' },
+      { key: 'r_cfs', label: '现金流量表', icon: '', _type: 'report', _code: 'CFS' },
+      { key: 'r_eq', label: '权益变动表', icon: '', _type: 'report', _code: 'EQ' },
+      { key: 'r_cfss', label: '现金流附表', icon: '', _type: 'report', _code: 'CFSS' },
+      { key: 'r_imp', label: '资产减值准备表', icon: '', _type: 'report', _code: 'IMP' },
+    ],
+  })
+
+  // 3. 附注域（从项目实际附注章节加载，带编号如「五、1 货币资金」）
+  if (noteSourceChildren.value.length) {
+    tree.push({ key: 'note', label: '附注', icon: '📝', _leafCount: noteSourceChildren.value.reduce((n, ch) => n + (ch.children?.length || 0), 0), children: noteSourceChildren.value })
+  } else {
+    // ACNR 降级
+    const noteSheets = acnrSourceSheets.value.filter(s => s.domain === 'note')
+    const noteChildren = noteSheets.length
+      ? noteSheets.map(s => ({
+          key: `n_${s.sheet_code || s.addr_id}`,
+          label: s.sheet_name || s.sheet_code || '',
+          icon: '',
+          _type: 'note',
+          _code: s.sheet_name || s.sheet_code || '',
+        }))
+      : [{ key: 'n_loading', label: '加载中…', icon: '⏳' }]
+    tree.push({ key: 'note', label: '附注', icon: '📝', _leafCount: noteChildren.length, children: noteChildren })
+  }
+
+  // 4. 底稿域（按 cycle → parent → sheet 三级，与公式管理中心一致）
   const wpSheets = acnrSourceSheets.value.filter(s => s.domain === 'wp')
   if (wpSheets.length) {
-    // 按 parent_wp_code 去重，每个 parent 显示一条
-    const seen = new Set<string>()
-    const items: Array<{ key: string; code: string; label: string }> = []
+    const byCycle = new Map<string, AcnrSheetEntry[]>()
     for (const s of wpSheets) {
-      const p = s.parent_wp_code
-      if (!p || seen.has(p)) continue
-      seen.add(p)
-      items.push({ key: p, code: p, label: `${p}（${s.sheet_name || s.sheet_code || ''}）` })
+      const c = s.cycle || s.parent_wp_code?.charAt(0) || '?'
+      if (!byCycle.has(c)) byCycle.set(c, [])
+      byCycle.get(c)!.push(s)
     }
-    return items.sort((a, b) => a.code.localeCompare(b.code))
+    const cycleNodes: any[] = []
+    let totalLeaves = 0
+    for (const [cycle, cycleSheets] of [...byCycle.entries()].sort((a, b) => wpCodeNaturalCompare(a[0], b[0]))) {
+      // 按 parent 分组
+      const byParent = new Map<string, AcnrSheetEntry[]>()
+      for (const s of cycleSheets) {
+        const p = s.parent_wp_code
+        if (!byParent.has(p)) byParent.set(p, [])
+        byParent.get(p)!.push(s)
+      }
+      const parentNodes = [...byParent.entries()]
+        .sort((a, b) => wpCodeNaturalCompare(a[0], b[0]))
+        .map(([parentCode, parentSheets]) => {
+          const subjectAbbr = parentSheets.find(s => s.account_name)?.account_name || ''
+          const children = composeSheetLabelsForGroup(parentSheets).map(({ entry, label }) => {
+            totalLeaves++
+            return {
+              key: `wp_${entry.sheet_code?.replace(/-/g, '_')?.toLowerCase() || entry.addr_id}`,
+              label,
+              icon: '',
+              _type: 'wp',
+              _code: parentCode,
+              _sheetCode: entry.sheet_code || '',
+            }
+          })
+          return {
+            key: `wp_p_${parentCode.toLowerCase()}`,
+            label: subjectAbbr ? `${parentCode} ${subjectAbbr}` : parentCode,
+            icon: '',
+            children,
+          }
+        })
+      cycleNodes.push({
+        key: `wp_c_${cycle.toLowerCase()}`,
+        label: CYCLE_LABEL_MAP[cycle.toUpperCase()] || `${cycle} 循环`,
+        icon: '',
+        children: parentNodes,
+      })
+    }
+    tree.push({ key: 'wp', label: '底稿', icon: '📋', _leafCount: totalLeaves, children: cycleNodes })
+  } else {
+    tree.push({ key: 'wp', label: '底稿', icon: '📋', _leafCount: 0, children: [{ key: 'wp_loading', label: '加载中…', icon: '⏳' }] })
   }
-  // 降级：静态常用底稿
-  return [
-    { key: 'E1', code: 'E1', label: '货币资金（E1-1审定）' },
-    { key: 'D2', code: 'D2', label: '应收账款（D2-1审定）' },
-    { key: 'D1', code: 'D1', label: '应收票据（D1-1审定）' },
-    { key: 'F1', code: 'F1', label: '应付账款（F1-1审定）' },
-    { key: 'F2', code: 'F2', label: '预付款项（F2-1审定）' },
-    { key: 'G1', code: 'G1', label: '存货（G1-1审定）' },
-    { key: 'H1', code: 'H1', label: '固定资产（H1-1审定）' },
-    { key: 'I1', code: 'I1', label: '无形资产（I1-1审定）' },
-    { key: 'J1', code: 'J1', label: '长期股权投资（J1-1审定）' },
-    { key: 'K1', code: 'K1', label: '短期借款（K1-1审定）' },
-    { key: 'L1', code: 'L1', label: '应付职工薪酬（L1-1审定）' },
-    { key: 'M1', code: 'M1', label: '所有者权益（M1-1审定）' },
-  ]
+
+  // 5. 合并报表
+  tree.push({
+    key: 'consol_report', label: '合并报表', icon: '🔗', children: [
+      { key: 'consol_report_bs', label: '合并资产负债表', icon: '', _type: 'consol_report', _code: 'BS' },
+      { key: 'consol_report_is', label: '合并利润表', icon: '', _type: 'consol_report', _code: 'IS' },
+    ],
+  })
+
+  // 6. 合并工作底稿
+  tree.push({
+    key: 'consolidation', label: '合并工作底稿', icon: '🔗', children: [
+      { key: 'consol_info', label: '基本信息表', icon: '', _type: 'consol', _code: 'info' },
+      { key: 'consol_cost', label: '投资明细-成本法和公允值', icon: '', _type: 'consol', _code: 'cost' },
+      { key: 'consol_equity_inv', label: '投资明细-权益法', icon: '', _type: 'consol', _code: 'equity_inv' },
+      { key: 'consol_net_asset', label: '净资产表', icon: '', _type: 'consol', _code: 'net_asset' },
+      { key: 'consol_equity_sim', label: '模拟权益法', icon: '', _type: 'consol', _code: 'equity_sim' },
+      { key: 'consol_elimination', label: '合并抵消分录', icon: '', _type: 'consol', _code: 'elimination' },
+      { key: 'consol_capital', label: '资本公积变动', icon: '', _type: 'consol', _code: 'capital' },
+    ],
+  })
+
+  // 7. 去同年报
+  tree.push({
+    key: 'cross_check', label: '去同年报', icon: '🔗', children: [
+      { key: 'cross_report_note', label: '报表 ↔ 附注', icon: '🔄', _type: 'cross_check', _code: 'report_note' },
+      { key: 'cross_report_wp', label: '报表 ↔ 底稿', icon: '🔄', _type: 'cross_check', _code: 'report_wp' },
+      { key: 'cross_note_wp', label: '附注 ↔ 底稿', icon: '🔄', _type: 'cross_check', _code: 'note_wp' },
+    ],
+  })
+
+  // 8. 数据质量超期！
+  tree.push({
+    key: 'data_quality', label: '数据质量超期！', icon: '📐', children: [
+      { key: 'dq_l1', label: 'L1 基础格式校验', icon: '📌', _type: 'data_quality', _code: 'l1' },
+      { key: 'dq_l2', label: 'L2 逻辑一致性', icon: '📌', _type: 'data_quality', _code: 'l2' },
+      { key: 'dq_l3', label: 'L3 跨表核对', icon: '📌', _type: 'data_quality', _code: 'l3' },
+    ],
+  })
+
+  return tree
 })
+
+/** 点击数据源树叶子节点 → 插入对应公式引用 */
+function onSourceNodeClick(data: any) {
+  if (data.children?.length) return // 非叶子节点不处理
+  const type = data._type
+  if (type) {
+    jumpToSource(type, data._code || data.key)
+  }
+}
+
+// (旧数据源列表已移除，改用 sourceTreeData computed + el-tree 渲染)
 
 // ── 源表浏览弹窗 ──
 const activeFormulaIdx = ref(0)
@@ -1143,10 +1282,12 @@ function confirmTargetCell() {
 
 <style scoped>
 .gt-fe-container {
+  --gt-font-size-xs: 13px;
   display: flex;
   gap: 12px;
   height: calc(100vh - 200px);
   min-height: 400px;
+  font-size: 13px;
 }
 .gt-fe-formulas {
   flex: 1;
@@ -1160,6 +1301,17 @@ function confirmTargetCell() {
   border-right: 1px solid var(--gt-color-border-purple);
   padding: 0 12px;
   overflow-y: auto;
+  font-size: 13px;
+}
+.gt-fe-source-tree {
+  font-size: 13px;
+}
+.gt-fe-source-tree :deep(.el-tree-node__content) {
+  height: 26px;
+  font-size: 13px;
+}
+.gt-fe-source-tree :deep(.el-tree-node__label) {
+  font-size: 13px;
 }
 .gt-fe-help {
   width: 280px;

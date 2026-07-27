@@ -66,6 +66,8 @@ def schedule_export(
     audit_year: int,
     user_id: str,
     filename: str,
+    password: str | None = None,
+    incremental: bool = False,
 ) -> str:
     """创建导出任务并调度后台 worker，立即返回 task_id（Req 6.1）。"""
     task = bulk_progress_service.create_task(
@@ -86,6 +88,8 @@ def schedule_export(
             audit_year=audit_year,
             filename=filename,
             user_id=str(user_id),
+            password=password,
+            incremental=incremental,
         )
     )
     return task.task_id
@@ -103,6 +107,8 @@ async def _run_export(
     audit_year: int,
     filename: str,
     user_id: str | None = None,
+    password: str | None = None,
+    incremental: bool = False,
 ) -> None:
     """后台 worker：用自有 session 跑 bulk_export_service.export，进度经 SSE 推。
 
@@ -168,6 +174,8 @@ async def _run_export(
                 audit_year=audit_year,
                 progress=progress,
                 visible_filter=visible_filter,
+                password=password,
+                incremental=incremental,
             )
 
         # 写盘（会话已关闭，纯 IO）

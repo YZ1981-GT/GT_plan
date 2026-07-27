@@ -327,6 +327,14 @@ class Settings(BaseSettings):
     # tb_ledger 1602 对方科目填充率约 9% 且凭证为合并记账 → 折旧费用归属不自动归集。
     H1_FOUR_TABLE_EXTRACTION_ENABLED: bool = True
 
+    # --- g7-linkage-extraction-completion（G7 长期股权投资取数灰度）---
+    # 门控 G7-2 逐户四表取数（tb_aux_balance aux_type='客户' 1511 归集）+ G7-1 叶子分类合计
+    # 核对（tb_balance 1511/1512 叶子聚合 → tb_leaf_categories）。默认 False = 零回归：
+    # render 不输出 tb_leaf_categories、取数端点返回 imported_count=0 不写入，G7 各 sheet
+    # 逐字节不变。取数异常一律 fail-open（返空/None）不阻断 render。
+    # 联动入口/抽凭/stale 提示/合并范围反向补录（R1/R5/R6/R7）为纯 UI 接线，不受本开关约束。
+    G7_FOUR_TABLE_EXTRACTION_ENABLED: bool = False
+
     # --- h4-four-table-extraction ---
     # H4 工程物资四表取数灰度开关：H4-2 明细从 tb_balance 1605 叶子自动种子、
     # H4-1 审定表 TB 核对走 report_account_mapping 规则映射、H4-6 盘点覆盖率分母自动带入、

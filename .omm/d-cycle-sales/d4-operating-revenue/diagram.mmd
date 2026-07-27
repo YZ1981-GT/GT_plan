@@ -1,0 +1,58 @@
+flowchart TB
+    LEDGER["tb_ledger 6001/6051<br/>resolver d4_ledger_monthly_by_product"]
+    TBV["trial_balance 6001/6051<br/>发生额口径"]
+
+    subgraph CORE["core 核心四段"]
+        IDX["D4TabIndex"]
+        PRC["D4TabProcedure D4A"]
+        DET["D4TabRevenueDetail D4-2<br/>产品 × 12 月"]
+        ADJU["D4TabAdjudication D4-1"]
+        ADJ["D4TabAdjustment D4-4"]
+        OTH["D4TabOtherRevenue 其他业务"]
+        DL["D4TabDisclosureListed"]
+        DS["D4TabDisclosureSoe"]
+    end
+
+    subgraph INSP["inspection 检查"]
+        OCC["D4TabOccurrence 发生测试"]
+        CF["D4TabCutoffForward 正向截止"]
+        CB["D4TabCutoffBackward 反向截止"]
+        CTR["D4TabContract 合同检查"]
+        CMP["D4TabCompleteness 完整性"]
+        RET["D4TabReturn 退回"]
+        DIS["D4TabDiscount 折扣折让"]
+        EXP["D4TabExport 出口"]
+        ERP["D4TabErpCheck ERP核查<br/>双模式标杆"]
+    end
+
+    subgraph ANA["analysis 分析"]
+        IND["指标 / 产品毛利 / 月度毛利<br/>产品价格 / 客户价格 / 客户结构"]
+    end
+
+    subgraph IPO["ipo 专项 13 表"]
+        IPOX["客户清单·经销商·资金流水<br/>访谈·发票比对·第三方回款<br/>境外收入·未披露关联方"]
+    end
+
+    D2["D2 应收账款"]
+    F5["F5 营业成本"]
+    D7["D7 合同负债"]
+    A13["A13 未更正错报"]
+    NOTE["附注（上市/国企）"]
+    ENGINE["GtVoucherSamplingEngine 6001"]
+
+    LEDGER -->|从序时账导入| DET
+    DET --> ADJU
+    DET --> IND
+    ADJ -->|AJE/RJE| ADJU
+    TBV -.->|核对| ADJU
+    ADJU --> DL
+    ADJU --> DS
+    DL --> NOTE
+    DS --> NOTE
+    ENGINE --> OCC
+    CF -->|跨期| A13
+    CB -->|跨期| A13
+    ADJU -.->|收入↔应收勾稽| D2
+    ADJU -.->|毛利率勾稽| F5
+    D7 -.->|合同负债结转收入| ADJU
+    IND -.->|异常波动| CMP

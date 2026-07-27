@@ -65,14 +65,23 @@
                   size="small"
                   max-height="240"
                   stripe
+                  class="dq-detail-table"
                 >
                   <el-table-column prop="account_code" label="科目编码" width="100" />
-                  <el-table-column prop="account_name" label="科目名称" width="140" />
-                  <el-table-column prop="closing_balance" label="期末余额" width="120" align="right" />
-                  <el-table-column prop="expected_closing" label="预期期末" width="120" align="right" />
-                  <el-table-column prop="difference" label="差异" width="100" align="right">
+                  <el-table-column prop="account_name" label="科目名称" min-width="120" />
+                  <el-table-column label="期末余额" width="130" align="right">
                     <template #default="{ row }">
-                      <span style="color: var(--gt-color-coral); font-weight: 600">{{ row.difference }}</span>
+                      <span class="dq-amt">{{ fmtAmt(row.closing_balance) }}</span>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="预期期末" width="130" align="right">
+                    <template #default="{ row }">
+                      <span class="dq-amt">{{ fmtAmt(row.expected_closing) }}</span>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="差异" width="110" align="right">
+                    <template #default="{ row }">
+                      <span class="dq-amt dq-amt--diff">{{ fmtAmt(row.difference) }}</span>
                     </template>
                   </el-table-column>
                 </el-table>
@@ -91,6 +100,14 @@
               :stroke-width="8"
               style="margin-top: 8px"
             />
+            <div v-if="result.results[checkName].status !== 'passed'" style="margin-top: 10px; display: flex; gap: 8px; align-items: center">
+              <el-button type="primary" size="small" @click="$emit('jump-to-mapping')">
+                📎 跳转到映射规则修复
+              </el-button>
+              <span style="font-size: 12px; color: var(--gt-color-info)">
+                未映射科目无法进入报表计算，建议立即修复
+              </span>
+            </div>
           </div>
 
           <!-- 5.4: 借贷平衡检查打开统一诊断弹窗入口 -->
@@ -130,6 +147,7 @@
 import { ref, watch } from 'vue'
 import { Loading } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import BalanceDiagnosticsDialog from '@/components/diagnostics/BalanceDiagnosticsDialog.vue'
 import type { BalanceDiagnosticsResult, Caliber } from '@/types/balance-diagnostics'
 import { CALIBER_LABELS } from '@/types/balance-diagnostics'
@@ -142,12 +160,16 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
+  'jump-to-mapping': []
 }>()
 
 const visible = ref(props.modelValue)
 const loading = ref(false)
 const error = ref('')
 const result = ref<any>(null)
+
+const displayPrefs = useDisplayPrefsStore()
+const fmtAmt = (v: any) => displayPrefs.fmtAmount(v)
 
 watch(() => props.modelValue, (val) => {
   visible.value = val
@@ -335,4 +357,12 @@ function getTagType(status: string): 'success' | 'warning' | 'danger' | 'info' {
   margin-top: 8px;
   padding-left: 24px;
 }
+
+/* 差异明细表格：对齐试算表主表格设置 */
+.dq-detail-table { font-size: 12px; }
+.dq-detail-table :deep(.el-table__header th .cell),
+.dq-detail-table :deep(.el-table__body td .cell) { font-size: 12px; padding: 2px 8px; line-height: 16px; }
+.dq-detail-table :deep(.el-table__body td) { height: 20px; padding: 0; }
+.dq-amt { font-family: 'Arial Narrow', Arial, sans-serif; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dq-amt--diff { color: var(--gt-color-coral); font-weight: 600; }
 </style>

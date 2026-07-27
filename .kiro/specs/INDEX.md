@@ -1,8 +1,8 @@
 # 致同审计作业平台 — Spec 开发索引
 
-**最后更新**：2026-07-26
+**最后更新**：2026-07-27
 **当前分支**：`work/2026-05-30-wp-specs`
-**统计**：Active 0 / Archived 448 = 总计 448
+**统计**：Active 5 / Archived 449 = 总计 454
 **最高迁移**：**V127**（以 `migration_status` 实测为准）
 **技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer
 
@@ -28,7 +28,14 @@
 
 新建 spec 放 `.kiro/specs/{name}/`。
 
-当前无活跃 spec。全部已归档。
+| Spec | 阶段 | 说明 |
+|------|------|------|
+| `g7-linkage-extraction-completion` | 三件套齐（待执行 run-all-tasks） | G7 长期股权投资：底稿侧发起合并联动、G7-2/G7-1 四表与跨册取数、抽凭铺开 G7-10/11/12、联动过期常驻提示、合并范围反向补录 G7-4、联动端点与建议草稿集成测试；灰度 `G7_FOUR_TABLE_EXTRACTION_ENABLED` 默认关 |
+| `confirmation-hub-workbench-tabs` | 三件套齐（33 任务全 `[ ]` 未开工） | 函证枢纽底稿多 sheet 可达 + 台账双向导航 + E0 重建（B 方案）+ **路由与编码治理（Req10：G0 差异表可达 / L0A 程序表模板生效 / Index_Code_Map + 非兜底守卫）** |
+| `confirmation-shared-model-extension` | 三件套齐（待执行 run-all-tasks） | 四张共享表行模型按源模板 additive 补列（ConfirmationRow ~10 列 + K0/L0 5 段与行级审计结论 + E0 原币/本位币/汇率 + H0 条款口径；EntityVerifyRow 回函核实块 ~11 列；ReliabilityRow ~8 列；DiffReconcileRow 支持性证据）——一次修惠及七枢纽；列配置驱动层 + 12 属性 + 6 波 |
+| `confirmation-alternative-structure-alignment` | 三件套齐（待执行 run-all-tasks） | 替代程序结构对齐：K0-5/K0-6/L0-5「本期发生额」渲染层拆借贷双表（工厂 4 block 位不动）、L0-5 补期初一致性核对、G0-6 区块对齐源三区并纳入工厂、F05/F06 拆子组件（characterization 先行）；12 属性 + 6 波 |
+| `g0-investment-diff-model` | 三件套齐（待执行 run-all-tasks，前置 confirmation-hub Req10 可达） | G0 证券差异表补 5 列 + 「是否需要调账」改判断列；非证券差异表新建三维专属组件（持股比例/投资金额/投资条款 × 账面·回函·差异），共享 `diffReconcile` 一行不改；10 属性 + 5 波 |
+| `e0-send-list-components` | 三件套齐（待执行 run-all-tasks） | E0-3~E0-6 四张发函前清单审定 `E0.yaml`（现 col_* 占位表）+ 生成器 `_reviewed` 防覆盖，支撑「清单 → E0-1 带入」上游可靠；8 属性 + 5 波 |
 
 ---
 
@@ -44,7 +51,7 @@ _archive/
 ├── 05-business-features/            216
 ├── 06-engineering-governance/        13
 ├── 07-workpaper-slimdown/            22
-├── 08-disclosure-notes/              14
+├── 08-disclosure-notes/              15
 ├── 09-consolidation-phases/           4
 ├── 10-A~S-workpaper-all-cycles-complete/ 31
 ├── 11-confirmation-d0-module/        10
@@ -52,6 +59,14 @@ _archive/
 ├── 13-2026-06-29-batch/              33
 └── 99-superseded/                     4
 ```
+
+### 最近归档（2026-07-27，disclosure-note-linkage-completion 完成归档）
+
+**→ 08-disclosure-notes（+1）**
+
+| Spec | 说明 |
+|------|------|
+| disclosure-note-linkage-completion | 附注模块联动链完成收口：①披露表保存后自动同步到附注（`useDisclosureAutoSync` 单一封装+全循环 24+ tab 铺开）②同步端点 URL 收敛为单一 canonical（H3/H4/H5/J1/D6 迁移+契约守卫）③合并附注 V2 落库激活穿透（`_persist_consol_sections_v2` provenance-only+灰度默认关）④stale_source 历史回填（221 行 report_fallback）⑤公式灰度按项目启用（`note_formula_gray_service`+就绪度看板暴露）；13 属性 P1-P13 全覆盖+live 端到端三流程验证 PASS |
 
 ### 最近归档（2026-07-26，13个已完成 spec 归档）
 

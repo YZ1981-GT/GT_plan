@@ -1,0 +1,18 @@
+graph LR
+  TB[(trial_balance 6401<br/>损益取发生额)] --> ADJU[F5-1 审定表]
+  LEDGER[(tb_ledger 6401)] -->|f5_ledger_monthly_by_product<br/>产品 × 月| MON[F5-2 月度明细]
+  MON -->|勾稽/聚合| ADJU
+  ADJ[F5-3 调整分录] --> ADJU
+  ROLL[F5-7 成本倒轧<br/>期初+购入/生产−期末] -->|勾稽| ADJU
+  QTY[量差调节] --> ROLL
+  ADJU -->|writeback 6401| TB
+  ADJU -->|substantive:adjudicated| IS[利润表 IS 行]
+
+  MON --> CMP[成本对比分析]
+  MAJ[重大成本调整<br/>接抽凭引擎] --> ADJ
+  OTH[其他业务成本] --> ADJU
+
+  F2[F2 存货<br/>计价方法/期末存货] --> ROLL
+  ADJU -->|毛利率勾稽 useF5CrossSheet.pullD4Revenue| D4[D4 营业收入审定]
+  D4 --> GP[毛利率异常告警]
+  ADJU --> GP

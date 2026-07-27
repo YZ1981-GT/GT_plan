@@ -1,0 +1,25 @@
+graph TD
+  subgraph sppi 入口
+    BM[业务模式判定] --> SP[SPPI 合同现金流量特征测试]
+    SP --> CLS{分类结论}
+  end
+  subgraph main 入口
+    CLS -->|摊余成本| ADJU[G4-1 审定表]
+    DET[G4-2 明细] --> ADJU
+    AMOR[摊余成本计量<br/>实际利率法/利息调整摊销] --> ADJU
+    ADJ[G4-3 调整分录] --> ADJU
+    TB[(trial_balance 1501)] <--> ADJU
+  end
+  subgraph ecl 入口
+    ST[三阶段划分] --> PD[PD / LGD 参数]
+    PD --> PROV[减值准备<br/>对方 1502]
+    VC[凭证检查] --> ST
+    REF[参考资料/内嵌示例] --> ST
+  end
+  PROV -->|减值小计勾稽| ADJU
+  PROV --> G14[G14 信用减值损失 6702]
+  AMOR -->|利息收入| G11[G11 投资收益 6111]
+  G0[G0 函证 券商/发行人] --> DET
+  CROSS[g4CrossHelpers + g4StorageContract<br/>G4_ITEM_IDS 三入口共用] -.存储契约.- ADJU
+  CROSS -.-> ST
+  CROSS -.-> SP
