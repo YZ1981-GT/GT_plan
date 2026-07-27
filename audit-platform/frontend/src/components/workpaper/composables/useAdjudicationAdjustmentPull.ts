@@ -56,7 +56,7 @@ export function useAdjudicationAdjustmentPull(opts: UseAdjudicationAdjustmentPul
     const direction = opts.direction ?? 'credit'
     loading.value = true
     try {
-      const data: any = await listAdjustments(pid, yr, { page_size: 500 })
+      const data: any = await listAdjustments(pid, yr, { page_size: 200 })
       const items: any[] = Array.isArray(data) ? data : (data?.items || [])
       const out: AdjudicationAdjMatch[] = []
       for (const g of items) {

@@ -141,6 +141,16 @@ export const NOTIFICATION_JUMP_ROUTES: Record<string, (meta: Record<string, any>
   [NOTIFICATION_TYPES.ADJ_COLLAB_CONTRIBUTED]: (m) => adjCollabRoute(m),
   [NOTIFICATION_TYPES.ADJ_COLLAB_CONFIRMED]: (m) => adjCollabRoute(m),
   [NOTIFICATION_TYPES.ADJ_COLLAB_REJECTED]: (m) => adjCollabRoute(m),
+  // #2: 新调整到达→点通知直达审定表带入
+  'adjustment_sync_arrived': (m) => {
+    if (!m.project_id) return ''
+    const wpCodes = m.affected_wp_codes || []
+    // 跳转到第一个受影响底稿的审定表（带 bringIn=true 打开带入弹窗）
+    if (wpCodes.length > 0) {
+      return `/projects/${m.project_id}/workpapers?view=workbench&highlight=${wpCodes[0]}`
+    }
+    return `/projects/${m.project_id}/adjustments`
+  },
 }
 
 /** 调整分录协作通知 → 集中调整页 + ?group=（Adjustments.vue 消费定位/开协作对话框）。 */

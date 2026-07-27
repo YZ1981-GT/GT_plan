@@ -26,10 +26,9 @@
             :show-copy="true"
             :show-fullscreen="true"
             :is-fullscreen="rvFullscreen"
-            :show-export="true"
+            :show-export="false"
             @copy="copyReportTable"
             @fullscreen="toggleRvFullscreen()"
-            @export="onExportExcel"
           >
             <template #left>
               <el-radio-group v-model="reportMode" size="small" @change="fetchReport" class="gt-rv-mode-radio">
@@ -41,16 +40,37 @@
               <el-button size="small" @click="_onConsistencyCheckWrapper" :loading="checkLoading">审核</el-button>
             </template>
             <template #right-extra>
-              <el-button size="small" @click="onExportAllExcel">全部导出</el-button>
-              <el-button size="small" @click="showReportImport = true">导入</el-button>
-              <el-button size="small" @click="showFormulaManager = true">公式</el-button>
+              <el-dropdown trigger="click" size="small">
+                <el-button size="small">📤 导入导出</el-button>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item @click="onExportExcel">导出当前表(Excel)</el-dropdown-item>
+                    <el-dropdown-item @click="onExportAllExcel">全部导出 — 已审数</el-dropdown-item>
+                    <el-dropdown-item @click="onExportAllUnadjusted">全部导出 — 未审数</el-dropdown-item>
+                    <el-dropdown-item divided @click="showReportImport = true">导入(Excel)</el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+              <el-button size="small" @click="showFormulaManager = true">📐 公式管理</el-button>
+              <el-button size="small" type="primary" plain @click="openAiWithContext">🤖 AI</el-button>
+              <el-button
+                size="small"
+                circle
+                :type="showRvGuide ? 'primary' : 'default'"
+                @click="showRvGuide = !showRvGuide"
+                title="操作指南"
+              >
+                ?
+              </el-button>
               <el-dropdown trigger="click" size="small">
                 <el-button size="small">更多</el-button>
                 <template #dropdown>
                   <el-dropdown-menu>
-                    <el-dropdown-item @click="onEditConfig">编辑结构</el-dropdown-item>
-                    <el-dropdown-item @click="showMappingDialog = true">转换规则</el-dropdown-item>
-                    <el-dropdown-item @click="showDocAiChat = true">AI 对话</el-dropdown-item>
+                    <el-dropdown-item @click="onEditConfig">
+                      编辑结构
+                      <span style="font-size:11px;color:var(--el-color-warning);margin-left:4px">⚠</span>
+                    </el-dropdown-item>
+                    <el-dropdown-item @click="showMappingDialog = true">转换规则（国企版↔上市版）</el-dropdown-item>
                   </el-dropdown-menu>
                 </template>
               </el-dropdown>
@@ -79,35 +99,34 @@
         @resolved="onConflictResolved"
       />
 
-      <!-- F29: 报表平衡检查结果（展示明细+跳转） -->
-      <el-alert
-        v-if="balanceCheckResult"
-        :title="balanceCheckResult.status === 'passed' ? '报表平衡检查通过' : balanceCheckResult.status === 'warning' ? '报表平衡检查有差异' : '报表平衡检查失败'"
-        :type="balanceCheckResult.status === 'passed' ? 'success' : balanceCheckResult.status === 'warning' ? 'warning' : 'error'"
-        show-icon
-        :closable="true"
-        style="margin-bottom: 8px"
-        @close="balanceCheckResult = null"
-      >
-        <template #default>
-          <div>{{ balanceCheckResult.message }}</div>
-          <div v-if="balanceCheckResult.checks?.length" style="margin-top: 6px; font-size: 12px; line-height: 1.8">
-            <div
-              v-for="(chk, idx) in balanceCheckResult.checks.filter(c => !c.passed)"
-              :key="idx"
-              style="display: flex; align-items: center; gap: 8px; cursor: pointer; padding: 2px 0;"
-              @click="scrollToReportRow(chk.name)"
-            >
-              <span style="color: var(--el-color-danger)">✗</span>
-              <span style="flex: 1">{{ chk.name }}</span>
-              <span style="color: var(--el-text-color-secondary)">期望 {{ chk.expected }}，实际 {{ chk.actual }}，差 {{ chk.diff }}</span>
-              <el-button text size="small" type="primary" style="padding: 0">定位 →</el-button>
-            </div>
+      <!-- F29: 报表平衡检查结果（紧凑单行可展开） -->
+      <div v-if="balanceCheckResult" class="gt-rv-balance-bar" :class="'gt-rv-balance-bar--' + balanceCheckResult.status">
+        <span class="gt-rv-balance-bar__icon">{{ balanceCheckResult.status === 'passed' ? '✅' : '❌' }}</span>
+        <span class="gt-rv-balance-bar__text">
+          {{ balanceCheckResult.status === 'passed' ? '报表平衡检查通过（7/7）' : `报表平衡检查有 ${balanceCheckResult.checks?.filter(c => !c.passed).length || 0} 项差异` }}
+        </span>
+        <el-button v-if="balanceCheckResult.checks?.some(c => !c.passed)" text size="small" type="primary" @click="rvBalanceExpanded = !rvBalanceExpanded">
+          {{ rvBalanceExpanded ? '收起' : '展开明细' }}
+        </el-button>
+        <el-button text size="small" @click="balanceCheckResult = null" style="margin-left: auto; padding: 0;">✕</el-button>
+      </div>
+      <transition name="el-zoom-in-top">
+        <div v-if="balanceCheckResult && rvBalanceExpanded && balanceCheckResult.checks?.some(c => !c.passed)" class="gt-rv-balance-detail">
+          <div
+            v-for="(chk, idx) in balanceCheckResult.checks.filter(c => !c.passed)"
+            :key="idx"
+            class="gt-rv-balance-detail__row"
+            @click="scrollToReportRow(chk.name)"
+          >
+            <span style="color: var(--el-color-danger)">✗</span>
+            <span style="flex: 1">{{ chk.name }}</span>
+            <span style="color: var(--el-text-color-secondary); font-size: 12px">期望 {{ chk.expected }}，实际 {{ chk.actual }}，差 {{ chk.diff }}</span>
+            <el-button text size="small" type="primary" style="padding: 0">定位 →</el-button>
           </div>
-        </template>
-      </el-alert>
+        </div>
+      </transition>
 
-      <!-- Sprint 4：StaleIndicator 统一组件 + 横幅 -->
+      <!-- Sprint 4：StaleIndicator 统一组件 + 横幅（三条互斥：stale > staleRefresh > reportStale） -->
       <div v-if="stale.isStale.value" class="gt-stale-banner">
         <StaleIndicator :stale="true" tooltip="上游数据已变更" />
         <span class="gt-stale-text">
@@ -119,7 +138,7 @@
       </div>
 
       <!-- useStaleRefresh：上游变更事件横幅 -->
-      <div v-if="staleRefresh.isStale.value && !stale.isStale.value" class="gt-stale-banner">
+      <div v-else-if="staleRefresh.isStale.value" class="gt-stale-banner">
         <StaleIndicator :stale="true" tooltip="上游数据已变更" />
         <span class="gt-stale-text">上游数据已变更，建议重新加载报表</span>
         <el-button size="small" type="primary" @click="staleRefresh.refresh()">刷新数据</el-button>
@@ -127,7 +146,7 @@
 
       <!-- US-2：底稿数据更新 → 报表 stale 黄色横幅 -->
       <el-alert
-        v-if="showReportStaleBanner"
+        v-else-if="showReportStaleBanner"
         title="底稿数据已更新"
         :description="`${reportStaleRows.length} 个报表行受影响，点击刷新获取最新数据`"
         type="warning"
@@ -145,18 +164,318 @@
       </el-alert>
 
       <!-- Tab 切换 -->
-      <el-tabs v-model="activeTab" @tab-change="onTabChange">
+      <el-tabs v-model="activeTab" @tab-change="onTabChange" stretch>
         <el-tab-pane label="资产负债表" name="balance_sheet" />
         <el-tab-pane label="利润表" name="income_statement" />
         <el-tab-pane label="现金流量表" name="cash_flow_statement" />
-        <el-tab-pane label="所有者权益变动表" name="equity_statement" />
+        <el-tab-pane label="权益变动表" name="equity_statement" />
         <el-tab-pane label="现金流附表" name="cash_flow_supplement" />
-        <el-tab-pane label="资产减值准备表" name="impairment_provision" />
-        <el-tab-pane label="⚖️ 跨表核对" name="cross_check" />
-        <el-tab-pane label="📊 多年度对比" name="multi_year_compare" />
-        <el-tab-pane label="📈 报表分析" name="report_analysis" />
+        <el-tab-pane label="减值准备表" name="impairment_provision" />
+        <el-tab-pane label="⚖️跨表核对" name="cross_check" />
+        <el-tab-pane label="📊多年对比" name="multi_year_compare" />
+        <el-tab-pane label="📈分析" name="report_analysis" />
       </el-tabs>
     </div>
+
+    <!-- 报表使用说明抽屉（右侧，边看边操作） -->
+    <el-drawer
+      v-model="showRvGuide"
+      title="📖 财务报表功能介绍与操作指南"
+      direction="rtl"
+      size="480px"
+      :append-to-body="true"
+      :close-on-press-escape="true"
+    >
+      <div class="gt-rv-guide-panel__body">
+
+          <!-- 功能定位 -->
+          <div class="gt-rv-guide-section">
+            <h4 class="gt-rv-guide-section__title">一、功能定位</h4>
+            <p class="gt-rv-guide-section__text">
+              财务报表模块是审计数据的<b>最终呈现层</b>——将试算表各科目审定数按报表行次公式汇总为6张标准财务报表（资产负债表/利润表/现金流量表/所有者权益变动表/现金流附表/资产减值准备表），
+              是审计报告的核心附表。报表数据<b>自动从试算表审定数经公式驱动计算</b>，无需手工填列；调整分录变更后刷新即自动重算。
+              同时提供跨表核对（7条平衡等式）、多年度对比（趋势分析）、报表分析（A2-1/A2-2比率试算）三个增值功能，辅助审计判断。
+            </p>
+          </div>
+
+          <!-- 工具栏按钮 -->
+          <div class="gt-rv-guide-section">
+            <h4 class="gt-rv-guide-section__title">二、工具栏按钮功能详解</h4>
+            <div class="gt-rv-guide-btn-list">
+              <div class="gt-rv-guide-btn-item">
+                <div class="gt-rv-guide-btn-item__head">
+                  <span class="gt-rv-guide-btn-item__badge gt-rv-guide-btn-item__badge--primary">📊</span>
+                  <b>已审 / 未审 / 对比</b>
+                </div>
+                <div class="gt-rv-guide-btn-item__desc">
+                  <p><b>已审</b>：显示审定金额（=未审数+AJE+RJE），是最终对外出具的数。</p>
+                  <p><b>未审</b>：显示未经审计调整的原始金额（来自试算表未审数），便于对照客户原始账面。</p>
+                  <p><b>对比</b>：同时展示未审/调整影响/已审/上年审定/变动额/变动率六列，一表纵览全链路。变动率超过20%的行自动红色标记，提示审计师关注异常波动。</p>
+                </div>
+              </div>
+              <div class="gt-rv-guide-btn-item">
+                <div class="gt-rv-guide-btn-item__head">
+                  <span class="gt-rv-guide-btn-item__badge gt-rv-guide-btn-item__badge--success">🔄</span>
+                  <b>刷新（生成报表）</b>
+                </div>
+                <div class="gt-rv-guide-btn-item__desc">
+                  <p><b>功能</b>：从试算表审定数重新按公式驱动计算全部报表行次金额。底稿编制/调整分录变更后须点此刷新才能反映最新审定数。</p>
+                  <p><b>计算逻辑</b>：每行根据 report_config 的 formula（如 <code>TB('1001','期末余额')+TB('1002','期末余额')</code>）从试算表取数汇总。合计行按父子行次自动求和。</p>
+                  <p><b>注意</b>：EQCR技术复核人角色下该按钮隐藏（只读复核不改数据）；报表锁定/归档后刷新禁用。</p>
+                </div>
+              </div>
+              <div class="gt-rv-guide-btn-item">
+                <div class="gt-rv-guide-btn-item__head">
+                  <span class="gt-rv-guide-btn-item__badge gt-rv-guide-btn-item__badge--info">✅</span>
+                  <b>审核（一致性校验）</b>
+                </div>
+                <div class="gt-rv-guide-btn-item__desc">
+                  <p><b>功能</b>：执行7条报表间平衡等式检查，是报表出具前的必查项。</p>
+                  <p><b>等式示例</b>：资产总计=负债+所有者权益总计、利润总额−所得税费用=净利润、期末现金=期初+经营+投资+筹资净额、所有者权益各项变动净额=期末−期初。</p>
+                  <p><b>结果</b>：弹窗逐条展示通过/未通过（含期望值/实际值/差异金额），未通过项可点击定位到对应报表行。全部通过后顶部显示绿色「报表平衡检查通过」横幅。</p>
+                </div>
+              </div>
+              <div class="gt-rv-guide-btn-item gt-rv-guide-btn-item--compact">
+                <div class="gt-rv-guide-btn-item__head">
+                  <b>📤 全部导出 / 📥 导入 / 📐 公式</b>
+                </div>
+                <div class="gt-rv-guide-btn-item__desc">
+                  <p><b>全部导出</b>：将6张报表一次性导出为单个格式化xlsx文件（每张报表一个sheet），适合归档或交付客户。</p>
+                  <p><b>导入</b>：上传xlsx覆盖报表数据（适用于客户直接提供格式化报表或手工填列权益变动表/现金流量表）。</p>
+                  <p><b>公式</b>：打开公式管理中心，查看/编辑各报表行的取数公式（TB/SUM_TB/ROW引用）、逻辑审核规则、合理性提示。</p>
+                </div>
+              </div>
+              <div class="gt-rv-guide-btn-item gt-rv-guide-btn-item--compact">
+                <div class="gt-rv-guide-btn-item__head">
+                  <b>更多 ▾（编辑结构/转换规则/AI对话）</b>
+                </div>
+                <div class="gt-rv-guide-btn-item__desc">
+                  <p><b>编辑结构</b>：修改报表行次定义（增/删/改行名、调整缩进层级、设置合计行、修改取数公式）。适合因企业特殊性需要调整报表格式的场景。</p>
+                  <p><b>转换规则</b>：管理「国企版↔上市版」报表项目的映射关系，确认后系统按规则自动转换。支持一键预设和手动调整。</p>
+                  <p><b>AI对话</b>：打开AI文档对话面板，可针对当前报表数据提问（如"为什么货币资金比上年增长50%"、"应收账款周转率是多少"）。</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 9个Tab -->
+          <div class="gt-rv-guide-section">
+            <h4 class="gt-rv-guide-section__title">三、报表Tab说明</h4>
+            <div class="gt-rv-guide-grid">
+              <div class="gt-rv-guide-card">
+                <div class="gt-rv-guide-card__icon">📋</div>
+                <div class="gt-rv-guide-card__name">资产负债表</div>
+                <div class="gt-rv-guide-card__desc">反映企业特定日期财务状况。资产=负债+所有者权益（平衡等式检查的核心对象）。</div>
+              </div>
+              <div class="gt-rv-guide-card">
+                <div class="gt-rv-guide-card__icon">📈</div>
+                <div class="gt-rv-guide-card__name">利润表</div>
+                <div class="gt-rv-guide-card__desc">反映会计期间经营成果。收入−成本−费用−税=净利润。与资产负债表未分配利润联动。</div>
+              </div>
+              <div class="gt-rv-guide-card">
+                <div class="gt-rv-guide-card__icon">💰</div>
+                <div class="gt-rv-guide-card__name">现金流量表</div>
+                <div class="gt-rv-guide-card__desc">反映现金流入流出，分经营/投资/筹资三大类。期末现金须与资产负债表货币资金一致。</div>
+              </div>
+              <div class="gt-rv-guide-card">
+                <div class="gt-rv-guide-card__icon">🔄</div>
+                <div class="gt-rv-guide-card__name">权益变动表</div>
+                <div class="gt-rv-guide-card__desc">矩阵表：横轴为权益项目（实收资本/资本公积/盈余公积/未分配利润等），纵轴为变动原因。期末余额须与资产负债表所有者权益各项一致。</div>
+              </div>
+              <div class="gt-rv-guide-card">
+                <div class="gt-rv-guide-card__icon">📑</div>
+                <div class="gt-rv-guide-card__name">现金流附表</div>
+                <div class="gt-rv-guide-card__desc">用间接法从净利润调节到经营活动现金净额（加折旧/减存货增加等），与直接法现金流量表互相印证。</div>
+              </div>
+              <div class="gt-rv-guide-card">
+                <div class="gt-rv-guide-card__icon">⚠️</div>
+                <div class="gt-rv-guide-card__name">减值准备表</div>
+                <div class="gt-rv-guide-card__desc">列示各类资产减值准备的期初/本期增加(计提)/本期减少(转回、转销)/期末变动，矩阵表结构。</div>
+              </div>
+              <div class="gt-rv-guide-card">
+                <div class="gt-rv-guide-card__icon">⚖️</div>
+                <div class="gt-rv-guide-card__name">跨表核对</div>
+                <div class="gt-rv-guide-card__desc">7条关键平衡等式自动计算+通过/失败状态标记。差异行可点击定位到对应报表Tab。</div>
+              </div>
+              <div class="gt-rv-guide-card">
+                <div class="gt-rv-guide-card__icon">📊</div>
+                <div class="gt-rv-guide-card__name">多年度对比</div>
+                <div class="gt-rv-guide-card__desc">纵向展示多个年度同一报表行次的数据趋势，辅助识别异常波动和趋势性变化。</div>
+              </div>
+              <div class="gt-rv-guide-card">
+                <div class="gt-rv-guide-card__icon">📈</div>
+                <div class="gt-rv-guide-card__name">报表分析</div>
+                <div class="gt-rv-guide-card__desc">自动计算常用审计比率（流动比率/速动比率/资产负债率/毛利率等），对应A2-1/A2-2分析性程序底稿。</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 表格交互 -->
+          <div class="gt-rv-guide-section">
+            <h4 class="gt-rv-guide-section__title">四、表格交互操作</h4>
+            <div class="gt-rv-guide-btn-list">
+              <div class="gt-rv-guide-btn-item gt-rv-guide-btn-item--compact">
+                <div class="gt-rv-guide-btn-item__head"><b>点击项目名 → 穿透科目构成</b></div>
+                <div class="gt-rv-guide-btn-item__desc">
+                  <p>点击报表行的「项目」名称，弹出该行由哪些科目构成（如"货币资金"=1001库存现金+1002银行存款+1012其他货币资金），含各科目审定金额和占比。</p>
+                </div>
+              </div>
+              <div class="gt-rv-guide-btn-item gt-rv-guide-btn-item--compact">
+                <div class="gt-rv-guide-btn-item__head"><b>点击金额 → 本期金额穿透</b></div>
+                <div class="gt-rv-guide-btn-item__desc">
+                  <p>点击本期金额单元格，弹出该行取数公式的逐项展开（每个TB()函数对应科目及其审定数）。悬停金额可看公式表达式。</p>
+                </div>
+              </div>
+              <div class="gt-rv-guide-btn-item gt-rv-guide-btn-item--compact">
+                <div class="gt-rv-guide-btn-item__head"><b>右键菜单（8项功能）</b></div>
+                <div class="gt-rv-guide-btn-item__desc">
+                  <p>在任意单元格右键弹出：📊查看穿透 / 📝跳转附注 / 🔎附注引用我 / 📋打开对应底稿 / 🔗查看调整明细 / 🔗查看合并明细(合并报表) / 🔍查看公式来源 / 🔍数字溯源。</p>
+                </div>
+              </div>
+              <div class="gt-rv-guide-btn-item gt-rv-guide-btn-item--compact">
+                <div class="gt-rv-guide-btn-item__head"><b>📝 附注跳转按钮</b></div>
+                <div class="gt-rv-guide-btn-item__desc">
+                  <p>项目名称后的📝按钮可直接跳转到该报表行对应的附注章节（如"货币资金"→五、1），在附注模块查看/编辑该科目披露内容。</p>
+                </div>
+              </div>
+              <div class="gt-rv-guide-btn-item gt-rv-guide-btn-item--compact">
+                <div class="gt-rv-guide-btn-item__head"><b>Ctrl+F 表内搜索 / 选区求和</b></div>
+                <div class="gt-rv-guide-btn-item__desc">
+                  <p>按 Ctrl+F 打开表内搜索栏，按关键词高亮匹配行并支持前后跳转。选中多个金额单元格后底部状态栏显示求和/均值/计数。</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 操作流程 -->
+          <div class="gt-rv-guide-section">
+            <h4 class="gt-rv-guide-section__title">五、报表生成完整流程</h4>
+            <div class="gt-rv-guide-steps">
+              <div class="gt-rv-guide-step">
+                <span class="gt-rv-guide-step__num">1</span>
+                <div class="gt-rv-guide-step__content">
+                  <b>确认试算表审定数完整</b>
+                  <span>在试算表页面确认全量重算已完成、一致性校验通过、数据质量检查无异常。试算表审定数是报表的唯一数据源。</span>
+                </div>
+              </div>
+              <div class="gt-rv-guide-step">
+                <span class="gt-rv-guide-step__num">2</span>
+                <div class="gt-rv-guide-step__content">
+                  <b>点击「刷新」生成报表</b>
+                  <span>系统自动按报表行次公式从试算表取数，计算全部6张报表。首次生成约需几秒。完成后表格自动刷新显示最新数据。</span>
+                </div>
+              </div>
+              <div class="gt-rv-guide-step">
+                <span class="gt-rv-guide-step__num">3</span>
+                <div class="gt-rv-guide-step__content">
+                  <b>点击「审核」执行平衡检查</b>
+                  <span>7条等式逐条校验。全部通过=报表内部自洽可出具。存在差异=需回溯底稿/调整分录排查原因（点击差异项可直接定位）。</span>
+                </div>
+              </div>
+              <div class="gt-rv-guide-step">
+                <span class="gt-rv-guide-step__num">4</span>
+                <div class="gt-rv-guide-step__content">
+                  <b>差异排查与修正</b>
+                  <span>若有不平衡，通过右键"查看穿透"/"打开对应底稿"/"查看调整明细"追溯根因。修正后回到试算表全量重算→报表刷新→再次审核。</span>
+                </div>
+              </div>
+              <div class="gt-rv-guide-step">
+                <span class="gt-rv-guide-step__num">5</span>
+                <div class="gt-rv-guide-step__content">
+                  <b>导出交付</b>
+                  <span>全部平衡后点击「全部导出」生成归档xlsx。导出前系统自动提示未通过的校验项（若有）。导出文件可直接作为审计报告附表使用。</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 注意事项 -->
+          <div class="gt-rv-guide-section">
+            <h4 class="gt-rv-guide-section__title">六、注意事项</h4>
+            <ul class="gt-rv-guide-notes">
+              <li>⚠️ 报表数据<b>不可直接编辑</b>——所有金额由公式从试算表审定数自动计算。如需修改某行金额，应回到底稿编制调整分录→试算表重算→报表刷新。</li>
+              <li>⚠️ 项目<b>归档后</b>报表只读，刷新/导入/编辑结构按钮全部禁用。</li>
+              <li>⚠️ <b>合并报表</b>需先在合并工作底稿模块完成抵消分录编制和合并重算，再来报表页查看合并口径数据。</li>
+              <li>⚠️ <b>权益变动表</b>为矩阵表，部分行可能需要通过导入xlsx手工填列（如其他综合收益明细、设定受益计划变动等非公式驱动行）。</li>
+              <li>⚠️ 对比模式下<b>变动率超过20%</b>的行自动红色标记，审计师须在分析性程序底稿(A2-1/A2-2)或附注中解释重大波动原因。</li>
+              <li>⚠️ 上方黄色横幅「底稿数据已更新 / 上游数据已变更」提示报表可能基于旧数据——点击横幅内🔄按钮即可刷新。</li>
+              <li>⚠️ <b>搜索快捷键</b>：Ctrl+F 打开表内搜索 / Esc 关闭。</li>
+            </ul>
+          </div>
+
+          <!-- 快捷键 -->
+          <div class="gt-rv-guide-section">
+            <h4 class="gt-rv-guide-section__title">七、快捷键与常用操作速查</h4>
+            <div class="gt-rv-guide-shortcut-table">
+              <div class="gt-rv-guide-shortcut-row gt-rv-guide-shortcut-row--header">
+                <span>操作</span><span>说明</span>
+              </div>
+              <div class="gt-rv-guide-shortcut-row">
+                <span><kbd>Ctrl</kbd>+<kbd>F</kbd></span><span>表内搜索（关键词高亮+前后跳转）</span>
+              </div>
+              <div class="gt-rv-guide-shortcut-row">
+                <span><kbd>Esc</kbd></span><span>关闭搜索栏 / 关闭弹窗</span>
+              </div>
+              <div class="gt-rv-guide-shortcut-row">
+                <span>单击项目名</span><span>穿透该行科目构成明细</span>
+              </div>
+              <div class="gt-rv-guide-shortcut-row">
+                <span>单击金额</span><span>穿透公式逐项展开（各科目审定数）</span>
+              </div>
+              <div class="gt-rv-guide-shortcut-row">
+                <span>右键任意单元格</span><span>弹出8项功能菜单</span>
+              </div>
+              <div class="gt-rv-guide-shortcut-row">
+                <span>📝 图标</span><span>跳转对应附注章节</span>
+              </div>
+              <div class="gt-rv-guide-shortcut-row">
+                <span>选中多格</span><span>底部状态栏求和/均值/计数</span>
+              </div>
+              <div class="gt-rv-guide-shortcut-row">
+                <span>切换 已审/未审/对比</span><span>同一报表三种视角一键切换</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 常见问题 -->
+          <div class="gt-rv-guide-section">
+            <h4 class="gt-rv-guide-section__title">八、常见问题速查</h4>
+            <div class="gt-rv-guide-btn-list">
+              <div class="gt-rv-guide-btn-item gt-rv-guide-btn-item--compact">
+                <div class="gt-rv-guide-btn-item__head"><b>Q：报表全是0怎么办？</b></div>
+                <div class="gt-rv-guide-btn-item__desc">
+                  <p>A：先确认试算表有数据（科目映射→全量重算→有审定额），再回报表页点「🔄 刷新」。若试算表也空，需先导入账套余额表。</p>
+                </div>
+              </div>
+              <div class="gt-rv-guide-btn-item gt-rv-guide-btn-item--compact">
+                <div class="gt-rv-guide-btn-item__head"><b>Q：资产负债不平衡怎么排查？</b></div>
+                <div class="gt-rv-guide-btn-item__desc">
+                  <p>A：点「✅ 审核」看差异金额→点差异行定位→右键"查看穿透"看构成科目→到试算表/底稿追溯。常见原因：调整分录借贷不平、科目映射遗漏、权益类科目未导入期末余额。</p>
+                </div>
+              </div>
+              <div class="gt-rv-guide-btn-item gt-rv-guide-btn-item--compact">
+                <div class="gt-rv-guide-btn-item__head"><b>Q：刷新后数据没变？</b></div>
+                <div class="gt-rv-guide-btn-item__desc">
+                  <p>A：报表取数来自试算表审定数。如果只改了底稿调整分录但没回试算表全量重算，审定数不变报表也不变。流程：底稿编AJE→试算表「全量重算」→报表「刷新」。</p>
+                </div>
+              </div>
+              <div class="gt-rv-guide-btn-item gt-rv-guide-btn-item--compact">
+                <div class="gt-rv-guide-btn-item__head"><b>Q：想手工改某行金额？</b></div>
+                <div class="gt-rv-guide-btn-item__desc">
+                  <p>A：报表金额由公式驱动不可直接编辑。如需调整：通过「更多→编辑结构」修改该行取数公式，或在底稿编制对应科目调整分录后重算。权益变动表/现金流量表可通过「导入」直接覆盖。</p>
+                </div>
+              </div>
+              <div class="gt-rv-guide-btn-item gt-rv-guide-btn-item--compact">
+                <div class="gt-rv-guide-btn-item__head"><b>Q：导出的xlsx和页面上看到的一样吗？</b></div>
+                <div class="gt-rv-guide-btn-item__desc">
+                  <p>A：完全一致。导出按当前选中视图（已审/未审/对比）格式化为6张sheet，含表头行次缩进。可直接作为审计报告附表或交付客户。</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+    </el-drawer>
 
     <!-- 可滚动的表格区域 -->
     <div class="gt-rv-table-area">
@@ -280,21 +599,27 @@
       @cell-click="onRvCellClick"
       @cell-dblclick="onRvCellDblClick"
       @cell-contextmenu="onRvCellContextMenu">
-      <el-table-column label="序号" width="70" align="center" :resizable="true">
-        <template #default="{ $index }">
-          <span style="color: var(--gt-color-text-tertiary);">{{ $index + 1 }}</span>
+      <el-table-column label="行次" width="80" align="center" :resizable="true">
+        <template #default="{ row, $index }">
+          <el-tooltip :content="row.row_code || ''" placement="left" :disabled="!row.row_code" :show-after="400">
+            <span style="color: var(--gt-color-text-tertiary); font-size: 11px; white-space: nowrap;">{{ row.row_code || ($index + 1) }}</span>
+          </el-tooltip>
         </template>
       </el-table-column>
-      <el-table-column label="项目" min-width="300" :resizable="true" fixed>
+      <el-table-column label="项目" min-width="240" :resizable="true" fixed show-overflow-tooltip>
         <template #default="{ row }">
           <span :class="['report-row-name', `report-indent-${Math.min(row.indent_level || 0, 2)}`]"
                 :style="{ paddingLeft: (row.indent_level || 0) * 24 + 8 + 'px', fontWeight: row.is_total_row || getRowType(row) === 'header' ? 700 : 400, fontSize: '13px', cursor: row.row_code && !row.is_total_row && getRowType(row) !== 'header' ? 'pointer' : 'default' }"
                 @click="onRowNameClick(row)">
             {{ row.row_name }}
-            <el-button v-if="getNoteSection(row.row_code)" size="small" text type="primary"
-              style="font-size: var(--gt-font-size-xs);padding:0 2px;margin-left:4px" title="查看附注"
-              @click.stop="goToNote(row.row_code)">📝</el-button>
           </span>
+        </template>
+      </el-table-column>
+      <el-table-column label="附注" width="52" align="center" :resizable="false" class-name="gt-rv-note-col">
+        <template #default="{ row }">
+          <el-button v-if="getNoteLabel(row.row_code)" size="small" text type="primary"
+            style="font-size: 11px; padding: 0; white-space: nowrap;" :title="`查看附注 ${getNoteLabel(row.row_code)}`"
+            @click.stop="goToNote(row.row_code)">{{ getNoteLabel(row.row_code) }}</el-button>
         </template>
       </el-table-column>
       <el-table-column label="本期金额" min-width="160" align="right" header-align="center" :resizable="true" sortable :sort-method="(a: any, b: any) => (Number(a.current_period_amount) || 0) - (Number(b.current_period_amount) || 0)">
@@ -348,15 +673,24 @@
       @cell-dblclick="onRvCellDblClick"
       @cell-contextmenu="onRvCellContextMenu"
       border size="small" :max-height="600">
-      <el-table-column label="序号" width="70" align="center" :resizable="true">
-        <template #default="{ $index }">
-          <span style="color: var(--gt-color-text-tertiary);">{{ $index + 1 }}</span>
+      <el-table-column label="行次" width="80" align="center" :resizable="true">
+        <template #default="{ row, $index }">
+          <el-tooltip :content="row.row_code || ''" placement="left" :disabled="!row.row_code" :show-after="400">
+            <span style="color: var(--gt-color-text-tertiary); font-size: 11px; white-space: nowrap;">{{ row.row_code || ($index + 1) }}</span>
+          </el-tooltip>
         </template>
       </el-table-column>
-      <el-table-column label="项目" min-width="250" :resizable="true">
+      <el-table-column label="项目" min-width="220" :resizable="true" show-overflow-tooltip>
         <template #default="{ row }">
           <span :style="{ paddingLeft: (row.indent_level || 0) * 24 + 8 + 'px', fontWeight: row.is_total_row || getRowType(row) === 'header' ? 700 : 400, fontSize: '13px', cursor: row.row_code && !row.is_total_row && getRowType(row) !== 'header' ? 'pointer' : 'default' }"
                 @click="onRowNameClick(row)">{{ row.row_name }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="附注" width="52" align="center" :resizable="false" class-name="gt-rv-note-col">
+        <template #default="{ row }">
+          <el-button v-if="getNoteLabel(row.row_code)" size="small" text type="primary"
+            style="font-size: 11px; padding: 0; white-space: nowrap;" :title="`查看附注 ${getNoteLabel(row.row_code)}`"
+            @click.stop="goToNote(row.row_code)">{{ getNoteLabel(row.row_code) }}</el-button>
         </template>
       </el-table-column>
       <el-table-column label="未审金额" min-width="130" align="right" header-align="center" :resizable="true">
@@ -388,9 +722,9 @@
       </el-table-column>
       <el-table-column label="变动率" width="90" align="right" header-align="center" :resizable="true">
         <template #default="{ row }">
-          <span v-if="row.prior_period_amount && row.prior_period_amount !== 0"
-                :class="['gt-rv-change-rate', { 'gt-rv-change-rate--alert': Math.abs(((row.audited_amount || 0) - row.prior_period_amount) / Math.abs(row.prior_period_amount) * 100) > 20 }]">
-            {{ (((row.audited_amount || 0) - row.prior_period_amount) / Math.abs(row.prior_period_amount) * 100).toFixed(1) }}%
+          <span v-if="Number(row.prior_period_amount) !== 0 && row.prior_period_amount != null"
+                :class="['gt-rv-change-rate', { 'gt-rv-change-rate--alert': Math.abs(((Number(row.audited_amount) || 0) - Number(row.prior_period_amount)) / Math.abs(Number(row.prior_period_amount)) * 100) > 20 }]">
+            {{ (((Number(row.audited_amount) || 0) - Number(row.prior_period_amount)) / Math.abs(Number(row.prior_period_amount)) * 100).toFixed(1) }}%
           </span>
           <span v-else style="color: var(--gt-color-text-placeholder);">-</span>
         </template>
@@ -399,10 +733,11 @@
     <!-- 选中区域状态栏 -->
     <SelectionBar :stats="rvCtx.selectionStats()" />
 
-    <!-- F28: 报表数据覆盖率摘要 -->
-    <div v-if="coverageSummary && activeTab !== 'cross_check'" class="gt-rv-coverage-summary">
-      <span class="gt-rv-coverage-icon">📊</span>
-      <span class="gt-rv-coverage-text">{{ coverageSummary.text }}</span>
+    <!-- F28: 报表数据覆盖率摘要 + 刷新时间 -->
+    <div v-if="rows.length > 0 && (coverageSummary || lastReportRefreshTime) && activeTab !== 'cross_check'" class="gt-rv-coverage-summary">
+      <span v-if="coverageSummary" class="gt-rv-coverage-icon">📊</span>
+      <span v-if="coverageSummary" class="gt-rv-coverage-text">{{ coverageSummary.text }}</span>
+      <span v-if="lastReportRefreshTime" class="gt-rv-refresh-time">🕒 上次刷新：{{ lastReportRefreshTime }}</span>
     </div>
 
     <!-- R7-S3-10 Task 49-50：跨表核对面板 -->
@@ -462,6 +797,7 @@
       :rows="rows"
       :project-id="projectId"
       :year="year"
+      scope="report"
       @saved="fetchReport"
       @applied="fetchReport"
     />
@@ -626,9 +962,11 @@ import { usePenetrate } from '@/composables/usePenetrate'
 import { useProjectEvents } from '@/composables/useProjectEvents'
 import { useStaleRefresh } from '@/composables/useStaleRefresh'
 import { recalcTrialBalance } from '@/services/auditPlatformApi'
+import { api } from '@/services/apiProxy'
 import { useAuthStore } from '@/stores/auth'
 import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
 import { useReportColumns } from './composables/useReportColumns'
+import http from '@/utils/http'
 import { useReportCrossCheck } from './composables/useReportCrossCheck'
 import { useReportData } from './composables/useReportData'
 import { useReportExport } from './composables/useReportExport'
@@ -809,6 +1147,13 @@ const {
 // Sync composable's reportScope → local proxy for currentApplicableStandard
 watchEffect(() => { _rdReportScope.value = reportScope.value })
 
+// 追踪报表刷新完成时间
+watch(loading, (newVal, oldVal) => {
+  if (oldVal === true && newVal === false && rows.value.length > 0) {
+    lastReportRefreshAt.value = new Date()
+  }
+})
+
 // 动态计算表格最大高度（窗口高度 - 顶部固定区域）
 function updateTableHeight() {
   const headerEl = document.querySelector('.gt-rv-sticky-header')
@@ -860,6 +1205,78 @@ onUnmounted(() => {
 })
 
 // ─── useReportColumns composable ────────────────────────────────────────────
+// ─── 附注有内容的章节集合（从 notes-tree 拉取 has_data=true 的节点） ────────
+const noteHasDataSections = ref<Set<string>>(new Set())
+const showZeroWithNote = ref(true) // 默认自动显示金额=0但附注有内容的科目
+
+// ─── 动态行次→附注章节映射（从后端 report_row_note_mapping.json 按变体加载）────
+const rowNoteMapping = ref<Record<string, string>>({})
+/** 全局连续附注序号（跨报表类型连续编排：BS→IS→CFS→EQ→CFSS） */
+const rowNoteSeqMap = ref<Record<string, number>>({})
+
+async function loadRowNoteMapping() {
+  try {
+    const standard = `${selectedTemplateType.value}_${reportScope.value}` || 'soe_standalone'
+    const data = await api.get('/api/report-config/row-note-mapping', {
+      params: { applicable_standard: standard },
+      _silent: true,
+    } as any)
+    if (data && typeof data === 'object') {
+      const mapped: Record<string, string> = {}
+      const seqs: Record<string, number> = {}
+      for (const [code, info] of Object.entries(data)) {
+        if (info && typeof info === 'object') {
+          const i = info as any
+          if (i.section_code) mapped[code] = i.section_code
+          if (i.seq) seqs[code] = i.seq
+        }
+      }
+      rowNoteMapping.value = mapped
+      rowNoteSeqMap.value = seqs
+    }
+  } catch { /* fail-open: 动态映射加载失败回退硬编码 */ }
+}
+
+// 加载附注各章节是否有内容（best-effort，不阻塞报表渲染）
+async function loadNoteHasData() {
+  try {
+    const { data } = await http.get(
+      `/api/disclosure-notes/${projectId.value}/${year.value}/notes-tree`,
+      { _silent: true } as any
+    )
+    const sections = data?.data || data || []
+    const set = new Set<string>()
+    for (const node of (Array.isArray(sections) ? sections : [])) {
+      if (node.has_data && node.note_section) {
+        set.add(node.note_section)
+      }
+      // 子节点
+      if (Array.isArray(node.children)) {
+        for (const child of node.children) {
+          if (child.has_data && child.note_section) {
+            set.add(child.note_section)
+          }
+        }
+      }
+    }
+    noteHasDataSections.value = set
+  } catch { /* fail-open: 拿不到附注数据不影响报表渲染 */ }
+}
+// 报表行数据加载后 best-effort 拉附注就绪状态 + 动态映射
+watch(rows, (newRows) => {
+  if (newRows.length > 0 && noteHasDataSections.value.size === 0) {
+    loadNoteHasData()
+  }
+  if (newRows.length > 0 && Object.keys(rowNoteMapping.value).length === 0) {
+    loadRowNoteMapping()
+  }
+}, { immediate: true })
+
+/** 缓存资产负债表 tab 的实际附注序号数（供利润表接续用） */
+const bsNoteCount = ref(0)
+/** 缓存利润表 tab 的实际附注序号数（供现金流量表接续用） */
+const isNoteCount = ref(0)
+
 const {
   eqColumns,
   eqTotalCols,
@@ -874,8 +1291,9 @@ const {
   compareRowClassName,
   formatReportAmount,
   getNoteSection,
+  getNoteLabel,
   goToNote,
-} = useReportColumns({ isConsolidated, activeTab, rows })
+} = useReportColumns({ isConsolidated, activeTab, rows, noteHasDataSections, showZeroWithNote, rowNoteMapping, rowNoteSeqMap, bsNoteCount, isNoteCount })
 
 // ─── useReportMapping composable ────────────────────────────────────────────
 const {
@@ -908,6 +1326,7 @@ const {
 const {
   onExportExcel,
   onExportAllExcel,
+  onExportAllUnadjusted,
   copyReportTable,
   showReportImport,
   onReportImported,
@@ -920,6 +1339,21 @@ const _reportModeLabel = computed(() => {
 
 // Drilldown + Formula Manager (kept in main file for template binding)
 const showFormulaManager = ref(false)
+const showRvGuide = ref(false)
+const rvBalanceExpanded = ref(false)
+const lastReportRefreshAt = ref<Date | null>(null)
+
+// P0-2: AI 对话提升为一级按钮，打开时注入当前报表数据 context
+function openAiWithContext() {
+  showDocAiChat.value = true
+}
+
+const lastReportRefreshTime = computed(() => {
+  if (!lastReportRefreshAt.value) return ''
+  const d = lastReportRefreshAt.value
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+})
 
 // V3 Req 9.6: 数字信任度
 const trustScorePanelRef = ref<InstanceType<typeof TrustScorePanel> | null>(null)
@@ -1054,7 +1488,15 @@ async function _onConsistencyCheckWrapper() {
 }
 
 function onEditConfig() {
-  router.push(`/projects/${projectId.value}/report-config`)
+  import('element-plus').then(({ ElMessageBox }) => {
+    ElMessageBox.confirm(
+      '编辑报表结构将改变报表行次定义，可能影响平衡校验和公式取数。建议仅项目经理/合伙人操作。\n\n修改前系统会自动保存当前结构快照，可通过「恢复默认结构」回退。',
+      '⚠️ 编辑报表结构',
+      { confirmButtonText: '继续编辑', cancelButtonText: '取消', type: 'warning' },
+    ).then(() => {
+      router.push(`/projects/${projectId.value}/report-config`)
+    }).catch(() => {})
+  })
 }
 
 // Wrapper: calls composable's reloadReportContext + syncs main-file state
@@ -1182,6 +1624,9 @@ function rvCellClassName({ rowIndex, columnIndex }: any) {
 
 // ─── 全屏与复制 ──────────────────────────────────────────────────────────────
 const { isFullscreen: rvFullscreen, toggleFullscreen: toggleRvFullscreen } = useFullscreen()
+
+// 全屏时自动收起使用说明面板
+watch(rvFullscreen, (v) => { if (v) showRvGuide.value = false })
 </script>
 
 <style scoped src="./report-view.css" />
@@ -1193,5 +1638,303 @@ const { isFullscreen: rvFullscreen, toggleFullscreen: toggleRvFullscreen } = use
 @keyframes gt-row-flash {
   0%, 100% { background-color: transparent; }
   50% { background-color: rgba(75, 45, 119, 0.12); }
+}
+
+/* ─── 报表使用说明面板 ─── */
+.gt-rv-guide-panel {
+  margin-bottom: 12px;
+  border: 1px solid var(--el-border-color-lighter, #e4e7ed);
+  border-radius: 8px;
+  background: linear-gradient(135deg, #fafbff 0%, #f5f0fa 100%);
+  overflow: hidden;
+}
+.gt-rv-guide-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background: linear-gradient(90deg, var(--gt-color-primary, #4b2d77) 0%, #6b4a99 100%);
+}
+.gt-rv-guide-panel__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: 0.5px;
+}
+.gt-rv-guide-panel__header .el-button {
+  color: rgba(255,255,255,0.85) !important;
+}
+.gt-rv-guide-panel__body {
+  padding: 24px 28px 32px;
+  height: 100%;
+  overflow-y: auto;
+}
+.gt-rv-guide-section {
+  margin-bottom: 20px;
+}
+.gt-rv-guide-section:last-child {
+  margin-bottom: 0;
+}
+.gt-rv-guide-section__title {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gt-color-primary, #4b2d77);
+  padding-left: 10px;
+  border-left: 3px solid var(--gt-color-primary, #4b2d77);
+}
+.gt-rv-guide-section__text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--el-text-color-regular, #606266);
+}
+.gt-rv-guide-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+.gt-rv-guide-card {
+  padding: 14px 16px;
+  background: #fff;
+  border-radius: 8px;
+  border: 1px solid var(--el-border-color-lighter, #e4e7ed);
+  transition: box-shadow 0.2s;
+}
+.gt-rv-guide-card:hover {
+  box-shadow: 0 2px 8px rgba(75, 45, 119, 0.1);
+}
+.gt-rv-guide-card__icon {
+  font-size: 20px;
+  margin-bottom: 6px;
+}
+.gt-rv-guide-card__name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--el-text-color-primary, #303133);
+  margin-bottom: 4px;
+}
+.gt-rv-guide-card__desc {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--el-text-color-secondary, #909399);
+}
+.gt-rv-guide-btn-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.gt-rv-guide-btn-item {
+  padding: 14px 18px;
+  background: #fff;
+  border-radius: 8px;
+  border: 1px solid var(--el-border-color-lighter, #e4e7ed);
+}
+.gt-rv-guide-btn-item--compact {
+  padding: 10px 16px;
+}
+.gt-rv-guide-btn-item__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+.gt-rv-guide-btn-item--compact .gt-rv-guide-btn-item__head {
+  margin-bottom: 4px;
+}
+.gt-rv-guide-btn-item__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  font-size: 14px;
+}
+.gt-rv-guide-btn-item__badge--success { background: #f0f9eb; }
+.gt-rv-guide-btn-item__badge--info { background: #ecf5ff; }
+.gt-rv-guide-btn-item__badge--primary { background: #f3f0f8; }
+.gt-rv-guide-btn-item__badge--danger { background: #fef0f0; }
+.gt-rv-guide-btn-item__desc {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--el-text-color-regular, #606266);
+}
+.gt-rv-guide-btn-item__desc p {
+  margin: 4px 0;
+}
+.gt-rv-guide-btn-item__desc code {
+  background: #f5f0fa;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 12px;
+  color: var(--gt-color-primary, #4b2d77);
+}
+.gt-rv-guide-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.gt-rv-guide-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 14px;
+  background: #fff;
+  border-radius: 6px;
+  border: 1px solid var(--el-border-color-lighter, #e4e7ed);
+}
+.gt-rv-guide-step__num {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--gt-color-primary, #4b2d77);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.gt-rv-guide-step__content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.gt-rv-guide-step__content b {
+  color: var(--el-text-color-primary, #303133);
+}
+.gt-rv-guide-step__content span {
+  color: var(--el-text-color-secondary, #909399);
+  font-size: 12px;
+}
+.gt-rv-guide-notes {
+  margin: 0;
+  padding: 0 0 0 4px;
+  list-style: none;
+  font-size: 13px;
+  line-height: 2;
+  color: var(--el-text-color-regular, #606266);
+}
+.gt-rv-guide-notes li {
+  padding: 2px 0;
+}
+.gt-rv-guide-shortcut-table {
+  border: 1px solid var(--el-border-color-lighter, #e4e7ed);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.gt-rv-guide-shortcut-row {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  font-size: 13px;
+  line-height: 1.6;
+  border-bottom: 1px solid var(--el-border-color-extra-light, #f2f6fc);
+}
+.gt-rv-guide-shortcut-row:last-child {
+  border-bottom: none;
+}
+.gt-rv-guide-shortcut-row--header {
+  background: #f9f7fc;
+  font-weight: 600;
+  color: var(--el-text-color-primary, #303133);
+}
+.gt-rv-guide-shortcut-row span {
+  padding: 8px 14px;
+}
+.gt-rv-guide-shortcut-row span:first-child {
+  border-right: 1px solid var(--el-border-color-extra-light, #f2f6fc);
+  color: var(--el-text-color-primary, #303133);
+  font-weight: 500;
+}
+.gt-rv-guide-shortcut-row span:last-child {
+  color: var(--el-text-color-regular, #606266);
+}
+.gt-rv-guide-shortcut-row kbd {
+  display: inline-block;
+  padding: 1px 5px;
+  font-size: 11px;
+  font-family: inherit;
+  background: #f5f7fa;
+  border: 1px solid #dcdfe6;
+  border-radius: 3px;
+  box-shadow: 0 1px 0 #dcdfe6;
+}
+
+/* ─── 报表平衡检查紧凑条 ─── */
+.gt-rv-balance-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  margin-bottom: 6px;
+  border-radius: 6px;
+  font-size: 13px;
+  background: #f0f9eb;
+  border: 1px solid #e1f3d8;
+}
+.gt-rv-balance-bar--warning,
+.gt-rv-balance-bar--error {
+  background: #fdf6ec;
+  border-color: #faecd8;
+}
+.gt-rv-balance-bar--passed {
+  background: #f0f9eb;
+  border-color: #e1f3d8;
+}
+.gt-rv-balance-bar__icon {
+  font-size: 14px;
+}
+.gt-rv-balance-bar__text {
+  font-weight: 500;
+  color: var(--el-text-color-primary, #303133);
+}
+.gt-rv-balance-detail {
+  margin-bottom: 8px;
+  padding: 8px 16px;
+  background: #fffbf0;
+  border: 1px solid #faecd8;
+  border-radius: 6px;
+  font-size: 12px;
+}
+.gt-rv-balance-detail__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(0,0,0,0.04);
+}
+.gt-rv-balance-detail__row:last-child {
+  border-bottom: none;
+}
+.gt-rv-balance-detail__row:hover {
+  background: rgba(75, 45, 119, 0.04);
+  border-radius: 4px;
+}
+
+/* ─── 报表行分组视觉强化 ─── */
+:deep(.report-row--header td) {
+  background: rgba(75, 45, 119, 0.04) !important;
+  border-top: 2px solid rgba(75, 45, 119, 0.12) !important;
+}
+:deep(.report-row--total td) {
+  background: rgba(75, 45, 119, 0.06) !important;
+  font-weight: 700 !important;
+}
+:deep(.gt-rv-note-col) {
+  padding: 0 !important;
+}
+:deep(.gt-rv-note-col .cell) {
+  padding: 0 4px !important;
+}
+.gt-rv-refresh-time {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--el-text-color-secondary, #909399);
 }
 </style>

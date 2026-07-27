@@ -533,7 +533,8 @@ function handleImportData() {
 function handleAiGenerate() {
   http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
     prompt: '请生成其他应付款(2241)明细表审计说明，包含：往来对象分布分析、账龄结构分析、3年以上长期挂账风险提示、明细合计与审定表勾稽情况',
-    context: JSON.stringify({
+    // 后端 context 为 dict[str,str]：直接传 dict（值已转字符串），勿再 JSON.stringify（会 422）
+    context: {
       科目: '2241其他应付款',
       方向: '贷方/负债类',
       往来笔数: String(detail.subtotals.value.count),
@@ -543,7 +544,7 @@ function handleAiGenerate() {
         const over3Keys = ['y3to4', 'y4to5', 'over5', 'over3']
         return over3Keys.some(k => k in r.agingAudited && (r.agingAudited[k] || 0) > 0)
       }).length),
-    }),
+    },
     existingContent: '',
     section: 'K3-2-detail',
   }).then((res: any) => {

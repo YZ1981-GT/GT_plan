@@ -7,6 +7,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
+import sqlalchemy as sa
 
 from app.core.database import get_db
 from app.core.redis import get_redis
@@ -124,6 +125,43 @@ async def recalc_trial_balance(
     svc = TrialBalanceService(db)
     await svc.full_recalc(project_id, year, company_code)
     await db.commit()
+
+    # Best-effort: 重算后自动创建版本快照（content_hash 去重，相同内容不重复）
+    try:
+        from app.services.tb_snapshot_service import TbSnapshotService
+        from app.models.audit_platform_models import TrialBalance as TbModel
+        snap_svc = TbSnapshotService()
+        # 读取重算后的最新试算表行
+        snap_rows_stmt = sa.select(TbModel).where(
+            TbModel.project_id == project_id,
+            TbModel.year == year,
+            TbModel.is_deleted == sa.false(),
+        )
+        snap_result = await db.execute(snap_rows_stmt)
+        snap_rows = [
+            {
+                "standard_account_code": r.standard_account_code,
+                "account_name": r.account_name,
+                "unadjusted_amount": str(r.unadjusted_amount) if r.unadjusted_amount is not None else None,
+                "aje_adjustment": str(r.aje_adjustment) if r.aje_adjustment is not None else None,
+                "rje_adjustment": str(r.rje_adjustment) if r.rje_adjustment is not None else None,
+                "audited_amount": str(r.audited_amount) if r.audited_amount is not None else None,
+            }
+            for r in snap_result.scalars().all()
+        ]
+        await snap_svc.create_snapshot(
+            db, str(project_id), year,
+            trigger="recalc",
+            actor_id=str(current_user.id) if current_user else None,
+            detail_rows=snap_rows,
+        )
+        await db.commit()
+    except Exception:
+        # 快照失败不阻断重算主操作
+        try:
+            await db.rollback()
+        except Exception:
+            pass
 
     # 失效 TB 缓存
     cache_svc = CacheService(redis)
@@ -386,4 +424,85 @@ async def writeback_audited_amount(
         "message": "回写成功",
         "account_code": body.account_code,
         "audited_amount": str(row.audited_amount),
+    }
+
+
+# ─── 试算表锁定/解锁（团队可见，持久化到 project.wizard_state） ──────────────
+
+
+@router.get("/freeze-status")
+async def get_freeze_status(
+    project_id: UUID,
+    year: int = Query(...),
+    db: AsyncSession = Depends(get_db),
+    _current_user: User = Depends(get_current_user),
+):
+    """获取试算表锁定状态（任何已认证用户可查看）。"""
+    from app.models.core import Project
+    project = await db.get(Project, project_id)
+    if not project:
+        raise HTTPException(404, "项目不存在")
+
+    ws = project.wizard_state or {}
+    freeze_key = f"tb_freeze_{year}"
+    freeze_data = ws.get(freeze_key)
+
+    if not freeze_data or not isinstance(freeze_data, dict):
+        return {"is_frozen": False, "frozen_by": None, "frozen_at": None}
+
+    return {
+        "is_frozen": bool(freeze_data.get("is_frozen")),
+        "frozen_by": freeze_data.get("frozen_by"),
+        "frozen_at": freeze_data.get("frozen_at"),
+    }
+
+
+@router.put("/freeze")
+async def set_freeze_status(
+    project_id: UUID,
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_project_access("edit")),
+):
+    """锁定/解锁试算表（需编辑权限：现场经理及以上角色）。
+
+    body: { is_frozen: bool, year: int }
+    持久化到 project.wizard_state.tb_freeze_{year} = { is_frozen, frozen_by, frozen_at }
+    """
+    from app.models.core import Project
+    from datetime import datetime, timezone
+    from sqlalchemy.orm import attributes
+
+    is_frozen = bool(body.get("is_frozen", False))
+    year = body.get("year")
+    if not year:
+        raise HTTPException(400, "缺少 year 参数")
+
+    project = await db.get(Project, project_id)
+    if not project:
+        raise HTTPException(404, "项目不存在")
+
+    freeze_key = f"tb_freeze_{year}"
+
+    # 就地修改 JSONB 不触发脏标记，需重新赋值
+    ws = dict(project.wizard_state or {})
+    if is_frozen:
+        ws[freeze_key] = {
+            "is_frozen": True,
+            "frozen_by": current_user.username or str(current_user.id),
+            "frozen_at": datetime.now(timezone.utc).isoformat(),
+        }
+    else:
+        ws[freeze_key] = {"is_frozen": False, "frozen_by": None, "frozen_at": None}
+
+    project.wizard_state = ws
+    attributes.flag_modified(project, "wizard_state")
+    await db.flush()
+    await db.commit()
+
+    return {
+        "message": "已锁定" if is_frozen else "已解锁",
+        "is_frozen": is_frozen,
+        "frozen_by": ws[freeze_key].get("frozen_by"),
+        "frozen_at": ws[freeze_key].get("frozen_at"),
     }

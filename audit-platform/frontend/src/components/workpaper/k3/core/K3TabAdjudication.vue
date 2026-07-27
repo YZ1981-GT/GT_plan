@@ -517,7 +517,8 @@ function handleAiGenerate(section: string) {
 
   http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
     prompt,
-    context: JSON.stringify({
+    // 后端 context 为 dict[str,str]：直接传 dict（值已转字符串），勿再 JSON.stringify（会 422）
+    context: {
       科目: '2241其他应付款',
       方向: '贷方/负债类',
       审计重点: '完整性认定(负债易少计)',
@@ -525,7 +526,7 @@ function handleAiGenerate(section: string) {
       账龄合计审定: String(agingSubtotal.value.audited),
       三角勾稽: reconciliation.value.isBalanced ? '平衡' : `不平衡(差额${reconciliation.value.diff})`,
       交叉验证差额: String(crossDiff.value),
-    }),
+    },
     existingContent: section.includes('conclusion') ? auditConclusion.value : (section.includes('completeness') ? completenessNote.value : ''),
     section: `K3-1-${section}`,
   }).then((res: any) => {

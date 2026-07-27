@@ -41,18 +41,18 @@
       </el-tabs>
 
       <!-- 逐条审核明细 -->
-      <el-table :data="filteredAuditChecks" border size="small" style="width: 100%;"
+      <el-table :data="filteredAuditChecks" border size="small" style="width: 100%; font-size: 12px;"
         max-height="calc(100vh - 300px)"
         :row-class-name="({ row }: any) => row.passed ? '' : 'gt-rv-audit-fail-row'">
         <el-table-column label="结果" width="80" align="center">
           <template #default="{ row }">
-            <span v-if="row.passed" style="color: var(--gt-color-success); font-size: var(--gt-font-size-md);">✓</span>
-            <span v-else style="color: var(--gt-color-coral); font-size: var(--gt-font-size-md);">✗</span>
+            <span v-if="row.passed" style="color: var(--gt-color-success); font-size: 12px;">✓</span>
+            <span v-else style="color: var(--gt-color-coral); font-size: 12px;">✗</span>
           </template>
         </el-table-column>
         <el-table-column label="审核项目" min-width="200">
           <template #default="{ row }">
-            <span style="font-weight: 500;">{{ row.name }}</span>
+            <span style="font-weight: 500; font-size: 12px;">{{ row.name }}</span>
           </template>
         </el-table-column>
         <el-table-column label="期望值" width="120" align="right">
@@ -72,33 +72,33 @@
         </el-table-column>
         <el-table-column label="类型" width="100" align="center">
           <template #default="{ row }">
-            <span style="font-size: var(--gt-font-size-xs);">{{ row.category_label }}</span>
+            <span style="font-size: 12px;">{{ row.category_label }}</span>
           </template>
         </el-table-column>
         <el-table-column label="公式/来源" min-width="160">
           <template #default="{ row }">
-            <code v-if="row.formula" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary); word-break: break-all; white-space: normal;">{{ row.formula }}</code>
-            <span v-else style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-placeholder);">{{ row.source || '—' }}</span>
+            <code v-if="row.formula" style="font-size: 12px; color: var(--gt-color-text-secondary); word-break: break-all; white-space: normal;">{{ row.formula }}</code>
+            <span v-else style="font-size: 12px; color: var(--gt-color-text-placeholder);">{{ row.source || '—' }}</span>
           </template>
         </el-table-column>
         <el-table-column label="溯源定位" min-width="180">
           <template #default="{ row }">
             <div v-if="row.source || row.formula" style="display: flex; align-items: center; gap: 4px; flex-wrap: wrap;">
               <template v-for="loc in parseTraceLocations(row)" :key="loc.label">
-                <el-button size="small" link type="primary" @click="$emit('trace-jump', loc)" style="font-size: var(--gt-font-size-xs);">
+                <el-button size="small" link type="primary" @click="$emit('trace-jump', loc)" style="font-size: 12px;">
                   📍 {{ loc.label }}
                 </el-button>
               </template>
-              <span v-if="!parseTraceLocations(row).length" style="color: var(--gt-color-text-placeholder); font-size: var(--gt-font-size-xs);">—</span>
+              <span v-if="!parseTraceLocations(row).length" style="color: var(--gt-color-text-placeholder); font-size: 12px;">—</span>
             </div>
-            <span v-else style="color: var(--gt-color-text-placeholder); font-size: var(--gt-font-size-xs);">—</span>
+            <span v-else style="color: var(--gt-color-text-placeholder); font-size: 12px;">—</span>
           </template>
         </el-table-column>
       </el-table>
 
       <!-- 底部操作栏 -->
       <div style="margin-top: 10px; display: flex; justify-content: space-between; align-items: center;">
-        <span style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary);">
+        <span style="font-size: 12px; color: var(--gt-color-text-tertiary);">
           共 {{ filteredAuditChecks.length }} 条审核项
         </span>
         <el-button size="small" @click="$emit('audit-export-excel')" round>📥 导出审核报告</el-button>
@@ -111,12 +111,12 @@
 
   <!-- 溯源定位选择弹窗（多个定位时） -->
   <el-dialog append-to-body :model-value="showTraceSelectDialog" title="选择溯源定位" width="500px" @update:model-value="$emit('update:showTraceSelectDialog', $event)">
-    <p style="color: var(--gt-color-text-secondary); font-size: var(--gt-font-size-xs); margin: 0 0 12px;">
+    <p style="color: var(--gt-color-text-secondary); font-size: 13px; margin: 0 0 12px;">
       该审核项涉及多个报表位置，请选择要查看的定位：
     </p>
-    <div v-if="traceSelectCheck" style="margin-bottom: 12px; padding: 8px 12px; background: var(--gt-color-primary-bg); border-radius: 8px; font-size: var(--gt-font-size-xs);">
+    <div v-if="traceSelectCheck" style="margin-bottom: 12px; padding: 8px 12px; background: var(--gt-color-primary-bg); border-radius: 8px; font-size: 13px;">
       <span style="font-weight: 600;">{{ traceSelectCheck.name }}</span>
-      <code v-if="traceSelectCheck.formula" style="display: block; margin-top: 4px; font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary);">{{ traceSelectCheck.formula }}</code>
+      <code v-if="traceSelectCheck.formula" style="display: block; margin-top: 4px; font-size: 13px; color: var(--gt-color-text-secondary);">{{ traceSelectCheck.formula }}</code>
     </div>
     <div style="display: flex; flex-direction: column; gap: 8px;">
       <el-button v-for="loc in traceSelectOptions" :key="loc.rowCode || loc.label"
@@ -200,3 +200,66 @@ defineEmits<{
   (e: 'trace-locate', node: any): void
 }>()
 </script>
+
+<style>
+/* 公式审核结果弹窗 — 汇总统计卡片 */
+.gt-rv-audit-summary {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 14px 16px;
+  background: linear-gradient(135deg, #f8f6fc 0%, #f0edf8 100%);
+  border-radius: 10px;
+  border: 1px solid #e8e0f0;
+}
+.gt-rv-audit-stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid #e8e0f0;
+  box-shadow: 0 1px 3px rgba(75, 45, 119, 0.05);
+}
+.gt-rv-audit-stat-num {
+  display: block;
+  font-size: 22px;
+  font-weight: 700;
+  color: #4b2d77;
+  line-height: 1.2;
+}
+.gt-rv-audit-stat-label {
+  display: block;
+  font-size: 12px;
+  color: #666;
+  margin-top: 4px;
+}
+.gt-rv-audit-stat-pass {
+  background: rgba(103, 194, 58, 0.08);
+  border-color: rgba(103, 194, 58, 0.3);
+}
+.gt-rv-audit-stat-pass .gt-rv-audit-stat-num { color: #67c23a; }
+.gt-rv-audit-stat-fail {
+  background: rgba(245, 108, 108, 0.08);
+  border-color: rgba(245, 108, 108, 0.3);
+}
+.gt-rv-audit-stat-fail .gt-rv-audit-stat-num { color: #f56c6c; }
+
+/* 审核弹窗失败行高亮 */
+.gt-rv-audit-fail-row {
+  background: rgba(245, 108, 108, 0.06) !important;
+}
+
+/* 审核弹窗 Tab 美化 */
+.gt-rv-audit-dialog .el-tabs--card > .el-tabs__header .el-tabs__item {
+  font-size: 13px;
+  padding: 0 16px;
+}
+.gt-rv-audit-dialog .el-tabs--card > .el-tabs__header .el-tabs__item.is-active {
+  font-weight: 600;
+  border-bottom: 2px solid #4b2d77;
+}
+</style>

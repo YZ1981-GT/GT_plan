@@ -508,14 +508,15 @@ function fmtAmt(val: number | null | undefined): string {
 function handleAiGenerate(section: string) {
   http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
     prompt: '请生成其他应付款(2241)关联方及交易检查表审计说明，包含：关联方识别完整性评估、交易公允性判断、资金占用风险评估、CAS36披露充分性',
-    context: JSON.stringify({
+    // 后端 context 为 dict[str,str]：直接传 dict（值已转字符串），勿再 JSON.stringify（会 422）
+    context: {
       科目: '2241其他应付款',
       方向: '贷方/负债类',
       审计重点: '关联方完整性+交易公允性+资金占用',
       关联方笔数: String(relatedPartyRows.value.length),
       不合规笔数: String(nonComplianceCount.value),
       资金占用笔数: String(relatedPartyRows.value.filter(r => r.capitalOccupation === '是').length),
-    }),
+    },
     existingContent: auditNote.value || '',
     section: 'K3-6-related-party',
   }).then((res: any) => {

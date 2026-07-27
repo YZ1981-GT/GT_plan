@@ -486,7 +486,8 @@ function fmtAmt(val: number | null | undefined): string {
 function handleAiGenerate(section: string) {
   http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
     prompt: '请生成其他应付款(2241)长期挂账检查审计说明，包含：长期挂账原因分析、是否满足CAS16转销条件评估、偿付计划合理性、跨底稿联动情况',
-    context: JSON.stringify({
+    // 后端 context 为 dict[str,str]：直接传 dict（值已转字符串），勿再 JSON.stringify（会 422）
+    context: {
       科目: '2241其他应付款',
       方向: '贷方/负债类',
       审计重点: '长期挂账转销评估(CAS16)',
@@ -495,7 +496,7 @@ function handleAiGenerate(section: string) {
       '3年以上合计': String(over3YTotal.value),
       需转营业外收入笔数: String(longOutstandingRows.value.filter(r => r.needTransfer === '是').length),
       无法支付笔数: String(longOutstandingRows.value.filter((r: any) => r.cannotPay === '是').length),
-    }),
+    },
     existingContent: auditNote.value || '',
     section: 'K3-5-long-outstanding',
   }).then((res: any) => {

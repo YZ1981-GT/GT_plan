@@ -56,7 +56,7 @@ export function useAdjustmentDetailPropagation(opts: UseAdjustmentDetailPropagat
     const year = unwrap(opts.year)
     if (!projectId || !year) return
     try {
-      const data: any = await listAdjustments(projectId, year, { page_size: 500 })
+      const data: any = await listAdjustments(projectId, year, { page_size: 200 })
       const items: any[] = Array.isArray(data) ? data : (data?.items || [])
       const flat: AdjustmentLineMatch[] = []
       for (const g of items) {

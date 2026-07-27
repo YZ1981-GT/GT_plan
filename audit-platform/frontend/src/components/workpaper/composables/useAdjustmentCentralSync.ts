@@ -11,12 +11,13 @@
  *
  * 不改动底稿→审定表→TB 既有链路；sync 失败仅 toast，不阻断底稿保存。
  */
-import { ref, type Ref } from 'vue'
+import { ref, onMounted, onBeforeUnmount, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   syncAdjustmentFromWorkpaper,
   getAdjustmentBySourceRef,
 } from '@/services/auditPlatformApi'
+import { eventBus } from '@/utils/eventBus'
 
 export interface CentralSyncLineItem {
   standard_account_code?: string
@@ -53,6 +54,8 @@ export interface UseAdjustmentCentralSyncOptions {
   buildLineItems: () => CentralSyncLineItem[]
   /** tab 提供 description + adjustmentType（报表调整→rje / 其余→aje） */
   buildMeta: () => { description: string; adjustmentType: 'aje' | 'rje' }
+  /** P1-7: 保存后自动同步到集中登记（默认 false，开启后 saveAndPublish 成功可调 scheduleAutoSync） */
+  autoSync?: boolean
 }
 
 function unwrap<T>(v: Ref<T> | (() => T) | T): T {
@@ -135,6 +138,15 @@ export function useAdjustmentCentralSync(opts: UseAdjustmentCentralSyncOptions) 
       })
       ElMessage.success('已同步到集中调整登记')
       await refreshStatus()
+      // P0-3: 显示同步后的编号供确认
+      if (centralStatus.value?.adjustment_no) {
+        ElMessage({
+          type: 'info',
+          message: `集中登记编号：${centralStatus.value.adjustment_no}`,
+          duration: 4000,
+          showClose: true,
+        })
+      }
     } catch (e: any) {
       const detail = e?.response?.data?.detail
       const code = detail?.error_code
@@ -163,12 +175,42 @@ export function useAdjustmentCentralSync(opts: UseAdjustmentCentralSyncOptions) 
     }
   }
 
+  // P0-4: 订阅集中登记复核状态变更事件，底稿侧自动回流刷新
+  function _onReviewChanged() { refreshStatus() }
+  onMounted(() => {
+    eventBus.on('adjustment:review-changed', _onReviewChanged)
+    refreshStatus()
+  })
+  onBeforeUnmount(() => {
+    eventBus.off('adjustment:review-changed', _onReviewChanged)
+  })
+
+  // P1-7: 保存后自动同步（debounce 5s，silent 模式失败不弹）
+  let _autoSyncTimer: ReturnType<typeof setTimeout> | null = null
+  function scheduleAutoSync(): void {
+    if (!opts.autoSync) return
+    if (_autoSyncTimer) clearTimeout(_autoSyncTimer)
+    _autoSyncTimer = setTimeout(async () => {
+      _autoSyncTimer = null
+      const lineItems = opts.buildLineItems().filter(
+        (li) => (Number(li.debit_amount) || 0) !== 0 || (Number(li.credit_amount) || 0) !== 0,
+      )
+      if (!lineItems.length) return
+      // 平衡检查（不平衡则跳过不弹）
+      const d = lineItems.reduce((s, li) => s + (Number(li.debit_amount) || 0), 0)
+      const c = lineItems.reduce((s, li) => s + (Number(li.credit_amount) || 0), 0)
+      if (Math.abs(d - c) > 0.005) return
+      try { await syncToCentral() } catch { /* silent */ }
+    }, 5000)
+  }
+
   return {
     centralStatus,
     syncing,
     syncToCentral,
     refreshStatus,
     sourceRef,
+    scheduleAutoSync,
   }
 }
 

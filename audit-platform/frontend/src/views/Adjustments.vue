@@ -87,21 +87,38 @@
     <!-- 在线成员 [enterprise-linkage 3.2] -->
     <PresenceAvatars :project-id="projectId" view-name="adjustments" />
 
-    <!-- 汇总面板 -->
-    <div class="gt-summary-panel" v-if="summary">
+    <!-- P0-2: 汇总面板（有分录时显示，0笔时隐藏减噪声） -->
+    <div class="gt-summary-panel" v-if="summary && (summary.aje_count + summary.rje_count > 0)">
       <div class="gt-summary-card">
         <span class="gt-summary-label">审计调整</span>
         <span class="gt-summary-value">{{ summary.aje_count }} 笔</span>
         <span class="gt-summary-sub">借 {{ fmtAmt(summary.aje_total_debit) }} / 贷 {{ fmtAmt(summary.aje_total_credit) }}</span>
+        <!-- P2-14: 平衡标签 -->
+        <el-tag v-if="summary.aje_count > 0" :type="summary.aje_total_debit === summary.aje_total_credit ? 'success' : 'danger'" size="small" style="margin-top: 4px">
+          {{ summary.aje_total_debit === summary.aje_total_credit ? '✓ 平衡' : '✗ 不平衡' }}
+        </el-tag>
       </div>
       <div class="gt-summary-card">
         <span class="gt-summary-label">重分类</span>
         <span class="gt-summary-value">{{ summary.rje_count }} 笔</span>
         <span class="gt-summary-sub">借 {{ fmtAmt(summary.rje_total_debit) }} / 贷 {{ fmtAmt(summary.rje_total_credit) }}</span>
+        <!-- P2-14: 平衡标签 -->
+        <el-tag v-if="summary.rje_count > 0" :type="summary.rje_total_debit === summary.rje_total_credit ? 'success' : 'danger'" size="small" style="margin-top: 4px">
+          {{ summary.rje_total_debit === summary.rje_total_credit ? '✓ 平衡' : '✗ 不平衡' }}
+        </el-tag>
       </div>
       <div class="gt-summary-card" v-for="(cnt, st) in summary.status_counts" :key="st">
         <span class="gt-summary-label">{{ dictStore.label('adjustment_status', st as string) }}</span>
         <span class="gt-summary-value">{{ cnt }}</span>
+      </div>
+      <!-- P1-5: TB影响概览条 -->
+      <div class="gt-summary-card gt-summary-card--impact" v-if="summary.aje_count + summary.rje_count > 0">
+        <span class="gt-summary-label">试算表影响</span>
+        <span class="gt-summary-value gt-summary-value--sm">{{ impactAccountCount }} 科目</span>
+        <span class="gt-summary-sub">
+          <el-tag type="success" size="small" effect="plain" v-if="!loading">已更新</el-tag>
+          <el-button size="small" text type="primary" @click="router.push(`/projects/${projectId}/trial-balance`)">查看试算表 →</el-button>
+        </span>
       </div>
       <el-button
         style="margin-left: auto; align-self: flex-start"
@@ -113,8 +130,39 @@
         使用手册
       </el-button>
     </div>
+
+    <!-- P0-1: 空态引导卡片（替代简单 info alert，让审计师第一眼就知道从哪开始） -->
+    <div v-if="!loading && entries.length === 0 && summary && (summary.aje_count + summary.rje_count === 0)" class="gt-adj-empty-guide">
+      <div class="gt-adj-empty-guide__header">
+        <h3>开始编制调整分录</h3>
+        <p>调整分录将自动更新试算表审定数和报表数据。选择一种方式开始：</p>
+      </div>
+      <div class="gt-adj-empty-guide__cards">
+        <div class="gt-adj-guide-card" @click="onGuideSyncFromWp">
+          <span class="gt-adj-guide-card__icon">📥</span>
+          <span class="gt-adj-guide-card__title">从底稿同步</span>
+          <span class="gt-adj-guide-card__desc">将各科目底稿中已编制的调整分录汇聚到此处统一管理</span>
+        </div>
+        <div class="gt-adj-guide-card" @click="openCreateDialog">
+          <span class="gt-adj-guide-card__icon">✏️</span>
+          <span class="gt-adj-guide-card__title">手工新建</span>
+          <span class="gt-adj-guide-card__desc">直接录入调整分录，支持快捷模板（坏账/折旧/重分类等）</span>
+        </div>
+        <div class="gt-adj-guide-card" @click="showImportDialog = true">
+          <span class="gt-adj-guide-card__icon">📊</span>
+          <span class="gt-adj-guide-card__title">Excel 导入</span>
+          <span class="gt-adj-guide-card__desc">下载国企版/上市版模板填写后批量导入</span>
+        </div>
+        <div class="gt-adj-guide-card" @click="showHandbook = true">
+          <span class="gt-adj-guide-card__icon">📖</span>
+          <span class="gt-adj-guide-card__title">查看编制手册</span>
+          <span class="gt-adj-guide-card__desc">了解调整分录编制规范、借贷方向、复核流程</span>
+        </div>
+      </div>
+    </div>
+
     <!-- summary 未就绪时也保留手册入口 -->
-    <div v-else class="gt-adj-handbook-fallback">
+    <div v-else-if="!summary" class="gt-adj-handbook-fallback">
       <el-button type="primary" plain :icon="Reading" @click="showHandbook = true">使用手册</el-button>
     </div>
 
@@ -138,6 +186,11 @@
           </el-tooltip>
         </template>
       </el-segmented>
+      <!-- P1-6: 从底稿同步主动入口 -->
+      <el-button size="small" type="success" plain @click="onGuideSyncFromWp" :disabled="!canEdit"
+        title="查看各科目底稿中有未同步到此处的调整分录，一键批量同步">
+        📥 从底稿同步
+      </el-button>
       <el-select
         v-model="creatorFilter"
         placeholder="全部编制人"
@@ -146,10 +199,11 @@
         class="gt-adj-creator-filter"
         style="width: 150px"
         @change="adjPage = 1"
+        v-if="entries.length > 0"
       >
         <el-option v-for="name in creatorOptions" :key="name" :label="name" :value="name" />
       </el-select>
-      <el-checkbox v-model="collabOnly" size="small" class="gt-adj-collab-only" @change="adjPage = 1">仅看协作中</el-checkbox>
+      <el-checkbox v-model="collabOnly" size="small" class="gt-adj-collab-only" @change="adjPage = 1" v-if="entries.length > 0">仅看协作中</el-checkbox>
       <el-tooltip content="全屏查看（ESC 退出）" placement="bottom">
         <el-button size="small" plain class="gt-adj-fs-btn" @click="onToggleFullscreen">
           {{ tableFullscreen ? '退出全屏' : '⛶ 全屏' }}
@@ -172,17 +226,17 @@
       </template>
     </el-alert>
 
-    <!-- 分录列表 -->
+    <!-- 分录列表（P0-4: 有数据才显示筛选器，空态已由引导卡片处理） -->
     <el-alert
-      v-if="!loading && entries.length === 0"
+      v-if="!loading && entries.length === 0 && summary && (summary.aje_count + summary.rje_count > 0)"
       type="info"
       show-icon
       :closable="false"
       style="margin-bottom: 12px"
     >
-      <template #title>暂无{{ activeTab === 'aje' ? '审计' : '重分类' }}调整分录</template>
+      <template #title>当前筛选条件下无{{ activeTab === 'aje' ? '审计调整' : activeTab === 'rje' ? '重分类' : '' }}分录</template>
       <div style="font-size: var(--gt-font-size-xs); line-height: 1.6; margin-top: 4px">
-        点击上方"新增"按钮创建调整分录。调整分录将自动更新试算表审定数和报表数据。
+        尝试切换 Tab 或清除筛选条件查看全部分录。
       </div>
     </el-alert>
     <GtEditableTable
@@ -240,6 +294,16 @@
             <span class="gt-adj-expand-impact" v-if="row.line_items?.length">
               影响科目：{{ row.line_items.map((li: any) => li.account_name || li.standard_account_code).filter(Boolean).join('、') }}
             </span>
+            <!-- P2-10: 查看变更历史 -->
+            <el-button size="small" text type="primary" class="gt-adj-expand-history"
+              @click="selectedAdjId = row.entry_group_id; openTimeMachine()">
+              🕐 查看历史
+            </el-button>
+            <!-- P2-10: 影响追溯（影响的报表行/附注章节） -->
+            <el-button size="small" text type="primary" class="gt-adj-expand-history"
+              @click="cellDetailWpCode = row.line_items?.[0]?.standard_account_code || ''; showCellFormulaDetail = true">
+              🔗 影响追溯
+            </el-button>
           </div>
         </div>
       </template>
@@ -463,8 +527,19 @@
             </el-option-group>
           </el-select>
         </el-form-item>
+        <!-- P2-7: 自定义编号（可选，不填则自动生成） -->
+        <el-form-item label="编号" v-if="!isEditing">
+          <el-input v-model="form.custom_no" placeholder="留空则自动生成 AJE-001 / RJE-001" clearable>
+            <template #prefix><span style="color:var(--gt-color-text-tertiary);font-size:12px">#</span></template>
+          </el-input>
+          <div style="font-size:11px;color:var(--gt-color-text-tertiary);margin-top:2px">自动编号规则：类型前缀 + 序号（如 AJE-003），可按事务所内部编号体系自定义</div>
+        </el-form-item>
         <el-form-item label="摘要" prop="description">
-          <el-input v-model="form.description" placeholder="调整说明" />
+          <el-input v-model="form.description" placeholder="调整说明（如：基于ECL模型补提应收账款坏账准备）" />
+        </el-form-item>
+        <!-- P2-15: 调整目的/审计依据（导出Excel时附带） -->
+        <el-form-item label="调整目的">
+          <el-input v-model="form.purpose" placeholder="可选，如：更正截止性错误 / 补提资产减值" />
         </el-form-item>
 
         <!-- 动态行项 -->
@@ -473,16 +548,24 @@
           <el-button size="small" @click="addLine">+ 添加行</el-button>
         </div>
         <el-table :data="form.line_items" border size="small" style="margin-bottom: 12px">
-          <el-table-column label="科目" min-width="200">
+          <el-table-column label="科目" min-width="240">
             <template #default="{ row, $index }">
               <el-select v-model="row.standard_account_code" filterable placeholder="选择科目"
                 style="width: 100%" @change="onAccountSelect($index)">
                 <el-option v-for="opt in accountOptions" :key="opt.code"
                   :label="`${opt.code} ${opt.name}`" :value="opt.code">
-                  <span>{{ opt.code }} {{ opt.name }}</span>
-                  <span v-if="opt.report_line" style="float: right; color: var(--gt-color-text-tertiary); font-size: var(--gt-font-size-xs); margin-left: 8px">
-                    → {{ opt.report_line }}
-                  </span>
+                  <div style="display:flex;justify-content:space-between;align-items:center;width:100%">
+                    <span>{{ opt.code }} {{ opt.name }}</span>
+                    <span style="display:flex;align-items:center;gap:8px">
+                      <!-- P2-13: 科目下拉显示试算表余额 -->
+                      <span v-if="opt.balance != null" style="color:var(--gt-color-text-tertiary);font-size:11px;font-variant-numeric:tabular-nums">
+                        余额 {{ fmtAmt(opt.balance) }}
+                      </span>
+                      <span v-if="opt.report_line" style="color:var(--gt-color-text-tertiary);font-size:11px">
+                        → {{ opt.report_line }}
+                      </span>
+                    </span>
+                  </div>
                 </el-option>
               </el-select>
             </template>
@@ -645,11 +728,11 @@ const { add: decAdd, sub: decSub, sum: decSum } = useDecimalCalc()
 const { canEdit, onContextChange } = useAuditContext()
 const { isEditing: isPageEditing, isDirty, enterEdit, exitEdit, markDirty, clearDirty } = useEditMode()
 
-/** GtEditableTable 列配置 */
+/** GtEditableTable 列配置 (P2-8: 摘要列 show-overflow-tooltip; P2-13: 科目下拉带余额) */
 const adjColumns: GtColumn[] = [
   { prop: 'adjustment_no', label: '编号', width: 120 },
   { prop: 'adjustment_type', label: '类型', width: 70 },
-  { prop: 'description', label: '摘要', minWidth: 180 },
+  { prop: 'description', label: '摘要', minWidth: 200, showOverflowTooltip: true },
   { prop: 'main_account', label: '主要科目', minWidth: 280 },
   { prop: 'total_debit', label: '借方金额', width: 130, align: 'right' },
   { prop: 'total_credit', label: '贷方金额', width: 130, align: 'right' },
@@ -680,9 +763,9 @@ const selectedYear = ref(projectStore.year)
 
 // ─── useStaleRefresh：试算表变更后自动刷新调整分录 ────────────────────────────
 const adjStaleRefresh = useStaleRefresh(projectId, {
-  events: ['trial-balance:updated'],
+  events: ['trial-balance:updated', 'adjustment:sync-arrived', 'adjustment:review-changed'],
   mode: 'auto',
-  onRefresh: () => { fetchEntries(); fetchSummary() },
+  onRefresh: () => { fetchEntries(); fetchSummary(); refreshCollabInbox() },
 })
 
 // 跨模块冲突调解（spec global-refinement-v3 Task 7.5）
@@ -747,6 +830,17 @@ const adjTotal = computed(() => filteredEntries.value.length)
 const pagedEntries = computed(() => {
   const start = (adjPage.value - 1) * adjPageSize.value
   return filteredEntries.value.slice(start, start + adjPageSize.value)
+})
+
+// P1-5: 试算表影响科目数（从分录行项的科目去重计数）
+const impactAccountCount = computed(() => {
+  const codes = new Set<string>()
+  for (const e of entries.value) {
+    for (const li of (e.line_items || [])) {
+      if (li.standard_account_code) codes.add(li.standard_account_code)
+    }
+  }
+  return codes.size
 })
 
 // ─── Impact Preview [enterprise-linkage 3.8] ─────────────────────────────────
@@ -925,6 +1019,8 @@ const selectedTemplate = ref('')
 const form = ref({
   adjustment_type: 'aje',
   description: '',
+  custom_no: '',
+  purpose: '',
   line_items: [{ standard_account_code: '', account_name: '', debit_amount: 0, credit_amount: 0 }],
 })
 
@@ -936,7 +1032,7 @@ const adjFormRules: FormRules = {
 }
 const { submit: submitAdjForm, submitting: adjSubmitting } = useFormSubmit(adjFormRef)
 
-// 分录模板定义
+// #5: 快捷模板项目级可配（从 wizard_state.adjustment_templates 读取，无则用默认）
 const ADJUSTMENT_TEMPLATES: Record<string, { type: string; description: string; lines: { code: string; name: string; dr: number; cr: number }[] }> = {
   bad_debt: { type: 'aje', description: '计提坏账准备', lines: [
     { code: '6601', name: '资产减值损失', dr: 0, cr: 0 },
@@ -971,14 +1067,23 @@ const ADJUSTMENT_TEMPLATES: Record<string, { type: string; description: string; 
     { code: '2202', name: '应付账款', dr: 0, cr: 0 },
   ]},
 }
+// 项目级自定义模板（从 wizard_state 加载，后续接线）
+const projectTemplates = ref<Record<string, any>>({})
+const mergedTemplateKeys = computed(() => {
+  // 项目级模板优先（同 key 覆盖默认），再追加默认
+  return Object.keys({ ...ADJUSTMENT_TEMPLATES, ...projectTemplates.value })
+})
+function getTemplate(key: string) {
+  return projectTemplates.value[key] || ADJUSTMENT_TEMPLATES[key]
+}
 
 function onTemplateSelect(key: string) {
   if (!key) return
-  const tpl = ADJUSTMENT_TEMPLATES[key]
+  const tpl = getTemplate(key)
   if (!tpl) return
   form.value.adjustment_type = tpl.type
   form.value.description = tpl.description
-  form.value.line_items = tpl.lines.map(l => ({
+  form.value.line_items = tpl.lines.map((l: any) => ({
     standard_account_code: l.code,
     account_name: l.name,
     debit_amount: l.dr,
@@ -1112,9 +1217,20 @@ function openCreateDialog() {
   form.value = {
     adjustment_type: 'aje',
     description: '',
+    custom_no: '',
+    purpose: '',
     line_items: [{ standard_account_code: '', account_name: '', debit_amount: 0, credit_amount: 0 }],
   }
   formDialogVisible.value = true
+}
+
+/** P1-6 + P0-1: 从底稿同步入口（引导审计师到各底稿调整tab点同步，或提示已全部同步） */
+async function onGuideSyncFromWp() {
+  ElMessage.info({
+    message: '请到各科目底稿的"调整分录"页签，点击"同步到集中登记"按钮将分录汇聚到此处。已同步的分录会在"来源"列显示底稿编码标签。',
+    duration: 6000,
+    showClose: true,
+  })
 }
 
 function openEditDialog(row: any) {
@@ -1256,9 +1372,11 @@ function jumpToSourceWorkpaper(row: any) {
   }
   // sheetCode 如 K9-3 / D4-4 → GtWpRenderer 以编码 endsWith/includes 兜底定位调整分录 sheet，
   // 不带 ?sheet= 会回退到底稿目录页。
+  // P1-8: 带 highlight=source_ref 供底稿侧定位到具体分录行
   const sheetCode = sourceWpLabel(row)
   const query: Record<string, string> = {}
   if (sheetCode) query.sheet = sheetCode
+  if (ref) query.highlight = ref
   router.push({ name: 'WorkpaperEditor', params: { projectId: projectId.value, wpId }, query })
 }
 
@@ -1352,9 +1470,10 @@ function onImported() {
 }
 
 function onExportSummary() {
+  // P2-9: 导出含协作状态+调整目的列（后端 additive 参数）
   import('@/services/commonApi').then(({ downloadFileAsBlob }) => {
     downloadFileAsBlob(
-      `${P.adjustments.exportSummary(projectId.value)}?year=${year.value}&format=excel`,
+      `${P.adjustments.exportSummary(projectId.value)}?year=${year.value}&format=excel&include_collaboration=true`,
       `审计调整汇总_${year.value}.xlsx`
     )
   })
@@ -1636,4 +1755,81 @@ onContextChange(() => {
   flex-shrink: 0;
   margin-bottom: 8px; /* 对齐 tabs 下边线 */
 }
+
+/* P0-1: 空态引导卡片 */
+.gt-adj-empty-guide {
+  background: linear-gradient(135deg, #faf8fc 0%, #f4f0fa 100%);
+  border: 1px solid rgba(75, 45, 119, 0.08);
+  border-radius: var(--gt-radius-lg, 12px);
+  padding: 32px;
+  margin-bottom: 20px;
+}
+.gt-adj-empty-guide__header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+.gt-adj-empty-guide__header h3 {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--gt-color-primary, #4b2d77);
+  margin: 0 0 8px;
+}
+.gt-adj-empty-guide__header p {
+  font-size: 13px;
+  color: var(--gt-color-text-secondary, #606266);
+  margin: 0;
+}
+.gt-adj-empty-guide__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+.gt-adj-guide-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 20px 16px;
+  background: #fff;
+  border-radius: var(--gt-radius-md, 8px);
+  border: 1px solid rgba(75, 45, 119, 0.06);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.gt-adj-guide-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(75, 45, 119, 0.12);
+  border-color: var(--gt-color-primary, #4b2d77);
+}
+.gt-adj-guide-card__icon {
+  font-size: 28px;
+  margin-bottom: 10px;
+}
+.gt-adj-guide-card__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gt-color-text, #303133);
+  margin-bottom: 6px;
+}
+.gt-adj-guide-card__desc {
+  font-size: 12px;
+  color: var(--gt-color-text-tertiary, #909399);
+  line-height: 1.5;
+}
+
+/* P1-5: TB影响概览卡片 */
+.gt-summary-card--impact {
+  border-left: 3px solid var(--gt-color-success, #67c23a);
+}
+.gt-summary-value--sm {
+  font-size: var(--gt-font-size-lg, 18px) !important;
+}
+
+/* P2-10: 展开行底部历史链接 */
+.gt-adj-expand-history {
+  margin-top: 6px;
+  font-size: 12px;
+}
+
+/* P0-3: 查看明细→链接明确化已在模板内处理 */
 </style>

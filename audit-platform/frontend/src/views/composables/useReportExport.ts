@@ -16,6 +16,7 @@ export interface UseReportExportOptions {
 export interface UseReportExportReturn {
   onExportExcel: () => void
   onExportAllExcel: () => void
+  onExportAllUnadjusted: () => void
   copyReportTable: () => void
   showReportImport: Ref<boolean>
   onReportImported: () => void
@@ -43,7 +44,14 @@ export function useReportExport(options: UseReportExportOptions): UseReportExpor
   function onExportAllExcel() {
     import('@/services/commonApi').then(({ downloadFileAsBlob }) => {
       const url = `/api/reports/${projectId.value}/${year.value}/export`
-      downloadFileAsBlob(url, `全部报表_${year.value}.xlsx`)
+      downloadFileAsBlob(url, `全部报表_已审_${year.value}.xlsx`)
+    })
+  }
+
+  function onExportAllUnadjusted() {
+    import('@/services/commonApi').then(({ downloadFileAsBlob }) => {
+      const url = `/api/reports/${projectId.value}/${year.value}/export?mode=unadjusted`
+      downloadFileAsBlob(url, `全部报表_未审_${year.value}.xlsx`)
     })
   }
 
@@ -65,6 +73,7 @@ export function useReportExport(options: UseReportExportOptions): UseReportExpor
   return {
     onExportExcel,
     onExportAllExcel,
+    onExportAllUnadjusted,
     copyReportTable,
     showReportImport,
     onReportImported,

@@ -365,7 +365,8 @@ function fmtPct(val: number | null | undefined): string {
 function handleAiGenerate(section: string) {
   http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
     prompt: '请生成其他应付款(2241)大额款项分析审计说明，包含：大额款项形成原因分析、偿付计划合理性、长期挂账风险、审计结论',
-    context: JSON.stringify({
+    // 后端 context 为 dict[str,str]：直接传 dict（值已转字符串），勿再 JSON.stringify（会 422）
+    context: {
       科目: '2241其他应付款',
       方向: '贷方/负债类',
       大额阈值: String(threshold.value),
@@ -373,7 +374,7 @@ function handleAiGenerate(section: string) {
       大额合计: String(largeTotal.value),
       总占比: largeTotalProportion.value != null ? `${(largeTotalProportion.value * 100).toFixed(1)}%` : '—',
       长期挂账笔数: String(largeRows.value.filter(r => r.isLongOutstanding).length),
-    }),
+    },
     existingContent: auditNote.value || '',
     section: 'K3-4-large-amount',
   }).then((res: any) => {

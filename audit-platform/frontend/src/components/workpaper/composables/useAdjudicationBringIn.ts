@@ -9,7 +9,7 @@
  *
  * 带入后不强制 TB 回写(保持"回写TB"为显式步骤)，仅发 substantive:adjudicated 使披露表/附注刷新。
  */
-import { ref, computed, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, onMounted, type Ref, type ComputedRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import { useAdjudicationAdjustmentPull } from './useAdjudicationAdjustmentPull'
@@ -82,7 +82,13 @@ export function useAdjudicationBringIn(opts: UseAdjudicationBringInOptions) {
     ElMessage.success('已带入调整分录，审定数已更新并联动披露/附注')
   }
 
-  return { adjPull, visible, rowOptions, open, apply }
+  // #3: 待带入数量（审定表 banner 直接显示「本科目有 N 笔集中调整待带入」）
+  const pendingCount = computed(() => adjPull.matches.value.length)
+
+  // 挂载时静默加载匹配数（供 banner 立即显示，不弹 message）
+  onMounted(() => { adjPull.load().catch(() => {}) })
+
+  return { adjPull, visible, rowOptions, open, apply, pendingCount }
 }
 
 export default useAdjudicationBringIn

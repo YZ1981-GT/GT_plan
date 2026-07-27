@@ -135,14 +135,24 @@
         :is-readonly="isReadonly"
       />
 
-      <!-- 附注披露 -->
+      <!-- 附注披露（上市公司） -->
       <D2TabDisclosure
-        v-else-if="currentSheet === '附注上市' || currentSheet === '附注国企'"
+        v-else-if="currentSheet === '附注上市'"
+        variant="listed"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :all-responses="allResponses"
         :is-readonly="isReadonly"
-        :variant="currentSheet === '附注国企' ? 'soe' : 'listed'"
+      />
+
+      <!-- 附注披露（国企） -->
+      <D2TabDisclosure
+        v-else-if="currentSheet === '附注国企'"
+        variant="soe"
+        :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :all-responses="allResponses"
+        :is-readonly="isReadonly"
       />
 
       <!-- 分析程序 -->

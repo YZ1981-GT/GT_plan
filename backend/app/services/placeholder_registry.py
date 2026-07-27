@@ -74,12 +74,19 @@ class PlaceholderRegistry:
 
         return canonical
 
+    # 合法可为空的字段：不计入"待补充"。
+    # - report_scope：单体报表本就返回空串（仅合并报表才有"合并及母公司"前缀）
+    # - entity_short_name：无简称时由服务回退为 全称加引号，也可能留空
+    _OPTIONAL_EMPTY_KEYS = frozenset({"report_scope", "company_short_name", "entity_short_name"})
+
     def detect_missing_fields(self, mapping: dict[str, str]) -> list[str]:
-        """检测仍为占位/空值的关键字段."""
+        """检测仍为占位/空值的关键字段（合法可空字段除外）。"""
         missing: list[str] = []
         for key, value in mapping.items():
+            if key in self._OPTIONAL_EMPTY_KEYS:
+                continue
             v = (value or "").strip()
-            if not v or v.startswith("[") and v.endswith("]"):
+            if not v or (v.startswith("[") and v.endswith("]")):
                 missing.append(key)
         return missing
 

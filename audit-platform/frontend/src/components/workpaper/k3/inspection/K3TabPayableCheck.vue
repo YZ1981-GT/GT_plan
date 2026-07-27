@@ -407,7 +407,8 @@ function handleAiGenerate() {
   // 接真实AI端点生成审计说明
   http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
     prompt: '请生成其他应付款(2241)凭证检查表审计说明，包含：测试总体覆盖情况、抽样方法合理性、检查比例分析、异常事项说明',
-    context: JSON.stringify({
+    // 后端 context 为 dict[str,str]：直接传 dict（值已转字符串），勿再 JSON.stringify（会 422）
+    context: {
       科目: '2241其他应付款',
       方向: '贷方/负债类',
       认定: '存在/义务/计价和分摊',
@@ -417,7 +418,7 @@ function handleAiGenerate() {
       异常笔数: String(abnormalRows.value.length),
       借方检查比例: checkRatios.value[0]?.ratio != null ? `${(checkRatios.value[0].ratio * 100).toFixed(1)}%` : '未计算',
       贷方检查比例: checkRatios.value[1]?.ratio != null ? `${(checkRatios.value[1].ratio * 100).toFixed(1)}%` : '未计算',
-    }),
+    },
     existingContent: auditNote.value || '',
     section: 'K3-7-voucher-check',
   }).then((res: any) => {
