@@ -292,7 +292,14 @@ export function useF4DisclosureSOE(options: UseF4DisclosureSOEOptions) {
     setItem(TEXT_KEY, value)
     // 联动国企附注模块
     window.dispatchEvent(new CustomEvent('disclosure:note-text-updated', {
-      detail: { accountCode: '2202', type: 'soe', text: value },
+      detail: {
+        wpCode: 'F4',
+        accountCode: '2202',
+        projectId: options.projectId.value,
+        section: 'soe',
+        sectionIds: ['八、37'],
+        text: value,
+      },
     }))
   })
 

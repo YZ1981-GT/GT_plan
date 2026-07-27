@@ -557,7 +557,14 @@ export function useD4Disclosure(options: UseD4DisclosureOptions) {
     // EventBus: 同步附注模块
     try {
       window.dispatchEvent(new CustomEvent('disclosure:note-text-updated', {
-        detail: { wpCode: 'D4', section: `${variant}-${key}`, text: value },
+        detail: {
+          wpCode: 'D4',
+          accountCode: '6001',
+          projectId: projectId.value,
+          section: `${variant}-${key}`,
+          sectionIds: [variant === 'soe' ? '八、64' : '五、62'],
+          text: value,
+        },
       }))
     } catch { /* silent */ }
   }

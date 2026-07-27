@@ -408,9 +408,10 @@ async function handleAiAssist(): Promise<void> {
   try {
     const res = await api.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
       prompt: '请为上市公司税金及附加附注各税种的变动生成简要说明',
-      context: JSON.stringify(rows.value.map((r) => ({
+      // 后端 context 为 dict[str,str]：包一层 dict + 值转 JSON 字符串（直接传字符串会 422）
+      context: { 各税种变动: JSON.stringify(rows.value.map((r) => ({
         tax: r.label, current: r.currentAmount, prior: r.priorAmount, change: r.changeAmount,
-      }))),
+      }))) },
       section: 'n4-disclosure-listed-remark',
     }, { _silent: true } as any)
     const text = res?.data?.content ?? res?.content ?? ''
@@ -435,9 +436,10 @@ async function handleAiNoteText(): Promise<void> {
   try {
     const res = await api.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
       prompt: '请为上市公司税金及附加附注披露生成完整说明文本（证监会格式）',
-      context: JSON.stringify(displayRows.value.map((r) => ({
+      // 后端 context 为 dict[str,str]：包一层 dict + 值转 JSON 字符串（直接传字符串会 422）
+      context: { 披露数据: JSON.stringify(displayRows.value.map((r) => ({
         tax: r.label, current: r.currentAmount, prior: r.priorAmount, changeRate: r.changeRate,
-      }))),
+      }))) },
       existingContent: noteText.value,
       section: 'n4-disclosure-listed-note',
     }, { _silent: true } as any)

@@ -121,7 +121,8 @@
  * H4TabDisclosureListed — 附注披露信息（上市公司）
  * 对齐源 xlsx：（2）工程物资分类表
  */
-import { ref, reactive, computed, inject, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, inject, onMounted, onUnmounted, onBeforeUnmount } from 'vue'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
 import GtIndexChip from '../../GtIndexChip.vue'
@@ -149,6 +150,7 @@ const props = defineProps<{
 }>()
 
 const isReadonly = computed(() => props.isReadonly)
+const autoSync = useDisclosureAutoSync({ isReadonly: () => isReadonly.value })
 const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 const allResponsesRef = computed(() => props.allResponses)
 const { pullListedMaterials, listedCrossCheck, significantNoteDraft } = useH4Disclosure(allResponsesRef as any)
@@ -177,7 +179,7 @@ async function syncToNotes() {
     }
     for (const payload of payloads) {
       await http.post(
-        `/api/projects/${props.projectId}/disclosure-notes/${auditYear?.value || ''}/sync-from-workpaper`,
+        `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,
         { ...payload, year: auditYear?.value },
       )
     }
@@ -254,6 +256,7 @@ function persistAll() {
     conclusion: null,
   })
   saveResponse(H4_LISTED_ITEM.noteText, noteText.value)
+  autoSync.scheduleAutoSync(syncToNotes)
 }
 
 function scheduleSave() {
@@ -310,6 +313,8 @@ onUnmounted(() => {
   if (saveTimer) clearTimeout(saveTimer)
   unsubscribe?.()
 })
+
+onBeforeUnmount(() => { autoSync.cancelPending() })
 </script>
 
 <style scoped>

@@ -29,8 +29,14 @@ from app.services.report_note_linkage import LinkTarget, ReportNoteLinkage
 logger = logging.getLogger(__name__)
 
 
-def _formula_enabled() -> bool:
-    """灰度开关（默认 False = 保持 stub 行为，逐字节零回归）。"""
+def _formula_enabled(*, formula_on: bool | None = None) -> bool:
+    """灰度开关（默认 False = 保持 stub 行为，逐字节零回归）。
+
+    若 `formula_on` 由上游入口预解析后传入，直接使用，避免逐格查库。
+    否则回退读全局 settings（向后兼容旧调用路径）。
+    """
+    if formula_on is not None:
+        return formula_on
     try:
         from app.core.config import settings
 
@@ -103,7 +109,11 @@ class ReportNoteSyncService:
             return {"synced_sections": 0, "skipped_sections": 0, "validation_run": False}
 
         # 灰度开关：关闭时逐字节保持 stub 行为（零回归 characterization 基线）
-        if not _formula_enabled():
+        # 统一入口：note_formula_gray_service.is_note_formula_enabled(db, project_id)
+        from app.services.note_formula_gray_service import is_note_formula_enabled
+
+        formula_on = await is_note_formula_enabled(self.db, project_id)
+        if not formula_on:
             return await self._sync_stub(notes)
 
         return await self._sync_real(project_id, year, report_rows, notes)

@@ -211,7 +211,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, inject, toRef, onMounted, onUnmounted } from 'vue'
+import { ref, computed, inject, toRef, onMounted, onUnmounted, onBeforeUnmount } from 'vue'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
@@ -241,6 +242,7 @@ const emit = defineEmits<{
 }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 const router = useRouter()
 // 跳转回附注模块（披露表 → 附注为单向推送；此处仅导航，方便相互编辑确认）
 function jumpToNote(target: DisclosureVariant): void {
@@ -441,12 +443,15 @@ async function syncToNotes() {
       sheet: '附注披露（国有企业）',
     })
     ElMessage.success(`已同步至附注 ${noteTarget.sectionId}（${rows} 行）`)
+    autoSync.scheduleAutoSync(syncToNotes)
   } catch (e: any) {
     ElMessage.error(e?.message || '同步失败')
   } finally {
     isSyncing.value = false
   }
 }
+
+onBeforeUnmount(() => autoSync.cancelPending())
 </script>
 
 <style scoped>

@@ -16,7 +16,7 @@
           type="success"
           :loading="disc.isSyncing.value"
           :disabled="isReadonly || !projectId"
-          @click="disc.syncToNotes()"
+          @click="syncToDisclosureNotes()"
         >
           同步至附注
         </el-button>
@@ -543,7 +543,8 @@
  * 对齐致同源模板 + note_template_listed §五、8
  * 账龄枚举 THREE_YEAR / FIVE_YEAR / CUSTOM；联动附注模块 sync-from-workpaper
  */
-import { computed, inject, toRef } from 'vue'
+import { computed, inject, toRef, onBeforeUnmount } from 'vue'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
@@ -653,6 +654,15 @@ function stageRowClass({ row }: { row: { kind?: string; rowKey?: string } }) {
 function handleReview(id: string): void {
   openReviewDialog(id)
 }
+
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+
+async function syncToDisclosureNotes() {
+  await disc.syncToNotes()
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
+}
+
+onBeforeUnmount(() => autoSync.cancelPending())
 </script>
 
 <style scoped>

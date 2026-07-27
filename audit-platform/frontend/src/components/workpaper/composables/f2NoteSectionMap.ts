@@ -16,8 +16,8 @@ export const F2_NOTE_SECTION = {
 } as const satisfies Record<F2DisclosureVariant, string>
 
 export const F2_DISCLOSURE_SHEET_NAME = {
-  listed: 'F2-note-listed',
-  soe: 'F2-note-soe',
+  listed: '附注披露信息（上市公司）',
+  soe: '附注披露信息（国企）',
 } as const satisfies Record<F2DisclosureVariant, string>
 
 /** 存货科目 1401–1412（与审定取数口径一致） */

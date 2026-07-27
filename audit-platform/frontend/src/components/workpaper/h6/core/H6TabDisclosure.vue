@@ -181,7 +181,8 @@
  * H6TabDisclosure — 附注披露（上市 / 国企）参数化组件
  * variant=listed|soe；Listed/Soe 薄包装保留原入口与 data-testid
  */
-import { ref, reactive, computed, inject, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, inject, onMounted, onUnmounted, onBeforeUnmount } from 'vue'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import GtIndexChip from '../../GtIndexChip.vue'
@@ -275,6 +276,7 @@ const ui = computed(() => {
   }
 })
 
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 const allResponsesRef = computed(() => props.allResponses)
 const { crossWarnings, pullFromLocalSources, pullFaFromH1, autoFill } = useH6Disclosure(allResponsesRef as any)
@@ -322,6 +324,7 @@ function persistAll() {
   } else {
     saveResponse(H6_SOE_KEYS.faBegin, state.faPrior)
   }
+  autoSync.scheduleAutoSync(syncToNotes)
 }
 
 function scheduleSave() {
@@ -439,6 +442,8 @@ onUnmounted(() => {
   unsubAdj?.()
   if (saveTimer) clearTimeout(saveTimer)
 })
+
+onBeforeUnmount(() => { autoSync.cancelPending() })
 </script>
 
 <style scoped>

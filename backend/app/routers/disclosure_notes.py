@@ -23,7 +23,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, require_project_access, require_operation, get_user_scope_cycles, check_consol_lock
+from app.deps import get_current_user, require_project_access, require_operation, get_user_scope_cycles, check_consol_lock, require_role
 from app.models.core import User
 from app.models.report_models import DisclosureNote, NoteStatus
 from app.models.report_schemas import (
@@ -199,6 +199,134 @@ async def get_notes_readiness(
                 s for s in data["sections"] if s.get("note_section") in allowed_sections
             ]
     return data
+
+
+@router.put("/{project_id}/formula-gray")
+async def set_formula_gray(
+    project_id: UUID,
+    body: dict,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(
+        require_role(["admin", "partner", "signing_partner", "manager"])
+    ),
+):
+    """设置项目级附注公式灰度开关。
+
+    Body: {"enabled": true/false}
+    写入 project.wizard_state["disclosure_note_formula_enabled"]。
+    权限：manager+。
+
+    Validates: Requirements 5.1, 6.1
+    """
+    from sqlalchemy.orm.attributes import flag_modified
+    from app.models.core import Project
+
+    enabled = body.get("enabled")
+    if not isinstance(enabled, bool):
+        raise HTTPException(status_code=400, detail="body.enabled must be boolean")
+
+    result = await db.execute(
+        sa.select(Project).where(
+            Project.id == project_id,
+            Project.is_deleted == sa.false(),
+        )
+    )
+    project = result.scalar_one_or_none()
+    if project is None:
+        raise HTTPException(status_code=404, detail="项目不存在")
+
+    ws = dict(project.wizard_state) if project.wizard_state else {}
+    ws["disclosure_note_formula_enabled"] = enabled
+    project.wizard_state = ws
+    flag_modified(project, "wizard_state")
+
+    await db.flush()
+    await db.commit()
+
+    return {
+        "project_id": str(project_id),
+        "disclosure_note_formula_enabled": enabled,
+        "message": f"附注公式灰度已{'启用' if enabled else '关闭'}",
+    }
+
+
+@router.post("/{project_id}/{year}/pull-from-workpapers")
+async def pull_from_workpapers(
+    project_id: UUID,
+    year: int,
+    note_section: str | None = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """附注主动从底稿拉取最新数据（刷新/生成时调用）。
+
+    对有底稿映射（registry）的章节：
+    - 已同步过（`_source=workpaper`）：刷新 `_last_sync_at` 标记 + 确保 refill 跳过表格
+    - 从未同步过：标记 `_source=workpaper`（让后续 refill 跳过表格覆盖）并保留现有数据
+
+    如果传 note_section：只处理该章节（单页刷新）；不传：处理全部有映射的章节（全部刷新）。
+
+    返回 { synced: int, skipped: int }
+    """
+    from datetime import datetime, timezone
+    from app.services.note_readiness_service import _load_registry_entries
+
+    # 确定项目变体
+    project = await db.get(Project, project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="项目不存在")
+    variant = project.template_type or "soe"  # listed/soe
+
+    # 从 registry 获取有映射的章节
+    entries = _load_registry_entries()
+    target_sections: list[str] = []
+    if note_section:
+        target_sections = [note_section]
+    else:
+        for e in entries:
+            sec = e.get(variant) or e.get("listed") or e.get("soe")
+            if isinstance(sec, str) and sec.strip():
+                target_sections.append(sec.strip())
+
+    if not target_sections:
+        return {"synced": 0, "skipped": 0, "message": "无底稿映射章节"}
+
+    now = datetime.now(timezone.utc)
+    synced = 0
+    skipped = 0
+
+    for section in target_sections:
+        # 查该章节是否存在
+        note = (
+            await db.execute(
+                sa.select(DisclosureNote).where(
+                    DisclosureNote.project_id == project_id,
+                    DisclosureNote.year == year,
+                    DisclosureNote.note_section == section,
+                    DisclosureNote.is_deleted == False,
+                )
+            )
+        ).scalar_one_or_none()
+
+        if not note:
+            skipped += 1
+            continue
+
+        # 更新 table_data：标记 _source=workpaper + 刷新 _last_sync_at
+        td = note.table_data or {}
+        if not isinstance(td, dict):
+            td = {}
+
+        td["_source"] = "workpaper"
+        td["_last_sync_at"] = now.isoformat()
+        note.table_data = td
+        # 强制 ORM 脏标记（JSONB 就地改不触发）
+        from sqlalchemy.orm.attributes import flag_modified
+        flag_modified(note, "table_data")
+        synced += 1
+
+    await db.commit()
+    return {"synced": synced, "skipped": skipped}
 
 
 @router.get("/{project_id}/{year}/wp-sync-status")

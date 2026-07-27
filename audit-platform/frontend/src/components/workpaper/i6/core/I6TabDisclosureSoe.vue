@@ -19,7 +19,7 @@
           type="success"
           :loading="disc.isSyncing.value"
           :disabled="isReadonly || !projectId"
-          @click="disc.syncToNotes()"
+          @click="syncToDisclosureNotes()"
         >同步到附注 {{ disc.noteTarget.value.sectionId }}</el-button>
         <el-button size="small" type="primary" plain :disabled="!projectId" @click="jumpToNote('soe')">↩ 跳转回附注</el-button>
       </div>
@@ -154,7 +154,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, onBeforeUnmount } from 'vue'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
@@ -223,6 +224,15 @@ function fmtPct(row: I6DisclosureRow): string {
   if (!row.priorAmount) return '-'
   return ((row.currentAmount - row.priorAmount) / Math.abs(row.priorAmount) * 100).toFixed(1) + '%'
 }
+
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+
+async function syncToDisclosureNotes() {
+  await disc.syncToNotes()
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
+}
+
+onBeforeUnmount(() => autoSync.cancelPending())
 </script>
 
 <style scoped>

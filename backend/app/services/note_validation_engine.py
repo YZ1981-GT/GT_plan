@@ -683,51 +683,74 @@ class NoteValidationEngine:
 
         return results
 
+    @staticmethod
+    def _finding_from_result(r: "ValidationResult") -> tuple[dict, str]:
+        """把单条未通过 ``ValidationResult`` 转为 finding dict + severity（单一真源）。
+
+        severity：|diff_amount| > 0.01 → error，否则 warning。
+        供 ``validate_all`` 的 findings 组装与 ``_persist_results`` 落库共用，
+        避免两处严重度/字段口径漂移。
+        """
+        severity = (
+            "error"
+            if (r.diff_amount is not None and abs(float(r.diff_amount)) > 0.01)
+            else "warning"
+        )
+        finding = {
+            "note_section": r.section_code,
+            "check_type": r.rule_type,
+            "severity": severity,
+            "message": r.rule_expression,
+            "expected_value": float(r.expected_value) if r.expected_value is not None else None,
+            "actual_value": float(r.actual_value) if r.actual_value is not None else None,
+            "table_name": (r.details or {}).get("table_name", "") if isinstance(r.details, dict) else "",
+        }
+        return finding, severity
+
     async def _persist_results(
         self, project_id: UUID, year: int, results: list[ValidationResult]
     ):
-        """Persist validation results to note_validation_results table."""
+        """落库一条 per-run 汇总行（对齐 ``note_validation_results`` 真表结构）。
+
+        历史实现按"一规则一行"写 section_code/rule_type/diff_amount/details/executed_at
+        等**不存在的列**，且缺 NOT NULL 的 validation_timestamp/findings → INSERT 恒失败，
+        被 try/except 静默吞掉 → 该表长期 0 行（校验空转的真因）。
+
+        真表是 per-run 汇总（findings JSONB + error/warning/info_count），故此处每次校验
+        落一条汇总行：findings = 全部未通过项（error+warning，不折叠），供
+        ``latest_findings_by_section`` / ``get_latest_results`` / eqcr VR 消费。
+        append 语义（不删历史，读端取 validation_timestamp 最新一条）。
+        """
         if not self.db:
             return
 
         try:
-            # Use raw insert for performance
-            table = sa.table(
-                "note_validation_results",
-                sa.column("id", sa.String),
-                sa.column("project_id", sa.String),
-                sa.column("year", sa.Integer),
-                sa.column("section_code", sa.String),
-                sa.column("rule_type", sa.String),
-                sa.column("rule_expression", sa.Text),
-                sa.column("passed", sa.Boolean),
-                sa.column("expected_value", sa.Numeric),
-                sa.column("actual_value", sa.Numeric),
-                sa.column("diff_amount", sa.Numeric),
-                sa.column("details", sa.JSON),
-                sa.column("executed_at", sa.DateTime),
-            )
+            from app.models.report_models import NoteValidationResult
 
-            rows = []
+            findings: list[dict] = []
+            error_count = 0
+            warning_count = 0
             for r in results:
-                rows.append({
-                    "id": r.id,
-                    "project_id": str(project_id),
-                    "year": year,
-                    "section_code": r.section_code,
-                    "rule_type": r.rule_type,
-                    "rule_expression": r.rule_expression,
-                    "passed": r.passed,
-                    "expected_value": float(r.expected_value) if r.expected_value is not None else None,
-                    "actual_value": float(r.actual_value) if r.actual_value is not None else None,
-                    "diff_amount": float(r.diff_amount) if r.diff_amount is not None else None,
-                    "details": r.details,
-                    "executed_at": r.executed_at,
-                })
+                if r.passed:
+                    continue
+                finding, severity = self._finding_from_result(r)
+                findings.append(finding)
+                if severity == "error":
+                    error_count += 1
+                else:
+                    warning_count += 1
 
-            if rows:
-                await self.db.execute(sa.insert(table), rows)
-                await self.db.flush()
+            row = NoteValidationResult(
+                project_id=project_id,
+                year=year,
+                validation_timestamp=datetime.now(timezone.utc).replace(tzinfo=None),
+                findings=findings,
+                error_count=error_count,
+                warning_count=warning_count,
+                info_count=0,
+            )
+            self.db.add(row)
+            await self.db.flush()
         except Exception as e:
             logger.warning("Failed to persist validation results: %s", e)
 
@@ -901,20 +924,7 @@ class NoteValidationEngine:
         for r in results:
             if r.passed:
                 continue
-            severity = (
-                "error"
-                if r.diff_amount and abs(float(r.diff_amount)) > 0.01
-                else "warning"
-            )
-            finding = {
-                "note_section": r.section_code,
-                "check_type": r.rule_type,
-                "severity": severity,
-                "message": r.rule_expression,
-                "expected_value": float(r.expected_value) if r.expected_value is not None else None,
-                "actual_value": float(r.actual_value) if r.actual_value is not None else None,
-                "table_name": r.details.get("table_name", "") if r.details else "",
-            }
+            finding, severity = self._finding_from_result(r)
             if severity == "error":
                 error_count += 1
                 findings.append(finding)
@@ -1051,53 +1061,42 @@ class NoteValidationEngine:
             return None
 
         try:
-            table = sa.table(
-                "note_validation_results",
-                sa.column("id", sa.String),
-                sa.column("project_id", sa.String),
-                sa.column("year", sa.Integer),
-                sa.column("section_code", sa.String),
-                sa.column("rule_type", sa.String),
-                sa.column("rule_expression", sa.Text),
-                sa.column("passed", sa.Boolean),
-                sa.column("expected_value", sa.Numeric),
-                sa.column("actual_value", sa.Numeric),
-                sa.column("diff_amount", sa.Numeric),
-                sa.column("details", sa.JSON),
-                sa.column("executed_at", sa.DateTime),
-            )
+            # 对齐真表：读最新一次 run 的 findings(JSONB) + 计数（不再查不存在的
+            # section_code/passed/diff_amount 等列）。findings 已是 [{note_section,
+            # check_type, severity, ...}] 列表，直接返回供详情面板消费。
+            row = (
+                await self.db.execute(
+                    sa.text(
+                        "SELECT findings, error_count, warning_count, validation_timestamp "
+                        "FROM note_validation_results "
+                        "WHERE project_id = :pid AND year = :yr "
+                        "ORDER BY validation_timestamp DESC NULLS LAST LIMIT 1"
+                    ),
+                    {"pid": str(project_id), "yr": year},
+                )
+            ).fetchone()
 
-            result = await self.db.execute(
-                sa.select(table).where(
-                    table.c.project_id == str(project_id),
-                    table.c.year == year,
-                ).order_by(table.c.executed_at.desc())
-            )
-            rows = result.fetchall()
-
-            if not rows:
+            if row is None:
                 return None
 
-            findings = []
-            for row in rows:
-                if not row.passed:
-                    findings.append({
-                        "note_section": row.section_code,
-                        "check_type": row.rule_type,
-                        "severity": "error" if row.diff_amount and abs(float(row.diff_amount)) > 0.01 else "warning",
-                        "message": row.rule_expression,
-                        "expected_value": float(row.expected_value) if row.expected_value is not None else None,
-                        "actual_value": float(row.actual_value) if row.actual_value is not None else None,
-                        "table_name": "",
-                    })
+            findings = row[0] if isinstance(row[0], list) else []
+            error_count = int(row[1] or 0)
+            warning_count = int(row[2] or 0)
+            ts = row[3]
+            failed = len(findings)
 
             return {
                 "project_id": str(project_id),
                 "year": year,
-                "total_rules": len(rows),
-                "passed": sum(1 for r in rows if r.passed),
-                "failed": len(findings),
+                # total_rules/passed 未持久化（真表只存未通过项）——POST validate 的
+                # 实时响应才有权威 total/passed；此处以 failed 兜底保持键契约。
+                "total_rules": failed,
+                "passed": 0,
+                "failed": failed,
+                "error_count": error_count,
+                "warning_count": warning_count,
                 "findings": findings,
+                "validated_at": ts.isoformat() if ts is not None else None,
             }
         except Exception as e:
             logger.warning("get_latest_results failed: %s", e)
@@ -1117,36 +1116,26 @@ class NoteValidationEngine:
             return False
 
         try:
-            table = sa.table(
-                "note_validation_results",
-                sa.column("id", sa.String),
-                sa.column("details", sa.JSON),
-            )
+            from app.models.report_models import NoteValidationResult
 
-            result = await self.db.execute(
-                sa.select(table).where(table.c.id == str(validation_id))
-            )
-            row = result.fetchone()
+            # 对齐真表：按 id 取 run，标记其 findings[finding_index] 为已确认
+            # （真表无 details 列，确认状态写进 findings JSONB 该项）。
+            row = await self.db.get(NoteValidationResult, validation_id)
             if row is None:
                 return False
 
-            # Update details to mark as confirmed
-            details = row.details or {}
-            if not isinstance(details, dict):
-                details = {}
-            confirmations = details.get("confirmations", [])
-            confirmations.append({
-                "finding_index": finding_index,
-                "reason": reason,
-                "confirmed_at": datetime.now(timezone.utc).isoformat(),
-            })
-            details["confirmations"] = confirmations
+            findings = list(row.findings or [])
+            if not (0 <= finding_index < len(findings)):
+                return False
 
-            await self.db.execute(
-                sa.update(table).where(table.c.id == str(validation_id)).values(
-                    details=details
-                )
-            )
+            item = dict(findings[finding_index]) if isinstance(findings[finding_index], dict) else {}
+            item["confirmed"] = True
+            item["confirm_reason"] = reason
+            item["confirmed_at"] = datetime.now(timezone.utc).isoformat()
+            findings[finding_index] = item
+
+            # 重新赋新列表触发 JSONB 脏标记（就地改 list 不会被 ORM 侦测）
+            row.findings = findings
             await self.db.flush()
             return True
         except Exception as e:

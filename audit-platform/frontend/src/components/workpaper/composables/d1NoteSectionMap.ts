@@ -91,21 +91,21 @@ const TXT = 'text' as const
 
 const SUMMARY_COLUMNS_LISTED: ColumnDef[] = [
   { key: 'label', label: '票据种类', is_label: true },
-  { key: 'end_balance', label: '期末账面余额', format: AMT },
-  { key: 'end_provision', label: '期末坏账准备', format: AMT },
-  { key: 'end_book_value', label: '期末账面价值', format: AMT },
-  { key: 'prior_balance', label: '上年末账面余额', format: AMT },
-  { key: 'prior_provision', label: '上年末坏账准备', format: AMT },
-  { key: 'prior_book_value', label: '上年末账面价值', format: AMT },
+  { key: 'end_balance', label: '账面余额', format: AMT, group: '期末余额' },
+  { key: 'end_provision', label: '坏账准备', format: AMT, group: '期末余额' },
+  { key: 'end_book_value', label: '账面价值', format: AMT, group: '期末余额' },
+  { key: 'prior_balance', label: '账面余额', format: AMT, group: '上年年末余额' },
+  { key: 'prior_provision', label: '坏账准备', format: AMT, group: '上年年末余额' },
+  { key: 'prior_book_value', label: '账面价值', format: AMT, group: '上年年末余额' },
 ]
 const SUMMARY_COLUMNS_SOE: ColumnDef[] = [
   { key: 'label', label: '票据种类', is_label: true },
-  { key: 'end_balance', label: '期末账面余额', format: AMT },
-  { key: 'end_provision', label: '期末坏账准备', format: AMT },
-  { key: 'end_book_value', label: '期末账面价值', format: AMT },
-  { key: 'prior_balance', label: '期初账面余额', format: AMT },
-  { key: 'prior_provision', label: '期初坏账准备', format: AMT },
-  { key: 'prior_book_value', label: '期初账面价值', format: AMT },
+  { key: 'end_balance', label: '账面余额', format: AMT, group: '期末余额' },
+  { key: 'end_provision', label: '坏账准备', format: AMT, group: '期末余额' },
+  { key: 'end_book_value', label: '账面价值', format: AMT, group: '期末余额' },
+  { key: 'prior_balance', label: '账面余额', format: AMT, group: '期初余额' },
+  { key: 'prior_provision', label: '坏账准备', format: AMT, group: '期初余额' },
+  { key: 'prior_book_value', label: '账面价值', format: AMT, group: '期初余额' },
 ]
 const PLEDGED_COLUMNS: ColumnDef[] = [
   { key: 'label', label: '种类', is_label: true },
@@ -152,12 +152,12 @@ const INDIVIDUAL_COLUMNS_SOE: ColumnDef[] = [
 ]
 const PORTFOLIO_COLUMNS_LISTED: ColumnDef[] = [
   { key: 'label', label: '名称', is_label: true },
-  { key: 'end_balance', label: '期末应收票据', format: AMT },
-  { key: 'end_provision', label: '期末坏账准备', format: AMT },
-  { key: 'end_loss_rate', label: '期末预期信用损失率(%)', format: PCT },
-  { key: 'prior_balance', label: '上年末应收票据', format: AMT },
-  { key: 'prior_provision', label: '上年末坏账准备', format: AMT },
-  { key: 'prior_loss_rate', label: '上年末预期信用损失率(%)', format: PCT },
+  { key: 'end_balance', label: '应收票据', format: AMT, group: '期末' },
+  { key: 'end_provision', label: '坏账准备', format: AMT, group: '期末' },
+  { key: 'end_loss_rate', label: '预期信用损失率(%)', format: PCT, group: '期末' },
+  { key: 'prior_balance', label: '应收票据', format: AMT, group: '上年末' },
+  { key: 'prior_provision', label: '坏账准备', format: AMT, group: '上年末' },
+  { key: 'prior_loss_rate', label: '预期信用损失率(%)', format: PCT, group: '上年末' },
 ]
 const PORTFOLIO_COLUMNS_SOE: ColumnDef[] = [
   { key: 'label', label: '名称', is_label: true },

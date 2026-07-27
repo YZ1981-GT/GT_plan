@@ -12,8 +12,8 @@ export const G12_NOTE_SECTION = {
 } as const satisfies Record<G12DisclosureVariant, string>
 
 export const G12_DISCLOSURE_SHEET_NAME = {
-  listed: '附注上市',
-  soe: '附注国企',
+  listed: '附注披露信息（上市公司）',
+  soe: '附注披露信息（国企）',
 } as const satisfies Record<G12DisclosureVariant, string>
 
 export { G12_ACCOUNT_CODE } from './g12Constants'

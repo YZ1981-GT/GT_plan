@@ -1354,6 +1354,11 @@ class DisclosureEngine:
         source_template = self._persist_source_template(template_type)
         results = []
 
+        # ── 统一入口：公式灰度按项目解析一次传下游（避免逐格查库）──
+        from app.services.note_formula_gray_service import is_note_formula_enabled
+
+        self._formula_on = await is_note_formula_enabled(self.db, project_id)
+
         # 预加载底稿和试算表数据（避免165次重复查询导致事务超时）
         self._wp_cache = {}
         self._tb_cache = {}
@@ -1491,7 +1496,7 @@ class DisclosureEngine:
             # 同表/报表在首遍落值后才能算），此处构表后、upsert 前跑第二遍回填；
             # 随后走既有 merge_table_data_preserving_cell_modes 合并保留 manual/locked。
             # 开关关时旁路（零回归 Property 12）；异常 fail-open 不阻断附注生成。
-            if settings.DISCLOSURE_NOTE_FORMULA_ENABLED and table_data is not None:
+            if getattr(self, '_formula_on', settings.DISCLOSURE_NOTE_FORMULA_ENABLED) and table_data is not None:
                 try:
                     table_data = await self._evaluate_note_formulas(
                         project_id, year, note_section, table_data,
@@ -1530,16 +1535,22 @@ class DisclosureEngine:
                 note.account_name = account_name
                 note.content_type = ContentType(content_type_str)
                 # D1 三态合并：已存在 note 且历史 table_data 非空 → 走合并保留 manual/locked
+                # 但对底稿同步来源的章节（_source=workpaper），跳过表格覆盖保持底稿数据
                 if table_data is not None and note.table_data:
-                    from sqlalchemy.orm.attributes import flag_modified
+                    existing_source = (note.table_data or {}).get("_source") if isinstance(note.table_data, dict) else None
+                    if existing_source in ("workpaper", "workpaper_html"):
+                        # 底稿同步来源：不覆盖表格结构，只更新文本/guidance/元数据
+                        pass
+                    else:
+                        from sqlalchemy.orm.attributes import flag_modified
 
-                    from app.services.note_cell_merge import (
-                        merge_table_data_preserving_cell_modes,
-                    )
-                    note.table_data = merge_table_data_preserving_cell_modes(
-                        note.table_data, table_data,
-                    )
-                    flag_modified(note, "table_data")
+                        from app.services.note_cell_merge import (
+                            merge_table_data_preserving_cell_modes,
+                        )
+                        note.table_data = merge_table_data_preserving_cell_modes(
+                            note.table_data, table_data,
+                        )
+                        flag_modified(note, "table_data")
                 else:
                     note.table_data = table_data
                 note.text_content = text_content
@@ -1661,7 +1672,12 @@ class DisclosureEngine:
             if note:
                 old_td = note.table_data or {}
                 if old_td:
-                    note.table_data = merge_table_data_preserving_cell_modes(old_td, new_td)
+                    # 底稿同步来源的章节：跳过表格覆盖保持底稿数据
+                    existing_source = old_td.get("_source") if isinstance(old_td, dict) else None
+                    if existing_source in ("workpaper", "workpaper_html"):
+                        pass  # 不覆盖底稿同步的表格结构
+                    else:
+                        note.table_data = merge_table_data_preserving_cell_modes(old_td, new_td)
                 else:
                     note.table_data = new_td
                 # JSONB 字段需要显式标记，确保嵌套字段持久化
@@ -1754,6 +1770,18 @@ class DisclosureEngine:
 
             td = note.table_data
             if not td or not isinstance(td, dict):
+                report.text_only_sections.append(section)
+                continue
+
+            # 4a. 底稿同步来源（_source=workpaper/workpaper_html）的章节：
+            # 表格结构（sub_table_data 推送的 rows/headers）由底稿披露表拥有，
+            # 刷新不得覆盖其 cell 值——底稿是该章节表格数据的唯一真源。
+            # 仅 binding 取数单元格（如 TB 科目期末余额）允许被 refill 更新，
+            # 但当前这类章节的 rows 通常无 binding 匹配（workpaper 推送的行
+            # 无 _cell_meta semantic），自然跳过；显式 guard 以防 binding 模板
+            # 意外命中 label 导致底稿推送的真实金额被 TB 值覆盖。
+            _note_source = td.get("_source")
+            if _note_source in ("workpaper", "workpaper_html"):
                 report.text_only_sections.append(section)
                 continue
 
@@ -1863,7 +1891,7 @@ class DisclosureEngine:
                             # 决策 3 —— binding 写 source='formula' + formula_kind 子类型。
                             _src = cell_binding.get("source")
                             if _src in ("sum", "report", "aging", "formula"):
-                                if not settings.DISCLOSURE_NOTE_FORMULA_ENABLED:
+                                if not getattr(self, '_formula_on', settings.DISCLOSURE_NOTE_FORMULA_ENABLED):
                                     # 开关关 → 旁路公式家族，绝不用 None 覆盖既有值（零回归）
                                     continue
                                 new_val = await resolve_formula(cell_binding, ctx)

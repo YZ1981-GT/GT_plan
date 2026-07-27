@@ -343,6 +343,7 @@ import { useAuditContext } from '@/composables/useAuditContext'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import { useN1FormData } from '../../composables/useN1FormData'
 import { useN1CrossSheet } from '../../composables/useN1CrossSheet'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { N1_NOTE_SECTION, buildN1SyncPayload } from '../../composables/n1NoteSectionMap'
 import { generateN1Text } from '../../composables/useN1AiText'
 import {
@@ -386,6 +387,9 @@ const deferredTaxChange = computed(() => crossSheet.deferredTaxChange.value)
 const isReadonly = computed(() => props.isReadonly ?? false)
 const conclusionNote = ref('')
 const aiLoading = ref(false)
+
+// 保存后自动同步到附注（防抖/非阻塞/失败静默/只读 gate；与手动按钮同源 syncToDisclosureNotes）
+const autoSync = useDisclosureAutoSync({ isReadonly: () => isReadonly.value })
 
 // ─── Section 1: 已确认递延所得税资产明细 (from N1-2 rows) ────────────────────
 
@@ -537,6 +541,7 @@ function updateUnrecognizedReason(index: number, val: string) {
   if (index >= 0 && index < rows.length) {
     rows[index] = { ...rows[index], reason: val }
     formData.debouncedSave('N1-disclosure-listed-unrecognized', { conclusion: JSON.stringify(rows) })
+    autoSync.scheduleAutoSync(syncToDisclosureNotes)
   }
 }
 
@@ -600,6 +605,7 @@ function _emitNoteUpdated(section: string, text?: string) {
 function handleConclusionChange() {
   formData.debouncedSave('N1-disclosure-listed-conclusion', { remark: conclusionNote.value || null })
   _emitNoteUpdated('conclusion-listed', conclusionNote.value)
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
 }
 
 // ─── 同步到附注（结构化推送，owner=N1，见 n1NoteSectionMap 顶部所有权说明） ──
@@ -748,6 +754,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   eventBus.off('substantive:adjudicated', onAdjudicatedRefresh)
+  autoSync.cancelPending()
 })
 </script>
 

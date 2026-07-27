@@ -145,12 +145,34 @@ describe('reverse map ↔ forward jump 一致性（single source of truth）', (
       ['K11', fwd.isK11AssetImpairmentNoteSection],
       ['K13', fwd.isK13NonOperatingExpenseNoteSection],
       ['N1', fwd.isN1DeferredTaxNoteSection],
+      ['G7', fwd.isG7EquityNoteSection],
     ]
     for (const [wp, pred] of checks) {
       const entry = DISCLOSURE_NOTE_SECTION_MAP[wp]
       expect(pred(entry.listed), `${wp} listed ${entry.listed}`).toBe(true)
       expect(pred(entry.soe), `${wp} soe ${entry.soe}`).toBe(true)
     }
+  })
+})
+
+// G7 长期股权投资（主节 五、18 / 八、18；国企「七、」各子节由披露表内 Note 芯片单独跳转）
+describe('reverse jump · G7 长期股权投资', () => {
+  it('maps G7 listed→五、18 soe→八、18 and builds routes', () => {
+    expect(DISCLOSURE_NOTE_SECTION_MAP.G7).toEqual({ listed: '五、18', soe: '八、18' })
+    expect((buildNoteJumpRoute('p1', 'G7', 'listed') as any).query)
+      .toEqual({ section: '五、18', noteTemplate: 'listed' })
+    expect((buildNoteJumpRoute('p1', 'G7', 'soe') as any).query)
+      .toEqual({ section: '八、18', noteTemplate: 'soe' })
+  })
+
+  it('与 G7 披露表内 NOTE_SECTION_ID / noteSectionId 常量一致', async () => {
+    const { G7_SOE_DISCLOSURE_SECTIONS } = await import(
+      '@/components/workpaper/g7-long-term-equity-main/disclosure/g7SoeDisclosureModel'
+    )
+    const lteSection = G7_SOE_DISCLOSURE_SECTIONS.find(
+      (s: any) => s.noteSectionId === DISCLOSURE_NOTE_SECTION_MAP.G7.soe,
+    )
+    expect(lteSection, '国企披露表应存在 八、18 长期股权投资节').toBeTruthy()
   })
 })
 

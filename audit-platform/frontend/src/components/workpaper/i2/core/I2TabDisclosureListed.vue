@@ -288,7 +288,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, toRef, inject } from 'vue'
+import { ref, toRef, inject, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
@@ -297,6 +297,7 @@ import { useI2Disclosure } from '../../composables/useI2Disclosure'
 import { buildI2ListedSyncPayloads } from '../../composables/i2DisclosureSyncPayload'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 
 const props = defineProps<{
   sheetName: string
@@ -320,6 +321,7 @@ function jumpToNote(target: DisclosureVariant): void {
 }
 
 const isSyncing = ref(false)
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 const allResponsesRef = toRef(props, 'allResponses')
 const standardsRef = toRef(props, 'applicableStandards')
 
@@ -382,6 +384,7 @@ async function syncToNotes() {
       variant: 'listed',
     })
     ElMessage.success(`已同步至附注 ${noteTarget.value?.sectionId || '五、27'}（${rows} 行）`)
+    autoSync.scheduleAutoSync(syncToNotes)
   } catch (e: any) {
     ElMessage.error(e?.message || '同步失败')
   } finally {
@@ -422,6 +425,8 @@ function movementSummaryMethod({ columns }: { columns: { label?: string }[] }) {
     return ''
   })
 }
+
+onBeforeUnmount(() => autoSync.cancelPending())
 </script>
 
 <style scoped>

@@ -652,8 +652,14 @@ async def _get_wp_parsed_data(
 # ---------------------------------------------------------------------------
 
 
-def _formula_enabled() -> bool:
-    """灰度开关（默认 False = 保持 stub 行为，逐字节零回归）."""
+def _formula_enabled(*, formula_on: bool | None = None) -> bool:
+    """灰度开关（默认 False = 保持 stub 行为，逐字节零回归）.
+
+    若 `formula_on` 由上游入口（generate_notes）预解析后传入，直接使用，避免逐格查库。
+    否则回退读全局 settings（向后兼容旧调用路径）。
+    """
+    if formula_on is not None:
+        return formula_on
     try:
         from app.core.config import settings
 

@@ -8,8 +8,9 @@
  * 通过 variant='listed'|'soe' 区分上市/国企版本。
  * 每个子节用 el-card 折叠卡片渲染对应 el-table。
  */
-import { ref, computed, watch, inject } from 'vue'
+import { ref, computed, watch, inject, onUnmounted } from 'vue'
 import { useDebounceFn } from '@vueuse/core'
+import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
 import { ElMessage } from 'element-plus'
 import { Lock, Delete, Plus } from '@element-plus/icons-vue'
 import {
@@ -61,6 +62,10 @@ watch(() => props.allResponses, loadSectionNotes, { immediate: true, deep: true 
 
 // ─── Persistence (debounced) ─────────────────────────────────────────────────
 
+// 保存后自动同步到附注（防抖/非阻塞/失败静默/只读 gate；与手动按钮同源 syncToDisclosureNotes）
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+onUnmounted(() => autoSync.cancelPending())
+
 const pendingSaveItems = ref<any[]>([])
 
 const debouncedSave = useDebounceFn(async () => {
@@ -80,6 +85,7 @@ const debouncedSave = useDebounceFn(async () => {
 async function saveWithDebounce(items: any[]): Promise<void> {
   pendingSaveItems.value.push(...items)
   debouncedSave()
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
 }
 
 // ─── Composable ──────────────────────────────────────────────────────────────

@@ -7920,93 +7920,74 @@
           "name": "按坏账计提方法分类披露",
           "headers": [
             "类别",
-            "期末余额"
-          ],
-          "rows": [
-            {
-              "label": "类别",
-              "row_type": "header_label"
-            },
-            {
-              "label": "类别",
-              "row_type": "header_label"
-            },
-            {
-              "label": "按单项计提坏账准备",
-              "row_type": "data"
-            },
-            {
-              "label": "其中：",
-              "row_type": "data"
-            },
-            {
-              "label": "按组合计提坏账准备【注意：与会计政策中披露的组合保持一致】",
-              "is_total": true,
-              "row_type": "total"
-            },
-            {
-              "label": "其中：",
-              "row_type": "data"
-            },
-            {
-              "label": "应收中央企业客户",
-              "row_type": "data"
-            },
-            {
-              "label": "应收海外企业客户",
-              "row_type": "data"
-            },
-            {
-              "label": "合计",
-              "is_total": true,
-              "row_type": "total"
-            }
-          ]
-        },
-        {
-          "name": "续：",
-          "headers": [
-            "类别",
+            "期末余额",
             "上年年末余额"
           ],
           "rows": [
             {
               "label": "类别",
-              "row_type": "header_label"
+              "row_type": "header_label",
+              "values": [
+                null
+              ]
             },
             {
               "label": "类别",
-              "row_type": "header_label"
+              "row_type": "header_label",
+              "values": [
+                null
+              ]
             },
             {
               "label": "按单项计提坏账准备",
-              "row_type": "data"
+              "row_type": "data",
+              "values": [
+                null
+              ]
             },
             {
               "label": "其中：",
-              "row_type": "data"
+              "row_type": "data",
+              "values": [
+                null
+              ]
             },
             {
               "label": "按组合计提坏账准备【注意：与会计政策中披露的组合保持一致】",
               "is_total": true,
-              "row_type": "total"
+              "row_type": "total",
+              "values": [
+                null
+              ]
             },
             {
               "label": "其中：",
-              "row_type": "data"
+              "row_type": "data",
+              "values": [
+                null
+              ]
             },
             {
               "label": "应收中央企业客户",
-              "row_type": "data"
+              "row_type": "data",
+              "values": [
+                null
+              ]
             },
             {
               "label": "应收海外企业客户",
-              "row_type": "data"
+              "row_type": "data",
+              "values": [
+                null
+              ]
             },
             {
               "label": "合计",
               "is_total": true,
-              "row_type": "total"
+              "row_type": "total",
+              "values": [
+                null
+              ]
             }
           ]
         },
@@ -8014,35 +7995,24 @@
           "name": "按单项计提坏账准备的应收账款",
           "headers": [
             "名称",
-            "期末余额"
-          ],
-          "rows": [
-            {
-              "label": "名称",
-              "row_type": "header_label"
-            },
-            {
-              "label": "合计",
-              "is_total": true,
-              "row_type": "total"
-            }
-          ]
-        },
-        {
-          "name": "续：",
-          "headers": [
-            "名称",
+            "期末余额",
             "上年年末余额"
           ],
           "rows": [
             {
               "label": "名称",
-              "row_type": "header_label"
+              "row_type": "header_label",
+              "values": [
+                null
+              ]
             },
             {
               "label": "合计",
               "is_total": true,
-              "row_type": "total"
+              "row_type": "total",
+              "values": [
+                null
+              ]
             }
           ]
         },
@@ -8299,6 +8269,37 @@
               "label": "合计",
               "is_total": true,
               "row_type": "total"
+            }
+          ]
+        },
+        {
+          "name": "转移应收账款且继续涉入形成的资产、负债",
+          "headers": [
+            "项 目",
+            "资产转移方式",
+            "继续涉入形成的资产金额",
+            "继续涉入形成的负债金额"
+          ],
+          "rows": [
+            {
+              "label": "",
+              "values": [
+                null,
+                null,
+                null
+              ],
+              "is_total": false,
+              "row_type": "data"
+            },
+            {
+              "label": "合 计",
+              "values": [
+                null,
+                null,
+                null
+              ],
+              "is_total": true,
+              "row_type": "data"
             }
           ]
         }

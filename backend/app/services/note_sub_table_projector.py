@@ -13,6 +13,7 @@ spec: disclosure-table-sync-convergence
 from __future__ import annotations
 
 import logging
+from functools import lru_cache
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -105,9 +106,16 @@ def project_sub_tables(table_data: Any) -> list[dict] | None:
         label_def = _pick_label_def(defs)
         label_key = label_def.get("key") if isinstance(label_def, dict) else None
         value_defs = [d for d in defs if d is not label_def]
+        # headers 产出子列名
         headers = [str(label_def.get("label", ""))] + [
             str(d.get("label", "")) for d in value_defs
         ]
+
+        # 分组信息：优先从 columns 的显式 group 字段提取；
+        # 无显式 group 时，自动从 headers 前缀检测分组（通用机制，不需要逐表手工标注）
+        col_groups = _extract_column_groups(defs)
+        if col_groups is None:
+            col_groups = _infer_groups_from_headers(headers)
 
         projected_rows = []
         for r in rows:
@@ -130,6 +138,197 @@ def project_sub_tables(table_data: Any) -> list[dict] | None:
             "columns": defs,
             "rows": projected_rows,
             "_source_sub_table_key": key,
+            "_column_groups": col_groups,
         })
 
     return tables
+
+
+def _extract_column_groups(defs: list[dict]) -> list[dict] | None:
+    """从列定义提取分组信息供前端渲染多级表头。
+
+    支持多级分组：group 字段用 "/" 分隔层级（如 "期末余额/账面余额"）。
+    返回树形结构供前端递归嵌套 el-table-column：
+    [{"group": "期末余额", "children": [
+        {"group": "账面余额", "columns": [idx1, idx2, ...]},
+        {"columns": [idx3]}  # 无子分组的直接列
+    ]}]
+    简单单级分组返回扁平格式 [{"group":"期末余额","start":1,"span":3}] 保持向后兼容。
+    无分组时返回 None。
+    """
+    if not defs:
+        return None
+
+    # 收集所有非 is_label 列的 group 信息
+    has_any_group = False
+    col_groups: list[tuple[int, str | None]] = []  # (headerIdx, group_path)
+    header_idx = 1  # headers[0] 是标签列
+    for d in defs:
+        if not isinstance(d, dict):
+            continue
+        if d.get("is_label"):
+            continue
+        g = d.get("group")
+        if g:
+            has_any_group = True
+        col_groups.append((header_idx, g if g else None))
+        header_idx += 1
+
+    if not has_any_group:
+        return None
+
+    # 检查是否有多级（含 "/"）
+    has_multi_level = any(g and "/" in g for _, g in col_groups)
+
+    if not has_multi_level:
+        # 单级分组 → 返回扁平格式 [{"group","start","span"}]（向后兼容）
+        groups: list[dict] = []
+        current_group: str | None = None
+        group_start = 0
+        group_span = 0
+        for idx, g in col_groups:
+            if g and g == current_group:
+                group_span += 1
+            else:
+                if current_group and group_span > 0:
+                    groups.append({"group": current_group, "start": group_start, "span": group_span})
+                if g:
+                    current_group = g
+                    group_start = idx
+                    group_span = 1
+                else:
+                    current_group = None
+                    group_span = 0
+        if current_group and group_span > 0:
+            groups.append({"group": current_group, "start": group_start, "span": group_span})
+        return groups if groups else None
+
+    # 多级分组 → 返回树形结构
+    # 按相邻且顶层 group 相同的列合并
+    tree: list[dict] = []
+    i = 0
+    while i < len(col_groups):
+        idx, g = col_groups[i]
+        if not g:
+            tree.append({"headerIdx": idx})
+            i += 1
+            continue
+
+        parts = g.split("/")
+        top = parts[0]
+        # 收集连续同顶层 group 的列
+        group_cols: list[tuple[int, list[str]]] = [(idx, parts)]
+        j = i + 1
+        while j < len(col_groups):
+            nidx, ng = col_groups[j]
+            if ng and ng.split("/")[0] == top:
+                group_cols.append((nidx, ng.split("/")))
+            else:
+                break
+            j += 1
+
+        # 构建子层级
+        if len(parts) == 1:
+            # 单级但在多级上下文中
+            tree.append({"group": top, "start": group_cols[0][0], "span": len(group_cols)})
+        else:
+            # 按第二级分组
+            children: list[dict] = []
+            ci = 0
+            while ci < len(group_cols):
+                c_idx, c_parts = group_cols[ci]
+                sub = c_parts[1] if len(c_parts) > 1 else None
+                if sub:
+                    # 收集连续同 sub 的列
+                    sub_cols = [c_idx]
+                    ck = ci + 1
+                    while ck < len(group_cols):
+                        ck_idx, ck_parts = group_cols[ck]
+                        if len(ck_parts) > 1 and ck_parts[1] == sub:
+                            sub_cols.append(ck_idx)
+                            ck += 1
+                        else:
+                            break
+                    children.append({"group": sub, "start": sub_cols[0], "span": len(sub_cols)})
+                    ci = ck
+                else:
+                    children.append({"headerIdx": c_idx})
+                    ci += 1
+            tree.append({"group": top, "children": children})
+
+        i = j
+
+    return tree if tree else None
+
+
+def _infer_groups_from_headers(headers: list[str]) -> list[dict] | None:
+    """从 headers 文本自动推断分组（通用机制，无需手工标注）。"""
+    # 委托带缓存的内部函数（list 不可 hash，转 tuple）
+    return _infer_groups_from_headers_cached(tuple(headers))
+
+
+@lru_cache(maxsize=256)
+def _infer_groups_from_headers_cached(headers: tuple[str, ...]) -> list[dict] | None:
+    """带缓存的实际推断逻辑。
+
+    规则：跳过 headers[0]（标签列），对值列检测相邻列共享前缀的模式。
+    只有当一个前缀覆盖 ≥2 列且去掉前缀后子列名有意义时才认为是分组。
+    返回与 _extract_column_groups 相同格式 [{"group","start","span"}]，或 None。
+    """
+    if len(headers) < 4:
+        return None
+
+    value_headers = list(headers[1:])  # 跳过标签列
+    if len(value_headers) < 4:
+        return None
+
+    # 尝试找公共前缀：取前一半和后一半分别找共享前缀
+    # 通用策略：逐个字符扫描相邻列，找最长公共前缀 ≥2 字符
+    def _find_prefix_of_run(items: list[str]) -> str:
+        """找一组字符串的最长公共前缀（≥2 中文字符才有意义）。"""
+        if not items or len(items) < 2:
+            return ""
+        prefix = items[0]
+        for s in items[1:]:
+            while prefix and not s.startswith(prefix):
+                prefix = prefix[:-1]
+            if not prefix:
+                return ""
+        # 前缀至少 2 字符且不等于完整字符串且去掉前缀后后缀互不相同
+        if len(prefix) < 2 or all(s == prefix for s in items):
+            return ""
+        suffixes = [s[len(prefix):] for s in items]
+        if len(set(suffixes)) != len(suffixes):
+            return ""  # 后缀有重复说明不是真分组
+        return prefix
+
+    # 扫描值列，用滑动窗口找连续 ≥2 列共享前缀的 runs
+    groups: list[dict] = []
+    i = 0
+    while i < len(value_headers):
+        # 尝试从 i 开始找最大的共享前缀 run
+        best_end = i
+        best_prefix = ""
+        for end in range(i + 2, len(value_headers) + 1):
+            p = _find_prefix_of_run(value_headers[i:end])
+            if p and len(p) >= 2:
+                best_end = end
+                best_prefix = p
+            else:
+                break
+
+        if best_prefix and best_end - i >= 2:
+            # 确认去掉前缀后子列名不为空
+            suffixes = [h[len(best_prefix):] for h in value_headers[i:best_end]]
+            if all(s.strip() for s in suffixes):
+                groups.append({
+                    "group": best_prefix.rstrip("：:"),  # 去掉可能的冒号尾缀
+                    "start": i + 1,  # +1 因为 headers 含标签列
+                    "span": best_end - i,
+                })
+                i = best_end
+                continue
+
+        i += 1
+
+    return groups if groups else None

@@ -53,7 +53,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, inject, onMounted, onUnmounted, toRef } from 'vue'
+import { ref, computed, inject, onMounted, onUnmounted, onBeforeUnmount, toRef } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
@@ -61,8 +61,10 @@ import http from '@/utils/http'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { buildH5SyncPayload, H5_NOTE_SECTION } from '../../composables/h5NoteSectionMap'
 import { buildNoteJumpRoute } from '@/views/composables/noteDisclosureReverseJump'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean }>()
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 const router = useRouter()
 const { year: auditYear } = useAuditContext()
@@ -93,6 +95,8 @@ onMounted(() => {
 onUnmounted(() => {
   eventBus.off('substantive:adjudicated', onAdjudicated)
 })
+
+onBeforeUnmount(() => { autoSync.cancelPending() })
 
 const summaryRows = computed(() => {
   const data = adjudicatedData.value
@@ -142,7 +146,7 @@ async function syncToNote(): Promise<void> {
       })),
       soeDisclosureText: soeDisclosureText.value,
     })
-    await http.post(`/api/disclosure-notes/${props.projectId}/${year}/${H5_NOTE_SECTION.soe}/sync-from-workpaper`, payload)
+    await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
     ElMessage.success('已同步到附注（八、25 油气资产）')
     eventBus.emit('disclosure:note-text-updated' as any, {
       wpCode: 'H5',
@@ -150,6 +154,7 @@ async function syncToNote(): Promise<void> {
       projectId: props.projectId,
       sectionIds: [H5_NOTE_SECTION.soe],
     })
+    autoSync.scheduleAutoSync(syncToNote)
   } catch (err: any) {
     if (err?.code !== 'ERR_CANCELED' && err?.name !== 'CanceledError') {
       ElMessage.error('同步失败')

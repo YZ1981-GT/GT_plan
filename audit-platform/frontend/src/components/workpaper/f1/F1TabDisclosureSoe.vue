@@ -302,7 +302,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, toRef, type Ref } from 'vue'
+import { computed, ref, toRef, onBeforeUnmount, type Ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
@@ -318,6 +318,7 @@ import type { ChecklistResponse } from '../composables/useF1FormData'
 import { ADJUDICATION_LABEL_BY_SEGMENT_KEY } from '../composables/agingPresets'
 import GtIndexChip from '../GtIndexChip.vue'
 import F1DisclosureUsageGuide from './F1DisclosureUsageGuide.vue'
+import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
 
 const props = withDefaults(defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -338,6 +339,19 @@ const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<strin
 const noteSectionId = F1_NOTE_SECTION.soe
 const showGuide = ref(false)
 const isSyncing = ref(false)
+
+// 保存后自动同步到附注（防抖/非阻塞/失败静默/只读 gate；与手动按钮同源 syncToDisclosureNotes）
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+onBeforeUnmount(() => autoSync.cancelPending())
+// 包装 saveImmediate/debouncedSave 使任一字段保存都触发一次自动同步
+const autoSaveImmediate = async (itemId: string, data: Partial<ChecklistResponse>): Promise<void> => {
+  await props.saveImmediate(itemId, data)
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
+}
+const autoDebouncedSave = (itemId: string, data: Partial<ChecklistResponse>): void => {
+  props.debouncedSave(itemId, data)
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
+}
 
 const router = useRouter()
 // 跳转回附注模块（披露表 → 附注为单向推送；此处仅导航，方便相互编辑确认）
@@ -380,8 +394,8 @@ const {
   allResponses: allResponsesRef,
   wpId: toRef(props, 'wpId') as Ref<string>,
   projectId: toRef(props, 'projectId') as Ref<string>,
-  saveImmediate: props.saveImmediate,
-  debouncedSave: props.debouncedSave,
+  saveImmediate: autoSaveImmediate,
+  debouncedSave: autoDebouncedSave,
   crossSheet: props.crossSheet,
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
   applicableStandards: toRef(props, 'applicableStandards') as unknown as Ref<string[]>,

@@ -33,6 +33,7 @@ import {
 import { buildK1SoeSyncPayloads } from './k1DisclosureSyncPayload'
 import {
   K1_ACCOUNT_CODE,
+  K1_NOTE_SECTION,
   isK1DisclosureApplicable,
   resolveK1NoteSectionTarget,
 } from './k1NoteSectionMap'
@@ -111,7 +112,14 @@ export function useK1DisclosureSoe(opts: {
     try {
       window.dispatchEvent(
         new CustomEvent('disclosure:note-text-updated', {
-          detail: { accountCode: K1_ACCOUNT_CODE, section: 'soe', text: noteText.value },
+          detail: {
+            wpCode: 'K1',
+            accountCode: K1_ACCOUNT_CODE,
+            section: 'soe',
+            projectId: projectId.value,
+            sectionIds: [K1_NOTE_SECTION.soe],
+            text: noteText.value,
+          },
         }),
       )
     } catch { /* silent */ }

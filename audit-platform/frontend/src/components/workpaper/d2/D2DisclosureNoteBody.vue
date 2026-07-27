@@ -7,7 +7,7 @@
  *
  * 由 D2TabDisclosure.vue 以 :key="variant" 挂载（切换版本即重建，持久化前缀随之切换）。
  */
-import { computed, inject, ref, toRef, type Ref } from 'vue'
+import { computed, inject, ref, toRef, onUnmounted, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useDebounceFn } from '@vueuse/core'
 import { Delete, Plus, RefreshLeft } from '@element-plus/icons-vue'
@@ -29,6 +29,7 @@ import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { getDisclosureNoteDetail } from '@/services/auditPlatformApi'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { useD2DisclosureImportExport } from '../composables/useD2DisclosureImportExport'
+import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
 
 const props = withDefaults(defineProps<{
   variant: D2DisclosureVariant
@@ -45,6 +46,10 @@ const isSoeVariant = computed(() => props.variant === 'soe')
 const { year: auditYear } = useAuditContext()
 
 // ─── 持久化（debounce 2s，与 D1 一致）──────────────────────────────────────────
+
+// 保存后自动同步到附注（防抖/非阻塞/失败静默/只读 gate；与手动按钮同源 syncToDisclosureNotes）
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+onUnmounted(() => autoSync.cancelPending())
 
 const pending = ref<ChecklistItem[]>([])
 const debouncedSave = useDebounceFn(async () => {
@@ -64,6 +69,7 @@ const debouncedSave = useDebounceFn(async () => {
 function save(items: ChecklistItem[]): void {
   pending.value.push(...items)
   debouncedSave()
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
 }
 
 // ─── Composable ──────────────────────────────────────────────────────────────
@@ -78,6 +84,8 @@ const {
   agingRows,
   detailAgingHasData,
   classRows,
+  soeClassEndRows,
+  soeClassPriorRows,
   individualRows, addIndividualRow, removeIndividualRow, updateIndividualRow, importIndividualFromBadDebt,
   portfolios, addPortfolio, renamePortfolio, removePortfolio, updatePortfolioCell,
   otherPortfolioRows, addOtherPortfolioRow, removeOtherPortfolioRow, updateOtherPortfolioRow,
@@ -87,6 +95,7 @@ const {
   writeOffRows, addWriteOffRow, removeWriteOffRow, updateWriteOffRow, importWriteOffFromWriteoffCheck,
   top5Rows, top5Total, top5Ratio, addTop5Row, removeTop5Row, updateTop5Row, importTop5FromAnalysis,
   derecognizedRows, addDerecognizedRow, removeDerecognizedRow, updateDerecognizedRow,
+  continuedInvolvementRows, addContinuedInvolvementRow, removeContinuedInvolvementRow, updateContinuedInvolvementRow,
   sectionNotes, setNote,
   setOverride, resetOverride,
   inconsistencyWarnings,
@@ -156,7 +165,7 @@ function buildAiContext(key: string): Record<string, string> {
   } else if (key === 'movement') {
     if (isSoeVariant.value) {
       ctx.坏账准备变动 = movementByCategory.value
-        .map((r) => `${r.label}: 期初=${r.priorAmount.toFixed(2)}, 变动=${r.changeAmount.toFixed(2)}, 期末=${r.endAmount.toFixed(2)}`)
+        .map((r) => `${r.label}: 期初=${r.priorAmount.toFixed(2)}, 计提=${r.provisionAmount.toFixed(2)}, 转回=${r.reversalAmount.toFixed(2)}, 核销=${r.writeOffAmount.toFixed(2)}, 期末=${r.endAmount.toFixed(2)}`)
         .join('；')
     } else {
       ctx.坏账准备变动 = movementFields.value.map((f) => `${f.label}=${f.amount.toFixed(2)}`).join('；')
@@ -695,53 +704,239 @@ async function checkNoteConsistency(silent = false): Promise<void> {
         </div>
       </template>
 
-      <el-table :data="classRows" border size="small" class="d2-disc__table">
-        <el-table-column label="类别" min-width="220">
-          <template #default="{ row }">
-            <span
-              :class="{ 'row-strong': row.kind === 'method' || row.kind === 'total', 'row-hint': row.kind === 'hint', 'row-detail': row.kind === 'detail' }"
-            >{{ row.label }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column :label="endLabel" min-width="150" align="right">
-          <template #default="{ row }">
-            <el-input-number
-              v-if="row.editable && !isReadonly"
-              :model-value="row.endAmount"
-              :controls="false"
-              :precision="2"
-              size="small"
-              class="amt-input"
-              :class="{ 'auto-cell': row.auto }"
-              @change="(v: number | undefined) => setOverride(`class:end:${row.key}`, v ?? 0)"
-            />
-            <el-tooltip v-else-if="row.autoSource" :content="row.autoSource" placement="top">
-              <span class="amt-cell" :class="{ 'auto-cell': row.kind !== 'hint' }">{{ row.kind === 'hint' ? '' : fmt(row.endAmount) }}</span>
-            </el-tooltip>
-            <span v-else class="amt-cell">{{ row.kind === 'hint' ? '' : fmt(row.endAmount) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column :label="priorLabel" min-width="150" align="right">
-          <template #default="{ row }">
-            <el-input-number
-              v-if="row.editable && !isReadonly"
-              :model-value="row.priorAmount"
-              :controls="false"
-              :precision="2"
-              size="small"
-              class="amt-input"
-              :class="{ 'auto-cell': row.auto }"
-              @change="(v: number | undefined) => setOverride(`class:prior:${row.key}`, v ?? 0)"
-            />
-            <span v-else class="amt-cell">{{ row.kind === 'hint' ? '' : fmt(row.priorAmount) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="取数说明" min-width="220">
-          <template #default="{ row }">
-            <span class="src-hint">{{ row.autoSource }}</span>
-          </template>
-        </el-table-column>
-      </el-table>
+      <!-- 国企版 6 列宽表（期末数+期初数各一张，三层表头） -->
+      <template v-if="isSoeVariant">
+        <el-table :data="soeClassEndRows" border size="small" class="d2-disc__table d2-disc__wide-table">
+          <el-table-column label="期末余额" align="center">
+            <el-table-column label="类 别" min-width="200">
+              <template #default="{ row }">
+                <span :class="{ 'row-strong': row.kind === 'total', 'row-detail': row.kind === 'subtotal' }">{{ row.label }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="账面余额" align="center">
+              <el-table-column label="金额" min-width="140" align="right">
+                <template #default="{ row }">
+                  <el-input-number
+                    v-if="row.editable && !isReadonly"
+                    :model-value="row.bookAmount"
+                    :controls="false"
+                    :precision="2"
+                    size="small"
+                    class="amt-input"
+                    @change="(v: number | undefined) => setOverride(`soeClass:current:${row.key}:book`, v ?? 0)"
+                  />
+                  <span v-else class="amt-cell">{{ fmt(row.bookAmount) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="比例（%）" min-width="90" align="right">
+                <template #default="{ row }">
+                  <span class="amt-cell auto-cell">{{ row.ratio.toFixed(2) }}</span>
+                </template>
+              </el-table-column>
+            </el-table-column>
+            <el-table-column label="坏账准备" align="center">
+              <el-table-column label="金额" min-width="140" align="right">
+                <template #default="{ row }">
+                  <el-input-number
+                    v-if="row.editable && !isReadonly"
+                    :model-value="row.provision"
+                    :controls="false"
+                    :precision="2"
+                    size="small"
+                    class="amt-input"
+                    @change="(v: number | undefined) => setOverride(`soeClass:current:${row.key}:prov`, v ?? 0)"
+                  />
+                  <span v-else class="amt-cell">{{ fmt(row.provision) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="预期信用损失率（%）" min-width="150" align="right">
+                <template #default="{ row }">
+                  <span class="amt-cell auto-cell">{{ row.lossRate.toFixed(2) }}</span>
+                </template>
+              </el-table-column>
+            </el-table-column>
+            <el-table-column label="账面价值" min-width="140" align="right">
+              <template #default="{ row }">
+                <span class="amt-cell auto-cell">{{ fmt(row.carryingValue) }}</span>
+              </template>
+            </el-table-column>
+          </el-table-column>
+        </el-table>
+
+        <el-table :data="soeClassPriorRows" border size="small" class="d2-disc__table d2-disc__wide-table" style="margin-top:14px">
+          <el-table-column label="上年年末余额" align="center">
+            <el-table-column label="类 别" min-width="200">
+              <template #default="{ row }">
+                <span :class="{ 'row-strong': row.kind === 'total', 'row-detail': row.kind === 'subtotal' }">{{ row.label }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="账面余额" align="center">
+              <el-table-column label="金额" min-width="140" align="right">
+                <template #default="{ row }">
+                  <el-input-number
+                    v-if="row.editable && !isReadonly"
+                    :model-value="row.bookAmount"
+                    :controls="false"
+                    :precision="2"
+                    size="small"
+                    class="amt-input"
+                    @change="(v: number | undefined) => setOverride(`soeClass:prior:${row.key}:book`, v ?? 0)"
+                  />
+                  <span v-else class="amt-cell">{{ fmt(row.bookAmount) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="比例（%）" min-width="90" align="right">
+                <template #default="{ row }">
+                  <span class="amt-cell auto-cell">{{ row.ratio.toFixed(2) }}</span>
+                </template>
+              </el-table-column>
+            </el-table-column>
+            <el-table-column label="坏账准备" align="center">
+              <el-table-column label="金额" min-width="140" align="right">
+                <template #default="{ row }">
+                  <el-input-number
+                    v-if="row.editable && !isReadonly"
+                    :model-value="row.provision"
+                    :controls="false"
+                    :precision="2"
+                    size="small"
+                    class="amt-input"
+                    @change="(v: number | undefined) => setOverride(`soeClass:prior:${row.key}:prov`, v ?? 0)"
+                  />
+                  <span v-else class="amt-cell">{{ fmt(row.provision) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="预期信用损失率（%）" min-width="150" align="right">
+                <template #default="{ row }">
+                  <span class="amt-cell auto-cell">{{ row.lossRate.toFixed(2) }}</span>
+                </template>
+              </el-table-column>
+            </el-table-column>
+            <el-table-column label="账面价值" min-width="140" align="right">
+              <template #default="{ row }">
+                <span class="amt-cell auto-cell">{{ fmt(row.carryingValue) }}</span>
+              </template>
+            </el-table-column>
+          </el-table-column>
+        </el-table>
+      </template>
+
+      <!-- 上市版：与国企版一致的 6 列分组宽表（期末金额 + 上年年末余额各一张） -->
+      <template v-else>
+        <el-table :data="soeClassEndRows" border size="small" class="d2-disc__table d2-disc__wide-table">
+          <el-table-column label="期末金额" align="center">
+            <el-table-column label="类 别" min-width="200">
+              <template #default="{ row }">
+                <span :class="{ 'row-strong': row.kind === 'total', 'row-detail': row.kind === 'subtotal' }">{{ row.label }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="账面余额" align="center">
+              <el-table-column label="金额" min-width="130" align="right">
+                <template #default="{ row }">
+                  <el-input-number
+                    v-if="row.editable && !isReadonly"
+                    :model-value="row.bookAmount"
+                    :controls="false"
+                    :precision="2"
+                    size="small"
+                    class="amt-input"
+                    @change="(v: number | undefined) => setOverride(`soeClass:current:${row.key}:book`, v ?? 0)"
+                  />
+                  <span v-else class="amt-cell">{{ fmt(row.bookAmount) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="比例（%）" min-width="80" align="right">
+                <template #default="{ row }">
+                  <span class="amt-cell auto-cell">{{ row.ratio.toFixed(2) }}</span>
+                </template>
+              </el-table-column>
+            </el-table-column>
+            <el-table-column label="坏账准备" align="center">
+              <el-table-column label="金额" min-width="130" align="right">
+                <template #default="{ row }">
+                  <el-input-number
+                    v-if="row.editable && !isReadonly"
+                    :model-value="row.provision"
+                    :controls="false"
+                    :precision="2"
+                    size="small"
+                    class="amt-input"
+                    @change="(v: number | undefined) => setOverride(`soeClass:current:${row.key}:prov`, v ?? 0)"
+                  />
+                  <span v-else class="amt-cell">{{ fmt(row.provision) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="预期信用损失率（%）" min-width="150" align="right">
+                <template #default="{ row }">
+                  <span class="amt-cell auto-cell">{{ row.lossRate.toFixed(2) }}</span>
+                </template>
+              </el-table-column>
+            </el-table-column>
+            <el-table-column label="账面价值" min-width="130" align="right">
+              <template #default="{ row }">
+                <span class="amt-cell auto-cell">{{ fmt(row.carryingValue) }}</span>
+              </template>
+            </el-table-column>
+          </el-table-column>
+        </el-table>
+
+        <el-table :data="soeClassPriorRows" border size="small" class="d2-disc__table d2-disc__wide-table" style="margin-top:14px">
+          <el-table-column label="上年年末余额" align="center">
+            <el-table-column label="类 别" min-width="200">
+              <template #default="{ row }">
+                <span :class="{ 'row-strong': row.kind === 'total', 'row-detail': row.kind === 'subtotal' }">{{ row.label }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="账面余额" align="center">
+              <el-table-column label="金额" min-width="130" align="right">
+                <template #default="{ row }">
+                  <el-input-number
+                    v-if="row.editable && !isReadonly"
+                    :model-value="row.bookAmount"
+                    :controls="false"
+                    :precision="2"
+                    size="small"
+                    class="amt-input"
+                    @change="(v: number | undefined) => setOverride(`soeClass:prior:${row.key}:book`, v ?? 0)"
+                  />
+                  <span v-else class="amt-cell">{{ fmt(row.bookAmount) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="比例（%）" min-width="80" align="right">
+                <template #default="{ row }">
+                  <span class="amt-cell auto-cell">{{ row.ratio.toFixed(2) }}</span>
+                </template>
+              </el-table-column>
+            </el-table-column>
+            <el-table-column label="坏账准备" align="center">
+              <el-table-column label="金额" min-width="130" align="right">
+                <template #default="{ row }">
+                  <el-input-number
+                    v-if="row.editable && !isReadonly"
+                    :model-value="row.provision"
+                    :controls="false"
+                    :precision="2"
+                    size="small"
+                    class="amt-input"
+                    @change="(v: number | undefined) => setOverride(`soeClass:prior:${row.key}:prov`, v ?? 0)"
+                  />
+                  <span v-else class="amt-cell">{{ fmt(row.provision) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="预期信用损失率（%）" min-width="150" align="right">
+                <template #default="{ row }">
+                  <span class="amt-cell auto-cell">{{ row.lossRate.toFixed(2) }}</span>
+                </template>
+              </el-table-column>
+            </el-table-column>
+            <el-table-column label="账面价值" min-width="130" align="right">
+              <template #default="{ row }">
+                <span class="amt-cell auto-cell">{{ fmt(row.carryingValue) }}</span>
+              </template>
+            </el-table-column>
+          </el-table-column>
+        </el-table>
+      </template>
 
       <div class="section-note">
         <label>说明：</label>
@@ -812,20 +1007,44 @@ async function checkNoteConsistency(silent = false): Promise<void> {
             />
           </template>
         </el-table-column>
+        <!-- 坏账准备/预期信用损失率/计提依据：上市版+国企版统一显示 -->
+        <el-table-column label="坏账准备" min-width="140" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              :model-value="row.provision"
+              :controls="false"
+              :precision="2"
+              size="small"
+              class="amt-input"
+              :disabled="isReadonly"
+              @change="(v: number | undefined) => updateIndividualRow(row.rowId, 'provision', v ?? 0)"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column label="预期信用损失率（%）" min-width="140" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              :model-value="row.lossRate"
+              :controls="false"
+              :precision="2"
+              size="small"
+              class="amt-input"
+              :disabled="isReadonly"
+              @change="(v: number | undefined) => updateIndividualRow(row.rowId, 'lossRate', v ?? 0)"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column label="计提依据" min-width="200">
+          <template #default="{ row }">
+            <el-input
+              :model-value="row.basis"
+              size="small"
+              :disabled="isReadonly"
+              @change="(v: string) => updateIndividualRow(row.rowId, 'basis', v)"
+            />
+          </template>
+        </el-table-column>
         <template v-if="isSoeVariant">
-          <el-table-column label="坏账准备" min-width="140" align="right">
-            <template #default="{ row }">
-              <el-input-number
-                :model-value="row.provision"
-                :controls="false"
-                :precision="2"
-                size="small"
-                class="amt-input"
-                :disabled="isReadonly"
-                @change="(v: number | undefined) => updateIndividualRow(row.rowId, 'provision', v ?? 0)"
-              />
-            </template>
-          </el-table-column>
           <el-table-column label="账龄" min-width="120">
             <template #default="{ row }">
               <el-select
@@ -839,29 +1058,6 @@ async function checkNoteConsistency(silent = false): Promise<void> {
               >
                 <el-option v-for="seg in agingSegments" :key="seg.key" :label="seg.label" :value="seg.label" />
               </el-select>
-            </template>
-          </el-table-column>
-          <el-table-column label="预期信用损失率（%）" min-width="150" align="right">
-            <template #default="{ row }">
-              <el-input-number
-                :model-value="row.lossRate"
-                :controls="false"
-                :precision="2"
-                size="small"
-                class="amt-input"
-                :disabled="isReadonly"
-                @change="(v: number | undefined) => updateIndividualRow(row.rowId, 'lossRate', v ?? 0)"
-              />
-            </template>
-          </el-table-column>
-          <el-table-column label="计提理由" min-width="200">
-            <template #default="{ row }">
-              <el-input
-                :model-value="row.basis"
-                size="small"
-                :disabled="isReadonly"
-                @change="(v: string) => updateIndividualRow(row.rowId, 'basis', v)"
-              />
             </template>
           </el-table-column>
         </template>
@@ -918,7 +1114,7 @@ async function checkNoteConsistency(silent = false): Promise<void> {
           <el-table-column label="账龄" min-width="160">
             <template #default="{ row }">{{ row.label }}</template>
           </el-table-column>
-          <el-table-column :label="endLabel" min-width="150" align="right">
+          <el-table-column :label="isSoeVariant ? '账面金额' : endLabel" min-width="140" align="right">
             <template #default="{ row }">
               <el-input-number
                 :model-value="row.endAmount"
@@ -931,7 +1127,27 @@ async function checkNoteConsistency(silent = false): Promise<void> {
               />
             </template>
           </el-table-column>
-          <el-table-column :label="priorLabel" min-width="150" align="right">
+          <template v-if="isSoeVariant">
+            <el-table-column label="比例(%)" min-width="90" align="right">
+              <template #default="{ row }">
+                <span class="amt-cell auto-cell">{{ group.rows.reduce((s, r) => s + r.endAmount, 0) > 0 ? ((row.endAmount / group.rows.reduce((s, r) => s + r.endAmount, 0)) * 100).toFixed(2) : '0.00' }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="坏账准备" min-width="140" align="right">
+              <template #default="{ row }">
+                <el-input-number
+                  :model-value="row.provision"
+                  :controls="false"
+                  :precision="2"
+                  size="small"
+                  class="amt-input"
+                  :disabled="isReadonly"
+                  @change="(v: number | undefined) => updatePortfolioCell(group.groupId, row.key, 'provision', v ?? 0)"
+                />
+              </template>
+            </el-table-column>
+          </template>
+          <el-table-column v-if="!isSoeVariant" :label="priorLabel" min-width="150" align="right">
             <template #default="{ row }">
               <el-input-number
                 :model-value="row.priorAmount"
@@ -1056,14 +1272,14 @@ async function checkNoteConsistency(silent = false): Promise<void> {
         <span class="amt-cell row-strong">{{ fmt(movementEndBalance) }}</span>
       </div>
 
-      <!-- 国企：按类别 -->
+      <!-- 国企：按类别 5 列变动表（期初/计提/收回或转回/转销或核销/期末） -->
       <el-table v-else :data="movementByCategory" border size="small" class="d2-disc__table">
-        <el-table-column label="类别" min-width="220">
+        <el-table-column label="类 别" min-width="200">
           <template #default="{ row }">
             <span :class="{ 'row-strong': row.isTotal }">{{ row.label }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="期初数" min-width="150" align="right">
+        <el-table-column label="期初数" min-width="130" align="right">
           <template #default="{ row }">
             <el-input-number
               v-if="!row.isTotal && !isReadonly"
@@ -1078,14 +1294,52 @@ async function checkNoteConsistency(silent = false): Promise<void> {
             <span v-else class="amt-cell">{{ fmt(row.priorAmount) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="本期变动金额" min-width="150" align="right">
+        <el-table-column label="本期计提" min-width="130" align="right">
           <template #default="{ row }">
-            <el-tooltip content="= 期末数 − 期初数（自动计算）" placement="top">
-              <span class="amt-cell calc-cell">{{ fmt(row.changeAmount) }}</span>
-            </el-tooltip>
+            <el-input-number
+              v-if="!row.isTotal && !isReadonly"
+              :model-value="row.provisionAmount"
+              :controls="false"
+              :precision="2"
+              size="small"
+              class="amt-input"
+              :class="{ 'auto-cell': row.auto }"
+              @change="(v: number | undefined) => setOverride(`movementCat:provision:${row.key}`, v ?? 0)"
+            />
+            <span v-else class="amt-cell">{{ fmt(row.provisionAmount) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="期末数" min-width="150" align="right">
+        <el-table-column label="收回或转回" min-width="130" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!row.isTotal && !isReadonly"
+              :model-value="row.reversalAmount"
+              :controls="false"
+              :precision="2"
+              size="small"
+              class="amt-input"
+              :class="{ 'auto-cell': row.auto }"
+              @change="(v: number | undefined) => setOverride(`movementCat:reversal:${row.key}`, v ?? 0)"
+            />
+            <span v-else class="amt-cell">{{ fmt(row.reversalAmount) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="转销或核销" min-width="130" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-if="!row.isTotal && !isReadonly"
+              :model-value="row.writeOffAmount"
+              :controls="false"
+              :precision="2"
+              size="small"
+              class="amt-input"
+              :class="{ 'auto-cell': row.auto }"
+              @change="(v: number | undefined) => setOverride(`movementCat:writeoff:${row.key}`, v ?? 0)"
+            />
+            <span v-else class="amt-cell">{{ fmt(row.writeOffAmount) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="期末数" min-width="130" align="right">
           <template #default="{ row }">
             <el-input-number
               v-if="!row.isTotal && !isReadonly"
@@ -1098,11 +1352,6 @@ async function checkNoteConsistency(silent = false): Promise<void> {
               @change="(v: number | undefined) => setOverride(`movementCat:end:${row.key}`, v ?? 0)"
             />
             <span v-else class="amt-cell">{{ fmt(row.endAmount) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="取数说明" min-width="220">
-          <template #default="{ row }">
-            <span class="src-hint">{{ row.autoSource }}</span>
           </template>
         </el-table-column>
       </el-table>
@@ -1411,8 +1660,8 @@ async function checkNoteConsistency(silent = false): Promise<void> {
       </div>
     </el-card>
 
-    <!-- ⑨ 国企：由金融资产转移而终止确认的应收账款 -->
-    <el-card v-if="isSoeVariant" shadow="never" class="d2-disc__card">
+    <!-- ⑥ 因金融资产转移而终止确认的应收账款（上市+国企通用） -->
+    <el-card shadow="never" class="d2-disc__card">
       <template #header>
         <div class="card-head">
           <span class="card-title">{{ D2_TABLE_NAMES.soe.derecognized }}</span>
@@ -1464,6 +1713,76 @@ async function checkNoteConsistency(silent = false): Promise<void> {
       </el-table>
     </el-card>
 
+    <!-- ⑦ 转移应收账款且继续涉入形成的资产、负债 -->
+    <el-card shadow="never" class="d2-disc__card">
+      <template #header>
+        <div class="card-head">
+          <span class="card-title">转移应收账款且继续涉入形成的资产、负债</span>
+          <div class="card-head-right">
+            <el-button size="small" type="primary" plain :icon="Plus" :disabled="isReadonly" @click="addContinuedInvolvementRow">新增行</el-button>
+            <GtReviewTrigger :section-id="`D2-disc-${variant}-continued-involvement`" label="💬 复核" />
+          </div>
+        </div>
+      </template>
+
+      <el-table :data="continuedInvolvementRows" border size="small" class="d2-disc__table">
+        <el-table-column label="项 目" min-width="200">
+          <template #default="{ row }">
+            <el-input :model-value="row.item" size="small" :disabled="isReadonly" @change="(v: string) => updateContinuedInvolvementRow(row.rowId, 'item', v)" />
+          </template>
+        </el-table-column>
+        <el-table-column label="资产转移方式" min-width="180">
+          <template #default="{ row }">
+            <el-input :model-value="row.transferMethod" size="small" :disabled="isReadonly" @change="(v: string) => updateContinuedInvolvementRow(row.rowId, 'transferMethod', v)" />
+          </template>
+        </el-table-column>
+        <el-table-column label="继续涉入形成的资产金额" min-width="180" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              :model-value="row.assetAmount"
+              :controls="false"
+              :precision="2"
+              size="small"
+              class="amt-input"
+              :disabled="isReadonly"
+              @change="(v: number | undefined) => updateContinuedInvolvementRow(row.rowId, 'assetAmount', v ?? 0)"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column label="继续涉入形成的负债金额" min-width="180" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              :model-value="row.liabilityAmount"
+              :controls="false"
+              :precision="2"
+              size="small"
+              class="amt-input"
+              :disabled="isReadonly"
+              @change="(v: number | undefined) => updateContinuedInvolvementRow(row.rowId, 'liabilityAmount', v ?? 0)"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column v-if="!isReadonly" label="" width="60" align="center">
+          <template #default="{ row }">
+            <el-button :icon="Delete" text type="danger" size="small" @click="removeContinuedInvolvementRow(row.rowId)" />
+          </template>
+        </el-table-column>
+        <template #empty>暂无转移应收账款且继续涉入的情况</template>
+      </el-table>
+
+      <div class="section-note">
+        <label>说明：</label>
+        <el-input
+          type="textarea"
+          :autosize="{ minRows: 3 }"
+          :model-value="sectionNotes['continuedInvolvement'] || ''"
+          :disabled="isReadonly"
+          placeholder="【转移金融资产且继续涉入的，应按照金融资产转移方式分类列示已转移金融资产的继续涉入形成的资产、负债的金额。】"
+          @input="(v: string) => setNote('continuedInvolvement', v)"
+        />
+      </div>
+    </el-card>
+
     <!-- 编制提示 -->
     <details class="d2-disc__guidance">
       <summary>📋 编制提示</summary>
@@ -1493,6 +1812,8 @@ async function checkNoteConsistency(silent = false): Promise<void> {
 .d2-disc__table :deep(.el-table__cell) { padding: 3px 6px; }
 .d2-disc__table :deep(th.el-table__cell) { padding: 4px 6px; }
 .d2-disc__table :deep(td.is-right .cell) { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.d2-disc__wide-table { margin-bottom: 12px; }
+.d2-disc__sub-title { font-size: 13px; font-weight: 600; margin: 14px 0 6px; color: #303133; }
 .amt-cell { font-variant-numeric: tabular-nums; }
 .amt-input { width: 100%; }
 .amt-input :deep(.el-input__inner) { text-align: right; font-variant-numeric: tabular-nums; }

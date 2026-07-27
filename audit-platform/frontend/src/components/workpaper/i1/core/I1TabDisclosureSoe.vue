@@ -139,7 +139,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, toRef } from 'vue'
+import { ref, toRef, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
@@ -158,6 +158,7 @@ import {
 } from '../../composables/i1SoeDisclosureModel'
 import { buildI1SoeSyncPayloads } from '../../composables/i1DisclosureSyncPayload'
 import { I1_NOTE_SECTION } from '../../composables/i1NoteSectionMap'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 
 const props = defineProps<{
   wpId: string
@@ -174,6 +175,7 @@ const emit = defineEmits<{
 
 const noteSectionId = I1_NOTE_SECTION.soe
 const isSyncing = ref(false)
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 
 const router = useRouter()
 // 跳转回附注模块（披露表 → 附注为单向推送；此处仅导航，方便相互编辑确认）
@@ -323,12 +325,15 @@ async function syncToNotes() {
       sheet: '附注披露信息（国有企业）',
     })
     ElMessage.success(`已同步至附注 ${noteSectionId}（${rows} 行）`)
+    autoSync.scheduleAutoSync(syncToNotes)
   } catch (e: any) {
     ElMessage.error(e?.message || '同步失败')
   } finally {
     isSyncing.value = false
   }
 }
+
+onBeforeUnmount(() => autoSync.cancelPending())
 </script>
 
 <style scoped>

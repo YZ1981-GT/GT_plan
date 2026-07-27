@@ -464,6 +464,46 @@ def apply_gt_three_line(table) -> None:
         _set_row_bottom_border(table.rows[0], sz=4)
 
 
+def _build_two_level_header_rows(
+    headers: list[str],
+    column_groups: list[dict],
+) -> list[list[dict]]:
+    """从 headers + _column_groups 构建两行表头定义（供 fill_multi_header 消费）。
+
+    Row 0: 分组父表头（合并跨列）+ 无分组列纵向合并2行
+    Row 1: 分组内子列名 + 纵向合并列占位（空，被 rowspan 覆盖）
+    """
+    num_cols = len(headers)
+    row0: list[dict] = []
+    row1: list[dict] = []
+
+    # 标记哪些列索引被分组覆盖
+    grouped_ranges: dict[int, dict] = {}  # start_col → group_info
+    for g in column_groups:
+        if "start" in g and "span" in g:
+            grouped_ranges[g["start"]] = g
+
+    i = 0
+    while i < num_cols:
+        if i in grouped_ranges:
+            g = grouped_ranges[i]
+            span = g["span"]
+            # Row 0: 分组名跨 span 列
+            row0.append({"text": g["group"], "colspan": span, "rowspan": 1})
+            # Row 1: 各子列名
+            for j in range(span):
+                col_idx = i + j
+                row1.append({"text": headers[col_idx] if col_idx < num_cols else "", "colspan": 1, "rowspan": 1})
+            i += span
+        else:
+            # 无分组列：纵向合并2行
+            row0.append({"text": headers[i], "colspan": 1, "rowspan": 2})
+            row1.append({"text": "", "colspan": 1, "rowspan": 1})  # 占位（被 rowspan 覆盖）
+            i += 1
+
+    return [row0, row1]
+
+
 def fill_multi_header(
     table,
     header_rows: list[list[dict]],
@@ -1334,24 +1374,38 @@ class NoteWordExporter:
         num_cols = len(headers)
         num_rows = len(rows) + 1  # +1 for header row
 
+        # 检测是否有两级分组表头（_column_groups）
+        column_groups = table_data.get("_column_groups")
+        has_multi_header = isinstance(column_groups, list) and len(column_groups) > 0
+
+        if has_multi_header:
+            num_rows = len(rows) + 2  # +2 for two header rows
+
         table = doc.add_table(rows=num_rows, cols=num_cols)
         table.alignment = WD_TABLE_ALIGNMENT.CENTER
 
         # Sprint 2 Task 2.2: 致同三线表（顶/底 1pt + 表头 cell tcBorders.bottom 1/2pt + 其他 nil）
         apply_gt_three_line(table)
 
-        # Header row
-        header_row = table.rows[0]
-        for i, h in enumerate(headers):
-            cell = header_row.cells[i]
-            cell.text = ""
-            p = cell.paragraphs[0]
-            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            run = p.add_run(str(h))
-            _set_run_font(run, bold=True)
-
-        # Sprint 2 Task 2.2: 表头行 + 数据行均固定 0.7cm + 关闭标题行重复
-        apply_gt_row_height(header_row, cm=0.7)
+        if has_multi_header:
+            # 两级表头：用 fill_multi_header 渲染合并单元格
+            header_row_defs = _build_two_level_header_rows(headers, column_groups)
+            fill_multi_header(table, header_row_defs, num_cols)
+            apply_gt_row_height(table.rows[0], cm=0.7)
+            apply_gt_row_height(table.rows[1], cm=0.7)
+            data_start_row = 2
+        else:
+            # 单级扁平表头
+            header_row = table.rows[0]
+            for i, h in enumerate(headers):
+                cell = header_row.cells[i]
+                cell.text = ""
+                p = cell.paragraphs[0]
+                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                run = p.add_run(str(h))
+                _set_run_font(run, bold=True)
+            apply_gt_row_height(header_row, cm=0.7)
+            data_start_row = 1
 
         # 表级 sidecar 数据（D1）：_formulas / _cell_modes 优先取 row 级
         formulas_index: dict[tuple[int, int], dict[str, Any]] = {}
@@ -1366,7 +1420,7 @@ class NoteWordExporter:
             cells_data = row.get("cells", values)
             cell_modes = row.get("_cell_modes") or []
 
-            data_row = table.rows[r_idx + 1]
+            data_row = table.rows[r_idx + data_start_row]
             apply_gt_row_height(data_row, cm=0.7)
 
             # First column: label

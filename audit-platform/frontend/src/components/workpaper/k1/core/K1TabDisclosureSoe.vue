@@ -13,7 +13,7 @@
           type="primary"
           :loading="dis.isSyncing.value"
           :disabled="isReadonly || !projectId"
-          @click="dis.syncToNotes()"
+          @click="syncToDisclosureNotes()"
         >
           同步至附注
         </el-button>
@@ -405,7 +405,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, inject, toRef, defineComponent, h } from 'vue'
+import { ref, computed, inject, toRef, defineComponent, h, onBeforeUnmount } from 'vue'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
@@ -483,6 +484,15 @@ function agingRowClass({ row }: { row: K1AgingDisclosureRow }) {
   if (row.kind === 'provision') return 'is-provision-row'
   return ''
 }
+
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+
+async function syncToDisclosureNotes() {
+  await dis.syncToNotes()
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
+}
+
+onBeforeUnmount(() => autoSync.cancelPending())
 </script>
 
 <style scoped>

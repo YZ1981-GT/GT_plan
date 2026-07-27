@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /** F2TabDisclosureSoe — 附注披露（国企），对齐源模板结构 */
-import { ref, toRef, type Ref } from 'vue'
+import { ref, toRef, watch, onBeforeUnmount, type Ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
@@ -13,6 +13,7 @@ import {
 import { F2_NOTE_SECTION } from '../../composables/f2NoteSectionMap'
 import type { ChecklistResponse } from '../../composables/useF2FormData'
 import GtIndexChip from '../../GtIndexChip.vue'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 
 const props = defineProps<{
   wpId: string
@@ -42,6 +43,12 @@ const {
 
 const isSyncing = ref(false)
 const noteSectionId = F2_NOTE_SECTION.soe
+
+// 保存后自动同步到附注（防抖/非阻塞/失败静默/只读 gate；与手动按钮同源 syncToDisclosureNotes）
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+onBeforeUnmount(() => autoSync.cancelPending())
+// 数据变更后自动同步（composable 内部保存触发 dataUpdatedVisible）
+watch(dataUpdatedVisible, (v) => { if (v) autoSync.scheduleAutoSync(syncToDisclosureNotes) })
 
 const router = useRouter()
 // 跳转回附注模块（披露表 → 附注为单向推送；此处仅导航，方便相互编辑确认）

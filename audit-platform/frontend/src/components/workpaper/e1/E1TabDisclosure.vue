@@ -28,6 +28,7 @@ import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/
 import { buildE1SyncPayload, E1_NOTE_SECTION, type E1DisclosureSnapshot } from '../composables/e1NoteSectionMap'
 import { amountFormatter, amountParser } from '../composables/wpAmountInput'
 import { useAuditContext } from '@/composables/useAuditContext'
+import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -50,6 +51,10 @@ const router = useRouter()
 // 审计年度（单一真源 projectStore），用于同步到附注时定位正确年度的附注记录，
 // 避免后端按服务器当前年默认导致同步到错误年度的附注（附注模块显示审计年度记录）。
 const { year: auditYear } = useAuditContext()
+
+// 保存后自动同步到附注（防抖/非阻塞/失败静默/只读 gate；与手动按钮同源 syncToDisclosureNotes）
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+onBeforeUnmount(() => autoSync.cancelPending())
 
 // 跳转回附注模块（披露表 → 附注为单向推送；此处仅导航，方便相互编辑确认）
 // 上市→五、1 / 国企→八、1，可自由切换上市↔国企
@@ -581,6 +586,9 @@ function persistAll(): void {
     sectionIds: items.map((it: any) => it.item_id),
     timestamp: Date.now(),
   })
+
+  // 自动同步到附注（防抖/非阻塞/失败静默）
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
 }
 
 // ─── Handlers ────────────────────────────────────────────────────────────────

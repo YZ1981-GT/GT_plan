@@ -234,7 +234,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, type Ref } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import GtIndexChip from '../../GtIndexChip.vue'
@@ -251,6 +251,7 @@ import {
   type J1DisclosureRow as DRow,
   type ChecklistItem,
 } from '@/composables/workpaper/j1/useJ1DisclosureSections'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 
 const props = defineProps<{
   wpId: string
@@ -262,6 +263,7 @@ const props = defineProps<{
 }>()
 
 const isReadonly = props.isReadonly ?? false
+const autoSync = useDisclosureAutoSync({ isReadonly: () => isReadonly })
 const projectId = props.projectId || ''
 
 const selectedRow = ref<DRow | null>(null)
@@ -368,7 +370,7 @@ async function syncToDisclosureNotes() {
       postEmployment: postEmploymentData.value,
       notes: notes.value as Record<string, string>,
     }
-    const { section, body } = buildJ1SyncPayload({
+    const { body } = buildJ1SyncPayload({
       variant: 'listed',
       wpId: props.wpId,
       year: useAuditContext().year.value,
@@ -376,7 +378,7 @@ async function syncToDisclosureNotes() {
     })
     const http = (await import('@/utils/http')).default
     await http.post(
-      `/api/disclosure-notes/${props.projectId}/${useAuditContext().year.value}/${encodeURIComponent(section)}/sync-from-workpaper`,
+      `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,
       body,
     )
     eventBus.emit('disclosure:note-text-updated', {
@@ -386,6 +388,7 @@ async function syncToDisclosureNotes() {
       sectionIds: [J1_NOTE_SECTION.listed],
     } as any)
     ElMessage.success('已同步到附注（五、40）')
+    autoSync.scheduleAutoSync(syncToDisclosureNotes)
   } catch (e: any) {
     ElMessage.error(e?.response?.data?.detail || '同步到附注失败，请重试')
   } finally {
@@ -404,11 +407,12 @@ function addSummaryRow() {
   if (isReadonly) return
   summaryData.value.push({ id: `s-${Date.now()}`, label: '', category: 'summary', beginBalance: 0, increase: 0, decrease: 0, endBalance: 0 })
   persist()
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
 }
 
 function removeSummaryRow(id: string) {
   const idx = summaryData.value.findIndex(r => r.id === id)
-  if (idx >= 0) { summaryData.value.splice(idx, 1); persist() }
+  if (idx >= 0) { summaryData.value.splice(idx, 1); persist(); autoSync.scheduleAutoSync(syncToDisclosureNotes) }
 }
 
 function addRow(category: string) {
@@ -419,16 +423,17 @@ function addRow(category: string) {
   const sel = selectedRow.value
   if (sel && !sel.isSubtotal && sel.category === category) {
     const idx = arr.value.findIndex(r => r.id === sel.id)
-    if (idx >= 0) { arr.value.splice(idx + 1, 0, newRow); persist(); return }
+    if (idx >= 0) { arr.value.splice(idx + 1, 0, newRow); persist(); autoSync.scheduleAutoSync(syncToDisclosureNotes); return }
   }
   arr.value.push(newRow)
   persist()
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
 }
 
 function removeRow(id: string, category: string) {
   const arr = category === 'short_term' ? shortTermData : postEmploymentData
   const idx = arr.value.findIndex(r => r.id === id)
-  if (idx >= 0) { arr.value.splice(idx, 1); persist() }
+  if (idx >= 0) { arr.value.splice(idx, 1); persist(); autoSync.scheduleAutoSync(syncToDisclosureNotes) }
 }
 
 function fmtN(v: number | null | undefined): string {
@@ -461,6 +466,7 @@ async function aiGenerate(section: string) {
     if (key) {
       notes.value[key] = text
       persist()
+      autoSync.scheduleAutoSync(syncToDisclosureNotes)
     }
   } catch { /* AI不可用时静默 */ }
 }
@@ -468,6 +474,8 @@ async function aiGenerate(section: string) {
 onMounted(() => {
   hydrate()
 })
+
+onBeforeUnmount(() => autoSync.cancelPending())
 </script>
 
 <style scoped>

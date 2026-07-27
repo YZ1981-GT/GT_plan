@@ -197,6 +197,7 @@ import {
 } from '../composables/g3AdjudicationItems'
 import { G3_ADJ_STORAGE_KEY } from '../composables/g3Constants'
 import { buildG3ListedSyncPayloads } from '../composables/g3DisclosureSyncPayload'
+import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
 import {
   G3_ACCOUNT_CODE,
   G3_COMBINED_DISCLOSURE_INDEX,
@@ -229,6 +230,7 @@ const openReviewDialog = inject<((sectionId: string) => void) | null>('openRevie
 const router = useRouter()
 const route = useRoute()
 const isSyncing = ref(false)
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 
 const noteTarget = computed(() => resolveG3NoteSectionTarget('listed', props.applicableStandards))
 const noteChip = computed(() => noteTarget.value?.chipValue ?? `Note:${G3_NOTE_SECTION.listed}`)
@@ -384,6 +386,7 @@ async function syncToDisclosureNotes() {
       rows += Number(data?.rows_synced ?? 0)
     }
     ElMessage.success(`已同步 ${rows} 行到附注模块「五、8 其他应收款（应收股利）」`)
+    autoSync.scheduleAutoSync(syncToDisclosureNotes)
   } catch {
     ElMessage.warning('同步附注失败，请稍后重试')
   } finally {
@@ -392,7 +395,7 @@ async function syncToDisclosureNotes() {
 }
 
 onMounted(() => { eventBus.on('substantive:adjudicated', handleAdjudicated) })
-onBeforeUnmount(() => { eventBus.off('substantive:adjudicated', handleAdjudicated) })
+onBeforeUnmount(() => { eventBus.off('substantive:adjudicated', handleAdjudicated); autoSync.cancelPending() })
 
 function fmtNum(v: unknown): string {
   if (v === 0) return '—'

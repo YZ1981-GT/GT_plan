@@ -166,12 +166,13 @@
 /**
  * H8TabDisclosureSoe — 使用权资产附注披露（国企）
  */
-import { ref, toRef } from 'vue'
+import { ref, toRef, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { useH8SoeDisclosure } from '../../composables/useH8Disclosure'
 import {
@@ -203,6 +204,9 @@ const emit = defineEmits<{
 const noteSectionId = H8_NOTE_SECTION.soe
 const isSyncing = ref(false)
 
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+onBeforeUnmount(() => autoSync.cancelPending())
+
 const router = useRouter()
 // 跳转回附注模块（披露表 → 附注为单向推送；此处仅导航，方便相互编辑确认）
 function jumpToNote(target: DisclosureVariant): void {
@@ -221,7 +225,7 @@ const {
   pullFromSources,
 } = useH8SoeDisclosure({
   allResponses: toRef(props, 'allResponses'),
-  onSave: (id, v) => emit('save', id, v),
+  onSave: (id, v) => { emit('save', id, v); autoSync.scheduleAutoSync(syncToNotes) },
 })
 
 function fmt(n: number): string {

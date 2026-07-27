@@ -35,6 +35,16 @@
         </div>
       </div>
 
+      <!-- 公式求值状态（Req 5.2） -->
+      <el-alert
+        :type="summary.formula_enabled ? 'success' : 'info'"
+        :closable="false"
+        show-icon
+        :title="`公式求值：${summary.formula_enabled ? '已启用' : '未启用'}`"
+        :description="summary.formula_enabled ? '本项目附注表内公式（合计/变动恒等式）将自动求值并写入对应单元格。' : '本项目尚未启用表内公式求值，合计/变动恒等式暂不自动计算。可在项目设置中按需开启。'"
+        style="margin-bottom: 10px"
+      />
+
       <el-alert
         v-if="!summary.validation_ran"
         type="info"
@@ -181,7 +191,7 @@ const sections = ref<NoteReadinessSection[]>([])
 const summary = ref<NoteReadinessSummary>({
   total: 0, with_data: 0, empty: 0, syncable: 0, never_synced: 0,
   stale: 0, stale_report: 0, error_sections: 0, warning_sections: 0,
-  validated_at: null, validation_ran: false,
+  validated_at: null, validation_ran: false, formula_enabled: false,
 })
 const filterMode = ref<'all' | 'needs_sync' | 'empty' | 'issues' | 'stale'>('all')
 

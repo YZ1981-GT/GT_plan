@@ -303,6 +303,7 @@ import {
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import { dispatchG6SaveItems } from '../../composables/g6CrossHelpers'
 import type { ColumnDef } from '../../composables/disclosureColumnDefs'
+import { useDisclosureAutoSync } from '../../../composables/useDisclosureAutoSync'
 
 interface BalanceRow {
   item: string
@@ -344,6 +345,7 @@ const STAGES_KEY = 'G6-disclosure-soe-stages'
 const TEXT_KEY = 'G6-disclosure-soe-text'
 
 const isReadonly = computed(() => props.isReadonly)
+const autoSync = useDisclosureAutoSync({ isReadonly: () => isReadonly.value })
 const wpIdRef = computed(() => props.wpId)
 const { generateAndConfirm, aiAvailable, loading: aiLoading } = useG6MainAiGenerate(wpIdRef)
 const isSyncing = ref(false)
@@ -781,6 +783,7 @@ async function syncToDisclosureNotes(): Promise<void> {
     )
     const data = result?.data ?? result
     ElMessage.success(`已同步 ${Number(data?.rows_synced ?? 0)} 行到附注模块“${noteSection.value} 其他债权投资”`)
+    autoSync.scheduleAutoSync(syncToDisclosureNotes)
   } catch {
     ElMessage.warning('同步附注失败，请稍后重试')
   } finally {
@@ -817,6 +820,7 @@ onMounted(() => {
   window.addEventListener('substantive:adjudicated', handleAdjudicated)
 })
 onBeforeUnmount(() => {
+  autoSync.cancelPending()
   window.removeEventListener('substantive:adjudicated', handleAdjudicated)
 })
 

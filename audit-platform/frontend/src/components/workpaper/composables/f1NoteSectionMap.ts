@@ -3,6 +3,9 @@
  * 权威：note_template_variant_matrix.json → yu_fu_kuan_xiang
  *   listed_* → 五、7
  *   soe_*    → 八、7
+ *
+ * 底稿披露 sheet 真实 tab 名取自 workpaper_sheet_classification（wp_code=F1）。
+ * 用真实 sheet 名而非合成标识，使附注「打开同步底稿」(_last_sync_sheet) 反向跳转能精确定位。
  */
 export type F1DisclosureVariant = 'listed' | 'soe'
 
@@ -11,9 +14,12 @@ export const F1_NOTE_SECTION = {
   soe: '八、7',
 } as const satisfies Record<F1DisclosureVariant, string>
 
+// 🔴 修正：使用 DB workpaper_sheet_classification 真实 tab 名（半角括号），
+// 而非合成标识 'F1-note-listed'/'F1-note-soe'。
+// 真实名使 sync_from_workpaper 存储的 _last_sync_sheet 能被 GtWpRenderer ?sheet= 精确匹配。
 export const F1_DISCLOSURE_SHEET_NAME = {
-  listed: 'F1-note-listed',
-  soe: 'F1-note-soe',
+  listed: '附注披露信息(上市公司)',
+  soe: '附注披露信息(国企)',
 } as const satisfies Record<F1DisclosureVariant, string>
 
 export function isF1ListedStandard(s: string): boolean {

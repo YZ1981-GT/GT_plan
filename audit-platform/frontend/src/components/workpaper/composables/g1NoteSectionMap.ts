@@ -15,8 +15,8 @@ export const G1_NOTE_SECTION = {
 } as const satisfies Record<G1DisclosureVariant, { trading: string; derivative: string }>
 
 export const G1_DISCLOSURE_SHEET_NAME = {
-  listed: 'G1-note-listed',
-  soe: 'G1-note-soe',
+  listed: '附注披露信息（上市公司）',
+  soe: '附注披露信息（国企）',
 } as const satisfies Record<G1DisclosureVariant, string>
 
 export const G1_ACCOUNT_CODE = '1501'

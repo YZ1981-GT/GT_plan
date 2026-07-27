@@ -29,7 +29,7 @@
         从 I5-2 同步
       </el-button>
       <el-button size="small" :disabled="isReadonly" @click="disc.syncFromDetail(true)">强制覆盖同步</el-button>
-      <el-button size="small" type="success" :loading="disc.isSyncing.value" :disabled="isReadonly" @click="disc.syncToNotes()">
+      <el-button size="small" type="success" :loading="disc.isSyncing.value" :disabled="isReadonly" @click="syncToDisclosureNotes()">
         同步到附注 {{ disc.noteTarget.value.sectionId }}
       </el-button>
       <el-button size="small" type="primary" plain :disabled="!projectId" @click="jumpToNote('soe')">↩ 跳转回附注（八、32）</el-button>
@@ -166,7 +166,8 @@
  * I5TabDisclosureSoe — 附注披露（国有企业）
  * 对齐源表 + 同步附注八、32
  */
-import { computed, ref } from 'vue'
+import { computed, ref, onBeforeUnmount } from 'vue'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
@@ -238,6 +239,15 @@ function fmtAmt(val: number | null | undefined): string {
   if (val == null || Math.abs(val) < 1e-9) return '-'
   return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
+
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+
+async function syncToDisclosureNotes() {
+  await disc.syncToNotes()
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
+}
+
+onBeforeUnmount(() => autoSync.cancelPending())
 </script>
 
 <style scoped>

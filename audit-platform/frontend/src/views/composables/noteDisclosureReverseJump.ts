@@ -37,6 +37,10 @@ export const DISCLOSURE_NOTE_SECTION_MAP: Record<string, NoteSectionVariants> = 
   // 以下为「正向跳转 + 底稿→附注 sync 已具备、仅补反向跳转」的科目
   // （章节号权威取自 note_template_variant_matrix.json，两变体均为精确编号章节）
   G10: { listed: '五、34', soe: '八、34' }, // 交易性金融负债
+  // G7 长期股权投资：主节 五、18 / 八、18（与正向 isG7EquityNoteSection 一致）。
+  // 国企披露表还覆盖「七、合并范围的变化」下 13 个子节，各子节标题旁已有 Note 芯片可单独跳转，
+  // 故 map 只登记主节（章节号权威 note_template_variant_matrix.json · chang_qi_gu_quan_tou_zi）。
+  G7: { listed: '五、18', soe: '八、18' },
   H1: { listed: '五、22', soe: '八、22' }, // 固定资产
   H3: { listed: '五、21', soe: '八、22' }, // 投资性房地产（注：国企版附注章节与固定资产同号八、22，靠内容区分）
   H8: { listed: '五、25', soe: '八、26' }, // 使用权资产

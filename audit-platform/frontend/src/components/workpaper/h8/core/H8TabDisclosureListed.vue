@@ -190,12 +190,13 @@
  * H8TabDisclosureListed — 使用权资产附注披露（上市公司）
  * HTML 主表 + 同步附注五、25；OO 不再作为唯一编辑面
  */
-import { ref, toRef } from 'vue'
+import { ref, toRef, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { useH8ListedDisclosure } from '../../composables/useH8Disclosure'
 import {
@@ -228,6 +229,9 @@ const noteSectionId = H8_NOTE_SECTION.listed
 const isSyncing = ref(false)
 const movementRowDefs = H8_LISTED_MOVEMENT_ROWS
 
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+onBeforeUnmount(() => autoSync.cancelPending())
+
 const router = useRouter()
 // 跳转回附注模块（披露表 → 附注为单向推送；此处仅导航，方便相互编辑确认）
 function jumpToNote(target: DisclosureVariant): void {
@@ -250,7 +254,7 @@ const {
   pullFromSources,
 } = useH8ListedDisclosure({
   allResponses: toRef(props, 'allResponses'),
-  onSave: (id, v) => emit('save', id, v),
+  onSave: (id, v) => { emit('save', id, v); autoSync.scheduleAutoSync(syncToNotes) },
 })
 
 function fmt(n: number): string {

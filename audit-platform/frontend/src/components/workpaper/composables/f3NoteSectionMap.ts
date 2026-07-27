@@ -18,8 +18,8 @@ export const F3_NOTE_SECTION = {
 } as const satisfies Record<F3DisclosureVariant, string>
 
 export const F3_DISCLOSURE_SHEET_NAME = {
-  listed: 'F3-note-listed',
-  soe: 'F3-note-soe',
+  listed: '附注披露信息(上市公司)',
+  soe: '附注披露信息(国企)',
 } as const satisfies Record<F3DisclosureVariant, string>
 
 export function resolveF3CurrentStandard(

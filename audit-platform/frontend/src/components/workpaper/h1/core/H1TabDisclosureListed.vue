@@ -485,6 +485,7 @@ import {
   resolveH1VariantFromTemplateType,
 } from '../../composables/h1NoteSectionMap'
 import { buildH1ListedSyncPayloads, type H1ListedSyncSnapshot } from '../../composables/h1DisclosureSyncPayload'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { pullH6ClearingForH1Listed } from '../../composables/h1SoeClearingH6Pull'
 import {
   buildListedDisclosurePack,
@@ -553,6 +554,7 @@ const variantMismatch = computed(
 )
 
 const isReadonly = computed(() => props.isReadonly)
+const autoSync = useDisclosureAutoSync({ isReadonly: () => isReadonly.value })
 const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 
 const router = useRouter()
@@ -767,6 +769,7 @@ function persistAll() {
     section: noteSectionId,
     text: noteImpairment.value || noteMortgage.value || '',
   })
+  autoSync.scheduleAutoSync(syncToNotes)
 }
 
 function handleImportExport(cmd: string) {
@@ -1169,7 +1172,7 @@ function _onAdjudicated(payload: any) {
   if (payload?.wpCode === 'H1' || payload?.accountCode === '1601') load()
 }
 eventBus.on('substantive:adjudicated', _onAdjudicated)
-onBeforeUnmount(() => { eventBus.off('substantive:adjudicated', _onAdjudicated) })
+onBeforeUnmount(() => { autoSync.cancelPending(); eventBus.off('substantive:adjudicated', _onAdjudicated) })
 </script>
 
 <style scoped>

@@ -273,6 +273,16 @@ async def build_readiness(
 
     summary["validated_at"] = validated_at
     summary["validation_ran"] = validated_at is not None
+
+    # 公式灰度状态暴露（Req 5.2）
+    try:
+        from app.services.note_formula_gray_service import is_note_formula_enabled
+
+        formula_enabled = await is_note_formula_enabled(db, project_id)
+    except Exception:
+        formula_enabled = False
+    summary["formula_enabled"] = formula_enabled
+
     return {"summary": summary, "sections": sections}
 
 

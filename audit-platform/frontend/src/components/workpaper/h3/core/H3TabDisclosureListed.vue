@@ -429,7 +429,7 @@
  * H3TabDisclosureListed.vue — 附注披露（上市公司版）
  * 模板化表格块 + 计量模式二选一 + 无限插行/删行 + 勾稽差异高亮
  */
-import { ref, computed, inject, toRef } from 'vue'
+import { ref, computed, inject, toRef, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { useH3Disclosure } from '../../composables/useH3Disclosure'
@@ -440,6 +440,8 @@ import http from '@/utils/http'
 import { buildH3SyncPayload, H3_NOTE_SECTION } from '../../composables/h3NoteSectionMap'
 import { buildNoteJumpRoute } from '@/views/composables/noteDisclosureReverseJump'
 import { generateH3AI, h3AiLoading } from '../useH3AiGenerate'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 
 const props = defineProps<{
   wpId: string
@@ -453,7 +455,10 @@ const emit = defineEmits<{
   (e: 'navigate-sheet', sheetName: string): void
 }>()
 
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+
 const openReviewDialog = inject<(section: string) => void>('openReviewDialog', () => {})
+const { year: auditYear } = useAuditContext()
 
 const { getValue, setValue, saveImmediate } = useH3FormData({
   wpId: toRef(props, 'wpId'),
@@ -580,9 +585,13 @@ async function syncToDisclosureNotes() {
       projectId: props.projectId,
       wpId: props.wpId,
     })
-    await http.post(`/api/disclosure-notes/${props.projectId}/sync-from-workpaper`, payload)
+    await http.post(
+      `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,
+      { ...payload, year: auditYear.value },
+    )
     ElMessage.success('已同步到附注（上市 五、21）')
     publishNoteTextUpdated('sync-listed')
+    autoSync.scheduleAutoSync(syncToDisclosureNotes)
   } catch (e: any) {
     ElMessage.error('同步失败：' + (e?.response?.data?.message || e?.message || '未知错误'))
   } finally {
@@ -595,6 +604,8 @@ function jumpToNote() {
   if (route) router.push(route)
   else ElMessage.info('无法定位附注章节')
 }
+
+onBeforeUnmount(() => { autoSync.cancelPending() })
 
 const _h3AiLoading = h3AiLoading
 async function generateAI(section: string) {

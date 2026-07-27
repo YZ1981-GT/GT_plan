@@ -115,9 +115,20 @@ const CLASS_COLUMNS_LISTED_PRIOR: ColumnDef[] = [
   { key: 'prior_amount', label: '上年年末余额', format: AMT },
 ]
 const CLASS_COLUMNS_SOE: ColumnDef[] = [
-  { key: 'label', label: '类别', is_label: true },
-  { key: 'end_amount', label: '期末数', format: AMT },
-  { key: 'prior_amount', label: '期初数', format: AMT },
+  { key: 'label', label: '类 别', is_label: true },
+  { key: 'book_amount', label: '金额', format: AMT, group: '账面金额' },
+  { key: 'ratio', label: '比例(%)', format: PCT, group: '账面金额' },
+  { key: 'provision', label: '金额', format: AMT, group: '坏账准备' },
+  { key: 'loss_rate', label: '预期信用损失率(%)', format: PCT, group: '坏账准备' },
+  { key: 'carrying_value', label: '账面价值', format: AMT },
+]
+const CLASS_COLUMNS_SOE_PRIOR: ColumnDef[] = [
+  { key: 'label', label: '类 别', is_label: true },
+  { key: 'book_amount', label: '金额', format: AMT, group: '账面金额' },
+  { key: 'ratio', label: '比例(%)', format: PCT, group: '账面金额' },
+  { key: 'provision', label: '金额', format: AMT, group: '坏账准备' },
+  { key: 'loss_rate', label: '预期信用损失率(%)', format: PCT, group: '坏账准备' },
+  { key: 'carrying_value', label: '账面价值', format: AMT },
 ]
 const INDIVIDUAL_COLUMNS_LISTED_END: ColumnDef[] = [
   { key: 'label', label: '名称', is_label: true },
@@ -145,9 +156,11 @@ const MOVEMENT_COLUMNS_LISTED: ColumnDef[] = [
   { key: 'amount', label: '坏账准备金额', format: AMT },
 ]
 const MOVEMENT_COLUMNS_SOE: ColumnDef[] = [
-  { key: 'label', label: '类别', is_label: true },
+  { key: 'label', label: '类 别', is_label: true },
   { key: 'prior_amount', label: '期初数', format: AMT },
-  { key: 'change_amount', label: '本期变动金额', format: AMT },
+  { key: 'provision_amount', label: '本期计提', format: AMT },
+  { key: 'reversal_amount', label: '收回或转回', format: AMT },
+  { key: 'writeoff_amount', label: '转销或核销', format: AMT },
   { key: 'end_amount', label: '期末数', format: AMT },
 ]
 const REVERSAL_COLUMNS_LISTED: ColumnDef[] = [
@@ -208,7 +221,7 @@ export interface D2TwoPeriodRowLike { label: string; endAmount: number; priorAmo
 export interface D2IndividualRowLike { name: string; endAmount: number; priorAmount?: number; provision?: number; aging?: string; lossRate?: number; basis?: string }
 export interface D2PortfolioGroupLike { name: string; groupId?: string; rows: D2TwoPeriodRowLike[] }
 export interface D2MovementLike { priorBalance: number; provision: number; reversal: number; writeOff: number; transfer: number; other: number; endBalance: number }
-export interface D2MovementByCategoryLike { label: string; priorAmount: number; changeAmount: number; endAmount: number; isTotal?: boolean }
+export interface D2MovementByCategoryLike { label: string; priorAmount: number; provisionAmount: number; reversalAmount: number; writeOffAmount: number; endAmount: number; isTotal?: boolean }
 export interface D2ReversalRowLike { companyName: string; reversalReason?: string; recoveryMethod?: string; originalBasis?: string; cumulativeProvision?: number; amount: number }
 export interface D2WriteOffRowLike { companyName: string; nature?: string; amount: number; reason?: string; procedure?: string; relatedParty?: string }
 export interface D2Top5RowLike { companyName: string; arAmount: number; contractAssetAmount?: number; ratio: number; provision: number }
@@ -219,6 +232,10 @@ export interface D2DisclosureSnapshot {
   agingRows: D2TwoPeriodRowLike[]
   /** 按坏账准备计提方法分类（单项/组合/其中：各组合/合计） */
   classRows: D2TwoPeriodRowLike[]
+  /** 国企版 6 列分类宽表（期末数） */
+  soeClassEndRows?: Array<{ label: string; bookAmount: number; ratio: number; provision: number; lossRate: number; carryingValue: number; isTotal?: boolean }>
+  /** 国企版 6 列分类宽表（期初数） */
+  soeClassPriorRows?: Array<{ label: string; bookAmount: number; ratio: number; provision: number; lossRate: number; carryingValue: number; isTotal?: boolean }>
   /** 单项计提明细 */
   individualRows: D2IndividualRowLike[]
   /** 组合计提项目（每个组合一张分表） */
@@ -285,9 +302,38 @@ export function buildD2SyncPayload(
     put(D2_TABLE_NAMES.listed.aging, snapshot.agingRows.map((r) => twoPeriodRow(r)), AGING_COLUMNS_LISTED)
   }
 
-  // ② 按坏账准备计提方法分类（上市拆期末/上年年末两表；国企单表两期）
+  // ② 按坏账准备计提方法分类（上市拆期末/上年年末两表；国企期末/期初各一张 6 列宽表）
   if (isSoe) {
-    put(D2_TABLE_NAMES.soe.classEnd, snapshot.classRows.map((r) => twoPeriodRow(r)), CLASS_COLUMNS_SOE)
+    // 国企 6 列宽表
+    const soeEnd = snapshot.soeClassEndRows ?? []
+    const soePrior = snapshot.soeClassPriorRows ?? []
+    put(
+      D2_TABLE_NAMES.soe.classEnd,
+      soeEnd.map((r) => ({
+        label: str(r.label),
+        book_amount: num(r.bookAmount),
+        ratio: num(r.ratio),
+        provision: num(r.provision),
+        loss_rate: num(r.lossRate),
+        carrying_value: num(r.carryingValue),
+        ...(r.isTotal ? { is_total: true } : {}),
+      })),
+      CLASS_COLUMNS_SOE,
+    )
+    // 国企期初数表（表名「续：期初数」）
+    put(
+      `${D2_TABLE_NAMES.soe.classEnd}（续：期初数）`,
+      soePrior.map((r) => ({
+        label: str(r.label),
+        book_amount: num(r.bookAmount),
+        ratio: num(r.ratio),
+        provision: num(r.provision),
+        loss_rate: num(r.lossRate),
+        carrying_value: num(r.carryingValue),
+        ...(r.isTotal ? { is_total: true } : {}),
+      })),
+      CLASS_COLUMNS_SOE_PRIOR,
+    )
   } else {
     put(
       D2_TABLE_NAMES.listed.classEnd,
@@ -379,7 +425,9 @@ export function buildD2SyncPayload(
       (snapshot.movementByCategory ?? []).map((r) => ({
         label: str(r.label),
         prior_amount: num(r.priorAmount),
-        change_amount: num(r.changeAmount),
+        provision_amount: num(r.provisionAmount),
+        reversal_amount: num(r.reversalAmount),
+        writeoff_amount: num(r.writeOffAmount),
         end_amount: num(r.endAmount),
         ...(r.isTotal || isTotalLabel(str(r.label)) ? { is_total: true } : {}),
       })),

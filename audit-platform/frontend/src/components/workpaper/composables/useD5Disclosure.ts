@@ -395,7 +395,10 @@ export function useD5Disclosure(options: UseD5DisclosureOptions) {
     // 统一 eventBus (crossWpEventBridge 双向桥接 window)
     eventBus.emit('disclosure:note-text-updated', {
       wpCode: 'D5',
+      accountCode: '1124',
+      projectId: options.projectId.value,
       section,
+      sectionIds: [section.startsWith('soe') ? '八、6' : '五、6'],
       text,
       timestamp: Date.now(),
     })

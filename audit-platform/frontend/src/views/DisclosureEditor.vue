@@ -435,6 +435,65 @@
                 :cell-class-name="deCellClassName"
                 @cell-click="onDeCellClick"
                 @cell-contextmenu="onDeCellContextMenu">
+                <!-- ━━━ 两级分组表头渲染（有 _column_groups 时） ━━━ -->
+                <template v-if="activeTableColumns">
+                  <template v-for="(col, ci) in activeTableColumns" :key="ci">
+                    <!-- 独立列（无分组） -->
+                    <el-table-column v-if="col.type === 'flat'"
+                      :label="col.label"
+                      :min-width="col.headerIdx === 0 ? 160 : 120"
+                      :align="col.headerIdx === 0 ? 'left' : 'right'" resizable>
+                      <template #default="{ row, $index }">
+                        <template v-if="col.headerIdx === 0">
+                          <template v-if="editMode && !row.is_total">
+                            <el-input v-if="isActiveCellEditing($index, -1)"
+                              v-model="row.label" size="small" style="width: 100%; height: 22px"
+                              @change="onLabelChange($index, $event)"
+                              @blur="onActiveCellBlur($event, $index, -1)"
+                              @keydown="onActiveCellKeydown($event, $index, -1)" />
+                            <span v-else class="gt-cell-editable" :class="{ 'total-label': row.is_total }">{{ row.label || '' }}</span>
+                          </template>
+                          <span v-else :class="{ 'total-label': row.is_total }">{{ row.label }}</span>
+                        </template>
+                        <template v-else>
+                          <div class="gt-cell-wrapper" :class="{ 'gt-cell-auto-fill': getCellMode(row, col.headerIdx - 1) === 'auto' }">
+                            <el-input-number v-if="editMode && !row.is_total && isActiveCellEditing($index, col.headerIdx - 1)"
+                              v-model="row.values[col.headerIdx - 1]" :controls="false" :precision="2"
+                              size="small" style="width: 100%; height: 22px"
+                              @change="onCellValueChange($index, col.headerIdx - 1, $event)"
+                              @blur="onActiveCellBlur($event, $index, col.headerIdx - 1)"
+                              @keydown="onActiveCellKeydown($event, $index, col.headerIdx - 1)" />
+                            <span v-else :class="['gt-amt', { 'total-val': row.is_total }]">
+                              <GtAmountCell :value="getCellValue(row, col.headerIdx - 1)" :unit="noteUnit" />
+                            </span>
+                          </div>
+                        </template>
+                      </template>
+                    </el-table-column>
+                    <!-- 分组列（嵌套 el-table-column 实现两级表头合并） -->
+                    <el-table-column v-else-if="col.type === 'grouped'"
+                      :label="col.group" align="center">
+                      <el-table-column v-for="child in col.children" :key="child.headerIdx"
+                        :label="child.label" :min-width="120" align="right" resizable>
+                        <template #default="{ row, $index }">
+                          <div class="gt-cell-wrapper" :class="{ 'gt-cell-auto-fill': getCellMode(row, child.headerIdx - 1) === 'auto' }">
+                            <el-input-number v-if="editMode && !row.is_total && isActiveCellEditing($index, child.headerIdx - 1)"
+                              v-model="row.values[child.headerIdx - 1]" :controls="false" :precision="2"
+                              size="small" style="width: 100%; height: 22px"
+                              @change="onCellValueChange($index, child.headerIdx - 1, $event)"
+                              @blur="onActiveCellBlur($event, child.headerIdx - 1)"
+                              @keydown="onActiveCellKeydown($event, $index, child.headerIdx - 1)" />
+                            <span v-else :class="['gt-amt', { 'total-val': row.is_total }]">
+                              <GtAmountCell :value="getCellValue(row, child.headerIdx - 1)" :unit="noteUnit" />
+                            </span>
+                          </div>
+                        </template>
+                      </el-table-column>
+                    </el-table-column>
+                  </template>
+                </template>
+                <!-- ━━━ 原扁平表头渲染（无分组，零回归兼容） ━━━ -->
+                <template v-else>
                 <el-table-column v-for="(h, hiRaw) in (activeTableData.headers || [])" :key="hiRaw"
                   :label="h" :min-width="Number(hiRaw) === 0 ? 160 : 120" :align="Number(hiRaw) === 0 ? 'left' : 'right'" resizable>
                   <template #default="{ row, $index }">
@@ -490,6 +549,7 @@
                     </template>
                   </template>
                 </el-table-column>
+                </template>
               </el-table>
               <div v-else-if="activeTableData?.headers?.length" style="font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); padding: 10px; text-align: center; border: 1px dashed var(--gt-color-border-purple); border-radius: 6px;">
                 该表格暂无数据行（可在编辑模式下添加）
@@ -522,10 +582,13 @@
               </div>
             </div>
 
-            <!-- 文字型 — 富文本编辑器 (Req 48.1-48.7) -->
-            <div v-if="currentNote.content_type === 'text' || currentNote.content_type === 'mixed'" class="gt-de-tiptap-wrapper">
+            <!-- 文字型 — 富文本编辑器 (Req 48.1-48.7)
+                 说明文本框对所有章节（表格/混合/文字）统一显示在表格下方：
+                 底稿披露表「表格下面的文本框」经同步写入 text_content，此处落地展示，
+                 并提供续写/改写/生成政策/变动分析/知识库等编制功能 -->
+            <div v-if="currentNote.content_type === 'text' || currentNote.content_type === 'mixed' || currentNote.content_type === 'table'" class="gt-de-tiptap-wrapper">
               <div
-                v-if="showGuidance"
+                v-if="showGuidance && currentNote.content_type !== 'table'"
                 class="gt-guidance-bar"
                 :class="{ 'is-collapsed': !isGuidanceExpanded }"
               >
@@ -1618,32 +1681,142 @@ const currentNoteTables = computed(() => {
   if (!currentNote.value?.table_data) return []
   const td = currentNote.value.table_data
   // 新格式：_tables 数组（后端已为 workpaper 来源注入投影表）
+  let rawTables: any[] | null = null
   if (td._tables && Array.isArray(td._tables) && td._tables.length > 0) {
-    return td._tables
+    rawTables = td._tables
   }
-  // 客户端兜底投影：workpaper 来源的 sub_table_data + _sub_table_columns（后端未注入 _tables 时，
-  // 用与后端一致的规则投影，保证过渡期渲染一致）— spec disclosure-table-sync-convergence Task 6.1
-  const clientProjected = projectSubTablesClient(td)
-  if (clientProjected && clientProjected.length > 0) {
-    return clientProjected
+  if (!rawTables) {
+    // 客户端兜底投影：workpaper 来源的 sub_table_data + _sub_table_columns
+    const clientProjected = projectSubTablesClient(td)
+    if (clientProjected && clientProjected.length > 0) {
+      rawTables = clientProjected
+    }
   }
-  // 旧格式：单表格
-  if (td.rows) {
-    // 表头补齐兜底：headers 为空（[]）但行携 _cell_meta 语义时派生可渲染表头，
-    // 修复 el-table 零列坍缩（"附注表格只有一行"）。后端 note_header_projector 亦在
-    // 读时补齐；此处保证后端未生效/其它加载路径时渲染一致。
-    const headers = (Array.isArray(td.headers) && td.headers.length > 0)
-      ? td.headers
-      : (deriveLegacyTableHeaders(td) || td.headers || [])
-    return [{ name: currentNote.value.section_title, headers, rows: td.rows }]
+  if (!rawTables) {
+    // 旧格式：单表格
+    if (td.rows) {
+      const headers = (Array.isArray(td.headers) && td.headers.length > 0)
+        ? td.headers
+        : (deriveLegacyTableHeaders(td) || td.headers || [])
+      rawTables = [{ name: currentNote.value.section_title, headers, rows: td.rows }]
+    } else {
+      return []
+    }
   }
-  return []
+
+  // 渲染时合并续表：表名以"续"开头 或 含"（续："的表，把其列合并到同名主表
+  const merged: any[] = []
+  for (let i = 0; i < rawTables.length; i++) {
+    const t = rawTables[i]
+    const name = (t.name || '') as string
+    // 判定是否为续表：以"续"开头（模板格式）或含"（续："（sub_table_data 格式）
+    const isContinuation = name.startsWith('续') || name.includes('（续：') || name.includes('(续：')
+    if (isContinuation && merged.length > 0) {
+      // 有独立列定义（_column_groups 或 columns）的续表不合并——它是完整独立子表
+      if (t._column_groups || (t.columns && Array.isArray(t.columns) && t.columns.length > 0)) {
+        merged.push(t)
+        continue
+      }
+      // 找到对应主表（续表名通常含主表名前缀，如"按坏账计提方法分类披露（续：上年年末余额）"对应"按坏账计提方法分类披露"）
+      let prevIdx = merged.length - 1
+      // 尝试精确匹配：续表名去掉"（续：...）"后 === 某已有表名
+      const baseName = name.replace(/[（(]续[：:].*$/, '').trim()
+      if (baseName) {
+        const matchIdx = merged.findIndex(m => (m.name || '').trim() === baseName)
+        if (matchIdx >= 0) prevIdx = matchIdx
+        else {
+          // 找不到对应主表，作为独立 tab 保留不合并
+          merged.push(t)
+          continue
+        }
+      }
+      const prev = merged[prevIdx]
+      const prevHeaders: string[] = prev.headers || []
+      const nextHeaders: string[] = t.headers || []
+      // 续表 headers 第一列通常是重复的标签列（类别/名称），跳过
+      const skipFirst = nextHeaders.length > 0 && prevHeaders.length > 0 &&
+        (nextHeaders[0] === prevHeaders[0] || nextHeaders[0] === '类别' || nextHeaders[0] === '名称')
+      const appendHeaders = skipFirst ? nextHeaders.slice(1) : nextHeaders
+      prev.headers = [...prevHeaders, ...appendHeaders]
+
+      // 合并行 values
+      const prevRows: any[] = prev.rows || []
+      const nextRows: any[] = t.rows || []
+      for (let ri = 0; ri < Math.max(prevRows.length, nextRows.length); ri++) {
+        const prevRow = ri < prevRows.length ? prevRows[ri] : { label: '', values: [] }
+        const nextRow = ri < nextRows.length ? nextRows[ri] : { values: [] }
+        const nextVals = nextRow.values || []
+        const appendVals = skipFirst ? nextVals : nextVals
+        if (!prevRow.values) prevRow.values = []
+        prevRow.values = [...prevRow.values, ...appendVals]
+        if (ri >= prevRows.length) prevRows.push(prevRow)
+      }
+      prev.rows = prevRows
+    } else {
+      merged.push(t)
+    }
+  }
+  return merged
 })
 
 const activeTableData = computed(() => {
   const idx = parseInt(activeTableTab.value) || 0
-  return currentNoteTables.value[idx] || currentNoteTables.value[0] || null
+  const table = currentNoteTables.value[idx] || currentNoteTables.value[0] || null
+  return table
 })
+
+/**
+ * 解析当前表的列结构，支持两级分组表头（el-table-column 嵌套）。
+ * 返回列描述数组：无 group 的独立列 {type:'flat', headerIdx, label}
+ * 有 group 的连续列合并为 {type:'grouped', group, children:[{headerIdx, label}]}
+ */
+const activeTableColumns = computed(() => {
+  const table = activeTableData.value
+  if (!table?.headers?.length) return []
+  const headers = table.headers as string[]
+  const groups: Array<{ group: string; start: number; span: number }> | null =
+    (table as any)?._column_groups ?? null
+
+  if (!groups || groups.length === 0) {
+    // 无分组信息 → 全部扁平列（走旧逻辑兼容）
+    return null
+  }
+
+  // 构建列结构：按 headers 索引逐列归类
+  type FlatCol = { type: 'flat'; headerIdx: number; label: string }
+  type GroupedCol = { type: 'grouped'; group: string; children: Array<{ headerIdx: number; label: string }> }
+  type Col = FlatCol | GroupedCol
+
+  const result: Col[] = []
+  // 标记哪些索引被分组占用
+  const grouped = new Set<number>()
+  for (const g of groups) {
+    for (let i = g.start; i < g.start + g.span; i++) grouped.add(i)
+  }
+
+  let gi = 0 // groups 游标
+  for (let i = 0; i < headers.length; i++) {
+    if (grouped.has(i)) {
+      // 找到对应的 group 定义
+      const g = groups.find(gg => gg.start === i)
+      if (g) {
+        const children: Array<{ headerIdx: number; label: string }> = []
+        for (let j = g.start; j < g.start + g.span && j < headers.length; j++) {
+          children.push({ headerIdx: j, label: headers[j] })
+        }
+        result.push({ type: 'grouped', group: g.group, children })
+        i = g.start + g.span - 1 // 跳到分组末尾
+      }
+    } else {
+      result.push({ type: 'flat', headerIdx: i, label: headers[i] })
+    }
+  }
+  return result
+})
+
+// 注：per-tab 说明文本框（activeTabNoteText/activeTabNoteTextEditable）已移除。
+// 底稿披露表「表格下面的文本框」经同步写入 note.text_content（_note_texts→_format_note_texts），
+// 统一落地到表格下方的富文本编辑器（textContent），不再拆分为 per-tab 纯文本框。
 
 // 当前 Tab 的提示文字：优先取该表 guidance，降级章节级 guidance_text
 const activeTableGuidance = computed(() =>
@@ -2369,6 +2542,10 @@ async function onGenerate() {
   if (!ok) return
   await withLoading(genLoading, async () => {
     try {
+      // 生成前先触发底稿→附注同步标记（确保已同步的章节不被生成覆盖）
+      try {
+        await http.post(`/api/disclosure-notes/${projectId.value}/${year.value}/pull-from-workpapers`, null, { _silent: true } as any)
+      } catch { /* fail-open */ }
       await generateDisclosureNotes(projectId.value, year.value, templateType.value)
       ElMessage.success('附注生成完成')
       await fetchTree()

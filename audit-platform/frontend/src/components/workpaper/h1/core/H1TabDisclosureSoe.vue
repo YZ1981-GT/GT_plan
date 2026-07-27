@@ -372,7 +372,7 @@
  * H1TabDisclosureSoe — 附注披露信息（国有企业）
  * 对齐源 xlsx 78 行 + note_template_soe「八、22」，支持跨 sheet 取数与同步附注。
  */
-import { reactive, computed, watch, inject, ref, onMounted, onUnmounted } from 'vue'
+import { reactive, computed, watch, inject, ref, onMounted, onUnmounted, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
@@ -385,6 +385,7 @@ import {
   resolveH1VariantFromTemplateType,
 } from '../../composables/h1NoteSectionMap'
 import { buildH1SoeSyncPayload } from '../../composables/h1DisclosureSyncPayload'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import {
   buildSoeDisclosurePack,
   downloadJsonPack,
@@ -440,6 +441,8 @@ const props = defineProps<{
 /** 项目实际附注口径；与本 tab（国企）不一致时禁止同步，避免污染上市体系章节 */
 const projectVariant = computed(() => resolveH1VariantFromTemplateType(props.templateType))
 const variantMismatch = computed(() => !!projectVariant.value && projectVariant.value !== 'soe')
+
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
@@ -537,6 +540,7 @@ function persistAll(): void {
   saveResponse(H1_SOE_KEYS.clearing, state.clearingRows)
   saveResponse(H1_SOE_KEYS.clearingNote, state.clearingNote)
   saveResponse(H1_SOE_KEYS.fullyDep, fullyDepRows.value)
+  autoSync.scheduleAutoSync(syncToNotes)
 }
 
 function handleImportExport(cmd: string) {
@@ -755,6 +759,7 @@ function onH6Adjudicated(payload: any) {
 onMounted(() => {
   eventBus.on('substantive:adjudicated', onH6Adjudicated)
 })
+onBeforeUnmount(() => { autoSync.cancelPending() })
 onUnmounted(() => {
   eventBus.off('substantive:adjudicated', onH6Adjudicated)
 })

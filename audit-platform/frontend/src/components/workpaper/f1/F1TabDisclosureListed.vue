@@ -249,12 +249,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, toRef, type Ref } from 'vue'
+import { computed, ref, toRef, onUnmounted, type Ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import { useF1DisclosureListed } from '../composables/useF1DisclosureListed'
+import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
 import {
   buildF1ListedSubTableData,
   buildF1SyncPayload,
@@ -293,6 +294,19 @@ function jumpToNote(target: DisclosureVariant): void {
   router.push(route)
 }
 
+// 保存后自动同步到附注（防抖/非阻塞/失败静默/只读 gate）：包装传入 composable 的
+// saveImmediate/debouncedSave，使任一字段保存都触发一次与手动按钮同源的 syncToDisclosureNotes。
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+onUnmounted(() => autoSync.cancelPending())
+const autoSaveImmediate = async (itemId: string, data: Partial<ChecklistResponse>): Promise<void> => {
+  await props.saveImmediate(itemId, data)
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
+}
+const autoDebouncedSave = (itemId: string, data: Partial<ChecklistResponse>): void => {
+  props.debouncedSave(itemId, data)
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
+}
+
 const {
   isApplicable,
   agingRows,
@@ -319,8 +333,8 @@ const {
   allResponses: allResponsesRef,
   wpId: toRef(props, 'wpId') as Ref<string>,
   projectId: toRef(props, 'projectId') as Ref<string>,
-  saveImmediate: props.saveImmediate,
-  debouncedSave: props.debouncedSave,
+  saveImmediate: autoSaveImmediate,
+  debouncedSave: autoDebouncedSave,
   crossSheet: props.crossSheet,
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
   applicableStandards: toRef(props, 'applicableStandards') as unknown as Ref<string[]>,

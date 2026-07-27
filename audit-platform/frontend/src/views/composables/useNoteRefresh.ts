@@ -8,6 +8,7 @@ import { ref, type Ref, type ComputedRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import { refreshDisclosureFromWorkpapers, refreshDisclosureSection, type RefreshFromWorkpapersResult } from '@/services/commonApi'
 import { handleApiError } from '@/utils/errorHandler'
+import http from '@/utils/http'
 // 复用「跳转至披露表」的同一套章节判定函数，消除跳转/刷新两套硬编码映射漂移（单一真源）
 import {
   isD1NotesReceivableNoteSection,
@@ -18,6 +19,7 @@ import {
   isH9LeaseLiabilityNoteSection,
   isH10AssetDisposalNoteSection,
   isI1IntangibleNoteSection,
+  isK1OtherReceivableNoteSection,
   isN1DeferredTaxNoteSection,
   isH2CipNoteSection,
 } from './noteDisclosureJump'
@@ -115,11 +117,26 @@ export function useNoteRefresh(options: UseNoteRefreshOptions): UseNoteRefreshRe
   }
 
   /**
+   * 触发底稿→附注同步标记（让 refill 知道有底稿映射的章节应跳过表格覆盖）。
+   * section=null 时全部章节，否则单个章节。fail-open：失败不阻断刷新流程。
+   */
+  async function _pullFromWorkpapers(section: string | null) {
+    try {
+      await http.post(`/api/disclosure-notes/${projectId.value}/${year.value}/pull-from-workpapers`, null, {
+        params: section ? { note_section: section } : undefined,
+        _silent: true,
+      } as any)
+    } catch { /* fail-open: 拉取失败不阻断刷新 */ }
+  }
+
+  /**
    * 刷新（当前页面级）— 只重算并重载「当前正在查看的章节」。
    *
    * 后端只重算该节（refresh_section_from_workpaper），前端也只重载该节，
    * 前后端一致；不再全量写库导致其它章节 DB 新、前端缓存旧的不一致。
    * 需刷新全部章节请用「全部刷新」(onRefreshAll)。
+   *
+   * 对有底稿映射且已同步的章节：先触发 sync 确保标记最新，refill 跳过表格覆盖。
    */
   async function onRefreshFromWP() {
     const section = currentNote.value?.note_section
@@ -129,6 +146,8 @@ export function useNoteRefresh(options: UseNoteRefreshOptions): UseNoteRefreshRe
     }
     refreshLoading.value = true
     try {
+      // 先触发底稿→附注同步标记（确保 refill 知道该章节由底稿驱动，跳过表格覆盖）
+      await _pullFromWorkpapers(section)
       const result = await refreshDisclosureSection(projectId.value, year.value, section)
       showRefreshResultMessage(result)
       await fetchDetail(section)
@@ -146,6 +165,8 @@ export function useNoteRefresh(options: UseNoteRefreshOptions): UseNoteRefreshRe
   async function onRefreshAll() {
     refreshAllLoading.value = true
     try {
+      // 先触发全部底稿→附注同步标记
+      await _pullFromWorkpapers(null)
       const result = await refreshDisclosureFromWorkpapers(projectId.value, year.value)
       // 清空全部章节详情缓存，避免其它已缓存章节仍显示旧数据
       invalidateAllCache?.()
@@ -289,6 +310,7 @@ export function useNoteRefresh(options: UseNoteRefreshOptions): UseNoteRefreshRe
       || isH9LeaseLiabilityNoteSection(current)
       || isH10AssetDisposalNoteSection(current)
       || isI1IntangibleNoteSection(current)
+      || isK1OtherReceivableNoteSection(current)
     )
     if (
       !matched && !isG7Lte && !isG10Tfl && !isG13Fvc && !isI5Ona

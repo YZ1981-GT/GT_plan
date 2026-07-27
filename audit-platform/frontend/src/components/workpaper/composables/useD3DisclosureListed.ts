@@ -170,7 +170,14 @@ export function useD3DisclosureListed(options: UseD3DisclosureListedOptions) {
     // EventBus双向回写附注模块
     try {
       window.dispatchEvent(new CustomEvent('disclosure:note-text-updated', {
-        detail: { wpCode: 'D3', section: 'listed-3', text: val },
+        detail: {
+          wpCode: 'D3',
+          accountCode: '2203',
+          projectId: options.projectId.value,
+          section: 'listed-3',
+          sectionIds: ['五、38'],
+          text: val,
+        },
       }))
     } catch { /* silent */ }
   })

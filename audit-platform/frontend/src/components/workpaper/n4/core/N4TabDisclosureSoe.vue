@@ -411,9 +411,10 @@ async function handleAiAssist(): Promise<void> {
   try {
     const res = await api.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
       prompt: '请为国有企业税金及附加附注各税费项目的变动生成简要说明（国资委格式）',
-      context: JSON.stringify(rows.value.map((r) => ({
+      // 后端 context 为 dict[str,str]：包一层 dict + 值转 JSON 字符串（直接传字符串会 422）
+      context: { 各税费变动: JSON.stringify(rows.value.map((r) => ({
         tax: r.label, current: r.currentAmount, prior: r.priorAmount, change: r.changeAmount,
-      }))),
+      }))) },
       section: 'n4-disclosure-soe-remark',
     }, { _silent: true } as any)
     const text = res?.data?.content ?? res?.content ?? ''
@@ -437,9 +438,10 @@ async function handleAiNoteText(): Promise<void> {
   try {
     const res = await api.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
       prompt: '请为国有企业税金及附加附注披露生成完整说明文本（国资委格式，含政府性基金附加等）',
-      context: JSON.stringify(displayRows.value.map((r) => ({
+      // 后端 context 为 dict[str,str]：包一层 dict + 值转 JSON 字符串（直接传字符串会 422）
+      context: { 披露数据: JSON.stringify(displayRows.value.map((r) => ({
         tax: r.label, current: r.currentAmount, prior: r.priorAmount, changeRate: r.changeRate,
-      }))),
+      }))) },
       existingContent: noteText.value,
       section: 'n4-disclosure-soe-note',
     }, { _silent: true } as any)

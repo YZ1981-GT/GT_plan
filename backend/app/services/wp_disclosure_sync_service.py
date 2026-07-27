@@ -449,9 +449,10 @@ async def sync_from_workpaper(
         note.content_type = content_type
         if formatted_texts:
             note.text_content = formatted_texts
-        elif note_texts is not None and not note_texts:
-            # 显式空列表不强制清空；仅当有正文载荷时覆盖
-            pass
+        else:
+            # 披露底稿未推送叙述（_note_texts 缺失或空）→ 清空残留文本（如旧 AI 草稿），
+            # 使 text_content 完全由披露底稿联动驱动，预设为空。
+            note.text_content = None
         note.last_sync_source = "workpaper"
         note.last_sync_wp_id = wp_id
         note.last_sync_at = now

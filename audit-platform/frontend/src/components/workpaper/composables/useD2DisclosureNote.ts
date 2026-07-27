@@ -63,6 +63,30 @@ export interface D2ClassDisplayRow {
   autoSource: string
 }
 
+/**
+ * 国企版 6 列分类宽表行（期末数/期初数各一张）
+ * 对齐源模板：类别 | 账面金额 | 比例(%) | 坏账准备 | 预期信用损失率(%) | 账面价值
+ */
+export interface D2SoeClassWideRow {
+  key: string
+  label: string
+  kind: 'category' | 'subtotal' | 'total'
+  /** 账面金额（审定数） */
+  bookAmount: number
+  /** 比例(%) = 本行账面金额 / 合计账面金额 × 100 */
+  ratio: number
+  /** 坏账准备 */
+  provision: number
+  /** 预期信用损失率(%) = 坏账准备 / 账面金额 × 100 */
+  lossRate: number
+  /** 账面价值 = 账面金额 − 坏账准备 */
+  carryingValue: number
+  /** 是否可编辑（手工覆盖自动取数） */
+  editable: boolean
+  /** 数据来源说明 */
+  autoSource: string
+}
+
 export interface D2IndividualRow {
   rowId: string
   name: string
@@ -80,6 +104,8 @@ export interface D2PortfolioRow {
   label: string
   endAmount: number
   priorAmount: number
+  /** 国企版：坏账准备（期末） */
+  provision: number
 }
 
 export interface D2PortfolioGroup {
@@ -117,7 +143,12 @@ export interface D2MovementCategoryRow {
   key: string
   label: string
   priorAmount: number
-  changeAmount: number
+  /** 本期计提 */
+  provisionAmount: number
+  /** 收回或转回 */
+  reversalAmount: number
+  /** 转销或核销 */
+  writeOffAmount: number
   endAmount: number
   auto: boolean
   autoSource: string
@@ -157,6 +188,19 @@ export interface D2DerecognizedRow {
   companyName: string
   amount: number
   gainLoss: number
+}
+
+/** (7) 转移应收账款且继续涉入形成的资产、负债 */
+export interface D2ContinuedInvolvementRow {
+  rowId: string
+  /** 项 目 */
+  item: string
+  /** 资产转移方式 */
+  transferMethod: string
+  /** 继续涉入形成的资产金额 */
+  assetAmount: number
+  /** 继续涉入形成的负债金额 */
+  liabilityAmount: number
 }
 
 export interface UseD2DisclosureNoteOptions {
@@ -257,6 +301,7 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
   const writeOffRows = ref<D2WriteOffRow[]>([])
   const top5Rows = ref<D2Top5Row[]>([])
   const derecognizedRows = ref<D2DerecognizedRow[]>([])
+  const continuedInvolvementRows = ref<D2ContinuedInvolvementRow[]>([])
   const sectionNotes = ref<Record<string, string>>({})
 
   let hydrated = false
@@ -282,6 +327,7 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
             label: String(r.label ?? ''),
             endAmount: parseNum(r.endAmount),
             priorAmount: parseNum(r.priorAmount),
+            provision: parseNum((r as any).provision),
           }))
         : [],
     }))
@@ -321,6 +367,13 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
       companyName: String(r.companyName ?? ''),
       amount: parseNum(r.amount),
       gainLoss: parseNum(r.gainLoss),
+    }))
+    continuedInvolvementRows.value = safeParse<D2ContinuedInvolvementRow[]>(readRaw('continued-involvement-rows'), []).map((r) => ({
+      rowId: r.rowId || genId('ci'),
+      item: String(r.item ?? ''),
+      transferMethod: String(r.transferMethod ?? ''),
+      assetAmount: parseNum(r.assetAmount),
+      liabilityAmount: parseNum(r.liabilityAmount),
     }))
     const notes: Record<string, string> = {}
     for (const { key } of D2_NOTE_TEXT_SECTIONS) {
@@ -583,6 +636,116 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
     return rows
   })
 
+  // ─── ②-SOE 国企 6 列分类宽表（期末数/期初数各一张）───────────────────────
+  // 源模板：类别 | 账面金额 | 比例(%) | 坏账准备 | 预期信用损失率(%) | 账面价值
+
+  function buildSoeClassWideRows(period: 'current' | 'prior'): D2SoeClassWideRow[] {
+    const adj = crossSheet.adjudicationForDisclosure.value
+    const bd = crossSheet.badDebtByCategory.value
+
+    const categories: Array<{ key: string; label: string }> = [
+      { key: 'individual', label: '按单项计提坏账准备' },
+      { key: 'aging', label: '按账龄组合计提坏账准备' },
+      { key: 'customerType', label: '按客户类型组合计提坏账准备' },
+    ]
+
+    const rows: D2SoeClassWideRow[] = []
+    let totalBook = 0
+    let totalProvision = 0
+
+    for (const cat of categories) {
+      const adjCat = adj[cat.key as keyof typeof adj] as { prior: number; current: number }
+      const bdCat = bd[cat.key as keyof typeof bd] as { prior: number; current: number }
+
+      const book = cellValue(`soeClass:${period}:${cat.key}:book`, period === 'current' ? adjCat.current : adjCat.prior).amount
+      const prov = cellValue(`soeClass:${period}:${cat.key}:prov`, period === 'current' ? bdCat.current : bdCat.prior).amount
+
+      totalBook += book
+      totalProvision += prov
+
+      rows.push({
+        key: cat.key,
+        label: cat.label,
+        kind: 'category',
+        bookAmount: book,
+        ratio: 0, // 后填
+        provision: prov,
+        lossRate: book !== 0 ? (prov / book) * 100 : 0,
+        carryingValue: book - prov,
+        editable: true,
+        autoSource: `取自 D2-1 审定表（${cat.label}，${period === 'current' ? '期末' : '期初'}审定数）+ D2-3 坏账准备`,
+      })
+
+      // 「其中：」子行——单项计提展开每个债务人，组合计提展开每个组合名
+      if (cat.key === 'individual' && individualRows.value.length > 0) {
+        for (const r of individualRows.value) {
+          const subBook = period === 'current' ? r.endAmount : r.priorAmount
+          const subProv = period === 'current' ? r.provision : 0
+          rows.push({
+            key: `ind-${r.rowId}`,
+            label: `  其中：${r.name || '（未命名）'}`,
+            kind: 'subtotal',
+            bookAmount: subBook,
+            ratio: 0,
+            provision: subProv,
+            lossRate: subBook !== 0 ? (subProv / subBook) * 100 : 0,
+            carryingValue: subBook - subProv,
+            editable: false,
+            autoSource: '取自本页「按单项计提坏账准备的应收账款」明细',
+          })
+        }
+      }
+      if ((cat.key === 'aging' || cat.key === 'customerType') && portfolios.value.length > 0) {
+        // 按组合计提行后展开各组合分表名称及汇总金额
+        for (const g of portfolios.value) {
+          const pfBook = SUM(g.rows.map((r) => period === 'current' ? r.endAmount : r.priorAmount))
+          rows.push({
+            key: `pf-${g.groupId}`,
+            label: `  其中：${g.name || '（未命名组合）'}`,
+            kind: 'subtotal',
+            bookAmount: pfBook,
+            ratio: 0,
+            provision: 0, // 组合分表未单独存坏账准备
+            lossRate: 0,
+            carryingValue: pfBook,
+            editable: false,
+            autoSource: '= 对应组合分表各账龄段之和',
+          })
+        }
+        // 只在第一个组合类别行（aging）后展开，避免 customerType 重复
+        if (cat.key === 'customerType') {
+          // customerType 无独立组合分表子行
+        }
+      }
+    }
+
+    // 回填比例（只对 category 行填比例，subtotal 行按其 bookAmount/totalBook 填）
+    for (const r of rows) {
+      if (r.kind === 'total') continue
+      r.ratio = totalBook !== 0 ? (r.bookAmount / totalBook) * 100 : 0
+    }
+
+    rows.push({
+      key: '__total',
+      label: '合计',
+      kind: 'total',
+      bookAmount: totalBook,
+      ratio: 100,
+      provision: totalProvision,
+      lossRate: totalBook !== 0 ? (totalProvision / totalBook) * 100 : 0,
+      carryingValue: totalBook - totalProvision,
+      editable: false,
+      autoSource: '= 各类别之和',
+    })
+
+    return rows
+  }
+
+  /** 国企版分类宽表——期末数 */
+  const soeClassEndRows: ComputedRef<D2SoeClassWideRow[]> = computed(() => buildSoeClassWideRows('current'))
+  /** 国企版分类宽表——期初数 */
+  const soeClassPriorRows: ComputedRef<D2SoeClassWideRow[]> = computed(() => buildSoeClassWideRows('prior'))
+
   // ─── ⑤ 坏账准备变动（上市纵向 7 行）───────────────────────────────────────
 
   const MOVEMENT_LABELS: Array<{ key: keyof D2MovementValues; label: string; autoSource: string }> = [
@@ -632,30 +795,42 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
   // ─── ⑤(国企) 按类别的坏账准备变动 ─────────────────────────────────────────
 
   const movementByCategory: ComputedRef<D2MovementCategoryRow[]> = computed(() => {
-    const by = crossSheet.badDebtByCategory.value
-    const defs: Array<{ key: 'individual' | 'aging' | 'customerType'; label: string }> = [
-      { key: 'individual', label: '按单项计提坏账准备' },
-      { key: 'aging', label: '按账龄组合计提坏账准备' },
-      { key: 'customerType', label: '按客户类型组合计提坏账准备' },
+    // 从 D2-3 各分类坏账准备明细表取逐列变动（isFixed 合计行）
+    const catKeys: Array<{ key: 'individual' | 'aging' | 'customerType'; label: string; jsonKey: string }> = [
+      { key: 'individual', label: '按单项计提坏账准备', jsonKey: 'D2-bd-individual-rows' },
+      { key: 'aging', label: '按账龄组合计提坏账准备', jsonKey: 'D2-bd-aging-rows' },
+      { key: 'customerType', label: '按客户类型组合计提坏账准备', jsonKey: 'D2-bd-customer-rows' },
     ]
-    const rows: D2MovementCategoryRow[] = defs.map(({ key, label }) => {
-      const prior = cellValue(`movementCat:prior:${key}`, by[key]?.prior ?? 0)
-      const end = cellValue(`movementCat:end:${key}`, by[key]?.current ?? 0)
+
+    const rows: D2MovementCategoryRow[] = catKeys.map(({ key, label, jsonKey }) => {
+      const catRows = safeParse<Record<string, any>[]>(allResponses.value.get(jsonKey)?.remark, [])
+      const fixed = (Array.isArray(catRows) ? catRows : []).find((r) => r?.isFixed)
+
+      const prior = parseNum(fixed?.priorAudited)
+      const prov = parseNum(fixed?.currentProvision)
+      const rev = parseNum(fixed?.currentReversal)
+      const wo = parseNum(fixed?.currentWriteOff)
+      const end = parseNum(fixed?.currentAudited)
+
       return {
         key,
         label,
-        priorAmount: prior.amount,
-        changeAmount: end.amount - prior.amount,
-        endAmount: end.amount,
-        auto: prior.auto && end.auto,
-        autoSource: '取自 D2-3 坏账准备明细表（对应分类小计的期初/期末审定数）',
+        priorAmount: cellValue(`movementCat:prior:${key}`, prior).amount,
+        provisionAmount: cellValue(`movementCat:provision:${key}`, prov).amount,
+        reversalAmount: cellValue(`movementCat:reversal:${key}`, rev).amount,
+        writeOffAmount: cellValue(`movementCat:writeoff:${key}`, wo).amount,
+        endAmount: cellValue(`movementCat:end:${key}`, end).amount,
+        auto: true,
+        autoSource: '取自 D2-3 坏账准备明细表（对应分类小计的逐列变动数）',
       }
     })
     rows.push({
       key: '__total',
       label: '合计',
       priorAmount: SUM(rows.map((r) => r.priorAmount)),
-      changeAmount: SUM(rows.map((r) => r.changeAmount)),
+      provisionAmount: SUM(rows.map((r) => r.provisionAmount)),
+      reversalAmount: SUM(rows.map((r) => r.reversalAmount)),
+      writeOffAmount: SUM(rows.map((r) => r.writeOffAmount)),
       endAmount: SUM(rows.map((r) => r.endAmount)),
       auto: true,
       autoSource: '= 各类别之和',
@@ -738,7 +913,7 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
 
   // 组合计提分表
   function buildPortfolioRows(): D2PortfolioRow[] {
-    return agingSegments.value.map((seg) => ({ key: seg.key, label: seg.label, endAmount: 0, priorAmount: 0 }))
+    return agingSegments.value.map((seg) => ({ key: seg.key, label: seg.label, endAmount: 0, priorAmount: 0, provision: 0 }))
   }
   function addPortfolio(name: string): void {
     if (isReadonly.value) return
@@ -755,7 +930,7 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
     portfolios.value = portfolios.value.filter((g) => g.groupId !== groupId)
     persistJson('portfolios', portfolios.value)
   }
-  function updatePortfolioCell(groupId: string, rowKey: string, field: 'endAmount' | 'priorAmount', value: number): void {
+  function updatePortfolioCell(groupId: string, rowKey: string, field: 'endAmount' | 'priorAmount' | 'provision', value: number): void {
     if (isReadonly.value) return
     portfolios.value = portfolios.value.map((g) => {
       if (g.groupId !== groupId) return g
@@ -772,7 +947,7 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
         const old = g.rows.find((r) => r.key === seg.key)
         if (!old) {
           changed = true
-          return { key: seg.key, label: seg.label, endAmount: 0, priorAmount: 0 }
+          return { key: seg.key, label: seg.label, endAmount: 0, priorAmount: 0, provision: 0 }
         }
         if (old.label !== seg.label) changed = true
         return { ...old, label: seg.label }
@@ -985,9 +1160,26 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
     persistJson('derecognized-rows', derecognizedRows.value)
   }
 
+  // ─── ⑦ 继续涉入 ───────────────────────────────────────────────────────────
+  function addContinuedInvolvementRow(): void {
+    if (isReadonly.value) return
+    continuedInvolvementRows.value = [...continuedInvolvementRows.value, { rowId: genId('ci'), item: '', transferMethod: '', assetAmount: 0, liabilityAmount: 0 }]
+    persistJson('continued-involvement-rows', continuedInvolvementRows.value)
+  }
+  function removeContinuedInvolvementRow(rowId: string): void {
+    if (isReadonly.value) return
+    continuedInvolvementRows.value = continuedInvolvementRows.value.filter((r) => r.rowId !== rowId)
+    persistJson('continued-involvement-rows', continuedInvolvementRows.value)
+  }
+  function updateContinuedInvolvementRow(rowId: string, field: keyof D2ContinuedInvolvementRow, value: string | number): void {
+    if (isReadonly.value) return
+    continuedInvolvementRows.value = continuedInvolvementRows.value.map((r) =>
+      r.rowId === rowId ? { ...r, [field]: (field === 'item' || field === 'transferMethod') ? String(value ?? '') : parseNum(value) } : r,
+    )
+    persistJson('continued-involvement-rows', continuedInvolvementRows.value)
+  }
+
   // ─── 旧版披露数据（D2-disclosure-*）兼容带入 ───────────────────────────────
-  // 旧 useD2Disclosure 是自造 4 版本通用表（by-category/by-bad-debt/by-nature/top5/aging-detail），
-  // 与附注模板结构不同，**不做静默自动迁移**（会造错数），只提供"检测 + 一键带入可映射部分"：
   //  - top5 区块 → 前五名（单位名称/期末余额/坏账准备）
   //  - aging-detail 区块 → 账龄段期末覆盖值（按段标签匹配，匹配不上的丢弃不臆造）
   // 分类/款项性质区块行是自由文本行，无法映射到模板固定分类，一律不迁移（提示审计师自行核对）。
@@ -1160,6 +1352,28 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
         priorAmount: r.priorAmount,
         isTotal: r.kind === 'total',
       })),
+      soeClassEndRows: isSoe
+        ? soeClassEndRows.value.map((r) => ({
+            label: r.label,
+            bookAmount: r.bookAmount,
+            ratio: r.ratio,
+            provision: r.provision,
+            lossRate: r.lossRate,
+            carryingValue: r.carryingValue,
+            isTotal: r.kind === 'total',
+          }))
+        : undefined,
+      soeClassPriorRows: isSoe
+        ? soeClassPriorRows.value.map((r) => ({
+            label: r.label,
+            bookAmount: r.bookAmount,
+            ratio: r.ratio,
+            provision: r.provision,
+            lossRate: r.lossRate,
+            carryingValue: r.carryingValue,
+            isTotal: r.kind === 'total',
+          }))
+        : undefined,
       individualRows: individualRows.value.map((r) => ({
         name: r.name,
         endAmount: r.endAmount,
@@ -1191,7 +1405,9 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
       movementByCategory: movementByCategory.value.map((r) => ({
         label: r.label,
         priorAmount: r.priorAmount,
-        changeAmount: r.changeAmount,
+        provisionAmount: r.provisionAmount,
+        reversalAmount: r.reversalAmount,
+        writeOffAmount: r.writeOffAmount,
         endAmount: r.endAmount,
         isTotal: r.isTotal,
       })),
@@ -1237,6 +1453,8 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
     detailAgingHasData: computed(() => detailAging.value.hasData),
     // ② 分类
     classRows,
+    soeClassEndRows,
+    soeClassPriorRows,
     // ③ 单项
     individualRows,
     addIndividualRow,
@@ -1285,6 +1503,11 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
     addDerecognizedRow,
     removeDerecognizedRow,
     updateDerecognizedRow,
+    // ⑦ 继续涉入
+    continuedInvolvementRows,
+    addContinuedInvolvementRow,
+    removeContinuedInvolvementRow,
+    updateContinuedInvolvementRow,
     // 说明 / 覆盖 / 告警 / 同步
     sectionNotes,
     setNote,

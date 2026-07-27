@@ -197,10 +197,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, toRef, computed, onMounted, watch } from 'vue'
+import { ref, toRef, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { useH10Disclosure } from '../../composables/useH10Disclosure'
 import { buildH10SyncPayloads } from '../../composables/h10DisclosureSyncPayload'
 import { H10_NOTE_SECTION } from '../../composables/h10NoteSectionMap'
@@ -219,10 +220,18 @@ const props = defineProps<{
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
 }>()
 
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+onBeforeUnmount(() => autoSync.cancelPending())
+
+const wrappedDebouncedSave: typeof props.debouncedSave = (itemId, data) => {
+  props.debouncedSave(itemId, data)
+  autoSync.scheduleAutoSync(syncToNotes)
+}
+
 const dis = useH10Disclosure({
   variant: props.variant,
   allResponses: toRef(props, 'allResponses'),
-  debouncedSave: props.debouncedSave,
+  debouncedSave: wrappedDebouncedSave,
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
   isReadonly: toRef(props, 'isReadonly'),
@@ -306,6 +315,7 @@ function saveAuditNote(val: string): void {
   const key = noteKey()
   props.allResponses.set(key, { item_id: key, conclusion: null, remark: val })
   props.debouncedSave(key, { conclusion: null, remark: val })
+  autoSync.scheduleAutoSync(syncToNotes)
 }
 
 function saveAuditConclusion(val: string): void {
@@ -314,6 +324,7 @@ function saveAuditConclusion(val: string): void {
   const key = conclusionKey()
   props.allResponses.set(key, { item_id: key, conclusion: null, remark: val })
   props.debouncedSave(key, { conclusion: null, remark: val })
+  autoSync.scheduleAutoSync(syncToNotes)
 }
 
 function hydrate(): void {

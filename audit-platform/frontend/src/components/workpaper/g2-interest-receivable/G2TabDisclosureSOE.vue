@@ -344,13 +344,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, inject, ref, toRef } from 'vue'
+import { computed, inject, onBeforeUnmount, ref, toRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter, useRoute } from 'vue-router'
 import { api } from '@/services/apiProxy'
 import { useAcnr } from '@/services/acnr'
 import { useG2DisclosureSoe } from '../composables/useG2DisclosureSoe'
 import { buildG2SoeSyncPayloads } from '../composables/g2DisclosureSyncPayload'
+import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
 import {
   G2_COMBINED_DISCLOSURE_INDEX,
   G2_NOTE_SECTION,
@@ -386,6 +387,7 @@ const combinedNoteChip = computed(() => noteTarget.value?.combinedNoteChip ?? `N
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 const isSyncing = ref(false)
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 
 const dis = useG2DisclosureSoe({
   allResponses: toRef(props, 'allResponses'),
@@ -506,12 +508,17 @@ async function syncToDisclosureNotes() {
       rows += Number(data?.rows_synced ?? 0)
     }
     ElMessage.success(`已同步 ${rows} 行到附注模块「八、9 其他应收款（应收利息明细）」`)
+    autoSync.scheduleAutoSync(syncToDisclosureNotes)
   } catch {
     ElMessage.warning('同步附注失败，请稍后重试')
   } finally {
     isSyncing.value = false
   }
 }
+
+onBeforeUnmount(() => {
+  autoSync.cancelPending()
+})
 </script>
 
 <style scoped>

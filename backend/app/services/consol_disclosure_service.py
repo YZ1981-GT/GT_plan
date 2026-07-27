@@ -41,6 +41,39 @@ from app.services.minority_interest_service import get_mi_list
 logger = logging.getLogger(__name__)
 
 
+# ---------------------------------------------------------------------------
+# 合并范围附注 owner 约束（P2-8：与 G7 soe 披露 sync 防双写）
+#
+# 「合并范围的变化」类附注存在两个来源：
+#   1. G7 soe 披露表 sync（`sync-batch-from-workpaper`）写入 disclosure_notes，
+#      note_section 为中文「七、…」子节 + 八、18（底稿 workpaper 拥有）。
+#   2. 合并模块 V2 `generate_full_consol_notes` 生成的英文 slug 章节
+#      （consol_scope / important_subsidiaries / scope_change …），当前**未落库**。
+#
+# 二者 section_id 命名空间不同（中文「七、N」vs 英文 slug），故不会写同一行；
+# 但一旦 V2 接 disclosure_notes 落库，需保证「合并范围」大章节不被两处内容重复填充。
+# owner 约束：合并范围类附注章节的 disclosure_notes 落库 owner = G7 soe workpaper sync；
+# V2 生成的对应 slug 章节仅供合并模块内部展示/穿透，**落库前必须经
+# `is_consol_scope_owned_by_workpaper` 判定跳过**（否则重复）。
+# ---------------------------------------------------------------------------
+
+# V2 生成的、语义等同于 G7 soe「七、合并范围的变化」的英文 slug 章节。
+_WORKPAPER_OWNED_CONSOL_SCOPE_SLUGS: frozenset[str] = frozenset({
+    "consol_scope",
+    "important_subsidiaries",
+    "scope_change",
+})
+
+
+def is_consol_scope_owned_by_workpaper(section_id: str) -> bool:
+    """判定某 V2 章节 section_id 是否属「G7 soe 披露 sync 拥有」的合并范围附注。
+
+    纯函数，供未来 V2 落 disclosure_notes 的写入路径调用：命中者跳过落库
+    （由 G7 soe workpaper sync 的中文「七、N」子节负责该章节内容），避免双写重复。
+    """
+    return str(section_id or "") in _WORKPAPER_OWNED_CONSOL_SCOPE_SLUGS
+
+
 def _decimal(v) -> Decimal:
     """安全转换为 Decimal"""
     if v is None:
@@ -981,7 +1014,171 @@ async def generate_full_consol_notes(
     for section in all_sections:
         section["lineage"] = lineage_chain
 
+    # Step 8: 合并附注 V2 落 disclosure_notes（灰度默认关，Req3.3 零回归）
+    # 仅 CONSOL_NOTES_V2_ENABLED=True 时落库；按 Task 4.0 裁决 C 只落 provenance
+    # 三字段激活附注级穿透（Req3.1/3.2），表格渲染保留 consol_note_data 老路径。
+    from app.core.config import settings
+    if getattr(settings, "CONSOL_NOTES_V2_ENABLED", False):
+        try:
+            await _persist_consol_sections_v2(
+                db, parent_project_id, year, all_sections, template_type,
+            )
+        except Exception as err:  # 落库整体异常不阻断附注返回（cascade 步骤6已二次隔离）
+            logger.warning(
+                "_persist_consol_sections_v2 failed (non-blocking): "
+                "project=%s year=%s err=%s",
+                parent_project_id, year, err,
+            )
+
     return all_sections
+
+
+# ---------------------------------------------------------------------------
+# Task 4.1：合并附注 V2 落 disclosure_notes（disclosure-note-linkage-completion Req3）
+# ---------------------------------------------------------------------------
+
+
+async def _persist_consol_sections_v2(
+    db: AsyncSession,
+    parent_project_id: UUID,
+    year: int,
+    sections: list[dict],
+    template_type: str = "soe",
+) -> dict:
+    """将 V2 合并附注章节落 disclosure_notes（Task 4.0 裁决 C：仅落 provenance）.
+
+    每章节按 ``(project_id=parent, year, note_section=section["section_id"])`` upsert：
+
+    - **写 provenance 三字段**（激活附注级穿透 Req3.2）：
+      ``source_project_id = parent_project_id`` / ``consolidation_breakdown =
+      section["consolidation_breakdown"]`` / ``last_sync_source = 'consolidation'``。
+    - **不落 V2 aggregate table_data 作渲染表**（其 shape 与附注渲染契约不兼容，
+      落库会导致前端空表；合并附注表格渲染保留 ``consol_note_data`` 老路径，Req3.3）。
+      新建行仅写最小非渲染占位 ``{"rows": []}``；更新行**不覆盖既有渲染 table_data**，
+      只更 provenance 列。
+    - ``section_title`` / ``account_name`` 经 ``_resolve_section_meta``（复用单体元数据
+      解析，禁用 section_id 当标题）。
+    - 跳过 ``section["workpaper_owned"] is True``（P2-8：由 G7 soe 披露 sync 拥有，防双写）。
+    - 幂等（Req3.4）：active 行→更新；否则软删行→**复活复用**；否则 INSERT
+      （唯一键含软删占位时 naive INSERT 撞键 500，故必须先查软删行复活）。
+    - 跳过 ``_manual_override=True`` 的锁定章节（复用 ``_detect_manual_override``）。
+    - 逐章节 try/except **fail-open**（Req3.5）→ 记 ``errors`` 并 continue，绝不 raise。
+
+    Returns: ``{"upserted": n, "skipped": n, "errors": [...]}``
+    """
+    # 复用单体 sync 的元数据解析与 manual_override 检测（不新造第二套语义）。
+    # 局部导入避免顶层循环依赖（与本模块 `from app.core.config import settings` 同款）。
+    from app.services.wp_disclosure_sync_service import (
+        _detect_manual_override,
+        _resolve_section_meta,
+    )
+
+    # template_type 字符串 → SourceTemplate 变体（供 _resolve_section_meta 选正确模板）
+    meta_variant = (
+        SourceTemplate.soe
+        if str(template_type or "").lower().startswith("soe")
+        else SourceTemplate.listed
+    )
+    now = datetime.now(timezone.utc)
+    upserted = 0
+    skipped = 0
+    errors: list[dict] = []
+
+    for section in sections or []:
+        section_id = str((section or {}).get("section_id") or "").strip()
+        try:
+            if not section_id:
+                skipped += 1
+                continue
+            # P2-8：合并范围类章节由 G7 soe 披露 sync 拥有，跳过防双写重复
+            if section.get("workpaper_owned") is True:
+                skipped += 1
+                continue
+
+            breakdown = section.get("consolidation_breakdown")
+
+            # ── 查 active 行 ─────────────────────────────────────────
+            note = (
+                await db.execute(
+                    sa.select(DisclosureNote).where(
+                        DisclosureNote.project_id == parent_project_id,
+                        DisclosureNote.year == year,
+                        DisclosureNote.note_section == section_id,
+                        DisclosureNote.is_deleted == sa.false(),
+                    )
+                )
+            ).scalar_one_or_none()
+
+            # ── 软删行复活（唯一键含软删占位 → naive INSERT 撞键 500）──
+            if note is None:
+                note = (
+                    await db.execute(
+                        sa.select(DisclosureNote).where(
+                            DisclosureNote.project_id == parent_project_id,
+                            DisclosureNote.year == year,
+                            DisclosureNote.note_section == section_id,
+                            DisclosureNote.is_deleted == sa.true(),
+                        )
+                    )
+                ).scalar_one_or_none()
+                if note is not None:
+                    note.is_deleted = False
+
+            if note is not None:
+                # ── 更新分支：跳过用户已锁定的手工编辑章节（Req3.4）──
+                if _detect_manual_override(note.table_data):
+                    skipped += 1
+                    continue
+                # 仅更 provenance 列，**不覆盖既有渲染 table_data**（Task 4.0 裁决 C）
+                note.source_project_id = parent_project_id
+                note.consolidation_breakdown = breakdown
+                note.last_sync_source = "consolidation"
+                note.last_sync_at = now
+                note.updated_at = now
+                upserted += 1
+                continue
+
+            # ── 新建分支：最小非渲染占位 table_data + provenance ──────
+            derived_title, derived_account = _resolve_section_meta(
+                section_id, meta_variant
+            )
+            note = DisclosureNote(
+                project_id=parent_project_id,
+                year=year,
+                note_section=section_id,
+                section_title=derived_title or section_id,
+                account_name=derived_account,
+                content_type=ContentType.table,
+                table_data={"rows": []},
+                source_template=SourceTemplate.consolidated,
+                status=NoteStatus.draft,
+                source_project_id=parent_project_id,
+                consolidation_breakdown=breakdown,
+                last_sync_source="consolidation",
+                last_sync_at=now,
+            )
+            db.add(note)
+            upserted += 1
+        except Exception as err:  # 逐章节 fail-open（Req3.5）
+            errors.append({"section_id": section_id, "error": str(err)})
+            logger.warning(
+                "_persist_consol_sections_v2: section %s failed: %s",
+                section_id, err,
+            )
+            continue
+
+    try:
+        await db.commit()
+    except Exception as err:  # commit 失败回滚（生成路径 _write_lineage_v2 已提前 commit）
+        await db.rollback()
+        errors.append({"section_id": "__commit__", "error": str(err)})
+        logger.warning("_persist_consol_sections_v2 commit failed: %s", err)
+
+    logger.info(
+        "_persist_consol_sections_v2: project=%s year=%s upserted=%d skipped=%d errors=%d",
+        parent_project_id, year, upserted, skipped, len(errors),
+    )
+    return {"upserted": upserted, "skipped": skipped, "errors": errors}
 
 
 # ---------------------------------------------------------------------------
@@ -1077,6 +1274,9 @@ async def _aggregate_common_section(
         # Phase 3 附注级穿透 provenance（落 disclosure_notes.consolidation_breakdown）
         "source_project_id": str(consol_project_id),
         "consolidation_breakdown": consolidation_breakdown,
+        # P2-8：合并范围类章节 owner 标记 —— 若为 True，未来 V2 落 disclosure_notes 时
+        # 须跳过（该章节由 G7 soe 披露 sync 的中文「七、N」子节拥有），防双写重复。
+        "workpaper_owned": is_consol_scope_owned_by_workpaper(consol_section_id),
     }
     if cross_template is not None:
         section_out["cross_template"] = cross_template

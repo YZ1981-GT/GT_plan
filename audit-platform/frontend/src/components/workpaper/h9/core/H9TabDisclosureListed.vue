@@ -211,12 +211,13 @@
  * H9TabDisclosureListed — 租赁负债附注披露（上市公司）
  * 对齐源模板 A1:F18 + note_template 五、47；同步附注模块
  */
-import { computed, ref, toRef } from 'vue'
+import { computed, ref, toRef, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { useH9ListedDisclosure } from '../../composables/useH9Disclosure'
 import {
@@ -245,6 +246,9 @@ const emit = defineEmits<{
 const noteSectionId = H9_NOTE_SECTION.listed
 const isSyncing = ref(false)
 
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+onBeforeUnmount(() => autoSync.cancelPending())
+
 const router = useRouter()
 // 跳转回附注模块（披露表 → 附注为单向推送；此处仅导航，方便相互编辑确认）
 function jumpToNote(target: DisclosureVariant): void {
@@ -263,7 +267,7 @@ const {
   removeCategory,
 } = useH9ListedDisclosure({
   allResponses: toRef(props, 'allResponses'),
-  onSave: (id, v) => emit('save', id, v),
+  onSave: (id, v) => { emit('save', id, v); autoSync.scheduleAutoSync(syncToNotes) },
 })
 
 const displayRows = computed(() => buildListedDisplayRows(state.value))

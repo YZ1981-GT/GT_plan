@@ -24,8 +24,8 @@ export { G3_ACCOUNT_CODE } from './g3Constants'
 
 
 export const G3_DISCLOSURE_SHEET_NAME = {
-  listed: 'G3-note-listed',
-  soe: 'G3-note-soe',
+  listed: '附注披露信息（上市公司）',
+  soe: '附注披露信息（国企）',
 } as const satisfies Record<G3DisclosureVariant, string>
 
 export const isG3ListedStandard = isG2ListedStandard

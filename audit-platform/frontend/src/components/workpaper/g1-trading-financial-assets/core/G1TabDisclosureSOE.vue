@@ -247,12 +247,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, inject, ref, toRef } from 'vue'
+import { computed, inject, onBeforeUnmount, ref, toRef } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import { useG1DisclosureSoe } from '../../composables/useG1DisclosureSoe'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { buildG1SoeSyncPayloads } from '../../composables/g1DisclosureSyncPayload'
 import { G1_NOTE_SECTION, resolveG1NoteSectionTarget } from '../../composables/g1NoteSectionMap'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
@@ -281,6 +282,7 @@ const noteChip = computed(() => {
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 const isSyncing = ref(false)
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 const router = useRouter()
 
 // 跳转回附注模块「衍生金融资产」（披露表 → 附注为单向推送；此处仅导航方便相互编辑确认）
@@ -356,12 +358,17 @@ async function syncToDisclosureNotes() {
       rows += Number(data?.rows_synced ?? 0)
     }
     ElMessage.success(`已同步 ${rows} 行到附注模块「八、2 交易性金融资产 / 八、3 衍生金融资产」`)
+    autoSync.scheduleAutoSync(syncToDisclosureNotes)
   } catch {
     ElMessage.warning('同步附注失败，请稍后重试')
   } finally {
     isSyncing.value = false
   }
 }
+
+onBeforeUnmount(() => {
+  autoSync.cancelPending()
+})
 </script>
 
 <style scoped>

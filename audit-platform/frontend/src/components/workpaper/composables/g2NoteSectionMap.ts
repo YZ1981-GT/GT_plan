@@ -16,8 +16,8 @@ export const G2_NOTE_SECTION = {
 } as const satisfies Record<G2DisclosureVariant, string>
 
 export const G2_DISCLOSURE_SHEET_NAME = {
-  listed: 'G2-note-listed',
-  soe: 'G2-note-soe',
+  listed: '附注披露信息（上市公司）',
+  soe: '附注披露信息（国企）',
 } as const satisfies Record<G2DisclosureVariant, string>
 
 /** Excel 合计数索引（旧）→ 平台跳转目标 */

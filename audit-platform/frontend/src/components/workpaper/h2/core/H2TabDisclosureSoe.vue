@@ -296,6 +296,7 @@
  * 对齐源 xlsx 列结构；动态插行；同步附注八、23
  */
 import { ref, reactive, computed, inject, watch, onMounted, onBeforeUnmount } from 'vue'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import { api } from '@/services/apiProxy'
@@ -341,6 +342,7 @@ function jumpToNote(target: DisclosureVariant): void {
 }
 
 const isReadonly = computed(() => props.isReadonly)
+const autoSync = useDisclosureAutoSync({ isReadonly: () => isReadonly.value })
 const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 const noteSectionId = H2_NOTE_SECTION.soe
 const isSyncing = ref(false)
@@ -500,6 +502,7 @@ function persistAll() {
     section: noteSectionId,
     text: noteImpairment.value || '',
   })
+  autoSync.scheduleAutoSync(syncToNotes)
 }
 
 function updateSummary(
@@ -634,7 +637,7 @@ const _onAdjudicated = (payload: any) => {
   if (payload?.wpCode === 'H2' || payload?.accountCode === '1604') load()
 }
 eventBus.on('substantive:adjudicated', _onAdjudicated)
-onBeforeUnmount(() => { eventBus.off('substantive:adjudicated', _onAdjudicated) })
+onBeforeUnmount(() => { autoSync.cancelPending(); eventBus.off('substantive:adjudicated', _onAdjudicated) })
 </script>
 
 <style scoped>

@@ -364,12 +364,13 @@
  * 对齐源 Excel + note_template_listed §五、8 应收利息子表；
  * 合计数交叉索引：Excel M1-1 → wp:K1-1 + Note:五、8
  */
-import { computed, inject, ref, toRef } from 'vue'
+import { computed, inject, onBeforeUnmount, ref, toRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRouter, useRoute } from 'vue-router'
 import { api } from '@/services/apiProxy'
 import { useG2DisclosureListed } from '../composables/useG2DisclosureListed'
 import { buildG2ListedSyncPayloads } from '../composables/g2DisclosureSyncPayload'
+import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
 import {
   G2_COMBINED_DISCLOSURE_INDEX,
   G2_NOTE_SECTION,
@@ -404,6 +405,7 @@ const combinedNoteChip = computed(() => noteTarget.value?.combinedNoteChip ?? `N
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 const isSyncing = ref(false)
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 
 const dis = useG2DisclosureListed({
   allResponses: toRef(props, 'allResponses'),
@@ -507,12 +509,17 @@ async function syncToDisclosureNotes() {
       rows += Number(data?.rows_synced ?? 0)
     }
     ElMessage.success(`已同步 ${rows} 行到附注模块「五、8 其他应收款（应收利息明细）」`)
+    autoSync.scheduleAutoSync(syncToDisclosureNotes)
   } catch {
     ElMessage.warning('同步附注失败，请稍后重试')
   } finally {
     isSyncing.value = false
   }
 }
+
+onBeforeUnmount(() => {
+  autoSync.cancelPending()
+})
 </script>
 
 <style scoped>

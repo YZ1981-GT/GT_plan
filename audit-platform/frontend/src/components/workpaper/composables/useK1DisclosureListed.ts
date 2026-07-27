@@ -36,6 +36,7 @@ import {
 import { buildK1ListedSyncPayloads } from './k1DisclosureSyncPayload'
 import {
   K1_ACCOUNT_CODE,
+  K1_NOTE_SECTION,
   isK1DisclosureApplicable,
   resolveK1NoteSectionTarget,
 } from './k1NoteSectionMap'
@@ -110,7 +111,14 @@ export function useK1DisclosureListed(opts: {
     try {
       window.dispatchEvent(
         new CustomEvent('disclosure:note-text-updated', {
-          detail: { accountCode: K1_ACCOUNT_CODE, section: 'listed', text: noteText.value },
+          detail: {
+            wpCode: 'K1',
+            accountCode: K1_ACCOUNT_CODE,
+            section: 'listed',
+            projectId: projectId.value,
+            sectionIds: [K1_NOTE_SECTION.listed],
+            text: noteText.value,
+          },
         }),
       )
     } catch {

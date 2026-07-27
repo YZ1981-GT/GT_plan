@@ -13,13 +13,15 @@
 export interface ColumnDef {
   /** 对应 sub_table_data 行对象的字段键（如 'end_gross'） */
   key: string
-  /** 中文列头，取自组件既有源对齐定义（如 '期末账面余额'） */
+  /** 中文列头，取自组件既有源对齐定义（如 '账面余额'） */
   label: string
   /** true=标签列（承载行名 label），投影为第一列 */
   is_label?: boolean
   align?: 'left' | 'center' | 'right'
   /** 渲染格式提示（可选） */
   format?: 'amount' | 'percent' | 'text'
+  /** 分组父表头（如 '期末余额'），相邻且同 group 的列在渲染时合并为两级表头 */
+  group?: string
 }
 
 export type SubTableColumns = Record<string, ColumnDef[]>

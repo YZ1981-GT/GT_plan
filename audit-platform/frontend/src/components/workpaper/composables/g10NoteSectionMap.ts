@@ -13,8 +13,8 @@ export const G10_NOTE_SECTION = {
 } as const satisfies Record<G10DisclosureVariant, { trading: string; derivative: string }>
 
 export const G10_DISCLOSURE_SHEET_NAME = {
-  listed: '附注上市',
-  soe: '附注国企',
+  listed: '附注披露信息（上市公司）',
+  soe: '附注披露信息（国企）',
 } as const satisfies Record<G10DisclosureVariant, string>
 
 export { G10_ACCOUNT_CODE } from './g10Constants'
