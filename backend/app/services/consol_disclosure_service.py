@@ -918,8 +918,9 @@ async def generate_consol_notes_with_flag(
     """
     from app.services.consol_note_gray_service import is_consol_note_v2_enabled
 
-    # 灰度按项目：全局 CONSOL_NOTES_V2_ENABLED=True 或该项目 opt-in → 走 V2（读端亦返回
-    # 穿透 provenance 供前端展示）；否则老版 7 骨架章节（零回归）。
+    # 灰度按项目：全局 CONSOL_NOTES_V2_ENABLED=True 或该项目 opt-in → 走 V2（读端 schema
+    # 不携带穿透 provenance，P1-A(a)；穿透明细走 Step 8 落库 + consol-breakdown 端点）；
+    # 否则老版 7 骨架章节（零回归）。
     if await is_consol_note_v2_enabled(db, project_id):
         try:
             v2_sections = await generate_full_consol_notes(db, project_id, year)
