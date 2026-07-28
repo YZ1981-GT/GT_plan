@@ -46,6 +46,25 @@
 - [x] 8. 零回归门：Property 9 + S4 契约 + 级联 PBT 全绿（41 passed）；级联步骤 6 门控保持全局不改
   - _Requirements: 5.1, 5.2_
 
+- [x] 9. 灰度端点路由契约测试 `test_consol_note_gray_endpoint.py`（复盘补 Req4 覆盖缺口，
+  ASGITransport DB-free/auth-free：GET/PUT 已注册不 404、路径不被 `{year}` 吞掉不 422、
+  命中端点鉴权拦截 401/403、路由表存在 GET+PUT，3 测）
+  - _Requirements: 4.1, 4.4_
+
+## 复盘改进 Backlog（2026-07-27，未落地，待决策）
+
+- **P1-A（设计内部矛盾）**：新增的 `ConsolDisclosureSection.consolidation_breakdown` 字段目前无消费者
+  （前端穿透走既有 `ConsolBreakdownDialog` 读 `consol-breakdown` 端点，非读该内存字段）→ 字段被 carry
+  进读端响应但无人读 = 死重量。二选一：(a) 删字段纯走端点；(b) 前端改读 `section.consolidation_breakdown`
+  内存（消除对落库的显示依赖，符合 Decision 2 原意，但需动一处前端）。
+- **P1-B（未言明副作用）**：opt-in 项目 `GET /consolidation/notes`（readonly）现每次读都跑完整 V2 生成
+  （加载子公司树 + 聚合 173 章节，比 legacy 重）+ Step 8 写 180 章节到 DB（读时写库）。落库幂等无重复，
+  但大集团 opt-in 有重算/写放大成本。建议 design 补决策：接受此代价（大集团慎用 / 后续加缓存）或落库
+  只在显式生成/reaggregate 触发。若采纳 P1-A(b) 内存读，显示层不再依赖落库，仅剩重算成本。
+- **P2**：wizard_state 读改写整 JSONB 存在 lost-update 竞态（平台所有 wizard 写者共有）；全局 True 时
+  项目关 effective 仍 True（响应透明但无 UI 提示被覆盖）；Property 9 off-path 引入 benign
+  "coroutine never awaited" 警告（测试通过，无生产影响）。
+
 ## Notes
 
 - **前端无改动**：穿透显示复用既有 `ConsolBreakdownDialog`（source=note，读 `consol-breakdown` 端点）；

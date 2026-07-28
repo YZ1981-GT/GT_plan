@@ -132,6 +132,8 @@ S4 随机形态永不抛错。
 
 ## Testing Strategy
 
-- 后端 `test_consol_note_gray_service.py`：Property 1/2/3 + PBT。
+- 后端 `test_consol_note_gray_service.py`：Property 1/2/3 + PBT（service 层灰度判定）。
+- 端点契约 `test_consol_note_gray_endpoint.py`：ASGITransport DB-free/auth-free 验 Req4 端点注册 +
+  Req4.4 路径非冲突（不被 `{year}` 吞掉）+ 鉴权拦截；正向 200 round-trip / 404 由 service Property + live 覆盖。
 - 回归门：`test_consol_notes_v2_persist`（Property 9）+ `test_consol_phase2_v2_contract`（S4）+
   `test_consol_phase2_cascade_pbt` 全绿。
