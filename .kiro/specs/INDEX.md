@@ -2,7 +2,7 @@
 
 **最后更新**：2026-07-27
 **当前分支**：`work/2026-05-30-wp-specs`
-**统计**：Active 5 / Archived 449 = 总计 454
+**统计**：Active 2 / Archived 457 = 总计 459
 **最高迁移**：**V127**（以 `migration_status` 实测为准）
 **技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer
 
@@ -30,12 +30,8 @@
 
 | Spec | 阶段 | 说明 |
 |------|------|------|
-| `g7-linkage-extraction-completion` | 三件套齐（待执行 run-all-tasks） | G7 长期股权投资：底稿侧发起合并联动、G7-2/G7-1 四表与跨册取数、抽凭铺开 G7-10/11/12、联动过期常驻提示、合并范围反向补录 G7-4、联动端点与建议草稿集成测试；灰度 `G7_FOUR_TABLE_EXTRACTION_ENABLED` 默认关 |
-| `confirmation-hub-workbench-tabs` | 三件套齐（33 任务全 `[ ]` 未开工） | 函证枢纽底稿多 sheet 可达 + 台账双向导航 + E0 重建（B 方案）+ **路由与编码治理（Req10：G0 差异表可达 / L0A 程序表模板生效 / Index_Code_Map + 非兜底守卫）** |
-| `confirmation-shared-model-extension` | 三件套齐（待执行 run-all-tasks） | 四张共享表行模型按源模板 additive 补列（ConfirmationRow ~10 列 + K0/L0 5 段与行级审计结论 + E0 原币/本位币/汇率 + H0 条款口径；EntityVerifyRow 回函核实块 ~11 列；ReliabilityRow ~8 列；DiffReconcileRow 支持性证据）——一次修惠及七枢纽；列配置驱动层 + 12 属性 + 6 波 |
-| `confirmation-alternative-structure-alignment` | 三件套齐（待执行 run-all-tasks） | 替代程序结构对齐：K0-5/K0-6/L0-5「本期发生额」渲染层拆借贷双表（工厂 4 block 位不动）、L0-5 补期初一致性核对、G0-6 区块对齐源三区并纳入工厂、F05/F06 拆子组件（characterization 先行）；12 属性 + 6 波 |
-| `g0-investment-diff-model` | 三件套齐（待执行 run-all-tasks，前置 confirmation-hub Req10 可达） | G0 证券差异表补 5 列 + 「是否需要调账」改判断列；非证券差异表新建三维专属组件（持股比例/投资金额/投资条款 × 账面·回函·差异），共享 `diffReconcile` 一行不改；10 属性 + 5 波 |
-| `e0-send-list-components` | 三件套齐（待执行 run-all-tasks） | E0-3~E0-6 四张发函前清单审定 `E0.yaml`（现 col_* 占位表）+ 生成器 `_reviewed` 防覆盖，支撑「清单 → E0-1 带入」上游可靠；8 属性 + 5 波 |
+| `trial-balance-cross-comparison` | 部分完成（Task 1-4 `[x]`，Task 5 PBT 套件未做 / 6* Playwright 可选留待） | 试算表跨年度/跨项目对比（`useTbComparison` 外连接+差异高亮+导出，复用 GET /trial-balance 无新端点）；待补 PBT 套件（Property 1-7） |
+| `confirmation-linkage-completion` | 起步（仅 `.config.kiro`，需求/设计未成） | 并发会话新建，函证联动完成收口方向；待补三件套 |
 
 ---
 
@@ -48,10 +44,10 @@ _archive/
 ├── 03-refinement-rounds/              9
 ├── 04-infra/                          2
 ├── 04-infra-architecture/            36
-├── 05-business-features/            216
+├── 05-business-features/            223
 ├── 06-engineering-governance/        13
 ├── 07-workpaper-slimdown/            22
-├── 08-disclosure-notes/              15
+├── 08-disclosure-notes/              16
 ├── 09-consolidation-phases/           4
 ├── 10-A~S-workpaper-all-cycles-complete/ 31
 ├── 11-confirmation-d0-module/        10
@@ -60,7 +56,27 @@ _archive/
 └── 99-superseded/                     4
 ```
 
-### 最近归档（2026-07-27，disclosure-note-linkage-completion 完成归档）
+### 最近归档（2026-07-27，本轮 8 个完成 spec 归档）
+
+**→ 08-disclosure-notes（+1）**
+
+| Spec | 说明 |
+|------|------|
+| disclosure-note-quality-completion | 附注模块质量完成：markdown 残留止血（前端 renderNoteTextToHtml + 生成侧 sanitize_note_narrative + 存量脚本 live 清 216 条）/ stale_source 诚实分级暴露 / linkage 诊断端点 + BS-002 示例 seed / consol V2 落库 SourceTemplate.consolidated AttributeError 修复；test_note_content_utils_sanitize 7 + test_note_readiness_and_stale 16 + test_consol_notes_v2_persist 24 全绿；灰度默认关零回归；已 commit+push `b57d713e` |
+
+**→ 05-business-features（+7）**
+
+| Spec | 说明 |
+|------|------|
+| confirmation-alternative-structure-alignment | 替代程序结构对齐九套（K0-5/K0-6/L0-5 渲染层拆借贷双表 + L0-5 期初一致性 + G0-6 区块对齐 + F05/F06 拆子组件 + L05 adapter passthrough 修复）；函证域 750 passed；Playwright 留待 |
+| confirmation-hub-workbench-tabs | 函证枢纽底稿多 sheet 可达 + 台账双向导航 + E0 重建（B 方案）+ 路由与编码治理（sheet override 编码尾码优先解析）；前端 706+后端契约 35 passed；仅 8.2* Playwright 可选留待 |
+| confirmation-shared-model-extension | 四张共享表行模型 additive 补列（ConfirmationRow/EntityVerifyRow/ReliabilityRow/DiffReconcileRow）+ 列配置驱动 + Master 简表回退/FullGrid 宽表分工修正；函证域 668+22 契约 passed；6.3 Playwright 留待 |
+| e0-send-list-components | E0-3~E0-6 四张发函前清单审定 E0.yaml + 生成器 `_reviewed` 防覆盖 + 候选去重纯函数；54 passed；Playwright 留待 |
+| g0-investment-diff-model | G0 证券差异表补 5 列 + 非证券三维差异专属组件（confirmation-diff-nonsecurities 全链注册）+ migrateAdjust 修复；g0 域 33+confirmation 691+注册 66+后端 29 passed+live round-trip PASS |
+| g7-linkage-extraction-completion | G7 长投联动取数（底稿侧合并联动 + G7-2/G7-1 四表跨册取数 + 抽凭铺开 + 过期常驻提示 + G7-4 反向补录 + 主入口白屏 P0 修复）；26/26 全绿；灰度默认关 |
+| trial-balance-version-timemachine | 试算表版本时光机（V128 snapshot 表 + TbSnapshotService create/list/restore/diff + SHA-256 dedup + 版本抽屉 + best-effort 快照不阻断 recalc）；8/8 全绿 + Property 1-8 PBT |
+
+### 上一轮归档（2026-07-27，disclosure-note-linkage-completion 完成归档）
 
 **→ 08-disclosure-notes（+1）**
 
