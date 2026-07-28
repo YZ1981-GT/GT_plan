@@ -4,8 +4,9 @@
 
 将合并附注 V2 落库/穿透从「全局灰度默认关空转」收敛为「按项目 opt-in + 严格零回归」。核心是新增一个
 镜像 `note_formula_gray_service` 的按项目灰度服务，替换 dispatcher 与 Step 8 落库两处全局门控；配套
-灰度配置端点；`ConsolDisclosureSection` 新增 Optional `consolidation_breakdown` 字段使穿透 provenance
-随读端返回；前端穿透显示复用**既有** `ConsolBreakdownDialog`（读 `consol-breakdown` 端点），无需新增前端。
+灰度配置端点；前端穿透显示复用**既有** `ConsolBreakdownDialog`（读 `consol-breakdown` 端点从落库表取数），
+无需新增前端。**穿透显示唯一来源=落库 + 端点**（P1-A(a) 决策：读端 `ConsolDisclosureSection` 不新增
+`consolidation_breakdown` 字段——曾试加但无消费者，已删）。
 
 ## Architecture
 
@@ -34,9 +35,9 @@ GET /consolidation/notes ──► generate_consol_notes_with_flag ──┐
 `getattr(settings, "CONSOL_NOTES_V2_ENABLED", False)` → `await is_consol_note_v2_enabled(db, project_id)`。
 生效则 V2 生成 + `_adapt_v2_sections_to_schema`；否则老版 `generate_consol_notes_sync`。
 
-### 组件 3：`_adapt_v2_sections_to_schema`（透传 breakdown）
+### 组件 3：`_adapt_v2_sections_to_schema`（不改，零回归）
 
-新增 `consolidation_breakdown = raw.get(...) if isinstance(dict) else None` 映射到章节。
+**不新增字段透传**（P1-A(a)：读端不携带 breakdown）。适配器保持既有映射，穿透明细走落库 + 端点。
 
 ### 组件 4：`generate_full_consol_notes` Step 8（改门控）
 
@@ -47,9 +48,11 @@ Step 8 落库门控由全局改为 `await is_consol_note_v2_enabled(db, parent_p
 `GET/PUT /api/consolidation/notes/{project_id}/config/consol-note-gray`（3 段静态路径，不冲突）。
 PUT 写 `wizard_state.consol_notes_v2_enabled` + `flag_modified` + commit，edit 权限。
 
-### 组件 6：`ConsolDisclosureSection.consolidation_breakdown`（新增 Optional 字段）
+### 组件 6：`ConsolDisclosureSection`（读端 schema 不新增字段）
 
-`dict | None = None`，additive 零回归。
+P1-A(a) 决策：读端 schema **不新增** `consolidation_breakdown` 字段。曾试加 Optional 字段但无消费者
+（前端穿透走既有 `ConsolBreakdownDialog` 读 `consol-breakdown` 端点，非读该内存字段）→ 死重量已删。
+落库 provenance 唯一来源=`_persist_consol_sections_v2` 写 DB 列 + 端点读取。
 
 ### 组件 7：前端穿透显示（复用既有，无改动）
 
@@ -68,7 +71,7 @@ project.wizard_state = {
 }
 ```
 
-### `ConsolDisclosureSection`（新增 Optional 字段）
+### `ConsolDisclosureSection`（读端 schema 不新增字段，逐字节同改造前）
 
 ```python
 class ConsolDisclosureSection(BaseModel):
@@ -78,10 +81,10 @@ class ConsolDisclosureSection(BaseModel):
     rows: list[ConsolDisclosureRow] = Field(default_factory=list)
     is_editable: bool = True
     is_group_header: bool = False
-    consolidation_breakdown: dict | None = None   # 新增：穿透 provenance，老版章节为 None
+    # P1-A(a)：不新增 consolidation_breakdown 字段（无消费者，穿透走落库 + 端点）
 ```
 
-### provenance breakdown 形态（落 `disclosure_notes.consolidation_breakdown` 列，读端亦携带）
+### provenance breakdown 形态（仅落 `disclosure_notes.consolidation_breakdown` DB 列，端点读取，读端 schema 不携带）
 
 ```
 {
@@ -115,13 +118,13 @@ ConsolNoteGrayResponse = { project_enabled: bool, global_enabled: bool, effectiv
 全局 True（Property 9 打桩）→ persist 调用一次；全局 False + 无 opt-in → persist 不调用。
 **Validates: Requirements 3.1, 3.3**
 
-### Property 5: 适配器透传 breakdown 且不破坏契约
-V2 章节 dict 的 `consolidation_breakdown`（dict）透传到 `ConsolDisclosureSection`；非 dict → None；
-S4 随机形态永不抛错。
+### Property 5: 适配器不新增字段且不破坏契约
+适配器输出的 `ConsolDisclosureSection` 不含 `consolidation_breakdown` 字段（P1-A(a)）；S4 随机形态的 V2
+章节 dict 输入下适配器永不抛错，输出合法 `ConsolDisclosureSection`，与老版契约逐字节一致。
 **Validates: Requirements 2.2, 5.3**
 
 ### Property 6: 未 opt-in 读端零回归
-全局关 + 未 opt-in → 读端返回老版章节，`consolidation_breakdown=None`，结构与改造前一致。
+全局关 + 未 opt-in → 读端返回老版 7 骨架章节，结构与改造前逐字节一致（读端 schema 无 breakdown 字段）。
 **Validates: Requirements 2.3, 5.1**
 
 ## Error Handling

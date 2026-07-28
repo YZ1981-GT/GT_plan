@@ -557,9 +557,6 @@ class ConsolDisclosureSection(BaseModel):
     rows: list[ConsolDisclosureRow] = Field(default_factory=list)
     is_editable: bool = True
     is_group_header: bool = False
-    # 合并附注穿透 provenance（V2 生成时 by_company 贡献明细；老版/非合并章节为 None）
-    # 供前端 ConsolNoteTab 直接读取展示子公司贡献，不依赖 V2 落库、不调穿透端点（Decision 2）。
-    consolidation_breakdown: dict | None = None
 
 
 # ========== 合并报表 ==========

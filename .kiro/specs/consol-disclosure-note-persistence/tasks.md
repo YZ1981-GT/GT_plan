@@ -24,10 +24,12 @@
   项目 opt-in / fail-open False）
   - _Requirements: 1.1, 1.2, 1.3_
 
-- [x] 2. `ConsolDisclosureSection` 新增 Optional `consolidation_breakdown: dict | None = None`
+- [x] 2. 读端 schema `ConsolDisclosureSection` **不新增** `consolidation_breakdown` 字段（P1-A(a)：
+  曾试加 Optional 字段但无消费者，已删；穿透唯一来源=落库 DB 列 + `consol-breakdown` 端点）
   - _Requirements: 2.2, 5.3_
 
-- [x] 3. `_adapt_v2_sections_to_schema` 透传 `consolidation_breakdown`（非 dict → None 防御 coerce）
+- [x] 3. `_adapt_v2_sections_to_schema` **不向读端 schema 透传** breakdown（V2 章节 dict 内 breakdown
+  仍供 Step 8 落库读取；适配器输出 shape 与老版逐字节一致）
   - _Requirements: 2.2, 5.3_
 
 - [x] 4. `generate_consol_notes_with_flag` dispatcher 门控改为 `await is_consol_note_v2_enabled(db, pid)`
@@ -53,10 +55,10 @@
 
 ## 复盘改进 Backlog（2026-07-27，未落地，待决策）
 
-- **P1-A（设计内部矛盾）**：新增的 `ConsolDisclosureSection.consolidation_breakdown` 字段目前无消费者
-  （前端穿透走既有 `ConsolBreakdownDialog` 读 `consol-breakdown` 端点，非读该内存字段）→ 字段被 carry
-  进读端响应但无人读 = 死重量。二选一：(a) 删字段纯走端点；(b) 前端改读 `section.consolidation_breakdown`
-  内存（消除对落库的显示依赖，符合 Decision 2 原意，但需动一处前端）。
+- **P1-A（已决策=(a)删字段，已落地）**：新增的 `ConsolDisclosureSection.consolidation_breakdown` 字段
+  无消费者（前端穿透走既有 `ConsolBreakdownDialog` 读 `consol-breakdown` 端点，非读该内存字段）= 死重量。
+  **用户选 (a) 删字段**：已删 `consolidation_schemas.py` 该字段 + 移除 `_adapt_v2_sections_to_schema` 透传；
+  穿透显示唯一来源=Step 8 落库 DB 列 + 端点弹窗路径（保持不动）。备选 (b)「前端改读内存字段」未采纳。
 - **P1-B（未言明副作用）**：opt-in 项目 `GET /consolidation/notes`（readonly）现每次读都跑完整 V2 生成
   （加载子公司树 + 聚合 173 章节，比 legacy 重）+ Step 8 写 180 章节到 DB（读时写库）。落库幂等无重复，
   但大集团 opt-in 有重算/写放大成本。建议 design 补决策：接受此代价（大集团慎用 / 后续加缓存）或落库

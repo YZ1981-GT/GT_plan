@@ -888,11 +888,6 @@ def _adapt_v2_sections_to_schema(
             or raw.get("section_type") == "group_header"
         )
 
-        # 透传合并穿透 provenance（V2 aggregate 已写在章节 dict 上，供前端直接读取）；
-        # 防御性 coerce：非 dict（含 None / 任意 S4 随机形态）→ None，绝不破坏 pydantic 校验。
-        raw_breakdown = raw.get("consolidation_breakdown")
-        breakdown = raw_breakdown if isinstance(raw_breakdown, dict) else None
-
         adapted.append(
             ConsolDisclosureSection(
                 section_code=raw.get("section_id") or raw.get("section_code") or "",
@@ -901,7 +896,6 @@ def _adapt_v2_sections_to_schema(
                 rows=rows,
                 is_editable=bool(raw.get("is_editable", True)),
                 is_group_header=is_group_header,
-                consolidation_breakdown=breakdown,
             )
         )
     return adapted

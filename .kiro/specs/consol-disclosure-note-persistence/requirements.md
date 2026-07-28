@@ -13,8 +13,9 @@
    章节 dict 内存里，两者未收敛，前端无从按项目可控地启用。
 
 本 spec 将 V2 落库/穿透从「全局灰度默认关」收敛为「按项目可控 opt-in + 严格零回归」，使单个合并项目
-可开启后：读端返回携 breakdown 的 V2 章节、落库 provenance、既有 `ConsolBreakdownDialog`（穿透弹窗，
-读 `consol-breakdown` 端点）真正显示子公司贡献明细。
+可开启后：读端走 V2 生成、Step 8 落库 provenance、既有 `ConsolBreakdownDialog`（穿透弹窗，读
+`consol-breakdown` 端点从落库表取数）真正显示子公司贡献明细。**穿透显示唯一来源=落库 + 端点**
+（P1-A(a) 决策：不在读端 schema 携带 breakdown 字段——该字段无消费者，已删）。
 
 **关键决策**：
 
@@ -55,18 +56,17 @@
 3. WHEN 全局开关为 True THEN 系统 SHALL 短路返回 True 而不查库（镜像 `is_note_formula_enabled`，
    保证既有 `monkeypatch(settings, ...)` 单测零回归）。
 
-### Requirement 2: 读端按项目返回 V2 章节（含穿透 provenance）
+### Requirement 2: 读端按项目返回 V2 章节
 
-**User Story:** 作为审计人员，我希望对已 opt-in 的合并项目，查看合并附注时能拿到携子公司贡献明细的
-V2 章节。
+**User Story:** 作为审计人员，我希望对已 opt-in 的合并项目，查看合并附注时走 V2 生成路径。
 
 #### Acceptance Criteria
 
 1. WHEN `generate_consol_notes_with_flag` 被调用 THEN 系统 SHALL 用 `is_consol_note_v2_enabled`
    判定；生效则走 V2 生成 + 适配为 `ConsolDisclosureSection`，否则老版 7 骨架章节。
-2. WHEN V2 章节适配为 `ConsolDisclosureSection` THEN 系统 SHALL 透传 `consolidation_breakdown`
-   （新增 Optional 字段，非 dict → None，绝不破坏 pydantic 校验）。
-3. WHEN 未 opt-in 且全局关 THEN 读端返回结构 SHALL 与改造前逐字节一致（老版章节，`consolidation_breakdown=None`）。
+2. WHEN 读端返回章节 THEN 系统 SHALL **不在读端 schema 携带穿透 provenance**（P1-A(a) 决策：
+   `ConsolDisclosureSection` 不新增字段，穿透明细唯一来源=Step 8 落库 + `consol-breakdown` 端点）。
+3. WHEN 未 opt-in 且全局关 THEN 读端返回结构 SHALL 与改造前逐字节一致（老版章节）。
 
 ### Requirement 3: Step 8 落库按项目触发（provenance-only）
 
@@ -105,8 +105,8 @@ V2 章节。
    SHALL 仍通过（灰度服务短路返 True）。
 2. WHEN 级联刷新步骤 6 THEN 其门控 SHALL 保持全局 `CONSOL_NOTES_V2_ENABLED`（不改，避免破坏
    `patch({module}.settings)` 单测）。
-3. WHEN 新增 `ConsolDisclosureSection.consolidation_breakdown` 字段 THEN 其 SHALL 为 Optional 默认 None
-   （老版/非合并章节不受影响，S4 契约测试仍通过）。
+3. WHEN 适配器 `_adapt_v2_sections_to_schema` 处理任意 V2 章节形态 THEN 其 SHALL 永不抛错且输出
+   合法 `ConsolDisclosureSection`（不新增字段，S4 契约测试仍通过）。
 
 ### Requirement 6: 属性化可测
 
