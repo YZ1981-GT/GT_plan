@@ -225,3 +225,104 @@ async def get_consol_note_breakdown(
     不 404/500），见错误场景 EH1/EH3。
     """
     return await get_note_consol_breakdown(db, project_id, year, section_id)
+
+
+# ---------------------------------------------------------------------------
+# 合并附注 V2 灰度按项目开关（consol-disclosure-note-persistence Req5）
+# ---------------------------------------------------------------------------
+#
+# 路由 {project_id}/config/consol-note-gray 为 3 段静态路径（第二段字面 config），
+# 与 {project_id}/{year}（2 段、year:int）不冲突。放在所有既有路由之后注册。
+
+
+class ConsolNoteGrayResponse(BaseModel):
+    """合并附注 V2 灰度状态"""
+    project_enabled: bool          # 项目级 opt-in（wizard_state.consol_notes_v2_enabled）
+    global_enabled: bool           # 全局开关 CONSOL_NOTES_V2_ENABLED
+    effective_enabled: bool        # 生效值（global OR project）
+
+
+class ConsolNoteGrayUpdateRequest(BaseModel):
+    """设置合并附注 V2 项目级 opt-in"""
+    enabled: bool
+
+
+@router.get(
+    "/{project_id}/config/consol-note-gray",
+    response_model=ConsolNoteGrayResponse,
+)
+async def get_consol_note_gray(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_project_access("readonly")),
+):
+    """读取合并附注 V2 灰度状态（项目级 opt-in / 全局 / 生效值）。"""
+    import sqlalchemy as sa
+    from app.core.config import settings
+    from app.models.core import Project
+
+    global_enabled = getattr(settings, "CONSOL_NOTES_V2_ENABLED", False) is True
+
+    result = await db.execute(
+        sa.select(Project.wizard_state).where(
+            Project.id == project_id,
+            Project.is_deleted == sa.false(),
+        )
+    )
+    row = result.first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="项目不存在")
+
+    ws = row[0]
+    project_enabled = bool(ws.get("consol_notes_v2_enabled", False)) if isinstance(ws, dict) else False
+
+    return ConsolNoteGrayResponse(
+        project_enabled=project_enabled,
+        global_enabled=global_enabled,
+        effective_enabled=global_enabled or project_enabled,
+    )
+
+
+@router.put(
+    "/{project_id}/config/consol-note-gray",
+    response_model=ConsolNoteGrayResponse,
+)
+async def update_consol_note_gray(
+    project_id: UUID,
+    payload: ConsolNoteGrayUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_project_access("edit")),
+):
+    """设置合并附注 V2 项目级 opt-in（现场经理+ 编辑权限）。
+
+    写 project.wizard_state.consol_notes_v2_enabled（JSONB，flag_modified 就地改落库）。
+    全局开关 True 时本 opt-in 不影响生效值（生效恒 True，向后兼容）。
+    """
+    import sqlalchemy as sa
+    from sqlalchemy.orm.attributes import flag_modified
+    from app.core.config import settings
+    from app.models.core import Project
+
+    result = await db.execute(
+        sa.select(Project).where(
+            Project.id == project_id,
+            Project.is_deleted == sa.false(),
+        )
+    )
+    project = result.scalar_one_or_none()
+    if project is None:
+        raise HTTPException(status_code=404, detail="项目不存在")
+
+    ws = project.wizard_state if isinstance(project.wizard_state, dict) else {}
+    ws["consol_notes_v2_enabled"] = bool(payload.enabled)
+    project.wizard_state = ws
+    flag_modified(project, "wizard_state")
+    await db.commit()
+
+    global_enabled = getattr(settings, "CONSOL_NOTES_V2_ENABLED", False) is True
+    project_enabled = bool(payload.enabled)
+    return ConsolNoteGrayResponse(
+        project_enabled=project_enabled,
+        global_enabled=global_enabled,
+        effective_enabled=global_enabled or project_enabled,
+    )

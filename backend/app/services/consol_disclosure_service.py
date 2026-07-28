@@ -888,6 +888,11 @@ def _adapt_v2_sections_to_schema(
             or raw.get("section_type") == "group_header"
         )
 
+        # 透传合并穿透 provenance（V2 aggregate 已写在章节 dict 上，供前端直接读取）；
+        # 防御性 coerce：非 dict（含 None / 任意 S4 随机形态）→ None，绝不破坏 pydantic 校验。
+        raw_breakdown = raw.get("consolidation_breakdown")
+        breakdown = raw_breakdown if isinstance(raw_breakdown, dict) else None
+
         adapted.append(
             ConsolDisclosureSection(
                 section_code=raw.get("section_id") or raw.get("section_code") or "",
@@ -896,6 +901,7 @@ def _adapt_v2_sections_to_schema(
                 rows=rows,
                 is_editable=bool(raw.get("is_editable", True)),
                 is_group_header=is_group_header,
+                consolidation_breakdown=breakdown,
             )
         )
     return adapted
@@ -916,9 +922,11 @@ async def generate_consol_notes_with_flag(
 
     返回结构契约与老版一致（list[ConsolDisclosureSection]，属性 S4）。
     """
-    from app.core.config import settings
+    from app.services.consol_note_gray_service import is_consol_note_v2_enabled
 
-    if getattr(settings, "CONSOL_NOTES_V2_ENABLED", False):
+    # 灰度按项目：全局 CONSOL_NOTES_V2_ENABLED=True 或该项目 opt-in → 走 V2（读端亦返回
+    # 穿透 provenance 供前端展示）；否则老版 7 骨架章节（零回归）。
+    if await is_consol_note_v2_enabled(db, project_id):
         try:
             v2_sections = await generate_full_consol_notes(db, project_id, year)
             return _adapt_v2_sections_to_schema(v2_sections)
@@ -1014,11 +1022,11 @@ async def generate_full_consol_notes(
     for section in all_sections:
         section["lineage"] = lineage_chain
 
-    # Step 8: 合并附注 V2 落 disclosure_notes（灰度默认关，Req3.3 零回归）
-    # 仅 CONSOL_NOTES_V2_ENABLED=True 时落库；按 Task 4.0 裁决 C 只落 provenance
-    # 三字段激活附注级穿透（Req3.1/3.2），表格渲染保留 consol_note_data 老路径。
-    from app.core.config import settings
-    if getattr(settings, "CONSOL_NOTES_V2_ENABLED", False):
+    # Step 8: 合并附注 V2 落 disclosure_notes（灰度按项目，Req3.3 零回归）
+    # 全局 CONSOL_NOTES_V2_ENABLED=True 或该项目 opt-in 时落库；按 Task 4.0 裁决 C 只落
+    # provenance 三字段激活附注级穿透（Req3.1/3.2），表格渲染保留 consol_note_data 老路径。
+    from app.services.consol_note_gray_service import is_consol_note_v2_enabled
+    if await is_consol_note_v2_enabled(db, parent_project_id):
         try:
             await _persist_consol_sections_v2(
                 db, parent_project_id, year, all_sections, template_type,

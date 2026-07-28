@@ -966,11 +966,12 @@ onUnmounted(() => {
   eventBus.off('formula-changed', onFormulaChanged)
 })
 
-function onFormulaChanged(_payload: FormulaChangedPayload) {
-  // 公式保存/应用后，重新加载合并范围数据（公式可能影响计算结果）
-  ElMessage.info('公式已更新，数据同步中...')
-  loadConsolScope()
-  // TODO: 后续接入公式引擎后，这里触发重算各表的公式列
+async function onFormulaChanged(_payload: FormulaChangedPayload) {
+  // 公式变更后重新加载已保存的合并数据（各表持久化值）。
+  // 注：按新公式的完整重算需走「一键刷新」（后端 recalc_full）；前端仅重载展示，
+  // 不在此处虚假声称"重算"（原实现只 loadConsolScope 却提示"数据同步中"=误导）。
+  ElMessage.info('公式已更新，正在重新加载合并数据；如需按新公式重算请使用「一键刷新」')
+  await Promise.all([loadConsolScope(), loadAllData()])
 }
 
 // ─── 拖拽 ─────────────────────────────────────────────────────────────────────
@@ -1222,26 +1223,54 @@ async function doSave(sheetKey: string, payload: any) {
 
 // ─── #4: 抵消分录 → 后端 elimination_entries 表同步 ─────────────────────────
 /**
- * 将 EliminationSheet 保存的自定义分录批量同步到后端 elimination_entries 表，
+ * 将 EliminationSheet 保存的自定义分录**双向同步（diff）**到后端 elimination_entries 表，
  * 使 recalc_full 的 _batch_load_eliminations 能读取到这些分录参与差额表计算。
- * 策略：逐条 POST 自定义分录（_custom=true），已有分录忽略。
- * 正确端点：POST /api/consolidation/eliminations?project_id=xxx
+ *
+ * 策略（对齐 D2/ShareChangeSheet 从单向 append 升级为 diff 的范式）：
+ *   1. 拉取后端已托管的 custom 分录（description 以固定前缀 `自定义抵消：` 开头）
+ *   2. 前端已移除的 → DELETE（修复原"逐条 POST 已有忽略"导致删除/修改不反映的单向 append）
+ *   3. 金额/方向变化的 → 删旧建新；未变的 → 跳过（保留后端记录不重建）
+ *   4. 新增的 → POST
+ * description 统一加前缀，保证所有托管分录可被 list 捕获、diff 一致。
+ * 端点：GET/POST /api/consolidation/eliminations，DELETE /{entry_id}?project_id=xxx
  */
+const _CUSTOM_ELIM_PREFIX = '自定义抵消：'
 async function _syncEliminationEntries(payload: any) {
   if (!projectId.value) return
   const entries: any[] = Array.isArray(payload) ? payload : (payload?.rows || [])
   // 只同步自定义分录（_custom=true），自动分录由 recalc_full 自行处理
   const customEntries = entries.filter((r: any) => r._custom && r.subject && (Number(r.amount) || 0) !== 0)
-  if (!customEntries.length) return
+
+  // 统一 description：始终加前缀，使托管分录可被 list 全量捕获并做 diff
+  const descOf = (e: any) => `${_CUSTOM_ELIM_PREFIX}${e.desc || e.subject}`
 
   try {
-    for (const entry of customEntries) {
+    // 1. 拉取后端已托管的 custom 分录（前缀匹配）
+    const existing: any[] = (await api.get('/api/consolidation/eliminations', {
+      params: { project_id: projectId.value, year: year.value },
+    })) || []
+    const managedByDesc = new Map<string, any>()
+    for (const e of existing) {
+      if (typeof e?.description === 'string' && e.description.startsWith(_CUSTOM_ELIM_PREFIX)) {
+        managedByDesc.set(e.description, e)
+      }
+    }
+
+    // 2. 前端当前 desired
+    const desiredByDesc = new Map<string, any>()
+    for (const e of customEntries) desiredByDesc.set(descOf(e), e)
+
+    const doDelete = (id: string) =>
+      api.delete(`/api/consolidation/eliminations/${id}`, {
+        params: { project_id: projectId.value }, _silent: true,
+      } as any)
+    const doCreate = (desc: string, entry: any) => {
       const amount = Math.abs(Number(entry.amount) || 0)
       const isDebit = entry.direction === '借'
-      await api.post('/api/consolidation/eliminations', {
+      return api.post('/api/consolidation/eliminations', {
         year: year.value,
         entry_type: entry.source || 'custom',
-        description: entry.desc || `自定义抵消：${entry.subject}`,
+        description: desc,
         lines: [{
           account_code: entry.subject,
           account_name: entry.subject,
@@ -1250,9 +1279,29 @@ async function _syncEliminationEntries(payload: any) {
         }],
         related_company_codes: [],
       }, {
-        params: { project_id: projectId.value },
-        _silent: true,
+        params: { project_id: projectId.value }, _silent: true,
       } as any)
+    }
+
+    // 3. 后端有、前端已移除 → 删除
+    for (const [desc, rec] of managedByDesc) {
+      if (!desiredByDesc.has(desc) && rec?.id) await doDelete(rec.id)
+    }
+
+    // 4. 新增 / 变化（删旧建新）/ 未变（跳过）
+    for (const [desc, entry] of desiredByDesc) {
+      const amount = Math.abs(Number(entry.amount) || 0)
+      const isDebit = entry.direction === '借'
+      const rec = managedByDesc.get(desc)
+      if (rec) {
+        const exDebit = Number(rec.lines?.[0]?.debit_amount) || 0
+        const exCredit = Number(rec.lines?.[0]?.credit_amount) || 0
+        const same = Math.abs(exDebit - (isDebit ? amount : 0)) < 0.005
+          && Math.abs(exCredit - (isDebit ? 0 : amount)) < 0.005
+        if (same) continue
+        if (rec.id) await doDelete(rec.id)
+      }
+      await doCreate(desc, entry)
     }
   } catch {
     // 同步失败不阻断 JSON 保存（降级：前端 JSON 存储仍为真源，后端表为副本）
