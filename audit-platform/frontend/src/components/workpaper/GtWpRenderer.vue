@@ -315,6 +315,7 @@ import GtBArchitectureTree from '@/components/workpaper/GtBArchitectureTree.vue'
 import { useProjectStore } from '@/stores/project'
 import { subscribeInvalidation } from '@/services/acnr'
 import { resolveEffectiveAuditYear } from '@/utils/resolveAuditYear'
+import { normalizeSheetName } from '@/utils/normalizeSheetName'
 import { useWorkpaperScaffold } from '@/components/workpaper/composables/useWorkpaperScaffold'
 
 // ─── Types ───
@@ -483,6 +484,7 @@ const activeSheetName = computed<string>({
     if (props.initialSheet) {
       const target = props.initialSheet
       const exact = sheets.find(s => s.sheet_name === target)
+        || sheets.find(s => normalizeSheetName(s.sheet_name) === normalizeSheetName(target))
       if (exact) return exact.sheet_name
       // 兜底：initialSheet 传的是底稿编码（如 K9-3/D4-4）时——来源底稿跳转仅有 wp_id+item_id
       // 前缀编码、无法得知中文 sheet 全名——匹配名称以该编码结尾/包含该编码的 sheet。
@@ -1001,9 +1003,11 @@ function onJumpToReference(refCode: string) {
 function onJumpToSection(sheetName: string) {
   // B-Index 架构图节点点击 → 切换到对应 sheet（同底稿内 sheet 切换）
   if (!sheetName || !renderConfig.value) return
-  const exists = renderConfig.value.sheets?.some(s => s.sheet_name === sheetName)
+  const exists = renderConfig.value.sheets?.find(
+    s => s.sheet_name === sheetName || normalizeSheetName(s.sheet_name) === normalizeSheetName(sheetName)
+  )
   if (exists) {
-    activeSheetName.value = sheetName
+    activeSheetName.value = exists.sheet_name
   } else {
     ElMessage.info('未找到对应底稿 sheet')
   }
@@ -1040,8 +1044,10 @@ function onSwitchNavigate(sheetName: string) {
 /** 子组件 emit navigate-sheet → 切换当前 active tab 到目标 sheet */
 function onChildNavigateSheet(sheetName: string) {
   if (!sheetName) return
-  // 尝试精确匹配
-  const exists = renderConfig.value?.sheets?.find(s => s.sheet_name.includes(sheetName))
+  // 尝试精确匹配 + 归一化兜底
+  const exists = renderConfig.value?.sheets?.find(
+    s => s.sheet_name.includes(sheetName) || normalizeSheetName(s.sheet_name).includes(normalizeSheetName(sheetName))
+  )
   if (exists) {
     activeSheetName.value = exists.sheet_name
   } else {

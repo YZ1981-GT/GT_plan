@@ -72,6 +72,16 @@ router = APIRouter(
     tags=["wp-render-config"],
 )
 
+# ─── 半/全角标点归一化（sheet 名称匹配用） ─────────────────────────────────
+_PUNCT_NORM = str.maketrans("（），：；", "(),:;")
+_WHITESPACE_STRIP = str.maketrans("", "", " \u3000\t")
+
+
+def _normalize_punct(s: str) -> str:
+    """折叠全角标点宽度+空白差异，用于 sheet 名称匹配回退。"""
+    return s.translate(_PUNCT_NORM).translate(_WHITESPACE_STRIP)
+
+
 # ─── Singleton schema service (stateless + cache) ────────────────────────────
 _schema_service = WpRenderSchemaService()
 
@@ -106,6 +116,9 @@ def _sheet_name_matches(actual: str | None, requested: str | None) -> bool:
         ac, rc = a_code.group(1), r_code.group(1)
         if ac == rc and ac[-1:].isalpha():
             return True
+    # 第四级：折叠半/全角标点宽度差异
+    if _normalize_punct(actual) == _normalize_punct(requested):
+        return True
     return False
 
 
