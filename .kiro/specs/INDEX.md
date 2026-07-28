@@ -2,7 +2,7 @@
 
 **最后更新**：2026-07-27
 **当前分支**：`work/2026-05-30-wp-specs`
-**统计**：Active 2 / Archived 457 = 总计 459
+**统计**：Active 1 / Archived 458 = 总计 459
 **最高迁移**：**V127**（以 `migration_status` 实测为准）
 **技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer
 
@@ -30,7 +30,6 @@
 
 | Spec | 阶段 | 说明 |
 |------|------|------|
-| `trial-balance-cross-comparison` | 部分完成（Task 1-4 `[x]`，Task 5 PBT 套件未做 / 6* Playwright 可选留待） | 试算表跨年度/跨项目对比（`useTbComparison` 外连接+差异高亮+导出，复用 GET /trial-balance 无新端点）；待补 PBT 套件（Property 1-7） |
 | `confirmation-linkage-completion` | 起步（仅 `.config.kiro`，需求/设计未成） | 并发会话新建，函证联动完成收口方向；待补三件套 |
 
 ---
@@ -108,6 +107,12 @@ _archive/
 |------|------|
 | n1-disclosure-note-linkage | N1 递延所得税资产披露表↔附注（五、30/八、31）结构化推送+正反向跳转+2211 定向刷新+覆盖率守卫；N3 共用章节子表所有权方案 A（N1 独占四张表）；前端 288+后端 63 测试+live round-trip RESTORED_IDENTICAL |
 | disclosure-note-formula-data-population | 附注表内公式数据补全（formula binding 119 条+合计标注 393 行+预设 995 条+附注侧 logic_check 61 条+只读诊断 linkage 缺口+契约守卫）；371 测试+真实项目 round-trip PASS；灰度默认 False |
+
+**→ 05-business-features（+1，2026-07-27）**
+
+| Spec | 说明 |
+|------|------|
+| trial-balance-cross-comparison | 试算表跨年度/跨项目对比（`useTbComparison` 外连接+差异高亮+SheetJS 导出，复用 GET /trial-balance 无新端点）；全 6 任务完成——Task 5 PBT+vitest 15 测绿（P1-P7，fast-check numRuns=20，含 zero-division/403 隔离/max5/零回归），Task 6* Playwright e2e 2 测 live 通过（真实栈 9980+3030/项目 0ec33ac9） |
 
 ### 上次归档（2026-07-25，活跃 spec 全部收尾归档）
 
