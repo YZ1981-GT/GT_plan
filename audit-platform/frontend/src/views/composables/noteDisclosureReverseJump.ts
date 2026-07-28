@@ -31,6 +31,11 @@ export interface NoteSectionVariants {
 export const DISCLOSURE_NOTE_SECTION_MAP: Record<string, NoteSectionVariants> = {
   E1: { listed: '五、1', soe: '八、1' },
   D1: { listed: '五、4', soe: '八、4' }, // 应收票据
+  D3: { listed: '五、38', soe: '八、38' }, // 预收款项
+  D5: { listed: '五、6', soe: '八、6' }, // 应收款项融资
+  D6: { listed: '五、10', soe: '八、11' }, // 合同资产
+  D7: { listed: '五、39', soe: '八、39' }, // 合同负债
+  D4: { listed: '五、62', soe: '八、64' }, // 营业收入和营业成本
   // G1 交易性金融资产底稿的两张披露表（正向 noteDisclosureJump 均路由到 G1 披露 sheet）
   G1: { listed: '五、2', soe: '八、2' }, // 交易性金融资产
   G1_DERIVATIVE: { listed: '五、3', soe: '八、3' }, // 衍生金融资产（同 G1 底稿，②衍生工具 / 表2）

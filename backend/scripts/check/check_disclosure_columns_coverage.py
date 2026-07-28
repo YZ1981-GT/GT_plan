@@ -77,6 +77,11 @@ COLUMN_BUILDERS = (
     "buildH8SoeSyncPayloads",      # H8 使用权资产 soe
     "buildD1SyncPayload",          # D1 应收票据（listed+soe，按 variant 附 columns）
     "buildD2SyncPayload",          # D2 应收账款（listed+soe，按 variant 附 columns）
+    "buildD3SyncPayload",          # D3 预收款项（listed+soe，按 variant 附 columns）
+    "buildD5SyncPayload",          # D5 应收款项融资（listed+soe，按 variant 附 columns）
+    "buildD6SyncPayload",          # D6 合同资产（listed+soe，按 variant 附 columns）
+    "buildD4SyncPayload",          # D4 营业收入/营业成本（listed+soe，按 variant 附 columns）
+    "buildD7SyncPayload",          # D7 合同负债（listed+soe，按 variant 附 columns）
     "buildE1SyncPayload",          # E1 货币资金（listed+soe，按 variant 附 columns）
     "buildN1SyncPayload",          # N1 递延所得税资产（listed+soe，与 N3 共用章节，owner=N1）
     "buildH3SyncPayload",          # H3 投资性房地产（listed+soe，按计量模式推表）

@@ -18,8 +18,23 @@ import {
   K13_DISCLOSURE_SHEET_SOE,
   N1_DISCLOSURE_SHEET_LISTED,
   N1_DISCLOSURE_SHEET_SOE,
+  D3_DISCLOSURE_SHEET_LISTED,
+  D3_DISCLOSURE_SHEET_SOE,
+  D5_DISCLOSURE_SHEET_LISTED,
+  D5_DISCLOSURE_SHEET_SOE,
+  D6_DISCLOSURE_SHEET_LISTED,
+  D6_DISCLOSURE_SHEET_SOE,
+  D7_DISCLOSURE_SHEET_LISTED,
+  D7_DISCLOSURE_SHEET_SOE,
+  D4_DISCLOSURE_SHEET_LISTED,
+  D4_DISCLOSURE_SHEET_SOE,
   isN1DeferredTaxNoteSection,
   isD1NotesReceivableNoteSection,
+  isD3PrepaymentNoteSection,
+  isD5ReceivablesFinancingNoteSection,
+  isD6ContractAssetNoteSection,
+  isD7ContractLiabilityNoteSection,
+  isD4RevenueNoteSection,
   isDerivativeFinancialAssetNoteSection,
   isE1MonetaryFundNoteSection,
   isG1TradingFinancialAssetNoteSection,
@@ -522,5 +537,66 @@ describe('noteDisclosureJump · N1 递延所得税资产', () => {
     expect(resolveNoteDisclosureJumpTarget({
       note_section: '八、32', source_template: 'soe',
     })?.wpCode).toBe('I5')
+  })
+})
+
+// ── D 循环其他科目（D3 预收款项 / D5 应收款项融资 / D6 合同资产 / D7 合同负债 / D4 营业收入） ──
+describe('noteDisclosureJump · D 循环其他科目', () => {
+  it('detects D3 预收款项 note sections (五、38 精确，区别于 五、39 合同负债)', () => {
+    expect(isD3PrepaymentNoteSection('五、38')).toBe(true)
+    expect(isD3PrepaymentNoteSection('八、38')).toBe(true)
+    expect(isD3PrepaymentNoteSection('预收款项')).toBe(true)
+    expect(isD3PrepaymentNoteSection('五、39')).toBe(false)
+    expect(isD3PrepaymentNoteSection('五、380')).toBe(false)
+  })
+
+  it('detects D5 应收款项融资 note sections (五、6 精确，不误伤 五、60~五、69)', () => {
+    expect(isD5ReceivablesFinancingNoteSection('五、6')).toBe(true)
+    expect(isD5ReceivablesFinancingNoteSection('八、6')).toBe(true)
+    expect(isD5ReceivablesFinancingNoteSection('五、60')).toBe(false)
+  })
+
+  it('detects D6 合同资产 note sections (五、10 精确，不误伤 五、1 货币资金)', () => {
+    expect(isD6ContractAssetNoteSection('五、10')).toBe(true)
+    expect(isD6ContractAssetNoteSection('八、11')).toBe(true)
+    expect(isD6ContractAssetNoteSection('五、1')).toBe(false)
+    expect(isD6ContractAssetNoteSection('五、100')).toBe(false)
+  })
+
+  it('detects D7 合同负债 note sections (五、39 精确，区别于 五、38 预收款项)', () => {
+    expect(isD7ContractLiabilityNoteSection('五、39')).toBe(true)
+    expect(isD7ContractLiabilityNoteSection('八、39')).toBe(true)
+    expect(isD7ContractLiabilityNoteSection('五、38')).toBe(false)
+  })
+
+  it('detects D4 营业收入 note sections (五、62 / 八、64)', () => {
+    expect(isD4RevenueNoteSection('五、62')).toBe(true)
+    expect(isD4RevenueNoteSection('八、64')).toBe(true)
+    expect(isD4RevenueNoteSection('营业收入和营业成本')).toBe(true)
+  })
+
+  it.each([
+    ['D3', '五、38', '八、38', D3_DISCLOSURE_SHEET_LISTED, D3_DISCLOSURE_SHEET_SOE],
+    ['D5', '五、6', '八、6', D5_DISCLOSURE_SHEET_LISTED, D5_DISCLOSURE_SHEET_SOE],
+    ['D6', '五、10', '八、11', D6_DISCLOSURE_SHEET_LISTED, D6_DISCLOSURE_SHEET_SOE],
+    ['D7', '五、39', '八、39', D7_DISCLOSURE_SHEET_LISTED, D7_DISCLOSURE_SHEET_SOE],
+    ['D4', '五、62', '八、64', D4_DISCLOSURE_SHEET_LISTED, D4_DISCLOSURE_SHEET_SOE],
+  ])('%s listed/soe 正确路由到披露 sheet', (wp, listed, soe, listedSheet, soeSheet) => {
+    const t1 = resolveNoteDisclosureJumpTarget({ note_section: listed })
+    expect(t1?.wpCode).toBe(wp)
+    expect(t1?.variant).toBe('listed')
+    expect(t1?.sheet).toBe(listedSheet)
+    const t2 = resolveNoteDisclosureJumpTarget({ note_section: soe, source_template: 'soe' })
+    expect(t2?.wpCode).toBe(wp)
+    expect(t2?.variant).toBe('soe')
+    expect(t2?.sheet).toBe(soeSheet)
+  })
+
+  it('D 循环互不抢占相邻章节（五、38=D3 / 五、39=D7 / 五、10=D6）', () => {
+    expect(resolveNoteDisclosureJumpTarget({ note_section: '五、38' })?.wpCode).toBe('D3')
+    expect(resolveNoteDisclosureJumpTarget({ note_section: '五、39' })?.wpCode).toBe('D7')
+    expect(resolveNoteDisclosureJumpTarget({ note_section: '五、10' })?.wpCode).toBe('D6')
+    // 五、1 仍是 E1 货币资金，不被 D6 五、10 抢占
+    expect(resolveNoteDisclosureJumpTarget({ note_section: '五、1' })?.wpCode).toBe('E1')
   })
 })

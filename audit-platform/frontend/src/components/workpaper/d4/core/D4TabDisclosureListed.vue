@@ -10,10 +10,15 @@
  *
  * 底部：审计说明textarea + AI辅助按钮 + 编制提示折叠
  */
-import { ref, computed, onMounted, inject } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, inject } from 'vue'
+import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { useDebounceFn } from '@vueuse/core'
 import http from '@/utils/http'
 import { useD4Disclosure, type ContractBalanceRow } from '../../composables/useD4Disclosure'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import { buildD4SyncPayload, D4_NOTE_SECTION, type D4DisclosureSnapshot } from '../../composables/d4NoteSectionMap'
+import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import { parseNum } from '../../composables/useD4FormulaEngine'
 
 const props = defineProps<{
@@ -63,6 +68,78 @@ const {
   saveBatch,
   isReadonly: isReadonlyRef,
 })
+
+// ─── 同步到附注 / 跳转回附注 ─────────────────────────────────────────────────
+const VARIANT: DisclosureVariant = 'listed'
+const router = useRouter()
+const isSyncing = ref(false)
+
+function jumpToNote(target: DisclosureVariant): void {
+  const route = buildNoteJumpRoute(props.projectId || '', 'D4', target)
+  if (route) router.push(route)
+}
+
+function buildSnapshot(): D4DisclosureSnapshot {
+  return {
+    revenueRows: section1Data.value.map((r: any) => ({
+      label: r.category,
+      currentRevenue: r.currentRevenue, currentCost: r.currentCost,
+      priorRevenue: r.priorRevenue, priorCost: r.priorCost,
+    })),
+    revenueTotal: {
+      label: section1Total.value.category,
+      currentRevenue: section1Total.value.currentRevenue, currentCost: section1Total.value.currentCost,
+      priorRevenue: section1Total.value.priorRevenue, priorCost: section1Total.value.priorCost,
+    },
+    industryRows: section2Rows.value.map((r: any) => ({
+      label: r.category, currentRevenue: parseNum(r.currentAmount), currentCost: parseNum(r.priorAmount),
+    })),
+    regionRows: section3Rows.value.map((r: any) => ({
+      label: r.name, currentRevenue: parseNum(r.amount), currentCost: parseNum(r.proportion),
+    })),
+    timingRows: (section4Rows.value as any[]).map((r: any) => ({
+      label: r.item || r.dimension || '',
+      currentRevenue: parseNum(r.endBalance ?? r.currentAmount),
+      currentCost: parseNum(r.beginBalance ?? r.priorAmount),
+    })),
+    notes: { ...noteTexts.value },
+  }
+}
+
+async function syncToDisclosureNotes(): Promise<void> {
+  if (isSyncing.value || !props.projectId || props.isReadonly) return
+  isSyncing.value = true
+  try {
+    const payload = buildD4SyncPayload(VARIANT, props.wpId || '', null, buildSnapshot())
+    const result: any = await http.post(
+      `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,
+      payload,
+    )
+    const data = result?.data ?? result
+    const rows = Number(data?.rows_synced ?? 0)
+    window.dispatchEvent(new CustomEvent('disclosure:note-text-updated', {
+      detail: { wpCode: 'D4', accountCode: '6001', projectId: props.projectId, section: VARIANT, sectionIds: [D4_NOTE_SECTION[VARIANT]] },
+    }))
+    ElMessage.success(`已同步 ${rows} 行到附注模块「${D4_NOTE_SECTION[VARIANT]} 营业收入和营业成本」`)
+  } catch {
+    ElMessage.warning('同步附注失败，请稍后重试')
+  } finally {
+    isSyncing.value = false
+  }
+}
+
+// 保存后自动同步（防抖/非阻塞/失败静默/只读 gate）
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+onUnmounted(() => autoSync.cancelPending())
+let autoSyncArmed = false
+watch(
+  [noteTexts, section1Data, section2Rows, section3Rows, section4Rows],
+  () => {
+    if (!autoSyncArmed) { autoSyncArmed = true; return }
+    autoSync.scheduleAutoSync(syncToDisclosureNotes)
+  },
+  { deep: true },
+)
 
 // ─── Format helpers ──────────────────────────────────────────────────────────
 function fmtAmt(v: number): string {
@@ -123,6 +200,19 @@ const formulaMap = [
     <!-- 工具栏 -->
     <div class="disclosure-toolbar">
       <el-button size="small" :loading="isRefreshing" @click="refreshFromTb">🔄 全量刷新取数</el-button>
+      <el-button type="primary" plain size="small" :loading="isSyncing" :disabled="isReadonly"
+        title="将披露表的表格与文本框内容同步到附注模块（五、62 营业收入和营业成本）"
+        @click="syncToDisclosureNotes">同步到附注</el-button>
+      <el-dropdown split-button type="default" size="small" :disabled="!projectId"
+        @click="jumpToNote('listed')" @command="jumpToNote">
+        ↩ 跳转回附注（五、62）
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item command="listed">上市版（五、62）</el-dropdown-item>
+            <el-dropdown-item command="soe">国企版（八、64）</el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
       <el-button size="small" @click="showFormulaDrawer = true">ƒx 公式管理</el-button>
       <span v-if="lastRefreshTime" class="toolbar-hint">
         上次取数：{{ lastRefreshTime.slice(0,16).replace('T',' ') }}

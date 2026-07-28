@@ -17,6 +17,19 @@ export const E1_DISCLOSURE_SHEET_SOE = '附注披露信息(国企)'
 export const D1_DISCLOSURE_SHEET_LISTED = '附注披露信息（上市公司）'
 export const D1_DISCLOSURE_SHEET_SOE = '附注披露信息（国企）'
 
+// D3~D7 披露 sheet：真实 tab 名逐字取自 workpaper_sheet_classification（半/全角括号各科目不一，
+// 尤其 D6 上市为半角左+全角右混合，错一字符 GtWpRenderer ?sheet= 精确匹配失败会回退底稿目录）。
+export const D3_DISCLOSURE_SHEET_LISTED = '附注披露信息(上市公司)'
+export const D3_DISCLOSURE_SHEET_SOE = '附注披露信息(国企)'
+export const D5_DISCLOSURE_SHEET_LISTED = '附注披露信息（上市公司）'
+export const D5_DISCLOSURE_SHEET_SOE = '附注披露信息（国企）'
+export const D6_DISCLOSURE_SHEET_LISTED = '附注披露信息(上市公司）'
+export const D6_DISCLOSURE_SHEET_SOE = '附注披露信息（国企）'
+export const D7_DISCLOSURE_SHEET_LISTED = '附注披露信息(上市公司)'
+export const D7_DISCLOSURE_SHEET_SOE = '附注披露信息(国企)'
+export const D4_DISCLOSURE_SHEET_LISTED = '附注披露信息（上市公司）'
+export const D4_DISCLOSURE_SHEET_SOE = '附注披露信息（国企）'
+
 // G1 交易性金融资产 / G10 交易性金融负债 披露 sheet：底稿实际 tab 名为
 // 「附注披露信息（上市公司）」/「附注披露信息（国企）」（全角括号，见 workpaper_sheet_classification
 // wp_code=G1/G10）。此前误设为 '附注上市'/'附注国企'（那是 OnlyOffice sheet-name 映射，非分类 tab 名）
@@ -112,7 +125,7 @@ export interface NoteDisclosureJumpTarget {
   /** 推断依据说明 */
   reason: string
   /** 底稿族代码（ACNR 回退解析） */
-  wpCode?: 'D1' | 'E1' | 'F1' | 'F2' | 'G1' | 'G7' | 'G10' | 'G11' | 'G13' | 'G14' | 'H1' | 'H2' | 'H3' | 'H8' | 'H9' | 'H10' | 'I1' | 'I2' | 'I3' | 'I4' | 'I5' | 'I6' | 'J1' | 'K1' | 'K11' | 'K13' | 'N1'
+  wpCode?: 'D1' | 'D3' | 'D4' | 'D5' | 'D6' | 'D7' | 'E1' | 'F1' | 'F2' | 'G1' | 'G7' | 'G10' | 'G11' | 'G13' | 'G14' | 'H1' | 'H2' | 'H3' | 'H8' | 'H9' | 'H10' | 'I1' | 'I2' | 'I3' | 'I4' | 'I5' | 'I6' | 'J1' | 'K1' | 'K11' | 'K13' | 'N1'
 }
 
 function asRecord(raw: unknown): Record<string, unknown> | null {
@@ -170,6 +183,66 @@ export function isD1NotesReceivableNoteSection(noteSection: string): boolean {
   if (!s) return false
   if (s === '五、4' || s === '八、4') return true
   if (s === '应收票据') return true
+  return false
+}
+
+/**
+ * 是否像 D3 预收款项相关附注节（五、38 / 八、38）。
+ * 纯编号须**精确===**匹配（禁 startsWith：五、38 会误伤 五、380+；且区别于 五、39 合同负债）。
+ */
+export function isD3PrepaymentNoteSection(noteSection: string): boolean {
+  const s = String(noteSection || '').trim()
+  if (!s) return false
+  if (s === '五、38' || s === '八、38') return true
+  if (s === '预收款项' || s === '预收账款') return true
+  return false
+}
+
+/**
+ * 是否像 D5 应收款项融资相关附注节（五、6 / 八、6）。
+ * 单字数字须**精确===**匹配（禁 startsWith：五、6 会误伤 五、60~五、69）。
+ */
+export function isD5ReceivablesFinancingNoteSection(noteSection: string): boolean {
+  const s = String(noteSection || '').trim()
+  if (!s) return false
+  if (s === '五、6' || s === '八、6') return true
+  if (s === '应收款项融资') return true
+  return false
+}
+
+/**
+ * 是否像 D6 合同资产相关附注节（五、10 / 八、11）。
+ * 纯编号须**精确===**匹配（禁 startsWith：五、10 会误伤 五、100+；且区别于 五、1 货币资金）。
+ */
+export function isD6ContractAssetNoteSection(noteSection: string): boolean {
+  const s = String(noteSection || '').trim()
+  if (!s) return false
+  if (s === '五、10' || s === '八、11') return true
+  if (s === '合同资产') return true
+  return false
+}
+
+/**
+ * 是否像 D7 合同负债相关附注节（五、39 / 八、39）。
+ * 纯编号须**精确===**匹配（禁 startsWith；区别于 五、38 预收款项）。
+ */
+export function isD7ContractLiabilityNoteSection(noteSection: string): boolean {
+  const s = String(noteSection || '').trim()
+  if (!s) return false
+  if (s === '五、39' || s === '八、39') return true
+  if (s === '合同负债') return true
+  return false
+}
+
+/**
+ * 是否像 D4 营业收入/营业成本相关附注节（五、62 / 八、64）。
+ * 纯编号须**精确===**匹配；关键词兜底"营业收入"（损益类，区别于其它科目）。
+ */
+export function isD4RevenueNoteSection(noteSection: string): boolean {
+  const s = String(noteSection || '').trim()
+  if (!s) return false
+  if (s === '五、62' || s === '八、64') return true
+  if (s === '营业收入和营业成本' || s === '营业收入、营业成本' || s === '营业收入与营业成本') return true
   return false
 }
 
@@ -745,6 +818,51 @@ export function resolveNoteDisclosureJumpTarget(note: unknown): NoteDisclosureJu
       variant,
       reason: `章节 ${section || '应收票据'}`,
       wpCode: 'D1',
+    }
+  }
+
+  // D3 预收款项（五、38 / 八、38）
+  if (isD3PrepaymentNoteSection(section)) {
+    const variant = section.startsWith('八') || std.startsWith('soe') ? 'soe' : 'listed'
+    return {
+      sheet: variant === 'listed' ? D3_DISCLOSURE_SHEET_LISTED : D3_DISCLOSURE_SHEET_SOE,
+      wpId, variant, reason: `章节 ${section || '预收款项'}`, wpCode: 'D3',
+    }
+  }
+
+  // D5 应收款项融资（五、6 / 八、6）
+  if (isD5ReceivablesFinancingNoteSection(section)) {
+    const variant = section.startsWith('八') || std.startsWith('soe') ? 'soe' : 'listed'
+    return {
+      sheet: variant === 'listed' ? D5_DISCLOSURE_SHEET_LISTED : D5_DISCLOSURE_SHEET_SOE,
+      wpId, variant, reason: `章节 ${section || '应收款项融资'}`, wpCode: 'D5',
+    }
+  }
+
+  // D6 合同资产（五、10 / 八、11）
+  if (isD6ContractAssetNoteSection(section)) {
+    const variant = section.startsWith('八') || std.startsWith('soe') ? 'soe' : 'listed'
+    return {
+      sheet: variant === 'listed' ? D6_DISCLOSURE_SHEET_LISTED : D6_DISCLOSURE_SHEET_SOE,
+      wpId, variant, reason: `章节 ${section || '合同资产'}`, wpCode: 'D6',
+    }
+  }
+
+  // D7 合同负债（五、39 / 八、39）
+  if (isD7ContractLiabilityNoteSection(section)) {
+    const variant = section.startsWith('八') || std.startsWith('soe') ? 'soe' : 'listed'
+    return {
+      sheet: variant === 'listed' ? D7_DISCLOSURE_SHEET_LISTED : D7_DISCLOSURE_SHEET_SOE,
+      wpId, variant, reason: `章节 ${section || '合同负债'}`, wpCode: 'D7',
+    }
+  }
+
+  // D4 营业收入/营业成本（五、62 / 八、64）——损益类
+  if (isD4RevenueNoteSection(section)) {
+    const variant = section.startsWith('八') || std.startsWith('soe') ? 'soe' : 'listed'
+    return {
+      sheet: variant === 'listed' ? D4_DISCLOSURE_SHEET_LISTED : D4_DISCLOSURE_SHEET_SOE,
+      wpId, variant, reason: `章节 ${section || '营业收入'}`, wpCode: 'D4',
     }
   }
 

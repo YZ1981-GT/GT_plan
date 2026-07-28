@@ -113,6 +113,19 @@ describe('noteDisclosureReverseJump', () => {
     expect((buildNoteJumpRoute('p1', wp, 'listed') as any).query).toEqual({ section: listed, noteTemplate: 'listed' })
     expect((buildNoteJumpRoute('p1', wp, 'soe') as any).query).toEqual({ section: soe, noteTemplate: 'soe' })
   })
+
+  // D 循环其他科目（章节号权威取自 note_template listed/soe：预收款项/应收款项融资/合同资产/合同负债/营业收入）
+  it.each([
+    ['D3', '五、38', '八、38'], // 预收款项
+    ['D5', '五、6', '八、6'],   // 应收款项融资
+    ['D6', '五、10', '八、11'], // 合同资产
+    ['D7', '五、39', '八、39'], // 合同负债
+    ['D4', '五、62', '八、64'], // 营业收入和营业成本
+  ])('D 循环 %s listed→%s soe→%s and builds routes', (wp, listed, soe) => {
+    expect(DISCLOSURE_NOTE_SECTION_MAP[wp]).toEqual({ listed, soe })
+    expect((buildNoteJumpRoute('p1', wp, 'listed') as any).query).toEqual({ section: listed, noteTemplate: 'listed' })
+    expect((buildNoteJumpRoute('p1', wp, 'soe') as any).query).toEqual({ section: soe, noteTemplate: 'soe' })
+  })
 })
 
 // 单一真源守卫：反向 map 的章节号必须被正向 isXxxNoteSection 判定接受，防两方向漂移
@@ -122,6 +135,11 @@ describe('reverse map ↔ forward jump 一致性（single source of truth）', (
     const checks: Array<[string, (s: string) => boolean]> = [
       ['E1', fwd.isE1MonetaryFundNoteSection],
       ['D1', fwd.isD1NotesReceivableNoteSection],
+      ['D3', fwd.isD3PrepaymentNoteSection],
+      ['D5', fwd.isD5ReceivablesFinancingNoteSection],
+      ['D6', fwd.isD6ContractAssetNoteSection],
+      ['D7', fwd.isD7ContractLiabilityNoteSection],
+      ['D4', fwd.isD4RevenueNoteSection],
       ['G1', fwd.isG1TradingFinancialAssetNoteSection],
       ['G1_DERIVATIVE', fwd.isDerivativeFinancialAssetNoteSection],
       ['G10', fwd.isG10TradingLiabilityNoteSection],

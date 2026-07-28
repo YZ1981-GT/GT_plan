@@ -12,6 +12,11 @@ import http from '@/utils/http'
 // 复用「跳转至披露表」的同一套章节判定函数，消除跳转/刷新两套硬编码映射漂移（单一真源）
 import {
   isD1NotesReceivableNoteSection,
+  isD3PrepaymentNoteSection,
+  isD4RevenueNoteSection,
+  isD5ReceivablesFinancingNoteSection,
+  isD6ContractAssetNoteSection,
+  isD7ContractLiabilityNoteSection,
   isG14CreditImpairmentNoteSection,
   isH1FixedAssetNoteSection,
   isH5OilGasAssetNoteSection,
@@ -303,6 +308,11 @@ export function useNoteRefresh(options: UseNoteRefreshOptions): UseNoteRefreshRe
     const hasAccountCode = !!String(payload.accountCode || '').trim()
     const matchesDisclosureFamily = hasAccountCode && (
       isD1NotesReceivableNoteSection(current)
+      || isD3PrepaymentNoteSection(current)
+      || isD4RevenueNoteSection(current)
+      || isD5ReceivablesFinancingNoteSection(current)
+      || isD6ContractAssetNoteSection(current)
+      || isD7ContractLiabilityNoteSection(current)
       || isG14CreditImpairmentNoteSection(current)
       || isH1FixedAssetNoteSection(current)
       || isH5OilGasAssetNoteSection(current)

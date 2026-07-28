@@ -4,6 +4,24 @@
     <el-alert type="info" title="当前项目不适用国企附注披露格式" :closable="false" show-icon />
   </template>
   <template v-else>
+    <!-- 工具栏：同步到附注 + 跳转回附注 -->
+    <div class="d3-disclosure-toolbar">
+      <el-button type="primary" plain size="small" :loading="isSyncing" :disabled="isReadonly"
+        title="将披露表内容同步到附注模块（八、38 预收款项）"
+        @click="syncToDisclosureNotes">同步到附注</el-button>
+      <el-dropdown split-button type="default" size="small" :disabled="!projectId"
+        @click="jumpToNote('soe')"
+        @command="jumpToNote">
+        ↩ 跳转回附注（八、38）
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item command="soe">国企版（八、38）</el-dropdown-item>
+            <el-dropdown-item command="listed">上市版（五、38）</el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
+    </div>
+
     <!-- 子节一：按账龄分类 -->
     <div class="disclosure-card">
       <h4 class="card-title">
@@ -115,8 +133,18 @@
  * D3TabDisclosureSoe.vue — 附注披露（国企）
  * 2子节卡片 + 跨sheet取数 + 动态行 + 合计 + applicable_standards判断
  */
-import { computed, toRef, type Ref } from 'vue'
+import { computed, ref, toRef, watch, onUnmounted, type Ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import http from '@/utils/http'
 import { useD3DisclosureSoe } from '../composables/useD3DisclosureSoe'
+import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
+import {
+  buildD3SyncPayload,
+  D3_NOTE_SECTION,
+  type D3DisclosureSnapshot,
+} from '../composables/d3NoteSectionMap'
+import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import type { useD3CrossSheet } from '../composables/useD3CrossSheet'
 import type { ChecklistResponse } from '../composables/useD3FormData'
 
@@ -165,10 +193,69 @@ function fmtAmount(val: number | null | undefined): string {
   if (val < 0) return `(${Math.abs(val).toLocaleString('zh-CN', { maximumFractionDigits: 2 })})`
   return val.toLocaleString('zh-CN', { maximumFractionDigits: 2 })
 }
+
+// ─── 同步到附注 / 跳转回附注 ─────────────────────────────────────────────────
+const router = useRouter()
+const isSyncing = ref(false)
+
+function jumpToNote(target: DisclosureVariant): void {
+  const route = buildNoteJumpRoute(props.projectId || '', 'D3', target)
+  if (route) router.push(route)
+}
+
+/** 底稿披露表 → 附注单向推送（结构化表格同步到附注 八、38 预收款项）。 */
+async function syncToDisclosureNotes(): Promise<void> {
+  if (isSyncing.value || !props.projectId || props.isReadonly) return
+  isSyncing.value = true
+  try {
+    const snapshot: D3DisclosureSnapshot = {
+      mainRows: section1Rows.value.map((r) => ({ label: r.label, endAmount: r.endAmount, priorAmount: r.priorAmount })),
+      mainTotal: { label: '合计', endAmount: section1Subtotal.value.endAmount, priorAmount: section1Subtotal.value.priorAmount },
+      longTermRows: section2Rows.value.map((r) => ({ label: r.label, endAmount: r.endAmount, priorAmount: r.priorAmount, reason: r.reason })),
+      longTermTotal: { label: '合计', endAmount: section2Subtotal.value.endAmount, priorAmount: section2Subtotal.value.priorAmount },
+      notes: {},
+    }
+    const payload = buildD3SyncPayload('soe', props.wpId || '', applicableStandardsRef.value, snapshot)
+    const result: any = await http.post(
+      `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,
+      payload,
+    )
+    const data = result?.data ?? result
+    const rows = Number(data?.rows_synced ?? 0)
+    window.dispatchEvent(new CustomEvent('disclosure:note-text-updated', {
+      detail: {
+        wpCode: 'D3',
+        accountCode: '2203',
+        projectId: props.projectId,
+        section: 'soe',
+        sectionIds: [D3_NOTE_SECTION.soe],
+      },
+    }))
+    ElMessage.success(`已同步 ${rows} 行到附注模块「${D3_NOTE_SECTION.soe} 预收款项」`)
+  } catch {
+    ElMessage.warning('同步附注失败，请稍后重试')
+  } finally {
+    isSyncing.value = false
+  }
+}
+
+// 保存后自动同步（防抖/非阻塞/失败静默/只读 gate；与手动按钮同源）
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+onUnmounted(() => autoSync.cancelPending())
+let autoSyncArmed = false
+watch(
+  [section2Rows],
+  () => {
+    if (!autoSyncArmed) { autoSyncArmed = true; return } // 跳过挂载首帧
+    autoSync.scheduleAutoSync(syncToDisclosureNotes)
+  },
+  { deep: true },
+)
 </script>
 
 <style scoped>
 .d3-disclosure-soe { padding: 16px; }
+.d3-disclosure-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
 .disclosure-card { margin-bottom: 20px; padding: 16px; background: #fff; border: 1px solid #ebeef5; border-radius: 6px; }
 .card-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
 .subtotal-label { font-weight: 700; }

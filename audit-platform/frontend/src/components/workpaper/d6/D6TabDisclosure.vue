@@ -15,6 +15,20 @@
   <div class="tab-toolbar">
     <div class="toolbar-left">
       <el-segmented v-if="showListed && showSoe" v-model="activeVariant" :options="variantOptions" size="small" />
+      <el-button type="primary" plain size="small" :loading="isSyncing" :disabled="isReadonly"
+        title="将披露表的表格与文本框内容同步到附注模块（五、10/八、11 合同资产）"
+        @click="syncToDisclosureNotes">同步到附注</el-button>
+      <el-dropdown split-button type="default" size="small" :disabled="!projectId"
+        @click="jumpToNote(displayVariant)"
+        @command="jumpToNote">
+        ↩ 跳转回附注（{{ displayVariant === 'soe' ? '八、11' : '五、10' }}）
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item command="listed">上市版（五、10）</el-dropdown-item>
+            <el-dropdown-item command="soe">国企版（八、11）</el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
     </div>
     <div class="toolbar-right">
       <span class="chip-wrap"><GtIndexChip value="wp:D6-1" :context-project-id="projectId" /></span>
@@ -380,9 +394,19 @@
 /**
  * D6TabDisclosure.vue — 附注披露（上市5子节 / 国企3子节）
  */
-import { computed, inject, toRef, type Ref } from 'vue'
+import { computed, inject, ref, toRef, watch, onUnmounted, type Ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import http from '@/utils/http'
 import { useD6Disclosure } from '../composables/useD6Disclosure'
 import { useD6ImportExport } from '../composables/useD6ImportExport'
+import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
+import {
+  buildD6SyncPayload,
+  D6_NOTE_SECTION,
+  type D6DisclosureSnapshot,
+} from '../composables/d6NoteSectionMap'
+import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import type { ChecklistResponse } from '../composables/useD6FormData'
 import type useD6CrossSheet from '../composables/useD6CrossSheet'
 
@@ -507,6 +531,108 @@ function fmtPct100(rate: number): string {
   if (!rate) return '-'
   return `${rate.toFixed(2)}%`
 }
+
+// ─── 同步到附注 / 跳转回附注 ─────────────────────────────────────────────────
+const router = useRouter()
+const isSyncing = ref(false)
+
+function jumpToNote(target: DisclosureVariant): void {
+  const route = buildNoteJumpRoute(props.projectId || '', 'D6', target)
+  if (route) router.push(route)
+}
+
+function findSection(sections: any[], key: string): any {
+  return (sections || []).find((s) => s.sectionKey === key) || { rows: [] }
+}
+
+/** 底稿披露表 → 附注单向推送（当前 displayVariant 对应上市/国企）。 */
+async function syncToDisclosureNotes(): Promise<void> {
+  if (isSyncing.value || !props.projectId || props.isReadonly) return
+  isSyncing.value = true
+  const variant = displayVariant.value as DisclosureVariant
+  try {
+    let snapshot: D6DisclosureSnapshot
+    if (variant === 'soe') {
+      const cls = findSection(soeSections.value, 'soe-1')
+      const imp = findSection(soeSections.value, 'soe-2')
+      snapshot = {
+        classRows: (cls.rows ?? []).map((r: any) => ({
+          label: r.label,
+          endBookBalance: r.endBookBalance, endImpairment: r.endImpairment, endBookValue: r.endBookValue,
+          priorBookBalance: r.priorBookBalance, priorImpairment: r.priorImpairment, priorBookValue: r.priorBookValue,
+        })),
+        soeImpairmentRows: (imp.rows ?? []).map((r: any) => ({
+          label: r.label, priorBalance: r.priorBalance, provision: r.provision,
+          reversal: r.reversal, writeOff: r.writeOff, endBalance: r.endBalance, reason: r.reason,
+        })),
+        majorChangeRows: majorChangeRows.value.map((r: any) => ({ label: r.label, amount: r.amount, reason: r.reason })),
+        notes: { ...noteTexts.value },
+      }
+    } else {
+      const cls = findSection(listedSections.value, 'listed-1')
+      const prov = findSection(listedSections.value, 'listed-2')
+      const single = findSection(listedSections.value, 'listed-3')
+      const change = findSection(listedSections.value, 'listed-5')
+      snapshot = {
+        classRows: (cls.rows ?? []).map((r: any) => ({
+          label: r.label,
+          endBookBalance: r.endBookBalance, endImpairment: r.endImpairment, endBookValue: r.endBookValue,
+          priorBookBalance: r.priorBookBalance, priorImpairment: r.priorImpairment, priorBookValue: r.priorBookValue,
+        })),
+        majorChangeRows: majorChangeRows.value.map((r: any) => ({ label: r.label, amount: r.amount, reason: r.reason })),
+        impairmentProvisionRows: (prov.rows ?? []).map((r: any) => ({
+          label: r.label, endBalance: r.endBalance, endPercentage: r.endPercentage,
+          endAmount: r.endAmount, endLossRate: r.endLossRate,
+        })),
+        singleItems: (single.rows ?? []).map((r: any) => ({
+          label: r.label, balance: r.balance, provision: r.provision, lossRate: r.lossRate, reason: r.reason,
+        })),
+        groups: groupedDetails.value.map((g: any) => ({
+          groupName: g.groupName,
+          rows: (g.rows ?? []).map((r: any) => ({ label: r.label, balance: r.balance, provision: r.provision, lossRate: r.lossRate })),
+        })),
+        changeRows: (change.rows ?? []).map((r: any) => ({
+          label: r.label, provision: r.provision, reversal: r.reversal, writeOff: r.writeOff, reason: r.reason,
+        })),
+        notes: { ...noteTexts.value },
+      }
+    }
+    const payload = buildD6SyncPayload(variant, props.wpId || '', null, snapshot)
+    const result: any = await http.post(
+      `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,
+      payload,
+    )
+    const data = result?.data ?? result
+    const rows = Number(data?.rows_synced ?? 0)
+    window.dispatchEvent(new CustomEvent('disclosure:note-text-updated', {
+      detail: {
+        wpCode: 'D6',
+        accountCode: '1402',
+        projectId: props.projectId,
+        section: variant,
+        sectionIds: [D6_NOTE_SECTION[variant]],
+      },
+    }))
+    ElMessage.success(`已同步 ${rows} 行到附注模块「${D6_NOTE_SECTION[variant]} 合同资产」`)
+  } catch {
+    ElMessage.warning('同步附注失败，请稍后重试')
+  } finally {
+    isSyncing.value = false
+  }
+}
+
+// 保存后自动同步（防抖/非阻塞/失败静默/只读 gate）
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+onUnmounted(() => autoSync.cancelPending())
+let autoSyncArmed = false
+watch(
+  [noteTexts, majorChangeRows, groupedDetails, listedSections, soeSections],
+  () => {
+    if (!autoSyncArmed) { autoSyncArmed = true; return }
+    autoSync.scheduleAutoSync(syncToDisclosureNotes)
+  },
+  { deep: true },
+)
 </script>
 
 <style scoped>

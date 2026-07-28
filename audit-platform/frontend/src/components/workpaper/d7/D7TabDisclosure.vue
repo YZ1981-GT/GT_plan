@@ -11,9 +11,23 @@
       </div>
     </details>
 
-    <!-- 上市/国企版切换 -->
+    <!-- 上市/国企版切换 + 同步到附注 / 跳转回附注 -->
     <div class="variant-toolbar">
       <el-segmented v-model="activeVariant" :options="variantOptions" size="small" />
+      <el-button type="primary" plain size="small" :loading="isSyncing" :disabled="isReadonly"
+        title="将披露表的表格与文本框内容同步到附注模块（五、39/八、39 合同负债）"
+        @click="syncToDisclosureNotes">同步到附注</el-button>
+      <el-dropdown split-button type="default" size="small" :disabled="!projectId"
+        @click="jumpToNote(activeVariant as DisclosureVariant)"
+        @command="jumpToNote">
+        ↩ 跳转回附注（{{ activeVariant === 'soe' ? '八、39' : '五、39' }}）
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item command="listed">上市版（五、39）</el-dropdown-item>
+            <el-dropdown-item command="soe">国企版（八、39）</el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
       <span class="chip-wrap"><GtIndexChip value="wp:D7-1" :context-project-id="projectId" /></span>
     </div>
 
@@ -146,9 +160,15 @@
  * Task: 23.1
  * Requirements: 13.1-13.8, 14.1-14.6, 15.1-15.6, 19.5, 20.1
  */
-import { computed, toRef, type Ref } from 'vue'
+import { computed, ref, toRef, watch, onUnmounted, type Ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { InfoFilled } from '@element-plus/icons-vue'
+import http from '@/utils/http'
 import { useD7Disclosure, type DisclosureSection, type DisclosureRow } from '../composables/useD7Disclosure'
+import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
+import { buildD7SyncPayload, D7_NOTE_SECTION, type D7DisclosureSnapshot } from '../composables/d7NoteSectionMap'
+import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import type { ChecklistResponse } from '../composables/useD7FormData'
 import type useD7CrossSheet from '../composables/useD7CrossSheet'
 
@@ -229,6 +249,91 @@ function fmtAmt(val: number | null | undefined): string {
   if (val < 0) return `(${Math.abs(val).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
   return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
+
+// ─── 同步到附注 / 跳转回附注 ─────────────────────────────────────────────────
+const router = useRouter()
+const isSyncing = ref(false)
+
+function jumpToNote(target: DisclosureVariant): void {
+  const route = buildNoteJumpRoute(props.projectId || '', 'D7', target)
+  if (route) router.push(route)
+}
+
+function findSection(sections: DisclosureSection[], key: string): DisclosureSection | undefined {
+  return (sections || []).find((s) => s.sectionKey === key)
+}
+
+function toSnapRow(r: DisclosureRow) {
+  return { label: r.label, current: r.current, prior: r.prior, reason: (r as any).reason }
+}
+
+const EMPTY_TOTAL = { label: '合计', current: 0, prior: 0 }
+
+/** 底稿披露表 → 附注单向推送（当前 activeVariant 对应上市/国企）。 */
+async function syncToDisclosureNotes(): Promise<void> {
+  if (isSyncing.value || !props.projectId || props.isReadonly) return
+  isSyncing.value = true
+  const variant = activeVariant.value as DisclosureVariant
+  try {
+    let snapshot: D7DisclosureSnapshot
+    if (variant === 'soe') {
+      const main = findSection(soeSections.value, 'soe-1')
+      const change = findSection(soeSections.value, 'soe-2')
+      snapshot = {
+        mainRows: (main?.rows ?? []).map(toSnapRow),
+        mainTotal: main?.totalRow ? toSnapRow(main.totalRow) : { ...EMPTY_TOTAL },
+        changeRows: (change?.rows ?? []).map(toSnapRow),
+        notes: { ...noteTexts.value },
+      }
+    } else {
+      const main = findSection(listedSections.value, 'listed-1')
+      const longTerm = findSection(listedSections.value, 'listed-2')
+      const change = findSection(listedSections.value, 'listed-3')
+      snapshot = {
+        mainRows: (main?.rows ?? []).map(toSnapRow),
+        mainTotal: main?.totalRow ? toSnapRow(main.totalRow) : { ...EMPTY_TOTAL },
+        longTermRows: (longTerm?.rows ?? []).map(toSnapRow),
+        longTermTotal: longTerm?.totalRow ? toSnapRow(longTerm.totalRow) : { ...EMPTY_TOTAL },
+        changeRows: (change?.rows ?? []).map(toSnapRow),
+        notes: { ...noteTexts.value },
+      }
+    }
+    const payload = buildD7SyncPayload(variant, props.wpId || '', null, snapshot)
+    const result: any = await http.post(
+      `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,
+      payload,
+    )
+    const data = result?.data ?? result
+    const rows = Number(data?.rows_synced ?? 0)
+    window.dispatchEvent(new CustomEvent('disclosure:note-text-updated', {
+      detail: {
+        wpCode: 'D7',
+        accountCode: '2205',
+        projectId: props.projectId,
+        section: variant,
+        sectionIds: [D7_NOTE_SECTION[variant]],
+      },
+    }))
+    ElMessage.success(`已同步 ${rows} 行到附注模块「${D7_NOTE_SECTION[variant]} 合同负债」`)
+  } catch {
+    ElMessage.warning('同步附注失败，请稍后重试')
+  } finally {
+    isSyncing.value = false
+  }
+}
+
+// 保存后自动同步（防抖/非阻塞/失败静默/只读 gate）
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+onUnmounted(() => autoSync.cancelPending())
+let autoSyncArmed = false
+watch(
+  [noteTexts, listedSections, soeSections],
+  () => {
+    if (!autoSyncArmed) { autoSyncArmed = true; return }
+    autoSync.scheduleAutoSync(syncToDisclosureNotes)
+  },
+  { deep: true },
+)
 </script>
 
 <style scoped>
