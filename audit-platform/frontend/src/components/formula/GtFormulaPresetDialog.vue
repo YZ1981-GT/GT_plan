@@ -88,6 +88,7 @@
                 {{ selectedPageKey || '请选择左侧页面' }}
               </span>
               <el-button
+                v-if="canEdit"
                 size="small"
                 type="primary"
                 plain
@@ -106,6 +107,17 @@
               empty-text="该页暂无预设公式"
             >
               <el-table-column prop="target_cell" label="目标单元" min-width="140" show-overflow-tooltip />
+              <el-table-column label="来源" width="90" align="center">
+                <template #default="{ row }">
+                  <el-tag
+                    size="small"
+                    effect="light"
+                    :type="isCustomEntry(row) ? 'warning' : 'info'"
+                  >
+                    {{ isCustomEntry(row) ? '自定义' : '通用' }}
+                  </el-tag>
+                </template>
+              </el-table-column>
               <el-table-column label="类型" width="110">
                 <template #default="{ row }">
                   <el-tag size="small" effect="plain" :type="typeTagType(row.formula_type)">
@@ -118,7 +130,7 @@
                   <code class="gt-fpd-expr">{{ row.expression }}</code>
                 </template>
               </el-table-column>
-              <el-table-column label="操作" width="80" align="center">
+              <el-table-column v-if="canEdit" label="操作" width="80" align="center">
                 <template #default="{ row }">
                   <el-button link type="primary" size="small" @click="openEditor(row)">编辑</el-button>
                 </template>
@@ -162,10 +174,18 @@ const props = withDefaults(defineProps<{
   scope?: FormulaDialogScope
   /** 可选：默认选中的页面键（scope:key，如 workpaper:D2） */
   pageKey?: string
+  /** 是否允许新建/编辑自定义预设（默认 true 保持既有调用点不变；无编辑权时传 false 隐藏入口） */
+  canEdit?: boolean
 }>(), {
   scope: 'workpaper',
   pageKey: '',
+  canEdit: true,
 })
+
+/** 判定条目是否为自定义预设（来源标注，Property 3）。 */
+function isCustomEntry(row: FormulaPresetEntry & { is_custom?: boolean }): boolean {
+  return row.is_custom === true || row.source === 'custom'
+}
 
 const emit = defineEmits<{
   'update:modelValue': [val: boolean]
@@ -202,7 +222,7 @@ const coverage = ref<FormulaPresetCoverage | null>(null)
 const pagesLoading = ref(false)
 const pageSearch = ref('')
 const selectedPageKey = ref('')
-const presets = ref<FormulaPresetEntry[]>([])
+const presets = ref<Array<FormulaPresetEntry & { is_custom?: boolean }>>([])
 const presetLoading = ref(false)
 
 const filteredPages = computed(() => {
@@ -286,6 +306,15 @@ function onEditorSave(payload: FormulaEditPayload) {
   emit('edit-formula', { ...payload, page_key: pageKey })
   ElMessage.success('公式已编辑（可经导入或底稿保存持久化）')
 }
+
+/** 供宿主在持久化成功后刷新当前页预设列表（复用现有 selectPage 拉取）。 */
+async function reloadCurrentPage() {
+  if (selectedPageKey.value) {
+    await selectPage(selectedPageKey.value)
+  }
+}
+
+defineExpose({ reloadCurrentPage })
 
 // 打开弹窗时按当前 tab 懒加载
 watch(visible, (v) => {

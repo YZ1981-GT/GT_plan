@@ -3,7 +3,7 @@
     <!-- 页面横幅 -->
     <GtPageHeader :title="projectName ? `${projectName} — 底稿管理` : '底稿管理'" @back="$router.push('/projects')" variant="default">
       <template #actions>
-        <GtToolbar :show-import="true" import-label="Excel导入" @import="showWpImport = true">
+        <GtToolbar :show-import="false">
           <template #left>
             <div v-if="hasData" class="gt-wp-view-toggle">
               <el-radio-group v-model="viewMode" size="small">
@@ -11,23 +11,94 @@
                   {{ tab.label }}
                 </el-radio-button>
               </el-radio-group>
+              <!-- 更多视图下拉 -->
+              <el-dropdown trigger="click" @command="(cmd: string) => { viewMode = cmd }" style="margin-left: 4px">
+                <el-button size="small" :type="isMoreTabActive ? 'primary' : ''" plain>
+                  {{ isMoreTabActive ? moreTabActiveLabel : '更多视图' }}
+                  <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+                </el-button>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item
+                      v-for="tab in moreTabOptions"
+                      :key="tab.value"
+                      :command="tab.value"
+                      :class="{ 'is-active-item': viewMode === tab.value }"
+                    >
+                      {{ tab.label }}
+                    </el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
             </div>
           </template>
           <template #right>
-            <el-button @click="fetchWpIndex" :loading="loading" size="small">刷新</el-button>
-            <el-button type="success" size="small" @click="onGenerateWorkpapers" :loading="generateLoading">
-              生成底稿
-            </el-button>
-            <el-button size="small" @click="showWpImportEnhanced = true">增强导入</el-button>
-            <el-button size="small" @click="showBatchExportEnhanced = true">批量导出(元数据)</el-button>
-            <el-button size="small" @click="showBulkTab = true">批量Tab导入导出</el-button>
-            <el-button size="small" @click="showTemplateCopy = true">模板复制</el-button>
-            <el-button type="primary" size="small" @click="onBatchDownload" :loading="downloadLoading">
-              批量下载 ({{ selectedWpIds.length || '全部' }})
-            </el-button>
-            <el-button type="warning" size="small" :disabled="selectedWpIds.length === 0" @click="showBatchAssign = true">
-              批量委派 ({{ selectedWpIds.length }})
-            </el-button>
+            <!-- 常用操作（所有角色可见） -->
+            <el-tooltip content="重新加载底稿列表数据" placement="bottom">
+              <el-button @click="fetchWpIndex" :loading="loading" size="small">
+                🔄 刷新
+              </el-button>
+            </el-tooltip>
+            <el-tooltip content="选择模板集 → 配置裁剪范围 → 批量创建本项目底稿" placement="bottom">
+              <el-button type="success" size="small" @click="onGenerateWorkpapers" :loading="generateLoading">
+                ⬇️ 生成底稿
+              </el-button>
+            </el-tooltip>
+
+            <!-- 📥 导入导出 收敛为一个下拉 -->
+            <el-tooltip content="底稿文件/数据的批量导入导出（含模板、数据包、ZIP下载）" placement="bottom">
+              <el-dropdown trigger="click" @command="onImportExportCommand">
+              <el-button size="small">
+                📥 导入导出 <el-icon class="el-icon--right"><ArrowDown /></el-icon>
+              </el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="excel-import">
+                    <span style="display:flex;align-items:center;gap:6px">
+                      📄 Excel 导入
+                      <span style="color:var(--el-text-color-secondary);font-size:11px">单份底稿模板覆盖</span>
+                    </span>
+                  </el-dropdown-item>
+                  <el-dropdown-item command="enhanced-import">
+                    <span style="display:flex;align-items:center;gap:6px">
+                      📋 增强导入
+                      <span style="color:var(--el-text-color-secondary);font-size:11px">带映射/校验/批量</span>
+                    </span>
+                  </el-dropdown-item>
+                  <el-dropdown-item divided command="batch-download">
+                    <span style="display:flex;align-items:center;gap:6px">
+                      📦 批量下载 ZIP
+                      <span style="color:var(--el-text-color-secondary);font-size:11px">{{ selectedWpIds.length ? `已选 ${selectedWpIds.length} 份` : '全部底稿' }}</span>
+                    </span>
+                  </el-dropdown-item>
+                  <el-dropdown-item command="batch-export-meta">
+                    <span style="display:flex;align-items:center;gap:6px">
+                      📊 元数据导出
+                      <span style="color:var(--el-text-color-secondary);font-size:11px">结构/配置快照</span>
+                    </span>
+                  </el-dropdown-item>
+                  <el-dropdown-item command="bulk-tab">
+                    <span style="display:flex;align-items:center;gap:6px">
+                      🗂️ Tab 数据包
+                      <span style="color:var(--el-text-color-secondary);font-size:11px">结构化数据导入导出</span>
+                    </span>
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+            </el-tooltip>
+
+            <!-- 管理操作（仅 manager/partner/admin 可见） -->
+            <template v-if="canManageWp">
+              <el-tooltip content="从其他项目复制底稿模板配置" placement="bottom">
+                <el-button size="small" @click="showTemplateCopy = true">📋 模板复制</el-button>
+              </el-tooltip>
+              <el-tooltip content="将选中底稿批量委派给项目组成员" placement="bottom">
+                <el-button type="warning" size="small" :disabled="selectedWpIds.length === 0" @click="showBatchAssign = true">
+                  👥 批量委派 ({{ selectedWpIds.length }})
+                </el-button>
+              </el-tooltip>
+            </template>
           </template>
         </GtToolbar>
       </template>
@@ -170,6 +241,7 @@ import { useAuditContext } from '@/composables/useAuditContext'
 import { useProjectStore } from '@/stores/project'
 import { useDictStore } from '@/stores/dict'
 import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
+import { ArrowDown } from '@element-plus/icons-vue'
 import GtPageHeader from '@/components/common/GtPageHeader.vue'
 import GtToolbar from '@/components/common/GtToolbar.vue'
 import ArchivedBanner from '@/components/common/ArchivedBanner.vue'
@@ -227,6 +299,34 @@ const trimDialogReject = ref<(() => void) | null>(null)
 
 const hasData = computed(() => wpIndex.value.length > 0 || wpList.value.length > 0)
 
+// ─── 角色门控（管理操作按钮可见性） ────────────────────────────────────────────
+const MANAGE_ROLES = new Set(['admin', 'partner', 'signing_partner', 'manager'])
+const canManageWp = computed(() => {
+  const role = authStore.user?.role
+  return role ? MANAGE_ROLES.has(role) : false
+})
+
+// ─── 导入导出下拉命令分派 ─────────────────────────────────────────────────────
+function onImportExportCommand(command: string) {
+  switch (command) {
+    case 'excel-import':
+      showWpImport.value = true
+      break
+    case 'enhanced-import':
+      showWpImportEnhanced.value = true
+      break
+    case 'batch-download':
+      onBatchDownload()
+      break
+    case 'batch-export-meta':
+      showBatchExportEnhanced.value = true
+      break
+    case 'bulk-tab':
+      showBulkTab.value = true
+      break
+  }
+}
+
 // ─── 进度计算 ─────────────────────────────────────────────────────────────────
 const COMPLETED_STATUSES = new Set(['review_passed', 'archived'])
 const totalProgress = computed<ProgressInfo>(() => {
@@ -239,24 +339,40 @@ const totalProgress = computed<ProgressInfo>(() => {
 // ─── Tab 可见性（角色控制） ─────────────────────────────────────────────────────
 interface TabDef { value: string; label: string; hidden?: boolean }
 
-const ALL_TABS: TabDef[] = [
+// 核心视图（所有角色直接显示）
+const PRIMARY_TABS: TabDef[] = [
   { value: 'lifecycle', label: '生命周期' },
-  { value: 'matrix', label: '委派矩阵' },
-  { value: 'list', label: '列表' },
   { value: 'workbench', label: '工作台' },
-  { value: 'kanban', label: '看板' },
-  { value: 'graph', label: '依赖图' },
+  { value: 'list', label: '列表' },
   { value: 'guide', label: '手册' },
 ]
 
+// 更多视图（收进下拉，按角色过滤）
+const MORE_TABS: TabDef[] = [
+  { value: 'matrix', label: '委派矩阵' },
+  { value: 'kanban', label: '看板' },
+  { value: 'graph', label: '依赖图' },
+]
+
+const ALL_TABS: TabDef[] = [...PRIMARY_TABS, ...MORE_TABS]
+
 const visibleTabs = computed(() => {
+  // 核心 Tab 直接显示在 radio-group
+  return PRIMARY_TABS
+})
+
+const moreTabOptions = computed(() => {
   const role = authStore.user?.role
   // auditor / qc 隐藏 DelegationMatrix
   if (role === 'auditor' || role === 'qc') {
-    return ALL_TABS.filter(t => t.value !== 'matrix')
+    return MORE_TABS.filter(t => t.value !== 'matrix')
   }
-  return ALL_TABS
+  return MORE_TABS
 })
+
+/** 当前是否选中了"更多视图"中的某个 */
+const isMoreTabActive = computed(() => MORE_TABS.some(t => t.value === viewMode.value))
+const moreTabActiveLabel = computed(() => MORE_TABS.find(t => t.value === viewMode.value)?.label || '更多视图')
 
 // ─── viewMode → 子 SFC 路由表 ─────────────────────────────────────────────────
 const WorkbenchView = defineAsyncComponent(() => import('./workpaper-list/WorkpaperWorkbenchView.vue'))
@@ -484,18 +600,22 @@ async function onGenerateWorkpapers() {
     const options = filteredSets.map(s => ({ label: s.set_name, value: s.id }))
     const selectedSetId = await new Promise<string>((resolve, reject) => {
       ElMessageBox({
-        title: '选择底稿模板集',
+        title: '📋 第一步：选择底稿模板集',
         message: () => {
           return h('div', { style: 'padding: 8px 0' }, [
-            h('p', { style: 'margin: 0 0 12px; color: var(--gt-color-text-secondary); font-size: 13px' },
-              `共 ${filteredSets.length} 个模板集可选（标准年审 + 项目组自定义）`),
+            h('p', { style: 'margin: 0 0 8px; color: var(--el-text-color-secondary); font-size: 13px; line-height: 1.5' },
+              '模板集决定生成哪些底稿。选择后进入下一步配置裁剪范围。'),
+            h('p', { style: 'margin: 0 0 12px; color: var(--el-text-color-placeholder); font-size: 12px' },
+              `共 ${filteredSets.length} 个可用模板集`),
             h('select', {
               id: '__wp_tpl_select',
-              style: 'width: 100%; padding: 8px 12px; border: 1px solid var(--gt-color-border-purple-light, #d8b8ee); border-radius: 6px; font-size: 14px; outline: none;',
+              style: 'width: 100%; padding: 10px 14px; border: 1px solid var(--el-border-color); border-radius: 8px; font-size: 14px; outline: none; background: var(--el-fill-color-blank); color: var(--el-text-color-primary); cursor: pointer; transition: border-color .2s;',
+              onfocus: 'this.style.borderColor="var(--el-color-primary)"',
+              onblur: 'this.style.borderColor="var(--el-border-color)"',
             }, options.map(o => h('option', { value: o.value }, o.label))),
           ])
         },
-        confirmButtonText: '生成',
+        confirmButtonText: '下一步：配置裁剪',
         cancelButtonText: '取消',
         showCancelButton: true,
         beforeClose: (action, instance, done) => {
@@ -716,6 +836,13 @@ onContextChange(async () => {
 }
 .gt-wp-view-toggle {
   margin: 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.gt-wp-view-toggle :deep(.is-active-item) {
+  color: var(--el-color-primary);
+  font-weight: 600;
 }
 .gt-wp-progress-bar {
   display: flex;

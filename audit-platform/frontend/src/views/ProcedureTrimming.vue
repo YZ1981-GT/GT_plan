@@ -7,14 +7,24 @@
         <el-tag size="small" type="info">{{ projectId.slice(0, 8) }}</el-tag>
       </div>
       <div class="gt-proc-toolbar__right">
-        <el-tag v-if="!canManage" size="small" type="info">只读（仅项目经理可裁剪/委派）</el-tag>
-        <template v-else>
-          <el-button size="small" @click="resetAll">🔄 恢复初始</el-button>
-          <el-button size="small" @click="openRefDialog">📋 参照其他项目</el-button>
+        <el-button size="small" @click="openOverview">📊 全项目概览</el-button>
+        <template v-if="canManage">
           <el-button size="small" type="warning" @click="onSmartTrim">🤖 一键智能裁剪</el-button>
           <el-button size="small" @click="openDelegateWizard">🎯 程序委派向导</el-button>
           <el-button size="small" type="primary" @click="saveTrim(true)" :loading="saving">💾 保存粗裁</el-button>
         </template>
+        <el-tag v-else size="small" type="info">只读（仅项目经理可裁剪/委派）</el-tag>
+        <!-- 低频操作收敛，避免工具栏拥挤/窄屏折行 -->
+        <el-dropdown size="small" trigger="click" @command="onToolbarCommand">
+          <el-button size="small">更多 <el-icon style="margin-left:2px"><ArrowDown /></el-icon></el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="export" :disabled="exporting">📤 导出方案</el-dropdown-item>
+              <el-dropdown-item v-if="canManage" command="ref" divided>📋 参照其他项目</el-dropdown-item>
+              <el-dropdown-item v-if="canManage" command="reset">🔄 恢复初始</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
       </div>
     </div>
 
@@ -29,7 +39,40 @@
       </template>
     </el-alert>
 
+    <!-- 裁剪操作指南（折叠） -->
+    <details class="gt-proc-guide-details">
+      <summary>📘 裁剪操作指南（展开查看）</summary>
+      <div class="gt-proc-guide-content">
+        <p><strong>操作步骤：</strong></p>
+        <ol>
+          <li>按审计循环切换 Tab（A~S），逐个循环处理</li>
+          <li>对每条程序切换「适用性开关」（执行/裁剪）</li>
+          <li>被裁剪的程序<strong>必须填写裁剪理由</strong>（否则无法保存）</li>
+          <li>指定该底稿的<strong>主编人</strong>（底稿主编下拉）</li>
+          <li>确认无误后点「💾 保存粗裁」</li>
+        </ol>
+        <p><strong>快捷功能：</strong></p>
+        <ul>
+          <li>🤖 <strong>一键智能裁剪</strong>：读取试算表，只裁"科目无数据"的循环（有数据保留；取数失败不裁=安全兜底）</li>
+          <li>📋 <strong>参照其他项目</strong>：套用历史项目的裁剪方案（续审项目可快速对齐上年）</li>
+          <li>🎯 <strong>程序委派向导</strong>：按循环/人员快速分派</li>
+          <li>📊 <strong>全项目概览</strong>：各循环保留/裁剪/缺理由一览，点击跳转对应循环</li>
+          <li>📤 <strong>导出方案</strong>：导出全循环裁剪方案 xlsx，供留痕/打印/复核签字</li>
+        </ul>
+        <p><strong>注意事项：</strong></p>
+        <ul>
+          <li>切换循环前先保存（未保存改动会丢失）</li>
+          <li>「恢复初始」会连已持久化的委派一并回滚</li>
+          <li>非项目经理/合伙人角色看到只读视图</li>
+        </ul>
+      </div>
+    </details>
+
     <!-- 统计卡片（点击联动筛选） -->
+    <div class="gt-proc-stats-header">
+      <span>以下为<strong>当前循环（{{ activeCycle }}）</strong>统计</span>
+      <el-button link type="primary" @click="openOverview">查看全项目概览 ›</el-button>
+    </div>
     <div class="gt-proc-stats">
       <div class="gt-proc-stat-card" :class="{ 'is-active': statsFilter === '' }" @click="statsFilter = ''">
         <div class="gt-proc-stat-card__num">{{ progressStats.total }}</div>
@@ -70,11 +113,21 @@
     <!-- 表格工具栏 -->
     <div class="gt-proc-table-toolbar">
       <span class="gt-proc-table-toolbar__label">{{ activeCycle }} 循环 · {{ filteredProcedures.length }} 个程序</span>
-      <div v-if="canManage" class="gt-proc-table-toolbar__actions">
-        <el-button size="small" type="primary" text @click="batchSetAll('execute')">✓ 全部执行</el-button>
-        <el-button size="small" type="danger" text @click="batchSetAll('not_applicable')">✗ 全部不适用</el-button>
-        <el-divider direction="vertical" />
-        <el-button size="small" @click="addCustom">+ 新增程序</el-button>
+      <div class="gt-proc-table-toolbar__actions">
+        <el-input
+          v-model="searchText"
+          placeholder="搜索程序名称 / 编号"
+          size="small"
+          clearable
+          style="width: 200px"
+        />
+        <template v-if="canManage">
+          <el-divider direction="vertical" />
+          <el-button size="small" type="primary" text @click="batchSetAll('execute')">✓ 全部执行</el-button>
+          <el-button size="small" type="danger" text @click="batchSetAll('not_applicable')">✗ 全部不适用</el-button>
+          <el-divider direction="vertical" />
+          <el-button size="small" @click="addCustom">+ 新增程序</el-button>
+        </template>
       </div>
     </div>
 
@@ -106,45 +159,65 @@
             />
           </template>
         </el-table-column>
-        <el-table-column label="裁剪理由" min-width="200" resizable>
-          <template #default="{ row }">
-            <el-input
-              v-if="!row._applicable"
-              v-model="row.skip_reason"
-              placeholder="填写裁剪理由..."
-              size="small"
-              clearable
-              :disabled="!canManage"
-            />
-            <span v-else class="gt-proc-text-muted">—</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="wp_code" label="关联底稿" min-width="140" resizable show-overflow-tooltip class-name="gt-proc-wpcode-col" />
-        <el-table-column width="160" align="center">
-          <template #header>
-            <el-tooltip content="粗裁层：底稿主编（WorkingPaper.assigned_to）。程序执行人/操作复核人在底稿程序表控制台按行细裁委派。" placement="top">
-              <span>底稿主编</span>
-            </el-tooltip>
-          </template>
+        <el-table-column label="裁剪理由" min-width="220" resizable>
           <template #default="{ row }">
             <el-select
-              v-if="row._applicable"
-              v-model="row.assigned_to"
-              placeholder="选择底稿主编"
+              v-if="!row._applicable"
+              v-model="row.skip_reason"
+              placeholder="选择或输入裁剪理由..."
               size="small"
               clearable
               filterable
+              allow-create
+              default-first-option
               :disabled="!canManage"
               style="width: 100%"
-              @change="onAssigneeChange(row)"
             >
-              <el-option
-                v-for="m in teamMembers"
-                :key="m.staff_id"
-                :label="m.staff_name + (m.role_label ? ` (${m.role_label})` : '')"
-                :value="m.staff_id"
-              />
+              <el-option v-for="r in COMMON_SKIP_REASONS" :key="r" :label="r" :value="r" />
             </el-select>
+            <span v-else class="gt-proc-text-muted">—</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="关联底稿" min-width="140" resizable class-name="gt-proc-wpcode-col">
+          <template #default="{ row }">
+            <el-tooltip
+              v-if="row.wp_code"
+              :content="expandWpCodeTooltip(row.wp_code)"
+              placement="top"
+              :disabled="expandWpCodeTooltip(row.wp_code) === row.wp_code"
+            >
+              <span>{{ row.wp_code }}</span>
+            </el-tooltip>
+            <span v-else class="gt-proc-text-muted">—</span>
+          </template>
+        </el-table-column>
+        <el-table-column width="200" align="center">
+          <template #header>
+            <el-tooltip content="粗裁层：底稿主编（WorkingPaper.assigned_to），选择后即时保存（无需点保存粗裁）。程序执行人/操作复核人在底稿程序表控制台按行细裁委派。" placement="top">
+              <span>底稿主编 ⓘ</span>
+            </el-tooltip>
+          </template>
+          <template #default="{ row }">
+            <div v-if="row._applicable" class="gt-proc-assignee-cell">
+              <el-select
+                v-model="row.assigned_to"
+                placeholder="选择底稿主编"
+                size="small"
+                clearable
+                filterable
+                :disabled="!canManage"
+                style="flex: 1; min-width: 0"
+                @change="onAssigneeChange(row)"
+              >
+                <el-option
+                  v-for="m in sortedTeamMembers"
+                  :key="m.staff_id"
+                  :label="assigneeOptionLabel(m)"
+                  :value="m.staff_id"
+                />
+              </el-select>
+              <span v-if="savedAssignees.has(row.id)" class="gt-proc-saved-flag">✓ 已存</span>
+            </div>
             <span v-else class="gt-proc-text-muted">—</span>
           </template>
         </el-table-column>
@@ -168,7 +241,7 @@
             </el-button>
             <el-tooltip
               v-else-if="row._applicable && !row.wp_id"
-              content="该程序底稿尚未生成，请先生成底稿"
+              content="该程序底稿尚未生成。保存粗裁后，保留执行的程序会进入待执行底稿库；可在「底稿列表 / 生命周期」页生成底稿后再回此处逐条细裁。"
               placement="top"
             >
               <el-button size="small" text disabled>未生成</el-button>
@@ -350,6 +423,54 @@
         <el-button v-else type="primary" :loading="delegateWizard.loading" @click="runDelegateApply">确认委派</el-button>
       </template>
     </el-dialog>
+
+    <!-- 全项目裁剪概览抽屉（P1-3 / P0-1：各循环 保留/裁剪/缺理由 一览，点击跳转对应循环） -->
+    <el-drawer v-model="showOverviewDrawer" title="全项目裁剪概览" size="560px" append-to-body>
+      <div v-loading="overviewLoading">
+        <el-alert type="info" :closable="false" style="margin-bottom:12px">
+          <template #title>
+            <span style="font-size:12px">按各审计循环汇总裁剪进度；「缺理由」= 已裁剪但未填裁剪理由（保存会被阻断，需补填）。点击行跳转对应循环。</span>
+          </template>
+        </el-alert>
+        <el-table :data="overviewRows" size="small" border style="font-size:13px" @row-click="(r:any) => !r.uninitialized && jumpToCycleFromOverview(r.code)">
+          <el-table-column prop="label" label="循环" min-width="120" />
+          <el-table-column label="总程序" width="80" align="center">
+            <template #default="{ row }">
+              <span v-if="row.uninitialized" class="gt-proc-text-muted">未初始化</span>
+              <span v-else>{{ row.total }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="保留" width="70" align="center">
+            <template #default="{ row }"><span v-if="!row.uninitialized" style="color: var(--gt-color-primary)">{{ row.execute }}</span><span v-else>—</span></template>
+          </el-table-column>
+          <el-table-column label="裁剪" width="70" align="center">
+            <template #default="{ row }"><span v-if="!row.uninitialized" style="color: var(--gt-color-coral)">{{ row.trimmed }}</span><span v-else>—</span></template>
+          </el-table-column>
+          <el-table-column label="缺理由" width="80" align="center">
+            <template #default="{ row }">
+              <el-tag
+                v-if="!row.uninitialized && row.missingReason > 0"
+                size="small"
+                type="danger"
+                style="cursor:pointer"
+                @click.stop="jumpToCycleFromOverview(row.code, 'trimmed')"
+              >{{ row.missingReason }}</el-tag>
+              <span v-else class="gt-proc-text-muted">{{ row.uninitialized ? '—' : 0 }}</span>
+            </template>
+          </el-table-column>
+        </el-table>
+        <div class="gt-proc-overview-totals">
+          <span>合计（已初始化循环）：</span>
+          <span>总 <strong>{{ overviewTotals.total }}</strong></span>
+          <span>保留 <strong style="color: var(--gt-color-primary)">{{ overviewTotals.execute }}</strong></span>
+          <span>裁剪 <strong style="color: var(--gt-color-coral)">{{ overviewTotals.trimmed }}</strong></span>
+          <span v-if="overviewTotals.missingReason > 0">缺理由 <strong style="color: var(--el-color-danger)">{{ overviewTotals.missingReason }}</strong></span>
+        </div>
+        <div style="margin-top:12px; text-align:right">
+          <el-button size="small" @click="exportScheme" :loading="exporting">📤 导出方案</el-button>
+        </div>
+      </div>
+    </el-drawer>
   </div>
 </template>
 
@@ -357,6 +478,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { ArrowDown } from '@element-plus/icons-vue'
 import {
   getProcedures, updateProcedureTrim, initProcedures,
   addCustomProcedure, applyProcedureScheme, listProjects,
@@ -382,6 +504,21 @@ const TERMS = {
   procedureAssignee: ROLE_TERMS.procedureAssignee,
   operationReviewer: ROLE_TERMS.operationReviewer,
   highOrderReviewer: ROLE_TERMS.highOrderReviewer,
+}
+
+// P0-2 常见裁剪理由（点选优先 + allow-create 自由输入，统一措辞利于复核/留痕）
+const COMMON_SKIP_REASONS = [
+  '本期无该类交易或余额',
+  '科目在试算表中无数据（无余额/未发生）',
+  '金额低于重要性水平（不重要）',
+  '相关认定已在其他底稿覆盖',
+  '被审计单位无此类业务',
+  '经风险评估该程序不适用',
+]
+
+// P1-4 底稿主编候选角色排序优先级（审计员/项目经理优先，高阶复核靠后）
+const ROLE_PRIORITY: Record<string, number> = {
+  auditor: 1, manager: 2, reviewer: 3, eqcr: 4, partner: 5, signing_partner: 6,
 }
 
 const route = useRoute()
@@ -414,15 +551,83 @@ const smartTrimCycles = ref<string[]>([])
 const refProjectId = ref('')
 const projectOptions = ref<any[]>([])
 const statsFilter = ref('') // '' | 'execute' | 'trimmed' | 'custom'
-const teamMembers = ref<{ staff_id: string; staff_name: string; role_label?: string }[]>([])
+const searchText = ref('') // P2-7 按程序名/编号搜索
+const teamMembers = ref<{ staff_id: string; staff_name: string; role?: string; role_label?: string }[]>([])
 let originalSnapshot: any[] = [] // 用于恢复初始状态
 
+// P1-5 底稿主编"即时保存"瞬时反馈（保存成功后短暂显示 ✓ 已存）
+const savedAssignees = ref<Set<string>>(new Set())
+
+// P1-3 / P0-1 全项目裁剪概览（按需懒加载各循环，不在挂载时全量拉取）
+const showOverviewDrawer = ref(false)
+const overviewLoading = ref(false)
+const allCyclesData = ref<Record<string, any[] | null>>({}) // cycleCode → 程序列表（null=未初始化）
+const exporting = ref(false)
+
 const filteredProcedures = computed(() => {
-  if (!statsFilter.value) return procedures.value
-  if (statsFilter.value === 'execute') return procedures.value.filter(p => p._applicable)
-  if (statsFilter.value === 'trimmed') return procedures.value.filter(p => !p._applicable)
-  if (statsFilter.value === 'custom') return procedures.value.filter(p => p.is_custom)
-  return procedures.value
+  let list = procedures.value
+  if (statsFilter.value === 'execute') list = list.filter(p => p._applicable)
+  else if (statsFilter.value === 'trimmed') list = list.filter(p => !p._applicable)
+  else if (statsFilter.value === 'custom') list = list.filter(p => p.is_custom)
+  const kw = searchText.value.trim().toLowerCase()
+  if (kw) {
+    list = list.filter(p =>
+      (p.procedure_name || '').toLowerCase().includes(kw) ||
+      (p.procedure_code || '').toLowerCase().includes(kw) ||
+      (p.wp_code || '').toLowerCase().includes(kw),
+    )
+  }
+  return list
+})
+
+// P1-4 底稿主编候选：按角色优先级排序（审计员/项目经理优先）
+const sortedTeamMembers = computed(() =>
+  [...teamMembers.value].sort((a, b) =>
+    (ROLE_PRIORITY[a.role || ''] ?? 90) - (ROLE_PRIORITY[b.role || ''] ?? 90)),
+)
+
+// P1-4 各主编已负责底稿数（仅在全项目概览已加载后有值，用于负载均衡参考）
+const assigneeLoadMap = computed(() => {
+  const map: Record<string, number> = {}
+  for (const list of Object.values(allCyclesData.value)) {
+    if (!Array.isArray(list)) continue
+    for (const p of list) {
+      const applicable = p.status !== 'not_applicable' && p.status !== 'skip'
+      if (applicable && p.assigned_to) map[p.assigned_to] = (map[p.assigned_to] || 0) + 1
+    }
+  }
+  return map
+})
+const assigneeLoadLoaded = computed(() => Object.keys(allCyclesData.value).length > 0)
+
+// 底稿主编下拉显示标签（角色 + 已负责张数）
+function assigneeOptionLabel(m: { staff_id: string; staff_name: string; role_label?: string }) {
+  const role = m.role_label ? ` (${m.role_label})` : ''
+  const load = assigneeLoadLoaded.value ? ` · 已负责${assigneeLoadMap.value[m.staff_id] || 0}张` : ''
+  return `${m.staff_name}${role}${load}`
+}
+
+// P1-3 / P0-1 全项目裁剪概览行（各循环 保留/裁剪/缺理由/未初始化）
+const overviewRows = computed(() => {
+  return cycles.map(c => {
+    const list = allCyclesData.value[c.code]
+    if (!Array.isArray(list)) {
+      return { code: c.code, label: c.label, total: 0, execute: 0, trimmed: 0, missingReason: 0, uninitialized: !(c.code in allCyclesData.value) }
+    }
+    const execute = list.filter(p => p.status !== 'not_applicable' && p.status !== 'skip').length
+    const trimmed = list.length - execute
+    const missingReason = list.filter(p => (p.status === 'not_applicable' || p.status === 'skip') && !(p.skip_reason || '').trim()).length
+    return { code: c.code, label: c.label, total: list.length, execute, trimmed, missingReason, uninitialized: false }
+  })
+})
+const overviewTotals = computed(() => {
+  const rows = overviewRows.value.filter(r => !r.uninitialized)
+  return {
+    total: rows.reduce((s, r) => s + r.total, 0),
+    execute: rows.reduce((s, r) => s + r.execute, 0),
+    trimmed: rows.reduce((s, r) => s + r.trimmed, 0),
+    missingReason: rows.reduce((s, r) => s + r.missingReason, 0),
+  }
 })
 const progressStats = computed(() => {
   const procs = procedures.value
@@ -704,6 +909,7 @@ async function loadTeamMembers() {
       .map((a: any) => ({
         staff_id: a.staff_id,
         staff_name: a.staff_name || a.staff_id.slice(0, 8),
+        role: a.role || '',
         role_label: ROLE_LABELS[a.role] || a.role || '',
       }))
   } catch {
@@ -711,16 +917,142 @@ async function loadTeamMembers() {
   }
 }
 
-// 委派执行人变更 → 立即持久化
+// 委派执行人变更 → 立即持久化（P1-5：成功后短暂显示 ✓ 已存，消除"即时保存 vs 批量保存"困惑）
 async function onAssigneeChange(row: any) {
   if (!row.id) return
   try {
     await assignProcedures(projectId.value, [{ procedure_id: row.id, staff_id: row.assigned_to }])
     const member = teamMembers.value.find(m => m.staff_id === row.assigned_to)
     ElMessage.success(row.assigned_to ? `已委派给 ${member?.staff_name || '执行人'}` : '已取消委派')
+    // 瞬时反馈：行内 ✓ 已存，2.5s 后消失
+    savedAssignees.value.add(row.id)
+    savedAssignees.value = new Set(savedAssignees.value)
+    setTimeout(() => {
+      savedAssignees.value.delete(row.id)
+      savedAssignees.value = new Set(savedAssignees.value)
+    }, 2500)
   } catch (e: any) {
     handleApiError(e, '委派')
   }
+}
+
+// ── P1-3 / P0-1 全项目裁剪概览 ──
+// 懒加载各循环程序（getProcedures 只读，不 init 避免对全部循环产生物化副作用；空循环标"未初始化"）
+async function loadAllCyclesData() {
+  // 并发拉取各循环（15 个循环顺序 await 慢网络下明显；Promise.all 并发）
+  const results = await Promise.all(
+    cycles.map(async (c) => {
+      try {
+        const procs = await getProcedures(projectId.value, c.code)
+        return [c.code, Array.isArray(procs) && procs.length ? procs : null] as const
+      } catch {
+        return [c.code, null] as const
+      }
+    }),
+  )
+  allCyclesData.value = Object.fromEntries(results)
+}
+
+async function openOverview() {
+  showOverviewDrawer.value = true
+  if (Object.keys(allCyclesData.value).length > 0) return // 已加载过
+  overviewLoading.value = true
+  try {
+    await loadAllCyclesData()
+  } finally {
+    overviewLoading.value = false
+  }
+}
+
+// 概览行点击 → 切换到该循环（先过脏检查，程序化切换不经 el-tabs before-leave）
+// focusFilter='trimmed' 时切换后自动定位到已裁剪项（点「缺理由」用，闭合发现→补填）
+async function jumpToCycleFromOverview(code: string, focusFilter: '' | 'trimmed' = '') {
+  const applyFilter = () => { statsFilter.value = focusFilter }
+  if (code === activeCycle.value) {
+    showOverviewDrawer.value = false
+    applyFilter()
+    return
+  }
+  if (isDirty.value) {
+    try {
+      await ElMessageBox.confirm(
+        '当前循环有未保存的粗裁修改，切换将丢失。是否放弃并切换？',
+        '未保存修改',
+        { type: 'warning', confirmButtonText: '放弃并切换', cancelButtonText: '取消' },
+      )
+    } catch { return }
+  }
+  activeCycle.value = code
+  showOverviewDrawer.value = false
+  await loadProcedures()
+  applyFilter()
+}
+
+// ── P1-6 导出裁剪方案（全循环 xlsx，供留痕/打印/复核签字）──
+async function exportScheme() {
+  exporting.value = true
+  try {
+    if (Object.keys(allCyclesData.value).length === 0) {
+      await loadAllCyclesData()
+    }
+    const staffName = (id: string | null) =>
+      id ? (teamMembers.value.find(m => m.staff_id === id)?.staff_name || id.slice(0, 8)) : ''
+    const aoa: any[][] = [['循环', '编号', '程序名称', '适用性', '裁剪理由', '底稿主编', '来源']]
+    for (const c of cycles) {
+      const list = allCyclesData.value[c.code]
+      if (!Array.isArray(list)) continue
+      for (const p of list) {
+        const applicable = p.status !== 'not_applicable' && p.status !== 'skip'
+        aoa.push([
+          c.label,
+          p.procedure_code || p.wp_code || '',
+          p.procedure_name || '',
+          applicable ? '执行' : '裁剪',
+          applicable ? '' : (p.skip_reason || ''),
+          staffName(p.assigned_to || null),
+          (p.is_custom || p.source === 'custom') ? '自定义' : '模板',
+        ])
+      }
+    }
+    if (aoa.length <= 1) {
+      ElMessage.warning('暂无可导出的程序数据')
+      return
+    }
+    const XLSX = await import('xlsx')
+    const wb = XLSX.utils.book_new()
+    const ws = XLSX.utils.aoa_to_sheet(aoa)
+    ws['!cols'] = [{ wch: 12 }, { wch: 12 }, { wch: 40 }, { wch: 8 }, { wch: 32 }, { wch: 14 }, { wch: 8 }]
+    XLSX.utils.book_append_sheet(wb, ws, '底稿粗裁方案')
+    XLSX.writeFile(wb, `底稿粗裁方案_${projectId.value.slice(0, 8)}.xlsx`)
+    ElMessage.success('裁剪方案已导出')
+  } catch (e: any) {
+    handleApiError(e, '导出裁剪方案')
+  } finally {
+    exporting.value = false
+  }
+}
+
+// P2-4 关联底稿区间码（如「D2-6至D2-13」）展开为具体底稿清单供 tooltip；非区间码原样返回
+function expandWpCodeTooltip(code: string): string {
+  const m = String(code || '').match(/^(.*?)(\d+)\s*至\s*(?:(.+?))?(\d+)$/)
+  if (!m) return code
+  const prefix = m[1]
+  const start = parseInt(m[2], 10)
+  const end = parseInt(m[4], 10)
+  // 仅当前缀一致（或省略）且区间合法（≤50 张防异常）时展开
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start || end - start > 50) return code
+  const endPrefix = m[3]
+  if (endPrefix && endPrefix !== prefix) return code
+  const list: string[] = []
+  for (let i = start; i <= end; i++) list.push(`${prefix}${i}`)
+  return `含 ${list.length} 张底稿：${list.join('、')}`
+}
+
+// 工具栏「更多 ▾」命令分发（低频操作收敛，避免主栏拥挤）
+function onToolbarCommand(cmd: string) {
+  if (cmd === 'export') exportScheme()
+  else if (cmd === 'ref') openRefDialog()
+  else if (cmd === 'reset') resetAll()
 }
 
 // 进入该底稿的程序表控制台做逐条程序裁剪
@@ -1085,6 +1417,10 @@ onMounted(async () => {
 .gt-proc-toolbar__right { display: flex; gap: 8px; }
 
 /* 统计卡片 */
+.gt-proc-stats-header {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 12px; color: var(--gt-color-text-tertiary); margin-bottom: 6px;
+}
 .gt-proc-stats {
   display: flex; gap: 12px; margin-bottom: 14px;
 }
@@ -1136,6 +1472,22 @@ onMounted(async () => {
 }
 .gt-proc-text-muted { color: var(--gt-color-text-placeholder); font-size: 12px; }
 
+/* 底稿主编单元格（select + 即时保存反馈） */
+.gt-proc-assignee-cell { display: flex; align-items: center; gap: 4px; }
+.gt-proc-saved-flag {
+  font-size: 11px; color: var(--gt-color-success, #67c23a); white-space: nowrap;
+  animation: gt-proc-fade 0.3s ease;
+}
+@keyframes gt-proc-fade { from { opacity: 0; } to { opacity: 1; } }
+
+/* 概览抽屉合计 */
+.gt-proc-overview-totals {
+  margin-top: 12px; padding: 10px 14px; font-size: 13px;
+  background: var(--gt-color-bg, #fafafa); border-radius: 8px;
+  display: flex; gap: 16px; flex-wrap: wrap; align-items: center;
+}
+.gt-proc-overview-totals > span:first-child { color: var(--gt-color-text-secondary); }
+
 /* 关联底稿列：区间编码（如 D2-6至D2-13）单行显示，不换行 */
 :deep(.gt-proc-wpcode-col .cell) {
   white-space: nowrap;
@@ -1162,6 +1514,36 @@ onMounted(async () => {
 
 /* 角色术语说明 */
 .gt-proc-role-legend { margin-bottom: 12px; }
+
+/* 裁剪操作指南折叠区 */
+.gt-proc-guide-details {
+  margin-bottom: 12px;
+  border: 1px solid #e8d5f5;
+  border-radius: 8px;
+  background: #fdf8ff;
+}
+.gt-proc-guide-details summary {
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: #4b2d77;
+}
+.gt-proc-guide-details[open] summary {
+  border-bottom: 1px solid #e8d5f5;
+}
+.gt-proc-guide-content {
+  padding: 10px 16px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #303133;
+}
+.gt-proc-guide-content ol,
+.gt-proc-guide-content ul {
+  padding-left: 1.5em;
+  margin: 4px 0;
+}
+.gt-proc-guide-content li { margin: 3px 0; }
 
 /* 委派向导 */
 .gt-proc-wizard-job { margin: 10px 0; }

@@ -31,6 +31,7 @@ export interface NoteSectionVariants {
 export const DISCLOSURE_NOTE_SECTION_MAP: Record<string, NoteSectionVariants> = {
   E1: { listed: '五、1', soe: '八、1' },
   D1: { listed: '五、4', soe: '八、4' }, // 应收票据
+  D2: { listed: '五、5', soe: '八、5' }, // 应收账款
   D3: { listed: '五、38', soe: '八、38' }, // 预收款项
   D5: { listed: '五、6', soe: '八、6' }, // 应收款项融资
   D6: { listed: '五、10', soe: '八、11' }, // 合同资产
@@ -67,6 +68,16 @@ export const DISCLOSURE_NOTE_SECTION_MAP: Record<string, NoteSectionVariants> = 
   I4: { listed: '五、29', soe: '八、30' }, // 长期待摊费用
   I6: { listed: '五、66', soe: '八、67' }, // 研发费用
   K1: { listed: '五、8', soe: '八、9' },   // 其他应收款
+  K2: { listed: '五、13', soe: '八、14' },  // 其他流动资产
+  K3: { listed: '五、42', soe: '八、42' },  // 其他应付款
+  K4: { listed: '五、44', soe: '八、48' },  // 其他流动负债
+  K5: { listed: '五、50', soe: '八、55' },  // 预计负债
+  K6: { listed: '持有待售资产', soe: '八、12' }, // 持有待售资产
+  K7: { listed: '五、51', soe: '八、56' },  // 递延收益
+  K8: { listed: '五、64', soe: '八、65' },  // 销售费用
+  K9: { listed: '五、65', soe: '八、66' },  // 管理费用
+  K10: { listed: '五、68', soe: '八、69' }, // 其他收益
+  K12: { listed: '三、营业外收入', soe: '八、76' }, // 营业外收入
   H5: { soe: '八、25' },                    // 油气资产（国企专属，上市无独立章节）
   // 损益类关键词标题（DB 可能截断，由 resolveSectionInList 模糊解析）
   K11: { listed: '三、资产减值损失', soe: '八、74' }, // 资产减值损失
@@ -75,8 +86,40 @@ export const DISCLOSURE_NOTE_SECTION_MAP: Record<string, NoteSectionVariants> = 
   // N3 若将来补披露表，可加 N3 条目指向同一章节号（导航共用，数据所有权见
   // spec n1-disclosure-note-linkage · Decision 1）。
   N1: { listed: '五、30', soe: '八、31' }, // 递延所得税资产（和递延所得税负债）
+  N2: { listed: '五、41', soe: '八、41' }, // 应交税费
+  N4: { listed: '五、63', soe: null }, // 税金及附加（仅上市有独立章节）
+  N5: { listed: null, soe: '八、78' }, // 所得税费用（仅国企有独立章节）
+  // L1 短期借款（权威 note_template_variant_matrix.json · duan_qi_jie_kuan）
+  L1: { listed: '五、33', soe: '八、33' }, // 短期借款
+  // L3 长期借款（权威 note_template_variant_matrix.json · chang_qi_jie_kuan）
+  L3: { listed: '五、45', soe: '八、49' }, // 长期借款
+  // L5 长期应付款（权威 note_template_variant_matrix.json · chang_qi_ying_fu_kuan）
+  L5: { listed: '五、48', soe: '八、53' }, // 长期应付款
+  // L7 其他非流动负债（权威 note_template_variant_matrix.json · qi_ta_fei_liu_dong_fu_zhai）
+  L7: { listed: '五、52', soe: '八、57' }, // 其他非流动负债
+  // M 循环权益类（权威 note_template_variant_matrix.json）
+  M2: { soe: '八、58' },                    // 实收资本（仅国企）
+  M3: { listed: '五、56' },                  // 库存股（仅上市）
+  M4: { listed: '五、55', soe: '八、60' },   // 资本公积
+  M5: { listed: '五、59', soe: '八、62' },   // 盈余公积
+  M6: { listed: '五、61', soe: '八、63' },   // 未分配利润
+  M7: { listed: '五、58', soe: '八、61' },   // 专项储备
+  M9: { listed: '五、57' },                  // 其他综合收益（仅上市）
+  M10: { listed: '五、54', soe: '八、59' },  // 其他权益工具
+  // H4 工程物资推送到 H2 在建工程附注章节（子表），反向跳转同样指向在建工程章节。
+  H4: { listed: '五、23', soe: '八、23' }, // 工程物资 → 在建工程章节
+  // H6 固定资产清理推送到 H1 固定资产附注章节（子表），反向跳转同样指向固定资产章节。
+  H6: { listed: '五、22', soe: '八、22' }, // 固定资产清理 → 固定资产章节
   // J1 应付职工薪酬（五、40 / 八、40，J1 独占，不与 J2 共用；精确===匹配）
   J1: { listed: '五、40', soe: '八、40' },
+  // F3 应付票据（五、36 / 八、36）
+  F3: { listed: '五、36', soe: '八、36' },
+  // G8 其他权益工具投资（五、19 / 八、19）
+  G8: { listed: '五、19', soe: '八、19' },
+  // G9 其他非流动金融资产（五、20 / 八、20）
+  G9: { listed: '五、20', soe: '八、20' },
+  // G12 套期净损益（五、70 / 八、71）
+  G12: { listed: '五、70', soe: '八、71' },
 }
 
 /** 解析某披露底稿 + 版本对应的附注章节号；无映射返回 null。 */

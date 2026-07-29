@@ -17,6 +17,8 @@ export const staff = {
   checkIns: (id: string) => `/api/staff/${id}/check-ins`,
   handoverPreview: (id: string) => `/api/staff/${id}/handover/preview`,
   handover: (id: string) => `/api/staff/${id}/handover`,
+  stats: '/api/staff/stats',
+  exportTemplate: '/api/staff/export-template',
 } as const
 
 // ─── 工时 ───────────────────────────────────────────────────────────────────

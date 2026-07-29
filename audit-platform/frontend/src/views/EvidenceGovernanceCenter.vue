@@ -21,6 +21,8 @@ import { storeToRefs } from 'pinia'
 import { useProjectStore } from '@/stores/project'
 import { useRoleContextStore } from '@/stores/roleContext'
 import { useAuthStore } from '@/stores/auth'
+import { Reading } from '@element-plus/icons-vue'
+import EvidenceGovernanceHandbookDialog from './EvidenceGovernanceHandbookDialog.vue'
 import EvidenceRefsTab from '@/components/evidence-governance/EvidenceRefsTab.vue'
 import OcrGovernanceTab from '@/components/evidence-governance/OcrGovernanceTab.vue'
 import CitationTab from '@/components/evidence-governance/CitationTab.vue'
@@ -47,6 +49,7 @@ const role = computed(
 )
 
 const activeTab = ref('refs')
+const handbookVisible = ref(false)
 
 // 项目角色确保加载（DefaultLayout 亦会加载，此处兜底）
 watch(
@@ -69,7 +72,10 @@ watch(
           <el-tag size="small">当前角色：{{ role }}</el-tag>
         </div>
       </div>
+      <el-button :icon="Reading" @click="handbookVisible = true">使用手册</el-button>
     </div>
+
+    <EvidenceGovernanceHandbookDialog v-model="handbookVisible" />
 
     <el-alert
       type="info"

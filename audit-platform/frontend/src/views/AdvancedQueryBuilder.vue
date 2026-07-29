@@ -328,6 +328,8 @@ import { DocumentCopy } from '@element-plus/icons-vue'
 import http from '@/utils/http'
 import api from '@/services/apiProxy'
 import { handleApiError } from '@/utils/errorHandler'
+import { resolveColumnLabel } from '@/components/query/queryColumnLabels'
+import { sanitizeExportName } from '@/components/query/queryExport'
 import CustomQueryFieldPicker from '@/components/custom-query/CustomQueryFieldPicker.vue'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
 import {
@@ -392,7 +394,7 @@ const route = useRoute()
 const { drill } = useAcnrDrill(() => (route.params.projectId as string) || '')
 // 归一结果列为 QueryColumnMeta（含 addr_id/drillable）
 const resultColumns = computed<QueryColumnMeta[]>(() =>
-  normalizeColumns(result.value?.columns),
+  normalizeColumns(result.value?.columns).map(c => ({ ...c, title: resolveColumnLabel(c.key, c.title) })),
 )
 
 const loadingPreview = ref(false)
@@ -644,7 +646,7 @@ async function doExport() {
     const link = document.createElement('a')
     link.href = URL.createObjectURL(blob)
     // 文件名带表 label 更易识别
-    const tableLabel = (currentTable.value?.label || dsl.table).replace(/[\\/:*?"<>|]/g, '_')
+    const tableLabel = sanitizeExportName(currentTable.value?.label || dsl.table)
     link.download = `${tableLabel}_${Date.now()}.xlsx`
     link.click()
     URL.revokeObjectURL(link.href)

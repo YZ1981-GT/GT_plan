@@ -6,18 +6,21 @@
         实时掌握项目进度、人员负荷与风险预警
       </template>
       <template #actions>
-        <el-button size="default" @click="refreshAll" :loading="loading" :icon="Refresh" round>刷新数据</el-button>
+        <div style="display: flex; align-items: center; gap: 8px">
+          <span v-if="refreshCountdown > 0" class="refresh-countdown">{{ refreshCountdown }}s</span>
+          <el-button size="default" @click="refreshAll" :loading="loading" :icon="Refresh" round>刷新数据</el-button>
+        </div>
       </template>
     </GtPageHeader>
 
     <!-- ── KPI 指标卡片 ── -->
     <div class="kpi-grid">
-      <div v-for="card in kpiCards" :key="card.label" class="kpi-card" :style="{ borderLeftColor: card.color, '--kpi-accent': card.color }">
+      <div v-for="card in kpiCards" :key="card.label" class="kpi-card" :style="{ borderLeftColor: card.color, '--kpi-accent': card.color, cursor: card.path ? 'pointer' : 'default' }" @click="card.path && $router.push(card.path)">
         <div class="kpi-top">
           <div class="kpi-icon" :style="{ background: card.bg, color: card.color }">
             <el-icon :size="22"><component :is="card.icon" /></el-icon>
           </div>
-          <div v-if="card.trend !== 0" class="kpi-trend" :class="card.trendDir">
+          <div v-if="card.trend !== null && card.trend !== 0" class="kpi-trend" :class="card.trendDir">
             {{ card.trend > 0 ? '↑' : '↓' }} {{ Math.abs(card.trend) }}%
           </div>
         </div>
@@ -30,53 +33,121 @@
     <el-row :gutter="16" class="chart-row gt-stagger">
       <el-col :span="12">
         <div class="chart-card">
-          <h3 class="chart-title">项目进度 Top 10</h3>
+          <div class="chart-title-row">
+            <h3 class="chart-title">项目进度 Top 10</h3>
+            <el-select v-model="progressSortMode" size="small" style="width: 130px">
+              <el-option label="进度最低优先" value="progress_asc" />
+              <el-option label="进度最高优先" value="progress_desc" />
+              <el-option label="最近创建" value="created" />
+            </el-select>
+          </div>
           <GTChart v-if="progressOption" :option="progressOption" :height="340" :loading="loading" />
+          <div v-else-if="!loading" class="chart-empty">
+            <span style="color: var(--gt-color-text-tertiary)">暂无项目数据</span>
+            <el-button text type="primary" size="small" @click="$router.push('/projects')" style="margin-top: 8px">前往项目列表 →</el-button>
+          </div>
         </div>
       </el-col>
       <el-col :span="12">
         <div class="chart-card">
-          <h3 class="chart-title">人员负荷排行（本周工时）</h3>
+          <h3 class="chart-title">人员负荷排行（工时 + 底稿）</h3>
           <GTChart v-if="workloadOption" :option="workloadOption" :height="340" :loading="loading" />
+          <div v-else-if="!loading" class="chart-empty">
+            <span style="color: var(--gt-color-text-tertiary)">暂无活跃人员负荷数据</span>
+            <div style="display: flex; gap: 12px; margin-top: 8px">
+              <el-button text type="primary" size="small" @click="$router.push('/staff')">前往人员管理</el-button>
+              <el-button text type="primary" size="small" @click="$router.push('/projects')">前往委派</el-button>
+            </div>
+          </div>
         </div>
       </el-col>
     </el-row>
 
-    <!-- ── 风险预警 + 集团审计 ── -->
+    <!-- ── 风险预警 + 审计质量 + 工时热力图 ── -->
     <el-row :gutter="16" class="chart-row gt-stagger">
-      <el-col :span="8">
+      <el-col :span="10">
         <div class="chart-card risk-card">
           <h3 class="chart-title">
             <el-icon style="color: var(--gt-color-coral); margin-right: 6px"><WarningFilled /></el-icon>
             风险预警
           </h3>
-          <div v-if="riskAlerts.length === 0" class="chart-empty">
+          <div v-if="riskAlerts.length === 0" class="chart-empty" style="min-height: 160px">
             <el-icon :size="32" style="color: var(--gt-color-success)"><CircleCheckFilled /></el-icon>
             <span style="margin-top: 8px; color: var(--gt-color-text-secondary)">暂无风险预警</span>
           </div>
           <div v-else class="risk-list">
             <div v-for="a in riskAlerts" :key="a.type" class="risk-item">
-              <el-tag :type="riskSeverity(a.type)" size="small" effect="dark" round>{{ a.count }}</el-tag>
+              <el-tag :type="riskSeverity(a.type, a.level)" size="small" effect="dark" round>{{ a.count }}</el-tag>
               <span class="risk-msg">{{ a.message }}</span>
+              <el-button
+                v-if="riskJumpPath(a.type)"
+                text type="primary" size="small"
+                style="margin-left: auto; flex-shrink: 0"
+                @click="$router.push(riskJumpPath(a.type)!)"
+              >处理 →</el-button>
             </div>
           </div>
         </div>
       </el-col>
-      <el-col :span="8">
+      <el-col :span="7">
+        <div class="chart-card quality-card">
+          <h3 class="chart-title">审计质量</h3>
+          <div v-if="qualityMetrics" class="quality-metrics">
+            <div class="quality-ring">
+              <el-progress type="circle" :percentage="qualityMetrics.qc_pass_rate" :width="72" :stroke-width="6" color="#4b2d77" />
+              <span class="quality-ring-label">QC通过率</span>
+            </div>
+            <div class="quality-ring">
+              <el-progress type="circle" :percentage="qualityMetrics.review_completion_rate" :width="72" :stroke-width="6" color="#0094B3" />
+              <span class="quality-ring-label">复核完成率</span>
+            </div>
+            <div class="quality-stat">
+              <span class="quality-stat-value">{{ qualityMetrics.adjustment_count }}</span>
+              <span class="quality-stat-label">调整分录</span>
+            </div>
+          </div>
+          <div v-else-if="!loading" class="chart-empty" style="min-height: 160px">
+            <span style="color: var(--gt-color-text-tertiary)">暂无质量数据</span>
+          </div>
+        </div>
+      </el-col>
+      <el-col :span="7">
+        <div class="chart-card">
+          <h3 class="chart-title">工时热力图（近30天）</h3>
+          <GTChart v-if="heatmapOption" :option="heatmapOption" :height="200" :loading="loading" />
+          <div v-else-if="!loading" class="chart-empty" style="min-height: 160px">
+            <span style="color: var(--gt-color-text-tertiary)">暂无工时数据</span>
+            <el-button text type="primary" size="small" @click="$router.push('/work-hours')" style="margin-top: 8px">前往工时填报 →</el-button>
+          </div>
+        </div>
+      </el-col>
+    </el-row>
+
+    <!-- ── 集团审计进度 + 最近动态 ── -->
+    <el-row :gutter="16" class="chart-row gt-stagger">
+      <el-col :span="12">
         <div class="chart-card">
           <h3 class="chart-title">集团审计进度</h3>
-          <GTChart v-if="groupOption" :option="groupOption" :height="260" :loading="loading" />
-          <div v-else-if="!loading" class="chart-empty">
+          <GTChart v-if="groupOption" :option="groupOption" :height="240" :loading="loading" />
+          <div v-else-if="!loading" class="chart-empty" style="min-height: 160px">
             <span style="color: var(--gt-color-text-tertiary)">无合并项目</span>
           </div>
         </div>
       </el-col>
-      <el-col :span="8">
+      <el-col :span="12">
         <div class="chart-card">
-          <h3 class="chart-title">工时热力图（近30天）</h3>
-          <GTChart v-if="heatmapOption" :option="heatmapOption" :height="260" :loading="loading" />
-          <div v-else-if="!loading" class="chart-empty">
-            <span style="color: var(--gt-color-text-tertiary)">暂无工时数据</span>
+          <h3 class="chart-title">📋 最近动态</h3>
+          <div v-if="recentActivities.length === 0 && !loading" class="chart-empty" style="min-height: 160px">
+            <span style="color: var(--gt-color-text-tertiary)">暂无最近操作记录</span>
+          </div>
+          <div v-else class="activity-list">
+            <div v-for="(act, i) in recentActivities" :key="i" class="activity-item">
+              <div class="activity-dot" :style="{ background: activityColor(act.action_type) }" />
+              <div class="activity-content">
+                <span class="activity-text">{{ act.description }}</span>
+                <span class="activity-time">{{ formatRelativeTime(act.created_at) }}</span>
+              </div>
+            </div>
           </div>
         </div>
       </el-col>
@@ -86,11 +157,13 @@
     <el-row :gutter="16" class="chart-row">
       <el-col :span="24">
         <div class="chart-card query-panel">
-          <h3 class="chart-title" style="margin-bottom: 16px">
-            <el-icon style="color: var(--gt-color-primary); margin-right: 6px"><Search /></el-icon>
-            人员工时查询
-          </h3>
-          <el-segmented v-model="queryTab" :options="queryTabOptions" size="default" style="margin-bottom: 20px" />
+          <div class="chart-title-row" style="margin-bottom: 18px">
+            <h3 class="chart-title" style="margin-bottom: 0">
+              <el-icon style="color: var(--gt-color-primary); margin-right: 6px"><Search /></el-icon>
+              人员工时查询
+            </h3>
+            <el-segmented v-model="queryTab" :options="queryTabOptions" size="default" />
+          </div>
 
           <!-- 按项目查 -->
           <div v-if="queryTab === 'by-project'" class="query-content">
@@ -100,23 +173,23 @@
               </el-select>
             </div>
             <el-table :data="projectStaffData" stripe size="default" v-loading="queryLoading" :empty-text="queryProjectId ? '该项目暂无委派人员' : '请先选择项目'" class="query-table">
-              <el-table-column prop="staff_name" label="姓名" width="120">
+              <el-table-column prop="staff_name" label="姓名" min-width="140">
                 <template #default="{ row }">
                   <span style="font-weight: 600; color: var(--gt-color-primary)">{{ row.staff_name }}</span>
                 </template>
               </el-table-column>
-              <el-table-column prop="title" label="职级" width="100" />
-              <el-table-column prop="role" label="角色" width="120">
+              <el-table-column prop="title" label="职级" min-width="120" />
+              <el-table-column prop="role" label="角色" min-width="130">
                 <template #default="{ row }">
                   <el-tag size="small" effect="plain" round>{{ row.role }}</el-tag>
                 </template>
               </el-table-column>
-              <el-table-column prop="week_hours" label="本周工时" width="120" align="right">
+              <el-table-column prop="week_hours" label="本周工时" min-width="130" align="right">
                 <template #default="{ row }">
                   <span :style="{ color: row.week_hours > 40 ? '#FF5149' : row.week_hours > 20 ? '#e6a23c' : '#333', fontWeight: 600 }">{{ row.week_hours }}h</span>
                 </template>
               </el-table-column>
-              <el-table-column prop="total_hours" label="累计工时" width="120" align="right">
+              <el-table-column prop="total_hours" label="累计工时" min-width="130" align="right">
                 <template #default="{ row }"><span style="font-weight: 500">{{ row.total_hours }}h</span></template>
               </el-table-column>
             </el-table>
@@ -191,20 +264,20 @@
               <el-button type="primary" @click="loadAvailableStaff" :loading="queryLoading">查询可用人员</el-button>
             </div>
             <el-table :data="availableStaffData" stripe size="default" v-loading="queryLoading" empty-text="点击查询按钮获取数据" class="query-table">
-              <el-table-column prop="name" label="姓名" width="120">
+              <el-table-column prop="name" label="姓名" min-width="130">
                 <template #default="{ row }"><span style="font-weight: 600">{{ row.name }}</span></template>
               </el-table-column>
-              <el-table-column prop="title" label="职级" width="100" />
-              <el-table-column prop="department" label="部门" width="120" />
-              <el-table-column prop="project_count" label="在手项目" width="100" align="center">
+              <el-table-column prop="title" label="职级" min-width="120" />
+              <el-table-column prop="department" label="部门" min-width="130" />
+              <el-table-column prop="project_count" label="在手项目" min-width="110" align="center">
                 <template #default="{ row }">
                   <el-tag :type="(row.project_count > 3 ? 'warning' : '') || undefined" size="small" round>{{ row.project_count }}</el-tag>
                 </template>
               </el-table-column>
-              <el-table-column prop="week_hours" label="本周工时" width="120" align="right">
+              <el-table-column prop="week_hours" label="本周工时" min-width="120" align="right">
                 <template #default="{ row }">{{ row.week_hours }}h</template>
               </el-table-column>
-              <el-table-column prop="available_hours" label="可用工时" width="120" align="right">
+              <el-table-column prop="available_hours" label="可用工时" min-width="120" align="right">
                 <template #default="{ row }">
                   <span style="color: var(--gt-color-success, #28a745); font-weight: 700; font-size: var(--gt-font-size-base)">{{ row.available_hours }}h</span>
                 </template>
@@ -259,44 +332,71 @@ const staffWorkload = ref<any[]>([])
 const riskAlerts = ref<any[]>([])
 const groupProgress = ref<any[]>([])
 const heatmapData = ref<any[]>([])
-
+const qualityMetrics = ref<any>(null)
+const recentActivities = ref<any[]>([])
 const animActive = useAnimNum(() => overview.value.active_projects ?? 0)
 const animWeekHours = useAnimNum(() => overview.value.week_hours ?? 0)
 const animStaff = useAnimNum(() => overview.value.staff_count ?? 0)
 const animOverdue = useAnimNum(() => overview.value.overdue_projects ?? 0)
 
+// ── KPI 环比趋势（真实数据） ──
+const compareDelta = ref<{ total: number | null; in_progress: number | null; pending_review: number | null; completed: number | null }>({
+  total: null, in_progress: null, pending_review: null, completed: null,
+})
+
+async function loadCompareData() {
+  try {
+    const data: any = await api.get(P_dash.statsCompare, { params: { window: 7 } })
+    if (data?.delta_pct) compareDelta.value = data.delta_pct
+  } catch {
+    // 静默失败
+  }
+}
+
 const kpiCards = computed(() => [
   {
     label: '在审项目', value: animActive.value, suffix: '',
-    icon: FolderOpened, color: '#4b2d77', bg: '#f4f0fa', trend: 5, trendDir: 'trend-up',
+    icon: FolderOpened, color: '#4b2d77', bg: '#f4f0fa',
+    trend: compareDelta.value?.total ?? 0, trendDir: (compareDelta.value?.total ?? 0) >= 0 ? 'trend-up' : 'trend-down',
+    path: '/projects',
   },
   {
     label: '本周工时', value: animWeekHours.value, suffix: 'h',
-    icon: Timer, color: '#0094B3', bg: '#e6f7fa', trend: 12, trendDir: 'trend-up',
+    icon: Timer, color: '#0094B3', bg: '#e6f7fa',
+    trend: compareDelta.value?.in_progress ?? 0, trendDir: (compareDelta.value?.in_progress ?? 0) >= 0 ? 'trend-up' : 'trend-down',
+    path: '/work-hours',
   },
   {
     label: '人员总数', value: animStaff.value, suffix: '',
     icon: User, color: '#28A745', bg: '#edf7ef', trend: 0, trendDir: '',
+    path: '/staff',
   },
   {
     label: '超期项目', value: animOverdue.value, suffix: '',
     icon: WarningFilled, color: '#FF5149', bg: '#fff0ef',
-    trend: overview.value.overdue_projects > 0 ? 0 : 0, trendDir: '',
+    trend: 0, trendDir: '',
+    path: '/projects?status=overdue',
   },
 ])
 
 // ── 项目进度图 ──
 const progressOption = computed(() => {
-  if (!projectProgress.value.length) return null
-  const top10 = projectProgress.value.slice(0, 10).reverse()
+  if (!sortedProjectProgress.value.length) return null
+  const top10 = sortedProjectProgress.value.slice(0, 10).reverse()
   return {
     tooltip: { trigger: 'axis' as const, formatter: (params: any) => {
       const p = params[0]
-      return `${p.name}<br/>进度: <b>${p.value}%</b>`
+      const idx = top10.length - 1 - p.dataIndex
+      const proj = sortedProjectProgress.value[idx]
+      let html = `<b>${p.name}</b><br/>进度: <b>${p.value}%</b>`
+      if (proj?.wp_total) {
+        html += `<br/>底稿: ${proj.wp_completed}/${proj.wp_total} 已复核通过`
+      }
+      return html
     }},
     grid: { left: 120, right: 40, top: 10, bottom: 10 },
     xAxis: { type: 'value' as const, max: 100, axisLabel: { formatter: '{value}%' }, splitLine: { lineStyle: { type: 'dashed' as const, color: '#f0f0f5' } } },
-    yAxis: { type: 'category' as const, data: top10.map((p: any) => p.project_name), axisLabel: { fontSize: 12, width: 100, overflow: 'truncate' as const } },
+    yAxis: { type: 'category' as const, data: top10.map((p: any) => p.project_name), axisLabel: { fontSize: 12, width: 100, overflow: 'truncate' as const }, triggerEvent: true },
     series: [{
       type: 'bar' as const,
       data: top10.map((p: any) => ({
@@ -310,35 +410,63 @@ const progressOption = computed(() => {
 })
 
 function progressColor(pct: number): any {
-  if (pct < 30) return { type: 'linear' as const, x: 0, y: 0, x2: 1, y2: 0, colorStops: [{ offset: 0, color: '#FF5149' }, { offset: 1, color: '#ff7b74' }] }
-  if (pct < 70) return { type: 'linear' as const, x: 0, y: 0, x2: 1, y2: 0, colorStops: [{ offset: 0, color: '#e6a817' }, { offset: 1, color: '#FFC23D' }] }
+  if (pct < 20) return { type: 'linear' as const, x: 0, y: 0, x2: 1, y2: 0, colorStops: [{ offset: 0, color: '#FF5149' }, { offset: 1, color: '#ff7b74' }] }
+  if (pct < 40) return { type: 'linear' as const, x: 0, y: 0, x2: 1, y2: 0, colorStops: [{ offset: 0, color: '#e6632e' }, { offset: 1, color: '#ff8c5a' }] }
+  if (pct < 60) return { type: 'linear' as const, x: 0, y: 0, x2: 1, y2: 0, colorStops: [{ offset: 0, color: '#e6a817' }, { offset: 1, color: '#FFC23D' }] }
+  if (pct < 80) return { type: 'linear' as const, x: 0, y: 0, x2: 1, y2: 0, colorStops: [{ offset: 0, color: '#5cb85c' }, { offset: 1, color: '#7ed47e' }] }
   return { type: 'linear' as const, x: 0, y: 0, x2: 1, y2: 0, colorStops: [{ offset: 0, color: '#1e8a38' }, { offset: 1, color: '#28A745' }] }
 }
 
-// ── 人员负荷图 ──
+// ── 人员负荷图（双维度：工时 + 底稿数） ──
 const workloadOption = computed(() => {
   if (!staffWorkload.value.length) return null
   const top10 = staffWorkload.value.slice(0, 10).reverse()
   return {
     tooltip: { trigger: 'axis' as const, formatter: (params: any) => {
-      const p = params[0]
-      return `${p.name}<br/>本周工时: <b>${p.value}h</b>`
+      const items = Array.isArray(params) ? params : [params]
+      let html = items[0]?.name || ''
+      items.forEach((p: any) => {
+        html += `<br/>${p.seriesName}: <b>${p.value}${p.seriesName.includes('工时') ? 'h' : '份'}</b>`
+      })
+      return html
     }},
-    grid: { left: 80, right: 40, top: 10, bottom: 10 },
-    xAxis: { type: 'value' as const, name: '工时(h)', splitLine: { lineStyle: { type: 'dashed' as const, color: '#f0f0f5' } } },
+    legend: { data: ['本周工时', '底稿数量'], top: 0, textStyle: { fontSize: 11 } },
+    grid: { left: 80, right: 50, top: 30, bottom: 10 },
+    xAxis: [
+      { type: 'value' as const, name: '工时(h)', position: 'bottom' as const, splitLine: { lineStyle: { type: 'dashed' as const, color: '#f0f0f5' } } },
+      { type: 'value' as const, name: '底稿(份)', position: 'top' as const, show: false },
+    ],
     yAxis: { type: 'category' as const, data: top10.map((s: any) => s.name), axisLabel: { fontSize: 12 } },
-    series: [{
-      type: 'bar' as const,
-      data: top10.map((s: any) => ({
-        value: s.week_hours,
-        itemStyle: {
-          color: { type: 'linear' as const, x: 0, y: 0, x2: 1, y2: 0, colorStops: [{ offset: 0, color: '#4b2d77' }, { offset: 1, color: '#A06DFF' }] },
-          borderRadius: [0, 6, 6, 0],
-        },
-      })),
-      barWidth: 18,
-      label: { show: true, position: 'right' as const, formatter: '{c}h', fontSize: 11, color: '#666', fontWeight: 600 },
-    }],
+    series: [
+      {
+        name: '本周工时',
+        type: 'bar' as const,
+        xAxisIndex: 0,
+        data: top10.map((s: any) => ({
+          value: s.week_hours,
+          itemStyle: {
+            color: { type: 'linear' as const, x: 0, y: 0, x2: 1, y2: 0, colorStops: [{ offset: 0, color: '#4b2d77' }, { offset: 1, color: '#A06DFF' }] },
+            borderRadius: [0, 4, 4, 0],
+          },
+        })),
+        barWidth: 12,
+        label: { show: true, position: 'right' as const, formatter: '{c}h', fontSize: 10, color: '#666' },
+      },
+      {
+        name: '底稿数量',
+        type: 'bar' as const,
+        xAxisIndex: 1,
+        data: top10.map((s: any) => ({
+          value: s.wp_count ?? 0,
+          itemStyle: {
+            color: { type: 'linear' as const, x: 0, y: 0, x2: 1, y2: 0, colorStops: [{ offset: 0, color: '#0094B3' }, { offset: 1, color: '#00C9E8' }] },
+            borderRadius: [0, 4, 4, 0],
+          },
+        })),
+        barWidth: 12,
+        label: { show: true, position: 'right' as const, formatter: '{c}份', fontSize: 10, color: '#666' },
+      },
+    ],
   }
 })
 
@@ -409,23 +537,118 @@ const heatmapOption = computed(() => {
 })
 
 // ── 风险等级 ──
-function riskSeverity(type: string): 'danger' | 'warning' | 'info' {
+function riskSeverity(type: string, level?: string): 'danger' | 'warning' | 'info' {
+  if (level === 'critical') return 'danger'
+  if (level === 'warning') return 'warning'
   if (type.includes('overdue')) return 'danger'
-  if (type.includes('warning')) return 'warning'
   return 'info'
 }
+
+// ── 风险预警跳转 ──
+function riskJumpPath(type: string): string | null {
+  const map: Record<string, string> = {
+    overdue_project: '/projects?status=overdue',
+    stale_review: '/projects?filter=pending_review_stale',
+    unassigned_wp: '/projects?filter=unassigned',
+    unadjusted_misstatement: '/projects',
+  }
+  return map[type] || null
+}
+
+// ── 最近动态 ──
+function activityColor(actionType: string): string {
+  const colors: Record<string, string> = {
+    create: '#28a745', update: '#4b2d77', delete: '#FF5149',
+    status_change: '#0094B3', review: '#e6a23c',
+    risk: '#FF5149', progress: '#28a745', workload: '#4b2d77',
+  }
+  return colors[actionType] || '#909399'
+}
+
+function formatRelativeTime(iso: string): string {
+  if (!iso) return ''
+  const diff = Date.now() - new Date(iso).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return '刚刚'
+  if (mins < 60) return `${mins}分钟前`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}小时前`
+  const days = Math.floor(hours / 24)
+  return `${days}天前`
+}
+
+function buildRecentActivities(): any[] {
+  const activities: any[] = []
+  const now = new Date().toISOString()
+
+  // 从风险预警派生动态
+  riskAlerts.value.forEach((a: any) => {
+    activities.push({
+      action_type: 'risk',
+      description: a.message,
+      created_at: now,
+    })
+  })
+
+  // 从项目进度派生——进度最低的项目标注
+  const lowest = projectProgress.value
+    .filter((p: any) => p.progress < 30 && p.wp_total > 0)
+    .slice(0, 3)
+  lowest.forEach((p: any) => {
+    activities.push({
+      action_type: 'progress',
+      description: `${p.project_name} 进度 ${p.progress}%（${p.wp_completed}/${p.wp_total} 已通过）`,
+      created_at: now,
+    })
+  })
+
+  // 从人员负荷派生——底稿最多的人
+  const busiest = staffWorkload.value.filter((s: any) => (s.wp_count ?? 0) > 5).slice(0, 2)
+  busiest.forEach((s: any) => {
+    activities.push({
+      action_type: 'workload',
+      description: `${s.name} 负荷较高（${s.wp_count}份底稿 · ${s.week_hours}h 本周工时）`,
+      created_at: now,
+    })
+  })
+
+  // 若无任何数据可派生则显示概要
+  if (activities.length === 0 && overview.value.active_projects > 0) {
+    activities.push({
+      action_type: 'status_change',
+      description: `当前共 ${overview.value.active_projects} 个在审项目`,
+      created_at: now,
+    })
+  }
+
+  return activities.slice(0, 8)
+}
+
+// ── 项目进度排序 ──
+const progressSortMode = ref<'progress_asc' | 'progress_desc' | 'created'>('progress_asc')
+const sortedProjectProgress = computed(() => {
+  const list = [...projectProgress.value]
+  if (progressSortMode.value === 'progress_asc') {
+    list.sort((a, b) => a.progress - b.progress)
+  } else if (progressSortMode.value === 'progress_desc') {
+    list.sort((a, b) => b.progress - a.progress)
+  }
+  // 'created' = default order from API (desc by created_at)
+  return list
+})
 
 // ── 数据加载 ──
 async function refreshAll() {
   loading.value = true
   try {
-    const [ov, progress, workload, alerts, group, heatmap] = await Promise.all([
+    const [ov, progress, workload, alerts, group, heatmap, quality, activities] = await Promise.all([
       getDashboardOverview().catch(() => ({})),
       getDashboardProjectProgress().catch(() => []),
       getDashboardStaffWorkload().catch(() => []),
       getDashboardRiskAlerts().catch(() => []),
       getDashboardGroupProgress().catch(() => []),
       getDashboardHoursHeatmap().catch(() => []),
+      api.get(P_dash.qualityMetrics).catch(() => null),
     ])
     overview.value = ov && typeof ov === 'object' ? ov : {}
     projectProgress.value = Array.isArray(progress) ? progress : []
@@ -433,6 +656,11 @@ async function refreshAll() {
     riskAlerts.value = Array.isArray(alerts) ? alerts : []
     groupProgress.value = Array.isArray(group) ? group : []
     heatmapData.value = Array.isArray(heatmap) ? heatmap : []
+    qualityMetrics.value = quality && typeof quality === 'object' ? quality : null
+    // 最近动态从已加载的数据派生（不依赖额外 API 端点）
+    recentActivities.value = buildRecentActivities()
+    // 加载环比趋势（非阻塞）
+    loadCompareData()
   } catch (e) {
     console.warn('Dashboard load error:', e)
   } finally {
@@ -441,12 +669,25 @@ async function refreshAll() {
 }
 
 let timer: ReturnType<typeof setInterval> | null = null
+const refreshCountdown = ref(30)
+let countdownTimer: ReturnType<typeof setInterval> | null = null
+
+function resetCountdown() {
+  refreshCountdown.value = 30
+}
+
 onMounted(() => {
   refreshAll()
   loadAllProjects()
-  timer = setInterval(refreshAll, 30000)
+  timer = setInterval(() => { refreshAll(); resetCountdown() }, 30000)
+  countdownTimer = setInterval(() => {
+    if (refreshCountdown.value > 0) refreshCountdown.value--
+  }, 1000)
 })
-onUnmounted(() => { if (timer) clearInterval(timer) })
+onUnmounted(() => {
+  if (timer) clearInterval(timer)
+  if (countdownTimer) clearInterval(countdownTimer)
+})
 
 // ── 查询面板 ──
 const queryTab = ref('by-project')
@@ -660,7 +901,7 @@ async function loadAvailableStaff() {
 .chart-empty .el-icon { opacity: 0.4; }
 
 /* ── 风险预警 ── */
-.risk-card { min-height: 300px; }
+.risk-card { min-height: 260px; }
 .risk-list { display: flex; flex-direction: column; gap: var(--gt-space-3); }
 .risk-item {
   display: flex; align-items: center; gap: var(--gt-space-3);
@@ -672,16 +913,48 @@ async function loadAvailableStaff() {
 .risk-item:hover { background: var(--gt-color-coral-light); border-color: rgba(255, 81, 73, 0.15); }
 .risk-msg { font-size: var(--gt-font-size-sm); color: var(--gt-color-text); }
 
+/* ── 审计质量卡片 ── */
+.quality-card { min-height: 260px; }
+.quality-metrics {
+  display: flex; align-items: center; justify-content: space-around;
+  padding: var(--gt-space-4) 0; gap: var(--gt-space-4);
+}
+.quality-ring { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.quality-ring-label { font-size: 11px; color: var(--gt-color-text-secondary); font-weight: 500; }
+.quality-stat { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.quality-stat-value { font-size: 28px; font-weight: 800; color: var(--gt-color-primary, #4b2d77); font-variant-numeric: tabular-nums; }
+.quality-stat-label { font-size: 11px; color: var(--gt-color-text-secondary); }
+
+/* ── 最近动态 ── */
+.activity-list { display: flex; flex-direction: column; gap: 2px; max-height: 260px; overflow-y: auto; }
+.activity-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 8px 4px; border-bottom: 1px solid var(--gt-color-border-light, #f0f0f5);
+}
+.activity-item:last-child { border-bottom: none; }
+.activity-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; }
+.activity-content { flex: 1; min-width: 0; }
+.activity-text { font-size: 13px; color: var(--gt-color-text); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.activity-time { font-size: 11px; color: var(--gt-color-text-tertiary); }
+
+/* ── 图表标题行 ── */
+.chart-title-row {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: var(--gt-space-3);
+}
+.chart-title-row .chart-title { margin-bottom: 0; }
+
 /* ── 查询面板 ── */
 .query-panel { padding: var(--gt-space-6); }
 .query-content { min-height: 200px; }
 .query-toolbar {
   display: flex; align-items: center; gap: 12px; margin-bottom: 16px;
-  padding: 14px 18px; background: linear-gradient(135deg, #faf9fd 0%, #f4f0fa 100%); border-radius: var(--gt-radius-md);
-  border: 1px solid rgba(75, 45, 119, 0.06);
+  padding: 12px 16px; background: var(--gt-color-bg); border-radius: var(--gt-radius-md);
+  border: 1px solid var(--gt-color-border-light);
 }
 .query-hint { font-size: var(--gt-font-size-sm); color: var(--gt-color-text-secondary); }
-.query-table { border-radius: 8px; overflow: hidden; }
+.query-table { border-radius: 8px; overflow: hidden; width: 100% !important; }
+.query-table :deep(.el-table) { width: 100% !important; }
 .query-table :deep(.el-table__header th) { background: var(--gt-color-primary-bg) !important; color: var(--gt-color-primary); font-weight: 600; }
 
 /* 人员详情面板 */
@@ -729,5 +1002,17 @@ async function loadAvailableStaff() {
 }
 @media (max-width: 768px) {
   .kpi-grid { grid-template-columns: 1fr; }
+}
+
+/* ── 自动刷新倒计时 ── */
+.refresh-countdown {
+  font-size: 11px;
+  color: var(--gt-color-text-tertiary);
+  background: var(--gt-color-bg-tertiary, #f5f5f5);
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-variant-numeric: tabular-nums;
+  min-width: 32px;
+  text-align: center;
 }
 </style>

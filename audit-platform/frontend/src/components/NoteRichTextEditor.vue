@@ -41,6 +41,13 @@
 
       <span class="gt-note-rte-divider" />
 
+      <!-- P2-8: Insert Table -->
+      <el-button size="small" class="gt-note-rte-btn" title="插入表格（3列2行）" @click="insertTable">
+        ☐ 表格
+      </el-button>
+
+      <span class="gt-note-rte-divider" />
+
       <!-- Placeholder insertion -->
       <el-dropdown size="small" trigger="click" @command="insertPlaceholder">
         <el-button size="small" class="gt-note-rte-btn" type="primary" plain>
@@ -192,6 +199,14 @@ function insertPlaceholder(placeholder: string) {
   editorRef.value?.focus()
   const html = `<span class="gt-note-placeholder" contenteditable="false" data-placeholder="${placeholder}">${placeholder}</span>&nbsp;`
   document.execCommand('insertHTML', false, html)
+  onInput()
+}
+
+// P2-8: Insert a simple comparison table (3 columns x 2 data rows + header)
+function insertTable() {
+  editorRef.value?.focus()
+  const tableHtml = `<table><tr><th>项目</th><th>金额</th><th>说明</th></tr><tr><td></td><td></td><td></td></tr><tr><td></td><td></td><td></td></tr></table><p></p>`
+  document.execCommand('insertHTML', false, tableHtml)
   onInput()
 }
 

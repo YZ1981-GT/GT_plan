@@ -13,6 +13,25 @@
           <div class="gt-nrp-stat-num">{{ summary.total }}</div>
           <div class="gt-nrp-stat-label">附注章节</div>
         </div>
+        <!-- P2-7：表头健康度指标 -->
+        <div class="gt-nrp-stat" :class="{ warn: headersEmptyCount > 0 }">
+          <div class="gt-nrp-stat-num">
+            <template v-if="headersEmptyCount > 0">{{ headersEmptyCount }}</template>
+            <template v-else>✅</template>
+          </div>
+          <div class="gt-nrp-stat-label">
+            {{ headersEmptyCount > 0 ? '表头待修复' : '表头全部正常' }}
+          </div>
+          <el-button
+            v-if="headersEmptyCount > 0"
+            size="small"
+            type="warning"
+            plain
+            :loading="fixHeadersLoading"
+            style="margin-top: 4px; font-size: 11px;"
+            @click="fixHeaders"
+          >一键修复表头</el-button>
+        </div>
         <div class="gt-nrp-stat" :class="{ warn: summary.empty > 0 }">
           <div class="gt-nrp-stat-num">{{ summary.empty }}</div>
           <div class="gt-nrp-stat-label">无数据</div>
@@ -75,7 +94,19 @@
           <el-radio-button value="issues">有校验问题（{{ counts.issues }}）</el-radio-button>
           <el-radio-button value="stale">已变更（{{ counts.stale }}）</el-radio-button>
         </el-radio-group>
-        <el-button size="small" :loading="loading" @click="load">🔄 刷新</el-button>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <el-button
+            v-if="filterMode === 'empty' && filtered.length > 0"
+            size="small"
+            type="warning"
+            plain
+            :loading="batchMarkLoading"
+            @click="batchMarkNotApplicable"
+          >
+            全部标记为「不适用」({{ filtered.length }})
+          </el-button>
+          <el-button size="small" :loading="loading" @click="load">🔄 刷新</el-button>
+        </div>
       </div>
 
       <el-table :data="filtered" size="small" border stripe height="calc(100vh - 320px)">
@@ -169,13 +200,14 @@
  */
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   getDisclosureReadiness,
   type NoteReadinessSection,
   type NoteReadinessSummary,
 } from '@/services/commonApi'
 import { handleApiError } from '@/utils/errorHandler'
+import http from '@/utils/http'
 
 const props = defineProps<{
   visible: boolean
@@ -190,6 +222,8 @@ const emit = defineEmits<{
 
 const router = useRouter()
 const loading = ref(false)
+const fixHeadersLoading = ref(false)
+const batchMarkLoading = ref(false)
 const sections = ref<NoteReadinessSection[]>([])
 const summary = ref<NoteReadinessSummary>({
   total: 0, with_data: 0, empty: 0, syncable: 0, never_synced: 0,
@@ -270,6 +304,67 @@ function fmtTime(iso: string | null): string {
   } catch {
     return iso
   }
+}
+
+/** P2-7：表头健康度——从 summary.headers_empty 或估算 (total - with_data) */
+const headersEmptyCount = computed(() => {
+  const s = summary.value as any
+  if (typeof s.headers_empty === 'number') return s.headers_empty
+  // 兜底：无 headers_empty 字段时用 total - with_data 估算
+  return Math.max(0, (s.total || 0) - (s.with_data || 0) - (s.empty || 0))
+})
+
+/** P2-7：一键修复表头——调全量刷新使投影器重走修复空表头 */
+async function fixHeaders() {
+  fixHeadersLoading.value = true
+  try {
+    await http.post(`/api/disclosure-notes/${props.projectId}/${props.year}/refresh-from-workpapers`)
+    ElMessage.success('表头修复完成，已触发全量刷新')
+    await load()
+  } catch (err: any) {
+    handleApiError(err, '修复表头')
+  } finally {
+    fixHeadersLoading.value = false
+  }
+}
+
+/** 批量标记不适用 */
+async function batchMarkNotApplicable() {
+  const targets = filtered.value.filter((s: any) => s.status !== 'not_applicable')
+  if (!targets.length) {
+    ElMessage.info('当前筛选下无可标记的章节')
+    return
+  }
+  try {
+    await ElMessageBox.confirm(
+      `确认将 ${targets.length} 个无数据章节标记为「不适用/不披露」？\n标记后这些章节将在附注树中折叠，不纳入导出。`,
+      '批量标记确认',
+      { type: 'warning', confirmButtonText: '确认标记', cancelButtonText: '取消' },
+    )
+  } catch { return }
+
+  batchMarkLoading.value = true
+  let success = 0
+  let failed = 0
+  for (const s of targets) {
+    try {
+      await http.patch(
+        `/api/disclosure-notes/${props.projectId}/${props.year}/${encodeURIComponent(s.note_section)}`,
+        { status: 'not_applicable' },
+      )
+      success++
+    } catch {
+      failed++
+    }
+  }
+  batchMarkLoading.value = false
+
+  if (failed > 0) {
+    ElMessage.warning(`已标记 ${success} 章节，${failed} 章节标记失败`)
+  } else {
+    ElMessage.success(`已将 ${success} 个章节标记为「不适用/不披露」`)
+  }
+  await load()
 }
 
 defineExpose({ load })

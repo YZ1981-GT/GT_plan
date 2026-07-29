@@ -12,6 +12,7 @@ import http from '@/utils/http'
 // 复用「跳转至披露表」的同一套章节判定函数，消除跳转/刷新两套硬编码映射漂移（单一真源）
 import {
   isD1NotesReceivableNoteSection,
+  isD2AccountsReceivableNoteSection,
   isD3PrepaymentNoteSection,
   isD4RevenueNoteSection,
   isD5ReceivablesFinancingNoteSection,
@@ -26,7 +27,14 @@ import {
   isI1IntangibleNoteSection,
   isK1OtherReceivableNoteSection,
   isN1DeferredTaxNoteSection,
+  isN2TaxesPayableNoteSection,
+  isN4TaxesAndSurchargesNoteSection,
+  isN5IncomeTaxExpenseNoteSection,
   isH2CipNoteSection,
+  isF3NotesPayableNoteSection,
+  isG8OtherEquityInstrumentNoteSection,
+  isG9OtherNoncurrentFinancialNoteSection,
+  isG12HedgingGainsNoteSection,
 } from './noteDisclosureJump'
 
 export interface UseNoteRefreshOptions {
@@ -283,6 +291,16 @@ export function useNoteRefresh(options: UseNoteRefreshOptions): UseNoteRefreshRe
         current.includes('营业外支出')
         || current.startsWith('八、77')
       )
+    // K2-K10 精确编号匹配刷新
+    const isK2Refresh = String(payload.accountCode || '') === '1231' && (current === '五、13' || current === '八、14')
+    const isK3Refresh = String(payload.accountCode || '') === '2241' && (current === '五、42' || current === '八、42')
+    const isK4Refresh = String(payload.accountCode || '') === '2245' && (current === '五、44' || current === '八、48')
+    const isK5Refresh = String(payload.accountCode || '') === '2701' && (current === '五、50' || current === '八、55')
+    const isK6Refresh = String(payload.accountCode || '') === '1481' && (current === '持有待售资产' || current === '八、12')
+    const isK7Refresh = String(payload.accountCode || '') === '2401' && (current === '五、51' || current === '八、56')
+    const isK8Refresh = String(payload.accountCode || '') === '6601' && (current === '五、64' || current === '八、65')
+    const isK9Refresh = String(payload.accountCode || '') === '6602' && (current === '五、65' || current === '八、66')
+    const isK10Refresh = String(payload.accountCode || '') === '6117' && (current === '五、68' || current === '八、69')
     // 1811 递延所得税资产（N1）：上市五、30 / 国企八、31（与 N3 共用章节）
     const isN1DeferredTax = String(payload.accountCode || '') === '1811'
       && isN1DeferredTaxNoteSection(current)
@@ -302,12 +320,25 @@ export function useNoteRefresh(options: UseNoteRefreshOptions): UseNoteRefreshRe
     // H5 油气资产（1631/1632）
     const isH5OilGas = (String(payload.accountCode || '') === '1631' || String(payload.accountCode || '') === '1632')
       && isH5OilGasAssetNoteSection(current)
+    // F3 应付票据（2201）：上市五、36 / 国企八、36
+    const isF3NotesPay = String(payload.accountCode || '') === '2201'
+      && isF3NotesPayableNoteSection(current)
+    // G8 其他权益工具投资（1503）：上市五、19 / 国企八、19
+    const isG8OtherEquity = String(payload.accountCode || '') === '1503'
+      && isG8OtherEquityInstrumentNoteSection(current)
+    // G9 其他非流动金融资产（1519）：上市五、20 / 国企八、20
+    const isG9OtherNoncurFin = String(payload.accountCode || '') === '1519'
+      && isG9OtherNoncurrentFinancialNoteSection(current)
+    // G12 套期净损益（6103）：上市五、70 / 国企八、71
+    const isG12Hedge = String(payload.accountCode || '') === '6103'
+      && isG12HedgingGainsNoteSection(current)
     // 兜底：补齐跳转侧支持但刷新侧此前缺失的 6 族（G14/H1/H8/H9/H10/I1）。
     // 复用 noteDisclosureJump 的章节判定（单一真源），当载荷携带 accountCode（=某底稿披露已变更）
     // 且当前正查看的附注节匹配上述任一披露族时兜底刷新；重取当前节详情幂等无害。
     const hasAccountCode = !!String(payload.accountCode || '').trim()
     const matchesDisclosureFamily = hasAccountCode && (
       isD1NotesReceivableNoteSection(current)
+      || isD2AccountsReceivableNoteSection(current)
       || isD3PrepaymentNoteSection(current)
       || isD4RevenueNoteSection(current)
       || isD5ReceivablesFinancingNoteSection(current)
@@ -321,10 +352,20 @@ export function useNoteRefresh(options: UseNoteRefreshOptions): UseNoteRefreshRe
       || isH10AssetDisposalNoteSection(current)
       || isI1IntangibleNoteSection(current)
       || isK1OtherReceivableNoteSection(current)
+      || isF3NotesPayableNoteSection(current)
+      || isG8OtherEquityInstrumentNoteSection(current)
+      || isG9OtherNoncurrentFinancialNoteSection(current)
+      || isG12HedgingGainsNoteSection(current)
+      || isN2TaxesPayableNoteSection(current)
+      || isN4TaxesAndSurchargesNoteSection(current)
+      || isN5IncomeTaxExpenseNoteSection(current)
     )
     if (
       !matched && !isG7Lte && !isG10Tfl && !isG13Fvc && !isI5Ona
-      && !isK11Impair && !isK13NonOpExp && !isN1DeferredTax && !isJ1EmployeeBenefits && !isH2Cip && !isH3InvestProp && !isH5OilGas && !matchesDisclosureFamily
+      && !isK11Impair && !isK13NonOpExp && !isN1DeferredTax && !isJ1EmployeeBenefits && !isH2Cip && !isH3InvestProp && !isH5OilGas
+      && !isK2Refresh && !isK3Refresh && !isK4Refresh && !isK5Refresh && !isK6Refresh && !isK7Refresh && !isK8Refresh && !isK9Refresh && !isK10Refresh
+      && !isF3NotesPay && !isG8OtherEquity && !isG9OtherNoncurFin && !isG12Hedge
+      && !matchesDisclosureFamily
     ) return
 
     if (syncDebounceTimer) clearTimeout(syncDebounceTimer)

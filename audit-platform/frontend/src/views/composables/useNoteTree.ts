@@ -24,6 +24,14 @@ export interface TreeNode {
    * Req 17.1
    */
   indexRef?: string
+  /**
+   * 校验状态圆点（P0-2）：从后端 findings 计数派生。
+   * - 'error'：有 error 级 findings
+   * - 'warning'：仅 warning 级
+   * - 'clean'：校验已跑且 0 findings
+   * - 'unchecked'：尚未校验（无 findings 数据）
+   */
+  validationStatus?: 'error' | 'warning' | 'clean' | 'unchecked'
 }
 
 export interface UseNoteTreeOptions {
@@ -179,11 +187,20 @@ const RELATED_GROUPS: Record<string, { label: string; keywords: string[] }> = {
 
 /**
  * 构建叶子 TreeNode（真实附注节点）。
- * 在原 `{ id, label, data }` 基础上 additive 附加 `indexRef = note:{note_section}`（Req 17.1）。
+ * 在原 `{ id, label, data }` 基础上 additive 附加 `indexRef = note:{note_section}`（Req 17.1）
+ * 及 `validationStatus`（P0-2 校验圆点）。
  * 不改变 id/label/data，故树结构/分组/拖拽行为保持不变（Req 17.3）。
  */
 function makeNoteLeaf(n: DisclosureNoteTreeItem): TreeNode {
-  return { id: n.id, label: n.section_title, data: n, indexRef: `note:${n.note_section}` }
+  let validationStatus: TreeNode['validationStatus']
+  if (n.findings) {
+    if (n.findings.error > 0) validationStatus = 'error'
+    else if (n.findings.warning > 0) validationStatus = 'warning'
+    else validationStatus = 'clean'
+  } else {
+    validationStatus = 'unchecked'
+  }
+  return { id: n.id, label: n.section_title, data: n, indexRef: `note:${n.note_section}`, validationStatus }
 }
 
 function buildGroupedChildren(

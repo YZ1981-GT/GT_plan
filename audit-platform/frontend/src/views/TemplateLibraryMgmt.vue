@@ -17,6 +17,9 @@
         <span class="gt-tlm-version-tag">{{ versionLabel }}</span>
       </div>
       <div class="gt-tlm-header-actions">
+        <el-button size="small" type="primary" plain @click="manualDialogVisible = true" round>
+          <el-icon style="margin-right: 4px"><Reading /></el-icon>使用手册
+        </el-button>
         <el-button size="small" @click="versionDialogVisible = true" round>
           <el-icon style="margin-right: 4px"><Clock /></el-icon>版本历史
         </el-button>
@@ -187,6 +190,9 @@
       :version-info="cachedVersionInfo"
       :file-count="templateCount"
     />
+
+    <!-- 使用手册对话框 -->
+    <TemplateLibraryManualDialog v-model="manualDialogVisible" />
   </div>
 </template>
 
@@ -194,6 +200,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { Folder, DataAnalysis, Document, Reading, Grid, Tickets, Refresh, Upload, Clock, CollectionTag, Search } from '@element-plus/icons-vue'
+import TemplateLibraryManualDialog from '@/components/template-library/TemplateLibraryManualDialog.vue'
 import { api } from '@/services/apiProxy'
 import { templateLibraryMgmt as P_tlm, workpapers as P_wp } from '@/services/apiPaths'
 import { handleApiError } from '@/utils/errorHandler'
@@ -256,6 +263,9 @@ const coverageColorClass = computed(() => {
 // ─── 详情面板 ───
 const detailDrawerVisible = ref(false)
 const selectedWpCode = ref('')
+
+// ─── 使用手册对话框 ───
+const manualDialogVisible = ref(false)
 
 // ─── 版本历史对话框（Task 5.2） ───
 const versionDialogVisible = ref(false)

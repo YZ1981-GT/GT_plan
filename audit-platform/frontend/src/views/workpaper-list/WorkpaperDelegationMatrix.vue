@@ -1,10 +1,19 @@
 <template>
   <div class="gt-wp-matrix-wrapper" style="flex: 1; min-height: 0">
+    <!-- 委派帮助入口 -->
+    <div class="gt-matrix-help-bar">
+      <el-button size="small" text type="primary" @click="showDelegateHelp = true">
+        📖 委派帮助
+      </el-button>
+      <span class="gt-matrix-help-bar__hint">成员 × 业务循环热力图，点格子指派底稿编制人/复核人</span>
+    </div>
+
     <InnerMatrix
       :project-id="props.projectId"
       :workpapers="matrixWpItems"
       :members="members"
       :can-assign="canAssign"
+      :project-name="ctx.projectName.value"
       style="flex: 1; min-height: 0"
       @cell-click="onCellClick"
       @open-assign="onOpenAssign"
@@ -17,6 +26,12 @@
       :wp-ids="assignWpIds"
       :wp-list="matrixWpItems"
       @assigned="onAssigned"
+    />
+
+    <!-- 委派帮助：打开模块手册并定位到§四委派 -->
+    <WorkpaperModuleHandbookDialog
+      v-model="showDelegateHelp"
+      initial-section="assign"
     />
   </div>
 </template>
@@ -36,6 +51,7 @@ import type { WpChildProps, WpChildEmits } from '@/composables/useWorkpaperListC
 import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
 import InnerMatrix from '@/components/workpaper/WorkpaperAssignmentMatrix.vue'
 import BatchAssignDialog from '@/components/assignment/BatchAssignDialog.vue'
+import WorkpaperModuleHandbookDialog from '@/components/workpaper/WorkpaperModuleHandbookDialog.vue'
 import { listUsers } from '@/services/commonApi'
 import type { WpIndexItem, WorkpaperDetail } from '@/services/workpaperApi'
 
@@ -56,7 +72,7 @@ const canAssign = computed(() =>
 )
 
 const members = ref<Array<{ id: string; username?: string; full_name?: string; role?: string }>>([])
-
+const showDelegateHelp = ref(false)
 onMounted(async () => {
   try {
     const users = await listUsers(props.projectId)
@@ -103,3 +119,18 @@ async function onAssigned() {
   await ctx.fetchWpIndex()
 }
 </script>
+
+
+<style scoped>
+.gt-matrix-help-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  margin-bottom: 8px;
+}
+.gt-matrix-help-bar__hint {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+</style>

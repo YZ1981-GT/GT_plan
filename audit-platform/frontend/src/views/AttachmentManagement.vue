@@ -14,7 +14,10 @@
     <!-- 顶部：标题 + 操作区 -->
     <div class="gt-att-top">
       <div class="gt-att-title-row">
-        <h2 class="gt-att-title">📎 附件管理</h2>
+        <div class="gt-att-title-left">
+          <h2 class="gt-att-title">📎 附件管理</h2>
+          <el-button class="gt-att-handbook-btn" :icon="Reading" @click="handbookVisible = true">使用手册</el-button>
+        </div>
         <div class="gt-att-actions">
           <el-input v-model="searchQuery" placeholder="搜索文件名..." size="default" clearable
             :prefix-icon="Search" class="gt-att-search" @keyup.enter="onSearch" />
@@ -85,7 +88,7 @@
 
       <!-- 文件列表 -->
       <TransitionGroup v-else name="gt-list" tag="div" class="gt-att-list">
-        <div v-for="(row, idx) in filteredAttachments" :key="row.id" class="gt-att-item" :style="{ '--delay': idx * 0.03 + 's' }">
+        <div v-for="(row, idx) in filteredAttachments" :key="row.id" class="gt-att-item" :class="{ 'gt-att-item--highlight': row.id === highlightId }" :data-att-id="row.id" :style="{ '--delay': idx * 0.03 + 's' }">
           <div class="gt-att-item-icon" :class="'gt-att-icon--' + getFileCategory(row.file_type)">
             {{ getFileEmoji(row.file_type) }}
           </div>
@@ -193,20 +196,24 @@
       :items="batchItems"
       @all-done="loadAttachments"
     />
+
+    <!-- 使用手册 -->
+    <AttachmentHandbookDialog v-model="handbookVisible" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
-import { Search, Upload, Document, View, Link, Download, RefreshRight, Right, Check, FolderOpened, FolderChecked } from '@element-plus/icons-vue'
+import { Search, Upload, Document, View, Link, Download, RefreshRight, Right, Check, FolderOpened, FolderChecked, Reading } from '@element-plus/icons-vue'
 import AttachmentPreview from '@/components/extension/AttachmentPreview.vue'
 import OcrConfirmDialog from '@/components/attachment/OcrConfirmDialog.vue'
 import type { OcrConfirmPayload } from '@/components/attachment/OcrConfirmDialog.vue'
 import BatchUploadResultDialog from '@/components/attachment/BatchUploadResultDialog.vue'
 import type { BatchUploadItem } from '@/components/attachment/BatchUploadResultDialog.vue'
+import AttachmentHandbookDialog from './AttachmentHandbookDialog.vue'
 import { downloadFile } from '@/utils/http'
 import { api } from '@/services/apiProxy'
 import { workpapers as P_wp, attachments as P_att } from '@/services/apiPaths'
@@ -219,6 +226,9 @@ const projectId = computed(() => route.params.projectId as string)
 
 const loading = ref(false)
 const attachments = ref<any[]>([])
+const handbookVisible = ref(false)
+const highlightId = ref('')
+let highlightTimer: ReturnType<typeof setTimeout> | null = null
 const searchQuery = ref('')
 const filterType = ref('')
 const isDragging = ref(false)
@@ -611,7 +621,31 @@ function ocrLabel(s: string): string {
   return m[s] || s || ''
 }
 
-onMounted(loadAttachments)
+/** 从索引芯片（GtIndexChip Layer-4）跳转过来时 ?id= 定位：高亮 + 滚动到目标附件 */
+async function locateFromQuery() {
+  const targetId = (route.query.id as string) || ''
+  if (!targetId) return
+  // 目标可能被类型筛选挡住 → 先清筛选保证在列表中
+  if (filterType.value) { filterType.value = ''; await loadAttachments() }
+  const exists = attachments.value.some(a => String(a.id) === String(targetId))
+  if (!exists) return
+  highlightId.value = targetId
+  await nextTick()
+  const el = document.querySelector(`[data-att-id="${targetId}"]`)
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  // 用 history.replaceState 清掉 ?id=（DefaultLayout router-view 以 fullPath 为 key，
+  // 用 router.replace 会整页重挂载 → 丢定位）
+  const url = new URL(window.location.href)
+  url.searchParams.delete('id')
+  window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash)
+  if (highlightTimer) clearTimeout(highlightTimer)
+  highlightTimer = setTimeout(() => { highlightId.value = '' }, 3000)
+}
+
+onMounted(async () => {
+  await loadAttachments()
+  await locateFromQuery()
+})
 
 // ─── SSE 实时同步：监听其他入口上传的附件 ───
 let sseSource: EventSource | null = null
@@ -625,6 +659,7 @@ onMounted(() => {
 })
 onUnmounted(() => {
   sseSource?.close()
+  if (highlightTimer) clearTimeout(highlightTimer)
 })
 </script>
 
@@ -669,6 +704,11 @@ onUnmounted(() => {
   flex-wrap: wrap;
   gap: 12px;
   margin-bottom: 16px;
+}
+.gt-att-title-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 .gt-att-title {
   margin: 0;
@@ -737,6 +777,16 @@ onUnmounted(() => {
   border-color: var(--gt-purple-light, #d8b8ee);
   box-shadow: 0 4px 16px rgba(75, 45, 119, 0.08);
   transform: translateX(4px);
+}
+.gt-att-item--highlight {
+  border-color: var(--gt-color-primary, #4b2d77);
+  background: var(--gt-color-primary-bg, #f4f0fa);
+  box-shadow: 0 0 0 2px rgba(75, 45, 119, 0.18);
+  animation: gt-att-highlight-pulse 1.2s ease-in-out 2;
+}
+@keyframes gt-att-highlight-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(75, 45, 119, 0.18); }
+  50% { box-shadow: 0 0 0 5px rgba(75, 45, 119, 0.28); }
 }
 
 /* 文件类型图标 */

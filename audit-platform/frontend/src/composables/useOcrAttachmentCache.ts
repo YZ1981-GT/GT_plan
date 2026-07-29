@@ -15,6 +15,7 @@
  */
 import { ref, type Ref } from 'vue'
 import http from '@/utils/http'
+import { appendOcrLinkageFields } from '@/components/workpaper/composables/ocrAttachmentLinkage'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -39,8 +40,8 @@ export interface UseOcrAttachmentCacheReturn {
   attachmentListLoaded: Ref<boolean>
   /** 加载附件列表（已加载则跳过） */
   loadAttachments: (wpId: string) => Promise<void>
-  /** 执行 OCR 并缓存（已缓存则直接返回，不发起 HTTP） */
-  runOcr: (wpId: string, attachmentId: string, file: File | Blob) => Promise<string>
+  /** 执行 OCR 并缓存（已缓存则直接返回，不发起 HTTP；forceReocr 可强制重识别） */
+  runOcr: (wpId: string, attachmentId: string, file: File | Blob, forceReocr?: boolean) => Promise<string>
   /** 清除附件列表缓存（dialog 关闭时调用），不清除 ocrCache */
   resetListCache: () => void
 }
@@ -134,22 +135,28 @@ export function useOcrAttachmentCache(): UseOcrAttachmentCacheReturn {
    *
    * Validates: Requirements 4.3, 6.3 (Property 4)
    */
-  async function runOcr(wpId: string, attachmentId: string, file: File | Blob): Promise<string> {
-    // 命中缓存：不发 HTTP
-    if (ocrCache.value.has(attachmentId)) {
+  async function runOcr(wpId: string, attachmentId: string, file: File | Blob, forceReocr = false): Promise<string> {
+    // 命中缓存：不发 HTTP（除非强制重识别）
+    if (!forceReocr && ocrCache.value.has(attachmentId)) {
       return ocrCache.value.get(attachmentId) as string
     }
 
     const formData = new FormData()
     formData.append('file', file)
+    appendOcrLinkageFields(formData, {
+      attachmentId,
+      forceReocr,
+    })
     const res = await http.post(
       `/api/workpapers/${wpId}/d4/contract-ocr`,
       formData,
       { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
     )
     // http 拦截器已解包一层；OCR 端点可能再嵌一层 data，双重兜底
-    const fields = ((res?.data?.data ?? res?.data) as any)?.extracted_fields || {}
+    const payload = (res?.data?.data ?? res?.data) as any
+    const fields = payload?.extracted_fields || {}
     const text =
+      payload?.ocr_text ||
       fields.full_text ||
       fields.summary ||
       fields.content ||

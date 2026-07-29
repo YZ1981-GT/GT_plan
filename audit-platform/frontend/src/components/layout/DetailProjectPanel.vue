@@ -28,6 +28,14 @@
                   {{ project.template_type === 'soe' ? '国企版' : project.template_type === 'listed' ? '上市版' : '未设置' }}
                 </el-tag>
               </el-descriptions-item>
+              <el-descriptions-item label="报表范围">
+                <el-tag :type="project.report_scope === 'consolidated' ? 'success' : 'info'" size="small">
+                  {{ project.report_scope === 'consolidated' ? '合并报表' : '单体报表' }}
+                </el-tag>
+              </el-descriptions-item>
+              <el-descriptions-item label="项目状态">
+                <GtStatusTag dict-key="project_status" :value="project.status" />
+              </el-descriptions-item>
               <el-descriptions-item label="企业代码">{{ project.company_code || project.client_code || '-' }}</el-descriptions-item>
               <el-descriptions-item label="创建时间">{{ formatDate(project.created_at) }}</el-descriptions-item>
               <!-- 双向导航 4.1：单体项目所属集团链接 → 跳合并项目 -->
@@ -37,6 +45,23 @@
                 </el-link>
               </el-descriptions-item>
             </el-descriptions>
+
+            <!-- 当前阶段引导：项目所处阶段 + 下一步该做什么 + 底稿完成率一眼可见 -->
+            <div class="gt-stage-guide">
+              <div class="gt-stage-guide__main">
+                <el-icon class="gt-stage-guide__icon" color="var(--gt-color-primary)"><Guide /></el-icon>
+                <span class="gt-stage-guide__text">{{ statusTooltip }}</span>
+              </div>
+              <div v-if="metrics.wpRate !== null" class="gt-stage-guide__progress">
+                <span class="gt-stage-guide__progress-label">底稿完成率</span>
+                <el-progress
+                  :percentage="metrics.wpRate"
+                  :stroke-width="8"
+                  :color="metrics.wpRate >= 100 ? 'var(--gt-color-success)' : 'var(--gt-color-primary)'"
+                  style="flex: 1"
+                />
+              </div>
+            </div>
 
             <!-- 配置缺失提示 -->
             <el-alert
@@ -58,107 +83,129 @@
           <div class="gt-detail-section">
             <div class="gt-workflow-hint">
               <span class="gt-workflow-hint-label">建议流程：</span>
-              <span class="gt-workflow-step">① 导入</span>
-              <span class="gt-workflow-arrow">→</span>
-              <span class="gt-workflow-step">② 映射</span>
-              <span class="gt-workflow-arrow">→</span>
-              <span class="gt-workflow-step">③ 底稿</span>
-              <span class="gt-workflow-arrow">→</span>
-              <span class="gt-workflow-step">④ 报表</span>
-              <span class="gt-workflow-arrow">→</span>
-              <span class="gt-workflow-step">⑤ 附注</span>
+              <template v-for="(step, si) in workflowSteps" :key="step.key">
+                <span
+                  class="gt-workflow-step"
+                  :class="{
+                    'gt-workflow-step--done': si < currentStageIndex,
+                    'gt-workflow-step--current': si === currentStageIndex,
+                  }"
+                >
+                  <span class="gt-workflow-step__mark">{{ si < currentStageIndex ? '✓' : ['①', '②', '③', '④', '⑤'][si] }}</span>
+                  {{ step.label }}
+                </span>
+                <span v-if="si < workflowSteps.length - 1" class="gt-workflow-arrow">→</span>
+              </template>
             </div>
             <div class="gt-quick-tip">
               💡 提示：首次使用请按建议流程操作。先导入账套数据，完成科目映射后系统自动生成试算表，再依次编制底稿、生成报表和附注。
             </div>
-            <div class="gt-quick-grid">
-              <!-- 第一行：核心流程（按建议流程顺序） -->
-              <el-tooltip content="上传企业导出的科目余额表、序时账等文件" placement="top">
-                <div class="gt-quick-btn" @click="goToLedgerImport()">
-                  <el-icon :size="20" color="var(--gt-color-primary-dark)"><Upload /></el-icon>
-                  <span>账套导入</span>
-                </div>
-              </el-tooltip>
-              <el-tooltip content="查看试算表（需先导入数据+科目映射）" placement="top">
-                <div class="gt-quick-btn" @click="goTo('trial-balance')">
-                  <el-icon :size="20" color="var(--gt-color-primary)"><DataLine /></el-icon>
-                  <span>试算表</span>
-                </div>
-              </el-tooltip>
-              <el-tooltip content="录入审计调整分录（AJE）和重分类调整（RJE）" placement="top">
-                <div class="gt-quick-btn" @click="goTo('adjustments')">
-                  <el-icon :size="20" color="var(--gt-color-teal)"><Edit /></el-icon>
-                  <span>调整分录</span>
-                </div>
-              </el-tooltip>
-              <el-tooltip content="查看和编辑审计底稿（需先生成底稿）" placement="top">
-                <div class="gt-quick-btn" @click="goTo('workpapers', { view: 'lifecycle' })">
-                  <el-icon :size="20" color="var(--gt-color-primary-light)"><Document /></el-icon>
-                  <span>底稿</span>
-                </div>
-              </el-tooltip>
-              <el-tooltip content="查看财务报表（需先导入数据并生成报表）" placement="top">
-                <div class="gt-quick-btn" @click="goTo('reports')">
-                  <el-icon :size="20" color="var(--gt-color-success)"><TrendCharts /></el-icon>
-                  <span>报表</span>
-                </div>
-              </el-tooltip>
-              <el-tooltip content="编辑附注章节（需先选择模板并生成附注）" placement="top">
-                <div class="gt-quick-btn" @click="goTo('disclosure-notes')">
-                  <el-icon :size="20" color="var(--gt-color-wheat)"><Notebook /></el-icon>
-                  <span>附注</span>
-                </div>
-              </el-tooltip>
-              <!-- 第二行：辅助功能 -->
-              <el-tooltip content="设置整体重要性水平、实际执行重要性和明显微小错报" placement="top">
-                <div class="gt-quick-btn" @click="goTo('materiality')">
-                  <el-icon :size="20" color="var(--gt-color-coral)"><Aim /></el-icon>
-                  <span>重要性</span>
-                </div>
-              </el-tooltip>
-              <el-tooltip content="执行审计检查清单" placement="top">
-                <div class="gt-quick-btn" @click="goTo('audit-checks')">
-                  <el-icon :size="20" color="var(--gt-color-success)"><CircleCheck /></el-icon>
-                  <span>审计检查</span>
-                </div>
-              </el-tooltip>
-              <el-tooltip content="查询科目余额、序时账、辅助余额等四表数据" placement="top">
-                <div class="gt-quick-btn" @click="goTo('ledger')">
-                  <el-icon :size="20" color="var(--gt-color-primary-dark)"><Search /></el-icon>
-                  <span>查账</span>
-                </div>
-              </el-tooltip>
-              <el-tooltip content="清除卡住的导入任务，释放导入锁" placement="top">
-                <div class="gt-quick-btn gt-quick-btn--danger" @click="handleResetImport">
-                  <el-icon :size="20" color="#f56c6c"><RefreshRight /></el-icon>
-                  <span>重置</span>
-                </div>
-              </el-tooltip>
-              <el-tooltip content="一键创建当年项目（继承上年配置）" placement="top">
-                <div class="gt-quick-btn" @click="onCreateNextYear">
-                  <el-icon :size="20" color="var(--gt-color-success)"><CopyDocument /></el-icon>
-                  <span>创建下年</span>
-                </div>
-              </el-tooltip>
-              <el-tooltip content="为项目分配团队成员" placement="top">
-                <div class="gt-quick-btn" @click="showTeamAssign = true">
-                  <el-icon :size="20" color="var(--gt-color-primary)"><User /></el-icon>
-                  <span>人员委派</span>
-                </div>
-              </el-tooltip>
-              <el-tooltip content="交付件管理中心：导出、版本、预览、审批、归档" placement="top">
-                <div class="gt-quick-btn" @click="goTo('deliverable-center')">
-                  <el-icon :size="20" color="var(--gt-color-primary-dark)"><Finished /></el-icon>
-                  <span>交付物</span>
-                </div>
-              </el-tooltip>
-              <div
-                v-if="project.report_scope === 'consolidated'"
-                class="gt-quick-btn"
-                @click="goTo('workpaper-summary')"
-              >
-                <el-icon :size="20" color="var(--gt-color-teal)"><Grid /></el-icon>
-                <span>底稿汇总</span>
+            <!-- 核心流程（按建议流程顺序，随项目阶段高亮"下一步"） -->
+            <div class="gt-quick-group">
+              <div class="gt-quick-group__label">核心流程</div>
+              <div class="gt-quick-grid">
+                <el-tooltip content="上传企业导出的科目余额表、序时账等文件" placement="top">
+                  <div class="gt-quick-btn" :class="{ 'gt-quick-btn--recommended': recommendedAction === 'import' }" @click="goToLedgerImport()">
+                    <span v-if="recommendedAction === 'import'" class="gt-quick-btn__badge">下一步</span>
+                    <el-icon :size="20" color="var(--gt-color-primary-dark)"><Upload /></el-icon>
+                    <span>账套导入</span>
+                  </div>
+                </el-tooltip>
+                <el-tooltip content="查看试算表（需先导入数据+科目映射）" placement="top">
+                  <div class="gt-quick-btn" @click="goTo('trial-balance')">
+                    <el-icon :size="20" color="var(--gt-color-primary)"><DataLine /></el-icon>
+                    <span>试算表</span>
+                  </div>
+                </el-tooltip>
+                <el-tooltip content="录入审计调整分录（AJE）和重分类调整（RJE）" placement="top">
+                  <div class="gt-quick-btn" @click="goTo('adjustments')">
+                    <el-icon :size="20" color="var(--gt-color-teal)"><Edit /></el-icon>
+                    <span>调整分录</span>
+                  </div>
+                </el-tooltip>
+                <el-tooltip content="查看和编辑审计底稿（需先生成底稿）" placement="top">
+                  <div class="gt-quick-btn" :class="{ 'gt-quick-btn--recommended': recommendedAction === 'workpapers' }" @click="goTo('workpapers', { view: 'lifecycle' })">
+                    <span v-if="recommendedAction === 'workpapers'" class="gt-quick-btn__badge">下一步</span>
+                    <el-icon :size="20" color="var(--gt-color-primary-light)"><Document /></el-icon>
+                    <span>底稿</span>
+                  </div>
+                </el-tooltip>
+                <el-tooltip content="查看财务报表（需先导入数据并生成报表）" placement="top">
+                  <div class="gt-quick-btn" :class="{ 'gt-quick-btn--recommended': recommendedAction === 'reports' }" @click="goTo('reports')">
+                    <span v-if="recommendedAction === 'reports'" class="gt-quick-btn__badge">下一步</span>
+                    <el-icon :size="20" color="var(--gt-color-success)"><TrendCharts /></el-icon>
+                    <span>报表</span>
+                  </div>
+                </el-tooltip>
+                <el-tooltip content="编辑附注章节（需先选择模板并生成附注）" placement="top">
+                  <div class="gt-quick-btn" :class="{ 'gt-quick-btn--recommended': recommendedAction === 'disclosure-notes' }" @click="goTo('disclosure-notes')">
+                    <span v-if="recommendedAction === 'disclosure-notes'" class="gt-quick-btn__badge">下一步</span>
+                    <el-icon :size="20" color="var(--gt-color-wheat)"><Notebook /></el-icon>
+                    <span>附注</span>
+                  </div>
+                </el-tooltip>
+              </div>
+            </div>
+
+            <!-- 辅助工具 -->
+            <div class="gt-quick-group">
+              <div class="gt-quick-group__label">辅助工具</div>
+              <div class="gt-quick-grid">
+                <el-tooltip content="设置整体重要性水平、实际执行重要性和明显微小错报" placement="top">
+                  <div class="gt-quick-btn" @click="goTo('materiality')">
+                    <el-icon :size="20" color="var(--gt-color-coral)"><Aim /></el-icon>
+                    <span>重要性</span>
+                  </div>
+                </el-tooltip>
+                <el-tooltip content="执行审计检查清单" placement="top">
+                  <div class="gt-quick-btn" @click="goTo('audit-checks')">
+                    <el-icon :size="20" color="var(--gt-color-success)"><CircleCheck /></el-icon>
+                    <span>审计检查</span>
+                  </div>
+                </el-tooltip>
+                <el-tooltip content="查询科目余额、序时账、辅助余额等四表数据" placement="top">
+                  <div class="gt-quick-btn" @click="goTo('ledger')">
+                    <el-icon :size="20" color="var(--gt-color-primary-dark)"><Search /></el-icon>
+                    <span>查账</span>
+                  </div>
+                </el-tooltip>
+                <el-tooltip content="交付件管理中心：导出、版本、预览、审批、归档" placement="top">
+                  <div class="gt-quick-btn" @click="goTo('deliverable-center')">
+                    <el-icon :size="20" color="var(--gt-color-primary-dark)"><Finished /></el-icon>
+                    <span>交付物</span>
+                  </div>
+                </el-tooltip>
+                <el-tooltip v-if="project.report_scope === 'consolidated'" content="合并底稿汇总" placement="top">
+                  <div class="gt-quick-btn" @click="goTo('workpaper-summary')">
+                    <el-icon :size="20" color="var(--gt-color-teal)"><Grid /></el-icon>
+                    <span>底稿汇总</span>
+                  </div>
+                </el-tooltip>
+              </div>
+            </div>
+
+            <!-- 项目管理（含危险操作，置于末尾） -->
+            <div class="gt-quick-group">
+              <div class="gt-quick-group__label">项目管理</div>
+              <div class="gt-quick-grid">
+                <el-tooltip content="为项目分配团队成员" placement="top">
+                  <div class="gt-quick-btn" @click="showTeamAssign = true">
+                    <el-icon :size="20" color="var(--gt-color-primary)"><User /></el-icon>
+                    <span>人员委派</span>
+                  </div>
+                </el-tooltip>
+                <el-tooltip content="一键创建当年项目（继承上年配置）" placement="top">
+                  <div class="gt-quick-btn" @click="onCreateNextYear">
+                    <el-icon :size="20" color="var(--gt-color-success)"><CopyDocument /></el-icon>
+                    <span>创建下年</span>
+                  </div>
+                </el-tooltip>
+                <el-tooltip content="清除卡住的导入任务，释放导入锁（谨慎操作）" placement="top">
+                  <div class="gt-quick-btn gt-quick-btn--danger" @click="handleResetImport">
+                    <el-icon :size="20" color="#f56c6c"><RefreshRight /></el-icon>
+                    <span>重置</span>
+                  </div>
+                </el-tooltip>
               </div>
             </div>
           </div>
@@ -558,7 +605,7 @@
 import { ref, watch, computed, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import {
-  DataLine, Edit, Document, TrendCharts, Notebook, Aim, Search, Grid, Paperclip, CopyDocument, Upload, RefreshRight, User, CircleCheck, Finished, Loading,
+  DataLine, Edit, Document, TrendCharts, Notebook, Aim, Search, Grid, Paperclip, CopyDocument, Upload, RefreshRight, User, CircleCheck, Finished, Loading, Guide,
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { confirmForceReset, confirmDangerous } from '@/utils/confirm'
@@ -600,6 +647,32 @@ const statusTooltip = computed(() => {
     archived: '【已归档】项目已完成并归档，所有底稿和报告已锁定',
   }
   return tips[s] || s
+})
+
+// 建议流程 5 步（导入→映射→底稿→报表→附注）
+const workflowSteps = [
+  { key: 'import', label: '导入' },
+  { key: 'map', label: '映射' },
+  { key: 'wp', label: '底稿' },
+  { key: 'report', label: '报表' },
+  { key: 'note', label: '附注' },
+]
+// 项目状态 → 流程条当前步索引（0=导入 … 4=附注，5=全完成/已归档）
+const currentStageIndex = computed(() => {
+  const s = props.project?.status || 'created'
+  const map: Record<string, number> = {
+    created: 0, planning: 1, execution: 2, completion: 3, reporting: 4, archived: 5,
+  }
+  return map[s] ?? 0
+})
+// 项目状态 → 快捷区推荐"下一步"按钮 key（用于高亮 + 下一步角标）
+const recommendedAction = computed(() => {
+  const s = props.project?.status || 'created'
+  const map: Record<string, string> = {
+    created: 'import', planning: 'import', execution: 'workpapers',
+    completion: 'reports', reporting: 'disclosure-notes', archived: '',
+  }
+  return map[s] ?? 'import'
 })
 
 // 附件列表
@@ -1275,6 +1348,7 @@ onUnmounted(() => { stopImportPoll() })
   background: var(--gt-color-bg); border-radius: 6px; border-left: 3px solid var(--gt-color-primary);
 }
 .gt-quick-btn {
+  position: relative;
   display: flex; flex-direction: column; align-items: center; gap: 4px;
   padding: var(--gt-space-3); border-radius: var(--gt-radius-sm);
   cursor: pointer; transition: all var(--gt-transition-fast);
@@ -1285,6 +1359,70 @@ onUnmounted(() => { stopImportPoll() })
   background: var(--gt-color-primary-bg);
   border-color: var(--gt-color-primary-lighter);
   color: var(--gt-color-primary);
+}
+.gt-quick-btn--danger:hover {
+  background: #fef0f0;
+  border-color: #fbc4c4;
+  color: #f56c6c;
+}
+/* 推荐"下一步"按钮：紫色描边 + 轻脉冲，引导新手 */
+.gt-quick-btn--recommended {
+  border-color: var(--gt-color-primary);
+  background: var(--gt-color-primary-bg);
+  color: var(--gt-color-primary);
+  box-shadow: 0 0 0 1px var(--gt-color-primary-lighter);
+  animation: gt-recommend-pulse 2s ease-in-out infinite;
+}
+@keyframes gt-recommend-pulse {
+  0%, 100% { box-shadow: 0 0 0 1px var(--gt-color-primary-lighter); }
+  50% { box-shadow: 0 0 0 3px var(--gt-color-primary-bg); }
+}
+.gt-quick-btn__badge {
+  position: absolute; top: -7px; right: -6px;
+  background: var(--gt-color-primary); color: #fff;
+  font-size: 10px; line-height: 1; padding: 2px 5px;
+  border-radius: 8px; white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(75, 45, 119, 0.3);
+}
+
+/* 快捷入口分组 */
+.gt-quick-group { margin-bottom: var(--gt-space-3); }
+.gt-quick-group__label {
+  font-size: var(--gt-font-size-xs); font-weight: 600;
+  color: var(--gt-color-text-tertiary); margin-bottom: 6px;
+  padding-left: 2px; letter-spacing: 0.5px;
+}
+
+/* 当前阶段引导条 */
+.gt-stage-guide {
+  margin-top: 10px; padding: 10px 12px;
+  background: linear-gradient(135deg, #f5f0ff 0%, #faf8fd 100%);
+  border-radius: 8px; border: 1px solid var(--gt-color-border-purple, #e5d9f5);
+}
+.gt-stage-guide__main {
+  display: flex; align-items: flex-start; gap: 6px;
+  font-size: var(--gt-font-size-xs); line-height: 1.6;
+  color: var(--gt-color-primary-dark);
+}
+.gt-stage-guide__icon { margin-top: 2px; flex-shrink: 0; }
+.gt-stage-guide__text { flex: 1; }
+.gt-stage-guide__progress {
+  display: flex; align-items: center; gap: 8px; margin-top: 8px;
+}
+.gt-stage-guide__progress-label {
+  font-size: var(--gt-font-size-xs); color: var(--gt-color-text-secondary);
+  white-space: nowrap; font-weight: 600;
+}
+
+/* 流程步骤：已完成 / 当前 高亮 */
+.gt-workflow-step__mark { font-weight: 700; margin-right: 1px; }
+.gt-workflow-step--done {
+  background: #e8f8f5; border-color: var(--gt-color-teal, #2db89a);
+  color: var(--gt-color-teal, #2db89a);
+}
+.gt-workflow-step--current {
+  background: var(--gt-color-primary); border-color: var(--gt-color-primary);
+  color: #fff; font-weight: 700;
 }
 
 .gt-board-loading { padding: var(--gt-space-6) 0; }

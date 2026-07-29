@@ -602,6 +602,8 @@ export interface DisclosureNoteTreeItem {
   is_stale?: boolean
   /** 是否空章节（前端离线导出按此判定 has_data；后端树端点可能不含 → 可选） */
   is_empty?: boolean
+  /** 最新校验 findings 计数（树端点 additive 附加；P0-4 校验落库后后端注入） */
+  findings?: { error: number; warning: number }
 }
 
 export interface DisclosureNoteDetail {

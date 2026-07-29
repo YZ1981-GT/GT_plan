@@ -17,6 +17,11 @@ export const E1_DISCLOSURE_SHEET_SOE = '附注披露信息(国企)'
 export const D1_DISCLOSURE_SHEET_LISTED = '附注披露信息（上市公司）'
 export const D1_DISCLOSURE_SHEET_SOE = '附注披露信息（国企）'
 
+// D2 应收账款 披露 sheet：底稿实际 tab 名为「附注披露信息(上市公司)」/「附注披露信息(国企)」
+// （半角括号，与 workpaper_sheet_classification wp_code=D2 一致）。靠章节号（五、5/八、5）区分归属。
+export const D2_DISCLOSURE_SHEET_LISTED = '附注披露信息(上市公司)'
+export const D2_DISCLOSURE_SHEET_SOE = '附注披露信息(国企)'
+
 // D3~D7 披露 sheet：真实 tab 名逐字取自 workpaper_sheet_classification（半/全角括号各科目不一，
 // 尤其 D6 上市为半角左+全角右混合，错一字符 GtWpRenderer ?sheet= 精确匹配失败会回退底稿目录）。
 export const D3_DISCLOSURE_SHEET_LISTED = '附注披露信息(上市公司)'
@@ -44,6 +49,23 @@ export const G10_DISCLOSURE_SHEET_SOE = '附注披露信息（国企）'
 // （全角括号，见 workpaper_sheet_classification wp_code=J1，与 D1 同款命名）。靠章节号区分 J1。
 export const J1_DISCLOSURE_SHEET_LISTED = '附注披露信息（上市公司）'
 export const J1_DISCLOSURE_SHEET_SOE = '附注披露信息（国有企业）'
+
+// L1 短期借款 披露 sheet：底稿实际 tab 名为「附注披露信息核对（上市公司）」/「附注披露信息核对（国企）」
+export const L1_DISCLOSURE_SHEET_LISTED = '附注披露信息核对（上市公司）'
+export const L1_DISCLOSURE_SHEET_SOE = '附注披露信息核对（国企）'
+
+export const L3_DISCLOSURE_SHEET_LISTED = '附注披露信息核对（上市公司）'
+export const L3_DISCLOSURE_SHEET_SOE = '附注披露信息核对（国企）'
+
+export const L5_DISCLOSURE_SHEET_LISTED = '附注披露信息核对（上市公司）'
+export const L5_DISCLOSURE_SHEET_SOE = '附注披露信息核对（国企）'
+
+export const L7_DISCLOSURE_SHEET_LISTED = '附注披露信息核对（上市公司）'
+export const L7_DISCLOSURE_SHEET_SOE = '附注披露信息核对（国企）'
+
+// M 循环权益类：披露 sheet 名 = 各科目底稿内附注tab真实名（与 L 循环同名）
+export const M_DISCLOSURE_SHEET_LISTED = '附注披露信息（上市公司）'
+export const M_DISCLOSURE_SHEET_SOE = '附注披露信息（国企）'
 
 export const G13_DISCLOSURE_SHEET_LISTED = '附注披露信息（上市公司）'
 export const G13_DISCLOSURE_SHEET_SOE = '附注披露信息（国企）'
@@ -77,6 +99,24 @@ export const K11_DISCLOSURE_SHEET_SOE = '附注披露信息（国有企业）'
 
 export const K13_DISCLOSURE_SHEET_LISTED = '附注披露信息（上市公司）'
 export const K13_DISCLOSURE_SHEET_SOE = '附注披露信息（国有企业）'
+
+// K2-K9 披露 sheet：底稿实际 tab 名(半角括号，workpaper_sheet_classification)
+export const K2_DISCLOSURE_SHEET_LISTED = '附注披露信息(上市公司)'
+export const K2_DISCLOSURE_SHEET_SOE = '附注披露信息(国企)'
+export const K3_DISCLOSURE_SHEET_LISTED = '附注披露信息(上市公司)'
+export const K3_DISCLOSURE_SHEET_SOE = '附注披露信息(国企)'
+export const K4_DISCLOSURE_SHEET_LISTED = '附注披露信息(上市公司)'
+export const K4_DISCLOSURE_SHEET_SOE = '附注披露信息(国企)'
+export const K5_DISCLOSURE_SHEET_LISTED = '附注披露信息(上市公司)'
+export const K5_DISCLOSURE_SHEET_SOE = '附注披露信息(国企)'
+export const K6_DISCLOSURE_SHEET_LISTED = '附注披露信息(上市公司)'
+export const K6_DISCLOSURE_SHEET_SOE = '附注披露信息(国企)'
+export const K7_DISCLOSURE_SHEET_LISTED = '附注披露信息(上市公司)'
+export const K7_DISCLOSURE_SHEET_SOE = '附注披露信息(国企)'
+export const K8_DISCLOSURE_SHEET_LISTED = '附注披露信息(上市公司)'
+export const K8_DISCLOSURE_SHEET_SOE = '附注披露信息(国企)'
+export const K9_DISCLOSURE_SHEET_LISTED = '附注披露信息(上市公司)'
+export const K9_DISCLOSURE_SHEET_SOE = '附注披露信息(国企)'
 
 // 以下为「有底稿→附注 sync 但附注侧原无『跳转至披露表』入口」的 9 个专有章节科目。
 // 真实 tab 名取自 workpaper_sheet_classification（各循环命名不统一：F1/K1 半角括号，
@@ -115,6 +155,29 @@ export const K1_DISCLOSURE_SHEET_SOE = '附注披露信息（国企）'
 export const N1_DISCLOSURE_SHEET_LISTED = '附注披露信息（上市公司）'
 export const N1_DISCLOSURE_SHEET_SOE = '附注披露信息（国企）'
 
+export const N2_DISCLOSURE_SHEET_LISTED = '附注披露信息（上市公司）'
+export const N2_DISCLOSURE_SHEET_SOE = '附注披露信息（国企）'
+
+export const N4_DISCLOSURE_SHEET_LISTED = '附注披露信息（上市公司）'
+
+export const N5_DISCLOSURE_SHEET_SOE = '附注披露信息（国企）'
+
+// F3 应付票据（五、36 / 八、36）。真实 tab 名取自 f3NoteSectionMap.F3_DISCLOSURE_SHEET_NAME。
+export const F3_DISCLOSURE_SHEET_LISTED = '附注披露信息(上市公司)'
+export const F3_DISCLOSURE_SHEET_SOE = '附注披露信息(国企)'
+
+// G8 其他权益工具投资（五、19 / 八、19）。
+export const G8_DISCLOSURE_SHEET_LISTED = '附注披露信息（上市公司）'
+export const G8_DISCLOSURE_SHEET_SOE = '附注披露信息（国企）'
+
+// G9 其他非流动金融资产（五、20 / 八、20）。
+export const G9_DISCLOSURE_SHEET_LISTED = '附注披露信息（上市公司）'
+export const G9_DISCLOSURE_SHEET_SOE = '附注披露信息（国企）'
+
+// G12 套期净损益（五、70 / 八、71）。
+export const G12_DISCLOSURE_SHEET_LISTED = '附注披露信息（上市公司）'
+export const G12_DISCLOSURE_SHEET_SOE = '附注披露信息（国企）'
+
 export interface NoteDisclosureJumpTarget {
   /** 底稿 sheet 名（传给 ?sheet=） */
   sheet: string
@@ -125,7 +188,7 @@ export interface NoteDisclosureJumpTarget {
   /** 推断依据说明 */
   reason: string
   /** 底稿族代码（ACNR 回退解析） */
-  wpCode?: 'D1' | 'D3' | 'D4' | 'D5' | 'D6' | 'D7' | 'E1' | 'F1' | 'F2' | 'G1' | 'G7' | 'G10' | 'G11' | 'G13' | 'G14' | 'H1' | 'H2' | 'H3' | 'H8' | 'H9' | 'H10' | 'I1' | 'I2' | 'I3' | 'I4' | 'I5' | 'I6' | 'J1' | 'K1' | 'K11' | 'K13' | 'N1'
+  wpCode?: 'D1' | 'D3' | 'D4' | 'D5' | 'D6' | 'D7' | 'E1' | 'F1' | 'F2' | 'F3' | 'G1' | 'G7' | 'G8' | 'G9' | 'G10' | 'G11' | 'G12' | 'G13' | 'G14' | 'H1' | 'H2' | 'H3' | 'H8' | 'H9' | 'H10' | 'I1' | 'I2' | 'I3' | 'I4' | 'I5' | 'I6' | 'J1' | 'K1' | 'K11' | 'K13' | 'L1' | 'N1' | 'N2' | 'N4' | 'N5'
 }
 
 function asRecord(raw: unknown): Record<string, unknown> | null {
@@ -159,6 +222,98 @@ export function isJ1EmployeeBenefitsNoteSection(noteSection: string): boolean {
 }
 
 /**
+ * 是否 L1 短期借款相关附注节（五、33 / 八、33）。
+ * 权威 note_template_variant_matrix.json · duan_qi_jie_kuan。
+ * 须**精确===**匹配（五、33≠五、3 衍生金融资产；八、33≠八、3）。
+ */
+export function isL1ShortTermLoanNoteSection(noteSection: string): boolean {
+  const s = String(noteSection || '').trim()
+  if (!s) return false
+  if (s === '五、33' || s === '八、33') return true
+  if (s === '短期借款') return true
+  return false
+}
+
+/**
+ * 是否 L3 长期借款相关附注节（五、45 / 八、49）。
+ * 权威 note_template_variant_matrix.json · chang_qi_jie_kuan。
+ */
+export function isL3LongTermLoanNoteSection(noteSection: string): boolean {
+  const s = String(noteSection || '').trim()
+  if (!s) return false
+  if (s === '五、45' || s === '八、49') return true
+  if (s === '长期借款') return true
+  return false
+}
+
+/**
+ * 是否 L5 长期应付款相关附注节（五、48 / 八、53）。
+ * 权威 note_template_variant_matrix.json · chang_qi_ying_fu_kuan。
+ */
+export function isL5LongTermPayableNoteSection(noteSection: string): boolean {
+  const s = String(noteSection || '').trim()
+  if (!s) return false
+  if (s === '五、48' || s === '八、53') return true
+  if (s === '长期应付款') return true
+  return false
+}
+
+/**
+ * 是否 L7 其他非流动负债相关附注节（五、52 / 八、57）。
+ * 权威 note_template_variant_matrix.json · qi_ta_fei_liu_dong_fu_zhai。
+ */
+export function isL7OtherNoncurrentLiabilityNoteSection(noteSection: string): boolean {
+  const s = String(noteSection || '').trim()
+  if (!s) return false
+  if (s === '五、52' || s === '八、57') return true
+  if (s === '其他非流动负债') return true
+  return false
+}
+
+// ─── M 循环（权益类）──────────────────────────────────────────────────────────
+
+/** M2 实收资本（仅国企八、58） */
+export function isM2PaidInCapitalNoteSection(noteSection: string): boolean {
+  const s = String(noteSection || '').trim()
+  return s === '八、58' || s === '实收资本'
+}
+/** M3 库存股（仅上市五、56） */
+export function isM3TreasuryStockNoteSection(noteSection: string): boolean {
+  const s = String(noteSection || '').trim()
+  return s === '五、56' || s === '库存股'
+}
+/** M4 资本公积（五、55 / 八、60） */
+export function isM4CapitalReserveNoteSection(noteSection: string): boolean {
+  const s = String(noteSection || '').trim()
+  return s === '五、55' || s === '八、60' || s === '资本公积'
+}
+/** M5 盈余公积（五、59 / 八、62） */
+export function isM5SurplusReserveNoteSection(noteSection: string): boolean {
+  const s = String(noteSection || '').trim()
+  return s === '五、59' || s === '八、62' || s === '盈余公积'
+}
+/** M6 未分配利润（五、61 / 八、63） */
+export function isM6UndistributedProfitNoteSection(noteSection: string): boolean {
+  const s = String(noteSection || '').trim()
+  return s === '五、61' || s === '八、63' || s === '未分配利润'
+}
+/** M7 专项储备（五、58 / 八、61） */
+export function isM7SpecialReserveNoteSection(noteSection: string): boolean {
+  const s = String(noteSection || '').trim()
+  return s === '五、58' || s === '八、61' || s === '专项储备'
+}
+/** M9 其他综合收益（仅上市五、57） */
+export function isM9OciNoteSection(noteSection: string): boolean {
+  const s = String(noteSection || '').trim()
+  return s === '五、57' || s === '其他综合收益'
+}
+/** M10 其他权益工具（五、54 / 八、59） */
+export function isM10OtherEquityInstrumentNoteSection(noteSection: string): boolean {
+  const s = String(noteSection || '').trim()
+  return s === '五、54' || s === '八、59' || s === '其他权益工具'
+}
+
+/**
  * 是否像 N1 递延所得税资产相关附注节（五、30 / 八、31）。
  * 权威 note_template_variant_matrix.json · di_yan_suo_de_shui_zi_chan_he_di_yan_suo_de。
  * 须**精确**匹配（禁 startsWith：'五、3' 是衍生金融资产、'八、3' 亦然；
@@ -183,6 +338,19 @@ export function isD1NotesReceivableNoteSection(noteSection: string): boolean {
   if (!s) return false
   if (s === '五、4' || s === '八、4') return true
   if (s === '应收票据') return true
+  return false
+}
+
+/**
+ * 是否像 D2 应收账款相关附注节（五、5 / 八、5）。
+ * 单字数字须**精确===**匹配（禁 startsWith：五、5 会误伤 五、50~五、59）。
+ * 关键词精确匹配"应收账款"（区别于"应收票据"/"应收款项融资"）。
+ */
+export function isD2AccountsReceivableNoteSection(noteSection: string): boolean {
+  const s = String(noteSection || '').trim()
+  if (!s) return false
+  if (s === '五、5' || s === '八、5') return true
+  if (s === '应收账款') return true
   return false
 }
 
@@ -437,6 +605,17 @@ export function isK13NonOperatingExpenseNoteSection(noteSection: string): boolea
   return false
 }
 
+// ─── K2-K9 章节谓词（精确编号匹配，禁 startsWith 避串科目）────────────────────
+export function isK2OtherCurrentAssetNoteSection(s: string): boolean { return s === '五、13' || s === '八、14' }
+export function isK3OtherPayableNoteSection(s: string): boolean { return s === '五、42' || s === '八、42' }
+export function isK4OtherCurrentLiabilityNoteSection(s: string): boolean { return s === '五、44' || s === '八、48' }
+export function isK5ProvisionsNoteSection(s: string): boolean { return s === '五、50' || s === '八、55' }
+export function isK6HeldForSaleNoteSection(s: string): boolean { return s === '持有待售资产' || s === '八、12' }
+export function isK7DeferredRevenueNoteSection(s: string): boolean { return s === '五、51' || s === '八、56' }
+export function isK8SellingExpenseNoteSection(s: string): boolean { return s === '五、64' || s === '八、65' }
+export function isK9AdminExpenseNoteSection(s: string): boolean { return s === '五、65' || s === '八、66' }
+export function isK10OtherIncomeNoteSection(s: string): boolean { return s === '五、68' || s === '八、69' }
+
 /** 是否像 I5 其他非流动资产相关附注节 */
 export function isI5OtherNoncurrentNoteSection(noteSection: string): boolean {
   const s = String(noteSection || '').trim()
@@ -531,6 +710,85 @@ export function isK1OtherReceivableNoteSection(noteSection: string): boolean {
   if (!s) return false
   if (s === '五、8' || s === '八、9') return true
   if (s === '其他应收款') return true
+  return false
+}
+
+/**
+ * 是否像 F3 应付票据相关附注节（五、36 / 八、36）。
+ * 权威 note_template_variant_matrix.json · ying_fu_piao_ju：上市→五、36，国企→八、36。
+ * 纯编号须**精确===**匹配（禁 startsWith：五、36≠五、3 衍生金融资产；八、36≠八、3）。
+ */
+export function isF3NotesPayableNoteSection(noteSection: string): boolean {
+  const s = String(noteSection || '').trim()
+  if (!s) return false
+  if (s === '五、36' || s === '八、36') return true
+  if (s === '应付票据') return true
+  return false
+}
+
+/**
+ * 是否像 G8 其他权益工具投资相关附注节（五、19 / 八、19）。
+ * 权威 note_template_variant_matrix.json · qi_ta_quan_yi_gong_ju_tou_zi。
+ * 纯编号须**精确===**匹配（禁 startsWith：五、19≠五、1 货币资金；八、19≠八、1）。
+ */
+export function isG8OtherEquityInstrumentNoteSection(noteSection: string): boolean {
+  const s = String(noteSection || '').trim()
+  if (!s) return false
+  if (s === '五、19' || s === '八、19') return true
+  if (s === '其他权益工具投资') return true
+  return false
+}
+
+/**
+ * 是否像 G9 其他非流动金融资产相关附注节（五、20 / 八、20）。
+ * 权威 note_template_variant_matrix.json · qi_ta_fei_liu_dong_jin_rong_zi_chan。
+ * 纯编号须**精确===**匹配（禁 startsWith：五、20≠五、2 交易性金融资产）。
+ */
+export function isG9OtherNoncurrentFinancialNoteSection(noteSection: string): boolean {
+  const s = String(noteSection || '').trim()
+  if (!s) return false
+  if (s === '五、20' || s === '八、20') return true
+  if (s === '其他非流动金融资产') return true
+  return false
+}
+
+/**
+ * 是否像 G12 套期净损益相关附注节（五、70 / 八、71）。
+ * 权威 note_template_variant_matrix.json · tao_qi_jing_sun_yi（又名净敞口套期收益）。
+ * 纯编号须**精确===**匹配（禁 startsWith：五、70≠五、7 预付款项；八、71≠八、7）。
+ */
+export function isG12HedgingGainsNoteSection(noteSection: string): boolean {
+  const s = String(noteSection || '').trim()
+  if (!s) return false
+  if (s === '五、70' || s === '八、71') return true
+  if (s === '套期净损益' || s === '净敞口套期收益') return true
+  return false
+}
+
+/** N2 应交税费（五、41 / 八、41）。权威 ying_jiao_shui_fei。精确===匹配。 */
+export function isN2TaxesPayableNoteSection(noteSection: string): boolean {
+  const s = String(noteSection || '').trim()
+  if (!s) return false
+  if (s === '五、41' || s === '八、41') return true
+  if (s === '应交税费') return true
+  return false
+}
+
+/** N4 税金及附加（仅上市 五、63；国企 null 无独立章节）。权威 shui_jin_ji_fu_jia。精确===。 */
+export function isN4TaxesAndSurchargesNoteSection(noteSection: string): boolean {
+  const s = String(noteSection || '').trim()
+  if (!s) return false
+  if (s === '五、63') return true
+  if (s === '税金及附加') return true
+  return false
+}
+
+/** N5 所得税费用（仅国企 八、78；上市 null 无独立章节）。权威 suo_de_shui_fei_yong。精确===。 */
+export function isN5IncomeTaxExpenseNoteSection(noteSection: string): boolean {
+  const s = String(noteSection || '').trim()
+  if (!s) return false
+  if (s === '八、78') return true
+  if (s === '所得税费用') return true
   return false
 }
 
@@ -673,6 +931,44 @@ export function resolveNoteDisclosureJumpTarget(note: unknown): NoteDisclosureJu
     }
   }
 
+  // ─── K2-K10 精确编号章节（须在通用「附注披露信息」sheet 回退之前）───────────────
+  if (isK2OtherCurrentAssetNoteSection(section)) {
+    const variant = section.startsWith('八') || std.startsWith('soe') ? 'soe' : 'listed'
+    return { sheet: variant === 'listed' ? K2_DISCLOSURE_SHEET_LISTED : K2_DISCLOSURE_SHEET_SOE, wpId, variant, reason: `章节 ${section}`, wpCode: 'K2' }
+  }
+  if (isK3OtherPayableNoteSection(section)) {
+    const variant = section.startsWith('八') || std.startsWith('soe') ? 'soe' : 'listed'
+    return { sheet: variant === 'listed' ? K3_DISCLOSURE_SHEET_LISTED : K3_DISCLOSURE_SHEET_SOE, wpId, variant, reason: `章节 ${section}`, wpCode: 'K3' }
+  }
+  if (isK4OtherCurrentLiabilityNoteSection(section)) {
+    const variant = section.startsWith('八') || std.startsWith('soe') ? 'soe' : 'listed'
+    return { sheet: variant === 'listed' ? K4_DISCLOSURE_SHEET_LISTED : K4_DISCLOSURE_SHEET_SOE, wpId, variant, reason: `章节 ${section}`, wpCode: 'K4' }
+  }
+  if (isK5ProvisionsNoteSection(section)) {
+    const variant = section.startsWith('八') || std.startsWith('soe') ? 'soe' : 'listed'
+    return { sheet: variant === 'listed' ? K5_DISCLOSURE_SHEET_LISTED : K5_DISCLOSURE_SHEET_SOE, wpId, variant, reason: `章节 ${section}`, wpCode: 'K5' }
+  }
+  if (isK6HeldForSaleNoteSection(section)) {
+    const variant = section === '八、12' || std.startsWith('soe') ? 'soe' : 'listed'
+    return { sheet: variant === 'listed' ? K6_DISCLOSURE_SHEET_LISTED : K6_DISCLOSURE_SHEET_SOE, wpId, variant, reason: `章节 ${section}`, wpCode: 'K6' }
+  }
+  if (isK7DeferredRevenueNoteSection(section)) {
+    const variant = section.startsWith('八') || std.startsWith('soe') ? 'soe' : 'listed'
+    return { sheet: variant === 'listed' ? K7_DISCLOSURE_SHEET_LISTED : K7_DISCLOSURE_SHEET_SOE, wpId, variant, reason: `章节 ${section}`, wpCode: 'K7' }
+  }
+  if (isK8SellingExpenseNoteSection(section)) {
+    const variant = section.startsWith('八') || std.startsWith('soe') ? 'soe' : 'listed'
+    return { sheet: variant === 'listed' ? K8_DISCLOSURE_SHEET_LISTED : K8_DISCLOSURE_SHEET_SOE, wpId, variant, reason: `章节 ${section}`, wpCode: 'K8' }
+  }
+  if (isK9AdminExpenseNoteSection(section)) {
+    const variant = section.startsWith('八') || std.startsWith('soe') ? 'soe' : 'listed'
+    return { sheet: variant === 'listed' ? K9_DISCLOSURE_SHEET_LISTED : K9_DISCLOSURE_SHEET_SOE, wpId, variant, reason: `章节 ${section}`, wpCode: 'K9' }
+  }
+  if (isK10OtherIncomeNoteSection(section)) {
+    const variant = section.startsWith('八') || std.startsWith('soe') ? 'soe' : 'listed'
+    return { sheet: variant === 'listed' ? K2_DISCLOSURE_SHEET_LISTED : K2_DISCLOSURE_SHEET_SOE, wpId, variant, reason: `章节 ${section}`, wpCode: 'K10' }
+  }
+
   // K11 资产减值损失（关键词=上市三、资产减值损失 / 八、74=国企）——须在通用「附注披露信息」sheet 回退之前
   if (isK11AssetImpairmentNoteSection(section)) {
     const variant = section.startsWith('八、74') || section.startsWith('八') || std.startsWith('soe') ? 'soe' : 'listed'
@@ -783,6 +1079,78 @@ export function resolveNoteDisclosureJumpTarget(note: unknown): NoteDisclosureJu
     }
   }
 
+  // F3 应付票据（五、36 / 八、36）——精确===匹配（五、36≠五、3；八、36≠八、3）
+  if (isF3NotesPayableNoteSection(section)) {
+    const variant = section.startsWith('八') || std.startsWith('soe') ? 'soe' : 'listed'
+    return {
+      sheet: variant === 'listed' ? F3_DISCLOSURE_SHEET_LISTED : F3_DISCLOSURE_SHEET_SOE,
+      wpId, variant, reason: `章节 ${section || '应付票据'}`, wpCode: 'F3',
+    }
+  }
+
+  // G8 其他权益工具投资（五、19 / 八、19）——精确===匹配（五、19≠五、1）
+  if (isG8OtherEquityInstrumentNoteSection(section)) {
+    const variant = section.startsWith('八') || std.startsWith('soe') ? 'soe' : 'listed'
+    return {
+      sheet: variant === 'listed' ? G8_DISCLOSURE_SHEET_LISTED : G8_DISCLOSURE_SHEET_SOE,
+      wpId, variant, reason: `章节 ${section || '其他权益工具投资'}`, wpCode: 'G8',
+    }
+  }
+
+  // G9 其他非流动金融资产（五、20 / 八、20）——精确===匹配（五、20≠五、2）
+  if (isG9OtherNoncurrentFinancialNoteSection(section)) {
+    const variant = section.startsWith('八') || std.startsWith('soe') ? 'soe' : 'listed'
+    return {
+      sheet: variant === 'listed' ? G9_DISCLOSURE_SHEET_LISTED : G9_DISCLOSURE_SHEET_SOE,
+      wpId, variant, reason: `章节 ${section || '其他非流动金融资产'}`, wpCode: 'G9',
+    }
+  }
+
+  // G12 套期净损益（五、70 / 八、71）——精确===匹配（五、70≠五、7）
+  if (isG12HedgingGainsNoteSection(section)) {
+    const variant = section.startsWith('八') || std.startsWith('soe') ? 'soe' : 'listed'
+    return {
+      sheet: variant === 'listed' ? G12_DISCLOSURE_SHEET_LISTED : G12_DISCLOSURE_SHEET_SOE,
+      wpId, variant, reason: `章节 ${section || '套期净损益'}`, wpCode: 'G12',
+    }
+  }
+
+  // N2 应交税费（五、41 / 八、41）——sheet 名通用，靠章节号精确命中。
+  if (isN2TaxesPayableNoteSection(section)) {
+    const variant = section.startsWith('八') || std.startsWith('soe') ? 'soe' : 'listed'
+    return {
+      sheet: variant === 'listed' ? N2_DISCLOSURE_SHEET_LISTED : N2_DISCLOSURE_SHEET_SOE,
+      wpId,
+      variant,
+      reason: `章节 ${section || '应交税费'}`,
+      wpCode: 'N2' as any,
+    }
+  }
+
+  // N4 税金及附加（仅上市 五、63；国企无独立章节→国企不跳转）
+  if (isN4TaxesAndSurchargesNoteSection(section)) {
+    if (std.startsWith('soe') && !section.startsWith('五')) return null
+    return {
+      sheet: N4_DISCLOSURE_SHEET_LISTED,
+      wpId,
+      variant: 'listed' as const,
+      reason: `章节 ${section || '税金及附加'}`,
+      wpCode: 'N4' as any,
+    }
+  }
+
+  // N5 所得税费用（仅国企 八、78；上市无独立章节→上市不跳转）
+  if (isN5IncomeTaxExpenseNoteSection(section)) {
+    if (!section.startsWith('八') && !std.startsWith('soe')) return null
+    return {
+      sheet: N5_DISCLOSURE_SHEET_SOE,
+      wpId,
+      variant: 'soe' as const,
+      reason: `章节 ${section || '所得税费用'}`,
+      wpCode: 'N5' as any,
+    }
+  }
+
   // E1 货币资金（五、1 / 八、1）——sheet 名（附注上市/附注国企）与 G1/G10 相同，
   // 须在 syncedSheet.includes('附注上市') 回退之前，靠章节号精确命中（五、1 exact，不误伤五、18=G7）。
   if (isE1MonetaryFundNoteSection(section)) {
@@ -808,6 +1176,85 @@ export function resolveNoteDisclosureJumpTarget(note: unknown): NoteDisclosureJu
     }
   }
 
+  // L1 短期借款（五、33 / 八、33）——精确===匹配（五、33≠五、3；八、33≠八、3）
+  if (isL1ShortTermLoanNoteSection(section)) {
+    const variant = section.startsWith('八') || std.startsWith('soe') ? 'soe' : 'listed'
+    return {
+      sheet: variant === 'listed' ? L1_DISCLOSURE_SHEET_LISTED : L1_DISCLOSURE_SHEET_SOE,
+      wpId,
+      variant,
+      reason: `章节 ${section || '短期借款'}`,
+      wpCode: 'L1',
+    }
+  }
+
+  // L3 长期借款（五、45 / 八、49）
+  if (isL3LongTermLoanNoteSection(section)) {
+    const variant = section.startsWith('八') || std.startsWith('soe') ? 'soe' : 'listed'
+    return {
+      sheet: variant === 'listed' ? L3_DISCLOSURE_SHEET_LISTED : L3_DISCLOSURE_SHEET_SOE,
+      wpId,
+      variant,
+      reason: `章节 ${section || '长期借款'}`,
+      wpCode: 'L3' as any,
+    }
+  }
+
+  // L5 长期应付款（五、48 / 八、53）
+  if (isL5LongTermPayableNoteSection(section)) {
+    const variant = section.startsWith('八') || std.startsWith('soe') ? 'soe' : 'listed'
+    return {
+      sheet: variant === 'listed' ? L5_DISCLOSURE_SHEET_LISTED : L5_DISCLOSURE_SHEET_SOE,
+      wpId,
+      variant,
+      reason: `章节 ${section || '长期应付款'}`,
+      wpCode: 'L5' as any,
+    }
+  }
+
+  // L7 其他非流动负债（五、52 / 八、57）
+  if (isL7OtherNoncurrentLiabilityNoteSection(section)) {
+    const variant = section.startsWith('八') || std.startsWith('soe') ? 'soe' : 'listed'
+    return {
+      sheet: variant === 'listed' ? L7_DISCLOSURE_SHEET_LISTED : L7_DISCLOSURE_SHEET_SOE,
+      wpId,
+      variant,
+      reason: `章节 ${section || '其他非流动负债'}`,
+      wpCode: 'L7' as any,
+    }
+  }
+
+  // ─── M 循环权益类 ─────────────────────────────────────────────────────────
+  if (isM2PaidInCapitalNoteSection(section)) {
+    return { sheet: M_DISCLOSURE_SHEET_SOE, wpId, variant: 'soe', reason: `章节 ${section || '实收资本'}`, wpCode: 'M2' as any }
+  }
+  if (isM3TreasuryStockNoteSection(section)) {
+    return { sheet: M_DISCLOSURE_SHEET_LISTED, wpId, variant: 'listed', reason: `章节 ${section || '库存股'}`, wpCode: 'M3' as any }
+  }
+  if (isM4CapitalReserveNoteSection(section)) {
+    const variant = section.startsWith('八') || std.startsWith('soe') ? 'soe' : 'listed'
+    return { sheet: variant === 'listed' ? M_DISCLOSURE_SHEET_LISTED : M_DISCLOSURE_SHEET_SOE, wpId, variant, reason: `章节 ${section || '资本公积'}`, wpCode: 'M4' as any }
+  }
+  if (isM5SurplusReserveNoteSection(section)) {
+    const variant = section.startsWith('八') || std.startsWith('soe') ? 'soe' : 'listed'
+    return { sheet: variant === 'listed' ? M_DISCLOSURE_SHEET_LISTED : M_DISCLOSURE_SHEET_SOE, wpId, variant, reason: `章节 ${section || '盈余公积'}`, wpCode: 'M5' as any }
+  }
+  if (isM6UndistributedProfitNoteSection(section)) {
+    const variant = section.startsWith('八') || std.startsWith('soe') ? 'soe' : 'listed'
+    return { sheet: variant === 'listed' ? M_DISCLOSURE_SHEET_LISTED : M_DISCLOSURE_SHEET_SOE, wpId, variant, reason: `章节 ${section || '未分配利润'}`, wpCode: 'M6' as any }
+  }
+  if (isM7SpecialReserveNoteSection(section)) {
+    const variant = section.startsWith('八') || std.startsWith('soe') ? 'soe' : 'listed'
+    return { sheet: variant === 'listed' ? M_DISCLOSURE_SHEET_LISTED : M_DISCLOSURE_SHEET_SOE, wpId, variant, reason: `章节 ${section || '专项储备'}`, wpCode: 'M7' as any }
+  }
+  if (isM9OciNoteSection(section)) {
+    return { sheet: M_DISCLOSURE_SHEET_LISTED, wpId, variant: 'listed', reason: `章节 ${section || '其他综合收益'}`, wpCode: 'M9' as any }
+  }
+  if (isM10OtherEquityInstrumentNoteSection(section)) {
+    const variant = section.startsWith('八') || std.startsWith('soe') ? 'soe' : 'listed'
+    return { sheet: variant === 'listed' ? M_DISCLOSURE_SHEET_LISTED : M_DISCLOSURE_SHEET_SOE, wpId, variant, reason: `章节 ${section || '其他权益工具'}`, wpCode: 'M10' as any }
+  }
+
   // D1 应收票据（五、4 / 八、4）——sheet 名为通用「附注披露信息（上市公司/国企）」，
   // 须在通用回退之前靠章节号精确命中（五、4 exact，不误伤 五、40~五、49）。
   if (isD1NotesReceivableNoteSection(section)) {
@@ -818,6 +1265,18 @@ export function resolveNoteDisclosureJumpTarget(note: unknown): NoteDisclosureJu
       variant,
       reason: `章节 ${section || '应收票据'}`,
       wpCode: 'D1',
+    }
+  }
+
+  // D2 应收账款（五、5 / 八、5）——单字数字须精确===（五、5≠五、50~五、59）。
+  if (isD2AccountsReceivableNoteSection(section)) {
+    const variant = section.startsWith('八') || std.startsWith('soe') ? 'soe' : 'listed'
+    return {
+      sheet: variant === 'listed' ? D2_DISCLOSURE_SHEET_LISTED : D2_DISCLOSURE_SHEET_SOE,
+      wpId,
+      variant,
+      reason: `章节 ${section || '应收账款'}`,
+      wpCode: 'D2',
     }
   }
 

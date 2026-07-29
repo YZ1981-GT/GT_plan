@@ -6,6 +6,10 @@
         <h2>交付件管理中心</h2>
         <p class="deliverable-center__subtitle">选择性导出 · 版本管理 · 在线预览 · 报告正文生成</p>
       </div>
+      <el-button class="deliverable-center__handbook-btn" text @click="handbookVisible = true">
+        <el-icon><Reading /></el-icon>
+        使用手册
+      </el-button>
     </div>
 
     <CompletenessBanner :project-id="projectId" :year="year" />
@@ -178,6 +182,8 @@
       :confirm-loading="confirmReportLoading"
       @confirm="onReportOptConfirm"
     />
+
+    <DeliverableHandbookDialog v-model:visible="handbookVisible" />
   </div>
 </template>
 
@@ -185,7 +191,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { FolderOpened } from '@element-plus/icons-vue'
+import { FolderOpened, Reading } from '@element-plus/icons-vue'
 import { downloadFile } from '@/utils/http'
 import ApprovalPanel from '@/components/deliverable/ApprovalPanel.vue'
 import CompletenessBanner from '@/components/deliverable/CompletenessBanner.vue'
@@ -197,6 +203,7 @@ import DeliverableExportDialog from '@/components/deliverable/DeliverableExportD
 import DisclosureNotesSelectionDialog from '@/components/deliverable/DisclosureNotesSelectionDialog.vue'
 import DeliverablePreview from '@/components/deliverable/DeliverablePreview.vue'
 import OptionalSectionDialog from '@/components/deliverable/OptionalSectionDialog.vue'
+import DeliverableHandbookDialog from '@/components/deliverable/DeliverableHandbookDialog.vue'
 import {
   deliverableDownloadUrl,
   deliverableGuidanceDownloadUrl,
@@ -226,6 +233,7 @@ import {
   type GenerateEntryKey,
 } from '@/components/deliverable/generateGuard'
 import { useProjectStore } from '@/stores/project'
+import { getDisclosureReadiness } from '@/services/commonApi'
 
 const route = useRoute()
 const projectStore = useProjectStore()
@@ -238,6 +246,7 @@ const generating = ref(false)
 const packaging = ref(false)
 const fullGenerating = ref(false)
 const approvalLoading = ref(false)
+const handbookVisible = ref(false)
 const selectedItem = ref<DeliverableItem | null>(null)
 const editorVisible = ref(false)
 const editorItem = ref<DeliverableItem | null>(null)
@@ -488,8 +497,36 @@ function goGenerateNotes() {
 /**
  * 附注选择对话框「确认生成」回调：以用户勾选的 selected_sections 生成交付 docx。
  * 不传 template_type（后端从 Project.template_type 权威解析变体）。
+ * P2-10: 生成前附注质量预检（校验未通过/stale/未同步），不硬阻断但明确提示。
  */
 async function onNotesSelectionConfirm({ selectedSections }: { selectedSections: string[] }) {
+  // P2-10: 质量预检——调 readiness 获取统计，有问题时提示确认
+  try {
+    const readiness = await getDisclosureReadiness(projectId.value, year.value)
+    const s = readiness?.summary
+    if (s) {
+      const issues: string[] = []
+      if (s.error_sections > 0) issues.push(`校验错误 ${s.error_sections} 章`)
+      if (s.never_synced > 0) issues.push(`未从底稿同步 ${s.never_synced} 章`)
+      if (s.stale > 0) issues.push(`上游已变更(stale) ${s.stale} 章`)
+      if (s.empty > 0) issues.push(`无数据 ${s.empty} 章`)
+      if (issues.length > 0) {
+        const msg = `<p style="margin-bottom:8px;font-weight:600;">📋 附注质量检查发现以下问题：</p>` +
+          issues.map(i => `<p style="color:#e74c3c;margin:2px 0;">• ${i}</p>`).join('') +
+          `<p style="margin-top:10px;color:#666;font-size:12px;">仍可继续生成，但导出文档可能存在缺失或过时数据。</p>`
+        await ElMessageBox.confirm(msg, '附注质量检查', {
+          confirmButtonText: '仍然生成',
+          cancelButtonText: '返回检查',
+          type: 'warning',
+          dangerouslyUseHTMLString: true,
+        })
+      }
+    }
+  } catch (qualityErr: any) {
+    // 质量预检失败不阻断生成（fail-open）
+    if (qualityErr === 'cancel' || qualityErr?.toString?.()?.includes?.('cancel')) return
+  }
+
   generating.value = true
   try {
     const res = await renderDisclosureNotes(projectId.value, {
@@ -715,6 +752,11 @@ onMounted(loadList)
   align-items: center;
   gap: 14px;
   margin-bottom: 16px;
+}
+.deliverable-center__handbook-btn {
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--el-text-color-secondary);
 }
 .deliverable-center__header-icon {
   display: flex;

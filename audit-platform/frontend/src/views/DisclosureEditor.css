@@ -52,6 +52,7 @@
 .gt-de-main { flex: 1; min-width: 0; background: var(--gt-color-bg-white); border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); padding: 16px; overflow-y: auto; }
 .gt-de-editor-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--gt-color-border-purple); }
 .gt-de-section-title { margin: 0; font-size: var(--gt-font-size-base); font-weight: 600; color: var(--gt-color-text-primary); }
+.gt-de-save-status { font-size: 12px; color: var(--el-text-color-secondary); display: inline-flex; align-items: center; gap: 4px; margin-left: auto; }
 .gt-de-section-account { font-size: var(--gt-font-size-xs); color: var(--gt-color-text-tertiary); margin-top: 2px; display: block; }
 .gt-de-editor-footer { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 10px; padding: 8px 10px; background: var(--gt-color-primary-bg, #f4f0fa); border: 1px solid var(--gt-color-border-purple, #d8b8ee); border-radius: 6px; }
 .gt-de-footer-secondary { display: flex; gap: 6px; align-items: center; }
@@ -93,6 +94,20 @@
 /* ── P0-4：服务端 findings 计数徽标（生成/刷新/同步后自动校验产出）── */
 .gt-de-tree-findings { background: var(--el-color-warning); color: #fff; font-size: 11px; padding: 0 5px; border-radius: 8px; margin-left: 4px; min-width: 16px; text-align: center; line-height: 16px; flex-shrink: 0; }
 .gt-de-tree-findings.is-error { background: var(--el-color-danger); }
+/* ── P0-2：校验状态圆点（makeNoteLeaf 派生 validationStatus）── */
+.gt-de-validation-dot { font-size: 8px; margin-left: 4px; vertical-align: middle; flex-shrink: 0; }
+.gt-de-validation-dot.is-error { color: var(--el-color-danger, #f56c6c); }
+.gt-de-validation-dot.is-warning { color: var(--el-color-warning, #e6a23c); }
+.gt-de-validation-dot.is-clean { color: var(--el-color-success, #67c23a); }
+/* ── P0-3：「需补充」内联引导提示条 ── */
+.gt-de-placeholder-hint { display: flex; align-items: center; gap: 6px; padding: 8px 12px; margin-bottom: 8px; background: #fffbeb; border-left: 4px solid #f59e0b; border-radius: 4px; font-size: 13px; color: #78350f; }
+.gt-de-placeholder-icon { flex-shrink: 0; }
+.gt-de-placeholder-msg { flex: 1; line-height: 1.5; }
+/* ── P0-3 树节点「待补充」标签 ── */
+.gt-de-tree-placeholder-tag { margin-left: 4px; font-size: 10px; vertical-align: middle; flex-shrink: 0; }
+/* ── P2-9：附注树快捷筛选栏 ── */
+.gt-de-tree-filter-bar { padding: 4px 6px 6px; }
+.gt-de-tree-filter-bar .el-segmented { width: 100%; }
 /* ── P0-1：就绪度按钮徽标（未同步 + 校验错误章节数）── */
 .gt-de-readiness-badge { display: inline-block; margin-left: 4px; padding: 0 5px; min-width: 15px; line-height: 15px; font-size: 11px; text-align: center; border-radius: 8px; background: var(--el-color-danger); color: #fff; }
 .gt-de-tree-stale-dot { font-size: 10px; margin-left: 4px; flex-shrink: 0; cursor: help; }
@@ -158,3 +173,23 @@
 .gt-stale-banner { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #fff8e1; border-radius: 6px; margin-bottom: 8px; font-size: var(--gt-font-size-xs); }
 .gt-stale-text { flex: 1; color: var(--gt-color-text-regular); }
 
+
+/* ── #20: 首次同步引导横幅 ── */
+.gt-de-sync-hint { display: flex; align-items: center; gap: 8px; padding: 10px 14px; margin-bottom: 10px; background: linear-gradient(135deg, #f0f4ff 0%, #e8f0fe 100%); border: 1px solid #bfdbfe; border-radius: 8px; font-size: 13px; color: #1e40af; }
+.gt-de-sync-hint__icon { font-size: 18px; flex-shrink: 0; }
+.gt-de-sync-hint__msg { flex: 1; line-height: 1.5; }
+
+/* ── #22: 编制进度条 ── */
+.gt-de-progress-bar { margin-bottom: 10px; padding: 6px 10px; background: var(--el-fill-color-lighter); border-radius: 6px; }
+.gt-de-progress-bar__track { display: flex; height: 6px; border-radius: 3px; overflow: hidden; background: #e5e7eb; }
+.gt-de-progress-bar__seg { transition: width 0.3s; }
+.gt-de-progress-bar__seg--complete { background: #10b981; }
+.gt-de-progress-bar__seg--text { background: #3b82f6; }
+.gt-de-progress-bar__seg--table { background: #f59e0b; }
+.gt-de-progress-bar__seg--empty { background: #d1d5db; }
+.gt-de-progress-bar__legend { display: flex; gap: 12px; margin-top: 4px; font-size: 11px; color: var(--el-text-color-secondary); }
+.gt-de-progress-bar__legend .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 3px; vertical-align: middle; }
+.gt-de-progress-bar__legend .dot--complete { background: #10b981; }
+.gt-de-progress-bar__legend .dot--text { background: #3b82f6; }
+.gt-de-progress-bar__legend .dot--table { background: #f59e0b; }
+.gt-de-progress-bar__legend .dot--empty { background: #d1d5db; }

@@ -19,12 +19,20 @@
       </div>
       <div class="ts-toolbar-right">
         <span v-if="hasUnsavedChanges" class="ts-unsaved-badge">● 未保存</span>
-        <el-button size="small" @click="fillFromEditTime" title="从底稿编辑记录自动填充工时">
-          <el-icon><Clock /></el-icon><span style="margin-left:4px">编辑记录</span>
+        <el-button size="small" type="warning" :loading="autoCollecting" @click="handleAutoCollect" title="从平台操作轨迹自动采集工时草稿">
+          ⚡ 自动采集
         </el-button>
-        <el-button size="small" @click="emit('ai-fill')">
-          <el-icon><MagicStick /></el-icon><span style="margin-left:4px">LLM 预填</span>
-        </el-button>
+        <el-dropdown trigger="click" @command="handleToolCommand">
+          <el-button size="small">更多工具 ▾</el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="external">+ 平台外工作</el-dropdown-item>
+              <el-dropdown-item command="editTime">📋 编辑记录</el-dropdown-item>
+              <el-dropdown-item command="aiFill">🤖 LLM 预填</el-dropdown-item>
+              <el-dropdown-item command="nlp">🗣️ 语音/文字</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
         <el-button type="primary" size="small" :loading="saving" @click="saveAll">保存</el-button>
       </div>
     </div>
@@ -48,6 +56,9 @@
         </div>
       </div>
 
+      <!-- 时间轴 -->
+      <WorkHourTimelineBar :date="selectedDate" ref="timelineRef" />
+
       <div v-if="projectRows.length === 0" class="ts-empty-card">
         <p>暂无参与项目</p>
         <el-button type="primary" size="small" @click="openAddProject">+ 添加项目填报</el-button>
@@ -59,6 +70,7 @@
             <div class="ts-project-card-name" :title="proj.project_name">{{ proj.project_name }}</div>
             <div class="ts-project-card-hours" :class="{ active: cellValue(proj.project_id, selectedDate) > 0 }">
               {{ cellValue(proj.project_id, selectedDate) || 0 }}h
+              <el-icon v-if="isApproved(proj.project_id, selectedDate)" :size="12" title="已审批锁定" style="margin-left: 4px; color: var(--el-color-warning);"><Lock /></el-icon>
             </div>
           </div>
           <div class="ts-project-card-actions">
@@ -185,23 +197,31 @@
       :date="selectedDate"
       @saved="onDetailSaved"
     />
+
+    <!-- 平台外工作快捷录入 -->
+    <WorkHourExternalEntryDialog v-model="showExternalDialog" :projects="projectRows" @saved="loadRange" />
+
+    <WorkHourNlpInput v-model="showNlpDialog" :projects="projectRows" @saved="loadRange" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import dayjs from 'dayjs'
-import { ArrowLeft, ArrowRight, Clock, MagicStick, Plus } from '@element-plus/icons-vue'
+import { ArrowLeft, ArrowRight, Clock, Lock, MagicStick, Plus } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { listEntries, getMyAssignments, type WorkHourEntryRecord } from '@/services/staffApi'
 import WorkHourEntryDialog from './WorkHourEntryDialog.vue'
+import WorkHourExternalEntryDialog from './WorkHourExternalEntryDialog.vue'
+import WorkHourNlpInput from './WorkHourNlpInput.vue'
+import WorkHourTimelineBar from './WorkHourTimelineBar.vue'
 import { listProjects } from '@/services/commonApi'
 import http from '@/utils/http'
 import { workHourEntries as P_whe, workHours as P_wh_paths } from '@/services/apiPaths'
 
 const props = defineProps<{ staffId: string; aiSuggestions?: any[] }>()
 const emit = defineEmits<{ (e: 'ai-fill'): void }>()
-
+const timelineRef = ref<InstanceType<typeof WorkHourTimelineBar> | null>(null)
 // AI 建议回填
 watch(() => props.aiSuggestions, (suggestions) => {
   if (!suggestions || suggestions.length === 0) return
@@ -219,6 +239,7 @@ watch(() => props.aiSuggestions, (suggestions) => {
 const viewMode = ref<'day' | 'week'>('day')
 const loading = ref(false)
 const saving = ref(false)
+const autoCollecting = ref(false)
 const anchor = ref(dayjs())
 const projects = ref<any[]>([])
 const records = ref<WorkHourEntryRecord[]>([])
@@ -227,6 +248,10 @@ const edits = ref<Record<string, number>>({})
 // 细粒度工时弹窗状态
 const detailDialogVisible = ref(false)
 const detailProjectId = ref('')
+
+// 平台外工作快捷录入弹窗
+const showExternalDialog = ref(false)
+const showNlpDialog = ref(false)
 
 function openDetailDialog(projectId: string) {
   detailProjectId.value = projectId
@@ -260,6 +285,37 @@ async function fillFromEditTime() {
     }
   } catch {
     ElMessage.warning('获取编辑记录失败')
+  }
+}
+
+async function handleAutoCollect() {
+  autoCollecting.value = true
+  try {
+    const { api } = await import('@/services/apiProxy')
+    const today = new Date().toISOString().slice(0, 10)
+    const result = await api.post('/api/workhours/auto-collect', null, {
+      params: { date_from: today, date_to: today }
+    }) as any
+    const created = result?.created || 0
+    if (created > 0) {
+      ElMessage.success(`已采集 ${created} 条工时草稿`)
+      await loadRange()
+    } else {
+      ElMessage.info('暂无新的可采集工时')
+    }
+  } catch (e: any) {
+    ElMessage.warning('自动采集失败，请手动填报')
+  } finally {
+    autoCollecting.value = false
+  }
+}
+
+function handleToolCommand(cmd: string) {
+  switch (cmd) {
+    case 'external': showExternalDialog.value = true; break
+    case 'editTime': fillFromEditTime(); break
+    case 'aiFill': emit('ai-fill'); break
+    case 'nlp': showNlpDialog.value = true; break
   }
 }
 
@@ -380,7 +436,16 @@ function cellValue(projectId: string, date: string): number {
   return recordMap.value[k]?.hours ?? 0
 }
 
+function isApproved(projectId: string, dateStr: string): boolean {
+  return records.value.some(r => r.project_id === projectId && r.date === dateStr && r.status === 'approved')
+}
+
 function setCell(projectId: string, date: string, value: number) {
+  // 审批锁定守卫
+  if (isApproved(projectId, date)) {
+    ElMessage.warning('该条目已审批通过，不可修改')
+    return
+  }
   edits.value[cellKey(projectId, date)] = Math.max(0, Math.min(24, value))
 }
 

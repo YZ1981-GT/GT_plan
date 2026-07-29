@@ -86,6 +86,7 @@ export const dashboard = {
   projectStaffHours: '/api/dashboard/project-staff-hours',
   staffDetail: '/api/dashboard/staff-detail',
   availableStaff: '/api/dashboard/available-staff',
+  qualityMetrics: '/api/dashboard/quality-metrics',
   statsTrend: '/api/dashboard/stats/trend',
   statsCompare: '/api/dashboard/stats/compare',
   manager: {

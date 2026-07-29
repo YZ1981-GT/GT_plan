@@ -437,6 +437,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { customQuery as P_cq, projects as P_proj } from '@/services/apiPaths'
 import { handleApiError } from '@/utils/errorHandler'
+import { resolveColumnLabel } from '@/components/query/queryColumnLabels'
+import { exportQueryResultToXlsx } from '@/components/query/queryExport'
 import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
 import CustomQueryFieldPicker from '@/components/custom-query/CustomQueryFieldPicker.vue'
 import AdvancedQueryBuilder from '@/views/AdvancedQueryBuilder.vue'
@@ -552,7 +554,7 @@ const { drill } = useAcnrDrill(() => formCtx.value.project_id)
 
 // 当前已展示列（结果优先用 result.columns，回退到用户选择）——归一为 QueryColumnMeta
 const displayColumns = computed<QueryColumnMeta[]>(() => {
-  const cols = normalizeColumns(result.value.columns)
+  const cols = normalizeColumns(result.value.columns).map(c => ({ ...c, title: resolveColumnLabel(c.key, c.title) }))
   if (cols.length > 0) {
     return selectedColumns.value.length > 0
       ? cols.filter((c) => selectedColumns.value.includes(c.key))
@@ -560,7 +562,7 @@ const displayColumns = computed<QueryColumnMeta[]>(() => {
   }
   return selectedColumns.value.map((k) => ({
     key: k,
-    title: k,
+    title: resolveColumnLabel(k),
     addrId: null,
     drillable: false,
     dtype: 'text',
@@ -724,20 +726,15 @@ async function onExportExcel() {
     return
   }
   try {
-    const XLSX: any = await import('xlsx')
     const cols = displayColumns.value
-    // 构造 [[header...], [row1...], [row2...]] 二维数组（表头用列标题，取值用列 key）
-    const aoa: any[][] = [cols.map((c) => c.title)]
-    for (const row of result.value.rows) {
-      aoa.push(cols.map((c) => row[c.key] ?? ''))
-    }
-    const ws = XLSX.utils.aoa_to_sheet(aoa)
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, '查询结果')
     const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
-    const fname = `高级查询_${formCtx.value.source}_${ts}.xlsx`
-    XLSX.writeFile(wb, fname)
-    ElMessage.success(`已导出 ${fname}`)
+    await exportQueryResultToXlsx({
+      columns: cols.map(c => c.key),
+      rows: result.value.rows,
+      labelFn: (key) => resolveColumnLabel(key, cols.find(c => c.key === key)?.title),
+      fileName: `高级查询_${formCtx.value.source}_${ts}`,
+    })
+    ElMessage.success('已导出')
   } catch (e: any) {
     handleApiError(e, '导出 Excel')
   }

@@ -2,8 +2,11 @@
   <div class="gt-hub">
     <div class="gt-hub-header">
       <h2>附件管理</h2>
+      <el-button class="gt-hub-handbook-btn" :icon="Reading" @click="handbookVisible = true">使用手册</el-button>
     </div>
     <p class="gt-hub-desc">管理项目附件文件。选择一个项目查看和管理其附件。</p>
+
+    <AttachmentHandbookDialog v-model="handbookVisible" />
 
     <div v-loading="loading">
       <GtEmpty v-if="!loading && projects.length === 0" preset="no-data" title="暂无项目" />
@@ -32,16 +35,18 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { Paperclip } from '@element-plus/icons-vue'
+import { Paperclip, Reading } from '@element-plus/icons-vue'
 import { listProjects } from '@/services/commonApi'
 import AttachmentPreviewDrawer from '@/components/common/AttachmentPreviewDrawer.vue'
 import GtEmpty from '@/components/common/GtEmpty.vue'
 import GtStatusTag from '@/components/common/GtStatusTag.vue'
+import AttachmentHandbookDialog from './AttachmentHandbookDialog.vue'
 
 // TODO: replace window.open with AttachmentPreviewDrawer when per-file preview is added to this hub view
 
 const loading = ref(false)
 const projects = ref<any[]>([])
+const handbookVisible = ref(false)
 
 const TYPE_MAP: Record<string, string> = {
   annual: '年度审计',
@@ -66,8 +71,9 @@ onMounted(async () => {
 
 <style scoped>
 .gt-hub { padding: 20px; }
-.gt-hub-header { margin-bottom: 8px; }
+.gt-hub-header { display: flex; align-items: center; margin-bottom: 8px; }
 .gt-hub-header h2 { margin: 0; font-size: 20px /* allow-px: special */; color: var(--gt-color-text-primary); }
+.gt-hub-handbook-btn { margin-left: auto; }
 .gt-hub-desc { color: var(--gt-color-text-secondary); font-size: var(--gt-font-size-sm); margin-bottom: 20px; }
 .gt-hub-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
 .gt-hub-card {

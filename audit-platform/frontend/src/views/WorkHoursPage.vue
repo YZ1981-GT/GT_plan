@@ -36,7 +36,7 @@
 
       <!-- ═══ Tab 3: 统计 ═══ -->
       <el-tab-pane label="统计" name="stats">
-        <WorkHourStatsPanel :staff-id="currentStaffId" />
+        <WorkHourStatsDashboard />
       </el-tab-pane>
 
       <!-- ═══ Tab 4: 预算对比 (Phase 7 F8) ═══ -->
@@ -73,6 +73,7 @@ import WorkHourApprovalTab from '@/components/workhour/WorkHourApprovalTab.vue'
 import BudgetCompareChart from '@/components/workhour/BudgetCompareChart.vue'
 import WeeklyTimesheet from '@/components/workhour/WeeklyTimesheet.vue'
 import WorkHourStatsPanel from '@/components/workhour/WorkHourStatsPanel.vue'
+import WorkHourStatsDashboard from '@/components/workhour/WorkHourStatsDashboard.vue'
 import { handleApiError } from '@/utils/errorHandler'
 
 const { can } = usePermission()

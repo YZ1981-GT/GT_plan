@@ -103,8 +103,29 @@
                 <el-button size="small" text :icon="RefreshLeft" @click="resetCategoryFilter" />
               </el-tooltip>
               <el-input v-model="filterText" size="small" style="width:200px" placeholder="科目名/行次过滤..." clearable />
+              <el-tooltip content="单次返回行数上限，达到上限说明结果可能被截断" placement="top">
+                <el-select v-model="queryLimit" size="small" style="width:110px">
+                  <el-option label="上限 200" :value="200" />
+                  <el-option label="上限 500" :value="500" />
+                  <el-option label="上限 1000" :value="1000" />
+                  <el-option label="上限 2000" :value="2000" />
+                </el-select>
+              </el-tooltip>
               <el-button size="small" type="primary" @click="executeQuery" :loading="loading">▶ 查询</el-button>
               <span style="flex:1" />
+              <el-dropdown v-if="queryHistory.length" size="small" trigger="click" @command="applyHistory">
+                <el-button size="small">🕘 历史</el-button>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item v-for="(h, i) in queryHistory" :key="i" :command="h">
+                      {{ h.sourceLabel }} · {{ h.projectLabel }}（{{ h.year }}）{{ h.filterText ? ' · ' + h.filterText : '' }}
+                    </el-dropdown-item>
+                    <el-dropdown-item v-if="queryHistory.length" divided :command="'__clear__'">
+                      🗑️ 清空历史
+                    </el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
               <el-button size="small" @click="goToFullCustomQuery" title="跳转独立页支持模板保存/共享">📑 模板</el-button>
               <el-button size="small" @click="saveAsTemplate" :disabled="!selectedSource" title="保存当前选区/条件为查询模板">💾 保存</el-button>
               <el-button size="small" @click="transposed = !transposed">{{ transposed ? '↩ 还原' : '↔ 转置' }}</el-button>
@@ -139,10 +160,10 @@
                 <template #default="{ row }">
                   <span v-if="col === 'cell_ref' && row.wp_code" class="gt-cq-cell-ref-link"
                     @click="jumpToCell(row)" :title="`跳到底稿 ${row.wp_code} ${row.sheet_name || ''} 单元格 ${row[col]}`">
-                    {{ formatCell(row[col]) }}
+                    {{ formatCell(row[col], col) }}
                   </span>
                   <span v-else :style="{ textAlign: isNumeric(row[col]) ? 'right' : 'left', display: 'block' }">
-                    {{ formatCell(row[col]) }}
+                    {{ formatCell(row[col], col) }}
                   </span>
                 </template>
               </el-table-column>
@@ -157,8 +178,13 @@
             </div>
             <!-- 转置视图 -->
             <div v-else class="gt-cq-transposed" v-loading="loading">
+              <el-alert v-if="filteredRows.length > 50" type="info" :closable="false" show-icon
+                title="转置视图仅展示前 50 行（作为列），完整数据请切回非转置视图或导出" style="margin-bottom: 6px" />
               <el-table :data="transposedRows" border size="small" max-height="calc(100vh - 280px)" style="width:100%"
                 :header-cell-style="{ background: '#f0edf5', whiteSpace: 'nowrap', fontSize: '12px' }">
+                <template #empty>
+                  <el-empty description="暂无数据" :image-size="60" />
+                </template>
                 <el-table-column prop="_field_label" label="字段" width="140" fixed="left" />
                 <el-table-column v-for="(_, ci) in transposedDataCols" :key="ci" :prop="'_v' + ci" :label="'#' + (ci + 1)" min-width="120" show-overflow-tooltip>
                   <template #default="{ row }">
@@ -169,6 +195,9 @@
             </div>
             <div class="gt-cq-footer">
               <span style="font-size: var(--gt-font-size-xs);color: var(--gt-color-text-tertiary)">{{ resultRows.length }} 行 × {{ resultColumns.length }} 列{{ filterText ? `（过滤后 ${filteredRows.length} 行）` : '' }}</span>
+              <el-tag v-if="resultTruncated" size="small" type="warning" effect="plain" round style="margin-left:8px">
+                已达上限 {{ queryLimit }} 行，可能被截断
+              </el-tag>
             </div>
           </div>
         </div>
@@ -201,7 +230,11 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { FullScreen, Aim, Close, RefreshLeft } from '@element-plus/icons-vue'
 import { handleApiError } from '@/utils/errorHandler'
 import { api } from '@/services/apiProxy'
+import http from '@/utils/http'
 import { fmtAmount } from '@/utils/formatters'
+import { resolveColumnLabel } from './queryColumnLabels'
+import { exportQueryResultToXlsx, sanitizeExportName } from './queryExport'
+import { buildTraceUri, RESOLVE_FAIL_MSG } from './querySourceUri'
 import { useAuthStore } from '@/stores/auth'
 import { listProjectsWithProgress } from '@/services/commonApi'
 import AdvancedQueryBuilder from '@/views/AdvancedQueryBuilder.vue'
@@ -274,6 +307,46 @@ const loading = ref(false)
 const transposed = ref(false)
 const filterText = ref('')
 const selectedSource = ref('report_balance_sheet')
+// 单次查询返回行数上限（后端 QueryRequest.limit，默认 500）；结果达上限时提示可能被截断
+const queryLimit = ref(500)
+const resultTruncated = ref(false)
+
+// 查询历史（最近 10 次，localStorage 持久，点击回填并重查）
+interface QueryHistoryItem {
+  projectId: string; projectLabel: string; year: number
+  source: string; sourceLabel: string; filterText: string; cellRange: string; ts: number
+}
+const QUERY_HISTORY_KEY = 'gt:cq:history'
+const queryHistory = ref<QueryHistoryItem[]>([])
+function loadQueryHistory() {
+  try { queryHistory.value = JSON.parse(localStorage.getItem(QUERY_HISTORY_KEY) || '[]') } catch { queryHistory.value = [] }
+}
+function pushQueryHistory() {
+  const item: QueryHistoryItem = {
+    projectId: localProjectId.value, projectLabel: currentProjectLabel.value, year: localYear.value,
+    source: selectedSource.value, sourceLabel: currentSourceLabel.value,
+    filterText: filterText.value, cellRange: sheetCellRange.value, ts: Date.now(),
+  }
+  const key = (h: QueryHistoryItem) => `${h.projectId}|${h.year}|${h.source}|${h.filterText}|${h.cellRange}`
+  const dedup = queryHistory.value.filter(h => key(h) !== key(item))
+  queryHistory.value = [item, ...dedup].slice(0, 10)
+  try { localStorage.setItem(QUERY_HISTORY_KEY, JSON.stringify(queryHistory.value)) } catch { /* ignore quota */ }
+}
+async function applyHistory(item: QueryHistoryItem | string) {
+  if (item === '__clear__') {
+    queryHistory.value = []
+    try { localStorage.removeItem(QUERY_HISTORY_KEY) } catch { /* ignore */ }
+    ElMessage.success('查询历史已清空')
+    return
+  }
+  const h = item as QueryHistoryItem
+  if (h.projectId) localProjectId.value = h.projectId
+  localYear.value = h.year
+  selectedSource.value = h.source
+  filterText.value = h.filterText || ''
+  sheetCellRange.value = h.cellRange || ''
+  await executeQuery()
+}
 const filterReportType = ref('balance_sheet')
 const resultRows = ref<any[]>([])
 const resultColumns = ref<string[]>([])
@@ -444,32 +517,27 @@ const transposedRows = computed(() => {
   const rows = transposedDataCols.value
   return resultColumns.value.map(col => {
     const entry: Record<string, any> = { _field_label: columnLabel(col) }
-    rows.forEach((row, ci) => { entry['_v' + ci] = formatCell(row[col]) })
+    rows.forEach((row, ci) => { entry['_v' + ci] = formatCell(row[col], col) })
     return entry
   })
 })
 
-const COLUMN_LABELS: Record<string, string> = {
-  row_code: '行次', row_name: '项目', current_period_amount: '本期金额', prior_period_amount: '上期金额',
-  account_code: '科目编码', account_name: '科目名称', opening_balance: '期初余额', closing_balance: '期末余额',
-  debit_amount: '借方发生额', credit_amount: '贷方发生额', unadjusted: '未审数', audited: '审定数',
-  aje_dr: 'AJE借', aje_cr: 'AJE贷', rcl_dr: 'RCL借', rcl_cr: 'RCL贷',
-  entry_number: '分录号', description: '说明', status: '状态', section_id: '章节ID',
-  company_name: '企业名称', company_code: '企业代码', holding_type: '持股类型',
-  direction: '借贷', subject: '科目', amount: '金额', desc: '说明',
-  summary: '审定汇总', equity_dr: '权益抵消借', equity_cr: '权益抵消贷',
-  indent: '层级', is_total: '合计行', non_common_ratio: '持股比例',
-  headers: '表头', row_count: '行数',
-}
-function columnLabel(col: string) { return COLUMN_LABELS[col] || col }
+function columnLabel(col: string) { return resolveColumnLabel(col) }
 function isNumeric(v: any) { return v != null && !isNaN(Number(v)) }
-function formatCell(v: any) {
+// 编码/标识/比率类列：不做金额千分位格式化（避免长数字科目码/行次/账号/比例被误当金额）
+const CODE_LIKE_COL_RE = /(_code$|^code$|_no$|number$|_id$|section|cell_ref|indent|row_count|is_total|ratio|比例|编码|编号|账号|行次|序号)/i
+function isCodeLikeColumn(col?: string): boolean {
+  return !!col && CODE_LIKE_COL_RE.test(col)
+}
+function formatCell(v: any, col?: string) {
   if (v == null) return '-'
   if (Array.isArray(v)) return v.join(', ')
   if (typeof v === 'boolean') return v ? '是' : '否'
   const s = String(v)
   // 不格式化长字符串（如信用代码、编码等）
   if (s.length > 12 || /[a-zA-Z\u4e00-\u9fff]/.test(s)) return s
+  // 编码/标识/比率类列按列名判定，原样输出不做金额格式化
+  if (isCodeLikeColumn(col)) return s
   const n = Number(v)
   if (!isNaN(n) && s.trim() !== '') return fmtAmount(n)
   return s
@@ -570,7 +638,7 @@ watch(selectedSource, (v) => {
   }
 })
 
-function onSheetRangeConfirm(payload: { wp_code: string; sheet_name?: string; range: string }) {
+async function onSheetRangeConfirm(payload: { wp_code: string; sheet_name?: string; range: string }) {
   sheetCellRange.value = payload.range
   // 在结果表格区直接预览：把选区拆成 cell 清单（如 A1:C3 → A1,A2,A3,B1,...,C3）
   const cells = _expandRange(payload.range)
@@ -583,7 +651,13 @@ function onSheetRangeConfirm(payload: { wp_code: string; sheet_name?: string; ra
     value: '— 待查询 —',
   }))
   hasQueried.value = true
-  ElMessage.success(`已锁定 ${payload.wp_code} / ${payload.sheet_name || ''} 选区 ${payload.range}（共 ${cells.length} 个单元格），点「▶ 查询」调取后台数据`)
+  // 已选项目 → 直接取数（省去再点一次「查询」）；未选项目 → 保留占位并提示
+  if (localProjectId.value) {
+    ElMessage.success(`已锁定 ${payload.wp_code} / ${payload.sheet_name || ''} 选区 ${payload.range}（共 ${cells.length} 格），正在取数…`)
+    await executeQuery()
+  } else {
+    ElMessage.success(`已锁定选区 ${payload.range}（共 ${cells.length} 格），请先选择项目再查询`)
+  }
 }
 
 /** 展开 'A1:C3' / 'B5' 形式 range 为单元格清单 */
@@ -665,10 +739,10 @@ async function jumpToCell(row: any) {
     }) as any
     const wpId = data?.wp_id
     if (!wpId) {
-      ElMessage.warning(`底稿 ${row.wp_code} 在当前项目不存在`)
+      ElMessage.warning(RESOLVE_FAIL_MSG.wpNotFound(row.wp_code))
       return
     }
-    visible.value = false  // 关闭弹窗
+    visible.value = false
     router.push({
       name: 'WorkpaperEditor',
       params: { projectId: localProjectId.value, wpId },
@@ -705,21 +779,9 @@ async function onTraceToTemplate() {
   const row = ctxMenuRow.value
   if (!row) return
 
-  // 构建 URI：优先用 source 字段，否则从 row 数据推断
-  let uri = ''
-  if (row.wp_code && row.sheet_name) {
-    uri = `workpaper:${row.wp_code}|${row.sheet_name}`
-    if (row.cell_ref) uri += `|${row.cell_ref}`
-  } else if (row.module === 'report' && row.report_type) {
-    uri = `report:${row.report_type}`
-  } else if (row.module === 'note' && row.section_id) {
-    uri = `note:${row.section_id}`
-  } else if (selectedSource.value) {
-    uri = selectedSource.value
-  }
-
+  const uri = buildTraceUri(row, selectedSource.value)
   if (!uri) {
-    ElMessage.warning('无法确定数据源 URI')
+    ElMessage.warning(RESOLVE_FAIL_MSG.noUri)
     return
   }
 
@@ -728,7 +790,7 @@ async function onTraceToTemplate() {
       params: { uri },
     }) as any
     if (!resp.registered && resp.module === 'workpaper') {
-      ElMessage.warning('该模板未在 registry，请先 migrate')
+      ElMessage.warning(RESOLVE_FAIL_MSG.notRegistered)
       return
     }
     visible.value = false
@@ -757,11 +819,16 @@ async function executeQuery() {
     const data = await api.post('/api/custom-query/execute', {
       project_id: localProjectId.value, year: localYear.value, source,
       filters: sheetCellRange.value ? { ...filters, cell_range: sheetCellRange.value } : filters,
+      limit: queryLimit.value, offset: 0,
     }, { validateStatus: (s: number) => s < 600 })
     const result = data
     resultRows.value = result?.rows || []
     resultColumns.value = result?.columns || (resultRows.value.length ? Object.keys(resultRows.value[0]) : [])
+    // 结果行数达到上限 → 可能被截断，提示用户缩小范围或调大上限
+    resultTruncated.value = resultRows.value.length >= queryLimit.value
     if (!resultRows.value.length) ElMessage.info('查询无结果')
+    else if (resultTruncated.value) ElMessage.warning(`结果已达上限 ${queryLimit.value} 行，可能未显示全部，请缩小范围或调大上限`)
+    pushQueryHistory()
   } catch (err: any) {
     handleApiError(err, '查询失败')
   } finally { loading.value = false }
@@ -781,17 +848,13 @@ function copyResult() {
 
 async function exportResult() {
   if (!resultRows.value.length) { ElMessage.warning('无数据'); return }
-  const XLSX = await import('xlsx')
-  const wb = XLSX.utils.book_new()
-  const headers = resultColumns.value.map(c => columnLabel(c))
-  const dataRows = filteredRows.value.map(r => resultColumns.value.map(c => r[c] ?? ''))
-  const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows])
-  ws['!cols'] = headers.map(() => ({ wch: 16 }))
-  XLSX.utils.book_append_sheet(wb, ws, '查询结果')
-  // 文件名带项目名 + 数据源标签 + 年度，便于用户辨识
   const projName = (currentProjectLabel.value || '查询').replace(/[\\/:*?"<>|]/g, '_')
-  const srcName = (currentSourceLabel.value || selectedSource.value).replace(/[📊📋📝📐📑\s]/g, '')
-  XLSX.writeFile(wb, `${projName}_${srcName}_${localYear.value}.xlsx`)
+  const srcName = (currentSourceLabel.value || selectedSource.value).replace(/[\u{1F000}-\u{1FFFF}\u{2600}-\u{27BF}\s]/gu, '')
+  await exportQueryResultToXlsx({
+    columns: resultColumns.value,
+    rows: filteredRows.value,
+    fileName: `${projName}_${srcName}_${localYear.value}`,
+  })
   ElMessage.success('已导出')
 }
 
@@ -805,12 +868,12 @@ function _indicatorCacheKey(pid: string | undefined, schemaVersion: string | num
 }
 
 async function loadIndicators(pid: string | undefined) {
-  // 拉数据：用原始 fetch 才能拿到 response headers（apiProxy 只返 body）
+  // 用 http(axios) 而非裸 fetch：自动附带鉴权、401 自动刷新，并可读响应头拿 schema version
   const url = pid ? `/api/custom-query/indicators?project_id=${encodeURIComponent(pid)}` : '/api/custom-query/indicators'
   try {
-    const token = localStorage.getItem('access_token') || ''
-    const resp = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
-    const schemaVersion = resp.headers.get(INDICATOR_SCHEMA_HEADER) || 'unknown'
+    // _silent：拉取失败由本函数兜底重建，不弹全局 toast
+    const resp = await http.get(url, { _silent: true } as any)
+    const schemaVersion = (resp.headers?.[INDICATOR_SCHEMA_HEADER] as string) || 'unknown'
     const cacheKey = _indicatorCacheKey(pid, schemaVersion)
     // 命中缓存优先（同 schema_version 下结构稳定）
     try {
@@ -820,9 +883,9 @@ async function loadIndicators(pid: string | undefined) {
         return
       }
     } catch { /* ignore */ }
-    const json = await resp.json()
-    // 后端 ApiResponse 包装 {code, data} 或裸数组
-    const tree = Array.isArray(json) ? json : (json?.data ?? json ?? [])
+    // 响应拦截器已解包 {code,data} 信封 → resp.data 即树数组（兜底再解一层）
+    const body: any = resp.data
+    const tree = Array.isArray(body) ? body : (body?.data ?? body ?? [])
     indicatorTree.value = Array.isArray(tree) ? tree : []
     try { sessionStorage.setItem(cacheKey, JSON.stringify(indicatorTree.value)) } catch { /* ignore */ }
     // 清理旧 schema 版本的缓存（保持 sessionStorage 干净）
@@ -862,6 +925,8 @@ watch(visible, (v) => {
 
 // 初次挂载时按现有 projectId 加载（弹窗未必打开但提前缓存）
 loadIndicators(localProjectId.value)
+// 加载查询历史（localStorage 持久）
+loadQueryHistory()
 
 // ─── Req 14 AC 5: open-custom-query 事件带 source 时自动选中 + 树 reveal ────
 watch(() => props.initialSource, (source) => {

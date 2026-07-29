@@ -19,6 +19,35 @@
     <!-- 顶部覆盖率仪表盘 -->
     <FormulaCoverageChart ref="coverageChartRef" />
 
+    <!-- 通用 vs 自定义 框架条（公式预设库入口，template-library-formula-preset-custom） -->
+    <div class="gt-ftab-preset-bar">
+      <div class="gt-ftab-preset-info">
+        <el-icon class="gt-ftab-preset-icon"><MagicStick /></el-icon>
+        <div class="gt-ftab-preset-text">
+          <span class="gt-ftab-preset-title">公式预设库</span>
+          <span class="gt-ftab-preset-desc">
+            <el-tag size="small" type="info" effect="light" round>通用</el-tag>
+            平台通用预设公式（所有企业通用、只读）
+            <el-divider direction="vertical" />
+            <el-tag size="small" type="warning" effect="light" round>自定义</el-tag>
+            自定义预设在通用基线之上新增（平台级共享，隔离存储；{{ canEditPreset ? '可新增/编辑' : '仅授权角色可编辑' }}）
+          </span>
+        </div>
+      </div>
+      <el-button type="primary" plain size="default" @click="presetDialogVisible = true">
+        🧮 公式预设库
+      </el-button>
+    </div>
+
+    <!-- 公式预设库弹窗（说明文档 + 通用/自定义浏览编辑，Req 25 + 自定义写入） -->
+    <GtFormulaPresetDialog
+      ref="presetDialogRef"
+      v-model="presetDialogVisible"
+      scope="workpaper"
+      :can-edit="canEditPreset"
+      @edit-formula="onSaveCustomPreset"
+    />
+
     <!-- 子 Tab 区 -->
     <div class="gt-ftab-body">
       <el-tabs v-model="activeSubTab" class="gt-ftab-tabs">
@@ -434,7 +463,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { Coin, PieChart, Link, Search, Connection } from '@element-plus/icons-vue'
+import { Coin, PieChart, Link, Search, Connection, MagicStick } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import {
@@ -444,7 +473,45 @@ import {
 import { handleApiError } from '@/utils/errorHandler'
 import { useTemplateLibrarySource } from '@/composables/useTemplateLibrarySource'
 import { useAcnr } from '@/services/acnr/useAcnr'
+import { useAuthStore } from '@/stores/auth'
+import { useFormulaImportExport } from '@/composables/useFormulaImportExport'
 import FormulaCoverageChart from '@/components/template-library/FormulaCoverageChart.vue'
+import GtFormulaPresetDialog from '@/components/formula/GtFormulaPresetDialog.vue'
+
+// ─── 公式预设库（通用 vs 自定义）─────────────────────────────────────────────
+const authStore = useAuthStore()
+// 权限门控（D7 ADR，与 ReportConfigTab/SeedLoaderPanel 一致）：admin/partner 可编辑自定义预设
+const canEditPreset = computed(() => {
+  const role = authStore.user?.role || ''
+  return role === 'admin' || role === 'partner'
+})
+const presetDialogVisible = ref(false)
+const presetDialogRef = ref<InstanceType<typeof GtFormulaPresetDialog> | null>(null)
+const { saveCustomPreset } = useFormulaImportExport()
+
+/** 弹窗内保存自定义公式 → 持久化到平台级 formula_custom_presets.json（隔离于 seed）。 */
+async function onSaveCustomPreset(payload: {
+  page_key: string
+  formula_type: 'auto_calc' | 'logic_check' | 'reasonability'
+  target_cell: string
+  expression: string
+  refs?: unknown[]
+  issue_description?: string
+  hint_text?: string
+}) {
+  const res = await saveCustomPreset({
+    page_key: payload.page_key,
+    target_cell: payload.target_cell,
+    expression: payload.expression,
+    formula_type: payload.formula_type,
+    refs: payload.refs,
+    description: payload.issue_description || payload.hint_text || '',
+  })
+  if (res) {
+    // 持久化成功后刷新弹窗当前页预设列表（复用弹窗 selectPage 拉取）
+    await presetDialogRef.value?.reloadCurrentPage()
+  }
+}
 
 // ─── ACNR 选址器（Req 24.2：候选地址经 useAcnr） ───
 const { resolveFormula } = useAcnr()
@@ -890,6 +957,47 @@ onMounted(async () => {
   gap: 16px;
   height: 100%;
   min-height: 0;
+}
+
+/* ─── 通用 vs 自定义 框架条 ─── */
+.gt-ftab-preset-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--gt-color-primary-bg, #f5f2fa);
+  border: 1px solid var(--gt-color-border-lighter, #ebeef5);
+  border-left: 3px solid var(--gt-color-primary, #7b5ea7);
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+.gt-ftab-preset-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.gt-ftab-preset-icon {
+  font-size: 20px;
+  color: var(--gt-color-primary, #7b5ea7);
+  flex-shrink: 0;
+}
+.gt-ftab-preset-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.gt-ftab-preset-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gt-color-text-primary, #303133);
+}
+.gt-ftab-preset-desc {
+  font-size: 12px;
+  color: var(--gt-color-text-regular, #606266);
+  line-height: 1.6;
 }
 
 /* ─── 子 Tab 区 ─── */

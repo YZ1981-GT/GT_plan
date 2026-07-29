@@ -208,6 +208,10 @@
           </el-tooltip>
         </div>
         <el-input v-model="treeSearch" size="small" placeholder="搜索章节..." clearable class="gt-de-tree-search" />
+        <!-- P2-9：附注树快捷筛选 -->
+        <div class="gt-de-tree-filter-bar">
+          <el-segmented v-model="treeFilter" :options="treeFilterOptions" size="small" />
+        </div>
         <div class="gt-de-tree-wrap">
           <!-- 树形视图 -->
           <el-tree
@@ -236,6 +240,10 @@
                 <span class="gt-de-tree-label">
                   <span v-if="getRenderedNumber(data.data?.note_section)" class="gt-de-tree-number">{{ getRenderedNumber(data.data?.note_section) }}</span>
                   {{ data.data?.section_title || data.label }}
+                  <span v-if="data.validationStatus === 'error'" class="gt-de-validation-dot is-error" title="校验有错误">●</span>
+                  <span v-else-if="data.validationStatus === 'warning'" class="gt-de-validation-dot is-warning" title="校验有警告">●</span>
+                  <span v-else-if="data.validationStatus === 'clean'" class="gt-de-validation-dot is-clean" title="校验通过">●</span>
+                  <el-tag v-if="nodeHasPlaceholderText(data)" type="warning" size="small" effect="plain" class="gt-de-tree-placeholder-tag">待补充</el-tag>
                 </span>
                 <span class="gt-de-tree-actions">
                   <el-tooltip :content="data.data?.status === 'not_applicable' ? '恢复生成' : '不导出'" placement="top" :show-after="500">
@@ -247,7 +255,6 @@
                     <span class="gt-de-tree-action-icon gt-de-tree-action-del" @click.stop="onDeleteSection(data.data)">✕</span>
                   </el-tooltip>
                 </span>
-                <span v-if="hasSectionValidationError(data.data?.note_section)" class="gt-de-tree-error-dot" title="校验失败">●</span>
                 <!-- P0-4：服务端最新一次校验的 findings 计数（生成/刷新/同步后自动跑） -->
                 <el-tooltip
                   v-if="serverFindings(data.data)"
@@ -352,10 +359,45 @@
           </template>
         </el-alert>
         <template v-if="currentNote">
+          <!-- #20: 首次同步引导横幅 -->
+          <transition name="el-fade-in">
+            <div v-if="showSyncHint" class="gt-de-sync-hint">
+              <span class="gt-de-sync-hint__icon">💡</span>
+              <span class="gt-de-sync-hint__msg">检测到底稿已编制审定/披露数据，可点击「🔁 全部刷新」自动同步最新审定数到附注表格。</span>
+              <el-button size="small" type="primary" @click="onRefreshAll(); dismissSyncHint()">立即全部刷新</el-button>
+              <el-button size="small" text @click="dismissSyncHint">不再提示</el-button>
+            </div>
+          </transition>
+          <!-- #22: 编制进度条 -->
+          <div v-if="noteProgress.total > 0" class="gt-de-progress-bar">
+            <div class="gt-de-progress-bar__track">
+              <div class="gt-de-progress-bar__seg gt-de-progress-bar__seg--complete" :style="{ width: (noteProgress.complete / noteProgress.total * 100) + '%' }" />
+              <div class="gt-de-progress-bar__seg gt-de-progress-bar__seg--text" :style="{ width: (noteProgress.textOnly / noteProgress.total * 100) + '%' }" />
+              <div class="gt-de-progress-bar__seg gt-de-progress-bar__seg--table" :style="{ width: (noteProgress.tableOnly / noteProgress.total * 100) + '%' }" />
+              <div class="gt-de-progress-bar__seg gt-de-progress-bar__seg--empty" :style="{ width: (noteProgress.empty / noteProgress.total * 100) + '%' }" />
+            </div>
+            <div class="gt-de-progress-bar__legend">
+              <span><i class="dot dot--complete"></i>完整 {{ noteProgress.complete }}</span>
+              <span><i class="dot dot--text"></i>待补表格 {{ noteProgress.textOnly }}</span>
+              <span><i class="dot dot--table"></i>待补文本 {{ noteProgress.tableOnly }}</span>
+              <span><i class="dot dot--empty"></i>空白 {{ noteProgress.empty }}</span>
+            </div>
+          </div>
           <div class="gt-de-editor-header">
             <div>
               <h4 class="gt-de-section-title">
                 {{ currentNote.section_title }}
+                <span class="gt-de-save-status">
+                  <template v-if="saveStatus === 'saving'">
+                    <el-icon class="is-loading"><Loading /></el-icon> 保存中...
+                  </template>
+                  <template v-else-if="saveStatus === 'saved'">
+                    <span style="color:#67c23a;">✓ 已保存</span>
+                  </template>
+                  <template v-else-if="saveStatus === 'error'">
+                    <span style="color:#f56c6c;">⚠ 保存失败</span>
+                  </template>
+                </span>
                 <transition name="el-fade-in">
                   <span v-if="justSaved" class="gt-de-saved-badge">✓ 已保存</span>
                 </transition>
@@ -363,6 +405,9 @@
               <span class="gt-de-section-account" v-if="currentNote.account_name && currentNote.account_name !== currentNote.section_title">{{ currentNote.account_name }}</span>
             </div>
             <div style="display: flex; gap: 6px; align-items: center;">
+              <el-tooltip content="保存后自动跳到下一未编制章节" placement="top">
+                <el-switch v-model="autoAdvance" size="small" @change="toggleAutoAdvance" style="margin-right:4px;" />
+              </el-tooltip>
               <template v-if="!isEqcrRole && (currentNote.content_type === 'text' || currentNote.content_type === 'mixed')">
                 <el-tooltip content="参照知识库文档由 AI 起草本章节正文草稿" placement="bottom" :show-after="400">
                   <el-button size="small" @click="openNoteAiFill('ai')">🤖 AI 填充</el-button>
@@ -604,6 +649,12 @@
                 <div v-show="isGuidanceExpanded" class="gt-guidance-text">{{ activeTableGuidance }}</div>
               </div>
               <!-- 增强富文本编辑器：支持标题/加粗/斜体/列表/表格/缩进/颜色/占位符/源码/字数 -->
+              <!-- P0-3：「需补充」内联引导——text_content 含占位文本时琥珀提示 -->
+              <div v-if="hasPlaceholderText && !placeholderDismissed" class="gt-de-placeholder-hint">
+                <span class="gt-de-placeholder-icon">⚠️</span>
+                <span class="gt-de-placeholder-msg">当前说明含占位文本（需补充/暂未/待确认），请结合底稿披露表数据完善内容。</span>
+                <el-button size="small" link @click="placeholderDismissed = true" style="margin-left: auto; flex-shrink: 0;">关闭</el-button>
+              </div>
               <NoteRichTextEditor
                 v-model="textContent"
                 @update:modelValue="onRichTextChange"
@@ -1156,7 +1207,7 @@ import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import SelectionBar from '@/components/common/SelectionBar.vue'
 import TableSearchBar from '@/components/common/TableSearchBar.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { InfoFilled, Close, ArrowDown, ArrowRight } from '@element-plus/icons-vue'
+import { InfoFilled, Close, ArrowDown, ArrowRight, Loading } from '@element-plus/icons-vue'
 import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
 import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
 import NoteReadinessPanel from '@/components/disclosure/NoteReadinessPanel.vue'
@@ -1364,7 +1415,7 @@ const numbering = useNoteSectionNumbering(
 // ─── 章节树 composable（useNoteTree 抽取） ──────────────────────────────────
 const {
   noteList, treeLoading, treeSearch, noteTreeRef,
-  treeData, filteredTreeData,
+  treeData, filteredTreeData: baseFilteredTreeData,
   fetchTree, allowTreeDrop, onTreeNodeDrop, expandAll, collapseAll,
 } = useNoteTree({
   projectId,
@@ -1372,6 +1423,58 @@ const {
   templateType,
   isEqcrRole,
   onTreeLoaded: () => numbering.refreshNumbers(),
+})
+
+// ─── P2-9：附注树快捷筛选 ──────────────────────────────────────────────────────
+const treeFilter = ref<'all' | 'incomplete' | 'has_findings' | 'has_placeholder'>('all')
+const treeFilterOptions = [
+  { label: '全部', value: 'all' },
+  { label: '未编制', value: 'incomplete' },
+  { label: '校验异常', value: 'has_findings' },
+  { label: '待补充', value: 'has_placeholder' },
+]
+
+/** P0-3 树节点标记：叶子节点 text_content 是否含占位文本 */
+function nodeHasPlaceholderText(node: any): boolean {
+  const text = node?.data?.text_content || ''
+  return /需补充|暂未|待确认/.test(text)
+}
+
+/**
+ * filteredTreeData 在 useNoteTree 的 baseFilteredTreeData（搜索过滤）基础上
+ * 叠加快捷筛选条件。
+ */
+const filteredTreeData = computed(() => {
+  const base = baseFilteredTreeData.value
+  if (treeFilter.value === 'all') return base
+
+  const matchesFilter = (node: any): boolean => {
+    const d = node.data || node
+    switch (treeFilter.value) {
+      case 'incomplete':
+        return !d.text_content && !d.has_data
+      case 'has_findings':
+        return (d.findings?.error > 0) || (d.findings?.warning > 0)
+      case 'has_placeholder':
+        return /需补充|暂未|待确认/.test(d.text_content || '')
+      default:
+        return true
+    }
+  }
+
+  // 过滤各分组节点的子节点
+  return base.map(group => {
+    if (!group.children?.length) return group
+    const filtered = group.children.map(child => {
+      if (child.children) {
+        // 二级分组
+        const sub = child.children.filter(n => !n.isGroup && matchesFilter(n))
+        return sub.length ? { ...child, children: sub } : null
+      }
+      return !child.isGroup && matchesFilter(child) ? child : null
+    }).filter(Boolean)
+    return filtered.length ? { ...group, children: filtered } : null
+  }).filter(Boolean) as any[]
 })
 
 // ─── 侧栏拖拽调整宽度 ─────────────────────────────────────────────────────────
@@ -1591,6 +1694,14 @@ const currentNote = ref<DisclosureNoteDetail | null>(null)
 const textContent = ref('')
 const validationFindings = ref<NoteValidationFinding[]>([])
 const priorYearNote = ref<any>(null)
+
+// P0-3：检测 text_content 是否含占位文本（需补充/暂未/待确认）
+const placeholderDismissed = ref(false)
+const hasPlaceholderText = computed(() => {
+  const t = textContent.value
+  if (!t) return false
+  return /需补充|暂未|待确认/.test(t)
+})
 
 // 用户关闭的提示条（按 `note_section:tabIdx` 粒度记录，各表 Tab 独立关闭）
 const dismissedGuidance = reactive(new Set<string>())
@@ -2010,6 +2121,36 @@ const {
   fetchTree,
   staleRecalc: () => stale.recalc(),
   invalidateAllCache: () => invalidateDetailCache(),  // 全部刷新：清空全部章节缓存
+})
+
+// #20: 首次同步引导横幅（从未同步过的项目一次性提示）
+const syncHintDismissed = ref(localStorage.getItem(`gt_note_sync_hint_dismissed_${projectId.value}`) === 'true')
+const showSyncHint = computed(() => {
+  if (syncHintDismissed.value) return false
+  // noteList 全部无 last_sync_at 时视为从未同步
+  const list = noteList.value || []
+  if (!list.length) return false
+  return !list.some((n: any) => n.last_sync_at || n.last_sync_source)
+})
+function dismissSyncHint() {
+  syncHintDismissed.value = true
+  localStorage.setItem(`gt_note_sync_hint_dismissed_${projectId.value}`, 'true')
+}
+
+// #22: 编制进度统计
+const noteProgress = computed(() => {
+  const list = (noteList.value || []) as any[]
+  if (!list.length) return { complete: 0, textOnly: 0, tableOnly: 0, empty: 0, total: 0 }
+  let complete = 0, textOnly = 0, tableOnly = 0, empty = 0
+  for (const n of list) {
+    const hasText = !!(n.text_content && n.text_content.trim())
+    const hasData = !!n.has_data
+    if (hasText && hasData) complete++
+    else if (hasText) textOnly++
+    else if (hasData) tableOnly++
+    else empty++
+  }
+  return { complete, textOnly, tableOnly, empty, total: list.length }
 })
 
 const { resolveInstance: acnrResolveInstance } = useAcnr()
@@ -2523,6 +2664,7 @@ async function fetchDetail(noteSection: string, bypassCache = false) {
 
   // markdown 残留归一为 HTML（幂等），喂给 NoteRichTextEditor(v-model=textContent) 与 legacy editor
   textContent.value = renderNoteTextToHtml(currentNote.value.text_content)
+  placeholderDismissed.value = false // P0-3：切换章节重置占位文本提示
   if (editor.value) {
     editor.value.commands.setContent(textContent.value || '')
   }
@@ -2589,6 +2731,8 @@ const onValidate = withLoading(validateLoading, async () => {
       : undefined
     await validateDisclosureNotes(projectId.value, year.value, tt)
     validationFindings.value = await getValidationResults(projectId.value, year.value)
+    // 校验后刷新左树圆点（P0-2：makeNoteLeaf 从后端 findings 派生 validationStatus）
+    void fetchTree()
     if (validationFindings.value.length === 0) {
       ElMessage.success('校验完成，未发现需处理的问题')
     } else {
@@ -2608,7 +2752,7 @@ const onValidate = withLoading(validateLoading, async () => {
 })
 
 // ── 保存功能（useNotePersist composable）──
-const { saveLoading, justSaved, onSave } = useNotePersist({
+const { saveLoading, justSaved, onSave: _rawSave } = useNotePersist({
   currentNote,
   textContent,
   editMode,
@@ -2616,6 +2760,47 @@ const { saveLoading, justSaved, onSave } = useNotePersist({
   autoSaveClearDirty: () => autoSave.clearDirty(),
   clearAutoSaveDraft,
 })
+
+// ── Task #11：保存状态指示器 ──
+const saveStatus = ref<'idle' | 'saving' | 'saved' | 'error'>('idle')
+
+async function onSave() {
+  saveStatus.value = 'saving'
+  try {
+    await _rawSave()
+    saveStatus.value = 'saved'
+    setTimeout(() => { if (saveStatus.value === 'saved') saveStatus.value = 'idle' }, 3000)
+    // ── Task #12：保存成功后自动跳到下一未编制章节 ──
+    if (autoAdvance.value) {
+      const next = findNextIncompleteSection()
+      if (next) {
+        setTimeout(async () => {
+          await fetchDetail(next)
+          await locateTreeNode(next)
+        }, 500)
+      }
+    }
+  } catch {
+    saveStatus.value = 'error'
+  }
+}
+
+// ── Task #12：自动滚到下一未编制章节 ──
+const autoAdvance = ref(localStorage.getItem('gt_note_auto_advance') !== 'false')
+function toggleAutoAdvance(val: boolean) {
+  autoAdvance.value = val
+  localStorage.setItem('gt_note_auto_advance', String(val))
+}
+function findNextIncompleteSection(): string | null {
+  const list = noteList.value || []
+  const currentIdx = list.findIndex((n: any) => n.note_section === currentNote.value?.note_section)
+  if (currentIdx < 0) return null
+  for (let i = currentIdx + 1; i < list.length; i++) {
+    const n = list[i] as any
+    if (!n.text_content && !n.has_data) return n.note_section
+  }
+  return null
+}
 
 // 保存后更新缓存为当前最新状态（避免导航回来时拿到旧缓存）
 watch(justSaved, (saved) => {
