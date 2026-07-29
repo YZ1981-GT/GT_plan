@@ -1,9 +1,9 @@
 # 致同审计作业平台 — Spec 开发索引
 
-**最后更新**：2026-07-27
+**最后更新**：2026-07-29
 **当前分支**：`work/2026-05-30-wp-specs`
-**统计**：Active 1 / Archived 458 = 总计 459
-**最高迁移**：**V127**（以 `migration_status` 实测为准）
+**统计**：Active 0 / Archived 470 = 总计 470
+**最高迁移**：**V133**（以 `migration_status` 实测为准）
 **技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer
 
 ---
@@ -30,7 +30,7 @@
 
 | Spec | 阶段 | 说明 |
 |------|------|------|
-| `confirmation-linkage-completion` | 起步（仅 `.config.kiro`，需求/设计未成） | 并发会话新建，函证联动完成收口方向；待补三件套 |
+| *(无)* | — | 全部归档完毕 |
 
 ---
 
@@ -43,17 +43,51 @@ _archive/
 ├── 03-refinement-rounds/              9
 ├── 04-infra/                          2
 ├── 04-infra-architecture/            36
-├── 05-business-features/            223
+├── 05-business-features/            234
 ├── 06-engineering-governance/        13
 ├── 07-workpaper-slimdown/            22
-├── 08-disclosure-notes/              16
-├── 09-consolidation-phases/           4
+├── 08-disclosure-notes/              19
+├── 09-consolidation-phases/           5
 ├── 10-A~S-workpaper-all-cycles-complete/ 31
-├── 11-confirmation-d0-module/        10
+├── 11-confirmation-d0-module/        11
 ├── 12-2026-06-23-batch/              12
 ├── 13-2026-06-29-batch/              33
 └── 99-superseded/                     4
 ```
+
+### 最近归档（2026-07-29，12个已完成 spec 归档）
+
+**→ 05-business-features（+9）**
+
+| Spec | 说明 |
+|------|------|
+| advanced-query-consolidation | 高级查询模块合并收敛（12/12 全绿） |
+| attachment-workpaper-linkage-convergence | 附件↔底稿联动收敛（V133 唯一约束+ensure_wp_link 幂等+反查去重+解除关联+证据类型声明+OCR 双轨归一；23/23） |
+| f2-adjudication-import-export | F2 审定表导入导出（9/9 + 3.3* live 可选留待） |
+| f2-detail-ledger-pull | F2 明细表序时账取数（11/11） |
+| f2-four-table-extraction-refresh | F2 四表取数刷新（22/22，含灰度+Tier A 预设+面板+render 委托） |
+| hi-cycle-four-table-extraction | H/I 循环四表取数（14/14，含 H5/H6/H7/H9/I1-I6 全铺） |
+| lmn-four-table-extraction | L/M/N 循环四表取数（12/12 + 13* Playwright 可选留待） |
+| template-library-formula-preset-custom | 模板库公式预设通用/自定义（16/16，含隔离存储+覆盖策略+权限门控） |
+| work-hours-auto-collect-and-edit | 工时自动采集与编辑（18/18） |
+
+**→ 08-disclosure-notes（+1）**
+
+| Spec | 说明 |
+|------|------|
+| d-cycle-disclosure-note-enhancement | D3-D7 审定↔披露差异告警+批量同步（据实判定 Req1/Req2 对 D3-D7 冗余=cross-sheet-cell 恒等不接入；Req4 由现有「全部刷新」满足；产出 useDisclosureAdjudicationReconcile 通用工具；13/13） |
+
+**→ 09-consolidation-phases（+1）**
+
+| Spec | 说明 |
+|------|------|
+| consol-disclosure-note-persistence | 合并附注 V2 按项目灰度（note_formula_gray 镜像+wizard_state opt-in+灰度端点+P1-A(a) 删读端 schema 死字段；9/9） |
+
+**→ 11-confirmation-d0-module（+1）**
+
+| Spec | 说明 |
+|------|------|
+| confirmation-linkage-completion | 函证两价值孤儿正式做完（D0-4/D0-7 un-stub 从 D0-1 带入+dispatch_records 退役标 DEPRECATED+舞弊信号汇集 D0-8 真接线落 checklist_responses；19/19） |
 
 ### 最近归档（2026-07-27，本轮 8 个完成 spec 归档）
 
