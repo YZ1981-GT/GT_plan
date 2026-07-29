@@ -49,6 +49,14 @@
         />
 
         <!-- I5-1 审定表 -->
+        <HiFourTableSourcePanel
+          v-if="props.htmlData?.hi_extraction_enabled"
+          :wp-code="'I5'"
+          :segments="getHiExtractionSegments('I5')"
+          :all-responses="allResponses"
+          :is-readonly="isReadonly"
+          @refresh-complete="selfLoad()"
+        />
         <I5TabAdjudication
           v-else-if="currentSheet === 'I5-1'"
           :wp-id="props.wpId"
@@ -153,6 +161,8 @@ import { useI5CrossSheet } from './composables/useI5CrossSheet'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useI5DualMode } from './composables/useI5DualMode'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
+import HiFourTableSourcePanel from './shared/HiFourTableSourcePanel.vue'
+import { getHiExtractionSegments } from './composables/hiExtractionSegments'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))

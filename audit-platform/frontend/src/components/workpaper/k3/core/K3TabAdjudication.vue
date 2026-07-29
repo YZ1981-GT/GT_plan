@@ -360,6 +360,7 @@ const props = defineProps<{
   projectId: string
   allResponses: Map<string, any>
   tbData: { unadjusted2241: number; audited2241: number }
+  prefill?: Array<Record<string, unknown>>
   isReadonly: boolean
 }>()
 
@@ -387,6 +388,7 @@ const {
 } = useK3Adjudication({
   allResponses: allResponsesRef as any,
   tbData: tbDataRef as any,
+  prefill: toRef(props, 'prefill') as any,
   saveResponse: handleSaveItem,
   agingSegments,
 })

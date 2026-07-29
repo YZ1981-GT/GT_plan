@@ -113,10 +113,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, toRef, computed } from 'vue'
+import { ref, toRef, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
+import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
 import { useG14Disclosure } from '../composables/useG14Disclosure'
 import { G14_ACCOUNT_CODE, G14_DISCLOSURE_FORMULA_MAP } from '../composables/g14Constants'
 import { buildG14SyncPayloads } from '../composables/g14DisclosureSyncPayload'
@@ -148,6 +149,9 @@ const dis = useG14Disclosure({
 const isSyncing = ref(false)
 const noteSectionId = G14_NOTE_SECTION.listed
 const noteChip = computed(() => `Note:${noteSectionId}`)
+
+// 保存后自动同步到附注（防抖/非阻塞/失败静默/只读 gate）
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 
 const router = useRouter()
 // 跳转回附注模块（披露表 → 附注为单向推送；此处仅导航，方便相互编辑确认）
@@ -203,6 +207,13 @@ function onReconcileRefresh(): void {
   dis.pullLatestAdjudicated()
   dis.syncFromDetail()
 }
+
+// 数据变更后自动同步到附注（debounce 由 autoSync 内部 800ms 控制，只读/失败静默）
+watch(
+  [dis.displayRows, dis.noteText],
+  () => { autoSync.scheduleAutoSync(syncToNotes) },
+  { deep: true },
+)
 </script>
 
 <style scoped>

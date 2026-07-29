@@ -6,6 +6,7 @@
       <div class="header-actions">
         <el-button size="small" type="primary" plain :loading="aiGenerating" @click="handleAiGenerate"><el-icon v-if="!aiGenerating"><MagicStick /></el-icon> AI辅助</el-button>
         <GtReviewTrigger section-id="K11-disclosure-soe" label="💬 复核" />
+        <el-button size="small" type="success" :disabled="isReadonly" @click="syncToDisclosureNotes">同步到附注</el-button>
         <el-button size="small" type="primary" plain :disabled="!projectId" @click="jumpToNote('soe')">↩ 跳转回附注</el-button>
       </div>
     </div>
@@ -122,7 +123,7 @@
  * - el-card包裹
  * - 大表格用虚拟滚动（max-height限制）
  */
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, onBeforeUnmount } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
 import { normalizeImpairmentCategory } from '../../composables/useK11Adjudication'
@@ -131,6 +132,9 @@ import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
+import http from '@/utils/http'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import { buildK11SyncPayload } from '../../composables/k11NoteSectionMap'
 
 const ABNORMAL_THRESHOLD = 0.3
 
@@ -142,6 +146,9 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{ (e: 'save', itemId: string, value: any): void }>()
+
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+onBeforeUnmount(() => autoSync.cancelPending())
 
 const { generating: aiGenerating, generate: aiGenerate } = useK11AiGenerate({ wpId: () => props.wpId })
 
@@ -293,6 +300,7 @@ function updateField(id: string, field: string, value: any): void {
   if (row) {
     ;(row as any)[field] = value
     persistRows()
+    autoSync.scheduleAutoSync(syncToDisclosureNotes)
   }
 }
 
@@ -311,6 +319,22 @@ function handleNarrativeSave(): void {
     sectionIds: ['资产减值损失', '五、75'],
     text: narrativeText.value,
   })
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
+}
+
+async function syncToDisclosureNotes(): Promise<void> {
+  if (!props.projectId || props.isReadonly) return
+  const payload = buildK11SyncPayload('soe', props.wpId || '',
+    disclosureRows.value.map(r => ({ project: r.category, currentAmount: r.currentProvision - r.currentReversal, priorAmount: r.priorAmount })),
+    narrativeText.value)
+  try {
+    await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
+    eventBus.emit('disclosure:note-text-updated' as any, {
+      wpCode: 'K11', variant: 'soe', accountCode: '6701',
+      projectId: props.projectId, sectionIds: ['八、74'],
+    })
+    ElMessage.success('已同步到附注')
+  } catch { /* silent */ }
 }
 
 // ─── 合计汇总方法 ────────────────────────────────────────────────────────────

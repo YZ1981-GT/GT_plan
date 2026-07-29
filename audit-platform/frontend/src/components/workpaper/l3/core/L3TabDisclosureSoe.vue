@@ -6,6 +6,12 @@
         <el-button text size="small" @click="$emit('navigate', '底稿目录')">← 返回目录</el-button>
         <h3 class="disclosure-title">附注披露（国企）信息核对</h3>
       </div>
+      <div class="disclosure-header-right">
+        <el-button size="small" type="success" :loading="syncing" :disabled="isReadonly" @click="syncToDisclosureNotes">
+          同步到附注（八、49）
+        </el-button>
+        <el-button size="small" type="primary" plain :disabled="!projectId" @click="jumpToNote('soe')">↩ 跳转回附注</el-button>
+      </div>
     </div>
 
     <!-- ═══ 方法论上下文 ═══ -->
@@ -104,12 +110,18 @@
  *
  * 科目：2501 长期借款（贷方/负债类）
  */
-import { inject, onMounted, onUnmounted } from 'vue'
+import { inject, onMounted, onUnmounted, onBeforeUnmount, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import http from '@/utils/http'
 import type { useL3FormData } from '@/components/workpaper/composables/useL3FormData'
 import { useL3Disclosure, type L3DisclosureRow, type L3CurrentPortionRow } from '@/components/workpaper/composables/useL3Disclosure'
 import { eventBus } from '@/utils/eventBus'
+import { L3_NOTE_SECTION, buildL3SyncPayload } from '../../composables/l3NoteSectionMap'
+import { buildNoteJumpRoute } from '@/views/composables/noteDisclosureReverseJump'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 
-defineProps<{
+const props = defineProps<{
   wpId: string
   projectId: string
   isReadonly: boolean
@@ -118,6 +130,7 @@ defineProps<{
 defineEmits<{ (e: 'navigate', sheetName: string): void }>()
 
 const formData = inject<ReturnType<typeof useL3FormData>>('l3FormData')!
+const router = useRouter()
 
 const {
   classificationRows,
@@ -139,6 +152,55 @@ onMounted(() => {
 onUnmounted(() => {
   eventBus.off('substantive:adjudicated', handleAdjudicatedRefresh)
 })
+
+// ─── 同步到附注 + 反向跳转 ───────────────────────────────────────────────────
+const syncing = ref(false)
+async function syncToDisclosureNotes() {
+  if (props.isReadonly || !props.projectId) return
+  syncing.value = true
+  try {
+    const { sub_table_data, columns } = buildL3SyncPayload({
+      variant: 'soe',
+      classificationRows: classificationRows.value,
+      currentPortionRows: currentPortionRows.value,
+      rateRange,
+      propertyNote: '',
+      conclusion: conclusion.value,
+    })
+    await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, {
+      wp_id: props.wpId,
+      sheet_name: 'L3-note-soe',
+      section_id: L3_NOTE_SECTION.soe,
+      current_standard: 'soe_standalone',
+      sub_table_data,
+      columns,
+    })
+    ElMessage.success(`已同步到附注（${L3_NOTE_SECTION.soe}）`)
+    eventBus.emit('disclosure:note-text-updated' as any, {
+      wpCode: 'L3', accountCode: '2501', projectId: props.projectId,
+      sectionIds: [L3_NOTE_SECTION.soe],
+    })
+  } catch { ElMessage.warning('同步附注失败') }
+  finally { syncing.value = false }
+}
+
+function jumpToNote(variant: 'listed' | 'soe') {
+  const route = buildNoteJumpRoute(props.projectId, 'L3', variant)
+  if (route) router.push(route)
+}
+
+// ─── 保存后自动同步（防抖/非阻塞/失败静默）──────────────────────────────────
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+onBeforeUnmount(() => autoSync.cancelPending())
+let _l3SoeMounted = false
+watch(
+  [classificationRows, currentPortionRows, repaidNote, extensionNote, conclusion],
+  () => {
+    if (!_l3SoeMounted) { _l3SoeMounted = true; return }
+    autoSync.scheduleAutoSync(syncToDisclosureNotes)
+  },
+  { deep: true },
+)
 
 function rowClass({ row }: { row: L3DisclosureRow }): string {
   if (row.isTotal) return 'total-row'

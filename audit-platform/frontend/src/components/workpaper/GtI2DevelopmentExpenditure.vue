@@ -75,6 +75,14 @@
         />
 
         <!-- I2-1 审定表 -->
+        <HiFourTableSourcePanel
+          v-if="props.htmlData?.hi_extraction_enabled"
+          :wp-code="'I2'"
+          :segments="getHiExtractionSegments('I2')"
+          :all-responses="allResponses"
+          :is-readonly="isReadonly"
+          @refresh-complete="selfLoad()"
+        />
         <I2TabAdjudication
           v-else-if="currentSheet === 'I2-1'"
           :sheet-name="props.sheetName || ''"
@@ -364,6 +372,8 @@ import { useI2CrossSheet } from './composables/useI2CrossSheet'
 import { useI2DualMode } from './composables/useI2DualMode'
 import { fetchI2TbData, persistI2TbData } from './composables/useI2FormData'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
+import HiFourTableSourcePanel from './shared/HiFourTableSourcePanel.vue'
+import { getHiExtractionSegments } from './composables/hiExtractionSegments'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))

@@ -5,6 +5,7 @@ import { ref, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import type { ImpairmentTestRow } from './useF2ImpairmentTest'
+import { buildLinkedOcrFormData } from './ocrAttachmentLinkage'
 
 export interface F2ImpairmentOcrFields {
   itemName?: string
@@ -22,7 +23,7 @@ function parseNum(v: number | string | undefined): number {
   return Number.isFinite(n) ? n : 0
 }
 
-export function useF2ImpairmentOcr(wpId: Ref<string>) {
+export function useF2ImpairmentOcr(wpId: Ref<string>, projectId?: Ref<string>) {
   const ocrLoadingId = ref<string | null>(null)
 
   async function uploadAndMerge(
@@ -31,12 +32,14 @@ export function useF2ImpairmentOcr(wpId: Ref<string>) {
     updateRow: (id: string, patch: Partial<ImpairmentTestRow>) => void,
   ): Promise<void> {
     ocrLoadingId.value = rowId
-    const formData = new FormData()
-    formData.append('file', file)
     try {
+      const { form } = await buildLinkedOcrFormData(file, {
+        projectId: projectId?.value,
+        wpId: wpId.value,
+      })
       const res = await http.post(
         `/api/workpapers/${wpId.value}/f2-val/contract-ocr`,
-        formData,
+        form,
         { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
       )
       const data = res.data?.data ?? res.data

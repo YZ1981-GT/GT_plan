@@ -186,6 +186,7 @@ import {
 } from '../../composables/h8SoeDisclosureModel'
 import { buildH8SoeSyncPayloads } from '../../composables/h8DisclosureSyncPayload'
 import { H8_NOTE_SECTION } from '../../composables/h8NoteSectionMap'
+import { useAuditContext } from '@/composables/useAuditContext'
 
 const props = defineProps<{
   wpId: string
@@ -321,7 +322,8 @@ async function checkNoteConsistency(silent = false) {
   if (!props.projectId) return
   noteCheckState.value = 'loading'
   try {
-    const year = new Date().getFullYear()
+    const { year: auditYear } = useAuditContext()
+    const year = auditYear.value || new Date().getFullYear()
     const res: any = await api.get(
       `/api/disclosure-notes/${props.projectId}/${year}/${noteSectionId}`,
       { _silent: true } as any,

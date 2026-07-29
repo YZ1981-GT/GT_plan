@@ -792,6 +792,13 @@ async function syncToNotes() {
     )
     const data = result?.data ?? result
     ElMessage.success(`已同步 ${Number(data?.rows_synced ?? 0)} 行到附注「${noteSectionId} 固定资产」`)
+    eventBus.emit('disclosure:note-text-updated' as any, {
+      wpCode: 'H1',
+      accountCode: '1601',
+      projectId: props.projectId,
+      section: noteSectionId,
+      sectionIds: [noteSectionId],
+    })
   } catch {
     ElMessage.warning('同步附注失败，请稍后重试')
   } finally {

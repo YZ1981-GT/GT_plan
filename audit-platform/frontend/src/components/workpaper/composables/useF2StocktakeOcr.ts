@@ -4,6 +4,7 @@
 import { ref, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
+import { buildLinkedOcrFormData } from './ocrAttachmentLinkage'
 
 export type F2StOcrSheet = 'F2-24' | 'F2-25' | 'F2-26'
 
@@ -17,7 +18,7 @@ function str(v: unknown): string {
   return v == null ? '' : String(v)
 }
 
-export function useF2StocktakeOcr(wpId: Ref<string>) {
+export function useF2StocktakeOcr(wpId: Ref<string>, projectId?: Ref<string>) {
   const ocrLoadingId = ref<string | null>(null)
 
   async function uploadAndMerge<T extends { id: string }>(
@@ -27,12 +28,14 @@ export function useF2StocktakeOcr(wpId: Ref<string>) {
     updateRow: (id: string, patch: Partial<T>) => void,
   ): Promise<void> {
     ocrLoadingId.value = rowId
-    const formData = new FormData()
-    formData.append('file', file)
     try {
+      const { form } = await buildLinkedOcrFormData(file, {
+        projectId: projectId?.value,
+        wpId: wpId.value,
+      })
       const res = await http.post(
         `/api/workpapers/${wpId.value}/f2-st/contract-ocr?sheet=${encodeURIComponent(sheet)}`,
-        formData,
+        form,
         { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
       )
       const data = res.data?.data ?? res.data

@@ -49,6 +49,14 @@
         />
 
         <!-- I3-1 审定表（66公式，商誉不摊销！） -->
+        <HiFourTableSourcePanel
+          v-if="props.htmlData?.hi_extraction_enabled"
+          :wp-code="'I3'"
+          :segments="getHiExtractionSegments('I3')"
+          :all-responses="allResponses"
+          :is-readonly="isReadonly"
+          @refresh-complete="selfLoad()"
+        />
         <I3TabAdjudication
           v-else-if="currentSheet === 'I3-1'"
           :wp-id="props.wpId"
@@ -211,6 +219,8 @@ import http from '@/utils/http'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useI3DualMode } from './composables/useI3DualMode'
 import { useI3CrossSheet } from './composables/useI3CrossSheet'
+import HiFourTableSourcePanel from './shared/HiFourTableSourcePanel.vue'
+import { getHiExtractionSegments } from './composables/hiExtractionSegments'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))

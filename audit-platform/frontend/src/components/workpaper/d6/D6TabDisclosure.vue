@@ -1,5 +1,8 @@
 <template>
 <div class="d6-disclosure">
+  <!-- 同步状态条 -->
+  <GtWpDisclosureSyncBar :project-id="projectId" :year="auditYear" :wp-code="'D6'" :sheet-name="displayVariant === 'soe' ? '附注披露信息（国企）' : '附注披露信息(上市公司）'" />
+
   <!-- 编制提示 -->
   <details class="guidance-details">
     <summary>📋 编制提示</summary>
@@ -394,13 +397,13 @@
 /**
  * D6TabDisclosure.vue — 附注披露（上市5子节 / 国企3子节）
  */
-import { computed, inject, ref, toRef, watch, onUnmounted, type Ref } from 'vue'
+import { computed, inject, ref, toRef, watch, onBeforeUnmount, type Ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
+import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
 import { useD6Disclosure } from '../composables/useD6Disclosure'
 import { useD6ImportExport } from '../composables/useD6ImportExport'
-import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
 import {
   buildD6SyncPayload,
   D6_NOTE_SECTION,
@@ -409,9 +412,12 @@ import {
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import type { ChecklistResponse } from '../composables/useD6FormData'
 import type useD6CrossSheet from '../composables/useD6CrossSheet'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { checkNoteConsistencyGeneric } from '../composables/noteConsistencyCheck'
 
 // @ts-ignore
 import GtIndexChip from '../GtIndexChip.vue'
+import GtWpDisclosureSyncBar from '../GtWpDisclosureSyncBar.vue'
 
 const props = defineProps<{
   wpId: string
@@ -424,6 +430,8 @@ const props = defineProps<{
 }>()
 
 const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
+
+const { year: auditYear } = useAuditContext()
 
 const {
   listedSections, soeSections, showListed, showSoe, activeVariant,
@@ -442,6 +450,19 @@ const {
 if (props.variant) {
   activeVariant.value = props.variant
 }
+
+// ─── 保存后自动同步到附注（防抖/非阻塞/失败静默）──────────────────────────────
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+onBeforeUnmount(() => autoSync.cancelPending())
+let _d6Mounted = false
+watch(
+  [listedSections, soeSections, groupedDetails, majorChangeRows, noteTexts],
+  () => {
+    if (!_d6Mounted) { _d6Mounted = true; return }
+    autoSync.scheduleAutoSync(syncToDisclosureNotes)
+  },
+  { deep: true },
+)
 
 // ─── 导入导出（参照 D4-2）：重大变动表 + 组合明细表 ─────────────────────
 const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
@@ -614,6 +635,8 @@ async function syncToDisclosureNotes(): Promise<void> {
       },
     }))
     ElMessage.success(`已同步 ${rows} 行到附注模块「${D6_NOTE_SECTION[variant]} 合同资产」`)
+    // 静默校对附注合计一致性
+    checkNoteConsistencyGeneric(props.projectId, auditYear.value, D6_NOTE_SECTION[variant], 0, true)
   } catch {
     ElMessage.warning('同步附注失败，请稍后重试')
   } finally {
@@ -621,18 +644,7 @@ async function syncToDisclosureNotes(): Promise<void> {
   }
 }
 
-// 保存后自动同步（防抖/非阻塞/失败静默/只读 gate）
-const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
-onUnmounted(() => autoSync.cancelPending())
-let autoSyncArmed = false
-watch(
-  [noteTexts, majorChangeRows, groupedDetails, listedSections, soeSections],
-  () => {
-    if (!autoSyncArmed) { autoSyncArmed = true; return }
-    autoSync.scheduleAutoSync(syncToDisclosureNotes)
-  },
-  { deep: true },
-)
+
 </script>
 
 <style scoped>

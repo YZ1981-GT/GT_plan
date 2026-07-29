@@ -48,6 +48,15 @@
 
     <div class="toolbar">
       <div class="toolbar-left">
+        <el-button
+          v-if="canPullLedger"
+          size="small"
+          type="warning"
+          plain
+          :loading="ledgerPulling"
+          :disabled="isReadonly"
+          @click="handleLedgerPull"
+        >📥 从序时账取数</el-button>
         <el-button size="small" type="primary" :disabled="isReadonly" @click="detail.addRow()">
           {{ isPartyMode ? '新增明细' : '新增品名' }}
         </el-button>
@@ -520,11 +529,13 @@
 
 <script setup lang="ts">
 import { computed, inject, toRef, ref, type Ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   useF2DetailSheet,
   type F2DetailRow,
 } from '../../composables/useF2DetailSheet'
 import { useF2AiGenerate, type F2AiSection } from '../../composables/useF2AiGenerate'
+import { F2_DETAIL_SHEET_ACCOUNT, pullF2DetailFromLedger } from '../../composables/f2DetailLedgerPull'
 import CycleImportExportDropdown from '../../shared/CycleImportExportDropdown.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import type { ChecklistResponse } from '../../composables/useF2FormData'
@@ -598,6 +609,70 @@ const detail = useF2DetailSheet({
   projectId: computed(() => props.projectId || ''),
   year: computed(() => props.year || 0),
 })
+
+const canPullLedger = computed(() => !!F2_DETAIL_SHEET_ACCOUNT[props.config.sheetCode])
+const ledgerPulling = ref(false)
+
+async function handleLedgerPull(): Promise<void> {
+  if (!props.projectId || !props.config.accountCode) return
+  ledgerPulling.value = true
+  try {
+    const auditYear = props.year ?? new Date().getFullYear() - 1
+    const result = await pullF2DetailFromLedger(
+      props.projectId,
+      props.config.accountCode,
+      auditYear,
+    )
+    if (!result.rows.length) {
+      ElMessage.info('该科目序时账无数据')
+      return
+    }
+    // 预览确认
+    const existingNames = new Set(detail.rows.value.map((r) => r.itemName?.trim()))
+    const matchCount = result.rows.filter((r) => existingNames.has(r.name)).length
+    const newCount = result.rows.length - matchCount
+    try {
+      await ElMessageBox.confirm(
+        `序时账共 ${result.rows.length} 个明细科目（匹配 ${matchCount} / 新增 ${newCount}），合计增加 ${result.totalIncrease.toLocaleString()} / 减少 ${result.totalDecrease.toLocaleString()}。\n确认填入？`,
+        '从序时账取数',
+        { confirmButtonText: '填入', cancelButtonText: '取消', type: 'info' },
+      )
+    } catch { return }
+    // 逐行填入
+    for (const pullRow of result.rows) {
+      const existingRow = detail.rows.value.find((r) => r.itemName?.trim() === pullRow.name)
+      if (existingRow) {
+        // 手工优先：已有非零值不覆盖
+        const patch: Partial<F2DetailRow> = {}
+        if (!existingRow.increaseAmt || existingRow.increaseAmt === 0) {
+          patch.increaseAmt = pullRow.increase
+        }
+        if (!existingRow.decreaseAmt || existingRow.decreaseAmt === 0) {
+          patch.decreaseAmt = pullRow.decrease
+        }
+        if (Object.keys(patch).length) {
+          detail.updateRow(existingRow.id, patch)
+        }
+      } else {
+        // 追加新行
+        detail.addRow()
+        const newRow = detail.rows.value[detail.rows.value.length - 1]
+        if (newRow) {
+          detail.updateRow(newRow.id, {
+            itemName: pullRow.name,
+            increaseAmt: pullRow.increase,
+            decreaseAmt: pullRow.decrease,
+          })
+        }
+      }
+    }
+    ElMessage.success(`已填入 ${result.rows.length} 个明细科目`)
+  } catch {
+    ElMessage.warning('序时账取数失败，请稍后重试')
+  } finally {
+    ledgerPulling.value = false
+  }
+}
 
 const showMove = computed(() => detail.activeView.value === 'movement' || detail.activeView.value === 'full')
 const showAging = computed(() => detail.activeView.value === 'aging' || detail.activeView.value === 'full')

@@ -1,11 +1,12 @@
 <script setup lang="ts">
 /** F3TabDisclosureListed — 附注披露（上市）| 与附注模块（五、36 应付票据）联动 */
-import { ref, toRef, type Ref } from 'vue'
+import { ref, toRef, watch, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { useF3DisclosureListed } from '../composables/useF3DisclosureListed'
 import { useF3AiGenerate } from '../composables/useF3AiGenerate'
 import { buildF3SyncPayload, F3_NOTE_SECTION } from '../composables/f3NoteSectionMap'
+import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
 import GtIndexChip from '../GtIndexChip.vue'
 
 const props = defineProps<{
@@ -52,6 +53,9 @@ async function generateListedNote(): Promise<void> {
   if (text) noteText.value = text
 }
 
+// 保存后自动同步到附注（防抖/非阻塞/失败静默/只读 gate）
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+
 // ─── 同步到附注模块（disclosure_notes 五、36 应付票据，单向 push 保证披露一致） ───
 const noteSectionId = F3_NOTE_SECTION.listed
 const isSyncing = ref(false)
@@ -84,6 +88,11 @@ async function syncToDisclosureNotes(): Promise<void> {
     isSyncing.value = false
   }
 }
+
+// 数据变更后自动同步到附注（debounce 由 autoSync 内部 800ms 控制，只读/失败静默）
+watch([section1Rows, section2Rows, noteText], () => {
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
+}, { deep: true })
 </script>
 
 <template>

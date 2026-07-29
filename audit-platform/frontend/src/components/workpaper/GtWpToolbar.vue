@@ -22,6 +22,9 @@
       <slot name="center" />
     </div>
     <div class="gt-wp-toolbar__right">
+      <el-button size="small" @click="$emit('open-attachments')">
+        <el-icon><Paperclip /></el-icon> 关联附件
+      </el-button>
       <el-button size="small" @click="$emit('add-row')">
         <el-icon><Plus /></el-icon> 增行
       </el-button>
@@ -37,7 +40,7 @@
 </template>
 
 <script setup lang="ts">
-import { Download, Document, Upload, Plus, FullScreen } from '@element-plus/icons-vue'
+import { Download, Document, Upload, Plus, FullScreen, Paperclip } from '@element-plus/icons-vue'
 
 defineProps<{
   fullscreen?: boolean
@@ -50,6 +53,7 @@ defineEmits<{
   'import-data': []
   'add-row': []
   'toggle-fullscreen': []
+  'open-attachments': []
 }>()
 </script>
 

@@ -51,6 +51,7 @@ export interface K4ReconciliationResult {
 export interface UseK4AdjudicationParams {
   allResponses: Ref<Map<string, any>>
   tbData: Ref<K4TbData>
+  prefill?: Ref<Array<{ name: string; code?: string; opening_balance: number; closing_balance: number }> | undefined>
   saveResponse: Function
 }
 
@@ -82,7 +83,7 @@ const ROW_LABELS = [
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useK4Adjudication(params: UseK4AdjudicationParams) {
-  const { allResponses, tbData, saveResponse } = params
+  const { allResponses, tbData, prefill, saveResponse } = params
 
   // ─── State ─────────────────────────────────────────────────────────────────
 
@@ -151,6 +152,34 @@ export function useK4Adjudication(params: UseK4AdjudicationParams) {
     return { diff, isBalanced: Math.abs(diff) < 0.01 }
   })
 
+  // ─── 从 tb_balance 明细子科目逐行预填 ─────────────────────────────────────
+
+  function seedFromPrefill(): void {
+    if (!prefill?.value || prefill.value.length === 0) return
+    const hasAnyUnadj = rows.value.some(r => r.unadjusted !== 0)
+    if (hasAnyUnadj) return
+    const savedTotal = num(allResponses.value, 'K4-1-audited-total')
+    if (savedTotal !== 0) return
+    const count = prefill.value.length
+    allResponses.value.set('K4-1-row-count', { item_id: 'K4-1-row-count', conclusion: null, remark: String(count) })
+    for (let i = 0; i < count; i++) {
+      const p = prefill.value[i]
+      const id = `K4-1-r${i}`
+      allResponses.value.set(`${id}-label`, { item_id: `${id}-label`, conclusion: null, remark: p.name })
+      allResponses.value.set(`${id}-begin`, { item_id: `${id}-begin`, conclusion: null, remark: String(p.opening_balance) })
+      allResponses.value.set(`${id}-unadj`, { item_id: `${id}-unadj`, conclusion: null, remark: String(p.closing_balance) })
+    }
+    // 持久化到 DB
+    saveResponse('K4-1-row-count', { remark: String(count) })
+    for (let i = 0; i < count; i++) {
+      const p = prefill.value[i]
+      const id = `K4-1-r${i}`
+      saveResponse(`${id}-label`, { remark: p.name })
+      saveResponse(`${id}-begin`, { remark: String(p.opening_balance) })
+      saveResponse(`${id}-unadj`, { remark: String(p.closing_balance) })
+    }
+  }
+
   // ─── 从 allResponses 初始化审计说明 ────────────────────────────────────────
 
   function initFromResponses(): void {
@@ -178,6 +207,7 @@ export function useK4Adjudication(params: UseK4AdjudicationParams) {
   // ─── Watch init ────────────────────────────────────────────────────────────
 
   watch(allResponses, () => initFromResponses(), { immediate: true })
+  watch([() => prefill?.value], () => seedFromPrefill(), { immediate: true })
 
   // ─── Return ────────────────────────────────────────────────────────────────
 

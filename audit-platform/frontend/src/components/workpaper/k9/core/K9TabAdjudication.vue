@@ -22,6 +22,10 @@
         <el-button size="small" type="warning" plain :disabled="isReadonly" @click="handleFillFromDetail">
           从 K9-2 带入
         </el-button>
+        <el-button size="small" type="success" plain :disabled="isReadonly" @click="handleRefreshFromTb">
+          🔄 从四表库刷新
+        </el-button>
+
         <el-button size="small" type="primary" plain :loading="aiLoading" @click="handleAiGenerate">
           <el-icon><MagicStick /></el-icon> AI审计说明
         </el-button>
@@ -55,6 +59,14 @@
         </template>
       </el-alert>
     </div>
+
+    <!-- 四表取数来源面板 -->
+    <GtAdjudicationSourcePanel
+      :prefill="prefill ?? []"
+      account-prefix="6602"
+      mode="income"
+      direction="debit"
+    />
 
     <!-- ═══ 审定表主表（44行虚拟滚动） ═══ -->
     <el-table
@@ -287,9 +299,10 @@
  * Requirements: 2.1-2.7
  */
 import { computed, inject, toRef, ref, type Ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, CircleCheckFilled, WarningFilled, ChatDotSquare, Download } from '@element-plus/icons-vue'
 import { useK9Adjudication, type K9AdjRow } from '../../composables/useK9Adjudication'
+import GtAdjudicationSourcePanel from '../../shared/GtAdjudicationSourcePanel.vue'
 import { generateK9AiText } from '../../composables/useK9AiText'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
@@ -327,6 +340,7 @@ const {
   adjustmentReconcile,
   updateCell,
   fillFromDetail,
+  refreshFromPrefill,
   writeback,
   saveNote,
   saveConclusion,
@@ -381,6 +395,19 @@ function handleFillFromDetail(): void {
   const r = fillFromDetail()
   if (r.ok) ElMessage.success(r.message)
   else ElMessage.warning(r.message)
+}
+
+async function handleRefreshFromTb(): Promise<void> {
+  try {
+    await ElMessageBox.confirm(
+      '将使用四表库最新数据覆盖当前各行未审数（借方/贷方发生额）。\n已填写的 AJE、RJE、备注不受影响。',
+      '🔄 从四表库刷新',
+      { confirmButtonText: '确认刷新', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch { return }
+  // 调 composable 暴露的 refreshFromPrefill
+  refreshFromPrefill()
+  ElMessage.success('已从四表库刷新未审数')
 }
 
 function handleSaveNote(): void {

@@ -31,6 +31,7 @@
         <div class="section-title-row">
           <span class="section-title">（一）其他流动负债汇总</span>
           <div class="title-actions">
+            <el-button size="small" type="success" :disabled="isReadonly" @click="syncToDisclosureNotes">同步到附注</el-button>
             <el-button v-if="!isReadonly" size="small" type="warning" plain @click="seedSummaryFromK41">从K4-1预填</el-button>
             <el-button size="small" type="default" link @click="handleReview('disc-listed-summary')">💬</el-button>
           </div>
@@ -230,13 +231,14 @@
  * 科目：2245 其他流动负债（负债类）
  */
 import { ref, reactive, computed, inject, onMounted, onBeforeUnmount } from 'vue'
-import { ref, reactive, computed, inject, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { MagicStick, Delete } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
 import type { WorkpaperRuntimeContext } from '../../composables/useWorkpaperScaffold'
 import { WorkpaperRuntimeContextKey } from '../../composables/useWorkpaperScaffold'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import { buildK4SyncPayload } from '../../composables/k4NoteSectionMap'
 
 const K4_ACCOUNT_CODE = '2245'
 
@@ -253,6 +255,7 @@ const emit = defineEmits<{
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 
 // ─── 数据模型 ─────────────────────────────────────────────────────────────────
 interface SummaryRow { item: string; endBalance: number; beginBalance: number; remark: string; isTotal?: boolean }
@@ -334,16 +337,33 @@ function addBondContFromDetail(): void {
   ElMessage.success(`已从债券明细带入 ${missingBonds.length} 条到续表`)
 }
 
+// ─── 同步到附注 ───────────────────────────────────────────────────────────────
+async function syncToDisclosureNotes(): Promise<void> {
+  if (!props.projectId || props.isReadonly) return
+  const rows = summaryRows.filter(r => !r.isTotal).map(r => ({ project: r.item, endAmount: r.endBalance ?? 0, priorAmount: r.beginBalance ?? 0 }))
+  const narrative = noteText.value
+  const payload = buildK4SyncPayload('listed', props.wpId || '', rows, narrative)
+  try {
+    await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
+    eventBus.emit('disclosure:note-text-updated' as any, {
+      wpCode: 'K4', variant: 'listed', accountCode: '2245',
+      projectId: props.projectId, sectionIds: ['五、44'],
+    })
+    ElMessage.success('已同步到附注')
+  } catch { /* silent */ }
+}
+
 // ─── 持久化 ───────────────────────────────────────────────────────────────────
 function persistSummary(): void {
   recalcSummaryTotal()
   emit('save', 'K4-disc-listed-summary', { remark: JSON.stringify(summaryRows) })
   scheduleAutoSnapshot()
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
 }
-function persistBonds(): void { emit('save', 'K4-disc-listed-bonds', { remark: JSON.stringify(bondRows.value) }); scheduleAutoSnapshot() }
-function persistBondCont(): void { emit('save', 'K4-disc-listed-bond-cont', { remark: JSON.stringify(bondContRows.value) }); scheduleAutoSnapshot() }
-function persistGrants(): void { emit('save', 'K4-disc-listed-grants', { remark: JSON.stringify(grantRows.value) }); scheduleAutoSnapshot() }
-function persistNote(): void { emit('save', 'K4-disc-listed-note', { remark: noteText.value }) }
+function persistBonds(): void { emit('save', 'K4-disc-listed-bonds', { remark: JSON.stringify(bondRows.value) }); scheduleAutoSnapshot(); autoSync.scheduleAutoSync(syncToDisclosureNotes) }
+function persistBondCont(): void { emit('save', 'K4-disc-listed-bond-cont', { remark: JSON.stringify(bondContRows.value) }); scheduleAutoSnapshot(); autoSync.scheduleAutoSync(syncToDisclosureNotes) }
+function persistGrants(): void { emit('save', 'K4-disc-listed-grants', { remark: JSON.stringify(grantRows.value) }); scheduleAutoSnapshot(); autoSync.scheduleAutoSync(syncToDisclosureNotes) }
+function persistNote(): void { emit('save', 'K4-disc-listed-note', { remark: noteText.value }); autoSync.scheduleAutoSync(syncToDisclosureNotes) }
 
 function scheduleAutoSnapshot(): void {
   try { runtime?.version?.scheduleAutoSnapshot?.() } catch { /* silent */ }
@@ -458,6 +478,7 @@ onMounted(() => {
 })
 onBeforeUnmount(() => {
   eventBus.off('substantive:adjudicated', handleAdjudicated)
+  autoSync.cancelPending()
 })
 
 function handleReview(id: string): void { openReviewDialog(id) }

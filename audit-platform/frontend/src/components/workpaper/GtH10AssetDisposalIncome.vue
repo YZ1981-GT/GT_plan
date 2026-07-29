@@ -33,6 +33,14 @@
         :is-readonly="isReadonly"
       />
 
+      <HiFourTableSourcePanel
+        v-if="props.htmlData?.hi_extraction_enabled"
+        :wp-code="'H10'"
+        :segments="getHiExtractionSegments('H10')"
+        :all-responses="allResponses"
+        :is-readonly="isReadonly"
+        @refresh-complete="selfLoad()"
+      />
       <H10TabAdjudication
         v-else-if="currentSheet === 'H10-1'"
         :all-responses="formData.allResponses.value"
@@ -145,6 +153,8 @@ import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThrea
 import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInjections'
 import { H10_ACCOUNT_CODE } from './composables/h10Constants'
 import type { ChecklistResponse } from './composables/useF1FormData'
+import HiFourTableSourcePanel from './shared/HiFourTableSourcePanel.vue'
+import { getHiExtractionSegments } from './composables/hiExtractionSegments'
 
 const H10TabProcedure = defineAsyncComponent(() => import('./h10/core/H10TabProcedure.vue'))
 const H10TabAdjudication = defineAsyncComponent(() => import('./h10/core/H10TabAdjudication.vue'))

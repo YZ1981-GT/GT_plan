@@ -50,6 +50,7 @@ export interface K5ReconciliationResult {
 export interface UseK5AdjudicationParams {
   allResponses: Ref<Map<string, any>>
   tbData: Ref<K5TbData>
+  prefill?: Ref<Array<{ name: string; code?: string; opening_balance: number; closing_balance: number }> | undefined>
   saveResponse: (field: string, value: any) => Promise<void>
 }
 
@@ -81,7 +82,7 @@ const ROW_LABELS = [
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useK5Adjudication(params: UseK5AdjudicationParams) {
-  const { allResponses, tbData, saveResponse } = params
+  const { allResponses, tbData, prefill, saveResponse } = params
 
   // ─── State ─────────────────────────────────────────────────────────────────
 
@@ -172,6 +173,37 @@ export function useK5Adjudication(params: UseK5AdjudicationParams) {
     return { diff, isMatch: Math.abs(diff) < 0.01 }
   })
 
+  // ─── 从 tb_balance 明细子科目逐行预填（按 name 模糊匹配固定行） ──────────
+
+  function seedFromPrefill(): void {
+    if (!prefill?.value || prefill.value.length === 0) return
+    // 仅在全部行未审数为 0 时 seed（手工优先）
+    const hasAnyUnadj = rows.value.some(r => r.unadjusted !== 0)
+    if (hasAnyUnadj) return
+
+    for (const p of prefill.value) {
+      const pName = (p.name || '').replace(/准备|损失|计提|义务/g, '').trim()
+      // 按核心词模糊匹配 ROW_LABELS
+      let matchIdx = ROW_LABELS.findIndex(label => {
+        const core = label.replace(/准备|损失|计提|义务/g, '').trim()
+        return core.includes(pName) || pName.includes(core)
+      })
+      // 未匹配 → 落入"其他"行（最后一行）
+      if (matchIdx < 0) matchIdx = ROW_LABELS.length - 1
+
+      const id = `K5-1-r${matchIdx}`
+      // 写期初余额和期末未审数到 Map 触发 computed 重算
+      const existing = num(allResponses.value, `${id}-unadj`)
+      if (existing === 0) {
+        allResponses.value.set(`${id}-begin`, { item_id: `${id}-begin`, conclusion: null, remark: String(p.opening_balance) })
+        allResponses.value.set(`${id}-unadj`, { item_id: `${id}-unadj`, conclusion: null, remark: String(p.closing_balance) })
+        // 持久化到 DB（一次性落库）
+        saveResponse(`1-r${matchIdx}-begin`, { remark: String(p.opening_balance) })
+        saveResponse(`1-r${matchIdx}-unadj`, { remark: String(p.closing_balance) })
+      }
+    }
+  }
+
   // ─── 从 allResponses 初始化审计说明 ────────────────────────────────────────
 
   function initFromResponses(): void {
@@ -231,6 +263,7 @@ export function useK5Adjudication(params: UseK5AdjudicationParams) {
   // ─── Watch init ────────────────────────────────────────────────────────────
 
   watch(allResponses, () => initFromResponses(), { immediate: true })
+  watch([() => prefill?.value], () => seedFromPrefill(), { immediate: true })
 
   // ─── Return ────────────────────────────────────────────────────────────────
 

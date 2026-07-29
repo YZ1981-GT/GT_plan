@@ -93,9 +93,11 @@
 
 <script setup lang="ts">
 import { ref, computed, defineAsyncComponent } from 'vue'
+import { ElMessage } from 'element-plus'
 import { useDiffReconcileData } from './composables/useDiffReconcileData'
 import { useDiffAnalysis } from './composables/useDiffAnalysis'
 import { useD01DiffImport } from './composables/useD01DiffImport'
+import { filterSummaryRows, defaultDiffFilter } from '../coordination/importFromSummary'
 import type { DiffReconcileRow } from './diffReconcileTypes'
 
 import DiffReconcileDashboard from './DiffReconcileDashboard.vue'
@@ -200,10 +202,33 @@ const showD01ImportDialog = ref(false)
 
 async function confirmD01Import() {
   showD01ImportDialog.value = false
-  // TODO: 调用跨底稿引用 API 获取 D0-1 不符项数据
-  // const d01Rows = await fetchD01DiffRows(props.wpId, props.projectId)
-  // d01Import.fetchAndImport(d01Rows)
-  console.log('[GtConfirmationDiffReconcile] 执行从 D0-1 带入')
+  if (!props.projectId) {
+    ElMessage.warning('缺少项目上下文，无法带入')
+    return
+  }
+  // 循环码派生：D0-4→D0-1, F0-4→F0-1（独立注册优先）; 回退 D0/F0（整册）
+  const cycleBase = (props.wpCode || '').split('-')[0]
+  const summaryCode = cycleBase + '-1'
+  try {
+    let res = await filterSummaryRows(props.projectId, summaryCode, defaultDiffFilter)
+    // 回退：X0-1 不存在时尝试父底稿 X0（整册含 confirmation-v1 sheet）
+    if (!res) {
+      res = await filterSummaryRows(props.projectId, cycleBase, defaultDiffFilter)
+    }
+    if (!res) {
+      ElMessage.warning(`未找到 ${summaryCode} 或 ${cycleBase} 函证结果汇总底稿`)
+      return
+    }
+    if (res.rows.length === 0) {
+      ElMessage.info(`${summaryCode} 暂无不符项（差异=0 或未回函的行不纳入）`)
+      return
+    }
+    d01Import.fetchAndImport(res.rows)
+    ElMessage.success(`已从汇总表带入 ${d01Import.lastImportCount.value} 条差异`)
+  } catch (e: any) {
+    console.warn('[GtConfirmationDiffReconcile] 从 D0-1 带入失败:', e)
+    ElMessage.error('带入失败：' + (e?.message || '网络错误'))
+  }
 }
 
 function handleImportExcel() {

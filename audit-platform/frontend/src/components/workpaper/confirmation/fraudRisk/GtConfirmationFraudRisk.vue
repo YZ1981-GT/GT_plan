@@ -65,9 +65,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineAsyncComponent } from 'vue'
+import { computed, ref, defineAsyncComponent } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useFraudRiskData } from './composables/useFraudRiskData'
+import { useFraudSignalCollector } from '../coordination/useFraudSignalCollector'
+import { filterSummaryRows, fetchWorkpaperHtmlRows, fetchConfirmationSummaryRows } from '../coordination/importFromSummary'
+import type { FraudSignal } from '../coordination/useFraudSignalCollector'
 import FraudRiskDashboard from './FraudRiskDashboard.vue'
 import FraudRiskChecklist from './FraudRiskChecklist.vue'
 import FraudRiskSummary from './FraudRiskSummary.vue'
@@ -149,48 +152,149 @@ function handleJumpRef(ref: string) {
   console.log('[GtConfirmationFraudRisk] 跳转索引:', ref)
 }
 
-function handleAutoFill() {
-  // 上游联动填充：从 useFraudSignalCollector 映射到对应检查项
-  // 当前为规则预填模式（dispatch persistence 接入后将从后端读取实际信号）
-  const items = data.items.value
+// ─── 舞弊信号收集器 ──────────────────────────────────────────────────────────
 
-  // 第 7 条：回函可靠性存疑 ← D0-7 不可靠
-  const item7 = items.find(i => i.seq === 7)
+const fraudSignals = ref<FraudSignal[]>([])
+const collector = useFraudSignalCollector({ signals: fraudSignals })
+const autoFillLoading = ref(false)
+
+async function handleAutoFill() {
+  if (props.readonly) return
+  if (autoFillLoading.value) return // 防重复点击
+  autoFillLoading.value = true
+  const items = data.items.value
+  const pid = props.projectId
+  if (!pid) {
+    ElMessage.warning('缺少项目上下文')
+    return
+  }
+
+  // 循环码派生
+  const cycleBase = (props.wpCode || '').split('-')[0] // D0/F0/G0/...
+  let hasAnySignal = false
+
+  // 清空临时收集器（每次重新汇集）
+  fraudSignals.value = []
+
+  // ─── D0-7 不可靠 ───────────────────────────────────────────────────────────
+  try {
+    const reliabilityCode = `${cycleBase}-7`
+    let reliRes = await fetchWorkpaperHtmlRows(pid, reliabilityCode, 'reliability-v1')
+    // 回退：X0-7 不独立存在时尝试父底稿 X0
+    if (!reliRes || (!reliRes.rows.length && !reliRes.htmlData)) {
+      reliRes = await fetchWorkpaperHtmlRows(pid, cycleBase, 'reliability-v1')
+    }
+    if (reliRes && reliRes.rows.length > 0) {
+      for (const row of reliRes.rows) {
+        if (row.conclusion_status === '不可靠') {
+          collector.addD07Unreliable(row.confirm_index || '', row.entity_name || '')
+          hasAnySignal = true
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[FraudRisk] D0-7 数据不可读，跳过:', e)
+  }
+
+  // ─── D0-3 控制失败 ─────────────────────────────────────────────────────────
+  try {
+    const followupCode = `${cycleBase}-3`
+    let fupRes = await fetchWorkpaperHtmlRows(pid, followupCode, 'confirmation-followup-v1')
+    // 回退父底稿
+    if (!fupRes || (!fupRes.rows.length && !fupRes.htmlData)) {
+      fupRes = await fetchWorkpaperHtmlRows(pid, cycleBase, 'confirmation-followup-v1')
+    }
+    if (fupRes && fupRes.rows.length > 0) {
+      for (const row of fupRes.rows) {
+        if (row.control_conclusion === 'fail' || row.control_conclusion === '否') {
+          collector.addD03ControlFailure(row.confirm_index || '', row.entity_name || '')
+          hasAnySignal = true
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[FraudRisk] D0-3 数据不可读，跳过:', e)
+  }
+
+  // ─── D0-1 低回函率 ─────────────────────────────────────────────────────────
+  try {
+    const summaryCode = `${cycleBase}-1`
+    let sumRes = await fetchConfirmationSummaryRows(pid, summaryCode)
+    // 回退父底稿
+    if (!sumRes) {
+      sumRes = await fetchConfirmationSummaryRows(pid, cycleBase)
+    }
+    if (sumRes && sumRes.rows.length > 0) {
+      const sent = sumRes.rows.length
+      const replied = sumRes.rows.filter(r => r.is_replied).length
+      const rate = sent > 0 ? (replied / sent) * 100 : 100
+      if (rate < 50) {
+        collector.addD01LowReplyRate(rate)
+        hasAnySignal = true
+      }
+    }
+  } catch (e) {
+    console.warn('[FraudRisk] D0-1 数据不可读，跳过:', e)
+  }
+
+  // ─── 汇集结果填入 D0-8 检查项（手工优先） ──────────────────────────────────
+  if (hasAnySignal) {
+    const d08Map = collector.exportForD08()
+    for (const [itemNo, sig] of d08Map) {
+      const item = items.find(i => i.seq === itemNo)
+      if (item && !item.is_exist) {
+        item.is_exist = '待核实'
+        item.source_ref = sig.index_refs.join(',') || `${cycleBase}-*`
+        item.response_note = sig.note
+        item._auto_filled = true
+        data.isDirty.value = true
+      }
+    }
+    ElMessage.success(`已从上游底稿自动汇集 ${d08Map.size} 类舞弊信号，请逐项确认后修改为"是"或"否"`)
+  } else {
+    // fail-open 降级：无信号时用规则预填（保留原行为）
+    _ruleFallbackFill(items)
+  }
+
+  // 持久化
+  if (data.isDirty.value) {
+    const payload = data.buildPayload()
+    emit('save', payload)
+  }
+  autoFillLoading.value = false
+}
+
+/** 规则预填降级（原 handleAutoFill 逻辑，作为 fail-open 兜底） */
+function _ruleFallbackFill(items: any[]) {
+  const item7 = items.find((i: any) => i.seq === 7)
   if (item7 && !item7.is_exist) {
     item7.is_exist = '待核实'
     item7.source_ref = 'D0-7'
     item7._auto_filled = true
     data.isDirty.value = true
   }
-
-  // 第 10 条：被函证单位异常特征 ← D0-2 红旗
-  const item10 = items.find(i => i.seq === 10)
+  const item10 = items.find((i: any) => i.seq === 10)
   if (item10 && !item10.is_exist) {
     item10.is_exist = '待核实'
     item10.source_ref = 'D0-2'
     item10._auto_filled = true
     data.isDirty.value = true
   }
-
-  // 第 14 条：回函率异常 ← D0-1 统计
-  const item14 = items.find(i => i.seq === 14)
+  const item14 = items.find((i: any) => i.seq === 14)
   if (item14 && !item14.is_exist) {
     item14.is_exist = '待核实'
     item14.source_ref = 'D0-1'
     item14._auto_filled = true
     data.isDirty.value = true
   }
-
-  // 第 15 条：资金往来无商业实质 ← D0-3 控制否
-  const item15 = items.find(i => i.seq === 15)
+  const item15 = items.find((i: any) => i.seq === 15)
   if (item15 && !item15.is_exist) {
     item15.is_exist = '待核实'
     item15.source_ref = 'D0-3'
     item15._auto_filled = true
     data.isDirty.value = true
   }
-
-  ElMessage.success('已从上游底稿（D0-1/D0-2/D0-3/D0-7）联动预填第 7/10/14/15 条，请逐项确认后修改为"是"或"否"')
+  ElMessage.success('上游底稿无可用信号，已用规则预填第 7/10/14/15 条，请逐项确认')
 }
 
 function handleJumpB50() {

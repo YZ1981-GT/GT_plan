@@ -4,6 +4,7 @@
     <div class="section-header">
       <h3>附注披露信息（国有企业）</h3>
       <div class="header-actions">
+        <el-button size="small" type="success" :disabled="isReadonly" @click="syncToDisclosureNotes">同步到附注</el-button>
         <el-button size="small" type="primary" plain @click="handleAiGenerate">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
@@ -139,7 +140,10 @@
  */
 import { ref, onMounted, onUnmounted, inject, toRef, type Ref } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
+import http from '@/utils/http'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 
 const K7_ACCOUNT_CODE = '2401'
 
@@ -159,6 +163,7 @@ const emit = defineEmits<{
 const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, any>>
 
 const openReview = inject<(sectionId: string) => void>('openReviewDialog', () => {})
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 
 // ─── 数据模型 ────────────────────────────────────────────────────────────────
 
@@ -281,10 +286,12 @@ function updateIncomeField(id: string, field: string, value: any): void {
 
 function persistAssetRows(): void {
   emit('save', 'K7-disclosure-soe-asset-rows', { remark: JSON.stringify(assetRelatedRows.value) })
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
 }
 
 function persistIncomeRows(): void {
   emit('save', 'K7-disclosure-soe-income-rows', { remark: JSON.stringify(incomeRelatedRows.value) })
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
 }
 
 function handleNarrativeSave(): void {
@@ -295,6 +302,29 @@ function handleNarrativeSave(): void {
     variant: 'soe',
     text: narrativeText.value,
   })
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
+}
+
+async function syncToDisclosureNotes(): Promise<void> {
+  if (!props.projectId || props.isReadonly) return
+  const rows = [...assetRelatedRows.value, ...incomeRelatedRows.value].map(r => ({ project: r.project, endAmount: (r.beginBalance + r.increase - r.decrease) ?? 0, priorAmount: r.beginBalance ?? 0 }))
+  const narrative = narrativeText.value
+  const payload = {
+    wp_id: props.wpId,
+    sheet_name: 'K7-note-soe',
+    section_id: '八、56',
+    current_standard: 'soe_standalone',
+    sub_table_data: { rows },
+    _note_texts: narrative ? [{ section: 'main', title: '说明', text: narrative }] : [],
+  }
+  try {
+    await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
+    eventBus.emit('disclosure:note-text-updated' as any, {
+      wpCode: 'K7', variant: 'soe', accountCode: '2401',
+      projectId: props.projectId, sectionIds: ['八、56'],
+    })
+    ElMessage.success('已同步到附注')
+  } catch { /* silent */ }
 }
 
 // ─── 合计汇总方法 ────────────────────────────────────────────────────────────
@@ -363,6 +393,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  autoSync.cancelPending()
   eventBus.off('substantive:adjudicated', handleAdjudicated)
   eventBus.off('adjustment:created', handleAdjustmentCreated)
 })

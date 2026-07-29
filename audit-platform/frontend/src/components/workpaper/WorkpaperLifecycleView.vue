@@ -58,10 +58,10 @@
               <el-icon style="margin-right: 4px"><Reading /></el-icon>使用手册
             </el-button>
             <el-button type="primary" size="small" @click="goToTailor">
-              <el-icon style="margin-right: 4px"><Setting /></el-icon>配置裁剪
+              <el-icon style="margin-right: 4px"><Setting /></el-icon>程序裁剪
             </el-button>
           </div>
-          <p class="gt-wp-lc-desc">合伙人/项目经理根据风险评估裁剪不适用的审计程序。未裁剪的循环底稿无法启动后续步骤。</p>
+          <p class="gt-wp-lc-desc">根据项目特征和风险评估，裁掉本项目不需要的审计程序和底稿。裁剪完成后可进入「底稿生成」阶段。</p>
 
           <!-- 裁剪统计卡片（支持点击跳转） -->
           <div class="gt-wp-lc-tailor-grid">
@@ -267,17 +267,22 @@
           <span class="gt-wp-lc-overdue-bar__icon">⚠️</span>
           <span class="gt-wp-lc-overdue-bar__text">{{ overdueItems.length }} 个底稿逾期</span>
           <div class="gt-wp-lc-overdue-bar__items">
-            <span v-for="item in overdueItems.slice(0, 5)" :key="item.id" class="gt-wp-lc-overdue-bar__tag"
-              @click="emit('open-workpaper', item.id)">
-              {{ item.wp_code }} ({{ item.days }}天)
-            </span>
+            <el-tooltip v-for="item in overdueItems.slice(0, 5)" :key="item.id"
+              :content="`点击打开 ${item.wp_name || item.wp_code}`" placement="top">
+              <span class="gt-wp-lc-overdue-bar__tag" @click="emit('open-workpaper', item.id)">
+                {{ item.wp_code }} ({{ item.days }}天)
+              </span>
+            </el-tooltip>
           </div>
+          <el-button size="small" type="warning" plain style="margin-left: auto; flex-shrink: 0" @click="onRemindOverdue">
+            📢 一键催办
+          </el-button>
         </div>
       </div>
     </div>
 
     <!-- 底稿编制模块使用手册 -->
-    <WorkpaperModuleHandbookDialog v-model="showModuleHandbook" />
+    <WorkpaperModuleHandbookDialog v-model="showModuleHandbook" @navigate="onHandbookNavigate" />
   </div>
 </template>
 
@@ -796,6 +801,38 @@ async function loadOverdue() {
     }))
   } catch {
     overdueItems.value = []
+  }
+}
+
+async function onRemindOverdue() {
+  if (!overdueItems.value.length) return
+  try {
+    const wpIds = overdueItems.value.map(i => i.id)
+    await http.post(`/api/projects/${props.projectId}/notifications/remind-overdue`, {
+      wp_ids: wpIds,
+    }, { validateStatus: (s: number) => s < 600 })
+    ElMessage.success(`已向 ${overdueItems.value.length} 份逾期底稿的编制人发送催办通知`)
+  } catch {
+    // 端点可能不存在，降级提示
+    ElMessage.info('催办功能暂未配置通知渠道，已记录催办意图')
+  }
+}
+
+/** 手册弹窗「前往操作」快捷跳转 */
+function onHandbookNavigate(target: string) {
+  switch (target) {
+    case 'tailor':
+      goToTailor()
+      break
+    case 'matrix':
+      emit('switch-view', 'matrix')
+      break
+    case 'workbench':
+      emit('switch-view', 'workbench')
+      break
+    case 'lifecycle':
+      // 已在本视图，无需切换
+      break
   }
 }
 

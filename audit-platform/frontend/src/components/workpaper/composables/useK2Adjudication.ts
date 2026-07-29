@@ -80,6 +80,7 @@ function num(allResponses: Map<string, any>, itemId: string): number {
 export function useK2Adjudication(
   allResponses: Ref<Map<string, any>>,
   options?: {
+    prefill?: Ref<Array<{ name: string; code?: string; opening_balance: number; closing_balance: number }> | undefined>
     onSave?: (itemId: string, value: any) => void
   },
 ) {
@@ -87,6 +88,32 @@ export function useK2Adjudication(
 
   const auditNote = ref('')
   const auditConclusion = ref('')
+
+  // ─── Prefill seed（从 tb_balance 1231 子科目按 name 匹配固定行） ───────────
+
+  function seedFromPrefill(): void {
+    const pf = options?.prefill?.value
+    if (!pf || pf.length === 0) return
+    const hasAnyUnadj = K2_ADJ_ITEMS.some(item => num(allResponses.value, `${ITEM_ID_PREFIX}-${item.key}-unadj`) !== 0)
+    if (hasAnyUnadj) return
+    for (const p of pf) {
+      const pName = (p.name || '').trim().toLowerCase()
+      let matchKey = K2_ADJ_ITEMS.find(item => {
+        const label = item.label.toLowerCase()
+        return label.includes(pName) || pName.includes(label)
+      })?.key
+      if (!matchKey) matchKey = 'other'
+      const id = `${ITEM_ID_PREFIX}-${matchKey}`
+      const existing = num(allResponses.value, `${id}-unadj`)
+      if (existing === 0) {
+        allResponses.value.set(`${id}-begin`, { item_id: `${id}-begin`, conclusion: null, remark: String(p.opening_balance) })
+        allResponses.value.set(`${id}-unadj`, { item_id: `${id}-unadj`, conclusion: null, remark: String(p.closing_balance) })
+        // 持久化到 DB
+        options?.onSave?.(`${id}-begin`, String(p.opening_balance))
+        options?.onSave?.(`${id}-unadj`, String(p.closing_balance))
+      }
+    }
+  }
 
   // ─── Row Builder ───────────────────────────────────────────────────────────
 
@@ -166,6 +193,9 @@ export function useK2Adjudication(
   )
 
   // ─── Return ────────────────────────────────────────────────────────────────
+
+  // Prefill seed 触发
+  watch([() => options?.prefill?.value], () => seedFromPrefill(), { immediate: true })
 
   return {
     rows,

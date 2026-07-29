@@ -53,6 +53,7 @@ export interface K3ReconciliationResult {
 export interface UseK3AdjudicationParams {
   allResponses: Ref<Map<string, any>>
   tbData: Ref<K3TbData>
+  prefill?: Ref<Array<{ name: string; code?: string; opening_balance: number; closing_balance: number }> | undefined>
   saveResponse: Function
   /** 动态账龄段（from useAgingConfig） */
   agingSegments?: Ref<AgingSegment[]>
@@ -93,7 +94,7 @@ const LEGACY_AGING_ROWKEY: Record<string, string> = {
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useK3Adjudication(params: UseK3AdjudicationParams) {
-  const { allResponses, tbData, saveResponse, agingSegments } = params
+  const { allResponses, tbData, prefill, saveResponse, agingSegments } = params
 
   // ─── State ─────────────────────────────────────────────────────────────────
 
@@ -217,6 +218,38 @@ export function useK3Adjudication(params: UseK3AdjudicationParams) {
   }
 
   /**
+   * 从 tb_balance 明细子科目逐行预填性质维度行（优先于 TB 总额兜底 seed）。
+   * 仅在性质行全部未审数为0且无持久化数据时生效。
+   */
+  function seedFromPrefill(): void {
+    if (!prefill?.value || prefill.value.length === 0) return
+    // 检查性质行是否全空（已有数据不覆盖）
+    const hasAnyUnadj = byNatureRows.value.some(r => r.unadjusted !== 0)
+    if (hasAnyUnadj) return
+    const savedTotal = num(allResponses.value, 'K3-1-audited-total')
+    if (savedTotal !== 0) return
+    // 逐行写入 allResponses Map 触发 computed 重算
+    const count = prefill.value.length
+    allResponses.value.set('K3-1-nature-count', { item_id: 'K3-1-nature-count', conclusion: null, remark: String(count) })
+    for (let i = 0; i < count; i++) {
+      const p = prefill.value[i]
+      const prefix = `K3-1-nature-r${i}`
+      allResponses.value.set(`${prefix}-label`, { item_id: `${prefix}-label`, conclusion: null, remark: p.name })
+      allResponses.value.set(`${prefix}-begin`, { item_id: `${prefix}-begin`, conclusion: null, remark: String(p.opening_balance) })
+      allResponses.value.set(`${prefix}-unadj`, { item_id: `${prefix}-unadj`, conclusion: null, remark: String(p.closing_balance) })
+    }
+    // 持久化到 DB（一次性落库，让刷新后仍有数据）
+    saveResponse('K3-1-nature-count', { remark: String(count) })
+    for (let i = 0; i < count; i++) {
+      const p = prefill.value[i]
+      const prefix = `K3-1-nature-r${i}`
+      saveResponse(`${prefix}-label`, { remark: p.name })
+      saveResponse(`${prefix}-begin`, { remark: String(p.opening_balance) })
+      saveResponse(`${prefix}-unadj`, { remark: String(p.closing_balance) })
+    }
+  }
+
+  /**
    * TB预填：仅在性质行全部未审数为0且无持久化数据时，
    * 将tbData.unadjusted2241 seed到性质合计的"其他"行未审数（兜底预填）。
    * 持久化优先——已编辑过的不覆盖。
@@ -263,8 +296,8 @@ export function useK3Adjudication(params: UseK3AdjudicationParams) {
   // ─── Watch init ────────────────────────────────────────────────────────────
 
   watch(allResponses, () => initFromResponses(), { immediate: true })
-  // TB数据到达后尝试seed
-  watch(tbData, () => seedFromTbIfEmpty(), { immediate: true })
+  // prefill 到达后优先尝试逐行种子，再 TB 兜底
+  watch([tbData, () => prefill?.value], () => { seedFromPrefill(); seedFromTbIfEmpty() }, { immediate: true })
 
   // ─── Return ────────────────────────────────────────────────────────────────
 
@@ -277,6 +310,7 @@ export function useK3Adjudication(params: UseK3AdjudicationParams) {
     completenessNote,
     reconciliation,
     initFromResponses,
+    seedFromPrefill,
     seedFromTbIfEmpty,
     saveAll,
     getAuditedTotal,

@@ -57,6 +57,14 @@
         />
 
         <!-- H5-1 审定表 -->
+        <HiFourTableSourcePanel
+          v-if="props.htmlData?.hi_extraction_enabled"
+          :wp-code="'H5'"
+          :segments="getHiExtractionSegments('H5')"
+          :all-responses="allResponses"
+          :is-readonly="isReadonly"
+          @refresh-complete="selfLoad()"
+        />
         <H5TabAdjudication
           v-else-if="currentSheet === 'H5-1'"
           :wp-id="props.wpId"
@@ -295,6 +303,8 @@ import { ref, computed, onMounted, provide, toRef, inject, defineAsyncComponent 
 import http from '@/utils/http'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
+import HiFourTableSourcePanel from './shared/HiFourTableSourcePanel.vue'
+import { getHiExtractionSegments } from './composables/hiExtractionSegments'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))

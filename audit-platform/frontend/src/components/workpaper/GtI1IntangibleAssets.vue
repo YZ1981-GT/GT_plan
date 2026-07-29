@@ -49,6 +49,14 @@
         />
 
         <!-- I1-1 审定表 -->
+        <HiFourTableSourcePanel
+          v-if="props.htmlData?.hi_extraction_enabled"
+          :wp-code="'I1'"
+          :segments="getHiExtractionSegments('I1')"
+          :all-responses="allResponses"
+          :is-readonly="isReadonly"
+          @refresh-complete="selfLoad()"
+        />
         <I1TabAdjudication
           v-else-if="currentSheet === 'I1-1'"
           :wp-id="props.wpId"
@@ -263,6 +271,8 @@ import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useI1DualMode } from './composables/useI1DualMode'
 import { useI1CrossSheet } from './composables/useI1CrossSheet'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
+import HiFourTableSourcePanel from './shared/HiFourTableSourcePanel.vue'
+import { getHiExtractionSegments } from './composables/hiExtractionSegments'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))

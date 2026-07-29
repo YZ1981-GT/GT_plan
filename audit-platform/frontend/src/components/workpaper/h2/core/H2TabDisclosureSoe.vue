@@ -497,9 +497,11 @@ function persistAll() {
   saveResponse(H2_SOE_ITEM.impairment, impairmentRows.value)
   saveResponse(H2_SOE_ITEM.noteImpairment, noteImpairment.value)
   eventBus.emit('disclosure:note-text-updated' as any, {
-    wp_code: 'H2',
-    variant: 'soe',
+    wpCode: 'H2',
+    accountCode: '1604',
+    projectId: props.projectId,
     section: noteSectionId,
+    sectionIds: [noteSectionId],
     text: noteImpairment.value || '',
   })
   autoSync.scheduleAutoSync(syncToNotes)

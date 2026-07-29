@@ -491,7 +491,10 @@ async function handlePullRecentPrice(): Promise<void> {
 }
 
 const wpIdRef = toRef(() => props.wpId || '') as Ref<string>
-const { ocrLoadingId, uploadAndMerge } = useF2ImpairmentOcr(wpIdRef)
+const { ocrLoadingId, uploadAndMerge } = useF2ImpairmentOcr(
+  wpIdRef,
+  toRef(() => props.projectId || '') as Ref<string>,
+)
 const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF2ValuationAiGenerate(wpIdRef)
 
 function aiContext(): Record<string, unknown> {

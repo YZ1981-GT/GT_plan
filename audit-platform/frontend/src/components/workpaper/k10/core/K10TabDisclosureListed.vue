@@ -17,6 +17,7 @@
             <el-button size="small" type="primary" link @click="generateAI('disclosure-listed')">
               <el-icon><MagicStick /></el-icon>AI辅助
             </el-button>
+            <el-button size="small" type="success" :disabled="isReadonly" @click="syncToDisclosureNotes">同步到附注</el-button>
             <GtReviewTrigger section-id="K10-disclosure-listed" label="💬 复核" />
           </div>
         </div>
@@ -166,12 +167,15 @@
  * - AI辅助按钮per section
  * - 补助来源分类+补助类型+确认方式+本期/上期/同比/占比
  */
-import { ref, computed, onMounted, onUnmounted, inject } from 'vue'
+import { ref, computed, onMounted, onUnmounted, onBeforeUnmount, inject } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Refresh, MagicStick } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
 import { api } from '@/services/apiProxy'
+import http from '@/utils/http'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import { buildK10SyncPayload } from '../../composables/k10NoteSectionMap'
 
 // ─── Props & Emits ───────────────────────────────────────────────────────────
 
@@ -188,6 +192,24 @@ const emit = defineEmits<{
 
 // ─── Inject ──────────────────────────────────────────────────────────────────
 const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', () => {})
+
+// ─── Auto-sync to disclosure notes ──────────────────────────────────────────
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+
+onBeforeUnmount(() => autoSync.cancelPending())
+
+async function syncToDisclosureNotes(): Promise<void> {
+  if (!props.projectId || props.isReadonly) return
+  const payload = buildK10SyncPayload('listed', props.wpId || '', disclosureRows.value, narrativeText.value)
+  try {
+    await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
+    eventBus.emit('disclosure:note-text-updated' as any, {
+      wpCode: 'K10', variant: 'listed', accountCode: '6117',
+      projectId: props.projectId, sectionIds: ['五、68'],
+    })
+    ElMessage.success('已同步到附注')
+  } catch { /* silent */ }
+}
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -380,6 +402,7 @@ function handleRowChange(row: DisclosureRow): void {
   if (idx >= CATEGORIES.length) {
     // 动态追加行 → name-keyed 持久化
     persistDynamicRow(row)
+    autoSync.scheduleAutoSync(syncToDisclosureNotes)
     return
   }
   emit('save', `K10-disc-listed-row-${idx}`, {
@@ -389,6 +412,7 @@ function handleRowChange(row: DisclosureRow): void {
     priorAmount: row.priorAmount,
     remark: row.remark,
   })
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
 }
 
 function handleNarrativeSave(): void {
@@ -399,6 +423,7 @@ function handleNarrativeSave(): void {
     variant: 'listed',
     text: narrativeText.value,
   })
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
 }
 
 // ─── AI generation ───────────────────────────────────────────────────────────

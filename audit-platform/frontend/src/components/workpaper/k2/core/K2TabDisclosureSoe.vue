@@ -10,6 +10,11 @@
       </div>
     </div>
 
+    <!-- 同步到附注按钮 -->
+    <div style="margin-bottom: 12px; text-align: right;">
+      <el-button size="small" type="success" :disabled="isReadonly" @click="syncToDisclosureNotes">同步到附注</el-button>
+    </div>
+
     <!-- 琥珀色方法论块 -->
     <div class="methodology-block">
       <div class="methodology-title">CAS 附注披露要求（国有企业适用）</div>
@@ -135,6 +140,8 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import { buildK2SyncPayload } from '../../composables/k2NoteSectionMap'
 
 const K2_ACCOUNT_CODE = '1231'
 
@@ -150,6 +157,8 @@ const emit = defineEmits<{
 }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 
 // ═══ 数据模型 ═══
 interface DisclosureRow {
@@ -281,6 +290,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   eventBus.off('substantive:adjudicated', handleAdjudicated)
   eventBus.off('adjustment:created', handleAdjustmentCreated)
+  autoSync.cancelPending()
 })
 
 // ═══ 单元格编辑 ═══
@@ -292,12 +302,35 @@ function handleCellEdit(sIdx: number, rowIdx: number, field: string, value: any)
   ;(row as any)[field] = value ?? (typeof value === 'number' ? 0 : '')
   recalcFormulas()
   persistSection(sIdx)
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
+}
+
+// ═══ 同步到附注 ═══
+async function syncToDisclosureNotes(): Promise<void> {
+  if (!props.projectId || props.isReadonly) return
+  const movementSection = sections.find(s => s.id === 'movement')
+  const disclosureRows = (movementSection?.rows || []).filter(r => !r.isFormula).map(r => ({
+    project: r.item,
+    endAmount: r.endBalance || 0,
+    priorAmount: r.beginBalance || 0,
+  }))
+  const narrativeText = sections.filter(s => s.hasTextArea && s.textContent).map(s => s.textContent).join('\n')
+  const payload = buildK2SyncPayload('soe', props.wpId || '', disclosureRows, narrativeText)
+  try {
+    await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
+    eventBus.emit('disclosure:note-text-updated' as any, {
+      wpCode: 'K2', variant: 'soe', accountCode: '1231',
+      projectId: props.projectId, sectionIds: ['八、14'],
+    })
+    ElMessage.success('已同步到附注')
+  } catch { /* silent */ }
 }
 
 // ═══ 文本变化 → publish EventBus ═══
 function handleNoteTextChange(sIdx: number): void {
   persistSection(sIdx)
   publishNoteText()
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
 }
 
 function publishNoteText(): void {

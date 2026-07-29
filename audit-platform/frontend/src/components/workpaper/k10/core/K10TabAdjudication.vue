@@ -376,6 +376,7 @@ const props = defineProps<{
   allResponses: Map<string, any>
   tbData?: { unadjusted6117: number; audited6117: number }
   isReadonly: boolean
+  prefill?: Array<{ name: string; unadjustedDebit: number; unadjustedCredit: number }>
 }>()
 
 const emit = defineEmits<{
@@ -392,6 +393,7 @@ const adjudication = useK10Adjudication({
   projectId: toRef(props, 'projectId'),
   wpId: toRef(props, 'wpId'),
   isReadonly: toRef(props, 'isReadonly'),
+  prefill: computed(() => props.prefill ?? []) as any,
   onSave: (itemId, value) => emit('save', itemId, value),
 })
 

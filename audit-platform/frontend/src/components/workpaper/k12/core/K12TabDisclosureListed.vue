@@ -11,6 +11,7 @@
         <div class="section-header">
           <span class="section-title">营业外收入披露明细（上市公司）</span>
           <div class="section-actions">
+            <el-button size="small" type="success" :disabled="isReadonly" @click="syncToDisclosureNotes">同步到附注</el-button>
             <el-button size="small" type="primary" link @click="applyAutoFill">
               <el-icon><Refresh /></el-icon>从审定表取数
             </el-button>
@@ -156,11 +157,14 @@
  * - subscribe: 'substantive:adjudicated' (filter accountCode=6301)
  * - publish: 'disclosure:note-text-updated' (noteId='non_operating_income')
  */
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Refresh, MagicStick } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
 import { generateK12AiText } from '../../composables/useK12AiText'
+import http from '@/utils/http'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import { buildK12SyncPayload } from '../../composables/k12NoteSectionMap'
 
 // ─── Props & Emits ───────────────────────────────────────────────────────────
 
@@ -174,6 +178,9 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'save', itemId: string, value: any): void
 }>()
+
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+onBeforeUnmount(() => autoSync.cancelPending())
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -310,6 +317,7 @@ function handleRowChange(row: DisclosureRow): void {
       remark: row.remark,
     })
   }
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
 }
 
 function handleNarrativeSave(): void {
@@ -321,6 +329,22 @@ function handleNarrativeSave(): void {
     variant: 'listed',
     text: narrativeText.value,
   })
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
+}
+
+async function syncToDisclosureNotes(): Promise<void> {
+  if (!props.projectId || props.isReadonly) return
+  const payload = buildK12SyncPayload('listed', props.wpId || '',
+    disclosureRows.value.map(r => ({ project: r.category, currentAmount: r.currentAmount, priorAmount: r.priorAmount })),
+    narrativeText.value)
+  try {
+    await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
+    eventBus.emit('disclosure:note-text-updated' as any, {
+      wpCode: 'K12', variant: 'listed', accountCode: '6301',
+      projectId: props.projectId, sectionIds: ['营业外收入'],
+    })
+    ElMessage.success('已同步到附注')
+  } catch { /* silent */ }
 }
 
 // ─── AI generation ───────────────────────────────────────────────────────────

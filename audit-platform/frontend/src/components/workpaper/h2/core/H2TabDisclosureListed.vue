@@ -677,9 +677,11 @@ function persistAll() {
   saveResponse(H2_LISTED_ITEM.noteFundSource, noteFundSource.value)
   saveResponse(H2_LISTED_ITEM.noteMortgage, noteMortgage.value)
   eventBus.emit('disclosure:note-text-updated' as any, {
-    wp_code: 'H2',
-    variant: 'listed',
+    wpCode: 'H2',
+    accountCode: '1604',
+    projectId: props.projectId,
     section: noteSectionId,
+    sectionIds: [noteSectionId],
     text: noteImpairment.value || noteFundSource.value || noteMortgage.value || '',
   })
   autoSync.scheduleAutoSync(syncToNotes)

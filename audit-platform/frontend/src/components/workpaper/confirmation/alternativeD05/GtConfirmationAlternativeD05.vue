@@ -102,6 +102,7 @@
 import { ref, computed, defineAsyncComponent, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useAlternativeData } from './composables/useAlternativeData'
+import { importUnrepliedAsCompanies } from '../coordination/importFromSummary'
 import type { AlternativeCompany, BlockType, CheckRow } from './alternativeD05Types'
 import { BLOCK_COLUMN_CONFIGS } from './blockColumnConfigs'
 
@@ -183,8 +184,40 @@ function handleUpdateField(companyId: string, field: string, value: any) {
 
 function handleImportD01() {
   showD01Dialog.value = false
-  // TODO: 跨底稿引用获取 D0-1 未回函公司
-  console.log('[GtConfirmationAlternativeD05] 执行从 D0-1 带入')
+  if (!props.projectId) {
+    ElMessage.warning('缺少项目上下文')
+    return
+  }
+  // 循环码派生：D0-5→D0-1 优先; 回退 D0（整册）
+  const cycleBase = (props.wpCode || '').split('-')[0]
+  const summaryCode = cycleBase + '-1'
+  importUnrepliedAsCompanies(props.projectId, summaryCode, { defaultItemName: '应收账款' })
+    .then(async (res) => {
+      if (!res.ok) {
+        // 回退尝试父底稿
+        const res2 = await importUnrepliedAsCompanies(props.projectId!, cycleBase, { defaultItemName: '应收账款' })
+        if (!res2.ok) {
+          ElMessage.warning(res2.reason === 'missing-summary' ? `未找到 ${summaryCode} 或 ${cycleBase}` : res2.message)
+          return
+        }
+        if (res2.companies.length === 0) {
+          ElMessage.info(res2.emptyReason || '无未回函项目')
+          return
+        }
+        data.importCompanies(res2.companies)
+        ElMessage.success(`已从 ${cycleBase} 带入 ${res2.companies.length} 个未回函被函证单位`)
+        return
+      }
+      if (res.companies.length === 0) {
+        ElMessage.info(res.emptyReason || '无未回函项目')
+        return
+      }
+      data.importCompanies(res.companies)
+      ElMessage.success(`已从 ${summaryCode} 带入 ${res.companies.length} 个未回函被函证单位`)
+    })
+    .catch((e: any) => {
+      ElMessage.error('带入失败：' + (e?.message || '网络错误'))
+    })
 }
 
 function handleImportExcel() {

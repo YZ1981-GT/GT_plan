@@ -14,10 +14,15 @@
  * Requirements: 10.1-10.2
  */
 import { ref, computed, inject, toRef, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ElMessage } from 'element-plus'
 import GtIndexChip from '../GtIndexChip.vue'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { amountFormatter, amountParser } from '../composables/wpAmountInput'
+import E1CreditOcrConfirmDialog, {
+  type CreditOcrFields,
+} from './E1CreditOcrConfirmDialog.vue'
+import http from '@/utils/http'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -70,6 +75,57 @@ interface CheckRow {
 }
 
 type CreditRow = QueryRow | CheckRow
+
+// ─── OCR (仅 E1-18 query 模式下启用) ─────────────────────────────────────────
+
+const creditOcrVisible = ref(false)
+const creditOcrLoading = ref(false)
+const creditOcrFields = ref<Partial<CreditOcrFields>>({})
+const creditOcrConfidence = ref<number | undefined>()
+const creditOcrPreview = ref('')
+const creditOcrFileName = ref('')
+const creditOcrAttachmentId = ref('')
+
+async function runCreditOcr(file: File): Promise<boolean> {
+  creditOcrLoading.value = true
+  try {
+    const form = new FormData()
+    form.append('file', file)
+    if (creditOcrAttachmentId.value) form.append('attachment_id', creditOcrAttachmentId.value)
+    const { data } = await http.post(
+      `/api/workpapers/${props.wpId}/e1/credit-ocr`,
+      form,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    )
+    creditOcrFields.value = data?.extracted_fields || {}
+    creditOcrConfidence.value = typeof data?.confidence === 'number' ? data.confidence : undefined
+    creditOcrPreview.value = String(data?.ocr_text || '').slice(0, 2000)
+    creditOcrFileName.value = file.name
+    creditOcrAttachmentId.value = String(data?.attachment_id || '')
+    creditOcrVisible.value = true
+  } catch {
+    ElMessage.error('征信 OCR 识别失败')
+  } finally {
+    creditOcrLoading.value = false
+  }
+  return false
+}
+
+function onCreditOcrConfirm(fields: CreditOcrFields): void {
+  creditOcrVisible.value = false
+  // 将识别结果追加一行到查询表
+  if (variant.value === 'query') {
+    rows.value.push({
+      id: generateId(),
+      borrower: fields.borrowerName || '',
+      creditCode: fields.creditCode || '',
+      loanCardCode: fields.loanCardCode || '',
+      queryDate: fields.inquireDate || fields.reportDate || '',
+      queryResult: fields.queryResult || '',
+    } as QueryRow)
+    ElMessage.success('征信字段已追加到查询记录，请核对后保存')
+  }
+}
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
@@ -272,6 +328,17 @@ onBeforeUnmount(() => {
           {{ variant === 'check' ? '征信核对 (E1-19)' : '征信查询 (E1-18)' }}
         </el-tag>
         <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">+ 添加行</el-button>
+        <el-upload
+          v-if="variant === 'query'"
+          :show-file-list="false"
+          accept=".pdf,.png,.jpg,.jpeg"
+          :before-upload="runCreditOcr"
+          :disabled="isReadonly || creditOcrLoading"
+        >
+          <el-button size="small" type="primary" plain :loading="creditOcrLoading" :disabled="isReadonly">
+            征信报告 OCR
+          </el-button>
+        </el-upload>
       </div>
       <div class="toolbar-right">
         <span class="chip-wrap"><GtIndexChip value="wp:E1-1" :context-project-id="projectId" /></span>
@@ -400,6 +467,16 @@ onBeforeUnmount(() => {
         @change="(val: string) => saveAuditConclusion(val)"
       />
     </el-card>
+
+    <!-- 征信 OCR 确认对话框 -->
+    <E1CreditOcrConfirmDialog
+      v-model="creditOcrVisible"
+      :fields="creditOcrFields"
+      :confidence="creditOcrConfidence"
+      :ocr-preview="creditOcrPreview"
+      :file-name="creditOcrFileName"
+      @confirm="onCreditOcrConfirm"
+    />
   </div>
 </template>
 

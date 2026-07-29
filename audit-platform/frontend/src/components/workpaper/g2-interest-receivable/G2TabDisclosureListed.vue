@@ -364,7 +364,7 @@
  * 对齐源 Excel + note_template_listed §五、8 应收利息子表；
  * 合计数交叉索引：Excel M1-1 → wp:K1-1 + Note:五、8
  */
-import { computed, inject, onBeforeUnmount, ref, toRef } from 'vue'
+import { computed, inject, onBeforeUnmount, ref, toRef, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRouter, useRoute } from 'vue-router'
 import { api } from '@/services/apiProxy'
@@ -516,6 +516,11 @@ async function syncToDisclosureNotes() {
     isSyncing.value = false
   }
 }
+
+// 数据变更后自动同步到附注（debounce 由 autoSync 内部 800ms 控制，只读/失败静默）
+watch([() => dis.classDisplayRows.value, () => dis.overdueRows.value, () => dis.eclDisplayRows.value, () => dis.noteText.value], () => {
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
+}, { deep: true })
 
 onBeforeUnmount(() => {
   autoSync.cancelPending()

@@ -4,6 +4,7 @@
     <div class="section-header">
       <h3>附注披露信息（国企）</h3>
       <div class="header-actions">
+        <el-button size="small" type="success" :disabled="isReadonly" @click="syncToDisclosureNotes">同步到附注</el-button>
         <el-tooltip :content="aiAvailable ? 'AI 辅助生成' : 'AI 服务暂不可用'" placement="top">
           <el-button size="small" type="primary" plain :loading="aiLoading" :disabled="isReadonly || !aiAvailable" @click="handleAiGenerate"><el-icon><MagicStick /></el-icon> AI辅助</el-button>
         </el-tooltip>
@@ -96,10 +97,14 @@
  * - subscribe EventBus 'adjustment:created' (accountCode=6601) 刷新
  * - AI辅助
  */
-import { ref, computed, onMounted, onUnmounted, inject } from 'vue'
+import { ref, computed, onMounted, onUnmounted, onBeforeUnmount, inject } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
+import http from '@/utils/http'
 import { useK8AiGenerate } from '../../composables/useK8AiGenerate'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import { buildK8SyncPayload } from '../../composables/k8NoteSectionMap'
 import type { Ref } from 'vue'
 
 const K8_ACCOUNT_CODE = '6601'
@@ -114,6 +119,22 @@ const props = defineProps<{
 
 const emit = defineEmits<{ (e: 'save', itemId: string, value: any): void }>()
 const openReviewDialog = inject<(section?: string) => void>('openReviewDialog', () => {})
+
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+onBeforeUnmount(() => autoSync.cancelPending())
+
+async function syncToDisclosureNotes(): Promise<void> {
+  if (!props.projectId || props.isReadonly) return
+  const payload = buildK8SyncPayload('soe', props.wpId || '', disclosureRows.value, narrativeText.value)
+  try {
+    await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
+    eventBus.emit('disclosure:note-text-updated' as any, {
+      wpCode: 'K8', variant: 'soe', accountCode: '6601',
+      projectId: props.projectId, sectionIds: ['八、65'],
+    })
+    ElMessage.success('已同步到附注')
+  } catch { /* silent */ }
+}
 
 // ─── 数据模型 ────────────────────────────────────────────────────────────────
 
@@ -224,11 +245,13 @@ function updateField(id: string, field: string, value: any): void {
 
 function persistRows(): void {
   emit('save', 'K8-disclosure-soe-rows', { remark: JSON.stringify(disclosureRows.value) })
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
 }
 
 function handleNarrativeSave(): void {
   emit('save', 'K8-disclosure-soe-narrative', { remark: narrativeText.value })
   eventBus.emit('disclosure:note-text-updated' as any, { wpCode: 'K8', variant: 'soe', text: narrativeText.value })
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
 }
 
 // ─── 合计汇总 ────────────────────────────────────────────────────────────────

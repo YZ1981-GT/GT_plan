@@ -495,7 +495,10 @@ onMounted(() => {
   if (c?.remark) auditConclusion.value = c.remark
 })
 
-const { ocrLoadingId, uploadAndMerge } = useF2PurchaseOcr(toRef(() => props.wpId || '') as Ref<string>)
+const { ocrLoadingId, uploadAndMerge } = useF2PurchaseOcr(
+  toRef(() => props.wpId || '') as Ref<string>,
+  toRef(() => props.projectId || '') as Ref<string>,
+)
 const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF2ValuationAiGenerate(
   toRef(() => props.wpId || '') as Ref<string>,
 )

@@ -1,5 +1,8 @@
 <template>
 <div class="d5-disclosure">
+    <!-- 同步状态条 -->
+    <GtWpDisclosureSyncBar :project-id="projectId" :year="auditYear" :wp-code="'D5'" :sheet-name="activeVariant === 'soe' ? '附注披露信息（国企）' : '附注披露信息（上市公司）'" />
+
     <!-- 工具栏：同步到附注 + 跳转回附注 -->
     <div class="d5-disclosure-toolbar">
       <el-button type="primary" plain size="small" :loading="isSyncing" :disabled="isReadonly"
@@ -457,12 +460,12 @@
  * Task: 17.1
  * Requirements: 8.1-8.8
  */
-import { ref, computed, watch, toRef, onUnmounted, type Ref } from 'vue'
+import { ref, computed, watch, toRef, onBeforeUnmount, type Ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
-import { useD5Disclosure } from '../composables/useD5Disclosure'
 import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
+import { useD5Disclosure } from '../composables/useD5Disclosure'
 import {
   buildD5SyncPayload,
   D5_NOTE_SECTION,
@@ -471,6 +474,9 @@ import {
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import type { useD5CrossSheet } from '../composables/useD5CrossSheet'
 import type { ChecklistResponse } from '../composables/useD5FormData'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { checkNoteConsistencyGeneric } from '../composables/noteConsistencyCheck'
+import GtWpDisclosureSyncBar from '../GtWpDisclosureSyncBar.vue'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -484,6 +490,8 @@ const props = defineProps<{
 }>()
 
 const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
+
+const { year: auditYear } = useAuditContext()
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -505,6 +513,19 @@ const {
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
   crossSheet: props.crossSheet,
 })
+
+// ─── 保存后自动同步到附注（防抖/非阻塞/失败静默）──────────────────────────────
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+onBeforeUnmount(() => autoSync.cancelPending())
+let _d5Mounted = false
+watch(
+  [listedSections, soeSections, impairmentRows, noteTexts],
+  () => {
+    if (!_d5Mounted) { _d5Mounted = true; return }
+    autoSync.scheduleAutoSync(syncToDisclosureNotes)
+  },
+  { deep: true },
+)
 
 // ─── (2) 期末已质押的应收票据 ────────────────────────────────────────────────
 
@@ -686,6 +707,9 @@ async function syncToDisclosureNotes(): Promise<void> {
       },
     }))
     ElMessage.success(`已同步 ${rows} 行到附注模块「${D5_NOTE_SECTION[variant]} 应收款项融资」`)
+    // 静默校对附注合计一致性
+    const pageTotal = snapshot.mainTotal?.endAmount ?? 0
+    checkNoteConsistencyGeneric(props.projectId, auditYear.value, D5_NOTE_SECTION[variant], pageTotal, true)
   } catch {
     ElMessage.warning('同步附注失败，请稍后重试')
   } finally {
@@ -693,18 +717,7 @@ async function syncToDisclosureNotes(): Promise<void> {
   }
 }
 
-// 保存后自动同步（防抖/非阻塞/失败静默/只读 gate）
-const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
-onUnmounted(() => autoSync.cancelPending())
-let autoSyncArmed = false
-watch(
-  [noteTexts, impairmentRows, pledgedRows, endorsedRows],
-  () => {
-    if (!autoSyncArmed) { autoSyncArmed = true; return }
-    autoSync.scheduleAutoSync(syncToDisclosureNotes)
-  },
-  { deep: true },
-)
+
 </script>
 
 <style scoped>

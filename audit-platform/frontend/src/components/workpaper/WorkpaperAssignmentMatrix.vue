@@ -21,6 +21,12 @@
             <div class="gt-wp-matrix-stat-label">已完成 ⓘ</div>
           </div>
         </el-tooltip>
+        <el-tooltip content="编制人 = 复核人的底稿数，违反职责分离/独立性，建议为这些底稿调整复核人" placement="top">
+          <div class="gt-wp-matrix-stat-cell" :class="{ 'is-conflict': selfReviewConflict > 0 }">
+            <div class="gt-wp-matrix-stat-num" :class="{ 'gt-warning': selfReviewConflict > 0 }">{{ selfReviewConflict }}</div>
+            <div class="gt-wp-matrix-stat-label">自审冲突 ⓘ</div>
+          </div>
+        </el-tooltip>
       </div>
       <div class="gt-wp-matrix-filters">
         <el-segmented v-model="mode" :options="modeOptions" size="small" />
@@ -61,6 +67,24 @@
           />
         </el-select>
         <el-checkbox v-model="highlightUnassigned" size="small">高亮未分配</el-checkbox>
+        <el-tooltip content="隐藏未参与编制/复核的管理员、只读、EQCR 等空行，使人均与负载统计更真实" placement="top">
+          <el-checkbox v-model="hideIdleNonComposers" size="small">隐藏未参与成员</el-checkbox>
+        </el-tooltip>
+        <el-tooltip
+          v-if="canAssign"
+          content="把全部未分配底稿一次送入委派弹窗，选多名候选人 + “均匀轮询/智能推荐”策略即可均衡分配"
+          placement="top"
+        >
+          <el-button
+            size="small"
+            type="primary"
+            plain
+            :disabled="unassignedByCycle.totalUnassigned === 0"
+            @click="onBalanceAssign"
+          >
+            ⚖ 均衡分配（{{ unassignedByCycle.totalUnassigned }}）
+          </el-button>
+        </el-tooltip>
         <el-button size="small" @click="exportMatrix">导出</el-button>
       </div>
     </div>
@@ -172,6 +196,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { ElMessageBox } from 'element-plus'
 
 interface WpItem {
   id: string
@@ -197,7 +222,9 @@ const props = withDefaults(defineProps<{
   members: Member[]
   /** 是否允许发起委派（非项目经理/合伙人时为只读矩阵）；缺省可委派，实际由父级按角色传入 */
   canAssign?: boolean
-}>(), { canAssign: true })
+  /** 项目名，用于导出文件名归档 */
+  projectName?: string
+}>(), { canAssign: true, projectName: '' })
 
 const emit = defineEmits<{
   'cell-click': [payload: { member_id: string; cycle: string }]
@@ -218,9 +245,14 @@ const CYCLE_NAMES: Record<string, string> = {
 
 const COMPLETED_STATUSES = new Set(['edit_complete', 'pending_review', 'reviewed', 'review_passed', 'archived', 'level1_passed', 'level2_passed'])
 
+// 通常不承担底稿编制的角色：当其在当前维度下 0 分配时，视为"占位空行"可隐藏（避免拉低人均/污染负载统计）
+// 审计员即使 0 分配也保留（是待委派对象）；这些角色一旦真被分配（total>0）也保留
+const IDLE_HIDE_ROLES = new Set(['admin', 'readonly', 'eqcr'])
+
 const memberFilter = ref<string[]>([])
 const cycleFilter = ref<string[]>([])
 const highlightUnassigned = ref(true)
+const hideIdleNonComposers = ref(true)
 
 // 维度：编制人(assigned_to) / 复核人(reviewer)
 const mode = ref<'assignee' | 'reviewer'>('assignee')
@@ -238,8 +270,8 @@ function ownerOf(w: WpItem): string | null | undefined {
 
 const completedTooltip = computed(() =>
   mode.value === 'reviewer'
-    ? '已完成 = 底稿状态达到编制完成/复核通过/归档等（编制+复核流程已推进）'
-    : '已完成 = 底稿状态 ∈ 编制完成/待复核/已复核/已通过/已归档'
+    ? '已完成 = 已配复核人 且 底稿状态达到编制完成/复核通过/归档等（与个人合计口径一致）'
+    : '已完成 = 已委派 且 底稿状态 ∈ 编制完成/待复核/已复核/已通过/已归档（与个人合计口径一致）'
 )
 
 // 计算每个循环的总底稿数
@@ -277,13 +309,14 @@ interface MatrixRow {
   member_id: string
   member_name: string
   member_role: string
+  _role?: string
   cells: Record<string, MatrixCell>
   total_assigned: number
   total_completed: number
   total_progress: number
 }
 
-const matrixRows = computed<MatrixRow[]>(() => {
+const allMatrixRows = computed<MatrixRow[]>(() => {
   const visibleMembers = memberFilter.value.length > 0
     ? props.members.filter(m => memberFilter.value.includes(m.id))
     : props.members
@@ -318,6 +351,7 @@ const matrixRows = computed<MatrixRow[]>(() => {
       member_id: m.id,
       member_name: m.full_name || m.username || m.id,
       member_role: roleLabel(m.role),
+      _role: m.role,
       cells,
       total_assigned: totalAssigned,
       total_completed: totalCompleted,
@@ -326,6 +360,14 @@ const matrixRows = computed<MatrixRow[]>(() => {
         : 0,
     }
   })
+})
+
+// 隐藏"未参与的管理/只读成员"占位空行：非编制角色 且 当前维度 0 分配
+const matrixRows = computed<MatrixRow[]>(() => {
+  if (!hideIdleNonComposers.value) return allMatrixRows.value
+  return allMatrixRows.value.filter(
+    r => !(IDLE_HIDE_ROLES.has(r._role || '') && r.total_assigned === 0)
+  )
 })
 
 function roleLabel(r?: string): string {
@@ -344,9 +386,15 @@ function roleLabel(r?: string): string {
 const totalSummary = computed(() => {
   const total = props.workpapers.length
   const assigned = props.workpapers.filter(w => !!ownerOf(w)).length
-  const completed = props.workpapers.filter(w => COMPLETED_STATUSES.has(w.status)).length
+  // 与个人合计/单元格口径一致：已分配（当前维度有归属人）且状态达完成
+  const completed = props.workpapers.filter(w => !!ownerOf(w) && COMPLETED_STATUSES.has(w.status)).length
   return { total, assigned, unassigned: total - assigned, completed }
 })
+
+// 自审冲突：编制人与复核人为同一人（违反职责分离/独立性），与维度无关，恒定义
+const selfReviewConflict = computed(() =>
+  props.workpapers.filter(w => !!w.assigned_to && !!w.reviewer && w.assigned_to === w.reviewer).length
+)
 
 // 负载均衡（基于当前可见成员的个人合计）
 const loadStats = computed(() => {
@@ -393,7 +441,25 @@ async function exportMatrix() {
   const ws = XLSX.utils.aoa_to_sheet([header, ...body])
   const wb = XLSX.utils.book_new()
   XLSX.utils.book_append_sheet(wb, ws, sheetLabel)
-  XLSX.writeFile(wb, `${sheetLabel}.xlsx`)
+  const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+  const fname = [sheetLabel, (props.projectName || '').trim(), stamp].filter(Boolean).join('_') + '.xlsx'
+  XLSX.writeFile(wb, fname)
+}
+
+/** 一键均衡：把当前可见循环内全部未分配底稿一次送入委派弹窗，用户选多人+"均匀轮询/智能推荐"策略即均衡 */
+function onBalanceAssign() {
+  if (!canAssign.value) return
+  const visibleCycles = new Set(cycleColumns.value)
+  const wpIds = props.workpapers
+    .filter(w => {
+      if (ownerOf(w)) return false
+      const c = (w.wp_code || w.audit_cycle || '?')[0] || '?'
+      return visibleCycles.has(c)
+    })
+    .map(w => w.id)
+  if (wpIds.length > 0) {
+    emit('open-assign', { wp_ids: wpIds })
+  }
 }
 
 // 未分配统计（按当前维度 + 受循环筛选影响）
@@ -422,12 +488,39 @@ function cellClass(cell: MatrixCell): Record<string, boolean> {
   }
 }
 
-function onCellClick(row: MatrixRow, cycle: string) {
+async function onCellClick(row: MatrixRow, cycle: string) {
   const cell = row.cells[cycle]
   emit('cell-click', { member_id: row.member_id, cycle })
   if (!canAssign.value) return // 无委派权限：仅查看
   if (cell.wp_ids.length > 0) {
-    // 已委派单元格 → 打开弹窗以改派/复核（弹窗两步即确认）
+    // 已委派单元格 → 改派。改派已完成底稿会变更归属并影响已完成成果，先甄别提示
+    const completedIds = new Set(
+      props.workpapers
+        .filter(w => cell.wp_ids.includes(w.id) && COMPLETED_STATUSES.has(w.status))
+        .map(w => w.id)
+    )
+    const pendingIds = cell.wp_ids.filter(id => !completedIds.has(id))
+    if (completedIds.size > 0) {
+      try {
+        await ElMessageBox.confirm(
+          `该单元格含 ${completedIds.size} 张已完成底稿。改派会变更其归属并可能影响已完成成果。`,
+          '改派确认',
+          {
+            confirmButtonText: '全部改派',
+            cancelButtonText: pendingIds.length > 0 ? '仅改派未完成' : '取消',
+            type: 'warning',
+            distinguishCancelAndClose: true,
+          }
+        )
+        emit('open-assign', { wp_ids: cell.wp_ids }) // 确认 → 全部改派
+      } catch (action) {
+        // cancel = 仅改派未完成；close/ESC = 取消不动作
+        if (action === 'cancel' && pendingIds.length > 0) {
+          emit('open-assign', { wp_ids: pendingIds })
+        }
+      }
+      return
+    }
     emit('open-assign', { wp_ids: cell.wp_ids })
     return
   }
@@ -490,6 +583,10 @@ function onUnassignedClick(cycle: string) {
   border-radius: 8px;
   border: 1px solid var(--gt-color-border-light, #f0f0f0);
   min-width: 70px;
+}
+.gt-wp-matrix-stat-cell.is-conflict {
+  background: #fff0f0;
+  border-color: #f89898;
 }
 .gt-wp-matrix-stat-num {
   font-size: 20px;

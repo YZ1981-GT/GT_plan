@@ -313,6 +313,7 @@ const props = defineProps<{
   projectId: string
   allResponses: Map<string, any>
   tbData: { unadjusted1231: number; audited1231: number }
+  prefill?: Array<Record<string, unknown>>
   isReadonly: boolean
 }>()
 
@@ -337,6 +338,7 @@ const {
   auditConclusion,
   updateField,
 } = useK2Adjudication(allResponsesRef as any, {
+  prefill: toRef(props, 'prefill') as any,
   onSave: (itemId: string, value: any) => {
     emit('save', itemId, value)
   },

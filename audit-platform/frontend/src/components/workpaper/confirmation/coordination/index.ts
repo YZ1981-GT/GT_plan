@@ -35,15 +35,9 @@ export {
   type SourceIndicatorConfig,
 } from './ConfirmationKit'
 
-// D0-1 枢纽分发
-export {
-  useConfirmationDispatch,
-  routeAlternative,
-  type DispatchTarget,
-  type DispatchEntry,
-  type DispatchResult,
-  type UseConfirmationDispatchOptions,
-} from './useConfirmationDispatch'
+// D0-1 枢纽分发 — DEPRECATED: dispatch_records 机制从未被前端组件采用，
+// 由 coordination/importFromSummary.ts 取代。保留 routeAlternative 纯函数供参考。
+// useConfirmationDispatch 及相关类型已删除（2026-07-27 confirmation-linkage-completion R3）。
 
 // 舞弊信号收集
 export {

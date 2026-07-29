@@ -17,7 +17,7 @@
  *
  * Item IDs: "K8-1-row-{idx}-{field}"
  */
-import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, nextTick, type Ref, type ComputedRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import {
@@ -71,11 +71,19 @@ export interface K8AdjSubtotalRow {
   yoyChangeRate: number | null
 }
 
+export interface K8AdjPrefillRow {
+  name: string
+  unadjustedDebit: number
+  unadjustedCredit: number
+}
+
 export interface UseK8AdjudicationParams {
   allResponses: Ref<Map<string, any>>
   projectId: Ref<string>
   wpId: Ref<string>
   isReadonly?: Ref<boolean>
+  /** tb_balance 6601 明细子科目预填（无持久化行时据此建行，对齐 K9 审定表预填铁律） */
+  prefill?: Ref<K8AdjPrefillRow[]>
   onSave?: (itemId: string, value: any) => void
 }
 
@@ -118,7 +126,7 @@ function calcChangeRate(current: number, prior: number): number | null {
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useK8Adjudication(params: UseK8AdjudicationParams) {
-  const { allResponses, projectId, wpId, isReadonly, onSave } = params
+  const { allResponses, projectId, wpId, isReadonly, prefill, onSave } = params
 
   // ─── State ─────────────────────────────────────────────────────────────────
 
@@ -126,6 +134,8 @@ export function useK8Adjudication(params: UseK8AdjudicationParams) {
   const auditNote = ref('')
   const auditConclusion = ref('')
   const isChanged = ref(false)
+  /** 是否已从预填 seed 并落库一次（避免重复/循环 persist） */
+  const hasSeededPrefill = ref(false)
 
   // ─── Load ──────────────────────────────────────────────────────────────────
 
@@ -133,6 +143,23 @@ export function useK8Adjudication(params: UseK8AdjudicationParams) {
     const raw = _getJson(ROWS_KEY)
     if (Array.isArray(raw) && raw.length > 0) {
       rows.value = raw.map(_normalizeRow)
+    } else if (prefill?.value && prefill.value.length > 0) {
+      // 无持久化行 → 从 tb_balance 6601 明细子科目预填
+      rows.value = prefill.value.map((p) => _normalizeRow({
+        projectName: p.name,
+        unadjustedDebit: p.unadjustedDebit,
+        unadjustedCredit: p.unadjustedCredit,
+        isEditable: true,
+      }))
+      // 预填落库：首次 seed 后一次性持久化行 + 审定合计，
+      // 让附注自动取数/TB 勾稽在用户动手前即有数（seed 的是 TB 真实发生额，非臆造）。
+      if (!hasSeededPrefill.value && onSave && !isReadonly?.value) {
+        hasSeededPrefill.value = true
+        void nextTick(() => {
+          _persist()
+          onSave(`${ITEM_PREFIX}-audited-total`, totalRow.value.audited)
+        })
+      }
     } else {
       rows.value = _buildDefaultRows()
     }
@@ -403,7 +430,7 @@ export function useK8Adjudication(params: UseK8AdjudicationParams) {
 
   // ─── Watch init ────────────────────────────────────────────────────────────
 
-  watch(allResponses, () => initFromResponses(), { immediate: true })
+  watch([allResponses, () => prefill?.value], () => initFromResponses(), { immediate: true })
 
   // ─── Return ────────────────────────────────────────────────────────────────
 

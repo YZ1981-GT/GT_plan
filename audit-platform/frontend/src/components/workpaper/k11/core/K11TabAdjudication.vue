@@ -381,6 +381,7 @@ const props = defineProps<{
   allResponses: Map<string, any>
   tbData: { unadjusted6701: number; audited6701: number }
   isReadonly: boolean
+  prefill?: Array<{ name: string; unadjustedDebit: number; unadjustedCredit: number }>
 }>()
 
 // 父组件模板绑定会自动解包 ref → 子组件收到纯 Map；重新包成 ref 供 composable 使用
@@ -409,6 +410,7 @@ const {
   projectId: toRef(props, 'projectId') as Ref<string>,
   wpId: toRef(props, 'wpId') as Ref<string>,
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
+  prefill: computed(() => props.prefill ?? []) as Ref<Array<{ name: string; unadjustedDebit: number; unadjustedCredit: number }>>,
   onSave: (itemId: string, value: any) => {
     emit('save', itemId, value)
   },

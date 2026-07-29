@@ -76,6 +76,14 @@
         />
 
         <!-- H8-1 审定表（四区块：原值/折旧/减值/净额 + H8-3 账项回写） -->
+        <HiFourTableSourcePanel
+          v-if="props.htmlData?.hi_extraction_enabled"
+          :wp-code="'H8'"
+          :segments="getHiExtractionSegments('H8')"
+          :all-responses="allResponses"
+          :is-readonly="isReadonly"
+          @refresh-complete="selfLoad()"
+        />
         <H8TabAdjudication
           v-else-if="currentSheet === 'H8-1'"
           @save="persistResponse"
@@ -332,6 +340,8 @@ import { eventBus } from '@/utils/eventBus'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useH8CrossSheet } from './composables/useH8CrossSheet'
+import HiFourTableSourcePanel from './shared/HiFourTableSourcePanel.vue'
+import { getHiExtractionSegments } from './composables/hiExtractionSegments'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))

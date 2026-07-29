@@ -10,16 +10,18 @@
  *
  * 底部：审计说明textarea + AI辅助按钮 + 编制提示折叠
  */
-import { ref, computed, onUnmounted, watch, inject } from 'vue'
+import { ref, computed, onBeforeUnmount, inject } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useDebounceFn } from '@vueuse/core'
 import http from '@/utils/http'
 import { useD4Disclosure, type ProductRegionRow } from '../../composables/useD4Disclosure'
-import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { buildD4SyncPayload, D4_NOTE_SECTION, type D4DisclosureSnapshot } from '../../composables/d4NoteSectionMap'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import { parseNum } from '../../composables/useD4FormulaEngine'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { checkNoteConsistencyGeneric } from '../../composables/noteConsistencyCheck'
 
 const props = defineProps<{
   wpId: string
@@ -38,6 +40,7 @@ const debouncedFlush = useDebounceFn(async () => {
   pendingItems.value = []
   try {
     await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, { items }, { _silent: true } as any)
+    autoSync.scheduleAutoSync(syncToDisclosureNotes)
   } catch { /* silent */ }
 }, 2000)
 
@@ -45,6 +48,11 @@ function saveBatch(items: any[]) {
   pendingItems.value.push(...items)
   debouncedFlush()
 }
+
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+onBeforeUnmount(() => autoSync.cancelPending())
+
+const { year: auditYear } = useAuditContext()
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 const allResponsesRef = computed(() => props.allResponses) as any
@@ -121,6 +129,9 @@ async function syncToDisclosureNotes(): Promise<void> {
       detail: { wpCode: 'D4', accountCode: '6001', projectId: props.projectId, section: VARIANT, sectionIds: [D4_NOTE_SECTION[VARIANT]] },
     }))
     ElMessage.success(`已同步 ${rows} 行到附注模块「${D4_NOTE_SECTION[VARIANT]} 营业收入、营业成本」`)
+    // 静默校对附注合计一致性
+    const pageTotal = Number(section1Total.value?.currentRevenue || 0)
+    checkNoteConsistencyGeneric(props.projectId, auditYear.value, D4_NOTE_SECTION[VARIANT], pageTotal, true)
   } catch {
     ElMessage.warning('同步附注失败，请稍后重试')
   } finally {
@@ -128,18 +139,7 @@ async function syncToDisclosureNotes(): Promise<void> {
   }
 }
 
-// 保存后自动同步（防抖/非阻塞/失败静默/只读 gate）
-const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
-onUnmounted(() => autoSync.cancelPending())
-let autoSyncArmed = false
-watch(
-  [noteTexts, section1Data, section2Rows, section3Rows, section4Rows],
-  () => {
-    if (!autoSyncArmed) { autoSyncArmed = true; return }
-    autoSync.scheduleAutoSync(syncToDisclosureNotes)
-  },
-  { deep: true },
-)
+
 
 // ─── Format helpers ──────────────────────────────────────────────────────────
 function fmtAmt(v: number): string {

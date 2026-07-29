@@ -22,6 +22,10 @@ import type { UseE1BaseOptions } from '../composables/useE1Adjudication'
 import GtIndexChip from '../GtIndexChip.vue'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import E1AccountListOcrConfirmDialog, {
+  type AccountListOcrFields,
+} from './E1AccountListOcrConfirmDialog.vue'
+import http from '@/utils/http'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -184,6 +188,63 @@ async function handleImport(file: File): Promise<boolean> {
   return false
 }
 
+// ─── OCR ─────────────────────────────────────────────────────────────────────
+
+const ocrVisible = ref(false)
+const ocrLoading = ref(false)
+const ocrFields = ref<Partial<AccountListOcrFields>>({})
+const ocrConfidence = ref<number | undefined>()
+const ocrPreview = ref('')
+const ocrFileName = ref('')
+const ocrAttachmentId = ref('')
+
+async function runAccountListOcr(file: File): Promise<boolean> {
+  ocrLoading.value = true
+  try {
+    const form = new FormData()
+    form.append('file', file)
+    if (ocrAttachmentId.value) form.append('attachment_id', ocrAttachmentId.value)
+    const { data } = await http.post(
+      `/api/workpapers/${props.wpId}/e1/account-list-ocr`,
+      form,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    )
+    const fields = data?.extracted_fields || {}
+    if (!fields.accounts?.length) {
+      ElMessage.warning('OCR 完成，未识别到账户行')
+    }
+    ocrFields.value = fields
+    ocrConfidence.value = typeof data?.confidence === 'number' ? data.confidence : undefined
+    ocrPreview.value = String(data?.ocr_text || '').slice(0, 2000)
+    ocrFileName.value = file.name
+    ocrAttachmentId.value = String(data?.attachment_id || '')
+    ocrVisible.value = true
+  } catch {
+    ElMessage.error('账户清单 OCR 识别失败')
+  } finally {
+    ocrLoading.value = false
+  }
+  return false
+}
+
+function onOcrConfirm(fields: AccountListOcrFields): void {
+  ocrVisible.value = false
+  const accounts = fields.accounts || []
+  accounts.forEach(r => {
+    const row = addRow(r.bank)
+    if (row) {
+      updateRow(row.id, {
+        accountNo: r.accountNo,
+        accountType: r.accountType,
+        accountStatus: r.accountStatus,
+        openDate: r.openDate,
+        closeDate: r.closeDate,
+      })
+    }
+  })
+  ElMessage.success(`已追加 ${accounts.length} 条账户行，请核对后保存`)
+}
+
 // ─── Row Class ───────────────────────────────────────────────────────────────
 
 function getRowClass({ row }: { row: AccountListRow }): string {
@@ -217,6 +278,11 @@ function getRowClass({ row }: { row: AccountListRow }): string {
     <div class="tab-toolbar">
       <div class="toolbar-left">
         <el-button size="small" type="primary" :disabled="isReadonly" @click="promptAndAdd">+ 新增账户</el-button>
+        <el-upload :show-file-list="false" accept=".pdf,.png,.jpg,.jpeg" :before-upload="runAccountListOcr" :disabled="isReadonly || ocrLoading">
+          <el-button size="small" type="primary" plain :loading="ocrLoading" :disabled="isReadonly">
+            账户清单 OCR
+          </el-button>
+        </el-upload>
       </div>
       <div class="toolbar-right">
         <el-dropdown size="small" trigger="click" :disabled="isReadonly">
@@ -473,6 +539,16 @@ function getRowClass({ row }: { row: AccountListRow }): string {
         @change="(val: string) => saveAuditConclusion(val)"
       />
     </el-card>
+
+    <!-- OCR 确认对话框 -->
+    <E1AccountListOcrConfirmDialog
+      v-model="ocrVisible"
+      :fields="ocrFields"
+      :confidence="ocrConfidence"
+      :ocr-preview="ocrPreview"
+      :file-name="ocrFileName"
+      @confirm="onOcrConfirm"
+    />
   </div>
 </template>
 

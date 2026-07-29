@@ -4,6 +4,9 @@
     <el-alert type="info" title="当前项目不适用国企附注披露格式" :closable="false" show-icon />
   </template>
   <template v-else>
+    <!-- 同步状态条 -->
+    <GtWpDisclosureSyncBar :project-id="projectId" :year="auditYear" :wp-code="'D3'" :sheet-name="'附注披露信息(国企)'" />
+
     <!-- 工具栏：同步到附注 + 跳转回附注 -->
     <div class="d3-disclosure-toolbar">
       <el-button type="primary" plain size="small" :loading="isSyncing" :disabled="isReadonly"
@@ -115,6 +118,23 @@
       </el-table>
     </div>
 
+    <!-- D3↔D7 口径交叉核对 -->
+    <el-alert
+      v-if="d3D7ReconcileVisible"
+      :type="'info'"
+      :closable="true"
+      show-icon
+      class="d3-d7-reconcile-alert"
+    >
+      <template #title>
+        <span>
+          预收账款(D3)审定 {{ fmtAmount(d3AuditedTotal) }} + 合同负债(D7)审定 {{ fmtAmount(d7AuditedFromTb) }} = {{ fmtAmount((d3AuditedTotal ?? 0) + (d7AuditedFromTb ?? 0)) }}，
+          请与资产负债表「合同负债」行核对一致（CAS14 预收拆分口径）
+        </span>
+        <GtIndexChip value="wp:D7" context="合同负债审定表" />
+      </template>
+    </el-alert>
+
     <!-- 编制提示 -->
     <details class="compile-hint">
       <summary>📋 编制提示</summary>
@@ -133,12 +153,12 @@
  * D3TabDisclosureSoe.vue — 附注披露（国企）
  * 2子节卡片 + 跨sheet取数 + 动态行 + 合计 + applicable_standards判断
  */
-import { computed, ref, toRef, watch, onUnmounted, type Ref } from 'vue'
+import { computed, ref, toRef, watch, onBeforeUnmount, type Ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
-import { useD3DisclosureSoe } from '../composables/useD3DisclosureSoe'
 import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
+import { useD3DisclosureSoe } from '../composables/useD3DisclosureSoe'
 import {
   buildD3SyncPayload,
   D3_NOTE_SECTION,
@@ -147,6 +167,12 @@ import {
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import type { useD3CrossSheet } from '../composables/useD3CrossSheet'
 import type { ChecklistResponse } from '../composables/useD3FormData'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { checkNoteConsistencyGeneric } from '../composables/noteConsistencyCheck'
+import GtWpDisclosureSyncBar from '../GtWpDisclosureSyncBar.vue'
+
+// @ts-ignore
+import GtIndexChip from '../GtIndexChip.vue'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -163,10 +189,16 @@ const props = defineProps<{
 const allResponsesRef = toRef(props, 'allResponses') as Ref<Map<string, ChecklistResponse>>
 const wpIdRef = toRef(props, 'wpId') as Ref<string>
 const projectIdRef = toRef(props, 'projectId') as Ref<string>
+
+const { year: auditYear } = useAuditContext()
 const applicableStandardsRef = computed<string[]>(() => {
   const v = props.applicableStandards
   return Array.isArray(v) ? v : (typeof v === 'string' && v ? [v] : [])
 }) as unknown as Ref<string[]>
+
+// ─── 保存后自动同步到附注（防抖/非阻塞/失败静默）──────────────────────────────
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+onBeforeUnmount(() => autoSync.cancelPending())
 
 const {
   isApplicable,
@@ -188,11 +220,42 @@ const {
   applicableStandards: applicableStandardsRef,
 })
 
+// 数据变化后防抖自动同步到附注
+let _d3SoeMounted = false
+watch(
+  [section1Rows, section2Rows],
+  () => {
+    if (!_d3SoeMounted) { _d3SoeMounted = true; return }
+    autoSync.scheduleAutoSync(syncToDisclosureNotes)
+  },
+  { deep: true },
+)
+
 function fmtAmount(val: number | null | undefined): string {
   if (val == null || val === 0) return '-'
   if (val < 0) return `(${Math.abs(val).toLocaleString('zh-CN', { maximumFractionDigits: 2 })})`
   return val.toLocaleString('zh-CN', { maximumFractionDigits: 2 })
 }
+
+// ─── D3↔D7 口径交叉核对（预收账款 + 合同负债 vs 报表行）─────────────────────
+const d3AuditedTotal = computed<number | null>(() => {
+  return section1Subtotal.value?.endAmount ?? null
+})
+
+const d7AuditedFromTb = computed<number | null>(() => {
+  const tbVal = props.allResponses.get('D3-d7-tb-audited-amount')?.remark
+  if (tbVal != null && String(tbVal).trim() !== '') {
+    const n = Number(tbVal)
+    return Number.isFinite(n) ? n : null
+  }
+  const csVal = (props.crossSheet as any)?.d7TbAudited?.value
+  if (typeof csVal === 'number' && Number.isFinite(csVal)) return csVal
+  return null
+})
+
+const d3D7ReconcileVisible = computed<boolean>(() => {
+  return d3AuditedTotal.value != null && d3AuditedTotal.value !== 0 && d7AuditedFromTb.value != null
+})
 
 // ─── 同步到附注 / 跳转回附注 ─────────────────────────────────────────────────
 const router = useRouter()
@@ -232,6 +295,9 @@ async function syncToDisclosureNotes(): Promise<void> {
       },
     }))
     ElMessage.success(`已同步 ${rows} 行到附注模块「${D3_NOTE_SECTION.soe} 预收款项」`)
+    // 静默校对附注合计一致性
+    const pageTotal = section1Subtotal.value?.current ?? 0
+    checkNoteConsistencyGeneric(props.projectId, auditYear.value, D3_NOTE_SECTION.soe, pageTotal, true)
   } catch {
     ElMessage.warning('同步附注失败，请稍后重试')
   } finally {
@@ -239,23 +305,13 @@ async function syncToDisclosureNotes(): Promise<void> {
   }
 }
 
-// 保存后自动同步（防抖/非阻塞/失败静默/只读 gate；与手动按钮同源）
-const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
-onUnmounted(() => autoSync.cancelPending())
-let autoSyncArmed = false
-watch(
-  [section2Rows],
-  () => {
-    if (!autoSyncArmed) { autoSyncArmed = true; return } // 跳过挂载首帧
-    autoSync.scheduleAutoSync(syncToDisclosureNotes)
-  },
-  { deep: true },
-)
+
 </script>
 
 <style scoped>
 .d3-disclosure-soe { padding: 16px; }
 .d3-disclosure-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+.d3-d7-reconcile-alert { margin-bottom: 12px; }
 .disclosure-card { margin-bottom: 20px; padding: 16px; background: #fff; border: 1px solid #ebeef5; border-radius: 6px; }
 .card-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
 .subtotal-label { font-weight: 700; }

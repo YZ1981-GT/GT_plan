@@ -129,6 +129,7 @@
         @import-data="onImportData"
         @add-row="onAddRow"
         @toggle-fullscreen="isWpFullscreen = !isWpFullscreen"
+        @open-attachments="attachmentsDrawerVisible = true"
       >
         <template v-if="activeSheetName" #center>
           <GtWpAiReviewToolbar
@@ -276,6 +277,15 @@
       :project-id="runtimeProjectId"
       @rollback-completed="reload"
     />
+
+    <!-- 本底稿关联附件抽屉（工具栏「关联附件」打开；可编辑时支持解除关联）。 -->
+    <WorkpaperAttachmentsDrawer
+      v-model="attachmentsDrawerVisible"
+      :wp-id="wpId"
+      :project-id="renderConfig?.project_id ?? runtimeProjectId ?? ''"
+      :wp-code="renderConfig?.wp_code ?? ''"
+      :can-edit="!readonly"
+    />
   </div>
 </template>
 
@@ -306,6 +316,7 @@ import SkippedSheetPlaceholder from '@/components/workpaper/SkippedSheetPlacehol
 import GtGridSheet from '@/components/workpaper/GtGridSheet.vue'
 import GtOnlyOfficeSheet from './GtOnlyOfficeSheet.vue'
 import GtWpToolbar from '@/components/workpaper/GtWpToolbar.vue'
+import WorkpaperAttachmentsDrawer from '@/components/workpaper/WorkpaperAttachmentsDrawer.vue'
 import GtWpAiReviewToolbar from './review/GtWpAiReviewToolbar.vue'
 import GtWpDisclosureSyncBar from './GtWpDisclosureSyncBar.vue'
 import { isDisclosureSheetName } from './composables/disclosureSyncBar'
@@ -375,6 +386,8 @@ const WHOLE_EXCEL_TAB = '__whole_excel__'
 const F1_CONFIRM_SHEET = '函证程序F1-CONF'
 // 统一工具栏状态
 const isWpFullscreen = ref(false)
+// 「本底稿关联附件」抽屉
+const attachmentsDrawerVisible = ref(false)
 // 子组件引用（用于转发工具栏操作）
 const activeComponentRef = ref<any>(null)
 // OnlyOffice 降级状态（当 GtOnlyOfficeSheet emit fallback 时切换到 GtGridSheet）

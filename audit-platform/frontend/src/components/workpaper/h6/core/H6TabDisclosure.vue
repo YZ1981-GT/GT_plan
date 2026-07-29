@@ -42,6 +42,15 @@
         <span class="chip-wrap"><GtIndexChip value="wp:H1-1" :context-project-id="projectId" /></span>
         <span class="chip-wrap"><GtIndexChip :value="`Note:${noteSectionId}`" :context-project-id="projectId" /></span>
         <GtReviewTrigger :section-id="ui.reviewSectionId" />
+        <el-dropdown v-if="projectId" split-button size="small" type="default" @click="jumpToNote(isListed ? 'listed' : 'soe')">
+          ↩ 跳转回附注（{{ noteSectionId }}）
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item @click="jumpToNote('listed')">上市版（五、22）</el-dropdown-item>
+              <el-dropdown-item @click="jumpToNote('soe')">国企版（八、22）</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
       </div>
     </div>
 
@@ -185,6 +194,9 @@ import { ref, reactive, computed, inject, onMounted, onUnmounted, onBeforeUnmoun
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { eventBus } from '@/utils/eventBus'
+import { useRouter } from 'vue-router'
+import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import {
@@ -228,6 +240,12 @@ const noteSectionId = computed(() =>
   isListed.value ? H6_NOTE_SECTION.listed : H6_NOTE_SECTION.soe,
 )
 const rootClass = computed(() => (isListed.value ? 'h6-disc-listed' : 'h6-disc-soe'))
+
+const router = useRouter()
+function jumpToNote(variant: DisclosureVariant) {
+  const route = buildNoteJumpRoute(props.projectId, 'H6', variant)
+  if (route) router.push(route)
+}
 
 const ui = computed(() => {
   if (isListed.value) {
@@ -406,6 +424,13 @@ async function syncToNotes() {
     )
     const data = result?.data ?? result
     ElMessage.success(`已同步 ${Number(data?.rows_synced ?? 0)} 行到附注「${noteSectionId.value}」固定资产清理`)
+    eventBus.emit('disclosure:note-text-updated' as any, {
+      wpCode: 'H6',
+      accountCode: '1606',
+      projectId: props.projectId,
+      section: noteSectionId.value,
+      sectionIds: [noteSectionId.value],
+    })
   } catch {
     ElMessage.warning('同步附注失败，请稍后重试')
   } finally {

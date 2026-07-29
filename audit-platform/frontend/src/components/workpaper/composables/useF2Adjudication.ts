@@ -13,6 +13,7 @@ import {
 } from './useF2InvMaiFormulaEngine'
 import type { ChecklistResponse } from './useF2FormData'
 import { F2_ROW_KEY_ACCOUNT } from './useF2CrossSheet'
+import { eventBus } from '@/utils/eventBus'
 
 export const F2_CATEGORIES = [
   { rowKey: 'raw-materials', label: '原材料' },
@@ -125,6 +126,14 @@ export function calcNetInventory(totalBalance: number, impairmentProvision: numb
 export interface TbValuesEntry {
   opening?: number
   closing?: number
+  /** 灰度开时后端返回：本期增加 */
+  increase?: number
+  /** 灰度开时后端返回：本期减少 */
+  decrease?: number
+  /** 灰度开时后端返回：取数公式溯源 */
+  formulas?: Record<string, string>
+  /** 灰度开时后端返回：源科目编码 */
+  source_codes?: string[]
 }
 
 export interface UseF2AdjudicationOptions {
@@ -159,60 +168,63 @@ export function useF2Adjudication(opts: UseF2AdjudicationOptions) {
     const tbVals = opts.tbValues?.value
     if (!tbVals || Object.keys(tbVals).length === 0) return
     seeded = true
-    // 将 tb_values 各 rowKey 的 opening/closing 填入对应行的 beginUnadj(opening)/endUnadj 相关字段
+    // 将 tb_values 各 rowKey 的 opening/increase/decrease 填入对应行
     for (const cat of F2_CATEGORIES) {
       const entry = tbVals[cat.rowKey]
       if (!entry) continue
-      const opening = entry.opening ?? 0
-      const closing = entry.closing ?? 0
-      if (opening !== 0) {
-        const id = itemId('gross', cat.rowKey, 'opening')
-        if (!map.has(id)) {
-          map.set(id, { item_id: id, conclusion: String(opening), remark: null })
-        }
-      }
-      // closing 填入的是"期末未审"= opening + increase - decrease
-      // 后端已算好期末，直接做差：increase = closing - opening（粗略 seed，仅预填参考）
-      // 但更正确的 seed：不拆 increase/decrease，只填 opening 和通过 endUnadjusted 推算
-      // 实际审计场景：opening 直接填 opening 字段；若无 crossSheet 带入 increase/decrease 则
-      // 用户需手工补填。但为了让"期末未审"列有初始值，这里 seed increase = closing - opening
-      if (closing !== opening) {
-        const incId = itemId('gross', cat.rowKey, 'increase')
-        if (!map.has(incId)) {
-          const inc = closing - opening
-          if (inc > 0) {
-            map.set(incId, { item_id: incId, conclusion: String(inc), remark: null })
-          } else if (inc < 0) {
-            const decId = itemId('gross', cat.rowKey, 'decrease')
-            if (!map.has(decId)) {
-              map.set(decId, { item_id: decId, conclusion: String(Math.abs(inc)), remark: null })
-            }
+
+      // 判断是否为新结构（灰度开时后端返回含 increase/decrease）
+      const hasNewFields = 'increase' in entry || 'decrease' in entry
+
+      // 判断 block：impairment-provision 归 impairment block，其余归 gross
+      const block: F2BlockKey = cat.rowKey === 'impairment-provision' ? 'impairment' : 'gross'
+
+      if (hasNewFields) {
+        // ─── 灰度开：直填 opening/increase/decrease（不粗猜） ───
+        const opening = (entry as any).opening ?? 0
+        const increase = (entry as any).increase ?? 0
+        const decrease = (entry as any).decrease ?? 0
+
+        if (opening !== 0) {
+          const id = itemId(block, cat.rowKey, 'opening')
+          if (!map.has(id)) {
+            map.set(id, { item_id: id, conclusion: String(opening), remark: null })
           }
         }
-      }
-    }
-    // 跌价准备(1471) seed — rowKey = 'impairment-provision'
-    const impEntry = tbVals['impairment-provision']
-    if (impEntry) {
-      const impOpening = impEntry.opening ?? 0
-      const impClosing = impEntry.closing ?? 0
-      if (impOpening !== 0) {
-        const id = itemId('impairment', 'impairment-provision', 'opening')
-        if (!map.has(id)) {
-          map.set(id, { item_id: id, conclusion: String(impOpening), remark: null })
+        if (increase !== 0) {
+          const id = itemId(block, cat.rowKey, 'increase')
+          if (!map.has(id)) {
+            map.set(id, { item_id: id, conclusion: String(increase), remark: null })
+          }
         }
-      }
-      if (impClosing !== impOpening) {
-        const inc = impClosing - impOpening
-        if (inc > 0) {
-          const incId = itemId('impairment', 'impairment-provision', 'increase')
+        if (decrease !== 0) {
+          const id = itemId(block, cat.rowKey, 'decrease')
+          if (!map.has(id)) {
+            map.set(id, { item_id: id, conclusion: String(decrease), remark: null })
+          }
+        }
+      } else {
+        // ─── 灰度关/旧结构：保持旧 closing−opening 粗猜逻辑（零回归） ───
+        const opening = entry.opening ?? 0
+        const closing = entry.closing ?? 0
+        if (opening !== 0) {
+          const id = itemId(block, cat.rowKey, 'opening')
+          if (!map.has(id)) {
+            map.set(id, { item_id: id, conclusion: String(opening), remark: null })
+          }
+        }
+        if (closing !== opening) {
+          const incId = itemId(block, cat.rowKey, 'increase')
           if (!map.has(incId)) {
-            map.set(incId, { item_id: incId, conclusion: String(inc), remark: null })
-          }
-        } else if (inc < 0) {
-          const decId = itemId('impairment', 'impairment-provision', 'decrease')
-          if (!map.has(decId)) {
-            map.set(decId, { item_id: decId, conclusion: String(Math.abs(inc)), remark: null })
+            const inc = closing - opening
+            if (inc > 0) {
+              map.set(incId, { item_id: incId, conclusion: String(inc), remark: null })
+            } else if (inc < 0) {
+              const decId = itemId(block, cat.rowKey, 'decrease')
+              if (!map.has(decId)) {
+                map.set(decId, { item_id: decId, conclusion: String(Math.abs(inc)), remark: null })
+              }
+            }
           }
         }
       }
@@ -348,7 +360,7 @@ export function useF2Adjudication(opts: UseF2AdjudicationOptions) {
     }
 
     try {
-      window.dispatchEvent(new CustomEvent('substantive:adjudicated', { detail: payload }))
+      eventBus.emit('substantive:adjudicated', payload)
     } catch { /* silent */ }
 
     if (opts.projectId.value) {
@@ -374,9 +386,7 @@ export function useF2Adjudication(opts: UseF2AdjudicationOptions) {
     })
     debounceMetaSave()
     try {
-      window.dispatchEvent(new CustomEvent('disclosure:note-text-updated', {
-        detail: { wpCode: 'F2', section: 'adj-note', text: val },
-      }))
+      eventBus.emit('disclosure:note-text-updated', { wpCode: 'F2', section: 'adj-note', text: val })
     } catch { /* silent */ }
   })
 

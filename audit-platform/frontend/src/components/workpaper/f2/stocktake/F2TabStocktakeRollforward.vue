@@ -429,7 +429,7 @@ const datesEqual = computed(() => {
 
 const wpIdRef = toRef(() => props.wpId || '') as Ref<string>
 const projectIdRef = toRef(() => props.projectId || '') as Ref<string>
-const { ocrLoadingId, uploadAndMerge } = useF2StocktakeOcr(wpIdRef)
+const { ocrLoadingId, uploadAndMerge } = useF2StocktakeOcr(wpIdRef, projectIdRef)
 const { aiAvailable, generateAndConfirm } = useF2StocktakeAiGenerate({
   wpId: wpIdRef,
   projectId: projectIdRef,

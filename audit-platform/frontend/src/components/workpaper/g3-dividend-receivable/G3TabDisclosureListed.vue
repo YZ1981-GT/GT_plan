@@ -394,6 +394,11 @@ async function syncToDisclosureNotes() {
   }
 }
 
+// 数据变更后自动同步到附注（debounce 由 autoSync 内部 800ms 控制，只读/失败静默）
+watch([tableRows, noteText], () => {
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
+}, { deep: true })
+
 onMounted(() => { eventBus.on('substantive:adjudicated', handleAdjudicated) })
 onBeforeUnmount(() => { eventBus.off('substantive:adjudicated', handleAdjudicated); autoSync.cancelPending() })
 

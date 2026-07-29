@@ -281,6 +281,7 @@ const props = defineProps<{
   projectId: string
   allResponses: Map<string, any>
   tbData: { unadjusted2245: number; audited2245: number }
+  prefill?: Array<Record<string, unknown>>
   isReadonly: boolean
 }>()
 
@@ -303,6 +304,7 @@ const {
 } = useK4Adjudication({
   allResponses: allResponsesRef as any,
   tbData: tbDataRef as any,
+  prefill: toRef(props, 'prefill') as any,
   saveResponse: handleSaveItem,
 })
 

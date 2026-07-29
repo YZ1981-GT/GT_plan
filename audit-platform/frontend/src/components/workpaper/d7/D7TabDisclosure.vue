@@ -1,5 +1,8 @@
 <template>
 <div class="d7-disclosure">
+    <!-- 同步状态条 -->
+    <GtWpDisclosureSyncBar :project-id="projectId" :year="auditYear" :wp-code="'D7'" :sheet-name="activeVariant === 'soe' ? '附注披露信息(国企)' : '附注披露信息(上市公司)'" />
+
     <!-- 编制提示 -->
     <details class="guidance-details">
       <summary>📋 编制提示</summary>
@@ -160,20 +163,23 @@
  * Task: 23.1
  * Requirements: 13.1-13.8, 14.1-14.6, 15.1-15.6, 19.5, 20.1
  */
-import { computed, ref, toRef, watch, onUnmounted, type Ref } from 'vue'
+import { computed, ref, toRef, watch, onBeforeUnmount, type Ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { InfoFilled } from '@element-plus/icons-vue'
 import http from '@/utils/http'
-import { useD7Disclosure, type DisclosureSection, type DisclosureRow } from '../composables/useD7Disclosure'
 import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
+import { useD7Disclosure, type DisclosureSection, type DisclosureRow } from '../composables/useD7Disclosure'
 import { buildD7SyncPayload, D7_NOTE_SECTION, type D7DisclosureSnapshot } from '../composables/d7NoteSectionMap'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import type { ChecklistResponse } from '../composables/useD7FormData'
 import type useD7CrossSheet from '../composables/useD7CrossSheet'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { checkNoteConsistencyGeneric } from '../composables/noteConsistencyCheck'
 
 // @ts-ignore
 import GtIndexChip from '../GtIndexChip.vue'
+import GtWpDisclosureSyncBar from '../GtWpDisclosureSyncBar.vue'
 
 const props = defineProps<{
   wpId: string
@@ -186,6 +192,8 @@ const props = defineProps<{
 }>()
 
 const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
+
+const { year: auditYear } = useAuditContext()
 
 const variantOptions = [
   { label: '上市公司版', value: 'listed' },
@@ -208,6 +216,19 @@ const {
 if (props.variant) {
   activeVariant.value = props.variant
 }
+
+// ─── 保存后自动同步到附注（防抖/非阻塞/失败静默）──────────────────────────────
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+onBeforeUnmount(() => autoSync.cancelPending())
+let _d7Mounted = false
+watch(
+  [listedSections, soeSections, noteTexts],
+  () => {
+    if (!_d7Mounted) { _d7Mounted = true; return }
+    autoSync.scheduleAutoSync(syncToDisclosureNotes)
+  },
+  { deep: true },
+)
 
 function getSectionDisplayData(section: DisclosureSection): DisclosureRow[] {
   if (section.totalRow) {
@@ -315,6 +336,9 @@ async function syncToDisclosureNotes(): Promise<void> {
       },
     }))
     ElMessage.success(`已同步 ${rows} 行到附注模块「${D7_NOTE_SECTION[variant]} 合同负债」`)
+    // 静默校对附注合计一致性
+    const pageTotal = snapshot.mainTotal?.current ?? 0
+    checkNoteConsistencyGeneric(props.projectId, auditYear.value, D7_NOTE_SECTION[variant], pageTotal, true)
   } catch {
     ElMessage.warning('同步附注失败，请稍后重试')
   } finally {
@@ -322,18 +346,7 @@ async function syncToDisclosureNotes(): Promise<void> {
   }
 }
 
-// 保存后自动同步（防抖/非阻塞/失败静默/只读 gate）
-const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
-onUnmounted(() => autoSync.cancelPending())
-let autoSyncArmed = false
-watch(
-  [noteTexts, listedSections, soeSections],
-  () => {
-    if (!autoSyncArmed) { autoSyncArmed = true; return }
-    autoSync.scheduleAutoSync(syncToDisclosureNotes)
-  },
-  { deep: true },
-)
+
 </script>
 
 <style scoped>

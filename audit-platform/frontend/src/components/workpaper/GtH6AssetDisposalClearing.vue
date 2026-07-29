@@ -63,6 +63,14 @@
         />
 
         <!-- H6-1 审定表（过渡科目59公式+期末应为零） -->
+        <HiFourTableSourcePanel
+          v-if="props.htmlData?.hi_extraction_enabled"
+          :wp-code="'H6'"
+          :segments="getHiExtractionSegments('H6')"
+          :all-responses="allResponses"
+          :is-readonly="isReadonly"
+          @refresh-complete="selfLoad()"
+        />
         <H6TabAdjudication
           v-else-if="currentSheet === 'H6-1'"
           :wp-id="props.wpId"
@@ -160,6 +168,8 @@ import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useH6DualMode } from './composables/useH6DualMode'
 import { useH6CrossSheet } from './composables/useH6CrossSheet'
 import { useH6H10Pull } from './composables/h6H10Pull'
+import HiFourTableSourcePanel from './shared/HiFourTableSourcePanel.vue'
+import { getHiExtractionSegments } from './composables/hiExtractionSegments'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))

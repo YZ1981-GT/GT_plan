@@ -46,6 +46,17 @@
         <el-tag size="small" type="info">数据来源：F2-3~13 明细自动聚合至原值区</el-tag>
       </div>
       <div class="toolbar-right">
+        <el-dropdown trigger="click" @command="handleIeCommand">
+          <el-button size="small" plain>导入导出 ▾</el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="export-template">导出模板</el-dropdown-item>
+              <el-dropdown-item command="export-data">导出数据</el-dropdown-item>
+              <el-dropdown-item command="import" :disabled="isReadonly">导入数据</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+        <input ref="ieFileInput" type="file" accept=".xlsx" style="display:none" @change="onIeFileChange" />
         <span class="chip-wrap"><GtIndexChip value="wp:F2-2" :context-project-id="projectId" /></span>
         <el-tag size="small" type="info">共 {{ grossRows.length }} 类</el-tag>
       </div>
@@ -176,6 +187,7 @@ import { useF2AiGenerate } from '../../composables/useF2AiGenerate'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { useAdjudicationAdjustmentPull } from '../../composables/useAdjudicationAdjustmentPull'
 import { F2_ROW_KEY_ACCOUNT, F2_IMPAIRMENT_ACCOUNT } from '../../composables/useF2CrossSheet'
+import { useF2ImportExport } from '../../composables/useWorkpaperImportExport'
 import type { ChecklistResponse } from '../../composables/useF2FormData'
 import type { useF2CrossSheet } from '../../composables/useF2CrossSheet'
 import F2AdjudicationBlockTable from './F2AdjudicationBlockTable.vue'
@@ -305,6 +317,40 @@ function applyBringIn(block: F2BlockKey, payload: { allocations: AdjudicationAll
   }
   ElMessage.success('已带入调整分录至账项调整列，点「发布审定数」后联动披露/附注（若 F2-14 已录调整分录将以其为准）')
 }
+
+// ─── 导入导出 F2-1 ─────────────────────────────────────────────────
+const f2Ie = useF2ImportExport({ wpId: toRef(props, 'wpId') as Ref<string> })
+
+async function handleIeCommand(cmd: string) {
+  if (cmd === 'export-template') {
+    await f2Ie.exportTemplate('F2-1')
+  } else if (cmd === 'export-data') {
+    await f2Ie.exportData('F2-1')
+  } else if (cmd === 'import') {
+    // 触发隐藏 file input
+    ieFileInput.value?.click()
+  }
+}
+
+const ieFileInput = ref<HTMLInputElement | null>(null)
+
+async function onIeFileChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  input.value = ''
+  const result = await f2Ie.importData('F2-1', file)
+  if (result) {
+    // 导入成功后重载数据
+    ElMessage.success(`成功导入 ${result.rowCount} 行 / ${result.fieldCount} 字段`)
+    // 触发父级重载（通过 emit 或直接 reload allResponses）
+    emit('reload')
+  }
+}
+
+const emit = defineEmits<{
+  reload: []
+}>()
 </script>
 
 <style scoped>

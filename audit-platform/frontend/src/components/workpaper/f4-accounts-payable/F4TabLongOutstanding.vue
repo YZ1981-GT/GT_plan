@@ -166,20 +166,32 @@ async function uploadAndRecognize(file: File): Promise<void> {
     const attachmentForm = new FormData()
     attachmentForm.append('file', file)
     attachmentForm.append('attachment_type', 'workpaper_item')
-    attachmentForm.append('reference_type', 'workpaper_item')
+    attachmentForm.append('reference_type', 'working_paper')
+    attachmentForm.append('reference_id', props.wpId)
     const objectId = `${props.wpId}:F4-5:${row.attSlot}`
     attachmentForm.append('title', objectId)
     attachmentForm.append('document_type', objectId)
-    await api.post(`/api/projects/${props.projectId}/attachments/upload`, attachmentForm, {
+    const uploadRes = await api.post(`/api/projects/${props.projectId}/attachments/upload`, attachmentForm, {
       headers: { 'Content-Type': 'multipart/form-data' },
       _silent: true,
     } as any)
     attachmentSaved = true
     attachmentRefresh.value += 1
+    const uploaded = uploadRes?.data?.data ?? uploadRes?.data ?? uploadRes
+    const attId = String(uploaded?.id || uploaded?.attachment_id || '')
+    if (attId) {
+      try {
+        await api.post(`/api/attachments/${attId}/associate`, {
+          wp_id: props.wpId,
+          association_type: 'evidence',
+        }, { _silent: true } as any)
+      } catch { /* fail-open */ }
+    }
 
     const ocrForm = new FormData()
     ocrForm.append('file', file)
     ocrForm.append('document_type', 'long-outstanding')
+    if (attId) ocrForm.append('attachment_id', attId)
     const response = await http.post(
       `/api/workpapers/${props.wpId}/f4/contract-ocr`,
       ocrForm,

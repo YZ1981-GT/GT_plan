@@ -23,6 +23,10 @@ import {
 import { useE1AiGenerate } from '../composables/useE1AiGenerate'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import E1CommitOcrConfirmDialog, {
+  type CommitOcrFields,
+} from './E1CommitOcrConfirmDialog.vue'
+import http from '@/utils/http'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -77,6 +81,52 @@ const checkSummary = ref('')
 const snapshotRows = ref<AccountCommitSnapshotRow[]>([])
 const snapshotGeneratedAt = ref('')
 const { generateText, isGenerating } = useE1AiGenerate(toRef(props, 'wpId') as Ref<string>)
+
+// ─── OCR ─────────────────────────────────────────────────────────────────────
+
+const commitOcrVisible = ref(false)
+const commitOcrLoading = ref(false)
+const commitOcrFields = ref<Partial<CommitOcrFields>>({})
+const commitOcrConfidence = ref<number | undefined>()
+const commitOcrPreview = ref('')
+const commitOcrFileName = ref('')
+const commitOcrAttachmentId = ref('')
+
+async function runCommitOcr(file: File): Promise<boolean> {
+  commitOcrLoading.value = true
+  try {
+    const form = new FormData()
+    form.append('file', file)
+    if (commitOcrAttachmentId.value) form.append('attachment_id', commitOcrAttachmentId.value)
+    const { data } = await http.post(
+      `/api/workpapers/${props.wpId}/e1/commit-ocr`,
+      form,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    )
+    commitOcrFields.value = data?.extracted_fields || {}
+    commitOcrConfidence.value = typeof data?.confidence === 'number' ? data.confidence : undefined
+    commitOcrPreview.value = String(data?.ocr_text || '').slice(0, 2000)
+    commitOcrFileName.value = file.name
+    commitOcrAttachmentId.value = String(data?.attachment_id || '')
+    commitOcrVisible.value = true
+  } catch {
+    ElMessage.error('承诺书 OCR 识别失败')
+  } finally {
+    commitOcrLoading.value = false
+  }
+  return false
+}
+
+function onCommitOcrConfirm(fields: CommitOcrFields): void {
+  commitOcrVisible.value = false
+  if (fields.unit && !commitUnit.value) commitUnit.value = fields.unit
+  if (fields.legalRep && !commitLegalRep.value) commitLegalRep.value = fields.legalRep
+  if (fields.finance && !commitFinanceHead.value) commitFinanceHead.value = fields.finance
+  if (fields.date && !commitDate.value) commitDate.value = fields.date
+  if (fields.signConfirm) signConfirm.value = fields.signConfirm as 'Y' | 'N' | ''
+  if (fields.checkSummary && !checkSummary.value) checkSummary.value = fields.checkSummary
+  ElMessage.success('OCR 字段已回填，请核对后保存')
+}
 
 // ─── Load from allResponses ──────────────────────────────────────────────────
 
@@ -333,6 +383,11 @@ onBeforeUnmount(() => {
         <el-tag size="small" type="success">银行账户情况承诺书 (E1-11)</el-tag>
         <el-button size="small" type="primary" :disabled="isReadonly" @click="generateSnapshot">一键从 E1-10 生成签署快照</el-button>
         <el-tag v-if="snapshotRows.length" size="small" type="info">快照 {{ snapshotRows.length }} 个账户</el-tag>
+        <el-upload :show-file-list="false" accept=".pdf,.png,.jpg,.jpeg" :before-upload="runCommitOcr" :disabled="isReadonly || commitOcrLoading">
+          <el-button size="small" type="primary" plain :loading="commitOcrLoading" :disabled="isReadonly">
+            承诺书 OCR
+          </el-button>
+        </el-upload>
       </div>
       <div class="toolbar-right">
         <span class="chip-wrap"><GtIndexChip value="wp:E1-1" :context-project-id="projectId" /></span>
@@ -500,6 +555,16 @@ onBeforeUnmount(() => {
         @change="(val: string) => saveAuditConclusion(val)"
       />
     </el-card>
+
+    <!-- 承诺书 OCR 确认对话框 -->
+    <E1CommitOcrConfirmDialog
+      v-model="commitOcrVisible"
+      :fields="commitOcrFields"
+      :confidence="commitOcrConfidence"
+      :ocr-preview="commitOcrPreview"
+      :file-name="commitOcrFileName"
+      @confirm="onCommitOcrConfirm"
+    />
   </div>
 </template>
 

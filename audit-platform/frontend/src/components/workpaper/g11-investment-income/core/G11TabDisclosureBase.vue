@@ -268,10 +268,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, toRef, onMounted, computed } from 'vue'
+import { ref, toRef, onMounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { useG11Disclosure } from '../../composables/useG11Disclosure'
 import { isG11DisclosureLeaf } from '../../composables/g11SchemaRows'
 import { buildG11SyncPayloads } from '../../composables/g11DisclosureSyncPayload'
@@ -319,6 +320,9 @@ function jumpToNote(target: DisclosureVariant): void {
   if (!route) { ElMessage.warning('未找到对应的附注章节'); return }
   router.push(route)
 }
+
+// 保存后自动同步到附注（防抖/非阻塞/失败静默/只读 gate）
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 
 async function syncToNotes(): Promise<void> {
   if (isSyncing.value || props.isReadonly || !props.projectId || !props.wpId) return
@@ -372,6 +376,13 @@ onMounted(() => {
   const c = props.allResponses.get(CONCLUSION_KEY)
   if (c?.conclusion || c?.remark) auditConclusion.value = String(c.conclusion ?? c.remark ?? '')
 })
+
+// 数据变更后自动同步到附注（debounce 由 autoSync 内部 800ms 控制，只读/失败静默）
+watch(
+  [dis.displayRows, dis.noteText, auditNote],
+  () => { autoSync.scheduleAutoSync(syncToNotes) },
+  { deep: true },
+)
 
 function rowClass(row: { rowKey: string }): string {
   if (row.rowKey === 'total') return 'total-row'

@@ -55,6 +55,7 @@
           :all-responses="allResponses"
           :tb-data="tbData"
           :is-readonly="isReadonly"
+          :prefill="adjudicationPrefill"
           @save="handleChildSave"
           @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
@@ -199,6 +200,11 @@ const tbData = ref({
   /** 6301 审定发生额 */
   audited6301: 0,
 })
+
+/** tb_balance 6301 明细子科目预填（后端 render 输出 adjudication_prefill） */
+const adjudicationPrefill = computed<Array<{ name: string; unadjustedDebit: number; unadjustedCredit: number }>>(() =>
+  Array.isArray(props.htmlData?.adjudication_prefill) ? props.htmlData.adjudication_prefill : []
+)
 
 // ─── 双模式 (OO 健康检查 + el-segmented) ─────────────────────────────────────
 const dualMode = useK12DualMode({

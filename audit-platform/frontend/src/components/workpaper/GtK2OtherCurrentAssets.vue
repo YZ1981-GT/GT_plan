@@ -56,6 +56,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :tb-data="tbData"
+          :prefill="adjudicationPrefill"
           :is-readonly="isReadonly"
           @save="handleChildSave"
           @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
@@ -224,6 +225,11 @@ const tbData = ref({
   unadjusted1231: 0,
   audited1231: 0,
 })
+
+/** K2-1 审定表明细子科目预填（来自后端 render adjudication_prefill） */
+const adjudicationPrefill = computed(() =>
+  Array.isArray(props.htmlData?.adjudication_prefill) ? props.htmlData.adjudication_prefill : []
+)
 
 // ─── 版本链 + 复核对话 provide（供子组件inject使用）────────────────────────
 import { provide } from 'vue'

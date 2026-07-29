@@ -25,6 +25,7 @@
             <el-button size="small" type="primary" link @click="generateAI('disclosure-soe')">
               <el-icon><MagicStick /></el-icon>AI辅助
             </el-button>
+            <el-button size="small" type="success" :disabled="isReadonly" @click="syncToDisclosureNotes">同步到附注</el-button>
             <el-button size="small" type="primary" plain :disabled="!projectId" @click="jumpToNote('soe')">↩ 跳转回附注</el-button>
           </div>
         </div>
@@ -134,13 +135,16 @@
  * - subscribe: 'adjustment:created' (filter wpCode='K13') — 调整分录变化时刷新
  * - publish: 'disclosure:note-text-updated' (noteId='non_operating_expense')
  */
-import { ref, computed, onMounted, onUnmounted, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, onUnmounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Refresh, MagicStick } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
 import { generateK13AiText } from '../../composables/useK13AiText'
 import { useRouter } from 'vue-router'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
+import http from '@/utils/http'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import { buildK13SyncPayload } from '../../composables/k13NoteSectionMap'
 
 const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
 
@@ -156,6 +160,9 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'save', itemId: string, value: any): void
 }>()
+
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+onBeforeUnmount(() => autoSync.cancelPending())
 
 const router = useRouter()
 // 跳转回附注模块（披露表 → 附注为单向推送；此处仅导航，方便相互编辑确认）
@@ -354,6 +361,7 @@ function handleRowChange(row: DisclosureRow): void {
       remark: row.remark,
     }))
   }
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
 }
 
 function handleNarrativeSave(): void {
@@ -367,6 +375,22 @@ function handleNarrativeSave(): void {
     sectionIds: ['营业外支出', '五、营业外支出'],
     text: narrativeText.value,
   })
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
+}
+
+async function syncToDisclosureNotes(): Promise<void> {
+  if (!props.projectId || props.isReadonly) return
+  const payload = buildK13SyncPayload('soe', props.wpId || '',
+    disclosureRows.value.map(r => ({ project: r.category, currentAmount: r.currentAmount, priorAmount: r.priorAmount })),
+    narrativeText.value)
+  try {
+    await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
+    eventBus.emit('disclosure:note-text-updated' as any, {
+      wpCode: 'K13', variant: 'soe', accountCode: '6711',
+      projectId: props.projectId, sectionIds: ['八、77'],
+    })
+    ElMessage.success('已同步到附注')
+  } catch { /* silent */ }
 }
 
 // ─── AI generation ───────────────────────────────────────────────────────────

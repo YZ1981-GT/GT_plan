@@ -764,9 +764,11 @@ function persistAll() {
   saveResponse(H1_LISTED_ITEM.noteClearing, noteClearing.value)
 
   eventBus.emit('disclosure:note-text-updated' as any, {
-    wp_code: 'H1',
-    variant: 'listed',
+    wpCode: 'H1',
+    accountCode: '1601',
+    projectId: props.projectId,
     section: noteSectionId,
+    sectionIds: [noteSectionId],
     text: noteImpairment.value || noteMortgage.value || '',
   })
   autoSync.scheduleAutoSync(syncToNotes)

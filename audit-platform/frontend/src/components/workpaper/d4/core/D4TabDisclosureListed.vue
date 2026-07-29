@@ -10,16 +10,18 @@
  *
  * 底部：审计说明textarea + AI辅助按钮 + 编制提示折叠
  */
-import { ref, computed, onMounted, onUnmounted, watch, inject } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, inject } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useDebounceFn } from '@vueuse/core'
 import http from '@/utils/http'
 import { useD4Disclosure, type ContractBalanceRow } from '../../composables/useD4Disclosure'
-import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { buildD4SyncPayload, D4_NOTE_SECTION, type D4DisclosureSnapshot } from '../../composables/d4NoteSectionMap'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import { parseNum } from '../../composables/useD4FormulaEngine'
+import { getDisclosureNoteDetail } from '@/services/auditPlatformApi'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 
 const props = defineProps<{
   wpId: string
@@ -38,6 +40,7 @@ const debouncedFlush = useDebounceFn(async () => {
   pendingItems.value = []
   try {
     await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, { items }, { _silent: true } as any)
+    autoSync.scheduleAutoSync(syncToDisclosureNotes)
   } catch { /* silent */ }
 }, 2000)
 
@@ -45,6 +48,9 @@ function saveBatch(items: any[]) {
   pendingItems.value.push(...items)
   debouncedFlush()
 }
+
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+onBeforeUnmount(() => autoSync.cancelPending())
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 const allResponsesRef = computed(() => props.allResponses) as any
@@ -121,6 +127,7 @@ async function syncToDisclosureNotes(): Promise<void> {
       detail: { wpCode: 'D4', accountCode: '6001', projectId: props.projectId, section: VARIANT, sectionIds: [D4_NOTE_SECTION[VARIANT]] },
     }))
     ElMessage.success(`已同步 ${rows} 行到附注模块「${D4_NOTE_SECTION[VARIANT]} 营业收入和营业成本」`)
+    await checkNoteConsistency(true)
   } catch {
     ElMessage.warning('同步附注失败，请稍后重试')
   } finally {
@@ -128,18 +135,52 @@ async function syncToDisclosureNotes(): Promise<void> {
   }
 }
 
-// 保存后自动同步（防抖/非阻塞/失败静默/只读 gate）
-const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
-onUnmounted(() => autoSync.cancelPending())
-let autoSyncArmed = false
-watch(
-  [noteTexts, section1Data, section2Rows, section3Rows, section4Rows],
-  () => {
-    if (!autoSyncArmed) { autoSyncArmed = true; return }
-    autoSync.scheduleAutoSync(syncToDisclosureNotes)
-  },
-  { deep: true },
-)
+// ─── 校对附注一致性（只读比对，不改附注）───────────────────────────────────────────
+const { year: auditYear } = useAuditContext()
+
+const noteCheckState = ref<{ status: 'idle' | 'loading' | 'ok' | 'diff' | 'missing' | 'error'; message: string }>({
+  status: 'idle',
+  message: '',
+})
+
+async function checkNoteConsistency(silent = false): Promise<void> {
+  if (!props.projectId) return
+  noteCheckState.value = { status: 'loading', message: '正在读取附注现存数据…' }
+  try {
+    const detail = await getDisclosureNoteDetail(props.projectId, auditYear.value, D4_NOTE_SECTION[VARIANT])
+    const td = detail?.table_data
+    const tables: any[] = Array.isArray(td?._tables) ? td._tables : []
+    const candidates = tables.length > 0 ? tables : (Array.isArray(td?.rows) ? [{ rows: td.rows }] : [])
+    let noteTotal: number | null = null
+    for (const t of candidates) {
+      const rows: any[] = Array.isArray(t?.rows) ? t.rows : []
+      const totalRow = rows.find((r: any) => r?.is_total || String(r?.label ?? '').trim() === '合计')
+      if (!totalRow) continue
+      const values: any[] = Array.isArray(totalRow.values) ? totalRow.values : []
+      for (const v of values) {
+        const n = Number(v)
+        if (Number.isFinite(n) && n !== 0) { noteTotal = n; break }
+      }
+      if (noteTotal !== null) break
+    }
+    const pageTotal = section1Total.value.currentRevenue ?? 0
+    if (noteTotal === null) {
+      noteCheckState.value = { status: 'missing', message: `附注「${D4_NOTE_SECTION[VARIANT]}」暂无可比对的合计行（尚未同步或附注为空）` }
+    } else if (Math.abs(noteTotal - pageTotal) <= 0.01) {
+      noteCheckState.value = { status: 'ok', message: `附注现存收入合计与本页一致` }
+    } else {
+      noteCheckState.value = { status: 'diff', message: `附注现存合计 ${fmtAmt(noteTotal)} 与本页收入合计 ${fmtAmt(pageTotal)} 不一致（差异 ${fmtAmt(noteTotal - pageTotal)}）` }
+    }
+    if (!silent) {
+      if (noteCheckState.value.status === 'ok') ElMessage.success(noteCheckState.value.message)
+      else ElMessage.warning(noteCheckState.value.message)
+    }
+  } catch {
+    noteCheckState.value = { status: 'error', message: '读取附注数据失败（附注可能尚未生成）' }
+    if (!silent) ElMessage.warning(noteCheckState.value.message)
+  }
+}
+
 
 // ─── Format helpers ──────────────────────────────────────────────────────────
 function fmtAmt(v: number): string {
@@ -214,10 +255,21 @@ const formulaMap = [
         </template>
       </el-dropdown>
       <el-button size="small" @click="showFormulaDrawer = true">ƒx 公式管理</el-button>
+      <el-button size="small" @click="checkNoteConsistency(false)" title="只读校对本页收入合计与附注合计是否一致">校对附注</el-button>
       <span v-if="lastRefreshTime" class="toolbar-hint">
         上次取数：{{ lastRefreshTime.slice(0,16).replace('T',' ') }}
       </span>
     </div>
+
+    <!-- 附注校对结果 -->
+    <el-alert
+      v-if="noteCheckState.status === 'ok' || noteCheckState.status === 'diff' || noteCheckState.status === 'missing'"
+      :type="noteCheckState.status === 'ok' ? 'success' : (noteCheckState.status === 'diff' ? 'warning' : 'info')"
+      show-icon
+      :closable="true"
+      style="margin: 0 0 8px"
+      :title="noteCheckState.message"
+    />
 
     <!-- 公式管理抽屉 -->
     <el-drawer v-model="showFormulaDrawer" title="公式管理 - 数据来源映射" size="480px" direction="rtl">

@@ -8,6 +8,9 @@
         <div class="guide-step"><span class="step-num">③</span> 自动从K4-1审定表取数</div>
         <div class="guide-step"><span class="step-num">④</span> AI辅助生成披露文字说明</div>
       </div>
+      <div style="margin-top:8px">
+        <el-button size="small" type="success" :disabled="isReadonly" @click="syncToDisclosureNotes">同步到附注</el-button>
+      </div>
     </div>
 
     <!-- 琥珀色方法论块 -->
@@ -125,6 +128,7 @@ import { ElMessageBox, ElMessage } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import type { WorkpaperRuntimeContext } from '../../composables/useWorkpaperScaffold'
 import { WorkpaperRuntimeContextKey } from '../../composables/useWorkpaperScaffold'
 
@@ -143,6 +147,7 @@ const emit = defineEmits<{
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 
 // ═══ 数据模型 ═══
 interface DisclosureRow {
@@ -238,6 +243,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  autoSync.cancelPending()
   eventBus.off('substantive:adjudicated', handleAdjudicated)
   eventBus.off('adjustment:created', handleAdjustmentCreated)
 })
@@ -306,6 +312,28 @@ async function handleAiGenerate(sIdx: number): Promise<void> {
 }
 
 // ═══ 持久化 ═══
+async function syncToDisclosureNotes(): Promise<void> {
+  if (!props.projectId || props.isReadonly) return
+  const rows = sections.flatMap(s => s.rows.filter(r => !r.isFormula).map(r => ({ project: r.item, endAmount: r.endBalance ?? 0, priorAmount: r.beginBalance ?? 0 })))
+  const narrative = sections.filter(s => s.textContent).map(s => s.textContent).join('\n\n')
+  const payload = {
+    wp_id: props.wpId,
+    sheet_name: 'K4-note-soe',
+    section_id: '八、48',
+    current_standard: 'soe_standalone',
+    sub_table_data: { rows },
+    _note_texts: narrative ? [{ section: 'main', title: '说明', text: narrative }] : [],
+  }
+  try {
+    await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
+    eventBus.emit('disclosure:note-text-updated' as any, {
+      wpCode: 'K4', variant: 'soe', accountCode: '2245',
+      projectId: props.projectId, sectionIds: ['八、48'],
+    })
+    ElMessage.success('已同步到附注')
+  } catch { /* silent */ }
+}
+
 function persistSection(sIdx: number): void {
   const section = sections[sIdx]
   if (!section) return
@@ -314,6 +342,7 @@ function persistSection(sIdx: number): void {
     textContent: section.textContent,
   }))
   scheduleAutoSnapshot()
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
 }
 
 function scheduleAutoSnapshot(): void {

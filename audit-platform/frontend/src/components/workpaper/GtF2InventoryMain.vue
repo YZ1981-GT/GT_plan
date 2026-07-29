@@ -41,15 +41,26 @@
           style="margin: 12px 0"
         />
 
-        <F2TabAdjudication
-          v-else-if="currentSheet === 'F2-1'"
-          :wp-id="props.wpId"
-          :project-id="props.projectId"
-          :all-responses="allResponses"
-          :is-readonly="isReadonly"
-          :debounced-save="formData.debouncedSave"
-          :cross-sheet="crossSheet"
-        />
+        <template v-else-if="currentSheet === 'F2-1'">
+          <F2FourTableSourcePanel
+            v-if="hasFourTableData"
+            :tb-values="tbValues"
+            :all-responses="allResponses"
+            :is-readonly="isReadonly"
+            :wp-id="props.wpId"
+            :project-id="props.projectId"
+            @refresh-complete="formData.debouncedSave('F2-adjudication-data', { item_id: 'F2-adjudication-data', conclusion: 'seeded', remark: null })"
+          />
+          <F2TabAdjudication
+            :wp-id="props.wpId"
+            :project-id="props.projectId"
+            :all-responses="allResponses"
+            :is-readonly="isReadonly"
+            :debounced-save="formData.debouncedSave"
+            :cross-sheet="crossSheet"
+            @reload="formData.loadAll()"
+          />
+        </template>
 
         <F2TabDetailSummary
           v-else-if="currentSheet === 'F2-2'"
@@ -240,6 +251,7 @@ const F2DetailSheetDevCost = defineAsyncComponent(() => import('./f2/detail/F2De
 const F2DetailSheetContractPerf = defineAsyncComponent(() => import('./f2/detail/F2DetailSheetContractPerf.vue'))
 const F2DetailSheetBio = defineAsyncComponent(() => import('./f2/detail/F2DetailSheetBio.vue'))
 const F2CutoffSheet = defineAsyncComponent(() => import('./f2/inspection/F2CutoffSheet.vue'))
+const F2FourTableSourcePanel = defineAsyncComponent(() => import('./f2/F2FourTableSourcePanel.vue'))
 const GtGridSheet = defineAsyncComponent(() => import('./GtGridSheet.vue'))
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 
@@ -275,6 +287,21 @@ const auditYearNum = computed(() => {
 })
 
 const allResponses = computed(() => formData.allResponses.value)
+
+// ─── 四表取数 provenance（灰度开时 render 输出含 formulas/source_codes） ───
+const tbValues = computed(() => {
+  // tb_values 在 render 输出中与 project_context 同级（html_data.tb_values）
+  const fromHtml = props.htmlData?.tb_values
+  if (fromHtml && Object.keys(fromHtml).length > 0) return fromHtml
+  // 部分路径可能把 tb_values 塞进 project_context
+  const ctx = formData.projectContext.value
+  return (ctx as any)?.tb_values ?? null
+})
+const hasFourTableData = computed(() => {
+  const tv = tbValues.value
+  if (!tv) return false
+  return Object.values(tv).some((v: any) => v && (v.formulas || v.source_codes))
+})
 
 const crossSheet = useF2CrossSheet({
   allResponses: formData.allResponses,

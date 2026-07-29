@@ -130,11 +130,17 @@
  * L5TabDisclosureListed — 附注披露信息（上市公司）
  * Requirements: 5.4-5.5
  */
-import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
+import { computed, inject, onMounted, onUnmounted, onBeforeUnmount, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { MagicStick, Check } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import http from '@/utils/http'
 import { eventBus } from '@/utils/eventBus'
 import { useL5FormData } from '../../composables/useL5FormData'
 import { calcNetPayable } from '../../composables/useL5FormulaEngine'
+import { L5_NOTE_SECTION, buildL5SyncPayload } from '../../composables/l5NoteSectionMap'
+import { buildNoteJumpRoute } from '@/views/composables/noteDisclosureReverseJump'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 
 const props = defineProps<{
   wpId: string

@@ -8,9 +8,8 @@
  * 通过 variant='listed'|'soe' 区分上市/国企版本。
  * 每个子节用 el-card 折叠卡片渲染对应 el-table。
  */
-import { ref, computed, watch, inject, onUnmounted } from 'vue'
+import { ref, computed, watch, inject } from 'vue'
 import { useDebounceFn } from '@vueuse/core'
-import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
 import { ElMessage } from 'element-plus'
 import { Lock, Delete, Plus } from '@element-plus/icons-vue'
 import {
@@ -28,6 +27,11 @@ import type { Ref } from 'vue'
 import { useAgingConfig, PRESET_SEGMENTS } from '@/composables/useAgingConfig'
 import GtIndexChip from '../GtIndexChip.vue'
 import http from '@/utils/http'
+import { useRouter } from 'vue-router'
+import { buildNoteJumpRoute, type DisclosureVariant as NoteVariant } from '@/views/composables/noteDisclosureReverseJump'
+import { getDisclosureNoteDetail } from '@/services/auditPlatformApi'
+import { useAuditContext } from '@/composables/useAuditContext'
+import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -62,9 +66,14 @@ watch(() => props.allResponses, loadSectionNotes, { immediate: true, deep: true 
 
 // ─── Persistence (debounced) ─────────────────────────────────────────────────
 
-// 保存后自动同步到附注（防抖/非阻塞/失败静默/只读 gate；与手动按钮同源 syncToDisclosureNotes）
-const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
-onUnmounted(() => autoSync.cancelPending())
+const router = useRouter()
+
+/** 跳转回附注模块对应章节 */
+function jumpToNote(target?: NoteVariant): void {
+  const v = target || props.variant as NoteVariant
+  const route = buildNoteJumpRoute(props.projectId, 'D1', v)
+  if (route) router.push(route)
+}
 
 const pendingSaveItems = ref<any[]>([])
 
@@ -77,6 +86,8 @@ const debouncedSave = useDebounceFn(async () => {
       project_id: props.projectId,
       items,
     })
+    // 保存成功后自动同步到附注（防抖/非阻塞/失败静默）
+    autoSync.scheduleAutoSync(syncToDisclosureNotes)
   } catch {
     // silently fail - data is already in allResponses map
   }
@@ -85,8 +96,10 @@ const debouncedSave = useDebounceFn(async () => {
 async function saveWithDebounce(items: any[]): Promise<void> {
   pendingSaveItems.value.push(...items)
   debouncedSave()
-  autoSync.scheduleAutoSync(syncToDisclosureNotes)
 }
+
+// ─── 自动同步 ─────────────────────────────────────────────────────────────────
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -477,6 +490,67 @@ function handleReview(sectionKey: string): void {
 // ─── 同步到附注模块（底稿披露表 → 附注单向推送）─────────────────────────────────
 // 结构化表格 + 文本框（说明）内容一并同步到附注 五、4/八、4「应收票据」，
 // 保证附注模块表格与文本与披露表保持一致。
+
+const { year: auditYear } = useAuditContext()
+
+// ─── 校对附注一致性（只读比对，不改附注）───────────────────────────────────────────
+const noteCheckState = ref<{ status: 'idle' | 'loading' | 'ok' | 'diff' | 'missing' | 'error'; message: string }>({
+  status: 'idle',
+  message: '',
+})
+
+function pickNoteTotal(detail: any): number | null {
+  const td = detail?.table_data
+  const tables: any[] = Array.isArray(td?._tables) ? td._tables : []
+  const candidates = tables.length > 0
+    ? tables
+    : (Array.isArray(td?.rows) ? [{ rows: td.rows }] : [])
+  for (const t of candidates) {
+    const rows: any[] = Array.isArray(t?.rows) ? t.rows : []
+    const totalRow = rows.find((r: any) => r?.is_total || String(r?.label ?? '').trim() === '合计')
+    if (!totalRow) continue
+    const values: any[] = Array.isArray(totalRow.values) ? totalRow.values : []
+    for (const v of values) {
+      const n = Number(v)
+      if (Number.isFinite(n) && n !== 0) return n
+    }
+  }
+  return null
+}
+
+async function checkNoteConsistency(silent = false): Promise<void> {
+  if (!props.projectId) return
+  noteCheckState.value = { status: 'loading', message: '正在读取附注现存数据…' }
+  try {
+    const detail = await getDisclosureNoteDetail(props.projectId, auditYear.value, D1_NOTE_SECTION[props.variant])
+    const noteTotal = pickNoteTotal(detail)
+    const pageTotal = categorySummaryTotal.value?.endBalance ?? 0
+    if (noteTotal === null) {
+      noteCheckState.value = {
+        status: 'missing',
+        message: `附注「${D1_NOTE_SECTION[props.variant]}」暂无可比对的合计行（尚未同步或附注为空）`,
+      }
+    } else if (Math.abs(noteTotal - pageTotal) <= 0.01) {
+      noteCheckState.value = {
+        status: 'ok',
+        message: `附注现存期末合计与本页一致`,
+      }
+    } else {
+      noteCheckState.value = {
+        status: 'diff',
+        message: `附注现存合计 ${noteTotal} 与本页期末合计 ${pageTotal} 不一致（差异 ${(noteTotal - pageTotal).toFixed(2)}）`,
+      }
+    }
+    if (!silent) {
+      if (noteCheckState.value.status === 'ok') ElMessage.success(noteCheckState.value.message)
+      else ElMessage.warning(noteCheckState.value.message)
+    }
+  } catch {
+    noteCheckState.value = { status: 'error', message: '读取附注数据失败（附注可能尚未生成）' }
+    if (!silent) ElMessage.warning(noteCheckState.value.message)
+  }
+}
+
 async function syncToDisclosureNotes(): Promise<void> {
   if (isSyncing.value || !props.projectId || props.isReadonly) return
   isSyncing.value = true
@@ -545,6 +619,7 @@ async function syncToDisclosureNotes(): Promise<void> {
       },
     }))
     ElMessage.success(`已同步 ${rows} 行到附注模块「${D1_NOTE_SECTION[props.variant]} 应收票据」`)
+    await checkNoteConsistency(true)
   } catch {
     ElMessage.warning('同步附注失败，请稍后重试')
   } finally {
@@ -584,8 +659,28 @@ async function syncToDisclosureNotes(): Promise<void> {
           title="将披露表的表格与文本框内容同步到附注模块（五、4/八、4 应收票据）"
           @click="syncToDisclosureNotes"
         >同步到附注</el-button>
+        <el-dropdown split-button size="small" type="primary" plain @click="jumpToNote()" title="跳转回附注模块查看">
+          ↩ 跳转回附注（{{ D1_NOTE_SECTION[variant] }}）
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item @click="jumpToNote('listed')">上市版（五、4）</el-dropdown-item>
+              <el-dropdown-item @click="jumpToNote('soe')">国企版（八、4）</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+        <el-button size="small" @click="checkNoteConsistency(false)" title="只读校对本页合计与附注合计是否一致">校对附注</el-button>
       </div>
     </div>
+
+    <!-- 附注校对结果 -->
+    <el-alert
+      v-if="noteCheckState.status === 'ok' || noteCheckState.status === 'diff' || noteCheckState.status === 'missing'"
+      :type="noteCheckState.status === 'ok' ? 'success' : (noteCheckState.status === 'diff' ? 'warning' : 'info')"
+      show-icon
+      :closable="true"
+      style="margin: 0 12px 8px"
+      :title="noteCheckState.message"
+    />
 
     <el-skeleton v-if="isLoading" :rows="10" animated />
     <template v-else>

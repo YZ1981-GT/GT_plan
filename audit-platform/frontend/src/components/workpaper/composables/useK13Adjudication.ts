@@ -17,7 +17,7 @@
  *
  * Item IDs: "K13-1-rows", "K13-1-audited-total", "K13-1-audit-note", "K13-1-audit-conclusion"
  */
-import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, nextTick, type Ref, type ComputedRef } from 'vue'
 import {
   parseNum,
   calcAuditedAmount,
@@ -68,11 +68,19 @@ export interface K13AdjSubtotalRow {
   yoyChange: number | null
 }
 
+export interface K13AdjPrefillRow {
+  name: string
+  unadjustedDebit: number
+  unadjustedCredit: number
+}
+
 export interface UseK13AdjudicationParams {
   allResponses: Ref<Map<string, any>>
   projectId: Ref<string>
   wpId: Ref<string>
   isReadonly?: Ref<boolean>
+  /** tb_balance 6711 明细子科目预填（无持久化行时据此建行） */
+  prefill?: Ref<K13AdjPrefillRow[]>
   onSave?: (itemId: string, value: any) => void
   /** writebackTB from parent (GtK13NonOperatingExpense) */
   writebackTB?: (auditedAmount: number) => Promise<void>
@@ -96,7 +104,7 @@ const DEFAULT_EXPENSE_CATEGORIES: Array<{ name: string }> = [
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useK13Adjudication(params: UseK13AdjudicationParams) {
-  const { allResponses, projectId, wpId, isReadonly, onSave, writebackTB } = params
+  const { allResponses, projectId, wpId, isReadonly, prefill, onSave, writebackTB } = params
 
   // ─── State ─────────────────────────────────────────────────────────────────
 
@@ -104,6 +112,8 @@ export function useK13Adjudication(params: UseK13AdjudicationParams) {
   const auditNote = ref('')
   const auditConclusion = ref('')
   const isChanged = ref(false)
+  /** 是否已从预填 seed 并落库一次（避免重复/循环 persist） */
+  const hasSeededPrefill = ref(false)
 
   // ─── Load ──────────────────────────────────────────────────────────────────
 
@@ -111,6 +121,19 @@ export function useK13Adjudication(params: UseK13AdjudicationParams) {
     const raw = _getJson(ROWS_KEY)
     if (Array.isArray(raw) && raw.length > 0) {
       rows.value = raw.map(_normalizeRow)
+    } else if (prefill?.value && prefill.value.length > 0) {
+      rows.value = prefill.value.map((p) => _normalizeRow({
+        name: p.name,
+        unadjusted: p.unadjustedDebit - p.unadjustedCredit,
+        isEditable: true,
+      }))
+      if (!hasSeededPrefill.value && onSave && !isReadonly?.value) {
+        hasSeededPrefill.value = true
+        void nextTick(() => {
+          _persist()
+          onSave(`${ITEM_PREFIX}-audited-total`, totalRow.value.audited)
+        })
+      }
     } else {
       rows.value = _buildDefaultRows()
     }
@@ -333,7 +356,7 @@ export function useK13Adjudication(params: UseK13AdjudicationParams) {
 
   // ─── Watch init ────────────────────────────────────────────────────────────
 
-  watch(allResponses, () => initFromResponses(), { immediate: true })
+  watch([allResponses, () => prefill?.value], () => initFromResponses(), { immediate: true })
 
   // ─── Return ────────────────────────────────────────────────────────────────
 

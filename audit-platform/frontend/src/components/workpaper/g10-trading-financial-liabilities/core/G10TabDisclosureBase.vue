@@ -588,6 +588,7 @@ import { computed, ref, toRef, watch, inject } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { useG10Disclosure } from '../../composables/useG10Disclosure'
 import {
   buildG10ListedSyncPayloads,
@@ -666,6 +667,9 @@ function jumpToNote(target: DisclosureVariant): void {
   router.push(route)
 }
 
+// 保存后自动同步到附注（防抖/非阻塞/失败静默/只读 gate）
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+
 async function syncToNotes() {
   if (isSyncing.value || props.isReadonly || !props.projectId || !props.wpId) return
   const standards = props.applicableStandards ?? []
@@ -733,6 +737,13 @@ async function onMarkProcedure() {
 function fmt(v: number) {
   return Number(v || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
+
+// 数据变更后自动同步到附注（debounce 由 autoSync 内部 800ms 控制，只读/失败静默）
+watch(
+  [dis.listedMovementDisplay, dis.soeBalanceDisplay, dis.fvCreditRows, dis.designatedDetailRows, dis.derivativeDisplay, auditNote],
+  () => { autoSync.scheduleAutoSync(syncToNotes) },
+  { deep: true },
+)
 
 function rowClass({ row }: { row: { isTotal?: boolean; isParent?: boolean } }): string {
   if (row.isTotal) return 'is-total-row'

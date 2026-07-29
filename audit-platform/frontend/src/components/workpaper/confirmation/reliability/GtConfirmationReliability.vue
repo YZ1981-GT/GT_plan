@@ -83,6 +83,8 @@
 import { ref, computed, defineAsyncComponent } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useReliabilityData } from './composables/useReliabilityData'
+import { mapSummaryToReliabilityRow } from './composables/mapD01ReliabilityRow'
+import { filterSummaryRows, defaultElectronicReplyFilter } from '../coordination/importFromSummary'
 import type { ReliabilityRow } from './reliabilityTypes'
 
 import ReliabilityDashboard from './ReliabilityDashboard.vue'
@@ -136,6 +138,7 @@ function handleUpdate(rowId: string, field: string, value: any) {
 }
 
 const showD01Dialog = ref(false)
+const importD01Loading = ref(false)
 const importFileInput = ref<HTMLInputElement | null>(null)
 
 function handleImportD01() {
@@ -144,9 +147,51 @@ function handleImportD01() {
 
 function confirmImportD01() {
   showD01Dialog.value = false
-  // TODO: 跨底稿引用 API 接入后，从后端获取 D0-1 回函方式=传真/电子邮件行
-  // 暂时用空提示
-  ElMessage.info('从 D0-1 带入功能待跨底稿引用 API 接入后启用')
+  if (!props.projectId) {
+    ElMessage.warning('缺少项目上下文，无法带入')
+    return
+  }
+  if (importD01Loading.value) return
+  importD01Loading.value = true
+  // 循环码派生：D0-7→D0-1 优先; 回退 D0（整册含 confirmation-v1 sheet）
+  const cycleBase = (props.wpCode || '').split('-')[0]
+  const summaryCode = cycleBase + '-1'
+
+  const doImport = async () => {
+    let res = await filterSummaryRows(props.projectId!, summaryCode, defaultElectronicReplyFilter)
+    // 回退：X0-1 不存在时尝试父底稿 X0
+    if (!res) {
+      res = await filterSummaryRows(props.projectId!, cycleBase, defaultElectronicReplyFilter)
+    }
+    if (!res) {
+      ElMessage.warning(`未找到 ${summaryCode} 或 ${cycleBase} 函证结果汇总底稿`)
+      return
+    }
+    if (res.rows.length === 0) {
+      ElMessage.info(`${summaryCode} 暂无电子回函（传真/电子邮件）行`)
+      return
+    }
+    // 按 confirm_index 去重
+    const existingIndexes = new Set(
+      data.rows.value.map((r: any) => r.confirm_index).filter(Boolean) as string[]
+    )
+    const mapped = res.rows
+      .filter((r) => !r.confirm_index || !existingIndexes.has(r.confirm_index))
+      .map(mapSummaryToReliabilityRow)
+    if (mapped.length === 0) {
+      ElMessage.info('电子回函行已全部存在，无需重复带入')
+      return
+    }
+    data.importRows(mapped)
+    ElMessage.success(`已从汇总表带入 ${mapped.length} 条电子回函记录`)
+  }
+
+  doImport()
+    .catch((e: any) => {
+      console.warn('[GtConfirmationReliability] 从 D0-1 带入失败:', e)
+      ElMessage.error('带入失败：' + (e?.message || '网络错误'))
+    })
+    .finally(() => { importD01Loading.value = false })
 }
 
 function handleImportExcel() {

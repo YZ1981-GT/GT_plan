@@ -335,6 +335,31 @@ export function useK9Adjudication(params: UseK9AdjudicationParams) {
     return { ok: true, message: `已从 K9-2 带入 ${rows.value.length} 项明细` }
   }
 
+  // ─── 从四表库刷新未审数（覆盖模式，保留 AJE/RJE/备注） ─────────────────────
+
+  function refreshFromPrefill(): void {
+    if (!prefill?.value || prefill.value.length === 0) return
+    // 用 prefill 覆盖各行的未审借/贷（保留 AJE/RJE/remark/priorAmount）
+    const existing = rows.value
+    const newRows = prefill.value.map((p, i) => {
+      const old = existing.find(r => r.projectName === p.name) || existing[i]
+      return _normalizeRow({
+        rowKey: old?.rowKey ?? `pf-${i}`,
+        projectName: p.name,
+        unadjustedDebit: p.unadjustedDebit,
+        unadjustedCredit: p.unadjustedCredit,
+        aje: old?.aje ?? 0,
+        rje: old?.rje ?? 0,
+        priorAmount: old?.priorAmount ?? 0,
+        remark: old?.remark ?? '',
+      })
+    })
+    rows.value = newRows
+    hasSeededPrefill.value = true
+    isChanged.value = true
+    _persist()
+  }
+
   // ─── TB回写 + EventBus（损益类发生额！）────────────────────────────────────
 
   async function writeback(): Promise<void> {
@@ -436,6 +461,7 @@ export function useK9Adjudication(params: UseK9AdjudicationParams) {
     addRow,
     removeRow,
     fillFromDetail,
+    refreshFromPrefill,
     writeback,
     saveNote,
     saveConclusion,

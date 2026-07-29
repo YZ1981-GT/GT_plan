@@ -7,6 +7,10 @@
         <h3 class="disclosure-title">附注披露信息核对（国有企业）</h3>
       </div>
       <div class="disclosure-header-right">
+        <el-button size="small" type="success" :loading="syncing" :disabled="isReadonly" @click="syncToDisclosureNotes">
+          同步到附注（八、33）
+        </el-button>
+        <el-button size="small" type="primary" plain :disabled="!projectId" @click="jumpToNote('soe')">↩ 跳转回附注</el-button>
         <el-tag type="info" effect="dark" size="small">国有企业版</el-tag>
       </div>
     </div>
@@ -106,17 +110,28 @@
  * 对齐致同源模板：(1) 短期借款分类（4类·自审定表 L1-1 派生）+ (2) 已逾期未偿还情况（审计师录入）+ 说明。
  * ⚠️ 旧版为 bank-level 手工录入 + 死链交叉校验（读 L1-detail-total-end 从不写 → 恒"一致"）。
  */
-import { computed, inject, toRef, ref } from 'vue'
+import { computed, inject, toRef, ref, onMounted, onUnmounted, onBeforeUnmount, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
+import { eventBus } from '@/utils/eventBus'
 import type { useL1FormData } from '@/composables/useL1FormData'
 import { useL1DisclosureData } from '@/composables/useL1DisclosureData'
+import { L1_NOTE_SECTION, buildL1SyncPayload } from '../../composables/l1NoteSectionMap'
+import { buildNoteJumpRoute } from '@/views/composables/noteDisclosureReverseJump'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 
 const props = defineProps<{ wpId: string; projectId: string; isReadonly: boolean }>()
 defineEmits<{ (e: 'navigate', sheetName: string): void }>()
 
 const formData = inject<ReturnType<typeof useL1FormData>>('l1FormData')!
 const isReadonlyRef = toRef(props, 'isReadonly')
+const router = useRouter()
+
+function jumpToNote(variant: 'listed' | 'soe') {
+  const route = buildNoteJumpRoute(props.projectId, 'L1', variant)
+  if (route) router.push(route)
+}
 
 const {
   categoryRows, categoryTotal, overdueRows, overdueTotal,
@@ -180,11 +195,72 @@ async function handleAiConclusion() {
   }
 }
 
+// ─── 同步到附注模块 ─────────────────────────────────────────────────────────
+const syncing = ref(false)
+async function syncToDisclosureNotes() {
+  if (props.isReadonly || !props.projectId) return
+  syncing.value = true
+  try {
+    const { sub_table_data, columns } = buildL1SyncPayload({
+      variant: 'soe',
+      categoryRows: categoryRows.value,
+      categoryTotal: categoryTotal.value,
+      overdueRows: overdueRows.value,
+      conclusionText: conclusionText.value,
+    })
+    await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, {
+      wp_id: props.wpId,
+      sheet_name: 'L1-note-soe',
+      section_id: L1_NOTE_SECTION.soe,
+      current_standard: 'soe_standalone',
+      sub_table_data,
+      columns,
+    })
+    ElMessage.success(`已同步到附注（${L1_NOTE_SECTION.soe}）`)
+    eventBus.emit('disclosure:note-text-updated' as any, {
+      wpCode: 'L1',
+      accountCode: '2001',
+      projectId: props.projectId,
+      sectionIds: [L1_NOTE_SECTION.soe],
+    })
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || '同步到附注失败')
+  } finally {
+    syncing.value = false
+  }
+}
+
 function fmt(val: number | null | undefined): string {
   if (val == null || val === 0) return '-'
   if (val < 0) return `(${Math.abs(val).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
   return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
+
+// ─── EventBus: 审定表变化后自动刷新披露分类表 ──────────────────────────────────
+function onAdjudicatedRefresh() {
+  formData.selfLoad()
+}
+
+onMounted(() => {
+  eventBus.on('substantive:adjudicated' as any, onAdjudicatedRefresh)
+})
+
+onUnmounted(() => {
+  eventBus.off('substantive:adjudicated' as any, onAdjudicatedRefresh)
+})
+
+// ─── 保存后自动同步到附注（防抖/非阻塞/失败静默）──────────────────────────────
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+onBeforeUnmount(() => autoSync.cancelPending())
+let _l1SoeMounted = false
+watch(
+  [overdueRows, noteText, conclusionText],
+  () => {
+    if (!_l1SoeMounted) { _l1SoeMounted = true; return }
+    autoSync.scheduleAutoSync(syncToDisclosureNotes)
+  },
+  { deep: true },
+)
 </script>
 
 <style scoped>

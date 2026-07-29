@@ -7,7 +7,7 @@
  *
  * 由 D2TabDisclosure.vue 以 :key="variant" 挂载（切换版本即重建，持久化前缀随之切换）。
  */
-import { computed, inject, ref, toRef, onUnmounted, type Ref } from 'vue'
+import { computed, inject, ref, toRef, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useDebounceFn } from '@vueuse/core'
 import { Delete, Plus, RefreshLeft } from '@element-plus/icons-vue'
@@ -29,6 +29,8 @@ import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { getDisclosureNoteDetail } from '@/services/auditPlatformApi'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { useD2DisclosureImportExport } from '../composables/useD2DisclosureImportExport'
+import { useRouter } from 'vue-router'
+import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
 
 const props = withDefaults(defineProps<{
@@ -47,10 +49,6 @@ const { year: auditYear } = useAuditContext()
 
 // ─── 持久化（debounce 2s，与 D1 一致）──────────────────────────────────────────
 
-// 保存后自动同步到附注（防抖/非阻塞/失败静默/只读 gate；与手动按钮同源 syncToDisclosureNotes）
-const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
-onUnmounted(() => autoSync.cancelPending())
-
 const pending = ref<ChecklistItem[]>([])
 const debouncedSave = useDebounceFn(async () => {
   if (pending.value.length === 0) return
@@ -61,6 +59,8 @@ const debouncedSave = useDebounceFn(async () => {
       project_id: props.projectId,
       items,
     })
+    // 保存成功后自动同步到附注（防抖/非阻塞/失败静默）
+    autoSync.scheduleAutoSync(syncToDisclosureNotes)
   } catch {
     // 静默：数据已写入 allResponses，下次编辑会重试
   }
@@ -69,10 +69,21 @@ const debouncedSave = useDebounceFn(async () => {
 function save(items: ChecklistItem[]): void {
   pending.value.push(...items)
   debouncedSave()
-  autoSync.scheduleAutoSync(syncToDisclosureNotes)
 }
 
+// ─── 自动同步 ─────────────────────────────────────────────────────────────────
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+
 // ─── Composable ──────────────────────────────────────────────────────────────
+
+const router = useRouter()
+
+/** 跳转回附注模块对应章节 */
+function jumpToNote(target?: DisclosureVariant): void {
+  const v = target || props.variant
+  const route = buildNoteJumpRoute(props.projectId, 'D2', v)
+  if (route) router.push(route)
+}
 
 const allResponsesRef = computed(() => props.allResponses) as unknown as Ref<Map<string, ChecklistResponse>>
 const wpIdRef = toRef(props, 'wpId') as Ref<string>
@@ -541,6 +552,15 @@ async function checkNoteConsistency(silent = false): Promise<void> {
           title="将本页表格与说明文本同步到附注模块"
           @click="syncToDisclosureNotes"
         >同步到附注</el-button>
+        <el-dropdown split-button size="small" type="primary" plain @click="jumpToNote()" title="跳转回附注模块查看">
+          ↩ 跳转回附注（{{ D2_NOTE_SECTION[variant] }}）
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item @click="jumpToNote('listed')">上市版（五、5）</el-dropdown-item>
+              <el-dropdown-item @click="jumpToNote('soe')">国企版（八、5）</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
       </div>
     </div>
 

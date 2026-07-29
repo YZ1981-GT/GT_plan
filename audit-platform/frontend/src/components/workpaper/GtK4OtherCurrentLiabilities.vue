@@ -69,6 +69,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :tb-data="tbData"
+          :prefill="adjudicationPrefill"
           :is-readonly="isReadonly"
           @save="handleChildSave"
           @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
@@ -210,6 +211,11 @@ const tbData = ref({
   unadjusted2245: 0,
   audited2245: 0,
 })
+
+/** K4-1 审定表明细子科目预填（来自后端 render adjudication_prefill） */
+const adjudicationPrefill = computed(() =>
+  Array.isArray(props.htmlData?.adjudication_prefill) ? props.htmlData.adjudication_prefill : []
+)
 
 // ─── 全局告警区（跨sheet汇总） ──────────────────────────────────────────────
 const globalAlerts = computed(() => {

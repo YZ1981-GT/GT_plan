@@ -37,6 +37,15 @@
         <span class="chip-wrap"><GtIndexChip value="wp:J2-1" :context-project-id="projectId" /></span>
         <span class="chip-wrap"><GtIndexChip :value="`Note:${noteSectionId}`" :context-project-id="projectId" /></span>
         <GtReviewTrigger section-id="H4-disclosure-listed" />
+        <el-dropdown v-if="projectId" split-button size="small" type="default" @click="jumpToNote('listed')">
+          ↩ 跳转回附注（{{ noteSectionId }}）
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item @click="jumpToNote('listed')">上市版（{{ noteSectionId }}）</el-dropdown-item>
+              <el-dropdown-item @click="jumpToNote('soe')">国企版（八、23）</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
       </div>
     </div>
 
@@ -140,6 +149,8 @@ import { H2_NOTE_SECTION } from '../../composables/h2NoteSectionMap'
 import { buildH4ListedSyncPayloads } from '../../composables/h4DisclosureSyncPayload'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { eventBus } from '@/utils/eventBus'
+import { useRouter } from 'vue-router'
+import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 
 const props = defineProps<{
   wpId: string
@@ -164,6 +175,12 @@ let unsubscribe: (() => void) | null = null
 const noteSectionId = H2_NOTE_SECTION.listed  // 五、23（与 H2 共用子表按 key 合并）
 const isSyncing = ref(false)
 const { year: auditYear } = useAuditContext()
+const router = useRouter()
+
+function jumpToNote(variant: DisclosureVariant) {
+  const route = buildNoteJumpRoute(props.projectId, 'H4', variant)
+  if (route) router.push(route)
+}
 
 async function syncToNotes() {
   if (isSyncing.value || isReadonly.value) return

@@ -64,6 +64,14 @@
 
         <!-- H7-1 审定表（双版本：成本/公允） -->
         <template v-else-if="currentSheet === 'H7-1'">
+          <HiFourTableSourcePanel
+            v-if="props.htmlData?.hi_extraction_enabled"
+            :wp-code="'H7'"
+            :segments="getHiExtractionSegments('H7')"
+            :all-responses="allResponses"
+            :is-readonly="isReadonly"
+            @refresh-complete="selfLoad()"
+          />
           <H7TabAdjudicationCost
             v-if="measurementModel === 'cost'"
             :wp-id="props.wpId"
@@ -356,6 +364,8 @@ import { ref, computed, onMounted, provide, toRef, inject, watch, defineAsyncCom
 import http from '@/utils/http'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
+import HiFourTableSourcePanel from './shared/HiFourTableSourcePanel.vue'
+import { getHiExtractionSegments } from './composables/hiExtractionSegments'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))

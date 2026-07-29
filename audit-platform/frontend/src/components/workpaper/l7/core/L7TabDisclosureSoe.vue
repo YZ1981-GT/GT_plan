@@ -124,10 +124,16 @@
  * Table: 项目 | 年初余额 | 期末余额 (same data different order from Listed)
  * Auto-fill from EventBus 'substantive:adjudicated'
  */
-import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
+import { computed, inject, onMounted, onUnmounted, onBeforeUnmount, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { MagicStick, Check } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import http from '@/utils/http'
 import { eventBus } from '@/utils/eventBus'
 import { useL7FormData } from '../../composables/useL7FormData'
+import { L7_NOTE_SECTION, buildL7SyncPayload } from '../../composables/l7NoteSectionMap'
+import { buildNoteJumpRoute } from '@/views/composables/noteDisclosureReverseJump'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 
 const props = defineProps<{
   wpId: string

@@ -5,6 +5,7 @@ import { ref, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import type { ContractCostCheckRow } from './useF2ContractCostCheck'
+import { buildLinkedOcrFormData } from './ocrAttachmentLinkage'
 
 export interface F2SpeOcrFields {
   voucherNo?: string
@@ -38,7 +39,7 @@ function numeric(value: number | string | undefined): number {
   return Number.isFinite(result) ? result : 0
 }
 
-export function useF2SpecialContractOcr(wpId: Ref<string>) {
+export function useF2SpecialContractOcr(wpId: Ref<string>, projectId?: Ref<string>) {
   const ocrLoadingId = ref<string | null>(null)
 
   async function uploadAndMerge(
@@ -48,13 +49,15 @@ export function useF2SpecialContractOcr(wpId: Ref<string>) {
     documentType: F2SpeDocumentType = 'contract',
   ): Promise<void> {
     ocrLoadingId.value = `${rowId}:${documentType}`
-    const formData = new FormData()
-    formData.append('file', file)
-    formData.append('document_type', documentType)
     try {
+      const { form } = await buildLinkedOcrFormData(file, {
+        projectId: projectId?.value,
+        wpId: wpId.value,
+        extraFields: { document_type: documentType },
+      })
       const res = await http.post(
         `/api/workpapers/${wpId.value}/f2-spe/contract-ocr`,
-        formData,
+        form,
         { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
       )
       const data = res.data?.data ?? res.data

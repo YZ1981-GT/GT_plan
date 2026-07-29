@@ -316,6 +316,7 @@ import CycleImportExportDropdown from '../shared/CycleImportExportDropdown.vue'
 import F5SheetAttachments from './F5SheetAttachments.vue'
 import GtIndexChip from '../GtIndexChip.vue'
 import type { ChecklistResponse } from '../composables/useF1FormData'
+import { buildLinkedOcrFormData } from '../composables/ocrAttachmentLinkage'
 
 const f5QtyNav = [
   { id: 'f5-6-sales', label: '销售' },
@@ -359,8 +360,10 @@ async function uploadOutboundOcr(file: File): Promise<void> {
   if (props.isReadonly || !props.wpId) return
   ocrLoading.value = true
   try {
-    const fd = new FormData()
-    fd.append('file', file)
+    const { form: fd } = await buildLinkedOcrFormData(file, {
+      projectId: props.projectId,
+      wpId: props.wpId,
+    })
     const res = await http.post(`/api/workpapers/${props.wpId}/f5/contract-ocr`, fd, {
       headers: { 'Content-Type': 'multipart/form-data' },
       _silent: true,

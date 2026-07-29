@@ -428,6 +428,7 @@ const props = defineProps<{
   allResponses: Map<string, any>
   tbData: { unadjusted6301: number; audited6301: number }
   isReadonly: boolean
+  prefill?: Array<{ name: string; unadjustedDebit: number; unadjustedCredit: number }>
 }>()
 
 const emit = defineEmits<{
@@ -446,6 +447,7 @@ const adjudication = useK12Adjudication({
   projectId: toRef(props, 'projectId') as any,
   wpId: toRef(props, 'wpId') as any,
   isReadonly: computed(() => props.isReadonly),
+  prefill: computed(() => props.prefill ?? []) as any,
   onSave: (itemId: string, value: any) => emit('save', itemId, value),
   writebackTB: handleWritebackTBInternal,
 })

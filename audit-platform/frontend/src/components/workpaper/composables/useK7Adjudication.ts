@@ -65,6 +65,7 @@ export interface K7ReconciliationResult {
 
 export interface UseK7AdjudicationParams {
   allResponses: Ref<Map<string, any>>
+  prefill?: Ref<Array<{ name: string; code?: string; opening_balance: number; closing_balance: number }> | undefined>
   saveResponse: (field: string, value: any) => Promise<void>
 }
 
@@ -99,12 +100,13 @@ const DEFAULT_ROWS: Array<{ project: string; group: K7AdjRow['group'] }> = [
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useK7Adjudication(params: UseK7AdjudicationParams) {
-  const { allResponses, saveResponse } = params
+  const { allResponses, prefill, saveResponse } = params
 
   // ─── State ─────────────────────────────────────────────────────────────────
 
   const rows = ref<K7AdjRow[]>([])
   const auditConclusion = ref('')
+  const hasSeededPrefill = ref(false)
 
   // ─── Load ──────────────────────────────────────────────────────────────────
 
@@ -123,6 +125,20 @@ export function useK7Adjudication(params: UseK7AdjudicationParams) {
       } catch { /* fallthrough to default */ }
     }
     // 从 allResponses 单字段模式加载（兼容）
+    if (prefill?.value && prefill.value.length > 0 && !hasSeededPrefill.value) {
+      // 从 tb_balance 明细子科目预填（余额模式）
+      rows.value = prefill.value.map((p, i) => _normalizeRow({
+        rowKey: `pf-${i}`,
+        project: p.name,
+        group: '与资产相关',
+        beginBalance: p.opening_balance,
+        unadj: p.closing_balance,
+      }))
+      hasSeededPrefill.value = true
+      _persist()
+      auditConclusion.value = getVal(allResponses.value, 'K7-1-audit-conclusion')
+      return
+    }
     rows.value = DEFAULT_ROWS.map((def, i) => _buildRowFromResponses(`r${i}`, def.project, def.group))
     auditConclusion.value = getVal(allResponses.value, 'K7-1-audit-conclusion')
   }
@@ -318,7 +334,7 @@ export function useK7Adjudication(params: UseK7AdjudicationParams) {
 
   // ─── Watch init ────────────────────────────────────────────────────────────
 
-  watch(allResponses, () => initFromResponses(), { immediate: true })
+  watch([allResponses, () => prefill?.value], () => initFromResponses(), { immediate: true })
 
   // ─── Return ────────────────────────────────────────────────────────────────
 

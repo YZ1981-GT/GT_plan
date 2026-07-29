@@ -65,6 +65,14 @@
         />
 
         <!-- H9-1 审定表（负债类双区块：租赁负债+未确认融资费用） -->
+        <HiFourTableSourcePanel
+          v-if="props.htmlData?.hi_extraction_enabled"
+          :wp-code="'H9'"
+          :segments="getHiExtractionSegments('H9')"
+          :all-responses="allResponses"
+          :is-readonly="isReadonly"
+          @refresh-complete="selfLoad()"
+        />
         <H9TabAdjudication
           v-else-if="currentSheet === 'H9-1'"
           @save="persistResponse"
@@ -183,6 +191,8 @@ import { eventBus } from '@/utils/eventBus'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { applyH8TerminationToH92Rows } from './composables/useH9Detail'
 import { useH9CrossSheet } from './composables/useH9CrossSheet'
+import HiFourTableSourcePanel from './shared/HiFourTableSourcePanel.vue'
+import { getHiExtractionSegments } from './composables/hiExtractionSegments'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))

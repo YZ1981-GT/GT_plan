@@ -8,6 +8,7 @@ import {
   type F3NoteOcrFields, type F3InterestCalcRow,
 } from '../composables/useF3InterestCalc'
 import { useF3AiGenerate } from '../composables/useF3AiGenerate'
+import { buildLinkedOcrFormData } from '../composables/ocrAttachmentLinkage'
 import F3ImportExportToolbar from './F3ImportExportToolbar.vue'
 import F3SheetAttachments from './F3SheetAttachments.vue'
 import GtIndexChip from '../GtIndexChip.vue'
@@ -106,13 +107,15 @@ const ocrLoadingId = ref<string | null>(null)
 async function handleNoteOcr(rowId: string, file: File) {
   if (props.isReadonly) return
   ocrLoadingId.value = rowId
-  const formData = new FormData()
-  formData.append('file', file)
 
   try {
+    const { form } = await buildLinkedOcrFormData(file, {
+      projectId: props.projectId,
+      wpId: props.wpId,
+    })
     const res = await http.post(
       `/api/workpapers/${props.wpId}/f3/contract-ocr`,
-      formData,
+      form,
       { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
     )
     const data = res.data?.data ?? res.data

@@ -360,6 +360,7 @@ const props = defineProps<{
   projectId: string
   allResponses: Map<string, any>
   tbData: { unadjusted2401: number; audited2401: number }
+  prefill?: Array<Record<string, unknown>>
   isReadonly: boolean
 }>()
 
@@ -377,6 +378,7 @@ const openReviewDialog = inject<(id: string, label?: string) => void>('openRevie
 
 const adj = useK7Adjudication({
   allResponses: allResponsesRef,
+  prefill: toRef(props, 'prefill') as any,
   saveResponse: async (field: string, value: any) => {
     emit('save', field, value)
   },

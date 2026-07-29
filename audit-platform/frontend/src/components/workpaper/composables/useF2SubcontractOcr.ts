@@ -7,6 +7,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import type { SubcontractSupplier2Row } from './useF2InspectionCheckFormulas'
 import type { F2PurchaseOcrFields } from './useF2PurchaseOcr'
+import { buildLinkedOcrFormData } from './ocrAttachmentLinkage'
 
 /** contract=合同/加工单位组；fee=加工费结算单据组 */
 export type SubcontractOcrTarget = 'contract' | 'fee'
@@ -45,7 +46,7 @@ export function mapOcrFieldsToSubcontract(
   return patch
 }
 
-export function useF2SubcontractOcr(wpId: Ref<string>) {
+export function useF2SubcontractOcr(wpId: Ref<string>, projectId?: Ref<string>) {
   const ocrLoadingId = ref<string | null>(null)
 
   async function uploadAndMerge(
@@ -59,12 +60,14 @@ export function useF2SubcontractOcr(wpId: Ref<string>) {
       return
     }
     ocrLoadingId.value = `${rowId}:${target}`
-    const formData = new FormData()
-    formData.append('file', file)
     try {
+      const { form } = await buildLinkedOcrFormData(file, {
+        projectId: projectId?.value,
+        wpId: wpId.value,
+      })
       const res = await http.post(
         `/api/workpapers/${wpId.value}/f2/contract-ocr`,
-        formData,
+        form,
         { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
       )
       const data = res.data?.data ?? res.data

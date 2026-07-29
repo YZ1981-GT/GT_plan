@@ -233,10 +233,19 @@ export function buildOutsourceSuperDeductionTip(bookAmount: number): string {
   return `本期委外账面约 ${bookAmount.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}，加计口径参考基数（×80%）约 ${base.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}；请与 I6 加计扣除计算交叉核对。`
 }
 
-/** 通用 OCR：复用 D4 contract-ocr 接口，返回 extracted_fields */
-export async function runWorkpaperOcr(wpId: string, file: File): Promise<Record<string, any>> {
-  const fd = new FormData()
-  fd.append('file', file)
+/** 通用 OCR：复用 D4 contract-ocr；可选 attachment 回流 */
+export async function runWorkpaperOcr(
+  wpId: string,
+  file: File,
+  opts?: { projectId?: string; attachmentId?: string; forceReocr?: boolean },
+): Promise<Record<string, any>> {
+  const { buildLinkedOcrFormData } = await import('./ocrAttachmentLinkage')
+  const { form: fd } = await buildLinkedOcrFormData(file, {
+    projectId: opts?.projectId,
+    wpId,
+    attachmentId: opts?.attachmentId,
+    forceReocr: opts?.forceReocr,
+  })
   const res = await http.post(`/api/workpapers/${wpId}/d4/contract-ocr`, fd, {
     headers: { 'Content-Type': 'multipart/form-data' },
     _silent: true,

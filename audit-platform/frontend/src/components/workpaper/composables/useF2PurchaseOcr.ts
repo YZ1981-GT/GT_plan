@@ -1,10 +1,13 @@
 /**
  * useF2PurchaseOcr — F2-33 采购入库行级 OCR
+ *
+ * 有 projectId 时：先 upload+associate 再 OCR（回流附件证据链）。
  */
 import { ref, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import type { InspectionCheckRow } from './useF2InspectionCheckFormulas'
+import { buildLinkedOcrFormData } from './ocrAttachmentLinkage'
 
 export interface F2PurchaseOcrFields {
   purchaseOrderNo?: string
@@ -15,7 +18,7 @@ export interface F2PurchaseOcrFields {
   itemName?: string
 }
 
-export function useF2PurchaseOcr(wpId: Ref<string>) {
+export function useF2PurchaseOcr(wpId: Ref<string>, projectId?: Ref<string>) {
   const ocrLoadingId = ref<string | null>(null)
 
   async function uploadAndMerge(
@@ -24,12 +27,14 @@ export function useF2PurchaseOcr(wpId: Ref<string>) {
     updateRow: (id: string, patch: Partial<InspectionCheckRow>) => void,
   ): Promise<void> {
     ocrLoadingId.value = rowId
-    const formData = new FormData()
-    formData.append('file', file)
     try {
+      const { form } = await buildLinkedOcrFormData(file, {
+        projectId: projectId?.value,
+        wpId: wpId.value,
+      })
       const res = await http.post(
         `/api/workpapers/${wpId.value}/f2/contract-ocr`,
-        formData,
+        form,
         { headers: { 'Content-Type': 'multipart/form-data' }, _silent: true } as any,
       )
       const data = res.data?.data ?? res.data
@@ -51,9 +56,7 @@ export function useF2PurchaseOcr(wpId: Ref<string>) {
       const patch: Partial<InspectionCheckRow> = { sampleSource: 'OCR识别' }
       if (fields.supplier) {
         patch.party = String(fields.supplier)
-        if ('invoiceParty' in ({} as InspectionCheckRow) || true) {
-          ;(patch as Record<string, unknown>).invoiceParty = String(fields.supplier)
-        }
+        ;(patch as Record<string, unknown>).invoiceParty = String(fields.supplier)
       }
       if (fields.purchaseOrderNo) {
         ;(patch as Record<string, unknown>).recvDateNo = String(fields.purchaseOrderNo)

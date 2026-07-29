@@ -10,6 +10,11 @@
       </div>
     </div>
 
+    <!-- 同步到附注按钮 -->
+    <div style="margin-bottom: 12px; text-align: right;">
+      <el-button size="small" type="success" :disabled="isReadonly" @click="syncToDisclosureNotes">同步到附注</el-button>
+    </div>
+
     <!-- 琥珀色方法论块 -->
     <div class="methodology-block">
       <div class="methodology-title">CAS37 其他应付款附注披露要求（国有企业适用）</div>
@@ -138,6 +143,8 @@ import { MagicStick } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
 import { useAgingConfig, type AgingBand } from '@/composables/useAgingConfig'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import { buildK3SyncPayload } from '../../composables/k3NoteSectionMap'
 
 const K3_ACCOUNT_CODE = '2241'
 
@@ -266,6 +273,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   eventBus.off('substantive:adjudicated', handleAdjudicated)
+  autoSync.cancelPending()
 })
 
 // ═══ 单元格编辑 ═══
@@ -341,6 +349,24 @@ function persistSection(sIdx: number): void {
   if (!section) return
   const data = JSON.stringify({ rows: section.rows, textContent: section.textContent })
   emit('save', `K3-disc-soe-${section.id}`, { remark: data })
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
+}
+
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+
+async function syncToDisclosureNotes(): Promise<void> {
+  if (!props.projectId || props.isReadonly) return
+  const rows = sections.flatMap(s => s.rows.filter((r: any) => !r.isFormula).map((r: any) => ({ project: r.item || '', endAmount: r.endBalance ?? 0, priorAmount: r.beginBalance ?? 0 })))
+  const narrative = sections.filter(s => s.textContent).map(s => s.textContent).join('\n\n')
+  const payload = buildK3SyncPayload('soe', props.wpId || '', rows, narrative)
+  try {
+    await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
+    eventBus.emit('disclosure:note-text-updated' as any, {
+      wpCode: 'K3', variant: 'soe', accountCode: '2241',
+      projectId: props.projectId, sectionIds: ['八、42'],
+    })
+    ElMessage.success('已同步到附注')
+  } catch { /* silent */ }
 }
 
 function loadSavedData(): void {

@@ -4,6 +4,7 @@
     <div class="section-head">
       <h3 class="sheet-title">附注披露信息（上市公司）</h3>
       <div class="head-actions">
+        <el-button size="small" type="success" :disabled="isReadonly" @click="syncToDisclosureNotes">同步到附注</el-button>
         <el-button size="small" type="primary" plain @click="handleAiGenerate">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
@@ -232,6 +233,7 @@ import { ref, computed, onMounted, onBeforeUnmount, inject } from 'vue'
 import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 
 const K6_ACCOUNT_CODE = '1481'
 
@@ -247,6 +249,7 @@ const emit = defineEmits<{
 }>()
 
 const openReview = inject<(sectionId: string) => void>('openReviewDialog', () => {})
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 
 // ─── Data Models ─────────────────────────────────────────────────────────────
 
@@ -476,6 +479,7 @@ function handleNarrativeSave(): void {
     variant: 'listed',
     text: disposalNarrative.value,
   })
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
 }
 
 // ─── CAS42(3)(4) 持久化 ──────────────────────────────────────────────────────
@@ -489,6 +493,7 @@ function persistCas42(): void {
       isDiscontinuedOp: isDiscontinuedOp.value,
     }),
   })
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
 }
 
 function _loadCas42(): void {
@@ -540,10 +545,34 @@ async function handleAiGenerate(): Promise<void> {
 
 function persistAssetTable(): void {
   emit('save', 'K6-disclosure-listed-asset-table', { remark: JSON.stringify(assetTable.value) })
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
 }
 
 function persistLiabTable(): void {
   emit('save', 'K6-disclosure-listed-liab-table', { remark: JSON.stringify(liabilityTable.value) })
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
+}
+
+async function syncToDisclosureNotes(): Promise<void> {
+  if (!props.projectId || props.isReadonly) return
+  const rows = assetTable.value.filter(r => !r.isTotal).map(r => ({ project: r.category, endAmount: r.closingBalance ?? 0, priorAmount: r.openingBalance ?? 0 }))
+  const narrative = disposalNarrative.value
+  const payload = {
+    wp_id: props.wpId,
+    sheet_name: 'K6-note-listed',
+    section_id: '持有待售资产',
+    current_standard: 'listed_standalone',
+    sub_table_data: { rows },
+    _note_texts: narrative ? [{ section: 'main', title: '说明', text: narrative }] : [],
+  }
+  try {
+    await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
+    eventBus.emit('disclosure:note-text-updated' as any, {
+      wpCode: 'K6', variant: 'listed', accountCode: '1481',
+      projectId: props.projectId, sectionIds: ['持有待售资产'],
+    })
+    ElMessage.success('已同步到附注')
+  } catch { /* silent */ }
 }
 
 // ─── EventBus: subscribe 'substantive:adjudicated' ───────────────────────────
@@ -569,6 +598,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  autoSync.cancelPending()
   eventBus.off('substantive:adjudicated', handleAdjudicated)
   eventBus.off('adjustment:created', handleAdjustmentCreated)
 })

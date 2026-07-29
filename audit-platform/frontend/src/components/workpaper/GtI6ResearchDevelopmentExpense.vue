@@ -50,6 +50,14 @@
         />
 
         <!-- I6-1 审定表（损益类！73公式） -->
+        <HiFourTableSourcePanel
+          v-if="props.htmlData?.hi_extraction_enabled"
+          :wp-code="'I6'"
+          :segments="getHiExtractionSegments('I6')"
+          :all-responses="allResponses"
+          :is-readonly="isReadonly"
+          @refresh-complete="selfLoad()"
+        />
         <I6TabAdjudication
           v-else-if="currentSheet === 'I6-1'"
           :wp-id="props.wpId"
@@ -183,6 +191,8 @@ import { useI6DualMode } from './composables/useI6DualMode'
 import { useI6CrossSheet } from './composables/useI6CrossSheet'
 import { resolveI6DisclosureVisibility } from './composables/i6ApplicableSheets'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
+import HiFourTableSourcePanel from './shared/HiFourTableSourcePanel.vue'
+import { getHiExtractionSegments } from './composables/hiExtractionSegments'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))

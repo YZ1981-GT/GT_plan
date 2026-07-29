@@ -252,6 +252,19 @@ function load() {
     const dbp = mainRows.find(r => r.key === 'dbp')!
     dbp.endUnadj = n(tb.unadjusted_amount) || n(tb.audited_amount)
   }
+  // Prefill seed（从 tb_balance 2221 子科目期末余额合计 seed 到设定受益计划行）
+  if (!anyMain) {
+    const pf = Array.isArray(props.htmlData?.adjudication_prefill) ? props.htmlData.adjudication_prefill : []
+    if (pf.length > 0) {
+      const totalClosing = pf.reduce((s: number, p: any) => s + (Number(p.closing_balance) || 0), 0)
+      const totalOpening = pf.reduce((s: number, p: any) => s + (Number(p.opening_balance) || 0), 0)
+      if (totalClosing !== 0 || totalOpening !== 0) {
+        const dbp = mainRows.find(r => r.key === 'dbp')!
+        if (n(dbp.endUnadj) === 0) dbp.endUnadj = Math.abs(totalClosing)
+        if (n(dbp.beginUnadj) === 0) dbp.beginUnadj = Math.abs(totalOpening)
+      }
+    }
+  }
 }
 
 // ─── 保存（防抖） ─────────────────────────────────────────────────────────────

@@ -260,6 +260,7 @@ const props = defineProps<{
   projectId: string
   allResponses: Map<string, any>
   tbData: K5TbData
+  prefill?: Array<Record<string, unknown>>
   isReadonly: boolean
 }>()
 
@@ -286,6 +287,7 @@ const {
 } = useK5Adjudication({
   allResponses: allResponsesRef,
   tbData: tbDataRef as Ref<K5TbData>,
+  prefill: toRef(props, 'prefill') as any,
   saveResponse: async (field: string, value: any) => {
     emit('save', `K5-${field}`, value)
   },
