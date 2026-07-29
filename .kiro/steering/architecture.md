@@ -571,3 +571,305 @@ EventBus(substantive:adjudicated) ──→ TB回写
 1. openpyxl脚本实读源xlsx → sheet结构/列头/公式（权威列名来源）
 2. 读`BCD类底稿md/X循环底稿模板库.md` → 业务逻辑/联动/认定（权威语义来源）
 3. 两源交叉验证 → 产出spec三件套
+
+
+---
+
+## 平台级数值格式全局机制（2026-07-25 定型）
+
+金额显示的**唯一真源** = `stores/displayPrefs.ts`，三层机制：
+
+### 1. 全局格式化（覆盖只读金额）
+
+- `fmtAmount()`：`toLocaleString` 千分符 + `decimals`（默认 2 位）+ `amountUnit`（**默认 `yuan`「元」**）
+- localStorage 键 `gt_display_prefs` + `PREFS_VERSION=2`（`_v<2` 且遗留 `amountUnit==='wan'` 时一次性迁移到 `yuan`）
+- 切换单位/小数位实时响应全平台
+- 只读金额只要用 `displayPrefs.fmtAmount()` 就已全局生效
+
+### 2. 防折行全局（覆盖全平台 el-table）
+
+`styles/global.css`（`main.ts` 全局导入）：
+
+```css
+.el-table td.is-right .cell { white-space: nowrap; font-variant-numeric: tabular-nums; }
+```
+
+一处覆盖全平台所有 el-table 右对齐数值列，防长金额（含千分符）折两行 + 等宽对齐。**金额列必须 `align="right"` 才命中**。
+
+### 3. 无法全局的两类（须逐模块）
+
+- **可编辑金额**：EP 无全局 formatter → 用共享 `composables/wpAmountInput.ts` 的 `amountFormatter`/`amountParser`
+  - **🔴 EP `el-input-number` 忽略 `:formatter`**（只 `:precision` 生效）→ 要千分符必须换 `el-input` + formatter/parser
+  - **绝不套用**利率/汇率/比例/笔数/count/年度/月份 及 `precision=4|6` 字段（`isAmountColumn(col)` 按 label/key 判定）
+- **显示原始数字** `{{ row.x }}` 未走 fmtAmount 的表格（无法全局拦截）须改用 fmtAmount
+
+### 字号缩放
+
+`global.css` 不强制字号（避免误伤正文）；个别超宽列按表微调 13→12→11px（14 位数在 130px 列 12px 单行可容），参照 E1-1。
+
+### 主入口一处穿透覆盖（推荐范式）
+
+多 tab 循环模块在主入口一次穿透覆盖全部子 tab 表格，不逐组件重复：
+
+```css
+:deep(.e1-monetary-fund :deep(.el-table td.is-right .cell)) { ... }
+```
+
+---
+
+## 附注联动三链架构（J / R / S）
+
+附注模块与底稿披露表的联动由三条独立链路组成，缺一即"改了披露表附注不动"：
+
+| 链 | 名称 | 实现位置 | 机制 |
+|----|------|----------|------|
+| **J** | 跳转（附注→披露表） | `views/composables/noteDisclosureJump.ts` | `resolveNoteDisclosureJumpTarget` 按 note_section 章节号推 listed/soe sheet |
+| **R** | 定向刷新 | `views/composables/useNoteRefresh.ts` | `onDisclosureNoteTextUpdated` 按 accountCode / sectionIds 匹配当前节 |
+| **S** | 结构化同步 | 后端 `wp_disclosure_sync_service.sync_from_workpaper` + `note_sub_table_projector` | 按 section_id 驱动（**后端科目无关**），缺口全在前端注册 |
+
+**反向跳转（披露表→附注）**：`views/composables/noteDisclosureReverseJump.ts` 的 `DISCLOSURE_NOTE_SECTION_MAP` + `buildNoteJumpRoute`。
+
+### 权威数据源
+
+- **章节号权威** = `backend/data/note_template_variant_matrix.json`（`account_key` → `variants{listed_standalone, soe_standalone}`）
+  - 损益类：listed = `三、{section_title}`（matrix listed_* 为 null）+ soe = `八、N`
+  - 资产负债类：listed = `五、N` + soe = `八、N`
+- **section↔wp 映射真源** = `backend/data/note_workpaper_sync_registry.json`（由 `scripts/gen_note_wp_sync_registry.py` 从前端 `*NoteSectionMap.ts` 生成，禁手工维护第二份）
+
+### 关键约束
+
+- **纯编号章节判定必须精确 `===`**（`五、7 ≠ 八、70`、`五、8 ≠ 五、80`）；损益类关键词标题才前缀双向模糊
+- **披露 sheet 名必须 = `workpaper_sheet_classification` 真实 tab 名**（各循环命名不统一：`附注披露信息（上市公司）` 全角 vs `附注披露信息(上市公司)` 半角），禁用 OnlyOffice sheet-name 映射（如 `附注上市`）
+- **emit 载荷必带** `accountCode` + `projectId` + `sectionIds`（对齐 G10 范式），否则 R 链命不中只靠全量刷新兜底
+- **piggyback 科目**（应收利息 G2 / 应收股利 G3 / 工程物资 H4 / 固定资产清理 H6 无独立章节）跳节主不单列入口
+- **写入年度必须以 `projects.audit_year` 为权威**（前端普遍不传 year，fallback 到服务器自然年 = 跨年审计必写错年度）
+
+### 结构化同步（S 链）payload 契约
+
+前端 `buildXSyncPayload` → `POST /api/projects/{pid}/disclosure-notes/sync-from-workpaper`：
+
+- `sub_table_data` 各子表键 ↔ `columns` 键**必须同名**（投影器按名匹配）
+- `_note_texts`（`list[{section,title,text}]`）混在 `sub_table_data` 里，服务端自动 pop 成 `text_content`
+- 空载荷 = no-op 保留既有子表（**不清空**）；`{key:[]}` 才是该表空行有效状态
+- 软删章节需"先查软删行复活"（唯一索引不含 `is_deleted`，否则删后重建撞键 500）
+
+---
+
+## 四表取数架构（Tier A / Tier B）
+
+四表库（`trial_balance` / `tb_balance` / `tb_ledger` / `tb_aux_balance`）→ 底稿自动取数的两层模型：
+
+| 层 | 适用 | 载体 | 可编辑 |
+|----|------|------|--------|
+| **Tier A** | 固定类别审定表（每类恰好=一个科目：F2 存货 13 类 / H/I/L/M/N 分段） | 预设 `TB('code','列名')` 公式（`{cycle}_extraction_presets.json`） | ✅ 公式管理可查可编 |
+| **Tier B** | 明细/分段预填（复用 `_build_adjudication_prefill` 范式） | render 策略 SQL 直查 + `_is_leaf` 叶子过滤 | ❌ 只读溯源 |
+
+### 铁律
+
+- **宁缺勿造**：分类/账龄/客户维度（D 循环信用风险组合、账龄分类）**无法用单条公式表达**且 TB 无对应维度 → **不 seed**，只登记 Tier B provenance 声明
+- **叶子过滤防双算**：`_is_leaf` = 该 code 不是任何其它 code 的前缀；父子同时累加会翻倍
+- **方向口径**：资产借方 → 增加=`debit_amount` / 减少=`credit_amount` / 期末=`closing_balance`；负债/权益贷方相反；备抵科目（1471/1602/1512）反转 + `abs()`
+- **手工优先（Persist_First）**：已有非空用户值不覆盖；仅锚点完全空时 seed
+- **灰度默认关**：`{X}_FOUR_TABLE_EXTRACTION_ENABLED` 默认 False，开关 on/off 须逐字节等价（无干净映射时不 seed）
+- **口径统一**：render 预填 / 公式求值 / 刷新三处必须同 `get_active_filter`（数据集版本一致）
+- **锚点必从真实 composable 反查**（`{cycle}_anchor_registry.json`），禁臆造 item_id
+- **明细项目/卡片级不取数**：`tb_aux_balance` 多数科目无项目/规格维度（实测 H1 固定资产 aux 只有 FFLEX10 三个 name）；`counterpart_account` 填充率仅 ~9% → 费用归属不做自动归集
+
+### 报表科目映射（避免硬编码前缀）
+
+审定表 TB 核对科目走 `services/report_account_mapping.py`：
+
+- `resolve_report_line_account_codes(db, pid, row_code, fallback)`：项目级 → 标准级解析 `report_config.formula` 提取 `TB()`/`SUM_TB()` 码
+- `build_trial_balance_code_filter`：单码 LIKE / 区间 BETWEEN 参数化
+- 无配置回退 fallback（保零回归）；`project_context.tb_source_codes` 供追溯
+- **报表取数真源 = `report_config` DB 表**（非 `formula_presets_seed.json`，后者是公式管理 UI 预设库）
+
+---
+
+## 双模式架构（结构化视图 / OnlyOffice 在线编辑）
+
+统一封装 `composables/useWpDualMode.ts`（或各循环 `useXEntryDualMode`），核心 = **"拉取成功才切"**：
+
+```
+switchMode('onlyoffice')
+  → GET /api/workpapers/{wp}/sheets/{sheet}/onlyoffice-config?project_id=  ← 必带 project_id 否则 422
+  → config 非空才置 currentMode='onlyoffice'
+  → 失败回退 html + warning
+```
+
+### 关键约束
+
+- **`el-segmented` 必须 `:model-value` + `@change`**，禁 `v-model`（v-model 抢先改值使 `switchMode` 首行 `if(target===current) return` 短路 → config 预拉与健康门控全失效）
+- **健康检查双层兼容** `res?.data?.healthy ?? res?.healthy`（`api.get` 只 return response.data）
+- **`@fallback` 必须接线**（文档渲染/45s 超时失败要回退 html + 标记不可用），否则"拉取成功"tag 撒谎
+- **入口级 mode 是共享状态**：目录/程序表等无切换栏的 sheet 必须从 OO 分支排除（`isSwitchableSheet`），否则切 OO 后被顶掉无法切回
+- **单 sheet config 失败不应全局禁用 OO**（合成"底稿目录"无 xlsx 对应必 422）
+- **OO sheet-name 必须与源 xlsx tab 名完全一致**；render 要输出 `source_sheet` 供前端定位
+
+### 机对机端点必须公开（V113 回归教训）
+
+`dedicated_wp_gate`（含 `get_current_user` 硬依赖）按"router 含 `{wp_id}` 路由"**整体挂载** → 同 router 内的机对机端点会被连坐要求用户 Bearer：
+
+- `/onlyoffice/health`（前端裸 fetch 无 Bearer）
+- `/{wp_id}/sheets/{sheet}/wopi/contents`（DocServer 拉文档，只带 `?token=` 签名 JWT）
+- `/{wp_id}/sheets/{sheet}/onlyoffice-callback`（DocServer 保存回调）
+
+**解法**：这三个迁到 `public_router` 且**显式在自动加 gate 的循环外注册**（放进 groups 列表会因含 wp_id 被重新加 gate）。
+
+---
+
+## 附件↔底稿关联权威真源（V133 收敛）
+
+平台曾有**多套并行**"附件↔底稿"关联写不同存储，导致"本底稿关联哪些附件"无单一答案：
+
+| 机制 | 写入 | 可被反查看见 |
+|------|------|-------------|
+| evidence-governance `associate` | `attachment_working_paper` 链表（M:N + association_type） | ✅ |
+| process-record `linkAttachment` | `UPDATE attachments SET reference_type/reference_id`（1:1 覆盖） | ❌（收敛前） |
+| 函证 | `confirmation_attachment_link(confirmation_id, attachment_id, role)` | 独立 |
+| 检查项级 | `attachment_type` 过滤 | 视图级 |
+
+**收敛后（V133）**：
+
+- **权威真源** = `attachment_working_paper` M:N 链表 + `uq_awp_attachment_wp` 唯一约束
+- `ensure_wp_link`（先查再 INSERT，幂等）；`associate` 委托它，`linkAttachment` 追加它（fail-open）
+- 反查 `GET /working-papers/{wp}/attachments` = 链表(associated) ∪ reference(referenced) ∪ 函证(best-effort) **去重**，additive `source`/`sources`/`association_type` 标注来源
+- 解除关联 `DELETE /working-papers/{wp}/attachments/{aid}/link`（清 reference + 幂等 no-op）
+- **C3 opaque-locator** 单一真源 `services/attachment_locator.py::project_attachment_locator`（paperless:// 原样 / 其它 → `/api/attachments/{id}/download`），禁泄露绝对 file_path
+
+---
+
+## 委派 / 可见性隔离架构（V113）
+
+两层委派**分层但联动**（非合并）：
+
+| 层 | 存储 | 语义 |
+|----|------|------|
+| 底稿主编 | `WorkingPaper.assigned_to` + `ProcedureInstance.assigned_to` | 底稿层负责人 |
+| 程序行执行/复核 | `ProcedureRowTask`（V105） | 具体程序步骤 |
+
+两层互不覆盖，共同贡献可见性。
+
+### 服务端 fail-closed 可见性隔离
+
+- `services/wp_visibility/`：`visible_wp_index_ids` = lead/assignee/reviewer grants ∩ scope_cycles
+- **列表/render-config/checklist/download/attachment/OnlyOffice 全部服务端强制**（不能靠前端隐藏）
+- 未委派资源统一 **404**（不可见原因不区分，防信息泄露）
+- Admin/Supervisor 产生显式 `admin`/`supervisor_scope` AccessGrant
+- 撤权一致性：权限/委派/history/scope/角色变化必须与持久 policy epoch + invalidation outbox **同一事务**提交；Redis 只做提交后 fan-out
+- 历史授权真源 = append-only `workpaper_delegation_history`（禁通过当前 StaffMember/ProcedureRowTask 反推）
+
+### 粗裁
+
+`ProcedureService.init_from_templates()` 按 wp_code 一张底稿一条 `ProcedureInstance` = **科目/底稿范围实例**（非程序行）；真实程序行在 `GtAProgramConsole.ProgramRow` + `WorkingPaper.parsed_data.procedure_status[sheet_key][row_id]`。
+
+**智能裁剪判据 = 数据驱动**：`GET /api/b50/scope-accounts`（试算表非零余额科目 + `cycle_for_account` 循环映射）→ 只裁"该循环/科目在试算表无数据"的 D~N 程序；取数失败/试算表未导入 → **fail-safe 不裁**（防"拿不到=全无数据=全裁光"）。子科目级精度走 `procedure_trim_scope.py`（`account_package_registry` + `procedure_trim_account_map.json` 隔离文件，registry 优先不覆盖）。
+
+---
+
+## 调整分录集中登记架构（V124/V125/V127）
+
+底稿级调整（`checklist_responses` JSON）→ 集中式 `adjustments` 表的汇聚：
+
+- **前端显式** `useAdjustmentCentralSync.syncToCentral()`（前端知自身 row schema + 科目上下文，避免后端维护 N 种键 schema）
+- **幂等** `source_ref = {wp_id}:{item_id}`；`origin='workpaper'` 隔离
+- **🔴 recalc 加 `origin != 'workpaper'` 过滤消除双计**（workpaper origin 已由审定表 writeback 写 audited_amount，不再进 aje_adjustment；manual/NULL 零回归）
+- **协作接力**（V125）：`adjustment_collaboration` 状态机 pending→acknowledged→contributed→confirmed + append-only `adjustment_collaboration_event`；锚点 = central `entry_group_id`；**协作锁**（活跃协作时 `sync_from_workpaper` 返 `COLLABORATION_LOCKED` 409 防底稿 re-sync 覆盖）
+- **明细科目码**（V127）：`adjustment_entries.detail_account_code` 可空列承载二级/明细码（`standard_account_code` 一级码保校验/recalc/报表口径不变）；前端匹配 `effectiveCode = detail_account_code || standard_account_code`
+- **错报 ≠ 调整**：`a13:push-misstatement` → `unadjusted_misstatements` 表（全局唯一消费者 `useA13MisstatementBridge` 挂 `WorkpaperEditor`，纯函数归一 4 种 payload 形态 + 5s 去重窗口 + `source_wp_code` 溯源）
+
+---
+
+## 前端 SSE 单连接总线（2026-07-23 收敛）
+
+`services/sse/projectEventStream.ts`：
+
+- 每 projectId **一条** `createSSE` Shared_Connection（fetch-based，Authorization header，**token 不入 URL**）
+- `subscribeProjectEvent(pid, eventName, handler, {onReconnect, onDegraded})` 按 Event_Name fan-out + Ref_Count_Lifecycle
+- `WILDCARD_EVENT='*'` 通配（ThreeColumnLayout 全局 catch-all 转发 `data.event_type` → mitt `sse:*`）
+- 断线重连/退避委托 `createSSE` 单一真源；总线只做 fan-out（异常隔离）
+- 守卫 `sseConsolidationGuard.spec.ts`：除总线/`utils/sse.ts` 外禁直连 `/events/stream`
+
+**native `EventSource` 无法设 Authorization header** → 只能 `?token=` 入 URL（安全隐患）；要 token 出 URL 必须用 fetch-based SSE。
+
+---
+
+## 公式管理架构（surfacing / 预设 / 自定义）
+
+### 底稿节点公式来源三层
+
+1. **`wp_formula` 表**（用户自建/编辑的 `items`）
+2. **surfaced 只读条目**（专属组件的取数/计算/勾稽公式，`wp_surfaced_{family}.py` 家族目录 + `wp_surfaced_formulas.py` try/except merge 聚合）
+3. **extraction**（Tier A 可编辑预设 + Tier B 只读溯源）
+
+**surfacing 铁律**：
+
+- 公式必从真实 composable 反查（`useXFormulaEngine` 函数名/`useXAdjudication` 取数键），**禁臆造**
+- 分类严格三种：`取数`（跨 sheet / 四表库）/ `计算`（表间）/ `logic_check`（核对）
+- 每条打 `sheet_codes` 归属（前端按选中 sheet 过滤），否则工作簿级全量在每 sheet 重复
+- `sheet_codes` 必须是 ACNR 真实编码节点（`X-1`/`X-2`）；非编码语义名（附注上市/程序表）在 ACNR 无独立节点 → 归到审定表 `{base}-1`
+- 只读行必给**非 null 稳定 id**（`editingId===row.id` 对 null 恒真 → 渲染空编辑框）
+
+### 预设库（通用 vs 自定义）
+
+- **通用基线** = `backend/data/formula_presets/formula_presets_seed.json`（876+ 条，致同标准）
+- **自定义** = `formula_custom_presets.json`（隔离文件）；`preset_library.build_preset_library` 把 custom **置于 seed 之前** → 去重首个赢使同键覆盖
+- `upsert_custom_presets` 只写 custom 文件绝不碰 seed；写端点 `require_role`(admin/partner)
+- 读时收敛（seed ∪ prefill ∪ check_presets ∪ wide_table，无 DB 表）
+
+---
+
+## 账套导入年度/月度列语义（2026-07-25 定型）
+
+余额表导入的三层修正（识别 / 分类 / 转换）：
+
+### 识别层
+
+- `年初余额.借方` → `year_opening_debit`（**非** `opening_debit`）
+- `本年累计.借方` / `累计发生额` → `year_debit`（原完全不被识别）
+- 三处表头映射真源：`identifier._MERGED_HEADER_MAPPING`（双行合并点号，最先命中）/ `ledger_recognition_rules.json` 的 `column_aliases` / `smart_import_engine._MERGED_HEADER_MAP`（legacy 参照）
+
+### 分类层
+
+- `KEY_COLUMNS["balance"]` = `{account_code, year_opening_debit, year_opening_credit, year_debit, year_credit, closing_balance}`
+- 月度列（`opening_balance` / `debit_amount` / `credit_amount`）→ RECOMMENDED（不硬阻断）
+- `_alt_to_key` 加 `if "+" not in alt_group: continue`（单字段替代只识别打分不提升 tier，仅组合型 `closing_debit+closing_credit` 提升）
+- `_NEGATIVE_SIGNALS["balance"]` 含 `aux_type`/`aux_code`（防含 aux 维度的净额表被误判 balance）
+
+### 转换层
+
+- `_first_decimal(*vals)`：**显式 `is None`** 判缺失（禁 `or`，`Decimal(0)` falsy 会误判）
+- 期初优先 `year_opening_*`，发生额优先 `year_debit`/`year_credit`，月度兜底
+- v2 `converter.py` 与 legacy `smart_import_engine.py` **必须同步改**
+
+### 符号口径
+
+`tb_balance.closing_balance` 可能是**无符号绝对值**（方向在 `closing_direction`）→ `recalc_unadjusted` 必按方向 `case` 带符号求和，否则混合方向科目（含借方性质挂账的其他应付款）同号累加不冲减 → 报表资产负债不平。
+
+---
+
+## 报表不平诊断链（2026-07-25 沉淀）
+
+「资产负债不平」按以下顺序逐层排查：
+
+1. **报表层**：总计行（BS-039/BS-099）→ 分段合计（资产/负债/**权益** BS-091）→ 定位为 0 的段
+2. **公式层**：该段行的 `formula_used`（`TB('科目')`）→ 是否漏减备抵（累计折旧/减值/未确认融资费用）
+3. **试算表层**：`trial_balance` 该科目 `audited_amount`
+4. **源数据层**：`tb_balance` 四列（opening/debit/credit/closing_balance + direction）是否 NULL / 是否无符号绝对值
+5. **映射层**：`account_mapping` 是否有未映射叶子（`original_account_code` 无匹配）
+
+### 三层根治（已实施）
+
+- **recalc 按方向带符号求和**（消除混合方向科目虚增）
+- **未映射叶子按最长前缀继承祖先映射**（`ORDER BY LENGTH(original_account_code) DESC LIMIT 1`，防 auto_match 覆盖不全的静默丢弃）
+- **`TB('父码')` 前缀聚合含子科目**（`LIKE 'code%'`，客户映射到合法子级标准码时不漏计；已验证 4 套标准 report_config 无前缀重叠不双算）
+
+### 四表入库 → 可用的三段独立链路
+
+`ledger_import/pipeline.py` 只做 detect → convert → activate_dataset → rebuild_aux_summary，**不建科目表/不做映射/不生成试算表**。后三步靠：
+
+- 标准科目表：访问「科目表」页懒加载（`GET /account-chart/standard`）
+- 科目映射：`mapping_service.auto_match`（幂等自愈：client 空→从 tb_balance 生成 / standard 不足→从 client 补 / 匹配 / 触发 recalc）
+- **已接自动化**：`_auto_map_on_dataset_activated` 订阅 `LEDGER_DATASET_ACTIVATED` 自动跑 auto_match（best-effort 不阻断导入）
+
+**🔴 dataset-stranding**：`account_chart` 唯一约束不含 `dataset_id` → client 科目项目全局唯一，**任何按 dataset 过滤 client 科目的地方都会造成 re-import 后滞留 superseded**（去过滤而非加过滤）。
