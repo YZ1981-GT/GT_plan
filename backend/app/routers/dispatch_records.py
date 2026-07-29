@@ -1,5 +1,10 @@
 """分发记录 REST Router — D0-1 跨底稿分发持久化
 
+DEPRECATED: cross-workpaper-dispatch-persistence 机制从未被前端组件采用，
+由 coordination/importFromSummary.ts 通用读取器取代（2026-07-28 confirmation-linkage-completion R3）。
+前端 useConfirmationDispatch/useDownstreamDispatch/dispatchApi.ts 已删除。
+本路由、service、模型及 V093 表保留休眠不删（避免破坏性 DDL），待运维决定是否清理。
+
 Feature: cross-workpaper-dispatch-persistence
 
 端点：

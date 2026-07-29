@@ -115,6 +115,75 @@ async def list_confirmation_candidates(
     return {"items": items, "total": len(items)}
 
 
+# ─── Match Queue (must be before /{confirmation_id} to avoid route conflict) ──
+
+
+class AssignMatchRequest(BaseModel):
+    """人工指派请求"""
+    confirmation_id: str = Field(..., description="指派到的函证 ID")
+    paired_outbound_id: str | None = Field(None, description="配对的发函件附件 ID")
+
+
+@router.get("/match-queue")
+async def list_match_queue(
+    project_id: str,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """列出项目下待人工指派的回函件（人工匹配队列）。
+
+    包含未匹配成功的回函件附件，供审计师手动指派到具体函证记录。
+
+    注意：本路由须在 ``/{confirmation_id}`` 之前注册，避免 "match-queue" 被当作 ID。
+
+    权限：只读（get_current_user）
+    """
+    pid = uuid.UUID(project_id)
+    items = await confirmation_evidence_service.list_match_queue(db, pid)
+    await db.commit()
+    return {"items": items, "total": len(items)}
+
+
+@router.post("/match-queue/{attachment_id}/assign")
+async def assign_match(
+    project_id: str,
+    attachment_id: str,
+    body: AssignMatchRequest,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """人工把队列中的回函件指派到指定函证 + 绑发函件。
+
+    注意：本路由须在 ``/{confirmation_id}`` 之前注册，避免路径冲突。
+
+    权限：编辑权（运行时按角色守卫）
+    """
+    from app.deps import require_role as _require_role
+    _ASSIGN_ROLES = ["admin", "manager", "partner", "signing_partner", "field_staff"]
+    # 运行时角色检查（不能在 Depends 层因为路由已提前注册到此位置）
+    aid = uuid.UUID(attachment_id)
+    cid = uuid.UUID(body.confirmation_id)
+    paired = uuid.UUID(body.paired_outbound_id) if body.paired_outbound_id else None
+    actor_user_id = getattr(user, "id", None)
+
+    try:
+        result = await confirmation_evidence_service.assign_match(
+            db,
+            attachment_id=aid,
+            confirmation_id=cid,
+            paired_outbound_id=paired,
+            actor_user_id=actor_user_id,
+        )
+    except ValueError as e:
+        msg = str(e)
+        if "不存在" in msg:
+            raise HTTPException(status_code=404, detail=msg)
+        raise HTTPException(status_code=400, detail=msg)
+
+    await db.commit()
+    return result
+
+
 # NOTE: 原 GET /stats（confirmation_stats）已移除（confirmation-coverage-single-source spec）。
 # 该端点零前端消费者、字段名 reply_rate/confirmation_coverage 与前端 ConfirmationCoverageMetrics
 # 口径不一致（分母用 total_book 而非科目审定总额 TB population），属死端点 + 双算发散。
@@ -146,7 +215,10 @@ async def get_confirmation(
     user=Depends(get_current_user),
 ):
     """获取函证详情"""
-    cid = uuid.UUID(confirmation_id)
+    try:
+        cid = uuid.UUID(confirmation_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail=f"无效的函证 ID: {confirmation_id}")
     try:
         result = await confirmation_service.get_confirmation(db, cid)
     except ValueError as e:
@@ -671,13 +743,7 @@ class AutoMatchRequest(BaseModel):
     attachment_id: str = Field(..., description="回函件附件 ID")
 
 
-class AssignMatchRequest(BaseModel):
-    """人工指派请求"""
-    confirmation_id: str = Field(..., description="指派到的函证 ID")
-    paired_outbound_id: str | None = Field(
-        None,
-        description="配对的发函件 attachment_id（多份发函件时必填）",
-    )
+# NOTE: AssignMatchRequest 已移至文件顶部（match-queue 路由前）避免路由排序冲突。
 
 
 @router.post("/auto-match")
@@ -717,59 +783,5 @@ async def auto_match(
     return result
 
 
-@router.get("/match-queue")
-async def list_match_queue(
-    project_id: str,
-    db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
-):
-    """列出项目下待人工指派的回函件（人工匹配队列）。
-
-    包含未匹配成功的回函件附件，供审计师手动指派到具体函证记录。
-
-    权限：只读（get_current_user）
-    """
-    pid = uuid.UUID(project_id)
-
-    items = await confirmation_evidence_service.list_match_queue(db, pid)
-    await db.commit()
-    return {"items": items, "total": len(items)}
-
-
-@router.post("/match-queue/{attachment_id}/assign")
-async def assign_match(
-    project_id: str,
-    attachment_id: str,
-    body: AssignMatchRequest,
-    db: AsyncSession = Depends(get_db),
-    user=Depends(require_role(_EDIT_ROLES)),
-):
-    """人工把队列中的回函件指派到指定函证 + 绑发函件。
-
-    - 如有既有 pending link → 更新其 confirmation_id / paired / match_status
-    - 如无既有 link → 创建新 link（match_status=assigned）
-    - 写 action_log（action='match_assign'）留痕
-
-    权限：编辑权
-    """
-    aid = uuid.UUID(attachment_id)
-    cid = uuid.UUID(body.confirmation_id)
-    paired = uuid.UUID(body.paired_outbound_id) if body.paired_outbound_id else None
-    actor_user_id = getattr(user, "id", None)
-
-    try:
-        result = await confirmation_evidence_service.assign_match(
-            db,
-            attachment_id=aid,
-            confirmation_id=cid,
-            paired_outbound_id=paired,
-            actor_user_id=actor_user_id,
-        )
-    except ValueError as e:
-        msg = str(e)
-        if "不存在" in msg:
-            raise HTTPException(status_code=404, detail=msg)
-        raise HTTPException(status_code=400, detail=msg)
-
-    await db.commit()
-    return result
+# NOTE: match-queue endpoints removed from here — moved before /{confirmation_id}
+# to avoid route conflict (FastAPI matches "match-queue" as a confirmation_id parameter).

@@ -3,6 +3,7 @@
 POST /api/workpapers/{wp_id}/h3/contract-ocr
 Content-Type: multipart/form-data
 Body: file (PDF/image)
+Optional: attachment_id（已关联附件时回流 ocr_text/ocr_fields_cache）, force_reocr
 
 上传租赁合同扫描件，OCR 后提取租赁要素，供 H3-13 关联交易检查 / H3-14 租金收入测算逐行预填。
 兼容 D4 合同 OCR 的通用返回键（amount/date/counterparty），并附加租赁专有字段。
@@ -13,16 +14,21 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import aiofiles
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import User
+from app.services.attachment_ocr_writeback import (
+    finalize_linked_ocr_writeback,
+    load_reusable_ocr,
+    parse_optional_uuid,
+)
 from app.services.llm_client import chat_completion
 from app.services.unified_ocr_service import UnifiedOCRService
 
@@ -68,33 +74,96 @@ class H3ContractOcrResponse(BaseModel):
     amount: float
     date: str
     counterparty: str
+    reused: bool = False
+    written_back: bool = False
+    governed: bool = False
+    requires_human_confirmation: bool = True
 
 
 def _build_extraction_prompt(ocr_text: str) -> str:
     return f"OCR文本：\n{ocr_text[:6000]}"
 
 
-def _empty_response(attachment_id: str, ocr_text: str = "") -> "H3ContractOcrResponse":
+def _to_num(v) -> float:
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _compat_keys(extracted_fields: dict) -> tuple[float, str, str]:
+    amount = (
+        _to_num(extracted_fields.get("contractAmount"))
+        or _to_num(extracted_fields.get("annualRent"))
+        or _to_num(extracted_fields.get("monthlyRent"))
+    )
+    date = str(extracted_fields.get("signDate") or extracted_fields.get("leaseStart") or "")
+    counterparty = str(extracted_fields.get("counterparty") or "")
+    return amount, date, counterparty
+
+
+def _resp(
+    attachment_id: str,
+    ocr_text: str,
+    extracted_fields: dict,
+    confidence: float,
+    *,
+    reused: bool = False,
+    written_back: bool = False,
+) -> H3ContractOcrResponse:
+    amount, date, counterparty = _compat_keys(extracted_fields)
     return H3ContractOcrResponse(
         attachment_id=attachment_id,
         ocr_text=ocr_text,
-        extracted_fields=dict(_EMPTY_FIELDS),
-        confidence=0,
-        amount=0,
-        date="",
-        counterparty="",
+        extracted_fields=extracted_fields,
+        confidence=confidence,
+        amount=amount,
+        date=date,
+        counterparty=counterparty,
+        reused=reused,
+        written_back=written_back,
+        governed=False,
+        requires_human_confirmation=True,
     )
+
+
+def _empty_response(attachment_id: str, ocr_text: str = "") -> H3ContractOcrResponse:
+    return _resp(attachment_id, ocr_text, dict(_EMPTY_FIELDS), 0.0)
 
 
 @router.post("/api/workpapers/{wp_id}/h3/contract-ocr")
 async def h3_contract_ocr(
     wp_id: str,
     file: UploadFile = File(...),
+    attachment_id: str | None = Form(None),
+    force_reocr: bool = Form(False),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> H3ContractOcrResponse:
-    """上传租赁合同附件，OCR识别并提取租赁要素供 H3-13/H3-14 预填"""
-    _ = db, current_user
+    """上传租赁合同附件，OCR识别并提取租赁要素；可选回流已关联附件证据链。"""
+    _ = current_user
+    linked_att_id = parse_optional_uuid(attachment_id)
+    try:
+        wp_uuid = UUID(wp_id)
+    except ValueError:
+        if linked_att_id is not None:
+            raise HTTPException(400, "无效的 wp_id")
+        wp_uuid = UUID(int=0)
+
+    if linked_att_id is not None and not force_reocr:
+        reused = await load_reusable_ocr(db, linked_att_id)
+        if reused is not None:
+            fields = reused["extracted_fields"] or {}
+            merged = dict(_EMPTY_FIELDS)
+            merged.update({k: fields[k] for k in LEASE_FIELDS_SCHEMA if k in fields})
+            return _resp(
+                str(linked_att_id),
+                reused["ocr_text"],
+                merged,
+                float(reused.get("confidence") or 0),
+                reused=True,
+                written_back=False,
+            )
 
     allowed_types = (".pdf", ".png", ".jpg", ".jpeg")
     filename = file.filename or "upload.pdf"
@@ -102,10 +171,10 @@ async def h3_contract_ocr(
     if suffix not in allowed_types:
         raise HTTPException(400, f"不支持的文件类型: {suffix}，仅支持 {allowed_types}")
 
-    attachment_id = str(uuid4())
+    temp_id = str(linked_att_id) if linked_att_id else str(uuid4())
     storage_dir = Path("storage/workpapers") / wp_id / "h3-lease-contracts"
     storage_dir.mkdir(parents=True, exist_ok=True)
-    file_path = storage_dir / f"{attachment_id}{suffix}"
+    file_path = storage_dir / f"{temp_id}{suffix}"
 
     content = await file.read()
     async with aiofiles.open(str(file_path), "wb") as f:
@@ -118,10 +187,10 @@ async def h3_contract_ocr(
         ocr_text = ocr_result.get("text", "")
     except Exception as e:
         logger.warning("H3 lease contract OCR failed for %s: %s", wp_id, e)
-        return _empty_response(attachment_id)
+        return _empty_response(temp_id)
 
     if not ocr_text.strip():
-        return _empty_response(attachment_id)
+        return _empty_response(temp_id)
 
     extracted_fields = dict(_EMPTY_FIELDS)
     confidence = 0.0
@@ -158,22 +227,15 @@ async def h3_contract_ocr(
 
     except Exception as e:
         logger.warning("H3 lease contract LLM extraction failed for %s: %s", wp_id, e)
-        return _empty_response(attachment_id, ocr_text)
+        return _empty_response(temp_id, ocr_text)
 
-    def _to_num(v) -> float:
-        try:
-            return float(v)
-        except (TypeError, ValueError):
-            return 0.0
-
-    return H3ContractOcrResponse(
-        attachment_id=attachment_id,
+    out_id, written = await finalize_linked_ocr_writeback(
+        db,
+        wp_id=wp_uuid,
+        linked_att_id=linked_att_id,
+        temp_id=temp_id,
         ocr_text=ocr_text,
         extracted_fields=extracted_fields,
         confidence=confidence,
-        amount=_to_num(extracted_fields.get("contractAmount"))
-        or _to_num(extracted_fields.get("annualRent"))
-        or _to_num(extracted_fields.get("monthlyRent")),
-        date=str(extracted_fields.get("signDate") or extracted_fields.get("leaseStart") or ""),
-        counterparty=str(extracted_fields.get("counterparty") or ""),
     )
+    return _resp(out_id, ocr_text, extracted_fields, confidence, written_back=written)

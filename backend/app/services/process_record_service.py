@@ -146,15 +146,45 @@ class AttachmentLinkService:
         attachment_id: UUID,
         wp_id: UUID,
     ) -> bool:
-        """将附件关联到底稿"""
+        """将附件关联到底稿（reference 兼容写 + 权威链表双写）。
+
+        保留 ``attachments.reference_*`` 写入（1:1 兼容路径）；随后幂等写入
+        ``attachment_working_paper``（权威真源）。权威写入失败 fail-open：不阻断
+        reference UPDATE，仅记 warning。
+
+        reference 使用 ORM ``UPDATE``（避免 raw SQL 在 SQLite 下 UUID 表征不一致）；
+        生产 PG 行为与原先 raw UPDATE 等价。
+
+        spec: attachment-workpaper-linkage-convergence Task 2.1
+        """
+        from app.models.attachment_models import Attachment
+
         await db.execute(
-            sa.text(
-                "UPDATE attachments SET reference_type = 'working_paper', "
-                "reference_id = :wp_id WHERE id = :att_id"
-            ),
-            {"wp_id": str(wp_id), "att_id": str(attachment_id)},
+            sa.update(Attachment)
+            .where(Attachment.id == attachment_id)
+            .values(reference_type="working_paper", reference_id=wp_id)
         )
         await db.flush()
+
+        # 双写权威关联真源（fail-open）
+        try:
+            from app.services.attachment_service import AttachmentService
+
+            await AttachmentService(db).ensure_wp_link(
+                attachment_id,
+                wp_id,
+                association_type="evidence",
+            )
+        except Exception:
+            from app.services.attachment_wp_fail_open import log_awp_fail_open
+
+            log_awp_fail_open(
+                "awp_dual_write_fail_open",
+                attachment_id=attachment_id,
+                wp_id=wp_id,
+                path="linkAttachment",
+            )
+
         return True
 
 

@@ -281,6 +281,8 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
     # ═══════════════════════════════════════════════════════════════════════
     "K2": {
         "K2-1": [
+            ("TB 取数（期末余额）", "TB('1231子科目','期末余额')", "取数",
+             "从 tb_balance 1231 叶子子科目取期初/期末余额预填审定表（_build_adjudication_prefill）", "_k2_other_current_assets.py render"),
             ("审定数", "未审数 + 账项调整(AJE) + 重分类调整(RJE)", "计算",
              "buildRow（calcAuditedAmount）", "useK2Adjudication / useK2FormulaEngine.calcAuditedAmount"),
             ("期末余额", "期初 + 借方 − 贷方", "计算",
@@ -336,6 +338,8 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
     # ═══════════════════════════════════════════════════════════════════════
     "K3": {
         "K3-1": [
+            ("TB 取数（期末余额）", "ABS(TB('2241子科目','期末余额'))", "取数",
+             "从 tb_balance 2241 叶子子科目取期初/期末余额预填审定表（负债取绝对值）", "_k3_other_payables.py render"),
             ("审定数", "未审数 + 账项调整(AJE) + 重分类调整(RJE)", "计算",
              "buildRow（calcAuditedAmount）", "useK3Adjudication / useK3FormulaEngine.calcAuditedAmount"),
             ("期末余额", "期初 + 贷方 − 借方", "计算",
@@ -411,6 +415,8 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
     # ═══════════════════════════════════════════════════════════════════════
     "K4": {
         "K4-1": [
+            ("TB 取数（期末余额）", "ABS(TB('2245子科目','期末余额'))", "取数",
+             "从 tb_balance 2245 叶子子科目取期初/期末余额预填审定表（负债取绝对值）", "_k4_other_current_liabilities.py render"),
             ("审定数", "未审 + AJE + RJE", "计算",
              "各行审定金额（calcAuditedAmount）", "useK4Adjudication / useK4FormulaEngine"),
             ("期末余额", "期初 + 贷方 − 借方", "计算",
@@ -464,6 +470,8 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
     # ═══════════════════════════════════════════════════════════════════════
     "K5": {
         "K5-1": [
+            ("TB 取数（期末余额）", "ABS(TB('2701子科目','期末余额'))", "取数",
+             "从 tb_balance 2701 叶子子科目取期初/期末余额预填审定表（负债取绝对值）", "_k5_provisions.py render"),
             ("审定数", "未审 + AJE + RJE", "计算",
              "审定金额（calcAuditedAmount）", "useK5Adjudication / useK5FormulaEngine"),
             ("期末余额", "期初 + 计提 − 转销", "计算",
@@ -624,6 +632,8 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
     # ═══════════════════════════════════════════════════════════════════════
     "K7": {
         "K7-1": [
+            ("TB 取数（期末余额）", "ABS(TB('2401子科目','期末余额'))", "取数",
+             "从 tb_balance 2401 叶子子科目取期初/期末余额预填审定表（负债取绝对值）", "_k7_deferred_income.py render"),
             ("审定数", "未审 + AJE + RJE", "计算",
              "审定金额（calcAuditedAmount）", "useK7Adjudication / useK7FormulaEngine"),
             ("期末余额", "期初 + 收到 − 分摊", "计算",
@@ -679,6 +689,8 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
     # ═══════════════════════════════════════════════════════════════════════
     "K8": {
         "K8-1": [
+            ("TB 取数（发生额）", "TB('6601子科目','借方发生额') - TB('6601子科目','贷方发生额')", "取数",
+             "从 tb_balance 6601 叶子子科目取借贷发生额预填审定表（损益借方）", "_k8_selling_expenses.py render"),
             ("未审数(净发生额)", "本期借方发生 − 本期贷方发生(红冲)", "计算",
              "损益类 6601 借方取发生额（calcIncomeStatementOccurrence）", "useK8FormulaEngine"),
             ("审定数", "未审(净发生额) + AJE 账项调整 + RJE 重分类调整", "计算",
@@ -963,6 +975,8 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
     # ═══════════════════════════════════════════════════════════════════════
     "K10": {
         "K10-1": [
+            ("TB 取数（发生额）", "TB('6117子科目','贷方发生额') - TB('6117子科目','借方发生额')", "取数",
+             "从 tb_balance 6117 叶子子科目取贷借发生额预填审定表（损益贷方）", "_k10_other_income.py render"),
             ("审定数", "未审 + 账项调整(AJE) + 重分类调整(RJE)", "计算",
              "各收益来源行审定金额（calcAuditedAmount）", "useK10Adjudication / useK10FormulaEngine"),
             ("本期发生额(净额)", "本期贷方发生 − 本期借方发生(红冲)", "计算",
@@ -1030,6 +1044,8 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
     # ═══════════════════════════════════════════════════════════════════════
     "K11": {
         "K11-1": [
+            ("TB 取数（发生额）", "TB('6701子科目','借方发生额') - TB('6701子科目','贷方发生额')", "取数",
+             "从 tb_balance 6701 叶子子科目取借贷发生额预填审定表（损益借方）", "_k11_asset_impairment_loss.py render"),
             ("本期发生额(净额)", "本期借方发生 − 本期贷方发生(转回红冲)", "计算",
              "损益借方发生额（calcIncomeStatementOccurrence 借−贷）", "useK11FormulaEngine"),
             ("审定数", "本期未审(发生额) + AJE + RJE", "计算",
@@ -1093,6 +1109,8 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
     # ═══════════════════════════════════════════════════════════════════════
     "K12": {
         "K12-1": [
+            ("TB 取数（发生额）", "TB('6301子科目','贷方发生额') - TB('6301子科目','借方发生额')", "取数",
+             "从 tb_balance 6301 叶子子科目取贷借发生额预填审定表（损益贷方）", "_k12_non_operating_income.py render"),
             ("审定数", "未审 + 账项调整(AJE) + 重分类调整(RJE)", "计算",
              "各来源行审定金额（calcAuditedAmount）", "useK12Adjudication / useK12FormulaEngine"),
             ("上期审定数", "上期未审 + 上期AJE + 上期RJE", "计算",
@@ -1140,6 +1158,8 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
     # ═══════════════════════════════════════════════════════════════════════
     "K13": {
         "K13-1": [
+            ("TB 取数（发生额）", "TB('6711子科目','借方发生额') - TB('6711子科目','贷方发生额')", "取数",
+             "从 tb_balance 6711 叶子子科目取借贷发生额预填审定表（损益借方）", "_k13_non_operating_expense.py render"),
             ("审定数", "未审 + 账项调整(AJE) + 重分类调整(RJE)", "计算",
              "各支出去向行审定金额（calcAuditedAmount）", "useK13Adjudication / useK13FormulaEngine"),
             ("上期审定数", "上期未审 + 上期AJE + 上期RJE", "计算",

@@ -12,16 +12,23 @@ import json
 import logging
 from pathlib import Path
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import aiofiles
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import User
+from app.services.attachment_ocr_writeback import (
+    finalize_linked_ocr_writeback,
+    load_reusable_ocr,
+    parse_optional_uuid,
+    provision_wp_linked_attachment,
+)
+from app.services.attachment_service import AttachmentService
 from app.services.llm_client import chat_completion
 from app.services.unified_ocr_service import UnifiedOCRService
 
@@ -74,6 +81,10 @@ class E1StatementOcrResponse(BaseModel):
     file_name: str = ""
     line_count: int = 0
     skipped_line_count: int = 0
+    reused: bool = False
+    written_back: bool = False
+    governed: bool = False
+    requires_human_confirmation: bool = True
 
 
 def _parse_llm_json(raw: str) -> dict:
@@ -153,11 +164,18 @@ def _normalize_fields(parsed: dict) -> tuple[dict[str, Any], int]:
 async def e1_statement_ocr(
     wp_id: str,
     file: UploadFile = File(...),
+    attachment_id: str | None = Form(None),
+    force_reocr: bool = Form(False),
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(get_current_user),
 ) -> E1StatementOcrResponse:
     """上传银行对账单/流水，OCR + AI 提取明细供 E1-31 确认回填。"""
-    _ = db
+    try:
+        wp_uuid = UUID(wp_id)
+    except ValueError:
+        raise HTTPException(400, "无效的 wp_id")
+
+    linked_att_id = parse_optional_uuid(attachment_id)
 
     allowed = (".pdf", ".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".webp", ".xlsx", ".xls")
     filename = file.filename or "bank-statement.pdf"
@@ -165,12 +183,40 @@ async def e1_statement_ocr(
     if suffix not in allowed:
         raise HTTPException(400, f"不支持的文件类型: {suffix}，仅支持 {allowed}")
 
-    attachment_id = str(uuid4())
-    storage_dir = Path("storage/workpapers") / wp_id / "bank-statements"
-    storage_dir.mkdir(parents=True, exist_ok=True)
-    file_path = storage_dir / f"{attachment_id}{suffix}"
+    if linked_att_id is not None and not force_reocr:
+        reused = await load_reusable_ocr(db, linked_att_id)
+        if reused is not None:
+            fields = reused["extracted_fields"] or {}
+            lines = fields.get("lines") if isinstance(fields, dict) else []
+            skipped = fields.get("skippedLineCount", 0) if isinstance(fields, dict) else 0
+            return E1StatementOcrResponse(
+                attachment_id=str(linked_att_id),
+                ocr_text=reused["ocr_text"],
+                extracted_fields=fields,
+                confidence=float(reused.get("confidence") or 0),
+                file_name=filename,
+                line_count=len(lines) if isinstance(lines, list) else 0,
+                skipped_line_count=int(skipped or 0),
+                reused=True,
+                written_back=False,
+            )
 
     content = await file.read()
+    out_attachment_id = str(linked_att_id) if linked_att_id else str(uuid4())
+    if linked_att_id is None:
+        out_attachment_id, linked_att_id = await provision_wp_linked_attachment(
+            db,
+            wp_id=wp_uuid,
+            file_name=filename,
+            content=content,
+            attachment_type="bank_statement",
+            created_by=getattr(_user, "id", None),
+        )
+
+    storage_dir = Path("storage/workpapers") / wp_id / "bank-statements"
+    storage_dir.mkdir(parents=True, exist_ok=True)
+    file_path = storage_dir / f"{out_attachment_id}{suffix}"
+
     async with aiofiles.open(str(file_path), "wb") as f:
         await f.write(content)
 
@@ -197,8 +243,11 @@ async def e1_statement_ocr(
             ocr_text = ocr_result.get("text", "") or ""
     except Exception as e:  # noqa: BLE001
         logger.warning("E1 statement OCR failed for %s: %s", wp_id, e)
+        if linked_att_id is not None:
+            await AttachmentService(db).update_ocr_status(linked_att_id, "failed", ocr_text="")
+            await db.commit()
         return E1StatementOcrResponse(
-            attachment_id=attachment_id,
+            attachment_id=out_attachment_id,
             ocr_text="",
             extracted_fields=dict(_EMPTY_FIELDS),
             confidence=0,
@@ -208,8 +257,11 @@ async def e1_statement_ocr(
         )
 
     if not ocr_text.strip():
+        if linked_att_id is not None:
+            await AttachmentService(db).update_ocr_status(linked_att_id, "failed", ocr_text="")
+            await db.commit()
         return E1StatementOcrResponse(
-            attachment_id=attachment_id,
+            attachment_id=out_attachment_id,
             ocr_text="",
             extracted_fields=dict(_EMPTY_FIELDS),
             confidence=0,
@@ -238,8 +290,11 @@ async def e1_statement_ocr(
         confidence = round(min(1.0, filled / 3 + min(len(lines), 20) * 0.02), 2)
     except Exception as e:  # noqa: BLE001
         logger.warning("E1 statement LLM extraction failed for %s: %s", wp_id, e)
+        if linked_att_id is not None:
+            await AttachmentService(db).update_ocr_status(linked_att_id, "failed", ocr_text=ocr_text)
+            await db.commit()
         return E1StatementOcrResponse(
-            attachment_id=attachment_id,
+            attachment_id=out_attachment_id,
             ocr_text=ocr_text,
             extracted_fields=dict(_EMPTY_FIELDS),
             confidence=0,
@@ -249,12 +304,22 @@ async def e1_statement_ocr(
         )
 
     lines = extracted_fields.get("lines") or []
+    out_attachment_id, written = await finalize_linked_ocr_writeback(
+        db,
+        wp_id=wp_uuid,
+        linked_att_id=linked_att_id,
+        temp_id=out_attachment_id,
+        ocr_text=ocr_text,
+        extracted_fields=extracted_fields,
+        confidence=confidence,
+    )
     return E1StatementOcrResponse(
-        attachment_id=attachment_id,
+        attachment_id=out_attachment_id,
         ocr_text=ocr_text,
         extracted_fields=extracted_fields,
         confidence=confidence,
         file_name=filename,
         line_count=len(lines),
         skipped_line_count=skipped_line_count,
+        written_back=written,
     )

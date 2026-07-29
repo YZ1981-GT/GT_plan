@@ -1,11 +1,14 @@
-"""F4 应付账款 — 长期挂账、未入账、抽凭检查及供应商融资支持性证据OCR识别。"""
+"""F4 应付账款 — 长期挂账、未入账、抽凭检查及供应商融资支持性证据OCR识别。
+
+Optional: attachment_id（已关联附件时回流 ocr_text/ocr_fields_cache）, force_reocr
+"""
 
 from __future__ import annotations
 
 import json
 import logging
 from pathlib import Path
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import aiofiles
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
@@ -15,6 +18,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import User
+from app.services.attachment_ocr_writeback import (
+    finalize_linked_ocr_writeback,
+    load_reusable_ocr,
+    parse_optional_uuid,
+)
 from app.services.llm_client import chat_completion
 from app.services.unified_ocr_service import UnifiedOCRService
 
@@ -190,6 +198,10 @@ class F4EvidenceOcrResponse(BaseModel):
     ocr_text: str
     extracted_fields: dict
     confidence: float
+    reused: bool = False
+    written_back: bool = False
+    governed: bool = False
+    requires_human_confirmation: bool = True
 
 
 def _empty_fields(schema: dict[str, str]) -> dict:
@@ -217,19 +229,66 @@ def _parse_llm_json(result: str) -> dict:
     return parsed if isinstance(parsed, dict) else {}
 
 
+def _resp(
+    attachment_id: str,
+    ocr_text: str,
+    extracted_fields: dict,
+    confidence: float,
+    *,
+    reused: bool = False,
+    written_back: bool = False,
+) -> F4EvidenceOcrResponse:
+    return F4EvidenceOcrResponse(
+        attachment_id=attachment_id,
+        ocr_text=ocr_text,
+        extracted_fields=extracted_fields,
+        confidence=confidence,
+        reused=reused,
+        written_back=written_back,
+        governed=False,
+        requires_human_confirmation=True,
+    )
+
+
 @router.post("/api/workpapers/{wp_id}/f4/contract-ocr")
 async def f4_contract_ocr(
     wp_id: str,
     file: UploadFile = File(...),
     document_type: str = Form("long-outstanding"),
+    attachment_id: str | None = Form(None),
+    force_reocr: bool = Form(False),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> F4EvidenceOcrResponse:
     """识别F4-5/F4-7/F4-8/F4-9附件并返回待用户预览、编辑和确认的字段。"""
-    del db, current_user
+    del current_user
+    linked_att_id = parse_optional_uuid(attachment_id)
+    try:
+        wp_uuid = UUID(wp_id)
+    except ValueError:
+        if linked_att_id is not None:
+            raise HTTPException(400, "无效的 wp_id")
+        wp_uuid = UUID(int=0)
     schema = DOCUMENT_SCHEMAS.get(document_type)
     if schema is None:
         raise HTTPException(400, f"不支持的F4文档类型: {document_type}")
+
+    empty_fields = _empty_fields(schema)
+
+    if linked_att_id is not None and not force_reocr:
+        reused = await load_reusable_ocr(db, linked_att_id)
+        if reused is not None:
+            fields = reused["extracted_fields"] or {}
+            merged = dict(empty_fields)
+            merged.update({k: fields[k] for k in schema if k in fields})
+            return _resp(
+                str(linked_att_id),
+                reused["ocr_text"],
+                merged,
+                float(reused.get("confidence") or 0),
+                reused=True,
+                written_back=False,
+            )
 
     allowed_types = (".pdf", ".png", ".jpg", ".jpeg")
     filename = file.filename or "upload.pdf"
@@ -237,34 +296,23 @@ async def f4_contract_ocr(
     if suffix not in allowed_types:
         raise HTTPException(400, f"不支持的文件类型: {suffix}，仅支持 {allowed_types}")
 
-    attachment_id = str(uuid4())
+    temp_id = str(linked_att_id) if linked_att_id else str(uuid4())
     storage_dir = Path("storage/workpapers") / wp_id / "accounts-payable"
     storage_dir.mkdir(parents=True, exist_ok=True)
-    file_path = storage_dir / f"{attachment_id}{suffix}"
+    file_path = storage_dir / f"{temp_id}{suffix}"
     content = await file.read()
     async with aiofiles.open(str(file_path), "wb") as target:
         await target.write(content)
 
-    empty_fields = _empty_fields(schema)
     try:
         ocr_result = await UnifiedOCRService().recognize(str(file_path))
         ocr_text = ocr_result.get("text", "")
     except Exception as exc:
         logger.warning("F4 evidence OCR failed for %s/%s: %s", wp_id, document_type, exc)
-        return F4EvidenceOcrResponse(
-            attachment_id=attachment_id,
-            ocr_text="",
-            extracted_fields=empty_fields,
-            confidence=0,
-        )
+        return _resp(temp_id, "", empty_fields, 0.0)
 
     if not ocr_text.strip():
-        return F4EvidenceOcrResponse(
-            attachment_id=attachment_id,
-            ocr_text="",
-            extracted_fields=empty_fields,
-            confidence=0,
-        )
+        return _resp(temp_id, "", empty_fields, 0.0)
 
     extracted = dict(empty_fields)
     confidence = 0.0
@@ -287,9 +335,13 @@ async def f4_contract_ocr(
     except Exception as exc:
         logger.warning("F4 evidence extraction failed for %s/%s: %s", wp_id, document_type, exc)
 
-    return F4EvidenceOcrResponse(
-        attachment_id=attachment_id,
+    out_id, written = await finalize_linked_ocr_writeback(
+        db,
+        wp_id=wp_uuid,
+        linked_att_id=linked_att_id,
+        temp_id=temp_id,
         ocr_text=ocr_text,
         extracted_fields=extracted,
         confidence=confidence,
     )
+    return _resp(out_id, ocr_text, extracted, confidence, written_back=written)

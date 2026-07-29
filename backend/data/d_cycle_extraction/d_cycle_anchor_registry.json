@@ -49,7 +49,19 @@
       "D3": { "D3-adj-trial-balance-amount": "remark" },
       "D4": { "D4-1-adj-tb-6001": "remark", "D4-1-adj-tb-6051": "remark" },
       "D5": { "D5-1-tb-amount": "remark" },
-      "D7": { "D7-1-adj-aging-trial-balance-currentAudited": "remark", "D7-1-adj-aging-trial-balance-priorAudited": "remark" }
+      "D7": { "D7-1-adj-aging-trial-balance-currentAudited": "remark", "D7-1-adj-aging-trial-balance-priorAudited": "remark" },
+      "H5": { "H5-1-tb-amount": "remark", "H5-1-tb-depletion": "remark" },
+      "H6": { "H6-1-tb-amount": "remark" },
+      "H7": { "H7-1-tb-amount": "remark" },
+      "H8": { "H8-1-tb-amount": "remark", "H8-1-tb-dep": "remark" },
+      "H9": { "H9-1-tb-amount": "remark", "H9-1-tb-unearned": "remark" },
+      "H10": { "H10-1-tb-amount": "remark" },
+      "I1": { "I1-1-tb-cost": "remark", "I1-1-tb-amort": "remark", "I1-1-tb-impair": "remark" },
+      "I2": { "I2-1-tb-amount": "remark" },
+      "I3": { "I3-1-tb-amount": "remark" },
+      "I4": { "I4-1-tb-amount": "remark" },
+      "I5": { "I5-1-tb-amount": "remark" },
+      "I6": { "I6-1-tb-amount": "remark" }
     }
   },
   "_detail_aggregation": {
@@ -124,5 +136,17 @@
     "D7-1-note-aging-explanation",
     "re:^D7-1-adj-(nature|aging)-.+-(priorUnadjusted|priorAje|priorRje|currentUnadjusted|currentAje|currentRje|reasonAnalysis)$",
     "D7-2-rows"
-  ]
+  ],
+  "H5": ["H5-1-tb-amount", "H5-1-tb-depletion", "H5-1-cost-rows", "H5-1-depletion-rows", "H5-1-impairment-rows", "H5-1-audit-note", "H5-1-audit-conclusion"],
+  "H6": ["H6-1-tb-amount", "H6-1-rows", "H6-1-end-balance-audited", "H6-1-audit-note", "H6-1-audit-conclusion"],
+  "H7": ["H7-1-tb-amount", "H7-1-cost-rows", "H7-1-dep-rows", "H7-1-impair-rows", "H7-1-audit-note", "H7-1-audit-conclusion"],
+  "H8": ["H8-1-tb-amount", "H8-1-tb-dep", "H8-1-cost-rows", "H8-1-dep-rows", "H8-1-impair-rows", "H8-1-audit-note", "H8-1-audit-conclusion"],
+  "H9": ["H9-1-tb-amount", "H9-1-tb-unearned", "H9-1-rows", "H9-1-liability-total-audited", "H9-1-unearned-total-audited", "H9-1-audit-note", "H9-1-audit-conclusion"],
+  "H10": ["H10-1-tb-amount", "H10-1-adjudicated-amount", "H10-1-audit-note", "H10-1-audit-conclusion"],
+  "I1": ["I1-1-tb-cost", "I1-1-tb-amort", "I1-1-tb-impair", "I1-adj-cost-rows", "I1-adj-amort-rows", "I1-adj-impair-rows", "I1-adj-audit-note", "I1-adj-audit-conclusion"],
+  "I2": ["I2-1-tb-amount", "I2-1-rows", "I2-1-audit-note", "I2-1-audit-conclusion"],
+  "I3": ["I3-1-tb-amount", "I3-adj-rows", "I3-adj-audit-note", "I3-adj-audit-conclusion"],
+  "I4": ["I4-1-tb-amount", "I4-adj-rows", "I4-adj-audit-note", "I4-adj-audit-conclusion"],
+  "I5": ["I5-1-tb-amount", "I5-adj-rows", "I5-adj-audit-note", "I5-adj-audit-conclusion"],
+  "I6": ["I6-1-tb-amount", "I6-1-rows", "I6-1-note", "I6-1-conclusion"]
 }

@@ -167,7 +167,7 @@ async def render(ctx: RenderContext) -> dict | None:
     # 3. 加载项目上下文
     project_context = await _load_project_context(ctx)
 
-    return {
+    payload = {
         "component_type": "i4-long-term-prepaid",
         "account_codes": ["1801"],
         "responses_snapshot": responses_snapshot,
@@ -185,3 +185,37 @@ async def render(ctx: RenderContext) -> dict | None:
             },
         },
     }
+
+    # ─── 灰度：H/I 四表取数增强 ───────────────────────────────────────────
+    from app.core.config import settings
+    if settings.HI_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED:
+        try:
+            import asyncio
+            from app.services.d_cycle_extraction.prefill import build_d_adjudication_prefill
+            segment_prefill = await asyncio.wait_for(
+                build_d_adjudication_prefill(ctx, account_prefix="1801", mode="balance"),
+                timeout=5.0,
+            )
+            payload["adjudication_segment_prefill"] = {
+                "segments": [{"segment": "cost", "account_prefix": "1801", "mode": "balance", "items": segment_prefill}],
+                "enabled": True,
+            }
+            payload["hi_extraction_enabled"] = True
+            # Tier A transient seed（TB核对行）
+            from app.services.d_cycle_extraction.tier_a_seed import seed_tier_a_reconciliation
+            from app.services.d_cycle_extraction.presets import resolve_effective
+            from app.services.wp_formula_eval_service import evaluate_wp_formula_expression
+            await asyncio.wait_for(
+                seed_tier_a_reconciliation(
+                    ctx, "I4",
+                    responses_snapshot,
+                    resolve_effective=resolve_effective,
+                    evaluate_wp_formula_expression=evaluate_wp_formula_expression,
+                ),
+                timeout=5.0,
+            )
+        except Exception as e:
+            import logging as _logging
+            _logging.getLogger(__name__).warning("HI extraction prefill failed (%s): %s", "I4", e)
+
+    return payload

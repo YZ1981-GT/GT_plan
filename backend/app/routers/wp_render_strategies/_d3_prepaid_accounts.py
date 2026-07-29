@@ -138,6 +138,32 @@ async def render(ctx: RenderContext) -> dict | None:
         "soe": "soe" in standards,
     }
 
+    # ─── D7 合同负债(2205)审定数注入（供 D3 披露表 D3↔D7 交叉核对）─────────────
+    # 前端 D3TabDisclosureListed/Soe 读 allResponses['D3-d7-tb-audited-amount'].remark
+    # 显示「预收账款(D3) + 合同负债(D7)」金额对照（CAS14 预收拆分口径核对）。
+    # trial_balance 2205 审定额 = 全项目合同负债权威真源（两底稿共用 TB 单一真源），
+    # 与 D7 审定表回写后的 TB 一致。
+    try:
+        d7_result = await db.execute(
+            sa.text(
+                "SELECT SUM(audited_amount) AS total "
+                "FROM trial_balance "
+                "WHERE project_id = :pid AND standard_account_code LIKE '2205%' "
+                "AND is_deleted = false"
+            ),
+            {"pid": str(ctx.project_id)},
+        )
+        d7_row = d7_result.fetchone()
+        d7_audited = float(d7_row.total) if d7_row and d7_row.total is not None else None
+        if d7_audited is not None:
+            # 负债贷方存正数（trial_balance v2 正数口径），直接用
+            responses_snapshot["D3-d7-tb-audited-amount"] = {
+                "conclusion": "",
+                "remark": str(d7_audited),
+            }
+    except Exception as e:  # noqa: BLE001
+        logger.debug("D3 render: D7(2205) TB 审定查询失败（不阻断）: %s", e)
+
     html_data: dict = {
         "sections": sections,
         "adjudication_config": adjudication_config,

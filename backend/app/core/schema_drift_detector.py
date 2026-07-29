@@ -87,6 +87,13 @@ class SchemaDriftDetector:
         "_category_correction_backup",
         "_note_guidance_split_backup",
         "_note_text_ch8_backup",
+        # 附注治理一次性清理脚本的回滚备份表（用完保留以支持 --rollback）：
+        # _note_ai_text_backup（清理 text_content 残留 AI 草稿）
+        # _note_wrong_year_orphan_backup（清理错误年度孤儿披露记录）
+        # _note_text_markdown_backup（清理 text_content 的 markdown 残留）
+        "_note_ai_text_backup",
+        "_note_wrong_year_orphan_backup",
+        "_note_text_markdown_backup",
         # checklist_responses: 裸 SQL 迁移建表，无独立 ORM 模型（数据通过 raw SQL 操作）
         "checklist_responses",
         # custom_account_packages: 裸 SQL 迁移建表

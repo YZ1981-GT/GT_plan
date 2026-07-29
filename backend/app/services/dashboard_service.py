@@ -76,7 +76,9 @@ class DashboardService:
         return result
 
     async def get_project_progress(self) -> list[dict]:
-        """项目进度列表"""
+        """项目进度列表——从 wp_index 实际编制状态派生真实完成率"""
+        from app.models.workpaper_models import WorkingPaper
+
         q = (
             sa.select(Project.id, Project.name, Project.client_name, Project.status)
             .where(Project.is_deleted == False)  # noqa
@@ -84,23 +86,67 @@ class DashboardService:
             .limit(50)
         )
         rows = (await self.db.execute(q)).all()
-        status_pct = {
-            "created": 5, "planning": 20, "execution": 50,
+
+        # 批量查询每个项目的底稿完成率（一次 SQL 聚合全部项目）
+        project_ids = [r.id for r in rows]
+        wp_stats: dict[str, dict] = {}
+        if project_ids:
+            wp_q = (
+                sa.select(
+                    WorkingPaper.project_id,
+                    sa.func.count(WorkingPaper.id).label("total"),
+                    sa.func.count(
+                        sa.case(
+                            (WorkingPaper.review_status.in_(["level1_passed", "level2_passed"]), WorkingPaper.id),
+                            else_=None,
+                        )
+                    ).label("completed"),
+                )
+                .where(
+                    WorkingPaper.is_deleted == sa.false(),
+                    WorkingPaper.project_id.in_(project_ids),
+                )
+                .group_by(WorkingPaper.project_id)
+            )
+            wp_rows = (await self.db.execute(wp_q)).all()
+            for wr in wp_rows:
+                total = wr.total or 0
+                completed = wr.completed or 0
+                wp_stats[str(wr.project_id)] = {
+                    "total": total,
+                    "completed": completed,
+                    "pct": round(completed / total * 100) if total > 0 else 0,
+                }
+
+        # 状态兜底（无底稿时按阶段估算）
+        status_pct_fallback = {
+            "created": 5, "planning": 15, "execution": 40,
             "completion": 75, "reporting": 90, "archived": 100,
         }
-        return [
-            {
-                "project_id": str(r.id),
+
+        results = []
+        for r in rows:
+            pid = str(r.id)
+            ws = wp_stats.get(pid)
+            if ws and ws["total"] > 0:
+                progress = ws["pct"]
+            else:
+                progress = status_pct_fallback.get(r.status, 0)
+            results.append({
+                "project_id": pid,
                 "project_name": r.name,
                 "client_name": r.client_name,
                 "status": r.status,
-                "progress": status_pct.get(r.status, 0),
-            }
-            for r in rows
-        ]
+                "progress": progress,
+                "wp_total": ws["total"] if ws else 0,
+                "wp_completed": ws["completed"] if ws else 0,
+            })
+        return results
 
     async def get_staff_workload(self) -> list[dict]:
-        """人员负荷排行"""
+        """人员负荷排行——工时 + 底稿分配数量双维度"""
+        from app.models.workpaper_models import WorkingPaper
+
         today = date.today()
         week_start = today - timedelta(days=today.weekday())
 
@@ -122,6 +168,17 @@ class DashboardService:
                     .scalar_subquery(),
                     0,
                 ).label("week_hours"),
+                # 底稿分配数量（该人作为编制人 assigned_to 的活跃底稿数）
+                sa.func.coalesce(
+                    sa.select(sa.func.count(WorkingPaper.id))
+                    .where(
+                        WorkingPaper.assigned_to == StaffMember.user_id,
+                        WorkingPaper.is_deleted == False,  # noqa
+                    )
+                    .correlate(StaffMember)
+                    .scalar_subquery(),
+                    0,
+                ).label("wp_count"),
             )
             .outerjoin(ProjectAssignment, sa.and_(
                 ProjectAssignment.staff_id == StaffMember.id,
@@ -129,7 +186,7 @@ class DashboardService:
             ))
             .where(StaffMember.is_deleted == False)  # noqa
             .group_by(StaffMember.id, StaffMember.name, StaffMember.title)
-            .order_by(sa.desc("week_hours"))
+            .order_by(sa.desc("wp_count"), sa.desc("week_hours"))
             .limit(20)
         )
         rows = (await self.db.execute(q)).all()
@@ -140,6 +197,7 @@ class DashboardService:
                 "title": r.title,
                 "project_count": r.project_count,
                 "week_hours": float(r.week_hours),
+                "wp_count": r.wp_count,
             }
             for r in rows
         ]
@@ -199,9 +257,12 @@ class DashboardService:
         ]
 
     async def get_risk_alerts(self) -> list[dict]:
-        """风险预警"""
+        """风险预警——多维度聚合"""
+        from app.models.workpaper_models import WorkingPaper, WpReviewStatus
+
         alerts = []
-        # 超期项目（简化：status != archived 且创建超过 180 天）
+
+        # 1. 超期项目（创建超 180 天仍处于 planning/execution）
         cutoff = datetime.now(timezone.utc) - timedelta(days=180)
         overdue_q = sa.select(sa.func.count()).select_from(Project).where(
             Project.is_deleted == False,  # noqa
@@ -210,7 +271,63 @@ class DashboardService:
         )
         overdue = (await self.db.execute(overdue_q)).scalar() or 0
         if overdue > 0:
-            alerts.append({"type": "overdue_project", "count": overdue, "message": f"{overdue} 个项目可能超期"})
+            alerts.append({
+                "type": "overdue_project",
+                "level": "critical",
+                "count": overdue,
+                "message": f"{overdue} 个项目可能超期（创建超180天未归档）",
+            })
+
+        # 2. 待复核底稿超期（submitted 超7天无复核操作）
+        review_cutoff = datetime.now(timezone.utc) - timedelta(days=7)
+        stale_review_q = sa.select(sa.func.count()).select_from(WorkingPaper).where(
+            WorkingPaper.is_deleted == sa.false(),
+            WorkingPaper.review_status.in_([
+                WpReviewStatus.pending_level1,
+                WpReviewStatus.pending_level2,
+            ]),
+            WorkingPaper.updated_at < review_cutoff,
+        )
+        stale_review = (await self.db.execute(stale_review_q)).scalar() or 0
+        if stale_review > 0:
+            alerts.append({
+                "type": "stale_review",
+                "level": "warning",
+                "count": stale_review,
+                "message": f"{stale_review} 份底稿待复核超过7天",
+            })
+
+        # 3. 未分配编制人的底稿
+        unassigned_q = sa.select(sa.func.count()).select_from(WorkingPaper).where(
+            WorkingPaper.is_deleted == sa.false(),
+            WorkingPaper.assigned_to.is_(None),
+        )
+        unassigned = (await self.db.execute(unassigned_q)).scalar() or 0
+        if unassigned > 0:
+            alerts.append({
+                "type": "unassigned_wp",
+                "level": "warning",
+                "count": unassigned,
+                "message": f"{unassigned} 份底稿未分配编制人",
+            })
+
+        # 4. 未更正错报
+        try:
+            from app.models.audit_platform_models import UnadjustedMisstatement
+            misstatement_q = sa.select(sa.func.count()).select_from(UnadjustedMisstatement).where(
+                UnadjustedMisstatement.is_deleted == sa.false(),
+            )
+            misstatement_count = (await self.db.execute(misstatement_q)).scalar() or 0
+            if misstatement_count > 0:
+                alerts.append({
+                    "type": "unadjusted_misstatement",
+                    "level": "warning" if misstatement_count <= 5 else "critical",
+                    "count": misstatement_count,
+                    "message": f"{misstatement_count} 笔未更正错报",
+                })
+        except Exception:
+            pass  # 表可能不存在
+
         return alerts
 
     async def get_quality_metrics(self) -> dict:
@@ -288,7 +405,9 @@ class DashboardService:
         return result.scalar() or 0
 
     async def get_group_progress(self) -> list[dict]:
-        """集团审计子公司进度对比"""
+        """集团审计子公司进度对比——从底稿实际复核通过率派生"""
+        from app.models.workpaper_models import WorkingPaper
+
         q = (
             sa.select(Project.id, Project.name, Project.client_name, Project.status, Project.parent_project_id)
             .where(
@@ -299,9 +418,40 @@ class DashboardService:
             .limit(50)
         )
         rows = (await self.db.execute(q)).all()
-        status_pct = {"created": 5, "planning": 20, "execution": 50, "completion": 75, "reporting": 90, "archived": 100}
+
+        # 批量查询底稿完成率
+        project_ids = [r.id for r in rows]
+        wp_stats: dict[str, int] = {}
+        if project_ids:
+            wp_q = (
+                sa.select(
+                    WorkingPaper.project_id,
+                    sa.func.count(WorkingPaper.id).label("total"),
+                    sa.func.count(
+                        sa.case(
+                            (WorkingPaper.review_status.in_(["level1_passed", "level2_passed"]), WorkingPaper.id),
+                            else_=None,
+                        )
+                    ).label("completed"),
+                )
+                .where(
+                    WorkingPaper.is_deleted == sa.false(),
+                    WorkingPaper.project_id.in_(project_ids),
+                )
+                .group_by(WorkingPaper.project_id)
+            )
+            for wr in (await self.db.execute(wp_q)).all():
+                total = wr.total or 0
+                wp_stats[str(wr.project_id)] = round(wr.completed / total * 100) if total > 0 else 0
+
+        status_pct_fallback = {"created": 5, "planning": 15, "execution": 40, "completion": 75, "reporting": 90, "archived": 100}
         return [
-            {"project_id": str(r.id), "name": r.client_name or r.name, "status": r.status, "progress": status_pct.get(r.status, 0)}
+            {
+                "project_id": str(r.id),
+                "name": r.client_name or r.name,
+                "status": r.status,
+                "progress": wp_stats.get(str(r.id), status_pct_fallback.get(r.status, 0)),
+            }
             for r in rows
         ]
 

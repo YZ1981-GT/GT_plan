@@ -68,6 +68,8 @@ _COLUMN_MAP = {
     "未审数": "unadjusted_amount",
     "RJE调整": "rje_adjustment",
     "AJE调整": "aje_adjustment",
+    "借方发生额": "debit_amount",
+    "贷方发生额": "credit_amount",
 }
 
 

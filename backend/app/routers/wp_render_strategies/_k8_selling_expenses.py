@@ -107,6 +107,69 @@ async def _fetch_tb_income_statement(ctx: RenderContext) -> dict:
     return tb
 
 
+async def _build_adjudication_prefill(ctx: RenderContext) -> list[dict]:
+    """从 tb_balance 6601 明细子科目预填 K8-1 审定表行（损益类取发生额）.
+
+    对齐 K9 范式：审定表未审数应从 tb_balance 明细子科目取，
+    仅取 6601 下的明细子科目（account_code != '6601'），
+    按明细科目名汇总本期借/贷发生额；净发生额 = 借方 - 贷方。
+
+    返回 [{name, unadjustedDebit, unadjustedCredit}]，前端在无持久化行时据此建行。
+    子科目不存在时返回 []（前端回退默认项目）。
+    """
+    rows: list[dict] = []
+    try:
+        active_filter = await get_active_filter(
+            ctx.db, TbBalance.__table__, ctx.project_id, ctx.year
+        )
+        result = await ctx.db.execute(
+            sa.select(
+                TbBalance.account_code.label("code"),
+                TbBalance.account_name.label("name"),
+                sa.func.sum(TbBalance.debit_amount).label("debit"),
+                sa.func.sum(TbBalance.credit_amount).label("credit"),
+            )
+            .where(
+                active_filter,
+                TbBalance.account_code.startswith(_K8_ACCOUNT_PREFIX),
+                TbBalance.account_code != _K8_ACCOUNT_PREFIX,
+            )
+            .group_by(TbBalance.account_code, TbBalance.account_name)
+        )
+        raw = [
+            {
+                "code": (r.code or "").strip(),
+                "name": (r.name or "").strip(),
+                "debit": float(r.debit or 0),
+                "credit": float(r.credit or 0),
+            }
+            for r in result.fetchall()
+        ]
+        all_codes = [x["code"] for x in raw if x["code"]]
+
+        def _is_leaf(code: str) -> bool:
+            if not code:
+                return True
+            return not any(c != code and c.startswith(code) for c in all_codes)
+
+        leaves = [x for x in raw if _is_leaf(x["code"])]
+        leaves.sort(key=lambda x: x["debit"], reverse=True)
+        for x in leaves:
+            name = x["name"]
+            debit = x["debit"]
+            credit = x["credit"]
+            if not name or (abs(debit) < 0.005 and abs(credit) < 0.005):
+                continue
+            rows.append({
+                "name": name,
+                "unadjustedDebit": debit,
+                "unadjustedCredit": credit,
+            })
+    except Exception as e:  # noqa: BLE001
+        logger.warning("K8 adjudication prefill build failed: %s", e)
+    return rows
+
+
 async def _load_project_context(ctx: RenderContext) -> dict:
     """加载项目上下文."""
     project_ctx: dict = {}
@@ -164,12 +227,16 @@ async def render(ctx: RenderContext) -> dict | None:
     # 3. 加载项目上下文
     project_context = await _load_project_context(ctx)
 
+    # 4. 审定表明细子科目预填（从 tb_balance 6601 明细取发生额）
+    adjudication_prefill = await _build_adjudication_prefill(ctx)
+
     return {
         "component_type": "k8-selling-expenses",
         "account_codes": ["6601"],
         "income_statement": True,  # 标识损益类
         "responses_snapshot": responses_snapshot,
         "tb_values": tb_values,
+        "adjudication_prefill": adjudication_prefill,
         "project_context": project_context,
         "prefix": "K8",
         "sheets": K8_SHEETS,

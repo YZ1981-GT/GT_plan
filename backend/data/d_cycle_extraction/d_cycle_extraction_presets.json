@@ -80,5 +80,43 @@
       "formula_type": "auto_calc",
       "description": "试算表 2205 合同负债期末余额（审定数），供 D7-1 审定表账龄区块 TB↔账龄合计核对行（D7-1-adj-aging-trial-balance-currentAudited，试算平衡表数）。可表达为单条 TB 公式（Tier A）可编辑；求值经 get_active_filter 数据集版本读取，与 Tier B prefill 同口径；render project_context.tb_amount 亦按 2205 seed（前端 tbSeedAmount 回退，本预设作可编辑覆盖）。审定表双区块固定分类（一、按性质：预收货款/开发项目预收款/预收工程款/其他；二、按账龄段）的未审数由 D7-2 明细（D7-2-rows）SUMIF 聚合（useD7Adjudication natAgg/agingByKey）、非 TB 按维度拆分（宁缺勿造 R3.4），不在此。"
     }
+  ],
+  "H5": [
+    {"anchor": "H5-1-tb-amount", "expression": "TB('1631','期末余额')", "sheet_name": "H5-1", "formula_type": "auto_calc", "description": "试算表 1631 油气资产期末余额（审定数），供 H5-1 审定表 TB↔审定核对行。资产类借方科目。"}
+  ],
+  "H6": [
+    {"anchor": "H6-1-tb-amount", "expression": "TB('1606','期末余额')", "sheet_name": "H6-1", "formula_type": "auto_calc", "description": "试算表 1606 固定资产清理期末余额（审定数），供 H6-1 审定表 TB↔审定核对行。过渡科目，期末应为0。"}
+  ],
+  "H7": [
+    {"anchor": "H7-1-tb-amount", "expression": "TB('1621','期末余额')", "sheet_name": "H7-1", "formula_type": "auto_calc", "description": "试算表 1621 生产性生物资产期末余额（审定数），供 H7-1 审定表 TB↔审定核对行。资产类借方科目。"}
+  ],
+  "H8": [
+    {"anchor": "H8-1-tb-amount", "expression": "TB('1901','期末余额')", "sheet_name": "H8-1", "formula_type": "auto_calc", "description": "试算表 1901 使用权资产原值期末余额（审定数），供 H8-1 审定表 TB↔审定核对行。"}
+  ],
+  "H9": [
+    {"anchor": "H9-1-tb-amount", "expression": "TB('2205','期末余额')", "sheet_name": "H9-1", "formula_type": "auto_calc", "description": "试算表 2205 租赁负债期末余额（审定数），供 H9-1 审定表 TB↔审定核对行。负债类贷方科目。"}
+  ],
+  "H10": [
+    {"anchor": "H10-1-tb-amount", "expression": "TB('6115','审定数')", "sheet_name": "H10-1", "formula_type": "auto_calc", "description": "试算表 6115 资产处置损益审定发生额（损益类，audited_amount 存发生额），供 H10-1 审定表 TB↔审定核对行。"}
+  ],
+  "I1": [
+    {"anchor": "I1-1-tb-cost", "expression": "TB('1701','期末余额')", "sheet_name": "I1-1", "formula_type": "auto_calc", "description": "试算表 1701 无形资产原值期末余额（审定数），供 I1-1 审定表原值段 TB核对。"},
+    {"anchor": "I1-1-tb-amort", "expression": "TB('1702','期末余额')", "sheet_name": "I1-1", "formula_type": "auto_calc", "description": "试算表 1702 累计摊销期末余额（审定数，备抵科目负值），供 I1-1 审定表摊销段 TB核对。"},
+    {"anchor": "I1-1-tb-impair", "expression": "TB('1703','期末余额')", "sheet_name": "I1-1", "formula_type": "auto_calc", "description": "试算表 1703 无形资产减值准备期末余额（审定数，备抵科目负值），供 I1-1 审定表减值段 TB核对。"}
+  ],
+  "I2": [
+    {"anchor": "I2-1-tb-amount", "expression": "TB('1717','期末余额')", "sheet_name": "I2-1", "formula_type": "auto_calc", "description": "试算表 1717 开发支出期末余额（审定数），供 I2-1 审定表 TB↔审定核对行。资产类借方科目。"}
+  ],
+  "I3": [
+    {"anchor": "I3-1-tb-amount", "expression": "TB('1711','期末余额')", "sheet_name": "I3-1", "formula_type": "auto_calc", "description": "试算表 1711 商誉期末余额（审定数），供 I3-1 审定表 TB↔审定核对行。不摊销，仅减值。"}
+  ],
+  "I4": [
+    {"anchor": "I4-1-tb-amount", "expression": "TB('1801','期末余额')", "sheet_name": "I4-1", "formula_type": "auto_calc", "description": "试算表 1801 长期待摊费用期末余额（审定数），供 I4-1 审定表 TB↔审定核对行。资产类借方科目。"}
+  ],
+  "I5": [
+    {"anchor": "I5-1-tb-amount", "expression": "TB('1911','期末余额')", "sheet_name": "I5-1", "formula_type": "auto_calc", "description": "试算表 1911 其他非流动资产期末余额（审定数），供 I5-1 审定表 TB↔审定核对行。"}
+  ],
+  "I6": [
+    {"anchor": "I6-1-tb-amount", "expression": "TB('6602','审定数')", "sheet_name": "I6-1", "formula_type": "auto_calc", "description": "试算表 6602 研发费用审定发生额（损益类借方，audited_amount 存发生额），供 I6-1 审定表 TB↔审定核对行。"}
   ]
 }

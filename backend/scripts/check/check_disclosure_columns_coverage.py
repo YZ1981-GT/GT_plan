@@ -86,6 +86,18 @@ COLUMN_BUILDERS = (
     "buildN1SyncPayload",          # N1 递延所得税资产（listed+soe，与 N3 共用章节，owner=N1）
     "buildH3SyncPayload",          # H3 投资性房地产（listed+soe，按计量模式推表）
     "buildH5SyncPayload",          # H5 油气资产 soe（listed 无独立章节）
+    "buildK2SyncPayload",          # K2 其他流动资产（listed+soe）
+    "buildK3SyncPayload",          # K3 其他应付款（listed+soe）
+    "buildK4SyncPayload",          # K4 其他流动负债（listed+soe）
+    "buildK5SyncPayload",          # K5 预计负债（listed+soe）
+    "buildK6SyncPayload",          # K6 持有待售资产（listed+soe）
+    "buildK7SyncPayload",          # K7 递延收益（listed+soe）
+    "buildK8SyncPayload",          # K8 销售费用（listed+soe）
+    "buildK9SyncPayload",          # K9 管理费用（listed+soe）
+    "buildK10SyncPayload",         # K10 其他收益（listed+soe）
+    "buildK11SyncPayload",         # K11 资产减值损失（listed+soe）
+    "buildK12SyncPayload",         # K12 营业外收入（listed+soe）
+    "buildK13SyncPayload",         # K13 营业外支出（listed+soe）
 )
 _BUILDER_RE = re.compile(r"build[A-Z]\w*Columns\b")
 _COLUMNS_FIELD_RE = re.compile(r"\bcolumns\s*:")

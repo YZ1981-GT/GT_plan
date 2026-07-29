@@ -297,22 +297,60 @@ class AttachmentService:
     # 关联底稿
     # ------------------------------------------------------------------
 
-    async def associate_with_wp(
-        self, attachment_id: UUID, wp_id: UUID,
+    async def ensure_wp_link(
+        self, attachment_id: UUID, wp_id: UUID, *,
         association_type: str = "evidence",
         notes: str | None = None,
         created_by: UUID | None = None,
     ) -> dict:
-        """关联附件到底稿"""
-        link = AttachmentWorkingPaper(
-            attachment_id=attachment_id,
-            wp_id=wp_id,
-            association_type=association_type,
-            notes=notes,
-            created_by=created_by,
-        )
-        self.db.add(link)
-        await self.db.flush()
+        """幂等关联附件到底稿（权威关联真源 upsert，绝不产生重复 (att, wp) 行）。
+
+        spec: attachment-workpaper-linkage-convergence（C1 权威关联收敛层）。
+
+        先查 (attachment_id, wp_id) 是否已存在链行：
+        - 存在 → 返回既有链行；传入非空 ``association_type`` / 非 None ``notes`` 时更新之
+          （last-write-wins；不覆盖为空/None）。绝不再 INSERT 新行。
+        - 不存在 → INSERT 新链行。
+
+        返回结构与 :meth:`associate_with_wp` 一致
+        （id / attachment_id / wp_id / association_type / notes）。
+
+        应用层「先查后插」是幂等主防线；V133 的 ``uq_awp_attachment_wp`` 唯一索引
+        为并发竞态的 DB 级兜底。
+        """
+        existing = (
+            await self.db.execute(
+                sa.select(AttachmentWorkingPaper)
+                .where(
+                    AttachmentWorkingPaper.attachment_id == attachment_id,
+                    AttachmentWorkingPaper.wp_id == wp_id,
+                )
+                .order_by(
+                    AttachmentWorkingPaper.created_at.asc(),
+                    AttachmentWorkingPaper.id.asc(),
+                )
+            )
+        ).scalars().first()
+
+        if existing is not None:
+            # 更新非空字段（不把既有值覆盖为空/None）
+            if association_type:
+                existing.association_type = association_type
+            if notes is not None:
+                existing.notes = notes
+            await self.db.flush()
+            link = existing
+        else:
+            link = AttachmentWorkingPaper(
+                attachment_id=attachment_id,
+                wp_id=wp_id,
+                association_type=association_type or "evidence",
+                notes=notes,
+                created_by=created_by,
+            )
+            self.db.add(link)
+            await self.db.flush()
+
         return {
             "id": str(link.id),
             "attachment_id": str(link.attachment_id),
@@ -321,15 +359,274 @@ class AttachmentService:
             "notes": link.notes,
         }
 
-    async def get_wp_attachments(self, wp_id: UUID) -> list[dict]:
-        """获取底稿关联的附件"""
-        stmt = (
-            sa.select(Attachment)
-            .join(AttachmentWorkingPaper, AttachmentWorkingPaper.attachment_id == Attachment.id)
-            .where(AttachmentWorkingPaper.wp_id == wp_id, Attachment.is_deleted == sa.false())
+    async def associate_with_wp(
+        self, attachment_id: UUID, wp_id: UUID,
+        association_type: str = "evidence",
+        notes: str | None = None,
+        created_by: UUID | None = None,
+    ) -> dict:
+        """关联附件到底稿（委托幂等 :meth:`ensure_wp_link`，去重）。
+
+        签名与返回结构保持不变；Wave 0 起同一 (attachment_id, wp_id) 连续调用不再
+        产生重复链行（历史无去重 → 每次 INSERT，现改为幂等 upsert）。
+
+        对称双写 ``reference_*``（1:1 last-write-wins，与 linkAttachment 对齐旧消费者）；
+        reference 写入失败 fail-open，不阻断权威链表结果。
+        """
+        link = await self.ensure_wp_link(
+            attachment_id,
+            wp_id,
+            association_type=association_type,
+            notes=notes,
+            created_by=created_by,
         )
-        result = await self.db.execute(stmt)
-        return [self._to_dict(a) for a in result.scalars().all()]
+        try:
+            await self.db.execute(
+                sa.update(Attachment)
+                .where(Attachment.id == attachment_id)
+                .values(reference_type="working_paper", reference_id=wp_id)
+            )
+            await self.db.flush()
+        except Exception:
+            from app.services.attachment_wp_fail_open import log_awp_fail_open
+
+            log_awp_fail_open(
+                "awp_associate_reference_fail_open",
+                attachment_id=attachment_id,
+                wp_id=wp_id,
+            )
+        return link
+
+    async def get_wp_attachments(self, wp_id: UUID) -> dict:
+        """获取底稿关联附件的统一反查视图（envelope）。
+
+        权威链表 ∪ reference 关联 ∪ 函证只读（best-effort），按 attachment.id 去重；
+        多来源合并 ``sources``，主 ``source`` 优先级：
+        associated > referenced > confirmation。
+
+        返回 ``{ "items": [ ... ] }``；行内保留既有 ``_to_dict`` 字段，并 additive
+        ``source`` / ``sources`` / ``association_type``（仅链表有值；其余来源为 null）。
+
+        spec: attachment-workpaper-linkage-convergence Task 2.2 / 3.1
+        """
+        by_id: dict[str, dict] = {}
+
+        # 1) 权威链表
+        link_stmt = (
+            sa.select(Attachment, AttachmentWorkingPaper.association_type)
+            .join(
+                AttachmentWorkingPaper,
+                AttachmentWorkingPaper.attachment_id == Attachment.id,
+            )
+            .where(
+                AttachmentWorkingPaper.wp_id == wp_id,
+                Attachment.is_deleted == sa.false(),
+            )
+        )
+        link_rows = (await self.db.execute(link_stmt)).all()
+        for att, assoc_type in link_rows:
+            row = self._to_dict(att)
+            row["source"] = "associated"
+            row["sources"] = ["associated"]
+            row["association_type"] = assoc_type
+            by_id[row["id"]] = row
+
+        # 2) reference 关联（兼容路径）
+        ref_stmt = (
+            sa.select(Attachment)
+            .where(
+                Attachment.reference_type == "working_paper",
+                Attachment.reference_id == wp_id,
+                Attachment.is_deleted == sa.false(),
+            )
+        )
+        ref_atts = (await self.db.execute(ref_stmt)).scalars().all()
+        for att in ref_atts:
+            aid = str(att.id)
+            existing = by_id.get(aid)
+            if existing is not None:
+                if "referenced" not in existing["sources"]:
+                    existing["sources"].append("referenced")
+                continue
+            row = self._to_dict(att)
+            row["source"] = "referenced"
+            row["sources"] = ["referenced"]
+            row["association_type"] = None
+            by_id[aid] = row
+
+        # 3) 函证只读纳入（wp → confirmations → confirmation_attachment_link）
+        # fail-open：异常跳过，仍返回链表 + reference
+        try:
+            from app.models.confirmation_models import (
+                Confirmation,
+                ConfirmationAttachmentLink,
+            )
+
+            conf_stmt = (
+                sa.select(Attachment)
+                .join(
+                    ConfirmationAttachmentLink,
+                    ConfirmationAttachmentLink.attachment_id == Attachment.id,
+                )
+                .join(
+                    Confirmation,
+                    Confirmation.id == ConfirmationAttachmentLink.confirmation_id,
+                )
+                .where(
+                    Confirmation.wp_id == wp_id,
+                    Attachment.is_deleted == sa.false(),
+                )
+            )
+            conf_atts = (await self.db.execute(conf_stmt)).scalars().unique().all()
+            for att in conf_atts:
+                aid = str(att.id)
+                existing = by_id.get(aid)
+                if existing is not None:
+                    if "confirmation" not in existing["sources"]:
+                        existing["sources"].append("confirmation")
+                    continue
+                row = self._to_dict(att)
+                row["source"] = "confirmation"
+                row["sources"] = ["confirmation"]
+                row["association_type"] = None
+                by_id[aid] = row
+        except Exception:
+            from app.services.attachment_wp_fail_open import log_awp_fail_open
+
+            log_awp_fail_open(
+                "awp_confirmation_lookup_fail_open",
+                wp_id=wp_id,
+            )
+
+        items = list(by_id.values())
+        result: dict = {"items": items}
+
+        # 一次取 wp 元数据，供证据声明 + stale 共用（减一次 WorkingPaper 往返）
+        wp_meta = await self._resolve_wp_meta(wp_id)
+
+        # Req4：证据类型声明（无声明不附加键；失败 fail-open）
+        try:
+            from app.services.workpaper_evidence_requirements import (
+                build_evidence_requirements,
+            )
+
+            ev_req = build_evidence_requirements(
+                wp_meta.get("wp_code") if wp_meta else None,
+                items,
+            )
+            if ev_req is not None:
+                result["evidence_requirements"] = ev_req
+        except Exception:
+            from app.services.attachment_wp_fail_open import log_awp_fail_open
+
+            log_awp_fail_open(
+                "awp_evidence_requirements_fail_open",
+                wp_id=wp_id,
+            )
+
+        # Req6：stale 失效前置（失败 omit；无失效也返回 has_stale=false 供前端门控）
+        try:
+            from app.services.workpaper_attachment_stale import build_stale_info
+
+            att_ids = [str(it.get("id")) for it in items if it.get("id")]
+            stale = await build_stale_info(
+                self.db,
+                wp_id=wp_id,
+                attachment_ids=att_ids,
+                wp_meta=wp_meta,
+            )
+            if stale is not None:
+                result["stale_info"] = stale
+        except Exception:
+            from app.services.attachment_wp_fail_open import log_awp_fail_open
+
+            log_awp_fail_open(
+                "awp_stale_fail_open",
+                wp_id=wp_id,
+            )
+
+        return result
+
+    async def _resolve_wp_meta(self, wp_id: UUID) -> dict | None:
+        """一次查出 wp_code / project_id / prefill_stale / audit_year；失败 None。"""
+        try:
+            from app.models.core import Project
+            from app.models.workpaper_models import WorkingPaper, WpIndex
+
+            row = (
+                await self.db.execute(
+                    sa.select(
+                        WpIndex.wp_code,
+                        WorkingPaper.project_id,
+                        WorkingPaper.prefill_stale,
+                        Project.audit_year,
+                    )
+                    .join(WorkingPaper, WorkingPaper.wp_index_id == WpIndex.id)
+                    .join(Project, Project.id == WorkingPaper.project_id)
+                    .where(WorkingPaper.id == wp_id)
+                )
+            ).first()
+            if row is None:
+                return None
+            return {
+                "wp_code": str(row[0]) if row[0] else None,
+                "project_id": row[1],
+                "prefill_stale": bool(row[2]),
+                "audit_year": row[3],
+            }
+        except Exception:
+            from app.services.attachment_wp_fail_open import log_awp_fail_open
+
+            log_awp_fail_open("awp_resolve_wp_meta_fail_open", wp_id=wp_id)
+            return None
+
+    async def _resolve_wp_code(self, wp_id: UUID) -> str | None:
+        """从 working_paper → wp_index 解析 wp_code；失败返回 None。"""
+        meta = await self._resolve_wp_meta(wp_id)
+        return meta.get("wp_code") if meta else None
+
+    async def unlink_wp_attachment(self, wp_id: UUID, attachment_id: UUID) -> dict:
+        """解除附件与底稿的关联（权威链表硬删 + 同步清空 matching reference）。
+
+        - 删除 ``attachment_working_paper`` 中 (attachment_id, wp_id) 链行（若无则跳过）。
+        - 若该附件 ``reference_type=='working_paper'`` 且 ``reference_id==wp_id``，置空。
+        - 不删附件本身；不改函证 ``confirmation_attachment_link``。
+        - 幂等：无关联时仍返回 ok（no-op 200）。
+
+        spec: attachment-workpaper-linkage-convergence Task 4.1 / Property 5
+        """
+        del_result = await self.db.execute(
+            sa.delete(AttachmentWorkingPaper).where(
+                AttachmentWorkingPaper.attachment_id == attachment_id,
+                AttachmentWorkingPaper.wp_id == wp_id,
+            )
+        )
+        link_removed = int(del_result.rowcount or 0)
+
+        ref_cleared = False
+        att = (
+            await self.db.execute(
+                sa.select(Attachment).where(
+                    Attachment.id == attachment_id,
+                    Attachment.is_deleted == sa.false(),
+                )
+            )
+        ).scalar_one_or_none()
+        if (
+            att is not None
+            and att.reference_type == "working_paper"
+            and att.reference_id == wp_id
+        ):
+            att.reference_type = None
+            att.reference_id = None
+            ref_cleared = True
+            await self.db.flush()
+
+        return {
+            "ok": True,
+            "link_removed": link_removed,
+            "reference_cleared": ref_cleared,
+        }
 
     async def get_latest_reference_attachment(
         self,

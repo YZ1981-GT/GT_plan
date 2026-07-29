@@ -1,5 +1,10 @@
 """分发记录业务服务 — D0-1 跨底稿分发持久化
 
+DEPRECATED: cross-workpaper-dispatch-persistence 机制从未被前端组件采用，
+由 coordination/importFromSummary.ts 通用读取器取代（2026-07-28 confirmation-linkage-completion R3）。
+前端 useConfirmationDispatch/useDownstreamDispatch/dispatchApi.ts 已删除。
+本文件、路由、模型及 V093 表保留休眠不删（避免破坏性 DDL），待运维决定是否清理。
+
 Feature: cross-workpaper-dispatch-persistence
 
 设计要点：

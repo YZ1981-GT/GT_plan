@@ -84,6 +84,19 @@ class StaffMember(Base, SoftDeleteMixin, TimestampMixin):
     # Batch 3 Fix 1: 费率计算用枚举，不依赖 title 自由文本
     role_level: Mapped[str | None] = mapped_column(String(20), nullable=True, comment="费率等级: partner/manager/senior/auditor/intern")
 
+    # P0-1 执业资质字段
+    is_cpa: Mapped[bool | None] = mapped_column(nullable=True, comment="是否注册会计师")
+    cpa_cert_no: Mapped[str | None] = mapped_column(String(50), nullable=True, comment="CPA执业证书号")
+    audit_years: Mapped[int | None] = mapped_column(nullable=True, comment="审计年限")
+    qualifications: Mapped[dict | None] = mapped_column(JSONB, nullable=True, comment="专业资质列表 [CPA,CIA,CISA...]")
+    industry_experience: Mapped[dict | None] = mapped_column(JSONB, nullable=True, comment="行业经验列表 [制造,金融,地产...]")
+
+    # 人员状态（active/on_leave/resigned）
+    status: Mapped[str] = mapped_column(String(20), server_default=text("'active'"), nullable=False, comment="人员状态: active/on_leave/resigned")
+
+    # 头像URL（预留）
+    avatar_url: Mapped[str | None] = mapped_column(String(500), nullable=True, comment="头像图片URL")
+
     __table_args__ = (
         Index("idx_staff_department", "department", postgresql_where=text("is_deleted = false")),
         Index("idx_staff_partner", "partner_id", postgresql_where=text("is_deleted = false")),

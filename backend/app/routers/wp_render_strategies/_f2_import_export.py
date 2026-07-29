@@ -54,9 +54,248 @@ _F2_SHEET_CONFIGS: dict[str, dict[str, Any]] = {
     "F2-32": {"kind": "cutoff", "title": "存货(原材料/产成品)截止-出库(单→账) F2-32"},
 }
 
-_SUPPORTED_SHEETS = set(_F2_SHEET_CONFIGS.keys())
+_SUPPORTED_SHEETS = set(_F2_SHEET_CONFIGS.keys()) | {"F2-1"}
 
 _STORAGE_FIELD = "remark"
+
+# ─── F2-1 审定表 导入导出（per-field item_id，非 JSON 数组） ─────────────────
+from ._f2_inventory_main import F2_CATEGORIES
+
+_F2_1_GROSS_CATEGORIES = [c for c in F2_CATEGORIES if c["rowKey"] != "impairment-provision"]
+_F2_1_IMPAIRMENT_CATEGORIES = [c for c in F2_CATEGORIES if c["rowKey"] == "impairment-provision"]
+
+_F2_1_HEADERS = ["类别名", "科目编码", "期初未审数", "本期增加", "本期减少", "账项调整"]
+_F2_1_FIELD_MAP = {
+    "期初未审数": "opening",
+    "本期增加": "increase",
+    "本期减少": "decrease",
+    "账项调整": "adjustment",
+}
+_F2_1_NUMERIC_FIELDS = {"opening", "increase", "decrease", "adjustment"}
+
+_F2_1_LABEL_TO_ROW_KEY = {c["label"]: c["rowKey"] for c in F2_CATEGORIES}
+_F2_1_ROW_KEY_TO_LABEL = {c["rowKey"]: c["label"] for c in F2_CATEGORIES}
+_F2_1_ROW_KEY_TO_ACCOUNT = {c["rowKey"]: c["account"] for c in F2_CATEGORIES}
+
+
+def _f2_1_item_id(block: str, row_key: str, field: str) -> str:
+    return f"F2-1-{block}-{row_key}-{field}"
+
+
+async def _export_f2_1_template(db: AsyncSession, wp_id: str) -> StreamingResponse:
+    """导出 F2-1 审定表模板（编制说明 + 原值 + 跌价准备）."""
+    from openpyxl.styles import Font, PatternFill, Alignment
+
+    wb = Workbook()
+    # Sheet 1: 编制说明
+    ws_guide = wb.active
+    ws_guide.title = "编制说明"
+    ws_guide.append(["F2-1 存货审定表 — 导入模板编制说明"])
+    ws_guide.append([])
+    ws_guide.append(["一、本模板含两张数据工作表：「原值」和「跌价准备」。"])
+    ws_guide.append(["二、按「类别名」匹配行，不匹配的行将被跳过。"])
+    ws_guide.append(["三、空值/非数值字段不覆盖已有数据（只写有效数字）。"])
+    ws_guide.append(["四、「科目编码」列仅供参考，导入按「类别名」定位。"])
+    ws_guide.append(["五、四表取数提示：期初未审数=TB(科目,期初余额), 增加=TB(科目,借方发生额), 减少=TB(科目,贷方发生额)"])
+    ws_guide.append([])
+    ws_guide.append(["字段说明："])
+    ws_guide.append(["  期初未审数 — 本年期初余额（未审数）"])
+    ws_guide.append(["  本期增加 — 本期借方发生额（增加）"])
+    ws_guide.append(["  本期减少 — 本期贷方发生额（减少）"])
+    ws_guide.append(["  账项调整 — 审计调整净额（AJE 影响）"])
+
+    # Sheet 2: 原值
+    ws_gross = wb.create_sheet("原值")
+    ws_gross.append(_F2_1_HEADERS)
+    # 表头加粗
+    for cell in ws_gross[1]:
+        cell.font = Font(bold=True)
+    for cat in _F2_1_GROSS_CATEGORIES:
+        ws_gross.append([cat["label"], cat["account"], None, None, None, None])
+
+    # Sheet 3: 跌价准备
+    ws_imp = wb.create_sheet("跌价准备")
+    ws_imp.append(_F2_1_HEADERS)
+    for cell in ws_imp[1]:
+        cell.font = Font(bold=True)
+    for cat in _F2_1_IMPAIRMENT_CATEGORIES:
+        ws_imp.append([cat["label"], cat["account"], None, None, None, None])
+
+    return workbook_to_response(wb, "F2-1 存货审定表_模板.xlsx")
+
+
+async def _export_f2_1_data(db: AsyncSession, wp_id: str) -> StreamingResponse:
+    """导出 F2-1 审定表当前数据."""
+    from openpyxl.styles import Font
+    import sqlalchemy as sa
+
+    # 查 checklist_responses 中以 F2-1- 开头的 item_id
+    from app.models.checklist_response_models import ChecklistResponse as CR
+
+    stmt = sa.select(CR.item_id, CR.conclusion).where(
+        CR.wp_id == wp_id,
+        CR.item_id.like("F2-1-%"),
+    )
+    result = await db.execute(stmt)
+    rows_raw = result.all()
+
+    # 按 block/rowKey/field 解析
+    data: dict[str, dict[str, dict[str, float]]] = {}  # block -> rowKey -> field -> value
+    for item_id, conclusion in rows_raw:
+        # F2-1-{block}-{rowKey}-{field}
+        parts = item_id.split("-", 3)  # ['F2', '1', '{block}-{rowKey}-{field}']
+        if len(parts) < 3:
+            continue
+        rest = item_id[len("F2-1-"):]  # e.g. "gross-raw-materials-opening"
+        # block is first segment, field is last segment, rowKey is middle
+        # Pattern: {block}-{rowKey}-{field}
+        # field is one of: opening/increase/decrease/adjustment
+        for field in _F2_1_NUMERIC_FIELDS:
+            suffix = f"-{field}"
+            if rest.endswith(suffix):
+                prefix = rest[: -len(suffix)]
+                # prefix = "gross-raw-materials" → split on first "-" to get block+rowKey
+                dash_idx = prefix.find("-")
+                if dash_idx < 0:
+                    continue
+                block = prefix[:dash_idx]
+                row_key = prefix[dash_idx + 1:]
+                data.setdefault(block, {}).setdefault(row_key, {})[field] = safe_float(conclusion)
+                break
+
+    wb = Workbook()
+    ws_guide = wb.active
+    ws_guide.title = "编制说明"
+    ws_guide.append(["F2-1 存货审定表 — 数据导出"])
+    ws_guide.append([f"底稿 ID: {wp_id}"])
+
+    # Sheet 2: 原值
+    ws_gross = wb.create_sheet("原值")
+    ws_gross.append(_F2_1_HEADERS)
+    for cell in ws_gross[1]:
+        cell.font = Font(bold=True)
+    for cat in _F2_1_GROSS_CATEGORIES:
+        rk = cat["rowKey"]
+        row_data = data.get("gross", {}).get(rk, {})
+        ws_gross.append([
+            cat["label"],
+            cat["account"],
+            row_data.get("opening"),
+            row_data.get("increase"),
+            row_data.get("decrease"),
+            row_data.get("adjustment"),
+        ])
+
+    # Sheet 3: 跌价准备
+    ws_imp = wb.create_sheet("跌价准备")
+    ws_imp.append(_F2_1_HEADERS)
+    for cell in ws_imp[1]:
+        cell.font = Font(bold=True)
+    for cat in _F2_1_IMPAIRMENT_CATEGORIES:
+        rk = cat["rowKey"]
+        row_data = data.get("impairment", {}).get(rk, {})
+        ws_imp.append([
+            cat["label"],
+            cat["account"],
+            row_data.get("opening"),
+            row_data.get("increase"),
+            row_data.get("decrease"),
+            row_data.get("adjustment"),
+        ])
+
+    return workbook_to_response(wb, "F2-1 存货审定表_数据.xlsx")
+
+
+async def _import_f2_1_data(db: AsyncSession, wp_id: str, content: bytes) -> dict[str, Any]:
+    """导入 F2-1 审定表数据（按类别名匹配行，逐字段 UPSERT）."""
+    import openpyxl
+    import sqlalchemy as sa
+
+    from app.models.checklist_response_models import ChecklistResponse as CR
+    from app.models.workpaper_models import WorkingPaper
+
+    # 反查 project_id
+    wp_result = await db.execute(
+        sa.select(WorkingPaper.project_id).where(WorkingPaper.id == wp_id)
+    )
+    wp_row = wp_result.first()
+    if not wp_row:
+        raise HTTPException(404, "底稿不存在")
+    project_id = str(wp_row[0])
+
+    wb = openpyxl.load_workbook(io.BytesIO(content), data_only=True, read_only=True)
+
+    _SHEET_BLOCK_MAP = {"原值": "gross", "跌价准备": "impairment"}
+
+    imported_count = 0
+    skipped_count = 0
+    field_count = 0
+    warnings: list[str] = []
+
+    for sheet_name, block in _SHEET_BLOCK_MAP.items():
+        if sheet_name not in wb.sheetnames:
+            warnings.append(f"未找到工作表「{sheet_name}」")
+            continue
+        ws = wb[sheet_name]
+        rows_iter = ws.iter_rows(min_row=2, values_only=True)  # skip header
+        for row_values in rows_iter:
+            if not row_values or not row_values[0]:
+                continue
+            category_name = str(row_values[0]).strip()
+            # 按类别名或 rowKey 匹配
+            row_key = _F2_1_LABEL_TO_ROW_KEY.get(category_name)
+            if not row_key:
+                # 尝试直接作为 rowKey
+                if category_name in _F2_1_ROW_KEY_TO_LABEL:
+                    row_key = category_name
+                else:
+                    skipped_count += 1
+                    warnings.append(f"未知类别「{category_name}」已跳过")
+                    continue
+
+            # 逐字段解析（列索引 2-5 对应 期初未审数/本期增加/本期减少/账项调整）
+            field_names = ["opening", "increase", "decrease", "adjustment"]
+            row_has_data = False
+            for col_idx, field in enumerate(field_names, start=2):
+                val = row_values[col_idx] if col_idx < len(row_values) else None
+                if val is None:
+                    continue
+                try:
+                    num_val = float(val)
+                except (ValueError, TypeError):
+                    continue
+                # UPSERT
+                item_id = _f2_1_item_id(block, row_key, field)
+                stmt = sa.text("""
+                    INSERT INTO checklist_responses (wp_id, item_id, project_id, conclusion)
+                    VALUES (:wp_id, :item_id, :project_id, :val)
+                    ON CONFLICT (wp_id, item_id)
+                    DO UPDATE SET conclusion = :val
+                """)
+                await db.execute(stmt, {
+                    "wp_id": wp_id,
+                    "item_id": item_id,
+                    "project_id": project_id,
+                    "val": str(num_val),
+                })
+                field_count += 1
+                row_has_data = True
+            if row_has_data:
+                imported_count += 1
+
+    wb.close()
+    await db.commit()
+
+    result: dict[str, Any] = {
+        "ok": True,
+        "imported_count": imported_count,
+        "skipped_count": skipped_count,
+        "field_count": field_count,
+        "errors": [],
+    }
+    if warnings:
+        result["warnings"] = warnings
+    return result
 
 
 def _validate_sheet(sheet: str) -> None:
@@ -318,9 +557,12 @@ def _export_f2_row(sheet: str, data: dict) -> list:
 async def f2_export_template(
     wp_id: str,
     sheet: str = Query(...),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     _validate_sheet(sheet)
+    if sheet == "F2-1":
+        return await _export_f2_1_template(db, wp_id)
     headers = _headers(sheet)
     title, subtitle, guidance = _template_meta(sheet)
     wb = build_workbook_template(sheet, headers, title=title, subtitle=subtitle, guidance=guidance)
@@ -335,6 +577,8 @@ async def f2_export_data(
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     _validate_sheet(sheet)
+    if sheet == "F2-1":
+        return await _export_f2_1_data(db, wp_id)
     headers = _headers(sheet)
     item_id = f"{sheet}-rows"
     rows_data = await load_json_rows(db, wp_id, item_id, field=_STORAGE_FIELD)
@@ -360,6 +604,9 @@ async def f2_import_data(
     content = await file.read()
     if len(content) > 10 * 1024 * 1024:
         raise HTTPException(400, "文件大小不能超过10MB")
+    # F2-1 走自定义逻辑（per-field item_id）
+    if sheet == "F2-1":
+        return await _import_f2_1_data(db, wp_id, content)
     headers = _headers(sheet)
     try:
         actual, raw_rows = parse_upload_xlsx(content, headers, header_row=_header_row_index())

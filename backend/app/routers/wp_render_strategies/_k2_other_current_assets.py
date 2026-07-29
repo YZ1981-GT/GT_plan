@@ -39,6 +39,71 @@ K2_SHEETS = [
 ]
 
 
+_K2_ACCOUNT_PREFIX = "1231"
+
+
+async def _build_adjudication_prefill(ctx: RenderContext) -> list[dict]:
+    """从 tb_balance 1231 明细子科目预填 K2-1 审定表行（资产类取余额）.
+
+    1231 其他流动资产为资产/借方科目：
+    期初未审 = opening_balance  [资产借方余额正数，不 abs]
+    期末未审 = closing_balance
+    返回 [{name, code, opening_balance, closing_balance}]，前端在无持久化行时据此建行。
+    """
+    rows: list[dict] = []
+    try:
+        active_filter = await get_active_filter(
+            ctx.db, TbBalance.__table__, ctx.project_id, ctx.year
+        )
+        result = await ctx.db.execute(
+            sa.select(
+                TbBalance.account_code.label("code"),
+                TbBalance.account_name.label("name"),
+                sa.func.sum(TbBalance.opening_balance).label("opening"),
+                sa.func.sum(TbBalance.closing_balance).label("closing"),
+            )
+            .where(
+                active_filter,
+                TbBalance.account_code.startswith(_K2_ACCOUNT_PREFIX),
+                TbBalance.account_code != _K2_ACCOUNT_PREFIX,
+            )
+            .group_by(TbBalance.account_code, TbBalance.account_name)
+        )
+        raw = [
+            {
+                "code": (r.code or "").strip(),
+                "name": (r.name or "").strip(),
+                "opening": float(r.opening or 0),
+                "closing": float(r.closing or 0),
+            }
+            for r in result.fetchall()
+        ]
+        all_codes = [x["code"] for x in raw if x["code"]]
+
+        def _is_leaf(code: str) -> bool:
+            if not code:
+                return True
+            return not any(c != code and c.startswith(code) for c in all_codes)
+
+        leaves = [x for x in raw if _is_leaf(x["code"])]
+        leaves.sort(key=lambda x: abs(x["closing"]), reverse=True)
+        for x in leaves:
+            name = x["name"]
+            opening = x["opening"]
+            closing = x["closing"]
+            if not name or (abs(opening) < 0.005 and abs(closing) < 0.005):
+                continue
+            rows.append({
+                "name": name,
+                "code": x["code"],
+                "opening_balance": opening,
+                "closing_balance": closing,
+            })
+    except Exception as e:  # noqa: BLE001
+        logger.warning("K2 adjudication prefill build failed: %s", e)
+    return rows
+
+
 async def _fetch_tb_data(ctx: RenderContext) -> dict:
     """取科目1231的期初/期末余额及借贷发生额."""
     tb: dict[str, float] = {}
@@ -135,6 +200,7 @@ async def render(ctx: RenderContext) -> dict | None:
 
     tb_values = await _fetch_tb_data(ctx)
     project_context = await _load_project_context(ctx)
+    adjudication_prefill = await _build_adjudication_prefill(ctx)
 
     return {
         "component_type": "k2-other-current-assets",
@@ -142,6 +208,7 @@ async def render(ctx: RenderContext) -> dict | None:
         "responses_snapshot": responses_snapshot,
         "tb_values": tb_values,
         "project_context": project_context,
+        "adjudication_prefill": adjudication_prefill,
         "prefix": "K2",
         "sheets": K2_SHEETS,
     }

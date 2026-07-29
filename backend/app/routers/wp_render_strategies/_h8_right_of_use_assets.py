@@ -562,7 +562,7 @@ async def render(ctx: RenderContext) -> dict | None:
     # 7. H8-2 明细表种子预填（叶子子科目，仅有子科目时产出）
     detail_prefill = await _build_h8_detail_prefill(ctx)
 
-    return {
+    payload = {
         "component_type": "h8-right-of-use-assets",
         "account_codes": ["1901"],
         "responses_snapshot": responses_snapshot,
@@ -576,3 +576,36 @@ async def render(ctx: RenderContext) -> dict | None:
         "sheets": H8_SHEETS,
         "meta": {"sheet_count": 20, "wp_code": "H8"},
     }
+
+    # ─── 灰度：H/I 四表取数增强 ───────────────────────────────────────────
+    from app.core.config import settings
+    if settings.HI_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED:
+        try:
+            import asyncio
+            from app.services.d_cycle_extraction.prefill import build_d_adjudication_prefill
+            segment_prefill = await asyncio.wait_for(
+                build_d_adjudication_prefill(ctx, account_prefix="1901", mode="balance"),
+                timeout=5.0,
+            )
+            payload["adjudication_segment_prefill"] = {
+                "segments": [{"segment": "cost", "account_prefix": "1901", "mode": "balance", "items": segment_prefill}],
+                "enabled": True,
+            }
+            payload["hi_extraction_enabled"] = True
+            # Tier A transient seed（TB核对行）
+            from app.services.d_cycle_extraction.tier_a_seed import seed_tier_a_reconciliation
+            from app.services.d_cycle_extraction.presets import resolve_effective
+            from app.services.wp_formula_eval_service import evaluate_wp_formula_expression
+            await asyncio.wait_for(
+                seed_tier_a_reconciliation(
+                    ctx, "H8",
+                    responses_snapshot,
+                    resolve_effective=resolve_effective,
+                    evaluate_wp_formula_expression=evaluate_wp_formula_expression,
+                ),
+                timeout=5.0,
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.warning("HI extraction prefill failed (%s): %s", "H8", e)
+
+    return payload

@@ -290,7 +290,7 @@ async def render(ctx: RenderContext) -> dict | None:
     # 4. H8联动校验
     h8_linkage = await _fetch_h8_linkage(ctx)
 
-    return {
+    payload = {
         "component_type": "h9-lease-liabilities",
         "account_codes": ["2205"],
         "responses_snapshot": responses_snapshot,
@@ -318,3 +318,36 @@ async def render(ctx: RenderContext) -> dict | None:
             },
         },
     }
+
+    # ─── 灰度：H/I 四表取数增强 ───────────────────────────────────────────
+    from app.core.config import settings
+    if settings.HI_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED:
+        try:
+            import asyncio
+            from app.services.d_cycle_extraction.prefill import build_d_adjudication_prefill
+            segment_prefill = await asyncio.wait_for(
+                build_d_adjudication_prefill(ctx, account_prefix="2205", mode="balance"),
+                timeout=5.0,
+            )
+            payload["adjudication_segment_prefill"] = {
+                "segments": [{"segment": "cost", "account_prefix": "2205", "mode": "balance", "items": segment_prefill}],
+                "enabled": True,
+            }
+            payload["hi_extraction_enabled"] = True
+            # Tier A transient seed（TB核对行）
+            from app.services.d_cycle_extraction.tier_a_seed import seed_tier_a_reconciliation
+            from app.services.d_cycle_extraction.presets import resolve_effective
+            from app.services.wp_formula_eval_service import evaluate_wp_formula_expression
+            await asyncio.wait_for(
+                seed_tier_a_reconciliation(
+                    ctx, "H9",
+                    responses_snapshot,
+                    resolve_effective=resolve_effective,
+                    evaluate_wp_formula_expression=evaluate_wp_formula_expression,
+                ),
+                timeout=5.0,
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.warning("HI extraction prefill failed (%s): %s", "H9", e)
+
+    return payload

@@ -27,6 +27,15 @@ class StaffCreate(BaseModel):
     phone: str | None = None
     email: str | None = None
     join_date: date | None = None
+    # P0-1 执业资质字段
+    is_cpa: bool | None = None  # 是否注册会计师
+    cpa_cert_no: str | None = None  # CPA执业证书号
+    audit_years: int | None = None  # 审计年限
+    role_level: str | None = None  # 角色等级: partner/manager/senior/auditor/intern
+    qualifications: list[str] | None = None  # 专业资质: CPA/CIA/CISA/评估师等
+    industry_experience: list[str] | None = None  # 行业经验: 制造/金融/地产/医药...
+    status: str | None = None  # active/on_leave/resigned
+    avatar_url: str | None = None
 
 
 class StaffUpdate(BaseModel):
@@ -38,6 +47,15 @@ class StaffUpdate(BaseModel):
     phone: str | None = None
     email: str | None = None
     join_date: date | None = None
+    # P0-1 执业资质字段
+    is_cpa: bool | None = None
+    cpa_cert_no: str | None = None
+    audit_years: int | None = None
+    role_level: str | None = None
+    qualifications: list[str] | None = None
+    industry_experience: list[str] | None = None
+    status: str | None = None
+    avatar_url: str | None = None
 
 
 class StaffResponse(BaseModel):
@@ -57,6 +75,16 @@ class StaffResponse(BaseModel):
     join_date: date | None = None
     resume_data: dict | None = None
     created_at: datetime | None = None
+    # P0-1 执业资质
+    is_cpa: bool | None = None
+    cpa_cert_no: str | None = None
+    audit_years: int | None = None
+    role_level: str | None = None
+    qualifications: list[str] | None = None
+    industry_experience: list[str] | None = None
+    source: str | None = None
+    status: str | None = None  # active/on_leave/resigned
+    avatar_url: str | None = None
 
 
 class StaffListResponse(BaseModel):

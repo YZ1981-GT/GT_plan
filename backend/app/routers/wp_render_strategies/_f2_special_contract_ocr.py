@@ -1,11 +1,14 @@
-"""F2 特殊组 — F2-56 合同/发票 OCR."""
+"""F2 特殊组 — F2-56 合同/发票 OCR.
+
+Optional: attachment_id（已关联附件时回流 ocr_text/ocr_fields_cache）, force_reocr
+"""
 
 from __future__ import annotations
 
 import json
 import logging
 from pathlib import Path
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import aiofiles
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
@@ -15,6 +18,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import User
+from app.services.attachment_ocr_writeback import (
+    finalize_linked_ocr_writeback,
+    load_reusable_ocr,
+    parse_optional_uuid,
+)
 from app.services.llm_client import chat_completion
 from app.services.unified_ocr_service import UnifiedOCRService
 
@@ -95,6 +103,31 @@ class F2SpeOcrResponse(BaseModel):
     ocr_text: str
     extracted_fields: dict
     confidence: float
+    reused: bool = False
+    written_back: bool = False
+    governed: bool = False
+    requires_human_confirmation: bool = True
+
+
+def _resp(
+    attachment_id: str,
+    ocr_text: str,
+    extracted_fields: dict,
+    confidence: float,
+    *,
+    reused: bool = False,
+    written_back: bool = False,
+) -> F2SpeOcrResponse:
+    return F2SpeOcrResponse(
+        attachment_id=attachment_id,
+        ocr_text=ocr_text,
+        extracted_fields=extracted_fields,
+        confidence=confidence,
+        reused=reused,
+        written_back=written_back,
+        governed=False,
+        requires_human_confirmation=True,
+    )
 
 
 @router.post("/api/workpapers/{wp_id}/f2-spe/contract-ocr")
@@ -102,23 +135,49 @@ async def f2_spe_contract_ocr(
     wp_id: str,
     file: UploadFile = File(...),
     document_type: str = Form("contract"),
+    attachment_id: str | None = Form(None),
+    force_reocr: bool = Form(False),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> F2SpeOcrResponse:
     if document_type not in DOCUMENT_FIELDS_SCHEMAS:
         raise HTTPException(400, f"不支持的单据类型: {document_type}")
+
+    linked_att_id = parse_optional_uuid(attachment_id)
+    try:
+        wp_uuid = UUID(wp_id)
+    except ValueError:
+        if linked_att_id is not None:
+            raise HTTPException(400, "无效的 wp_id")
+        wp_uuid = UUID(int=0)
     field_schema = DOCUMENT_FIELDS_SCHEMAS[document_type]
     empty = {key: (0 if key in _NUMERIC_FIELDS else "") for key in field_schema}
+
+    if linked_att_id is not None and not force_reocr:
+        reused = await load_reusable_ocr(db, linked_att_id)
+        if reused is not None:
+            fields = reused["extracted_fields"] or {}
+            merged = dict(empty)
+            merged.update({k: fields[k] for k in field_schema if k in fields})
+            return _resp(
+                str(linked_att_id),
+                reused["ocr_text"],
+                merged,
+                float(reused.get("confidence") or 0),
+                reused=True,
+                written_back=False,
+            )
+
     allowed = (".pdf", ".png", ".jpg", ".jpeg")
     filename = file.filename or "upload.pdf"
     suffix = Path(filename).suffix.lower()
     if suffix not in allowed:
         raise HTTPException(400, f"不支持的文件类型: {suffix}")
 
-    attachment_id = str(uuid4())
+    temp_id = str(linked_att_id) if linked_att_id else str(uuid4())
     storage_dir = Path("storage/workpapers") / wp_id / "contract-cost" / document_type
     storage_dir.mkdir(parents=True, exist_ok=True)
-    file_path = storage_dir / f"{attachment_id}{suffix}"
+    file_path = storage_dir / f"{temp_id}{suffix}"
 
     content = await file.read()
     async with aiofiles.open(str(file_path), "wb") as f:
@@ -130,10 +189,10 @@ async def f2_spe_contract_ocr(
         ocr_text = ocr_result.get("text", "")
     except Exception as e:
         logger.warning("F2 spe OCR failed: %s", e)
-        return F2SpeOcrResponse(attachment_id=attachment_id, ocr_text="", extracted_fields=dict(empty), confidence=0)
+        return _resp(temp_id, "", dict(empty), 0.0)
 
     if not ocr_text.strip():
-        return F2SpeOcrResponse(attachment_id=attachment_id, ocr_text="", extracted_fields=dict(empty), confidence=0)
+        return _resp(temp_id, "", dict(empty), 0.0)
 
     extracted = dict(empty)
     confidence = 0.0
@@ -177,9 +236,13 @@ async def f2_spe_contract_ocr(
     except Exception as e:
         logger.warning("F2 spe LLM extraction failed: %s", e)
 
-    return F2SpeOcrResponse(
-        attachment_id=attachment_id,
+    out_id, written = await finalize_linked_ocr_writeback(
+        db,
+        wp_id=wp_uuid,
+        linked_att_id=linked_att_id,
+        temp_id=temp_id,
         ocr_text=ocr_text,
         extracted_fields=extracted,
         confidence=confidence,
     )
+    return _resp(out_id, ocr_text, extracted, confidence, written_back=written)

@@ -139,7 +139,7 @@ class VisibilityGrantSet:
 
 _BRANCH_LEAD = """
 SELECT wi.id AS wp_index_id, wi.audit_cycle AS audit_cycle,
-       'lead'::text AS access_kind, 'workpaper_lead'::text AS identity,
+       CAST('lead' AS varchar) AS access_kind, CAST('workpaper_lead' AS varchar) AS identity,
        CAST(NULL AS varchar) AS sheet_key, false AS readonly
 FROM working_paper wp
 JOIN wp_index wi ON wi.id = wp.wp_index_id
@@ -153,7 +153,7 @@ WHERE wp.project_id = CAST(:pid AS uuid)
 
 _BRANCH_ASSIGNEE = """
 SELECT prt.wp_index_id AS wp_index_id, wi.audit_cycle AS audit_cycle,
-       'assignee'::text AS access_kind, 'row_assignee'::text AS identity,
+       CAST('assignee' AS varchar) AS access_kind, CAST('row_assignee' AS varchar) AS identity,
        prt.sheet_key AS sheet_key, false AS readonly
 FROM procedure_row_tasks prt
 JOIN staff_members sm ON sm.id = prt.assignee_staff_id
@@ -170,7 +170,7 @@ WHERE prt.project_id = CAST(:pid AS uuid)
 
 _BRANCH_REVIEWER = """
 SELECT prt.wp_index_id AS wp_index_id, wi.audit_cycle AS audit_cycle,
-       'reviewer'::text AS access_kind, 'row_reviewer'::text AS identity,
+       CAST('reviewer' AS varchar) AS access_kind, CAST('row_reviewer' AS varchar) AS identity,
        prt.sheet_key AS sheet_key, false AS readonly
 FROM procedure_row_tasks prt
 JOIN staff_members sm ON sm.id = prt.reviewer_staff_id
@@ -189,7 +189,7 @@ WHERE prt.project_id = CAST(:pid AS uuid)
 # 按事件时冻结 user 匹配（Property 6：不回查当前 staff/task）。
 _BRANCH_LEAD_HISTORY = """
 SELECT DISTINCT wdh.wp_index_id AS wp_index_id, wi.audit_cycle AS audit_cycle,
-       'lead_history'::text AS access_kind, 'lead_history'::text AS identity,
+       CAST('lead_history' AS varchar) AS access_kind, CAST('lead_history' AS varchar) AS identity,
        CAST(NULL AS varchar) AS sheet_key, true AS readonly
 FROM workpaper_delegation_history wdh
 JOIN wp_index wi ON wi.id = wdh.wp_index_id
@@ -204,7 +204,7 @@ WHERE wdh.project_id = CAST(:pid AS uuid)
 # row_history：页面来源 = 不可变快照 sheet_key（Req 5.18），只读；同样按冻结 user 匹配。
 _BRANCH_ROW_HISTORY = """
 SELECT DISTINCT wdh.wp_index_id AS wp_index_id, wi.audit_cycle AS audit_cycle,
-       'row_history'::text AS access_kind, 'row_history'::text AS identity,
+       CAST('row_history' AS varchar) AS access_kind, CAST('row_history' AS varchar) AS identity,
        wdh.sheet_key AS sheet_key, true AS readonly
 FROM workpaper_delegation_history wdh
 JOIN wp_index wi ON wi.id = wdh.wp_index_id
@@ -219,7 +219,7 @@ WHERE wdh.project_id = CAST(:pid AS uuid)
 # admin：项目内全部底稿全页面，忽略 scope（Req 1.8/5.5）。
 _BRANCH_ADMIN = """
 SELECT wi.id AS wp_index_id, wi.audit_cycle AS audit_cycle,
-       'admin'::text AS access_kind, 'admin'::text AS identity,
+       CAST('admin' AS varchar) AS access_kind, CAST('admin' AS varchar) AS identity,
        CAST(NULL AS varchar) AS sheet_key, false AS readonly
 FROM wp_index wi
 WHERE wi.project_id = CAST(:pid AS uuid)
@@ -230,7 +230,7 @@ WHERE wi.project_id = CAST(:pid AS uuid)
 # supervisor_scope：scope 内全部底稿全页面（Req 5.6）。
 _BRANCH_SUPERVISOR = """
 SELECT wi.id AS wp_index_id, wi.audit_cycle AS audit_cycle,
-       'supervisor_scope'::text AS access_kind, 'supervisor_scope'::text AS identity,
+       CAST('supervisor_scope' AS varchar) AS access_kind, CAST('supervisor_scope' AS varchar) AS identity,
        CAST(NULL AS varchar) AS sheet_key, false AS readonly
 FROM wp_index wi
 WHERE wi.project_id = CAST(:pid AS uuid)
@@ -321,6 +321,7 @@ class VisibilityQueryService:
         # ── Admin：单分支 SELECT，忽略 scope（Req 1.8/5.5）──
         if context.role is VisibilityRole.admin:
             sql = _BRANCH_ADMIN.format(wpx_filter_wi_id=f_wi_id)
+            sql = self._sqlite_portable_uuid_casts(sql)
             return list((await self.db.execute(sa.text(sql), params)).all())
 
         # ── Non_Admin：scope 相交；空 scope 直接空集（不回退循环级，Req 5.3/5.4）──
@@ -340,7 +341,30 @@ class VisibilityQueryService:
             branches.append(_BRANCH_SUPERVISOR.format(wpx_filter_wi_id=f_wi_id))
 
         sql = "\nUNION ALL\n".join(f"({b.strip()})" for b in branches)
+        sql = self._sqlite_portable_uuid_casts(sql)
         return list((await self.db.execute(sa.text(sql), params)).all())
+
+    def _sqlite_portable_uuid_casts(self, sql: str) -> str:
+        """SQLite 无 uuid 类型；测试夹具下去掉 CAST(... AS uuid)，参数直接按文本比。"""
+        dialect = ""
+        try:
+            bind = self.db.get_bind()
+            if bind is not None:
+                dialect = bind.dialect.name
+        except Exception:
+            dialect = ""
+        if not dialect:
+            try:
+                dialect = self.db.sync_session.get_bind().dialect.name
+            except Exception:
+                dialect = ""
+        if dialect != "sqlite":
+            return sql
+        return (
+            sql.replace("CAST(:pid AS uuid)", ":pid")
+            .replace("CAST(:uid AS uuid)", ":uid")
+            .replace("CAST(:wpx AS uuid)", ":wpx")
+        )
 
     @staticmethod
     def _aggregate(

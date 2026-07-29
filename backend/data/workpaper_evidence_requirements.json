@@ -1,0 +1,45 @@
+{
+  "_comment": "底稿证据类型声明 — attachment-workpaper-linkage-convergence Req4。wp_code_prefix → 应收集证据类型；宁缺勿造，未列出的底稿不提示。匹配规则：exact / prefix- / prefix+字母后缀（如 E1A）。",
+  "D0": [
+    { "type": "confirmation", "label": "函证回函件" }
+  ],
+  "D2": [
+    { "type": "voucher", "label": "记账凭证/原始单据影像" }
+  ],
+  "D3": [
+    { "type": "voucher", "label": "记账凭证影像" }
+  ],
+  "D4": [
+    { "type": "contract", "label": "合同/协议影像" }
+  ],
+  "E0": [
+    { "type": "confirmation", "label": "银行函证回函件" }
+  ],
+  "E1": [
+    { "type": "bank_statement", "label": "银行对账单" },
+    { "type": "confirmation", "label": "银行询证函回函" }
+  ],
+  "F0": [
+    { "type": "confirmation", "label": "应付函证回函件" }
+  ],
+  "F1": [
+    { "type": "confirmation", "label": "预付函证回函件" }
+  ],
+  "F2": [
+    { "type": "stocktake", "label": "存货盘点/监盘记录" },
+    { "type": "contract", "label": "购销合同/入库单据" }
+  ],
+  "F3": [
+    { "type": "note", "label": "票据影像" }
+  ],
+  "F4": [
+    { "type": "contract", "label": "供应商合同/对账单" }
+  ],
+  "H1": [
+    { "type": "stocktake", "label": "固定资产盘点记录" }
+  ],
+  "H3": [
+    { "type": "contract", "label": "产权/权属证明" }
+  ]
+}
+

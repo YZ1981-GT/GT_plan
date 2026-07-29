@@ -28,6 +28,7 @@ from typing import Any
 import sqlalchemy as sa
 
 from ._context import RenderContext
+from ._lmn_tb_helper import fetch_tb_for_balance
 
 logger = logging.getLogger(__name__)
 
@@ -172,6 +173,9 @@ async def render(ctx: RenderContext) -> dict | None:
     # ─── 负余额检测 ─────────────────────────────────────────────────────
     negative_balance_warnings = detect_negative_balances(responses_snapshot)
 
+    # ─── TB 取数（L 循环四表取数 spec） ─────────────────────────────────────
+    tb = await fetch_tb_for_balance(ctx, "2601")
+
     return {
         "sheet_name": ctx.classification.sheet_name if ctx.classification else "",
         "project_context": project_context,
@@ -185,4 +189,5 @@ async def render(ctx: RenderContext) -> dict | None:
         },
         # 负余额警告（前端可展示黄色提示）
         "negative_balance_warnings": negative_balance_warnings,
+        "trial_balance": tb,
     }

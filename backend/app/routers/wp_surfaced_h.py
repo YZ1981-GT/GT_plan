@@ -644,6 +644,7 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
              "行业适用性（useH5IndustryGuard）", "useH5IndustryGuard"),
             ("审定回写 TB", "原值(1631)/累计折耗(1632) 审定数回写 trial_balance", "取数",
              "publishAdjudicated（account_codes 1631/1632）", "useH5Adjudication"),
+            ("试算表1631期末余额(TB核对)", "TB('1631','期末余额')", "取数", "审定表TB↔审定核对标量", "Tier A"),
         ],
         # H5-2 明细表
         "H5-2": [
@@ -734,6 +735,7 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
              "与经审计财务报表核对（fsCompareRows）/审定表H6-1", "useH6Adjudication"),
             ("审定数回写试算表", "期末审定合计回写试算平衡表科目1606（借方/资产类过渡科目）", "logic_check",
              "审定确认回写 TB（publishAdjudicated / writebackTrialBalance，account_code=1606）/审定表H6-1", "useH6FormData"),
+            ("试算表1606期末余额(TB核对)", "TB('1606','期末余额')", "取数", "审定表TB↔审定核对标量，过渡科目期末应为0", "Tier A"),
         ],
         "H6-2": [
             ("净值", "净值 = 原值 − 累计折旧 − 减值准备", "计算",
@@ -823,6 +825,7 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
              "adjudicationVsDetail", "useH7CrossSheet"),
             ("累计折旧本期计提勾稽", "H7-11 折旧测算本期计提合计（H7-11-dep-total）应与 H7-1 审定表累计折旧本期贷方发生（H7-1-dep-credit）一致，|差额|<0.01", "logic_check",
              "depreciationVsAdjudication", "useH7CrossSheet"),
+            ("试算表1621期末余额(TB核对)", "TB('1621','期末余额')", "取数", "审定表TB↔审定核对标量", "Tier A"),
         ],
         "H7-2": [
             ("明细净值", "净值 = 原值 - 累计折旧 - 减值准备", "计算",
@@ -884,6 +887,7 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
              "TB 回写（onWritebackTB / writebackTrialBalance）", "useH8Adjudication"),
             ("审定合计与明细表核对", "H8-1 原值审定合计 与 H8-2 明细入账值合计 应一致", "logic_check",
              "H8-1↔H8-2 勾稽（adjudicationVsDetail）", "useH8CrossSheet"),
+            ("试算表1901期末余额(TB核对)", "TB('1901','期末余额')", "取数", "审定表TB↔审定核对标量", "Tier A"),
         ],
         "H8-2": [
             ("使用权资产初始计量(入账值)", "租赁负债初始确认(H9) + 初始直接费用 − 租赁激励（CAS21第16条）", "计算",
@@ -1091,6 +1095,7 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
              "h9VsH8Linkage", "useH9CrossSheet"),
             ("摊销表利息↔审定表本期利息勾稽", "摊销表本期利息合计 − H9-1 审定表本期利息费用，|差额|≤1元", "logic_check",
              "amortizationVsAdjudication（H9-amort-current-interest）", "useH9CrossSheet"),
+            ("试算表2205期末余额(TB核对)", "TB('2205','期末余额')", "取数", "审定表TB↔审定核对标量，负债类", "Tier A"),
         ],
         "H9-2": [
             ("期末余额", "期初余额 − 本期偿还(借方减少) + 本期利息(贷方增加)（负债贷方 E=B−C+D）", "计算",
@@ -1198,6 +1203,7 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
              "与H1/H6/H8等来源底稿处置勾稽（sourceWpMismatches / H10_SOURCE_WP_TO_ROW_KEY）", "useH10CrossSheet"),
             ("审定合计回写试算平衡表", "审定合计回写6115审定数并发布 substantive:adjudicated 跨底稿事件", "取数",
              "审定数回写TB及联动（publishAdjudicated/writebackTB）", "useH10Adjudication"),
+            ("试算表6115审定发生额(TB核对)", "TB('6115','审定数')", "取数", "审定表TB↔审定核对标量，损益类", "Tier A"),
         ],
         "H10-2": [
             ("净账面价值", "原值 − 累计折旧 − 减值准备", "计算",

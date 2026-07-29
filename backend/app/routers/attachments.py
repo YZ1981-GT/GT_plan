@@ -6,6 +6,7 @@
 - POST   /api/attachments/{id}/associate         — 关联到底稿
 - GET    /api/attachments/search                 — 全文搜索
 - GET    /api/working-papers/{wp_id}/attachments — 底稿关联附件
+- DELETE /api/working-papers/{wp_id}/attachments/{attachment_id}/link — 解除关联
 
 Validates: Requirements 14.2, 14.5, 14.8
 """
@@ -23,7 +24,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import PERMISSION_HIERARCHY, get_current_user, require_project_access
+from app.deps import PERMISSION_HIERARCHY, authorize_wp_edit, get_current_user, require_project_access
 from app.models.core import ProjectUser, User
 from app.services.attachment_service import AttachmentService
 from app.services.wp_visibility.entry_integration import (
@@ -236,6 +237,33 @@ async def get_wp_attachments(wp_id: UUID, db: AsyncSession = Depends(get_db), cu
         wp_id=wp_id, entry_family="attachment",
     )
     return await svc.get_wp_attachments(wp_id)
+
+
+@router.delete("/api/working-papers/{wp_id}/attachments/{attachment_id}/link")
+async def unlink_wp_attachment(
+    wp_id: UUID,
+    attachment_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """解除附件↔底稿关联（权威链表 + matching reference）。
+
+    权限双层：gate_wp 可见性 + authorize_wp_edit（无编辑权 403）。
+    不存在的关联 no-op 200。不删附件本身。
+
+    spec: attachment-workpaper-linkage-convergence Task 4.1
+    """
+    await gate_wp(
+        db, current_user,
+        entrypoint="attachment.unlink", action="attach_associate", method="DELETE",
+        wp_id=wp_id, entry_family="attachment",
+    )
+    await authorize_wp_edit(db, current_user, wp_id)
+
+    svc = _svc(db)
+    result = await svc.unlink_wp_attachment(wp_id, attachment_id)
+    await db.commit()
+    return result
 
 
 class OCRStatusUpdate(BaseModel):

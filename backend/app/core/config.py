@@ -307,6 +307,12 @@ class Settings(BaseSettings):
     # D6/D2 试点验证后再铺 D1/D3/D4/D5/D7，单循环可回退。
     D_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED: bool = False
 
+    # --- f2-four-table-extraction-refresh ---
+    # F2 存货审定表四表取数灰度开关。置 True 才启用 F2-1 Tier A 可编辑取数公式 +
+    # Tier B render 预填 + 🔄刷新取数入口。默认 False = 零回归：F2 render/公式管理/
+    # 前端行为与改动前逐字节等价。
+    F2_FOUR_TABLE_EXTRACTION_ENABLED: bool = False
+
     # --- d-cycle-tier-a-writeback-detail-seed（前置 spec 的增量，P0-2 子开关）---
     # 门控「明细表维度归集 render 自动 seed」（P0-2 / Requirement 4）——打开 D-cycle 明细表
     # 且明细行完全空时，调既有后端归集（tb_aux_balance 客户/合同维度、序时账期后归集）
@@ -347,6 +353,20 @@ class Settings(BaseSettings):
     # H2 在建工程四表取数灰度开关：H2-2 明细从 tb_balance 1604 叶子自动种子。
     # 默认 True = render 输出 detail_prefill 供前端 Persist_First 种子。
     H2_FOUR_TABLE_EXTRACTION_ENABLED: bool = True
+
+    # --- hi-cycle-four-table-extraction ---
+    # H5-H10 / I1-I6 共 12 张审定表四表库取数公式预设 + render 分段 prefill + 刷新入口。
+    # 复用 d_cycle_extraction 模块（presets/anchor_registry/tier_a_seed/prefill）。
+    # 默认 False = 零回归：render 不输出 adjudication_segment_prefill 等取数字段，
+    # 既有功能逐字节不变。各底稿取数环节异常一律 fail-open 不阻断 render。
+    HI_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED: bool = False
+
+    # --- lmn-four-table-extraction ---
+    # L/M/N 循环审定表四表库取数灰度开关：L1-L8 + M1/M2 从 tb_balance 取期初/期末余额
+    # 或借贷发生额供审定表 TB 核对行消费。默认 False = 零回归：helper 返回全 0 结果，
+    # 前端 `hasTb` 守卫不渲染核对行（逐字节等价当前无 TB 数据时审定表无核对行）。
+    # 任一取数异常一律 fail-open（result 各字段置 0，log warning），不阻断 render。
+    LMN_FOUR_TABLE_EXTRACTION_ENABLED: bool = False
 
     model_config = SettingsConfigDict(env_file=_env_file, extra="ignore")
 

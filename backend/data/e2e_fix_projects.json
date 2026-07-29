@@ -35,9 +35,9 @@
       "warnings": []
     },
     "FIX-INT": {
-      "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
-      "project_name": "重药控股安徽有限公司_2025",
-      "business_category": "C",
+      "project_id": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
+      "project_name": "重庆和平药房连锁有限责任公司_2025",
+      "business_category": "A1",
       "ready": true,
       "missing_wp_codes": [],
       "warnings": []
@@ -71,7 +71,7 @@
     "TEST_PROJECT_ID": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
     "TEST_PROJECT_ID_FIX_A": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
     "TEST_PROJECT_ID_FIX_B": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
-    "TEST_PROJECT_ID_FIX_INT": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
+    "TEST_PROJECT_ID_FIX_INT": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
     "TEST_PROJECT_ID_FIX_RP": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
     "TEST_PROJECT_ID_FIX_F": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
     "TEST_PROJECT_ID_FIX_I6": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",

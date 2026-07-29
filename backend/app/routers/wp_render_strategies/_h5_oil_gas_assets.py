@@ -213,7 +213,7 @@ async def render(ctx: RenderContext) -> dict | None:
     # ─── 4. 项目上下文 ──────────────────────────────────────────────────────
     project_context = await _load_project_context(ctx)
 
-    return {
+    payload = {
         "component_type": "h5-oil-gas-assets",
         "account_codes": ["1631", "1632"],
         "responses_snapshot": responses_snapshot,
@@ -223,3 +223,43 @@ async def render(ctx: RenderContext) -> dict | None:
         "sheets": H5_SHEETS,
         "industry": industry,
     }
+
+    # ─── 灰度：H/I 四表取数增强（仅行业适用时，AFTER industry guard） ──────
+    from app.core.config import settings
+    if settings.HI_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED:
+        try:
+            import asyncio
+            from app.services.d_cycle_extraction.prefill import build_d_adjudication_prefill
+            segments = []
+            cost_items = await asyncio.wait_for(
+                build_d_adjudication_prefill(ctx, account_prefix="1631", mode="balance"),
+                timeout=5.0,
+            )
+            if cost_items:
+                segments.append({"segment": "cost", "account_prefix": "1631", "mode": "balance", "items": cost_items})
+            dep_items = await asyncio.wait_for(
+                build_d_adjudication_prefill(ctx, account_prefix="1632", mode="balance"),
+                timeout=5.0,
+            )
+            if dep_items:
+                segments.append({"segment": "depletion", "account_prefix": "1632", "mode": "balance", "items": dep_items})
+            if segments:
+                payload["adjudication_segment_prefill"] = {"segments": segments, "enabled": True}
+                payload["hi_extraction_enabled"] = True
+            # Tier A transient seed（TB核对行）
+            from app.services.d_cycle_extraction.tier_a_seed import seed_tier_a_reconciliation
+            from app.services.d_cycle_extraction.presets import resolve_effective
+            from app.services.wp_formula_eval_service import evaluate_wp_formula_expression
+            await asyncio.wait_for(
+                seed_tier_a_reconciliation(
+                    ctx, "H5",
+                    responses_snapshot,
+                    resolve_effective=resolve_effective,
+                    evaluate_wp_formula_expression=evaluate_wp_formula_expression,
+                ),
+                timeout=5.0,
+            )
+        except Exception as e:  # noqa: BLE001
+            logger.warning("HI extraction prefill failed (%s): %s", "H5", e)
+
+    return payload

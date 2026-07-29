@@ -28143,6 +28143,375 @@
       ],
       "source": "note_report_cross_check",
       "description": "报表↔附注勾稽（与报表侧 `report:cross_check` 同源）：所得税费用：报表 IS-023 = 附注五、61合计"
+    },
+    {
+      "page_key": "workpaper:L1-1",
+      "target_cell": "L1-adj-tb-amount-opening",
+      "expression": "TB('2001','期初余额')",
+      "formula_type": "auto_calc",
+      "refs": [{"formula_ref": "TB('2001')"}],
+      "source": "lmn_four_table_extraction",
+      "description": "L1短期借款TB核对（期初，负债贷方）"
+    },
+    {
+      "page_key": "workpaper:L1-1",
+      "target_cell": "L1-adj-tb-amount-ending",
+      "expression": "TB('2001','期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [{"formula_ref": "TB('2001')"}],
+      "source": "lmn_four_table_extraction",
+      "description": "L1短期借款TB核对（期末，负债贷方）"
+    },
+    {
+      "page_key": "workpaper:L2-1",
+      "target_cell": "L2-adj-tb-amount-opening",
+      "expression": "TB('2231','期初余额')",
+      "formula_type": "auto_calc",
+      "refs": [{"formula_ref": "TB('2231')"}],
+      "source": "lmn_four_table_extraction",
+      "description": "L2应付利息TB核对（期初，负债贷方）"
+    },
+    {
+      "page_key": "workpaper:L2-1",
+      "target_cell": "L2-adj-tb-amount-ending",
+      "expression": "TB('2231','期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [{"formula_ref": "TB('2231')"}],
+      "source": "lmn_four_table_extraction",
+      "description": "L2应付利息TB核对（期末，负债贷方）"
+    },
+    {
+      "page_key": "workpaper:L3-1",
+      "target_cell": "L3-adj-tb-amount-opening",
+      "expression": "TB('2501','期初余额')",
+      "formula_type": "auto_calc",
+      "refs": [{"formula_ref": "TB('2501')"}],
+      "source": "lmn_four_table_extraction",
+      "description": "L3长期借款TB核对（期初，负债贷方）"
+    },
+    {
+      "page_key": "workpaper:L3-1",
+      "target_cell": "L3-adj-tb-amount-ending",
+      "expression": "TB('2501','期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [{"formula_ref": "TB('2501')"}],
+      "source": "lmn_four_table_extraction",
+      "description": "L3长期借款TB核对（期末，负债贷方）"
+    },
+    {
+      "page_key": "workpaper:L4-1",
+      "target_cell": "L4-adj-tb-amount-opening",
+      "expression": "TB('2502','期初余额')",
+      "formula_type": "auto_calc",
+      "refs": [{"formula_ref": "TB('2502')"}],
+      "source": "lmn_four_table_extraction",
+      "description": "L4应付债券TB核对（期初，负债贷方）"
+    },
+    {
+      "page_key": "workpaper:L4-1",
+      "target_cell": "L4-adj-tb-amount-ending",
+      "expression": "TB('2502','期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [{"formula_ref": "TB('2502')"}],
+      "source": "lmn_four_table_extraction",
+      "description": "L4应付债券TB核对（期末，负债贷方）"
+    },
+    {
+      "page_key": "workpaper:L5-1",
+      "target_cell": "L5-adj-tb-amount-opening",
+      "expression": "TB('2701','期初余额')",
+      "formula_type": "auto_calc",
+      "refs": [{"formula_ref": "TB('2701')"}],
+      "source": "lmn_four_table_extraction",
+      "description": "L5长期应付款TB核对（期初，负债贷方）"
+    },
+    {
+      "page_key": "workpaper:L5-1",
+      "target_cell": "L5-adj-tb-amount-ending",
+      "expression": "TB('2701','期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [{"formula_ref": "TB('2701')"}],
+      "source": "lmn_four_table_extraction",
+      "description": "L5长期应付款TB核对（期末，负债贷方）"
+    },
+    {
+      "page_key": "workpaper:L6-1",
+      "target_cell": "L6-adj-tb-amount-opening",
+      "expression": "TB('2601','期初余额')",
+      "formula_type": "auto_calc",
+      "refs": [{"formula_ref": "TB('2601')"}],
+      "source": "lmn_four_table_extraction",
+      "description": "L6专项应付款TB核对（期初，负债贷方）"
+    },
+    {
+      "page_key": "workpaper:L6-1",
+      "target_cell": "L6-adj-tb-amount-ending",
+      "expression": "TB('2601','期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [{"formula_ref": "TB('2601')"}],
+      "source": "lmn_four_table_extraction",
+      "description": "L6专项应付款TB核对（期末，负债贷方）"
+    },
+    {
+      "page_key": "workpaper:L7-1",
+      "target_cell": "L7-adj-tb-amount-opening",
+      "expression": "TB('2801','期初余额')",
+      "formula_type": "auto_calc",
+      "refs": [{"formula_ref": "TB('2801')"}],
+      "source": "lmn_four_table_extraction",
+      "description": "L7其他非流动负债TB核对（期初，负债贷方）"
+    },
+    {
+      "page_key": "workpaper:L7-1",
+      "target_cell": "L7-adj-tb-amount-ending",
+      "expression": "TB('2801','期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [{"formula_ref": "TB('2801')"}],
+      "source": "lmn_four_table_extraction",
+      "description": "L7其他非流动负债TB核对（期末，负债贷方）"
+    },
+    {
+      "page_key": "workpaper:L8-1",
+      "target_cell": "L8-adj-tb-amount-occurrence",
+      "expression": "TB('6603','借方发生额')-TB('6603','贷方发生额')",
+      "formula_type": "auto_calc",
+      "refs": [{"formula_ref": "TB('6603')"}],
+      "source": "lmn_four_table_extraction",
+      "description": "L8财务费用TB核对（发生额=借-贷，损益借方）"
+    },
+    {
+      "page_key": "workpaper:M1-1",
+      "target_cell": "M1-adj-tb-amount-opening",
+      "expression": "TB('2232','期初余额')",
+      "formula_type": "auto_calc",
+      "refs": [{"formula_ref": "TB('2232')"}],
+      "source": "lmn_four_table_extraction",
+      "description": "M1应付股利TB核对（期初，负债贷方）"
+    },
+    {
+      "page_key": "workpaper:M1-1",
+      "target_cell": "M1-adj-tb-amount-ending",
+      "expression": "TB('2232','期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [{"formula_ref": "TB('2232')"}],
+      "source": "lmn_four_table_extraction",
+      "description": "M1应付股利TB核对（期末，负债贷方）"
+    },
+    {
+      "page_key": "workpaper:M2-1",
+      "target_cell": "M2-adj-tb-amount-opening",
+      "expression": "TB('4001','期初余额')",
+      "formula_type": "auto_calc",
+      "refs": [{"formula_ref": "TB('4001')"}],
+      "source": "lmn_four_table_extraction",
+      "description": "M2实收资本TB核对（期初，权益贷方）"
+    },
+    {
+      "page_key": "workpaper:M2-1",
+      "target_cell": "M2-adj-tb-amount-ending",
+      "expression": "TB('4001','期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [{"formula_ref": "TB('4001')"}],
+      "source": "lmn_four_table_extraction",
+      "description": "M2实收资本TB核对（期末，权益贷方）"
+    },
+    {
+      "page_key": "workpaper:M3-1",
+      "target_cell": "M3-adj-tb-amount-net",
+      "expression": "TB('4002','借方发生额')-TB('4002','贷方发生额')",
+      "formula_type": "auto_calc",
+      "refs": [{"formula_ref": "TB('4002')"}],
+      "source": "lmn_four_table_extraction",
+      "description": "M3库存股TB核对（净额=借-贷，权益备抵借方）"
+    },
+    {
+      "page_key": "workpaper:M4-1",
+      "target_cell": "M4-adj-tb-amount-opening",
+      "expression": "TB('4002','期初余额')",
+      "formula_type": "auto_calc",
+      "refs": [{"formula_ref": "TB('4002')"}],
+      "source": "lmn_four_table_extraction",
+      "description": "M4资本公积TB核对（期初，权益贷方）"
+    },
+    {
+      "page_key": "workpaper:M4-1",
+      "target_cell": "M4-adj-tb-amount-ending",
+      "expression": "TB('4002','期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [{"formula_ref": "TB('4002')"}],
+      "source": "lmn_four_table_extraction",
+      "description": "M4资本公积TB核对（期末，权益贷方）"
+    },
+    {
+      "page_key": "workpaper:M5-1",
+      "target_cell": "M5-adj-tb-amount-opening",
+      "expression": "TB('4101','期初余额')",
+      "formula_type": "auto_calc",
+      "refs": [{"formula_ref": "TB('4101')"}],
+      "source": "lmn_four_table_extraction",
+      "description": "M5盈余公积TB核对（期初，权益贷方）"
+    },
+    {
+      "page_key": "workpaper:M5-1",
+      "target_cell": "M5-adj-tb-amount-ending",
+      "expression": "TB('4101','期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [{"formula_ref": "TB('4101')"}],
+      "source": "lmn_four_table_extraction",
+      "description": "M5盈余公积TB核对（期末，权益贷方）"
+    },
+    {
+      "page_key": "workpaper:M6-1",
+      "target_cell": "M6-adj-tb-amount-opening",
+      "expression": "TB('4104','期初余额')",
+      "formula_type": "auto_calc",
+      "refs": [{"formula_ref": "TB('4104')"}],
+      "source": "lmn_four_table_extraction",
+      "description": "M6利润分配TB核对（期初，权益贷方）"
+    },
+    {
+      "page_key": "workpaper:M6-1",
+      "target_cell": "M6-adj-tb-amount-ending",
+      "expression": "TB('4104','期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [{"formula_ref": "TB('4104')"}],
+      "source": "lmn_four_table_extraction",
+      "description": "M6利润分配TB核对（期末，权益贷方）"
+    },
+    {
+      "page_key": "workpaper:M7-1",
+      "target_cell": "M7-adj-tb-amount-opening",
+      "expression": "TB('4201','期初余额')",
+      "formula_type": "auto_calc",
+      "refs": [{"formula_ref": "TB('4201')"}],
+      "source": "lmn_four_table_extraction",
+      "description": "M7专项储备TB核对（期初，权益贷方）"
+    },
+    {
+      "page_key": "workpaper:M7-1",
+      "target_cell": "M7-adj-tb-amount-ending",
+      "expression": "TB('4201','期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [{"formula_ref": "TB('4201')"}],
+      "source": "lmn_four_table_extraction",
+      "description": "M7专项储备TB核对（期末，权益贷方）"
+    },
+    {
+      "page_key": "workpaper:M8-1",
+      "target_cell": "M8-adj-tb-amount-audited",
+      "expression": "SUM_TB('4104','审定数')",
+      "formula_type": "auto_calc",
+      "refs": [{"formula_ref": "SUM_TB('4104')"}],
+      "source": "lmn_four_table_extraction",
+      "description": "M8一般风险准备TB核对（审定数，金融专属）"
+    },
+    {
+      "page_key": "workpaper:M9-1",
+      "target_cell": "M9-adj-tb-amount-opening",
+      "expression": "TB('4103','期初余额')",
+      "formula_type": "auto_calc",
+      "refs": [{"formula_ref": "TB('4103')"}],
+      "source": "lmn_four_table_extraction",
+      "description": "M9其他综合收益TB核对（期初，权益贷方）"
+    },
+    {
+      "page_key": "workpaper:M9-1",
+      "target_cell": "M9-adj-tb-amount-ending",
+      "expression": "TB('4103','期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [{"formula_ref": "TB('4103')"}],
+      "source": "lmn_four_table_extraction",
+      "description": "M9其他综合收益TB核对（期末，权益贷方）"
+    },
+    {
+      "page_key": "workpaper:M10-1",
+      "target_cell": "M10-adj-tb-amount-opening",
+      "expression": "TB('4003','期初余额')",
+      "formula_type": "auto_calc",
+      "refs": [{"formula_ref": "TB('4003')"}],
+      "source": "lmn_four_table_extraction",
+      "description": "M10其他权益工具TB核对（期初，权益贷方）"
+    },
+    {
+      "page_key": "workpaper:M10-1",
+      "target_cell": "M10-adj-tb-amount-ending",
+      "expression": "TB('4003','期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [{"formula_ref": "TB('4003')"}],
+      "source": "lmn_four_table_extraction",
+      "description": "M10其他权益工具TB核对（期末，权益贷方）"
+    },
+    {
+      "page_key": "workpaper:N1-1",
+      "target_cell": "N1-adj-tb-amount-opening",
+      "expression": "TB('1811','期初余额')",
+      "formula_type": "auto_calc",
+      "refs": [{"formula_ref": "TB('1811')"}],
+      "source": "lmn_four_table_extraction",
+      "description": "N1递延所得税资产TB核对（期初，资产借方）"
+    },
+    {
+      "page_key": "workpaper:N1-1",
+      "target_cell": "N1-adj-tb-amount-ending",
+      "expression": "TB('1811','期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [{"formula_ref": "TB('1811')"}],
+      "source": "lmn_four_table_extraction",
+      "description": "N1递延所得税资产TB核对（期末，资产借方）"
+    },
+    {
+      "page_key": "workpaper:N2-1",
+      "target_cell": "N2-adj-tb-amount-opening",
+      "expression": "TB('2221','期初余额')",
+      "formula_type": "auto_calc",
+      "refs": [{"formula_ref": "TB('2221')"}],
+      "source": "lmn_four_table_extraction",
+      "description": "N2应交税费TB核对（期初，负债贷方）"
+    },
+    {
+      "page_key": "workpaper:N2-1",
+      "target_cell": "N2-adj-tb-amount-ending",
+      "expression": "TB('2221','期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [{"formula_ref": "TB('2221')"}],
+      "source": "lmn_four_table_extraction",
+      "description": "N2应交税费TB核对（期末，负债贷方）"
+    },
+    {
+      "page_key": "workpaper:N3-1",
+      "target_cell": "N3-adj-tb-amount-opening",
+      "expression": "TB('2901','期初余额')",
+      "formula_type": "auto_calc",
+      "refs": [{"formula_ref": "TB('2901')"}],
+      "source": "lmn_four_table_extraction",
+      "description": "N3递延所得税负债TB核对（期初，负债贷方）"
+    },
+    {
+      "page_key": "workpaper:N3-1",
+      "target_cell": "N3-adj-tb-amount-ending",
+      "expression": "TB('2901','期末余额')",
+      "formula_type": "auto_calc",
+      "refs": [{"formula_ref": "TB('2901')"}],
+      "source": "lmn_four_table_extraction",
+      "description": "N3递延所得税负债TB核对（期末，负债贷方）"
+    },
+    {
+      "page_key": "workpaper:N4-1",
+      "target_cell": "N4-adj-tb-amount-occurrence",
+      "expression": "TB('6403','借方发生额')-TB('6403','贷方发生额')",
+      "formula_type": "auto_calc",
+      "refs": [{"formula_ref": "TB('6403')"}],
+      "source": "lmn_four_table_extraction",
+      "description": "N4税金及附加TB核对（发生额=借-贷，损益借方）"
+    },
+    {
+      "page_key": "workpaper:N5-1",
+      "target_cell": "N5-adj-tb-amount-occurrence",
+      "expression": "TB('6801','借方发生额')-TB('6801','贷方发生额')",
+      "formula_type": "auto_calc",
+      "refs": [{"formula_ref": "TB('6801')"}],
+      "source": "lmn_four_table_extraction",
+      "description": "N5所得税费用TB核对（发生额=借-贷，损益借方）"
     }
   ]
 }

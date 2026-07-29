@@ -56,6 +56,9 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
              "审定数与 TB 各科目未审数核对（differenceRows）", "useI1Adjudication.differenceRows"),
             ("审定表 ↔ I1-2 明细交叉验证", "原值/摊销/减值小计审定 − I1-2 明细各科目期末合计", "logic_check",
              "差异>0.01 黄色警告（crossValidation）", "useI1Adjudication.crossValidation / useI1CrossSheet.adjudicationFromDetail"),
+            ("试算表1701原值期末(TB核对)", "TB('1701','期末余额')", "取数", "审定表TB↔审定核对标量，原值", "Tier A"),
+            ("试算表1702摊销期末(TB核对)", "TB('1702','期末余额')", "取数", "审定表TB↔审定核对标量，备抵", "Tier A"),
+            ("试算表1703减值期末(TB核对)", "TB('1703','期末余额')", "取数", "审定表TB↔审定核对标量，备抵", "Tier A"),
         ],
         # I1-2 明细表
         "I1-2": [
@@ -210,6 +213,7 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
              "审定合计与 TB 开发支出(1717)核对（tbDiff）", "useI2Adjudication.tbDiff"),
             ("期末余额 ↔ I2-2 明细交叉验证", "审定表期末余额合计 − I2-2 资本化期末合计", "logic_check",
              "审定表↔明细勾稽（detailTotals.capitalized）", "useI2CrossSheet.detailTotals"),
+            ("试算表1717期末余额(TB核对)", "TB('1717','期末余额')", "取数", "审定表TB↔审定核对标量", "Tier A"),
         ],
         # I2-2 明细表
         "I2-2": [
@@ -354,6 +358,7 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
              "审定合计与 TB 商誉(1711)核对（tbDiff）", "useI3Adjudication.tbDiff"),
             ("审定表 ↔ I3-2 明细交叉验证", "审定原值/减值/净值 − I3-2 明细合计", "logic_check",
              "审定表↔明细勾稽（buildI3AdjudicationCrossCheck）", "useI3Adjudication.crossCheck"),
+            ("试算表1711期末余额(TB核对)", "TB('1711','期末余额')", "取数", "审定表TB↔审定核对标量，不摊销仅减值", "Tier A"),
         ],
         # I3-2 明细表
         "I3-2": [
@@ -447,6 +452,7 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
              "审定合计与 TB 长期待摊费用(1801)核对（tbDifference）", "useI4Adjudication.tbDifference"),
             ("审定表 ↔ I4-2 明细交叉验证", "审定期末合计 − I4-2 明细期末余额合计", "logic_check",
              "审定表↔明细勾稽（buildI4AdjudicationCrossCheck）", "useI4Adjudication.crossCheck"),
+            ("试算表1801期末余额(TB核对)", "TB('1801','期末余额')", "取数", "审定表TB↔审定核对标量", "Tier A"),
         ],
         # I4-2 明细表
         "I4-2": [
@@ -523,6 +529,7 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
              "审定合计与 TB 其他非流动资产(1911)核对（tbDifference）", "useI5Adjudication.tbDifference"),
             ("审定表 ↔ I5-2 明细交叉验证", "审定期末合计 − I5-2 明细净值期末合计", "logic_check",
              "审定表↔明细勾稽（buildI5AdjudicationCrossCheck）", "useI5Adjudication.crossCheck"),
+            ("试算表1911期末余额(TB核对)", "TB('1911','期末余额')", "取数", "审定表TB↔审定核对标量", "Tier A"),
         ],
         # I5-2 明细表
         "I5-2": [
@@ -580,6 +587,7 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
              "审定发生额与 TB 研发费用(6602)核对（tbDifference）", "useI6Adjudication.tbDifference"),
             ("审定表 ↔ I6-2 明细交叉验证", "本期审定合计 − I6-2 月度合计之和", "logic_check",
              "审定表↔明细月度勾稽（detailCrossValidation）", "useI6Adjudication.detailCrossValidation"),
+            ("试算表6602审定发生额(TB核对)", "TB('6602','审定数')", "取数", "审定表TB↔审定核对标量，损益类借方", "Tier A"),
         ],
         # I6-2 明细表（月度12列横向）
         "I6-2": [

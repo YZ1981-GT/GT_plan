@@ -30,6 +30,7 @@ from app.models.audit_platform_models import TbLedger
 from app.services.dataset_query import get_active_filter
 
 from ._context import RenderContext
+from ._lmn_tb_helper import fetch_tb_for_income
 
 logger = logging.getLogger(__name__)
 
@@ -195,6 +196,9 @@ async def render(ctx: RenderContext) -> dict | None:
         db, ctx.project_id, audit_year, "6603"
     )
 
+    # ─── TB 取数（L 循环四表取数 spec） ─────────────────────────────────────
+    tb = await fetch_tb_for_income(ctx, "6603")
+
     return {
         "sheet_name": ctx.classification.sheet_name if ctx.classification else "",
         "project_context": project_context,
@@ -208,4 +212,5 @@ async def render(ctx: RenderContext) -> dict | None:
         },
         # tb_ledger 发生额（前端审定表 seed 数据）
         "occurrence_from_ledger": occurrence_data,
+        "trial_balance": tb,
     }

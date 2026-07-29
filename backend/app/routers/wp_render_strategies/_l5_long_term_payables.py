@@ -23,6 +23,7 @@ import logging
 import sqlalchemy as sa
 
 from ._context import RenderContext
+from ._lmn_tb_helper import fetch_tb_for_balance
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +84,9 @@ async def render(ctx: RenderContext) -> dict | None:
     except Exception as e:  # noqa: BLE001
         logger.warning("L5 render: project context 查询失败: %s", e)
 
+    # ─── TB 取数（L 循环四表取数 spec） ─────────────────────────────────────
+    tb = await fetch_tb_for_balance(ctx, "2701")
+
     return {
         "sheet_name": ctx.classification.sheet_name if ctx.classification else "",
         "project_context": project_context,
@@ -100,4 +104,5 @@ async def render(ctx: RenderContext) -> dict | None:
             "direction": "debit",  # 借方/备抵类
             "end_balance_formula": "begin + debit - credit",  # 期末=期初+借方-贷方
         },
+        "trial_balance": tb,
     }

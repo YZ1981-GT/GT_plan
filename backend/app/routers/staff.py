@@ -32,16 +32,95 @@ async def list_staff(
     search: str | None = Query(None),
     department: str | None = Query(None),
     partner_name: str | None = Query(None),
+    title: str | None = Query(None),
+    status: str | None = Query(None),
+    project_id: str | None = Query(None),
     offset: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
     svc = StaffService(db)
-    items, total = await svc.list_staff(search, department, partner_name, offset, limit)
+    pid = UUID(project_id) if project_id else None
+    items, total = await svc.list_staff(search, department, partner_name, title, status, pid, offset, limit)
     return StaffListResponse(
         items=[StaffResponse.model_validate(s) for s in items],
         total=total,
+    )
+
+
+@router.get("/stats")
+async def get_staff_stats(
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    """获取人员统计汇总（总人数/CPA/合伙人/在项目）"""
+    svc = StaffService(db)
+    return await svc.get_stats()
+
+
+@router.get("/export-template")
+async def download_import_template(user=Depends(get_current_user)):
+    """下载人员档案导入模板（xlsx 格式，含数据验证）"""
+    import io
+    import openpyxl
+    from openpyxl.worksheet.datavalidation import DataValidation
+    from fastapi.responses import StreamingResponse
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "人员档案"
+
+    # 表头
+    headers = ["姓名*", "工号", "部门", "职级", "所属合伙人", "联系电话", "邮箱",
+               "是否注册会计师", "CPA证书号", "审计年限", "专业领域", "行业经验", "入职日期"]
+    ws.append(headers)
+
+    # 示例行
+    ws.append(["张三", "A001", "审计一部", "经理", "李合伙人", "13800138000",
+               "zhangsan@gt.com", "是", "CPA-20180001", "5", "审计", "制造业,金融业", "2019-07-01"])
+
+    # 数据验证
+    title_dv = DataValidation(type="list", formula1='"合伙人,总监,高级经理,经理,高级审计员,审计员,实习生"')
+    title_dv.error = "请选择合法职级"
+    ws.add_data_validation(title_dv)
+    title_dv.add("D2:D1000")
+
+    cpa_dv = DataValidation(type="list", formula1='"是,否"')
+    ws.add_data_validation(cpa_dv)
+    cpa_dv.add("H2:H1000")
+
+    # 列宽
+    for col in range(1, len(headers) + 1):
+        ws.column_dimensions[openpyxl.utils.get_column_letter(col)].width = 15
+
+    # 编制说明 sheet
+    ws2 = wb.create_sheet("编制说明")
+    ws2.append(["字段", "说明", "必填"])
+    ws2.append(["姓名", "人员真实姓名", "是"])
+    ws2.append(["工号", "企业内部员工编号", "否"])
+    ws2.append(["部门", "如：审计一部/审计二部/审计三部", "否"])
+    ws2.append(["职级", "合伙人/总监/高级经理/经理/高级审计员/审计员/实习生", "否"])
+    ws2.append(["所属合伙人", "直属合伙人姓名", "否"])
+    ws2.append(["是否注册会计师", "填 是 或 否", "否"])
+    ws2.append(["CPA证书号", "注册会计师执业证书编号", "否"])
+    ws2.append(["审计年限", "从事审计工作年数（整数）", "否"])
+    ws2.append(["行业经验", "多个行业用英文逗号分隔", "否"])
+    ws2.append(["入职日期", "格式 YYYY-MM-DD", "否"])
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    filename = "人员档案导入模板.xlsx"
+    from urllib.parse import quote
+    encoded = quote(filename)
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{encoded}"
+        },
     )
 
 

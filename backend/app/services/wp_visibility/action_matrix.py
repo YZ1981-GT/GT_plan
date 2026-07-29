@@ -127,6 +127,8 @@ _CONTENT_MUTATION_FAMILIES: tuple[tuple[str, str, str], ...] = (
 
 # 附件关联（associate）：lead/admin/supervisor_scope 允许；assignee/reviewer 不允许（§6）。
 _ASSOCIATE_FAMILY = ("attachment.associate", "POST", "attach_associate")
+# 附件解除关联（unlink）：与 associate 同权；spec attachment-workpaper-linkage-convergence Task 4.1
+_UNLINK_FAMILY = ("attachment.unlink", "DELETE", "attach_associate")
 # 版本回滚（restore）：仅 lead/admin/supervisor_scope。
 _VERSION_RESTORE_FAMILY = ("version.restore", "POST", "version_restore")
 # 版本快照创建（snapshot）：whole-wp 写，仅 lead/admin/supervisor_scope（与 restore 同级）。
@@ -245,6 +247,7 @@ def _build_entries() -> tuple[frozenset[MatrixEntry], frozenset[MatrixKey]]:
             entries.add(_entry(uc, ak, ep, method, action, "mutation"))
         for ep, method, action in (
             _ASSOCIATE_FAMILY,
+            _UNLINK_FAMILY,
             _VERSION_RESTORE_FAMILY,
             _VERSION_SNAPSHOT_FAMILY,
             _EDITOR_WRITE_FAMILY,

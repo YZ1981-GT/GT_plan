@@ -24,12 +24,12 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import get_current_user, require_role
 from app.models.core import User
 from app.services.formula_management.delivery_export import (
     content_disposition_attachment,
@@ -38,15 +38,22 @@ from app.services.formula_management.formula_import_export import (
     build_data_workbook,
     build_template_workbook,
     parse_import_rows,
+    validate_single_formula_refs,
     workbook_to_bytes,
 )
 from app.services.formula_management.preset_library import (
+    VALID_FORMULA_TYPES,
+    PresetEntry,
     build_inventory,
     build_preset_library,
     compute_preset_coverage,
     find_presets_for_page,
+    upsert_custom_presets,
     upsert_seed_presets,
 )
+
+# 自定义预设写入角色门控（与平台编辑门控一致：系统管理员 / 业务合伙人 / 签字合伙人）
+_CUSTOM_PRESET_WRITE_ROLES = ["admin", "partner", "signing_partner"]
 from app.services.formula_management.reporting_instructions import (
     DOC_VERSION,
     instructions_as_dict,
@@ -186,8 +193,15 @@ async def get_preset_inventory(
     pages = build_inventory(entries)
     if scope:
         pages = [p for p in pages if p.scope == scope]
+
+    def _page_dict(p) -> dict[str, Any]:
+        d = p.to_dict()
+        # additive 只读派生：该页是否含自定义预设（Task 3.2 / Property 3）
+        d["has_custom"] = "custom" in (p.sources or [])
+        return d
+
     return {
-        "pages": [p.to_dict() for p in pages],
+        "pages": [_page_dict(p) for p in pages],
         "coverage": compute_preset_coverage(entries=entries),
     }
 
@@ -202,11 +216,84 @@ async def get_preset_page(
     未预设页面返回空列表（``presetted=false``），前端据此提示"该页暂无预设"。
     """
     entries = find_presets_for_page(page_key)
+
+    def _entry_dict(e) -> dict[str, Any]:
+        d = e.to_dict()
+        # additive 只读派生：来源标注（通用 vs 自定义，Task 3.2 / Property 3）
+        d["is_custom"] = e.source == "custom"
+        return d
+
     return {
         "page_key": page_key,
         "presetted": bool(entries),
-        "presets": [e.to_dict() for e in entries],
+        "presets": [_entry_dict(e) for e in entries],
     }
+
+
+# ── 自定义预设写入（平台级共享，require edit role，隔离于 seed） ───────────────
+@router.post("/presets/custom")
+async def create_custom_preset(
+    payload: dict[str, Any] = Body(...),
+    project_id: str | None = Query(default=None, description="可选：项目上下文，供引用解析"),
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_role(_CUSTOM_PRESET_WRITE_ROLES)),
+) -> dict[str, Any]:
+    """新增/更新一条平台级自定义预设（写 ``formula_custom_presets.json``，隔离于 seed）。
+
+    body：``{page_key, target_cell, expression, formula_type, refs?, description?, variant?}``。
+    ``require_role``（admin/partner/signing_partner）为唯一权限防线（Property 5）。
+    落库前**复用 ``import-data`` 的逐条 ACNR full_resolve 校验路径**（``validate_single_formula_refs``），
+    悬空引用 → 422 携清单**不落库**（Property 6）；通过 → ``upsert_custom_presets``
+    写 ``formula_custom_presets.json``（**绝不触碰 seed**，Property 2）。
+    """
+    page_key = str(payload.get("page_key") or "").strip()
+    target_cell = str(payload.get("target_cell") or "").strip()
+    expression = str(payload.get("expression") or "").strip()
+    formula_type = str(payload.get("formula_type") or "").strip()
+    if not page_key or not target_cell:
+        raise HTTPException(400, "page_key 与 target_cell 不能为空")
+    if not expression:
+        raise HTTPException(400, "expression 不能为空")
+    if formula_type not in VALID_FORMULA_TYPES:
+        raise HTTPException(
+            400,
+            f"无效公式类型 {formula_type!r}（须为 {sorted(VALID_FORMULA_TYPES)} 之一）",
+        )
+
+    raw_refs = payload.get("refs")
+    refs_in = raw_refs if isinstance(raw_refs, list) else None
+
+    # 复用 import-data 的 full_resolve 校验路径（悬空 → 422 不落库）
+    normalized_refs, dangling = await validate_single_formula_refs(
+        expression=expression,
+        refs=refs_in,
+        project_id=project_id,
+        db=db,
+    )
+    if dangling:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "message": "公式引用悬空（无法经 ACNR 解析），未保存",
+                "dangling_refs": dangling,
+            },
+        )
+
+    stats = upsert_custom_presets(
+        [
+            PresetEntry(
+                page_key=page_key,
+                target_cell=target_cell,
+                expression=expression,
+                formula_type=formula_type,
+                refs=normalized_refs,
+                source="custom",
+                description=str(payload.get("description") or ""),
+                variant=payload.get("variant"),
+            )
+        ]
+    )
+    return {"ok": True, **stats}
 
 
 # ── 说明文档单一源（Req 23.6 / 25.2 / 25.3） ─────────────────────────────────

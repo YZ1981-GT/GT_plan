@@ -24,6 +24,7 @@ from app.core.database import get_db
 from app.deps import require_project_access
 from app.models.core import User
 from app.models.workpaper_models import WpIndex, WorkingPaper, WpFileStatus
+from app.models.wp_optimization_models import WorkpaperProcedure
 
 router = APIRouter(
     prefix="/api/projects/{project_id}",
@@ -95,6 +96,50 @@ async def _resolve_user_names(db: AsyncSession, user_ids: set[str]) -> dict[str,
     return name_map
 
 
+async def _resolve_step_progress(
+    db: AsyncSession, wp_ids: set[str]
+) -> dict[str, dict[str, int]]:
+    """批量解析各底稿的程序步骤进度（单次分组查询，避免 N+1）。
+
+    返回 {wp_id: {"total": 全部步骤, "completed": 已完成, "not_applicable": 不适用}}。
+    完成率口径与 ``WpProcedureService.calc_completion_rate`` 一致：
+    有效分母 = total − not_applicable。fail-open：查询异常返回 {}。
+    """
+    if not wp_ids:
+        return {}
+
+    def _as_uuid(v):
+        try:
+            return UUID(str(v))
+        except Exception:
+            return None
+
+    ids = [g for g in (_as_uuid(u) for u in wp_ids) if g]
+    if not ids:
+        return {}
+    progress: dict[str, dict[str, int]] = {}
+    try:
+        q = sa.select(
+            WorkpaperProcedure.wp_id,
+            sa.func.count(WorkpaperProcedure.id).label("total"),
+            sa.func.count(
+                sa.case((WorkpaperProcedure.status == "completed", WorkpaperProcedure.id))
+            ).label("completed"),
+            sa.func.count(
+                sa.case((WorkpaperProcedure.status == "not_applicable", WorkpaperProcedure.id))
+            ).label("not_applicable"),
+        ).where(WorkpaperProcedure.wp_id.in_(ids)).group_by(WorkpaperProcedure.wp_id)
+        for wp_id, total, completed, na in (await db.execute(q)).all():
+            progress[str(wp_id)] = {
+                "total": int(total or 0),
+                "completed": int(completed or 0),
+                "not_applicable": int(na or 0),
+            }
+    except Exception:  # noqa: BLE001 — 程序步骤解析失败不影响看板主体
+        pass
+    return progress
+
+
 @router.get("/working-papers-kanban")
 async def get_workpapers_kanban(
     project_id: UUID,
@@ -147,26 +192,46 @@ async def get_workpapers_kanban(
     result = await db.execute(query)
     rows = result.all()
 
-    # 先收集所有 user_id 供批量人名解析（编制人 + 复核人）
+    # 先收集所有 user_id 供批量人名解析（编制人 + 复核人）+ wp_id 供步骤进度解析
     user_ids: set[str] = set()
+    wp_ids: set[str] = set()
     for _idx_row, wp in rows:
         if wp and wp.assigned_to:
             user_ids.add(str(wp.assigned_to))
         if wp and getattr(wp, "reviewer", None):
             user_ids.add(str(wp.reviewer))
+        if wp:
+            wp_ids.add(str(wp.id))
     name_map = await _resolve_user_names(db, user_ids)
+    progress_map = await _resolve_step_progress(db, wp_ids)
 
     # 按人聚合累加器：key=assignee user_id 或 None（未分配）
-    _EMPTY = lambda: {"not_started": 0, "in_progress": 0, "under_review": 0, "completed": 0}
+    _EMPTY = lambda: {"not_started": 0, "in_progress": 0, "under_review": 0, "completed": 0, "na": 0}
     by_assignee: dict[str | None, dict] = {}
+
+    # 完成率口径：有效分母排除"整体不适用"底稿（全部步骤 not_applicable，即已粗裁的科目）
+    not_applicable_wp_count = 0
 
     for idx_row, wp in rows:
         status = wp.status.value if wp and wp.status else "not_started"
         col = _kanban_column_for(status)
         assignee = str(wp.assigned_to) if wp and wp.assigned_to else None
         reviewer = str(wp.reviewer) if wp and getattr(wp, "reviewer", None) else None
+        wp_id = str(wp.id) if wp else None
+        prog = progress_map.get(wp_id) if wp_id else None
+        # 有效步骤数 = 总步骤 − 不适用（与完成率铁律一致）；无程序步骤的底稿 total_steps=0（不显进度条）
+        total_steps = 0
+        completed_steps = 0
+        is_na_wp = False
+        if prog:
+            total_steps = max(prog["total"] - prog["not_applicable"], 0)
+            completed_steps = prog["completed"]
+            # 有步骤且全部不适用 → 该底稿整体不适用
+            is_na_wp = prog["total"] > 0 and prog["total"] == prog["not_applicable"]
+        if is_na_wp:
+            not_applicable_wp_count += 1
         item = {
-            "wp_id": str(wp.id) if wp else None,
+            "wp_id": wp_id,
             "wp_code": idx_row.wp_code,
             "wp_name": idx_row.wp_name,
             "audit_cycle": idx_row.audit_cycle,
@@ -175,21 +240,32 @@ async def get_workpapers_kanban(
             "assigned_to_name": name_map.get(assignee) if assignee else None,
             "reviewer": reviewer,
             "reviewer_name": name_map.get(reviewer) if reviewer else None,
+            "total_steps": total_steps,
+            "completed_steps": completed_steps,
+            "updated_at": wp.updated_at.isoformat() if wp and wp.updated_at else None,
+            "stale": bool(wp.prefill_stale) if wp else False,
         }
         kanban[col].append(item)
 
         bucket = by_assignee.setdefault(assignee, _EMPTY())
         bucket[col] += 1
+        if is_na_wp:
+            bucket["na"] += 1
 
     # 统计（按状态）
     stats = {k: len(v) for k, v in kanban.items()}
     stats["total"] = sum(stats.values())
-    stats["completion_rate"] = round(stats["completed"] / max(stats["total"], 1) * 100, 1)
+    # 完成率 = 已通过 /（总数 − 整体不适用底稿）——排除已粗裁科目，与完成率铁律口径一致
+    effective_total = max(stats["total"] - not_applicable_wp_count, 0)
+    stats["not_applicable"] = not_applicable_wp_count
+    stats["completion_rate"] = round(stats["completed"] / max(effective_total, 1) * 100, 1)
 
     # 按人视图：每人各列数量 + 完成率（负责人查看每人完成情况）
     assignee_rows = []
     for uid, cnt in by_assignee.items():
         total = cnt["not_started"] + cnt["in_progress"] + cnt["under_review"] + cnt["completed"]
+        # 有效分母排除整体不适用底稿（与 KPI 完成率同口径）
+        effective = max(total - cnt["na"], 0)
         assignee_rows.append({
             "user_id": uid,
             "name": (name_map.get(uid) if uid else None) or ("未分配" if uid is None else uid[:8]),
@@ -198,7 +274,7 @@ async def get_workpapers_kanban(
             "under_review": cnt["under_review"],
             "completed": cnt["completed"],
             "total": total,
-            "completion_rate": round(cnt["completed"] / max(total, 1) * 100, 1),
+            "completion_rate": round(cnt["completed"] / max(effective, 1) * 100, 1),
         })
     # 已分配的人排前面（按完成率降序），未分配殿后
     assignee_rows.sort(key=lambda r: (r["user_id"] is None, -r["completion_rate"], -r["total"]))

@@ -28,6 +28,7 @@ from typing import Any
 import sqlalchemy as sa
 
 from ._context import RenderContext
+from ._lmn_tb_helper import fetch_tb_for_balance
 
 logger = logging.getLogger(__name__)
 
@@ -86,10 +87,14 @@ async def render(ctx: RenderContext) -> dict | None:
     except Exception as e:  # noqa: BLE001
         logger.warning("M1 render: project context 查询失败: %s", e)
 
+    # ─── TB 取数（LMN 四表取数 spec） ─────────────────────────────────────
+    tb = await fetch_tb_for_balance(ctx, "2232")
+
     return {
         "sheet_name": ctx.classification.sheet_name if ctx.classification else "",
         "project_context": project_context,
         "responses_snapshot": responses_snapshot,
+        "trial_balance": tb,
         # 负债类公式方向元数据（前端可用于初始化校验）
         "formula_direction": {
             "account_code": "2232",

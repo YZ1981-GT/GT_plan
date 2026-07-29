@@ -46,6 +46,106 @@ def _row_depth(row, account: str) -> int:
     return 1 if code == account else 2
 
 
+async def _build_adjudication_prefill_v2(ctx: RenderContext) -> dict[str, dict]:
+    """灰度开时：委托 extract_f2_category_values（新口径）取数。
+
+    返回结构：{ rowKey: {opening, increase, decrease, closing, formulas, source_codes} }
+    """
+    from app.services.f2_extraction.extract import extract_f2_category_values
+    from app.services.f2_extraction.presets import resolve_effective
+
+    try:
+        effective_bindings = await resolve_effective(ctx.db, ctx.wp_id, ctx.project_id)
+    except Exception as e:
+        logger.warning("F2 render: resolve_effective 失败, 回退默认绑定: %s", e)
+        from app.services.f2_extraction.extract import build_default_bindings
+        effective_bindings = build_default_bindings()
+
+    raw_result = await extract_f2_category_values(ctx, effective_bindings)
+    # raw_result: {anchor: {value, account, column, is_abs, source_codes}}
+
+    # 按 rowKey 聚合：anchor = F2-1-{block}-{rowKey}-{field}
+    from collections import defaultdict
+
+    by_row: dict[str, dict] = defaultdict(
+        lambda: {
+            "opening": 0.0,
+            "increase": 0.0,
+            "decrease": 0.0,
+            "closing": 0.0,
+            "formulas": {},
+            "source_codes": set(),
+        }
+    )
+
+    for anchor, info in raw_result.items():
+        # anchor = F2-1-{block}-{rowKey}-{field}
+        # block ∈ {gross, impairment}, field ∈ {opening, increase, decrease}
+        # rowKey 可含连字符如 raw-materials
+        # 解析策略：去掉 "F2-1-" 前缀，末尾取 field，中间解析 block 和 rowKey
+        if not anchor.startswith("F2-1-"):
+            continue
+        remainder = anchor[5:]  # 去掉 "F2-1-"
+
+        # 末尾 field
+        for candidate_field in ("opening", "increase", "decrease"):
+            suffix = f"-{candidate_field}"
+            if remainder.endswith(suffix):
+                field = candidate_field
+                remainder = remainder[: -len(suffix)]
+                break
+        else:
+            continue
+
+        # remainder = {block}-{rowKey}
+        # block ∈ {gross, impairment}
+        if remainder.startswith("gross-"):
+            row_key = remainder[6:]
+        elif remainder.startswith("impairment-"):
+            row_key = remainder[11:]
+        else:
+            continue
+
+        entry = by_row[row_key]
+        entry[field] = info["value"]
+        entry["source_codes"].update(info.get("source_codes") or [])
+
+        # 从 effective_bindings 取公式表达式
+        # 找到匹配的 binding 取 expression
+        for b in effective_bindings:
+            if b.get("anchor") == anchor:
+                entry["formulas"][field] = b.get("expression", "")
+                break
+
+    # 计算 closing = opening + increase - decrease（审计 roll-forward 一致）
+    result: dict[str, dict] = {}
+    for row_key, entry in by_row.items():
+        opening = entry["opening"]
+        increase = entry["increase"]
+        decrease = entry["decrease"]
+        closing = opening + increase - decrease
+
+        # 全零跳过
+        if (
+            abs(opening) < 0.005
+            and abs(increase) < 0.005
+            and abs(decrease) < 0.005
+            and abs(closing) < 0.005
+        ):
+            continue
+
+        result[row_key] = {
+            "opening": opening,
+            "increase": increase,
+            "decrease": decrease,
+            "closing": closing,
+            "formulas": entry["formulas"],
+            "source_codes": sorted(entry["source_codes"]),
+        }
+
+    return result
+
+
 async def _build_adjudication_prefill(ctx: RenderContext) -> dict[str, dict[str, float]]:
     """无持久化审定数据时，从 tb_balance 存货科目预填各分类行期初/期末未审数。
 
@@ -58,6 +158,10 @@ async def _build_adjudication_prefill(ctx: RenderContext) -> dict[str, dict[str,
 
     返回结构：{ rowKey: {"opening": float, "closing": float}, ... }
     """
+    from app.core.config import settings
+
+    if settings.F2_FOUR_TABLE_EXTRACTION_ENABLED:
+        return await _build_adjudication_prefill_v2(ctx)
     tb_values: dict[str, dict[str, float]] = {}
     try:
         active_filter = await get_active_filter(
@@ -172,6 +276,41 @@ async def render(ctx: RenderContext) -> dict | None:
         project_context["related_parties"] = [r.name for r in rp_rows if r.name]
     except Exception as e:  # noqa: BLE001
         logger.warning("F2 render: related_parties 查询失败: %s", e)
+
+    # ─── F2-1 TB 核对标量（存货净额 BS-008，走规则映射） ──────────────────
+    year = project_context.get("audit_year")
+    if year:
+        try:
+            from app.services.report_account_mapping import (
+                resolve_report_line_account_codes,
+                build_trial_balance_code_filter,
+            )
+
+            codes = await resolve_report_line_account_codes(
+                db, ctx.project_id, "BS-008",
+                fallback=["1401", "1402", "1403", "1404", "1405", "1406",
+                          "1407", "1408", "1409", "1410", "1411", "1412", "1471"],
+            )
+            where_clause, code_params = build_trial_balance_code_filter(codes)
+            project_context["tb_source_codes"] = codes
+            tb_row = (
+                await db.execute(
+                    sa.text(
+                        "SELECT COALESCE(SUM(audited_amount), 0) AS audited, "
+                        "COALESCE(SUM(unadjusted_amount), 0) AS unadjusted "
+                        "FROM trial_balance "
+                        "WHERE project_id = :pid AND year = :year AND is_deleted = false "
+                        f"AND {where_clause}"
+                    ),
+                    {"pid": str(ctx.project_id), "year": int(year), **code_params},
+                )
+            ).fetchone()
+            if tb_row:
+                audited = float(tb_row.audited or 0)
+                unadjusted = float(tb_row.unadjusted or 0)
+                project_context["tb_amount"] = audited if audited else unadjusted
+        except Exception as e:  # noqa: BLE001
+            logger.warning("F2 render: trial_balance 存货净额查询失败: %s", e)
 
     # ─── F2-1 审定表 TB 子科目预填 ────────────────────────────────────────
     tb_values = await _build_adjudication_prefill(ctx)

@@ -400,5 +400,41 @@ async def parse_import_rows(
     return result
 
 
+async def validate_single_formula_refs(
+    *,
+    expression: str,
+    refs: list[Any] | None,
+    project_id: str | None = None,
+    db: AsyncSession | None = None,
+) -> tuple[list[Any], list[str]]:
+    """校验单条公式的引用（复用 ``import-data`` 的逐条 ACNR full_resolve 路径）。
+
+    与 ``parse_import_rows`` 内每行校验逻辑一致：refs 留空时从表达式自动提取；
+    每条引用经 ``resolve_ref`` 解析，**found=False 且非 fail-open** 记为悬空
+    （基础设施故障 fail-open 不视为悬空，Req 11.3）。
+
+    Returns:
+        (归一化后的 refs, 悬空引用清单)；悬空清单非空即校验不通过。
+    """
+    normalized = list(refs or [])
+    if not normalized:
+        normalized = _formula_ref_from_expr(expression)
+
+    dangling: list[str] = []
+    for ref in normalized:
+        formula_ref, addr_id = _normalize_ref_item(ref)
+        if not formula_ref and not addr_id:
+            continue
+        rr = await resolve_ref(
+            formula_ref=formula_ref,
+            addr_id=addr_id,
+            project_id=project_id,
+            db=db,
+        )
+        if not rr.found and not rr.fail_open:
+            dangling.append(formula_ref or addr_id or "")
+    return normalized, dangling
+
+
 def _safe_str(val: Any) -> str:
     return "" if val is None else str(val).strip()

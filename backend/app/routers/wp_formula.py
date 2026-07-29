@@ -528,7 +528,18 @@ async def _build_surfaced_formulas(db: AsyncSession, wp: WorkingPaper) -> list[d
             logger.warning("E1 surfaced 叶子提取失败 wp=%s: %s", wp.id, e)
     else:
         # 其他循环（D/F/G/H…）：静态公式目录，与各循环 FormulaEngine/Adjudication/CrossSheet 同源（不臆造）。
-        catalog = _CYCLE_SHEET_FORMULAS.get(base)
+        # F2 灰度开时：F2-1 显式取数条目由 surface.py 动态产出（预设 ∪ 用户覆盖），
+        # 替换 CYCLE_SHEET_FORMULAS 中 F2-1 的静态条目（其余 F2 sheet 仍用静态）。
+        if base == "F2" and settings.F2_FOUR_TABLE_EXTRACTION_ENABLED:
+            from app.services.f2_extraction.surface import build_f2_surfaced_formulas
+            f2_dynamic = await build_f2_surfaced_formulas(db, wp)
+            out.extend(f2_dynamic)
+            # 静态目录中排除 F2-1（已由动态条目替代），其余 sheet 保持原静态
+            catalog = _CYCLE_SHEET_FORMULAS.get(base)
+            if catalog:
+                catalog = {sc: entries for sc, entries in catalog.items() if sc != "F2-1"}
+        else:
+            catalog = _CYCLE_SHEET_FORMULAS.get(base)
         if catalog:
             for sheet_code, entries in catalog.items():
                 # 非编码 sheet_code（如「附注上市」/「附注国企」，ACNR catalog 无独立可点节点，
@@ -666,21 +677,46 @@ async def save_formula(
     ):
         is_dcycle_anchor = True
 
+    # --- F2 Tier A 取数公式分支（f2-four-table-extraction-refresh） ---
+    is_f2_anchor = False
+    if (
+        settings.F2_FOUR_TABLE_EXTRACTION_ENABLED
+        and base_wp_code == "F2"
+    ):
+        from app.services.f2_extraction.anchor_registry import is_known_anchor as f2_is_known_anchor
+        if f2_is_known_anchor(body.target_cell):
+            is_f2_anchor = True
+
+            # F2 列名校验：表达式列名必须 ∈ F2_COLUMN_MAP
+            from app.services.f2_extraction.validation import validate_f2_formula
+            error = validate_f2_formula(body.expression)
+            if error:
+                raise HTTPException(
+                    status_code=422,
+                    detail=error,
+                )
+
     # 仅 auto_calc 求值回填目标单元（Req 14.3）；logic_check / reasonability
     # 绝不改值（Req 6.3 / 7.3），不写回单元。跨 sheet 引用经 CrossSheetResolver
     # 追溯（Req 14.2），传 parsed_data + parent_wp_code 启用。
     evaluated_value: object | None = None
     eval_errors: list[str] = []
     if saved.formula_type == "auto_calc":
-        evaluated_value, eval_errors = await evaluate_wp_formula_expression(
-            db,
-            project_id=wp.project_id,
-            year=body.year,
-            expression=body.expression,
-            parsed_data=wp.parsed_data,
-            parent_wp_code=wp_code,
-        )
-        if not is_dcycle_anchor:
+        if is_f2_anchor:
+            # F2 Tier A 取数公式不走 generic evaluator（走 f2_extraction 取数路径）
+            # 保存时不即时求值，值由 render/刷新提供
+            evaluated_value = None
+            eval_errors = []
+        else:
+            evaluated_value, eval_errors = await evaluate_wp_formula_expression(
+                db,
+                project_id=wp.project_id,
+                year=body.year,
+                expression=body.expression,
+                parsed_data=wp.parsed_data,
+                parent_wp_code=wp_code,
+            )
+        if not is_dcycle_anchor and not is_f2_anchor:
             # 普通网格 cell（∉ known_anchors）/ 非 D-cycle / 主开关关 → parsed_data 网格写回（零回归）
             write_cell_to_parsed_data(
                 wp,
@@ -691,7 +727,7 @@ async def save_formula(
 
     linkage: dict | None = None
     # D-cycle 锚点未写 parsed_data 网格 → 无网格 cell 变更可传播，跳过 linkage（避免误导）。
-    if wp_code and saved.formula_type == "auto_calc" and not is_dcycle_anchor:
+    if wp_code and saved.formula_type == "auto_calc" and not is_dcycle_anchor and not is_f2_anchor:
         try:
             from app.services.wp_formula_linkage_service import (
                 propagate_custom_wp_cell_change,

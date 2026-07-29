@@ -31,6 +31,9 @@ class StaffService:
         search: str | None = None,
         department: str | None = None,
         partner_name: str | None = None,
+        title: str | None = None,
+        status: str | None = None,
+        project_id: UUID | None = None,
         offset: int = 0,
         limit: int = 50,
     ) -> tuple[list[StaffMember], int]:
@@ -49,6 +52,17 @@ class StaffService:
             q = q.where(StaffMember.department == department)
         if partner_name:
             q = q.where(StaffMember.partner_name == partner_name)
+        if title:
+            q = q.where(StaffMember.title == title)
+        if status:
+            q = q.where(StaffMember.status == status)
+        if project_id:
+            # 筛选参与指定项目的成员
+            sub = sa.select(ProjectAssignment.staff_id).where(
+                ProjectAssignment.project_id == project_id,
+                ProjectAssignment.is_deleted == False,  # noqa
+            )
+            q = q.where(StaffMember.id.in_(sub))
 
         count_q = sa.select(sa.func.count()).select_from(q.subquery())
         total = (await self.db.execute(count_q)).scalar() or 0
@@ -191,3 +205,32 @@ class StaffService:
             .where(StaffMember.id == staff_id)
             .values(resume_data=resume)
         )
+
+    # ------------------------------------------------------------------
+    # 统计汇总（人员档案页顶部统计卡）
+    # ------------------------------------------------------------------
+    async def get_stats(self) -> dict:
+        base = StaffMember.is_deleted == False  # noqa
+
+        total_q = sa.select(sa.func.count()).where(base)
+        total = (await self.db.execute(total_q)).scalar() or 0
+
+        cpa_q = sa.select(sa.func.count()).where(base, StaffMember.is_cpa == True)  # noqa
+        cpa_count = (await self.db.execute(cpa_q)).scalar() or 0
+
+        partner_q = sa.select(sa.func.count()).where(base, StaffMember.title == '合伙人')
+        partner_count = (await self.db.execute(partner_q)).scalar() or 0
+
+        # 当前有项目委派的人员数
+        active_sub = (
+            sa.select(sa.func.count(sa.distinct(ProjectAssignment.staff_id)))
+            .where(ProjectAssignment.is_deleted == False)  # noqa
+        )
+        active_project_count = (await self.db.execute(active_sub)).scalar() or 0
+
+        return {
+            "total": total,
+            "cpa_count": cpa_count,
+            "partner_count": partner_count,
+            "active_project_count": active_project_count,
+        }

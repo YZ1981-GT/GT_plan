@@ -41,6 +41,8 @@ DATA_DIR = Path(__file__).resolve().parent.parent.parent.parent / "data"
 PRESET_DIR = DATA_DIR / "formula_presets"
 INVENTORY_PATH = PRESET_DIR / "inventory.json"
 SEED_PATH = PRESET_DIR / "formula_presets_seed.json"
+# 自定义预设隔离存储（与致同基线 seed 分离，平台级共享；template-library-formula-preset-custom）
+CUSTOM_PATH = PRESET_DIR / "formula_custom_presets.json"
 
 # 三类型枚举（与 engine.FormulaRecord.formula_type 一致）
 VALID_FORMULA_TYPES = {"auto_calc", "logic_check", "reasonability"}
@@ -278,18 +280,58 @@ def load_seed_presets() -> list[PresetEntry]:
     return entries
 
 
+# ── 自定义预设（用户在致同基线之上新增，隔离存储，平台级共享） ────────────────
+def load_custom_presets() -> list[PresetEntry]:
+    """读取 ``formula_custom_presets.json`` 的自定义预设条目（``source='custom'``）。
+
+    镜像 ``load_seed_presets``：文件缺失/损坏/空 → 返回 ``[]``（容错，不阻断
+    ``build_preset_library``）。自定义与显式 seed 同属**显式预设源**，但存于**隔离
+    文件**（``upsert_custom_presets`` 绝不触碰 seed，Property 2）。
+    """
+    data = _safe_load_json(CUSTOM_PATH)
+    if not isinstance(data, dict):
+        return []
+    entries: list[PresetEntry] = []
+    for p in data.get("presets", []) or []:
+        page_key = (p.get("page_key") or "").strip()
+        target_cell = (p.get("target_cell") or "").strip()
+        expression = p.get("expression") or ""
+        if not page_key or not target_cell:
+            continue
+        entries.append(
+            PresetEntry(
+                page_key=page_key,
+                target_cell=target_cell,
+                expression=expression,
+                formula_type=_map_formula_type(p.get("formula_type"), "auto_calc"),
+                refs=list(p.get("refs") or []),
+                source="custom",  # 强制 custom（隔离来源标注，Property 3）
+                description=p.get("description") or "",
+                variant=p.get("variant"),
+            )
+        )
+    return entries
+
+
 # ── 合并 + 去重（Req 22.3） ──────────────────────────────────────────────────
 def build_preset_library(
     *, include_sources: bool = True
 ) -> tuple[list[PresetEntry], dict[str, int]]:
-    """构建统一预设库：seed ∪ 收敛源，按 ``(page_key, target_cell)`` 去重。
+    """构建统一预设库：custom ∪ seed ∪ 收敛源，按 ``(page_key, target_cell)`` 去重。
 
-    显式 seed 优先（先加入），收敛源后加入；相同去重键的后来者跳过（skipped）。
+    **自定义（custom）置于最前** → 同 ``(page_key, target_cell)`` 键覆盖通用（seed/
+    收敛源），"去重首个赢"（Property 4）。显式 seed 次之，收敛源最后；相同去重键的
+    后来者跳过（skipped）。
+
+    **🔴 custom 与 ``include_sources`` 正交、恒前置**：``include_sources`` 只控制
+    prefill/check/wide_table 三个**收敛源**是否并入；custom 与 seed 同属**显式预设源**，
+    两个分支都含。零回归依据 = custom 初始为空（空 custom 使 ``[custom=[], seed, ...]``
+    去重结果与改前 ``[seed, ...]`` 逐字节一致，Property 7）。
 
     Returns:
         (entries, stats)；stats 含 ``inserted`` / ``skipped`` / 各 source 计数。
     """
-    ordered: list[Iterable[PresetEntry]] = [load_seed_presets()]
+    ordered: list[Iterable[PresetEntry]] = [load_custom_presets(), load_seed_presets()]
     if include_sources:
         ordered.extend(
             [
@@ -529,6 +571,58 @@ def upsert_seed_presets(entries: list[PresetEntry]) -> dict[str, int]:
         )
     except OSError as exc:
         logger.error("写入预设 seed 失败 %s: %s", SEED_PATH, exc)
+        raise
+
+    return {"inserted": inserted, "updated": updated, "total": len(presets)}
+
+
+# ── 自定义预设幂等 upsert（平台级自定义写入，隔离于 seed） ────────────────────
+def upsert_custom_presets(entries: list[PresetEntry]) -> dict[str, int]:
+    """把自定义预设条目幂等写入 ``formula_custom_presets.json``（隔离于 seed）。
+
+    镜像 ``upsert_seed_presets`` 的幂等语义（按 ``(page_key, target_cell)`` 覆盖/追加），
+    但**只写 ``formula_custom_presets.json``，绝不触碰 ``formula_presets_seed.json``**
+    （Property 2）。写入条目 ``source`` 一律标 ``custom``。
+
+    Returns:
+        stats：``{"inserted": n, "updated": m, "total": k}``。
+    """
+    data = _safe_load_json(CUSTOM_PATH)
+    if not isinstance(data, dict):
+        data = {
+            "description": "公式预设库自定义条目（用户在致同通用基线之上新增，与 formula_presets_seed.json 隔离，平台级共享）。",
+            "version": "2025-R1",
+            "presets": [],
+        }
+    presets: list[dict[str, Any]] = list(data.get("presets") or [])
+
+    index: dict[tuple[str, str], int] = {}
+    for i, p in enumerate(presets):
+        key = ((p.get("page_key") or "").strip(), (p.get("target_cell") or "").strip())
+        index[key] = i
+
+    inserted = 0
+    updated = 0
+    for entry in entries:
+        key = entry.dedup_key()
+        payload = entry.to_dict()
+        payload["source"] = "custom"  # 隔离来源标注（Property 3）
+        if key in index:
+            presets[index[key]] = payload
+            updated += 1
+        else:
+            index[key] = len(presets)
+            presets.append(payload)
+            inserted += 1
+
+    data["presets"] = presets
+    try:
+        PRESET_DIR.mkdir(parents=True, exist_ok=True)
+        CUSTOM_PATH.write_text(
+            json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+    except OSError as exc:
+        logger.error("写入自定义预设失败 %s: %s", CUSTOM_PATH, exc)
         raise
 
     return {"inserted": inserted, "updated": updated, "total": len(presets)}

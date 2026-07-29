@@ -1,20 +1,28 @@
-"""F2 存货监盘 — 单据/盘点表 OCR（F2-24/25/26 行级填充）."""
+"""F2 存货监盘 — 单据/盘点表 OCR（F2-24/25/26 行级填充）.
+
+Optional: attachment_id（已关联附件时回流 ocr_text/ocr_fields_cache）, force_reocr
+"""
 
 from __future__ import annotations
 
 import json
 import logging
 from pathlib import Path
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import aiofiles
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import User
+from app.services.attachment_ocr_writeback import (
+    finalize_linked_ocr_writeback,
+    load_reusable_ocr,
+    parse_optional_uuid,
+)
 from app.services.llm_client import chat_completion
 from app.services.unified_ocr_service import UnifiedOCRService
 
@@ -86,6 +94,10 @@ class F2StocktakeOcrResponse(BaseModel):
     extracted_fields: dict
     confidence: float
     sheet: str
+    reused: bool = False
+    written_back: bool = False
+    governed: bool = False
+    requires_human_confirmation: bool = True
 
 
 def _empty_fields(sheet: str) -> dict:
@@ -96,16 +108,67 @@ def _empty_fields(sheet: str) -> dict:
     return out
 
 
+def _resp(
+    attachment_id: str,
+    ocr_text: str,
+    extracted_fields: dict,
+    confidence: float,
+    sheet: str,
+    *,
+    reused: bool = False,
+    written_back: bool = False,
+) -> F2StocktakeOcrResponse:
+    return F2StocktakeOcrResponse(
+        attachment_id=attachment_id,
+        ocr_text=ocr_text,
+        extracted_fields=extracted_fields,
+        confidence=confidence,
+        sheet=sheet,
+        reused=reused,
+        written_back=written_back,
+        governed=False,
+        requires_human_confirmation=True,
+    )
+
+
 @router.post("/api/workpapers/{wp_id}/f2-st/contract-ocr")
 async def f2_stocktake_contract_ocr(
     wp_id: str,
     file: UploadFile = File(...),
     sheet: str = Query(..., description="F2-24|F2-25|F2-26|H1-10"),
+    attachment_id: str | None = Form(None),
+    force_reocr: bool = Form(False),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> F2StocktakeOcrResponse:
     if sheet not in _SHEET_SCHEMAS:
         raise HTTPException(400, f"不支持的 sheet: {sheet}")
+
+    linked_att_id = parse_optional_uuid(attachment_id)
+    try:
+        wp_uuid = UUID(wp_id)
+    except ValueError:
+        if linked_att_id is not None:
+            raise HTTPException(400, "无效的 wp_id")
+        wp_uuid = UUID(int=0)
+    schema = _SHEET_SCHEMAS[sheet]
+    empty = _empty_fields(sheet)
+
+    if linked_att_id is not None and not force_reocr:
+        reused = await load_reusable_ocr(db, linked_att_id)
+        if reused is not None:
+            fields = reused["extracted_fields"] or {}
+            merged = dict(empty)
+            merged.update({k: fields[k] for k in schema if k in fields})
+            return _resp(
+                str(linked_att_id),
+                reused["ocr_text"],
+                merged,
+                float(reused.get("confidence") or 0),
+                sheet,
+                reused=True,
+                written_back=False,
+            )
 
     allowed = (".pdf", ".png", ".jpg", ".jpeg", ".xlsx", ".xls")
     filename = file.filename or "upload.pdf"
@@ -113,10 +176,10 @@ async def f2_stocktake_contract_ocr(
     if suffix not in allowed:
         raise HTTPException(400, f"不支持的文件类型: {suffix}")
 
-    attachment_id = str(uuid4())
+    temp_id = str(linked_att_id) if linked_att_id else str(uuid4())
     storage_dir = Path("storage/workpapers") / wp_id / "stocktake"
     storage_dir.mkdir(parents=True, exist_ok=True)
-    file_path = storage_dir / f"{attachment_id}{suffix}"
+    file_path = storage_dir / f"{temp_id}{suffix}"
 
     content = await file.read()
     async with aiofiles.open(str(file_path), "wb") as f:
@@ -129,24 +192,11 @@ async def f2_stocktake_contract_ocr(
         ocr_text = ocr_result.get("text", "")
     except Exception as e:
         logger.warning("F2 stocktake OCR failed for %s/%s: %s", wp_id, sheet, e)
-        return F2StocktakeOcrResponse(
-            attachment_id=attachment_id,
-            ocr_text="",
-            extracted_fields=_empty_fields(sheet),
-            confidence=0,
-            sheet=sheet,
-        )
+        return _resp(temp_id, "", empty, 0.0, sheet)
 
     if not ocr_text.strip():
-        return F2StocktakeOcrResponse(
-            attachment_id=attachment_id,
-            ocr_text="",
-            extracted_fields=_empty_fields(sheet),
-            confidence=0,
-            sheet=sheet,
-        )
+        return _resp(temp_id, "", empty, 0.0, sheet)
 
-    schema = _SHEET_SCHEMAS[sheet]
     system = (
         "你是审计存货监盘底稿信息提取专家。从 OCR 文本提取监盘/盘点表字段。\n"
         "严格返回 JSON（不确定填空字符串，数值填0）：\n"
@@ -182,10 +232,13 @@ async def f2_stocktake_contract_ocr(
     except Exception as e:
         logger.warning("F2 stocktake LLM extraction failed: %s", e)
 
-    return F2StocktakeOcrResponse(
-        attachment_id=attachment_id,
+    out_id, written = await finalize_linked_ocr_writeback(
+        db,
+        wp_id=wp_uuid,
+        linked_att_id=linked_att_id,
+        temp_id=temp_id,
         ocr_text=ocr_text,
         extracted_fields=extracted,
         confidence=confidence,
-        sheet=sheet,
     )
+    return _resp(out_id, ocr_text, extracted, confidence, sheet, written_back=written)

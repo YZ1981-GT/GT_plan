@@ -3,6 +3,7 @@
 POST /api/workpapers/{wp_id}/g1/contract-ocr
 Content-Type: multipart/form-data
 Body: file (PDF/image)
+Optional: attachment_id（已关联附件时回流 ocr_text/ocr_fields_cache）, force_reocr
 
 识别贷款/投资/存款等协议，判断是否含影响合同价值的变量（利率/汇率/商品价格/
 指数/信用等级等），供 G1-14 衍生识别 B 问卷自动勾选参考。
@@ -13,16 +14,21 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import aiofiles
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import User
+from app.services.attachment_ocr_writeback import (
+    finalize_linked_ocr_writeback,
+    load_reusable_ocr,
+    parse_optional_uuid,
+)
 from app.services.llm_client import chat_completion
 from app.services.unified_ocr_service import UnifiedOCRService
 
@@ -51,6 +57,8 @@ _META_FIELDS = {
 _EMPTY: dict = {k: False for k in _B_VARIABLE_FIELDS}
 _EMPTY.update({k: "" for k in _META_FIELDS})
 
+_ALL_SCHEMA = {**_B_VARIABLE_FIELDS, **_META_FIELDS}
+
 
 class G1ContractOcrResponse(BaseModel):
     attachment_id: str
@@ -58,25 +66,85 @@ class G1ContractOcrResponse(BaseModel):
     extracted_fields: dict
     summary: str
     confidence: float
+    reused: bool = False
+    written_back: bool = False
+    governed: bool = False
+    requires_human_confirmation: bool = True
+
+
+def _resp(
+    attachment_id: str,
+    ocr_text: str,
+    extracted_fields: dict,
+    summary: str,
+    confidence: float,
+    *,
+    reused: bool = False,
+    written_back: bool = False,
+) -> G1ContractOcrResponse:
+    return G1ContractOcrResponse(
+        attachment_id=attachment_id,
+        ocr_text=ocr_text,
+        extracted_fields=extracted_fields,
+        summary=summary,
+        confidence=confidence,
+        reused=reused,
+        written_back=written_back,
+        governed=False,
+        requires_human_confirmation=True,
+    )
 
 
 @router.post("/api/workpapers/{wp_id}/g1/contract-ocr", response_model=G1ContractOcrResponse)
 async def g1_contract_ocr(
     wp_id: str,
     file: UploadFile = File(...),
+    attachment_id: str | None = Form(None),
+    force_reocr: bool = Form(False),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> G1ContractOcrResponse:
+    """上传合同/协议附件，OCR识别并提取衍生变量；可选回流已关联附件证据链。"""
+    linked_att_id = parse_optional_uuid(attachment_id)
+    try:
+        wp_uuid = UUID(wp_id)
+    except ValueError:
+        if linked_att_id is not None:
+            raise HTTPException(400, "无效的 wp_id")
+        wp_uuid = UUID(int=0)
+
+    if linked_att_id is not None and not force_reocr:
+        reused = await load_reusable_ocr(db, linked_att_id)
+        if reused is not None:
+            fields = reused["extracted_fields"] or {}
+            merged = dict(_EMPTY)
+            for key in _B_VARIABLE_FIELDS:
+                if key in fields:
+                    merged[key] = bool(fields[key])
+            for key in _META_FIELDS:
+                if key in fields and fields[key] is not None:
+                    merged[key] = str(fields[key])
+            summary = str(merged.get("summary") or (reused["ocr_text"] or "")[:200].replace("\n", " "))
+            return _resp(
+                str(linked_att_id),
+                reused["ocr_text"],
+                merged,
+                summary,
+                float(reused.get("confidence") or 0),
+                reused=True,
+                written_back=False,
+            )
+
     allowed = (".pdf", ".png", ".jpg", ".jpeg")
     filename = file.filename or "upload.pdf"
     suffix = Path(filename).suffix.lower()
     if suffix not in allowed:
         raise HTTPException(400, f"不支持的文件类型: {suffix}")
 
-    attachment_id = str(uuid4())
+    temp_id = str(linked_att_id) if linked_att_id else str(uuid4())
     storage_dir = Path("storage/workpapers") / wp_id / "contracts"
     storage_dir.mkdir(parents=True, exist_ok=True)
-    file_path = storage_dir / f"{attachment_id}{suffix}"
+    file_path = storage_dir / f"{temp_id}{suffix}"
 
     content = await file.read()
     async with aiofiles.open(str(file_path), "wb") as f:
@@ -88,27 +156,14 @@ async def g1_contract_ocr(
         ocr_text = ocr_result.get("text", "")
     except Exception as e:  # noqa: BLE001
         logger.warning("G1 contract OCR failed: %s", e)
-        return G1ContractOcrResponse(
-            attachment_id=attachment_id,
-            ocr_text="",
-            extracted_fields=dict(_EMPTY),
-            summary="",
-            confidence=0,
-        )
+        return _resp(temp_id, "", dict(_EMPTY), "", 0.0)
 
     if not ocr_text.strip():
-        return G1ContractOcrResponse(
-            attachment_id=attachment_id,
-            ocr_text="",
-            extracted_fields=dict(_EMPTY),
-            summary="",
-            confidence=0,
-        )
+        return _resp(temp_id, "", dict(_EMPTY), "", 0.0)
 
     extracted = dict(_EMPTY)
     summary = ocr_text[:200].replace("\n", " ")
     try:
-        all_fields = {**_B_VARIABLE_FIELDS, **_META_FIELDS}
         messages = [
             {
                 "role": "system",
@@ -116,7 +171,7 @@ async def g1_contract_ocr(
                     "你是审计衍生工具识别专家。阅读合同/协议 OCR 文本，判断合同价值是否"
                     "受下列变量影响（用于识别衍生或嵌入衍生特征）。"
                     "布尔字段：识别到相关条款填 true，否则 false。"
-                    f"严格返回 JSON：{json.dumps(all_fields, ensure_ascii=False)}"
+                    f"严格返回 JSON：{json.dumps(_ALL_SCHEMA, ensure_ascii=False)}"
                 ),
             },
             {"role": "user", "content": f"合同 OCR 文本：\n{ocr_text[:5000]}"},
@@ -144,10 +199,13 @@ async def g1_contract_ocr(
     hit = sum(1 for k in _B_VARIABLE_FIELDS if extracted.get(k))
     confidence = round(min(1.0, 0.3 + hit * 0.1), 2) if ocr_text.strip() else 0.0
 
-    return G1ContractOcrResponse(
-        attachment_id=attachment_id,
+    out_id, written = await finalize_linked_ocr_writeback(
+        db,
+        wp_id=wp_uuid,
+        linked_att_id=linked_att_id,
+        temp_id=temp_id,
         ocr_text=ocr_text,
         extracted_fields=extracted,
-        summary=summary,
         confidence=confidence,
     )
+    return _resp(out_id, ocr_text, extracted, summary, confidence, written_back=written)

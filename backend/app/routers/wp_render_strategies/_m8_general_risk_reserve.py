@@ -23,7 +23,8 @@ from typing import Any
 
 import sqlalchemy as sa
 
-from app.models.audit_platform_models import TrialBalance
+from app.models.audit_platform_models import TbBalance
+from app.services.dataset_query import get_active_filter
 
 from ._context import RenderContext
 
@@ -73,28 +74,28 @@ async def render(ctx: RenderContext) -> dict[str, Any]:
     # ── 取 TB 余额 4104 ─────────────────────────────────────────────────
     tb_data: dict[str, Any] = {}
     try:
-        stmt = (
-            sa.select(
-                TrialBalance.standard_account_code,
-                TrialBalance.unadjusted_amount,
-                TrialBalance.aje_adjustment,
-                TrialBalance.rje_adjustment,
-                TrialBalance.audited_amount,
-            )
-            .where(
-                TrialBalance.project_id == str(project_id),
-                TrialBalance.standard_account_code.like(f"{_M8_ACCOUNT_CODE}%"),
-                TrialBalance.is_deleted == sa.false(),
-            )
+        active_filter = await get_active_filter(
+            ctx.db, TbBalance.__table__, ctx.project_id, ctx.year or 0
+        )
+        stmt = sa.select(
+            TbBalance.account_code,
+            TbBalance.opening_balance.label("begin_balance"),
+            TbBalance.debit_amount,
+            TbBalance.credit_amount,
+            TbBalance.closing_balance.label("end_balance"),
+        ).where(
+            TbBalance.project_id == str(project_id),
+            TbBalance.account_code.like(f"{_M8_ACCOUNT_CODE}%"),
+            active_filter,
         )
         result = await db.execute(stmt)
         rows = result.fetchall()
         for row in rows:
-            tb_data[row.standard_account_code] = {
-                "unadjusted": _parse_num(row.unadjusted_amount),
-                "aje": _parse_num(row.aje_adjustment),
-                "rje": _parse_num(row.rje_adjustment),
-                "audited": _parse_num(row.audited_amount),
+            tb_data[row.account_code] = {
+                "begin_balance": _parse_num(row.begin_balance),
+                "end_balance": _parse_num(row.end_balance),
+                "debit_amount": _parse_num(row.debit_amount),
+                "credit_amount": _parse_num(row.credit_amount),
             }
     except Exception as exc:
         logger.warning("[M8 render] TB query failed: %s", exc)

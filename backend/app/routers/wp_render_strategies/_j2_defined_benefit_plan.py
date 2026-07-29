@@ -11,6 +11,10 @@ from __future__ import annotations
 import json
 import logging
 import sqlalchemy as sa
+
+from app.models.audit_platform_models import TbBalance
+from app.services.dataset_query import get_active_filter
+
 from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
@@ -27,6 +31,70 @@ J2_SHEETS = [
 ]
 
 ACCOUNT_CODE = "2221"
+
+_J2_ACCOUNT_PREFIX = "2221"
+
+
+async def _build_adjudication_prefill(ctx: RenderContext) -> list[dict]:
+    """从 tb_balance 2221 明细子科目预填 J2-1 审定表行（负债类取余额）.
+
+    2221 长期应付职工薪酬为负债/贷方科目：
+    期初未审 = ABS(opening_balance)
+    期末未审 = ABS(closing_balance)
+    返回 [{name, code, opening_balance, closing_balance}]，前端在无持久化行时据此建行。
+    """
+    rows: list[dict] = []
+    try:
+        active_filter = await get_active_filter(
+            ctx.db, TbBalance.__table__, ctx.project_id, ctx.year
+        )
+        result = await ctx.db.execute(
+            sa.select(
+                TbBalance.account_code.label("code"),
+                TbBalance.account_name.label("name"),
+                sa.func.sum(TbBalance.opening_balance).label("opening"),
+                sa.func.sum(TbBalance.closing_balance).label("closing"),
+            )
+            .where(
+                active_filter,
+                TbBalance.account_code.startswith(_J2_ACCOUNT_PREFIX),
+                TbBalance.account_code != _J2_ACCOUNT_PREFIX,
+            )
+            .group_by(TbBalance.account_code, TbBalance.account_name)
+        )
+        raw = [
+            {
+                "code": (r.code or "").strip(),
+                "name": (r.name or "").strip(),
+                "opening": float(r.opening or 0),
+                "closing": float(r.closing or 0),
+            }
+            for r in result.fetchall()
+        ]
+        all_codes = [x["code"] for x in raw if x["code"]]
+
+        def _is_leaf(code: str) -> bool:
+            if not code:
+                return True
+            return not any(c != code and c.startswith(code) for c in all_codes)
+
+        leaves = [x for x in raw if _is_leaf(x["code"])]
+        leaves.sort(key=lambda x: abs(x["closing"]), reverse=True)
+        for x in leaves:
+            name = x["name"]
+            opening = x["opening"]
+            closing = x["closing"]
+            if not name or (abs(opening) < 0.005 and abs(closing) < 0.005):
+                continue
+            rows.append({
+                "name": name,
+                "code": x["code"],
+                "opening_balance": abs(opening),
+                "closing_balance": abs(closing),
+            })
+    except Exception as e:  # noqa: BLE001
+        logger.warning("J2 adjudication prefill build failed: %s", e)
+    return rows
 
 
 async def render(ctx: RenderContext) -> dict | None:
@@ -93,6 +161,9 @@ async def render(ctx: RenderContext) -> dict | None:
     # ─── 解析明细表 ───────────────────────────────────────────────────────
     detail = _extract_json(responses_snapshot, "J2-detail-data", [])
 
+    # ─── 预填审定表行 ─────────────────────────────────────────────────────
+    adjudication_prefill = await _build_adjudication_prefill(ctx)
+
     return {
         "component_type": "j2-defined-benefit-plan",
         "account_code": ACCOUNT_CODE,
@@ -103,6 +174,7 @@ async def render(ctx: RenderContext) -> dict | None:
         "isa620": isa620,
         "adjudication": adjudication,
         "detail": detail,
+        "adjudication_prefill": adjudication_prefill,
         "responses": responses_snapshot,
         "sheets": J2_SHEETS,
     }

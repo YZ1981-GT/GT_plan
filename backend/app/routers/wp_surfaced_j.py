@@ -32,6 +32,8 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
     "J1": {
         # J1-1 审定表（四分类 × 期初/期末 × 未审/调整/审定 + 变动分析）
         "J1-1": [
+            ("TB 取数（发生额）", "TB('2211子科目','借方发生额') − TB('2211子科目','贷方发生额')", "取数",
+             "从 tb_balance 2211 叶子子科目取借贷发生额预填审定表（_build_adjudication_prefill，负债贷方科目净增=贷−借，但 prefill 返回原始借/贷供前端按方向计算）", "_j1_employee_compensation.py render"),
             ("审定数", "未审数 + 账项调整(AJE) + 重分类调整(RJE)", "计算",
              "各行期初/期末审定金额（calcAuditedAmount）", "useJ1Adjudication / useJ1FormulaEngine"),
             ("分类小计", "Σ 该分类明细行", "计算",
@@ -194,6 +196,8 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
     "J2": {
         # J2-1 审定表（三区块：设定受益计划/其他长期福利/辞退福利 + 减一年内到期）
         "J2-1": [
+            ("TB 取数（期末余额）", "ABS(TB('2221子科目','期末余额'))", "取数",
+             "从 tb_balance 2221 叶子子科目取期初/期末余额合计预填审定表设定受益计划行（负债取绝对值）", "_j2_defined_benefit_plan.py render"),
             ("审定数", "未审数 + 账项调整(AJE)", "计算",
              "各区块期初/期末审定金额（calcAuditedAmount）", "useJ2Adjudication / useJ2FormulaEngine"),
             ("合计", "设定受益计划 + 其他长期职工福利 + 辞退福利（期初/期末 审定）", "计算",

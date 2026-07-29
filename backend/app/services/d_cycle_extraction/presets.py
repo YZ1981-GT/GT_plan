@@ -437,6 +437,18 @@ _TIER_B_PROVENANCE: dict[str, list[dict]] = {
             ),
         },
     ],
+    "H5": [{"sheet_name": "H5-1", "anchor": "H5-1-cost-rows/depletion-rows", "description": "审定表原值/折耗 ← tb_balance 1631/1632 子科目余额（_fetch_tb_data 黑盒取数）"}],
+    "H6": [{"sheet_name": "H6-1", "anchor": "H6-1-rows", "description": "审定表期初/期末 ← tb_balance 1606 子科目余额（过渡科目期末应为0）"}],
+    "H7": [{"sheet_name": "H7-1", "anchor": "H7-1-cost-rows", "description": "审定表原值/折旧 ← trial_balance 1621（_fetch_tb_data，行业守卫agriculture/forestry/livestock/fishery）"}],
+    "H8": [{"sheet_name": "H8-2", "anchor": "H8-2-rows", "description": "明细表合同级原值 ← tb_balance 1901 叶子子科目（_build_h8_detail_prefill）"}],
+    "H9": [{"sheet_name": "H9-1", "anchor": "H9-1-rows", "description": "审定表租赁负债/未确认融资费用 ← tb_balance 2205+子科目（负债贷方/备抵借方）"}],
+    "H10": [{"sheet_name": "H10-1", "anchor": "H10-1-adjudicated-amount", "description": "审定表资产处置损益 ← tb_balance 6115 借贷发生额（损益类）"}],
+    "I1": [{"sheet_name": "I1-1", "anchor": "I1-adj-cost/amort/impair-rows", "description": "审定表原值/累计摊销/减值三区块 ← tb_balance 1701/1702/1703 子科目余额"}],
+    "I2": [{"sheet_name": "I2-1", "anchor": "I2-1-rows", "description": "审定表开发支出 ← tb_balance 1717 子科目余额（资产类）"}],
+    "I3": [{"sheet_name": "I3-1", "anchor": "I3-adj-rows", "description": "审定表商誉 ← tb_balance 1711（不摊销仅减值）"}],
+    "I4": [{"sheet_name": "I4-1", "anchor": "I4-adj-rows", "description": "审定表长期待摊费用 ← tb_balance 1801 子科目余额"}],
+    "I5": [{"sheet_name": "I5-1", "anchor": "I5-adj-rows", "description": "审定表其他非流动资产 ← tb_balance 1911 子科目余额"}],
+    "I6": [{"sheet_name": "I6-1", "anchor": "I6-1-rows", "description": "审定表研发费用 ← tb_balance 6602 发生额（损益类借方）"}],
 }
 
 
