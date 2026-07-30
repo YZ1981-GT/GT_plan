@@ -257,9 +257,10 @@ jobs:
         run: python backend/scripts/check/check_wp_version_trail.py --strict
 
   disclosure-columns-coverage:
-    # 披露表 _columns 覆盖守卫（disclosure-table-sync-convergence Task 13/15.1）
+    # 披露表 _columns 覆盖守卫（disclosure-table-sync-convergence Task 13/15.1
+    # → disclosure-columns-coverage-rollout R4/R6.7 复核）
     # 扫描 sync-from-workpaper 调用点是否携带 columns 列头元数据（供附注模块投影渲染）。
-    # 严格模式：全部 43 调用点已迁移覆盖，此后新增未覆盖同步调用点将阻断 CI。
+    # 严格模式：92/92 调用点已覆盖（rollout 批 1~4 收口），此后新增未覆盖同步调用点将阻断 CI。
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -268,6 +269,111 @@ jobs:
           python-version: "3.12"
       - name: Check disclosure _columns coverage (strict)
         run: python backend/scripts/check/check_disclosure_columns_coverage.py --strict
+      # 守卫自身的单测（rollout Task 5.3 新增，10 条）。ci.yml 的 backend-tests 虽然跑
+      # `pytest backend/tests/` 全量，但它带 `-x` 且依赖 PG + 全量 requirements —— 前序
+      # 任一失败就到不了这里。守卫脚本是 stdlib-only，故在本 job 内独立跑一遍，
+      # 保证「守卫失效」这类回归不会被别的失败掩盖（与 note-inventory-structure /
+      # procedure-delegation-architecture 两个 job 同款做法）。
+      - name: Install guard self-test dependency
+        run: python -m pip install pytest==8.4.2
+      - name: Run disclosure columns coverage guard self-tests
+        run: python -m pytest backend/tests/scripts/test_check_disclosure_columns_coverage.py -q
+      # R6.7：账龄档位标签披露口径扫描 —— **warn 级，明确不阻断**（各循环随批次收敛）。
+      # 不加 --strict，并额外 `|| true` 兜底，确保此步永不使本 job 变红。
+      - name: Scan disclosure aging label coverage (warn only, non-blocking)
+        run: python backend/scripts/check/check_disclosure_aging_label_coverage.py || true
+
+  note-inventory-structure:
+    # 附注存货章节结构守卫（f2-inventory-disclosure-template-alignment R12）
+    # 背景：`note_template_*.json` 是 md 重建产物，`rebuild_note_from_md.py` 会把源模版
+    # 的两级表头压扁（第二行表头降级成 row_type=header_label 假数据行）；且多会话并发
+    # 已实测把存货章节对齐回退过。此处在 CI 拦住回退，红了就重跑修订脚本。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check note inventory section alignment (五、9 / 八、10)
+        run: python backend/scripts/fix/fix_note_inventory_structure.py --check
+      - name: Install test dependency
+        run: python -m pip install pytest==8.4.2
+      - name: Run note inventory structure contract tests
+        run: python -m pytest backend/tests/services/test_note_inventory_structure.py -q
+
+  note-g-cycle-structure:
+    # 附注 G 循环（金融工具）披露章节结构守卫（disclosure-sync-path-buildout 批 1）
+    # 背景：G 循环 66 张披露表原本 columns / guidance 全缺，且多处表名是表头首格
+    # （`项  目` / `种  类`）——与前端子表名常量错位会产出孤儿子表（附注 TAB 永空 +
+    # 底稿数据丢失）。已对齐 G8 / G9 / G12，此处拦住回退。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check note G-cycle section alignment (G8 / G9 / G12)
+        run: python backend/scripts/fix/fix_note_g_cycle_structure.py --check
+      - name: Install test dependency
+        run: python -m pip install pytest==8.4.2
+      - name: Run note G-cycle structure contract tests
+        run: python -m pytest backend/tests/services/test_note_g_cycle_structure.py -q
+
+  note-j1-structure:
+    # 附注 J1 应付职工薪酬章节结构守卫（j1-disclosure-template-alignment R1/R2/R7.1）
+    # 背景：五、40 / 八、40 共 6 张披露表原本 columns / guidance 全缺（「本期增加」
+    # 「本期减少」共享前缀「本期」→ seed 路径会被反猜出源模板不存在的「本期」父表头）；
+    # 且 soe 第 3 张表与第 2 张**重名**（都叫「短期薪酬列示」），而前端推
+    # 「设定提存计划列示」→ 孤儿子表（模板第 3 张表永空）。另拦 `……` 占位行回归
+    # 与两侧说明文本区被清空（soe 曾只剩 3 个 `###` 表标题 → 文本区 seed 恒空）。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check note J1 section alignment (五、40 / 八、40)
+        run: python backend/scripts/fix/fix_note_j1_employee_comp_structure.py --check
+      - name: Install test dependency
+        run: python -m pip install pytest==8.4.2
+      - name: Run note J1 structure contract tests
+        run: python -m pytest backend/tests/services/test_note_j1_employee_comp_structure.py -q
+
+  note-d1-structure:
+    # 附注 D1 应收票据章节结构守卫（d1-notes-receivable-disclosure-alignment R1/R4.2）
+    # 背景：五、4 / 八、4 共 26 张披露表原本 columns / guidance 全缺、两级表头被 md 重建
+    # 脚本压扁，且「可无限量添加行」「出票人类型或账龄」等占位说明被当数据行落进 rows。
+    # 另拦两类会渲染崩 / 静默失真的回退：`group` 含 `/`（前端 activeTableColumns 只认
+    # 扁平 {group,start,span}）、国企「转回或收回前累计已计提坏账准备金额」被改回文本列。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check note D1 section alignment (五、4 / 八、4)
+        run: python backend/scripts/fix/fix_note_d1_notes_receivable_structure.py --check
+      - name: Install test dependency
+        run: python -m pip install pytest==8.4.2
+      - name: Run note D1 structure contract tests
+        run: python -m pytest backend/tests/test_note_d1_structure.py -q
+
+  disclosure-sync-hardening:
+    # 两条已实测的披露同步缺陷守卫（均为幂等脚本，带 --check）：
+    # 1. `_xxxMounted` 一次性防护 —— 浏览器实测会吞掉「切走再切回后的第一次编辑」
+    #    （防护的消耗时机取决于数据是否已加载；Vue watch 默认 immediate:false，本不需要）
+    # 2. `saveBatch` 未按 item_id 去重 —— 同批次重复 item_id 会被后端**整批拒绝**，
+    #    该批全部数据丢失（联动回写「先写整表 JSON、再写汇总字段」时最容易触发）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check no one-shot _xxxMounted autosync guard
+        run: python backend/scripts/fix/fix_disclosure_mounted_guard.py --check
+      - name: Check saveBatch dedupes item_id
+        run: python backend/scripts/fix/fix_save_batch_dedup.py --check
 
   note-formula-contract:
     # 附注公式数据契约守卫（disclosure-note-formula-data-population Task 6.1）
