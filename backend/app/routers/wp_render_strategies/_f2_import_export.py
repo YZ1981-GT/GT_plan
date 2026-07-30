@@ -54,7 +54,21 @@ _F2_SHEET_CONFIGS: dict[str, dict[str, Any]] = {
     "F2-32": {"kind": "cutoff", "title": "存货(原材料/产成品)截止-出库(单→账) F2-32"},
 }
 
-_SUPPORTED_SHEETS = set(_F2_SHEET_CONFIGS.keys()) | {"F2-1"}
+from ._f2_disclosure_import_export import (
+    SHEET_LISTED as _SHEET_NOTE_LISTED,
+    SHEET_SOE as _SHEET_NOTE_SOE,
+    build_disclosure_workbook,
+    export_disclosure_data,
+    import_disclosure_data,
+)
+
+# 附注披露（多区块：一区块一 sheet + 文本域集中一 sheet）
+_DISCLOSURE_SHEETS: dict[str, str] = {
+    _SHEET_NOTE_LISTED: "listed",
+    _SHEET_NOTE_SOE: "soe",
+}
+
+_SUPPORTED_SHEETS = set(_F2_SHEET_CONFIGS.keys()) | {"F2-1"} | set(_DISCLOSURE_SHEETS)
 
 _STORAGE_FIELD = "remark"
 
@@ -561,6 +575,10 @@ async def f2_export_template(
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     _validate_sheet(sheet)
+    if sheet in _DISCLOSURE_SHEETS:
+        variant = _DISCLOSURE_SHEETS[sheet]
+        wb = build_disclosure_workbook(variant)  # type: ignore[arg-type]
+        return workbook_to_response(wb, f"{sheet}_模板.xlsx")
     if sheet == "F2-1":
         return await _export_f2_1_template(db, wp_id)
     headers = _headers(sheet)
@@ -577,6 +595,10 @@ async def f2_export_data(
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     _validate_sheet(sheet)
+    if sheet in _DISCLOSURE_SHEETS:
+        variant = _DISCLOSURE_SHEETS[sheet]
+        wb = await export_disclosure_data(db, wp_id, variant)  # type: ignore[arg-type]
+        return workbook_to_response(wb, f"{sheet}_数据.xlsx")
     if sheet == "F2-1":
         return await _export_f2_1_data(db, wp_id)
     headers = _headers(sheet)
@@ -604,6 +626,11 @@ async def f2_import_data(
     content = await file.read()
     if len(content) > 10 * 1024 * 1024:
         raise HTTPException(400, "文件大小不能超过10MB")
+    # 披露页走多区块逻辑（一区块一 sheet）
+    if sheet in _DISCLOSURE_SHEETS:
+        return await import_disclosure_data(
+            db, wp_id, _DISCLOSURE_SHEETS[sheet], content,  # type: ignore[arg-type]
+        )
     # F2-1 走自定义逻辑（per-field item_id）
     if sheet == "F2-1":
         return await _import_f2_1_data(db, wp_id, content)

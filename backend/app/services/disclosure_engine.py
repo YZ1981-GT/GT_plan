@@ -441,6 +441,54 @@ def _infer_table_names_from_text(
             built_tables[i]["name"] = sequential_titles[j]
 
 
+# seed 模板上声明的列元数据键：需透传到生成的 table_data 才能渲染两级表头
+_SEED_COLUMN_META_KEYS = ("columns", "_column_groups")
+
+
+def _carry_seed_table_guidance(seed_tables: list[dict], built_tables: list[dict]) -> None:
+    """把 seed 表显式声明的 ``guidance``（TAB 页签编制提示）写回生成的 table_data。
+
+    与 ``per_table_guidance``（从 ``text_sections`` 按游标推断）的关系：
+    seed 上**显式声明**的 guidance 优先——它是人工按源模板红字 / 15号文条款 / 勾稽关系
+    撰写的，比按段落游标推断更准确。未声明 guidance 的表保持推断结果不变
+    （当前仅 K1 其他应收款 §五、8 / §八、9 显式声明，其余章节零影响）。
+
+    spec: k1-other-receivable-disclosure-alignment R4.3 / R5.4
+    """
+    for i, seed in enumerate(seed_tables):
+        if i >= len(built_tables) or not isinstance(seed, dict):
+            continue
+        g = seed.get("guidance")
+        if isinstance(g, str) and g.strip():
+            built_tables[i]["guidance"] = g
+
+
+def _carry_seed_column_meta(seed: dict, built: dict) -> None:
+    """把 seed 表的列元数据（``columns`` / ``_column_groups``）透传到生成的 table_data。
+
+    ``_build_table_data`` 只产出 ``{headers, rows}``，会丢弃 seed 上声明的两级表头
+    元数据，导致模板生成（非底稿同步）的附注渲染成扁平表头。此处按需补写。
+
+    幂等 + 零影响：
+    - seed 未声明 / 声明为空 / 类型非法（非 list） → 不写任何键
+    - ``built`` 已有同名键（如底稿投影已填）→ 不覆盖
+
+    消费方：``DisclosureEditor.activeTableColumns``（嵌套 el-table-column）与
+    ``note_word_exporter._build_two_level_header_rows``（fill_multi_header）。
+
+    spec: f2-inventory-disclosure-template-alignment R5 / Property 9
+    """
+    if not isinstance(seed, dict) or not isinstance(built, dict):
+        return
+    for key in _SEED_COLUMN_META_KEYS:
+        val = seed.get(key)
+        if not isinstance(val, list) or not val:
+            continue
+        if key in built:
+            continue
+        built[key] = val
+
+
 def _convert_md_headings_to_numbered(text: str) -> str:
     """将模板中的 ## / ### markdown 标题转为中文序号格式。
 
@@ -1472,7 +1520,14 @@ class DisclosureEngine:
                         )
                         if built:
                             built["name"] = tbl.get("name", "")
-                        built_tables.append(built or {"name": tbl.get("name", ""), "headers": tbl.get("headers", []), "rows": []})
+                        else:
+                            built = {
+                                "name": tbl.get("name", ""),
+                                "headers": tbl.get("headers", []),
+                                "rows": [],
+                            }
+                        _carry_seed_column_meta(tbl, built)
+                        built_tables.append(built)
 
                     # 动态提取表格标题：name 为空或"（表N）"占位时，从 text_sections 按序号匹配
                     _infer_table_names_from_text(built_tables, text_sections)
@@ -1480,6 +1535,8 @@ class DisclosureEngine:
                     for idx, g in per_table_guidance.items():
                         if 0 <= idx < len(built_tables) and g:
                             built_tables[idx]["guidance"] = g
+                    # seed 显式声明的 guidance 优先于按段落游标推断的结果
+                    _carry_seed_table_guidance(tables_list, built_tables)
                     # 存储为独立的 _tables 数组，避免循环引用
                     if built_tables:
                         table_data = {
@@ -2147,7 +2204,15 @@ class DisclosureEngine:
                             )
                             if built:
                                 built["name"] = tbl.get("name", "")
-                            built_tables.append(built or {"name": tbl.get("name", ""), "headers": tbl.get("headers", []), "rows": []})
+                            else:
+                                built = {
+                                    "name": tbl.get("name", ""),
+                                    "headers": tbl.get("headers", []),
+                                    "rows": [],
+                                }
+                            _carry_seed_column_meta(tbl, built)
+                            built_tables.append(built)
+                        _carry_seed_table_guidance(tables_list, built_tables)
                         if built_tables:
                             note.table_data = {
                                 "headers": built_tables[0].get("headers", []),

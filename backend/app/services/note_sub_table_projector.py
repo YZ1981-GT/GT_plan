@@ -38,6 +38,85 @@ def _pick_label_def(defs: list[dict]) -> dict | None:
     return None
 
 
+def _clean_defs(defs_raw: Any) -> list[dict]:
+    """从列头元数据取出有效列定义（每项须为含 ``key`` 的 dict）。"""
+    if not isinstance(defs_raw, list):
+        return []
+    return [d for d in defs_raw if isinstance(d, dict) and d.get("key")]
+
+
+def _inverse_project_row(row: dict, defs: list[dict]) -> dict:
+    """把投影态行（``label`` / ``values[]`` / ``is_total``）还原为业务键行。
+
+    投影输出（``rows[].values`` 按列序排列）若被回写进 ``sub_table_data``，行里就
+    只有位置化的 ``values`` 而没有业务键，直接投影会得到整表空值。此处按已声明列头
+    逆投影：``values[i]`` → ``value_defs[i]['key']``，``label`` → 标签列键。
+
+    - 无 ``values`` 列表或无列头声明 → 原样返回（不猜字段）
+    - 已存在的业务键**不被覆盖**（原始值优先）
+    """
+    values = row.get("values")
+    if not isinstance(values, list) or not defs:
+        return row
+
+    label_def = _pick_label_def(defs)
+    value_defs = [d for d in defs if d is not label_def]
+
+    out = {k: v for k, v in row.items() if k != "values"}
+    label_key = label_def.get("key") if isinstance(label_def, dict) else None
+    if label_key and label_key != "label" and label_key not in out and "label" in out:
+        out[label_key] = out["label"]
+    for d, val in zip(value_defs, values):
+        key = d.get("key")
+        if key and key not in out:
+            out[key] = val
+    return out
+
+
+def normalize_sub_table_data(sub: Any, cols_map: Any = None) -> dict[str, Any]:
+    """把 ``sub_table_data`` 归一为 ``{key: list[dict]}`` 规范形态（纯函数）。
+
+    容错两类"投影结果被回写"造成的非规范值（历史数据 + 未类型化的保存入口）：
+
+    1. 表对象包装 ``{"rows": [...], "_column_groups": ...}`` → 解包为行列表；
+    2. 投影态行 ``{label, values[], is_total}`` → 按列头逆投影回业务键行。
+
+    - ``_`` 前缀元数据键原样保留（不做行归一）
+    - 既非列表、又取不出 ``rows`` 列表的值 → 丢弃该键并 ``warning``（真损坏）
+
+    Returns:
+        新 dict（不修改入参）。入参非 dict 时返回 ``{}``。
+    """
+    if not isinstance(sub, dict):
+        return {}
+    cols = cols_map if isinstance(cols_map, dict) else {}
+
+    out: dict[str, Any] = {}
+    for key, value in sub.items():
+        if _is_meta_key(key):
+            out[key] = value
+            continue
+
+        rows = value
+        if isinstance(rows, dict):
+            # 表对象包装：只认 rows 列表，其余同级键（headers/_column_groups）丢弃
+            inner = rows.get("rows")
+            if isinstance(inner, list):
+                rows = inner
+        if not isinstance(rows, list):
+            logger.warning(
+                "normalize_sub_table_data: sub-table %r 值形态无法识别 (%s)，丢弃",
+                key, type(value).__name__,
+            )
+            continue
+
+        defs = _clean_defs(cols.get(key))
+        out[key] = [
+            _inverse_project_row(r, defs) for r in rows if isinstance(r, dict)
+        ]
+    return out
+
+
 def project_sub_tables(table_data: Any) -> list[dict] | None:
     """把 ``sub_table_data`` + ``_sub_table_columns`` 投影为可渲染 ``_tables[]``。
 
@@ -62,23 +141,18 @@ def project_sub_tables(table_data: Any) -> list[dict] | None:
     if not isinstance(cols_map, dict):
         cols_map = {}
 
+    # 读时归一：容错"投影结果被回写"的表对象包装 / 位置化 values 行，
+    # 避免整表被静默跳过（附注与 Word 导出同时丢表）。
+    sub = normalize_sub_table_data(sub, cols_map)
+
     tables: list[dict] = []
     for key, rows in sub.items():  # 保持 sub_table_data 键插入序（Property 6）
         if _is_meta_key(key):
             continue
-        if not isinstance(rows, list):
-            logger.warning(
-                "project_sub_tables: sub-table %r rows not a list (%s), skip",
-                key, type(rows).__name__,
-            )
+        if not isinstance(rows, list):  # 归一后恒为 list，纯防御
             continue
 
-        defs_raw = cols_map.get(key)
-        defs = (
-            [d for d in defs_raw if isinstance(d, dict) and d.get("key")]
-            if isinstance(defs_raw, list)
-            else []
-        )
+        defs = _clean_defs(cols_map.get(key))
 
         if not defs:
             # Property 8 / Requirement 7.2 降级：无列头元数据 → 绝不用英文字段键当 header。
@@ -111,8 +185,12 @@ def project_sub_tables(table_data: Any) -> list[dict] | None:
             str(d.get("label", "")) for d in value_defs
         ]
 
-        # 分组信息：优先从 columns 的显式 group 字段提取；
-        # 无显式 group 时，自动从 headers 前缀检测分组（通用机制，不需要逐表手工标注）
+        # 分组信息三态（见 _extract_column_groups 文档）：
+        #   None → 未声明，回退 headers 前缀推断（存量行为）
+        #   []   → 任一列 flat=True，显式单级表头，禁止推断
+        #   非空 → 显式 group 分组
+        # ⚠️ 守卫必须是 `is None`：写成 `if not col_groups:` 会让 flat 的 [] 也去推断，
+        #    凭空造出「本期」这类父表头（disclosure-columns-coverage-rollout R3.1）
         col_groups = _extract_column_groups(defs)
         if col_groups is None:
             col_groups = _infer_groups_from_headers(headers)
@@ -154,10 +232,24 @@ def _extract_column_groups(defs: list[dict]) -> list[dict] | None:
         {"columns": [idx3]}  # 无子分组的直接列
     ]}]
     简单单级分组返回扁平格式 [{"group":"期末余额","start":1,"span":3}] 保持向后兼容。
-    无分组时返回 None。
+
+    返回值三态（调用方仅在 ``None`` 时回退 ``_infer_groups_from_headers``）：
+
+    - ``None``  未声明任何分组信息 → 允许前缀推断（**存量行为不变**）
+    - ``[]``    任一列带 ``flat: True`` → 显式单级表头，**禁止**前缀推断
+    - 非空列表  显式分组
+
+    ``flat`` 用于源模板本就是单行表头的表：不声明时前缀推断会把
+    ``本期增加``/``本期减少`` 归到凭空的「本期」父表头下。
+
+    spec: disclosure-columns-coverage-rollout R3 / f2-inventory-...-alignment R10
     """
     if not defs:
         return None
+
+    # 显式单级声明：标在任意一列即对整表生效
+    if any(isinstance(d, dict) and d.get("flat") for d in defs):
+        return []
 
     # 收集所有非 is_label 列的 group 信息
     has_any_group = False

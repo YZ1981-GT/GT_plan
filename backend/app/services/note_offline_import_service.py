@@ -393,6 +393,16 @@ def diff_section_cells(
     - FORMULA: formula cells — skip if import hasn't modified
     - MANUAL: user-editable cells — always compare
 
+    🔴 两侧行结构不同，必须各按自己的形态取值再对齐到同一 cell_key：
+    - **local**（附注持久化真源）：``rows[].values``（标签在 ``rows[].label``，不是数据列）
+    - **imported**（``_extract_imported_sections`` 的中间结构）：``rows[].cells``，
+      其中 ``cells[0]`` 是**标签列**（导出时第 1 列写 label），``cells[1:]`` 才是数据列
+    - cell_key 统一为 ``{row_idx}:{value_idx}``（value_idx 从 0 起，**不含标签列**），
+      与 ``_cell_meta`` / ``_cell_modes`` / ``_bindings`` 的既有键序一致
+
+    早期实现两侧都读 ``cells`` 且把标签列当数据列，导致对真实附注（存 ``values``）
+    diff 恒为「本地全空 + 全部 ADD」，离线导入形同虚设。
+
     Returns list of CellDiff objects.
     """
     meta = meta or {}
@@ -401,17 +411,24 @@ def diff_section_cells(
     local_rows = local_section.get("rows", [])
     imported_rows = imported_section.get("rows", [])
 
-    # Build cell maps: {row_idx:col_idx: value}
+    # Build cell maps: {row_idx:value_idx: value}
     local_cells: dict[str, Any] = {}
     for r_idx, row in enumerate(local_rows):
-        cells = row.get("cells", [])
-        for c_idx, val in enumerate(cells):
+        if not isinstance(row, dict):
+            continue
+        values = row.get("values")
+        if not isinstance(values, list):
+            # 兼容早期以 `cells` 承载数据列的调用方（无标签列语义）
+            values = row.get("cells") or []
+        for c_idx, val in enumerate(values):
             local_cells[f"{r_idx}:{c_idx}"] = val
 
     imported_cells: dict[str, Any] = {}
     for r_idx, row in enumerate(imported_rows):
-        cells = row.get("cells", [])
-        for c_idx, val in enumerate(cells):
+        if not isinstance(row, dict):
+            continue
+        # 去掉标签列后对齐 value_idx
+        for c_idx, val in enumerate((row.get("cells") or [])[1:]):
             imported_cells[f"{r_idx}:{c_idx}"] = val
 
     # Union of all cell keys
@@ -574,9 +591,17 @@ def apply_import(
                 # Replace local with imported data
                 imp = imported[sid]
                 if sid in existing_lookup:
+                    # 写回附注持久化真源形态：label + values（标签列是 cells[0]），
+                    # 不得写 `cells`（渲染器/投影器/Word 导出只认 `values`）
                     existing_lookup[sid]["table_data"] = {
                         "headers": imp.get("headers", []),
-                        "rows": [{"cells": r["cells"]} for r in imp.get("rows", [])],
+                        "rows": [
+                            {
+                                "label": (r.get("cells") or [None])[0],
+                                "values": list((r.get("cells") or [])[1:]),
+                            }
+                            for r in imp.get("rows", [])
+                        ],
                     }
                     if meta_data and sid in meta_data and "guidance_text" in meta_data[sid]:
                         existing_lookup[sid]["guidance_text"] = meta_data[sid]["guidance_text"]
@@ -621,7 +646,11 @@ def _merge_cells_into_local(
     imported: dict[str, Any],
     cell_keys: list[str],
 ) -> None:
-    """Merge specific cells from imported into local section."""
+    """把 imported 的指定单元格并入 local section。
+
+    cell_key = ``{row_idx}:{value_idx}``（不含标签列）；local 写 ``values``，
+    imported 取 ``cells[value_idx + 1]``（``cells[0]`` 是标签列）。
+    """
     local_rows = local.get("table_data", {}).get("rows", [])
     imported_rows = imported.get("rows", [])
 
@@ -632,14 +661,19 @@ def _merge_cells_into_local(
         row_idx, col_idx = int(parts[0]), int(parts[1])
 
         if row_idx < len(imported_rows):
-            imp_cells = imported_rows[row_idx].get("cells", [])
-            if col_idx < len(imp_cells):
-                # Ensure local has enough rows/cells
+            imp_cells = imported_rows[row_idx].get("cells") or []
+            imp_values = imp_cells[1:]  # 去掉标签列
+            if col_idx < len(imp_values):
+                # 补足 local 的行/列（缺失处补 None，不改动其他单元格）
                 while len(local_rows) <= row_idx:
-                    local_rows.append({"cells": []})
-                while len(local_rows[row_idx].get("cells", [])) <= col_idx:
-                    local_rows[row_idx].setdefault("cells", []).append(None)
-                local_rows[row_idx]["cells"][col_idx] = imp_cells[col_idx]
+                    local_rows.append({"label": "", "values": []})
+                target = local_rows[row_idx]
+                if not isinstance(target.get("values"), list):
+                    target["values"] = list(target.get("cells") or [])
+                    target.pop("cells", None)
+                while len(target["values"]) <= col_idx:
+                    target["values"].append(None)
+                target["values"][col_idx] = imp_values[col_idx]
 
 
 # ---------------------------------------------------------------------------

@@ -470,8 +470,17 @@ def _build_two_level_header_rows(
 ) -> list[list[dict]]:
     """从 headers + _column_groups 构建两行表头定义（供 fill_multi_header 消费）。
 
-    Row 0: 分组父表头（合并跨列）+ 无分组列纵向合并2行
-    Row 1: 分组内子列名 + 纵向合并列占位（空，被 rowspan 覆盖）
+    Row 0: 分组父表头（合并跨列）+ 无分组列纵向合并 2 行
+    Row 1: **仅**分组内子列名
+
+    ⚠️ Row 1 **不得**为 `rowspan=2` 的无分组列补空占位：``fill_multi_header`` 内部
+    已用 ``while grid[r][col_cursor] is not None: col_cursor += 1`` 自动跳过被上方
+    rowspan 占用的列。多补一个占位会挤占一个真实列位，导致 row 1 子列名整体右移、
+    末列被 ``col_cursor >= total_cols`` 分支丢弃。
+
+    实测（Word 导出附注存货章节）曾表现为「存货分类」第二行少了末尾「账面价值」、
+    「按组合计提」少了第二个「比例(%)」。约定同
+    ``test_fill_multi_header_basic_grid``（row1 只给子列名）。
     """
     num_cols = len(headers)
     row0: list[dict] = []
@@ -496,9 +505,8 @@ def _build_two_level_header_rows(
                 row1.append({"text": headers[col_idx] if col_idx < num_cols else "", "colspan": 1, "rowspan": 1})
             i += span
         else:
-            # 无分组列：纵向合并2行
+            # 无分组列：纵向合并 2 行；row1 不补占位（fill_multi_header 会自动跳过该列位）
             row0.append({"text": headers[i], "colspan": 1, "rowspan": 2})
-            row1.append({"text": "", "colspan": 1, "rowspan": 1})  # 占位（被 rowspan 覆盖）
             i += 1
 
     return [row0, row1]

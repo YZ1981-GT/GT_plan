@@ -966,22 +966,136 @@ async def parse_workpaper_real(
 # 详见 backend/docs/STALE-PROPAGATION-LAYERS.md
 # ---------------------------------------------------------------------------
 
+# 「持有已落库派生值」的 parsed_data 键：只有这些底稿才可能过期。
+#   html_data       — HTML 底稿保存后的正文（含公式算出的金额，持久化后渲染不再覆盖）
+#   univer_snapshot — Univer/xlsx 底稿的单元格快照（prefill 写入的值）
+#   cell_provenance — 预填公式溯源（存在即说明曾按公式落值）
+# 未编辑过的底稿在 render 时实时取数（TB/tb_balance），不存在「过期」状态。
+_PERSISTED_VALUE_KEYS: tuple[str, ...] = ("html_data", "univer_snapshot", "cell_provenance")
+
+
+def _holds_persisted_values():
+    """SQL 条件：底稿是否持有已落库的派生值（含 prefill 时的 TB 快照）。
+
+    用 ``col[key] IS NOT NULL`` 而非 PG 专属的 ``has_key``（``?`` 运算符）：
+    后者在 sqlite 上编译成裸 ``?`` 与占位符冲突，测试库会直接语法错误。
+    """
+    conds = [WorkingPaper.parsed_data[k].isnot(None) for k in _PERSISTED_VALUE_KEYS]
+    conds.append(WorkingPaper.prefill_tb_snapshot.isnot(None))
+    return sa.or_(*conds)
+
+
 async def mark_stale(
     db: AsyncSession,
     project_id: UUID,
     account_codes: list[str] | None = None,
 ) -> int:
-    """标记底稿预填数据为过期"""
-    q = (
-        sa.update(WorkingPaper)
-        .where(
-            WorkingPaper.project_id == project_id,
-            WorkingPaper.is_deleted == False,  # noqa: E712
+    """标记底稿预填数据为过期。
+
+    只标记「持有已落库派生值」的底稿（见 ``_holds_persisted_values``）。此前无条件
+    全量标记，导致从未编辑过的底稿也常亮 stale（实测 340/340），且平台无任何清除
+    路径 → 横幅永久显示。
+
+    ``account_codes`` 非空时进一步收窄：有 ``prefill_tb_snapshot`` 的底稿只在快照
+    引用了变动科目时才标脏；无快照的底稿无法判定，保守标脏。
+    """
+    where = [
+        WorkingPaper.project_id == project_id,
+        WorkingPaper.is_deleted == False,  # noqa: E712
+        _holds_persisted_values(),
+    ]
+    if account_codes:
+        where.append(
+            sa.or_(
+                WorkingPaper.prefill_tb_snapshot.is_(None),
+                sa.or_(
+                    *[
+                        WorkingPaper.prefill_tb_snapshot[code].isnot(None)
+                        for code in account_codes
+                    ]
+                ),
+            )
         )
-        .values(prefill_stale=True)
+    result = await db.execute(
+        sa.update(WorkingPaper).where(*where).values(prefill_stale=True)
     )
-    result = await db.execute(q)
-    return result.rowcount
+    return int(result.rowcount or 0)
+
+
+async def clear_stale(
+    db: AsyncSession,
+    project_id: UUID,
+    wp_ids: list[UUID] | None = None,
+) -> int:
+    """清除底稿的 prefill_stale 标记（``wp_ids=None`` 表示项目全量）。"""
+    where = [
+        WorkingPaper.project_id == project_id,
+        WorkingPaper.is_deleted == False,  # noqa: E712
+    ]
+    if wp_ids is not None:
+        if not wp_ids:
+            return 0
+        where.append(WorkingPaper.id.in_(wp_ids))
+    result = await db.execute(
+        sa.update(WorkingPaper).where(*where).values(prefill_stale=False)
+    )
+    return int(result.rowcount or 0)
+
+
+async def resolve_stale_after_recalc(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+) -> dict[str, int]:
+    """试算表全量重算后收敛底稿 stale 标记（供「一键重算 / 点击重算」闭环）。
+
+    按底稿实际持有的派生值分三类处理：
+
+    1. 有公式快照（``univer_snapshot`` / ``cell_provenance``）→ 重跑 prefill，成功即清除；
+    2. 无任何已落库派生值 → 渲染时实时取数，重算后即最新，直接清除；
+    3. 仅有 ``html_data``（人工保存的正文）→ 保留 stale，需在底稿内手工刷新后重存。
+
+    Returns: ``{"cleared": n, "refilled": n, "kept_stale": n}``
+    """
+    rows = (
+        await db.execute(
+            sa.select(WorkingPaper.id, WorkingPaper.parsed_data).where(
+                WorkingPaper.project_id == project_id,
+                WorkingPaper.is_deleted == False,  # noqa: E712
+                WorkingPaper.prefill_stale == True,  # noqa: E712
+            )
+        )
+    ).all()
+
+    to_clear: list[UUID] = []
+    refilled = 0
+    kept = 0
+
+    for wp_id, parsed in rows:
+        pd = parsed if isinstance(parsed, dict) else {}
+        if pd.get("univer_snapshot") or pd.get("cell_provenance"):
+            try:
+                result = await prefill_workpaper_real(db, project_id, year, wp_id)
+            except Exception as exc:  # noqa: BLE001 — 单张失败不阻断其余
+                _logger.warning("resolve_stale: prefill 失败 wp=%s err=%s", wp_id, exc)
+                result = {"status": "error"}
+            if result.get("status") == "ok":
+                refilled += 1
+                to_clear.append(wp_id)
+            else:
+                kept += 1
+        elif pd.get("html_data"):
+            # 人工保存的正文不会被重算覆盖 → 仍需人工在底稿内刷新
+            kept += 1
+        else:
+            to_clear.append(wp_id)
+
+    cleared = await clear_stale(db, project_id, to_clear)
+    _logger.info(
+        "resolve_stale_after_recalc: project=%s cleared=%d refilled=%d kept=%d",
+        project_id, cleared, refilled, kept,
+    )
+    return {"cleared": cleared, "refilled": refilled, "kept_stale": kept}
 
 
 # ---------------------------------------------------------------------------

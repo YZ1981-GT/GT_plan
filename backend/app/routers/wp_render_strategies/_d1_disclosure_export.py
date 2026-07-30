@@ -42,25 +42,68 @@ router = APIRouter(prefix="/api/workpapers", tags=["D1附注披露导入导出"]
 VALID_VARIANTS = frozenset({'listed', 'soe'})
 MAX_IMPORT_ROWS = 200
 
+# 🔴 列名必须与**界面**和**附注模板**三方一致（`d1NoteSectionMap.ts` 是列头单一真源）：
+#    「种类」而非「票据种类」、「期末终止确认金额」带「期末」前缀、
+#    「预期信用损失率(%)」用**半角**括号（附注模板与同步载荷都是半角）。
+#    守卫：`backend/tests/test_d1_disclosure_export_columns.py` 直接读 `.ts` 源码比对。
 SECTION_COLUMNS: dict[str, list[str]] = {
-    'topSummary': ['票据种类', '期末余额', '期末坏账准备', '期末账面价值', '上年年末余额', '上年年末坏账准备', '上年年末账面价值'],
-    'pledged': ['票据种类', '期末已质押金额'],
-    'endorsed': ['票据种类', '终止确认金额', '未终止确认金额'],
-    'transfer': ['票据种类', '转应收账款金额'],
-    'badDebtClassEnd': ['类别', '账面余额', '坏账准备', '预期信用损失率（%）', '计提依据', '账面价值'],
-    'badDebtClassPrior': ['类别', '账面余额', '坏账准备', '预期信用损失率（%）', '计提依据', '账面价值'],
+    'topSummary': ['票据种类', '期末账面余额', '期末坏账准备', '期末账面价值', '上年年末账面余额', '上年年末坏账准备', '上年年末账面价值'],
+    'pledged': ['种类', '期末已质押金额'],
+    'endorsed': ['种类', '期末终止确认金额', '期末未终止确认金额'],
+    'transfer': ['种类', '期末转应收账款金额'],
+    'badDebtClassEnd': ['类别', '账面余额', '坏账准备', '预期信用损失率(%)', '计提依据', '账面价值'],
+    'badDebtClassPrior': ['类别', '账面余额', '坏账准备', '预期信用损失率(%)', '计提依据', '账面价值'],
     'badDebtMovementMain': ['项目', '坏账准备金额'],
-    'badDebtMovementDetail': ['单位名称', '转回原因', '收回方式', '原确定坏账准备金额的依据', '转回或收回金额'],
+    'badDebtMovementDetail': ['单位名称', '转回原因', '收回方式', '原确定坏账准备的依据', '转回或收回金额'],
     'writeOffMain': ['项目', '核销金额'],
-    'writeOffDetail': ['单位名称', '应收票据', '核销金额', '核销原因', '履行的核销程序', '款项是否由关联交易产生'],
-    'categorySummary': ['票据种类', '期末余额', '期末坏账准备', '期末账面价值', '期初余额', '期初坏账准备', '期初账面价值'],
+    'writeOffDetail': ['单位名称', '应收票据性质', '核销金额', '核销原因', '履行的核销程序', '款项是否由关联交易产生'],
+    'categorySummary': ['票据种类', '期末账面余额', '期末坏账准备', '期末账面价值', '期初账面余额', '期初坏账准备', '期初账面价值'],
+    # 上市组合计提项目明细（源模板 R76~R89，一张表双期并列）；国企只用期末两列
+    'portfolioBank': ['名称', '期末应收票据', '期末坏账准备', '上年年末应收票据', '上年年末坏账准备'],
+    'portfolioCommercial': ['名称', '期末应收票据', '期末坏账准备', '上年年末应收票据', '上年年末坏账准备'],
+    # 国企变动表「其中：」下的组合明细（预设 F4-20）
+    'movementDetail': ['类别', '期初数', '计提', '收回或转回', '核销', '其他变动'],
     'notes': ['事项', '说明'],
 }
 
+# 变体差异列（国企措辞与列结构与上市不同，见源模板 / 附注模板 八、4）
+SECTION_COLUMNS_OVERRIDE: dict[str, dict[str, list[str]]] = {
+    'soe': {
+        'badDebtClassEnd': ['类别', '账面余额', '坏账准备', '预期信用损失率(%)', '计提理由', '账面价值'],
+        'badDebtClassPrior': ['类别', '账面余额', '坏账准备', '预期信用损失率(%)', '计提理由', '账面价值'],
+        # 国企变动主表是横排 7 列（源模板 A46:G47）
+        'badDebtMovementMain': ['类别', '期初数', '计提', '收回或转回', '核销', '其他变动', '期末数'],
+        # 国企转回表 4 列，且「转回或收回前累计已计提坏账准备金额」是**金额列**（源模板 C59==SUM）
+        'badDebtMovementDetail': ['债务人名称', '转回或收回金额', '转回或收回前累计已计提坏账准备金额', '转回或收回原因、方式'],
+        'writeOffDetail': ['单位名称', '应收票据的性质', '核销金额', '核销原因', '履行的核销程序', '是否由关联交易产生'],
+        # 国企组合计提表只有期末（源模板 A34:D42）
+        'portfolioBank': ['名称', '期末应收票据', '期末坏账准备'],
+        'portfolioCommercial': ['名称', '期末应收票据', '期末坏账准备'],
+    },
+}
+
+
+def _cols(section: str, variant: str) -> list[str]:
+    """取某变体下某区块的列名（变体覆盖优先）。"""
+    return SECTION_COLUMNS_OVERRIDE.get(variant, {}).get(section) or SECTION_COLUMNS.get(section, [])
+
+
 # Sections per variant
 VARIANT_SECTIONS: dict[str, list[str]] = {
-    'listed': ['topSummary', 'pledged', 'endorsed', 'transfer', 'badDebtClassEnd', 'badDebtClassPrior', 'badDebtMovementMain', 'badDebtMovementDetail', 'writeOffMain', 'writeOffDetail', 'notes'],
-    'soe': ['categorySummary', 'badDebtClassEnd', 'badDebtClassPrior', 'badDebtMovementMain', 'badDebtMovementDetail', 'pledged', 'endorsed', 'transfer', 'writeOffMain', 'writeOffDetail', 'notes'],
+    'listed': [
+        'topSummary', 'pledged', 'endorsed', 'transfer',
+        'badDebtClassEnd', 'badDebtClassPrior',
+        'portfolioBank', 'portfolioCommercial',
+        'badDebtMovementMain', 'badDebtMovementDetail',
+        'writeOffMain', 'writeOffDetail', 'notes',
+    ],
+    'soe': [
+        'categorySummary', 'badDebtClassEnd', 'badDebtClassPrior',
+        'portfolioBank', 'portfolioCommercial',
+        'badDebtMovementMain', 'movementDetail', 'badDebtMovementDetail',
+        'pledged', 'endorsed', 'transfer',
+        'writeOffMain', 'writeOffDetail', 'notes',
+    ],
 }
 
 SHEET_TITLES: dict[str, str] = {
@@ -71,7 +114,10 @@ SHEET_TITLES: dict[str, str] = {
     'transfer': '（3）转为应收账款的票据',
     'badDebtClassEnd': '（4.1）坏账计提分类（期末）',
     'badDebtClassPrior': '（4.2）坏账计提分类（上年年末）',
+    'portfolioBank': '（4.3）组合计提-银行承兑汇票',
+    'portfolioCommercial': '（4.3）组合计提-商业承兑汇票',
     'badDebtMovementMain': '（5）坏账准备变动（主表）',
+    'movementDetail': '（5）坏账准备变动（其中明细）',
     'badDebtMovementDetail': '（5）坏账准备转回收回（其中）',
     'writeOffMain': '（6）实际核销（主表）',
     'writeOffDetail': '（6）实际核销（其中）',
@@ -79,57 +125,56 @@ SHEET_TITLES: dict[str, str] = {
 }
 TITLE_TO_SECTION: dict[str, str] = {v: k for k, v in SHEET_TITLES.items()}
 
-# 多层表头配置：section -> (第1行, 第2行, 合并区域, 数据起始行)
-MULTI_HEADER_CONFIG: dict[str, dict[str, Any]] = {
-    "topSummary": {
-        "row1": ["票据种类", "期末余额", "", "", "上年年末余额", "", ""],
-        "row2": ["票据种类", "账面余额", "坏账准备", "账面价值", "账面余额", "坏账准备", "账面价值"],
-        "merges": ["A1:A2", "B1:D1", "E1:G1"],
-        "data_start_row": 3,
-    },
-    "categorySummary": {
-        "row1": ["票据种类", "期末数", "", "", "期初数", "", ""],
-        "row2": ["票据种类", "账面余额", "坏账准备", "期末账面价值", "账面余额", "坏账准备", "期初账面价值"],
-        "merges": ["A1:A2", "B1:D1", "E1:G1"],
-        "data_start_row": 3,
-    },
-    "badDebtClassEnd": {
-        "row1": ["类别", "期末余额", "", "", "", ""],
-        "row2": ["类别", "账面余额", "坏账准备", "预期信用损失率（%）", "计提依据", "账面价值"],
-        "merges": ["A1:A2", "B1:F1"],
-        "data_start_row": 3,
-    },
-    "badDebtClassPrior": {
-        "row1": ["类别", "上年年末余额", "", "", "", ""],
-        "row2": ["类别", "账面余额", "坏账准备", "预期信用损失率（%）", "计提依据", "账面价值"],
-        "merges": ["A1:A2", "B1:F1"],
-        "data_start_row": 3,
-    },
-    "badDebtMovementMain": {
-        "row1": ["（5）本期计提、收回或转回的坏账准备情况", ""],
-        "row2": ["项目", "坏账准备金额"],
-        "merges": ["A1:B1"],
-        "data_start_row": 3,
-    },
-    "writeOffMain": {
-        "row1": ["（6）本期实际核销的应收票据情况", ""],
-        "row2": ["项目", "核销金额"],
-        "merges": ["A1:B1"],
-        "data_start_row": 3,
-    },
-    "badDebtMovementDetail": {
-        "row1": ["其中：本期转回或收回金额重要的坏账准备如下：", "", "", "", ""],
-        "row2": ['单位名称', '转回原因', '收回方式', '原确定坏账准备金额的依据', '转回或收回金额'],
-        "merges": ["A1:E1"],
-        "data_start_row": 3,
-    },
-    "writeOffDetail": {
-        "row1": ["其中，重要的应收票据核销情况如下（逐项披露）：", "", "", "", "", ""],
-        "row2": ['单位名称', '应收票据', '核销金额', '核销原因', '履行的核销程序', '款项是否由关联交易产生'],
-        "merges": ["A1:F1"],
-        "data_start_row": 3,
+# 多层表头：只声明**第 1 行**（分组带 / 小节标题）与合并区域；
+# 第 2 行（末级表头）一律由 `_cols(section, variant)` 派生 —— 防止列名改了表头没跟着改，
+# 导致 `_validate_columns` 把自家导出的模板判成「列名不匹配」。
+_MULTI_HEADER_ROW1: dict[str, dict[str, Any]] = {
+    "topSummary": {"row1": ["票据种类", "期末余额", "", "", "上年年末余额", "", ""], "merges": ["A1:A2", "B1:D1", "E1:G1"]},
+    "categorySummary": {"row1": ["票据种类", "期末数", "", "", "期初数", "", ""], "merges": ["A1:A2", "B1:D1", "E1:G1"]},
+    "badDebtClassEnd": {"row1": ["类别", "期末余额", "", "", "", ""], "merges": ["A1:A2", "B1:F1"]},
+    "badDebtClassPrior": {"row1": ["类别", "上年年末余额", "", "", "", ""], "merges": ["A1:A2", "B1:F1"]},
+    "badDebtMovementMain": {"row1": ["（5）本期计提、收回或转回的坏账准备情况", ""], "merges": ["A1:B1"]},
+    "writeOffMain": {"row1": ["（6）本期实际核销的应收票据情况", ""], "merges": ["A1:B1"]},
+    "badDebtMovementDetail": {"row1": ["其中：本期转回或收回金额重要的坏账准备如下：", "", "", "", ""], "merges": ["A1:E1"]},
+    "writeOffDetail": {"row1": ["其中，重要的应收票据核销情况如下（逐项披露）：", "", "", "", "", ""], "merges": ["A1:F1"]},
+    "portfolioBank": {"row1": ["组合计提项目：银行承兑汇票", "", "", "", ""], "merges": ["A1:E1"]},
+    "portfolioCommercial": {"row1": ["组合计提项目：商业承兑汇票", "", "", "", ""], "merges": ["A1:E1"]},
+    "movementDetail": {"row1": ["其中：按组合计提预期信用损失的应收票据明细（F4-20）", "", "", "", "", ""], "merges": ["A1:F1"]},
+}
+
+# 国企侧第 1 行差异（列数不同 → 合并区域也不同）
+_MULTI_HEADER_ROW1_OVERRIDE: dict[str, dict[str, dict[str, Any]]] = {
+    "soe": {
+        "badDebtMovementMain": {
+            "row1": ["类别", "期初数", "本期变动情况", "", "", "", "期末数"],
+            "merges": ["A1:A2", "B1:B2", "C1:F1", "G1:G2"],
+        },
+        "badDebtMovementDetail": {
+            "row1": ["其中，本期转回或收回金额重要的应收票据坏账准备：", "", "", ""],
+            "merges": ["A1:D1"],
+        },
+        "portfolioBank": {"row1": ["按组合计提坏账准备：银行承兑汇票", "", ""], "merges": ["A1:C1"]},
+        "portfolioCommercial": {"row1": ["按组合计提坏账准备：商业承兑汇票", "", ""], "merges": ["A1:C1"]},
     },
 }
+
+
+def _multi_header(section: str, variant: str) -> dict[str, Any] | None:
+    """多层表头配置（row1 声明 + row2 派生 + 合并区域 + 数据起始行）。"""
+    base = _MULTI_HEADER_ROW1_OVERRIDE.get(variant, {}).get(section) or _MULTI_HEADER_ROW1.get(section)
+    if not base:
+        return None
+    cols = _cols(section, variant)
+    row1 = list(base["row1"])
+    # row1 长度对齐列数（列数被变体覆盖改变时自动补空）
+    if len(row1) < len(cols):
+        row1 += [""] * (len(cols) - len(row1))
+    return {
+        "row1": row1[: len(cols)],
+        "row2": cols,
+        "merges": base["merges"],
+        "data_start_row": 3,
+    }
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -151,9 +196,9 @@ def _create_template_workbook(variant: str) -> "Workbook":
     header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
 
     for section in sections:
-        columns = SECTION_COLUMNS[section]
+        columns = _cols(section, variant)
         ws = wb.create_sheet(title=SHEET_TITLES.get(section, section))
-        mh = MULTI_HEADER_CONFIG.get(section)
+        mh = _multi_header(section, variant)
         if mh:
             for col_idx, col_name in enumerate(mh["row1"], 1):
                 cell = ws.cell(row=1, column=col_idx, value=col_name)
@@ -189,15 +234,20 @@ def _create_template_workbook(variant: str) -> "Workbook":
                 ws.cell(row=idx, column=1, value=k)
                 ws.cell(row=idx, column=2, value=v)
         elif section == 'badDebtMovementMain':
-            fixed_rows = ['上年年末数', '本期计提', '本期收回或转回', '本期核销', '【本期转销】', '【其他】', '期末数']
-            start_row = MULTI_HEADER_CONFIG['badDebtMovementMain']['data_start_row']
+            # 上市是竖排 7 个项目行；国企是横排 3 个类别行（源模板 A48~A52）
+            fixed_rows = (
+                ['单项计提预期信用损失的应收票据', '按组合计提预期信用损失的应收票据', '合计']
+                if variant == 'soe'
+                else ['上年年末数', '本期计提', '本期收回或转回', '本期核销', '【本期转销】', '【其他】', '期末数']
+            )
+            start_row = int((_multi_header('badDebtMovementMain', variant) or {}).get('data_start_row', 2))
             for i, label in enumerate(fixed_rows, start=start_row):
                 ws.cell(row=i, column=1, value=label)
                 if '【' in label:
                     ws.cell(row=i, column=1).font = Font(color="C00000")
                 ws.cell(row=i, column=1).fill = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
         elif section == 'writeOffMain':
-            start_row = MULTI_HEADER_CONFIG['writeOffMain']['data_start_row']
+            start_row = int((_multi_header('writeOffMain', variant) or {}).get('data_start_row', 2))
             ws.cell(row=start_row, column=1, value='实际核销的应收票据')
             ws.cell(row=start_row, column=1).fill = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
 
@@ -228,37 +278,66 @@ def _fill_template_with_data(wb: "Workbook", variant: str, response_map: dict[st
         'topSummary': _safe_parse_rows(response_map.get(prefix + 'top-summary-rows')),
         'categorySummary': _safe_parse_rows(response_map.get(prefix + 'top-summary-rows')),
         'pledged': [
-            {'票据种类': r.get('category', ''), '期末已质押金额': _num(r.get('pledgedAmount'))}
+            {'种类': r.get('category', ''), '期末已质押金额': _num(r.get('pledgedAmount'))}
             for r in get_rows('pledged-rows')
         ],
         'endorsed': [
-            {'票据种类': r.get('category', ''), '终止确认金额': _num(r.get('derecognizedAmount')), '未终止确认金额': _num(r.get('notDerecognizedAmount'))}
+            {'种类': r.get('category', ''), '期末终止确认金额': _num(r.get('derecognizedAmount')), '期末未终止确认金额': _num(r.get('notDerecognizedAmount'))}
             for r in get_rows('endorsed-rows')
         ],
         'transfer': [
-            {'票据种类': r.get('category', ''), '转应收账款金额': _num(r.get('transferAmount'))}
+            {'种类': r.get('category', ''), '期末转应收账款金额': _num(r.get('transferAmount'))}
             for r in get_rows('transfer-rows')
         ],
+        # 国企转回表列结构与上市不同：4 列且「累计已计提坏账准备金额」是金额列
         'badDebtMovementDetail': [
-            {
-                '单位名称': r.get('companyName', ''),
-                '转回原因': r.get('reversalReason', ''),
-                '收回方式': r.get('originalMethod', ''),
-                '原确定坏账准备金额的依据': r.get('reversalBasis', ''),
-                '转回或收回金额': _num(r.get('amount')),
-            }
+            (
+                {
+                    '债务人名称': r.get('companyName', ''),
+                    '转回或收回金额': _num(r.get('amount')),
+                    '转回或收回前累计已计提坏账准备金额': _num(r.get('cumulativeProvision')),
+                    '转回或收回原因、方式': r.get('reversalReason', ''),
+                }
+                if variant == 'soe' else
+                {
+                    '单位名称': r.get('companyName', ''),
+                    '转回原因': r.get('reversalReason', ''),
+                    '收回方式': r.get('originalMethod', ''),
+                    '原确定坏账准备的依据': r.get('reversalBasis', ''),
+                    '转回或收回金额': _num(r.get('amount')),
+                }
+            )
             for r in get_rows('reversal-rows')
         ],
         'writeOffDetail': [
             {
                 '单位名称': r.get('companyName', ''),
-                '应收票据': r.get('noteType', ''),
+                ('应收票据的性质' if variant == 'soe' else '应收票据性质'): r.get('noteType', ''),
                 '核销金额': _num(r.get('amount')),
                 '核销原因': r.get('reason', ''),
                 '履行的核销程序': r.get('procedure', ''),
-                '款项是否由关联交易产生': r.get('relatedPartyFlag', ''),
+                ('是否由关联交易产生' if variant == 'soe' else '款项是否由关联交易产生'): r.get('relatedPartyFlag', ''),
             }
             for r in get_rows('writeoff-rows')
+        ],
+        # 组合计提项目明细（上市双期并列 / 国企只期末）——本轮新增录入面的导入导出覆盖
+        'portfolioBank': _portfolio_sheet_rows(
+            get_rows('bank-portfolio-end-rows'), get_rows('bank-portfolio-prior-rows'), variant,
+        ),
+        'portfolioCommercial': _portfolio_sheet_rows(
+            get_rows('commercial-portfolio-end-rows'), get_rows('commercial-portfolio-prior-rows'), variant,
+        ),
+        # 国企变动表「其中：」明细（F4-20）
+        'movementDetail': [
+            {
+                '类别': r.get('label', ''),
+                '期初数': _num(r.get('priorBalance')),
+                '计提': _num(r.get('provision')),
+                '收回或转回': _num(r.get('reversal')),
+                '核销': _num(r.get('writeOff')),
+                '其他变动': _num(r.get('other')),
+            }
+            for r in get_rows('movement-detail-rows')
         ],
         'writeOffMain': [{'项目': '实际核销的应收票据', '核销金额': get_num('writeoff-amount')}],
         'notes': [
@@ -319,22 +398,22 @@ def _fill_template_with_data(wb: "Workbook", variant: str, response_map: dict[st
         if sheet_title not in wb.sheetnames:
             continue
         ws = wb[sheet_title]
-        cols = SECTION_COLUMNS[sheet_name]
-        mh = MULTI_HEADER_CONFIG.get(sheet_name)
+        cols = _cols(sheet_name, variant)
+        mh = _multi_header(sheet_name, variant)
         start_row = int(mh["data_start_row"]) if mh else 2
         for r_idx, row_vals in enumerate(_sheet_values(rows, cols), start=start_row):
             for c_idx, cell_val in enumerate(row_vals, start=1):
                 ws.cell(row=r_idx, column=c_idx, value=cell_val)
 
 
-def _validate_columns(ws: Any, section: str) -> list[str]:
+def _validate_columns(ws: Any, section: str, variant: str) -> list[str]:
     """Validate column names, return list of invalid column names."""
-    expected_list = SECTION_COLUMNS.get(section, [])
+    expected_list = _cols(section, variant)
     expected = set(expected_list)
     if not expected:
         return ['未知的section类型']
 
-    mh = MULTI_HEADER_CONFIG.get(section)
+    mh = _multi_header(section, variant)
     header_row = 2 if mh else 1
     actual: list[str] = []
     for cell in ws[header_row]:
@@ -349,10 +428,10 @@ def _validate_columns(ws: Any, section: str) -> list[str]:
     return invalid
 
 
-def _parse_rows(ws: Any, section: str) -> tuple[list[dict], str | None]:
+def _parse_rows(ws: Any, section: str, variant: str) -> tuple[list[dict], str | None]:
     """Parse data rows into dict list, truncate at MAX_IMPORT_ROWS."""
-    columns = SECTION_COLUMNS.get(section, [])
-    mh = MULTI_HEADER_CONFIG.get(section)
+    columns = _cols(section, variant)
+    mh = _multi_header(section, variant)
     header_row = 2 if mh else 1
     data_start = int(mh["data_start_row"]) if mh else 2
     actual_cols: list[str] = []
@@ -411,6 +490,62 @@ def _safe_parse_rows(raw: str | None) -> list[dict[str, Any]]:
 
 def _sheet_values(rows: list[dict[str, Any]], cols: list[str]) -> list[list[Any]]:
     return [[r.get(c, '') for c in cols] for r in rows]
+
+
+def _portfolio_sheet_rows(
+    end_rows: list[dict[str, Any]],
+    prior_rows: list[dict[str, Any]],
+    variant: str,
+) -> list[dict[str, Any]]:
+    """组合计提明细 → sheet 行（按名称把期末 / 上年年末对齐，同前端 `mergePortfolio`）。
+
+    国企侧源模板只有期末两列，故不输出上年年末列（列定义已在 override 里裁掉）。
+    """
+    def name_of(r: dict[str, Any]) -> str:
+        return str(r.get('drawerTypeOrAging') or '')
+
+    names: list[str] = []
+    for r in [*end_rows, *prior_rows]:
+        n = name_of(r)
+        if n not in names:
+            names.append(n)
+    out: list[dict[str, Any]] = []
+    for n in names:
+        e = next((r for r in end_rows if name_of(r) == n), {})
+        p = next((r for r in prior_rows if name_of(r) == n), {})
+        row: dict[str, Any] = {
+            '名称': n,
+            '期末应收票据': _num(e.get('balance')),
+            '期末坏账准备': _num(e.get('provision')),
+        }
+        if variant != 'soe':
+            row['上年年末应收票据'] = _num(p.get('balance'))
+            row['上年年末坏账准备'] = _num(p.get('provision'))
+        out.append(row)
+    return out
+
+
+def _portfolio_import_rows(rows: list[dict[str, Any]], period: str) -> list[dict[str, Any]]:
+    """sheet 行 → 组合计提明细持久化行（`*-portfolio-{period}-rows`）。"""
+    bal_key = '期末应收票据' if period == 'end' else '上年年末应收票据'
+    prov_key = '期末坏账准备' if period == 'end' else '上年年末坏账准备'
+    out: list[dict[str, Any]] = []
+    for r in rows:
+        name = str(r.get('名称') or '').strip()
+        if not name:
+            continue
+        bal = _num(r.get(bal_key))
+        prov = _num(r.get(prov_key))
+        out.append({
+            "rowId": f"pf-{uuid.uuid4().hex[:10]}",
+            "rowType": "dynamic",
+            "drawerTypeOrAging": name,
+            "isFixed": False,
+            "balance": bal,
+            "provision": prov,
+            "lossRate": (prov / bal) if bal else 0,
+        })
+    return out
 
 
 def _upsert_item_payload(variant: str, item_key: str, remark: Any) -> tuple[str, str]:
@@ -513,12 +648,12 @@ async def import_disclosure_data(
         ws = wb[sheet_name]
 
         # Column validation
-        invalid = _validate_columns(ws, section_key)
+        invalid = _validate_columns(ws, section_key, variant)
         if invalid:
             all_invalid.extend([f"{sheet_name}: {col}" for col in invalid])
             continue
 
-        rows, warning = _parse_rows(ws, section_key)
+        rows, warning = _parse_rows(ws, section_key, variant)
         total_rows += len(rows)
         parsed_by_sheet[section_key] = rows
         if warning:

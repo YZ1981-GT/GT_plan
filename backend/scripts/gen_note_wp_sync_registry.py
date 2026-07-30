@@ -35,8 +35,14 @@ _SECTION_BLOCK = re.compile(r"_NOTE_SECTION[^=]*=\s*\{(?P<body>[^}]*)\}", re.S)
 _LISTED = re.compile(r"listed\s*:\s*['\"](?P<v>[^'\"]+)['\"]")
 _SOE = re.compile(r"soe\s*:\s*['\"](?P<v>[^'\"]+)['\"]")
 # X_DISCLOSURE_SHEET_LISTED / _SOE / _NAME（sheet 真实 tab 名，尽力提取；找不到留空不臆造）
+#
+# 🔴 必须锚定 `const/let/var` 声明：否则文档注释里提到常量名时，`[^=]*=` 会跨过注释
+#    咬到**下一条语句**的等号（实测 G12 因此把 `export type XVariant = 'listed'` 的
+#    `'listed'` 当成 sheet 名，两个变体都写成 `listed`）。
 _SHEET_CONST = re.compile(
-    r"_DISCLOSURE_SHEET_(?P<kind>LISTED|SOE|NAME)[^=]*=\s*(?P<body>[^;]{0,400})", re.S
+    r"(?:const|let|var)\s+\w*_DISCLOSURE_SHEET_(?P<kind>LISTED|SOE|NAME)\b"
+    r"(?P<anno>\s*:[^=]{0,200})?\s*=\s*(?P<body>[^;]{0,400})",
+    re.S,
 )
 _WP_CODE = re.compile(r"^(?P<code>[a-z]+\d+)NoteSectionMap\.ts$")
 

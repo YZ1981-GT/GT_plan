@@ -2,7 +2,9 @@
 
 POST /api/workpapers/{wp_id}/k1/ai-generate
 
-sections: policy-check / large-amount-eval / overdue-eval / overall-opinion
+sections: policy-check / large-amount-eval / overdue-eval / overall-opinion /
+          writeoff-eval / disclosure-balance-change / disclosure-ecl-basis /
+          disclosure-writeoff-note / disclosure-transfer-note
 """
 
 from __future__ import annotations
@@ -43,6 +45,11 @@ _SUPPORTED_SECTIONS = {
     "overdue-eval",
     "overall-opinion",
     "writeoff-eval",
+    # 附注披露表（上市 / 国企）文字段落
+    "disclosure-balance-change",
+    "disclosure-ecl-basis",
+    "disclosure-writeoff-note",
+    "disclosure-transfer-note",
 }
 
 _SYSTEM_PROMPT = """你是一位资深注册会计师（CPA），正在协助编制审计底稿 K1《其他应收款》。
@@ -87,6 +94,31 @@ _SECTION_PROMPTS: dict[str, str] = {
         "③关联方往来核销是否需特别关注；"
         "④本表合计与K1-3坏账准备明细表转回/核销列是否勾稽。"
         "语言简洁，适合直接写入底稿「审计说明」栏。"
+    ),
+    "disclosure-balance-change": (
+        "请生成附注披露段落：说明本期发生损失准备的其他应收款「账面余额」显著变动的情况。"
+        "要求：①指出账面余额较上年年末的增减金额与幅度；②说明主要变动成因"
+        "（新增往来/资金集中管理归集/收回/核销/阶段迁移等）；③说明变动对损失准备计提的影响。"
+        "面向财务报表附注读者，第三人称陈述，不出现「我们」「审计」等审计语汇，2~4 句。"
+    ),
+    "disclosure-ecl-basis": (
+        "请生成附注披露段落：说明本期坏账准备计提金额以及评估金融工具的信用风险是否显著增加所采用的依据。"
+        "要求：①三阶段划分的量化与定性判断标准（如逾期超过30天但未超过90天划入第二阶段、"
+        "逾期超过90天或债务人重大财务困难划入第三阶段）；②预期信用损失率的确定依据"
+        "（历史违约损失经验+前瞻性宏观调整）；③本期计提金额及与上期计提比例的差异原因。"
+        "面向财务报表附注读者，第三人称陈述，3~5 句。"
+    ),
+    "disclosure-writeoff-note": (
+        "请生成附注披露段落：说明本期实际核销其他应收款的整体情况。"
+        "要求：①核销总额及笔数；②主要核销原因（债务人注销/破产/清算/长期无力偿付等）；"
+        "③已履行的内部核销审批程序；④是否存在由关联交易产生的核销及其单独披露情况。"
+        "面向财务报表附注读者，第三人称陈述，2~4 句。"
+    ),
+    "disclosure-transfer-note": (
+        "请生成附注披露段落：说明其他应收款转移且继续涉入的情况。"
+        "要求：①资产转移方式（保理/证券化/债权转让等）；②未全部终止确认的被转移金融资产"
+        "与相关负债之间的关系；③已终止确认的金融资产继续涉入的性质及所保留的相关风险。"
+        "面向财务报表附注读者，第三人称陈述，2~4 句；若无此类交易，输出「本期不存在…」的否定式表述。"
     ),
 }
 

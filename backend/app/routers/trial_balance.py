@@ -126,6 +126,19 @@ async def recalc_trial_balance(
     await svc.full_recalc(project_id, year, company_code)
     await db.commit()
 
+    # 重算后收敛底稿 stale 标记（否则 stale-summary 永远返回旧计数，
+    # 「一键重算 / 点击重算」横幅点完仍常亮）。失败不阻断重算主操作。
+    stale_resolution: dict[str, int] = {"cleared": 0, "refilled": 0, "kept_stale": 0}
+    try:
+        from app.services.prefill_engine import resolve_stale_after_recalc
+        stale_resolution = await resolve_stale_after_recalc(db, project_id, year)
+        await db.commit()
+    except Exception:
+        try:
+            await db.rollback()
+        except Exception:
+            pass
+
     # Best-effort: 重算后自动创建版本快照（content_hash 去重，相同内容不重复）
     try:
         from app.services.tb_snapshot_service import TbSnapshotService
@@ -172,7 +185,7 @@ async def recalc_trial_balance(
         project_id=project_id,
         year=year,
     ))
-    return {"message": "重算完成"}
+    return {"message": "重算完成", "stale_resolution": stale_resolution}
 
 
 @router.get("/balance-check")

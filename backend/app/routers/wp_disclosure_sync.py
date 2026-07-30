@@ -14,6 +14,7 @@ Validates: Requirements US-3（C 类底稿 → 附注自动同步）
 from __future__ import annotations
 
 import logging
+from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -59,9 +60,13 @@ class SyncFromWorkpaperRequest(BaseModel):
         min_length=1,
         description='附注 section（如 "五-1-1 应收账款"）',
     )
-    sub_table_data: dict[str, list[dict]] = Field(
+    sub_table_data: dict[str, Any] = Field(
         default_factory=dict,
-        description="子表数据：sub_table_id → 行列表",
+        description=(
+            "子表数据：sub_table_id → 行列表。`_` 前缀键为元数据："
+            "`_note_texts`（叙述正文）、`_removed_table_keys`（改版后待删除的旧表名）。"
+            "非元数据键的值由服务层 `normalize_sub_table_data` 归一为行列表。"
+        ),
     )
     columns: dict[str, list[dict]] | None = Field(
         None,
@@ -97,7 +102,10 @@ class SyncBatchItem(BaseModel):
 
     sheet_name: str = Field(..., min_length=1)
     section_id: str = Field(..., min_length=1)
-    sub_table_data: dict[str, list[dict]] = Field(default_factory=dict)
+    sub_table_data: dict[str, Any] = Field(
+        default_factory=dict,
+        description="子表数据（含 `_` 前缀元数据键，同单章节同步）",
+    )
     columns: dict[str, list[dict]] | None = Field(None, description="列头元数据 sub_table_id → ColumnDef[]")
 
 

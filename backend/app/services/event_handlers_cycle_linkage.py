@@ -541,4 +541,19 @@ def register_cycle_linkage_handlers() -> None:
     event_bus.subscribe(EventType.WORKPAPER_SAVED, _on_d_audit_determination_saved)
     # 函证回函 → 下游 stale 传播（D0/F0/G0…）
     event_bus.subscribe(EventType.CONFIRMATION_RECEIVED, _on_confirmation_received)
-    logger.debug("Cycle linkage handlers registered (C/F/D~N + confirmation)")
+
+    # 底稿保存 → 附注章节标记过期（**兜底**，只标 stale 不重建载荷）
+    #
+    # 真正的自动同步由前端 `useDisclosureAutoSync` 承担（后端拿不到 sub_table_data，
+    # 那是前端 buildXSyncPayload 算的）。本 handler 覆盖绕过前端 composable 的路径：
+    # 多区块导入 / API 直写 / 后台重算 / 只改了上游而没打开披露 Tab。
+    # 由 `DISCLOSURE_AUTO_SYNC_ENABLED` 灰度控制，默认关。
+    # spec: disclosure-note-follow-actual-content R1.4 / R5.1
+    from app.services.disclosure_stale_marker import (
+        handle_workpaper_saved_for_disclosure as _mark_disclosure_stale,
+    )
+
+    event_bus.subscribe(EventType.WORKPAPER_SAVED, _mark_disclosure_stale)
+    logger.debug(
+        "Cycle linkage handlers registered (C/F/D~N + confirmation + disclosure stale)"
+    )

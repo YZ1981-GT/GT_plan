@@ -29,13 +29,19 @@ async def get_stale_summary(
     from app.models.workpaper_models import WorkingPaper, WpIndex
 
     stmt = (
-        select(WorkingPaper, WpIndex.wp_code, WpIndex.wp_name)
+        select(
+            WorkingPaper.id,
+            WpIndex.wp_code,
+            WpIndex.wp_name,
+            WorkingPaper.parsed_data["html_data"].isnot(None).label("has_saved_body"),
+        )
         .join(WpIndex, WorkingPaper.wp_index_id == WpIndex.id)
         .where(
             WorkingPaper.project_id == project_id,
             WorkingPaper.prefill_stale == True,  # noqa: E712
             WorkingPaper.is_deleted == False,  # noqa: E712
         )
+        .order_by(WpIndex.wp_code)
     )
     result = await db.execute(stmt)
     rows = result.all()
@@ -44,12 +50,17 @@ async def get_stale_summary(
         "stale_count": len(rows),
         "items": [
             {
-                "id": str(wp.id),
+                "id": str(wp_id),
                 "wp_code": wp_code,
                 "wp_name": wp_name,
-                "stale_reason": None,
+                # 已保存正文的底稿重算不会覆盖持久化值 → 需在底稿内手工刷新后重存
+                "stale_reason": (
+                    "底稿正文已保存，重算不覆盖持久化值，需打开底稿刷新后重新保存"
+                    if has_saved_body
+                    else "上游数据变更，预填数据待重算"
+                ),
             }
-            for wp, wp_code, wp_name in rows
+            for wp_id, wp_code, wp_name, has_saved_body in rows
         ],
     }
 

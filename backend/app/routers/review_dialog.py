@@ -336,6 +336,80 @@ _REVIEW_AI_SYSTEM_PROMPT = (
     "- 引用审定表数据时使用具体数字\n- 不超过300字"
 )
 
+# ── 按 section_id 精确命中的专属 prompt（纯增量，未命中回退通用 prompt）─────────
+#
+# 🔴 铁律：prompt 过短会诱导模型自造披露内容。每条必须 ≥20 字并写明源模板 / 15 号文 /
+#    校验预设口径 + 「不得虚构」约束。新增前端 section_id 必须同时在此登记，
+#    守卫见 `backend/tests/test_review_dialog_section_prompts.py`。
+
+_NO_FABRICATION = (
+    "严禁虚构未提供的数据、单位名称、金额或事实；上下文缺失的部分直接留空或写\u201c待补充\u201d，"
+    "不得推测。只依据给定数据组织语言。"
+)
+
+_D1_DISCLOSURE_PROMPTS: dict[str, str] = {
+    "top": (
+        "撰写应收票据附注总体说明。依据源模板提示：不属于《票据法》规范的\u201c云信\u201d\u201c融信\u201d等"
+        "数字化应收账款债权凭证不在\u201c应收票据\u201d列示；供应链票据自 2023 年 1 月 1 日起按业务模式"
+        "列示为应收票据或应收款项融资。结合银行承兑汇票与商业承兑汇票的期末 / 上年年末账面余额、"
+        "坏账准备、账面价值说明构成与变动原因。"
+    ),
+    "pledged": (
+        "撰写期末已质押应收票据的说明。按票据种类说明质押金额、质押事由与对应的借款或担保安排，"
+        "并说明质押对票据可回收性与流动性的影响（15 号文关于所有权受限资产的披露要求）。"
+    ),
+    "endorsed": (
+        "撰写期末已背书或贴现但尚未到期应收票据的说明。依据《企业会计准则第 23 号——金融资产转移》"
+        "与证监会《2014 年上市公司年报会计监管报告》，分别说明终止确认与未终止确认的判断依据"
+        "（承兑行信用等级、追索权是否影响、主要风险和报酬是否转移），并说明票据被追索时可能存在的"
+        "支付风险。"
+    ),
+    "badDebtClass": (
+        "撰写坏账准备计提方法分类的说明。区分按单项计提与按组合计提，说明组合的划分依据"
+        "（出票人类型或账龄）、预期信用损失率的确定方法与关键假设。注意源模板口径：此处只披露"
+        "未逾期的应收票据；票据逾期应转入应收账款并计提坏账准备、账龄连续计算。"
+    ),
+    "writeOff": (
+        "撰写本期实际核销应收票据的说明。对其中重要的核销逐项说明款项性质、核销原因、"
+        "履行的核销程序及核销金额；由关联交易产生的款项须单独说明"
+        "（源模板核销表附注要求）。"
+    ),
+}
+
+_SECTION_PROMPTS: dict[str, str] = {
+    # D1 应收票据附注披露（上市 / 国企两版共用同一子节口径）
+    **{
+        f"d1-disclosure-{variant}-{key}-note": f"{text}\n{_NO_FABRICATION}"
+        for variant in ("listed", "soe")
+        for key, text in _D1_DISCLOSURE_PROMPTS.items()
+    },
+    # D1-1 审定表
+    "d1-adjudication-audit-note": (
+        "撰写 D1-1 应收票据审定表的审计说明。依据各区块（账面余额 / 坏账准备 / 净值）的"
+        "期初审定数、期末审定数与变动额，说明已执行的审计程序（监盘、函证、贴现背书检查、"
+        "坏账准备复核）及发现，并说明与试算平衡表的差异原因。\n"
+        + _NO_FABRICATION
+    ),
+    "d1-adjudication-audit-conclusion": (
+        "撰写 D1-1 应收票据审定表的审计结论。依据期末审定数与试算平衡表差异，就应收票据的"
+        "存在、完整性、计价与分摊、列报是否恰当给出结论，并指出需提请管理层调整或关注的事项。\n"
+        + _NO_FABRICATION
+    ),
+}
+
+
+def resolve_review_ai_prompt(section_id: str, section_type: str) -> str:
+    """按 ``section_id`` 取专属 prompt；未登记则回退通用 prompt（保持存量行为）。"""
+    specific = _SECTION_PROMPTS.get(section_id)
+    if specific:
+        return (
+            f"你是一位资深注册会计师（CPA），正在协助编制审计底稿的{section_type}。\n"
+            f"{specific}\n"
+            "语言：中文，审计专业用语；客观陈述事实并引用具体数字；不超过 400 字。"
+        )
+    return _REVIEW_AI_SYSTEM_PROMPT.format(section_type=section_type)
+
+
 @router.post("/workpapers/{wp_id}/review-dialog/ai-generate", response_model=AiGenerateResponse)
 async def ai_generate_review_text(
     wp_id: str, body: AiGenerateRequest,
@@ -347,7 +421,7 @@ async def ai_generate_review_text(
     await _check_project_access(db, current_user, project_id)
 
     section_type = "审计说明" if "note" in body.section_id else "审计结论"
-    system_prompt = _REVIEW_AI_SYSTEM_PROMPT.format(section_type=section_type)
+    system_prompt = resolve_review_ai_prompt(body.section_id, section_type)
     parts = [f"请为以下底稿区域生成{section_type}："]
     if body.related_data:
         parts.append(f"审定表数据：{json.dumps(body.related_data, ensure_ascii=False)}")

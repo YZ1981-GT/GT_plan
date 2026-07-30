@@ -30,6 +30,7 @@ from app.models.report_models import (
 from app.services.conflict_resolution_service import (
     _check_manual_override_before_propagate,
 )
+from app.services.note_sub_table_projector import normalize_sub_table_data
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +94,47 @@ def _extract_note_texts(
             if isinstance(item, dict):
                 texts.append(item)
     return data, texts
+
+
+def _extract_removed_table_keys(
+    sub_table_data: dict[str, Any] | None,
+) -> tuple[dict[str, Any], list[str]]:
+    """分离表格数据与「待删除表名」元数据键 ``_removed_table_keys``。
+
+    底稿改版重命名子表后，附注侧浅合并不会删除旧键 → 附注永久残留空表。
+    底稿据此显式上报旧表名，由 ``sync_from_workpaper`` 删除（Requirement 8）。
+    """
+    data = dict(sub_table_data or {})
+    raw = data.pop("_removed_table_keys", None)
+    keys: list[str] = []
+    if isinstance(raw, (list, tuple, set)):
+        for item in raw:
+            name = str(item).strip()
+            # 元数据键不可删除（`_note_texts` 等由各自路径管理）
+            if name and not name.startswith("_") and name not in keys:
+                keys.append(name)
+    return data, keys
+
+
+def _drop_removed_tables(
+    merged_sub: dict[str, Any],
+    merged_cols: dict[str, Any],
+    removed_keys: list[str],
+    pushed_keys: set[str],
+) -> list[str]:
+    """从合并结果中删除 ``removed_keys``，跳过本次推送的表名（Property 7）。
+
+    返回实际删除的表名（供审计日志/返回值）。原地修改传入的 dict（均为调用方新建的副本）。
+    """
+    dropped: list[str] = []
+    for key in removed_keys:
+        if key in pushed_keys:
+            continue  # 本次刚推送 → 推送优先，绝不删
+        removed_any = merged_sub.pop(key, None) is not None
+        merged_cols.pop(key, None)
+        if removed_any:
+            dropped.append(key)
+    return dropped
 
 
 def _format_note_texts(note_texts: list[dict[str, Any]]) -> str:
@@ -276,6 +318,10 @@ async def sync_from_workpaper(
     target_year = await _resolve_target_year(db, project_id, year)
     now = datetime.now(timezone.utc)
     clean_sub_table_data, note_texts = _extract_note_texts(sub_table_data)
+    clean_sub_table_data, removed_table_keys = _extract_removed_table_keys(clean_sub_table_data)
+    # 入库前归一为 {key: list[dict]} 规范形态：拒绝表对象包装 / 位置化 values 行
+    # 落库（否则投影器读时取不出业务键 → 附注整表丢失）。
+    clean_sub_table_data = normalize_sub_table_data(clean_sub_table_data, sub_table_columns)
     rows_synced = _count_rows_synced(clean_sub_table_data)
     formatted_texts = _format_note_texts(note_texts)
 
@@ -347,6 +393,22 @@ async def sync_from_workpaper(
         new_table_data["_sub_table_columns"] = merged_cols
     elif existing_cols:
         new_table_data["_sub_table_columns"] = existing_cols
+
+    # ── 旧表名清理（Requirement 8）：改版重命名后删除附注残留空表 ──
+    if removed_table_keys:
+        sub_after = dict(new_table_data.get("sub_table_data") or {})
+        cols_after = dict(new_table_data.get("_sub_table_columns") or {})
+        dropped = _drop_removed_tables(
+            sub_after, cols_after, removed_table_keys, set(clean_sub_table_data or {}),
+        )
+        new_table_data["sub_table_data"] = sub_after
+        if cols_after or "_sub_table_columns" in new_table_data:
+            new_table_data["_sub_table_columns"] = cols_after
+        if dropped:
+            logger.info(
+                "wp_disclosure_sync: dropped obsolete sub-tables %s section=%s",
+                dropped, section_id,
+            )
 
     new_table_data["_source"] = "workpaper"
     new_table_data["_current_standard"] = current_standard
@@ -586,6 +648,8 @@ class WpDisclosureSyncService:
             ConflictError: 附注侧有更新的手动编辑
         """
         now = datetime.now(timezone.utc)
+        # 先剥离元数据键（`_removed_table_keys`），保证新建/更新两条分支入库形态一致
+        incoming_raw, html_removed_keys = _extract_removed_table_keys(sub_table_data)
 
         # 1. 查映射：通过 sheet_name 推导 section_id
         mapping = await self._get_section_mapping(db, wp_id, sheet_name)
@@ -632,9 +696,16 @@ class WpDisclosureSyncService:
                 account_name=html_account,
                 content_type=ContentType.table,
                 table_data=(
-                    {"sub_table_data": sub_table_data, "_sub_table_columns": sub_table_columns}
+                    {
+                        "sub_table_data": normalize_sub_table_data(
+                            incoming_raw, sub_table_columns,
+                        ),
+                        "_sub_table_columns": sub_table_columns,
+                    }
                     if isinstance(sub_table_columns, dict) and sub_table_columns
-                    else {"sub_table_data": sub_table_data}
+                    else {
+                        "sub_table_data": normalize_sub_table_data(incoming_raw),
+                    }
                 ),
                 status=NoteStatus.draft,
                 is_stale=False,
@@ -671,7 +742,8 @@ class WpDisclosureSyncService:
 
         # 4. 写入（原子操作）
         existing_table_data = dict(note.table_data) if note.table_data else {}
-        incoming_sub = sub_table_data if isinstance(sub_table_data, dict) else {}
+        # 该入口的 sub_table_data 未做逐值类型约束（dict），归一后再落库
+        incoming_sub = normalize_sub_table_data(incoming_raw, sub_table_columns)
         if incoming_sub:
             existing_table_data["sub_table_data"] = incoming_sub
         else:
@@ -688,6 +760,13 @@ class WpDisclosureSyncService:
             existing_table_data["_sub_table_columns"] = merged_cols
         elif prev_cols:
             existing_table_data["_sub_table_columns"] = prev_cols
+        if html_removed_keys:
+            sub_after = dict(existing_table_data.get("sub_table_data") or {})
+            cols_after = dict(existing_table_data.get("_sub_table_columns") or {})
+            _drop_removed_tables(sub_after, cols_after, html_removed_keys, set(incoming_sub or {}))
+            existing_table_data["sub_table_data"] = sub_after
+            if cols_after or "_sub_table_columns" in existing_table_data:
+                existing_table_data["_sub_table_columns"] = cols_after
         existing_table_data["_source"] = "workpaper_html"
         existing_table_data["_last_sync_wp_id"] = str(wp_id)
         existing_table_data["_last_sync_sheet"] = sheet_name

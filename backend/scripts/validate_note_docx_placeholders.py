@@ -1,9 +1,18 @@
 #!/usr/bin/env python3
-"""校验附注 Word 模板：拒绝【、使用说明、XXXX 等编制残留.
+"""校验附注 **Word（docx）模板**：拒绝【、使用说明、XXXX 等编制残留占位符.
+
+**名实相符说明**：本脚本原名 `validate_note_template.py`（2026-07-29 更名）。
+它只扫 `data/audit_report_templates/disclosure_notes/*.docx` 的段落文本，
+**不校验 `data/note_template_{soe,listed}.json` 的表结构** —— 旧名容易被误当作
+JSON 结构守卫使用（曾实际误用）。
+
+附注 JSON 结构守卫请用：
+    backend/scripts/fix/fix_note_*_structure.py --check
+    backend/tests/services/test_note_*_structure.py
 
 Usage:
-    python backend/scripts/validate_note_template.py
-    python backend/scripts/validate_note_template.py --variant soe_standalone
+    python backend/scripts/validate_note_docx_placeholders.py
+    python backend/scripts/validate_note_docx_placeholders.py --variant soe_standalone
 """
 from __future__ import annotations
 
