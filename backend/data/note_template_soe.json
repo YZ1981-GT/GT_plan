@@ -2463,86 +2463,234 @@
           "name": "应收票据分类",
           "headers": [
             "票据种类",
-            "期末账面余额",
-            "期末坏账准备",
-            "期末账面价值",
-            "期初账面余额",
-            "期初坏账准备",
-            "期初账面价值"
+            "账面余额",
+            "坏账准备",
+            "账面价值",
+            "账面余额",
+            "坏账准备",
+            "账面价值"
           ],
           "rows": [
             {
               "label": "银行承兑汇票",
-              "row_type": "data",
-              "account_codes": []
+              "row_type": "data"
             },
             {
               "label": "商业承兑汇票",
-              "row_type": "data",
-              "account_codes": []
+              "row_type": "data"
             },
             {
               "label": "合计",
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "票据种类",
+              "is_label": true
+            },
+            {
+              "key": "end_balance",
+              "label": "账面余额",
+              "group": "期末数",
+              "format": "amount"
+            },
+            {
+              "key": "end_provision",
+              "label": "坏账准备",
+              "group": "期末数",
+              "format": "amount"
+            },
+            {
+              "key": "end_book_value",
+              "label": "账面价值",
+              "group": "期末数",
+              "format": "amount"
+            },
+            {
+              "key": "prior_balance",
+              "label": "账面余额",
+              "group": "期初数",
+              "format": "amount"
+            },
+            {
+              "key": "prior_provision",
+              "label": "坏账准备",
+              "group": "期初数",
+              "format": "amount"
+            },
+            {
+              "key": "prior_book_value",
+              "label": "账面价值",
+              "group": "期初数",
+              "format": "amount"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "期末数",
+              "start": 1,
+              "span": 3
+            },
+            {
+              "group": "期初数",
+              "start": 4,
+              "span": 3
+            }
+          ],
+          "guidance": "【提示：企业因销售商品、提供服务等取得的、不属于《中华人民共和国票据法》规范票据的“云信”“融信”等数字化应收账款债权凭证，不应当在“应收票据”项目中列示。企业管理“云信”“融信”等的业务模式以收取合同现金流量为目标的，应当在“应收账款”项目中列示；既以收取合同现金流量为目标又以出售为目标的，应当在“应收款项融资”项目中列示。如果法律上认定供应链票据属于《商业汇票承兑、贴现与再贴现管理办法》（中国人民银行中国银行保险监督管理委员会令〔2022〕第4号）的范围、具备《票据法》规定的要件，则持有方应当自法律认定生效日（2023年1月1日）起将其作为“应收票据”进行会计处理（根据其业务模式列示为应收票据或应收款项融资），且无需对前期比较期间数据进行追溯调整。】勾稽：合计行账面价值 = 报表应收票据（期末 / 期初各校验，F4-1、F4-2）；各票据种类行之和 = 合计行（每个数值列独立，F4-3）；账面余额 − 坏账准备 = 账面价值（F4-3a）；本表三列合计 = 按计提方法分类表对应合计（F4-8~F4-10）；坏账准备期末 / 期初合计 = 坏账准备变动表期末 / 期初合计（F4-6、F4-6a）。数据来源：审定表 D1-1。"
         },
         {
           "name": "按坏账准备计提方法分类披露应收票据（期末数）",
           "headers": [
             "类别",
-            "账面余额金额",
-            "账面余额比例(%)",
-            "坏账准备金额",
+            "金额",
+            "比例(%)",
+            "金额",
             "预期信用损失率(%)",
             "账面价值"
           ],
           "rows": [
             {
               "label": "按单项计提坏账准备",
-              "row_type": "data",
-              "account_codes": []
+              "row_type": "data"
             },
             {
               "label": "按组合计提坏账准备",
-              "row_type": "data",
-              "account_codes": []
+              "row_type": "data"
             },
             {
               "label": "合计",
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "类别",
+              "is_label": true
+            },
+            {
+              "key": "balance",
+              "label": "金额",
+              "group": "账面余额",
+              "format": "amount"
+            },
+            {
+              "key": "ratio",
+              "label": "比例(%)",
+              "group": "账面余额",
+              "format": "percent"
+            },
+            {
+              "key": "provision",
+              "label": "金额",
+              "group": "坏账准备",
+              "format": "amount"
+            },
+            {
+              "key": "loss_rate",
+              "label": "预期信用损失率(%)",
+              "group": "坏账准备",
+              "format": "percent"
+            },
+            {
+              "key": "book_value",
+              "label": "账面价值",
+              "format": "amount"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "账面余额",
+              "start": 1,
+              "span": 2
+            },
+            {
+              "group": "坏账准备",
+              "start": 3,
+              "span": 2
+            }
+          ],
+          "guidance": "按坏账准备计提方法分类披露应收票据（期末数）。勾稽：比例(%) = 该行账面余额 ÷ 合计行账面余额 × 100（合计行应为 100，F4-25）；预期信用损失率(%) = 坏账准备 ÷ 账面余额 × 100（F4-12）；账面余额 − 坏账准备 = 账面价值（F4-11）；各明细行之和 = 合计行（F4-16）；按单项计提行 = 单项计提明细小计、按组合计提行 = 组合计提明细小计（F4-4、F4-5）。【提示：此处披露未逾期的应收票据计提的坏账准备。若票据逾期，则应转入应收账款并计提坏账准备，账龄应连续计算。】"
         },
         {
           "name": "按坏账准备计提方法分类披露应收票据（续：期初数）",
           "headers": [
             "类别",
-            "账面余额金额",
-            "账面余额比例(%)",
-            "坏账准备金额",
+            "金额",
+            "比例(%)",
+            "金额",
             "预期信用损失率(%)",
             "账面价值"
           ],
           "rows": [
             {
               "label": "按单项计提坏账准备",
-              "row_type": "data",
-              "account_codes": []
+              "row_type": "data"
             },
             {
               "label": "按组合计提坏账准备",
-              "row_type": "data",
-              "account_codes": []
+              "row_type": "data"
             },
             {
               "label": "合计",
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "类别",
+              "is_label": true
+            },
+            {
+              "key": "balance",
+              "label": "金额",
+              "group": "账面余额",
+              "format": "amount"
+            },
+            {
+              "key": "ratio",
+              "label": "比例(%)",
+              "group": "账面余额",
+              "format": "percent"
+            },
+            {
+              "key": "provision",
+              "label": "金额",
+              "group": "坏账准备",
+              "format": "amount"
+            },
+            {
+              "key": "loss_rate",
+              "label": "预期信用损失率(%)",
+              "group": "坏账准备",
+              "format": "percent"
+            },
+            {
+              "key": "book_value",
+              "label": "账面价值",
+              "format": "amount"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "账面余额",
+              "start": 1,
+              "span": 2
+            },
+            {
+              "group": "坏账准备",
+              "start": 3,
+              "span": 2
+            }
+          ],
+          "guidance": "按坏账准备计提方法分类披露应收票据（期初数），与期末数表同构。勾稽：比例(%) = 该行账面余额 ÷ 合计行账面余额 × 100（合计行应为 100，F4-25）；预期信用损失率(%) = 坏账准备 ÷ 账面余额 × 100（F4-12）；账面余额 − 坏账准备 = 账面价值（F4-11）；各明细行之和 = 合计行（F4-16）；按单项计提行 = 单项计提明细小计、按组合计提行 = 组合计提明细小计（F4-4、F4-5）。【提示：此处披露未逾期的应收票据计提的坏账准备。若票据逾期，则应转入应收账款并计提坏账准备，账龄应连续计算。】"
         },
         {
           "name": "按单项计提坏账准备的应收票据",
@@ -2555,16 +2703,52 @@
           ],
           "rows": [
             {
-              "label": "可无限量添加行",
-              "row_type": "data",
-              "account_codes": []
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
             },
             {
               "label": "合计",
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "名称",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "balance",
+              "label": "账面余额",
+              "format": "amount"
+            },
+            {
+              "key": "provision",
+              "label": "坏账准备",
+              "format": "amount"
+            },
+            {
+              "key": "loss_rate",
+              "label": "预期信用损失率(%)",
+              "format": "percent"
+            },
+            {
+              "key": "basis",
+              "label": "计提理由",
+              "format": "text"
+            }
+          ],
+          "guidance": "按单项计提坏账准备的应收票据逐项列示，可无限量添加行项目。勾稽：预期信用损失率(%) = 坏账准备 ÷ 账面余额 × 100（F4-13）；各明细行之和 = 合计行（F4-17）。完整性：账面余额 ≠ 0 时，名称、坏账准备、预期信用损失率、计提依据（理由）列均不应为空（F4-14）。"
         },
         {
           "name": "按组合计提坏账准备的应收票据",
@@ -2577,74 +2761,132 @@
           "rows": [
             {
               "label": "商业承兑汇票小计：",
-              "row_type": "data",
-              "account_codes": []
+              "is_total": true,
+              "row_type": "subtotal"
             },
             {
-              "label": "出票人类型或账龄",
-              "row_type": "data",
-              "account_codes": []
-            },
-            {
-              "label": "……",
-              "row_type": "data",
-              "account_codes": []
+              "label": "",
+              "row_type": "data"
             },
             {
               "label": "银行承兑汇票小计：",
-              "row_type": "data",
-              "account_codes": []
+              "is_total": true,
+              "row_type": "subtotal"
             },
             {
-              "label": "出票人类型或账龄",
-              "row_type": "data",
-              "account_codes": []
-            },
-            {
-              "label": "……",
-              "row_type": "data",
-              "account_codes": []
+              "label": "",
+              "row_type": "data"
             },
             {
               "label": "合计",
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "名称",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "balance",
+              "label": "账面余额",
+              "format": "amount"
+            },
+            {
+              "key": "provision",
+              "label": "坏账准备",
+              "format": "amount"
+            },
+            {
+              "key": "loss_rate",
+              "label": "预期信用损失率(%)",
+              "format": "percent"
+            }
+          ],
+          "guidance": "行维度为**出票人类型或账龄**（源模板占位说明），可无限量添加行项目；并需在下方说明按组合计提坏账准备的原因。勾稽：各明细行之和 = 合计行（F4-18）；合计 = 按计提方法分类表「按组合计提坏账准备」行（F4-4、F4-5）。【提示：此处披露未逾期的应收票据计提的坏账准备。若票据逾期，则应转入应收账款并计提坏账准备，账龄应连续计算。】"
         },
         {
           "name": "本期计提、收回或转回的应收票据坏账准备情况",
           "headers": [
             "类别",
             "期初数",
-            "本期计提",
-            "本期收回或转回",
-            "本期核销",
-            "本期其他变动",
+            "计提",
+            "收回或转回",
+            "核销",
+            "其他变动",
             "期末数"
           ],
           "rows": [
             {
               "label": "单项计提预期信用损失的应收票据",
-              "row_type": "data",
-              "account_codes": []
+              "row_type": "data"
             },
             {
               "label": "按组合计提预期信用损失的应收票据",
-              "row_type": "data",
-              "account_codes": []
+              "row_type": "data"
             },
             {
               "label": "其中：",
-              "row_type": "data",
-              "account_codes": []
+              "row_type": "data"
             },
             {
               "label": "合计",
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "类别",
+              "is_label": true
+            },
+            {
+              "key": "prior_balance",
+              "label": "期初数",
+              "format": "amount"
+            },
+            {
+              "key": "provision",
+              "label": "计提",
+              "group": "本期变动情况",
+              "format": "amount"
+            },
+            {
+              "key": "reversal",
+              "label": "收回或转回",
+              "group": "本期变动情况",
+              "format": "amount"
+            },
+            {
+              "key": "write_off",
+              "label": "核销",
+              "group": "本期变动情况",
+              "format": "amount"
+            },
+            {
+              "key": "other",
+              "label": "其他变动",
+              "group": "本期变动情况",
+              "format": "amount"
+            },
+            {
+              "key": "end_balance",
+              "label": "期末数",
+              "format": "amount"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "本期变动情况",
+              "start": 2,
+              "span": 4
+            }
+          ],
+          "guidance": "勾稽：期末数 = 期初数 + 计提 − 收回或转回 − 核销 − 其他变动（每行独立，源模板 G48 公式）；单项计提行 + 按组合计提行 = 合计行（每个数值列独立，F4-19）；「其中：」下方所有明细行之和 = 按组合计提行（F4-20）；合计行期末数 = 应收票据分类表坏账准备期末合计（F4-6）。"
         },
         {
           "name": "本期转回或收回金额重要的应收票据坏账准备",
@@ -2656,16 +2898,51 @@
           ],
           "rows": [
             {
-              "label": "可无限量添加行",
-              "row_type": "data",
-              "account_codes": []
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
             },
             {
               "label": "合计",
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "债务人名称",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "amount",
+              "label": "转回或收回金额",
+              "format": "amount"
+            },
+            {
+              "key": "cumulative_provision",
+              "label": "转回或收回前累计已计提坏账准备金额",
+              "format": "amount"
+            },
+            {
+              "key": "reason_method",
+              "label": "转回或收回原因、方式",
+              "format": "text"
+            }
+          ],
+          "guidance": "列示本期转回或收回金额重要的坏账准备，可无限量添加行项目。勾稽：各明细行之和 = 合计行（F4-26）。完整性：转回或收回金额 ≠ 0 时，单位（债务人）名称、转回或收回原因 / 方式列均不应为空（F4-27）。"
         },
         {
           "name": "期末已质押的应收票据",
@@ -2676,20 +2953,32 @@
           "rows": [
             {
               "label": "银行承兑票据",
-              "row_type": "data",
-              "account_codes": []
+              "row_type": "data"
             },
             {
               "label": "商业承兑票据",
-              "row_type": "data",
-              "account_codes": []
+              "row_type": "data"
             },
             {
               "label": "合计",
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "种类",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "pledged_amount",
+              "label": "期末已质押金额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "列示期末已质押的应收票据。本表可无限量添加行项目。勾稽：各明细行之和 = 合计行（每个数值列独立，F4-21）。"
         },
         {
           "name": "期末已背书或贴现但尚未到期的应收票据",
@@ -2701,20 +2990,37 @@
           "rows": [
             {
               "label": "银行承兑票据",
-              "row_type": "data",
-              "account_codes": []
+              "row_type": "data"
             },
             {
               "label": "商业承兑票据",
-              "row_type": "data",
-              "account_codes": []
+              "row_type": "data"
             },
             {
               "label": "合计",
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "种类",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "derecognized",
+              "label": "期末终止确认金额",
+              "format": "amount"
+            },
+            {
+              "key": "not_derecognized",
+              "label": "期末未终止确认金额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "【提示：证监会《2014年上市公司年报会计监管报告》，对已背书或贴现且尚未到期的银行承兑汇票予以终止确认后，需在财务报表中补充披露终止确认的票据以及对票据被追索时可能存在的支付风险予以清晰说明。参考披露：用于贴现的银行承兑汇票是由信用等级较高的银行承兑，信用风险和延期付款风险很小，并且票据相关的利率风险已转移给银行，可以判断票据所有权上的主要风险和报酬已经转移，故终止确认。或：用于贴现的银行承兑汇票是由信用等级不高的银行承兑，贴现不影响追索权，票据相关的信用风险和延期付款风险仍没有转移，故未终止确认。】本表可添加行项目。勾稽：各明细行之和 = 合计行（F4-22）。"
         },
         {
           "name": "期末因出票人未履约而其转为应收账款的票据",
@@ -2725,15 +3031,28 @@
           "rows": [
             {
               "label": "商业承兑票据",
-              "row_type": "data",
-              "account_codes": []
+              "row_type": "data"
             },
             {
               "label": "合计",
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "种类",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "transfer_amount",
+              "label": "期末转应收账款金额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "（如根据《企业会计准则第23号——金融资产转移》终止确认的应收票据，列示其终止确认的金额，及与终止确认相关的利得和损失）【提示：票据逾期后应转入应收账款并计提坏账准备，账龄应连续计算，故本表只列示商业承兑票据。】勾稽：各明细行之和 = 合计行（F4-23）。"
         },
         {
           "name": "本期实际核销的应收票据",
@@ -2744,10 +3063,23 @@
           "rows": [
             {
               "label": "实际核销的应收票据",
-              "row_type": "data",
-              "account_codes": []
+              "row_type": "data"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "amount",
+              "label": "核销金额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "列示本期实际核销的应收票据总额。勾稽：本表（含逐项披露子表）各明细行之和 = 合计行（F4-24）；核销金额应与坏账准备变动表「本期核销」列一致。"
         },
         {
           "name": "重要的应收票据核销情况",
@@ -2761,11 +3093,57 @@
           ],
           "rows": [
             {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
               "label": "合计",
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "单位名称",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "note_type",
+              "label": "应收票据的性质",
+              "format": "text"
+            },
+            {
+              "key": "amount",
+              "label": "核销金额",
+              "format": "amount"
+            },
+            {
+              "key": "reason",
+              "label": "核销原因",
+              "format": "text"
+            },
+            {
+              "key": "procedure",
+              "label": "履行的核销程序",
+              "format": "text"
+            },
+            {
+              "key": "related",
+              "label": "是否由关联交易产生",
+              "format": "text"
+            }
+          ],
+          "guidance": "（对于其中重要的应收票据，应逐项披露款项性质、核销原因、履行的核销程序及核销金额。实际核销的款项由关联交易产生的，应单独披露。）勾稽：各明细行之和 = 合计行（F4-24）。完整性：核销金额 ≠ 0 时，单位名称、应收票据性质、核销原因、履行的核销程序、是否由关联交易产生列均不应为空（F4-29）。"
         }
       ],
       "text_sections": [
@@ -2793,7 +3171,9 @@
       "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
       "sort_index": 3,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "d1-notes-receivable-disclosure-alignment",
+      "_aligned_at": "2026-07-30 15:24:31"
     },
     {
       "section_number": "八、5",
@@ -2804,7 +3184,7 @@
         {
           "name": "（1）按账龄披露应收账款",
           "headers": [
-            "账龄",
+            "账 龄",
             "期末数",
             "期初数"
           ],
@@ -2822,11 +3202,28 @@
               "row_type": "data"
             },
             {
-              "label": "3年以上",
+              "label": "3至4年",
               "row_type": "data"
             },
             {
-              "label": "合计",
+              "label": "4至5年",
+              "row_type": "data"
+            },
+            {
+              "label": "5年以上",
+              "row_type": "data"
+            },
+            {
+              "label": "小 计",
+              "is_total": true,
+              "row_type": "subtotal"
+            },
+            {
+              "label": "减：坏账准备",
+              "row_type": "data"
+            },
+            {
+              "label": "合 计",
               "is_total": true,
               "row_type": "total"
             }
@@ -2835,9 +3232,24 @@
         {
           "name": "（2）按坏账准备计提方法分类披露应收账款",
           "headers": [
-            "类别",
-            "期末数",
-            "期初数"
+            "类 别",
+            "金额",
+            "比例(%)",
+            "金额",
+            "预期信用损失率(%)",
+            "账面价值"
+          ],
+          "_column_groups": [
+            {
+              "group": "账面金额",
+              "start": 1,
+              "span": 2
+            },
+            {
+              "group": "坏账准备",
+              "start": 3,
+              "span": 2
+            }
           ],
           "rows": [
             {
@@ -2846,12 +3258,11 @@
             },
             {
               "label": "按组合计提坏账准备",
-              "is_total": true,
-              "row_type": "total"
+              "row_type": "data"
             },
             {
               "label": "其中：",
-              "row_type": "data"
+              "row_type": "header_label"
             },
             {
               "label": "应收中央企业客户",
@@ -2862,7 +3273,57 @@
               "row_type": "data"
             },
             {
-              "label": "合计",
+              "label": "合 计",
+              "is_total": true,
+              "row_type": "total"
+            }
+          ]
+        },
+        {
+          "name": "（2）按坏账准备计提方法分类披露应收账款（续：期初数）",
+          "headers": [
+            "类 别",
+            "金额",
+            "比例(%)",
+            "金额",
+            "预期信用损失率(%)",
+            "账面价值"
+          ],
+          "_column_groups": [
+            {
+              "group": "账面金额",
+              "start": 1,
+              "span": 2
+            },
+            {
+              "group": "坏账准备",
+              "start": 3,
+              "span": 2
+            }
+          ],
+          "rows": [
+            {
+              "label": "按单项计提坏账准备",
+              "row_type": "data"
+            },
+            {
+              "label": "按组合计提坏账准备",
+              "row_type": "data"
+            },
+            {
+              "label": "其中：",
+              "row_type": "header_label"
+            },
+            {
+              "label": "应收中央企业客户",
+              "row_type": "data"
+            },
+            {
+              "label": "应收海外企业客户",
+              "row_type": "data"
+            },
+            {
+              "label": "合 计",
               "is_total": true,
               "row_type": "total"
             }
@@ -2875,12 +3336,12 @@
             "账面余额",
             "坏账准备",
             "账龄",
-            "预期信用<br/>损失率（%）",
+            "预期信用损失率（%）",
             "计提理由"
           ],
           "rows": [
             {
-              "label": "合计",
+              "label": "合 计",
               "is_total": true,
               "row_type": "total"
             }
@@ -2889,19 +3350,27 @@
         {
           "name": "组合计提项目：应收中央企业客户",
           "headers": [
-            "账龄",
-            "期末数",
-            "期初数"
+            "账 龄",
+            "应收账款",
+            "比例（%）",
+            "坏账准备",
+            "应收账款",
+            "比例（%）",
+            "坏账准备"
+          ],
+          "_column_groups": [
+            {
+              "group": "期末数",
+              "start": 1,
+              "span": 3
+            },
+            {
+              "group": "期初数",
+              "start": 4,
+              "span": 3
+            }
           ],
           "rows": [
-            {
-              "label": "账龄",
-              "row_type": "header_label"
-            },
-            {
-              "label": "账龄",
-              "row_type": "header_label"
-            },
             {
               "label": "1年以内（含1年）",
               "row_type": "data"
@@ -2915,11 +3384,19 @@
               "row_type": "data"
             },
             {
-              "label": "3年以上",
+              "label": "3至4年",
               "row_type": "data"
             },
             {
-              "label": "合计",
+              "label": "4至5年",
+              "row_type": "data"
+            },
+            {
+              "label": "5年以上",
+              "row_type": "data"
+            },
+            {
+              "label": "合 计",
               "is_total": true,
               "row_type": "total"
             }
@@ -2928,19 +3405,27 @@
         {
           "name": "组合计提项目：应收海外企业客户",
           "headers": [
-            "账龄",
-            "期末数",
-            "期初数"
+            "账 龄",
+            "应收账款",
+            "比例（%）",
+            "坏账准备",
+            "应收账款",
+            "比例（%）",
+            "坏账准备"
+          ],
+          "_column_groups": [
+            {
+              "group": "期末数",
+              "start": 1,
+              "span": 3
+            },
+            {
+              "group": "期初数",
+              "start": 4,
+              "span": 3
+            }
           ],
           "rows": [
-            {
-              "label": "账龄",
-              "row_type": "header_label"
-            },
-            {
-              "label": "账龄",
-              "row_type": "header_label"
-            },
             {
               "label": "1年以内（含1年）",
               "row_type": "data"
@@ -2954,11 +3439,19 @@
               "row_type": "data"
             },
             {
-              "label": "3年以上",
+              "label": "3至4年",
               "row_type": "data"
             },
             {
-              "label": "合计",
+              "label": "4至5年",
+              "row_type": "data"
+            },
+            {
+              "label": "5年以上",
+              "row_type": "data"
+            },
+            {
+              "label": "合 计",
               "is_total": true,
               "row_type": "total"
             }
@@ -2968,16 +3461,28 @@
           "name": "采用余额百分比或其他组合方法计提坏账准备的应收账款",
           "headers": [
             "组合名称",
-            "期末数",
-            "期初数"
+            "账面余额",
+            "计提比例（%）",
+            "坏账准备",
+            "账面余额",
+            "计提比例（%）",
+            "坏账准备"
+          ],
+          "_column_groups": [
+            {
+              "group": "期末数",
+              "start": 1,
+              "span": 3
+            },
+            {
+              "group": "期初数",
+              "start": 4,
+              "span": 3
+            }
           ],
           "rows": [
             {
-              "label": "组合名称",
-              "row_type": "header_label"
-            },
-            {
-              "label": "合计",
+              "label": "合 计",
               "is_total": true,
               "row_type": "total"
             }
@@ -2986,16 +3491,21 @@
         {
           "name": "（3）本期计提、收回或转回的坏账准备情况",
           "headers": [
-            "类别",
+            "类 别",
             "期初数",
-            "本期变动金额",
+            "计提",
+            "收回或转回",
+            "转销或核销",
             "期末数"
           ],
-          "rows": [
+          "_column_groups": [
             {
-              "label": "类别",
-              "row_type": "header_label"
-            },
+              "group": "本期变动金额",
+              "start": 2,
+              "span": 3
+            }
+          ],
+          "rows": [
             {
               "label": "单项",
               "row_type": "data"
@@ -3009,7 +3519,7 @@
               "row_type": "data"
             },
             {
-              "label": "合计",
+              "label": "合 计",
               "is_total": true,
               "row_type": "total"
             }
@@ -3019,13 +3529,13 @@
           "name": "收回或转回的坏账准备",
           "headers": [
             "债务人名称",
-            "转回或收回<br/>金额",
-            "转回或收回前累计<br/>已计提坏账准备金额",
-            "转回或收回<br/>原因、方式"
+            "转回或收回金额",
+            "转回或收回前累计已计提坏账准备金额",
+            "转回或收回原因、方式"
           ],
           "rows": [
             {
-              "label": "合计",
+              "label": "合 计",
               "is_total": true,
               "row_type": "total"
             }
@@ -3038,12 +3548,12 @@
             "应收账款性质",
             "核销金额",
             "核销原因",
-            "履行的核销<br/>程序",
-            "是否因关联<br/>交易产生"
+            "履行的核销程序",
+            "是否因关联交易产生"
           ],
           "rows": [
             {
-              "label": "合计",
+              "label": "合 计",
               "is_total": true,
               "row_type": "total"
             }
@@ -3059,7 +3569,7 @@
           ],
           "rows": [
             {
-              "label": "合计",
+              "label": "合 计",
               "is_total": true,
               "row_type": "total"
             }
@@ -3074,9 +3584,36 @@
           ],
           "rows": [
             {
-              "label": "合计",
+              "label": "合 计",
               "is_total": true,
               "row_type": "total"
+            }
+          ]
+        },
+        {
+          "name": "（7）应收账款转移继续涉入形成的资产、负债的金额",
+          "headers": [
+            "项  目",
+            "期末金额"
+          ],
+          "rows": [
+            {
+              "label": "资产：",
+              "row_type": "header_label"
+            },
+            {
+              "label": "资产小计",
+              "is_total": true,
+              "row_type": "subtotal"
+            },
+            {
+              "label": "负债：",
+              "row_type": "header_label"
+            },
+            {
+              "label": "负债小计",
+              "is_total": true,
+              "row_type": "subtotal"
             }
           ]
         }
@@ -3088,7 +3625,8 @@
         "（3）本期计提、收回或转回的坏账准备情况",
         "（4）本期实际核销的应收账款",
         "（5）按欠款方归集的期末余额前五名的应收账款",
-        "（6）由金融资产转移而终止确认的应收账款"
+        "（6）由金融资产转移而终止确认的应收账款",
+        "（7）应收账款转移继续涉入形成的资产、负债的金额"
       ],
       "check_presets": [
         "LLM审核",
@@ -3109,7 +3647,8 @@
       "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
       "sort_index": 4,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "d2-ar-disclosure-soe-alignment"
     },
     {
       "section_number": "八、6",
@@ -3175,14 +3714,12 @@
           "name": "预付款项按账龄列示",
           "headers": [
             "账龄",
-            "期末数",
-            "期初数"
+            "金额",
+            "比例（%）",
+            "金额",
+            "比例（%）"
           ],
           "rows": [
-            {
-              "label": "账龄",
-              "row_type": "header_label"
-            },
             {
               "label": "1年以内（含1年）",
               "row_type": "data"
@@ -3213,7 +3750,51 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "账龄",
+              "is_label": true
+            },
+            {
+              "key": "end_amount",
+              "label": "金额",
+              "group": "期末数",
+              "format": "amount"
+            },
+            {
+              "key": "end_pct",
+              "label": "比例（%）",
+              "group": "期末数",
+              "format": "percent"
+            },
+            {
+              "key": "prior_amount",
+              "label": "金额",
+              "group": "期初数",
+              "format": "amount"
+            },
+            {
+              "key": "prior_pct",
+              "label": "比例（%）",
+              "group": "期初数",
+              "format": "percent"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "期末数",
+              "start": 1,
+              "span": 2
+            },
+            {
+              "group": "期初数",
+              "start": 3,
+              "span": 2
+            }
+          ],
+          "guidance": "账龄段随项目账龄枚举自动适配（3年段 / 5年段 / 自定义），由 F1-2 明细表审定账龄聚合；「减：减值准备」行取底稿逐账龄段减值准备之列合计。勾稽：各账龄段之和 = 小计行（期末 / 期初各独立校验）；合计行 = 小计行 − 减：减值准备行；比例（%）= 该行金额 ÷ 小计行金额 × 100；合计行期末金额 = 资产负债表「预付款项」期末数。"
         },
         {
           "name": "账龄超过1年的大额预付款项",
@@ -3226,14 +3807,60 @@
           ],
           "rows": [
             {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
               "label": "合计",
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "creditor_unit",
+              "label": "债权单位",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "debtor_unit",
+              "label": "债务单位"
+            },
+            {
+              "key": "end_balance",
+              "label": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "aging",
+              "label": "账龄"
+            },
+            {
+              "key": "reason",
+              "label": "未结算的原因"
+            }
+          ],
+          "guidance": "债务单位 / 期末余额 / 账龄自 F1-5「账龄1年以上的大额预付账款检查表」带入，需补「未结算的原因」。勾稽：明细行之和 = 合计行（期末余额列）；合计行期末余额 ≤ 按账龄表 1 年以上各段期末金额之和；完整性：期末余额 ≠ 0 的行，债权单位 / 债务单位 / 账龄 / 未结算的原因均不得为空。"
         },
         {
-          "name": "账龄超过1年的大额预付款项",
+          "name": "按欠款方归集的期末余额前五名的预付款项",
           "headers": [
             "债务人名称",
             "账面余额",
@@ -3242,16 +3869,61 @@
           ],
           "rows": [
             {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
               "label": "合计",
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "债务人名称",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "end_amount",
+              "label": "账面余额",
+              "format": "amount"
+            },
+            {
+              "key": "proportion_pct",
+              "label": "占预付款项合计的比例（%）",
+              "format": "percent"
+            },
+            {
+              "key": "impairment",
+              "label": "减值准备",
+              "format": "amount"
+            }
+          ],
+          "guidance": "按期末账面余额降序取前五名，自 F1-2 明细表归集。勾稽：明细行之和 = 合计行（每个数值列独立校验）；合计行账面余额 ≤ 按账龄表小计行期末金额；合计行减值准备 ≤ 按账龄表减：减值准备行期末金额；占比 = 该行账面余额 ÷ 按账龄表小计行期末金额 × 100。"
         }
       ],
       "text_sections": [
         "### 预付款项按账龄列示",
         "### 账龄超过1年的大额预付款项",
+        "（账龄超过1年的大额预付款项，应说明未结算的原因。）",
         "### 按欠款方归集的期末余额前五名的预付款项"
       ],
       "check_presets": [
@@ -3271,7 +3943,9 @@
       "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
       "sort_index": 6,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "f1-prepayment-disclosure-template-alignment",
+      "_aligned_at": "2026-07-29 22:20:43"
     },
     {
       "section_number": "八、8",
@@ -3340,7 +4014,8 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "guidance": "汇总表：应收利息 + 应收股利 + 其他应收款项 = 合计。勾稽：合计 = 资产负债表「其他应收款」项目。"
         },
         {
           "name": "应收利息分类",
@@ -3380,7 +4055,8 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "guidance": "勾稽：小计 − 减：坏账准备 = 合计。"
         },
         {
           "name": "重要逾期利息",
@@ -3397,7 +4073,8 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "guidance": "按借款单位披露期末余额、逾期时间、逾期原因，以及是否发生减值及其判断依据。"
         },
         {
           "name": "坏账准备计提情况",
@@ -3461,7 +4138,8 @@
               "label": "期末余额",
               "row_type": "data"
             }
-          ]
+          ],
+          "guidance": "本表为**应收利息**的坏账准备三阶段变动；其他应收款项的三阶段变动见「其他应收款项坏账准备计提情况」。"
         },
         {
           "name": "应收股利",
@@ -3519,14 +4197,17 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "guidance": "按账龄一年以内 / 一年以上分组，其中项逐项列示；勾稽：小计： − 减：坏账准备 = 合计。"
         },
         {
           "name": "按账龄披露其他应收款项",
           "headers": [
-            "账龄",
-            "期末数",
-            "期初数"
+            "账  龄",
+            "期末账面余额",
+            "期末坏账准备",
+            "期初账面余额",
+            "期初坏账准备"
           ],
           "rows": [
             {
@@ -3550,23 +4231,32 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "_column_groups": [
+            {
+              "group": "期末数",
+              "start": 1,
+              "span": 2
+            },
+            {
+              "group": "期初数",
+              "start": 3,
+              "span": 2
+            }
+          ],
+          "guidance": "两级表头：期末数 / 期初数 各含账面余额、坏账准备。勾稽：合计账面余额 = K1-1 其他应收款审定期末数；合计坏账准备 = 三阶段变动表期末余额。"
         },
         {
           "name": "按坏账准备计提方法分类披露其他应收款项",
           "headers": [
-            "类别",
-            "期末余额"
+            "类  别",
+            "账面余额",
+            "比例(%)",
+            "坏账准备",
+            "预期信用损失率(%)",
+            "账面价值"
           ],
           "rows": [
-            {
-              "label": "类别",
-              "row_type": "header_label"
-            },
-            {
-              "label": "类别",
-              "row_type": "header_label"
-            },
             {
               "label": "单项计提坏账准备的其他应收款项",
               "row_type": "data"
@@ -3585,23 +4275,33 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "_column_groups": [
+            {
+              "group": "账面余额",
+              "start": 1,
+              "span": 2
+            },
+            {
+              "group": "坏账准备",
+              "start": 3,
+              "span": 2
+            }
+          ],
+          "period_label": "期末余额",
+          "guidance": "两级表头：账面余额（金额、比例%）、坏账准备（金额、预期信用损失率%）、账面价值。比例% = 该类账面余额 ÷ 合计账面余额；预期信用损失率% = 坏账准备 ÷ 账面余额。勾稽：合计账面余额 = 按账龄披露表合计。"
         },
         {
           "name": "续：",
           "headers": [
-            "类别",
-            "期初余额"
+            "类  别",
+            "账面余额",
+            "比例(%)",
+            "坏账准备",
+            "预期信用损失率(%)",
+            "账面价值"
           ],
           "rows": [
-            {
-              "label": "类别",
-              "row_type": "header_label"
-            },
-            {
-              "label": "类别",
-              "row_type": "header_label"
-            },
             {
               "label": "单项计提坏账准备的其他应收款项",
               "row_type": "data"
@@ -3620,42 +4320,59 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "_column_groups": [
+            {
+              "group": "账面余额",
+              "start": 1,
+              "span": 2
+            },
+            {
+              "group": "坏账准备",
+              "start": 3,
+              "span": 2
+            }
+          ],
+          "period_label": "期初余额",
+          "guidance": "本表为「按坏账准备计提方法分类披露其他应收款项」的期初余额续表，列结构与期末表一致。"
         },
         {
           "name": "单项计提坏账准备的其他应收款项",
           "headers": [
             "债务人名称",
-            "期末余额"
+            "账面余额",
+            "坏账准备",
+            "预期信用损失率(%)",
+            "计提理由"
           ],
           "rows": [
-            {
-              "label": "债务人名称",
-              "row_type": "header_label"
-            },
             {
               "label": "合计",
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "_column_groups": [
+            {
+              "group": "期末余额",
+              "start": 1,
+              "span": 4
+            }
+          ],
+          "guidance": "逐户列示单项评估的债务人及计提理由。勾稽：合计账面余额 / 坏账准备 = 按计提方法分类表「单项计提坏账准备的其他应收款项」行。"
         },
         {
           "name": "账龄组合",
           "headers": [
-            "账龄",
-            "期末数",
-            "期初数"
+            "账  龄",
+            "期末账面余额",
+            "期末比例(%)",
+            "期末坏账准备",
+            "期初账面余额",
+            "期初比例(%)",
+            "期初坏账准备"
           ],
           "rows": [
-            {
-              "label": "账龄",
-              "row_type": "header_label"
-            },
-            {
-              "label": "账龄",
-              "row_type": "header_label"
-            },
             {
               "label": "1年以内（含1年）",
               "row_type": "data"
@@ -3677,26 +4394,52 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "_column_groups": [
+            {
+              "group": "期末数",
+              "start": 1,
+              "span": 3
+            },
+            {
+              "group": "期初数",
+              "start": 4,
+              "span": 3
+            }
+          ],
+          "guidance": "按信用风险特征组合计提中的**账龄组合**。两级表头：期末数 / 期初数 各含账面余额（金额、比例%）与坏账准备。勾稽：账龄组合坏账准备 + 其他组合坏账准备 = 按计提方法分类表「按信用风险特征组合计提坏账准备的其他应收款项」行。"
         },
         {
           "name": "采用余额百分比法或其他组合方法计提坏账准备的其他应收款项",
           "headers": [
             "组合名称",
-            "期末数",
-            "期初数"
+            "期末账面余额",
+            "期末计提比例(%)",
+            "期末坏账准备",
+            "期初账面余额",
+            "期初计提比例(%)",
+            "期初坏账准备"
           ],
           "rows": [
-            {
-              "label": "组合名称",
-              "row_type": "header_label"
-            },
             {
               "label": "合计",
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "_column_groups": [
+            {
+              "group": "期末数",
+              "start": 1,
+              "span": 3
+            },
+            {
+              "group": "期初数",
+              "start": 4,
+              "span": 3
+            }
+          ],
+          "guidance": "按组合名称列示；此处「计提比例(%)」为人工设定的计提比例（非结构占比），坏账准备 = 账面余额 × 计提比例。"
         },
         {
           "name": "其他应收款项坏账准备计提情况",
@@ -3760,7 +4503,66 @@
               "label": "期末余额",
               "row_type": "data"
             }
-          ]
+          ],
+          "guidance": "三阶段滚动表：期初余额 → 阶段迁移 → 本期计提/转回/转销/核销/其他变动 → 期末余额。勾稽：期末余额 = 按账龄披露表合计坏账准备。"
+        },
+        {
+          "name": "其他应收款项账面余额变动",
+          "headers": [
+            "账面余额",
+            "第一阶段",
+            "第二阶段",
+            "第三阶段",
+            "合计"
+          ],
+          "rows": [
+            {
+              "label": "账面余额",
+              "row_type": "header_label"
+            },
+            {
+              "label": "期初余额",
+              "row_type": "data"
+            },
+            {
+              "label": "期初余额在本期",
+              "row_type": "data"
+            },
+            {
+              "label": "—转入第二阶段",
+              "row_type": "data"
+            },
+            {
+              "label": "—转入第三阶段",
+              "row_type": "data"
+            },
+            {
+              "label": "—转回第二阶段",
+              "row_type": "data"
+            },
+            {
+              "label": "—转回第一阶段",
+              "row_type": "data"
+            },
+            {
+              "label": "本期新增",
+              "row_type": "data"
+            },
+            {
+              "label": "本期终止确认",
+              "row_type": "data"
+            },
+            {
+              "label": "其他变动",
+              "row_type": "data"
+            },
+            {
+              "label": "期末余额",
+              "row_type": "total",
+              "is_total": true
+            }
+          ],
+          "guidance": "账面余额（非坏账准备）的三阶段变动。方向约定（源模板）：转入第二阶段＝第一阶段【负数】、第二阶段【正数】；转入第三阶段＝第一、二阶段【负数】、第三阶段【正数】；转回第一阶段＝第一阶段【正数】、第二、三阶段【负数】。勾稽：期末余额合计 = K1-1 其他应收款审定期末数。"
         },
         {
           "name": "收回或转回的坏账准备",
@@ -3776,7 +4578,8 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "guidance": "（注：本表列报本报告期前已全额计提坏账准备，或计提减值准备的比例较大，但在本期又全额收回或转回，或在本期收回或转回比例较大的其他应收款项。对本期通过重组等方式收回的金额重大的其他应收款项，则应逐笔列报，金额不重大的，可汇总列报。）"
         },
         {
           "name": "本期实际核销的其他应收款项",
@@ -3794,7 +4597,8 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "guidance": "对重要的核销逐项披露款项性质、核销原因、履行的核销程序及核销金额；因关联交易产生的应单独披露。"
         },
         {
           "name": "按欠款方归集的期末余额前五名的其他应收款项",
@@ -3812,22 +4616,100 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "guidance": "勾稽：占比分母 = 其他应收款项账面余额合计；占比合计不应超过 100%。"
+        },
+        {
+          "name": "由金融资产转移而终止确认的其他应收款项",
+          "headers": [
+            "债务人名称",
+            "终止确认金额",
+            "与终止确认相关的利得或损失"
+          ],
+          "rows": [
+            {
+              "label": "合  计",
+              "row_type": "total",
+              "is_total": true
+            }
+          ],
+          "guidance": "列示因金融资产转移而终止确认的金额及相关利得或损失，损失以「-」填列。"
+        },
+        {
+          "name": "其他应收款项转移继续涉入形成的资产、负债的金额",
+          "headers": [
+            "项  目",
+            "期末金额"
+          ],
+          "rows": [
+            {
+              "label": "资产：",
+              "row_type": "data"
+            },
+            {
+              "label": "资产小计",
+              "row_type": "subtotal",
+              "is_total": true
+            },
+            {
+              "label": "负债：",
+              "row_type": "data"
+            },
+            {
+              "label": "负债小计",
+              "row_type": "subtotal",
+              "is_total": true
+            }
+          ],
+          "guidance": "【如证券化、保理等】分资产、负债两区分项列示并给出小计；说明中披露资产转移方式、未全部终止确认的被转移金融资产与相关负债之间的关系、已终止确认的金融资产继续涉入的性质及相关风险的信息。"
+        },
+        {
+          "name": "涉及政府补助的应收款项",
+          "headers": [
+            "单位名称",
+            "政府补助项目名称",
+            "期末余额",
+            "期末账龄",
+            "预计收取的时间、金额及依据"
+          ],
+          "rows": [
+            {
+              "label": "合  计",
+              "row_type": "total",
+              "is_total": true
+            }
+          ],
+          "guidance": "（注：涉及重要的政府补助的应收款项应披露相关信息。）按补助单位与补助项目逐项披露期末余额、期末账龄及预计收取的时间、金额及依据。"
         }
       ],
       "text_sections": [
         "应收利息",
         "#### 应收利息分类",
         "#### 重要逾期利息",
+        "（对于重要的逾期应收利息，应按借款单位披露应收利息的期末余额、逾期时间和逾期原因、是否发生减值的判断。）",
+        "#### 坏账准备计提情况",
         "应收股利",
+        "（对于重要的账龄超过1 年的应收股利，应披露未收回的原因和对相关款项是否发生减值的判断。）",
         "其他应收款项",
+        "#### 按账龄披露其他应收款项",
+        "#### 按坏账准备计提方法分类披露其他应收款项",
         "单项计提坏账准备的其他应收款项",
         "按信用风险特征组合计提坏账准备的其他应收款项",
+        "#### 账龄组合",
         "#### 采用余额百分比法或其他组合方法计提坏账准备的其他应收款项",
+        "#### 其他应收款项坏账准备计提情况",
+        "本期坏账准备计提金额以及评估金融工具的信用风险是否显著增加的采用依据。",
+        "#### 其他应收款项账面余额变动",
+        "说明：对本期发生损失准备变动的账面余额显著变动的情况说明。",
         "收回或转回的坏账准备",
+        "（注：本表列报本报告期前已全额计提坏账准备，或计提减值准备的比例较大，但在本期又全额收回或转回，或在本期收回或转回比例较大的其他应收款项。对本期通过重组等方式收回的金额重大的其他应收款项，则应逐笔列报，金额不重大的，可汇总列报。）",
         "本期实际核销的其他应收款项",
         "按欠款方归集的期末余额前五名的其他应收款项",
-        "企业应披露涉及政府补助的应收款项"
+        "由金融资产转移而终止确认的其他应收款项",
+        "其他应收款项转移继续涉入形成的资产、负债的金额【如证券化、保理等】",
+        "说明：（资产转移方式；未全部终止确认的被转移金融资产与相关负债之间的关系，已终止确认的金融资产继续涉入的性质及相关风险的信息。）",
+        "企业应披露涉及政府补助的应收款项",
+        "（注：涉及重要的政府补助的应收款项应披露相关信息。）"
       ],
       "check_presets": [
         "LLM审核",
@@ -3860,14 +4742,14 @@
           "name": "存货分类",
           "headers": [
             "项目",
-            "期末数",
-            "期初数"
+            "账面余额",
+            "跌价准备/合同履约成本减值准备",
+            "账面价值",
+            "账面余额",
+            "跌价准备/合同履约成本减值准备",
+            "账面价值"
           ],
           "rows": [
-            {
-              "label": "项目",
-              "row_type": "header_label"
-            },
             {
               "label": "原材料",
               "row_type": "data"
@@ -3917,22 +4799,77 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true
+            },
+            {
+              "key": "end_gross",
+              "label": "账面余额",
+              "group": "期末数",
+              "format": "amount"
+            },
+            {
+              "key": "end_impairment",
+              "label": "跌价准备/合同履约成本减值准备",
+              "group": "期末数",
+              "format": "amount"
+            },
+            {
+              "key": "end_net",
+              "label": "账面价值",
+              "group": "期末数",
+              "format": "amount"
+            },
+            {
+              "key": "prior_gross",
+              "label": "账面余额",
+              "group": "期初数",
+              "format": "amount"
+            },
+            {
+              "key": "prior_impairment",
+              "label": "跌价准备/合同履约成本减值准备",
+              "group": "期初数",
+              "format": "amount"
+            },
+            {
+              "key": "prior_net",
+              "label": "账面价值",
+              "group": "期初数",
+              "format": "amount"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "期末数",
+              "start": 1,
+              "span": 3
+            },
+            {
+              "group": "期初数",
+              "start": 4,
+              "span": 3
+            }
+          ],
+          "guidance": "按企业具体情况分类；房地产开发企业应增加「开发成本」「开发产品」等种类（源模版注）。勾稽：合计行 = 各分类行之和；账面价值 = 账面余额 − 跌价准备。 国企版「其他」项应说明房地产企业土地储备情况，包括土地储备面积、本期增加及土地储备年末余额（源模版注）。「其中：」行为上一行的子集，不计入合计（防双计）。"
         },
         {
           "name": "存货跌价准备及合同履约成本减值准备",
           "headers": [
             "存货种类",
             "期初数",
-            "本期增加",
-            "本期减少",
+            "计提",
+            "其他",
+            "转回",
+            "转销",
+            "其他",
             "期末数"
           ],
           "rows": [
-            {
-              "label": "存货种类",
-              "row_type": "header_label"
-            },
             {
               "label": "原材料",
               "row_type": "data"
@@ -3978,7 +4915,67 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "存货种类",
+              "is_label": true
+            },
+            {
+              "key": "opening",
+              "label": "期初数",
+              "format": "amount"
+            },
+            {
+              "key": "increase_provision",
+              "label": "计提",
+              "group": "本期增加",
+              "format": "amount"
+            },
+            {
+              "key": "increase_other",
+              "label": "其他",
+              "group": "本期增加",
+              "format": "amount"
+            },
+            {
+              "key": "decrease_reversal",
+              "label": "转回",
+              "group": "本期减少",
+              "format": "amount"
+            },
+            {
+              "key": "decrease_writeoff",
+              "label": "转销",
+              "group": "本期减少",
+              "format": "amount"
+            },
+            {
+              "key": "decrease_other",
+              "label": "其他",
+              "group": "本期减少",
+              "format": "amount"
+            },
+            {
+              "key": "ending",
+              "label": "期末数",
+              "format": "amount"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "本期增加",
+              "start": 2,
+              "span": 2
+            },
+            {
+              "group": "本期减少",
+              "start": 4,
+              "span": 3
+            }
+          ],
+          "guidance": "按存货种类披露跌价准备的期初数、本期增加（计提/其他）、本期减少（转回/转销/其他）与期末数。国企版本期减少细分为三列（转回 / 转销 / 其他），与上市版两列不同。「其中：」行为上一行的子集，不计入合计。勾稽：期末 = 期初 + 计提 + 其他增加 − 转回 − 转销 − 其他减少。"
         },
         {
           "name": "确认为存货的数据资源",
@@ -4074,7 +5071,36 @@
               "label": "2.期初账面价值",
               "row_type": "data"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "purchased",
+              "label": "外购的数据资源存货",
+              "format": "amount"
+            },
+            {
+              "key": "self_processed",
+              "label": "自行加工的数据资源存货",
+              "format": "amount"
+            },
+            {
+              "key": "other",
+              "label": "其他方式取得的数据资源存货",
+              "format": "amount"
+            },
+            {
+              "key": "total",
+              "label": "合计",
+              "format": "amount"
+            }
+          ],
+          "guidance": "《企业数据资源相关会计处理暂行规定》：应披露确定发出数据资源存货成本所采用的方法；数据资源存货可变现净值的确定依据、跌价准备计提方法、当期计提与转回金额及有关情况；单独披露对财务报表具有重要影响的单项数据资源存货。《关于严格执行企业会计准则 切实做好企业2025年年报工作的通知》：不得将不符合资产定义和确认条件的数据资源确认为资产，不得将前期已费用化的数据资源重新资本化。勾稽（F9-7~F9-13a）：各段 期末 = 期初 + 本期增加 − 本期减少；账面价值 = 账面原值 − 跌价准备；合计列 = 外购 + 自行加工 + 其他方式；「其中」子项之和 ≤ 父项（仅告警）。"
         }
       ],
       "text_sections": [
@@ -4082,6 +5108,9 @@
         "（注：其他项中应说明房地产企业土地储备的情况，包括土地储备的面积、本期增加及土地储备期末余额。）",
         "存货跌价准备及合同履约成本减值准备",
         "确认为存货的数据资源",
+        "（《企业数据资源相关会计处理暂行规定》：（2）企业应当披露确定发出数据资源存货成本所采用的方法。（3）企业应当披露数据资源存货可变现净值的确定依据、存货跌价准备的计提方法、当期计提的存货跌价准备的金额、当期转回的存货跌价准备的金额，以及计提和转回的有关情况。（4）企业应当单独披露对企业财务报表具有重要影响的单项数据资源存货的内容、账面价值和可变现净值。（5）企业应当披露所有权或使用权受到限制的数据资源存货，以及用于担保的数据资源存货的账面价值等情况。",
+        "企业对数据资源进行评估且评估结果对企业财务报表具有重要影响的，应当披露评估依据的信息来源，评估结论成立的假设前提和限制条件，评估方法的选择，各重要参数的来源、分析、比较与测算过程等信息。）",
+        "【提示：上述信息，若已在会计政策、其他项目附注中披露，可索引至相关内容。】",
         "借款费用资本化",
         "合同履约成本本期摊销金额的说明"
       ],
@@ -4102,7 +5131,9 @@
       "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
       "sort_index": 9,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "f2-inventory-disclosure-template-alignment",
+      "_aligned_at": "2026-07-30 08:11:32"
     },
     {
       "section_number": "八、11",
@@ -4487,7 +5518,26 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "end_amount",
+              "label": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_amount",
+              "label": "期初余额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "【提示：待抵扣进项税额，根据“应交税费-应交增值税”科目借方余额分析填列；预缴税金中的增值税额，根据“应交税费-未交增值税”科目以及“应交税费-预交增值税”科目借方余额分析填列；上述重分类事项，如属于其他非流动资产的，应在“其他非流动资产”科目列示。】源模板要求根据性质选择披露方式。勾稽：合计行期末余额 = 报表「其他流动资产」期末数（F13-1）；合计行期初余额 = 报表期初数（F13-1a）；各明细行之和 = 合计行（每个数值列独立校验，F13-2）。数据来源：审定表 K2-1 / 明细表 K2-2。"
         }
       ],
       "text_sections": [
@@ -4505,7 +5555,9 @@
       "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
       "sort_index": 13,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "k2-other-current-assets-disclosure-alignment",
+      "_aligned_at": "2026-07-30 16:49:35"
     },
     {
       "section_number": "八、15",
@@ -4517,20 +5569,92 @@
           "name": "债权投资情况",
           "headers": [
             "项目",
-            "期末数",
-            "期初数"
+            "账面余额",
+            "减值准备",
+            "账面价值",
+            "账面余额",
+            "减值准备",
+            "账面价值"
           ],
           "rows": [
             {
-              "label": "项目",
-              "row_type": "header_label"
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
             },
             {
               "label": "合计",
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true
+            },
+            {
+              "key": "end_gross",
+              "label": "账面余额",
+              "group": "期末数",
+              "format": "amount"
+            },
+            {
+              "key": "end_provision",
+              "label": "减值准备",
+              "group": "期末数",
+              "format": "amount"
+            },
+            {
+              "key": "end_net",
+              "label": "账面价值",
+              "group": "期末数",
+              "format": "amount"
+            },
+            {
+              "key": "prior_gross",
+              "label": "账面余额",
+              "group": "期初数",
+              "format": "amount"
+            },
+            {
+              "key": "prior_provision",
+              "label": "减值准备",
+              "group": "期初数",
+              "format": "amount"
+            },
+            {
+              "key": "prior_net",
+              "label": "账面价值",
+              "group": "期初数",
+              "format": "amount"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "期末数",
+              "start": 1,
+              "span": 3
+            },
+            {
+              "group": "期初数",
+              "start": 4,
+              "span": 3
+            }
+          ],
+          "guidance": "两级表头：期末数 / 期初数 各含账面余额、减值准备、账面价值。勾稽：账面价值 = 账面余额 − 减值准备（逐行）；各明细行之和 = 合计行；合计行期末账面价值 = 资产负债表「债权投资」期末数 = G4-1 审定表审定数。"
         },
         {
           "name": "期末重要的债权投资",
@@ -4543,11 +5667,55 @@
           ],
           "rows": [
             {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
               "label": "合计",
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "债权项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "face_value",
+              "label": "面值",
+              "format": "amount"
+            },
+            {
+              "key": "coupon_rate",
+              "label": "票面利率%",
+              "format": "percent"
+            },
+            {
+              "key": "effective_rate",
+              "label": "实际利率（%）",
+              "format": "percent"
+            },
+            {
+              "key": "maturity_date",
+              "label": "到期日"
+            }
+          ],
+          "guidance": "逐项列示期末重要的债权投资（国企版单级表头，仅期末口径）。勾稽：合计行面值 ≤ 上表合计行期末账面余额；实际利率与票面利率差异较大时应结合溢折价摊销核对。"
         },
         {
           "name": "期末，处于第一阶段的债权投资的减值准备",
@@ -4561,7 +5729,7 @@
           ],
           "rows": [
             {
-              "label": "按单项计提坏账准备",
+              "label": "按单项计提减值准备",
               "row_type": "data"
             },
             {
@@ -4569,12 +5737,27 @@
               "row_type": "data"
             },
             {
-              "label": "按组合计提坏账准备",
-              "is_total": true,
-              "row_type": "total"
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "按组合计提减值准备",
+              "row_type": "data"
             },
             {
               "label": "其中：",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
               "row_type": "data"
             },
             {
@@ -4582,7 +5765,40 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "类别",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "gross",
+              "label": "账面余额",
+              "format": "amount"
+            },
+            {
+              "key": "loss_rate",
+              "label": "未来12个月内预期信用损失率(%)",
+              "format": "percent"
+            },
+            {
+              "key": "provision",
+              "label": "减值准备",
+              "format": "amount"
+            },
+            {
+              "key": "net",
+              "label": "账面价值",
+              "format": "amount"
+            },
+            {
+              "key": "reason",
+              "label": "理由"
+            }
+          ],
+          "guidance": "勾稽：账面价值 = 账面余额 − 减值准备；减值准备 ≈ 账面余额 × 预期信用损失率；「其中：」下明细之和 = 对应的单项 / 组合计提行；单项 + 组合 = 合计行。三个阶段的合计行减值准备之和 = 债权投资情况表合计行期末减值准备。"
         },
         {
           "name": "期末，处于第二阶段的债权投资的减值准备",
@@ -4596,7 +5812,7 @@
           ],
           "rows": [
             {
-              "label": "按单项计提坏账准备",
+              "label": "按单项计提减值准备",
               "row_type": "data"
             },
             {
@@ -4604,12 +5820,27 @@
               "row_type": "data"
             },
             {
-              "label": "按组合计提坏账准备",
-              "is_total": true,
-              "row_type": "total"
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "按组合计提减值准备",
+              "row_type": "data"
             },
             {
               "label": "其中：",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
               "row_type": "data"
             },
             {
@@ -4617,7 +5848,40 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "类别",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "gross",
+              "label": "账面余额",
+              "format": "amount"
+            },
+            {
+              "key": "loss_rate",
+              "label": "整个存续期预期信用损失率(%)",
+              "format": "percent"
+            },
+            {
+              "key": "provision",
+              "label": "减值准备",
+              "format": "amount"
+            },
+            {
+              "key": "net",
+              "label": "账面价值",
+              "format": "amount"
+            },
+            {
+              "key": "reason",
+              "label": "理由"
+            }
+          ],
+          "guidance": "勾稽：账面价值 = 账面余额 − 减值准备；减值准备 ≈ 账面余额 × 预期信用损失率；「其中：」下明细之和 = 对应的单项 / 组合计提行；单项 + 组合 = 合计行。三个阶段的合计行减值准备之和 = 债权投资情况表合计行期末减值准备。"
         },
         {
           "name": "期末，处于第三阶段的债权投资的减值准备",
@@ -4631,7 +5895,7 @@
           ],
           "rows": [
             {
-              "label": "按单项计提坏账准备",
+              "label": "按单项计提减值准备",
               "row_type": "data"
             },
             {
@@ -4639,12 +5903,27 @@
               "row_type": "data"
             },
             {
-              "label": "按组合计提坏账准备",
-              "is_total": true,
-              "row_type": "total"
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "按组合计提减值准备",
+              "row_type": "data"
             },
             {
               "label": "其中：",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
               "row_type": "data"
             },
             {
@@ -4652,22 +5931,51 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "类别",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "gross",
+              "label": "账面余额",
+              "format": "amount"
+            },
+            {
+              "key": "loss_rate",
+              "label": "整个存续期预期信用损失率(%)",
+              "format": "percent"
+            },
+            {
+              "key": "provision",
+              "label": "减值准备",
+              "format": "amount"
+            },
+            {
+              "key": "net",
+              "label": "账面价值",
+              "format": "amount"
+            },
+            {
+              "key": "reason",
+              "label": "理由"
+            }
+          ],
+          "guidance": "勾稽：账面价值 = 账面余额 − 减值准备；减值准备 ≈ 账面余额 × 预期信用损失率；「其中：」下明细之和 = 对应的单项 / 组合计提行；单项 + 组合 = 合计行。三个阶段的合计行减值准备之和 = 债权投资情况表合计行期末减值准备。"
         },
         {
-          "name": "债权投资（表6）",
+          "name": "本期计提、收回或转回的减值准备情况",
           "headers": [
             "减值准备",
-            "第一阶段",
-            "第二阶段",
-            "第三阶段",
+            "未来12个月预期信用损失",
+            "整个存续期预期信用损失（未发生信用减值）",
+            "整个存续期预期信用损失（已发生信用减值）",
             "合计"
           ],
           "rows": [
-            {
-              "label": "减值准备",
-              "row_type": "header_label"
-            },
             {
               "label": "期初余额",
               "row_type": "data"
@@ -4716,7 +6024,55 @@
               "label": "期末余额",
               "row_type": "data"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "减值准备",
+              "is_label": true
+            },
+            {
+              "key": "stage1",
+              "label": "未来12个月预期信用损失",
+              "group": "第一阶段",
+              "format": "amount"
+            },
+            {
+              "key": "stage2",
+              "label": "整个存续期预期信用损失（未发生信用减值）",
+              "group": "第二阶段",
+              "format": "amount"
+            },
+            {
+              "key": "stage3",
+              "label": "整个存续期预期信用损失（已发生信用减值）",
+              "group": "第三阶段",
+              "format": "amount"
+            },
+            {
+              "key": "total",
+              "label": "合计",
+              "format": "amount"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "第一阶段",
+              "start": 1,
+              "span": 1
+            },
+            {
+              "group": "第二阶段",
+              "start": 2,
+              "span": 1
+            },
+            {
+              "group": "第三阶段",
+              "start": 3,
+              "span": 1
+            }
+          ],
+          "guidance": "三阶段迁移表：两级表头「第一/二/三阶段」下分别是未来12个月预期信用损失、整个存续期预期信用损失（未发生 / 已发生信用减值）。阶段间转移行有符号约束（转入下一阶段：转出方为负、转入方为正；转回则相反）。勾稽：期末余额 = 期初余额 + 阶段间转移合计 + 本期计提 − 本期转回 − 本期转销 − 本期核销 + 其他变动（逐列独立校验）；合计列 = 三个阶段之和；期末余额合计 = 各阶段减值准备表的合计行减值准备之和。"
         }
       ],
       "text_sections": [
@@ -4744,7 +6100,9 @@
       "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
       "sort_index": 14,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "disclosure-sync-path-buildout",
+      "_aligned_at": "2026-07-30 12:17:07"
     },
     {
       "section_number": "八、16",
@@ -4761,11 +6119,42 @@
           ],
           "rows": [
             {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
               "label": "合计",
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "end_balance",
+              "label": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "opening_balance",
+              "label": "期初余额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "按项目列示其他债权投资期末 / 期初余额（国企版单级表头）。勾稽：各明细行之和 = 合计行；合计行期末余额 = 资产负债表「其他债权投资」期末数 = G6-1 审定表审定数。减值准备计提情况参照「附注八、15、债权投资（3）减值准备计提情况」披露。"
         },
         {
           "name": "期末重要的其他债权投资",
@@ -4779,11 +6168,61 @@
           ],
           "rows": [
             {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
               "label": "合计",
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "其他债权投资项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "face_value",
+              "label": "面值",
+              "format": "amount"
+            },
+            {
+              "key": "amortized_cost",
+              "label": "摊余成本",
+              "format": "amount"
+            },
+            {
+              "key": "fair_value",
+              "label": "公允价值",
+              "format": "amount"
+            },
+            {
+              "key": "oci_fv_change_cumulative",
+              "label": "累计计入其他综合收益的公允价值变动金额",
+              "format": "amount"
+            },
+            {
+              "key": "provision",
+              "label": "已计提减值准备金额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "逐项列示期末重要的其他债权投资（国企版单级表头）。勾稽：公允价值 = 摊余成本 + 累计计入其他综合收益的公允价值变动金额；合计行公允价值 = 上表合计行期末余额；已计提减值准备在其他综合收益中确认，不减少资产负债表列示的账面价值。"
         }
       ],
       "text_sections": [
@@ -4808,7 +6247,9 @@
       "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
       "sort_index": 15,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "disclosure-sync-path-buildout",
+      "_aligned_at": "2026-07-30 12:01:11"
     },
     {
       "section_number": "八、17",
@@ -4820,15 +6261,15 @@
           "name": "长期应收款按性质披露",
           "headers": [
             "项目",
-            "期末余额",
-            "期初余额",
+            "账面余额",
+            "坏账准备",
+            "账面价值",
+            "账面余额",
+            "坏账准备",
+            "账面价值",
             "期末折现率区间"
           ],
           "rows": [
-            {
-              "label": "项目",
-              "row_type": "header_label"
-            },
             {
               "label": "融资租赁款",
               "row_type": "data"
@@ -4843,6 +6284,14 @@
             },
             {
               "label": "分期收款提供劳务",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
               "row_type": "data"
             },
             {
@@ -4863,7 +6312,67 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true
+            },
+            {
+              "key": "end_gross",
+              "label": "账面余额",
+              "group": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "end_provision",
+              "label": "坏账准备",
+              "group": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "end_net",
+              "label": "账面价值",
+              "group": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_gross",
+              "label": "账面余额",
+              "group": "期初余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_provision",
+              "label": "坏账准备",
+              "group": "期初余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_net",
+              "label": "账面价值",
+              "group": "期初余额",
+              "format": "amount"
+            },
+            {
+              "key": "discount_rate_range",
+              "label": "期末折现率区间"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "期末余额",
+              "start": 1,
+              "span": 3
+            },
+            {
+              "group": "期初余额",
+              "start": 4,
+              "span": 3
+            }
+          ],
+          "guidance": "两级表头：期末 / 期初各含账面余额、坏账准备、账面价值；折现率区间为独立列（跨两行）。勾稽：账面价值 = 账面余额 − 坏账准备（逐行）；「其中：未实现融资收益」是上一行的内含项、不参与加总；各性质行之和 = 小计行；合计行 = 小计行 − 减：1年内到期的长期应收款行；合计行期末账面价值 = 资产负债表「长期应收款」期末数 = G5-1 审定数。源模版的明细行数按项目实际情况增减。"
         },
         {
           "name": "终止确认的长期应收款",
@@ -4871,15 +6380,50 @@
             "项目",
             "转移方式",
             "终止确认金额",
-            "与终止确认相关的<br/>利得或损失"
+            "与终止确认相关的利得或损失"
           ],
           "rows": [
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
             {
               "label": "合计",
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "transfer_method",
+              "label": "转移方式"
+            },
+            {
+              "key": "derecognized_amount",
+              "label": "终止确认金额",
+              "format": "amount"
+            },
+            {
+              "key": "gain_or_loss",
+              "label": "与终止确认相关的利得或损失",
+              "format": "amount"
+            }
+          ],
+          "guidance": "注：报告期内因金融资产转移而终止确认的长期应收款，应披露资产转移的方式、终止确认的长期应收款金额，以及与终止确认相关的利得或损失。源模版合计行的「与终止确认相关的利得或损失」列示为「--」。勾稽：明细行之和 = 合计行终止确认金额；相关利得或损失应与利润表「投资收益」或「资产处置收益」中对应项目一致。"
         },
         {
           "name": "转移长期应收款且继续涉入形成的资产、负债的金额",
@@ -4893,6 +6437,10 @@
               "row_type": "data"
             },
             {
+              "label": "",
+              "row_type": "data"
+            },
+            {
               "label": "资产小计",
               "is_total": true,
               "row_type": "subtotal"
@@ -4902,11 +6450,29 @@
               "row_type": "data"
             },
             {
+              "label": "",
+              "row_type": "data"
+            },
+            {
               "label": "负债小计",
               "is_total": true,
               "row_type": "subtotal"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "end_amount",
+              "label": "期末数",
+              "format": "amount"
+            }
+          ],
+          "guidance": "注：转移长期应收款且继续涉入形成的资产、负债金额。「资产：」「负债：」为分区标题行，其下逐项列示。勾稽：资产小计 = 资产区各明细行之和；负债小计 = 负债区各明细行之和；两者应能在资产负债表相应项目中找到列示位置。"
         }
       ],
       "text_sections": [
@@ -4930,7 +6496,9 @@
       "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
       "sort_index": 16,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "disclosure-sync-path-buildout",
+      "_aligned_at": "2026-07-30 12:17:07"
     },
     {
       "section_number": "八、18",
@@ -5445,11 +7013,42 @@
           ],
           "rows": [
             {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
               "label": "合计",
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "end_balance",
+              "label": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "opening_balance",
+              "label": "期初余额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "【披露企业将上述各项目指定为以公允价值计量且其变动计入其他综合收益的原因。】勾稽：各明细行之和 = 合计行（期末 / 期初各独立校验）；合计行期末余额 = 资产负债表「其他权益工具投资」期末数 = G8-1 审定表审定数。"
         },
         {
           "name": "期末其他权益工具投资情况",
@@ -5463,11 +7062,60 @@
           ],
           "rows": [
             {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
               "label": "合计",
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目名称",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "dividend_income",
+              "label": "本期确认的股利收入",
+              "format": "amount"
+            },
+            {
+              "key": "oci_current",
+              "label": "本期计入其他综合收益的利得或损失",
+              "format": "amount"
+            },
+            {
+              "key": "oci_cumulative",
+              "label": "截至期末累计计入其他综合收益的利得或损失",
+              "format": "amount"
+            },
+            {
+              "key": "oci_to_re",
+              "label": "其他综合收益转入留存收益的金额",
+              "format": "amount"
+            },
+            {
+              "key": "oci_to_re_reason",
+              "label": "其他综合收益转入留存收益的原因"
+            }
+          ],
+          "guidance": "本表逐项目列示，项目集合须与上表「其他权益工具投资情况」一致。勾稽：各明细行之和 = 合计行（每个金额列独立校验）；「本期计入其他综合收益的利得或损失」合计 = 所有者权益变动表「其他综合收益」中其他权益工具公允价值变动部分；「其他综合收益转入留存收益的金额」非零时，转入原因不得为空。"
         }
       ],
       "text_sections": [
@@ -5488,7 +7136,9 @@
       "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
       "sort_index": 18,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "disclosure-sync-path-buildout",
+      "_aligned_at": "2026-07-30 10:34:49"
     },
     {
       "section_number": "八、20",
@@ -5505,11 +7155,46 @@
           ],
           "rows": [
             {
+              "label": "债务工具投资",
+              "row_type": "data"
+            },
+            {
+              "label": "权益工具投资",
+              "row_type": "data"
+            },
+            {
+              "label": "指定为以公允价值计量且其变动计入当期损益的金融资产",
+              "row_type": "data"
+            },
+            {
+              "label": "其他",
+              "row_type": "data"
+            },
+            {
               "label": "合计",
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "end_fair_value",
+              "label": "期末公允价值",
+              "format": "amount"
+            },
+            {
+              "key": "opening_fair_value",
+              "label": "期初公允价值",
+              "format": "amount"
+            }
+          ],
+          "guidance": "按国企口径列示其他非流动金融资产期末 / 期初公允价值。勾稽：各项目行之和 = 合计行（期末 / 期初各独立校验）；合计行期末公允价值 = 资产负债表「其他非流动金融资产」期末数 = G9-1 审定表审定数；公允价值应与 G9 估值层级表（L1/L2/L3）合计一致。"
         }
       ],
       "text_sections": [],
@@ -5525,7 +7210,9 @@
       "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
       "sort_index": 19,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "disclosure-sync-path-buildout",
+      "_aligned_at": "2026-07-30 10:34:49"
     },
     {
       "section_number": "八、21",
@@ -5746,7 +7433,8 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "guidance": "汇总表（源模板 R7–R10）：固定资产 + 固定资产清理 = 合计。勾稽：固定资产行 = 「固定资产情况」表「五、固定资产账面价值合计」的期末/期初余额；固定资产清理行 = 「固定资产清理」表合计（可从 H6 同步）；本表合计 = 资产负债表「固定资产」项目。注意国企口径列名为「期末账面价值 / 期初账面价值」，不同于上市的「期末余额 / 上年年末余额」。"
         },
         {
           "name": "固定资产情况",
@@ -5943,7 +7631,8 @@
               "label": "其他",
               "row_type": "data"
             }
-          ]
+          ],
+          "guidance": "国企五层结构（源模板 R14–R58）：一、账面原值合计 → 二、累计折旧合计 → 三、固定资产账面净值合计 → 四、固定资产减值准备合计 → 五、固定资产账面价值合计；每层下以「其中：」列示土地资产 / 房屋、建筑物 / 机器设备 / 运输工具 / 电子设备 / 办公设备 / 酒店业家具 / 其他。\n勾稽：期末余额 = 期初余额 + 本期增加 − 本期减少（原值 / 累计折旧 / 减值准备三层各自成立）；账面净值 = 账面原值 − 累计折旧；账面价值 = 账面净值 − 减值准备；各层合计行 = 该层「其中：」各类别之和。\n源模板列示约定：账面净值层与账面价值层的「本期增加 / 本期减少」列填「—」（推导列不作变动分析）；土地资产不计提折旧，累计折旧层该行整行填「—」。"
         },
         {
           "name": "暂时闲置的固定资产情况",
@@ -5961,7 +7650,8 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "guidance": "按资产类别列示暂时闲置固定资产的账面原值、累计折旧、减值准备、账面价值及备注。勾稽：账面价值 = 账面原值 − 累计折旧 − 减值准备；合计行 = 各明细行之和。底稿可从 H1-4 闲置检查表同步。停工项目、闲置资产的减值情况应予特别关注并作出恰当判断。"
         },
         {
           "name": "未办妥产权证书的固定资产情况",
@@ -5976,7 +7666,8 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "guidance": "披露期末未办妥产权证书的固定资产账面价值及未办妥原因。底稿可从 H1-16 房屋建筑物权属检查表同步（未取得权证、或在建转固且无证号的资产）。勾稽：合计不得超过「固定资产情况」表期末账面价值合计。"
         },
         {
           "name": "固定资产清理",
@@ -5992,10 +7683,12 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "guidance": "注：说明转入固定资产清理起始时间已超过1年的固定资产清理进展情况。\n勾稽：合计期末账面价值 = 汇总表「固定资产清理」行期末账面价值；期初同口径核对。底稿可从 H6 固定资产清理底稿同步。"
         }
       ],
       "text_sections": [
+        "### 固定资产",
         "### 固定资产情况",
         "#### 暂时闲置的固定资产情况",
         "#### 未办妥产权证书的固定资产情况",
@@ -7111,14 +8804,56 @@
           "name": "未经抵销的递延所得税资产和递延所得税负债",
           "headers": [
             "项目",
-            "期末余额",
-            "期初余额"
+            "递延所得税资产/负债",
+            "可抵扣/应纳税暂时性差异",
+            "递延所得税资产/负债",
+            "可抵扣/应纳税暂时性差异"
           ],
-          "rows": [
+          "columns": [
             {
+              "key": "label",
               "label": "项目",
-              "row_type": "header_label"
+              "is_label": true
             },
+            {
+              "key": "end_tax",
+              "label": "递延所得税资产/负债",
+              "group": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "end_diff",
+              "label": "可抵扣/应纳税暂时性差异",
+              "group": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_tax",
+              "label": "递延所得税资产/负债",
+              "group": "年初余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_diff",
+              "label": "可抵扣/应纳税暂时性差异",
+              "group": "年初余额",
+              "format": "amount"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "期末余额",
+              "start": 1,
+              "span": 2
+            },
+            {
+              "group": "年初余额",
+              "start": 3,
+              "span": 2
+            }
+          ],
+          "guidance": "递延所得税资产和递延所得税负债**不**以抵销后的净额列示时按本表披露（以抵销后净额列示的改填下一张表）。【提示：资产减值准备，含“持有待售资产减值准备”】【注：计入其他综合收益的其他金融资产为计入其他综合收益的其他债权投资、其他权益工具投资。】负债段数据来源于递延所得税负债底稿。勾稽：小计 = 段内各明细项之和。",
+          "rows": [
             {
               "label": "一、递延所得税资产",
               "row_type": "data"
@@ -7201,20 +8936,142 @@
           "name": "以抵销后净额列示的递延所得税资产或负债",
           "headers": [
             "项目",
-            "期末",
-            "期初"
+            "报告期末互抵后的递延所得税资产或负债",
+            "报告期末互抵后的可抵扣或应纳税暂时性差异",
+            "报告年初互抵后的递延所得税资产或负债",
+            "报告年初互抵后的可抵扣或应纳税暂时性差异"
           ],
-          "rows": [
+          "columns": [
             {
+              "key": "label",
               "label": "项目",
-              "row_type": "header_label"
+              "is_label": true,
+              "flat": true
             },
+            {
+              "key": "net_end",
+              "label": "报告期末互抵后的递延所得税资产或负债",
+              "format": "amount"
+            },
+            {
+              "key": "diff_end",
+              "label": "报告期末互抵后的可抵扣或应纳税暂时性差异",
+              "format": "amount"
+            },
+            {
+              "key": "net_prior",
+              "label": "报告年初互抵后的递延所得税资产或负债",
+              "format": "amount"
+            },
+            {
+              "key": "diff_prior",
+              "label": "报告年初互抵后的可抵扣或应纳税暂时性差异",
+              "format": "amount"
+            }
+          ],
+          "guidance": "递延所得税资产和递延所得税负债以抵销后的净额列示时按本表披露：列示互抵后的递延所得税资产或负债，及其对应的互抵后可抵扣或应纳税暂时性差异。勾稽：小计 = 段内各明细项之和。",
+          "rows": [
             {
               "label": "一、递延所得税资产",
               "row_type": "data"
             },
             {
+              "label": "信用减值准备",
+              "row_type": "data"
+            },
+            {
+              "label": "资产减值准备",
+              "row_type": "data"
+            },
+            {
+              "label": "交易性金融工具、衍生金融工具的估值",
+              "row_type": "data"
+            },
+            {
+              "label": "计入其他综合收益的其他金融资产公允价值变动",
+              "row_type": "data"
+            },
+            {
+              "label": "租赁负债",
+              "account_codes": [
+                "2601"
+              ],
+              "report_row_code": "BS-042",
+              "row_type": "data"
+            },
+            {
+              "label": "开办费",
+              "row_type": "data"
+            },
+            {
+              "label": "可抵扣亏损",
+              "row_type": "data"
+            },
+            {
+              "label": "……",
+              "row_type": "data"
+            },
+            {
+              "label": "小计",
+              "is_total": true,
+              "row_type": "subtotal"
+            },
+            {
               "label": "二、递延所得税负债",
+              "row_type": "data"
+            },
+            {
+              "label": "交易性金融工具、衍生金融工具的估值",
+              "row_type": "data"
+            },
+            {
+              "label": "计入其他综合收益的其他金融资产公允价值变动",
+              "row_type": "data"
+            },
+            {
+              "label": "使用权资产",
+              "account_codes": [
+                "1641",
+                "1642",
+                "1643"
+              ],
+              "report_row_code": "BS-019",
+              "row_type": "data"
+            },
+            {
+              "label": "……",
+              "row_type": "data"
+            },
+            {
+              "label": "小计",
+              "is_total": true,
+              "row_type": "subtotal"
+            }
+          ]
+        },
+        {
+          "name": "递延所得税资产和递延所得税负债互抵明细",
+          "headers": [
+            "项目",
+            "本期互抵金额"
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "amount",
+              "label": "本期互抵金额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "源模板（2）B、递延所得税资产和递延所得税负债互抵明细：按项目列示本期互抵金额。仅在以抵销后净额列示时填列。",
+          "rows": [
+            {
+              "label": "……",
               "row_type": "data"
             }
           ]
@@ -7226,6 +9083,25 @@
             "期末余额",
             "期初余额"
           ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "end",
+              "label": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior",
+              "label": "期初余额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "列示由于未来能否获得足够的应纳税所得额具有不确定性，因此没有确认为递延所得税资产的可抵扣暂时性差异和可抵扣亏损。勾稽：合计 = 可抵扣暂时性差异 + 可抵扣亏损。",
           "rows": [
             {
               "label": "可抵扣暂时性差异",
@@ -7250,6 +9126,29 @@
             "期初余额",
             "备注"
           ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "年份",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "end",
+              "label": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior",
+              "label": "期初余额",
+              "format": "amount"
+            },
+            {
+              "key": "remark",
+              "label": "备注"
+            }
+          ],
+          "guidance": "【注：无法在资产负债表日确定全部可抵扣亏损情况的，可只填写能确定部分的金额及其到期年度，并在备注栏予以说明。】第 3 列附注口径为「期初余额」（源模板底稿侧称「年初余额」，同一口径）。勾稽：本表「合计」= 上表「可抵扣亏损」行（源模板 B72=B62 / C72=C62）。",
           "rows": [
             {
               "label": "2025年",
@@ -7312,12 +9211,14 @@
         }
       ],
       "text_sections": [
-        "### 未经抵销的递延所得税资产和递延所得税负债",
+        "#### 未经抵销的递延所得税资产和递延所得税负债",
+        "递延所得税资产和递延所得税负债不以抵销后的净额列示的，按（1）披露；若递延所得税资产和递延所得税负债以抵销后的净额列示的，按（2）披露。",
         "【提示：资产减值准备，含“持有待售资产减值准备”】",
         "【注：计入其他综合收益的其他金融资产为计入其他综合收益的其他债权投资、其他权益工具投资。】",
-        "### 以抵销后净额列示的递延所得税资产或负债",
-        "### 未确认递延所得税资产明细",
-        "### 未确认递延所得税资产的可抵扣亏损将于以下年度到期",
+        "#### 以抵销后净额列示的递延所得税资产或负债",
+        "#### 递延所得税资产和递延所得税负债互抵明细",
+        "#### 未确认递延所得税资产明细",
+        "#### 未确认递延所得税资产的可抵扣亏损将于以下年度到期",
         "【注：无法在资产负债表日确定全部可抵扣亏损情况的，可只填写能确定部分的金额及其到期年度，并在备注栏予以说明。】"
       ],
       "check_presets": [],
@@ -7329,7 +9230,8 @@
       "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
       "sort_index": 30,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "n1-deferred-tax-disclosure-template-alignment"
     },
     {
       "section_number": "八、32",
@@ -7697,7 +9599,26 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "账龄",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "end_amount",
+              "label": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "opening_amount",
+              "label": "期初余额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "按账龄分类列示（附注模版：1年以内（含1年）／1至2年／2至3年／3年以上）。账龄档位跟随项目账龄配置：3年段即上述 4 档；5年段按同一「X至Y年」口径展开为1年以内（含1年）／1至2年／2至3年／3至4年／4至5年／5年以上；自定义段用配置段名。勾稽：期末余额＝F4-1 按账龄「期末审定数」，期初余额＝按账龄「期初审定数」；合计应与 F4-1 按性质分类合计一致。"
         },
         {
           "name": "账龄超过1 年的重要应付账款",
@@ -7708,15 +9629,42 @@
           ],
           "rows": [
             {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
               "label": "合计",
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "债权单位名称",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "end_amount",
+              "label": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "unsettled_reason",
+              "label": "未偿还原因"
+            }
+          ],
+          "guidance": "源模板提示：账龄超过1年的大额应付账款，应说明未偿还或未结转的原因，并在资产负债表日后事项中说明是否偿还；账龄超过3年以上的应付账款应说明未偿还的原因。勾稽：取自 F4-5 账龄1年以上的应付账款检查表（债权人名称／审定金额／未偿还或未结转的原因），本表合计不应超过上表「1年以上」各档期末余额之和。"
         }
       ],
       "text_sections": [
-        "### 账龄超过1 年的重要应付账款"
+        "【提示：账龄超过1年的大额应付账款，应说明未偿还或未结转的原因，并在资产负债表日后事项中说明是否偿还；账龄超过3年以上的应付账款应说明未偿还的原因。】",
+        "【提示：存在供应商融资安排（如反向保理、供应链融资平台）的，按《企业会计准则解释第17号》在「现金流量表补充资料—供应商融资安排」中披露该安排的条款和条件、资产负债表中的列报项目及其中「供应商已收到款项」的金额、付款到期日的区间、不涉及现金收支的当期变动；底稿见 F4-9 供应商融资检查表。】"
       ],
       "check_presets": [
         "LLM审核",
@@ -7734,7 +9682,9 @@
       "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
       "sort_index": 36,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "f4-accounts-payable-disclosure-template-alignment",
+      "_aligned_at": "2026-07-29 22:14:52"
     },
     {
       "section_number": "八、38",
@@ -7903,7 +9853,36 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "项目",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "期初余额",
+              "label": "期初余额",
+              "format": "amount"
+            },
+            {
+              "key": "本期增加",
+              "label": "本期增加",
+              "format": "amount"
+            },
+            {
+              "key": "本期减少",
+              "label": "本期减少",
+              "format": "amount"
+            },
+            {
+              "key": "期末余额",
+              "label": "期末余额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "按国企口径分类列示应付职工薪酬的期初余额、本期增减与期末余额（不适用的类别可删除）。勾稽：逐行 期末余额 = 期初余额 + 本期增加 − 本期减少；各类别行之和 = 合计行（四列各自独立校验）；「短期薪酬」行 = 下方「短期薪酬」表合计行，「离职后福利-设定提存计划」行 = 下方「设定提存计划」表合计行（源模板三张表同引「明细表J1-2 」，互为勾稽关系而非派生）；合计行期末余额 = 资产负债表「应付职工薪酬」期末数 = J1-1 审定表期末审定合计。"
         },
         {
           "name": "短期薪酬列示",
@@ -7964,10 +9943,39 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "项目",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "期初余额",
+              "label": "期初余额",
+              "format": "amount"
+            },
+            {
+              "key": "本期增加",
+              "label": "本期增加",
+              "format": "amount"
+            },
+            {
+              "key": "本期减少",
+              "label": "本期减少",
+              "format": "amount"
+            },
+            {
+              "key": "期末余额",
+              "label": "期末余额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "国企口径的短期薪酬明细。本表 seed 骨架按附注模板列「其中：医疗保险费及生育保险费 / 工伤保险费 / 其他」3 项；源底稿（J1 国企披露 sheet）按医疗 / 工伤 / 生育 / 其他 4 项录入，同步后附注按底稿实际行呈现（更细，不做聚合）。国企版无独立「非货币性福利」行，源模板将其并入「其他短期薪酬」。勾稽：「社会保险费」行 = 其下「其中：」各险种之和（源模板父行为 SUM 公式，不应手工录入）；合计行 = 各非「其中：」行之和（源模板合计公式显式排除「其中：」明细行，避免双算）；逐行 期末余额 = 期初余额 + 本期增加 − 本期减少；合计行 = 上方汇总表「短期薪酬」行。"
         },
         {
-          "name": "短期薪酬列示",
+          "name": "设定提存计划列示",
           "headers": [
             "项目",
             "期初余额",
@@ -8013,13 +10021,46 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "项目",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "期初余额",
+              "label": "期初余额",
+              "format": "amount"
+            },
+            {
+              "key": "本期增加",
+              "label": "本期增加",
+              "format": "amount"
+            },
+            {
+              "key": "本期减少",
+              "label": "本期减少",
+              "format": "amount"
+            },
+            {
+              "key": "期末余额",
+              "label": "期末余额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "国企口径的设定提存计划列示（不适用的类别可删除）。勾稽：「离职后福利」行 = 其下「其中：」四项之和（基本养老保险费 / 失业保险费 / 企业年金缴费 / 其他）；「其他长期职工福利」行 = 其下「其中：」各项之和；合计行 = 「离职后福利」+「其他长期职工福利」（源模板合计公式只加这两个父行，不含「其中：」明细）；逐行 期末余额 = 期初余额 + 本期增加 − 本期减少；合计行 = 上方汇总表「离职后福利-设定提存计划」行。说明区须披露设定提存计划的性质与缴费金额计算依据；存在设定受益计划的，另见附注八、54「长期应付职工薪酬」。"
         }
       ],
       "text_sections": [
         "### 应付职工薪酬列示",
         "### 短期薪酬列示",
-        "### 设定提存计划列示"
+        "### 设定提存计划列示",
+        "说明：",
+        "1.企业本期为职工提供的各项非货币性福利的形式、金额及其计算依据。",
+        "2.企业应说明设立或参与的设定提存计划的性质、计算缴费金额的公式或依据。",
+        "3.存在设定受益计划的企业，应说明设定受益计划的特征及与之相关的风险、在财务报表中确认的金额及其变动、对未来现金流的影响、重大精算假设及有关敏感性分析等。设定受益计划情况详见附注八、54「长期应付职工薪酬」。"
       ],
       "check_presets": [
         "二级明细",
@@ -8037,7 +10078,9 @@
       "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
       "sort_index": 39,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "j1-disclosure-template-alignment",
+      "_aligned_at": "2026-07-30 16:19:46"
     },
     {
       "section_number": "八、41",
@@ -10623,7 +12666,26 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "产生净敞口套期收益的来源",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "current_amount",
+              "label": "本期发生额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_amount",
+              "label": "上期发生额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "按国企口径分两项来源列示（被套期项目累计公允价值变动转入损益、现金流量套期储备转入损益）。勾稽：两项来源之和 = 合计行；合计行本期发生额 = G12-1 审定数（6103）；来源金额应与 G12-2 套期明细表的有效 / 无效部分拆分一致。"
         }
       ],
       "text_sections": [],
@@ -10639,7 +12701,9 @@
       "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
       "sort_index": 70,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "disclosure-sync-path-buildout",
+      "_aligned_at": "2026-07-30 10:34:49"
     },
     {
       "section_number": "八、72",
