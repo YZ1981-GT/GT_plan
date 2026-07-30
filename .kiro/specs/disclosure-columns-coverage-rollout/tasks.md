@@ -248,10 +248,20 @@ vitest 时无法一眼分辨「本批新引入的红」和「历史欠账的红�
   - Ensure all tests pass, ask the user if questions arise.
   - 门槛：D2 两版同步载荷账龄 label 为披露口径；改名场景 DB 无残留 key；`sheet_name` 断言零漂移且守卫生效
 
-- [ ] 12. 收尾
+- [x] 12. 收尾
   - [x] 12.1 清理临时脚本与 dump
   - [x] 12.2 更新 `.kiro/specs/INDEX.md`
-  - [ ] 12.3 单 commit
+  - [x] 12.3 提交 —— **已随分层批次提交**（2026-07-30，用户确认口径）
+        **按 spec 单独提交不成立**：本 spec 专属文件仅 9 个（`disclosureColumnDefs.ts` /
+        `disclosureAgingLabels.ts` / `disclosureSyncedTables.ts` / 4 份守卫 spec /
+        `check_disclosure_aging_label_coverage.py`），但核心交付（列元数据透传三态、
+        账龄口径收敛、孤儿表清理）同时落在 `disclosure_engine.py` /
+        `note_sub_table_projector.py` / `note_template_{listed,soe}.json` 等**被 8 个
+        在飞 spec 同时修改**的共享真源上，且 `P1_ROUTE` 登记散落在各循环 builder 里。
+        → 改为**按层 8 个 commit** 覆盖全部 352 个改动文件
+        （`work/2026-05-30-wp-specs`，未 push）：`21cdd06a` / `f5debfa4` / `4678ec3b` /
+        `02f122b8` / `9a9cf12e` / `a2a4feb2` / `1c3241af` / `030d2535`，
+        详见 `f2-inventory-disclosure-template-alignment` Task 11.3 的同一份清单。
 
 ## Notes
 

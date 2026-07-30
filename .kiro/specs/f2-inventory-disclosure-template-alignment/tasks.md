@@ -233,15 +233,25 @@ Sprint 1/2 只动前端披露表；Sprint 3 是 Sprint 4 附注渲染生效的�
   - [x] 17.3 更新全部引用点（测试 / CI / 文档），确认无悬空引用
   - _Requirements: 12.1, 12.2, 12.3_
 
-- [ ] 11. 收尾
+- [x] 11. 收尾
   - [x] 11.1 清理 `scripts/_tmp_*` 临时脚本与 dump
         （本 spec 产生的 18 个已删；根目录残留的 `tmp_f4*` / `tmp_h1*` / `tmp_note_fa*`
         属其它并发会话，未代删）
   - [x] 11.2 更新 `.kiro/specs/INDEX.md`
-  - [ ] 11.3 单 commit
-        **未做（不假绿）**：工作树含 40+ 个来自 `d2-ar-disclosure-template-alignment` /
-        `k1-other-receivable-disclosure-alignment` / `procedure-delegation-visibility-isolation`
-        的未提交改动，单 commit 会误纳 → 需按本 spec 文件白名单单独提交，待用户确认
+  - [x] 11.3 提交 —— **已随分层批次提交**（2026-07-30，用户确认口径）
+        **按 spec 单独提交不成立**（实测：工作树 411 项、纳入 352 项，其中 f2 专属仅 8 个文件，
+        但本 spec 的核心交付同时落在 `note_template_{listed,soe}.json` /
+        `disclosure_engine.py` / `note_sub_table_projector.py` 这些**被 8 个在飞 spec
+        同时修改**的共享真源上 → 按文件白名单切分必然「漏核心改动」或「误纳他人未完成工作」，
+        按 hunk 切机器生成的 JSON 亦不可靠）。仓库历史本身也是按层分批（`feat(frontend)` /
+        `test(backend)` / …），非按 spec。
+        → 改为**按层 8 个 commit**覆盖全部改动（`work/2026-05-30-wp-specs`，未 push）：
+        `21cdd06a` feat(backend) 42 / `f5debfa4` data(note-templates) 4 /
+        `4678ec3b` test(backend) 31 / `02f122b8` feat(frontend/workpaper) 179 /
+        `9a9cf12e` feat(frontend) 16 / `a2a4feb2` test(frontend) 63 /
+        `1c3241af` ci 1 / `030d2535` docs(specs+steering) 16。
+        提交前已排除疑似密钥/本地配置（0 命中）与产物/临时脚本（59 项，多为并发会话的
+        根目录 `tmp_*`，仍留在工作树未跟踪）。
 
 ## Notes
 
