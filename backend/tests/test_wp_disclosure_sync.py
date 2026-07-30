@@ -118,6 +118,48 @@ class TestServiceHelpers:
         assert _derive_section_title("五-1-1") == "五-1-1"
         assert _derive_section_title("") == ""
 
+    # ── 旧表名清理（spec d2-ar-disclosure-template-alignment，Requirement 8）──
+
+    def test_extract_removed_table_keys(self):
+        from app.services.wp_disclosure_sync_service import _extract_removed_table_keys
+
+        clean, keys = _extract_removed_table_keys({
+            "主表": [{"a": 1}],
+            "_removed_table_keys": ["旧表A", " 旧表B ", "旧表A", "", "_note_texts"],
+        })
+        assert clean == {"主表": [{"a": 1}]}
+        # 去重 + strip + 丢弃空值与元数据键（元数据不可经此删除）
+        assert keys == ["旧表A", "旧表B"]
+
+    def test_extract_removed_table_keys_absent_or_invalid(self):
+        from app.services.wp_disclosure_sync_service import _extract_removed_table_keys
+
+        assert _extract_removed_table_keys({"主表": []}) == ({"主表": []}, [])
+        assert _extract_removed_table_keys(None) == ({}, [])
+        # 非列表值 → 忽略（幂等，不抛错）
+        assert _extract_removed_table_keys({"_removed_table_keys": "旧表A"}) == ({}, [])
+
+    def test_drop_removed_tables_skips_pushed_keys(self):
+        """Property 7：删除旧键但绝不删本次推送的表名。"""
+        from app.services.wp_disclosure_sync_service import _drop_removed_tables
+
+        sub = {"旧表A": [{"x": 1}], "新表": [{"y": 2}], "保留表": []}
+        cols = {"旧表A": [{"key": "x"}], "新表": [{"key": "y"}]}
+        dropped = _drop_removed_tables(sub, cols, ["旧表A", "新表"], pushed_keys={"新表"})
+
+        assert dropped == ["旧表A"]
+        assert sub == {"新表": [{"y": 2}], "保留表": []}
+        assert cols == {"新表": [{"key": "y"}]}
+
+    def test_drop_removed_tables_unknown_key_is_noop(self):
+        from app.services.wp_disclosure_sync_service import _drop_removed_tables
+
+        sub = {"主表": [{"a": 1}]}
+        cols = {"主表": [{"key": "a"}]}
+        assert _drop_removed_tables(sub, cols, ["不存在的表"], pushed_keys=set()) == []
+        assert sub == {"主表": [{"a": 1}]}
+        assert cols == {"主表": [{"key": "a"}]}
+
 
 # ─── Router-level tests ──────────────────────────────────────────────────────
 

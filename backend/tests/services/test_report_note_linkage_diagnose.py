@@ -28,25 +28,47 @@ def _note(section: str, table_data: dict | None = None) -> SimpleNamespace:
 
 
 # ---------------------------------------------------------------------------
-# Property 13 —— linkage 业务条目仍为 0（未批量派生写值映射）
+# Property 13 —— linkage 不得批量派生映射（人工逐节核实的 seed 允许存在）
 # ---------------------------------------------------------------------------
 
+# 已人工对照源模板核实的 seed（见 JSON `_backlog`）。新增条目必须逐节核实后同步此处，
+# 这样「批量臆造 N 条」一定撞红线，而合规的增量维护不会被误伤。
+_VERIFIED_SEED_ROW_CODES = {"BS-002"}
+# 决策 1 下本表只做 stale 定向 + 报表行「关联附注」引用，规模应保持很小
+_MAX_BUSINESS_ENTRIES = 5
 
-def test_linkage_config_has_no_business_entries():
+
+def test_linkage_config_has_no_bulk_derived_entries():
     raw = json.loads(_LINKAGE_PATH.read_text(encoding="utf-8"))
     business = [k for k in raw if isinstance(k, str) and not k.startswith("_")]
-    assert business == [], (
-        "report_note_linkage.json 不得批量填写值映射（决策 1）；"
-        f"发现业务条目 {business[:5]}"
+
+    unverified = sorted(set(business) - _VERIFIED_SEED_ROW_CODES)
+    assert not unverified, (
+        "report_note_linkage.json 不得批量派生值映射（决策 1 / Property 13）；"
+        f"发现未登记核实的业务条目 {unverified[:5]}。"
+        "逐节对照源模板核实后，把 row_code 加入 _VERIFIED_SEED_ROW_CODES 并更新 JSON `_backlog`。"
+    )
+    assert len(business) <= _MAX_BUSINESS_ENTRIES, (
+        f"业务条目 {len(business)} 条已超出「逐节增量维护」规模上限 {_MAX_BUSINESS_ENTRIES}，"
+        "疑似批量派生"
     )
     # 元数据仍在（_schema/_rules 保留，禁止臆造的口径说明不得被删）
     assert "_rules" in raw
+    assert "_backlog" in raw
 
 
-def test_linkage_service_loads_empty_mapping():
-    """业务条目为 0 → 服务加载后无 config 目标（cells_updated=0 属正确行为）。"""
+def test_linkage_service_resolves_only_seeded_sections():
+    """未 seed 的章节无 config 目标（cells_updated=0 属正确行为）；已 seed 的章节可定向。
+
+    与 `test_note_readiness_and_stale.py` 同款处理：五、1/八、1 已 seed BS-002，
+    故「无 linkage」前提改用未 seed 的章节表达。
+    """
     svc = ReportNoteLinkage()
-    assert svc._iter_config_targets(_note("五、1")) == []
+    assert svc._iter_config_targets(_note("五、900")) == []
+
+    seeded = svc._iter_config_targets(_note("五、1"))
+    assert [t.row_code for t in seeded] == ["BS-002"]
+    assert seeded[0].origin == "config"
 
 
 # ---------------------------------------------------------------------------

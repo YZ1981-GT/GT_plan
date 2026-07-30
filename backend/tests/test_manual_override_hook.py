@@ -452,8 +452,12 @@ class TestWpDisclosureSyncHook:
         assert result["blocked_by_manual_override"] is False
         assert result["created"] is False
         assert result["rows_synced"] == 1  # 一行
-        # table_data 已被替换为新内容
-        assert note.table_data["sub_table_data"] == new_sub
+        # 契约是「按子表 key 浅合并」：推送的 key 写入，未推送的既有子表保留
+        # （便于 H4 只推「工程物资」而不清空 H2 已同步的在建工程明细；空载荷不清表）
+        assert note.table_data["sub_table_data"] == {
+            "existing_table": [{"name": "原值"}],
+            **new_sub,
+        }
         assert note.table_data["_source"] == "workpaper"
 
     @pytest.mark.asyncio
@@ -483,9 +487,12 @@ class TestWpDisclosureSyncHook:
             propagation_origin="system_recompute",
         )
 
-        # system_recompute 路径不阻断写入
+        # system_recompute 路径不阻断写入（同款浅合并语义）
         assert result["blocked_by_manual_override"] is False
-        assert note.table_data["sub_table_data"] == new_sub
+        assert note.table_data["sub_table_data"] == {
+            "existing_table": [{"name": "原值"}],
+            **new_sub,
+        }
 
 
 # ---------------------------------------------------------------------------

@@ -151,11 +151,20 @@ class TestF4WpCodeOverrides:
         with open(overrides_path, encoding="utf-8") as f:
             return json.load(f)
 
-    def test_all_12_f4_codes_mapped(self, overrides):
-        """全部12个F4编码映射到 'f4-accounts-payable'."""
+    # 渲染分发实际命中的键：附注披露页无尾部编码，`wp_render_config` 只能靠
+    # 「{wp_code}-{sheet_name}」命中；缺失时退回 class_code `C-附注披露` → 泛用
+    # c-note-table，F4 专属披露组件不可达。括号为半角，与源 xlsx tab 名逐字一致。
+    SHEET_NAME_KEYS = [
+        "F4-附注披露信息(上市公司)",
+        "F4-附注披露信息(国企)",
+    ]
+
+    def test_all_14_f4_codes_mapped(self, overrides):
+        """全部14个F4键映射到 'f4-accounts-payable'（12 个 wp_code + 2 个 sheet 名键）."""
         expected_codes = [
             "F4A", "F4-1", "F4-2", "F4-3", "F4-4", "F4-5",
             "F4-6", "F4-7", "F4-8", "F4-9", "F4-note-listed", "F4-note-soe",
+            *self.SHEET_NAME_KEYS,
         ]
         for code in expected_codes:
             assert code in overrides, f"wp_code_overrides缺少 {code}"
@@ -163,10 +172,17 @@ class TestF4WpCodeOverrides:
                 f"{code} 应映射到 f4-accounts-payable，实际为 {overrides[code]}"
             )
 
+    def test_disclosure_sheet_name_keys_present(self, overrides):
+        """附注披露 sheet 名键必须存在，否则专属披露组件被 c-note-table 顶掉."""
+        for key in self.SHEET_NAME_KEYS:
+            assert overrides.get(key) == "f4-accounts-payable", (
+                f"缺少渲染分发键 {key!r}：附注披露页将退回泛用 c-note-table"
+            )
+
     def test_no_extra_f4_codes(self, overrides):
         """不应有意外的F4编码."""
         f4_keys = [k for k in overrides if k.startswith("F4")]
-        assert len(f4_keys) == 12, f"应有12个F4编码，实际有 {len(f4_keys)}: {f4_keys}"
+        assert len(f4_keys) == 14, f"应有14个F4键，实际有 {len(f4_keys)}: {f4_keys}"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

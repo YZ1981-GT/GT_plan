@@ -90,3 +90,101 @@ def test_export_enabled_false_filtered_after_projection():
     note = _workpaper_note()
     tables = exporter._note_tables(note)
     assert len(tables) == 1  # 投影表无 export_enabled=false → 保留
+
+
+# ---------------------------------------------------------------------------
+# _build_two_level_header_rows：row1 不得为 rowspan 列补占位
+#
+# 回归来源：Word 导出附注存货章节实测发现第二行子表头整体右移一格、末列丢失
+# （「存货分类」少末尾「账面价值」；「按组合计提」少第二个「比例(%)」）。
+# 根因：无分组列已用 rowspan=2 纵向合并，row1 再补空占位会挤占一个真实列位，
+# 而 fill_multi_header 本就会跳过被 rowspan 占用的列。
+#
+# spec: f2-inventory-disclosure-template-alignment R11.2
+# ---------------------------------------------------------------------------
+
+INVENTORY_HEADERS = [
+    "项目",
+    "账面余额", "跌价准备/合同履约成本减值准备", "账面价值",
+    "账面余额", "跌价准备/合同履约成本减值准备", "账面价值",
+]
+INVENTORY_GROUPS = [
+    {"group": "期末余额", "start": 1, "span": 3},
+    {"group": "上年年末余额", "start": 4, "span": 3},
+]
+
+
+def test_build_two_level_header_rows_row1_has_only_subcolumns() -> None:
+    """row1 长度 = 分组覆盖的列数（不含 rowspan 列占位）。"""
+    from app.services.note_word_exporter import _build_two_level_header_rows
+
+    row0, row1 = _build_two_level_header_rows(INVENTORY_HEADERS, INVENTORY_GROUPS)
+
+    assert [c["text"] for c in row0] == ["项目", "期末余额", "上年年末余额"]
+    assert row0[0]["rowspan"] == 2
+    assert row0[1]["colspan"] == 3 and row0[2]["colspan"] == 3
+
+    # 6 个子列名，且不含空串占位
+    assert [c["text"] for c in row1] == [
+        "账面余额", "跌价准备/合同履约成本减值准备", "账面价值",
+        "账面余额", "跌价准备/合同履约成本减值准备", "账面价值",
+    ]
+    assert all(c["text"] for c in row1), "row1 不得含空占位（会挤掉末列）"
+
+
+def test_two_level_header_renders_all_subcolumns_in_docx() -> None:
+    """端到端：渲染进 docx 后每个子列名都在正确列位，末列不丢。"""
+    from docx import Document
+
+    from app.services.note_word_exporter import (
+        _build_two_level_header_rows,
+        fill_multi_header,
+    )
+
+    header_rows = _build_two_level_header_rows(INVENTORY_HEADERS, INVENTORY_GROUPS)
+    doc = Document()
+    table = doc.add_table(rows=2, cols=len(INVENTORY_HEADERS))
+    fill_multi_header(table, header_rows, total_cols=len(INVENTORY_HEADERS))
+
+    r1 = [c.text.strip() for c in table.rows[1].cells]
+    # 索引 0 是标签列的纵向合并延续（python-docx 回显主格文本）
+    assert r1[1:] == [
+        "账面余额", "跌价准备/合同履约成本减值准备", "账面价值",
+        "账面余额", "跌价准备/合同履约成本减值准备", "账面价值",
+    ], f"子列名错位或丢失：{r1}"
+
+
+def test_two_level_header_multi_group_with_trailing_plain_column() -> None:
+    """「按组合计提」形态：分组之后还有无分组列（账面价值）也不错位。"""
+    from docx import Document
+
+    from app.services.note_word_exporter import (
+        _build_two_level_header_rows,
+        fill_multi_header,
+    )
+
+    headers = ["组合", "金额", "比例(%)", "金额", "计提标准", "比例(%)", "账面价值"]
+    groups = [
+        {"group": "账面余额", "start": 1, "span": 2},
+        {"group": "存货跌价准备", "start": 3, "span": 3},
+    ]
+
+    row0, row1 = _build_two_level_header_rows(headers, groups)
+    assert [c["text"] for c in row0] == ["组合", "账面余额", "存货跌价准备", "账面价值"]
+    assert [c["text"] for c in row1] == ["金额", "比例(%)", "金额", "计提标准", "比例(%)"]
+
+    doc = Document()
+    table = doc.add_table(rows=2, cols=len(headers))
+    fill_multi_header(table, [row0, row1], total_cols=len(headers))
+    r1 = [c.text.strip() for c in table.rows[1].cells]
+    # 第二个「比例(%)」曾因错位丢失
+    assert r1[1:6] == ["金额", "比例(%)", "金额", "计提标准", "比例(%)"], f"错位：{r1}"
+
+
+def test_all_plain_columns_yields_empty_row1() -> None:
+    """全无分组时 row1 为空（调用方据此判定不走两行表头）。"""
+    from app.services.note_word_exporter import _build_two_level_header_rows
+
+    row0, row1 = _build_two_level_header_rows(["项目", "期初", "期末"], [])
+    assert [c["text"] for c in row0] == ["项目", "期初", "期末"]
+    assert row1 == []

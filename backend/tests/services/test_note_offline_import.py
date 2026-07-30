@@ -56,8 +56,8 @@ def _make_section(
 ) -> dict:
     if rows is None:
         rows = [
-            {"row_type": "data", "label": "银行存款", "cells": [100.0, 200.0]},
-            {"row_type": "data", "label": "现金", "cells": [50.0, 30.0]},
+            {"row_type": "data", "label": "银行存款", "values": [100.0, 200.0]},
+            {"row_type": "data", "label": "现金", "values": [50.0, 30.0]},
         ]
     return {
         "section_id": section_id,
@@ -180,42 +180,47 @@ class TestSectionMatching:
 class TestFieldLevelDiff:
     """C.0.11 — cell-level diff algorithm."""
 
+    # 🔴 两侧形态不同（见 diff_section_cells docstring）：
+    #   local = 附注真源 rows[].values（label 独立字段，不占数据列）
+    #   imported = xlsx 提取中间结构 rows[].cells，cells[0] 是标签列
+    #   cell_key = {row}:{value_idx}（不含标签列）
+
     def test_no_diff_same_data(self):
-        local = {"rows": [{"cells": [100, 200]}]}
-        imported = {"rows": [{"cells": [100, 200]}]}
+        local = {"rows": [{"label": "甲", "values": [100, 200]}]}
+        imported = {"rows": [{"cells": ["甲", 100, 200]}]}
         diffs = diff_section_cells(local, imported)
         assert len(diffs) == 0
 
     def test_modify_diff(self):
-        local = {"rows": [{"cells": [100, 200]}]}
-        imported = {"rows": [{"cells": [100, 300]}]}
+        local = {"rows": [{"label": "甲", "values": [100, 200]}]}
+        imported = {"rows": [{"cells": ["甲", 100, 300]}]}
         diffs = diff_section_cells(local, imported)
         assert len(diffs) == 1
         assert diffs[0].diff_type == DiffType.MODIFY
         assert diffs[0].cell_key == "0:1"
 
     def test_add_diff(self):
-        local = {"rows": [{"cells": [100]}]}
-        imported = {"rows": [{"cells": [100, 200]}]}
+        local = {"rows": [{"label": "甲", "values": [100]}]}
+        imported = {"rows": [{"cells": ["甲", 100, 200]}]}
         diffs = diff_section_cells(local, imported)
         assert any(d.diff_type == DiffType.ADD for d in diffs)
 
     def test_remove_diff(self):
-        local = {"rows": [{"cells": [100, 200]}]}
-        imported = {"rows": [{"cells": [100, None]}]}
+        local = {"rows": [{"label": "甲", "values": [100, 200]}]}
+        imported = {"rows": [{"cells": ["甲", 100, None]}]}
         diffs = diff_section_cells(local, imported)
         assert any(d.diff_type == DiffType.REMOVE for d in diffs)
 
     def test_formula_cell_skipped_if_unchanged(self):
-        local = {"rows": [{"cells": [100]}]}
-        imported = {"rows": [{"cells": [100]}]}
+        local = {"rows": [{"label": "甲", "values": [100]}]}
+        imported = {"rows": [{"cells": ["甲", 100]}]}
         meta = {"0:0": {"mode": "formula", "source": "formula"}}
         diffs = diff_section_cells(local, imported, meta=meta)
         assert len(diffs) == 0
 
     def test_formula_cell_detected_if_changed(self):
-        local = {"rows": [{"cells": [100]}]}
-        imported = {"rows": [{"cells": [999]}]}
+        local = {"rows": [{"label": "甲", "values": [100]}]}
+        imported = {"rows": [{"cells": ["甲", 999]}]}
         meta = {"0:0": {"mode": "formula", "source": "formula"}}
         diffs = diff_section_cells(local, imported, meta=meta)
         assert len(diffs) == 1
@@ -243,9 +248,9 @@ class TestConflictResolution:
     """C.0.12 — apply import with decisions."""
 
     def test_overwrite(self):
-        sections = [_make_section("s1", rows=[{"row_type": "data", "cells": [100]}])]
+        sections = [_make_section("s1", rows=[{"row_type": "data", "label": "甲", "values": [100]}])]
         xlsx_bytes = _export_and_get_bytes(
-            [_make_section("s1", rows=[{"row_type": "data", "cells": [999]}])]
+            [_make_section("s1", rows=[{"row_type": "data", "label": "甲", "values": [999]}])]
         )
         result = apply_import(
             xlsx_bytes, sections, {"s1": ConflictResolution.OVERWRITE}
@@ -271,9 +276,9 @@ class TestConflictResolution:
         assert result.sections_discarded == 1
 
     def test_merge_specific_cells(self):
-        sections = [_make_section("s1", rows=[{"row_type": "data", "cells": [100, 200]}])]
+        sections = [_make_section("s1", rows=[{"row_type": "data", "label": "甲", "values": [100, 200]}])]
         xlsx_bytes = _export_and_get_bytes(
-            [_make_section("s1", rows=[{"row_type": "data", "cells": [999, 888]}])]
+            [_make_section("s1", rows=[{"row_type": "data", "label": "甲", "values": [999, 888]}])]
         )
         result = apply_import(
             xlsx_bytes, sections,
@@ -369,7 +374,7 @@ class TestRoundTripPBT:
         for i in range(n_sections):
             headers = [f"列{c}" for c in range(n_cols)]
             rows = [
-                {"row_type": "data", "cells": [float(r * n_cols + c) for c in range(n_cols)]}
+                {"row_type": "data", "label": f"行{r}", "values": [float(r * n_cols + c) for c in range(n_cols)]}
                 for r in range(n_rows)
             ]
             sections.append({
@@ -415,8 +420,8 @@ class TestRoundTripPBT:
         """Simple deterministic round-trip test."""
         sections = [
             _make_section("s1", "测试", rows=[
-                {"row_type": "data", "cells": [100.0, 200.0, "文本"]},
-                {"row_type": "data", "cells": [300.0, 400.0, "另一个"]},
+                {"row_type": "data", "label": "甲", "values": [100.0, 200.0, "文本"]},
+                {"row_type": "data", "label": "乙", "values": [300.0, 400.0, "另一个"]},
             ])
         ]
         xlsx_bytes, hash1 = export_sections_to_xlsx(sections)

@@ -96,3 +96,65 @@ async def test_f2_ai_generate_rejects_unknown_section():
             json={"section": "unknown-section", "existingContent": ""},
         )
     assert response.status_code == 400
+
+
+# ════════════════════════════════════════════════════════════════════
+# 附注披露 section 的 AI 覆盖（spec f2-inventory-disclosure-template-alignment
+# Task 13.1 / 13.5）：两个披露 Tab 的每个文本域都要能调 AI，故 11 个 section
+# 必须既在 _SUPPORTED_SECTIONS 中，又有非空 prompt（缺 prompt 会退化成无指令生成）。
+# ════════════════════════════════════════════════════════════════════
+
+_DISCLOSURE_SECTIONS = [
+    "listed-note-category",
+    "listed-note-nrv",
+    "listed-note-provision",
+    "listed-note-borrow",
+    "listed-note-amort",
+    "listed-note-re",
+    "soe-note-category",
+    "soe-note-borrow",
+    "soe-note-amort",
+    "soe-note-land",
+    "soe-note",
+]
+
+
+@pytest.mark.parametrize("section", _DISCLOSURE_SECTIONS)
+def test_disclosure_section_supported_and_has_prompt(section: str):
+    from app.routers.wp_render_strategies import _f2_inventory_main_ai as mod
+
+    assert section in mod._SUPPORTED_SECTIONS, f"{section} 未登记到 _SUPPORTED_SECTIONS"
+    prompt = mod._SECTION_PROMPTS.get(section)
+    assert prompt, f"{section} 缺少 prompt（会退化为无指令生成）"
+    assert len(prompt) >= 20, f"{section} 的 prompt 过短，缺少审计口径约束：{prompt!r}"
+
+
+def test_disclosure_prompts_reference_source_template_semantics():
+    """披露 prompt 必须带口径约束，避免自造披露内容（铁律：禁止自造披露内容）。"""
+    from app.routers.wp_render_strategies import _f2_inventory_main_ai as mod
+
+    # 借款费用资本化 / 合同履约成本摊销 / 土地使用权：各自的专有口径关键词
+    assert "借款费用" in mod._SECTION_PROMPTS["listed-note-borrow"]
+    assert "借款费用" in mod._SECTION_PROMPTS["soe-note-borrow"]
+    assert "合同履约成本" in mod._SECTION_PROMPTS["listed-note-amort"]
+    assert "合同履约成本" in mod._SECTION_PROMPTS["soe-note-amort"]
+    assert "土地" in mod._SECTION_PROMPTS["soe-note-land"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("section", _DISCLOSURE_SECTIONS)
+async def test_f2_ai_generate_accepts_disclosure_sections(section: str):
+    with patch(
+        "app.routers.wp_render_strategies._f2_inventory_main_ai.chat_completion",
+        new_callable=AsyncMock,
+    ) as mock_llm:
+        mock_llm.return_value = "本期不存在需披露的相关事项。"
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.post(
+                "/api/workpapers/test-wp-id/f2/ai-generate",
+                json={"section": section, "existingContent": "", "relatedContext": {}},
+            )
+        assert response.status_code == 200, f"{section} 被拒绝：{response.text}"
+        payload = response.json().get("data", response.json())
+        assert len(payload["content"]) > 0

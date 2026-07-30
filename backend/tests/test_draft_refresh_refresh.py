@@ -433,7 +433,11 @@ async def test_marked_human_edited_then_refresh_skips_it(db_session: AsyncSessio
 
 
 def _seed_working_paper(*, prefill_stale: bool = False) -> WorkingPaper:
-    """最小 WorkingPaper 行（sqlite 不强制 FK；仅供 trigger_recalc 的 mark_stale 命中）。"""
+    """最小 WorkingPaper 行（sqlite 不强制 FK；仅供 trigger_recalc 的 mark_stale 命中）。
+
+    带 ``parsed_data.html_data``：mark_stale 只标记「持有已落库派生值」的底稿，
+    从未编辑过的底稿渲染时实时取数、不存在过期状态，不再被无条件标脏。
+    """
     return WorkingPaper(
         project_id=PROJECT_ID,
         wp_index_id=uuid.uuid4(),
@@ -441,6 +445,7 @@ def _seed_working_paper(*, prefill_stale: bool = False) -> WorkingPaper:
         source_type=WpSourceType.manual,
         status=WpFileStatus.draft,
         prefill_stale=prefill_stale,
+        parsed_data={"html_data": {"rows": []}},
     )
 
 

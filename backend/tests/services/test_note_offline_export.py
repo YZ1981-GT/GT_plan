@@ -50,11 +50,14 @@ def _make_section(
     provenance: dict | None = None,
 ) -> dict:
     """Create a mock section dict."""
+    # 🔴 真实结构：单元格值字段是 `values`（非 `cells`），行级 `_cell_meta` /
+    # `_cell_modes` 按**列索引**键（"0"/"1"…）内嵌在每行；首列是 label，其后才是 values。
+    # 早期版本误读 `cells` / section 级 `_cell_meta` 导致导出全空（2026-06-13 修）。
     if rows is None:
         rows = [
-            {"row_type": "data", "label": "银行存款", "cells": [100.0, 200.0]},
-            {"row_type": "data", "label": "现金", "cells": [50.0, None]},
-            {"row_type": "dynamic_data", "label": "其他", "cells": [10.0, 20.0]},
+            {"row_type": "data", "label": "银行存款", "values": [100.0, 200.0]},
+            {"row_type": "data", "label": "现金", "values": [50.0, None]},
+            {"row_type": "dynamic_data", "label": "其他", "values": [10.0, 20.0]},
         ]
     return {
         "section_id": section_id,
@@ -84,6 +87,15 @@ def _make_sections(n: int = 3) -> list[dict]:
 def _load_wb(xlsx_bytes: bytes):
     """Load workbook from bytes."""
     return load_workbook(BytesIO(xlsx_bytes))
+
+
+def _first_data_row(ws, label: str) -> int:
+    """按 label 定位数据行行号（表名行/编制提示行可选，故不写死起始行）。"""
+    for row in range(1, ws.max_row + 1):
+        val = ws.cell(row=row, column=1).value
+        if isinstance(val, str) and val.replace("★ ", "") == label:
+            return row
+    raise AssertionError(f"未找到 label={label!r} 的数据行")
 
 
 # ---------------------------------------------------------------------------
@@ -186,22 +198,51 @@ class TestCellFormatting:
         assert _classify_cell({"source": "manual", "is_required": True}) == "required"
 
     def test_fill_applied_in_xlsx(self):
+        """着色只作用于 value 列（列 1 是 label 列，不着色）；mode 决定颜色。"""
         section = _make_section(
-            cell_meta={
-                "0:0": {"source": "manual", "mode": "manual"},
-                "0:1": {"source": "formula", "mode": "formula"},
-            }
+            rows=[
+                {
+                    "row_type": "data",
+                    "label": "银行存款",
+                    "values": [100.0, 200.0],
+                    # 行级 _cell_modes 按列索引键：第 0 列手工可编辑、第 1 列公式
+                    "_cell_modes": {"0": "manual", "1": "formula"},
+                },
+            ],
         )
         xlsx_bytes, _ = export_sections_to_xlsx([section])
         wb = _load_wb(xlsx_bytes)
-        # Find the section sheet (3rd sheet)
         ws = wb.worksheets[2]
-        # Row 4 (data starts at row 4), col 1 = editable (yellow)
-        cell_a4 = ws.cell(row=4, column=1)
-        assert cell_a4.fill.start_color.rgb == "FFFFFF00"
-        # Row 4, col 2 = formula (gray)
-        cell_b4 = ws.cell(row=4, column=2)
-        assert cell_b4.fill.start_color.rgb == "FFD9D9D9"
+
+        data_row = _first_data_row(ws, "银行存款")
+        # value 列 1（Excel B 列）= manual → 可编辑黄
+        cell_b = ws.cell(row=data_row, column=2)
+        assert cell_b.fill.start_color.rgb == FILL_EDITABLE.start_color.rgb
+        assert cell_b.protection.locked is False
+        # value 列 2（Excel C 列）= formula → 公式灰且锁定
+        cell_c = ws.cell(row=data_row, column=3)
+        assert cell_c.fill.start_color.rgb == FILL_FORMULA.start_color.rgb
+        assert cell_c.protection.locked is True
+        # label 列不着色（避免误导审计师以为行名可编辑）
+        assert ws.cell(row=data_row, column=1).fill.start_color.rgb in ("00000000", None)
+
+    def test_binding_id_locks_cell(self):
+        """行级 _cell_meta.binding_id → 锁定色（系统取数，禁止离线改写）。"""
+        section = _make_section(
+            rows=[
+                {
+                    "row_type": "data",
+                    "label": "银行存款",
+                    "values": [100.0],
+                    "_cell_meta": {"0": {"binding_id": "bind-1", "source": "trial_balance"}},
+                },
+            ],
+        )
+        xlsx_bytes, _ = export_sections_to_xlsx([section])
+        ws = _load_wb(xlsx_bytes).worksheets[2]
+        cell = ws.cell(row=_first_data_row(ws, "银行存款"), column=2)
+        assert cell.fill.start_color.rgb == FILL_LOCKED.start_color.rgb
+        assert cell.protection.locked is True
 
 
 # ---------------------------------------------------------------------------
@@ -210,53 +251,52 @@ class TestCellFormatting:
 
 
 class TestCellComments:
-    """C.0.4 — formula + provenance comments."""
+    """C.0.4 — 公式/溯源信息的承载方式。
 
-    def test_formula_comment(self):
+    🔴 已**不再写 openpyxl Comment**：legacy VML 批注 + sheet protection 组合在 WPS 下
+    会触发「无法打开指定的文件」。公式/绑定溯源改由 **4 色语义 + 隐藏 `_meta_` sheet**
+    完整承载（见 `_render_section_table` 内注释）。本组测试据此断言"信息不丢 + 不写批注"。
+    """
+
+    def test_never_writes_openpyxl_comments(self):
+        """任何单元格都不得带 Comment（WPS 兼容硬约束）。"""
+        section = _make_section(
+            formulas={"0:1": {"expression": "=SUM(B2:B10)", "type": "formula"}},
+            provenance={"0:1": {"source": "wp_data", "wp_code": "h08"}},
+        )
+        xlsx_bytes, _ = export_sections_to_xlsx([section])
+        ws = _load_wb(xlsx_bytes).worksheets[2]
+        offenders = [
+            c.coordinate
+            for row in ws.iter_rows()
+            for c in row
+            if c.comment is not None
+        ]
+        assert offenders == [], f"导出不得写批注（WPS 兼容），发现 {offenders[:5]}"
+
+    def test_formula_survives_in_meta_sheet(self):
         section = _make_section(
             formulas={"0:1": {"expression": "=SUM(B2:B10)", "type": "formula"}}
         )
         xlsx_bytes, _ = export_sections_to_xlsx([section])
         wb = _load_wb(xlsx_bytes)
-        ws = wb.worksheets[2]
-        cell = ws.cell(row=4, column=2)
-        assert cell.comment is not None
-        assert "公式: =SUM(B2:B10)" in cell.comment.text
+        payload = _decompress_meta(wb["_meta_"].cell(row=1, column=2).value)
+        formulas = payload["section_cash"]["formulas"]
+        assert formulas["0:1"]["expression"] == "=SUM(B2:B10)"
 
-    def test_provenance_wp_data_comment(self):
-        section = _make_section(
-            provenance={"0:1": {"source": "wp_data", "wp_code": "h08"}}
-        )
+    def test_bindings_survive_in_meta_sheet(self):
+        """溯源（binding：wp_data / trial_balance）经 `_meta_` 往返不丢。"""
+        section = _make_section()
+        section["_bindings"] = {
+            "0:0": {"source": "trial_balance", "account_codes": ["1001", "1002"]},
+            "0:1": {"source": "wp_data", "wp_code": "h08"},
+        }
         xlsx_bytes, _ = export_sections_to_xlsx([section])
         wb = _load_wb(xlsx_bytes)
-        ws = wb.worksheets[2]
-        cell = ws.cell(row=4, column=2)
-        assert cell.comment is not None
-        assert "wp_data" in cell.comment.text
-        assert "h08" in cell.comment.text
-
-    def test_provenance_tb_comment(self):
-        section = _make_section(
-            provenance={"0:0": {"source": "trial_balance", "account_codes": ["1001", "1002"]}}
-        )
-        xlsx_bytes, _ = export_sections_to_xlsx([section])
-        wb = _load_wb(xlsx_bytes)
-        ws = wb.worksheets[2]
-        cell = ws.cell(row=4, column=1)
-        assert cell.comment is not None
-        assert "试算表" in cell.comment.text
-
-    def test_no_comment_when_disabled(self):
-        section = _make_section(
-            formulas={"0:1": {"expression": "=SUM(B2:B10)"}}
-        )
-        xlsx_bytes, _ = export_sections_to_xlsx(
-            [section], include_formulas=False, include_provenance=False
-        )
-        wb = _load_wb(xlsx_bytes)
-        ws = wb.worksheets[2]
-        cell = ws.cell(row=4, column=2)
-        assert cell.comment is None
+        payload = _decompress_meta(wb["_meta_"].cell(row=1, column=2).value)
+        bindings = payload["section_cash"]["bindings"]
+        assert bindings["0:0"]["account_codes"] == ["1001", "1002"]
+        assert bindings["0:1"]["wp_code"] == "h08"
 
 
 # ---------------------------------------------------------------------------
@@ -388,8 +428,8 @@ class TestTocSheet:
 
     def test_completeness_calculation(self):
         section = _make_section(rows=[
-            {"row_type": "data", "cells": [100, 200]},
-            {"row_type": "data", "cells": [None, ""]},
+            {"row_type": "data", "values": [100, 200]},
+            {"row_type": "data", "values": [None, ""]},
         ])
         assert _calc_completeness(section) == 50  # 2/4 filled
 
