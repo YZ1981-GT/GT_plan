@@ -90,7 +90,7 @@
           v-if="staleCount > 0"
           :stale-count="staleCount"
           @recalc="onRecalcStale"
-          @detail="$router.push(`/projects/${route.params.projectId}/workpapers?filter=stale`)"
+          @detail="onShowStaleDetail"
         />
         <router-view v-slot="{ Component, route: viewRoute }">
           <ErrorBoundary :key="viewRoute.fullPath">
@@ -170,6 +170,22 @@ async function loadStaleCount() {
   } catch { staleCount.value = 0 }
 }
 
+/**
+ * 「查看详情」→ 底稿列表的「仅看待重算」视图。
+ *
+ * 必须带 view=list（筛选栏只在列表视图渲染）+ year（WorkpaperList.currentYear 读
+ * route.query.year，漏传会退到当前自然年导致跨年度串数据）。
+ */
+function onShowStaleDetail() {
+  const pid = route.params.projectId as string
+  if (!pid) return
+  const year = projectStore.year || Number(route.query.year) || new Date().getFullYear() - 1
+  router.push({
+    path: `/projects/${pid}/workpapers`,
+    query: { view: 'list', filter: 'stale', year: String(year) },
+  })
+}
+
 async function onRecalcStale() {
   const pid = route.params.projectId as string
   if (!pid) return
@@ -177,11 +193,18 @@ async function onRecalcStale() {
   // 漏传会爆 422 "[{type:missing,loc:[query,year],msg:Field required}]"
   const year = projectStore.year || Number(route.query.year) || new Date().getFullYear() - 1
   try {
-    await import('@/services/apiProxy').then(m =>
+    const resp: any = await import('@/services/apiProxy').then(m =>
       m.api.post(`/api/projects/${pid}/trial-balance/recalc`, undefined, { params: { year } })
     )
-    staleCount.value = 0
-    ElMessage.success('已触发全量重算')
+    // 以后端返回的 stale 收敛结果为准复查计数，不再乐观置 0
+    // （置 0 只是把横条藏到下次刷新，用户会以为重算没生效）
+    await loadStaleCount()
+    const kept = Number(resp?.stale_resolution?.kept_stale ?? 0)
+    if (kept > 0) {
+      ElMessage.warning(`重算完成，仍有 ${kept} 张底稿正文已保存需手工刷新（点「查看详情」）`)
+    } else {
+      ElMessage.success('重算完成，过期数据已同步')
+    }
   } catch (err: any) {
     handleApiError(err, '全量重算')
   }

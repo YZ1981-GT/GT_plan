@@ -105,9 +105,12 @@
 .gt-de-placeholder-msg { flex: 1; line-height: 1.5; }
 /* ── P0-3 树节点「待补充」标签 ── */
 .gt-de-tree-placeholder-tag { margin-left: 4px; font-size: 10px; vertical-align: middle; flex-shrink: 0; }
-/* ── P2-9：附注树快捷筛选栏 ── */
+/* ── P2-9：附注树快捷筛选栏（全部 / 未编制 / 校验异常 / 待补充） ── */
+/* 注：el-segmented 内部类名与 teleport 的 tooltip 样式在 DisclosureEditor.vue 的非 scoped style 块 */
 .gt-de-tree-filter-bar { padding: 4px 6px 6px; }
-.gt-de-tree-filter-bar .el-segmented { width: 100%; }
+.gt-de-tree-filter-label { display: inline-flex; align-items: center; justify-content: center; gap: 3px; font-size: 13px; line-height: 1.4; white-space: nowrap; }
+.gt-de-tree-filter-label.has-hit::after { content: ''; width: 5px; height: 5px; border-radius: 50%; background: var(--el-color-warning); flex-shrink: 0; }
+.gt-de-tree-filter-label.is-error-hit::after { background: var(--el-color-danger); }
 /* ── P0-1：就绪度按钮徽标（未同步 + 校验错误章节数）── */
 .gt-de-readiness-badge { display: inline-block; margin-left: 4px; padding: 0 5px; min-width: 15px; line-height: 15px; font-size: 11px; text-align: center; border-radius: 8px; background: var(--el-color-danger); color: #fff; }
 .gt-de-tree-stale-dot { font-size: 10px; margin-left: 4px; flex-shrink: 0; cursor: help; }
@@ -172,6 +175,11 @@
 /* ── Stale banner ── */
 .gt-stale-banner { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #fff8e1; border-radius: 6px; margin-bottom: 8px; font-size: var(--gt-font-size-xs); }
 .gt-stale-text { flex: 1; color: var(--gt-color-text-regular); }
+/* 待重算底稿明细（横幅「查看明细」popover） */
+.gt-stale-detail__title { font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--gt-color-text-primary); }
+.gt-stale-detail__row { display: flex; align-items: center; gap: 8px; padding: 4px 0; border-bottom: 1px dashed var(--gt-color-border-lighter); font-size: 12px; }
+.gt-stale-detail__name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--gt-color-text-regular); }
+.gt-stale-detail__reason { color: var(--gt-color-text-secondary); flex-shrink: 0; max-width: 220px; }
 
 
 /* ── #20: 首次同步引导横幅 ── */

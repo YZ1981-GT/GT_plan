@@ -14,19 +14,28 @@
  *       小计/合计只累加非缩进行（缩进行是「其中：」明细，避免重复计入）。
  */
 import { ref, computed, watch, type Ref } from 'vue'
+import {
+  buildDisclosureSubtotal,
+  recalcDisclosureRow,
+  type J1DisclosureRow,
+  type J1DisclosureVariant,
+} from './j1DisclosureRowModel'
+import {
+  applyDetailPullToDisclosureRows,
+  J1_SOE_SHORT_TERM_ABSORB,
+  type J1DetailPullResult,
+  type J1DetailPullRow,
+} from './j1DisclosureDetailPull'
+import { J1_DETAIL_SECTION_KEYS } from './useJ1Adjudication'
 
-export type J1DisclosureVariant = 'listed' | 'soe'
-
-export interface J1DisclosureRow {
-  id: string
-  label: string
-  category: string
-  indent?: number
-  beginBalance: number
-  increase: number
-  decrease: number
-  endBalance: number
-  isSubtotal?: boolean
+// 行模型与合计口径已抽到零依赖的 leaf 模块（`j1DisclosureRowModel`），
+// 供 `j1DisclosureDetailPull` / `j1NoteSectionMap` 共用而不产生循环依赖。
+// 此处 re-export，既有 `from '.../useJ1DisclosureSections'` 的 import 保持可用。
+export {
+  buildDisclosureSubtotal,
+  recalcDisclosureRow,
+  type J1DisclosureRow,
+  type J1DisclosureVariant,
 }
 
 export interface ChecklistItem {
@@ -47,32 +56,6 @@ export interface UseJ1DisclosureSectionsOptions {
   isReadonly?: Ref<boolean>
   /** 说明文本键（listed 有多段，soe 单段） */
   noteKeys: string[]
-}
-
-/** 期末余额 = 期初 + 增加 − 减少 */
-export function recalcDisclosureRow(row: J1DisclosureRow): J1DisclosureRow {
-  row.endBalance = (row.beginBalance || 0) + (row.increase || 0) - (row.decrease || 0)
-  return row
-}
-
-/** 小计：只累加非缩进行（缩进行为「其中：」明细） */
-export function buildDisclosureSubtotal(
-  id: string,
-  label: string,
-  category: string,
-  rows: J1DisclosureRow[],
-): J1DisclosureRow {
-  const top = rows.filter(r => !r.indent && !r.isSubtotal)
-  return {
-    id,
-    label,
-    category,
-    isSubtotal: true,
-    beginBalance: top.reduce((s, r) => s + (r.beginBalance || 0), 0),
-    increase: top.reduce((s, r) => s + (r.increase || 0), 0),
-    decrease: top.reduce((s, r) => s + (r.decrease || 0), 0),
-    endBalance: top.reduce((s, r) => s + (r.endBalance || 0), 0),
-  }
 }
 
 // ── 从 J1-1 审定表 / J1-2 明细表带入 ────────────────────────────────────────
@@ -356,6 +339,35 @@ export function useJ1DisclosureSections(options: UseJ1DisclosureSectionsOptions)
     return matched
   }
 
+  /**
+   * 明细两表「从 J1-2 明细表带入」（审定口径）。
+   *
+   * 源模板里披露明细表**每一行**都引用 J1-2（`A18='明细表J1-2 '!J13` …），
+   * 历史实现只带入了汇总表 4~5 行，短期薪酬 12 行 + 设定提存 8 行全靠手打。
+   *
+   * 只覆盖匹配到的行（未匹配的披露行保持原值，不清零手工录入）。
+   */
+  function pullDetailSections(): {
+    shortTerm: J1DetailPullResult
+    postEmployment: J1DetailPullResult
+  } {
+    const shortTerm = applyDetailPullToDisclosureRows(
+      shortTermData.value,
+      readJson<J1DetailPullRow[]>(J1_DETAIL_SECTION_KEYS.shortTerm) || [],
+      // 🔴 仅国企：源模板 `B28='明细表J1-2 '!J30+J31` 把「非货币性福利」并入
+      //    「其他短期薪酬」；上市披露表有独立该行，不得套用
+      variant === 'soe' ? { absorb: J1_SOE_SHORT_TERM_ABSORB } : {},
+    )
+    const postEmployment = applyDetailPullToDisclosureRows(
+      postEmploymentData.value,
+      readJson<J1DetailPullRow[]>(J1_DETAIL_SECTION_KEYS.postEmployment) || [],
+    )
+    const touched =
+      shortTerm.matched + shortTerm.appended + postEmployment.matched + postEmployment.appended
+    if (touched > 0) persist()
+    return { shortTerm, postEmployment }
+  }
+
   // 深度监听兜底：项目名称等非金额字段的修改（模板未挂 @change）也会落库。
   // hydrate 期间抑制，避免刚加载就回写一次。
   let hydrating = false
@@ -390,6 +402,7 @@ export function useJ1DisclosureSections(options: UseJ1DisclosureSectionsOptions)
     adjudicationEndTotal,
     summaryVsAdjudicationDiff,
     pullFromSources,
+    pullDetailSections,
     /** hydrate（内部抑制 deep-watch 回写，避免加载即 PUT） */
     hydrate: hydrateSafe,
     persist,

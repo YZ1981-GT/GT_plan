@@ -43,7 +43,8 @@ export interface UseNoteRefreshOptions {
   currentNote: Ref<{ note_section: string } | null>
   fetchDetail: (noteSection: string) => Promise<void>
   fetchTree: () => Promise<void>
-  staleRecalc: () => Promise<void>
+  /** 触发试算表重算；返回后端 stale 收敛结果（cleared/refilled/kept_stale）供提示 */
+  staleRecalc: () => Promise<{ cleared?: number; refilled?: number; kept_stale?: number } | null | void>
   /** 清空全部章节详情缓存（「全部刷新」用，使所有章节都反映最新科目数据而非仅当前节） */
   invalidateAllCache?: () => void
 }
@@ -205,13 +206,30 @@ export function useNoteRefresh(options: UseNoteRefreshOptions): UseNoteRefreshRe
   }
 
   async function onStaleRecalc() {
-    await staleRecalc()
+    let resolution: { kept_stale?: number } | null | void = null
+    try {
+      resolution = await staleRecalc()
+    } catch (e) {
+      // 重算失败必须让用户看见（此前非 2xx 被 validateStatus 吞掉，表现为「点了没反应」）
+      handleApiError(e, '试算表重算')
+      return
+    }
     // 重算试算表后，再触发附注从底稿刷新获取差异化提示
     try {
       const result = await refreshDisclosureFromWorkpapers(projectId.value, year.value)
       showRefreshResultMessage(result)
     } catch { /* stale recalc 已完成，附注刷新失败静默 */ }
     await fetchTree()
+
+    const kept = Number(resolution?.kept_stale ?? 0)
+    if (kept > 0) {
+      ElMessage({
+        type: 'warning',
+        message: `试算表已重算；仍有 ${kept} 张底稿正文已保存、重算不覆盖，需打开该底稿刷新后重新保存`,
+        duration: 6000,
+        customClass: 'gt-msg-purple',
+      })
+    }
   }
 
   /** 底稿保存事件监听（自动同步附注数据） */

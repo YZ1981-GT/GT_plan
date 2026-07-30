@@ -75,6 +75,12 @@ export interface WorkpaperDetail {
   wp_name?: string
   audit_cycle?: string
   qc_passed?: boolean | null
+  /**
+   * 预填数据是否过期（上游试算表/账套变更后待重算）。
+   * 后端 `working_paper_service.list_workpapers` / 可见性分页 envelope 均返回该字段，
+   * `normalizeWorkpaper` 透传；底稿列表据此提供「仅看待重算」过滤与行内标记。
+   */
+  prefill_stale?: boolean
   /** 解析后的工作簿数据（含 user_overrides 等扩展信息），后端按需返回 */
   parsed_data?: Record<string, any> | null
   /** 业务年度（部分接口返回） */

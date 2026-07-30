@@ -169,6 +169,22 @@
       <span class="gt-stale-text">
         上游数据已变更（{{ stale.staleCount.value }} 张底稿待重算），附注数据可能过时
       </span>
+      <el-popover placement="bottom-end" trigger="click" width="460" popper-class="gt-stale-detail-pop">
+        <template #reference>
+          <el-button size="small" text>查看明细</el-button>
+        </template>
+        <div class="gt-stale-detail">
+          <div class="gt-stale-detail__title">待重算底稿（{{ stale.staleCount.value }} 张）</div>
+          <el-scrollbar max-height="300px">
+            <div v-for="it in stale.staleItems.value" :key="it.id" class="gt-stale-detail__row">
+              <el-tag size="small" effect="plain">{{ it.wp_code }}</el-tag>
+              <span class="gt-stale-detail__name">{{ it.wp_name }}</span>
+              <span class="gt-stale-detail__reason">{{ it.stale_reason || '上游数据变更' }}</span>
+            </div>
+            <el-empty v-if="stale.staleItems.value.length === 0" description="无明细" :image-size="60" />
+          </el-scrollbar>
+        </div>
+      </el-popover>
       <el-button size="small" type="primary" :loading="stale.loading.value" @click="onStaleRecalc">
         🔄 点击重算
       </el-button>
@@ -210,7 +226,27 @@
         <el-input v-model="treeSearch" size="small" placeholder="搜索章节..." clearable class="gt-de-tree-search" />
         <!-- P2-9：附注树快捷筛选 -->
         <div class="gt-de-tree-filter-bar">
-          <el-segmented v-model="treeFilter" :options="treeFilterOptions" size="small" />
+          <el-segmented v-model="treeFilter" :options="treeFilterOptions" size="small">
+            <template #default="{ item }">
+              <el-tooltip placement="bottom" :show-after="200" popper-class="gt-de-tree-filter-tip">
+                <template #content>
+                  <div class="gt-de-tip-title">{{ item.label }}</div>
+                  <div class="gt-de-tip-desc">{{ item.tip }}</div>
+                  <div class="gt-de-tip-count">
+                    当前命中：<b>{{ treeFilterCounts[item.value] }}</b> 个章节<span v-if="item.value !== 'all'"> / 共 {{ treeFilterCounts.all }} 个</span>
+                  </div>
+                  <div class="gt-de-tip-rule">判定依据：{{ item.rule }}</div>
+                </template>
+                <span
+                  class="gt-de-tree-filter-label"
+                  :class="{
+                    'has-hit': item.value !== 'all' && treeFilterCounts[item.value] > 0,
+                    'is-error-hit': item.value === 'has_findings' && treeFilterCounts[item.value] > 0,
+                  }"
+                >{{ item.label }}</span>
+              </el-tooltip>
+            </template>
+          </el-segmented>
         </div>
         <div class="gt-de-tree-wrap">
           <!-- 树形视图 -->
@@ -1428,11 +1464,70 @@ const {
 // ─── P2-9：附注树快捷筛选 ──────────────────────────────────────────────────────
 const treeFilter = ref<'all' | 'incomplete' | 'has_findings' | 'has_placeholder'>('all')
 const treeFilterOptions = [
-  { label: '全部', value: 'all' },
-  { label: '未编制', value: 'incomplete' },
-  { label: '校验异常', value: 'has_findings' },
-  { label: '待补充', value: 'has_placeholder' },
+  {
+    label: '全部',
+    value: 'all',
+    tip: '不做筛选，显示左侧目录树的全部附注章节。',
+    rule: '仅受上方「搜索章节」关键词影响。',
+  },
+  {
+    label: '未编制',
+    value: 'incomplete',
+    tip: '只看还没动过的章节：既没有填写附注正文，也没有录入任何表格数据，用来快速定位待编制的工作量。',
+    rule: '正文为空 且 无表格数据。',
+  },
+  {
+    label: '校验异常',
+    value: 'has_findings',
+    tip: '只看最近一次附注校验命中问题的章节（如与试算表/报表金额不平、合计不符、必填缺失），用来集中修错。',
+    rule: '服务端校验结果存在 错误 或 警告。',
+  },
+  {
+    label: '待补充',
+    value: 'has_placeholder',
+    tip: '只看正文里还留着占位表述的章节，通常是 AI 生成或模板预填后需要人工补齐具体内容的地方。',
+    rule: '正文含「需补充」「暂未」「待确认」等占位词。',
+  },
 ]
+
+/** 单个节点是否命中指定筛选条件 */
+function matchesTreeFilter(node: any, filter: string): boolean {
+  const d = node.data || node
+  switch (filter) {
+    case 'incomplete':
+      return !d.text_content && !d.has_data
+    case 'has_findings':
+      return (d.findings?.error > 0) || (d.findings?.warning > 0)
+    case 'has_placeholder':
+      return /需补充|暂未|待确认/.test(d.text_content || '')
+    default:
+      return true
+  }
+}
+
+/** 遍历分组树，收集所有叶子章节节点 */
+function collectTreeLeaves(nodes: any[]): any[] {
+  const out: any[] = []
+  const walk = (list: any[]) => {
+    for (const n of list || []) {
+      if (n.children?.length) walk(n.children)
+      else if (!n.isGroup) out.push(n)
+    }
+  }
+  walk(nodes)
+  return out
+}
+
+/** 各筛选项命中数量（随搜索关键词联动，供 tooltip / 徽标展示） */
+const treeFilterCounts = computed<Record<string, number>>(() => {
+  const leaves = collectTreeLeaves(baseFilteredTreeData.value)
+  return {
+    all: leaves.length,
+    incomplete: leaves.filter(n => matchesTreeFilter(n, 'incomplete')).length,
+    has_findings: leaves.filter(n => matchesTreeFilter(n, 'has_findings')).length,
+    has_placeholder: leaves.filter(n => matchesTreeFilter(n, 'has_placeholder')).length,
+  }
+})
 
 /** P0-3 树节点标记：叶子节点 text_content 是否含占位文本 */
 function nodeHasPlaceholderText(node: any): boolean {
@@ -1448,19 +1543,7 @@ const filteredTreeData = computed(() => {
   const base = baseFilteredTreeData.value
   if (treeFilter.value === 'all') return base
 
-  const matchesFilter = (node: any): boolean => {
-    const d = node.data || node
-    switch (treeFilter.value) {
-      case 'incomplete':
-        return !d.text_content && !d.has_data
-      case 'has_findings':
-        return (d.findings?.error > 0) || (d.findings?.warning > 0)
-      case 'has_placeholder':
-        return /需补充|暂未|待确认/.test(d.text_content || '')
-      default:
-        return true
-    }
-  }
+  const matchesFilter = (node: any): boolean => matchesTreeFilter(node, treeFilter.value)
 
   // 过滤各分组节点的子节点
   return base.map(group => {
@@ -3220,6 +3303,16 @@ function getCellValidationError(rowIndex: number, colIndex: number): string {
 
 <!-- 全局样式：teleport 到 body 的右键菜单脱离 scoped 作用域 -->
 <style>
+/* 附注树快捷筛选：el-segmented 内部元素 + teleport 到 body 的 tooltip 均在 scoped 作用域外 */
+.gt-de-tree-filter-bar .el-segmented { width: 100%; font-size: 13px; }
+.gt-de-tree-filter-bar .el-segmented__item { font-size: 13px; padding: 0 2px; }
+.gt-de-tree-filter-bar .el-segmented__item-label { font-size: 13px; }
+.gt-de-tree-filter-tip { max-width: 300px; }
+.gt-de-tree-filter-tip .gt-de-tip-title { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+.gt-de-tree-filter-tip .gt-de-tip-desc { font-size: 12px; line-height: 1.6; }
+.gt-de-tree-filter-tip .gt-de-tip-count { font-size: 12px; line-height: 1.6; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.gt-de-tree-filter-tip .gt-de-tip-rule { font-size: 11px; line-height: 1.6; margin-top: 4px; padding-top: 4px; border-top: 1px solid rgba(255, 255, 255, 0.25); opacity: 0.85; }
+
 .gt-de-tree-ctx-menu { position: fixed; z-index: 9999; background: var(--gt-color-bg-white, #fff); border: 1px solid var(--gt-color-border-purple, #d8caee); border-radius: 6px; box-shadow: 0 4px 16px rgba(75, 45, 119, 0.18); padding: 4px 0; min-width: 160px; font-size: var(--gt-font-size-xs, 12px); }
 .gt-de-tree-ctx-item { padding: 6px 14px; cursor: pointer; color: var(--gt-color-text-primary, #303133); white-space: nowrap; user-select: none; }
 .gt-de-tree-ctx-item:hover { background: var(--gt-color-primary-bg, #f5f0ff); }

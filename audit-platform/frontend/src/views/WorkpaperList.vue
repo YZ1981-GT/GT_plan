@@ -135,6 +135,16 @@
         <el-option label="全部" value="" />
         <el-option v-for="u in userOptions" :key="u.id" :label="u.full_name || u.username" :value="u.id" />
       </el-select>
+      <!-- 联动状态横条「查看详情」跳转 ?filter=stale 落到这里 -->
+      <el-tooltip
+        content="仅显示上游数据变更后预填待重算的底稿；重算不覆盖已保存的底稿正文，需打开底稿刷新后重新保存"
+        placement="top"
+        :show-after="300"
+      >
+        <el-checkbox v-model="filterStale" size="default" class="gt-wp-filter-bar__stale">
+          仅看待重算<span v-if="staleCount > 0" class="gt-wp-filter-bar__stale-count">{{ staleCount }}</span>
+        </el-checkbox>
+      </el-tooltip>
     </div>
 
     <!-- 进度指示器 -->
@@ -281,6 +291,8 @@ const viewMode = ref('workbench')
 const searchKeyword = ref('')
 const filterCycle = ref('')
 const filterStatus = ref('')
+/** 仅看「预填待重算」底稿（?filter=stale 或筛选栏勾选） */
+const filterStale = ref(false)
 const filterAssignee = ref('')
 const selectedWpId = ref('')
 const selectedWpIds = ref<string[]>([])
@@ -335,6 +347,9 @@ const totalProgress = computed<ProgressInfo>(() => {
   const percent = total > 0 ? Math.round((completed / total) * 100) : 0
   return { total, completed, percent }
 })
+
+/** 待重算底稿数（筛选栏「仅看待重算」角标；与联动状态横条计数同源字段 prefill_stale） */
+const staleCount = computed(() => wpList.value.filter((w) => w.prefill_stale === true).length)
 
 // ─── Tab 可见性（角色控制） ─────────────────────────────────────────────────────
 interface TabDef { value: string; label: string; hidden?: boolean }
@@ -462,6 +477,12 @@ async function fetchWpIndex() {
         reviewer: matchedWorkpaper?.reviewer ?? item.reviewer,
       }
     })
+  } catch (err: any) {
+    // 请求被取消不是错误：query 变更（如 ?filter=stale 补 view=list）会让
+    // DefaultLayout 按 fullPath 重建本视图，新实例的同 URL GET 触发 http.ts 去重
+    // abort 旧实例在飞的请求。此处吞掉，否则 CanceledError 冒泡到 ErrorBoundary。
+    if (err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError') return
+    throw err
   } finally {
     loading.value = false
   }
@@ -490,6 +511,7 @@ const ctx: WpListContext = {
   filterCycle,
   filterStatus,
   filterAssignee,
+  filterStale,
   showTrimmedFilter,
   selectedWpId,
   totalProgress,
@@ -774,6 +796,19 @@ const statusOptions = computed(() => {
 // ─── 生命周期 ─────────────────────────────────────────────────────────────────
 watch([filterCycle, filterStatus, filterAssignee], () => fetchWpIndex())
 
+// filterStale 纯前端过滤（prefill_stale 已在列表响应里），无需重拉；仅同步 URL 便于分享/刷新保留
+watch(filterStale, (on) => {
+  const q = { ...route.query }
+  if (on) {
+    if (q.filter === 'stale') return
+    q.filter = 'stale'
+  } else {
+    if (q.filter !== 'stale') return
+    delete q.filter
+  }
+  router.replace({ query: q })
+}, { flush: 'post' })
+
 onMounted(async () => {
   // 预热 OnlyOffice api.js（仅 preload 不初始化 DocsAPI）
   const baseUrl = import.meta.env.VITE_ONLYOFFICE_URL || ''
@@ -793,6 +828,12 @@ onMounted(async () => {
   const queryView = route.query.view as string
   if (queryView && VIEW_MODE_WHITELIST.has(queryView)) {
     viewMode.value = queryView
+  }
+  // ?filter=stale（联动状态横条「查看详情」）→ 开启待重算过滤并强制列表视图
+  // （筛选栏只在 list 视图渲染，落到工作台视图会让用户看不到自己被过滤了）
+  if (route.query.filter === 'stale') {
+    filterStale.value = true
+    viewMode.value = 'list'
   }
   await fetchWpIndex()
   // 加载项目名称
@@ -833,6 +874,20 @@ onContextChange(async () => {
   box-shadow: var(--gt-shadow-sm);
   flex-wrap: nowrap;
   overflow-x: auto;
+}
+.gt-wp-filter-bar__stale {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.gt-wp-filter-bar__stale-count {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 6px;
+  border-radius: 9px;
+  background: var(--el-color-warning-light-8, #faecd8);
+  color: var(--el-color-warning, #e6a23c);
+  font-size: 12px;
+  font-weight: 600;
 }
 .gt-wp-view-toggle {
   margin: 0 12px;

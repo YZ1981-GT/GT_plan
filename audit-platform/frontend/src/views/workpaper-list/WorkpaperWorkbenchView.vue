@@ -77,6 +77,7 @@
                   {{ node.children.length }} 子表
                 </el-tag>
                 <el-tag :type="node.row.status_type" size="small" class="gt-wpb-cycle-item__status">{{ node.row.status_label }}</el-tag>
+                <WpStaleTag :stale="node.row.prefill_stale" hide-fresh />
                 <span class="gt-wpb-cycle-item__assignee">{{ node.row.assignee_name || '—' }}</span>
                 <span class="gt-wpb-cycle-item__steps" v-if="node.row.total_steps">{{ node.row.completed_steps || 0 }}/{{ node.row.total_steps }}</span>
                 <GtRowActions :actions="getWpRowActions(node.row)" :max-visible="2" @action="(key: string) => handleWpRowAction(key, node.row)" class="gt-wpb-cycle-item__actions" />
@@ -397,6 +398,7 @@
             {{ listSelectedCycle ? (cycleNameMap[listSelectedCycle] || listSelectedCycle) : '全部底稿' }}
           </span>
           <el-tag size="small" type="info" effect="plain" round>共 {{ listTotal }} 张</el-tag>
+          <el-tag v-if="ctx.filterStale?.value" size="small" type="warning" effect="light" round closable @close="ctx.filterStale.value = false">仅看待重算</el-tag>
         </div>
         <el-table
           :data="listPaged"
@@ -415,6 +417,9 @@
               <el-tag :type="row.status_type" size="small">{{ row.status_label }}</el-tag>
             </template>
           </el-table-column>
+          <el-table-column label="数据" min-width="90" resizable>
+            <template #default="{ row }"><WpStaleTag :stale="row.prefill_stale" /></template>
+          </el-table-column>
           <el-table-column prop="assignee_name" label="编制人" min-width="90" resizable>
             <template #default="{ row }">{{ row.assignee_name || '—' }}</template>
           </el-table-column>
@@ -424,7 +429,7 @@
             </template>
           </el-table-column>
           <template #empty>
-            <el-empty description="该循环暂无底稿" :image-size="80" />
+            <el-empty :description="ctx.filterStale?.value ? '没有待重算的底稿（数据均为最新）' : '该循环暂无底稿'" :image-size="80" />
           </template>
         </el-table>
         <div class="gt-pagination" v-if="listTotal > wbPageSize" style="margin-top: 12px; display: flex; justify-content: flex-end;">
@@ -448,6 +453,7 @@ import type { WpChildProps, WpChildEmits, MutatePayload } from '@/composables/us
 import type { WpIndexItem, WorkpaperDetail } from '@/services/workpaperApi'
 import { downloadWorkpaper } from '@/services/workpaperApi'
 import GtRowActions from '@/components/common/GtRowActions.vue'
+import WpStaleTag from '@/components/workpaper/WpStaleTag.vue'
 import type { RowAction } from '@/components/common/GtRowActions.vue'
 import { cycleColor } from '@/constants/cyclePalette'
 
@@ -560,6 +566,8 @@ const filteredWpList = computed<WorkpaperDetail[]>(() => {
     if (ctx.filterCycle.value && !idx?.wp_code?.startsWith(ctx.filterCycle.value)) return false
     if (ctx.filterStatus.value && w.status !== ctx.filterStatus.value) return false
     if (ctx.filterAssignee.value && w.assigned_to !== ctx.filterAssignee.value) return false
+    // 仅看待重算（?filter=stale / 筛选栏勾选）
+    if (ctx.filterStale?.value && w.prefill_stale !== true) return false
     if (ctx.searchKeyword.value) {
       const kw = ctx.searchKeyword.value.toLowerCase()
       if (!w.wp_code?.toLowerCase().includes(kw) && !w.wp_name?.toLowerCase().includes(kw)) return false
@@ -609,16 +617,10 @@ const workbenchTableData = computed(() => {
         assignee_name: (w as any).assignee_name || '',
         total_steps: (w as any).total_steps || 0,
         completed_steps: (w as any).completed_steps || 0,
+        prefill_stale: w.prefill_stale === true,
       }
     })
     .sort((a, b) => phaseOrderCompare(a.wp_code, b.wp_code))
-})
-
-const wbTotal = computed(() => workbenchTableData.value.length)
-const pagedWorkbenchData = computed(() => {
-  const start = (wbPage.value - 1) * wbPageSize.value
-  return workbenchTableData.value.slice(start, start + wbPageSize.value)
-
 })
 
 // ─── 列表视图：左循环树导航 + 右表格（master-detail） ──────────────────────────
