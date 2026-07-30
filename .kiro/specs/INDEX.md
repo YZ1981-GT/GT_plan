@@ -1,8 +1,8 @@
 # 致同审计作业平台 — Spec 开发索引
 
-**最后更新**：2026-07-29
+**最后更新**：2026-07-30
 **当前分支**：`work/2026-05-30-wp-specs`
-**统计**：Active 0 / Archived 470 = 总计 470
+**统计**：Active 9（`.kiro/specs/` 实测目录数；本表已列 4 条，余 5 条待补）/ Archived 470 = 总计 479
 **最高迁移**：**V133**（以 `migration_status` 实测为准）
 **技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer
 
@@ -30,7 +30,10 @@
 
 | Spec | 阶段 | 说明 |
 |------|------|------|
-| *(无)* | — | 全部归档完毕 |
+| `d2-ar-disclosure-template-alignment` | 实现完成，待 Playwright 实测 | D2 应收账款上市披露三层（底稿 / 同步映射 / 附注模板 五、5）对齐致同源模板：分类披露与单项计提恢复双期 6/5 列、组合分表双期 6 值列、补终止确认与继续涉入两表、10 节说明文本、旧表名清理机制 |
+| `f2-inventory-disclosure-template-alignment` | 全部任务完成，仅剩 commit | F2 存货披露表（上市/国企）与附注 §五、9 / §八、10 对齐源模版：(3) 计提比例口径修正（`D/B` 而非占跌价合计）、(4) 借款费用资本化拆为独立小节 + 合同履约成本摊销说明、新增「确认为存货的数据资源」21 行三段式表（两版共用）、附注两级表头 `_column_groups`、seed 列元数据贯通 `_carry_seed_column_meta`。**Sprint 6 复盘改进**：数据资源表 4 条 F9 交叉勾稽、金额真源收归 `displayPrefs.fmtAmount` + 新建 `shared/WpAmountInput.vue`（`el-input` 承载千分符，实证 `el-input-number :formatter` 是空操作）、`ColumnDef.flat` 三态抑制凭空父表头、PBT 9 条、修掉 `note_word_exporter._build_two_level_header_rows` 子表头右移丢末列的真 bug、CI 加 `note-inventory-structure` job、`validate_note_template.py` → `validate_note_docx_placeholders.py`、两披露 Tab 接入 11 处 AI 辅助 + 复核 chip（并按源模板口径补详 5 条过于笼统的 prompt）。**多区块导入导出**（新建 `_f2_disclosure_import_export.py`：一区块一 sheet + 文本域集中「文本说明」sheet，上市 10 sheet / 国企 5 sheet；DR 表必须按 rowKey 匹配因三段标签重复；override/dr 为整表覆盖但全空表跳过防误清；前后端 4 组常量镜像由读 .ts 源码的契约测试守）。前端 95 + 后端 123 测试全绿，live HTTP 往返 + Playwright 实测 0 console error。**未做**：11.3 commit（工作树含其它 spec 改动）。⚠️ 并发会话曾回退 `disclosure_engine.py` 与两个 `note_template_*.json` |
+| `disclosure-columns-coverage-rollout` | 主体完成（Task 1~11 / 13~16），收尾中（12.2 本次、12.3 待 commit） | 披露表 `columns` 覆盖与两级表头推广。**基础设施**：`ColumnDef.flat` 声明 + `defineColumns` 透传；后端 `_extract_column_groups` 三态（`None`=未声明回退前缀推断 / `[]`=任一列 `flat` 显式单级 / 非空=显式分组），调用侧守卫写 `if col_groups is None` 防 `[]` 被推断抢占；F2 房企 3 表 + 数据资源表标 `flat` 消除凭空「本期」父表头。**守卫**：`check_disclosure_columns_coverage.py --strict` + allowlist `reason` 必填（空白视为未登记、不豁免）+ 守卫自测 10 条；CI job `disclosure-columns-coverage`。**批 1~4**：L1/L3（范式样板）→ K4~K7 → J1（补 `flat` + 收敛到共享 `ColumnDef`）→ H4（复用 `buildH2ListedColumns` 子集，不各造一份）；全 Tab 契约测试 `disclosureColumnsCoverage.spec.ts`（P1 键一一对应 / P2 标签列唯一居首 / P3 group 相邻 / P6 禁英文键当列头）；Playwright + DB 实测 K6 两版真两级表头（父表头串上市「期末余额/上年年末余额」vs 国企「期末数/期初数」不串味）+ K7 单级对照 + F2 四表 1 行表头。**并入 3 项遗留**：R6 账龄标签披露口径单一真源 `disclosureAgingLabels.ts`（D2/F1/F4/K1/G5/D3 六循环收敛，国企首档字面收归 `DISCLOSURE_AGING_WITHIN1_SOE`，守卫 15/15 `--strict` exit 0；D3 合计行字面为「合计」故不套 `合 计`）/ R7 动态子表名孤儿清理 `disclosureSyncedTables.ts`（同步**成功后**才 `markSynced`）+ R7.5 基线播种（实测 13 表→11 表清掉上线前残留、再同步 11→11 稳态）/ R8 `sheet_name` 断言漂移 10 条全改引用 `X_DISCLOSURE_SHEET_NAME` 常量（不写字面量，8 种括号写法并存）+ 守卫 `disclosureSheetNameRegistry.spec.ts` 6/6。**顺带修掉 3 个实质缺陷**：D2 披露 sheet 分发被 wp_code 后缀抢占（`附注披露信息（国企）D2-1` 被 `/D2(?:-\d+)?[A-Z]?$/` 抢先命中 → 披露组件此前完全挂不上，vitest 与 `get_diagnostics` 均查不出）、D3 国企静默校对读错字段恒为 0、`（续：期初数）` 续表键双真源。**🔴 跨 spec 交接（2026-07-30 实测）**：`--strict` 现报 98 调用点 / 92 覆盖 / 0 豁免 / **6 未覆盖**、exit 1 → CI job 当前为**红**；6 条全部是 `disclosure-sync-path-buildout` 新接线的 G 循环 Tab（`G12TabDisclosure{Listed,SOE}` / `G5TabDisclosure{Listed,SOE}` / `G8TabDisclosureBase` / `G9TabDisclosureBase`，调用点总数由 92→98 恰好 +6），本 rollout 自己的 14 个 Tab 全覆盖（批 4 收口时为 92/92）→ 红灯归属该 spec，列头补齐随其批 1 收尾（其 Notes 已记「新 builder 必须登记 `disclosureColumnsCoverage.spec.ts` 的 `P1_ROUTE`」）。**未做**：12.3 单 commit（工作树含其它 spec 改动） |
+| `f1-prepayment-disclosure-template-alignment` | 实现完成 + 实测通过，待 commit | F1 预付款项披露三层（底稿上市/国企披露表 / 同步映射 / 附注 §五、7 与 §八、7）对齐源模板：两版按账龄表恢复 5 列两级表头 + 小计/减：减值准备/合计 三行尾、上市超1年表列结构改为「账面余额/占比/减值准备」（原因移入行展开区 + 据此生成说明）、国企第 3 张表消重名（原与第 2 张同名 → 孤儿子表）、上市第 3 张表名从「单位名称」改为完整表名并上报 `_removed_table_keys`、6 张表补 `columns`/`guidance`/空白行骨架、国企逐段减值准备同步时聚合为一行。幂等脚本 `fix_note_prepayment_structure.py`（`--dry-run`/`--check`）+ 存量回填 `backfill_note_prepayment_snapshots.py`（4 条空骨架已回填、1 条有数据按安全门跳过）+ 后端 44 测试 + 前端 58 测试全绿 + 国企底稿与附注 §八、7 Playwright 实测通过 |
 
 ---
 
