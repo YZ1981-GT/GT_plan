@@ -6,10 +6,16 @@
  * **Validates: Requirements 8.1, 8.2, 8.3**
  *
  * 锁定内容：
- * 1. N1_SUB_TABLE_KEYS 四键（listed / soe 各 4 个子表名）
+ * 1. N1_SUB_TABLE_KEYS 子表名（listed 4 张 / soe 5 张）
  * 2. buildN1SyncPayload 的 `columns` 键集合与 `sub_table_data` 键集合恒相同
  * 3. N1-5-total-recognizable 为 remark 字符串（跨表键语义）
  * 4. deriveUnrecognizedFromLoss 现行为（legacy 兼容路径）
+ *
+ * ⚠️ 2026-07-30 基线更新（spec `n1-deferred-tax-disclosure-template-alignment` R4.4）：
+ * 原基线锁 soe 为 4 键，实为源模板对齐缺陷 —— 国企源模板
+ * `附注披露信息（国企）` R54 有第 5 张表「B、递延所得税资产和递延所得税负债互抵明细」，
+ * 附注模板与同步映射此前都整张缺失。故 soe 期望值由 4 键改为 5 键（新增 `offsetDetail`），
+ * listed 仍为 4 键（上市源模板确无该表）。
  */
 import { describe, it, expect } from 'vitest'
 import {
@@ -22,19 +28,19 @@ import {
   type N1DisclosureLossRow,
 } from '../composables/useN1DisclosureSource'
 
-// ─── 1. N1_SUB_TABLE_KEYS 四键锁定 ──────────────────────────────────────────
+// ─── 1. N1_SUB_TABLE_KEYS 子表名锁定 ────────────────────────────────────────
 
-describe('N1_SUB_TABLE_KEYS 四键契约', () => {
-  it('listed 变体恒含 4 个子表键', () => {
+describe('N1_SUB_TABLE_KEYS 子表名契约', () => {
+  it('listed 变体恒含 4 个子表键（上市源模板确无「互抵明细」表）', () => {
     const keys = Object.keys(N1_SUB_TABLE_KEYS.listed)
     expect(keys).toHaveLength(4)
     expect(keys).toEqual(['unoffset', 'netOffset', 'unrecognized', 'lossExpiry'])
   })
 
-  it('soe 变体恒含 4 个子表键', () => {
+  it('soe 变体恒含 5 个子表键（源模板（2）B 互抵明细）', () => {
     const keys = Object.keys(N1_SUB_TABLE_KEYS.soe)
-    expect(keys).toHaveLength(4)
-    expect(keys).toEqual(['unoffset', 'netOffset', 'unrecognized', 'lossExpiry'])
+    expect(keys).toHaveLength(5)
+    expect(keys).toEqual(['unoffset', 'netOffset', 'offsetDetail', 'unrecognized', 'lossExpiry'])
   })
 
   it('listed 子表名逐字锁定', () => {
@@ -47,6 +53,7 @@ describe('N1_SUB_TABLE_KEYS 四键契约', () => {
   it('soe 子表名逐字锁定', () => {
     expect(N1_SUB_TABLE_KEYS.soe.unoffset).toBe('未经抵销的递延所得税资产和递延所得税负债')
     expect(N1_SUB_TABLE_KEYS.soe.netOffset).toBe('以抵销后净额列示的递延所得税资产或负债')
+    expect(N1_SUB_TABLE_KEYS.soe.offsetDetail).toBe('递延所得税资产和递延所得税负债互抵明细')
     expect(N1_SUB_TABLE_KEYS.soe.unrecognized).toBe('未确认递延所得税资产明细')
     expect(N1_SUB_TABLE_KEYS.soe.lossExpiry).toBe('未确认递延所得税资产的可抵扣亏损将于以下年度到期')
   })
@@ -55,8 +62,11 @@ describe('N1_SUB_TABLE_KEYS 四键契约', () => {
 // ─── 2. buildN1SyncPayload columns 键集合 ≡ sub_table_data 键集合 ─────────
 
 describe('buildN1SyncPayload columns/sub_table_data 键集合恒相同', () => {
+  // 表 1 行含 4 个值列（期末/期初 × 暂时性差异/递延税额），对齐源模板两级表头
   const minimalSnapshot: N1DisclosureSnapshot = {
-    assetRows: [{ item: '资产减值准备', endBalance: 100, priorBalance: 80 }],
+    assetRows: [
+      { item: '资产减值准备', endDiff: 400, endTax: 100, priorDiff: 320, priorTax: 80 },
+    ],
     unrecognizedRows: [{ item: '可抵扣亏损', amount: 50, priorAmount: 30 }],
     lossExpiryRows: [{ expiryYear: '2027', unrecovered: 50, priorUnrecovered: 30 }],
   }

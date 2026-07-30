@@ -101,6 +101,87 @@ describe('useF2DisclosureListed', () => {
     expect(api.s3EndTotal.value.impairmentPct).toBe(0)
   })
 
+  // ── (3) 按组合计提：两列比例分母不同（源模板 C52=B52/B54 / F52=D52/B52）──
+  describe('（3）按组合计提比例口径', () => {
+    function mountWithS3(rows: Array<{ groupName: string; balance: number; impairment: number }>) {
+      const map = new Map<string, ChecklistResponse>()
+      const payload = rows.map((r, i) => ({
+        rowId: `s3-fixed-${i}`,
+        groupName: r.groupName,
+        balance: r.balance,
+        impairment: r.impairment,
+        provisionStandard: '',
+        netValue: 0,
+        balancePct: 0,
+        impairmentPct: 0,
+      }))
+      for (const key of ['F2-note-listed-s3-end', 'F2-note-listed-s3-prior']) {
+        map.set(key, { item_id: key, conclusion: null, remark: JSON.stringify(payload) })
+      }
+      return useF2DisclosureListed({
+        allResponses: ref(map),
+        isReadonly: ref(false),
+        applicableStandards: ref(['listed_standalone']),
+      })
+    }
+
+    it('R1.1 计提比例 = 本组合跌价 ÷ 本组合账面余额', () => {
+      const api = mountWithS3([
+        { groupName: '组合A', balance: 1000, impairment: 150 },
+        { groupName: '组合B', balance: 4000, impairment: 250 },
+      ])
+      const a = api.s3EndRows.value.find((r) => r.groupName === '组合A')!
+      expect(a.impairmentPct).toBeCloseTo(0.15, 10)
+      const b = api.s3EndRows.value.find((r) => r.groupName === '组合B')!
+      expect(b.impairmentPct).toBeCloseTo(0.0625, 10)
+    })
+
+    it('R1.2 合计行计提比例 = 跌价合计 ÷ 账面余额合计', () => {
+      const api = mountWithS3([
+        { groupName: '组合A', balance: 1000, impairment: 150 },
+        { groupName: '组合B', balance: 4000, impairment: 250 },
+      ])
+      const total = api.s3EndTotal.value
+      expect(total.balance).toBe(5000)
+      expect(total.impairment).toBe(400)
+      expect(total.impairmentPct).toBeCloseTo(0.08, 10)
+    })
+
+    it('R1.3 本组合账面余额为 0 时计提比例为 0（不产生 NaN/Infinity）', () => {
+      const api = mountWithS3([
+        { groupName: '零余额组合', balance: 0, impairment: 50 },
+        { groupName: '组合B', balance: 4000, impairment: 250 },
+      ])
+      const z = api.s3EndRows.value.find((r) => r.groupName === '零余额组合')!
+      expect(z.impairmentPct).toBe(0)
+      expect(Number.isFinite(z.impairmentPct)).toBe(true)
+    })
+
+    it('R1.4 占比列口径不变：分母为合计账面余额，合计行 100%', () => {
+      const api = mountWithS3([
+        { groupName: '组合A', balance: 1000, impairment: 150 },
+        { groupName: '组合B', balance: 4000, impairment: 250 },
+      ])
+      const a = api.s3EndRows.value.find((r) => r.groupName === '组合A')!
+      expect(a.balancePct).toBeCloseTo(0.2, 10)
+      expect(api.s3EndTotal.value.balancePct).toBe(1)
+    })
+
+    it('R1.5 期末表与上年年末表采用同一算法', () => {
+      const api = mountWithS3([
+        { groupName: '组合A', balance: 1000, impairment: 150 },
+        { groupName: '组合B', balance: 4000, impairment: 250 },
+      ])
+      const endA = api.s3EndRows.value.find((r) => r.groupName === '组合A')!
+      const priorA = api.s3PriorRows.value.find((r) => r.groupName === '组合A')!
+      expect(priorA.impairmentPct).toBeCloseTo(endA.impairmentPct, 10)
+      expect(priorA.balancePct).toBeCloseTo(endA.balancePct, 10)
+      expect(api.s3PriorTotal.value.impairmentPct).toBeCloseTo(
+        api.s3EndTotal.value.impairmentPct, 10,
+      )
+    })
+  })
+
   it('getSyncSnapshot 可构建附注 sync payload', () => {
     const map = new Map<string, ChecklistResponse>()
     setAdj(map, 'gross', 'raw-materials', { opening: 100, increase: 0, decrease: 0, adjustment: 0 })
@@ -117,5 +198,31 @@ describe('useF2DisclosureListed', () => {
     expect(sub['存货分类'][0].label).toBe('原材料')
     expect(sub['存货分类'][0].end_gross).toBe(100)
     expect(sub['存货跌价准备及合同履约成本减值准备'][0].ending).toBe(10)
+  })
+
+  it('R2.4 合同履约成本摊销说明随 _note_texts 以 listed-note-amort 推送', () => {
+    const map = new Map<string, ChecklistResponse>()
+    map.set('F2-note-listed-note-amort', {
+      item_id: 'F2-note-listed-note-amort',
+      conclusion: null,
+      remark: '本期摊销合同履约成本 1,200,000.00 元，计入主营业务成本。',
+    })
+
+    const api = useF2DisclosureListed({
+      allResponses: ref(map),
+      isReadonly: ref(false),
+      applicableStandards: ref(['listed_standalone']),
+    })
+
+    expect(api.s4AmortText.value).toContain('1,200,000.00')
+
+    const texts = buildF2ListedSubTableData(api.getSyncSnapshot())._note_texts as Array<{
+      section: string
+      text: string
+    }>
+    const amort = texts.find((t) => t.section === 'listed-note-amort')
+    expect(amort?.text).toContain('计入主营业务成本')
+    // 借款费用资本化仍独立成段，未被摊销说明顶替
+    expect(texts.some((t) => t.section === 'listed-note-borrow')).toBe(true)
   })
 })

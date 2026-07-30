@@ -136,8 +136,15 @@ describe('d1NoteSectionMap', () => {
     expect(p.sub_table_data['按组合计提坏账准备的应收票据']).toBeDefined()
     expect(p.sub_table_data['期末因出票人未履约而其转为应收账款的票据']).toBeDefined()
     expect(p.sub_table_data['本期实际核销的应收票据']).toBeDefined()
-    // 国企主表用期初口径列头
-    expect(p.columns['应收票据分类'].map(c => c.label)).toContain('期初账面余额')
+    // 国企主表：期间由父表头承载（源模板 B6:D6「期末数」/ E6:G6「期初数」），
+    // 子列名按预设 F4-3a 取「账面余额 / 坏账准备 / 账面价值」
+    const mainCols = p.columns['应收票据分类']
+    expect(mainCols.map(c => c.label)).toEqual([
+      '票据种类', '账面余额', '坏账准备', '账面价值', '账面余额', '坏账准备', '账面价值',
+    ])
+    expect(mainCols.map(c => c.group ?? null)).toEqual([
+      null, '期末数', '期末数', '期末数', '期初数', '期初数', '期初数',
+    ])
     const mv = p.sub_table_data['本期计提、收回或转回的应收票据坏账准备情况'] as any[]
     expect(mv[0]).toMatchObject({ label: '合计', prior_balance: 1, end_balance: 3, is_total: true })
   })
@@ -175,7 +182,15 @@ describe('d1NoteSectionMap', () => {
 
   it('转回或收回表：上市 5 列 / 国企 4 列（各按自身模板，不互相硬套）', () => {
     const reversalRows = [
-      { companyName: 'A公司', reversalReason: '客户回款', originalMethod: '银行转账', reversalBasis: '累计已计提 12', amount: 100 },
+      {
+        companyName: 'A公司',
+        reversalReason: '客户回款',
+        originalMethod: '银行转账',
+        reversalBasis: '累计已计提 12',
+        amount: 100,
+        // 国企「转回或收回前累计已计提坏账准备金额」源模板 C59==SUM → 数值列
+        cumulativeProvision: 12,
+      },
     ]
     const listed = buildD1SyncPayload('listed', 'wp-1', null, snap({ reversalRows } as any))
     const lc = listed.columns['本期转回或收回金额重要的坏账准备'].map((c) => c.label)
@@ -195,9 +210,14 @@ describe('d1NoteSectionMap', () => {
     expect(sr).toMatchObject({
       label: 'A公司',
       amount: 100,
-      cumulative_provision: '累计已计提 12',
+      cumulative_provision: 12,
       reason_method: '客户回款',
     })
+    // 数值列进合计行（源模板 C59==SUM(C55:C58)）
+    const st = (soe.sub_table_data['本期转回或收回金额重要的应收票据坏账准备'] as any[]).at(-1)
+    expect(st).toMatchObject({ label: '合计', amount: 100, cumulative_provision: 12, is_total: true })
+    expect(soe.columns['本期转回或收回金额重要的应收票据坏账准备']
+      .find((c) => c.key === 'cumulative_provision')?.format).toBe('amount')
   })
 
   it('核销逐项披露列头按变体措辞（模板逐字）', () => {

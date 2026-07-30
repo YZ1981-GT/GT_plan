@@ -115,22 +115,42 @@ describe('F4 应付账款 — 注册契约测试', () => {
       expect(overrides['F4-9']).toBe('f4-accounts-payable')
     })
 
-    // 附注披露(上市)
+    // 附注披露(上市) — 复核提示词/注册标识用的 wp_code 形态
     it('F4-note-listed 映射为 f4-accounts-payable', () => {
       expect(overrides['F4-note-listed']).toBe('f4-accounts-payable')
     })
 
-    // 附注披露(国企)
+    // 附注披露(国企) — 复核提示词/注册标识用的 wp_code 形态
     it('F4-note-soe 映射为 f4-accounts-payable', () => {
       expect(overrides['F4-note-soe']).toBe('f4-accounts-payable')
     })
 
-    // 完整性校验：共12个wp_code映射到f4-accounts-payable
-    it('f4-accounts-payable 共有12个wp_code映射', () => {
+    /**
+     * 🔴 渲染分发实际生效的键是「{wp_code}-{sheet_name}」（源 xlsx 中文 tab 名）。
+     *
+     * `wp_render_config.py` 对多 sheet 底稿依次尝试：sheet 尾部编码 → 完整 sheet_name →
+     * `{wp_code}-{sheet_name}`。附注披露页无尾部编码，故只有第三种形态能命中；
+     * 缺这两个键时会退回 class_code `C-附注披露` → 泛用 `c-note-table`，
+     * F4 专属披露组件（F4TabDisclosureListed/SOE）在真实路径上不可达
+     * （实测症状：上市页只剩「账龄超过1年」一张 3 列表，按性质分类表整块丢失）。
+     *
+     * ⚠️ 括号为**半角**，与 `F4 应付账款.xlsx` 的 tab 名逐字一致（G/H 循环的源表用全角）。
+     */
+    it('F4-附注披露信息(上市公司) 映射为 f4-accounts-payable（渲染分发实际命中键）', () => {
+      expect(overrides['F4-附注披露信息(上市公司)']).toBe('f4-accounts-payable')
+    })
+
+    it('F4-附注披露信息(国企) 映射为 f4-accounts-payable（渲染分发实际命中键）', () => {
+      expect(overrides['F4-附注披露信息(国企)']).toBe('f4-accounts-payable')
+    })
+
+    // 完整性校验：共14个key映射到f4-accounts-payable（12 个 wp_code + 2 个 sheet 名键）
+    it('f4-accounts-payable 共有14个key映射', () => {
       const expectedCodes = [
         'F4A', 'F4-1', 'F4-2', 'F4-3', 'F4-4', 'F4-5',
         'F4-6', 'F4-7', 'F4-8', 'F4-9',
         'F4-note-listed', 'F4-note-soe',
+        'F4-附注披露信息(上市公司)', 'F4-附注披露信息(国企)',
       ]
       for (const code of expectedCodes) {
         expect(overrides[code]).toBe('f4-accounts-payable')

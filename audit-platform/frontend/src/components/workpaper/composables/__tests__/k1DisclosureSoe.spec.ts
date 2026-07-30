@@ -1,15 +1,18 @@
 import { describe, it, expect } from 'vitest'
 import { PRESET_SEGMENTS } from '@/composables/useAgingConfig'
 import {
+  autoFillSoeFromK1Sources,
   buildDefaultMethodRows,
   buildBalanceStageMovementsFromK17,
   buildGovGrantFromK1Detail,
   buildPortfolioAgingRows,
   calcBalanceStageTieOut,
   calcMethodTieOut,
+  calcPortfolioSplitTieOut,
   emptyK1SoePayload,
   parseK1SoePayload,
   recomputeMethodRows,
+  recomputeOtherPortfolioRows,
   splitK1DetailByProvisionMethod,
 } from '../k1DisclosureModel'
 import { buildK1SoeSubTableData, buildK1SoeSyncPayloads } from '../k1DisclosureSyncPayload'
@@ -141,7 +144,9 @@ describe('k1SoeDisclosureSyncPayload', () => {
     expect(data[K1_SOE_SUBTABLE.aging]).toBeDefined()
     expect(data[K1_SOE_SUBTABLE.eclMovement]).toBeDefined()
     expect(data[K1_SOE_SUBTABLE.balanceMovement]).toBeDefined()
-    expect(data[K1_SOE_SUBTABLE.portfolioOther]?.length).toBeGreaterThan(0)
+    // 账龄组合与其他组合分表：portfolioAging 承载账龄组合，portfolioOther 承载人工组合
+    expect(data[K1_SOE_SUBTABLE.portfolioAging]?.length).toBeGreaterThan(0)
+    expect(data[K1_SOE_SUBTABLE.continuedInvolvement]?.length).toBeGreaterThan(0)
   })
 
   it('buildK1SoeSyncPayloads 附带 columns（源对齐中文列头）', () => {
@@ -150,12 +155,79 @@ describe('k1SoeDisclosureSyncPayload', () => {
     expect(payload).toBeDefined()
     const cols = payload.columns!
     expect(Object.keys(cols)).toContain(K1_SOE_SUBTABLE.aging)
-    // 账龄表：期末数/期初数（国企两列口径）
-    expect(cols[K1_SOE_SUBTABLE.aging].map((c) => c.label)).toEqual(['账龄', '期末数', '期初数'])
+    // 账龄表：期末数/期初数 各含账面余额 + 坏账准备（附注模版 md 二级表头口径）
+    expect(cols[K1_SOE_SUBTABLE.aging].map((c) => c.label)).toEqual([
+      '账  龄', '期末账面余额', '期末坏账准备', '期初账面余额', '期初坏账准备',
+    ])
     expect(cols[K1_SOE_SUBTABLE.aging][0].is_label).toBe(true)
     // 政府补助表源对齐五列
     expect(cols[K1_SOE_SUBTABLE.govGrant].map((c) => c.label)).toEqual([
-      '单位名称', '政府补助项目名称', '期末余额', '期末账龄', '预计收取的时间_金额及依据',
+      '单位名称', '政府补助项目名称', '期末余额', '期末账龄', '预计收取的时间、金额及依据',
     ])
+    // 转回表含国企专有的「转回或收回前累计已计提坏账准备金额」列
+    expect(cols[K1_SOE_SUBTABLE.reversal].map((c) => c.label)).toEqual([
+      '债务人名称', '转回或收回金额', '转回或收回前累计已计提坏账准备金额', '转回或收回原因、方式',
+    ])
+    // 国企转移表无「转移方式」列（上市版才有）
+    expect(cols[K1_SOE_SUBTABLE.transfer].map((c) => c.label)).toEqual([
+      '债务人名称', '终止确认金额', '与终止确认相关的利得或损失',
+    ])
+  })
+
+  it('其他组合：坏账准备由计提比例派生，合计与账龄组合共同勾稽方法表组合行', () => {
+    const rows = recomputeOtherPortfolioRows([
+      {
+        rowId: 'a', label: '余额百分比法组合',
+        endBalance: 1000, endRatePct: 5, endProvision: 0,
+        priorBalance: 800, priorRatePct: 5, priorProvision: 0,
+        editable: true,
+      },
+    ])
+    expect(rows[0].endProvision).toBe(50)
+    expect(rows[0].priorProvision).toBe(40)
+
+    const methodRows = buildDefaultMethodRows().map((r) =>
+      r.rowKey === 'portfolio' ? { ...r, endProvision: 50 } : r,
+    )
+    const tie = calcPortfolioSplitTieOut([], rows, methodRows)
+    expect(tie.matched).toBe(true)
+  })
+
+  it('旧 otherPortfolioRows（endBalancePct 口径）迁移为计提比例', () => {
+    const legacy = JSON.stringify({
+      version: 2,
+      otherPortfolioRows: [
+        { rowId: 'x', label: '组合1', endBalance: 200, endBalancePct: 10, endProvision: 0, priorBalance: 0, priorProvision: 0 },
+      ],
+    })
+    const parsed = parseK1SoePayload(legacy, PRESET_SEGMENTS.FIVE_YEAR)
+    expect(parsed.otherPortfolioRows[0].endRatePct).toBe(10)
+    expect(parsed.otherPortfolioRows[0].endProvision).toBe(20)
+  })
+
+  it('转回行携带 accumProvision → cumulativeProvision（K1-9 取数）', () => {
+    const map = new Map<string, any>([
+      ['K1-9-writeoff', {
+        remark: JSON.stringify({
+          tables: {
+            reversal: [{ id: 'r1', unit: '甲公司', amount: 100, accumProvision: 80, reason: '重组收回', method: '银行转账收回' }],
+            writeoff: [],
+          },
+        }),
+      }],
+    ])
+    const payload = autoFillSoeFromK1Sources(emptyK1SoePayload(), map, PRESET_SEGMENTS.FIVE_YEAR, { force: true })
+    expect(payload.reversalRows[0].cumulativeProvision).toBe(80)
+  })
+
+  it('国企账龄表不生成 1 年以内月度细分行（上市专有）', () => {
+    const payload = autoFillSoeFromK1Sources(
+      emptyK1SoePayload(),
+      new Map(),
+      PRESET_SEGMENTS.FIVE_YEAR,
+      { force: true },
+    )
+    expect(payload.agingRows.some((r) => r.kind === 'sub')).toBe(false)
+    expect(payload.agingRows.some((r) => r.kind === 'subtotal1y')).toBe(false)
   })
 })

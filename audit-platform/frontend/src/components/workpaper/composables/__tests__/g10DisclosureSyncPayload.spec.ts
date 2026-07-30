@@ -4,7 +4,7 @@ import {
   buildG10SoeSyncPayloads,
 } from '../g10DisclosureSyncPayload'
 import { defaultG10ListedDiscStore, defaultG10SoeDiscStore } from '../g10DisclosureFromAdj'
-import { G10_NOTE_SECTION } from '../g10NoteSectionMap'
+import { G10_DISCLOSURE_SHEET_NAME, G10_NOTE_SECTION } from '../g10NoteSectionMap'
 
 describe('g10DisclosureSyncPayload', () => {
   it('buildG10ListedSyncPayloads 对齐五、34', () => {
@@ -22,7 +22,8 @@ describe('g10DisclosureSyncPayload', () => {
     })
     expect(payloads).toHaveLength(1)
     expect(payloads[0].section_id).toBe(G10_NOTE_SECTION.listed.trading)
-    expect(payloads[0].sheet_name).toBe('附注上市')
+    // sheet_name = 源 xlsx 真实 tab 名（非 `附注上市` 短名，否则附注反向跳转匹配不上）
+    expect(payloads[0].sheet_name).toBe(G10_DISCLOSURE_SHEET_NAME.listed)
     const rows = payloads[0].sub_table_data['交易性金融负债']
     expect(rows.some((r) => r.row_key === 'mv_trading_bond')).toBe(true)
     expect(rows.some((r) => r.is_total === true)).toBe(true)
@@ -53,6 +54,6 @@ describe('g10DisclosureSyncPayload', () => {
     })
     expect(payloads).toHaveLength(1)
     expect(payloads[0].section_id).toBe(G10_NOTE_SECTION.soe.trading)
-    expect(payloads[0].sheet_name).toBe('附注国企')
+    expect(payloads[0].sheet_name).toBe(G10_DISCLOSURE_SHEET_NAME.soe)
   })
 })

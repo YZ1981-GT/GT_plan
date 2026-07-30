@@ -14,6 +14,7 @@ import {
   layerTotal,
   deriveSoeFullyDepreciated,
   fullyDepSubtotal,
+  createH1SoeDisclosureState,
 } from '../h1SoeDisclosureModel'
 import { buildH1SoeSubTableData, buildH1SoeSyncPayload } from '../h1DisclosureSyncPayload'
 import { H1_NOTE_SECTION, isH1FixedAssetNoteSection } from '../h1NoteSectionMap'
@@ -42,6 +43,38 @@ describe('h1SoeDisclosureModel — 已提足折旧仍在使用', () => {
     expect(res).toHaveLength(1)
     expect(res[0].name).toBe('电子设备')
     expect(res[0].cost).toBeCloseTo(200_000)
+  })
+})
+
+describe('flattenSoeMovement — 源模板整行「—」列示约定', () => {
+  function landRow(layer: string, layers = recomputeSoeLayers(createEmptyLayersFixture())) {
+    return flattenSoeMovement(layers).find((r) => r.rowKey === `${layer}-land`)!
+  }
+
+  function createEmptyLayersFixture() {
+    return createH1SoeDisclosureState().layers
+  }
+
+  it('土地资产在累计折旧（R24）与减值准备（R42）层标记 allNa', () => {
+    expect(landRow('dep').allNa).toBe(true)
+    expect(landRow('impair').allNa).toBe(true)
+    // 原值层土地是正常可填行
+    expect(landRow('cost').allNa).toBe(false)
+  })
+
+  it('无金额时 hasAmount=false（UI 显示「—」）', () => {
+    expect(landRow('dep').hasAmount).toBe(false)
+    expect(landRow('impair').hasAmount).toBe(false)
+  })
+
+  it('带入金额后 hasAmount=true —— 照常显示以免静默丢数', () => {
+    const st = createH1SoeDisclosureState()
+    st.layers.find((l) => l.layer === 'dep')!.categories.find((c) => c.key === 'land')!.begin = 123
+    recomputeSoeLayers(st.layers)
+    const row = flattenSoeMovement(st.layers).find((r) => r.rowKey === 'dep-land')!
+    expect(row.allNa).toBe(true)
+    expect(row.hasAmount).toBe(true)
+    expect(row.begin).toBe(123)
   })
 })
 

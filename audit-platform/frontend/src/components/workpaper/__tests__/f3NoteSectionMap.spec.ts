@@ -4,6 +4,7 @@
 import { describe, it, expect } from 'vitest'
 import { ref } from 'vue'
 import {
+  F3_DISCLOSURE_SHEET_NAME,
   F3_NOTE_SECTION,
   buildF3SyncPayload,
   orderF3ClassRows,
@@ -51,7 +52,9 @@ describe('f3NoteSectionMap', () => {
       '注：企业应说明本期已到期未支付的应付票据总金额。',
     )
     expect(payload.section_id).toBe('八、36')
-    expect(payload.sheet_name).toBe('F3-note-soe')
+    // sheet_name = 源 xlsx 真实 tab 名（不是 `F3-note-soe` 合成标识，否则附注
+    // 「打开同步底稿」的 `?sheet=` 匹配不上）；断言引用常量，禁止另写字面量
+    expect(payload.sheet_name).toBe(F3_DISCLOSURE_SHEET_NAME.soe)
     expect(payload.current_standard).toBe('soe_standalone')
     // 缺失的商业承兑行自动补 0，保持模板固定两行
     expect(payload.sub_table_data['应付票据'].map((r) => r.label)).toEqual([
@@ -72,7 +75,7 @@ describe('f3NoteSectionMap', () => {
       '本期末已到期未支付的应付票据总额为0元。',
     )
     expect(payload.section_id).toBe('五、36')
-    expect(payload.sheet_name).toBe('F3-note-listed')
+    expect(payload.sheet_name).toBe(F3_DISCLOSURE_SHEET_NAME.listed)
     expect(payload.current_standard).toBe('listed_standalone')
     const rows = payload.sub_table_data['应付票据']
     expect(rows).toHaveLength(3)

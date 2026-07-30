@@ -4,6 +4,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   G2_COMBINED_DISCLOSURE_INDEX,
+  G2_DISCLOSURE_SHEET_NAME,
   G2_NOTE_SECTION,
   isG2DisclosureApplicable,
   resolveG2NoteSectionTarget,
@@ -38,7 +39,8 @@ describe('g2NoteSectionMap', () => {
     expect(t?.chipValue).toBe('Note:五、8')
     expect(t?.combinedWpChip).toBe('wp:K1-1')
     expect(t?.combinedNoteChip).toBe('Note:五、8')
-    expect(t?.sheetName).toBe('G2-note-listed')
+    // sheetName = 源 xlsx 真实 tab 名（非 `G2-note-listed` 合成标识）
+    expect(t?.sheetName).toBe(G2_DISCLOSURE_SHEET_NAME.listed)
   })
 
   it('上市准则下国企页不适用', () => {
@@ -180,7 +182,7 @@ describe('g2DisclosureSyncPayload', () => {
     })
     expect(payloads).toHaveLength(1)
     expect(payloads[0].section_id).toBe('五、8')
-    expect(payloads[0].sheet_name).toBe('G2-note-listed')
+    expect(payloads[0].sheet_name).toBe(G2_DISCLOSURE_SHEET_NAME.listed)
     expect(payloads[0].current_standard).toBe('listed_standalone')
     expect(payloads[0].sub_table_data._note_texts?.[0]).toMatchObject({
       section: 'listed-audit-note',

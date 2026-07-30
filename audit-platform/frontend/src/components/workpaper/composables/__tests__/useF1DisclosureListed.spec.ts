@@ -8,7 +8,11 @@ import {
   useF1DisclosureListed,
 } from '../useF1DisclosureListed'
 import { calcPercentage } from '../useF1FormulaEngine'
-import { buildF1ListedSubTableData, buildF1SyncPayload } from '../f1DisclosureSyncPayload'
+import {
+  F1_LISTED_SUBTABLE,
+  buildF1ListedSubTableData,
+  buildF1SyncPayload,
+} from '../f1DisclosureSyncPayload'
 import type { ChecklistResponse } from '../useF1FormData'
 
 vi.mock('element-plus', () => ({
@@ -144,12 +148,111 @@ describe('useF1DisclosureListed integration', () => {
 
     const snap = api.getSyncSnapshot()
     const sub = buildF1ListedSubTableData(snap)
-    expect(sub['预付款项按账龄披露'].length).toBeGreaterThan(4)
-    expect(sub['账龄超过1年的重要预付款项'][0].label).toBe('甲')
-    expect(sub['单位名称']).toHaveLength(6) // 5 + 合计
+    // 4 段 + 小计 + 减：减值准备 + 合计
+    expect(sub[F1_LISTED_SUBTABLE.AGING] as unknown[]).toHaveLength(7)
+    expect((sub[F1_LISTED_SUBTABLE.OVER1] as any[])[0].label).toBe('甲')
+    expect(sub[F1_LISTED_SUBTABLE.TOP5] as unknown[]).toHaveLength(6) // 5 + 合计
 
     const payload = buildF1SyncPayload('listed', 'wp-1', ['listed_standalone'], sub)
     expect(payload?.section_id).toBe('五、7')
-    expect(payload?.sheet_name).toBe('F1-note-listed')
+    // 真实 tab 名（DB workpaper_sheet_classification），使附注反向跳转能精确定位
+    expect(payload?.sheet_name).toBe('附注披露信息(上市公司)')
+  })
+
+  it('减值准备双期入表：小计 − 减：减值准备 = 合计', () => {
+    const map = new Map<string, ChecklistResponse>()
+    map.set('F1-note-listed-impairment-provision', {
+      item_id: 'F1-note-listed-impairment-provision', conclusion: null, remark: '90',
+    })
+    map.set('F1-note-listed-impairment-provision-prior', {
+      item_id: 'F1-note-listed-impairment-provision-prior', conclusion: null, remark: '60',
+    })
+
+    const api = useF1DisclosureListed({
+      allResponses: ref(map),
+      wpId: ref('wp-1'),
+      projectId: ref('p1'),
+      saveImmediate: vi.fn(),
+      debouncedSave: vi.fn(),
+      crossSheet: makeCrossSheet({
+        within1: 1000, y1to2: 0, y2to3: 0, over3: 0,
+        prior_within1: 800, prior_y1to2: 0, prior_y2to3: 0, prior_over3: 0,
+      }),
+      isReadonly: ref(false),
+      applicableStandards: ref(['listed_standalone']),
+    })
+
+    expect(api.agingTotal.value.label).toBe('小计')
+    expect(api.agingImpairmentRow.value.endAmount).toBe(90)
+    expect(api.agingImpairmentRow.value.priorAmount).toBe(60)
+    expect(api.agingNet.value.endAmount).toBe(1000 - 90)
+    expect(api.agingNet.value.priorAmount).toBe(800 - 60)
+  })
+
+  it('5年段：附注账龄行推 6 档 + 三行尾，标签用附注简写', () => {
+    const fiveYearSegs = [
+      { key: 'within1', label: '1年以内', dayFrom: 0, dayTo: 365 },
+      { key: 'y1to2', label: '1-2年', dayFrom: 366, dayTo: 730 },
+      { key: 'y2to3', label: '2-3年', dayFrom: 731, dayTo: 1095 },
+      { key: 'y3to4', label: '3-4年', dayFrom: 1096, dayTo: 1460 },
+      { key: 'y4to5', label: '4-5年', dayFrom: 1461, dayTo: 1825 },
+      { key: 'over5', label: '5年以上', dayFrom: 1826, dayTo: null },
+    ]
+    const api = useF1DisclosureListed({
+      allResponses: ref(new Map<string, ChecklistResponse>()),
+      wpId: ref('wp-1'),
+      projectId: ref('p1'),
+      saveImmediate: vi.fn(),
+      debouncedSave: vi.fn(),
+      crossSheet: {
+        agingAggregation: computed(() => ({
+          within1: 100, y1to2: 100, y2to3: 100, y3to4: 100, y4to5: 100, over5: 100,
+        })),
+        agingSegments: computed(() => fiveYearSegs),
+        longTermRows: computed(() => []),
+        natureAggregation: computed(() => ({})),
+        adjudicationForDisclosure: computed(() => ({
+          natureAggregation: {}, agingAggregation: {}, longTermRows: [],
+        })),
+      } as any,
+      isReadonly: ref(false),
+      applicableStandards: ref(['listed_standalone']),
+    })
+
+    expect(api.agingRows.value.map((r) => r.label)).toEqual([
+      '1年以内', '1至2年', '2至3年', '3至4年', '4至5年', '5年以上',
+    ])
+    const rows = buildF1ListedSubTableData(api.getSyncSnapshot())[F1_LISTED_SUBTABLE.AGING] as any[]
+    expect(rows).toHaveLength(9) // 6 段 + 小计 + 减：减值准备 + 合计
+    expect(rows.slice(-3).map((r) => r.label)).toEqual(['小计', '减：减值准备', '合计'])
+  })
+
+  it('自定义段：标签回退 segment.label，行数随段数', () => {
+    const customSegs = [
+      { key: 'custom-0', label: '半年以内', dayFrom: 0, dayTo: null },
+      { key: 'custom-1', label: '半年至一年', dayFrom: 0, dayTo: null },
+      { key: 'custom-2', label: '一年以上', dayFrom: 0, dayTo: null },
+    ]
+    const api = useF1DisclosureListed({
+      allResponses: ref(new Map<string, ChecklistResponse>()),
+      wpId: ref('wp-1'),
+      projectId: ref('p1'),
+      saveImmediate: vi.fn(),
+      debouncedSave: vi.fn(),
+      crossSheet: {
+        agingAggregation: computed(() => ({ 'custom-0': 50, 'custom-1': 30, 'custom-2': 20 })),
+        agingSegments: computed(() => customSegs),
+        longTermRows: computed(() => []),
+        natureAggregation: computed(() => ({})),
+        adjudicationForDisclosure: computed(() => ({
+          natureAggregation: {}, agingAggregation: {}, longTermRows: [],
+        })),
+      } as any,
+      isReadonly: ref(false),
+      applicableStandards: ref(['listed_standalone']),
+    })
+
+    expect(api.agingRows.value.map((r) => r.label)).toEqual(['半年以内', '半年至一年', '一年以上'])
+    expect(api.agingTotal.value.endAmount).toBe(100)
   })
 })

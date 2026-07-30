@@ -6,7 +6,7 @@ import {
   G11_MAIN_SUBTABLE,
 } from '../g11DisclosureSyncPayload'
 import { defaultG11DiscStore } from '../g11DisclosureFromAdj'
-import { G11_NOTE_SECTION } from '../g11NoteSectionMap'
+import { G11_DISCLOSURE_SHEET_NAME, G11_NOTE_SECTION } from '../g11NoteSectionMap'
 
 describe('g11DisclosureSyncPayload', () => {
   it('buildG11ListedSyncPayloads 对齐五、69', () => {
@@ -29,7 +29,8 @@ describe('g11DisclosureSyncPayload', () => {
     })
     expect(payloads).toHaveLength(1)
     expect(payloads[0].section_id).toBe(G11_NOTE_SECTION.listed)
-    expect(payloads[0].sheet_name).toBe('附注上市')
+    // sheet_name = 源 xlsx 真实 tab 名（非 `附注上市` 短名）
+    expect(payloads[0].sheet_name).toBe(G11_DISCLOSURE_SHEET_NAME.listed)
     const main = payloads[0].sub_table_data[G11_MAIN_SUBTABLE]
     expect(main.some((r) => r.row_key === 'equity_method')).toBe(true)
     expect(main.some((r) => r.is_total === true)).toBe(true)
@@ -51,7 +52,7 @@ describe('g11DisclosureSyncPayload', () => {
     })
     expect(payloads).toHaveLength(1)
     expect(payloads[0].section_id).toBe(G11_NOTE_SECTION.soe)
-    expect(payloads[0].sheet_name).toBe('附注国企')
+    expect(payloads[0].sheet_name).toBe(G11_DISCLOSURE_SHEET_NAME.soe)
     const main = payloads[0].sub_table_data[G11_MAIN_SUBTABLE]
     expect(main.some((r) => r.row_key === 'other')).toBe(true)
     expect(payloads[0].sub_table_data._note_texts?.some((t) => t.section === 'repatriation-note')).toBe(true)

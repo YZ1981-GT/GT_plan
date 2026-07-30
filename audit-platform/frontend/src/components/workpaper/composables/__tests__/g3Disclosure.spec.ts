@@ -4,6 +4,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   G3_COMBINED_DISCLOSURE_INDEX,
+  G3_DISCLOSURE_SHEET_NAME,
   G3_NOTE_SECTION,
   isG3DisclosureApplicable,
   resolveG3NoteSectionTarget,
@@ -21,14 +22,15 @@ describe('g3NoteSectionMap', () => {
     expect(G3_COMBINED_DISCLOSURE_INDEX.wpCode).toBe('K1-1')
     const t = resolveG3NoteSectionTarget('listed', ['listed_standalone'])
     expect(t?.sectionId).toBe('五、8')
-    expect(t?.sheetName).toBe('G3-note-listed')
+    // sheetName = 源 xlsx 真实 tab 名（非 `G3-note-listed` 合成标识）
+    expect(t?.sheetName).toBe(G3_DISCLOSURE_SHEET_NAME.listed)
     expect(t?.combinedWpChip).toBe('wp:K1-1')
   })
 
   it('国企映射八、9', () => {
     const t = resolveG3NoteSectionTarget('soe', ['soe_standalone'])
     expect(t?.sectionId).toBe('八、9')
-    expect(t?.sheetName).toBe('G3-note-soe')
+    expect(t?.sheetName).toBe(G3_DISCLOSURE_SHEET_NAME.soe)
   })
 
   it('准则互斥', () => {
@@ -79,7 +81,7 @@ describe('g3DisclosureSyncPayload', () => {
     )
     expect(payloads).toHaveLength(1)
     expect(payloads[0].section_id).toBe('五、8')
-    expect(payloads[0].sheet_name).toBe('G3-note-listed')
+    expect(payloads[0].sheet_name).toBe(G3_DISCLOSURE_SHEET_NAME.listed)
     const sub = payloads[0].sub_table_data['应收股利']
     expect(sub?.some((r) => r.label === '甲公司' && r.end_balance === 110)).toBe(true)
     expect(sub?.some((r) => r.is_total && r.end_balance === 110)).toBe(true)

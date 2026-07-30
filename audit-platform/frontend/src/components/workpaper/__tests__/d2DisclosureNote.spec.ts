@@ -57,14 +57,17 @@ const LEGACY_DETAIL = JSON.stringify([
 ])
 
 describe('useD2DisclosureNote — 账龄披露', () => {
-  it('账龄行 = 动态账龄段 + 1年以内小计/小计/减：坏账准备/合计 四结构行', () => {
+  it('账龄行 = 动态账龄段 + 小计/减：坏账准备/合计 三结构行（1年以内未细分时无小计）', () => {
     const { api } = setup()
     const rows = api.agingRows.value
-    const segCount = api.agingSegments.value.length
-    expect(segCount).toBeGreaterThan(0)
-    expect(rows).toHaveLength(segCount + 4)
-    expect(rows.slice(-4).map((r) => r.label)).toEqual(['1年以内小计', '小计', '减：坏账准备', '合计'])
-    expect(rows.slice(-4).map((r) => r.kind)).toEqual(['within1Subtotal', 'subtotal', 'badDebt', 'total'])
+    const segs = api.agingSegments.value
+    expect(segs.length).toBeGreaterThan(0)
+    // 默认 5 年段：1年以内只有一段 → 「1年以内小计」恒等于该段，源模板国企版无此行
+    expect(segs.filter((s) => s.dayFrom < 366)).toHaveLength(1)
+    expect(rows).toHaveLength(segs.length + 3)
+    expect(rows.some((r) => r.kind === 'within1Subtotal')).toBe(false)
+    expect(rows.slice(-3).map((r) => r.label)).toEqual(['小计', '减：坏账准备', '合计'])
+    expect(rows.slice(-3).map((r) => r.kind)).toEqual(['subtotal', 'badDebt', 'total'])
   })
 
   it('账龄金额自动取自 D2-2 明细 nested 账龄；小计/合计按公式派生', () => {
@@ -81,7 +84,6 @@ describe('useD2DisclosureNote — 账龄披露', () => {
     expect(byLabel('1-2年').endAmount).toBe(200)
     expect(byLabel('2-3年').endAmount).toBe(100)
     // 1年以内小计 = 1年以内段之和
-    expect(byLabel('1年以内小计').endAmount).toBe(1000)
     // 小计 = 各账龄段之和
     expect(byLabel('小计').endAmount).toBe(1300)
     // 坏账准备取自 D2-3
@@ -202,20 +204,51 @@ describe('useD2DisclosureNote — 坏账准备变动', () => {
     expect(api.movementEndBalance.value).toBe(130)
   })
 
-  it('国企按类别变动：本期变动金额 = 期末 − 期初，合计为各类别之和', () => {
+  it('国企按类别变动：期初/计提/收回或转回/转销或核销/期末 五列，合计为各类别之和', () => {
     const { api } = setup({
       variant: 'soe',
       entries: [
-        resp('D2-bd-individual-rows', badDebtFixed({ priorAudited: 60, currentAudited: 70 })),
-        resp('D2-bd-aging-rows', badDebtFixed({ priorAudited: 40, currentAudited: 60 })),
+        resp('D2-bd-individual-rows', badDebtFixed({
+          priorAudited: 60, currentAudited: 70,
+          currentProvision: 14, currentReversal: 3, currentWriteOff: 1,
+        })),
+        resp('D2-bd-aging-rows', badDebtFixed({
+          priorAudited: 40, currentAudited: 60,
+          currentProvision: 26, currentReversal: 4, currentWriteOff: 2,
+        })),
       ],
     })
     const rows = api.movementByCategory.value
     expect(rows).toHaveLength(4)
-    expect(rows[0]).toMatchObject({ priorAmount: 60, endAmount: 70, changeAmount: 10 })
-    expect(rows[1]).toMatchObject({ priorAmount: 40, endAmount: 60, changeAmount: 20 })
+    expect(rows[0]).toMatchObject({
+      priorAmount: 60, provisionAmount: 14, reversalAmount: 3, writeOffAmount: 1, endAmount: 70,
+    })
+    expect(rows[1]).toMatchObject({
+      priorAmount: 40, provisionAmount: 26, reversalAmount: 4, writeOffAmount: 2, endAmount: 60,
+    })
     const total = rows.find((r) => r.isTotal)!
-    expect(total).toMatchObject({ priorAmount: 100, endAmount: 130, changeAmount: 30 })
+    expect(total).toMatchObject({
+      priorAmount: 100, provisionAmount: 40, reversalAmount: 7, writeOffAmount: 3, endAmount: 130,
+    })
+  })
+})
+
+describe('useD2DisclosureNote — 快照透出账龄段 key（R6 映射前置条件）', () => {
+  it('buildSnapshot 的账龄行与组合分表行必须带 key，否则同步层无法映射披露口径', () => {
+    const { api } = setup({ variant: 'soe' })
+    api.addPortfolio('应收中央企业客户')
+    const snap = api.buildSnapshot()
+
+    // 账龄段行（kind=segment）必须有 key，且与 agingSegments 对齐
+    const segKeys = api.agingSegments.value.map((s) => s.key)
+    const snapSegKeys = snap.agingRows.map((r) => r.key).filter((k) => k && !k.startsWith('__'))
+    expect(snapSegKeys).toEqual(segKeys)
+
+    // 结构行也带 key（`__subtotal` / `__badDebt` / `__total`）
+    expect(snap.agingRows.every((r) => !!r.key)).toBe(true)
+
+    // 组合分表行按账龄段生成 → key 同样透出
+    expect(snap.portfolios[0].rows.map((r) => r.key)).toEqual(segKeys)
   })
 })
 
@@ -320,7 +353,7 @@ describe('useD2DisclosureNote — 勾稽告警与同步快照', () => {
     expect(texts).toEqual([{ section: 'note-aging', title: '按账龄披露说明', text: '账龄说明' }])
     // 账龄表行含结构行（合计标记）
     const aging = payload.sub_table_data[D2_TABLE_NAMES.soe.aging] as any[]
-    expect(aging.at(-1)).toMatchObject({ label: '合计', is_total: true })
+    expect(aging.at(-1)).toMatchObject({ label: '合 计', is_total: true })
   })
 
   it('只读态禁止任何写入', () => {
@@ -455,5 +488,61 @@ describe('buildD2SyncPayload — 同名组合分表不丢表', () => {
     expect(Object.keys(payload.sub_table_data)).toContain(D2_TABLE_NAMES.soe.aging)
     expect(payload.sub_table_data['组合计提项目：应收中央企业客户']).toBeDefined()
     expect(payload.sub_table_data['组合计提项目：应收海外企业客户']).toBeDefined()
+  })
+})
+
+describe('useD2DisclosureNote — R7.5 基线播种 seedSyncedTablesFromNote', () => {
+  const NOTE_TABLE_DATA = {
+    sub_table_data: {
+      [D2_TABLE_NAMES.soe.aging]: [],
+      '组合计提项目：应收中央企业客户': [],
+      // 别的底稿推的表（不在 D2 命名空间内）
+      存货跌价准备: [],
+      _note_texts: [],
+    },
+  }
+
+  it('首次同步：播种命名空间内的附注现存表名并持久化', () => {
+    const { api, save } = setup({ variant: 'soe' })
+    expect(api.syncedTableNames.value).toEqual([])
+    const seeded = api.seedSyncedTablesFromNote(NOTE_TABLE_DATA)
+    expect(seeded).toEqual([D2_TABLE_NAMES.soe.aging, '组合计提项目：应收中央企业客户'])
+    expect(api.syncedTableNames.value).toEqual(seeded)
+    expect(save).toHaveBeenCalledWith([
+      expect.objectContaining({
+        item_id: 'D2-disc-soe-synced-tables',
+        remark: JSON.stringify(seeded),
+      }),
+    ])
+  })
+
+  it('基线已建立 → 幂等，不覆盖、不再写库', () => {
+    const { api, save } = setup({ variant: 'soe' })
+    api.markSynced(['既有表A'])
+    save.mockClear()
+    const seeded = api.seedSyncedTablesFromNote(NOTE_TABLE_DATA)
+    expect(seeded).toEqual(['既有表A'])
+    expect(api.syncedTableNames.value).toEqual(['既有表A'])
+    expect(save).not.toHaveBeenCalled()
+  })
+
+  it('播种结果参与差集：上线前残留的组合分表被清理，别的底稿的表不受影响', () => {
+    const { api } = setup({ variant: 'soe' })
+    api.seedSyncedTablesFromNote(NOTE_TABLE_DATA)
+    const payload = buildD2SyncPayload('soe', 'wp-1', null, api.buildSnapshot())
+    const removed = (payload.sub_table_data._removed_table_keys ?? []) as string[]
+    expect(removed).toEqual(['组合计提项目：应收中央企业客户'])
+    expect(removed).not.toContain('存货跌价准备')
+    // 本轮推送的表绝不在待删除清单里
+    for (const key of removed) expect(payload.sub_table_data[key]).toBeUndefined()
+  })
+
+  it('附注尚未生成 / 读取失败（空 table_data）→ 不播种、不写库', () => {
+    const { api, save } = setup({ variant: 'soe' })
+    save.mockClear()
+    expect(api.seedSyncedTablesFromNote(null)).toEqual([])
+    expect(api.seedSyncedTablesFromNote({ rows: [] })).toEqual([])
+    expect(api.syncedTableNames.value).toEqual([])
+    expect(save).not.toHaveBeenCalled()
   })
 })

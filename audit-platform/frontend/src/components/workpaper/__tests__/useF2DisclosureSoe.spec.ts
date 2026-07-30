@@ -86,4 +86,78 @@ describe('useF2DisclosureSoe', () => {
     expect(row.ending).toBe(120)
     expect(Math.abs(row.tieDiff)).toBeLessThan(0.01)
   })
+
+  // ── (5) 确认为存货的数据资源（R3）──
+  describe('（5）确认为存货的数据资源', () => {
+    function mountWithDr(remark?: string) {
+      const map = new Map<string, ChecklistResponse>()
+      if (remark !== undefined) {
+        map.set('F2-note-soe-s5-data-resource', {
+          item_id: 'F2-note-soe-s5-data-resource',
+          conclusion: null,
+          remark,
+        })
+      }
+      return useF2DisclosureSoe({
+        allResponses: ref(map),
+        isReadonly: ref(false),
+        applicableStandards: ref(['soe']),
+      })
+    }
+
+    it('21 行三段式，国企段标题为「二、跌价准备」', () => {
+      const api = mountWithDr()
+      expect(api.drRows.value).toHaveLength(21)
+      expect(api.drRows.value.filter((r) => r.kind === 'section').map((r) => r.label)).toEqual([
+        '一、账面原值', '二、跌价准备', '三、账面价值',
+      ])
+      expect(api.drIsEmpty.value).toBe(true)
+    })
+
+    it('录入后期末/账面价值/合计按公式联动', () => {
+      const api = mountWithDr(JSON.stringify({
+        'gross-open': { purchased: 100, selfProcessed: 50, other: 0 },
+        'gross-inc': { purchased: 20, selfProcessed: 0, other: 5 },
+        'gross-dec': { purchased: 10, selfProcessed: 0, other: 0 },
+        'imp-open': { purchased: 8, selfProcessed: 2, other: 0 },
+      }))
+      expect(api.drIsEmpty.value).toBe(false)
+
+      const grossEnd = api.drRows.value.find((r) => r.rowKey === 'gross-end')!
+      expect(grossEnd.purchased).toBe(110)
+      expect(grossEnd.total).toBe(165) // 110 + 50 + 5
+
+      const impEnd = api.drRows.value.find((r) => r.rowKey === 'imp-end')!
+      expect(impEnd.total).toBe(10)
+
+      const nvEnd = api.drRows.value.find((r) => r.rowKey === 'nv-end')!
+      expect(nvEnd.purchased).toBe(102) // 110 - 8
+      const nvOpen = api.drRows.value.find((r) => r.rowKey === 'nv-open')!
+      expect(nvOpen.purchased).toBe(92) // 100 - 8
+    })
+
+    it('updateDrCell 写入录入行、忽略派生行', () => {
+      const api = mountWithDr()
+      api.updateDrCell('imp-inc', 'purchased', 42)
+      expect(api.drRows.value.find((r) => r.rowKey === 'imp-inc')!.purchased).toBe(42)
+
+      api.updateDrCell('imp-end', 'purchased', 999)
+      // imp-end 仍为公式值 0 + 42 - 0
+      expect(api.drRows.value.find((r) => r.rowKey === 'imp-end')!.purchased).toBe(42)
+    })
+
+    it('remark 非法 JSON 时回退空表而非抛错', () => {
+      const api = mountWithDr('{not json')
+      expect(api.drRows.value).toHaveLength(21)
+      expect(api.drIsEmpty.value).toBe(true)
+    })
+
+    it('getSyncSnapshot 携带 21 行数据资源子表', () => {
+      const api = mountWithDr(JSON.stringify({ 'gross-open': { purchased: 7 } }))
+      const snap = api.getSyncSnapshot()
+      expect(snap.s5DataResourceRows).toHaveLength(21)
+      expect(snap.s5DataResourceRows[1].purchased).toBe(7)
+      expect(snap.s5DataResourceRows[1].total).toBe(7)
+    })
+  })
 })

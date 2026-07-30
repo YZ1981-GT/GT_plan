@@ -9,7 +9,7 @@ import {
   G1_INPUT_CANDIDATES,
 } from '../g1DisclosureItems'
 import { buildG1ListedSubTableData, buildG1SyncPayload } from '../g1DisclosureSyncPayload'
-import { G1_NOTE_SECTION } from '../g1NoteSectionMap'
+import { G1_DISCLOSURE_SHEET_NAME, G1_NOTE_SECTION } from '../g1NoteSectionMap'
 
 describe('g1DisclosureItems', () => {
   it('分类行含划分为与指定小类及合计', () => {
@@ -68,6 +68,7 @@ describe('g1DisclosureSyncPayload', () => {
     expect(sub['指定理由'][0].说明).toBe('指定理由测试')
     const payload = buildG1SyncPayload('listed', 'wp-1', ['listed_standalone'], sub)
     expect(payload?.section_id).toBe(G1_NOTE_SECTION.listed.trading)
-    expect(payload?.sheet_name).toBe('G1-note-listed')
+    // sheet_name = 源 xlsx 真实 tab 名（非 `G1-note-listed` 合成标识）
+    expect(payload?.sheet_name).toBe(G1_DISCLOSURE_SHEET_NAME.listed)
   })
 })

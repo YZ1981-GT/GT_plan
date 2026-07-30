@@ -22,16 +22,39 @@ import {
   resolveDeductibleDiff,
   N1_DETAIL_ROWS_KEY,
   N1_LOSS_ROWS_KEY,
+  N1_LOSS_ROWS_KEY_V2,
 } from '../useN1DisclosureSource'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+/**
+ * `useN1FormData` 的测试桩。
+ *
+ * 🔴 `getField` / `setField` 必须与真实实现同 item_id 约定（`N1-{sheet}-{field}`）：
+ * 桩此前缺这两个方法，`useN1Adjudication._readNote` 调 `formData.getField('1', ...)`
+ * 时抛 `is not a function`，导致本文件 5 条用例整体失败（与披露改造无关的既有缺口）。
+ */
 function makeFormDataStub(allResponses: any) {
+  const itemIdOf = (sheet: string, field: string) => `N1-${sheet}-${field}`
   return {
     allResponses,
     tbSeed: ref({ beginBalance: 0, debitAmount: 0, creditAmount: 0, endBalance: 0 }),
+    getField: (sheet: string, field: string) =>
+      allResponses.value.get(itemIdOf(sheet, field))?.conclusion ?? null,
+    setField: vi.fn((sheet: string, field: string, value: any) => {
+      const itemId = itemIdOf(sheet, field)
+      allResponses.value.set(itemId, {
+        item_id: itemId,
+        conclusion: typeof value === 'string' ? value : JSON.stringify(value),
+        remark: null,
+      })
+      return Promise.resolve()
+    }),
+    setTbValues: vi.fn(),
+    loadData: vi.fn(() => Promise.resolve()),
     debouncedSave: vi.fn(),
     saveField: vi.fn(),
+    saveBatch: vi.fn(() => Promise.resolve()),
     writebackTB: vi.fn(),
   } as any
 }
@@ -97,26 +120,38 @@ describe('N1 hydration — allResponses 异步填充后重新装载', () => {
         projectId: ref('p-1'),
         allResponses,
         formData: makeFormDataStub(allResponses),
-        currentYear: 2025,
+        // 🔴 入参名是 `auditYear`（Req 2.1 禁用 new Date()）；桩此前写 `currentYear`
+        // → composable 内 `auditYear.value` 抛 undefined，本用例长期红
+        auditYear: ref(2025),
       })
     })
     expect(loss.rows.value).toHaveLength(0)
 
+    // 🔴 hydrate 读的是 N1-5 **新模型**键 `N1_LOSS_ROWS_KEY_V2`（'N1-5-rows'）与
+    // 新行字段（expiryYear / bookAmount / auditAdjustment / recognizedAmount / …）。
+    // 本用例原先写 legacy 键 `N1-5-loss-rows` + legacy 行形状（lossAmount/maxYears/…）
+    // → hydrate 恒不命中、rows 恒空，自 spec `n1-loss-check-source-alignment`
+    // 重建 N1-5 后长期红。fixture 已按新模型重写。
     allResponses.value = new Map([
       [
-        N1_LOSS_ROWS_KEY,
+        N1_LOSS_ROWS_KEY_V2,
         {
           conclusion: JSON.stringify([
             {
               id: 'loss-1',
+              expiryYear: 2027,
               lossYear: 2022,
-              lossAmount: 5_000_000,
-              maxYears: 5,
-              recoveredBegin: 1_000_000,
-              currentRecovery: 0,
-              futureTaxableIncome: 10_000_000,
+              priorUnrecognized: 0,
+              bookAmount: 5_000_000,
+              auditAdjustment: -1_000_000,
+              recognizedAmount: 0,
               taxRate: 0.25,
-              recognitionBasis: '',
+              basis: '预计未来应纳税所得额不足',
+              sufficient: 'no',
+              sourceOperating: false,
+              sourceTemporaryDiff: false,
+              sourceOther: false,
+              indexRef: '',
             },
           ]),
         },
@@ -125,7 +160,10 @@ describe('N1 hydration — allResponses 异步填充后重新装载', () => {
     await nextTick()
 
     expect(loss.rows.value).toHaveLength(1)
-    expect(loss.rows.value[0].unrecoveredLoss).toBe(4_000_000)
+    // 审定金额 = 账面 + 审计调整；未确认额 = 审定 − 有效确认额（未届满行确认额为 0）
+    expect(loss.rows.value[0].auditedAmount).toBe(4_000_000)
+    expect(loss.rows.value[0].unrecognizedAmount).toBe(4_000_000)
+    expect(loss.rows.value[0].isExpired).toBe(false)
     scope.stop()
   })
 

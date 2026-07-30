@@ -147,6 +147,63 @@ describe('projectSubTablesClient', () => {
     const tables = projectSubTablesClient(td)!
     expect(tables[0].headers).toEqual([])
   })
+
+  // P9 归一化：与后端 normalize_sub_table_data 同规则（投影结果被回写的容错）
+  const P9_COLS = {
+    t: [
+      { key: 'label', label: '类别', is_label: true },
+      { key: 'book_amount_prior', label: '账面余额·金额' },
+      { key: 'provision_amount_prior', label: '坏账准备·金额' },
+    ],
+  }
+
+  it('P9 表对象包装 {rows:[...]} → 解包并逆投影', () => {
+    const td = {
+      _source: 'workpaper',
+      sub_table_data: {
+        t: {
+          rows: [{ label: '按单项计提坏账准备', values: [10, 1], is_total: false }],
+          _column_groups: [{ group: '上年年末金额', start: 1, span: 2 }],
+        },
+      },
+      _sub_table_columns: P9_COLS,
+    }
+    const tables = projectSubTablesClient(td)!
+    expect(tables).toHaveLength(1)
+    expect(tables[0].headers).toEqual(['类别', '账面余额·金额', '坏账准备·金额'])
+    expect(tables[0].rows[0].label).toBe('按单项计提坏账准备')
+    expect(tables[0].rows[0].values).toEqual([10, 1])
+  })
+
+  it('P9 业务键优先于位置化 values', () => {
+    const td = {
+      _source: 'workpaper',
+      sub_table_data: { t: [{ label: '甲', book_amount_prior: 999, values: [100, 5] }] },
+      _sub_table_columns: P9_COLS,
+    }
+    const tables = projectSubTablesClient(td)!
+    expect(tables[0].rows[0].values).toEqual([999, 5])
+  })
+
+  it('P9 取不出 rows 列表 → 丢弃该表，其余表不受影响', () => {
+    const td = {
+      _source: 'workpaper',
+      sub_table_data: { 坏: { headers: ['x'] }, 好: [{ label: '甲' }] },
+    }
+    const tables = projectSubTablesClient(td)!
+    expect(tables.map(t => t.name)).toEqual(['好'])
+  })
+
+  it('P9 归一化不修改入参', () => {
+    const td = {
+      _source: 'workpaper',
+      sub_table_data: { t: { rows: [{ label: '甲', values: [1, 2] }] } },
+      _sub_table_columns: P9_COLS,
+    }
+    const snap = JSON.parse(JSON.stringify(td))
+    projectSubTablesClient(td)
+    expect(td).toEqual(snap)
+  })
 })
 
 describe('defineColumns', () => {
@@ -160,6 +217,58 @@ describe('defineColumns', () => {
     expect(cols[0].is_label).toBe(true)
     expect(cols[1].format).toBe('amount')
     expect(cols[1].is_label).toBeUndefined()
+  })
+
+  // R3.1 flat 透传：后端 _extract_column_groups 靠「键是否存在」区分三态
+  // （None=未声明→前缀推断 / []=显式单级 / 非空=显式分组），
+  // 因此 flat 未声明时输出**不能带 flat 键**，否则会被当成显式单级。
+  it('flat: true 透传为 flat: true', () => {
+    const cols = defineColumns([
+      { key: 'label', label: '项目名称', is_label: true, flat: true },
+      { key: 'opening', label: '期初余额', format: 'amount' },
+    ])
+    expect(cols[0].flat).toBe(true)
+    expect(cols.some(c => c.flat === true)).toBe(true)
+  })
+
+  it('flat 省略 → 输出无 flat 键（保留后端未声明三态）', () => {
+    const cols = defineColumns([
+      { key: 'label', label: '类别', is_label: true },
+      { key: 'v', label: '值', format: 'amount' },
+    ])
+    for (const c of cols) {
+      expect('flat' in c).toBe(false)
+      expect(Object.keys(c)).not.toContain('flat')
+    }
+  })
+
+  it('flat: false → 输出无 flat 键（不写 false，避免与未声明混淆）', () => {
+    const cols = defineColumns([
+      { key: 'label', label: '类别', is_label: true, flat: false },
+      { key: 'v', label: '值', flat: false },
+    ])
+    for (const c of cols) {
+      expect('flat' in c).toBe(false)
+    }
+    expect(JSON.parse(JSON.stringify(cols))).toEqual([
+      { key: 'label', label: '类别', is_label: true },
+      { key: 'v', label: '值' },
+    ])
+  })
+
+  it('flat 与 group / is_label / format 共存互不干扰', () => {
+    const cols = defineColumns([
+      { key: 'label', label: '开发成本项目', is_label: true, flat: true },
+      { key: 'opening', label: '期初余额', format: 'amount', group: '账面余额' },
+      { key: 'closing', label: '期末余额', format: 'amount', group: '账面余额', flat: true },
+      { key: 'ratio', label: '占比', format: 'percent', align: 'right' },
+    ])
+    expect(cols[0]).toEqual({ key: 'label', label: '开发成本项目', is_label: true, flat: true })
+    expect(cols[1]).toEqual({ key: 'opening', label: '期初余额', format: 'amount', group: '账面余额' })
+    expect(cols[2]).toEqual({ key: 'closing', label: '期末余额', format: 'amount', group: '账面余额', flat: true })
+    expect(cols[3]).toEqual({ key: 'ratio', label: '占比', align: 'right', format: 'percent' })
+    // group 也必须透传（该 helper 曾漏传 group，防同类回归）
+    expect(cols.filter(c => c.group === '账面余额').map(c => c.key)).toEqual(['opening', 'closing'])
   })
 })
 

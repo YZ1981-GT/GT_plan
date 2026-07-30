@@ -5,8 +5,10 @@ import {
   buildAgingDisclosureRows,
   buildTop5FromK1Detail,
   calcAgingTieOut,
+  calcWithinOneYearTieOut,
   noteAgingLabel,
   parseK1ListedPayload,
+  summarizeContinuedInvolvement,
 } from '../k1DisclosureModel'
 import { buildK1ListedSubTableData, buildK1ListedSyncPayloads } from '../k1DisclosureSyncPayload'
 import { K1_LISTED_SUBTABLE } from '../k1NoteSectionMap'
@@ -111,10 +113,75 @@ describe('k1DisclosureSyncPayload', () => {
     expect(aging[0].label).toBe('账龄')
     // value 列 key 与行对象中文键逐字一致，且非英文键当 header
     expect(aging.map((c) => c.label)).toEqual(['账龄', '期末余额', '上年年末余额'])
-    // 性质表源对齐六列
+    // 性质表源对齐七列（首列表头与 note_template「项  目」一致）
     expect(cols[K1_LISTED_SUBTABLE.nature].map((c) => c.label)).toEqual([
-      '款项性质', '期末账面余额', '期末坏账准备', '期末账面价值',
+      '项  目', '期末账面余额', '期末坏账准备', '期末账面价值',
       '上年年末账面余额', '上年年末坏账准备', '上年年末账面价值',
     ])
+  })
+
+  it('上年年末三阶段子表随 payload 一并同步（附注 五、8 已有 3 张表）', () => {
+    const snap = emptyK1ListedPayload()
+    const data = buildK1ListedSubTableData(snap)
+    for (const name of [
+      K1_LISTED_SUBTABLE.priorStage1,
+      K1_LISTED_SUBTABLE.priorStage2,
+      K1_LISTED_SUBTABLE.priorStage3,
+    ]) {
+      expect(data[name], `缺子表 ${name}`).toBeDefined()
+    }
+  })
+
+  it('开启「不存在第二阶段」后对应子表清空并生成标准语句', () => {
+    const snap = emptyK1ListedPayload()
+    snap.stage2NoneEnd = true
+    snap.stage2NonePrior = true
+    const data = buildK1ListedSubTableData(snap)
+    expect(data[K1_LISTED_SUBTABLE.stage2]).toEqual([])
+    expect(data[K1_LISTED_SUBTABLE.priorStage2]).toEqual([])
+    const texts = (data._note_texts as unknown as Array<{ section: string; text: string }>)
+    expect(texts.some((t) => t.section === 'listed-stage2-none-end')).toBe(true)
+    expect(texts.some((t) => t.section === 'listed-stage2-none-prior')).toBe(true)
+  })
+
+  it('账龄表 1 年以内月度细分：sub 行不进小计，1年以内小计跟随 within1', () => {
+    const rows = buildAgingDisclosureRows(
+      PRESET_SEGMENTS.THREE_YEAR,
+      { end: { within1: 100, y1to2: 20, y2to3: 0, over3: 0 }, prior: {} },
+      { end: 0, prior: 0 },
+    )
+    const subs = rows.filter((r) => r.kind === 'sub')
+    expect(subs).toHaveLength(2)
+    expect(subs.every((r) => r.labelEditable)).toBe(true)
+    expect(rows.find((r) => r.kind === 'subtotal1y')?.endAmount).toBe(100)
+    // 小计只汇总 data 行（100 + 20），不含细分行
+    expect(rows.find((r) => r.kind === 'subtotal')?.endAmount).toBe(120)
+  })
+
+  it('calcWithinOneYearTieOut：细分为 0 视为未启用，不告警', () => {
+    const rows = buildAgingDisclosureRows(
+      PRESET_SEGMENTS.THREE_YEAR,
+      { end: { within1: 100 }, prior: {} },
+      { end: 0, prior: 0 },
+    )
+    expect(calcWithinOneYearTieOut(rows).matched).toBe(true)
+    const filled = rows.map((r) => (r.kind === 'sub' ? { ...r, endAmount: 30 } : r))
+    const tie = calcWithinOneYearTieOut(filled)
+    expect(tie.applicable).toBe(true)
+    expect(tie.subSumEnd).toBe(60)
+    expect(tie.matched).toBe(false)
+  })
+
+  it('继续涉入：旧标量 payload 迁移为明细行并可求小计', () => {
+    const legacy = JSON.stringify({
+      version: 2,
+      continuedInvolvementAssets: 500,
+      continuedInvolvementLiabilities: 200,
+    })
+    const parsed = parseK1ListedPayload(legacy, PRESET_SEGMENTS.THREE_YEAR)
+    expect(parsed.continuedInvolvementRows).toHaveLength(2)
+    const totals = summarizeContinuedInvolvement(parsed.continuedInvolvementRows)
+    expect(totals.assets).toBe(500)
+    expect(totals.liabilities).toBe(200)
   })
 })
