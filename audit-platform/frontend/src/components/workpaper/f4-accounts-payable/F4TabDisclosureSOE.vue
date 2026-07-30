@@ -36,6 +36,9 @@ const {
   removeImportantRow,
   updateImportantCell,
   disclosureText,
+  isSyncing,
+  syncToNotes,
+  noteSection,
 } = useF4DisclosureSOE({
   wpId: toRef(props, 'wpId') as Ref<string>,
   projectId: toRef(props, 'projectId') as Ref<string>,
@@ -131,9 +134,15 @@ onBeforeUnmount(() => window.removeEventListener('substantive:adjudicated', onAd
         <p>1. 按账龄披露：账龄档位跟随<strong>项目账龄配置</strong>（3年段／5年段／自定义），各档自动取自F4-1审定表按账龄分类（期末余额=期末审定数、期初余额=期初审定数），本表不可直接改数；“1年以上”合计按段起始天数≥366派生，不含“其他/未分类”残差行。</p>
         <p>2. 账龄超过1年的重要应付账款：点击"从F4-5同步"自动带入长期挂账检查表中挂账超过1年的债权单位、期末余额及未偿还原因，也可手工补行。</p>
         <p>3. 按账龄披露合计与F4-1按性质审定合计交叉核对，不一致时红色预警；重要应付账款合计不应超过1年以上账龄的披露合计。</p>
-        <p>4. 披露文字保存后自动联动国企附注模块（应付账款2202）。</p>
+        <p>4. 披露文字保存后自动联动国企附注模块（应付账款2202）；点击<strong>「⇄ 同步到附注」</strong>把两张表的行数据整表推送到附注「{{ noteSection }} 应付账款」。</p>
+        <p>5. <strong>账龄行名换算</strong>：底稿沿用源模板用词「1至2年（含2年）」，附注模版用词为「1至2年」；推送时自动按附注模版投影（鼠标悬停账龄可见附注行名），「其他/未分类」残差行不进附注但计入合计。</p>
       </div>
     </details>
+
+    <div class="methodology-note">
+      <p><strong>源模板提示：</strong>账龄超过1年的大额应付账款，应说明未偿还或未结转的原因，并在资产负债表日后事项中说明是否偿还；账龄超过3年以上的应付账款应说明未偿还的原因。</p>
+      <p>存在供应商融资安排（反向保理／供应链融资平台）的，还应按《企业会计准则解释第17号》在附注「现金流量表补充资料—供应商融资安排」中披露，底稿见 F4-9 供应商融资检查表。</p>
+    </div>
 
     <el-alert
       class="audit-objective"
@@ -164,6 +173,15 @@ onBeforeUnmount(() => window.removeEventListener('substantive:adjudicated', onAd
       </div>
       <div class="toolbar-right">
         <GtIndexChip value="wp:F4-1" :context-project-id="projectId" />
+        <GtIndexChip :value="`Note:${noteSection}`" :context-project-id="projectId" />
+        <el-button
+          size="small"
+          type="success"
+          plain
+          :disabled="isReadonly"
+          :loading="isSyncing"
+          @click="syncToNotes"
+        >⇄ 同步到附注</el-button>
         <el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('f4-disclosure-soe')">复核</el-button>
       </div>
     </div>
@@ -171,7 +189,13 @@ onBeforeUnmount(() => window.removeEventListener('substantive:adjudicated', onAd
     <el-table :data="visibleAgingRows" border size="small" class="disclosure-table">
       <el-table-column label="账龄" min-width="180">
         <template #default="{ row }">
-          <span class="linked-label">🔗 {{ row.label }}</span>
+          <el-tooltip
+            v-if="row.noteLabel && row.noteLabel !== row.label"
+            :content="`附注列示行名：${row.noteLabel}（附注模版用词）`"
+          >
+            <span class="linked-label note-label-hint">🔗 {{ row.label }}</span>
+          </el-tooltip>
+          <span v-else class="linked-label">🔗 {{ row.label }}</span>
         </template>
       </el-table-column>
       <el-table-column label="期末余额" width="170" align="right">
@@ -311,6 +335,17 @@ onBeforeUnmount(() => window.removeEventListener('substantive:adjudicated', onAd
 .guidance-content { margin-top: 8px; color: #606266; line-height: 1.65; }
 .guidance-content p { margin: 3px 0; }
 .audit-objective, .warning-alert { margin-bottom: 10px; }
+.methodology-note {
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  border-left: 3px solid #e6a23c;
+  border-radius: 4px;
+  background: #fdf6ec;
+  color: #7d5a1a;
+  line-height: 1.65;
+}
+.methodology-note p { margin: 3px 0; }
+.note-label-hint { border-bottom: 1px dashed #b7bcc5; cursor: help; }
 .section-toolbar { display: flex; justify-content: space-between; align-items: center; margin: 10px 0 8px; }
 .second-section { margin-top: 20px; }
 .toolbar-left, .toolbar-right { display: flex; gap: 8px; align-items: center; }

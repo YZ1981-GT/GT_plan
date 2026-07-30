@@ -40,9 +40,22 @@
       </div>
     </div>
 
+    <!-- ══════ 披露内部勾稽 ══════ -->
+    <H1DisclosureConsistencyPanel
+      :result="consistency"
+      :project-id="projectId"
+      :default-expanded="consistency.errorCount > 0"
+    />
+
     <!-- ══════ 15、固定资产 汇总 ══════ -->
     <section class="block">
       <h3 class="block-title">15、固定资产</h3>
+      <div class="row-actions" v-if="!isReadonly">
+        <el-button size="small" :disabled="!hasMovementData" @click="fillSummaryFromMovement">
+          从①情况表回填账面价值
+        </el-button>
+        <span class="hint inline">期末/上年年末固定资产 = ①表「四、账面价值」合计；清理行取（2）清理表合计</span>
+      </div>
       <el-table :data="summaryDisplay" border size="small" class="wp-table" style="max-width: 560px">
         <el-table-column label="项  目" min-width="160">
           <template #default="{ row }">
@@ -479,6 +492,11 @@ import { eventBus } from '@/utils/eventBus'
 import { api } from '@/services/apiProxy'
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
+import H1DisclosureConsistencyPanel from './H1DisclosureConsistencyPanel.vue'
+import {
+  checkH1ListedConsistency,
+  listedMovementTotal,
+} from '../../composables/h1DisclosureConsistency'
 import {
   H1_NOTE_SECTION,
   resolveH1CurrentStandardFromProject,
@@ -616,6 +634,44 @@ const fullyDepDisplay = computed(() => {
 
 /** 抵押、担保固定资产账面价值合计（供与借款质押/或有事项交叉核对） */
 const mortgageTotal = computed(() => mortgageRows.value.reduce((s, r) => s + num(r.amount), 0))
+
+/** ①情况表是否已有数据（用于回填按钮可用性 / 子集校验的 warn 判定） */
+const hasMovementData = computed(() => !isMovementEmpty(movement.value))
+
+/** 披露内部勾稽（汇总↔①表、政府补助↔「其他减少」、②③④⑥ 子集约束） */
+const consistency = computed(() =>
+  checkH1ListedConsistency({
+    summary,
+    categories: categories.value,
+    movement: movement.value,
+    idle: idleRows.value,
+    leaseOut: leaseRows.value,
+    titleCert: titleCertRows.value,
+    clearing: clearingRows.value,
+    fullyDep: fullyDepRows.value,
+    govSubsidyAmount: govSubsidy.amount,
+  }),
+)
+
+/**
+ * 汇总表从①情况表 + （2）清理表回填。
+ * 源模板汇总表（R7–R10）是①表账面价值与清理表合计的汇总，不应重复手工录入。
+ */
+function fillSummaryFromMovement(): void {
+  const fa = summary.find((r) => r.key === 'fixed_assets')
+  if (fa) {
+    fa.endBalance = listedMovementTotal(movement.value, categories.value, 'book_end')
+    fa.priorBalance = listedMovementTotal(movement.value, categories.value, 'book_begin')
+  }
+  const clr = summary.find((r) => r.key === 'clearing')
+  if (clr) {
+    const t = sumClearing(clearingRows.value)
+    clr.endBalance = t.endBalance
+    clr.priorBalance = t.priorBalance
+  }
+  scheduleSave()
+  ElMessage.success('已按①情况表账面价值与（2）清理表合计回填汇总表')
+}
 
 const leaseHint = computed(() => {
   const item = props.allResponses.get('H1-19-rows')

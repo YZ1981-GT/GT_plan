@@ -9,7 +9,15 @@
  * 披露文字通过 disclosure:note-text-updated(type='soe') 联动国企附注模块。
  */
 import { computed, inject, onBeforeUnmount, ref, watch, type ComputedRef, type Ref } from 'vue'
+import { ElMessage } from 'element-plus'
+import { api } from '@/services/apiProxy'
 import { parseNum, calcSubtotal } from './useF4AccPayFormulaEngine'
+import {
+  F4_ACCOUNT_CODE,
+  F4_NOTE_SECTION,
+  buildF4SoeSyncPayload,
+  f4NoteAgingLabelByRowKey,
+} from './f4NoteSectionMap'
 import {
   aggregateF4Detail,
   buildF4AgingDefaults,
@@ -32,11 +40,16 @@ export interface UseF4DisclosureSOEOptions {
   projectId: Ref<string>
   allResponses: Ref<Map<string, ChecklistResponse>>
   isReadonly?: Ref<boolean>
+  /** 项目适用准则（用于 current_standard 分流）；未提供时按 soe_standalone */
+  applicableStandards?: Ref<readonly string[] | null | undefined>
 }
 
 export interface F4SOEAgingDisclosureRow {
   rowKey: string
+  /** 底稿用词（源 xlsx：1年以内（含1年）/1至2年（含2年）/…） */
   label: string
+  /** 附注模版用词（推送到附注模块的行名，如「1至2年」） */
+  noteLabel: string
   closingBalance: number
   openingBalance: number
 }
@@ -137,6 +150,7 @@ export function useF4DisclosureSOE(options: UseF4DisclosureSOEOptions) {
       return {
         rowKey: row.rowKey,
         label: row.label,
+        noteLabel: f4NoteAgingLabelByRowKey(row.rowKey, row.label),
         closingBalance: computed_.closingAdjusted,
         openingBalance: computed_.openingAdjusted,
       }
@@ -288,20 +302,70 @@ export function useF4DisclosureSOE(options: UseF4DisclosureSOEOptions) {
     }
   }
 
-  watch(disclosureText, (value) => {
-    setItem(TEXT_KEY, value)
-    // 联动国企附注模块
+  function publishNoteTextUpdated(value: string): void {
     window.dispatchEvent(new CustomEvent('disclosure:note-text-updated', {
       detail: {
         wpCode: 'F4',
-        accountCode: '2202',
+        accountCode: F4_ACCOUNT_CODE,
         projectId: options.projectId.value,
         section: 'soe',
-        sectionIds: ['八、37'],
+        sectionIds: [F4_NOTE_SECTION.soe],
         text: value,
       },
     }))
+  }
+
+  watch(disclosureText, (value) => {
+    setItem(TEXT_KEY, value)
+    // 联动国企附注模块
+    publishNoteTextUpdated(value)
   })
+
+  // ─── 结构化同步到附注（国企 八、37） ──────────────────────────────────────
+  const isSyncing = ref(false)
+
+  function buildSyncPayload() {
+    return buildF4SoeSyncPayload(
+      options.wpId.value,
+      options.applicableStandards?.value,
+      agingRows.value.map((row) => ({
+        rowKey: row.rowKey,
+        label: row.label,
+        endAmount: row.closingBalance,
+        openingAmount: row.openingBalance,
+      })),
+      importantRows.value.map((row) => ({
+        creditor: row.creditor,
+        amount: row.amount,
+        reason: row.reason,
+      })),
+      disclosureText.value,
+    )
+  }
+
+  async function syncToNotes(): Promise<void> {
+    if (isSyncing.value || readonly.value) return
+    if (!options.projectId.value || !options.wpId.value) {
+      ElMessage.warning('缺少项目或底稿标识，无法同步附注')
+      return
+    }
+    isSyncing.value = true
+    try {
+      const result: any = await api.post(
+        `/api/projects/${options.projectId.value}/disclosure-notes/sync-from-workpaper`,
+        buildSyncPayload(),
+      )
+      const data = result?.data ?? result
+      ElMessage.success(
+        `已同步 ${Number(data?.rows_synced ?? 0)} 行到附注「${F4_NOTE_SECTION.soe} 应付账款」`,
+      )
+      publishNoteTextUpdated(disclosureText.value)
+    } catch {
+      ElMessage.warning('同步附注失败，请稍后重试')
+    } finally {
+      isSyncing.value = false
+    }
+  }
 
   onBeforeUnmount(() => {
     if (debounceTimer) {
@@ -329,6 +393,10 @@ export function useF4DisclosureSOE(options: UseF4DisclosureSOEOptions) {
     removeImportantRow,
     updateImportantCell,
     disclosureText,
+    isSyncing,
+    buildSyncPayload,
+    syncToNotes,
+    noteSection: F4_NOTE_SECTION.soe,
   }
 }
 

@@ -93,6 +93,7 @@
         :project-id="props.projectId"
         :is-readonly="isReadonly"
         :all-responses="formData.allResponses.value"
+        :applicable-standards="applicableStandards"
       />
 
       <!-- 附注披露信息（国企） -->
@@ -215,9 +216,11 @@ const currentSheet = computed(() => {
   const name = props.sheetName || ''
   if (SHEET_CODE_MAP[name]) return SHEET_CODE_MAP[name]
   if (/G6-note-listed|附注披露.*上市|附注.*上市/.test(name)) return 'disclosureListed'
-  if (/G6-note-soe|附注披露.*国企|附注.*国企/.test(name)) return 'disclosureSOE'
+  // 🔴 「国企」「国有企业」两种写法都要认（源模板 24 份用的是「国有企业」），
+  //    否则国企 TAB 会落到末尾 fallback 被误判成上市。
+  if (/G6-note-soe|附注.*国(企|有)/.test(name)) return 'disclosureSOE'
   if (/G6-directory|底稿目录/.test(name)) return 'directory'
-  if (/附注/.test(name)) return name.includes('国企') ? 'disclosureSOE' : 'disclosureListed'
+  if (/附注/.test(name)) return /国(企|有)/.test(name) ? 'disclosureSOE' : 'disclosureListed'
   const codeMatch = name.match(/(G6A|G6-[1-4])/i)
   if (codeMatch) {
     const code = codeMatch[1].toUpperCase().replace(/^G6A$/i, 'G6A')
@@ -247,6 +250,16 @@ const runtime = inject(WorkpaperRuntimeContextKey, null)
 const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
 const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
 const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
+
+/** 适用准则：htmlData / project_context / runtime 任一来源（与 G4/G11/G13 同口径） */
+const applicableStandards = computed<string[]>(() => {
+  const raw =
+    resolvedHtmlData.value?.project_context?.applicable_standards
+    ?? resolvedHtmlData.value?.projectContext?.applicable_standards
+    ?? resolvedHtmlData.value?.applicable_standards
+    ?? runtime?.applicableStandards?.value
+  return Array.isArray(raw) ? raw.map(String) : []
+})
 
 // ─── useG6MainFormData ──────────────────────────────────────────────────────
 const formData = useG6MainFormData({

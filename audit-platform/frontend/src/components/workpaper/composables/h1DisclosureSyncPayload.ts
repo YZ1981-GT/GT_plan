@@ -7,6 +7,7 @@ import {
   H1_DISCLOSURE_SHEET_NAME,
   H1_LISTED_SUBTABLE,
   H1_NOTE_SECTION,
+  H1_SOE_SUBTABLE,
   isH1DisclosureApplicable,
   resolveH1CurrentStandard,
   resolveH1NoteSectionTarget,
@@ -57,21 +58,24 @@ export interface H1SyncFromWorkpaperPayload {
   columns?: Record<string, ColumnDef[]>
 }
 
-// SOE 子表英文键 → 源对齐列头（取自 H1TabDisclosureSoe）
-const H1_SOE_COLUMNS: Record<string, ColumnDef[]> = {
-  固定资产: [
+/**
+ * SOE 子表列头（取自 H1TabDisclosureSoe，逐字对齐 note_template_soe §八、22 headers）。
+ * 标签列 label 必须等于附注 `headers[0]`，否则附注 TAB 首列名漂移。
+ */
+export const H1_SOE_COLUMNS: Record<string, ColumnDef[]> = {
+  [H1_SOE_SUBTABLE.summary]: [
     { key: 'label', label: '项目', is_label: true },
     { key: 'end_carrying', label: '期末账面价值', format: 'amount' },
     { key: 'begin_carrying', label: '期初账面价值', format: 'amount' },
   ],
-  固定资产情况: [
+  [H1_SOE_SUBTABLE.movement]: [
     { key: 'label', label: '项目', is_label: true },
     { key: 'begin', label: '期初余额', format: 'amount' },
     { key: 'increase', label: '本期增加', format: 'amount' },
     { key: 'decrease', label: '本期减少', format: 'amount' },
     { key: 'end', label: '期末余额', format: 'amount' },
   ],
-  暂时闲置的固定资产情况: [
+  [H1_SOE_SUBTABLE.idle]: [
     { key: 'label', label: '项目', is_label: true },
     { key: 'original_cost', label: '账面原值', format: 'amount' },
     { key: 'accum_dep', label: '累计折旧', format: 'amount' },
@@ -79,12 +83,12 @@ const H1_SOE_COLUMNS: Record<string, ColumnDef[]> = {
     { key: 'carrying', label: '账面价值', format: 'amount' },
     { key: 'remark', label: '备注' },
   ],
-  未办妥产权证书的固定资产情况: [
+  [H1_SOE_SUBTABLE.titleCert]: [
     { key: 'label', label: '项目', is_label: true },
     { key: 'carrying', label: '账面价值', format: 'amount' },
     { key: 'reason', label: '未办妥产权证书原因' },
   ],
-  固定资产清理: [
+  [H1_SOE_SUBTABLE.clearing]: [
     { key: 'label', label: '项目', is_label: true },
     { key: 'end_carrying', label: '期末账面价值', format: 'amount' },
     { key: 'begin_carrying', label: '期初账面价值', format: 'amount' },
@@ -210,11 +214,11 @@ export function buildH1SoeSubTableData(state: H1SoeDisclosureState): Record<stri
   } as Record<string, unknown>)
 
   return {
-    固定资产: summaryRows,
-    固定资产情况: movementRows,
-    暂时闲置的固定资产情况: idleRows,
-    未办妥产权证书的固定资产情况: titleRows,
-    固定资产清理: clearingRows,
+    [H1_SOE_SUBTABLE.summary]: summaryRows,
+    [H1_SOE_SUBTABLE.movement]: movementRows,
+    [H1_SOE_SUBTABLE.idle]: idleRows,
+    [H1_SOE_SUBTABLE.titleCert]: titleRows,
+    [H1_SOE_SUBTABLE.clearing]: clearingRows,
     _note_texts: [
       {
         section: 'soe-clearing-progress',

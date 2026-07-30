@@ -32,6 +32,7 @@ import { useD2DisclosureImportExport } from '../composables/useD2DisclosureImpor
 import { useRouter } from 'vue-router'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
+import { dataTableNames } from '../composables/disclosureSyncedTables'
 
 const props = withDefaults(defineProps<{
   variant: D2DisclosureVariant
@@ -52,7 +53,11 @@ const { year: auditYear } = useAuditContext()
 const pending = ref<ChecklistItem[]>([])
 const debouncedSave = useDebounceFn(async () => {
   if (pending.value.length === 0) return
-  const items = [...pending.value]
+  // 🔴 同一 item_id 在一个批次里出现两次会被后端整批拒绝
+  //   （「同一批次不得重复提交相同 item_id」）→ 按 item_id 去重，后写覆盖先写。
+  const dedup = new Map<string, ChecklistItem>()
+  for (const it of pending.value) dedup.set(it.item_id, it)
+  const items = [...dedup.values()]
   pending.value = []
   try {
     await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
@@ -95,10 +100,11 @@ const {
   agingRows,
   detailAgingHasData,
   classRows,
-  soeClassEndRows,
-  soeClassPriorRows,
+  classWideEndRows,
+  classWidePriorRows,
   individualRows, addIndividualRow, removeIndividualRow, updateIndividualRow, importIndividualFromBadDebt,
   portfolios, addPortfolio, renamePortfolio, removePortfolio, updatePortfolioCell,
+  portfolioLossRate, portfolioRatio, otherPortfolioRate,
   otherPortfolioRows, addOtherPortfolioRow, removeOtherPortfolioRow, updateOtherPortfolioRow,
   movementFields, movementEndBalance, movementByCategory,
   reversalRows, addReversalRow, removeReversalRow, updateReversalRow, importReversalFromWriteoffCheck,
@@ -108,6 +114,7 @@ const {
   derecognizedRows, addDerecognizedRow, removeDerecognizedRow, updateDerecognizedRow,
   continuedInvolvementRows, addContinuedInvolvementRow, removeContinuedInvolvementRow, updateContinuedInvolvementRow,
   sectionNotes, setNote,
+  markSynced, syncedTableNames, seedSyncedTablesFromNote,
   setOverride, resetOverride,
   inconsistencyWarnings,
   buildSnapshot,
@@ -127,6 +134,42 @@ const {
 const endLabel = computed(() => (isSoeVariant.value ? '期末数' : '期末余额'))
 const priorLabel = computed(() => (isSoeVariant.value ? '期初数' : '上年年末余额'))
 const T = computed(() => (isSoeVariant.value ? D2_TABLE_NAMES.soe : D2_TABLE_NAMES.listed))
+
+/**
+ * 前五名「汇总披露格式」模板句（源模板 r150 汇总披露格式）：
+ * 金额与占比自下表合计派生，审计师可直接改写为最终披露文字。
+ */
+const top5SummaryTemplate = computed(() => {
+  const totalAmount = top5Rows.value.reduce((s, r) => s + (r.arAmount || 0) + (r.contractAssetAmount || 0), 0)
+  const totalProvision = top5Rows.value.reduce((s, r) => s + (r.provision || 0), 0)
+  const ratio = top5Total.value ? (totalAmount / top5Total.value) * 100 : 0
+  return (
+    `本期按欠款方归集的期末余额前五名应收账款和合同资产汇总金额 ${fmt(totalAmount)}，`
+    + `占应收账款和合同资产期末余额合计数的比例 ${fmtPct(ratio)}，`
+    + `相应计提的坏账准备期末余额汇总金额 ${fmt(totalProvision)}。`
+  )
+})
+
+/** 金融资产转移方式枚举（源模板说明 A/B/C 三类范式 + 常见方式，可自由输入补充） */
+const TRANSFER_METHODS = [
+  '不附追索权保理',
+  '附追索权保理',
+  '应收账款质押',
+  '应收账款证券化',
+  '票据背书转让',
+  '票据贴现',
+  '债权转让',
+] as const
+
+/** 单项计提某期预期信用损失率(%)（派生只读，源模板 D53/D60=IFERROR(C/B,0)） */
+function individualLossRate(
+  row: { endAmount: number; priorAmount: number; provision: number; priorProvision: number },
+  period: 'end' | 'prior',
+): number {
+  const book = period === 'end' ? row.endAmount : row.priorAmount
+  const prov = period === 'end' ? row.provision : row.priorProvision
+  return book !== 0 ? (prov / book) * 100 : 0
+}
 
 const NOTE_TITLES = computed<Record<string, string>>(() => {
   const map: Record<string, string> = {}
@@ -391,6 +434,21 @@ async function syncToDisclosureNotes(): Promise<void> {
   if (isSyncing.value || !props.projectId || props.isReadonly) return
   isSyncing.value = true
   try {
+    // R7.5 基线播种：首次同步（尚无「上次已同步表名」持久化）时读一次附注现存表名，
+    // 按 D2 命名空间过滤后写入基线 → 让上线前就残留的孤儿表在本轮一次性被清掉。
+    // 读取失败（附注尚未生成）不阻断同步，下次同步再试。
+    if (syncedTableNames.value.length === 0) {
+      try {
+        const detail: any = await getDisclosureNoteDetail(
+          props.projectId,
+          auditYear.value,
+          D2_NOTE_SECTION[props.variant],
+        )
+        seedSyncedTablesFromNote(detail?.table_data)
+      } catch {
+        // 附注章节不存在 / 网络失败 → 跳过播种
+      }
+    }
     const payload = buildD2SyncPayload(
       props.variant,
       props.wpId || '',
@@ -403,6 +461,9 @@ async function syncToDisclosureNotes(): Promise<void> {
     )
     const data = result?.data ?? result
     const rows = Number(data?.rows_synced ?? 0)
+    // R7：POST 成功后才记录本轮推送的子表名，作为下次孤儿表差集的基准。
+    // 失败路径绝不写入 —— 否则下次会把本轮表名当「上次已同步」而误删现存表。
+    markSynced(dataTableNames(payload.sub_table_data as Record<string, unknown>))
     window.dispatchEvent(new CustomEvent('disclosure:note-text-updated', {
       detail: {
         wpCode: 'D2',
@@ -726,8 +787,8 @@ async function checkNoteConsistency(silent = false): Promise<void> {
 
       <!-- 国企版 6 列宽表（期末数+期初数各一张，三层表头） -->
       <template v-if="isSoeVariant">
-        <el-table :data="soeClassEndRows" border size="small" class="d2-disc__table d2-disc__wide-table">
-          <el-table-column label="期末余额" align="center">
+        <el-table :data="classWideEndRows" border size="small" class="d2-disc__table d2-disc__wide-table">
+          <el-table-column label="期末数" align="center">
             <el-table-column label="类 别" min-width="200">
               <template #default="{ row }">
                 <span :class="{ 'row-strong': row.kind === 'total', 'row-detail': row.kind === 'subtotal' }">{{ row.label }}</span>
@@ -743,7 +804,7 @@ async function checkNoteConsistency(silent = false): Promise<void> {
                     :precision="2"
                     size="small"
                     class="amt-input"
-                    @change="(v: number | undefined) => setOverride(`soeClass:current:${row.key}:book`, v ?? 0)"
+                    @change="(v: number | undefined) => setOverride(`classWide:current:${row.key}:book`, v ?? 0)"
                   />
                   <span v-else class="amt-cell">{{ fmt(row.bookAmount) }}</span>
                 </template>
@@ -764,7 +825,7 @@ async function checkNoteConsistency(silent = false): Promise<void> {
                     :precision="2"
                     size="small"
                     class="amt-input"
-                    @change="(v: number | undefined) => setOverride(`soeClass:current:${row.key}:prov`, v ?? 0)"
+                    @change="(v: number | undefined) => setOverride(`classWide:current:${row.key}:prov`, v ?? 0)"
                   />
                   <span v-else class="amt-cell">{{ fmt(row.provision) }}</span>
                 </template>
@@ -783,8 +844,8 @@ async function checkNoteConsistency(silent = false): Promise<void> {
           </el-table-column>
         </el-table>
 
-        <el-table :data="soeClassPriorRows" border size="small" class="d2-disc__table d2-disc__wide-table" style="margin-top:14px">
-          <el-table-column label="上年年末余额" align="center">
+        <el-table :data="classWidePriorRows" border size="small" class="d2-disc__table d2-disc__wide-table" style="margin-top:14px">
+          <el-table-column label="期初数" align="center">
             <el-table-column label="类 别" min-width="200">
               <template #default="{ row }">
                 <span :class="{ 'row-strong': row.kind === 'total', 'row-detail': row.kind === 'subtotal' }">{{ row.label }}</span>
@@ -800,7 +861,7 @@ async function checkNoteConsistency(silent = false): Promise<void> {
                     :precision="2"
                     size="small"
                     class="amt-input"
-                    @change="(v: number | undefined) => setOverride(`soeClass:prior:${row.key}:book`, v ?? 0)"
+                    @change="(v: number | undefined) => setOverride(`classWide:prior:${row.key}:book`, v ?? 0)"
                   />
                   <span v-else class="amt-cell">{{ fmt(row.bookAmount) }}</span>
                 </template>
@@ -821,7 +882,7 @@ async function checkNoteConsistency(silent = false): Promise<void> {
                     :precision="2"
                     size="small"
                     class="amt-input"
-                    @change="(v: number | undefined) => setOverride(`soeClass:prior:${row.key}:prov`, v ?? 0)"
+                    @change="(v: number | undefined) => setOverride(`classWide:prior:${row.key}:prov`, v ?? 0)"
                   />
                   <span v-else class="amt-cell">{{ fmt(row.provision) }}</span>
                 </template>
@@ -843,7 +904,7 @@ async function checkNoteConsistency(silent = false): Promise<void> {
 
       <!-- 上市版：与国企版一致的 6 列分组宽表（期末金额 + 上年年末余额各一张） -->
       <template v-else>
-        <el-table :data="soeClassEndRows" border size="small" class="d2-disc__table d2-disc__wide-table">
+        <el-table :data="classWideEndRows" border size="small" class="d2-disc__table d2-disc__wide-table">
           <el-table-column label="期末金额" align="center">
             <el-table-column label="类 别" min-width="200">
               <template #default="{ row }">
@@ -860,7 +921,7 @@ async function checkNoteConsistency(silent = false): Promise<void> {
                     :precision="2"
                     size="small"
                     class="amt-input"
-                    @change="(v: number | undefined) => setOverride(`soeClass:current:${row.key}:book`, v ?? 0)"
+                    @change="(v: number | undefined) => setOverride(`classWide:current:${row.key}:book`, v ?? 0)"
                   />
                   <span v-else class="amt-cell">{{ fmt(row.bookAmount) }}</span>
                 </template>
@@ -881,7 +942,7 @@ async function checkNoteConsistency(silent = false): Promise<void> {
                     :precision="2"
                     size="small"
                     class="amt-input"
-                    @change="(v: number | undefined) => setOverride(`soeClass:current:${row.key}:prov`, v ?? 0)"
+                    @change="(v: number | undefined) => setOverride(`classWide:current:${row.key}:prov`, v ?? 0)"
                   />
                   <span v-else class="amt-cell">{{ fmt(row.provision) }}</span>
                 </template>
@@ -900,7 +961,7 @@ async function checkNoteConsistency(silent = false): Promise<void> {
           </el-table-column>
         </el-table>
 
-        <el-table :data="soeClassPriorRows" border size="small" class="d2-disc__table d2-disc__wide-table" style="margin-top:14px">
+        <el-table :data="classWidePriorRows" border size="small" class="d2-disc__table d2-disc__wide-table" style="margin-top:14px">
           <el-table-column label="上年年末余额" align="center">
             <el-table-column label="类 别" min-width="200">
               <template #default="{ row }">
@@ -917,7 +978,7 @@ async function checkNoteConsistency(silent = false): Promise<void> {
                     :precision="2"
                     size="small"
                     class="amt-input"
-                    @change="(v: number | undefined) => setOverride(`soeClass:prior:${row.key}:book`, v ?? 0)"
+                    @change="(v: number | undefined) => setOverride(`classWide:prior:${row.key}:book`, v ?? 0)"
                   />
                   <span v-else class="amt-cell">{{ fmt(row.bookAmount) }}</span>
                 </template>
@@ -938,7 +999,7 @@ async function checkNoteConsistency(silent = false): Promise<void> {
                     :precision="2"
                     size="small"
                     class="amt-input"
-                    @change="(v: number | undefined) => setOverride(`soeClass:prior:${row.key}:prov`, v ?? 0)"
+                    @change="(v: number | undefined) => setOverride(`classWide:prior:${row.key}:prov`, v ?? 0)"
                   />
                   <span v-else class="amt-cell">{{ fmt(row.provision) }}</span>
                 </template>
@@ -1027,8 +1088,8 @@ async function checkNoteConsistency(silent = false): Promise<void> {
             />
           </template>
         </el-table-column>
-        <!-- 坏账准备/预期信用损失率/计提依据：上市版+国企版统一显示 -->
-        <el-table-column label="坏账准备" min-width="140" align="right">
+        <!-- 坏账准备（期末，源模板 C53）：上市版+国企版统一显示 -->
+        <el-table-column :label="isSoeVariant ? '坏账准备' : '期末坏账准备'" min-width="140" align="right">
           <template #default="{ row }">
             <el-input-number
               :model-value="row.provision"
@@ -1041,20 +1102,52 @@ async function checkNoteConsistency(silent = false): Promise<void> {
             />
           </template>
         </el-table-column>
-        <el-table-column label="预期信用损失率（%）" min-width="140" align="right">
+        <!-- 上年年末坏账准备（源模板 C60「续：」表）：上市双期披露必需 -->
+        <el-table-column v-if="!isSoeVariant" label="上年年末坏账准备" min-width="150" align="right">
           <template #default="{ row }">
             <el-input-number
-              :model-value="row.lossRate"
+              :model-value="row.priorProvision"
               :controls="false"
               :precision="2"
               size="small"
               class="amt-input"
               :disabled="isReadonly"
-              @change="(v: number | undefined) => updateIndividualRow(row.rowId, 'lossRate', v ?? 0)"
+              @change="(v: number | undefined) => updateIndividualRow(row.rowId, 'priorProvision', v ?? 0)"
             />
           </template>
         </el-table-column>
-        <el-table-column label="计提依据" min-width="200">
+        <!-- 国企源模板 r30 列序：债务人名称|账面余额|坏账准备|账龄|预期信用损失率（%） -->
+        <el-table-column v-if="isSoeVariant" label="账龄" min-width="120">
+          <template #default="{ row }">
+            <el-select
+              :model-value="row.aging"
+              size="small"
+              filterable
+              allow-create
+              clearable
+              :disabled="isReadonly"
+              @change="(v: string) => updateIndividualRow(row.rowId, 'aging', v || '')"
+            >
+              <el-option v-for="seg in agingSegments" :key="seg.key" :label="seg.label" :value="seg.label" />
+            </el-select>
+          </template>
+        </el-table-column>
+        <!-- 预期信用损失率：派生只读（源模板 D53=IFERROR(C53/B53,0)） -->
+        <el-table-column label="预期信用损失率（%）" min-width="140" align="right">
+          <template #default="{ row }">
+            <el-tooltip content="= 期末坏账准备 ÷ 期末账面余额（自动计算）" placement="top">
+              <span class="amt-cell auto-cell">{{ fmtPct(individualLossRate(row, 'end')) }}</span>
+            </el-tooltip>
+          </template>
+        </el-table-column>
+        <el-table-column v-if="!isSoeVariant" label="上年预期信用损失率（%）" min-width="160" align="right">
+          <template #default="{ row }">
+            <el-tooltip content="= 上年年末坏账准备 ÷ 上年年末账面余额（自动计算）" placement="top">
+              <span class="amt-cell auto-cell">{{ fmtPct(individualLossRate(row, 'prior')) }}</span>
+            </el-tooltip>
+          </template>
+        </el-table-column>
+        <el-table-column :label="isSoeVariant ? '计提理由' : '计提依据'" min-width="200">
           <template #default="{ row }">
             <el-input
               :model-value="row.basis"
@@ -1064,23 +1157,6 @@ async function checkNoteConsistency(silent = false): Promise<void> {
             />
           </template>
         </el-table-column>
-        <template v-if="isSoeVariant">
-          <el-table-column label="账龄" min-width="120">
-            <template #default="{ row }">
-              <el-select
-                :model-value="row.aging"
-                size="small"
-                filterable
-                allow-create
-                clearable
-                :disabled="isReadonly"
-                @change="(v: string) => updateIndividualRow(row.rowId, 'aging', v || '')"
-              >
-                <el-option v-for="seg in agingSegments" :key="seg.key" :label="seg.label" :value="seg.label" />
-              </el-select>
-            </template>
-          </el-table-column>
-        </template>
         <el-table-column v-if="!isReadonly" label="" width="60" align="center">
           <template #default="{ row }">
             <el-button :icon="Delete" text type="danger" size="small" @click="removeIndividualRow(row.rowId)" />
@@ -1130,30 +1206,31 @@ async function checkNoteConsistency(silent = false): Promise<void> {
             <el-button size="small" text type="danger" :icon="Delete" :disabled="isReadonly" @click="removePortfolio(group.groupId)">删除组合</el-button>
           </div>
         </div>
-        <el-table :data="group.rows" border size="small" class="d2-disc__table">
-          <el-table-column label="账龄" min-width="160">
+        <!-- 国企版：源模板 r36~r79 双期各（应收账款 / 比例（%） / 坏账准备），比例为派生只读 -->
+        <el-table v-if="isSoeVariant" :data="group.rows" border size="small" class="d2-disc__table d2-disc__wide-table">
+          <el-table-column label="账 龄" min-width="140">
             <template #default="{ row }">{{ row.label }}</template>
           </el-table-column>
-          <el-table-column :label="isSoeVariant ? '账面金额' : endLabel" min-width="140" align="right">
-            <template #default="{ row }">
-              <el-input-number
-                :model-value="row.endAmount"
-                :controls="false"
-                :precision="2"
-                size="small"
-                class="amt-input"
-                :disabled="isReadonly"
-                @change="(v: number | undefined) => updatePortfolioCell(group.groupId, row.key, 'endAmount', v ?? 0)"
-              />
-            </template>
-          </el-table-column>
-          <template v-if="isSoeVariant">
-            <el-table-column label="比例(%)" min-width="90" align="right">
+          <el-table-column label="期末数" align="center">
+            <el-table-column label="应收账款" min-width="130" align="right">
               <template #default="{ row }">
-                <span class="amt-cell auto-cell">{{ group.rows.reduce((s, r) => s + r.endAmount, 0) > 0 ? ((row.endAmount / group.rows.reduce((s, r) => s + r.endAmount, 0)) * 100).toFixed(2) : '0.00' }}</span>
+                <el-input-number
+                  :model-value="row.endAmount"
+                  :controls="false"
+                  :precision="2"
+                  size="small"
+                  class="amt-input"
+                  :disabled="isReadonly"
+                  @change="(v: number | undefined) => updatePortfolioCell(group.groupId, row.key, 'endAmount', v ?? 0)"
+                />
               </template>
             </el-table-column>
-            <el-table-column label="坏账准备" min-width="140" align="right">
+            <el-table-column label="比例（%）" min-width="100" align="right">
+              <template #default="{ row }">
+                <span class="amt-cell auto-cell">{{ portfolioRatio(row, group.rows, 'end').toFixed(2) }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="坏账准备" min-width="130" align="right">
               <template #default="{ row }">
                 <el-input-number
                   :model-value="row.provision"
@@ -1166,19 +1243,112 @@ async function checkNoteConsistency(silent = false): Promise<void> {
                 />
               </template>
             </el-table-column>
-          </template>
-          <el-table-column v-if="!isSoeVariant" :label="priorLabel" min-width="150" align="right">
-            <template #default="{ row }">
-              <el-input-number
-                :model-value="row.priorAmount"
-                :controls="false"
-                :precision="2"
-                size="small"
-                class="amt-input"
-                :disabled="isReadonly"
-                @change="(v: number | undefined) => updatePortfolioCell(group.groupId, row.key, 'priorAmount', v ?? 0)"
-              />
-            </template>
+          </el-table-column>
+          <el-table-column label="期初数" align="center">
+            <el-table-column label="应收账款" min-width="130" align="right">
+              <template #default="{ row }">
+                <el-input-number
+                  :model-value="row.priorAmount"
+                  :controls="false"
+                  :precision="2"
+                  size="small"
+                  class="amt-input"
+                  :disabled="isReadonly"
+                  @change="(v: number | undefined) => updatePortfolioCell(group.groupId, row.key, 'priorAmount', v ?? 0)"
+                />
+              </template>
+            </el-table-column>
+            <el-table-column label="比例（%）" min-width="100" align="right">
+              <template #default="{ row }">
+                <span class="amt-cell auto-cell">{{ portfolioRatio(row, group.rows, 'prior').toFixed(2) }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="坏账准备" min-width="130" align="right">
+              <template #default="{ row }">
+                <el-input-number
+                  :model-value="row.priorProvision"
+                  :controls="false"
+                  :precision="2"
+                  size="small"
+                  class="amt-input"
+                  :disabled="isReadonly"
+                  @change="(v: number | undefined) => updatePortfolioCell(group.groupId, row.key, 'priorProvision', v ?? 0)"
+                />
+              </template>
+            </el-table-column>
+          </el-table-column>
+        </el-table>
+
+        <!-- 上市版：源模板 r66~r67 双期各（应收账款 / 坏账准备 / 预期信用损失率） -->
+        <el-table v-else :data="group.rows" border size="small" class="d2-disc__table d2-disc__wide-table">
+          <el-table-column label="账龄" min-width="140">
+            <template #default="{ row }">{{ row.label }}</template>
+          </el-table-column>
+          <el-table-column label="期末余额" align="center">
+            <el-table-column label="应收账款" min-width="130" align="right">
+              <template #default="{ row }">
+                <el-input-number
+                  :model-value="row.endAmount"
+                  :controls="false"
+                  :precision="2"
+                  size="small"
+                  class="amt-input"
+                  :disabled="isReadonly"
+                  @change="(v: number | undefined) => updatePortfolioCell(group.groupId, row.key, 'endAmount', v ?? 0)"
+                />
+              </template>
+            </el-table-column>
+            <el-table-column label="坏账准备" min-width="130" align="right">
+              <template #default="{ row }">
+                <el-input-number
+                  :model-value="row.provision"
+                  :controls="false"
+                  :precision="2"
+                  size="small"
+                  class="amt-input"
+                  :disabled="isReadonly"
+                  @change="(v: number | undefined) => updatePortfolioCell(group.groupId, row.key, 'provision', v ?? 0)"
+                />
+              </template>
+            </el-table-column>
+            <el-table-column label="预期信用损失率(%)" min-width="140" align="right">
+              <template #default="{ row }">
+                <span class="amt-cell auto-cell">{{ portfolioLossRate(row, 'end').toFixed(2) }}</span>
+              </template>
+            </el-table-column>
+          </el-table-column>
+          <el-table-column label="上年年末余额" align="center">
+            <el-table-column label="应收账款" min-width="130" align="right">
+              <template #default="{ row }">
+                <el-input-number
+                  :model-value="row.priorAmount"
+                  :controls="false"
+                  :precision="2"
+                  size="small"
+                  class="amt-input"
+                  :disabled="isReadonly"
+                  @change="(v: number | undefined) => updatePortfolioCell(group.groupId, row.key, 'priorAmount', v ?? 0)"
+                />
+              </template>
+            </el-table-column>
+            <el-table-column label="坏账准备" min-width="130" align="right">
+              <template #default="{ row }">
+                <el-input-number
+                  :model-value="row.priorProvision"
+                  :controls="false"
+                  :precision="2"
+                  size="small"
+                  class="amt-input"
+                  :disabled="isReadonly"
+                  @change="(v: number | undefined) => updatePortfolioCell(group.groupId, row.key, 'priorProvision', v ?? 0)"
+                />
+              </template>
+            </el-table-column>
+            <el-table-column label="预期信用损失率(%)" min-width="140" align="right">
+              <template #default="{ row }">
+                <span class="amt-cell auto-cell">{{ portfolioLossRate(row, 'prior').toFixed(2) }}</span>
+              </template>
+            </el-table-column>
           </el-table-column>
         </el-table>
       </div>
@@ -1189,7 +1359,7 @@ async function checkNoteConsistency(silent = false): Promise<void> {
           <span class="portfolio-group__name">{{ D2_TABLE_NAMES.soe.otherPortfolio }}</span>
           <el-button size="small" text :icon="Plus" :disabled="isReadonly" @click="promptAddOtherPortfolio">新增行</el-button>
         </div>
-        <el-table :data="otherPortfolioRows" border size="small" class="d2-disc__table">
+        <el-table :data="otherPortfolioRows" border size="small" class="d2-disc__table d2-disc__wide-table">
           <el-table-column label="组合名称" min-width="200">
             <template #default="{ row }">
               <el-input
@@ -1200,31 +1370,71 @@ async function checkNoteConsistency(silent = false): Promise<void> {
               />
             </template>
           </el-table-column>
-          <el-table-column label="期末数" min-width="150" align="right">
-            <template #default="{ row }">
-              <el-input-number
-                :model-value="row.endAmount"
-                :controls="false"
-                :precision="2"
-                size="small"
-                class="amt-input"
-                :disabled="isReadonly"
-                @change="(v: number | undefined) => updateOtherPortfolioRow(row.rowId, 'endAmount', v ?? 0)"
-              />
-            </template>
+          <el-table-column label="期末数" align="center">
+            <el-table-column label="账面余额" min-width="130" align="right">
+              <template #default="{ row }">
+                <el-input-number
+                  :model-value="row.endAmount"
+                  :controls="false"
+                  :precision="2"
+                  size="small"
+                  class="amt-input"
+                  :disabled="isReadonly"
+                  @change="(v: number | undefined) => updateOtherPortfolioRow(row.rowId, 'endAmount', v ?? 0)"
+                />
+              </template>
+            </el-table-column>
+            <el-table-column label="计提比例（%）" min-width="120" align="right">
+              <template #default="{ row }">
+                <span class="amt-cell auto-cell">{{ otherPortfolioRate(row, 'end').toFixed(2) }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="坏账准备" min-width="130" align="right">
+              <template #default="{ row }">
+                <el-input-number
+                  :model-value="row.provision"
+                  :controls="false"
+                  :precision="2"
+                  size="small"
+                  class="amt-input"
+                  :disabled="isReadonly"
+                  @change="(v: number | undefined) => updateOtherPortfolioRow(row.rowId, 'provision', v ?? 0)"
+                />
+              </template>
+            </el-table-column>
           </el-table-column>
-          <el-table-column label="期初数" min-width="150" align="right">
-            <template #default="{ row }">
-              <el-input-number
-                :model-value="row.priorAmount"
-                :controls="false"
-                :precision="2"
-                size="small"
-                class="amt-input"
-                :disabled="isReadonly"
-                @change="(v: number | undefined) => updateOtherPortfolioRow(row.rowId, 'priorAmount', v ?? 0)"
-              />
-            </template>
+          <el-table-column label="期初数" align="center">
+            <el-table-column label="账面余额" min-width="130" align="right">
+              <template #default="{ row }">
+                <el-input-number
+                  :model-value="row.priorAmount"
+                  :controls="false"
+                  :precision="2"
+                  size="small"
+                  class="amt-input"
+                  :disabled="isReadonly"
+                  @change="(v: number | undefined) => updateOtherPortfolioRow(row.rowId, 'priorAmount', v ?? 0)"
+                />
+              </template>
+            </el-table-column>
+            <el-table-column label="计提比例（%）" min-width="120" align="right">
+              <template #default="{ row }">
+                <span class="amt-cell auto-cell">{{ otherPortfolioRate(row, 'prior').toFixed(2) }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="坏账准备" min-width="130" align="right">
+              <template #default="{ row }">
+                <el-input-number
+                  :model-value="row.priorProvision"
+                  :controls="false"
+                  :precision="2"
+                  size="small"
+                  class="amt-input"
+                  :disabled="isReadonly"
+                  @change="(v: number | undefined) => updateOtherPortfolioRow(row.rowId, 'priorProvision', v ?? 0)"
+                />
+              </template>
+            </el-table-column>
           </el-table-column>
           <el-table-column v-if="!isReadonly" label="" width="60" align="center">
             <template #default="{ row }">
@@ -1234,6 +1444,23 @@ async function checkNoteConsistency(silent = false): Promise<void> {
           <template #empty>暂无其他组合方法计提的应收账款</template>
         </el-table>
       </template>
+
+      <!--
+        🔴 `D2_NOTE_TEXT_SECTIONS` 声明了 `portfolio` 一节，AI 按钮也已备好
+        `ctx.组合计提项目` 上下文，但此前**缺这个文本域** → AI 生成的组合说明既
+        看不见也改不了，同步到附注时永远是空的（浏览器实测 10 节只落 9 节）。
+      -->
+      <div class="section-note">
+        <label>说明：</label>
+        <el-input
+          type="textarea"
+          :autosize="{ minRows: 3 }"
+          :model-value="sectionNotes['portfolio'] || ''"
+          :disabled="isReadonly"
+          placeholder="请说明组合的划分依据（账龄组合 / 风险特征组合等）、各组合预期信用损失率的确定方法与关键假设..."
+          @input="(v: string) => setNote('portfolio', v)"
+        />
+      </div>
     </el-card>
 
     <!-- ⑤ 坏账准备变动 -->
@@ -1288,12 +1515,12 @@ async function checkNoteConsistency(silent = false): Promise<void> {
         </el-table-column>
       </el-table>
       <div v-if="!isSoeVariant" class="movement-end">
-        <span class="movement-end__label">期末余额（= 期初 + 计提 − 转回 − 核销 − 转销 + 其他）：</span>
+        <span class="movement-end__label">期末余额（= 上年年末余额 + 计提 − 转回 − 核销 − 转销 + 其他）：</span>
         <span class="amt-cell row-strong">{{ fmt(movementEndBalance) }}</span>
       </div>
 
       <!-- 国企：按类别 5 列变动表（期初/计提/收回或转回/转销或核销/期末） -->
-      <el-table v-else :data="movementByCategory" border size="small" class="d2-disc__table">
+      <el-table v-else :data="movementByCategory" border size="small" class="d2-disc__table d2-disc__wide-table">
         <el-table-column label="类 别" min-width="200">
           <template #default="{ row }">
             <span :class="{ 'row-strong': row.isTotal }">{{ row.label }}</span>
@@ -1314,50 +1541,53 @@ async function checkNoteConsistency(silent = false): Promise<void> {
             <span v-else class="amt-cell">{{ fmt(row.priorAmount) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="本期计提" min-width="130" align="right">
-          <template #default="{ row }">
-            <el-input-number
-              v-if="!row.isTotal && !isReadonly"
-              :model-value="row.provisionAmount"
-              :controls="false"
-              :precision="2"
-              size="small"
-              class="amt-input"
-              :class="{ 'auto-cell': row.auto }"
-              @change="(v: number | undefined) => setOverride(`movementCat:provision:${row.key}`, v ?? 0)"
-            />
-            <span v-else class="amt-cell">{{ fmt(row.provisionAmount) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="收回或转回" min-width="130" align="right">
-          <template #default="{ row }">
-            <el-input-number
-              v-if="!row.isTotal && !isReadonly"
-              :model-value="row.reversalAmount"
-              :controls="false"
-              :precision="2"
-              size="small"
-              class="amt-input"
-              :class="{ 'auto-cell': row.auto }"
-              @change="(v: number | undefined) => setOverride(`movementCat:reversal:${row.key}`, v ?? 0)"
-            />
-            <span v-else class="amt-cell">{{ fmt(row.reversalAmount) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="转销或核销" min-width="130" align="right">
-          <template #default="{ row }">
-            <el-input-number
-              v-if="!row.isTotal && !isReadonly"
-              :model-value="row.writeOffAmount"
-              :controls="false"
-              :precision="2"
-              size="small"
-              class="amt-input"
-              :class="{ 'auto-cell': row.auto }"
-              @change="(v: number | undefined) => setOverride(`movementCat:writeoff:${row.key}`, v ?? 0)"
-            />
-            <span v-else class="amt-cell">{{ fmt(row.writeOffAmount) }}</span>
-          </template>
+        <!-- 源模板 r94：本期变动金额跨「计提 / 收回或转回 / 转销或核销」三子列 -->
+        <el-table-column label="本期变动金额" align="center">
+          <el-table-column label="计提" min-width="130" align="right">
+            <template #default="{ row }">
+              <el-input-number
+                v-if="!row.isTotal && !isReadonly"
+                :model-value="row.provisionAmount"
+                :controls="false"
+                :precision="2"
+                size="small"
+                class="amt-input"
+                :class="{ 'auto-cell': row.auto }"
+                @change="(v: number | undefined) => setOverride(`movementCat:provision:${row.key}`, v ?? 0)"
+              />
+              <span v-else class="amt-cell">{{ fmt(row.provisionAmount) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="收回或转回" min-width="130" align="right">
+            <template #default="{ row }">
+              <el-input-number
+                v-if="!row.isTotal && !isReadonly"
+                :model-value="row.reversalAmount"
+                :controls="false"
+                :precision="2"
+                size="small"
+                class="amt-input"
+                :class="{ 'auto-cell': row.auto }"
+                @change="(v: number | undefined) => setOverride(`movementCat:reversal:${row.key}`, v ?? 0)"
+              />
+              <span v-else class="amt-cell">{{ fmt(row.reversalAmount) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="转销或核销" min-width="130" align="right">
+            <template #default="{ row }">
+              <el-input-number
+                v-if="!row.isTotal && !isReadonly"
+                :model-value="row.writeOffAmount"
+                :controls="false"
+                :precision="2"
+                size="small"
+                class="amt-input"
+                :class="{ 'auto-cell': row.auto }"
+                @change="(v: number | undefined) => setOverride(`movementCat:writeoff:${row.key}`, v ?? 0)"
+              />
+              <span v-else class="amt-cell">{{ fmt(row.writeOffAmount) }}</span>
+            </template>
+          </el-table-column>
         </el-table-column>
         <el-table-column label="期末数" min-width="130" align="right">
           <template #default="{ row }">
@@ -1401,6 +1631,15 @@ async function checkNoteConsistency(silent = false): Promise<void> {
           </div>
         </div>
       </template>
+
+      <div v-if="!isSoeVariant" class="methodology-context">
+        <div class="methodology-title">15 号文第十九条（四）4</div>
+        <div class="methodology-text">
+          本期坏账准备收回或转回金额重要的，应披露转回原因、收回方式、确定原坏账准备计提比例的依据及其合理性。
+          同时应对本期损失准备变动所涉金融工具账面余额的显著变动作出定性与定量说明
+          （如业务增长、逾期超过 30 天余额增加、本年核销等分别导致坏账准备增减的金额）。
+        </div>
+      </div>
 
       <el-table :data="reversalRows" border size="small" class="d2-disc__table">
         <el-table-column :label="isSoeVariant ? '债务人名称' : '单位名称'" min-width="170">
@@ -1507,6 +1746,14 @@ async function checkNoteConsistency(silent = false): Promise<void> {
         />
       </div>
 
+      <div v-if="!isSoeVariant" class="methodology-context">
+        <div class="methodology-title">15 号文第十九条（四）6</div>
+        <div class="methodology-text">
+          对于其中重要的款项，应<strong>逐项</strong>披露款项性质、核销原因、履行的核销程序及核销金额。
+          实际核销的款项由关联交易产生的，应单独披露。
+        </div>
+      </div>
+
       <el-table :data="writeOffRows" border size="small" class="d2-disc__table">
         <el-table-column :label="isSoeVariant ? '债务人名称' : '单位名称'" min-width="170">
           <template #default="{ row }">
@@ -1595,6 +1842,28 @@ async function checkNoteConsistency(silent = false): Promise<void> {
         </div>
       </template>
 
+      <div v-if="!isSoeVariant" class="methodology-context">
+        <div class="methodology-title">15 号文第十九条（四）7 / 第七条</div>
+        <div class="methodology-text">
+          按欠款方集中度，<strong>汇总或分别披露</strong>期末余额前 5 名的应收账款和合同资产的期末余额及占
+          应收账款和合同资产期末余额合计数的比例，以及相应计提的坏账准备期末余额。对同一客户存在合同资产的，
+          应将合同资产与应收账款合并计算。编制和披露财务报告时应当严格遵守保密相关法律法规。
+        </div>
+      </div>
+
+      <div v-if="!isSoeVariant" class="section-note">
+        <label>汇总披露格式（与下方分别披露格式二选一）：</label>
+        <el-input
+          type="textarea"
+          :autosize="{ minRows: 2 }"
+          :model-value="sectionNotes['top5Summary'] || top5SummaryTemplate"
+          :disabled="isReadonly"
+          @input="(v: string) => setNote('top5Summary', v)"
+        />
+        <div class="top5-base">未填写时按左侧模板句自动生成（金额取自下表合计与占比）。</div>
+      </div>
+
+      <div v-if="!isSoeVariant" class="section-subtitle">分别披露格式：</div>
       <el-table :data="top5Rows" border size="small" class="d2-disc__table">
         <el-table-column :label="isSoeVariant ? '债务人名称' : '单位名称'" min-width="180">
           <template #default="{ row }">
@@ -1684,18 +1953,49 @@ async function checkNoteConsistency(silent = false): Promise<void> {
     <el-card shadow="never" class="d2-disc__card">
       <template #header>
         <div class="card-head">
-          <span class="card-title">{{ D2_TABLE_NAMES.soe.derecognized }}</span>
+          <span class="card-title">{{ isSoeVariant ? D2_TABLE_NAMES.soe.derecognized : D2_TABLE_NAMES.listed.derecognized }}</span>
           <div class="card-head-right">
             <el-button size="small" type="primary" plain :icon="Plus" :disabled="isReadonly" @click="addDerecognizedRow">新增行</el-button>
+            <el-button
+              size="small"
+              :loading="aiLoadingKey === 'derecognition'"
+              :disabled="isReadonly || !ai.aiAvailable.value"
+              @click="handleAiGenerate('derecognition')"
+            >🤖 AI</el-button>
             <GtReviewTrigger :section-id="`D2-disc-${variant}-derecognized`" label="💬 复核" />
           </div>
         </div>
       </template>
 
+      <div class="methodology-context">
+        <div class="methodology-title">15 号文第五十一条</div>
+        <div class="methodology-text">
+          公司发生金融资产转移的，应按照金融资产转移方式分类列示已转移金融资产性质及金额、
+          终止确认情况及其判断依据。因转移而终止确认的金融资产，应分项列示金融资产转移的方式、
+          终止确认的金融资产金额，及与终止确认相关的利得或损失。
+        </div>
+      </div>
+
       <el-table :data="derecognizedRows" border size="small" class="d2-disc__table">
-        <el-table-column label="债务人名称" min-width="200">
+        <el-table-column :label="isSoeVariant ? '债务人名称' : '项  目'" min-width="200">
           <template #default="{ row }">
             <el-input :model-value="row.companyName" size="small" :disabled="isReadonly" @change="(v: string) => updateDerecognizedRow(row.rowId, 'companyName', v)" />
+          </template>
+        </el-table-column>
+        <el-table-column v-if="!isSoeVariant" label="转移方式" min-width="180">
+          <template #default="{ row }">
+            <el-select
+              :model-value="row.transferMethod"
+              size="small"
+              filterable
+              allow-create
+              clearable
+              placeholder="选择或输入"
+              :disabled="isReadonly"
+              @change="(v: string) => updateDerecognizedRow(row.rowId, 'transferMethod', v || '')"
+            >
+              <el-option v-for="m in TRANSFER_METHODS" :key="m" :label="m" :value="m" />
+            </el-select>
           </template>
         </el-table-column>
         <el-table-column label="终止确认金额" min-width="160" align="right">
@@ -1731,29 +2031,65 @@ async function checkNoteConsistency(silent = false): Promise<void> {
         </el-table-column>
         <template #empty>暂无因金融资产转移而终止确认的应收账款（损失以负数填列）</template>
       </el-table>
+
+      <div class="section-note">
+        <label>说明：</label>
+        <el-input
+          type="textarea"
+          :autosize="{ minRows: 4 }"
+          :model-value="sectionNotes['derecognition'] || ''"
+          :disabled="isReadonly"
+          placeholder="A、不附追索权保理：期末因办理不附追索权应收账款保理，保理金额 XXX 元，终止确认应收账款账面价值 XXX 元、账面余额 XXX 元，账龄一年以内，已计提坏账准备 XXX 元；B、不符合终止确认条件的转移（附追索权保理 / 应收账款质押取得借款）须单独列示金额；C、已背书或贴现的银行承兑汇票，说明转移几乎所有风险与报酬的判断依据及继续涉入的最大风险敞口。"
+          @input="(v: string) => setNote('derecognition', v)"
+        />
+      </div>
     </el-card>
 
     <!-- ⑦ 转移应收账款且继续涉入形成的资产、负债 -->
     <el-card shadow="never" class="d2-disc__card">
       <template #header>
         <div class="card-head">
-          <span class="card-title">转移应收账款且继续涉入形成的资产、负债</span>
+          <span class="card-title">{{ isSoeVariant ? D2_TABLE_NAMES.soe.continuedInvolvement : D2_TABLE_NAMES.listed.continuedInvolvement }}</span>
           <div class="card-head-right">
             <el-button size="small" type="primary" plain :icon="Plus" :disabled="isReadonly" @click="addContinuedInvolvementRow">新增行</el-button>
+            <el-button
+              size="small"
+              :loading="aiLoadingKey === 'continuedInvolvement'"
+              :disabled="isReadonly || !ai.aiAvailable.value"
+              @click="handleAiGenerate('continuedInvolvement')"
+            >🤖 AI</el-button>
             <GtReviewTrigger :section-id="`D2-disc-${variant}-continued-involvement`" label="💬 复核" />
           </div>
         </div>
       </template>
 
+      <div class="methodology-context">
+        <div class="methodology-title">源模板提示</div>
+        <div class="methodology-text">
+          转移金融资产且继续涉入的，应披露资产转移方式、分项列示继续涉入形成的资产、负债的金额。
+        </div>
+      </div>
+
       <el-table :data="continuedInvolvementRows" border size="small" class="d2-disc__table">
-        <el-table-column label="项 目" min-width="200">
+        <el-table-column label="项  目" min-width="200">
           <template #default="{ row }">
             <el-input :model-value="row.item" size="small" :disabled="isReadonly" @change="(v: string) => updateContinuedInvolvementRow(row.rowId, 'item', v)" />
           </template>
         </el-table-column>
         <el-table-column label="资产转移方式" min-width="180">
           <template #default="{ row }">
-            <el-input :model-value="row.transferMethod" size="small" :disabled="isReadonly" @change="(v: string) => updateContinuedInvolvementRow(row.rowId, 'transferMethod', v)" />
+            <el-select
+              :model-value="row.transferMethod"
+              size="small"
+              filterable
+              allow-create
+              clearable
+              placeholder="选择或输入"
+              :disabled="isReadonly"
+              @change="(v: string) => updateContinuedInvolvementRow(row.rowId, 'transferMethod', v || '')"
+            >
+              <el-option v-for="m in TRANSFER_METHODS" :key="m" :label="m" :value="m" />
+            </el-select>
           </template>
         </el-table-column>
         <el-table-column label="继续涉入形成的资产金额" min-width="180" align="right">
@@ -1854,6 +2190,17 @@ span.auto-cell { background-color: #ecf5ff; padding: 1px 4px; border-radius: 2px
 .top5-base { margin-top: 6px; color: #909399; font-size: 12px; }
 .section-note { margin-top: 10px; }
 .section-note label { display: block; margin-bottom: 4px; color: #606266; }
+/* 源模板红字法规原文 → 方法论上下文（琥珀色左边线 + 浅黄背景） */
+.methodology-context {
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  border-left: 4px solid #e6a23c;
+  background: #fdf6ec;
+  border-radius: 0 4px 4px 0;
+}
+.methodology-title { font-weight: 600; font-size: 12px; color: #b88230; margin-bottom: 4px; }
+.methodology-text { font-size: 12px; line-height: 1.75; color: #6b5900; }
+.section-subtitle { margin: 12px 0 6px; font-weight: 600; color: #606266; }
 .amount-table { max-width: 760px; }
 .d2-disc__guidance { margin-top: 10px; background: #fffbeb; border-left: 4px solid #f59e0b; padding: 8px 12px; border-radius: 4px; }
 .d2-disc__guidance summary { cursor: pointer; font-weight: 600; color: #78350f; }

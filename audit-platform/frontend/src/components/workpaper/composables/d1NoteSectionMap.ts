@@ -51,6 +51,8 @@ export function resolveD1CurrentStandard(
 }
 
 // ─── 表名（逐字取自附注模板 五、4 / 八、4）──────────────────────────────────
+// 🔴 每个值必须与 note_template `tables[].name` 逐字一致，否则同步产出孤儿子表
+//    （附注 TAB 永空 + 底稿数据丢失）。守卫：`__tests__/d1NoteSubtableContract.spec.ts`
 const T = {
   listed: {
     main: '应收票据',
@@ -84,115 +86,162 @@ const T = {
   },
 } as const
 
-// ─── 列头元数据（逐字取自附注模板 headers + D1TabDisclosure el-table-column）──
+/** 上市 五、4 子表名映射（`{语义键: 模板表名}`），供契约测试与调用方复用。 */
+export const D1_LISTED_SUBTABLE = T.listed
+/** 国企 八、4 子表名映射。 */
+export const D1_SOE_SUBTABLE = T.soe
+
+/**
+ * 主表（分类总表）表名。
+ *
+ * 「校对附注」必须按此名定位附注里的主表再取合计行 —— 遍历所有表取第一个非零数
+ * 会抓到「期末已质押的应收票据」的合计并误报差异（2026-07-30 实测）。
+ */
+export const D1_MAIN_SUBTABLE = {
+  listed: T.listed.main,
+  soe: T.soe.main,
+} as const satisfies Record<D1DisclosureVariant, string>
+
+// ─── 列头元数据（逐字取自附注模板 headers + 源模板两级表头合并单元格）────────
+//
+// 🔴 表态铁律（与 `fix_note_d1_notes_receivable_structure.py` 同口径）：
+//   **同表并列双期 → `group`；拆表双期 / 单期 → `flat`**。
+//   期间已在表名里时（如「（期末余额）」「（续：期初数）」），单组跨全部数据列
+//   不携带分组信息，且必须显式 `flat` 抑制后端 `_infer_groups_from_headers` 前缀推断。
+// 🔴 `group` 禁止含 `/`：后端会走树形分支（`children`/`headerIdx`），
+//   而前端 `DisclosureEditor.activeTableColumns` 只认扁平 `{group,start,span}` → 渲染崩。
 const AMT = 'amount' as const
 const PCT = 'percent' as const
 const TXT = 'text' as const
 
-const SUMMARY_COLUMNS_LISTED: ColumnDef[] = [
-  { key: 'label', label: '票据种类', is_label: true },
-  { key: 'end_balance', label: '账面余额', format: AMT, group: '期末余额' },
-  { key: 'end_provision', label: '坏账准备', format: AMT, group: '期末余额' },
-  { key: 'end_book_value', label: '账面价值', format: AMT, group: '期末余额' },
-  { key: 'prior_balance', label: '账面余额', format: AMT, group: '上年年末余额' },
-  { key: 'prior_provision', label: '坏账准备', format: AMT, group: '上年年末余额' },
-  { key: 'prior_book_value', label: '账面价值', format: AMT, group: '上年年末余额' },
-]
-const SUMMARY_COLUMNS_SOE: ColumnDef[] = [
-  { key: 'label', label: '票据种类', is_label: true },
-  { key: 'end_balance', label: '账面余额', format: AMT, group: '期末余额' },
-  { key: 'end_provision', label: '坏账准备', format: AMT, group: '期末余额' },
-  { key: 'end_book_value', label: '账面价值', format: AMT, group: '期末余额' },
-  { key: 'prior_balance', label: '账面余额', format: AMT, group: '期初余额' },
-  { key: 'prior_provision', label: '坏账准备', format: AMT, group: '期初余额' },
-  { key: 'prior_book_value', label: '账面价值', format: AMT, group: '期初余额' },
-]
+// 期间父表头（逐字取自源模板合并单元格：上市 B7:D7/E7:G7、国企 B6:D6/E6:G6）
+const G_END_LISTED = '期末余额'
+const G_PRIOR_LISTED = '上年年末余额'
+const G_END_SOE = '期末数'
+const G_PRIOR_SOE = '期初数'
+const G_GROSS = '账面余额'
+const G_PROVISION = '坏账准备'
+const G_MOVEMENT_SOE = '本期变动情况'
+
+/**
+ * 分类总表列头：票据种类 × 双期并列 × 账面余额 / 坏账准备 / 账面价值。
+ *
+ * 源模板把期间标签写了两遍（父表头「期末余额」下首个子列也叫「期末余额」，
+ * 国企侧「期初数」下子列叫「年初余额」），子列名按预设 F4-3a
+ * （账面余额 − 坏账准备 = 账面价值）取，消除冗余。
+ */
+function summaryColumns(groupEnd: string, groupPrior: string): ColumnDef[] {
+  return [
+    { key: 'label', label: '票据种类', is_label: true },
+    { key: 'end_balance', label: '账面余额', format: AMT, group: groupEnd },
+    { key: 'end_provision', label: '坏账准备', format: AMT, group: groupEnd },
+    { key: 'end_book_value', label: '账面价值', format: AMT, group: groupEnd },
+    { key: 'prior_balance', label: '账面余额', format: AMT, group: groupPrior },
+    { key: 'prior_provision', label: '坏账准备', format: AMT, group: groupPrior },
+    { key: 'prior_book_value', label: '账面价值', format: AMT, group: groupPrior },
+  ]
+}
+const SUMMARY_COLUMNS_LISTED: ColumnDef[] = summaryColumns(G_END_LISTED, G_PRIOR_LISTED)
+const SUMMARY_COLUMNS_SOE: ColumnDef[] = summaryColumns(G_END_SOE, G_PRIOR_SOE)
+
 const PLEDGED_COLUMNS: ColumnDef[] = [
-  { key: 'label', label: '种类', is_label: true },
+  { key: 'label', label: '种类', is_label: true, flat: true },
   { key: 'pledged_amount', label: '期末已质押金额', format: AMT },
 ]
 const ENDORSED_COLUMNS: ColumnDef[] = [
-  { key: 'label', label: '种类', is_label: true },
+  { key: 'label', label: '种类', is_label: true, flat: true },
   { key: 'derecognized', label: '期末终止确认金额', format: AMT },
   { key: 'not_derecognized', label: '期末未终止确认金额', format: AMT },
 ]
 const TRANSFER_COLUMNS: ColumnDef[] = [
-  { key: 'label', label: '种类', is_label: true },
+  { key: 'label', label: '种类', is_label: true, flat: true },
   { key: 'transfer_amount', label: '期末转应收账款金额', format: AMT },
 ]
-const CLASS_COLUMNS_LISTED: ColumnDef[] = [
-  { key: 'label', label: '类别', is_label: true },
-  { key: 'balance', label: '金额', format: AMT },
-  { key: 'ratio', label: '比例(%)', format: PCT },
-  { key: 'provision', label: '坏账准备', format: AMT },
-  { key: 'loss_rate', label: '预期信用损失率(%)', format: PCT },
-  { key: 'book_value', label: '账面价值', format: AMT },
-]
+/** 上市按坏账计提方法分类：源模板 B38:F38 合并为期间父表头，子列 5 个。 */
+function classColumnsListed(group: string): ColumnDef[] {
+  return [
+    { key: 'label', label: '类别', is_label: true },
+    { key: 'balance', label: '金额', format: AMT, group },
+    { key: 'ratio', label: '比例(%)', format: PCT, group },
+    { key: 'provision', label: '坏账准备', format: AMT, group },
+    { key: 'loss_rate', label: '预期信用损失率(%)', format: PCT, group },
+    { key: 'book_value', label: '账面价值', format: AMT, group },
+  ]
+}
+/**
+ * 国企按坏账准备计提方法分类：源模板是三级
+ * （期间 > 账面余额·坏账准备 > 金额·比例）。顶层期间已在表名里
+ * （（期末数）/（续：期初数）），只保留下两级；「账面价值」是 rowspan
+ * 独立列（源模板 F14「账面」/ F15「价值」纵向合并），不进任何父表头。
+ */
 const CLASS_COLUMNS_SOE: ColumnDef[] = [
   { key: 'label', label: '类别', is_label: true },
-  { key: 'balance', label: '账面余额金额', format: AMT },
-  { key: 'ratio', label: '账面余额比例(%)', format: PCT },
-  { key: 'provision', label: '坏账准备金额', format: AMT },
-  { key: 'loss_rate', label: '预期信用损失率(%)', format: PCT },
+  { key: 'balance', label: '金额', format: AMT, group: G_GROSS },
+  { key: 'ratio', label: '比例(%)', format: PCT, group: G_GROSS },
+  { key: 'provision', label: '金额', format: AMT, group: G_PROVISION },
+  { key: 'loss_rate', label: '预期信用损失率(%)', format: PCT, group: G_PROVISION },
   { key: 'book_value', label: '账面价值', format: AMT },
 ]
-const INDIVIDUAL_COLUMNS_LISTED: ColumnDef[] = [
-  { key: 'label', label: '名称', is_label: true },
-  { key: 'balance', label: '账面余额', format: AMT },
-  { key: 'provision', label: '坏账准备', format: AMT },
-  { key: 'loss_rate', label: '预期信用损失率(%)', format: PCT },
-  { key: 'basis', label: '计提依据', format: TXT },
-]
-const INDIVIDUAL_COLUMNS_SOE: ColumnDef[] = [
-  { key: 'label', label: '名称', is_label: true },
-  { key: 'balance', label: '账面余额', format: AMT },
-  { key: 'provision', label: '坏账准备', format: AMT },
-  { key: 'loss_rate', label: '预期信用损失率(%)', format: PCT },
-  { key: 'basis', label: '计提理由', format: TXT },
-]
+/** 单项计提明细（上市双期拆两张表、国企只期末）→ 单级表头。 */
+function individualColumns(basisLabel: string): ColumnDef[] {
+  return [
+    { key: 'label', label: '名称', is_label: true, flat: true },
+    { key: 'balance', label: '账面余额', format: AMT },
+    { key: 'provision', label: '坏账准备', format: AMT },
+    { key: 'loss_rate', label: '预期信用损失率(%)', format: PCT },
+    { key: 'basis', label: basisLabel, format: TXT },
+  ]
+}
+const INDIVIDUAL_COLUMNS_LISTED: ColumnDef[] = individualColumns('计提依据')
+const INDIVIDUAL_COLUMNS_SOE: ColumnDef[] = individualColumns('计提理由')
+/** 上市组合计提项目：一张表双期并列（源模板 B77:D77 / E77:G77 合并）。 */
 const PORTFOLIO_COLUMNS_LISTED: ColumnDef[] = [
   { key: 'label', label: '名称', is_label: true },
-  { key: 'end_balance', label: '应收票据', format: AMT, group: '期末' },
-  { key: 'end_provision', label: '坏账准备', format: AMT, group: '期末' },
-  { key: 'end_loss_rate', label: '预期信用损失率(%)', format: PCT, group: '期末' },
-  { key: 'prior_balance', label: '应收票据', format: AMT, group: '上年末' },
-  { key: 'prior_provision', label: '坏账准备', format: AMT, group: '上年末' },
-  { key: 'prior_loss_rate', label: '预期信用损失率(%)', format: PCT, group: '上年末' },
+  { key: 'end_balance', label: '应收票据', format: AMT, group: G_END_LISTED },
+  { key: 'end_provision', label: '坏账准备', format: AMT, group: G_END_LISTED },
+  { key: 'end_loss_rate', label: '预期信用损失率(%)', format: PCT, group: G_END_LISTED },
+  { key: 'prior_balance', label: '应收票据', format: AMT, group: G_PRIOR_LISTED },
+  { key: 'prior_provision', label: '坏账准备', format: AMT, group: G_PRIOR_LISTED },
+  { key: 'prior_loss_rate', label: '预期信用损失率(%)', format: PCT, group: G_PRIOR_LISTED },
 ]
 const PORTFOLIO_COLUMNS_SOE: ColumnDef[] = [
-  { key: 'label', label: '名称', is_label: true },
+  { key: 'label', label: '名称', is_label: true, flat: true },
   { key: 'balance', label: '账面余额', format: AMT },
   { key: 'provision', label: '坏账准备', format: AMT },
   { key: 'loss_rate', label: '预期信用损失率(%)', format: PCT },
 ]
 const MOVEMENT_COLUMNS_LISTED: ColumnDef[] = [
-  { key: 'label', label: '项目', is_label: true },
+  { key: 'label', label: '项目', is_label: true, flat: true },
   { key: 'amount', label: '坏账准备金额', format: AMT },
 ]
+/** 国企坏账准备变动：源模板 C46:F46 合并为「本期变动情况」，期初 / 期末为独立列。 */
 const MOVEMENT_COLUMNS_SOE: ColumnDef[] = [
   { key: 'label', label: '类别', is_label: true },
   { key: 'prior_balance', label: '期初数', format: AMT },
-  { key: 'provision', label: '本期计提', format: AMT },
-  { key: 'reversal', label: '本期收回或转回', format: AMT },
-  { key: 'write_off', label: '本期核销', format: AMT },
-  { key: 'other', label: '本期其他变动', format: AMT },
+  { key: 'provision', label: '计提', format: AMT, group: G_MOVEMENT_SOE },
+  { key: 'reversal', label: '收回或转回', format: AMT, group: G_MOVEMENT_SOE },
+  { key: 'write_off', label: '核销', format: AMT, group: G_MOVEMENT_SOE },
+  { key: 'other', label: '其他变动', format: AMT, group: G_MOVEMENT_SOE },
   { key: 'end_balance', label: '期末数', format: AMT },
 ]
 /**
  * 重要转回或收回列头。上市 5 列、国企 4 列（模板 五、4[11] / 八、4[6] 结构本就不同，
  * 与披露表 D1TabDisclosure 两个变体的表头一一对应）。
+ *
+ * 国企「转回或收回前累计已计提坏账准备金额」在源模板里是**数值列**
+ * （C59==SUM(C55:C58)），故 `format: amount` 并取 `cumulativeProvision` 数值字段。
  */
 function reversalColumns(variant: D1DisclosureVariant): ColumnDef[] {
   if (variant === 'soe') {
     return [
-      { key: 'label', label: '债务人名称', is_label: true },
+      { key: 'label', label: '债务人名称', is_label: true, flat: true },
       { key: 'amount', label: '转回或收回金额', format: AMT },
-      { key: 'cumulative_provision', label: '转回或收回前累计已计提坏账准备金额', format: TXT },
+      { key: 'cumulative_provision', label: '转回或收回前累计已计提坏账准备金额', format: AMT },
       { key: 'reason_method', label: '转回或收回原因、方式', format: TXT },
     ]
   }
   return [
-    { key: 'label', label: '单位名称', is_label: true },
+    { key: 'label', label: '单位名称', is_label: true, flat: true },
     { key: 'reversal_reason', label: '转回原因', format: TXT },
     { key: 'recovery_method', label: '收回方式', format: TXT },
     { key: 'original_basis', label: '原确定坏账准备的依据', format: TXT },
@@ -200,13 +249,17 @@ function reversalColumns(variant: D1DisclosureVariant): ColumnDef[] {
   ]
 }
 const WRITEOFF_AMOUNT_COLUMNS: ColumnDef[] = [
-  { key: 'label', label: '项目', is_label: true },
+  { key: 'label', label: '项目', is_label: true, flat: true },
   { key: 'amount', label: '核销金额', format: AMT },
 ]
-/** 重要核销逐项披露列头（上市/国企措辞按各自模板逐字，字段键相同）。 */
+/**
+ * 重要核销逐项披露列头（上市/国企措辞按各自模板逐字，字段键相同）。
+ *
+ * 上市源模板 B111 字面是「应收票据」，预设 F4-29 明确为「应收票据性质」→ 取预设。
+ */
 function writeOffDetailColumns(variant: D1DisclosureVariant): ColumnDef[] {
   return [
-    { key: 'label', label: '单位名称', is_label: true },
+    { key: 'label', label: '单位名称', is_label: true, flat: true },
     { key: 'note_type', label: variant === 'soe' ? '应收票据的性质' : '应收票据性质', format: TXT },
     { key: 'amount', label: '核销金额', format: AMT },
     { key: 'reason', label: '核销原因', format: TXT },
@@ -225,7 +278,15 @@ export interface D1IndividualRowLike { name: string; balance: number; provision:
 export interface D1PortfolioRowLike { drawerTypeOrAging: string; balance: number; provision: number; lossRate: number }
 export interface D1SoePortfolioRowLike { name: string; balance: number; provision: number; lossRate: number; isTotal?: boolean }
 export interface D1MovementRowLike { label?: string; priorBalance: number; provision: number; reversal: number; writeOff: number; transfer: number; other: number; endBalance: number }
-export interface D1ReversalRowLike { companyName: string; reversalReason: string; originalMethod: string; reversalBasis: string; amount: number }
+export interface D1ReversalRowLike {
+  companyName: string
+  reversalReason: string
+  originalMethod: string
+  reversalBasis: string
+  amount: number
+  /** 国企「转回或收回前累计已计提坏账准备金额」（源模板 C 列是 SUM 数值列） */
+  cumulativeProvision?: number
+}
 export interface D1WriteOffDetailRowLike { companyName: string; noteType: string; amount: number; reason: string; procedure: string; relatedPartyFlag: string }
 
 export interface D1DisclosureSnapshot {
@@ -354,8 +415,9 @@ function individualTable(rows: D1IndividualRowLike[] | undefined): Array<Record<
 /**
  * 重要转回或收回 → 行（附合计）。
  * 国企列结构与上市不同（见 reversalColumns）：披露表国企版把
- * `reversalBasis` 绑在「转回或收回前累计已计提坏账准备金额」、`reversalReason` 绑在
- * 「转回或收回原因」，故按变体产出对应字段键，不硬套上市结构。
+ * `cumulativeProvision` 绑在「转回或收回前累计已计提坏账准备金额」（源模板 C59==SUM
+ * → 数值列，进合计行）、`reversalReason` 绑在「转回或收回原因、方式」，
+ * 故按变体产出对应字段键，不硬套上市结构。
  */
 function reversalTable(
   variant: D1DisclosureVariant,
@@ -368,10 +430,16 @@ function reversalTable(
     const out: Array<Record<string, unknown>> = list.map((r) => ({
       label: str(r.companyName),
       amount: num(r.amount),
-      cumulative_provision: str(r.reversalBasis),
+      cumulative_provision: num(r.cumulativeProvision),
       reason_method: str(r.reversalReason),
     }))
-    out.push({ label: '合计', amount: sumAmount, cumulative_provision: '', reason_method: '', is_total: true })
+    out.push({
+      label: '合计',
+      amount: sumAmount,
+      cumulative_provision: list.reduce((s, r) => s + num(r.cumulativeProvision), 0),
+      reason_method: '',
+      is_total: true,
+    })
     return out
   }
   const out: Array<Record<string, unknown>> = list.map((r) => ({
@@ -393,6 +461,48 @@ function reversalTable(
 }
 
 /**
+ * 某变体全部子表的列头元数据（`{模板表名: ColumnDef[]}`）。
+ *
+ * `buildD1SyncPayload` 的 `columns` 直接取自本函数（**单一真源**，
+ * 避免载荷与契约测试各写一套导致漂移）。契约测试用零参
+ * `buildD1ListedColumns()` / `buildD1SoeColumns()` 消费。
+ */
+function d1ColumnsFor(variant: D1DisclosureVariant): Record<string, ColumnDef[]> {
+  const isSoe = variant === 'soe'
+  const names = isSoe ? T.soe : T.listed
+  const out: Record<string, ColumnDef[]> = {
+    [names.main]: isSoe ? SUMMARY_COLUMNS_SOE : SUMMARY_COLUMNS_LISTED,
+    [names.classEnd]: isSoe ? CLASS_COLUMNS_SOE : classColumnsListed(G_END_LISTED),
+    [names.classPrior]: isSoe ? CLASS_COLUMNS_SOE : classColumnsListed(G_PRIOR_LISTED),
+    [names.individualEnd]: isSoe ? INDIVIDUAL_COLUMNS_SOE : INDIVIDUAL_COLUMNS_LISTED,
+    [names.movement]: isSoe ? MOVEMENT_COLUMNS_SOE : MOVEMENT_COLUMNS_LISTED,
+    [names.reversal]: reversalColumns(variant),
+    [names.pledged]: PLEDGED_COLUMNS,
+    [names.endorsed]: ENDORSED_COLUMNS,
+    [names.transfer]: TRANSFER_COLUMNS,
+    [names.writeOffAmount]: WRITEOFF_AMOUNT_COLUMNS,
+    [names.writeOffDetail]: writeOffDetailColumns(variant),
+  }
+  if (isSoe) {
+    out[T.soe.portfolio] = PORTFOLIO_COLUMNS_SOE
+  } else {
+    out[T.listed.individualPrior] = INDIVIDUAL_COLUMNS_LISTED
+    out[T.listed.portfolioBank] = PORTFOLIO_COLUMNS_LISTED
+    out[T.listed.portfolioCommercial] = PORTFOLIO_COLUMNS_LISTED
+  }
+  return out
+}
+
+/** 上市 五、4 全部子表列头（零参，供契约测试 sweep）。 */
+export function buildD1ListedColumns(): Record<string, ColumnDef[]> {
+  return d1ColumnsFor('listed')
+}
+/** 国企 八、4 全部子表列头（零参，供契约测试 sweep）。 */
+export function buildD1SoeColumns(): Record<string, ColumnDef[]> {
+  return d1ColumnsFor('soe')
+}
+
+/**
  * 构建 D1 → 附注 sync-from-workpaper 载荷。
  * 覆盖披露表全部表格（上市 14 张 / 国企 12 张，与附注模板表名逐字一致）+ 全部子节说明文本。
  */
@@ -404,11 +514,13 @@ export function buildD1SyncPayload(
 ): D1SyncPayload {
   const isSoe = variant === 'soe'
   const names = isSoe ? T.soe : T.listed
+  const colsMap = d1ColumnsFor(variant)
   const subTableData: Record<string, unknown> = {}
   const columns: Record<string, ColumnDef[]> = {}
-  const put = (name: string, rows: unknown, cols: ColumnDef[]) => {
+  /** 列头统一取自 `d1ColumnsFor`（单一真源）；`cols` 入参仅作断言用途保留。 */
+  const put = (name: string, rows: unknown, cols?: ColumnDef[]) => {
     subTableData[name] = rows
-    columns[name] = cols
+    columns[name] = colsMap[name] ?? cols ?? []
   }
 
   // ① 主表（票据种类分类）
@@ -444,9 +556,18 @@ export function buildD1SyncPayload(
   const classPrior = isSoe
     ? (snapshot.soeClassPriorRows ?? snapshot.classPriorRows)
     : (snapshot.classDisplayPriorRows ?? snapshot.classPriorRows)
-  const classCols = isSoe ? CLASS_COLUMNS_SOE : CLASS_COLUMNS_LISTED
-  put(names.classEnd, classEnd.map(classRow), classCols)
-  put(names.classPrior, classPrior.map(classRow), classCols)
+  // 上市分类表拆两张、期间父表头各自不同（源模板 B38:F38 / B51:F51）；
+  // 国企两张表同构（期间在表名里，父表头是 账面余额 / 坏账准备）。
+  put(
+    names.classEnd,
+    classEnd.map(classRow),
+    isSoe ? CLASS_COLUMNS_SOE : classColumnsListed(G_END_LISTED),
+  )
+  put(
+    names.classPrior,
+    classPrior.map(classRow),
+    isSoe ? CLASS_COLUMNS_SOE : classColumnsListed(G_PRIOR_LISTED),
+  )
 
   // ③ 单项计提明细
   put(

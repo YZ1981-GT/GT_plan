@@ -238,6 +238,7 @@ import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import { buildK5SyncPayload, K5_NOTE_SECTION } from '../../composables/k5NoteSectionMap'
 
 const K5_ACCOUNT_CODE = '2701'
 
@@ -429,21 +430,19 @@ function persistContingent(): void {
 
 async function syncToDisclosureNotes(): Promise<void> {
   if (!props.projectId || props.isReadonly) return
-  const rows = provisionTable.value.filter(r => !r.isTotal).map(r => ({ project: r.category, endAmount: r.endBalance ?? 0, priorAmount: r.beginBalance ?? 0 }))
-  const narrative = narrativeText.value
-  const payload = {
-    wp_id: props.wpId,
-    sheet_name: 'K5-note-soe',
-    section_id: '八、55',
-    current_standard: 'soe_standalone',
-    sub_table_data: { rows },
-    _note_texts: narrative ? [{ section: 'main', title: '说明', text: narrative }] : [],
-  }
+  // 附注 八、55 只有 2 个值列（附注模版 L3952 / note headers / consol 五-56-1 三源一致，
+  // 形成原因降级为表下注文字）→ 不传 `reason`；`basis`/`riskLevel` 是审计列，附注无落点。
+  const rows = provisionTable.value.filter(r => !r.isTotal).map(r => ({
+    project: r.category,
+    endAmount: r.endBalance ?? 0,
+    priorAmount: r.beginBalance ?? 0,
+  }))
+  const payload = buildK5SyncPayload('soe', props.wpId || '', rows, narrativeText.value)
   try {
     await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
     eventBus.emit('disclosure:note-text-updated' as any, {
       wpCode: 'K5', variant: 'soe', accountCode: '2701',
-      projectId: props.projectId, sectionIds: ['八、55'],
+      projectId: props.projectId, sectionIds: [K5_NOTE_SECTION.soe],
     })
     ElMessage.success('已同步到附注')
   } catch { /* silent */ }

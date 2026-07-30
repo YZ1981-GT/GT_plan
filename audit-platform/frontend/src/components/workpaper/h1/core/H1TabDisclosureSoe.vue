@@ -39,6 +39,13 @@
       <div class="toolbar-hint">源模板 78 行 · 清理余额跨底稿取自 H6（1606）</div>
     </div>
 
+    <!-- 披露内部勾稽 -->
+    <H1DisclosureConsistencyPanel
+      :result="consistency"
+      :project-id="projectId"
+      :default-expanded="consistency.errorCount > 0"
+    />
+
     <!-- A 汇总 -->
     <el-card shadow="never" class="disclosure-card">
       <template #header>
@@ -100,7 +107,7 @@
         </el-table-column>
         <el-table-column label="期初余额" width="120" align="right">
           <template #default="{ row }">
-            <template v-if="row.allNa"><span class="na-cell">—</span></template>
+            <template v-if="isNaCell(row)"><span class="na-cell">—</span></template>
             <el-input-number
               v-else-if="row.editable && !isReadonly"
               :model-value="cellAmt(row, 'begin')"
@@ -113,7 +120,7 @@
         </el-table-column>
         <el-table-column label="本期增加" width="120" align="right">
           <template #default="{ row }">
-            <span v-if="row.movementNa || row.allNa" class="na-cell">—</span>
+            <span v-if="row.movementNa || isNaCell(row)" class="na-cell">—</span>
             <el-input-number
               v-else-if="row.editable && !isReadonly"
               :model-value="cellAmt(row, 'increase')"
@@ -126,7 +133,7 @@
         </el-table-column>
         <el-table-column label="本期减少" width="120" align="right">
           <template #default="{ row }">
-            <span v-if="row.movementNa || row.allNa" class="na-cell">—</span>
+            <span v-if="row.movementNa || isNaCell(row)" class="na-cell">—</span>
             <el-input-number
               v-else-if="row.editable && !isReadonly"
               :model-value="cellAmt(row, 'decrease')"
@@ -139,12 +146,23 @@
         </el-table-column>
         <el-table-column label="期末余额" width="120" align="right">
           <template #default="{ row }">
-            <span v-if="row.allNa" class="na-cell">—</span>
+            <span v-if="isNaCell(row)" class="na-cell">—</span>
             <span v-else class="formula-cell">{{ fmtAmt(row.end) }}</span>
           </template>
         </el-table-column>
       </el-table>
-      <div class="auto-fill-hint">净值/账面价值层增减列按模板为「—」；合计与分类由公式勾稽（净值=原值−折旧，账面价值=净值−减值）</div>
+      <div class="auto-fill-hint">
+        净值/账面价值层增减列按模板为「—」；土地资产不计提折旧、不单独计提减值准备（源模板整行「—」）；
+        合计与分类由公式勾稽（净值=原值−折旧，账面价值=净值−减值）
+      </div>
+      <el-alert
+        v-if="landNaAnomaly.length"
+        type="warning"
+        :closable="false"
+        show-icon
+        class="land-na-alert"
+        :title="`土地资产在${landNaAnomaly.join('、')}层带有金额，与源模板「—」列示约定不符：请核对 H1-2 分类是否将土地误并入房屋建筑物，或在此清零。`"
+      />
     </el-card>
 
     <!-- C 闲置 -->
@@ -379,6 +397,8 @@ import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
 import GtIndexChip from '../../GtIndexChip.vue'
+import H1DisclosureConsistencyPanel from './H1DisclosureConsistencyPanel.vue'
+import { checkH1SoeConsistency } from '../../composables/h1DisclosureConsistency'
 import {
   H1_NOTE_SECTION,
   resolveH1CurrentStandardFromProject,
@@ -465,6 +485,35 @@ const lastH6Pull = ref<H6ClearingPullResult | null>(null)
 const state = reactive(createH1SoeDisclosureState())
 /** ⑥已提足折旧仍在使用（独立于 state，单独持久化 H1-soe-fully-dep-rows） */
 const fullyDepRows = ref<H1SoeFullyDepRow[]>([])
+
+/**
+ * 披露内部勾稽（五层公式与结转、土地不提折旧/减值、清理汇总↔清理表、②③⑥ 子集约束）
+ */
+const consistency = computed(() =>
+  checkH1SoeConsistency({ state, fullyDep: fullyDepRows.value }),
+)
+
+/**
+ * 源模板整行「—」的格子是否真的显示「—」。
+ * 仅当该行无任何金额时才隐藏——若已从 H1-2 带入金额，照常显示以免静默丢数，
+ * 由上方告警 + 勾稽面板提示审计师处理。
+ */
+function isNaCell(row: H1SoeFlatMoveRow): boolean {
+  return !!row.allNa && !row.hasAmount
+}
+
+/** 土地资产在折旧/减值层带有金额的层名（与源模板「—」约定不符） */
+const landNaAnomaly = computed(() => {
+  const names: string[] = []
+  for (const layer of ['dep', 'impair'] as const) {
+    const block = state.layers.find((l) => l.layer === layer)
+    const land = block?.categories.find((c) => c.key === 'land')
+    if (land && (n(land.begin) || n(land.increase) || n(land.decrease) || n(land.end))) {
+      names.push(layer === 'dep' ? '累计折旧' : '减值准备')
+    }
+  }
+  return names
+})
 
 const h6Hint = computed(() => {
   const r = lastH6Pull.value
@@ -835,6 +884,7 @@ function fmtAmt(val: number | null | undefined): string {
 }
 .na-cell { color: var(--el-text-color-placeholder); }
 .auto-fill-hint { font-size: 11px; color: var(--el-text-color-secondary); margin-top: 8px; }
+.land-na-alert { margin-top: 8px; }
 .dynamic-actions { margin-top: 8px; display: flex; gap: 8px; }
 .subtotal-row { margin-top: 8px; font-weight: 500; text-align: right; padding-right: 12px; }
 .indent-label { padding-left: 1.5em; }

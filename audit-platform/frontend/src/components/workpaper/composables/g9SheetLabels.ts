@@ -112,7 +112,9 @@ export function isG9SheetComplete(code: string, m: Map<string, any>): boolean {
 
 export function extractG9SheetCode(sheetName: string): string {
   if (/底稿目录/.test(sheetName)) return '底稿目录'
-  if (/附注披露/.test(sheetName)) return sheetName.includes('国企') ? '附注国企' : '附注上市'
+  // 🔴 「国企」与「国有企业」两种写法都要认（24 份源模板用后者）。只判「国企」时
+  //    国企 TAB 会落到 fallback 渲染成上市组件，vitest / get_diagnostics 都查不出。
+  if (/附注披露/.test(sheetName)) return /国企|国有/.test(sheetName) ? '附注国企' : '附注上市'
   const m = sheetName.match(/(G9A|G9-\d+)/)
   return m ? m[1] : ''
 }

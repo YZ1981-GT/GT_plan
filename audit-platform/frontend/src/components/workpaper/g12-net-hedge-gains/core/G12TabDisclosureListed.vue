@@ -6,6 +6,15 @@
         <el-button size="small" :disabled="isReadonly" @click="dis.syncFromG12Adjudication()">从 G12-1 同步</el-button>
         <el-button size="small" :loading="dis.aiLoading.value" :disabled="isReadonly"
           @click="dis.generateAiConclusion()">🤖 AI辅助</el-button>
+        <el-button
+          size="small"
+          type="primary"
+          plain
+          data-testid="g12-disclosure-listed-sync-notes"
+          :loading="isSyncing"
+          :disabled="isReadonly || !projectId"
+          @click="syncToDisclosureNotes"
+        >同步到附注</el-button>
         <GtReviewTrigger section-id="G12-disclosure-listed" />
       </div>
     </div>
@@ -95,19 +104,26 @@
 </template>
 
 <script setup lang="ts">
-import { ref, toRef, computed } from 'vue'
+import { ref, toRef, computed, watch } from 'vue'
+import { ElMessage } from 'element-plus'
 import { useG12Disclosure } from '../../composables/useG12Disclosure'
 import { G12_ACCOUNT_CODE, G12_CORE_WORKFLOW_HINT, G12_CORE_WORKFLOW_STEPS, G12_DISCLOSURE_FORMULA_MAP } from '../../composables/g12Constants'
 import { useG12CoreWorkflow } from '../../composables/useG12CoreWorkflow'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import { buildG12SyncPayload } from '../../composables/g12DisclosureSyncPayload'
+import { G12_NOTE_SECTION } from '../../composables/g12NoteSectionMap'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import GCycleDisclosureExtras from '../../shared/GCycleDisclosureExtras.vue'
 import GCycleGuideStrip from '../../shared/GCycleGuideStrip.vue'
 import G12CoreWorkflowChecklist from '../shared/G12CoreWorkflowChecklist.vue'
+import { api } from '@/services/apiProxy'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
   wpId: string
+  projectId?: string
+  applicableStandards?: string[]
   isReadonly: boolean
   debouncedSave: (id: string, d: Partial<ChecklistResponse>) => void
 }>()
@@ -121,6 +137,39 @@ const dis = useG12Disclosure({
 })
 
 const wf = useG12CoreWorkflow({ allResponses: toRef(props, 'allResponses'), pageCode: '附注上市' })
+
+const isSyncing = ref(false)
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+
+async function syncToDisclosureNotes(): Promise<void> {
+  if (isSyncing.value || props.isReadonly || !props.projectId) return
+  const payload = buildG12SyncPayload(props.wpId, 'listed', props.applicableStandards, {
+    rows: dis.rows.value,
+    noteText: dis.noteText.value,
+  })
+  if (!payload) return
+  isSyncing.value = true
+  try {
+    const res: any = await api.post(
+      `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,
+      payload,
+    )
+    const rows = Number((res?.data ?? res)?.rows_synced ?? 0)
+    ElMessage.success(`已同步 ${rows} 行到附注模块「${G12_NOTE_SECTION.listed} 净敞口套期收益」`)
+  } catch {
+    ElMessage.warning('同步附注失败，请稍后重试')
+  } finally {
+    isSyncing.value = false
+  }
+}
+
+// 数据变更后自动同步（防抖 800ms 由 autoSync 内部控制；只读/失败静默）。
+// 🔴 监听实际数据（与载荷构建所用字段一致），不监听提示横幅类状态。
+watch(
+  [dis.rows, dis.noteText],
+  () => { autoSync.scheduleAutoSync(syncToDisclosureNotes) },
+  { deep: true },
+)
 
 function rowClassName({ row }: { row: { rowKey: string } }): string {
   return row.rowKey === 'total' ? 'g12-row-total' : ''

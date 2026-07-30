@@ -96,6 +96,8 @@
         variant="listed"
         :all-responses="formData.allResponses.value"
         :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :applicable-standards="applicableStandards"
         :is-readonly="isReadonly"
         :debounced-save="onDebouncedSave"
       />
@@ -105,6 +107,8 @@
         variant="soe"
         :all-responses="formData.allResponses.value"
         :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :applicable-standards="applicableStandards"
         :is-readonly="isReadonly"
         :debounced-save="onDebouncedSave"
       />
@@ -224,6 +228,16 @@ provide('getThreadDot', getThreadDot)
 provide('getRowDot', getRowDot)
 
 const currentSheet = computed(() => extractG8SheetCode(props.sheetName || props.wpCode || ''))
+
+/** 适用准则：htmlData / project_context / runtime 任一来源（与 G11/G13 同口径） */
+const applicableStandards = computed<string[]>(() => {
+  const raw =
+    props.htmlData?.project_context?.applicable_standards
+    ?? props.htmlData?.projectContext?.applicable_standards
+    ?? props.htmlData?.applicable_standards
+    ?? runtime?.applicableStandards?.value
+  return Array.isArray(raw) ? raw.map(String) : []
+})
 
 const HTML_SHEETS = new Set(['G8A', 'G8-1', 'G8-2', 'G8-3', 'G8-4', 'G8-5', 'G8-6', '附注上市', '附注国企', '底稿目录', '参考中证协'])
 const isHtmlSheet = computed(() => HTML_SHEETS.has(currentSheet.value))

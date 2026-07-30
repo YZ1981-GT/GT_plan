@@ -238,7 +238,7 @@ import http from '@/utils/http'
 import type { WorkpaperRuntimeContext } from '../../composables/useWorkpaperScaffold'
 import { WorkpaperRuntimeContextKey } from '../../composables/useWorkpaperScaffold'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
-import { buildK4SyncPayload } from '../../composables/k4NoteSectionMap'
+import { buildK4SyncPayload, K4_NOTE_SECTION } from '../../composables/k4NoteSectionMap'
 
 const K4_ACCOUNT_CODE = '2245'
 
@@ -342,12 +342,16 @@ async function syncToDisclosureNotes(): Promise<void> {
   if (!props.projectId || props.isReadonly) return
   const rows = summaryRows.filter(r => !r.isTotal).map(r => ({ project: r.item, endAmount: r.endBalance ?? 0, priorAmount: r.beginBalance ?? 0 }))
   const narrative = noteText.value
-  const payload = buildK4SyncPayload('listed', props.wpId || '', rows, narrative)
+  // 债券明细/续表为条件表：有行才进 sub_table_data（columns 由 builder 走同一判据配对）
+  const payload = buildK4SyncPayload('listed', props.wpId || '', rows, narrative, {
+    bondRows: bondRows.value,
+    bondContRows: bondContRows.value,
+  })
   try {
     await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
     eventBus.emit('disclosure:note-text-updated' as any, {
       wpCode: 'K4', variant: 'listed', accountCode: '2245',
-      projectId: props.projectId, sectionIds: ['五、44'],
+      projectId: props.projectId, sectionIds: [K4_NOTE_SECTION.listed],
     })
     ElMessage.success('已同步到附注')
   } catch { /* silent */ }

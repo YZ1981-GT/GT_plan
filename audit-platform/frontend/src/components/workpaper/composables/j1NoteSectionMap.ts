@@ -16,7 +16,11 @@
  *
  * Spec: .kiro/specs/j1-disclosure-note-linkage/
  */
-import type { J1DisclosureRow } from '@/composables/workpaper/j1/useJ1DisclosureSections'
+import {
+  buildDisclosureSubtotal,
+  type J1DisclosureRow,
+} from '@/composables/workpaper/j1/j1DisclosureRowModel'
+import { defineColumns, type ColumnDef } from './disclosureColumnDefs'
 
 // ─── 常量（Wave 0 冻结） ──────────────────────────────────────────────────────
 
@@ -41,21 +45,23 @@ export const J1_SUB_TABLE_KEYS = {
 export const J1_NOTE_HEADERS = ['项目', '期初余额', '本期增加', '本期减少', '期末余额'] as const
 
 // ─── 列定义（供 columns 传参 + 投影器消费） ──────────────────────────────────
-
-export interface ColumnDef {
-  key: string
-  label: string
-  is_label?: boolean
-}
+//
+// 🔴 `flat: true` 必需：本表 5 列是**单行表头**（附注模板 J1 三张表 headers 均为一行），
+//    但「本期增加」「本期减少」共享前缀「本期」→ 后端 `_infer_groups_from_headers`
+//    会反猜出一个源模板**不存在**的「本期」父表头（与 F2 房企 3 表同款缺陷，
+//    spec disclosure-columns-coverage-rollout R3.1/R3.4）。标在标签列即对整表生效。
+//
+// 列定义收敛到共享 `disclosureColumnDefs.ColumnDef`（原本地 interface 无 `flat`/`format`
+// 字段，无法表达单级声明与金额格式；经查无任何消费方 import 该本地类型）。
 
 export function j1MovementColumns(): ColumnDef[] {
-  return [
-    { key: '项目', label: '项目', is_label: true },
-    { key: '期初余额', label: '期初余额' },
-    { key: '本期增加', label: '本期增加' },
-    { key: '本期减少', label: '本期减少' },
-    { key: '期末余额', label: '期末余额' },
-  ]
+  return defineColumns([
+    { key: '项目', label: '项目', is_label: true, flat: true },
+    { key: '期初余额', label: '期初余额', format: 'amount' },
+    { key: '本期增加', label: '本期增加', format: 'amount' },
+    { key: '本期减少', label: '本期减少', format: 'amount' },
+    { key: '期末余额', label: '期末余额', format: 'amount' },
+  ])
 }
 
 // ─── current_standard 解析 ───────────────────────────────────────────────────
@@ -87,8 +93,34 @@ function nullableAmount(v: unknown): number | null {
   return Number.isFinite(n) ? n : null
 }
 
-function mapDisclosureRows(rows: J1DisclosureRow[]): J1SyncRow[] {
-  return rows.map((r) => ({
+/**
+ * 附注模板三张表的合计行字面 = `合计`（**无空格**）。
+ *
+ * 🔴 底稿 UI 用的是源模板字面「合 计」/「合  计」（中间带空格），
+ * 直接外溢会让附注合计行与模板 `rows[].label` 漂移 —— 与 D3 的
+ * `DISCLOSURE_TOTAL_LABEL`（`合 计`）不可全局硬套同款问题，按**本章节实证**取字面。
+ */
+export const J1_NOTE_TOTAL_LABEL = '合计'
+
+/**
+ * 补合计行。
+ *
+ * 🔴 P0 回归（2026-07-30 复盘）：组件传入的 `summaryData` / `shortTermData` /
+ * `postEmploymentData` **都不含合计行**（合计在 composable 里是 computed），
+ * 历史实现直接 `mapDisclosureRows(snapshot.summary)` → 同步后附注三张表**全缺合计行**。
+ * 交付物缺合计行等于表没编完，故由载荷层统一补，组件不会漏。
+ *
+ * 合计口径复用 `buildDisclosureSubtotal`（只累加非缩进行），与 UI 显示的合计同源。
+ */
+function withTotalRow(rows: J1DisclosureRow[], id: string): J1DisclosureRow[] {
+  // 防御：若上游已带合计行（历史脏数据 / 未来改动），先剔除再重算，避免双合计行
+  const data = rows.filter((r) => !r.isSubtotal)
+  const category = data.find((r) => r.category)?.category ?? ''
+  return [...data, buildDisclosureSubtotal(id, J1_NOTE_TOTAL_LABEL, category, data)]
+}
+
+function mapDisclosureRows(rows: J1DisclosureRow[], totalId: string): J1SyncRow[] {
+  return withTotalRow(rows, totalId).map((r) => ({
     label: r.label || '',
     values: [
       nullableAmount(r.beginBalance),
@@ -149,9 +181,9 @@ export function buildJ1SyncPayload(args: {
   const cols = j1MovementColumns()
 
   const sub_table_data: Record<string, unknown> = {
-    [keys.summary]: mapDisclosureRows(snapshot.summary),
-    [keys.shortTerm]: mapDisclosureRows(snapshot.shortTerm),
-    [keys.postEmployment]: mapDisclosureRows(snapshot.postEmployment),
+    [keys.summary]: mapDisclosureRows(snapshot.summary, 'summary-total'),
+    [keys.shortTerm]: mapDisclosureRows(snapshot.shortTerm, 'short-term-total'),
+    [keys.postEmployment]: mapDisclosureRows(snapshot.postEmployment, 'post-employment-total'),
     _note_texts: buildJ1NoteTexts(variant, snapshot.notes),
   }
 

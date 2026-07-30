@@ -234,6 +234,7 @@ import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import { buildK6SyncPayload, K6_NOTE_SECTION } from '../../composables/k6NoteSectionMap'
 
 const K6_ACCOUNT_CODE = '1481'
 
@@ -555,21 +556,21 @@ function persistLiabTable(): void {
 
 async function syncToDisclosureNotes(): Promise<void> {
   if (!props.projectId || props.isReadonly) return
-  const rows = assetTable.value.filter(r => !r.isTotal).map(r => ({ project: r.category, endAmount: r.closingBalance ?? 0, priorAmount: r.openingBalance ?? 0 }))
-  const narrative = disposalNarrative.value
-  const payload = {
-    wp_id: props.wpId,
-    sheet_name: 'K6-note-listed',
-    section_id: '持有待售资产',
-    current_standard: 'listed_standalone',
-    sub_table_data: { rows },
-    _note_texts: narrative ? [{ section: 'main', title: '说明', text: narrative }] : [],
-  }
+  // 附注 五、11 是两行表头 7 列：期末/上年年末 各 [账面余额, 减值准备, 账面价值]。
+  // 上年年末仅 `openingBalance`（账面价值）有录入来源，账面余额/减值准备推 null（禁造数）。
+  // 持有待售负债表不推：模板 `tables[]` name↔rows 错位一位（详见 spec 决策 B1）。
+  const rows = assetTable.value.filter(r => !r.isTotal).map(r => ({
+    project: r.category,
+    bookValue: r.bookValue ?? 0,
+    impairment: r.impairment ?? 0,
+    openingBalance: r.openingBalance ?? 0,
+  }))
+  const payload = buildK6SyncPayload('listed', props.wpId || '', rows, disposalNarrative.value)
   try {
     await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
     eventBus.emit('disclosure:note-text-updated' as any, {
       wpCode: 'K6', variant: 'listed', accountCode: '1481',
-      projectId: props.projectId, sectionIds: ['持有待售资产'],
+      projectId: props.projectId, sectionIds: [K6_NOTE_SECTION.listed],
     })
     ElMessage.success('已同步到附注')
   } catch { /* silent */ }

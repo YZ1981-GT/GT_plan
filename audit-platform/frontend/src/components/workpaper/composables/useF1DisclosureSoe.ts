@@ -7,11 +7,12 @@ import { parseNum, calcSubtotal, calcPercentage } from './useF1FormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
 import type { useF1CrossSheet } from './useF1CrossSheet'
 import { computeTop5 } from './useF1Analysis'
-import { collapseAgingForListedDisclosure } from './useF1DisclosureListed'
+import { buildAgingDisclosureRows } from './useF1DisclosureListed'
 import { isF1DisclosureApplicable } from './f1NoteSectionMap'
 import type { F1SoeSyncSnapshot } from './f1DisclosureSyncPayload'
 import { PRESET_SEGMENTS } from '@/composables/useAgingConfig'
 import { ADJUDICATION_LABEL_BY_SEGMENT_KEY } from './agingPresets'
+import { lookupDisclosureAgingLabel, SOE_AGING_OVERRIDES } from './disclosureAgingLabels'
 
 export interface F1SoeAgingRow {
   rowId: string
@@ -60,15 +61,8 @@ const ITEM_OVER1_META = `${PREFIX}over1-meta`
 const ITEM_AGING_BAD_DEBT = `${PREFIX}aging-bad-debt`
 const ITEM_TOP5_BAD_DEBT = `${PREFIX}top5-bad-debt`
 
-const SOE_AGING_LABEL: Record<string, string> = {
-  within1: '1年以内（含1年）',
-  y1to2: '1至2年',
-  y2to3: '2至3年',
-  over3: '3年以上',
-  y3to4: '3至4年',
-  y4to5: '4至5年',
-  over5: '5年以上',
-}
+/** 国企首档带「（含1年）」；其余档位取共享表（per-section 覆盖范式）。 */
+const F1_SOE_AGING_OVERRIDES: Readonly<Record<string, string>> = SOE_AGING_OVERRIDES
 
 type BadDebtPair = { end: number; prior: number }
 type Over1Meta = { creditorUnit?: string; reason?: string; agingLabel?: string }
@@ -109,7 +103,7 @@ export function useF1DisclosureSoe(options: UseF1DisclosureSoeOptions) {
     const segs = crossSheet.agingSegments?.value?.length
       ? crossSheet.agingSegments.value
       : PRESET_SEGMENTS.THREE_YEAR
-    const buckets = collapseAgingForListedDisclosure(agg, segs)
+    const buckets = buildAgingDisclosureRows(agg, segs)
     const endTotal = calcSubtotal(buckets.map((b) => b.endAmount))
     const priorTotal = calcSubtotal(buckets.map((b) => b.priorAmount))
     return buckets.map((b) => {
@@ -117,7 +111,9 @@ export function useF1DisclosureSoe(options: UseF1DisclosureSoeOptions) {
       return {
         rowId: `aging-${b.key}`,
         key: b.key,
-        label: SOE_AGING_LABEL[b.key] || ADJUDICATION_LABEL_BY_SEGMENT_KEY[b.key] || b.label,
+        label: lookupDisclosureAgingLabel(b.key, F1_SOE_AGING_OVERRIDES)
+          || ADJUDICATION_LABEL_BY_SEGMENT_KEY[b.key]
+          || b.label,
         endAmount: b.endAmount,
         endPct: calcPercentage(b.endAmount, endTotal),
         endBadDebt: parseNum(bd.end),
@@ -133,8 +129,8 @@ export function useF1DisclosureSoe(options: UseF1DisclosureSoeOptions) {
     const priorAmount = calcSubtotal(agingRows.value.map((r) => r.priorAmount))
     return {
       rowId: '__subtotal__',
-      key: 'total',
-      label: '合计',
+      key: 'subtotal',
+      label: '小计',
       endAmount,
       endPct: endAmount ? 100 : 0,
       endBadDebt: calcSubtotal(agingRows.value.map((r) => r.endBadDebt)),
@@ -143,6 +139,26 @@ export function useF1DisclosureSoe(options: UseF1DisclosureSoeOptions) {
       priorBadDebt: calcSubtotal(agingRows.value.map((r) => r.priorBadDebt)),
     }
   })
+
+  /**
+   * 「减：减值准备」行：取逐账龄段减值准备列合计（只读派生）。
+   * 源 xlsx 国企 sheet 把减值准备做成逐段列，附注模版/F7-7 做成一行 →
+   * 底稿保留逐段列作审计明细，此行为投影到附注的聚合口径。
+   */
+  const agingImpairmentRow = computed(() => ({
+    rowId: '__impairment__',
+    label: '减：减值准备',
+    endAmount: agingTotal.value.endBadDebt,
+    priorAmount: agingTotal.value.priorBadDebt,
+  }))
+
+  /** 「合计」行 = 小计 − 减：减值准备（期末/期初各独立，F7-7） */
+  const agingNet = computed(() => ({
+    rowId: '__net__',
+    label: '合计',
+    endAmount: agingTotal.value.endAmount - agingTotal.value.endBadDebt,
+    priorAmount: agingTotal.value.priorAmount - agingTotal.value.priorBadDebt,
+  }))
 
   function updateAgingBadDebt(key: string, field: 'end' | 'prior', val: number) {
     if (isReadonly.value) return
@@ -358,6 +374,11 @@ export function useF1DisclosureSoe(options: UseF1DisclosureSoeOptions) {
         priorPct: agingTotal.value.priorPct,
         priorBadDebt: agingTotal.value.priorBadDebt,
       },
+      agingNet: {
+        label: agingNet.value.label,
+        endAmount: agingNet.value.endAmount,
+        priorAmount: agingNet.value.priorAmount,
+      },
       over1YearRows: over1YearRows.value.map((r) => ({
         creditorUnit: r.creditorUnit,
         debtorUnit: r.debtorUnit,
@@ -389,6 +410,8 @@ export function useF1DisclosureSoe(options: UseF1DisclosureSoeOptions) {
     isApplicable,
     agingRows,
     agingTotal,
+    agingImpairmentRow,
+    agingNet,
     /** 兼容旧模板解构名（重构前 D3 风格 section1Rows） */
     section1Rows: agingRows,
     section1Subtotal: agingTotal,

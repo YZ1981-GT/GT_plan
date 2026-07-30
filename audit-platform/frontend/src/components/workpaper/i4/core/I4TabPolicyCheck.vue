@@ -279,7 +279,7 @@
     >
       <template #header>
         <div class="section-title">
-          <span class="check-title">{{ idx + 1 }. {{ item.label }}</span>
+          <span class="check-title">{{ idx + 1 }}. {{ item.label }}</span>
           <div class="title-actions">
             <el-tag v-if="item.conclusion" :type="casTagType(item.conclusion)" size="small">
               {{ item.conclusion }}

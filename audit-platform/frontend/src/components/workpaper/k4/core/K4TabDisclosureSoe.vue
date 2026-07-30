@@ -129,6 +129,7 @@ import { MagicStick } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import { buildK4SyncPayload, K4_NOTE_SECTION } from '../../composables/k4NoteSectionMap'
 import type { WorkpaperRuntimeContext } from '../../composables/useWorkpaperScaffold'
 import { WorkpaperRuntimeContextKey } from '../../composables/useWorkpaperScaffold'
 
@@ -314,21 +315,20 @@ async function handleAiGenerate(sIdx: number): Promise<void> {
 // ═══ 持久化 ═══
 async function syncToDisclosureNotes(): Promise<void> {
   if (!props.projectId || props.isReadonly) return
-  const rows = sections.flatMap(s => s.rows.filter(r => !r.isFormula).map(r => ({ project: r.item, endAmount: r.endBalance ?? 0, priorAmount: r.beginBalance ?? 0 })))
+  // 只推「一、按项目性质分类」段：`二、增减变动说明` 的本期增加/减少/净变动不是科目行，
+  // 混进同一张附注表会变成假科目（原 `sections.flatMap` 把两段压进一张表）。
+  // 增减变动说明随 `_note_texts` 走文字。
+  const natureSection = sections.find(s => s.id === 'nature')
+  const rows = (natureSection?.rows ?? [])
+    .filter(r => !r.isFormula)
+    .map(r => ({ project: r.item, endAmount: r.endBalance ?? 0, priorAmount: r.beginBalance ?? 0 }))
   const narrative = sections.filter(s => s.textContent).map(s => s.textContent).join('\n\n')
-  const payload = {
-    wp_id: props.wpId,
-    sheet_name: 'K4-note-soe',
-    section_id: '八、48',
-    current_standard: 'soe_standalone',
-    sub_table_data: { rows },
-    _note_texts: narrative ? [{ section: 'main', title: '说明', text: narrative }] : [],
-  }
+  const payload = buildK4SyncPayload('soe', props.wpId || '', rows, narrative)
   try {
     await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
     eventBus.emit('disclosure:note-text-updated' as any, {
       wpCode: 'K4', variant: 'soe', accountCode: '2245',
-      projectId: props.projectId, sectionIds: ['八、48'],
+      projectId: props.projectId, sectionIds: [K4_NOTE_SECTION.soe],
     })
     ElMessage.success('已同步到附注')
   } catch { /* silent */ }

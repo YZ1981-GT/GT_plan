@@ -174,10 +174,13 @@ export function isG8SheetComplete(code: string, m: Map<string, any>): boolean {
 export function extractG8SheetCode(sheetName: string): string {
   if (!sheetName) return ''
   if (/参考中证协|非上市公司股权估值|参考.*估值指引/.test(sheetName)) return '参考中证协'
+  // 🔴 国企判定必须先于上市，且「国企」「国有企业」两种写法都要认（24 份源模板用后者）。
+  //    若上市分支先命中（`附注.*上市` 不会误命中国企名，但顺序仍以国企优先更稳），
+  //    或只判「国企」，国企 TAB 会渲染成上市组件 —— vitest / 诊断都查不出。
+  if (/G8-note-soe|附注.*(国企|国有)/.test(sheetName)) return '附注国企'
   if (/G8-note-listed|附注披露.*上市|附注.*上市/.test(sheetName)) return '附注上市'
-  if (/G8-note-soe|附注披露.*国企|附注.*国企/.test(sheetName)) return '附注国企'
   if (/G8-directory|底稿目录/.test(sheetName)) return '底稿目录'
-  if (/附注/.test(sheetName)) return sheetName.includes('国企') ? '附注国企' : '附注上市'
+  if (/附注/.test(sheetName)) return '附注上市'
   const m = sheetName.match(/(G8A|G8-\d+)/)
   return m ? m[1] : ''
 }

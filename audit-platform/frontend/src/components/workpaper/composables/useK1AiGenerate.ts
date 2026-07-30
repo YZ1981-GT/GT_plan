@@ -11,6 +11,11 @@ export type K1AiSection =
   | 'overdue-eval'
   | 'overall-opinion'
   | 'writeoff-eval'
+  // 附注披露表文字段落（上市 / 国企共用）
+  | 'disclosure-balance-change'
+  | 'disclosure-ecl-basis'
+  | 'disclosure-writeoff-note'
+  | 'disclosure-transfer-note'
 
 export interface K1AiGenerateParams {
   section: K1AiSection

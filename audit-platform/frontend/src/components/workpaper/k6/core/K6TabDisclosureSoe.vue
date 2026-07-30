@@ -213,6 +213,7 @@ import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import { buildK6SyncPayload, K6_NOTE_SECTION } from '../../composables/k6NoteSectionMap'
 
 const K6_ACCOUNT_CODE = '1481'
 
@@ -506,21 +507,22 @@ function persistLiabTable(): void {
 
 async function syncToDisclosureNotes(): Promise<void> {
   if (!props.projectId || props.isReadonly) return
-  const rows = assetSummary.value.filter(r => !r.isTotal).map(r => ({ project: r.category, endAmount: r.closingBalance ?? 0, priorAmount: r.openingBalance ?? 0 }))
-  const narrative = narrativeText.value
-  const payload = {
-    wp_id: props.wpId,
-    sheet_name: 'K6-note-soe',
-    section_id: '八、12',
-    current_standard: 'soe_standalone',
-    sub_table_data: { rows },
-    _note_texts: narrative ? [{ section: 'main', title: '说明', text: narrative }] : [],
-  }
+  // 附注 八、12 是两行表头 7 列：期末数/期初数 各 [账面余额, 减值准备, 账面价值]。
+  // `end_book` 取 `bookValue`（与 `impairment` 同源，满足 F11-4 勾稽），不取 `closingBalance`。
+  // 期初仅 `openingBalance`（账面价值）有来源，账面余额/减值准备推 null（禁造数）。
+  // 「持有待售负债」是独立章节 八、43，需章节路由改造（另立 spec），本 Tab 只推资产表。
+  const rows = assetSummary.value.filter(r => !r.isTotal).map(r => ({
+    project: r.category,
+    bookValue: r.bookValue ?? 0,
+    impairment: r.impairment ?? 0,
+    openingBalance: r.openingBalance ?? 0,
+  }))
+  const payload = buildK6SyncPayload('soe', props.wpId || '', rows, narrativeText.value)
   try {
     await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
     eventBus.emit('disclosure:note-text-updated' as any, {
       wpCode: 'K6', variant: 'soe', accountCode: '1481',
-      projectId: props.projectId, sectionIds: ['八、12'],
+      projectId: props.projectId, sectionIds: [K6_NOTE_SECTION.soe],
     })
     ElMessage.success('已同步到附注')
   } catch { /* silent */ }

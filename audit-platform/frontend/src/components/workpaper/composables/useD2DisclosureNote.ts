@@ -30,7 +30,13 @@ import { parseNum } from './useD2FormulaEngine'
 import { useD2CrossSheet } from './useD2CrossSheet'
 import type { ChecklistItem, ChecklistResponse } from './useD2FormData'
 import { useAgingConfig, PRESET_SEGMENTS, type AgingSegment } from '@/composables/useAgingConfig'
-import { D2_NOTE_TEXT_SECTIONS, type D2DisclosureSnapshot, type D2DisclosureVariant } from './d2NoteSectionMap'
+import {
+  D2_NOTE_TEXT_SECTIONS,
+  D2_TABLE_NAMESPACE,
+  type D2DisclosureSnapshot,
+  type D2DisclosureVariant,
+} from './d2NoteSectionMap'
+import { seedSyncedTableBaseline } from './disclosureSyncedTables'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -64,10 +70,10 @@ export interface D2ClassDisplayRow {
 }
 
 /**
- * 国企版 6 列分类宽表行（期末数/期初数各一张）
- * 对齐源模板：类别 | 账面金额 | 比例(%) | 坏账准备 | 预期信用损失率(%) | 账面价值
+ * 6 列分类宽表行（期末余额/上年年末余额各一张），上市版与国企版共用。
+ * 对齐源模板 r21~r49：类别 | 账面余额{金额, 比例(%)} | 坏账准备{金额, 预期信用损失率(%)} | 账面价值
  */
-export interface D2SoeClassWideRow {
+export interface D2ClassWideRow {
   key: string
   label: string
   kind: 'category' | 'subtotal' | 'total'
@@ -87,25 +93,39 @@ export interface D2SoeClassWideRow {
   autoSource: string
 }
 
+/**
+ * 按单项计提坏账准备明细行（源模板 r50~r63 双期各一张 5 列表）。
+ * 预期信用损失率为派生列（源模板 D53=IFERROR(C53/B53,0)），不落库。
+ */
 export interface D2IndividualRow {
   rowId: string
   name: string
+  /** 账面余额（期末） */
   endAmount: number
+  /** 账面余额（上年年末） */
   priorAmount: number
-  /** 国企版专有列 */
+  /** 坏账准备（期末） */
   provision: number
+  /** 坏账准备（上年年末） */
+  priorProvision: number
+  /** 国企版专有列：账龄 */
   aging: string
-  lossRate: number
+  /** 计提依据 */
   basis: string
 }
 
+/** 组合计提分表行（源模板 r64~r114：账龄 × 双期{应收账款, 坏账准备, 预期信用损失率}） */
 export interface D2PortfolioRow {
   key: string
   label: string
+  /** 应收账款（期末） */
   endAmount: number
+  /** 应收账款（上年年末） */
   priorAmount: number
-  /** 国企版：坏账准备（期末） */
+  /** 坏账准备（期末） */
   provision: number
+  /** 坏账准备（上年年末） */
+  priorProvision: number
 }
 
 export interface D2PortfolioGroup {
@@ -114,11 +134,20 @@ export interface D2PortfolioGroup {
   rows: D2PortfolioRow[]
 }
 
+/**
+ * 「采用余额百分比或其他组合方法计提坏账准备」行（国企源模板 r82~r90）。
+ * 列 = 组合名称 | 期末数{账面余额, 计提比例（%）, 坏账准备} | 期初数{同}。
+ * 计提比例为派生列（坏账准备 ÷ 账面余额），不落库。
+ */
 export interface D2TwoPeriodManualRow {
   rowId: string
   name: string
   endAmount: number
   priorAmount: number
+  /** 坏账准备（期末） */
+  provision: number
+  /** 坏账准备（期初 / 上年年末） */
+  priorProvision: number
 }
 
 export interface D2MovementField {
@@ -183,9 +212,17 @@ export interface D2Top5Row {
   provision: number
 }
 
+/**
+ * (6) 因金融资产转移而终止确认的应收账款（源模板 r160~r166）。
+ * 上市版列：项 目 | 转移方式 | 终止确认金额 | 与终止确认相关的利得或损失；
+ * 国企版沿用其模板 3 列（不含转移方式）。
+ */
 export interface D2DerecognizedRow {
   rowId: string
+  /** 上市版渲染为「项 目」，国企版渲染为「债务人名称」 */
   companyName: string
+  /** 转移方式（上市版专有列，源模板 B162） */
+  transferMethod: string
   amount: number
   gainLoss: number
 }
@@ -302,6 +339,8 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
   const top5Rows = ref<D2Top5Row[]>([])
   const derecognizedRows = ref<D2DerecognizedRow[]>([])
   const continuedInvolvementRows = ref<D2ContinuedInvolvementRow[]>([])
+  /** 上次成功同步时推送过的数据子表名（R7 孤儿表清理的差集基准） */
+  const syncedTableNames = ref<string[]>([])
   const sectionNotes = ref<Record<string, string>>({})
 
   let hydrated = false
@@ -314,8 +353,8 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
       endAmount: parseNum(r.endAmount),
       priorAmount: parseNum(r.priorAmount),
       provision: parseNum(r.provision),
+      priorProvision: parseNum((r as any).priorProvision),
       aging: String(r.aging ?? ''),
-      lossRate: parseNum(r.lossRate),
       basis: String(r.basis ?? ''),
     }))
     portfolios.value = safeParse<D2PortfolioGroup[]>(readRaw('portfolios'), []).map((g) => ({
@@ -328,14 +367,20 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
             endAmount: parseNum(r.endAmount),
             priorAmount: parseNum(r.priorAmount),
             provision: parseNum((r as any).provision),
+            priorProvision: parseNum((r as any).priorProvision),
           }))
         : [],
     }))
+    syncedTableNames.value = safeParse<string[]>(readRaw('synced-tables'), [])
+      .filter((n) => typeof n === 'string' && n.trim() !== '')
+    // 旧持久化行只有 endAmount/priorAmount → 新增两列按 0 读入，原值不丢
     otherPortfolioRows.value = safeParse<D2TwoPeriodManualRow[]>(readRaw('other-portfolio-rows'), []).map((r) => ({
       rowId: r.rowId || genId('op'),
       name: String(r.name ?? ''),
       endAmount: parseNum(r.endAmount),
       priorAmount: parseNum(r.priorAmount),
+      provision: parseNum((r as any).provision),
+      priorProvision: parseNum((r as any).priorProvision),
     }))
     reversalRows.value = safeParse<D2ReversalRow[]>(readRaw('reversal-rows'), []).map((r) => ({
       rowId: r.rowId || genId('rv'),
@@ -365,6 +410,7 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
     derecognizedRows.value = safeParse<D2DerecognizedRow[]>(readRaw('derecognized-rows'), []).map((r) => ({
       rowId: r.rowId || genId('dr'),
       companyName: String(r.companyName ?? ''),
+      transferMethod: String((r as any).transferMethod ?? ''),
       amount: parseNum(r.amount),
       gainLoss: parseNum(r.gainLoss),
     }))
@@ -465,6 +511,28 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
     return { amount: autoValue, auto: true }
   }
 
+  /**
+   * 带旧 cellKey 兼容的取值（读兼容、写新键）：分类宽表覆盖键由 `soeClass:*`
+   * 更名为 `classWide:*`（上市版同样使用该宽表，旧名不实）。已保存的旧键仍可读出，
+   * 审计师下一次覆盖即写入新键，旧键自然停止生效。
+   */
+  function cellValueCompat(
+    cellKey: string,
+    legacyCellKey: string,
+    autoValue: number,
+  ): { amount: number; auto: boolean } {
+    const manual = overrides.value[cellKey]
+    if (manual !== undefined && manual !== null) return { amount: parseNum(manual), auto: false }
+    const legacy = overrides.value[legacyCellKey]
+    if (legacy !== undefined && legacy !== null) return { amount: parseNum(legacy), auto: false }
+    return { amount: autoValue, auto: true }
+  }
+
+  /** 预期信用损失率(%) = 坏账准备 ÷ 账面余额 × 100（分母 0 → 0，对齐源模板 IFERROR） */
+  function lossRateOf(provision: number, bookAmount: number): number {
+    return bookAmount !== 0 ? (parseNum(provision) / parseNum(bookAmount)) * 100 : 0
+  }
+
   const agingRows: ComputedRef<D2AgingDisplayRow[]> = computed(() => {
     const segs = agingSegments.value
     const auto = detailAging.value
@@ -486,20 +554,25 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
       })
     }
 
+    // 「1年以内小计」只在 1年以内被细分为多段时才有意义（源模板上市版 r9~r12
+    // 把 1年以内拆成 0-X个月 / X-Y个月 才有该小计行；国企版 r7~r15 无细分也无此行）。
+    // 只有一段时小计恒等于该段本身 → 不产出，避免附注多一行凭空的结构行。
     const within1Keys = segs.filter((s) => s.dayFrom < 366).map((s) => s.key)
-    const within1End = SUM(rows.filter((r) => within1Keys.includes(r.key)).map((r) => r.endAmount))
-    const within1Prior = SUM(rows.filter((r) => within1Keys.includes(r.key)).map((r) => r.priorAmount))
-    rows.push({
-      key: '__within1_subtotal',
-      label: '1年以内小计',
-      kind: 'within1Subtotal',
-      endAmount: within1End,
-      priorAmount: within1Prior,
-      endAuto: true,
-      priorAuto: true,
-      editable: false,
-      autoSource: '= 1年以内各账龄段之和',
-    })
+    if (within1Keys.length > 1) {
+      const within1End = SUM(rows.filter((r) => within1Keys.includes(r.key)).map((r) => r.endAmount))
+      const within1Prior = SUM(rows.filter((r) => within1Keys.includes(r.key)).map((r) => r.priorAmount))
+      rows.push({
+        key: '__within1_subtotal',
+        label: '1年以内小计',
+        kind: 'within1Subtotal',
+        endAmount: within1End,
+        priorAmount: within1Prior,
+        endAuto: true,
+        priorAuto: true,
+        editable: false,
+        autoSource: '= 1年以内各账龄段之和',
+      })
+    }
 
     const segEnd = SUM(rows.filter((r) => r.kind === 'segment').map((r) => r.endAmount))
     const segPrior = SUM(rows.filter((r) => r.kind === 'segment').map((r) => r.priorAmount))
@@ -636,10 +709,10 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
     return rows
   })
 
-  // ─── ②-SOE 国企 6 列分类宽表（期末数/期初数各一张）───────────────────────
-  // 源模板：类别 | 账面金额 | 比例(%) | 坏账准备 | 预期信用损失率(%) | 账面价值
+  // ─── ② 6 列分类宽表（期末余额 / 上年年末余额各一张，上市版与国企版共用）──────
+  // 源模板 r21~r49：类别 | 账面余额{金额, 比例(%)} | 坏账准备{金额, 预期信用损失率(%)} | 账面价值
 
-  function buildSoeClassWideRows(period: 'current' | 'prior'): D2SoeClassWideRow[] {
+  function buildClassWideRows(period: 'current' | 'prior'): D2ClassWideRow[] {
     const adj = crossSheet.adjudicationForDisclosure.value
     const bd = crossSheet.badDebtByCategory.value
 
@@ -649,16 +722,25 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
       { key: 'customerType', label: '按客户类型组合计提坏账准备' },
     ]
 
-    const rows: D2SoeClassWideRow[] = []
+    const rows: D2ClassWideRow[] = []
     let totalBook = 0
     let totalProvision = 0
+    const isCurrent = period === 'current'
 
     for (const cat of categories) {
       const adjCat = adj[cat.key as keyof typeof adj] as { prior: number; current: number }
       const bdCat = bd[cat.key as keyof typeof bd] as { prior: number; current: number }
 
-      const book = cellValue(`soeClass:${period}:${cat.key}:book`, period === 'current' ? adjCat.current : adjCat.prior).amount
-      const prov = cellValue(`soeClass:${period}:${cat.key}:prov`, period === 'current' ? bdCat.current : bdCat.prior).amount
+      const book = cellValueCompat(
+        `classWide:${period}:${cat.key}:book`,
+        `soeClass:${period}:${cat.key}:book`,
+        isCurrent ? adjCat.current : adjCat.prior,
+      ).amount
+      const prov = cellValueCompat(
+        `classWide:${period}:${cat.key}:prov`,
+        `soeClass:${period}:${cat.key}:prov`,
+        isCurrent ? bdCat.current : bdCat.prior,
+      ).amount
 
       totalBook += book
       totalProvision += prov
@@ -670,17 +752,17 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
         bookAmount: book,
         ratio: 0, // 后填
         provision: prov,
-        lossRate: book !== 0 ? (prov / book) * 100 : 0,
+        lossRate: lossRateOf(prov, book),
         carryingValue: book - prov,
         editable: true,
-        autoSource: `取自 D2-1 审定表（${cat.label}，${period === 'current' ? '期末' : '期初'}审定数）+ D2-3 坏账准备`,
+        autoSource: `取自 D2-1 审定表（${cat.label}，${isCurrent ? '期末' : '期初'}审定数）+ D2-3 坏账准备`,
       })
 
       // 「其中：」子行——单项计提展开每个债务人，组合计提展开每个组合名
       if (cat.key === 'individual' && individualRows.value.length > 0) {
         for (const r of individualRows.value) {
-          const subBook = period === 'current' ? r.endAmount : r.priorAmount
-          const subProv = period === 'current' ? r.provision : 0
+          const subBook = isCurrent ? r.endAmount : r.priorAmount
+          const subProv = isCurrent ? r.provision : r.priorProvision
           rows.push({
             key: `ind-${r.rowId}`,
             label: `  其中：${r.name || '（未命名）'}`,
@@ -688,33 +770,30 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
             bookAmount: subBook,
             ratio: 0,
             provision: subProv,
-            lossRate: subBook !== 0 ? (subProv / subBook) * 100 : 0,
+            lossRate: lossRateOf(subProv, subBook),
             carryingValue: subBook - subProv,
             editable: false,
             autoSource: '取自本页「按单项计提坏账准备的应收账款」明细',
           })
         }
       }
-      if ((cat.key === 'aging' || cat.key === 'customerType') && portfolios.value.length > 0) {
-        // 按组合计提行后展开各组合分表名称及汇总金额
+      // 组合明细只在「按账龄组合」行后展开一次（customerType 不重复展开）
+      if (cat.key === 'aging' && portfolios.value.length > 0) {
         for (const g of portfolios.value) {
-          const pfBook = SUM(g.rows.map((r) => period === 'current' ? r.endAmount : r.priorAmount))
+          const pfBook = SUM(g.rows.map((r) => (isCurrent ? r.endAmount : r.priorAmount)))
+          const pfProv = SUM(g.rows.map((r) => (isCurrent ? r.provision : r.priorProvision)))
           rows.push({
             key: `pf-${g.groupId}`,
             label: `  其中：${g.name || '（未命名组合）'}`,
             kind: 'subtotal',
             bookAmount: pfBook,
             ratio: 0,
-            provision: 0, // 组合分表未单独存坏账准备
-            lossRate: 0,
-            carryingValue: pfBook,
+            provision: pfProv,
+            lossRate: lossRateOf(pfProv, pfBook),
+            carryingValue: pfBook - pfProv,
             editable: false,
-            autoSource: '= 对应组合分表各账龄段之和',
+            autoSource: '= 对应组合分表各账龄段之和（应收账款 / 坏账准备）',
           })
-        }
-        // 只在第一个组合类别行（aging）后展开，避免 customerType 重复
-        if (cat.key === 'customerType') {
-          // customerType 无独立组合分表子行
         }
       }
     }
@@ -732,7 +811,7 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
       bookAmount: totalBook,
       ratio: 100,
       provision: totalProvision,
-      lossRate: totalBook !== 0 ? (totalProvision / totalBook) * 100 : 0,
+      lossRate: lossRateOf(totalProvision, totalBook),
       carryingValue: totalBook - totalProvision,
       editable: false,
       autoSource: '= 各类别之和',
@@ -741,15 +820,16 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
     return rows
   }
 
-  /** 国企版分类宽表——期末数 */
-  const soeClassEndRows: ComputedRef<D2SoeClassWideRow[]> = computed(() => buildSoeClassWideRows('current'))
-  /** 国企版分类宽表——期初数 */
-  const soeClassPriorRows: ComputedRef<D2SoeClassWideRow[]> = computed(() => buildSoeClassWideRows('prior'))
+  /** 分类宽表——期末余额（源模板 r22~r36） */
+  const classWideEndRows: ComputedRef<D2ClassWideRow[]> = computed(() => buildClassWideRows('current'))
+  /** 分类宽表——上年年末余额（源模板 r38~r49「续：」） */
+  const classWidePriorRows: ComputedRef<D2ClassWideRow[]> = computed(() => buildClassWideRows('prior'))
 
   // ─── ⑤ 坏账准备变动（上市纵向 7 行）───────────────────────────────────────
 
   const MOVEMENT_LABELS: Array<{ key: keyof D2MovementValues; label: string; autoSource: string }> = [
-    { key: 'priorBalance', label: '期初余额', autoSource: '取自 D2-3 坏账准备明细表（期初审定合计）' },
+    // 源模板 r117 行名为「上年年末余额」，且 B117=C19（= 账龄表「减：坏账准备」上年年末列）
+    { key: 'priorBalance', label: '上年年末余额', autoSource: '取自本页账龄表「减：坏账准备」上年年末余额（回退 D2-3 期初审定合计）' },
     { key: 'provision', label: '本期计提', autoSource: '取自 D2-3（本期计提合计）' },
     { key: 'reversal', label: '本期收回或转回', autoSource: '取自 D2-3（本期转回合计）' },
     { key: 'writeOff', label: '本期核销', autoSource: '取自 D2-3（本期核销合计）' },
@@ -759,8 +839,11 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
 
   const movementFields: ComputedRef<D2MovementField[]> = computed(() => {
     const bd = badDebtSummary.value
+    // 源模板 B117=C19：变动表首行取账龄表「减：坏账准备」上年年末列（含审计师覆盖值），
+    // 账龄表该格未取到数时回退 D2-3 期初审定合计。
+    const agingPriorBadDebt = agingRows.value.find((r) => r.kind === 'badDebt')?.priorAmount ?? 0
     const autoMap: Record<keyof D2MovementValues, number> = {
-      priorBalance: bd.priorAudited,
+      priorBalance: agingPriorBadDebt !== 0 ? agingPriorBadDebt : bd.priorAudited,
       provision: bd.provision,
       reversal: bd.reversal,
       writeOff: bd.writeOff,
@@ -863,7 +946,7 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
     if (isReadonly.value) return
     individualRows.value = [
       ...individualRows.value,
-      { rowId: genId('ind'), name: '', endAmount: 0, priorAmount: 0, provision: 0, aging: '', lossRate: 0, basis: '' },
+      { rowId: genId('ind'), name: '', endAmount: 0, priorAmount: 0, provision: 0, priorProvision: 0, aging: '', basis: '' },
     ]
     persistJson('individual-rows', individualRows.value)
   }
@@ -899,8 +982,8 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
         endAmount: 0,
         priorAmount: 0,
         provision: parseNum(raw.currentAudited),
+        priorProvision: parseNum(raw.priorAudited),
         aging: '',
-        lossRate: 0,
         basis: '',
       })
       existing.add(name)
@@ -913,7 +996,45 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
 
   // 组合计提分表
   function buildPortfolioRows(): D2PortfolioRow[] {
-    return agingSegments.value.map((seg) => ({ key: seg.key, label: seg.label, endAmount: 0, priorAmount: 0, provision: 0 }))
+    return agingSegments.value.map((seg) => ({
+      key: seg.key,
+      label: seg.label,
+      endAmount: 0,
+      priorAmount: 0,
+      provision: 0,
+      priorProvision: 0,
+    }))
+  }
+
+  /**
+   * 组合分表某期账龄占比(%)（国企源模板 C73=ROUND(B73/$B$79,4)）：
+   * 本行应收账款 ÷ 该组合本期应收账款合计 × 100，分母 0 → 0。派生只读，不落库。
+   */
+  function portfolioRatio(
+    row: D2PortfolioRow,
+    groupRows: readonly D2PortfolioRow[],
+    period: 'end' | 'prior',
+  ): number {
+    const pick = (r: D2PortfolioRow) => (period === 'end' ? r.endAmount : r.priorAmount)
+    const total = SUM((groupRows ?? []).map(pick))
+    return total === 0 ? 0 : (pick(row) / total) * 100
+  }
+
+  /**
+   * 其他组合方法某期计提比例(%)（国企源模板 C83/F83「计提比例（%）」）：
+   * 坏账准备 ÷ 账面余额 × 100，分母 0 → 0。派生只读，不落库。
+   */
+  function otherPortfolioRate(row: D2TwoPeriodManualRow, period: 'end' | 'prior'): number {
+    return period === 'end'
+      ? lossRateOf(row.provision, row.endAmount)
+      : lossRateOf(row.priorProvision, row.priorAmount)
+  }
+
+  /** 组合分表某期预期信用损失率(%)（派生只读，源模板 D68/G68=IFERROR(C68/B68,0)） */
+  function portfolioLossRate(row: D2PortfolioRow, period: 'end' | 'prior'): number {
+    return period === 'end'
+      ? lossRateOf(row.provision, row.endAmount)
+      : lossRateOf(row.priorProvision, row.priorAmount)
   }
   function addPortfolio(name: string): void {
     if (isReadonly.value) return
@@ -930,7 +1051,12 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
     portfolios.value = portfolios.value.filter((g) => g.groupId !== groupId)
     persistJson('portfolios', portfolios.value)
   }
-  function updatePortfolioCell(groupId: string, rowKey: string, field: 'endAmount' | 'priorAmount' | 'provision', value: number): void {
+  function updatePortfolioCell(
+    groupId: string,
+    rowKey: string,
+    field: 'endAmount' | 'priorAmount' | 'provision' | 'priorProvision',
+    value: number,
+  ): void {
     if (isReadonly.value) return
     portfolios.value = portfolios.value.map((g) => {
       if (g.groupId !== groupId) return g
@@ -947,7 +1073,7 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
         const old = g.rows.find((r) => r.key === seg.key)
         if (!old) {
           changed = true
-          return { key: seg.key, label: seg.label, endAmount: 0, priorAmount: 0, provision: 0 }
+          return { key: seg.key, label: seg.label, endAmount: 0, priorAmount: 0, provision: 0, priorProvision: 0 }
         }
         if (old.label !== seg.label) changed = true
         return { ...old, label: seg.label }
@@ -964,7 +1090,10 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
   // 国企：其他组合方法
   function addOtherPortfolioRow(): void {
     if (isReadonly.value) return
-    otherPortfolioRows.value = [...otherPortfolioRows.value, { rowId: genId('op'), name: '', endAmount: 0, priorAmount: 0 }]
+    otherPortfolioRows.value = [
+      ...otherPortfolioRows.value,
+      { rowId: genId('op'), name: '', endAmount: 0, priorAmount: 0, provision: 0, priorProvision: 0 },
+    ]
     persistJson('other-portfolio-rows', otherPortfolioRows.value)
   }
   function removeOtherPortfolioRow(rowId: string): void {
@@ -1144,7 +1273,10 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
   // ⑨ 国企：终止确认
   function addDerecognizedRow(): void {
     if (isReadonly.value) return
-    derecognizedRows.value = [...derecognizedRows.value, { rowId: genId('dr'), companyName: '', amount: 0, gainLoss: 0 }]
+    derecognizedRows.value = [
+      ...derecognizedRows.value,
+      { rowId: genId('dr'), companyName: '', transferMethod: '', amount: 0, gainLoss: 0 },
+    ]
     persistJson('derecognized-rows', derecognizedRows.value)
   }
   function removeDerecognizedRow(rowId: string): void {
@@ -1154,9 +1286,11 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
   }
   function updateDerecognizedRow(rowId: string, field: keyof D2DerecognizedRow, value: string | number): void {
     if (isReadonly.value) return
-    derecognizedRows.value = derecognizedRows.value.map((r) =>
-      r.rowId === rowId ? { ...r, [field]: field === 'companyName' ? String(value ?? '') : parseNum(value) } : r,
-    )
+    derecognizedRows.value = derecognizedRows.value.map((r) => {
+      if (r.rowId !== rowId) return r
+      const isText = field === 'companyName' || field === 'transferMethod'
+      return { ...r, [field]: isText ? String(value ?? '') : parseNum(value) }
+    })
     persistJson('derecognized-rows', derecognizedRows.value)
   }
 
@@ -1302,6 +1436,52 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
     persist(`note-${key}`, value)
   }
 
+  /**
+   * 记录本次成功同步推送的数据子表名（R7）。
+   *
+   * 🔴 只能在同步 **POST 成功后** 调用：若同步失败也写入，下一次会把本轮表名
+   * 当作「上次已同步」，反而把现存表当孤儿删掉。
+   */
+  function markSynced(tableNames: readonly string[]): void {
+    if (isReadonly.value) return
+    const next = Array.from(
+      new Set(
+        (tableNames ?? [])
+          .map((n) => String(n ?? '').trim())
+          .filter((n) => n !== '' && !n.startsWith('_')),
+      ),
+    )
+    // 表名集合未变（同一批表反复同步是常态：手动同步 + autoSync）→ 不重复写入，
+    // 避免同一 item_id 在一个防抖批次里出现两次被后端整批拒绝。
+    const prev = syncedTableNames.value
+    if (prev.length === next.length && prev.every((n, i) => n === next[i])) return
+    syncedTableNames.value = next
+    persistJson('synced-tables', next)
+  }
+
+  /**
+   * 基线播种（R7.5）：首次同步前用附注**现存**表名 ∩ D2 命名空间播种差集基线。
+   *
+   * 为什么必须播种：`_removed_table_keys` 的基线来自底稿自己的持久化清单，因此
+   * **基线建立之前**残留在附注里的孤儿表（如改名前的 `组合计提项目：应收中央企业客户`）
+   * 永远进不了差集，不会自愈。首次同步时读一次附注章节，按命名空间过滤后写入基线，
+   * 本轮同步即可把不再推送的历史键一次性清掉。
+   *
+   * 幂等：基线已建立（清单非空）→ 直接返回，不发起额外判断、不覆盖。
+   *
+   * @param noteTableData 附注章节 detail 的 `table_data`（由组件负责取数，
+   *                      composable 不直接依赖 HTTP，便于单测）
+   * @returns 实际播种的表名（已建立基线时返回当前清单）
+   */
+  function seedSyncedTablesFromNote(noteTableData: unknown): string[] {
+    if (syncedTableNames.value.length > 0) return [...syncedTableNames.value]
+    const seeded = seedSyncedTableBaseline(noteTableData, D2_TABLE_NAMESPACE[variant])
+    if (!seeded.length || isReadonly.value) return seeded
+    syncedTableNames.value = seeded
+    persistJson('synced-tables', seeded)
+    return seeded
+  }
+
   // ─── 不一致告警（披露合计 vs D2-1 审定表 / D2-3 坏账表）────────────────────
 
   const inconsistencyWarnings: ComputedRef<string[]> = computed(() => {
@@ -1332,6 +1512,14 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
       out.push(`坏账准备变动表期末余额(${fmt(mvEnd)}) 与 D2-3 坏账准备表期末审定合计(${fmt(bdTotal)}) 不一致`)
     }
 
+    // 源模板闭环：变动表期末余额 ↔ 分类披露表期末坏账准备合计（Requirement 5.3）
+    const classWideProvision = classWideEndRows.value.find((r) => r.kind === 'total')?.provision ?? 0
+    if (classWideProvision !== 0 && Math.abs(mvEnd - classWideProvision) > 0.01) {
+      out.push(
+        `坏账准备变动表期末余额(${fmt(mvEnd)}) 与按坏账计提方法分类披露表期末坏账准备合计(${fmt(classWideProvision)}) 不一致`,
+      )
+    }
+
     return out
   })
 
@@ -1341,6 +1529,8 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
     const m = movementValues.value
     return {
       agingRows: agingRows.value.map((r) => ({
+        // key 必须透出：同步层据此把配置口径标签映射为披露口径（R6，`1-2年`→`1至2年`）
+        key: r.key,
         label: r.label,
         endAmount: r.endAmount,
         priorAmount: r.priorAmount,
@@ -1352,46 +1542,62 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
         priorAmount: r.priorAmount,
         isTotal: r.kind === 'total',
       })),
-      soeClassEndRows: isSoe
-        ? soeClassEndRows.value.map((r) => ({
-            label: r.label,
-            bookAmount: r.bookAmount,
-            ratio: r.ratio,
-            provision: r.provision,
-            lossRate: r.lossRate,
-            carryingValue: r.carryingValue,
-            isTotal: r.kind === 'total',
-          }))
-        : undefined,
-      soeClassPriorRows: isSoe
-        ? soeClassPriorRows.value.map((r) => ({
-            label: r.label,
-            bookAmount: r.bookAmount,
-            ratio: r.ratio,
-            provision: r.provision,
-            lossRate: r.lossRate,
-            carryingValue: r.carryingValue,
-            isTotal: r.kind === 'total',
-          }))
-        : undefined,
+      // 分类宽表：上市版与国企版都推（源模板双期各一张 6 列表）
+      classWideEndRows: classWideEndRows.value.map((r) => ({
+        label: r.label,
+        bookAmount: r.bookAmount,
+        ratio: r.ratio,
+        provision: r.provision,
+        lossRate: r.lossRate,
+        carryingValue: r.carryingValue,
+        isTotal: r.kind === 'total',
+      })),
+      classWidePriorRows: classWidePriorRows.value.map((r) => ({
+        label: r.label,
+        bookAmount: r.bookAmount,
+        ratio: r.ratio,
+        provision: r.provision,
+        lossRate: r.lossRate,
+        carryingValue: r.carryingValue,
+        isTotal: r.kind === 'total',
+      })),
       individualRows: individualRows.value.map((r) => ({
         name: r.name,
         endAmount: r.endAmount,
         priorAmount: r.priorAmount,
         provision: r.provision,
+        priorProvision: r.priorProvision,
+        lossRate: lossRateOf(r.provision, r.endAmount),
+        priorLossRate: lossRateOf(r.priorProvision, r.priorAmount),
         aging: r.aging,
-        lossRate: r.lossRate,
         basis: r.basis,
       })),
       portfolios: portfolios.value.map((g) => ({
         name: g.name,
         groupId: g.groupId,
-        rows: g.rows.map((r) => ({ label: r.label, endAmount: r.endAmount, priorAmount: r.priorAmount })),
+        rows: g.rows.map((r) => ({
+          // 同上：组合分表行也按账龄段生成，key 透出以走披露口径映射
+          key: r.key,
+          label: r.label,
+          endAmount: r.endAmount,
+          priorAmount: r.priorAmount,
+          provision: r.provision,
+          priorProvision: r.priorProvision,
+          lossRate: portfolioLossRate(r, 'end'),
+          priorLossRate: portfolioLossRate(r, 'prior'),
+          // 国企口径：账龄占比(%)（源模板 C73），与损失率并存由同步层按变体取用
+          ratio: portfolioRatio(r, g.rows, 'end'),
+          priorRatio: portfolioRatio(r, g.rows, 'prior'),
+        })),
       })),
       otherPortfolioRows: otherPortfolioRows.value.map((r) => ({
         label: r.name,
         endAmount: r.endAmount,
         priorAmount: r.priorAmount,
+        provision: r.provision,
+        priorProvision: r.priorProvision,
+        rate: otherPortfolioRate(r, 'end'),
+        priorRate: otherPortfolioRate(r, 'prior'),
       })),
       movement: {
         priorBalance: m.priorBalance,
@@ -1437,10 +1643,18 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
       })),
       derecognizedRows: derecognizedRows.value.map((r) => ({
         companyName: r.companyName,
+        transferMethod: r.transferMethod,
         amount: r.amount,
         gainLoss: r.gainLoss,
       })),
+      continuedInvolvementRows: continuedInvolvementRows.value.map((r) => ({
+        item: r.item,
+        transferMethod: r.transferMethod,
+        assetAmount: r.assetAmount,
+        liabilityAmount: r.liabilityAmount,
+      })),
       notes: { ...sectionNotes.value },
+      previouslySyncedTables: [...syncedTableNames.value],
     }
   }
 
@@ -1453,8 +1667,8 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
     detailAgingHasData: computed(() => detailAging.value.hasData),
     // ② 分类
     classRows,
-    soeClassEndRows,
-    soeClassPriorRows,
+    classWideEndRows,
+    classWidePriorRows,
     // ③ 单项
     individualRows,
     addIndividualRow,
@@ -1467,6 +1681,9 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
     renamePortfolio,
     removePortfolio,
     updatePortfolioCell,
+    portfolioLossRate,
+    portfolioRatio,
+    otherPortfolioRate,
     otherPortfolioRows,
     addOtherPortfolioRow,
     removeOtherPortfolioRow,
@@ -1515,6 +1732,11 @@ export function useD2DisclosureNote(options: UseD2DisclosureNoteOptions) {
     resetOverride,
     inconsistencyWarnings,
     buildSnapshot,
+    // R7 孤儿表清理：同步成功后由组件回调，记录本轮推送的子表名
+    syncedTableNames,
+    markSynced,
+    // R7.5 基线播种：首次同步前由组件传入附注 table_data，播种命名空间内的历史键
+    seedSyncedTablesFromNote,
     badDebtSummary,
     // 旧版披露数据兼容
     legacyDisclosureInfo,

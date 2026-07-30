@@ -302,11 +302,9 @@ const {
 })
 
 // 数据变化后防抖自动同步到附注（composable 内部 watch→debouncedSave 保存后本 watch 触发）
-let _d3ListedMounted = false
 watch(
   [section1Rows, section2Rows, section3Rows, note1, note2, note3],
   () => {
-    if (!_d3ListedMounted) { _d3ListedMounted = true; return }
     autoSync.scheduleAutoSync(syncToDisclosureNotes)
   },
   { deep: true },

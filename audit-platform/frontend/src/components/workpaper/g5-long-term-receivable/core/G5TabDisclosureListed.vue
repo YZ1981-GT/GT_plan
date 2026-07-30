@@ -31,6 +31,17 @@
         >
           🤖 AI 辅助
         </el-button>
+        <el-button
+          size="small"
+          type="primary"
+          plain
+          data-testid="g5-disclosure-listed-sync-notes"
+          :loading="isSyncing"
+          :disabled="isReadonly || !props.projectId"
+          @click="syncToDisclosureNotes"
+        >
+          同步到附注
+        </el-button>
         <GtReviewTrigger section-id="G5-disclosure-listed" />
       </div>
     </div>
@@ -752,7 +763,7 @@
  * G5TabDisclosureListed — 附注披露信息（上市公司）
  * 结构化对齐致同 Excel；替换原纯文本 stub。
  */
-import { computed, onMounted, ref, toRef } from 'vue'
+import { computed, onMounted, ref, toRef, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
@@ -760,13 +771,26 @@ import G5AuditTextCards from '../G5AuditTextCards.vue'
 import { useInjectedG5FormData } from '../../composables/useG5LonRecFormData'
 import { useG5DisclosureListed } from '../../composables/useG5DisclosureListed'
 import { useG5AiGenerate } from '../../composables/useG5AiGenerate'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import {
+  buildG5ListedSyncPayload,
+  g5PortfolioTableNames,
+} from '../../composables/g5DisclosureSyncPayload'
+import { G5_NOTE_SECTION } from '../../composables/g5NoteSectionMap'
+import {
+  buildRemovedTableKeys,
+  parseSyncedTableNames,
+  serializeSyncedTableNames,
+} from '../../composables/disclosureSyncedTables'
 import type { G5MethodRow } from '../../composables/g5ListedDisclosureRows'
 import type { G5AgingPreset } from '../../composables/g5AgingScheme'
+import { api } from '@/services/apiProxy'
 
 const props = defineProps<{
   htmlData?: unknown
   wpId: string
   projectId: string
+  applicableStandards?: string[]
   readonly?: boolean
 }>()
 
@@ -784,6 +808,76 @@ const dis = useG5DisclosureListed({
 
 const wpIdRef = computed(() => props.wpId)
 const { generateAndConfirm, aiAvailable, loading: aiLoading } = useG5AiGenerate(wpIdRef)
+
+// ─── 同步到附注（§五、16）───────────────────────────────────────────────
+// 组合计提表是**动态多表**（`组合计提项目：{组合名}`）→ 组合改名/删除会在附注侧留孤儿表，
+// 故持久化「上次同步表名」并在同步**成功后**才 markSynced（失败也写会把现存表当孤儿删）。
+const SYNCED_TABLES_ITEM = 'G5-disclosure-listed-synced-tables'
+const isSyncing = ref(false)
+const autoSync = useDisclosureAutoSync({ isReadonly: () => isReadonly.value })
+
+function listedSnapshot() {
+  const st = dis.state.value
+  return {
+    natureRows: dis.natureDisplayRows.value,
+    methodRows: dis.methodDisplayRows.value,
+    individualDetails: st.individualDetails,
+    portfolios: st.portfolios,
+    movementRows: dis.movementDisplayRows.value,
+    writeoffRows: st.writeoffRows,
+    unrealizedNote: st.unrealizedNote ?? '',
+    noteText: dis.noteText.value ?? '',
+  }
+}
+
+async function syncToDisclosureNotes(): Promise<void> {
+  if (isSyncing.value || isReadonly.value || !props.projectId) return
+  const snap = listedSnapshot()
+  const pushed = g5PortfolioTableNames(snap.portfolios)
+  const previouslySynced = parseSyncedTableNames(
+    g5Notes.allResponses.value.get(SYNCED_TABLES_ITEM)?.remark ?? null,
+  )
+  const payload = buildG5ListedSyncPayload(
+    props.wpId,
+    props.applicableStandards,
+    snap,
+    buildRemovedTableKeys({ previouslySynced, pushed }),
+  )
+  if (!payload) return
+  isSyncing.value = true
+  try {
+    const res: any = await api.post(
+      `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,
+      payload,
+    )
+    const rows = Number((res?.data ?? res)?.rows_synced ?? 0)
+    // 仅同步成功后记账，否则下次会把仍存在的表误判为孤儿
+    g5Notes.debouncedSave(SYNCED_TABLES_ITEM, {
+      remark: serializeSyncedTableNames(pushed),
+    })
+    ElMessage.success(`已同步 ${rows} 行到附注模块「${G5_NOTE_SECTION.listed} 长期应收款」`)
+  } catch {
+    ElMessage.warning('同步附注失败，请稍后重试')
+  } finally {
+    isSyncing.value = false
+  }
+}
+
+// 数据变更后自动同步（防抖 800ms；只读/失败静默）。监听实际数据，不监听提示横幅状态。
+watch(
+  [
+    dis.natureDisplayRows,
+    dis.methodDisplayRows,
+    dis.movementDisplayRows,
+    () => dis.state.value.individualDetails,
+    () => dis.state.value.portfolios,
+    () => dis.state.value.writeoffRows,
+    () => dis.state.value.unrealizedNote,
+    dis.noteText,
+  ],
+  () => { autoSync.scheduleAutoSync(syncToDisclosureNotes) },
+  { deep: true },
+)
 
 function fmt(n: number | null | undefined): string {
   const v = Number(n) || 0

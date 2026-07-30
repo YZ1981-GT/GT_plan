@@ -18,13 +18,23 @@ export const K1_DISCLOSURE_SHEET_NAME = {
   soe: '附注披露信息（国企）',
 } as const satisfies Record<K1DisclosureVariant, string>
 
-/** 与 note_template_listed §五、8 tables[].name 对齐（K1 其他应收款项部分） */
+/**
+ * 与 note_template_listed §五、8 tables[].name **逐字**对齐（K1 其他应收款项部分）。
+ * 契约测试见 `__tests__/k1NoteSubtableContract.spec.ts`——改名前先改附注模板。
+ *
+ * 注意：底稿上市披露表还有「资金集中管理」「应收政府补助」「转移终止确认」「继续涉入」四块，
+ * 其附注真源**不在 §五、8**：政府补助 → 附注「计入其他应收款的政府补助」；
+ * 转移/继续涉入 → 附注 §七 金融工具「因转移而终止确认的金融资产」。故不在此映射内。
+ */
 export const K1_LISTED_SUBTABLE = {
   aging: '按账龄披露',
   nature: '按款项性质披露',
   stage1: '期末处于第一阶段的坏账准备',
   stage2: '期末处于第二阶段的坏账准备',
   stage3: '期末处于第三阶段的坏账准备',
+  priorStage1: '上年年末处于第一阶段的坏账准备',
+  priorStage2: '上年年末处于第二阶段的坏账准备',
+  priorStage3: '上年年末处于第三阶段的坏账准备',
   stageMovement: '本期计提、收回或转回的坏账准备情况',
   reversal: '本期转回或收回金额重要的坏账准备',
   writeoffSummary: '本期实际核销的其他应收款情况',
@@ -32,20 +42,22 @@ export const K1_LISTED_SUBTABLE = {
   top5: '按欠款方归集的其他应收款期末余额前五名单位情况',
 } as const
 
-/** 与 note_template_soe §八、9 tables[].name 对齐（K1 其他应收款项部分） */
+/** 与 note_template_soe §八、9 tables[].name **逐字**对齐（K1 其他应收款项部分） */
 export const K1_SOE_SUBTABLE = {
   aging: '按账龄披露其他应收款项',
   methodEnd: '按坏账准备计提方法分类披露其他应收款项',
   methodPrior: '续：',
   individualDetail: '单项计提坏账准备的其他应收款项',
+  portfolioAging: '账龄组合',
   portfolioOther: '采用余额百分比法或其他组合方法计提坏账准备的其他应收款项',
   eclMovement: '其他应收款项坏账准备计提情况',
-  balanceMovement: '其他应收款项账面余额三阶段变动',
-  reversal: '本期收回或转回金额重要的坏账准备',
+  balanceMovement: '其他应收款项账面余额变动',
+  reversal: '收回或转回的坏账准备',
   writeoff: '本期实际核销的其他应收款项',
   top5: '按欠款方归集的期末余额前五名的其他应收款项',
   govGrant: '涉及政府补助的应收款项',
-  transfer: '因金融资产转移而终止确认的其他应收款',
+  transfer: '由金融资产转移而终止确认的其他应收款项',
+  continuedInvolvement: '其他应收款项转移继续涉入形成的资产、负债的金额',
 } as const
 
 /** 国企披露各区块编制提示（结构 vs 内容） */
@@ -121,6 +133,53 @@ export const K1_LISTED_SECTION_GUIDES: K1SectionGuideExt[] = [
     sourceSheet: '明细表K1-2',
     adjudicationKey: 'receivable',
   },
+  {
+    id: 'priorEcl',
+    title: '上年年末 ECL 三阶段',
+    structure: 'Stage1/2/3 快照（上年年末）+ 合计',
+    source: 'K1-3 上年审定列 / 上期归档底稿',
+    noteTarget: '五、8·上年年末处于第一/二/三阶段的坏账准备',
+    sourceSheet: '坏账准备明细表K1-3',
+    sourceItemId: 'K1-3-baddebt-rows',
+    adjudicationKey: 'none',
+  },
+  {
+    id: 'movement',
+    title: '坏账准备三阶段变动',
+    structure: '期初→阶段迁移→计提/转回/转销/核销→期末',
+    source: 'K1-3 三阶段转入转出表',
+    noteTarget: '五、8·本期计提、收回或转回的坏账准备情况',
+    sourceSheet: '坏账准备明细表K1-3',
+    sourceItemId: 'K1-3-baddebt-rows',
+    adjudicationKey: 'badDebt',
+  },
+  {
+    id: 'fundCentralization',
+    title: '资金集中管理',
+    structure: '金额 + 文字（解释15号）',
+    source: '人工判断；需考虑非经营性资金占用专项说明',
+    noteTarget: '五、8·资金集中管理（文字）',
+    sourceSheet: '审定表K1-1',
+    adjudicationKey: 'none',
+  },
+  {
+    id: 'govGrant',
+    title: '应收政府补助',
+    structure: '发文单位 | 补助项目 | 期末余额 | 账龄 | 预计收取时间/金额/依据',
+    source: 'K1-2 款项性质含「政府补助」的明细行',
+    noteTarget: '附注「计入其他应收款的政府补助」（不在 五、8）',
+    sourceSheet: '明细表K1-2',
+    adjudicationKey: 'none',
+  },
+  {
+    id: 'transfer',
+    title: '转移终止确认 / 继续涉入',
+    structure: '终止确认：项目/方式/金额/损益；继续涉入：资产、负债分项',
+    source: '人工录入（金融资产转移合同）',
+    noteTarget: '附注 §七 金融工具·因转移而终止确认的金融资产（不在 五、8）',
+    sourceSheet: '审定表K1-1',
+    adjudicationKey: 'none',
+  },
 ]
 
 export const K1_SOE_SECTION_GUIDES: K1SectionGuideExt[] = [
@@ -159,11 +218,20 @@ export const K1_SOE_SECTION_GUIDES: K1SectionGuideExt[] = [
     title: '组合计提·账龄组合',
     structure: '各账龄段余额、比例、坏账准备（期末/期初对照）',
     source: 'K1-2 组合户账龄汇总（排除 K1-3 单项子行对应户）',
-    noteTarget: '八、9·账龄组合（组合计提附表）',
+    noteTarget: '八、9·账龄组合',
     sourceSheet: '坏账准备测算K1-8',
     adjudicationKey: 'portfolio',
     portfolioLabel: '账龄组合',
     portfolioRowKey: 'r1',
+  },
+  {
+    id: 'portfolioOther',
+    title: '组合计提·其他组合',
+    structure: '组合名称 | 账面余额 | 计提比例(%) | 坏账准备（期末/期初对照）',
+    source: '人工设定组合（余额百分比法等）；坏账准备由计提比例派生',
+    noteTarget: '八、9·采用余额百分比法或其他组合方法计提坏账准备的其他应收款项',
+    sourceSheet: '坏账准备测算K1-8',
+    adjudicationKey: 'none',
   },
   {
     id: 'ecl',
@@ -187,9 +255,9 @@ export const K1_SOE_SECTION_GUIDES: K1SectionGuideExt[] = [
   {
     id: 'reversal',
     title: '转回/收回',
-    structure: '债务人 | 转回金额 | 累计已计提 | 转回原因/方式',
-    source: 'K1-9 转回检查表',
-    noteTarget: '八、9·本期收回或转回',
+    structure: '债务人 | 转回或收回金额 | 转回或收回前累计已计提坏账准备金额 | 原因、方式',
+    source: 'K1-9 转回检查表（accumProvision → 累计已计提）',
+    noteTarget: '八、9·收回或转回的坏账准备',
     sourceSheet: '坏账准备转回(收回)核销检查表K1-9',
     sourceItemId: 'K1-9-writeoff',
     adjudicationKey: 'none',
@@ -224,12 +292,30 @@ export const K1_SOE_SECTION_GUIDES: K1SectionGuideExt[] = [
   },
   {
     id: 'transfer',
-    title: '金融资产转移',
-    structure: '终止确认：债务人/金额/损益；继续涉入：资产/负债金额',
-    source: '人工录入（无标准源底稿时）',
-    noteTarget: '八、9·转移终止确认及继续涉入',
+    title: '金融资产转移终止确认',
+    structure: '债务人名称 | 终止确认金额 | 与终止确认相关的利得或损失（损失以「-」填列）',
+    source: '人工录入（金融资产转移合同）',
+    noteTarget: '八、9·由金融资产转移而终止确认的其他应收款项',
     sourceSheet: '审定表K1-1',
     adjudicationKey: 'net',
+  },
+  {
+    id: 'continuedInvolvement',
+    title: '转移继续涉入形成的资产、负债',
+    structure: '资产：/资产小计；负债：/负债小计 + 说明（转移方式/关系/风险）',
+    source: '人工录入（证券化、保理等）',
+    noteTarget: '八、9·其他应收款项转移继续涉入形成的资产、负债的金额',
+    sourceSheet: '审定表K1-1',
+    adjudicationKey: 'none',
+  },
+  {
+    id: 'balanceChangeNote',
+    title: '说明：账面余额显著变动 / 计提依据',
+    structure: '两段文字（源模板 R88 / R89）',
+    source: '人工撰写（可 AI 辅助），随同步写入附注文字',
+    noteTarget: '八、9·文字段落',
+    sourceSheet: '坏账准备明细表K1-3',
+    adjudicationKey: 'none',
   },
 ] as const
 

@@ -42,9 +42,11 @@ export const G5_DIRECTORY_ROWS: Array<{ seq: number; indexCode: string; name: st
 /** sheetName → 内部分发编码 */
 export function extractG5SheetCode(sheetName: string): string {
   if (/底稿目录/.test(sheetName)) return '底稿目录'
+  // 🔴 国企判定前置，且「国企」「国有企业」两种写法都要认（24 份源模板用后者）。
+  //    只判「国企」会让国企 TAB 落到 fallback 渲染成上市组件，vitest / 诊断都查不出。
+  if (/G5-note-soe|附注.*(国企|国有)/.test(sheetName)) return '附注国企'
   if (/G5-note-listed|附注披露.*上市|附注.*上市/.test(sheetName)) return '附注上市'
-  if (/G5-note-soe|附注披露.*国企|附注.*国企/.test(sheetName)) return '附注国企'
-  if (/附注/.test(sheetName)) return sheetName.includes('国企') ? '附注国企' : '附注上市'
+  if (/附注/.test(sheetName)) return '附注上市'
   const m = sheetName.match(/(G5A|G5-1[0-2]|G5-[1-9])/i)
   if (!m) return ''
   return m[1].toUpperCase().replace(/^G5A$/i, 'G5A')

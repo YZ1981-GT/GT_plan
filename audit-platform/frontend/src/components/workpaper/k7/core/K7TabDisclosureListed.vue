@@ -157,6 +157,7 @@ import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import { buildK7SyncPayload, K7_NOTE_SECTION } from '../../composables/k7NoteSectionMap'
 
 const K7_ACCOUNT_CODE = '2401'
 
@@ -368,21 +369,23 @@ function handleAiNarrative(): void {
 
 async function syncToDisclosureNotes(): Promise<void> {
   if (!props.projectId || props.isReadonly) return
-  const rows = [...assetRelatedRows.value, ...incomeRelatedRows.value].filter(r => !r.isTotal).map(r => ({ project: r.project, endAmount: (r.beginBalance + r.increase - r.decrease) ?? 0, priorAmount: r.beginBalance ?? 0 }))
-  const narrative = narrativeText.value
-  const payload = {
-    wp_id: props.wpId,
-    sheet_name: 'K7-note-listed',
-    section_id: '五、51',
-    current_standard: 'listed_standalone',
-    sub_table_data: { rows },
-    _note_texts: narrative ? [{ section: 'main', title: '说明', text: narrative }] : [],
-  }
+  // 附注 五、51 只有 1 张表 → 与资产相关 / 与收益相关 两张底稿表的行拼成一个列表。
+  // 上市版 5 个值列（末列 形成原因），期末余额由 builder 按 F51-3 算（期初+增加−减少）。
+  const rows = [...assetRelatedRows.value, ...incomeRelatedRows.value]
+    .filter(r => !r.isTotal)
+    .map(r => ({
+      project: r.project,
+      beginBalance: r.beginBalance ?? 0,
+      increase: r.increase ?? 0,
+      decrease: r.decrease ?? 0,
+      reason: r.reason ?? '',
+    }))
+  const payload = buildK7SyncPayload('listed', props.wpId || '', rows, narrativeText.value)
   try {
     await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
     eventBus.emit('disclosure:note-text-updated' as any, {
       wpCode: 'K7', variant: 'listed', accountCode: '2401',
-      projectId: props.projectId, sectionIds: ['五、51'],
+      projectId: props.projectId, sectionIds: [K7_NOTE_SECTION.listed],
     })
     ElMessage.success('已同步到附注')
   } catch { /* silent */ }

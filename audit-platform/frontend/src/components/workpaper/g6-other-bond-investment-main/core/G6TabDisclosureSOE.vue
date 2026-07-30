@@ -303,7 +303,7 @@ import {
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import { dispatchG6SaveItems } from '../../composables/g6CrossHelpers'
 import type { ColumnDef } from '../../composables/disclosureColumnDefs'
-import { useDisclosureAutoSync } from '../../../composables/useDisclosureAutoSync'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 
 interface BalanceRow {
   item: string

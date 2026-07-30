@@ -4,6 +4,7 @@
  * 上市：仅推送「（2）工程物资」分类子表至附注「五、23」
  * （依赖后端 sub_table_data 按 key 浅合并，不覆盖 H2 已推送的在建工程子表）
  */
+import type { ColumnDef } from './disclosureColumnDefs'
 import {
   H2_DISCLOSURE_SHEET_NAME,
   H2_LISTED_SUBTABLE,
@@ -11,6 +12,7 @@ import {
   isH2DisclosureApplicable,
   resolveH2CurrentStandard,
 } from './h2NoteSectionMap'
+import { buildH2ListedColumns } from './h2DisclosureSyncPayload'
 import {
   h4ListedMaterialsGross,
   h4ListedMaterialsNet,
@@ -24,6 +26,31 @@ export interface H4SyncFromWorkpaperPayload {
   section_id: string
   current_standard: string
   sub_table_data: Record<string, Record<string, unknown>[]>
+  /**
+   * 列头元数据（disclosure-columns-coverage-rollout R1）。
+   *
+   * 🔴 **复用 H2 的定义，不另造**：H4 推的是 H2 章节（五、23）里的子表
+   * （`工程物资` 分类表 + 顺带勾稽 `在建工程` 汇总表的工程物资行），两处写同一张表；
+   * 各造一份列头必然分叉（label 漂移 → 附注列头随最后一次同步跳变）。
+   */
+  columns?: Record<string, ColumnDef[]>
+}
+
+/**
+ * 从 H2 上市列头里挑出本次实际推送的子表（Property 1：columns 键 ≡ 数据键）。
+ *
+ * `existingSubTableData` 里的键同样来自 H2 自己的推送，故都能在 H2 列头映射中找到；
+ * 找不到定义的键**不臆造列头**（宁缺勿造），由覆盖守卫/契约测试暴露。
+ */
+function pickH4ListedColumns(sub: Record<string, unknown>): Record<string, ColumnDef[]> {
+  const all = buildH2ListedColumns()
+  const out: Record<string, ColumnDef[]> = {}
+  for (const key of Object.keys(sub)) {
+    if (key.startsWith('_')) continue
+    const defs = all[key]
+    if (defs) out[key] = defs
+  }
+  return out
 }
 
 export interface H4ListedSyncSnapshot {
@@ -108,5 +135,6 @@ export function buildH4ListedSyncPayloads(
     section_id: H2_NOTE_SECTION.listed,
     current_standard: resolveH2CurrentStandard('listed', applicableStandards),
     sub_table_data: sub as Record<string, Record<string, unknown>[]>,
+    columns: pickH4ListedColumns(sub),
   }]
 }

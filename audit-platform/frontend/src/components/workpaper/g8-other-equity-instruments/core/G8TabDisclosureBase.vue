@@ -18,6 +18,15 @@
           data-testid="g8-disclosure-sync-designation"
           @click="onSyncDesignation"
         >指定原因草稿</el-button>
+        <el-button
+          size="small"
+          type="primary"
+          plain
+          data-testid="g8-disclosure-sync-notes"
+          :loading="isSyncing"
+          :disabled="isReadonly || !projectId"
+          @click="syncToDisclosureNotes"
+        >同步到附注</el-button>
         <GtReviewTrigger :section-id="variant === 'listed' ? 'G8-disclosure-listed' : 'G8-disclosure-soe'" />
       </div>
     </div>
@@ -308,16 +317,22 @@
 </template>
 
 <script setup lang="ts">
-import { computed, toRef } from 'vue'
+import { computed, ref, toRef, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import { useG8Disclosure } from '../../composables/useG8Disclosure'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import { buildG8SyncPayload } from '../../composables/g8DisclosureSyncPayload'
+import { G8_NOTE_SECTION } from '../../composables/g8NoteSectionMap'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
+import { api } from '@/services/apiProxy'
 
 const props = defineProps<{
   variant: 'listed' | 'soe'
   allResponses: Map<string, ChecklistResponse>
   wpId: string
+  projectId?: string
+  applicableStandards?: string[]
   isReadonly: boolean
   debouncedSave: (id: string, d: Partial<ChecklistResponse>) => void
 }>()
@@ -329,6 +344,57 @@ const disc = useG8Disclosure({
   debouncedSave: props.debouncedSave,
   isReadonly: computed(() => props.isReadonly),
 })
+
+const isSyncing = ref(false)
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+
+/** 逐项目明细行：上市取 OCI 变动表，国企取期末明细表（合计行由载荷侧重算，故剔除） */
+const syncDetailRows = computed(() => {
+  const src = props.variant === 'listed' ? disc.ociRows.value : disc.detailRows.value
+  return src
+    .filter((r: any) => !r.isTotal)
+    .map((r: any) => ({
+      label: r.label,
+      ociPeriod: r.ociPeriod,
+      ociCumulative: r.ociCumulative,
+      dividend: r.dividend,
+      transferAmount: props.variant === 'listed' ? r.transferToRE : r.transferAmt,
+      transferReason: props.variant === 'listed' ? r.derecogReason : r.transferReason,
+    }))
+})
+
+async function syncToDisclosureNotes(): Promise<void> {
+  if (isSyncing.value || props.isReadonly || !props.projectId) return
+  const payload = buildG8SyncPayload(props.wpId, props.variant, props.applicableStandards, {
+    balanceRows: disc.store.value.balanceRows,
+    detailRows: syncDetailRows.value,
+    designationText: disc.designationText.value,
+    noteText: disc.noteText.value,
+  })
+  if (!payload) return
+  isSyncing.value = true
+  try {
+    const res: any = await api.post(
+      `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,
+      payload,
+    )
+    const rows = Number((res?.data ?? res)?.rows_synced ?? 0)
+    ElMessage.success(
+      `已同步 ${rows} 行到附注模块「${G8_NOTE_SECTION[props.variant]} 其他权益工具投资」`,
+    )
+  } catch {
+    ElMessage.warning('同步附注失败，请稍后重试')
+  } finally {
+    isSyncing.value = false
+  }
+}
+
+// 数据变更后自动同步（防抖 800ms；只读/失败静默）。监听实际数据，不监听提示横幅状态。
+watch(
+  [() => disc.store.value.balanceRows, syncDetailRows, disc.designationText, disc.noteText],
+  () => { autoSync.scheduleAutoSync(syncToDisclosureNotes) },
+  { deep: true },
+)
 
 const priorColLabel = computed(() =>
   props.variant === 'listed' ? '上年年末余额' : '期初余额',

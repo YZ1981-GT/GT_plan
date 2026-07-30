@@ -86,6 +86,7 @@
         :html-data="resolvedHtmlData"
         :wp-id="props.wpId"
         :project-id="props.projectId"
+        :applicable-standards="applicableStandards"
         :is-readonly="isReadonly"
       />
 
@@ -94,6 +95,7 @@
         :html-data="resolvedHtmlData"
         :wp-id="props.wpId"
         :project-id="props.projectId"
+        :applicable-standards="applicableStandards"
         :is-readonly="isReadonly"
       />
 
@@ -331,6 +333,16 @@ const runtime = inject(WorkpaperRuntimeContextKey, null)
 const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
 const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
 const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
+
+/** 适用准则：htmlData / project_context / runtime 任一来源（与 G11/G13 同口径） */
+const applicableStandards = computed<string[]>(() => {
+  const raw =
+    props.htmlData?.project_context?.applicable_standards
+    ?? props.htmlData?.projectContext?.applicable_standards
+    ?? props.htmlData?.applicable_standards
+    ?? runtime?.applicableStandards?.value
+  return Array.isArray(raw) ? raw.map(String) : []
+})
 
 provide('g4VersionTrailRef', versionTrailRef)
 provide('g4OpenVersionHistory', openVersionHistory)

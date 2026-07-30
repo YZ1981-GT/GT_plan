@@ -19,12 +19,25 @@ export const H1_DISCLOSURE_SHEET_NAME = {
   soe: '附注披露信息（国有企业）',
 } as const satisfies Record<H1DisclosureVariant, string>
 
-/** 与 note_template_listed tables[].name 一致 */
+/** 与 note_template_listed §五、22 tables[].name 逐字一致 */
 export const H1_LISTED_SUBTABLE = {
   summary: '固定资产',
   movement: '固定资产情况',
   idle: '暂时闲置的固定资产情况',
   leaseOut: '通过经营租赁租出的固定资产',
+  titleCert: '未办妥产权证书的固定资产情况',
+  clearing: '固定资产清理',
+} as const
+
+/**
+ * 与 note_template_soe §八、22 tables[].name 逐字一致。
+ * 国企比上市**少一张**「通过经营租赁租出的固定资产」（源模板国企 sheet 无此段），
+ * 且汇总/清理两表列名为「期末账面价值 / 期初账面价值」而非上市的「期末余额 / 上年年末余额」。
+ */
+export const H1_SOE_SUBTABLE = {
+  summary: '固定资产',
+  movement: '固定资产情况',
+  idle: '暂时闲置的固定资产情况',
   titleCert: '未办妥产权证书的固定资产情况',
   clearing: '固定资产清理',
 } as const

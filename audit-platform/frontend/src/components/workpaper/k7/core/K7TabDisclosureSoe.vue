@@ -144,6 +144,7 @@ import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import { buildK7SyncPayload, K7_NOTE_SECTION } from '../../composables/k7NoteSectionMap'
 
 const K7_ACCOUNT_CODE = '2401'
 
@@ -307,21 +308,23 @@ function handleNarrativeSave(): void {
 
 async function syncToDisclosureNotes(): Promise<void> {
   if (!props.projectId || props.isReadonly) return
-  const rows = [...assetRelatedRows.value, ...incomeRelatedRows.value].map(r => ({ project: r.project, endAmount: (r.beginBalance + r.increase - r.decrease) ?? 0, priorAmount: r.beginBalance ?? 0 }))
-  const narrative = narrativeText.value
-  const payload = {
-    wp_id: props.wpId,
-    sheet_name: 'K7-note-soe',
-    section_id: '八、56',
-    current_standard: 'soe_standalone',
-    sub_table_data: { rows },
-    _note_texts: narrative ? [{ section: 'main', title: '说明', text: narrative }] : [],
-  }
+  // 附注 八、56 表1 只有 4 个值列（**无 形成原因**：源 xlsx A7:E7 / 附注模版 L3972 /
+  // note headers 三源一致，国企 `DisclosureRow` 也没有 `reason` 字段）。
+  // 表2「其中：递延收益-政府补助情况」底稿无录入表 → 不推、不造列。
+  const rows = [...assetRelatedRows.value, ...incomeRelatedRows.value]
+    .filter(r => !r.isTotal)
+    .map(r => ({
+      project: r.project,
+      beginBalance: r.beginBalance ?? 0,
+      increase: r.increase ?? 0,
+      decrease: r.decrease ?? 0,
+    }))
+  const payload = buildK7SyncPayload('soe', props.wpId || '', rows, narrativeText.value)
   try {
     await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
     eventBus.emit('disclosure:note-text-updated' as any, {
       wpCode: 'K7', variant: 'soe', accountCode: '2401',
-      projectId: props.projectId, sectionIds: ['八、56'],
+      projectId: props.projectId, sectionIds: [K7_NOTE_SECTION.soe],
     })
     ElMessage.success('已同步到附注')
   } catch { /* silent */ }

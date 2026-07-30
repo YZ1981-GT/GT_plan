@@ -5,6 +5,7 @@
  * (3) 坏账变动    (4) 未实现融资收益 / 重要核销 / 最低租赁收款
  * 比例类字段用 safeRate，避免模板中的 #DIV/0!
  */
+import { lookupDisclosureAgingLabel } from './disclosureAgingLabels'
 
 export interface G5PeriodAmt {
   balance: number
@@ -150,12 +151,17 @@ function emptyAmt(): G5PeriodAmt {
   return { balance: 0, provision: 0 }
 }
 
-export const G5_DEFAULT_AGING_BANDS: ReadonlyArray<{ bandKey: string; label: string }> = [
-  { bandKey: 'within1', label: '1年以内' },
-  { bandKey: 'y1to2', label: '1-2年' },
-  { bandKey: 'y2to3', label: '2-3年' },
-  { bandKey: 'over3', label: '3年以上' },
-]
+/**
+ * 默认账龄档（3 年段）。label 取**披露口径**（`1至2年`），
+ * 而非项目账龄配置简写（`1-2年`）—— 这些行会原样进附注。
+ * 字面量来自共享模块 `disclosureAgingLabels`（spec disclosure-columns-coverage-rollout R6）。
+ */
+export const G5_DEFAULT_AGING_BANDS: ReadonlyArray<{ bandKey: string; label: string }> = (
+  ['within1', 'y1to2', 'y2to3', 'over3'] as const
+).map((bandKey) => ({
+  bandKey,
+  label: lookupDisclosureAgingLabel(bandKey) ?? bandKey,
+}))
 
 export function createAgingRows(
   bands: ReadonlyArray<{ bandKey: string; label: string }> = G5_DEFAULT_AGING_BANDS,

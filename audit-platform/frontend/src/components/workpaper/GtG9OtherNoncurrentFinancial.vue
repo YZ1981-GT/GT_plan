@@ -95,6 +95,8 @@
         v-else-if="currentSheet === '附注上市'"
         :all-responses="formData.allResponses.value"
         :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :applicable-standards="applicableStandards"
         :is-readonly="isReadonly"
         :debounced-save="onDebouncedSave"
         @imported="reloadAll"
@@ -104,6 +106,8 @@
         v-else-if="currentSheet === '附注国企'"
         :all-responses="formData.allResponses.value"
         :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :applicable-standards="applicableStandards"
         :is-readonly="isReadonly"
         :debounced-save="onDebouncedSave"
         @imported="reloadAll"
@@ -216,6 +220,16 @@ provide('getThreadDot', getThreadDot)
 provide('getRowDot', getRowDot)
 
 const currentSheet = computed(() => extractG9SheetCode(props.sheetName || props.wpCode || ''))
+
+/** 适用准则：htmlData / project_context / runtime 任一来源（与 G11/G13 同口径） */
+const applicableStandards = computed<string[]>(() => {
+  const raw =
+    props.htmlData?.project_context?.applicable_standards
+    ?? props.htmlData?.projectContext?.applicable_standards
+    ?? props.htmlData?.applicable_standards
+    ?? runtime?.applicableStandards?.value
+  return Array.isArray(raw) ? raw.map(String) : []
+})
 
 const HTML_SHEETS = new Set(['G9A', 'G9-1', 'G9-2', 'G9-3', 'G9-4', 'G9-5', 'G9-6', '附注上市', '附注国企', '底稿目录'])
 const isHtmlSheet = computed(() => HTML_SHEETS.has(currentSheet.value))

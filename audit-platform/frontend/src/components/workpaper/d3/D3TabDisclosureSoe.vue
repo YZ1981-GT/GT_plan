@@ -221,11 +221,9 @@ const {
 })
 
 // 数据变化后防抖自动同步到附注
-let _d3SoeMounted = false
 watch(
   [section1Rows, section2Rows],
   () => {
-    if (!_d3SoeMounted) { _d3SoeMounted = true; return }
     autoSync.scheduleAutoSync(syncToDisclosureNotes)
   },
   { deep: true },
@@ -272,7 +270,7 @@ async function syncToDisclosureNotes(): Promise<void> {
   isSyncing.value = true
   try {
     const snapshot: D3DisclosureSnapshot = {
-      mainRows: section1Rows.value.map((r) => ({ label: r.label, endAmount: r.endAmount, priorAmount: r.priorAmount })),
+      mainRows: section1Rows.value.map((r) => ({ rowKey: r.rowKey, label: r.label, endAmount: r.endAmount, priorAmount: r.priorAmount })),
       mainTotal: { label: '合计', endAmount: section1Subtotal.value.endAmount, priorAmount: section1Subtotal.value.priorAmount },
       longTermRows: section2Rows.value.map((r) => ({ label: r.label, endAmount: r.endAmount, priorAmount: r.priorAmount, reason: r.reason })),
       longTermTotal: { label: '合计', endAmount: section2Subtotal.value.endAmount, priorAmount: section2Subtotal.value.priorAmount },
@@ -295,8 +293,8 @@ async function syncToDisclosureNotes(): Promise<void> {
       },
     }))
     ElMessage.success(`已同步 ${rows} 行到附注模块「${D3_NOTE_SECTION.soe} 预收款项」`)
-    // 静默校对附注合计一致性
-    const pageTotal = section1Subtotal.value?.current ?? 0
+    // 静默校对附注合计一致性（`section1Subtotal` 为 SoeDisclosureRow，期末数在 endAmount）
+    const pageTotal = section1Subtotal.value?.endAmount ?? 0
     checkNoteConsistencyGeneric(props.projectId, auditYear.value, D3_NOTE_SECTION.soe, pageTotal, true)
   } catch {
     ElMessage.warning('同步附注失败，请稍后重试')

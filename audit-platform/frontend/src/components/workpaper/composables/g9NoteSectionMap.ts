@@ -20,8 +20,15 @@ export const G9_DISCLOSURE_SHEET_NAME = {
   soe: '附注披露信息（国企）',
 } as const satisfies Record<G9DisclosureVariant, string>
 
+/**
+ * 子表名 —— 与 `note_template_*.json` `tables[].name` 逐字一致。
+ *
+ * 🔴 修正史：上市侧原写 `项  目`，而模板该表名是表头首格 `种  类`（两者都不对：
+ * 前者压根不存在 → 孤儿子表；后者是列名当表名）。已由
+ * `backend/scripts/fix/fix_note_g_cycle_structure.py` 把模板表名对齐为科目名。
+ */
 export const G9_MAIN_SUBTABLE = {
-  listed: '项  目',
+  listed: '其他非流动金融资产',
   soe: '其他非流动金融资产',
 } as const satisfies Record<G9DisclosureVariant, string>
 

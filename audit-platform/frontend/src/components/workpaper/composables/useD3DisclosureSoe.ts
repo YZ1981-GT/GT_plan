@@ -25,6 +25,13 @@ export interface SoeDisclosureRow {
   endAmount: number
   priorAmount: number
   reason?: string
+  /**
+   * 账龄段 key（仅 section1 两桶行有；供同步层做「底稿字面 → 附注口径」映射）。
+   *
+   * 方案 A：底稿页显示口径不变（`1年以内`），只有构建同步载荷时按
+   * `disclosureAgingLabels` 映射成附注模板字面（国企 `1年以内（含1年）`）。
+   */
+  rowKey?: string
 }
 
 export interface UseD3DisclosureSoeOptions {
@@ -96,8 +103,8 @@ export function useD3DisclosureSoe(options: UseD3DisclosureSoeOptions) {
     }
 
     return [
-      { rowId: 'cs-aging-within1', label: '1年以内', endAmount: within1End, priorAmount: within1Prior },
-      { rowId: 'cs-aging-over1', label: '1年以上', endAmount: over1End, priorAmount: over1Prior },
+      { rowId: 'cs-aging-within1', rowKey: 'within1', label: '1年以内', endAmount: within1End, priorAmount: within1Prior },
+      { rowId: 'cs-aging-over1', rowKey: 'over1', label: '1年以上', endAmount: over1End, priorAmount: over1Prior },
     ]
   })
 

@@ -15,10 +15,16 @@ import {
 import type { K1StageMovementRow } from './useK1BadDebt'
 import { parseK13Payload, recalcStageClosing } from './useK1BadDebt'
 import { parseK1StageRowsFromMap, type K1StageRow } from './useK1StageCheck'
+import { buildDisclosureAgingLabelMap } from './disclosureAgingLabels'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-export type K1AgingRowKind = 'data' | 'subtotal' | 'provision' | 'total'
+/**
+ * data       普通账龄段行（参与 subtotal 求和）
+ * sub        1 年以内月度细分行（源模板「其中：0-X个月」/「X-Y个月」），**不参与** subtotal 求和
+ * subtotal1y 1 年以内小计（只读，= within1 的 data 行金额）
+ */
+export type K1AgingRowKind = 'data' | 'sub' | 'subtotal1y' | 'subtotal' | 'provision' | 'total'
 
 export interface K1AgingDisclosureRow {
   rowId: string
@@ -29,6 +35,8 @@ export interface K1AgingDisclosureRow {
   priorAmount: number
   editable: boolean
   autoFilled?: boolean
+  /** sub 行：标签可编辑（月度区间由项目自定） */
+  labelEditable?: boolean
 }
 
 export interface K1NatureDisclosureRow {
@@ -65,6 +73,8 @@ export interface K1ReversalDisclosureRow {
   method: string
   basis: string
   amount: number
+  /** 转回或收回前累计已计提坏账准备金额（国企源模板 R92 专有列，上市版不披露） */
+  cumulativeProvision?: number
 }
 
 export interface K1WriteoffDisclosureRow {
@@ -105,6 +115,31 @@ export interface K1TransferRow {
   gainLoss: number
 }
 
+/** 转移且继续涉入形成的资产 / 负债明细（源模板 listed R153-R159 / soe R117-R123） */
+export interface K1ContinuedInvolvementRow {
+  rowId: string
+  side: 'asset' | 'liability'
+  item: string
+  amount: number
+}
+
+/**
+ * notes key 约定（两版共用，见 spec design §2.4）
+ * balanceChange / eclBasis / writeoffNote / transferNote
+ * stage2NoneTextEnd / stage2NoneTextPrior
+ */
+export const K1_NOTE_KEYS = {
+  balanceChange: 'balanceChange',
+  eclBasis: 'eclBasis',
+  writeoffNote: 'writeoffNote',
+  transferNote: 'transferNote',
+} as const
+
+export const K1_STAGE2_NONE_TEXT_END =
+  '期末，本公司不存在处于第二阶段的应收利息、应收股利和其他应收款。'
+export const K1_STAGE2_NONE_TEXT_PRIOR =
+  '截至上年年末，本公司不存在处于第二阶段的应收利息、应收股利和其他应收款。'
+
 export interface K1ListedDisclosurePayloadV2 {
   version: 2
   agingRows: K1AgingDisclosureRow[]
@@ -112,6 +147,13 @@ export interface K1ListedDisclosurePayloadV2 {
   stage1Rows: K1StageEclDisclosureRow[]
   stage2Rows: K1StageEclDisclosureRow[]
   stage3Rows: K1StageEclDisclosureRow[]
+  /** 上年年末三阶段快照（源模板 R61-R89） */
+  priorStage1Rows: K1StageEclDisclosureRow[]
+  priorStage2Rows: K1StageEclDisclosureRow[]
+  priorStage3Rows: K1StageEclDisclosureRow[]
+  /** 【或】不存在处于第二阶段（源模板 R49 / R80） */
+  stage2NoneEnd: boolean
+  stage2NonePrior: boolean
   stageMovements: K1StageMovementRow[]
   reversalRows: K1ReversalDisclosureRow[]
   writeoffSummaryAmount: number
@@ -121,9 +163,49 @@ export interface K1ListedDisclosurePayloadV2 {
   fundCentralizationNote: string
   govGrantRows: K1GovGrantRow[]
   transferRows: K1TransferRow[]
+  continuedInvolvementRows: K1ContinuedInvolvementRow[]
+  /** @deprecated 由 continuedInvolvementRows 小计派生，仅为旧 payload 兼容保留 */
   continuedInvolvementAssets: number
+  /** @deprecated 同上 */
   continuedInvolvementLiabilities: number
   notes: Record<string, string>
+}
+
+/** 继续涉入表小计（资产 / 负债各自求和） */
+export function summarizeContinuedInvolvement(rows: K1ContinuedInvolvementRow[]): {
+  assets: number
+  liabilities: number
+} {
+  return {
+    assets: rows.filter((r) => r.side === 'asset').reduce((s, r) => s + parseNum(r.amount), 0),
+    liabilities: rows
+      .filter((r) => r.side === 'liability')
+      .reduce((s, r) => s + parseNum(r.amount), 0),
+  }
+}
+
+/** 旧标量 continuedInvolvementAssets/Liabilities → 明细行迁移 */
+export function migrateContinuedInvolvement(
+  rows: unknown,
+  legacyAssets: unknown,
+  legacyLiabilities: unknown,
+): K1ContinuedInvolvementRow[] {
+  if (Array.isArray(rows) && rows.length) {
+    return rows
+      .filter((r): r is Record<string, unknown> => !!r && typeof r === 'object')
+      .map((r) => ({
+        rowId: String(r.rowId || uid('ci')),
+        side: r.side === 'liability' ? 'liability' : 'asset',
+        item: String(r.item ?? ''),
+        amount: parseNum(r.amount),
+      }))
+  }
+  const out: K1ContinuedInvolvementRow[] = []
+  const a = parseNum(legacyAssets)
+  const l = parseNum(legacyLiabilities)
+  if (a) out.push({ rowId: uid('ci'), side: 'asset', item: '继续涉入形成的资产', amount: a })
+  if (l) out.push({ rowId: uid('ci'), side: 'liability', item: '继续涉入形成的负债', amount: l })
+  return out
 }
 
 export const K1_DISC_STORAGE_KEY = 'K1-note-listed-rows'
@@ -131,16 +213,12 @@ export const K1_DISC_NOTE_KEY = 'K1-note-listed-note'
 
 export const K1_DEFAULT_NATURE_LABELS = ['备用金', '保证金、押金'] as const
 
-/** 附注模板账龄标签（1至2年）；与 segment.label 对齐 */
-export const K1_NOTE_AGING_LABEL: Record<string, string> = {
-  within1: '1年以内',
-  y1to2: '1至2年',
-  y2to3: '2至3年',
-  y3to4: '3至4年',
-  y4to5: '4至5年',
-  over3: '3年以上',
-  over5: '5年以上',
-}
+/**
+ * 附注模板账龄标签（`1至2年` 口径）。
+ * 字面量已收敛到共享模块 `disclosureAgingLabels`（原 per-cycle 表与共享表逐项同值）；
+ * K1 首档用通用 `1年以内`，故不传 overrides。
+ */
+export const K1_NOTE_AGING_LABEL: Record<string, string> = buildDisclosureAgingLabelMap()
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -191,24 +269,59 @@ export function aggregateNatureFromK1Detail(
   return map
 }
 
+/** 源模板 R9/R10：1 年以内月度细分行默认标签 */
+export const K1_WITHIN1_SUB_LABELS = ['其中：0-6个月', '7-12个月'] as const
+
 export function buildAgingDisclosureRows(
   segments: AgingSegment[],
   agg: { end: Record<string, number>; prior: Record<string, number> },
   provision: { end: number; prior: number },
+  opts: { withinOneYearBreakdown?: boolean; withinOneYearSubLabels?: readonly string[] } = {},
 ): K1AgingDisclosureRow[] {
-  const dataRows: K1AgingDisclosureRow[] = segments.map((seg) => ({
-    rowId: uid('aging'),
-    segmentKey: seg.key,
-    label: noteAgingLabel(seg.key, seg.label),
-    kind: 'data',
-    endAmount: parseNum(agg.end[seg.key]),
-    priorAmount: parseNum(agg.prior[seg.key]),
-    editable: true,
-    autoFilled: true,
-  }))
+  const withBreakdown = opts.withinOneYearBreakdown ?? true
+  const subLabels = opts.withinOneYearSubLabels ?? K1_WITHIN1_SUB_LABELS
 
-  const subtotalEnd = dataRows.reduce((s, r) => s + r.endAmount, 0)
-  const subtotalPrior = dataRows.reduce((s, r) => s + r.priorAmount, 0)
+  const dataRows: K1AgingDisclosureRow[] = []
+  for (const seg of segments) {
+    dataRows.push({
+      rowId: uid('aging'),
+      segmentKey: seg.key,
+      label: noteAgingLabel(seg.key, seg.label),
+      kind: 'data',
+      endAmount: parseNum(agg.end[seg.key]),
+      priorAmount: parseNum(agg.prior[seg.key]),
+      editable: true,
+      autoFilled: true,
+    })
+    // 源模板 R9~R12：1 年以内下挂月度细分 + 1年以内小计
+    if (withBreakdown && seg.key === 'within1') {
+      subLabels.forEach((label, i) => {
+        dataRows.push({
+          rowId: uid('agingsub'),
+          segmentKey: `within1-sub${i + 1}`,
+          label,
+          kind: 'sub',
+          endAmount: 0,
+          priorAmount: 0,
+          editable: true,
+          labelEditable: true,
+        })
+      })
+      dataRows.push({
+        rowId: uid('aging1y'),
+        segmentKey: 'subtotal1y',
+        label: '1年以内小计：',
+        kind: 'subtotal1y',
+        endAmount: parseNum(agg.end[seg.key]),
+        priorAmount: parseNum(agg.prior[seg.key]),
+        editable: false,
+      })
+    }
+  }
+
+  const isSummable = (r: K1AgingDisclosureRow) => r.kind === 'data'
+  const subtotalEnd = dataRows.filter(isSummable).reduce((s, r) => s + r.endAmount, 0)
+  const subtotalPrior = dataRows.filter(isSummable).reduce((s, r) => s + r.priorAmount, 0)
 
   dataRows.push({
     rowId: uid('aging'),
@@ -436,8 +549,22 @@ export function readK13StageMovements(raw: unknown): K1StageMovementRow[] {
   return parseK13Payload(raw).stageMovements
 }
 
+/** K1-9 转回检查行 → 披露表转回行（`accumProvision` = 转回前累计已计提坏账准备） */
+export function mapK9ReversalRow(r: any): K1ReversalDisclosureRow {
+  return {
+    rowId: r?.id || uid('rev'),
+    unitName: r?.unit || '',
+    reason: r?.reason || '',
+    method: r?.method || '',
+    basis: r?.basis || '',
+    amount: parseNum(r?.amount),
+    cumulativeProvision: parseNum(r?.accumProvision),
+  }
+}
+
 export function emptyK1ListedPayload(portfolioLabels?: string[]): K1ListedDisclosurePayloadV2 {
   const stages = buildDefaultStageBlocks(portfolioLabels)
+  const priorStages = buildDefaultStageBlocks(portfolioLabels)
   return {
     version: 2,
     agingRows: [],
@@ -445,6 +572,11 @@ export function emptyK1ListedPayload(portfolioLabels?: string[]): K1ListedDisclo
     stage1Rows: stages.stage1,
     stage2Rows: stages.stage2,
     stage3Rows: stages.stage3,
+    priorStage1Rows: priorStages.stage1,
+    priorStage2Rows: priorStages.stage2,
+    priorStage3Rows: priorStages.stage3,
+    stage2NoneEnd: false,
+    stage2NonePrior: false,
     stageMovements: [],
     reversalRows: [],
     writeoffSummaryAmount: 0,
@@ -454,6 +586,7 @@ export function emptyK1ListedPayload(portfolioLabels?: string[]): K1ListedDisclo
     fundCentralizationNote: '',
     govGrantRows: [],
     transferRows: [],
+    continuedInvolvementRows: [],
     continuedInvolvementAssets: 0,
     continuedInvolvementLiabilities: 0,
     notes: {},
@@ -482,12 +615,28 @@ export function parseK1ListedPayload(raw: unknown, segments: AgingSegment[]): K1
     stage1Rows: recomputeStageEclRows(Array.isArray(parsed.stage1Rows) ? parsed.stage1Rows : base.stage1Rows),
     stage2Rows: recomputeStageEclRows(Array.isArray(parsed.stage2Rows) ? parsed.stage2Rows : base.stage2Rows),
     stage3Rows: recomputeStageEclRows(Array.isArray(parsed.stage3Rows) ? parsed.stage3Rows : base.stage3Rows),
+    priorStage1Rows: recomputeStageEclRows(
+      Array.isArray(parsed.priorStage1Rows) ? parsed.priorStage1Rows : base.priorStage1Rows,
+    ),
+    priorStage2Rows: recomputeStageEclRows(
+      Array.isArray(parsed.priorStage2Rows) ? parsed.priorStage2Rows : base.priorStage2Rows,
+    ),
+    priorStage3Rows: recomputeStageEclRows(
+      Array.isArray(parsed.priorStage3Rows) ? parsed.priorStage3Rows : base.priorStage3Rows,
+    ),
+    stage2NoneEnd: parsed.stage2NoneEnd === true,
+    stage2NonePrior: parsed.stage2NonePrior === true,
     stageMovements: Array.isArray(parsed.stageMovements) ? parsed.stageMovements : [],
     reversalRows: Array.isArray(parsed.reversalRows) ? parsed.reversalRows : [],
     writeoffDetailRows: Array.isArray(parsed.writeoffDetailRows) ? parsed.writeoffDetailRows : [],
     top5Rows: Array.isArray(parsed.top5Rows) ? parsed.top5Rows : [],
     govGrantRows: Array.isArray(parsed.govGrantRows) ? parsed.govGrantRows : [],
     transferRows: Array.isArray(parsed.transferRows) ? parsed.transferRows : [],
+    continuedInvolvementRows: migrateContinuedInvolvement(
+      parsed.continuedInvolvementRows,
+      parsed.continuedInvolvementAssets,
+      parsed.continuedInvolvementLiabilities,
+    ),
     notes: parsed.notes && typeof parsed.notes === 'object' ? parsed.notes : {},
   }
 }
@@ -627,14 +776,7 @@ export function autoFillFromK1Sources(
     try {
       const k9 = typeof k9Raw === 'string' ? JSON.parse(k9Raw) : k9Raw
       if (force || !payload.reversalRows.length) {
-        payload.reversalRows = (k9?.tables?.reversal || []).map((r: any) => ({
-          rowId: r.id || uid('rev'),
-          unitName: r.unit || '',
-          reason: r.reason || '',
-          method: r.method || '',
-          basis: r.basis || '',
-          amount: parseNum(r.amount),
-        }))
+        payload.reversalRows = (k9?.tables?.reversal || []).map(mapK9ReversalRow)
       }
       if (force || !payload.writeoffDetailRows.length) {
         payload.writeoffDetailRows = (k9?.tables?.writeoff || []).map((r: any) => ({
@@ -675,6 +817,115 @@ export function calcNatureTieOut(
   const totalGross = summarizeNatureRows(natureRows).endGross
   const diff = Math.round((totalGross - adjReceivable) * 100) / 100
   return { totalGross, diff, matched: Math.abs(diff) < 0.01 }
+}
+
+/** T3 勾稽：1 年以内月度细分合计 = 1 年以内（期末/上年年末各校验，仅存在细分行时生效） */
+export function calcWithinOneYearTieOut(agingRows: K1AgingDisclosureRow[]): {
+  applicable: boolean
+  subSumEnd: number
+  subSumPrior: number
+  within1End: number
+  within1Prior: number
+  diffEnd: number
+  diffPrior: number
+  matched: boolean
+} {
+  const subs = agingRows.filter((r) => r.kind === 'sub')
+  const within1 = agingRows.find((r) => r.kind === 'data' && r.segmentKey === 'within1')
+  const subSumEnd = subs.reduce((s, r) => s + parseNum(r.endAmount), 0)
+  const subSumPrior = subs.reduce((s, r) => s + parseNum(r.priorAmount), 0)
+  const within1End = parseNum(within1?.endAmount)
+  const within1Prior = parseNum(within1?.priorAmount)
+  const diffEnd = Math.round((subSumEnd - within1End) * 100) / 100
+  const diffPrior = Math.round((subSumPrior - within1Prior) * 100) / 100
+  // 细分行全为 0 视为未启用细分披露，不报警
+  const applicable = !!subs.length && !!within1 && (subSumEnd !== 0 || subSumPrior !== 0)
+  return {
+    applicable,
+    subSumEnd,
+    subSumPrior,
+    within1End,
+    within1Prior,
+    diffEnd,
+    diffPrior,
+    matched: !applicable || (Math.abs(diffEnd) < 0.01 && Math.abs(diffPrior) < 0.01),
+  }
+}
+
+/** 三阶段块坏账合计（取 total 行 provision） */
+export function stageBlocksProvisionTotal(
+  ...blocks: K1StageEclDisclosureRow[][]
+): number {
+  return blocks.reduce(
+    (s, rows) => s + parseNum(rows.find((r) => r.rowKey === 'total')?.provision),
+    0,
+  )
+}
+
+/** T4prior 勾稽：上年年末三阶段坏账合计 = 账龄表「减：坏账准备」上年年末 */
+export function calcPriorProvisionTieOut(
+  agingRows: K1AgingDisclosureRow[],
+  priorStageTotal: number,
+): { agingProvision: number; stageTotal: number; diff: number; matched: boolean } {
+  const agingProvision = parseNum(
+    agingRows.find((r) => r.kind === 'provision')?.priorAmount,
+  )
+  const diff = Math.round((agingProvision - priorStageTotal) * 100) / 100
+  return { agingProvision, stageTotal: priorStageTotal, diff, matched: Math.abs(diff) < 0.01 }
+}
+
+function movementRowTotal(rows: K1StageMovementRow[], key: string): number {
+  const r = rows.find((x) => x.key === key)
+  if (!r) return 0
+  return parseNum(r.stage1) + parseNum(r.stage2) + parseNum(r.stage3)
+}
+
+/**
+ * T5/T6/T7 勾稽：④ 坏账变动表与 ③ 三阶段快照、⑤ 核销汇总互等。
+ * `movements` 行 key 约定见 useK1BadDebt（opening/closing/writeOff…）。
+ */
+export function calcMovementTieOut(
+  movements: K1StageMovementRow[],
+  endStageTotal: number,
+  priorStageTotal: number,
+  writeoffSummary: number,
+): {
+  closingTotal: number
+  openingTotal: number
+  writeOffTotal: number
+  closingDiff: number
+  openingDiff: number
+  writeoffDiff: number
+  matched: boolean
+} {
+  const closingTotal = movementRowTotal(movements, 'closing')
+  const openingTotal = movementRowTotal(movements, 'opening')
+  // 变动表核销行为负数口径（准备减少），⑤ 核销汇总为正数口径 → 取绝对值比对
+  const writeOffTotal = movementRowTotal(movements, 'writeoff')
+  const closingDiff = Math.round((closingTotal - endStageTotal) * 100) / 100
+  const openingDiff = Math.round((openingTotal - priorStageTotal) * 100) / 100
+  const writeoffDiff = Math.round((Math.abs(writeOffTotal) - Math.abs(writeoffSummary)) * 100) / 100
+  const has = movements.length > 0
+  return {
+    closingTotal,
+    openingTotal,
+    writeOffTotal,
+    closingDiff,
+    openingDiff,
+    writeoffDiff,
+    matched:
+      !has
+      || (Math.abs(closingDiff) < 0.01 && Math.abs(openingDiff) < 0.01 && Math.abs(writeoffDiff) < 0.01),
+  }
+}
+
+/** T12 勾稽：前五名占比合计 ≤ 100%（超 100% 说明分母取错） */
+export function calcTop5ProportionCheck(rows: K1Top5DisclosureRow[]): {
+  totalPct: number
+  exceeded: boolean
+} {
+  const totalPct = Math.round(rows.reduce((s, r) => s + parseNum(r.proportionPct), 0) * 100) / 100
+  return { totalPct, exceeded: totalPct > 100.01 }
 }
 
 export function dominantAgingForDetail(d: K1DetailPartial): string {
@@ -726,13 +977,30 @@ export interface K1PortfolioAgingRow {
   autoFilled?: boolean
 }
 
+/**
+ * 「其他组合」行（源模板 soe R57-R61 / 附注「采用余额百分比法或其他组合方法…」）。
+ * 与 K1PortfolioAgingRow 的区别：此处比例是**人工输入的计提比例**，坏账准备由比例派生；
+ * 账龄组合的比例是各账龄段余额占组合总额的**结构占比**（派生值）。
+ */
+export interface K1OtherPortfolioRow {
+  rowId: string
+  label: string
+  endBalance: number
+  endRatePct: number | null
+  endProvision: number
+  priorBalance: number
+  priorRatePct: number | null
+  priorProvision: number
+  editable: boolean
+}
+
 export interface K1SoeDisclosurePayloadV2 {
   version: 2
   agingRows: K1AgingDisclosureRow[]
   methodRows: K1MethodDisclosureRow[]
   individualDetailRows: K1IndividualDetailRow[]
   portfolioAgingRows: K1PortfolioAgingRow[]
-  otherPortfolioRows: K1PortfolioAgingRow[]
+  otherPortfolioRows: K1OtherPortfolioRow[]
   stageMovements: K1StageMovementRow[]
   balanceStageMovements: K1StageMovementRow[]
   reversalRows: K1ReversalDisclosureRow[]
@@ -741,9 +1009,94 @@ export interface K1SoeDisclosurePayloadV2 {
   top5Rows: K1Top5DisclosureRow[]
   govGrantRows: K1GovGrantRow[]
   transferRows: K1TransferRow[]
+  continuedInvolvementRows: K1ContinuedInvolvementRow[]
+  /** @deprecated 由 continuedInvolvementRows 小计派生，仅为旧 payload 兼容保留 */
   continuedInvolvementAssets: number
+  /** @deprecated 同上 */
   continuedInvolvementLiabilities: number
   notes: Record<string, string>
+}
+
+/** 其他组合：坏账准备 = 账面余额 × 计提比例（人工覆盖后不再派生） */
+export function recomputeOtherPortfolioRows(
+  rows: K1OtherPortfolioRow[],
+): K1OtherPortfolioRow[] {
+  return rows.map((r) => {
+    const next = { ...r }
+    if (next.endRatePct != null) {
+      next.endProvision = Math.round(next.endBalance * (next.endRatePct / 100) * 100) / 100
+    }
+    if (next.priorRatePct != null) {
+      next.priorProvision = Math.round(next.priorBalance * (next.priorRatePct / 100) * 100) / 100
+    }
+    return next
+  })
+}
+
+/** 旧结构（复用 K1PortfolioAgingRow，字段名 endBalancePct）→ 新 K1OtherPortfolioRow */
+export function migrateOtherPortfolioRows(raw: unknown): K1OtherPortfolioRow[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .filter((r): r is Record<string, unknown> => !!r && typeof r === 'object')
+    .map((r) => ({
+      rowId: String(r.rowId || uid('oport')),
+      label: String(r.label ?? ''),
+      endBalance: parseNum(r.endBalance),
+      endRatePct: r.endRatePct != null ? parseNum(r.endRatePct) : (r.endBalancePct != null ? parseNum(r.endBalancePct) : null),
+      endProvision: parseNum(r.endProvision),
+      priorBalance: parseNum(r.priorBalance),
+      priorRatePct: r.priorRatePct != null ? parseNum(r.priorRatePct) : (r.priorBalancePct != null ? parseNum(r.priorBalancePct) : null),
+      priorProvision: parseNum(r.priorProvision),
+      editable: true,
+    }))
+}
+
+/** T10 勾稽：账龄组合坏账 + 其他组合坏账 = 方法表「组合计提」行坏账 */
+export function calcPortfolioSplitTieOut(
+  portfolioAgingRows: K1PortfolioAgingRow[],
+  otherPortfolioRows: K1OtherPortfolioRow[],
+  methodRows: K1MethodDisclosureRow[],
+): { sumProvision: number; methodProvision: number; diff: number; matched: boolean } {
+  const sumProvision =
+    portfolioAgingRows.reduce((s, r) => s + parseNum(r.endProvision), 0)
+    + otherPortfolioRows.reduce((s, r) => s + parseNum(r.endProvision), 0)
+  const methodProvision = parseNum(
+    methodRows.find((r) => r.rowKey === 'portfolio')?.endProvision,
+  )
+  const diff = Math.round((sumProvision - methodProvision) * 100) / 100
+  return { sumProvision, methodProvision, diff, matched: Math.abs(diff) < 0.01 }
+}
+
+/** T9 勾稽：单项明细合计 = 方法表「单项计提」行 */
+export function calcIndividualSplitTieOut(
+  individualDetailRows: K1IndividualDetailRow[],
+  methodRows: K1MethodDisclosureRow[],
+): {
+  detailBalance: number
+  detailProvision: number
+  methodBalance: number
+  methodProvision: number
+  diffBalance: number
+  diffProvision: number
+  matched: boolean
+} {
+  const detailBalance = individualDetailRows.reduce((s, r) => s + parseNum(r.balance), 0)
+  const detailProvision = individualDetailRows.reduce((s, r) => s + parseNum(r.provision), 0)
+  const m = methodRows.find((r) => r.rowKey === 'individual')
+  const methodBalance = parseNum(m?.endBalance)
+  const methodProvision = parseNum(m?.endProvision)
+  const diffBalance = Math.round((detailBalance - methodBalance) * 100) / 100
+  const diffProvision = Math.round((detailProvision - methodProvision) * 100) / 100
+  const applicable = individualDetailRows.length > 0
+  return {
+    detailBalance,
+    detailProvision,
+    methodBalance,
+    methodProvision,
+    diffBalance,
+    diffProvision,
+    matched: !applicable || (Math.abs(diffBalance) < 0.01 && Math.abs(diffProvision) < 0.01),
+  }
 }
 
 export const K1_SOE_DISC_STORAGE_KEY = 'K1-note-soe-rows'
@@ -1071,6 +1424,7 @@ export function emptyK1SoePayload(): K1SoeDisclosurePayloadV2 {
     top5Rows: [],
     govGrantRows: [],
     transferRows: [],
+    continuedInvolvementRows: [],
     continuedInvolvementAssets: 0,
     continuedInvolvementLiabilities: 0,
     notes: {},
@@ -1117,7 +1471,12 @@ function migrateLegacySoeSections(map: Map<string, any>, segments: AgingSegment[
     } catch { /* ignore */ }
   }
   if (!payload.agingRows.length && segments.length) {
-    payload.agingRows = buildAgingDisclosureRows(segments, { end: {}, prior: {} }, { end: 0, prior: 0 })
+    payload.agingRows = buildAgingDisclosureRows(
+      segments,
+      { end: {}, prior: {} },
+      { end: 0, prior: 0 },
+      { withinOneYearBreakdown: false },
+    )
   }
   return payload
 }
@@ -1144,7 +1503,7 @@ export function parseK1SoePayload(
     methodRows: recomputeMethodRows(Array.isArray(parsed.methodRows) ? parsed.methodRows : base.methodRows),
     individualDetailRows: Array.isArray(parsed.individualDetailRows) ? parsed.individualDetailRows : [],
     portfolioAgingRows: Array.isArray(parsed.portfolioAgingRows) ? parsed.portfolioAgingRows : [],
-    otherPortfolioRows: Array.isArray(parsed.otherPortfolioRows) ? parsed.otherPortfolioRows : [],
+    otherPortfolioRows: recomputeOtherPortfolioRows(migrateOtherPortfolioRows(parsed.otherPortfolioRows)),
     stageMovements: Array.isArray(parsed.stageMovements) ? parsed.stageMovements : [],
     balanceStageMovements: Array.isArray(parsed.balanceStageMovements) ? parsed.balanceStageMovements : [],
     reversalRows: Array.isArray(parsed.reversalRows) ? parsed.reversalRows : [],
@@ -1152,6 +1511,11 @@ export function parseK1SoePayload(
     top5Rows: Array.isArray(parsed.top5Rows) ? parsed.top5Rows : [],
     govGrantRows: Array.isArray(parsed.govGrantRows) ? parsed.govGrantRows : [],
     transferRows: Array.isArray(parsed.transferRows) ? parsed.transferRows : [],
+    continuedInvolvementRows: migrateContinuedInvolvement(
+      parsed.continuedInvolvementRows,
+      parsed.continuedInvolvementAssets,
+      parsed.continuedInvolvementLiabilities,
+    ),
     notes: parsed.notes && typeof parsed.notes === 'object' ? parsed.notes : {},
   }
 }
@@ -1175,10 +1539,13 @@ export function autoFillSoeFromK1Sources(
 
   const agingEmpty = !payload.agingRows.some((r) => r.kind === 'data' && r.endAmount)
   if (force || agingEmpty) {
-    payload.agingRows = buildAgingDisclosureRows(segments, agingAgg, {
-      end: adj.badDebtEnd,
-      prior: adj.badDebtPrior,
-    })
+    // 国企源模板账龄表无「1 年以内」月度细分（仅上市版有）
+    payload.agingRows = buildAgingDisclosureRows(
+      segments,
+      agingAgg,
+      { end: adj.badDebtEnd, prior: adj.badDebtPrior },
+      { withinOneYearBreakdown: false },
+    )
   }
 
   if (k13Raw && (force || !payload.methodRows.some((r) => r.autoFilled && r.endBalance))) {
@@ -1225,14 +1592,7 @@ export function autoFillSoeFromK1Sources(
     try {
       const k9 = typeof k9Raw === 'string' ? JSON.parse(k9Raw) : k9Raw
       if (force || !payload.reversalRows.length) {
-        payload.reversalRows = (k9?.tables?.reversal || []).map((r: any) => ({
-          rowId: r.id || uid('rev'),
-          unitName: r.unit || '',
-          reason: r.reason || '',
-          method: r.method || '',
-          basis: r.basis || '',
-          amount: parseNum(r.amount),
-        }))
+        payload.reversalRows = (k9?.tables?.reversal || []).map(mapK9ReversalRow)
       }
       if (force || !payload.writeoffDetailRows.length) {
         payload.writeoffDetailRows = (k9?.tables?.writeoff || []).map((r: any) => ({

@@ -159,8 +159,12 @@ export function useD6FormData(options: UseD6FormDataOptions) {
 
   /** 批量保存多个 items */
   async function saveBatch(items: Array<{ itemId: string; data: Partial<ChecklistResponse> }>): Promise<void> {
+    // 🔴 同一批次不得重复提交相同 item_id：后端会**整批拒绝** → 该批全部数据丢失
+    //    （联动回写常见：先写整表 JSON、再写其中某个汇总字段）。
+    //    同 itemId 多次传入时后写覆盖先写，与「用户最后一次输入」语义一致。
+    const deduped = [...new Map(items.map((it) => [it.itemId, it])).values()]
     const toSave: ChecklistResponse[] = []
-    for (const { itemId, data } of items) {
+    for (const { itemId, data } of deduped) {
       // 取消 debounce
       const timer = _debounceTimers.get(itemId)
       if (timer) {

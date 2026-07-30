@@ -347,9 +347,11 @@ const isHtmlSheet = computed(() => currentSheet.value !== '')
 const currentSheet = computed(() => {
   const name = props.sheetName || props.wpCode || ''
   // 附注匹配
+  // 源模板国企 sheet 名是「附注披露信息（国有企业）」——「国有企业」而非「国企」，
+  // 只认「国企」会落到末尾 fallback 被误判成上市（H1 实测踩中过）
   if (/附注.*上市|I1-note-listed/.test(name)) return '附注上市'
-  if (/附注.*国企|I1-note-soe/.test(name)) return '附注国企'
-  if (/附注/.test(name)) return name.includes('国企') ? '附注国企' : '附注上市'
+  if (/附注.*国企|附注.*国有|I1-note-soe/.test(name)) return '附注国企'
+  if (/附注/.test(name)) return name.includes('国企') || name.includes('国有') ? '附注国企' : '附注上市'
   // 程序表 I1A
   if (/I1A/.test(name)) return 'I1A'
   // 审定表（xlsx「审定表I1」/ Adjudication_I1）→ I1-1，勿误判为目录

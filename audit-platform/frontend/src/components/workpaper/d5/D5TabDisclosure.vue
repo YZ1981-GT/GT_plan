@@ -517,11 +517,9 @@ const {
 // ─── 保存后自动同步到附注（防抖/非阻塞/失败静默）──────────────────────────────
 const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 onBeforeUnmount(() => autoSync.cancelPending())
-let _d5Mounted = false
 watch(
   [listedSections, soeSections, impairmentRows, noteTexts],
   () => {
-    if (!_d5Mounted) { _d5Mounted = true; return }
     autoSync.scheduleAutoSync(syncToDisclosureNotes)
   },
   { deep: true },

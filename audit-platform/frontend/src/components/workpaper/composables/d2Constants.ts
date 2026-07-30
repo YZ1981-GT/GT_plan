@@ -53,3 +53,31 @@ export function getTabStatusFromResponses(tabResponses: ChecklistResponse[]): Ta
   const allComplete = tabResponses.every(r => r.conclusion || r.remark)
   return allComplete ? 'completed' : 'in-progress'
 }
+
+/**
+ * D2 底稿 sheet 名 → 内部分发键（`GtD2AccountsReceivable.currentSheet` 唯一实现）。
+ *
+ * 🔴 判定顺序不可调换：附注披露 sheet 必须**先于** wp_code 后缀正则判定。
+ * 源模板 tab 名形如 `附注披露信息（国企）D2-1` / `附注披露信息(上市公司）D2-1`
+ * —— 尾部带 wp_code，若先跑 `/D2(?:-\d+)?[A-Z]?$/` 会被判成 `D2-1`（审定表），
+ * 披露组件永远挂不上（2026-07-30 Playwright 实测：点「附注披露信息（国企）D2-1」
+ * 渲染出「应收账款审定表 D2-1」，`get_diagnostics` 与 vitest 均查不出）。
+ *
+ * 「国企」与「国有企业」两种源模板写法都必须认（平台级铁律，见
+ * `__tests__/disclosureSheetDispatch.spec.ts`）。
+ */
+export function normalizeD2SheetName(sheetName?: string | null): string {
+  const name = sheetName || 'D2'
+  if (name.includes('目录')) return '目录'
+  if (name.includes('附注')) {
+    if (name.includes('上市')) return '附注上市'
+    if (name.includes('国企') || name.includes('国有')) return '附注国企'
+  }
+  const codeMatch = name.match(/D2(?:-\d+)?[A-Z]?$|D2A$/)
+  if (codeMatch) return codeMatch[0]
+  if (name.includes('上市')) return '附注上市'
+  if (name.includes('国企') || name.includes('国有')) return '附注国企'
+  if (name.includes('截止')) return '截止测试'
+  if (name === 'D2' || name.startsWith('D2 ')) return 'D2'
+  return name
+}

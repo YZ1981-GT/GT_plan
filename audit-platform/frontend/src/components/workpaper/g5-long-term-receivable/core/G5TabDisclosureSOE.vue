@@ -20,6 +20,17 @@
         >
           🤖 AI 辅助
         </el-button>
+        <el-button
+          size="small"
+          type="primary"
+          plain
+          data-testid="g5-disclosure-soe-sync-notes"
+          :loading="isSyncing"
+          :disabled="isReadonly || !props.projectId"
+          @click="syncToDisclosureNotes"
+        >
+          同步到附注
+        </el-button>
         <GtReviewTrigger section-id="G5-disclosure-soe" />
       </div>
     </div>
@@ -714,7 +725,7 @@
  * G5TabDisclosureSOE — 附注披露信息（国企）
  * 对齐致同 Excel；共享上市取数/勾稽/组合同步，补国企专有段。
  */
-import { computed, onMounted, ref, toRef } from 'vue'
+import { computed, onMounted, ref, toRef, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
@@ -722,14 +733,19 @@ import G5AuditTextCards from '../G5AuditTextCards.vue'
 import { useInjectedG5FormData } from '../../composables/useG5LonRecFormData'
 import { useG5DisclosureSoe } from '../../composables/useG5DisclosureSoe'
 import { useG5AiGenerate } from '../../composables/useG5AiGenerate'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import { buildG5SoeSyncPayload } from '../../composables/g5DisclosureSyncPayload'
+import { G5_NOTE_SECTION } from '../../composables/g5NoteSectionMap'
 import { G5_SOE_PROVISION_METHOD_PLACEHOLDER } from '../../composables/g5SoeDisclosureRows'
 import type { G5MethodRow } from '../../composables/g5ListedDisclosureRows'
 import type { G5AgingPreset } from '../../composables/g5AgingScheme'
+import { api } from '@/services/apiProxy'
 
 const props = defineProps<{
   htmlData?: unknown
   wpId: string
   projectId: string
+  applicableStandards?: string[]
   readonly?: boolean
 }>()
 
@@ -748,6 +764,52 @@ const dis = useG5DisclosureSoe({
 const wpIdRef = computed(() => props.wpId)
 const { generateAndConfirm, aiAvailable, loading: aiLoading } = useG5AiGenerate(wpIdRef)
 const provisionPlaceholder = G5_SOE_PROVISION_METHOD_PLACEHOLDER
+
+// ─── 同步到附注（§八、17）───────────────────────────────────────────────
+// 🔴 国企附注模版对「坏账准备计提情况」只有交叉引用、无表 → 底稿侧的坏账准备 /
+//    按单项 / 组合计提系列表**不推附注**（宁缺勿造），只推 3 张：性质 / 终止确认 / 继续涉入。
+//    故本变体无动态表名，不需要 `_removed_table_keys`。
+const isSyncing = ref(false)
+const autoSync = useDisclosureAutoSync({ isReadonly: () => isReadonly.value })
+
+async function syncToDisclosureNotes(): Promise<void> {
+  if (isSyncing.value || isReadonly.value || !props.projectId) return
+  const st = dis.state.value
+  const payload = buildG5SoeSyncPayload(props.wpId, props.applicableStandards, {
+    natureRows: dis.natureDisplayRows.value,
+    derecogRows: st.derecogRows,
+    continuing: st.continuing,
+    provisionMethodNote: st.provisionMethodNote ?? '',
+    noteText: dis.noteText.value ?? '',
+  })
+  if (!payload) return
+  isSyncing.value = true
+  try {
+    const res: any = await api.post(
+      `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,
+      payload,
+    )
+    const rows = Number((res?.data ?? res)?.rows_synced ?? 0)
+    ElMessage.success(`已同步 ${rows} 行到附注模块「${G5_NOTE_SECTION.soe} 长期应收款」`)
+  } catch {
+    ElMessage.warning('同步附注失败，请稍后重试')
+  } finally {
+    isSyncing.value = false
+  }
+}
+
+// 数据变更后自动同步（防抖 800ms；只读/失败静默）。监听实际数据，不监听提示横幅状态。
+watch(
+  [
+    dis.natureDisplayRows,
+    () => dis.state.value.derecogRows,
+    () => dis.state.value.continuing,
+    () => dis.state.value.provisionMethodNote,
+    dis.noteText,
+  ],
+  () => { autoSync.scheduleAutoSync(syncToDisclosureNotes) },
+  { deep: true },
+)
 
 function fmt(n: number | null | undefined): string {
   const v = Number(n) || 0

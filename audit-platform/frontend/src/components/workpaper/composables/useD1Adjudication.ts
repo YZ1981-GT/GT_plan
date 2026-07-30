@@ -337,26 +337,32 @@ export function useD1Adjudication(options: UseD1AdjudicationOptions) {
 
   // ─── AI Generate ─────────────────────────────────────────────────────────
 
-  async function aiGenerateNote(): Promise<string> {
+  /**
+   * 调用平台 AI 生成端点。
+   *
+   * 🔴 请求体必须是 `{section_id, related_data, existing_content}`（后端
+   * `review_dialog.AiGenerateRequest`），响应字段是 `generated_text`。
+   * 历史实现发的是 `{section, context}` 且读 `.text` → 必然 422 且取不到文本，
+   * 审定表两个 AI 按钮长期空转。平台正解见 `useReviewDialog.ts`。
+   * `section_id` 含 `note` 时后端产出「审计说明」，否则产出「审计结论」。
+   */
+  async function aiGenerate(sectionId: string): Promise<string> {
     const { api } = await import('@/services/apiProxy')
-    const context = buildAiContext()
     const res = await api.post(`/api/workpapers/${wpId.value}/review-dialog/ai-generate`, {
-      section: 'audit-note',
-      context,
+      section_id: sectionId,
+      related_data: { context: buildAiContext() },
+      existing_content: '',
     })
-    const text = (res as any)?.text || (res as any)?.data?.text || ''
-    return text
+    const payload = (res as any)?.data ?? res
+    return payload?.generated_text || payload?.data?.generated_text || ''
+  }
+
+  async function aiGenerateNote(): Promise<string> {
+    return aiGenerate('d1-adjudication-audit-note')
   }
 
   async function aiGenerateConclusion(): Promise<string> {
-    const { api } = await import('@/services/apiProxy')
-    const context = buildAiContext()
-    const res = await api.post(`/api/workpapers/${wpId.value}/review-dialog/ai-generate`, {
-      section: 'audit-conclusion',
-      context,
-    })
-    const text = (res as any)?.text || (res as any)?.data?.text || ''
-    return text
+    return aiGenerate('d1-adjudication-audit-conclusion')
   }
 
   function buildAiContext(): string {

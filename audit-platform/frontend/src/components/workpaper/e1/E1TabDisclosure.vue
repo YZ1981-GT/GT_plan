@@ -55,6 +55,17 @@ const { year: auditYear } = useAuditContext()
 // 保存后自动同步到附注（防抖/非阻塞/失败静默/只读 gate；与手动按钮同源 syncToDisclosureNotes）
 const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 onBeforeUnmount(() => autoSync.cancelPending())
+// 数据变更后自动同步：此前只创建了 autoSync 实例却从不调 scheduleAutoSync（接了一半，
+// 等于没接）→ 补触发，对齐 G3/L1/L3 范式监听实际数据 + mounted 防护。
+// 监听源与 syncToDisclosureNotes 构建 snapshot 所用字段一致（disclosureRows /
+// restrictedRows / noteText / variant），保证「改了什么就同步什么」。
+watch(
+  [disclosureRows, restrictedRows, noteText, variant],
+  () => {
+    autoSync.scheduleAutoSync(syncToDisclosureNotes)
+  },
+  { deep: true },
+)
 
 // 跳转回附注模块（披露表 → 附注为单向推送；此处仅导航，方便相互编辑确认）
 // 上市→五、1 / 国企→八、1，可自由切换上市↔国企

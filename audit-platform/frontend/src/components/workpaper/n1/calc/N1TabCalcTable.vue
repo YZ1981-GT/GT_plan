@@ -809,7 +809,6 @@ async function _applyLossToCalcRow(base: number, rate: number) {
   }
   ElMessage.success(`已从 N1-5 带入可弥补亏损 ${fmtAmt(base)}（税率 ${fmtPercent(rate)}）`)
 }
-}
 
 // ─── 差异推送 N1-3 建议调整分录 ──────────────────────────────────────────────
 

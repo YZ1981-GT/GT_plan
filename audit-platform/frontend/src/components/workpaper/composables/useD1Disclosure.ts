@@ -9,7 +9,10 @@
  */
 import { ref, computed, type Ref, type ComputedRef } from 'vue'
 import type { ChecklistItem, ChecklistResponse } from './useD1FormData'
-import { parseNum, calcSubtotal, calcNetValue, safeDivide, calcBadDebtEndBalance } from './useD1FormulaEngine'
+import {
+  parseNum, calcSubtotal, calcNetValue, safeDivide, calcBadDebtEndBalance,
+  deriveClassRows,
+} from './useD1FormulaEngine'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -23,7 +26,25 @@ export interface BadDebtClassRow { rowId: string; rowType: RowType; label: strin
 export interface IndividualDetailRow { rowId: string; rowType: RowType; name: string; isFixed: boolean; balance: number; provision: number; lossRate: number; basis: string }
 export interface PortfolioDetailRow { rowId: string; rowType: RowType; drawerTypeOrAging: string; isFixed: boolean; balance: number; provision: number; lossRate: number }
 export interface BadDebtMovementRow { rowId: string; rowType: RowType; label: string; isFixed: boolean; priorBalance: number; provision: number; reversal: number; writeOff: number; transfer: number; other: number; endBalance: number }
-export interface ReversalDetailRow { rowId: string; rowType: RowType; isFixed: boolean; companyName: string; reversalReason: string; originalMethod: string; reversalBasis: string; amount: number }
+export interface ReversalDetailRow {
+  rowId: string
+  rowType: RowType
+  isFixed: boolean
+  companyName: string
+  /** 上市「转回原因」/ 国企「转回或收回原因、方式」 */
+  reversalReason: string
+  /** 上市「收回方式」（国企无此列） */
+  originalMethod: string
+  /** 上市「原确定坏账准备的依据」（文本；国企无此列） */
+  reversalBasis: string
+  amount: number
+  /**
+   * 国企「转回或收回前累计已计提坏账准备金额」。
+   * 源模板 C59==SUM(C55:C58) → **数值列**，进合计行。
+   * 历史数据曾把该列绑在文本字段 `reversalBasis` 上，加载时按需迁移（见 loadReversalRows）。
+   */
+  cumulativeProvision: number
+}
 export interface WriteOffDetailRow { rowId: string; rowType: RowType; isFixed: boolean; companyName: string; noteType: string; amount: number; reason: string; procedure: string; relatedPartyFlag: string }
 export interface CategorySummaryRow { rowId: string; rowType: RowType; category: string; isFixed: boolean; endBalance: number; endProvision: number; endBookValue: number; priorBalance: number; priorProvision: number; priorBookValue: number }
 
@@ -135,9 +156,12 @@ export function useD1Disclosure(options: UseD1DisclosureOptions) {
   }
 
   // ─── Pledged Section (Task 2.2) ──────────────────────────────────────────
+  // 🔴 质押 / 背书贴现 / 转应收账款三表源模板用的是「票据」而非「汇票」
+  //    （分类总表才用「汇票」）——这是源模板的**逐表**措辞，附注模板 JSON 亦然，
+  //    按表各自对齐，不做全局统一，否则同步后附注行名与模板骨架不匹配。
   const defaultPledgedRows: PledgedRow[] = [
-    { rowId: 'pledged-fixed-bank', rowType: 'fixed', category: '银行承兑汇票', isFixed: true, pledgedAmount: 0 },
-    { rowId: 'pledged-fixed-commercial', rowType: 'fixed', category: '商业承兑汇票', isFixed: true, pledgedAmount: 0 },
+    { rowId: 'pledged-fixed-bank', rowType: 'fixed', category: '银行承兑票据', isFixed: true, pledgedAmount: 0 },
+    { rowId: 'pledged-fixed-commercial', rowType: 'fixed', category: '商业承兑票据', isFixed: true, pledgedAmount: 0 },
   ]
   const pledgedRows = ref<PledgedRow[]>(loadRows<PledgedRow>('pledged-rows').length ? loadRows<PledgedRow>('pledged-rows') : [...defaultPledgedRows])
   const pledgedTotal = computed<PledgedRow>(() => ({
@@ -155,8 +179,8 @@ export function useD1Disclosure(options: UseD1DisclosureOptions) {
 
   // ─── Endorsed Section (Task 2.3) ─────────────────────────────────────────
   const defaultEndorsedRows: EndorsedRow[] = [
-    { rowId: 'endorsed-fixed-bank', rowType: 'fixed', category: '银行承兑汇票', isFixed: true, derecognizedAmount: 0, notDerecognizedAmount: 0 },
-    { rowId: 'endorsed-fixed-commercial', rowType: 'fixed', category: '商业承兑汇票', isFixed: true, derecognizedAmount: 0, notDerecognizedAmount: 0 },
+    { rowId: 'endorsed-fixed-bank', rowType: 'fixed', category: '银行承兑票据', isFixed: true, derecognizedAmount: 0, notDerecognizedAmount: 0 },
+    { rowId: 'endorsed-fixed-commercial', rowType: 'fixed', category: '商业承兑票据', isFixed: true, derecognizedAmount: 0, notDerecognizedAmount: 0 },
   ]
   const endorsedRows = ref<EndorsedRow[]>(loadRows<EndorsedRow>('endorsed-rows').length ? loadRows<EndorsedRow>('endorsed-rows') : [...defaultEndorsedRows])
   const endorsedTotal = computed<EndorsedRow>(() => ({
@@ -174,9 +198,11 @@ export function useD1Disclosure(options: UseD1DisclosureOptions) {
   }
 
   // ─── Transfer Section (Task 2.4) ─────────────────────────────────────────
+  // 🔴 源模板（上市 R33 / 国企 R76）与附注模板 JSON 都**只列商业承兑票据**：
+  //    票据逾期后应转入应收账款并计提坏账准备、账龄连续计算，出票人未履约的场景
+  //    只对商业承兑成立。多推一行银行承兑会在附注里出现凭空的空数据行。
   const defaultTransferRows: TransferRow[] = [
-    { rowId: 'transfer-fixed-bank', rowType: 'fixed', category: '银行承兑汇票', isFixed: true, transferAmount: 0 },
-    { rowId: 'transfer-fixed-commercial', rowType: 'fixed', category: '商业承兑汇票', isFixed: true, transferAmount: 0 },
+    { rowId: 'transfer-fixed-commercial', rowType: 'fixed', category: '商业承兑票据', isFixed: true, transferAmount: 0 },
   ]
   const transferRows = ref<TransferRow[]>(loadRows<TransferRow>('transfer-rows').length ? loadRows<TransferRow>('transfer-rows') : [...defaultTransferRows])
   const transferTotal = computed<TransferRow>(() => ({
@@ -193,7 +219,11 @@ export function useD1Disclosure(options: UseD1DisclosureOptions) {
   }
 
   // ─── Bad Debt Classification (Task 2.5) ──────────────────────────────────
-  function buildClassRows(periodKey: string): Ref<BadDebtClassRow[]> {
+  // 🔴 账面余额 / 坏账准备是唯一真源；比例(%) / 预期信用损失率(%) / 账面价值
+  //    一律**读时推导**（`deriveClassRows`），不再持久化派生值。
+  //    旧实现把 ratio 存进行对象、编辑时用**编辑前**的合计做分母且只重算被编辑行 →
+  //    浏览器实测比例漂移到 162.50%（应 100.00%）并随同步污染附注。
+  function buildClassRowsRaw(periodKey: string): Ref<BadDebtClassRow[]> {
     const defaults: BadDebtClassRow[] = [
       { rowId: `class-${periodKey}-individual`, rowType: 'fixed', label: '按单项计提', isFixed: true, balance: 0, ratio: 0, provision: 0, lossRate: 0, bookValue: 0 },
       { rowId: `class-${periodKey}-portfolio-bank`, rowType: 'fixed', label: '按组合计提-银行承兑汇票', isFixed: true, balance: 0, ratio: 0, provision: 0, lossRate: 0, bookValue: 0 },
@@ -203,27 +233,30 @@ export function useD1Disclosure(options: UseD1DisclosureOptions) {
     return ref(loaded.length ? loaded : [...defaults])
   }
 
-  const classEndRows = buildClassRows('end')
-  const classPriorRows = buildClassRows('prior')
+  /** 录入态（持久化对象）—— 只有 balance / provision 有意义 */
+  const classEndRowsRaw = buildClassRowsRaw('end')
+  const classPriorRowsRaw = buildClassRowsRaw('prior')
 
-  function computeClassTotal(rows: Ref<BadDebtClassRow[]>): ComputedRef<BadDebtClassRow> {
-    return computed(() => {
-      const totalBalance = calcSubtotal(rows.value.map(r => r.balance))
-      const totalProvision = calcSubtotal(rows.value.map(r => r.provision))
-      return {
-        rowId: '__class_total__', rowType: 'summary' as RowType, label: '合计', isFixed: true,
-        balance: totalBalance, ratio: totalBalance ? 1 : 0, provision: totalProvision,
-        lossRate: safeDivide(totalProvision, totalBalance), bookValue: calcNetValue(totalBalance, totalProvision),
-      }
-    })
+  function totalOf(rows: readonly BadDebtClassRow[]): BadDebtClassRow {
+    const totalBalance = calcSubtotal(rows.map(r => r.balance))
+    const totalProvision = calcSubtotal(rows.map(r => r.provision))
+    return {
+      rowId: '__class_total__', rowType: 'summary' as RowType, label: '合计', isFixed: true,
+      balance: totalBalance, ratio: totalBalance ? 1 : 0, provision: totalProvision,
+      lossRate: safeDivide(totalProvision, totalBalance), bookValue: calcNetValue(totalBalance, totalProvision),
+    }
   }
-  const classEndTotal = computeClassTotal(classEndRows)
-  const classPriorTotal = computeClassTotal(classPriorRows)
 
-  // Recalculate ratio/lossRate/bookValue for class rows when balance/provision change
-  function recalcClassRow(row: BadDebtClassRow, totalBalance: number): BadDebtClassRow {
-    return { ...row, ratio: safeDivide(row.balance, totalBalance), lossRate: safeDivide(row.provision, row.balance), bookValue: calcNetValue(row.balance, row.provision) }
-  }
+  const classEndTotal = computed<BadDebtClassRow>(() => totalOf(classEndRowsRaw.value))
+  const classPriorTotal = computed<BadDebtClassRow>(() => totalOf(classPriorRowsRaw.value))
+
+  /** 对外暴露的分类行 —— 派生列按**当前**合计推导，恒自洽 */
+  const classEndRows = computed<BadDebtClassRow[]>(
+    () => deriveClassRows(classEndRowsRaw.value, classEndTotal.value.balance),
+  )
+  const classPriorRows = computed<BadDebtClassRow[]>(
+    () => deriveClassRows(classPriorRowsRaw.value, classPriorTotal.value.balance),
+  )
 
   // Individual detail rows
   const individualEndRows = ref<IndividualDetailRow[]>(loadRows<IndividualDetailRow>('individual-end-rows'))
@@ -287,6 +320,83 @@ export function useD1Disclosure(options: UseD1DisclosureOptions) {
     persistRows(key, target.value)
   }
 
+  // ─── 上市组合计提：双期并列成对行 ────────────────────────────────────────
+  // 源模板（R76~R89）上市组合计提项目是**一张表双期并列**，同步时
+  // `mergePortfolio` 按 `drawerTypeOrAging` 名称把期末 / 上年末对齐。
+  // 若两期名称不一致就会各自成为孤儿行，故新增 / 改名 / 按段生成一律**成对**操作。
+
+  function _portfolioRef(type: 'bank' | 'commercial', period: 'end' | 'prior') {
+    return type === 'bank'
+      ? (period === 'end' ? bankPortfolioEndRows : bankPortfolioPriorRows)
+      : (period === 'end' ? commercialPortfolioEndRows : commercialPortfolioPriorRows)
+  }
+  function _portfolioKey(type: 'bank' | 'commercial', period: 'end' | 'prior'): string {
+    return `${type}-portfolio-${period}-rows`
+  }
+
+  /** 向期末 + 上年末各插一行同名行，返回是否新增（名称为空或两期均已存在则不加）。 */
+  function addPortfolioPairRow(type: 'bank' | 'commercial', name: string): boolean {
+    const trimmed = String(name || '').trim()
+    if (!trimmed) return false
+    let added = false
+    for (const period of ['end', 'prior'] as const) {
+      const target = _portfolioRef(type, period)
+      if (target.value.some(r => String(r.drawerTypeOrAging || '').trim() === trimmed)) continue
+      target.value = [...target.value, {
+        rowId: genId('pf'), rowType: 'dynamic', drawerTypeOrAging: trimmed,
+        isFixed: false, balance: 0, provision: 0, lossRate: 0,
+      }]
+      persistRows(_portfolioKey(type, period), target.value)
+      added = true
+    }
+    return added
+  }
+
+  /** 同时改期末 + 上年末同名行的名称，保持两期对齐；返回改动行数。 */
+  function renamePortfolioPair(type: 'bank' | 'commercial', oldName: string, nextName: string): number {
+    const from = String(oldName ?? '').trim()
+    const to = String(nextName ?? '').trim()
+    if (!to || from === to) return 0
+    let touched = 0
+    for (const period of ['end', 'prior'] as const) {
+      const target = _portfolioRef(type, period)
+      let hit = false
+      target.value = target.value.map(r => {
+        if (String(r.drawerTypeOrAging || '').trim() !== from) return r
+        hit = true
+        touched += 1
+        return { ...r, drawerTypeOrAging: to }
+      })
+      if (hit) persistRows(_portfolioKey(type, period), target.value)
+    }
+    return touched
+  }
+
+  /** 按账龄段成对补齐（期末 + 上年末），返回两期合计新增行数。 */
+  function fillPortfolioAgingBandsPair(
+    type: 'bank' | 'commercial',
+    segmentLabels: readonly string[],
+  ): number {
+    return fillPortfolioAgingBands(type, 'end', segmentLabels)
+      + fillPortfolioAgingBands(type, 'prior', segmentLabels)
+  }
+
+  /** 删除某组合项目在两期的同名行，返回删除行数。 */
+  function removePortfolioPairRow(type: 'bank' | 'commercial', name: string): number {
+    const target0 = String(name ?? '').trim()
+    let removed = 0
+    for (const period of ['end', 'prior'] as const) {
+      const target = _portfolioRef(type, period)
+      const before = target.value.length
+      target.value = target.value.filter(r => String(r.drawerTypeOrAging || '').trim() !== target0)
+      if (target.value.length !== before) {
+        removed += before - target.value.length
+        persistRows(_portfolioKey(type, period), target.value)
+      }
+    }
+    return removed
+  }
+
   // ─── Bad Debt Movement (Task 2.6) ────────────────────────────────────────
   function buildMovementRows(): BadDebtMovementRow[] {
     const loaded = loadRows<BadDebtMovementRow>('movement-rows')
@@ -301,6 +411,44 @@ export function useD1Disclosure(options: UseD1DisclosureOptions) {
     ]
   }
   const movementRows = ref<BadDebtMovementRow[]>(buildMovementRows())
+
+  // ─── 变动表「其中：」明细行（国企，预设 F4-20）────────────────────────────
+  // 源模板 A50「其中：」下方是可添加的组合明细行；F4-20 要求「其中：」下方所有明细行之和
+  // = 按组合计提行。旧实现只渲染一个固定 hint 行、无法新增 → 该勾稽永远无法满足。
+  const movementDetailRows = ref<BadDebtMovementRow[]>(
+    loadRows<BadDebtMovementRow>('movement-detail-rows'),
+  )
+
+  /** 「其中：」下明细汇总（供按组合计提行在有明细时改为只读汇总）。 */
+  const movementDetailTotal = computed<BadDebtMovementRow>(() => {
+    const rows = movementDetailRows.value
+    const sum = (k: keyof BadDebtMovementRow) =>
+      calcSubtotal(rows.map(r => parseNum(r[k] as number)))
+    return {
+      rowId: '__mv_detail_total__', rowType: 'summary', label: '其中小计', isFixed: true,
+      priorBalance: sum('priorBalance'), provision: sum('provision'), reversal: sum('reversal'),
+      writeOff: sum('writeOff'), transfer: sum('transfer'), other: sum('other'),
+      endBalance: sum('endBalance'),
+    }
+  })
+  const hasMovementDetail = computed(() => movementDetailRows.value.length > 0)
+
+  /** 新增「其中：」明细行（名称由调用方先 prompt 取得，空名不创建）。 */
+  function addMovementDetailRow(label: string): boolean {
+    const name = String(label ?? '').trim()
+    if (!name || isReadonly.value) return false
+    movementDetailRows.value = [...movementDetailRows.value, {
+      rowId: genId('mvd'), rowType: 'dynamic', label: name, isFixed: false,
+      priorBalance: 0, provision: 0, reversal: 0, writeOff: 0, transfer: 0, other: 0, endBalance: 0,
+    }]
+    persistRows('movement-detail-rows', movementDetailRows.value)
+    return true
+  }
+
+  function removeMovementDetailRow(rowId: string): void {
+    movementDetailRows.value = movementDetailRows.value.filter(r => r.rowId !== rowId)
+    persistRows('movement-detail-rows', movementDetailRows.value)
+  }
 
   const movementTotal = computed<BadDebtMovementRow>(() => {
     const rows = variant === 'soe' ? movementRows.value.filter(r => r.label !== '合计') : movementRows.value
@@ -317,13 +465,36 @@ export function useD1Disclosure(options: UseD1DisclosureOptions) {
   })
 
   // Reversal detail rows
-  const reversalDetailRows = ref<ReversalDetailRow[]>(loadRows<ReversalDetailRow>('reversal-rows'))
+  /**
+   * 加载转回明细并迁移 legacy 数据：国企「转回或收回前累计已计提坏账准备金额」
+   * 原先误绑在文本字段 `reversalBasis` 上。若 `cumulativeProvision` 缺失而
+   * `reversalBasis` 可解析为数值，则搬到数值字段并清空文本字段（否则同一值会重复显示）。
+   */
+  function loadReversalRows(): ReversalDetailRow[] {
+    return loadRows<Partial<ReversalDetailRow>>('reversal-rows').map((r) => {
+      const legacyNum = r.cumulativeProvision === undefined ? parseNum(r.reversalBasis) : 0
+      const migrate = r.cumulativeProvision === undefined && legacyNum !== 0
+      return {
+        rowId: String(r.rowId ?? genId('rv')),
+        rowType: (r.rowType ?? 'dynamic') as RowType,
+        isFixed: Boolean(r.isFixed),
+        companyName: String(r.companyName ?? ''),
+        reversalReason: String(r.reversalReason ?? ''),
+        originalMethod: String(r.originalMethod ?? ''),
+        reversalBasis: migrate ? '' : String(r.reversalBasis ?? ''),
+        amount: parseNum(r.amount),
+        cumulativeProvision: migrate ? legacyNum : parseNum(r.cumulativeProvision),
+      }
+    })
+  }
+  const reversalDetailRows = ref<ReversalDetailRow[]>(loadReversalRows())
   const reversalDetailTotal = computed<ReversalDetailRow>(() => ({
     rowId: '__rev_total__', rowType: 'summary', isFixed: true, companyName: '合计', reversalReason: '', originalMethod: '', reversalBasis: '',
     amount: calcSubtotal(reversalDetailRows.value.map(r => r.amount)),
+    cumulativeProvision: calcSubtotal(reversalDetailRows.value.map(r => r.cumulativeProvision)),
   }))
   function addReversalRow(): void {
-    reversalDetailRows.value.push({ rowId: genId('rv'), rowType: 'dynamic', isFixed: false, companyName: '', reversalReason: '', originalMethod: '', reversalBasis: '', amount: 0 })
+    reversalDetailRows.value.push({ rowId: genId('rv'), rowType: 'dynamic', isFixed: false, companyName: '', reversalReason: '', originalMethod: '', reversalBasis: '', amount: 0, cumulativeProvision: 0 })
     persistRows('reversal-rows', reversalDetailRows.value)
   }
   function removeReversalRow(rowId: string): void {
@@ -409,13 +580,12 @@ export function useD1Disclosure(options: UseD1DisclosureOptions) {
       transferRows.value = transferRows.value.map(r => r.rowId === rowId ? { ...r, [field]: field === 'category' ? value : numVal } : r)
       persistRows('transfer-rows', transferRows.value)
     } else if (section === 'classEnd') {
-      const totalBal = classEndTotal.value.balance
-      classEndRows.value = classEndRows.value.map(r => r.rowId === rowId ? recalcClassRow({ ...r, [field]: numVal }, totalBal) : r)
-      persistRows('class-end-rows', classEndRows.value)
+      // 只写录入列；派生列由 classEndRows computed 按新合计重新推导
+      classEndRowsRaw.value = classEndRowsRaw.value.map(r => r.rowId === rowId ? { ...r, [field]: numVal } : r)
+      persistRows('class-end-rows', classEndRowsRaw.value)
     } else if (section === 'classPrior') {
-      const totalBal = classPriorTotal.value.balance
-      classPriorRows.value = classPriorRows.value.map(r => r.rowId === rowId ? recalcClassRow({ ...r, [field]: numVal }, totalBal) : r)
-      persistRows('class-prior-rows', classPriorRows.value)
+      classPriorRowsRaw.value = classPriorRowsRaw.value.map(r => r.rowId === rowId ? { ...r, [field]: numVal } : r)
+      persistRows('class-prior-rows', classPriorRowsRaw.value)
     } else if (section === 'individualEnd') {
       individualEndRows.value = individualEndRows.value.map(r => {
         if (r.rowId !== rowId) return r
@@ -454,8 +624,17 @@ export function useD1Disclosure(options: UseD1DisclosureOptions) {
         return updated
       })
       persistRows('movement-rows', movementRows.value)
+    } else if (section === 'movementDetail') {
+      movementDetailRows.value = movementDetailRows.value.map(r => {
+        if (r.rowId !== rowId) return r
+        const updated = { ...r, [field]: field === 'label' ? String(value) : numVal }
+        updated.endBalance = calcBadDebtEndBalance(updated.priorBalance, updated.provision, updated.reversal, updated.writeOff, updated.transfer, updated.other)
+        return updated
+      })
+      persistRows('movement-detail-rows', movementDetailRows.value)
     } else if (section === 'reversalDetail') {
-      reversalDetailRows.value = reversalDetailRows.value.map(r => r.rowId === rowId ? { ...r, [field]: field === 'amount' ? numVal : value } : r)
+      const isNumField = field === 'amount' || field === 'cumulativeProvision'
+      reversalDetailRows.value = reversalDetailRows.value.map(r => r.rowId === rowId ? { ...r, [field]: isNumField ? numVal : value } : r)
       persistRows('reversal-rows', reversalDetailRows.value)
     } else if (section === 'writeOffDetail') {
       writeOffDetailRows.value = writeOffDetailRows.value.map(r => r.rowId === rowId ? { ...r, [field]: field === 'amount' ? numVal : value } : r)
@@ -488,8 +667,13 @@ export function useD1Disclosure(options: UseD1DisclosureOptions) {
     individualEndRows, individualPriorRows, addIndividualRow, removeIndividualRow,
     bankPortfolioEndRows, bankPortfolioPriorRows, commercialPortfolioEndRows, commercialPortfolioPriorRows,
     addPortfolioRow, removePortfolioRow, fillPortfolioAgingBands,
+    // 上市双期并列成对操作
+    addPortfolioPairRow, renamePortfolioPair, fillPortfolioAgingBandsPair, removePortfolioPairRow,
     // Movement
     movementRows, movementTotal, reversalDetailRows, reversalDetailTotal, addReversalRow, removeReversalRow,
+    // 变动表「其中：」明细（国企 F4-20）
+    movementDetailRows, movementDetailTotal, hasMovementDetail,
+    addMovementDetailRow, removeMovementDetailRow,
     // Write-off
     writeOffAmount, writeOffDetailRows, writeOffDetailTotal, addWriteOffRow, removeWriteOffRow,
     // Category summary (SOE)

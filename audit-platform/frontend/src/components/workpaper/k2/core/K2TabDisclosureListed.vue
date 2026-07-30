@@ -1,121 +1,320 @@
 <template>
   <div class="k2-disclosure-listed">
-    <!-- 蓝色渐变引导区 -->
-    <div class="guide-area">
-      <div class="guide-grid">
-        <div class="guide-step"><span class="step-num">①</span> 其他流动资产变动矩阵（期初+增加-减少=期末）自动从K2-2审定数取数</div>
-        <div class="guide-step"><span class="step-num">②</span> 按项目分类列示（合同取得成本/预付款项/待摊费用等）</div>
-        <div class="guide-step"><span class="step-num">③</span> 重大明细需单独列示（含原因说明及占比）</div>
-        <div class="guide-step"><span class="step-num">④</span> 上市公司版 13行×13列，AI辅助生成说明文字</div>
-      </div>
-    </div>
-
-    <!-- 同步到附注按钮 -->
-    <div style="margin-bottom: 12px; text-align: right;">
-      <el-button size="small" type="success" :disabled="isReadonly" @click="syncToDisclosureNotes">同步到附注</el-button>
-    </div>
-
-    <!-- 琥珀色方法论块 -->
+    <!-- 方法论上下文（源模板原文，禁改写） -->
     <div class="methodology-block">
-      <div class="methodology-title">CAS 附注披露要求（上市公司版）</div>
+      <div class="methodology-title">源模板要求（附注披露信息（上市公司））</div>
       <div class="methodology-content">
-        按《企业会计准则》应用指南及信息披露编报规则：上市公司应披露其他流动资产的期初余额、
-        本期增加、本期减少及期末余额变动情况；重大项目应单独列示并说明原因及占总额比例。
-        科目1231其他流动资产，资产类借方，期末=期初+借方-贷方。
+        其他流动资产（注：根据实际情况列示；不存在的项目请删除）。<br />
+        （金额较大的其他流动资产，应说明其内容、性质）<br />
+        <span class="methodology-sub">
+          附注 §五、13 共三张表：①明细列示表（必备）②合同取得成本变动（有则披露）
+          ③碳排放配额变动（有则披露）。数据来源：审定表 K2-1 / 明细表 K2-2 /
+          合同取得成本明细 K2-4 / 摊销测算 K2-5。
+        </span>
       </div>
     </div>
 
-    <!-- 多section卡片 -->
-    <template v-for="(section, sIdx) in sections" :key="section.id">
-      <el-card shadow="never" class="disclosure-card">
-        <template #header>
-          <div class="section-title-row">
-            <span class="section-title">{{ section.title }}</span>
-            <div class="title-actions">
-              <el-button v-if="section.hasTextArea" size="small" type="primary" link :disabled="isReadonly" @click="handleAiGenerate(sIdx)">
-                <el-icon><MagicStick /></el-icon> AI生成
-              </el-button>
-              <el-button size="small" type="default" link @click="handleReview(`disc-listed-${section.id}`)">💬</el-button>
-            </div>
-          </div>
+    <!-- 勾稽校验 bar -->
+    <div class="check-bar" :class="`check-${checkSummary.level}`">
+      <span class="check-icon">{{ checkSummary.level === 'ok' ? '✓' : '!' }}</span>
+      <span class="check-text">
+        披露勾稽 {{ checkSummary.total - checkSummary.failed }}/{{ checkSummary.total }} 通过
+        <template v-if="checkSummary.failed > 0">（{{ checkSummary.failed }} 项存在差异）</template>
+      </span>
+      <el-button size="small" link type="primary" @click="checkExpanded = !checkExpanded">
+        {{ checkExpanded ? '收起明细' : '查看明细' }}
+      </el-button>
+      <span class="check-spacer" />
+      <el-button size="small" type="success" :disabled="isReadonly" @click="syncToDisclosureNotes">
+        同步到附注
+      </el-button>
+    </div>
+    <el-table v-if="checkExpanded" :data="checkItems" size="small" class="check-table">
+      <el-table-column label="校验项" min-width="200">
+        <template #default="{ row }">
+          <el-tooltip :content="row.rule" placement="top">
+            <span class="rule-cell">{{ row.label }}</span>
+          </el-tooltip>
         </template>
+      </el-table-column>
+      <el-table-column label="本表" width="140" align="right">
+        <template #default="{ row }">{{ fmtAmount(row.left) }}</template>
+      </el-table-column>
+      <el-table-column label="对方" width="140" align="right">
+        <template #default="{ row }">{{ fmtAmount(row.right) }}</template>
+      </el-table-column>
+      <el-table-column label="差异" width="140" align="right">
+        <template #default="{ row }">{{ fmtAmount(row.diff) }}</template>
+      </el-table-column>
+      <el-table-column label="结果" width="90">
+        <template #default="{ row }">
+          <el-tag :type="row.level === 'ok' ? 'success' : row.level === 'warn' ? 'warning' : 'danger'" size="small">
+            {{ row.level === 'ok' ? '通过' : row.level === 'warn' ? '关注' : '不平' }}
+          </el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="说明" min-width="180">
+        <template #default="{ row }">{{ row.detail || '-' }}</template>
+      </el-table-column>
+    </el-table>
 
-        <!-- 结构化表格区 -->
-        <el-table
-          v-if="section.rows.length > 0"
-          :data="section.rows"
-          border
-          stripe
-          size="small"
-          class="disclosure-table"
-        >
-          <el-table-column prop="item" label="项目" min-width="140" fixed />
-          <el-table-column label="期初余额" width="120" align="right">
+    <!-- ① 其他流动资产明细列示 -->
+    <el-card shadow="never" class="disclosure-card">
+      <template #header>
+        <div class="section-title-row">
+          <span class="section-title">① 其他流动资产</span>
+          <div class="title-actions">
+            <el-button size="small" :disabled="isReadonly" @click="addMainRow">新增明细行</el-button>
+            <el-button size="small" type="default" link @click="handleReview('K2-disc-listed-main')">💬</el-button>
+          </div>
+        </div>
+      </template>
+      <el-table :data="mainRows" size="small" class="disclosure-table">
+        <el-table-column prop="label" label="项目" min-width="200">
+          <template #default="{ row, $index }">
+            <span v-if="row.fixed">{{ row.label }}</span>
+            <el-input
+              v-else
+              :model-value="row.label"
+              size="small"
+              :disabled="isReadonly"
+              @change="(v: string) => onMainLabelChange($index, v)"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column label="期末余额" width="180" align="right">
+          <template #default="{ row, $index }">
+            <WpAmountInput
+              v-if="!isReadonly"
+              :model-value="row.endAmount"
+              :aria-label="`期末余额 ${row.label}`"
+              @change="(v: number) => onMainCellChange($index, 'endAmount', v)"
+            />
+            <span v-else>{{ fmtAmount(row.endAmount) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="上年年末余额" width="180" align="right">
+          <template #default="{ row, $index }">
+            <WpAmountInput
+              v-if="!isReadonly"
+              :model-value="row.priorAmount"
+              :aria-label="`上年年末余额 ${row.label}`"
+              @change="(v: number) => onMainCellChange($index, 'priorAmount', v)"
+            />
+            <span v-else>{{ fmtAmount(row.priorAmount) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="80" align="center">
+          <template #default="{ row, $index }">
+            <el-button
+              v-if="!row.fixed"
+              size="small"
+              link
+              type="danger"
+              :disabled="isReadonly"
+              @click="removeMainRow($index)"
+            >
+              删除
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <el-table :data="[mainTotalRow]" size="small" class="disclosure-table total-table" :show-header="false">
+        <el-table-column prop="label" min-width="200" />
+        <el-table-column width="180" align="right">
+          <template #default="{ row }">
+            <el-tooltip content="合计 = 各明细行之和（F13-2）" placement="top">
+              <span class="formula-cell">{{ fmtAmount(row.endAmount) }}</span>
+            </el-tooltip>
+          </template>
+        </el-table-column>
+        <el-table-column width="180" align="right">
+          <template #default="{ row }">
+            <el-tooltip content="合计 = 各明细行之和（F13-2）" placement="top">
+              <span class="formula-cell">{{ fmtAmount(row.priorAmount) }}</span>
+            </el-tooltip>
+          </template>
+        </el-table-column>
+        <el-table-column width="80" />
+      </el-table>
+    </el-card>
+
+    <!-- ② 合同取得成本 -->
+    <el-card shadow="never" class="disclosure-card">
+      <template #header>
+        <div class="section-title-row">
+          <span class="section-title">② 合同取得成本</span>
+          <div class="title-actions">
+            <el-switch
+              :model-value="contractCost.enabled"
+              size="small"
+              active-text="本项目适用"
+              inactive-text="不适用"
+              :disabled="isReadonly"
+              @change="(v: any) => onToggleContractCost(!!v)"
+            />
+            <el-button
+              v-if="contractCost.enabled"
+              size="small"
+              :disabled="isReadonly"
+              @click="addContractCostCategory"
+            >
+              新增类别列
+            </el-button>
+            <el-button size="small" type="default" link @click="handleReview('K2-disc-listed-contract-cost')">💬</el-button>
+          </div>
+        </div>
+      </template>
+      <div v-if="!contractCost.enabled" class="disabled-hint">
+        已标记不适用 —— 同步时不推送该表，并清理附注中的残留表（源模板：不存在的项目请删除）。
+      </div>
+      <template v-else>
+        <el-table :data="contractCostRows" size="small" class="disclosure-table">
+          <el-table-column prop="label" label="项目" min-width="180" />
+          <el-table-column
+            v-for="(cat, catIdx) in contractCost.categories"
+            :key="`cat-${catIdx}`"
+            :label="cat"
+            width="180"
+            align="right"
+          >
+            <template #header>
+              <div class="cat-header">
+                <span>{{ cat }}</span>
+                <el-button
+                  size="small"
+                  link
+                  :disabled="isReadonly"
+                  @click="renameContractCostCategory(catIdx)"
+                >
+                  改名
+                </el-button>
+                <el-button
+                  v-if="contractCost.categories.length > 1"
+                  size="small"
+                  link
+                  type="danger"
+                  :disabled="isReadonly"
+                  @click="removeContractCostCategory(catIdx)"
+                >
+                  删除
+                </el-button>
+              </div>
+            </template>
             <template #default="{ row }">
-              <template v-if="!isReadonly && !row.isAutoFilled">
-                <el-input-number :model-value="row.beginBalance" :controls="false" size="small" @change="(v: number) => handleCellEdit(sIdx, row.rowIdx, 'beginBalance', v)" />
-              </template>
-              <span v-else :class="{ 'formula-cell': row.isFormula, 'auto-fill': row.isAutoFilled }">{{ fmtAmt(row.beginBalance) }}</span>
+              <el-tooltip
+                v-if="row.isFormula"
+                content="期末余额 = 期初余额 + 本年增加 − 本年摊销 − 本年计提减值损失"
+                placement="top"
+              >
+                <span class="formula-cell">{{ fmtAmount(row.values[catIdx]) }}</span>
+              </el-tooltip>
+              <WpAmountInput
+                v-else-if="!isReadonly"
+                :model-value="row.values[catIdx]"
+                :aria-label="`${cat} ${row.label}`"
+                @change="(v: number) => onContractCostChange(row.rowIdx, catIdx, v)"
+              />
+              <span v-else>{{ fmtAmount(row.values[catIdx]) }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="本期增加" width="120" align="right">
+          <el-table-column label="合计" width="180" align="right">
             <template #default="{ row }">
-              <template v-if="!isReadonly && !row.isAutoFilled">
-                <el-input-number :model-value="row.increase" :controls="false" size="small" @change="(v: number) => handleCellEdit(sIdx, row.rowIdx, 'increase', v)" />
-              </template>
-              <span v-else class="amount-cell">{{ fmtAmt(row.increase) }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="本期减少" width="120" align="right">
-            <template #default="{ row }">
-              <template v-if="!isReadonly && !row.isAutoFilled">
-                <el-input-number :model-value="row.decrease" :controls="false" size="small" @change="(v: number) => handleCellEdit(sIdx, row.rowIdx, 'decrease', v)" />
-              </template>
-              <span v-else class="amount-cell">{{ fmtAmt(row.decrease) }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="期末余额" width="120" align="right">
-            <template #default="{ row }">
-              <span class="formula-cell" title="= 期初 + 增加 - 减少">{{ fmtAmt(row.endBalance) }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="占比(%)" width="90" align="right">
-            <template #default="{ row }">
-              <span class="formula-cell" title="= 期末余额 / 合计期末余额">{{ row.proportion != null ? row.proportion.toFixed(2) + '%' : '-' }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="备注" min-width="100">
-            <template #default="{ row }">
-              <el-input v-if="!isReadonly" :model-value="row.remark" size="small" @change="(v: string) => handleCellEdit(sIdx, row.rowIdx, 'remark', v)" />
-              <span v-else>{{ row.remark || '-' }}</span>
+              <el-tooltip content="合计 = 各类别列之和" placement="top">
+                <span class="formula-cell">{{ fmtAmount(row.total) }}</span>
+              </el-tooltip>
             </template>
           </el-table-column>
         </el-table>
+        <div class="table-hint">
+          本年摊销、本年计提减值损失按正数录入，期末余额行自动按减项计算。
+          源模板以［佣金支出］为示例类别，请按该资产主要类别改名或增列。
+        </div>
+      </template>
+    </el-card>
 
-        <!-- 文字说明区 -->
-        <template v-if="section.hasTextArea">
-          <el-divider v-if="section.rows.length > 0" content-position="left">文字说明</el-divider>
-          <el-input
-            v-model="section.textContent"
-            type="textarea"
-            :autosize="{ minRows: 3, maxRows: 10 }"
-            :disabled="isReadonly"
-            :placeholder="`请填写${section.title}相关披露文字...`"
-            @change="handleNoteTextChange(sIdx)"
-          />
-        </template>
-      </el-card>
-    </template>
+    <!-- ③ 碳排放配额变动情况 -->
+    <el-card shadow="never" class="disclosure-card">
+      <template #header>
+        <div class="section-title-row">
+          <span class="section-title">③ 碳排放配额变动情况</span>
+          <div class="title-actions">
+            <el-switch
+              :model-value="carbon.enabled"
+              size="small"
+              active-text="本项目适用"
+              inactive-text="不适用"
+              :disabled="isReadonly"
+              @change="(v: any) => onToggleCarbon(!!v)"
+            />
+            <el-button size="small" type="default" link @click="handleReview('K2-disc-listed-carbon')">💬</el-button>
+          </div>
+        </div>
+      </template>
+      <div v-if="!carbon.enabled" class="disabled-hint">
+        已标记不适用 —— 同步时不推送该表，并清理附注中的残留表。
+      </div>
+      <el-table v-else :data="carbon.rows" size="small" class="disclosure-table">
+        <el-table-column prop="label" label="项目" min-width="240" />
+        <el-table-column label="本期发生额" width="180" align="right">
+          <template #default="{ row, $index }">
+            <WpAmountInput
+              v-if="!isReadonly"
+              :model-value="row.currentAmount"
+              :aria-label="`本期发生额 ${row.label}`"
+              @change="(v: number) => onCarbonChange($index, 'currentAmount', v)"
+            />
+            <span v-else>{{ fmtAmount(row.currentAmount) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="上期发生额" width="180" align="right">
+          <template #default="{ row, $index }">
+            <WpAmountInput
+              v-if="!isReadonly"
+              :model-value="row.priorAmount"
+              :aria-label="`上期发生额 ${row.label}`"
+              @change="(v: number) => onCarbonChange($index, 'priorAmount', v)"
+            />
+            <span v-else>{{ fmtAmount(row.priorAmount) }}</span>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
 
-    <!-- 编制提示 -->
+    <!-- 文本说明区（三段，取自附注模版 text_sections） -->
+    <el-card v-for="seg in textSegments" :key="seg.key" shadow="never" class="disclosure-card">
+      <template #header>
+        <div class="section-title-row">
+          <span class="section-title">{{ seg.title }}</span>
+          <div class="title-actions">
+            <el-button size="small" type="primary" link :disabled="isReadonly" @click="handleAiGenerate(seg.key)">
+              <el-icon><MagicStick /></el-icon> AI辅助
+            </el-button>
+            <el-button size="small" type="default" link @click="handleReview(`K2-disc-listed-text-${seg.key}`)">💬</el-button>
+          </div>
+        </div>
+      </template>
+      <div class="seg-requirement">{{ seg.requirement }}</div>
+      <el-input
+        :model-value="texts[seg.key]"
+        type="textarea"
+        :autosize="{ minRows: 4 }"
+        :disabled="isReadonly"
+        :placeholder="seg.placeholder"
+        @update:model-value="(v: string) => (texts[seg.key] = v)"
+        @change="onTextChange"
+      />
+    </el-card>
+
     <details class="compile-hint">
       <summary>编制提示</summary>
       <ul>
-        <li>上市公司附注：13行×13列，按项目分类披露变动情况</li>
-        <li>科目1231其他流动资产（资产类借方）：期末=期初+增加-减少</li>
-        <li>数据优先从K2-2明细表审定数自动取数（收到 substantive:adjudicated 事件后刷新）</li>
-        <li>重大明细动态行：弹窗输入名称后新增，含占比计算</li>
-        <li>说明文字可使用AI辅助生成初稿</li>
+        <li>①表列结构对齐附注 §五、13：项目 / 期末余额 / 上年年末余额，合计行自动汇总。</li>
+        <li>13 个固定行名取自附注模版；项目实际存在其他项目时用「新增明细行」补充（可命名可删除）。</li>
+        <li>②表是转置结构：行为变动项目，列为资产主要类别；合计列与期末余额行均为公式。</li>
+        <li>③表 10 个固定行名取自附注模版，逐字不改。</li>
+        <li>②③两表不适用时关闭开关，同步会清理附注中的残留表。</li>
+        <li>录入后 800ms 自动同步到附注；也可点「同步到附注」立即推送。</li>
       </ul>
     </details>
   </div>
@@ -125,26 +324,41 @@
 /**
  * K2TabDisclosureListed.vue — 附注披露信息（上市公司）
  *
- * Spec: .kiro/specs/k2-other-current-assets/
- * Task: 4.6
- * Requirements: 7.1
+ * 结构对齐 note_template_listed.json §五、13（交付物权威）：
+ * ①其他流动资产（3 列 13 固定行 + 合计）
+ * ②合同取得成本（转置：行=变动项目，列=资产主要类别 + 合计）
+ * ③碳排放配额变动情况（3 列 10 固定行）
+ * 文本三段取自模板 text_sections。
  *
- * 13行×13列结构化表格，包含：
- * - 其他流动资产变动矩阵（项目/期初/增加/减少/期末/占比/备注）
- * - 按项目分类（合同取得成本/预付款项/待摊费用/其他）
- * - 重大明细+原因说明
+ * 历史版本是自造的 7 列变动矩阵（期初/增加/减少/期末/占比/备注），与附注不符，已废止。
  *
- * EventBus: subscribe 'substantive:adjudicated' → auto-refresh
- *           subscribe 'adjustment:created' → auto-refresh
- *           publish 'disclosure:note-text-updated' on text change
+ * spec: .kiro/specs/k2-other-current-assets-disclosure-alignment/ R1 R2 R3
  */
-import { reactive, inject, onMounted, onBeforeUnmount } from 'vue'
+import { computed, inject, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
+import { fmtAmount } from '@/utils/formatters'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
-import { buildK2SyncPayload } from '../../composables/k2NoteSectionMap'
+import {
+  K2_CARBON_ROWS,
+  K2_CONTRACT_COST_FORMULA_ROW,
+  K2_CONTRACT_COST_ROWS,
+  K2_DEFAULT_CONTRACT_COST_CATEGORIES,
+  K2_LISTED_MAIN_ROWS,
+  K2_NOTE_SECTION,
+  K2_TOTAL_ROW_LABEL,
+  buildK2SyncPayload,
+  type K2DisclosureSnapshot,
+} from '../../composables/k2NoteSectionMap'
+import {
+  checkK2Consistency,
+  contractCostRowTotal,
+  k2ConsistencySummary,
+  recalcContractCost,
+} from '../../composables/useK2DisclosureEngine'
 
 const K2_ACCOUNT_CODE = '1231'
 
@@ -155,259 +369,411 @@ const props = defineProps<{
   isReadonly: boolean
 }>()
 
-const emit = defineEmits<{
-  save: [itemId: string, value: any]
-}>()
+const emit = defineEmits<{ save: [itemId: string, value: any] }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
-
 const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 
 // ═══ 数据模型 ═══
-interface DisclosureRow {
-  rowIdx: number
-  item: string
-  beginBalance: number
-  increase: number
-  decrease: number
-  endBalance: number
-  proportion: number | null
-  remark: string
-  isFormula?: boolean
-  isAutoFilled?: boolean
+interface MainRow {
+  label: string
+  endAmount: number
+  priorAmount: number
+  /** 模板固定行（行名不可改、不可删） */
+  fixed: boolean
 }
 
-interface DisclosureSection {
-  id: string
-  title: string
-  rows: DisclosureRow[]
-  hasTextArea: boolean
-  textContent: string
-}
+type TextKey = 'significant' | 'contractCost' | 'carbon'
 
-// ═══ 构建sections ═══
-function buildSections(): DisclosureSection[] {
-  return [
-    {
-      id: 'movement',
-      title: '（一）其他流动资产变动情况',
-      rows: [
-        { rowIdx: 0, item: '合同取得成本', beginBalance: 0, increase: 0, decrease: 0, endBalance: 0, proportion: null, remark: '' },
-        { rowIdx: 1, item: '预付款项-待转', beginBalance: 0, increase: 0, decrease: 0, endBalance: 0, proportion: null, remark: '' },
-        { rowIdx: 2, item: '待摊费用', beginBalance: 0, increase: 0, decrease: 0, endBalance: 0, proportion: null, remark: '' },
-        { rowIdx: 3, item: '待抵扣进项税额', beginBalance: 0, increase: 0, decrease: 0, endBalance: 0, proportion: null, remark: '' },
-        { rowIdx: 4, item: '待认证进项税额', beginBalance: 0, increase: 0, decrease: 0, endBalance: 0, proportion: null, remark: '' },
-        { rowIdx: 5, item: '增值税留抵税额', beginBalance: 0, increase: 0, decrease: 0, endBalance: 0, proportion: null, remark: '' },
-        { rowIdx: 6, item: '理财产品', beginBalance: 0, increase: 0, decrease: 0, endBalance: 0, proportion: null, remark: '' },
-        { rowIdx: 7, item: '其他', beginBalance: 0, increase: 0, decrease: 0, endBalance: 0, proportion: null, remark: '' },
-        { rowIdx: 8, item: '合计', beginBalance: 0, increase: 0, decrease: 0, endBalance: 0, proportion: null, remark: '', isFormula: true },
-      ],
-      hasTextArea: true,
-      textContent: '',
-    },
-    {
-      id: 'significant',
-      title: '（二）重大其他流动资产明细',
-      rows: [],
-      hasTextArea: true,
-      textContent: '',
-    },
-    {
-      id: 'restricted',
-      title: '（三）受限资产及其他说明',
-      rows: [],
-      hasTextArea: true,
-      textContent: '',
-    },
-  ]
-}
+const mainRows = reactive<MainRow[]>(
+  K2_LISTED_MAIN_ROWS.map(label => ({ label, endAmount: 0, priorAmount: 0, fixed: true })),
+)
 
-const sections = reactive<DisclosureSection[]>(buildSections())
+const contractCost = reactive({
+  enabled: false,
+  categories: [...K2_DEFAULT_CONTRACT_COST_CATEGORIES] as string[],
+  cells: recalcContractCost([], K2_DEFAULT_CONTRACT_COST_CATEGORIES.length),
+})
 
-// ═══ 自动取数 from allResponses（K2-2审定数） ═══
-function applyAutoFill(): void {
-  const endBal = getResponseNumber('K2-1-audited-total')
-  const beginBal = getResponseNumber('K2-1-begin-total')
+const carbon = reactive({
+  enabled: false,
+  rows: K2_CARBON_ROWS.map(label => ({ label, currentAmount: 0, priorAmount: 0 })),
+})
 
-  // 合计行自动填充
-  const movementSection = sections.find(s => s.id === 'movement')
-  if (movementSection) {
-    const totalRow = movementSection.rows.find(r => r.item === '合计')
-    if (totalRow) {
-      totalRow.endBalance = endBal
-      totalRow.beginBalance = beginBal
-      totalRow.increase = endBal - beginBal > 0 ? endBal - beginBal : 0
-      totalRow.decrease = beginBal - endBal > 0 ? beginBal - endBal : 0
-      totalRow.isAutoFilled = true
-    }
-  }
+const texts = reactive<Record<TextKey, string>>({
+  significant: '',
+  contractCost: '',
+  carbon: '',
+})
 
-  recalcFormulas()
-}
+const checkExpanded = ref(false)
 
-function getResponseNumber(key: string): number {
+/** 文本段定义 —— requirement 逐字取自 note_template_listed.json §五、13 text_sections */
+const textSegments: Array<{ key: TextKey; title: string; requirement: string; placeholder: string }> = [
+  {
+    key: 'significant',
+    title: '金额较大的其他流动资产说明',
+    requirement:
+      '（金额较大的其他流动资产，应说明其内容、性质）【提示：进项税额，根据应交税费-应交增值税科目借方余额分析填列；'
+      + '多交或预缴的增值税额，根据应交税费-未交增值税科目以及应交税费-预交增值税科目借方余额分析填列。'
+      + '上述重分类事项，如属于其他非流动资产的，应在其他非流动资产科目列示。】',
+    placeholder: '按①表金额较大的项目，逐项说明其内容与性质',
+  },
+  {
+    key: 'contractCost',
+    title: '合同取得成本判断与摊销方法说明',
+    requirement:
+      '披露与合同取得成本有关的资产相关的信息，包括确定该资产金额所做的判断、该资产的摊销方法、'
+      + '按该资产主要类别披露的期末账面价值以及本期确认的摊销及减值损失金额等。'
+      + '摊销期限未超过一年的合同取得成本于其发生时计入当期损益。',
+    placeholder: '说明资本化判断依据、摊销方法与摊销期间，以及本期摊销及减值损失金额',
+  },
+  {
+    key: 'carbon',
+    title: '碳排放权相关信息说明',
+    requirement:
+      '披露与碳排放权相关的信息，包括：①与碳排放权交易相关的信息（参与减排机制的特征、碳排放战略、节能减排措施等）；'
+      + '②碳排放配额的具体来源（配额取得方式、取得年度、用途、结转原因等）；'
+      + '③节能减排或超额排放情况（免费分配取得的碳排放配额与同期实际排放量有关数据的对比情况、原因等）；'
+      + '④碳排放配额变动情况按③表格式披露。',
+    placeholder: '按①②③四项要求分别说明',
+  },
+]
+
+// ═══ 派生 ═══
+const mainTotalRow = computed(() => ({
+  label: K2_TOTAL_ROW_LABEL,
+  endAmount: mainRows.reduce((s, r) => s + (Number(r.endAmount) || 0), 0),
+  priorAmount: mainRows.reduce((s, r) => s + (Number(r.priorAmount) || 0), 0),
+}))
+
+const contractCostRows = computed(() =>
+  K2_CONTRACT_COST_ROWS.map((label, rowIdx) => ({
+    rowIdx,
+    label,
+    isFormula: label === K2_CONTRACT_COST_FORMULA_ROW,
+    values: contractCost.categories.map((_c, catIdx) => contractCost.cells[rowIdx]?.[catIdx] ?? 0),
+    total: contractCostRowTotal(contractCost.cells, rowIdx, contractCost.categories.length),
+  })),
+)
+
+function responseNumber(key: string): number | null {
   const item = props.allResponses.get(key)
-  if (!item) return 0
-  const val = item.value ?? item
-  return typeof val === 'number' ? val : parseFloat(val) || 0
+  if (!item) return null
+  const raw = item.remark ?? item.value ?? null
+  if (raw == null || raw === '') return null
+  const n = Number(raw)
+  return Number.isFinite(n) ? n : null
 }
 
-function recalcFormulas(): void {
-  for (const section of sections) {
-    // 计算期末 = 期初 + 增加 - 减少（非公式行）
-    for (const row of section.rows) {
-      if (!row.isFormula && !row.isAutoFilled) {
-        row.endBalance = row.beginBalance + row.increase - row.decrease
-      }
-    }
-    // 合计行汇总
-    const totalRow = section.rows.find(r => r.isFormula)
-    if (totalRow && !totalRow.isAutoFilled) {
-      const dataRows = section.rows.filter(r => !r.isFormula)
-      totalRow.beginBalance = dataRows.reduce((s, r) => s + r.beginBalance, 0)
-      totalRow.increase = dataRows.reduce((s, r) => s + r.increase, 0)
-      totalRow.decrease = dataRows.reduce((s, r) => s + r.decrease, 0)
-      totalRow.endBalance = dataRows.reduce((s, r) => s + r.endBalance, 0)
-    }
-    // 占比计算
-    const totalEnd = section.rows.find(r => r.isFormula)?.endBalance || 0
-    for (const row of section.rows) {
-      if (!row.isFormula && totalEnd > 0) {
-        row.proportion = (row.endBalance / totalEnd) * 100
-      } else if (!row.isFormula) {
-        row.proportion = null
-      }
-    }
-  }
-}
+const checkItems = computed(() =>
+  checkK2Consistency({
+    variant: 'listed',
+    mainRows,
+    auditedEnd: responseNumber('K2-1-audited-total'),
+    auditedPrior: responseNumber('K2-1-begin-total'),
+    contractCost,
+  }),
+)
 
-// ═══ EventBus: subscribe 'substantive:adjudicated' + 'adjustment:created' ═══
-function handleAdjudicated(payload: any): void {
-  if (!payload || payload.accountCode === K2_ACCOUNT_CODE || payload.wpCode === 'K2') {
-    applyAutoFill()
-  }
-}
+const checkSummary = computed(() => k2ConsistencySummary(checkItems.value))
 
-function handleAdjustmentCreated(payload: any): void {
-  if (!payload || payload.accountCode === K2_ACCOUNT_CODE || payload.wpCode === 'K2') {
-    applyAutoFill()
-  }
-}
-
-onMounted(() => {
-  eventBus.on('substantive:adjudicated', handleAdjudicated)
-  eventBus.on('adjustment:created', handleAdjustmentCreated)
-  loadSavedData()
-  applyAutoFill()
-})
-
-onBeforeUnmount(() => {
-  eventBus.off('substantive:adjudicated', handleAdjudicated)
-  eventBus.off('adjustment:created', handleAdjustmentCreated)
-  autoSync.cancelPending()
-})
-
-// ═══ 单元格编辑 ═══
-function handleCellEdit(sIdx: number, rowIdx: number, field: string, value: any): void {
-  const section = sections[sIdx]
-  if (!section) return
-  const row = section.rows[rowIdx]
+// ═══ 编辑 ═══
+function onMainCellChange(index: number, field: 'endAmount' | 'priorAmount', value: number): void {
+  const row = mainRows[index]
   if (!row) return
-  ;(row as any)[field] = value ?? 0
-  recalcFormulas()
-  persistSection(sIdx)
-  autoSync.scheduleAutoSync(syncToDisclosureNotes)
+  row[field] = Number(value) || 0
+  persistMain()
 }
 
-// ═══ 同步到附注 ═══
-async function syncToDisclosureNotes(): Promise<void> {
-  if (!props.projectId || props.isReadonly) return
-  const movementSection = sections.find(s => s.id === 'movement')
-  const disclosureRows = (movementSection?.rows || []).filter(r => !r.isFormula).map(r => ({
-    project: r.item,
-    endAmount: r.endBalance || 0,
-    priorAmount: r.beginBalance || 0,
-  }))
-  const narrativeText = sections.filter(s => s.hasTextArea && s.textContent).map(s => s.textContent).join('\n')
-  const payload = buildK2SyncPayload('listed', props.wpId || '', disclosureRows, narrativeText)
+function onMainLabelChange(index: number, value: string): void {
+  const row = mainRows[index]
+  if (!row || row.fixed) return
+  row.label = String(value ?? '').trim()
+  persistMain()
+}
+
+async function addMainRow(): Promise<void> {
   try {
-    await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
-    eventBus.emit('disclosure:note-text-updated' as any, {
-      wpCode: 'K2', variant: 'listed', accountCode: '1231',
-      projectId: props.projectId, sectionIds: ['五、13'],
+    const { value } = await ElMessageBox.prompt('请输入其他流动资产明细项目名称', '新增明细行', {
+      confirmButtonText: '新增',
+      cancelButtonText: '取消',
+      inputPattern: /\S/,
+      inputErrorMessage: '名称不能为空',
     })
-    ElMessage.success('已同步到附注')
-  } catch { /* silent */ }
+    const label = String(value ?? '').trim()
+    if (mainRows.some(r => r.label === label)) {
+      ElMessage.warning('该项目已存在')
+      return
+    }
+    mainRows.push({ label, endAmount: 0, priorAmount: 0, fixed: false })
+    persistMain()
+  } catch {
+    /* 取消 */
+  }
 }
 
-// ═══ 文本变化 → publish EventBus ═══
-function handleNoteTextChange(sIdx: number): void {
-  persistSection(sIdx)
-  publishNoteText()
-  autoSync.scheduleAutoSync(syncToDisclosureNotes)
+function removeMainRow(index: number): void {
+  const row = mainRows[index]
+  if (!row || row.fixed) return
+  mainRows.splice(index, 1)
+  persistMain()
 }
 
-function publishNoteText(): void {
-  const allText = sections
-    .filter(s => s.hasTextArea && s.textContent)
-    .map(s => `【${s.title}】\n${s.textContent}`)
-    .join('\n\n')
+function onToggleContractCost(enabled: boolean): void {
+  contractCost.enabled = enabled
+  persistContractCost()
+}
+
+function onContractCostChange(rowIdx: number, catIdx: number, value: number): void {
+  if (!contractCost.cells[rowIdx]) contractCost.cells[rowIdx] = []
+  contractCost.cells[rowIdx][catIdx] = Number(value) || 0
+  contractCost.cells = recalcContractCost(contractCost.cells, contractCost.categories.length)
+  persistContractCost()
+}
+
+async function addContractCostCategory(): Promise<void> {
   try {
-    eventBus.emit('disclosure:note-text-updated', {
-      accountCode: K2_ACCOUNT_CODE,
-      section: 'listed',
-      text: allText,
+    const { value } = await ElMessageBox.prompt('请输入合同取得成本的资产类别名称', '新增类别列', {
+      confirmButtonText: '新增',
+      cancelButtonText: '取消',
+      inputPattern: /\S/,
+      inputErrorMessage: '名称不能为空',
     })
-  } catch { /* silent */ }
+    const name = String(value ?? '').trim()
+    if (contractCost.categories.includes(name)) {
+      ElMessage.warning('该类别已存在')
+      return
+    }
+    contractCost.categories.push(name)
+    contractCost.cells = recalcContractCost(contractCost.cells, contractCost.categories.length)
+    persistContractCost()
+  } catch {
+    /* 取消 */
+  }
 }
 
-// ═══ AI辅助 ═══
-async function handleAiGenerate(sIdx: number): Promise<void> {
-  const section = sections[sIdx]
-  if (!section) return
-
+async function renameContractCostCategory(catIdx: number): Promise<void> {
+  const current = contractCost.categories[catIdx]
+  if (current == null) return
   try {
-    const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
-      prompt: `请生成其他流动资产(1231)附注中"${section.title}"的披露文字说明`,
-      context: '科目:其他流动资产(1231) 资产类借方 期末=期初+增加-减少 上市公司格式',
-      existingContent: section.textContent || '',
-      section: section.id,
+    const { value } = await ElMessageBox.prompt('请输入新的类别名称', '类别改名', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      inputValue: current,
+      inputPattern: /\S/,
+      inputErrorMessage: '名称不能为空',
     })
-    const generated = res.data?.data?.content || res.data?.content || ''
-    if (!generated) { ElMessage.warning('AI未生成内容'); return }
+    const name = String(value ?? '').trim()
+    if (name === current) return
+    if (contractCost.categories.includes(name)) {
+      ElMessage.warning('该类别已存在')
+      return
+    }
+    contractCost.categories[catIdx] = name
+    persistContractCost()
+  } catch {
+    /* 取消 */
+  }
+}
 
-    await ElMessageBox.confirm(
-      `AI生成内容预览：\n\n${generated.slice(0, 300)}${generated.length > 300 ? '...' : ''}`,
-      'AI生成确认',
-      { confirmButtonText: '填入', cancelButtonText: '取消', type: 'info' },
-    )
-    section.textContent = section.textContent ? `${section.textContent}\n${generated}` : generated
-    handleNoteTextChange(sIdx)
-    ElMessage.success('已填入AI生成内容')
-  } catch { /* cancelled or error */ }
+function removeContractCostCategory(catIdx: number): void {
+  if (contractCost.categories.length <= 1) return
+  contractCost.categories.splice(catIdx, 1)
+  for (const row of contractCost.cells) row.splice(catIdx, 1)
+  contractCost.cells = recalcContractCost(contractCost.cells, contractCost.categories.length)
+  persistContractCost()
+}
+
+function onToggleCarbon(enabled: boolean): void {
+  carbon.enabled = enabled
+  persistCarbon()
+}
+
+function onCarbonChange(index: number, field: 'currentAmount' | 'priorAmount', value: number): void {
+  const row = carbon.rows[index]
+  if (!row) return
+  row[field] = Number(value) || 0
+  persistCarbon()
+}
+
+function onTextChange(): void {
+  persistTexts()
 }
 
 // ═══ 持久化 ═══
-function persistSection(sIdx: number): void {
-  const section = sections[sIdx]
-  if (!section) return
-  emit('save', `K2-disc-listed-${section.id}`, JSON.stringify({
-    rows: section.rows,
-    textContent: section.textContent,
-  }))
+function persist(itemId: string, payload: unknown): void {
+  emit('save', itemId, JSON.stringify(payload))
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
+}
+
+function persistMain(): void {
+  persist('K2-disc-listed-main', mainRows.map(r => ({ ...r })))
+}
+
+function persistContractCost(): void {
+  persist('K2-disc-listed-contract-cost', {
+    enabled: contractCost.enabled,
+    categories: [...contractCost.categories],
+    cells: contractCost.cells.map(r => [...r]),
+  })
+}
+
+function persistCarbon(): void {
+  persist('K2-disc-listed-carbon', {
+    enabled: carbon.enabled,
+    rows: carbon.rows.map(r => ({ ...r })),
+  })
+}
+
+function persistTexts(): void {
+  persist('K2-disc-listed-texts', { ...texts })
+}
+
+function parseSaved(itemId: string): any {
+  const saved = props.allResponses.get(itemId)
+  const raw = saved?.remark ?? saved?.value ?? null
+  if (!raw) return null
+  if (typeof raw !== 'string') return raw
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return null
+  }
 }
 
 function loadSavedData(): void {
-  for (let i = 0; i < sections.length; i++) {
-    const section = sections[i]
-    const saved = props.allResponses.get(`K2-disc-listed-${section.id}`)
-    if (saved?.value) {
-      try {
-        const parsed = typeof saved.value === 'string' ? JSON.parse(saved.value) : saved.value
-        if (parsed.rows?.length) section.rows = parsed.rows
-        if (parsed.textContent) section.textContent = parsed.textContent
-      } catch { /* ignore */ }
+  const savedMain = parseSaved('K2-disc-listed-main')
+  if (Array.isArray(savedMain) && savedMain.length) {
+    mainRows.splice(0, mainRows.length, ...savedMain.map((r: any) => ({
+      label: String(r?.label ?? ''),
+      endAmount: Number(r?.endAmount) || 0,
+      priorAmount: Number(r?.priorAmount) || 0,
+      fixed: K2_LISTED_MAIN_ROWS.includes(String(r?.label ?? '')),
+    })))
+  }
+
+  const savedCc = parseSaved('K2-disc-listed-contract-cost')
+  if (savedCc && typeof savedCc === 'object') {
+    contractCost.enabled = !!savedCc.enabled
+    const cats = Array.isArray(savedCc.categories)
+      ? savedCc.categories.map((c: any) => String(c ?? '').trim()).filter(Boolean)
+      : []
+    contractCost.categories = cats.length ? cats : [...K2_DEFAULT_CONTRACT_COST_CATEGORIES]
+    contractCost.cells = recalcContractCost(
+      Array.isArray(savedCc.cells) ? savedCc.cells : [],
+      contractCost.categories.length,
+    )
+  }
+
+  const savedCarbon = parseSaved('K2-disc-listed-carbon')
+  if (savedCarbon && typeof savedCarbon === 'object') {
+    carbon.enabled = !!savedCarbon.enabled
+    const byLabel = new Map(
+      (Array.isArray(savedCarbon.rows) ? savedCarbon.rows : []).map((r: any) => [String(r?.label ?? ''), r]),
+    )
+    carbon.rows = K2_CARBON_ROWS.map(label => {
+      const hit: any = byLabel.get(label)
+      return {
+        label,
+        currentAmount: Number(hit?.currentAmount) || 0,
+        priorAmount: Number(hit?.priorAmount) || 0,
+      }
+    })
+  }
+
+  const savedTexts = parseSaved('K2-disc-listed-texts')
+  if (savedTexts && typeof savedTexts === 'object') {
+    for (const key of ['significant', 'contractCost', 'carbon'] as TextKey[]) {
+      texts[key] = String(savedTexts[key] ?? '')
     }
+  }
+}
+
+// ═══ 同步到附注 ═══
+function buildSnapshot(): K2DisclosureSnapshot {
+  return {
+    mainRows: mainRows.map(r => ({
+      label: r.label,
+      endAmount: r.endAmount,
+      priorAmount: r.priorAmount,
+    })),
+    contractCost: {
+      enabled: contractCost.enabled,
+      categories: [...contractCost.categories],
+      cells: contractCost.cells.map(r => [...r]),
+    },
+    carbon: {
+      enabled: carbon.enabled,
+      rows: carbon.rows.map(r => ({ ...r })),
+    },
+    texts: textSegments
+      .filter(seg => texts[seg.key].trim())
+      .map(seg => ({ section: `k2-${seg.key}`, title: seg.title, text: texts[seg.key] })),
+  }
+}
+
+async function syncToDisclosureNotes(): Promise<void> {
+  if (!props.projectId || props.isReadonly) return
+  const payload = buildK2SyncPayload('listed', props.wpId || '', buildSnapshot())
+  try {
+    await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
+    eventBus.emit('disclosure:note-text-updated' as any, {
+      wpCode: 'K2',
+      variant: 'listed',
+      accountCode: K2_ACCOUNT_CODE,
+      projectId: props.projectId,
+      sectionIds: [K2_NOTE_SECTION.listed],
+    })
+  } catch {
+    /* 静默：自动同步失败不打断录入 */
+  }
+}
+
+// ═══ AI 辅助 ═══
+const AI_PROMPTS: Record<TextKey, string> = {
+  significant:
+    '请依据致同 2025 修订版底稿 K2 源模板与企业会计准则 15 号文口径，'
+    + '就其他流动资产中金额较大的项目撰写附注披露文字，逐项说明其内容与性质。'
+    + '只能使用已提供的项目名称与金额，不得虚构项目、金额或业务背景；无把握的内容留空由审计师补充。',
+  contractCost:
+    '请依据致同 2025 修订版底稿 K2 源模板与收入准则关于合同取得成本的披露要求，'
+    + '撰写附注披露文字：说明将增量成本资本化确认为合同取得成本所做的判断、该资产的摊销方法与摊销期间、'
+    + '按主要类别的期末账面价值以及本期确认的摊销及减值损失金额。'
+    + '只能使用已提供的类别与金额，不得虚构合同、客户或金额。',
+  carbon:
+    '请依据致同 2025 修订版底稿 K2 源模板关于碳排放权的披露要求，撰写附注披露文字，'
+    + '分别说明：与碳排放权交易相关的信息（参与减排机制的特征、碳排放战略、节能减排措施）、'
+    + '碳排放配额的具体来源（取得方式、取得年度、用途、结转原因）、节能减排或超额排放情况及原因。'
+    + '只能使用已提供的配额变动数据，不得虚构减排项目、政策或数量。',
+}
+
+async function handleAiGenerate(key: TextKey): Promise<void> {
+  const seg = textSegments.find(s => s.key === key)
+  if (!seg) return
+  try {
+    const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      prompt: AI_PROMPTS[key],
+      context: `科目：其他流动资产(1231)；附注章节：${K2_NOTE_SECTION.listed}；变体：上市公司；`
+        + `源模板要求：${seg.requirement}`,
+      existingContent: texts[key] || '',
+      section: `k2-${key}`,
+    })
+    const generated = res.data?.data?.content || res.data?.content || ''
+    if (!generated) {
+      ElMessage.warning('AI 未生成内容')
+      return
+    }
+    await ElMessageBox.confirm(
+      `AI 生成内容预览：\n\n${generated.slice(0, 300)}${generated.length > 300 ? '…' : ''}`,
+      'AI 生成确认',
+      { confirmButtonText: '填入', cancelButtonText: '取消', type: 'info' },
+    )
+    texts[key] = texts[key] ? `${texts[key]}\n${generated}` : generated
+    persistTexts()
+    ElMessage.success('已填入 AI 生成内容')
+  } catch {
+    /* 取消或失败 */
   }
 }
 
@@ -416,40 +782,143 @@ function handleReview(id: string): void {
   openReviewDialog(id)
 }
 
-// ═══ 格式化 ═══
-function fmtAmt(v: number | null | undefined): string {
-  if (v == null || v === 0) return '-'
-  return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+// ═══ 生命周期 ═══
+onMounted(() => {
+  loadSavedData()
+})
+
+onBeforeUnmount(() => {
+  autoSync.cancelPending()
+})
 </script>
 
 <style scoped>
-.k2-disclosure-listed { padding: 16px; font-size: var(--wp-font-size, 13px); }
+.k2-disclosure-listed {
+  padding: 16px;
+  font-size: var(--wp-font-size, 13px);
+}
 
-/* 蓝色渐变引导区 */
-.guide-area { background: linear-gradient(135deg, #e8f4fd 0%, #d4ecfb 100%); border-radius: 8px; padding: 12px 16px; margin-bottom: 12px; }
-.guide-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-.guide-step { display: flex; align-items: center; gap: 6px; font-size: 12px; }
-.step-num { font-weight: 700; color: var(--el-color-primary); }
+.methodology-block {
+  border-left: 4px solid #d97706;
+  background: #fffbeb;
+  border-radius: 4px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: #92400e;
+  line-height: 1.8;
+}
+.methodology-title {
+  font-weight: 600;
+  color: #78350f;
+  margin-bottom: 4px;
+}
+.methodology-sub {
+  color: #a16207;
+}
 
-/* 琥珀色方法论 */
-.methodology-block { border-left: 4px solid #d97706; background: #fffbeb; border-radius: 4px; padding: 12px 16px; margin-bottom: 12px; font-size: 12px; color: #92400e; line-height: 1.7; }
-.methodology-title { font-weight: 600; color: #78350f; margin-bottom: 4px; }
+.check-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  border-radius: 4px;
+  margin-bottom: 12px;
+  font-size: 12px;
+}
+.check-ok {
+  background: var(--el-color-success-light-9);
+  color: var(--el-color-success);
+}
+.check-warn {
+  background: var(--el-color-warning-light-9);
+  color: var(--el-color-warning);
+}
+.check-error {
+  background: var(--el-color-danger-light-9);
+  color: var(--el-color-danger);
+}
+.check-icon {
+  font-weight: 700;
+}
+.check-spacer {
+  flex: 1;
+}
+.check-table {
+  margin-bottom: 12px;
+  font-size: 12px;
+}
+.rule-cell {
+  border-bottom: 1px dashed var(--el-border-color);
+  cursor: help;
+}
 
-/* 卡片 */
-.disclosure-card { margin-bottom: 12px; }
-.section-title-row { display: flex; align-items: center; justify-content: space-between; }
-.section-title { font-weight: 600; font-size: 14px; }
-.title-actions { display: flex; gap: 8px; align-items: center; }
+.disclosure-card {
+  margin-bottom: 12px;
+}
+.section-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.section-title {
+  font-weight: 600;
+  font-size: 14px;
+}
+.title-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-left: auto;
+}
 
-/* 表格 */
-.disclosure-table { font-size: var(--wp-font-size, 13px); }
-.formula-cell { border-bottom: 1px dashed var(--el-border-color); cursor: help; font-variant-numeric: tabular-nums; }
-.amount-cell { font-variant-numeric: tabular-nums; }
-.auto-fill { color: var(--el-color-primary); }
+.disclosure-table {
+  font-size: var(--wp-font-size, 13px);
+}
+.total-table :deep(.el-table__row) {
+  font-weight: 600;
+}
+.formula-cell {
+  border-bottom: 1px dashed var(--el-border-color);
+  cursor: help;
+  font-variant-numeric: tabular-nums;
+}
+.cat-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  justify-content: flex-end;
+}
+.disabled-hint,
+.table-hint {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  padding: 6px 0;
+  line-height: 1.7;
+}
+.seg-requirement {
+  border-left: 3px solid #d97706;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 12px;
+  line-height: 1.7;
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  border-radius: 3px;
+}
 
-/* 编制提示 */
-.compile-hint { margin-top: 16px; font-size: 12px; color: var(--el-text-color-secondary); }
-.compile-hint summary { cursor: pointer; font-weight: 500; }
-.compile-hint ul { padding-left: 20px; margin-top: 8px; line-height: 1.8; }
+.compile-hint {
+  margin-top: 16px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+.compile-hint summary {
+  cursor: pointer;
+  font-weight: 500;
+}
+.compile-hint ul {
+  padding-left: 20px;
+  margin-top: 8px;
+  line-height: 1.8;
+}
 </style>

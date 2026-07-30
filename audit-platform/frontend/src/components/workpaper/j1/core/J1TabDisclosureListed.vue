@@ -7,7 +7,7 @@
       </template>
     </el-alert>
 
-    <!-- 工具栏：同步到附注 + 跳转回附注 -->
+    <!-- 工具栏：同步到附注 + 跳转回附注 + 取数追溯 + 复核 -->
     <div class="disc-toolbar">
       <el-button size="small" type="success" :disabled="isReadonly" :loading="syncLoading" @click="syncToDisclosureNotes">
         同步到附注（五、40）
@@ -15,6 +15,10 @@
       <el-button size="small" type="primary" plain :disabled="!projectId" @click="jumpToNote">
         ↩ 跳转回附注（五、40）
       </el-button>
+      <span class="chip-wrap"><GtIndexChip value="wp:J1-1" :context-project-id="projectId" /></span>
+      <span class="chip-wrap"><GtIndexChip value="wp:J1-2" :context-project-id="projectId" /></span>
+      <span class="chip-wrap"><GtIndexChip :value="`Note:${J1_NOTE_SECTION.listed}`" :context-project-id="projectId" /></span>
+      <GtReviewTrigger section-id="J1-disclosure-listed" />
     </div>
 
     <!-- 第一部分：应付职工薪酬汇总 -->
@@ -95,7 +99,13 @@
       <template #header>
         <div class="group-header">
           <span class="section-title">（1）短期薪酬</span>
-          <el-button size="small" type="primary" plain :disabled="isReadonly" @click="addRow('short_term')">+ 新增行</el-button>
+          <div class="header-actions">
+            <el-button size="small" type="warning" plain :disabled="isReadonly" @click="pullDetail">
+              从 J1-2 明细带入
+            </el-button>
+            <el-button size="small" type="primary" plain :disabled="isReadonly" @click="addRow('short_term')">+ 新增行</el-button>
+            <GtReviewTrigger section-id="J1-disclosure-listed-short-term" />
+          </div>
         </div>
       </template>
       <el-table :data="[...shortTermRows, shortTermSubtotal]" border size="small"
@@ -153,7 +163,13 @@
       <template #header>
         <div class="group-header">
           <span class="section-title">（2）设定提存计划</span>
-          <el-button size="small" type="primary" plain :disabled="isReadonly" @click="addRow('post_employment')">+ 新增行</el-button>
+          <div class="header-actions">
+            <el-button size="small" type="warning" plain :disabled="isReadonly" @click="pullDetail">
+              从 J1-2 明细带入
+            </el-button>
+            <el-button size="small" type="primary" plain :disabled="isReadonly" @click="addRow('post_employment')">+ 新增行</el-button>
+            <GtReviewTrigger section-id="J1-disclosure-listed-post-employment" />
+          </div>
         </div>
       </template>
       <el-table :data="[...postEmploymentRows, postEmploymentSubtotal]" border size="small"
@@ -238,6 +254,7 @@ import { ref, computed, onMounted, onBeforeUnmount, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import GtIndexChip from '../../GtIndexChip.vue'
+import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import { eventBus } from '@/utils/eventBus'
 import { useAuditContext } from '@/composables/useAuditContext'
 import {
@@ -320,7 +337,7 @@ const {
   shortTermData, shortTermSubtotal,
   postEmploymentData, postEmploymentSubtotal,
   notes, hydrate, persist, persistDebounced, onRowChange,
-  adjudicationEndTotal, summaryVsAdjudicationDiff, pullFromSources,
+  adjudicationEndTotal, summaryVsAdjudicationDiff, pullFromSources, pullDetailSections,
 } = useJ1DisclosureSections({
   variant: 'listed',
   defaults: { summary: DEFAULT_SUMMARY, shortTerm: DEFAULT_SHORT_TERM, postEmployment: DEFAULT_POST },
@@ -356,6 +373,43 @@ async function pullFromAdjudication() {
     return
   }
   ElMessage.success(`已带入 ${matched} 个分类行`)
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
+}
+
+/**
+ * 明细两表「从 J1-2 明细带入」（审定口径）
+ *
+ * 源模板里本页每一行都引用 J1-2（`A18='明细表J1-2 '!J13`、`A42='明细表J1-2 '!J38` …），
+ * 故按行名带入而非只带汇总。「其中：医疗保险费」聚合 J1-2 的基本 + 补充医疗保险费，
+ * 「工会经费和职工教育经费」聚合 J1-2 的两行（均为源模板公式明示）。
+ */
+async function pullDetail() {
+  if (isReadonly) return
+  try {
+    await ElMessageBox.confirm(
+      '将按项目名从 J1-2 明细表带入审定数（未审 + 调整）：期初/本期增加/本期减少，期末自动计算。' +
+      '仅覆盖能匹配到的行，未匹配的披露行保持原值；J1-2 中未匹配的顶层项目会追加为新行。是否继续？',
+      '从 J1-2 明细带入',
+      { confirmButtonText: '带入', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return
+  }
+  const { shortTerm, postEmployment } = pullDetailSections()
+  const matched = shortTerm.matched + postEmployment.matched
+  const appended = shortTerm.appended + postEmployment.appended
+  if (matched === 0 && appended === 0) {
+    ElMessage.warning('未取到 J1-2 明细表数据，请先编制明细表')
+    return
+  }
+  const skipped = [...shortTerm.skippedSubItems, ...postEmployment.skippedSubItems]
+  ElMessage.success(
+    `已带入 ${matched} 行` +
+    (appended ? `，追加 ${appended} 行` : '') +
+    // 未匹配的「其中：」子项金额已含在父行，如实提示而不臆造归属
+    (skipped.length ? `；${skipped.length} 个子项未匹配（金额已含在父行，未重复计入）` : ''),
+  )
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
 }
 
 /** 同步到附注 */
@@ -481,7 +535,8 @@ onBeforeUnmount(() => autoSync.cancelPending())
 <style scoped>
 .j1-tab-disclosure { padding: 16px; }
 .audit-objective { margin-bottom: 14px; }
-.disc-toolbar { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+.disc-toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+.chip-wrap { display: inline-flex; align-items: center; }
 .section-card { margin-bottom: 16px; }
 .section-card :deep(.el-card__header) { padding: 8px 16px; }
 .section-card :deep(.el-card__body) { padding: 12px 16px; }

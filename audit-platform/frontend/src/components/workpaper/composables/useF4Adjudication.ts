@@ -89,12 +89,22 @@ export const F4_AGING_DEFAULTS: StoredF4AdjRow[] = [
   createStoredRow(F4_RESIDUAL_ROW_KEY, F4_RESIDUAL_ROW_LABEL),
 ]
 
-/** 3 年段下的段 key → 迁移前 label（保持零回归文案） */
+/**
+ * 段 key/rowKey → F4 底稿账龄行名。
+ *
+ * 前 4 项为 3 年段迁移前 label（零回归文案，逐字取自源 xlsx `审定表F4-1` 二、按照账龄分类）。
+ * 后 3 项为 5 年段按源模板同一「X至Y年（含Y年）」构词的延伸——不加会退回账龄配置的
+ * `seg.label`（「3-4年」半角连字符），与前 4 档用词分裂（实测 5 年段项目已出现）。
+ * 附注侧另有一套不带括注的用词，见 `f4NoteSectionMap.F4_NOTE_AGING_LABEL`。
+ */
 const LEGACY_AGING_LABEL: Record<string, string> = {
   within1year: '1年以内（含1年）',
   '1to2year': '1至2年（含2年）',
   '2to3year': '2至3年（含3年）',
   '3yearplus': '3年以上',
+  y3to4: '3至4年（含4年）',
+  y4to5: '4至5年（含5年）',
+  over5: '5年以上',
 }
 
 /**

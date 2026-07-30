@@ -16,14 +16,21 @@ import {
   K1_DISC_STORAGE_KEY,
   autoFillFromK1Sources,
   calcAgingTieOut,
+  calcMovementTieOut,
   calcNatureTieOut,
+  calcPriorProvisionTieOut,
+  calcTop5ProportionCheck,
+  calcWithinOneYearTieOut,
   emptyK1ListedPayload,
   parseK1ListedPayload,
   readAdjudicationTotals,
   recomputeStageEclRows,
   serializeK1ListedPayload,
+  stageBlocksProvisionTotal,
+  summarizeContinuedInvolvement,
   summarizeNatureRows,
   type K1AgingDisclosureRow,
+  type K1ContinuedInvolvementRow,
   type K1GovGrantRow,
   type K1ListedDisclosurePayloadV2,
   type K1NatureDisclosureRow,
@@ -74,9 +81,16 @@ export function useK1DisclosureListed(opts: {
   const stage1Rows = computed(() => payload.value.stage1Rows)
   const stage2Rows = computed(() => payload.value.stage2Rows)
   const stage3Rows = computed(() => payload.value.stage3Rows)
+  const priorStage1Rows = computed(() => payload.value.priorStage1Rows)
+  const priorStage2Rows = computed(() => payload.value.priorStage2Rows)
+  const priorStage3Rows = computed(() => payload.value.priorStage3Rows)
   const stageMovements = computed(() => payload.value.stageMovements)
   const top5Rows = computed(() => payload.value.top5Rows)
   const reversalRows = computed(() => payload.value.reversalRows)
+  const continuedInvolvementRows = computed(() => payload.value.continuedInvolvementRows)
+  const continuedInvolvementTotals = computed(() =>
+    summarizeContinuedInvolvement(payload.value.continuedInvolvementRows),
+  )
 
   const agingTieOut = computed(() =>
     calcAgingTieOut(payload.value.agingRows, adjudication.value.receivableEnd),
@@ -84,15 +98,52 @@ export function useK1DisclosureListed(opts: {
   const natureTieOut = computed(() =>
     calcNatureTieOut(payload.value.natureRows, adjudication.value.receivableEnd),
   )
+  /** T3：1 年以内月度细分合计 = 1 年以内 */
+  const withinOneYearTieOut = computed(() => calcWithinOneYearTieOut(payload.value.agingRows))
 
-  const stage1Closing = computed(() =>
-    payload.value.stage1Rows.find((r) => r.rowKey === 'total')?.provision ?? 0,
+  /** 期末三阶段坏账合计（③ 三张表 total 行之和） */
+  const endStageProvisionTotal = computed(() =>
+    stageBlocksProvisionTotal(
+      payload.value.stage1Rows,
+      payload.value.stage2NoneEnd ? [] : payload.value.stage2Rows,
+      payload.value.stage3Rows,
+    ),
   )
+  /** 上年年末三阶段坏账合计 */
+  const priorStageProvisionTotal = computed(() =>
+    stageBlocksProvisionTotal(
+      payload.value.priorStage1Rows,
+      payload.value.stage2NonePrior ? [] : payload.value.priorStage2Rows,
+      payload.value.priorStage3Rows,
+    ),
+  )
+
+  /** T4：账龄表「减：坏账准备」期末 = 期末三阶段坏账合计 */
   const provisionTieOut = computed(() => {
     const agingProv = payload.value.agingRows.find((r) => r.kind === 'provision')?.endAmount ?? 0
-    const diff = Math.round((agingProv - stage1Closing.value) * 100) / 100
-    return { agingProvision: agingProv, stageClosing: stage1Closing.value, diff, matched: Math.abs(diff) < 0.01 }
+    const diff = Math.round((agingProv - endStageProvisionTotal.value) * 100) / 100
+    return {
+      agingProvision: agingProv,
+      stageClosing: endStageProvisionTotal.value,
+      diff,
+      matched: Math.abs(diff) < 0.01,
+    }
   })
+  /** T4prior：账龄表「减：坏账准备」上年年末 = 上年年末三阶段坏账合计 */
+  const priorProvisionTieOut = computed(() =>
+    calcPriorProvisionTieOut(payload.value.agingRows, priorStageProvisionTotal.value),
+  )
+  /** T5/T6/T7：④ 变动表 ↔ ③ 三阶段快照 ↔ ⑤ 核销汇总 */
+  const movementTieOut = computed(() =>
+    calcMovementTieOut(
+      payload.value.stageMovements,
+      endStageProvisionTotal.value,
+      priorStageProvisionTotal.value,
+      payload.value.writeoffSummaryAmount,
+    ),
+  )
+  /** T12：前五名占比合计 ≤ 100% */
+  const top5Check = computed(() => calcTop5ProportionCheck(payload.value.top5Rows))
 
   function _standards(): readonly string[] | null | undefined {
     const s = opts.applicableStandards
@@ -176,15 +227,30 @@ export function useK1DisclosureListed(opts: {
     persistPayload()
   }
 
+  /** 1 年以内月度细分行标签可改（源模板「其中：0-X个月」的 X/Y 由项目自定） */
+  function updateAgingRowLabel(rowId: string, label: string): void {
+    if (isReadonly.value) return
+    payload.value.agingRows = payload.value.agingRows.map((r) =>
+      r.rowId === rowId && r.labelEditable ? { ...r, label } : r,
+    )
+    persistPayload()
+  }
+
   function recalcAgingDerived(): void {
-    const dataRows = payload.value.agingRows.filter((r) => r.kind === 'data')
+    const rows = payload.value.agingRows
+    const dataRows = rows.filter((r) => r.kind === 'data')
     const subtotalEnd = dataRows.reduce((s, r) => s + r.endAmount, 0)
     const subtotalPrior = dataRows.reduce((s, r) => s + r.priorAmount, 0)
-    const prov = payload.value.agingRows.find((r) => r.kind === 'provision')
+    const prov = rows.find((r) => r.kind === 'provision')
     const provEnd = prov?.endAmount ?? 0
     const provPrior = prov?.priorAmount ?? 0
-    payload.value.agingRows = payload.value.agingRows.map((r) => {
+    const within1 = rows.find((r) => r.kind === 'data' && r.segmentKey === 'within1')
+    payload.value.agingRows = rows.map((r) => {
       if (r.kind === 'subtotal') return { ...r, endAmount: subtotalEnd, priorAmount: subtotalPrior }
+      // 「1年以内小计：」始终跟随「1年以内」行（源模板 R12 = R8）
+      if (r.kind === 'subtotal1y') {
+        return { ...r, endAmount: within1?.endAmount ?? 0, priorAmount: within1?.priorAmount ?? 0 }
+      }
       if (r.kind === 'total') {
         return {
           ...r,
@@ -234,19 +300,37 @@ export function useK1DisclosureListed(opts: {
     persistPayload()
   }
 
+  type StageBlockKey =
+    | 'stage1Rows' | 'stage2Rows' | 'stage3Rows'
+    | 'priorStage1Rows' | 'priorStage2Rows' | 'priorStage3Rows'
+
+  function stageBlockKey(stage: 1 | 2 | 3, period: 'end' | 'prior'): StageBlockKey {
+    const suffix = stage === 1 ? '1Rows' : stage === 2 ? '2Rows' : '3Rows'
+    return (period === 'end' ? `stage${suffix}` : `priorStage${suffix}`) as StageBlockKey
+  }
+
   function updateStageRow(
     stage: 1 | 2 | 3,
     rowId: string,
     field: keyof Pick<K1StageEclDisclosureRow, 'balance' | 'eclRate' | 'provision' | 'reason' | 'label'>,
     value: string | number | null,
+    period: 'end' | 'prior' = 'end',
   ): void {
     if (isReadonly.value) return
-    const key = stage === 1 ? 'stage1Rows' : stage === 2 ? 'stage2Rows' : 'stage3Rows'
+    const key = stageBlockKey(stage, period)
     payload.value[key] = recomputeStageEclRows(
       payload.value[key].map((r) =>
         r.rowId === rowId && r.editable ? { ...r, [field]: value ?? 0, autoFilled: false } : r,
       ),
     )
+    persistPayload()
+  }
+
+  /** 【或】不存在处于第二阶段（源模板 R49 / R80） */
+  function toggleStage2None(period: 'end' | 'prior', value: boolean): void {
+    if (isReadonly.value) return
+    if (period === 'end') payload.value.stage2NoneEnd = value
+    else payload.value.stage2NonePrior = value
     persistPayload()
   }
 
@@ -393,16 +477,56 @@ export function useK1DisclosureListed(opts: {
     persistPayload()
   }
 
-  function updateContinuedInvolvement(field: 'assets' | 'liabilities', value: number): void {
+  function removeTransferRow(rowId: string): void {
     if (isReadonly.value) return
-    if (field === 'assets') payload.value.continuedInvolvementAssets = value
-    else payload.value.continuedInvolvementLiabilities = value
+    payload.value.transferRows = payload.value.transferRows.filter((r) => r.rowId !== rowId)
+    persistPayload()
+  }
+
+  function removeGovGrantRow(rowId: string): void {
+    if (isReadonly.value) return
+    payload.value.govGrantRows = payload.value.govGrantRows.filter((r) => r.rowId !== rowId)
+    persistPayload()
+  }
+
+  function addContinuedInvolvementRow(side: 'asset' | 'liability'): void {
+    if (isReadonly.value) return
+    payload.value.continuedInvolvementRows.push({
+      rowId: uid('ci'),
+      side,
+      item: '',
+      amount: 0,
+    })
+    persistPayload()
+  }
+
+  function updateContinuedInvolvementRow(
+    rowId: string,
+    field: keyof Pick<K1ContinuedInvolvementRow, 'item' | 'amount'>,
+    value: string | number,
+  ): void {
+    if (isReadonly.value) return
+    payload.value.continuedInvolvementRows = payload.value.continuedInvolvementRows.map((r) =>
+      r.rowId === rowId ? { ...r, [field]: value } : r,
+    )
+    persistPayload()
+  }
+
+  function removeContinuedInvolvementRow(rowId: string): void {
+    if (isReadonly.value) return
+    payload.value.continuedInvolvementRows = payload.value.continuedInvolvementRows.filter(
+      (r) => r.rowId !== rowId,
+    )
     persistPayload()
   }
 
   function updateNoteSection(key: string, text: string): void {
     payload.value.notes = { ...payload.value.notes, [key]: text }
     persistPayload()
+  }
+
+  function noteSection(key: string): string {
+    return payload.value.notes?.[key] ?? ''
   }
 
   function getSyncSnapshot(): K1ListedDisclosurePayloadV2 {
@@ -471,18 +595,31 @@ export function useK1DisclosureListed(opts: {
     stage1Rows,
     stage2Rows,
     stage3Rows,
+    priorStage1Rows,
+    priorStage2Rows,
+    priorStage3Rows,
     stageMovements,
     top5Rows,
     reversalRows,
+    continuedInvolvementRows,
+    continuedInvolvementTotals,
     agingTieOut,
     natureTieOut,
+    withinOneYearTieOut,
     provisionTieOut,
+    priorProvisionTieOut,
+    movementTieOut,
+    top5Check,
+    endStageProvisionTotal,
+    priorStageProvisionTotal,
     refreshFromSources,
     updateAgingRow,
+    updateAgingRowLabel,
     updateNatureRow,
     addNatureRow,
     removeNatureRow,
     updateStageRow,
+    toggleStage2None,
     updateTop5Row,
     addTop5Row,
     updateReversalRow,
@@ -491,11 +628,16 @@ export function useK1DisclosureListed(opts: {
     addWriteoffRow,
     updateGovGrantRow,
     addGovGrantRow,
+    removeGovGrantRow,
     updateTransferRow,
     addTransferRow,
+    removeTransferRow,
     updateFundCentralization,
-    updateContinuedInvolvement,
+    addContinuedInvolvementRow,
+    updateContinuedInvolvementRow,
+    removeContinuedInvolvementRow,
     updateNoteSection,
+    noteSection,
     getSyncSnapshot,
     syncToNotes,
     payload,

@@ -20,10 +20,21 @@ export const G8_DISCLOSURE_SHEET_NAME = {
   soe: '附注披露信息（国企）',
 } as const satisfies Record<G8DisclosureVariant, string>
 
+/**
+ * 子表名 —— 与 `note_template_*.json` `tables[].name` 逐字一致。
+ *
+ * 🔴 修正史：上市侧原写 `项  目`（那是**第 2 张表**被 seed 拿表头首格当表名的结果），
+ * 国企侧原写 `其他权益工具投资`（模板实为 `其他权益工具投资情况`）——两侧都会产出
+ * 孤儿子表。已由 `backend/scripts/fix/fix_note_g_cycle_structure.py` 统一：
+ * 上市第 2 张表改名为国企侧同名的 `期末其他权益工具投资情况`（致同措辞，不自造）。
+ */
 export const G8_MAIN_SUBTABLE = {
-  listed: '项  目',
-  soe: '其他权益工具投资',
+  listed: '其他权益工具投资',
+  soe: '其他权益工具投资情况',
 } as const satisfies Record<G8DisclosureVariant, string>
+
+/** 第 2 张表（逐项目的其他综合收益 / 股利 / 终止确认情况），两版同名 */
+export const G8_DETAIL_SUBTABLE = '期末其他权益工具投资情况'
 
 export { G8_ACCOUNT_CODE } from './g8Constants'
 

@@ -186,6 +186,7 @@ import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import { buildK5SyncPayload, K5_NOTE_SECTION } from '../../composables/k5NoteSectionMap'
 
 const K5_ACCOUNT_CODE = '2701'
 
@@ -403,21 +404,20 @@ function persistContingent(): void {
 
 async function syncToDisclosureNotes(): Promise<void> {
   if (!props.projectId || props.isReadonly) return
-  const rows = provisionTable.value.filter(r => !r.isTotal).map(r => ({ project: r.category, endAmount: r.endBalance ?? 0, priorAmount: r.beginBalance ?? 0 }))
-  const narrative = narrativeText.value
-  const payload = {
-    wp_id: props.wpId,
-    sheet_name: 'K5-note-listed',
-    section_id: '五、50',
-    current_standard: 'listed_standalone',
-    sub_table_data: { rows },
-    _note_texts: narrative ? [{ section: 'main', title: '说明', text: narrative }] : [],
-  }
+  // 附注 五、50 只有「期末余额 / 上年年末余额 / 形成原因」三个值列（预设 F50-1/2/3）；
+  // 底稿 roll-forward 的本期增加/减少不进附注列，`remark`（变动说明）落 `形成原因`。
+  const rows = provisionTable.value.filter(r => !r.isTotal).map(r => ({
+    project: r.category,
+    endAmount: r.endBalance ?? 0,
+    priorAmount: r.beginBalance ?? 0,
+    reason: r.remark ?? '',
+  }))
+  const payload = buildK5SyncPayload('listed', props.wpId || '', rows, narrativeText.value)
   try {
     await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
     eventBus.emit('disclosure:note-text-updated' as any, {
       wpCode: 'K5', variant: 'listed', accountCode: '2701',
-      projectId: props.projectId, sectionIds: ['五、50'],
+      projectId: props.projectId, sectionIds: [K5_NOTE_SECTION.listed],
     })
     ElMessage.success('已同步到附注')
   } catch { /* silent */ }

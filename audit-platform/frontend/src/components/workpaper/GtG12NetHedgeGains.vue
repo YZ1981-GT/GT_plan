@@ -92,6 +92,8 @@
         variant="listed"
         :all-responses="formData.allResponses.value"
         :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :applicable-standards="applicableStandards"
         :is-readonly="isReadonly"
         :debounced-save="onDebouncedSave"
       />
@@ -100,6 +102,8 @@
         v-else-if="currentSheet === '附注国企'"
         :all-responses="formData.allResponses.value"
         :wp-id="props.wpId"
+        :project-id="props.projectId"
+        :applicable-standards="applicableStandards"
         :is-readonly="isReadonly"
         :debounced-save="onDebouncedSave"
       />
@@ -194,9 +198,21 @@ provide('g12OpenVersionHistory', openVersionHistory)
 const currentSheet = computed(() => {
   const name = props.sheetName || props.wpCode || ''
   if (/底稿目录/.test(name)) return '底稿目录'
-  if (/附注披露/.test(name)) return name.includes('国企') ? '附注国企' : '附注上市'
+  // 🔴 「国企」与「国有企业」两种写法都要认（24 份源模板用后者，误判会把国企 TAB
+  //    渲染成上市组件；vitest 与 get_diagnostics 都查不出，只有浏览器实测能发现）
+  if (/附注披露/.test(name)) return /国企|国有/.test(name) ? '附注国企' : '附注上市'
   const m = name.match(/(G12A|G12-\d+)/)
   return m ? m[1] : ''
+})
+
+/** 适用准则：htmlData / project_context / runtime 任一来源（与 G11/G13 同口径） */
+const applicableStandards = computed<string[]>(() => {
+  const raw =
+    props.htmlData?.project_context?.applicable_standards
+    ?? props.htmlData?.projectContext?.applicable_standards
+    ?? props.htmlData?.applicable_standards
+    ?? runtime?.applicableStandards?.value
+  return Array.isArray(raw) ? raw.map(String) : []
 })
 
 const HTML_SHEETS = ['G12A', 'G12-1', 'G12-2', 'G12-3', 'G12-4', 'G12-5', 'G12-6', '底稿目录']

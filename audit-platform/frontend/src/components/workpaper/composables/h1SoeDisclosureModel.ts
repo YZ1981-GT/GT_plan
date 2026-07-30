@@ -157,8 +157,15 @@ export interface H1SoeFlatMoveRow {
   end: number
   /** 本期增减列显示「—」 */
   movementNa: boolean
-  /** 土地折旧等不适用 */
+  /**
+   * 整行不适用（源模板整行填「—」/「--」）：土地资产不计提折旧（R24）、
+   * 也不单独计提减值准备（R42）。
+   * 注意：仅表示**模板列示约定**，若实际带入了金额仍应显示出来（防静默丢数），
+   * 由 `hasAmount` 区分——UI 只在 `allNa && !hasAmount` 时显示「—」。
+   */
   allNa?: boolean
+  /** 该行是否已有任一非零金额（配合 allNa 决定显示「—」还是标红实际值） */
+  hasAmount: boolean
   editable: boolean
 }
 
@@ -292,11 +299,13 @@ export function flattenSoeMovement(layers: H1SoeLayerBlock[]): H1SoeFlatMoveRow[
       decrease: tot.decrease,
       end: tot.end,
       movementNa: meta.movementNa,
+      hasAmount: !!(tot.begin || tot.increase || tot.decrease || tot.end),
       editable: false,
     })
     for (const def of H1_SOE_CATEGORIES) {
       const c = block.categories.find((x) => x.key === def.key) ?? { key: def.key, ...emptyMove() }
-      const landDepNa = block.layer === 'dep' && def.key === 'land'
+      // 源模板：土地资产在累计折旧层（R24）与减值准备层（R42）整行填「—」/「--」
+      const landNa = def.key === 'land' && (block.layer === 'dep' || block.layer === 'impair')
       rows.push({
         rowKey: `${block.layer}-${def.key}`,
         layer: block.layer,
@@ -309,7 +318,8 @@ export function flattenSoeMovement(layers: H1SoeLayerBlock[]): H1SoeFlatMoveRow[
         decrease: c.decrease,
         end: c.end,
         movementNa: meta.movementNa,
-        allNa: landDepNa,
+        allNa: landNa,
+        hasAmount: !!(c.begin || c.increase || c.decrease || c.end),
         editable: !meta.movementNa && block.layer !== 'net' && block.layer !== 'carrying',
       })
     }

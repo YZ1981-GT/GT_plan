@@ -8,7 +8,14 @@
  *    （债权人/期末余额/未偿还或未结转的原因），支持同步与手工行。
  */
 import { computed, onBeforeUnmount, ref, watch, type ComputedRef, type Ref } from 'vue'
+import { ElMessage } from 'element-plus'
+import { api } from '@/services/apiProxy'
 import { parseNum, calcSubtotal, calcOutstandingDays } from './useF4AccPayFormulaEngine'
+import {
+  F4_ACCOUNT_CODE,
+  F4_NOTE_SECTION,
+  buildF4ListedSyncPayload,
+} from './f4NoteSectionMap'
 import {
   aggregateF4Detail,
   computeF4AdjudicationRow,
@@ -24,7 +31,17 @@ export interface UseF4DisclosureListedOptions {
   projectId: Ref<string>
   allResponses: Ref<Map<string, ChecklistResponse>>
   isReadonly?: Ref<boolean>
+  /** 项目适用准则（用于 current_standard 分流）；未提供时按 listed_standalone */
+  applicableStandards?: Ref<readonly string[] | null | undefined>
 }
+
+/**
+ * 手工添加行的项目名建议（源模板 F4-1 审定表「一、按照性质分类」5 类）。
+ * 交互点选优先：下拉可选可输（allow-create），避免自由文本与审定表分类漂移。
+ */
+export const F4_LISTED_NATURE_OPTIONS: readonly string[] = [
+  '货款', '工程款', '设备款', '服务费', '其他',
+]
 
 export interface F4DisclosureNatureRow {
   rowId: string
@@ -383,9 +400,70 @@ export function useF4DisclosureListed(options: UseF4DisclosureListedOptions) {
     setItem(TEXT_KEY, value)
     window.dispatchEvent(new CustomEvent('disclosure:note-text-updated', {
       // 应付账款 listed → 五、37（note_template_variant_matrix）→ useNoteRefresh 定向刷新
-      detail: { wpCode: 'F4', accountCode: '2202', type: 'listed', sectionIds: ['五、37'], text: value },
+      detail: {
+        wpCode: 'F4',
+        accountCode: F4_ACCOUNT_CODE,
+        projectId: options.projectId.value,
+        type: 'listed',
+        sectionIds: [F4_NOTE_SECTION.listed],
+        text: value,
+      },
     }))
   })
+
+  // ─── 结构化同步到附注（上市 五、37） ──────────────────────────────────────
+  const isSyncing = ref(false)
+
+  function buildSyncPayload() {
+    return buildF4ListedSyncPayload(
+      options.wpId.value,
+      options.applicableStandards?.value,
+      natureRows.value.map((row) => ({
+        label: row.label,
+        endAmount: row.closingBalance,
+        priorAmount: row.priorBalance,
+      })),
+      agingRows.value.map((row) => ({
+        creditor: row.creditor,
+        amount: row.amount,
+        reason: row.reason,
+      })),
+      disclosureText.value,
+    )
+  }
+
+  async function syncToNotes(): Promise<void> {
+    if (isSyncing.value || readonly.value) return
+    if (!options.projectId.value || !options.wpId.value) {
+      ElMessage.warning('缺少项目或底稿标识，无法同步附注')
+      return
+    }
+    isSyncing.value = true
+    try {
+      const result: any = await api.post(
+        `/api/projects/${options.projectId.value}/disclosure-notes/sync-from-workpaper`,
+        buildSyncPayload(),
+      )
+      const data = result?.data ?? result
+      ElMessage.success(
+        `已同步 ${Number(data?.rows_synced ?? 0)} 行到附注「${F4_NOTE_SECTION.listed} 应付账款」`,
+      )
+      window.dispatchEvent(new CustomEvent('disclosure:note-text-updated', {
+        detail: {
+          wpCode: 'F4',
+          accountCode: F4_ACCOUNT_CODE,
+          projectId: options.projectId.value,
+          type: 'listed',
+          sectionIds: [F4_NOTE_SECTION.listed],
+          text: disclosureText.value,
+        },
+      }))
+    } catch {
+      ElMessage.warning('同步附注失败，请稍后重试')
+    } finally {
+      isSyncing.value = false
+    }
+  }
 
   onBeforeUnmount(() => {
     if (debounceTimer) {
@@ -415,6 +493,10 @@ export function useF4DisclosureListed(options: UseF4DisclosureListedOptions) {
     updateAgingCell,
     syncFromLongOutstanding,
     disclosureText,
+    isSyncing,
+    buildSyncPayload,
+    syncToNotes,
+    noteSection: F4_NOTE_SECTION.listed,
   }
 }
 

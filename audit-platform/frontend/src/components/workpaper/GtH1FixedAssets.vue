@@ -501,9 +501,12 @@ const h1Year = computed(() => {
 const currentSheet = computed(() => {
   const name = props.sheetName || props.wpCode || ''
   // 附注匹配
+  // 注意：H1 源模板国企 sheet 名是「附注披露信息（国有企业）」——用的是「国有企业」
+  // 而非其他循环的「国企」。只认「国企」会落到末尾 fallback 被误判成上市，
+  // 导致国企 TAB 渲染上市组件（实测踩中）。故两种写法都要认。
   if (/附注.*上市|H1-note-listed/.test(name)) return '附注上市'
-  if (/附注.*国企|H1-note-soe/.test(name)) return '附注国企'
-  if (/附注/.test(name)) return name.includes('国企') ? '附注国企' : '附注上市'
+  if (/附注.*国企|附注.*国有|H1-note-soe/.test(name)) return '附注国企'
+  if (/附注/.test(name)) return name.includes('国企') || name.includes('国有') ? '附注国企' : '附注上市'
   // 程序表
   const mA = name.match(/H1A/)
   if (mA) return 'H1A'

@@ -13,15 +13,22 @@ import {
   K1_SOE_DISC_STORAGE_KEY,
   autoFillSoeFromK1Sources,
   calcAgingTieOut,
+  calcIndividualSplitTieOut,
   calcMethodTieOut,
   calcBalanceStageTieOut,
+  calcPortfolioSplitTieOut,
+  calcTop5ProportionCheck,
   emptyK1SoePayload,
   parseK1SoePayload,
   recomputeMethodRows,
+  recomputeOtherPortfolioRows,
   serializeK1SoePayload,
+  summarizeContinuedInvolvement,
+  type K1ContinuedInvolvementRow,
   type K1GovGrantRow,
   type K1IndividualDetailRow,
   type K1MethodDisclosureRow,
+  type K1OtherPortfolioRow,
   type K1PortfolioAgingRow,
   type K1ReversalDisclosureRow,
   type K1SoeDisclosurePayloadV2,
@@ -67,6 +74,11 @@ export function useK1DisclosureSoe(opts: {
   const methodRows = computed(() => payload.value.methodRows)
   const individualDetailRows = computed(() => payload.value.individualDetailRows)
   const portfolioAgingRows = computed(() => payload.value.portfolioAgingRows)
+  const otherPortfolioRows = computed(() => payload.value.otherPortfolioRows)
+  const continuedInvolvementRows = computed(() => payload.value.continuedInvolvementRows)
+  const continuedInvolvementTotals = computed(() =>
+    summarizeContinuedInvolvement(payload.value.continuedInvolvementRows),
+  )
   const stageMovements = computed(() => payload.value.stageMovements)
   const balanceStageMovements = computed(() => payload.value.balanceStageMovements)
   const top5Rows = computed(() => payload.value.top5Rows)
@@ -96,6 +108,21 @@ export function useK1DisclosureSoe(opts: {
     const diff = Math.round((agingProv - eclClosingTotal.value) * 100) / 100
     return { agingProvision: agingProv, eclClosing: eclClosingTotal.value, diff, matched: Math.abs(diff) < 0.01 }
   })
+
+  /** T9：单项明细合计 = 方法表「单项计提」行 */
+  const individualTieOut = computed(() =>
+    calcIndividualSplitTieOut(payload.value.individualDetailRows, payload.value.methodRows),
+  )
+  /** T10：账龄组合坏账 + 其他组合坏账 = 方法表「组合计提」行坏账 */
+  const portfolioSplitTieOut = computed(() =>
+    calcPortfolioSplitTieOut(
+      payload.value.portfolioAgingRows,
+      payload.value.otherPortfolioRows,
+      payload.value.methodRows,
+    ),
+  )
+  /** T12：前五名占比合计 ≤ 100% */
+  const top5Check = computed(() => calcTop5ProportionCheck(payload.value.top5Rows))
 
   function _standards(): readonly string[] | null | undefined {
     return opts.applicableStandards?.value
@@ -219,6 +246,44 @@ export function useK1DisclosureSoe(opts: {
     persistPayload()
   }
 
+  // ─── 其他组合（源模板 R56-R61 / 附注「采用余额百分比法或其他组合方法…」）────
+  function addOtherPortfolioRow(label: string): void {
+    if (isReadonly.value) return
+    payload.value.otherPortfolioRows.push({
+      rowId: uid('oport'),
+      label,
+      endBalance: 0,
+      endRatePct: null,
+      endProvision: 0,
+      priorBalance: 0,
+      priorRatePct: null,
+      priorProvision: 0,
+      editable: true,
+    })
+    persistPayload()
+  }
+
+  function updateOtherPortfolioRow(
+    rowId: string,
+    field: keyof Pick<K1OtherPortfolioRow,
+      'label' | 'endBalance' | 'endRatePct' | 'endProvision' | 'priorBalance' | 'priorRatePct' | 'priorProvision'>,
+    value: string | number | null,
+  ): void {
+    if (isReadonly.value) return
+    payload.value.otherPortfolioRows = recomputeOtherPortfolioRows(
+      payload.value.otherPortfolioRows.map((r) =>
+        r.rowId === rowId ? { ...r, [field]: value } : r,
+      ),
+    )
+    persistPayload()
+  }
+
+  function removeOtherPortfolioRow(rowId: string): void {
+    if (isReadonly.value) return
+    payload.value.otherPortfolioRows = payload.value.otherPortfolioRows.filter((r) => r.rowId !== rowId)
+    persistPayload()
+  }
+
   function updateTop5Row(
     rowId: string,
     field: keyof Pick<K1Top5DisclosureRow, 'unitName' | 'nature' | 'endBalance' | 'aging' | 'provision'>,
@@ -228,18 +293,72 @@ export function useK1DisclosureSoe(opts: {
     payload.value.top5Rows = payload.value.top5Rows.map((r) =>
       r.rowId === rowId ? { ...r, [field]: value, autoFilled: false } : r,
     )
+    recalcTop5Proportions()
+    persistPayload()
+  }
+
+  /** 占比分母：其他应收款项账面余额合计（账龄小计），无值时退回前五名合计 */
+  function recalcTop5Proportions(): void {
+    const subtotal = payload.value.agingRows.find((r) => r.kind === 'subtotal')?.endAmount ?? 0
+    const fallback = payload.value.top5Rows.reduce((s, r) => s + (r.endBalance || 0), 0)
+    const base = subtotal || fallback || 1
+    payload.value.top5Rows = payload.value.top5Rows.map((r) => ({
+      ...r,
+      proportionPct: Math.round((r.endBalance / base) * 10000) / 100,
+    }))
+  }
+
+  function addTop5Row(): void {
+    if (isReadonly.value) return
+    payload.value.top5Rows.push({
+      rowId: uid('top5'),
+      unitName: '',
+      nature: '',
+      endBalance: 0,
+      aging: '',
+      proportionPct: 0,
+      provision: 0,
+    })
+    persistPayload()
+  }
+
+  function removeTop5Row(rowId: string): void {
+    if (isReadonly.value) return
+    payload.value.top5Rows = payload.value.top5Rows.filter((r) => r.rowId !== rowId)
+    recalcTop5Proportions()
     persistPayload()
   }
 
   function updateReversalRow(
     rowId: string,
-    field: keyof Pick<K1ReversalDisclosureRow, 'unitName' | 'reason' | 'method' | 'basis' | 'amount'>,
+    field: keyof Pick<K1ReversalDisclosureRow,
+      'unitName' | 'reason' | 'method' | 'basis' | 'amount' | 'cumulativeProvision'>,
     value: string | number,
   ): void {
     if (isReadonly.value) return
     payload.value.reversalRows = payload.value.reversalRows.map((r) =>
       r.rowId === rowId ? { ...r, [field]: value } : r,
     )
+    persistPayload()
+  }
+
+  function addReversalRow(): void {
+    if (isReadonly.value) return
+    payload.value.reversalRows.push({
+      rowId: uid('rev'),
+      unitName: '',
+      reason: '',
+      method: '',
+      basis: '',
+      amount: 0,
+      cumulativeProvision: 0,
+    })
+    persistPayload()
+  }
+
+  function removeReversalRow(rowId: string): void {
+    if (isReadonly.value) return
+    payload.value.reversalRows = payload.value.reversalRows.filter((r) => r.rowId !== rowId)
     persistPayload()
   }
 
@@ -256,6 +375,27 @@ export function useK1DisclosureSoe(opts: {
     persistPayload()
   }
 
+  function addWriteoffRow(): void {
+    if (isReadonly.value) return
+    payload.value.writeoffDetailRows.push({
+      rowId: uid('wof'),
+      unitName: '',
+      nature: '',
+      amount: 0,
+      reason: '',
+      procedure: '',
+      relatedParty: '',
+    })
+    persistPayload()
+  }
+
+  function removeWriteoffRow(rowId: string): void {
+    if (isReadonly.value) return
+    payload.value.writeoffDetailRows = payload.value.writeoffDetailRows.filter((r) => r.rowId !== rowId)
+    payload.value.writeoffSummaryAmount = payload.value.writeoffDetailRows.reduce((s, r) => s + r.amount, 0)
+    persistPayload()
+  }
+
   function updateGovGrantRow(
     rowId: string,
     field: keyof Pick<K1GovGrantRow, 'unitName' | 'projectName' | 'endBalance' | 'aging' | 'expectedCollection'>,
@@ -268,9 +408,29 @@ export function useK1DisclosureSoe(opts: {
     persistPayload()
   }
 
+  function addGovGrantRow(): void {
+    if (isReadonly.value) return
+    payload.value.govGrantRows.push({
+      rowId: uid('gov'),
+      unitName: '',
+      projectName: '',
+      endBalance: 0,
+      aging: '',
+      expectedCollection: '',
+    })
+    persistPayload()
+  }
+
+  function removeGovGrantRow(rowId: string): void {
+    if (isReadonly.value) return
+    payload.value.govGrantRows = payload.value.govGrantRows.filter((r) => r.rowId !== rowId)
+    persistPayload()
+  }
+
+  /** 国企源模板 R111 转移表列为「债务人名称 | 终止确认金额 | 利得或损失」，无「转移方式」列 */
   function updateTransferRow(
     rowId: string,
-    field: keyof Pick<K1TransferRow, 'item' | 'method' | 'derecognizedAmount' | 'gainLoss'>,
+    field: keyof Pick<K1TransferRow, 'item' | 'derecognizedAmount' | 'gainLoss'>,
     value: string | number,
   ): void {
     if (isReadonly.value) return
@@ -292,16 +452,46 @@ export function useK1DisclosureSoe(opts: {
     persistPayload()
   }
 
-  function updateContinuedInvolvement(field: 'assets' | 'liabilities', value: number): void {
+  function removeTransferRow(rowId: string): void {
     if (isReadonly.value) return
-    if (field === 'assets') payload.value.continuedInvolvementAssets = value
-    else payload.value.continuedInvolvementLiabilities = value
+    payload.value.transferRows = payload.value.transferRows.filter((r) => r.rowId !== rowId)
+    persistPayload()
+  }
+
+  // ─── 继续涉入（源模板 R117-R123：资产：/资产小计/负债：/负债小计）──────────
+  function addContinuedInvolvementRow(side: 'asset' | 'liability'): void {
+    if (isReadonly.value) return
+    payload.value.continuedInvolvementRows.push({ rowId: uid('ci'), side, item: '', amount: 0 })
+    persistPayload()
+  }
+
+  function updateContinuedInvolvementRow(
+    rowId: string,
+    field: keyof Pick<K1ContinuedInvolvementRow, 'item' | 'amount'>,
+    value: string | number,
+  ): void {
+    if (isReadonly.value) return
+    payload.value.continuedInvolvementRows = payload.value.continuedInvolvementRows.map((r) =>
+      r.rowId === rowId ? { ...r, [field]: value } : r,
+    )
+    persistPayload()
+  }
+
+  function removeContinuedInvolvementRow(rowId: string): void {
+    if (isReadonly.value) return
+    payload.value.continuedInvolvementRows = payload.value.continuedInvolvementRows.filter(
+      (r) => r.rowId !== rowId,
+    )
     persistPayload()
   }
 
   function updateNoteSection(key: string, text: string): void {
     payload.value.notes = { ...payload.value.notes, [key]: text }
     persistPayload()
+  }
+
+  function noteSection(key: string): string {
+    return payload.value.notes?.[key] ?? ''
   }
 
   function getSyncSnapshot(): K1SoeDisclosurePayloadV2 {
@@ -368,6 +558,9 @@ export function useK1DisclosureSoe(opts: {
     methodRows,
     individualDetailRows,
     portfolioAgingRows,
+    otherPortfolioRows,
+    continuedInvolvementRows,
+    continuedInvolvementTotals,
     stageMovements,
     balanceStageMovements,
     top5Rows,
@@ -379,19 +572,37 @@ export function useK1DisclosureSoe(opts: {
     methodTieOut,
     balanceStageTieOut,
     provisionTieOut,
+    individualTieOut,
+    portfolioSplitTieOut,
+    top5Check,
     refreshFromSources,
     updateAgingRow,
     updateMethodRow,
     updateIndividualRow,
     updatePortfolioRow,
+    addOtherPortfolioRow,
+    updateOtherPortfolioRow,
+    removeOtherPortfolioRow,
     updateTop5Row,
+    addTop5Row,
+    removeTop5Row,
     updateReversalRow,
+    addReversalRow,
+    removeReversalRow,
     updateWriteoffRow,
+    addWriteoffRow,
+    removeWriteoffRow,
     updateGovGrantRow,
+    addGovGrantRow,
+    removeGovGrantRow,
     updateTransferRow,
     addTransferRow,
-    updateContinuedInvolvement,
+    removeTransferRow,
+    addContinuedInvolvementRow,
+    updateContinuedInvolvementRow,
+    removeContinuedInvolvementRow,
     updateNoteSection,
+    noteSection,
     syncToNotes,
     payload,
   }

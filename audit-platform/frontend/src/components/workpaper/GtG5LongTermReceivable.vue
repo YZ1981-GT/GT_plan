@@ -142,6 +142,7 @@
         :html-data="resolvedHtmlData"
         :wp-id="props.wpId"
         :project-id="props.projectId"
+        :applicable-standards="applicableStandards"
         :readonly="isReadonly"
       />
       <G5TabDisclosureSOE
@@ -149,6 +150,7 @@
         :html-data="resolvedHtmlData"
         :wp-id="props.wpId"
         :project-id="props.projectId"
+        :applicable-standards="applicableStandards"
         :readonly="isReadonly"
       />
       <template v-else-if="currentSheet === '底稿目录'">
@@ -308,6 +310,17 @@ const renderMode = computed({
 const isOoAvailable = computed(() => dualMode.isOoAvailable.value)
 
 const runtime = inject(WorkpaperRuntimeContextKey, null)
+
+/** 适用准则：htmlData / project_context / runtime 任一来源（与 G11/G13 同口径） */
+const applicableStandards = computed<string[]>(() => {
+  const html = props.htmlData as Record<string, any> | null | undefined
+  const raw =
+    html?.project_context?.applicable_standards
+    ?? html?.projectContext?.applicable_standards
+    ?? html?.applicable_standards
+    ?? runtime?.applicableStandards?.value
+  return Array.isArray(raw) ? raw.map(String) : []
+})
 const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
 const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
 const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)

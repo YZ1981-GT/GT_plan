@@ -278,11 +278,9 @@ onUnmounted(() => {
 // ─── 保存后自动同步到附注（防抖/非阻塞/失败静默）──────────────────────────────
 const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 onBeforeUnmount(() => autoSync.cancelPending())
-let _l1ListedMounted = false
 watch(
   [overdueRows, noteText, conclusionText, transferInAmount],
   () => {
-    if (!_l1ListedMounted) { _l1ListedMounted = true; return }
     autoSync.scheduleAutoSync(syncToDisclosureNotes)
   },
   { deep: true },

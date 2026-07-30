@@ -44,6 +44,18 @@ export type F2AiSection =
   | 'f2-20-note'
   | 'f2-20-abnormal'
   | 'f2-20-conclusion'
+  // 附注披露（上市 / 国企）—— 键与 _note_texts 的 section 同名，便于同步链路对照
+  | 'listed-note-category'
+  | 'listed-note-nrv'
+  | 'listed-note-provision'
+  | 'listed-note-borrow'
+  | 'listed-note-amort'
+  | 'listed-note-re'
+  | 'soe-note-category'
+  | 'soe-note-borrow'
+  | 'soe-note-amort'
+  | 'soe-note-land'
+  | 'soe-note'
 
 export function useF2AiGenerate(wpId: Ref<string>) {
   const aiAvailable = ref(false)

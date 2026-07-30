@@ -172,6 +172,16 @@
 
       <div class="head-actions">
 
+        <el-button
+          size="small"
+          type="primary"
+          plain
+          data-testid="g4-disclosure-soe-sync-notes"
+          :loading="isSyncing"
+          :disabled="isReadonly || !projectId"
+          @click="syncToDisclosureNotes"
+        >同步到附注</el-button>
+
         <GtReviewTrigger section-id="G4-disclosure-soe-stage-impairment" />
 
       </div>
@@ -472,13 +482,23 @@
 
  */
 
-import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+
+import { ElMessage } from 'element-plus'
 
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 
 import http from '@/utils/http'
 
+import { api } from '@/services/apiProxy'
+
 import { useG4MainAiGenerate } from '../../composables/useG4MainAiGenerate'
+
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+
+import { buildG4SyncPayload } from '../../composables/g4DisclosureSyncPayload'
+
+import { G4_NOTE_SECTION } from '../../composables/g4NoteSectionMap'
 
 import {
 
@@ -529,6 +549,8 @@ const props = defineProps<{
   projectId: string
 
   isReadonly: boolean
+
+  applicableStandards?: string[]
 
 }>()
 
@@ -749,6 +771,56 @@ const sections = reactive<DisclosureSection[]>(buildSections())
 const stageBlocks = ref<G4StageBlock[]>(buildDefaultSoeStageBlocks())
 
 const stageNoteText = ref('')
+
+// ─── 同步到附注（§八、15 债权投资）──────────────────────────────────────────
+// 🔴 只推送底稿字段真实存在的表：主表「债权投资情况」（7 列两级）+ 三张期末三阶段表
+//    （6 列单级）。国企侧无上年三阶段对照、无重要核销明细；
+//    「本期计提、收回或转回的减值准备情况」在底稿里无对应字段 → 不推
+//    （见 `g4NoteSectionMap.G4_NOT_SYNCED_TABLES`，宁缺勿造）。
+const isSyncing = ref(false)
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+
+function buildSyncSnapshot() {
+  const main = sections.find((s) => s.id === 'bond-overview')
+  const sectionTexts: Record<string, string> = {}
+  for (const s of sections) {
+    if (s.hasTextArea && s.textContent) sectionTexts[s.id] = s.textContent
+  }
+  return {
+    mainRows: main?.rows ?? [],
+    stageBlocks: stageBlocks.value,
+    stageNote: stageNoteText.value,
+    sectionTexts,
+  }
+}
+
+async function syncToDisclosureNotes(): Promise<void> {
+  if (isSyncing.value || props.isReadonly || !props.projectId) return
+  const payload = buildG4SyncPayload(
+    props.wpId, 'soe', props.applicableStandards, buildSyncSnapshot(),
+  )
+  if (!payload) return
+  isSyncing.value = true
+  try {
+    const res: any = await api.post(
+      `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,
+      payload,
+    )
+    const rows = Number((res?.data ?? res)?.rows_synced ?? 0)
+    ElMessage.success(`已同步 ${rows} 行到附注模块「${G4_NOTE_SECTION.soe} 债权投资」`)
+  } catch {
+    ElMessage.warning('同步附注失败，请稍后重试')
+  } finally {
+    isSyncing.value = false
+  }
+}
+
+// 数据变更后自动同步（防抖 800ms；只读/失败静默）。监听实际数据，不监听提示横幅状态。
+watch(
+  [() => sections.map((s) => ({ rows: s.rows, text: s.textContent })), stageBlocks, stageNoteText],
+  () => { autoSync.scheduleAutoSync(syncToDisclosureNotes) },
+  { deep: true },
+)
 
 
 

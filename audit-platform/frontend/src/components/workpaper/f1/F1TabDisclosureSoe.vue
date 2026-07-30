@@ -7,10 +7,11 @@
     <details class="guidance-details">
       <summary>编制提示</summary>
       <div class="guidance-content">
-        <p>1. （1）按账龄列示：期末/期初账面余额（金额+比例）及坏账准备，自 F1-2 审定账龄聚合。</p>
-        <p>2. （2）账龄超过1年的重要预付款项：债权单位可填；债务单位/余额/账龄自 F1-2 带入，补未结算原因。</p>
-        <p>3. （3）前五名：按期末余额降序；坏账准备可手工录入。</p>
-        <p>4. 「同步到附注」推送至附注模块「{{ noteSectionId }} 预付款项」。</p>
+        <p>1. （1）按账龄列示：期末数/期初数各含账面余额（金额+比例（%））与减值准备；账面余额自 F1-2 审定账龄聚合，减值准备逐段录入。行序 = 各账龄段 → 小计 → 减：减值准备 → 合计。</p>
+        <p>2. （2）账龄超过1年的大额预付款项：债权单位可填；债务单位/余额/账龄自 F1-5 带入，须补「未结算的原因」。</p>
+        <p>3. （3）按欠款方归集的期末余额前五名：按期末余额降序；减值准备可手工录入。</p>
+        <p>4. 账龄档数随项目账龄枚举（3年段 / 5年段 / 自定义）自动适配，在 F1-2 明细表切换；超1年行的账龄下拉同步排除首档。</p>
+        <p>5. 「同步到附注」推送至附注模块「{{ noteSectionId }} 预付款项」——逐段减值准备聚合为一行。</p>
       </div>
     </details>
 
@@ -51,28 +52,40 @@
         </el-tooltip>
         <GtIndexChip value="wp:F1-1" :context-project-id="projectId" />
       </h4>
+      <div class="methodology-context">
+        源模板口径：账龄 + 期末数{账面余额（金额、比例（%））、减值准备} + 期初数{同上}。
+        账面余额取自 F1-1 审定表「按账龄分类」审定数；减值准备逐账龄段录入。
+        同步到附注时逐段减值准备聚合为「减：减值准备」一行（附注模版与校验预设 F7-7 口径），
+        「合计」行 = 小计 − 减：减值准备。
+      </div>
       <el-table :data="agingTableData" size="small" border stripe>
-        <el-table-column prop="label" label="账龄" width="140">
+        <el-table-column prop="label" label="账龄" width="150">
           <template #default="{ row }">
-            <span :class="{ 'subtotal-label': row.rowId === '__subtotal__' }">{{ row.label }}</span>
+            <span :class="{ 'subtotal-label': row.isSummary }">{{ row.label }}</span>
           </template>
         </el-table-column>
         <el-table-column label="期末数" align="center">
           <el-table-column label="账面余额" align="center">
-            <el-table-column label="金额" width="120" align="right">
+            <el-table-column label="金额" width="130" align="right">
               <template #default="{ row }">
-                <span class="cross-sheet-cell">{{ fmtAmount(row.endAmount) }}</span>
+                <span class="cross-sheet-cell" :class="{ 'subtotal-val': row.isSummary }">
+                  {{ fmtAmount(row.endAmount) }}
+                </span>
               </template>
             </el-table-column>
-            <el-table-column label="比例%" width="90" align="right">
+            <el-table-column label="比例（%）" width="100" align="right">
               <template #default="{ row }">
-                <span class="cross-sheet-cell">{{ fmtPct(row.endPct) }}</span>
+                <span v-if="row.showPct" class="cross-sheet-cell">{{ fmtPct(row.endPct) }}</span>
+                <span v-else class="muted">——</span>
               </template>
             </el-table-column>
           </el-table-column>
-          <el-table-column label="坏账准备" width="110" align="right">
+          <el-table-column label="减值准备" width="120" align="right">
             <template #default="{ row }">
-              <template v-if="row.rowId === '__subtotal__'">
+              <template v-if="row.isDerived">
+                <span class="muted">——</span>
+              </template>
+              <template v-else-if="row.isSummary">
                 <span class="subtotal-val">{{ fmtAmount(row.endBadDebt) }}</span>
               </template>
               <template v-else>
@@ -80,7 +93,9 @@
                   :model-value="row.endBadDebt"
                   size="small"
                   :controls="false"
+                  :precision="2"
                   :disabled="isReadonly"
+                  style="width:100%"
                   @change="(v: number | undefined) => updateAgingBadDebt(row.key, 'end', v ?? 0)"
                 />
               </template>
@@ -89,20 +104,26 @@
         </el-table-column>
         <el-table-column label="期初数" align="center">
           <el-table-column label="账面余额" align="center">
-            <el-table-column label="金额" width="120" align="right">
+            <el-table-column label="金额" width="130" align="right">
               <template #default="{ row }">
-                <span class="cross-sheet-cell">{{ fmtAmount(row.priorAmount) }}</span>
+                <span class="cross-sheet-cell" :class="{ 'subtotal-val': row.isSummary }">
+                  {{ fmtAmount(row.priorAmount) }}
+                </span>
               </template>
             </el-table-column>
-            <el-table-column label="比例%" width="90" align="right">
+            <el-table-column label="比例（%）" width="100" align="right">
               <template #default="{ row }">
-                <span class="cross-sheet-cell">{{ fmtPct(row.priorPct) }}</span>
+                <span v-if="row.showPct" class="cross-sheet-cell">{{ fmtPct(row.priorPct) }}</span>
+                <span v-else class="muted">——</span>
               </template>
             </el-table-column>
           </el-table-column>
-          <el-table-column label="坏账准备" width="110" align="right">
+          <el-table-column label="减值准备" width="120" align="right">
             <template #default="{ row }">
-              <template v-if="row.rowId === '__subtotal__'">
+              <template v-if="row.isDerived">
+                <span class="muted">——</span>
+              </template>
+              <template v-else-if="row.isSummary">
                 <span class="subtotal-val">{{ fmtAmount(row.priorBadDebt) }}</span>
               </template>
               <template v-else>
@@ -110,7 +131,9 @@
                   :model-value="row.priorBadDebt"
                   size="small"
                   :controls="false"
+                  :precision="2"
                   :disabled="isReadonly"
+                  style="width:100%"
                   @change="(v: number | undefined) => updateAgingBadDebt(row.key, 'prior', v ?? 0)"
                 />
               </template>
@@ -118,6 +141,10 @@
           </el-table-column>
         </el-table-column>
       </el-table>
+      <p class="hint">
+        账龄段随项目账龄枚举自动适配（当前 {{ agingRows.length }} 档）；
+        勾稽：各段之和 = 小计；合计 = 小计 − 减：减值准备（期末 / 期初各独立）。
+      </p>
       <div class="note-area">
         <span class="note-prefix">说明：</span>
         <el-input
@@ -133,10 +160,15 @@
     <!-- (2) 超1年 -->
     <div class="disclosure-card">
       <h4 class="card-title">
-        (2) 账龄超过1年的重要预付款项
+        (2) 账龄超过1年的大额预付款项
         <el-button size="small" :disabled="isReadonly" @click="addOver1Row()">+ 添加</el-button>
-        <GtIndexChip value="wp:F1-2" :context-project-id="projectId" />
+        <GtIndexChip value="wp:F1-5" :context-project-id="projectId" />
       </h4>
+      <div class="methodology-context">
+        源模板口径：债权单位 / 债务单位 / 期末余额 / 账龄 / 未结算的原因，五列齐备。
+        债务单位、期末余额、账龄自 F1-5「账龄1年以上的大额预付账款检查表」带入；
+        完整性校验：期末余额 ≠ 0 的行四列均不得为空。
+      </div>
       <el-table :data="over1TableData" size="small" border stripe>
         <el-table-column label="债权单位" min-width="120">
           <template #default="{ row }">
@@ -247,6 +279,10 @@
         (3) 按欠款方归集的期末余额前五名的预付款项情况
         <GtIndexChip value="wp:F1-2" :context-project-id="projectId" />
       </h4>
+      <div class="methodology-context">
+        源模板口径：债务人名称 / 账面余额 / 占预付款项合计的比例（%）/ 减值准备。
+        按期末账面余额降序自 F1-2 明细表归集前五名；占比分母 = 按账龄表小计行期末金额。
+      </div>
       <el-table :data="top5TableData" size="small" border stripe>
         <el-table-column label="债务人名称" min-width="160">
           <template #default="{ row }">
@@ -262,12 +298,12 @@
             </span>
           </template>
         </el-table-column>
-        <el-table-column label="占预付款项合计的比例(%)" width="170" align="right">
+        <el-table-column label="占预付款项合计的比例（%）" width="180" align="right">
           <template #default="{ row }">
             <span class="cross-sheet-cell">{{ fmtPct(row.proportionPct) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="坏账准备" width="110" align="right">
+        <el-table-column label="减值准备" width="120" align="right">
           <template #default="{ row }">
             <template v-if="row.rowId === '__total__'">
               <span class="subtotal-val">{{ fmtAmount(row.badDebt) }}</span>
@@ -277,7 +313,9 @@
                 :model-value="row.badDebt"
                 size="small"
                 :controls="false"
+                :precision="2"
                 :disabled="isReadonly"
+                style="width:100%"
                 @change="(v: number | undefined) => updateTop5BadDebt(row.debtorName, v ?? 0)"
               />
             </template>
@@ -377,6 +415,8 @@ const {
   isApplicable,
   agingRows,
   agingTotal,
+  agingImpairmentRow,
+  agingNet,
   updateAgingBadDebt,
   over1YearRows,
   over1YearTotal,
@@ -419,8 +459,38 @@ const top5TotalRow = computed(() => ({
   badDebt: top5Total.value.badDebt,
 }))
 
+/**
+ * (1) 账龄表 = 各账龄段 + 小计 + 减：减值准备 + 合计（与附注 §八、7 同构）
+ * `isDerived`：派生行的减值准备列显示 ——（其值已在「减：减值准备」行的金额列体现）
+ * `showPct`：减值准备行与合计行不参与比例校验（F7-8）
+ */
+const agingTableData = computed(() => [
+  ...(agingRows.value ?? []).map((r) => ({ ...r, isSummary: false, isDerived: false, showPct: true })),
+  { ...agingTotal.value, isSummary: true, isDerived: false, showPct: true },
+  {
+    ...agingImpairmentRow.value,
+    key: 'impairment',
+    endPct: 0,
+    priorPct: 0,
+    endBadDebt: 0,
+    priorBadDebt: 0,
+    isSummary: false,
+    isDerived: true,
+    showPct: false,
+  },
+  {
+    ...agingNet.value,
+    key: 'net',
+    endPct: 0,
+    priorPct: 0,
+    endBadDebt: 0,
+    priorBadDebt: 0,
+    isSummary: true,
+    isDerived: true,
+    showPct: false,
+  },
+])
 /** 避免模板 spread 在 Ref 未就绪时抛出 “X is not iterable” */
-const agingTableData = computed(() => [...(agingRows.value ?? []), agingTotal.value])
 const over1TableData = computed(() => [...(over1YearRows.value ?? []), over1TotalRow.value])
 const top5TableData = computed(() => [...(top5Rows.value ?? []), top5TotalRow.value])
 
@@ -508,6 +578,18 @@ function fmtPct(val: number | null | undefined): string {
 }
 .subtotal-label, .subtotal-val { font-weight: 700; }
 .cross-sheet-cell { background: #ecf5ff; padding: 2px 6px; border-radius: 2px; }
+.muted { color: #909399; }
+.hint { margin: 6px 0 0; font-size: 12px; color: #909399; }
+.methodology-context {
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  border-left: 3px solid #e6a23c;
+  background: #fdf6ec;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #8a6d3b;
+  line-height: 1.7;
+}
 .note-area { margin-top: 12px; display: flex; align-items: flex-start; gap: 8px; }
 .note-prefix { font-size: 13px; color: #606266; white-space: nowrap; padding-top: 6px; }
 </style>

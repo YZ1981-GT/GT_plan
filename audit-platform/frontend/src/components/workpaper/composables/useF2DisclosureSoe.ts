@@ -8,6 +8,15 @@ import { parseNum, calcSubtotal, calcNetValue, calcAuditedEnd } from './useF2Inv
 import type { ChecklistResponse } from './useF2FormData'
 import { isF2DisclosureApplicable } from './f2NoteSectionMap'
 import type { F2SoeSyncSnapshot } from './f2DisclosureSyncPayload'
+import {
+  buildDataResourceRows,
+  buildDataResourceSyncRows,
+  buildDataResourceTieChecks,
+  isDataResourceEmpty,
+  setDrCell,
+  type DrColKey,
+  type DrValueMap,
+} from './f2DataResourceInventory'
 
 /** kind: normal 计入合计；detail=「其中」子集，防双计 */
 export type F2SoeRowKind = 'normal' | 'detail'
@@ -60,6 +69,8 @@ const ITEM_NOTE_BORROW = `${PREFIX}note-borrow`
 const ITEM_NOTE_AMORT = `${PREFIX}note-amort`
 const ITEM_NOTE = `${PREFIX}note`
 const ITEM_LAND_NOTE = `${PREFIX}land-note`
+/** (5) 确认为存货的数据资源（三段式 21 行，仅存录入行） */
+const ITEM_S5_DR = `${PREFIX}s5-data-resource`
 
 export interface F2SoeClassRow {
   rowKey: string
@@ -263,6 +274,37 @@ export function useF2DisclosureSoe(options: {
     }
   })
 
+  // ─── (5) 确认为存货的数据资源 ─────────────
+  const drValues = ref<DrValueMap>({})
+
+  watch(
+    () => allResponses.value.get(ITEM_S5_DR)?.remark,
+    (json) => { drValues.value = safeParseJson<DrValueMap>(json, {}) },
+    { immediate: true },
+  )
+
+  const drRows = computed(() => buildDataResourceRows(drValues.value, 'soe'))
+  const drIsEmpty = computed(() => isDataResourceEmpty(drValues.value))
+
+  /** 与 (1) 分类表「数据资源」行的交叉勾稽（F9-12/12a/13/13a） */
+  const drTieChecks = computed(() => {
+    const cls = section1Rows.value.find((r) => r.rowKey === 'data-resources')
+    return buildDataResourceTieChecks(
+      drValues.value,
+      cls
+        ? {
+            endGross: cls.endGross,
+            endImpairment: cls.endImpairment,
+            priorGross: cls.priorGross,
+            priorImpairment: cls.priorImpairment,
+          }
+        : null,
+      'soe',
+    )
+  })
+
+  const drTieFailures = computed(() => drTieChecks.value.filter((c) => !c.ok))
+
   // ─── 附注文字 ─────────────
   const noteCategory = ref('')
   const s3BorrowText = ref('')
@@ -281,7 +323,10 @@ export function useF2DisclosureSoe(options: {
   }
 
   function flushSave(): void {
-    const keys = [ITEM_S2_OVERRIDES, ITEM_NOTE_CATEGORY, ITEM_NOTE_BORROW, ITEM_NOTE_AMORT, ITEM_NOTE, ITEM_LAND_NOTE]
+    const keys = [
+      ITEM_S2_OVERRIDES, ITEM_S5_DR,
+      ITEM_NOTE_CATEGORY, ITEM_NOTE_BORROW, ITEM_NOTE_AMORT, ITEM_NOTE, ITEM_LAND_NOTE,
+    ]
     const items = keys.map((k) => allResponses.value.get(k)).filter(Boolean)
     if (items.length) window.dispatchEvent(new CustomEvent('f2:save-items', { detail: { items } }))
   }
@@ -330,6 +375,16 @@ export function useF2DisclosureSoe(options: {
     debounceSave()
   }
 
+  /** (5) 数据资源：仅录入行可写（派生行/段标题行由 setDrCell 拦截） */
+  function updateDrCell(rowKey: string, col: DrColKey, value: number | string | null): void {
+    if (isReadonly.value) return
+    const next = setDrCell(drValues.value, rowKey, col, value)
+    if (next === drValues.value) return
+    drValues.value = next
+    setItem(ITEM_S5_DR, JSON.stringify(next))
+    debounceSave()
+  }
+
   function getSyncSnapshot(): F2SoeSyncSnapshot {
     return {
       section1Rows: section1Rows.value.map((r) => ({
@@ -373,6 +428,7 @@ export function useF2DisclosureSoe(options: {
         decOther: section2Total.value.decOther,
         ending: section2Total.value.ending,
       },
+      s5DataResourceRows: buildDataResourceSyncRows(drRows.value),
       noteCategory: noteCategory.value,
       s3BorrowText: s3BorrowText.value,
       s4AmortText: s4AmortText.value,
@@ -392,6 +448,10 @@ export function useF2DisclosureSoe(options: {
     section1Total,
     section2Rows,
     section2Total,
+    drRows,
+    drIsEmpty,
+    drTieChecks,
+    drTieFailures,
     noteCategory,
     s3BorrowText,
     s4AmortText,
@@ -399,6 +459,7 @@ export function useF2DisclosureSoe(options: {
     landNote,
     dataUpdatedVisible,
     updateS2Field,
+    updateDrCell,
     getSyncSnapshot,
   }
 }

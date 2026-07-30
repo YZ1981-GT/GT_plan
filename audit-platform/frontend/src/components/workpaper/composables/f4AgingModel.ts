@@ -41,14 +41,26 @@ export const LEGACY_AGING_ROWKEY: Record<string, string> = {
 }
 
 /**
- * F4 账龄文案（3 年段沿用迁移前 F4 用词「1～2年/2～3年」，避免披露/检查表文案回归）。
- * 未覆盖段用配置段 label。
+ * F4 明细/检查表账龄文案（逐字取自源 xlsx `明细表F4-2` N10:Q10「1年以下/1～2年/２～3年/3年以上」，
+ * 3 年段沿用迁移前 F4 用词，避免披露/检查表文案回归）。
+ *
+ * 5 年段三档按同一「X～Y年」构词延伸——不加会退回账龄配置 `seg.label`（「3-4年」半角连字符），
+ * 与前 4 档用词分裂。分组按段 **key**，此处仅影响展示与下拉选项文案；
+ * `extractOverOneYearRows` 另保留 `seg.label` 兜底匹配，故既有存量数据不失配。
+ *
+ * 注意平台内 F4 有三套账龄用词，各有权威源，不要相互"修正"：
+ * - 本表（明细/检查表）：`1～2年`
+ * - `useF4Adjudication.LEGACY_AGING_LABEL`（F4-1 审定表 / 国企披露表）：`1至2年（含2年）`
+ * - `f4NoteSectionMap.F4_NOTE_AGING_LABEL`（附注模块）：`1至2年`
  */
 export const LEGACY_AGING_TEXT: Record<string, string> = {
   within1: '1年以内',
   y1to2: '1～2年',
   y2to3: '2～3年',
   over3: '3年以上',
+  y3to4: '3～4年',
+  y4to5: '4～5年',
+  over5: '5年以上',
 }
 
 /** 段 → F4 展示用账龄文案 */

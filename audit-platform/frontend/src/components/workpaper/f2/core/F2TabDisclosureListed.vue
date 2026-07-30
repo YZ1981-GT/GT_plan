@@ -1,11 +1,17 @@
 ﻿<script setup lang="ts">
 /** F2TabDisclosureListed — 附注披露（上市），对齐源模板结构 */
-import { ref, toRef, watch, onBeforeUnmount, type Ref } from 'vue'
+import { inject, ref, toRef, watch, onBeforeUnmount, type Ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import { useF2DisclosureListed } from '../../composables/useF2DisclosureListed'
+import { DR_COL_LABELS, DR_INPUT_COLS } from '../../composables/f2DataResourceInventory'
+import { useF2AiGenerate, type F2AiSection } from '../../composables/useF2AiGenerate'
+import WpAmountInput from '../../shared/WpAmountInput.vue'
+import CycleImportExportDropdown from '../../shared/CycleImportExportDropdown.vue'
+import F2ReviewChip from '../shared/F2ReviewChip.vue'
 import {
   buildF2ListedSubTableData,
   buildF2SyncPayload,
@@ -23,13 +29,21 @@ const props = defineProps<{
   applicableStandards: string[]
 }>()
 
-function fmtAmount(v: number): string {
-  return !v ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const displayPrefs = useDisplayPrefsStore()
+
+/** 只读金额统一走平台单一真源，响应顶栏「显示设置」的单位与小数位 */
+function fmtAmount(v: number | null | undefined): string {
+  return displayPrefs.fmtAmount(v)
 }
 
 function fmtPct(ratio: number): string {
   if (!ratio) return '-'
   return `${(ratio * 100).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`
+}
+
+/** (8) 数据资源表：段标题行加浅底强调 */
+function drRowClass({ row }: { row: { kind: string } }): string {
+  return row.kind === 'section' ? 'dr-section-row' : ''
 }
 
 const {
@@ -38,12 +52,14 @@ const {
   section2Rows, section2Total, section2QualRows,
   s3EndRows, s3EndTotal, s3PriorRows, s3PriorTotal,
   s5Rows, s5Total, s6Rows, s6Total, s7Rows, s7Total,
-  noteCategory, noteNrv, noteProvision, s4BorrowText, noteRe,
+  drRows, drIsEmpty, drTieFailures,
+  noteCategory, noteNrv, noteProvision, s4BorrowText, s4AmortText, noteRe,
   dataUpdatedVisible,
   updateS2Field, updateQualField,
   updateS3Row, addS3Row, removeS3Row,
   updateS5, updateS6, updateS7,
   addS5, addS6, addS7, removeS5, removeS6, removeS7,
+  updateDrCell,
   getSyncSnapshot,
 } = useF2DisclosureListed({
   allResponses: toRef(props, 'allResponses') as Ref<Map<string, ChecklistResponse>>,
@@ -54,11 +70,83 @@ const {
 const isSyncing = ref(false)
 const noteSectionId = F2_NOTE_SECTION.listed
 
+/** 多区块导入后重载 allResponses（由 WorkpaperEditor 提供） */
+const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
+async function onImported(): Promise<void> {
+  await reloadWorkpaperData?.()
+}
+
+// ─── AI 辅助（每个文本域一个 section，键与同步 _note_texts 同名）───
+const wpIdRef = toRef(() => props.wpId || '') as Ref<string>
+const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF2AiGenerate(wpIdRef)
+/** 当前正在生成的 section，用于只在该按钮上转圈 */
+const aiActiveSection = ref<F2AiSection | ''>('')
+
+/** 传给 AI 的上下文：合计口径 + 勾稽状态，避免模型凭空编数 */
+function aiContext(): Record<string, unknown> {
+  return {
+    noteSection: noteSectionId,
+    endGrossTotal: section1Total.value.endGross,
+    endImpairmentTotal: section1Total.value.endImpairment,
+    endNetTotal: section1Total.value.endNet,
+    impairmentTieDiff: section2Total.value.tieDiff,
+    dataResourceTieFailures: drTieFailures.value.length,
+  }
+}
+
+/**
+ * section → 目标 ref + 弹窗标题。
+ * 模板里 ref 会自动解包，故不能把 ref 当参数传，改由此表在 script 作用域内回写。
+ */
+const AI_TARGETS: Record<string, { target: Ref<string>; title: string }> = {
+  'listed-note-category': { target: noteCategory, title: 'AI 生成 · 存货分类说明' },
+  'listed-note-nrv': { target: noteNrv, title: 'AI 生成 · 可变现净值确定依据' },
+  'listed-note-provision': { target: noteProvision, title: 'AI 生成 · 跌价准备计提政策' },
+  'listed-note-borrow': { target: s4BorrowText, title: 'AI 生成 · 借款费用资本化说明' },
+  'listed-note-amort': { target: s4AmortText, title: 'AI 生成 · 合同履约成本摊销说明' },
+  'listed-note-re': { target: noteRe, title: 'AI 生成 · 房企披露说明' },
+}
+
+async function runAi(section: F2AiSection): Promise<void> {
+  if (props.isReadonly) return
+  const entry = AI_TARGETS[section]
+  if (!entry) return
+  aiActiveSection.value = section
+  try {
+    const text = await generateAndConfirm(section, entry.target.value || '', aiContext(), entry.title)
+    if (text) entry.target.value = text
+  } finally {
+    aiActiveSection.value = ''
+  }
+}
+
 // 保存后自动同步到附注（防抖/非阻塞/失败静默/只读 gate；与手动按钮同源 syncToDisclosureNotes）
 const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 onBeforeUnmount(() => autoSync.cancelPending())
-// 数据变更后自动同步（composable 内部保存触发 dataUpdatedVisible）
-watch(dataUpdatedVisible, (v) => { if (v) autoSync.scheduleAutoSync(syncToDisclosureNotes) })
+
+// 🔴 触发条件必须监听**实际数据**，不能只监听提示横幅：
+// 原实现为 `watch(dataUpdatedVisible, ...)`，而 `dataUpdatedVisible` 是「上游 F2-1 数据已更新」
+// 的提示横幅可见性 —— 用户在本页改组合计提 / 房企 3 表 / 数据资源 / 6 个文本域一律不触发，
+// 导致必须手动点「同步到附注」（实测确认）。改为对齐 G3/L1/L3 范式监听数据本身。
+// `section1Rows` 同时覆盖上游 F2-1 变化场景，故不再单独监听 `dataUpdatedVisible`。
+//
+// 🔴 **不加 mounted 一次性防护**（L1/L3 用的 `_xxxMounted` 范式在此有 bug，已实测）：
+// 防护的消耗时机取决于「数据是否已加载」——首次挂载时 allResponses 异步填充会让 computed
+// 变化并消耗掉防护；但**切走再切回**时 allResponses 已有值、computed 不变化、watch 不触发，
+// 防护没被消耗 → 吞掉用户回到本页后的**第一次真实编辑**。
+// 浏览器实测（2026-07-30）：切国企再切回上市后改文本域 → checklist_responses 已存但附注
+// `_last_sync_at` 不变；同一挂载内再改一次 → 立即同步。
+// Vue `watch` 默认 `immediate: false`，挂载本身不会触发；数据加载引起的那次同步是**有益的**
+// （正是本 spec 要的「附注跟随内容」），且 `sync_from_workpaper` 空载荷 no-op + 幂等。
+watch(
+  [
+    section1Rows, section2Rows, section2QualRows,
+    s3EndRows, s3PriorRows, s5Rows, s6Rows, s7Rows, drRows,
+    noteCategory, noteNrv, noteProvision, s4BorrowText, s4AmortText, noteRe,
+  ],
+  () => { autoSync.scheduleAutoSync(syncToDisclosureNotes) },
+  { deep: true },
+)
 
 const router = useRouter()
 // 跳转回附注模块（披露表 → 附注为单向推送；此处仅导航，方便相互编辑确认）
@@ -106,8 +194,10 @@ async function syncToDisclosureNotes(): Promise<void> {
         <div class="guidance-content">
           <p>1. （1）存货分类：账面余额 / 跌价准备 / 账面价值 × 期末与上年年末，自 F2-1 审定表跨 sheet 取数（只读）。</p>
           <p>2. （2）跌价准备变动：期初/计提默认取自 F2-1；期末=期初+计提+其他−转回或转销−其他，应与（1）期末跌价勾稽。</p>
-          <p>3. （3）按组合计提：比例分母为 0 时显示「-」，避免除零错误；房企另填（5）～（7）。</p>
-          <p>4. 可「同步到附注」推送至附注模块「{{ noteSectionId }} 存货」。</p>
+          <p>3. （3）按组合计提：账面余额「比例(%)」= 本组合 ÷ 合计（占比）；跌价准备「比例(%)」= 本组合跌价 ÷ 本组合账面余额（计提比例）——两列分母不同，分母为 0 时显示「-」。</p>
+          <p>4. （4）借款费用资本化 + 合同履约成本本期摊销：均为文字披露，按 15 号文第十九条（六）说明计算标准和依据。</p>
+          <p>5. （5）～（7）开发成本 / 开发产品 / 周转房：房地产开发企业填列。</p>
+          <p>6. 可「同步到附注」推送至附注模块「{{ noteSectionId }} 存货」。</p>
         </div>
       </details>
 
@@ -125,8 +215,18 @@ async function syncToDisclosureNotes(): Promise<void> {
             同步到附注
           </el-button>
           <el-button size="small" type="primary" plain :disabled="!projectId" @click="jumpToNote('listed')">↩ 跳转回附注</el-button>
+          <!-- 多区块导入导出：一区块一 sheet + 文本域集中「文本说明」sheet（后端 _f2_disclosure_import_export） -->
+          <CycleImportExportDropdown
+            :wp-id="props.wpId"
+            api-prefix="f2"
+            sheet="F2-note-listed"
+            :disabled="isReadonly"
+            @imported="onImported"
+          />
+          <F2ReviewChip section-id="F2-note-listed" />
         </div>
         <div class="toolbar-right">
+          <el-tag size="small">单位：{{ displayPrefs.unitSuffix }}</el-tag>
           <span class="chip-wrap"><GtIndexChip value="wp:F2-1" :context-project-id="projectId" /></span>
           <span class="chip-wrap"><GtIndexChip :value="`Note:${noteSectionId}`" :context-project-id="projectId" /></span>
         </div>
@@ -193,7 +293,15 @@ async function syncToDisclosureNotes(): Promise<void> {
         </el-table>
         <p class="hint-text">注：根据企业具体情况分类，房地产开发企业应增加「开发成本」「开发产品」等种类（见下方（5）～（7））。</p>
         <div class="note-block">
-          <div class="note-label">分类说明</div>
+          <div class="note-label">
+            <span>分类说明</span>
+            <el-button
+              class="ai-btn" size="small" type="primary" plain
+              :disabled="isReadonly || !aiAvailable"
+              :loading="aiLoading && aiActiveSection === 'listed-note-category'"
+              @click="runAi('listed-note-category')"
+            >🤖 AI 辅助</el-button>
+          </div>
           <el-input v-model="noteCategory" type="textarea" :autosize="{ minRows: 2, maxRows: 5 }" :disabled="isReadonly" placeholder="存货分类补充说明..." />
         </div>
       </div>
@@ -233,6 +341,7 @@ async function syncToDisclosureNotes(): Promise<void> {
                   v-else
                   :model-value="row.incProvision"
                   :controls="false"
+                  :precision="2"
                   size="small"
                   :disabled="isReadonly"
                   style="width:100%"
@@ -247,6 +356,7 @@ async function syncToDisclosureNotes(): Promise<void> {
                   v-else
                   :model-value="row.incOther"
                   :controls="false"
+                  :precision="2"
                   size="small"
                   :disabled="isReadonly"
                   style="width:100%"
@@ -263,6 +373,7 @@ async function syncToDisclosureNotes(): Promise<void> {
                   v-else
                   :model-value="row.decReversal"
                   :controls="false"
+                  :precision="2"
                   size="small"
                   :disabled="isReadonly"
                   style="width:100%"
@@ -277,6 +388,7 @@ async function syncToDisclosureNotes(): Promise<void> {
                   v-else
                   :model-value="row.decOther"
                   :controls="false"
+                  :precision="2"
                   size="small"
                   :disabled="isReadonly"
                   style="width:100%"
@@ -322,9 +434,26 @@ async function syncToDisclosureNotes(): Promise<void> {
         </el-table>
         <p class="hint-text">【披露确定可变现净值的具体依据及本期转回或转销存货跌价准备的原因。】</p>
         <div class="note-block">
-          <div class="note-label">NRV / 跌价政策说明</div>
+          <div class="note-label">
+            <span>可变现净值确定依据</span>
+            <el-button
+              class="ai-btn" size="small" type="primary" plain
+              :disabled="isReadonly || !aiAvailable"
+              :loading="aiLoading && aiActiveSection === 'listed-note-nrv'"
+              @click="runAi('listed-note-nrv')"
+            >🤖 AI 辅助</el-button>
+          </div>
           <el-input v-model="noteNrv" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" :disabled="isReadonly" placeholder="可变现净值确定方法..." />
-          <el-input v-model="noteProvision" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" :disabled="isReadonly" class="mt-8" placeholder="跌价准备计提政策说明..." />
+          <div class="note-label mt-8">
+            <span>跌价准备计提政策说明</span>
+            <el-button
+              class="ai-btn" size="small" type="primary" plain
+              :disabled="isReadonly || !aiAvailable"
+              :loading="aiLoading && aiActiveSection === 'listed-note-provision'"
+              @click="runAi('listed-note-provision')"
+            >🤖 AI 辅助</el-button>
+          </div>
+          <el-input v-model="noteProvision" type="textarea" :autosize="{ minRows: 2, maxRows: 4 }" :disabled="isReadonly" placeholder="跌价准备计提政策说明..." />
         </div>
       </div>
 
@@ -357,6 +486,7 @@ async function syncToDisclosureNotes(): Promise<void> {
                   v-else
                   :model-value="row.balance"
                   :controls="false"
+                  :precision="2"
                   size="small"
                   :disabled="isReadonly"
                   style="width:100%"
@@ -364,7 +494,12 @@ async function syncToDisclosureNotes(): Promise<void> {
                 />
               </template>
             </el-table-column>
-            <el-table-column label="比例(%)" min-width="90" align="right">
+            <el-table-column min-width="90" align="right">
+              <template #header>
+                <el-tooltip content="占比 = 本组合账面余额 ÷ 合计账面余额（源模板 C52=B52/B54）" placement="top">
+                  <span class="formula-header">比例(%)</span>
+                </el-tooltip>
+              </template>
               <template #default="{ row }">{{ fmtPct(row.balancePct) }}</template>
             </el-table-column>
           </el-table-column>
@@ -376,6 +511,7 @@ async function syncToDisclosureNotes(): Promise<void> {
                   v-else
                   :model-value="row.impairment"
                   :controls="false"
+                  :precision="2"
                   size="small"
                   :disabled="isReadonly"
                   style="width:100%"
@@ -395,7 +531,12 @@ async function syncToDisclosureNotes(): Promise<void> {
                 />
               </template>
             </el-table-column>
-            <el-table-column label="比例(%)" min-width="90" align="right">
+            <el-table-column min-width="90" align="right">
+              <template #header>
+                <el-tooltip content="计提比例 = 本组合跌价准备 ÷ 本组合账面余额（源模板 F52=D52/B52）" placement="top">
+                  <span class="formula-header">比例(%)</span>
+                </el-tooltip>
+              </template>
               <template #default="{ row }">{{ fmtPct(row.impairmentPct) }}</template>
             </el-table-column>
           </el-table-column>
@@ -434,6 +575,7 @@ async function syncToDisclosureNotes(): Promise<void> {
                   v-else
                   :model-value="row.balance"
                   :controls="false"
+                  :precision="2"
                   size="small"
                   :disabled="isReadonly"
                   style="width:100%"
@@ -441,7 +583,12 @@ async function syncToDisclosureNotes(): Promise<void> {
                 />
               </template>
             </el-table-column>
-            <el-table-column label="比例(%)" min-width="90" align="right">
+            <el-table-column min-width="90" align="right">
+              <template #header>
+                <el-tooltip content="占比 = 本组合账面余额 ÷ 合计账面余额（源模板 C52=B52/B54）" placement="top">
+                  <span class="formula-header">比例(%)</span>
+                </el-tooltip>
+              </template>
               <template #default="{ row }">{{ fmtPct(row.balancePct) }}</template>
             </el-table-column>
           </el-table-column>
@@ -453,6 +600,7 @@ async function syncToDisclosureNotes(): Promise<void> {
                   v-else
                   :model-value="row.impairment"
                   :controls="false"
+                  :precision="2"
                   size="small"
                   :disabled="isReadonly"
                   style="width:100%"
@@ -472,7 +620,12 @@ async function syncToDisclosureNotes(): Promise<void> {
                 />
               </template>
             </el-table-column>
-            <el-table-column label="比例(%)" min-width="90" align="right">
+            <el-table-column min-width="90" align="right">
+              <template #header>
+                <el-tooltip content="计提比例 = 本组合跌价准备 ÷ 本组合账面余额（源模板 F52=D52/B52）" placement="top">
+                  <span class="formula-header">比例(%)</span>
+                </el-tooltip>
+              </template>
               <template #default="{ row }">{{ fmtPct(row.impairmentPct) }}</template>
             </el-table-column>
           </el-table-column>
@@ -486,10 +639,45 @@ async function syncToDisclosureNotes(): Promise<void> {
           </el-table-column>
         </el-table>
 
-        <div class="note-block">
-          <div class="note-label">（4）借款费用资本化说明</div>
-          <el-input v-model="s4BorrowText" type="textarea" :autosize="{ minRows: 2, maxRows: 5 }" :disabled="isReadonly" placeholder="存货期末余额中含有的借款费用资本化金额及其计算标准和依据..." />
-        </div>
+      </div>
+
+      <!-- (4) 借款费用资本化 + 合同履约成本摊销 -->
+      <div class="disclosure-card">
+        <h4 class="card-title">
+          (4) 存货期末余额中含有借款费用资本化金额的说明
+          <el-button
+            class="ai-btn" size="small" type="primary" plain
+            :disabled="isReadonly || !aiAvailable"
+            :loading="aiLoading && aiActiveSection === 'listed-note-borrow'"
+            @click="runAi('listed-note-borrow')"
+          >🤖 AI 辅助</el-button>
+        </h4>
+        <p class="hint-text">15号文第十九条（六）披露存货期末余额中含有的借款费用资本化金额及其计算标准和依据。</p>
+        <el-input
+          v-model="s4BorrowText"
+          type="textarea"
+          :autosize="{ minRows: 3, maxRows: 6 }"
+          :disabled="isReadonly"
+          placeholder="存货期末余额中含有的借款费用资本化金额为 XXX 元，计算标准和依据为..."
+        />
+
+        <h4 class="card-title sub">
+          合同履约成本本期摊销金额的说明
+          <el-button
+            class="ai-btn" size="small" type="primary" plain
+            :disabled="isReadonly || !aiAvailable"
+            :loading="aiLoading && aiActiveSection === 'listed-note-amort'"
+            @click="runAi('listed-note-amort')"
+          >🤖 AI 辅助</el-button>
+        </h4>
+        <p class="hint-text">说明合同履约成本本期摊销金额。</p>
+        <el-input
+          v-model="s4AmortText"
+          type="textarea"
+          :autosize="{ minRows: 3, maxRows: 6 }"
+          :disabled="isReadonly"
+          placeholder="合同履约成本本期摊销金额为 XXX 元，摊销依据与计入科目为..."
+        />
       </div>
 
       <!-- (5) 开发成本 -->
@@ -520,25 +708,25 @@ async function syncToDisclosureNotes(): Promise<void> {
           <el-table-column label="预计总投资" min-width="110" align="right">
             <template #default="{ row }">
               <span v-if="row.rowId === '__total__'" class="subtotal-label">{{ fmtAmount(row.estimatedInvestment) }}</span>
-              <el-input-number v-else :model-value="row.estimatedInvestment" :controls="false" size="small" :disabled="isReadonly" style="width:100%" @change="(v: number | undefined) => updateS5(row.rowId, 'estimatedInvestment', v ?? 0)" />
+              <el-input-number v-else :model-value="row.estimatedInvestment" :controls="false" :precision="2" size="small" :disabled="isReadonly" style="width:100%" @change="(v: number | undefined) => updateS5(row.rowId, 'estimatedInvestment', v ?? 0)" />
             </template>
           </el-table-column>
           <el-table-column label="期末数" min-width="110" align="right">
             <template #default="{ row }">
               <span v-if="row.rowId === '__total__'" class="subtotal-label">{{ fmtAmount(row.endBalance) }}</span>
-              <el-input-number v-else :model-value="row.endBalance" :controls="false" size="small" :disabled="isReadonly" style="width:100%" @change="(v: number | undefined) => updateS5(row.rowId, 'endBalance', v ?? 0)" />
+              <el-input-number v-else :model-value="row.endBalance" :controls="false" :precision="2" size="small" :disabled="isReadonly" style="width:100%" @change="(v: number | undefined) => updateS5(row.rowId, 'endBalance', v ?? 0)" />
             </template>
           </el-table-column>
           <el-table-column label="上年年末数" min-width="110" align="right">
             <template #default="{ row }">
               <span v-if="row.rowId === '__total__'" class="subtotal-label">{{ fmtAmount(row.priorBalance) }}</span>
-              <el-input-number v-else :model-value="row.priorBalance" :controls="false" size="small" :disabled="isReadonly" style="width:100%" @change="(v: number | undefined) => updateS5(row.rowId, 'priorBalance', v ?? 0)" />
+              <el-input-number v-else :model-value="row.priorBalance" :controls="false" :precision="2" size="small" :disabled="isReadonly" style="width:100%" @change="(v: number | undefined) => updateS5(row.rowId, 'priorBalance', v ?? 0)" />
             </template>
           </el-table-column>
           <el-table-column label="期末跌价准备" min-width="110" align="right">
             <template #default="{ row }">
               <span v-if="row.rowId === '__total__'" class="subtotal-label">{{ fmtAmount(row.endImpairment) }}</span>
-              <el-input-number v-else :model-value="row.endImpairment" :controls="false" size="small" :disabled="isReadonly" style="width:100%" @change="(v: number | undefined) => updateS5(row.rowId, 'endImpairment', v ?? 0)" />
+              <el-input-number v-else :model-value="row.endImpairment" :controls="false" :precision="2" size="small" :disabled="isReadonly" style="width:100%" @change="(v: number | undefined) => updateS5(row.rowId, 'endImpairment', v ?? 0)" />
             </template>
           </el-table-column>
           <el-table-column v-if="!isReadonly" label="操作" width="56">
@@ -571,19 +759,19 @@ async function syncToDisclosureNotes(): Promise<void> {
           <el-table-column label="期初余额" min-width="100" align="right">
             <template #default="{ row }">
               <span v-if="row.rowId === '__total__'" class="subtotal-label">{{ fmtAmount(row.opening) }}</span>
-              <el-input-number v-else :model-value="row.opening" :controls="false" size="small" :disabled="isReadonly" style="width:100%" @change="(v: number | undefined) => updateS6(row.rowId, 'opening', v ?? 0)" />
+              <el-input-number v-else :model-value="row.opening" :controls="false" :precision="2" size="small" :disabled="isReadonly" style="width:100%" @change="(v: number | undefined) => updateS6(row.rowId, 'opening', v ?? 0)" />
             </template>
           </el-table-column>
           <el-table-column label="本期增加" min-width="100" align="right">
             <template #default="{ row }">
               <span v-if="row.rowId === '__total__'" class="subtotal-label">{{ fmtAmount(row.increase) }}</span>
-              <el-input-number v-else :model-value="row.increase" :controls="false" size="small" :disabled="isReadonly" style="width:100%" @change="(v: number | undefined) => updateS6(row.rowId, 'increase', v ?? 0)" />
+              <el-input-number v-else :model-value="row.increase" :controls="false" :precision="2" size="small" :disabled="isReadonly" style="width:100%" @change="(v: number | undefined) => updateS6(row.rowId, 'increase', v ?? 0)" />
             </template>
           </el-table-column>
           <el-table-column label="本期减少" min-width="100" align="right">
             <template #default="{ row }">
               <span v-if="row.rowId === '__total__'" class="subtotal-label">{{ fmtAmount(row.decrease) }}</span>
-              <el-input-number v-else :model-value="row.decrease" :controls="false" size="small" :disabled="isReadonly" style="width:100%" @change="(v: number | undefined) => updateS6(row.rowId, 'decrease', v ?? 0)" />
+              <el-input-number v-else :model-value="row.decrease" :controls="false" :precision="2" size="small" :disabled="isReadonly" style="width:100%" @change="(v: number | undefined) => updateS6(row.rowId, 'decrease', v ?? 0)" />
             </template>
           </el-table-column>
           <el-table-column label="期末余额" min-width="100" align="right">
@@ -594,7 +782,7 @@ async function syncToDisclosureNotes(): Promise<void> {
           <el-table-column label="期末跌价准备" min-width="110" align="right">
             <template #default="{ row }">
               <span v-if="row.rowId === '__total__'" class="subtotal-label">{{ fmtAmount(row.endImpairment) }}</span>
-              <el-input-number v-else :model-value="row.endImpairment" :controls="false" size="small" :disabled="isReadonly" style="width:100%" @change="(v: number | undefined) => updateS6(row.rowId, 'endImpairment', v ?? 0)" />
+              <el-input-number v-else :model-value="row.endImpairment" :controls="false" :precision="2" size="small" :disabled="isReadonly" style="width:100%" @change="(v: number | undefined) => updateS6(row.rowId, 'endImpairment', v ?? 0)" />
             </template>
           </el-table-column>
           <el-table-column v-if="!isReadonly" label="操作" width="56">
@@ -621,19 +809,19 @@ async function syncToDisclosureNotes(): Promise<void> {
           <el-table-column label="期初余额" min-width="110" align="right">
             <template #default="{ row }">
               <span v-if="row.rowId === '__total__'" class="subtotal-label">{{ fmtAmount(row.opening) }}</span>
-              <el-input-number v-else :model-value="row.opening" :controls="false" size="small" :disabled="isReadonly" style="width:100%" @change="(v: number | undefined) => updateS7(row.rowId, 'opening', v ?? 0)" />
+              <el-input-number v-else :model-value="row.opening" :controls="false" :precision="2" size="small" :disabled="isReadonly" style="width:100%" @change="(v: number | undefined) => updateS7(row.rowId, 'opening', v ?? 0)" />
             </template>
           </el-table-column>
           <el-table-column label="本期增加" min-width="110" align="right">
             <template #default="{ row }">
               <span v-if="row.rowId === '__total__'" class="subtotal-label">{{ fmtAmount(row.increase) }}</span>
-              <el-input-number v-else :model-value="row.increase" :controls="false" size="small" :disabled="isReadonly" style="width:100%" @change="(v: number | undefined) => updateS7(row.rowId, 'increase', v ?? 0)" />
+              <el-input-number v-else :model-value="row.increase" :controls="false" :precision="2" size="small" :disabled="isReadonly" style="width:100%" @change="(v: number | undefined) => updateS7(row.rowId, 'increase', v ?? 0)" />
             </template>
           </el-table-column>
           <el-table-column label="本期减少" min-width="110" align="right">
             <template #default="{ row }">
               <span v-if="row.rowId === '__total__'" class="subtotal-label">{{ fmtAmount(row.decrease) }}</span>
-              <el-input-number v-else :model-value="row.decrease" :controls="false" size="small" :disabled="isReadonly" style="width:100%" @change="(v: number | undefined) => updateS7(row.rowId, 'decrease', v ?? 0)" />
+              <el-input-number v-else :model-value="row.decrease" :controls="false" :precision="2" size="small" :disabled="isReadonly" style="width:100%" @change="(v: number | undefined) => updateS7(row.rowId, 'decrease', v ?? 0)" />
             </template>
           </el-table-column>
           <el-table-column label="期末余额" min-width="110" align="right">
@@ -648,10 +836,89 @@ async function syncToDisclosureNotes(): Promise<void> {
           </el-table-column>
         </el-table>
         <div class="note-block">
-          <div class="note-label">房企披露说明</div>
+          <div class="note-label">
+            <span>房企披露说明</span>
+            <el-button
+              class="ai-btn" size="small" type="primary" plain
+              :disabled="isReadonly || !aiAvailable"
+              :loading="aiLoading && aiActiveSection === 'listed-note-re'"
+              @click="runAi('listed-note-re')"
+            >🤖 AI 辅助</el-button>
+          </div>
           <el-input v-model="noteRe" type="textarea" :autosize="{ minRows: 2, maxRows: 5 }" :disabled="isReadonly" placeholder="对停工/烂尾/空置项目若不计提或计提比例较低，应详细说明理由..." />
         </div>
         <p class="hint-text">房地产开发企业列示存货跌价准备时，对于开发中项目可以合并列示。</p>
+      </div>
+
+      <!-- (8) 确认为存货的数据资源 -->
+      <div class="disclosure-card">
+        <h4 class="card-title">
+          (8) 确认为存货的数据资源
+          <el-tooltip content="期末余额 / 账面价值 / 合计列为公式，按《企业数据资源相关会计处理暂行规定》三段式披露" placement="top">
+            <el-tag size="small" type="info">公式联动</el-tag>
+          </el-tooltip>
+        </h4>
+        <el-alert
+          v-if="drIsEmpty"
+          type="info"
+          :closable="false"
+          show-icon
+          class="dr-empty-alert"
+          title="本表仅在存货中确认数据资源时填列；（1）分类表「数据资源」行为 0 时可不填。"
+        />
+        <el-alert
+          v-for="chk in drTieFailures"
+          :key="chk.key"
+          type="warning"
+          :closable="false"
+          show-icon
+          class="dr-empty-alert"
+          :title="`勾稽差异 ${fmtAmount(chk.diff)}：${chk.label} 本表合计 ${fmtAmount(chk.detail)} ≠ （1）分类表「数据资源」行 ${fmtAmount(chk.classified)}（${chk.preset}）`"
+        />
+        <el-table :data="drRows" size="small" border stripe style="width:100%" :row-class-name="drRowClass">
+          <el-table-column label="项目" min-width="180" fixed>
+            <template #default="{ row }">
+              <span :class="{ 'dr-section': row.kind === 'section', 'dr-sub': row.indent === 1 }">{{ row.label }}</span>
+              <el-tooltip v-if="row.subExcess" content="「其中」子项之和已超过本行金额，请复核" placement="top">
+                <span class="tie-warn dr-warn-flag">⚠</span>
+              </el-tooltip>
+            </template>
+          </el-table-column>
+          <el-table-column
+            v-for="col in DR_INPUT_COLS"
+            :key="col"
+            :label="DR_COL_LABELS[col]"
+            min-width="150"
+            align="right"
+          >
+            <template #default="{ row }">
+              <span v-if="row.kind === 'section'" />
+              <span v-else-if="row.kind === 'derived'" class="cross-sheet-cell">{{ fmtAmount(row[col]) }}</span>
+              <WpAmountInput
+                v-else
+                :model-value="row[col]"
+                :disabled="isReadonly"
+                :aria-label="`${DR_COL_LABELS[col]} ${row.label}`"
+                @change="(v: number) => updateDrCell(row.rowKey, col, v)"
+              />
+            </template>
+          </el-table-column>
+          <el-table-column min-width="140" align="right">
+            <template #header>
+              <el-tooltip content="合计 = 外购 + 自行加工 + 其他方式取得（源模板校验 F9-11）" placement="top">
+                <span class="formula-header">合计</span>
+              </el-tooltip>
+            </template>
+            <template #default="{ row }">
+              <span v-if="row.kind === 'section'" />
+              <span v-else class="cross-sheet-cell">{{ fmtAmount(row.total) }}</span>
+            </template>
+          </el-table-column>
+        </el-table>
+        <p class="hint-text">
+          4.期末余额＝1.期初余额＋2.本期增加金额−3.本期减少金额；期末/期初账面价值＝账面原值−跌价准备。
+          「其中」子项为部分列示，独立录入，其之和不应超过所属小节金额。
+        </p>
       </div>
     </template>
   </div>
@@ -683,8 +950,25 @@ async function syncToDisclosureNotes(): Promise<void> {
 .subtotal-label { font-weight: 600; }
 .cross-sheet-cell { color: #409eff; }
 .tie-warn { color: #e6a23c; font-weight: 600; }
+/* 公式列表头：虚线下划线 + tooltip 标注取数来源（平台表格 UI 规范） */
+.formula-header { border-bottom: 1px dashed var(--el-color-primary); cursor: help; }
 .hint-text { margin: 8px 0; font-size: 12px; color: #909399; line-height: 1.5; }
 .note-block { margin-top: 10px; }
-.note-label { font-size: 12px; color: #606266; margin-bottom: 4px; }
+/* 文本域标题行：AI 辅助按钮右对齐在同一行（平台底稿 UI 规范） */
+.note-label {
+  font-size: 12px;
+  color: #606266;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ai-btn { margin-left: auto; }
 .mt-8 { margin-top: 8px; }
+/* (8) 数据资源表 */
+.dr-empty-alert { margin-bottom: 10px; }
+.dr-section { font-weight: 600; }
+.dr-sub { padding-left: 16px; color: #606266; }
+.dr-warn-flag { margin-left: 4px; cursor: help; }
+.f2-disclosure-listed :deep(.dr-section-row) { background: #f5f7fa; }
 </style>

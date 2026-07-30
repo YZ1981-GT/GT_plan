@@ -112,7 +112,6 @@ import { eventBus } from '@/utils/eventBus'
 import { useL7FormData } from '../../composables/useL7FormData'
 import { L7_NOTE_SECTION, buildL7SyncPayload } from '../../composables/l7NoteSectionMap'
 import { buildNoteJumpRoute } from '@/views/composables/noteDisclosureReverseJump'
-import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 
 const props = defineProps<{
   wpId: string

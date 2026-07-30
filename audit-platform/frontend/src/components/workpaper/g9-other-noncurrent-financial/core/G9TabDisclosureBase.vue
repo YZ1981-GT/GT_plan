@@ -18,6 +18,15 @@
           data-testid="g9-disclosure-pull-adj"
           @click="disc.pullFromAdjudication()"
         >↓ 从 G9-1/G9-2 分项带入</el-button>
+        <el-button
+          size="small"
+          type="primary"
+          plain
+          data-testid="g9-disclosure-sync-notes"
+          :loading="isSyncing"
+          :disabled="isReadonly || !projectId"
+          @click="syncToDisclosureNotes"
+        >同步到附注</el-button>
         <GtReviewTrigger :section-id="variant === 'listed' ? 'G9-disclosure-listed' : 'G9-disclosure-soe'" />
       </div>
     </div>
@@ -161,18 +170,25 @@
 </template>
 
 <script setup lang="ts">
-import { computed, toRef } from 'vue'
+import { computed, ref, toRef, watch } from 'vue'
+import { ElMessage } from 'element-plus'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import G9ImportExportDropdown from '../G9ImportExportDropdown.vue'
 import { useG9Disclosure } from '../../composables/useG9Disclosure'
 import { g9AccountLabel } from '../../composables/g9AccountMatch'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import { buildG9SyncPayload } from '../../composables/g9DisclosureSyncPayload'
+import { G9_NOTE_SECTION } from '../../composables/g9NoteSectionMap'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
+import { api } from '@/services/apiProxy'
 
 const props = defineProps<{
   variant: 'listed' | 'soe'
   allResponses: Map<string, ChecklistResponse>
   wpId: string
+  projectId?: string
+  applicableStandards?: string[]
   isReadonly: boolean
   debouncedSave: (id: string, d: Partial<ChecklistResponse>) => void
 }>()
@@ -186,6 +202,40 @@ const disc = useG9Disclosure({
   debouncedSave: props.debouncedSave,
   isReadonly: computed(() => props.isReadonly),
 })
+
+const isSyncing = ref(false)
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+
+async function syncToDisclosureNotes(): Promise<void> {
+  if (isSyncing.value || props.isReadonly || !props.projectId) return
+  const payload = buildG9SyncPayload(props.wpId, props.variant, props.applicableStandards, {
+    rows: disc.dataRows.value,
+    noteText: disc.noteText.value,
+  })
+  if (!payload) return
+  isSyncing.value = true
+  try {
+    const res: any = await api.post(
+      `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,
+      payload,
+    )
+    const rows = Number((res?.data ?? res)?.rows_synced ?? 0)
+    ElMessage.success(
+      `已同步 ${rows} 行到附注模块「${G9_NOTE_SECTION[props.variant]} 其他非流动金融资产」`,
+    )
+  } catch {
+    ElMessage.warning('同步附注失败，请稍后重试')
+  } finally {
+    isSyncing.value = false
+  }
+}
+
+// 数据变更后自动同步（防抖 800ms；只读/失败静默）。监听实际数据，不监听提示横幅状态。
+watch(
+  [disc.dataRows, disc.noteText],
+  () => { autoSync.scheduleAutoSync(syncToDisclosureNotes) },
+  { deep: true },
+)
 
 const objectiveTitle = computed(() =>
   props.variant === 'listed'

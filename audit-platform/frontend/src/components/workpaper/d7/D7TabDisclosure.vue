@@ -220,11 +220,9 @@ if (props.variant) {
 // ─── 保存后自动同步到附注（防抖/非阻塞/失败静默）──────────────────────────────
 const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 onBeforeUnmount(() => autoSync.cancelPending())
-let _d7Mounted = false
 watch(
   [listedSections, soeSections, noteTexts],
   () => {
-    if (!_d7Mounted) { _d7Mounted = true; return }
     autoSync.scheduleAutoSync(syncToDisclosureNotes)
   },
   { deep: true },

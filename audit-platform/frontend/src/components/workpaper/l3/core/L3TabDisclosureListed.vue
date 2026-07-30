@@ -187,11 +187,9 @@ function jumpToNote(variant: 'listed' | 'soe') {
 // ─── 保存后自动同步（防抖/非阻塞/失败静默）──────────────────────────────────
 const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 onBeforeUnmount(() => autoSync.cancelPending())
-let _l3ListedMounted = false
 watch(
   [classificationRows, currentPortionRows, propertyNote, conclusion],
   () => {
-    if (!_l3ListedMounted) { _l3ListedMounted = true; return }
     autoSync.scheduleAutoSync(syncToDisclosureNotes)
   },
   { deep: true },

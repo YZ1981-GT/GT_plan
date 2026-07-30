@@ -6,7 +6,10 @@
  */
 import { computed, inject, onBeforeUnmount, toRef, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { useF4DisclosureListed } from '../composables/useF4DisclosureListed'
+import {
+  useF4DisclosureListed,
+  F4_LISTED_NATURE_OPTIONS,
+} from '../composables/useF4DisclosureListed'
 import { useF4AiGenerate } from '../composables/useF4AiGenerate'
 import GtIndexChip from '../GtIndexChip.vue'
 
@@ -38,6 +41,9 @@ const {
   updateAgingCell,
   syncFromLongOutstanding,
   disclosureText,
+  isSyncing,
+  syncToNotes,
+  noteSection,
 } = useF4DisclosureListed({
   wpId: toRef(props, 'wpId') as Ref<string>,
   projectId: toRef(props, 'projectId') as Ref<string>,
@@ -120,8 +126,14 @@ onBeforeUnmount(() => window.removeEventListener('substantive:adjudicated', onAd
         <p>2. 可无限量添加行：新增的手工行可自行填写项目与金额，用于补充F4-1未涵盖的披露项目。</p>
         <p>3. 账龄超过1年的重要应付账款：点击"从F4-5同步"自动带入长期挂账检查表中挂账超过1年的债权人、金额及挂账原因，也可手工补行。</p>
         <p>4. 披露合计与F4-1审定合计不一致时红色预警，应先核对审定表或手工行。</p>
+        <p>5. 两张表编制完成后点击右上角<strong>「⇄ 同步到附注」</strong>，把行数据与披露文字整表推送到附注「{{ noteSection }} 应付账款」（含「其中，账龄超过1年的重要应付账款」子表）。</p>
       </div>
     </details>
+
+    <div class="methodology-note">
+      <p><strong>源模板提示：</strong>账龄超过1年的大额应付账款，应说明未偿还或未结转的原因，并在资产负债表日后事项中说明是否偿还；账龄超过3年以上的应付账款应说明未偿还的原因。</p>
+      <p>存在供应商融资安排（反向保理／供应链融资平台）的，还应按《企业会计准则解释第17号》在附注「现金流量表补充资料—供应商融资安排」中披露，底稿见 F4-9 供应商融资检查表。</p>
+    </div>
 
     <el-alert
       class="audit-objective"
@@ -148,6 +160,15 @@ onBeforeUnmount(() => window.removeEventListener('substantive:adjudicated', onAd
       </div>
       <div class="toolbar-right">
         <GtIndexChip value="wp:F4-1" :context-project-id="projectId" />
+        <GtIndexChip :value="`Note:${noteSection}`" :context-project-id="projectId" />
+        <el-button
+          size="small"
+          type="success"
+          plain
+          :disabled="isReadonly"
+          :loading="isSyncing"
+          @click="syncToNotes"
+        >⇄ 同步到附注</el-button>
         <el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('f4-disclosure-listed')">复核</el-button>
       </div>
     </div>
@@ -156,13 +177,19 @@ onBeforeUnmount(() => window.removeEventListener('substantive:adjudicated', onAd
       <el-table-column label="项目" min-width="180">
         <template #default="{ row }">
           <span v-if="row.linked" class="linked-label">🔗 {{ row.label }}</span>
-          <el-input
+          <el-select
             v-else-if="!isReadonly"
             :model-value="row.label"
             size="small"
-            placeholder="披露项目名称"
+            filterable
+            allow-create
+            default-first-option
+            placeholder="选择或输入披露项目"
+            style="width:100%"
             @change="(value: string) => updateNatureCell(row.rowId, 'label', value)"
-          />
+          >
+            <el-option v-for="opt in F4_LISTED_NATURE_OPTIONS" :key="opt" :label="opt" :value="opt" />
+          </el-select>
           <span v-else>{{ row.label }}</span>
         </template>
       </el-table-column>
@@ -334,6 +361,16 @@ onBeforeUnmount(() => window.removeEventListener('substantive:adjudicated', onAd
 .guidance-content { margin-top: 8px; color: #606266; line-height: 1.65; }
 .guidance-content p { margin: 3px 0; }
 .audit-objective, .warning-alert { margin-bottom: 10px; }
+.methodology-note {
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  border-left: 3px solid #e6a23c;
+  border-radius: 4px;
+  background: #fdf6ec;
+  color: #7d5a1a;
+  line-height: 1.65;
+}
+.methodology-note p { margin: 3px 0; }
 .section-toolbar { display: flex; justify-content: space-between; align-items: center; margin: 10px 0 8px; }
 .second-section { margin-top: 20px; }
 .toolbar-left, .toolbar-right { display: flex; gap: 8px; align-items: center; }

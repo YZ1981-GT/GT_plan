@@ -22,6 +22,14 @@ export interface ColumnDef {
   format?: 'amount' | 'percent' | 'text'
   /** 分组父表头（如 '期末余额'），相邻且同 group 的列在渲染时合并为两级表头 */
   group?: string
+  /**
+   * 显式声明「本表为单级表头」→ 后端跳过 `_infer_groups_from_headers` 前缀推断。
+   *
+   * 不声明时，后端会对 ≥4 列且共享前缀的 headers 反猜父表头（如把 `本期增加`/`本期减少`
+   * 归到凭空的「本期」下），对源模板本就是单行表头的表属于误加。标在任意一列
+   * （建议标签列）即对整表生效。
+   */
+  flat?: boolean
 }
 
 export type SubTableColumns = Record<string, ColumnDef[]>
@@ -39,6 +47,10 @@ export function defineColumns(defs: Array<Partial<ColumnDef> & { key: string; la
       ...(d.is_label ? { is_label: true } : {}),
       ...(d.align ? { align: d.align } : {}),
       ...(d.format ? { format: d.format } : {}),
+      // group 必须透传：后端 _extract_column_groups 据此产出 _column_groups（两级表头）
+      ...(d.group ? { group: d.group } : {}),
+      // flat 必须透传：显式单级声明，抑制后端前缀推断
+      ...(d.flat ? { flat: true } : {}),
     }))
 }
 
@@ -57,6 +69,34 @@ function isMetaKey(key: string): boolean {
 
 function pickLabelDef(defs: ColumnDef[]): ColumnDef | null {
   return defs.find(d => d && d.is_label) ?? defs.find(d => !!d) ?? null
+}
+
+/**
+ * 归一子表值为行数组（与后端 `normalize_sub_table_data` 同规则）。
+ * 容错表对象包装 `{rows:[...]}`（投影结果被回写），取不出行则返回 null。
+ */
+function normalizeSubTableRows(value: any): any[] | null {
+  if (Array.isArray(value)) return value
+  if (value && typeof value === 'object' && Array.isArray(value.rows)) return value.rows
+  return null
+}
+
+/**
+ * 投影态行（label/values[]/is_total）→ 业务键行（与后端 `_inverse_project_row` 同规则）。
+ * 无 values 数组或无列头声明时原样返回；已有业务键不被覆盖。
+ */
+function inverseProjectRow(row: any, labelDef: ColumnDef | null, valueDefs: ColumnDef[]): any {
+  if (!Array.isArray(row?.values) || (!labelDef && valueDefs.length === 0)) return row
+  const { values, ...rest } = row
+  const out: Record<string, any> = { ...rest }
+  const labelKey = labelDef?.key
+  if (labelKey && labelKey !== 'label' && !(labelKey in out) && 'label' in out) {
+    out[labelKey] = out.label
+  }
+  valueDefs.forEach((d, i) => {
+    if (d.key && !(d.key in out)) out[d.key] = values[i] ?? null
+  })
+  return out
 }
 
 /**
@@ -82,8 +122,8 @@ export function projectSubTablesClient(tableData: Record<string, any> | null | u
   const tables: ProjectedTable[] = []
   for (const key of keys) { // 保持键序（P6）
     if (isMetaKey(key)) continue
-    const rows = sub[key]
-    if (!Array.isArray(rows)) continue
+    const rawRows = normalizeSubTableRows(sub[key])
+    if (!rawRows) continue
 
     const defsRaw = colsMap[key]
     const defs: ColumnDef[] = Array.isArray(defsRaw)
@@ -92,12 +132,12 @@ export function projectSubTablesClient(tableData: Record<string, any> | null | u
 
     if (defs.length === 0) {
       // P8 / 降级：无列头 → 不用英文字段键当 header
-      const hasLabel = rows.some((r: any) => r && typeof r === 'object' && 'label' in r)
+      const hasLabel = rawRows.some((r: any) => r && typeof r === 'object' && 'label' in r)
       tables.push({
         name: key,
         headers: hasLabel ? ['项目'] : [],
         columns: [],
-        rows: rows
+        rows: rawRows
           .filter((r: any) => r && typeof r === 'object')
           .map((r: any) => ({ label: r.label ?? '', values: [], is_total: !!r.is_total })),
         _source_sub_table_key: key,
@@ -110,13 +150,16 @@ export function projectSubTablesClient(tableData: Record<string, any> | null | u
     const labelKey = labelDef?.key
     const valueDefs = defs.filter(d => d !== labelDef)
     const headers = [String(labelDef?.label ?? ''), ...valueDefs.map(d => String(d.label ?? ''))]
+    // 逆投影：位置化 values 行还原为业务键行，再走统一取键逻辑
+    const rows = rawRows
+      .filter((r: any) => r && typeof r === 'object')
+      .map((r: any) => inverseProjectRow(r, labelDef, valueDefs))
 
     tables.push({
       name: key,
       headers,
       columns: defs,
       rows: rows
-        .filter((r: any) => r && typeof r === 'object')
         .map((r: any) => {
           let labelVal = labelKey ? (r[labelKey] ?? '') : ''
           // 兜底：标签列键值缺失时回退通用 label（合计/小计行常用 label 而非业务键）

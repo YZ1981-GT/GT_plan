@@ -8,6 +8,15 @@ import { parseNum, calcSubtotal, calcNetValue, calcAuditedEnd } from './useF2Inv
 import type { ChecklistResponse } from './useF2FormData'
 import { isF2DisclosureApplicable } from './f2NoteSectionMap'
 import type { F2ListedSyncSnapshot } from './f2DisclosureSyncPayload'
+import {
+  buildDataResourceRows,
+  buildDataResourceSyncRows,
+  buildDataResourceTieChecks,
+  isDataResourceEmpty,
+  setDrCell,
+  type DrColKey,
+  type DrValueMap,
+} from './f2DataResourceInventory'
 
 /** Excel 上市披露分类行（与源模板一致；多源科目合并取数） */
 export const F2_LISTED_DISCLOSURE_CATEGORIES: ReadonlyArray<{
@@ -34,10 +43,14 @@ const ITEM_S3_PRIOR = `${PREFIX}s3-prior`
 const ITEM_S5 = `${PREFIX}s5-rows`
 const ITEM_S6 = `${PREFIX}s6-rows`
 const ITEM_S7 = `${PREFIX}s7-rows`
+/** (8) 确认为存货的数据资源（三段式 21 行，仅存录入行） */
+const ITEM_S8_DR = `${PREFIX}s8-data-resource`
 const ITEM_NOTE_CATEGORY = `${PREFIX}note-category`
 const ITEM_NOTE_NRV = `${PREFIX}note-nrv`
 const ITEM_NOTE_PROVISION = `${PREFIX}note-provision`
 const ITEM_NOTE_BORROW = `${PREFIX}note-borrow`
+/** (4) 合同履约成本本期摊销说明（源：附注模版「（说明合同履约成本本期摊销金额。）」） */
+const ITEM_NOTE_AMORT = `${PREFIX}note-amort`
 const ITEM_NOTE_RE = `${PREFIX}note-re`
 
 export interface F2ListedClassRow {
@@ -252,16 +265,24 @@ function emptyS7Row(): F2ListedTurnoverHousingRow {
   }
 }
 
+/**
+ * 补算 (3) 按组合计提的派生列。
+ *
+ * 源模板口径（附注披露信息（上市公司）R52/R54）：
+ * - `C52 = B52/B54` → 账面余额「比例(%)」= 本组合账面余额 ÷ 合计账面余额（占比）
+ * - `F52 = D52/B52` → 存货跌价准备「比例(%)」= 本组合跌价准备 ÷ **本组合账面余额**（计提比例）
+ *
+ * 注意两列分母不同：占比的分母是合计，计提比例的分母是本行账面余额。
+ */
 function enrichS3(rows: F2ListedPortfolioRow[]): F2ListedPortfolioRow[] {
   const balTotal = calcSubtotal(rows.map((r) => r.balance))
-  const impTotal = calcSubtotal(rows.map((r) => r.impairment))
   return rows.map((r) => {
     const netValue = calcNetValue(r.balance, r.impairment)
     return {
       ...r,
       netValue,
       balancePct: safeRatio(r.balance, balTotal),
-      impairmentPct: safeRatio(r.impairment, impTotal),
+      impairmentPct: safeRatio(r.impairment, r.balance),
     }
   })
 }
@@ -399,8 +420,8 @@ export function useF2DisclosureListed(options: {
   const s3EndRows = computed(() => enrichS3(s3EndRaw.value))
   const s3PriorRows = computed(() => enrichS3(s3PriorRaw.value))
 
-  const s3EndTotal = computed(() => {
-    const rows = s3EndRows.value
+  /** 合计行：balancePct 恒 1（源模板 C54=1）；impairmentPct = D54/B54（合计计提比例） */
+  function s3Total(rows: F2ListedPortfolioRow[]): F2ListedPortfolioRow {
     const balance = calcSubtotal(rows.map((r) => r.balance))
     const impairment = calcSubtotal(rows.map((r) => r.impairment))
     return {
@@ -411,25 +432,12 @@ export function useF2DisclosureListed(options: {
       provisionStandard: '',
       netValue: calcNetValue(balance, impairment),
       balancePct: balance ? 1 : 0,
-      impairmentPct: impairment ? 1 : 0,
-    } satisfies F2ListedPortfolioRow
-  })
+      impairmentPct: safeRatio(impairment, balance),
+    }
+  }
 
-  const s3PriorTotal = computed(() => {
-    const rows = s3PriorRows.value
-    const balance = calcSubtotal(rows.map((r) => r.balance))
-    const impairment = calcSubtotal(rows.map((r) => r.impairment))
-    return {
-      rowId: '__total__',
-      groupName: '合计',
-      balance,
-      impairment,
-      provisionStandard: '',
-      netValue: calcNetValue(balance, impairment),
-      balancePct: balance ? 1 : 0,
-      impairmentPct: impairment ? 1 : 0,
-    } satisfies F2ListedPortfolioRow
-  })
+  const s3EndTotal = computed(() => s3Total(s3EndRows.value))
+  const s3PriorTotal = computed(() => s3Total(s3PriorRows.value))
 
   // ─── (5)(6)(7) 房企附表 ─────────────
   const s5Rows = ref<F2ListedDevCostRow[]>([])
@@ -499,17 +507,50 @@ export function useF2DisclosureListed(options: {
     ending: calcSubtotal(s7Rows.value.map((r) => r.ending)),
   } satisfies F2ListedTurnoverHousingRow))
 
+  // ─── (8) 确认为存货的数据资源 ─────────────
+  const drValues = ref<DrValueMap>({})
+
+  watch(
+    () => allResponses.value.get(ITEM_S8_DR)?.remark,
+    (json) => { drValues.value = safeParseJson<DrValueMap>(json, {}) },
+    { immediate: true },
+  )
+
+  const drRows = computed(() => buildDataResourceRows(drValues.value, 'listed'))
+  const drIsEmpty = computed(() => isDataResourceEmpty(drValues.value))
+
+  /** 与 (1) 分类表「数据资源」行的交叉勾稽（F9-12/12a/13/13a） */
+  const drTieChecks = computed(() => {
+    const cls = section1Rows.value.find((r) => r.rowKey === 'data-resources')
+    return buildDataResourceTieChecks(
+      drValues.value,
+      cls
+        ? {
+            endGross: cls.endGross,
+            endImpairment: cls.endImpairment,
+            priorGross: cls.priorGross,
+            priorImpairment: cls.priorImpairment,
+          }
+        : null,
+      'listed',
+    )
+  })
+
+  const drTieFailures = computed(() => drTieChecks.value.filter((c) => !c.ok))
+
   // ─── 附注文字 ─────────────
   const noteCategory = ref('')
   const noteNrv = ref('')
   const noteProvision = ref('')
   const s4BorrowText = ref('')
+  const s4AmortText = ref('')
   const noteRe = ref('')
 
   watch(() => allResponses.value.get(ITEM_NOTE_CATEGORY)?.remark, (v) => { noteCategory.value = v || '' }, { immediate: true })
   watch(() => allResponses.value.get(ITEM_NOTE_NRV)?.remark, (v) => { noteNrv.value = v || '' }, { immediate: true })
   watch(() => allResponses.value.get(ITEM_NOTE_PROVISION)?.remark, (v) => { noteProvision.value = v || '' }, { immediate: true })
   watch(() => allResponses.value.get(ITEM_NOTE_BORROW)?.remark, (v) => { s4BorrowText.value = v || '' }, { immediate: true })
+  watch(() => allResponses.value.get(ITEM_NOTE_AMORT)?.remark, (v) => { s4AmortText.value = v || '' }, { immediate: true })
   watch(() => allResponses.value.get(ITEM_NOTE_RE)?.remark, (v) => { noteRe.value = v || '' }, { immediate: true })
 
   // ─── 持久化 ─────────────
@@ -520,8 +561,9 @@ export function useF2DisclosureListed(options: {
   function flushSave(): void {
     const keys = [
       ITEM_S2_OVERRIDES, ITEM_S2_QUAL, ITEM_S3_END, ITEM_S3_PRIOR,
-      ITEM_S5, ITEM_S6, ITEM_S7,
-      ITEM_NOTE_CATEGORY, ITEM_NOTE_NRV, ITEM_NOTE_PROVISION, ITEM_NOTE_BORROW, ITEM_NOTE_RE,
+      ITEM_S5, ITEM_S6, ITEM_S7, ITEM_S8_DR,
+      ITEM_NOTE_CATEGORY, ITEM_NOTE_NRV, ITEM_NOTE_PROVISION,
+      ITEM_NOTE_BORROW, ITEM_NOTE_AMORT, ITEM_NOTE_RE,
     ]
     const items = keys.map((k) => allResponses.value.get(k)).filter(Boolean)
     if (items.length) window.dispatchEvent(new CustomEvent('f2:save-items', { detail: { items } }))
@@ -547,6 +589,7 @@ export function useF2DisclosureListed(options: {
   watch(noteNrv, (v) => persistNote(ITEM_NOTE_NRV, v, 'listed-note-nrv'))
   watch(noteProvision, (v) => persistNote(ITEM_NOTE_PROVISION, v, 'listed-note-provision'))
   watch(s4BorrowText, (v) => persistNote(ITEM_NOTE_BORROW, v, 'listed-note-borrow'))
+  watch(s4AmortText, (v) => persistNote(ITEM_NOTE_AMORT, v, 'listed-note-amort'))
   watch(noteRe, (v) => persistNote(ITEM_NOTE_RE, v, 'listed-note-re'))
 
   const adjudicatedHandler = (e: Event) => {
@@ -710,6 +753,16 @@ export function useF2DisclosureListed(options: {
     debounceSave()
   }
 
+  /** (8) 数据资源：仅录入行可写（派生行/段标题行由 setDrCell 拦截） */
+  function updateDrCell(rowKey: string, col: DrColKey, value: number | string | null): void {
+    if (isReadonly.value) return
+    const next = setDrCell(drValues.value, rowKey, col, value)
+    if (next === drValues.value) return
+    drValues.value = next
+    setItem(ITEM_S8_DR, JSON.stringify(next))
+    debounceSave()
+  }
+
   function getSyncSnapshot(): F2ListedSyncSnapshot {
     return {
       section1Rows: section1Rows.value.map(({ rowKey, label, endGross, endImpairment, endNet, priorGross, priorImpairment, priorNet }) => ({
@@ -758,6 +811,7 @@ export function useF2DisclosureListed(options: {
         netValue: r.netValue,
       })),
       s4BorrowText: s4BorrowText.value,
+      s4AmortText: s4AmortText.value,
       s5Rows: s5Rows.value.map((r) => ({
         projectName: r.projectName,
         startDate: r.startDate,
@@ -783,6 +837,7 @@ export function useF2DisclosureListed(options: {
         decrease: r.decrease,
         ending: r.ending,
       })),
+      s8DataResourceRows: buildDataResourceSyncRows(drRows.value),
       noteCategory: noteCategory.value,
       noteNrv: noteNrv.value,
       noteProvision: noteProvision.value,
@@ -813,10 +868,15 @@ export function useF2DisclosureListed(options: {
     s6Total,
     s7Rows,
     s7Total,
+    drRows,
+    drIsEmpty,
+    drTieChecks,
+    drTieFailures,
     noteCategory,
     noteNrv,
     noteProvision,
     s4BorrowText,
+    s4AmortText,
     noteRe,
     dataUpdatedVisible,
     updateS2Field,
@@ -833,6 +893,7 @@ export function useF2DisclosureListed(options: {
     removeS5,
     removeS6,
     removeS7,
+    updateDrCell,
     getSyncSnapshot,
   }
 }

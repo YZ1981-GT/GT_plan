@@ -7,10 +7,11 @@
     <details class="guidance-details">
       <summary>编制提示</summary>
       <div class="guidance-content">
-        <p>1. （1）账龄分析：期末/上年年末金额与比例，自 F1-2 审定账龄聚合（与 F1-1 按账龄勾稽）。</p>
-        <p>2. （2）账龄超过1年的重要预付款项：自 F1-2 筛选；填写未偿还原因；占比分母为账龄合计。</p>
-        <p>3. （3）前五名：汇总披露格式自动生成；分别披露表按期末余额降序取前五。</p>
-        <p>4. 「同步到附注」推送至附注模块「{{ noteSectionId }} 预付款项」。</p>
+        <p>1. （1）按账龄披露：5 列（期末余额 / 上年年末余额各含金额+比例%），行序 = 各账龄段 → 小计 → 减：减值准备 → 合计；金额自 F1-2 审定账龄聚合（与 F1-1 按账龄勾稽），仅「减：减值准备」两格需手工录入。</p>
+        <p>2. （2）账龄超过1年的重要预付款项：列为 债务人名称 / 账面余额 / 占预付款项合计的比例（%）/ 减值准备（上市列报格式无「账龄」「未结算的原因」列）；逐户原因展开行录入后点「据此生成说明」汇编到说明段落。</p>
+        <p>3. （3）前五名：汇总披露格式自动生成；分别披露表按期末余额降序取前五，3 列。</p>
+        <p>4. 账龄档数随项目账龄枚举（3年段 / 5年段 / 自定义）自动适配，在 F1-2 明细表切换。</p>
+        <p>5. 「同步到附注」推送至附注模块「{{ noteSectionId }} 预付款项」。</p>
       </div>
     </details>
 
@@ -51,48 +52,72 @@
         </el-tooltip>
         <GtIndexChip value="wp:F1-1" :context-project-id="projectId" />
       </h4>
+      <div class="methodology-context">
+        源模板口径：账龄 + 期末余额{金额、比例%} + 上年年末余额{金额、比例%}；
+        行序为各账龄段 → 小计 → 减：减值准备 → 合计。
+        金额取自 F1-1 审定表「按账龄分类」审定数（= F1-2 明细表审定账龄聚合）。
+      </div>
       <el-table :data="agingTableData" size="small" border stripe class="disclosure-table" style="width:100%">
-        <el-table-column prop="label" label="账龄" min-width="120">
+        <el-table-column prop="label" label="账龄" min-width="140">
           <template #default="{ row }">
-            <span :class="{ 'subtotal-label': row.rowId === '__subtotal__' }">{{ row.label }}</span>
+            <span :class="{ 'subtotal-label': row.isSummary }">{{ row.label }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="期末数" align="center">
-          <el-table-column label="金额" min-width="130" align="right">
+        <el-table-column label="期末余额" align="center">
+          <el-table-column label="金额" min-width="140" align="right">
             <template #default="{ row }">
-              <span class="cross-sheet-cell">{{ fmtAmount(row.endAmount) }}</span>
+              <el-input-number
+                v-if="row.rowId === '__impairment__'"
+                :model-value="row.endAmount"
+                size="small"
+                :controls="false"
+                :precision="2"
+                :disabled="isReadonly"
+                style="width:100%"
+                @change="(v: number | undefined) => persistImpairment(v ?? 0)"
+              />
+              <span v-else class="cross-sheet-cell" :class="{ 'subtotal-val': row.isSummary }">
+                {{ fmtAmount(row.endAmount) }}
+              </span>
             </template>
           </el-table-column>
           <el-table-column label="比例%" min-width="100" align="right">
             <template #default="{ row }">
-              <span class="cross-sheet-cell">{{ fmtPct(row.endPct) }}</span>
+              <span v-if="row.showPct" class="cross-sheet-cell">{{ fmtPct(row.endPct) }}</span>
+              <span v-else class="muted">——</span>
             </template>
           </el-table-column>
         </el-table-column>
-        <el-table-column label="上年年末数" align="center">
-          <el-table-column label="金额" min-width="130" align="right">
+        <el-table-column label="上年年末余额" align="center">
+          <el-table-column label="金额" min-width="140" align="right">
             <template #default="{ row }">
-              <span class="cross-sheet-cell">{{ fmtAmount(row.priorAmount) }}</span>
+              <el-input-number
+                v-if="row.rowId === '__impairment__'"
+                :model-value="row.priorAmount"
+                size="small"
+                :controls="false"
+                :precision="2"
+                :disabled="isReadonly"
+                style="width:100%"
+                @change="(v: number | undefined) => persistImpairmentPrior(v ?? 0)"
+              />
+              <span v-else class="cross-sheet-cell" :class="{ 'subtotal-val': row.isSummary }">
+                {{ fmtAmount(row.priorAmount) }}
+              </span>
             </template>
           </el-table-column>
           <el-table-column label="比例%" min-width="100" align="right">
             <template #default="{ row }">
-              <span class="cross-sheet-cell">{{ fmtPct(row.priorPct) }}</span>
+              <span v-if="row.showPct" class="cross-sheet-cell">{{ fmtPct(row.priorPct) }}</span>
+              <span v-else class="muted">——</span>
             </template>
           </el-table-column>
         </el-table-column>
       </el-table>
-      <div class="impairment-row">
-        <span class="lab">减：减值准备</span>
-        <el-input-number
-          :model-value="impairmentProvision"
-          size="small"
-          :controls="false"
-          :disabled="isReadonly"
-          @change="(v: number | undefined) => persistImpairment(v ?? 0)"
-        />
-        <span class="muted">净额 {{ fmtAmount(agingNet.endAmount) }}</span>
-      </div>
+      <p class="hint">
+        账龄段随项目账龄枚举自动适配（当前 {{ agingRows.length }} 档）；
+        勾稽：各段之和 = 小计，合计 = 小计 − 减：减值准备（期末 / 上年年末各独立）。
+      </p>
       <div class="note-area">
         <span class="note-prefix">说明：</span>
         <el-input
@@ -110,9 +135,30 @@
       <h4 class="card-title">
         (2) 账龄超过1年的重要预付款项
         <el-button size="small" :disabled="isReadonly" @click="addOver1Row()">+ 添加</el-button>
+        <el-button size="small" type="primary" plain :disabled="isReadonly" @click="onComposeOver1Note">据此生成说明</el-button>
         <GtIndexChip value="wp:F1-2" :context-project-id="projectId" />
       </h4>
+      <div class="methodology-context">
+        源模板说明：（账龄超过1年的金额重要预付账款，应说明未及时结算的原因。）
+        上市公司列报格式本表**不含**「账龄」「未结算的原因」列，原因在下方说明段落披露 ——
+        逐户原因请展开行录入，再点「据此生成说明」汇编。
+      </div>
       <el-table :data="over1TableData" size="small" border stripe class="disclosure-table" style="width:100%">
+        <el-table-column type="expand">
+          <template #default="{ row }">
+            <div v-if="row.rowId !== '__total__'" class="expand-pane">
+              <span class="expand-label">未及时结算的原因</span>
+              <el-input
+                :model-value="row.reason"
+                type="textarea"
+                :autosize="{ minRows: 2, maxRows: 5 }"
+                :disabled="isReadonly"
+                placeholder="说明该笔预付款项未及时结算的原因（供下方说明段落汇编，不作为附注列）"
+                @change="(v: string) => updateOver1Reason(row.rowId, v)"
+              />
+            </div>
+          </template>
+        </el-table-column>
         <el-table-column label="债务人名称" min-width="160">
           <template #default="{ row }">
             <template v-if="row.rowId === '__total__'">
@@ -131,7 +177,7 @@
             </template>
           </template>
         </el-table-column>
-        <el-table-column label="期末余额" min-width="130" align="right">
+        <el-table-column label="账面余额" min-width="130" align="right">
           <template #default="{ row }">
             <template v-if="row.rowId === '__total__' || row.fromCrossSheet">
               <span :class="{ 'cross-sheet-cell': row.fromCrossSheet, 'subtotal-val': row.rowId === '__total__' }">
@@ -143,6 +189,7 @@
                 :model-value="row.endBalance"
                 size="small"
                 :controls="false"
+                :precision="2"
                 :disabled="isReadonly"
                 style="width:100%"
                 @change="(v: number | undefined) => updateOver1Field(row.rowId, 'endBalance', v ?? 0)"
@@ -150,20 +197,27 @@
             </template>
           </template>
         </el-table-column>
-        <el-table-column label="占预付款项合计的比例(%)" min-width="160" align="right">
+        <el-table-column label="占预付款项合计的比例（%）" min-width="170" align="right">
           <template #default="{ row }">
             <span>{{ fmtPct(row.proportionPct) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="未偿还原因" min-width="160">
+        <el-table-column label="减值准备" min-width="130" align="right">
           <template #default="{ row }">
-            <el-input
-              v-if="row.rowId !== '__total__'"
-              :model-value="row.reason"
-              size="small"
-              :disabled="isReadonly"
-              @change="(v: string) => updateOver1Reason(row.rowId, v)"
-            />
+            <template v-if="row.rowId === '__total__'">
+              <span class="subtotal-val">{{ fmtAmount(row.impairment) }}</span>
+            </template>
+            <template v-else>
+              <el-input-number
+                :model-value="row.impairment"
+                size="small"
+                :controls="false"
+                :precision="2"
+                :disabled="isReadonly"
+                style="width:100%"
+                @change="(v: number | undefined) => updateOver1Field(row.rowId, 'impairment', v ?? 0)"
+              />
+            </template>
           </template>
         </el-table-column>
         <el-table-column v-if="!isReadonly" label="操作" min-width="64" width="64">
@@ -198,6 +252,10 @@
         (3) 按预付对象归集的预付款项期末余额前五名单位情况
         <GtIndexChip value="wp:F1-2" :context-project-id="projectId" />
       </h4>
+      <div class="methodology-context">
+        源模板说明：（按预付对象集中度，汇总或分别披露期末余额前五名的预付款项的期末余额及占预付款项期末余额合计数的比例。）
+        两种格式择一披露 —— 集中度低用汇总格式，集中度高或单户重大用分别格式。
+      </div>
       <p class="sub-label">汇总披露格式</p>
       <el-input
         type="textarea"
@@ -311,9 +369,11 @@ const {
   isApplicable,
   agingRows,
   agingTotal,
+  agingImpairmentRow,
   agingNet,
-  impairmentProvision,
   persistImpairment,
+  persistImpairmentPrior,
+  applyComposedOver1Note,
   over1YearRows,
   over1YearTotal,
   addOver1Row,
@@ -357,10 +417,27 @@ const top5TotalRow = computed(() => ({
   proportionPct: top5Total.value.proportionPct,
 }))
 
+/**
+ * (1) 账龄表 = 各账龄段 + 小计 + 减：减值准备 + 合计（与附注 §五、7 同构）
+ * `showPct`：减值准备行与合计行不参与比例校验（F7-8）→ 比例列显示 ——
+ */
+const agingTableData = computed(() => [
+  ...(agingRows.value ?? []).map((r) => ({ ...r, isSummary: false, showPct: true })),
+  { ...agingTotal.value, isSummary: true, showPct: true },
+  { ...agingImpairmentRow.value, endPct: 0, priorPct: 0, isSummary: false, showPct: false },
+  { ...agingNet.value, endPct: 0, priorPct: 0, isSummary: true, showPct: false },
+])
 /** 避免模板 spread 在 Ref 未就绪时抛出 “X is not iterable” */
-const agingTableData = computed(() => [...(agingRows.value ?? []), agingTotal.value])
 const over1TableData = computed(() => [...(over1YearRows.value ?? []), over1TotalRow.value])
 const top5TableData = computed(() => [...(top5Rows.value ?? []), top5TotalRow.value])
+
+function onComposeOver1Note(): void {
+  if (applyComposedOver1Note()) {
+    ElMessage.success('已按逐户原因生成说明')
+  } else {
+    ElMessage.warning('请先在展开行填写「未及时结算的原因」')
+  }
+}
 
 async function syncToDisclosureNotes() {
   const payload = buildF1SyncPayload(
@@ -462,15 +539,19 @@ function fmtPct(val: number | null | undefined): string {
 .hint { margin: 4px 0 12px; font-size: 12px; color: #909399; }
 .subtotal-label, .subtotal-val { font-weight: 700; }
 .cross-sheet-cell { background: #ecf5ff; padding: 2px 6px; border-radius: 2px; }
-.impairment-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: 10px;
-  font-size: 13px;
-}
-.impairment-row .lab { color: #606266; min-width: 100px; }
 .muted { color: #909399; }
+.methodology-context {
+  margin-bottom: 10px;
+  padding: 8px 12px;
+  border-left: 3px solid #e6a23c;
+  background: #fdf6ec;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #8a6d3b;
+  line-height: 1.7;
+}
+.expand-pane { padding: 8px 24px; display: flex; align-items: flex-start; gap: 10px; }
+.expand-label { font-size: 13px; color: #606266; white-space: nowrap; padding-top: 6px; }
 .note-area { margin-top: 12px; display: flex; align-items: flex-start; gap: 8px; }
 .note-prefix { font-size: 13px; color: #606266; white-space: nowrap; padding-top: 6px; }
 </style>

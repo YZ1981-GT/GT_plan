@@ -11,6 +11,22 @@ import {
 } from './f2NoteSectionMap'
 
 import type { ColumnDef } from './disclosureColumnDefs'
+import { DR_COL_LABELS, type DrSyncRow } from './f2DataResourceInventory'
+
+/**
+ * 「确认为存货的数据资源」列头（上市/国企共用，逐字取自附注模版）。
+ * 该表为三段式明细，无两级表头。
+ */
+function buildDataResourceColumns(): ColumnDef[] {
+  return [
+    // flat：源模版为单行表头，抑制前缀推断
+    { key: 'label', label: '项目', is_label: true, flat: true },
+    { key: 'purchased', label: DR_COL_LABELS.purchased, format: 'amount' },
+    { key: 'self_processed', label: DR_COL_LABELS.selfProcessed, format: 'amount' },
+    { key: 'other', label: DR_COL_LABELS.other, format: 'amount' },
+    { key: 'total', label: DR_COL_LABELS.total, format: 'amount' },
+  ]
+}
 
 export interface F2SyncFromWorkpaperPayload {
   wp_id: string
@@ -25,51 +41,53 @@ export interface F2SyncFromWorkpaperPayload {
 // ── 列头元数据：label 逐字取自 F2TabDisclosureListed/Soe 的 el-table-column（源对齐，禁止杜撰）──
 // 两级表头（如「期末数 > 账面余额」）在扁平投影中合并为「期末账面余额」，保留源语义。
 
+/** (3) 按组合计提：期末 / 上年年末两表列结构相同（源模板 R49-R61） */
+function buildPortfolioColumns(): ColumnDef[] {
+  return [
+    { key: 'group_name', label: '组合', is_label: true },
+    { key: 'balance', label: '金额', group: '账面余额', format: 'amount' },
+    { key: 'balance_pct', label: '比例(%)', group: '账面余额', format: 'percent' },
+    { key: 'impairment', label: '金额', group: '存货跌价准备', format: 'amount' },
+    { key: 'provision_standard', label: '计提标准', group: '存货跌价准备' },
+    { key: 'impairment_pct', label: '比例(%)', group: '存货跌价准备', format: 'percent' },
+    { key: 'net_value', label: '账面价值', format: 'amount' },
+  ]
+}
+
 export function buildF2ListedColumns(): Record<string, ColumnDef[]> {
   return {
+    // 两级表头：期末余额{账面余额,跌价准备,账面价值} / 上年年末余额{同}
     存货分类: [
-      { key: 'label', label: '存货种类', is_label: true },
-      { key: 'end_gross', label: '期末账面余额', format: 'amount' },
-      { key: 'end_impairment', label: '期末跌价准备/合同履约成本减值准备', format: 'amount' },
-      { key: 'end_net', label: '期末账面价值', format: 'amount' },
-      { key: 'prior_gross', label: '上年年末账面余额', format: 'amount' },
-      { key: 'prior_impairment', label: '上年年末跌价准备/合同履约成本减值准备', format: 'amount' },
-      { key: 'prior_net', label: '上年年末账面价值', format: 'amount' },
+      { key: 'label', label: '项目', is_label: true },
+      { key: 'end_gross', label: '账面余额', group: '期末余额', format: 'amount' },
+      { key: 'end_impairment', label: '跌价准备/合同履约成本减值准备', group: '期末余额', format: 'amount' },
+      { key: 'end_net', label: '账面价值', group: '期末余额', format: 'amount' },
+      { key: 'prior_gross', label: '账面余额', group: '上年年末余额', format: 'amount' },
+      { key: 'prior_impairment', label: '跌价准备/合同履约成本减值准备', group: '上年年末余额', format: 'amount' },
+      { key: 'prior_net', label: '账面价值', group: '上年年末余额', format: 'amount' },
     ],
+    // 两级表头：本期增加{计提,其他} / 本期减少{转回或转销,其他}；期初/期末为无分组列
     存货跌价准备及合同履约成本减值准备: [
-      { key: 'label', label: '存货种类', is_label: true },
+      { key: 'label', label: '项目', is_label: true },
       { key: 'opening', label: '期初余额', format: 'amount' },
-      { key: 'increase_provision', label: '本期增加-计提', format: 'amount' },
-      { key: 'increase_other', label: '本期增加-其他', format: 'amount' },
-      { key: 'decrease_reversal', label: '本期减少-转回或转销', format: 'amount' },
-      { key: 'decrease_other', label: '本期减少-其他', format: 'amount' },
+      { key: 'increase_provision', label: '计提', group: '本期增加', format: 'amount' },
+      { key: 'increase_other', label: '其他', group: '本期增加', format: 'amount' },
+      { key: 'decrease_reversal', label: '转回或转销', group: '本期减少', format: 'amount' },
+      { key: 'decrease_other', label: '其他', group: '本期减少', format: 'amount' },
       { key: 'ending', label: '期末余额', format: 'amount' },
     ],
     '存货跌价准备及合同履约成本减值准备（续）': [
-      { key: 'label', label: '存货种类', is_label: true },
+      // flat：源模板 B35/C35 为单行表头（与模板 JSON 的 columns 保持一致）
+      { key: 'label', label: '项目', is_label: true, flat: true },
       { key: 'nrv_basis', label: '确定可变现净值/剩余对价与将要发生的成本的具体依据' },
       { key: 'reversal_reason', label: '本期转回或转销存货跌价准备/合同履约成本减值准备的原因' },
     ],
-    按组合计提存货跌价准备: [
-      { key: 'group_name', label: '组合', is_label: true },
-      { key: 'balance', label: '账面余额-金额', format: 'amount' },
-      { key: 'balance_pct', label: '账面余额-比例(%)', format: 'percent' },
-      { key: 'impairment', label: '存货跌价准备-金额', format: 'amount' },
-      { key: 'provision_standard', label: '存货跌价准备-计提标准' },
-      { key: 'impairment_pct', label: '存货跌价准备-比例(%)', format: 'percent' },
-      { key: 'net_value', label: '账面价值', format: 'amount' },
-    ],
-    '按组合计提存货跌价准备（续）': [
-      { key: 'group_name', label: '组合', is_label: true },
-      { key: 'balance', label: '账面余额-金额', format: 'amount' },
-      { key: 'balance_pct', label: '账面余额-比例(%)', format: 'percent' },
-      { key: 'impairment', label: '存货跌价准备-金额', format: 'amount' },
-      { key: 'provision_standard', label: '存货跌价准备-计提标准' },
-      { key: 'impairment_pct', label: '存货跌价准备-比例(%)', format: 'percent' },
-      { key: 'net_value', label: '账面价值', format: 'amount' },
-    ],
+    按组合计提存货跌价准备: buildPortfolioColumns(),
+    '按组合计提存货跌价准备（续）': buildPortfolioColumns(),
+    // (5)~(7) 房企附表为单级表头（源模板 R67/R75/R84）→ flat 抑制前缀推断，
+    // 否则「本期增加/本期减少」会被反猜出一个源模板不存在的「本期」父表头
     开发成本: [
-      { key: 'project_name', label: '项目名称', is_label: true },
+      { key: 'project_name', label: '项目名称', is_label: true, flat: true },
       { key: 'start_date', label: '开工时间' },
       { key: 'expected_complete_date', label: '预计竣工时间' },
       { key: 'estimated_investment', label: '预计总投资', format: 'amount' },
@@ -78,7 +96,7 @@ export function buildF2ListedColumns(): Record<string, ColumnDef[]> {
       { key: 'end_impairment', label: '期末跌价准备', format: 'amount' },
     ],
     开发产品: [
-      { key: 'project_name', label: '项目名称', is_label: true },
+      { key: 'project_name', label: '项目名称', is_label: true, flat: true },
       { key: 'complete_date', label: '竣工时间' },
       { key: 'opening', label: '期初余额', format: 'amount' },
       { key: 'increase', label: '本期增加', format: 'amount' },
@@ -87,36 +105,40 @@ export function buildF2ListedColumns(): Record<string, ColumnDef[]> {
       { key: 'end_impairment', label: '期末跌价准备', format: 'amount' },
     ],
     周转房: [
-      { key: 'project_name', label: '项目名称', is_label: true },
+      { key: 'project_name', label: '项目名称', is_label: true, flat: true },
       { key: 'opening', label: '期初余额', format: 'amount' },
       { key: 'increase', label: '本期增加', format: 'amount' },
       { key: 'decrease', label: '本期减少', format: 'amount' },
       { key: 'ending', label: '期末余额', format: 'amount' },
     ],
+    确认为存货的数据资源: buildDataResourceColumns(),
   }
 }
 
 export function buildF2SoeColumns(): Record<string, ColumnDef[]> {
   return {
+    // 两级表头：期末数{账面余额,跌价准备,账面价值} / 期初数{同}（国企用「期末数/期初数」）
     存货分类: [
       { key: 'label', label: '项目', is_label: true },
-      { key: 'end_gross', label: '期末账面余额', format: 'amount' },
-      { key: 'end_impairment', label: '期末跌价准备/合同履约成本减值准备', format: 'amount' },
-      { key: 'end_net', label: '期末账面价值', format: 'amount' },
-      { key: 'prior_gross', label: '期初账面余额', format: 'amount' },
-      { key: 'prior_impairment', label: '期初跌价准备/合同履约成本减值准备', format: 'amount' },
-      { key: 'prior_net', label: '期初账面价值', format: 'amount' },
+      { key: 'end_gross', label: '账面余额', group: '期末数', format: 'amount' },
+      { key: 'end_impairment', label: '跌价准备/合同履约成本减值准备', group: '期末数', format: 'amount' },
+      { key: 'end_net', label: '账面价值', group: '期末数', format: 'amount' },
+      { key: 'prior_gross', label: '账面余额', group: '期初数', format: 'amount' },
+      { key: 'prior_impairment', label: '跌价准备/合同履约成本减值准备', group: '期初数', format: 'amount' },
+      { key: 'prior_net', label: '账面价值', group: '期初数', format: 'amount' },
     ],
+    // 两级表头：本期增加{计提,其他} / 本期减少{转回,转销,其他}——国企转回与转销分列
     存货跌价准备及合同履约成本减值准备: [
       { key: 'label', label: '存货种类', is_label: true },
       { key: 'opening', label: '期初数', format: 'amount' },
-      { key: 'increase_provision', label: '本期增加-计提', format: 'amount' },
-      { key: 'increase_other', label: '本期增加-其他', format: 'amount' },
-      { key: 'decrease_reversal', label: '本期减少-转回', format: 'amount' },
-      { key: 'decrease_writeoff', label: '本期减少-转销', format: 'amount' },
-      { key: 'decrease_other', label: '本期减少-其他', format: 'amount' },
+      { key: 'increase_provision', label: '计提', group: '本期增加', format: 'amount' },
+      { key: 'increase_other', label: '其他', group: '本期增加', format: 'amount' },
+      { key: 'decrease_reversal', label: '转回', group: '本期减少', format: 'amount' },
+      { key: 'decrease_writeoff', label: '转销', group: '本期减少', format: 'amount' },
+      { key: 'decrease_other', label: '其他', group: '本期减少', format: 'amount' },
       { key: 'ending', label: '期末数', format: 'amount' },
     ],
+    确认为存货的数据资源: buildDataResourceColumns(),
   }
 }
 
@@ -184,6 +206,8 @@ export interface F2ListedSyncSnapshot {
     netValue: number
   }>
   s4BorrowText: string
+  /** (4) 合同履约成本本期摊销说明（源：附注模版「（说明合同履约成本本期摊销金额。）」） */
+  s4AmortText: string
   s5Rows: Array<{
     projectName: string
     startDate: string
@@ -209,6 +233,8 @@ export interface F2ListedSyncSnapshot {
     decrease: number
     ending: number
   }>
+  /** (8) 确认为存货的数据资源（21 行三段式） */
+  s8DataResourceRows: DrSyncRow[]
   noteCategory: string
   noteNrv: string
   noteProvision: string
@@ -257,6 +283,8 @@ export interface F2SoeSyncSnapshot {
     decOther: number
     ending: number
   }
+  /** (5) 确认为存货的数据资源（21 行三段式） */
+  s5DataResourceRows: DrSyncRow[]
   noteCategory: string
   s3BorrowText: string
   s4AmortText: string
@@ -350,11 +378,14 @@ export function buildF2ListedSubTableData(snap: F2ListedSyncSnapshot): Record<st
       decrease: r.decrease,
       ending: r.ending,
     })),
+    // 容错残缺快照：缺该子表时推空数组而非抛错（同步链路不因单表缺失整体失败）
+    确认为存货的数据资源: (snap.s8DataResourceRows ?? []).map((r) => ({ ...r })),
     _note_texts: [
       { section: 'listed-note-category', text: snap.noteCategory },
       { section: 'listed-note-nrv', text: snap.noteNrv },
       { section: 'listed-note-provision', text: snap.noteProvision },
       { section: 'listed-note-borrow', text: snap.s4BorrowText },
+      { section: 'listed-note-amort', text: snap.s4AmortText },
       { section: 'listed-note-re', text: snap.noteRe },
     ],
   }
@@ -407,6 +438,8 @@ export function buildF2SoeSubTableData(snap: F2SoeSyncSnapshot): Record<string, 
         is_total: true,
       },
     ],
+    // 容错残缺快照：缺该子表时推空数组而非抛错
+    确认为存货的数据资源: (snap.s5DataResourceRows ?? []).map((r) => ({ ...r })),
     _note_texts: [
       { section: 'soe-note-category', text: snap.noteCategory },
       { section: 'soe-note-borrow', text: snap.s3BorrowText },

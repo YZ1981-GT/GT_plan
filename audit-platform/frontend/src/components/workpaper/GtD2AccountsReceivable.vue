@@ -289,6 +289,7 @@ import GtWpReviewRail from './GtWpReviewRail.vue'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useD2ReviewThreads } from './composables/useD2ReviewThreads'
 import { D2_SAVE_ITEMS_KEY, D2_WRITEBACK_KEY } from './composables/d2InjectionKeys'
+import { normalizeD2SheetName } from './composables/d2Constants'
 import D2TabIndex from './d2/D2TabIndex.vue'
 import GtOnlyOfficeSheet from './GtOnlyOfficeSheet.vue'
 
@@ -375,17 +376,7 @@ const relatedParties = computed<string[]>(() => {
 const isLoading = ref(true)
 const onlyOfficeFallback = ref(false)
 
-const currentSheet = computed(() => {
-  const name = props.sheetName || 'D2'
-  const codeMatch = name.match(/D2(?:-\d+)?[A-Z]?$|D2A$/)
-  if (codeMatch) return codeMatch[0]
-  if (name.includes('目录')) return '目录'
-  if (name.includes('上市')) return '附注上市'
-  if (name.includes('国企')) return '附注国企'
-  if (name.includes('截止')) return '截止测试'
-  if (name === 'D2' || name.startsWith('D2 ')) return 'D2'
-  return name
-})
+const currentSheet = computed(() => normalizeD2SheetName(props.sheetName))
 
 const d2ReviewSection = computed(() => resolveCycleReviewSection('D2', currentSheet.value))
 

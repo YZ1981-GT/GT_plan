@@ -430,9 +430,11 @@ const allResponses = ref<Map<string, any>>(new Map())
 const currentSheet = computed(() => {
   const name = props.sheetName || props.wpCode || ''
   // 附注匹配
+  // 源模板国企 sheet 名是「附注披露（国有企业）」——「国有企业」而非「国企」，
+  // 只认「国企」会落到末尾 fallback 被误判成上市（H1 实测踩中过）
   if (/附注.*上市|I2-note-listed/.test(name)) return '附注上市'
-  if (/附注.*国企|I2-note-soe/.test(name)) return '附注国企'
-  if (/附注/.test(name)) return name.includes('国企') ? '附注国企' : '附注上市'
+  if (/附注.*国企|附注.*国有|I2-note-soe/.test(name)) return '附注国企'
+  if (/附注/.test(name)) return name.includes('国企') || name.includes('国有') ? '附注国企' : '附注上市'
   // 程序表 I2A
   if (/I2A/.test(name)) return 'I2A'
   // I2-N 编码（I2-1 到 I2-16）

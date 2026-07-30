@@ -20,6 +20,7 @@
  *    故变动金额 = 期末金额 − 期初金额（保留披露表两期数据的净变动口径）。
  */
 import type { ColumnDef } from './disclosureColumnDefs'
+import { SOE_AGING_OVERRIDES, toDisclosureAgingLabel } from './disclosureAgingLabels'
 
 export type D3DisclosureVariant = 'listed' | 'soe'
 
@@ -95,7 +96,7 @@ const CHANGE_COLUMNS_LISTED: ColumnDef[] = [
 ]
 
 // ─── 快照行类型（组件层传入，字段与 useD3Disclosure* 行接口对齐）────────────────
-export interface D3RowLike { label: string; endAmount: number; priorAmount: number }
+export interface D3RowLike { label: string; endAmount: number; priorAmount: number; rowKey?: string }
 export interface D3LongTermRowLike { label: string; endAmount: number; priorAmount?: number; reason?: string }
 export interface D3ChangeRowLike { label: string; endAmount: number; priorAmount: number; reason?: string }
 
@@ -144,8 +145,12 @@ export function buildD3SyncPayload(
   }
 
   // ① 主表（上市按性质分类 / 国企按账龄）
+  //
+  // 🔴 合计行标签**不做**结构行映射：D3 附注模板（五、38 / 八、38）合计行字面为
+  // `合计`（无空格），与 D2 §五、5 / §八、5 的 `合 计` 不同 —— 按附注模板逐字照抄，
+  // 不套 `DISCLOSURE_TOTAL_LABEL`，否则反而制造漂移。
   const mainRow = (r: D3RowLike, isTotal = false) => ({
-    label: str(r.label),
+    label: isTotal || !isSoe ? str(r.label) : toDisclosureAgingLabel(r, SOE_AGING_OVERRIDES),
     end_amount: num(r.endAmount),
     prior_amount: num(r.priorAmount),
     ...(isTotal ? { is_total: true } : {}),

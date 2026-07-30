@@ -162,7 +162,6 @@ import { useL5FormData } from '../../composables/useL5FormData'
 import { calcNetPayable } from '../../composables/useL5FormulaEngine'
 import { L5_NOTE_SECTION, buildL5SyncPayload } from '../../composables/l5NoteSectionMap'
 import { buildNoteJumpRoute } from '@/views/composables/noteDisclosureReverseJump'
-import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 
 const props = defineProps<{
   wpId: string

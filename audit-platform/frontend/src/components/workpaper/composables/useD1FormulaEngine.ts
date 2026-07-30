@@ -314,3 +314,55 @@ export function determineReportItem(businessMode: string): string {
   }
   return ''
 }
+
+// ─── 坏账分类表派生列（读时推导，禁止持久化）─────────────────────────────────
+
+/** 坏账分类行的最小形状（仅派生列所需字段）。 */
+export interface ClassRowDerivable {
+  balance: number
+  provision: number
+  ratio: number
+  lossRate: number
+  bookValue: number
+}
+
+/**
+ * 重算单行的三个派生列（纯函数）。
+ *
+ * 口径取自应收票据校验预设（`note_check_preset_formulas.json` 的 `F4-*`）：
+ * - `F4-25` 比例(%)          = 该行账面余额 ÷ **合计行**账面余额 × 100
+ * - `F4-12` 预期信用损失率(%) = 坏账准备 ÷ 账面余额 × 100
+ * - `F4-11` 账面价值          = 账面余额 − 坏账准备
+ *
+ * 🔴 三列必须**读时推导**，不能持久化后再用：
+ * 历史实现把 `ratio` 存进行对象、只在编辑时用**编辑前**的合计做分母重算被编辑的那一行，
+ * 组件层又把两个不同分母的 `ratio` 相加（银承 / 商承）→ 浏览器实测「按组合计提坏账准备」
+ * 行显示 162.50%（应 100.00%），且错值已随同步进入附注。
+ * 比率乘 100 由展示层 `fmtPct` / 同步层 `pct()` 负责，此处一律存分数。
+ */
+export function deriveClassRow<T extends ClassRowDerivable>(row: T, totalBalance: number): T {
+  return {
+    ...row,
+    ratio: safeDivide(row.balance, totalBalance),
+    lossRate: safeDivide(row.provision, row.balance),
+    bookValue: calcNetValue(row.balance, row.provision),
+  }
+}
+
+/** 批量重算派生列（分母统一取传入的合计账面余额）。 */
+export function deriveClassRows<T extends ClassRowDerivable>(
+  rows: readonly T[],
+  totalBalance: number,
+): T[] {
+  return rows.map((r) => deriveClassRow(r, totalBalance))
+}
+
+/**
+ * 部分 ÷ 整体（分数），整体为 0 时返回 0。
+ *
+ * 组件层聚合行（如国企「按组合计提坏账准备」= 银承 + 商承）必须用本函数按
+ * **聚合后的金额**重算，禁止把成员行的比率相加。
+ */
+export function ratioOf(part: number, whole: number): number {
+  return safeDivide(part, whole)
+}
