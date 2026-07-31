@@ -65,12 +65,10 @@ const MISSING_SYNC_PATH: readonly string[] = [
   'H5TabDisclosureListed.vue',
   // H6（2）已补齐：改为 v-bind="$props" 薄壳，由 resolveDelegate 解析到 H6TabDisclosure.vue
   //   （已有 useDisclosureAutoSync + syncToNotes + buildH6*SyncPayloads 完整链路）
-  // 🔴 H7（2）**需结构对齐重建**（暂留缺口）：源模板 §五、24/八、24 是「以成本计量」
-  //   转置矩阵（类别作列 种植业/畜牧养殖业/林业/水产业，行为账面原值/累计折旧/减值准备/
-  //   账面价值明细）+「以公允价值计量」变动表；现有组件只有单行 movementRows，
-  //   无法在不自造披露内容的前提下映射 → 按 G6 范式另立批次重建，不做仓促接线。
-  'H7TabDisclosureListed.vue',
-  'H7TabDisclosureSoe.vue',
+  // H7（2）已收口（spec h7-biological-assets-disclosure-rebuild）：两个 Tab 由「单行只读
+  //   movementRows」整体重建为源模板结构（上市 = 产业分组的两级表头列转置表，34 行 / 11 行；
+  //   国企 = 4 产业 + 可扩类别行 5 列表），并建立 h7NoteSectionMap / h7DisclosureSyncPayload
+  //   与自动同步 → 按「清单只许变短」移出。
   // J2（2）
   'J2TabDisclosureListed.vue',
   'J2TabDisclosureSoe.vue',
@@ -464,8 +462,9 @@ describe('披露 Tab 同步链路完整性', () => {
   // L6×2 补齐 → 34；L5×2 补齐 → 30
   // M 循环批 4：M4×2 / M5×2 / M7×2 补齐（标准权益变动表）→ 24
   //   （M1×2 豁免归 K3、M2/M3/M6/M8/M9/M10 结构不同构留清单）
-  it('缺链路数量记录在案（23 个）', () => {
-    expect(MISSING_SYNC_PATH.length).toBe(23)
+  // H7×2 整体重建后补齐（h7-biological-assets-disclosure-rebuild）→ 21
+  it('缺链路数量记录在案（21 个）', () => {
+    expect(MISSING_SYNC_PATH.length).toBe(21)
   })
 
   /**

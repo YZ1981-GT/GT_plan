@@ -96,6 +96,75 @@ describe('F1 disclosure mount', () => {
     expect(w.find('.f1-disclosure-soe').exists()).toBe(true)
   })
 
+  it('两个披露表都渲染四表溯源面板与勾稽面板（消除 dead output）', async () => {
+    for (const [Comp, std, root] of [
+      [F1TabDisclosureListed, 'listed_standalone', '.f1-disclosure-listed'],
+      [F1TabDisclosureSoe, 'soe_standalone', '.f1-disclosure-soe'],
+    ] as const) {
+      const w = mount(Comp as any, {
+        props: {
+          allResponses: new Map(),
+          wpId: 'w1',
+          projectId: 'p1',
+          isReadonly: false,
+          crossSheet: makeCrossSheet(),
+          applicableStandards: [std],
+          saveImmediate: vi.fn(),
+          debouncedSave: vi.fn(),
+          tbSourceCodes: {
+            row_code: 'BS-008',
+            formula: "TB('1123','期末余额')",
+            gross: ['1123'],
+            gross_standard: ['1123'],
+            provision: ['1231'],
+            provision_standard: ['1231-04'],
+            resolved_from: 'report_config',
+            provision_resolved_from: 'fallback',
+            provision_exact: false,
+            use_provision_name_filter: true,
+          },
+          reportAmount: 100,
+        },
+        global: { stubs },
+      })
+      await flushPromises()
+      expect(w.find(root).exists()).toBe(true)
+      expect(w.find('.f1-four-table-source').exists(), `${root} 缺溯源面板`).toBe(true)
+      expect(w.find('.f1-consistency').exists(), `${root} 缺勾稽面板`).toBe(true)
+    }
+  })
+
+  it('上市③前五名默认「分别披露格式」，可切到「汇总披露格式」', async () => {
+    const w = mount(F1TabDisclosureListed, {
+      props: {
+        allResponses: new Map(),
+        wpId: 'w1',
+        projectId: 'p1',
+        isReadonly: false,
+        crossSheet: makeCrossSheet(),
+        applicableStandards: ['listed_standalone'],
+        saveImmediate: vi.fn(),
+        debouncedSave: vi.fn(),
+      },
+      global: { stubs },
+    })
+    await flushPromises()
+    expect((w.vm as any).top5Mode).toBe('separate')
+    ;(w.vm as any).setTop5Mode('summary')
+    await flushPromises()
+    expect((w.vm as any).top5Mode).toBe('summary')
+  })
+
+  it('F1-1 审定表 SFC 可编译并导出组件（结构级冒烟）', async () => {
+    const mod = await import('../f1/F1TabAdjudication.vue')
+    expect(mod.default).toBeTruthy()
+    // Vue SFC 编译产物必有 render / setup
+    expect(
+      typeof (mod.default as any).render === 'function'
+      || typeof (mod.default as any).setup === 'function',
+    ).toBe(true)
+  })
+
   it('composable 同时导出 section1Rows 别名（兼容旧模板）', () => {
     vi.spyOn(window, 'addEventListener').mockImplementation(() => undefined)
     vi.spyOn(window, 'removeEventListener').mockImplementation(() => undefined)

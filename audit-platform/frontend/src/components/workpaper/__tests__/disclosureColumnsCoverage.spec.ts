@@ -352,6 +352,11 @@ const P1_ROUTE: Record<string, { spec: string; complete: boolean; note?: string 
   buildF2SoeColumns: { spec: '__tests__/f2NoteSectionMap.spec.ts', complete: true },
   buildH1ListedColumns: { spec: 'composables/__tests__/h1NoteSubtableContract.spec.ts', complete: true },
   buildH3ListedColumns: { spec: 'composables/__tests__/h3NoteSubtableContract.spec.ts', complete: true },
+  buildH7ListedColumns: {
+    spec: 'composables/__tests__/h7NoteSubtableContract.spec.ts',
+    complete: true,
+    note: 'h7-biological-assets-disclosure-rebuild：默认类别下列 key ≡ 模板列 key + 行键 ⊆ 列键 + 产业分组两级表头',
+  },
   buildH3SoeColumns: { spec: 'composables/__tests__/h3NoteSubtableContract.spec.ts', complete: true },
   buildH8ListedColumns: {
     spec: 'composables/__tests__/h8NoteSubtableContract.spec.ts',
