@@ -9606,7 +9606,36 @@
               "label": "3．井及相关设施",
               "row_type": "data"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "begin",
+              "label": "期初余额",
+              "format": "amount"
+            },
+            {
+              "key": "increase",
+              "label": "本期增加额",
+              "format": "amount"
+            },
+            {
+              "key": "decrease",
+              "label": "本期减少额",
+              "format": "amount"
+            },
+            {
+              "key": "end",
+              "label": "期末余额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "油气资产分类表（源模板 R9–R24）：四层结构 —— 一、原价合计 / 二、累计折耗合计 / 三、油气资产减值准备累计金额合计 / 四、油气资产账面价值合计，各层下以「其中：」列示 探明矿区权益 / 未探明矿区权益 / 井及相关设施（累计折耗层源模板只列 探明矿区权益 与 井及相关设施 两类）。源模板列示约定：「四、油气资产账面价值合计」层的「本期增加额」「本期减少额」填「—」（该层为推导层，不作变动分析）。勾稽：各层 期末余额 = 期初余额 + 本期增加额 − 本期减少额；四、账面价值合计 = 一、原价合计 − 二、累计折耗合计 − 三、减值准备累计金额合计（逐期成立）；各层合计行 = 该层「其中：」各类别之和。另需披露当期在国内和国外发生的取得矿区权益、油气勘探和油气开发各项支出的总额。数据来源：审定表 H5-1 / 明细表 H5-2 / 折耗测算表 H5-12 / 减值测算表 H5-14。"
         }
       ],
       "text_sections": [
@@ -9627,7 +9656,9 @@
       "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
       "sort_index": 24,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "h5-oil-gas-disclosure-alignment",
+      "_aligned_at": "2026-07-31 19:45:30"
     },
     {
       "section_number": "八、26",
