@@ -31,11 +31,38 @@ from app.services.conflict_resolution_service import (
     _check_manual_override_before_propagate,
 )
 from app.services.note_sub_table_projector import normalize_sub_table_data
+from app.services.standard_unification_service import (
+    StandardUnificationService,
+    derive_applicable_standards,
+    detect_standard_conflict,
+)
 
 logger = logging.getLogger(__name__)
 
 
 # ─── Conflict Error ──────────────────────────────────────────────────────────
+
+
+class StandardMismatchError(ValueError):
+    """``current_standard`` 与项目 ``entity_type`` 冲突（跨主体类型同步）。
+
+    继承 ``ValueError``：即便某个调用方未显式捕获本类型，既有的
+    ``except ValueError -> 422`` 兜底仍会拦住写入，不会退化成 500 或静默写错章节。
+
+    Spec: applicable-standards-runtime-and-sync-guard R4.1
+    """
+
+    code = "STANDARD_MISMATCH"
+
+    def __init__(self, conflict: dict[str, Any]):
+        self.conflict = conflict
+        self.project_standard = str(conflict.get("project_standard") or "")
+        self.requested_standard = str(conflict.get("requested_standard") or "")
+        self.allowed = list(conflict.get("allowed") or [])
+        super().__init__(
+            f"项目适用准则为 {self.project_standard}，"
+            f"不能以 {self.requested_standard} 同步披露数据"
+        )
 
 
 class ConflictError(Exception):
@@ -250,6 +277,81 @@ async def _resolve_project_audit_year(
     return None
 
 
+async def _resolve_project_sync_context(
+    db: AsyncSession, project_id: UUID
+) -> tuple[int | None, dict | None]:
+    """一次查询取回 ``(审计年度, 结构化准则)``；任何异常 → ``(None, None)`` fail-open。
+
+    合并了原先只为 ``audit_year`` 而做的那次查询（R4.7：守卫不引入额外 DB 往返）。
+    准则优先读 v2 权威源，缺失时用旧列 ``template_type`` / ``report_scope`` 兜底；
+    两者皆空返回 ``None``（表示"不可判"，守卫据此放行，而不是被
+    ``_normalize_standard`` 补成默认的 soe 从而误杀上市项目）。
+    """
+    try:
+        row = (
+            await db.execute(
+                sa.select(
+                    Project.audit_year,
+                    Project.applicable_standard_v2,
+                    Project.template_type,
+                    Project.report_scope,
+                ).where(
+                    Project.id == project_id,
+                    Project.is_deleted == sa.false(),
+                )
+            )
+        ).first()
+        if row is None:
+            return None, None
+        audit_year, v2, template_type, report_scope = row
+        year = audit_year if isinstance(audit_year, int) and audit_year > 0 else None
+        standard: dict | None = None
+        if isinstance(v2, dict) and v2:
+            standard = StandardUnificationService._normalize_standard(v2)
+        elif template_type or report_scope:
+            standard = StandardUnificationService._normalize_standard(
+                {"entity_type": template_type, "scope": report_scope}
+            )
+        return year, standard
+    except Exception as err:  # pragma: no cover - 查询异常时安全降级
+        logger.warning(
+            "resolve project sync context failed for project %s: %s; falling back",
+            project_id, err,
+        )
+        return None, None
+
+
+def _guard_standard_matches_project(
+    project_id: UUID,
+    project_standard: dict | None,
+    requested_standard: str,
+    section_id: str,
+) -> None:
+    """跨主体类型（listed vs soe）的披露同步守卫。冲突则抛 :class:`StandardMismatchError`。
+
+    必须在**任何写入语句之前**调用（Property 6：拒绝时零写入）。
+    """
+    conflict = detect_standard_conflict(project_standard, requested_standard)
+    if conflict is not None:
+        logger.warning(
+            "wp_disclosure_sync: REJECTED cross-entity sync project=%s section=%s "
+            "project_standard=%s requested=%s",
+            project_id, section_id,
+            conflict.get("project_standard"), conflict.get("requested_standard"),
+        )
+        raise StandardMismatchError(conflict)
+    requested = str(requested_standard or "").strip().lower()
+    if requested and isinstance(project_standard, dict) and project_standard:
+        allowed = derive_applicable_standards(project_standard)
+        if requested not in allowed:
+            # R4.3：entity 一致、仅 scope 维度不同（合并 vs 个别报表口径）→ 放行留痕
+            logger.warning(
+                "wp_disclosure_sync: scope mismatch (allowed) project=%s section=%s "
+                "requested=%s allowed=%s",
+                project_id, section_id, requested, allowed,
+            )
+
+
 async def _resolve_target_year(
     db: AsyncSession, project_id: UUID, payload_year: int | None
 ) -> int:
@@ -315,7 +417,20 @@ async def sync_from_workpaper(
         raise ValueError("section_id 不能为空")
     section_id = section_id.strip()
 
-    target_year = await _resolve_target_year(db, project_id, year)
+    # 一次查询同时拿到审计年度与项目准则（R4.7）
+    audit_year, project_standard = await _resolve_project_sync_context(db, project_id)
+    # 🔴 守卫必须在任何写入之前：定位键不含 current_standard，跨主体类型的推送
+    # 会静默写进错误章节（国企项目的「五、xx」是另一套压缩编号）。
+    _guard_standard_matches_project(
+        project_id, project_standard, current_standard, section_id
+    )
+
+    if year and isinstance(year, int):
+        target_year = year
+    elif audit_year is not None:
+        target_year = audit_year
+    else:
+        target_year = _derive_year(None)
     now = datetime.now(timezone.utc)
     clean_sub_table_data, note_texts = _extract_note_texts(sub_table_data)
     clean_sub_table_data, removed_table_keys = _extract_removed_table_keys(clean_sub_table_data)

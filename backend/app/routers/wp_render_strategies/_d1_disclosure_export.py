@@ -260,6 +260,12 @@ def _create_template_workbook(variant: str) -> "Workbook":
     guide_ws.append(["4）坏账分类表中“其中：”行为说明行，可保留；明细行可自行增删。"])
     guide_ws.append(["5）说明事项sheet用于填写页面中的各段“说明”文本。"])
     guide_ws.append(["6）如提示列名不匹配，请使用最新模板重新填写。"])
+    guide_ws.append(["7）“（4.3）组合计提-银行/商业承兑汇票”按出票人类型或账龄逐行填写；"
+                     "上市版含期末与上年年末两组金额，按名称成对对齐（同名视为同一行）。"])
+    if variant == 'soe':
+        guide_ws.append(["8）“（5）坏账准备变动（其中明细）”填写按组合计提下的明细；"
+                         "填了明细后“按组合计提预期信用损失的应收票据”行按明细汇总（校验预设 F4-20）。"])
+    guide_ws.append(["9）比例、预期信用损失率等派生列由系统按金额推导，模板中不提供，请勿另加列。"])
     guide_ws.column_dimensions["A"].width = 110
 
     return wb
@@ -361,6 +367,9 @@ def _fill_template_with_data(wb: "Workbook", variant: str, response_map: dict[st
         {'项目': '期末数', '坏账准备金额': _num(mv.get('endBalance'))},
     ]
 
+    # 上市源模板用「计提依据」，国企用「计提理由」（逐表措辞，见附注模板 五、4[6] / 八、4[3]）
+    basis_col = '计提理由' if variant == 'soe' else '计提依据'
+
     def build_bad_debt_class(period: str) -> list[dict[str, Any]]:
         class_rows = get_rows(f'class-{period}-rows')
         individuals = get_rows(f'individual-{"end" if period=="end" else "prior"}-rows')
@@ -374,19 +383,19 @@ def _fill_template_with_data(wb: "Workbook", variant: str, response_map: dict[st
         total_prov = _num(single.get('provision')) + combo_prov
         total_book = total_bal - total_prov
         rows: list[dict[str, Any]] = [
-            {'类别': '按单项计提坏账准备', '账面余额': _num(single.get('balance')), '坏账准备': _num(single.get('provision')), '预期信用损失率（%）': '', '计提依据': '', '账面价值': _num(single.get('bookValue'))},
-            {'类别': '其中：', '账面余额': '', '坏账准备': '', '预期信用损失率（%）': '', '计提依据': '', '账面价值': ''},
+            {'类别': '按单项计提坏账准备', '账面余额': _num(single.get('balance')), '坏账准备': _num(single.get('provision')), '预期信用损失率(%)': '', basis_col: '', '账面价值': _num(single.get('bookValue'))},
+            {'类别': '其中：', '账面余额': '', '坏账准备': '', '预期信用损失率(%)': '', basis_col: '', '账面价值': ''},
         ]
         for r in individuals:
             bal = _num(r.get('balance'))
             prov = _num(r.get('provision'))
-            rows.append({'类别': r.get('name', ''), '账面余额': bal, '坏账准备': prov, '预期信用损失率（%）': '', '计提依据': r.get('basis', ''), '账面价值': bal - prov})
+            rows.append({'类别': r.get('name', ''), '账面余额': bal, '坏账准备': prov, '预期信用损失率(%)': '', basis_col: r.get('basis', ''), '账面价值': bal - prov})
         rows.extend([
-            {'类别': '按组合计提坏账准备', '账面余额': combo_bal, '坏账准备': combo_prov, '预期信用损失率（%）': '', '计提依据': '', '账面价值': combo_bal - combo_prov},
-            {'类别': '其中：', '账面余额': '', '坏账准备': '', '预期信用损失率（%）': '', '计提依据': '', '账面价值': ''},
-            {'类别': '银行承兑汇票', '账面余额': _num(bank.get('balance')), '坏账准备': _num(bank.get('provision')), '预期信用损失率（%）': '', '计提依据': '', '账面价值': _num(bank.get('bookValue'))},
-            {'类别': '商业承兑汇票', '账面余额': _num(commercial.get('balance')), '坏账准备': _num(commercial.get('provision')), '预期信用损失率（%）': '', '计提依据': '', '账面价值': _num(commercial.get('bookValue'))},
-            {'类别': '合计', '账面余额': total_bal, '坏账准备': total_prov, '预期信用损失率（%）': '', '计提依据': '', '账面价值': total_book},
+            {'类别': '按组合计提坏账准备', '账面余额': combo_bal, '坏账准备': combo_prov, '预期信用损失率(%)': '', basis_col: '', '账面价值': combo_bal - combo_prov},
+            {'类别': '其中：', '账面余额': '', '坏账准备': '', '预期信用损失率(%)': '', basis_col: '', '账面价值': ''},
+            {'类别': '银行承兑汇票', '账面余额': _num(bank.get('balance')), '坏账准备': _num(bank.get('provision')), '预期信用损失率(%)': '', basis_col: '', '账面价值': _num(bank.get('bookValue'))},
+            {'类别': '商业承兑汇票', '账面余额': _num(commercial.get('balance')), '坏账准备': _num(commercial.get('provision')), '预期信用损失率(%)': '', basis_col: '', '账面价值': _num(commercial.get('bookValue'))},
+            {'类别': '合计', '账面余额': total_bal, '坏账准备': total_prov, '预期信用损失率(%)': '', basis_col: '', '账面价值': total_book},
         ])
         return rows
 
@@ -406,6 +415,34 @@ def _fill_template_with_data(wb: "Workbook", variant: str, response_map: dict[st
                 ws.cell(row=r_idx, column=c_idx, value=cell_val)
 
 
+def _header_cells(ws: Any, section: str, variant: str) -> list[str]:
+    """读末级表头（按列序，空串占位）。
+
+    🔴 纵向合并的列（`A1:A2` / `B1:B2` 这类 rowspan=2 的表头）在 openpyxl 里
+    **只有左上角单元格有值**，第 2 行被清空 → 直接读第 2 行会漏掉标签列，
+    导致「导入自家导出的模板」必然报「缺少列」（本轮往返自检发现的既有缺陷）。
+    故第 2 行为空时回退取同列第 1 行的值。
+    """
+    mh = _multi_header(section, variant)
+    if not mh:
+        return [
+            (str(c.value).strip() if c.value is not None else '')
+            for c in ws[1]
+        ]
+    row1 = list(ws[1])
+    row2 = list(ws[2])
+    width = max(len(row1), len(row2))
+    out: list[str] = []
+    for i in range(width):
+        v2 = row2[i].value if i < len(row2) else None
+        if v2 is not None and str(v2).strip() != '':
+            out.append(str(v2).strip())
+            continue
+        v1 = row1[i].value if i < len(row1) else None
+        out.append(str(v1).strip() if v1 is not None else '')
+    return out
+
+
 def _validate_columns(ws: Any, section: str, variant: str) -> list[str]:
     """Validate column names, return list of invalid column names."""
     expected_list = _cols(section, variant)
@@ -413,12 +450,7 @@ def _validate_columns(ws: Any, section: str, variant: str) -> list[str]:
     if not expected:
         return ['未知的section类型']
 
-    mh = _multi_header(section, variant)
-    header_row = 2 if mh else 1
-    actual: list[str] = []
-    for cell in ws[header_row]:
-        if cell.value is not None and str(cell.value).strip() != '':
-            actual.append(str(cell.value).strip())
+    actual = [c for c in _header_cells(ws, section, variant) if c]
 
     invalid = [col for col in actual if col not in expected]
     missing = [col for col in expected_list if col not in actual]
@@ -432,14 +464,9 @@ def _parse_rows(ws: Any, section: str, variant: str) -> tuple[list[dict], str | 
     """Parse data rows into dict list, truncate at MAX_IMPORT_ROWS."""
     columns = _cols(section, variant)
     mh = _multi_header(section, variant)
-    header_row = 2 if mh else 1
     data_start = int(mh["data_start_row"]) if mh else 2
-    actual_cols: list[str] = []
-    for cell in ws[header_row]:
-        if cell.value is not None:
-            actual_cols.append(str(cell.value).strip())
-        else:
-            actual_cols.append('')
+    # 与 _validate_columns 同一套表头读取（纵向合并列回退第 1 行）
+    actual_cols = _header_cells(ws, section, variant)
 
     rows: list[dict] = []
     warning: str | None = None
@@ -693,7 +720,7 @@ async def import_disclosure_data(
                     "balance": bal,
                     "provision": prov,
                     "lossRate": (prov / bal) if bal else 0,
-                    "basis": str(row.get('计提依据') or ''),
+                    "basis": str(row.get('计提依据') or row.get('计提理由') or ''),
                 })
         class_rows = [
             {"rowId": f"class-{period}-individual", "rowType": "fixed", "label": "按单项计提", "isFixed": True, "balance": single_balance, "ratio": 0, "provision": single_provision, "lossRate": (single_provision / single_balance) if single_balance else 0, "bookValue": single_balance - single_provision},
@@ -705,23 +732,77 @@ async def import_disclosure_data(
             r["ratio"] = (r["balance"] / total_balance) if total_balance else 0
         return class_rows, individuals
 
-    movement_map = {
-        '上年年末数': 'priorBalance',
-        '本期计提': 'provision',
-        '本期收回或转回': 'reversal',
-        '本期核销': 'writeOff',
-        '【本期转销】': 'transfer',
-        '【其他】': 'other',
-        '期末数': 'endBalance',
-    }
-    mv_obj = {"rowId": "mv-total", "rowType": "fixed", "label": "合计", "isFixed": True, "priorBalance": 0, "provision": 0, "reversal": 0, "writeOff": 0, "transfer": 0, "other": 0, "endBalance": 0}
-    for row in parsed_by_sheet.get('badDebtMovementMain', []):
-        label = str(row.get('项目') or '').strip()
-        key = movement_map.get(label)
-        if key:
-            mv_obj[key] = _num(row.get('坏账准备金额'))
-    if not mv_obj["endBalance"]:
-        mv_obj["endBalance"] = mv_obj["priorBalance"] + mv_obj["provision"] - mv_obj["reversal"] - mv_obj["writeOff"] - mv_obj["transfer"] + mv_obj["other"]
+    def _end_balance(o: dict[str, Any]) -> float:
+        """期末 = 期初 + 计提 − 收回或转回 − 核销 − 转销 − 其他变动（源模板 G48 / B100）。"""
+        return (
+            _num(o.get('priorBalance')) + _num(o.get('provision'))
+            - _num(o.get('reversal')) - _num(o.get('writeOff'))
+            - _num(o.get('transfer')) - _num(o.get('other'))
+        )
+
+    movement_rows_payload: list[dict[str, Any]]
+    if variant == 'soe':
+        # 国企变动主表是横排：类别 × 期初 / 计提 / 收回或转回 / 核销 / 其他变动 / 期末
+        soe_mv_labels = [
+            ('mv-individual', '按单项计提', '单项计提预期信用损失的应收票据'),
+            ('mv-portfolio', '按组合计提', '按组合计提预期信用损失的应收票据'),
+            ('mv-total', '合计', '合计'),
+        ]
+        by_label = {str(r.get('类别') or '').strip(): r for r in parsed_by_sheet.get('badDebtMovementMain', [])}
+        movement_rows_payload = []
+        for row_id, stored_label, sheet_label in soe_mv_labels:
+            src = by_label.get(sheet_label, {})
+            obj = {
+                "rowId": row_id, "rowType": "fixed", "label": stored_label, "isFixed": True,
+                "priorBalance": _num(src.get('期初数')),
+                "provision": _num(src.get('计提')),
+                "reversal": _num(src.get('收回或转回')),
+                "writeOff": _num(src.get('核销')),
+                "transfer": 0.0,
+                "other": _num(src.get('其他变动')),
+                "endBalance": _num(src.get('期末数')),
+            }
+            if not obj["endBalance"]:
+                obj["endBalance"] = _end_balance(obj)
+            movement_rows_payload.append(obj)
+    else:
+        movement_map = {
+            '上年年末数': 'priorBalance',
+            '本期计提': 'provision',
+            '本期收回或转回': 'reversal',
+            '本期核销': 'writeOff',
+            '【本期转销】': 'transfer',
+            '【其他】': 'other',
+            '期末数': 'endBalance',
+        }
+        mv_obj: dict[str, Any] = {"rowId": "mv-total", "rowType": "fixed", "label": "合计", "isFixed": True, "priorBalance": 0, "provision": 0, "reversal": 0, "writeOff": 0, "transfer": 0, "other": 0, "endBalance": 0}
+        for row in parsed_by_sheet.get('badDebtMovementMain', []):
+            label = str(row.get('项目') or '').strip()
+            key = movement_map.get(label)
+            if key:
+                mv_obj[key] = _num(row.get('坏账准备金额'))
+        if not mv_obj["endBalance"]:
+            mv_obj["endBalance"] = _end_balance(mv_obj)
+        movement_rows_payload = [mv_obj]
+
+    # 国企「其中：」明细行（F4-20）
+    movement_detail_payload = []
+    for r in parsed_by_sheet.get('movementDetail', []):
+        label = str(r.get('类别') or '').strip()
+        if not label:
+            continue
+        obj = {
+            "rowId": f"mvd-{uuid.uuid4().hex[:10]}", "rowType": "dynamic", "label": label, "isFixed": False,
+            "priorBalance": _num(r.get('期初数')),
+            "provision": _num(r.get('计提')),
+            "reversal": _num(r.get('收回或转回')),
+            "writeOff": _num(r.get('核销')),
+            "transfer": 0.0,
+            "other": _num(r.get('其他变动')),
+            "endBalance": 0.0,
+        }
+        obj["endBalance"] = _end_balance(obj)
+        movement_detail_payload.append(obj)
 
     class_end_rows, individual_end_rows = build_class_rows(parsed_by_sheet.get('badDebtClassEnd', []), 'end')
     class_prior_rows, individual_prior_rows = build_class_rows(parsed_by_sheet.get('badDebtClassPrior', []), 'prior')
@@ -731,10 +812,14 @@ async def import_disclosure_data(
             "rowId": f"rv-{uuid.uuid4().hex[:10]}",
             "rowType": "dynamic",
             "isFixed": False,
-            "companyName": str(r.get('单位名称') or ''),
-            "reversalReason": str(r.get('转回原因') or ''),
+            "companyName": str(r.get('债务人名称') if variant == 'soe' else r.get('单位名称') or ''),
+            # 国企只有「转回或收回原因、方式」一列文本
+            "reversalReason": str(
+                (r.get('转回或收回原因、方式') if variant == 'soe' else r.get('转回原因')) or ''
+            ),
             "originalMethod": str(r.get('收回方式') or ''),
-            "reversalBasis": str(r.get('原确定坏账准备金额的依据') or ''),
+            "reversalBasis": str(r.get('原确定坏账准备的依据') or ''),
+            "cumulativeProvision": _num(r.get('转回或收回前累计已计提坏账准备金额')),
             "amount": _num(r.get('转回或收回金额')),
         }
         for r in parsed_by_sheet.get('badDebtMovementDetail', [])
@@ -745,11 +830,15 @@ async def import_disclosure_data(
             "rowType": "dynamic",
             "isFixed": False,
             "companyName": str(r.get('单位名称') or ''),
-            "noteType": str(r.get('应收票据') or ''),
+            "noteType": str(
+                (r.get('应收票据的性质') if variant == 'soe' else r.get('应收票据性质')) or ''
+            ),
             "amount": _num(r.get('核销金额')),
             "reason": str(r.get('核销原因') or ''),
             "procedure": str(r.get('履行的核销程序') or ''),
-            "relatedPartyFlag": str(r.get('款项是否由关联交易产生') or ''),
+            "relatedPartyFlag": str(
+                (r.get('是否由关联交易产生') if variant == 'soe' else r.get('款项是否由关联交易产生')) or ''
+            ),
         }
         for r in parsed_by_sheet.get('writeOffDetail', [])
     ]
@@ -761,22 +850,41 @@ async def import_disclosure_data(
 
     payload_items: list[tuple[str, str]] = []
     payload_items.append(_upsert_item_payload(variant, 'pledged-rows', [
-        {"rowId": f"pl-{uuid.uuid4().hex[:10]}", "rowType": "dynamic", "category": str(r.get('票据种类') or ''), "isFixed": False, "pledgedAmount": _num(r.get('期末已质押金额'))}
+        {"rowId": f"pl-{uuid.uuid4().hex[:10]}", "rowType": "dynamic", "category": str(r.get('种类') or ''), "isFixed": False, "pledgedAmount": _num(r.get('期末已质押金额'))}
         for r in parsed_by_sheet.get('pledged', [])
     ]))
     payload_items.append(_upsert_item_payload(variant, 'endorsed-rows', [
-        {"rowId": f"en-{uuid.uuid4().hex[:10]}", "rowType": "dynamic", "category": str(r.get('票据种类') or ''), "isFixed": False, "derecognizedAmount": _num(r.get('终止确认金额')), "notDerecognizedAmount": _num(r.get('未终止确认金额'))}
+        {"rowId": f"en-{uuid.uuid4().hex[:10]}", "rowType": "dynamic", "category": str(r.get('种类') or ''), "isFixed": False, "derecognizedAmount": _num(r.get('期末终止确认金额')), "notDerecognizedAmount": _num(r.get('期末未终止确认金额'))}
         for r in parsed_by_sheet.get('endorsed', [])
     ]))
     payload_items.append(_upsert_item_payload(variant, 'transfer-rows', [
-        {"rowId": f"tr-{uuid.uuid4().hex[:10]}", "rowType": "dynamic", "category": str(r.get('票据种类') or ''), "isFixed": False, "transferAmount": _num(r.get('转应收账款金额'))}
+        {"rowId": f"tr-{uuid.uuid4().hex[:10]}", "rowType": "dynamic", "category": str(r.get('种类') or ''), "isFixed": False, "transferAmount": _num(r.get('期末转应收账款金额'))}
         for r in parsed_by_sheet.get('transfer', [])
     ]))
     payload_items.append(_upsert_item_payload(variant, 'class-end-rows', class_end_rows))
     payload_items.append(_upsert_item_payload(variant, 'individual-end-rows', individual_end_rows))
     payload_items.append(_upsert_item_payload(variant, 'class-prior-rows', class_prior_rows))
     payload_items.append(_upsert_item_payload(variant, 'individual-prior-rows', individual_prior_rows))
-    payload_items.append(_upsert_item_payload(variant, 'movement-rows', [mv_obj]))
+    payload_items.append(_upsert_item_payload(variant, 'movement-rows', movement_rows_payload))
+    payload_items.append(_upsert_item_payload(variant, 'movement-detail-rows', movement_detail_payload))
+    # 组合计提明细（本轮新增录入面）
+    payload_items.append(_upsert_item_payload(
+        variant, 'bank-portfolio-end-rows',
+        _portfolio_import_rows(parsed_by_sheet.get('portfolioBank', []), 'end'),
+    ))
+    payload_items.append(_upsert_item_payload(
+        variant, 'commercial-portfolio-end-rows',
+        _portfolio_import_rows(parsed_by_sheet.get('portfolioCommercial', []), 'end'),
+    ))
+    if variant != 'soe':
+        payload_items.append(_upsert_item_payload(
+            variant, 'bank-portfolio-prior-rows',
+            _portfolio_import_rows(parsed_by_sheet.get('portfolioBank', []), 'prior'),
+        ))
+        payload_items.append(_upsert_item_payload(
+            variant, 'commercial-portfolio-prior-rows',
+            _portfolio_import_rows(parsed_by_sheet.get('portfolioCommercial', []), 'prior'),
+        ))
     payload_items.append(_upsert_item_payload(variant, 'reversal-rows', reversal_rows))
     payload_items.append(_upsert_item_payload(variant, 'writeoff-rows', writeoff_rows))
     payload_items.append(_upsert_item_payload(variant, 'writeoff-amount', writeoff_amount))

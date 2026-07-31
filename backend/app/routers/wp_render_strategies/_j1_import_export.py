@@ -32,10 +32,20 @@ from openpyxl.utils import get_column_letter
 from app.core.database import get_db
 from app.deps import get_current_user
 
+# 附注披露（多区块：一区块一 sheet + 说明文本集中一 sheet）
+# 沿用 F2-1 的分派模式：披露页逻辑独立成模块，但**复用本文件既有三路由**，不新建 router。
+from ._j1_disclosure_import_export import (
+    DISCLOSURE_FILE_LABELS as _DISC_FILE_LABELS,
+    DISCLOSURE_SHEET_TYPES as _DISC_SHEET_TYPES,
+    build_disclosure_workbook as _build_disclosure_wb,
+    export_disclosure_data as _export_disclosure_data,
+    import_disclosure_data as _import_disclosure_data,
+)
+
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["j1-import-export"])
 
-SHEET_TYPES = {"detail", "accrual", "allocation", "general", "non_monetary", "severance", "monthly", "voucher", "industry", "adjustment"}
+SHEET_TYPES = {"detail", "accrual", "allocation", "general", "non_monetary", "severance", "monthly", "voucher", "industry", "adjustment"} | set(_DISC_SHEET_TYPES)
 
 # ─── J1-2 明细表 14 列定义 ────────────────────────────────────────────────────
 
@@ -569,17 +579,35 @@ def _set_monthly_col_widths(ws):
 
 # ─── 路由 ─────────────────────────────────────────────────────────────────────
 
-@router.get("/api/workpapers/{wp_id}/j1/export-template")
+
+def _resolve_sheet_type(sheet: str | None, sheet_type: str | None) -> str:
+    """归一 `sheet` / `sheet_type` 两种入参名。
+
+    历史 J1 端点用 `sheet_type`（`useJ1ImportExport.ts` 走 GET）；披露页复用共享组件
+    `CycleImportExportDropdown` → `useWorkpaperImportExport` 发的是 **POST + `sheet`**。
+    两者都认，避免为披露页另造一套前端 composable。
+    """
+    resolved = (sheet or sheet_type or "").strip()
+    if not resolved:
+        raise HTTPException(400, "缺少 sheet 参数")
+    if resolved not in SHEET_TYPES:
+        raise HTTPException(400, f"不支持的sheet类型: {resolved}")
+    return resolved
+
+
+@router.api_route("/api/workpapers/{wp_id}/j1/export-template", methods=["GET", "POST"])
 async def export_template(
     wp_id: str,
-    sheet_type: str = Query(...),
+    sheet_type: str | None = Query(None),
+    sheet: str | None = Query(None),
     _user=Depends(get_current_user),
 ):
     """导出模板（空表头 + 默认行骨架 + 编制说明）."""
-    if sheet_type not in SHEET_TYPES:
-        raise HTTPException(400, f"不支持的sheet类型: {sheet_type}")
+    sheet_type = _resolve_sheet_type(sheet, sheet_type)
 
-    if sheet_type == "detail":
+    if sheet_type in _DISC_SHEET_TYPES:
+        wb = _build_disclosure_wb(_DISC_SHEET_TYPES[sheet_type])
+    elif sheet_type == "detail":
         wb = _build_detail_template_wb()
     elif sheet_type == "monthly":
         wb = _build_monthly_template_wb()
@@ -609,7 +637,7 @@ async def export_template(
     wb.save(buf)
     buf.seek(0)
 
-    filename = f"J1_{sheet_type}_模板.xlsx"
+    filename = f"J1_{_DISC_FILE_LABELS.get(sheet_type, sheet_type)}_模板.xlsx"
     encoded = quote(filename, safe="")
     return StreamingResponse(
         buf,
@@ -618,18 +646,20 @@ async def export_template(
     )
 
 
-@router.get("/api/workpapers/{wp_id}/j1/export-data")
+@router.api_route("/api/workpapers/{wp_id}/j1/export-data", methods=["GET", "POST"])
 async def export_data(
     wp_id: str,
-    sheet_type: str = Query(...),
+    sheet_type: str | None = Query(None),
+    sheet: str | None = Query(None),
     db=Depends(get_db),
     _user=Depends(get_current_user),
 ):
     """导出数据（含现有数据）."""
-    if sheet_type not in SHEET_TYPES:
-        raise HTTPException(400, f"不支持的sheet类型: {sheet_type}")
+    sheet_type = _resolve_sheet_type(sheet, sheet_type)
 
-    if sheet_type == "detail":
+    if sheet_type in _DISC_SHEET_TYPES:
+        wb = await _export_disclosure_data(db, wp_id, _DISC_SHEET_TYPES[sheet_type])
+    elif sheet_type == "detail":
         # 读3分区数据
         data_sections = {}
         for stor_key in ["shortTerm", "postEmployment", "severance"]:
@@ -753,7 +783,7 @@ async def export_data(
     wb.save(buf)
     buf.seek(0)
 
-    filename = f"J1_{sheet_type}_数据.xlsx"
+    filename = f"J1_{_DISC_FILE_LABELS.get(sheet_type, sheet_type)}_数据.xlsx"
     encoded = quote(filename, safe="")
     return StreamingResponse(
         buf,
@@ -766,15 +796,22 @@ async def export_data(
 async def import_data(
     wp_id: str,
     file: UploadFile = File(...),
-    sheet_type: str = Query("detail"),
+    sheet_type: str | None = Query(None),
+    sheet: str | None = Query(None),
     db=Depends(get_db),
     _user=Depends(get_current_user),
 ):
     """导入数据."""
-    if sheet_type not in SHEET_TYPES:
-        raise HTTPException(400, f"不支持的sheet类型: {sheet_type}")
+    sheet_type = _resolve_sheet_type(sheet, sheet_type or "detail")
 
     content = await file.read()
+    # 披露页走多区块逻辑（一区块一 sheet；自行解析 workbook）
+    if sheet_type in _DISC_SHEET_TYPES:
+        result = await _import_disclosure_data(
+            db, wp_id, _DISC_SHEET_TYPES[sheet_type], content
+        )
+        return {**result, "sheet_type": sheet_type}
+
     wb = load_workbook(io.BytesIO(content), data_only=True)
 
     if sheet_type == "detail":

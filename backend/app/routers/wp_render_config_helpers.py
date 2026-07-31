@@ -131,6 +131,45 @@ async def _inject_confirmation_population(
         ctx["population_amount"] = population
 
 
+def inject_applicable_standards(sheets: list[dict], standards: list[str]) -> int:
+    """向每个 sheet 的 ``html_data.project_context`` 统一注入 ``applicable_standards``。
+
+    🔴 为什么统一注入：各 render 策略**各写一份** ``_load_project_context``（60+ 份），
+    多数根本不下发适用准则；I1~I6 下发的是**原始 v2 对象**
+    （``{entity_type, scope, stage}``），而前端 ``normalizeApplicableStandards``
+    只认字符串/数组/``{type|code|value}`` → 拿到对象直接返回 ``[]``，门控恒空：
+    D3 两版披露 Tab 对所有项目都显示「当前项目不适用…」（用户不可达），
+    其余循环则门控恒开（允许在国企项目编辑上市 Tab，数据写进错误章节）。
+
+    统一注入是**覆盖式**（不是 setdefault）：策略层残留的 v2 对象必须被规范列表替换，
+    否则前端仍归一成 ``[]``。
+
+    Args:
+        sheets: render-config 的 sheets 列表（就地修改）
+        standards: :func:`derive_applicable_standards` 的输出（字符串列表）
+
+    Returns:
+        实际注入的 sheet 数（供日志/测试断言）
+
+    Spec: applicable-standards-frontend-wiring R1.2 / R4.3
+    """
+    if not standards:
+        return 0
+    injected = 0
+    for sheet in sheets:
+        if not isinstance(sheet, dict):
+            continue
+        html_data = sheet.get("html_data")
+        if not isinstance(html_data, dict):
+            continue
+        ctx = html_data.setdefault("project_context", {})
+        if not isinstance(ctx, dict):
+            continue
+        ctx["applicable_standards"] = list(standards)
+        injected += 1
+    return injected
+
+
 # 标准底稿编号判定：统一使用 ACNR grammar_v1 的 STANDARD_WP_CODE_RE (R12.2)
 # 旧版 [A-I]\d 已修正为 [A-S]\d，覆盖 J~S 循环（R12.4, R12.5）
 from app.services.acnr.grammar import is_standard_wp_code as _is_standard_wp_code_fn

@@ -49,6 +49,7 @@ from __future__ import annotations
 import argparse
 import datetime as _dt
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -639,6 +640,66 @@ def apply_plan(section: dict[str, Any], plan: list[dict[str, Any]]) -> tuple[lis
     return changes, warnings
 
 
+# ─────────────────── text_sections 标题化（裸表名不得当正文）───────────────────
+
+# 与后端 `disclosure_engine._NUMBERED_TITLE_RE` 同口径（`（N）xxx` / `N. xxx`）
+_NUMBERED_TITLE_RE = re.compile(r"^(?:（(\d+)）|(\d+)[.、])")
+
+
+def _is_title_paragraph(para: str) -> bool:
+    """复刻 `disclosure_engine._is_table_title_paragraph`（stdlib-only，供 --check 独立跑）。
+
+    ① `#` 开头 → 任意长度都算标题
+    ② 非 `#` 时须 **≤20 字且匹配编号**
+    """
+    s = (para or "").strip()
+    if not s:
+        return False
+    if s.startswith("#"):
+        return True
+    if len(s) > 20:
+        return False
+    return bool(_NUMBERED_TITLE_RE.match(s))
+
+
+def titleize_text_sections(section: dict[str, Any]) -> list[str]:
+    """把 `text_sections` 里的**裸表名**加上 `#### ` 前缀，返回变更说明。
+
+    🔴 后端只把「`#` 开头」或「≤20 字的编号短标题」当标题（标题本身不进任何输出）。
+    写成裸表名（如 `组合计提项目：银行承兑汇票`）既不是标题、也没有 `提示`/`【` 等
+    guidance 关键词 → 落进 `text_content`，**附注正文与 Word 导出会凭空多出
+    「只有一个表名」的段落**（D1 实测 6 条：上市 3 + 国企 3）。
+    正确范式见 `fix_note_ar_soe_structure.TEXT_SECTIONS`（`#### xxx` / `（N）xxx`）。
+    """
+    paras = section.get("text_sections")
+    if not isinstance(paras, list):
+        return []
+    names = {str(t.get("name", "")).strip() for t in (section.get("tables") or [])}
+    changes: list[str] = []
+    out: list[str] = []
+    for p in paras:
+        s = str(p)
+        stripped = s.strip()
+        if stripped in names and not _is_title_paragraph(s):
+            out.append(f"#### {stripped}")
+            changes.append(f"text_sections：裸表名「{stripped}」→ 加 #### 前缀（不再当正文渲染）")
+        else:
+            out.append(s)
+    if changes:
+        section["text_sections"] = out
+    return changes
+
+
+def find_bare_table_name_paragraphs(section: dict[str, Any]) -> list[str]:
+    """返回仍会被当正文渲染的裸表名段落（供 validate / 测试）。"""
+    names = {str(t.get("name", "")).strip() for t in (section.get("tables") or [])}
+    return [
+        str(p).strip()
+        for p in (section.get("text_sections") or [])
+        if str(p).strip() in names and not _is_title_paragraph(str(p))
+    ]
+
+
 def _stamp(section: dict[str, Any]) -> None:
     section["_aligned_by"] = ALIGNED_BY
     section["_aligned_at"] = _dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -726,6 +787,13 @@ def validate_section(section: dict[str, Any], expected: list[str]) -> list[str]:
     missing = [n for n in expected if n not in seen]
     if missing:
         errs.append(f"缺表：{missing}")
+
+    bare = find_bare_table_name_paragraphs(section)
+    if bare:
+        errs.append(
+            f"text_sections 含裸表名 {bare} → 会被当披露正文渲染"
+            "（附注正文与 Word 导出多出只有表名的段落），须加 #### 前缀"
+        )
     return errs
 
 
@@ -743,6 +811,7 @@ def run(variant: str, *, dry_run: bool, check: bool) -> tuple[list[str], list[st
         return [], [], validate_section(section, spec["expected"])
 
     changes, warnings = apply_plan(section, spec["plan"])
+    changes += titleize_text_sections(section)
     errs = validate_section(section, spec["expected"])
     if changes and not dry_run and not errs:
         _stamp(section)

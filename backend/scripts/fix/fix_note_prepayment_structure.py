@@ -132,7 +132,10 @@ LISTED_OVER1_PATCH = {
 }
 
 LISTED_TOP5_PATCH = {
-    "headers": ["单位名称", "预付款项<br/>期末余额", "占预付款项期末余额<br/>合计数的比例%"],
+    # 🔴 headers 必须纯文本：`<br/>` 是附注模版 md 表格的排版换行残留，
+    # `el-table-column :label` 与 `note_word_exporter` 都不解析 HTML → 会显示字面量。
+    # 同步载荷的 `columns[].label` 本就是纯文本，此处与之对齐（spec f-cycle-disclosure-parity R7）。
+    "headers": ["单位名称", "预付款项期末余额", "占预付款项期末余额合计数的比例%"],
     "columns": [
         {"key": "label", "label": "单位名称", "is_label": True, "flat": True},
         {"key": "end_amount", "label": "预付款项期末余额", "format": "amount"},
@@ -417,6 +420,11 @@ def validate_section(section: dict[str, Any], section_number: str) -> list[str]:
         headers = tbl.get("headers") or []
         if any(not str(h).strip() for h in headers):
             errs.append(f"[{i}] {name} headers 含空串：{headers}")
+        # headers 必须纯文本：`el-table-column :label` 与 Word 导出都不解析 HTML，
+        # md 表格搬来的 `<br/>` 会当字面量显示（R7）
+        for h in headers:
+            if "<" in str(h) and ">" in str(h):
+                errs.append(f"[{i}] {name} headers 含 HTML 标记：{h!r}（应为纯文本）")
         n_val = max(len(headers) - 1, 0)
 
         for j, row in enumerate(tbl.get("rows") or []):

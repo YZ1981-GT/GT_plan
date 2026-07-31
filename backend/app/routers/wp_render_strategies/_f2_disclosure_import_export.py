@@ -60,8 +60,11 @@ _SECTION_FILL = PatternFill("solid", fgColor="FFF8E6")
 _LISTED_CATEGORIES: tuple[tuple[str, str], ...] = (
     ("raw-materials", "原材料"),
     ("work-in-progress", "在产品"),
+    # Sprint 8 新增：源 xlsx 注要求房地产开发企业增加「开发成本」「开发产品」种类
+    ("dev-costs", "开发成本"),
     ("outsourced-processing", "委托加工物资"),
     ("finished-goods", "库存商品"),
+    ("dev-products", "开发产品"),
     ("goods-in-transit", "发出商品"),
     ("revolving-materials", "周转材料"),
     ("contract-performance", "合同履约成本"),
@@ -396,19 +399,25 @@ async def _load_class_rows(db: AsyncSession, wp_id: str, variant: Variant) -> li
 # rowKey → sourceKeys（镜像前端常量的 sourceKeys 字段，契约测试同步守）
 _LISTED_SOURCE_KEYS: dict[str, tuple[str, ...]] = {
     "raw-materials": ("raw-materials", "material-in-transit"),
-    "work-in-progress": ("work-in-progress", "semi-finished"),
+    # `work-in-progress` 作行标识保留，但不是审定表 rowKey（1404 是 semi-finished）→ 已从取数键删除
+    "work-in-progress": ("semi-finished",),
+    "dev-costs": ("dev-costs",),
     "outsourced-processing": ("outsourced-processing",),
-    "finished-goods": ("finished-goods",),
+    # 1412 商品进销差价是 1406 的备抵科目，上市版并入库存商品（国企版归「其他」）
+    "finished-goods": ("finished-goods", "price-difference"),
+    "dev-products": ("dev-products",),
     "goods-in-transit": ("goods-in-transit",),
     "revolving-materials": ("revolving-materials",),
     "contract-performance": ("contract-performance",),
     "consumable-bio": ("consumable-bio",),
-    "data-resources": ("data-resources",),
+    # 数据资源无对应存货科目 → 从 (8) 数据资源表联动，无取数键
+    "data-resources": (),
 }
 
 _SOE_SOURCE_KEYS: dict[str, tuple[str, ...]] = {
     "raw-combined": ("raw-materials", "material-in-transit"),
-    "wip-combined": ("work-in-progress", "semi-finished", "dev-costs"),
+    # 死键 `work-in-progress` 已删（1404 是 semi-finished）
+    "wip-combined": ("semi-finished", "dev-costs"),
     "dev-costs": ("dev-costs",),
     "outsourced-processing": ("outsourced-processing",),
     "fg-combined": ("finished-goods", "dev-products"),
@@ -417,9 +426,12 @@ _SOE_SOURCE_KEYS: dict[str, tuple[str, ...]] = {
     "goods-in-transit": ("goods-in-transit",),
     "consumable-bio": ("consumable-bio",),
     "contract-performance": ("contract-performance",),
-    "data-resources": ("data-resources",),
-    "other": ("price-difference", "other"),
-    "land-reserve": ("land-reserve",),
+    # 数据资源无对应存货科目 → 从 (5) 数据资源表联动，无取数键
+    "data-resources": (),
+    # 死键 `other` 已删；「其他」行余量由 s1Overrides 手工录入
+    "other": ("price-difference",),
+    # 土地储备无对应科目 → 全靠 s1Overrides 手工录入
+    "land-reserve": (),
 }
 
 

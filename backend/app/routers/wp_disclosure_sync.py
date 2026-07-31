@@ -27,6 +27,7 @@ from app.deps import get_current_user, require_project_access
 from app.models.core import User
 from app.services.wp_disclosure_sync_service import (
     ConflictError,
+    StandardMismatchError,
     sync_batch_from_workpaper,
     sync_from_workpaper,
     wp_disclosure_sync_service,
@@ -118,6 +119,30 @@ class SyncBatchFromWorkpaperRequest(BaseModel):
     year: int | None = None
 
 
+class StandardMismatchDetail(BaseModel):
+    """409 跨主体类型准则冲突详情"""
+
+    code: str = "STANDARD_MISMATCH"
+    detail: str
+    project_standard: str
+    requested_standard: str
+    allowed: list[str] = Field(default_factory=list)
+
+
+def _standard_mismatch_http(exc: StandardMismatchError) -> HTTPException:
+    """跨主体类型同步 → 409（拒绝写入，避免污染另一变体的章节）。"""
+    return HTTPException(
+        status_code=409,
+        detail={
+            "code": exc.code,
+            "detail": str(exc),
+            "project_standard": exc.project_standard,
+            "requested_standard": exc.requested_standard,
+            "allowed": exc.allowed,
+        },
+    )
+
+
 class SyncBatchFromWorkpaperResponse(BaseModel):
     """批量同步结果"""
 
@@ -154,6 +179,12 @@ async def _autorun_validation(
 @router.post(
     "/{project_id}/disclosure-notes/sync-from-workpaper",
     response_model=SyncFromWorkpaperResponse,
+    responses={
+        409: {
+            "model": StandardMismatchDetail,
+            "description": "current_standard 与项目主体类型冲突（拒绝写入）",
+        },
+    },
 )
 async def sync_disclosure_from_workpaper(
     project_id: UUID,
@@ -182,6 +213,8 @@ async def sync_disclosure_from_workpaper(
             year=body.year,
             sub_table_columns=body.columns,
         )
+    except StandardMismatchError as exc:
+        raise _standard_mismatch_http(exc) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:  # pragma: no cover - defensive
@@ -205,6 +238,12 @@ async def sync_disclosure_from_workpaper(
 @router.post(
     "/{project_id}/disclosure-notes/sync-batch-from-workpaper",
     response_model=SyncBatchFromWorkpaperResponse,
+    responses={
+        409: {
+            "model": StandardMismatchDetail,
+            "description": "current_standard 与项目主体类型冲突（拒绝写入）",
+        },
+    },
 )
 async def sync_disclosure_batch_from_workpaper(
     project_id: UUID,
@@ -223,6 +262,8 @@ async def sync_disclosure_batch_from_workpaper(
             user=current_user,
             year=body.year,
         )
+    except StandardMismatchError as exc:
+        raise _standard_mismatch_http(exc) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:  # pragma: no cover - defensive

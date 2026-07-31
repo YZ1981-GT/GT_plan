@@ -943,9 +943,29 @@ async def _get_render_config_impl(
             sign_status = "draft"
         permissions = {"edit": sign_status != "signed"}
 
+    # Step 9.5: 适用准则统一下发（applicable-standards-frontend-wiring R1.1/R1.2）
+    # 🔴 前端披露 Tab 的门控此前恒空：各 render 策略各写一份 _load_project_context，
+    # 多数不下发准则、I1~I6 下发的是原始 v2 对象（前端归一函数不认）→ D3 两版披露 Tab
+    # 对所有项目显示「当前项目不适用…」，其余循环门控恒开（可在国企项目编辑上市 Tab）。
+    # 此处一处注入覆盖全部策略；注入失败只记 warning，不阻断渲染。
+    _standards: list[str] = []
+    try:
+        from app.routers.wp_render_config_helpers import inject_applicable_standards
+        from app.services.standard_unification_service import (
+            StandardUnificationService,
+            derive_applicable_standards,
+        )
+
+        _standards = derive_applicable_standards(
+            await StandardUnificationService(db).get_standard(project_id)
+        )
+        inject_applicable_standards(sheets, _standards)
+    except Exception as e:  # noqa: BLE001 — 注入失败不阻断渲染
+        logger.warning("applicable_standards 注入失败 pid=%s: %s", project_id, e)
+
     response = {"wp_id": str(wp_id), "wp_code": wp_code, "project_id": str(project_id),
                 "scope": scope, "is_real_workpaper": is_real, "template_version": tpl_ver_str,
-                "audit_year": _prog_year,
+                "audit_year": _prog_year, "applicable_standards": _standards,
                 "sheets": sheets, "fill_results": fill_results, "guidance": get_wp_guidance(wp_code)}
     if sign_status is not None:
         response["sign_status"] = sign_status

@@ -20,9 +20,12 @@
 - ``基础数据/附注模版/国企报表附注.md`` §存货
 - 列数校验口径：``backend/data/note_check_preset_formulas.json`` F9-1~F9-13a
 
-**行不动原则**：附注行集合以附注模版为准，不引入底稿披露表多出的
-「委托加工物资」「发出商品」（附注模版无此两行）；同步时 ``sub_table_data``
-整表覆盖行，seed 行仅为初始骨架。
+**行集原则（Sprint 7 修订）**：seed 行以**运行时权威源 xlsx** 为准（见
+``LISTED_CATEGORY_LABELS`` / ``SOE_CATEGORY_ROWS``），含第一轮遗漏的「委托加工物资」
+「发出商品」。第一轮的「行不动原则」（以 ``基础数据/附注模版/*.md`` 为裁决者）已推翻：
+该目录在本仓库不存在，无法核对；而底稿披露表常量已与 xlsx 一致，附注 seed 少行会让
+未同步项目看到与源模板不符的骨架。seed 行只是骨架，用户数据一律经同步的
+``sub_table_data`` 整表覆盖，故重建行集无数据丢失风险。
 
 Usage::
 
@@ -68,21 +71,77 @@ def _strip_header_labels(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [r for r in rows if str(r.get("row_type", "")) != "header_label"]
 
 
+# ── 分类行集（Sprint 7 / R18）：逐字逐序取自运行时权威源 xlsx ──────────────
+#
+# 源：backend/wp_templates/F/F2-1至F2-14 存货及跌价准备-审定明细表类（Leap-常规程序）.xlsx
+#   「附注披露信息（上市公司）」 r10~r19
+#   「附注披露信息（国企）」     r9~r22
+#
+# 🔴 推翻第一轮的「行不动原则」：当时以 `基础数据/附注模版/*.md` 为附注侧行集裁决者，
+# 但该目录在本仓库**不存在**（无法核对），而 xlsx 是运行时权威（`wp_template_init_service`
+# 据此生成底稿）。底稿 `F2_LISTED_DISCLOSURE_CATEGORIES` / `F2_SOE_DISCLOSURE_CATEGORIES`
+# 已与 xlsx 一致，只有附注 seed 骨架少行 → 未同步项目看到的骨架与源模板不符。
+#
+# 与前端常量的对应关系（同步载荷 `label` 必须逐字一致，否则 seed 骨架与同步结果异构）：
+#   前端 useF2DisclosureListed.ts / useF2DisclosureSoe.ts
+# 🔴 Sprint 8：补「开发成本」「开发产品」两个种类行。
+# 源 xlsx 上市 r20 注：「根据企业具体情况分类，**房地产开发企业应增加"开发成本"
+# "开发产品"等种类**」。原 9 类的取数键并集漏掉 1408/1409 → 房企存货审定数在上市
+# 披露表没有落点。行位对齐国企语义归属：开发成本属在建/在产（紧随在产品）、
+# 开发产品属产成品（紧随库存商品）。
+LISTED_CATEGORY_LABELS: list[str] = [
+    "原材料",
+    "在产品",
+    "开发成本",
+    "委托加工物资",
+    "库存商品",
+    "开发产品",
+    "发出商品",
+    "周转材料",
+    "合同履约成本",
+    "消耗性生物资产",
+    "数据资源",
+]
+
+# (label, is_detail)：`其中：` 行为上一行的子集，不计入合计（防双计）
+SOE_CATEGORY_ROWS: list[tuple[str, bool]] = [
+    ("原材料", False),
+    ("自制半成品及在产品", False),
+    ("其中：开发成本", True),
+    ("委托加工物资", False),
+    ("库存商品（产成品）", False),
+    ("其中：开发产品", True),
+    ("周转材料（包装物、低值易耗品等）", False),
+    ("发出商品", False),
+    ("消耗性生物资产", False),
+    ("合同履约成本", False),
+    ("数据资源", False),
+    ("其他", False),
+    # 源 xlsx 为半角开括号 `(由房地产开发企业填列）`（排版笔误）→ 归一为全角，
+    # 与前端 `F2_SOE_DISCLOSURE_CATEGORIES` 推送的 label 逐字一致。
+    ("其中：尚未开发的土地储备（由房地产开发企业填列）", True),
+]
+
+
 # ─────────────────────────── 列结构（逐字取自源模版） ───────────────────────────
 
 _IMP_LABEL = "跌价准备/合同履约成本减值准备"
 
 
-def _classification(end_group: str, prior_group: str) -> dict[str, Any]:
-    """存货分类表：项目 + {账面余额, 跌价准备, 账面价值} × 期末/期初两组。"""
+def _classification(end_group: str, prior_group: str, label_header: str) -> dict[str, Any]:
+    """存货分类表：标签列 + {账面余额, 跌价准备, 账面价值} × 期末/期初两组。
+
+    ``label_header`` 取自源 xlsx 的 A 列表头：上市 A8「存货种类」/ 国企 A7「项  目」
+    （归一为「项目」）。
+    """
     return {
         "headers": [
-            "项目",
+            label_header,
             "账面余额", _IMP_LABEL, "账面价值",
             "账面余额", _IMP_LABEL, "账面价值",
         ],
         "columns": [
-            {"key": "label", "label": "项目", "is_label": True},
+            {"key": "label", "label": label_header, "is_label": True},
             {"key": "end_gross", "label": "账面余额", "group": end_group, "format": "amount"},
             {"key": "end_impairment", "label": _IMP_LABEL, "group": end_group, "format": "amount"},
             {"key": "end_net", "label": "账面价值", "group": end_group, "format": "amount"},
@@ -97,11 +156,16 @@ def _classification(end_group: str, prior_group: str) -> dict[str, Any]:
     }
 
 
+# 上市标签列头（源 xlsx A8/A22/A35 均为「存货种类」；旧值「项目」为第一轮误写）
+LISTED_LABEL_HEADER = "存货种类"
+# 国企存货分类标签列头（源 xlsx A7「项  目」→ 归一）
+SOE_LABEL_HEADER = "项目"
+
 # 上市跌价变动：本期减少为「转回或转销」单列（源模版上市版）
 LISTED_MOVEMENT = {
-    "headers": ["项目", "期初余额", "计提", "其他", "转回或转销", "其他", "期末余额"],
+    "headers": [LISTED_LABEL_HEADER, "期初余额", "计提", "其他", "转回或转销", "其他", "期末余额"],
     "columns": [
-        {"key": "label", "label": "项目", "is_label": True},
+        {"key": "label", "label": LISTED_LABEL_HEADER, "is_label": True},
         {"key": "opening", "label": "期初余额", "format": "amount"},
         {"key": "increase_provision", "label": "计提", "group": "本期增加", "format": "amount"},
         {"key": "increase_other", "label": "其他", "group": "本期增加", "format": "amount"},
@@ -225,13 +289,16 @@ def _listed_plan() -> list[dict[str, Any]]:
     return [
         {
             "aliases": ["存货分类"],
-            "patch": {**_classification("期末余额", "上年年末余额"), "guidance": _G_CLASSIFICATION},
-            "rows": "strip",
+            "patch": {
+                **_classification("期末余额", "上年年末余额", LISTED_LABEL_HEADER),
+                "guidance": _G_CLASSIFICATION,
+            },
+            "rows": "listed_categories",
         },
         {
             "aliases": ["存货跌价准备及合同履约成本减值准备"],
             "patch": {**LISTED_MOVEMENT, "guidance": _G_MOVEMENT},
-            "rows": "strip",
+            "rows": "listed_categories",
         },
         {
             "aliases": ["存货跌价准备及合同履约成本减值准备（续）"],
@@ -240,12 +307,13 @@ def _listed_plan() -> list[dict[str, Any]]:
                 # 源 xlsx（B35/C35）无此标记。前端 `el-table-column :label` 是纯文本
                 # 渲染 → 留着会把 `<br/>` 当字面量显示；Word 导出同理。
                 "headers": [
-                    "项目",
+                    LISTED_LABEL_HEADER,
                     "确定可变现净值/剩余对价与将要发生的成本的具体依据",
                     "本期转回或转销存货跌价准备/合同履约成本减值准备的原因",
                 ],
                 "columns": [
-                    {"key": "label", "label": "项目", "is_label": True, "flat": True},
+                    {"key": "label", "label": LISTED_LABEL_HEADER,
+                     "is_label": True, "flat": True},
                     {"key": "nrv_basis",
                      "label": "确定可变现净值/剩余对价与将要发生的成本的具体依据"},
                     {"key": "reversal_reason",
@@ -253,7 +321,7 @@ def _listed_plan() -> list[dict[str, Any]]:
                 ],
                 "guidance": _G_MOVEMENT_CONT,
             },
-            "rows": "strip",
+            "rows": "listed_categories_qual",
         },
         {
             "aliases": ["按组合计提存货跌价准备"],
@@ -352,7 +420,7 @@ def _soe_plan() -> list[dict[str, Any]]:
         {
             "aliases": ["存货分类"],
             "patch": {
-                **_classification("期末数", "期初数"),
+                **_classification("期末数", "期初数", SOE_LABEL_HEADER),
                 "guidance": (
                     _G_CLASSIFICATION
                     + " 国企版「其他」项应说明房地产企业土地储备情况，包括土地储备面积、"
@@ -360,7 +428,7 @@ def _soe_plan() -> list[dict[str, Any]]:
                     "「其中：」行为上一行的子集，不计入合计（防双计）。"
                 ),
             },
-            "rows": "strip",
+            "rows": "soe_categories",
         },
         {
             "aliases": ["存货跌价准备及合同履约成本减值准备"],
@@ -374,7 +442,7 @@ def _soe_plan() -> list[dict[str, Any]]:
                     "勾稽：期末 = 期初 + 计提 + 其他增加 − 转回 − 转销 − 其他减少。"
                 ),
             },
-            "rows": "strip",
+            "rows": "soe_categories",
         },
         {
             "aliases": ["确认为存货的数据资源"],
@@ -399,7 +467,19 @@ SOE_TEXT_ADDITIONS = [
     ),
     "【提示：上述信息，若已在会计政策、其他项目附注中披露，可索引至相关内容。】",
 ]
-SOE_TEXT_ANCHOR = "确认为存货的数据资源"
+SOE_TEXT_ANCHOR = "### 确认为存货的数据资源"
+# 兼容旧锚点（retitle 之前落库的模板）
+SOE_TEXT_ANCHOR_LEGACY = "确认为存货的数据资源"
+
+# R22：国企侧小节标题原为裸字符串 → 被 `_is_table_title_paragraph` 判为正文，
+# 在附注里渲染成一行没有内容的「存货分类」段落。上市侧本就是 `### xxx`，此处对齐。
+SOE_TEXT_RETITLE: list[str] = [
+    "存货分类",
+    "存货跌价准备及合同履约成本减值准备",
+    "确认为存货的数据资源",
+    "借款费用资本化",
+    "合同履约成本本期摊销金额的说明",
+]
 
 
 # ─────────────────────────── 应用 ───────────────────────────
@@ -411,6 +491,21 @@ def _rows_for(mode: str, existing: list[dict[str, Any]]) -> list[dict[str, Any]]
         return [_data_row(), _data_row(), _data_row(), _total_row()]
     if mode == "portfolio_aging":
         return [_data_row("1年以内"), _data_row("1至2年"), _data_row(), _total_row()]
+    # ── R18：分类行集重建（seed 行是骨架，用户数据一律经 sub_table_data 整表覆盖）──
+    if mode == "listed_categories":
+        return [_data_row(x) for x in LISTED_CATEGORY_LABELS] + [_total_row()]
+    if mode == "listed_categories_qual":
+        # 续表为文字表，源 xlsx r45 合计行两列均为「--」→ 仍保留合计行占位
+        return [_data_row(x) for x in LISTED_CATEGORY_LABELS] + [_total_row()]
+    if mode == "soe_categories":
+        rows: list[dict[str, Any]] = []
+        for label, is_detail in SOE_CATEGORY_ROWS:
+            row = _data_row(label)
+            if is_detail:
+                # 「其中：」子集行标记，供渲染缩进与合计防双计
+                row["is_detail"] = True
+            rows.append(row)
+        return rows + [_total_row()]
     return existing
 
 
@@ -507,10 +602,26 @@ def apply_plan(
     return changes, warnings
 
 
+def retitle_text_sections(section: dict[str, Any], plain_titles: list[str]) -> list[str]:
+    """把裸标题段升级为 ``### 标题``（幂等：已有 `###` 版本则不动）。"""
+    texts: list[str] = section.setdefault("text_sections", [])
+    changes: list[str] = []
+    for plain in plain_titles:
+        marked = f"### {plain}"
+        if marked in texts:
+            continue
+        if plain not in texts:
+            continue
+        texts[texts.index(plain)] = marked
+        changes.append(f"text_sections 标题标记：「{plain}」→「{marked}」")
+    return changes
+
+
 def append_text_sections(
     section: dict[str, Any],
     additions: list[str],
     anchor: str | None,
+    anchor_legacy: str | None = None,
 ) -> list[str]:
     """在 anchor 之后插入缺失文本段（精确串查重 → 幂等）。"""
     texts: list[str] = section.setdefault("text_sections", [])
@@ -519,8 +630,10 @@ def append_text_sections(
         return []
 
     pos = len(texts)
-    if anchor and anchor in texts:
-        pos = texts.index(anchor) + 1
+    for cand in (anchor, anchor_legacy):
+        if cand and cand in texts:
+            pos = texts.index(cand) + 1
+            break
     texts[pos:pos] = missing
     return [f"text_sections 追加 {len(missing)} 段（位置 {pos}）"]
 
@@ -622,6 +735,7 @@ def _process(
     plan: list[dict[str, Any]],
     text_additions: list[str],
     text_anchor: str | None,
+    text_retitle: list[str] | None = None,
     *,
     dry_run: bool,
     check_only: bool,
@@ -644,8 +758,12 @@ def _process(
         return not errs, log
 
     changes, warnings = apply_plan(section, plan)
+    if text_retitle:
+        changes += retitle_text_sections(section, text_retitle)
     if text_additions:
-        changes += append_text_sections(section, text_additions, text_anchor)
+        changes += append_text_sections(
+            section, text_additions, text_anchor, SOE_TEXT_ANCHOR_LEGACY,
+        )
 
     log.extend(changes or ["无需修改（已对齐）"])
     log.extend(f"[WARN] {w}" for w in warnings)
@@ -685,14 +803,17 @@ def main() -> int:
     args = ap.parse_args()
 
     targets = [
-        (LISTED_PATH, LISTED_SECTION, _listed_plan(), [], None),
-        (SOE_PATH, SOE_SECTION, _soe_plan(), SOE_TEXT_ADDITIONS, SOE_TEXT_ANCHOR),
+        (LISTED_PATH, LISTED_SECTION, _listed_plan(), [], None, None),
+        (
+            SOE_PATH, SOE_SECTION, _soe_plan(),
+            SOE_TEXT_ADDITIONS, SOE_TEXT_ANCHOR, SOE_TEXT_RETITLE,
+        ),
     ]
 
     ok_all = True
-    for path, section_number, plan, texts, anchor in targets:
+    for path, section_number, plan, texts, anchor, retitle in targets:
         ok, log = _process(
-            path, section_number, plan, texts, anchor,
+            path, section_number, plan, texts, anchor, retitle,
             dry_run=args.dry_run, check_only=args.check,
         )
         print("\n".join(log))

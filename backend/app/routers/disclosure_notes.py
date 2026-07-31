@@ -586,6 +586,17 @@ async def get_note_detail(
 
         projected = project_sub_tables(detail.table_data)
         if projected and detail.table_data is not None:
+            # 读时回填 TAB 编制提示：投影只认推送来的业务数据，模板 `tables[].guidance`
+            # 不在同步载荷里 → 项目一旦同步过，附注 TAB 提示就永久变空（实测 §八、31）。
+            # 这里按 (source_template, note_section, 表名) 把模板 guidance 贴回来，不写库。
+            from app.services.note_table_guidance import carry_template_guidance
+
+            # 用已 model_validate 的 detail 取值，**不要**从 ORM 对象取 ——
+            # 异步会话下对未加载属性取值会触发 MissingGreenlet，异常被下面的
+            # except 吞掉后连 `_tables` 都不会被赋值（实测：附注表全部消失）。
+            carry_template_guidance(
+                projected, getattr(detail, "source_template", None), note_section
+            )
             detail.table_data = {**detail.table_data, "_tables": projected}
     except Exception:  # pragma: no cover - 投影失败降级不阻断读取
         import logging as _logging

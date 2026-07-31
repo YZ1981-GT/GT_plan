@@ -52,6 +52,96 @@ DEFAULT_STANDARD: dict[str, str] = {
 }
 
 
+def derive_applicable_standards(standard: dict | None) -> list[str]:
+    """结构化 standard → 前端可直接匹配的字符串列表（去重、保序、永不为空）。
+
+    输出 = ``[f"{entity_type}_{scope}", entity_type, scope]``：
+
+    - **组合值在前**：前端 `resolveXDisclosureCurrentStandard` 优先匹配
+      `soe_consolidated` / `listed_standalone` 这类整体值
+    - **维度值兜底**：部分循环的门控按 `['soe']` / `['listed']` 精确比较
+    - ``stage`` 不入列表：披露版本只由 entity_type × scope 决定
+      （ipo / fraud_response 等场景走 S 专项循环，不影响附注版本）
+    - 非法 / 缺失维度按 :data:`DEFAULT_STANDARD` 补齐（复用
+      ``StandardUnificationService._normalize_standard``，避免第二套补齐规则）
+
+    🔴 前端 `normalizeApplicableStandards`（`useF2FormData.ts`）必须与本函数同口径，
+    守卫见 `backend/tests/test_applicable_standards_derive.py` 与
+    `composables/__tests__/normalizeApplicableStandards.spec.ts` 的共享样本表。
+
+    Spec: applicable-standards-frontend-wiring R1.3 / R1.4
+    """
+    norm = StandardUnificationService._normalize_standard(standard)
+    entity = norm["entity_type"]
+    scope = norm["scope"]
+    out: list[str] = []
+    for value in (f"{entity}_{scope}", entity, scope):
+        if value and value not in out:
+            out.append(value)
+    return out
+
+
+def detect_standard_conflict(
+    project_standard: dict | None,
+    requested_standard: str | None,
+) -> dict | None:
+    """检测「请求准则」与「项目准则」的**主体类型**冲突（纯函数，无 DB）。
+
+    返回 ``None`` 表示放行；否则返回冲突详情
+    ``{"project_standard", "requested_standard", "project_entity", "requested_entity", "allowed"}``。
+
+    为什么只判 entity 维度：附注模板只有 ``note_template_listed.json`` /
+    ``note_template_soe.json`` 两份，章节号编制差异也只由 ``entity_type`` 决定；
+    ``scope``（standalone / consolidated）影响的是合并报表口径，另有流程。
+    只拦 entity 冲突可做到「拦住全部真实污染场景 + 零误杀」：
+
+    ==========================  ==========================  ==========
+    项目准则                     请求 current_standard       判定
+    ==========================  ==========================  ==========
+    soe_standalone              soe_standalone/soe/…        放行
+    soe_standalone              soe_consolidated            放行（scope 差异）
+    soe_standalone              listed_standalone/listed    **冲突**
+    soe_standalone              general/default/空          放行（非准则字面量）
+    无准则字段 / 查询失败        任意                        放行（fail-open）
+    ==========================  ==========================  ==========
+
+    背景：``sync_from_workpaper`` 的定位键只有 ``(project_id, year, note_section)``，
+    ``current_standard`` 既不参与匹配也不校验 → 在国企项目上编辑上市披露 Tab 会把数据
+    写进上市章节号对应的记录（国企项目「五、xx」是另一套压缩编号）→ 静默污染。
+    前端门控已生效，但客户端门控可被绕过（旧版本前端 / 直接 POST），服务端必须自守。
+
+    Spec: applicable-standards-runtime-and-sync-guard R4.1~R4.5
+    """
+    requested = str(requested_standard or "").strip().lower()
+    if not requested:
+        return None  # R4.5：空值放行（历史调用方不传）
+    if not isinstance(project_standard, dict) or not project_standard:
+        return None  # R4.4：项目无准则 / 查询失败 → fail-open
+
+    project_entity = str(project_standard.get("entity_type") or "").strip().lower()
+    if project_entity not in VALID_ENTITY_TYPES:
+        return None  # 项目侧数据本身不可判 → fail-open
+
+    allowed = derive_applicable_standards(project_standard)
+    if requested in allowed:
+        return None  # R4.2
+
+    # 请求值的 entity 维度：组合值取 `_` 前段，维度值取自身。
+    requested_entity = requested.split("_", 1)[0]
+    if requested_entity not in VALID_ENTITY_TYPES:
+        return None  # R4.5：`general` / `default` / 纯 scope 值等非 entity 字面量 → 放行
+    if requested_entity == project_entity:
+        return None  # R4.3：仅 scope 维度不同 → 放行（调用方另记 warning）
+
+    return {
+        "project_standard": allowed[0],
+        "requested_standard": requested,
+        "project_entity": project_entity,
+        "requested_entity": requested_entity,
+        "allowed": allowed,
+    }
+
+
 class StandardUnificationService:
     """统一准则状态源读写服务。"""
 
