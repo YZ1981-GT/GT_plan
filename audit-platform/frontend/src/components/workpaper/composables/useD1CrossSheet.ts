@@ -4,6 +4,11 @@
 import { computed, type Ref, type ComputedRef } from 'vue'
 import { parseNum } from './useD1FormulaEngine'
 import type { ChecklistResponse } from './useD1FormData'
+import {
+  readD1AdjudicationTotals,
+  readD1BadDebtTotal,
+  readD1CategoryTotal,
+} from './d1AdjudicationModel'
 
 export interface UseD1CrossSheetOptions {
   allResponses: Ref<Map<string, ChecklistResponse>>
@@ -27,24 +32,37 @@ export function useD1CrossSheet(options: UseD1CrossSheetOptions) {
     }
   }
 
-  /** 审定表应收票据期末审定数 */
-  const adjNotesReceivableAudited: ComputedRef<number> = computed(() =>
-    parseNum(getRemark('D1-adj-notes-receivable-current-audited')),
+  /**
+   * 审定表应收票据**净值**期末审定数（源模板 D1-1 三、应收票据净值 小计 I18）。
+   *
+   * 🔴 改造前读 `D1-adj-notes-receivable-current-audited` —— 该锚点**全平台无写入方**
+   * （审定表实际锚点是 `D1-adj-{gross|bd|net}-{slug}-{field}`，且审定数是 computed 列
+   * 从不持久化），故 D1-10 监盘 / D1-11 关联方的账面余额一直恒 0、
+   * `bookBalanceLoaded` / `adjDataLoaded` 恒 false。现改由共享模型现算。
+   */
+  const adjNotesReceivableAudited: ComputedRef<number> = computed(
+    () => readD1AdjudicationTotals(allResponses.value).netTotal.currentAudited,
   )
 
-  /** D1-4 坏账准备小计（individual + portfolio currentAudited 之和） */
-  const badDebtTotalAudited: ComputedRef<number> = computed(() => {
-    const ind = parseRows<{ currentAudited?: number }>('D1-bd-individual-rows')
-    const port = parseRows<{ currentAudited?: number }>('D1-bd-portfolio-rows')
-    const sum = (rows: typeof ind) => rows.reduce((s, r) => s + parseNum(r.currentAudited), 0)
-    return sum(ind) + sum(port)
-  })
+  /** 审定表应收票据**原值**期末审定合计（票据面值口径，供实物监盘/关联方核对用）。 */
+  const adjGrossAudited: ComputedRef<number> = computed(
+    () => readD1AdjudicationTotals(allResponses.value).grossTotal.currentAudited,
+  )
 
-  /** D1-2 按类别原值合计 */
-  const categoryTotalBalance: ComputedRef<number> = computed(() => {
-    const rows = parseRows<{ currentUnadjusted?: number; currentAje?: number; currentRje?: number }>('D1-cat-rows')
-    return rows.reduce((s, r) => s + parseNum(r.currentUnadjusted) + parseNum(r.currentAje) + parseNum(r.currentRje), 0)
-  })
+  /**
+   * D1-4 坏账准备期末审定合计。
+   *
+   * 🔴 改造前直接读行里的 `currentAudited` —— `useD1BadDebt.serializeRows()` 不持久化
+   * 派生列 → 恒 0 → `eclVsBadDebtDiff` 把整个 ECL 应计提额当差异常亮。现由共享模型现算。
+   */
+  const badDebtTotalAudited: ComputedRef<number> = computed(
+    () => readD1BadDebtTotal(allResponses.value).currentAudited,
+  )
+
+  /** D1-2 按类别原值期末审定合计（同上：派生列不落库，必须现算）。 */
+  const categoryTotalBalance: ComputedRef<number> = computed(
+    () => readD1CategoryTotal(allResponses.value).currentAudited,
+  )
 
   /** D1-15 ECL 模型应计提减值合计（标量 remark） */
   const eclShouldProvision: ComputedRef<number> = computed(() =>
@@ -86,6 +104,7 @@ export function useD1CrossSheet(options: UseD1CrossSheetOptions) {
 
   return {
     adjNotesReceivableAudited,
+    adjGrossAudited,
     badDebtTotalAudited,
     categoryTotalBalance,
     eclShouldProvision,

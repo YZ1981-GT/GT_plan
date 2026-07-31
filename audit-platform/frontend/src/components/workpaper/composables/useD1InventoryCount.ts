@@ -26,6 +26,7 @@
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import type { ChecklistItem, ChecklistResponse } from './useD1FormData'
 import { sumColumn, type InventoryCountRow } from './d1InspectionFormulas'
+import { readD1AdjudicationTotals } from './d1AdjudicationModel'
 import { useD1ImportExport, type ImportResult } from './useD1ImportExport'
 import http from '@/utils/http'
 
@@ -62,8 +63,17 @@ const RECON_INDEX_KEY = 'D1-inventory-recon-indexRef'
 const NOTE_KEY = 'D1-inventory-note'
 const CONCLUSION_KEY = 'D1-inventory-conclusion'
 
-/** 跨Spec审定表期末余额 key（来自 d1-adjudication-table Spec） */
-const CROSS_SPEC_BOOK_BALANCE_KEY = 'D1-adj-notes-receivable-current-audited'
+/**
+ * 🔴 已删除常量 `CROSS_SPEC_BOOK_BALANCE_KEY = 'D1-adj-notes-receivable-current-audited'`。
+ *
+ * 该锚点**全平台无写入方**：审定表实际锚点形如 `D1-adj-gross-bank-current-unadj`，
+ * 且审定数是 computed 列（`useD1Adjudication` 有意不持久化）→ 本表账面余额一直恒 0、
+ * `bookBalanceLoaded` 恒 false（界面显示「审定表数据未加载」）。
+ * 现改由共享模型 `d1AdjudicationModel.readD1AdjudicationTotals` 现算。
+ *
+ * 口径：监盘核对的是**票据实物面值**，故取「一、应收票据原值」期末审定合计
+ * （非净值 —— 坏账准备不体现在票据实物上）。
+ */
 
 /** InventoryCountRow 数值字段 */
 const NUMERIC_FIELDS: Array<keyof InventoryCountRow> = ['amount']
@@ -299,15 +309,13 @@ export function useD1InventoryCount(options: UseD1InventoryCountOptions) {
 
   // ─── Computed: 跨Spec账面余额 ────────────────────────────────────────────
 
-  const bookBalance: ComputedRef<number> = computed(() => {
-    const raw = allResponses.value.get(CROSS_SPEC_BOOK_BALANCE_KEY)?.remark
-    if (raw == null) return 0
-    return parseNum(raw)
-  })
+  const adjTotals = computed(() => readD1AdjudicationTotals(allResponses.value))
 
-  const bookBalanceLoaded: ComputedRef<boolean> = computed(() => {
-    return allResponses.value.has(CROSS_SPEC_BOOK_BALANCE_KEY)
-  })
+  const bookBalance: ComputedRef<number> = computed(
+    () => adjTotals.value.grossTotal.currentAudited,
+  )
+
+  const bookBalanceLoaded: ComputedRef<boolean> = computed(() => adjTotals.value.hasData)
 
   // ─── Computed: 差异 ──────────────────────────────────────────────────────
 

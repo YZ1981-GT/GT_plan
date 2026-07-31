@@ -544,9 +544,8 @@ export function useD1Disclosure(options: UseD1DisclosureOptions) {
    * 没有理由只让国企有兜底。
    */
   const categorySummaryRows = computed<CategorySummaryRow[]>(() => {
-    const d = crossSheetData.value
-    const hasCross = Boolean(d.bankEndBalance || d.bankPriorBalance || d.bankEndProvision || d.bankPriorProvision || d.commercialEndBalance || d.commercialPriorBalance || d.commercialEndProvision || d.commercialPriorProvision)
-    if (!hasCross && importedTopSummaryRows.value.length > 0) {
+    const t = adjTotals.value
+    if (!t.hasData && importedTopSummaryRows.value.length > 0) {
       return importedTopSummaryRows.value.map((r, idx) => ({
         rowId: r.rowId || `cat-import-${idx}`,
         rowType: (r.rowType || 'fixed') as RowType,
@@ -560,18 +559,25 @@ export function useD1Disclosure(options: UseD1DisclosureOptions) {
         priorBookValue: parseNum(r.priorBookValue),
       }))
     }
-    return [
-      {
-        rowId: 'cat-bank', rowType: 'fixed' as RowType, category: '银行承兑汇票', isFixed: true,
-        endBalance: d.bankEndBalance, endProvision: d.bankEndProvision, endBookValue: calcNetValue(d.bankEndBalance, d.bankEndProvision),
-        priorBalance: d.bankPriorBalance, priorProvision: d.bankPriorProvision, priorBookValue: calcNetValue(d.bankPriorBalance, d.bankPriorProvision),
-      },
-      {
-        rowId: 'cat-commercial', rowType: 'fixed' as RowType, category: '商业承兑汇票', isFixed: true,
-        endBalance: d.commercialEndBalance, endProvision: d.commercialEndProvision, endBookValue: calcNetValue(d.commercialEndBalance, d.commercialEndProvision),
-        priorBalance: d.commercialPriorBalance, priorProvision: d.commercialPriorProvision, priorBookValue: calcNetValue(d.commercialPriorBalance, d.commercialPriorProvision),
-      },
-    ]
+    // 🔴 票据种类**按 D1-2 实际类别动态生成**（不再写死银承/商承两行）：
+    // 客户可能还有「财务公司承兑汇票」（源模板 D1-2 固定行之一）、「信用证」等，
+    // 写死两行会让这些金额在附注①分类表里丢失、合计对不上 TB。
+    return t.categories.map((c) => {
+      const g = t.gross[c.slug] ?? D1_ZERO_AMOUNTS
+      const p = t.provision[c.slug] ?? D1_ZERO_AMOUNTS
+      return {
+        rowId: `cat-${c.slug}`,
+        rowType: (c.isFixed ? 'fixed' : 'dynamic') as RowType,
+        category: c.label,
+        isFixed: c.isFixed,
+        endBalance: g.currentAudited,
+        endProvision: p.currentAudited,
+        endBookValue: calcNetValue(g.currentAudited, p.currentAudited),
+        priorBalance: g.priorAudited,
+        priorProvision: p.priorAudited,
+        priorBookValue: calcNetValue(g.priorAudited, p.priorAudited),
+      }
+    })
   })
 
   /**
@@ -648,7 +654,8 @@ export function useD1Disclosure(options: UseD1DisclosureOptions) {
       movementRows.value = movementRows.value.map(r => {
         if (r.rowId !== rowId) return r
         const updated = { ...r, [field]: numVal }
-        updated.endBalance = calcBadDebtEndBalance(updated.priorBalance, updated.provision, updated.reversal, updated.writeOff, updated.transfer, updated.other)
+        // 源模板上市 B100 / 国企 G48：其他变动是**减项**（与 D1-4 相反，见 engine 注释）
+        updated.endBalance = calcDisclosureBadDebtEnd(updated.priorBalance, updated.provision, updated.reversal, updated.writeOff, updated.transfer, updated.other)
         return updated
       })
       persistRows('movement-rows', movementRows.value)
@@ -656,7 +663,7 @@ export function useD1Disclosure(options: UseD1DisclosureOptions) {
       movementDetailRows.value = movementDetailRows.value.map(r => {
         if (r.rowId !== rowId) return r
         const updated = { ...r, [field]: field === 'label' ? String(value) : numVal }
-        updated.endBalance = calcBadDebtEndBalance(updated.priorBalance, updated.provision, updated.reversal, updated.writeOff, updated.transfer, updated.other)
+        updated.endBalance = calcDisclosureBadDebtEnd(updated.priorBalance, updated.provision, updated.reversal, updated.writeOff, updated.transfer, updated.other)
         return updated
       })
       persistRows('movement-detail-rows', movementDetailRows.value)

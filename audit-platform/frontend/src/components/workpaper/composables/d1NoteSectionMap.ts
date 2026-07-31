@@ -346,6 +346,16 @@ const str = (v: unknown): string => String(v ?? '')
  * 保证附注显示口径与披露表一致（不出现 0.01 挂在 % 表头下）。
  */
 const pct = (v: unknown): number => num(v) * 100
+/**
+ * 由**合计金额**现算比率并换算为百分数（源模板 `IFERROR(C82/B82,0)` 语义）。
+ *
+ * 用于合计行：比率不可加，必须用合计分子 ÷ 合计分母重算；分母为 0 返回 0。
+ */
+const ratePercent = (part: unknown, whole: unknown): number => {
+  const w = num(whole)
+  if (w === 0) return 0
+  return (num(part) / w) * 100
+}
 const ZERO_MOVEMENT: D1MovementRowLike = {
   priorBalance: 0, provision: 0, reversal: 0, writeOff: 0, transfer: 0, other: 0, endBalance: 0,
 }
@@ -378,14 +388,21 @@ function mergePortfolio(
   })
   const sum = (k: 'end_balance' | 'end_provision' | 'prior_balance' | 'prior_provision') =>
     rows.reduce((s, r) => s + num(r[k]), 0)
+  const endBalanceSum = sum('end_balance')
+  const endProvisionSum = sum('end_provision')
+  const priorBalanceSum = sum('prior_balance')
+  const priorProvisionSum = sum('prior_provision')
   rows.push({
     label: '合计',
-    end_balance: sum('end_balance'),
-    end_provision: sum('end_provision'),
-    end_loss_rate: 0,
-    prior_balance: sum('prior_balance'),
-    prior_provision: sum('prior_provision'),
-    prior_loss_rate: 0,
+    end_balance: endBalanceSum,
+    end_provision: endProvisionSum,
+    // 🔴 合计行损失率必须**按合计金额现算**（源模板 D82/G82/D89/G89 = 合计坏账 ÷ 合计余额）：
+    //    改造前硬编码 0 → 附注组合表合计行的预期信用损失率恒显示 0.00%；
+    //    也不能把各行损失率相加（比率不可加）。
+    end_loss_rate: ratePercent(endProvisionSum, endBalanceSum),
+    prior_balance: priorBalanceSum,
+    prior_provision: priorProvisionSum,
+    prior_loss_rate: ratePercent(priorProvisionSum, priorBalanceSum),
     is_total: true,
   } as Record<string, unknown>)
   return rows
@@ -401,11 +418,15 @@ function individualTable(rows: D1IndividualRowLike[] | undefined): Array<Record<
     loss_rate: pct(r.lossRate),
     basis: str(r.basis),
   }))
+  const balanceSum = list.reduce((s, r) => s + num(r.balance), 0)
+  const provisionSum = list.reduce((s, r) => s + num(r.provision), 0)
   out.push({
     label: '合计',
-    balance: list.reduce((s, r) => s + num(r.balance), 0),
-    provision: list.reduce((s, r) => s + num(r.provision), 0),
-    loss_rate: 0,
+    balance: balanceSum,
+    provision: provisionSum,
+    // 源模板 D68=IFERROR(C68/B68,0) / D74 —— 单项计提表合计行的损失率是有公式的，
+    // 改造前硬编码 0（附注恒显示 0.00%）。
+    loss_rate: ratePercent(provisionSum, balanceSum),
     basis: '',
     is_total: true,
   })
@@ -581,11 +602,15 @@ export function buildD1SyncPayload(
 
   // ④ 组合计提明细
   if (isSoe) {
+    // 🔴 `loss_rate` 必须 `pct()`（×100）：披露表 `soeAgingRows` 的 `lossRate` 由
+    //    `ratioOf` 产出**分数**（0.0575），而附注列头是「预期信用损失率(%)」且同版
+    //    分类表已按 `pct()` 推送 —— 改造前这里漏乘 100，附注该表显示 0.06 而不是 5.75，
+    //    与源模板国企侧 `D36/D39/D42 = C/B*100` 也不一致。
     const rows = (snapshot.soePortfolioRows ?? []).map((r) => ({
       label: str(r.name),
       balance: num(r.balance),
       provision: num(r.provision),
-      loss_rate: num(r.lossRate),
+      loss_rate: pct(r.lossRate),
       ...(r.isTotal || r.name === '合计' ? { is_total: true } : {}),
     }))
     put(T.soe.portfolio, rows, PORTFOLIO_COLUMNS_SOE)

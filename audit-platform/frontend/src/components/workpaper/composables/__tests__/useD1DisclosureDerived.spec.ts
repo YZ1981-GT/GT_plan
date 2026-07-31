@@ -10,6 +10,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { ref, nextTick } from 'vue'
 import { useD1Disclosure } from '../useD1Disclosure'
+import { d1AdjAnchor } from '../d1AdjudicationModel'
 import type { ChecklistResponse } from '../useD1FormData'
 
 function setup(variant: 'listed' | 'soe' = 'soe', seed: Record<string, string> = {}) {
@@ -240,6 +241,18 @@ describe('R2.1 上市组合计提双期成对操作', () => {
 describe('主表手工兜底（两个变体一致）', () => {
   const CROSS = 'D1-disc-listed-'
 
+  /**
+   * 🔴 fixture 锚点必须经 `d1AdjAnchor` 构造，**不得写字面量**。
+   *
+   * 改造前本文件（与 `useD1Disclosure.pbt.spec.ts`）用
+   * `'D1-adj-gross-bank-current-audited'` 播种 —— 该锚点全平台**无写入方**
+   * （`-current-audited` 是 computed 列、从不持久化），于是测试恒绿、生产恒死。
+   * 现在只允许用真实持久化字段（`current-unadj` / `current-aje` / `current-rje`）。
+   */
+  const adjGrossFixture = (currentUnadj: number): Record<string, string> => ({
+    [d1AdjAnchor('gross', 'bank', 'current-unadj')]: String(currentUnadj),
+  })
+
   it.each([['listed'], ['soe']] as const)(
     '%s：审定表未取数时开放手工录入',
     (variant) => {
@@ -252,11 +265,7 @@ describe('主表手工兜底（两个变体一致）', () => {
   it.each([['listed'], ['soe']] as const)(
     '%s：审定表取到数后转为只读（以审定表为准）',
     (variant) => {
-      const p = `D1-disc-${variant}-`
-      const { api } = setup(variant, {
-        'D1-adj-gross-bank-current-audited': '500000',
-      })
-      void p
+      const { api } = setup(variant, adjGrossFixture(500000))
       expect(api.crossSheetStatus.value).toBe('loaded')
       expect(api.canEditCategorySummary.value).toBe(false)
     },
@@ -293,10 +302,28 @@ describe('主表手工兜底（两个变体一致）', () => {
     ])
     const { api } = setup('listed', {
       [CROSS + 'top-summary-rows']: imported,
-      'D1-adj-gross-bank-current-audited': '500000',
+      ...adjGrossFixture(500000),
     })
     const bank = api.categorySummaryRows.value.find(r => r.category === '银行承兑汇票')!
     expect(bank.endBalance).toBe(500000)
+  })
+
+  it('🔴 D1-2 明细填了数即带入主表（派生列不落库，必须现算）', () => {
+    // D1-cat-rows 只持久化录入列（无 currentUnadjusted），改造前审定表读派生列 → 恒 0
+    const catRows = JSON.stringify([
+      { rowId: 'fixed-bank', category: '银行承兑汇票', isFixed: true, priorUnadjusted: 100, currentIncrease: 60, currentDecrease: 20 },
+      { rowId: 'dynamic-tb-1', category: '信用证', isFixed: false, priorUnadjusted: 500, currentIncrease: 0, currentDecrease: 500 },
+    ])
+    const { api } = setup('listed', { 'D1-cat-rows': catRows })
+    const rows = api.categorySummaryRows.value
+    const bank = rows.find(r => r.category === '银行承兑汇票')!
+    expect(bank.endBalance).toBe(140) // 100 + 60 − 20（源模板 D1-2 H11=B11+F11-G11）
+    // 动态票据种类（信用证）必须有落点，否则金额在附注①分类表丢失
+    const lc = rows.find(r => r.category === '信用证')!
+    expect(lc).toBeTruthy()
+    expect(lc.priorBalance).toBe(500)
+    expect(lc.endBalance).toBe(0)
+    expect(api.categorySummaryTotal.value.priorBalance).toBe(600)
   })
 
   it('只读时手工录入被拒（不越过 isReadonly）', () => {

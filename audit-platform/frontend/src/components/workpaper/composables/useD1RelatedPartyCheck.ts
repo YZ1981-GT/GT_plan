@@ -31,6 +31,7 @@ import {
   computeBookValue,
   type RelatedPartyRow,
 } from './d1InspectionFormulas'
+import { readD1AdjudicationTotals } from './d1AdjudicationModel'
 import { useD1ImportExport, type ImportResult } from './useD1ImportExport'
 import http from '@/utils/http'
 
@@ -54,8 +55,15 @@ const ROWS_KEY = 'D1-rp-rows'
 const NOTE_KEY = 'D1-rp-note'
 const CONCLUSION_KEY = 'D1-rp-conclusion'
 
-/** 跨Spec审定表期末余额 key（来自 d1-adjudication-table Spec） */
-const CROSS_SPEC_ADJ_KEY = 'D1-adj-notes-receivable-current-audited'
+/**
+ * 🔴 已删除常量 `CROSS_SPEC_ADJ_KEY = 'D1-adj-notes-receivable-current-audited'`。
+ *
+ * 该锚点**全平台无写入方**（审定表实际锚点是 `D1-adj-{gross|bd|net}-{slug}-{field}`，
+ * 且审定数是 computed 列从不持久化）→ 本表 `adjClosingBalance` 恒 0、`adjDataLoaded`
+ * 恒 false。现改由共享模型 `readD1AdjudicationTotals` 现算。
+ *
+ * 口径：关联方票据往来核对的是**票据面值**，故取「一、应收票据原值」期末审定合计。
+ */
 
 /** RelatedPartyRow 数值字段 */
 const NUMERIC_FIELDS: Array<keyof RelatedPartyRow> = [
@@ -308,15 +316,13 @@ export function useD1RelatedPartyCheck(options: UseD1RelatedPartyCheckOptions) {
 
   // ─── Computed: 跨Spec审定表期末余额 ──────────────────────────────────────
 
-  const adjClosingBalance: ComputedRef<number> = computed(() => {
-    const raw = allResponses.value.get(CROSS_SPEC_ADJ_KEY)?.remark
-    if (raw == null) return 0
-    return parseNum(raw)
-  })
+  const adjTotals = computed(() => readD1AdjudicationTotals(allResponses.value))
 
-  const adjDataLoaded: ComputedRef<boolean> = computed(() => {
-    return allResponses.value.has(CROSS_SPEC_ADJ_KEY)
-  })
+  const adjClosingBalance: ComputedRef<number> = computed(
+    () => adjTotals.value.grossTotal.currentAudited,
+  )
+
+  const adjDataLoaded: ComputedRef<boolean> = computed(() => adjTotals.value.hasData)
 
   // ─── Computed: 核对差异 ──────────────────────────────────────────────────
 

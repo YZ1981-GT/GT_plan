@@ -6,7 +6,8 @@
  *
  * 使用 fast-check + vitest 验证 7 个 correctness properties (Property 3–9)。
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
+import { ref } from 'vue'
 import * as fc from 'fast-check'
 import {
   calcNetValue,
@@ -14,7 +15,10 @@ import {
   calcBadDebtEndBalance,
   parseNum,
 } from '../useD1FormulaEngine'
+import { d1AdjAnchor } from '../d1AdjudicationModel'
+import { useD1Disclosure } from '../useD1Disclosure'
 import type { PledgedRow, EndorsedRow, TransferRow, RowType } from '../useD1Disclosure'
+import type { ChecklistResponse } from '../useD1FormData'
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Property 3: 账面价值等于余额减坏账
@@ -161,46 +165,77 @@ describe('Feature: d1-disclosure-note, Property 7: 跨Sheet取数响应式一致
    * For each key in CROSS_SHEET_KEYS, parseNum(map.get(key).remark) === expected field value
    */
 
-  // Mirror the CROSS_SHEET_KEYS mapping from useD1Disclosure.ts (not exported)
-  const CROSS_SHEET_KEYS: Record<string, string> = {
-    bankEndBalance: 'D1-adj-gross-bank-current-audited',
-    bankPriorBalance: 'D1-adj-gross-bank-prior-audited',
-    bankEndProvision: 'D1-adj-baddebt-bank-current-audited',
-    bankPriorProvision: 'D1-adj-baddebt-bank-prior-audited',
-    commercialEndBalance: 'D1-adj-gross-commercial-current-audited',
-    commercialPriorBalance: 'D1-adj-gross-commercial-prior-audited',
-    commercialEndProvision: 'D1-adj-baddebt-commercial-current-audited',
-    commercialPriorProvision: 'D1-adj-baddebt-commercial-prior-audited',
-  }
-
-  it('for each key in CROSS_SHEET_KEYS, parseNum(map.get(key).remark) equals the expected field', () => {
-    // Custom generator: Map with D1-adj-* keys, each having a random float value stored as remark
-    const mapGen = fc.record(
-      Object.fromEntries(
-        Object.values(CROSS_SHEET_KEYS).map(adjKey => [
-          adjKey,
-          fc.float({ min: -1e9, max: 1e9, noNaN: true }),
-        ]),
-      ),
-    )
-
+  /**
+   * 🔴 本用例原来是**空转的重言式**：它自己用
+   * `'D1-adj-gross-bank-current-audited'` / `'D1-adj-baddebt-*'` 建 Map，再断言
+   * `parseNum` 能把同一个值读回来 —— 既没触碰生产代码，也掩盖了「这批锚点全平台
+   * 无写入方」这一事实（`-current-audited` 是 computed 列从不持久化、前缀
+   * `baddebt` ≠ 写入方的 `bd`）。披露①分类表的跨表取数因此从未生效过。
+   *
+   * 现改为对**真实持久化锚点**（`current-unadj` / `current-aje` / `current-rje`）
+   * 做 PBT：`crossSheetData` 必须等于 `审定 = 未审 + 账项调整 + 重分类调整`
+   * （源模板 D1-1 `I8=F8+G8+H8`）。锚点一律经 `d1AdjAnchor` 构造，禁字面量。
+   */
+  it('crossSheetData 恒等于「未审 + 账项调整 + 重分类调整」（真实锚点，禁派生列）', () => {
+    const amount = () => fc.float({ min: -1e9, max: 1e9, noNaN: true })
     fc.assert(
-      fc.property(mapGen, (valuesRecord) => {
-        // Build a Map simulating allResponses
-        const map = new Map<string, { remark: string }>()
-        for (const [adjKey, value] of Object.entries(valuesRecord)) {
-          map.set(adjKey, { remark: String(value) })
-        }
+      fc.property(
+        fc.record({
+          gUnadj: amount(),
+          gAje: amount(),
+          gRje: amount(),
+          pUnadj: amount(),
+          pAje: amount(),
+          pRje: amount(),
+        }),
+        (v) => {
+          const map = new Map<string, ChecklistResponse>()
+          const put = (k: string, val: number) =>
+            map.set(k, { item_id: k, conclusion: null, remark: String(val) })
+          put(d1AdjAnchor('gross', 'bank', 'current-unadj'), v.gUnadj)
+          put(d1AdjAnchor('gross', 'bank', 'current-aje'), v.gAje)
+          put(d1AdjAnchor('gross', 'bank', 'current-rje'), v.gRje)
+          put(d1AdjAnchor('bd', 'bank', 'current-unadj'), v.pUnadj)
+          put(d1AdjAnchor('bd', 'bank', 'current-aje'), v.pAje)
+          put(d1AdjAnchor('bd', 'bank', 'current-rje'), v.pRje)
 
-        // For each field in CROSS_SHEET_KEYS, verify the mapping logic
-        for (const [field, adjKey] of Object.entries(CROSS_SHEET_KEYS)) {
-          const expectedValue = valuesRecord[adjKey] as number
-          const actualValue = parseNum(map.get(adjKey)?.remark)
-          expect(actualValue).toBeCloseTo(expectedValue, 5)
-        }
-      }),
-      { numRuns: 100 },
+          const api = useD1Disclosure({
+            allResponses: ref(map) as any,
+            wpId: ref('wp-1') as any,
+            projectId: ref('p-1') as any,
+            variant: 'listed',
+            saveImmediate: vi.fn(async () => {}),
+            isReadonly: ref(false) as any,
+          })
+          expect(api.crossSheetData.value.bankEndBalance).toBeCloseTo(
+            v.gUnadj + v.gAje + v.gRje,
+            4,
+          )
+          expect(api.crossSheetData.value.bankEndProvision).toBeCloseTo(
+            v.pUnadj + v.pAje + v.pRje,
+            4,
+          )
+        },
+      ),
+      { numRuns: 60 },
     )
+  })
+
+  it('🔴 反向自检：派生列锚点（-current-audited）不得被消费', () => {
+    // 若有人把 `-current-audited` 重新接回读取路径，本断言立即打红
+    const map = new Map<string, ChecklistResponse>()
+    const bogus = 'D1-adj-gross-bank-current-audited'
+    map.set(bogus, { item_id: bogus, conclusion: null, remark: '999999' })
+    const api = useD1Disclosure({
+      allResponses: ref(map) as any,
+      wpId: ref('wp-1') as any,
+      projectId: ref('p-1') as any,
+      variant: 'listed',
+      saveImmediate: vi.fn(async () => {}),
+      isReadonly: ref(false) as any,
+    })
+    expect(api.crossSheetData.value.bankEndBalance).toBe(0)
+    expect(api.crossSheetStatus.value).toBe('empty')
   })
 })
 

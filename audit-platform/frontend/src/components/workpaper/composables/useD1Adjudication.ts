@@ -265,16 +265,16 @@ export function useD1Adjudication(options: UseD1AdjudicationOptions) {
       {
         key: 'gross-vs-d1-2',
         label: '原值小计 ↔ D1-2 明细合计（期末未审）',
-        detailAmount: cat.current,
+        detailAmount: cat.currentUnadjusted,
         adjudicatedAmount: t.grossTotal.currentUnadjusted,
-        diff: t.grossTotal.currentUnadjusted - cat.current,
+        diff: t.grossTotal.currentUnadjusted - cat.currentUnadjusted,
       },
       {
         key: 'provision-vs-d1-4',
         label: '坏账小计 ↔ D1-4 明细合计（期末未审）',
-        detailAmount: bd.current,
+        detailAmount: bd.currentUnadjusted,
         adjudicatedAmount: t.provisionTotal.currentUnadjusted,
-        diff: t.provisionTotal.currentUnadjusted - bd.current,
+        diff: t.provisionTotal.currentUnadjusted - bd.currentUnadjusted,
       },
     ]
   })

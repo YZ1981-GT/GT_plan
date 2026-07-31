@@ -351,34 +351,49 @@ export function readD1BadDebtByNoteType(map: D1ResponseMap): Record<string, D1Pe
   return out
 }
 
-/** D1-4 坏账准备**合计**（按单项 + 按组合，用于与按票据种类小计做勾稽提示）。 */
-export function readD1BadDebtTotal(map: D1ResponseMap): { prior: number; current: number } {
-  let prior = 0
-  let current = 0
+/**
+ * D1-4 坏账准备**合计**（按单项 + 按组合），派生列现算。
+ *
+ * 🔴 不能直接读行里的 `currentAudited` / `priorAudited`：`useD1BadDebt.serializeRows()`
+ * 与 `useD1DetailCategory.serializeRows()` 一样**有意只持久化录入列**，派生列不落库。
+ * 改造前 `useD1CrossSheet.badDebtTotalAudited` 直接读 `currentAudited` → 恒 0 →
+ * `eclVsBadDebtDiff` 把整个 ECL 应计提额当成差异常亮。
+ *
+ * 口径与 `useD1FormulaEngine.calcBadDebtEndBalance` 逐字一致
+ * （期初审定 + 计提 − 收回 − 转回 − 核销 + 其他）。
+ */
+export function readD1BadDebtTotal(map: D1ResponseMap): D1PeriodAmounts {
+  const rows: D1PeriodAmounts[] = []
   for (const key of [D1_BD_INDIVIDUAL_KEY, D1_BD_PORTFOLIO_KEY]) {
     for (const raw of readJsonArray(map, key)) {
-      const p = n(raw?.priorUnadjusted)
-      prior += p
-      // D1-4 五列变动，口径与 `useD1FormulaEngine.calcBadDebtEndBalance` **逐字一致**
-      // （期初审定 + 计提 − 收回 − 转回 − 核销 + 其他）。此处用期初未审起算，
-      // 只作与审定表小计的**勾稽提示**，不参与取数，故不叠 aje/rje。
-      current +=
-        d1Audited(p, n(raw?.priorAje), n(raw?.priorRje)) +
+      const priorUnadjusted = n(raw?.priorUnadjusted)
+      const priorAje = n(raw?.priorAje)
+      const priorRje = n(raw?.priorRje)
+      const currentUnadjusted =
+        d1Audited(priorUnadjusted, priorAje, priorRje) +
         n(raw?.currentProvision) -
         n(raw?.currentRecovery) -
         n(raw?.currentReversal) -
         n(raw?.currentWriteOff) +
         n(raw?.currentOther)
+      rows.push(
+        d1WithAudited({
+          priorUnadjusted,
+          priorAje,
+          priorRje,
+          currentUnadjusted,
+          currentAje: n(raw?.currentAje),
+          currentRje: n(raw?.currentRje),
+        }),
+      )
     }
   }
-  return { prior, current }
+  return d1SumAmounts(rows)
 }
 
-/** D1-2 原值**合计**（用于与审定表原值小计做勾稽提示）。 */
-export function readD1CategoryTotal(map: D1ResponseMap): { prior: number; current: number } {
-  const amounts = Object.values(readD1CategoryAmounts(map))
-  const sum = d1SumAmounts(amounts)
-  return { prior: sum.priorUnadjusted, current: sum.currentUnadjusted }
+/** D1-2 原值**合计**（派生列现算，理由同 `readD1BadDebtTotal`）。 */
+export function readD1CategoryTotal(map: D1ResponseMap): D1PeriodAmounts {
+  return d1SumAmounts(Object.values(readD1CategoryAmounts(map)))
 }
 
 export interface D1AdjudicationTotals {

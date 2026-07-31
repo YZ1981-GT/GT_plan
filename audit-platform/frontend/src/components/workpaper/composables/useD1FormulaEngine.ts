@@ -143,6 +143,38 @@ export function calcBadDebtEndBalance(
 }
 
 /**
+ * 披露表「本期计提、收回或转回的坏账准备」变动表期末数。
+ *
+ * 🔴 与 `calcBadDebtEndBalance`（D1-4 明细表）**符号不同**，两者不可互用：
+ *
+ * | 表 | 源模板公式 | 「其他」方向 |
+ * |----|-----------|-------------|
+ * | D1-4 坏账准备明细表 | `K12=B12+SUM(F12:G12)-SUM(H12:J12)`（本期增加含「其他增加」） | **加项** |
+ * | 披露变动表（上市 `B100` / 国企 `G48`） | `期初+计提-收回或转回-核销-转销-其他变动` | **减项** |
+ *
+ * 改造前披露变动表复用了 D1-4 的函数（其他为加项）→ 与自家勾稽面板的 F4-7 判定
+ * （已按源模板 G48 取减项）**符号相反**，只要「其他变动」非 0，披露表算出的期末数
+ * 就会被自己的勾稽面板判为异常。
+ *
+ * @param prior 期初数（上年年末数）
+ * @param provision 本期计提
+ * @param reversal 本期收回或转回
+ * @param writeOff 本期核销
+ * @param transfer 本期转销（源模板上市 `[本期转销]` 可选行）
+ * @param other 其他 / 其他变动
+ */
+export function calcDisclosureBadDebtEnd(
+  prior: number,
+  provision: number,
+  reversal: number,
+  writeOff: number,
+  transfer: number,
+  other: number,
+): number {
+  return prior + provision - reversal - writeOff - transfer - other
+}
+
+/**
  * 期末未审数 = 期初审定 + 本期增加 - 本期减少
  *
  * D1-2（按类别）/ D1-3（按客户）原值明细表的期末未审数计算。

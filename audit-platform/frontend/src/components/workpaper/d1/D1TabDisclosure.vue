@@ -35,6 +35,7 @@ import { buildNoteJumpRoute, type DisclosureVariant as NoteVariant } from '@/vie
 import { getDisclosureNoteDetail } from '@/services/auditPlatformApi'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
+import { useHostApplicableStandards } from '../composables/hostApplicableStandards'
 // 披露内部勾稽校验（规则源 = 应收票据校验预设 F4-1~F4-30）
 import { runD1DisclosureChecks } from '../composables/d1DisclosureConsistency'
 import D1DisclosureConsistencyPanel from './D1DisclosureConsistencyPanel.vue'
@@ -150,6 +151,11 @@ async function saveWithDebounce(items: any[]): Promise<void> {
   pendingSaveItems.value.push(...items)
   debouncedSave()
 }
+
+// ─── 适用准则（宿主真源）─────────────────────────────────────────────────────
+// 🔴 必须在 setup 作用域调用（内部 inject）；写进 syncToDisclosureNotes 函数体里
+// 会拿不到上下文并抛错 → 同步在发请求前就死（平台已有同类踩坑记录）。
+const hostApplicableStandards = useHostApplicableStandards()
 
 // ─── 自动同步 ─────────────────────────────────────────────────────────────────
 const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
@@ -1016,7 +1022,16 @@ async function syncToDisclosureNotes(): Promise<void> {
       writeOffDetailRows: writeOffDetailRows.value as any,
       notes: { ...sectionNotes.value },
     }
-    const payload = buildD1SyncPayload(props.variant, props.wpId || '', null, snapshot)
+    // 🔴 适用准则必须取宿主真源，不能传 null：`resolveD1CurrentStandard` 会据此产出
+    // `current_standard`，传 null 时 consolidated 项目也会被写成 `*_standalone`。
+    // 平台单一真源 = `useHostApplicableStandards`（本 Tab 无 htmlData prop，
+    // 故走 WorkpaperRuntimeContext 注入值）。
+    const payload = buildD1SyncPayload(
+      props.variant,
+      props.wpId || '',
+      hostApplicableStandards.value,
+      snapshot,
+    )
     const result: any = await http.post(
       `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,
       payload,
