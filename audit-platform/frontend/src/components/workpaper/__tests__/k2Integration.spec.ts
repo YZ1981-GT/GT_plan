@@ -229,11 +229,12 @@ describe('K2 Integration: 交叉验证 adjudicationVsDetail', () => {
 // Requirements: 2.5, 2.6
 // ══════════════════════════════════════════════════════════════════════════════
 
-describe('K2 Integration: 审定表subtotalRow + writebackTB(1231)', () => {
+describe('K2 Integration: 审定表subtotalRow + writebackTB（科目 1901）', () => {
   beforeEach(() => { vi.clearAllMocks() })
 
-  it('subtotalRow 正确汇总8个明细行', () => {
-    // Setup: 8个明细项（合同取得成本/预付款项/待摊费用/待抵扣税额/合同资产/押金/应收转让/其他）
+  it('subtotalRow 汇总全部动态行（历史固定行按有数据者迁移）', () => {
+    // Setup: 三个历史 rowKey 有数据 → 迁移成 3 个动态行；其余 5 个从未填过，
+    // 按「宁缺勿造」不再占位（旧实现恒 8 行，其中 5 行全 0）。合计口径不变。
     const entries: Record<string, number> = {
       'K2-1-contract-cost-begin': 100000,
       'K2-1-contract-cost-debit': 20000,
@@ -262,7 +263,10 @@ describe('K2 Integration: 审定表subtotalRow + writebackTB(1231)', () => {
     const saveFn = vi.fn()
     const { subtotalRow, rows } = useK2Adjudication(allResponses, { onSave: saveFn })
 
-    // 3个有值，其余5个为0
+    // 只迁移有数据的 3 行（rowId 沿用旧 rowKey → 金额零丢失）
+    expect(rows.value.map((r) => r.rowKey)).toEqual([
+      'contract-cost', 'prepayment', 'deferred-expense',
+    ])
     // subtotalRow.begin = 100000 + 50000 + 30000 = 180000
     expect(subtotalRow.value.begin).toBe(180000)
     // subtotalRow.debit = 20000 + 10000 + 5000 = 35000
@@ -281,17 +285,18 @@ describe('K2 Integration: 审定表subtotalRow + writebackTB(1231)', () => {
     expect(subtotalRow.value.audited).toBe(193000)
   })
 
-  it('writebackTB 调用正确端点并发布 EventBus', async () => {
+  it('writebackTB 调用正确端点并发布 EventBus（科目 1901，不是 1231）', async () => {
     const { useK2FormData } = await import('../composables/useK2FormData')
     const formData = useK2FormData(ref('wp-k2-001'), ref('proj-001'))
 
     await formData.writebackTB(193000)
 
-    // 验证 API 调用
+    // 🔴 科目口径 = 报表行 BS-014 解析结果（实证 TB('1901')）。
+    // 历史实现写死 `1231`（应收款项坏账准备）→ 回写会覆盖 D1/D2/K1 的坏账口径。
     expect(mockPut).toHaveBeenCalledTimes(1)
     expect(mockPut).toHaveBeenCalledWith(
       '/api/projects/proj-001/trial-balance/writeback',
-      { account_code: '1231', audited_amount: 193000 },
+      { account_code: '1901', audited_amount: 193000 },
     )
 
     // 验证 EventBus 发布
@@ -299,7 +304,7 @@ describe('K2 Integration: 审定表subtotalRow + writebackTB(1231)', () => {
     expect(emitSpy).toHaveBeenCalledWith(
       'substantive:adjudicated',
       expect.objectContaining({
-        accountCode: '1231',
+        accountCode: '1901',
         auditedAmount: 193000,
         wpCode: 'K2',
       }),
