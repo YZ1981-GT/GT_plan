@@ -568,6 +568,61 @@ jobs:
       - name: Run N1 formula preset purity guard
         run: python -m pytest backend/tests/formula_management/test_n1_preset_purity.py -q
 
+  n345-four-table-extraction:
+    # N3 / N4 / N5 四表取数守卫
+    # （n345-four-table-extraction-alignment R1 / R2 / R3 / R4 / R5 / R8 / R9）
+    #
+    # 拦五类已实测缺陷：
+    # 1. **N5 `get_active_filter` 单参调用** —— 真实签名 `(db, table, project_id, year)`，
+    #    单参必 TypeError 被 `except Exception` 吞 → `trial_balance` 恒 0、
+    #    `adjudication_prefill` 恒 None。而既有 28 个 N5 测试全绿（从不真实调用取数函数）
+    #    → 本 job 以**真实签名 + await** 调用并断言返回非零。
+    # 2. **损益类「Σ借 − Σ贷」结构性恒为 0** —— 全年序时账必含年末「结转损益」分录
+    #    （活体实证：凭证「计提当期所得税」借 110,445.40 / 凭证「结转损益」贷 110,445.40），
+    #    9 个项目的 6403 / 6801 借贷两侧金额全部相等。权威口径 = `trial_balance`
+    #    （`report_config` 的 `IS-003` / `IS-023` 即 `本期发生额`），兜底 `tb_balance.debit_amount`。
+    # 3. **`1812` 是活体 0 命中的不存在科目码**（递延所得税负债是 `2901`）；
+    #    **`6001` 是营业收入**（`IS-022 利润总额` 是 `ROW()` 派生行，不是科目）。
+    # 4. **N3 只查科目级精确单行 + `.limit(1)`** → 客户按子科目挂账时恒 0；
+    #    且审定表 seed 把数据全塞「其他」一行，分类信息全丢。
+    # 5. **6403 子科目编码语义客户间冲突**（`6403.01` 某客户是印花税）→ 按税种取数
+    #    只能用名称判据，且后端税种清单须与前端逐字同序（否则预填有孤儿税种）。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install backend deps
+        run: python -m pip install -r backend/requirements.txt
+      - name: Check N3/N4/N5 prefill preset alignment
+        run: python backend/scripts/fix/fix_n345_prefill_presets.py --check
+      - name: Run N5 four-table extraction guards (real-signature calls)
+        run: python -m pytest backend/tests/test_n5_four_table_extraction.py -q
+      - name: Run N3/N4 + shared module guards
+        run: python -m pytest backend/tests/test_n3_n4_four_table_extraction.py -q
+      - name: Run N3/N4/N5 preset purity guards
+        run: python -m pytest backend/tests/formula_management/test_n345_preset_purity.py -q
+      - name: Run existing N4/N5 regression suites
+        run: python -m pytest backend/tests/test_n4_taxes_and_surcharges.py backend/tests/test_n5_integration.py -q
+
+  four-table-output-consumption:
+    # 平台守卫：render 输出的四表键必须有前端消费点（禁 dead output）
+    # + 共享件 `useLmnTbReconcile` 必须有 ≥3 个消费方（它曾 78 行 0 引用）
+    # + N3 无披露 inert 残留（源模板无附注 sheet，披露与 N1 共节）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install frontend deps
+        working-directory: audit-platform/frontend
+        run: npm ci
+      - name: Run four-table output consumption guard
+        working-directory: audit-platform/frontend
+        run: npx vitest run src/components/workpaper/__tests__/fourTableOutputConsumption.spec.ts
+
   n1-disclosure-frontend:
     # N1 披露表四表直通 / 骨架 / 行镜像 / 二选一分支守卫
     # （n1-four-table-extraction-and-disclosure-alignment R3 / R4 / R7）
@@ -777,6 +832,50 @@ jobs:
       - name: Run H8 disclosure contract tests
         working-directory: audit-platform/frontend
         run: npx vitest run src/components/workpaper/composables/__tests__/h8NoteSubtableContract.spec.ts src/components/workpaper/composables/__tests__/h8Disclosure.spec.ts
+
+  note-h9-h10-structure:
+    # 附注 H9 租赁负债（五、47 / 八、52）+ H10 资产处置损益（三、资产处置收益（损 / 八、75）
+    # （h9-h10-remaining-disclosure-alignment Task 8）
+    # H10 原有两个 P0：
+    # ①上市章节号常量写 `三、资产处置收益`，模板 section_number 实为 md 截断值
+    #   `三、资产处置收益（损`（10 字符）→ sync_from_workpaper 精确定位落空、会新建垃圾章节；
+    # ②上市两张表**同名** `项  目`（表头首格泄漏）→ sub_table_data 以表名为键，同名互相覆盖
+    #   丢整张表；载荷用 `项  目__trial` + `_trial_detail` 双写绕过，但那两个键在模板里不存在
+    #   = 孤儿，试运行销售明细永远进不了附注。
+    # 另修：两版主表各缺源模板 3 行（债务重组/使用权资产/油气资产）、上市试运行表两级表头被
+    # 压扁成 3 列（载荷早已带 income/cost 四字段无落点）、国企 sheet 名漂移成「国有企业」、
+    # 国企 text_sections 残留 `**` 且漏第 3 条、三表缺 columns/guidance。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check note H9/H10 section alignment
+        run: python backend/scripts/fix/fix_note_h9_h10_structure.py --check
+      - name: Install test dependencies
+        run: python -m pip install pytest==8.4.2 openpyxl==3.1.5
+      - name: Run note H9/H10 structure contract tests
+        run: python -m pytest backend/tests/test_note_h9_h10_structure.py -q
+
+  note-h9-h10-frontend:
+    # H9/H10 披露载荷契约（章节号/sheet 名/表名逐字命中、无绕过键、两级表头、
+    # `_note_texts` 中文 title、三 Tab 无自调度）+ 平台 columns 覆盖率与 sheet 名 registry 回归
+    # （h9-h10-remaining-disclosure-alignment Task 8）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: audit-platform/frontend/package-lock.json
+      - name: Install frontend dependencies
+        working-directory: audit-platform/frontend
+        run: npm ci
+      - name: Run H9/H10 disclosure contract tests
+        working-directory: audit-platform/frontend
+        run: npx vitest run src/components/workpaper/composables/__tests__/h9h10NoteSubtableContract.spec.ts src/components/workpaper/composables/__tests__/h9Disclosure.spec.ts src/components/workpaper/__tests__/h10DisclosureSync.spec.ts src/components/workpaper/composables/__tests__/disclosureSheetNameRegistry.spec.ts
 
   note-l-cycle-structure:
     # 附注 L 循环章节结构守卫（L7 其他非流动负债 五、52/八、57 + L8 财务费用 五、67/八、68）
