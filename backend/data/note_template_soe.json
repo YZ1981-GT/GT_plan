@@ -4348,10 +4348,8 @@
           "name": "按账龄披露其他应收款项",
           "headers": [
             "账  龄",
-            "账面余额",
-            "坏账准备",
-            "账面余额",
-            "坏账准备"
+            "期末数",
+            "期初数"
           ],
           "rows": [
             {
@@ -4367,56 +4365,48 @@
               "row_type": "data"
             },
             {
-              "label": "3年以上",
+              "label": "3至4年",
               "row_type": "data"
             },
             {
-              "label": "合计",
+              "label": "4至5年",
+              "row_type": "data"
+            },
+            {
+              "label": "5年以上",
+              "row_type": "data"
+            },
+            {
+              "label": "小  计",
+              "is_total": true,
+              "row_type": "subtotal"
+            },
+            {
+              "label": "减：坏账准备",
+              "row_type": "data"
+            },
+            {
+              "label": "合  计",
               "is_total": true,
               "row_type": "total"
             }
           ],
-          "_column_groups": [
-            {
-              "group": "期末数",
-              "start": 1,
-              "span": 2
-            },
-            {
-              "group": "期初数",
-              "start": 3,
-              "span": 2
-            }
-          ],
-          "guidance": "两级表头：期末数 / 期初数 各含账面余额、坏账准备。勾稽：合计账面余额 = K1-1 其他应收款审定期末数；合计坏账准备 = 三阶段变动表期末余额。",
+          "guidance": "源模板国企版账龄表为**单级 3 列**（账龄 / 期末数 / 期初数），行含小  计、减：坏账准备、合  计。勾稽：小  计 = K1-1 其他应收款审定期末数；小  计 − 减：坏账准备 = 合  计；减：坏账准备 = 三阶段变动表期末余额。账龄档随项目账龄配置（3年段 / 5年段 / 自定义），此处 seed 取源模板 5 年段口径。",
           "columns": [
             {
               "key": "label",
               "label": "账  龄",
-              "is_label": true
+              "is_label": true,
+              "flat": true
             },
             {
-              "key": "期末账面余额",
-              "label": "账面余额",
-              "group": "期末数",
+              "key": "期末数",
+              "label": "期末数",
               "format": "amount"
             },
             {
-              "key": "期末坏账准备",
-              "label": "坏账准备",
-              "group": "期末数",
-              "format": "amount"
-            },
-            {
-              "key": "期初账面余额",
-              "label": "账面余额",
-              "group": "期初数",
-              "format": "amount"
-            },
-            {
-              "key": "期初坏账准备",
-              "label": "坏账准备",
-              "group": "期初数",
+              "key": "期初数",
+              "label": "期初数",
               "format": "amount"
             }
           ]
@@ -4674,11 +4664,19 @@
               "row_type": "data"
             },
             {
-              "label": "3年以上",
+              "label": "3至4年",
               "row_type": "data"
             },
             {
-              "label": "合计",
+              "label": "4至5年",
+              "row_type": "data"
+            },
+            {
+              "label": "5年以上",
+              "row_type": "data"
+            },
+            {
+              "label": "合  计",
               "is_total": true,
               "row_type": "total"
             }
@@ -5383,7 +5381,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "fix_note_k_complex_structure",
-      "_aligned_at": "2026-07-31 00:46:03"
+      "_aligned_at": "2026-07-31 20:28:22"
     },
     {
       "section_number": "八、10",
@@ -9781,7 +9779,36 @@
               "label": "其他",
               "row_type": "data"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "begin",
+              "label": "期初余额",
+              "format": "amount"
+            },
+            {
+              "key": "increase",
+              "label": "本期增加",
+              "format": "amount"
+            },
+            {
+              "key": "decrease",
+              "label": "本期减少",
+              "format": "amount"
+            },
+            {
+              "key": "end",
+              "label": "期末余额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "使用权资产变动表（源模板 R6–R31）：五层结构 —— 一、账面原值合计 / 二、累计折旧合计 / 三、使用权资产账面净值合计 / 四、减值准备合计 / 五、使用权资产账面价值合计，各层下以「其中：」列示 土地 / 房屋、建筑物 / 机器、运输、办公设备 / 其他。勾稽：一、二、四层 期末余额 = 期初余额 + 本期增加 − 本期减少；账面净值 = 账面原值 − 累计折旧；账面价值 = 账面净值 − 减值准备；各层合计行 = 该层「其中：」四类别之和。源模板列示约定：「三、使用权资产账面净值合计」与「五、使用权资产账面价值合计」两层为推导层，其「本期增加」「本期减少」列填「——」（不作变动分析）。数据来源：审定表 H8-1 / 明细表 H8-2 / 折旧测算表 H8-8 / 减值测算表 H8-10。"
         }
       ],
       "text_sections": [],
@@ -9799,7 +9826,9 @@
       "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
       "sort_index": 25,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "h8-right-of-use-disclosure-alignment",
+      "_aligned_at": "2026-07-31 20:13:46"
     },
     {
       "section_number": "八、27",
