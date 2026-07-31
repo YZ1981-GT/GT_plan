@@ -1,6 +1,6 @@
 {
   "_source": "生成自前端 *NoteSectionMap.ts（唯一真源），勿手工编辑；重生成：python backend/scripts/gen_note_wp_sync_registry.py --write",
-  "generated_at": "2026-07-31T13:22:58.566261+00:00",
+  "generated_at": "2026-07-31T14:03:40.276584+00:00",
   "entries": [
     {
       "wp_code": "D1",
@@ -217,6 +217,14 @@
       "sheet_listed": null,
       "sheet_soe": "附注披露信息（国有企业）",
       "source_file": "audit-platform/frontend/src/components/workpaper/composables/h5NoteSectionMap.ts"
+    },
+    {
+      "wp_code": "H7",
+      "listed": "五、24",
+      "soe": "八、24",
+      "sheet_listed": "附注披露信息（上市公司）",
+      "sheet_soe": "附注披露信息（国有企业）",
+      "source_file": "audit-platform/frontend/src/components/workpaper/composables/h7NoteSectionMap.ts"
     },
     {
       "wp_code": "H8",

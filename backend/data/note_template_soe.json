@@ -9390,19 +9390,11 @@
               "row_type": "data"
             },
             {
-              "label": "……",
-              "row_type": "data"
-            },
-            {
               "label": "二、畜牧养殖业",
               "row_type": "data"
             },
             {
               "label": "其中：1．",
-              "row_type": "data"
-            },
-            {
-              "label": "……",
               "row_type": "data"
             },
             {
@@ -9414,10 +9406,6 @@
               "row_type": "data"
             },
             {
-              "label": "……",
-              "row_type": "data"
-            },
-            {
               "label": "四、水产业",
               "row_type": "data"
             },
@@ -9426,15 +9414,40 @@
               "row_type": "data"
             },
             {
-              "label": "……",
-              "row_type": "data"
-            },
-            {
               "label": "合计",
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "begin",
+              "label": "期初账面价值",
+              "format": "amount"
+            },
+            {
+              "key": "increase",
+              "label": "本期增加额",
+              "format": "amount"
+            },
+            {
+              "key": "decrease",
+              "label": "本期减少额",
+              "format": "amount"
+            },
+            {
+              "key": "end",
+              "label": "期末账面价值",
+              "format": "amount"
+            }
+          ],
+          "guidance": "以成本计量的生产性生物资产（源模板 R8–R21）：行为 4 个产业（一、种植业 / 二、畜牧养殖业 / 三、林业 / 四、水产业）+ 每个产业下以「其中：N．」列示的具体类别（按被审计单位实际情况增删行）+ 合计。勾稽：期末账面价值 = 期初账面价值 + 本期增加额 − 本期减少额；产业行 = 其下各类别行之和（无类别明细时直接填列产业行）；合计行 = 4 个产业行之和。另需披露：①各类生物资产的期末实物数量，如有天然起源的生物资产，还应披露该资产的类别、取得方式和数量等；②各类生产性生物资产的预计使用寿命、预计净残值、折旧方法、累计折旧和减值准备累计金额（在本节说明文字中披露）。本表合计应与审定表 H7-1（成本模式）审定数一致。数据来源：审定表 H7-1 / 明细表 H7-2 / 折旧测算表 H7-11 / 减值测算表 H7-15。"
         },
         {
           "name": "以公允价值计量",
@@ -9455,19 +9468,11 @@
               "row_type": "data"
             },
             {
-              "label": "……",
-              "row_type": "data"
-            },
-            {
               "label": "二、畜牧养殖业",
               "row_type": "data"
             },
             {
               "label": "其中：1．",
-              "row_type": "data"
-            },
-            {
-              "label": "……",
               "row_type": "data"
             },
             {
@@ -9479,10 +9484,6 @@
               "row_type": "data"
             },
             {
-              "label": "……",
-              "row_type": "data"
-            },
-            {
               "label": "四、水产业",
               "row_type": "data"
             },
@@ -9491,23 +9492,49 @@
               "row_type": "data"
             },
             {
-              "label": "……",
-              "row_type": "data"
-            },
-            {
               "label": "合计",
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "begin",
+              "label": "期初账面价值",
+              "format": "amount"
+            },
+            {
+              "key": "increase",
+              "label": "本期增加额",
+              "format": "amount"
+            },
+            {
+              "key": "decrease",
+              "label": "本期减少额",
+              "format": "amount"
+            },
+            {
+              "key": "end",
+              "label": "期末账面价值",
+              "format": "amount"
+            }
+          ],
+          "guidance": "以公允价值计量的生产性生物资产（源模板 R25–R38）：行为 4 个产业（一、种植业 / 二、畜牧养殖业 / 三、林业 / 四、水产业）+ 每个产业下以「其中：N．」列示的具体类别（按被审计单位实际情况增删行）+ 合计。勾稽：期末账面价值 = 期初账面价值 + 本期增加额 − 本期减少额；产业行 = 其下各类别行之和（无类别明细时直接填列产业行）；合计行 = 4 个产业行之和。另需披露公允价值确认依据，以及生产性生物资产相关的风险情况与管理措施（在本节说明文字中披露）。本表合计应与审定表 H7-1（公允价值模式）审定数一致。数据来源：审定表 H7-1 / 明细表 H7-2 / 公允价值复核表 H7-13。"
         }
       ],
       "text_sections": [
-        "以成本计量",
+        "#### 以成本计量",
         "①各类生物资产的期末实物数量，如有天然起源的生物资产，还应披露该资产的类别、取得方式和数量等。",
         "②各类生产性生物资产的预计使用寿命、预计净残值、折旧方法、累计折旧和减值准备累计金额。）",
-        "以公允价值计量",
-        "说明生产性生物资产相关的风险情况与管理措施。"
+        "#### 以公允价值计量",
+        "注：应披露公允价值确认依据。",
+        "（3）说明生产性生物资产相关的风险情况与管理措施。"
       ],
       "check_presets": [
         "余额",
@@ -9522,7 +9549,9 @@
       "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
       "sort_index": 23,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "h7-biological-assets-disclosure-rebuild",
+      "_aligned_at": "2026-07-31 21:50:42"
     },
     {
       "section_number": "八、25",

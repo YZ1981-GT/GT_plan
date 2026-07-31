@@ -467,7 +467,8 @@
       "wp_name": "预付账款审定表",
       "sheet": "审定表F1-1",
       "account_codes": [
-        "1123"
+        "1123",
+        "1231-04"
       ],
       "cells": [
         {
@@ -499,6 +500,100 @@
           "formula": "=PREV('F1','审定表F1-1','审定数')",
           "formula_type": "PREV",
           "description": "上年同底稿审定数"
+        },
+        {
+          "cell_ref": "坏账准备期初余额",
+          "formula": "=TB('1231-04','期初余额')",
+          "formula_type": "TB",
+          "description": "坏账准备-预付账款期初余额（细分码；写 1231 宽口径会含应收账款坏账）"
+        },
+        {
+          "cell_ref": "坏账准备期末未审数",
+          "formula": "=TB('1231-04','期末余额')",
+          "formula_type": "TB",
+          "description": "坏账准备-预付账款期末余额（供两个披露表「减：减值准备」行取数）"
+        },
+        {
+          "cell_ref": "本期借方发生额",
+          "formula": "=TB('1123','本期借方')",
+          "formula_type": "TB",
+          "description": "预付款项本期借方发生额（新增预付；供 F1-4 借方发生额分析）"
+        },
+        {
+          "cell_ref": "本期贷方发生额",
+          "formula": "=TB('1123','本期贷方')",
+          "formula_type": "TB",
+          "description": "预付款项本期贷方发生额（转销/收回；供 F1-4 贷方发生额分析）"
+        },
+        {
+          "cell_ref": "明细表期末审定合计",
+          "formula": "=WP('F1','明细表F1-2','期末审定余额合计')",
+          "formula_type": "WP",
+          "description": "审定表按性质/账龄未审数来源 = F1-2 明细表期末审定余额合计"
+        },
+        {
+          "cell_ref": "长期挂款审定合计",
+          "formula": "=WP('F1','长期挂款检查表F1-5','审定余额合计')",
+          "formula_type": "WP",
+          "description": "账龄 1 年以上大额预付款项审定余额合计（← F1-5，供账龄行与披露②表勾稽）"
+        }
+      ]
+    },
+    {
+      "wp_code": "F1",
+      "wp_name": "预付账款明细表",
+      "sheet": "明细表F1-2",
+      "account_codes": [
+        "1123"
+      ],
+      "cells": [
+        {
+          "cell_ref": "明细期初余额",
+          "formula": "=TB('1123','期初余额')",
+          "formula_type": "TB",
+          "description": "明细表期初未审余额合计核对数（与总账勾稽）"
+        },
+        {
+          "cell_ref": "明细期末余额",
+          "formula": "=TB('1123','期末余额')",
+          "formula_type": "TB",
+          "description": "明细表期末未审余额合计核对数（与总账勾稽）"
+        },
+        {
+          "cell_ref": "明细往来单位期末余额",
+          "formula": "=AUX('1123','客户','XX单位','期末余额')",
+          "formula_type": "AUX",
+          "description": "按往来单位（辅助维度 `客户`）取某供应商期末余额 —— F1-2 逐行取数走「从辅助余额表导入」批量归集，本条供单户复核/覆盖"
+        }
+      ]
+    },
+    {
+      "wp_code": "F1",
+      "wp_name": "预付账款实质性分析",
+      "sheet": "实质性分析F1-4",
+      "account_codes": [
+        "1123",
+        "1401~1499",
+        "2202"
+      ],
+      "cells": [
+        {
+          "cell_ref": "存货期末余额",
+          "formula": "=TB_SUM('1401~1499','期末余额')",
+          "formula_type": "TB_SUM",
+          "description": "存货期末账面价值（报表行 BS-010 口径）—— 🔴 不能写 TB('1401')，1401 是「材料采购」不是存货合计"
+        },
+        {
+          "cell_ref": "存货本期采购金额",
+          "formula": "=TB_SUM('1401~1499','本期借方')",
+          "formula_type": "TB_SUM",
+          "description": "存货本期借方发生额（近似本期采购金额，供预付/采购占比分析）"
+        },
+        {
+          "cell_ref": "应付账款期末余额",
+          "formula": "=TB('2202','期末余额')",
+          "formula_type": "TB",
+          "description": "应付账款期末余额（报表行 BS-045）—— 与预付款项对同一供应商双向挂账核查"
         }
       ]
     },
