@@ -26,7 +26,7 @@ H7 是 H 循环唯一需要整体重建的循环：两个披露 Tab 只有单行
 
 ## Tasks
 
-- [ ] 1. 源模板与现状确权
+- [x] 1. 源模板与现状确权
   - openpyxl 直读 `H7 生产性生物资产.xlsx`：确认上市两表合并区
     （`A9:A10`/`B9:C9`/`D9:E9`/`F9:G9`/`H9:I9`/`J9:J10` 与 R51:R52 同构）、
     R10/R52 为 `类别 | ……` × 4、表1 R11–R44 共 34 行、表2 R53–R64 共 11 行（R61 空）；
@@ -37,7 +37,7 @@ H7 是 H 循环唯一需要整体重建的循环：两个披露 Tab 只有单行
     `variant_matrix` 上市 `五、24` / 国企 `八、24`。
   - _Requirements: 1.1, 1.2, 1.3, 3.2, 4.1, 4.4_
 
-- [ ] 2. 上市数据模型 `h7ListedDisclosureModel.ts`
+- [x] 2. 上市数据模型 `h7ListedDisclosureModel.ts`
   - 4 产业常量 + `H7ListedCategory`（`key = {industryKey}_{seq}` 稳定）+
     `createDefaultH7Categories()`（每产业 1 个，label 取源模板字面 `类别`）。
   - `H7_COST_MOVEMENT_ROWS`（34 行四层，含 3 个 `ellipsis` 参与小计）、
@@ -47,14 +47,14 @@ H7 是 H 循环唯一需要整体重建的循环：两个披露 Tab 只有单行
   - 复用 `h1ListedDisclosureModel` 的 `MovementCellMap`/`rawCell`/`setCell`。
   - _Requirements: 1.1, 1.2, 1.4, 1.5, 1.7, 1.8_
 
-- [ ] 3. 国企数据模型 `h7SoeDisclosureModel.ts`
+- [x] 3. 国企数据模型 `h7SoeDisclosureModel.ts`
   - `H7_SOE_INDUSTRIES`（4 个，label 取源模板 `一、种植业` 等）+ `H7SoeIndustryBlock`
     （`categories[{id,name,begin,increase,decrease}]` + `selfAmounts`）。
   - `industryTotals`（有类别取类别之和、无类别取 `selfAmounts`）、`grandTotal`、
     `buildSoeDisplayRows`（产业行 + 类别行 + 合计），`end` 恒派生不持久化。
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
 
-- [ ] 4. 章节映射与载荷 `h7NoteSectionMap.ts` / `h7DisclosureSyncPayload.ts`
+- [x] 4. 章节映射与载荷 `h7NoteSectionMap.ts` / `h7DisclosureSyncPayload.ts`
   - 章节号字面量**内联**（`五、24` / `八、24`），sheet 名逐字（国企「国有企业」）；
     `H7_LISTED_SUBTABLE`/`H7_SOE_SUBTABLE` 对齐模板正名后的表名；
     `H7_LEGACY_OBSOLETE_TABLES = ['项  目']`。
@@ -64,7 +64,7 @@ H7 是 H 循环唯一需要整体重建的循环：两个披露 Tab 只有单行
     （中文 title + 空过滤）/ `_removed_table_keys`。
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 4.1, 4.2, 4.3, 5.1, 5.2, 5.3_
 
-- [ ] 5. 模板幂等脚本 `fix_note_h7_biological_assets_structure.py`
+- [x] 5. 模板幂等脚本 `fix_note_h7_biological_assets_structure.py`
   - 上市：第 2 表 `项  目` → 「（2）以公允价值计量」（走 `rule(aliases=)` **不进 drops**）；
     两表删 `header_label` 假行；两表补两级 5 数据列 + guidance；行集按源模板 34/11 行。
   - 国企：两表补 5 列 flat + guidance；行集 13 → 9 行（删 4 个 `……` 纯占位行）；
@@ -73,34 +73,34 @@ H7 是 H 循环唯一需要整体重建的循环：两个披露 Tab 只有单行
   - `--dry-run` → 应用 → `--check` 幂等 0 欠账。
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 6.4_
 
-- [ ] 6. 重建 `H7TabDisclosureListed.vue`
+- [x] 6. 重建 `H7TabDisclosureListed.vue`
   - 两张动态列表格（按产业分组表头 + 类别列增删改名 + 合计列只读派生），
     金额录入用 `WpAmountInput`、只读金额走 `fmtAmount`；派生行只读并带公式 tooltip。
   - 3 个文本域（政策 / 减值 / 补充）+ AI 辅助 + 复核；源模板红字作方法论上下文块。
   - 接 `useDisclosureAutoSync`（`scheduleAutoSync` 放保存处理器，**不得**放同步函数体内）。
   - _Requirements: 1.3, 1.4, 1.5, 1.8, 3.5, 3.6, 5.4, 5.5, 5.6_
 
-- [ ] 7. 重建 `H7TabDisclosureSoe.vue`
+- [x] 7. 重建 `H7TabDisclosureSoe.vue`
   - 两张 5 列表格（4 产业 + 可扩类别行，新增走 `ElMessageBox.prompt` 先输名称）；
     产业行有类别时只读派生、无类别时可录入；期末列恒派生。
   - 3 个文本域（政策 / 公允价值依据 / 风险与管理措施）+ AI 辅助 + 复核。
   - 接自动同步（同上约束）。
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 3.5, 3.6, 5.4, 5.5, 5.6_
 
-- [ ] 8. 后端守卫 `test_note_h7_biological_assets_structure.py`
+- [x] 8. 后端守卫 `test_note_h7_biological_assets_structure.py`
   - Property 1/2/5/7/10：行集与源 xlsx 交叉比对（含 `……` 行保留正向断言）、
     两级表头与合并区一致、国企 9 行且无 `……`、`项  目` 不复活、
     columns/guidance 齐备、`text_sections` 完整且无裸表名、反向自检。
   - _Requirements: 6.1, 6.4_
 
-- [ ] 9. 前端守卫 `h7DisclosureModel.spec.ts` + `h7NoteSubtableContract.spec.ts`
+- [x] 9. 前端守卫 `h7DisclosureModel.spec.ts` + `h7NoteSubtableContract.spec.ts`
   - 模型：Property 3（key 稳定性）+ Property 4（上市派生公式，含 PBT）+ Property 5（国企派生）。
   - 契约：Property 1/2/6/7/8/9（表名/章节号/sheet 名逐字、列 key ≡ 模板 key、行键 ⊆ 列键、
     两级 group、`_removed_table_keys`、`_note_texts` 规范、无自调度、无自造 toLocaleString、
     `WpAmountInput` 已用）。
   - _Requirements: 6.2_
 
-- [ ] 10. 平台守卫回归
+- [x] 10. 平台守卫回归
   - `disclosureAutoSyncCoverage.spec.ts`：`MISSING_SYNC_PATH` 移出
     `H7TabDisclosureListed.vue` / `H7TabDisclosureSoe.vue`（清单只许变短）。
   - `disclosureColumnsCoverage.spec.ts`：`P1_ROUTE` 登记 `buildH7ListedColumns`
@@ -109,11 +109,11 @@ H7 是 H 循环唯一需要整体重建的循环：两个披露 Tab 只有单行
   - 后端 `_SECTION_PROMPTS` 补 H7 六个披露文本域 prompt（写明源模板口径 + 不得虚构）。
   - _Requirements: 3.7, 5.6, 6.2_
 
-- [ ] 11. CI 挂载 `note-h7-structure` + `note-h7-frontend`
+- [x] 11. CI 挂载 `note-h7-structure` + `note-h7-frontend`
   - `--check` + 后端守卫（需 openpyxl）；前端两份守卫 + 平台三份回归。
   - _Requirements: 6.3_
 
-- [ ] 12. 实测（真实后端 + 只读 DB）
+- [x] 12. 实测（真实后端 + 只读 DB）
   - 国企侧活体：录入产业与类别 → 不点按钮自动同步 → 核 `八、24` 落库两表、9+ 行、
     5 列元数据、派生金额、`_last_sync_sheet` 为「国有企业」、`text_content` 中文小标题。
   - 上市侧若无活体则记录为遗留（不临时改项目 `entity_type`）。
@@ -122,6 +122,20 @@ H7 是 H 循环唯一需要整体重建的循环：两个披露 Tab 只有单行
 
 ## Notes
 
+- **🔴 Task 12 实测挖出三个「只有浏览器才暴露」的缺陷（已修 + 已加守卫）**：
+  ① **`fmtAmount` 是 store 成员**（`useDisplayPrefsStore().fmtAmount`），不是
+  `@/stores/displayPrefs` 的模块命名导出 → 写成 `import { fmtAmount }` 会在**运行时**抛
+  `does not provide an export named 'fmtAmount'`，而 Vite transform 200 / vitest /
+  `get_diagnostics` **全绿**，只有浏览器挂载才暴露（组件整块不渲染）。
+  ② **H7 宿主 `GtH7BiologicalAssets.vue` 没有任何 `@save` 处理器**（该循环全部 Tab 都自持久化）
+  → 只 `emit('save')` 让录入**只存在于内存**：实测自动同步已写进附注，但
+  `checklist_responses` 一条都没有（刷新即丢）。改为组件自己 `api.put`，`emit` 保留。
+  ③ **不能 `watch(props.allResponses)` 重新 hydrate**：宿主 map 异步加载，自持久化后宿主未必
+  刷新 → watch 触发时用**旧值**覆盖刚录入的数据。改为本地镜像 + `onMounted` 自取。
+  另补宿主 `:applicable-standards`（原缺失 → 变体门控恒开）与 `@save`。
+- **🔴 `buildXColumns` 必须零入参可调**：平台覆盖率 sweep
+  （`disclosureColumnsCoverage.spec.ts`）用空入参调用，缺省时只剩「项目 + 合计」两列（均无
+  group）→ 被判「flat/group 未表态」。`buildH7ListedColumns` 已给默认类别入参。
 - **🔴 上市列 `key` 不能用 `key: label`**（H1/H8 那样）：四个产业的默认叶子名都是源模板字面
   `类别`，用 label 作 key 会撞键 → 用稳定 `{industryKey}_{seq}`。
 - **🔴 `……` 两种语义相反**：作**列头**必须丢弃（永远收不到数据）；作**行**是真实可扩明细行

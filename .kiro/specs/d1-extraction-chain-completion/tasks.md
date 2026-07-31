@@ -57,8 +57,8 @@ Wave 6 收口。
 
 ## Tasks
 
-- [ ] 1. 后端科目映射解析层与 seed 泛化
-- [ ] 1.1 新建 `backend/app/services/d_cycle_extraction/d1_account_resolver.py`
+- [x] 1. 后端科目映射解析层与 seed 泛化
+- [x] 1.1 新建 `backend/app/services/d_cycle_extraction/d1_account_resolver.py`
   - `D1_REPORT_ROW_CODE='BS-005'` / `D1_FALLBACK_CODES=['1121','1231-01']`（DB 实证）
   - 纯函数 `split_gross_provision(codes, chart_rows)`（备抵判定：`direction=='credit'` 或名含「坏账准备」/「减值准备」）
   - 纯函数 `normalize_standard_prefix('1231-01') → '1231'`
@@ -66,67 +66,67 @@ Wave 6 收口。
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
   - _Properties: 1, 2, 3_
 
-- [ ] 1.2 泛化 `d1_detail_seed.py`
+- [x] 1.2 泛化 `d1_detail_seed.py`
   - `_fetch_leaves(ctx, prefixes: list[str], *, name_contains=None)`：单前缀 → 前缀集（`or_`）
   - `seed_d1_detail_rows(ctx, snapshot, codes=None)`：`codes` 为 None 时自解析；坏账侧仅 `resolved_from=='fallback'` 时叠加名称过滤
   - _Requirements: 1.1, 1.3, 1.4_
   - _Properties: 1, 3_
 
-- [ ] 1.3 接入 `_d1_notes_receivable.py::render`
+- [x] 1.3 接入 `_d1_notes_receivable.py::render`
   - 灰度分支内解析 codes 并传给 seed
   - `html_data['tb_source_codes']`（additive）
   - `trial_balance` 查询改用 `gross_standard`；新增 `project_context['tb_provision_amount']`
   - _Requirements: 1.6, 1.7_
   - _Properties: 1, 10_
 
-- [ ] 1.4 后端守卫 `backend/tests/d_cycle_extraction/test_d1_account_resolver.py`
+- [x] 1.4 后端守卫 `backend/tests/d_cycle_extraction/test_d1_account_resolver.py`
   - Property 1/2/3 全覆盖 + 反向自检（构造 credit 科目必须被判成 provision）
   - 扩展 `test_d1_render_prefill_integration.py`：灰度关逐字节等价（Property 10）、`tb_source_codes` 结构
   - _Requirements: 8.3_
   - _Properties: 1, 2, 3, 10_
 
-- [ ] 2. 前端共享锚点模型 + 审定表取数补齐
-- [ ] 2.1 新建 `composables/d1AdjudicationModel.ts`（零依赖 leaf 纯函数）
+- [x] 2. 前端共享锚点模型 + 审定表取数补齐
+- [x] 2.1 新建 `composables/d1AdjudicationModel.ts`（零依赖 leaf 纯函数）
   - `d1AdjAnchor` / `d1CategorySlug` / `readD1Categories` / `readD1BadDebtByNoteType` / `readD1AdjudicationTotals`
   - 审定数现算 = 未审 + 账项调整 + 重分类调整；净值 = 原值 − 坏账
   - _Requirements: 3.1, 3.2, 3.4_
   - _Properties: 4, 5, 6_
 
-- [ ] 2.2 `useD1BadDebt.ts` 新增「按票据种类小计」区块
+- [x] 2.2 `useD1BadDebt.ts` 新增「按票据种类小计」区块
   - 持久化键 `D1-bd-notetype-rows`，行名逐字「银行承兑汇票小计」「商业承兑汇票小计」+ 动态票据种类
   - 与 D1-4 合计行的勾稽提示（源模板 R22 vs R23+R24）；**不做按原值比例分摊**
   - _Requirements: 2.1, 2.3_
 
-- [ ] 2.3 `useD1Adjudication.ts` 三区块改由共享模型驱动
+- [x] 2.3 `useD1Adjudication.ts` 三区块改由共享模型驱动
   - 行集由 `readD1Categories` 派生（银承/商承固定在前 + 动态追加）
   - 坏账区块接 `readD1BadDebtByNoteType` override（未命中保持可编辑且 `isFromCrossSheet=false`）
   - 新增 `crossCheckRows`（D1-2 合计 vs 原值小计 / D1-4 合计 vs 坏账小计）
   - _Requirements: 2.1, 2.2, 2.4, 2.5, 2.6_
   - _Properties: 5, 6, 7_
 
-- [ ] 2.4 锚点登记表扩展
+- [x] 2.4 锚点登记表扩展
   - `d_cycle_anchor_registry.json` D1 模式锚点接纳动态 slug；新增 `D1-bd-notetype-rows`
   - _Requirements: 2.5_
   - _Properties: 4_
 
-- [ ] 2.5 前端守卫
+- [x] 2.5 前端守卫
   - `composables/__tests__/d1AdjudicationModel.spec.ts`（Property 4/5/6/7 + 与 registry 正则交叉校验）
   - `composables/__tests__/d1AnchorSingleSource.spec.ts`：扫 D1 全部 composable/vue 源码，禁止模块外构造 `D1-adj-*` 字面量（含 `stripComments` 与反向自检）
   - _Requirements: 8.1, 8.2_
   - _Properties: 4_
 
-- [ ] 3. 披露表接共享模型 + 源模板口径修复
-- [ ] 3.1 `useD1Disclosure.ts` 删除 `CROSS_SHEET_KEYS`
+- [x] 3. 披露表接共享模型 + 源模板口径修复
+- [x] 3.1 `useD1Disclosure.ts` 删除 `CROSS_SHEET_KEYS`
   - `crossSheetData` / `categorySummaryRows` / `canEditCategorySummary` 改由 `readD1AdjudicationTotals` 驱动，支持动态票据种类
   - _Requirements: 3.1, 3.2, 3.3_
   - _Properties: 4, 5_
 
-- [ ] 3.2 `useD1InventoryCount.ts` / `useD1RelatedPartyCheck.ts` / `useD1CrossSheet.ts` 改用共享模型
+- [x] 3.2 `useD1InventoryCount.ts` / `useD1RelatedPartyCheck.ts` / `useD1CrossSheet.ts` 改用共享模型
   - 删除 `D1-adj-notes-receivable-current-audited`（无写入方）
   - _Requirements: 3.4_
   - _Properties: 4_
 
-- [ ] 3.3 源模板口径修复
+- [x] 3.3 源模板口径修复
   - `d1NoteSectionMap.ts`：国企组合表 `loss_rate` → `pct()`；`mergePortfolio` / `individualTable` 合计行损失率改派生
   - `useD1FormulaEngine.ts`：新增 `calcDisclosureBadDebtEnd`（其他为减项），`calcBadDebtEndBalance` 不动
   - `useD1Disclosure.updateCell('movement'|'movementDetail')` 改用新函数
@@ -135,43 +135,43 @@ Wave 6 收口。
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6_
   - _Properties: 8, 9_
 
-- [ ] 3.4 前端守卫
+- [x] 3.4 前端守卫
   - 修正 `useD1Disclosure.pbt.spec.ts` / `useD1DisclosureDerived.spec.ts`：fixture 锚点改取共享常量（Requirement 8.2）
   - 新增 `d1DisclosureRateUnit.spec.ts`（Property 8）与 `d1MovementSign.spec.ts`（Property 9）
   - _Requirements: 8.2, 8.3_
   - _Properties: 8, 9_
 
-- [ ] 4. D1-3 辅助余额表客户维度取数
-- [ ] 4.1 后端端点 `POST /api/workpapers/{wp_id}/d1/import-aux-balance`
+- [x] 4. D1-3 辅助余额表客户维度取数
+- [x] 4.1 后端端点 `POST /api/workpapers/{wp_id}/d1/import-aux-balance`
   - `aux_type='客户'` + `codes.gross` 原始码 + `get_active_filter`，按客户名合并、票据种类以「/」连接
   - 无维度/无匹配 → `imported_count=0`，不抛错
   - _Requirements: 4.1, 4.2, 4.3, 4.5_
   - _Properties: 11_
 
-- [ ] 4.2 前端 `useD1DetailCustomer.ts` + `D1TabDetailCustomer.vue` 接入
+- [x] 4.2 前端 `useD1DetailCustomer.ts` + `D1TabDetailCustomer.vue` 接入
   - 「从辅助余额表导入」按钮；按客户名合并，不覆盖关联方标记/期后兑付/备注
   - 归集合计与 tb 原值期末合计勾稽提示
   - _Requirements: 4.4, 4.5_
   - _Properties: 11_
 
-- [ ] 4.3 守卫 `backend/tests/d_cycle_extraction/test_d1_aux_import.py`（Property 11 + 合并语义）
+- [x] 4.3 守卫 `backend/tests/d_cycle_extraction/test_d1_aux_import.py`（Property 11 + 合并语义）
   - _Requirements: 8.3_
   - _Properties: 11_
 
-- [ ] 5. 公式管理预设与报表↔附注映射
-- [ ] 5.1 修订 `prefill_formula_mapping.json` 的 D1 段
+- [x] 5. 公式管理预设与报表↔附注映射
+- [x] 5.1 修订 `prefill_formula_mapping.json` 的 D1 段
   - sheet 名纠正（`原值明细表（按客户）D1-3` / `坏账准备明细表D1-4`）
   - `TB_AUX('1121','票据类型',…)` → `TB_AUX('1121','客户','期末余额')` 并归到 D1-3
   - 补 D1-2（`TB('1121',…)`）/ D1-4（`TB('1231-01',…)`）/ D1-1（两条 `WP()`）
   - _Requirements: 5.1, 5.2, 5.3, 5.4_
   - _Properties: 12_
 
-- [ ] 5.2 更新 `presets.py::_TIER_B_PROVENANCE['D1']`
+- [x] 5.2 更新 `presets.py::_TIER_B_PROVENANCE['D1']`
   - D1-2/D1-4 溯源改为「报表映射 BS-005 → 标准码 → account_mapping → tb_balance 叶子」
   - 新增 D1-3 ← `tb_aux_balance` 客户维度条目
   - _Requirements: 5.3_
 
-- [ ] 5.3 `report_note_linkage.json` 补 BS-005 → 五、4 / 八、4
+- [x] 5.3 `report_note_linkage.json` 补 BS-005 → 五、4 / 八、4
   - 依据 F4-1 / F4-2 人工核实；同步加入 `test_report_note_linkage_diagnose._VERIFIED_SEED_ROW_CODES`
   - 守卫 `backend/tests/test_d1_prefill_presets.py`（Property 12）
   - _Requirements: 7.3, 5.5_
