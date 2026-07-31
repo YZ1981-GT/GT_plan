@@ -33,7 +33,6 @@ import {
   deserializeRows,
   dropRow,
   findDuplicateLabel,
-  foreignRowWarning,
   labelKey,
   normalizeLabel,
   readNum,
@@ -66,8 +65,6 @@ export interface K2AdjRow {
   remark: string
   /** 行来源（合计行为 `undefined`） */
   source?: DynamicAdjRow['source']
-  /** 该行属于别的报表行时的警示文案（历史遗留行） */
-  foreignWarning?: string | null
 }
 
 export interface K2ReconciliationResult {
@@ -141,26 +138,83 @@ export function useK2Adjudication(
     if (migrated) persistRowDefs()
   }
 
-  // ─── 四表库预填（宁缺勿造：无科目 → 不建行、不塞「其他」兜底行） ───────────
+  // ─── 四表库预填 / 刷新取数（宁缺勿造：无科目 → 不建行、不塞「其他」兜底行） ──
 
-  function seedFromPrefill(): boolean {
+  /**
+   * 「刷新取数」预演 —— 不写任何值，只回答「点下去会发生什么」。
+   *
+   * 供 UI 决定要不要弹覆盖确认框：四表库明细子科目新增时补行，
+   * 已有的四表行金额有变化时才需要用户确认覆盖。
+   */
+  function previewSeedFromPrefill(): {
+    createdCount: number
+    changedCount: number
+    total: number
+  } {
     const pf = options?.prefill?.value
-    if (!pf || pf.length === 0) return false
-    const { rows, values } = seedRowsFromPrefill(SPEC, pf, rowDefs.value, {
+    if (!pf || pf.length === 0) return { createdCount: 0, changedCount: 0, total: 0 }
+    const { rows, values, createdRowIds } = seedRowsFromPrefill(SPEC, pf, rowDefs.value, {
       opening: 'begin',
       closing: 'unadj',
     })
-    let touched = false
+    const created = new Set(createdRowIds)
+    let changed = 0
     for (const [itemId, value] of Object.entries(values)) {
-      // 手工优先：已有非零值不覆盖
-      if (readNum(allResponses.value, itemId) !== 0) continue
-      allResponses.value.set(itemId, { item_id: itemId, conclusion: null, remark: value })
-      options?.onSave?.(itemId, value)
-      touched = true
+      const rowId = rowIdOfItemId(rows, itemId)
+      if (!rowId || created.has(rowId)) continue
+      const current = readNum(allResponses.value, itemId)
+      if (current !== 0 && current !== Number(value)) changed++
     }
-    if (rows.length !== rowDefs.value.length) {
+    return { createdCount: created.size, changedCount: changed, total: pf.length }
+  }
+
+  /** 由字段 itemId 反查 rowId（`{prefix}-{rowId}-{field}`；rowId 自身含 `-`，故按清单反查） */
+  function rowIdOfItemId(rows: readonly DynamicAdjRow[], itemId: string): string | null {
+    for (const r of rows) {
+      if (itemId.startsWith(`${SPEC.prefix}-${r.rowId}-`)) return r.rowId
+    }
+    return null
+  }
+
+  /**
+   * 从四表库带入 / 刷新未审数。
+   *
+   * - **动态插行**：四表库出现新的明细子科目 → 自动补行（`source='tb'`）
+   * - **改名不失联**：已有行按**科目码**优先匹配（`findRowForPrefill`），不重复建行
+   * - **手工优先**：`overwrite=false`（默认，含自动 watch 触发）只补空值；
+   *   `overwrite=true`（用户显式点「刷新」并确认）才覆盖，且**只覆盖 `source='tb'` 的行**，
+   *   手工/历史行的已录值永不被冲掉
+   */
+  function seedFromPrefill(opts?: { overwrite?: boolean }): boolean {
+    const pf = options?.prefill?.value
+    if (!pf || pf.length === 0) return false
+    const overwrite = !!opts?.overwrite
+    const { rows, values, createdRowIds } = seedRowsFromPrefill(SPEC, pf, rowDefs.value, {
+      opening: 'begin',
+      closing: 'unadj',
+    })
+    const created = new Set(createdRowIds)
+    const rowById = new Map(rows.map((r) => [r.rowId, r]))
+    let touched = false
+
+    // 行清单先落库（新增行 / 回填科目码），否则下面写值的行在 UI 上没有落点
+    if (serializeRows(rows) !== serializeRows(rowDefs.value)) {
       rowDefs.value = rows
       persistRowDefs()
+      touched = true
+    }
+
+    for (const [itemId, value] of Object.entries(values)) {
+      const rowId = rowIdOfItemId(rows, itemId)
+      const current = readNum(allResponses.value, itemId)
+      if (current !== 0) {
+        const isTbRow = !!rowId && rowById.get(rowId)?.source === 'tb'
+        const isNewRow = !!rowId && created.has(rowId)
+        if (!(isNewRow || (overwrite && isTbRow))) continue
+        if (current === Number(value)) continue
+      }
+      allResponses.value.set(itemId, { item_id: itemId, conclusion: null, remark: value })
+      options?.onSave?.(itemId, value)
       touched = true
     }
     return touched
@@ -191,7 +245,6 @@ export function useK2Adjudication(
       changeRate: calcChangeRate(audited, at('prior-audited')),
       remark: readRaw(allResponses.value, rowFieldItemId(SPEC, def.rowId, 'remark')),
       source: def.source,
-      foreignWarning: foreignRowWarning(SPEC, def),
     }
   }
 
@@ -377,6 +430,7 @@ export function useK2Adjudication(
     rowItemIds,
     pullFromDetail,
     seedFromPrefill,
+    previewSeedFromPrefill,
     loadRowDefs,
   }
 }

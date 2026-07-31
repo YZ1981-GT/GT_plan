@@ -42,9 +42,10 @@
               size="small"
               plain
               :disabled="isReadonly || !hasPrefill"
+              :loading="seeding"
               @click="handleSeedFromTb"
             >
-              <el-icon><Download /></el-icon> 从四表库带入未审数
+              <el-icon><Refresh /></el-icon> 从四表库带入/刷新未审数
             </el-button>
             <el-button size="small" plain :disabled="isReadonly" @click="handleFillFromDetail">
               从 K2-2 明细带入
@@ -113,12 +114,13 @@
                 @keyup.enter="commitLabel(row.rowKey)"
               />
               <span v-else>{{ row.label }}</span>
-              <el-tooltip v-if="row.foreignWarning" :content="row.foreignWarning" placement="top">
-                <el-tag type="danger" size="small" effect="plain">口径存疑</el-tag>
+              <el-tooltip
+                v-if="row.source === 'tb'"
+                content="该行由四表库明细子科目带入，行名可改、可删"
+                placement="top"
+              >
+                <el-tag type="success" size="small" effect="plain">四表</el-tag>
               </el-tooltip>
-              <el-tag v-else-if="row.source === 'tb'" type="success" size="small" effect="plain">
-                四表
-              </el-tag>
             </div>
           </template>
         </el-table-column>
@@ -347,8 +349,8 @@
       <summary>编制提示</summary>
       <ul>
         <li>科目由报表行 <code>BS-014 其他流动资产</code> 的映射规则解析得出（实证 <code>TB('1901','期末余额')</code>），不再硬编码前缀</li>
-        <li>明细项目行按客户实际情况增删改名（源模板：不存在的项目请删除）；行名是「从 K2-2 带入」与附注推送的匹配键，必须唯一</li>
-        <li>「口径存疑」标记的行属于<strong>别的报表行</strong>（预付款项→BS-008/F1、合同资产→D6、押金保证金→K1），列在本表会重复计入资产，请核实后删除</li>
+        <li>明细项目行 = 其他流动资产的<strong>二级子明细</strong>，按客户实际情况增删改名（源模板：不存在的项目请删除）；行名是「从 K2-2 带入」与附注推送的匹配键，必须唯一</li>
+        <li>带「四表」标记的行由四表库明细子科目带入，行名同样可改可删；「从四表库带入未审数」可反复点，已录值不被覆盖（手工优先）</li>
         <li>审定数 = 未审数 + AJE + RJE；资产类期末 = 期初 + 借方 − 贷方</li>
         <li>三角勾稽：期末 = 期初 + 借 − 贷，绿色表示平衡，红色表示差异</li>
         <li>公式列（期末/审定数/变动率）虚线下划线 + 鼠标悬停显示公式来源</li>
@@ -375,13 +377,13 @@
  *
  * 🔴 两处历史缺陷已修（详见 `useK2Adjudication.ts` / `_k2_other_current_assets.py`）：
  * ① 科目写成 `1231`（应收款项坏账准备）→ 改由报表行 `BS-014` 映射解析（`1901`）；
- * ② 明细行硬编码 8 行且混入别循环科目 → 改动态行（增删改名 + 四表带入 + 明细带入）。
+ * ② 二级子明细行硬编码 8 行 → 改动态行（增删改名 + 四表带入 + K2-2 明细带入）。
  *
  * Spec: .kiro/specs/k2-four-table-extraction-and-dynamic-rows/ Task 3.3
  * Requirements: 2.2, 2.3, 2.5, 2.7
  */
 import { ref, computed, inject, toRef, watch } from 'vue'
-import { MagicStick, CircleCheck, WarningFilled, Download, Plus } from '@element-plus/icons-vue'
+import { MagicStick, CircleCheck, WarningFilled, Download, Plus, Refresh } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import { eventBus } from '@/utils/eventBus'
@@ -445,6 +447,7 @@ const {
   rowItemIds,
   pullFromDetail,
   seedFromPrefill,
+  previewSeedFromPrefill,
 } = useK2Adjudication(allResponsesRef as any, {
   prefill: toRef(props, 'prefill') as any,
   onSave: (itemId: string, value: any) => {
@@ -485,6 +488,7 @@ const { adjPull, visible: bringInVisible, rowOptions: bringInRowOptions, open: o
 // ─── Local State ──────────────────────────────────────────────────────────────
 
 const publishing = ref(false)
+const seeding = ref(false)
 
 /** 行名编辑草稿（`el-input` 只绑 `@change` 会被 EP 重置，故用本地 v-model + blur 提交） */
 const labelDrafts = ref<Record<string, string>>({})
@@ -564,15 +568,47 @@ async function handleRemoveRow(row: K2AdjRow): Promise<void> {
   ElMessage.success('已删除项目行')
 }
 
-function handleSeedFromTb(): void {
+/**
+ * 从四表库带入 / 刷新未审数。
+ *
+ * 动态插行：四表库出现新明细子科目 → 自动补行；已有的四表行按科目码定位（改名不失联）。
+ * 已录值有变化时先弹确认，且只覆盖「四表」来源行 —— 手工行的录入永不被冲掉。
+ */
+async function handleSeedFromTb(): Promise<void> {
   if (!hasPrefill.value) {
     ElMessage.info('四表库暂无其他流动资产明细子科目数据')
     return
   }
-  const touched = seedFromPrefill()
-  ElMessage[touched ? 'success' : 'info'](
-    touched ? '已从四表库带入明细项目与未审数' : '各项目已有录入值，未覆盖（手工优先）',
-  )
+  const pv = previewSeedFromPrefill()
+  let overwrite = false
+  if (pv.changedCount > 0) {
+    try {
+      await ElMessageBox.confirm(
+        `四表库有 ${pv.changedCount} 个「四表」来源项目的金额与本表现值不同`
+        + `${pv.createdCount > 0 ? `，另有 ${pv.createdCount} 个新增明细子科目待插行` : ''}。`
+        + '刷新将以四表库值覆盖这些行（手工新增/历史行的录入不受影响）。确认刷新？',
+        '刷新取数',
+        { confirmButtonText: '确认刷新', cancelButtonText: '仅补空值', type: 'warning' },
+      )
+      overwrite = true
+    } catch {
+      overwrite = false   // 「仅补空值」= 手工优先路径
+    }
+  }
+  seeding.value = true
+  try {
+    const touched = seedFromPrefill({ overwrite })
+    if (!touched) {
+      ElMessage.info('各项目已与四表库一致，无需更新')
+      return
+    }
+    const parts: string[] = []
+    if (pv.createdCount > 0) parts.push(`新增 ${pv.createdCount} 个明细项目行`)
+    if (overwrite && pv.changedCount > 0) parts.push(`刷新 ${pv.changedCount} 行未审数`)
+    ElMessage.success(parts.length ? `已${parts.join('，')}` : '已从四表库带入未审数')
+  } finally {
+    seeding.value = false
+  }
 }
 
 /** 从 K2-2 明细表按项目名称聚合带入未审数 */
@@ -686,9 +722,7 @@ function getChangeRateClass(rate: number | null): string {
 }
 
 function getRowClassName({ row }: { row: K2AdjRow }): string {
-  if (row.rowKey === 'subtotal') return 'subtotal-row'
-  if (row.foreignWarning) return 'foreign-row'
-  return ''
+  return row.rowKey === 'subtotal' ? 'subtotal-row' : ''
 }
 </script>
 
@@ -806,10 +840,6 @@ function getRowClassName({ row }: { row: K2AdjRow }): string {
 :deep(.subtotal-row) {
   background-color: #f5f7fa !important;
   font-weight: 600;
-}
-/* 口径存疑行（属于别的报表行的历史遗留行） */
-:deep(.foreign-row) {
-  background-color: #fef6f6 !important;
 }
 
 /* 变动率警告色 */

@@ -52,11 +52,6 @@ export interface LegacyFixedRow {
   /** 旧 rowKey —— 迁移后作为 `rowId` 沿用，保证既有持久化键命中 */
   key: string
   label: string
-  /**
-   * 该行是否属于**别的报表行**（如 K2 历史行里的「预付款项」实为 BS-008/F1）。
-   * 有值时 UI 显示警示 tooltip；**不静默删除**用户已录数据。
-   */
-  foreignWarning?: string
 }
 
 /**
@@ -274,6 +269,28 @@ export interface SeedFromPrefillResult {
   rows: DynamicAdjRow[]
   /** 要写入的字段值 `{itemId: 字符串值}`（调用方负责持久化 + 手工优先判定） */
   values: Record<string, string>
+  /** 本次新建的 rowId（其余为命中已有行） */
+  createdRowIds: string[]
+  /** 本次带入涉及的 rowId → 该行是否由四表库承载（供调用方判「可否刷新覆盖」） */
+  touchedRowIds: string[]
+}
+
+/**
+ * 在现有清单里为某个预填项找对应行 —— **先按科目码，再按行名**。
+ *
+ * 🔴 按科目码优先是「刷新取数」能用的前提：审计师把四表带入的行改名后
+ * （如把科目全名改成披露口径的简称），只按行名匹配会再建一行重复行。
+ */
+export function findRowForPrefill(
+  rows: readonly DynamicAdjRow[],
+  item: DynamicRowPrefillItem,
+): DynamicAdjRow | null {
+  const code = String(item?.code ?? '').trim()
+  if (code) {
+    const byCode = (rows || []).find((r) => r.accountCode === code)
+    if (byCode) return byCode
+  }
+  return findDuplicateLabel(rows, normalizeLabel(item?.name))
 }
 
 /**
@@ -282,8 +299,9 @@ export interface SeedFromPrefillResult {
  * **宁缺勿造**：预填为空 / 科目名为空 → 返回空结果，**不产生兜底行**
  * （旧实现「未匹配一律塞进『其他』」是把别的科目金额堆到错误行的根因）。
  *
- * **手工优先**：与现有行**同名**时不新建行、也不覆盖其已有值，只在该行对应字段
- * 为空时补值（由 `existing` 判定，调用方传入现有清单）。
+ * **动态插行 + 刷新取数**：四表库新增明细子科目 → 自动补出新行；已存在的行
+ * （按科目码优先匹配，改名不失联）只更新金额、不重复建行。是否覆盖已有值由**调用方**
+ * 按 `touchedRowIds` + 行 `source` 决定（手工行永不覆盖）。
  *
  * @param spec 循环声明
  * @param prefill 后端 `adjudication_prefill`
@@ -301,12 +319,16 @@ export function seedRowsFromPrefill(
   const closingField = fields.closing ?? 'unadj'
   const rows: DynamicAdjRow[] = [...(existing || [])]
   const values: Record<string, string> = {}
-  if (!prefill || prefill.length === 0) return { rows: [...(existing || [])], values }
+  const createdRowIds: string[] = []
+  const touchedRowIds: string[] = []
+  if (!prefill || prefill.length === 0) {
+    return { rows: [...(existing || [])], values, createdRowIds, touchedRowIds }
+  }
 
   for (const p of prefill) {
     const label = normalizeLabel(p?.name)
     if (!label) continue
-    let row = findDuplicateLabel(rows, label)
+    let row = findRowForPrefill(rows, p)
     if (!row) {
       row = {
         rowId: nextRowId(rows, rand),
@@ -315,13 +337,20 @@ export function seedRowsFromPrefill(
         ...(p.code ? { accountCode: String(p.code) } : {}),
       }
       rows.push(row)
+      createdRowIds.push(row.rowId)
+    } else if (p.code && !row.accountCode) {
+      // 命中的是「同名手工/历史行」→ 回填科目码，下次刷新即可按码定位
+      const idx = rows.indexOf(row)
+      row = { ...row, accountCode: String(p.code) }
+      rows[idx] = row
     }
+    if (!touchedRowIds.includes(row.rowId)) touchedRowIds.push(row.rowId)
     const opening = Number(p?.opening_balance) || 0
     const closing = Number(p?.closing_balance) || 0
     values[rowFieldItemId(spec, row.rowId, openingField)] = String(opening)
     values[rowFieldItemId(spec, row.rowId, closingField)] = String(closing)
   }
-  return { rows, values }
+  return { rows, values, createdRowIds, touchedRowIds }
 }
 
 // ─── 删除行 ──────────────────────────────────────────────────────────────────
@@ -390,25 +419,6 @@ export function appendManualRow(
   }
   list.push(row)
   return { rows: list, row }
-}
-
-// ─── 外来行警示 ──────────────────────────────────────────────────────────────
-
-/**
- * 该行是否为「属于别的报表行」的历史遗留行（返回警示文案，否则 `null`）。
- *
- * 判定按 `rowId` 命中 `spec.legacyRows[].foreignWarning` —— 只对**迁移来的**历史行
- * 生效，审计师自己新建的同名行不误报。
- */
-export function foreignRowWarning(
-  spec: DynamicRowsSpec,
-  row: DynamicAdjRow | null | undefined,
-): string | null {
-  if (!row) return null
-  for (const legacy of spec.legacyRows || []) {
-    if (legacy.key === row.rowId && legacy.foreignWarning) return legacy.foreignWarning
-  }
-  return null
 }
 
 /**
