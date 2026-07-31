@@ -7,14 +7,19 @@
  *   - note_template_listed.json 五、40: 3 tables (应付职工薪酬/短期薪酬/设定提存计划)
  *   - note_template_soe.json 八、40: 3 tables (应付职工薪酬列示/短期薪酬列示/短期薪酬列示[重名])
  *
- * 允许偏离模板（Decision 3）：
- *   soe 第三张表模板 name 重复为「短期薪酬列示」（与第二张同名，模板笔误），
- *   Sub_Table_Key 改取 text_sections 章节标题「设定提存计划列示」，避免同名键覆盖丢表。
+ * ✅ 原 Decision 3 已撤销（2026-07-30，`j1-disclosure-template-alignment` Task 1.2）：
+ *   soe 第 3 张表模板 name 原重复为「短期薪酬列示」（与第 2 张同名），当时的处置是
+ *   "允许偏离模板，Sub_Table_Key 取 text_sections 章节标题「设定提存计划列示」"——
+ *   这是绕行而非修复：前端推的键在模板里**根本不存在** → 孤儿子表（未同步项目的 seed
+ *   `_tables` 里是两张同名表，附注 TAB 页签重复且按 name 建键互相覆盖；契约 P1 必失败）。
+ *   现已改模板（`fix_note_j1_employee_comp_structure.py`，`consol_note_sections_soe`
+ *   五-41-3 的 title 即「设定提存计划列示」，是致同原本措辞）→ 前端键不变即自动对齐。
  *
- * 列头（Decision 2）：
- *   组件列头「上年年末数」不外溢到附注，columns label 一律用模板「期初余额」。
+ * 列头（Decision 2，仍有效）：
+ *   组件列头「上年年末数 / 期末数」（上市源模板口径）不外溢到附注，
+ *   columns label 一律用附注交付口径「期初余额 / 期末余额」。
  *
- * Spec: .kiro/specs/j1-disclosure-note-linkage/
+ * Spec: .kiro/specs/j1-disclosure-template-alignment/（前身 j1-disclosure-note-linkage）
  */
 import {
   buildDisclosureSubtotal,
@@ -140,22 +145,75 @@ export interface NoteText {
   text: string
 }
 
-const LISTED_NOTE_KEYS: Array<{ key: string; title: string }> = [
-  { key: 'shortTerm', title: '短期薪酬说明' },
-  { key: 'postEmployment', title: '设定提存计划说明' },
-  { key: 'severance', title: '辞退福利说明' },
+export interface J1NoteFieldDef {
+  /** 持久化键（`J1-disc-{variant}-notes` 里的字段名） */
+  key: string
+  /** 推给附注 `_note_texts` 的小节标题，也用作底稿文本域标签 */
+  title: string
+  /** 底稿文本域 placeholder（源模板说明段原文，不得改写） */
+  placeholder: string
+}
+
+/** 上市侧 3 段说明（源 xlsx R37 / R38 / R50 / R53；前两条合为「短期薪酬说明」一域） */
+export const J1_LISTED_NOTE_FIELDS: readonly J1NoteFieldDef[] = [
+  {
+    key: 'shortTerm',
+    title: '短期薪酬说明',
+    placeholder:
+      '1、（企业本期为职工提供的各项非货币性福利形式、其计算依据。）\n' +
+      '2、（企业依据短期利润分享计划提供的职工薪酬计算依据。）',
+  },
+  {
+    key: 'postEmployment',
+    title: '设定提存计划说明',
+    placeholder: '（设定提存计划的性质、计算缴费金额的公式或依据）',
+  },
+  { key: 'severance', title: '辞退福利说明', placeholder: '辞退福利的性质、内容及计算依据。' },
 ]
 
-const SOE_NOTE_KEYS: Array<{ key: string; title: string }> = [
-  { key: 'soe', title: '应付职工薪酬说明' },
+/**
+ * 国企侧 3 段说明（源 xlsx R42 / R43 / R44 **逐字**）。
+ *
+ * 🔴 历史实现只有 1 段 `soe`（单一 textarea），且第 3 条 placeholder 被截断改写，
+ * 丢了「及其变动、对未来现金流的影响、重大精算假设及有关敏感性分析等」。
+ * 交叉引用按实证指向 `八、54`（源 xlsx 写的 八、47 在平台现行编号里是
+ * 「（3）一年内到期的长期应付款」，`八、54` 才是「长期应付职工薪酬」）。
+ */
+export const J1_SOE_NOTE_FIELDS: readonly J1NoteFieldDef[] = [
+  {
+    key: 'soeNonMonetary',
+    title: '非货币性福利说明',
+    placeholder: '1.企业本期为职工提供的各项非货币性福利的形式、金额及其计算依据。',
+  },
+  {
+    key: 'soeDefinedContribution',
+    title: '设定提存计划说明',
+    placeholder: '2.企业应说明设立或参与的设定提存计划的性质、计算缴费金额的公式或依据。',
+  },
+  {
+    key: 'soeDefinedBenefit',
+    title: '设定受益计划说明',
+    placeholder:
+      '3.存在设定受益计划的企业，应说明设定受益计划的特征及与之相关的风险、' +
+      '在财务报表中确认的金额及其变动、对未来现金流的影响、重大精算假设及有关敏感性分析等。' +
+      '设定受益计划情况详见附注八、54「长期应付职工薪酬」。',
+  },
 ]
+
+export function j1NoteFields(variant: J1DisclosureVariant): readonly J1NoteFieldDef[] {
+  return variant === 'listed' ? J1_LISTED_NOTE_FIELDS : J1_SOE_NOTE_FIELDS
+}
+
+/** 持久化键列表（传给 `useJ1DisclosureSections({ noteKeys })`） */
+export function j1NoteKeys(variant: J1DisclosureVariant): string[] {
+  return j1NoteFields(variant).map((d) => d.key)
+}
 
 export function buildJ1NoteTexts(
   variant: J1DisclosureVariant,
   notes: Record<string, string>,
 ): NoteText[] {
-  const defs = variant === 'listed' ? LISTED_NOTE_KEYS : SOE_NOTE_KEYS
-  return defs
+  return j1NoteFields(variant)
     .filter((d) => (notes[d.key] ?? '').trim())
     .map((d) => ({ section: d.key, title: d.title, text: notes[d.key].trim() }))
 }

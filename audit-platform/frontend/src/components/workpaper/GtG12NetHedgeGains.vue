@@ -154,6 +154,7 @@ import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInje
 import { G12_ACCOUNT_CODE } from './composables/g12Constants'
 import { parseNum } from './composables/useG12FormulaEngine'
 import type { ChecklistResponse } from './composables/useF1FormData'
+import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 
 const G12TabProcedure = defineAsyncComponent(() => import('./g12-net-hedge-gains/core/G12TabProcedure.vue'))
 const G12TabAdjudication = defineAsyncComponent(() => import('./g12-net-hedge-gains/core/G12TabAdjudication.vue'))
@@ -205,14 +206,10 @@ const currentSheet = computed(() => {
   return m ? m[1] : ''
 })
 
-/** 适用准则：htmlData / project_context / runtime 任一来源（与 G11/G13 同口径） */
-const applicableStandards = computed<string[]>(() => {
-  const raw =
-    props.htmlData?.project_context?.applicable_standards
-    ?? props.htmlData?.projectContext?.applicable_standards
-    ?? props.htmlData?.applicable_standards
-    ?? runtime?.applicableStandards?.value
-  return Array.isArray(raw) ? raw.map(String) : []
+// 适用准则：显式 prop > 本 sheet html_data > runtime context（scaffold 从 render-config
+// 顶层注入）。收敛到共享 composable，兼容 v2 对象 / 逗号串 / JSON 串。
+const applicableStandards = useHostApplicableStandards({
+  htmlData: () => props.htmlData,
 })
 
 const HTML_SHEETS = ['G12A', 'G12-1', 'G12-2', 'G12-3', 'G12-4', 'G12-5', 'G12-6', '底稿目录']

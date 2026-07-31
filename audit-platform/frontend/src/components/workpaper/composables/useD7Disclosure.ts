@@ -16,6 +16,7 @@
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import { parseNum, calcSubtotal } from './useD7FormulaEngine'
+import { D7_NOTE_TEXT_KEYS } from './d7NoteSectionMap'
 import { eventBus } from '@/utils/eventBus'
 import type { ChecklistResponse } from './useD7FormData'
 import type useD7CrossSheet from './useD7CrossSheet'
@@ -302,13 +303,10 @@ export function useD7Disclosure(options: UseD7DisclosureOptions) {
 
   // ─── Note Texts + EventBus ───────────────────────────────────────────
 
-  const NOTE_TEXT_KEYS = [
-    'D7-note-listed-text-1',
-    'D7-note-listed-text-2',
-    'D7-note-listed-text-3',
-    'D7-note-soe-text-1',
-    'D7-note-soe-text-2',
-  ]
+  // 🔴 单一真源 = `d7NoteSectionMap.D7_NOTE_TEXT_SECTIONS`（含按表说明 + 源模板
+  // A31-A37 / A14-A19 要求的定性披露段）。此前这里硬编码 5 个键，与载荷侧双真源，
+  // 漏一个键 = 该段说明无处录入、AI 无处落笔、附注 text_content 永远缺这一节。
+  const NOTE_TEXT_KEYS = D7_NOTE_TEXT_KEYS
 
   const noteTexts = ref<Record<string, string>>({})
 

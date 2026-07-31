@@ -155,24 +155,24 @@
         @navigate-sheet="handleNavigate"
       />
 
-      <!-- 附注（上市） -->
+      <!-- 附注（上市）—— 🔴 必须传 projectId，否则同步（含自动同步）永久静默失败 -->
       <N2TabDisclosureListed
-        v-else-if="currentSheet === '附注(上市)' || currentSheet === '附注（上市）'"
+        v-else-if="currentSheet === N2_SHEET_DISCLOSURE_LISTED"
         :all-responses="allResponsesRef"
         :wp-id="props.wpId"
+        :project-id="props.projectId"
         :is-readonly="isReadonly"
         @navigate="handleNavigate"
-        @navigate-sheet="handleNavigate"
       />
 
       <!-- 附注（国企） -->
       <N2TabDisclosureSoe
-        v-else-if="currentSheet === '附注(国企)' || currentSheet === '附注（国企）'"
+        v-else-if="currentSheet === N2_SHEET_DISCLOSURE_SOE"
         :all-responses="allResponsesRef"
         :wp-id="props.wpId"
+        :project-id="props.projectId"
         :is-readonly="isReadonly"
         @navigate="handleNavigate"
-        @navigate-sheet="handleNavigate"
       />
 
       <!-- 兜底：skip sheet / 未迁移 → OnlyOffice fallback -->
@@ -201,6 +201,12 @@
 import { ref, computed, inject, onMounted, onBeforeUnmount, provide, defineAsyncComponent } from 'vue'
 import { WorkpaperRuntimeContextKey, type WorkpaperRuntimeContext } from './composables/useWorkpaperScaffold'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
+import {
+  N2_SHEET_DISCLOSURE_LISTED,
+  N2_SHEET_DISCLOSURE_SOE,
+  isN2HtmlSheet,
+  normalizeN2SheetName,
+} from './composables/n2SheetRouting'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
 // ─── defineAsyncComponent lazy 加载子组件 ────────────────────────────────────
@@ -265,29 +271,20 @@ const dualMode = {
   onModeChange: () => {},
 }
 
-// ─── sheetName 正则提取编码 ──────────────────────────────────────────────────
-const currentSheet = computed(() => {
-  const name = props.sheetName || props.wpCode || ''
-  // 匹配 N2A, N2-1~N2-11, N2, 底稿目录, 附注(上市), 附注(国企) 等
-  const m = name.match(/(N2A|N2-\d+|N2)/)
-  if (m) return m[1]
-  // 附注匹配
-  if (name.includes('附注') && (name.includes('上市') || name.includes('國企'))) {
-    return name.includes('上市') ? '附注(上市)' : '附注(国企)'
-  }
-  if (name.includes('底稿目录')) return '底稿目录'
-  return name
-})
+// ─── sheetName 分发（纯函数，见 composables/n2SheetRouting.ts）───────────────
+// 🔴 原实现有两处缺陷，已随 spec n-cycle-tax-disclosure-alignment 修掉：
+//   ① wp_code 正则跑在披露判定**之前**（D2 实测过这类抢占会让披露组件永远挂不上）
+//   ② 国企判定写的是**繁体「國企」**，而真实 sheet 名是简体「附注披露信息（国企）」
+//      → 国企披露 Tab 从来没渲染过，落到 OnlyOffice 兜底
+const currentSheet = computed(() => normalizeN2SheetName(props.sheetName, props.wpCode))
 
 /** skip sheet 列表（O1A原底稿/出口退税额复核示例走OO兜底，不做HTML组件化） */
 const SKIP_SHEETS = ['O1A', '出口退税额复核示例']
 
-/** N2-1~N2-11 为 HTML 专属组件渲染的 sheet（支持双模式切换）；N2A/skip走 OnlyOffice */
+/** N2-1~N2-11 + 底稿目录 + 两张披露表为 HTML 专属组件渲染；N2A/skip 走 OnlyOffice */
 const isHtmlSheet = computed(() => {
-  const s = currentSheet.value
   if (SKIP_SHEETS.some(sk => (props.sheetName || '').includes(sk))) return false
-  return /^N2-\d+$/.test(s) || s === 'N2' || s === '底稿目录'
-    || s.includes('附注')
+  return isN2HtmlSheet(currentSheet.value)
 })
 
 // ─── selfLoad（bundle内嵌场景 htmlData 为 null 时自加载） ─────────────────────

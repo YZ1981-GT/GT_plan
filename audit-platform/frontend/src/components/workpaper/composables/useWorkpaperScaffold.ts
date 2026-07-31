@@ -23,6 +23,7 @@ import { useAgingConfig, type UseAgingConfigReturn } from '@/composables/useAgin
 import { useWorkpaperVersionToolbar } from './useWorkpaperVersionToolbar'
 import { useWorkpaperReviewProvide } from './useWorkpaperReviewProvide'
 import { useWorkpaperEntryInjections } from './useWorkpaperEntryInjections'
+import { normalizeApplicableStandards } from './applicableStandards'
 import http from '@/utils/http'
 
 export const AgingConfig_Key: InjectionKey<UseAgingConfigReturn> = Symbol('agingConfig')
@@ -57,6 +58,13 @@ export interface UseWorkpaperScaffoldOptions {
    * 避免把正常加载窗口误报为缺上下文；独立 Shell 不传时仍立即校验。
    */
   contextReady?: boolean | Ref<boolean>
+  /**
+   * 项目适用准则。接受任意历史形态（字符串 / 逗号串 / 数组 / v2 对象 `{entity_type, scope}`），
+   * 由 `normalizeApplicableStandards` 归一后暴露为 `string[]`。
+   *
+   * 来源：render-config 响应顶层 `applicable_standards`（后端 Step 9.5 统一注入）。
+   */
+  applicableStandards?: unknown | Ref<unknown>
 }
 
 export interface WorkpaperRuntimeContext {
@@ -64,6 +72,13 @@ export interface WorkpaperRuntimeContext {
   projectId: Ref<string>
   wpCode: Ref<string>
   year: Ref<number | undefined>
+  /**
+   * 项目适用准则（归一后的 `string[]`，缺省 `[]` 而非 undefined）。
+   *
+   * 宿主**不要**直接读这里 —— 走 `useHostApplicableStandards()`，它会先看
+   * 显式 prop 与 `props.htmlData`（逐 sheet 值），再回退到本字段。
+   */
+  applicableStandards: Ref<string[]>
   displayPrefs: DisplayPrefsContract
   agingConfig: UseAgingConfigReturn
   version: ReturnType<typeof useWorkpaperVersionToolbar>
@@ -130,6 +145,11 @@ export function useWorkpaperScaffold(opts: UseWorkpaperScaffoldOptions): UseWork
   const projectIdRef = normalizeRef(opts.projectId)
   const yearRef = normalizeRef<number | undefined>(opts.year)
   const contextReadyRef = normalizeRef(opts.contextReady ?? true)
+  const applicableStandardsSource = normalizeRef<unknown>(opts.applicableStandards)
+  // 响应式：render-config 到达后自动更新（不是一次性快照）；未传时恒 []。
+  const applicableStandards = computed<string[]>(
+    () => normalizeApplicableStandards(applicableStandardsSource.value),
+  )
 
   if (import.meta.env.DEV) {
     let lastMissingSignature = ''
@@ -222,6 +242,7 @@ export function useWorkpaperScaffold(opts: UseWorkpaperScaffoldOptions): UseWork
     projectId: projectIdRef,
     wpCode: wpCodeRef,
     year: yearRef,
+    applicableStandards,
     displayPrefs,
     agingConfig,
     version,

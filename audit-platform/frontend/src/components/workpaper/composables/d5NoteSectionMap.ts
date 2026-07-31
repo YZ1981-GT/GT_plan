@@ -61,28 +61,31 @@ const T = {
 
 const AMT = 'amount' as const
 
-// ─── 列头元数据（逐字取自附注模板 headers）────────────────────────────────────
+// ─── 列头元数据（逐字取自附注模板 headers = 源模板字面）──────────────────────
+// 🔴 四张表都是源模板单行表头 → 首列必须标 `flat` 抑制前缀推断。
+// 最典型的是 `ENDORSED_COLUMNS`：两个数据列共前缀「期末」，未表态时
+// `_infer_groups_from_headers` 会凭空造出「期末」父表头（seed 路径实证）。
 const MAIN_COLUMNS_LISTED: ColumnDef[] = [
-  { key: 'label', label: '项目', is_label: true },
+  { key: 'label', label: '项  目', is_label: true, flat: true },
   { key: 'end_amount', label: '期末余额', format: AMT },
   { key: 'prior_amount', label: '上年年末余额', format: AMT },
 ]
 const MAIN_COLUMNS_SOE: ColumnDef[] = [
-  { key: 'label', label: '种类', is_label: true },
+  { key: 'label', label: '项  目', is_label: true, flat: true },
   { key: 'end_amount', label: '期末余额', format: AMT },
   { key: 'prior_amount', label: '期初余额', format: AMT },
 ]
-// 减值变动：模板单列（减值准备金额），行 = 变动阶段
+// 减值变动：源模板 B20 单列（减值准备金额），行 = 变动阶段（A21-A27）
 const IMPAIRMENT_COLUMNS: ColumnDef[] = [
-  { key: 'label', label: '项目', is_label: true },
+  { key: 'label', label: '项目', is_label: true, flat: true },
   { key: 'amount', label: '减值准备金额', format: AMT },
 ]
 const PLEDGED_COLUMNS: ColumnDef[] = [
-  { key: 'label', label: '种类', is_label: true },
+  { key: 'label', label: '种  类', is_label: true, flat: true },
   { key: 'pledged_amount', label: '期末已质押金额', format: AMT },
 ]
 const ENDORSED_COLUMNS: ColumnDef[] = [
-  { key: 'label', label: '种类', is_label: true },
+  { key: 'label', label: '种  类', is_label: true, flat: true },
   { key: 'derecognized', label: '期末终止确认金额', format: AMT },
   { key: 'not_derecognized', label: '期末未终止确认金额', format: AMT },
 ]
@@ -119,8 +122,54 @@ export interface D5SyncPayload {
 
 const num = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) ? v : 0)
 const str = (v: unknown): string => String(v ?? '')
-const isTotalLabel = (label: string): boolean =>
-  label === '合计' || label === '小计' || label.includes('公允价值合计')
+
+/**
+ * 底稿行名 → 附注行名（源模板字面）。
+ *
+ * 底稿 UI 用的是自拟短名，源模板 A11/A13 分别是「小  计」（中间两空格）与
+ * 「期末公允价值」。附注是交付物 → 行名随源模板；底稿 UI 字面不动。
+ * 键按去空白后比对，避免「小计」/「小 计」两种写法漏配。
+ */
+const NOTE_ROW_LABELS: Record<string, string> = {
+  小计: '小  计',
+  应收款项融资公允价值合计: '期末公允价值',
+  期末公允价值: '期末公允价值',
+  合计: '合  计',
+}
+
+/** 合计行字面 = 源模板字面（D5 各表统一「合  计」，中间两个空格）。 */
+export const D5_NOTE_TOTAL_LABEL = '合  计'
+
+/** 子表名映射（供共享契约 helper 逐字校验）。 */
+export const D5_LISTED_SUBTABLE = T.listed
+export const D5_SOE_SUBTABLE = T.soe
+
+/** 列定义：`{模板表名: ColumnDef[]}`（零参，供覆盖率 sweep 调用）。 */
+export function buildD5ListedColumns(): Record<string, ColumnDef[]> {
+  return {
+    [T.listed.main]: MAIN_COLUMNS_LISTED,
+    [T.listed.impairment]: IMPAIRMENT_COLUMNS,
+    [T.listed.pledged]: PLEDGED_COLUMNS,
+    [T.listed.endorsed]: ENDORSED_COLUMNS,
+  }
+}
+
+export function buildD5SoeColumns(): Record<string, ColumnDef[]> {
+  return { [T.soe.main]: MAIN_COLUMNS_SOE }
+}
+
+const bare = (label: string): string => label.replace(/\s+/g, '')
+
+/** 🔴 行型判定必须先去空白：源模板写的是「小  计」「合  计」。 */
+const isTotalLabel = (label: string): boolean => {
+  const s = bare(label)
+  return s === '合计' || s === '小计' || s === '期末公允价值' || s.includes('公允价值合计')
+}
+
+/** 底稿行名归一到附注行名（未登记的原样透传）。 */
+export function toD5NoteRowLabel(label: string): string {
+  return NOTE_ROW_LABELS[bare(label)] ?? label
+}
 
 /**
  * 构建 D5 → 附注 sync-from-workpaper 载荷。
@@ -142,7 +191,7 @@ export function buildD5SyncPayload(
 
   // ① 分类表
   const mainRow = (r: D5RowLike) => ({
-    label: str(r.label),
+    label: toD5NoteRowLabel(str(r.label)),
     end_amount: num(r.endAmount),
     prior_amount: num(r.priorAmount),
     ...(isTotalLabel(str(r.label)) ? { is_total: true } : {}),
@@ -170,7 +219,9 @@ export function buildD5SyncPayload(
   put(
     T.listed.impairment,
     [
-      { label: '期初余额', amount: num(imp.priorBalance) },
+      // 源模板 A21 字面为「上年年末余额」（非「期初余额」）；A25/A26 的
+      // `[本期转销]` `[其他]` 是可选项标记，无发生额时不推送
+      { label: '上年年末余额', amount: num(imp.priorBalance) },
       { label: '本期计提', amount: num(imp.provision) },
       { label: '本期收回或转回', amount: num(imp.reversal) },
       { label: '本期核销', amount: num(imp.writeOff) },
@@ -185,7 +236,11 @@ export function buildD5SyncPayload(
     T.listed.pledged,
     [
       ...pledged.map((r) => ({ label: str(r.label), pledged_amount: num(r.pledgedAmount) })),
-      { label: '合计', pledged_amount: pledged.reduce((s, r) => s + num(r.pledgedAmount), 0), is_total: true },
+      {
+        label: D5_NOTE_TOTAL_LABEL,
+        pledged_amount: pledged.reduce((s, r) => s + num(r.pledgedAmount), 0),
+        is_total: true,
+      },
     ],
     PLEDGED_COLUMNS,
   )
@@ -201,7 +256,7 @@ export function buildD5SyncPayload(
         not_derecognized: num(r.notDerecognizedAmount),
       })),
       {
-        label: '合计',
+        label: D5_NOTE_TOTAL_LABEL,
         derecognized: endorsed.reduce((s, r) => s + num(r.derecognizedAmount), 0),
         not_derecognized: endorsed.reduce((s, r) => s + num(r.notDerecognizedAmount), 0),
         is_total: true,

@@ -151,6 +151,7 @@ import { useG4PriorYearRollForward } from './composables/useG4PriorYearRollForwa
 import { fetchG4SuiteResponseMap } from './composables/g4CrossHelpers'
 import { buildDirectoryHtmlData } from './composables/gCycleIndexRouting'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
+import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 
@@ -334,14 +335,10 @@ const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: ()
 const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
 const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
 
-/** 适用准则：htmlData / project_context / runtime 任一来源（与 G11/G13 同口径） */
-const applicableStandards = computed<string[]>(() => {
-  const raw =
-    props.htmlData?.project_context?.applicable_standards
-    ?? props.htmlData?.projectContext?.applicable_standards
-    ?? props.htmlData?.applicable_standards
-    ?? runtime?.applicableStandards?.value
-  return Array.isArray(raw) ? raw.map(String) : []
+// 适用准则：显式 prop > 本 sheet html_data > runtime context（scaffold 从 render-config
+// 顶层注入）。收敛到共享 composable，兼容 v2 对象 / 逗号串 / JSON 串。
+const applicableStandards = useHostApplicableStandards({
+  htmlData: () => props.htmlData,
 })
 
 provide('g4VersionTrailRef', versionTrailRef)

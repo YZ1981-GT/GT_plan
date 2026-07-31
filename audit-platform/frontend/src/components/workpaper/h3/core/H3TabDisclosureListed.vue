@@ -429,7 +429,7 @@
  * H3TabDisclosureListed.vue — 附注披露（上市公司版）
  * 模板化表格块 + 计量模式二选一 + 无限插行/删行 + 勾稽差异高亮
  */
-import { ref, computed, inject, toRef, onBeforeUnmount } from 'vue'
+import { ref, computed, inject, toRef, onBeforeUnmount, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { useH3Disclosure } from '../../composables/useH3Disclosure'
@@ -591,7 +591,6 @@ async function syncToDisclosureNotes() {
     )
     ElMessage.success('已同步到附注（上市 五、21）')
     publishNoteTextUpdated('sync-listed')
-    autoSync.scheduleAutoSync(syncToDisclosureNotes)
   } catch (e: any) {
     ElMessage.error('同步失败：' + (e?.response?.data?.message || e?.message || '未知错误'))
   } finally {
@@ -604,6 +603,22 @@ function jumpToNote() {
   if (route) router.push(route)
   else ElMessage.info('无法定位附注章节')
 }
+
+// [auto-sync] 监听实际数据（历史实现是 syncToDisclosureNotes 里调度自己 → 800ms 周期无限 POST，
+// 且让 disclosureAutoSyncCoverage 守卫误判为「已接自动同步」= 假接入）。
+// 🔴 不加 `_xxxMounted` 一次性防护：Vue watch 默认 immediate:false，挂载本身不触发；
+//    该防护会吞掉「切走再切回后的第一次编辑」（平台铁律）。
+watch(
+  [
+    () => getSectionRows('cost-original'),
+    () => getSectionRows('cost-dep'),
+    () => getSectionRows('cost-impair'),
+    () => getSectionRows('fair-change'),
+    () => sectionTexts,
+  ],
+  () => autoSync.scheduleAutoSync(syncToDisclosureNotes),
+  { deep: true },
+)
 
 onBeforeUnmount(() => { autoSync.cancelPending() })
 

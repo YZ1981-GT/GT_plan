@@ -187,6 +187,7 @@
 import { ref, computed, onMounted, provide, toRef, defineAsyncComponent, inject} from 'vue'
 import http from '@/utils/http'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
+import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 import { useI6DualMode } from './composables/useI6DualMode'
 import { useI6CrossSheet } from './composables/useI6CrossSheet'
 import { resolveI6DisclosureVisibility } from './composables/i6ApplicableSheets'
@@ -229,13 +230,11 @@ const runtime = inject(WorkpaperRuntimeContextKey, null)
 
 // ─── State ───────────────────────────────────────────────────────────────────
 const isReadonly = computed(() => !!props.readonly)
-const applicableStandards = computed<string[]>(() => {
-  const fromProp = props.applicableStandards
-  if (fromProp?.length) return fromProp
-  const fromRuntime = (runtime as any)?.applicableStandards?.value
-  if (Array.isArray(fromRuntime) && fromRuntime.length) return fromRuntime
-  const fromHtml = props.htmlData?.applicableStandards
-  return Array.isArray(fromHtml) ? fromHtml : []
+// 适用准则：显式 prop > 本 sheet html_data > runtime context（scaffold 从 render-config
+// 顶层注入）。收敛到共享 composable，兼容 v2 对象 / 逗号串 / JSON 串。
+const applicableStandards = useHostApplicableStandards({
+  explicit: () => props.applicableStandards,
+  htmlData: () => props.htmlData,
 })
 const disclosureVis = computed(() => resolveI6DisclosureVisibility(applicableStandards.value))
 const isLoading = ref(true)

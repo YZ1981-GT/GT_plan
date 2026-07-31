@@ -34,13 +34,13 @@
       <el-table-column prop="project" label="项目" min-width="140" />
       <el-table-column prop="currentAmount" label="本期发生额" width="140" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly && !row.isTotal" :model-value="row.currentAmount" size="small" :controls="false" :precision="2" style="width:100%" @change="(v: number | undefined) => updateField(row.id, 'currentAmount', v ?? 0)" />
+          <WpAmountInput v-if="!isReadonly && !row.isTotal" :model-value="row.currentAmount" @change="(v: number | undefined) => updateField(row.id, 'currentAmount', v ?? 0)" />
           <span v-else :class="{ 'formula-cell': row.isTotal }">{{ fmtAmt(row.currentAmount) }}</span>
         </template>
       </el-table-column>
       <el-table-column prop="priorAmount" label="上期发生额" width="140" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly && !row.isTotal" :model-value="row.priorAmount" size="small" :controls="false" :precision="2" style="width:100%" @change="(v: number | undefined) => updateField(row.id, 'priorAmount', v ?? 0)" />
+          <WpAmountInput v-if="!isReadonly && !row.isTotal" :model-value="row.priorAmount" @change="(v: number | undefined) => updateField(row.id, 'priorAmount', v ?? 0)" />
           <span v-else :class="{ 'formula-cell': row.isTotal }">{{ fmtAmt(row.priorAmount) }}</span>
         </template>
       </el-table-column>
@@ -98,11 +98,13 @@
  * - AI辅助
  */
 import { ref, computed, onMounted, onUnmounted, onBeforeUnmount, inject } from 'vue'
+import { fmtAmount } from '@/utils/formatters'
 import { MagicStick } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
 import { useK8AiGenerate } from '../../composables/useK8AiGenerate'
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { buildK8SyncPayload } from '../../composables/k8NoteSectionMap'
 import type { Ref } from 'vue'
@@ -125,7 +127,13 @@ onBeforeUnmount(() => autoSync.cancelPending())
 
 async function syncToDisclosureNotes(): Promise<void> {
   if (!props.projectId || props.isReadonly) return
-  const payload = buildK8SyncPayload('soe', props.wpId || '', disclosureRows.value, narrativeText.value)
+  // 合计行由载荷层统一派生，此处只推明细行（避免双合计）
+  const payload = buildK8SyncPayload(
+    'soe',
+    props.wpId || '',
+    disclosureRows.value.filter(r => !r.isTotal),
+    narrativeText.value,
+  )
   try {
     await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
     eventBus.emit('disclosure:note-text-updated' as any, {
@@ -322,9 +330,10 @@ function formatRate(row: DisclosureRow): string {
   return (rate * 100).toFixed(1) + '%'
 }
 
+/** 只读金额展示：委托平台金额格式单一真源，保留底稿「0 显示 -」语义 */
 function fmtAmt(val: number | null | undefined): string {
   if (val == null || val === 0) return '-'
-  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return fmtAmount(val)
 }
 
 // ─── AI 辅助（统一 /ai/generate-text 端点）─────────────────────────────────
@@ -347,7 +356,7 @@ async function handleAiGenerate(): Promise<void> {
   const text = await generateAndConfirm(
     'k8-disclosure-soe-note',
     narrativeText.value || '',
-    { ..._disclosureContext(), 任务: '请生成销售费用附注披露说明（费用性质构成概述、本期较上期主要变动及原因）' },
+    { ..._disclosureContext(), 任务: '请生成销售费用附注披露说明（费用性质构成概述、本期较上期主要变动及原因）口径以致同 2025 修订版底稿源模板与附注模版为准；只能使用已提供的项目名称与金额，不得虚构项目、金额或业务背景，无把握的内容留空由审计师补充。' },
     'AI 生成 · 附注披露说明',
   )
   if (text) { narrativeText.value = text; handleNarrativeSave() }
@@ -358,7 +367,7 @@ async function handleAiNarrative(): Promise<void> {
   const text = await generateAndConfirm(
     'k8-disclosure-soe-narrative',
     narrativeText.value || '',
-    { ..._disclosureContext(), 任务: '请生成销售费用附注说明文本（重大变动分析、异常波动解释）' },
+    { ..._disclosureContext(), 任务: '请生成销售费用附注说明文本（重大变动分析、异常波动解释）口径以致同 2025 修订版底稿源模板与附注模版为准；只能使用已提供的项目名称与金额，不得虚构项目、金额或业务背景，无把握的内容留空由审计师补充。' },
     'AI 生成 · 附注说明',
   )
   if (text) { narrativeText.value = text; handleNarrativeSave() }

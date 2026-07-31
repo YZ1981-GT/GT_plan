@@ -170,6 +170,7 @@ import { useD3ReviewThreads } from './composables/useD3ReviewThreads'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useD3EventBus } from './composables/useD3EventBus'
 import { resolveD3SheetLabel } from './composables/d3SheetLabels'
+import { normalizeApplicableStandards } from './composables/useF2FormData'
 import { useAgingConfig } from '@/composables/useAgingConfig'
 import D3TabIndex from './d3/D3TabIndex.vue'
 import D3TabProcedure from './d3/D3TabProcedure.vue'
@@ -202,7 +203,8 @@ const emit = defineEmits<{
 }>()
 
 const isLoading = ref(true)
-const applicableStandards = ref('')
+/** 适用准则（归一后的字符串列表，如 `['soe_standalone','soe','standalone']`） */
+const applicableStandards = ref<string[]>([])
 
 const isReadonly = computed(() => !!props.readonly)
 const wpIdRef = computed(() => props.wpId)
@@ -307,6 +309,15 @@ async function saveImmediateBatch(
 const displayPrefs = useDisplayPrefsStore()
 
 async function selfLoad(): Promise<void> {
+  // 🔴 适用准则必须在早返回**之前**赋值：原实现放在 `responses_snapshot` 早返回之后，
+  // 有快照的项目根本走不到 → 门控恒空（两版披露 Tab 都显示「当前项目不适用…」）。
+  // 值经 `normalizeApplicableStandards` 归一（render-config 现统一下发字符串列表，
+  // 但历史/其它路径可能是 v2 对象或逗号串）。
+  applicableStandards.value = normalizeApplicableStandards(
+    props.htmlData?.project_context?.applicable_standards
+    ?? props.htmlData?.applicable_standards,
+  )
+
   if (props.htmlData?.responses_snapshot) {
     const map = new Map<string, any>()
     for (const [k, v] of Object.entries(props.htmlData.responses_snapshot)) {
@@ -315,13 +326,6 @@ async function selfLoad(): Promise<void> {
     allResponses.value = map as any
     isLoading.value = false
     return
-  }
-
-  if (props.htmlData?.applicable_standards || props.htmlData?.project_context?.applicable_standards) {
-    applicableStandards.value =
-      props.htmlData.applicable_standards
-      || props.htmlData.project_context?.applicable_standards
-      || ''
   }
 
   try {

@@ -31,13 +31,13 @@
         <el-table-column prop="project" label="项目" min-width="140" fixed />
         <el-table-column prop="currentAmount" label="本期发生额" width="130" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly && !row.isTotal" :model-value="row.currentAmount" size="small" :controls="false" :precision="2" style="width:100%" @change="(v: number | undefined) => updateField(row.id, 'currentAmount', v ?? 0)" />
+            <WpAmountInput v-if="!isReadonly && !row.isTotal" :model-value="row.currentAmount" @change="(v: number | undefined) => updateField(row.id, 'currentAmount', v ?? 0)" />
             <span v-else :class="{ 'formula-cell': row.isTotal }">{{ fmtAmt(row.currentAmount) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="priorAmount" label="上期发生额" width="130" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly && !row.isTotal" :model-value="row.priorAmount" size="small" :controls="false" :precision="2" style="width:100%" @change="(v: number | undefined) => updateField(row.id, 'priorAmount', v ?? 0)" />
+            <WpAmountInput v-if="!isReadonly && !row.isTotal" :model-value="row.priorAmount" @change="(v: number | undefined) => updateField(row.id, 'priorAmount', v ?? 0)" />
             <span v-else :class="{ 'formula-cell': row.isTotal }">{{ fmtAmt(row.priorAmount) }}</span>
           </template>
         </el-table-column>
@@ -99,11 +99,13 @@
  * - AI辅助生成说明文本
  */
 import { ref, onMounted, onUnmounted, onBeforeUnmount, inject } from 'vue'
+import { fmtAmount } from '@/utils/formatters'
 import { MagicStick } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
 import { generateK9AiText } from '../../composables/useK9AiText'
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { K9_FEE_NATURES_SOE } from '../../composables/k9FeeNatures'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { buildK9SyncPayload } from '../../composables/k9NoteSectionMap'
@@ -126,7 +128,13 @@ onBeforeUnmount(() => autoSync.cancelPending())
 
 async function syncToDisclosureNotes(): Promise<void> {
   if (!props.projectId || props.isReadonly) return
-  const payload = buildK9SyncPayload('soe', props.wpId || '', disclosureRows.value, narrativeText.value)
+  // 合计行由载荷层统一派生，此处只推明细行（避免双合计）
+  const payload = buildK9SyncPayload(
+    'soe',
+    props.wpId || '',
+    disclosureRows.value.filter(r => !r.isTotal),
+    narrativeText.value,
+  )
   try {
     await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
     eventBus.emit('disclosure:note-text-updated' as any, {
@@ -282,9 +290,10 @@ function formatRate(row: DisclosureRow): string {
   return (rate * 100).toFixed(1) + '%'
 }
 
+/** 只读金额展示：委托平台金额格式单一真源，保留底稿「0 显示 -」语义 */
 function fmtAmt(val: number | null | undefined): string {
   if (val == null || val === 0) return '-'
-  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return fmtAmount(val)
 }
 
 const aiLoading = ref(false)
@@ -300,7 +309,7 @@ async function generateNarrative(): Promise<void> {
       .slice(0, 5)
       .map(r => `${r.project} ${r.currentAmount.toFixed(0)}`)
     const content = await generateK9AiText(props.wpId, {
-      prompt: '请根据国有企业管理费用按费用性质分类的披露数据，生成附注说明文本（概述本期管理费用总额、同比变动及主要构成项目原因）。',
+      prompt: '请根据国有企业管理费用按费用性质分类的披露数据，生成附注说明文本（概述本期管理费用总额、同比变动及主要构成项目原因）。口径以致同 2025 修订版底稿源模板与附注模版为准；只能使用已提供的项目名称与金额，不得虚构项目、金额或业务背景，无把握的内容留空由审计师补充。',
       section: 'K9-disclosure-soe-narrative',
       context: {
         本期合计: totalCur,

@@ -159,6 +159,7 @@ import { ref, computed, onMounted, provide, toRef, inject, defineAsyncComponent 
 import { useI5FormData } from './composables/useI5FormData'
 import { useI5CrossSheet } from './composables/useI5CrossSheet'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
+import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 import { useI5DualMode } from './composables/useI5DualMode'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 import HiFourTableSourcePanel from './shared/HiFourTableSourcePanel.vue'
@@ -194,14 +195,11 @@ const emit = defineEmits<{ (e: 'save'): void; (e: 'completed'): void; (e: 'navig
 // ─── State ───────────────────────────────────────────────────────────────────
 const isReadonly = computed(() => !!props.readonly)
 const runtime = inject(WorkpaperRuntimeContextKey, null)
-const applicableStandards = computed<string[]>(() => {
-  const fromProp = props.applicableStandards
-  if (Array.isArray(fromProp) && fromProp.length) return fromProp.map(String)
-  const fromRuntime = (runtime as any)?.applicableStandards?.value
-  if (Array.isArray(fromRuntime) && fromRuntime.length) return fromRuntime.map(String)
-  const fromHtml = props.htmlData?.applicableStandards
-  if (Array.isArray(fromHtml) && fromHtml.length) return fromHtml.map(String)
-  return []
+// 适用准则：显式 prop > 本 sheet html_data > runtime context（scaffold 从 render-config
+// 顶层注入）。收敛到共享 composable，兼容 v2 对象 / 逗号串 / JSON 串。
+const applicableStandards = useHostApplicableStandards({
+  explicit: () => props.applicableStandards,
+  htmlData: () => props.htmlData,
 })
 
 const wpIdRef = toRef(props, 'wpId')

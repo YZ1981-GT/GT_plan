@@ -32,7 +32,7 @@ import {
   type N1CheckSegment,
 } from './n1DisclosureConsistency'
 import { deriveDisclosureDetailRows, deriveUnrecognizedLossPayload } from './useN1DisclosureSource'
-import type { N1SegColumn, N1Segment } from './n1DisclosureSegmentTypes'
+import type { N1SegColumn, N1Segment } from './shared/disclosureSegmentTypes'
 
 // ─── 源模板行骨架 ────────────────────────────────────────────────────────────
 

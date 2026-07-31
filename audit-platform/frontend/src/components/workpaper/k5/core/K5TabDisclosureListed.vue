@@ -5,7 +5,7 @@
       <h3 class="sheet-title">附注披露信息（上市公司）</h3>
       <div class="head-actions">
         <el-button size="small" type="success" :disabled="isReadonly" @click="syncToDisclosureNotes">同步到附注</el-button>
-        <el-button size="small" type="primary" plain @click="handleAiGenerate">
+        <el-button size="small" type="primary" plain :loading="aiLoading" :disabled="isReadonly" @click="handleAiGenerate">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
         <el-button size="small" @click="openReview('K5-disclosure-listed')">💬复核</el-button>
@@ -136,7 +136,7 @@
       <template #header>
         <div class="section-card-header">
           <span>四、补充说明</span>
-          <el-button size="small" type="primary" plain @click="handleAiGenerate">
+          <el-button size="small" type="primary" plain :loading="aiLoading" :disabled="isReadonly" @click="handleAiGenerate">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
         </div>
@@ -181,8 +181,9 @@
  * Requirements: 9.1, 2.7
  */
 import { ref, computed, onMounted, onBeforeUnmount, inject } from 'vue'
+import { fmtAmount } from '@/utils/formatters'
 import { MagicStick } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
@@ -388,8 +389,58 @@ function handlePolicySave(): void {
   emit('save', 'K5-disclosure-listed-policy', { remark: policyNarrative.value })
 }
 
-function handleAiGenerate(): void {
-  emit('save', 'K5-disclosure-listed-ai-trigger', { remark: 'contingency-disclosure' })
+/**
+ * AI 辅助生成附注补充说明。
+ *
+ * 🔴 原实现只 `emit('save', ...ai-trigger)` 写一个 marker、从不调 AI 端点 —— 按钮可见但空转。
+ * prompt 写明源模板口径 + 「不得虚构」约束（平台铁律：过短/无约束的 prompt 会诱导自造披露内容）。
+ */
+const aiLoading = ref(false)
+
+async function handleAiGenerate(): Promise<void> {
+  if (!props.wpId || props.isReadonly || aiLoading.value) return
+  aiLoading.value = true
+  try {
+    const detail = provisionTable.value
+      .filter(r => !r.isTotal && (r.endBalance || r.beginBalance))
+      .map(r => `${r.category}：期末${fmtAmt(r.endBalance)}｜上年年末${fmtAmt(r.beginBalance)}｜${r.remark || '未填变动原因'}`)
+      .join('；')
+    const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: 'k5-disclosure-listed-narrative',
+      prompt:
+        '请依据致同 2025 修订版底稿 K5 源模板与附注模版（五、50 预计负债）撰写附注补充说明：'
+        + '逐项说明重要预计负债的形成原因、计量所依据的重要假设与会计估计，'
+        + '以及未决诉讼、待执行亏损合同的进展；并说明流动/非流动划分口径'
+        + '（期限在一年或一个营业周期以内的在「其他流动负债」列报，将于一年内到期的重分类至'
+        + '「一年内到期的非流动负债」）。'
+        + '只能使用已提供的项目名称与金额，不得虚构诉讼、担保、合同或金额，'
+        + '无把握的内容留空由审计师补充。',
+      context: {
+        科目: '2701 预计负债（上市公司版）',
+        附注章节: K5_NOTE_SECTION.listed,
+        披露明细: detail || '（暂无数据）',
+        既有说明: narrativeText.value || '（空）',
+      },
+      existingContent: narrativeText.value || '',
+    })
+    const generated = res.data?.data?.content || res.data?.content || ''
+    if (!generated) {
+      ElMessage.warning('AI 未生成内容')
+      return
+    }
+    await ElMessageBox.confirm(
+      `AI 生成内容预览：\n\n${generated.slice(0, 300)}${generated.length > 300 ? '…' : ''}`,
+      'AI 生成确认',
+      { confirmButtonText: '填入', cancelButtonText: '取消', type: 'info' },
+    )
+    narrativeText.value = narrativeText.value ? `${narrativeText.value}\n${generated}` : generated
+    handleNarrativeSave()
+    ElMessage.success('已填入 AI 生成内容')
+  } catch {
+    /* 取消或失败：静默（与平台既有披露 Tab 一致） */
+  } finally {
+    aiLoading.value = false
+  }
 }
 
 function persistTable(): void {
@@ -452,9 +503,10 @@ onBeforeUnmount(() => {
 
 // ─── Formatting ──────────────────────────────────────────────────────────────
 
+/** 只读金额展示：委托平台金额格式单一真源，保留底稿「0 显示 -」语义 */
 function fmtAmt(v: number | null | undefined): string {
   if (v == null || v === 0) return '-'
-  return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return fmtAmount(v)
 }
 </script>
 

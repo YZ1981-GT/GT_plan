@@ -34,12 +34,9 @@
         <el-table-column prop="category" label="项目" min-width="180" />
         <el-table-column prop="currentAmount" label="本期发生额" min-width="130" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               v-model="row.currentAmount"
-              :controls="false"
-              size="small"
-              style="width: 100%"
               @change="handleRowChange(row)"
             />
             <span v-else :class="{ 'amount-zero': !row.currentAmount }">{{ fmtAmt(row.currentAmount) }}</span>
@@ -47,15 +44,29 @@
         </el-table-column>
         <el-table-column prop="priorAmount" label="上期发生额" min-width="130" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               v-model="row.priorAmount"
-              :controls="false"
-              size="small"
-              style="width: 100%"
               @change="handleRowChange(row)"
             />
             <span v-else>{{ fmtAmt(row.priorAmount) }}</span>
+          </template>
+        </el-table-column>
+        <!-- 源模板国企侧第 4 列（附注 §八、69 headers[3]），交互点选 -->
+        <el-table-column prop="isGovGrant" label="是否为政府补助" width="140">
+          <template #default="{ row }">
+            <el-select
+              v-if="!isReadonly"
+              v-model="row.isGovGrant"
+              size="small"
+              style="width: 100%"
+              placeholder="请选择"
+              @change="handleRowChange(row)"
+            >
+              <el-option label="是" value="是" />
+              <el-option label="否" value="否" />
+            </el-select>
+            <span v-else>{{ row.isGovGrant || '—' }}</span>
           </template>
         </el-table-column>
         <el-table-column label="同比变动" min-width="100" align="right">
@@ -129,6 +140,7 @@
  * - AI辅助按钮
  */
 import { ref, computed, onMounted, onUnmounted, onBeforeUnmount } from 'vue'
+import { fmtAmount } from '@/utils/formatters'
 import { ElMessage } from 'element-plus'
 import { Refresh, MagicStick } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
@@ -136,6 +148,7 @@ import http from '@/utils/http'
 import { api } from '@/services/apiProxy'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { buildK10SyncPayload } from '../../composables/k10NoteSectionMap'
 
 // ─── Props & Emits ───────────────────────────────────────────────────────────
@@ -161,7 +174,30 @@ onBeforeUnmount(() => autoSync.cancelPending())
 
 async function syncToDisclosureNotes(): Promise<void> {
   if (!props.projectId || props.isReadonly) return
-  const payload = buildK10SyncPayload('soe', props.wpId || '', disclosureRows.value, narrativeText.value)
+  // 🔴 行模型字段是 `category`，旧载荷读 `project` → 曾把标签推成空串；
+  // 第 4 列「是否为政府补助」与合计后的「其中：政府补助」结构行按源模板行序推送
+  const detail = disclosureRows.value.map(r => ({
+    project: r.category,
+    currentAmount: r.currentAmount,
+    priorAmount: r.priorAmount,
+    isGovGrant: r.isGovGrant,
+  }))
+  const govGrantRow = disclosureRows.value
+    .filter(r => r.isGovGrant === '是')
+    .reduce(
+      (acc, r) => ({
+        currentAmount: acc.currentAmount + (Number(r.currentAmount) || 0),
+        priorAmount: acc.priorAmount + (Number(r.priorAmount) || 0),
+      }),
+      { currentAmount: 0, priorAmount: 0 },
+    )
+  const payload = buildK10SyncPayload(
+    'soe',
+    props.wpId || '',
+    detail,
+    narrativeText.value,
+    govGrantRow,
+  )
   try {
     await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
     eventBus.emit('disclosure:note-text-updated' as any, {
@@ -193,13 +229,24 @@ interface DisclosureRow {
   category: string
   currentAmount: number
   priorAmount: number
+  /** 附注 §八、69 第 4 列「是否为政府补助」（源模板国企侧独有） */
+  isGovGrant: string
   remark: string
 }
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
+/** 固定分类中语义上即政府补助的项目，作为第 4 列默认值（可人工改选） */
+const GOV_GRANT_DEFAULT = new Set(['政府补助', '即征即退', '财政贴息', '研发补助', '稳岗补贴'])
+
 const disclosureRows = ref<DisclosureRow[]>(
-  CATEGORIES.map(c => ({ category: c, currentAmount: 0, priorAmount: 0, remark: '' }))
+  CATEGORIES.map(c => ({
+    category: c,
+    currentAmount: 0,
+    priorAmount: 0,
+    isGovGrant: GOV_GRANT_DEFAULT.has(c) ? '是' : '否',
+    remark: '',
+  }))
 )
 const narrativeText = ref('')
 
@@ -217,6 +264,8 @@ function loadSavedData(): void {
             category: CATEGORIES[i],
             currentAmount: Number(parsed.currentAmount || 0),
             priorAmount: Number(parsed.priorAmount || 0),
+            isGovGrant: parsed.isGovGrant
+              || (GOV_GRANT_DEFAULT.has(CATEGORIES[i]) ? '是' : '否'),
             remark: parsed.remark || '',
           }
         }
@@ -244,6 +293,7 @@ function loadDynamicRows(): void {
           category: parsed.category,
           currentAmount: Number(parsed.currentAmount || 0),
           priorAmount: Number(parsed.priorAmount || 0),
+          isGovGrant: parsed.isGovGrant || '否',
           remark: parsed.remark || '',
         })
       }
@@ -305,7 +355,13 @@ function applyAutoFill(): void {
       existing.currentAmount = amt
       persistDynamicRow(existing)
     } else {
-      const row: DisclosureRow = { category: name, currentAmount: amt, priorAmount: 0, remark: '' }
+      const row: DisclosureRow = {
+        category: name,
+        currentAmount: amt,
+        priorAmount: 0,
+        isGovGrant: '否',
+        remark: '',
+      }
       disclosureRows.value.push(row)
       persistDynamicRow(row)
     }
@@ -321,6 +377,7 @@ function persistDynamicRow(row: DisclosureRow): void {
     category: row.category,
     currentAmount: row.currentAmount,
     priorAmount: row.priorAmount,
+    isGovGrant: row.isGovGrant,
     remark: row.remark,
   })
 }
@@ -347,6 +404,7 @@ function handleRowChange(row: DisclosureRow): void {
   emit('save', `K10-disc-soe-row-${idx}`, {
     currentAmount: row.currentAmount,
     priorAmount: row.priorAmount,
+    isGovGrant: row.isGovGrant,
     remark: row.remark,
   })
   autoSync.scheduleAutoSync(syncToDisclosureNotes)
@@ -370,7 +428,7 @@ async function generateAI(section: string): Promise<void> {
   try {
     const res = await api.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
       section,
-      prompt: `为K10其他收益底稿生成国企附注披露文本。来源分类：${CATEGORIES.join('/')}。`,
+      prompt: `为K10其他收益底稿生成国企附注披露文本。来源分类：${CATEGORIES.join('/')}。口径以致同 2025 修订版底稿源模板与附注模版为准；只能使用已提供的项目名称与金额，不得虚构项目、金额或业务背景，无把握的内容留空由审计师补充。`,
       context: {
         来源分类: CATEGORIES.join('/'),
         本期合计: String(totalCurrentAmount.value),
@@ -419,9 +477,10 @@ function formatRate(row: DisclosureRow): string {
   return (((row.currentAmount - row.priorAmount) / row.priorAmount) * 100).toFixed(1) + '%'
 }
 
+/** 只读金额展示：委托平台金额格式单一真源，保留底稿「0 显示 -」语义 */
 function fmtAmt(val: number | null | undefined): string {
   if (val == null || val === 0) return '-'
-  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return fmtAmount(val)
 }
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────

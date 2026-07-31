@@ -131,6 +131,7 @@ import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInje
 import { G14_ACCOUNT_CODE } from './composables/g14Constants'
 import { parseNum } from './composables/useG14FormulaEngine'
 import type { ChecklistResponse } from './composables/useF1FormData'
+import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 
 const G14TabProcedure = defineAsyncComponent(() => import('./g14-credit-impairment-loss/G14TabProcedure.vue'))
 const G14TabAdjudication = defineAsyncComponent(() => import('./g14-credit-impairment-loss/G14TabAdjudication.vue'))
@@ -165,15 +166,11 @@ const isReadonly = computed(() => !!props.readonly)
 // ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ───
 const runtime = inject(WorkpaperRuntimeContextKey, null)
 
-const applicableStandards = computed<string[]>(() => {
-  const fromProp = props.applicableStandards
-  if (Array.isArray(fromProp) && fromProp.length) return fromProp
-  return (
-    runtime?.applicableStandards?.value
-    ?? props.htmlData?.applicable_standards
-    ?? props.htmlData?.applicableStandards
-    ?? []
-  )
+// 适用准则：显式 prop > 本 sheet html_data > runtime context（scaffold 从 render-config
+// 顶层注入）。收敛到共享 composable，兼容 v2 对象 / 逗号串 / JSON 串。
+const applicableStandards = useHostApplicableStandards({
+  explicit: () => props.applicableStandards,
+  htmlData: () => props.htmlData,
 })
 
 const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)

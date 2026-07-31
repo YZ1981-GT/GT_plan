@@ -205,6 +205,11 @@ const emit = defineEmits<{
 const noteSectionId = H8_NOTE_SECTION.soe
 const isSyncing = ref(false)
 
+// 🔴 `useAuditContext()` 只能在 setup 顶层调用（内部依赖 inject / effect scope）。
+// 历史实现写在 `checkNoteConsistency()` 里 → 点击时抛 TypeError 被 catch 吞成
+// `noteCheckState='error'`，「校对附注」永远报错。见 H8TabDisclosureListed 同款注释。
+const { year: auditYear } = useAuditContext()
+
 const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 onBeforeUnmount(() => autoSync.cancelPending())
 
@@ -322,7 +327,6 @@ async function checkNoteConsistency(silent = false) {
   if (!props.projectId) return
   noteCheckState.value = 'loading'
   try {
-    const { year: auditYear } = useAuditContext()
     const year = auditYear.value || new Date().getFullYear()
     const res: any = await api.get(
       `/api/disclosure-notes/${props.projectId}/${year}/${noteSectionId}`,

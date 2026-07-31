@@ -326,7 +326,7 @@ import GtBArchitectureTree from '@/components/workpaper/GtBArchitectureTree.vue'
 import { useProjectStore } from '@/stores/project'
 import { subscribeInvalidation } from '@/services/acnr'
 import { resolveEffectiveAuditYear } from '@/utils/resolveAuditYear'
-import { normalizeSheetName } from '@/utils/normalizeSheetName'
+import { normalizeSheetName, resolveSheetNameByDeepLink } from '@/utils/normalizeSheetName'
 import { useWorkpaperScaffold } from '@/components/workpaper/composables/useWorkpaperScaffold'
 
 // ─── Types ───
@@ -493,18 +493,13 @@ const activeSheetName = computed<string>({
       const exists = sheets.find(s => s.sheet_name === internalActiveSheetName.value)
       if (exists) return internalActiveSheetName.value
     }
-    // 否则匹配 initialSheet
+    // 否则匹配 initialSheet（三级匹配的单一真源 = resolveSheetNameByDeepLink）
     if (props.initialSheet) {
-      const target = props.initialSheet
-      const exact = sheets.find(s => s.sheet_name === target)
-        || sheets.find(s => normalizeSheetName(s.sheet_name) === normalizeSheetName(target))
-      if (exact) return exact.sheet_name
-      // 兜底：initialSheet 传的是底稿编码（如 K9-3/D4-4）时——来源底稿跳转仅有 wp_id+item_id
-      // 前缀编码、无法得知中文 sheet 全名——匹配名称以该编码结尾/包含该编码的 sheet。
-      // 仅在精确匹配失败时启用，附注等传全名的调用方不受影响（精确恒先命中）。
-      const byCode = sheets.find(s => s.sheet_name.endsWith(target))
-        || sheets.find(s => s.sheet_name.includes(target))
-      if (byCode) return byCode.sheet_name
+      const hit = resolveSheetNameByDeepLink(
+        sheets.map(s => s.sheet_name),
+        props.initialSheet,
+      )
+      if (hit) return hit
     }
     // 兜底：第一个非 skip 的 sheet
     return visibleSheets.value[0]?.sheet_name ?? sheets[0].sheet_name
@@ -756,6 +751,12 @@ const preparationYear = computed(() => {
 const runtimeProjectId = computed(() => renderConfig.value?.project_id ?? '')
 const runtimeWpCode = computed(() => renderConfig.value?.wp_code ?? '')
 const runtimeContextReady = computed(() => !loading.value && (!!renderConfig.value || !!error.value))
+// 适用准则：后端 wp_render_config Step 9.5 在响应顶层统一注入（逐 sheet 的
+// html_data.project_context 同值）。交给 scaffold provide，宿主经
+// useHostApplicableStandards 取用，不再各写一份取值链。
+const runtimeApplicableStandards = computed<unknown>(
+  () => (renderConfig.value as any)?.applicable_standards,
+)
 const runtime = useWorkpaperScaffold({
   wpId: wpIdRef,
   projectId: runtimeProjectId,
@@ -765,6 +766,7 @@ const runtime = useWorkpaperScaffold({
   onJumpToSection: onChildNavigateSheet,
   reloadFn: reload,
   contextReady: runtimeContextReady,
+  applicableStandards: runtimeApplicableStandards,
 })
 
 // 外层编辑器的版本按钮委托给 Runtime Boundary，避免同一 HTML 底稿挂载第二个版本 Host。
@@ -1016,11 +1018,12 @@ function onJumpToReference(refCode: string) {
 function onJumpToSection(sheetName: string) {
   // B-Index 架构图节点点击 → 切换到对应 sheet（同底稿内 sheet 切换）
   if (!sheetName || !renderConfig.value) return
-  const exists = renderConfig.value.sheets?.find(
-    s => s.sheet_name === sheetName || normalizeSheetName(s.sheet_name) === normalizeSheetName(sheetName)
+  const hit = resolveSheetNameByDeepLink(
+    (renderConfig.value.sheets ?? []).map(s => s.sheet_name),
+    sheetName,
   )
-  if (exists) {
-    activeSheetName.value = exists.sheet_name
+  if (hit) {
+    activeSheetName.value = hit
   } else {
     ElMessage.info('未找到对应底稿 sheet')
   }
@@ -1057,12 +1060,12 @@ function onSwitchNavigate(sheetName: string) {
 /** 子组件 emit navigate-sheet → 切换当前 active tab 到目标 sheet */
 function onChildNavigateSheet(sheetName: string) {
   if (!sheetName) return
-  // 尝试精确匹配 + 归一化兜底
-  const exists = renderConfig.value?.sheets?.find(
-    s => s.sheet_name.includes(sheetName) || normalizeSheetName(s.sheet_name).includes(normalizeSheetName(sheetName))
+  const hit = resolveSheetNameByDeepLink(
+    (renderConfig.value?.sheets ?? []).map(s => s.sheet_name),
+    sheetName,
   )
-  if (exists) {
-    activeSheetName.value = exists.sheet_name
+  if (hit) {
+    activeSheetName.value = hit
   } else {
     ElMessage.info(`未找到 sheet「${sheetName}」`)
   }

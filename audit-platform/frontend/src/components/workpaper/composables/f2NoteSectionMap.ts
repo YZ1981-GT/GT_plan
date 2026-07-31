@@ -20,6 +20,32 @@ export const F2_DISCLOSURE_SHEET_NAME = {
   soe: '附注披露信息（国企）',
 } as const satisfies Record<F2DisclosureVariant, string>
 
+/**
+ * 子表名 ↔ note_template `tables[].name` 逐字映射。
+ *
+ * 🔴 每个值必须与模板 `tables[].name` 完全一致，否则同步出孤儿子表
+ * （附注 TAB 永空 + 底稿数据丢失）。守卫 = `f2NoteSubtableContract.spec.ts`。
+ */
+export const F2_LISTED_SUBTABLE = {
+  classification: '存货分类',
+  movement: '存货跌价准备及合同履约成本减值准备',
+  movementQual: '存货跌价准备及合同履约成本减值准备（续）',
+  portfolioEnd: '按组合计提存货跌价准备',
+  portfolioPrior: '按组合计提存货跌价准备（续）',
+  agingEnd: '按库龄组合计提存货跌价准备',
+  agingPrior: '按库龄组合计提存货跌价准备（续）',
+  devCost: '开发成本',
+  devProduct: '开发产品',
+  turnoverHousing: '周转房',
+  dataResource: '确认为存货的数据资源',
+} as const
+
+export const F2_SOE_SUBTABLE = {
+  classification: '存货分类',
+  movement: '存货跌价准备及合同履约成本减值准备',
+  dataResource: '确认为存货的数据资源',
+} as const
+
 /** 存货科目 1401–1412（与审定取数口径一致） */
 export const F2_INVENTORY_ACCOUNT_CODES: readonly string[] = Array.from(
   { length: 12 },

@@ -21,3 +21,36 @@ export function normalizeSheetName(name: string): string {
     // trim 首尾空白
     .trim()
 }
+
+/**
+ * 深链 `?sheet=` → 实际 sheet_name 解析（纯函数，供 `GtWpRenderer` 与守卫共用）。
+ *
+ * 三级匹配，逐级放宽：
+ * 1. 原样精确相等
+ * 2. `normalizeSheetName` 归一后相等（吸收全/半角括号与空白差异）
+ * 3. **归一后**的后缀 / 包含匹配 —— 覆盖两类调用方：
+ *    - 来源底稿跳转只知底稿编码（`K9-3` / `D4-4`），不知中文 sheet 全名
+ *    - 🔴 附注「打开同步底稿」传的是**源 xlsx tab 名**（`附注披露信息(上市公司）`），
+ *      而 render-config 下发的 `sheet_name` 带科目前缀
+ *      （`合同资产附注披露信息（上市公司）`）→ 两者既差前缀又差括号宽度。
+ *      此前第 3 级用**未归一**的原串做 `endsWith/includes`，全角左括号 vs 半角左括号
+ *      直接落空 → 深链回退到「底稿目录」（D6/D7 实测中招）。
+ *
+ * @returns 命中的 `sheet_name`（原样），未命中返回 `null`
+ */
+export function resolveSheetNameByDeepLink(
+  sheetNames: readonly string[],
+  target: string | null | undefined,
+): string | null {
+  const want = String(target ?? '')
+  if (!want) return null
+  const exact = sheetNames.find((n) => n === want)
+  if (exact !== undefined) return exact
+  const normWant = normalizeSheetName(want)
+  const normHit = sheetNames.find((n) => normalizeSheetName(n) === normWant)
+  if (normHit !== undefined) return normHit
+  const suffix = sheetNames.find((n) => normalizeSheetName(n).endsWith(normWant))
+  if (suffix !== undefined) return suffix
+  const contains = sheetNames.find((n) => normalizeSheetName(n).includes(normWant))
+  return contains ?? null
+}

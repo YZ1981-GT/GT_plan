@@ -50,7 +50,7 @@ const {
   isApplicable,
   section1Rows, section1Total,
   section2Rows, section2Total, section2QualRows,
-  s3EndRows, s3EndTotal, s3PriorRows, s3PriorTotal,
+  s3EndRows, s3EndTotal, s3PriorRows, s3PriorTotal, s3Mode, setS3Mode,
   s5Rows, s5Total, s6Rows, s6Total, s7Rows, s7Total,
   drRows, drIsEmpty, drTieFailures,
   noteCategory, noteNrv, noteProvision, s4BorrowText, s4AmortText, noteRe,
@@ -141,7 +141,7 @@ onBeforeUnmount(() => autoSync.cancelPending())
 watch(
   [
     section1Rows, section2Rows, section2QualRows,
-    s3EndRows, s3PriorRows, s5Rows, s6Rows, s7Rows, drRows,
+    s3EndRows, s3PriorRows, s3Mode, s5Rows, s6Rows, s7Rows, drRows,
     noteCategory, noteNrv, noteProvision, s4BorrowText, s4AmortText, noteRe,
   ],
   () => { autoSync.scheduleAutoSync(syncToDisclosureNotes) },
@@ -457,14 +457,30 @@ async function syncToDisclosureNotes(): Promise<void> {
         </div>
       </div>
 
-      <!-- (3) 按组合计提 -->
+      <!-- (3) 按组合计提 / 按库龄组合计提（源模板「或：」二选一） -->
       <div class="disclosure-card">
         <h4 class="card-title">
-          (3) 按组合计提存货跌价准备
+          (3) {{ s3Mode === 'aging' ? '按库龄组合计提存货跌价准备' : '按组合计提存货跌价准备' }}
+          <el-radio-group
+            :model-value="s3Mode"
+            size="small"
+            :disabled="isReadonly"
+            @change="(v: any) => setS3Mode(v)"
+          >
+            <el-radio-button value="portfolio">按组合</el-radio-button>
+            <el-radio-button value="aging">按库龄组合</el-radio-button>
+          </el-radio-group>
           <el-button size="small" :disabled="isReadonly" @click="addS3Row('end')">+ 期末组合</el-button>
         </h4>
         <p class="hint-text">15号文第十九条（六）：按组合计提的，应分类披露不同组合存货的期初/期末余额及跌价准备、计提标准和比例。</p>
-        <h5 class="sub-title">期末余额</h5>
+        <p class="hint-text">
+          源模板中「按组合」与「按库龄组合」是「或」的关系（二选一）：按实际计提方式选择，
+          同步到附注时只推送所选的那一组，另一组会从附注中移除，避免留下空表。
+          <template v-if="s3Mode === 'aging'">
+            按库龄组合还需按 15 号文第十六条（十二）说明各库龄组合可变现净值的计算方法与确定依据。
+          </template>
+        </p>
+        <h5 class="sub-title">{{ s3Mode === 'aging' ? '期末余额（库龄组合）' : '期末余额' }}</h5>
         <el-table :data="[...s3EndRows, s3EndTotal]" size="small" border stripe style="width:100%">
           <el-table-column label="组合" min-width="140">
             <template #default="{ row }">
@@ -474,6 +490,7 @@ async function syncToDisclosureNotes(): Promise<void> {
                 :model-value="row.groupName"
                 size="small"
                 :disabled="isReadonly"
+                :placeholder="s3Mode === 'aging' ? '库龄段，如 1年以内' : '组合名称'"
                 @change="(v: string) => updateS3Row('end', row.rowId, 'groupName', v)"
               />
             </template>
@@ -551,7 +568,7 @@ async function syncToDisclosureNotes(): Promise<void> {
         </el-table>
 
         <h5 class="sub-title">
-          上年年末余额
+          {{ s3Mode === 'aging' ? '上年年末余额（库龄组合）' : '上年年末余额' }}
           <el-button size="small" :disabled="isReadonly" @click="addS3Row('prior')">+ 上年组合</el-button>
         </h5>
         <el-table :data="[...s3PriorRows, s3PriorTotal]" size="small" border stripe style="width:100%">
@@ -563,6 +580,7 @@ async function syncToDisclosureNotes(): Promise<void> {
                 :model-value="row.groupName"
                 size="small"
                 :disabled="isReadonly"
+                :placeholder="s3Mode === 'aging' ? '库龄段，如 1年以内' : '组合名称'"
                 @change="(v: string) => updateS3Row('prior', row.rowId, 'groupName', v)"
               />
             </template>

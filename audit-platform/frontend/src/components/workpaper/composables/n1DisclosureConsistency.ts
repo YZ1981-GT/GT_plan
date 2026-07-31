@@ -22,25 +22,24 @@
  * spec: .kiro/specs/n1-deferred-tax-disclosure-template-alignment/ R3
  */
 import type { N1DisclosureVariant, NullableAmount } from './n1NoteSectionMap'
+import {
+  WP_CHECK_TOLERANCE,
+  eqCheck as sharedEqCheck,
+  segmentSumCheck,
+  sumNullable,
+  summarizeChecks,
+  type WpCheckLevel,
+  type WpCheckResult,
+} from './shared/disclosureConsistency'
 
-/** 金额比较容差（元） */
-export const N1_CHECK_TOLERANCE = 0.01
+/**
+ * 金额比较容差（元）。
+ * 共用原语在 `shared/disclosureConsistency.ts`；此处保留 N1 名以免既有引用 churn。
+ */
+export const N1_CHECK_TOLERANCE = WP_CHECK_TOLERANCE
 
-export type N1CheckLevel = 'ok' | 'warn' | 'error' | 'skip'
-
-export interface N1CheckResult {
-  /** 规则短名（展示用） */
-  label: string
-  /** 规则说明（tooltip，含源模板公式出处） */
-  rule: string
-  left: NullableAmount
-  right: NullableAmount
-  /** left − right；任一侧 null 时为 null */
-  diff: NullableAmount
-  level: N1CheckLevel
-  /** 追溯索引（`GtIndexChip` 用） */
-  refs?: string[]
-}
+export type N1CheckLevel = WpCheckLevel
+export type N1CheckResult = WpCheckResult
 
 // ─── 输入 ────────────────────────────────────────────────────────────────────
 
@@ -80,45 +79,10 @@ export interface N1ConsistencyInput {
   }
 }
 
-// ─── 内部工具 ────────────────────────────────────────────────────────────────
+// ─── 内部工具（委托共用原语，保留 N1 名以免既有引用 churn）───────────────────
 
-function sumNullable(vals: readonly NullableAmount[]): NullableAmount {
-  let has = false
-  let total = 0
-  for (const v of vals) {
-    if (v === null || v === undefined || !Number.isFinite(v)) continue
-    has = true
-    total += v
-  }
-  return has ? Math.round(total * 100) / 100 : null
-}
-
-/**
- * 相等类校验。任一侧 `null` → skip（未取到不报错）。
- *
- * 两侧同为 `null` 也是 skip：此时"相等"不构成有效结论。
- */
-export function eqCheck(
-  label: string,
-  rule: string,
-  left: NullableAmount,
-  right: NullableAmount,
-  refs?: string[],
-): N1CheckResult {
-  if (left === null || left === undefined || right === null || right === undefined) {
-    return { label, rule, left: left ?? null, right: right ?? null, diff: null, level: 'skip', refs }
-  }
-  const diff = Math.round((left - right) * 100) / 100
-  return {
-    label,
-    rule,
-    left,
-    right,
-    diff,
-    level: Math.abs(diff) <= N1_CHECK_TOLERANCE ? 'ok' : 'error',
-    refs,
-  }
-}
+/** 相等类校验（容差 0.01 元；任一侧 null → skip） */
+export const eqCheck = sharedEqCheck
 
 function segmentCheck(
   label: string,
@@ -127,9 +91,7 @@ function segmentCheck(
   refs?: string[],
 ): N1CheckResult | null {
   if (!seg) return null
-  // 段内无明细行时不校验（空段的小计可能来自跨底稿取数，不是"明细之和"）
-  if (seg.details.length === 0) return null
-  return eqCheck(label, rule, seg.subtotal, sumNullable(seg.details), refs)
+  return segmentSumCheck(label, rule, seg.details, seg.subtotal, refs)
 }
 
 // ─── 主入口 ──────────────────────────────────────────────────────────────────
@@ -250,19 +212,7 @@ export function runN1DisclosureChecks(
   return out.filter((r): r is N1CheckResult => r !== null)
 }
 
-/** 汇总：用于紧凑 bar 展示 */
-export interface N1CheckSummary {
-  total: number
-  ok: number
-  error: number
-  skip: number
-  /** 全部为 ok（且至少 1 条）→ true */
-  allPassed: boolean
-}
+/** 汇总：用于紧凑 bar 展示（委托共用原语） */
+export type { WpCheckSummary as N1CheckSummary } from './shared/disclosureConsistency'
 
-export function summarizeN1Checks(results: readonly N1CheckResult[]): N1CheckSummary {
-  const ok = results.filter((r) => r.level === 'ok').length
-  const error = results.filter((r) => r.level === 'error').length
-  const skip = results.filter((r) => r.level === 'skip' || r.level === 'warn').length
-  return { total: results.length, ok, error, skip, allPassed: error === 0 && ok > 0 }
-}
+export const summarizeN1Checks = summarizeChecks

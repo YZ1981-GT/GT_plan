@@ -48,6 +48,7 @@ const {
   drRows, drIsEmpty, drTieFailures,
   noteCategory, s3BorrowText, s4AmortText, noteText, landNote,
   dataUpdatedVisible,
+  isManualClassRow, updateS1Field,
   updateS2Field,
   updateDrCell,
   getSyncSnapshot,
@@ -238,12 +239,26 @@ async function syncToDisclosureNotes(): Promise<void> {
           <el-table-column label="期末数" align="center">
             <el-table-column label="账面余额" min-width="120" align="right">
               <template #default="{ row }">
-                <span class="cross-sheet-cell">{{ fmtAmount(row.endGross) }}</span>
+                <WpAmountInput
+                  v-if="isManualClassRow(row.rowKey)"
+                  :model-value="row.endGross"
+                  :disabled="isReadonly"
+                  :aria-label="`${row.label} 期末账面余额`"
+                  @change="(v: number) => updateS1Field(row.rowKey, 'endGross', v)"
+                />
+                <span v-else class="cross-sheet-cell">{{ fmtAmount(row.endGross) }}</span>
               </template>
             </el-table-column>
             <el-table-column label="跌价准备/合同履约成本减值准备" min-width="150" align="right">
               <template #default="{ row }">
-                <span class="cross-sheet-cell">{{ fmtAmount(row.endImpairment) }}</span>
+                <WpAmountInput
+                  v-if="isManualClassRow(row.rowKey)"
+                  :model-value="row.endImpairment"
+                  :disabled="isReadonly"
+                  :aria-label="`${row.label} 期末跌价准备`"
+                  @change="(v: number) => updateS1Field(row.rowKey, 'endImpairment', v)"
+                />
+                <span v-else class="cross-sheet-cell">{{ fmtAmount(row.endImpairment) }}</span>
               </template>
             </el-table-column>
             <el-table-column label="账面价值" min-width="120" align="right">
@@ -255,12 +270,26 @@ async function syncToDisclosureNotes(): Promise<void> {
           <el-table-column label="期初数" align="center">
             <el-table-column label="账面余额" min-width="120" align="right">
               <template #default="{ row }">
-                <span class="cross-sheet-cell">{{ fmtAmount(row.priorGross) }}</span>
+                <WpAmountInput
+                  v-if="isManualClassRow(row.rowKey)"
+                  :model-value="row.priorGross"
+                  :disabled="isReadonly"
+                  :aria-label="`${row.label} 期初账面余额`"
+                  @change="(v: number) => updateS1Field(row.rowKey, 'priorGross', v)"
+                />
+                <span v-else class="cross-sheet-cell">{{ fmtAmount(row.priorGross) }}</span>
               </template>
             </el-table-column>
             <el-table-column label="跌价准备/合同履约成本减值准备" min-width="150" align="right">
               <template #default="{ row }">
-                <span class="cross-sheet-cell">{{ fmtAmount(row.priorImpairment) }}</span>
+                <WpAmountInput
+                  v-if="isManualClassRow(row.rowKey)"
+                  :model-value="row.priorImpairment"
+                  :disabled="isReadonly"
+                  :aria-label="`${row.label} 期初跌价准备`"
+                  @change="(v: number) => updateS1Field(row.rowKey, 'priorImpairment', v)"
+                />
+                <span v-else class="cross-sheet-cell">{{ fmtAmount(row.priorImpairment) }}</span>
               </template>
             </el-table-column>
             <el-table-column label="账面价值" min-width="120" align="right">
@@ -270,7 +299,12 @@ async function syncToDisclosureNotes(): Promise<void> {
             </el-table-column>
           </el-table-column>
         </el-table>
-        <p class="hint-text">注：房地产开发企业应在「其他」中披露土地储备的面积、本期增加及期末余额等情况。</p>
+        <p class="hint-text">
+          注：房地产开发企业应在「其他」中披露土地储备的面积、本期增加及期末余额等情况。
+          「其他」与「其中：尚未开发的土地储备」两行无对应存货科目，账面余额与跌价准备可手工录入；
+          「数据资源」行自 (5) 数据资源表联动；其余行自 F2-1 审定表跨表取数（只读）。
+          账面价值恒为「账面余额 − 跌价准备」派生值。
+        </p>
         <div class="note-block">
           <div class="note-label">
             <span>土地储备说明</span>

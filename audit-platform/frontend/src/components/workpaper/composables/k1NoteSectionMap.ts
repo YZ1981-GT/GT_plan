@@ -13,8 +13,16 @@ export const K1_NOTE_SECTION = {
   soe: '八、9',
 } as const satisfies Record<K1DisclosureVariant, string>
 
+/**
+ * 同步载荷 `sheet_name` = 源 xlsx 真实中文 tab 名（逐字，openpyxl 实测 `wb.sheetnames`）。
+ *
+ * 🔴 上市侧是**前半角后全角**括号 `(上市公司）`，源模板 `K1 其他应收款.xlsx` 即如此。
+ * 原先写成全角全角 → 附注「打开同步底稿」的 `?sheet=` 精确匹配落空。
+ * `disclosureSheetNameRegistry.spec.ts` 只比对「常量 ↔ registry（由常量生成）」，
+ * **查不出与 xlsx 的漂移** → 守卫改用 openpyxl 直读（`test_note_k_sheet_names.py`）。
+ */
 export const K1_DISCLOSURE_SHEET_NAME = {
-  listed: '附注披露信息（上市公司）',
+  listed: '附注披露信息(上市公司）',
   soe: '附注披露信息（国企）',
 } as const satisfies Record<K1DisclosureVariant, string>
 
@@ -46,7 +54,12 @@ export const K1_LISTED_SUBTABLE = {
 export const K1_SOE_SUBTABLE = {
   aging: '按账龄披露其他应收款项',
   methodEnd: '按坏账准备计提方法分类披露其他应收款项',
-  methodPrior: '续：',
+  /**
+   * 🔴 原为**裸续表名** `续：`（源 xlsx A27 就是这两个字）——裸续表名跨章节撞键，
+   * 且附注 TAB 只显示「续：」看不出续的是哪张表。已由
+   * `fix_note_k_complex_structure.py` 正名，改这里必须与模板同步（否则立刻孤儿表）。
+   */
+  methodPrior: '按坏账准备计提方法分类披露其他应收款项（续：期初余额）',
   individualDetail: '单项计提坏账准备的其他应收款项',
   portfolioAging: '账龄组合',
   portfolioOther: '采用余额百分比法或其他组合方法计提坏账准备的其他应收款项',

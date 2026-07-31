@@ -230,6 +230,12 @@ const noteSectionId = H8_NOTE_SECTION.listed
 const isSyncing = ref(false)
 const movementRowDefs = H8_LISTED_MOVEMENT_ROWS
 
+// 🔴 `useAuditContext()` 内部用 `useRoute()`（inject）+ `onScopeDispose()`，**只能在
+// setup 顶层同步调用**。历史实现写在 `checkNoteConsistency()` 函数体里 → 点击时 inject
+// 拿不到 route → `route.params` 上 TypeError → 被 catch 吞成 `noteCheckState='error'`，
+// 「校对附注」永远报错（J1 同款缺陷 2026-07-30 实测确认，vitest 与 get_diagnostics 查不出）。
+const { year: auditYear } = useAuditContext()
+
 const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 onBeforeUnmount(() => autoSync.cancelPending())
 
@@ -337,7 +343,6 @@ async function checkNoteConsistency(silent = false) {
   if (!props.projectId) return
   noteCheckState.value = 'loading'
   try {
-    const { year: auditYear } = useAuditContext()
     const year = auditYear.value || new Date().getFullYear()
     const res: any = await api.get(
       `/api/disclosure-notes/${props.projectId}/${year}/${noteSectionId}`,

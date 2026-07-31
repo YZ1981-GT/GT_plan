@@ -984,7 +984,7 @@
  * （R6 账龄 → R160 继续涉入说明）+ note_template_listed §五、8。
  * spec: k1-other-receivable-disclosure-alignment Sprint 4
  */
-import { computed, inject, ref, toRef, onBeforeUnmount } from 'vue'
+import { computed, inject, ref, toRef, onBeforeUnmount, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
@@ -1189,8 +1189,31 @@ const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 
 async function syncToDisclosureNotes() {
   await disc.syncToNotes()
-  autoSync.scheduleAutoSync(syncToDisclosureNotes)
 }
+
+// [auto-sync] 监听实际数据（历史实现是 syncToDisclosureNotes 里调度自己 → 800ms 周期无限 POST，
+// 且让 disclosureAutoSyncCoverage 守卫误判为「已接自动同步」= 假接入）。
+// 🔴 不加 `_xxxMounted` 一次性防护：Vue watch 默认 immediate:false，挂载本身不触发；
+//    该防护会吞掉「切走再切回后的第一次编辑」（平台铁律）。
+watch(
+  [
+    () => disc.agingRows,
+    () => disc.natureRows,
+    () => disc.stage1Rows,
+    () => disc.stage2Rows,
+    () => disc.stage3Rows,
+    () => disc.priorStage1Rows,
+    () => disc.priorStage2Rows,
+    () => disc.priorStage3Rows,
+    () => disc.stageMovements,
+    () => disc.top5Rows,
+    () => disc.reversalRows,
+    () => disc.continuedInvolvementRows,
+    () => disc.noteText,
+  ],
+  () => autoSync.scheduleAutoSync(syncToDisclosureNotes),
+  { deep: true },
+)
 
 onBeforeUnmount(() => autoSync.cancelPending())
 </script>

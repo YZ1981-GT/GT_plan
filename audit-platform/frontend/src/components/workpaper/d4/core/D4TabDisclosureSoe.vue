@@ -34,14 +34,40 @@ const openReviewDialog = inject<((sectionId: string) => void) | null>('openRevie
 
 // ─── Debounced batch save ──────────────────────────────────────────────────
 const pendingItems = ref<any[]>([])
+
+/**
+ * 🔴 同一批次不得重复提交相同 `item_id` —— 后端会**整批拒绝**，该批全部数据丢失。
+ *
+ * 披露表把每张动态表整表存成一个 JSON item，2 秒防抖窗口内改同一张表两个格子
+ * 就必然产生两条同 id 记录。D1 已浏览器实测中招（界面有值但库里根本没有这个键）。
+ * 按 item_id 去重，**后写覆盖先写**（累积顺序即时间顺序，最后一条是最新整表快照）。
+ *
+ * 守卫：`__tests__/disclosureSaveBatchDedupe.spec.ts`
+ */
+function dedupeByItemId(items: any[]): any[] {
+  const byId = new Map<string, any>()
+  for (const it of items) {
+    const key = String(it?.item_id ?? '')
+    if (!key) continue
+    byId.set(key, it)
+  }
+  return [...byId.values()]
+}
+
 const debouncedFlush = useDebounceFn(async () => {
   if (pendingItems.value.length === 0) return
-  const items = [...pendingItems.value]
+  const items = dedupeByItemId(pendingItems.value)
   pendingItems.value = []
+  if (items.length === 0) return
   try {
     await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, { items }, { _silent: true } as any)
     autoSync.scheduleAutoSync(syncToDisclosureNotes)
-  } catch { /* silent */ }
+  } catch (err) {
+    // 保存失败必须让用户知道（旧实现完全静默 → 数据丢了没人发现）
+    ElMessage.warning('披露表保存失败，请检查网络后重新编辑该单元格')
+    // eslint-disable-next-line no-console
+    console.error('[D4Disclosure] checklist-responses 保存失败', err)
+  }
 }, 2000)
 
 function saveBatch(items: any[]) {

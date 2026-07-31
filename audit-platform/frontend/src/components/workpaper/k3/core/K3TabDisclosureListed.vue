@@ -31,7 +31,7 @@
           <div class="section-title-row">
             <span class="section-title">{{ section.title }}</span>
             <div class="title-actions">
-              <el-button v-if="section.hasTextArea" size="small" type="primary" link :disabled="isReadonly" @click="handleAiGenerate(sIdx)">
+              <el-button v-if="section.hasTextArea" size="small" type="primary" link :loading="aiLoading === sIdx" :disabled="isReadonly" @click="handleAiGenerate(sIdx)">
                 <el-icon><MagicStick /></el-icon> AI生成
               </el-button>
               <el-button size="small" type="default" link @click="handleReview(`disc-listed-${section.id}`)">💬</el-button>
@@ -49,19 +49,30 @@
           :max-height="section.rows.length > 30 ? 480 : undefined"
           class="disclosure-table"
         >
-          <el-table-column prop="item" label="项目" min-width="160" fixed />
-          <el-table-column label="期末余额" width="120" align="right">
+          <el-table-column prop="item" :label="section.labelHeader || '项目'" min-width="160" fixed>
+            <template #default="{ row }">
+              <span v-if="row.isFormula || !section.editableLabel">{{ row.item }}</span>
+              <el-input
+                v-else
+                :model-value="row.item"
+                size="small"
+                :disabled="isReadonly"
+                @change="(v: string) => handleCellEdit(sIdx, row.rowIdx, 'item', v)"
+              />
+            </template>
+          </el-table-column>
+          <el-table-column :label="section.amountHeader || '期末余额'" width="140" align="right">
             <template #default="{ row }">
               <template v-if="!isReadonly && !row.isAutoFilled">
-                <el-input-number :model-value="row.endBalance" :controls="false" size="small" @change="(v: number) => handleCellEdit(sIdx, row.rowIdx, 'endBalance', v)" />
+                <WpAmountInput :model-value="row.endBalance" @change="(v: number) => handleCellEdit(sIdx, row.rowIdx, 'endBalance', v)" />
               </template>
               <span v-else :class="{ 'formula-cell': row.isFormula, 'auto-fill': row.isAutoFilled }">{{ fmtAmt(row.endBalance) }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="期初余额" width="120" align="right">
+          <el-table-column v-if="!section.hidePriorColumn" label="期初余额" width="140" align="right">
             <template #default="{ row }">
               <template v-if="!isReadonly && !row.isAutoFilled">
-                <el-input-number :model-value="row.beginBalance" :controls="false" size="small" @change="(v: number) => handleCellEdit(sIdx, row.rowIdx, 'beginBalance', v)" />
+                <WpAmountInput :model-value="row.beginBalance" @change="(v: number) => handleCellEdit(sIdx, row.rowIdx, 'beginBalance', v)" />
               </template>
               <span v-else :class="{ 'auto-fill': row.isAutoFilled }">{{ fmtAmt(row.beginBalance) }}</span>
             </template>
@@ -77,7 +88,7 @@
             >
               <template #default="{ row }">
                 <template v-if="!isReadonly && !row.isAutoFilled">
-                  <el-input-number :model-value="row.agingData?.[band.key] ?? 0" :controls="false" size="small" @change="(v: number) => handleAgingCellEdit(sIdx, row.rowIdx, band.key, v)" />
+                  <WpAmountInput :model-value="row.agingData?.[band.key] ?? 0" @change="(v: number) => handleAgingCellEdit(sIdx, row.rowIdx, band.key, v)" />
                 </template>
                 <span v-else :class="{ 'over3y-highlight': band.key !== 'within1' && band.key !== 'y1to2' && band.key !== 'y2to3' && (row.agingData?.[band.key] || 0) > 0 }">{{ fmtAmt(row.agingData?.[band.key]) }}</span>
               </template>
@@ -89,7 +100,7 @@
               <span class="formula-cell" title="占比=本项/合计">{{ row.proportion != null ? row.proportion.toFixed(2) : '-' }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="备注" min-width="100">
+          <el-table-column :label="section.remarkHeader || '备注'" min-width="160">
             <template #default="{ row }">
               <el-input v-if="!isReadonly" :model-value="row.remark" size="small" @change="(v: string) => handleCellEdit(sIdx, row.rowIdx, 'remark', v)" />
               <span v-else>{{ row.remark || '-' }}</span>
@@ -148,8 +159,14 @@ import { MagicStick } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
 import { useAgingConfig, type AgingBand } from '@/composables/useAgingConfig'
+import { fmtAmount } from '@/utils/formatters'
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
-import { buildK3SyncPayload } from '../../composables/k3NoteSectionMap'
+import {
+  K3_DIVIDEND_ROWS,
+  K3_INTEREST_ROWS,
+  buildK3SyncPayload,
+} from '../../composables/k3NoteSectionMap'
 
 const K3_ACCOUNT_CODE = '2241'
 
@@ -193,6 +210,18 @@ interface DisclosureSection {
   hasAgingColumns: boolean
   hasProportion: boolean
   textContent: string
+  /** 附注该表只有「金额 + 原因」两列（逾期利息 / 超1年未付股利 / 账龄超1年）→ 隐藏期初列 */
+  hidePriorColumn?: boolean
+  /** 标签列列头（默认「项目」），逐字取自附注模版 headers[0] */
+  labelHeader?: string
+  /** 金额列列头（默认「期末余额」） */
+  amountHeader?: string
+  /** 备注列列头（默认「备注」）；条件表用于承载附注的「原因」列 */
+  remarkHeader?: string
+  /** 该段是否推送到附注（底稿侧审计分析段不推，附注 §五、42 无对应表） */
+  syncedToNote: boolean
+  /** 行名可由用户填写（单位名称 / 股东名称等明细表） */
+  editableLabel?: boolean
 }
 
 // ═══ 构建45行分配到5个section ═══
@@ -219,15 +248,96 @@ function buildSections(): DisclosureSection[] {
   topFiveRows.push(makeRow('小计', 5, { isFormula: true }))
 
   // (四) 重要长期未支付款项
-  const longTermItems = ['项目1', '项目2', '项目3', '项目4', '项目5', '小计']
-  const longTermRows = longTermItems.map((item, i) => makeRow(item, i, { isFormula: item === '小计' }))
+  // 账龄超过1年的重要其他应付款：行名由用户填（单位/项目名称），预置空行骨架 —— 预置
+  // `项目1..5` 会被当真数据推给附注，渲染成占位披露行
+  const longTermRows: DisclosureRow[] = Array.from({ length: 5 }, (_, i) => makeRow('', i))
+  longTermRows.push(makeRow('小计', 5, { isFormula: true }))
+
+  // 附注 §五、42 表 2「应付利息」固定行（逐字取自 note_template_listed）
+  const interestRows = [...K3_INTEREST_ROWS.listed, '合计'].map((item, i) =>
+    makeRow(item, i, { isFormula: item === '合计' }),
+  )
+  // 表 3「重要的逾期未付利息」——行名=借款单位，金额+逾期原因
+  const interestOverdueRows: DisclosureRow[] = Array.from({ length: 3 }, (_, i) => makeRow('', i))
+  // 表 4「应付股利」固定行
+  const dividendRows = [...K3_DIVIDEND_ROWS.listed, '合计'].map((item, i) =>
+    makeRow(item, i, { isFormula: item === '合计' }),
+  )
+  // 表 5「重要的超过1年未支付的应付股利」——行名=股东名称，金额+未支付原因
+  const dividendOverdueRows: DisclosureRow[] = Array.from({ length: 3 }, (_, i) => makeRow('', i))
 
   return [
-    { id: 'nature', title: '（一）按款项性质分类', rows: natureRows, hasTextArea: true, hasAgingColumns: false, hasProportion: true, textContent: '' },
-    { id: 'aging', title: '（二）按账龄分析', rows: agingRows, hasTextArea: true, hasAgingColumns: true, hasProportion: true, textContent: '' },
-    { id: 'top-five', title: '（三）期末余额前五名的其他应付款', rows: topFiveRows, hasTextArea: true, hasAgingColumns: false, hasProportion: true, textContent: '' },
-    { id: 'long-term', title: '（四）重要的长期未支付款项', rows: longTermRows, hasTextArea: true, hasAgingColumns: false, hasProportion: false, textContent: '' },
-    { id: 'other', title: '（五）其他披露事项', rows: [], hasTextArea: true, hasAgingColumns: false, hasProportion: false, textContent: '' },
+    {
+      id: 'interest',
+      title: '（一）应付利息',
+      rows: interestRows,
+      hasTextArea: true, hasAgingColumns: false, hasProportion: false, textContent: '',
+      syncedToNote: true,
+    },
+    {
+      id: 'interest-overdue',
+      title: '（二）重要的逾期未付利息',
+      rows: interestOverdueRows,
+      hasTextArea: true, hasAgingColumns: false, hasProportion: false, textContent: '',
+      syncedToNote: true,
+      hidePriorColumn: true, editableLabel: true,
+      labelHeader: '借款单位', amountHeader: '逾期金额', remarkHeader: '逾期原因',
+    },
+    {
+      id: 'dividend',
+      title: '（三）应付股利',
+      rows: dividendRows,
+      hasTextArea: true, hasAgingColumns: false, hasProportion: false, textContent: '',
+      syncedToNote: true,
+      labelHeader: '项目（或股东名称）',
+    },
+    {
+      id: 'dividend-overdue',
+      title: '（四）重要的超过1年未支付的应付股利',
+      rows: dividendOverdueRows,
+      hasTextArea: true, hasAgingColumns: false, hasProportion: false, textContent: '',
+      syncedToNote: true,
+      hidePriorColumn: true, editableLabel: true,
+      labelHeader: '股东名称', amountHeader: '应付股利金额', remarkHeader: '未支付原因',
+    },
+    {
+      id: 'nature',
+      title: '（五）其他应付款（按款项性质列示）',
+      rows: natureRows,
+      hasTextArea: true, hasAgingColumns: false, hasProportion: true, textContent: '',
+      syncedToNote: true,
+    },
+    {
+      id: 'long-term',
+      title: '（六）其中，账龄超过1年的重要其他应付款',
+      rows: longTermRows,
+      hasTextArea: true, hasAgingColumns: false, hasProportion: false, textContent: '',
+      syncedToNote: true,
+      hidePriorColumn: true, editableLabel: true,
+      remarkHeader: '未偿还或未结转的原因',
+    },
+    // ↓ 底稿侧审计分析段：附注 §五、42 无对应表，不推送（推了会造孤儿表）
+    {
+      id: 'aging',
+      title: '（七）按账龄分析（底稿分析，不进附注）',
+      rows: agingRows,
+      hasTextArea: true, hasAgingColumns: true, hasProportion: true, textContent: '',
+      syncedToNote: false,
+    },
+    {
+      id: 'top-five',
+      title: '（八）期末余额前五名的其他应付款（底稿分析，不进附注）',
+      rows: topFiveRows,
+      hasTextArea: true, hasAgingColumns: false, hasProportion: true, textContent: '',
+      syncedToNote: false, editableLabel: true,
+    },
+    {
+      id: 'other',
+      title: '（九）其他披露事项',
+      rows: [],
+      hasTextArea: true, hasAgingColumns: false, hasProportion: false, textContent: '',
+      syncedToNote: false,
+    },
   ]
 }
 
@@ -347,14 +457,34 @@ function publishNoteText(): void {
 }
 
 // ═══ AI辅助 ═══
+/** 正在生成的段索引（null = 空闲）——按段 loading，防同段重复提交 */
+const aiLoading = ref<number | null>(null)
+
 async function handleAiGenerate(sIdx: number): Promise<void> {
   const section = sections[sIdx]
-  if (!section) return
+  if (!section || props.isReadonly || aiLoading.value !== null) return
 
+  aiLoading.value = sIdx
   try {
     const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
-      prompt: `请生成其他应付款附注（上市公司格式）中"${section.title}"的披露文字说明`,
-      context: `科目:其他应付款(2241) 负债类 期末余额来自K3-1审定表 关注完整性认定`,
+      prompt:
+        `请依据致同 2025 修订版底稿 K3 源模板与上市公司附注模版（五、42 其他应付款）`
+        + `撰写"${section.title}"的披露文字说明：说明各项目的性质与构成、`
+        + `重要项目的形成原因、账龄超过 1 年仍未支付的原因，`
+        + `以及应付利息 / 应付股利中逾期未付部分的原因。`
+        + `口径依财会〔2018〕15 号文披露要求，关注负债完整性认定（易少计）。`
+        + `只能使用已提供的项目名称与金额，不得虚构往来单位、合同、诉讼或金额，`
+        + `无把握的内容留空由审计师补充。`,
+      // 🔴 `context` 必须是 dict[str,str]（后端 `AiGenerateTextRequest.context`），
+      // 传字符串会 422 → 被 catch 静默吞成「AI生成失败」。
+      context: {
+        科目: '2241 其他应付款（负债类）',
+        格式: '上市公司报表附注',
+        当前节: section.title,
+        本节行数: String(section.rows.length),
+        数据来源: '期末余额来自 K3-1 审定表',
+        关注认定: '完整性（负债易少计）',
+      },
       existingContent: section.textContent || '',
       section: section.id,
     })
@@ -369,15 +499,51 @@ async function handleAiGenerate(sIdx: number): Promise<void> {
     section.textContent = section.textContent ? `${section.textContent}\n${generated}` : generated
     handleNoteTextChange(sIdx)
     ElMessage.success('已填入AI生成内容')
-  } catch { /* cancelled or error */ }
+  } catch {
+    /* cancelled or error */
+  } finally {
+    aiLoading.value = null
+  }
 }
 
 // ═══ 持久化 ═══
 async function syncToDisclosureNotes(): Promise<void> {
   if (!props.projectId || props.isReadonly) return
-  const rows = sections.flatMap(s => s.rows.map(r => ({ project: r.item || '', endAmount: r.endBalance ?? 0, priorAmount: r.beginBalance ?? 0 })))
-  const narrative = sections.filter(s => s.textContent).map(s => s.textContent).join('\n\n')
-  const payload = buildK3SyncPayload('listed', props.wpId || '', rows, narrative)
+  // 🔴 只推 `syncedToNote` 段：「按账龄分析」「前五名」是底稿侧审计分析，
+  // 附注 §五、42 无对应表，推了会造孤儿表。
+  const sectionRows = (id: string) =>
+    (sections.find(s => s.id === id)?.rows ?? []).filter((r: any) => !r.isFormula)
+  const twoPeriod = (id: string) =>
+    sectionRows(id).map((r: any) => ({
+      project: r.item || '',
+      endAmount: r.endBalance ?? 0,
+      priorAmount: r.beginBalance ?? 0,
+    }))
+  const narrative = sections
+    .filter(s => s.textContent)
+    .map(s => `【${s.title}】\n${s.textContent}`)
+    .join('\n\n')
+  const payload = buildK3SyncPayload('listed', props.wpId || '', {
+    byNature: twoPeriod('nature'),
+    interest: twoPeriod('interest'),
+    dividend: twoPeriod('dividend'),
+    interestOverdue: sectionRows('interest-overdue').map((r: any) => ({
+      unit: r.item || '',
+      amount: r.endBalance ?? 0,
+      reason: r.remark || '',
+    })),
+    dividendOverdue: sectionRows('dividend-overdue').map((r: any) => ({
+      shareholder: r.item || '',
+      amount: r.endBalance ?? 0,
+      reason: r.remark || '',
+    })),
+    agingOver1y: sectionRows('long-term').map((r: any) => ({
+      name: r.item || '',
+      endAmount: r.endBalance ?? 0,
+      reason: r.remark || '',
+    })),
+    narrativeText: narrative,
+  })
   try {
     await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
     eventBus.emit('disclosure:note-text-updated' as any, {
@@ -418,9 +584,10 @@ function handleReview(id: string): void {
 }
 
 // ═══ 格式化 ═══
+/** 只读金额展示：委托平台金额格式单一真源，保留底稿「0 显示 -」语义 */
 function fmtAmt(v: number | null | undefined): string {
   if (v == null || v === 0) return '-'
-  return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return fmtAmount(v)
 }
 </script>
 

@@ -80,16 +80,17 @@
         @navigate-sheet="handleNavigate"
       />
 
-      <!-- 附注披露 -->
-      <N3TabDisclosure
-        v-else-if="currentSheet === '附注' || currentSheet === 'disclosure'"
-        :all-responses="allResponsesRef"
-        :wp-id="props.wpId"
-        :project-id="props.projectId"
-        :is-readonly="isReadonly"
-        @navigate="handleNavigate"
-        @navigate-sheet="handleNavigate"
-      />
+      <!--
+        🔴 N3 **没有**披露 Tab：源模板 `backend/wp_templates/N/N3 递延所得税负债.xlsx`
+        全部 sheet = 底稿目录 / N3A / N3-1 / N3-2 / N3-3 / GT_Custom，**无「附注披露信息」sheet**
+        （`workpaper_sheet_classification` 里 wp_code=N3 同样 0 条附注 sheet）。
+        递延所得税负债的附注披露与 N1 **共节**（五、30 / 八、31「递延所得税资产和递延所得税负债」，
+        N1 的表(1) 已含负债段），由 N1 的披露 Tab 负责推送。
+        原 `N3TabDisclosure.vue` 是自造的三小节（概述 / 应纳税暂时性差异明细 / 余额变动表），
+        源模板一张都没有、且入口不可达（无 `附注` sheet）→ 已删除，防其接上同步链路后污染 N1 章节。
+        反向守卫见 `__tests__/disclosureAutoSyncCoverage.spec.ts`。
+        spec: `.kiro/specs/n-cycle-tax-disclosure-alignment/`
+      -->
 
       <!-- 兜底：未迁移 sheet → OnlyOffice fallback -->
       <GtOnlyOfficeSheet
@@ -126,7 +127,7 @@ const N3TabIndex = defineAsyncComponent(() => import('./n3/core/N3TabIndex.vue')
 const N3TabAdjudication = defineAsyncComponent(() => import('./n3/core/N3TabAdjudication.vue'))
 const N3TabDetail = defineAsyncComponent(() => import('./n3/core/N3TabDetail.vue'))
 const N3TabAdjustment = defineAsyncComponent(() => import('./n3/core/N3TabAdjustment.vue'))
-const N3TabDisclosure = defineAsyncComponent(() => import('./n3/core/N3TabDisclosure.vue'))
+// N3TabDisclosure 已删除：源模板无「附注披露信息」sheet，披露与 N1 共节（见模板注释）
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 const props = defineProps<{

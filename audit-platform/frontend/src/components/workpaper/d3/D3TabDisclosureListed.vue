@@ -61,6 +61,11 @@
         <span class="note-prefix">说明：</span>
         <el-input v-model="note1" type="textarea" :rows="2" :disabled="isReadonly"
           placeholder="按性质分类的附注披露说明..." />
+        <div class="note-actions">
+          <el-button size="small" :loading="aiLoadingSection === 'nature'" :disabled="isReadonly"
+            @click="runAi('nature')">🤖 AI</el-button>
+          <el-button v-if="openReviewDialog" size="small" @click="openReview('nature')">💬 复核</el-button>
+        </div>
       </div>
     </div>
 
@@ -128,6 +133,11 @@
         <span class="note-prefix">说明：</span>
         <el-input v-model="note2" type="textarea" :rows="2" :disabled="isReadonly"
           placeholder="超1年预收的附注披露说明..." />
+        <div class="note-actions">
+          <el-button size="small" :loading="aiLoadingSection === 'longTerm'" :disabled="isReadonly"
+            @click="runAi('longTerm')">🤖 AI</el-button>
+          <el-button v-if="openReviewDialog" size="small" @click="openReview('longTerm')">💬 复核</el-button>
+        </div>
       </div>
     </div>
 
@@ -189,6 +199,11 @@
         <span class="note-prefix">说明：</span>
         <el-input v-model="note3" type="textarea" :rows="2" :disabled="isReadonly"
           placeholder="重大变动的附注披露说明..." />
+        <div class="note-actions">
+          <el-button size="small" :loading="aiLoadingSection === 'change'" :disabled="isReadonly"
+            @click="runAi('change')">🤖 AI</el-button>
+          <el-button v-if="openReviewDialog" size="small" @click="openReview('change')">💬 复核</el-button>
+        </div>
       </div>
     </div>
 
@@ -229,12 +244,14 @@
  * D3TabDisclosureListed.vue — 附注披露（上市公司）
  * 3子节卡片 + 跨sheet取数 + 动态行 + 合计 + 说明 + 编制提示
  */
-import { computed, ref, toRef, watch, onBeforeUnmount, type Ref } from 'vue'
+import { computed, inject, ref, toRef, watch, onBeforeUnmount, type Ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
 import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
+import { useDisclosureNoteAi } from '../composables/useDisclosureNoteAi'
 import { useD3DisclosureListed } from '../composables/useD3DisclosureListed'
+import { D3_NOTE_TEXT_SECTIONS } from '../composables/d3NoteSectionMap'
 import {
   buildD3SyncPayload,
   D3_NOTE_SECTION,
@@ -299,6 +316,21 @@ const {
   crossSheet: props.crossSheet,
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
   applicableStandards: applicableStandardsRef,
+})
+
+// ─── 说明文本域的 AI 辅助 + 复核入口（共享 composable）──────────────────────
+// 🔴 `section_id` 必须与后端 `review_dialog._SECTION_PROMPTS` 的键逐字一致，
+// 否则回退通用 prompt（过短会诱导模型自造披露内容）。
+const NOTE_REFS: Record<string, Ref<string>> = { nature: note1, longTerm: note2, change: note3 }
+const openReviewDialog = inject<any>('openReviewDialog', null)
+const { aiLoadingSection, runAi, openReview } = useDisclosureNoteAi({
+  wpId: wpIdRef,
+  isReadonly: () => props.isReadonly,
+  getText: (k) => NOTE_REFS[k]?.value ?? '',
+  setText: (k, text) => { if (NOTE_REFS[k]) NOTE_REFS[k].value = text },
+  buildSectionId: (k) => `d3-disclosure-listed-${k}-note`,
+  labelOf: (k) => D3_NOTE_TEXT_SECTIONS.find((s) => s.key === k)?.title ?? k,
+  openReviewDialog,
 })
 
 // 数据变化后防抖自动同步到附注（composable 内部 watch→debouncedSave 保存后本 watch 触发）
@@ -413,6 +445,7 @@ async function syncToDisclosureNotes(): Promise<void> {
 .subtotal-val { font-weight: 700; }
 .cross-sheet-cell { background: #ecf5ff; padding: 2px 6px; border-radius: 2px; }
 .note-area { margin-top: 12px; display: flex; align-items: flex-start; gap: 8px; }
+.note-actions { display: flex; flex-direction: column; gap: 4px; }
 .note-prefix { font-size: var(--wp-font-size, 13px); color: #606266; white-space: nowrap; padding-top: 6px; }
 .compile-hint { margin-top: 16px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; }
 .compile-hint summary { padding: 8px 12px; cursor: pointer; font-size: var(--wp-font-size, 13px); color: #409eff; }

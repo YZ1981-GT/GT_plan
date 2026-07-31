@@ -42,7 +42,7 @@
         <el-table-column label="期末数" width="150" align="right">
           <template #default="{ row }">
             <template v-if="!isReadonly && !row.isTotal">
-              <el-input-number :model-value="row.endBalance" :controls="false" size="small" @change="(v: number) => onSummaryEdit(row, 'endBalance', v)" />
+              <WpAmountInput :model-value="row.endBalance" @change="(v: number) => onSummaryEdit(row, 'endBalance', v)" />
             </template>
             <span v-else :class="{ 'formula-cell': row.isTotal }">{{ fmtAmt(row.endBalance) }}</span>
           </template>
@@ -50,7 +50,7 @@
         <el-table-column label="上年年末数" width="150" align="right">
           <template #default="{ row }">
             <template v-if="!isReadonly && !row.isTotal">
-              <el-input-number :model-value="row.beginBalance" :controls="false" size="small" @change="(v: number) => onSummaryEdit(row, 'beginBalance', v)" />
+              <WpAmountInput :model-value="row.beginBalance" @change="(v: number) => onSummaryEdit(row, 'beginBalance', v)" />
             </template>
             <span v-else :class="{ 'formula-cell': row.isTotal }">{{ fmtAmt(row.beginBalance) }}</span>
           </template>
@@ -78,7 +78,7 @@
           <template #default="{ row }"><el-input v-model="row.name" :disabled="isReadonly" size="small" @change="persistBonds" /></template>
         </el-table-column>
         <el-table-column label="面值" width="120" align="right">
-          <template #default="{ row }"><el-input-number v-model="row.faceValue" :disabled="isReadonly" :controls="false" :precision="2" size="small" class="dnum" @change="persistBonds" /></template>
+          <template #default="{ row }"><WpAmountInput v-model="row.faceValue" :disabled="isReadonly" @change="persistBonds" /></template>
         </el-table-column>
         <el-table-column label="票面利率" width="100" align="right">
           <template #default="{ row }"><el-input-number v-model="row.couponRate" :disabled="isReadonly" :controls="false" :precision="4" :step="0.001" size="small" class="dnum" @change="persistBonds" /></template>
@@ -90,7 +90,7 @@
           <template #default="{ row }"><el-input v-model="row.term" :disabled="isReadonly" size="small" placeholder="如：1年" @change="persistBonds" /></template>
         </el-table-column>
         <el-table-column label="发行金额" width="130" align="right">
-          <template #default="{ row }"><el-input-number v-model="row.issueAmount" :disabled="isReadonly" :controls="false" :precision="2" size="small" class="dnum" @change="persistBonds" /></template>
+          <template #default="{ row }"><WpAmountInput v-model="row.issueAmount" :disabled="isReadonly" @change="persistBonds" /></template>
         </el-table-column>
         <el-table-column v-if="!isReadonly" label="" width="46" align="center">
           <template #default="{ $index }"><el-button link type="danger" size="small" @click="removeBondRow($index)"><el-icon><Delete /></el-icon></el-button></template>
@@ -116,19 +116,19 @@
           <template #default="{ row }"><el-input v-model="row.name" :disabled="isReadonly" size="small" @change="persistBondCont" /></template>
         </el-table-column>
         <el-table-column label="上年年末数" width="120" align="right">
-          <template #default="{ row }"><el-input-number v-model="row.beginBalance" :disabled="isReadonly" :controls="false" :precision="2" size="small" class="dnum" @change="persistBondCont" /></template>
+          <template #default="{ row }"><WpAmountInput v-model="row.beginBalance" :disabled="isReadonly" @change="persistBondCont" /></template>
         </el-table-column>
         <el-table-column label="本期发行" width="120" align="right">
-          <template #default="{ row }"><el-input-number v-model="row.issued" :disabled="isReadonly" :controls="false" :precision="2" size="small" class="dnum" @change="persistBondCont" /></template>
+          <template #default="{ row }"><WpAmountInput v-model="row.issued" :disabled="isReadonly" @change="persistBondCont" /></template>
         </el-table-column>
         <el-table-column label="按面值计提利息" width="130" align="right">
-          <template #default="{ row }"><el-input-number v-model="row.interestAccrued" :disabled="isReadonly" :controls="false" :precision="2" size="small" class="dnum" @change="persistBondCont" /></template>
+          <template #default="{ row }"><WpAmountInput v-model="row.interestAccrued" :disabled="isReadonly" @change="persistBondCont" /></template>
         </el-table-column>
         <el-table-column label="溢折价摊销" width="120" align="right">
-          <template #default="{ row }"><el-input-number v-model="row.premiumAmort" :disabled="isReadonly" :controls="false" :precision="2" size="small" class="dnum" @change="persistBondCont" /></template>
+          <template #default="{ row }"><WpAmountInput v-model="row.premiumAmort" :disabled="isReadonly" @change="persistBondCont" /></template>
         </el-table-column>
         <el-table-column label="本期偿还" width="120" align="right">
-          <template #default="{ row }"><el-input-number v-model="row.repaid" :disabled="isReadonly" :controls="false" :precision="2" size="small" class="dnum" @change="persistBondCont" /></template>
+          <template #default="{ row }"><WpAmountInput v-model="row.repaid" :disabled="isReadonly" @change="persistBondCont" /></template>
         </el-table-column>
         <el-table-column label="期末数" width="120" align="right">
           <template #default="{ row }">
@@ -159,7 +159,7 @@
         <div class="section-title-row">
           <span class="section-title">（四）递延收益-政府补助情况</span>
           <div class="title-actions">
-            <el-button size="small" type="primary" link :disabled="isReadonly" @click="handleAiGenerate">
+            <el-button size="small" type="primary" link :loading="aiLoading" :disabled="isReadonly" @click="handleAiGenerate">
               <el-icon><MagicStick /></el-icon> AI生成
             </el-button>
             <el-button v-if="!isReadonly" size="small" @click="addGrantRow()">＋ 新增补助</el-button>
@@ -172,13 +172,13 @@
           <template #default="{ row }"><el-input v-model="row.item" :disabled="isReadonly" size="small" @change="persistGrants" /></template>
         </el-table-column>
         <el-table-column label="上年年末数" width="120" align="right">
-          <template #default="{ row }"><el-input-number v-model="row.beginBalance" :disabled="isReadonly" :controls="false" :precision="2" size="small" class="dnum" @change="persistGrants" /></template>
+          <template #default="{ row }"><WpAmountInput v-model="row.beginBalance" :disabled="isReadonly" @change="persistGrants" /></template>
         </el-table-column>
         <el-table-column label="本期增加" width="120" align="right">
-          <template #default="{ row }"><el-input-number v-model="row.increase" :disabled="isReadonly" :controls="false" :precision="2" size="small" class="dnum" @change="persistGrants" /></template>
+          <template #default="{ row }"><WpAmountInput v-model="row.increase" :disabled="isReadonly" @change="persistGrants" /></template>
         </el-table-column>
         <el-table-column label="本期减少" width="120" align="right">
-          <template #default="{ row }"><el-input-number v-model="row.decrease" :disabled="isReadonly" :controls="false" :precision="2" size="small" class="dnum" @change="persistGrants" /></template>
+          <template #default="{ row }"><WpAmountInput v-model="row.decrease" :disabled="isReadonly" @change="persistGrants" /></template>
         </el-table-column>
         <el-table-column label="期末数" width="120" align="right">
           <template #default="{ row }">
@@ -231,11 +231,13 @@
  * 科目：2245 其他流动负债（负债类）
  */
 import { ref, reactive, computed, inject, onMounted, onBeforeUnmount } from 'vue'
+import { fmtAmount } from '@/utils/formatters'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { MagicStick, Delete } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
 import type { WorkpaperRuntimeContext } from '../../composables/useWorkpaperScaffold'
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { WorkpaperRuntimeContextKey } from '../../composables/useWorkpaperScaffold'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { buildK4SyncPayload, K4_NOTE_SECTION } from '../../composables/k4NoteSectionMap'
@@ -419,10 +421,21 @@ function addGrantRow(): void { grantRows.value.push({ item: '', beginBalance: 0,
 function removeGrantRow(i: number): void { grantRows.value.splice(i, 1); persistGrants() }
 
 // ─── AI辅助 ───────────────────────────────────────────────────────────────────
+const aiLoading = ref(false)
+
 async function handleAiGenerate(): Promise<void> {
+  if (props.isReadonly || aiLoading.value) return
+  aiLoading.value = true
   try {
     const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
-      prompt: '请生成其他流动负债附注（上市公司格式）中递延收益-政府补助及债券情况的披露文字说明',
+      prompt:
+        '请依据致同 2025 修订版底稿 K4 源模板与上市公司附注模版（五、43 其他流动负债）'
+        + '撰写附注披露文字说明：说明其他流动负债的构成（短期应付债券、待转销项税额、'
+        + '一年内摊销的递延收益-政府补助等）、短期应付债券的发行与到期偿付情况、'
+        + '是否存在到期未偿付（违约）债券及其原因，以及政府补助的形成原因与摊销安排。'
+        + '口径依财会〔2018〕15 号文与 CAS16。'
+        + '只能使用已提供的项目名称、笔数与金额，不得虚构债券名称、票面利率、发行批文或补助项目，'
+        + '无把握的内容留空由审计师补充。',
       context: {
         科目: '2245 其他流动负债（负债类）',
         汇总表期末合计: String(summaryEndTotal.value),
@@ -444,7 +457,11 @@ async function handleAiGenerate(): Promise<void> {
     noteText.value = noteText.value ? `${noteText.value}\n${generated}` : generated
     onNoteTextChange()
     ElMessage.success('已填入AI生成内容')
-  } catch { /* cancelled or error */ }
+  } catch {
+    /* cancelled or error */
+  } finally {
+    aiLoading.value = false
+  }
 }
 
 // ─── 加载（读 responses_snapshot 的 remark 键）────────────────────────────────
@@ -486,9 +503,10 @@ onBeforeUnmount(() => {
 })
 
 function handleReview(id: string): void { openReviewDialog(id) }
+/** 只读金额展示：委托平台金额格式单一真源，保留底稿「0 显示 -」语义 */
 function fmtAmt(v: number | null | undefined): string {
   if (v == null || v === 0) return '-'
-  return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return fmtAmount(v)
 }
 </script>
 

@@ -49,21 +49,22 @@
         <!-- Section 1: 分类表 -->
         <template v-if="section.sectionKey === 'listed-classification'">
           <el-table :data="section.rows" size="small" border>
-            <el-table-column prop="label" label="项目" width="240">
+            <!-- 列头取源模板 A8：项  目 / 期末余额 / 上年年末余额（与附注列头同口径） -->
+            <el-table-column prop="label" label="项  目" width="240">
               <template #default="{ row }">
                 <span :class="{ 'oci-label': row.rowId === 'listed-cls-oci' }">
                   {{ row.label }}
                 </span>
               </template>
             </el-table-column>
-            <el-table-column label="期末数" width="140" align="right">
+            <el-table-column label="期末余额" width="140" align="right">
               <template #default="{ row }">
                 <span class="cross-sheet-cell" title="来源：D5-1审定表">
                   {{ fmtAmount(row.endAmount) }}
                 </span>
               </template>
             </el-table-column>
-            <el-table-column label="期初数" width="140" align="right">
+            <el-table-column label="上年年末余额" width="140" align="right">
               <template #default="{ row }">
                 <span class="cross-sheet-cell" title="来源：D5-1审定表">
                   {{ fmtAmount(row.priorAmount) }}
@@ -81,6 +82,11 @@
               :disabled="isReadonly"
               placeholder="对应收款项融资分类的补充说明..."
             />
+          <div class="note-actions">
+            <el-button size="small" :loading="aiLoadingSection === 'listed-1'" :disabled="isReadonly"
+              @click="runAi('listed-1')">🤖 AI</el-button>
+            <el-button v-if="openReviewDialog" size="small" @click="openReview('listed-1')">💬 复核</el-button>
+          </div>
           </div>
           <!-- 编制提示 -->
           <details class="guidance-hint">
@@ -196,6 +202,11 @@
               :disabled="isReadonly"
               placeholder="对减值准备变动的补充说明..."
             />
+          <div class="note-actions">
+            <el-button size="small" :loading="aiLoadingSection === 'listed-2'" :disabled="isReadonly"
+              @click="runAi('listed-2')">🤖 AI</el-button>
+            <el-button v-if="openReviewDialog" size="small" @click="openReview('listed-2')">💬 复核</el-button>
+          </div>
           </div>
           <!-- 编制提示 -->
           <details class="guidance-hint">
@@ -281,6 +292,11 @@
               :disabled="isReadonly"
               placeholder="说明应收款项融资本期增减变动及公允价值变动情况；无单项计提减值准备的银行承兑汇票，评价其是否不存在重大信用风险..."
             />
+          <div class="note-actions">
+            <el-button size="small" :loading="aiLoadingSection === 'listed-3'" :disabled="isReadonly"
+              @click="runAi('listed-3')">🤖 AI</el-button>
+            <el-button v-if="openReviewDialog" size="small" @click="openReview('listed-3')">💬 复核</el-button>
+          </div>
           </div>
           <!-- 编制提示 -->
           <details class="guidance-hint">
@@ -300,16 +316,17 @@
       <div v-for="section in soeSections" :key="section.sectionKey" class="disclosure-card">
         <h4 class="section-title">{{ section.label }}</h4>
 
+        <!-- 列头取源模板国企 A7：项  目 / 期末余额 / 期初余额（与附注列头同口径） -->
         <el-table :data="section.rows" size="small" border>
-          <el-table-column prop="label" label="项目" width="200" />
-          <el-table-column label="期末数" width="140" align="right">
+          <el-table-column prop="label" label="项  目" width="200" />
+          <el-table-column label="期末余额" width="140" align="right">
             <template #default="{ row }">
               <span class="cross-sheet-cell" title="来源：D5-1审定表">
                 {{ fmtAmount(row.endAmount) }}
               </span>
             </template>
           </el-table-column>
-          <el-table-column label="期初数" width="140" align="right">
+          <el-table-column label="期初余额" width="140" align="right">
             <template #default="{ row }">
               <span class="cross-sheet-cell" title="来源：D5-1审定表">
                 {{ fmtAmount(row.priorAmount) }}
@@ -319,7 +336,7 @@
         </el-table>
         <!-- 合计行 -->
         <div v-if="section.totalRow" class="total-summary">
-          合计 — 期末：{{ fmtAmount(section.totalRow.endAmount) }}，期初：{{ fmtAmount(section.totalRow.priorAmount) }}
+          合计 — 期末余额：{{ fmtAmount(section.totalRow.endAmount) }}，期初余额：{{ fmtAmount(section.totalRow.priorAmount) }}
         </div>
         <!-- 说明 -->
         <div class="note-block">
@@ -331,6 +348,11 @@
             :disabled="isReadonly"
             placeholder="国企版分类披露补充说明..."
           />
+          <div class="note-actions">
+            <el-button size="small" :loading="aiLoadingSection === 'soe-1'" :disabled="isReadonly"
+              @click="runAi('soe-1')">🤖 AI</el-button>
+            <el-button v-if="openReviewDialog" size="small" @click="openReview('soe-1')">💬 复核</el-button>
+          </div>
         </div>
         <!-- 编制提示 -->
         <details class="guidance-hint">
@@ -460,15 +482,17 @@
  * Task: 17.1
  * Requirements: 8.1-8.8
  */
-import { ref, computed, watch, toRef, onBeforeUnmount, type Ref } from 'vue'
+import { ref, computed, inject, watch, toRef, onBeforeUnmount, type Ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
 import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
+import { useDisclosureNoteAi } from '../composables/useDisclosureNoteAi'
 import { useD5Disclosure } from '../composables/useD5Disclosure'
 import {
   buildD5SyncPayload,
   D5_NOTE_SECTION,
+  D5_NOTE_TEXT_SECTIONS,
   type D5DisclosureSnapshot,
 } from '../composables/d5NoteSectionMap'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
@@ -513,6 +537,21 @@ const {
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
   crossSheet: props.crossSheet,
 })
+
+// ─── 说明文本域的 AI 辅助 + 复核入口（共享 composable）──────────────────────
+// 🔴 `section_id` 与后端 `review_dialog._SECTION_PROMPTS` 的键逐字一致，
+// 未登记会回退通用 prompt（过短 → 诱导模型自造披露内容）。
+const openReviewDialog = inject<any>('openReviewDialog', null)
+const noteAi = useDisclosureNoteAi({
+  wpId: toRef(props, 'wpId') as Ref<string>,
+  isReadonly: () => props.isReadonly,
+  getText: (k) => noteTexts.value?.[k] ?? '',
+  setText: (k, text) => { noteTexts.value = { ...noteTexts.value, [k]: text } },
+  buildSectionId: (k) => `d5-disclosure-${k}-note`,
+  labelOf: (k) => D5_NOTE_TEXT_SECTIONS.find((s) => s.key === k)?.title ?? k,
+  openReviewDialog,
+})
+const { aiLoadingSection, runAi, openReview } = noteAi
 
 // ─── 保存后自动同步到附注（防抖/非阻塞/失败静默）──────────────────────────────
 const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
@@ -844,6 +883,13 @@ async function syncToDisclosureNotes(): Promise<void> {
 
 .note-block {
   margin-top: 12px;
+}
+
+.note-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+  justify-content: flex-end;
 }
 
 .note-label {

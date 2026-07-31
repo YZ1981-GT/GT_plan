@@ -178,6 +178,7 @@ import { buildDirectoryHtmlData } from './composables/gCycleIndexRouting'
 import { eventBus } from '@/utils/eventBus'
 import { G3SaveItemsKey, G3WritebackTbKey, G3DetailRevisionKey } from './composables/g3InternalKeys'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
+import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 import type { ChecklistResponse } from './composables/useF1FormData'
@@ -218,24 +219,11 @@ const emit = defineEmits<{
 
 const formData = useG3FormData({ wpId: wpIdRef, projectId: projectIdRef })
 const isReadonly = computed(() => !!props.readonly)
-const applicableStandards = computed<string[]>(() => {
-  const fromProp = props.applicableStandards
-  if (Array.isArray(fromProp) && fromProp.length) return fromProp.map(String).filter(Boolean)
-  const raw =
-    props.htmlData?.project_context?.applicable_standards
-    ?? props.htmlData?.projectContext?.applicable_standards
-    ?? props.htmlData?.applicable_standards
-    ?? props.htmlData?.applicableStandards
-    ?? []
-  if (Array.isArray(raw)) return raw.map(String).filter(Boolean)
-  if (typeof raw === 'string' && raw.trim()) {
-    try {
-      const parsed = JSON.parse(raw)
-      if (Array.isArray(parsed)) return parsed.map(String).filter(Boolean)
-    } catch { /* ignore */ }
-    return raw.split(/[,;|]+/).map((s: string) => s.trim()).filter(Boolean)
-  }
-  return []
+// 适用准则：显式 prop > 本 sheet html_data > runtime context（scaffold 从 render-config
+// 顶层注入）。收敛到共享 composable，兼容 v2 对象 / 逗号串 / JSON 串。
+const applicableStandards = useHostApplicableStandards({
+  explicit: () => props.applicableStandards,
+  htmlData: () => props.htmlData,
 })
 const runtime = inject(WorkpaperRuntimeContextKey, null)
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)

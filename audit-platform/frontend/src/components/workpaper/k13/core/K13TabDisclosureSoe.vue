@@ -52,12 +52,9 @@
         </el-table-column>
         <el-table-column prop="nonRecurring" label="计入当期非经常性损益的金额" min-width="180" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               v-model="row.nonRecurring"
-              :controls="false"
-              :precision="2"
-              size="small"
               placeholder="0.00"
               @change="handleRowChange(row)"
             />
@@ -136,15 +133,17 @@
  * - publish: 'disclosure:note-text-updated' (noteId='non_operating_expense')
  */
 import { ref, computed, onMounted, onUnmounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
+import { fmtAmount } from '@/utils/formatters'
 import { ElMessage } from 'element-plus'
 import { Refresh, MagicStick } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
 import { generateK13AiText } from '../../composables/useK13AiText'
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { useRouter } from 'vue-router'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import http from '@/utils/http'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
-import { buildK13SyncPayload } from '../../composables/k13NoteSectionMap'
+import { K13_NOTE_SECTION, buildK13SyncPayload } from '../../composables/k13NoteSectionMap'
 
 const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
 
@@ -372,7 +371,7 @@ function handleNarrativeSave(): void {
     variant: 'soe',
     accountCode: ACCOUNT_CODE,
     projectId: props.projectId,
-    sectionIds: ['营业外支出', '五、营业外支出'],
+    sectionIds: [K13_NOTE_SECTION.soe],
     text: narrativeText.value,
   })
   autoSync.scheduleAutoSync(syncToDisclosureNotes)
@@ -381,13 +380,19 @@ function handleNarrativeSave(): void {
 async function syncToDisclosureNotes(): Promise<void> {
   if (!props.projectId || props.isReadonly) return
   const payload = buildK13SyncPayload('soe', props.wpId || '',
-    disclosureRows.value.map(r => ({ project: r.category, currentAmount: r.currentAmount, priorAmount: r.priorAmount })),
+    // 第 4 列「计入当期非经常性损益的金额」是源模板必填列，旧载荷从未推送
+    disclosureRows.value.map(r => ({
+      project: r.category,
+      currentAmount: r.currentAmount,
+      priorAmount: r.priorAmount,
+      nonRecurringAmount: r.nonRecurring,
+    })),
     narrativeText.value)
   try {
     await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
     eventBus.emit('disclosure:note-text-updated' as any, {
       wpCode: 'K13', variant: 'soe', accountCode: '6711',
-      projectId: props.projectId, sectionIds: ['八、77'],
+      projectId: props.projectId, sectionIds: [K13_NOTE_SECTION.soe],
     })
     ElMessage.success('已同步到附注')
   } catch { /* silent */ }
@@ -404,7 +409,7 @@ async function generateAI(section: string): Promise<void> {
     .join('；')
   const content = await generateK13AiText(props.wpId, {
     section,
-    prompt: '为 K13 营业外支出底稿生成国有企业附注披露文本，需包含各去向分类的本期/上期发生额及重大变动说明。',
+    prompt: '为 K13 营业外支出底稿生成国有企业附注披露文本，需包含各去向分类的本期/上期发生额及重大变动说明。口径以致同 2025 修订版底稿源模板与附注模版为准；只能使用已提供的项目名称与金额，不得虚构项目、金额或业务背景，无把握的内容留空由审计师补充。',
     context: {
       科目: '6711 营业外支出（国有企业版）',
       去向分类: CATEGORIES.join('/'),
@@ -451,9 +456,10 @@ function formatRate(row: DisclosureRow): string {
   return (rate * 100).toFixed(1) + '%'
 }
 
+/** 只读金额展示：委托平台金额格式单一真源，保留底稿「0 显示 -」语义 */
 function fmtAmt(val: number | null | undefined): string {
   if (val == null || val === 0) return '-'
-  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return fmtAmount(val)
 }
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────

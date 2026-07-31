@@ -85,21 +85,23 @@
         @navigate-sheet="handleNavigate"
       />
 
-      <!-- 附注（上市） -->
+      <!-- 附注（上市）—— 🔴 必须传 projectId，否则同步按钮永久锁死 -->
       <N4TabDisclosureListed
-        v-else-if="currentSheet === '附注(上市)' || currentSheet === '附注（上市）'"
+        v-else-if="currentSheet === N4_SHEET_DISCLOSURE_LISTED"
         :all-responses="allResponsesRef"
         :wp-id="props.wpId"
+        :project-id="props.projectId"
         :is-readonly="isReadonly"
         @navigate="handleNavigate"
         @navigate-sheet="handleNavigate"
       />
 
-      <!-- 附注（国企） -->
+      <!-- 附注（国企）—— 源模板此节为「无」→ 本版不适用说明页 -->
       <N4TabDisclosureSoe
-        v-else-if="currentSheet === '附注(国企)' || currentSheet === '附注（国企）'"
+        v-else-if="currentSheet === N4_SHEET_DISCLOSURE_SOE"
         :all-responses="allResponsesRef"
         :wp-id="props.wpId"
+        :project-id="props.projectId"
         :is-readonly="isReadonly"
         @navigate="handleNavigate"
         @navigate-sheet="handleNavigate"
@@ -148,6 +150,13 @@ const N4TabAdjustment = defineAsyncComponent(() => import('./n4/core/N4TabAdjust
 const N4TabDisclosureListed = defineAsyncComponent(() => import('./n4/core/N4TabDisclosureListed.vue'))
 const N4TabDisclosureSoe = defineAsyncComponent(() => import('./n4/core/N4TabDisclosureSoe.vue'))
 
+import {
+  N4_SHEET_DISCLOSURE_LISTED,
+  N4_SHEET_DISCLOSURE_SOE,
+  isN4HtmlSheet,
+  normalizeN4SheetName,
+} from './composables/n4SheetRouting'
+
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 const props = defineProps<{
   wpId: string
@@ -194,30 +203,17 @@ const dualMode = {
   onModeChange: () => {},
 }
 
-// ─── sheetName 正则提取编码 ──────────────────────────────────────────────────
-const currentSheet = computed(() => {
-  const name = props.sheetName || props.wpCode || ''
-  // 匹配 N4A, O2A, N4-1~N4-3, N4, 底稿目录, 附注 等
-  const m = name.match(/(N4A|O2A|N4-[1-3]|N4)/)
-  if (m) return m[1]
-  // 附注匹配
-  if (name.includes('附注') && (name.includes('上市') || name.includes('国企'))) {
-    return name.includes('上市') ? '附注(上市)' : '附注(国企)'
-  }
-  if (name.includes('底稿目录')) return '底稿目录'
-  return name
-})
+// ─── sheetName 归一（纯函数，见 composables/n4SheetRouting.ts）────────────────
+// 🔴 披露判定前置于 wp_code 正则 + 国企多写法全认，防披露组件静默挂不上
+const currentSheet = computed(() => normalizeN4SheetName(props.sheetName, props.wpCode))
 
 /** skip sheet 列表（O2A原底稿标记skip走OO兜底） */
 const SKIP_SHEETS = ['O2A']
 
 /** HTML 专属组件渲染的 sheet（支持双模式切换）；N4A走程序表，O2A走OO */
 const isHtmlSheet = computed(() => {
-  const s = currentSheet.value
   if (SKIP_SHEETS.some(sk => (props.sheetName || '').includes(sk))) return false
-  if (s === 'N4A' || s === 'O2A') return false
-  return /^N4-[1-3]$/.test(s) || s === 'N4' || s === '底稿目录'
-    || s.includes('附注')
+  return isN4HtmlSheet(currentSheet.value)
 })
 
 // ─── selfLoad（bundle内嵌场景 htmlData 为 null 时自加载） ─────────────────────

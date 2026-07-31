@@ -43,99 +43,172 @@ export interface K1SyncFromWorkpaperPayload {
   columns?: Record<string, ColumnDef[]>
 }
 
-/** 金额列（格式化为金额） */
+/**
+ * 金额列（key 与 label 同名 —— 行对象的中文数据键）。
+ * 单级表头的表用它 + `flat()`；两级表头用 `amtG` / `txtG` 显式给 `group`。
+ */
 const amt = (k: string): ColumnDef => ({ key: k, label: k, format: 'amount' })
 /** 文本/比例列（原样） */
 const txt = (k: string): ColumnDef => ({ key: k, label: k })
 /** 标签列（行名，键恒为 label，表头取自 note_template 首列语义） */
 const lbl = (header: string): ColumnDef => ({ key: 'label', label: header, is_label: true })
 
-// ─── 列头定义（逐字对齐 buildK1*SubTableData 的行键 + note_template 首列语义）───
+/**
+ * 两级表头的金额子列：`key` 保留既有**带期别前缀的中文数据键**（行对象就是这些键，
+ * 改 key 会让整表数据丢落点），`label` 只写**叶子列名**，父表头交给 `group`。
+ */
+const amtG = (key: string, label: string, group?: string): ColumnDef => ({
+  key, label, ...(group ? { group } : {}), format: 'amount',
+})
+/** 两级表头的文本/比例子列 */
+const txtG = (key: string, label: string, group?: string): ColumnDef => ({
+  key, label, ...(group ? { group } : {}),
+})
 
-/** 三阶段快照表共用列头 */
-const STAGE_COLUMNS: ColumnDef[] = [
-  lbl('类别'), amt('账面余额'), txt('预期信用损失率'), amt('坏账准备'), amt('账面价值'), txt('理由'),
-]
-
-/** 三阶段变动表共用列头（label 表头由各表首列决定） */
-const stageMovementColumns = (labelHeader: string): ColumnDef[] => [
-  lbl(labelHeader), amt('第一阶段'), amt('第二阶段'), amt('第三阶段'), amt('合计'),
-]
-
-export const K1_LISTED_COLUMNS: Record<string, ColumnDef[]> = {
-  [K1_LISTED_SUBTABLE.aging]: [lbl('账龄'), amt('期末余额'), amt('上年年末余额')],
-  [K1_LISTED_SUBTABLE.nature]: [
-    lbl('项  目'),
-    amt('期末账面余额'), amt('期末坏账准备'), amt('期末账面价值'),
-    amt('上年年末账面余额'), amt('上年年末坏账准备'), amt('上年年末账面价值'),
-  ],
-  [K1_LISTED_SUBTABLE.stage1]: STAGE_COLUMNS,
-  [K1_LISTED_SUBTABLE.stage2]: STAGE_COLUMNS,
-  [K1_LISTED_SUBTABLE.stage3]: STAGE_COLUMNS,
-  [K1_LISTED_SUBTABLE.priorStage1]: STAGE_COLUMNS,
-  [K1_LISTED_SUBTABLE.priorStage2]: STAGE_COLUMNS,
-  [K1_LISTED_SUBTABLE.priorStage3]: STAGE_COLUMNS,
-  [K1_LISTED_SUBTABLE.stageMovement]: stageMovementColumns('坏账准备'),
-  [K1_LISTED_SUBTABLE.reversal]: [
-    lbl('单位名称'), txt('转回原因'), txt('收回方式'), txt('原确定坏账准备的依据'), amt('转回或收回金额'),
-  ],
-  [K1_LISTED_SUBTABLE.writeoffSummary]: [lbl('项目'), amt('核销金额')],
-  [K1_LISTED_SUBTABLE.writeoffDetail]: [
-    lbl('单位名称'), txt('其他应收款性质'), amt('核销金额'), txt('核销原因'), txt('履行的核销程序'), txt('是否由关联交易产生'),
-  ],
-  [K1_LISTED_SUBTABLE.top5]: [
-    lbl('单位名称'), txt('款项性质'), amt('其他应收款期末余额'), txt('账龄'),
-    txt('占其他应收款期末余额合计数的比例(%)'), amt('坏账准备期末余额'),
-  ],
+/**
+ * 单级表头显式表态：在标签列打 `flat`。
+ *
+ * 🔴 必须打 —— 不打时后端 `_extract_column_groups` 返回 `None` → 退化到
+ * `_infer_groups_from_headers` **前缀推断**，会给「期末账面余额/期末坏账准备/…」
+ * 这类表头凭空造出父表头；契约 P3「group / flat 之间必须表态」也不满足。
+ */
+function flat(cols: ColumnDef[]): ColumnDef[] {
+  return cols.map((c, i) => (i === 0 ? { ...c, flat: true } : c))
 }
 
+// ─── 列头定义（逐字对齐 buildK1*SubTableData 的行键 + note_template 列结构）───
+
+/**
+ * 三阶段快照表列头（源 xlsx 上市 `A32:F39` 等 —— **6 列，末列「理由」**）。
+ * ECL 率列的**表头按阶段不同**（第一阶段 = 未来 12 个月内；第二/三阶段 = 整个存续期），
+ * `key` 统一 `预期信用损失率`（既有行键真源，不随表头变）。
+ */
+const RATE_12M = '未来12个月内的预期信用损失率(%)'
+const RATE_LIFETIME = '整个存续期预期信用损失率（%）'
+
+const stageColumns = (rateHeader: string): ColumnDef[] => flat([
+  lbl('类别'),
+  amt('账面余额'),
+  txtG('预期信用损失率', rateHeader),
+  amt('坏账准备'),
+  amt('账面价值'),
+  txt('理由'),
+])
+
+/** 三阶段变动表共用列头（附注模版为单级 5 列；label 表头由各表首列决定） */
+const stageMovementColumns = (labelHeader: string): ColumnDef[] => flat([
+  lbl(labelHeader), amt('第一阶段'), amt('第二阶段'), amt('第三阶段'), amt('合计'),
+])
+
+export const K1_LISTED_COLUMNS: Record<string, ColumnDef[]> = {
+  [K1_LISTED_SUBTABLE.aging]: flat([lbl('账龄'), amt('期末余额'), amt('上年年末余额')]),
+  // 源 xlsx `A22:G28`：`B22:D22`（期末数）/ `E22:G22`（上年年末数）跨列合并 = 真两级表头；
+  // 父表头取附注模版口径「期末金额」/「上年年末金额」（附注是交付物）。
+  [K1_LISTED_SUBTABLE.nature]: [
+    lbl('项  目'),
+    amtG('期末账面余额', '账面余额', '期末金额'),
+    amtG('期末坏账准备', '坏账准备', '期末金额'),
+    amtG('期末账面价值', '账面价值', '期末金额'),
+    amtG('上年年末账面余额', '账面余额', '上年年末金额'),
+    amtG('上年年末坏账准备', '坏账准备', '上年年末金额'),
+    amtG('上年年末账面价值', '账面价值', '上年年末金额'),
+  ],
+  [K1_LISTED_SUBTABLE.stage1]: stageColumns(RATE_12M),
+  [K1_LISTED_SUBTABLE.stage2]: stageColumns(RATE_LIFETIME),
+  [K1_LISTED_SUBTABLE.stage3]: stageColumns(RATE_LIFETIME),
+  [K1_LISTED_SUBTABLE.priorStage1]: stageColumns(RATE_12M),
+  [K1_LISTED_SUBTABLE.priorStage2]: stageColumns(RATE_LIFETIME),
+  [K1_LISTED_SUBTABLE.priorStage3]: stageColumns(RATE_LIFETIME),
+  [K1_LISTED_SUBTABLE.stageMovement]: stageMovementColumns('坏账准备'),
+  [K1_LISTED_SUBTABLE.reversal]: flat([
+    lbl('单位名称'), txt('转回原因'), txt('收回方式'), txt('原确定坏账准备的依据'), amt('转回或收回金额'),
+  ]),
+  [K1_LISTED_SUBTABLE.writeoffSummary]: flat([lbl('项目'), amt('核销金额')]),
+  [K1_LISTED_SUBTABLE.writeoffDetail]: flat([
+    lbl('单位名称'), txt('其他应收款性质'), amt('核销金额'), txt('核销原因'), txt('履行的核销程序'), txt('是否由关联交易产生'),
+  ]),
+  [K1_LISTED_SUBTABLE.top5]: flat([
+    lbl('单位名称'), txt('款项性质'), amt('其他应收款期末余额'), txt('账龄'),
+    txt('占其他应收款期末余额合计数的比例(%)'), amt('坏账准备期末余额'),
+  ]),
+}
+
+/**
+ * 国企「按坏账准备计提方法分类」列头（主表 / 续表共用）。
+ *
+ * 源 xlsx `A19:F26` 是**三级表头**：`期末余额` > `账面余额`/`坏账准备`/`账面价值`
+ * > `金额`/`比例(%)`/`预期信用损失率(%)`。顶层期别已由「主表 + 续表」两张表承载
+ * （D1/D6 同款范式：把顶层期间提到表名），剩下两级用 `group`；`账面价值` 是
+ * rowspan=2 的独立列 → 不给 `group`（混合分组，前后端均支持）。
+ */
+const methodColumns = (): ColumnDef[] => [
+  lbl('类  别'),
+  amtG('账面余额', '金额', '账面余额'),
+  txtG('比例(%)', '比例(%)', '账面余额'),
+  amtG('坏账准备', '金额', '坏账准备'),
+  txtG('预期信用损失率(%)', '预期信用损失率(%)', '坏账准备'),
+  amtG('账面价值', '账面价值'),
+]
+
 export const K1_SOE_COLUMNS: Record<string, ColumnDef[]> = {
+  // 源 xlsx `A46:G55`：`B46:D46`（期末数）/ `E46:G46`（期初数）跨列合并
   [K1_SOE_SUBTABLE.aging]: [
     lbl('账  龄'),
-    amt('期末账面余额'), amt('期末坏账准备'),
-    amt('期初账面余额'), amt('期初坏账准备'),
+    amtG('期末账面余额', '账面余额', '期末数'),
+    amtG('期末坏账准备', '坏账准备', '期末数'),
+    amtG('期初账面余额', '账面余额', '期初数'),
+    amtG('期初坏账准备', '坏账准备', '期初数'),
   ],
-  [K1_SOE_SUBTABLE.methodEnd]: [
-    lbl('类  别'), amt('账面余额'), txt('比例(%)'), amt('坏账准备'), txt('预期信用损失率(%)'), amt('账面价值'),
-  ],
-  [K1_SOE_SUBTABLE.methodPrior]: [
-    lbl('类  别'), amt('账面余额'), txt('比例(%)'), amt('坏账准备'), txt('预期信用损失率(%)'), amt('账面价值'),
-  ],
+  [K1_SOE_SUBTABLE.methodEnd]: methodColumns(),
+  [K1_SOE_SUBTABLE.methodPrior]: methodColumns(),
+  // 源 xlsx `A38:E39`：`B38:E38`（期末余额）跨列合并，下辖 4 个子列
   [K1_SOE_SUBTABLE.individualDetail]: [
-    lbl('债务人名称'), amt('账面余额'), amt('坏账准备'), txt('预期信用损失率(%)'), txt('计提理由'),
+    lbl('债务人名称'),
+    amtG('账面余额', '账面余额', '期末余额'),
+    amtG('坏账准备', '坏账准备', '期末余额'),
+    txtG('预期信用损失率(%)', '预期信用损失率(%)', '期末余额'),
+    txtG('计提理由', '计提理由', '期末余额'),
   ],
   [K1_SOE_SUBTABLE.portfolioAging]: [
     lbl('账  龄'),
-    amt('期末账面余额'), txt('期末比例(%)'), amt('期末坏账准备'),
-    amt('期初账面余额'), txt('期初比例(%)'), amt('期初坏账准备'),
+    amtG('期末账面余额', '账面余额', '期末数'),
+    txtG('期末比例(%)', '比例(%)', '期末数'),
+    amtG('期末坏账准备', '坏账准备', '期末数'),
+    amtG('期初账面余额', '账面余额', '期初数'),
+    txtG('期初比例(%)', '比例(%)', '期初数'),
+    amtG('期初坏账准备', '坏账准备', '期初数'),
   ],
   [K1_SOE_SUBTABLE.portfolioOther]: [
     lbl('组合名称'),
-    amt('期末账面余额'), txt('期末计提比例(%)'), amt('期末坏账准备'),
-    amt('期初账面余额'), txt('期初计提比例(%)'), amt('期初坏账准备'),
+    amtG('期末账面余额', '账面余额', '期末数'),
+    txtG('期末计提比例(%)', '计提比例(%)', '期末数'),
+    amtG('期末坏账准备', '坏账准备', '期末数'),
+    amtG('期初账面余额', '账面余额', '期初数'),
+    txtG('期初计提比例(%)', '计提比例(%)', '期初数'),
+    amtG('期初坏账准备', '坏账准备', '期初数'),
   ],
   [K1_SOE_SUBTABLE.eclMovement]: stageMovementColumns('坏账准备'),
   [K1_SOE_SUBTABLE.balanceMovement]: stageMovementColumns('账面余额'),
-  [K1_SOE_SUBTABLE.reversal]: [
+  [K1_SOE_SUBTABLE.reversal]: flat([
     lbl('债务人名称'),
     amt('转回或收回金额'),
     amt('转回或收回前累计已计提坏账准备金额'),
     txt('转回或收回原因、方式'),
-  ],
-  [K1_SOE_SUBTABLE.writeoff]: [
+  ]),
+  [K1_SOE_SUBTABLE.writeoff]: flat([
     lbl('债务人名称'), txt('其他应收款项性质'), amt('核销金额'), txt('核销原因'), txt('履行的核销程序'), txt('是否因关联交易产生'),
-  ],
-  [K1_SOE_SUBTABLE.top5]: [
+  ]),
+  [K1_SOE_SUBTABLE.top5]: flat([
     lbl('债务人名称'), txt('款项性质'), amt('账面余额'), txt('账龄'),
     txt('占其他应收款项合计的比例（%）'), amt('坏账准备'),
-  ],
-  [K1_SOE_SUBTABLE.govGrant]: [
+  ]),
+  [K1_SOE_SUBTABLE.govGrant]: flat([
     lbl('单位名称'), txt('政府补助项目名称'), amt('期末余额'), txt('期末账龄'), txt('预计收取的时间、金额及依据'),
-  ],
-  [K1_SOE_SUBTABLE.transfer]: [
+  ]),
+  [K1_SOE_SUBTABLE.transfer]: flat([
     lbl('债务人名称'), amt('终止确认金额'), amt('与终止确认相关的利得或损失'),
-  ],
-  [K1_SOE_SUBTABLE.continuedInvolvement]: [lbl('项  目'), amt('期末金额')],
+  ]),
+  [K1_SOE_SUBTABLE.continuedInvolvement]: flat([lbl('项  目'), amt('期末金额')]),
 }
 
 function _num(v: unknown): number {

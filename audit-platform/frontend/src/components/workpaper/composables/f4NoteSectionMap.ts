@@ -208,6 +208,31 @@ function over1yRows(
   ]
 }
 
+export interface F4NoteTextRow {
+  section: string
+  title: string
+  text: string
+}
+
+/** 披露正文标题（源 xlsx 小节名：上市「应付账款附注披露信息」/ 国企同名） */
+const F4_NOTE_TITLE = '应付账款披露说明'
+
+/**
+ * 说明文本 → `_note_texts`（后端 `_format_note_texts` 渲染为 `【title】\n正文`）。
+ *
+ * 🔴 原实现是 `[{ text }]` —— 既无 `section` 也无 `title`：正文虽不会渲染出英文键，
+ * 但附注侧无从判断这段正文来自哪个披露 Tab，与平台其它循环（D1/D2/F1/F2/F3）不一致。
+ * 现补齐中文 `title` + 变体 `section`，空文本仍然过滤（不用空段落覆盖附注既有正文）。
+ */
+export function buildF4NoteTexts(
+  variant: 'listed' | 'soe',
+  noteText: string,
+): F4NoteTextRow[] {
+  const body = String(noteText ?? '').trim()
+  if (!body) return []
+  return [{ section: `${variant}-disclosure-note`, title: F4_NOTE_TITLE, text: body }]
+}
+
 /**
  * 上市（五、37）同步载荷：按性质表 + 账龄超 1 年重要应付账款表 + 披露正文。
  *
@@ -247,8 +272,7 @@ export function buildF4ListedSyncPayload(
         },
       ],
       [F4_LISTED_SUBTABLE.over1y]: over1yRows(over1y, 'unsettled_reason'),
-      // 无 title → 附注 text_content 即披露正文原文（不注入英文小节名）
-      _note_texts: [{ text: String(noteText || '') }],
+      _note_texts: buildF4NoteTexts('listed', noteText),
       _removed_table_keys: [...F4_LISTED_REMOVED_TABLE_KEYS],
     },
     columns: {
@@ -295,7 +319,7 @@ export function buildF4SoeSyncPayload(
         },
       ],
       [F4_SOE_SUBTABLE.over1y]: over1yRows(over1y, 'unsettled_reason'),
-      _note_texts: [{ text: String(noteText || '') }],
+      _note_texts: buildF4NoteTexts('soe', noteText),
     },
     columns: {
       [F4_SOE_SUBTABLE.aging]: F4_SOE_AGING_COLUMNS,

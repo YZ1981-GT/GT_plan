@@ -134,6 +134,52 @@ export function isDataResourceEmpty(values: DrValueMap | null | undefined): bool
   return true
 }
 
+/** (1) 分类表「数据资源」行的四个金额（账面余额/跌价准备 × 期末/期初） */
+export interface DrClassLinkage {
+  endGross: number
+  endImpairment: number
+  priorGross: number
+  priorImpairment: number
+}
+
+/**
+ * 数据资源表 → (1) 分类表「数据资源」行的联动取数。
+ *
+ * 🔴 数据资源在存货科目表（1401~1412）中**没有对应科目**，F2-1 审定表取不到数
+ * → 分类表该行原先恒为 0 且无录入口，而 `buildDataResourceTieChecks` 又拿这个 0
+ * 去和本表合计比对 ⇒ 用户一填数据资源表，勾稽差异就必然常亮（假告警）。
+ * 改为从本表联动后差额恒 0，勾稽面板转为「已联动」证据。
+ *
+ * 取数口径（合计列 = 外购 + 自行加工 + 其他方式，F9-11）：
+ * - 账面余额期末/期初 ← 「一、账面原值」的 `4.期末余额` / `1.期初余额`
+ * - 跌价准备期末/期初 ← 「二、存货跌价准备」的 `4.期末余额` / `1.期初余额`
+ *
+ * 表未填（`isDataResourceEmpty`）时返回全 0 —— 不凭空造数。
+ */
+export function deriveDataResourceClassRow(
+  values: DrValueMap | null | undefined,
+): DrClassLinkage {
+  const zero: DrClassLinkage = {
+    endGross: 0, endImpairment: 0, priorGross: 0, priorImpairment: 0,
+  }
+  if (isDataResourceEmpty(values)) return zero
+  const v = values || {}
+  let endGross = 0
+  let endImpairment = 0
+  let priorGross = 0
+  let priorImpairment = 0
+  // 期末为派生行 → 用与 buildDataResourceRows 同一算法逐列重算，避免读落库的陈旧值
+  for (const col of DR_INPUT_COLS) {
+    const grossOpen = readCol(v, 'gross-open', col)
+    const impOpen = readCol(v, 'imp-open', col)
+    priorGross += grossOpen
+    priorImpairment += impOpen
+    endGross += calcDrEnding(grossOpen, readCol(v, 'gross-inc', col), readCol(v, 'gross-dec', col))
+    endImpairment += calcDrEnding(impOpen, readCol(v, 'imp-inc', col), readCol(v, 'imp-dec', col))
+  }
+  return { endGross, endImpairment, priorGross, priorImpairment }
+}
+
 /**
  * 按持久化值构建 21 行渲染模型：派生行读时重算，不依赖落库值。
  *

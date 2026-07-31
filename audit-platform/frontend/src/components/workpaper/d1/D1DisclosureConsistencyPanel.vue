@@ -8,15 +8,45 @@
  * spec: .kiro/specs/d1-notes-receivable-disclosure-alignment/ R10.3
  */
 import { computed, ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import GtIndexChip from '../GtIndexChip.vue'
-import type { D1ConsistencySummary, D1ConsistencyCheck } from '../composables/d1DisclosureConsistency'
+import { eventBus } from '@/utils/eventBus'
+import {
+  buildD1MisstatementPayload,
+  D1_AMOUNT_TOLERANCE,
+  type D1ConsistencySummary,
+  type D1ConsistencyCheck,
+} from '../composables/d1DisclosureConsistency'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   summary: D1ConsistencySummary
   projectId?: string
-}>()
+  isReadonly?: boolean
+}>(), { isReadonly: false })
 
 const expanded = ref(false)
+
+// ─── 差异回写 A13 未更正错报汇总 ─────────────────────────────────────────────
+// 平台铁律「结论/缺陷/偏差回写」：勾稽差异不能只能看不能推。
+// 通道 = `eventBus.emit('a13:push-misstatement')` → `useA13MisstatementBridge`
+// （挂在 WorkpaperEditor Shell）→ POST /misstatements。桥自带 5s 去重窗口。
+
+/** 该项是否可推错报：error 级且差异超容差 */
+function canPush(c: D1ConsistencyCheck): boolean {
+  return c.level === 'error' && Math.abs(c.diff) > D1_AMOUNT_TOLERANCE
+}
+
+const pushableCount = computed(() => props.summary.checks.filter(canPush).length)
+
+function push(checkIds?: readonly string[]): void {
+  if (props.isReadonly) return
+  const payload = buildD1MisstatementPayload(props.summary, checkIds ? { checkIds } : undefined)
+  if (!payload) {
+    ElMessage.info('没有可推送的勾稽差异（提示类差异与容差内差异不作为错报）')
+    return
+  }
+  eventBus.emit('a13:push-misstatement', payload as any)
+}
 
 /** 只显示有结论的项（skip 折叠进「未取数」计数，避免空表刷屏） */
 const visibleChecks = computed<D1ConsistencyCheck[]>(() => {
@@ -65,6 +95,14 @@ function fmt(v: number): string {
         · 未取数 {{ summary.skipCount }}
       </span>
       <span class="d1-cc__hint">规则源：应收票据校验预设 F4-1~F4-30</span>
+      <el-button
+        v-if="pushableCount > 0 && !isReadonly"
+        size="small"
+        type="danger"
+        plain
+        title="把勾稽差异记入 A13 未更正错报汇总（提示类与容差内差异不推）"
+        @click.stop="push()"
+      >推送 {{ pushableCount }} 项差异至错报汇总</el-button>
       <el-button link size="small">{{ expanded ? '收起明细 ▴' : '展开明细 ▾' }}</el-button>
     </div>
 
@@ -116,6 +154,19 @@ function fmt(v: number): string {
             :context-project-id="projectId"
             style="margin-right:4px"
           />
+        </template>
+      </el-table-column>
+      <el-table-column v-if="!isReadonly" label="错报" width="96" align="center">
+        <template #default="{ row }">
+          <el-button
+            v-if="canPush(row)"
+            size="small"
+            type="danger"
+            link
+            title="把本项差异记入 A13 未更正错报汇总"
+            @click="push([row.id])"
+          >推送错报</el-button>
+          <span v-else style="color:#c0c4cc">—</span>
         </template>
       </el-table-column>
     </el-table>

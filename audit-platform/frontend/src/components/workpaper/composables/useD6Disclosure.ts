@@ -212,6 +212,10 @@ export function useD6Disclosure(options: UseD6DisclosureOptions) {
           balance: parseNum(r.balance || r.auditedBalance),
           provision: parseNum(r.provision || r.expectedProvision),
           lossRate: parseNum(r.lossRate) * 100,
+          // 上年年末段（源模板 E69:G69「上年年末余额」）—— 手工录入，历史数据缺省 0
+          priorBalance: parseNum(r.priorBalance),
+          priorProvision: parseNum(r.priorProvision),
+          priorLossRate: parseNum(r.priorLossRate),
         })) : [],
       }))
     },
@@ -243,6 +247,9 @@ export function useD6Disclosure(options: UseD6DisclosureOptions) {
           balance: 0,
           provision: 0,
           lossRate: 0,
+          priorBalance: 0,
+          priorProvision: 0,
+          priorLossRate: 0,
         }],
       }
     })
@@ -257,7 +264,10 @@ export function useD6Disclosure(options: UseD6DisclosureOptions) {
   }
 
   function updateGroupedCell(groupIndex: number, rowId: string, field: string, value: any): void {
-    const NUMERIC_FIELDS = ['balance', 'provision', 'lossRate']
+    const NUMERIC_FIELDS = [
+      'balance', 'provision', 'lossRate',
+      'priorBalance', 'priorProvision', 'priorLossRate',
+    ]
     groupedDetails.value = groupedDetails.value.map((g, idx) => {
       if (idx !== groupIndex) return g
       return {
@@ -283,6 +293,115 @@ export function useD6Disclosure(options: UseD6DisclosureOptions) {
       return { ...g, rows: g.rows.filter(r => r.rowId !== rowId) }
     })
     persistGroupedDetails()
+  }
+
+  // ─── 上年年末段（源模板 G43:K54 与 A61「续：」）──────────────────────
+  //
+  // 🔴 源模板这两段是**手工填列**（G47:G49 / A64:A65 都是空白录入行），
+  // 底稿此前完全没有录入位置 → 附注比较期整段空缺。持久化到 checklist_responses，
+  // 结构与期末段同构（列定义共用 `IMPAIRMENT_COLUMNS` / `SINGLE_COLUMNS`）。
+
+  const impairmentPriorRows = ref<DisclosureRow[]>([])
+  const singlePriorRows = ref<DisclosureRow[]>([])
+
+  // 主表披露格式（源模板 A20「或：披露格式如下」二选一），持久化到 checklist_responses
+  const mainFormat = ref<'detailed' | 'simple'>('detailed')
+
+  watch(
+    () => allResponses.value.get('D6-note-listed-main-format')?.remark,
+    (val) => {
+      mainFormat.value = String(val ?? '') === 'simple' ? 'simple' : 'detailed'
+    },
+    { immediate: true },
+  )
+
+  function setMainFormat(value: 'detailed' | 'simple'): void {
+    mainFormat.value = value === 'simple' ? 'simple' : 'detailed'
+    debouncedSave('D6-note-listed-main-format', { remark: mainFormat.value })
+  }
+
+  watch(
+    () => allResponses.value.get('D6-note-listed-s2-prior-rows')?.remark,
+    (jsonStr) => {
+      impairmentPriorRows.value = safeParseArray(jsonStr).map((r: any) => ({
+        rowId: r.rowId || generateRowId(),
+        label: r.label || '',
+        balance: parseNum(r.balance),
+        ratio: parseNum(r.ratio),
+        provision: parseNum(r.provision),
+        lossRate: parseNum(r.lossRate),
+      }))
+    },
+    { immediate: true },
+  )
+
+  watch(
+    () => allResponses.value.get('D6-note-listed-s3-prior-rows')?.remark,
+    (jsonStr) => {
+      singlePriorRows.value = safeParseArray(jsonStr).map((r: any) => ({
+        rowId: r.rowId || generateRowId(),
+        label: r.label || '',
+        balance: parseNum(r.balance),
+        provision: parseNum(r.provision),
+        lossRate: parseNum(r.lossRate),
+        reason: r.reason || '',
+      }))
+    },
+    { immediate: true },
+  )
+
+  function persistImpairmentPrior(): void {
+    debouncedSave('D6-note-listed-s2-prior-rows', {
+      remark: JSON.stringify(impairmentPriorRows.value),
+    })
+  }
+
+  function persistSinglePrior(): void {
+    debouncedSave('D6-note-listed-s3-prior-rows', {
+      remark: JSON.stringify(singlePriorRows.value),
+    })
+  }
+
+  function addImpairmentPriorRow(): void {
+    impairmentPriorRows.value = [
+      ...impairmentPriorRows.value,
+      { rowId: generateRowId(), label: '', balance: 0, ratio: 0, provision: 0, lossRate: 0 },
+    ]
+    persistImpairmentPrior()
+  }
+
+  function updateImpairmentPriorCell(rowId: string, field: string, value: any): void {
+    const NUMERIC = ['balance', 'ratio', 'provision', 'lossRate']
+    impairmentPriorRows.value = impairmentPriorRows.value.map(r =>
+      r.rowId === rowId ? { ...r, [field]: NUMERIC.includes(field) ? parseNum(value) : value } : r,
+    )
+    persistImpairmentPrior()
+  }
+
+  function removeImpairmentPriorRow(rowId: string): void {
+    impairmentPriorRows.value = impairmentPriorRows.value.filter(r => r.rowId !== rowId)
+    persistImpairmentPrior()
+  }
+
+  function addSinglePriorRow(): void {
+    singlePriorRows.value = [
+      ...singlePriorRows.value,
+      { rowId: generateRowId(), label: '', balance: 0, provision: 0, lossRate: 0, reason: '' },
+    ]
+    persistSinglePrior()
+  }
+
+  function updateSinglePriorCell(rowId: string, field: string, value: any): void {
+    const NUMERIC = ['balance', 'provision', 'lossRate']
+    singlePriorRows.value = singlePriorRows.value.map(r =>
+      r.rowId === rowId ? { ...r, [field]: NUMERIC.includes(field) ? parseNum(value) : value } : r,
+    )
+    persistSinglePrior()
+  }
+
+  function removeSinglePriorRow(rowId: string): void {
+    singlePriorRows.value = singlePriorRows.value.filter(r => r.rowId !== rowId)
+    persistSinglePrior()
   }
 
   // ─── (1) 本期合同资产账面价值的重大变动 ──────────────────────────────
@@ -420,6 +539,18 @@ export function useD6Disclosure(options: UseD6DisclosureOptions) {
     addMajorChangeRow,
     updateMajorChangeCell,
     removeMajorChangeRow,
+    // 主表披露格式二选一（源模板 A20「或：」）
+    mainFormat,
+    setMainFormat,
+    // 上年年末段（手工填列，源模板 G43:K54 / A61「续：」）
+    impairmentPriorRows,
+    addImpairmentPriorRow,
+    updateImpairmentPriorCell,
+    removeImpairmentPriorRow,
+    singlePriorRows,
+    addSinglePriorRow,
+    updateSinglePriorCell,
+    removeSinglePriorRow,
     noteTexts,
   }
 }

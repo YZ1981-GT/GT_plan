@@ -338,6 +338,7 @@ import { ref, computed, watch, onMounted, onBeforeUnmount, provide, toRef, defin
 import http from '@/utils/http'
 import { eventBus } from '@/utils/eventBus'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
+import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useH8CrossSheet } from './composables/useH8CrossSheet'
 import HiFourTableSourcePanel from './shared/HiFourTableSourcePanel.vue'
@@ -473,13 +474,15 @@ const modeOptions = [
 ]
 
 // ─── 项目适用准则（供披露表判定变体） ────────────────────────────────────────
+// 适用准则：本 sheet html_data > runtime context（scaffold 从 render-config 顶层注入）；
+// 两者都缺时才从 template_type 派生（后端 Step 9.5 注入失败的兜底）。
+const hostApplicableStandards = useHostApplicableStandards({
+  htmlData: () => props.htmlData,
+})
 const applicableStandards = computed<string[]>(() => {
-  const pc = props.htmlData?.project_context
-  if (pc?.applicable_standards) return Array.isArray(pc.applicable_standards) ? pc.applicable_standards : [pc.applicable_standards]
-  // 回退从 template_type 派生
-  const tt = pc?.template_type
-  if (tt) return [`${tt}_standalone`]
-  return []
+  if (hostApplicableStandards.value.length) return hostApplicableStandards.value
+  const tt = props.htmlData?.project_context?.template_type
+  return tt ? [`${tt}_standalone`] : []
 })
 
 // ─── sheetName → 编码提取 ────────────────────────────────────────────────────

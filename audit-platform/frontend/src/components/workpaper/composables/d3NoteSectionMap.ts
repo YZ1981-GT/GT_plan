@@ -61,36 +61,64 @@ const T = {
   },
   soe: {
     main: '预收款项',
-    longTerm: '账龄超过1年的重要预收款项',
+    // 🔴 源模板 A10 字面为「预收账款」（非「预收款项」），模板 JSON 已随
+    // fix_note_d_cycle_rest_structure.py 校正 → 表名逐字对齐，否则产出孤儿子表
+    longTerm: '账龄超过1年的重要预收账款',
   },
 } as const
 
 const AMT = 'amount' as const
 const TXT = 'text' as const
 
-// ─── 列头元数据（逐字取自附注模板 headers）────────────────────────────────────
+/**
+ * 合计行字面 = 源模板逐表字面。
+ *
+ * 🔴 源模板内部就不统一（上市三表 `合 计` 单空格 / 国企主表 `合  计` 两空格 /
+ * 国企超1年表 `合计` 无空格），**不能**套全局 `DISCLOSURE_TOTAL_LABEL`
+ * （同 D3 既有结论：硬套反而制造漂移）→ 逐表实证取字面。
+ */
+export const D3_NOTE_TOTAL_LABEL = {
+  listed: '合 计',
+  soeMain: '合  计',
+  soeLongTerm: '合计',
+} as const
+
+/** 已废弃的子表名（按源模板 A10 重命名）→ 随载荷上报 `_removed_table_keys`。 */
+export const D3_OBSOLETE_TABLE_NAMES: Record<D3DisclosureVariant, string[]> = {
+  listed: [],
+  soe: ['账龄超过1年的重要预收款项'],
+}
+
+/** 子表名映射（供共享契约 helper 逐字校验，🔴 值必须与模板 `tables[].name` 一致）。 */
+export const D3_LISTED_SUBTABLE = T.listed
+export const D3_SOE_SUBTABLE = T.soe
+
+// ─── 列头元数据（逐字取自附注模板 headers = 源模板字面）──────────────────────
+// 🔴 每张表首列必须标 `flat`：`_extract_column_groups` 三态里 `None`（未表态）会回退
+// 前缀推断，凭空造出父表头。D3 三张表都是源模板单行表头。
 const MAIN_COLUMNS_LISTED: ColumnDef[] = [
-  { key: 'label', label: '项目', is_label: true },
+  { key: 'label', label: '项 目', is_label: true, flat: true },
   { key: 'end_amount', label: '期末余额', format: AMT },
   { key: 'prior_amount', label: '上年年末余额', format: AMT },
 ]
 const MAIN_COLUMNS_SOE: ColumnDef[] = [
-  { key: 'label', label: '账龄', is_label: true },
+  { key: 'label', label: '账  龄', is_label: true, flat: true },
   { key: 'end_amount', label: '期末余额', format: AMT },
   { key: 'prior_amount', label: '期初余额', format: AMT },
 ]
 const LONG_TERM_COLUMNS_LISTED: ColumnDef[] = [
-  { key: 'label', label: '项目', is_label: true },
+  { key: 'label', label: '项目', is_label: true, flat: true },
   { key: 'end_amount', label: '期末余额', format: AMT },
   { key: 'reason', label: '未偿还或未结转的原因', format: TXT },
 ]
 const LONG_TERM_COLUMNS_SOE: ColumnDef[] = [
-  { key: 'label', label: '债权单位名称', is_label: true },
+  { key: 'label', label: '债权单位名称', is_label: true, flat: true },
   { key: 'end_amount', label: '期末余额', format: AMT },
-  { key: 'reason', label: '未结转原因', format: TXT },
+  // 源模板 A11 = 「未偿还原因」（上市侧才是「未偿还或未结转的原因」）
+  { key: 'reason', label: '未偿还原因', format: TXT },
 ]
 const CHANGE_COLUMNS_LISTED: ColumnDef[] = [
-  { key: 'label', label: '项目', is_label: true },
+  { key: 'label', label: '项目', is_label: true, flat: true },
   { key: 'change_amount', label: '变动金额', format: AMT },
   { key: 'reason', label: '变动原因', format: TXT },
 ]
@@ -145,12 +173,10 @@ export function buildD3SyncPayload(
   }
 
   // ① 主表（上市按性质分类 / 国企按账龄）
-  //
-  // 🔴 合计行标签**不做**结构行映射：D3 附注模板（五、38 / 八、38）合计行字面为
-  // `合计`（无空格），与 D2 §五、5 / §八、5 的 `合 计` 不同 —— 按附注模板逐字照抄，
-  // 不套 `DISCLOSURE_TOTAL_LABEL`，否则反而制造漂移。
   const mainRow = (r: D3RowLike, isTotal = false) => ({
-    label: isTotal || !isSoe ? str(r.label) : toDisclosureAgingLabel(r, SOE_AGING_OVERRIDES),
+    label: isTotal
+      ? (isSoe ? D3_NOTE_TOTAL_LABEL.soeMain : D3_NOTE_TOTAL_LABEL.listed)
+      : (isSoe ? toDisclosureAgingLabel(r, SOE_AGING_OVERRIDES) : str(r.label)),
     end_amount: num(r.endAmount),
     prior_amount: num(r.priorAmount),
     ...(isTotal ? { is_total: true } : {}),
@@ -171,7 +197,7 @@ export function buildD3SyncPayload(
         reason: str(r.reason),
       })),
       {
-        label: snapshot.longTermTotal.label || '合计',
+        label: isSoe ? D3_NOTE_TOTAL_LABEL.soeLongTerm : D3_NOTE_TOTAL_LABEL.listed,
         end_amount: num(snapshot.longTermTotal.endAmount),
         reason: '',
         is_total: true,
@@ -192,7 +218,7 @@ export function buildD3SyncPayload(
           reason: str(r.reason),
         })),
         {
-          label: '合计',
+          label: D3_NOTE_TOTAL_LABEL.listed,
           change_amount: changeRows.reduce((s, r) => s + (num(r.endAmount) - num(r.priorAmount)), 0),
           reason: '',
           is_total: true,
@@ -205,6 +231,10 @@ export function buildD3SyncPayload(
   // ④ 文本框内容
   sub._note_texts = buildD3NoteTexts(snapshot.notes)
 
+  // ⑤ 清理改名前的旧子表（国企超1年表原名「…重要预收款项」）
+  const obsolete = D3_OBSOLETE_TABLE_NAMES[variant].filter((n) => !(n in sub))
+  if (obsolete.length) sub._removed_table_keys = obsolete
+
   return {
     wp_id: wpId,
     sheet_name: D3_DISCLOSURE_SHEET_NAME[variant],
@@ -212,6 +242,22 @@ export function buildD3SyncPayload(
     current_standard: resolveD3CurrentStandard(variant, applicableStandards),
     sub_table_data: sub,
     columns,
+  }
+}
+
+/** 列定义：`{模板表名: ColumnDef[]}`（供覆盖率 sweep 与契约 helper 零参调用）。 */
+export function buildD3ListedColumns(): Record<string, ColumnDef[]> {
+  return {
+    [T.listed.main]: MAIN_COLUMNS_LISTED,
+    [T.listed.longTerm]: LONG_TERM_COLUMNS_LISTED,
+    [T.listed.change]: CHANGE_COLUMNS_LISTED,
+  }
+}
+
+export function buildD3SoeColumns(): Record<string, ColumnDef[]> {
+  return {
+    [T.soe.main]: MAIN_COLUMNS_SOE,
+    [T.soe.longTerm]: LONG_TERM_COLUMNS_SOE,
   }
 }
 

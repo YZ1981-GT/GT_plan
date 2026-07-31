@@ -296,6 +296,7 @@ import { useF3CrossSheet } from './composables/useF3CrossSheet'
 import { useF3DualMode } from './composables/useF3DualMode'
 
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
+import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 
 
@@ -440,11 +441,12 @@ const showHtmlToolbar = computed(() => {
 
 
 
-const applicableStandards = computed(() =>
-
-  formData.projectContext.value?.applicable_standards ?? [],
-
-)
+// 适用准则：显式 prop > 本 sheet html_data > runtime context（scaffold 从 render-config
+// 顶层注入）。收敛到共享 composable，兼容 v2 对象 / 逗号串 / JSON 串。
+const applicableStandards = useHostApplicableStandards({
+  explicit: () => formData.projectContext.value?.applicable_standards,
+  htmlData: () => props.htmlData,
+})
 
 
 

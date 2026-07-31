@@ -155,6 +155,7 @@ import { H10_ACCOUNT_CODE } from './composables/h10Constants'
 import type { ChecklistResponse } from './composables/useF1FormData'
 import HiFourTableSourcePanel from './shared/HiFourTableSourcePanel.vue'
 import { getHiExtractionSegments } from './composables/hiExtractionSegments'
+import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 
 const H10TabProcedure = defineAsyncComponent(() => import('./h10/core/H10TabProcedure.vue'))
 const H10TabAdjudication = defineAsyncComponent(() => import('./h10/core/H10TabAdjudication.vue'))
@@ -188,15 +189,11 @@ const isReadonly = computed(() => !!props.readonly)
 // ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ───
 const runtime = inject(WorkpaperRuntimeContextKey, null)
 
-const applicableStandards = computed<string[]>(() => {
-  const fromProp = props.applicableStandards
-  if (Array.isArray(fromProp) && fromProp.length) return fromProp
-  return (
-    runtime?.applicableStandards?.value
-    ?? props.htmlData?.applicable_standards
-    ?? props.htmlData?.applicableStandards
-    ?? []
-  )
+// 适用准则：显式 prop > 本 sheet html_data > runtime context（scaffold 从 render-config
+// 顶层注入）。收敛到共享 composable，兼容 v2 对象 / 逗号串 / JSON 串。
+const applicableStandards = useHostApplicableStandards({
+  explicit: () => props.applicableStandards,
+  htmlData: () => props.htmlData,
 })
 
 const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)

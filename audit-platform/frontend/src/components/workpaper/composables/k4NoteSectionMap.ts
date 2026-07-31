@@ -40,9 +40,18 @@ export const K4_SUBTABLE = {
   summary: '其他流动负债',
   /** 上市 五、44 T1（条件表：有债券明细行才推） */
   bond: '短期应付债券',
-  /** 上市 五、44 T2 = 「短期应付债券（续）」，模板 name 退化为 `headers[0]`（条件表） */
-  bondCont: '债券名称',
+  /**
+   * 上市 五、44 T2（条件表）。模板原 name 是表头首格泄漏值 `债券名称`，
+   * 已由 `fix_note_k_liability_structure.py` 正名为源 xlsx A24 的「短期应付债券（续）」。
+   */
+  bondCont: '短期应付债券（续）',
 } as const
+
+/**
+ * 模板改名前的旧表名（表头首格泄漏）。同步时上报 `_removed_table_keys`，
+ * 清理既有项目 `sub_table_data` 里的残留孤儿键。
+ */
+export const K4_LEGACY_OBSOLETE_TABLES: readonly string[] = ['债券名称']
 
 // ─── 列定义 ──────────────────────────────────────────────────────────────────
 
@@ -236,6 +245,13 @@ export function buildK4SyncPayload(
       title: '其他流动负债说明',
       text: narrativeText.trim(),
     }]
+  }
+
+  // 模板改名后的旧表名清理（本次推送的键不进 removed，后端亦会跳过）
+  if (variant === 'listed') {
+    const pushed = new Set(Object.keys(sub))
+    const removed = K4_LEGACY_OBSOLETE_TABLES.filter(n => !pushed.has(n))
+    if (removed.length > 0) sub._removed_table_keys = removed
   }
 
   return {

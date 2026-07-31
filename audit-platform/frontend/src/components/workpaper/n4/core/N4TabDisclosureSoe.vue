@@ -1,511 +1,111 @@
 <template>
-  <div class="n4-disclosure-soe" data-testid="n4-disclosure-soe">
-    <!-- ═══ 方法论上下文（琥珀色左边线+浅黄背景） ═══ -->
-    <div class="methodology-context">
-      <p><strong>附注披露（国有企业）</strong>：按国资委格式披露税金及附加各税种的本期与上期发生额明细，分析变动原因。数据自动从N4-1审定表同步。含政府性基金附加等国企特有税费项目。</p>
-    </div>
-
-    <!-- ═══ Section Header ═══ -->
+  <div class="n4-tab-disclosure-soe">
     <div class="section-header">
-      <div class="section-title">
-        <span>税金及附加附注（国有企业） — 17×11</span>
-        <el-tag type="warning" size="small">国资委格式</el-tag>
+      <div class="section-header-left">
+        <el-button text size="small" @click="emit('navigate', '底稿目录')">← 返回目录</el-button>
+        <h3 class="section-title">{{ N4_DISCLOSURE_SHEET_NAME.soe }}</h3>
+        <el-tag type="info" size="small">本版不适用</el-tag>
       </div>
-      <div class="section-actions">
-        <el-button size="small" :loading="aiLoading" :disabled="props.isReadonly" @click="handleAiAssist">
-          <el-icon><MagicStick /></el-icon>AI变动说明
+      <div class="section-header-right">
+        <el-button size="small" @click="emit('navigate', '附注披露信息（上市公司）')">
+          → 打开上市版披露表
         </el-button>
-        <el-button size="small" @click="handleReview">
-          <el-icon><ChatDotSquare /></el-icon>复核
-        </el-button>
+        <GtReviewTrigger section-id="N4-附注国企-不适用" label="💬 复核" />
       </div>
     </div>
 
-    <!-- ═══ 审定数同步提示 ═══ -->
-    <el-alert v-if="adjudicatedTotal != null" type="success" :closable="false" class="sync-hint">
-      已同步N4-1审定发生额合计：{{ fmtAmount(adjudicatedTotal) }}
-      <el-button link size="small" @click="pullFromAdjudication">刷新</el-button>
+    <el-alert type="info" :closable="false" show-icon class="not-applicable-alert">
+      <template #title>国有企业格式财务报表不单独披露税金及附加</template>
+      <template #default>
+        <p class="reason">{{ N4_SOE_NOT_APPLICABLE_REASON }}</p>
+      </template>
     </el-alert>
 
-    <!-- ═══ 主数据表格（国企格式：含政府性基金附加等） ═══ -->
-    <el-table
-      :data="displayRows"
-      border
-      size="small"
-      class="disclosure-table"
-      :row-class-name="getRowClassName"
-    >
-      <el-table-column prop="label" label="税费项目" min-width="170" fixed />
-
-      <el-table-column label="本期发生额" min-width="130" align="right">
-        <template #default="{ row }">
-          <el-input-number
-            v-if="!props.isReadonly && !row.isTotal && !row.isSubtotal"
-            :model-value="row.currentAmount"
-            :controls="false"
-            :precision="2"
-            size="small"
-            class="cell-input"
-            @change="(val: number | undefined) => updateField(row.rowKey, 'currentAmount', val ?? 0)"
-          />
-          <span v-else class="cell-value">{{ fmtAmount(row.currentAmount) }}</span>
-        </template>
-      </el-table-column>
-
-      <el-table-column label="上期发生额" min-width="130" align="right">
-        <template #default="{ row }">
-          <el-input-number
-            v-if="!props.isReadonly && !row.isTotal && !row.isSubtotal"
-            :model-value="row.priorAmount"
-            :controls="false"
-            :precision="2"
-            size="small"
-            class="cell-input"
-            @change="(val: number | undefined) => updateField(row.rowKey, 'priorAmount', val ?? 0)"
-          />
-          <span v-else class="cell-value">{{ fmtAmount(row.priorAmount) }}</span>
-        </template>
-      </el-table-column>
-
-      <el-table-column label="变动额" min-width="110" align="right">
-        <template #header>
-          <el-tooltip content="变动额 = 本期发生额 − 上期发生额" placement="top">
-            <span class="formula-header">变动额</span>
-          </el-tooltip>
-        </template>
-        <template #default="{ row }">
-          <span class="formula-cell">{{ fmtAmount(row.changeAmount) }}</span>
-        </template>
-      </el-table-column>
-
-      <el-table-column label="变动率" min-width="90" align="right">
-        <template #header>
-          <el-tooltip content="变动率 = (本期 − 上期) / |上期|" placement="top">
-            <span class="formula-header">变动率</span>
-          </el-tooltip>
-        </template>
-        <template #default="{ row }">
-          <span :class="['formula-cell', yoyClass(row.changeRate)]">{{ fmtPercent(row.changeRate) }}</span>
-        </template>
-      </el-table-column>
-
-      <el-table-column label="变动说明" min-width="180">
-        <template #default="{ row }">
-          <el-input
-            v-if="!props.isReadonly && !row.isTotal && !row.isSubtotal"
-            :model-value="row.remark"
-            size="small"
-            placeholder="变动说明..."
-            @update:model-value="(val: string) => updateField(row.rowKey, 'remark', val)"
-          />
-          <span v-else>{{ row.remark }}</span>
-        </template>
-      </el-table-column>
-    </el-table>
-
-    <!-- ═══ 附注文本（自由文本，autosize） ═══ -->
-    <el-card shadow="never" class="note-card">
-      <template #header>
-        <div class="note-header">
-          <span>附注说明文本</span>
-          <el-button size="small" :loading="aiLoading" :disabled="props.isReadonly" @click="handleAiNoteText">
-            <el-icon><MagicStick /></el-icon>AI生成
-          </el-button>
-        </div>
-      </template>
-      <el-input
-        v-model="noteText"
-        type="textarea"
-        :autosize="{ minRows: 3, maxRows: 10 }"
-        :disabled="props.isReadonly"
-        placeholder="税金及附加附注披露说明（国资委格式，含政府性基金附加等...）"
-        @input="onNoteTextChange"
-      />
+    <el-card shadow="never" class="disclosure-card">
+      <template #header><span>源模板依据</span></template>
+      <el-descriptions :column="1" border size="small">
+        <el-descriptions-item label="源模板文件">
+          backend/wp_templates/N/N4 税金及附加.xlsx
+        </el-descriptions-item>
+        <el-descriptions-item label="源模板 sheet">
+          {{ N4_DISCLOSURE_SHEET_NAME.soe }}
+        </el-descriptions-item>
+        <el-descriptions-item label="sheet 内容">
+          R5 「附注披露信息：」 / R6 「无」（全 sheet 无表格）
+        </el-descriptions-item>
+        <el-descriptions-item label="附注章节矩阵">
+          shui_jin_ji_fu_jia → soe_standalone / soe_consolidated 均为空
+        </el-descriptions-item>
+        <el-descriptions-item label="上市版对应章节">
+          {{ N4_NOTE_SECTION.listed }} 税金及附加
+        </el-descriptions-item>
+      </el-descriptions>
     </el-card>
+
+    <details class="n4-details-tip">
+      <summary>编制提示</summary>
+      <ul>
+        <li>本页<strong>不是缺功能</strong>：源模板国企版本节内容为「无」，故无披露表、无同步按钮、不产生附注章节</li>
+        <li>国企项目的税金及附加审计工作在 N4-1 审定表、N4-2 明细表与 N4A 程序表完成</li>
+        <li>若项目同时适用上市准则，请到「{{ N4_DISCLOSURE_SHEET_NAME.listed }}」编制披露表</li>
+        <li>如后续国资委格式要求披露，须先补附注章节矩阵与模板章节，再启用本页</li>
+      </ul>
+    </details>
   </div>
 </template>
 
 <script setup lang="ts">
 /**
- * N4TabDisclosureSoe.vue — 附注披露信息（国有企业），17×11
+ * N4TabDisclosureSoe — 税金及附加附注披露（国企）：**本版不适用说明页**
  *
- * Spec: .kiro/specs/n4-taxes-and-surcharges/ Task 4.5
- * Requirements: 5.2-5.4
+ * Spec: `.kiro/specs/n-cycle-tax-disclosure-alignment/`（R2.4 / R5.7 / R6.5）
  *
- * 功能：
- * - 国企格式税种行（含政府性基金附加等国企特有项）
- * - 列：税费项目 | 本期发生额 | 上期发生额 | 变动额 | 变动率 | 变动说明
- * - Subscribe 'substantive:adjudicated' 自动从N4-1拉取审定数据
- * - Publish 'disclosure:note-text-updated' 当文本变化时
- * - AI按钮生成变动说明文本
- * - allResponses持久化，item_id: "N4-disclosure-soe-*"
+ * 🔴 源模板 `N4 税金及附加.xlsx` 的 `附注披露信息（国企）` sheet 内容是
+ * `附注披露信息：` / **`无`** —— 国有企业格式财务报表不单独披露税金及附加。
+ * `note_template_variant_matrix.json` 里 `shui_jin_ji_fu_jia` 的 soe 变体为 `null`，是正确的。
  *
- * 国资委格式：按税费类别分组（一般税费+附加税费+其他）
+ * 本组件此前是**自造的整套国企披露表**（把上市口径复制过来还加了变动分析列），
+ * 会把不存在的章节推给附注。现改为说明页：不提供表格、不提供同步入口、
+ * `buildN4SyncPayload('soe', …)` 恒返回 `null`。
  */
-import { ref, computed, watch, onMounted, onBeforeUnmount, inject } from 'vue'
-import { MagicStick, ChatDotSquare } from '@element-plus/icons-vue'
-import { calcSubtotal, calcYoyChange, parseNum } from '../../composables/useN4FormulaEngine'
-import { api } from '@/services/apiProxy'
-import { eventBus } from '@/utils/eventBus'
+import { onMounted } from 'vue'
+// @ts-ignore
+import GtReviewTrigger from '../../GtReviewTrigger.vue'
+import {
+  N4_DISCLOSURE_SHEET_NAME,
+  N4_NOTE_SECTION,
+  N4_SOE_NOT_APPLICABLE_REASON,
+} from '../../composables/n4NoteSectionMap'
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-
-interface DisclosureRow {
-  rowKey: string
-  label: string
-  currentAmount: number
-  priorAmount: number
-  changeAmount: number
-  changeRate: number | null
-  remark: string
-  isTotal?: boolean
-  isSubtotal?: boolean
-}
-
-// ─── Props ───────────────────────────────────────────────────────────────────
-
-const props = defineProps<{
-  allResponses: Map<string, any>
+defineProps<{
   wpId: string
+  projectId?: string
+  allResponses?: Map<string, any>
   isReadonly?: boolean
+  year?: number
 }>()
 
-// ─── Constants ───────────────────────────────────────────────────────────────
-
-const ITEM_ID = 'N4-disclosure-soe'
-const NOTE_ITEM_ID = 'N4-disclosure-soe-note'
-const ACCOUNT_CODE = '6403'
-
-/** 国企附注税费行定义（国资委格式，含政府性基金附加等） */
-const TAX_ROW_DEFS = [
-  { rowKey: 'consumption-tax', label: '消费税' },
-  { rowKey: 'urban-construction', label: '城市维护建设税' },
-  { rowKey: 'education-surcharge', label: '教育费附加' },
-  { rowKey: 'local-education', label: '地方教育附加' },
-  { rowKey: 'property-tax', label: '房产税' },
-  { rowKey: 'land-use-tax', label: '城镇土地使用税' },
-  { rowKey: 'vehicle-vessel', label: '车船税' },
-  { rowKey: 'stamp-tax', label: '印花税' },
-  { rowKey: 'resource-tax', label: '资源税' },
-  { rowKey: 'environmental-tax', label: '环境保护税' },
-  { rowKey: 'gov-fund', label: '政府性基金附加' },
-  { rowKey: 'water-conservancy', label: '水利建设基金' },
-  { rowKey: 'other', label: '其他' },
-]
-
-// ─── State ───────────────────────────────────────────────────────────────────
-
-const rows = ref<DisclosureRow[]>(defaultRows())
-const noteText = ref('')
-const adjudicatedTotal = ref<number | null>(null)
-const aiLoading = ref(false)
-
-const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function defaultRows(): DisclosureRow[] {
-  return TAX_ROW_DEFS.map((d) => ({
-    rowKey: d.rowKey,
-    label: d.label,
-    currentAmount: 0,
-    priorAmount: 0,
-    changeAmount: 0,
-    changeRate: null,
-    remark: '',
-  }))
-}
-
-function enrichRow(raw: Partial<DisclosureRow> & { rowKey: string }): DisclosureRow {
-  const def = TAX_ROW_DEFS.find((d) => d.rowKey === raw.rowKey)
-  const currentAmount = parseNum(raw.currentAmount)
-  const priorAmount = parseNum(raw.priorAmount)
-  const changeAmount = currentAmount - priorAmount
-  return {
-    rowKey: raw.rowKey,
-    label: def?.label ?? raw.label ?? raw.rowKey,
-    currentAmount,
-    priorAmount,
-    changeAmount,
-    changeRate: calcYoyChange(currentAmount, priorAmount),
-    remark: raw.remark ?? '',
-  }
-}
-
-function fmtAmount(v: number | null | undefined): string {
-  if (v == null) return '—'
-  return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
-
-function fmtPercent(v: number | null): string {
-  if (v == null) return '—'
-  return (v * 100).toFixed(2) + '%'
-}
-
-function yoyClass(v: number | null): string {
-  if (v == null) return ''
-  if (v > 0.3) return 'yoy-up'
-  if (v < -0.3) return 'yoy-down'
-  return ''
-}
-
-function getRowClassName({ row }: { row: DisclosureRow }): string {
-  if (row.isTotal) return 'total-row'
-  if (row.isSubtotal) return 'subtotal-row'
-  return ''
-}
-
-// ─── Computed ────────────────────────────────────────────────────────────────
-
-const displayRows = computed<DisclosureRow[]>(() => {
-  const data = rows.value
-  const totalCurrent = calcSubtotal(data.map((r) => r.currentAmount))
-  const totalPrior = calcSubtotal(data.map((r) => r.priorAmount))
-  const totalChange = totalCurrent - totalPrior
-  const total: DisclosureRow = {
-    rowKey: 'total',
-    label: '合  计',
-    currentAmount: totalCurrent,
-    priorAmount: totalPrior,
-    changeAmount: totalChange,
-    changeRate: calcYoyChange(totalCurrent, totalPrior),
-    remark: '',
-    isTotal: true,
-  }
-  return [...data, total]
-})
-
-// ─── Load from allResponses ──────────────────────────────────────────────────
-
-function loadFromStore(): void {
-  const raw = props.allResponses.get(ITEM_ID)?.remark
-  if (raw) {
-    try {
-      const parsed = JSON.parse(raw)
-      if (Array.isArray(parsed)) {
-        const byKey = new Map(parsed.map((r: any) => [r.rowKey, r]))
-        rows.value = TAX_ROW_DEFS.map((def) =>
-          enrichRow({ ...def, ...byKey.get(def.rowKey) }),
-        )
-      }
-    } catch { /* ignore */ }
-  }
-  noteText.value = props.allResponses.get(NOTE_ITEM_ID)?.conclusion ?? props.allResponses.get(NOTE_ITEM_ID)?.remark ?? ''
-  const adj = props.allResponses.get('N4-1-adjudicated-amount')?.conclusion ?? props.allResponses.get('N4-1-adjudicated-amount')?.remark
-  if (adj != null && adj !== '') adjudicatedTotal.value = parseNum(adj)
-}
-
-watch(() => props.allResponses, loadFromStore, { deep: true, immediate: true })
-
-// ─── Persistence ─────────────────────────────────────────────────────────────
-
-function persist(): void {
-  if (!props.wpId) return
-  const data = rows.value.map(({ rowKey, currentAmount, priorAmount, remark }) => ({
-    rowKey, currentAmount, priorAmount, remark,
-  }))
-  const item = {
-    item_id: ITEM_ID,
-    remark: JSON.stringify(data),
-    conclusion: null,
-  }
-  props.allResponses.set(ITEM_ID, item)
-  void saveSingle(ITEM_ID, item)
-}
-
-function persistNote(): void {
-  if (!props.wpId) return
-  const item = { item_id: NOTE_ITEM_ID, conclusion: noteText.value, remark: null }
-  props.allResponses.set(NOTE_ITEM_ID, item)
-  void saveSingle(NOTE_ITEM_ID, item)
-}
-
-async function saveSingle(itemId: string, data: any): Promise<void> {
-  try {
-    await api.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
-      items: [{
-        item_id: itemId,
-        conclusion: data.conclusion || null,
-        remark: data.remark || null,
-      }],
-    })
-  } catch { /* silent */ }
-}
-
-// ─── Actions ─────────────────────────────────────────────────────────────────
-
-function updateField(rowKey: string, field: 'currentAmount' | 'priorAmount' | 'remark', value: unknown): void {
-  if (props.isReadonly || rowKey === 'total') return
-  rows.value = rows.value.map((r) => {
-    if (r.rowKey !== rowKey) return r
-    const patch = { ...r, [field]: field === 'remark' ? String(value ?? '') : parseNum(value) }
-    return enrichRow(patch)
-  })
-  persist()
-  publishNoteDebounced()
-}
-
-function onNoteTextChange(): void {
-  if (props.isReadonly) return
-  persistNote()
-  publishNoteDebounced()
-}
-
-// ─── EventBus: publish disclosure:note-text-updated ──────────────────────────
-
-let noteTimer: ReturnType<typeof setTimeout> | null = null
-function publishNoteDebounced(): void {
-  if (noteTimer) clearTimeout(noteTimer)
-  noteTimer = setTimeout(() => {
-    noteTimer = null
-    eventBus.emit('disclosure:note-text-updated', {
-      accountCode: ACCOUNT_CODE,
-      wpCode: 'N4',
-      variant: 'soe',
-      text: noteText.value,
-      timestamp: Date.now(),
-    })
-  }, 2000)
-}
-
-// ─── EventBus: subscribe substantive:adjudicated ─────────────────────────────
-
-function handleAdjudicated(payload: any): void {
-  if (payload?.accountCode === ACCOUNT_CODE || payload?.wpCode === 'N4') {
-    adjudicatedTotal.value = parseNum(payload.auditedAmount)
-    pullFromAdjudication()
-  }
-}
-
-function pullFromAdjudication(): void {
-  const adj = props.allResponses.get('N4-1-adjudicated-amount')?.conclusion ?? props.allResponses.get('N4-1-adjudicated-amount')?.remark
-  if (adj != null) adjudicatedTotal.value = parseNum(adj)
-
-  // 尝试从N4-1审定行数据同步各税种审定额
-  const adjData = props.allResponses.get('N4-1-rows')?.remark
-  if (adjData) {
-    try {
-      const adjRows = JSON.parse(adjData)
-      if (Array.isArray(adjRows)) {
-        rows.value = rows.value.map((row) => {
-          const matchRow = adjRows.find((ar: any) => ar.rowKey === row.rowKey)
-          if (matchRow) {
-            return enrichRow({
-              ...row,
-              currentAmount: parseNum(matchRow.audited ?? matchRow.currentAmount),
-            })
-          }
-          return row
-        })
-        persist()
-      }
-    } catch { /* ignore */ }
-  }
-}
-
-// ─── AI Assist ───────────────────────────────────────────────────────────────
-
-async function handleAiAssist(): Promise<void> {
-  if (props.isReadonly) return
-  aiLoading.value = true
-  try {
-    const res = await api.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
-      prompt: '请为国有企业税金及附加附注各税费项目的变动生成简要说明（国资委格式）',
-      // 后端 context 为 dict[str,str]：包一层 dict + 值转 JSON 字符串（直接传字符串会 422）
-      context: { 各税费变动: JSON.stringify(rows.value.map((r) => ({
-        tax: r.label, current: r.currentAmount, prior: r.priorAmount, change: r.changeAmount,
-      }))) },
-      section: 'n4-disclosure-soe-remark',
-    }, { _silent: true } as any)
-    const text = res?.data?.content ?? res?.content ?? ''
-    if (text) {
-      const lines = text.split('\n').filter((l: string) => l.trim())
-      rows.value = rows.value.map((row, idx) => {
-        if (lines[idx] && !row.remark) {
-          return enrichRow({ ...row, remark: lines[idx].replace(/^[^:：]+[:：]\s*/, '') })
-        }
-        return row
-      })
-      persist()
-    }
-  } catch { /* AI is optional */ }
-  finally { aiLoading.value = false }
-}
-
-async function handleAiNoteText(): Promise<void> {
-  if (props.isReadonly) return
-  aiLoading.value = true
-  try {
-    const res = await api.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
-      prompt: '请为国有企业税金及附加附注披露生成完整说明文本（国资委格式，含政府性基金附加等）',
-      // 后端 context 为 dict[str,str]：包一层 dict + 值转 JSON 字符串（直接传字符串会 422）
-      context: { 披露数据: JSON.stringify(displayRows.value.map((r) => ({
-        tax: r.label, current: r.currentAmount, prior: r.priorAmount, changeRate: r.changeRate,
-      }))) },
-      existingContent: noteText.value,
-      section: 'n4-disclosure-soe-note',
-    }, { _silent: true } as any)
-    const text = res?.data?.content ?? res?.content ?? ''
-    if (text) {
-      noteText.value = text
-      persistNote()
-    }
-  } catch { /* AI is optional */ }
-  finally { aiLoading.value = false }
-}
-
-function handleReview(): void {
-  openReviewDialog('N4-disclosure-soe')
-}
-
-// ─── Lifecycle ───────────────────────────────────────────────────────────────
+const emit = defineEmits<{ (e: 'navigate', sheetName: string): void }>()
 
 onMounted(() => {
-  eventBus.on('substantive:adjudicated', handleAdjudicated)
-  pullFromAdjudication()
-})
-
-onBeforeUnmount(() => {
-  eventBus.off('substantive:adjudicated', handleAdjudicated)
-  if (noteTimer) clearTimeout(noteTimer)
+  // 无数据加载：本页无持久化字段，避免多余请求
 })
 </script>
 
 <style scoped>
-.n4-disclosure-soe { font-size: var(--wp-font-size, 13px); padding: 8px 0; }
-.methodology-context {
-  margin-bottom: 12px;
-  padding: 8px 12px;
-  border-left: 3px solid #e6a23c;
-  background: #fdf6ec;
-  border-radius: 2px;
-  font-size: 12px;
-  color: #666;
-}
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-}
-.section-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 15px;
-  font-weight: 600;
-}
-.section-actions { display: flex; gap: 6px; }
-.sync-hint { margin-bottom: 8px; }
-.disclosure-table { margin-bottom: 12px; }
-.cell-input { width: 100%; }
-.cell-value { font-variant-numeric: tabular-nums; }
-.formula-header { border-bottom: 1px dashed #999; cursor: help; }
-.formula-cell { border-bottom: 1px dashed #999; cursor: help; font-variant-numeric: tabular-nums; }
-.yoy-up { color: #f56c6c; }
-.yoy-down { color: #67c23a; }
-.note-card { margin-top: 12px; }
-.note-header { display: flex; justify-content: space-between; align-items: center; }
-:deep(.total-row) { font-weight: 600; background: #f5f7fa !important; }
-:deep(.subtotal-row) { font-weight: 500; background: #fafafa !important; }
+.n4-tab-disclosure-soe { padding: 12px; font-size: var(--wp-font-size, 13px); }
+
+.section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+.section-header-left { display: flex; align-items: center; gap: 8px; }
+.section-header-right { display: flex; align-items: center; gap: 8px; }
+.section-title { margin: 0; font-size: 15px; font-weight: 600; color: #303133; }
+
+.not-applicable-alert { margin-bottom: 16px; }
+.reason { margin: 6px 0 0; line-height: 1.8; }
+
+.disclosure-card { margin-bottom: 16px; }
+
+.n4-details-tip { margin-top: 16px; padding: 12px 16px; background: #fafafa; border: 1px solid #ebeef5; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #606266; }
+.n4-details-tip summary { cursor: pointer; font-weight: 500; color: #303133; }
+.n4-details-tip ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
 </style>

@@ -5,10 +5,11 @@
  * 账龄超过1年的重要应付账款（联动F4-5长期挂账检查表）。
  * 披露文字通过 disclosure:note-text-updated(type='soe') 联动国企附注模块。
  */
-import { computed, inject, onBeforeUnmount, toRef, type Ref } from 'vue'
+import { computed, inject, onBeforeUnmount, toRef, watch, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useF4DisclosureSOE } from '../composables/useF4DisclosureSOE'
 import { useF4AiGenerate } from '../composables/useF4AiGenerate'
+import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
 import GtIndexChip from '../GtIndexChip.vue'
 
 const props = defineProps<{
@@ -48,6 +49,17 @@ const {
 
 const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF4AiGenerate(
   toRef(props, 'wpId') as Ref<string>,
+)
+
+// 保存后自动同步到附注（防抖 / 非阻塞 / 失败静默 / 只读 gate；与手动按钮同源 syncToNotes）。
+// 触发源为披露表实际数据（账龄行 / 重要应付账款行 / 披露正文），详见上市 Tab 同位注释。
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+onBeforeUnmount(() => autoSync.cancelPending())
+
+watch(
+  [agingRows, importantRows, disclosureText],
+  () => { autoSync.scheduleAutoSync(syncToNotes) },
+  { deep: true },
 )
 
 // 账龄区间跟随项目账龄配置；"其他/未分类"（残差行）仅在有余额时展示（合计不受影响）

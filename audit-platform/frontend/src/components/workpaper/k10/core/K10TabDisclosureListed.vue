@@ -66,12 +66,9 @@
         </el-table-column>
         <el-table-column prop="currentAmount" label="本期发生额" min-width="120" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               v-model="row.currentAmount"
-              :controls="false"
-              size="small"
-              style="width: 100%"
               @change="handleRowChange(row)"
             />
             <span v-else :class="{ 'amount-zero': !row.currentAmount }">{{ fmtAmt(row.currentAmount) }}</span>
@@ -79,12 +76,9 @@
         </el-table-column>
         <el-table-column prop="priorAmount" label="上期发生额" min-width="120" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               v-model="row.priorAmount"
-              :controls="false"
-              size="small"
-              style="width: 100%"
               @change="handleRowChange(row)"
             />
             <span v-else>{{ fmtAmt(row.priorAmount) }}</span>
@@ -168,6 +162,7 @@
  * - 补助来源分类+补助类型+确认方式+本期/上期/同比/占比
  */
 import { ref, computed, onMounted, onUnmounted, onBeforeUnmount, inject } from 'vue'
+import { fmtAmount } from '@/utils/formatters'
 import { ElMessage } from 'element-plus'
 import { Refresh, MagicStick } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
@@ -175,6 +170,7 @@ import { api } from '@/services/apiProxy'
 import http from '@/utils/http'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { buildK10SyncPayload } from '../../composables/k10NoteSectionMap'
 
 // ─── Props & Emits ───────────────────────────────────────────────────────────
@@ -200,7 +196,17 @@ onBeforeUnmount(() => autoSync.cancelPending())
 
 async function syncToDisclosureNotes(): Promise<void> {
   if (!props.projectId || props.isReadonly) return
-  const payload = buildK10SyncPayload('listed', props.wpId || '', disclosureRows.value, narrativeText.value)
+  // 🔴 行模型字段是 `category`，旧载荷读 `project` → 曾把标签推成空串
+  const payload = buildK10SyncPayload(
+    'listed',
+    props.wpId || '',
+    disclosureRows.value.map(r => ({
+      project: r.category,
+      currentAmount: r.currentAmount,
+      priorAmount: r.priorAmount,
+    })),
+    narrativeText.value,
+  )
   try {
     await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
     eventBus.emit('disclosure:note-text-updated' as any, {
@@ -433,7 +439,7 @@ async function generateAI(section: string): Promise<void> {
   try {
     const res = await api.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
       section,
-      prompt: `为K10其他收益底稿生成上市公司附注披露文本。来源分类：${CATEGORIES.join('/')}。`,
+      prompt: `为K10其他收益底稿生成上市公司附注披露文本。来源分类：${CATEGORIES.join('/')}。口径以致同 2025 修订版底稿源模板与附注模版为准；只能使用已提供的项目名称与金额，不得虚构项目、金额或业务背景，无把握的内容留空由审计师补充。`,
       context: {
         来源分类: CATEGORIES.join('/'),
         本期合计: String(totalCurrentAmount.value),
@@ -488,9 +494,10 @@ function formatProportion(row: DisclosureRow): string {
   return ((row.currentAmount / total) * 100).toFixed(1) + '%'
 }
 
+/** 只读金额展示：委托平台金额格式单一真源，保留底稿「0 显示 -」语义 */
 function fmtAmt(val: number | null | undefined): string {
   if (val == null || val === 0) return '-'
-  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return fmtAmount(val)
 }
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────

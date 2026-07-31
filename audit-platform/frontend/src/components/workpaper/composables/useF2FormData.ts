@@ -42,43 +42,10 @@ export function readRowJson(resp: ChecklistResponse | undefined): string | null 
   return resp.remark ?? resp.conclusion ?? null
 }
 
-/** 把项目侧适用准则字段规整为 string[]（兼容 v2 对象 / 单字符串 / 数组） */
-export function normalizeApplicableStandards(raw: unknown): string[] {
-  if (raw == null || raw === '') return []
-  if (Array.isArray(raw)) {
-    return raw
-      .flatMap((item) => {
-        if (item == null) return []
-        if (typeof item === 'string') return [item]
-        if (typeof item === 'object') {
-          const o = item as Record<string, unknown>
-          const cand = o.type ?? o.code ?? o.value ?? o.id
-          return cand != null && cand !== '' ? [String(cand)] : []
-        }
-        return [String(item)]
-      })
-      .map((s) => s.trim())
-      .filter(Boolean)
-  }
-  if (typeof raw === 'string') {
-    const t = raw.trim()
-    if (!t) return []
-    if (t.startsWith('[') || t.startsWith('{')) {
-      try {
-        return normalizeApplicableStandards(JSON.parse(t))
-      } catch { /* fall through */ }
-    }
-    return t.split(/[,，;；|/]/).map((s) => s.trim()).filter(Boolean)
-  }
-  if (typeof raw === 'object') {
-    const o = raw as Record<string, unknown>
-    if (Array.isArray(o.standards)) return normalizeApplicableStandards(o.standards)
-    if (Array.isArray(o.list)) return normalizeApplicableStandards(o.list)
-    const type = o.type ?? o.code ?? o.value
-    return type != null && type !== '' ? [String(type)] : []
-  }
-  return []
-}
+// 适用准则归一实现已迁至零依赖 leaf 模块 `./applicableStandards`
+// （`useWorkpaperScaffold` / `hostApplicableStandards` 也要用它，放在本文件会把
+//  element-plus / apiProxy 依赖拖进运行时上下文）。此处 re-export 保持存量 import 不变。
+export { normalizeApplicableStandards } from './applicableStandards'
 
 export function useF2FormData(options: UseF2FormDataOptions) {
   const { wpId, projectId } = options

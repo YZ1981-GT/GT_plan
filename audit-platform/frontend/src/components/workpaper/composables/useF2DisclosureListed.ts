@@ -7,32 +7,54 @@ import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } fro
 import { parseNum, calcSubtotal, calcNetValue, calcAuditedEnd } from './useF2InvMaiFormulaEngine'
 import type { ChecklistResponse } from './useF2FormData'
 import { isF2DisclosureApplicable } from './f2NoteSectionMap'
-import type { F2ListedSyncSnapshot } from './f2DisclosureSyncPayload'
+import type { F2ListedS3Mode, F2ListedSyncSnapshot } from './f2DisclosureSyncPayload'
 import {
   buildDataResourceRows,
   buildDataResourceSyncRows,
   buildDataResourceTieChecks,
+  deriveDataResourceClassRow,
   isDataResourceEmpty,
   setDrCell,
+  type DrClassLinkage,
   type DrColKey,
   type DrValueMap,
 } from './f2DataResourceInventory'
 
-/** Excel 上市披露分类行（与源模板一致；多源科目合并取数） */
+/**
+ * Excel 上市披露分类行（多源科目合并取数）。
+ *
+ * 🔴 `sourceKeys` 的并集必须覆盖 `f2AccountModel.F2_ROW_KEY_ACCOUNT` 的全部非跌价
+ * rowKey，否则该科目的审定数在披露表**没有落点**（合计 ≠ F2-1 审定合计，附注也拿不到）。
+ * Sprint 8 前漏了 `dev-costs`(1409) / `dev-products`(1408) / `price-difference`(1412)
+ * —— 房地产开发企业与商业零售企业的存货审定数在上市披露里直接丢失。
+ * 守卫：`useF2DisclosureListed.spec.ts` 的「sourceKeys 并集 ⊇ 审定表 rowKey 全集」。
+ *
+ * 行序对齐国企版的语义归属：「开发成本」属在建/在产（紧随在产品）、
+ * 「开发产品」属产成品（紧随库存商品）。源模板注（上市 r20）要求
+ * 「房地产开发企业应增加"开发成本""开发产品"等种类」。
+ *
+ * `rowKey` 是**行标识/持久化键**，与取数键是两回事：`work-in-progress` 作为 rowKey
+ * 保留（改名会丢既有 `s2Overrides` / `s2QualMap` 数据），但从 `sourceKeys` 里删除
+ * —— 审定表 1404 的键是 `semi-finished`，`work-in-progress` 从来取不到数。
+ */
 export const F2_LISTED_DISCLOSURE_CATEGORIES: ReadonlyArray<{
   rowKey: string
   label: string
   sourceKeys: readonly string[]
 }> = [
   { rowKey: 'raw-materials', label: '原材料', sourceKeys: ['raw-materials', 'material-in-transit'] },
-  { rowKey: 'work-in-progress', label: '在产品', sourceKeys: ['work-in-progress', 'semi-finished'] },
+  { rowKey: 'work-in-progress', label: '在产品', sourceKeys: ['semi-finished'] },
+  { rowKey: 'dev-costs', label: '开发成本', sourceKeys: ['dev-costs'] },
   { rowKey: 'outsourced-processing', label: '委托加工物资', sourceKeys: ['outsourced-processing'] },
-  { rowKey: 'finished-goods', label: '库存商品', sourceKeys: ['finished-goods'] },
+  // 1412 商品进销差价是 1406 库存商品的备抵/附加科目，会计上不单列
+  { rowKey: 'finished-goods', label: '库存商品', sourceKeys: ['finished-goods', 'price-difference'] },
+  { rowKey: 'dev-products', label: '开发产品', sourceKeys: ['dev-products'] },
   { rowKey: 'goods-in-transit', label: '发出商品', sourceKeys: ['goods-in-transit'] },
   { rowKey: 'revolving-materials', label: '周转材料', sourceKeys: ['revolving-materials'] },
   { rowKey: 'contract-performance', label: '合同履约成本', sourceKeys: ['contract-performance'] },
   { rowKey: 'consumable-bio', label: '消耗性生物资产', sourceKeys: ['consumable-bio'] },
-  { rowKey: 'data-resources', label: '数据资源', sourceKeys: ['data-resources'] },
+  // 数据资源无对应存货科目（1401~1412）→ 从 (8) 数据资源表联动取数，见 loadClassRow
+  { rowKey: 'data-resources', label: '数据资源', sourceKeys: [] },
 ]
 
 const PREFIX = 'F2-note-listed-'
@@ -40,6 +62,8 @@ const ITEM_S2_OVERRIDES = `${PREFIX}s2-overrides`
 const ITEM_S2_QUAL = `${PREFIX}s2-qual`
 const ITEM_S3_END = `${PREFIX}s3-end`
 const ITEM_S3_PRIOR = `${PREFIX}s3-prior`
+/** (3) 计提方式：'portfolio'（按组合）| 'aging'（按库龄组合）——源模板「或：」二选一 */
+const ITEM_S3_MODE = `${PREFIX}s3-mode`
 const ITEM_S5 = `${PREFIX}s5-rows`
 const ITEM_S6 = `${PREFIX}s6-rows`
 const ITEM_S7 = `${PREFIX}s7-rows`
@@ -162,6 +186,23 @@ function sumSources(
   field: string,
 ): number {
   return sourceKeys.reduce((s, key) => s + loadField(map, itemId(block, key, field)), 0)
+}
+
+/** 「数据资源」行：无对应存货科目 → 从 (8) 数据资源表联动（R25） */
+function linkedClassRow(
+  cat: { rowKey: string; label: string },
+  dr: DrClassLinkage,
+): F2ListedClassRow {
+  return {
+    rowKey: cat.rowKey,
+    label: cat.label,
+    endGross: dr.endGross,
+    endImpairment: dr.endImpairment,
+    endNet: calcNetValue(dr.endGross, dr.endImpairment),
+    priorGross: dr.priorGross,
+    priorImpairment: dr.priorImpairment,
+    priorNet: calcNetValue(dr.priorGross, dr.priorImpairment),
+  }
 }
 
 function loadClassRow(
@@ -308,11 +349,31 @@ export function useF2DisclosureListed(options: {
     isF2DisclosureApplicable('listed', applicableStandards.value),
   )
 
-  // ─── (1) 存货分类：跨 sheet 自 F2-1 ─────────────
+  // ─── (8) 数据资源持久化值 ─────────────
+  // 🔴 声明必须早于 `section1Rows`：分类表「数据资源」行从本表联动取数，
+  // 而 computed 可能在 setup 期间（s2 的 immediate watch）就被求值，
+  // 若 `drValues` 还在 TDZ 会直接 ReferenceError。
+  const drValues = ref<DrValueMap>({})
+
+  watch(
+    () => allResponses.value.get(ITEM_S8_DR)?.remark,
+    (json) => { drValues.value = safeParseJson<DrValueMap>(json, {}) },
+    { immediate: true },
+  )
+
+  /** 数据资源表 → 分类表「数据资源」行（R25） */
+  const drClassLinkage: ComputedRef<DrClassLinkage> = computed(() =>
+    deriveDataResourceClassRow(drValues.value),
+  )
+
+  // ─── (1) 存货分类：跨 sheet 自 F2-1；数据资源行自 (8) 联动 ─────────────
   const section1Rows: ComputedRef<F2ListedClassRow[]> = computed(() => {
     void adjudicatedRefreshKey.value
     const map = allResponses.value
-    return F2_LISTED_DISCLOSURE_CATEGORIES.map((cat) => loadClassRow(map, cat))
+    const dr = drClassLinkage.value
+    return F2_LISTED_DISCLOSURE_CATEGORIES.map((cat) =>
+      cat.rowKey === 'data-resources' ? linkedClassRow(cat, dr) : loadClassRow(map, cat),
+    )
   })
 
   const section1Total: ComputedRef<F2ListedClassRow> = computed(() =>
@@ -417,6 +478,18 @@ export function useF2DisclosureListed(options: {
     { immediate: true },
   )
 
+  /**
+   * (3) 计提方式。源模板 R47~R61「按组合计提」与其后「或：…各库龄组合…」是**互斥两组**，
+   * 列结构完全相同 → 共用一套行 state（`s3EndRaw` / `s3PriorRaw`），只切换推送表名与行语义，
+   * 避免第二套 state 造成双真源。
+   */
+  const s3Mode = ref<F2ListedS3Mode>('portfolio')
+  watch(
+    () => allResponses.value.get(ITEM_S3_MODE)?.remark,
+    (v) => { s3Mode.value = v === 'aging' ? 'aging' : 'portfolio' },
+    { immediate: true },
+  )
+
   const s3EndRows = computed(() => enrichS3(s3EndRaw.value))
   const s3PriorRows = computed(() => enrichS3(s3PriorRaw.value))
 
@@ -507,15 +580,7 @@ export function useF2DisclosureListed(options: {
     ending: calcSubtotal(s7Rows.value.map((r) => r.ending)),
   } satisfies F2ListedTurnoverHousingRow))
 
-  // ─── (8) 确认为存货的数据资源 ─────────────
-  const drValues = ref<DrValueMap>({})
-
-  watch(
-    () => allResponses.value.get(ITEM_S8_DR)?.remark,
-    (json) => { drValues.value = safeParseJson<DrValueMap>(json, {}) },
-    { immediate: true },
-  )
-
+  // ─── (8) 确认为存货的数据资源（`drValues` 与 watch 已提前到 (1) 之前声明）─────────────
   const drRows = computed(() => buildDataResourceRows(drValues.value, 'listed'))
   const drIsEmpty = computed(() => isDataResourceEmpty(drValues.value))
 
@@ -560,7 +625,7 @@ export function useF2DisclosureListed(options: {
 
   function flushSave(): void {
     const keys = [
-      ITEM_S2_OVERRIDES, ITEM_S2_QUAL, ITEM_S3_END, ITEM_S3_PRIOR,
+      ITEM_S2_OVERRIDES, ITEM_S2_QUAL, ITEM_S3_END, ITEM_S3_PRIOR, ITEM_S3_MODE,
       ITEM_S5, ITEM_S6, ITEM_S7, ITEM_S8_DR,
       ITEM_NOTE_CATEGORY, ITEM_NOTE_NRV, ITEM_NOTE_PROVISION,
       ITEM_NOTE_BORROW, ITEM_NOTE_AMORT, ITEM_NOTE_RE,
@@ -642,6 +707,32 @@ export function useF2DisclosureListed(options: {
     }
     raw.value.splice(idx, 1, row)
     setItem(itemKey, JSON.stringify(raw.value))
+    debounceSave()
+  }
+
+  /** 库龄组合骨架（源模板未列具体档位，给最常见两档作提示，可改名/增删） */
+  const S3_AGING_SEED_LABELS = ['1年以内', '1至2年'] as const
+
+  /**
+   * 切换 (3) 计提方式。切到「按库龄组合」且组合名全空时，用库龄段预填骨架
+   * （只填名字，金额不动；已有名字一律不覆盖）。
+   */
+  function setS3Mode(mode: F2ListedS3Mode): void {
+    if (isReadonly.value || s3Mode.value === mode) return
+    s3Mode.value = mode
+    setItem(ITEM_S3_MODE, mode)
+    if (mode === 'aging') {
+      for (const [raw, itemKey] of [
+        [s3EndRaw, ITEM_S3_END],
+        [s3PriorRaw, ITEM_S3_PRIOR],
+      ] as const) {
+        if (raw.value.some((r) => r.groupName.trim())) continue
+        raw.value = raw.value.map((r, i) => (
+          i < S3_AGING_SEED_LABELS.length ? { ...r, groupName: S3_AGING_SEED_LABELS[i] } : r
+        ))
+        setItem(itemKey, JSON.stringify(raw.value))
+      }
+    }
     debounceSave()
   }
 
@@ -838,6 +929,7 @@ export function useF2DisclosureListed(options: {
         ending: r.ending,
       })),
       s8DataResourceRows: buildDataResourceSyncRows(drRows.value),
+      s3Mode: s3Mode.value,
       noteCategory: noteCategory.value,
       noteNrv: noteNrv.value,
       noteProvision: noteProvision.value,
@@ -862,6 +954,8 @@ export function useF2DisclosureListed(options: {
     s3EndTotal,
     s3PriorRows,
     s3PriorTotal,
+    s3Mode,
+    setS3Mode,
     s5Rows,
     s5Total,
     s6Rows,

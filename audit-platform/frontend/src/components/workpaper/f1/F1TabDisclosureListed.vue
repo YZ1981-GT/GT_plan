@@ -118,8 +118,16 @@
         账龄段随项目账龄枚举自动适配（当前 {{ agingRows.length }} 档）；
         勾稽：各段之和 = 小计，合计 = 小计 − 减：减值准备（期末 / 上年年末各独立）。
       </p>
-      <div class="note-area">
-        <span class="note-prefix">说明：</span>
+      <div class="note-block">
+        <div class="note-label">
+          <span>说明：</span>
+          <el-button
+            class="ai-btn" size="small" type="primary" plain
+            :disabled="isReadonly || !aiAvailable"
+            :loading="aiLoading && aiActiveSection === 'listed-note-aging'"
+            @click="runAi('listed-note-aging')"
+          >🤖 AI 辅助</el-button>
+        </div>
         <el-input
           v-model="note1"
           type="textarea"
@@ -234,8 +242,16 @@
           </template>
         </el-table-column>
       </el-table>
-      <div class="note-area">
-        <span class="note-prefix">说明：</span>
+      <div class="note-block">
+        <div class="note-label">
+          <span>说明：</span>
+          <el-button
+            class="ai-btn" size="small" type="primary" plain
+            :disabled="isReadonly || !aiAvailable"
+            :loading="aiLoading && aiActiveSection === 'listed-note-over1'"
+            @click="runAi('listed-note-over1')"
+          >🤖 AI 辅助</el-button>
+        </div>
         <el-input
           v-model="note2"
           type="textarea"
@@ -289,8 +305,16 @@
           </template>
         </el-table-column>
       </el-table>
-      <div class="note-area">
-        <span class="note-prefix">说明：</span>
+      <div class="note-block">
+        <div class="note-label">
+          <span>说明：</span>
+          <el-button
+            class="ai-btn" size="small" type="primary" plain
+            :disabled="isReadonly || !aiAvailable"
+            :loading="aiLoading && aiActiveSection === 'listed-note-top5'"
+            @click="runAi('listed-note-top5')"
+          >🤖 AI 辅助</el-button>
+        </div>
         <el-input
           v-model="note3"
           type="textarea"
@@ -314,6 +338,7 @@ import { api } from '@/services/apiProxy'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import { useF1DisclosureListed } from '../composables/useF1DisclosureListed'
 import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
+import { useF1AiGenerate, type F1AiSection } from '../composables/useF1AiGenerate'
 import {
   buildF1ListedSubTableData,
   buildF1SyncPayload,
@@ -399,6 +424,64 @@ const {
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
   applicableStandards: toRef(props, 'applicableStandards') as unknown as Ref<string[]>,
 })
+
+// ─── AI 辅助（每个说明文本域一个 section，键与同步 `_note_texts` 同名）───
+const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF1AiGenerate(
+  toRef(props, 'wpId') as Ref<string>,
+)
+/** 当前正在生成的 section，只在该按钮上转圈 */
+const aiActiveSection = ref<F1AiSection | ''>('')
+
+/** 传给 AI 的上下文：账龄结构 + 集中度，避免模型凭空编数 */
+function aiContext(): Record<string, unknown> {
+  return {
+    noteSection: noteSectionId,
+    agingRows: (agingRows.value ?? []).map((r) => ({
+      aging: r.label,
+      endAmount: r.endAmount,
+      endPct: r.endPct,
+      priorAmount: r.priorAmount,
+      priorPct: r.priorPct,
+    })),
+    agingSubtotal: agingTotal.value,
+    impairment: agingImpairmentRow.value,
+    agingNet: agingNet.value,
+    over1YearRows: (over1YearRows.value ?? []).map((r) => ({
+      debtor: r.debtorName,
+      endBalance: r.endBalance,
+      proportionPct: r.proportionPct,
+      impairment: r.impairment,
+      reason: r.reason,
+    })),
+    over1YearTotal: over1YearTotal.value,
+    top5Rows: (top5Rows.value ?? []).map((r) => ({
+      entity: r.entityName,
+      endBalance: r.endBalance,
+      proportionPct: r.proportionPct,
+    })),
+    top5Total: top5Total.value,
+  }
+}
+
+/** section → 目标 ref + 弹窗标题（模板里 ref 自动解包，故由此表在 script 内回写） */
+const AI_TARGETS: Record<string, { target: Ref<string>; title: string }> = {
+  'listed-note-aging': { target: note1, title: 'AI 生成 · 预付款项按账龄披露说明' },
+  'listed-note-over1': { target: note2, title: 'AI 生成 · 账龄超过1年的重要预付款项说明' },
+  'listed-note-top5': { target: note3, title: 'AI 生成 · 前五名预付款项说明' },
+}
+
+async function runAi(section: F1AiSection): Promise<void> {
+  if (props.isReadonly) return
+  const entry = AI_TARGETS[section]
+  if (!entry) return
+  aiActiveSection.value = section
+  try {
+    const text = await generateAndConfirm(section, entry.target.value || '', aiContext(), entry.title)
+    if (text) entry.target.value = text
+  } finally {
+    aiActiveSection.value = ''
+  }
+}
 
 const over1TotalRow = computed(() => ({
   rowId: '__total__',
@@ -552,6 +635,15 @@ function fmtPct(val: number | null | undefined): string {
 }
 .expand-pane { padding: 8px 24px; display: flex; align-items: flex-start; gap: 10px; }
 .expand-label { font-size: 13px; color: #606266; white-space: nowrap; padding-top: 6px; }
-.note-area { margin-top: 12px; display: flex; align-items: flex-start; gap: 8px; }
-.note-prefix { font-size: 13px; color: #606266; white-space: nowrap; padding-top: 6px; }
+.note-block { margin-top: 12px; }
+/* 文本域标题行：AI 辅助按钮右对齐在同一行（平台底稿 UI 规范） */
+.note-label {
+  font-size: 13px;
+  color: #606266;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ai-btn { margin-left: auto; }
 </style>

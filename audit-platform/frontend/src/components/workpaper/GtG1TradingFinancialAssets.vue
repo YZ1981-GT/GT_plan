@@ -272,6 +272,7 @@ import { eventBus } from '@/utils/eventBus'
 import { useG1TraFinFormData } from './composables/useG1TraFinFormData'
 import { useG1DualMode, type G1RenderMode } from './composables/useG1DualMode'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
+import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInjections'
 import { extractG1SheetCode } from './composables/g1SheetLabels'
 import { buildDirectoryHtmlData } from './composables/gCycleIndexRouting'
@@ -360,22 +361,10 @@ const formData = useG1TraFinFormData({
   onAfterSave: () => scheduleAutoSnapshot(),
 })
 
-/** 适用准则：htmlData / project_context 可能是数组或逗号分隔字符串 */
-const applicableStandards = computed<string[]>(() => {
-  const raw =
-    props.htmlData?.project_context?.applicable_standards
-    ?? props.htmlData?.projectContext?.applicable_standards
-    ?? props.htmlData?.applicable_standards
-    ?? []
-  if (Array.isArray(raw)) return raw.map(String).filter(Boolean)
-  if (typeof raw === 'string' && raw.trim()) {
-    try {
-      const parsed = JSON.parse(raw)
-      if (Array.isArray(parsed)) return parsed.map(String).filter(Boolean)
-    } catch { /* ignore */ }
-    return raw.split(/[,;|]+/).map((s: string) => s.trim()).filter(Boolean)
-  }
-  return []
+// 适用准则：显式 prop > 本 sheet html_data > runtime context（scaffold 从 render-config
+// 顶层注入）。收敛到共享 composable，兼容 v2 对象 / 逗号串 / JSON 串。
+const applicableStandards = useHostApplicableStandards({
+  htmlData: () => props.htmlData,
 })
 
 // ─── 全局勾稽告警 computed ────────────────────────────────────────────────────

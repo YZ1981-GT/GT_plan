@@ -15,7 +15,9 @@
  */
 import { ref, computed, watch, type Ref } from 'vue'
 import {
+  applyParentSums,
   buildDisclosureSubtotal,
+  derivedParentIds,
   recalcDisclosureRow,
   type J1DisclosureRow,
   type J1DisclosureVariant,
@@ -32,7 +34,9 @@ import { J1_DETAIL_SECTION_KEYS } from './useJ1Adjudication'
 // 供 `j1DisclosureDetailPull` / `j1NoteSectionMap` 共用而不产生循环依赖。
 // 此处 re-export，既有 `from '.../useJ1DisclosureSections'` 的 import 保持可用。
 export {
+  applyParentSums,
   buildDisclosureSubtotal,
+  derivedParentIds,
   recalcDisclosureRow,
   type J1DisclosureRow,
   type J1DisclosureVariant,
@@ -235,7 +239,22 @@ export function useJ1DisclosureSections(options: UseJ1DisclosureSectionsOptions)
         /* 忽略损坏数据 */
       }
     }
+    // 历史持久化里父行可能是手工录入值（与子项之和不符）→ 加载后立即上卷对齐源模板口径。
+    // 这里不落库：hydrate 期间的 deep-watch 被抑制，值差异会在用户首次编辑时一并持久化。
+    syncParentSums()
   }
+
+  // ── 父行派生（源模板同表内 SUM 公式；汇总表无缩进行故不涉及） ────────────
+  //
+  // 只有明细两表存在「其中：」缩进子行。派生后父行的三列变成只读展示，
+  // 由 `derivedIds` 交给 `J1MovementTable` 渲染成公式单元格。
+
+  function syncParentSums(): number {
+    return applyParentSums(shortTermData.value) + applyParentSums(postEmploymentData.value)
+  }
+
+  const shortTermDerivedIds = computed(() => derivedParentIds(shortTermData.value))
+  const postEmploymentDerivedIds = computed(() => derivedParentIds(postEmploymentData.value))
 
   // ── 合计 / 小计（历史实现汇总表「合计」行恒为 0，无聚合） ────────────────
   const summaryTotal = computed(() =>
@@ -289,9 +308,11 @@ export function useJ1DisclosureSections(options: UseJ1DisclosureSectionsOptions)
     timer = setTimeout(persist, delay)
   }
 
-  /** 单元格变更：重算期末 + 落库 */
+  /** 单元格变更：重算期末 + 上卷派生父行 + 落库 */
   function onRowChange(row: J1DisclosureRow): void {
     recalcDisclosureRow(row)
+    // 改的是「其中：」子项时，父行（源模板 SUM 公式）必须同步上卷
+    syncParentSums()
     persistDebounced()
   }
 
@@ -364,7 +385,11 @@ export function useJ1DisclosureSections(options: UseJ1DisclosureSectionsOptions)
     )
     const touched =
       shortTerm.matched + shortTerm.appended + postEmployment.matched + postEmployment.appended
-    if (touched > 0) persist()
+    if (touched > 0) {
+      // 带入把父行与子项都写了；父行仍以「Σ 其下其中项」为准（源模板 SUM 公式）
+      syncParentSums()
+      persist()
+    }
     return { shortTerm, postEmployment }
   }
 
@@ -403,6 +428,11 @@ export function useJ1DisclosureSections(options: UseJ1DisclosureSectionsOptions)
     summaryVsAdjudicationDiff,
     pullFromSources,
     pullDetailSections,
+    /** 派生父行 id（明细两表；供 J1MovementTable 渲染只读公式单元格） */
+    shortTermDerivedIds,
+    postEmploymentDerivedIds,
+    /** 增删行后调用：父行随子项集合变化重新上卷 */
+    syncParentSums,
     /** hydrate（内部抑制 deep-watch 回写，避免加载即 PUT） */
     hydrate: hydrateSafe,
     persist,

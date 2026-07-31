@@ -203,6 +203,9 @@ async function selfLoad(): Promise<void> {
   persistence.hydrate(merged)
 }
 
+// 子 tab（披露页多区块导入）导入成功后主动重载 allResponses，否则界面停留在旧值
+provide('reloadWorkpaperData', selfLoad)
+
 /**
  * 子 tab 已完成业务序列化；统一交给 Adapter 管理逐 item debounce/flush/error。
  * 返回 Promise 以兼容子 composable 的 `saveImmediate(items).catch(...)` 契约。

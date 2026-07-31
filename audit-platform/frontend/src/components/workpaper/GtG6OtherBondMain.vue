@@ -154,6 +154,7 @@ import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import type { ChecklistResponse } from './composables/useF1FormData'
 import { matchG6SaveItemsEvent } from './composables/g6CrossHelpers'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
+import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 
 // ─── defineAsyncComponent 懒加载所有子组件 ───────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
@@ -251,14 +252,10 @@ const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: ()
 const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)
 const scheduleAutoSnapshot = runtime?.version.scheduleAutoSnapshot ?? (() => undefined)
 
-/** 适用准则：htmlData / project_context / runtime 任一来源（与 G4/G11/G13 同口径） */
-const applicableStandards = computed<string[]>(() => {
-  const raw =
-    resolvedHtmlData.value?.project_context?.applicable_standards
-    ?? resolvedHtmlData.value?.projectContext?.applicable_standards
-    ?? resolvedHtmlData.value?.applicable_standards
-    ?? runtime?.applicableStandards?.value
-  return Array.isArray(raw) ? raw.map(String) : []
+// 适用准则：显式 prop > 本 sheet html_data > runtime context（scaffold 从 render-config
+// 顶层注入）。收敛到共享 composable，兼容 v2 对象 / 逗号串 / JSON 串。
+const applicableStandards = useHostApplicableStandards({
+  htmlData: () => resolvedHtmlData.value,
 })
 
 // ─── useG6MainFormData ──────────────────────────────────────────────────────

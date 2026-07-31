@@ -4,13 +4,14 @@
  * 对齐源表：按性质披露（联动F4-1审定数、可无限量添加行）+
  * 账龄超过1年的重要应付账款（联动F4-5长期挂账检查表）。
  */
-import { computed, inject, onBeforeUnmount, toRef, type Ref } from 'vue'
+import { computed, inject, onBeforeUnmount, toRef, watch, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   useF4DisclosureListed,
   F4_LISTED_NATURE_OPTIONS,
 } from '../composables/useF4DisclosureListed'
 import { useF4AiGenerate } from '../composables/useF4AiGenerate'
+import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
 import GtIndexChip from '../GtIndexChip.vue'
 
 const props = defineProps<{
@@ -53,6 +54,23 @@ const {
 
 const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF4AiGenerate(
   toRef(props, 'wpId') as Ref<string>,
+)
+
+// 保存后自动同步到附注（防抖 / 非阻塞 / 失败静默 / 只读 gate；与手动按钮同源 syncToNotes）。
+//
+// 🔴 触发源必须是**披露表实际数据**（按性质行 / 账龄超 1 年行 / 披露正文），
+// 不能只监听提示横幅或上游联动标志 —— F2 曾因只 watch `dataUpdatedVisible`（横幅可见性）
+// 导致用户自己改数据一律不触发，必须手动点按钮。
+// 🔴 不加 `_xxxMounted` 一次性防护：防护的消耗时机取决于数据是否已加载，切走再切回时
+// 会吞掉用户回到本页后的第一次真实编辑（浏览器实测）。Vue `watch` 默认 `immediate: false`，
+// 挂载本身不会触发；数据加载引起的那次同步是幂等的空载荷 no-op。
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+onBeforeUnmount(() => autoSync.cancelPending())
+
+watch(
+  [natureRows, agingRows, disclosureText],
+  () => { autoSync.scheduleAutoSync(syncToNotes) },
+  { deep: true },
 )
 
 const totalsConsistent = computed(() =>

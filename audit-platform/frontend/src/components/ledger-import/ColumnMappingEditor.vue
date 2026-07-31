@@ -275,11 +275,16 @@ const referenceProjects = ref<Array<{ id: string; name: string }>>([])
 const loadingProjects = ref(false)
 const importingMapping = ref(false)
 
+// 🔴 `useRoute()` 用 `inject`，**只能在 setup 顶层同步调用**。历史实现写在
+// `getCurrentProjectId()` 函数体里 → prop 为空走回退分支时 inject 拿不到 route →
+// `route.params` 上 TypeError，**回退逻辑实际是死的**（J1/H8 同款缺陷，2026-07-30 由
+// `check_setup_scoped_composables.py` 静态扫出）。
+const currentRoute = useRoute()
+
 /** 获取当前项目 ID（优先 prop，回退路由参数） */
 function getCurrentProjectId(): string {
   if (props.projectId) return props.projectId
-  const route = useRoute()
-  return (route.params.projectId as string) || ''
+  return (currentRoute.params.projectId as string) || ''
 }
 
 // ─── Standard Fields ────────────────────────────────────────────────────────

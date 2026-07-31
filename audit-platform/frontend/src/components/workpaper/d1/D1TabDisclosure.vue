@@ -40,6 +40,8 @@ import { runD1DisclosureChecks } from '../composables/d1DisclosureConsistency'
 import D1DisclosureConsistencyPanel from './D1DisclosureConsistencyPanel.vue'
 // 证据附件（复用平台 ItemAttachment 通道，不新建后端）
 import D1SheetAttachments from './D1SheetAttachments.vue'
+// 🔴 可编辑金额千分符只能用 el-input 接管（EP 的 input-number 无 formatter prop）
+import WpAmountInput from '../shared/WpAmountInput.vue'
 // 金额格式单一真源（与 D1 其余 15 个 Tab 同款 provide/inject + store 兜底）
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
@@ -58,7 +60,22 @@ const props = withDefaults(defineProps<{
 
 // Note textareas per section
 const sectionNotes = ref<Record<string, string>>({})
-const NOTE_SECTION_KEYS = ['top', 'pledged', 'endorsed', 'badDebtClass', 'writeOff'] as const
+/**
+ * 说明文本域子节键 —— **必须覆盖 `sectionOrder` 的全部子节**。
+ *
+ * 🔴 漏一个子节 = 该段说明无处录入、AI 无处落笔、附注 `text_content` 永远缺这一节
+ * （同 D2 `portfolio` 缺文本域那类缺陷）。原先只有 5 个键，而 sectionOrder 是
+ * 6 段（上市）/ 7 段（国企）—— `transfer` 与 `badDebtMovement` 无文本域：
+ * 源模板 R27 括注要求 transfer 段披露「终止确认的金额及相关利得损失」，
+ * R43/R90 要求变动区说明「按组合计提坏账准备的原因」。
+ * 注：`categorySummary`（国企主表）与上市顶部汇总表共用 `top`（= 应收票据总体说明），
+ * 故键集不含 `categorySummary`。
+ * 守卫：`__tests__/d1NoteTextSections.spec.ts`（键集 ⊇ sectionOrder ∪ 'top'）。
+ */
+const NOTE_SECTION_KEYS = [
+  'top', 'pledged', 'endorsed', 'transfer',
+  'badDebtClass', 'badDebtMovement', 'writeOff',
+] as const
 const aiLoadingSection = ref<string>('')
 const isSyncing = ref(false)
 const openReviewDialog = inject<any>('openReviewDialog', null)
@@ -89,10 +106,31 @@ function jumpToNote(target?: NoteVariant): void {
 
 const pendingSaveItems = ref<any[]>([])
 
+/**
+ * 🔴 同一批次不得重复提交相同 `item_id` —— 后端会**整批拒绝**，该批全部数据丢失。
+ *
+ * 本页每张动态表整表存成一个 JSON item（`class-end-rows` 等），2 秒防抖窗口内对同一张表
+ * 改两个格子就必然产生两条同 id 记录。2026-07-30 浏览器实测中招：连改
+ * 商承/银承 的账面余额与坏账准备共 4 次 → 4 条 `D1-disc-soe-class-end-rows` 同批提交 →
+ * 整批被拒、`catch` 静默吞掉，界面看着有值但库里根本没有这个键。
+ *
+ * 按 item_id 去重，**后写覆盖先写**（累积顺序即时间顺序，最后一条是最新整表快照）。
+ */
+function dedupeByItemId(items: any[]): any[] {
+  const byId = new Map<string, any>()
+  for (const it of items) {
+    const key = String(it?.item_id ?? '')
+    if (!key) continue
+    byId.set(key, it)
+  }
+  return [...byId.values()]
+}
+
 const debouncedSave = useDebounceFn(async () => {
   if (pendingSaveItems.value.length === 0) return
-  const items = [...pendingSaveItems.value]
+  const items = dedupeByItemId(pendingSaveItems.value)
   pendingSaveItems.value = []
+  if (items.length === 0) return
   try {
     await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
       project_id: props.projectId,
@@ -100,8 +138,11 @@ const debouncedSave = useDebounceFn(async () => {
     })
     // 保存成功后自动同步到附注（防抖/非阻塞/失败静默）
     autoSync.scheduleAutoSync(syncToDisclosureNotes)
-  } catch {
-    // silently fail - data is already in allResponses map
+  } catch (err) {
+    // 保存失败必须让用户知道（旧实现完全静默 → 数据丢了没人发现）
+    ElMessage.warning('披露表保存失败，请检查网络后重新编辑该单元格')
+    // eslint-disable-next-line no-console
+    console.error('[D1TabDisclosure] checklist-responses 保存失败', err)
   }
 }, 2000)
 
@@ -137,7 +178,7 @@ const {
   addMovementDetailRow, removeMovementDetailRow,
   writeOffAmount, writeOffDetailRows, writeOffDetailTotal,
   addWriteOffRow, removeWriteOffRow,
-  categorySummaryRows, categorySummaryTotal,
+  categorySummaryRows, categorySummaryTotal, canEditCategorySummary,
   updateCell,
 } = useD1Disclosure({
   allResponses: allResponsesRef,
@@ -601,6 +642,33 @@ const consistencySummary = computed(() => {
   })
 })
 
+/**
+ * 主表（分类总表）两级表头。父表头随变体：上市「期末余额 / 上年年末余额」、
+ * 国企「期末数 / 期初数」（逐字取自源模板合并单元格）。
+ * `derived` 列由「账面余额 − 坏账准备」推导，不可录入。
+ */
+const MAIN_TABLE_GROUPS = computed(() => {
+  const isSoe = props.variant === 'soe'
+  return [
+    {
+      group: isSoe ? '期末数' : '期末余额',
+      cols: [
+        { field: 'endBalance', label: '账面余额' },
+        { field: 'endProvision', label: '坏账准备' },
+        { field: 'endBookValue', label: isSoe ? '期末账面价值' : '账面价值', derived: true },
+      ],
+    },
+    {
+      group: isSoe ? '期初数' : '上年年末余额',
+      cols: [
+        { field: 'priorBalance', label: '账面余额' },
+        { field: 'priorProvision', label: '坏账准备' },
+        { field: 'priorBookValue', label: isSoe ? '期初账面价值' : '账面价值', derived: true },
+      ],
+    },
+  ]
+})
+
 /** 国企变动表「本期变动情况」下的 4 个子列（列名逐字取自源模板 C47:F47）。 */
 const SOE_MOVEMENT_CHANGE_COLS = [
   { field: 'provision', label: '计提', width: 90 },
@@ -738,9 +806,22 @@ function buildAiContext(sectionKey: string): string {
     for (const row of [...endorsedRows.value, endorsedTotal.value]) {
       lines.push(`${row.category}: 终止确认=${row.derecognizedAmount}, 未终止确认=${row.notDerecognizedAmount}`)
     }
+  } else if (sectionKey === 'transfer') {
+    for (const row of [...transferRows.value, transferTotal.value]) {
+      lines.push(`${row.category}: 期末转应收账款金额=${row.transferAmount}`)
+    }
   } else if (sectionKey === 'badDebtClass') {
     lines.push(`期末按方法分类合计: 账面余额=${classEndTotal.value.balance}, 坏账准备=${classEndTotal.value.provision}, 账面价值=${classEndTotal.value.bookValue}`)
     lines.push(`上年按方法分类合计: 账面余额=${classPriorTotal.value.balance}, 坏账准备=${classPriorTotal.value.provision}, 账面价值=${classPriorTotal.value.bookValue}`)
+  } else if (sectionKey === 'badDebtMovement') {
+    const m = props.variant === 'soe' ? movementTotal.value : listedMovementRow.value
+    lines.push(`坏账准备变动合计: 期初=${m.priorBalance}, 计提=${m.provision}, 收回或转回=${m.reversal}, 核销=${m.writeOff}, 转销=${m.transfer}, 其他变动=${m.other}, 期末=${m.endBalance}`)
+    if (props.variant === 'soe' && movementDetailRows.value.length > 0) {
+      for (const r of movementDetailRows.value) {
+        lines.push(`  其中 ${r.label}: 期初=${r.priorBalance}, 计提=${r.provision}, 收回或转回=${r.reversal}, 核销=${r.writeOff}, 其他变动=${r.other}, 期末=${r.endBalance}`)
+      }
+    }
+    lines.push(`重要转回或收回明细条数=${reversalDetailRows.value.length}, 金额合计=${reversalDetailTotal.value.amount}`)
   } else if (sectionKey === 'writeOff') {
     lines.push(`本期核销总额=${writeOffAmount.value}`)
     lines.push(`重要核销明细条数=${writeOffDetailRows.value.length}`)
@@ -1021,6 +1102,7 @@ async function syncToDisclosureNotes(): Promise<void> {
       v-if="!isLoading"
       :summary="consistencySummary"
       :project-id="projectId"
+      :is-readonly="isReadonly"
       style="margin: 0 12px"
     />
 
@@ -1052,53 +1134,47 @@ async function syncToDisclosureNotes(): Promise<void> {
                 <span :style="row.rowType === 'summary' ? 'font-weight:600' : ''">{{ row.category }}</span>
               </template>
             </el-table-column>
-            <el-table-column label="期末余额" align="center">
-              <el-table-column label="账面余额" min-width="100" align="right">
+            <!-- 审定表 D1-1 取到数时只读（以审定表为准）；未取到数时开放手工兜底录入 -->
+            <el-table-column
+              v-for="grp in MAIN_TABLE_GROUPS"
+              :key="grp.group"
+              :label="grp.group"
+              align="center"
+            >
+              <el-table-column
+                v-for="col in grp.cols"
+                :key="col.field"
+                :label="col.label"
+                min-width="100"
+                align="right"
+              >
                 <template #default="{ row }">
-                  <el-tooltip v-if="row.isFixed" content="取自审定表D1-1" placement="top">
-                    <span class="amount-cell auto-fetch-cell" v-html="fmtAmt(row.endBalance)" />
-                  </el-tooltip>
-                  <span v-else class="amount-cell" v-html="fmtAmt(row.endBalance)" />
-                </template>
-              </el-table-column>
-              <el-table-column label="坏账准备" min-width="100" align="right">
-                <template #default="{ row }">
-                  <el-tooltip v-if="row.isFixed" content="取自审定表D1-1" placement="top">
-                    <span class="amount-cell auto-fetch-cell" v-html="fmtAmt(row.endProvision)" />
-                  </el-tooltip>
-                  <span v-else class="amount-cell" v-html="fmtAmt(row.endProvision)" />
-                </template>
-              </el-table-column>
-              <el-table-column label="账面价值" min-width="100" align="right">
-                <template #default="{ row }">
-                  <span class="amount-cell" v-html="fmtAmt(row.endBookValue)" />
-                </template>
-              </el-table-column>
-            </el-table-column>
-            <el-table-column label="上年年末余额" align="center">
-              <el-table-column label="账面余额" min-width="100" align="right">
-                <template #default="{ row }">
-                  <el-tooltip v-if="row.isFixed" content="取自审定表D1-1" placement="top">
-                    <span class="amount-cell auto-fetch-cell" v-html="fmtAmt(row.priorBalance)" />
-                  </el-tooltip>
-                  <span v-else class="amount-cell" v-html="fmtAmt(row.priorBalance)" />
-                </template>
-              </el-table-column>
-              <el-table-column label="坏账准备" min-width="100" align="right">
-                <template #default="{ row }">
-                  <el-tooltip v-if="row.isFixed" content="取自审定表D1-1" placement="top">
-                    <span class="amount-cell auto-fetch-cell" v-html="fmtAmt(row.priorProvision)" />
-                  </el-tooltip>
-                  <span v-else class="amount-cell" v-html="fmtAmt(row.priorProvision)" />
-                </template>
-              </el-table-column>
-              <el-table-column label="账面价值" min-width="100" align="right">
-                <template #default="{ row }">
-                  <span class="amount-cell" v-html="fmtAmt(row.priorBookValue)" />
+                  <template v-if="col.derived || row.rowType === 'summary'">
+                    <span class="amount-cell" v-html="fmtAmt(row[col.field])" />
+                  </template>
+                  <template v-else-if="canEditCategorySummary && !isReadonly">
+                    <WpAmountInput
+                      :model-value="row[col.field]"
+                      size="small"
+                      :disabled="isReadonly"
+                      :aria-label="`${grp.group} ${col.label} ${row.category}`"
+                      @change="(v: number) => updateCell('categorySummary', row.rowId, col.field, v)"
+                      style="width:100%"
+                    />
+                  </template>
+                  <template v-else>
+                    <el-tooltip content="取自审定表D1-1" placement="top">
+                      <span class="amount-cell auto-fetch-cell" v-html="fmtAmt(row[col.field])" />
+                    </el-tooltip>
+                  </template>
                 </template>
               </el-table-column>
             </el-table-column>
           </el-table>
+          <div v-if="canEditCategorySummary" class="portfolio-methodology">
+            审定表 D1-1 暂未取到数，本表已开放手工录入（账面价值按「账面余额 − 坏账准备」自动计算）；
+            审定表导数后将自动改回以审定表为准并转为只读。
+          </div>
 
           <div class="section-note listed-top-note">
             <label>说明：</label>
@@ -1158,7 +1234,7 @@ async function syncToDisclosureNotes(): Promise<void> {
                   <template #default="{ row }">
                     <template v-if="row.rowType === 'summary'"><b class="amount-cell" v-html="fmtAmt(row.pledgedAmount)" /></template>
                     <template v-else>
-                      <el-input-number v-model="row.pledgedAmount" :controls="false" size="small" :disabled="isReadonly"
+                      <WpAmountInput v-model="row.pledgedAmount" size="small" :disabled="isReadonly"
                         @change="updateCell('pledged', row.rowId, 'pledgedAmount', row.pledgedAmount)" style="width:100%" />
                     </template>
                   </template>
@@ -1206,7 +1282,7 @@ async function syncToDisclosureNotes(): Promise<void> {
                   <template #default="{ row }">
                     <template v-if="row.rowType === 'summary'"><b class="amount-cell" v-html="fmtAmt(row.derecognizedAmount)" /></template>
                     <template v-else>
-                      <el-input-number v-model="row.derecognizedAmount" :controls="false" size="small" :disabled="isReadonly"
+                      <WpAmountInput v-model="row.derecognizedAmount" size="small" :disabled="isReadonly"
                         @change="updateCell('endorsed', row.rowId, 'derecognizedAmount', row.derecognizedAmount)" style="width:100%" />
                     </template>
                   </template>
@@ -1215,7 +1291,7 @@ async function syncToDisclosureNotes(): Promise<void> {
                   <template #default="{ row }">
                     <template v-if="row.rowType === 'summary'"><b class="amount-cell" v-html="fmtAmt(row.notDerecognizedAmount)" /></template>
                     <template v-else>
-                      <el-input-number v-model="row.notDerecognizedAmount" :controls="false" size="small" :disabled="isReadonly"
+                      <WpAmountInput v-model="row.notDerecognizedAmount" size="small" :disabled="isReadonly"
                         @change="updateCell('endorsed', row.rowId, 'notDerecognizedAmount', row.notDerecognizedAmount)" style="width:100%" />
                     </template>
                   </template>
@@ -1267,7 +1343,7 @@ async function syncToDisclosureNotes(): Promise<void> {
                   <template #default="{ row }">
                     <template v-if="row.rowType === 'summary'"><b class="amount-cell" v-html="fmtAmt(row.transferAmount)" /></template>
                     <template v-else>
-                      <el-input-number v-model="row.transferAmount" :controls="false" size="small" :disabled="isReadonly"
+                      <WpAmountInput v-model="row.transferAmount" size="small" :disabled="isReadonly"
                         @change="updateCell('transfer', row.rowId, 'transferAmount', row.transferAmount)" style="width:100%" />
                     </template>
                   </template>
@@ -1282,10 +1358,19 @@ async function syncToDisclosureNotes(): Promise<void> {
               <div v-if="!isReadonly" style="margin-top:8px">
                 <el-button size="small" :icon="Plus" @click="addTransferRow">添加行</el-button>
               </div>
-              <details v-if="variant === 'listed'" class="guidance-fold">
+              <details class="guidance-fold">
                 <summary>📋 编制提示</summary>
                 <p v-for="(t, i) in DISCLOSURE_GUIDANCE.transferIntro" :key="'transfer-intro-'+i">{{ t }}</p>
               </details>
+              </div>
+              <!-- 源模板 R27 括注要求披露终止确认的金额及相关利得损失 → 需说明文本域 -->
+              <div class="section-note">
+                <label>说明：</label>
+                <el-input type="textarea" :rows="3" :model-value="sectionNotes['transfer'] || ''" placeholder="请输入因出票人未履约转应收账款的相关说明（含终止确认金额及相关利得或损失）..." :disabled="isReadonly" @input="(v: string) => onNoteChange('transfer', v)" />
+                <div class="note-actions">
+                  <el-button size="small" :loading="aiLoadingSection === 'transfer'" :disabled="isReadonly" @click="handleAiGenerate('transfer')">🤖 AI</el-button>
+                  <el-button v-if="openReviewDialog" size="small" @click="handleReview('transfer')">💬 复核</el-button>
+                </div>
               </div>
             </template>
 
@@ -1345,13 +1430,13 @@ async function syncToDisclosureNotes(): Promise<void> {
                     <el-table-column label="账面余额" min-width="120" align="right">
                       <template #default="{ row }">
                         <template v-if="row.rowType==='summary'"><b v-html="fmtAmt(row.balance)" /></template>
-                        <template v-else><el-input-number :model-value="row.balance" :controls="false" size="small" :disabled="isReadonly" @change="(v:number|undefined)=>updateCell('individualEnd', row.rowId, 'balance', Number(v ?? 0))" style="width:100%" /></template>
+                        <template v-else><WpAmountInput :model-value="row.balance" size="small" :disabled="isReadonly" @change="(v: number) =>updateCell('individualEnd', row.rowId, 'balance', v)" style="width:100%" /></template>
                       </template>
                     </el-table-column>
                     <el-table-column label="坏账准备" min-width="120" align="right">
                       <template #default="{ row }">
                         <template v-if="row.rowType==='summary'"><b v-html="fmtAmt(row.provision)" /></template>
-                        <template v-else><el-input-number :model-value="row.provision" :controls="false" size="small" :disabled="isReadonly" @change="(v:number|undefined)=>updateCell('individualEnd', row.rowId, 'provision', Number(v ?? 0))" style="width:100%" /></template>
+                        <template v-else><WpAmountInput :model-value="row.provision" size="small" :disabled="isReadonly" @change="(v: number) =>updateCell('individualEnd', row.rowId, 'provision', v)" style="width:100%" /></template>
                       </template>
                     </el-table-column>
                     <el-table-column label="预期信用损失率(%)" min-width="120" align="right"><template #default="{ row }">{{ fmtPct(row.lossRate || 0) }}</template></el-table-column>
@@ -1402,18 +1487,18 @@ async function syncToDisclosureNotes(): Promise<void> {
                       <template #default="{ row }">
                         <template v-if="row.rowKind === 'summary' || (row.rowKind === 'subtotal' && row.hasDetail)"><span :style="row.rowKind==='summary'?'font-weight:600':''" v-html="fmtAmt(row.balance)" /></template>
                         <template v-else-if="row.rowKind === 'subtotal'">
-                          <el-input-number :model-value="row.balance" :controls="false" size="small" :disabled="isReadonly" @change="(v:number|undefined)=>updateBadDebtClassFixed('end', row.sourceType === 'bank' ? 'bank' : 'commercial', 'balance', Number(v ?? 0))" style="width:100%" />
+                          <WpAmountInput :model-value="row.balance" size="small" :disabled="isReadonly" @change="(v: number) =>updateBadDebtClassFixed('end', row.sourceType === 'bank' ? 'bank' : 'commercial', 'balance', v)" style="width:100%" />
                         </template>
-                        <template v-else><el-input-number :model-value="row.balance" :controls="false" size="small" :disabled="isReadonly" @change="(v:number|undefined)=>updateCell(`portfolio-${row.sourceType}-end`, row.rowId, 'balance', Number(v ?? 0))" style="width:100%" /></template>
+                        <template v-else><WpAmountInput :model-value="row.balance" size="small" :disabled="isReadonly" @change="(v: number) =>updateCell(`portfolio-${row.sourceType}-end`, row.rowId, 'balance', v)" style="width:100%" /></template>
                       </template>
                     </el-table-column>
                     <el-table-column label="坏账准备" min-width="120" align="right">
                       <template #default="{ row }">
                         <template v-if="row.rowKind === 'summary' || (row.rowKind === 'subtotal' && row.hasDetail)"><span :style="row.rowKind==='summary'?'font-weight:600':''" v-html="fmtAmt(row.provision)" /></template>
                         <template v-else-if="row.rowKind === 'subtotal'">
-                          <el-input-number :model-value="row.provision" :controls="false" size="small" :disabled="isReadonly" @change="(v:number|undefined)=>updateBadDebtClassFixed('end', row.sourceType === 'bank' ? 'bank' : 'commercial', 'provision', Number(v ?? 0))" style="width:100%" />
+                          <WpAmountInput :model-value="row.provision" size="small" :disabled="isReadonly" @change="(v: number) =>updateBadDebtClassFixed('end', row.sourceType === 'bank' ? 'bank' : 'commercial', 'provision', v)" style="width:100%" />
                         </template>
-                        <template v-else><el-input-number :model-value="row.provision" :controls="false" size="small" :disabled="isReadonly" @change="(v:number|undefined)=>updateCell(`portfolio-${row.sourceType}-end`, row.rowId, 'provision', Number(v ?? 0))" style="width:100%" /></template>
+                        <template v-else><WpAmountInput :model-value="row.provision" size="small" :disabled="isReadonly" @change="(v: number) =>updateCell(`portfolio-${row.sourceType}-end`, row.rowId, 'provision', v)" style="width:100%" /></template>
                       </template>
                     </el-table-column>
                     <el-table-column label="预期信用损失率(%)" min-width="120" align="right"><template #default="{ row }">{{ fmtPct(row.lossRate || 0) }}</template></el-table-column>
@@ -1473,22 +1558,20 @@ async function syncToDisclosureNotes(): Promise<void> {
                       <template v-if="row.rowKind === 'summary'"><b v-html="fmtAmt(row.balance)" /></template>
                       <template v-else-if="row.rowKind === 'hint'">-</template>
                       <template v-else-if="row.rowKind === 'individual'">
-                        <el-input-number
+                        <WpAmountInput
                           :model-value="row.balance"
-                          :controls="false"
                           size="small"
                           :disabled="isReadonly"
-                          @change="(v: number | undefined) => updateCell('individualEnd', row.rowId, 'balance', Number(v ?? 0))"
+                          @change="(v: number) => updateCell('individualEnd', row.rowId, 'balance', v)"
                           style="width:100%"
                         />
                       </template>
                       <template v-else-if="row.source">
-                        <el-input-number
+                        <WpAmountInput
                           :model-value="row.balance"
-                          :controls="false"
                           size="small"
                           :disabled="isReadonly"
-                          @change="(v: number | undefined) => updateBadDebtClassFixed('end', row.source, 'balance', Number(v ?? 0))"
+                          @change="(v: number) => updateBadDebtClassFixed('end', row.source, 'balance', v)"
                           style="width:100%"
                         />
                       </template>
@@ -1503,22 +1586,20 @@ async function syncToDisclosureNotes(): Promise<void> {
                       <template v-if="row.rowKind === 'summary'"><b v-html="fmtAmt(row.provision)" /></template>
                       <template v-else-if="row.rowKind === 'hint'">-</template>
                       <template v-else-if="row.rowKind === 'individual'">
-                        <el-input-number
+                        <WpAmountInput
                           :model-value="row.provision"
-                          :controls="false"
                           size="small"
                           :disabled="isReadonly"
-                          @change="(v: number | undefined) => updateCell('individualEnd', row.rowId, 'provision', Number(v ?? 0))"
+                          @change="(v: number) => updateCell('individualEnd', row.rowId, 'provision', v)"
                           style="width:100%"
                         />
                       </template>
                       <template v-else-if="row.source">
-                        <el-input-number
+                        <WpAmountInput
                           :model-value="row.provision"
-                          :controls="false"
                           size="small"
                           :disabled="isReadonly"
-                          @change="(v: number | undefined) => updateBadDebtClassFixed('end', row.source, 'provision', Number(v ?? 0))"
+                          @change="(v: number) => updateBadDebtClassFixed('end', row.source, 'provision', v)"
                           style="width:100%"
                         />
                       </template>
@@ -1603,22 +1684,20 @@ async function syncToDisclosureNotes(): Promise<void> {
                       <template v-if="row.rowKind === 'summary'"><b v-html="fmtAmt(row.balance)" /></template>
                       <template v-else-if="row.rowKind === 'hint'">-</template>
                       <template v-else-if="row.rowKind === 'individual'">
-                        <el-input-number
+                        <WpAmountInput
                           :model-value="row.balance"
-                          :controls="false"
                           size="small"
                           :disabled="isReadonly"
-                          @change="(v: number | undefined) => updateCell('individualPrior', row.rowId, 'balance', Number(v ?? 0))"
+                          @change="(v: number) => updateCell('individualPrior', row.rowId, 'balance', v)"
                           style="width:100%"
                         />
                       </template>
                       <template v-else-if="row.source">
-                        <el-input-number
+                        <WpAmountInput
                           :model-value="row.balance"
-                          :controls="false"
                           size="small"
                           :disabled="isReadonly"
-                          @change="(v: number | undefined) => updateBadDebtClassFixed('prior', row.source, 'balance', Number(v ?? 0))"
+                          @change="(v: number) => updateBadDebtClassFixed('prior', row.source, 'balance', v)"
                           style="width:100%"
                         />
                       </template>
@@ -1633,22 +1712,20 @@ async function syncToDisclosureNotes(): Promise<void> {
                       <template v-if="row.rowKind === 'summary'"><b v-html="fmtAmt(row.provision)" /></template>
                       <template v-else-if="row.rowKind === 'hint'">-</template>
                       <template v-else-if="row.rowKind === 'individual'">
-                        <el-input-number
+                        <WpAmountInput
                           :model-value="row.provision"
-                          :controls="false"
                           size="small"
                           :disabled="isReadonly"
-                          @change="(v: number | undefined) => updateCell('individualPrior', row.rowId, 'provision', Number(v ?? 0))"
+                          @change="(v: number) => updateCell('individualPrior', row.rowId, 'provision', v)"
                           style="width:100%"
                         />
                       </template>
                       <template v-else-if="row.source">
-                        <el-input-number
+                        <WpAmountInput
                           :model-value="row.provision"
-                          :controls="false"
                           size="small"
                           :disabled="isReadonly"
-                          @change="(v: number | undefined) => updateBadDebtClassFixed('prior', row.source, 'provision', Number(v ?? 0))"
+                          @change="(v: number) => updateBadDebtClassFixed('prior', row.source, 'provision', v)"
                           style="width:100%"
                         />
                       </template>
@@ -1734,8 +1811,8 @@ async function syncToDisclosureNotes(): Promise<void> {
                         <template #default="{ row }">
                           <template v-if="row.name === '合计'"><b class="amount-cell" v-html="fmtAmt(row.endBalance)" /></template>
                           <template v-else>
-                            <el-input-number :model-value="row.endBalance" :controls="false" size="small" :disabled="isReadonly || !row.endRowId"
-                              @change="(v: number | undefined) => updateCell(`portfolio-${pf.type}-end`, row.endRowId, 'balance', Number(v ?? 0))" style="width:100%" />
+                            <WpAmountInput :model-value="row.endBalance" size="small" :disabled="isReadonly || !row.endRowId"
+                              @change="(v: number) => updateCell(`portfolio-${pf.type}-end`, row.endRowId, 'balance', v)" style="width:100%" />
                           </template>
                         </template>
                       </el-table-column>
@@ -1743,8 +1820,8 @@ async function syncToDisclosureNotes(): Promise<void> {
                         <template #default="{ row }">
                           <template v-if="row.name === '合计'"><b class="amount-cell" v-html="fmtAmt(row.endProvision)" /></template>
                           <template v-else>
-                            <el-input-number :model-value="row.endProvision" :controls="false" size="small" :disabled="isReadonly || !row.endRowId"
-                              @change="(v: number | undefined) => updateCell(`portfolio-${pf.type}-end`, row.endRowId, 'provision', Number(v ?? 0))" style="width:100%" />
+                            <WpAmountInput :model-value="row.endProvision" size="small" :disabled="isReadonly || !row.endRowId"
+                              @change="(v: number) => updateCell(`portfolio-${pf.type}-end`, row.endRowId, 'provision', v)" style="width:100%" />
                           </template>
                         </template>
                       </el-table-column>
@@ -1757,8 +1834,8 @@ async function syncToDisclosureNotes(): Promise<void> {
                         <template #default="{ row }">
                           <template v-if="row.name === '合计'"><b class="amount-cell" v-html="fmtAmt(row.priorBalance)" /></template>
                           <template v-else>
-                            <el-input-number :model-value="row.priorBalance" :controls="false" size="small" :disabled="isReadonly || !row.priorRowId"
-                              @change="(v: number | undefined) => updateCell(`portfolio-${pf.type}-prior`, row.priorRowId, 'balance', Number(v ?? 0))" style="width:100%" />
+                            <WpAmountInput :model-value="row.priorBalance" size="small" :disabled="isReadonly || !row.priorRowId"
+                              @change="(v: number) => updateCell(`portfolio-${pf.type}-prior`, row.priorRowId, 'balance', v)" style="width:100%" />
                           </template>
                         </template>
                       </el-table-column>
@@ -1766,8 +1843,8 @@ async function syncToDisclosureNotes(): Promise<void> {
                         <template #default="{ row }">
                           <template v-if="row.name === '合计'"><b class="amount-cell" v-html="fmtAmt(row.priorProvision)" /></template>
                           <template v-else>
-                            <el-input-number :model-value="row.priorProvision" :controls="false" size="small" :disabled="isReadonly || !row.priorRowId"
-                              @change="(v: number | undefined) => updateCell(`portfolio-${pf.type}-prior`, row.priorRowId, 'provision', Number(v ?? 0))" style="width:100%" />
+                            <WpAmountInput :model-value="row.priorProvision" size="small" :disabled="isReadonly || !row.priorRowId"
+                              @change="(v: number) => updateCell(`portfolio-${pf.type}-prior`, row.priorRowId, 'provision', v)" style="width:100%" />
                           </template>
                         </template>
                       </el-table-column>
@@ -1838,8 +1915,8 @@ async function syncToDisclosureNotes(): Promise<void> {
                           <span :style="row.rowKind==='summary'?'font-weight:600':''" v-html="fmtAmt(row.sourceRow?.priorBalance || 0)" />
                         </template>
                         <template v-else>
-                          <el-input-number :model-value="row.sourceRow?.priorBalance || 0" :controls="false" size="small" :disabled="isReadonly"
-                            @change="(v:number|undefined)=>updateCell(row.rowKind === 'detail' ? 'movementDetail' : 'movement', row.sourceRow.rowId, 'priorBalance', Number(v ?? 0))" style="width:100%" />
+                          <WpAmountInput :model-value="row.sourceRow?.priorBalance || 0" size="small" :disabled="isReadonly"
+                            @change="(v: number) =>updateCell(row.rowKind === 'detail' ? 'movementDetail' : 'movement', row.sourceRow.rowId, 'priorBalance', v)" style="width:100%" />
                         </template>
                       </template>
                     </el-table-column>
@@ -1857,8 +1934,8 @@ async function syncToDisclosureNotes(): Promise<void> {
                             <span :style="row.rowKind==='summary'?'font-weight:600':''" v-html="fmtAmt(row.sourceRow?.[mc.field] || 0)" />
                           </template>
                           <template v-else>
-                            <el-input-number :model-value="row.sourceRow?.[mc.field] || 0" :controls="false" size="small" :disabled="isReadonly"
-                              @change="(v:number|undefined)=>updateCell(row.rowKind === 'detail' ? 'movementDetail' : 'movement', row.sourceRow.rowId, mc.field, Number(v ?? 0))" style="width:100%" />
+                            <WpAmountInput :model-value="row.sourceRow?.[mc.field] || 0" size="small" :disabled="isReadonly"
+                              @change="(v: number) =>updateCell(row.rowKind === 'detail' ? 'movementDetail' : 'movement', row.sourceRow.rowId, mc.field, v)" style="width:100%" />
                           </template>
                         </template>
                       </el-table-column>
@@ -1901,14 +1978,14 @@ async function syncToDisclosureNotes(): Promise<void> {
                     <el-table-column label="转回或收回金额" min-width="130" align="right">
                       <template #default="{ row }">
                         <template v-if="row.rowType==='summary'"><b class="amount-cell" v-html="fmtAmt(row.amount)" /></template>
-                        <template v-else><el-input-number :model-value="row.amount" :controls="false" size="small" :disabled="isReadonly" @change="(v:number|undefined)=>updateCell('reversalDetail', row.rowId, 'amount', Number(v ?? 0))" style="width:100%" /></template>
+                        <template v-else><WpAmountInput :model-value="row.amount" size="small" :disabled="isReadonly" @change="(v: number) =>updateCell('reversalDetail', row.rowId, 'amount', v)" style="width:100%" /></template>
                       </template>
                     </el-table-column>
                     <!-- 源模板 C59==SUM(C55:C58) → 金额列，进合计行 -->
                     <el-table-column label="转回或收回前累计已计提坏账准备金额" min-width="210" align="right">
                       <template #default="{ row }">
                         <template v-if="row.rowType==='summary'"><b class="amount-cell" v-html="fmtAmt(row.cumulativeProvision)" /></template>
-                        <template v-else><el-input-number :model-value="row.cumulativeProvision" :controls="false" size="small" :disabled="isReadonly" @change="(v:number|undefined)=>updateCell('reversalDetail', row.rowId, 'cumulativeProvision', Number(v ?? 0))" style="width:100%" /></template>
+                        <template v-else><WpAmountInput :model-value="row.cumulativeProvision" size="small" :disabled="isReadonly" @change="(v: number) =>updateCell('reversalDetail', row.rowId, 'cumulativeProvision', v)" style="width:100%" /></template>
                       </template>
                     </el-table-column>
                     <el-table-column label="转回或收回原因、方式" min-width="180">
@@ -1950,12 +2027,12 @@ async function syncToDisclosureNotes(): Promise<void> {
                         <span class="amount-cell" v-html="fmtAmt(row.value)" />
                       </template>
                       <template v-else>
-                        <el-input-number
+                        <WpAmountInput
                           :model-value="row.value"
-                          :controls="false"
                           size="small"
                           :disabled="isReadonly"
-                          @change="(v: number | undefined) => updateCell('movement', listedMovementRow.rowId, row.key, Number(v ?? 0))"
+                          :aria-label="`坏账准备金额 ${row.label}`"
+                          @change="(v: number) => updateCell('movement', listedMovementRow.rowId, row.key, v)"
                           style="width:100%"
                         />
                       </template>
@@ -2025,12 +2102,11 @@ async function syncToDisclosureNotes(): Promise<void> {
                     <template #default="{ row }">
                       <template v-if="row.rowType==='summary'"><b class="amount-cell" v-html="fmtAmt(row.amount)" /></template>
                       <template v-else>
-                        <el-input-number
+                        <WpAmountInput
                           :model-value="row.amount"
-                          :controls="false"
                           size="small"
                           :disabled="isReadonly"
-                          @change="(v: number | undefined) => updateCell('reversalDetail', row.rowId, 'amount', Number(v ?? 0))"
+                          @change="(v: number) => updateCell('reversalDetail', row.rowId, 'amount', v)"
                           style="width:100%"
                         />
                       </template>
@@ -2042,6 +2118,15 @@ async function syncToDisclosureNotes(): Promise<void> {
                 </el-table>
                 </div>
               </template>
+              <!-- 源模板 R43/R90「说明：按组合计提坏账准备的原因」→ 需说明文本域 -->
+              <div class="section-note">
+                <label>说明：</label>
+                <el-input type="textarea" :rows="3" :model-value="sectionNotes['badDebtMovement'] || ''" placeholder="请输入坏账准备变动相关说明（含按组合计提坏账准备的原因、重要转回或收回的原因与方式）..." :disabled="isReadonly" @input="(v: string) => onNoteChange('badDebtMovement', v)" />
+                <div class="note-actions">
+                  <el-button size="small" :loading="aiLoadingSection === 'badDebtMovement'" :disabled="isReadonly" @click="handleAiGenerate('badDebtMovement')">🤖 AI</el-button>
+                  <el-button v-if="openReviewDialog" size="small" @click="handleReview('badDebtMovement')">💬 复核</el-button>
+                </div>
+              </div>
             </template>
 
             <!-- ═══ 6.7 Write-off Section ═══ -->
@@ -2060,12 +2145,11 @@ async function syncToDisclosureNotes(): Promise<void> {
                 </el-table-column>
                 <el-table-column label="核销金额" min-width="180" align="right">
                   <template #default="{ row }">
-                    <el-input-number
+                    <WpAmountInput
                       :model-value="row.amount"
-                      :controls="false"
                       size="small"
                       :disabled="isReadonly"
-                      @change="(v: number | undefined) => updateCell('writeOffAmount', '', 'amount', Number(v ?? 0))"
+                      @change="(v: number) => updateCell('writeOffAmount', '', 'amount', v)"
                       style="width:100%"
                     />
                   </template>
@@ -2112,12 +2196,11 @@ async function syncToDisclosureNotes(): Promise<void> {
                   <template #default="{ row }">
                     <template v-if="row.rowType==='summary'"><b class="amount-cell" v-html="fmtAmt(row.amount)" /></template>
                     <template v-else>
-                      <el-input-number
+                      <WpAmountInput
                         :model-value="row.amount"
-                        :controls="false"
                         size="small"
                         :disabled="isReadonly"
-                        @change="(v: number | undefined) => updateCell('writeOffDetail', row.rowId, 'amount', Number(v ?? 0))"
+                        @change="(v: number) => updateCell('writeOffDetail', row.rowId, 'amount', v)"
                         style="width:100%"
                       />
                     </template>
@@ -2197,45 +2280,61 @@ async function syncToDisclosureNotes(): Promise<void> {
                 <el-table-column label="票据种类" min-width="130" fixed>
                   <template #default="{ row }"><span :style="row.rowType==='summary'?'font-weight:600':''">{{ row.category }}</span></template>
                 </el-table-column>
-                <el-table-column label="期末数" align="center">
-                  <el-table-column label="账面余额" min-width="100" align="right">
+                <!-- 与上市顶部汇总表共用 MAIN_TABLE_GROUPS（父表头随变体切换），
+                     审定表未取数时同样开放手工兜底录入 -->
+                <el-table-column
+                  v-for="grp in MAIN_TABLE_GROUPS"
+                  :key="grp.group"
+                  :label="grp.group"
+                  align="center"
+                >
+                  <el-table-column
+                    v-for="col in grp.cols"
+                    :key="col.field"
+                    :label="col.label"
+                    min-width="100"
+                    align="right"
+                  >
                     <template #default="{ row }">
-                      <el-tooltip content="取自审定表D1-1" placement="top">
-                        <span class="amount-cell auto-fetch-cell" v-html="fmtAmt(row.endBalance)" />
-                      </el-tooltip>
+                      <template v-if="col.derived || row.rowType === 'summary'">
+                        <span class="amount-cell" v-html="fmtAmt(row[col.field])" />
+                      </template>
+                      <template v-else-if="canEditCategorySummary && !isReadonly">
+                        <WpAmountInput
+                          :model-value="row[col.field]"
+                          size="small"
+                          :disabled="isReadonly"
+                          :aria-label="`${grp.group} ${col.label} ${row.category}`"
+                          @change="(v: number) => updateCell('categorySummary', row.rowId, col.field, v)"
+                          style="width:100%"
+                        />
+                      </template>
+                      <template v-else>
+                        <el-tooltip content="取自审定表D1-1" placement="top">
+                          <span class="amount-cell auto-fetch-cell" v-html="fmtAmt(row[col.field])" />
+                        </el-tooltip>
+                      </template>
                     </template>
-                  </el-table-column>
-                  <el-table-column label="坏账准备" min-width="100" align="right">
-                    <template #default="{ row }">
-                      <el-tooltip content="取自审定表D1-1" placement="top">
-                        <span class="amount-cell auto-fetch-cell" v-html="fmtAmt(row.endProvision)" />
-                      </el-tooltip>
-                    </template>
-                  </el-table-column>
-                  <el-table-column label="期末账面价值" min-width="100" align="right">
-                    <template #default="{ row }"><span class="amount-cell" v-html="fmtAmt(row.endBookValue)" /></template>
-                  </el-table-column>
-                </el-table-column>
-                <el-table-column label="期初数" align="center">
-                  <el-table-column label="账面余额" min-width="100" align="right">
-                    <template #default="{ row }">
-                      <el-tooltip content="取自审定表D1-1" placement="top">
-                        <span class="amount-cell auto-fetch-cell" v-html="fmtAmt(row.priorBalance)" />
-                      </el-tooltip>
-                    </template>
-                  </el-table-column>
-                  <el-table-column label="坏账准备" min-width="100" align="right">
-                    <template #default="{ row }">
-                      <el-tooltip content="取自审定表D1-1" placement="top">
-                        <span class="amount-cell auto-fetch-cell" v-html="fmtAmt(row.priorProvision)" />
-                      </el-tooltip>
-                    </template>
-                  </el-table-column>
-                  <el-table-column label="期初账面价值" min-width="100" align="right">
-                    <template #default="{ row }"><span class="amount-cell" v-html="fmtAmt(row.priorBookValue)" /></template>
                   </el-table-column>
                 </el-table-column>
               </el-table>
+              <div v-if="canEditCategorySummary" class="portfolio-methodology">
+                审定表 D1-1 暂未取到数，本表已开放手工录入（账面价值按「账面余额 − 坏账准备」自动计算）；
+                审定表导数后将自动改回以审定表为准并转为只读。
+              </div>
+              <!-- 国企主表的总体说明与上市顶部汇总表共用 `top` 键（= 应收票据说明） -->
+              <div class="section-note">
+                <label>说明：</label>
+                <details class="guidance-fold">
+                  <summary>📋 编制提示</summary>
+                  <p v-for="(t, i) in DISCLOSURE_GUIDANCE.top" :key="'soe-top-tip-'+i">{{ t }}</p>
+                </details>
+                <el-input type="textarea" :rows="3" :model-value="sectionNotes['top'] || ''" placeholder="请输入应收票据相关说明..." :disabled="isReadonly" @input="(v: string) => onNoteChange('top', v)" />
+                <div class="note-actions">
+                  <el-button size="small" :loading="aiLoadingSection === 'top'" :disabled="isReadonly" @click="handleAiGenerate('top')">🤖 AI</el-button>
+                  <el-button v-if="openReviewDialog" size="small" @click="handleReview('top')">💬 复核</el-button>
+                </div>
+              </div>
             </template>
 
           </div>

@@ -21,6 +21,11 @@ export interface GtWorkpaperShellProps {
   year?: number
   agingSubject?: string
   readonly?: boolean
+  /**
+   * 项目适用准则（供披露 Tab 变体门控）。接受数组 / 逗号串 / v2 对象，
+   * 由 scaffold 归一后 provide；套壳路径不经 render-config，故须由使用方传入。
+   */
+  applicableStandards?: unknown
 }
 
 const props = defineProps<GtWorkpaperShellProps>()
@@ -49,6 +54,7 @@ const scaffold = useWorkpaperScaffold({
   year: toRef(props, 'year') as Ref<number | undefined>,
   agingSubject: props.agingSubject,
   readonly: toRef(props, 'readonly') as Ref<boolean | undefined>,
+  applicableStandards: toRef(props, 'applicableStandards'),
   onJumpToSection: (sheetLabel: string) => emit('jump-to-section', sheetLabel),
   reloadFn: () => emit('reload'),
 })

@@ -24,6 +24,13 @@ export type F1AiSection =
   | 'detail-fluctuation'
   | 'detail-over1year'
   | 'detail-conclusion'
+  // 附注披露说明（键与 `_note_texts` 的 section 同名，便于同步链路对照）
+  | 'listed-note-aging'
+  | 'listed-note-over1'
+  | 'listed-note-top5'
+  | 'soe-note-aging'
+  | 'soe-note-over1'
+  | 'soe-note-top5'
 
 export function useF1AiGenerate(wpId: Ref<string>) {
   const aiAvailable = ref(false)

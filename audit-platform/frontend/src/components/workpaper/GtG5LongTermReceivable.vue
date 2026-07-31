@@ -197,6 +197,7 @@ import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import type { ChecklistResponse } from './composables/useF1FormData'
 import { extractG5SheetCode, resolveG5SheetLabel } from './composables/g5SheetLabels'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
+import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 const G5TabProcedure = defineAsyncComponent(() => import('./g5-long-term-receivable/core/G5TabProcedure.vue'))
@@ -311,15 +312,10 @@ const isOoAvailable = computed(() => dualMode.isOoAvailable.value)
 
 const runtime = inject(WorkpaperRuntimeContextKey, null)
 
-/** 适用准则：htmlData / project_context / runtime 任一来源（与 G11/G13 同口径） */
-const applicableStandards = computed<string[]>(() => {
-  const html = props.htmlData as Record<string, any> | null | undefined
-  const raw =
-    html?.project_context?.applicable_standards
-    ?? html?.projectContext?.applicable_standards
-    ?? html?.applicable_standards
-    ?? runtime?.applicableStandards?.value
-  return Array.isArray(raw) ? raw.map(String) : []
+// 适用准则：显式 prop > 本 sheet html_data > runtime context（scaffold 从 render-config
+// 顶层注入）。收敛到共享 composable，兼容 v2 对象 / 逗号串 / JSON 串。
+const applicableStandards = useHostApplicableStandards({
+  htmlData: () => props.htmlData as Record<string, any> | null | undefined,
 })
 const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
 const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)

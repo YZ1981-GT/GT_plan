@@ -521,10 +521,20 @@ export function useD1Disclosure(options: UseD1DisclosureOptions) {
 
   // ─── Category Summary - SOE Only (Task 2.8) ──────────────────────────────
   const importedTopSummaryRows = ref<any[]>(loadRows<any>('top-summary-rows'))
+
+  /**
+   * 主表（分类总表）行。优先走审定表 D1-1 跨表取数；取不到时回落到
+   * **手工录入 / 导入的 `top-summary-rows`**。
+   *
+   * 🔴 回退分支原先写死 `variant === 'soe'` → 上市侧在审定表未加载时主表恒 0
+   * （浏览器实测全为 `-`），且导入模板里的 topSummary 对上市**导了也不生效**。
+   * 两个变体的主表语义完全相同（票据种类 × 双期 × 账面余额/坏账准备/账面价值），
+   * 没有理由只让国企有兜底。
+   */
   const categorySummaryRows = computed<CategorySummaryRow[]>(() => {
     const d = crossSheetData.value
     const hasCross = Boolean(d.bankEndBalance || d.bankPriorBalance || d.bankEndProvision || d.bankPriorProvision || d.commercialEndBalance || d.commercialPriorBalance || d.commercialEndProvision || d.commercialPriorProvision)
-    if (!hasCross && variant === 'soe' && importedTopSummaryRows.value.length > 0) {
+    if (!hasCross && importedTopSummaryRows.value.length > 0) {
       return importedTopSummaryRows.value.map((r, idx) => ({
         rowId: r.rowId || `cat-import-${idx}`,
         rowType: (r.rowType || 'fixed') as RowType,
@@ -551,6 +561,12 @@ export function useD1Disclosure(options: UseD1DisclosureOptions) {
       },
     ]
   })
+
+  /**
+   * 主表是否可手工录入 —— 审定表 D1-1 未取到数时开放（否则以审定表为准，只读）。
+   * 两个变体一致：主表是附注交付的第一张表，不能因上游未导数就永远是 0 且无法补录。
+   */
+  const canEditCategorySummary = computed(() => crossSheetStatus.value === 'empty')
 
   const categorySummaryTotal = computed<CategorySummaryRow>(() => {
     const rows = categorySummaryRows.value
@@ -639,6 +655,22 @@ export function useD1Disclosure(options: UseD1DisclosureOptions) {
     } else if (section === 'writeOffDetail') {
       writeOffDetailRows.value = writeOffDetailRows.value.map(r => r.rowId === rowId ? { ...r, [field]: field === 'amount' ? numVal : value } : r)
       persistRows('writeoff-rows', writeOffDetailRows.value)
+    } else if (section === 'categorySummary') {
+      // 手工兜底：审定表 D1-1 未取到数时允许直接录主表，写入 `top-summary-rows`
+      // （与导入路径同一个持久化键，两者互为覆盖，不新建第二真源）。
+      if (!canEditCategorySummary.value) return
+      const base = importedTopSummaryRows.value.length > 0
+        ? importedTopSummaryRows.value
+        : categorySummaryRows.value.map(r => ({ ...r }))
+      const next = base.map((r: any) => {
+        if (String(r.rowId) !== rowId) return r
+        const updated: any = { ...r, [field]: numVal }
+        updated.endBookValue = calcNetValue(parseNum(updated.endBalance), parseNum(updated.endProvision))
+        updated.priorBookValue = calcNetValue(parseNum(updated.priorBalance), parseNum(updated.priorProvision))
+        return updated
+      })
+      importedTopSummaryRows.value = next
+      persistRows('top-summary-rows', next)
     } else if (section === 'writeOffAmount') {
       writeOffAmount.value = numVal
       const fullId = prefix + 'writeoff-amount'
@@ -676,8 +708,8 @@ export function useD1Disclosure(options: UseD1DisclosureOptions) {
     addMovementDetailRow, removeMovementDetailRow,
     // Write-off
     writeOffAmount, writeOffDetailRows, writeOffDetailTotal, addWriteOffRow, removeWriteOffRow,
-    // Category summary (SOE)
-    categorySummaryRows, categorySummaryTotal,
+    // Category summary（主表，两个变体共用；审定表未取数时可手工兜底）
+    categorySummaryRows, categorySummaryTotal, canEditCategorySummary,
     // Generic
     updateCell,
   }

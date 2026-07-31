@@ -165,6 +165,7 @@ import { G9_ACCOUNT_CODE } from './composables/g9Constants'
 import { parseNum } from './composables/useG9FormulaEngine'
 import type { ChecklistResponse } from './composables/useF1FormData'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
+import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 
 const G9TabProcedure = defineAsyncComponent(() => import('./g9-other-noncurrent-financial/core/G9TabProcedure.vue'))
 const G9TabAdjudication = defineAsyncComponent(() => import('./g9-other-noncurrent-financial/core/G9TabAdjudication.vue'))
@@ -221,14 +222,10 @@ provide('getRowDot', getRowDot)
 
 const currentSheet = computed(() => extractG9SheetCode(props.sheetName || props.wpCode || ''))
 
-/** 适用准则：htmlData / project_context / runtime 任一来源（与 G11/G13 同口径） */
-const applicableStandards = computed<string[]>(() => {
-  const raw =
-    props.htmlData?.project_context?.applicable_standards
-    ?? props.htmlData?.projectContext?.applicable_standards
-    ?? props.htmlData?.applicable_standards
-    ?? runtime?.applicableStandards?.value
-  return Array.isArray(raw) ? raw.map(String) : []
+// 适用准则：显式 prop > 本 sheet html_data > runtime context（scaffold 从 render-config
+// 顶层注入）。收敛到共享 composable，兼容 v2 对象 / 逗号串 / JSON 串。
+const applicableStandards = useHostApplicableStandards({
+  htmlData: () => props.htmlData,
 })
 
 const HTML_SHEETS = new Set(['G9A', 'G9-1', 'G9-2', 'G9-3', 'G9-4', 'G9-5', 'G9-6', '附注上市', '附注国企', '底稿目录'])

@@ -15,10 +15,32 @@
       <el-button size="small" type="primary" plain :disabled="!projectId" @click="jumpToNote">
         ↩ 跳转回附注（五、40）
       </el-button>
+      <!-- 多区块导入导出：一区块一 sheet + 说明域集中「文本说明」sheet（后端 _j1_disclosure_import_export） -->
+      <CycleImportExportDropdown
+        :wp-id="props.wpId"
+        api-prefix="j1"
+        sheet="J1-note-listed"
+        :disabled="isReadonly"
+        @imported="onImported"
+      />
       <span class="chip-wrap"><GtIndexChip value="wp:J1-1" :context-project-id="projectId" /></span>
       <span class="chip-wrap"><GtIndexChip value="wp:J1-2" :context-project-id="projectId" /></span>
       <span class="chip-wrap"><GtIndexChip :value="`Note:${J1_NOTE_SECTION.listed}`" :context-project-id="projectId" /></span>
       <GtReviewTrigger section-id="J1-disclosure-listed" />
+    </div>
+
+    <!-- 披露内部勾稽（源模板 Excel 公式可判定的关系） -->
+    <J1DisclosureConsistencyPanel
+      :result="consistency"
+      :project-id="projectId"
+      :default-expanded="consistency.errorCount > 0"
+    />
+
+    <!-- 方法论上下文（源模板 R13~R15 红字提示，嵌在汇总表上方） -->
+    <div class="methodology-block">
+      <p>【提示：</p>
+      <p>1、辞退福利包括（1）预期在其确认的年度报告期间期末后12个月内完全支付的辞退福利；（2）补偿款超过1年支付的辞退计划将于年度报告期间期末后12个月内支付的款项，例如内退计划将于下一年支付的金额。</p>
+      <p>2、一年内到期的其他福利：指一年内到期的其他长期福利（不含设定受益计划）；应根据「长期应付职工薪酬」项目分析填列。】</p>
     </div>
 
     <!-- 第一部分：应付职工薪酬汇总 -->
@@ -37,62 +59,24 @@
       <el-alert v-if="adjudicationEndTotal !== 0" :closable="false" show-icon
         :type="Math.abs(summaryVsAdjudicationDiff) < 0.01 ? 'success' : 'warning'" class="recon-alert">
         <template #title>
-          附注汇总期末合计 {{ fmtN(summaryRows.at(-1)?.endBalance ?? 0) }}
+          附注汇总期末合计 {{ fmtN(summaryEndTotal) }}
           ｜审定表 J1-1 期末审定合计 {{ fmtN(adjudicationEndTotal) }}
           ｜差异 {{ fmtN(summaryVsAdjudicationDiff) }}
           {{ Math.abs(summaryVsAdjudicationDiff) < 0.01 ? '（勾稽一致）' : '（请核查或点「从审定表/明细表带入」）' }}
         </template>
       </el-alert>
-      <el-table :data="summaryRows" border size="small"
-        :row-class-name="({ row }) => row.isSubtotal ? 'subtotal-row' : ''">
-        <el-table-column label="项 目" min-width="240">
-          <template #default="{ row }">
-            <template v-if="row.isSubtotal"><span class="subtotal-label">{{ row.label }}</span></template>
-            <el-input v-else v-model="row.label" size="small" :disabled="isReadonly" placeholder="输入项目名称" />
-          </template>
-        </el-table-column>
-        <el-table-column label="上年年末数" align="right">
-          <template #default="{ row }">
-            <template v-if="row.isSubtotal">{{ fmtN(row.beginBalance) }}</template>
-            <el-input-number v-else v-model="row.beginBalance" :controls="false" :precision="2"
-              size="small" :disabled="isReadonly" @change="recalcRow(row)" />
-          </template>
-        </el-table-column>
-        <el-table-column label="本期增加" align="right">
-          <template #default="{ row }">
-            <template v-if="row.isSubtotal">{{ fmtN(row.increase) }}</template>
-            <el-input-number v-else v-model="row.increase" :controls="false" :precision="2"
-              size="small" :disabled="isReadonly" @change="recalcRow(row)" />
-          </template>
-        </el-table-column>
-        <el-table-column label="本期减少" align="right">
-          <template #default="{ row }">
-            <template v-if="row.isSubtotal">{{ fmtN(row.decrease) }}</template>
-            <el-input-number v-else v-model="row.decrease" :controls="false" :precision="2"
-              size="small" :disabled="isReadonly" @change="recalcRow(row)" />
-          </template>
-        </el-table-column>
-        <el-table-column label="期末数" align="right" class-name="auto-calc-col">
-          <template #default="{ row }">
-            <span class="formula-cell" title="期末=期初+增加-减少">{{ fmtN(row.endBalance) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="" width="36" align="center">
-          <template #default="{ row }">
-            <el-button v-if="!row.isSubtotal" type="danger" link size="small" :disabled="isReadonly" @click="removeSummaryRow(row.id)">✕</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+      <J1MovementTable
+        :rows="summaryData"
+        :subtotal="summaryTotal"
+        begin-label="上年年末数"
+        end-label="期末数"
+        label-editable="all"
+        removable="all"
+        :is-readonly="isReadonly"
+        @row-change="recalcRow"
+        @remove="removeSummaryRow"
+      />
     </el-card>
-
-    <!-- 编制提示（折叠） -->
-    <details class="guidance-details">
-      <summary>📋 编制提示</summary>
-      <div class="guidance-content">
-        <p>1、辞退福利包括（1）预期在其确认的年度报告期间期末后12个月内完全支付的辞退福利；（2）补偿款超过1年支付的辞退计划将于年度报告期间期末后12个月内支付的款项，例如内退计划将于下一年支付的金额。</p>
-        <p>2、一年内到期的其他福利，指一年内到期的其他长期福利（不含设定受益计划）；应根据"长期应付职工薪酬"项目分析填列。</p>
-      </div>
-    </details>
 
     <!-- 第二部分：（1）短期薪酬 -->
     <el-card shadow="never" class="section-card">
@@ -108,53 +92,26 @@
           </div>
         </div>
       </template>
-      <el-table :data="[...shortTermRows, shortTermSubtotal]" border size="small"
-        highlight-current-row @current-change="(r) => selectedRow = r"
-        :row-class-name="({ row }) => row.isSubtotal ? 'subtotal-row' : (row.indent ? 'indent-row' : '')">
-        <el-table-column label="项 目" min-width="240">
-          <template #default="{ row }">
-            <template v-if="row.isSubtotal"><span class="subtotal-label">{{ row.label }}</span></template>
-            <template v-else-if="row.indent">
-              <el-input v-model="row.label" size="small" :disabled="isReadonly" style="padding-left:16px" placeholder="输入子项名称" />
-            </template>
-            <template v-else><span>{{ row.label }}</span></template>
-          </template>
-        </el-table-column>
-        <el-table-column label="上年年末数" align="right">
-          <template #default="{ row }">
-            <template v-if="row.isSubtotal">{{ fmtN(row.beginBalance) }}</template>
-            <el-input-number v-else v-model="row.beginBalance" :controls="false" :precision="2" size="small" :disabled="isReadonly" @change="recalcRow(row)" />
-          </template>
-        </el-table-column>
-        <el-table-column label="本期增加" align="right">
-          <template #default="{ row }">
-            <template v-if="row.isSubtotal">{{ fmtN(row.increase) }}</template>
-            <el-input-number v-else v-model="row.increase" :controls="false" :precision="2" size="small" :disabled="isReadonly" @change="recalcRow(row)" />
-          </template>
-        </el-table-column>
-        <el-table-column label="本期减少" align="right">
-          <template #default="{ row }">
-            <template v-if="row.isSubtotal">{{ fmtN(row.decrease) }}</template>
-            <el-input-number v-else v-model="row.decrease" :controls="false" :precision="2" size="small" :disabled="isReadonly" @change="recalcRow(row)" />
-          </template>
-        </el-table-column>
-        <el-table-column label="期末数" align="right" class-name="auto-calc-col">
-          <template #default="{ row }"><span class="formula-cell" title="期末=期初+增加-减少">{{ fmtN(row.endBalance) }}</span></template>
-        </el-table-column>
-        <el-table-column label="" width="36" align="center">
-          <template #default="{ row }">
-            <el-button v-if="!row.isSubtotal && row.indent" type="danger" link size="small" :disabled="isReadonly" @click="removeRow(row.id, 'short_term')">✕</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+      <J1MovementTable
+        :rows="shortTermData"
+        :subtotal="shortTermSubtotal"
+        begin-label="上年年末数"
+        end-label="期末数"
+        :derived-ids="shortTermDerivedIds"
+        selectable
+        :is-readonly="isReadonly"
+        @row-change="recalcRow"
+        @remove="(id) => removeRow(id, 'short_term')"
+        @current-change="(r) => selectedRow = r"
+      />
       <div class="section-note-area">
         <div class="note-header"><label class="note-label">说明</label>
           <el-button size="small" type="primary" plain @click="aiGenerate('short-term-note')" :disabled="isReadonly">🤖 AI辅助</el-button>
         </div>
         <el-input type="textarea" v-model="notes.shortTerm" :disabled="isReadonly"
           @change="persistDebounced()"
-          :autosize="{ minRows: 2, maxRows: 5 }" size="small"
-          placeholder="1、（企业本期为职工提供的各项非货币性福利形式、其计算依据。）&#10;2、（企业依据短期利润分享计划提供的职工薪酬计算依据。）" />
+          :autosize="{ minRows: 5 }" size="small"
+          :placeholder="NOTE_FIELDS[0].placeholder" />
       </div>
     </el-card>
 
@@ -172,67 +129,55 @@
           </div>
         </div>
       </template>
-      <el-table :data="[...postEmploymentRows, postEmploymentSubtotal]" border size="small"
-        highlight-current-row @current-change="(r) => selectedRow = r"
-        :row-class-name="({ row }) => row.isSubtotal ? 'subtotal-row' : (row.indent ? 'indent-row' : '')">
-        <el-table-column label="项 目" min-width="240">
-          <template #default="{ row }">
-            <template v-if="row.isSubtotal"><span class="subtotal-label">{{ row.label }}</span></template>
-            <template v-else-if="row.indent">
-              <el-input v-model="row.label" size="small" :disabled="isReadonly" style="padding-left:16px" placeholder="输入子项名称" />
-            </template>
-            <template v-else><span>{{ row.label }}</span></template>
-          </template>
-        </el-table-column>
-        <el-table-column label="上年年末数" align="right">
-          <template #default="{ row }">
-            <template v-if="row.isSubtotal">{{ fmtN(row.beginBalance) }}</template>
-            <el-input-number v-else v-model="row.beginBalance" :controls="false" :precision="2" size="small" :disabled="isReadonly" @change="recalcRow(row)" />
-          </template>
-        </el-table-column>
-        <el-table-column label="本期增加" align="right">
-          <template #default="{ row }">
-            <template v-if="row.isSubtotal">{{ fmtN(row.increase) }}</template>
-            <el-input-number v-else v-model="row.increase" :controls="false" :precision="2" size="small" :disabled="isReadonly" @change="recalcRow(row)" />
-          </template>
-        </el-table-column>
-        <el-table-column label="本期减少" align="right">
-          <template #default="{ row }">
-            <template v-if="row.isSubtotal">{{ fmtN(row.decrease) }}</template>
-            <el-input-number v-else v-model="row.decrease" :controls="false" :precision="2" size="small" :disabled="isReadonly" @change="recalcRow(row)" />
-          </template>
-        </el-table-column>
-        <el-table-column label="期末数" align="right" class-name="auto-calc-col">
-          <template #default="{ row }"><span class="formula-cell" title="期末=期初+增加-减少">{{ fmtN(row.endBalance) }}</span></template>
-        </el-table-column>
-        <el-table-column label="" width="36" align="center">
-          <template #default="{ row }">
-            <el-button v-if="!row.isSubtotal && row.indent" type="danger" link size="small" :disabled="isReadonly" @click="removeRow(row.id, 'post_employment')">✕</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
+      <!-- 方法论上下文（源模板 R51 红字提示） -->
+      <div class="methodology-block">
+        <p>【提示：其他长期职工福利指符合设定提存计划条件的其他长期职工福利】</p>
+      </div>
+      <J1MovementTable
+        :rows="postEmploymentData"
+        :subtotal="postEmploymentSubtotal"
+        begin-label="上年年末数"
+        end-label="期末数"
+        :derived-ids="postEmploymentDerivedIds"
+        selectable
+        :is-readonly="isReadonly"
+        @row-change="recalcRow"
+        @remove="(id) => removeRow(id, 'post_employment')"
+        @current-change="(r) => selectedRow = r"
+      />
       <div class="section-note-area">
         <div class="note-header"><label class="note-label">说明</label>
           <el-button size="small" type="primary" plain @click="aiGenerate('post-employment-note')" :disabled="isReadonly">🤖 AI辅助</el-button>
         </div>
         <el-input type="textarea" v-model="notes.postEmployment" :disabled="isReadonly"
           @change="persistDebounced()"
-          :autosize="{ minRows: 2, maxRows: 5 }" size="small"
-          placeholder="（设定提存计划的性质、计算缴费金额的公式或依据）&#10;【提示：其他长期职工福利指符合设定提存计划条件的其他长期职工福利】" />
+          :autosize="{ minRows: 5 }" size="small"
+          :placeholder="NOTE_FIELDS[1].placeholder" />
       </div>
     </el-card>
 
     <!-- 第四部分：（3）辞退福利 -->
     <el-card shadow="never" class="section-card">
-      <template #header><span class="section-title">（3）辞退福利</span></template>
+      <template #header>
+        <div class="group-header">
+          <span class="section-title">（3）辞退福利</span>
+          <div class="header-actions">
+            <GtReviewTrigger section-id="J1-disclosure-listed-severance" />
+          </div>
+        </div>
+      </template>
+      <!-- 方法论上下文（源模板 R54 红字注，逐字口径） -->
+      <div class="methodology-block">
+        <p>（注：应付职工薪酬、设定受益计划净负债（净资产）、一年后支付的辞退福利及其他长期职工福利本期减少，一般与现金流量表「支付给职工以及为职工支付的现金」一致，除非存在代扣税未交、实物发放等情形。）</p>
+      </div>
       <div class="section-note-area">
         <div class="note-header"><label class="note-label">说明</label>
           <el-button size="small" type="primary" plain @click="aiGenerate('severance-note')" :disabled="isReadonly">🤖 AI辅助</el-button>
         </div>
         <el-input type="textarea" v-model="notes.severance" :disabled="isReadonly"
           @change="persistDebounced()"
-          :autosize="{ minRows: 2, maxRows: 5 }" size="small"
-          placeholder="辞退福利的性质、内容及计算依据。&#10;（注：应付职工薪酬、设定受益计划净负债（净资产）、一年后支付的辞退福利及其他长期职工福利本期减少一般不得超过期初数加本期增加数之和）" />
+          :autosize="{ minRows: 5 }" size="small"
+          :placeholder="NOTE_FIELDS[2].placeholder" />
       </div>
     </el-card>
 
@@ -250,15 +195,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, type Ref } from 'vue'
+import { ref, computed, inject, onMounted, onBeforeUnmount, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
+import CycleImportExportDropdown from '../../shared/CycleImportExportDropdown.vue'
+import J1MovementTable from './J1MovementTable.vue'
+import J1DisclosureConsistencyPanel from './J1DisclosureConsistencyPanel.vue'
+import { buildJ1Consistency } from '../../composables/j1DisclosureConsistency'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { eventBus } from '@/utils/eventBus'
 import { useAuditContext } from '@/composables/useAuditContext'
 import {
   buildJ1SyncPayload,
+  j1NoteKeys,
+  J1_LISTED_NOTE_FIELDS,
   J1_NOTE_SECTION,
   type J1DisclosureSnapshot,
 } from '../../composables/j1NoteSectionMap'
@@ -282,6 +234,13 @@ const props = defineProps<{
 const isReadonly = props.isReadonly ?? false
 const autoSync = useDisclosureAutoSync({ isReadonly: () => isReadonly })
 const projectId = props.projectId || ''
+
+// 🔴 必须在 setup 顶层取审计上下文：`useAuditContext()` 内部用 `useRoute()`（inject）+
+// `onScopeDispose()`，在 async 点击处理器里调用会拿到 undefined 的 route → TypeError
+// → 整个 `syncToDisclosureNotes` 在 `http.post` 之前就抛错，同步按钮与自动同步**全程是死的**
+// （2026-07-30 浏览器实测发现：零网络请求 + 只弹「同步到附注失败」，vitest 与
+// get_diagnostics 都查不出）。
+const { year: auditYear } = useAuditContext()
 
 const selectedRow = ref<DRow | null>(null)
 
@@ -322,7 +281,8 @@ const DEFAULT_POST: DRow[] = ([
 ]) as DRow[]
 
 // ── 数据 + 持久化（共享 composable：hydrate / 防抖落库 / 合计 computed） ──
-const NOTE_KEYS = ['shortTerm', 'postEmployment', 'severance'] as const
+/** 说明文本域定义（单一真源在 `j1NoteSectionMap`，与推给附注的 `_note_texts` 同源） */
+const NOTE_FIELDS = J1_LISTED_NOTE_FIELDS
 const allResponsesRef = computed(
   () => props.allResponses ?? new Map<string, ChecklistItem>(),
 ) as unknown as Ref<Map<string, ChecklistItem>>
@@ -333,22 +293,22 @@ async function defaultSave(items: ChecklistItem[]): Promise<void> {
 }
 
 const {
-  summaryData, summaryRows,
+  summaryData,
   shortTermData, shortTermSubtotal,
   postEmploymentData, postEmploymentSubtotal,
+  summaryTotal,
   notes, hydrate, persist, persistDebounced, onRowChange,
   adjudicationEndTotal, summaryVsAdjudicationDiff, pullFromSources, pullDetailSections,
+  shortTermDerivedIds, postEmploymentDerivedIds, syncParentSums,
 } = useJ1DisclosureSections({
   variant: 'listed',
   defaults: { summary: DEFAULT_SUMMARY, shortTerm: DEFAULT_SHORT_TERM, postEmployment: DEFAULT_POST },
   allResponses: allResponsesRef,
   saveImmediate: (items) => (props.saveImmediate ?? defaultSave)(items),
   isReadonly: computed(() => isReadonly) as Ref<boolean>,
-  noteKeys: [...NOTE_KEYS],
+  noteKeys: j1NoteKeys('listed'),
 })
 
-const shortTermRows = computed(() => shortTermData.value)
-const postEmploymentRows = computed(() => postEmploymentData.value)
 
 // ── 通用方法 ──────────────────────────────────────────────
 function recalcRow(row: DRow) {
@@ -427,7 +387,7 @@ async function syncToDisclosureNotes() {
     const { body } = buildJ1SyncPayload({
       variant: 'listed',
       wpId: props.wpId,
-      year: useAuditContext().year.value,
+      year: auditYear.value,
       snapshot,
     })
     const http = (await import('@/utils/http')).default
@@ -442,7 +402,10 @@ async function syncToDisclosureNotes() {
       sectionIds: [J1_NOTE_SECTION.listed],
     } as any)
     ElMessage.success('已同步到附注（五、40）')
-    autoSync.scheduleAutoSync(syncToDisclosureNotes)
+    // 🔴 这里**不能**再 `scheduleAutoSync(syncToDisclosureNotes)` —— 那是调度自己，
+    // 800ms 后会再发一次同样的 POST（自触发）。自动同步只应由**数据变更**触发
+    // （增删行 / 从明细带入 / AI 写入），2026-07-30 浏览器实测发现该自触发会让
+    // 用户在一次成功同步后又收到一条莫名的「同步到附注失败」。
   } catch (e: any) {
     ElMessage.error(e?.response?.data?.detail || '同步到附注失败，请重试')
   } finally {
@@ -457,6 +420,21 @@ function jumpToNote() {
   if (route) router.push(route)
 }
 
+// ── 多区块导入导出（共享组件 CycleImportExportDropdown → J1 既有三端点） ──────
+/** 导入后重载 allResponses（由主入口 provide），否则界面停留在旧值 */
+const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
+
+/**
+ * 导入是后端直写 `checklist_responses`，组件本地 ref 不会自动跟随
+ * → 重载共享 allResponses 后必须再 `hydrate()`，否则界面停在导入前的值；
+ * 随后触发一次自动同步，把导入结果推给附注。
+ */
+async function onImported(): Promise<void> {
+  await reloadWorkpaperData?.()
+  hydrate()
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
+}
+
 function addSummaryRow() {
   if (isReadonly) return
   summaryData.value.push({ id: `s-${Date.now()}`, label: '', category: 'summary', beginBalance: 0, increase: 0, decrease: 0, endBalance: 0 })
@@ -469,6 +447,20 @@ function removeSummaryRow(id: string) {
   if (idx >= 0) { summaryData.value.splice(idx, 1); persist(); autoSync.scheduleAutoSync(syncToDisclosureNotes) }
 }
 
+/** 汇总表期末合计（勾稽 alert / AI 上下文用；合计行由 composable computed 产出） */
+const summaryEndTotal = computed(() => summaryTotal.value.endBalance)
+
+/** 披露内部勾稽（纯函数引擎，只取源模板 Excel 公式可判定的关系） */
+const consistency = computed(() =>
+  buildJ1Consistency({
+    variant: 'listed',
+    summary: summaryData.value,
+    shortTerm: shortTermData.value,
+    postEmployment: postEmploymentData.value,
+    adjudicationEndTotal: adjudicationEndTotal.value,
+  }),
+)
+
 function addRow(category: string) {
   if (isReadonly) return
   const arr = category === 'short_term' ? shortTermData : postEmploymentData
@@ -477,22 +469,29 @@ function addRow(category: string) {
   const sel = selectedRow.value
   if (sel && !sel.isSubtotal && sel.category === category) {
     const idx = arr.value.findIndex(r => r.id === sel.id)
-    if (idx >= 0) { arr.value.splice(idx + 1, 0, newRow); persist(); autoSync.scheduleAutoSync(syncToDisclosureNotes); return }
+    if (idx >= 0) { arr.value.splice(idx + 1, 0, newRow); afterRowSetChange(); return }
   }
   arr.value.push(newRow)
-  persist()
-  autoSync.scheduleAutoSync(syncToDisclosureNotes)
+  afterRowSetChange()
 }
 
 function removeRow(id: string, category: string) {
   const arr = category === 'short_term' ? shortTermData : postEmploymentData
   const idx = arr.value.findIndex(r => r.id === id)
-  if (idx >= 0) { arr.value.splice(idx, 1); persist(); autoSync.scheduleAutoSync(syncToDisclosureNotes) }
+  if (idx >= 0) { arr.value.splice(idx, 1); afterRowSetChange() }
 }
 
+/** 增删行后：父行随「其中：」子项集合变化重新上卷，再落库 + 自动同步 */
+function afterRowSetChange() {
+  syncParentSums()
+  persist()
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
+}
+
+/** 只读金额统一走平台单一真源（表格内的展示由 J1MovementTable 负责） */
+const displayPrefs = useDisplayPrefsStore()
 function fmtN(v: number | null | undefined): string {
-  if (!v) return '-'
-  return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return displayPrefs.fmtAmount(v ?? 0)
 }
 
 async function aiGenerate(section: string) {
@@ -505,7 +504,7 @@ async function aiGenerate(section: string) {
         context: {
           短期薪酬期末合计: String(shortTermSubtotal.value.endBalance),
           设定提存期末合计: String(postEmploymentSubtotal.value.endBalance),
-          汇总表期末合计: String(summaryRows.value.at(-1)?.endBalance ?? 0),
+          汇总表期末合计: String(summaryEndTotal.value),
         },
       },
     )
@@ -542,8 +541,7 @@ onBeforeUnmount(() => autoSync.cancelPending())
 .section-card :deep(.el-card__body) { padding: 12px 16px; }
 .section-card :deep(.el-table) { font-size: 13px !important; }
 .section-card :deep(.el-table th), .section-card :deep(.el-table td) { font-size: 13px !important; padding: 4px 6px !important; }
-.section-card :deep(.el-input-number) { width: 100%; }
-.section-card :deep(.el-input-number .el-input__inner) { text-align: right; font-size: 13px; }
+/* 可编辑金额格由 WpAmountInput（el-input）渲染，右对齐/等宽数字在其内部 scoped 样式里 */
 .section-card :deep(.el-input__inner) { font-size: 13px; }
 .section-title { font-weight: 600; font-size: 14px; }
 .group-header { display: flex; justify-content: space-between; align-items: center; }

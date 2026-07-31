@@ -430,3 +430,72 @@ export function runD1DisclosureChecks(input: D1ConsistencyInput): D1ConsistencyS
   const skipCount = checks.filter(c => c.level === 'skip').length
   return { checks, errorCount, warnCount, okCount, skipCount, allPass: errorCount === 0 }
 }
+
+// ─── 勾稽差异 → A13 未更正错报汇总 ───────────────────────────────────────────
+
+/** 应收票据科目编码（附注 五、4 / 八、4 对应科目）。 */
+export const D1_ACCOUNT_CODE = '1121'
+export const D1_ACCOUNT_NAME = '应收票据'
+
+/** `a13:push-misstatement` 的行草稿（形态 A：`{items:[...]}`，见 `useA13MisstatementBridge`）。 */
+export interface D1MisstatementItem {
+  wpCode: string
+  description: string
+  accountCode: string
+  accountName: string
+  amount: number
+  indexRef: string
+}
+
+export interface D1MisstatementPayload {
+  wpCode: string
+  accountCode: string
+  accountName: string
+  source: string
+  items: D1MisstatementItem[]
+}
+
+/**
+ * 勾稽差异 → A13 错报推送载荷（纯函数）。
+ *
+ * 平台通道：`eventBus.emit('a13:push-misstatement', payload)` →
+ * `useA13MisstatementBridge`（挂在 WorkpaperEditor Shell）→
+ * `POST /api/projects/{pid}/misstatements` 写 `unadjusted_misstatements`。
+ * 载荷用**形态 A**（`items[]`），桥会按 `amount` 归一并截断 `source_wp_code` ≤20 字符。
+ *
+ * 规则：
+ * - 只推 `error`（`warn` 是「逐项披露只覆盖重要者」这类正常差额，不是错报）
+ * - `|diff| ≤ 容差` 或为 0 的不推（桥对 amount ≤0 也会丢弃，这里提前过滤）
+ * - 描述内联规则编号与两侧金额，便于错报汇总里直接溯源
+ */
+export function buildD1MisstatementPayload(
+  summary: D1ConsistencySummary,
+  opts?: { checkIds?: readonly string[] },
+): D1MisstatementPayload | null {
+  const wanted = opts?.checkIds ? new Set(opts.checkIds) : null
+  const items: D1MisstatementItem[] = []
+  for (const c of summary.checks) {
+    if (wanted ? !wanted.has(c.id) : c.level !== 'error') continue
+    const amount = Math.abs(round2(c.diff))
+    if (amount <= D1_AMOUNT_TOLERANCE) continue
+    items.push({
+      wpCode: 'D1',
+      description:
+        `应收票据披露勾稽差异：${c.label}（${c.id}）—— `
+        + `本表 ${round2(c.left)}，勾稽对象 ${round2(c.right)}，差异 ${round2(c.diff)}。`
+        + `规则：${c.rule}`,
+      accountCode: D1_ACCOUNT_CODE,
+      accountName: D1_ACCOUNT_NAME,
+      amount,
+      indexRef: c.refs.join('/'),
+    })
+  }
+  if (items.length === 0) return null
+  return {
+    wpCode: 'D1',
+    accountCode: D1_ACCOUNT_CODE,
+    accountName: D1_ACCOUNT_NAME,
+    source: 'D1披露勾稽校验',
+    items,
+  }
+}

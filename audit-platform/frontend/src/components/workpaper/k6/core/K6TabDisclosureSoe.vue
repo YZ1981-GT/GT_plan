@@ -82,11 +82,12 @@
       </el-table>
     </el-card>
 
-    <!-- Section 2: 处置组负债 -->
+    <!-- Section 2: 处置组负债（底稿侧变动分析，附注 八、43 用下方 5 列表） -->
     <el-card shadow="never" class="disclosure-section">
       <template #header>
         <div class="section-card-header">
-          <span>二、处置组相关负债</span>
+          <span>二、处置组相关负债（底稿分析·不进附注）</span>
+          <el-tag type="info" size="small" effect="plain">附注 八、43 请填下方「附注表·持有待售负债」</el-tag>
         </div>
       </template>
 
@@ -124,6 +125,9 @@
       </el-table>
     </el-card>
 
+    <!-- 附注要求的 4 张表（改造前底稿完全没有录入位置） -->
+    <K6NoteBlockTables variant="soe" :blocks="noteBlocks" :is-readonly="isReadonly" />
+
     <!-- Section 3: CAS42(3)(4) 减值损失 + 处置组损益 -->
     <el-card shadow="never" class="disclosure-section">
       <template #header>
@@ -135,27 +139,21 @@
       <div class="cas42-fields">
         <div class="cas42-field">
           <span class="cas42-label">(3) 本期已确认减值损失金额</span>
-          <el-input-number
-            v-model="impairmentLoss"
-            :controls="false"
-            :precision="2"
+          <WpAmountInput
+            :model-value="impairmentLoss"
             :disabled="isReadonly"
-            size="small"
             class="cas42-input"
-            @change="persistCas42"
+            @change="(v?: number) => { impairmentLoss = v ?? 0; persistCas42() }"
           />
           <span class="cas42-hint">（来自K6-5减值测试/K6-1减值合计）</span>
         </div>
         <div class="cas42-field">
           <span class="cas42-label">(4) 报告期间处置组营业利润/亏损</span>
-          <el-input-number
-            v-model="disposalGroupProfit"
-            :controls="false"
-            :precision="2"
+          <WpAmountInput
+            :model-value="disposalGroupProfit"
             :disabled="isReadonly"
-            size="small"
             class="cas42-input"
-            @change="persistCas42"
+            @change="(v?: number) => { disposalGroupProfit = v ?? 0; persistCas42() }"
           />
           <span class="cas42-hint">（正=利润，负=亏损）</span>
         </div>
@@ -210,10 +208,19 @@
  */
 import { ref, onMounted, onBeforeUnmount, inject } from 'vue'
 import { ElMessage } from 'element-plus'
+import { fmtAmount } from '@/utils/formatters'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
-import { buildK6SyncPayload, K6_NOTE_SECTION } from '../../composables/k6NoteSectionMap'
+import WpAmountInput from '../../shared/WpAmountInput.vue'
+import K6NoteBlockTables from './K6NoteBlockTables.vue'
+import {
+  buildK6SoeLiabilityPayload,
+  buildK6SyncPayload,
+  K6_NOTE_SECTION,
+  K6_SOE_LIABILITY_NOTE_SECTION,
+} from '../../composables/k6NoteSectionMap'
+import { useK6NoteBlocks } from '../../composables/useK6NoteBlocks'
 
 const K6_ACCOUNT_CODE = '1481'
 
@@ -230,6 +237,18 @@ const emit = defineEmits<{
 
 const openReview = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+
+/**
+ * 附注要求的 4 张表（减值准备变动 / 非流动资产 / 处置组 / 持有待售负债）。
+ * 改造前底稿完全没有这些录入位置 → 同步路径永远推不出这些表。
+ */
+const noteBlocks = useK6NoteBlocks({
+  variant: 'soe',
+  wpId: () => props.wpId,
+  responses: () => props.allResponses,
+  save: (itemId, remark) => emit('save', itemId, { remark }),
+  onChanged: () => autoSync.scheduleAutoSync(syncToDisclosureNotes),
+})
 
 // ─── Data Models ─────────────────────────────────────────────────────────────
 
@@ -353,6 +372,7 @@ function loadSavedData(): void {
   const savedNarrative = props.allResponses.get('K6-disclosure-soe-narrative')
   if (savedNarrative?.remark) narrativeText.value = savedNarrative.remark
 
+  noteBlocks.load()
   _loadCas42()
 }
 
@@ -507,24 +527,44 @@ function persistLiabTable(): void {
 
 async function syncToDisclosureNotes(): Promise<void> {
   if (!props.projectId || props.isReadonly) return
-  // 附注 八、12 是两行表头 7 列：期末数/期初数 各 [账面余额, 减值准备, 账面价值]。
+  // 附注 八、12 主表是两行表头 7 列：期末数/期初数 各 [账面余额, 减值准备, 账面价值]。
   // `end_book` 取 `bookValue`（与 `impairment` 同源，满足 F11-4 勾稽），不取 `closingBalance`。
   // 期初仅 `openingBalance`（账面价值）有来源，账面余额/减值准备推 null（禁造数）。
-  // 「持有待售负债」是独立章节 八、43，需章节路由改造（另立 spec），本 Tab 只推资产表。
   const rows = assetSummary.value.filter(r => !r.isTotal).map(r => ({
     project: r.category,
     bookValue: r.bookValue ?? 0,
     impairment: r.impairment ?? 0,
     openingBalance: r.openingBalance ?? 0,
   }))
-  const payload = buildK6SyncPayload('soe', props.wpId || '', rows, narrativeText.value)
+  const payload = buildK6SyncPayload('soe', props.wpId || '', {
+    assets: rows,
+    impairment: noteBlocks.impairment.value,
+    nonCurrent: noteBlocks.nonCurrent.value,
+    disposalGroup: noteBlocks.disposalGroup.value,
+    narrativeText: narrativeText.value,
+  })
+  // 🔴 持有待售负债是**独立章节 八、43** —— `sync_from_workpaper` 的定位键是
+  // `(project_id, year, note_section)`，一个 payload 只能写一节 → 必须单独再 POST 一次。
+  // 空行时也要发（`clearWhenEmpty` 默认 true）：用户填过再清空后若不发清理载荷，
+  // 附注 §八、43 会永久残留上次推送的过时负债明细（2026-07-31 浏览器实测踩中）。
+  const liabPayload = buildK6SoeLiabilityPayload(
+    props.wpId || '',
+    noteBlocks.liabilities.value,
+    narrativeText.value,
+  )
   try {
-    await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
+    const url = `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`
+    await http.post(url, payload)
+    const sectionIds = [K6_NOTE_SECTION.soe]
+    if (liabPayload) {
+      await http.post(url, liabPayload)
+      sectionIds.push(K6_SOE_LIABILITY_NOTE_SECTION)
+    }
     eventBus.emit('disclosure:note-text-updated' as any, {
       wpCode: 'K6', variant: 'soe', accountCode: '1481',
-      projectId: props.projectId, sectionIds: [K6_NOTE_SECTION.soe],
+      projectId: props.projectId, sectionIds,
     })
-    ElMessage.success('已同步到附注')
+    ElMessage.success(liabPayload ? '已同步到附注（八、12 + 八、43）' : '已同步到附注')
   } catch { /* silent */ }
 }
 
@@ -557,9 +597,10 @@ onBeforeUnmount(() => {
 
 // ─── Format ──────────────────────────────────────────────────────────────────
 
+/** 只读金额展示：委托平台金额格式单一真源（千分符 + 2 位 + 单位偏好），保留「0 显示 -」语义 */
 function fmtAmt(v: number | null | undefined): string {
   if (v == null || v === 0) return '-'
-  return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return fmtAmount(v)
 }
 </script>
 

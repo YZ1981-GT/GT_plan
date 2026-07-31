@@ -715,17 +715,30 @@ export function buildD1SyncPayload(
   }
 }
 
+/**
+ * 子节说明标题（附注 `text_content` 的小节名）。
+ *
+ * 🔴 必须与披露表 `NOTE_SECTION_KEYS` 键集**一一对应**：少一个键 = 该段说明
+ * 同步不到附注（`buildNoteTexts` 按 `NOTE_TEXT_ORDER` 遍历，缺键即静默丢失）。
+ */
 const NOTE_TITLES: Record<string, string> = {
   top: '应收票据说明',
   pledged: '已质押应收票据说明',
   endorsed: '已背书或贴现应收票据说明',
+  transfer: '因出票人未履约转应收账款说明',
   badDebtClass: '坏账准备计提说明',
+  badDebtMovement: '坏账准备变动说明',
   writeOff: '应收票据核销说明',
 }
 
+/** 说明小节输出顺序（与源模板小节顺序一致）；导出供守卫比对披露表键集。 */
+export const D1_NOTE_TEXT_ORDER = [
+  'top', 'pledged', 'endorsed', 'transfer', 'badDebtClass', 'badDebtMovement', 'writeOff',
+] as const
+
 /** 各子节说明 → _note_texts（仅非空），保证附注 text_content 与披露表文本框一致。 */
 export function buildNoteTexts(notes: Record<string, string>): Array<{ section: string; title: string; text: string }> {
-  const order = ['top', 'pledged', 'endorsed', 'badDebtClass', 'writeOff']
+  const order = D1_NOTE_TEXT_ORDER
   const out: Array<{ section: string; title: string; text: string }> = []
   for (const key of order) {
     const text = String(notes?.[key] ?? '').trim()

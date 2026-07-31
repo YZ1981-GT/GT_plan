@@ -187,6 +187,7 @@ import { resolveG11SheetLabel } from './composables/g11SheetLabels'
 import { offerG11DisclosurePull, G11_OFFER_DISCLOSURE_PULL_EVENT, promptForG11DisclosureSource } from './composables/g11DisclosureSync'
 import GtIndexChip from './GtIndexChip.vue'
 import type { ChecklistResponse } from './composables/useF1FormData'
+import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 
 const G11TabProcedure = defineAsyncComponent(() => import('./g11-investment-income/core/G11TabProcedure.vue'))
 const G11TabAdjudication = defineAsyncComponent(() => import('./g11-investment-income/core/G11TabAdjudication.vue'))
@@ -263,13 +264,10 @@ const auditYear = computed(() => {
   const n = Number(y)
   return Number.isFinite(n) && n > 0 ? n : null
 })
-const applicableStandards = computed<string[]>(() => {
-  const raw =
-    props.htmlData?.project_context?.applicable_standards
-    ?? props.htmlData?.projectContext?.applicable_standards
-    ?? props.htmlData?.applicable_standards
-    ?? runtime?.applicableStandards?.value
-  return Array.isArray(raw) ? raw.map(String) : []
+// 适用准则：显式 prop > 本 sheet html_data > runtime context（scaffold 从 render-config
+// 顶层注入）。收敛到共享 composable，兼容 v2 对象 / 逗号串 / JSON 串。
+const applicableStandards = useHostApplicableStandards({
+  htmlData: () => props.htmlData,
 })
 const versionTrailRef = runtime?.version.versionTrailRef ?? ref<{ openDrawer: () => void } | null>(null)
 const openVersionHistory = runtime?.version.openVersionHistory ?? (() => undefined)

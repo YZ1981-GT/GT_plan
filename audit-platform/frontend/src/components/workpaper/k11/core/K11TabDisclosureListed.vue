@@ -41,7 +41,7 @@
         <el-table-column prop="category" label="资产类别" min-width="150" fixed />
         <el-table-column prop="currentProvision" label="本期计提" width="130" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly && !row.isTotal" :model-value="row.currentProvision" size="small" :controls="false" :precision="2" style="width:100%" @change="(v: number | undefined) => updateField(row.id, 'currentProvision', v ?? 0)" />
+            <WpAmountInput v-if="!isReadonly && !row.isTotal" :model-value="row.currentProvision" @change="(v: number | undefined) => updateField(row.id, 'currentProvision', v ?? 0)" />
             <span v-else :class="{ 'formula-cell': row.isTotal }">{{ fmtAmt(row.currentProvision) }}</span>
           </template>
         </el-table-column>
@@ -51,7 +51,7 @@
               <span class="no-reversal">不可转回</span>
             </template>
             <template v-else>
-              <el-input-number v-if="!isReadonly && !row.isTotal" :model-value="row.currentReversal" size="small" :controls="false" :precision="2" style="width:100%" @change="(v: number | undefined) => updateField(row.id, 'currentReversal', v ?? 0)" />
+              <WpAmountInput v-if="!isReadonly && !row.isTotal" :model-value="row.currentReversal" @change="(v: number | undefined) => updateField(row.id, 'currentReversal', v ?? 0)" />
               <span v-else :class="{ 'formula-cell': row.isTotal }">{{ fmtAmt(row.currentReversal) }}</span>
             </template>
           </template>
@@ -65,7 +65,7 @@
         </el-table-column>
         <el-table-column prop="priorAmount" label="上期发生额" width="130" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly && !row.isTotal" :model-value="row.priorAmount" size="small" :controls="false" :precision="2" style="width:100%" @change="(v: number | undefined) => updateField(row.id, 'priorAmount', v ?? 0)" />
+            <WpAmountInput v-if="!isReadonly && !row.isTotal" :model-value="row.priorAmount" @change="(v: number | undefined) => updateField(row.id, 'priorAmount', v ?? 0)" />
             <span v-else :class="{ 'formula-cell': row.isTotal }">{{ fmtAmt(row.priorAmount) }}</span>
           </template>
         </el-table-column>
@@ -125,9 +125,11 @@
  * - 大表格用虚拟滚动（max-height限制）
  */
 import { ref, onMounted, onUnmounted, onBeforeUnmount } from 'vue'
+import { fmtAmount } from '@/utils/formatters'
 import { MagicStick } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
 import { normalizeImpairmentCategory } from '../../composables/useK11Adjudication'
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { useK11AiGenerate } from '../../composables/useK11AiGenerate'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import { ElMessage } from 'element-plus'
@@ -135,7 +137,7 @@ import { useRouter } from 'vue-router'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import http from '@/utils/http'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
-import { buildK11SyncPayload } from '../../composables/k11NoteSectionMap'
+import { K11_NOTE_SECTION, buildK11SyncPayload } from '../../composables/k11NoteSectionMap'
 
 const ABNORMAL_THRESHOLD = 0.3
 
@@ -318,7 +320,7 @@ function handleNarrativeSave(): void {
     section: 'listed',
     accountCode: '6701',
     projectId: props.projectId,
-    sectionIds: ['资产减值损失', '五、73'],
+    sectionIds: [K11_NOTE_SECTION.listed],
     text: narrativeText.value,
   })
   autoSync.scheduleAutoSync(syncToDisclosureNotes)
@@ -327,13 +329,15 @@ function handleNarrativeSave(): void {
 async function syncToDisclosureNotes(): Promise<void> {
   if (!props.projectId || props.isReadonly) return
   const payload = buildK11SyncPayload('listed', props.wpId || '',
-    disclosureRows.value.map(r => ({ project: r.category, currentAmount: r.currentProvision - r.currentReversal, priorAmount: r.priorAmount })),
+    disclosureRows.value
+      .filter(r => !r.isTotal)
+      .map(r => ({ project: r.category, currentAmount: r.currentProvision - r.currentReversal, priorAmount: r.priorAmount })),
     narrativeText.value)
   try {
     await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
     eventBus.emit('disclosure:note-text-updated' as any, {
       wpCode: 'K11', variant: 'listed', accountCode: '6701',
-      projectId: props.projectId, sectionIds: ['资产减值损失'],
+      projectId: props.projectId, sectionIds: [K11_NOTE_SECTION.listed],
     })
     ElMessage.success('已同步到附注')
   } catch { /* silent */ }
@@ -391,9 +395,10 @@ function formatRate(row: DisclosureRow): string {
   return (rate * 100).toFixed(1) + '%'
 }
 
+/** 只读金额展示：委托平台金额格式单一真源，保留底稿「0 显示 -」语义 */
 function fmtAmt(val: number | null | undefined): string {
   if (val == null || val === 0) return '-'
-  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return fmtAmount(val)
 }
 
 // ─── AI辅助 ──────────────────────────────────────────────────────────────────
@@ -415,7 +420,7 @@ function _buildAiContext(): Record<string, string> {
 async function handleAiSection(section: string): Promise<void> {
   const text = await aiGenerate({
     section,
-    prompt: `为K11资产减值损失附注（上市公司版）的"${section}"部分生成披露说明，按资产类别汇总本期减值损失，商誉减值不可转回。`,
+    prompt: `为K11资产减值损失附注（上市公司版）的"${section}"部分生成披露说明，按资产类别汇总本期减值损失，商誉减值不可转回。口径以致同 2025 修订版底稿源模板与附注模版为准；只能使用已提供的项目名称与金额，不得虚构项目、金额或业务背景，无把握的内容留空由审计师补充。`,
     context: _buildAiContext(),
     existingContent: section === 'narrative' ? narrativeText.value : '',
   })

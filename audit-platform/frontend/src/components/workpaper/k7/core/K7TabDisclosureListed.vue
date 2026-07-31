@@ -5,7 +5,7 @@
       <h3>附注披露信息（上市公司）</h3>
       <div class="header-actions">
         <el-button size="small" type="success" :disabled="isReadonly" @click="syncToDisclosureNotes">同步到附注</el-button>
-        <el-button size="small" type="primary" plain @click="handleAiGenerate">
+        <el-button size="small" type="primary" plain :loading="aiLoading" :disabled="isReadonly" @click="handleAiGenerate">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
         <el-button size="small" @click="openReview?.('K7-disclosure-listed')">💬 复核</el-button>
@@ -33,19 +33,19 @@
         <el-table-column prop="project" label="项目" min-width="150" />
         <el-table-column prop="beginBalance" label="期初余额" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly && !row.isTotal" :model-value="row.beginBalance" size="small" :controls="false" :precision="2" style="width:100%" @change="(v: number | undefined) => updateAssetField(row.id, 'beginBalance', v ?? 0)" />
+            <WpAmountInput v-if="!isReadonly && !row.isTotal" :model-value="row.beginBalance" @change="(v: number | undefined) => updateAssetField(row.id, 'beginBalance', v ?? 0)" />
             <span v-else :class="{ 'formula-cell': row.isTotal }">{{ fmtAmt(row.beginBalance) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="increase" label="本期增加" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly && !row.isTotal" :model-value="row.increase" size="small" :controls="false" :precision="2" style="width:100%" @change="(v: number | undefined) => updateAssetField(row.id, 'increase', v ?? 0)" />
+            <WpAmountInput v-if="!isReadonly && !row.isTotal" :model-value="row.increase" @change="(v: number | undefined) => updateAssetField(row.id, 'increase', v ?? 0)" />
             <span v-else :class="{ 'formula-cell': row.isTotal }">{{ fmtAmt(row.increase) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="decrease" label="本期减少" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly && !row.isTotal" :model-value="row.decrease" size="small" :controls="false" :precision="2" style="width:100%" @change="(v: number | undefined) => updateAssetField(row.id, 'decrease', v ?? 0)" />
+            <WpAmountInput v-if="!isReadonly && !row.isTotal" :model-value="row.decrease" @change="(v: number | undefined) => updateAssetField(row.id, 'decrease', v ?? 0)" />
             <span v-else :class="{ 'formula-cell': row.isTotal }">{{ fmtAmt(row.decrease) }}</span>
           </template>
         </el-table-column>
@@ -74,19 +74,19 @@
         <el-table-column prop="project" label="项目" min-width="150" />
         <el-table-column prop="beginBalance" label="期初余额" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly && !row.isTotal" :model-value="row.beginBalance" size="small" :controls="false" :precision="2" style="width:100%" @change="(v: number | undefined) => updateIncomeField(row.id, 'beginBalance', v ?? 0)" />
+            <WpAmountInput v-if="!isReadonly && !row.isTotal" :model-value="row.beginBalance" @change="(v: number | undefined) => updateIncomeField(row.id, 'beginBalance', v ?? 0)" />
             <span v-else :class="{ 'formula-cell': row.isTotal }">{{ fmtAmt(row.beginBalance) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="increase" label="本期增加" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly && !row.isTotal" :model-value="row.increase" size="small" :controls="false" :precision="2" style="width:100%" @change="(v: number | undefined) => updateIncomeField(row.id, 'increase', v ?? 0)" />
+            <WpAmountInput v-if="!isReadonly && !row.isTotal" :model-value="row.increase" @change="(v: number | undefined) => updateIncomeField(row.id, 'increase', v ?? 0)" />
             <span v-else :class="{ 'formula-cell': row.isTotal }">{{ fmtAmt(row.increase) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="decrease" label="本期减少" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly && !row.isTotal" :model-value="row.decrease" size="small" :controls="false" :precision="2" style="width:100%" @change="(v: number | undefined) => updateIncomeField(row.id, 'decrease', v ?? 0)" />
+            <WpAmountInput v-if="!isReadonly && !row.isTotal" :model-value="row.decrease" @change="(v: number | undefined) => updateIncomeField(row.id, 'decrease', v ?? 0)" />
             <span v-else :class="{ 'formula-cell': row.isTotal }">{{ fmtAmt(row.decrease) }}</span>
           </template>
         </el-table-column>
@@ -109,7 +109,7 @@
       <template #header>
         <div class="card-head">
           <span class="card-title">附注说明</span>
-          <el-button size="small" type="primary" plain @click="handleAiNarrative">
+          <el-button size="small" type="primary" plain :loading="aiLoading" :disabled="isReadonly" @click="handleAiNarrative">
             <el-icon><MagicStick /></el-icon> AI生成
           </el-button>
         </div>
@@ -152,11 +152,13 @@
  * - AI assisted (section: overall-opinion)
  */
 import { ref, computed, onMounted, onUnmounted, inject, toRef, type Ref } from 'vue'
+import { fmtAmount } from '@/utils/formatters'
 import { MagicStick } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { buildK7SyncPayload, K7_NOTE_SECTION } from '../../composables/k7NoteSectionMap'
 
 const K7_ACCOUNT_CODE = '2401'
@@ -359,12 +361,83 @@ function incomeSummary({ columns, data }: { columns: any[]; data: DisclosureRow[
 
 // ─── AI ──────────────────────────────────────────────────────────────────────
 
-function handleAiGenerate(): void {
-  emit('save', 'K7-disclosure-listed-ai-trigger', { remark: 'overall-opinion' })
+/**
+ * 🔴 原实现只 `emit('save', ...ai-trigger)` 写一个 marker、从不调 AI 端点 —— 按钮可见但空转。
+ * prompt 写明源模板 / CAS16 口径 + 「不得虚构」约束（平台铁律：过短或无约束的 prompt
+ * 会诱导模型自造披露内容）。
+ */
+const aiLoading = ref(false)
+
+/** context 值必须全为字符串（`/ai/generate-text` 要求 dict[str,str]，否则 422） */
+function buildAiContext(): Record<string, string> {
+  const fmtRows = (list: DisclosureRow[]): string => list
+    .filter(r => !r.isTotal && (r.beginBalance || r.increase || r.decrease))
+    .map(r => `${r.project}：期初${fmtAmt(r.beginBalance)}｜增加${fmtAmt(r.increase)}｜减少${fmtAmt(r.decrease)}｜期末${fmtAmt(r.beginBalance + r.increase - r.decrease)}｜形成原因${r.reason || '未填'}`)
+    .join('；')
+  return {
+    科目: '2401 递延收益（上市公司版）',
+    附注章节: K7_NOTE_SECTION.listed,
+    与资产相关: fmtRows(assetRelatedRows.value) || '（暂无数据）',
+    与收益相关: fmtRows(incomeRelatedRows.value) || '（暂无数据）',
+    既有说明: narrativeText.value || '（空）',
+  }
 }
 
-function handleAiNarrative(): void {
-  emit('save', 'K7-disclosure-listed-ai-narrative', { remark: 'narrative-generate' })
+async function runAi(section: string, prompt: string): Promise<void> {
+  if (!props.wpId || props.isReadonly || aiLoading.value) return
+  aiLoading.value = true
+  try {
+    const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section,
+      prompt,
+      context: buildAiContext(),
+      existingContent: narrativeText.value || '',
+    })
+    const generated = (res.data?.data ?? res.data)?.content || ''
+    if (!generated) {
+      ElMessage.warning('AI 未生成内容')
+      return
+    }
+    await ElMessageBox.confirm(
+      `AI 生成内容预览：\n\n${generated.slice(0, 300)}${generated.length > 300 ? '…' : ''}`,
+      'AI 生成确认',
+      { confirmButtonText: '填入', cancelButtonText: '取消', type: 'info' },
+    )
+    narrativeText.value = narrativeText.value ? `${narrativeText.value}\n${generated}` : generated
+    handleNarrativeSave()
+    ElMessage.success('已填入 AI 生成内容')
+  } catch {
+    /* 取消或失败：静默（与平台既有披露 Tab 一致） */
+  } finally {
+    aiLoading.value = false
+  }
+}
+
+function handleAiGenerate(): Promise<void> {
+  return runAi(
+    'k7-disclosure-listed-overall',
+    '请依据致同 2025 修订版底稿 K7 源模板与上市公司附注模版（五、51 递延收益）撰写附注整体披露说明：'
+    + '按 CAS16《政府补助》说明与资产相关、与收益相关政府补助的种类及金额、'
+    + '计入当期损益的政府补助金额及其列报项目、本期返还的政府补助金额及原因。'
+    + '并按源模板红字说明流动/非流动划分口径：受益期在一年以内（含一年）的在「其他流动负债」列报；'
+    + '自资产负债表日起受益期超过一年的在「递延收益」列报，且摊销期限只剩一年或不足一年的'
+    + '仍留在本项目、不转入「一年内到期的非流动负债」。'
+    + '只能使用已提供的项目名称与金额，不得虚构补助项目、批文、金额或摊销年限，'
+    + '无把握的内容留空由审计师补充。',
+  )
+}
+
+function handleAiNarrative(): Promise<void> {
+  return runAi(
+    'k7-disclosure-listed-narrative',
+    '请依据致同 2025 修订版底稿 K7 源模板与上市公司附注模版（五、51 递延收益）撰写附注说明文本：'
+    + '逐项说明重要政府补助项目的形成原因（批准文号/拨款依据）、与资产相关或与收益相关的判断依据、'
+    + '确认与摊销方法（与资产相关按资产使用寿命分期计入其他收益），'
+    + '并注明「计入递延收益的政府补助详见附注八、政府补助」。'
+    + '口径依 CAS16 与财会〔2018〕15 号文披露要求。'
+    + '只能使用已提供的项目名称与金额，不得虚构补助文件、拨付单位或金额，'
+    + '无把握的内容留空由审计师补充。',
+  )
 }
 
 async function syncToDisclosureNotes(): Promise<void> {
@@ -420,10 +493,11 @@ onUnmounted(() => {
 
 // ─── 格式化 ──────────────────────────────────────────────────────────────────
 
+/** 只读金额展示：委托平台金额格式单一真源，保留底稿「0 显示 -」语义 */
 function fmtAmt(val: number | null | undefined): string {
   if (val == null) return '-'
   if (val === 0) return '-'
-  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return fmtAmount(val)
 }
 </script>
 

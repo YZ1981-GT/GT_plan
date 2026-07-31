@@ -30,7 +30,7 @@
           <div class="section-title-row">
             <span class="section-title">{{ section.title }}</span>
             <div class="title-actions">
-              <el-button v-if="section.hasTextArea" size="small" type="primary" link :disabled="isReadonly" @click="handleAiGenerate(sIdx)">
+              <el-button v-if="section.hasTextArea" size="small" type="primary" link :loading="aiLoading === sIdx" :disabled="isReadonly" @click="handleAiGenerate(sIdx)">
                 <el-icon><MagicStick /></el-icon> AI生成
               </el-button>
               <el-button size="small" type="default" link @click="handleReview(`disc-soe-${section.id}`)">💬</el-button>
@@ -51,7 +51,7 @@
           <el-table-column label="期末余额" width="120" align="right">
             <template #default="{ row }">
               <template v-if="!isReadonly && !row.isAutoFilled">
-                <el-input-number :model-value="row.endBalance" :controls="false" size="small" @change="(v: number) => handleCellEdit(sIdx, row.rowIdx, 'endBalance', v)" />
+                <WpAmountInput :model-value="row.endBalance" @change="(v: number) => handleCellEdit(sIdx, row.rowIdx, 'endBalance', v)" />
               </template>
               <span v-else :class="{ 'formula-cell': row.isFormula, 'auto-fill': row.isAutoFilled }" :title="row.isFormula ? '公式计算' : row.isAutoFilled ? '跨sheet自动取数' : ''">{{ fmtAmt(row.endBalance) }}</span>
             </template>
@@ -59,7 +59,7 @@
           <el-table-column label="期初余额" width="120" align="right">
             <template #default="{ row }">
               <template v-if="!isReadonly && !row.isAutoFilled">
-                <el-input-number :model-value="row.beginBalance" :controls="false" size="small" @change="(v: number) => handleCellEdit(sIdx, row.rowIdx, 'beginBalance', v)" />
+                <WpAmountInput :model-value="row.beginBalance" @change="(v: number) => handleCellEdit(sIdx, row.rowIdx, 'beginBalance', v)" />
               </template>
               <span v-else :class="{ 'auto-fill': row.isAutoFilled }">{{ fmtAmt(row.beginBalance) }}</span>
             </template>
@@ -124,11 +124,13 @@
  * 科目：2245 其他流动负债（负债类）
  */
 import { reactive, inject, onMounted, onBeforeUnmount } from 'vue'
+import { fmtAmount } from '@/utils/formatters'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { buildK4SyncPayload, K4_NOTE_SECTION } from '../../composables/k4NoteSectionMap'
 import type { WorkpaperRuntimeContext } from '../../composables/useWorkpaperScaffold'
 import { WorkpaperRuntimeContextKey } from '../../composables/useWorkpaperScaffold'
@@ -280,13 +282,23 @@ function publishNoteText(): void {
 }
 
 // ═══ AI辅助 ═══
+/** 正在生成的段索引（null = 空闲）——按段 loading，防同段重复提交 */
+const aiLoading = ref<number | null>(null)
+
 async function handleAiGenerate(sIdx: number): Promise<void> {
   const section = sections[sIdx]
-  if (!section) return
+  if (!section || props.isReadonly || aiLoading.value !== null) return
 
+  aiLoading.value = sIdx
   try {
     const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
-      prompt: `请生成其他流动负债附注（国企格式）中"${section.title}"的披露文字说明`,
+      prompt:
+        `请依据致同 2025 修订版底稿 K4 源模板与国有企业附注模版（八、48 其他流动负债）`
+        + `撰写"${section.title}"的披露文字说明：说明其他流动负债各项目的性质与构成、`
+        + `本期增减变动的主要原因，以及一年内摊销的递延收益-政府补助的列报口径`
+        + `（受益期超过一年的部分在「递延收益」K7 列报）。口径依财会〔2018〕15 号文与 CAS16。`
+        + `只能使用已提供的项目名称与金额，不得虚构项目、批文、拨付单位或金额，`
+        + `无把握的内容留空由审计师补充。`,
       context: {
         科目: '2245 其他流动负债（负债类）',
         格式: '国有企业报表附注',
@@ -309,7 +321,11 @@ async function handleAiGenerate(sIdx: number): Promise<void> {
     section.textContent = section.textContent ? `${section.textContent}\n${generated}` : generated
     handleNoteTextChange(sIdx)
     ElMessage.success('已填入AI生成内容')
-  } catch { /* cancelled or error */ }
+  } catch {
+    /* cancelled or error */
+  } finally {
+    aiLoading.value = null
+  }
 }
 
 // ═══ 持久化 ═══
@@ -369,9 +385,10 @@ function handleReview(id: string): void {
 }
 
 // ═══ 格式化 ═══
+/** 只读金额展示：委托平台金额格式单一真源，保留底稿「0 显示 -」语义 */
 function fmtAmt(v: number | null | undefined): string {
   if (v == null || v === 0) return '-'
-  return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return fmtAmount(v)
 }
 </script>
 

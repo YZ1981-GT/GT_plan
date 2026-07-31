@@ -12,8 +12,10 @@ import {
   buildDataResourceRows,
   buildDataResourceSyncRows,
   buildDataResourceTieChecks,
+  deriveDataResourceClassRow,
   isDataResourceEmpty,
   setDrCell,
+  type DrClassLinkage,
   type DrColKey,
   type DrValueMap,
 } from './f2DataResourceInventory'
@@ -29,10 +31,11 @@ export const F2_SOE_DISCLOSURE_CATEGORIES: ReadonlyArray<{
 }> = [
   { rowKey: 'raw-combined', label: '原材料', kind: 'normal', sourceKeys: ['raw-materials', 'material-in-transit'] },
   {
+    // `work-in-progress` 不在审定表 rowKey 全集（1404 是 `semi-finished`）→ 已删该死键
     rowKey: 'wip-combined',
     label: '自制半成品及在产品',
     kind: 'normal',
-    sourceKeys: ['work-in-progress', 'semi-finished', 'dev-costs'],
+    sourceKeys: ['semi-finished', 'dev-costs'],
   },
   { rowKey: 'dev-costs', label: '其中：开发成本', kind: 'detail', sourceKeys: ['dev-costs'] },
   { rowKey: 'outsourced-processing', label: '委托加工物资', kind: 'normal', sourceKeys: ['outsourced-processing'] },
@@ -52,18 +55,27 @@ export const F2_SOE_DISCLOSURE_CATEGORIES: ReadonlyArray<{
   { rowKey: 'goods-in-transit', label: '发出商品', kind: 'normal', sourceKeys: ['goods-in-transit'] },
   { rowKey: 'consumable-bio', label: '消耗性生物资产', kind: 'normal', sourceKeys: ['consumable-bio'] },
   { rowKey: 'contract-performance', label: '合同履约成本', kind: 'normal', sourceKeys: ['contract-performance'] },
-  { rowKey: 'data-resources', label: '数据资源', kind: 'normal', sourceKeys: ['data-resources'] },
-  { rowKey: 'other', label: '其他', kind: 'normal', sourceKeys: ['price-difference', 'other'] },
+  // 数据资源无对应存货科目（1401~1412）→ 从 (5) 数据资源表联动取数，见 loadClassRow
+  { rowKey: 'data-resources', label: '数据资源', kind: 'normal', sourceKeys: [] },
+  // 1412 商品进销差价在国企版归入「其他」（国企源模板有「其他」行，上市版没有 → 并入库存商品）；
+  // 死键 `other` 已删（审定表无此 rowKey），其余部分由 s1Overrides 手工录入补足
+  { rowKey: 'other', label: '其他', kind: 'normal', sourceKeys: ['price-difference'] },
   {
+    // 土地储备无对应科目 → 全靠 s1Overrides 手工录入（源模板注要求披露面积/本期增加/期末余额）
     rowKey: 'land-reserve',
     label: '其中：尚未开发的土地储备（由房地产开发企业填列）',
     kind: 'detail',
-    sourceKeys: ['land-reserve'],
+    sourceKeys: [],
   },
 ]
 
+/** 允许手工录入 (1) 分类表金额的行（无科目来源者）；其余行一律跨表取数，禁手工覆盖 */
+export const F2_SOE_MANUAL_CLASS_ROW_KEYS: readonly string[] = ['other', 'land-reserve']
+
 const PREFIX = 'F2-note-soe-'
 const ITEM_S2_OVERRIDES = `${PREFIX}s2-overrides`
+/** (1) 分类表手工录入（仅「其他」「土地储备」两行，无科目来源） */
+const ITEM_S1_OVERRIDES = `${PREFIX}s1-overrides`
 const ITEM_NOTE_CATEGORY = `${PREFIX}note-category`
 const ITEM_NOTE_BORROW = `${PREFIX}note-borrow`
 const ITEM_NOTE_AMORT = `${PREFIX}note-amort`
@@ -97,6 +109,15 @@ export interface F2SoeMovementRow {
   ending: number
   tieDiff: number
 }
+
+/**
+ * (1) 分类表手工录入字段。`endNet` / `priorNet` **不可直接录入** ——
+ * 由 `calcNetValue(账面余额, 跌价准备)` 派生，避免三者互不自洽。
+ */
+export type F2SoeClassManualField =
+  'endGross' | 'endImpairment' | 'priorGross' | 'priorImpairment'
+
+export type S1Override = Partial<Record<F2SoeClassManualField, number>>
 
 interface S2Override {
   incProvision?: number | null
@@ -202,10 +223,85 @@ export function useF2DisclosureSoe(options: {
     isF2DisclosureApplicable('soe', applicableStandards.value),
   )
 
-  // ─── (1) 存货分类 ─────────────
+  // ─── (5) 数据资源持久化值 ─────────────
+  // 🔴 声明必须早于 `section1Rows`（分类表「数据资源」行从本表联动，computed 可能在
+  // setup 期间就被求值；`drValues` 若在 TDZ 会 ReferenceError）。
+  const drValues = ref<DrValueMap>({})
+
+  watch(
+    () => allResponses.value.get(ITEM_S5_DR)?.remark,
+    (json) => { drValues.value = safeParseJson<DrValueMap>(json, {}) },
+    { immediate: true },
+  )
+
+  const drClassLinkage: ComputedRef<DrClassLinkage> = computed(() =>
+    deriveDataResourceClassRow(drValues.value),
+  )
+
+  // ─── (1) 分类表手工录入（仅无科目来源的两行）─────────────
+  const s1Overrides = ref<Record<string, S1Override>>({})
+  watch(
+    () => allResponses.value.get(ITEM_S1_OVERRIDES)?.remark,
+    (json) => { s1Overrides.value = safeParseJson(json, {}) },
+    { immediate: true },
+  )
+
+  /** 手工录入行：四个金额取覆盖值，净值仍派生 */
+  function manualClassRow(
+    cat: (typeof F2_SOE_DISCLOSURE_CATEGORIES)[number],
+    ov: S1Override,
+  ): F2SoeClassRow {
+    const endGross = parseNum(ov.endGross)
+    const endImpairment = parseNum(ov.endImpairment)
+    const priorGross = parseNum(ov.priorGross)
+    const priorImpairment = parseNum(ov.priorImpairment)
+    return {
+      rowKey: cat.rowKey,
+      label: cat.label,
+      kind: cat.kind,
+      endGross,
+      endImpairment,
+      endNet: calcNetValue(endGross, endImpairment),
+      priorGross,
+      priorImpairment,
+      priorNet: calcNetValue(priorGross, priorImpairment),
+    }
+  }
+
+  // ─── (1) 存货分类：跨 sheet 自 F2-1；数据资源自 (5) 联动；其他/土地储备手工录入 ───
   const section1Rows: ComputedRef<F2SoeClassRow[]> = computed(() => {
     void adjudicatedRefreshKey.value
-    return F2_SOE_DISCLOSURE_CATEGORIES.map((cat) => loadClassRow(allResponses.value, cat))
+    const map = allResponses.value
+    const dr = drClassLinkage.value
+    return F2_SOE_DISCLOSURE_CATEGORIES.map((cat) => {
+      if (cat.rowKey === 'data-resources') {
+        return {
+          rowKey: cat.rowKey,
+          label: cat.label,
+          kind: cat.kind,
+          endGross: dr.endGross,
+          endImpairment: dr.endImpairment,
+          endNet: calcNetValue(dr.endGross, dr.endImpairment),
+          priorGross: dr.priorGross,
+          priorImpairment: dr.priorImpairment,
+          priorNet: calcNetValue(dr.priorGross, dr.priorImpairment),
+        }
+      }
+      if (F2_SOE_MANUAL_CLASS_ROW_KEYS.includes(cat.rowKey)) {
+        const base = loadClassRow(map, cat)
+        const ov = s1Overrides.value[cat.rowKey]
+        if (!ov || Object.keys(ov).length === 0) return base
+        // 「其他」行仍保留 1412 进销差价的跨表取数：手工值与取数值相加
+        const merged: S1Override = {
+          endGross: base.endGross + parseNum(ov.endGross),
+          endImpairment: base.endImpairment + parseNum(ov.endImpairment),
+          priorGross: base.priorGross + parseNum(ov.priorGross),
+          priorImpairment: base.priorImpairment + parseNum(ov.priorImpairment),
+        }
+        return manualClassRow(cat, merged)
+      }
+      return loadClassRow(map, cat)
+    })
   })
 
   const section1Total: ComputedRef<F2SoeClassRow> = computed(() => totalClass(section1Rows.value))
@@ -274,15 +370,7 @@ export function useF2DisclosureSoe(options: {
     }
   })
 
-  // ─── (5) 确认为存货的数据资源 ─────────────
-  const drValues = ref<DrValueMap>({})
-
-  watch(
-    () => allResponses.value.get(ITEM_S5_DR)?.remark,
-    (json) => { drValues.value = safeParseJson<DrValueMap>(json, {}) },
-    { immediate: true },
-  )
-
+  // ─── (5) 确认为存货的数据资源（`drValues` 与 watch 已提前到 (1) 之前声明）─────────────
   const drRows = computed(() => buildDataResourceRows(drValues.value, 'soe'))
   const drIsEmpty = computed(() => isDataResourceEmpty(drValues.value))
 
@@ -324,7 +412,7 @@ export function useF2DisclosureSoe(options: {
 
   function flushSave(): void {
     const keys = [
-      ITEM_S2_OVERRIDES, ITEM_S5_DR,
+      ITEM_S1_OVERRIDES, ITEM_S2_OVERRIDES, ITEM_S5_DR,
       ITEM_NOTE_CATEGORY, ITEM_NOTE_BORROW, ITEM_NOTE_AMORT, ITEM_NOTE, ITEM_LAND_NOTE,
     ]
     const items = keys.map((k) => allResponses.value.get(k)).filter(Boolean)
@@ -366,6 +454,24 @@ export function useF2DisclosureSoe(options: {
   }
   window.addEventListener('substantive:adjudicated', adjudicatedHandler)
   eventListeners.push({ event: 'substantive:adjudicated', handler: adjudicatedHandler })
+
+  /**
+   * (1) 分类表手工录入。**rowKey 白名单**：只允许「其他」「土地储备」两行 ——
+   * 其余行一律跨表自 F2-1 审定表取数，开放手工覆盖会破坏审定表的唯一权威性。
+   */
+  function updateS1Field(rowKey: string, field: F2SoeClassManualField, value: number): void {
+    if (isReadonly.value) return
+    if (!F2_SOE_MANUAL_CLASS_ROW_KEYS.includes(rowKey)) return
+    const next = { ...(s1Overrides.value[rowKey] || {}), [field]: parseNum(value) }
+    s1Overrides.value = { ...s1Overrides.value, [rowKey]: next }
+    setItem(ITEM_S1_OVERRIDES, JSON.stringify(s1Overrides.value))
+    debounceSave()
+  }
+
+  /** UI 判定：该行该列是否可手工录入 */
+  function isManualClassRow(rowKey: string): boolean {
+    return F2_SOE_MANUAL_CLASS_ROW_KEYS.includes(rowKey)
+  }
 
   function updateS2Field(rowKey: string, field: keyof S2Override, value: number): void {
     if (isReadonly.value) return
@@ -430,6 +536,7 @@ export function useF2DisclosureSoe(options: {
       },
       s5DataResourceRows: buildDataResourceSyncRows(drRows.value),
       noteCategory: noteCategory.value,
+      landNote: landNote.value,
       s3BorrowText: s3BorrowText.value,
       s4AmortText: s4AmortText.value,
       noteText: noteText.value,
@@ -458,6 +565,8 @@ export function useF2DisclosureSoe(options: {
     noteText,
     landNote,
     dataUpdatedVisible,
+    isManualClassRow,
+    updateS1Field,
     updateS2Field,
     updateDrCell,
     getSyncSnapshot,

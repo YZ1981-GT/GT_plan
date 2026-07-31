@@ -166,6 +166,36 @@ export interface F1ListedSyncSnapshot {
   noteTop5: string
 }
 
+export interface F1NoteTextRow {
+  section: string
+  title: string
+  text: string
+}
+
+/**
+ * 说明文本 → `_note_texts`（后端 `_format_note_texts` 渲染为 `【title】\n正文`）。
+ *
+ * 🔴 `title` 必填中文：缺省时后端用 `section` 兜底，附注正文会出现
+ * `【listed-note-aging】` 这类英文键（违反 UI 全中文化）。空文本直接丢弃，
+ * 避免用空段落覆盖附注既有正文。
+ *
+ * title 取源 = 源 xlsx 小节标题（上市「（1）预付款项按账龄披露」/
+ * 「（2）账龄超过1年的重要预付款项」/「（3）按预付对象归集的预付款项期末余额前五名单位情况」；
+ * 国企「（1）预付款项按账龄列示」/「（2）账龄超过1年的大额预付款项」/
+ * 「（3）按欠款方归集的期末余额前五名的预付款项情况」）。
+ */
+export function buildF1NoteTexts(
+  entries: ReadonlyArray<readonly [section: string, title: string, text: string]>,
+): F1NoteTextRow[] {
+  const out: F1NoteTextRow[] = []
+  for (const [section, title, text] of entries) {
+    const body = String(text ?? '').trim()
+    if (!body) continue
+    out.push({ section, title, text: body })
+  }
+  return out
+}
+
 export function buildF1ListedSubTableData(
   snap: F1ListedSyncSnapshot,
 ): Record<string, unknown> {
@@ -230,12 +260,12 @@ export function buildF1ListedSubTableData(
         is_total: true,
       },
     ],
-    _note_texts: [
-      { section: 'listed-note-aging', text: snap.noteAging },
-      { section: 'listed-note-over1', text: snap.noteOver1Year },
-      { section: 'listed-note-top5', text: snap.noteTop5 },
-      { section: 'listed-top5-summary', text: snap.top5SummaryText },
-    ],
+    _note_texts: buildF1NoteTexts([
+      ['listed-note-aging', '预付款项按账龄披露说明', snap.noteAging],
+      ['listed-note-over1', '账龄超过1年的重要预付款项说明', snap.noteOver1Year],
+      ['listed-note-top5', '按预付对象归集的前五名预付款项说明', snap.noteTop5],
+      ['listed-top5-summary', '前五名预付款项汇总披露', snap.top5SummaryText],
+    ]),
   }
   // 旧表名清理（后端据此删除附注残留空表；不含本次推送的键）
   const removed = F1_LISTED_OBSOLETE_TABLE_KEYS.filter((k) => !(k in sub))
@@ -364,11 +394,11 @@ export function buildF1SoeSubTableData(
         is_total: true,
       },
     ],
-    _note_texts: [
-      { section: 'soe-note-aging', text: snap.noteAging },
-      { section: 'soe-note-over1', text: snap.noteOver1Year },
-      { section: 'soe-note-top5', text: snap.noteTop5 },
-    ],
+    _note_texts: buildF1NoteTexts([
+      ['soe-note-aging', '预付款项按账龄列示说明', snap.noteAging],
+      ['soe-note-over1', '账龄超过1年的大额预付款项说明', snap.noteOver1Year],
+      ['soe-note-top5', '按欠款方归集的前五名预付款项说明', snap.noteTop5],
+    ]),
   }
 }
 

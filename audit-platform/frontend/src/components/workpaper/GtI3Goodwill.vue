@@ -217,6 +217,7 @@ import { ref, computed, onMounted, provide, toRef, defineAsyncComponent, inject}
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
+import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 import { useI3DualMode } from './composables/useI3DualMode'
 import { useI3CrossSheet } from './composables/useI3CrossSheet'
 import HiFourTableSourcePanel from './shared/HiFourTableSourcePanel.vue'
@@ -255,14 +256,11 @@ const props = defineProps<{
 
 const emit = defineEmits<{ (e: 'save'): void; (e: 'completed'): void; (e: 'navigate-sheet', sheetName: string): void }>()
 
-const runtimeCtx = inject(WorkpaperRuntimeContextKey, null)
-const applicableStandards = computed<string[]>(() => {
-  const fromProp = props.applicableStandards
-  if (Array.isArray(fromProp) && fromProp.length) return fromProp
-  const fromRuntime = (runtimeCtx as any)?.applicableStandards?.value
-  if (Array.isArray(fromRuntime) && fromRuntime.length) return fromRuntime
-  const fromHtml = props.htmlData?.applicableStandards
-  return Array.isArray(fromHtml) ? fromHtml : []
+// 适用准则：显式 prop > 本 sheet html_data > runtime context（scaffold 从 render-config
+// 顶层注入）。收敛到共享 composable，兼容 v2 对象 / 逗号串 / JSON 串。
+const applicableStandards = useHostApplicableStandards({
+  explicit: () => props.applicableStandards,
+  htmlData: () => props.htmlData,
 })
 
 // ─── State ───────────────────────────────────────────────────────────────────

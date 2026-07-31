@@ -40,7 +40,7 @@
         <h4 class="card-title">{{ section.label }}</h4>
 
         <el-table :data="getSectionDisplayData(section)" size="small" border>
-          <el-table-column label="项目" min-width="200">
+          <el-table-column label="项  目" min-width="200">
             <template #default="{ row }">
               <span :class="{ 'label-bold': row.rowId.startsWith('__') }">
                 {{ row.label }}
@@ -50,16 +50,18 @@
               </span>
             </template>
           </el-table-column>
-          <el-table-column label="期初数" width="140" align="right">
-            <template #default="{ row }">
-              <el-input-number v-if="section.isDynamic && !row.rowId.startsWith('__') && !isReadonly" :model-value="row.prior" :controls="false" size="small" style="width:100%" @change="(v: number) => updateDynamicRow(section.sectionKey, row.rowId, 'prior', v ?? 0)" />
-              <span v-else :class="{ 'cross-sheet-cell': !section.isDynamic && !row.rowId.startsWith('__') }">{{ fmtAmt(row.prior) }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="期末数" width="140" align="right">
+          <!-- 🔴 列名与顺序取源模板 A7：期末列在前，字面按变体（上市「上年年末余额」/
+               国企「期初余额」），与附注列头一致，避免底稿与交付物两套口径 -->
+          <el-table-column :label="PERIOD_HEADERS.end" width="140" align="right">
             <template #default="{ row }">
               <el-input-number v-if="section.isDynamic && !row.rowId.startsWith('__') && !isReadonly" :model-value="row.current" :controls="false" size="small" style="width:100%" @change="(v: number) => updateDynamicRow(section.sectionKey, row.rowId, 'current', v ?? 0)" />
               <span v-else :class="{ 'cross-sheet-cell': !section.isDynamic && !row.rowId.startsWith('__') }">{{ fmtAmt(row.current) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column :label="priorHeader" width="140" align="right">
+            <template #default="{ row }">
+              <el-input-number v-if="section.isDynamic && !row.rowId.startsWith('__') && !isReadonly" :model-value="row.prior" :controls="false" size="small" style="width:100%" @change="(v: number) => updateDynamicRow(section.sectionKey, row.rowId, 'prior', v ?? 0)" />
+              <span v-else :class="{ 'cross-sheet-cell': !section.isDynamic && !row.rowId.startsWith('__') }">{{ fmtAmt(row.prior) }}</span>
             </template>
           </el-table-column>
           <el-table-column v-if="section.isDynamic && !isReadonly" label="操作" width="60" align="center">
@@ -84,6 +86,11 @@
             placeholder="补充披露说明..."
             @change="(v: string) => updateNoteText(getNoteKey(section.sectionKey), v)"
           />
+          <div class="note-actions">
+            <el-button size="small" :loading="aiLoadingSection === getNoteKey(section.sectionKey)" :disabled="isReadonly"
+              @click="runAi(getNoteKey(section.sectionKey))">🤖 AI</el-button>
+            <el-button v-if="openReviewDialog" size="small" @click="openReview(getNoteKey(section.sectionKey))">💬 复核</el-button>
+          </div>
         </div>
 
         <!-- 编制提示 -->
@@ -104,21 +111,21 @@
         <h4 class="card-title">{{ section.label }}</h4>
 
         <el-table :data="getSectionDisplayData(section)" size="small" border>
-          <el-table-column label="项目" min-width="200">
+          <el-table-column label="项  目" min-width="200">
             <template #default="{ row }">
               <span :class="{ 'label-bold': row.rowId.startsWith('__') }">{{ row.label }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="期初数" width="140" align="right">
-            <template #default="{ row }">
-              <el-input-number v-if="section.isDynamic && !row.rowId.startsWith('__') && !isReadonly" :model-value="row.prior" :controls="false" size="small" style="width:100%" @change="(v: number) => updateDynamicRow(section.sectionKey, row.rowId, 'prior', v ?? 0)" />
-              <span v-else :class="{ 'cross-sheet-cell': !section.isDynamic && !row.rowId.startsWith('__') }">{{ fmtAmt(row.prior) }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="期末数" width="140" align="right">
+          <el-table-column :label="PERIOD_HEADERS.end" width="140" align="right">
             <template #default="{ row }">
               <el-input-number v-if="section.isDynamic && !row.rowId.startsWith('__') && !isReadonly" :model-value="row.current" :controls="false" size="small" style="width:100%" @change="(v: number) => updateDynamicRow(section.sectionKey, row.rowId, 'current', v ?? 0)" />
               <span v-else :class="{ 'cross-sheet-cell': !section.isDynamic && !row.rowId.startsWith('__') }">{{ fmtAmt(row.current) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column :label="priorHeader" width="140" align="right">
+            <template #default="{ row }">
+              <el-input-number v-if="section.isDynamic && !row.rowId.startsWith('__') && !isReadonly" :model-value="row.prior" :controls="false" size="small" style="width:100%" @change="(v: number) => updateDynamicRow(section.sectionKey, row.rowId, 'prior', v ?? 0)" />
+              <span v-else :class="{ 'cross-sheet-cell': !section.isDynamic && !row.rowId.startsWith('__') }">{{ fmtAmt(row.prior) }}</span>
             </template>
           </el-table-column>
           <el-table-column v-if="section.isDynamic && !isReadonly" label="操作" width="60" align="center">
@@ -142,6 +149,11 @@
             placeholder="补充披露说明..."
             @change="(v: string) => updateNoteText(getNoteKey(section.sectionKey), v)"
           />
+          <div class="note-actions">
+            <el-button size="small" :loading="aiLoadingSection === getNoteKey(section.sectionKey)" :disabled="isReadonly"
+              @click="runAi(getNoteKey(section.sectionKey))">🤖 AI</el-button>
+            <el-button v-if="openReviewDialog" size="small" @click="openReview(getNoteKey(section.sectionKey))">💬 复核</el-button>
+          </div>
         </div>
 
         <!-- 编制提示 -->
@@ -153,6 +165,30 @@
         </details>
       </div>
     </template>
+
+    <!-- 源模板要求的定性披露（上市 A32-A34「披露以下信息：」/ 国企 A15-A17「说明：」）-->
+    <div class="disclosure-card">
+      <h4 class="section-title">定性披露（源模板要求）</h4>
+      <div class="qual-hint">
+        源模板在表格之后要求以文字披露以下事项；缺失将导致附注正文相应段落空缺。
+      </div>
+      <div v-for="(item, qi) in qualitativeSections" :key="item.key" class="note-block">
+        <div class="note-label">{{ qi + 1 }}、{{ item.title }}</div>
+        <el-input
+          :model-value="noteTexts[item.key]"
+          type="textarea"
+          :autosize="{ minRows: 2, maxRows: 6 }"
+          :disabled="isReadonly"
+          placeholder="按项目实际情况填写..."
+          @change="(v: string) => updateNoteText(item.key, v)"
+        />
+        <div class="note-actions">
+          <el-button size="small" :loading="aiLoadingSection === item.key" :disabled="isReadonly"
+            @click="runAi(item.key)">🤖 AI</el-button>
+          <el-button v-if="openReviewDialog" size="small" @click="openReview(item.key)">💬 复核</el-button>
+        </div>
+      </div>
+    </div>
 </div>
 </template>
 
@@ -163,14 +199,21 @@
  * Task: 23.1
  * Requirements: 13.1-13.8, 14.1-14.6, 15.1-15.6, 19.5, 20.1
  */
-import { computed, ref, toRef, watch, onBeforeUnmount, type Ref } from 'vue'
+import { computed, inject, ref, toRef, watch, onBeforeUnmount, type Ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { InfoFilled } from '@element-plus/icons-vue'
 import http from '@/utils/http'
 import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
 import { useD7Disclosure, type DisclosureSection, type DisclosureRow } from '../composables/useD7Disclosure'
-import { buildD7SyncPayload, D7_NOTE_SECTION, type D7DisclosureSnapshot } from '../composables/d7NoteSectionMap'
+import {
+  buildD7SyncPayload,
+  D7_NOTE_SECTION,
+  D7_NOTE_TEXT_SECTIONS,
+  D7_QUALITATIVE_TITLES,
+  type D7DisclosureSnapshot,
+} from '../composables/d7NoteSectionMap'
+import { useDisclosureNoteAi } from '../composables/useDisclosureNoteAi'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import type { ChecklistResponse } from '../composables/useD7FormData'
 import type useD7CrossSheet from '../composables/useD7CrossSheet'
@@ -246,6 +289,41 @@ function updateDynamicRow(sectionKey: string, rowId: string, field: string, valu
     // Trigger persist by re-adding (composable handles persistence)
   }
 }
+
+// ─── 说明文本域的 AI 辅助 + 复核入口（共享 composable）──────────────────────
+// 🔴 `section_id` 与后端 `review_dialog._SECTION_PROMPTS` 的键逐字一致：
+// 文本域键形如 `D7-note-listed-text-1` / `D7-note-soe-qual-2` → 去 `D7-note-` 前缀。
+const openReviewDialog = inject<any>('openReviewDialog', null)
+const D7_NOTE_TITLES: Record<string, string> = Object.fromEntries(
+  [...D7_NOTE_TEXT_SECTIONS.listed, ...D7_NOTE_TEXT_SECTIONS.soe].map((s) => [s.key, s.title]),
+)
+const { aiLoadingSection, runAi, openReview } = useDisclosureNoteAi({
+  wpId: toRef(props, 'wpId') as Ref<string>,
+  isReadonly: () => props.isReadonly,
+  getText: (k) => noteTexts.value?.[k] ?? '',
+  setText: (k, text) => updateNoteText(k, text),
+  buildSectionId: (k) => `d7-disclosure-${String(k).replace(/^D7-note-/, '')}-note`,
+  labelOf: (k) => D7_NOTE_TITLES[k] ?? k,
+  openReviewDialog,
+})
+
+/**
+ * 期间列头 = 源模板字面（A7/A6）：期末列恒为「期末余额」，比较期列按变体。
+ * 🔴 与附注列头（`d7NoteSectionMap` 的 `MAIN_COLUMNS_*`）同口径，
+ * 避免底稿显示「期初数/期末数」而交付物是「期末余额/上年年末余额」两套说法。
+ */
+const PERIOD_HEADERS = { end: '期末余额', listedPrior: '上年年末余额', soePrior: '期初余额' } as const
+const priorHeader = computed(() =>
+  activeVariant.value === 'soe' ? PERIOD_HEADERS.soePrior : PERIOD_HEADERS.listedPrior,
+)
+
+/**
+ * 源模板定性披露三段（按当前变体取键；标题来自 `D7_QUALITATIVE_TITLES` 单一真源）。
+ * 取 `D7_NOTE_TEXT_SECTIONS` 末 3 条，保证与载荷 `_note_texts` 键集完全一致。
+ */
+const qualitativeSections = computed(() =>
+  D7_NOTE_TEXT_SECTIONS[activeVariant.value].slice(-D7_QUALITATIVE_TITLES.length),
+)
 
 function getNoteKey(sectionKey: string): string {
   const map: Record<string, string> = {
@@ -398,6 +476,18 @@ async function syncToDisclosureNotes(): Promise<void> {
 
 .note-block { margin-top: 12px; }
 .note-label { font-size: var(--wp-font-size, 13px); color: #606266; margin-bottom: 6px; }
+.note-actions { display: flex; gap: 8px; margin-top: 6px; justify-content: flex-end; }
+.section-title { font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #303133; }
+/* 源模板方法论上下文（琥珀色左边线 + 浅黄背景，平台统一口径） */
+.qual-hint {
+  border-left: 3px solid #e6a23c;
+  background: #fdf6ec;
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: #7d5b1e;
+}
 
 .guidance-hint {
   margin-top: 12px;

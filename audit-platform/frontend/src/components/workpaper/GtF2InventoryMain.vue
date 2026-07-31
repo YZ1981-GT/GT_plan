@@ -229,6 +229,7 @@ import { useF2CrossSheet } from './composables/useF2CrossSheet'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useF2DualMode } from './composables/useF2DualMode'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
+import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 import { getF2DetailConfig } from './f2/detail/f2DetailSheetConfigs'
 import { getF2CutoffConfig } from './f2/inspection/f2CutoffSheetConfigs'
 
@@ -345,9 +346,12 @@ const showHtmlToolbar = computed(() => {
   return s.startsWith('F2-') || s === 'F2A' || s.startsWith('附注')
 })
 
-const applicableStandards = computed(() =>
-  formData.projectContext.value?.applicable_standards ?? [],
-)
+// 适用准则：显式 prop > 本 sheet html_data > runtime context（scaffold 从 render-config
+// 顶层注入）。收敛到共享 composable，兼容 v2 对象 / 逗号串 / JSON 串。
+const applicableStandards = useHostApplicableStandards({
+  explicit: () => formData.projectContext.value?.applicable_standards,
+  htmlData: () => props.htmlData,
+})
 
 const detailConfig = computed(() => getF2DetailConfig(currentSheet.value))
 const cutoffConfig = computed(() => getF2CutoffConfig(currentSheet.value))

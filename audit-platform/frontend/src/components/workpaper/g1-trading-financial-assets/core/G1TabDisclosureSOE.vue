@@ -247,7 +247,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, inject, onBeforeUnmount, ref, toRef } from 'vue'
+import { computed, inject, onBeforeUnmount, ref, toRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
@@ -358,13 +358,24 @@ async function syncToDisclosureNotes() {
       rows += Number(data?.rows_synced ?? 0)
     }
     ElMessage.success(`已同步 ${rows} 行到附注模块「八、2 交易性金融资产 / 八、3 衍生金融资产」`)
-    autoSync.scheduleAutoSync(syncToDisclosureNotes)
   } catch {
     ElMessage.warning('同步附注失败，请稍后重试')
   } finally {
     isSyncing.value = false
   }
 }
+
+// [auto-sync] 监听实际数据（历史实现是 syncToDisclosureNotes 里调度自己 → 800ms 周期无限 POST，
+// 且让 disclosureAutoSyncCoverage 守卫误判为「已接自动同步」= 假接入）。
+// 🔴 不加 `_xxxMounted` 一次性防护：Vue watch 默认 immediate:false，挂载本身不触发；
+//    该防护会吞掉「切走再切回后的第一次编辑」（平台铁律）。
+watch(
+  [
+    () => JSON.stringify(dis.getSyncSnapshot()),
+  ],
+  () => autoSync.scheduleAutoSync(syncToDisclosureNotes),
+  { deep: true },
+)
 
 onBeforeUnmount(() => {
   autoSync.cancelPending()

@@ -46,25 +46,56 @@
 
       <!-- Section 1: 分类 -->
       <template v-if="section.sectionKey === 'listed-1'">
-        <el-table :data="padRows(section.rows)" size="small" border>
-          <el-table-column prop="label" label="项目" width="200" />
-          <el-table-column label="期末账面余额" width="120" align="right">
-            <template #default="{ row }"><span class="cross-sheet-cell">{{ fmtAmt(row.endBookBalance) }}</span></template>
+        <!-- 源模板 A20「或：披露格式如下」= 二选一表组（同名同表，列/行形态不同） -->
+        <div class="format-switch">
+          <span class="format-label">披露格式（源模板「或：」二选一）：</span>
+          <el-radio-group
+            :model-value="mainFormat"
+            size="small"
+            :disabled="isReadonly"
+            @change="(v: any) => setMainFormat(v)"
+          >
+            <el-radio-button value="detailed">明细式（账面余额/减值准备/账面价值）</el-radio-button>
+            <el-radio-button value="simple">简化式（合同资产/减：减值准备/小计）</el-radio-button>
+          </el-radio-group>
+        </div>
+
+        <!-- 简化式：源模板 A21-A26，单级 3 列，行由明细派生 -->
+        <el-table v-if="mainFormat === 'simple'" :data="simpleMainRows" size="small" border>
+          <el-table-column prop="label" label="项  目" min-width="260" />
+          <el-table-column label="期末余额" width="140" align="right">
+            <template #default="{ row }"><span class="cross-sheet-cell">{{ fmtAmt(row.end_amount) }}</span></template>
           </el-table-column>
-          <el-table-column label="期末减值准备" width="120" align="right">
-            <template #default="{ row }"><span class="cross-sheet-cell">{{ fmtAmt(row.endImpairment) }}</span></template>
+          <el-table-column label="上年年末余额" width="140" align="right">
+            <template #default="{ row }"><span class="cross-sheet-cell">{{ fmtAmt(row.prior_amount) }}</span></template>
           </el-table-column>
-          <el-table-column label="期末账面价值" width="120" align="right">
-            <template #default="{ row }"><span class="cross-sheet-cell">{{ fmtAmt(row.endBookValue) }}</span></template>
+        </el-table>
+
+        <!-- 明细式：源模板 B8:D8「期末余额」/ E8:G8「上年年末余额」两级表头（旧实现拍平成
+             「期末账面余额」式组合列名，与附注渲染不一致） -->
+        <el-table v-else :data="padRows(section.rows)" size="small" border>
+          <el-table-column prop="label" label="项  目" width="200" />
+          <el-table-column label="期末余额">
+            <el-table-column label="账面余额" width="120" align="right">
+              <template #default="{ row }"><span class="cross-sheet-cell">{{ fmtAmt(row.endBookBalance) }}</span></template>
+            </el-table-column>
+            <el-table-column label="减值准备" width="120" align="right">
+              <template #default="{ row }"><span class="cross-sheet-cell">{{ fmtAmt(row.endImpairment) }}</span></template>
+            </el-table-column>
+            <el-table-column label="账面价值" width="120" align="right">
+              <template #default="{ row }"><span class="cross-sheet-cell">{{ fmtAmt(row.endBookValue) }}</span></template>
+            </el-table-column>
           </el-table-column>
-          <el-table-column label="上年账面余额" width="120" align="right">
-            <template #default="{ row }"><span class="cross-sheet-cell">{{ fmtAmt(row.priorBookBalance) }}</span></template>
-          </el-table-column>
-          <el-table-column label="上年减值准备" width="120" align="right">
-            <template #default="{ row }"><span class="cross-sheet-cell">{{ fmtAmt(row.priorImpairment) }}</span></template>
-          </el-table-column>
-          <el-table-column label="上年账面价值" width="120" align="right">
-            <template #default="{ row }"><span class="cross-sheet-cell">{{ fmtAmt(row.priorBookValue) }}</span></template>
+          <el-table-column label="上年年末余额">
+            <el-table-column label="账面余额" width="120" align="right">
+              <template #default="{ row }"><span class="cross-sheet-cell">{{ fmtAmt(row.priorBookBalance) }}</span></template>
+            </el-table-column>
+            <el-table-column label="减值准备" width="120" align="right">
+              <template #default="{ row }"><span class="cross-sheet-cell">{{ fmtAmt(row.priorImpairment) }}</span></template>
+            </el-table-column>
+            <el-table-column label="账面价值" width="120" align="right">
+              <template #default="{ row }"><span class="cross-sheet-cell">{{ fmtAmt(row.priorBookValue) }}</span></template>
+            </el-table-column>
           </el-table-column>
         </el-table>
       </template>
@@ -129,19 +160,93 @@
 
       <!-- Section 2: 减值计提情况 -->
       <template v-else-if="section.sectionKey === 'listed-2'">
+        <div class="section-hint">
+          源模板 A42-A54 为三级表头（期末余额 / 上年年末余额 各含「账面余额{金额, 比例(%)}、
+          减值准备{金额, 预期信用损失率(%)}、账面价值」）。平台附注只支持两级，故按期间拆两张表：
+          期末段自 ECL 底稿取数，上年年末段为源模板要求的**手工填列**。
+        </div>
+        <div class="sub-caption">期末余额</div>
         <el-table :data="padRows(section.rows)" size="small" border>
           <el-table-column prop="label" label="类别" width="180" />
-          <el-table-column label="期末余额" width="120" align="right">
-            <template #default="{ row }"><span class="cross-sheet-cell">{{ fmtAmt(row.endBalance) }}</span></template>
+          <el-table-column label="账面余额">
+            <el-table-column label="金额" width="120" align="right">
+              <template #default="{ row }"><span class="cross-sheet-cell">{{ fmtAmt(row.endBalance) }}</span></template>
+            </el-table-column>
+            <el-table-column label="比例(%)" width="90" align="right">
+              <template #default="{ row }">{{ fmtPct(row.endPercentage) }}</template>
+            </el-table-column>
           </el-table-column>
-          <el-table-column label="比例%" width="90" align="right">
-            <template #default="{ row }">{{ fmtPct(row.endPercentage) }}</template>
+          <el-table-column label="减值准备">
+            <el-table-column label="金额" width="120" align="right">
+              <template #default="{ row }"><span class="cross-sheet-cell">{{ fmtAmt(row.endAmount) }}</span></template>
+            </el-table-column>
+            <el-table-column label="预期信用损失率(%)" width="140" align="right">
+              <template #default="{ row }">{{ fmtPct100(row.endLossRate) }}</template>
+            </el-table-column>
           </el-table-column>
-          <el-table-column label="减值金额" width="120" align="right">
-            <template #default="{ row }"><span class="cross-sheet-cell">{{ fmtAmt(row.endAmount) }}</span></template>
+          <el-table-column label="账面价值" width="120" align="right">
+            <template #default="{ row }">
+              {{ row._isPad ? '' : fmtAmt((row.endBalance || 0) - (row.endAmount || 0)) }}
+            </template>
           </el-table-column>
-          <el-table-column label="损失率%" width="90" align="right">
-            <template #default="{ row }">{{ fmtPct100(row.endLossRate) }}</template>
+        </el-table>
+
+        <div class="sub-caption">
+          续：上年年末余额
+          <el-button v-if="!isReadonly" size="small" style="margin-left:8px" @click="addImpairmentPriorRow">添加行</el-button>
+        </div>
+        <el-table :data="padRows(impairmentPriorRows)" size="small" border>
+          <el-table-column label="类别" width="180">
+            <template #default="{ row }">
+              <el-input v-if="!isReadonly && !row._isPad" :model-value="row.label" size="small"
+                @input="(v: string) => updateImpairmentPriorCell(row.rowId, 'label', v)" />
+              <span v-else>{{ row.label }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="账面余额">
+            <el-table-column label="金额" width="120" align="right">
+              <template #default="{ row }">
+                <WpAmountInput v-if="!isReadonly && !row._isPad" :model-value="row.balance" :precision="2"
+                  aria-label="上年年末账面余额金额"
+                  @change="(v: number | null) => updateImpairmentPriorCell(row.rowId, 'balance', v)" />
+                <span v-else>{{ row._isPad ? '' : fmtAmt(row.balance) }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="比例(%)" width="90" align="right">
+              <template #default="{ row }">
+                <el-input v-if="!isReadonly && !row._isPad" :model-value="String(row.ratio ?? '')" size="small"
+                  @input="(v: string) => updateImpairmentPriorCell(row.rowId, 'ratio', v)" />
+                <span v-else>{{ row._isPad ? '' : fmtPct100(row.ratio) }}</span>
+              </template>
+            </el-table-column>
+          </el-table-column>
+          <el-table-column label="减值准备">
+            <el-table-column label="金额" width="120" align="right">
+              <template #default="{ row }">
+                <WpAmountInput v-if="!isReadonly && !row._isPad" :model-value="row.provision" :precision="2"
+                  aria-label="上年年末减值准备金额"
+                  @change="(v: number | null) => updateImpairmentPriorCell(row.rowId, 'provision', v)" />
+                <span v-else>{{ row._isPad ? '' : fmtAmt(row.provision) }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="预期信用损失率(%)" width="140" align="right">
+              <template #default="{ row }">
+                <el-input v-if="!isReadonly && !row._isPad" :model-value="String(row.lossRate ?? '')" size="small"
+                  @input="(v: string) => updateImpairmentPriorCell(row.rowId, 'lossRate', v)" />
+                <span v-else>{{ row._isPad ? '' : fmtPct100(row.lossRate) }}</span>
+              </template>
+            </el-table-column>
+          </el-table-column>
+          <el-table-column label="账面价值" width="120" align="right">
+            <template #default="{ row }">
+              {{ row._isPad ? '' : fmtAmt((row.balance || 0) - (row.provision || 0)) }}
+            </template>
+          </el-table-column>
+          <el-table-column v-if="!isReadonly" label="" width="50" align="center">
+            <template #default="{ row }">
+              <el-button v-if="!row._isPad" type="danger" text size="small"
+                @click="removeImpairmentPriorRow(row.rowId)">删</el-button>
+            </template>
           </el-table-column>
         </el-table>
       </template>
@@ -160,6 +265,57 @@
             <template #default="{ row }">{{ fmtPct100(row.lossRate) }}</template>
           </el-table-column>
           <el-table-column prop="reason" label="计提理由" min-width="160" />
+        </el-table>
+
+        <div class="sub-caption">
+          续：上年年末余额
+          <el-button v-if="!isReadonly" size="small" style="margin-left:8px" @click="addSinglePriorRow">添加行</el-button>
+        </div>
+        <div class="section-hint">源模板 A61「续：」段（A62-A66），比较期单项明细为手工填列。</div>
+        <el-table :data="padRows(singlePriorRows)" size="small" border>
+          <el-table-column label="名 称" min-width="160">
+            <template #default="{ row }">
+              <el-input v-if="!isReadonly && !row._isPad" :model-value="row.label" size="small"
+                @input="(v: string) => updateSinglePriorCell(row.rowId, 'label', v)" />
+              <span v-else>{{ row.label }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="账面余额" width="120" align="right">
+            <template #default="{ row }">
+              <WpAmountInput v-if="!isReadonly && !row._isPad" :model-value="row.balance" :precision="2"
+                aria-label="上年年末账面余额"
+                @change="(v: number | null) => updateSinglePriorCell(row.rowId, 'balance', v)" />
+              <span v-else>{{ row._isPad ? '' : fmtAmt(row.balance) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="坏账准备" width="120" align="right">
+            <template #default="{ row }">
+              <WpAmountInput v-if="!isReadonly && !row._isPad" :model-value="row.provision" :precision="2"
+                aria-label="上年年末坏账准备"
+                @change="(v: number | null) => updateSinglePriorCell(row.rowId, 'provision', v)" />
+              <span v-else>{{ row._isPad ? '' : fmtAmt(row.provision) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="预期信用损失率(%)" width="140" align="right">
+            <template #default="{ row }">
+              <el-input v-if="!isReadonly && !row._isPad" :model-value="String(row.lossRate ?? '')" size="small"
+                @input="(v: string) => updateSinglePriorCell(row.rowId, 'lossRate', v)" />
+              <span v-else>{{ row._isPad ? '' : fmtPct100(row.lossRate) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="计提理由" min-width="160">
+            <template #default="{ row }">
+              <el-input v-if="!isReadonly && !row._isPad" :model-value="row.reason" size="small"
+                @input="(v: string) => updateSinglePriorCell(row.rowId, 'reason', v)" />
+              <span v-else>{{ row.reason }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column v-if="!isReadonly" label="" width="50" align="center">
+            <template #default="{ row }">
+              <el-button v-if="!row._isPad" type="danger" text size="small"
+                @click="removeSinglePriorRow(row.rowId)">删</el-button>
+            </template>
+          </el-table-column>
         </el-table>
       </template>
 
@@ -194,29 +350,62 @@
             <el-button v-if="!isReadonly" size="small" @click="addGroupedDetailRow(group.groupName)">添加行</el-button>
           </div>
           <el-table :data="padRows(group.rows)" size="small" border>
-            <el-table-column label="账龄" width="120">
+            <el-table-column label="账  龄" width="120">
               <template #default="{ row }">
-                <el-input v-if="!isReadonly && !row._isPad" :model-value="row.label" size="small" @change="(v: string) => updateGroupedCell(gIdx, row.rowId, 'label', v)" />
+                <el-input v-if="!isReadonly && !row._isPad" :model-value="row.label" size="small" @input="(v: string) => updateGroupedCell(gIdx, row.rowId, 'label', v)" />
                 <span v-else>{{ row.label }}</span>
               </template>
             </el-table-column>
-            <el-table-column label="合同资产" width="120" align="right">
-              <template #default="{ row }">
-                <el-input-number v-if="!isReadonly && !row._isPad" :model-value="row.balance" :controls="false" size="small" style="width:100%" @change="(v: number) => updateGroupedCell(gIdx, row.rowId, 'balance', v ?? 0)" />
-                <span v-else>{{ row._isPad ? '' : fmtAmt(row.balance) }}</span>
-              </template>
+            <!-- 源模板 B69:D69「期末余额」/ E69:G69「上年年末余额」两级表头 -->
+            <el-table-column label="期末余额">
+              <el-table-column label="合同资产" width="120" align="right">
+                <template #default="{ row }">
+                  <WpAmountInput v-if="!isReadonly && !row._isPad" :model-value="row.balance" :precision="2"
+                    aria-label="期末合同资产"
+                    @change="(v: number | null) => updateGroupedCell(gIdx, row.rowId, 'balance', v)" />
+                  <span v-else>{{ row._isPad ? '' : fmtAmt(row.balance) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="坏账准备" width="120" align="right">
+                <template #default="{ row }">
+                  <WpAmountInput v-if="!isReadonly && !row._isPad" :model-value="row.provision" :precision="2"
+                    aria-label="期末坏账准备"
+                    @change="(v: number | null) => updateGroupedCell(gIdx, row.rowId, 'provision', v)" />
+                  <span v-else>{{ row._isPad ? '' : fmtAmt(row.provision) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="预期信用损失率(%)" width="130" align="right">
+                <template #default="{ row }">
+                  <el-input v-if="!isReadonly && !row._isPad" :model-value="String(row.lossRate ?? '')" size="small"
+                    @input="(v: string) => updateGroupedCell(gIdx, row.rowId, 'lossRate', v)" />
+                  <span v-else>{{ row._isPad ? '' : fmtPct100(row.lossRate) }}</span>
+                </template>
+              </el-table-column>
             </el-table-column>
-            <el-table-column label="坏账准备" width="120" align="right">
-              <template #default="{ row }">
-                <el-input-number v-if="!isReadonly && !row._isPad" :model-value="row.provision" :controls="false" size="small" style="width:100%" @change="(v: number) => updateGroupedCell(gIdx, row.rowId, 'provision', v ?? 0)" />
-                <span v-else>{{ row._isPad ? '' : fmtAmt(row.provision) }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="损失率%" width="100" align="right">
-              <template #default="{ row }">
-                <el-input-number v-if="!isReadonly && !row._isPad" :model-value="row.lossRate" :controls="false" size="small" style="width:100%" @change="(v: number) => updateGroupedCell(gIdx, row.rowId, 'lossRate', v ?? 0)" />
-                <span v-else>{{ row._isPad ? '' : fmtPct100(row.lossRate) }}</span>
-              </template>
+            <el-table-column label="上年年末余额">
+              <el-table-column label="合同资产" width="120" align="right">
+                <template #default="{ row }">
+                  <WpAmountInput v-if="!isReadonly && !row._isPad" :model-value="row.priorBalance" :precision="2"
+                    aria-label="上年年末合同资产"
+                    @change="(v: number | null) => updateGroupedCell(gIdx, row.rowId, 'priorBalance', v)" />
+                  <span v-else>{{ row._isPad ? '' : fmtAmt(row.priorBalance) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="坏账准备" width="120" align="right">
+                <template #default="{ row }">
+                  <WpAmountInput v-if="!isReadonly && !row._isPad" :model-value="row.priorProvision" :precision="2"
+                    aria-label="上年年末坏账准备"
+                    @change="(v: number | null) => updateGroupedCell(gIdx, row.rowId, 'priorProvision', v)" />
+                  <span v-else>{{ row._isPad ? '' : fmtAmt(row.priorProvision) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="预期信用损失率(%)" width="130" align="right">
+                <template #default="{ row }">
+                  <el-input v-if="!isReadonly && !row._isPad" :model-value="String(row.priorLossRate ?? '')" size="small"
+                    @input="(v: string) => updateGroupedCell(gIdx, row.rowId, 'priorLossRate', v)" />
+                  <span v-else>{{ row._isPad ? '' : fmtPct100(row.priorLossRate) }}</span>
+                </template>
+              </el-table-column>
             </el-table-column>
             <el-table-column v-if="!isReadonly" label="" width="50" align="center">
               <template #default="{ row }">
@@ -238,7 +427,8 @@
           <el-table-column label="本期转回" width="120" align="right">
             <template #default="{ row }"><span class="cross-sheet-cell">{{ fmtAmt(row.reversal) }}</span></template>
           </el-table-column>
-          <el-table-column label="本期核销" width="120" align="right">
+          <!-- 源模板 D85 字面为「本期转销/核销」 -->
+          <el-table-column label="本期转销/核销" width="130" align="right">
             <template #default="{ row }"><span class="cross-sheet-cell">{{ fmtAmt(row.writeOff) }}</span></template>
           </el-table-column>
           <el-table-column prop="reason" label="原因" min-width="160" />
@@ -255,6 +445,11 @@
           placeholder="补充披露说明..."
           @change="(v: string) => updateNoteText(getListedNoteKey(section.sectionKey), v)"
         />
+        <div class="note-actions">
+          <el-button size="small" :loading="aiLoadingSection === getListedNoteKey(section.sectionKey)" :disabled="isReadonly"
+            @click="runAi(getListedNoteKey(section.sectionKey))">🤖 AI</el-button>
+          <el-button v-if="openReviewDialog" size="small" @click="openReview(getListedNoteKey(section.sectionKey))">💬 复核</el-button>
+        </div>
       </div>
     </div>
   </template>
@@ -387,6 +582,11 @@
           placeholder="补充披露说明..."
           @change="(v: string) => updateNoteText(getSoeNoteKey(section.sectionKey), v)"
         />
+        <div class="note-actions">
+          <el-button size="small" :loading="aiLoadingSection === getSoeNoteKey(section.sectionKey)" :disabled="isReadonly"
+            @click="runAi(getSoeNoteKey(section.sectionKey))">🤖 AI</el-button>
+          <el-button v-if="openReviewDialog" size="small" @click="openReview(getSoeNoteKey(section.sectionKey))">💬 复核</el-button>
+        </div>
       </div>
     </div>
   </template>
@@ -406,9 +606,12 @@ import { useD6Disclosure } from '../composables/useD6Disclosure'
 import { useD6ImportExport } from '../composables/useD6ImportExport'
 import {
   buildD6SyncPayload,
+  buildD6SimpleMainRows,
   D6_NOTE_SECTION,
+  D6_NOTE_TEXT_SECTIONS,
   type D6DisclosureSnapshot,
 } from '../composables/d6NoteSectionMap'
+import { useDisclosureNoteAi } from '../composables/useDisclosureNoteAi'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import type { ChecklistResponse } from '../composables/useD6FormData'
 import type useD6CrossSheet from '../composables/useD6CrossSheet'
@@ -418,6 +621,8 @@ import { checkNoteConsistencyGeneric } from '../composables/noteConsistencyCheck
 // @ts-ignore
 import GtIndexChip from '../GtIndexChip.vue'
 import GtWpDisclosureSyncBar from '../GtWpDisclosureSyncBar.vue'
+// 🔴 可编辑金额千分符只能用 el-input（EP 2.13.6 的 el-input-number 无 formatter prop）
+import WpAmountInput from '../shared/WpAmountInput.vue'
 
 const props = defineProps<{
   wpId: string
@@ -437,6 +642,9 @@ const {
   listedSections, soeSections, showListed, showSoe, activeVariant,
   groupedDetails, addGroup, addGroupedDetailRow, updateGroupName, updateGroupedCell, removeGroupedRow,
   majorChangeRows, addMajorChangeRow, updateMajorChangeCell, removeMajorChangeRow,
+  mainFormat, setMainFormat,
+  impairmentPriorRows, addImpairmentPriorRow, updateImpairmentPriorCell, removeImpairmentPriorRow,
+  singlePriorRows, addSinglePriorRow, updateSinglePriorCell, removeSinglePriorRow,
   noteTexts,
 } = useD6Disclosure({
   allResponses: allResponsesRef,
@@ -455,7 +663,10 @@ if (props.variant) {
 const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 onBeforeUnmount(() => autoSync.cancelPending())
 watch(
-  [listedSections, soeSections, groupedDetails, majorChangeRows, noteTexts],
+  [
+    listedSections, soeSections, groupedDetails, majorChangeRows,
+    impairmentPriorRows, singlePriorRows, mainFormat, noteTexts,
+  ],
   () => {
     autoSync.scheduleAutoSync(syncToDisclosureNotes)
   },
@@ -560,6 +771,30 @@ function jumpToNote(target: DisclosureVariant): void {
   if (route) router.push(route)
 }
 
+// ─── 说明文本域的 AI 辅助 + 复核入口（共享 composable）──────────────────────
+// 🔴 `section_id` 与后端 `review_dialog._SECTION_PROMPTS` 的键逐字一致：
+// 文本域键形如 `D6-note-listed-text-1` → 去掉 `D6-note-` 前缀作后缀，
+// 得 `d6-disclosure-listed-text-1-note`。未登记会回退通用 prompt（诱导自造内容）。
+const openReviewDialog = inject<any>('openReviewDialog', null)
+const D6_NOTE_TITLES: Record<string, string> = Object.fromEntries(
+  [...D6_NOTE_TEXT_SECTIONS.listed, ...D6_NOTE_TEXT_SECTIONS.soe].map((s) => [s.key, s.title]),
+)
+const { aiLoadingSection, runAi, openReview } = useDisclosureNoteAi({
+  wpId: toRef(props, 'wpId') as Ref<string>,
+  isReadonly: () => props.isReadonly,
+  getText: (k) => noteTexts.value?.[k] ?? '',
+  setText: (k, text) => updateNoteText(k, text),
+  buildSectionId: (k) => `d6-disclosure-${String(k).replace(/^D6-note-/, '')}-note`,
+  labelOf: (k) => D6_NOTE_TITLES[k] ?? k,
+  openReviewDialog,
+})
+
+/** 简化式主表行：与同步载荷共用同一纯函数（禁止两处各算一遍）。 */
+const simpleMainRows = computed(() => {
+  const cls = findSection(listedSections.value, 'listed-1')
+  return buildD6SimpleMainRows((cls.rows ?? []) as any[])
+})
+
 function findSection(sections: any[], key: string): any {
   return (sections || []).find((s) => s.sectionKey === key) || { rows: [] }
 }
@@ -598,17 +833,34 @@ async function syncToDisclosureNotes(): Promise<void> {
           endBookBalance: r.endBookBalance, endImpairment: r.endImpairment, endBookValue: r.endBookValue,
           priorBookBalance: r.priorBookBalance, priorImpairment: r.priorImpairment, priorBookValue: r.priorBookValue,
         })),
+        mainFormat: mainFormat.value,
         majorChangeRows: majorChangeRows.value.map((r: any) => ({ label: r.label, amount: r.amount, reason: r.reason })),
+        // 🔴 字段名必须与 `D6ImpairmentProvisionRowLike` 一致（旧代码写的是
+        // endBalance/endPercentage/endAmount/endLossRate → 载荷侧读不到，静默推 0）
         impairmentProvisionRows: (prov.rows ?? []).map((r: any) => ({
-          label: r.label, endBalance: r.endBalance, endPercentage: r.endPercentage,
-          endAmount: r.endAmount, endLossRate: r.endLossRate,
+          label: r.label,
+          balance: r.endBalance,
+          ratio: r.endPercentage,
+          provision: r.endAmount,
+          lossRate: r.endLossRate,
+        })),
+        impairmentProvisionPriorRows: impairmentPriorRows.value.map((r: any) => ({
+          label: r.label, balance: r.balance, ratio: r.ratio,
+          provision: r.provision, lossRate: r.lossRate,
         })),
         singleItems: (single.rows ?? []).map((r: any) => ({
           label: r.label, balance: r.balance, provision: r.provision, lossRate: r.lossRate, reason: r.reason,
         })),
+        singleItemsPrior: singlePriorRows.value.map((r: any) => ({
+          label: r.label, balance: r.balance, provision: r.provision, lossRate: r.lossRate, reason: r.reason,
+        })),
         groups: groupedDetails.value.map((g: any) => ({
           groupName: g.groupName,
-          rows: (g.rows ?? []).map((r: any) => ({ label: r.label, balance: r.balance, provision: r.provision, lossRate: r.lossRate })),
+          rows: (g.rows ?? []).map((r: any) => ({
+            label: r.label,
+            balance: r.balance, provision: r.provision, lossRate: r.lossRate,
+            priorBalance: r.priorBalance, priorProvision: r.priorProvision, priorLossRate: r.priorLossRate,
+          })),
         })),
         changeRows: (change.rows ?? []).map((r: any) => ({
           label: r.label, provision: r.provision, reversal: r.reversal, writeOff: r.writeOff, reason: r.reason,
@@ -703,6 +955,38 @@ async function syncToDisclosureNotes(): Promise<void> {
   border-radius: 6px;
 }
 .section-title { font-size: 14px; font-weight: 600; margin-bottom: 12px; color: #303133; }
+/* 源模板方法论上下文（琥珀色左边线 + 浅黄背景，平台统一口径） */
+.section-hint {
+  border-left: 3px solid #e6a23c;
+  background: #fdf6ec;
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: #7d5b1e;
+}
+.note-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+  justify-content: flex-end;
+}
+.format-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.format-label { font-size: 12px; color: #909399; }
+.sub-caption {
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: #606266;
+  margin: 10px 0 6px;
+}
 
 /* 重大变动情形说明（准则指引琥珀块） */
 .amber-context {

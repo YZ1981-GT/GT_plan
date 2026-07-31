@@ -157,24 +157,24 @@
         @navigate-sheet="handleNavigate"
       />
 
-      <!-- 附注（上市） -->
+      <!-- 附注（上市）—— 🔴 必须传 projectId，否则同步按钮永久锁死 -->
       <N5TabDisclosureListed
-        v-else-if="currentSheet === '附注(上市)' || currentSheet === '附注（上市）'"
+        v-else-if="currentSheet === N5_SHEET_DISCLOSURE_LISTED"
         :all-responses="allResponsesRef"
         :wp-id="props.wpId"
+        :project-id="props.projectId"
         :is-readonly="isReadonly"
         @navigate="handleNavigate"
-        @navigate-sheet="handleNavigate"
       />
 
-      <!-- 附注（国企） -->
+      <!-- 附注（国企）—— 源模板 tab 名缺右括号 `附注披露信息（国企`，判定用「包含国企」 -->
       <N5TabDisclosureSoe
-        v-else-if="currentSheet === '附注(国企)' || currentSheet === '附注（国企）'"
+        v-else-if="currentSheet === N5_SHEET_DISCLOSURE_SOE"
         :all-responses="allResponsesRef"
         :wp-id="props.wpId"
+        :project-id="props.projectId"
         :is-readonly="isReadonly"
         @navigate="handleNavigate"
-        @navigate-sheet="handleNavigate"
       />
 
       <!-- 兜底：skip sheet / 未迁移 → OnlyOffice fallback -->
@@ -218,6 +218,13 @@ const N5TabDetail = defineAsyncComponent(() => import('./n5/core/N5TabDetail.vue
 const N5TabAdjustment = defineAsyncComponent(() => import('./n5/core/N5TabAdjustment.vue'))
 const N5TabDisclosureListed = defineAsyncComponent(() => import('./n5/core/N5TabDisclosureListed.vue'))
 const N5TabDisclosureSoe = defineAsyncComponent(() => import('./n5/core/N5TabDisclosureSoe.vue'))
+
+import {
+  N5_SHEET_DISCLOSURE_LISTED,
+  N5_SHEET_DISCLOSURE_SOE,
+  isN5HtmlSheet,
+  normalizeN5SheetName,
+} from './composables/n5SheetRouting'
 
 // calc/
 const N5TabCurrentTaxCalc = defineAsyncComponent(() => import('./n5/calc/N5TabCurrentTaxCalc.vue'))
@@ -278,30 +285,17 @@ const dualMode = {
   onModeChange: () => {},
 }
 
-// ─── sheetName 正则提取编码 ──────────────────────────────────────────────────
-const currentSheet = computed(() => {
-  const name = props.sheetName || props.wpCode || ''
-  // 匹配 N5A, N3A, N5-6-1, N5-6-2, N5-1~N5-8, N5, 底稿目录, 附注 等
-  const m = name.match(/(N5A|N3A|N5-6-[12]|N5-[1-8]|N5)/)
-  if (m) return m[1]
-  // 附注匹配
-  if (name.includes('附注') && (name.includes('上市') || name.includes('国企'))) {
-    return name.includes('上市') ? '附注(上市)' : '附注(国企)'
-  }
-  if (name.includes('底稿目录')) return '底稿目录'
-  return name
-})
+// ─── sheetName 归一（纯函数，见 composables/n5SheetRouting.ts）────────────────
+// 🔴 披露判定前置于 wp_code 正则 + 国企多写法全认（源模板 tab 名缺右括号）
+const currentSheet = computed(() => normalizeN5SheetName(props.sheetName, props.wpCode))
 
 /** skip sheet 列表（N3A原底稿标记skip走OO兜底） */
 const SKIP_SHEETS = ['N3A']
 
 /** HTML 专属组件渲染的 sheet（支持双模式切换）；N5A/N3A走 OnlyOffice */
 const isHtmlSheet = computed(() => {
-  const s = currentSheet.value
   if (SKIP_SHEETS.some(sk => (props.sheetName || '').includes(sk))) return false
-  if (s === 'N5A' || s === 'N3A') return false
-  return /^N5-\d+(-\d+)?$/.test(s) || s === 'N5' || s === '底稿目录'
-    || s.includes('附注')
+  return isN5HtmlSheet(currentSheet.value)
 })
 
 // ─── selfLoad（bundle内嵌场景 htmlData 为 null 时自加载） ─────────────────────
