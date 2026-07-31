@@ -339,20 +339,41 @@ function applyTbSeed(): void {
     ElMessage.info('四表库暂无所得税费用发生额，或该科目未导入')
     return
   }
+  const slots = [['current', currentRow], ['deferred', deferredRow]] as const
+  // 🔴 全 0 时直接返回：落一行全零数据会让后端预填门
+  // （`"N5-1-current-row" not in responses_snapshot`）关闭，反而把另一行的取数值弄丢。
+  if (!slots.some(([k]) => parseNum(prefill[k]?.periodAmount) !== 0)) {
+    ElMessage.info('四表库该科目本期发生额为 0，无可带入数据')
+    return
+  }
   let filled = 0
-  for (const [key, row] of [['current', currentRow], ['deferred', deferredRow]] as const) {
+  let manual = 0
+  for (const [key, row] of slots) {
     const src = prefill[key]
     if (!src) continue
-    if (parseNum(row.value.unadjusted) !== 0) continue // 手工优先
+    const want = parseNum(src.unadjusted ?? src.periodAmount)
+    const cur = parseNum(row.value.unadjusted)
+    if (cur !== 0) {
+      // 已等于四表值 = 挂载时自动预填的结果；不等则是手工录入，一律不覆盖
+      if (Math.abs(cur - want) >= 0.01) manual += 1
+      continue
+    }
+    if (parseNum(src.periodAmount) === 0 && want === 0) continue
     row.value.periodAmount = parseNum(src.periodAmount)
-    row.value.unadjusted = parseNum(src.unadjusted ?? src.periodAmount)
-    void handleCellChange(row.value)
+    row.value.unadjusted = want
     filled += 1
   }
   if (filled === 0) {
-    ElMessage.info('未审数已录入，未覆盖（手工优先）')
+    ElMessage.info(
+      manual > 0
+        ? '未审数已手工录入，未覆盖（手工优先）'
+        : '四表取数已自动预填到本表，无需重复带入',
+    )
     return
   }
+  // 两行一并落库（见 handleCellChange 注释：任一行持久化即关闭后端预填门）
+  void handleCellChange(currentRow.value)
+  void handleCellChange(deferredRow.value)
   ElMessage.success(`已从四表库带入 ${filled} 行未审数（当期 / 递延按子科目拆分）`)
 }
 
@@ -388,10 +409,18 @@ onMounted(async () => {
 
 // ─── 保存 ────────────────────────────────────────────────────────────────────
 
+/**
+ * 🔴 当期 / 递延**两行一并落库**，不只保存被编辑的那一行。
+ *
+ * 后端预填门是 `"N5-1-current-row" not in responses_snapshot`（整表级），而本表把
+ * 两行存成两个 item。若只保存被编辑行，下次打开时门已关闭 → 另一行的 transient
+ * 预填值（四表取数）不再下发，界面凭空归零。两行都写实即无此窗口；写入内容就是
+ * 用户当前所见状态，幂等且不会覆盖手工数据。
+ */
 async function handleCellChange(row: AdjRow) {
   row.audited = calcAuditedAmount(row.unadjusted, row.aje, row.rje)
-  if (row.key === 'current') await formData.setField('1', 'current-row', { ...currentRow.value })
-  if (row.key === 'deferred') await formData.setField('1', 'deferred-row', { ...deferredRow.value })
+  await formData.setField('1', 'current-row', { ...currentRow.value })
+  await formData.setField('1', 'deferred-row', { ...deferredRow.value })
   scheduleAutoSnapshot?.()
 }
 

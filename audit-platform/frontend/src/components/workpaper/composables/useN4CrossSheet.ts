@@ -23,6 +23,24 @@ import { api } from '@/services/apiProxy'
 import { parseNum } from './useN4FormulaEngine'
 import { calcExpenseDiff } from './useN4MultiTaxEngine'
 
+/**
+ * 从 `allResponses` 读取某 item 的数值（`remark` 优先，回退 `conclusion`）。
+ *
+ * 🔴 本函数原先**既未 import 也未定义**却被调用 3 次（`adjudicationVsDetail` ×2、
+ * `toIncomeStatement` ×1）→ 一旦走到「无现算数据、回退持久化合计」的分支就
+ * `ReferenceError: getResponseNum is not defined`，**整个 N4 页面渲染崩**
+ * （实测报「页面渲染出错 getResponseNum is not defined」）。
+ * 该分支恰好在 N4-1 尚未编制时触发，即新项目打开 N4 必崩。
+ */
+function getResponseNum(
+  allResponses: Map<string, any> | undefined,
+  itemId: string,
+): number {
+  const item = allResponses?.get(itemId)
+  if (!item) return 0
+  return parseNum(item.remark ?? item.conclusion ?? item.value ?? item)
+}
+
 // ─── 税种常量 ─────────────────────────────────────────────────────────────────
 
 /** N4涵盖的全部税种（10种） */

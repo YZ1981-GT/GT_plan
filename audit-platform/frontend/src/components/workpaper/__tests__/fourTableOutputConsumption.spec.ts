@@ -190,3 +190,107 @@ describe('N3 无披露 inert 残留（Property 13）', () => {
     expect(host).toContain('附注')
   })
 })
+
+// ─── N5 专属：宿主 provide 与审定表持久化（活体实测挖出的两个静默缺陷）───────
+
+/** 剥注释（守卫自身与被测源码的注释里都会出现反例字样，不剥必误判） */
+function stripComments(src: string): string {
+  return src
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:])\/\/[^\n]*/g, '$1')
+}
+
+/** 按花括号配对截取函数体（不能按「下一个 function 声明」切，中间的 watch 块会被算进来） */
+function functionBody(src: string, name: string): string {
+  const m = new RegExp(`function\\s+${name}\\s*\\(`).exec(src)
+  if (!m) return ''
+  const open = src.indexOf('{', m.index)
+  if (open < 0) return ''
+  let depth = 0
+  for (let i = open; i < src.length; i += 1) {
+    if (src[i] === '{') depth += 1
+    else if (src[i] === '}') {
+      depth -= 1
+      if (depth === 0) return src.slice(open, i + 1)
+    }
+  }
+  return ''
+}
+
+describe('N5 宿主四表键提取（htmlData 分支不得漏）', () => {
+  const host = readFileSafe(path.join(WORKPAPER_DIR, 'GtN5IncomeTaxExpense.vue'))
+  const stripped = stripComments(host)
+
+  it('自检：宿主可读且含提取函数', () => {
+    expect(host.length).toBeGreaterThan(1000)
+    expect(stripped).toContain('_absorbFourTableKeys')
+  })
+
+  it('提取函数在 selfLoad 与 props.htmlData 两条路径都被调用', () => {
+    // 🔴 渲染器提供 htmlData 时 selfLoad 被跳过 → 只在 selfLoad 里提取会让
+    // `n5TrialBalance` / `n5TbSourceCodes` 恒 null，审定表 TB 核对条与
+    // 「从四表库带入」按钮完全不渲染（活体实测复现）。
+    const calls = stripped.match(/_absorbFourTableKeys\s*\(/g) ?? []
+    expect(
+      calls.length,
+      `_absorbFourTableKeys 调用点仅 ${calls.length} 处（含声明），`
+        + 'selfLoad 与 props.htmlData 分支必须各调一次',
+    ).toBeGreaterThanOrEqual(3)
+    expect(
+      /_absorbFourTableKeys\s*\(\s*props\.htmlData\s*\)/.test(stripped),
+      'props.htmlData 分支未提取四表键',
+    ).toBe(true)
+  })
+
+  it('不得重复 provide 同一 key（死代码）', () => {
+    const dup = stripped.match(/provide\(\s*'scheduleAutoSnapshot'/g) ?? []
+    expect(dup.length, 'scheduleAutoSnapshot 被重复 provide').toBe(1)
+  })
+})
+
+describe('N5 审定表：两行一并落库 + 零值不带入', () => {
+  const tab = readFileSafe(
+    path.join(WORKPAPER_DIR, 'n5/core/N5TabAdjudication.vue'),
+  )
+  const stripped = stripComments(tab)
+  const cellChange = functionBody(stripped, 'handleCellChange')
+  const seed = functionBody(stripped, 'applyTbSeed')
+
+  it('自检：两个函数体都截到了', () => {
+    expect(cellChange.length, 'handleCellChange 截取失败').toBeGreaterThan(80)
+    expect(seed.length, 'applyTbSeed 截取失败').toBeGreaterThan(200)
+  })
+
+  it('handleCellChange 无条件保存当期与递延两行', () => {
+    // 🔴 后端预填门是整表级 `"N5-1-current-row" not in responses_snapshot`，
+    // 而本表把两行存成两个 item：只保存被编辑行 → 下次打开门已关闭 →
+    // 另一行的四表预填值凭空归零（活体实测复现）。
+    expect(cellChange).toContain("'current-row'")
+    expect(cellChange).toContain("'deferred-row'")
+    expect(
+      /if\s*\(\s*row\.key\s*===/.test(cellChange),
+      'handleCellChange 仍按 row.key 分支只存一行 → 另一行预填值会丢',
+    ).toBe(false)
+  })
+
+  it('applyTbSeed 在四表全 0 时不落库（否则关掉预填门反而丢数）', () => {
+    expect(
+      /periodAmount\s*\)\s*!==\s*0/.test(seed) || /!==\s*0/.test(seed),
+      'applyTbSeed 缺「全 0 直接返回」守卫',
+    ).toBe(true)
+    expect(seed).toContain('手工优先')
+    // 带入成功后必须两行都写实
+    expect(seed).toContain('handleCellChange(currentRow.value)')
+    expect(seed).toContain('handleCellChange(deferredRow.value)')
+  })
+
+  it('反向自检：stripComments 确实剥掉了注释，functionBody 配对正确', () => {
+    // 该句只出现在 handleCellChange 上方的 JSDoc 注释里
+    const inComment = '后端预填门是'
+    expect(tab).toContain(inComment)
+    expect(stripped).not.toContain(inComment)
+    expect(functionBody('function foo() { return 1 }', 'foo')).toBe('{ return 1 }')
+    expect(functionBody(stripped, '__nope__')).toBe('')
+  })
+})

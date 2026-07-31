@@ -234,10 +234,18 @@ export function useN4FormData(opts: {
         _silent: true,
       } as any)
       const configData = configRes?.data ?? configRes
-      renderMeta.value = configData?.html_data ?? configData ?? {}
+      const sheetsArr = configData?.sheets ?? configData?.data?.sheets
+
+      // 🔴 render-config 把 html_data 放在 **`sheets[].html_data`**，顶层没有。
+      //    原实现只取 `configData?.html_data` → 恒 undefined → 回退整个 config，
+      //    于是 `renderMeta.tb_values` / `tb_source_codes` / `adjudication_prefill`
+      //    全都读不到（后端输出成了 dead output，审定表 seed 与 TB 核对都失效）。
+      const fromSheet = Array.isArray(sheetsArr)
+        ? sheetsArr.find((s: any) => s?.html_data?.tb_values)?.html_data
+        : undefined
+      renderMeta.value = fromSheet ?? configData?.html_data ?? configData ?? {}
 
       // 2. 从 sheets 数组提取 allResponses（如有）
-      const sheetsArr = configData?.sheets ?? configData?.data?.sheets
       if (sheetsArr && Array.isArray(sheetsArr)) {
         for (const sheet of sheetsArr) {
           if (sheet.html_data?.allResponses) {

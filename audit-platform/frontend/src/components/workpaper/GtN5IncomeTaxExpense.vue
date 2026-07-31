@@ -316,6 +316,23 @@ function _mergeResponses(map: Map<string, any>, src: any): void {
   for (const [k, v] of Object.entries(src)) map.set(k, (v && typeof v === 'object' && !Array.isArray(v)) ? { item_id: k, ...v } : { item_id: k, remark: v })
 }
 
+/**
+ * 提取审定表预填 + 四表取数种子（TB 核对与取数溯源用）。
+ *
+ * 🔴 selfLoad 与 `props.htmlData` 两条路径都必须调用：渲染器提供 htmlData 时
+ * selfLoad 被跳过，只合并 responses 会让 `n5TrialBalance` / `n5TbSourceCodes`
+ * 恒为 null → 审定表 TB 核对条与「从四表库带入」按钮完全不渲染。
+ */
+function _absorbFourTableKeys(h: any): void {
+  if (!h || typeof h !== 'object') return
+  if (h.adjudication_prefill && !adjudicationPrefill.value) {
+    adjudicationPrefill.value = h.adjudication_prefill
+  }
+  // 🔴 `trial_balance` 原为 dead output（后端输出、前端零消费）→ 接入 TB 核对
+  if (h.trial_balance && !tbTrialBalance.value) tbTrialBalance.value = h.trial_balance
+  if (h.tb_source_codes && !tbSourceCodes.value) tbSourceCodes.value = h.tb_source_codes
+}
+
 async function selfLoad(): Promise<void> {
   try {
     const res = await http.get(`/api/workpapers/${props.wpId}/render-config`, {
@@ -329,17 +346,7 @@ async function selfLoad(): Promise<void> {
       _mergeResponses(map, sheet?.html_data?.allResponses)
     }
     if (map.size > 0) allResponses.value = map
-    // 提取审定表预填 + 四表取数种子（TB 核对与取数溯源用）
-    for (const sheet of sheets) {
-      const h = sheet?.html_data
-      if (!h) continue
-      if (h.adjudication_prefill && !adjudicationPrefill.value) {
-        adjudicationPrefill.value = h.adjudication_prefill
-      }
-      // 🔴 `trial_balance` 原为 dead output（后端输出、前端零消费）→ 接入 TB 核对
-      if (h.trial_balance && !tbTrialBalance.value) tbTrialBalance.value = h.trial_balance
-      if (h.tb_source_codes && !tbSourceCodes.value) tbSourceCodes.value = h.tb_source_codes
-    }
+    for (const sheet of sheets) _absorbFourTableKeys(sheet?.html_data)
   } catch (e) {
     console.error('[N5] selfLoad failed:', e)
   }
@@ -373,6 +380,7 @@ onMounted(async () => {
     _mergeResponses(map, props.htmlData?.checklist_responses)
     _mergeResponses(map, props.htmlData?.allResponses)
     allResponses.value = map
+    _absorbFourTableKeys(props.htmlData)
   }
   isLoading.value = false
 
@@ -397,9 +405,6 @@ function onDeferredTaxUpdate(): void {
   // N1/N3递延税变动 → 刷新N5-8递延核对数据
   selfLoad()
 }
-
-// ─── 版本快照：子组件保存后触发自动快照（版本链能力来自 Runtime Boundary） ────
-provide('scheduleAutoSnapshot', () => runtime?.version.scheduleAutoSnapshot())
 </script>
 
 <style scoped>
