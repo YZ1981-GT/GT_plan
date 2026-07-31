@@ -166,10 +166,23 @@ Wave 4 收尾（公式预设 / sheet 名 / 实测）。
 - 实测数据已复原：wp `d5f0d168` 的 5 个 `K2-1-*` 键全部置空串
   （该 wp 实测前无任何 `K2-1-*` 记录；空串与缺键等价 —— `deserializeRows('')→[]`、`readNum→0`）。
 
-**待用户确认的口径**
+**口径纠正（2026-07-31 用户裁决，已落地）**
 
-- R2.5：三个外来行（`预付款项` / `合同资产` / `押金保证金`）**不静默删除**，只加警示。
-  若用户希望直接移除，需确认这三行在既有项目上是否已有录入数据。
+首版把历史 8 行里的 `预付款项` / `合同资产` / `押金保证金` 判成「属于别的报表行」，
+在 UI 打「口径存疑」红 tag。**用户明确：这三行是 K2 自己的二级子明细，不是别的循环的科目。**
+→ 已撤回该判定：删掉 `K2_LEGACY_FOREIGN_WARNINGS`、共享件的 `LegacyFixedRow.foreignWarning`
+与 `foreignRowWarning()`（死代码不留）、UI 的红 tag 与 `.foreign-row` 样式，
+requirements R2.5 改为「8 行一视同仁按二级子明细迁移，不做归属判定」。
+守卫改为**正向锁死**：`K2_LEGACY_ROWS` 每项只许有 `key`/`label` 两字段，
+且 `k2AdjudicationRows.ts` 源码不得再出现 `foreignWarning` / `口径存疑`。
+
+**刷新取数增强（R2.9，同批落地）**
+
+`seedRowsFromPrefill` 增 `createdRowIds`/`touchedRowIds` + `findRowForPrefill`
+（**科目码优先于行名** —— 改名后不重复插行，并回填 `accountCode`）；
+`seedFromPrefill({overwrite})` + `previewSeedFromPrefill()`：
+四表库重新入库后点「从四表库带入/刷新未审数」→ 新子科目自动插行、
+已有四表行金额有变化时弹确认（可选「仅补空值」），**手工/历史行的录入永不被覆盖**。
 
 **范围外**
 

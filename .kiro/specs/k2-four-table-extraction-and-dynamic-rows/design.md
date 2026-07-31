@@ -85,9 +85,9 @@ async def render(ctx) -> dict   # 新增 tb_source_codes
 | 文件 | 改动 |
 |------|------|
 | `composables/shared/dynamicAdjudicationRows.ts`（新建，**平台级共享件**） | 零 Vue 依赖纯函数：行清单序列化/反序列化、`rowId` 生成、重名判定、历史固定行迁移、四表 seed、行键清理。**不含任何循环专属常量** —— 循环差异全部由入参 `DynamicRowsSpec` 声明 |
-| `composables/k2AdjudicationRows.ts`（新建，薄壳） | 只放 K2 的 `DynamicRowsSpec`（前缀 `K2-1`、8 个历史 rowKey、3 条外来行警示文案），逻辑一律委托共享件 |
+| `composables/k2AdjudicationRows.ts`（新建，薄壳） | 只放 K2 的 `DynamicRowsSpec`（前缀 `K2-1`、8 个历史 rowKey = 二级子明细、金额字段集），逻辑一律委托共享件 |
 | `composables/useK2Adjudication.ts` | 行集由动态清单驱动；新增 `addRow`/`renameRow`/`removeRow`/`pullFromDetail`；`seedFromPrefill` 去掉模糊匹配与 `other` 兜底 |
-| `k2/core/K2TabAdjudication.vue` | 「新增项目行」「删除」「从 K2-2 带入」「从四表库带入」按钮 + 行名可编辑 + 外来行警示 tag + 溯源面板 |
+| `k2/core/K2TabAdjudication.vue` | 「新增项目行」「删除」「从 K2-2 带入」「从四表库带入/刷新未审数」按钮 + 行名可编辑 + 四表来源 tag + 溯源面板 |
 | `GtK2OtherCurrentAssets.vue` | 透传 `tbSourceCodes` |
 | `k2/core/K2FourTableSourcePanel.vue` | 薄壳复用 K1 的 `K1FourTableSourcePanel`（同结构，仅报表行不同）→ 实际做法是把 K1 面板提升为 `shared/WpFourTableSourcePanel.vue` 供两循环共用 |
 
@@ -98,7 +98,7 @@ async def render(ctx) -> dict   # 新增 tb_source_codes
 | `backend/tests/four_table/test_k2_account_scope.py` | 科目解析不含 `1231*`、叶子口径、最长前缀、fail-open、`tb_source_codes` 形态、sheet 名 |
 | `backend/tests/four_table/test_k2_formula_presets.py` | 无 `6601`/`1231`、含 `1901`、K2-2 无 `WP(` |
 | `composables/__tests__/dynamicAdjudicationRows.spec.ts` | **共享件**纯函数 + PBT（往返/迁移/清理/宁缺勿造），用与任何循环无关的替身 spec 驱动 |
-| `composables/__tests__/k2AdjudicationRows.spec.ts` | K2 的 spec 声明正确（前缀/历史 rowKey/外来行）+ 动态行在 K2 语境下的行为 |
+| `composables/__tests__/k2AdjudicationRows.spec.ts` | K2 的 spec 声明正确（前缀/历史 rowKey/金额字段集）+ 动态行与刷新取数在 K2 语境下的行为 |
 | `composables/__tests__/k2FourTableWiring.spec.ts` | 溯源透传 + 按钮接线 + 无硬编码枚举残留（反向自检） |
 
 ## Data Models
@@ -139,17 +139,36 @@ async def render(ctx) -> dict   # 新增 tb_source_codes
 
 其他流动资产无备抵科目 → `provision` 为空是正常态，守卫须允许。
 
-### `LEGACY_FOREIGN_ROWS`（属于其它报表行的历史固定行）
+### `K2_LEGACY_ROWS`（历史固定行 = 二级子明细，迁移源）
 
 ```ts
-export const LEGACY_FOREIGN_ROWS: Record<string, string> = {
-  'prepayment':      '预付款项属于报表行 BS-008（F1 循环），列在其他流动资产会重复计入资产',
-  'contract-asset':  '合同资产有独立报表行（D6 循环）',
-  'deposit':         '押金保证金属于其他应收款的款项性质（K1 循环）',
-}
+export const K2_LEGACY_ROWS: readonly LegacyFixedRow[] = [
+  { key: 'contract-cost', label: '合同取得成本' },
+  { key: 'prepayment', label: '预付款项' },
+  { key: 'deferred-expense', label: '待摊费用' },
+  { key: 'tax-deductible', label: '待抵扣税额' },
+  { key: 'contract-asset', label: '合同资产' },
+  { key: 'deposit', label: '押金保证金' },
+  { key: 'receivable-transfer', label: '应收款项转让' },
+  { key: 'other', label: '其他' },
+]
 ```
 
-UI 对这三行显示警示 tag + tooltip，**不自动删除**（R2.5）。
+这 8 行都是其他流动资产的**二级子明细**（客户可能把预付性质、押金性质的款项挂在
+其他流动资产下核算），迁移时一视同仁：有录入的按旧 rowKey 迁成动态行（金额零丢失），
+从未填过的不占位。**不做「归属别的报表行」判定、不加警示 tag** —— 共享件里也不保留
+`foreignWarning` 机制（R2.5）。
+
+### 刷新取数（R2.9）
+
+`seedRowsFromPrefill` 返回 `{rows, values, createdRowIds, touchedRowIds}`：
+
+- **动态插行**：四表库新出现的明细子科目 → 自动补行（`source='tb'`）
+- **改名不失联**：`findRowForPrefill` **先按 `accountCode`、再按行名**匹配；命中同名
+  手工/历史行时回填 `accountCode`，下次刷新即可按码定位
+- **覆盖边界**：`seedFromPrefill({overwrite})` —— 默认（含自动 watch）只补空值；
+  用户点「刷新」并确认后才覆盖，且**只覆盖 `source='tb'` 的行**
+- `previewSeedFromPrefill()` 预演（不写值）供 UI 决定是否弹确认框
 
 ## Correctness Properties
 
