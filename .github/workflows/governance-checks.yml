@@ -319,6 +319,29 @@ jobs:
       - name: Run note G-cycle structure contract tests
         run: python -m pytest backend/tests/services/test_note_g_cycle_structure.py -q
 
+  disclosure-sync-wiring:
+    # 两类"只有浏览器实测才暴露"的披露同步接线缺陷静态守卫
+    # （j1-disclosure-template-alignment Task 17 横向推广，2026-07-30）
+    #
+    # 1. setup 作用域 composable（useAuditContext / useRoute / useRouter /
+    #    useDisplayPrefsStore）写进 async 处理器 → 运行时 inject 失效 → TypeError →
+    #    整个处理器在发请求前抛错，功能静默全废。J1 两个披露 Tab 的同步按钮与自动同步
+    #    因此**一直是死的**（库里 `_last_sync_at` 恒 NULL）；H8 两个 Tab 的「校对附注」
+    #    与 ColumnMappingEditor 的路由回退同款。全 src 2344 个 .vue 已清零。
+    # 2. `scheduleAutoSync(syncToDisclosureNotes)` 写在同步函数内 = 调度自己 →
+    #    800ms 周期重复 POST；且让覆盖率守卫误判为"已接自动同步"（假接入）。
+    #    静态扫出 16 处，横跨 G1/G2/G3/G6/H3/I4/I5/I6/K1，已全部改为监听实际数据。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check setup-scoped composables & sync self-trigger (all .vue)
+        run: python backend/scripts/check/check_setup_scoped_composables.py --path .
+      - name: Check disclosure self-schedule fix alignment
+        run: python backend/scripts/fix/fix_disclosure_self_schedule.py --check
+
   note-j1-structure:
     # 附注 J1 应付职工薪酬章节结构守卫（j1-disclosure-template-alignment R1/R2/R7.1）
     # 背景：五、40 / 八、40 共 6 张披露表原本 columns / guidance 全缺（「本期增加」
@@ -357,6 +380,293 @@ jobs:
         run: python -m pip install pytest==8.4.2
       - name: Run note D1 structure contract tests
         run: python -m pytest backend/tests/test_note_d1_structure.py -q
+
+  d1-disclosure-hardening:
+    # D1 披露第二阶段四条守卫（前三条均为 2026-07-30 浏览器实测暴露的既有缺陷）：
+    # 1. AI section prompt —— 前端曾发 `section` 而后端要 `section_id` → 7 个按钮长期 422 空转；
+    #    修好字段名后又须防「prompt 过短诱导自造披露内容」（每条 ≥20 字 + 不得虚构约束）
+    # 2. 导入导出列名 —— 导出模板列名与界面/附注三方漂移（全角括号、缺「期末」前缀），
+    #    且 `merge_cells("A1:A2")` 清空 A2 导致**导入自家导出的模板必然报「缺少列」**
+    # 3. 往返自检 —— 导出模板 → 立刻用导入校验器验一遍，必须零错误
+    # 4. Word 导出两级表头（P2-3）—— 9 张表含**混合分组**（部分列有 group、部分列
+    #    rowspan=2 独立），`_build_two_level_header_rows` 的 row1 一旦为独立列补空占位，
+    #    子列名会整体右移、末列被丢弃（存货章节曾实测中招）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: python -m pip install pytest==8.4.2 openpyxl
+      - name: Run D1 AI section prompt guard
+        run: python -m pytest backend/tests/test_review_dialog_section_prompts.py -q
+      - name: Run D1 disclosure import/export column contract
+        run: python -m pytest backend/tests/test_d1_disclosure_export_columns.py -q
+      - name: Run D1 note Word export two-level header guard
+        run: python -m pytest backend/tests/services/test_note_word_export_d1.py -q
+
+  applicable-standards-wiring:
+    # 适用准则前端全链守卫（applicable-standards-frontend-wiring R1/R4）
+    # 背景：DB 权威源是 `projects.applicable_standard_v2 = {entity_type, scope, stage}`，
+    # 而前端门控要的是 `soe_standalone` 这类字符串。此前 render-config 的 60+ 份
+    # `_load_project_context` 多数不下发、I1~I6 下发原始 v2 对象（前端归一函数不认）
+    # → 门控恒空：D3 两版披露 Tab 对所有项目显示「当前项目不适用…」（用户不可达），
+    # 其余循环门控恒开（可在国企项目编辑上市 Tab，而 sync_from_workpaper 不按
+    # current_standard 定位 → 数据写进错误章节）。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: python -m pip install -r backend/requirements.txt
+      - name: Run applicable_standards derive guard
+        run: python -m pytest backend/tests/test_applicable_standards_derive.py -q
+      - name: Run render-config injection guard
+        run: python -m pytest backend/tests/test_render_config_applicable_standards.py -q
+
+  applicable-standards-runtime-guard:
+    # 跨主体类型披露同步守卫 + runtime context 供给
+    # （applicable-standards-runtime-and-sync-guard R4/R5）
+    # 背景：`sync_from_workpaper` 的定位键只有 `(project_id, year, note_section)`，
+    # 请求体里的 `current_standard` 既不参与匹配也不校验 → 在国企项目上编辑上市披露
+    # Tab 会把数据写进上市章节号对应的记录（国企项目「五、xx」是另一套压缩编号，
+    # 实测 五、19=应付职工薪酬 / 五、20=应交税费）→ 静默污染。前端门控可被绕过
+    # （旧版本前端 / 直接 POST），服务端必须自守：只拦 entity 维度冲突（listed vs soe），
+    # scope 差异与非准则字面量一律放行，查不到准则时 fail-open。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: python -m pip install -r backend/requirements.txt
+      - name: Run cross-entity disclosure sync guard
+        run: python -m pytest backend/tests/test_standard_conflict_guard.py -q
+      - name: Run disclosure sync regression (fake-DB paths)
+        run: >-
+          python -m pytest backend/tests/test_wp_disclosure_sync.py
+          backend/tests/test_wp_disclosure_sync_revive.py
+          backend/tests/test_manual_override_hook.py -q
+
+  applicable-standards-runtime-frontend:
+    # 宿主取「适用准则」的前端守卫（applicable-standards-runtime-and-sync-guard R1~R3/R5.1）
+    # 三类回归：
+    # ① scaffold 不再 provide `applicableStandards`（宿主取值链回到「恒空」）
+    # ② 宿主用 `(runtime as any)?.applicableStandards` 绕过守卫留死 fallback
+    #    （上一轮守卫只匹配 `runtime?.applicableStandards`，I3/I5/I6 三个宿主借 as any 逃逸）
+    # ③ 新宿主又抄一份取值链而不接共享 composable
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: audit-platform/frontend/package-lock.json
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: audit-platform/frontend
+      - name: Run applicable standards host/runtime guards
+        run: >-
+          npx vitest run
+          src/components/workpaper/__tests__/hostApplicableStandards.spec.ts
+          src/components/workpaper/composables/__tests__/useWorkpaperScaffold.spec.ts
+          src/components/workpaper/composables/__tests__/normalizeApplicableStandards.spec.ts
+        working-directory: audit-platform/frontend
+
+  note-d-cycle-rest-structure:
+    # 附注 D 类剩余四循环披露章节结构守卫
+    # （d-cycle-remaining-disclosure-alignment R1/R2/R3/R5）
+    # 背景：五、38/八、38（D3 预收款项）、五、6/八、6（D5 应收款项融资）、
+    # 五、10/八、11（D6 合同资产）、五、39/八、39（D7 合同负债）共 27 张表
+    # `columns` 与 `guidance` 全缺；D6 上市 9 张表里 5 张是垃圾表名
+    # （空名 / `续：` / `项  目` / 尾冒号），两版主表的两级表头被压扁成 3 列；
+    # D5 上市「背书或贴现」两列共前缀「期末」→ 未表态时必然被反猜出凭空父表头；
+    # D7 国企第 2 表名是占位「合同负债（表2）」。
+    # 另验 D6 四张两级表头表在 Word 导出路径（混合分组：独立列 rowspan=2、
+    # row1 不得为独立列补空占位）。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check note D-cycle rest section alignment
+        run: python backend/scripts/fix/fix_note_d_cycle_rest_structure.py --check
+      - name: Install test dependency
+        run: python -m pip install pytest==8.4.2
+      - name: Run note D-cycle rest structure contract tests
+        run: python -m pytest backend/tests/test_note_d_cycle_rest_structure.py -q
+      - name: Run D-cycle note Word export two-level header guard
+        run: python -m pytest backend/tests/services/test_note_word_export_d_cycle.py -q
+      - name: Run D-cycle disclosure AI prompt guard
+        # 四循环说明文本域接入共享 useDisclosureNoteAi 后，section_id 必须在
+        # review_dialog._SECTION_PROMPTS 登记；未登记会回退通用 prompt（诱导自造披露内容）
+        run: python -m pytest backend/tests/test_review_dialog_d_cycle_prompts.py -q
+
+  note-deferred-tax-structure:
+    # 附注 N1 递延所得税资产/负债章节结构守卫
+    # （n1-deferred-tax-disclosure-template-alignment R4）
+    # 背景：五、30 / 八、31 的第 1 张表在源模板是 **5 列两级表头**（期末余额 /
+    # 上年年末|年初余额，各含「可抵扣/应纳税暂时性差异」与「递延所得税资产/负债」），
+    # 被 `rebuild_note_from_md.py` 压扁成 3 列并残留 `row_type: header_label` 假数据行；
+    # 国企第 2 张表同样被压成 3 列，且**整张缺失**源模板（2）B「互抵明细」表。
+    # 另拦一类静默失真：两版表 1 的子列序在源模板里是**相反**的（上市暂时性差异在前、
+    # 国企递延所得税资产/负债在前），被「统一」后附注列会串味。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check note deferred-tax section alignment (五、30 / 八、31)
+        run: python backend/scripts/fix/fix_note_deferred_tax_structure.py --check
+      - name: Install test dependency
+        run: python -m pip install pytest==8.4.2
+      - name: Run note deferred-tax structure contract tests
+        run: python -m pytest backend/tests/services/test_note_deferred_tax_structure.py -q
+
+  note-n-cycle-tax-structure:
+    # 附注 N 循环税务类章节结构守卫（n-cycle-tax-disclosure-alignment R5）
+    # 拦三类已实测缺陷：
+    # 1. **表名同章节内重复** —— 表名是同步键，同名会让 `sub_table_data` 互相覆盖丢表。
+    #    N5 两版原先各有两张同名表（上市 `项  目` ×2 是 md 重建把表头首格当表名泄漏；
+    #    国企 `所得税费用` ×2）。
+    # 2. **N2 两版列结构被"统一"** —— 上市是 3 列双期表（期末 / 上年年末），
+    #    国企是 5 列变动表（期初 / 本期应交 / 本期已交 / 期末，末列行内公式）。
+    #    md 重建把国企压成了 3 列；前端曾让上市误用国企口径。
+    # 3. **N5 国企表 2 丢列** —— 源模板 3 列，被压扁成 2 列丢了「上期发生额」。
+    # 另反向断言：国企版**不得**存在「税金及附加」章节（源模板 `附注披露信息：无`），
+    # 防后来者"补齐"出一个源模板里不存在的披露表。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check note N-cycle tax section alignment
+        run: python backend/scripts/fix/fix_note_n_cycle_tax_structure.py --check
+      - name: Install test dependency
+        run: python -m pip install pytest==8.4.2
+      - name: Run note N-cycle tax structure contract tests
+        run: python -m pytest backend/tests/services/test_note_n_cycle_tax_structure.py -q
+
+  note-n-cycle-tax-frontend:
+    # N 循环税务类披露前端守卫（n-cycle-tax-disclosure-alignment Task 8）
+    # 拦四类只有实测才暴露的缺陷：
+    # 1. **子表名 / 列头与附注模板漂移** → 孤儿子表（附注 TAB 永空 + 底稿数据丢失）
+    # 2. **N2 两版共用列定义** → 上市误用国企变动口径（反向断言两版列键集不等）
+    # 3. **N4 国企产出载荷** → 源模板 `附注披露信息：无`，`buildN4SyncPayload('soe')` 恒 null
+    # 4. **sheet 名漂移**：披露判定被 wp_code 正则抢占 / 国企写法不全认 /
+    #    N5 国企 tab 名缺右括号（`附注披露信息（国企`）被"修正"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: audit-platform/frontend/package-lock.json
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: audit-platform/frontend
+      - name: Run N-cycle tax disclosure guards
+        run: >-
+          npx vitest run
+          src/components/workpaper/composables/__tests__/n2NoteSectionMap.spec.ts
+          src/components/workpaper/composables/__tests__/n2NoteSubtableContract.spec.ts
+          src/components/workpaper/composables/__tests__/n2SheetRouting.spec.ts
+          src/components/workpaper/composables/__tests__/n4NoteSectionMap.spec.ts
+          src/components/workpaper/composables/__tests__/n4NoteSubtableContract.spec.ts
+          src/components/workpaper/composables/__tests__/n5NoteSectionMap.spec.ts
+          src/components/workpaper/composables/__tests__/n5NoteSubtableContract.spec.ts
+          src/components/workpaper/composables/__tests__/nCycleSheetRouting.spec.ts
+          src/components/workpaper/composables/__tests__/nCycleTaxConsistency.spec.ts
+          src/components/workpaper/composables/__tests__/disclosureSheetNameRegistry.spec.ts
+          src/components/workpaper/__tests__/disclosureAutoSyncCoverage.spec.ts
+          src/components/workpaper/__tests__/disclosureColumnsCoverage.spec.ts
+        working-directory: audit-platform/frontend
+
+  note-k2-structure:
+    # 附注 K2 其他流动资产章节结构守卫
+    # （k2-other-current-assets-disclosure-alignment R4）
+    # 背景：五、13 的第 2 张表名是**段落文本泄漏**（`[披露与合同取得成本有关的资产…例如：`）
+    # 且 `headers[0]` 是类别列 `[佣金支出]`（md 重建丢了空的标签列首格）；第 3 张表名是
+    # **表头首格** `项  目`，`rows[0]` 又是 `row_type: header_label` 假数据行。
+    # 两版共 4 张表原本 columns / guidance 全缺 → seed 路径会走前缀推断塞凭空父表头。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check note K2 section alignment (五、13 / 八、14)
+        run: python backend/scripts/fix/fix_note_k2_structure.py --check
+      - name: Install test dependency
+        run: python -m pip install pytest==8.4.2
+      - name: Run note K2 structure contract tests
+        run: python -m pytest backend/tests/services/test_note_k2_structure.py -q
+
+  note-k-cycle-structure:
+    # 附注 K 系章节结构 + sheet 名守卫（批 1 损益类 K8~K13 + 批 2 负债/递延类 K3/K4/K5/K7）
+    # （k-cycle-disclosure-alignment 批 1）
+    # 背景（三个 P0）：①K11/K12/K13 上市侧常量章节号写 `资产减值损失` 等，而模板
+    # `section_number` 是 md 重建截断值 `三、资产减值损失（损` → 上市侧同步落不到章节；
+    # ②K8/K9 上市侧常量表名 `销售费用`/`管理费用`，模板实为「（按费用性质列示）」→ 孤儿子表；
+    # ③K10 国企第 4 列「是否为政府补助」与 K12/K13 两版第 4 列「计入当期非经常性损益的
+    # 金额」常量未声明 → 组件已录入却从未推送。
+    # sheet 名守卫直接以 openpyxl 读 xlsx tab 名比对（前端 registry 守卫查不出该漂移）。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check note K-cycle P/L section alignment (K8~K13)
+        run: python backend/scripts/fix/fix_note_k_pl_structure.py --check
+      - name: Install test dependencies
+        run: python -m pip install pytest==8.4.2 openpyxl==3.1.5
+      - name: Check note K-cycle liability section alignment (K3/K4/K5/K7)
+        run: python backend/scripts/fix/fix_note_k_liability_structure.py --check
+      - name: Check note K-cycle complex section alignment (K1/K6)
+        # 批 3：K1 §五、8 / §八、9（37 表全缺 columns + 两级表头压扁 + 4 处 header_label
+        # 假行 + 裸续表名 `续：`）；K6 §五、11 / §八、12 / §八、43（上市 6 张表里 5 张垃圾名、
+        # tables[1] 的 name↔rows 整体错位、主表两级表头 6 列压成 3 列、11 表 guidance 全缺）
+        run: python backend/scripts/fix/fix_note_k_complex_structure.py --check
+      - name: Run note K-cycle structure and sheet-name contract tests
+        run: >-
+          python -m pytest backend/tests/services/test_note_k_pl_structure.py
+          backend/tests/services/test_note_k_liability_structure.py
+          backend/tests/services/test_note_k_complex_structure.py
+          backend/tests/services/test_note_k_sheet_names.py -q
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: audit-platform/frontend/package-lock.json
+      - name: Install frontend deps
+        run: npm ci
+        working-directory: audit-platform/frontend
+      - name: Run K-cycle disclosure subtable + AI wiring guards
+        # AI 接线守卫背景（2026-07-31 实证的三类静默失效）：
+        # ①K5/K7 四个 `handleAiGenerate` 只 `emit('save', ...ai-trigger)` 写 marker、
+        #   从不调端点 → 按钮可见可点但零网络请求；
+        # ②K3 两版 `context` 传字符串，而后端要 `dict[str,str]` → 必然 422 被 catch 静默吞；
+        # ③prompt 过短无「不得虚构」约束 → 诱导模型自造披露内容。
+        run: >-
+          npx vitest run
+          src/components/workpaper/composables/__tests__/kLiabilityNoteSubtableContract.spec.ts
+          src/components/workpaper/composables/__tests__/kPlNoteSubtableContract.spec.ts
+          src/components/workpaper/composables/__tests__/kDisclosureAiWiring.spec.ts
+          src/components/workpaper/composables/__tests__/k7NoteSectionMap.spec.ts
+          src/components/workpaper/composables/__tests__/k6NoteSectionMap.spec.ts
+          src/components/workpaper/composables/__tests__/k6NoteBlocksWiring.spec.ts
+          src/components/workpaper/composables/__tests__/k1NoteSubtableContract.spec.ts
+        working-directory: audit-platform/frontend
 
   disclosure-sync-hardening:
     # 两条已实测的披露同步缺陷守卫（均为幂等脚本，带 --check）：
