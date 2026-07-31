@@ -70,9 +70,23 @@ K1 必须复用而不是再造一套方言。
 
 本 spec 只做 K1；K2~K13 沿用本 spec 建立的范式另立。
 
+## Glossary
+
+| 术语 | 含义 |
+|------|------|
+| 原始码 | `tb_balance.account_code` / `account_mapping.original_account_code`，客户自有科目表编码，**点号**分级（`1231.03`） |
+| 标准码 | `trial_balance.standard_account_code` / `report_config` 公式引用码，平台标准科目编码，**横杠**分级（`1231-03`） |
+| 科目映射模块 | `account_mapping` 表（project 级，原始码 → 标准码），5074 条实测 |
+| 报表映射规则 | `report_config.formula`（按 `applicable_standard`），把标准码组合成报表行 |
+| 叶子科目 | `tb_balance` 中不存在以「本码 + `.`」开头的同数据集兄弟行的最明细行 |
+| 备抵科目 | 贷方性质的减值/坏账科目（`1231*`），报表公式中以 `-` 参与 |
+| 账龄枚举模块 | `useAgingConfig(projectId, subject)` + `PRESET_SEGMENTS`（3年段 4 档 / 5年段 6 档 / 自定义 2~10 段） |
+| 三向比对 | 源 xlsx 单元格文本 ↔ `note_template` `headers` ↔ 同步载荷 `columns` 逐字一致 |
+| 混合分组 | 一张表内部分列带 `group`（两级）、部分列不带（rowspan=2），`_extract_column_groups` 支持 |
+
 ## Requirements
 
-### Requirement 1：四表库→K1 科目定位经报表映射链路解析
+### Requirement 1: 四表库→K1 科目定位经报表映射链路解析
 
 **User Story:** 作为审计助理，我希望 K1 的坏账准备只取「其他应收款」自己的备抵科目，
 这样审定表的坏账数才可信。
@@ -102,7 +116,7 @@ THEN 系统 SHALL 回退到与改动前等价的兜底科目并继续渲染，�
 1.7 WHEN render 返回 THEN 输出 SHALL 含 `tb_source_codes` 取数溯源，且该字段被前端
 K1 界面消费展示（不得成为 dead output）。
 
-### Requirement 2：tb_balance 聚合改为叶子科目口径
+### Requirement 2: tb_balance 聚合改为叶子科目口径
 
 **User Story:** 作为现场经理，我希望 K1 从四表库带出的原值等于科目余额表的期末余额，
 这样才能和总账核对。
@@ -122,7 +136,7 @@ K1 界面消费展示（不得成为 dead output）。
 「无符号 + 方向列」与「已带符号」两种约定并存），但 SHALL NOT 对原值科目做方向翻转
 （实测存在 `direction='debit'` 且余额为负的合法叶子，翻转会破坏 2.2 勾稽）。
 
-### Requirement 3：审定表 K1-1 四表预填补齐
+### Requirement 3: 审定表 K1-1 四表预填补齐
 
 **User Story:** 作为审计助理，我希望四表入库后打开 K1-1 就能看到未审数、并能显式重新带入。
 
@@ -142,7 +156,7 @@ K1 界面消费展示（不得成为 dead output）。
 
 3.5 WHEN 四表库无 K1 相关数据 THEN 系统 SHALL 返回空预填（不写 0 占位、不清空既有值）。
 
-### Requirement 4：前端 TB 兜底口径与后端一致
+### Requirement 4: 前端 TB 兜底口径与后端一致
 
 **User Story:** 作为质量控制复核合伙人，我希望同一张底稿在不同加载路径下显示同一个数。
 
@@ -156,7 +170,7 @@ K1 界面消费展示（不得成为 dead output）。
 4.3 WHEN 兜底请求返回父子科目并存的行集 THEN 前端 SHALL 只累加叶子（或最长前缀不重叠集），
 不得父子双计。
 
-### Requirement 5：账龄枚举模块贯通 K1-1
+### Requirement 5: 账龄枚举模块贯通 K1-1
 
 **User Story:** 作为项目组，我希望在项目里选了 3 年段后，K1 全部底稿的账龄档位一致。
 
@@ -174,7 +188,7 @@ SHALL NOT 残留为幽灵行。
 5.4 WHEN 账龄段为自定义 THEN K1-1 行标签 SHALL 取自定义段 label；披露侧标签
 SHALL 继续走 `disclosureAgingLabels` 单一真源。
 
-### Requirement 6：公式管理预设补齐
+### Requirement 6: 公式管理预设补齐
 
 **User Story:** 作为现场经理，我希望在底稿的公式管理里看到 K1 的完整取数公式，可追溯可覆盖。
 
@@ -192,7 +206,7 @@ SHALL 继续走 `disclosureAgingLabels` 单一真源。
 6.4 WHEN `convert_prefill_presets()` 收敛 THEN K1 条目 SHALL 全部归入 `workpaper:K1`
 且 `formula_type == 'auto_calc'`。
 
-### Requirement 7：上市披露表 / §五、8 结构对齐源模板
+### Requirement 7: 上市披露表 / §五、8 结构对齐源模板
 
 **User Story:** 作为业务合伙人，我希望附注里的表格结构和致同模板逐格一致。
 
@@ -214,7 +228,7 @@ SHALL 继续走 `disclosureAgingLabels` 单一真源。
 7.4 WHEN 上市披露表存在 ⑦资金集中管理 / ⑧⑨⑩ 的说明文字 THEN `_note_texts`
 SHALL 逐条带中文 `title`，空文本过滤。
 
-### Requirement 8：国企披露表 / §八、9 结构对齐源模板
+### Requirement 8: 国企披露表 / §八、9 结构对齐源模板
 
 **User Story:** 同上（国企版）。
 
@@ -232,7 +246,7 @@ SHALL 逐条带中文 `title`，空文本过滤。
 8.4 WHEN 上述改动落地 THEN 「按坏账准备计提方法分类」主表/续表、「单项计提」、
 「其他组合」、两张三阶段变动表的既有列结构 SHALL 零回归。
 
-### Requirement 9：结构一致性守卫
+### Requirement 9: 结构一致性守卫
 
 **User Story:** 作为质控，我希望结构一旦对齐就不会被下一次改动悄悄破坏。
 
@@ -250,7 +264,7 @@ SHALL 逐条带中文 `title`，空文本过滤。
 9.4 WHEN 新增/改名子表 THEN 守卫 SHALL 同时校验 `K1_LISTED_SUBTABLE` /
 `K1_SOE_SUBTABLE` 常量与模板 `tables[].name` 逐字一致。
 
-### Requirement 10：端到端实测
+### Requirement 10: 端到端实测
 
 **User Story:** 作为用户，我要看到「四表入库 → 底稿有数 → 推送 → 附注有数」真的通了。
 
