@@ -43,14 +43,31 @@ def _scalar_result(value):
     return res
 
 
-def _make_db(*, active=None, deleted=None, audit_year: int | None = 2025) -> MagicMock:
-    """按调用顺序返回：audit_year → active note → (可选) deleted note。"""
+def _project_row(audit_year: int | None, standard: dict | None) -> MagicMock:
+    """项目行：`_resolve_project_sync_context` 一次取回 audit_year + 准则四列。"""
+    row = MagicMock()
+    row.first = MagicMock(return_value=(audit_year, standard, None, None))
+    return row
+
+
+def _make_db(
+    *,
+    active=None,
+    deleted=None,
+    audit_year: int | None = 2025,
+    standard: dict | None = None,
+) -> MagicMock:
+    """按调用顺序返回：项目行（audit_year + 准则）→ active note → (可选) deleted note。"""
     db = MagicMock(spec=AsyncSession)
     db.add = MagicMock()
     db.flush = AsyncMock()
     db.commit = AsyncMock()
     db.rollback = AsyncMock()
-    sequence = [_scalar_result(audit_year), _scalar_result(active)]
+    # 本文件的用例统一用 listed 项目 + listed_standalone 推送（跨主体类型守卫放行）
+    sequence = [
+        _project_row(audit_year, standard or {"entity_type": "listed", "scope": "standalone"}),
+        _scalar_result(active),
+    ]
     if active is None:
         sequence.append(_scalar_result(deleted))
     db.execute = AsyncMock(side_effect=sequence)

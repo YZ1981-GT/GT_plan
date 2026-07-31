@@ -31,7 +31,11 @@ _REPO = Path(__file__).resolve().parent.parent.parent
 _WORKPAPER = _REPO / "audit-platform" / "frontend" / "src" / "components" / "workpaper"
 
 # D1 披露 5 个子节 × 2 变体 + 审定表 2 个
-_D1_DISCLOSURE_KEYS = ["top", "pledged", "endorsed", "badDebtClass", "writeOff"]
+# 与前端 `NOTE_SECTION_KEYS` 一致（`transfer` / `badDebtMovement` 于第二阶段补齐 —— 
+# 原先这两段有表格但没有说明文本域，附注 text_content 永远缺这两节）
+_D1_DISCLOSURE_KEYS = [
+    "top", "pledged", "endorsed", "transfer", "badDebtClass", "badDebtMovement", "writeOff",
+]
 EXPECTED_D1_SECTION_IDS = [
     f"d1-disclosure-{v}-{k}-note" for v in ("listed", "soe") for k in _D1_DISCLOSURE_KEYS
 ] + ["d1-adjudication-audit-note", "d1-adjudication-audit-conclusion"]

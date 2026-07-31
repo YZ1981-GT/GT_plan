@@ -75,8 +75,9 @@ def _get(section: dict[str, Any], name: str) -> dict[str, Any]:
 # ─────────────── R4.1 / R4.4：存货分类 7 列两级表头 ───────────────
 
 def test_listed_classification_is_seven_columns(listed: dict[str, Any]) -> None:
+    # R19：标签列头取源 xlsx A8「存货种类」（第一轮误写为「项目」）
     tbl = _get(listed, "存货分类")
-    assert tbl["headers"] == ["项目", "账面余额", _IMP, "账面价值", "账面余额", _IMP, "账面价值"]
+    assert tbl["headers"] == ["存货种类", "账面余额", _IMP, "账面价值", "账面余额", _IMP, "账面价值"]
     assert tbl["_column_groups"] == [
         {"group": "期末余额", "start": 1, "span": 3},
         {"group": "上年年末余额", "start": 4, "span": 3},
@@ -98,7 +99,9 @@ def test_soe_classification_is_seven_columns(soe: dict[str, Any]) -> None:
 def test_listed_movement_merges_reversal_and_writeoff(listed: dict[str, Any]) -> None:
     """上市本期减少为「转回或转销」单列 → 7 列。"""
     tbl = _get(listed, "存货跌价准备及合同履约成本减值准备")
-    assert tbl["headers"] == ["项目", "期初余额", "计提", "其他", "转回或转销", "其他", "期末余额"]
+    assert tbl["headers"] == [
+        "存货种类", "期初余额", "计提", "其他", "转回或转销", "其他", "期末余额",
+    ]
     assert tbl["_column_groups"] == [
         {"group": "本期增加", "start": 2, "span": 2},
         {"group": "本期减少", "start": 4, "span": 2},
@@ -240,35 +243,82 @@ def test_section_carries_alignment_stamp(
     assert section.get("_aligned_at")
 
 
-# ─────────────── R4：行不动原则 ───────────────
+# ─────────────── R18：seed 行集以源 xlsx 为准 ───────────────
+#
+# 第一轮的「行不动原则」（以 `基础数据/附注模版/*.md` 为裁决者、不引入「委托加工物资」
+# 「发出商品」）已推翻：该目录在本仓库不存在无法核对，而运行时权威模板
+# `backend/wp_templates/F/F2-1至F2-14 …xlsx` 的披露 sheet 明确含这两行
+# （上市 r12/r14、国企 r12/r16），底稿常量也与之一致。
 
-def test_listed_rows_follow_note_template_not_workpaper(listed: dict[str, Any]) -> None:
-    """附注行集合以附注模版为准：不含底稿披露表多出的「委托加工物资」「发出商品」。"""
-    labels = [str(r.get("label")) for r in _get(listed, "存货分类").get("rows") or []]
-    assert labels == [
-        "原材料", "在产品", "库存商品", "周转材料",
-        "合同履约成本", "数据资源", "消耗性生物资产", "合计",
-    ]
+# Sprint 8：补「开发成本」「开发产品」（源 xlsx r20 注要求房企增加这两个种类；
+# 原 9 类的取数键并集漏掉 1408/1409/1412，房企与商业零售企业的审定数无落点）
+_LISTED_CATEGORY_LABELS = [
+    "原材料", "在产品", "开发成本", "委托加工物资", "库存商品", "开发产品",
+    "发出商品", "周转材料", "合同履约成本", "消耗性生物资产", "数据资源",
+]
+
+_SOE_CATEGORY_LABELS = [
+    "原材料",
+    "自制半成品及在产品",
+    "其中：开发成本",
+    "委托加工物资",
+    "库存商品（产成品）",
+    "其中：开发产品",
+    "周转材料（包装物、低值易耗品等）",
+    "发出商品",
+    "消耗性生物资产",
+    "合同履约成本",
+    "数据资源",
+    "其他",
+    "其中：尚未开发的土地储备（由房地产开发企业填列）",
+]
 
 
-def test_soe_rows_keep_inline_subitems(soe: dict[str, Any]) -> None:
-    """国企分类表按源模版归并主项 + 3 个「其中」子项（合计不含之，防双计）。"""
-    labels = [str(r.get("label")) for r in _get(soe, "存货分类").get("rows") or []]
-    assert labels == [
-        "原材料",
-        "自制半成品及在产品",
-        "其中：开发成本",
-        "库存商品（产成品）",
-        "其中：开发产品",
-        "周转材料（包装物、低值易耗品等）",
-        "合同履约成本",
-        "消耗性生物资产",
-        "数据资源",
-        "其他",
-        "其中：尚未开发的土地储备(由房地产开发企业填列）",
-        "合计",
-    ]
+@pytest.mark.parametrize(
+    "table_name",
+    [
+        "存货分类",
+        "存货跌价准备及合同履约成本减值准备",
+        "存货跌价准备及合同履约成本减值准备（续）",
+    ],
+)
+def test_listed_rows_follow_source_xlsx(listed: dict[str, Any], table_name: str) -> None:
+    """上市三表 seed 行 = 源 xlsx 的 9 个分类行 + 合计，且顺序一致。"""
+    labels = [str(r.get("label")) for r in _get(listed, table_name).get("rows") or []]
+    assert labels == _LISTED_CATEGORY_LABELS + ["合计"], _FIX_HINT
+
+
+@pytest.mark.parametrize(
+    "table_name",
+    ["存货分类", "存货跌价准备及合同履约成本减值准备"],
+)
+def test_soe_rows_follow_source_xlsx(soe: dict[str, Any], table_name: str) -> None:
+    """国企两表 seed 行 = 源 xlsx 的 13 行 + 合计（含 3 个「其中」子集行）。"""
+    rows = _get(soe, table_name).get("rows") or []
+    labels = [str(r.get("label")) for r in rows]
+    assert labels == _SOE_CATEGORY_LABELS + ["合计"], _FIX_HINT
     assert sum(1 for x in labels if x.startswith("其中：")) == 3
+    # 「其中：」行带 is_detail 标记，供渲染缩进与合计防双计
+    for row in rows:
+        if str(row.get("label", "")).startswith("其中："):
+            assert row.get("is_detail") is True
+
+
+def test_seed_rows_match_workpaper_push_labels(
+    listed: dict[str, Any], soe: dict[str, Any],
+) -> None:
+    """seed 骨架行标签必须与底稿常量逐字一致，否则「未同步」与「已同步」行集异构。"""
+    ts_dir = (
+        Path(__file__).resolve().parents[3]
+        / "audit-platform" / "frontend" / "src" / "components" / "workpaper" / "composables"
+    )
+    listed_src = (ts_dir / "useF2DisclosureListed.ts").read_text(encoding="utf-8")
+    soe_src = (ts_dir / "useF2DisclosureSoe.ts").read_text(encoding="utf-8")
+
+    for label in _LISTED_CATEGORY_LABELS:
+        assert f"label: '{label}'" in listed_src, f"底稿上市常量缺「{label}」"
+    for label in _SOE_CATEGORY_LABELS:
+        assert f"label: '{label}'" in soe_src, f"底稿国企常量缺「{label}」"
 
 
 # ─────────────── R4：数据资源表三段式（F9-7~F9-13a）───────────────

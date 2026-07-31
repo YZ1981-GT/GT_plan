@@ -267,3 +267,57 @@ def test_apply_plan_is_idempotent(variant: str) -> None:
     changes, warnings = FIX.apply_plan(section, FIX.SECTION_PLANS[variant]["plan"])
     assert warnings == []
     assert changes == []
+
+
+# ─── text_sections 不得含裸表名 ───────────────────────────────────────────────
+
+
+@pytest.mark.parametrize("variant", VARIANTS)
+def test_text_sections_has_no_bare_table_name(variant: str) -> None:
+    """裸表名会被当披露正文渲染（附注正文与 Word 导出多出只有表名的段落）。
+
+    后端 `disclosure_engine._is_table_title_paragraph` 只认 ① `#` 开头
+    ② 非 `#` 时 ≤20 字且匹配 `（N）xxx` / `N. xxx` 编号。写成裸表名既不是标题、
+    也没有 `提示`/`【` 等 guidance 关键词 → 落进 `text_content`。
+    """
+    bare = FIX.find_bare_table_name_paragraphs(_section(variant))
+    assert bare == [], (
+        f"{SECTION[variant]} text_sections 含裸表名 {bare}，须加 #### 前缀"
+    )
+
+
+@pytest.mark.parametrize("variant", VARIANTS)
+def test_table_name_paragraphs_use_hash_prefix(variant: str) -> None:
+    """引用表名的段落一律 `#### ` 前缀（与 `fix_note_ar_soe_structure` 同范式）。"""
+    section = _section(variant)
+    names = {str(t.get("name", "")).strip() for t in (section.get("tables") or [])}
+    offenders = [
+        p for p in (section.get("text_sections") or [])
+        if str(p).strip().lstrip("#").strip() in names and not str(p).startswith("#")
+    ]
+    assert offenders == [], offenders
+
+
+@pytest.mark.parametrize("variant", VARIANTS)
+def test_titleize_is_idempotent(variant: str) -> None:
+    """已标题化后再跑一次应零变更。"""
+    assert FIX.titleize_text_sections(_section(variant)) == []
+
+
+def test_is_title_paragraph_matches_backend_semantics() -> None:
+    """复刻函数与后端真实实现同口径（防脚本判定漂移导致守卫空转）。"""
+    from app.services.disclosure_engine import _is_table_title_paragraph as backend_impl
+
+    samples = [
+        "#### 组合计提项目：银行承兑汇票",
+        "组合计提项目：银行承兑汇票",
+        "（1）期末已质押的应收票据",
+        "1. 期末已质押的应收票据",
+        "重要的应收票据核销情况（逐项披露）",
+        "【提示：此处披露未逾期的应收票据计提的坏账准备。】",
+        "",
+        "   ",
+        "这是一段超过二十个字的普通披露正文用于验证长度约束是否一致生效",
+    ]
+    for s in samples:
+        assert FIX._is_title_paragraph(s) == backend_impl(s), f"判定不一致：{s!r}"

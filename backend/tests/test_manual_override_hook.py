@@ -333,6 +333,10 @@ class _DiscFakeDB:
         else:
             result.scalar_one_or_none = MagicMock(return_value=None)
             result.scalar_one = MagicMock(return_value=None)
+        # `_resolve_project_sync_context` 走 `.first()`：本 FakeDB 不建项目行 →
+        # 显式返回 None（fail-open：无准则可判 → 跨主体类型守卫放行），
+        # 避免依赖 MagicMock 解包失败这种"意外"路径。本文件用例均显式传 year。
+        result.first = MagicMock(return_value=None)
 
         def _scalars():
             inner = MagicMock()
