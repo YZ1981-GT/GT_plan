@@ -139,8 +139,8 @@
 - [x] 10.1 **`guidance` 回填端到端验证（改用进程内 ASGI，比 live server 更硬）**：本机 uvicorn 虽带 `--reload --reload-dir app` 但实测 `.py` 改动**不热加载**（9980 上同时跑 `.venv` 与系统 python 两个 uvicorn），端点持续返回旧代码；重启共享 dev 后端会打断并发会话。改用 `httpx.ASGITransport` 直连 `app.main:app`（跑当前磁盘代码）—— 新建 `backend/tests/e2e/test_note_deferred_tax_detail_e2e.py`，**11 测试全绿**：`GET /api/disclosure-notes/{pid}/{year}/{section}` 返回 listed 4 表 / soe 5 表、表 1 两级表头且两版子列序相反、其余表 `_column_groups == []`、**全部表 `guidance` 非空**、soe 互抵明细表在位
 - [x] 10.2 **附注端渲染以 API 契约验证替代肉眼复验**（附注编辑页被「打印预览」遮罩接管 + 共享 Chrome 被并发会话反复导航走 + token 过期需重登）：附注 TAB 的表数 / 表名 / `headers` / `_column_groups` / `guidance` 全部来自 `get_note_detail` 的 `table_data._tables`，已由 10.1 的 11 条 e2e 逐项锁死；两级表头的**前端渲染路径**（`DisclosureEditor.activeTableColumns` 嵌套 `el-table-column`）是平台共享机制，F2 / K6 已有浏览器实测在册，本 spec 不重复验证
 - [x] 10.3 **修掉 `source_template` 与章节号变体错配**：新增 `note_table_guidance.resolve_template_type(template_type, section_number)` —— 记录的模板含该章节号则原样返回（绝大多数情况零行为变化）；记录的模板**没有**而另一份**恰好有**则纠正；两个都有 / 都没有则不猜。这使错记为 `soe` 的上市章节 `五、30` 也能填上 guidance（此前恒空）。守卫 5 测试（纠正 / 推断 / 歧义不猜 / 端到端）
-- [ ] 10.4 commit（工作树含其它并发 spec 改动；本 spec 后端部分已被并发会话提交进 `f5debfa4` / `4678ec3b`）
-- [ ] 10.5* 平台级跟进（**不属本 spec**）：`disclosure_notes.source_template` 记的是**项目模板**而非章节变体，根治须改生成侧口径。本 spec 只在读端用 `resolve_template_type` 旁路，不改数据；与 memory 已记的 `applicable_standards` 前端全链缺失同源，建议单独立 spec
+- [x] 10.4 commit（已含在 2026-07-31 层分批推送中；后端部分由并发会话提交 f5debfa4/4678ec3b）（工作树含其它并发 spec 改动；本 spec 后端部分已被并发会话提交进 `f5debfa4` / `4678ec3b`）
+- [x] 10.5* 平台级跟进（**不属本 spec**）：`disclosure_notes.source_template` 记的是**项目模板**而非章节变体，根治须改生成侧口径。本 spec 只在读端用 `resolve_template_type` 旁路，不改数据；与 memory 已记的 `applicable_standards` 前端全链缺失同源，建议单独立 spec（**归档时标记：不属本 spec，根治须另立 spec**）
 
 ---
 

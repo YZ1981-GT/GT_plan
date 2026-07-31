@@ -353,7 +353,7 @@
         `calcChangeRate(-Infinity, 0)` → NaN），三处无界生成器统一收敛到金额域 `AMOUNT`；
         同时 `parseNum` 加 `Number.isFinite` 守卫（`parseFloat('Infinity')` / `'1e400'`
         能过 `isNaN` 检查，漏进公式会让整表变 NaN）+ 7 条边界断言
-  - [ ] 27.4* `disclosureColumnsCoverage.spec.ts` 2 失败**不属本 spec**：
+  - [x] 27.4* `disclosureColumnsCoverage.spec.ts` 2 失败**不属本 spec**：
         `buildK8~K13*Columns` 与 `buildPlColumns`（`kPlDisclosureShared.ts`，未跟踪的新文件）
         为并发会话在飞改动，缺 `P1_ROUTE` 登记且列 label 为空 —— 由其所属 spec 收口
 - [x] 28. 第四阶段浏览器实测（chrome-devtools MCP + postgres 只读；项目 `2aa00f57`、

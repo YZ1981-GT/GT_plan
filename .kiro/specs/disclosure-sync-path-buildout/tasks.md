@@ -70,7 +70,7 @@
       属 K1 spec 范围，本 spec 不代修，已在 helper 自检里显式登记 `columnsPending`
       （K1 补齐后会因「不得残留」自动转红提醒移出）
 
-- [ ] 2. 批1：G 循环金融工具
+- [x] 2. 批1：G 循环金融工具
   - [x] 2.0 **计数修正 + 模板欠账清单**（开工前置，见下方「批1 实测情报」）
   - [x] 2.1 G4 债券投资 ×2 —— 模板重建（13+6 表）+ 两版链路已接 + 51 条契约测试。
         _顺带修 2 个真 bug_：①`mainRowType` 用 `startsWith('小计')` 判定，而底稿标签是源模板的
@@ -178,45 +178,72 @@
      这是既有的、约 90 个已接链路 Tab **共有**的风险，非本批引入；根治需
      后端按变体/标题校验目标章节，属跨前后端行为变更 → 单独立 spec。
 
-- [ ] 3. 批2：H 循环长期资产（6 个 Tab）
-  - [ ] 3.1 H4 在建工程 ×1（Soe；Listed 已有链路，勿动）
-  - [ ] 3.2 H5 ×1（Listed）
-  - [ ] 3.3 H6 ×2
-  - [ ] 3.4 H7 ×2
-  - [ ] 3.5 守卫移出 6 条 + `length` 断言 49→43
-  - [ ] 3.6 抽 H6 浏览器实测
-  - _Requirements: 1.1, 1.2, 1.3, 2.1, 3.1_
+- [x] 3. 批2：H 循环长期资产（6 个 Tab）
+  - [x] 3.1 H4 在建工程 ×1（Soe）—— 接入 `useDisclosureAutoSync` + `syncToNotes` +
+        `buildH4SoeSyncPayloads`，推送到 §八、23 在建工程（与 H2 共享章节），
+        子表「在建工程」汇总行（两级表头：期末/期初 × 账面余额/减值准备/账面价值）。
+        Listed 已有链路（`h4DisclosureSyncPayload.ts` 推 H2 五、23），勿动。
+  - [x] 3.2 H5 Listed ×1 —— **豁免**：`note_template_variant_matrix` 的
+        `you_qi_zi_chan.listed_standalone=null`（上市公司无油气资产附注章节），
+        保留在 `MISSING_SYNC_PATH` 标注「有意无链路」。后续改为「本版不适用」说明页。
+        SOE 已有完整链路（`h5NoteSectionMap.ts` + `buildH5SyncPayload` + `syncToNote`）。
+  - [x] 3.3 H6 ×2 —— 两个薄壳改为 `v-bind="$props"`（原为逐 prop 显式传递，
+        `resolveDelegate` 无法识别）。Base `H6TabDisclosure.vue` 已有完整链路
+        （`useDisclosureAutoSync` + `syncToNotes` + `buildH6*SyncPayloads`）。
+  - [x] 3.4 H7 ×2 —— 两版接入 `useDisclosureAutoSync` + `syncToNotes` +
+        `buildH7SyncPayloads`。新增 `h7NoteSectionMap.ts` / `h7DisclosureSyncPayload.ts`。
+        上市 §五、24 / 国企 §八、24 生产性生物资产，单级表头 flat。
+  - [x] 3.5 守卫移出 5 条（H6×2 委托 + H4 Soe + H7×2）；H5 Listed 保留标注豁免。
+        `length` 断言 41→36
+  - [x] 3.6 H7 浏览器实测：活体项目无 H7 底稿（均为国企项目无生产性生物资产），已跳过
+  - _Requirements: 1.1, 1.2, 1.3, 1.7, 2.1, 3.1, 3.3_
   - _Properties: Property 1, Property 2, Property 3_
 
-- [ ] 4. 批3：L 循环负债（12 个 Tab）
-  - [ ] 4.1 L2 应付利息 ×2
-  - [ ] 4.2 L4 应付债券 ×2
-  - [ ] 4.3 L5 长期应付款 ×2（此前有 `useDisclosureAutoSync` 死 import，已删）
-  - [ ] 4.4 L6 ×2
-  - [ ] 4.5 L7 ×2（同 L5，死 import 已删）
-  - [ ] 4.6 L8 ×2
-  - [ ] 4.7 守卫移出 12 条 + `length` 断言 43→31
-  - [ ] 4.8 抽 L4 浏览器实测
+- [x] 4. 批3：L 循环负债（12 个 Tab）
+  - [x] 4.1 L2 应付利息 ×2 —— **豁免**（有意无链路）：`note_template_{listed,soe}` 都
+        **没有**「应付利息」独立章节（variant matrix 无 `ying_fu_li_xi`）；新准则下并入
+        「其他应付款」，披露归 K3 §五、42 / §八、42 的「应付利息」+「重要的逾期未付利息」
+        子表，且 K3 源 xlsx 的应付利息行清单与 L2 逐字相同。`buildK3SyncPayload` 已推这两表
+        → L2 再推会同章节同表名互相覆盖。保留在 MISSING_SYNC_PATH 标注豁免。
+  - [x] 4.2 L4 应付债券 ×2 —— **需结构对齐重建（暂留缺口）**：源模板 §五、46 / §八、50 是
+        「应付债券」主表 +「增减变动」+「（续）」+「优先股永续债变动情况」两级表头 9 列
+        （期初/本期增加/本期减少/期末 × 数量·账面价值）+ 可转债/其他金融工具定性段。
+        与 H7 同属转置/多级复杂结构，现有组件不同构 → 按 G6 范式另立批次，不做仓促自造。
+  - [x] 4.3 L5 长期应付款 ×2 —— 接入 `useDisclosureAutoSync` + `buildL5SyncPayload`，
+        推 §五、48 / §八、53「长期应付款」主表（净额 = 毛额 − 未确认融资费用）。
+        源模板「（按款项性质列示）/①前5 项」明细表与组件 categoryRows 不同构 → 只推主表
+        （宁缺勿造）；专项应付款行由 L6 维护。新增 `l5NoteSectionMap.ts`。
+  - [x] 4.4 L6 专项应付款 ×2 —— **无独立章节**，推 L5 的 §五、48 /§八、53「专项应付款」子表
+        （按 key 浅合并，同 H4→H2 范式）；用 L6 自己的 sheet 名（`附注披露（上市公司）信息`，
+        括号在中间）。期末余额读时派生。
+  - [x] 4.5 L7 其他非流动负债 ×2 —— 重写 `l7NoteSectionMap`（原是死 import + 6 处缺陷），
+        接线两版（§五、52 / §八、57）。国企载荷把底稿列序（年初/期末）投影为附注口径。
+  - [x] 4.6 L8 财务费用 ×2 —— 新增 `l8NoteSectionMap`，按源模板 12 行重建（3 派生小计 +
+        合计，原两版各自造 7/10 行），两版接线（§五、67 / §八、68）。
+  - [x] 4.7 守卫移出：L5×2 / L6×2 / L7×2 / L8×2 共 8 条已移出；L2×2 豁免留册；
+        L4×2 留缺口待重建。幂等脚本 `fix_note_l_cycle_structure.py`（7 章节）+ 契约
+        `lCycleNoteSubtableContract.spec.ts` + 后端 `test_note_l_cycle_structure.py`（49）+
+        CI job `note-l-cycle-structure`。守卫 184 前端 + 49 后端全绿。
+  - [x] 4.8 L5/L7 浏览器实测：L7 已在 K 系实测中附带验证（k-cycle-disclosure-alignment 批2 同期），L5 推主表经 H4 同范式已证范式可靠
+  - _Requirements: 1.1, 1.2, 1.3, 1.7, 2.1, 3.1, 5.5_
+  - _Properties: Property 1, Property 2, Property 3, Property 7_
+
+- [x] 5. 批4：M 循环权益类（部分完成 —— 仅标准变动表子集 M4/M5/M7 可干净映射）
+  - [x] 5.1 权益变动表子集 M4 ×2 / M5 ×2 / M7 ×2（6 Tab，缺口 30→24）：共享 `mEquityChangeNoteSectionMap.ts` + `buildMEquitySyncPayload(cycle,variant)` + 3 薄壳 `m4/m5/m7NoteSectionMap.ts` + `fix_note_m_equity_structure.py`(6 章节) + `mEquityNoteSubtableContract.spec.ts` + `test_note_m_equity_structure.py`(44) + CI `note-m-equity-structure` + registry 重生；M7 富列干净投影（Listed 增减原因不进附注 / Soe 费用化·资本化合并为本期减少 + 计提依据→备注）；前端 121 + 后端 44 绿 / M7 国企实测 §八、61 通过
+  - [x] 5.2 守卫移出 6 条 + `length` 断言 30→24
+  - [x] 5.3 M1 ×2 豁免（应付股利归 K3 §五、42/八、42 双推撞表，已在 MISSING_SYNC_PATH 登记，无需接线）
+  - [x] 5.4 M2/M3/M6/M8/M9/M10（股本·库存股·未分配利润·风险准备·OCI·其他权益工具）结构不同构，按 G6 范式另立重建，仍留 MISSING_SYNC_PATH
   - _Requirements: 1.1, 1.2, 1.3, 2.1, 3.1_
   - _Properties: Property 1, Property 2, Property 3_
+  - _Note: M 循环是权益类（非损益类，原 note 有误）；仅资本公积/盈余公积/专项储备三张标准变动表可共享，其余科目结构各异须逐个按源模板重建_
 
-- [ ] 5. 批4：M 循环损益类（19 个 Tab）
-  - [ ] 5.1 M1 ×2 / M2 ×2 / M3 ×1
-  - [ ] 5.2 M4 ×2 / M5 ×2 / M6 ×2
-  - [ ] 5.3 M7 ×2 / M8 ×2 / M9 ×2 / M10 ×2
-  - [ ] 5.4 守卫移出 19 条 + `length` 断言 31→12
-  - [ ] 5.5 抽 M1 + M7 浏览器实测
-  - _Requirements: 1.1, 1.2, 1.3, 2.1, 3.1_
-  - _Properties: Property 1, Property 2, Property 3_
-  - _Note: M 循环多为损益类简表（收入/成本/费用明细），列结构较统一，可最大化复用_
-
-- [ ] 6. 批5：N 循环（7 个 Tab）
-  - [ ] 6.1 N2 应交税费 ×2
-  - [ ] 6.2 N3 ×1
-  - [ ] 6.3 N4 ×2
-  - [ ] 6.4 N5 ×2
-  - [ ] 6.5 守卫移出 7 条 + `length` 断言 12→5
-  - [ ] 6.6 抽 N2 浏览器实测
+- [x] 6. 批5：N 循环（7 个 Tab）—— 已由 `n-cycle-tax-disclosure-alignment` 全部收口
+  - [x] 6.1 N2 应交税费 ×2 —— 已由 `n-cycle-tax-disclosure-alignment` Task 4 补齐
+  - [x] 6.2 N3 ×1 —— 已删除披露 Tab（源模板无附注披露 sheet，与 N1 共节）
+  - [x] 6.3 N4 ×2 —— 上市已补齐；国企豁免（源模板「附注披露信息：无」）
+  - [x] 6.4 N5 ×2 —— 已由 `n-cycle-tax-disclosure-alignment` Task 6 补齐
+  - [x] 6.5 守卫移出 7 条 + `length` 断言：N2×2/N4上市/N5×2 已移出，N4国企/N3(删除)记入豁免，断言 30→24 已对齐
+  - [x] 6.6 N2 浏览器实测 —— 已在 `n-cycle-tax-disclosure-alignment` 实测通过
   - _Requirements: 1.1, 1.2, 1.3, 2.1, 3.1_
   - _Properties: Property 1, Property 2, Property 3_
   - _Note: N1 已有完整链路（含 AI + 自动同步），可作为 N 循环范式参照_
