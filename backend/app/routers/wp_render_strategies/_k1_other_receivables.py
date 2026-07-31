@@ -1,11 +1,34 @@
 """K1 其他应收款 — 专属渲染策略.
 
 componentType: k1-other-receivables
-科目 1221 其他应收款（借方/资产类）+ 坏账准备（贷方/资产备抵类）。
 
-返回 allResponses + projectContext + TB数据(1221+坏账准备)
-+ adjudication_prefill（无持久化审定未审数时从 tb_balance 预填）
-供前端 K1-1 审定表试算表列（只读）seed / 期后回款窗口。
+科目定位**不硬编码前缀**，走报表映射规则链路（共享件
+`app/services/four_table/report_line_accounts.py`）::
+
+    报表行 BS-009「其他应收款」
+      soe_standalone : TB('1221','期末余额') - TB('1231-03','期末余额') + TB('1131','期末余额')
+      listed_*       : TB('1221','期末余额')
+          │ 标准码 → account_mapping 反解
+          ▼
+    客户原始码：原值 1221 / 备抵 1231.03 / 附加 1131 应收股利、1132 应收利息
+
+🔴 两条已修正的历史错误（DB 只读实证，项目 `0ec33ac9`/2025）：
+
+1. **备抵科目取整个 `1231` 前缀** —— `1231` 下挂的是按应收款种类拆分的备抵子科目
+   （`1231.01` 应收票据 / `1231.02` 应收账款 / `1231.03` 其他应收款 / `1231.05` 长期应收款）。
+   旧实现取到 28,464,225.16，其中 26,401,719.77 属**应收账款**；K1 真值仅 `1231.03`
+   的 900,217.36 → 虚增 31.6 倍。
+2. **只取最深层级（`_aggregate_prefix_deepest`）** —— 客户科目树参差，只取 depth==2 会
+   整段丢掉一级叶子 `1221.11 个人往来`（3,597,359.45）与 `1221.12 保证金及押金`
+   （55,035,942.52）→ 原值少 21.7%，且「款项性质分布」最核心的保证金押金桶恒 0。
+   现改为**叶子口径**（`four_table/leaf_aggregation.select_leaves`），叶子和 == 父科目
+   `1221` 期末 269,885,933.03（逐分相等）。
+
+返回 allResponses + projectContext + TB数据 + tb_source_codes（取数溯源）
++ adjudication_prefill（无持久化审定未审数时从 tb_balance 预填，含「与经审计的财务报表
+核对」区的应收利息 / 应收股利 / 报表数三项）。
+
+spec: .kiro/specs/k1-four-table-extraction-and-disclosure-alignment/
 """
 
 from __future__ import annotations
@@ -17,24 +40,60 @@ import sqlalchemy as sa
 
 from app.models.audit_platform_models import TbBalance
 from app.services.dataset_query import get_active_filter
+from app.services.four_table.leaf_aggregation import (
+    LeafRow,
+    aggregate_leaves,
+    filter_by_prefixes,
+    select_leaves,
+    to_leaf_rows,
+)
+from app.services.four_table.report_line_accounts import (
+    ReportLineAccounts,
+    ReportLineAccountSpec,
+    resolve_report_line_accounts,
+)
 
 from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
 
-# 科目前缀：1221其他应收款(借方/资产类) + 1231坏账准备(贷方/备抵类)
-_K1_ACCOUNT_PREFIXES = {
-    "1221": ("receivable_unadjusted", "receivable_audited"),  # 其他应收款
-    "1231": ("bad_debt_unadjusted", "bad_debt_audited"),  # 坏账准备
-}
+#: 报表行次（DB 实证：四个准则的「其他应收款」行 row_code 均为 BS-009）
+K1_REPORT_ROW_CODE = "BS-009"
 
-# 款项性质关键词 → K1-1 nature syncKey
+#: 兜底标准码：原值 1221 其他应收款、备抵 1231-03 坏账准备-其他应收款
+K1_FALLBACK_GROSS = "1221"
+K1_FALLBACK_PROVISION = "1231-03"
+
+#: 附加科目（报表行 BS-009 含它们，但 K1-1 第一段「项目【不含应收利息、应收股利】」
+#: 明确排除 → 不并入原值，单独喂「与经审计的财务报表核对」区）
+K1_INTEREST_STANDARD = "1132"
+K1_DIVIDEND_STANDARD = "1131"
+
+#: 备抵侧名称过滤（仅在反解退化为宽前缀 `1231` 时叠加，防把其它应收科目坏账算进 K1）
+K1_PROVISION_NAME_FILTER = "其他应收款"
+
+K1_ACCOUNT_SPEC = ReportLineAccountSpec(
+    row_code=K1_REPORT_ROW_CODE,
+    fallback_gross=(K1_FALLBACK_GROSS,),
+    fallback_provision=(K1_FALLBACK_PROVISION,),
+    provision_name_filter=K1_PROVISION_NAME_FILTER,
+    extra_standard_codes=(K1_DIVIDEND_STANDARD, K1_INTEREST_STANDARD),
+)
+
+# 款项性质关键词 → K1-1 nature syncKey（与前端 `classifyK1Nature` 逐条同源）
 _NATURE_RULES: list[tuple[str, str]] = [
     (r"保证金", "margin"),
     (r"押金", "deposit"),
     (r"备用金", "petty"),
     (r"往来|代垫|关联", "intercompany"),
 ]
+
+#: 披露 sheet 名 = 源 xlsx 真实中文 tab 名（openpyxl 实测 `wb.sheetnames`）。
+#: 🔴 上市侧是**前半角后全角**括号；国企侧是「国企」而非「国有企业」。
+#: 前端同源常量 = `k1NoteSectionMap.K1_DISCLOSURE_SHEET_NAME`（守卫
+#: `test_note_k_sheet_names.py` 直读源 xlsx 比对）。
+K1_DISCLOSURE_SHEET_LISTED = "附注披露信息(上市公司）"
+K1_DISCLOSURE_SHEET_SOE = "附注披露信息（国企）"
 
 K1_SHEETS = [
     {"sheet_name": "底稿目录", "component_type": "k1-other-receivables"},
@@ -51,8 +110,8 @@ K1_SHEETS = [
     {"sheet_name": "长期未收回款项检查表K1-10", "component_type": "k1-other-receivables"},
     {"sheet_name": "关联方及交易检查表K1-11", "component_type": "k1-other-receivables"},
     {"sheet_name": "其他应收款检查表K1-12", "component_type": "k1-other-receivables"},
-    {"sheet_name": "附注披露信息（上市公司）", "component_type": "k1-other-receivables"},
-    {"sheet_name": "附注披露信息（国有企业）", "component_type": "k1-other-receivables"},
+    {"sheet_name": K1_DISCLOSURE_SHEET_LISTED, "component_type": "k1-other-receivables"},
+    {"sheet_name": K1_DISCLOSURE_SHEET_SOE, "component_type": "k1-other-receivables"},
 ]
 
 
@@ -64,49 +123,18 @@ def _classify_nature(name: str) -> str:
     return "other-nature"
 
 
-def _row_depth(code: str, prefix: str) -> int:
-    """1221→0 / 1221.01→1 / 1221.01.02→2."""
-    if code == prefix:
-        return 0
-    rest = code[len(prefix) :].lstrip(".")
-    if not rest:
-        return 0
-    return len(rest.split("."))
+def _apply_provision_name_filter(
+    leaves: list[LeafRow], accounts: ReportLineAccounts
+) -> list[LeafRow]:
+    """备抵侧反解退化为宽前缀时叠加名称过滤（`provision_exact=False` 才生效）。"""
+    if accounts.provision_exact:
+        return leaves
+    kw = K1_PROVISION_NAME_FILTER
+    return [r for r in leaves if kw in (r.account_name or "")]
 
 
-def _aggregate_prefix_deepest(
-    rows: list,
-    prefix: str,
-    *,
-    abs_amount: bool = False,
-) -> dict[str, float]:
-    """按最深明细层级汇总，避免父子科目重复计数."""
-    by_depth: dict[int, list] = {}
-    for r in rows:
-        code = (r.account_code or "").strip()
-        if not (code == prefix or code.startswith(prefix)):
-            continue
-        depth = _row_depth(code, prefix)
-        by_depth.setdefault(depth, []).append(r)
-    if not by_depth:
-        return {"opening": 0.0, "closing": 0.0, "debit": 0.0, "credit": 0.0}
-    chosen = by_depth[max(by_depth.keys())]
-    opening = sum(float(r.opening_balance or 0) for r in chosen)
-    closing = sum(float(r.closing_balance or 0) for r in chosen)
-    debit = sum(float(getattr(r, "debit_amount", 0) or 0) for r in chosen)
-    credit = sum(float(getattr(r, "credit_amount", 0) or 0) for r in chosen)
-    if abs_amount:
-        opening, closing = abs(opening), abs(closing)
-        debit, credit = abs(debit), abs(credit)
-    return {
-        "opening": opening,
-        "closing": closing,
-        "debit": debit,
-        "credit": credit,
-    }
-
-
-async def _fetch_tb_balance_rows(ctx: RenderContext) -> list:
+async def _fetch_tb_balance_leaves(ctx: RenderContext) -> list[LeafRow]:
+    """取 active 数据集全部 `tb_balance` 行并筛出叶子（失败返 []，fail-open）。"""
     try:
         active_filter = await get_active_filter(
             ctx.db, TbBalance.__table__, ctx.project_id, ctx.year
@@ -119,27 +147,32 @@ async def _fetch_tb_balance_rows(ctx: RenderContext) -> list:
                 TbBalance.closing_balance,
                 TbBalance.debit_amount,
                 TbBalance.credit_amount,
+                TbBalance.closing_direction,
+                TbBalance.dataset_id,
             ).where(active_filter)
         )
-        return list(result.fetchall())
+        return select_leaves(to_leaf_rows(result.fetchall()))
     except Exception as e:  # noqa: BLE001
         logger.warning("K1 TB balance fetch failed: %s", e)
+        try:
+            await ctx.db.rollback()
+        except Exception:
+            pass
         return []
 
 
-async def _fetch_tb_data(ctx: RenderContext) -> dict:
-    """取科目1221+1231的期初/期末余额及借贷发生额（最深层级，防重复计数）."""
-    tb: dict[str, float] = {}
-    rows = await _fetch_tb_balance_rows(ctx)
-    if rows:
-        for prefix, (unadj_key, _audited_key) in _K1_ACCOUNT_PREFIXES.items():
-            agg = _aggregate_prefix_deepest(rows, prefix, abs_amount=(prefix == "1231"))
-            tb[f"{unadj_key}_opening"] = agg["opening"]
-            tb[f"{unadj_key}_closing"] = agg["closing"]
-            tb[f"{unadj_key}_debit"] = agg["debit"]
-            tb[f"{unadj_key}_credit"] = agg["credit"]
+async def _fetch_trial_balance_amounts(
+    ctx: RenderContext, standard_codes: list[str]
+) -> dict[str, dict[str, float]]:
+    """按标准码前缀取 `trial_balance` 未审/审定额。
 
-    # 从 trial_balance 取未审数/审定数
+    返回 ``{标准码: {"unadjusted","audited"}}``；标准码用**精确前缀**匹配
+    （`1231-03` 只命中 `1231-03*`，不会误吃 `1231-02`）。失败返 ``{}``。
+    """
+    codes = [c for c in (standard_codes or []) if c]
+    if not codes:
+        return {}
+    out: dict[str, dict[str, float]] = {c: {"unadjusted": 0.0, "audited": 0.0} for c in codes}
     try:
         result = await ctx.db.execute(
             sa.text(
@@ -147,81 +180,174 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict:
                 SELECT standard_account_code, unadjusted_amount, audited_amount
                 FROM trial_balance
                 WHERE project_id = :pid AND year = :year AND is_deleted = false
-                  AND (standard_account_code LIKE '1221%' OR standard_account_code LIKE '1231%')
-            """
+                """
             ),
             {"pid": str(ctx.project_id), "year": ctx.year},
         )
         for row in result.fetchall():
             code = (row.standard_account_code or "").strip()
-            for prefix, (unadj_key, audited_key) in _K1_ACCOUNT_PREFIXES.items():
-                if code == prefix or code.startswith(prefix):
-                    tb[unadj_key] = tb.get(unadj_key, 0.0) + float(row.unadjusted_amount or 0)
-                    tb[audited_key] = tb.get(audited_key, 0.0) + float(row.audited_amount or 0)
-                    break
+            if not code:
+                continue
+            # 最长前缀命中，避免 1231 与 1231-03 双计
+            best = ""
+            for c in codes:
+                if (code == c or code.startswith(c)) and len(c) > len(best):
+                    best = c
+            if not best:
+                continue
+            out[best]["unadjusted"] += float(row.unadjusted_amount or 0)
+            out[best]["audited"] += float(row.audited_amount or 0)
     except Exception as e:  # noqa: BLE001
         logger.warning("K1 trial_balance fetch failed: %s", e)
+        try:
+            await ctx.db.rollback()
+        except Exception:
+            pass
+    return out
 
+
+def _build_tb_values(
+    leaves: list[LeafRow],
+    accounts: ReportLineAccounts,
+    tb_amounts: dict[str, dict[str, float]],
+) -> dict[str, float]:
+    """组装前端 `tb_values`（键名与 `GtK1OtherReceivables._loadTbData` 逐字对齐）。"""
+    rec = aggregate_leaves(leaves, accounts.gross)
+    prov_leaves = _apply_provision_name_filter(
+        filter_by_prefixes(leaves, accounts.provision), accounts
+    )
+    bd = aggregate_leaves(prov_leaves, accounts.provision, absolute=True)
+
+    tb: dict[str, float] = {
+        "receivable_unadjusted_opening": rec["opening"],
+        "receivable_unadjusted_closing": rec["closing"],
+        "receivable_unadjusted_debit": rec["debit"],
+        "receivable_unadjusted_credit": rec["credit"],
+        "bad_debt_unadjusted_opening": bd["opening"],
+        "bad_debt_unadjusted_closing": bd["closing"],
+        "bad_debt_unadjusted_debit": bd["debit"],
+        "bad_debt_unadjusted_credit": bd["credit"],
+    }
+
+    rec_tb = {"unadjusted": 0.0, "audited": 0.0}
+    for code in accounts.gross_standard:
+        got = tb_amounts.get(code)
+        if got:
+            rec_tb["unadjusted"] += got["unadjusted"]
+            rec_tb["audited"] += got["audited"]
+    bd_tb = {"unadjusted": 0.0, "audited": 0.0}
+    for code in accounts.provision_standard:
+        got = tb_amounts.get(code)
+        if got:
+            bd_tb["unadjusted"] += got["unadjusted"]
+            bd_tb["audited"] += got["audited"]
+
+    tb["receivable_unadjusted"] = rec_tb["unadjusted"]
+    tb["receivable_audited"] = rec_tb["audited"]
+    tb["bad_debt_unadjusted"] = abs(bd_tb["unadjusted"])
+    tb["bad_debt_audited"] = abs(bd_tb["audited"])
     return tb
 
 
-async def _build_adjudication_prefill(ctx: RenderContext) -> dict:
-    """无持久化审定未审数时，从 tb_balance 预填 K1-1 组合/性质行.
+def _build_fs_reconciliation(
+    leaves: list[LeafRow],
+    accounts: ReportLineAccounts,
+) -> dict[str, float]:
+    """K1-1「与经审计的财务报表核对」区三项。
+
+    - ``interest`` / ``dividend``：附加科目 1132 / 1131 的叶子期末合计。
+    - ``report_total``：按 `BS-009` 公式中各 `TB()` **前置运算符**加权求和
+      （`+` 加 / `-` 减），与报表引擎同口径（Property 10）。公式缺失时退化为
+      「原值 − 备抵 + 附加」的默认口径。
+    """
+    def _closing(prefixes, *, absolute=False) -> float:
+        return aggregate_leaves(leaves, prefixes, absolute=absolute)["closing"]
+
+    dividend = _closing(accounts.extra.get(K1_DIVIDEND_STANDARD) or [])
+    interest = _closing(accounts.extra.get(K1_INTEREST_STANDARD) or [])
+
+    if accounts.signed_codes:
+        total = 0.0
+        for std_code, sign in accounts.signed_codes:
+            if std_code in accounts.provision_standard:
+                prefixes = accounts.provision
+                amount = _closing(prefixes, absolute=True)
+            elif std_code in accounts.extra:
+                amount = _closing(accounts.extra[std_code])
+            elif std_code in accounts.gross_standard:
+                amount = _closing(accounts.gross)
+            else:
+                continue
+            total += sign * amount
+    else:
+        prov = _closing(accounts.provision, absolute=True)
+        total = _closing(accounts.gross) - prov + dividend + interest
+
+    return {
+        "interest": interest,
+        "dividend": dividend,
+        "report_total": total,
+    }
+
+
+def _build_adjudication_prefill(
+    leaves: list[LeafRow],
+    accounts: ReportLineAccounts,
+) -> dict:
+    """无持久化审定未审数时，从 `tb_balance` **叶子**预填 K1-1 各区块。
 
     返回::
+
         {
-          "receivable_total": {"opening", "closing", "debit", "credit"},
+          "receivable_total": {"opening","closing","debit","credit"},
           "bad_debt_total": {...},
-          "nature": { syncKey: {"opening", "closing"}, ... },
-          "portfolio": { "aging"|"individual"|...: {"opening", "closing"}, ... },
+          "nature": { syncKey: {"opening","closing"}, ... },
+          "portfolio": { "aging": {"opening","closing"} },
+          "portfolio_provision": { "aging": {...} },
+          "fs_reconciliation": {"interest","dividend","report_total"},
         }
     """
-    rows = await _fetch_tb_balance_rows(ctx)
-    if not rows:
+    if not leaves:
         return {}
 
-    rec = _aggregate_prefix_deepest(rows, "1221", abs_amount=False)
-    bd = _aggregate_prefix_deepest(rows, "1231", abs_amount=True)
+    rec = aggregate_leaves(leaves, accounts.gross)
+    prov_leaves = _apply_provision_name_filter(
+        filter_by_prefixes(leaves, accounts.provision), accounts
+    )
+    bd = aggregate_leaves(prov_leaves, accounts.provision, absolute=True)
 
-    # 性质分布：仅取 1221 最深叶子明细，按科目名称归类
-    by_depth: dict[int, list] = {}
-    for r in rows:
-        code = (r.account_code or "").strip()
-        if not (code == "1221" or code.startswith("1221")):
-            continue
-        depth = _row_depth(code, "1221")
-        by_depth.setdefault(depth, []).append(r)
-
+    # 性质分布：遍历原值侧**全部叶子**（含一级叶子），按科目名归类
     nature: dict[str, dict[str, float]] = {}
-    if by_depth:
-        leaves = by_depth[max(by_depth.keys())]
-        # 若只有一级科目本身，无法拆性质 → 整笔进「其他」
-        for r in leaves:
-            name = (getattr(r, "account_name", None) or "").strip()
-            key = _classify_nature(name) if name else "other-nature"
-            bucket = nature.setdefault(key, {"opening": 0.0, "closing": 0.0})
-            bucket["opening"] += float(r.opening_balance or 0)
-            bucket["closing"] += float(r.closing_balance or 0)
+    for r in filter_by_prefixes(leaves, accounts.gross):
+        key = _classify_nature(r.account_name) if r.account_name else "other-nature"
+        bucket = nature.setdefault(key, {"opening": 0.0, "closing": 0.0})
+        bucket["opening"] += r.opening
+        bucket["closing"] += r.closing
 
-    # 组合：无明细分类时默认全部进账龄组合；有性质拆分时仍把总额放账龄组合作未审兜底
-    portfolio: dict[str, dict[str, float]] = {
-        "aging": {"opening": rec["opening"], "closing": rec["closing"]},
-    }
-    portfolio_bd: dict[str, dict[str, float]] = {
-        "aging": {"opening": bd["opening"], "closing": bd["closing"]},
-    }
+    # 组合：客户科目表无信用风险组合维度 → 总额进账龄组合作未审兜底（审计师可改）
+    portfolio = {"aging": {"opening": rec["opening"], "closing": rec["closing"]}}
+    portfolio_bd = {"aging": {"opening": bd["opening"], "closing": bd["closing"]}}
 
-    prefill: dict = {
+    fs = _build_fs_reconciliation(leaves, accounts)
+
+    non_zero = any(
+        abs(v) >= 0.005
+        for v in (
+            rec["opening"], rec["closing"], bd["opening"], bd["closing"],
+            fs["interest"], fs["dividend"], fs["report_total"],
+        )
+    )
+    if not non_zero:
+        return {}
+
+    return {
         "receivable_total": rec,
         "bad_debt_total": bd,
         "nature": nature,
         "portfolio": portfolio,
         "portfolio_provision": portfolio_bd,
+        "fs_reconciliation": fs,
     }
-    # 空预填不返回
-    if rec["opening"] == 0 and rec["closing"] == 0 and bd["opening"] == 0 and bd["closing"] == 0:
-        return {}
-    return prefill
 
 
 def _has_persisted_adjudication(responses_snapshot: dict) -> bool:
@@ -246,7 +372,7 @@ async def _load_project_context(ctx: RenderContext) -> dict:
         "business_category": "",
         "bs_date": "",
         "related_parties": [],
-        "bad_debt_account_prefix": "1231",
+        "bad_debt_account_prefix": K1_FALLBACK_PROVISION,
     }
     try:
         result = await ctx.db.execute(
@@ -294,7 +420,7 @@ async def _load_project_context(ctx: RenderContext) -> dict:
 
 
 async def render(ctx: RenderContext) -> dict | None:
-    """K1其他应收款渲染策略：allResponses + projectContext + TB数据 + 预填."""
+    """K1其他应收款渲染策略：allResponses + projectContext + TB数据 + 预填 + 取数溯源."""
     responses_snapshot: dict = {}
     try:
         result = await ctx.db.execute(
@@ -312,18 +438,27 @@ async def render(ctx: RenderContext) -> dict | None:
     except Exception as e:  # noqa: BLE001
         logger.warning("K1 render responses load failed: %s", e)
 
-    tb_values = await _fetch_tb_data(ctx)
+    accounts = await resolve_report_line_accounts(ctx, K1_ACCOUNT_SPEC)
+    leaves = await _fetch_tb_balance_leaves(ctx)
+    tb_amounts = await _fetch_trial_balance_amounts(
+        ctx,
+        list(accounts.gross_standard)
+        + list(accounts.provision_standard)
+        + list(accounts.extra.keys()),
+    )
+    tb_values = _build_tb_values(leaves, accounts, tb_amounts)
     project_context = await _load_project_context(ctx)
 
     adjudication_prefill: dict = {}
     if not _has_persisted_adjudication(responses_snapshot):
-        adjudication_prefill = await _build_adjudication_prefill(ctx)
+        adjudication_prefill = _build_adjudication_prefill(leaves, accounts)
 
     return {
         "component_type": "k1-other-receivables",
-        "account_codes": ["1221", "1231"],
+        "account_codes": list(accounts.gross_standard) + list(accounts.provision_standard),
         "responses_snapshot": responses_snapshot,
         "tb_values": tb_values,
+        "tb_source_codes": accounts.as_dict(),
         "adjudication_prefill": adjudication_prefill,
         "project_context": project_context,
         "prefix": "K1",
