@@ -73,11 +73,21 @@ class _FakeResult:
 
 
 class _FakeSession:
-    def __init__(self, *, checklist_rows=None, project_row=None, rp_rows=None, tb_row=None):
+    def __init__(
+        self,
+        *,
+        checklist_rows=None,
+        project_row=None,
+        rp_rows=None,
+        tb_row=None,
+        tb_balance_rows=None,
+    ):
         self.checklist_rows = checklist_rows or []
         self.project_row = project_row
         self.rp_rows = rp_rows or []
         self.tb_row = tb_row
+        # tb_balance 叶子行（供 seed_d1_detail_rows 的 1121/1231 查询）；默认空 → seed no-op
+        self.tb_balance_rows = tb_balance_rows or []
 
     async def execute(self, stmt, params=None):
         s = str(stmt).lower()
@@ -89,6 +99,20 @@ class _FakeSession:
             return _FakeResult(one=self.tb_row)
         if "from projects" in s or "projects where" in s:
             return _FakeResult(one=self.project_row)
+        if "tb_balance" in s:
+            # seed_d1_detail_rows：按 account_code 前缀路由（1121 原值 / 1231 坏账）
+            try:
+                compiled = str(stmt.compile(compile_kwargs={"literal_binds": True}))
+            except Exception:
+                compiled = str(stmt)
+            rows = [
+                r for r in self.tb_balance_rows
+                if str(getattr(r, "code", "")) and (
+                    ("1231" in compiled and str(r.code).startswith("1231"))
+                    or ("1231" not in compiled and str(r.code).startswith("1121"))
+                )
+            ]
+            return _FakeResult(rows=rows)
         return _FakeResult()
 
     async def rollback(self):
@@ -123,12 +147,31 @@ def _session(*, checklist_rows=None):
     )
 
 
+def _set_gates(monkeypatch, *, main: bool, detail_seed: bool):
+    """显式设定**两个**灰度开关（禁止依赖环境默认值）。
+
+    D1 明细 seed 门控 = 主开关 `D_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED`
+    ∧ 子开关 `D_CYCLE_DETAIL_SEED_ENABLED`（与 D6-2 同款门控矩阵）。
+    两者都必须显式 setattr —— 否则一旦部署环境的 `.env` 打开任一开关，
+    这些测试会随环境漂移（本环境为跑 live 实测确实会开），断言即失去意义。
+    """
+    monkeypatch.setattr(d1.settings, "D_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED", main)
+    monkeypatch.setattr(d1.settings, "D_CYCLE_DETAIL_SEED_ENABLED", detail_seed)
+
+
 def _enable_flag(monkeypatch):
-    monkeypatch.setattr(d1.settings, "D_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED", True)
+    """主开关开、明细 seed 子开关**关** —— 即文档所称「发 P0-1、压 P0-2」。"""
+    _set_gates(monkeypatch, main=True, detail_seed=False)
 
 
 def _disable_flag(monkeypatch):
-    monkeypatch.setattr(d1.settings, "D_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED", False)
+    """两开关全关（默认态）。"""
+    _set_gates(monkeypatch, main=False, detail_seed=False)
+
+
+def _enable_detail_seed(monkeypatch):
+    """主 ∧ 子 全开 —— 明细 seed 真生效。"""
+    _set_gates(monkeypatch, main=True, detail_seed=True)
 
 
 # ---------------------------------------------------------------------------
@@ -145,15 +188,35 @@ def test_flag_off_baseline_keys_no_prefill(monkeypatch):
 
 
 def test_flag_on_still_no_prefill_ningquewuzao(monkeypatch):
-    """开关开启 → D1 **仍不返回** adjudication_prefill（宁缺勿造 R3.4，票据类型固定分类不可从 TB 拆分）。"""
+    """开关开启 → D1 **仍不返回** adjudication_prefill 顶层键。
+
+    实证纠正（d1-four-table-extraction-formula-wiring）：D1 四表库取数走 responses_snapshot
+    明细行 seed（D1-cat-rows / D1-bd-portfolio-rows），**非** D6 式 adjudication_prefill 顶层键。
+
+    d1-extraction-chain-completion R1.6 起，主开关开时**额外**输出一个 additive 键
+    `tb_source_codes`（科目定位溯源：BS-005 → 标准码 → account_mapping → 原始码），
+    故顶层键集 == 基线 ∪ {tb_source_codes}；`adjudication_prefill` 仍恒不出现。
+    """
     _enable_flag(monkeypatch)
     result = _run(d1.render(_ctx(_session())))
     assert "adjudication_prefill" not in result
-    assert set(result.keys()) == _BASELINE_KEYS
+    assert set(result.keys()) == _BASELINE_KEYS | {"tb_source_codes"}
+    # 取数溯源结构固定，且 fail-open 兜底恒非空
+    src = result["tb_source_codes"]
+    assert src["gross"] and src["provision"]
+    assert src["resolved_from"] in {"report_config", "fallback"}
 
 
-def test_flag_on_off_byte_equivalent(monkeypatch):
-    """开关开/关 D1 render 输出逐字节等价（D1 不新增任何键，Property 9 天然成立）。"""
+def test_flag_on_off_byte_equivalent_when_no_tb_leaves(monkeypatch):
+    """无 tb 叶子 + D1-cat-rows 已持久化时，开关开/关逐字节等价（seed no-op / 手工优先 / Property 3）。
+
+    注意：本 fake session 不返回 tb_balance 叶子，且 D1-cat-rows 已持久化 → seed 为空操作。
+    当 tb 有叶子且未持久化时 seed 会写入（见 test_flag_on_seeds_detail_from_tb_leaves）。
+
+    d1-extraction-chain-completion R1.6/R1.7 起口径细化：**灰度关**输出必须与改动前
+    逐字节等价（Property 10，由 test_flag_off_baseline_keys_no_prefill 钉住基线键集）；
+    **灰度开**允许多出 additive 的取数溯源键，故此处剥离新增键后再比对逐字节等价。
+    """
     checklist = [
         _checklist_row("D1-adj-gross-bank-current-unadj", remark="123456"),
         _checklist_row("D1-cat-rows", remark='[{"category":"银行承兑汇票"}]'),
@@ -162,8 +225,94 @@ def test_flag_on_off_byte_equivalent(monkeypatch):
     off = _run(d1.render(_ctx(_session(checklist_rows=list(checklist)))))
     _enable_flag(monkeypatch)
     on = _run(d1.render(_ctx(_session(checklist_rows=list(checklist)))))
-    assert off == on
+
+    # 灰度关：绝不出现新增键（零回归硬断言）
+    assert "tb_source_codes" not in off
+    assert not any(k.startswith("tb_provision_amount") for k in off["project_context"])
+
+    stripped = {k: v for k, v in on.items() if k != "tb_source_codes"}
+    stripped["project_context"] = {
+        k: v
+        for k, v in on["project_context"].items()
+        if not k.startswith("tb_provision_amount")
+    }
+    assert off == stripped
     assert "adjudication_prefill" not in on
+
+
+def test_main_on_sub_off_no_detail_seed(monkeypatch):
+    """🔴 主开关开 + 明细 seed 子开关关 + tb **有**叶子 → 一律不 seed（发 P0-1、压 P0-2）。
+
+    子开关 `D_CYCLE_DETAIL_SEED_ENABLED` 的语义是 D 循环通用的「明细表 render 自动 seed」，
+    D6-2 早已按「主 ∧ 子」门控。D1 首版只挂主开关 → 运维为启用 Tier A 而开主开关时会**静默**
+    连带打开 D1 明细 seed、且无法单独回退。本例锁死该门控矩阵态。
+    """
+    from app.services.d_cycle_extraction import d1_detail_seed as _seed_mod
+
+    async def _fake_af(*_a, **_k):
+        return True
+
+    monkeypatch.setattr(_seed_mod, "get_active_filter", _fake_af)
+    _enable_flag(monkeypatch)  # main=True, detail_seed=False
+
+    sess = _session()
+    sess.tb_balance_rows = [
+        SimpleNamespace(code="1121.01", name="应收票据_银行承兑汇票",
+                        opening=100.0, closing=120.0, debit=50.0, credit=30.0),
+        SimpleNamespace(code="1231.01", name="坏账准备_应收票据",
+                        opening=3000.0, closing=1200.0, debit=0.0, credit=0.0),
+    ]
+    snap = _run(d1.render(_ctx(sess)))["responses_snapshot"]
+
+    assert "D1-cat-rows" not in snap
+    assert "D1-bd-portfolio-rows" not in snap
+    # 反向自检：同一 fixture 在子开关开时确实会 seed（否则本例恒真 = 空转）
+    _enable_detail_seed(monkeypatch)
+    sess2 = _session()
+    sess2.tb_balance_rows = list(sess.tb_balance_rows)
+    snap2 = _run(d1.render(_ctx(sess2)))["responses_snapshot"]
+    assert "D1-cat-rows" in snap2
+    assert "D1-bd-portfolio-rows" in snap2
+
+
+def test_flag_on_seeds_detail_from_tb_leaves(monkeypatch):
+    """主 ∧ 子 全开 + tb 有 1121/1231 叶子 + 无持久化 → seed D1-cat-rows / D1-bd-portfolio-rows。
+
+    实证正路：证明 render 端到端接入 seed_d1_detail_rows（原值 fixed-bank/commercial +
+    坏账 fixed-portfolio），落 responses_snapshot（transient，供前端 loadFromResponses 消费）。
+    """
+    import json as _json
+
+    from app.services.d_cycle_extraction import d1_detail_seed as _seed_mod
+
+    async def _fake_af(*_a, **_k):
+        return True
+
+    monkeypatch.setattr(_seed_mod, "get_active_filter", _fake_af)
+    _enable_detail_seed(monkeypatch)
+
+    tb_leaves = [
+        SimpleNamespace(code="1121.01", name="应收票据_银行承兑汇票",
+                        opening=100.0, closing=120.0, debit=50.0, credit=30.0),
+        SimpleNamespace(code="1121.02", name="应收票据_商业承兑汇票",
+                        opening=200.0, closing=150.0, debit=10.0, credit=60.0),
+        SimpleNamespace(code="1231.01", name="坏账准备_应收票据",
+                        opening=3000.0, closing=1200.0, debit=0.0, credit=0.0),
+    ]
+    sess = _session()
+    sess.tb_balance_rows = tb_leaves
+    result = _run(d1.render(_ctx(sess)))
+    snap = result["responses_snapshot"]
+
+    assert "adjudication_prefill" not in result  # 仍不用顶层键
+    cat = _json.loads(snap["D1-cat-rows"]["remark"])
+    assert {r["rowId"] for r in cat} == {"fixed-bank", "fixed-commercial"}
+    # roll-forward：opening + debit − credit == closing
+    bank = next(r for r in cat if r["rowId"] == "fixed-bank")
+    assert round(bank["priorUnadjusted"] + bank["currentIncrease"] - bank["currentDecrease"], 2) == 120.0
+    bd = _json.loads(snap["D1-bd-portfolio-rows"]["remark"])
+    assert bd[0]["priorUnadjusted"] == 3000.0
+    assert bd[0]["currentReversal"] == 1800.0  # 3000 − 1200 净减少 → 转回
 
 
 # ---------------------------------------------------------------------------
@@ -196,8 +345,12 @@ def test_tb_amount_seeded_in_project_context(monkeypatch):
 
 
 def test_coexist_with_existing_detail_seed(monkeypatch):
-    """既有 D1-cat-rows（cross-sheet 明细）/ D1-cust-rows 原样透传，render 不覆盖。"""
-    _enable_flag(monkeypatch)
+    """既有 D1-cat-rows（cross-sheet 明细）/ D1-cust-rows 原样透传，render 不覆盖。
+
+    门控用**主 ∧ 子全开**：手工优先只有在 seed 逻辑真会跑时才有验证意义
+    （子开关关时压根不进 seed 分支，本例会退化为恒真）。
+    """
+    _enable_detail_seed(monkeypatch)
     checklist = [
         _checklist_row("D1-cat-rows", remark='[{"category":"银行承兑汇票","currentUnadjusted":100}]'),
         _checklist_row("D1-cust-rows", remark='[{"customerName":"甲","postSettlement":50}]'),
@@ -306,17 +459,30 @@ def test_flag_off_no_extraction_for_d1(monkeypatch):
 
 
 def test_tier_b_provenance_d1_honest():
-    """tier_b_provenance("D1") 登记 D1-3 归集来源 + D1-1 分类不填声明，全部只读。"""
+    """tier_b_provenance("D1") 登记 tb 叶子取数（D1-2/D1-4）+ 各底稿间连接取数溯源，全部只读。
+
+    实证纠正后（d1-four-table-extraction-formula-wiring）：D1-2 原值 ← tb_balance 1121 叶子、
+    D1-4 坏账 ← tb_balance 1231.01；另登记 D1-1←D1-2/D1-4、D1-4↔D1-15、D1-1 表外←D1-8 等
+    cross-sheet 连接取数关系。全部 editable=False（复杂归集/cross-sheet 不压成单条公式）。
+    """
     entries = tier_b_provenance("D1")
-    assert len(entries) == 2
+    assert len(entries) >= 6
     for e in entries:
         assert e["editable"] is False
         assert e["source"] == "prefill"
         assert e["tier"] == "B"
         assert e["value"] is None
     anchors = {e["anchor"] for e in entries}
-    assert "D1-cust-rows" in anchors
-    assert any("gross" in a for a in anchors)
+    # 四表库直取来源
+    assert "D1-cat-rows" in anchors      # D1-2 原值 ← tb 1121 叶子
+    assert "D1-bd-portfolio-rows" in anchors  # D1-4 坏账 ← tb 1231.01
+    assert "D1-cust-rows" in anchors     # D1-3 期后兑付 ← 序时账 1121 贷方
+    # 连接取数溯源
+    assert any("gross" in a for a in anchors)  # D1-1 原值 ← D1-2
+    assert any("D1-15" in a for a in anchors)  # D1-4 ↔ D1-15 ECL
+    # tb 叶子取数描述可追溯
+    cat = next(e for e in entries if e["anchor"] == "D1-cat-rows")
+    assert "tb_balance 1121" in cat["description"]
 
 
 # ---------------------------------------------------------------------------

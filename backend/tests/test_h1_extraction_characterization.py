@@ -98,7 +98,13 @@ async def test_sheets_and_prefix_stable(monkeypatch):
     assert len(h1.H1_SHEETS) == 24
 
 
-def test_flag_defaults_to_false():
+def test_flag_default_is_live():
+    """H1 四表取数已上线：`H1_FOUR_TABLE_EXTRACTION_ENABLED` 默认 True。
+
+    历史基线曾断言默认 False（灰度关闭时的零回归契约），但该灰度已随
+    `h1-four-table-extraction` spec 收口后正式开启（前端 H1FourTableSourcePanel /
+    H1TabDetail 已消费 `h1_four_table_prefill`）。此处锁定当前上线默认值。
+    """
     from app.core.config import Settings
 
-    assert Settings().H1_FOUR_TABLE_EXTRACTION_ENABLED is False
+    assert Settings().H1_FOUR_TABLE_EXTRACTION_ENABLED is True

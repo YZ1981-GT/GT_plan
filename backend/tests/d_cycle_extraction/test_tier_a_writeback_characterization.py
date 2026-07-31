@@ -32,7 +32,7 @@ import asyncio
 from types import SimpleNamespace
 from uuid import uuid4
 
-from app.core.config import settings
+from app.core.config import Settings, settings
 from app.routers import wp_formula as router_mod
 from app.routers.wp_render_strategies import _d6_contract_assets as d6
 from app.services.d_cycle_extraction import presets as presets_mod
@@ -171,12 +171,13 @@ def _patch_save_path(monkeypatch, *, saved, evaluated=123.45, eval_errors=None):
 
 
 def test_put_auto_calc_currently_writes_parsed_data_for_d_cycle_anchor(monkeypatch):
-    """零回归护栏：**主开关关**（默认，本测试未 _enable）时保存 D-cycle 锚点 auto_calc
+    """零回归护栏：**主开关关**时保存 D-cycle 锚点 auto_calc
     公式仍照写 parsed_data 网格（前置 spec 状态逐字节等价）。
 
     Task 2.1 落地后仅在**主开关开**时才对 D-cycle 锚点跳过此写（见
     `test_put_auto_calc_dcycle_anchor_flag_gated_parsed_data_write`）；此处锁"主开关关零回归"。
     """
+    _disable(monkeypatch)  # 显式关闭（.env 可能已设为 True，不依赖默认值）
     wp = _wp()
     saved = _saved_formula("D6-1-tb-amount", wp=wp)
     calls = _patch_save_path(monkeypatch, saved=saved, evaluated=98765.43)
@@ -414,8 +415,13 @@ def test_d6_render_flag_off_no_prefill_no_detail_seed(monkeypatch):
 
 
 def test_detail_seed_subswitch_default_false():
-    """新增配置 D_CYCLE_DETAIL_SEED_ENABLED 默认 False（零回归）。"""
-    assert settings.D_CYCLE_DETAIL_SEED_ENABLED is False
+    """新增配置 D_CYCLE_DETAIL_SEED_ENABLED **代码默认** False（零回归）。
+
+    断言 Settings 类的**声明默认值**而非 `settings` 实例的运行值 —— 后者会被部署环境的
+    `.env` 覆盖（本环境为 live 验 D1 明细取数已 opt-in 置 True），读实例会让「代码默认零回归」
+    这一意图随环境漂移、误报为回归。同理见下方主开关默认值断言。
+    """
+    assert Settings.model_fields["D_CYCLE_DETAIL_SEED_ENABLED"].default is False
 
 
 def test_detail_seed_effective_gate_is_main_and_sub(monkeypatch):
