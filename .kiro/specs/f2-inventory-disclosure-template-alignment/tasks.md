@@ -359,3 +359,191 @@ export-template 200（上市 10 sheet / 国企 5 sheet）→ export-data 200 →
   该测试另需 `_carry_seed_table_guidance`，属 K1 会话范围，未代为实现）
 - 两个 JSON：重跑 `fix_note_inventory_structure.py`（幂等）即可恢复
 - **未执行 commit**：工作树含大量其它 spec 的未提交改动，单 commit 会误纳
+
+---
+
+## Sprint 7 任务（第二轮打磨）
+
+```json
+{
+  "waves": [
+    { "wave": 7, "tasks": ["18", "19", "20", "22"], "desc": "行集/列头/文本回流/标题标记（互不相干）" },
+    { "wave": 8, "tasks": ["21"], "desc": "库龄二选一（依赖 19 的列头口径）", "depends_on": [7] },
+    { "wave": 9, "tasks": ["23"], "desc": "回归与实测", "depends_on": [8] }
+  ]
+}
+```
+
+- [x] 18. R18 附注 seed 行集对齐源 xlsx
+  - [x] 18.1 `fix_note_inventory_structure.py` 增 `LISTED_CATEGORY_LABELS`（9 项）/
+        `SOE_CATEGORY_ROWS`（13 项）常量与 `listed_categories` / `listed_categories_qual` /
+        `soe_categories` 三个 rows 模式
+  - [x] 18.2 上市 3 表 / 国企 2 表 plan 的 `rows` 由 `strip` 改为新模式
+  - [x] 18.3 `test_note_inventory_structure.py` 增行集断言（含「委托加工物资」「发出商品」
+        存在、国企完整标签、行序与 xlsx 一致）
+  - _Requirements: 18.1, 18.2, 18.3_
+
+- [x] 19. R19 上市三表标签列头改「存货种类」
+  - [x] 19.1 脚本 `_classification(label_header=...)` 参数化；`LISTED_MOVEMENT` 与续表
+        headers[0]/columns[0].label 改「存货种类」
+  - [x] 19.2 `f2DisclosureSyncPayload.buildF2ListedColumns` 三表 `label` 同改
+  - [x] 19.3 契约测试断言「同步 columns[0].label === 模板 headers[0]」
+  - _Requirements: 19.1, 19.2, 19.3_
+
+- [x] 20. R20 `_note_texts` 补中文 title + 国企土地储备说明回流
+  - [x] 20.1 新增 `buildF2NoteTexts`，上市 6 条 / 国企 5 条中文标题
+  - [x] 20.2 `F2SoeSyncSnapshot` 增 `landNote`，`useF2DisclosureSoe.getSyncSnapshot` 补字段
+  - [x] 20.3 测试：每条 `_note_texts` 有非空中文 title、空文本被过滤、土地储备可回流
+  - _Requirements: 20.1, 20.2_
+
+- [x] 21. R21 「按库龄组合计提」计提方式二选一
+  - [x] 21.1 `useF2DisclosureListed` 增 `s3Mode` + `setS3Mode` + 持久化项
+  - [x] 21.2 `F2ListedSyncSnapshot.s3Mode`；`buildF2ListedSubTableData` 按模式选表名 +
+        写 `_removed_table_keys`
+  - [x] 21.3 `buildF2ListedColumns` 补库龄两表列头
+  - [x] 21.4 `F2TabDisclosureListed.vue` (3) 卡片增 `el-radio-group` 计提方式切换 + 提示语
+  - [x] 21.5 测试：两模式推送表名互斥、`_removed_table_keys` 不含本次推送键、columns 齐备
+  - _Requirements: 21.1, 21.2, 21.3_
+
+- [x] 22. R22 国企 text_sections 标题加 `###`
+  - [x] 22.1 脚本增 `retitle_text_sections` 幂等 helper + 锚点兼容
+  - [x] 22.2 测试：5 个标题均为 `### ` 前缀、重复执行不产生新增
+  - _Requirements: 22.1_
+
+- [x] 23. Sprint 7 回归
+  - [x] 23.1 `fix_note_inventory_structure.py --dry-run` → `--apply` → `--check` 三段
+  - [x] 23.2 后端 `test_note_inventory_structure.py` + `test_f2_disclosure_import_export.py`
+  - [x] 23.3 前端 F2 披露相关 spec 全绿
+  - [x] 23.4 `get_diagnostics` 覆盖改动文件与共享模块消费方
+
+### Sprint 7 交付说明
+
+**裁决依据**：`基础数据/` 目录在本仓库不存在 → 唯一可核对权威源 =
+`backend/wp_templates/F/F2-1至F2-14 …xlsx` 的两个披露 sheet（逐格 openpyxl dump 实证）。
+`diagnose_disclosure_sheet_vs_template.py --cycle F2` 显示上市 7 小节 / 国企 4 小节。
+
+**实际改动**
+
+| 项 | 改动 | 证据 |
+|---|---|---|
+| R18 | 上市 3 表 seed 行 7/6/6 → 9+合计；国企 2 表 12/11 → 13+合计 | 源 xlsx 上市 r10~r19、国企 r9~r22 |
+| R19 | 上市 3 表标签列头「项目」→「存货种类」（模板 + 同步 columns 同改） | 源 xlsx A8/A22/A35 |
+| R20 | `_note_texts` 全部补中文 `title`；空文本过滤；国企补 `soe-note-land` | 后端 `_format_note_texts` 用 section 兜底 → 原本渲染成 `【listed-note-category】` |
+| R21 | (3) 新增「按组合 / 按库龄组合」切换，推送对应两表 + `_removed_table_keys` 清另一组 | 源模板「或：」二选一；此前库龄两表永空 |
+| R22 | 国企 `text_sections` 5 个裸标题 → `### ` 前缀 | 上市侧本就如此；裸标题会被当披露正文渲染 |
+
+**新增/扩展守卫**
+- `fix_note_inventory_structure.py`：新增 `listed_categories` / `listed_categories_qual` /
+  `soe_categories` 三个 rows 模式 + `retitle_text_sections` + `_classification(label_header)`
+- `test_note_inventory_structure.py`：行集参数化断言（3+2 表）、`is_detail` 标记、
+  **seed 行标签 ↔ 底稿 `.ts` 常量逐字比对**（防两侧漂移）
+- 新建 `composables/__tests__/f2NoteSubtableContract.spec.ts`：接入平台共享
+  `runDisclosureSubtableContract`（P1~P5）+ F2 专属 4 条（载荷键 ⊆ 常量 / 二选一互斥 /
+  列头键集合 === 推送键集合 / 待删键不与推送键相交）
+- 新增 `F2_LISTED_SUBTABLE`（11）/ `F2_SOE_SUBTABLE`（3）子表名常量
+
+**验证**
+- `fix_note_inventory_structure.py --dry-run` → 写入 → `--check` 三段绿（幂等，二次无 diff）
+- 后端 `test_note_inventory_structure.py` + `test_f2_disclosure_import_export.py`：100 passed
+- 前端 `src/components/workpaper/__tests__` 全量：488 passed / 6 failed，
+  失败全在未触碰文件（b23×2 / GtG0Confirmation / h8 / i6，属既有基线）
+- `f2NoteSubtableContract.spec.ts` 单跑绿
+
+**⚠️ 生效范围提醒**：改模板 JSON 只对**新建项目 / 重新生成附注**生效
+（`disclosure_notes.table_data._tables` 是生成时快照）。既有项目要看到新结构，
+需在底稿披露 Tab 点「同步到附注」（或触发自动同步）整表覆盖。
+
+**未做（留待后续）**
+- Playwright 活体实测：8 个在册项目 `applicable_standard_v2.entity_type` 全为 soe，
+  唯一 listed 适用项目已软删 → 上市侧（含新增计提方式切换）无法活体验证
+- 库龄组合的导入导出：复用 `s3-end`/`s3-prior` 同一批 item，导出 sheet 名仍为「按组合计提」
+
+---
+
+## Sprint 8 任务（分类表取数缺口）
+
+```json
+{
+  "waves": [
+    { "wave": 10, "tasks": ["24", "25"], "desc": "上市分类常量补全 + 数据资源联动纯函数（互不相干）" },
+    { "wave": 11, "tasks": ["26", "27"], "desc": "国企手工录入 + 模板/后端镜像同步", "depends_on": [10] },
+    { "wave": 12, "tasks": ["28"], "desc": "守卫与回归", "depends_on": [11] }
+  ]
+}
+```
+
+- [x] 24. R23/R24 上市分类补「开发成本」「开发产品」+ 清死键
+  - [x] 24.1 `F2_LISTED_DISCLOSURE_CATEGORIES` 9 → 11 行（新增 `dev-costs` / `dev-products`），
+        「库存商品」`sourceKeys` 加 `price-difference`，两版删死键 `work-in-progress`
+  - [x] 24.2 `F2_SOE_DISCLOSURE_CATEGORIES` 的 `wip-combined` 删死键
+  - [x] 24.3 新增守卫：两版 `sourceKeys` 并集 ⊇ `F2_ROW_KEY_ACCOUNT` 全部非跌价 rowKey
+  - _Requirements: 23.1~23.5, 24.1, 24.2_
+
+- [x] 25. R25 数据资源行联动
+  - [x] 25.1 `f2DataResourceInventory.ts` 增纯函数 `deriveDataResourceClassRow`
+  - [x] 25.2 两个 composable 的 `loadClassRow` 对 `data-resources` 走联动分支（空表仍返 0）
+  - [x] 25.3 测试：填数据资源表后分类表该行随动、`drTieFailures` 为空、空表返 0
+  - _Requirements: 25.1~25.4_
+
+- [x] 26. R26 国企「其他」「土地储备」手工录入
+  - [x] 26.1 `useF2DisclosureSoe` 增 `s1Overrides` + `updateS1Field`（rowKey 白名单）
+  - [x] 26.2 `F2TabDisclosureSoe.vue` 这两行六列改 `WpAmountInput`
+  - [x] 26.3 测试：白名单外 rowKey 不可写、`endNet` 仍为派生、「其中」行不计入合计
+  - _Requirements: 26.1~26.3_
+
+- [x] 27. 模板与后端镜像同步
+  - [x] 27.1 `fix_note_inventory_structure.py` 的 `LISTED_CATEGORY_LABELS` 9 → 11 项
+  - [x] 27.2 跑 dry-run → 写入 → `--check`
+  - [x] 27.3 后端 `_f2_disclosure_import_export.py` 两处上市镜像常量同步
+  - _Requirements: 23.3_
+
+- [x] 28. 回归
+  - [x] 28.1 后端：存货结构守卫 + F2 导入导出契约
+  - [x] 28.2 前端：F2 披露相关 spec + 平台守卫 spec
+  - [x] 28.3 `get_diagnostics` 覆盖改动文件
+
+### Sprint 8 交付说明
+
+用户口径：**「披露表推送到附注模块，很多明细行要根据实际情况来」**。据此复核 F2 分类表
+取数链，修掉 4 处缺陷（均为「行取不到实际数据」）：
+
+| 缺陷 | 现象 | 修法 |
+|---|---|---|
+| 上市漏取 1408/1409/1412 | 房企与商业零售企业的开发产品、开发成本、商品进销差价审定数在上市披露表**没有落点**，分类表合计 ≠ F2-1 审定合计，附注拿不到 | 上市 9 → 11 类（新增「开发成本」紧随在产品、「开发产品」紧随库存商品）；1412 并入「库存商品」 |
+| 死键 `work-in-progress` | 两版 `sourceKeys` 都列了它，但审定表 1404 的键是 `semi-finished` → 纯空转 | 从 `sourceKeys` 删除（`rowKey` 作行标识保留，改名会丢既有 `s2Overrides`/`s2QualMap`） |
+| 「数据资源」行恒 0 且勾稽假告警 | 无对应存货科目（1401~1412）→ 恒 0，而 `buildDataResourceTieChecks` 拿这个 0 与数据资源表比 ⇒ 用户一填表勾稽差异必然常亮 | 新增纯函数 `deriveDataResourceClassRow`，分类表该行从 (8)/(5) 数据资源表联动；空表仍返 0 |
+| 国企「其他」「土地储备」恒 0 且无录入口 | 源模板注要求披露土地储备面积/本期增加/期末余额，但两行无科目来源 | 新增 `s1Overrides` + `updateS1Field`（**rowKey 白名单**仅这两行）；国企 Tab 六列改 `WpAmountInput`；净值仍派生 |
+
+**关键实现细节**
+
+- `drValues` ref 与其 watch **必须声明在 `section1Rows` 之前**：分类表「数据资源」行
+  联动本表，而 computed 可能在 setup 期间（s2 的 `immediate` watch）就被求值，
+  `drValues` 若还在 TDZ 会直接 ReferenceError。两个 composable 都做了前移。
+- 「其他」行是**取数 + 手工叠加**（保留 1412 跨表取数），「土地储备」是纯手工
+  （`sourceKeys` 为空）。`updateS1Field` 白名单外的 rowKey 直接 return，
+  防误开放跨表取数行的手工覆盖、破坏 F2-1 审定表的唯一权威性。
+- `endNet` / `priorNet` 一律由 `calcNetValue` 派生，不开放录入（避免余额−准备−净值三者不自洽）。
+
+**新增守卫** `composables/__tests__/f2ClassRowSourceCoverage.spec.ts`（17 条）：
+核心是两条 Property —— ①两版 `sourceKeys` 并集 ⊇ `F2_ROW_KEY_ACCOUNT` 全部非跌价 rowKey
+（漏科目立刻红）②无死键（`sourceKeys` 必须都是审定表真实 rowKey）。
+直接从 `f2AccountModel` 取全集，将来加存货科目也会被强制接出口。
+
+**双真源同步**：后端 `_f2_disclosure_import_export.py` 的 `_LISTED_CATEGORIES` /
+`_LISTED_SOURCE_KEYS` / `_SOE_SOURCE_KEYS` 三处镜像同步（正则读 `.ts` 的契约测试强制一致）；
+`fix_note_inventory_structure.LISTED_CATEGORY_LABELS` 9 → 11，模板 seed 上市三表 rows 10 → 12。
+
+**修掉一处测试里的伪造数据**：`useF2DisclosureSoe.spec.ts` 原 fixture 给
+`work-in-progress` 喂了 80 元 —— 该 rowKey 在审定表并不存在，等于用假键凑数。
+已并回真实键 `semi-finished`，保持「合并取数」被验证的语义。
+
+**验证**
+- `fix_note_inventory_structure.py` dry-run → 写入 → `--check` 三段绿（幂等）
+- 后端 `test_note_inventory_structure.py` + `test_f2_disclosure_import_export.py`：100 passed
+- 前端 `composables/__tests__` + `__tests__` 全量：1202 files / 16925 tests passed，
+  9 个失败文件全在未触碰区域（b23×3 / GtG0 / i6 / l4 / useF3Integration /
+  useF5Integration / useH4DualMode，既有基线）
+- `get_diagnostics` 覆盖全部改动文件
+
+**生效范围**：上市附注分类表由 9 行变 11 行，既有项目需在披露 Tab 点一次「同步到附注」
+（或触发自动同步）才会整表覆盖为新行集；未同步项目看到的是新 seed 骨架。

@@ -1,5 +1,112 @@
 # N1 递延所得税资产披露表与附注对齐 — 设计
 
+## Overview
+
+三层链路对齐同一个权威源（底稿源 xlsx 的两张披露 sheet）：底稿披露组件按源模板逐字重建、
+同步载荷把底稿形状投影成附注形状、附注模板 JSON 修掉 md 重建器造成的列压扁与缺表。
+新增披露内部勾稽（规则全部取自源模板公式）与两级表头分段表共用组件。
+
+关键约束三条：①两版表 1 的**子列序在源模板里相反**，必须单一真源；②附注**行集合**以
+附注模板为准（seed 行会被底稿整表覆盖），只有**列结构**跟随源 xlsx；③取不到的金额写
+`null`，禁止用 0 冒充。
+
+## Architecture
+
+见 §2 的三层分工图与裁决表。数据流：
+源 xlsx（权威）→ 底稿披露组件（可编辑 + 勾稽）→ `buildN1SyncPayload` 列结构投影
+→ `POST /disclosure-notes/sync-from-workpaper` → `disclosure_notes.sub_table_data`
+→ 读时 `project_sub_tables` + `carry_template_guidance` → 附注 TAB / Word 导出。
+seed 路径（新建项目）另从 `note_template_{listed,soe}.json` 生成骨架。
+
+## Components and Interfaces
+
+见 §5「前端结构」（组件与 composable 清单）、§4「幂等脚本」、§6「同步载荷」。
+新增后端读时组件 `note_table_guidance.carry_template_guidance(tables, template_type, section_number)`。
+
+## Data Models
+
+见 §3「附注模板目标结构」（两版表清单 / headers / 表头形态 / 行骨架）、
+§5.1「数据形态」（持久化键与 JSON 载荷）、§6（`sub_table_data` 行键与 `columns` 键序）。
+
+## Correctness Properties
+
+### Property 1: 键集合三方相等
+`sub_table_data` 数据键集合 ≡ `columns` 键集合 ≡ 该变体子表名全集（listed 4 / soe 5）。
+验证：`n1NoteSectionMap.spec.ts` Property 2/9。
+
+**Validates: Requirements 5.3**
+
+### Property 2: 子表名双向覆盖
+子表名与附注模板 `tables[].name` 逐字一致，且模板该章节每张表都有映射（无孤儿、无遗漏）。
+验证：`n1NoteSubtableContract.spec.ts` P1 / P6。
+
+**Validates: Requirements 5.3, 6.2**
+
+### Property 3: 表 1 两级表头且两版子列序相反
+表 1 为 5 列两级表头；上市子列序 `[暂时性差异, 递延税资产/负债]`、国企 `[递延税资产/负债, 暂时性差异]`；
+`columns` 键序必须跟随子列序（否则附注列错位）。验证：Property 12 / P9 / 后端 `test_unoffset_two_level_header`。
+
+**Validates: Requirements 1.1, 2.2, 5.1**
+
+### Property 4: 表头形态必须表态
+每张表在 `group`（多级）与 `flat`（单级）之间明确表态，不得都无、不得并存；单级表不得带 `_column_groups`。
+验证：后端 `test_every_table_declares_header_state` + 前端 P3。
+
+**Validates: Requirements 4.5**
+
+### Property 5: 行型判定先去空白
+`normalizeN1RowLabel` 去空白后再判 `小计`/`合计`（源模板写 `小  计`、`合  计`），命中即打 `is_total`。
+
+**Validates: Requirements 5.4**
+
+### Property 6: 缺失写 null 不写 0
+取不到的金额恒为 `null`；`sumNullable` 在全 null 时返回 `null`（不塌成 0）。
+
+**Validates: Requirements 5.5**
+
+### Property 7: 勾稽容差与 skip 语义
+相等类容差 0.01 元；任一侧 `null` → `level='skip'`（不误报）；段内无明细行时不产出该条校验。
+
+**Validates: Requirements 3.6**
+
+### Property 8: 幂等与纯函数（后端）
+幂等脚本重跑结果逐字节相等（`apply(check_only=True)` 返回 False）；`build_*_tables()` 为纯函数且不共享可变行对象。
+
+**Validates: Requirements 4.9**
+
+### Property 9: guidance 回填零回归
+按表名逐字命中才贴；已有非空 `guidance` 不覆盖；模板/章节/表名任一对不上则原样返回。
+
+**Validates: Requirements 4.6**
+
+### Property 10: 载荷构造为纯函数
+`buildN1SyncPayload` 同输入多次调用深相等，且不修改入参 snapshot。
+
+**Validates: Requirements 5.1**
+
+## Error Handling
+
+- 同步失败：`ElMessage.error` 提示；请求取消（`ERR_CANCELED`）不算失败；
+  **失败时不 `markSynced`**（否则会把现存表当孤儿删）
+- 缺项目上下文：同步/跳转前 `ElMessage.warning` 拦住，不发请求
+- 读时 guidance 回填与投影都包在 `try/except` 内，失败降级不阻断读取
+- 模板 JSON 损坏 / 章节缺失：`load_section_guidance` 返回空 dict（表现为提示为空，不报错）
+- 幂等脚本遇章节数 ≠ 1 时 `SystemExit`，不做猜测性写入
+
+## Testing Strategy
+
+| 层 | 覆盖 |
+|---|---|
+| 后端结构守卫 | `test_note_deferred_tax_structure.py`（表数/列数/`_column_groups`/表态/guidance/text_sections/无假数据行/幂等） |
+| 后端读时链路 | `test_note_deferred_tax_read_projection.py`（真实同步载荷形状走投影 + guidance 回填） |
+| 后端 guidance 回填 | `test_note_table_guidance.py`（逐字命中/不覆盖/跨模板不串味/mtime 缓存失效） |
+| 前端载荷 | `n1NoteSectionMap.spec.ts`（Property 1~12） |
+| 前端契约 | `n1NoteSubtableContract.spec.ts`（共享 helper 5 条 + N1 专属 P6~P10） |
+| 前端勾稽 | `n1DisclosureConsistency.spec.ts`（单测 + 4 条 PBT） |
+| 平台守卫 | `disclosureColumnsCoverage` / `disclosureSheetNameRegistry` / `disclosureAutoSyncCoverage` |
+| 实测 | chrome-devtools 驱动两 Tab + postgres 只读比对落库 |
+| CI | job `note-deferred-tax-structure`（`--check` + 契约测试） |
+
 ## 1. 源模板权威结构（实证）
 
 来源：`backend/wp_templates/N/N1 递延所得税资产.xlsx`（运行时权威目录；参考副本缺失）。
@@ -279,3 +386,6 @@ export function runN1DisclosureChecks(variant, snapshot): N1CheckResult[]
 | `columns` 键序与 UI 列序不一致 → 附注错位 | 契约测试断言 `columns` 顺序与 `variant` 子列序表一致 |
 | soe 新增表在既有项目产生"孤儿"错觉 | 新增不是重命名，无需 `_removed_table_keys`；但仍纳入 `N1_TABLE_NAMESPACE` |
 | 中文引号进 Vue 模板属性触发 Vite 崩溃 | `【提示：…含"持有待售资产减值准备"】` 只作为 JS 字符串常量/JSON 值，不写进模板属性 |
+
+**Validates: Requirements 5.1**
+

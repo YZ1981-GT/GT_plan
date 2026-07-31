@@ -101,6 +101,31 @@ inclusion: manual
 
 ## 后端踩坑与规范（2026-05-10 补充）
 
+### uvicorn --reload 本机实测不生效（2026-07-30）
+
+9980 端口上同时跑着 `.venv\Scripts\python.exe` 与系统 `Python312\python.exe` 两个 uvicorn
+（均带 `--reload --reload-dir app`）。实测改 `app/routers/*.py`、新增 `app/services/*.py`
+后端点**仍返回旧代码结果**，`os.utime` 触摸文件也无效。需要 live 验证后端改动时**先重启后端**。
+
+配套坑：**空结果可能是 token 过期的 401 假阴性** —— 浏览器里用 `fetch` + `?.` 链式取值会把
+`{"code":401}` 吞成 `[]`，看起来像"我的代码把数据搞没了"。判定前必须先看 HTTP status。
+
+### get_note_detail 投影块内禁止从 ORM 对象取属性
+
+`getattr(note, "source_template")` 在异步会话下可能触发 `MissingGreenlet`，
+而该块外层是 `except Exception` 兜底 → 异常被吞掉后**连 `_tables` 都不会被赋值**，
+表现为「附注表格全部消失」。一律用已 `model_validate` 的 `detail` 取值。
+
+### 附注 `guidance` 只在 seed 路径生效 → 需读时回填
+
+`tables[].guidance`（附注 TAB 编制提示）只经 `disclosure_engine._carry_seed_table_guidance`
+在生成时写入。`_source=workpaper` 的记录读取时走 `note_sub_table_projector.project_sub_tables`
+投影，投影只认推来的 `sub_table_data` + `_sub_table_columns`，**模板 guidance 完全不参与**
+（同步载荷里也没有 guidance，它是模板侧指引而非业务数据）→ 项目一旦点过「同步到附注」，
+TAB 提示就永久变空。解法 = `backend/app/services/note_table_guidance.py` 读时按
+`(source_template, section_number, 表名)` 回填：不写库、表名对不上就跳过、已有非空不覆盖，
+因此零回归（此前是空，最坏还是空）。已接在 `get_note_detail` 投影之后。
+
 ### uvicorn --reload 路由树不可变限制
 
 给已注册 router 追加新 `@router.get(...)` 端点后，`--reload` 只能重新 import 代码，无法重建 FastAPI app 的路由树，新端点访问返回 404。修复必须整进程重启（Ctrl+C + 重跑 start-dev.bat）。反之对现有端点函数体的改动 --reload 可以正常热加载。
@@ -516,6 +541,7 @@ WHERE l.project_id = :pid AND l.year = :yr
 - **PBT 策略选择**：用 `st.floats` + 后转 Decimal 验证（hypothesis 对 float shrinking 成熟 + 生成快 10x），不要直接用 `st.decimals`（慢且 shrinking 不成熟）
 - **PBT 已注册 vs 未注册 prefix 必须分开测**：`_ensure_ipo_loaded` 对未注册 prefix 返回降级 errors 而非 []；用 `st.text().filter(lambda s: s.upper() not in REGISTERED)` 拆出独立 property 验证降级行为
 - **optional PBT task 跳过必须注明**：spec 起草时把 PBT 列为 `[ ]*` 但实施时跳过，形成"显式列出但隐式跳过"的偏差；跳过决策（实施/等价 case 覆盖/性价比不足）须在 spec 末尾"已知缺口"段落留一句话注明
+- **🔴 fast-check `fc.float({ noNaN: true })` 仍会生成 ±Infinity（金额域必须显式给上下界）**：2026-07-30 实测 seed `1139061718` 命中 `calcChangeRate(-Infinity, 0)` → `Infinity / -Infinity` = NaN → `toBeCloseTo(NaN)` 必失败；同形状还有 `calcSubtotal([+Inf, -Inf])`、`calcNetValue(Inf, Inf)`。**这类红是生成器越界而非公式缺陷，但随机 seed 让它成为定时炸弹**（D1 两个 spec 文件潜伏至今才炸）。规矩：①金额类生成器统一 `{ min: -1e9, max: 1e9, noNaN: true }`（抽成文件级 `AMOUNT` 常量）②若必须无界，则在 predicate 里 `Number.isFinite(v) ? v : 0` 归一（G10/G11/H10 已是此写法，故一直安全）③配套把 `parseNum` 类入口从 `isNaN(n)` 改为 `Number.isFinite(n)` —— `parseFloat('Infinity')` / `parseFloat('1e400')` 都能过 `isNaN` 检查，漏进公式会让整表变 NaN
 
 ### pytest 输出与运行
 - **pytest 输出捕获铁律**：①PowerShell `2>&1 | Tee-Object` 在长时输出 + 并发情况下会出现"文件被锁"+ 静默丢失输出；正确方法 = `cmd /c "python -m pytest ... > _log 2>&1"` 然后 `Get-Content _log -Tail N` 分两步 ②本仓库未装 `pytest-timeout` 插件（`--timeout=60` 报错 unrecognized arguments）③测试代码用 `Path("backend/data")` 相对路径时必须从仓库根 cwd 跑（不能在 backend/ cwd 跑）
@@ -840,6 +866,8 @@ powershell 进程异常退出但仍持有 log 文件句柄时，`Get-Content / R
 
 ## §前端 UI 踩坑铁律
 
+- **🔴 `el-input` 只绑 `@change` 不回写 `modelValue` → 用户键入被抹掉**（2026-07-30 浏览器 + DB 双证）：element-plus 的 `handleInput` 在 `await nextTick()` 后调 `setNativeInputValue()`，把 DOM 值重置回 `modelValue`。若只监听 `@change`（modelValue 不随键入更新），用户敲的字会消失，`change` 拿到的是空串。实证：N1 国企「互抵明细」行名落库 `label: ""`，改 `@input` 回写后落库 `label: "同一纳税主体互抵"`。**规矩**：表格里的**文本列一律 `@input` 回写**；金额列走 `components/workpaper/shared/WpAmountInput.vue`（它自持 `draft` + 失焦归一，不受此坑影响）。平台存量 `:model-value + @change` 的纯文本输入（如各披露 Tab 的「原因」「备注」列）普遍有同一风险，逐个核时以浏览器实测为准，vitest 与 `get_diagnostics` 都查不出
+- **🔴 `<script setup>` 不允许任何 `export` 语句（含 `export interface`）**：SFC 编译直接失败，而 `get_diagnostics`(Volar) **查不出**，只有 Vite transform 返回 500。组件对外类型必须下沉到同级 `.ts`（范式：`composables/n1DisclosureSegmentTypes.ts` 供 `N1DisclosureSegmentTable.vue` 与 composable 共同引用）
 - **🔴 contenteditable + Vue v-model 回写循环**：`@input`emit + `watch(modelValue)` 比较 innerHTML 重设→浏览器规范化 HTML 使 innerHTML 永不等于父串→每次 keystroke 重设光标丢失。修=watch 加 `isInternalChange` 标记跳过自身回写 + 聚焦期间（`document.activeElement===ed`）不重设。`execCommand insertHTML` 内联 style 不解析 `var(--xxx)`，表格用具体色值+`<td><br></td>`保证可聚焦
 - **el-segmented 逐项加 tooltip/徽标**：用 `#default="{ item }"` 插槽（渲染在 `.el-segmented__item-label` 内，`options` 可挂任意扩展字段如 `tip`/`rule`）；`<label>+radio` 结构下包 `el-tooltip` 不影响点选。**220px 侧栏内 4 项中文标签放不下数字徽标**（13px 下 4 项≈216px > 可用 208px）→ 用 5px 命中小圆点 + 数量写进 tooltip，改完必查 `scrollWidth === clientWidth`
 - **🔴 el-tooltip 包非单元素根组件触发器失效**：`<el-tooltip>` 靠 `ElOnlyChild` 绑事件到子元素真实 DOM 根；包渲染 fragment/teleport 的组件→事件绑不上→hover 不弹（控制台 `non-element root node` 警告）。修=外套真实 `<span style="display:inline-block">` 作触发器
@@ -1030,3 +1058,234 @@ powershell 进程异常退出但仍持有 log 文件句柄时，`Get-Content / R
 - **`validateStatus: s => s < 600` 会吞掉 422/403**，配上漏传必填 query（如 recalc 的 `year`）就是「点了完全没反应」。只读探测可静默降级，**用户主动触发的写操作必须让错误可见**（`handleApiError`）。
 - **`DefaultLayout` 用 `:key="viewRoute.fullPath"` 重建子视图** → 任何 query 变更（含自身 `router.replace` 补参数）都会**重挂载**当前视图，新实例的同 URL GET 会 abort 旧实例在飞的请求。视图内 fetch 必须把 `err.code === 'ERR_CANCELED'` / `err.name === 'CanceledError'` 当正常取消吞掉，否则冒泡到 ErrorBoundary。
 - **横幅/状态条的 CTA 必须有落地页**：`?filter=stale` 这类 query 只有在目标页真正实现过滤器时才不是死链；跳转要带 `view=`（筛选栏可能只在特定视图渲染）+ `year=`（漏传会退到当前自然年，跨年度串数据）。
+
+
+## §J1 披露复盘沉淀（2026-07-30，从 memory.md 下沉明细）
+
+> memory.md 只留「披露同步载荷极易漏合计行」一条索引，明细在此。
+
+### 明细底稿 → 披露表 按行名带入范式
+
+首建 `audit-platform/frontend/src/composables/workpaper/j1/j1DisclosureDetailPull.ts`
+（`applyDetailPullToDisclosureRows`），其它循环可照抄。
+
+源模板披露行往往逐行引用明细底稿（J1 实证：`A18='明细表J1-2 '!J13`、`A21=J21+J22`、
+`A29=J26+J27`），所以「带入」不是只带汇总，而是按行名逐行带。五条约束：
+
+1. **两趟匹配**：先做全表精确匹配，再做包含聚合 → 消除"先处理的行把后面行需要的明细项
+   贪心吃掉"（单趟时披露行排列顺序会影响结果）。守卫用「正序 vs 倒序结果一致」断言。
+2. **包含匹配最短 3 字**：否则「其他」（2 字）会命中「其他短期薪酬」「其他长期职工福利」。
+   两字词只走精确匹配 + **队列配对**（明细里两个「其他」按出现顺序配给披露里两个「其他」）。
+3. **包含聚合是双向的**：披露名 ⊂ 明细名（`医疗保险费` ← 基本 + 补充医疗保险费）与
+   明细名 ⊂ 披露名（`工会经费和职工教育经费` ← 工会经费 + 职工教育经费）都要支持。
+4. **源模板公式明确合并的用 `absorb` 显式别名**，不靠字符串猜：国企 `B28=J1-2!J30+J31`
+   → 「其他短期薪酬」吸收「非货币性福利」；上市 `A32=J1-2!J30` 是独立行，**不得套用**。
+   反向断言（去掉 absorb 时该行必被追加成多余行）证明别名不是可省的装饰。
+5. **未匹配「其中：」子项跳过**（金额已含在已匹配的父行，追加会双算），只有未匹配且
+   **非零的顶层行**才追加为新行（对齐 J1-7 的"未匹配追加"范式）；未匹配的披露行
+   **保持原值**不清零手工录入。UI 如实提示「命中 N 行 / 追加 M 行 / K 个子项未匹配」。
+
+金额口径 = **审定数**（未审 + 期初调整 / 账项调整）。标签归一化复用既有
+`normalizeJ1Label`（去空白 / 「其中：」前缀 / 序号前缀 / 「（不适用的删除）」尾注），别重写。
+
+### 抽零依赖 leaf 模块消除循环依赖
+
+新纯函数模块要用 composable 里的行模型 / recalc / 合计口径，而 composable 又要 import
+新模块 → 直接互相 import 就形成运行时循环依赖（ESM 有时能靠函数提升侥幸跑通，很脆弱）。
+
+范式：把 `行模型 interface + recalcXRow + buildXSubtotal` 抽到零依赖 leaf
+（`j1DisclosureRowModel.ts`），composable **re-export 全部符号** → 既有
+`from '.../useXDisclosureSections'` 的 import 一个都不用改。改完 `get_diagnostics`
+逐个消费方复查（含 `.vue` 与 `XNoteSectionMap.ts`）。
+
+### spec 三件套格式校验（`get_diagnostics` 对 `.kiro/specs/**/*.md` 生效，写完必查）
+
+| 文件 | 必需 |
+|---|---|
+| requirements.md | `# Requirements Document` + `## Introduction` + `## Glossary`（推荐） |
+| design.md | `## Overview` / `## Architecture` / `## Components and Interfaces` / `## Data Models` 四个必需；`## Correctness Properties`（每条必须是 `### Property N: xxx` 且带 `**Validates: Requirements X.Y**`）/ `## Error Handling` / `## Testing Strategy` 三个推荐 |
+| tasks.md | `# Implementation Plan: xxx` + `## Overview` + `## Task Dependency Graph`（waves JSON）+ `## Tasks` + `## Notes` |
+
+任务行必须 `- [ ] N.` 形式 —— `- [ ] 16* 可选（另立任务）` 会报
+"Task line does not match expected format"，写成 `- [ ] 16. 可选（另立任务）`；
+可选标记 `*` 放在子任务编号后（`- [ ] 10.2* ...`）。
+
+### PowerShell 输出编码与 heredoc
+
+- **`>` 重定向会把 UTF-8 中文输出腌成乱码并落盘**：python 以 utf-8 emit → PS 按 cp936
+  解码 → 乱码写入文件 → `read_file` 读到的就是乱码（不是显示问题，是内容问题）。
+  → 诊断 / 修订脚本一律用自带 `--out` 参数**自己写盘**；必须看终端时先
+  `[Console]::OutputEncoding=[System.Text.Encoding]::UTF8`。
+- **PS 不支持 heredoc**：`python - <<'PY' ... PY` 报「无法初始化设备 PRN」
+  → 临时脚本写成文件再跑。
+- `set X=v & cmd` 是 CMD 语法，PS 用 `$env:X="v"; cmd`（`&` 在 PS 里保留字会报错）。
+
+### `composables/__tests__` 全量预存在失败基线（2026-07-30 实测）
+
+693 文件 / 7132 测试里 **5 例失败**，**单独跑同样失败**（非并发污染）：
+
+| 文件 | 失败点 |
+|---|---|
+| `l4-bonds-payable.integration.test.ts` | `adjudicationVsDetail` 差异计算（2 例） |
+| `useD1FormulaEngine.spec.ts` | `calcChangeRate` 三分支 PBT |
+| `useF3Integration.spec.ts` | `substantive:adjudicated`(2201) EventBus 刷新 section1 |
+| `useF5Integration.spec.ts` | `substantive:adjudicated`(6401) EventBus 消费 |
+| `useH4DualMode.spec.ts` | OO 健康检查后切模式 |
+
+判「是否本次引入」看**失败断言是否触及本次改动的符号**，别当新增回归；
+也别用 `git stash` 做基线对比（并发会话 / IDE 缓存会把文件回写成另一版本）。
+
+
+## §J1 披露 wave 3~6 沉淀（2026-07-30，从 memory.md 下沉明细）
+
+> memory.md 只留三条铁律索引（`useAuditContext` setup 顶层 / 同步成功不得自触发 /
+> 读源码守卫先去注释），明细在此。
+
+### 变动表子组件抽取范式（`J1MovementTable.vue`）
+
+同一循环的多张「五列变动表」在上市 / 国企两个 Tab 里往往各写 N 遍（J1 是 3×2 = 6 份，
+约 55 行 × 6）。抽子组件时差异全部由 props 表达：
+
+| prop | 差异来源 |
+|---|---|
+| `beginLabel` / `endLabel` | 上市「上年年末数 / 期末数」vs 国企「期初余额 / 期末余额」（源模板各自口径） |
+| `labelEditable: 'all' \| 'indent' \| 'none'` | 汇总表全行可改名；明细表只有「其中：」缩进行可改名 |
+| `removable` 同上三态 | 删除按钮可见范围 |
+| `selectable` | 明细表需 `highlight-current-row` 支持"在选中行后插入"，汇总表不需要 |
+| `derivedIds` | 派生父行（渲染成只读公式单元格） |
+
+**只读单元格三类**（都渲染成虚线下划线 + tooltip）：①合计行全部金额列 ②任意行的期末列
+③派生父行的期初/增加/减少列。抽完后加一条守卫断言「模板内 0 处裸 `el-table`」防回退。
+
+### 同表内父行派生（`applyParentSums` / `derivedParentIds`）
+
+源模板里父行常是 SUM 公式而非录入项（J1：`B20=SUM(B21:B27)` 社会保险费、
+`B41=SUM(B42:B45)` 离职后福利），且合计行公式显式排除这些「其中：」子行。
+
+通用规则：**非缩进行若其后紧跟 ≥1 个连续缩进行，则该行 期初/增加/减少 = 子行之和**。
+一条规则覆盖多处且对「+ 新增行」自动生效。要点：
+
+- 期末列**不**单独求和，仍由 `recalc` 按「期初 + 增加 − 减少」派生（同口径）
+- **合计行截断子项区间**（合计行之后的缩进行不归前一父行）
+- 无缩进子行的行**完全不动**（保持可手工录入，行为与历史一致）
+- 返回"被改写的父行数"，值本就相等时不计入 → 调用方据此判断是否需落库（幂等）
+- 调用时机：`hydrate`（历史手工值对齐源模板口径，不落库靠首次编辑一并持久化）/
+  `onRowChange` / 增删行（`afterRowSetChange`）/ 明细带入之后
+
+### 披露内部勾稽引擎（H1 范式的第二次落地）
+
+`buildJ1ConsistencyChecks(input): J1CheckResult[]` + `summarizeJ1Consistency`。
+只取**源模板 Excel 公式可判定**的关系，每条 `rule` 字段写明证据（如"两处同引
+`'明细表J1-2 '!J33`"）。容差 1 分，金额勾稽无 warn 中间态。
+
+设计要点：
+
+- **跨表规则按列拆**（4 列各一条）→ 差异能定位到具体列，而不是只说"不平"
+- **缺行 / 无子项 / 空表时跳过该条**，不产出 `0 = 0` 的假通过
+- **J1-1 未编制（合计为 0）时不产出审定勾稽项**，避免恒不平的噪声
+- 合计行不参与"逐行期末公式"校验（其值由 computed 产出）
+- 反向断言是必需的：制造差异必须报出 + 只报出错那一列 + 容差 0.01 通过 / 0.02 报错
+
+### 说明文本域收敛为单一真源
+
+各循环披露 Tab 的说明 placeholder、文本域标题、持久化键、推给附注的 `_note_texts`
+小节标题**是同一份东西**，散落四处必漂移。收敛成
+`X_LISTED_NOTE_FIELDS` / `X_SOE_NOTE_FIELDS`（`{key, title, placeholder}`）+
+`xNoteFields(variant)` / `xNoteKeys(variant)`，放在 `XNoteSectionMap.ts`；
+组件 `noteKeys: xNoteKeys('soe')` + `:placeholder="FIELDS[i].placeholder"`。
+
+placeholder 必须是**源模板说明段原文**，不得改写截断（J1 国企第 3 条历史实现被截断，
+丢了「及其变动、对未来现金流的影响、重大精算假设及有关敏感性分析等」）。
+
+### AI section prompt 登记（通用端点是放行式的）
+
+`POST /api/workpapers/{wp_id}/ai/generate-text`（`wp_guidance_chat`）对 section
+**不做拒绝式白名单** → 未登记的 section 静默落到通用兜底
+「请根据提供的上下文信息生成专业的审计文本。」= 放任模型自造披露内容。
+
+新增披露文本域必须同时：①组件里的 `aiSection` ②`_SECTION_PROMPTS` 登记
+③prompt ≥20 字 + 点名准则（应付职工薪酬是 CAS 9）+ 含「不得虚构」类约束
+④参数化守卫（section 名从前端 `.ts` 源码正则读出防双真源漂移，并用测试**锁住
+"端点不做白名单"这一前提**——前提变了守卫的价值判断要重估）。
+
+设定受益计划这类"可能不存在"的小节，prompt 要明确允许直接声明「本公司不存在xxx」，
+否则模型会硬凑内容。
+
+### 浏览器实测的可复用手法（chrome-devtools MCP + postgres 只读）
+
+1. 登录：`admin` / `admin123`（既有 e2e 通用凭据；token 在 `sessionStorage.token`）
+2. 底稿编辑器路由：`/projects/{pid}/workpapers/{wpId}/edit`；切 sheet 靠
+   `[...document.querySelectorAll('*')].find(e => e.children.length===0 && e.textContent.trim()===sheetName)`
+   再 `.closest('[role=tab], .el-tabs__item, li, div').click()`
+3. 模拟录入 `el-input-number`：`focus()` → 改 `value` → `dispatchEvent(new Event('input',{bubbles:true}))`
+   → `change` → `blur()`，每格间隔 ~60ms
+4. **判"请求到底发出了没"**：临时包 `window.fetch` + `XMLHttpRequest.prototype.open/send`
+   收集 URL。`performance.getEntriesByType('resource')` 缓冲区只有 250 条，页面加载多时会溢出，
+   **不可靠**
+5. **`el-message` 3 秒自动消失** → 轮询收集（每 250ms × N 次）而不是等待后一次性读，
+   否则会漏掉关键错误提示（本轮就因此第一次没看到失败原因）
+6. 落库真相一律用 postgres 只读比对（`_last_sync_at` / `_source` / `sub_table_data` 键 /
+   合计行 / `_column_groups`），不看截图
+
+
+## §披露自动同步「活体验证」手法（2026-07-30，12 Tab 实测沉淀）
+
+> 验证目标：`watch(实际数据) → scheduleAutoSync → syncToNotes → POST` 全链在**用户编辑**
+> 路径下真的通，且**静置期不误触发**。memory.md 只留结论，手法在此。
+
+### 判定范式（每个 Tab 三步）
+
+1. **静置基线**：切到该 Tab 后再等 4~6s，统计 `sync-from-workpaper` 请求数 —— 必须为 **0**
+   （否则说明挂载/数据加载会误触发，`_last_sync_at` 的前移就不能归因于编辑）
+2. **数据变更**：改一个响应式字段，等 6s，统计请求数 —— 必须为 **1**
+3. **落库比对**：postgres 只读查 `_last_sync_at` / `_source` / `sub_table_data` 键数
+
+三者齐备才算通过；只看 ②会把噪声当成功，只看 ③无法排除是别的路径写的。
+
+### 🔴 不要用合成 DOM 事件驱动录入（两次误判的根源）
+
+`el.value = x` + `dispatchEvent(new Event('input'))` **不可靠**：
+
+- **`el-input-number` 不响应**合成事件（内部有自己的 parse/setCurrentValue 流程）→ UI 显示变了、
+  **零保存请求**、响应式数据没动。而 **`el-input` 会响应** —— 这解释了为什么同一手法在
+  J1/K1/G1（改的是文本列）成功、在 G6（改数值列）失败。
+- **`el-table` 重渲染会替换元素**：复用上一次拿到的元素引用，v-model 已断，写 `value` 只留在
+  detach 的 DOM 上。每次操作前必须重新 `querySelectorAll`。
+
+**正确手法 = 直接改响应式数据**（语义上就是"数据变更"，且绕开控件实现细节）：
+
+```js
+const root = [...document.querySelectorAll('div[class*=disclosure]')]
+  .filter(e => e.offsetParent !== null && e.__vueParentComponent?.setupState)[0]
+const ss = root.__vueParentComponent.setupState   // script setup 的绑定全在这里
+const disc = ss.disc ?? ss.dis                    // 各 Tab 的 composable 实例名不统一
+const arr = disc.rows?.value ?? disc.rows         // ref 与裸值都兼容
+arr[0][numericField] += 12345                     // deep watch 会追踪
+```
+
+`setupState` 里能看到全部 setup 绑定（含 `buildSyncData` / `syncToNotes` / 各 ref），
+调试极方便；dev build 才有 `__vueParentComponent`。
+
+### 🔴 先读模板确认"真实用户路径"，别对着 API 猜
+
+H3 曾被我判成「行数据变更不触发」：我调 `updateRow(key, {...row, x: v})` 传**新对象**，
+数据没变。读模板才知道真实路径是 `v-model="row.beginBalance"` —— **直接 mutate
+`getSectionRows(key)` 返回的响应式行对象**，`@change` 上的 `updateRow` 只负责持久化。
+按真实路径（直接 mutate）测即 1 次 POST。**`updateRow` 不是坏的，是用法不对。**
+
+判「某个 API 是否该改数据」先看模板怎么用它，不要按名字推断语义。
+
+### 手动调 syncFn 返回 `canceled` = 内部有 ElMessageBox
+
+I6 的 `syncToNotes` 在勾稽有差异时弹确认框；脚本里直调它会被 `ElMessageBox.confirm`
+reject → 捕获后静默返回、零请求，`el-message` 显示 `canceled`。验证时需轮询
+`.el-message-box`、点 `.el-button--primary`（**按钮文本可能是「仍要同步」而非「确定」**，
+按 class 取比按文本正则稳）。
+
+### 其它实测坑
+
+- **token 会中途过期**（跳 `/login`）→ 脚本开头判 `location.href` 含 `login` 就先登录
+- **Chrome 实例被多会话共享**：本轮页面被别的会话导航到 D6 底稿 → 每次 evaluate 前确认
+  `location.href` 与预期底稿一致
+- **`el-message` 3 秒消失** → 轮询收集，别等完再读
+- **测完把数据改回原值**（这些是真实在册项目的底稿）；改回也会触发一次同步，正好二次验证

@@ -328,3 +328,136 @@ seed 表未声明 `columns` / `_column_groups`（或声明为空/非法类型）
 - 不改 `note_check_preset_formulas.json`（F9-\* 已与目标结构一致）
 - 不动 `note_template_bindings.json`（本次不涉及公式取数绑定）
 - 不改其它章节的 `header_label` 行（超出本 spec 范围；R5 的贯通已为后续同类修复铺路）
+
+---
+
+## Sprint 7 设计：源 xlsx 裁决 + 库龄二选一
+
+### 裁决顺序修订
+
+原设计的三源裁决（源 xlsx / 附注模版 md / 校验预设）中，**附注模版 md 在本仓库不存在**，
+故本轮裁决顺序收敛为：**源 xlsx（`backend/wp_templates/` 运行时权威）> 校验预设
+`note_check_preset_formulas.json` > 现状模板 JSON**。凡 xlsx 可实证的行/列，一律以 xlsx 为准。
+
+xlsx 之外的两组表（「按库龄组合计提」×2、「确认为存货的数据资源」）保留：前者源自
+15 号文第十六条（十二），后者源自《企业数据资源相关会计处理暂行规定》，均非 xlsx 披露 sheet
+覆盖范围，但属交付物必需，不删。
+
+### R18/R19 落点：扩展既有幂等脚本
+
+`fix_note_inventory_structure.py` 已有 `rows` 模式机制（`strip` / `portfolio_blank` /
+`portfolio_aging` / `keep`）。新增两个模式，行集常量单一真源：
+
+- `LISTED_CATEGORY_LABELS`（9 项）→ 模式 `listed_categories`（分类/变动）与
+  `listed_categories_qual`（续表，合计行不带金额）
+- `SOE_CATEGORY_ROWS`（13 项，含 `kind=detail` 的「其中：」行）→ 模式 `soe_categories`
+
+`rows` 模式从 `strip`（保留既有行、只删 header_label）改为显式行集重建 —— 因为 seed 行是
+骨架而非用户数据（用户数据一律经 `sub_table_data` 整表覆盖），重建无数据丢失风险。
+
+`_classification()` 增 `label_header` 形参：上市传「存货种类」，国企传「项目」。
+`LISTED_MOVEMENT` / 上市续表的 `headers[0]` / `columns[0].label` 同步改「存货种类」。
+
+守卫 `validate_section` 已有「headers[k] == columns[k].label」逐位断言，改错会立刻红。
+
+### R20 落点：`buildNoteTexts` 化
+
+`f2DisclosureSyncPayload.ts` 内联的 `_note_texts` 字面量数组改为经
+`buildF2NoteTexts(entries)`：入参 `[section, title, text]` 三元组，过滤空文本，
+输出 `{section, title, text}`。与 D1/D2 的 `buildXNoteTexts` 同形。
+
+`F2SoeSyncSnapshot` 增 `landNote: string`；`useF2DisclosureSoe.getSyncSnapshot` 补该字段
+（`landNote` ref 已存在，只是没进快照）。
+
+### R21 落点：计提方式开关
+
+- `useF2DisclosureListed` 增持久化项 `F2-note-listed-s3-mode`（`'portfolio' | 'aging'`，
+  默认 `'portfolio'`），暴露 `s3Mode` + `setS3Mode`。
+- 表数据复用既有 `s3EndRaw` / `s3PriorRaw`（同一列结构），**不再开第二套 state** ——
+  源模板两表列结构完全相同，仅表名与行标签语义不同（组合名 vs 库龄段），
+  且二选一互斥，共用一套 state 即可，避免双真源。
+- 切到 `aging` 时若行为空，`groupName` 预填库龄段（`1年以内` / `1至2年`）作为骨架提示。
+- `buildF2ListedSubTableData(snap)` 按 `snap.s3Mode` 决定推送表名，并写
+  `_removed_table_keys` = 未选中的那一组两个表名（`sync_from_workpaper` 的
+  `_drop_removed_tables` 会跳过本次推送键，故不会误删）。
+
+### R22 落点：`retitle_text_sections`
+
+新增幂等 helper：`{plain: '### plain'}` 映射，仅当 `plain` 精确存在且
+`'### ' + plain` 不存在时替换。`SOE_TEXT_ANCHOR` 随之改为 `### 确认为存货的数据资源`，
+并对旧锚点做兼容查找（先找新锚点，未命中再找旧锚点）。
+
+---
+
+## Sprint 8 设计：分类表取数补全
+
+### R23/R24：上市分类常量重排
+
+`F2_LISTED_DISCLOSURE_CATEGORIES` 9 → 11 行，顺序与 `sourceKeys`：
+
+| # | rowKey | label | sourceKeys |
+|---|---|---|---|
+| 1 | `raw-materials` | 原材料 | raw-materials, material-in-transit |
+| 2 | `work-in-progress` | 在产品 | **semi-finished**（删死键 `work-in-progress`） |
+| 3 | `dev-costs` | **开发成本**（新增） | dev-costs |
+| 4 | `outsourced-processing` | 委托加工物资 | outsourced-processing |
+| 5 | `finished-goods` | 库存商品 | finished-goods, **price-difference** |
+| 6 | `dev-products` | **开发产品**（新增） | dev-products |
+| 7 | `goods-in-transit` | 发出商品 | goods-in-transit |
+| 8 | `revolving-materials` | 周转材料 | revolving-materials |
+| 9 | `contract-performance` | 合同履约成本 | contract-performance |
+| 10 | `consumable-bio` | 消耗性生物资产 | consumable-bio |
+| 11 | `data-resources` | 数据资源 | （无科目 → R25 联动） |
+
+`rowKey` 保留 `work-in-progress` 作**行标识**（持久化键，改了会丢既有 `s2Overrides` /
+`s2QualMap` 数据），只把它从 `sourceKeys` 里删掉 —— 行标识与取数键是两回事。
+
+国企侧 `wip-combined` 同样从 `sourceKeys` 删 `work-in-progress`（保留 semi-finished、dev-costs）。
+
+守卫：新增 Property「`sourceKeys` 并集 ⊇ 审定表全部非跌价 rowKey」，
+两版各一条，直接从 `f2AccountModel.F2_ROW_KEY_ACCOUNT` 取全集，防再漏科目。
+
+### R25：数据资源行联动
+
+`f2DataResourceInventory.ts` 已有 `calcDrTotals`（按行的 4 列合计）。新增纯函数：
+
+```ts
+export function deriveDataResourceClassRow(values: DrValueMap, variant: F2DrVariant)
+  : { endGross; endImpairment; priorGross; priorImpairment }
+```
+
+取 `gross-end` / `gross-open` / `imp-end` / `imp-open` 四行的 `total`（= 外购 + 自行加工 +
+其他方式）。`gross-end` / `imp-end` 是派生行（`calcDrEnding`），已有算法复用。
+
+两个 composable 的 `loadClassRow` 对 `rowKey === 'data-resources'` 走该分支：
+- 数据资源表为空（`isDataResourceEmpty`）→ 仍返回 0（不制造凭空数字）
+- 非空 → 返回联动值
+
+`buildDataResourceTieChecks` 的入参不变（仍传分类表该行），联动后差额恒 0，
+面板从"告警"变为恒通过；`drTieFailures` 自然为空。
+
+### R26：国企「其他」「土地储备」手工录入
+
+复用 `s2Overrides` 范式，新增独立持久化项 `F2-note-soe-s1-overrides`：
+
+```ts
+type S1Override = Partial<Record<
+  'endGross'|'endImpairment'|'priorGross'|'priorImpairment', number>>
+Record<rowKey, S1Override>   // 仅 'other' | 'land-reserve' 两个键被接受
+```
+
+`endNet` / `priorNet` 仍由 `calcNetValue` 派生（不可直接录入，避免与余额-准备不自洽）。
+`updateS1Field(rowKey, field, value)` 白名单校验 rowKey，非白名单直接 return
+（防误开放跨表取数行的手工覆盖，破坏 F2-1 权威性）。
+
+UI：国企 (1) 表的六个金额列对这两行渲染 `WpAmountInput`，其余行保持只读跨表取数样式。
+
+### 连带改动清单
+
+1. `f2DisclosureSyncPayload.ts`：无需改结构（行由快照 map 而来，行数自动跟随）
+2. `fix_note_inventory_structure.py`：`LISTED_CATEGORY_LABELS` 9 → 11 项（同序）
+3. 后端 `_f2_disclosure_import_export.py`：`_LISTED_CATEGORIES` / `LISTED_CATEGORIES`
+   两处镜像常量同步（正则契约测试会强制两侧一致）
+4. 测试：`test_note_inventory_structure`（行集参数化 + `.ts` 常量逐字比对）、
+   `useF2DisclosureListed.spec`、`f2NoteSectionMap.spec`、`f2NoteSubtableContract`、
+   `f2DataResourceInventory.spec`、后端 `test_f2_disclosure_import_export`
