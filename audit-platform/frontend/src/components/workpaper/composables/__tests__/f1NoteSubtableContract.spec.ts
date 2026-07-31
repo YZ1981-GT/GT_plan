@@ -13,10 +13,17 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { F1_NOTE_SECTION } from '../f1NoteSectionMap'
 import {
+  F1_AGING_LABEL_COL,
+  F1_LISTED_AGING_GROUPS,
+  F1_LISTED_AMOUNT_LABEL,
   F1_LISTED_COLUMNS,
   F1_LISTED_OBSOLETE_TABLE_KEYS,
+  F1_LISTED_PCT_LABEL,
   F1_LISTED_SUBTABLE,
+  F1_SOE_AGING_GROUPS,
+  F1_SOE_AMOUNT_LABEL,
   F1_SOE_COLUMNS,
+  F1_SOE_PCT_LABEL,
   F1_SOE_SUBTABLE,
 } from '../f1DisclosureSyncPayload'
 
@@ -94,19 +101,35 @@ describe('F1 子表名 ↔ note_template 契约', () => {
 
 describe('附注 §五、7 / §八、7 结构要求', () => {
   it('对齐脚本已打标 _aligned_by', () => {
+    // 集合判定：历史批次写归档 spec 名，改标记后重跑脚本前不应打红
+    const accepted = new Set([
+      'f1-four-table-extraction-and-disclosure-alignment',
+      'f1-prepayment-disclosure-template-alignment',
+    ])
     for (const s of [listedSection, soeSection]) {
-      expect(s._aligned_by).toBe('f1-prepayment-disclosure-template-alignment')
+      expect(accepted.has(String(s._aligned_by)), String(s._aligned_by)).toBe(true)
     }
   })
 
   it('按账龄表为 5 列两级表头 + 7 行（各段 + 小计 + 减：减值准备 + 合计）', () => {
+    // 🔴 列头字面**引用常量**（源 xlsx 逐格实证，含空格）：写死字面量必再分叉
     const cases = [
-      [listedSection, F1_LISTED_SUBTABLE.AGING, '期末余额', '上年年末余额', '比例%'],
-      [soeSection, F1_SOE_SUBTABLE.AGING, '期末数', '期初数', '比例（%）'],
+      [
+        listedSection, F1_LISTED_SUBTABLE.AGING,
+        F1_LISTED_AGING_GROUPS.end, F1_LISTED_AGING_GROUPS.prior,
+        F1_LISTED_AMOUNT_LABEL, F1_LISTED_PCT_LABEL,
+      ],
+      [
+        soeSection, F1_SOE_SUBTABLE.AGING,
+        F1_SOE_AGING_GROUPS.end, F1_SOE_AGING_GROUPS.prior,
+        F1_SOE_AMOUNT_LABEL, F1_SOE_PCT_LABEL,
+      ],
     ] as const
-    for (const [section, name, endGroup, priorGroup, pctLabel] of cases) {
+    for (const [section, name, endGroup, priorGroup, amountLabel, pctLabel] of cases) {
       const t = table(section, name)
-      expect(t.headers, name).toEqual(['账龄', '金额', pctLabel, '金额', pctLabel])
+      expect(t.headers, name).toEqual([
+        F1_AGING_LABEL_COL, amountLabel, pctLabel, amountLabel, pctLabel,
+      ])
       expect(t._column_groups, name).toEqual([
         { group: endGroup, start: 1, span: 2 },
         { group: priorGroup, start: 3, span: 2 },
@@ -203,5 +226,15 @@ describe('附注 §五、7 / §八、7 结构要求', () => {
     expect(texts).toContain('汇总披露格式')
     expect(texts).toContain('分别披露格式')
     expect(texts).toContain('账龄超过1年的金额重要预付账款，应说明未及时结算的原因')
+  })
+
+  it('列头字面逐字对齐源 xlsx（含空格）—— 两版金额列空格数不同，不得被 trim', () => {
+    // 上市 `B9=金  额`（双空格）/ 国企 `B10=金 额`（单空格）/ 两版 `A8=账  龄`（双空格）
+    expect(F1_AGING_LABEL_COL).toBe('账  龄')
+    expect(F1_LISTED_AMOUNT_LABEL).toBe('金  额')
+    expect(F1_SOE_AMOUNT_LABEL).toBe('金 额')
+    expect(F1_LISTED_AMOUNT_LABEL).not.toBe(F1_SOE_AMOUNT_LABEL)
+    expect(F1_LISTED_AGING_GROUPS).toEqual({ end: '期末数', prior: '上年年末数' })
+    expect(F1_SOE_AGING_GROUPS).toEqual({ end: '期末数', prior: '期初数' })
   })
 })

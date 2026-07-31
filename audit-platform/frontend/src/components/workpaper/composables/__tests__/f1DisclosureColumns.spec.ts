@@ -1,6 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import {
+  F1_AGING_LABEL_COL,
+  F1_LISTED_AGING_GROUPS,
+  F1_LISTED_AMOUNT_LABEL,
+  F1_LISTED_PCT_LABEL,
   F1_LISTED_SUBTABLE,
+  F1_SOE_AGING_GROUPS,
+  F1_SOE_AMOUNT_LABEL,
+  F1_SOE_PCT_LABEL,
   F1_SOE_SUBTABLE,
   buildF1ListedSubTableData,
   buildF1SoeSubTableData,
@@ -29,15 +36,19 @@ const soeSnap: F1SoeSyncSnapshot = {
 
 // disclosure-table-sync-convergence：F1 预付款项英文键子表须携带源对齐中文列头
 describe('F1 预付款项披露 columns 契约', () => {
-  it('上市：按账龄表 5 列两级表头（期末余额 / 上年年末余额）', () => {
+  it('上市：按账龄表 5 列两级表头（期末数 / 上年年末数，源 xlsx B8/D8）', () => {
     const payload = buildF1SyncPayload('listed', 'wp-f1', null, buildF1ListedSubTableData(listedSnap))
     expect(payload).not.toBeNull()
     const cols = payload!.columns![F1_LISTED_SUBTABLE.AGING]
     expect(cols[0].is_label).toBe(true)
-    expect(cols.map((c) => c.label)).toEqual(['账龄', '金额', '比例%', '金额', '比例%'])
+    expect(cols.map((c) => c.label)).toEqual([
+      F1_AGING_LABEL_COL, F1_LISTED_AMOUNT_LABEL, F1_LISTED_PCT_LABEL,
+      F1_LISTED_AMOUNT_LABEL, F1_LISTED_PCT_LABEL,
+    ])
     // 两级表头唯一机制：group → 后端 _extract_column_groups → _column_groups
     expect(cols.map((c) => c.group ?? '')).toEqual([
-      '', '期末余额', '期末余额', '上年年末余额', '上年年末余额',
+      '', F1_LISTED_AGING_GROUPS.end, F1_LISTED_AGING_GROUPS.end,
+      F1_LISTED_AGING_GROUPS.prior, F1_LISTED_AGING_GROUPS.prior,
     ])
     expect(cols[1].key).toBe('end_amount')
     expect(cols[3].key).toBe('prior_amount')
@@ -90,8 +101,14 @@ describe('F1 预付款项披露 columns 契约', () => {
   it('国企：按账龄表收敛为 5 列两级表头（期末数 / 期初数）', () => {
     const payload = buildF1SyncPayload('soe', 'wp-f1', null, buildF1SoeSubTableData(soeSnap))
     const cols = payload!.columns![F1_SOE_SUBTABLE.AGING]
-    expect(cols.map((c) => c.label)).toEqual(['账龄', '金额', '比例（%）', '金额', '比例（%）'])
-    expect(cols.map((c) => c.group ?? '')).toEqual(['', '期末数', '期末数', '期初数', '期初数'])
+    expect(cols.map((c) => c.label)).toEqual([
+      F1_AGING_LABEL_COL, F1_SOE_AMOUNT_LABEL, F1_SOE_PCT_LABEL,
+      F1_SOE_AMOUNT_LABEL, F1_SOE_PCT_LABEL,
+    ])
+    expect(cols.map((c) => c.group ?? '')).toEqual([
+      '', F1_SOE_AGING_GROUPS.end, F1_SOE_AGING_GROUPS.end,
+      F1_SOE_AGING_GROUPS.prior, F1_SOE_AGING_GROUPS.prior,
+    ])
   })
 
   it('国企：超1年大额表以债权单位为标签列，五列齐备', () => {

@@ -84,11 +84,10 @@ const INFERENCE_FALLBACK_ALLOWLIST: Record<string, { reason: string; tables: str
   // 缺 flat 时国企侧被投影成 `_column_groups=[{group:'本期',start:2,span:2}]`，
   // 即「现状无害」的旧判断只对上市侧成立）
   // → 按 R3「已修好的表必须从 allowlist 删除」移出（allowlist 只许缩）。
-  buildH10SubTableColumns: {
-    reason:
-      'H10 资产处置收益（批 1~4 之外）：3 表未声明 flat。推断结果均为空（列数 <4）→ 现状无害；且 H10 无 per-cycle columns 键集契约（见 P1_ROUTE 备注）',
-    tables: ['资产处置收益（损失以“-”号填列）', '项  目', '项  目__trial'],
-  },
+  // buildH10SubTableColumns 已由 h9-h10-remaining-disclosure-alignment 收口：
+  // 两张同名 `项  目` 表正名（原本同名互相覆盖丢整张表）、`项  目__trial` 孤儿绕过键删净、
+  // 主表补 flat、试运行表改源模板两级表头（group 各 span 2）
+  // → 按 R3「已修好的表必须从 allowlist 删除」移出（allowlist 只许缩）。
   buildI1ListedColumns: {
     reason:
       'I1 无形资产（批 1~4 之外）：5 表未声明 flat。推断结果均为空 → 现状无害，补 flat 待 I 循环收口',
@@ -375,9 +374,9 @@ const P1_ROUTE: Record<string, { spec: string; complete: boolean; note?: string 
     note: 'G7 列头有断言，键集相等未覆盖（G7 专项工作）',
   },
   buildH10SubTableColumns: {
-    spec: '__tests__/h10DisclosureSync.spec.ts',
-    complete: false,
-    note: '仅断言主表首列与 current_amount 列头；键集相等未覆盖 —— 已知缺口，待 H10 收口',
+    spec: 'composables/__tests__/h9h10NoteSubtableContract.spec.ts',
+    complete: true,
+    note: 'h9-h10-remaining-disclosure-alignment：载荷列 key ≡ 模板列 key + 行键 ⊆ 列键 + 两级表头 group',
   },
   // ── spec disclosure-sync-path-buildout 批1（G 循环）─────────────────────────
   buildG8ListedColumns: { spec: 'composables/__tests__/g8NoteSubtableContract.spec.ts', complete: true },
