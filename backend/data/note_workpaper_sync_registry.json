@@ -1,6 +1,6 @@
 {
   "_source": "生成自前端 *NoteSectionMap.ts（唯一真源），勿手工编辑；重生成：python backend/scripts/gen_note_wp_sync_registry.py --write",
-  "generated_at": "2026-07-30T08:58:25.302934+00:00",
+  "generated_at": "2026-07-30T17:17:39.618579+00:00",
   "entries": [
     {
       "wp_code": "D1",
@@ -294,39 +294,39 @@
       "wp_code": "K10",
       "listed": "五、68",
       "soe": "八、69",
-      "sheet_listed": "附注披露信息(上市公司)",
-      "sheet_soe": "附注披露信息(国企)",
+      "sheet_listed": "附注披露信息（上市公司）",
+      "sheet_soe": "附注披露信息（国企）",
       "source_file": "audit-platform/frontend/src/components/workpaper/composables/k10NoteSectionMap.ts"
     },
     {
       "wp_code": "K11",
-      "listed": "三、资产减值损失",
+      "listed": "三、资产减值损失（损",
       "soe": "八、74",
-      "sheet_listed": "附注披露信息(上市公司)",
-      "sheet_soe": "附注披露信息(国企)",
+      "sheet_listed": "附注披露信息（上市公司）",
+      "sheet_soe": "附注披露信息（国企）",
       "source_file": "audit-platform/frontend/src/components/workpaper/composables/k11NoteSectionMap.ts"
     },
     {
       "wp_code": "K12",
-      "listed": "三、营业外收入",
+      "listed": "三、营业外收入（注：",
       "soe": "八、76",
-      "sheet_listed": "附注披露信息(上市公司)",
-      "sheet_soe": "附注披露信息(国企)",
+      "sheet_listed": "附注披露信息（上市公司）",
+      "sheet_soe": "附注披露信息（国企）",
       "source_file": "audit-platform/frontend/src/components/workpaper/composables/k12NoteSectionMap.ts"
     },
     {
       "wp_code": "K13",
-      "listed": "三、营业外支出",
+      "listed": "三、营业外支出（注：",
       "soe": "八、77",
-      "sheet_listed": "附注披露信息(上市公司)",
-      "sheet_soe": "附注披露信息(国企)",
+      "sheet_listed": "附注披露信息（上市公司）",
+      "sheet_soe": "附注披露信息（国企）",
       "source_file": "audit-platform/frontend/src/components/workpaper/composables/k13NoteSectionMap.ts"
     },
     {
       "wp_code": "K1",
       "listed": "五、8",
       "soe": "八、9",
-      "sheet_listed": "附注披露信息（上市公司）",
+      "sheet_listed": "附注披露信息(上市公司）",
       "sheet_soe": "附注披露信息（国企）",
       "source_file": "audit-platform/frontend/src/components/workpaper/composables/k1NoteSectionMap.ts"
     },
@@ -382,16 +382,16 @@
       "wp_code": "K8",
       "listed": "五、64",
       "soe": "八、65",
-      "sheet_listed": "附注披露信息(上市公司)",
-      "sheet_soe": "附注披露信息(国企)",
+      "sheet_listed": "附注披露信息（上市公司）",
+      "sheet_soe": "附注披露信息（国企）",
       "source_file": "audit-platform/frontend/src/components/workpaper/composables/k8NoteSectionMap.ts"
     },
     {
       "wp_code": "K9",
       "listed": "五、65",
       "soe": "八、66",
-      "sheet_listed": "附注披露信息(上市公司)",
-      "sheet_soe": "附注披露信息(国企)",
+      "sheet_listed": "附注披露信息（上市公司）",
+      "sheet_soe": "附注披露信息（国企）",
       "source_file": "audit-platform/frontend/src/components/workpaper/composables/k9NoteSectionMap.ts"
     },
     {
@@ -433,6 +433,30 @@
       "sheet_listed": "附注披露信息（上市公司）",
       "sheet_soe": "附注披露信息（国企）",
       "source_file": "audit-platform/frontend/src/components/workpaper/composables/n1NoteSectionMap.ts"
+    },
+    {
+      "wp_code": "N2",
+      "listed": "五、41",
+      "soe": "八、41",
+      "sheet_listed": "附注披露信息（上市公司）",
+      "sheet_soe": "附注披露信息（国企）",
+      "source_file": "audit-platform/frontend/src/components/workpaper/composables/n2NoteSectionMap.ts"
+    },
+    {
+      "wp_code": "N4",
+      "listed": "五、63",
+      "soe": null,
+      "sheet_listed": "附注披露信息（上市公司）",
+      "sheet_soe": "附注披露信息（国企）",
+      "source_file": "audit-platform/frontend/src/components/workpaper/composables/n4NoteSectionMap.ts"
+    },
+    {
+      "wp_code": "N5",
+      "listed": "三、所得税费用",
+      "soe": "八、78",
+      "sheet_listed": "附注披露信息（上市公司）",
+      "sheet_soe": "附注披露信息（国企",
+      "source_file": "audit-platform/frontend/src/components/workpaper/composables/n5NoteSectionMap.ts"
     }
   ]
 }
