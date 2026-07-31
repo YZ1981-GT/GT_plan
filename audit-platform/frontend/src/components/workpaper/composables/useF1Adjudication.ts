@@ -467,28 +467,46 @@ export function useF1Adjudication(options: UseF1AdjudicationOptions) {
   )
 
   /**
-   * 把四表库「按性质分类」预填**持久化**为未审数。
+   * 把四表库「按性质分类」预填**持久化**为未审数（显式动作 = 把性质口径钉到四表库）。
    *
-   * - 只覆盖预填中**出现**的性质桶，未出现的桶逐字不动（不清零）；
-   * - 幂等：连续调用两次结果相同；
-   * - 只读态直接返回。
+   * - 预填中**出现**的性质桶：写入期初/期末；
+   * - 预填中**未出现**的性质桶：
+   *   * 有手工值 → **逐字不动**（手工优先，绝不覆盖审计师的录入）；
+   *   * 无手工值 → 显式写 0。
    *
-   * @returns 实际写入的性质桶数（0 = 四表库无数据 / 只读）
+   *     🔴 为什么必须写 0：未录入的桶显示的是 **F1-2 明细聚合**值，而明细里由
+   *     `/f1/import-aux-balance` 自动归集的行款项性质是占位「其他」—— 若只写四表命中的
+   *     桶，「其他」会继续显示明细的**全额**，合计立刻翻倍（浏览器实测：
+   *     带入后合计 2,603,836.86 = 真值 1,301,918.43 的 2 倍，且性质合计 ≠ 账龄合计）。
+   *     写 0 不销毁任何手工数据，只把「同一笔钱的另一种口径」清掉。
+   * - 幂等：连续调用两次结果相同。
+   *
+   * @returns `{applied, cleared}`；两者皆 0 表示四表库无数据 / 只读。
    */
-  function pullNatureFromTB(): number {
-    if (isReadonly.value) return 0
+  function pullNatureFromTB(): { applied: number; cleared: number } {
+    if (isReadonly.value) return { applied: 0, cleared: 0 }
     const src = naturePrefill?.value ?? {}
+    if (!Object.keys(src).length) return { applied: 0, cleared: 0 }
+
+    const responses = allResponses.value
     let applied = 0
+    let cleared = 0
     for (const { rowKey } of NATURE_ROWS) {
+      const priorId = makeItemId('nature', rowKey, 'priorUnadjusted')
+      const currentId = makeItemId('nature', rowKey, 'currentUnadjusted')
       const bucket = src[rowKey]
-      if (!bucket) continue
-      const opening = parseNum(bucket.opening)
-      const closing = parseNum(bucket.closing)
-      debouncedSave(makeItemId('nature', rowKey, 'priorUnadjusted'), { remark: String(opening) })
-      debouncedSave(makeItemId('nature', rowKey, 'currentUnadjusted'), { remark: String(closing) })
-      applied += 1
+      if (bucket) {
+        debouncedSave(priorId, { remark: String(parseNum(bucket.opening)) })
+        debouncedSave(currentId, { remark: String(parseNum(bucket.closing)) })
+        applied += 1
+        continue
+      }
+      if (hasManualEntry(responses, priorId) || hasManualEntry(responses, currentId)) continue
+      debouncedSave(priorId, { remark: '0' })
+      debouncedSave(currentId, { remark: '0' })
+      cleared += 1
     }
-    return applied
+    return { applied, cleared }
   }
 
   // ─── publishAdjudicated ──────────────────────────────────────────────

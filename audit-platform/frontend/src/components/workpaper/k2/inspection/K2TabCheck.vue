@@ -42,7 +42,7 @@
 
     <!-- 方法论上下文 -->
     <div class="methodology-context">
-      <p>其他流动资产（1231）为<strong>借方/资产类</strong>科目。检查内容：①原始凭证齐全 ②记账凭证与原始凭证相符 ③账务处理正确 ④记录于恰当的会计期间 ⑤其他（如摊销是否正确）。关注待摊费用摊销期限、预缴税费抵扣时效、合同取得成本增量性。</p>
+      <p>其他流动资产（报表行 BS-014，实证科目 1901）为<strong>借方/资产类</strong>科目。检查内容：①原始凭证齐全 ②记账凭证与原始凭证相符 ③账务处理正确 ④记录于恰当的会计期间 ⑤其他（如摊销是否正确）。关注待摊费用摊销期限、预缴税费抵扣时效、合同取得成本增量性。</p>
     </div>
 
     <!-- 二、样本选取标准与规模 -->
@@ -222,12 +222,12 @@
         <li>样本选取：测试总体扣除特定样本得抽样总体；大额、异常摊销、合同取得成本应全部测试</li>
         <li>检查比例 = 检查金额 / 账面金额；比例偏低（&lt;30%）须扩样或说明</li>
         <li>关注待摊费用是否在受益期内均匀摊销，预缴税费是否在抵扣时效内</li>
-        <li>抽凭引擎复用序时账，科目 1231 其他流动资产（借方/资产类）</li>
+        <li>抽凭引擎复用序时账，科目由报表行 BS-014 解析（实证 1901 其他流动资产，借方/资产类）</li>
       </ul>
     </details>
 
-    <el-dialog v-model="samplingVisible" title="抽凭引擎 — 其他流动资产(1231)" width="90%" top="5vh" destroy-on-close>
-      <GtVoucherSamplingEngine v-if="samplingVisible" account-code="1231" phase="final" :workpaper-id="props.wpId" :project-id="props.projectId" :year="year" @filled="onSamplesFilled" />
+    <el-dialog v-model="samplingVisible" :title="`抽凭引擎 — 其他流动资产（${k2CheckAccountCode}）`" width="90%" top="5vh" destroy-on-close>
+      <GtVoucherSamplingEngine v-if="samplingVisible" :account-code="k2CheckAccountCode" phase="final" :workpaper-id="props.wpId" :project-id="props.projectId" :year="year" @filled="onSamplesFilled" />
     </el-dialog>
   </div>
 </template>
@@ -245,6 +245,8 @@ import { MagicStick } from '@element-plus/icons-vue'
 import http from '@/utils/http'
 import { eventBus } from '@/utils/eventBus'
 import { useK1VoucherCheck, type K1VoucherRow } from '../../composables/useK1VoucherCheck'
+import { K2_ACCOUNT_NAME, k2AccountCode } from '../../composables/k2AccountScope'
+import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
 
 const GtVoucherSamplingEngine = defineAsyncComponent(() => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'))
 
@@ -252,9 +254,17 @@ const props = defineProps<{
   wpId: string
   projectId: string
   allResponses: Map<string, any>
+  /** 四表取数溯源（render 下发 `tb_source_codes`）—— 决定抽凭引擎的科目 */
+  tbSourceCodes?: TbSourceCodes | null
   isReadonly: boolean
   year?: number
 }>()
+
+/**
+ * 抽凭 / 事件科目码 —— 由报表行 `BS-014` 解析（实证 `1901`）。
+ * 🔴 历史写死 `1231`，抽凭引擎会抽**应收款项坏账准备**的凭证。
+ */
+const k2CheckAccountCode = computed(() => k2AccountCode(props.tbSourceCodes))
 const emit = defineEmits<{
   (e: 'save', itemId: string, value: any): void
   (e: 'navigate-sheet', sheetName: string): void
@@ -321,8 +331,8 @@ function abnormalRowClass({ row }: { row: K1VoucherRow }): string { return row.a
 async function handleAiGenerate() {
   try {
     const context: Record<string, string> = {
-      accountCode: '1231',
-      accountName: '其他流动资产',
+      accountCode: k2CheckAccountCode.value,
+      accountName: K2_ACCOUNT_NAME,
       sheet: 'K2-6',
       sampleCount: String(occurrenceRows.value.length),
       abnormalCount: String(abnormalRows.value.length),
@@ -331,7 +341,7 @@ async function handleAiGenerate() {
       checkRatioSummary: k2CheckRatios.value.map(r => `${r.direction}:${r.ratio != null ? (r.ratio * 100).toFixed(1) + '%' : '未计算'}`).join('; '),
     }
     const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
-      prompt: '请根据其他流动资产(1231)凭证检查表的测试结果，生成审计说明：概述抽样过程、核对结果、异常事项及结论建议',
+      prompt: '请根据其他流动资产凭证检查表的测试结果，生成审计说明：概述抽样过程、核对结果、异常事项及结论建议，不得虚构未提供的样本与金额',
       context,
       existingContent: auditNote.value,
       section: 'K2-6-voucher-note',
@@ -403,7 +413,7 @@ function handlePushAbnormalToK23(): void {
   try {
     eventBus.emit('adjustment:created', {
       wpCode: 'K2',
-      accountCode: '1231',
+      accountCode: k2CheckAccountCode.value,
       source: 'K2-6-abnormal',
       suggestedEntries: entries,
     })

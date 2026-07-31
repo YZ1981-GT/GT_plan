@@ -1,25 +1,33 @@
 /**
- * useK2FormData — K2 其他流动资产 selfLoad/checklist_responses/writebackTB(1231)/TB取数
+ * useK2FormData — K2 其他流动资产 selfLoad/checklist_responses/writebackTB/TB取数
  *
- * Spec: .kiro/specs/k2-other-current-assets/
- * Task: 3.1
- * Requirements: 1.9, 1.10, 2.6
+ * Spec: .kiro/specs/k2-other-current-assets/（科目口径修正见
+ *       .kiro/specs/k2-four-table-extraction-and-dynamic-rows/ Requirements 1.1~1.3）
  *
  * 职责：
  * - selfLoad(): bundle内嵌场景从 render-config 加载上下文 + checklist_responses
- * - loadTbData(): 从 trial_balance 获取科目 1231 未审/审定数据
- * - writebackTB(): 审定数回写 trial_balance(1231) + EventBus 'substantive:adjudicated'
+ * - loadTbData(): 从 trial_balance 获取其他流动资产未审/审定数据
+ * - writebackTB(): 审定数回写 trial_balance + EventBus 'substantive:adjudicated'
  * - checklist_responses 持久化: GET/PUT /api/workpapers/:wpId/checklist-responses
  * - item_id 命名: 前缀 "K2-{sheet}-{field}"（如 "K2-1-audited-amount", "K2-4-contract-cost"）
  * - debounce/即时保存: 文本字段 debounce 2s，枚举/结论即时保存
  * - 组件卸载时 flush 未保存数据（onScopeDispose）
  *
- * 科目：1231 其他流动资产（借方/资产类）
+ * 🔴 科目口径由 `k2AccountScope` 单一真源给出（报表行 `BS-014` → 实证 `TB('1901')`）。
+ * 历史实现写死 `1231`（应收款项坏账准备）→ `writebackTB` 会往坏账准备科目写审定数，
+ * 覆盖 D1/D2/K1 的口径；`loadTbData` 的 seed 键 `other_current_1231_unadjusted`
+ * 在 render 输出里**根本不存在**（真实键是 `other_current_unadjusted`）→ seed 从未生效。
  */
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
+import {
+  K2_ACCOUNT_NAME,
+  K2_GROSS_FALLBACK_STANDARD,
+  k2GrossQueryCodes,
+} from './k2AccountScope'
+import { sumLongestPrefixOnly, type TbSourceCodes } from './shared/tbSourceCodes'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -30,8 +38,8 @@ export interface ChecklistItem {
 }
 
 export interface K2TbData {
-  unadjusted1231: number
-  audited1231: number
+  unadjusted: number
+  audited: number
 }
 
 export interface ProjectContext {
@@ -42,8 +50,6 @@ export interface ProjectContext {
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const DEBOUNCE_MS = 2000
-/** 科目：1231 其他流动资产（借方/资产类） */
-const ACCOUNT_CODE_1231 = '1231'
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -51,7 +57,7 @@ export function useK2FormData(wpId: Ref<string>, projectId: Ref<string>) {
   // ─── Reactive state ────────────────────────────────────────────────────────
   const isLoading = ref(false)
   const allResponses = ref<Map<string, ChecklistItem>>(new Map())
-  const tbData = ref<K2TbData>({ unadjusted1231: 0, audited1231: 0 })
+  const tbData = ref<K2TbData>({ unadjusted: 0, audited: 0 })
   const projectContext = ref<ProjectContext>({})
   const renderMeta = ref<Record<string, any>>({})
 
@@ -181,53 +187,57 @@ export function useK2FormData(wpId: Ref<string>, projectId: Ref<string>) {
     await _doSave(checklistItems)
   }
 
-  // ─── loadTbData: 从 trial_balance 获取 1231 数据 ───────────────────────────
+  /** 该项目解析出的科目口径（render 下发 `tb_source_codes`；缺省回退 `1901`） */
+  function _queryCodes(): string[] {
+    return k2GrossQueryCodes(renderMeta.value?.tb_source_codes as TbSourceCodes | undefined)
+  }
+
+  // ─── loadTbData: 从 trial_balance 获取其他流动资产数据 ─────────────────────
 
   /**
-   * 从 trial_balance 获取科目 1231 的未审数和审定数。
-   * 优先从 renderMeta seed 读取，否则请求 TB 端点。
+   * 从 trial_balance 获取其他流动资产的未审数和审定数。
+   * 优先从 renderMeta seed 读取（键名与 render 输出逐字一致），否则请求 TB 端点。
    */
   async function loadTbData(): Promise<void> {
     if (!projectId.value) return
 
-    // 优先从 render-config seed 取值
-    const seeded = renderMeta.value?.tb_values?.other_current_1231_unadjusted
-    const seededAudited = renderMeta.value?.tb_values?.other_current_1231_audited
+    // 优先从 render-config seed 取值（render 已按最长前缀归属算好，口径同源）
+    const seeded = renderMeta.value?.tb_values?.other_current_unadjusted
+    const seededAudited = renderMeta.value?.tb_values?.other_current_audited
     if (seeded != null) {
       tbData.value = {
-        unadjusted1231: Number(seeded) || 0,
-        audited1231: Number(seededAudited) || 0,
+        unadjusted: Number(seeded) || 0,
+        audited: Number(seededAudited) || 0,
       }
       return
     }
 
+    const codes = _queryCodes()
     try {
       const res = await api.get(`/api/projects/${projectId.value}/trial-balance`, {
-        params: { account_prefix: '1231' },
+        params: { account_prefix: codes[0] },
         _silent: true,
       } as any)
       const list: any[] = Array.isArray(res?.data ?? res) ? (res?.data ?? res) : (res?.data?.items ?? [])
 
-      let unadjusted = 0
-      let audited = 0
-      let found = false
+      const rows = list.map((item) => ({
+        code: String(item.standard_account_code ?? item.account_code ?? ''),
+        unadjusted: Number(item.unadjusted_amount ?? 0) || 0,
+        audited: Number(item.audited_amount ?? 0) || 0,
+      }))
+      // 最长前缀求和：父子并存时不双计（`1901` 与 `1901-01` 可能同时在册）
+      const sum = sumLongestPrefixOnly(rows, codes)
+      const found = rows.some((r) => codes.some((c) => r.code === c || r.code.startsWith(c)))
 
-      for (const item of list) {
-        const code = String(item.standard_account_code ?? item.account_code ?? '')
-        if (code.startsWith(ACCOUNT_CODE_1231)) {
-          unadjusted = Number(item.unadjusted_amount ?? 0)
-          audited = Number(item.audited_amount ?? 0)
-          found = true
-        }
-      }
-
-      tbData.value = { unadjusted1231: unadjusted, audited1231: audited }
+      tbData.value = { unadjusted: sum.unadjusted, audited: sum.audited }
 
       if (!found) {
-        ElMessage.warning('科目1231其他流动资产未在试算表中找到，请先导入试算表')
+        ElMessage.warning(
+          `科目 ${codes.join('、')} ${K2_ACCOUNT_NAME}未在试算表中找到，请先导入试算表`,
+        )
       }
     } catch {
-      tbData.value = { unadjusted1231: 0, audited1231: 0 }
+      tbData.value = { unadjusted: 0, audited: 0 }
     }
   }
 
@@ -237,40 +247,42 @@ export function useK2FormData(wpId: Ref<string>, projectId: Ref<string>) {
    * 外部设置 TB 值（从 render 策略 seed 或组件 watch 调用）。
    */
   function setTbValues(values: Partial<K2TbData>): void {
-    if (values.unadjusted1231 != null) {
-      tbData.value.unadjusted1231 = values.unadjusted1231
+    if (values.unadjusted != null) {
+      tbData.value.unadjusted = values.unadjusted
     }
-    if (values.audited1231 != null) {
-      tbData.value.audited1231 = values.audited1231
+    if (values.audited != null) {
+      tbData.value.audited = values.audited
     }
   }
 
-  // ─── writebackTB（1231 其他流动资产） ──────────────────────────────────────
+  // ─── writebackTB（其他流动资产，科目由报表映射解析） ────────────────────────
 
   /**
-   * 审定数回写 trial_balance：科目1231其他流动资产（借方/资产类）。
+   * 审定数回写 trial_balance：其他流动资产（借方/资产类）。
    * 回写成功后发布 EventBus 'substantive:adjudicated' 通知附注刷新。
    *
-   * Req 2.6: WHEN 审定数变化时 SHALL 回写trial_balance(1231)+发布'substantive:adjudicated'
+   * 🔴 科目码取解析结果（实证 `1901`），**不是** `1231`（那是应收款项坏账准备，
+   * 往它回写会覆盖 D1/D2/K1 的坏账口径）。
    */
   async function writebackTB(auditedAmount: number): Promise<void> {
     if (!projectId.value) return
+    const accountCode = _queryCodes()[0] || K2_GROSS_FALLBACK_STANDARD
     try {
       await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: ACCOUNT_CODE_1231,
+        account_code: accountCode,
         audited_amount: auditedAmount,
       })
 
       // EventBus publish 'substantive:adjudicated'
       eventBus.emit('substantive:adjudicated', {
-        accountCode: ACCOUNT_CODE_1231,
+        accountCode,
         auditedAmount,
         wpCode: 'K2',
         timestamp: Date.now(),
       })
 
       // 同步更新本地 tbData
-      tbData.value.audited1231 = auditedAmount
+      tbData.value.audited = auditedAmount
     } catch {
       ElMessage.warning('审定数回写失败，请手动确认试算表数据')
     }

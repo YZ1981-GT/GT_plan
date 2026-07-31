@@ -362,9 +362,12 @@ async function onPullNatureFromTB() {
   }
   pullingFromTb.value = true
   try {
-    const applied = pullNatureFromTB()
+    const { applied, cleared } = pullNatureFromTB()
     if (applied > 0) {
-      ElMessage.success(`已从四表库带入 ${applied} 个性质分类的未审数（期初/期末）`)
+      const tail = cleared > 0
+        ? `；另有 ${cleared} 个四表库无数据的性质已置 0（避免与 F1-2 明细占位「其他」重复计入）`
+        : ''
+      ElMessage.success(`已从四表库带入 ${applied} 个性质分类的未审数（期初/期末）${tail}`)
     }
   } finally {
     pullingFromTb.value = false

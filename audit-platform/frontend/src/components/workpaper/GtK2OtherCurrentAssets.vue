@@ -57,8 +57,10 @@
           :all-responses="allResponses"
           :tb-data="tbData"
           :prefill="adjudicationPrefill"
+          :tb-source-codes="tbSourceCodes"
           :is-readonly="isReadonly"
           @save="handleChildSave"
+          @remove="handleChildRemove"
           @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 
@@ -68,6 +70,7 @@
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
+          :tb-source-codes="tbSourceCodes"
           :is-readonly="isReadonly"
           @save="handleChildSave"
           @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
@@ -79,6 +82,7 @@
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
+          :tb-source-codes="tbSourceCodes"
           :is-readonly="isReadonly"
           @save="handleChildSave"
           @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
@@ -112,6 +116,7 @@
           :wp-id="props.wpId"
           :project-id="props.projectId"
           :all-responses="allResponses"
+          :tb-source-codes="tbSourceCodes"
           :is-readonly="isReadonly"
           :year="props.year"
           @save="handleChildSave"
@@ -177,7 +182,15 @@ import {
   WorkpaperRuntimeContextKey,
   type WorkpaperRuntimeContext,
 } from './composables/useWorkpaperScaffold'
+import {
+  sumLongestPrefixOnly,
+  tbQueryCodes,
+  type TbSourceCodes,
+} from './composables/shared/tbSourceCodes'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
+
+/** 原值兜底标准码（报表行 BS-014 实证公式 `TB('1901','期末余额')`） */
+const K2_GROSS_FALLBACK_STANDARD = '1901'
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 
@@ -221,14 +234,27 @@ const projectIdRef = computed<string | undefined>(() => props.projectId || undef
 const persistence = useChecklistPersistence({ wpId: wpIdRef, projectId: projectIdRef })
 const allResponses = persistence.responses
 const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
-const tbData = ref({
-  unadjusted1231: 0,
-  audited1231: 0,
-})
+
+/**
+ * 试算平衡表核对数 —— 口径由报表行 `BS-014` 映射解析得出（见 `tbSourceCodes`）。
+ * 🔴 历史实现按硬编码前缀 `1231` 汇总，而 `1231` 是应收款项坏账准备，与本科目无关。
+ */
+const tbData = ref({ unadjusted: 0, audited: 0 })
 
 /** K2-1 审定表明细子科目预填（来自后端 render adjudication_prefill） */
 const adjudicationPrefill = computed(() =>
   Array.isArray(props.htmlData?.adjudication_prefill) ? props.htmlData.adjudication_prefill : []
+)
+
+/** 四表取数溯源（report_line_accounts 解析结果，供溯源面板 + 回写科目码） */
+const tbSourceCodes = computed<TbSourceCodes | null>(() => {
+  const src = props.htmlData?.tb_source_codes
+  return src && typeof src === 'object' ? (src as TbSourceCodes) : null
+})
+
+/** 试算平衡表查询口径（标准码集）；溯源缺失时回退 `1901` */
+const tbQueryStandardCodes = computed(() =>
+  tbQueryCodes(tbSourceCodes.value?.gross_standard, K2_GROSS_FALLBACK_STANDARD),
 )
 
 // ─── 版本链 + 复核对话 provide（供子组件inject使用）────────────────────────
@@ -326,34 +352,56 @@ async function handleChildSave(itemId: string, value: unknown): Promise<void> {
   }
 }
 
-// ─── TB自动取数（1231其他流动资产） ──────────────────────────────────────────
+/**
+ * 子组件删除动态行 → 清理该行全部字段键。
+ *
+ * `checklist_responses` 无删除端点（PUT 语义是 upsert）→ 置空串即视为无值
+ * （`readNum` 归 0、`readRaw` 返空），与「行已删除」等价且不留脏数据。
+ */
+async function handleChildRemove(itemIds: string[]): Promise<void> {
+  if (!props.wpId || !itemIds?.length) return
+  for (const id of itemIds) {
+    try {
+      await persistence.save(id, toChecklistPatch(''))
+    } catch (error) {
+      console.warn(`[GtK2OtherCurrentAssets] remove failed: ${id}`, error)
+    }
+  }
+  runtime?.version.scheduleAutoSnapshot()
+  emit('save')
+}
+
+// ─── TB 自动取数（口径 = 报表行 BS-014 解析出的标准码，实证 1901） ─────────────
 async function _loadTbData(): Promise<void> {
+  // render 已按最长前缀归属算好 → 优先直读，避免重复请求与口径分叉
+  const tv = props.htmlData?.tb_values
+  if (tv && typeof tv === 'object') {
+    tbData.value = {
+      unadjusted: Number((tv as any).other_current_unadjusted ?? 0) || 0,
+      audited: Number((tv as any).other_current_audited ?? 0) || 0,
+    }
+    return
+  }
   if (!props.projectId) return
+  // selfLoad 路径（htmlData 为 null）兜底请求：按解析出的标准码取，最长前缀求和防父子双计
   try {
+    const codes = tbQueryStandardCodes.value
     const res = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
-      params: { account_prefix: '1231', year: props.year },
+      params: { account_prefix: codes[0], year: props.year },
       _silent: true,
     } as any)
     const list: any[] = Array.isArray(res?.data?.data ?? res?.data) ? (res?.data?.data ?? res?.data) : []
-    let u1231 = 0, a1231 = 0
-    for (const item of list) {
-      const code = String(item.standard_account_code ?? item.account_code ?? '')
-      if (code.startsWith('1231')) {
-        u1231 += Number(item.unadjusted_amount ?? 0)
-        a1231 += Number(item.audited_amount ?? 0)
-      }
-    }
-    tbData.value.unadjusted1231 = u1231
-    tbData.value.audited1231 = a1231
-
-    // Seed K2-1审定表合计未审数（仅首次无持久化数据时预填）
-    const existingUnadj = allResponses.get('K2-1-subtotal-unadj')
-    if (!existingUnadj?.remark && u1231 > 0) {
-      // 写入allResponses供K2-1 buildRow读取(不覆盖已有手工值)
-      allResponses.set('K2-1-subtotal-unadj', { item_id: 'K2-1-subtotal-unadj', remark: String(u1231) })
-    }
+    const sum = sumLongestPrefixOnly(
+      list.map((item) => ({
+        code: String(item.standard_account_code ?? item.account_code ?? ''),
+        unadjusted: Number(item.unadjusted_amount ?? 0) || 0,
+        audited: Number(item.audited_amount ?? 0) || 0,
+      })),
+      codes,
+    )
+    tbData.value = { unadjusted: sum.unadjusted, audited: sum.audited }
   } catch {
-    // TB取数失败静默处理
+    // TB取数失败静默处理（fail-open）
   }
 }
 

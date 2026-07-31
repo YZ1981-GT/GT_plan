@@ -1,77 +1,101 @@
 <template>
   <div class="h7-tab-disclosure-soe">
-    <!-- 审计目标 -->
     <el-alert type="info" :closable="false" show-icon class="obj-alert">
       <template #title>
-        审计目标：按国有企业财务报表附注要求披露生产性生物资产的账面变动、计量政策与经营管理信息，
-        数据与 H7-1 审定表勾稽一致。
+        审计目标：按国有企业财务报表附注要求，分产业及具体类别披露生产性生物资产的
+        期初 / 增加 / 减少 / 期末账面价值，数据与 H7-1 审定表勾稽一致。
       </template>
     </el-alert>
 
-    <!-- 工具栏 -->
     <div class="tab-toolbar">
       <span class="chip-wrap"><GtIndexChip value="wp:H7-1" :context-project-id="projectId" /></span>
+      <span class="chip-wrap"><GtIndexChip :value="`Note:${noteSectionId}`" :context-project-id="projectId" /></span>
       <el-tag size="small" type="info">国有企业版</el-tag>
-      <el-tag size="small" :type="hasAdjudicatedData ? 'success' : 'warning'">{{ hasAdjudicatedData ? '已接收审定数' : '待审定' }}</el-tag>
+      <el-button
+        size="small"
+        type="primary"
+        :loading="isSyncing"
+        :disabled="isReadonly || !projectId"
+        data-testid="h7-disclosure-soe-sync"
+        @click="syncToNotes"
+      >同步到附注</el-button>
     </div>
 
     <el-card shadow="never" class="block-card">
       <template #header>
         <div class="section-title">
-          <span>附注披露 — 国有企业版</span>
+          <span>（1）以成本计量</span>
           <div class="title-actions">
-            <el-button size="small" link @click="handleReview('H7-disc-soe')">💬 复核</el-button>
+            <el-button size="small" link @click="handleReview('soe-policy')">💬 复核</el-button>
           </div>
         </div>
       </template>
+      <H7SoeIndustryTable
+        :rows="costRows"
+        :is-readonly="isReadonly"
+        @change="(i, c, f, v) => onCellChange('cost', i, c, f, v)"
+        @add="(i) => onAddCategory('cost', i)"
+        @rename="(i, c) => onRenameCategory('cost', i, c)"
+        @remove="(i, c) => onRemoveCategory('cost', i, c)"
+      />
+    </el-card>
 
-      <el-alert v-if="!hasAdjudicatedData" type="info" :closable="false" show-icon class="hint-alert">
-        尚未接收审定数据。请先完成 H7-1 审定表并确认审定，本表将自动同步账面数据。
-      </el-alert>
+    <el-card shadow="never" class="block-card">
+      <template #header>
+        <div class="section-title">
+          <span>（2）以公允价值计量</span>
+          <div class="title-actions">
+            <el-button size="small" link @click="handleReview('soe-fair-basis')">💬 复核</el-button>
+          </div>
+        </div>
+      </template>
+      <H7SoeIndustryTable
+        :rows="fairRows"
+        :is-readonly="isReadonly"
+        @change="(i, c, f, v) => onCellChange('fair', i, c, f, v)"
+        @add="(i) => onAddCategory('fair', i)"
+        @rename="(i, c) => onRenameCategory('fair', i, c)"
+        @remove="(i, c) => onRemoveCategory('fair', i, c)"
+      />
+    </el-card>
 
-      <!-- （一）生产性生物资产账面变动 -->
-      <div class="note-section">
-        <h4>（一）生产性生物资产账面变动</h4>
-        <el-table :data="movementRows" border size="small" class="note-table">
-          <el-table-column prop="item" label="项目" min-width="150" />
-          <el-table-column label="原值" min-width="130" align="right">
-            <template #default="{ row }"><span class="amount-cell">{{ fmtAmt(row.cost) }}</span></template>
-          </el-table-column>
-          <el-table-column label="累计折旧" min-width="130" align="right">
-            <template #default="{ row }"><span class="amount-cell">{{ fmtAmt(row.dep) }}</span></template>
-          </el-table-column>
-          <el-table-column label="减值准备" min-width="130" align="right">
-            <template #default="{ row }"><span class="amount-cell">{{ fmtAmt(row.imp) }}</span></template>
-          </el-table-column>
-          <el-table-column label="账面价值" min-width="130" align="right" class-name="auto-calc-col">
-            <template #default="{ row }"><span class="formula-cell" title="账面价值=原值-累计折旧-减值准备">{{ fmtAmt(row.cost - row.dep - row.imp) }}</span></template>
-          </el-table-column>
-        </el-table>
-      </div>
-
-      <!-- （二）计量政策 -->
-      <div class="note-section">
-        <h4>（二）计量政策与折旧方法</h4>
-        <el-input v-model="policyText" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" placeholder="披露计量模式、折旧方法、折旧年限与残值率等会计政策..." :disabled="isReadonly" @blur="persist('H7-disc-soe-policy', policyText)" />
-      </div>
-
-      <!-- （三）经营管理与国资监管信息 -->
-      <div class="note-section">
-        <h4>（三）经营管理与国资监管信息</h4>
-        <el-input v-model="disclosureText" type="textarea" :autosize="{ minRows: 4, maxRows: 12 }" placeholder="补充披露内容（国有资产保值增值、重大处置审批、自然灾害损失、抵押担保等）..." :disabled="isReadonly" @blur="persist('H7-disc-soe-text', disclosureText)" />
+    <el-card shadow="never" class="block-card">
+      <template #header><div class="section-title"><span>文字披露</span></div></template>
+      <div v-for="k in NOTE_KEYS" :key="k" class="note-section">
+        <div class="note-head">
+          <h4>{{ H7_NOTE_TEXT_TITLES[k] }}</h4>
+          <div class="title-actions">
+            <el-button
+              size="small"
+              link
+              :loading="aiLoadingSection === k"
+              :disabled="isReadonly"
+              @click="runAi(k)"
+            >🤖 AI 辅助</el-button>
+            <el-button size="small" link @click="handleReview(k)">💬 复核</el-button>
+          </div>
+        </div>
+        <div v-if="SRC_HINT[k]" class="src-hint">{{ SRC_HINT[k] }}</div>
+        <el-input
+          :model-value="noteTexts[k]"
+          type="textarea"
+          :autosize="{ minRows: 4, maxRows: 12 }"
+          :disabled="isReadonly"
+          :placeholder="`请填写${H7_NOTE_TEXT_TITLES[k]}…`"
+          @input="(v: string) => onNoteInput(k, v)"
+        />
       </div>
     </el-card>
 
-    
-    <!-- 编制提示 -->
     <details class="compile-hint">
       <summary>编制提示（CAS 5 生物资产准则）</summary>
       <ul>
-        <li>附注账面数据从 H7-1 审定表通过 EventBus(substantive:adjudicated) 自动同步。</li>
-        <li>国有企业须按 CAS 5 及财政部报表格式披露分类原值/累计折旧/减值准备/账面价值。</li>
-        <li>披露计量模式、折旧方法（直线法）、折旧年限、残值率等会计政策。</li>
+        <li>行结构 = 4 个产业（一、种植业 / 二、畜牧养殖业 / 三、林业 / 四、水产业）+
+          每产业下「其中：N．」具体类别 + 合计；点产业行的「＋ 类别」新增明细。</li>
+        <li>期末账面价值 = 期初账面价值 + 本期增加额 − 本期减少额（只读派生）。</li>
+        <li>产业行有类别明细时金额 = 类别之和（只读）；无类别明细时可直接填列产业行。</li>
+        <li>合计行 = 4 个产业行之和，应与审定表 H7-1 审定数一致。</li>
         <li>关注国有资产保值增值、重大资产处置审批程序合规性。</li>
-        <li>披露抵押担保、自然灾害损失、重大期后事项等特殊情况。</li>
       </ul>
     </details>
   </div>
@@ -79,114 +103,271 @@
 
 <script setup lang="ts">
 /**
- * H7TabDisclosureSoe.vue — H7 附注披露（国有企业）
+ * H7TabDisclosureSoe.vue — H7 生产性生物资产 附注披露（国有企业）
  *
- * 账面变动表(EventBus + allResponses 解析) + 政策/国资监管文字披露。
+ * 按源模板 `附注披露信息（国有企业）` 重建：两张 5 列表（4 产业 + 可扩类别行 + 合计）。
+ * 重建前本组件只有单行只读 `movementRows`，无产业与类别维度、无同步链路。
  *
- * 🔴 **暂无同步链路**（列入 MISSING_SYNC_PATH，需结构对齐重建）：源模板 §八、24 是
- *    「以成本计量」/「以公允价值计量」两张明细表（项目 种植业/畜牧养殖业/林业/水产业
- *    + 其中，列 期初账面价值/本期增加额/本期减少额/期末账面价值），本组件当前只有单行
- *    movementRows，无法在不自造的前提下映射。需按 G6 范式结构对齐重建（另立批次）。
+ * spec: h7-biological-assets-disclosure-rebuild (Task 7)
  */
-import { ref, computed, onMounted, onUnmounted, inject } from 'vue'
-import { ElMessage } from 'element-plus'
+import { computed, inject, onBeforeUnmount, onMounted, ref, toRef, watch } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
-import { eventBus } from '@/utils/eventBus'
 import GtIndexChip from '../../GtIndexChip.vue'
+import H7SoeIndustryTable from './H7SoeIndustryTable.vue'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import { useDisclosureNoteAi } from '../../composables/useDisclosureNoteAi'
+import {
+  H7_SOE_GUIDANCE,
+  H7_SOE_INDUSTRIES,
+  H7_SOE_KEYS,
+  buildSoeDisplayRows,
+  createDefaultSoeBlocks,
+  nextSoeCategoryId,
+  type H7SoeIndustryBlock,
+} from '../../composables/h7SoeDisclosureModel'
+import type { H7IndustryKey } from '../../composables/h7ListedDisclosureModel'
+import {
+  H7_NOTE_TEXT_TITLES,
+  buildH7SoeSyncPayloads,
+} from '../../composables/h7DisclosureSyncPayload'
+import { H7_NOTE_SECTION } from '../../composables/h7NoteSectionMap'
 
 const props = defineProps<{
   wpId: string
   projectId: string
   allResponses: Map<string, any>
   isReadonly: boolean
+  applicableStandards?: string[]
 }>()
 
-const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+const emit = defineEmits<{ (e: 'save', itemId: string, value: any): void }>()
 
-const localResponses = ref<Map<string, any>>(new Map(props.allResponses ?? []))
-const policyText = ref('')
-const disclosureText = ref('')
-const adjudicatedAmount = ref<number | null>(null)
+const noteSectionId = H7_NOTE_SECTION.soe
+const isSyncing = ref(false)
 
-function num(v: any): number { const n = Number(v); return Number.isFinite(n) ? n : 0 }
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+onBeforeUnmount(() => autoSync.cancelPending())
 
-function getStr(itemId: string): string {
-  const item = localResponses.value.get(itemId)
-  return (item?.remark ?? item?.conclusion ?? '') as string
+const NOTE_KEYS = ['soe-policy', 'soe-fair-basis', 'soe-supplement'] as const
+type NoteKey = (typeof NOTE_KEYS)[number]
+
+const SRC_HINT: Record<string, string> = {
+  'soe-fair-basis': H7_SOE_GUIDANCE.fairBasis,
+  'soe-supplement': `${H7_SOE_GUIDANCE.supplement}${H7_SOE_GUIDANCE.risk}`,
 }
 
-const hasAdjudicatedData = computed(() => adjudicatedAmount.value != null || localResponses.value.has('H7-1-cost-orig') || localResponses.value.has('H7-1-fair'))
+const NOTE_ITEM_ID: Record<NoteKey, string> = {
+  'soe-policy': H7_SOE_KEYS.notePolicy,
+  'soe-fair-basis': H7_SOE_KEYS.noteFairBasis,
+  'soe-supplement': H7_SOE_KEYS.noteSupplement,
+}
 
-const movementRows = computed(() => {
-  const origRaw = getStr('H7-1-cost-orig')
-  const depRaw = getStr('H7-1-cost-dep')
-  const impRaw = getStr('H7-1-cost-imp')
-  if (origRaw) {
-    try {
-      const orig = JSON.parse(origRaw)
-      const dep = depRaw ? JSON.parse(depRaw) : {}
-      const imp = impRaw ? JSON.parse(impRaw) : {}
-      const cost = num(orig.unadjusted) + num(orig.aje) + num(orig.rje)
-      const depEnd = num(dep.begin) + num(dep.credit) - num(dep.debit) + num(dep.aje)
-      const impEnd = num(imp.begin) + num(imp.credit) - num(imp.debit) + num(imp.aje)
-      return [{ item: '生产性生物资产（成本模式）', cost, dep: depEnd, imp: impEnd }]
-    } catch { /* ignore */ }
-  }
-  const fairRaw = getStr('H7-1-fair')
-  if (fairRaw) {
-    try {
-      const fair = JSON.parse(fairRaw)
-      const cost = num(fair.unadjusted) + num(fair.aje)
-      return [{ item: '生产性生物资产（公允价值模式）', cost, dep: 0, imp: 0 }]
-    } catch { /* ignore */ }
-  }
-  return [{ item: '生产性生物资产', cost: adjudicatedAmount.value ?? 0, dep: 0, imp: 0 }]
+type Mode = 'cost' | 'fair'
+
+const blocks = ref<Record<Mode, H7SoeIndustryBlock[]>>({
+  cost: createDefaultSoeBlocks(),
+  fair: createDefaultSoeBlocks(),
+})
+const noteTexts = ref<Record<string, string>>({
+  'soe-policy': '', 'soe-fair-basis': '', 'soe-supplement': '',
 })
 
-function onAdjudicated(payload: any) {
-  if (!payload) return
-  if (payload.accountCode === '1621' || payload.componentType === 'h7-biological-assets') {
-    adjudicatedAmount.value = num(payload.auditedAmount)
-  }
+const costRows = computed(() => buildSoeDisplayRows(blocks.value.cost))
+const fairRows = computed(() => buildSoeDisplayRows(blocks.value.fair))
+
+const responses = toRef(props, 'allResponses')
+
+function readRaw(itemId: string): string {
+  const item = responses.value?.get(itemId)
+  return String(item?.remark ?? item?.conclusion ?? '')
 }
 
-async function loadOwn() {
+function parseBlocks(raw: string): H7SoeIndustryBlock[] {
+  if (!raw.trim()) return createDefaultSoeBlocks()
   try {
-    const list: any[] = await api.get(`/api/workpapers/${props.wpId}/checklist-responses`)
-    const m = new Map(localResponses.value)
-    for (const r of (Array.isArray(list) ? list : [])) {
-      if (r.item_id?.startsWith('H7-')) m.set(r.item_id, { item_id: r.item_id, conclusion: r.conclusion ?? null, remark: r.remark ?? null })
-    }
-    localResponses.value = m
-  } catch { /* empty */ }
-  policyText.value = getStr('H7-disc-soe-policy')
-  disclosureText.value = getStr('H7-disc-soe-text')
-}
-
-async function persist(itemId: string, value: any) {
-  const remark = value == null ? null : (typeof value === 'string' ? value : JSON.stringify(value))
-  localResponses.value.set(itemId, { item_id: itemId, conclusion: null, remark })
-  try {
-    await api.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
-      project_id: props.projectId,
-      items: [{ item_id: itemId, conclusion: null, remark }],
+    const v = JSON.parse(raw)
+    if (!Array.isArray(v)) return createDefaultSoeBlocks()
+    // 反序列化补齐：缺失产业按源模板四类补空块，顺序归一
+    return H7_SOE_INDUSTRIES.map((ind) => {
+      const hit = v.find((b: any) => b?.key === ind.key)
+      return {
+        key: ind.key,
+        selfAmounts: {
+          begin: Number(hit?.selfAmounts?.begin) || 0,
+          increase: Number(hit?.selfAmounts?.increase) || 0,
+          decrease: Number(hit?.selfAmounts?.decrease) || 0,
+        },
+        categories: Array.isArray(hit?.categories)
+          ? hit.categories.map((c: any) => ({
+              id: String(c?.id ?? ''),
+              name: String(c?.name ?? ''),
+              begin: Number(c?.begin) || 0,
+              increase: Number(c?.increase) || 0,
+              decrease: Number(c?.decrease) || 0,
+            })).filter((c: any) => c.id && c.name)
+          : [],
+      }
     })
-  } catch { ElMessage.error('保存失败，请稍后重试') }
+  } catch { return createDefaultSoeBlocks() }
 }
 
-function handleReview(id: string) { openReviewDialog(id) }
-function fmtAmt(v: number | null | undefined): string {
-  if (v == null) return '-'
-  return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+function hydrate(): void {
+  blocks.value = {
+    cost: parseBlocks(readRaw(H7_SOE_KEYS.cost)),
+    fair: parseBlocks(readRaw(H7_SOE_KEYS.fair)),
+  }
+  for (const k of NOTE_KEYS) noteTexts.value[k] = readRaw(NOTE_ITEM_ID[k])
 }
 
-onMounted(() => {
-  void loadOwn()
-  eventBus.on('substantive:adjudicated', onAdjudicated)
+onMounted(hydrate)
+watch(responses, hydrate, { deep: false })
+
+function persist(itemId: string, value: unknown): void {
+  const remark = typeof value === 'string' ? value : JSON.stringify(value)
+  emit('save', itemId, remark)
+  autoSync.scheduleAutoSync(syncToNotes)
+}
+
+function persistMode(mode: Mode): void {
+  persist(mode === 'cost' ? H7_SOE_KEYS.cost : H7_SOE_KEYS.fair, blocks.value[mode])
+}
+
+function blockOf(mode: Mode, industryKey: string | undefined): H7SoeIndustryBlock | undefined {
+  return blocks.value[mode].find((b) => b.key === industryKey)
+}
+
+function onCellChange(
+  mode: Mode,
+  industryKey: string | undefined,
+  categoryId: string | undefined,
+  field: 'begin' | 'increase' | 'decrease',
+  value: number,
+): void {
+  const block = blockOf(mode, industryKey)
+  if (!block) return
+  if (categoryId) {
+    const cat = block.categories.find((c) => c.id === categoryId)
+    if (!cat) return
+    cat[field] = value
+  } else {
+    block.selfAmounts[field] = value
+  }
+  persistMode(mode)
+}
+
+async function onAddCategory(mode: Mode, industryKey: string | undefined): Promise<void> {
+  if (props.isReadonly) return
+  const block = blockOf(mode, industryKey)
+  if (!block) return
+  try {
+    const { value } = await ElMessageBox.prompt(
+      '请输入类别名称（如 苹果树 / 奶牛 / 杉木）', '新增类别明细行',
+      { confirmButtonText: '创建', cancelButtonText: '取消' },
+    )
+    const name = String(value ?? '').trim()
+    if (!name) { ElMessage.warning('类别名称不能为空'); return }
+    block.categories.push({
+      id: nextSoeCategoryId(block, industryKey as H7IndustryKey),
+      name,
+      begin: 0, increase: 0, decrease: 0,
+    })
+    persistMode(mode)
+  } catch { /* 用户取消 */ }
+}
+
+async function onRenameCategory(
+  mode: Mode, industryKey: string | undefined, categoryId: string | undefined,
+): Promise<void> {
+  if (props.isReadonly) return
+  const cat = blockOf(mode, industryKey)?.categories.find((c) => c.id === categoryId)
+  if (!cat) return
+  try {
+    const { value } = await ElMessageBox.prompt('请输入类别名称', '修改类别名称', {
+      inputValue: cat.name, confirmButtonText: '保存', cancelButtonText: '取消',
+    })
+    const name = String(value ?? '').trim()
+    if (!name) { ElMessage.warning('类别名称不能为空'); return }
+    cat.name = name
+    persistMode(mode)
+  } catch { /* 用户取消 */ }
+}
+
+async function onRemoveCategory(
+  mode: Mode, industryKey: string | undefined, categoryId: string | undefined,
+): Promise<void> {
+  if (props.isReadonly) return
+  const block = blockOf(mode, industryKey)
+  const cat = block?.categories.find((c) => c.id === categoryId)
+  if (!block || !cat) return
+  try {
+    await ElMessageBox.confirm(`确认删除类别明细行「${cat.name}」？`, '删除类别', {
+      type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消',
+    })
+  } catch { return }
+  block.categories = block.categories.filter((c) => c.id !== categoryId)
+  persistMode(mode)
+}
+
+function onNoteInput(key: NoteKey, v: string): void {
+  noteTexts.value[key] = v
+  persist(NOTE_ITEM_ID[key], v)
+}
+
+// 🔴 `inject` 只能在 setup 顶层调用（写进函数体会在点击时抛 TypeError 被 catch 吞掉）
+const openReviewDialogFn = inject<((p: Record<string, unknown>) => void) | null>(
+  'openReviewDialog', null,
+)
+
+const { aiLoadingSection, runAi, openReview } = useDisclosureNoteAi({
+  wpId: () => props.wpId,
+  isReadonly: () => props.isReadonly,
+  getText: (k) => noteTexts.value[k] || '',
+  setText: (k, text) => onNoteInput(k as NoteKey, text),
+  buildSectionId: (k) => `H7-disc-${k}`,
+  buildContext: (k) => ({
+    section_label: H7_NOTE_TEXT_TITLES[k] || k,
+    industries: H7_SOE_INDUSTRIES.map((i) => i.shortLabel).join('、'),
+  }),
+  labelOf: (k) => H7_NOTE_TEXT_TITLES[k] || k,
+  openReviewDialog: openReviewDialogFn,
 })
-onUnmounted(() => {
-  eventBus.off('substantive:adjudicated', onAdjudicated)
-})
+
+function handleReview(key: string): void {
+  openReview(key)
+}
+
+async function syncToNotes(): Promise<void> {
+  if (isSyncing.value || props.isReadonly || !props.projectId || !props.wpId) return
+  const payloads = buildH7SoeSyncPayloads(props.wpId, props.applicableStandards || [], {
+    cost: blocks.value.cost,
+    fair: blocks.value.fair,
+    notePolicy: noteTexts.value['soe-policy'] || '',
+    noteFairBasis: noteTexts.value['soe-fair-basis'] || '',
+    noteSupplement: noteTexts.value['soe-supplement'] || '',
+  })
+  if (!payloads.length) {
+    ElMessage.warning('当前不适用国企附注同步')
+    return
+  }
+  isSyncing.value = true
+  try {
+    let rows = 0
+    for (const payload of payloads) {
+      const result: any = await api.post(
+        `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,
+        payload,
+      )
+      const data = result?.data ?? result
+      rows += Number(data?.rows_synced ?? 0)
+    }
+    ElMessage.success(`已同步 ${rows} 行到附注「${noteSectionId}」`)
+  } catch {
+    ElMessage.warning('同步附注失败，请稍后重试')
+  } finally {
+    isSyncing.value = false
+  }
+}
 </script>
 
 <style scoped>
@@ -196,14 +377,19 @@ onUnmounted(() => {
 .chip-wrap { display: inline-flex; }
 .block-card { margin-bottom: 16px; }
 .section-title { display: flex; align-items: center; justify-content: space-between; }
-.title-actions { display: flex; gap: 8px; }
-.hint-alert { margin-bottom: 12px; }
-.note-section { margin-top: 20px; }
-.note-section h4 { font-size: 14px; margin-bottom: 8px; }
-.note-table { font-size: var(--wp-font-size, 13px); margin-bottom: 12px; }
-.note-table :deep(.auto-calc-col) { background: var(--el-fill-color-lighter); }
-.amount-cell { font-variant-numeric: tabular-nums; }
-.formula-cell { font-variant-numeric: tabular-nums; border-bottom: 1px dashed var(--el-border-color); cursor: help; }
+.title-actions { display: flex; gap: 8px; margin-left: auto; }
+.note-section { margin-top: 18px; }
+.note-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.note-head h4 { font-size: 14px; margin: 0; }
+.src-hint {
+  border-left: 3px solid var(--el-color-warning);
+  background: var(--el-color-warning-light-9);
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--el-text-color-regular);
+}
 .compile-hint { margin-top: 12px; font-size: 12px; color: var(--el-text-color-secondary); }
 .compile-hint summary { cursor: pointer; font-weight: 500; }
 .compile-hint ul { padding-left: 20px; margin-top: 8px; }

@@ -165,7 +165,7 @@
         <p>1. 调整分录(AJE)用于更正被审计单位财务报表中的错报；重分类分录(RJE)用于分析性归类调整。</p>
         <p>2. 借贷必须平衡后方可保存回写。点击"保存&amp;回写"将汇总AJE/RJE数据回写K2-1审定表。</p>
         <p>3. 保存后自动发布 adjustment:created 事件联动 A13 错报汇总底稿。</p>
-        <p>4. 其他流动资产科目代码 1231，资产类借方，期末=期初+借-贷。</p>
+        <p>4. 其他流动资产科目由报表行 BS-014 映射解析（实证 1901），资产类借方，期末=期初+借-贷。</p>
         <p>5. K2-5摊销测算差异超重要性水平时会推送建议AJE，本表自动接收。</p>
       </div>
     </details>
@@ -193,16 +193,25 @@ import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
 import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
+import { k2AccountCode } from '../../composables/k2AccountScope'
+import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
 
-const K2_ACCOUNT_CODE = '1231'
 const ITEM_PREFIX = 'K2-3-adj'
 
 const props = defineProps<{
   wpId: string
   projectId: string
   allResponses: Map<string, any>
+  /** 四表取数溯源（render 下发 `tb_source_codes`）—— 决定 EventBus 科目码 */
+  tbSourceCodes?: TbSourceCodes | null
   isReadonly: boolean
 }>()
+
+/**
+ * 事件科目码 —— 由报表行 `BS-014` 解析（实证 `1901`）。
+ * 🔴 历史写死 `1231` = 应收款项坏账准备，会让 A13/披露按错误科目匹配。
+ */
+const k2EventAccountCode = computed(() => k2AccountCode(props.tbSourceCodes))
 
 const emit = defineEmits<{
   (e: 'save', itemId: string, value: any): void
@@ -424,7 +433,7 @@ function handleSaveWriteback(): void {
   try {
     eventBus.emit('adjustment:created', {
       wpCode: 'K2',
-      accountCode: K2_ACCOUNT_CODE,
+      accountCode: k2EventAccountCode.value,
       projectId: props.projectId,
       ajeTotal,
       rjeTotal,

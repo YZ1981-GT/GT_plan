@@ -245,7 +245,7 @@
         <li>性质列选项：预付款项/待摊费用/合同取得成本/待抵扣税额/押金保证金/其他</li>
         <li>新增行需弹窗输入项目名称后创建</li>
         <li>明细合计应与K2-1审定表其他流动资产总额一致</li>
-        <li>"从序时账导入"从TB查1231子科目余额按名称归集，仅填空值不覆盖</li>
+        <li>"从序时账导入"按报表行 BS-014 解析出的科目（实证 1901）查子科目余额并按名称归集，仅填空值不覆盖</li>
         <li>导入导出支持按模板批量录入明细</li>
       </ul>
     </details>
@@ -265,6 +265,12 @@ import { MagicStick } from '@element-plus/icons-vue'
 import http from '@/utils/http'
 import { useK2Detail } from '../../composables/useK2Detail'
 import { useK2ImportExport } from '../../composables/useK2ImportExport'
+import {
+  K2_ACCOUNT_NAME,
+  k2AccountCode,
+  k2GrossQueryCodes,
+} from '../../composables/k2AccountScope'
+import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -272,6 +278,8 @@ const props = defineProps<{
   wpId: string
   projectId: string
   allResponses: Map<string, any>
+  /** 四表取数溯源（render 下发 `tb_source_codes`）—— 决定序时账导入的科目口径 */
+  tbSourceCodes?: TbSourceCodes | null
   isReadonly: boolean
 }>()
 
@@ -347,20 +355,25 @@ function handleImportData() {
 // ─── 从序时账导入 ─────────────────────────────────────────────────────────────
 
 async function handleImportFromLedger() {
+  // 🔴 科目口径取解析结果（报表行 BS-014 → 实证 1901）。历史实现按 `1231` 拉取，
+  // 会把**应收款项坏账准备**的子科目导进其他流动资产明细表。
+  const codes = k2GrossQueryCodes(props.tbSourceCodes)
+  const codeText = codes.join('、')
   try {
     const res = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
-      params: { account_prefix: '1231', year: undefined },
+      params: { account_prefix: codes[0], year: undefined },
       _silent: true,
     } as any)
     const list: any[] = Array.isArray(res?.data?.data ?? res?.data) ? (res?.data?.data ?? res?.data) : []
     if (list.length === 0) {
-      ElMessage.warning('未找到1231子科目余额数据')
+      ElMessage.warning(`未找到 ${codeText} 子科目余额数据`)
       return
     }
     const items = list
       .filter((item: any) => {
         const code = String(item.standard_account_code ?? item.account_code ?? '')
-        return code.startsWith('1231') && code.length > 4
+        // 只取明细子科目（严格分级边界，父级自身不导入）
+        return codes.some((c) => code.startsWith(`${c}-`) || code.startsWith(`${c}.`))
       })
       .map((item: any) => ({
         name: String(item.account_name ?? item.standard_account_name ?? '未知'),
@@ -368,7 +381,7 @@ async function handleImportFromLedger() {
         increase: Math.max(0, Number(item.closing_balance ?? item.unadjusted_amount ?? 0) - Number(item.opening_balance ?? 0)),
       }))
     if (items.length === 0) {
-      ElMessage.warning('未找到1231明细子科目')
+      ElMessage.warning(`未找到 ${codeText} 明细子科目`)
       return
     }
     await ElMessageBox.confirm(
@@ -415,14 +428,14 @@ function persistDetailConclusion(): void {
 async function handleAiGenerate() {
   try {
     const context: Record<string, string> = {
-      accountCode: '1231',
-      accountName: '其他流动资产',
+      accountCode: k2AccountCode(props.tbSourceCodes),
+      accountName: K2_ACCOUNT_NAME,
       sheet: 'K2-2',
       rowCount: String(detail.rows.value.length),
       endBalanceTotal: String(detail.subtotals.value.endBalance ?? 0),
     }
     const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
-      prompt: '请根据其他流动资产(1231)明细表数据，生成审计说明，概述主要项目、变动原因及审计关注点',
+      prompt: '请根据其他流动资产明细表数据，生成审计说明，概述主要项目、变动原因及审计关注点，不得虚构未提供的项目与金额',
       context,
       existingContent: detailAuditNote.value,
       section: 'K2-2-detail',
