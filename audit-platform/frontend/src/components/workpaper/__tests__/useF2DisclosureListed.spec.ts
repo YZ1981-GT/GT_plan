@@ -37,10 +37,11 @@ describe('safeRatio', () => {
 })
 
 describe('useF2DisclosureListed', () => {
-  it('分类行对齐 Excel：含在产品/数据资源等 9 类', () => {
+  // Sprint 8：9 → 11 类，补源模板注要求的「开发成本」「开发产品」
+  it('分类行对齐 Excel：含在产品/开发成本/开发产品/数据资源等 11 类', () => {
     expect(F2_LISTED_DISCLOSURE_CATEGORIES.map((c) => c.label)).toEqual([
-      '原材料', '在产品', '委托加工物资', '库存商品', '发出商品',
-      '周转材料', '合同履约成本', '消耗性生物资产', '数据资源',
+      '原材料', '在产品', '开发成本', '委托加工物资', '库存商品', '开发产品',
+      '发出商品', '周转材料', '合同履约成本', '消耗性生物资产', '数据资源',
     ])
   })
 
@@ -207,6 +208,11 @@ describe('useF2DisclosureListed', () => {
       conclusion: null,
       remark: '本期摊销合同履约成本 1,200,000.00 元，计入主营业务成本。',
     })
+    map.set('F2-note-listed-note-borrow', {
+      item_id: 'F2-note-listed-note-borrow',
+      conclusion: null,
+      remark: '存货期末余额中含有借款费用资本化金额 300,000.00 元。',
+    })
 
     const api = useF2DisclosureListed({
       allResponses: ref(map),
@@ -218,11 +224,79 @@ describe('useF2DisclosureListed', () => {
 
     const texts = buildF2ListedSubTableData(api.getSyncSnapshot())._note_texts as Array<{
       section: string
+      title: string
       text: string
     }>
     const amort = texts.find((t) => t.section === 'listed-note-amort')
     expect(amort?.text).toContain('计入主营业务成本')
+    // R20：title 必须是中文（缺省会让附注正文出现 `【listed-note-amort】`）
+    expect(amort?.title).toBe('合同履约成本本期摊销金额的说明')
     // 借款费用资本化仍独立成段，未被摊销说明顶替
     expect(texts.some((t) => t.section === 'listed-note-borrow')).toBe(true)
+    // R20：空文本域不入 _note_texts（本例未填分类说明）
+    expect(texts.some((t) => t.section === 'listed-note-category')).toBe(false)
+  })
+
+  it('R20 每条 _note_texts 都带非空中文 title', () => {
+    const map = new Map<string, ChecklistResponse>()
+    for (const key of ['category', 'nrv', 'provision', 'borrow', 'amort', 're']) {
+      map.set(`F2-note-listed-note-${key}`, {
+        item_id: `F2-note-listed-note-${key}`,
+        conclusion: null,
+        remark: `说明-${key}`,
+      })
+    }
+    const api = useF2DisclosureListed({
+      allResponses: ref(map),
+      isReadonly: ref(false),
+      applicableStandards: ref(['listed_standalone']),
+    })
+    const texts = buildF2ListedSubTableData(api.getSyncSnapshot())._note_texts as Array<{
+      section: string
+      title: string
+      text: string
+    }>
+    expect(texts).toHaveLength(6)
+    for (const t of texts) {
+      expect(t.title.trim()).not.toBe('')
+      // 禁止英文 section 键泄漏成标题
+      expect(t.title).not.toBe(t.section)
+      expect(/[a-z-]{6,}/.test(t.title)).toBe(false)
+    }
+  })
+
+  it('R21 计提方式二选一：推送表名互斥 + 另一组进 _removed_table_keys', () => {
+    const map = new Map<string, ChecklistResponse>()
+    const api = useF2DisclosureListed({
+      allResponses: ref(map),
+      isReadonly: ref(false),
+      applicableStandards: ref(['listed_standalone']),
+    })
+
+    const byPortfolio = buildF2ListedSubTableData(api.getSyncSnapshot())
+    expect(byPortfolio['按组合计提存货跌价准备']).toBeDefined()
+    expect(byPortfolio['按库龄组合计提存货跌价准备']).toBeUndefined()
+    expect(byPortfolio._removed_table_keys).toEqual([
+      '按库龄组合计提存货跌价准备',
+      '按库龄组合计提存货跌价准备（续）',
+    ])
+
+    api.setS3Mode('aging')
+    expect(api.s3Mode.value).toBe('aging')
+    // 空组合名时用库龄段预填骨架
+    expect(api.s3EndRows.value[0].groupName).toBe('1年以内')
+
+    const byAging = buildF2ListedSubTableData(api.getSyncSnapshot())
+    expect(byAging['按库龄组合计提存货跌价准备（续）']).toBeDefined()
+    expect(byAging['按组合计提存货跌价准备']).toBeUndefined()
+    expect(byAging._removed_table_keys).toEqual([
+      '按组合计提存货跌价准备',
+      '按组合计提存货跌价准备（续）',
+    ])
+    // 待删表名不得与本次推送表名相交（否则后端会被要求删刚推的表）
+    const pushed = new Set(Object.keys(byAging).filter((k) => !k.startsWith('_')))
+    for (const k of byAging._removed_table_keys as string[]) {
+      expect(pushed.has(k)).toBe(false)
+    }
   })
 })

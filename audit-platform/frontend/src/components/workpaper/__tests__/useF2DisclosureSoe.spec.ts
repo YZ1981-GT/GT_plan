@@ -40,9 +40,10 @@ describe('useF2DisclosureSoe', () => {
     setAdj(map, 'impairment', 'material-in-transit', { opening: 5, increase: 0, decrease: 0, adjustment: 0 })
     setAdj(map, 'gross', 'dev-costs', { opening: 200, increase: 0, decrease: 0, adjustment: 0 })
     setAdj(map, 'impairment', 'dev-costs', { opening: 20, increase: 0, decrease: 0, adjustment: 0 })
-    setAdj(map, 'gross', 'work-in-progress', { opening: 80, increase: 0, decrease: 0, adjustment: 0 })
-    setAdj(map, 'impairment', 'work-in-progress', { opening: 0, increase: 0, decrease: 0, adjustment: 0 })
-    setAdj(map, 'gross', 'semi-finished', { opening: 20, increase: 0, decrease: 0, adjustment: 0 })
+    // 🔴 原 fixture 还给 `work-in-progress` 喂了 80 —— 但审定表没有这个 rowKey
+    // （1404 是 `semi-finished`），属伪造键。Sprint 8 已把该死键从 sourceKeys 删除，
+    // 这里把金额并回真实键 `semi-finished`，保持「合并取数」的被验证语义（100 + 200 = 300）。
+    setAdj(map, 'gross', 'semi-finished', { opening: 100, increase: 0, decrease: 0, adjustment: 0 })
     setAdj(map, 'impairment', 'semi-finished', { opening: 0, increase: 0, decrease: 0, adjustment: 0 })
 
     const api = useF2DisclosureSoe({
@@ -58,7 +59,7 @@ describe('useF2DisclosureSoe', () => {
     expect(raw.priorNet).toBe(135)
 
     const wip = api.section1Rows.value.find((r) => r.rowKey === 'wip-combined')!
-    expect(wip.priorGross).toBe(300) // 80+20+200
+    expect(wip.priorGross).toBe(300) // semi-finished 100 + dev-costs 200
     const detail = api.section1Rows.value.find((r) => r.rowKey === 'dev-costs')!
     expect(detail.priorGross).toBe(200)
 

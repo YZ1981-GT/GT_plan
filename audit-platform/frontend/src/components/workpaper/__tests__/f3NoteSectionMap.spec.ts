@@ -27,18 +27,19 @@ describe('f3NoteSectionMap', () => {
     expect(resolveF3CurrentStandard('soe', [])).toBe('soe_standalone')
   })
 
-  it('分类行按附注模板行序：商业承兑 → 银行承兑', () => {
+  // 行序权威 = 源 xlsx「F3 应付票据.xlsx」r7 银行承兑汇票 / r8 商业承兑汇票
+  it('分类行按源模板行序：银行承兑 → 商业承兑', () => {
     const ordered = orderF3ClassRows([
       { label: '银行承兑汇票', endAmount: 100, priorAmount: 80 },
       { label: '商业承兑汇票', endAmount: 50, priorAmount: 40 },
     ])
-    expect(ordered[0].label).toBe('商业承兑汇票')
-    expect(ordered[1].label).toBe('银行承兑汇票')
+    expect(ordered[0].label).toBe('银行承兑汇票')
+    expect(ordered[1].label).toBe('商业承兑汇票')
   })
 
   it('审定表无数据时仍补齐模板固定两行（0 值）', () => {
     const ordered = orderF3ClassRows([])
-    expect(ordered.map((r) => r.label)).toEqual(['商业承兑汇票', '银行承兑汇票'])
+    expect(ordered.map((r) => r.label)).toEqual(['银行承兑汇票', '商业承兑汇票'])
     expect(ordered.every((r) => r.endAmount === 0 && r.priorAmount === 0)).toBe(true)
   })
 
@@ -58,8 +59,12 @@ describe('f3NoteSectionMap', () => {
     expect(payload.current_standard).toBe('soe_standalone')
     // 缺失的商业承兑行自动补 0，保持模板固定两行
     expect(payload.sub_table_data['应付票据'].map((r) => r.label)).toEqual([
-      '商业承兑汇票', '银行承兑汇票', '合计',
+      '银行承兑汇票', '商业承兑汇票', '合计',
     ])
+    // R1：国企列头用国企口径（类别 / 期初余额），不得沿用上市的 种类 / 上年年末余额
+    const soeCols = payload.columns!['应付票据']
+    expect(soeCols[0]).toMatchObject({ key: 'label', label: '类别', is_label: true })
+    expect(soeCols.find((c) => c.key === 'prior_amount')?.label).toBe('期初余额')
   })
 
   it('sync payload 指向 五、36 且含合计与附注说明', () => {
@@ -79,10 +84,12 @@ describe('f3NoteSectionMap', () => {
     expect(payload.current_standard).toBe('listed_standalone')
     const rows = payload.sub_table_data['应付票据']
     expect(rows).toHaveLength(3)
-    expect(rows[0].label).toBe('商业承兑汇票')
-    expect(rows[1].label).toBe('银行承兑汇票')
+    expect(rows[0].label).toBe('银行承兑汇票')
+    expect(rows[1].label).toBe('商业承兑汇票')
     expect(rows[2]).toMatchObject({ label: '合计', end_amount: 150, prior_amount: 120, is_total: true })
     expect(payload.sub_table_data['_note_texts'][0].text).toContain('已到期未支付')
+    // R5：中文 title（缺省会让附注正文渲染成 `【listed-note】`）
+    expect(payload.sub_table_data['_note_texts'][0].title).toBe('已到期未支付的应付票据说明')
     // disclosure-table-sync-convergence: 携带源对齐 columns（种类/期末余额/上年年末余额）
     expect(payload.columns).toBeDefined()
     const cols = payload.columns!['应付票据']

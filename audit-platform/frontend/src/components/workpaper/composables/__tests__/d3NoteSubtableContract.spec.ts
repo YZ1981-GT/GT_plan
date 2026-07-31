@@ -8,10 +8,13 @@
  * 2. 国企按账龄主表的行名走 `disclosureAgingLabels`（方案 A：同步层映射）——
  *    底稿显示 `1年以内`，推给附注必须是模板字面 `1年以内（含1年）`。
  *
- * 🔴 合计行按 D3 模板逐字为 `合计`（**无空格**，与 D2 §五、5 / §八、5 的 `合 计` 不同），
- *    故 D3 不套 `DISCLOSURE_TOTAL_LABEL`。本测试正向锁死此差异。
+ * 🔴 合计行字面**逐表**取源 xlsx（`D3 预收账款.xlsx`）字面，不套全局
+ *    `DISCLOSURE_TOTAL_LABEL`：上市三表 `合 计`（单空格，A13/A19/A26）/
+ *    国企主表 `合  计`（两空格，A9）/ 国企超1年表 `合计`（无空格，A15）。
+ *    单一真源 = `D3_NOTE_TOTAL_LABEL`，本测试正向锁死。
  *
  * spec: .kiro/specs/disclosure-columns-coverage-rollout/ R6（Task 13.6）
+ *     + .kiro/specs/d-cycle-remaining-disclosure-alignment/ Task 2（源模板对齐）
  */
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
@@ -20,6 +23,7 @@ import {
   buildD3SyncPayload,
   D3_DISCLOSURE_SHEET_NAME,
   D3_NOTE_SECTION,
+  D3_NOTE_TOTAL_LABEL,
   type D3DisclosureSnapshot,
 } from '../d3NoteSectionMap'
 import { DISCLOSURE_AGING_WITHIN1_SOE } from '../disclosureAgingLabels'
@@ -76,7 +80,8 @@ describe('D3 子表名 ↔ note_template 契约', () => {
   it('国企载荷子表名逐字存在于 §八、38', () => {
     const payload = buildD3SyncPayload('soe', 'wp-1', ['soe_standalone'], SOE_SNAPSHOT)
     const tplNames = (soeSection.tables ?? []).map((t) => t.name)
-    expect(dataTableNames(payload)).toEqual(['预收款项', '账龄超过1年的重要预收款项'])
+    // 源 xlsx A10 字面是「预收账款」（上市侧才是「预收款项」）
+    expect(dataTableNames(payload)).toEqual(['预收款项', '账龄超过1年的重要预收账款'])
     for (const name of dataTableNames(payload)) {
       expect(tplNames, `孤儿子表「${name}」`).toContain(name)
     }
@@ -90,6 +95,8 @@ describe('D3 子表名 ↔ note_template 契约', () => {
       '账龄超过1年的重要预收款项',
       '本期预收账款账面价值的重大变动',
     ])
+    // 上市主表标签列头 = 源 A6 字面「项 目」（单空格）
+    expect(payload.columns['预收款项'][0].label).toBe('项 目')
     for (const name of dataTableNames(payload)) {
       expect(tplNames, `孤儿子表「${name}」`).toContain(name)
     }
@@ -108,7 +115,11 @@ describe('D3 国企按账龄主表行名（方案 A：同步层映射）', () =>
   const rows = payload.sub_table_data['预收款项'] as Array<Record<string, unknown>>
 
   it('首档映射为模板字面「1年以内（含1年）」，底稿快照仍是「1年以内」', () => {
-    expect(rows.map((r) => r.label)).toEqual([DISCLOSURE_AGING_WITHIN1_SOE, '1年以上', '合计'])
+    expect(rows.map((r) => r.label)).toEqual([
+      DISCLOSURE_AGING_WITHIN1_SOE,
+      '1年以上',
+      D3_NOTE_TOTAL_LABEL.soeMain,
+    ])
     // Property 8：不改入参（底稿显示口径不受影响）
     expect(SOE_SNAPSHOT.mainRows.map((r) => r.label)).toEqual(['1年以内', '1年以上'])
   })
@@ -118,9 +129,36 @@ describe('D3 国企按账龄主表行名（方案 A：同步层映射）', () =>
     expect(rows.map((r) => r.label)).toEqual(tplRows)
   })
 
-  it('合计行字面为「合计」（无空格），不套 D2 的「合 计」', () => {
-    expect(rows[rows.length - 1]).toMatchObject({ label: '合计', is_total: true })
-    expect(rows.map((r) => r.label)).not.toContain('合 计')
+  it('合计行字面逐表取源 xlsx（国企主表 A9 = 「合  计」两空格）', () => {
+    expect(rows[rows.length - 1]).toMatchObject({
+      label: D3_NOTE_TOTAL_LABEL.soeMain,
+      is_total: true,
+    })
+    expect(D3_NOTE_TOTAL_LABEL.soeMain).toBe('合  计')
+    // 三处字面互不相同 → 禁止套用全局 DISCLOSURE_TOTAL_LABEL
+    expect(
+      new Set([
+        D3_NOTE_TOTAL_LABEL.listed,
+        D3_NOTE_TOTAL_LABEL.soeMain,
+        D3_NOTE_TOTAL_LABEL.soeLongTerm,
+      ]).size,
+    ).toBe(3)
+  })
+
+  it('国企超1年表合计行字面为「合计」（无空格，源 A15）', () => {
+    const ltRows = payload.sub_table_data['账龄超过1年的重要预收账款'] as Array<
+      Record<string, unknown>
+    >
+    expect(ltRows[ltRows.length - 1]).toMatchObject({
+      label: D3_NOTE_TOTAL_LABEL.soeLongTerm,
+      is_total: true,
+    })
+  })
+
+  it('改名前的旧子表名进 _removed_table_keys（否则附注残留空表）', () => {
+    expect(payload.sub_table_data._removed_table_keys).toEqual([
+      '账龄超过1年的重要预收款项',
+    ])
   })
 
   it('金额原样透传，合计不重算', () => {
@@ -133,14 +171,23 @@ describe('D3 上市主表不做账龄映射（按性质分类）', () => {
   it('性质行名原样透传', () => {
     const payload = buildD3SyncPayload('listed', 'wp-1', ['listed_standalone'], LISTED_SNAPSHOT)
     const rows = payload.sub_table_data['预收款项'] as Array<Record<string, unknown>>
-    expect(rows.map((r) => r.label)).toEqual(['工程款', '合计'])
+    expect(rows.map((r) => r.label)).toEqual(['工程款', D3_NOTE_TOTAL_LABEL.listed])
   })
 
   it('重大变动表变动金额 = 期末 − 期初', () => {
     const payload = buildD3SyncPayload('listed', 'wp-1', ['listed_standalone'], LISTED_SNAPSHOT)
     const rows = payload.sub_table_data['本期预收账款账面价值的重大变动'] as Array<Record<string, unknown>>
     expect(rows[0]).toMatchObject({ label: '预收工程款', change_amount: 100 })
-    expect(rows[1]).toMatchObject({ label: '合计', change_amount: 100, is_total: true })
+    expect(rows[1]).toMatchObject({
+      label: D3_NOTE_TOTAL_LABEL.listed,
+      change_amount: 100,
+      is_total: true,
+    })
+  })
+
+  it('上市侧无废弃表名 → 不推 _removed_table_keys', () => {
+    const payload = buildD3SyncPayload('listed', 'wp-1', ['listed_standalone'], LISTED_SNAPSHOT)
+    expect(payload.sub_table_data._removed_table_keys).toBeUndefined()
   })
 
   it('文本框内容进 _note_texts', () => {

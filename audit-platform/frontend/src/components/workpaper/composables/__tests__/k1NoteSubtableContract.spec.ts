@@ -17,6 +17,7 @@ import {
   K1_SOE_SUBTABLE,
 } from '../k1NoteSectionMap'
 import { K1_LISTED_COLUMNS, K1_SOE_COLUMNS } from '../k1DisclosureSyncPayload'
+import type { ColumnDef } from '../disclosureColumnDefs'
 
 interface NoteTable { name?: string; headers?: string[]; guidance?: string; _column_groups?: unknown }
 interface NoteSection { section_number?: string; tables?: NoteTable[]; text_sections?: string[] }
@@ -63,8 +64,10 @@ describe('附注 §五、8 / §八、9 结构要求', () => {
       ...(listedSection.tables ?? []).filter((t) => t.name === '按款项性质披露'),
       ...(soeSection.tables ?? []).filter((t) => [
         '按账龄披露其他应收款项',
-        '按坏账准备计提方法分类披露其他应收款项',
-        '续：',
+        K1_SOE_SUBTABLE.methodEnd,
+        // 🔴 原为裸续表名 `续：`（跨章节撞键 + 附注 TAB 看不出续的是哪张表），
+        // 2026-07-31 由 `fix_note_k_complex_structure.py` 正名，引用常量避免再漂移
+        K1_SOE_SUBTABLE.methodPrior,
         '单项计提坏账准备的其他应收款项',
         '账龄组合',
         '采用余额百分比法或其他组合方法计提坏账准备的其他应收款项',
@@ -73,6 +76,57 @@ describe('附注 §五、8 / §八、9 结构要求', () => {
     expect(needGroups).toHaveLength(7)
     for (const t of needGroups) {
       expect(Array.isArray(t._column_groups), `${t.name} 缺 _column_groups`).toBe(true)
+    }
+  })
+
+  it('裸续表名 `续：` 已从模板消失（跨章节撞键 + TAB 上看不出续哪张表）', () => {
+    expect((soeSection.tables ?? []).map((t) => String(t.name))).not.toContain('续：')
+    expect(K1_SOE_SUBTABLE.methodPrior).toBe('按坏账准备计提方法分类披露其他应收款项（续：期初余额）')
+  })
+
+  it('三阶段快照 6 表含第 6 列「理由」（源 xlsx F32/F41/F51/F63/F72/F82，附注模板原缺）', () => {
+    const stageTables = [
+      K1_LISTED_SUBTABLE.stage1, K1_LISTED_SUBTABLE.stage2, K1_LISTED_SUBTABLE.stage3,
+      K1_LISTED_SUBTABLE.priorStage1, K1_LISTED_SUBTABLE.priorStage2, K1_LISTED_SUBTABLE.priorStage3,
+    ]
+    for (const name of stageTables) {
+      const tbl = (listedSection.tables ?? []).find((t) => t.name === name)
+      expect(tbl, `模板缺表 ${name}`).toBeDefined()
+      expect(tbl!.headers, `${name} 列数`).toHaveLength(6)
+      expect(tbl!.headers![5], `${name} 末列`).toBe('理由')
+      expect(K1_LISTED_COLUMNS[name].map((c) => c.label), `${name} 同步列头`).toEqual(tbl!.headers)
+    }
+    // ECL 率表头按阶段不同（第一阶段 = 未来 12 个月内；第二/三阶段 = 整个存续期）
+    expect(K1_LISTED_COLUMNS[K1_LISTED_SUBTABLE.stage1][2].label).toContain('未来12个月')
+    expect(K1_LISTED_COLUMNS[K1_LISTED_SUBTABLE.stage2][2].label).toContain('整个存续期')
+    // `key` 不随表头变（行对象键真源）
+    expect(K1_LISTED_COLUMNS[K1_LISTED_SUBTABLE.stage1][2].key).toBe('预期信用损失率')
+    expect(K1_LISTED_COLUMNS[K1_LISTED_SUBTABLE.stage2][2].key).toBe('预期信用损失率')
+  })
+
+  it('同步 columns 与模板 headers 逐位同形（两侧同一真源，防单边漂移）', () => {
+    const pairs: Array<[NoteSection, Record<string, ColumnDef[]>]> = [
+      [listedSection, K1_LISTED_COLUMNS],
+      [soeSection, K1_SOE_COLUMNS],
+    ]
+    for (const [section, colMap] of pairs) {
+      for (const [name, cols] of Object.entries(colMap)) {
+        const tbl = (section.tables ?? []).find((t) => t.name === name)
+        expect(tbl, `模板缺表 ${name}`).toBeDefined()
+        expect(cols.map((c) => c.label), `${name} 列头漂移`).toEqual(tbl!.headers)
+      }
+    }
+  })
+
+  it('每张同步表在 group / flat 之间明确表态（防前缀推断凭空造父表头）', () => {
+    for (const colMap of [K1_LISTED_COLUMNS, K1_SOE_COLUMNS]) {
+      for (const [name, cols] of Object.entries(colMap)) {
+        const hasFlat = cols.some((c) => c.flat === true)
+        const hasGroup = cols.some((c) => c.group)
+        expect(hasFlat && hasGroup, `${name} flat 与 group 并存`).toBe(false)
+        expect(hasFlat || hasGroup, `${name} 未表态`).toBe(true)
+        expect(cols[0].group, `${name} 标签列不得带 group`).toBeUndefined()
+      }
     }
   })
 

@@ -90,6 +90,13 @@ describe('H8 使用权资产 — 注册契约测试', () => {
       'H8-12',
       'H8-13',
       'H8-14',
+      // 两个披露 sheet 的映射（短码 + 源模板中文 tab 名各一份）。
+      // 2026-07-30：`wp_code_overrides.json` 已提交 20 条映射，而本文件当时仍写死 16
+      // → 计数断言长期为红。补进期望清单而**不是**放宽计数，守卫依旧有约束力。
+      'H8-disc-L',
+      'H8-disc-S',
+      'H8-附注披露信息（上市公司）',
+      'H8-附注披露信息（国企）',
     ]
 
     beforeAll(() => {
@@ -107,14 +114,13 @@ describe('H8 使用权资产 — 注册契约测试', () => {
       }
     )
 
-    it('h8-right-of-use-assets 共有16个wp_code映射', () => {
+    it('h8-right-of-use-assets 的 wp_code 映射与期望清单完全一致（不多不少）', () => {
       const actualMappings = Object.entries(overrides)
         .filter(([, v]) => v === COMPONENT_TYPE)
         .map(([k]) => k)
-      expect(actualMappings).toHaveLength(16)
-      for (const code of EXPECTED_WP_CODES) {
-        expect(actualMappings).toContain(code)
-      }
+      // 双向断言：既不许漏（漏了该 sheet 挂不上组件），也不许多（多了会把别的底稿抢过来）
+      expect([...actualMappings].sort()).toEqual([...EXPECTED_WP_CODES].sort())
+      expect(actualMappings).toHaveLength(EXPECTED_WP_CODES.length)
     })
   })
 

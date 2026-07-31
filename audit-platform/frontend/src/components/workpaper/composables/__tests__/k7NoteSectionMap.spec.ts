@@ -206,10 +206,16 @@ describe('K7 子表名 ↔ note_template 逐字契约（T7-3 孤儿 TAB 守卫�
     expect(soeNames.has(K7_SUBTABLE.deferredIncome)).toBe(true)
   })
 
-  it('负向：国企 10 列「其中：递延收益-政府补助情况」底稿无录入表 → 不推、不造列', () => {
-    expect(soeNames.has('其中：递延收益-政府补助情况')).toBe(true)
-    expect(Object.values(K7_SUBTABLE)).not.toContain('其中：递延收益-政府补助情况')
-    expect(dataKeys(payloadOf('soe').sub_table_data)).not.toContain('其中：递延收益-政府补助情况')
+  it('国企 10 列「其中：递延收益-政府补助情况」已接线，且只在国企侧', () => {
+    // 2026-07-31 起底稿国企侧已补录入区块 → 有行才推（载荷断言见
+    // `kLiabilityNoteSubtableContract.spec.ts` §buildK7SyncPayload 政府补助明细表）
+    expect(soeNames.has(K7_SUBTABLE.grantDetail)).toBe(true)
+    expect(listedNames.has(K7_SUBTABLE.grantDetail)).toBe(false)
+  })
+
+  it('负向：无明细行时不推空表（`_source=workpaper` 下推空表会整表覆盖模板骨架）', () => {
+    expect(dataKeys(payloadOf('soe').sub_table_data)).not.toContain(K7_SUBTABLE.grantDetail)
+    expect(dataKeys(payloadOf('listed').sub_table_data)).not.toContain(K7_SUBTABLE.grantDetail)
   })
 
   it('负向：旧实现推的英文键 `rows` 不是任何模板表名', () => {

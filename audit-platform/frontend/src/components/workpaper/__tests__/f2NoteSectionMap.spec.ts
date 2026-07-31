@@ -121,6 +121,7 @@ describe('f2DisclosureSyncPayload', () => {
       { label: '一、账面原值', purchased: 0, self_processed: 0, other: 0, total: 0 },
       { label: '1.期初余额', purchased: 100, self_processed: 0, other: 0, total: 100 },
     ],
+    s3Mode: 'portfolio' as const,
     noteCategory: '分类说明',
     noteNrv: 'NRV',
     noteProvision: '计提依据',
@@ -152,7 +153,14 @@ describe('f2DisclosureSyncPayload', () => {
     expect(payload.columns).toBeDefined()
     const lc = payload.columns!['存货分类']
     expect(lc).toBeDefined()
-    expect(lc[0]).toMatchObject({ key: 'label', label: '项目', is_label: true })
+    // R19：源 xlsx A8/A22/A35 均为「存货种类」（旧值「项目」为第一轮误写）
+    expect(lc[0]).toMatchObject({ key: 'label', label: '存货种类', is_label: true })
+    for (const name of [
+      '存货跌价准备及合同履约成本减值准备',
+      '存货跌价准备及合同履约成本减值准备（续）',
+    ]) {
+      expect(payload.columns![name][0].label, `${name} 标签列头`).toBe('存货种类')
+    }
     // 两级表头：子列名 + group 父表头（后端 _extract_column_groups 据此产出 _column_groups）
     expect(lc.find((c) => c.key === 'end_gross')).toMatchObject({
       label: '账面余额',
@@ -217,6 +225,7 @@ describe('f2DisclosureSyncPayload', () => {
         { label: '1.期初余额', purchased: 20, self_processed: 30, other: 0, total: 50 },
       ],
       noteCategory: '国企分类',
+      landNote: '土地储备 100 亩',
       s3BorrowText: '借款',
       s4AmortText: '摊销',
       noteText: '其他',
@@ -232,6 +241,15 @@ describe('f2DisclosureSyncPayload', () => {
     expect(payload.current_standard).toBe('soe_standalone')
     expect(payload.sub_table_data['存货分类'][0].end_gross).toBe(50)
     expect(payload.section_id).not.toBe('五、9')
+    // R20：土地储备说明必须回流（曾整条缺失）
+    const soeTexts = payload.sub_table_data._note_texts as unknown as Array<{
+      section: string
+      title: string
+    }>
+    expect(soeTexts.find((t) => t.section === 'soe-note-land')).toMatchObject({
+      title: '土地储备说明',
+    })
+    for (const t of soeTexts) expect(t.title.trim()).not.toBe('')
     // Task 7: 国企版 _columns 源对齐（含转销列）
     expect(payload.columns).toBeDefined()
     const sc = payload.columns!['存货分类']

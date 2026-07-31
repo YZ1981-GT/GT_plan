@@ -155,11 +155,19 @@ describe('k1SoeDisclosureSyncPayload', () => {
     expect(payload).toBeDefined()
     const cols = payload.columns!
     expect(Object.keys(cols)).toContain(K1_SOE_SUBTABLE.aging)
-    // 账龄表：期末数/期初数 各含账面余额 + 坏账准备（附注模版 md 二级表头口径）
-    expect(cols[K1_SOE_SUBTABLE.aging].map((c) => c.label)).toEqual([
-      '账  龄', '期末账面余额', '期末坏账准备', '期初账面余额', '期初坏账准备',
+    // 账龄表是**两级表头**（源 xlsx 国企 B46:D46「期末数」/ E46:G46「期初数」跨列合并）：
+    // `label` 只写叶子列名，父表头走 `group`，`key` 保持既有带期别前缀的中文数据键。
+    const aging = cols[K1_SOE_SUBTABLE.aging]
+    expect(aging.map((c) => c.label)).toEqual([
+      '账  龄', '账面余额', '坏账准备', '账面余额', '坏账准备',
     ])
-    expect(cols[K1_SOE_SUBTABLE.aging][0].is_label).toBe(true)
+    expect(aging.map((c) => c.key)).toEqual([
+      'label', '期末账面余额', '期末坏账准备', '期初账面余额', '期初坏账准备',
+    ])
+    expect(aging.map((c) => c.group)).toEqual([
+      undefined, '期末数', '期末数', '期初数', '期初数',
+    ])
+    expect(aging[0].is_label).toBe(true)
     // 政府补助表源对齐五列
     expect(cols[K1_SOE_SUBTABLE.govGrant].map((c) => c.label)).toEqual([
       '单位名称', '政府补助项目名称', '期末余额', '期末账龄', '预计收取的时间、金额及依据',

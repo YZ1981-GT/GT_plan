@@ -76,6 +76,67 @@ describe('useWorkpaperScaffold', () => {
     wrapper.unmount()
   })
 
+  // ─── applicable-standards-runtime-and-sync-guard Property 1 / 2 ───────────
+
+  it('exposes normalized applicableStandards for every input shape (Property 1)', async () => {
+    const source = ref<unknown>(undefined)
+    let runtime: WorkpaperRuntimeContext | undefined
+    const Host = defineComponent({
+      setup() {
+        runtime = useWorkpaperScaffold({ ...options(), applicableStandards: source })
+        return () => h('div')
+      },
+    })
+    const wrapper = mount(Host)
+
+    // 未传 / undefined → [] 而非 undefined（各循环「空 = 全部适用」宽松回退不变）
+    expect(runtime!.applicableStandards.value).toEqual([])
+
+    // render-config 到达后自动更新（响应式，不是一次性快照）
+    source.value = ['soe_standalone', 'soe', 'standalone']
+    await nextTick()
+    expect(runtime!.applicableStandards.value).toEqual(['soe_standalone', 'soe', 'standalone'])
+
+    // v2 对象（历史 I1~I6 下发形态）与逗号串都能归一
+    source.value = { entity_type: 'listed', scope: 'standalone', stage: 'ipo' }
+    await nextTick()
+    expect(runtime!.applicableStandards.value).toEqual(['listed_standalone', 'listed', 'standalone'])
+
+    source.value = 'soe, listed'
+    await nextTick()
+    expect(runtime!.applicableStandards.value).toEqual(['soe', 'listed'])
+
+    wrapper.unmount()
+  })
+
+  it('nested scaffold shares the ancestor applicableStandards ref (Property 2)', () => {
+    let parentRuntime: WorkpaperRuntimeContext | undefined
+    let childRuntime: WorkpaperRuntimeContext | undefined
+    const Child = defineComponent({
+      setup() {
+        childRuntime = useWorkpaperScaffold({
+          ...options('-child'),
+          applicableStandards: ['private'],
+        })
+        return () => h('span')
+      },
+    })
+    const Parent = defineComponent({
+      setup() {
+        parentRuntime = useWorkpaperScaffold({
+          ...options(),
+          applicableStandards: ['soe_standalone'],
+        })
+        return () => h(Child)
+      },
+    })
+    const wrapper = mount(Parent)
+
+    expect(childRuntime!.applicableStandards).toBe(parentRuntime!.applicableStandards)
+    expect(childRuntime!.applicableStandards.value).toEqual(['soe_standalone'])
+    wrapper.unmount()
+  })
+
   it('defers missing-context diagnostics until an async renderer context is ready', async () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const contextReady = ref(false)

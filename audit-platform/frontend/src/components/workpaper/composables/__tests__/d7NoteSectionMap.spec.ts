@@ -5,6 +5,7 @@ import {
   resolveD7CurrentStandard,
   D7_NOTE_SECTION,
   D7_DISCLOSURE_SHEET_NAME,
+  D7_NOTE_TOTAL_LABEL,
   type D7DisclosureSnapshot,
 } from '../d7NoteSectionMap'
 
@@ -53,29 +54,41 @@ describe('d7NoteSectionMap', () => {
     for (const k of ['合同负债', '账龄超过1年的重要合同负债', '本期合同负债账面价值的重大变动']) {
       expect(p.columns[k]).toBeDefined()
     }
-    // 列头逐字取自模板
-    expect(p.columns['合同负债'].map(c => c.label)).toEqual(['项目', '期末余额', '上年年末余额'])
-    expect(p.columns['账龄超过1年的重要合同负债'].map(c => c.label)).toEqual(['项目', '期末余额', '未偿还或未结转的原因'])
-    expect(p.columns['本期合同负债账面价值的重大变动'].map(c => c.label)).toEqual(['项目', '变动金额', '变动原因'])
-    // 主表：current→期末 / prior→上年年末，合计标 is_total
+    // 列头逐字取自源模板（A7/A18/A25 均为「项  目」，两个空格）
+    expect(p.columns['合同负债'].map(c => c.label)).toEqual(['项  目', '期末余额', '上年年末余额'])
+    expect(p.columns['账龄超过1年的重要合同负债'].map(c => c.label)).toEqual(['项  目', '期末余额', '未偿还或未结转的原因'])
+    expect(p.columns['本期合同负债账面价值的重大变动'].map(c => c.label)).toEqual(['项  目', '变动金额', '变动原因'])
+    // 🔴 单行表头必须显式 flat（否则 seed 路径按前缀反猜父表头）
+    for (const k of ['合同负债', '账龄超过1年的重要合同负债', '本期合同负债账面价值的重大变动']) {
+      expect(p.columns[k].some(c => c.flat), `${k} 未标 flat`).toBe(true)
+      expect(p.columns[k].some(c => c.group)).toBe(false)
+    }
+    // 主表：current→期末 / prior→上年年末，合计标 is_total（字面走 D7_NOTE_TOTAL_LABEL）
     const mainRows = p.sub_table_data['合同负债'] as any[]
     expect(mainRows[0]).toEqual({ label: '预收货款', end_amount: 100, prior_amount: 80 })
-    expect(mainRows[mainRows.length - 1]).toMatchObject({ label: '合计', end_amount: 90, prior_amount: 75, is_total: true })
+    expect(mainRows[mainRows.length - 1]).toMatchObject({
+      label: D7_NOTE_TOTAL_LABEL, end_amount: 90, prior_amount: 75, is_total: true,
+    })
     // 重大变动：变动金额 = 期末 − 期初
     const changeRows = p.sub_table_data['本期合同负债账面价值的重大变动'] as any[]
     expect(changeRows[0]).toEqual({ label: '重大合同A', change_amount: 30, reason: '' })
-    expect(changeRows[1]).toMatchObject({ label: '合计', change_amount: 30, is_total: true })
+    expect(changeRows[1]).toMatchObject({ label: D7_NOTE_TOTAL_LABEL, change_amount: 30, is_total: true })
   })
 
-  it('soe payload → 八、39 两表（合同负债 / 表2重大变动），无超1年表', () => {
+  it('soe payload → 八、39 两表（合同负债 / 重大变动），无超1年表', () => {
     const p = buildD7SyncPayload('soe', 'wp-2', ['soe_standalone'], soeSnapshot())
     expect(p.section_id).toBe('八、39')
     expect(p.sheet_name).toBe('附注披露信息(国企)')
-    expect(Object.keys(p.sub_table_data)).toEqual(['合同负债', '合同负债（表2）', '_note_texts'])
-    expect(p.columns['合同负债'].map(c => c.label)).toEqual(['项目', '期末余额', '期初余额'])
-    expect(p.columns['合同负债（表2）'].map(c => c.label)).toEqual(['项目', '变动金额', '变动原因'])
-    const change = p.sub_table_data['合同负债（表2）'] as any[]
+    // 第 2 表原为占位名「合同负债（表2）」，已按源模板 A20 校正
+    expect(Object.keys(p.sub_table_data)).toEqual([
+      '合同负债', '本期合同负债账面价值的重大变动', '_note_texts', '_removed_table_keys',
+    ])
+    expect(p.columns['合同负债'].map(c => c.label)).toEqual(['项  目', '期末余额', '期初余额'])
+    expect(p.columns['本期合同负债账面价值的重大变动'].map(c => c.label)).toEqual(['项  目', '变动金额', '变动原因'])
+    const change = p.sub_table_data['本期合同负债账面价值的重大变动'] as any[]
     expect(change[0]).toEqual({ label: '变动项B', change_amount: 20, reason: '' })
+    // 旧表名必须上报，否则附注永久残留空表
+    expect(p.sub_table_data._removed_table_keys).toEqual(['合同负债（表2）'])
   })
 
   it('buildD7NoteTexts: 非空文本→带标题条目；空→跳过', () => {

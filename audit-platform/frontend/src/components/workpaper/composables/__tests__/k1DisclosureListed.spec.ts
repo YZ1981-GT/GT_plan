@@ -113,11 +113,24 @@ describe('k1DisclosureSyncPayload', () => {
     expect(aging[0].label).toBe('账龄')
     // value 列 key 与行对象中文键逐字一致，且非英文键当 header
     expect(aging.map((c) => c.label)).toEqual(['账龄', '期末余额', '上年年末余额'])
-    // 性质表源对齐七列（首列表头与 note_template「项  目」一致）
-    expect(cols[K1_LISTED_SUBTABLE.nature].map((c) => c.label)).toEqual([
-      '项  目', '期末账面余额', '期末坏账准备', '期末账面价值',
+    // 单级表头的表必须显式 flat（否则后端退化到前缀推断，凭空造父表头）
+    expect(aging.some((c) => c.flat === true)).toBe(true)
+    // 性质表是**两级表头**（源 xlsx A22:G28 的 B22:D22 / E22:G22 跨列合并）：
+    // label 只写叶子列名，父表头走 group，`key` 保持既有带前缀的中文数据键。
+    const nature = cols[K1_LISTED_SUBTABLE.nature]
+    expect(nature.map((c) => c.label)).toEqual([
+      '项  目', '账面余额', '坏账准备', '账面价值',
+      '账面余额', '坏账准备', '账面价值',
+    ])
+    expect(nature.map((c) => c.key)).toEqual([
+      'label', '期末账面余额', '期末坏账准备', '期末账面价值',
       '上年年末账面余额', '上年年末坏账准备', '上年年末账面价值',
     ])
+    expect(nature.map((c) => c.group)).toEqual([
+      undefined, '期末金额', '期末金额', '期末金额',
+      '上年年末金额', '上年年末金额', '上年年末金额',
+    ])
+    expect(nature.some((c) => c.flat === true), '两级表头的表不得标 flat').toBe(false)
   })
 
   it('上年年末三阶段子表随 payload 一并同步（附注 五、8 已有 3 张表）', () => {

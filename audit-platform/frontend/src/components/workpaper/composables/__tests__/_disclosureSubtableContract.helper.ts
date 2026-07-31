@@ -26,6 +26,8 @@
  * - P3 每张表在 `group`（多级表头）与 `flat`（单级表头）之间明确表态，不得都无、不得并存
  * - P4 列标签与分组名为纯文本（`el-table-column :label` 与 Word 导出都不解析 HTML）
  * - P5 `columns` 的标签列头与该表 `headers[0]` 一致
+ * - P6 模板 `tables[].headers` 为纯文本（P4 只看同步 `columns`，模板 headers 原是盲区：
+ *   F1 上市「前五名」表的 `预付款项<br/>期末余额` 长期未被发现）
  *
  * Spec: .kiro/specs/disclosure-sync-path-buildout/ Task 1.2
  */
@@ -227,6 +229,21 @@ export function runDisclosureSubtableContract(opts: DisclosureContractOptions): 
           }
         }
         expect(mismatches, '标签列头与模板首列不一致会导致同步后表头错位').toEqual([])
+      })
+
+      it(`P6 ${v.variant} 模板 headers 为纯文本`, () => {
+        const bad: string[] = []
+        for (const name of tableNames) {
+          for (const h of byName.get(name)?.headers ?? []) {
+            if (HTML_RE.test(String(h))) bad.push(`${name}: ${h}`)
+          }
+        }
+        expect(
+          bad,
+          `模板 headers 含 HTML（多为附注模版 md 表格的 <br/> 排版残留）：` +
+            `附注渲染与 Word 导出都不解析 HTML，会显示为字面量。` +
+            `请在对应 fix_note_*_structure.py 里改为纯文本`,
+        ).toEqual([])
       })
 
       it(`${v.variant} columnsPending 每条都有理由`, () => {

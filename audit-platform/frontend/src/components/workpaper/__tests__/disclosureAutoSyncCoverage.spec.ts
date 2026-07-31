@@ -47,9 +47,8 @@ const BANNER_ONLY_SOURCES = ['dataUpdatedVisible', 'upstreamUpdatedVisible', 'st
 const MISSING_SYNC_PATH: readonly string[] = [
   // D2（1）
   'D2TabDisclosure.vue',
-  // F4（2）
-  'F4TabDisclosureListed.vue',
-  'F4TabDisclosureSOE.vue',
+  // F4（2）已补齐：spec f-cycle-disclosure-parity R6（原为只有手动 syncToNotes、
+  // 未接 useDisclosureAutoSync → 用户改数据不点按钮永不进附注）
   // G10 / G11：Listed+SOE 是薄壳，链路在 Base 里 → 由 `resolveDelegate` 解析，不算缺口
   // G12 已补齐（spec disclosure-sync-path-buildout Task 2.8）
   // G4 已补齐（Task 2.1）；G5 已补齐（Task 2.2）
@@ -117,18 +116,38 @@ const MISSING_SYNC_PATH: readonly string[] = [
   // M9（2）
   'M9TabDisclosureListed.vue',
   'M9TabDisclosureSoe.vue',
-  // N2（2）
-  'N2TabDisclosureListed.vue',
-  'N2TabDisclosureSoe.vue',
-  // N3（1）
-  'N3TabDisclosure.vue',
-  // N4（2）
-  'N4TabDisclosureListed.vue',
+  // N2 两版已补齐（spec n-cycle-tax-disclosure-alignment Task 4）：
+  //   原两组件是复制粘贴关系，上市误用国企变动口径，两版都无同步链路
+  // N3 已**删除**披露 Tab：源模板 `N3 递延所得税负债.xlsx` 无「附注披露信息」sheet
+  //   （classification 里 wp_code=N3 同样 0 条），递延所得税负债披露与 N1 共节
+  //   （五、30 / 八、31，N1 表(1) 已含负债段）。原组件是自造三小节且入口不可达。
+  //   反向守卫见下方 `CYCLES_WITHOUT_DISCLOSURE`。
+  // N4 上市已补齐（Task 5.2）；原为自造 6 列（多变动额/变动率/变动原因）
+  // 🔴 N4 国企**豁免**：源模板 `附注披露信息（国企）` 内容为「附注披露信息：无」
+  //   → 国有企业格式不单独披露税金及附加，`note_template_variant_matrix` 的
+  //   `shui_jin_ji_fu_jia.soe_*` 为 null。该 Tab 已改为「本版不适用」说明页
+  //   （无表格、无同步按钮、`buildN4SyncPayload('soe')` 恒 null），
+  //   属**有意无链路**，不是缺口。反向锁死见 `n4NoteSectionMap.spec.ts` Property 4。
   'N4TabDisclosureSoe.vue',
-  // N5（2）
-  'N5TabDisclosureListed.vue',
-  'N5TabDisclosureSoe.vue',
+  // N5 两版已补齐（Task 6）：薄壳委托 `n5/shared/N5DisclosureBody.vue`
+  //   （由 `resolveDelegate` 解析），并修掉两表重名丢表 + 国企 sheet 名缺右括号
 ]
+
+/**
+ * 🔴 源模板**没有**披露 sheet 的循环 —— 不得存在披露 Tab 组件。
+ *
+ * 造一个出来的后果不是"多个空页面"，而是**自造披露内容有机会被推进别人的附注章节**
+ * （N3 递延所得税负债与 N1 共节 五、30 / 八、31，N1 表(1) 已含负债段）。
+ * 原 `N3TabDisclosure.vue` 就是这种产物：三个自拟小节（概述 / 应纳税暂时性差异明细 /
+ * 余额变动表），源模板一张都没有，且宿主判定 `currentSheet === '附注'` 永不命中
+ * （classification 里 wp_code=N3 零条附注 sheet）→ 死代码 + 污染源，已删除。
+ *
+ * 每条必须写明「源模板依据」，新增前先 openpyxl 读 `wb.sheetnames` 确认。
+ */
+const CYCLES_WITHOUT_DISCLOSURE: Readonly<Record<string, string>> = {
+  N3: '源模板 N3 递延所得税负债.xlsx 仅 底稿目录/N3A/N3-1/N3-2/N3-3/GT_Custom，无附注披露 sheet；'
+    + '递延所得税负债披露与 N1 共节（五、30 / 八、31，N1 表(1) 含负债段）',
+}
 
 /**
  * 尚未接入自动同步的 Tab —— 每条**必须**有 reason。
@@ -185,6 +204,20 @@ function walk(dir: string, out: string[] = []): string[] {
   return out
 }
 
+/** 全部 `.vue`（含宿主 `Gt*.vue`）—— 用于扫「宿主是否给披露 Tab 传 projectId」 */
+function walkVue(dir: string, out: string[] = []): string[] {
+  for (const entry of readdirSync(dir)) {
+    const p = join(dir, entry)
+    if (statSync(p).isDirectory()) {
+      if (entry === '__tests__' || entry === 'node_modules') continue
+      walkVue(p, out)
+    } else if (entry.endsWith('.vue')) {
+      out.push(p)
+    }
+  }
+  return out
+}
+
 const TABS: TabInfo[] = walk(WP_ROOT).map((p) => {
   const src = readFileSync(p, 'utf8')
   return {
@@ -197,6 +230,32 @@ const TABS: TabInfo[] = walk(WP_ROOT).map((p) => {
     delegatesTo: resolveDelegate(src, p),
   }
 })
+
+/**
+ * 取 `syncToDisclosureNotes` 的函数体（大括号配平），找不到返回 ''。
+ *
+ * 用于识别「自递归假接入」：见下方 `selfScheduleOnly` 断言。
+ */
+function syncFnBody(src: string): string {
+  const m = /\b(?:async\s+)?function\s+syncToDisclosureNotes\s*\(/.exec(src)
+  if (!m) return ''
+  const open = src.indexOf('{', m.index + m[0].length)
+  if (open < 0) return ''
+  let depth = 0
+  for (let i = open; i < src.length; i += 1) {
+    if (src[i] === '{') depth += 1
+    else if (src[i] === '}') {
+      depth -= 1
+      if (depth === 0) return src.slice(open, i + 1)
+    }
+  }
+  return ''
+}
+
+/** 去注释（守卫源码里会用注释解释"为什么不能这么写"，不去会误判） */
+function stripComments(code: string): string {
+  return code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+}
 
 /** 提取包含 scheduleAutoSync 的 watch 的监听源片段 */
 function watchSourcesFor(src: string): string[] {
@@ -230,6 +289,60 @@ describe('披露 Tab 自动同步覆盖率', () => {
       undeclared,
       `以下 Tab 有同步能力但未接自动同步且未登记 allowlist：${undeclared.join(', ')}`,
     ).toEqual([])
+  })
+
+  // ── 🔴 自递归假接入（2026-07-30 静态扫出 16 处，横跨 G1/G2/G3/G6/H3/I4/I5/I6/K1） ──
+  //
+  // `scheduleAutoSync(fn)` 的语义是「**数据变更后**防抖调度一次同步」。写在
+  // `syncToDisclosureNotes()` 内部就是调度自己：
+  //
+  //   async function syncToDisclosureNotes() {
+  //     await disc.syncToNotes()
+  //     autoSync.scheduleAutoSync(syncToDisclosureNotes)   // ← 每次调用都排下一次
+  //   }
+  //
+  // 后果：①用户点一次同步就进入 800ms 周期的无限 POST（直到组件卸载 cancelPending）
+  //       ②`hasCall` 只看「有没有 scheduleAutoSync」→ **被这行骗过**，8 个 Tab 的
+  //         自动同步从未接到任何数据变更（与 F2 只 watch 横幅可见性同款「假接入」）。
+
+  it('🔴 syncToDisclosureNotes 内不得调 scheduleAutoSync（自触发 → 周期性重复 POST）', () => {
+    const offenders = TABS.filter((t) =>
+      stripComments(syncFnBody(t.src)).includes('scheduleAutoSync('),
+    ).map((t) => t.name)
+    expect(
+      offenders,
+      `以下 Tab 在同步函数内调度自己，会 800ms 周期重复发同一个 POST：${offenders.join(', ')}`,
+    ).toEqual([])
+  })
+
+  it('🔴 不得只靠自递归充当"已接入"（自动同步必须由数据变更触发）', () => {
+    const fake = TABS.filter((t) => {
+      if (!t.hasCall) return false
+      const clean = stripComments(t.src)
+      const total = (clean.match(/scheduleAutoSync\(/g) ?? []).length
+      const inSyncFn = (stripComments(syncFnBody(t.src)).match(/scheduleAutoSync\(/g) ?? []).length
+      return total > 0 && total === inSyncFn
+    }).map((t) => t.name)
+    expect(
+      fake,
+      `以下 Tab 的 scheduleAutoSync 全部在同步函数内 → 自动同步是假接入（骗过 hasCall）：${fake.join(', ')}`,
+    ).toEqual([])
+  })
+
+  it('自检替身：能识别自递归假接入（防守卫本身空转）', () => {
+    const fixture = `
+async function syncToDisclosureNotes() {
+  await disc.syncToNotes()
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
+}`
+    expect(stripComments(syncFnBody(fixture)).includes('scheduleAutoSync(')).toBe(true)
+
+    const fixed = `
+async function syncToDisclosureNotes() {
+  await disc.syncToNotes()
+}
+watch([() => disc.rows], () => autoSync.scheduleAutoSync(syncToDisclosureNotes), { deep: true })`
+    expect(stripComments(syncFnBody(fixed)).includes('scheduleAutoSync(')).toBe(false)
   })
 
   it('allowlist 每条都必须有非空 reason', () => {
@@ -323,8 +436,67 @@ describe('披露 Tab 同步链路完整性', () => {
     expect(missing, `清单中的文件已不存在，请更新：${missing.join(', ')}`).toEqual([])
   })
 
-  it('缺链路数量记录在案（49 个；批1 G 循环 11 条全部补齐：G4/G5/G6/G8/G9/G12）', () => {
-    expect(MISSING_SYNC_PATH.length).toBe(49)
+  // 只允许变短：G 循环批1 补 11 条 → 49；F4 两条补齐（f-cycle-disclosure-parity R6）→ 47；
+  // N 循环税务类补 5 条（N2×2 / N4 上市 / N5×2，n-cycle-tax-disclosure-alignment）→ 42
+  // （N4 国企按源模板「附注披露信息：无」豁免留在清单，理由见常量注释）
+  // 再删 N3 自造披露 Tab（源模板无披露 sheet，披露与 N1 共节）→ 41
+  it('缺链路数量记录在案（41 个）', () => {
+    expect(MISSING_SYNC_PATH.length).toBe(41)
+  })
+
+  /**
+   * 🔴 宿主必须给披露 Tab 传 `projectId` —— 漏传 = 同步（含自动同步）**永久静默失败**。
+   *
+   * `syncToDisclosureNotes` 首行就是 `if (!props.projectId) return`，而披露组件不会
+   * 因缺 prop 崩溃，只在控制台留一条 `Missing required prop` 警告 → vitest 与
+   * `get_diagnostics` 都查不出。G9 两个薄壳曾因此让同步按钮永久 disabled；
+   * 2026-07-30 浏览器实测发现 N2 / N4 / N5 三个宿主同样漏传（已修）。
+   *
+   * 判定：宿主模板里的 `<XTabDisclosure*>` 使用点必须有 `:project-id`
+   * （或 `v-bind="$props"` 整体转发）。
+   */
+  it('宿主给披露 Tab 传了 projectId（漏传 = 同步永久静默失败）', () => {
+    const TAG_RE = /<([A-Z]\w*TabDisclosure\w*)\b((?:[^<>]|\n)*?)\/?>/g
+    const offenders: string[] = []
+    let usages = 0
+    for (const p of walkVue(WP_ROOT)) {
+      const src = readFileSync(p, 'utf8')
+      const tpl = /<template>([\s\S]*?)<\/template>/.exec(src)?.[1]
+      if (!tpl) continue
+      for (const m of tpl.matchAll(TAG_RE)) {
+        const [, tag, attrs] = m
+        usages += 1
+        if (/v-bind="\$props"/.test(attrs)) continue
+        if (/:project-id|:projectId/.test(attrs)) continue
+        offenders.push(`${p.split(/[\\/]/).pop()} → <${tag}>`)
+      }
+    }
+    // 防正则失效导致空转
+    expect(usages, '未扫到任何披露 Tab 使用点，正则可能失效').toBeGreaterThan(100)
+    expect(
+      offenders,
+      '以上宿主未向披露 Tab 传 projectId → 同步按钮点了没反应、自动同步永不落库',
+    ).toEqual([])
+  })
+
+  it('源模板无披露 sheet 的循环不得有披露 Tab（防自造内容污染他人附注章节）', () => {
+    const offenders: string[] = []
+    for (const [cycle, reason] of Object.entries(CYCLES_WITHOUT_DISCLOSURE)) {
+      // 只认「循环号 + 非数字」的前缀，避免 N3 误伤 N30（若将来有）
+      const re = new RegExp(`^${cycle}(?![0-9])\\w*TabDisclosure`)
+      const hit = TABS.filter((t) => re.test(t.name)).map((t) => t.name)
+      if (hit.length) offenders.push(`${cycle}: ${hit.join(', ')}（${reason}）`)
+    }
+    expect(
+      offenders,
+      '这些循环源模板没有披露 sheet，造披露 Tab 等于自造披露内容，'
+        + '一旦接上同步链路就会污染与其共节的别的循环的附注章节',
+    ).toEqual([])
+  })
+
+  it('反向自检：谓词能抓住真实存在的披露 Tab（防上一条空转）', () => {
+    const re = new RegExp('^N5(?![0-9])\\w*TabDisclosure')
+    expect(TABS.filter((t) => re.test(t.name)).length).toBeGreaterThan(0)
   })
 
   it('委托解析生效：薄壳继承 Base 的链路判定（G10/G11 不得被虚报）', () => {

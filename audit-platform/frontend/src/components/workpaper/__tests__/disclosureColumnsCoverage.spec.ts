@@ -206,8 +206,72 @@ const P1_ROUTE: Record<string, { spec: string; complete: boolean; note?: string 
     complete: true,
     note: '国企 5 张表（含源模板（2）B 互抵明细）；键集一致断言在 n1NoteSectionMap.spec.ts',
   },
+  // N 循环税务类（n-cycle-tax-disclosure-alignment）：N2 / N4 / N5 同步链路从零建立
+  buildN2ListedColumns: {
+    spec: 'composables/__tests__/n2NoteSubtableContract.spec.ts',
+    complete: true,
+    note: '上市 = 双期余额表 3 列；反向断言两版列键集不等（原两组件复制粘贴导致上市误用国企变动口径）',
+  },
+  buildN2SoeColumns: {
+    spec: 'composables/__tests__/n2NoteSubtableContract.spec.ts',
+    complete: true,
+    note: '国企 = 变动表 5 列（期末余额为源模板行内公式 =B8+C8-D8）；模板侧原被 md 重建压成 3 列',
+  },
+  buildN4ListedColumns: {
+    spec: 'composables/__tests__/n4NoteSubtableContract.spec.ts',
+    complete: true,
+    note: '只有上市变体 —— 国企源模板此节为「附注披露信息：无」，buildN4SyncPayload(soe) 恒返回 null',
+  },
+  buildN5ListedColumns: {
+    spec: 'composables/__tests__/n5NoteSubtableContract.spec.ts',
+    complete: true,
+    note: '两表原都叫「项  目」（md 重建把表头首格当表名）→ 已去重；旧键锁在 N5_LEGACY_OBSOLETE_TABLES',
+  },
+  buildN5SoeColumns: {
+    spec: 'composables/__tests__/n5NoteSubtableContract.spec.ts',
+    complete: true,
+    note: '两表原都叫「所得税费用」→ 第 2 表改名「会计利润与所得税费用调整过程」；表 2 列由 2 补回 3',
+  },
   buildL1ListedColumns: { spec: 'composables/__tests__/l1NoteSectionMap.spec.ts', complete: true },
   buildL1SoeColumns: { spec: 'composables/__tests__/l1NoteSectionMap.spec.ts', complete: true },
+  // D 类剩余四循环（d-cycle-remaining-disclosure-alignment）：模板与载荷已按源 xlsx 对齐
+  buildD3ListedColumns: {
+    spec: 'composables/__tests__/d3NoteSubtableContractShared.spec.ts',
+    complete: true,
+    note: '另含逐表合计字面（上市「合 计」/国企主表「合  计」/国企超1年「合计」）与账龄映射',
+  },
+  buildD3SoeColumns: {
+    spec: 'composables/__tests__/d3NoteSubtableContractShared.spec.ts',
+    complete: true,
+  },
+  buildD5ListedColumns: {
+    spec: 'composables/__tests__/d5NoteSubtableContract.spec.ts',
+    complete: true,
+    note: '重点守背书贴现表两列共前缀「期末」必须 flat（否则 seed 路径凭空父表头）',
+  },
+  buildD5SoeColumns: {
+    spec: 'composables/__tests__/d5NoteSubtableContract.spec.ts',
+    complete: true,
+  },
+  buildD6ListedColumns: {
+    spec: 'composables/__tests__/d6NoteSubtableContract.spec.ts',
+    complete: true,
+    note: '两级表头两期同构 + 减值计提情况按期间拆两表（源模板三级 → 顶层期间提到表名）',
+  },
+  buildD6SoeColumns: {
+    spec: 'composables/__tests__/d6NoteSubtableContract.spec.ts',
+    complete: true,
+    note: '「本期变动金额」3 列一组，期初/期末/原因为 rowspan=2 独立列',
+  },
+  buildD7ListedColumns: {
+    spec: 'composables/__tests__/d7NoteSubtableContract.spec.ts',
+    complete: true,
+  },
+  buildD7SoeColumns: {
+    spec: 'composables/__tests__/d7NoteSubtableContract.spec.ts',
+    complete: true,
+    note: '第 2 表原为占位名「合同负债（表2）」，已按源模板 A20 校正并进 _removed_table_keys',
+  },
   buildL3ListedColumns: { spec: 'composables/__tests__/l3NoteSectionMap.spec.ts', complete: true },
   buildL3SoeColumns: { spec: 'composables/__tests__/l3NoteSectionMap.spec.ts', complete: true },
   buildK2ListedColumns: {
@@ -218,12 +282,43 @@ const P1_ROUTE: Record<string, { spec: string; complete: boolean; note?: string 
       + '类别列 `cat_{i}` 随快照扩展，键集恒等经 buildK2SyncPayload 双向断言',
   },
   buildK2SoeColumns: { spec: 'composables/__tests__/k2NoteSubtableContract.spec.ts', complete: true },
+  // ── spec k-cycle-disclosure-alignment 批1（K8~K13 损益类）──────────────────
+  buildK8ListedColumns: { spec: 'composables/__tests__/kPlNoteSubtableContract.spec.ts', complete: true },
+  buildK8SoeColumns: { spec: 'composables/__tests__/kPlNoteSubtableContract.spec.ts', complete: true },
+  buildK9ListedColumns: { spec: 'composables/__tests__/kPlNoteSubtableContract.spec.ts', complete: true },
+  buildK9SoeColumns: { spec: 'composables/__tests__/kPlNoteSubtableContract.spec.ts', complete: true },
+  buildK10ListedColumns: { spec: 'composables/__tests__/kPlNoteSubtableContract.spec.ts', complete: true },
+  buildK10SoeColumns: {
+    spec: 'composables/__tests__/kPlNoteSubtableContract.spec.ts',
+    complete: true,
+    note: '国企 4 列（末列「是否为政府补助」文本型）+ 合计后结构行「其中：政府补助」不参与求和',
+  },
+  buildK11ListedColumns: { spec: 'composables/__tests__/kPlNoteSubtableContract.spec.ts', complete: true },
+  buildK11SoeColumns: { spec: 'composables/__tests__/kPlNoteSubtableContract.spec.ts', complete: true },
+  buildK12ListedColumns: { spec: 'composables/__tests__/kPlNoteSubtableContract.spec.ts', complete: true },
+  buildK12SoeColumns: { spec: 'composables/__tests__/kPlNoteSubtableContract.spec.ts', complete: true },
+  buildK13ListedColumns: { spec: 'composables/__tests__/kPlNoteSubtableContract.spec.ts', complete: true },
+  buildK13SoeColumns: { spec: 'composables/__tests__/kPlNoteSubtableContract.spec.ts', complete: true },
+  // ── spec k-cycle-disclosure-alignment 批2（K3 其他应付款）────────────────────
+  buildK3ListedColumns: {
+    spec: 'composables/__tests__/kLiabilityNoteSubtableContract.spec.ts',
+    complete: false,
+    note:
+      '7 张表列头逐字对齐模板；逾期利息 / 超1年未付股利 / 账龄超1年为条件表，'
+      + '应付利息·应付股利待底稿补录入区块（spec Task 8）→ columns 键集随快照变化，未做恒等',
+  },
+  buildK3SoeColumns: {
+    spec: 'composables/__tests__/kLiabilityNoteSubtableContract.spec.ts',
+    complete: false,
+    note: '同 buildK3ListedColumns（国企 6 表，无「超过1年未支付的应付股利」）',
+  },
   buildK4ListedColumns: { spec: 'composables/__tests__/k4NoteSectionMap.spec.ts', complete: true },
   buildK4SoeColumns: { spec: 'composables/__tests__/k4NoteSectionMap.spec.ts', complete: true },
   buildK5ListedColumns: { spec: 'composables/__tests__/k5NoteSectionMap.spec.ts', complete: true },
   buildK5SoeColumns: { spec: 'composables/__tests__/k5NoteSectionMap.spec.ts', complete: true },
   buildK6ListedColumns: { spec: 'composables/__tests__/k6NoteSectionMap.spec.ts', complete: true },
   buildK6SoeColumns: { spec: 'composables/__tests__/k6NoteSectionMap.spec.ts', complete: true },
+  buildK6SoeLiabilityColumns: { spec: 'composables/__tests__/k6NoteSectionMap.spec.ts', complete: true },
   buildK7ListedColumns: { spec: 'composables/__tests__/k7NoteSectionMap.spec.ts', complete: true },
   buildK7SoeColumns: { spec: 'composables/__tests__/k7NoteSectionMap.spec.ts', complete: true },
   buildH2ListedColumns: { spec: 'composables/__tests__/h2DisclosureSyncPayload.spec.ts', complete: true },

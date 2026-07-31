@@ -16,7 +16,43 @@ import {
   isChangeRateExceeding,
   calcBadDebtEndBalance,
   safeDivide,
+  parseNum,
 } from '../useD1FormulaEngine'
+
+/**
+ * 金额域生成器约束：**必须显式给上下界**。
+ *
+ * `fc.float({ noNaN: true })` 只排除 NaN，仍会生成 ±Infinity。审计金额恒为有限数
+ * （非有限输入由 `parseNum` 归零，见同名单测），而恒等式在 Infinity 上会退化为 NaN
+ * → `toBeCloseTo(NaN)` 必失败：
+ *   - `calcChangeRate(-Infinity, 0)` → `Infinity / -Infinity` = NaN（实测 seed 1139061718 命中）
+ *   - `calcSubtotal([+Infinity, -Infinity])` → NaN
+ *   - `calcNetValue(Infinity, Infinity)` → NaN
+ * 这类失败是生成器越界，不是公式缺陷 → 本文件所有 float 统一走此约束。
+ */
+const AMOUNT = { min: -1e9, max: 1e9, noNaN: true } as const
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// parseNum 边界：非有限值必须归零（否则会把整表算成 NaN）
+// ═══════════════════════════════════════════════════════════════════════════════
+
+describe('parseNum 非有限值边界', () => {
+  it('把 ±Infinity / 溢出字面量 / NaN 全部归零', () => {
+    expect(parseNum(Number.POSITIVE_INFINITY)).toBe(0)
+    expect(parseNum(Number.NEGATIVE_INFINITY)).toBe(0)
+    expect(parseNum('Infinity')).toBe(0)
+    expect(parseNum('-Infinity')).toBe(0)
+    expect(parseNum('1e400')).toBe(0) // parseFloat 溢出为 Infinity
+    expect(parseNum(Number.NaN)).toBe(0)
+    expect(parseNum('abc')).toBe(0)
+  })
+
+  it('有限值原样通过（含负数与小数）', () => {
+    expect(parseNum(0)).toBe(0)
+    expect(parseNum(-1234.56)).toBe(-1234.56)
+    expect(parseNum('1234.56')).toBe(1234.56)
+  })
+})
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Property 1: 审定数公式正确性
@@ -62,11 +98,11 @@ describe('Feature: d1-adjudication-table, Property 2: 变动额与变动率公�
           // Strategy 1: both zero
           fc.constant([0, 0] as [number, number]),
           // Strategy 2: prior=0, audited≠0
-          fc.float({ noNaN: true }).filter(v => v !== 0).map(v => [0, v] as [number, number]),
+          fc.float(AMOUNT).filter(v => v !== 0).map(v => [0, v] as [number, number]),
           // Strategy 3: general case (prior≠0)
           fc.tuple(
-            fc.float({ noNaN: true }).filter(v => v !== 0),
-            fc.float({ noNaN: true }),
+            fc.float(AMOUNT).filter(v => v !== 0),
+            fc.float(AMOUNT),
           ),
         ),
         ([prior, audited]) => {
@@ -99,7 +135,7 @@ describe('Feature: d1-adjudication-table, Property 3: 小计行恒等于明细�
   it('calcSubtotal equals sum of all elements', () => {
     fc.assert(
       fc.property(
-        fc.array(fc.float({ noNaN: true }), { minLength: 1, maxLength: 20 }),
+        fc.array(fc.float(AMOUNT), { minLength: 1, maxLength: 20 }),
         (rows) => {
           const result = calcSubtotal(rows)
           const expected = rows.reduce((a, b) => a + b, 0)
@@ -124,8 +160,8 @@ describe('Feature: d1-adjudication-table, Property 4: 净值等于原值减坏�
   it('calcNetValue(gross, bad) === gross - bad', () => {
     fc.assert(
       fc.property(
-        fc.float({ noNaN: true }),
-        fc.float({ noNaN: true }),
+        fc.float(AMOUNT),
+        fc.float(AMOUNT),
         (gross, bad) => {
           const result = calcNetValue(gross, bad)
           const expected = gross - bad

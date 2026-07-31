@@ -55,7 +55,9 @@ describe('Feature: d1-disclosure-note, Property 4: 合计行恒等于明细行�
   it('calcSubtotal equals sum of all elements', () => {
     fc.assert(
       fc.property(
-        fc.array(fc.float({ noNaN: true }), { minLength: 1, maxLength: 20 }),
+        // 金额域必须有界：`noNaN` 只排 NaN 不排 ±Infinity，
+        // 数组同时含 +Inf 与 -Inf 时求和为 NaN → `toBeCloseTo(NaN)` 必失败（生成器越界，非公式缺陷）
+        fc.array(fc.float({ min: -1e9, max: 1e9, noNaN: true }), { minLength: 1, maxLength: 20 }),
         (rows) => {
           const result = calcSubtotal(rows)
           const expected = rows.reduce((a, b) => a + b, 0)

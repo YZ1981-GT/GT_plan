@@ -233,12 +233,24 @@ describe('buildF4ListedSyncPayload', () => {
     expect(rows[1]).toMatchObject({ label: '合计', end_amount: 300, is_total: true })
   })
 
-  it('叙述正文不带 title（避免英文小节名进附注正文）', () => {
+  // R5（spec f-cycle-disclosure-parity）：原实现 `[{ text }]` 无 section 也无 title，
+  // 附注侧无从判断正文来自哪个披露 Tab。现补齐变体 section + 中文 title。
+  it('叙述正文带变体 section 与中文 title', () => {
     const texts = payload.sub_table_data._note_texts as any[]
     expect(texts).toHaveLength(1)
-    expect(texts[0].title).toBeUndefined()
-    expect(texts[0].section).toBeUndefined()
+    expect(texts[0]).toMatchObject({
+      section: 'listed-disclosure-note',
+      title: '应付账款披露说明',
+    })
     expect(texts[0].text).toContain('应付账款')
+    // 禁止英文 section 键泄漏成标题
+    expect(texts[0].title).not.toBe(texts[0].section)
+    expect(/[a-z-]{6,}/.test(texts[0].title)).toBe(false)
+  })
+
+  it('R5 空正文被过滤（不用空段落覆盖附注既有正文）', () => {
+    const empty = buildF4ListedSyncPayload('wp-x', ['listed_standalone'], [], [], '   ')
+    expect(empty.sub_table_data._note_texts).toEqual([])
   })
 
   it('上报历史误名以删除附注侧残留空表', () => {
