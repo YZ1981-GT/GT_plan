@@ -43,6 +43,15 @@
       </div>
     </div>
 
+    <F1FourTableSourcePanel
+      :tb-source-codes="tbSourceCodes"
+      :trial-balance-amount="reportAmount"
+      :leaf-amount="reportAmount"
+      :show-cross-cycle="false"
+    />
+
+    <F1DisclosureConsistencyPanel :results="consistencyResults" :project-id="projectId" />
+
     <!-- (1) 账龄列示 -->
     <div class="disclosure-card">
       <h4 class="card-title">
@@ -59,28 +68,28 @@
         「合计」行 = 小计 − 减：减值准备。
       </div>
       <el-table :data="agingTableData" size="small" border stripe>
-        <el-table-column prop="label" label="账龄" width="150">
+        <el-table-column prop="label" :label="AGING_LABEL_COL" width="150">
           <template #default="{ row }">
             <span :class="{ 'subtotal-label': row.isSummary }">{{ row.label }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="期末数" align="center">
+        <el-table-column :label="AGING_GROUPS.end" align="center">
           <el-table-column label="账面余额" align="center">
-            <el-table-column label="金额" width="130" align="right">
+            <el-table-column :label="AMOUNT_LABEL" width="140" align="right">
               <template #default="{ row }">
                 <span class="cross-sheet-cell" :class="{ 'subtotal-val': row.isSummary }">
                   {{ fmtAmount(row.endAmount) }}
                 </span>
               </template>
             </el-table-column>
-            <el-table-column label="比例（%）" width="100" align="right">
+            <el-table-column :label="PCT_LABEL" width="100" align="right">
               <template #default="{ row }">
                 <span v-if="row.showPct" class="cross-sheet-cell">{{ fmtPct(row.endPct) }}</span>
                 <span v-else class="muted">——</span>
               </template>
             </el-table-column>
           </el-table-column>
-          <el-table-column label="减值准备" width="120" align="right">
+          <el-table-column :label="BAD_DEBT_LABEL" width="140" align="right">
             <template #default="{ row }">
               <template v-if="row.isDerived">
                 <span class="muted">——</span>
@@ -89,36 +98,33 @@
                 <span class="subtotal-val">{{ fmtAmount(row.endBadDebt) }}</span>
               </template>
               <template v-else>
-                <el-input-number
+                <WpAmountInput
                   :model-value="row.endBadDebt"
-                  size="small"
-                  :controls="false"
-                  :precision="2"
                   :disabled="isReadonly"
-                  style="width:100%"
-                  @change="(v: number | undefined) => updateAgingBadDebt(row.key, 'end', v ?? 0)"
+                  :aria-label="`${row.label}期末${BAD_DEBT_LABEL}`"
+                  @change="(v: number) => updateAgingBadDebt(row.key, 'end', v)"
                 />
               </template>
             </template>
           </el-table-column>
         </el-table-column>
-        <el-table-column label="期初数" align="center">
+        <el-table-column :label="AGING_GROUPS.prior" align="center">
           <el-table-column label="账面余额" align="center">
-            <el-table-column label="金额" width="130" align="right">
+            <el-table-column :label="AMOUNT_LABEL" width="140" align="right">
               <template #default="{ row }">
                 <span class="cross-sheet-cell" :class="{ 'subtotal-val': row.isSummary }">
                   {{ fmtAmount(row.priorAmount) }}
                 </span>
               </template>
             </el-table-column>
-            <el-table-column label="比例（%）" width="100" align="right">
+            <el-table-column :label="PCT_LABEL" width="100" align="right">
               <template #default="{ row }">
                 <span v-if="row.showPct" class="cross-sheet-cell">{{ fmtPct(row.priorPct) }}</span>
                 <span v-else class="muted">——</span>
               </template>
             </el-table-column>
           </el-table-column>
-          <el-table-column label="减值准备" width="120" align="right">
+          <el-table-column :label="BAD_DEBT_LABEL" width="140" align="right">
             <template #default="{ row }">
               <template v-if="row.isDerived">
                 <span class="muted">——</span>
@@ -127,14 +133,11 @@
                 <span class="subtotal-val">{{ fmtAmount(row.priorBadDebt) }}</span>
               </template>
               <template v-else>
-                <el-input-number
+                <WpAmountInput
                   :model-value="row.priorBadDebt"
-                  size="small"
-                  :controls="false"
-                  :precision="2"
                   :disabled="isReadonly"
-                  style="width:100%"
-                  @change="(v: number | undefined) => updateAgingBadDebt(row.key, 'prior', v ?? 0)"
+                  :aria-label="`${row.label}期初${BAD_DEBT_LABEL}`"
+                  @change="(v: number) => updateAgingBadDebt(row.key, 'prior', v)"
                 />
               </template>
             </template>
@@ -217,12 +220,11 @@
               </span>
             </template>
             <template v-else>
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.endBalance"
-                size="small"
-                :controls="false"
                 :disabled="isReadonly"
-                @change="(v: number | undefined) => updateOver1Field(row.rowId, 'endBalance', v ?? 0)"
+                aria-label="期末余额"
+                @change="(v: number) => updateOver1Field(row.rowId, 'endBalance', v)"
               />
             </template>
           </template>
@@ -325,14 +327,11 @@
               <span class="subtotal-val">{{ fmtAmount(row.badDebt) }}</span>
             </template>
             <template v-else>
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.badDebt"
-                size="small"
-                :controls="false"
-                :precision="2"
                 :disabled="isReadonly"
-                style="width:100%"
-                @change="(v: number | undefined) => updateTop5BadDebt(row.debtorName, v ?? 0)"
+                aria-label="减值准备"
+                @change="(v: number) => updateTop5BadDebt(row.debtorName, v)"
               />
             </template>
           </template>
@@ -382,6 +381,29 @@ import { ADJUDICATION_LABEL_BY_SEGMENT_KEY } from '../composables/agingPresets'
 import GtIndexChip from '../GtIndexChip.vue'
 import F1DisclosureUsageGuide from './F1DisclosureUsageGuide.vue'
 import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
+import WpAmountInput from '../shared/WpAmountInput.vue'
+import F1FourTableSourcePanel from './F1FourTableSourcePanel.vue'
+import F1DisclosureConsistencyPanel from './F1DisclosureConsistencyPanel.vue'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import {
+  F1_AGING_LABEL_COL,
+  F1_SOE_AGING_GROUPS,
+  F1_SOE_AMOUNT_LABEL,
+  F1_SOE_PCT_LABEL,
+} from '../composables/f1DisclosureSyncPayload'
+import { buildF1ConsistencyChecks } from '../composables/f1DisclosureConsistency'
+import type { AgingSegment } from '@/composables/useAgingConfig'
+
+// 列头字面单一真源（源 xlsx 逐格实证，含空格）—— 与同步载荷 columns 同源
+const AGING_LABEL_COL = F1_AGING_LABEL_COL
+const AGING_GROUPS = F1_SOE_AGING_GROUPS
+const AMOUNT_LABEL = F1_SOE_AMOUNT_LABEL
+const PCT_LABEL = F1_SOE_PCT_LABEL
+/**
+ * ①表逐段备抵列列头 = 源模板 `D9`/`G9` 字面「坏账准备」（底稿侧）；
+ * 同步到附注时聚合为「减：减值准备」**行**（附注模版与 F7-7 口径）—— 两侧各守其源。
+ */
+const BAD_DEBT_LABEL = '坏账准备'
 
 const props = withDefaults(defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -394,8 +416,18 @@ const props = withDefaults(defineProps<{
   year?: number
   saveImmediate: (itemId: string, data: Partial<ChecklistResponse>) => Promise<void>
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
+  /** F1 账龄口径单一真源（主入口注入，供勾稽的「1 年以上」段集自适配） */
+  agingSegments?: AgingSegment[]
+  /** 四表库减值准备（render impairment_prefill；null = 无该备抵科目）——只做溯源与勾稽 */
+  impairmentPrefill?: { end: number; prior: number } | null
+  /** 四表库取数溯源（render project_context.tb_source_codes） */
+  tbSourceCodes?: unknown
+  /** 报表「预付款项」期末数（render project_context.prepaid_tb_amount），供 F7-1 勾稽 */
+  reportAmount?: number
 }>(), {
   applicableStandards: () => [],
+  impairmentPrefill: null,
+  reportAmount: 0,
 })
 
 const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
@@ -451,6 +483,7 @@ const {
   top5Rows,
   top5Total,
   updateTop5BadDebt,
+  fourTableImpairment,
   note1,
   note2,
   note3,
@@ -464,7 +497,67 @@ const {
   crossSheet: props.crossSheet,
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
   applicableStandards: toRef(props, 'applicableStandards') as unknown as Ref<string[]>,
+  impairmentPrefill: computed(() => props.impairmentPrefill ?? null) as unknown as
+    Ref<{ end: number; prior: number } | null>,
 })
+
+// ─── 披露内部勾稽（规则全取 F7-1~F7-14 + 国企附加四表库比对）──────────────────
+const OVER_ONE_YEAR_DAY_FROM = 366
+
+/** 「1 年以上」账龄段 key 集合：随账龄枚举（3年段/5年段/自定义）自适配 */
+const overOneYearKeys = computed<string[]>(() => {
+  const segs = props.agingSegments?.length
+    ? props.agingSegments
+    : (props.crossSheet.agingSegments?.value ?? [])
+  if (!segs.length) return agingRows.value.slice(1).map((r) => r.key)
+  const byDay = segs.filter((s) => s.dayFrom >= OVER_ONE_YEAR_DAY_FROM).map((s) => s.key)
+  return byDay.length ? byDay : segs.slice(1).map((s) => s.key)
+})
+
+const consistencyResults = computed(() => buildF1ConsistencyChecks('soe', {
+  reportEndAmount: props.reportAmount,
+  reportPriorAmount: null,
+  agingRows: agingRows.value.map((r) => ({
+    key: r.key,
+    label: r.label,
+    endAmount: r.endAmount,
+    endPct: r.endPct,
+    priorAmount: r.priorAmount,
+    priorPct: r.priorPct,
+  })),
+  agingSubtotal: {
+    endAmount: agingTotal.value.endAmount,
+    endPct: agingTotal.value.endPct,
+    priorAmount: agingTotal.value.priorAmount,
+    priorPct: agingTotal.value.priorPct,
+  },
+  agingImpairment: {
+    endAmount: agingImpairmentRow.value.endAmount,
+    priorAmount: agingImpairmentRow.value.priorAmount,
+  },
+  agingNet: { endAmount: agingNet.value.endAmount, priorAmount: agingNet.value.priorAmount },
+  overOneYearKeys: overOneYearKeys.value,
+  over1Rows: over1YearRows.value.map((r) => ({
+    name: r.debtorUnit,
+    endBalance: r.endBalance,
+    creditorUnit: r.creditorUnit,
+    agingLabel: r.agingLabel,
+    reason: r.reason,
+  })),
+  over1Total: { endBalance: over1YearTotal.value.endBalance },
+  top5Rows: top5Rows.value.map((r) => ({
+    name: r.debtorName,
+    endBalance: r.endBalance,
+    proportionPct: r.proportionPct,
+    impairment: r.badDebt,
+  })),
+  top5Total: {
+    endBalance: top5Total.value.endBalance,
+    proportionPct: top5Total.value.proportionPct,
+    impairment: top5Total.value.badDebt,
+  },
+  fourTableImpairmentEnd: fourTableImpairment.value?.end ?? null,
+}))
 
 // ─── AI 辅助（每个说明文本域一个 section，键与同步 `_note_texts` 同名）───
 const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF1AiGenerate(
@@ -603,10 +696,12 @@ async function syncToDisclosureNotes() {
   }
 }
 
+// 🔴 金额格式单一真源 = stores/displayPrefs.fmtAmount（千分符 / 小数位 / 单位换算 /
+//   showZero 均为用户可切换的平台级偏好），不再各 Tab 自写 toLocaleString。
+const displayPrefs = useDisplayPrefsStore()
+
 function fmtAmount(val: number | null | undefined): string {
-  if (val == null || val === 0) return '-'
-  if (val < 0) return `(${Math.abs(val).toLocaleString('zh-CN', { maximumFractionDigits: 2 })})`
-  return val.toLocaleString('zh-CN', { maximumFractionDigits: 2 })
+  return displayPrefs.fmtAmount(val)
 }
 
 function fmtPct(val: number | null | undefined): string {

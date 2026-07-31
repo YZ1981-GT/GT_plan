@@ -45,6 +45,10 @@
           :debounced-save="debouncedSave"
           :cross-sheet="crossSheet"
           :tb-amount-seed="f1TbAmountSeed"
+          :tb-leaf-amount="f1TbLeafAmount"
+          :nature-prefill="f1NaturePrefill"
+          :tb-source-codes="f1TbSourceCodes"
+          :tb-cross-cycle-codes="f1TbCrossCycleCodes"
           :aging-segments="f1AgingSegments"
         />
 
@@ -126,6 +130,10 @@
           :debounced-save="debouncedSave"
           :cross-sheet="crossSheet"
           :applicable-standards="applicableStandards"
+          :aging-segments="f1AgingSegments"
+          :impairment-prefill="f1ImpairmentPrefill"
+          :tb-source-codes="f1TbSourceCodes"
+          :report-amount="f1TbAmountSeed"
         />
 
         <F1TabDisclosureSoe
@@ -139,6 +147,10 @@
           :debounced-save="debouncedSave"
           :cross-sheet="crossSheet"
           :applicable-standards="applicableStandards"
+          :aging-segments="f1AgingSegments"
+          :impairment-prefill="f1ImpairmentPrefill"
+          :tb-source-codes="f1TbSourceCodes"
+          :report-amount="f1TbAmountSeed"
         />
 
         <F1TabConfirmationProcedure
@@ -221,8 +233,12 @@ const sheetNameRef = computed(() => props.sheetName || '')
 const currentSheet = computed(() => {
   const name = props.sheetName || props.wpCode || ''
   if (/F1-note-listed|附注披露.*上市|附注.*上市/.test(name)) return '附注上市'
-  if (/F1-note-soe|附注披露.*国企|附注.*国企/.test(name)) return '附注国企'
-  if (/附注/.test(name)) return name.includes('国企') ? '附注国企' : '附注上市'
+  // 🔴「国企」与「国有企业」两种写法都要认：平台 24 份源模板用的是「国有企业」，
+  //   只写 /国企/ 会让国企 TAB 落到末尾 fallback 再误判成上市（H1/I1 等曾踩中）。
+  if (/F1-note-soe|附注披露.*(国企|国有)|附注.*(国企|国有)/.test(name)) return '附注国企'
+  if (/附注/.test(name)) {
+    return name.includes('国企') || name.includes('国有') ? '附注国企' : '附注上市'
+  }
   if (/函证|F1-CONF|F1CONF/i.test(name)) return 'F1-CONF'
   const m = name.match(/(F1A|F1-\d+)/i)
   return m ? m[1].toUpperCase().replace(/^F1A$/i, 'F1A') : ''
@@ -253,6 +269,44 @@ const f1RelatedParties = computed<string[]>(() => {
 const f1TbAmountSeed = computed(() => {
   const ctx = props.htmlData?.project_context ?? props.htmlData?.projectContext ?? {}
   return Number(ctx.prepaid_tb_amount ?? 0) || 0
+})
+
+/** 科目余额表叶子合计（与 f1TbAmountSeed 并列，供溯源面板显示两口径差异） */
+const f1TbLeafAmount = computed(() => {
+  const ctx = props.htmlData?.project_context ?? props.htmlData?.projectContext ?? {}
+  return Number(ctx.prepaid_tb_leaf_amount ?? 0) || 0
+})
+
+/** 四表库取数溯源（report_config BS-008 规则映射解析结果） */
+const f1TbSourceCodes = computed(() => {
+  const ctx = props.htmlData?.project_context ?? props.htmlData?.projectContext ?? {}
+  return ctx.tb_source_codes
+})
+
+/** F1-4 跨循环锚点科目来源（存货 BS-010 / 应付账款 BS-045） */
+const f1TbCrossCycleCodes = computed(() => {
+  const ctx = props.htmlData?.project_context ?? props.htmlData?.projectContext ?? {}
+  return ctx.tb_cross_cycle_codes
+})
+
+/**
+ * F1-1「按性质分类」四表库预填（render `adjudication_prefill.nature`）。
+ * 后端只输出**实际出现**的性质桶 → 前端「只覆盖出现的类别、不清零未出现的类别」。
+ */
+const f1NaturePrefill = computed<Record<string, { opening?: number; closing?: number }>>(() => {
+  const raw = props.htmlData?.adjudication_prefill?.nature
+    ?? props.htmlData?.adjudicationPrefill?.nature
+  return raw && typeof raw === 'object' ? raw : {}
+})
+
+/**
+ * 减值准备（坏账准备-预付账款）四表库预填（render `impairment_prefill`）。
+ * `null` = 四表库无该备抵科目 → 披露侧保持手工录入（宁缺勿造）。
+ */
+const f1ImpairmentPrefill = computed<{ end: number; prior: number } | null>(() => {
+  const raw = props.htmlData?.impairment_prefill ?? props.htmlData?.impairmentPrefill
+  if (!raw || typeof raw !== 'object') return null
+  return { end: Number(raw.end ?? 0) || 0, prior: Number(raw.prior ?? 0) || 0 }
 })
 
 // 适用准则：显式 prop > 本 sheet html_data > runtime context（scaffold 从 render-config

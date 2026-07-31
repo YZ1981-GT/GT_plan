@@ -22,6 +22,17 @@
         <el-tag type="warning" size="small">损益类·借方·取发生额</el-tag>
       </div>
       <div class="section-actions">
+        <el-tooltip v-if="tbSourceSummary" :content="tbSourceSummary" placement="top">
+          <el-button
+            size="small"
+            type="success"
+            plain
+            :disabled="isReadonly || !hasTbSource"
+            @click="applyTbSeed"
+          >
+            从四表库带入未审数
+          </el-button>
+        </el-tooltip>
         <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
           <el-icon><Download /></el-icon>带入调整
         </el-button>
@@ -95,6 +106,25 @@
         </template>
       </el-table-column>
     </el-table>
+
+    <!-- ═══ 与试算平衡表核对（四表库·本期发生额）═══ -->
+    <el-alert
+      v-if="tbReconcile.hasTb"
+      class="tb-reconcile"
+      :type="tbReconcile.hasWarning ? 'warning' : 'success'"
+      :closable="false"
+      show-icon
+    >
+      <template #title>
+        {{ tbReconcile.hasWarning
+          ? `审定合计与试算平衡表核对不一致（差异 ${fmtAmount(tbReconcile.diff)}）`
+          : '审定合计与试算平衡表核对一致' }}
+      </template>
+      <template #default>
+        试算平衡表数 {{ fmtAmount(tbReconcile.tbAmount) }} · 审定合计
+        {{ fmtAmount(totalRow.audited) }}<span v-if="tbSourceSummary"> · {{ tbSourceSummary }}</span>
+      </template>
+    </el-alert>
 
     <!-- ═══ N5-4/N5-8取数交叉验证 ═══ -->
     <div class="cross-validation-section">
@@ -179,7 +209,8 @@ import { ref, computed, inject, onMounted, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { MagicStick, ChatDotSquare, Download } from '@element-plus/icons-vue'
 import { useN5FormData } from '../../composables/useN5FormData'
-import { calcAuditedAmount } from '../../composables/useN5FormulaEngine'
+import { calcAuditedAmount, parseNum } from '../../composables/useN5FormulaEngine'
+import { useLmnTbReconcile } from '../../composables/useLmnTbReconcile'
 import { useN5CrossSheet } from '../../composables/useN5CrossSheet'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
@@ -195,6 +226,8 @@ const props = defineProps<{
 const openReviewDialog = inject<((section: string) => void) | undefined>('openReviewDialog', undefined)
 const scheduleAutoSnapshot = inject<(() => void) | undefined>('scheduleAutoSnapshot', undefined)
 const n5AdjudicationPrefill = inject<any>('n5AdjudicationPrefill', null)
+const n5TrialBalance = inject<any>('n5TrialBalance', null)
+const n5TbSourceCodes = inject<any>('n5TbSourceCodes', null)
 const n5Year = inject<Ref<number> | undefined>('n5Year', undefined)
 
 const wpIdRef = computed(() => props.wpId) as Ref<string>
@@ -267,6 +300,61 @@ const {
   },
   totalAudited: () => totalRow.value.audited,
 })
+
+// ─── 四表库：TB 核对 + 带入未审数 ─────────────────────────────────────────────
+
+/**
+ * 审定合计 vs 试算平衡表核对（复用共享件 `useLmnTbReconcile`，原全仓 0 消费方）。
+ * N5 是**损益类** → `isIncome: true`（`period_amount` 即本期发生额）。
+ */
+const tbReconcile = useLmnTbReconcile(
+  computed(() => {
+    const tb = n5TrialBalance?.value
+    if (!tb) return {}
+    return { trial_balance: { end_balance: tb.period_amount ?? 0, begin_balance: 0 } }
+  }),
+  computed(() => totalRow.value.audited),
+  { isIncome: true },
+)
+
+/** 取数溯源（消费后端 `tb_source_codes`，消除 dead output） */
+const tbSourceSummary = computed(() => {
+  const s = n5TbSourceCodes?.value
+  if (!s?.codes?.length) return ''
+  const basis = s.basis === 'period' ? '本期发生额' : '期末余额'
+  return `科目 ${s.codes.join('、')}（报表行 ${s.row_code} · ${basis}）`
+})
+
+const hasTbSource = computed(
+  () => Boolean(n5AdjudicationPrefill?.value) || tbReconcile.value.hasTb,
+)
+
+/**
+ * 从四表库带入未审数（后端按 `6801.01 当期` / `6801.02 递延` 叶子拆分）。
+ * 🔴 只填空不覆盖（手工优先）；无子科目时后端把总额落「当期」行。
+ */
+function applyTbSeed(): void {
+  const prefill = n5AdjudicationPrefill?.value
+  if (!prefill) {
+    ElMessage.info('四表库暂无所得税费用发生额，或该科目未导入')
+    return
+  }
+  let filled = 0
+  for (const [key, row] of [['current', currentRow], ['deferred', deferredRow]] as const) {
+    const src = prefill[key]
+    if (!src) continue
+    if (parseNum(row.value.unadjusted) !== 0) continue // 手工优先
+    row.value.periodAmount = parseNum(src.periodAmount)
+    row.value.unadjusted = parseNum(src.unadjusted ?? src.periodAmount)
+    void handleCellChange(row.value)
+    filled += 1
+  }
+  if (filled === 0) {
+    ElMessage.info('未审数已录入，未覆盖（手工优先）')
+    return
+  }
+  ElMessage.success(`已从四表库带入 ${filled} 行未审数（当期 / 递延按子科目拆分）`)
+}
 
 // ─── 交叉验证 ────────────────────────────────────────────────────────────────
 
@@ -362,6 +450,8 @@ function fmtPercent(val: number | null | undefined): string {
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .section-title { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 600; color: #303133; }
 .section-actions { display: flex; align-items: center; gap: 8px; }
+.tb-reconcile { margin: 12px 0; }
+.tb-reconcile :deep(.el-alert__description) { font-size: var(--wp-font-size, 13px); line-height: 1.6; }
 
 .etr-indicator { display: flex; align-items: center; gap: 8px; padding: 10px 16px; margin-bottom: 16px; background: #f0f9eb; border: 1px solid #c2e7b0; border-radius: 6px; font-size: var(--wp-font-size, 13px); }
 .etr-label { color: #606266; font-weight: 500; }

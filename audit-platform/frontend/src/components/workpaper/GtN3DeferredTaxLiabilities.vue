@@ -200,14 +200,17 @@ const currentSheet = computed(() => {
   const m = name.match(/(N3A|N3-\d+|N3)/)
   if (m) return m[1]
   if (name.includes('底稿目录')) return '底稿目录'
-  if (name.includes('附注') || name.includes('披露')) return '附注'
+  // 🔴 **不认「附注」/「披露」**：N3 源模板无披露 sheet（披露与 N1 共节 五、30 / 八、31），
+  //    `N3TabDisclosure.vue` 已删除。原先这里返回 `'附注'` 且 `isHtmlSheet` 也认它 →
+  //    该 sheet 一旦出现（如手工加 tab / 分类表脏数据）就渲染出一个空白 Tab。
+  //    现落到 OnlyOffice 兜底，至少能看到原始内容。
   return name
 })
 
-/** N3-1~N3-3 + 附注 为 HTML 专属组件渲染的 sheet（支持双模式切换）；N3A 走 OnlyOffice */
+/** N3-1~N3-3 为 HTML 专属组件渲染的 sheet（支持双模式切换）；N3A 与其他走 OnlyOffice */
 const isHtmlSheet = computed(() => {
   const s = currentSheet.value
-  return /^N3-\d+$/.test(s) || s === 'N3' || s === '底稿目录' || s === '附注'
+  return /^N3-\d+$/.test(s) || s === 'N3' || s === '底稿目录'
 })
 
 // ─── selfLoad（bundle内嵌场景 htmlData 为 null 时自加载） ─────────────────────

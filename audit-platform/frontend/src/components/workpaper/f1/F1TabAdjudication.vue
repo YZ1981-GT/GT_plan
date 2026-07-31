@@ -278,8 +278,9 @@
  * F1TabAdjudication.vue — F1-1 审定表
  * 双区块(按性质+按账龄) + 变动率高亮 + 跨sheet取数 + 审计说明/结论
  */
-import { computed, inject, toRef, type Ref } from 'vue'
+import { computed, inject, ref, toRef, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { Download } from '@element-plus/icons-vue'
 import { isChangeRateExceeding } from '../composables/useF1FormulaEngine'
 import { useF1Adjudication } from '../composables/useF1Adjudication'
@@ -400,10 +401,13 @@ const {
 
 // ─── Formatting helpers ─────────────────────────────────────────────────────
 
+// 🔴 金额格式单一真源 = stores/displayPrefs.fmtAmount（千分符 + 小数位 + 单位换算 +
+//   showZero 均为用户可切换的平台级偏好）。此前 F1 各 Tab 各写一份 toLocaleString，
+//   忽略用户偏好且小数位不一致。
+const displayPrefs = useDisplayPrefsStore()
+
 function fmtAmount(val: number | null | undefined): string {
-  if (val == null || val === 0) return '-'
-  if (val < 0) return `(${Math.abs(val).toLocaleString('zh-CN', { maximumFractionDigits: 2 })})`
-  return val.toLocaleString('zh-CN', { maximumFractionDigits: 2 })
+  return displayPrefs.fmtAmount(val)
 }
 
 function fmtRate(rate: number | '' | 'N/A'): string {

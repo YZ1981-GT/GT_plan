@@ -33,17 +33,46 @@ export interface H9SyncFromWorkpaperPayload {
   columns?: Record<string, ColumnDef[]>
 }
 
-// 租赁负债子表列头：逐字取自 H9TabDisclosureListed/Soe el-table-column（源对齐）
+/**
+ * 租赁负债子表列头：逐字取自源模板 R7（上市 上年年末余额 / 国企 期初余额）。
+ *
+ * 🔴 首列 `flat: true`：源模板表头单行，不声明时后端 `_extract_column_groups` 返 `None`
+ * → 回退前缀推断造凭空父表头。**seed 与推送两处都要加**（H8 实测教训）。
+ */
 const H9_LISTED_COLUMNS: ColumnDef[] = [
-  { key: 'label', label: '项目', is_label: true },
+  { key: 'label', label: '项目', is_label: true, flat: true },
   { key: 'end_balance', label: '期末余额', format: 'amount' },
   { key: 'prior_balance', label: '上年年末余额', format: 'amount' },
 ]
 const H9_SOE_COLUMNS: ColumnDef[] = [
-  { key: 'label', label: '项目', is_label: true },
+  { key: 'label', label: '项目', is_label: true, flat: true },
   { key: 'end_balance', label: '期末余额', format: 'amount' },
   { key: 'begin_balance', label: '期初余额', format: 'amount' },
 ]
+
+/**
+ * `_note_texts` section → 中文标题。
+ *
+ * 🔴 缺 `title` 时后端 `_format_note_texts` 用 `section` 兜底 → 附注正文渲染成
+ * `【listed-interest】`（违反 UI 全中文化）。
+ */
+export const H9_NOTE_TEXT_TITLES: Record<string, string> = {
+  'listed-interest': '租赁负债利息费用说明',
+  'soe-guidance': '补充披露说明',
+}
+
+/** 构造 `_note_texts`：过滤空白 + 补中文 title（两变体共用） */
+export function buildH9NoteTexts(
+  items: ReadonlyArray<{ section: string; text: string | null | undefined }>,
+): Array<{ section: string; title: string; text: string }> {
+  return items
+    .filter((it) => String(it.text ?? '').trim())
+    .map((it) => ({
+      section: it.section,
+      title: H9_NOTE_TEXT_TITLES[it.section] || it.section,
+      text: String(it.text).trim(),
+    }))
+}
 
 export function buildH9ListedSubTableData(
   state: H9ListedDisclosureState,
@@ -67,15 +96,13 @@ export function buildH9ListedSubTableData(
     })
   }
 
-  const interestText = resolveListedInterestNote(state)
   const sub: Record<string, Record<string, unknown>[]> = {
     [H9_LISTED_SUBTABLE.main]: rows,
   }
-  if (interestText) {
-    sub._note_texts = [
-      { section: 'listed-interest', text: interestText },
-    ] as unknown as Record<string, unknown>[]
-  }
+  const notes = buildH9NoteTexts([
+    { section: 'listed-interest', text: resolveListedInterestNote(state) },
+  ])
+  if (notes.length) sub._note_texts = notes as unknown as Record<string, unknown>[]
   return sub
 }
 
@@ -95,11 +122,10 @@ export function buildH9SoeSubTableData(
   const sub: Record<string, Record<string, unknown>[]> = {
     [H9_SOE_SUBTABLE.main]: rows,
   }
-  if (state.supplementNote?.trim()) {
-    sub._note_texts = [
-      { section: 'soe-guidance', text: state.supplementNote.trim() },
-    ] as unknown as Record<string, unknown>[]
-  }
+  const notes = buildH9NoteTexts([
+    { section: 'soe-guidance', text: state.supplementNote },
+  ])
+  if (notes.length) sub._note_texts = notes as unknown as Record<string, unknown>[]
   return sub
 }
 

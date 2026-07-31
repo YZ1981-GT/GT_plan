@@ -329,11 +329,16 @@ async function selfLoad(): Promise<void> {
       _mergeResponses(map, sheet?.html_data?.allResponses)
     }
     if (map.size > 0) allResponses.value = map
-    // 提取审定表预填
+    // 提取审定表预填 + 四表取数种子（TB 核对与取数溯源用）
     for (const sheet of sheets) {
-      if (sheet?.html_data?.adjudication_prefill && !adjudicationPrefill.value) {
-        adjudicationPrefill.value = sheet.html_data.adjudication_prefill
+      const h = sheet?.html_data
+      if (!h) continue
+      if (h.adjudication_prefill && !adjudicationPrefill.value) {
+        adjudicationPrefill.value = h.adjudication_prefill
       }
+      // 🔴 `trial_balance` 原为 dead output（后端输出、前端零消费）→ 接入 TB 核对
+      if (h.trial_balance && !tbTrialBalance.value) tbTrialBalance.value = h.trial_balance
+      if (h.tb_source_codes && !tbSourceCodes.value) tbSourceCodes.value = h.tb_source_codes
     }
   } catch (e) {
     console.error('[N5] selfLoad failed:', e)
@@ -351,6 +356,11 @@ provide('getRowDot', reviewThreads.getRowDot)
 // ─── 审定表预填 + 版本快照 ──────────────────────────────────────────────────
 const adjudicationPrefill = ref<any>(null)
 provide('n5AdjudicationPrefill', adjudicationPrefill)
+/** 四表取数：`trial_balance`（本期发生额）+ `tb_source_codes`（报表行溯源） */
+const tbTrialBalance = ref<any>(null)
+const tbSourceCodes = ref<any>(null)
+provide('n5TrialBalance', tbTrialBalance)
+provide('n5TbSourceCodes', tbSourceCodes)
 provide('scheduleAutoSnapshot', () => runtime?.version.scheduleAutoSnapshot())
 onMounted(async () => {
   // 如果 htmlData 为 null（selfLoad 场景），自行加载

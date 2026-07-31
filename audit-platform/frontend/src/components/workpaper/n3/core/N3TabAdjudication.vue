@@ -23,6 +23,17 @@
         <el-tag type="danger" size="small" class="liability-tag">负债类·贷方</el-tag>
       </div>
       <div class="section-actions">
+        <el-tooltip v-if="tbSourceSummary" :content="tbSourceSummary" placement="top">
+          <el-button
+            size="small"
+            type="success"
+            plain
+            :disabled="props.isReadonly || !hasTbSource"
+            @click="applyTbSeed"
+          >
+            从四表库带入未审数
+          </el-button>
+        </el-tooltip>
         <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
           <el-icon><Download /></el-icon>带入调整
         </el-button>
@@ -226,6 +237,25 @@
       </el-table-column>
     </el-table>
 
+    <!-- ═══ 与试算平衡表核对（四表库）═══ -->
+    <el-alert
+      v-if="tbReconcile.hasTb"
+      class="tb-reconcile"
+      :type="tbReconcile.hasWarning ? 'warning' : 'success'"
+      :closable="false"
+      show-icon
+    >
+      <template #title>
+        {{ tbReconcile.hasWarning
+          ? `审定合计与试算平衡表核对不一致（差异 ${fmtNum(tbReconcile.diff)}）`
+          : '审定合计与试算平衡表核对一致' }}
+      </template>
+      <template #default>
+        试算平衡表数 {{ fmtNum(tbReconcile.tbAmount) }}（期初 {{ fmtNum(tbReconcile.tbBeginAmount) }}）
+        · 审定合计 {{ fmtNum(total.audited) }}<span v-if="tbSourceSummary"> · {{ tbSourceSummary }}</span>
+      </template>
+    </el-alert>
+
     <!-- ═══ 交叉验证区 ═══ -->
     <div class="cross-validation-section">
       <div class="cv-title">交叉验证</div>
@@ -376,7 +406,7 @@
  *
  * 科目：2901递延所得税负债（贷方/负债类！）
  */
-import { ref, computed, inject, watch, type Ref } from 'vue'
+import { ref, computed, inject, onMounted, watch, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { MagicStick, ChatDotSquare, WarningFilled, Download } from '@element-plus/icons-vue'
 // @ts-ignore
@@ -384,6 +414,7 @@ import GtIndexChip from '../../GtIndexChip.vue'
 import { useN3FormData } from '../../composables/useN3FormData'
 import { useN3Adjudication, type N3DiffCategory } from '../../composables/useN3Adjudication'
 import { useN3CrossSheet } from '../../composables/useN3CrossSheet'
+import { useLmnTbReconcile } from '../../composables/useLmnTbReconcile'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
@@ -429,13 +460,81 @@ const {
   total,
   crossValidation,
   updateRow,
+  pullFromTB,
   saveAndSync,
 } = useN3Adjudication({
   allResponses: allResponsesRef,
   saveField: formData.setField,
   getField: formData.getField,
   writebackTB: formData.writebackTB,
+  // 四表分类预填（2901 叶子 → 五语义槽），替代「全塞其他行」
+  adjudicationPrefill: computed(
+    () => formData.renderMeta.value?.adjudication_prefill ?? {},
+  ),
 })
+
+// ─── 四表库：TB 核对 + 带入未审数 ─────────────────────────────────────────────
+
+/**
+ * 审定合计 vs 试算平衡表核对（复用共享件 `useLmnTbReconcile`）。
+ * 该 composable 早已存在但**全仓 0 消费方**，本次接入 N3/N4/N5 三处。
+ * N3 是余额类（不传 `isIncome`）。
+ */
+const tbReconcile = useLmnTbReconcile(
+  computed(() => formData.renderMeta.value),
+  computed(() => total.value.audited),
+)
+
+/** 后端按 2901 叶子子科目归入五语义槽（与 N1 披露表负债段共用分类逻辑） */
+const tbPrefill = computed<Record<string, { opening: number; closing: number }>>(
+  () => formData.renderMeta.value?.adjudication_prefill ?? {},
+)
+
+/** 取数溯源（消费后端 `tb_source_codes`，消除 dead output） */
+const tbSourceSummary = computed(() => {
+  const s = formData.renderMeta.value?.tb_source_codes
+  if (!s?.codes?.length) return ''
+  const basis = s.basis === 'period' ? '本期发生额' : '期末余额'
+  return `科目 ${s.codes.join('、')}（报表行 ${s.row_code} · ${basis}）`
+})
+
+const hasTbSource = computed(
+  () => Object.keys(tbPrefill.value).length > 0 || tbReconcile.value.hasTb,
+)
+
+/** 核对条数值格式（千分符 + 2 位小数；0 显示 0.00 以区分「核对为零」与「无数据」） */
+function fmtNum(v: number | null | undefined): string {
+  return (Number(v) || 0).toLocaleString('zh-CN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+}
+
+/**
+ * 🔴 本组件原先**完全没有 `onMounted`** → `formData.selfLoad()` 从不执行 →
+ * `renderMeta` 恒为空 → 后端 render 输出的 `trial_balance` / `adjudication_prefill` /
+ * `tb_source_codes` 全部拿不到（这是「dead output」的前端侧根因）。
+ */
+onMounted(() => {
+  void formData.selfLoad()
+})
+
+async function applyTbSeed(): Promise<void> {
+  const r = await pullFromTB(tbPrefill.value)
+  if (r.filled === 0) {
+    ElMessage.info(
+      r.total === 0
+        ? '四表库暂无递延所得税负债余额，或该科目未导入'
+        : '未审数已录入，未覆盖（手工优先）',
+    )
+    return
+  }
+  ElMessage.success(
+    r.bySlot
+      ? `已按差异项目分类带入 ${r.filled} 行（期末合计 ${r.total.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}）`
+      : '该科目无子科目，已把总额带入「其他」行，请按差异项目分类拆分',
+  )
+}
 
 const {
   adjudicationVsDetail,
@@ -699,6 +798,8 @@ watch(
 
 <style scoped>
 .audit-objective { margin-bottom: 16px; }
+.tb-reconcile { margin-bottom: 12px; }
+.tb-reconcile :deep(.el-alert__description) { font-size: var(--wp-font-size, 13px); line-height: 1.6; }
 .audit-objective :deep(.el-alert__description) { font-size: var(--wp-font-size, 13px); line-height: 1.6; }
 .n3-adjudication {
   padding: 12px;

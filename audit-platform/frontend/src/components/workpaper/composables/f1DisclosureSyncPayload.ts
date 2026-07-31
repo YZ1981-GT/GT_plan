@@ -60,15 +60,58 @@ export const F1_SOE_SUBTABLE = {
  */
 export const F1_LISTED_OBSOLETE_TABLE_KEYS = ['单位名称'] as const
 
+// ─── 列头字面单一真源（源 xlsx 逐格实证，含空格；底稿 Tab 模板亦引用本组常量） ──────
+//
+// 🔴 空格必须逐字保留（与平台 `账  龄` / `小 计` / `合  计` 同族约定）：
+//   上市 `A8=账  龄`（双空格）/ `B8=期末数` / `D8=上年年末数` / `B9=金  额`（双空格）/ `C9=比例%`
+//   国企 `A8=账  龄`（双空格）/ `B8=期末数` / `E8=期初数` / `B10=金 额`（**单**空格）/ `C10=比例（%）`
+//
+// 数据 key（label / end_amount / end_pct / prior_amount / prior_pct）**逐字不变** ——
+// 改 key 会让整表数据在附注侧丢落点。
+
+/** 两版按账龄表的标签列列头（源 A8，双空格） */
+export const F1_AGING_LABEL_COL = '账  龄'
+/** 上市按账龄表两级表头父组名（源 B8 / D8） */
+export const F1_LISTED_AGING_GROUPS = { end: '期末数', prior: '上年年末数' } as const
+/** 国企按账龄表两级表头父组名（源 B8 / E8） */
+export const F1_SOE_AGING_GROUPS = { end: '期末数', prior: '期初数' } as const
+/** 上市金额列列头（源 B9，双空格） */
+export const F1_LISTED_AMOUNT_LABEL = '金  额'
+/** 国企金额列列头（源 B10，单空格） */
+export const F1_SOE_AMOUNT_LABEL = '金 额'
+/** 比例列列头（上市源 C9 / 国企源 C10） */
+export const F1_LISTED_PCT_LABEL = '比例%'
+export const F1_SOE_PCT_LABEL = '比例（%）'
+
 // ─── 列定义（键与 build*SubTableData 行键、note_template columns 逐字一致） ─────
 
 export const F1_LISTED_COLUMNS: Record<string, ColumnDef[]> = {
   [F1_LISTED_SUBTABLE.AGING]: [
-    { key: 'label', label: '账龄', is_label: true },
-    { key: 'end_amount', label: '金额', group: '期末余额', format: 'amount' },
-    { key: 'end_pct', label: '比例%', group: '期末余额', format: 'percent' },
-    { key: 'prior_amount', label: '金额', group: '上年年末余额', format: 'amount' },
-    { key: 'prior_pct', label: '比例%', group: '上年年末余额', format: 'percent' },
+    { key: 'label', label: F1_AGING_LABEL_COL, is_label: true },
+    {
+      key: 'end_amount',
+      label: F1_LISTED_AMOUNT_LABEL,
+      group: F1_LISTED_AGING_GROUPS.end,
+      format: 'amount',
+    },
+    {
+      key: 'end_pct',
+      label: F1_LISTED_PCT_LABEL,
+      group: F1_LISTED_AGING_GROUPS.end,
+      format: 'percent',
+    },
+    {
+      key: 'prior_amount',
+      label: F1_LISTED_AMOUNT_LABEL,
+      group: F1_LISTED_AGING_GROUPS.prior,
+      format: 'amount',
+    },
+    {
+      key: 'prior_pct',
+      label: F1_LISTED_PCT_LABEL,
+      group: F1_LISTED_AGING_GROUPS.prior,
+      format: 'percent',
+    },
   ],
   [F1_LISTED_SUBTABLE.OVER1]: [
     { key: 'label', label: '债务人名称', is_label: true, flat: true },
@@ -85,11 +128,31 @@ export const F1_LISTED_COLUMNS: Record<string, ColumnDef[]> = {
 
 export const F1_SOE_COLUMNS: Record<string, ColumnDef[]> = {
   [F1_SOE_SUBTABLE.AGING]: [
-    { key: 'label', label: '账龄', is_label: true },
-    { key: 'end_amount', label: '金额', group: '期末数', format: 'amount' },
-    { key: 'end_pct', label: '比例（%）', group: '期末数', format: 'percent' },
-    { key: 'prior_amount', label: '金额', group: '期初数', format: 'amount' },
-    { key: 'prior_pct', label: '比例（%）', group: '期初数', format: 'percent' },
+    { key: 'label', label: F1_AGING_LABEL_COL, is_label: true },
+    {
+      key: 'end_amount',
+      label: F1_SOE_AMOUNT_LABEL,
+      group: F1_SOE_AGING_GROUPS.end,
+      format: 'amount',
+    },
+    {
+      key: 'end_pct',
+      label: F1_SOE_PCT_LABEL,
+      group: F1_SOE_AGING_GROUPS.end,
+      format: 'percent',
+    },
+    {
+      key: 'prior_amount',
+      label: F1_SOE_AMOUNT_LABEL,
+      group: F1_SOE_AGING_GROUPS.prior,
+      format: 'amount',
+    },
+    {
+      key: 'prior_pct',
+      label: F1_SOE_PCT_LABEL,
+      group: F1_SOE_AGING_GROUPS.prior,
+      format: 'percent',
+    },
   ],
   [F1_SOE_SUBTABLE.OVER1]: [
     { key: 'creditor_unit', label: '债权单位', is_label: true, flat: true },
@@ -161,9 +224,32 @@ export interface F1ListedSyncSnapshot {
     proportionPct: number
   }
   top5SummaryText: string
+  /**
+   * 前五名披露格式（源模板 `A23=（…汇总**或**分别披露…）` + `A24=汇总披露格式：`
+   * + `A26=分别披露格式：` → **二选一**，不能两者同时进附注）。
+   *
+   * - `'separate'`（默认，与改造前行为一致）：推③表，不推汇总句；
+   * - `'summary'`：推汇总句，③表进 `_removed_table_keys`（否则用户切换后附注永久残留过时明细）。
+   */
+  top5Mode?: F1Top5Mode
   noteAging: string
   noteOver1Year: string
   noteTop5: string
+}
+
+/** 上市③前五名披露格式（源模板「汇总或分别披露」二选一） */
+export type F1Top5Mode = 'separate' | 'summary'
+
+export const F1_TOP5_MODE_DEFAULT: F1Top5Mode = 'separate'
+
+/** 前五名披露格式选项（UI 全中文化；label 取源模板 A24 / A26 字面） */
+export const F1_TOP5_MODE_OPTIONS: ReadonlyArray<{ value: F1Top5Mode; label: string }> = [
+  { value: 'separate', label: '分别披露格式' },
+  { value: 'summary', label: '汇总披露格式' },
+]
+
+export function normalizeF1Top5Mode(raw: unknown): F1Top5Mode {
+  return String(raw ?? '').trim() === 'summary' ? 'summary' : F1_TOP5_MODE_DEFAULT
 }
 
 export interface F1NoteTextRow {
@@ -199,6 +285,7 @@ export function buildF1NoteTexts(
 export function buildF1ListedSubTableData(
   snap: F1ListedSyncSnapshot,
 ): Record<string, unknown> {
+  const top5Mode = normalizeF1Top5Mode(snap.top5Mode)
   const sub: Record<string, unknown> = {
     [F1_LISTED_SUBTABLE.AGING]: [
       ...snap.agingRows.map((r) => ({
@@ -247,7 +334,20 @@ export function buildF1ListedSubTableData(
         is_total: true,
       },
     ],
-    [F1_LISTED_SUBTABLE.TOP5]: [
+    _note_texts: buildF1NoteTexts([
+      ['listed-note-aging', '预付款项按账龄披露说明', snap.noteAging],
+      ['listed-note-over1', '账龄超过1年的重要预付款项说明', snap.noteOver1Year],
+      ['listed-note-top5', '按预付对象归集的前五名预付款项说明', snap.noteTop5],
+      // 汇总披露格式的正文句只在该模式下进附注（与③表互斥）
+      ...(top5Mode === 'summary'
+        ? ([['listed-top5-summary', '前五名预付款项汇总披露', snap.top5SummaryText]] as const)
+        : []),
+    ]),
+  }
+
+  // ③前五名：源模板「汇总或分别披露」二选一
+  if (top5Mode === 'separate') {
+    sub[F1_LISTED_SUBTABLE.TOP5] = [
       ...snap.top5Rows.map((r) => ({
         label: r.entityName,
         end_amount: r.endBalance,
@@ -259,16 +359,13 @@ export function buildF1ListedSubTableData(
         proportion_pct: snap.top5Total.proportionPct,
         is_total: true,
       },
-    ],
-    _note_texts: buildF1NoteTexts([
-      ['listed-note-aging', '预付款项按账龄披露说明', snap.noteAging],
-      ['listed-note-over1', '账龄超过1年的重要预付款项说明', snap.noteOver1Year],
-      ['listed-note-top5', '按预付对象归集的前五名预付款项说明', snap.noteTop5],
-      ['listed-top5-summary', '前五名预付款项汇总披露', snap.top5SummaryText],
-    ]),
+    ]
   }
-  // 旧表名清理（后端据此删除附注残留空表；不含本次推送的键）
-  const removed = F1_LISTED_OBSOLETE_TABLE_KEYS.filter((k) => !(k in sub))
+
+  // 孤儿子表清理：旧表名 + 汇总模式下的③表（不含本次推送的键）
+  const removedCandidates: string[] = [...F1_LISTED_OBSOLETE_TABLE_KEYS]
+  if (top5Mode === 'summary') removedCandidates.push(F1_LISTED_SUBTABLE.TOP5)
+  const removed = removedCandidates.filter((k) => !(k in sub))
   if (removed.length) sub._removed_table_keys = removed
   return sub
 }
@@ -410,13 +507,21 @@ export function buildF1SyncPayload(
   year?: number | null,
 ): F1SyncFromWorkpaperPayload | null {
   if (!isF1DisclosureApplicable(variant, applicableStandards)) return null
+  // 🔴 列元数据只发**本次实际推送**的表：上市③在「汇总披露格式」下不推表且进
+  //   `_removed_table_keys`，若仍发它的 columns 会在附注留一条无数据的列元数据残片。
+  const allColumns = variant === 'listed' ? F1_LISTED_COLUMNS : F1_SOE_COLUMNS
+  const columns: Record<string, ColumnDef[]> = {}
+  for (const [name, cols] of Object.entries(allColumns)) {
+    if (name in subTableData) columns[name] = cols
+  }
+
   const payload: F1SyncFromWorkpaperPayload = {
     wp_id: wpId,
     sheet_name: F1_DISCLOSURE_SHEET_NAME[variant],
     section_id: F1_NOTE_SECTION[variant],
     current_standard: resolveF1CurrentStandard(variant, applicableStandards),
     sub_table_data: subTableData,
-    columns: variant === 'listed' ? F1_LISTED_COLUMNS : F1_SOE_COLUMNS,
+    columns,
   }
   const y = Number(year ?? 0)
   if (y > 0) payload.year = y

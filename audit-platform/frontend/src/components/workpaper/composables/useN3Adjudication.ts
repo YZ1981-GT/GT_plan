@@ -118,6 +118,25 @@ export const DEFAULT_CATEGORIES: N3DiffCategory[] = [
   '其他',
 ]
 
+/**
+ * 后端语义槽 → N3-1 分类行（单一真源）。
+ *
+ * 语义槽由 `backend/app/services/deferred_tax_shared.LIABILITY_SLOTS` 下发
+ * （与 N1 披露表负债段共用同一套分类逻辑，不新造第 2 套）。
+ *
+ * 🔴 `afs_fv` 与 `investment_property_fv` **都落到「公允价值变动」** ——
+ * N1 披露表把公允价值变动细分为「可供出售金融资产」与「投资性房地产」两行，
+ * 而 N3-1 审定表源模板只有一行「公允价值变动」→ 两槽聚合。
+ * 🔴 「评估增值」**无对应语义槽**（非暂时性差异的科目分类维度）→ 不预填，宁缺勿造。
+ */
+export const N3_SLOT_TO_CATEGORY: Readonly<Record<string, N3DiffCategory>> = {
+  depreciation: '购入摊销年限大于税法规定的资产',
+  afs_fv: '公允价值变动',
+  investment_property_fv: '公允价值变动',
+  lease: '使用权资产',
+  other: '其他',
+}
+
 /** 阈值：差异容忍度 */
 const MATCH_THRESHOLD = 0.01
 
@@ -150,10 +169,18 @@ export interface UseN3AdjudicationOptions {
   saveField: (sheet: string, field: string, value: any) => Promise<void>
   getField: (sheet: string, field: string) => any
   writebackTB: (auditedAmount: number) => Promise<void>
+  /**
+   * 四表分类预填（后端 `adjudication_prefill`：2901 叶子子科目 → 五语义槽）。
+   * 无子科目时为空 dict → 回退「其他」行总额 seed。
+   */
+  adjudicationPrefill?: Ref<Record<string, { opening: number; closing: number }>>
 }
 
 export function useN3Adjudication(options: UseN3AdjudicationOptions) {
   const { allResponses, saveField, getField, writebackTB } = options
+  const slotPrefill = computed<Record<string, { opening: number; closing: number }>>(
+    () => options.adjudicationPrefill?.value ?? {},
+  )
 
   // ─── 1. 从 allResponses 提取审定表行数据 ─────────────────────────────────
 
@@ -189,7 +216,22 @@ export function useN3Adjudication(options: UseN3AdjudicationOptions) {
       })
     }
 
-    // 默认空行 — TB prefill seed from N3-1-tb-prefill
+    // 默认空行 —— 四表 seed 两级优先级：
+    // ① `adjudicationPrefill`（后端按 2901 **叶子子科目**归五语义槽）→ 落到对应分类行
+    // ② 无子科目时回退 `N3-1-tb-prefill` 总额 → 落「其他」行（原有行为）
+    // 🔴 原实现**只有 ②**，客户按子科目挂账时分类信息全丢（都堆在「其他」）。
+    const slots = slotPrefill.value
+    const bySlot = new Map<string, { opening: number; closing: number }>()
+    for (const [slot, v] of Object.entries(slots)) {
+      const cat = N3_SLOT_TO_CATEGORY[slot]
+      if (!cat) continue
+      const cell = bySlot.get(cat) || { opening: 0, closing: 0 }
+      cell.opening += parseNum(v?.opening)
+      cell.closing += parseNum(v?.closing)
+      bySlot.set(cat, cell)
+    }
+    const hasSlots = bySlot.size > 0
+
     const prefill = getFieldFromResponses(allResponses.value, '1', 'tb-prefill')
     const seedBeginning = prefill ? parseNum(prefill.beginning) : 0
     const seedCredit = prefill ? parseNum(prefill.creditAmount) : 0
@@ -197,12 +239,17 @@ export function useN3Adjudication(options: UseN3AdjudicationOptions) {
     const seedUnadjusted = prefill ? parseNum(prefill.unadjusted) : 0
 
     return DEFAULT_CATEGORIES.map(category => {
-      const isOtherRow = category === '其他'
-      const beginning = isOtherRow ? seedBeginning : 0
+      const slot = hasSlots ? bySlot.get(category) : undefined
+      const isOtherRow = !hasSlots && category === '其他'
+      const beginning = slot ? Math.round(slot.opening * 100) / 100 : (isOtherRow ? seedBeginning : 0)
       const creditAmount = isOtherRow ? seedCredit : 0
       const debitAmount = isOtherRow ? seedDebit : 0
-      const unadjusted = isOtherRow ? seedUnadjusted : 0
-      const endBalance = calcLiabilityEndBalance(beginning, creditAmount, debitAmount)
+      const unadjusted = slot
+        ? Math.round(slot.closing * 100) / 100
+        : (isOtherRow ? seedUnadjusted : 0)
+      const endBalance = slot
+        ? Math.round(slot.closing * 100) / 100
+        : calcLiabilityEndBalance(beginning, creditAmount, debitAmount)
       const change = calcChange(endBalance, beginning)
       return {
         category,
@@ -296,6 +343,72 @@ export function useN3Adjudication(options: UseN3AdjudicationOptions) {
     await saveField('1', 'adjudication-rows', raw)
   }
 
+  // ─── 5b. 从四表库带入未审数（按语义槽落分类行）─────────────────────────────
+
+  /**
+   * 从四表库带入期初/未审数（后端 `adjudication_prefill` 按 2901 叶子子科目归语义槽）。
+   *
+   * 🔴 只填空不覆盖：目标行的 `beginning` / `unadjusted` 已非 0 时保留（手工优先）。
+   * 🔴 无子科目（`prefill` 为空）→ 回退把 `N3-1-tb-prefill` 的总额落「其他」行
+   *    （即原有行为），并由调用方提示需人工按分类拆分。
+   *
+   * @returns `{ filled, total, bySlot }`
+   */
+  async function pullFromTB(
+    prefill?: Record<string, { opening: number; closing: number }> | null,
+  ): Promise<{ filled: number; total: number; bySlot: boolean }> {
+    const slots = prefill && Object.keys(prefill).length > 0 ? prefill : null
+
+    const stored = getField('1', 'adjudication-rows')
+    const raw: any[] = Array.isArray(stored) && stored.length > 0
+      ? stored.map((r: any) => ({ ...r }))
+      : DEFAULT_CATEGORIES.map((c) => ({ category: c }))
+
+    let filled = 0
+    let total = 0
+
+    if (slots) {
+      // 语义槽 → 分类行聚合（两个公允价值槽合并到同一行）
+      const byCategory = new Map<string, { opening: number; closing: number }>()
+      for (const [slot, v] of Object.entries(slots)) {
+        const cat = N3_SLOT_TO_CATEGORY[slot]
+        if (!cat) continue
+        const cell = byCategory.get(cat) || { opening: 0, closing: 0 }
+        cell.opening += parseNum(v?.opening)
+        cell.closing += parseNum(v?.closing)
+        byCategory.set(cat, cell)
+      }
+      for (const [cat, v] of byCategory) {
+        total += v.closing
+        const idx = raw.findIndex((r) => r.category === cat)
+        if (idx < 0) continue
+        const row = raw[idx]
+        if (parseNum(row.beginning) !== 0 || parseNum(row.unadjusted) !== 0) continue
+        raw[idx] = {
+          ...row,
+          beginning: Math.round(v.opening * 100) / 100,
+          unadjusted: Math.round(v.closing * 100) / 100,
+        }
+        filled += 1
+      }
+    } else {
+      // 回退：总额落「其他」行（原有行为）
+      const seed = getFieldFromResponses(allResponses.value, '1', 'tb-prefill')
+      const opening = parseNum(seed?.beginning)
+      const closing = parseNum(seed?.unadjusted)
+      total = closing
+      const idx = raw.findIndex((r) => r.category === '其他')
+      if (idx >= 0 && (opening !== 0 || closing !== 0)
+          && parseNum(raw[idx].beginning) === 0 && parseNum(raw[idx].unadjusted) === 0) {
+        raw[idx] = { ...raw[idx], beginning: opening, unadjusted: closing }
+        filled = 1
+      }
+    }
+
+    if (filled > 0) await saveField('1', 'adjudication-rows', raw)
+    return { filled, total: Math.round(total * 100) / 100, bySlot: Boolean(slots) }
+  }
+
   // ─── 6. 审定数变化 → TB回写 ───────────────────────────────────────────────
 
   /**
@@ -341,6 +454,7 @@ export function useN3Adjudication(options: UseN3AdjudicationOptions) {
     rowValidations,
     crossValidation,
     updateRow,
+    pullFromTB,
     triggerWriteback,
     saveAndSync,
   }

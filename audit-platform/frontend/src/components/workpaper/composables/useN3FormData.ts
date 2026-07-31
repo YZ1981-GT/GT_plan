@@ -59,16 +59,31 @@ export function useN3FormData(options: UseN3FormDataOptions) {
   // ─── selfLoad ──────────────────────────────────────────────────────────────
 
   /**
+   * render-config 的 `html_data`（四表取数种子的单一来源）。
+   *
+   * 🔴 原实现 `await api.get(...)` **把响应整个丢弃**（不赋值给任何 ref）→
+   * 后端 render 输出的 `trial_balance` / `formula_direction` / `n3_metadata`
+   * 三个键在前端零消费 = dead output，TB 核对与分类预填都无从谈起。
+   */
+  const renderMeta = ref<Record<string, any>>({})
+
+  /**
    * selfLoad: 当组件在bundle内嵌时无htmlData，自行加载render-config。
    * 用 _silent:true 避免触发全局404弹窗。
    */
   async function selfLoad(): Promise<void> {
     if (!wpId.value) return
     try {
-      await api.get(
+      const res: any = await api.get(
         `/api/workpapers/${wpId.value}/render-config?force_component_type=n3-deferred-tax-liabilities`,
         { _silent: true } as any,
       )
+      const cfg = res?.data ?? res
+      // 顶层 html_data 优先；bundle 场景取首个带 trial_balance 的 sheet
+      const fromTop = cfg?.html_data
+      const fromSheet = (cfg?.sheets ?? []).find((s: any) => s?.html_data?.trial_balance)
+        ?.html_data
+      renderMeta.value = fromSheet ?? fromTop ?? cfg ?? {}
     } catch {
       // selfLoad 失败不阻塞：组件仍可从 checklist_responses 加载数据
     }
@@ -342,8 +357,10 @@ export function useN3FormData(options: UseN3FormDataOptions) {
     // State
     isLoading,
     allResponses,
+    renderMeta,
     // Actions
     loadData,
+    selfLoad,
     getField,
     setField,
     setTbValues,

@@ -53,6 +53,14 @@ export interface UseF1DisclosureSoeOptions {
   crossSheet: ReturnType<typeof useF1CrossSheet>
   isReadonly: Ref<boolean>
   applicableStandards: Ref<string[]>
+  /**
+   * 四表库减值准备（render `impairment_prefill`）；`null` = 四表库无
+   * 「坏账准备-预付账款」科目。
+   *
+   * 🔴 国企侧减值准备是**逐账龄段**列，而四表库无账龄维度 → **不按段编造分摊**
+   * （宁缺勿造）。此处只做两件事：① 溯源展示；② 勾稽「逐段合计 vs 四表库期末」。
+   */
+  impairmentPrefill?: Ref<{ end: number; prior: number } | null>
 }
 
 const PREFIX = 'F1-note-soe-'
@@ -82,8 +90,16 @@ function safeParseJson<T>(jsonStr: string | null | undefined, fallback: T): T {
 }
 
 export function useF1DisclosureSoe(options: UseF1DisclosureSoeOptions) {
-  const { allResponses, debouncedSave, crossSheet, isReadonly, applicableStandards } = options
+  const {
+    allResponses, debouncedSave, crossSheet, isReadonly, applicableStandards,
+    impairmentPrefill,
+  } = options
   const eventListeners: Array<{ event: string; handler: (e: Event) => void }> = []
+
+  /** 四表库「坏账准备-预付账款」期末/期初（只读，供溯源与勾稽；不参与录入） */
+  const fourTableImpairment: ComputedRef<{ end: number; prior: number } | null> = computed(
+    () => impairmentPrefill?.value ?? null,
+  )
 
   const isApplicable: ComputedRef<boolean> = computed(() =>
     isF1DisclosureApplicable('soe', applicableStandards.value),
@@ -415,6 +431,7 @@ export function useF1DisclosureSoe(options: UseF1DisclosureSoeOptions) {
     /** 兼容旧模板解构名（重构前 D3 风格 section1Rows） */
     section1Rows: agingRows,
     section1Subtotal: agingTotal,
+    fourTableImpairment,
     updateAgingBadDebt,
     over1YearRows,
     over1YearTotal,

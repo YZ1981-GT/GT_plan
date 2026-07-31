@@ -167,6 +167,67 @@ export function useN4Adjudication(params: UseN4AdjudicationParams) {
     }))
   }
 
+  // ─── 四表库带入未审数 ──────────────────────────────────────────────────────
+
+  /**
+   * 从四表库带入未审数（本期发生额）。
+   *
+   * 数据来源优先级：
+   * 1. `adjudication_prefill`（后端按 6403 **叶子子科目名称**归入 10 个税种行）——
+   *    活体实测编码语义在客户间冲突（`6403.01` 某客户是印花税），故按名称判据。
+   * 2. 无子科目时用 `tb_values.audited_amount` 总额落「其他」行，并由界面提示需人工分配。
+   *
+   * 🔴 只填空不覆盖：目标行 `unadjusted` 已非 0 时一律保留（手工优先）。
+   *
+   * @returns `{ filled, total, byTaxType }` 供调用方提示
+   */
+  function pullFromTB(source: {
+    prefill?: Record<string, number> | null
+    totalAmount?: number
+  }): { filled: number; total: number; byTaxType: boolean } {
+    const prefill = source.prefill || {}
+    const hasPrefill = Object.keys(prefill).length > 0
+    let filled = 0
+    let total = 0
+
+    if (hasPrefill) {
+      rows.value = rows.value.map((r) => {
+        const amount = parseNum(prefill[r.taxType])
+        if (!amount) return r
+        total += amount
+        if (parseNum(r.unadjusted) !== 0) return r // 手工优先
+        filled += 1
+        return { ...r, unadjusted: amount }
+      })
+    } else {
+      const amount = parseNum(source.totalAmount)
+      if (amount) {
+        total = amount
+        const idx = rows.value.findIndex((r) => r.taxType === '其他')
+        if (idx >= 0 && parseNum(rows.value[idx].unadjusted) === 0) {
+          const next = [...rows.value]
+          next[idx] = { ...next[idx], unadjusted: amount }
+          rows.value = next
+          filled = 1
+        }
+      }
+    }
+
+    if (filled > 0) {
+      for (const r of rows.value) _recalcRow(r)
+      isChanged.value = true
+      _persist()
+    }
+    return { filled, total: Math.round(total * 100) / 100, byTaxType: hasPrefill }
+  }
+
+  /** 审定表是否已有任何录入（供 seed 守卫；避免覆盖已编制内容） */
+  function hasAnyInput(): boolean {
+    return rows.value.some(
+      (r) => parseNum(r.unadjusted) !== 0 || parseNum(r.aje) !== 0 || parseNum(r.rje) !== 0,
+    )
+  }
+
   // ─── Computed: 带公式列完整行 ──────────────────────────────────────────────
 
   const computedRows: ComputedRef<N4AdjRow[]> = computed(() => {
@@ -306,7 +367,12 @@ export function useN4Adjudication(params: UseN4AdjudicationParams) {
     saveConclusion,
     getAuditedTotal,
     initFromResponses,
+    pullFromTB,
+    hasAnyInput,
+    DEFAULT_TAX_TYPES,
   }
 }
+
+export { DEFAULT_TAX_TYPES as N4_DEFAULT_TAX_TYPES }
 
 export default useN4Adjudication

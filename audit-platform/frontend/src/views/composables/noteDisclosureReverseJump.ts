@@ -57,7 +57,7 @@ export const DISCLOSURE_NOTE_SECTION_MAP: Record<string, NoteSectionVariants> = 
   // 由 DisclosureEditor.resolveSectionInList 前缀模糊解析为精确章节）；soe 用清晰编号。
   G13: { listed: '三、公允价值变动收益', soe: '八、72' }, // 公允价值变动收益
   G14: { listed: '三、信用减值损失', soe: '八、73' }, // 信用减值损失
-  H10: { listed: '三、资产处置收益', soe: '八、75' }, // 资产处置收益
+  H10: { listed: '三、资产处置收益（损', soe: '八、75' }, // 资产处置收益（listed 章节号是模板 md 截断值，勿「修正」）
   // 对称补齐：正向跳转已具备、本轮补反向的专有章节科目（章节号权威取自 DB note_section↔section_title）。
   F1: { listed: '五、7', soe: '八、7' },   // 预付款项
   F2: { listed: '五、9', soe: '八、10' },  // 存货

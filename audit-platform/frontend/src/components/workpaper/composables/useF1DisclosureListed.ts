@@ -9,7 +9,8 @@ import type { useF1CrossSheet } from './useF1CrossSheet'
 import { computeTop5 } from './useF1Analysis'
 import { PRESET_SEGMENTS, type AgingSegment } from '@/composables/useAgingConfig'
 import { isF1DisclosureApplicable } from './f1NoteSectionMap'
-import type { F1ListedSyncSnapshot } from './f1DisclosureSyncPayload'
+import type { F1ListedSyncSnapshot, F1Top5Mode } from './f1DisclosureSyncPayload'
+import { F1_TOP5_MODE_DEFAULT, normalizeF1Top5Mode } from './f1DisclosureSyncPayload'
 import { ADJUDICATION_LABEL_BY_SEGMENT_KEY } from './agingPresets'
 import { lookupDisclosureAgingLabel } from './disclosureAgingLabels'
 
@@ -49,6 +50,11 @@ export interface UseF1DisclosureListedOptions {
   crossSheet: ReturnType<typeof useF1CrossSheet>
   isReadonly: Ref<boolean>
   applicableStandards: Ref<string[]>
+  /**
+   * 四表库减值准备预填（render `impairment_prefill`）；`null` = 四表库无
+   * 「坏账准备-预付账款」科目 → 保持手工录入（宁缺勿造）。**手工值优先**。
+   */
+  impairmentPrefill?: Ref<{ end: number; prior: number } | null>
 }
 
 const PREFIX = 'F1-note-listed-'
@@ -60,6 +66,8 @@ const ITEM_IMPAIRMENT = `${PREFIX}impairment-provision`
 /** 上年年末减值准备（F7-7 要求期末/上年年末各独立校验） */
 const ITEM_IMPAIRMENT_PRIOR = `${PREFIX}impairment-provision-prior`
 const ITEM_TOP5_SUMMARY = `${PREFIX}top5-summary`
+/** ③前五名披露格式（源模板「汇总或分别披露」二选一） */
+const ITEM_TOP5_MODE = `${PREFIX}top5-mode`
 
 
 function generateRowId(): string {
@@ -121,7 +129,10 @@ export function collapseAgingForListedDisclosure(
 }
 
 export function useF1DisclosureListed(options: UseF1DisclosureListedOptions) {
-  const { allResponses, debouncedSave, crossSheet, isReadonly, applicableStandards } = options
+  const {
+    allResponses, debouncedSave, crossSheet, isReadonly, applicableStandards,
+    impairmentPrefill,
+  } = options
   const eventListeners: Array<{ event: string; handler: (e: Event) => void }> = []
 
   const isApplicable: ComputedRef<boolean> = computed(() =>
@@ -130,17 +141,34 @@ export function useF1DisclosureListed(options: UseF1DisclosureListedOptions) {
 
   // ─── (1) 账龄分析 ───────────────────────────────────────────────────
 
+  /** 是否存在手工录入（键存在且非空串；`0` 视为有效手工值） */
+  function hasManual(itemId: string): boolean {
+    const raw = allResponses.value.get(itemId)?.remark
+    return raw !== undefined && raw !== null && String(raw).trim() !== ''
+  }
+
+  // 减值准备：手工优先，无持久化时用四表库预填（坏账准备-预付账款 1231-04）
   const impairmentProvision = ref(0)
   watch(
-    () => allResponses.value.get(ITEM_IMPAIRMENT)?.remark,
-    (v) => { impairmentProvision.value = parseNum(v) },
+    [
+      () => allResponses.value.get(ITEM_IMPAIRMENT)?.remark,
+      () => impairmentPrefill?.value?.end ?? null,
+    ],
+    ([v, seed]) => {
+      impairmentProvision.value = hasManual(ITEM_IMPAIRMENT) ? parseNum(v) : parseNum(seed)
+    },
     { immediate: true },
   )
 
   const impairmentPrior = ref(0)
   watch(
-    () => allResponses.value.get(ITEM_IMPAIRMENT_PRIOR)?.remark,
-    (v) => { impairmentPrior.value = parseNum(v) },
+    [
+      () => allResponses.value.get(ITEM_IMPAIRMENT_PRIOR)?.remark,
+      () => impairmentPrefill?.value?.prior ?? null,
+    ],
+    ([v, seed]) => {
+      impairmentPrior.value = hasManual(ITEM_IMPAIRMENT_PRIOR) ? parseNum(v) : parseNum(seed)
+    },
     { immediate: true },
   )
 
@@ -305,6 +333,26 @@ export function useF1DisclosureListed(options: UseF1DisclosureListedOptions) {
   })
 
   const top5SummaryText = computed(() => top5SummaryOverride.value || top5SummaryAuto.value)
+
+  /**
+   * ③前五名披露格式（源模板 A23「汇总**或**分别披露」→ 二选一）。
+   * 默认「分别披露格式」= 与改造前推③表的行为一致（升级零回归）。
+   * 切换只改推送口径，两种格式的录入数据各自保留（切回即复原）。
+   */
+  const top5Mode = ref<F1Top5Mode>(F1_TOP5_MODE_DEFAULT)
+  watch(
+    () => allResponses.value.get(ITEM_TOP5_MODE)?.remark,
+    (v) => { top5Mode.value = normalizeF1Top5Mode(v) },
+    { immediate: true },
+  )
+
+  function setTop5Mode(mode: F1Top5Mode) {
+    if (isReadonly.value) return
+    const next = normalizeF1Top5Mode(mode)
+    if (next === top5Mode.value) return
+    top5Mode.value = next
+    debouncedSave(ITEM_TOP5_MODE, { remark: next })
+  }
 
   // ─── Notes ───────────────────────────────────────────────────────────
 
@@ -481,6 +529,7 @@ export function useF1DisclosureListed(options: UseF1DisclosureListedOptions) {
       })),
       top5Total: top5Total.value,
       top5SummaryText: top5SummaryText.value,
+      top5Mode: top5Mode.value,
       noteAging: note1.value,
       noteOver1Year: note2.value,
       noteTop5: note3.value,
@@ -519,6 +568,8 @@ export function useF1DisclosureListed(options: UseF1DisclosureListedOptions) {
     top5SummaryText,
     top5SummaryAuto,
     persistTop5Summary,
+    top5Mode,
+    setTop5Mode,
     note1,
     note2,
     note3,

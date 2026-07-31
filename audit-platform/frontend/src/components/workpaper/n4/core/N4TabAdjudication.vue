@@ -22,6 +22,17 @@
         <el-tag type="warning" size="small">损益类·借方·取发生额</el-tag>
       </div>
       <div class="section-actions">
+        <el-tooltip v-if="tbSourceSummary" :content="tbSourceSummary" placement="top">
+          <el-button
+            size="small"
+            type="success"
+            plain
+            :disabled="props.isReadonly || !hasTbSource"
+            @click="applyTbSeed()"
+          >
+            从四表库带入未审数
+          </el-button>
+        </el-tooltip>
         <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
           <el-icon><Download /></el-icon>带入调整
         </el-button>
@@ -146,6 +157,25 @@
         </template>
       </el-table-column>
     </el-table>
+
+    <!-- ═══ 与试算平衡表核对（四表库·本期发生额）═══ -->
+    <el-alert
+      v-if="tbReconcile.hasTb"
+      class="tb-reconcile"
+      :type="tbReconcile.hasWarning ? 'warning' : 'success'"
+      :closable="false"
+      show-icon
+    >
+      <template #title>
+        {{ tbReconcile.hasWarning
+          ? `审定合计与试算平衡表核对不一致（差异 ${fmtAmount(tbReconcile.diff)}）`
+          : '审定合计与试算平衡表核对一致' }}
+      </template>
+      <template #default>
+        试算平衡表数 {{ fmtAmount(tbReconcile.tbAmount) }} · 审定合计
+        {{ fmtAmount(totalRowAudited) }}<span v-if="tbSourceSummary"> · {{ tbSourceSummary }}</span>
+      </template>
+    </el-alert>
 
     <!-- ═══ N4-2明细合计交叉验证 ═══ -->
     <div class="cross-validation-section">
@@ -276,6 +306,7 @@ import { ref, computed, inject, onMounted, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { MagicStick, ChatDotSquare, Download } from '@element-plus/icons-vue'
 import { useN4FormData } from '../../composables/useN4FormData'
+import { useLmnTbReconcile } from '../../composables/useLmnTbReconcile'
 import { useN4Adjudication, type N4AdjRow } from '../../composables/useN4Adjudication'
 import { useN4CrossSheet } from '../../composables/useN4CrossSheet'
 import { useAuditContext } from '@/composables/useAuditContext'
@@ -407,15 +438,72 @@ onMounted(async () => {
   auditConcl.value = adjudication.auditConclusion.value
   // 尝试刷新N2数据
   crossSheet.refreshN2AccrualData()
-  // 初始化未审数（从TB发生额seed）
-  if (formData.tbData.value.unadjustedNet !== 0 && !_hasExistingRows()) {
-    // 如果没有已保存数据，用TB总发生额作为"合计"参考（逐税种需手动分配）
-  }
+  // 🔴 四表直通：无任何录入时按税种自动带入未审数（本期发生额）。
+  //    原实现此处是**空 if 块**（只有注释）→ `tb_values` 是 dead output，
+  //    TB 发生额从未进过未审数，用户必须手工再敲一遍。
+  if (!_hasExistingRows()) applyTbSeed({ silent: true })
 })
 
 /** 检查是否已有保存的行数据 */
 function _hasExistingRows(): boolean {
-  return adjudication.rows.value.some(r => r.unadjusted !== 0 || r.aje !== 0 || r.rje !== 0)
+  return adjudication.hasAnyInput()
+}
+
+// ─── 四表库带入未审数 ─────────────────────────────────────────────────────────
+
+/** 后端按 6403 叶子子科目**名称**归入 10 个税种行（编码语义客户间冲突，不可作判据） */
+const tbPrefill = computed<Record<string, number>>(
+  () => (formData.renderMeta.value?.adjudication_prefill as Record<string, number>) ?? {},
+)
+
+/** 取数溯源（消费后端 `tb_source_codes`，消除 dead output） */
+const tbSourceSummary = computed(() => {
+  const s = formData.renderMeta.value?.tb_source_codes
+  if (!s?.codes?.length) return ''
+  const basis = s.basis === 'period' ? '本期发生额' : '期末余额'
+  return `科目 ${s.codes.join('、')}（报表行 ${s.row_code} · ${basis}）`
+})
+
+const hasTbSource = computed(
+  () => Object.keys(tbPrefill.value).length > 0 || formData.tbData.value.auditedAmount !== 0,
+)
+
+/**
+ * 审定合计 vs 试算平衡表核对（复用共享件 `useLmnTbReconcile`，原全仓 0 消费方）。
+ * N4 是**损益类** → `isIncome: true`（`end_balance` 位存的是本期发生额）。
+ */
+const totalRowAudited = computed(() => adjudication.totalRow.value.audited)
+
+const tbReconcile = useLmnTbReconcile(
+  computed(() => ({
+    trial_balance: {
+      end_balance: formData.tbData.value.auditedAmount,
+      begin_balance: formData.tbData.value.priorAmount,
+    },
+  })),
+  totalRowAudited,
+  { isIncome: true },
+)
+
+function applyTbSeed(opts: { silent?: boolean } = {}): void {
+  const r = adjudication.pullFromTB({
+    prefill: tbPrefill.value,
+    totalAmount: formData.tbData.value.auditedAmount,
+  })
+  if (opts.silent) return
+  if (r.filled === 0) {
+    ElMessage.info(
+      r.total === 0
+        ? '四表库暂无税金及附加发生额，或该科目未导入'
+        : '未审数已录入，未覆盖（手工优先）',
+    )
+    return
+  }
+  ElMessage.success(
+    r.byTaxType
+      ? `已按税种带入 ${r.filled} 行未审数（合计 ${fmtAmount(r.total)}）`
+      : `该科目无子科目，已把总额 ${fmtAmount(r.total)} 带入「其他」行，请按税种分配`,
+  )
 }
 
 // ─── Cell change ─────────────────────────────────────────────────────────────
@@ -523,6 +611,9 @@ function yoyClass(val: number | null | undefined): string {
 /* ─── 方法论上下文 ─── */
 .methodology-context { padding: 12px 16px; margin-bottom: 16px; background: #fffbeb; border: 1px solid #fde68a; border-left: 4px solid #d97706; border-radius: 6px; font-size: var(--wp-font-size, 13px); color: #92400e; line-height: 1.7; }
 .methodology-context p { margin: 0; }
+
+.tb-reconcile { margin: 12px 0; }
+.tb-reconcile :deep(.el-alert__description) { font-size: var(--wp-font-size, 13px); line-height: 1.6; }
 
 /* ─── Section header ─── */
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }

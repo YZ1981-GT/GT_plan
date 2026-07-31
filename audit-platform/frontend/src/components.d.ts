@@ -535,6 +535,7 @@ declare module 'vue' {
     F1ConfirmationUsageGuide: typeof import('./components/workpaper/f1/F1ConfirmationUsageGuide.vue')['default']
     F1CreditCheckTable: typeof import('./components/workpaper/f1/F1CreditCheckTable.vue')['default']
     F1DetailUsageGuide: typeof import('./components/workpaper/f1/F1DetailUsageGuide.vue')['default']
+    F1DisclosureConsistencyPanel: typeof import('./components/workpaper/f1/F1DisclosureConsistencyPanel.vue')['default']
     F1DisclosureUsageGuide: typeof import('./components/workpaper/f1/F1DisclosureUsageGuide.vue')['default']
     F1FourTableSourcePanel: typeof import('./components/workpaper/f1/F1FourTableSourcePanel.vue')['default']
     F1LongTermUsageGuide: typeof import('./components/workpaper/f1/F1LongTermUsageGuide.vue')['default']

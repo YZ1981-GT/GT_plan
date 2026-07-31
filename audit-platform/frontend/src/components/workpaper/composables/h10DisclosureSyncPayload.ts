@@ -11,6 +11,7 @@ import {
 } from './h10Constants'
 import {
   H10_DISCLOSURE_SHEET_NAME,
+  H10_LEGACY_OBSOLETE_TABLES,
   H10_MAIN_SUBTABLE,
   H10_NOTE_SECTION,
   H10_TRIAL_SUBTABLE,
@@ -32,20 +33,34 @@ export interface H10SyncFromWorkpaperPayload {
   columns?: Record<string, ColumnDef[]>
 }
 
-// 资产处置收益列头：逐字取自 H10TabDisclosureBase（项目/本期发生额/上期发生额[/非经常性损益]）
+/**
+ * 资产处置收益列头：逐字取自源模板 R8（项目/本期发生额/上期发生额[/非经常性损益]）。
+ *
+ * 🔴 首列 `flat: true`：源模板表头单行，不声明时后端 `_extract_column_groups` 返 `None`
+ * → 回退 `_infer_groups_from_headers` 前缀推断造凭空父表头。**seed 与推送两处都要加**。
+ */
 const H10_MAIN_BASE_COLUMNS: ColumnDef[] = [
-  { key: 'label', label: '项目', is_label: true },
+  { key: 'label', label: '项目', is_label: true, flat: true },
   { key: 'current_amount', label: '本期发生额', format: 'amount' },
   { key: 'prior_amount', label: '上期发生额', format: 'amount' },
 ]
 const H10_SOE_NONRECURRING: ColumnDef = {
   key: 'non_recurring_amount', label: '计入当期非经常性损益的金额', format: 'amount',
 }
-// 试运行销售明细（推送净额，本期/上期）
+/**
+ * 试运行销售明细：源模板 R27/R28 是**两级表头** `本期发生额{收入,成本}` /
+ * `上期发生额{收入,成本}` 共 5 列。原实现只声明净额 3 列，导致载荷早已带的
+ * `current_income`/`current_cost`/`prior_income`/`prior_cost` 四个字段无落点。
+ *
+ * 🔴 两级表**不得**标 `flat`（`flat` 会让 `_extract_column_groups` 直接返 `[]`）；
+ * 标签列 rowspan=2 故不带 `group`。
+ */
 const H10_TRIAL_COLUMNS: ColumnDef[] = [
   { key: 'label', label: '项目', is_label: true },
-  { key: 'current_amount', label: '本期发生额', format: 'amount' },
-  { key: 'prior_amount', label: '上期发生额', format: 'amount' },
+  { key: 'current_income', label: '收入', group: '本期发生额', format: 'amount' },
+  { key: 'current_cost', label: '成本', group: '本期发生额', format: 'amount' },
+  { key: 'prior_income', label: '收入', group: '上期发生额', format: 'amount' },
+  { key: 'prior_cost', label: '成本', group: '上期发生额', format: 'amount' },
 ]
 
 /** 按 variant 构造 H10 各子表列头（键与 buildH10SubTableData 输出一致）。 */
@@ -59,8 +74,7 @@ export function buildH10SubTableColumns(
     [H10_MAIN_SUBTABLE[variant]]: mainCols,
   }
   if (variant === 'listed') {
-    // 第二张试运行明细表键 `项  目__trial`（_trial_detail 为 `_` 前缀元数据，投影器自动跳过）
-    cols[`${H10_TRIAL_SUBTABLE}__trial`] = H10_TRIAL_COLUMNS
+    cols[H10_TRIAL_SUBTABLE] = H10_TRIAL_COLUMNS
   }
   return cols
 }
@@ -190,59 +204,77 @@ export function buildH10MainSubTableRows(
   ]
 }
 
-/** 试运行明细：附注模板仅本期/上期，推送净额=收入−成本 */
+/**
+ * 试运行明细：按源模板两级表头推**收入/成本分列**（不再压成净额一列）。
+ *
+ * 净额只用于「本行是否有金额」的判定与主表「试运行销售损益」行，附注本表要的是四个分列值。
+ */
 export function buildH10TrialSubTableRows(
   trialRows: readonly H10TrialDetailRow[],
 ): Record<string, unknown>[] {
   const dataRows = trialRows
-    .map((r) => {
-      const current = parseNum(r.currentIncome) - parseNum(r.currentCost)
-      const prior = parseNum(r.priorIncome) - parseNum(r.priorCost)
-      return { r, current, prior }
-    })
-    .filter(({ current, prior }) => hasAmount(current, prior))
-    .map(({ r, current, prior }) =>
-      mapAmountRow(
-        resolveH10NoteTemplateLabel(r.rowKey, 'listed', r.label),
-        r.rowKey,
-        current,
-        prior,
-        {
-          current_income: parseNum(r.currentIncome),
-          current_cost: parseNum(r.currentCost),
-          prior_income: parseNum(r.priorIncome),
-          prior_cost: parseNum(r.priorCost),
-        },
-      ),
+    .map((r) => ({
+      r,
+      currentIncome: parseNum(r.currentIncome),
+      currentCost: parseNum(r.currentCost),
+      priorIncome: parseNum(r.priorIncome),
+      priorCost: parseNum(r.priorCost),
+    }))
+    // 四个分列值任一非零即推送（原实现只看净额 → 收入=成本 的行会被误判为空行丢掉）
+    .filter((x) =>
+      [x.currentIncome, x.currentCost, x.priorIncome, x.priorCost]
+        .some((v) => Math.abs(v) > 0.005),
     )
+    .map((x) => ({
+      label: resolveH10NoteTemplateLabel(x.r.rowKey, 'listed', x.r.label).trim(),
+      row_key: x.r.rowKey,
+      current_income: x.currentIncome,
+      current_cost: x.currentCost,
+      prior_income: x.priorIncome,
+      prior_cost: x.priorCost,
+      row_type: 'data' as const,
+    }))
 
   if (!dataRows.length) return []
 
-  const currentTotal = trialRows.reduce(
-    (s, r) => s + parseNum(r.currentIncome) - parseNum(r.currentCost),
-    0,
-  )
-  const priorTotal = trialRows.reduce(
-    (s, r) => s + parseNum(r.priorIncome) - parseNum(r.priorCost),
-    0,
-  )
+  const sum = (pick: (r: H10TrialDetailRow) => unknown) =>
+    trialRows.reduce((s, r) => s + parseNum(pick(r)), 0)
 
   return [
     ...dataRows,
     {
       label: '合计',
-      current_amount: currentTotal,
-      prior_amount: priorTotal,
+      current_income: sum((r) => r.currentIncome),
+      current_cost: sum((r) => r.currentCost),
+      prior_income: sum((r) => r.priorIncome),
+      prior_cost: sum((r) => r.priorCost),
       is_total: true,
       row_type: 'total' as const,
     },
   ]
 }
 
-function buildNoteTexts(snap: H10SyncSnapshot): Array<Record<string, string>> {
-  const note = snap.noteText.trim()
-  if (!note) return []
-  return [{ section: 'disclosure-note', text: note }]
+/**
+ * `_note_texts` section → 中文标题。
+ *
+ * 🔴 缺 `title` 时后端 `_format_note_texts` 用 `section` 兜底 → 附注正文渲染成
+ * `【disclosure-note】`（违反 UI 全中文化）。
+ */
+export const H10_NOTE_TEXT_TITLES: Record<string, string> = {
+  'disclosure-note': '资产处置收益说明',
+}
+
+/** 构造 `_note_texts`：过滤空白 + 补中文 title */
+export function buildH10NoteTexts(
+  items: ReadonlyArray<{ section: string; text: string | null | undefined }>,
+): Array<{ section: string; title: string; text: string }> {
+  return items
+    .filter((it) => String(it.text ?? '').trim())
+    .map((it) => ({
+      section: it.section,
+      title: H10_NOTE_TEXT_TITLES[it.section] || it.section,
+      text: String(it.text).trim(),
+    }))
 }
 
 export function buildH10SubTableData(
@@ -254,17 +286,19 @@ export function buildH10SubTableData(
   }
 
   if (variant === 'listed') {
+    // 模板两张表已正名（原本同名 `项  目` → 后一张覆盖前一张）→ 直接用真表名，
+    // 不再需要 `项  目__trial` / `_trial_detail` 双写绕过（那两个键是孤儿，附注收不到）
     const trial = buildH10TrialSubTableRows(snap.trialRows)
-    // 模板两张表同名「项  目」：第二张用 trial 后缀键，后端按数组顺序消费时可并存
-    if (trial.length) {
-      result[`${H10_TRIAL_SUBTABLE}__trial`] = trial
-      // 兼容仅识别「项  目」的消费者：若主表已占用，附加 _trial_detail
-      result._trial_detail = trial
-    }
+    if (trial.length) result[H10_TRIAL_SUBTABLE] = trial
+    result._removed_table_keys = [
+      ...H10_LEGACY_OBSOLETE_TABLES,
+    ] as unknown as Record<string, unknown>[]
   }
 
-  const noteTexts = buildNoteTexts(snap)
-  if (noteTexts.length) result._note_texts = noteTexts
+  const noteTexts = buildH10NoteTexts([{ section: 'disclosure-note', text: snap.noteText }])
+  if (noteTexts.length) {
+    result._note_texts = noteTexts as unknown as Record<string, unknown>[]
+  }
   return result
 }
 

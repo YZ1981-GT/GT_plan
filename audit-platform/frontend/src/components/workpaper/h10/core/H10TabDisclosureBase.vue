@@ -25,7 +25,7 @@
     <details class="guidance-details" open>
       <summary>📋 编制提示</summary>
       <div class="guidance-content">
-        <p>1. 资产处置损益（6115）本期合计应与 H10-1 审定数一致；点「从审定表带入」按分项同步，再「同步到附注」写入附注模块「{{ noteSectionId }}」。</p>
+        <p>1. 资产处置损益（6115）本期合计应与 H10-1 审定数一致；点「从审定表带入」按分项同步，再「同步到附注」写入附注模块「{{ noteSectionLabel }}」。</p>
         <p>2. 不构成业务的资产组处置（含持有待售后出售）计入本项目；构成业务（子公司/分公司）的处置计入投资收益。</p>
         <p>3. 单项投资性房地产处置计入「其他业务收入/成本」，不计入本项目。</p>
         <p v-if="variant === 'listed'">4. 试运行销售：与日常活动相关的计入营业收入/成本；非日常活动的计入资产处置损益，并须单独披露收入与成本（解释第15号）。</p>
@@ -204,7 +204,7 @@ import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { useH10Disclosure } from '../../composables/useH10Disclosure'
 import { buildH10SyncPayloads } from '../../composables/h10DisclosureSyncPayload'
-import { H10_NOTE_SECTION } from '../../composables/h10NoteSectionMap'
+import { H10_NOTE_SECTION, H10_NOTE_SECTION_DISPLAY } from '../../composables/h10NoteSectionMap'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import { api } from '@/services/apiProxy'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
@@ -238,7 +238,10 @@ const dis = useH10Disclosure({
 })
 
 const isSyncing = ref(false)
+// 定位用：必须逐字等于模板 section_number（listed 侧是 md 截断值 `三、资产处置收益（损`）
 const noteSectionId = H10_NOTE_SECTION[props.variant]
+// 展示用：截断值直接显示不可读
+const noteSectionLabel = H10_NOTE_SECTION_DISPLAY[props.variant]
 const noteChip = computed(() => `Note:${noteSectionId}`)
 
 const router = useRouter()
@@ -289,7 +292,7 @@ async function syncToNotes(): Promise<void> {
         diff: Math.round((current - nonRecurring) * 100) / 100,
       }
     }
-    ElMessage.success(`已同步 ${rows} 行到附注「${noteSectionId}」`)
+    ElMessage.success(`已同步 ${rows} 行到附注「${noteSectionLabel}」`)
   } catch {
     ElMessage.warning('同步附注失败，请稍后重试')
   } finally {
