@@ -611,6 +611,90 @@ jobs:
       - name: Run note K2 structure contract tests
         run: python -m pytest backend/tests/services/test_note_k2_structure.py -q
 
+  note-h2-structure:
+    # 附注 H2 在建工程章节结构守卫
+    # （h2-construction-in-progress-disclosure-alignment Task 6）
+    # 背景：md 重建把两级表头压扁 —— 上市「在建工程明细」与国企「在建工程」汇总/
+    # 「（1）在建工程情况」源模板均为 期末/上年年末|期初 各含 账面余额/减值准备/账面净值|账面价值
+    # （7 列两级），模板压成 3 列；上市第 6 张表名是表头首格泄漏 `项  目`（源实为「工程物资」）；
+    # 「在建工程明细」等含 header_label 假数据行；两版共 10 表 columns/guidance 全缺。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check note H2 section alignment (五、23 / 八、23)
+        run: python backend/scripts/fix/fix_note_h2_construction_structure.py --check
+      - name: Install test dependencies
+        run: python -m pip install pytest==8.4.2 openpyxl==3.1.5
+      - name: Run note H2 structure contract tests
+        run: python -m pytest backend/tests/test_note_h2_construction_structure.py -q
+
+  note-h3-structure:
+    # 附注 H3 投资性房地产章节结构守卫
+    # （h3-investment-property-disclosure-alignment Task 8）
+    # 背景：①前端映射 soe 章节号曾误写 `八、22`（= **固定资产**章节）→ 国企披露一直推错章节；
+    # ②国企两级表头被 md 重建压扁（以成本计量源 7 列 `本期增加{购置或计提,自用房地产或存货转入}`/
+    # `本期减少{处 置,转为自用房地产}`；以公允价值计量源 8 列含 `公允价值变动损益`）；
+    # ③国企第 3 表与第 2 表**重名** `以公允价值计量`（表名是 sub_table_data 键，同名互相覆盖丢整表）；
+    # ④上市 6 处「可无限量添加行」占位当数据行 + 国企 2 处 header_label 假行；
+    # ⑤两版 6 表 columns/guidance 全缺。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check note H3 section alignment (五、21 / 八、21)
+        run: python backend/scripts/fix/fix_note_h3_investment_property_structure.py --check
+      - name: Install test dependencies
+        run: python -m pip install pytest==8.4.2 openpyxl==3.1.5
+      - name: Run note H3 structure contract tests
+        run: python -m pytest backend/tests/test_note_h3_investment_property_structure.py -q
+
+  note-l-cycle-structure:
+    # 附注 L 循环章节结构守卫（L7 其他非流动负债 五、52/八、57 + L8 财务费用 五、67/八、68）
+    # （disclosure-sync-path-buildout Task 4.5 / 4.6）
+    # 背景：①五、52 表名是**表头首格泄漏** `项  目` 且只有合计行无数据行骨架；
+    # ②八、57 残留 `……` 占位行（md 重建把源模板省略号当数据行）；
+    # ③**财务费用两版行集与源模板不符** —— 源 xlsx r7~r18 共 12 行（含 3 个派生小计
+    # 行「利息费用/利息净支出/汇兑净损失」），而模板上市只有 7 行、国企 9 行，且
+    # 「利息支出」应为「利息费用总额」、「汇兑损益」应为「汇兑损失」；
+    # ④四张表 columns / guidance 全缺 → seed 路径走前缀推断塞凭空父表头。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check note L-cycle section alignment (五、52/八、57/五、67/八、68)
+        run: python backend/scripts/fix/fix_note_l_cycle_structure.py --check
+      - name: Install test dependency
+        run: python -m pip install pytest==8.4.2
+      - name: Run note L-cycle structure contract tests
+        run: python -m pytest backend/tests/test_note_l_cycle_structure.py -q
+
+  note-m-equity-structure:
+    # 附注 M 循环权益类变动表章节结构守卫
+    # （disclosure-sync-path-buildout Task 5，批 4）
+    # 覆盖 资本公积（五、55/八、60）/ 盈余公积（五、59/八、62）/ 专项储备（五、58/八、61）。
+    # 背景：6 张表名 / 表头 / 行骨架均正确（源模板单行表头），但 columns 与 guidance 全缺
+    # → seed 路径走 `_infer_groups_from_headers` 前缀推断（「本期增加」「本期减少」共享
+    # 「本期」前缀 → 凭空造「本期」父表头）。国企八、61 专项储备源模板含第 6 列「备注」。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check note M-cycle equity section alignment (五、55/八、60/五、59/八、62/五、58/八、61)
+        run: python backend/scripts/fix/fix_note_m_equity_structure.py --check
+      - name: Install test dependency
+        run: python -m pip install pytest==8.4.2
+      - name: Run note M-cycle equity structure contract tests
+        run: python -m pytest backend/tests/test_note_m_equity_structure.py -q
+
   note-k-cycle-structure:
     # 附注 K 系章节结构 + sheet 名守卫（批 1 损益类 K8~K13 + 批 2 负债/递延类 K3/K4/K5/K7）
     # （k-cycle-disclosure-alignment 批 1）
