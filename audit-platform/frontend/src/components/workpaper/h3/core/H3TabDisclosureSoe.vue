@@ -64,22 +64,30 @@
         <table class="disc-table">
           <thead>
             <tr>
-              <th class="col-item">项 目</th>
-              <th class="col-num">期初余额</th>
-              <th class="col-num">本期增加</th>
-              <th class="col-num">本期减少</th>
-              <th class="col-num formula-th">期末余额</th>
-              <th class="col-usage">用 途</th>
-              <th v-if="!isReadonly" class="col-op"></th>
+              <th rowspan="2" class="col-item">项 目</th>
+              <th rowspan="2" class="col-num">期初余额</th>
+              <th colspan="2" class="group-th">本期增加</th>
+              <th colspan="2" class="group-th">本期减少</th>
+              <th rowspan="2" class="col-num formula-th">期末余额</th>
+              <th rowspan="2" class="col-usage">用 途</th>
+              <th v-if="!isReadonly" rowspan="2" class="col-op"></th>
+            </tr>
+            <tr>
+              <th class="col-num">购置或计提</th>
+              <th class="col-num">自用房地产或存货转入</th>
+              <th class="col-num">处 置</th>
+              <th class="col-num">转为自用房地产</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="row in getSectionRows('soe-cost')" :key="row.rowId" class="data-row">
               <td><el-input v-model="row.category" size="small" :disabled="isReadonly" @change="onRowChange('soe-cost', row)" /></td>
               <td><el-input v-model.number="row.beginBalance" size="small" :disabled="isReadonly" class="num-input" @change="onRowChange('soe-cost', row)" /></td>
-              <td><el-input v-model.number="row.increase" size="small" :disabled="isReadonly" class="num-input" @change="onRowChange('soe-cost', row)" /></td>
-              <td><el-input v-model.number="row.decrease" size="small" :disabled="isReadonly" class="num-input" @change="onRowChange('soe-cost', row)" /></td>
-              <td class="formula-cell">{{ fmtNum(row.beginBalance + row.increase - row.decrease) }}</td>
+              <td><el-input v-model.number="row.buyOrProvision" size="small" :disabled="isReadonly" class="num-input" @change="onSubChange('soe-cost', row)" /></td>
+              <td><el-input v-model.number="row.transferIn" size="small" :disabled="isReadonly" class="num-input" @change="onSubChange('soe-cost', row)" /></td>
+              <td><el-input v-model.number="row.disposal" size="small" :disabled="isReadonly" class="num-input" @change="onSubChange('soe-cost', row)" /></td>
+              <td><el-input v-model.number="row.transferOut" size="small" :disabled="isReadonly" class="num-input" @change="onSubChange('soe-cost', row)" /></td>
+              <td class="formula-cell">{{ fmtNum((Number(row.beginBalance) || 0) + rowIncrease(row) - rowDecrease(row)) }}</td>
               <td><el-input v-model="row.usage" size="small" :disabled="isReadonly" placeholder="出租/自用/增值" @change="onRowChange('soe-cost', row)" /></td>
               <td v-if="!isReadonly"><el-button text type="danger" size="small" @click="removeRow('soe-cost', row.rowId)">删除</el-button></td>
             </tr>
@@ -88,8 +96,10 @@
             <tr class="total-row">
               <td>合 计</td>
               <td>{{ fmtNum(sumCol('soe-cost', 'beginBalance')) }}</td>
-              <td>{{ fmtNum(sumCol('soe-cost', 'increase')) }}</td>
-              <td>{{ fmtNum(sumCol('soe-cost', 'decrease')) }}</td>
+              <td>{{ fmtNum(sumCol('soe-cost', 'buyOrProvision')) }}</td>
+              <td>{{ fmtNum(sumCol('soe-cost', 'transferIn')) }}</td>
+              <td>{{ fmtNum(sumCol('soe-cost', 'disposal')) }}</td>
+              <td>{{ fmtNum(sumCol('soe-cost', 'transferOut')) }}</td>
               <td class="formula-cell">{{ fmtNum(sumCol('soe-cost', 'beginBalance') + sumCol('soe-cost', 'increase') - sumCol('soe-cost', 'decrease')) }}</td>
               <td></td>
               <td v-if="!isReadonly"></td>
@@ -115,22 +125,30 @@
         <table class="disc-table">
           <thead>
             <tr>
-              <th class="col-item">项 目</th>
-              <th class="col-num">期初余额</th>
-              <th class="col-num">本期计提/增加</th>
-              <th class="col-num">本期转出/减少</th>
-              <th class="col-num formula-th">期末余额</th>
-              <th class="col-usage">用 途</th>
-              <th v-if="!isReadonly" class="col-op"></th>
+              <th rowspan="2" class="col-item">项 目</th>
+              <th rowspan="2" class="col-num">期初余额</th>
+              <th colspan="2" class="group-th">本期增加</th>
+              <th colspan="2" class="group-th">本期减少</th>
+              <th rowspan="2" class="col-num formula-th">期末余额</th>
+              <th rowspan="2" class="col-usage">用 途</th>
+              <th v-if="!isReadonly" rowspan="2" class="col-op"></th>
+            </tr>
+            <tr>
+              <th class="col-num">购置或计提</th>
+              <th class="col-num">自用房地产或存货转入</th>
+              <th class="col-num">处 置</th>
+              <th class="col-num">转为自用房地产</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="row in getSectionRows('soe-cost-dep')" :key="row.rowId" class="data-row">
               <td><el-input v-model="row.category" size="small" :disabled="isReadonly" @change="onRowChange('soe-cost-dep', row)" /></td>
               <td><el-input v-model.number="row.beginBalance" size="small" :disabled="isReadonly" class="num-input" @change="onRowChange('soe-cost-dep', row)" /></td>
-              <td><el-input v-model.number="row.increase" size="small" :disabled="isReadonly" class="num-input" @change="onRowChange('soe-cost-dep', row)" /></td>
-              <td><el-input v-model.number="row.decrease" size="small" :disabled="isReadonly" class="num-input" @change="onRowChange('soe-cost-dep', row)" /></td>
-              <td class="formula-cell">{{ fmtNum(row.beginBalance + row.increase - row.decrease) }}</td>
+              <td><el-input v-model.number="row.buyOrProvision" size="small" :disabled="isReadonly" class="num-input" @change="onSubChange('soe-cost-dep', row)" /></td>
+              <td><el-input v-model.number="row.transferIn" size="small" :disabled="isReadonly" class="num-input" @change="onSubChange('soe-cost-dep', row)" /></td>
+              <td><el-input v-model.number="row.disposal" size="small" :disabled="isReadonly" class="num-input" @change="onSubChange('soe-cost-dep', row)" /></td>
+              <td><el-input v-model.number="row.transferOut" size="small" :disabled="isReadonly" class="num-input" @change="onSubChange('soe-cost-dep', row)" /></td>
+              <td class="formula-cell">{{ fmtNum((Number(row.beginBalance) || 0) + rowIncrease(row) - rowDecrease(row)) }}</td>
               <td><el-input v-model="row.usage" size="small" :disabled="isReadonly" placeholder="出租/自用" @change="onRowChange('soe-cost-dep', row)" /></td>
               <td v-if="!isReadonly"><el-button text type="danger" size="small" @click="removeRow('soe-cost-dep', row.rowId)">删除</el-button></td>
             </tr>
@@ -139,8 +157,10 @@
             <tr class="total-row">
               <td>合 计</td>
               <td>{{ fmtNum(sumCol('soe-cost-dep', 'beginBalance')) }}</td>
-              <td>{{ fmtNum(sumCol('soe-cost-dep', 'increase')) }}</td>
-              <td>{{ fmtNum(sumCol('soe-cost-dep', 'decrease')) }}</td>
+              <td>{{ fmtNum(sumCol('soe-cost-dep', 'buyOrProvision')) }}</td>
+              <td>{{ fmtNum(sumCol('soe-cost-dep', 'transferIn')) }}</td>
+              <td>{{ fmtNum(sumCol('soe-cost-dep', 'disposal')) }}</td>
+              <td>{{ fmtNum(sumCol('soe-cost-dep', 'transferOut')) }}</td>
               <td class="formula-cell">{{ fmtNum(sumCol('soe-cost-dep', 'beginBalance') + sumCol('soe-cost-dep', 'increase') - sumCol('soe-cost-dep', 'decrease')) }}</td>
               <td></td>
               <td v-if="!isReadonly"></td>
@@ -203,21 +223,29 @@
         <table class="disc-table">
           <thead>
             <tr>
-              <th class="col-item">项 目</th>
-              <th class="col-num">期初余额</th>
-              <th class="col-num">本期计提</th>
-              <th class="col-num">本期转回/核销</th>
-              <th class="col-num formula-th">期末余额</th>
-              <th v-if="!isReadonly" class="col-op"></th>
+              <th rowspan="2" class="col-item">项 目</th>
+              <th rowspan="2" class="col-num">期初余额</th>
+              <th colspan="2" class="group-th">本期增加</th>
+              <th colspan="2" class="group-th">本期减少</th>
+              <th rowspan="2" class="col-num formula-th">期末余额</th>
+              <th v-if="!isReadonly" rowspan="2" class="col-op"></th>
+            </tr>
+            <tr>
+              <th class="col-num">购置或计提</th>
+              <th class="col-num">自用房地产或存货转入</th>
+              <th class="col-num">处 置</th>
+              <th class="col-num">转为自用房地产</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="row in getSectionRows('soe-impair')" :key="row.rowId" class="data-row">
               <td><el-input v-model="row.category" size="small" :disabled="isReadonly" @change="onRowChange('soe-impair', row)" /></td>
               <td><el-input v-model.number="row.beginBalance" size="small" :disabled="isReadonly" class="num-input" @change="onRowChange('soe-impair', row)" /></td>
-              <td><el-input v-model.number="row.increase" size="small" :disabled="isReadonly" class="num-input" @change="onRowChange('soe-impair', row)" /></td>
-              <td><el-input v-model.number="row.decrease" size="small" :disabled="isReadonly" class="num-input" @change="onRowChange('soe-impair', row)" /></td>
-              <td class="formula-cell">{{ fmtNum(row.beginBalance + row.increase - row.decrease) }}</td>
+              <td><el-input v-model.number="row.buyOrProvision" size="small" :disabled="isReadonly" class="num-input" @change="onSubChange('soe-impair', row)" /></td>
+              <td><el-input v-model.number="row.transferIn" size="small" :disabled="isReadonly" class="num-input" @change="onSubChange('soe-impair', row)" /></td>
+              <td><el-input v-model.number="row.disposal" size="small" :disabled="isReadonly" class="num-input" @change="onSubChange('soe-impair', row)" /></td>
+              <td><el-input v-model.number="row.transferOut" size="small" :disabled="isReadonly" class="num-input" @change="onSubChange('soe-impair', row)" /></td>
+              <td class="formula-cell">{{ fmtNum((Number(row.beginBalance) || 0) + rowIncrease(row) - rowDecrease(row)) }}</td>
               <td v-if="!isReadonly"><el-button text type="danger" size="small" @click="removeRow('soe-impair', row.rowId)">删除</el-button></td>
             </tr>
           </tbody>
@@ -225,8 +253,10 @@
             <tr class="total-row">
               <td>合 计</td>
               <td>{{ fmtNum(sumCol('soe-impair', 'beginBalance')) }}</td>
-              <td>{{ fmtNum(sumCol('soe-impair', 'increase')) }}</td>
-              <td>{{ fmtNum(sumCol('soe-impair', 'decrease')) }}</td>
+              <td>{{ fmtNum(sumCol('soe-impair', 'buyOrProvision')) }}</td>
+              <td>{{ fmtNum(sumCol('soe-impair', 'transferIn')) }}</td>
+              <td>{{ fmtNum(sumCol('soe-impair', 'disposal')) }}</td>
+              <td>{{ fmtNum(sumCol('soe-impair', 'transferOut')) }}</td>
               <td class="formula-cell">{{ fmtNum(sumCol('soe-impair', 'beginBalance') + sumCol('soe-impair', 'increase') - sumCol('soe-impair', 'decrease')) }}</td>
               <td v-if="!isReadonly"></td>
             </tr>
@@ -310,21 +340,31 @@
         <table class="disc-table">
           <thead>
             <tr>
-              <th class="col-item">项 目</th>
-              <th class="col-num">期初余额</th>
-              <th class="col-num">本期增加</th>
-              <th class="col-num">本期减少</th>
-              <th class="col-num formula-th">期末余额</th>
-              <th v-if="!isReadonly" class="col-op"></th>
+              <th rowspan="2" class="col-item">项 目</th>
+              <th rowspan="2" class="col-num">期初公允价值</th>
+              <th colspan="3" class="group-th">本期增加</th>
+              <th colspan="2" class="group-th">本期减少</th>
+              <th rowspan="2" class="col-num formula-th">期末公允价值</th>
+              <th v-if="!isReadonly" rowspan="2" class="col-op"></th>
+            </tr>
+            <tr>
+              <th class="col-num">购置</th>
+              <th class="col-num">自用房地产或存货转入</th>
+              <th class="col-num">公允价值变动损益</th>
+              <th class="col-num">处 置</th>
+              <th class="col-num">转为自用房地产</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="row in getSectionRows('soe-fair-change')" :key="row.rowId" class="data-row">
               <td><el-input v-model="row.category" size="small" :disabled="isReadonly" @change="onRowChange('soe-fair-change', row)" /></td>
               <td><el-input v-model.number="row.beginBalance" size="small" :disabled="isReadonly" class="num-input" @change="onRowChange('soe-fair-change', row)" /></td>
-              <td><el-input v-model.number="row.increase" size="small" :disabled="isReadonly" class="num-input" @change="onRowChange('soe-fair-change', row)" /></td>
-              <td><el-input v-model.number="row.decrease" size="small" :disabled="isReadonly" class="num-input" @change="onRowChange('soe-fair-change', row)" /></td>
-              <td class="formula-cell">{{ fmtNum(row.beginBalance + row.increase - row.decrease) }}</td>
+              <td><el-input v-model.number="row.buyOrProvision" size="small" :disabled="isReadonly" class="num-input" @change="onSubChange('soe-fair-change', row)" /></td>
+              <td><el-input v-model.number="row.transferIn" size="small" :disabled="isReadonly" class="num-input" @change="onSubChange('soe-fair-change', row)" /></td>
+              <td><el-input v-model.number="row.fairChange" size="small" :disabled="isReadonly" class="num-input" @change="onSubChange('soe-fair-change', row)" /></td>
+              <td><el-input v-model.number="row.disposal" size="small" :disabled="isReadonly" class="num-input" @change="onSubChange('soe-fair-change', row)" /></td>
+              <td><el-input v-model.number="row.transferOut" size="small" :disabled="isReadonly" class="num-input" @change="onSubChange('soe-fair-change', row)" /></td>
+              <td class="formula-cell">{{ fmtNum((Number(row.beginBalance) || 0) + rowIncrease(row) - rowDecrease(row) + (Number(row.fairChange) || 0)) }}</td>
               <td v-if="!isReadonly"><el-button text type="danger" size="small" @click="removeRow('soe-fair-change', row.rowId)">删除</el-button></td>
             </tr>
           </tbody>
@@ -332,9 +372,12 @@
             <tr class="total-row">
               <td>合 计</td>
               <td>{{ fmtNum(sumCol('soe-fair-change', 'beginBalance')) }}</td>
-              <td>{{ fmtNum(sumCol('soe-fair-change', 'increase')) }}</td>
-              <td>{{ fmtNum(sumCol('soe-fair-change', 'decrease')) }}</td>
-              <td class="formula-cell">{{ fmtNum(sumCol('soe-fair-change', 'beginBalance') + sumCol('soe-fair-change', 'increase') - sumCol('soe-fair-change', 'decrease')) }}</td>
+              <td>{{ fmtNum(sumCol('soe-fair-change', 'buyOrProvision')) }}</td>
+              <td>{{ fmtNum(sumCol('soe-fair-change', 'transferIn')) }}</td>
+              <td>{{ fmtNum(sumCol('soe-fair-change', 'fairChange')) }}</td>
+              <td>{{ fmtNum(sumCol('soe-fair-change', 'disposal')) }}</td>
+              <td>{{ fmtNum(sumCol('soe-fair-change', 'transferOut')) }}</td>
+              <td class="formula-cell">{{ fmtNum(sumCol('soe-fair-change', 'beginBalance') + sumCol('soe-fair-change', 'increase') - sumCol('soe-fair-change', 'decrease') + sumCol('soe-fair-change', 'fairChange')) }}</td>
               <td v-if="!isReadonly"></td>
             </tr>
           </tfoot>
@@ -656,8 +699,11 @@ async function syncToDisclosureNotes() {
       measurementModel: props.measurementModel,
       costOriginalRows: getSectionRows('soe-cost'),
       costDepRows: getSectionRows('soe-cost-dep'),
-      costImpairRows: getSectionRows('cost-impair'),
+      // 🔴 原写 'cost-impair'（那是**上市**组件的 section key）→ 国企减值行永远取空、
+      // 减值层与账面价值层恒为 0。国企自身 key 是 'soe-impair'。
+      costImpairRows: getSectionRows('soe-impair'),
       fairChangeRows: getSectionRows('soe-fair-change'),
+      titleRows: getSectionRows('soe-unlicensed'),
       sectionTexts: { ...sectionTexts },
       projectId: props.projectId,
       wpId: props.wpId,
@@ -689,8 +735,10 @@ watch(
   [
     () => getSectionRows('soe-cost'),
     () => getSectionRows('soe-cost-dep'),
-    () => getSectionRows('cost-impair'),
+    // 与 buildH3SyncPayload 入参一致（原写 'cost-impair' 是上市 key → 国企减值改动不触发同步）
+    () => getSectionRows('soe-impair'),
     () => getSectionRows('soe-fair-change'),
+    () => getSectionRows('soe-unlicensed'),
     () => sectionTexts,
   ],
   () => autoSync.scheduleAutoSync(syncToDisclosureNotes),
@@ -707,8 +755,30 @@ function onTextChange(key: string) {
 function addRow(key: string) { addSectionRow(key, { category: '', usage: '' }) }
 function removeRow(key: string, rowId: string) { removeSectionRow(key, rowId) }
 
-function sumCol(key: string, field: 'beginBalance' | 'increase' | 'decrease'): number {
-  return getSectionRows(key).reduce((s, r) => s + (Number(r[field]) || 0), 0)
+function sumCol(key: string, field: string): number {
+  return getSectionRows(key).reduce((s, r) => s + (Number((r as any)[field]) || 0), 0)
+}
+
+/**
+ * 源模板两级子列（本期增加{购置或计提, 自用房地产或存货转入} /
+ * 本期减少{处 置, 转为自用房地产}）录入后，把聚合 `increase`/`decrease` 回写为子列之和。
+ *
+ * 这样期末余额、合计行、`buildH3SyncPayload` 的期末派生三处口径一致；
+ * 载荷侧 `toMovement` 会优先采用细分子列值（不再走「聚合额归入主渠道」的退化映射）。
+ */
+function onSubChange(key: string, row: any) {
+  const n = (v: unknown) => Number(v) || 0
+  row.increase = n(row.buyOrProvision) + n(row.transferIn)
+  row.decrease = n(row.disposal) + n(row.transferOut)
+  updateRow(key, row)
+}
+
+/** 该行本期增加 / 减少（由子列派生，供表格展示与合计） */
+function rowIncrease(row: any): number {
+  return (Number(row.buyOrProvision) || 0) + (Number(row.transferIn) || 0)
+}
+function rowDecrease(row: any): number {
+  return (Number(row.disposal) || 0) + (Number(row.transferOut) || 0)
 }
 function sumFairChange(key: string): number {
   return getSectionRows(key).reduce((s, r) => s + (Number((r as any).fairChange) || 0), 0)
@@ -796,6 +866,8 @@ async function generateAI(section: string) {
 .col-obs { width: 96px; text-align: center; }
 .empty-tip { text-align: center; color: var(--el-text-color-secondary); font-size: 12px; padding: 10px; }
 .formula-th { background: #f0f7ff; }
+/* 两级表头父分组（源模板 本期增加 / 本期减少 跨列表头） */
+.group-th { text-align: center; background: #eef1f6; font-weight: 600; }
 .formula-cell { background: #f0f7ff; text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .data-row:hover { background: var(--el-fill-color-lighter); }
 .total-row td { background: var(--el-fill-color); font-weight: 600; }

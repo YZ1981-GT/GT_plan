@@ -25,10 +25,23 @@
         >
           重大变动→附注说明
         </el-button>
+        <el-button
+          size="small"
+          type="primary"
+          plain
+          :loading="isSyncing"
+          :disabled="isReadonly || !projectId"
+          data-testid="h4-disclosure-soe-sync"
+          @click="syncToNotes"
+        >同步到附注</el-button>
         <span class="chip-wrap"><GtIndexChip value="wp:H4-1" :context-project-id="projectId" /></span>
         <span class="chip-wrap"><GtIndexChip value="wp:H2-1" :context-project-id="projectId" /></span>
         <span class="chip-wrap"><GtIndexChip value="wp:J2-1" :context-project-id="projectId" /></span>
+        <span class="chip-wrap"><GtIndexChip :value="`Note:八、23`" :context-project-id="projectId" /></span>
         <GtReviewTrigger section-id="H4-disclosure-soe" />
+        <el-button size="small" type="default" plain @click="jumpToNote">
+          ↩ 跳转回附注（八、23）
+        </el-button>
       </div>
     </div>
 
@@ -147,11 +160,16 @@
  * H4TabDisclosureSoe — 附注披露信息（国有企业）
  * CIP 行：H2 EventBus substantive:adjudicated + sessionStorage 回放
  */
-import { ref, reactive, computed, inject, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, inject, onMounted, onUnmounted, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
+import { useRouter } from 'vue-router'
+import { api } from '@/services/apiProxy'
+import { buildNoteJumpRoute } from '@/views/composables/noteDisclosureReverseJump'
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import { H2_NOTE_SECTION } from '../../composables/h2NoteSectionMap'
 import {
   H4_SOE_ITEM,
   buildH4SoeSummaryDisplay,
@@ -159,6 +177,7 @@ import {
   num,
   type H4SoeSummaryRow,
 } from '../../composables/h4SoeDisclosureModel'
+import { buildH4SoeSyncPayloads } from '../../composables/h4SoeDisclosureSyncPayload'
 import { useH4Disclosure } from '../../composables/useH4Disclosure'
 import {
   parseH2CipFromAdjudicatedEvent,
@@ -178,9 +197,12 @@ const isReadonly = computed(() => props.isReadonly)
 const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
 const allResponsesRef = computed(() => props.allResponses)
 const { pullSoeSummary, soeCrossCheck, significantNoteDraft } = useH4Disclosure(allResponsesRef as any)
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+const router = useRouter()
 
 const summary = reactive<H4SoeSummaryRow[]>(createDefaultH4SoeSummary())
 const noteText = ref('')
+const isSyncing = ref(false)
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 let unsubBus: (() => void) | null = null
 
@@ -252,12 +274,51 @@ function persistAll() {
     conclusion: null,
   })
   saveResponse(H4_SOE_ITEM.noteText, noteText.value)
+  autoSync.scheduleAutoSync(syncToNotes)
 }
 
 function scheduleSave() {
   if (isReadonly.value) return
   if (saveTimer) clearTimeout(saveTimer)
   saveTimer = setTimeout(() => persistAll(), 300)
+}
+
+// ─── 同步到附注 ──────────────────────────────────────────────────────────────
+async function syncToNotes(): Promise<void> {
+  if (isSyncing.value || !props.projectId || props.isReadonly) return
+  const payloads = buildH4SoeSyncPayloads(props.wpId, null, {
+    summary: summary.map((r) => ({ ...r })),
+    noteText: noteText.value,
+  })
+  if (!payloads.length) {
+    ElMessage.warning('当前项目准则不适用国企附注同步')
+    return
+  }
+  isSyncing.value = true
+  try {
+    const result: any = await api.post(
+      `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,
+      payloads[0],
+    )
+    const data = result?.data ?? result
+    ElMessage.success(`已同步 ${Number(data?.rows_synced ?? 0)} 行到附注「八、23 在建工程」`)
+    eventBus.emit('disclosure:note-text-updated' as any, {
+      wpCode: 'H4',
+      accountCode: '1604',
+      projectId: props.projectId,
+      section: H2_NOTE_SECTION.soe,
+      sectionIds: [H2_NOTE_SECTION.soe],
+    })
+  } catch {
+    ElMessage.warning('同步附注失败，请稍后重试')
+  } finally {
+    isSyncing.value = false
+  }
+}
+
+function jumpToNote() {
+  const route = buildNoteJumpRoute(props.projectId, 'H4', 'soe')
+  if (route) router.push(route)
 }
 
 function updateSummary(
@@ -340,6 +401,8 @@ onUnmounted(() => {
   if (saveTimer) clearTimeout(saveTimer)
   unsubBus?.()
 })
+
+onBeforeUnmount(() => { autoSync.cancelPending() })
 </script>
 
 <style scoped>

@@ -17,14 +17,21 @@
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import { eventBus } from '@/utils/eventBus'
 import type { ChecklistItem, ChecklistResponse } from './useD1FormData'
+import { parseNum, calcChangeRate, calcSubtotal } from './useD1FormulaEngine'
 import {
-  parseNum,
-  calcAuditedAmount,
-  calcChangeRate,
-  calcSubtotal,
-  calcNetValue,
-  isChangeRateExceeding,
-} from './useD1FormulaEngine'
+  D1_ADJ_CONCLUSION_KEY,
+  D1_ADJ_NOTE_KEY,
+  D1_ADJ_TB_AMOUNT_KEY,
+  d1AdjAnchorByRowKey,
+  d1AdjRowKey,
+  isD1AdjAnchor,
+  readD1AdjudicationTotals,
+  readD1AnchorReason,
+  readD1BadDebtTotal,
+  readD1CategoryTotal,
+  type D1AdjSection,
+  type D1PeriodAmounts,
+} from './d1AdjudicationModel'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -61,6 +68,15 @@ export interface TrialBalanceDiffRow {
   diff: number
 }
 
+/** 审定表小计 ↔ 上游明细底稿合计的勾稽提示行（非阻断，仅展示差异）。 */
+export interface CrossCheckRow {
+  key: string
+  label: string
+  detailAmount: number
+  adjudicatedAmount: number
+  diff: number
+}
+
 export interface UseD1AdjudicationOptions {
   allResponses: Ref<Map<string, ChecklistResponse>>
   wpId: Ref<string>
@@ -75,26 +91,19 @@ export interface UseD1AdjudicationOptions {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-interface RowConfig {
-  rowKey: string
-  label: string
-  isEditable: boolean
+/**
+ * 三区块行集**不再是固定常量**：改由 `readD1Categories`（D1-2 实际票据种类）派生。
+ *
+ * 🔴 原因（实证）：源模板 D1-2 固定行就有三个（银行承兑汇票 / **财务公司承兑汇票** /
+ * 商业承兑汇票），四表库 seed 还会按客户科目表产出「信用证」等动态行（项目 0ec33ac9
+ * 的 1121.03 信用证 期初 55,021,577.23）。写死「银行/商业」两行会让这些金额在审定表
+ * **无落点** → 原值小计 ≠ D1-2 合计 → 净值与试算平衡表出现假差异、附注主表跟着少数。
+ */
+const SECTION_META: Record<D1AdjSection, { label: string; editable: boolean }> = {
+  gross: { label: '一、应收票据原值', editable: true },
+  bd: { label: '二、坏账准备', editable: true },
+  net: { label: '三、应收票据净值', editable: false },
 }
-
-const GROSS_ROWS: RowConfig[] = [
-  { rowKey: 'gross-bank', label: '银行承兑汇票', isEditable: true },
-  { rowKey: 'gross-commercial', label: '商业承兑汇票', isEditable: true },
-]
-
-const BAD_DEBT_ROWS: RowConfig[] = [
-  { rowKey: 'bd-bank', label: '银行承兑汇票', isEditable: true },
-  { rowKey: 'bd-commercial', label: '商业承兑汇票', isEditable: true },
-]
-
-const NET_VALUE_ROWS: RowConfig[] = [
-  { rowKey: 'net-bank', label: '银行承兑汇票', isEditable: false },
-  { rowKey: 'net-commercial', label: '商业承兑汇票', isEditable: false },
-]
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -115,75 +124,64 @@ export function useD1Adjudication(options: UseD1AdjudicationOptions) {
 
   // ─── Cross-Sheet Data (pure computed from allResponses) ──────────────────
 
-  const crossSheetStatus = ref<'loaded' | 'loading' | 'error'>('loaded')
+
 
   /**
-   * 从 allResponses 中解析 D1-cat-rows remark JSON 获取按类别明细数据
-   * item_id = "D1-cat-rows", remark = JSON array of CategoryRow
+   * 跨表取数**唯一入口** = `readD1AdjudicationTotals`（共享纯函数）。
+   *
+   * 🔴 改造前这里有两个致命缺陷：
+   *  1. 原值行读 `catRow.currentUnadjusted`，而 `useD1DetailCategory.serializeRows()`
+   *     **有意不持久化派生列** → 恒 `undefined` → 0，即「D1-2 填了数、审定表期末仍是 0」。
+   *  2. 坏账区块只把 `isFromCrossSheet` 标记翻成 true、**从不写值** → 界面显示「已取数」
+   *     但金额恒 0 → 净值 = 原值、附注主表坏账列全 0、F4-3a/F4-6 勾稽必不成立。
+   *
+   * 现在两侧都由共享模型按源模板口径现算（原值 ← D1-2；坏账 ← D1-4 按票据种类小计）。
    */
-  interface CategoryRowData {
-    rowId: string
-    category: string
-    priorUnadjusted: number
-    priorAje: number
-    priorRje: number
-    priorAudited: number
-    currentUnadjusted: number
-    currentAje: number
-    currentRje: number
-    currentAudited: number
-  }
+  const totals = computed(() => readD1AdjudicationTotals(allResponses.value))
 
-  const categoryRows = computed<CategoryRowData[]>(() => {
-    const raw = getVal('D1-cat-rows').remark
-    if (!raw) return []
-    try {
-      const parsed = JSON.parse(raw)
-      return Array.isArray(parsed) ? parsed : []
-    } catch { return [] }
-  })
-
-  /** 从 D1-bd-individual-rows / D1-bd-portfolio-rows 解析坏账数据 */
-  interface BadDebtRowData {
-    rowId: string
-    priorAudited: number
-    currentAudited: number
-  }
-
-  const badDebtRows = computed<BadDebtRowData[]>(() => {
-    const rows: BadDebtRowData[] = []
-    for (const key of ['D1-bd-individual-rows', 'D1-bd-portfolio-rows']) {
-      const raw = getVal(key).remark
-      if (!raw) continue
-      try {
-        const parsed = JSON.parse(raw)
-        if (Array.isArray(parsed)) rows.push(...parsed)
-      } catch { /* skip */ }
-    }
-    return rows
-  })
+  /**
+   * 跨表取数状态：`loaded` = 至少一行由上游明细带入；否则 `loading`（需手工补录）。
+   *
+   * 改造前是恒 `'loaded'` 的 ref（无论有没有取到数），审计师无法据此判断是否需手工补录。
+   * 🔴 必须声明在 `totals` **之后**（computed 若被 setup 期的 immediate watch 提前求值，
+   * 引用尚未初始化的 const 会 TDZ ReferenceError —— 平台已有同类踩坑记录）。
+   */
+  const crossSheetStatus = computed<'loaded' | 'loading' | 'error'>(() =>
+    Object.values(totals.value.grossFromCrossSheet).some(Boolean) ||
+    Object.values(totals.value.provisionFromCrossSheet).some(Boolean)
+      ? 'loaded'
+      : 'loading',
+  )
 
   // ─── Row Builder ─────────────────────────────────────────────────────────
 
-  function buildRow(rowKey: string, label: string, isEditable: boolean, isFromCrossSheet: boolean): AdjudicationDetailRow {
-    const priorUnadjusted = parseNum(getVal(`D1-adj-${rowKey}-prior-unadj`).remark)
-    const priorAje = parseNum(getVal(`D1-adj-${rowKey}-prior-aje`).remark)
-    const priorRje = parseNum(getVal(`D1-adj-${rowKey}-prior-rje`).remark)
-    const priorAudited = calcAuditedAmount(priorUnadjusted, priorAje, priorRje)
-
-    const currentUnadjusted = parseNum(getVal(`D1-adj-${rowKey}-current-unadj`).remark)
-    const currentAje = parseNum(getVal(`D1-adj-${rowKey}-current-aje`).remark)
-    const currentRje = parseNum(getVal(`D1-adj-${rowKey}-current-rje`).remark)
-    const currentAudited = calcAuditedAmount(currentUnadjusted, currentAje, currentRje)
-
-    const change = currentAudited - priorAudited
-    const changeRate = calcChangeRate(priorAudited, currentAudited)
-    const reasonAnalysis = getVal(`D1-adj-${rowKey}-reason`).remark || ''
-
+  /** 由共享模型算出的金额组装成表格行（派生列现算，不落库）。 */
+  function buildRow(
+    section: D1AdjSection,
+    slug: string,
+    label: string,
+    amounts: D1PeriodAmounts,
+    isFromCrossSheet: boolean,
+  ): AdjudicationDetailRow {
+    const rowKey = d1AdjRowKey(section, slug)
+    const change = amounts.currentAudited - amounts.priorAudited
     return {
-      rowKey, label, priorUnadjusted, priorAje, priorRje, priorAudited,
-      currentUnadjusted, currentAje, currentRje, currentAudited,
-      change, changeRate, reasonAnalysis, isFromCrossSheet, isEditable,
+      rowKey,
+      label,
+      priorUnadjusted: amounts.priorUnadjusted,
+      priorAje: amounts.priorAje,
+      priorRje: amounts.priorRje,
+      priorAudited: amounts.priorAudited,
+      currentUnadjusted: amounts.currentUnadjusted,
+      currentAje: amounts.currentAje,
+      currentRje: amounts.currentRje,
+      currentAudited: amounts.currentAudited,
+      change,
+      changeRate: calcChangeRate(amounts.priorAudited, amounts.currentAudited),
+      reasonAnalysis: readD1AnchorReason(allResponses.value, section, slug),
+      isFromCrossSheet,
+      // 跨表取数命中的行不可手工改（以上游明细为准）；净值区块恒只读
+      isEditable: SECTION_META[section].editable && !isFromCrossSheet,
     }
   }
 
@@ -218,82 +216,74 @@ export function useD1Adjudication(options: UseD1AdjudicationOptions) {
   // ─── Adjudication Sections (computed) ────────────────────────────────────
 
   const adjudicationSections: ComputedRef<AdjudicationSection[]> = computed(() => {
-    // Section 1: 原值
-    const grossDetailRows = GROSS_ROWS.map(cfg => {
-      // Try cross-sheet first
-      const catRow = categoryRows.value.find(r =>
-        (cfg.rowKey === 'gross-bank' && r.category?.includes('银行')) ||
-        (cfg.rowKey === 'gross-commercial' && r.category?.includes('商业'))
-      )
-      const row = buildRow(cfg.rowKey, cfg.label, cfg.isEditable, !!catRow)
-      // Override with cross-sheet data if available
-      if (catRow) {
-        row.priorUnadjusted = parseNum(catRow.priorUnadjusted)
-        row.priorAje = parseNum(catRow.priorAje)
-        row.priorRje = parseNum(catRow.priorRje)
-        row.priorAudited = calcAuditedAmount(row.priorUnadjusted, row.priorAje, row.priorRje)
-        row.currentUnadjusted = parseNum(catRow.currentUnadjusted)
-        row.currentAje = parseNum(catRow.currentAje)
-        row.currentRje = parseNum(catRow.currentRje)
-        row.currentAudited = calcAuditedAmount(row.currentUnadjusted, row.currentAje, row.currentRje)
-        row.change = row.currentAudited - row.priorAudited
-        row.changeRate = calcChangeRate(row.priorAudited, row.currentAudited)
-        row.isFromCrossSheet = true
-      }
-      return row
-    })
-    const grossSubtotal = buildSubtotalRow('gross', '小计', grossDetailRows)
+    const t = totals.value
 
-    // Section 2: 坏账准备
-    const bdDetailRows = BAD_DEBT_ROWS.map(cfg => {
-      const row = buildRow(cfg.rowKey, cfg.label, cfg.isEditable, badDebtRows.value.length > 0)
-      return row
-    })
-    const bdSubtotal = buildSubtotalRow('bad-debt', '小计', bdDetailRows)
-
-    // Section 3: 净值 = 原值 - 坏账准备
-    const netDetailRows = NET_VALUE_ROWS.map((cfg, idx) => {
-      const grossRow = grossDetailRows[idx]
-      const bdRow = bdDetailRows[idx]
-      if (!grossRow || !bdRow) return buildRow(cfg.rowKey, cfg.label, false, false)
-
-      const priorAudited = calcNetValue(grossRow.priorAudited, bdRow.priorAudited)
-      const currentAudited = calcNetValue(grossRow.currentAudited, bdRow.currentAudited)
-      const change = currentAudited - priorAudited
-      const changeRate = calcChangeRate(priorAudited, currentAudited)
-
-      return {
-        rowKey: cfg.rowKey,
-        label: cfg.label,
-        priorUnadjusted: calcNetValue(grossRow.priorUnadjusted, bdRow.priorUnadjusted),
-        priorAje: calcNetValue(grossRow.priorAje, bdRow.priorAje),
-        priorRje: calcNetValue(grossRow.priorRje, bdRow.priorRje),
-        priorAudited,
-        currentUnadjusted: calcNetValue(grossRow.currentUnadjusted, bdRow.currentUnadjusted),
-        currentAje: calcNetValue(grossRow.currentAje, bdRow.currentAje),
-        currentRje: calcNetValue(grossRow.currentRje, bdRow.currentRje),
-        currentAudited,
-        change,
-        changeRate,
-        reasonAnalysis: '',
-        isFromCrossSheet: true,
-        isEditable: false,
-      }
-    })
-    const netSubtotal = buildSubtotalRow('net-value', '小计', netDetailRows)
+    const grossDetailRows = t.categories.map((c) =>
+      buildRow('gross', c.slug, c.label, t.gross[c.slug], t.grossFromCrossSheet[c.slug]),
+    )
+    const bdDetailRows = t.categories.map((c) =>
+      buildRow('bd', c.slug, c.label, t.provision[c.slug], t.provisionFromCrossSheet[c.slug]),
+    )
+    // 净值恒 = 原值 − 坏账（源模板 B16=B8-B12），不可手工
+    const netDetailRows = t.categories.map((c) =>
+      buildRow('net', c.slug, c.label, t.net[c.slug], true),
+    )
 
     return [
-      { sectionKey: 'gross', sectionLabel: '一、应收票据原值', rows: grossDetailRows, subtotalRow: grossSubtotal },
-      { sectionKey: 'bad-debt', sectionLabel: '二、坏账准备', rows: bdDetailRows, subtotalRow: bdSubtotal },
-      { sectionKey: 'net-value', sectionLabel: '三、应收票据净值', rows: netDetailRows, subtotalRow: netSubtotal },
+      {
+        sectionKey: 'gross',
+        sectionLabel: SECTION_META.gross.label,
+        rows: grossDetailRows,
+        subtotalRow: buildSubtotalRow('gross', '小计', grossDetailRows),
+      },
+      {
+        sectionKey: 'bad-debt',
+        sectionLabel: SECTION_META.bd.label,
+        rows: bdDetailRows,
+        subtotalRow: buildSubtotalRow('bad-debt', '小计', bdDetailRows),
+      },
+      {
+        sectionKey: 'net-value',
+        sectionLabel: SECTION_META.net.label,
+        rows: netDetailRows,
+        subtotalRow: buildSubtotalRow('net-value', '小计', netDetailRows),
+      },
     ] as AdjudicationSection[]
+  })
+
+  // ─── 与上游明细的勾稽提示行（非阻断）──────────────────────────────────────
+  //
+  // 源模板 D1-1 的原值/坏账小计本应逐分对上 D1-2 / D1-4 的合计；出现差异通常意味着
+  // ① D1-2 有类别未在审定表建行（改造后已由动态行消除）② D1-4 按票据种类小计未填齐
+  // （四表库 1231 只有总额、无票据种类拆分，故该块只能手工，宁缺勿造）。
+
+  const crossCheckRows = computed<CrossCheckRow[]>(() => {
+    const t = totals.value
+    const cat = readD1CategoryTotal(allResponses.value)
+    const bd = readD1BadDebtTotal(allResponses.value)
+    return [
+      {
+        key: 'gross-vs-d1-2',
+        label: '原值小计 ↔ D1-2 明细合计（期末未审）',
+        detailAmount: cat.current,
+        adjudicatedAmount: t.grossTotal.currentUnadjusted,
+        diff: t.grossTotal.currentUnadjusted - cat.current,
+      },
+      {
+        key: 'provision-vs-d1-4',
+        label: '坏账小计 ↔ D1-4 明细合计（期末未审）',
+        detailAmount: bd.current,
+        adjudicatedAmount: t.provisionTotal.currentUnadjusted,
+        diff: t.provisionTotal.currentUnadjusted - bd.current,
+      },
+    ]
   })
 
   // ─── Trial Balance Diff ──────────────────────────────────────────────────
 
   const trialBalanceDiff: ComputedRef<TrialBalanceDiffRow> = computed(() => {
     // 手工录入的 D1-adj-tb-amount 优先；未录入时回退 render 预填的 TB(1121) 数
-    const manual = getVal('D1-adj-tb-amount').remark
+    const manual = getVal(D1_ADJ_TB_AMOUNT_KEY).remark
     const tbAmount = (manual !== null && manual !== '')
       ? parseNum(manual)
       : (tbSeedAmount?.value ?? 0)
@@ -304,22 +294,22 @@ export function useD1Adjudication(options: UseD1AdjudicationOptions) {
 
   // ─── Audit Note & Conclusion ─────────────────────────────────────────────
 
-  const auditNote = ref<string>(getVal('D1-adj-note').remark || '')
-  const auditConclusion = ref<string>(getVal('D1-adj-conclusion').remark || '')
+  const auditNote = ref<string>(getVal(D1_ADJ_NOTE_KEY).remark || '')
+  const auditConclusion = ref<string>(getVal(D1_ADJ_CONCLUSION_KEY).remark || '')
 
   // Sync from allResponses on load
-  watch(() => getVal('D1-adj-note').remark, (v) => { if (v !== null) auditNote.value = v || '' }, { immediate: true })
-  watch(() => getVal('D1-adj-conclusion').remark, (v) => { if (v !== null) auditConclusion.value = v || '' }, { immediate: true })
+  watch(() => getVal(D1_ADJ_NOTE_KEY).remark, (v) => { if (v !== null) auditNote.value = v || '' }, { immediate: true })
+  watch(() => getVal(D1_ADJ_CONCLUSION_KEY).remark, (v) => { if (v !== null) auditConclusion.value = v || '' }, { immediate: true })
 
   function saveAuditNote(text: string): void {
     auditNote.value = text
-    const item = setLocal('D1-adj-note', null, text)
+    const item = setLocal(D1_ADJ_NOTE_KEY, null, text)
     saveImmediate([item])
   }
 
   function saveAuditConclusion(text: string): void {
     auditConclusion.value = text
-    const item = setLocal('D1-adj-conclusion', null, text)
+    const item = setLocal(D1_ADJ_CONCLUSION_KEY, null, text)
     saveImmediate([item])
   }
 
@@ -381,22 +371,24 @@ export function useD1Adjudication(options: UseD1AdjudicationOptions) {
 
   let saveTimer: ReturnType<typeof setTimeout> | null = null
 
+  /** 收集当前全部 `D1-adj-*` 响应并整批保存（按 item_id 去重，防同批重复被后端整批拒绝）。 */
+  function flushAdjItems(): void {
+    const byId = new Map<string, ChecklistItem>()
+    for (const [, resp] of allResponses.value) {
+      if (isD1AdjAnchor(resp.item_id)) byId.set(resp.item_id, resp)
+    }
+    saveImmediate([...byId.values()])
+  }
+
   function updateCell(rowKey: string, field: string, value: number): void {
     if (isReadonly.value) return
-    const itemId = `D1-adj-${rowKey}-${field}`
-    setLocal(itemId, null, String(value))
+    setLocal(d1AdjAnchorByRowKey(rowKey, field), null, String(value))
 
     // Debounce 2s
     if (saveTimer) clearTimeout(saveTimer)
     saveTimer = setTimeout(() => {
       saveTimer = null
-      const items: ChecklistItem[] = []
-      for (const [, resp] of allResponses.value) {
-        if (resp.item_id.startsWith('D1-adj-')) {
-          items.push(resp)
-        }
-      }
-      saveImmediate(items)
+      flushAdjItems()
     }, 2000)
   }
 
@@ -464,7 +456,7 @@ export function useD1Adjudication(options: UseD1AdjudicationOptions) {
     if (!targetRowKey) return
 
     const fieldSuffix = entryType === 'AJE' ? 'current-aje' : 'current-rje'
-    const itemId = `D1-adj-${targetRowKey}-${fieldSuffix}`
+    const itemId = d1AdjAnchorByRowKey(targetRowKey, fieldSuffix)
     const existing = parseNum(getVal(itemId).remark)
     setLocal(itemId, null, String(existing + amount))
 
@@ -472,20 +464,16 @@ export function useD1Adjudication(options: UseD1AdjudicationOptions) {
     if (saveTimer) clearTimeout(saveTimer)
     saveTimer = setTimeout(() => {
       saveTimer = null
-      const items: ChecklistItem[] = []
-      for (const [, resp] of allResponses.value) {
-        if (resp.item_id.startsWith('D1-adj-')) items.push(resp)
-      }
-      saveImmediate(items)
+      flushAdjItems()
     }, 2000)
   }
 
   function resolveRowKeyFromAccount(accountCode: string): string | null {
     // Map account codes to row keys
-    if (accountCode.startsWith('1121') || accountCode.includes('银行承兑')) return 'gross-bank'
-    if (accountCode.startsWith('1122') || accountCode.includes('商业承兑')) return 'gross-commercial'
-    if (accountCode.startsWith('1231') || accountCode.includes('坏账')) return 'bd-bank'
-    return 'gross-bank' // fallback to first row
+    if (accountCode.startsWith('1121') || accountCode.includes('银行承兑')) return d1AdjRowKey('gross', 'bank')
+    if (accountCode.startsWith('1122') || accountCode.includes('商业承兑')) return d1AdjRowKey('gross', 'commercial')
+    if (accountCode.startsWith('1231') || accountCode.includes('坏账')) return d1AdjRowKey('bd', 'bank')
+    return d1AdjRowKey('gross', 'bank') // fallback to first row
   }
 
   // Register EventBus listeners
@@ -514,6 +502,7 @@ export function useD1Adjudication(options: UseD1AdjudicationOptions) {
   return {
     adjudicationSections,
     crossSheetStatus,
+    crossCheckRows,
     trialBalanceDiff,
     auditNote,
     auditConclusion,

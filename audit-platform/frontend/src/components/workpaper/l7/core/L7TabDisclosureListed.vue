@@ -14,6 +14,16 @@
         <el-button size="small" @click="handleReview">
           <el-icon><Check /></el-icon> 复核
         </el-button>
+        <el-button
+          type="primary"
+          plain
+          size="small"
+          :loading="isSyncing"
+          :disabled="isReadonly || !projectId"
+          data-testid="l7-disclosure-listed-sync"
+          @click="syncToDisclosureNotes"
+        >同步到附注</el-button>
+        <el-button size="small" plain @click="jumpToNote">↩ 附注（五、52）</el-button>
       </div>
     </div>
 
@@ -36,35 +46,57 @@
           </el-button>
         </div>
       </template>
-      <el-table :data="disclosureRows" border size="small" style="width: 100%">
-        <el-table-column prop="item" label="项目" min-width="200" />
+      <el-table :data="displayRows" border size="small" style="width: 100%">
+        <el-table-column label="项目" min-width="200">
+          <template #default="{ row, $index }">
+            <span v-if="row.isTotal" class="total-value">{{ row.item }}</span>
+            <el-input
+              v-else-if="!isReadonly"
+              :model-value="row.item"
+              size="small"
+              placeholder="按实际项目性质填列"
+              @input="(val: string) => updateRowLabel($index, val)"
+            />
+            <span v-else>{{ row.item }}</span>
+          </template>
+        </el-table-column>
         <el-table-column label="期末数" min-width="140" align="right">
           <template #default="{ row, $index }">
-            <el-input-number
-              v-if="!isReadonly"
+            <WpAmountInput
+              v-if="!row.isTotal && !isReadonly"
               :model-value="row.endAmount"
-              :controls="false"
-              size="small"
-              style="width:100%"
-              @change="(val: number | undefined) => updateRow($index, 'endAmount', val ?? 0)"
+              :aria-label="`期末数 ${row.item}`"
+              @change="(val: number) => updateRow($index, 'endAmount', val)"
             />
-            <span v-else>{{ fmtAmount(row.endAmount) }}</span>
+            <span v-else :class="row.isTotal ? 'total-value' : ''">{{ fmtAmt(row.endAmount) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="上年年末数" min-width="140" align="right">
           <template #default="{ row, $index }">
-            <el-input-number
-              v-if="!isReadonly"
+            <WpAmountInput
+              v-if="!row.isTotal && !isReadonly"
               :model-value="row.priorYearEnd"
-              :controls="false"
-              size="small"
-              style="width:100%"
-              @change="(val: number | undefined) => updateRow($index, 'priorYearEnd', val ?? 0)"
+              :aria-label="`上年年末数 ${row.item}`"
+              @change="(val: number) => updateRow($index, 'priorYearEnd', val)"
             />
-            <span v-else>{{ fmtAmount(row.priorYearEnd) }}</span>
+            <span v-else :class="row.isTotal ? 'total-value' : ''">{{ fmtAmt(row.priorYearEnd) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column v-if="!isReadonly" label="" width="60" align="center">
+          <template #default="{ row, $index }">
+            <el-button
+              v-if="!row.isTotal"
+              link
+              type="danger"
+              size="small"
+              @click="removeRow($index)"
+            >删</el-button>
           </template>
         </el-table-column>
       </el-table>
+      <div v-if="!isReadonly" class="table-actions">
+        <el-button size="small" @click="addRow">+ 添加行</el-button>
+      </div>
     </el-card>
 
     <!-- ═══ 核对结论 ═══ -->
@@ -103,13 +135,16 @@
  * Table: 项目 | 期末数 | 上年年末数
  * Auto-fill from EventBus 'substantive:adjudicated'
  */
-import { computed, inject, onMounted, onUnmounted, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, inject, onMounted, onUnmounted, onBeforeUnmount, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { MagicStick, Check } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
 import { eventBus } from '@/utils/eventBus'
+import { fmtAmount } from '@/utils/formatters'
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { useL7FormData } from '../../composables/useL7FormData'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { L7_NOTE_SECTION, buildL7SyncPayload } from '../../composables/l7NoteSectionMap'
 import { buildNoteJumpRoute } from '@/views/composables/noteDisclosureReverseJump'
 
@@ -124,6 +159,8 @@ const emit = defineEmits<{
 }>()
 
 const openReviewDialog = inject<((sectionId: string, sectionLabel?: string) => void) | null>('openReviewDialog', null)
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+const router = useRouter()
 
 // ─── FormData ───────────────────────────────────────────────────────────────
 
@@ -134,22 +171,110 @@ const formData = useL7FormData({
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
-const disclosureRows = ref([
-  { item: '递延收益', endAmount: 0, priorYearEnd: 0 },
-  { item: '长期保证金/押金', endAmount: 0, priorYearEnd: 0 },
-  { item: '政府补助（非流动）', endAmount: 0, priorYearEnd: 0 },
-  { item: '预收款项（非流动）', endAmount: 0, priorYearEnd: 0 },
-  { item: '其他', endAmount: 0, priorYearEnd: 0 },
-  { item: '合计', endAmount: 0, priorYearEnd: 0 },
+interface L7Row { item: string; endAmount: number; priorYearEnd: number }
+
+/** 持久化键（整表 JSON；旧版是逐格 `L7-disclosure-listed-{i}-{field}`，见 restore 兼容） */
+const ROWS_ITEM_ID = 'L7-disclosure-listed-rows'
+
+/**
+ * 源模板 五、52 是**空行骨架**（r7~r11 五个空行，无固定行名）→ 默认给 5 个
+ * 常见项目名作示例、行名可编辑可增删，避免把示例名当披露内容写死。
+ */
+function defaultRows(): L7Row[] {
+  return [
+    { item: '递延收益', endAmount: 0, priorYearEnd: 0 },
+    { item: '长期保证金/押金', endAmount: 0, priorYearEnd: 0 },
+    { item: '政府补助（非流动）', endAmount: 0, priorYearEnd: 0 },
+    { item: '预收款项（非流动）', endAmount: 0, priorYearEnd: 0 },
+    { item: '其他', endAmount: 0, priorYearEnd: 0 },
+  ]
+}
+
+const disclosureRows = ref<L7Row[]>(defaultRows())
+
+/** 合计行**读时派生**（禁持久化派生值） */
+const displayRows = computed(() => [
+  ...disclosureRows.value.map((r) => ({ ...r, isTotal: false })),
+  {
+    item: '合计',
+    endAmount: disclosureRows.value.reduce((s, r) => s + (Number(r.endAmount) || 0), 0),
+    priorYearEnd: disclosureRows.value.reduce((s, r) => s + (Number(r.priorYearEnd) || 0), 0),
+    isTotal: true,
+  },
 ])
 
 // ─── Handlers ────────────────────────────────────────────────────────────────
 
+function persistRows() {
+  formData.debouncedSave(ROWS_ITEM_ID, { remark: JSON.stringify(disclosureRows.value) })
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
+}
+
 function updateRow(index: number, field: 'endAmount' | 'priorYearEnd', val: number) {
   if (index >= 0 && index < disclosureRows.value.length) {
     disclosureRows.value[index][field] = val
-    formData.debouncedSave(`L7-disclosure-listed-${index}-${field}`, { remark: String(val) })
+    persistRows()
   }
+}
+
+function updateRowLabel(index: number, val: string) {
+  if (index >= 0 && index < disclosureRows.value.length) {
+    disclosureRows.value[index].item = val
+    persistRows()
+  }
+}
+
+function addRow() {
+  disclosureRows.value.push({ item: '', endAmount: 0, priorYearEnd: 0 })
+  persistRows()
+}
+
+function removeRow(index: number) {
+  if (index >= 0 && index < disclosureRows.value.length) {
+    disclosureRows.value.splice(index, 1)
+    persistRows()
+  }
+}
+
+// ─── 同步到附注 ──────────────────────────────────────────────────────────────
+
+const isSyncing = ref(false)
+
+async function syncToDisclosureNotes(): Promise<void> {
+  if (isSyncing.value || !props.projectId || props.isReadonly) return
+  const payload = buildL7SyncPayload(props.wpId, {
+    variant: 'listed',
+    rows: disclosureRows.value
+      .filter((r) => String(r.item ?? '').trim())
+      .map((r) => ({
+        label: r.item,
+        endAmount: Number(r.endAmount) || 0,
+        priorAmount: Number(r.priorYearEnd) || 0,
+      })),
+  })
+  if (!payload) {
+    ElMessage.warning('当前项目准则不适用上市附注同步')
+    return
+  }
+  isSyncing.value = true
+  try {
+    await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
+    ElMessage.success('已同步到附注（五、52 其他非流动负债）')
+    eventBus.emit('disclosure:note-text-updated' as any, {
+      wpCode: 'L7',
+      projectId: props.projectId,
+      sectionIds: [L7_NOTE_SECTION.listed],
+    })
+  } catch {
+    ElMessage.warning('同步附注失败，请稍后重试')
+  } finally {
+    isSyncing.value = false
+  }
+}
+
+function jumpToNote() {
+  const route = buildNoteJumpRoute(props.projectId, 'L7', 'listed')
+  if (route) router.push(route)
 }
 
 // ─── Conclusion ──────────────────────────────────────────────────────────────
@@ -171,25 +296,60 @@ function handleAI(section: string) {
 }
 function handleReview() { openReviewDialog?.('L7-disclosure-listed', '附注披露（上市）') }
 
-function fmtAmount(val: number): string {
-  if (val === 0) return '—'
-  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+/** 只读金额走平台单一真源（千分符 + 2 位小数 + 「元」偏好） */
+const fmtAmt = (val: number) => fmtAmount(val)
+
+// ─── 反序列化（含旧版逐格 key 兼容） ────────────────────────────────────────
+
+function restoreRows() {
+  const packed = formData.allResponses.value.get(ROWS_ITEM_ID)?.remark
+  if (packed) {
+    try {
+      const parsed = JSON.parse(packed)
+      if (Array.isArray(parsed) && parsed.length) {
+        disclosureRows.value = parsed.map((r: any) => ({
+          item: String(r?.item ?? ''),
+          endAmount: Number(r?.endAmount) || 0,
+          priorYearEnd: Number(r?.priorYearEnd) || 0,
+        }))
+        return
+      }
+    } catch { /* 落到旧格式兼容 */ }
+  }
+  // 旧格式：逐格 `L7-disclosure-listed-{index}-{field}`（含被当数据行的第 6 行合计，丢弃）
+  const rows = defaultRows()
+  let touched = false
+  rows.forEach((row, i) => {
+    for (const field of ['endAmount', 'priorYearEnd'] as const) {
+      const raw = formData.allResponses.value.get(`L7-disclosure-listed-${i}-${field}`)?.remark
+      if (raw != null && raw !== '') {
+        const n = Number(raw)
+        if (Number.isFinite(n)) { row[field] = n; touched = true }
+      }
+    }
+  })
+  if (touched) disclosureRows.value = rows
+  const savedConclusion = formData.allResponses.value.get('L7-disc-listed-conclusion')?.remark
+  if (savedConclusion) conclusion.value = String(savedConclusion)
 }
 
 // ─── EventBus subscribe: 审定变化刷新 ───────────────────────────────────────
 
 function onAdjudicatedRefresh() {
-  formData.loadData()
+  formData.loadData().then(() => restoreRows())
 }
 
 onMounted(async () => {
   await formData.loadData()
+  restoreRows()
   eventBus.on('substantive:adjudicated' as any, onAdjudicatedRefresh)
 })
 
 onUnmounted(() => {
   eventBus.off('substantive:adjudicated' as any, onAdjudicatedRefresh)
 })
+
+onBeforeUnmount(() => { autoSync.cancelPending() })
 </script>
 
 <style scoped>
@@ -202,6 +362,8 @@ onUnmounted(() => {
 .methodology-text { font-size: var(--wp-font-size, 13px); color: #6b5900; line-height: 1.6; }
 .disclosure-card { margin-bottom: 16px; }
 .card-header { display: flex; align-items: center; justify-content: space-between; }
+.table-actions { margin-top: 8px; }
+.total-value { font-weight: 700; color: #303133; }
 :deep(.el-table) { font-size: var(--wp-font-size, 13px); }
 .conclusion-card { margin-top: 16px; }
 .card-title { font-size: 14px; font-weight: 600; color: #303133; }

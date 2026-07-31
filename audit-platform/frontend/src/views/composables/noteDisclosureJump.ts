@@ -60,8 +60,17 @@ export const L3_DISCLOSURE_SHEET_SOE = '附注披露信息核对（国企）'
 export const L5_DISCLOSURE_SHEET_LISTED = '附注披露信息核对（上市公司）'
 export const L5_DISCLOSURE_SHEET_SOE = '附注披露信息核对（国企）'
 
-export const L7_DISCLOSURE_SHEET_LISTED = '附注披露信息核对（上市公司）'
-export const L7_DISCLOSURE_SHEET_SOE = '附注披露信息核对（国企）'
+// 🔴 L7 实测源 xlsx `backend/wp_templates/L/L7 其他非流动负债.xlsx` 的 tab 名是
+//    `附注披露信息（上市公司）` / `附注披露信息(国企)`（**国企侧半角括号**），
+//    原写「附注披露信息核对（…）」→ 深链 `?sheet=` 精确匹配落空、回退底稿目录。
+//    单一真源 = `components/workpaper/composables/l7NoteSectionMap.L7_DISCLOSURE_SHEET_NAME`
+export const L7_DISCLOSURE_SHEET_LISTED = '附注披露信息（上市公司）'
+export const L7_DISCLOSURE_SHEET_SOE = '附注披露信息(国企)'
+
+// ⚠️ 待核（本 spec 后续批次）：L1 国企实为 `附注披露信息核对（国企）`（对）、
+//    L3 国企实为 `附注披露（国企）信息核对`（**括号在中间**，此处写法错）、
+//    L5 两版实为 `附注披露信息（上市公司）` / `附注披露信息（国企）`（**无「核对」**）。
+//    L2/L6 是 `附注披露（国企）信息` 式（括号在中间），L4 才是「核对」式。
 
 // M 循环权益类：披露 sheet 名 = 各科目底稿内附注tab真实名（与 L 循环同名）
 export const M_DISCLOSURE_SHEET_LISTED = '附注披露信息（上市公司）'

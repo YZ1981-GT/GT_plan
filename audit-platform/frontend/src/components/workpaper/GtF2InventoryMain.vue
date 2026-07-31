@@ -58,6 +58,8 @@
             :is-readonly="isReadonly"
             :debounced-save="formData.debouncedSave"
             :cross-sheet="crossSheet"
+            :tb-values="tbValues"
+            :tb-amount="tbAmount"
             @reload="formData.loadAll()"
           />
         </template>
@@ -298,6 +300,14 @@ const tbValues = computed(() => {
   const ctx = formData.projectContext.value
   return (ctx as any)?.tb_values ?? null
 })
+// 存货净额 TB 核对标量（BS-010 trial_balance）：render 置于 project_context.tb_amount
+const tbAmount = computed<number | null>(() => {
+  const fromHtml = props.htmlData?.project_context?.tb_amount ?? props.htmlData?.projectContext?.tb_amount
+  if (fromHtml != null) return Number(fromHtml) || 0
+  const ctx = formData.projectContext.value as any
+  return ctx?.tb_amount != null ? (Number(ctx.tb_amount) || 0) : null
+})
+
 const hasFourTableData = computed(() => {
   const tv = tbValues.value
   if (!tv) return false

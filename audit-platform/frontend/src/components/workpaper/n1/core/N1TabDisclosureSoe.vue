@@ -38,6 +38,26 @@
       <div class="methodology-text">
         <strong>披露口径分支（源模板 R7）：</strong>{{ BRANCH_RULE }}
       </div>
+      <div class="branch-picker">
+        <span class="branch-label">本期披露口径：</span>
+        <el-radio-group
+          v-model="tables.offsetMode.value"
+          size="small"
+          :disabled="isReadonly"
+          @change="onOffsetModeChange"
+        >
+          <el-radio-button value="undecided">未判断</el-radio-button>
+          <el-radio-button value="gross">不以抵销后净额列示（按（1））</el-radio-button>
+          <el-radio-button value="net">以抵销后净额列示（按（2））</el-radio-button>
+        </el-radio-group>
+        <el-tag v-if="tables.offsetMode.value === 'undecided'" type="warning" size="small">
+          两分支表均保留，待判断后自动清理另一分支
+        </el-tag>
+      </div>
+      <div class="branch-picker source-trace" v-if="tbSourceSummary">
+        <span class="branch-label">四表取数来源：</span>
+        <span>{{ tbSourceSummary }}</span>
+      </div>
       <div class="methodology-text methodology-sub">
         本页 5 张表逐字对齐源模板 <code>附注披露信息（国企）</code>：
         （1）A、已确认递延所得税资产和递延所得税负债；
@@ -60,7 +80,12 @@
     <el-card shadow="never" class="disclosure-card">
       <template #header>
         <div class="card-header">
-          <span>（1）递延所得税资产和递延所得税负债不以抵销后的净额列示 —— A、已确认递延所得税资产和递延所得税负债</span>
+          <span>
+            （1）递延所得税资产和递延所得税负债不以抵销后的净额列示 —— A、已确认递延所得税资产和递延所得税负债
+            <el-tag v-if="tables.offsetMode.value === 'net'" type="info" size="small">
+              本口径不披露（已从附注清除）
+            </el-tag>
+          </span>
           <el-button size="small" :loading="aiLoading" @click="handleAI('unoffset')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
@@ -85,7 +110,13 @@
     <el-card shadow="never" class="disclosure-card">
       <template #header>
         <div class="card-header">
-          <span>（2）递延所得税资产和递延所得税负债以抵销后的净额列示 —— A、互抵后的递延所得税资产或负债及对应的互抵后可抵扣或应纳税暂时性差异</span>
+          <span>
+            （2）递延所得税资产和递延所得税负债以抵销后的净额列示 —— A、互抵后的递延所得税资产或负债及对应的互抵后可抵扣或应纳税暂时性差异
+            <el-tag v-if="tables.offsetMode.value === 'gross'" type="info" size="small">
+              本口径不披露（已从附注清除）
+            </el-tag>
+            <el-tag type="success" size="small">行标签自动跟随（1）</el-tag>
+          </span>
           <el-button size="small" :loading="aiLoading" @click="handleAI('netoffset')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
@@ -107,7 +138,12 @@
     <el-card shadow="never" class="disclosure-card">
       <template #header>
         <div class="card-header">
-          <span>（2）B、递延所得税资产和递延所得税负债互抵明细</span>
+          <span>
+            （2）B、递延所得税资产和递延所得税负债互抵明细
+            <el-tag v-if="tables.offsetMode.value === 'gross'" type="info" size="small">
+              本口径不披露（已从附注清除）
+            </el-tag>
+          </span>
           <el-button size="small" :loading="aiLoading" @click="handleAI('offsetdetail')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
@@ -213,12 +249,14 @@
       <summary>编制提示</summary>
       <ul>
         <li>本页 5 张表逐字对齐致同源模板 <code>附注披露信息（国企）</code>，是附注 {{ N1_NOTE_SECTION.soe }} 的交付物源</li>
-        <li>不以抵销后净额列示按（1）披露；以抵销后净额列示按（2）披露 —— 两者择一，另一张按源模板可删除</li>
+        <li>顶部「本期披露口径」二选一（源模板 R7）：选定后另一分支的表会从附注自动清除；保持「未判断」时两分支都保留</li>
+        <li>表（2）A 的行标签自动跟随表（1）（源模板 A36=<code>=A13</code> … A50=<code>=A27</code>），在表（1）增删/改名即同步；金额两表各自录入</li>
+        <li>四表入库后打开本页，资产段与负债段的「递延所得税资产/负债」列按科目叶子余额自动带出（暂时性差异列需人工，四表推不出税率）；已录数据不被覆盖</li>
         <li>表（1）两级表头：期末余额 / 年初余额，子列序为「递延所得税资产/负债」→「可抵扣/应纳税暂时性差异」（与上市相反）</li>
         <li>负债段第 4 项国企为「租赁形成」（上市为「使用权资产」），不要互相套用</li>
         <li>表（1）（2）各段小计 = 段内各项之和（源模板 =SUM(B13:B19) / =SUM(B36:B43) / =SUM(B46:B51)）</li>
         <li>表（3）「可抵扣亏损」行与表（4）合计必须相等（源模板 B72=B62 / C72=C62），由勾稽面板实时校验</li>
-        <li>表（4）默认列示审计年度后 5 年；高新 / 科技型中小企业为 10 年，用「+ 新增行」补足</li>
+        <li>表（4）默认列示 6 个年度（源模板 R66:R71）：期末列的亏损到期于 Y+1~Y+5、年初列到期于 Y~Y+4，两列并集即 Y~Y+5，故首行期末列与末行年初列填「——」；10 年结转或无使用期限用「+ 新增行」补足</li>
         <li>审计过程（账面价值 / 计税基础 / 适用税率 / 确认依据）在 N1-2 明细表与 N1-4 测算表，不在披露表列示</li>
         <li>编辑后自动同步到附注（防抖 800ms），也可点「同步到附注」立即推送</li>
       </ul>
@@ -313,6 +351,9 @@ const tables = useN1DisclosureTables({
   variant: 'soe',
   allResponses: formData.allResponses,
   auditYear: syncYear,
+  // 四表直通：`loadData()` 内部 await `selfLoad()` → restore() 前预填已就绪
+  adjudicationPrefill: formData.adjudicationPrefill,
+  liabilityPrefill: formData.liabilityPrefill,
 })
 
 const autoSync = useDisclosureAutoSync({ isReadonly: () => isReadonly.value })
@@ -324,6 +365,31 @@ const unrecognizedColumns = computed(() => n1UnrecognizedSegColumns('soe'))
 const lossExpiryColumns = computed(() => n1LossExpirySegColumns('soe'))
 
 const hasCheckError = computed(() => tables.checks.value.some((c) => c.level === 'error'))
+
+/**
+ * 四表取数溯源（消费后端 `tb_source_codes`）：展示本页金额来自哪些科目、依据哪个报表行。
+ * 科目集由 `report_config` 规则映射解析（BS-036 递延所得税资产 / BS-067 递延所得税负债），
+ * 项目自定义了报表行公式时这里会随之变化。
+ */
+const tbSourceSummary = computed(() => {
+  const s = formData.tbSourceCodes.value
+  const parts: string[] = []
+  if (s.asset.codes.length) {
+    parts.push(`递延所得税资产 ${s.asset.codes.join('、')}（报表行 ${s.asset.row_code}）`)
+  }
+  if (s.liability.codes.length) {
+    parts.push(`递延所得税负债 ${s.liability.codes.join('、')}（报表行 ${s.liability.row_code}）`)
+  }
+  return parts.join('； ')
+})
+
+/** 披露口径分支变更：持久化 + 触发同步（另一分支表进 `_removed_table_keys`） */
+function onOffsetModeChange(): void {
+  formData.debouncedSave(tables.itemIds.offsetMode, {
+    conclusion: tables.offsetMode.value,
+  })
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
+}
 
 // ─── 持久化（整表 JSON，一表一 item）────────────────────────────────────────
 
@@ -628,6 +694,10 @@ onUnmounted(() => {
 .methodology-text { font-size: var(--wp-font-size, 13px); color: #6b5900; line-height: 1.7; }
 .methodology-text strong { color: #b88230; }
 .methodology-sub { margin-top: 6px; }
+
+.branch-picker { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.branch-label { font-size: var(--wp-font-size, 13px); color: #b88230; font-weight: 600; }
+.source-trace { font-size: 12px; color: #6b5900; }
 
 .disclosure-card { margin-bottom: 16px; }
 .card-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }

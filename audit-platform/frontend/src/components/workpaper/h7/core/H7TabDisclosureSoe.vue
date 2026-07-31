@@ -82,10 +82,11 @@
  * H7TabDisclosureSoe.vue — H7 附注披露（国有企业）
  *
  * 账面变动表(EventBus + allResponses 解析) + 政策/国资监管文字披露。
- * 无专属 disclosure composable → H5 附注同族范式(eventBus 订阅 + allResponses JSON 解析)，
- * 持久化走 api.put(remark)。
  *
- * Spec: .kiro/specs/h7-biological-assets/  Requirements: 附注披露·国企
+ * 🔴 **暂无同步链路**（列入 MISSING_SYNC_PATH，需结构对齐重建）：源模板 §八、24 是
+ *    「以成本计量」/「以公允价值计量」两张明细表（项目 种植业/畜牧养殖业/林业/水产业
+ *    + 其中，列 期初账面价值/本期增加额/本期减少额/期末账面价值），本组件当前只有单行
+ *    movementRows，无法在不自造的前提下映射。需按 G6 范式结构对齐重建（另立批次）。
  */
 import { ref, computed, onMounted, onUnmounted, inject } from 'vue'
 import { ElMessage } from 'element-plus'

@@ -218,10 +218,20 @@ const auditYear = computed(() => {
   if (yr) return parseInt(String(yr), 10)
   return new Date().getFullYear() - 1
 })
-const bsDate = computed(() => formData.projectContext.value?.bs_date || '')
+const bsDate = computed(
+  () => props.htmlData?.project_context?.bs_date
+    ?? props.htmlData?.projectContext?.bs_date
+    ?? formData.projectContext.value?.bs_date
+    || '',
+)
+// 🔴 render 输出 project_context（snake_case）；formData.projectContext 仅在 selfLoad
+// 读到 htmlData.projectContext（camelCase）时才填 → 恒空。故优先读 htmlData.project_context，
+// 否则 2202 TB 核对标量恒 0（审定表差异/全局告警失效）。
 const tbAmount = computed(() => {
-  const ctx = formData.projectContext.value
-  return ctx?.tb_amount ?? ctx?.tb_amount_audited ?? 0
+  const ctx = props.htmlData?.project_context
+    ?? props.htmlData?.projectContext
+    ?? formData.projectContext.value
+  return Number(ctx?.tb_amount ?? ctx?.tb_amount_audited ?? 0) || 0
 })
 
 // 从 allResponses 解析 F4-1 审定合计（用于全局勾稽告警）

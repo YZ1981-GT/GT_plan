@@ -82,10 +82,12 @@
  * H7TabDisclosureListed.vue — H7 附注披露（上市公司）
  *
  * 账面变动表(EventBus substantive:adjudicated + allResponses 解析) + 政策/补充文字披露。
- * 无专属 disclosure composable → 采用 H5 附注同族范式(eventBus 订阅 + allResponses JSON 解析)，
- * 持久化走 api.put(remark)。
  *
- * Spec: .kiro/specs/h7-biological-assets/  Requirements: 附注披露·上市
+ * 🔴 **暂无同步链路**（列入 MISSING_SYNC_PATH，需结构对齐重建）：源模板 §五、24 是
+ *    「（1）以成本计量」转置矩阵（类别作列 种植业/畜牧养殖业/林业/水产业，行为
+ *    账面原值/累计折旧/减值准备/账面价值明细）+「（2）以公允价值计量」变动表；
+ *    本组件当前只有单行 movementRows（原值/累计折旧/减值准备），无法在不自造的
+ *    前提下映射到源模板结构。需按 G6 范式做结构对齐重建（另立批次）。
  */
 import { ref, computed, onMounted, onUnmounted, inject } from 'vue'
 import { ElMessage } from 'element-plus'

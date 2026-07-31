@@ -384,6 +384,45 @@
 
     </template>
 
+    <!-- （3）未办妥产权证书的情况（源模板 A65~A68；此前底稿无行录入位置 → 该附注表永远无法推送） -->
+    <div class="disc-block">
+      <div class="block-header">
+        <span class="block-title">（3）未办妥产权证书的情况</span>
+        <div class="block-actions">
+          <el-button v-if="!isReadonly" size="small" @click="addRow('title-cert')">＋ 插行</el-button>
+        </div>
+      </div>
+      <div class="src-hint">
+        <p>（披露未办妥产权证书的投资性房地产账面价值及原因。）行可无限量添加。</p>
+      </div>
+      <table class="disc-table">
+        <thead>
+          <tr>
+            <th class="col-item">项 目</th>
+            <th class="col-num">账面价值</th>
+            <th style="min-width:200px">未办妥产权证书原因</th>
+            <th v-if="!isReadonly" class="col-op"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="row in getSectionRows('title-cert')" :key="row.rowId" class="data-row">
+            <td><el-input v-model="row.category" size="small" :disabled="isReadonly" @change="onRowChange('title-cert', row)" /></td>
+            <td><el-input v-model.number="row.beginBalance" size="small" :disabled="isReadonly" class="num-input" @change="onRowChange('title-cert', row)" /></td>
+            <td><el-input v-model="row.usage" size="small" :disabled="isReadonly" placeholder="请填写原因" @change="onRowChange('title-cert', row)" /></td>
+            <td v-if="!isReadonly"><el-button text type="danger" size="small" @click="removeRow('title-cert', row.rowId)">删除</el-button></td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr class="total-row">
+            <td>合 计</td>
+            <td class="formula-cell">{{ fmtNum(sumCol('title-cert', 'beginBalance')) }}</td>
+            <td></td>
+            <td v-if="!isReadonly"></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
     <!-- ⑤ 共用块：补充说明 / 受限及担保 -->
     <div class="disc-block">
       <div class="block-header">
@@ -407,6 +446,24 @@
         placeholder="说明抵押给金融机构的投资性房地产账面价值、未办妥产权证书情况及原因，以及其他使用限制。"
         :disabled="isReadonly"
         @change="onTextChange('restriction')" />
+    </div>
+
+    <!-- （4）房地产转换情况及改变计量模式的情况（源模板 A71~A74，此前底稿无录入位置） -->
+    <div class="disc-block">
+      <div class="block-header">
+        <span class="block-title">（4）房地产转换情况及改变计量模式的情况</span>
+        <el-button size="small" plain :loading="_h3AiLoading" :disabled="isReadonly"
+          @click="generateAI('conversion')">🤖 AI</el-button>
+      </div>
+      <div class="src-hint">
+        <p>（说明报告期内房地产转换或改变计量模式的情况、理由，以及对损益或所有者权益的影响。</p>
+        <p>对于转换为投资性房地产并采用公允价值计量模式的，应披露转换的理由、审批程序，以及对损益、其他综合收益的影响。（15号文第十九条（十二））</p>
+        <p>房地产开发企业列示出租开发产品时，应披露出租开发产品的成本、租赁合同主要条款等内容。对重要的出租房产应单项披露，非重要或零星的出租房产可采用合并披露。）</p>
+      </div>
+      <el-input v-model="sectionTexts['conversion']" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }"
+        placeholder="按源模板口径说明：①报告期内房地产转换或改变计量模式的情况、理由及对损益/所有者权益的影响；②转换为投资性房地产并采用公允价值计量模式的，披露理由、审批程序及对损益、其他综合收益的影响；③房地产开发企业出租开发产品的成本、租赁合同主要条款。"
+        :disabled="isReadonly"
+        @change="onTextChange('conversion')" />
     </div>
 
     <!-- ⑥ 编制提示 -->
@@ -581,6 +638,7 @@ async function syncToDisclosureNotes() {
       costDepRows: getSectionRows('cost-dep'),
       costImpairRows: getSectionRows('cost-impair'),
       fairChangeRows: getSectionRows('fair-change'),
+      titleRows: getSectionRows('title-cert'),
       sectionTexts: { ...sectionTexts },
       projectId: props.projectId,
       wpId: props.wpId,
@@ -614,6 +672,7 @@ watch(
     () => getSectionRows('cost-dep'),
     () => getSectionRows('cost-impair'),
     () => getSectionRows('fair-change'),
+    () => getSectionRows('title-cert'),
     () => sectionTexts,
   ],
   () => autoSync.scheduleAutoSync(syncToDisclosureNotes),
@@ -680,6 +739,19 @@ async function generateAI(section: string) {
 
 /* 汇总块 */
 .summary-block .block-header { background: #f0f9eb; }
+
+/* 源模板红字方法论上下文（琥珀色左边线 + 浅黄背景，平台统一约定） */
+.src-hint {
+  margin: 8px 12px 0;
+  padding: 8px 10px;
+  border-left: 3px solid #e6a23c;
+  background: #fdf6ec;
+  font-size: 12px;
+  line-height: 1.7;
+  color: #7a5b1c;
+}
+.src-hint p { margin: 0 0 4px; }
+.src-hint p:last-child { margin-bottom: 0; }
 
 /* 备注文本 */
 .block-note { padding: 8px 12px; border-top: 1px solid var(--el-border-color-light); background: #fafafa; }

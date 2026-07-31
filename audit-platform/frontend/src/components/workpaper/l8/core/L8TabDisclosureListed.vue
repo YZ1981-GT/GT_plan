@@ -14,9 +14,16 @@
         <el-button size="small" @click="handleReview">
           <el-icon><Check /></el-icon> 复核
         </el-button>
-        <el-button type="primary" size="small" :loading="isSaving" @click="handleSave">
-          保存
-        </el-button>
+        <el-button
+          type="primary"
+          plain
+          size="small"
+          :loading="isSyncing"
+          :disabled="isReadonly || !projectId"
+          data-testid="l8-disclosure-listed-sync"
+          @click="syncToDisclosureNotes"
+        >同步到附注</el-button>
+        <el-button size="small" plain @click="jumpToNote">↩ 附注（五、67）</el-button>
       </div>
     </div>
 
@@ -29,42 +36,65 @@
       </div>
     </div>
 
-    <!-- ═══ 附注表格（3列：项目/本期/上期） ═══ -->
-    <el-table :data="disclosureRows" border size="small" style="width: 100%">
-      <el-table-column prop="item" label="项目" min-width="200" />
-      <el-table-column label="本期金额" width="160" align="right">
-        <template #default="{ row, $index }">
-          <template v-if="row.isEditable && !isReadonly">
-            <el-input-number
-              :model-value="row.currentAmount"
-              :controls="false"
-              size="small"
-              style="width: 100%"
-              @change="(val: number | undefined) => updateDisclosure($index, 'currentAmount', val ?? 0)"
-            />
-          </template>
-          <span v-else :class="{ 'formula-value': row.isFormula, 'total-value': row.isTotal }">
-            {{ fmtAmount(row.currentAmount) }}
+    <!-- ═══ 附注表格（3列：项目/本期发生额/上期发生额，源模板 12 行） ═══ -->
+    <el-table :data="displayRows" border size="small" style="width: 100%">
+      <el-table-column prop="label" label="项目" min-width="200">
+        <template #default="{ row }">
+          <span :class="{ 'formula-value': row.derived, 'total-value': row.key === 'total' }">
+            {{ row.label }}
           </span>
         </template>
       </el-table-column>
-      <el-table-column label="上期金额" width="160" align="right">
-        <template #default="{ row, $index }">
-          <template v-if="row.isEditable && !isReadonly">
-            <el-input-number
-              :model-value="row.priorAmount"
-              :controls="false"
-              size="small"
-              style="width: 100%"
-              @change="(val: number | undefined) => updateDisclosure($index, 'priorAmount', val ?? 0)"
-            />
-          </template>
-          <span v-else :class="{ 'formula-value': row.isFormula, 'total-value': row.isTotal }">
-            {{ fmtAmount(row.priorAmount) }}
-          </span>
+      <el-table-column label="本期发生额" width="180" align="right">
+        <template #default="{ row }">
+          <WpAmountInput
+            v-if="!row.derived && !isReadonly"
+            :model-value="row.current"
+            :aria-label="`本期发生额 ${row.label}`"
+            @change="(val: number) => updateInput('current', row.key, val)"
+          />
+          <span
+            v-else
+            :class="{ 'formula-value': row.derived, 'total-value': row.key === 'total' }"
+            :title="row.derived ? L8_DERIVE_HINT[row.key] : undefined"
+          >{{ fmtAmt(row.current) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="上期发生额" width="180" align="right">
+        <template #default="{ row }">
+          <WpAmountInput
+            v-if="!row.derived && !isReadonly"
+            :model-value="row.prior"
+            :aria-label="`上期发生额 ${row.label}`"
+            @change="(val: number) => updateInput('prior', row.key, val)"
+          />
+          <span
+            v-else
+            :class="{ 'formula-value': row.derived, 'total-value': row.key === 'total' }"
+            :title="row.derived ? L8_DERIVE_HINT[row.key] : undefined"
+          >{{ fmtAmt(row.prior) }}</span>
         </template>
       </el-table-column>
     </el-table>
+
+    <!-- ═══ 利息资本化说明（源 xlsx r19/r20，仅上市侧） ═══ -->
+    <el-card shadow="never" class="note-text-card">
+      <template #header>
+        <div class="section-header">
+          <span class="card-title">利息资本化说明</span>
+          <el-button size="small" @click="handleAI('capitalization')">
+            <el-icon><MagicStick /></el-icon> AI辅助
+          </el-button>
+        </div>
+      </template>
+      <el-input
+        v-model="capitalizationNote"
+        type="textarea"
+        :autosize="{ minRows: 2, maxRows: 6 }"
+        placeholder="利息资本化金额已计入存货和在建工程。本期用于计算确定借款费用资本化金额的资本化率为XX%（上期：XX%）"
+        :disabled="isReadonly"
+        @change="saveCapitalizationNote"
+      /></el-card>
 
     <!-- ═══ 附注文本说明 ═══ -->
     <el-card shadow="never" class="note-text-card">
@@ -121,10 +151,25 @@
  * - 从L8-1/L8-2自动取数（EventBus订阅刷新）
  * - AI辅助按钮per section
  */
-import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
+import { computed, inject, onMounted, onUnmounted, onBeforeUnmount, ref } from 'vue'
 import { MagicStick, Check } from '@element-plus/icons-vue'
-import { useL8FormData } from '../../composables/useL8FormData'
+import { ElMessage } from 'element-plus'
+import { useRouter } from 'vue-router'
+import http from '@/utils/http'
 import { eventBus } from '@/utils/eventBus'
+import { fmtAmount } from '@/utils/formatters'
+import WpAmountInput from '../../shared/WpAmountInput.vue'
+import { useL8FormData } from '../../composables/useL8FormData'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import { buildNoteJumpRoute } from '@/views/composables/noteDisclosureReverseJump'
+import {
+  L8_NOTE_SECTION,
+  buildL8DisplayRows,
+  buildL8SyncPayload,
+  createEmptyL8Period,
+  type L8InputKey,
+  type L8PeriodValues,
+} from '../../composables/l8NoteSectionMap'
 
 const props = defineProps<{
   wpId: string
@@ -137,6 +182,8 @@ const emit = defineEmits<{
 }>()
 
 const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', () => {})
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+const router = useRouter()
 
 // ─── FormData ────────────────────────────────────────────────────────────────
 
@@ -145,76 +192,90 @@ const formData = useL8FormData({
   projectId: computed(() => props.projectId),
 })
 
-// ─── 附注行数据 ──────────────────────────────────────────────────────────────
+// ─── 附注行数据（源 xlsx 五、67 r7~r18 共 12 行，3 个派生小计 + 合计） ───────
+//
+// 🔴 只持久化 8 个**录入行**，派生行由 `buildL8DisplayRows` 读时推导
+//    （派生值持久化会在编辑后错位）。
+const DATA_ITEM_ID = 'L8-disclosure-listed-data'
 
-interface DisclosureRow {
-  item: string
-  currentAmount: number
-  priorAmount: number
-  isEditable: boolean
-  isFormula: boolean
-  isTotal: boolean
+const current = ref<L8PeriodValues>(createEmptyL8Period())
+const prior = ref<L8PeriodValues>(createEmptyL8Period())
+
+const displayRows = computed(() => buildL8DisplayRows(current.value, prior.value))
+
+/** 派生行公式提示（tooltip；源模板计算关系） */
+const L8_DERIVE_HINT: Record<string, string> = {
+  interestExpense: '利息费用 = 利息费用总额 − 利息资本化',
+  interestNet: '利息净支出 = 利息费用 − 利息收入',
+  exchangeNet: '汇兑净损失 = 汇兑损失 − 汇兑收益 − 汇兑损益资本化',
+  total: '合计 = 利息净支出 + 承兑汇票贴息 + 汇兑净损失 + 手续费及其他',
 }
 
-const disclosureRows = ref<DisclosureRow[]>([
-  { item: '利息费用', currentAmount: 0, priorAmount: 0, isEditable: true, isFormula: false, isTotal: false },
-  { item: '  其中：利息资本化金额', currentAmount: 0, priorAmount: 0, isEditable: true, isFormula: false, isTotal: false },
-  { item: '减：利息收入', currentAmount: 0, priorAmount: 0, isEditable: true, isFormula: false, isTotal: false },
-  { item: '汇兑损益（净损失以"+"号列示）', currentAmount: 0, priorAmount: 0, isEditable: true, isFormula: false, isTotal: false },
-  { item: '手续费', currentAmount: 0, priorAmount: 0, isEditable: true, isFormula: false, isTotal: false },
-  { item: '其他', currentAmount: 0, priorAmount: 0, isEditable: true, isFormula: false, isTotal: false },
-  { item: '合  计', currentAmount: 0, priorAmount: 0, isEditable: false, isFormula: true, isTotal: true },
-])
-
-// ─── 合计行自动计算 ──────────────────────────────────────────────────────────
-
-function recalcTotal() {
-  const items = disclosureRows.value
-  // 合计 = 利息费用 - 利息收入 + 汇兑 + 手续费 + 其他
-  const totalIdx = items.length - 1
-  // 利息费用(0) - 利息收入(2) + 汇兑(3) + 手续费(4) + 其他(5)
-  items[totalIdx].currentAmount = items[0].currentAmount - items[2].currentAmount + items[3].currentAmount + items[4].currentAmount + items[5].currentAmount
-  items[totalIdx].priorAmount = items[0].priorAmount - items[2].priorAmount + items[3].priorAmount + items[4].priorAmount + items[5].priorAmount
-}
-
-function updateDisclosure(index: number, field: 'currentAmount' | 'priorAmount', value: number) {
-  disclosureRows.value[index][field] = value
-  recalcTotal()
+function updateInput(period: 'current' | 'prior', key: L8InputKey, value: number) {
+  const target = period === 'current' ? current : prior
+  target.value = { ...target.value, [key]: value }
   _triggerSave()
 }
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
 const noteText = ref('')
-const isSaving = ref(false)
+const capitalizationNote = ref('')
+const isSyncing = ref(false)
 
 // ─── Handlers ────────────────────────────────────────────────────────────────
 
 function _triggerSave() {
-  formData.debouncedSave('L8-disclosure-listed-data', {
-    remark: JSON.stringify(disclosureRows.value.map(r => ({
-      item: r.item,
-      currentAmount: r.currentAmount,
-      priorAmount: r.priorAmount,
-    }))),
+  formData.debouncedSave(DATA_ITEM_ID, {
+    remark: JSON.stringify({ current: current.value, prior: prior.value }),
   })
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
 }
 
 function saveNoteText() {
   formData.debouncedSave('L8-disclosure-listed-note', { remark: noteText.value || null })
 }
 
-async function handleSave() {
-  isSaving.value = true
-  try {
-    _triggerSave()
-    // 发布附注更新事件
-    eventBus.emit('disclosure:note-text-updated' as any, {
-      wpCode: 'L8', type: 'listed', timestamp: Date.now(),
-    })
-  } finally {
-    isSaving.value = false
+function saveCapitalizationNote() {
+  formData.debouncedSave('L8-disclosure-listed-capitalization', {
+    remark: capitalizationNote.value || null,
+  })
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
+}
+
+// ─── 同步到附注 ──────────────────────────────────────────────────────────────
+
+async function syncToDisclosureNotes(): Promise<void> {
+  if (isSyncing.value || !props.projectId || props.isReadonly) return
+  const payload = buildL8SyncPayload(props.wpId, {
+    variant: 'listed',
+    current: current.value,
+    prior: prior.value,
+    capitalizationNote: capitalizationNote.value,
+  })
+  if (!payload) {
+    ElMessage.warning('当前项目准则不适用上市附注同步')
+    return
   }
+  isSyncing.value = true
+  try {
+    await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
+    ElMessage.success('已同步到附注（五、67 财务费用）')
+    eventBus.emit('disclosure:note-text-updated' as any, {
+      wpCode: 'L8',
+      projectId: props.projectId,
+      sectionIds: [L8_NOTE_SECTION.listed],
+    })
+  } catch {
+    ElMessage.warning('同步附注失败，请稍后重试')
+  } finally {
+    isSyncing.value = false
+  }
+}
+
+function jumpToNote() {
+  const route = buildNoteJumpRoute(props.projectId, 'L8', 'listed')
+  if (route) router.push(route)
 }
 
 // ─── Conclusion ──────────────────────────────────────────────────────────────
@@ -238,10 +299,8 @@ function handleReview() { openReviewDialog?.('L8-disclosure-listed', '附注(上
 
 // ─── Format ──────────────────────────────────────────────────────────────────
 
-function fmtAmount(val: number): string {
-  if (val === 0 || val === undefined || val === null) return '—'
-  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
+/** 只读金额走平台单一真源 */
+const fmtAmt = (val: number) => fmtAmount(val)
 
 // ─── EventBus: subscribe adjudicated 刷新 ────────────────────────────────────
 
@@ -261,24 +320,52 @@ onUnmounted(() => {
   eventBus.off('substantive:adjudicated' as any, handleAdjudicated)
 })
 
+onBeforeUnmount(() => { autoSync.cancelPending() })
+
+/**
+ * 反序列化。
+ *
+ * 新格式 `{current:{...}, prior:{...}}`（按录入键）；
+ * 旧格式是 7 行数组 `[{item,currentAmount,priorAmount}...]`（自造行名），
+ * 按行名映射到源模板录入键，映射不到的丢弃。
+ */
+const LEGACY_LABEL_TO_KEY: Record<string, L8InputKey> = {
+  '利息费用': 'interestTotal',
+  '  其中：利息资本化金额': 'interestCapitalized',
+  '减：利息资本化金额': 'interestCapitalized',
+  '减：利息收入': 'interestIncome',
+  '汇兑损益（净损失以"+"号列示）': 'exchangeLoss',
+  '手续费': 'feeAndOther',
+}
+
 function _restoreData() {
-  const data = formData.allResponses.value.get('L8-disclosure-listed-data')
+  const data = formData.allResponses.value.get(DATA_ITEM_ID)
   if (data?.remark) {
     try {
       const parsed = JSON.parse(data.remark)
-      if (Array.isArray(parsed)) {
-        parsed.forEach((r: any, i: number) => {
-          if (i < disclosureRows.value.length) {
-            disclosureRows.value[i].currentAmount = r.currentAmount ?? 0
-            disclosureRows.value[i].priorAmount = r.priorAmount ?? 0
-          }
-        })
-        recalcTotal()
+      if (parsed && !Array.isArray(parsed) && (parsed.current || parsed.prior)) {
+        current.value = { ...createEmptyL8Period(), ...(parsed.current || {}) }
+        prior.value = { ...createEmptyL8Period(), ...(parsed.prior || {}) }
+      } else if (Array.isArray(parsed)) {
+        const c = createEmptyL8Period()
+        const p = createEmptyL8Period()
+        for (const r of parsed) {
+          const key = LEGACY_LABEL_TO_KEY[String(r?.item ?? '')]
+          if (!key) continue
+          c[key] = Number(r?.currentAmount) || 0
+          p[key] = Number(r?.priorAmount) || 0
+        }
+        current.value = c
+        prior.value = p
       }
     } catch { /* ignore */ }
   }
   const nt = formData.allResponses.value.get('L8-disclosure-listed-note')
-  if (nt?.remark) noteText.value = nt.remark
+  if (nt?.remark) noteText.value = String(nt.remark)
+  const cap = formData.allResponses.value.get('L8-disclosure-listed-capitalization')
+  if (cap?.remark) capitalizationNote.value = String(cap.remark)
+  const conc = formData.allResponses.value.get('L8-disc-listed-conclusion')
+  if (conc?.remark) conclusion.value = String(conc.remark)
 }
 </script>
 

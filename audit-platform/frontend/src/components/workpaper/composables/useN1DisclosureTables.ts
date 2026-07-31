@@ -12,7 +12,7 @@
  * 两张源模板没有的表，且把 N1-2 的审计过程列（账面价值/计税基础/确认依据）
  * 搬进披露表 —— 披露表只放交付物内容，审计过程留在 N1-2 / N1-4。
  */
-import { computed, ref, type Ref } from 'vue'
+import { computed, ref, watch, type Ref } from 'vue'
 import {
   N1_GROUP_LABELS,
   N1_SUBTOTAL_LABEL,
@@ -48,24 +48,49 @@ export const N1_ASSET_ITEMS = [
 ] as const
 
 /**
- * 表 1 负债段 5 项（上市 R23~R27 / 国企 R23~R27）。
- * 🔴 第 4 项两版不同：上市 `使用权资产`，国企 `租赁形成`。
+ * 表 1 负债段 5 个行位（上市 R23~R27 / 国企 R23~R27）—— **单一真源**。
+ *
+ * `slot` 是稳定英文键，与后端 `_classify_n1_liability_subaccount` 的返回值逐字对应
+ * （四表预填 `liability_prefill` 就是按它下发的）。
+ * 🔴 第 4 项两版用语不同：上市 `使用权资产`（源模板 A26）/ 国企 `租赁形成`（源模板 A26）
+ * → 中文名不能当键，否则必有一版对不上。
  */
+export const N1_LIABILITY_SLOT_DEFS = [
+  { slot: 'depreciation', listed: '购入摊销年限大于税法规定的资产', soe: '购入摊销年限大于税法规定的资产' },
+  { slot: 'afs_fv', listed: '可供出售金融资产公允价值变动', soe: '可供出售金融资产公允价值变动' },
+  { slot: 'investment_property_fv', listed: '投资性房地产公允价值变动', soe: '投资性房地产公允价值变动' },
+  { slot: 'lease', listed: '使用权资产', soe: '租赁形成' },
+  { slot: 'other', listed: '其他', soe: '其他' },
+] as const
+
+export type N1LiabilitySlot = (typeof N1_LIABILITY_SLOT_DEFS)[number]['slot']
+
+/** 语义槽顺序（= 源模板 R23:R27 行序） */
+export const N1_LIABILITY_SLOTS: readonly N1LiabilitySlot[] = N1_LIABILITY_SLOT_DEFS.map(
+  (d) => d.slot,
+)
+
+/** 语义槽 → 两版显示名（禁在别处写这些中文字面量） */
+export const N1_LIABILITY_SLOT_LABEL: Record<
+  N1LiabilitySlot,
+  Record<N1DisclosureVariant, string>
+> = Object.fromEntries(
+  N1_LIABILITY_SLOT_DEFS.map((d) => [d.slot, { listed: d.listed, soe: d.soe }]),
+) as Record<N1LiabilitySlot, Record<N1DisclosureVariant, string>>
+
+/** 行骨架（由 `N1_LIABILITY_SLOT_DEFS` 派生，避免行名双真源） */
 export const N1_LIABILITY_ITEMS: Record<N1DisclosureVariant, readonly string[]> = {
-  listed: [
-    '购入摊销年限大于税法规定的资产',
-    '可供出售金融资产公允价值变动',
-    '投资性房地产公允价值变动',
-    '使用权资产',
-    '其他',
-  ],
-  soe: [
-    '购入摊销年限大于税法规定的资产',
-    '可供出售金融资产公允价值变动',
-    '投资性房地产公允价值变动',
-    '租赁形成',
-    '其他',
-  ],
+  listed: N1_LIABILITY_SLOT_DEFS.map((d) => d.listed),
+  soe: N1_LIABILITY_SLOT_DEFS.map((d) => d.soe),
+}
+
+/** 显示名 → 语义槽（预填时按行名反查；未命中返回 undefined 不猜） */
+export function n1LiabilitySlotOf(
+  variant: N1DisclosureVariant,
+  label: string,
+): N1LiabilitySlot | undefined {
+  const target = String(label ?? '').trim()
+  return N1_LIABILITY_SLOT_DEFS.find((d) => d[variant] === target)?.slot
 }
 
 /** 未确认明细两行（上市 R39/R40 / 国企 R61/R62） */
@@ -74,8 +99,18 @@ export const N1_UNRECOGNIZED_ITEMS = ['可抵扣暂时性差异', '可抵扣亏�
 /** 表 2（上市）两行（R35/R36） */
 export const N1_NET_OFFSET_ROWS_LISTED = ['递延所得税资产', '递延所得税负债'] as const
 
-/** 可抵扣亏损结转期限（税法一般 5 年；高新 / 科技型中小企业 10 年，用增行处理） */
-const LOSS_CARRY_FORWARD_YEARS = 5
+/**
+ * 亏损到期骨架行数 = **6**（源模板 R46:R51 / R66:R71 实测 6 行）。
+ *
+ * 设计原理：税法一般结转 5 年 →
+ * - 期末（审计年度 Y 末）的未弥补亏损到期于 `Y+1 … Y+5`
+ * - 上年年末（Y−1 末）的未弥补亏损到期于 `Y … Y+4`
+ *
+ * 两列并集 = `Y … Y+5` 共 6 个年度。故源模板首行期末列写「——」（B46）、
+ * 末行上年年末列写「——」（C51）—— 这正是 6 行而非 5 行的证据。
+ * 高新 / 科技型中小企业 10 年结转或无使用期限，用「+ 新增行」处理。
+ */
+const LOSS_EXPIRY_ROW_COUNT = 6
 
 // ─── 行模型 ──────────────────────────────────────────────────────────────────
 
@@ -108,6 +143,20 @@ export interface UnrecognizedRowModel {
   prior: NullableAmount
 }
 
+/**
+ * 披露口径分支（源模板国企 R7）：
+ * - `undecided` 审计师尚未判断（**缺省**）→ 两个分支表都保留并推送
+ * - `gross`     不以抵销后的净额列示 → 按（1）披露，（2）A/（2）B 从附注清除
+ * - `net`       以抵销后的净额列示   → 按（2）A 与（2）B 披露，（1）从附注清除
+ *
+ * 🔴 为什么要 `undecided` 而不是直接缺省 `gross`：R7 虽是二选一，但「审计师还没答」
+ * 与「审计师答了不抵销」是两种状态。若缺省即 `gross`，存量项目下一次同步就会把
+ * 已披露的（2）A/（2）B **静默删掉** —— 平台不能因为用户没回答问题就删交付物内容。
+ * 用持久化三态而非「是否被改动过」的启发式（后者在真实宿主里已实证不可靠：
+ * 宿主保存后会重挂 Tab、实例级标记归零）。
+ */
+export type N1OffsetMode = 'undecided' | 'gross' | 'net'
+
 export interface LossExpiryRowModel {
   item: string
   end: NullableAmount
@@ -129,6 +178,10 @@ export function n1DisclosureItemIds(variant: N1DisclosureVariant) {
     rollbackNote: `${p}-rollback-note`,
     conclusion: `${p}-conclusion`,
     syncedTables: `${p}-synced-tables`,
+    /** 国企：披露口径分支（源模板 R7 二选一） */
+    offsetMode: `${p}-offset-mode`,
+    /** 上市：表(2) 适用性（源模板 R33「不适用的删除」） */
+    netOffsetApplicable: `${p}-netoffset-applicable`,
   } as const
 }
 
@@ -270,22 +323,66 @@ function blankNetOffsetRow(item: string, editable = false): NetOffsetRowModel {
   }
 }
 
-/** 亏损到期默认年度骨架：审计年度后 5 年（税法一般结转期限） */
+/**
+ * 亏损到期默认年度骨架 = `auditYear … auditYear+5`（6 行，源模板 R46:R51）。
+ *
+ * 🔴 曾实现为 `auditYear+1 … auditYear+5`（5 行）—— 那只覆盖「期末」列的到期区间，
+ * 漏掉「上年年末」列最早的那个到期年度（= `auditYear`），导致上年比较数无处填列。
+ */
 export function defaultLossExpiryRows(auditYear: number): LossExpiryRowModel[] {
-  return Array.from({ length: LOSS_CARRY_FORWARD_YEARS }, (_, i) => ({
-    item: `${auditYear + i + 1}年`,
+  return Array.from({ length: LOSS_EXPIRY_ROW_COUNT }, (_, i) => ({
+    item: `${auditYear + i}年`,
     end: null,
     prior: null,
     remark: '',
   }))
 }
 
+/**
+ * 国企表 (2)A 行标签镜像表 (1)（源模板 A36=`=A13` … A42=`=A19` / A46=`=A23` … A50=`=A27`）。
+ *
+ * 纯函数：输出行数与标签恒等于 `src`；`prev` 中同标签行的金额被保留
+ * （行增删改名时不丢已录数据）；重复调用结果不变（幂等）。
+ */
+export function mirrorNetOffsetRows(
+  src: readonly UnoffsetRowModel[],
+  prev: readonly NetOffsetRowModel[],
+): NetOffsetRowModel[] {
+  const byLabel = new Map<string, NetOffsetRowModel>()
+  for (const r of prev) {
+    const key = String(r.item ?? '').trim()
+    if (key && !byLabel.has(key)) byLabel.set(key, r)
+  }
+  return src.map((s, i) => {
+    const label = String(s.item ?? '')
+    const kept = byLabel.get(label.trim()) ?? (label.trim() ? undefined : prev[i])
+    return {
+      item: label,
+      netEnd: nz(kept?.netEnd),
+      diffEnd: nz(kept?.diffEnd),
+      netPrior: nz(kept?.netPrior),
+      diffPrior: nz(kept?.diffPrior),
+      ...(s._editableLabel ? { _editableLabel: true } : {}),
+    }
+  })
+}
+
 // ─── 主 composable ───────────────────────────────────────────────────────────
+
+/** 四表预填载荷（后端 render `adjudication_prefill` / `liability_prefill` 同形） */
+export type N1PrefillMap = Record<string, { opening: number; closing: number }>
 
 export interface UseN1DisclosureTablesOptions {
   variant: N1DisclosureVariant
   allResponses: Ref<Map<string, { conclusion?: string | null; remark?: string | null }>>
   auditYear: Ref<number>
+  /**
+   * 资产段四表预填（`{暂时性差异类别: {opening, closing}}`）。
+   * 后端 7 类与 `N1_ASSET_ITEMS` 7 项**逐字同构**，故可直接按行名匹配。
+   */
+  adjudicationPrefill?: Ref<N1PrefillMap>
+  /** 负债段四表预填（`{语义槽: {opening, closing}}`） */
+  liabilityPrefill?: Ref<N1PrefillMap>
 }
 
 export function useN1DisclosureTables(opts: UseN1DisclosureTablesOptions) {
@@ -313,6 +410,15 @@ export function useN1DisclosureTables(opts: UseN1DisclosureTablesOptions) {
   const rollbackNote = ref('')
   const conclusionNote = ref('')
   const syncedTables = ref<string[]>([])
+
+  // ── 披露分支（源模板国企 R7 二选一 / 上市 R33「不适用的删除」）──────────────
+  /** 国企披露口径分支（源模板 R7，三态，缺省 `undecided`）。 */
+  const offsetMode = ref<N1OffsetMode>('undecided')
+  /**
+   * 上市表(2) 是否适用（源模板 R33 标题括注「不适用的删除」）。
+   * `null` = 未判断（缺省，仍推送）；`false` = 明确不适用 → 从附注清除。
+   */
+  const netOffsetApplicable = ref<boolean | null>(null)
 
   /**
    * N1-2 明细按「类别」聚合，用于表 1 资产段预填。
@@ -352,8 +458,12 @@ export function useN1DisclosureTables(opts: UseN1DisclosureTablesOptions) {
       ? unoffset.liability
       : N1_LIABILITY_ITEMS[variant].map((n) => blankUnoffsetRow(n))
 
-    // 未持久化的行按 N1-2 类别预填（已编辑过的不覆盖）
-    if (!unoffset?.asset?.length) applyDetailPrefill()
+    // 未持久化的行按三级优先级预填（手工 > N1-2 明细 > 四表叶子聚合）
+    if (!unoffset?.asset?.length) {
+      applyDetailPrefill()
+      applyTbAssetPrefill()
+    }
+    if (!unoffset?.liability?.length) applyTbLiabilityPrefill()
 
     if (variant === 'listed') {
       const saved = parseJsonArray<NetOffsetListedRowModel>(
@@ -373,12 +483,13 @@ export function useN1DisclosureTables(opts: UseN1DisclosureTablesOptions) {
         asset?: NetOffsetRowModel[]
         liability?: NetOffsetRowModel[]
       }>(allResponses.value.get(ID.netOffset)?.conclusion)
-      netOffsetAssetRows.value = saved?.asset?.length
-        ? saved.asset
-        : N1_ASSET_ITEMS.map((n) => blankNetOffsetRow(n))
-      netOffsetLiabilityRows.value = saved?.liability?.length
-        ? saved.liability
-        : N1_LIABILITY_ITEMS.soe.map((n) => blankNetOffsetRow(n))
+      // 🔴 行标签镜像表 (1)（源模板 A36=`=A13` … A50=`=A27`）：
+      //    以表 (1) 的行集为准，已录金额按行名保留。
+      netOffsetAssetRows.value = mirrorNetOffsetRows(assetRows.value, saved?.asset ?? [])
+      netOffsetLiabilityRows.value = mirrorNetOffsetRows(
+        liabilityRows.value,
+        saved?.liability ?? [],
+      )
 
       offsetDetailRows.value =
         parseJsonArray<OffsetDetailRowModel>(allResponses.value.get(ID.offsetDetail)?.conclusion) ?? []
@@ -401,6 +512,53 @@ export function useN1DisclosureTables(opts: UseN1DisclosureTablesOptions) {
     conclusionNote.value = allResponses.value.get(ID.conclusion)?.remark || ''
     syncedTables.value =
       parseJsonArray<string>(allResponses.value.get(ID.syncedTables)?.conclusion) ?? []
+
+    // 披露分支（未持久化 → 未判断态，两分支表都保留，零回归）
+    const savedMode = String(allResponses.value.get(ID.offsetMode)?.conclusion ?? '')
+    offsetMode.value =
+      savedMode === 'net' || savedMode === 'gross' ? (savedMode as N1OffsetMode) : 'undecided'
+    const savedApplicable = allResponses.value.get(ID.netOffsetApplicable)?.conclusion
+    netOffsetApplicable.value =
+      savedApplicable === '1' ? true : savedApplicable === '0' ? false : null
+  }
+
+  /**
+   * 表 1 资产段按四表叶子聚合预填（优先级低于 N1-2 明细）。
+   *
+   * 后端 `adjudication_prefill` 的 7 类与 `N1_ASSET_ITEMS` 7 项逐字同构 → 直接按行名匹配。
+   * 🔴 只填「递延所得税资产」两列：四表只有科目余额，**推不出暂时性差异**
+   *    （需要适用税率），故 `endDiff` / `priorDiff` 一律留 `null`（宁缺勿造）。
+   * 🔴 值为 0 或缺失时写 `null` 不写 0（0 会被误读为「已核实为零」）。
+   */
+  function applyTbAssetPrefill(): void {
+    const src = opts.adjudicationPrefill?.value
+    if (!src || Object.keys(src).length === 0) return
+    assetRows.value = assetRows.value.map((r) => {
+      const hit = src[String(r.item ?? '').trim()]
+      const untouched =
+        r.endDiff === null && r.endTax === null && r.priorDiff === null && r.priorTax === null
+      if (!hit || !untouched) return r
+      return { ...r, endTax: nz(hit.closing) || null, priorTax: nz(hit.opening) || null }
+    })
+  }
+
+  /**
+   * 表 1 负债段按四表叶子聚合预填（`liability_prefill` 按语义槽下发）。
+   *
+   * 负债数据业务上归 N3 底稿（源模板红字），但四表已入库时先带出总额级分类，
+   * 避免「四表有数而披露表全空」；同样只填金额列、只填未编辑行、不写 0。
+   */
+  function applyTbLiabilityPrefill(): void {
+    const src = opts.liabilityPrefill?.value
+    if (!src || Object.keys(src).length === 0) return
+    liabilityRows.value = liabilityRows.value.map((r) => {
+      const slot = n1LiabilitySlotOf(variant, String(r.item ?? ''))
+      const hit = slot ? src[slot] : undefined
+      const untouched =
+        r.endDiff === null && r.endTax === null && r.priorDiff === null && r.priorTax === null
+      if (!hit || !untouched) return r
+      return { ...r, endTax: nz(hit.closing) || null, priorTax: nz(hit.opening) || null }
+    })
   }
 
   /** 表 1 资产段按 N1-2 类别预填（只填逐字同名行，且只在该行四值全空时） */
@@ -455,6 +613,32 @@ export function useN1DisclosureTables(opts: UseN1DisclosureTablesOptions) {
         prior: nz(payload.totalPriorUnrecognized),
       }
     }
+  }
+
+  /**
+   * 表 (2)A 行标签跟随表 (1)（国企；源模板 A36=`=A13` 的运行时等价）。
+   *
+   * 只监听**行标签序列**而非整行对象 —— 否则金额一变就重建表 (2)，
+   * 既产生无谓写入又会把 (2) 的独立金额抹掉。
+   */
+  if (variant === 'soe') {
+    watch(
+      () => [
+        assetRows.value.map((r) => String(r.item ?? '')).join('\u0001'),
+        liabilityRows.value.map((r) => String(r.item ?? '')).join('\u0001'),
+      ],
+      () => {
+        const nextAsset = mirrorNetOffsetRows(assetRows.value, netOffsetAssetRows.value)
+        const nextLiab = mirrorNetOffsetRows(liabilityRows.value, netOffsetLiabilityRows.value)
+        // 幂等：标签未变时 mirror 结果与现值相同 → 不写、不触发下游自动同步
+        if (JSON.stringify(nextAsset) !== JSON.stringify(netOffsetAssetRows.value)) {
+          netOffsetAssetRows.value = nextAsset
+        }
+        if (JSON.stringify(nextLiab) !== JSON.stringify(netOffsetLiabilityRows.value)) {
+          netOffsetLiabilityRows.value = nextLiab
+        }
+      },
+    )
   }
 
   // ── 小计 / 合计（源模板公式） ─────────────────────────────────────────────
@@ -650,6 +834,8 @@ export function useN1DisclosureTables(opts: UseN1DisclosureTablesOptions) {
         ...(conclusionNote.value.trim() ? { conclusion: conclusionNote.value } : {}),
       },
       previouslySyncedTables: syncedTables.value,
+      offsetMode: offsetMode.value,
+      netOffsetApplicable: netOffsetApplicable.value,
     }
   }
 
@@ -696,6 +882,9 @@ export function useN1DisclosureTables(opts: UseN1DisclosureTablesOptions) {
     rollbackNote,
     conclusionNote,
     syncedTables,
+    // 披露分支
+    offsetMode,
+    netOffsetApplicable,
     // 公式
     assetSubtotal,
     liabilitySubtotal,
@@ -720,6 +909,8 @@ export function useN1DisclosureTables(opts: UseN1DisclosureTablesOptions) {
     // 生命周期 / 载荷
     restore,
     applyDetailPrefill,
+    applyTbAssetPrefill,
+    applyTbLiabilityPrefill,
     applyLossPrefill,
     buildSnapshot,
     buildPayload,

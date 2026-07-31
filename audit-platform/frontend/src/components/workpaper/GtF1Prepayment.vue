@@ -178,6 +178,7 @@ import { useF1FormData } from './composables/useF1FormData'
 import { useF1CrossSheet } from './composables/useF1CrossSheet'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useF1AgingScope } from './composables/useF1AgingScope'
+import { autoSeedF1DetailFromAux } from './composables/useF1DetailAutoSeed'
 import { useF1DualMode } from './composables/useF1DualMode'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useHostApplicableStandards } from './composables/hostApplicableStandards'
@@ -325,6 +326,15 @@ async function selfLoad() {
   }
   try {
     await loadAll()
+    // 四表库自动取数：F1-2 明细为空时，从 tb_aux_balance(1123) 归集落库并级联刷新
+    // （手工优先，仅空表时执行；下游 F1-1/附注读持久化的 F1-det-rows）
+    await autoSeedF1DetailFromAux({
+      wpId: wpIdRef,
+      projectId: projectIdRef,
+      isReadonly,
+      allResponses,
+      reloadAll: () => loadAll(),
+    })
   } catch (err) {
     console.warn('[GtF1Prepayment] selfLoad failed:', err)
   } finally {

@@ -20,6 +20,9 @@ export interface UseF3BaseOptions {
   projectId: Ref<string>
   allResponses: Ref<Map<string, ChecklistResponse>>
   isReadonly?: Ref<boolean>
+  /** 后端 render 输出的 2201 应付票据 TB 核对标量（trial_balance/tb_balance），
+   *  无持久化时作「试算平衡表数」只读回退 seed（四表入库刷新即有核对基准）。 */
+  tbAmountSeed?: Ref<number | null | undefined>
 }
 
 export interface F3AdjudicationRow {
@@ -132,7 +135,7 @@ function ensureDefaultRows(stored: StoredF3AdjRow[]): StoredF3AdjRow[] {
 }
 
 export function useF3Adjudication(options: UseF3BaseOptions & { crossSheet?: ReturnType<typeof import('./useF3CrossSheet').useF3CrossSheet> }) {
-  const { wpId, projectId, allResponses, isReadonly, crossSheet } = options
+  const { wpId, projectId, allResponses, isReadonly, crossSheet, tbAmountSeed } = options
   const readonly = isReadonly ?? ref(false)
 
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
@@ -194,9 +197,14 @@ function mergeCrossSheet(stored: StoredF3AdjRow): StoredF3AdjRow {
     return computeRow(stored)
   })
 
-  const trialBalanceRow: ComputedRef<number> = computed(() =>
-    parseNum(allResponses.value.get('F3-1-adj-tb-2201')?.remark),
-  )
+  const trialBalanceRow: ComputedRef<number> = computed(() => {
+    // 手工优先：有持久化 F3-1-adj-tb-2201 用之；否则回退后端 render 的 2201 TB 核对标量
+    const persisted = allResponses.value.get('F3-1-adj-tb-2201')?.remark
+    if (persisted !== undefined && persisted !== null && String(persisted).trim() !== '') {
+      return parseNum(persisted)
+    }
+    return parseNum(tbAmountSeed?.value ?? 0)
+  })
 
   const differenceRow: ComputedRef<number> = computed(() =>
     subtotalRow.value.closingAdjusted - trialBalanceRow.value,

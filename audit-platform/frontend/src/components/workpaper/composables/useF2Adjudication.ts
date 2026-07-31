@@ -145,6 +145,8 @@ export interface UseF2AdjudicationOptions {
   crossSheet?: ReturnType<typeof import('./useF2CrossSheet').useF2CrossSheet>
   /** 后端 render 输出的 tb_values（各 rowKey 期初/期末未审） */
   tbValues?: Ref<Record<string, TbValuesEntry> | null | undefined>
+  /** 后端 render 输出的存货净额 TB 核对标量（BS-010 trial_balance），无持久化时只读回退 seed */
+  tbAmountSeed?: Ref<number | null | undefined>
 }
 
 export function useF2Adjudication(opts: UseF2AdjudicationOptions) {
@@ -277,9 +279,14 @@ export function useF2Adjudication(opts: UseF2AdjudicationOptions) {
     }
   })
 
-  const trialBalanceAmount = computed(() =>
-    parseNum(opts.allResponses.value.get('F2-1-tb-total')?.remark),
-  )
+  const trialBalanceAmount = computed(() => {
+    // 手工优先：有持久化 F2-1-tb-total 用之；否则回退后端 render 的存货净额（BS-010）
+    const persisted = opts.allResponses.value.get('F2-1-tb-total')?.remark
+    if (persisted !== undefined && persisted !== null && String(persisted).trim() !== '') {
+      return parseNum(persisted)
+    }
+    return parseNum(opts.tbAmountSeed?.value ?? 0)
+  })
 
   const trialBalanceDiff = computed(
     () => netSubtotal.value.endAudited - trialBalanceAmount.value,

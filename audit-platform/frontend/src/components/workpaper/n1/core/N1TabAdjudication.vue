@@ -63,6 +63,9 @@
               <el-tag type="success" size="small" class="asset-tag">资产类·借方</el-tag>
             </div>
             <div class="section-actions">
+              <el-button size="small" type="warning" plain :disabled="isReadonly" @click="handlePullFromTB">
+                <el-icon><RefreshRight /></el-icon> 从四表库带入未审数
+              </el-button>
               <el-button size="small" type="warning" plain :disabled="isReadonly" @click="handlePullFromDetail">
                 <el-icon><RefreshRight /></el-icon> 从N1-2带入未审数
               </el-button>
@@ -551,6 +554,28 @@ function getSummaries({ columns }: any) {
     sums[i] = prop && map[prop] !== undefined ? fmtAmt(map[prop]) : ''
   })
   return sums
+}
+
+// ─── 从四表库带入未审数（tb_balance 1811 子科目 → 暂时性差异类别）──────────────
+
+async function handlePullFromTB() {
+  try {
+    await ElMessageBox.confirm(
+      '将从四表库（试算表科目 1811 子科目）按暂时性差异类别归集，覆盖对应分类的'
+        + '「期初/期末未审数」；未出现的分类保持原值不清零，AJE/RJE 与原因分析一并保留。'
+        + '（仅当被审计单位按类别设置 1811 子科目时可带入；否则请用「从 N1-2 带入」。）是否继续？',
+      '从四表库带入未审数',
+      { type: 'warning', confirmButtonText: '带入', cancelButtonText: '取消' },
+    )
+  } catch {
+    return
+  }
+  const count = adjudication.pullFromTB()
+  if (count === 0) {
+    ElMessage.warning('四表库无 1811 子科目数据（或仅有 1811 总额无法按类别拆分），请改用「从 N1-2 带入」')
+    return
+  }
+  ElMessage.success(`已从四表库带入 ${count} 个类别的未审数（按 1811 子科目聚合）`)
 }
 
 // ─── 从 N1-2 明细带入未审数 ──────────────────────────────────────────────────

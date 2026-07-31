@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /** F4TabAdjudication — F4-1 应付账款审定表（严格对齐源表双分类结构）。 */
-import { computed, inject, toRef, type Ref } from 'vue'
+import { computed, inject, ref, toRef, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Download } from '@element-plus/icons-vue'
 import {
@@ -27,6 +27,9 @@ const props = defineProps<{
 
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
 const reloadWorkpaperData = inject<(() => void) | null>('reloadWorkpaperData', null)
+// 2202 应付账款 TB 核对标量（主入口 provide，源自 render project_context.tb_amount）：
+// 供审定表「试算平衡表数·期末」只读回退 seed（四表入库刷新即有核对基准）。
+const f4TbAmount = inject<Ref<number>>('f4TbAmount', ref(0))
 
 const {
   natureDataRows,
@@ -51,6 +54,7 @@ const {
   projectId: toRef(props, 'projectId') as Ref<string>,
   allResponses: toRef(props, 'allResponses') as Ref<Map<string, any>>,
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
+  tbAmountSeed: f4TbAmount,
 })
 
 const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF4AiGenerate(

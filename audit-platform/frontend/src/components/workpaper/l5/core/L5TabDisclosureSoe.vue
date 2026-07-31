@@ -14,6 +14,16 @@
         <el-button size="small" @click="handleReview">
           <el-icon><Check /></el-icon> 复核
         </el-button>
+        <el-button
+          type="primary"
+          plain
+          size="small"
+          :loading="isSyncing"
+          :disabled="isReadonly || !projectId"
+          data-testid="l5-disclosure-soe-sync"
+          @click="syncToDisclosureNotes"
+        >同步到附注</el-button>
+        <el-button size="small" plain @click="jumpToNote">↩ 附注（八、53）</el-button>
       </div>
     </div>
 
@@ -23,6 +33,7 @@
         <strong>国有企业附注披露要求：</strong>
         除上市公司通用披露外，需额外列示：①国有资本相关融资安排 ②政府贴息/补贴明细
         ③关联方国资体系内交易公允性评价。格式按国资委报表体系要求组织。
+        <br />同步到附注仅推「长期应付款」主表（净额）；专项应付款行由 L6 底稿维护。
       </div>
     </div>
 
@@ -161,6 +172,7 @@ import { eventBus } from '@/utils/eventBus'
 import { useL5FormData } from '../../composables/useL5FormData'
 import { calcNetPayable } from '../../composables/useL5FormulaEngine'
 import { L5_NOTE_SECTION, buildL5SyncPayload } from '../../composables/l5NoteSectionMap'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { buildNoteJumpRoute } from '@/views/composables/noteDisclosureReverseJump'
 
 const props = defineProps<{
@@ -174,6 +186,8 @@ const emit = defineEmits<{
 }>()
 
 const openReviewDialog = inject<() => void>('openReviewDialog', () => {})
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+const router = useRouter()
 
 // ─── FormData ───────────────────────────────────────────────────────────────
 
@@ -209,7 +223,55 @@ function updateCategoryRow(index: number, field: 'endBalance' | 'beginBalance', 
   if (index >= 0 && index < categoryRows.value.length) {
     categoryRows.value[index][field] = val
     formData.debouncedSave(`L5-disclosure-soe-cat-${index}-${field}`, { remark: String(val) })
+    autoSync.scheduleAutoSync(syncToDisclosureNotes)
   }
+}
+
+// ─── 同步到附注 ──────────────────────────────────────────────────────────────
+//
+// 🔴 同 L5 上市：只推主表（长期应付款净额 / 专项应付款 / 合计）。国企侧「①前5 项」
+//    明细表与组件 categoryRows 不同构（源为按单位/项目前 5 大 + 其他），不强推。
+//    专项应付款行由 L6 底稿维护。
+const isSyncing = ref(false)
+
+watch([unrecognizedEnd, unrecognizedBegin], () => {
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
+})
+
+async function syncToDisclosureNotes(): Promise<void> {
+  if (isSyncing.value || !props.projectId || props.isReadonly) return
+  const total = categoryRows.value[categoryRows.value.length - 1] || { endBalance: 0, beginBalance: 0 }
+  const payload = buildL5SyncPayload(props.wpId, {
+    variant: 'soe',
+    longTerm: {
+      end: calcNetPayable(Number(total.endBalance) || 0, Number(unrecognizedEnd.value) || 0),
+      prior: calcNetPayable(Number(total.beginBalance) || 0, Number(unrecognizedBegin.value) || 0),
+    },
+    special: { end: 0, prior: 0 },
+  })
+  if (!payload) {
+    ElMessage.warning('当前项目准则不适用国企附注同步')
+    return
+  }
+  isSyncing.value = true
+  try {
+    await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
+    ElMessage.success('已同步到附注（八、53 长期应付款）')
+    eventBus.emit('disclosure:note-text-updated' as any, {
+      wpCode: 'L5',
+      projectId: props.projectId,
+      sectionIds: [L5_NOTE_SECTION.soe],
+    })
+  } catch {
+    ElMessage.warning('同步附注失败，请稍后重试')
+  } finally {
+    isSyncing.value = false
+  }
+}
+
+function jumpToNote() {
+  const route = buildNoteJumpRoute(props.projectId, 'L5', 'soe')
+  if (route) router.push(route)
 }
 
 function handleSoeNoteChange() {
@@ -253,6 +315,8 @@ onMounted(async () => {
 onUnmounted(() => {
   eventBus.off('substantive:adjudicated' as any, onAdjudicatedRefresh)
 })
+
+onBeforeUnmount(() => { autoSync.cancelPending() })
 </script>
 
 <style scoped>

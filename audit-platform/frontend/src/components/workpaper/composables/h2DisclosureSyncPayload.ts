@@ -238,6 +238,8 @@ export function buildH2ListedSubTableData(state: H2ListedSyncSnapshot): Record<s
     [H2_LISTED_SUBTABLE.projectCont]: contRows,
     [H2_LISTED_SUBTABLE.impairment]: impRows,
     [H2_LISTED_SUBTABLE.materials]: matRows,
+    // 工程物资表旧名「项  目」（表头首格泄漏）迁移后清理，避免附注残留孤儿空表
+    _removed_table_keys: ['项  目'] as unknown as Record<string, unknown>[],
     _note_texts: buildNoteTexts([
       { section: 'listed-impairment', title: '在建工程减值情况说明', text: state.noteImpairment },
       { section: 'listed-fund-source', title: '在建工程资金来源说明', text: state.noteFundSource },
@@ -363,21 +365,21 @@ export function buildH2SoeSubTableData(state: H2SoeSyncSnapshot): Record<string,
 
 const H2_LISTED_COLUMNS: Record<string, ColumnDef[]> = {
   [H2_LISTED_SUBTABLE.summary]: [
-    { key: 'label', label: '项目', is_label: true },
+    { key: 'label', label: '项目', is_label: true, flat: true },
     { key: 'end_balance', label: '期末余额', format: 'amount' },
     { key: 'prior_balance', label: '上年年末余额', format: 'amount' },
   ],
   [H2_LISTED_SUBTABLE.detail]: [
     { key: 'label', label: '项目', is_label: true },
-    { key: 'end_book', label: '期末余额-账面余额', format: 'amount' },
-    { key: 'end_impairment', label: '期末余额-减值准备', format: 'amount' },
-    { key: 'end_net', label: '期末余额-账面净值', format: 'amount' },
-    { key: 'prior_book', label: '上年年末余额-账面余额', format: 'amount' },
-    { key: 'prior_impairment', label: '上年年末余额-减值准备', format: 'amount' },
-    { key: 'prior_net', label: '上年年末余额-账面净值', format: 'amount' },
+    { key: 'end_book', label: '账面余额', group: '期末余额', format: 'amount' },
+    { key: 'end_impairment', label: '减值准备', group: '期末余额', format: 'amount' },
+    { key: 'end_net', label: '账面净值', group: '期末余额', format: 'amount' },
+    { key: 'prior_book', label: '账面余额', group: '上年年末余额', format: 'amount' },
+    { key: 'prior_impairment', label: '减值准备', group: '上年年末余额', format: 'amount' },
+    { key: 'prior_net', label: '账面净值', group: '上年年末余额', format: 'amount' },
   ],
   [H2_LISTED_SUBTABLE.projectMovement]: [
-    { key: 'label', label: '工程名称', is_label: true },
+    { key: 'label', label: '工程名称', is_label: true, flat: true },
     { key: 'begin_balance', label: '期初余额', format: 'amount' },
     { key: 'increase', label: '本期增加', format: 'amount' },
     { key: 'transfer_to_fa', label: '转入固定资产', format: 'amount' },
@@ -388,21 +390,21 @@ const H2_LISTED_COLUMNS: Record<string, ColumnDef[]> = {
     { key: 'end_balance', label: '期末余额', format: 'amount' },
   ],
   [H2_LISTED_SUBTABLE.projectCont]: [
-    { key: 'label', label: '工程名称', is_label: true },
+    { key: 'label', label: '工程名称', is_label: true, flat: true },
     { key: 'budget', label: '预算数', format: 'amount' },
     { key: 'cum_input_pct', label: '工程累计投入占预算比例%' },
     { key: 'progress', label: '工程进度' },
     { key: 'fund_source', label: '资金来源' },
   ],
   [H2_LISTED_SUBTABLE.impairment]: [
-    { key: 'label', label: '项目', is_label: true },
+    { key: 'label', label: '项目', is_label: true, flat: true },
     { key: 'begin_balance', label: '期初余额', format: 'amount' },
     { key: 'provision', label: '本期计提', format: 'amount' },
     { key: 'decrease', label: '本期减少', format: 'amount' },
     { key: 'end_balance', label: '期末余额', format: 'amount' },
   ],
   [H2_LISTED_SUBTABLE.materials]: [
-    { key: 'label', label: '项目', is_label: true },
+    { key: 'label', label: '项目', is_label: true, flat: true },
     { key: 'end_balance', label: '期末余额', format: 'amount' },
     { key: 'prior_balance', label: '上年年末余额', format: 'amount' },
   ],
@@ -412,19 +414,19 @@ const H2_LISTED_COLUMNS: Record<string, ColumnDef[]> = {
 
 const H2_SOE_TWO_LEVEL: ColumnDef[] = [
   { key: 'label', label: '项目', is_label: true },
-  { key: 'end_book', label: '期末余额-账面余额', format: 'amount' },
-  { key: 'end_impairment', label: '期末余额-减值准备', format: 'amount' },
-  { key: 'end_carrying', label: '期末余额-账面价值', format: 'amount' },
-  { key: 'begin_book', label: '期初余额-账面余额', format: 'amount' },
-  { key: 'begin_impairment', label: '期初余额-减值准备', format: 'amount' },
-  { key: 'begin_carrying', label: '期初余额-账面价值', format: 'amount' },
+  { key: 'end_book', label: '账面余额', group: '期末余额', format: 'amount' },
+  { key: 'end_impairment', label: '减值准备', group: '期末余额', format: 'amount' },
+  { key: 'end_carrying', label: '账面价值', group: '期末余额', format: 'amount' },
+  { key: 'begin_book', label: '账面余额', group: '期初余额', format: 'amount' },
+  { key: 'begin_impairment', label: '减值准备', group: '期初余额', format: 'amount' },
+  { key: 'begin_carrying', label: '账面价值', group: '期初余额', format: 'amount' },
 ]
 
 const H2_SOE_COLUMNS: Record<string, ColumnDef[]> = {
   [H2_SOE_SUBTABLE.summary]: H2_SOE_TWO_LEVEL,
   [H2_SOE_SUBTABLE.detail]: H2_SOE_TWO_LEVEL,
   [H2_SOE_SUBTABLE.projectMovement]: [
-    { key: 'label', label: '项目名称', is_label: true },
+    { key: 'label', label: '项目名称', is_label: true, flat: true },
     { key: 'budget', label: '预算数', format: 'amount' },
     { key: 'begin_balance', label: '期初余额', format: 'amount' },
     { key: 'increase', label: '本期增加', format: 'amount' },
@@ -439,9 +441,9 @@ const H2_SOE_COLUMNS: Record<string, ColumnDef[]> = {
     { key: 'fund_source', label: '资金来源' },
   ],
   [H2_SOE_SUBTABLE.impairment]: [
-    { key: 'label', label: '项目', is_label: true },
-    { key: 'provision_amount', label: '计提金额', format: 'amount' },
-    { key: 'reason', label: '原因' },
+    { key: 'label', label: '项目', is_label: true, flat: true },
+    { key: 'provision_amount', label: '本期计提金额', format: 'amount' },
+    { key: 'reason', label: '计提原因' },
   ],
 }
 

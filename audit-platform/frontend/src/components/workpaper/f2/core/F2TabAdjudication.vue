@@ -190,6 +190,7 @@ import { F2_ROW_KEY_ACCOUNT, F2_IMPAIRMENT_ACCOUNT } from '../../composables/use
 import { useF2ImportExport } from '../../composables/useWorkpaperImportExport'
 import type { ChecklistResponse } from '../../composables/useF2FormData'
 import type { useF2CrossSheet } from '../../composables/useF2CrossSheet'
+import type { TbValuesEntry } from '../../composables/useF2Adjudication'
 import F2AdjudicationBlockTable from './F2AdjudicationBlockTable.vue'
 import F2ReviewChip from '../shared/F2ReviewChip.vue'
 import AdjudicationBringInDialog, { type AdjudicationAllocation } from '@/components/adjustment/AdjudicationBringInDialog.vue'
@@ -202,6 +203,11 @@ const props = defineProps<{
   isReadonly: boolean
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
   crossSheet?: ReturnType<typeof useF2CrossSheet>
+  /** 后端 render 输出的 tb_values（各存货类别 期初/期末未审，来自 tb_balance 1401~1471）。
+   *  供 useF2Adjudication.seedFromTbValues 在无持久化时自动预填审定表（四表入库刷新即有数据）。 */
+  tbValues?: Record<string, TbValuesEntry> | null
+  /** 存货净额 TB 核对标量（BS-010 trial_balance），供审定表「试算平衡表数」只读回退 seed */
+  tbAmount?: number | null
 }>()
 
 const activeBlocks = ref(['gross', 'impairment'])
@@ -229,6 +235,8 @@ const {
   debouncedSave: props.debouncedSave,
   isReadonly: toRef(props, 'isReadonly'),
   crossSheet: props.crossSheet,
+  tbValues: toRef(props, 'tbValues'),
+  tbAmountSeed: toRef(props, 'tbAmount'),
 })
 
 const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF2AiGenerate(toRef(props, 'wpId') as Ref<string>)

@@ -32,6 +32,9 @@ export interface UseF4AdjudicationOptions {
   projectId: Ref<string>
   allResponses: Ref<Map<string, ChecklistResponse>>
   isReadonly?: Ref<boolean>
+  /** 后端 render 输出的 2202 应付账款 TB 核对标量（trial_balance 期末，取绝对值）。
+   *  无持久化时作「试算平衡表数·期末」只读回退 seed（trial_balance v2 无期初，故不 seed 期初）。 */
+  tbAmountSeed?: Ref<number | null | undefined>
 }
 
 export interface StoredF4AdjRow {
@@ -399,7 +402,7 @@ export function parseF4TrialBalance(value: string | null | undefined): F4TrialBa
 }
 
 export function useF4Adjudication(options: UseF4AdjudicationOptions) {
-  const { allResponses, isReadonly, projectId } = options
+  const { allResponses, isReadonly, projectId, tbAmountSeed } = options
   const readonly = isReadonly ?? ref(false)
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
   const natureStored = ref<StoredF4AdjRow[]>([])
@@ -487,9 +490,14 @@ export function useF4Adjudication(options: UseF4AdjudicationOptions) {
     openingCrossCheckPassed.value && closingCrossCheckPassed.value,
   )
 
-  const trialBalance = computed(() =>
-    parseF4TrialBalance(allResponses.value.get(TB_STORAGE_KEY)?.remark),
-  )
+  const trialBalance = computed(() => {
+    // 手工优先：有持久化 F4-1-adj-tb-2202 用之；否则回退后端 render 的 2202 期末 TB 核对标量
+    const remark = allResponses.value.get(TB_STORAGE_KEY)?.remark
+    if (remark != null && String(remark).trim() !== '') {
+      return parseF4TrialBalance(remark)
+    }
+    return { opening: 0, closing: parseNum(tbAmountSeed?.value ?? 0) }
+  })
   const openingVariance = computed(() =>
     natureSubtotalRow.value.openingAdjusted - trialBalance.value.opening,
   )

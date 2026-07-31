@@ -294,6 +294,32 @@ export function useN1Adjudication(options: UseN1AdjudicationOptions) {
   }
 
   /**
+   * 从四表库带入未审数（tb_balance 科目 1811 子科目按暂时性差异类别归集，
+   * 后端 `_build_adjudication_prefill` 预填，经 render-config → `formData.adjudicationPrefill`）。
+   *
+   * 口径：子科目期初余额 → 期初未审数，期末余额 → 期末未审数（1811 借方/资产类直取）。
+   * 只覆盖预填里出现的类别（其余类别的手工录入不清零），保留手工 AJE/RJE。
+   *
+   * @returns 带入的类别数（0 表示四表库无 1811 子科目数据 / 只有父级 1811 无法分类）
+   */
+  function pullFromTB(): number {
+    const prefill = formData.adjudicationPrefill?.value || {}
+    const cats = Object.keys(prefill)
+    if (cats.length === 0) return 0
+    let touched = 0
+    rows.value.forEach((row, i) => {
+      const src = prefill[row.category]
+      if (!src) return
+      row.beginUnadjusted = parseFloat((Number(src.opening) || 0).toFixed(2))
+      row.endUnadjusted = parseFloat((Number(src.closing) || 0).toFixed(2))
+      _persistRow(i)
+      touched++
+    })
+    _syncTotals()
+    return touched
+  }
+
+  /**
    * 从 N1-5 亏损检查表带入「可抵扣亏损」分类行的期末未审数（= 可确认递延所得税资产合计）。
    *
    * 🔴 只写该一行，不动其他分类（不清零）；届满行由 N1-5 侧判定后不产生可确认额。
@@ -451,6 +477,7 @@ export function useN1Adjudication(options: UseN1AdjudicationOptions) {
     totals,
     tbReconcile,
     pullFromDetail,
+    pullFromTB,
     pullLossFromN15,
     addAdjustment,
     removeAdjustment,

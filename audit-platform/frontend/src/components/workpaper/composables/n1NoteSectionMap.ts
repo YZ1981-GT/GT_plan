@@ -156,8 +156,8 @@ function netOffsetColumns(variant: N1DisclosureVariant): ColumnDef[] {
       { key: 'label', label: '项目', is_label: true, flat: true },
       { key: 'offset_end', label: '递延所得税资产和负债期末互抵金额', format: AMT },
       { key: 'net_end', label: '抵销后递延所得税资产或负债期末余额', format: AMT },
-      { key: 'offset_prior', label: '递延所得税资产和负债上年年末互抵金额', format: AMT },
-      { key: 'net_prior', label: '抵销后递延所得税资产或负债上年年末余额', format: AMT },
+      { key: 'offset_prior', label: '递延所得税资产和负债期初互抵金额', format: AMT },
+      { key: 'net_prior', label: '抵销后递延所得税资产或负债期初余额', format: AMT },
     ])
   }
   return defineColumns([
@@ -177,21 +177,21 @@ function offsetDetailColumns(): ColumnDef[] {
   ])
 }
 
-/** 未确认明细：项目 + 期末余额 + （上年年末 / 期初）余额 */
+/** 未确认明细：项目 + 期末余额 + （上年年末 / 年初）余额 */
 function unrecognizedColumns(variant: N1DisclosureVariant): ColumnDef[] {
   return defineColumns([
     { key: 'label', label: '项目', is_label: true, flat: true },
     { key: 'end', label: '期末余额', format: AMT },
-    { key: 'prior', label: variant === 'listed' ? '上年年末余额' : '期初余额', format: AMT },
+    { key: 'prior', label: variant === 'listed' ? '上年年末余额' : '年初余额', format: AMT },
   ])
 }
 
-/** 亏损到期：年份 + 期末 + （上年年末 / 期初）+ 备注 */
+/** 亏损到期：年份 + 期末 + （上年年末 / 年初）+ 备注 */
 function lossExpiryColumns(variant: N1DisclosureVariant): ColumnDef[] {
   return defineColumns([
     { key: 'label', label: '年份', is_label: true, flat: true },
     { key: 'end', label: '期末余额', format: AMT },
-    { key: 'prior', label: variant === 'listed' ? '上年年末余额' : '期初余额', format: AMT },
+    { key: 'prior', label: variant === 'listed' ? '上年年末余额' : '年初余额', format: AMT },
     { key: 'remark', label: '备注', format: TXT },
   ])
 }
@@ -315,6 +315,18 @@ export interface N1DisclosureSnapshot {
   notes?: Record<string, string>
   /** 上次同步成功时推送的子表名（R7 孤儿清理差集基线） */
   previouslySyncedTables?: readonly string[]
+  /**
+   * 披露口径分支（源模板国企 R7）：`gross` 按（1）披露 / `net` 按（2）A+（2）B 披露。
+   * 二者**互斥** —— 未选中分支的表不推送并进 `_removed_table_keys`。
+   * 上市变体不使用本字段（上市（1）恒披露，（2）由 `netOffsetApplicable` 控制）。
+   */
+  offsetMode?: 'undecided' | 'gross' | 'net'
+  /**
+   * 上市表（2）是否适用（源模板 R33 标题括注「不适用的删除」）。
+   * `false` → 不推送该表并进 `_removed_table_keys`；
+   * `true` / `null` / 缺省 → 推送（未判断时不删交付物内容）。
+   */
+  netOffsetApplicable?: boolean | null
 }
 
 export interface N1SyncPayload {
@@ -325,6 +337,46 @@ export interface N1SyncPayload {
   year: number
   sub_table_data: Record<string, unknown>
   columns: Record<string, ColumnDef[]>
+}
+
+/**
+ * 按披露分支判定「本次应推送哪些分支表」。
+ *
+ * 源模板规则：
+ * - 国企 R7：不以抵销后净额列示 → 只披露（1）；以抵销后净额列示 → 只披露（2）A 与（2）B。
+ * - 上市 R33：（1）恒披露；（2）标题括注「不适用的删除」→ 由适用性开关控制。
+ *
+ * 返回 `{pushed, removed}`，两者**恒无交集**且并集覆盖该变体全部分支表键
+ * （Property 8，由 `n1NoteSectionMap.spec.ts` 锁死）。
+ */
+export function n1BranchTableKeys(variant: N1DisclosureVariant): string[] {
+  // 上市：（1）恒披露，只有（2）受适用性开关控制
+  if (variant === 'listed') return [N1_SUB_TABLE_KEYS.listed.netOffset]
+  // 国企：（1）与（2）A/（2）B 互斥，三张表都是分支表
+  const soe = N1_SUB_TABLE_KEYS.soe
+  return [soe.unoffset, soe.netOffset, soe.offsetDetail]
+}
+
+export function resolveN1BranchTables(
+  variant: N1DisclosureVariant,
+  snapshot: Pick<N1DisclosureSnapshot, 'offsetMode' | 'netOffsetApplicable'>,
+): { pushed: string[]; removed: string[] } {
+  if (variant === 'listed') {
+    const key = N1_SUB_TABLE_KEYS.listed.netOffset
+    // 只有**明确判定不适用**（false）才清除；未判断（null/undefined）仍推送
+    return snapshot.netOffsetApplicable === false
+      ? { pushed: [], removed: [key] }
+      : { pushed: [key], removed: [] }
+  }
+  const soe = N1_SUB_TABLE_KEYS.soe
+  if (snapshot.offsetMode === 'net') {
+    return { pushed: [soe.netOffset, soe.offsetDetail], removed: [soe.unoffset] }
+  }
+  if (snapshot.offsetMode === 'gross') {
+    return { pushed: [soe.unoffset], removed: [soe.netOffset, soe.offsetDetail] }
+  }
+  // undecided：三张分支表全推、不删任何表（零回归）
+  return { pushed: [soe.unoffset, soe.netOffset, soe.offsetDetail], removed: [] }
 }
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -466,52 +518,68 @@ export function buildN1SyncPayload(
   ctx: { wpId: string; year: number; applicableStandards?: readonly string[] | null },
 ): N1SyncPayload {
   const G = N1_GROUP_LABELS[variant]
-  const columns = n1ColumnsFor(variant)
+  const allColumns = n1ColumnsFor(variant)
   const subTableData: Record<string, unknown> = {}
+  const branch = resolveN1BranchTables(variant, snapshot)
+  const skipped = new Set(branch.removed)
 
   // ① 表 1 未经抵销：资产段（标题 + 明细 + 小计）+ 负债段（标题 + 明细 + 小计）
+  //    国企在「以抵销后净额列示」口径下不披露本表（源模板 R7），故按分支跳过。
   const assetRows = snapshot.assetRows || []
   const liabRows = snapshot.liabilityRows || []
-  subTableData[N1_SUB_TABLE_KEYS[variant].unoffset] = [
-    unoffsetGroupRow(G.asset),
-    ...assetRows.map(unoffsetDataRow),
-    unoffsetSubtotalRow(assetRows),
-    unoffsetGroupRow(G.liability),
-    ...liabRows.map(unoffsetDataRow),
-    unoffsetSubtotalRow(liabRows, snapshot.liabilitySubtotal),
-  ]
+  const unoffsetKey = N1_SUB_TABLE_KEYS[variant].unoffset
+  if (!skipped.has(unoffsetKey)) {
+    subTableData[unoffsetKey] = [
+      unoffsetGroupRow(G.asset),
+      ...assetRows.map(unoffsetDataRow),
+      unoffsetSubtotalRow(assetRows),
+      unoffsetGroupRow(G.liability),
+      ...liabRows.map(unoffsetDataRow),
+      unoffsetSubtotalRow(liabRows, snapshot.liabilitySubtotal),
+    ]
+  }
 
-  // ② 表 2 抵销后净额列示
+  // ② 表 2 抵销后净额列示（上市受 R33 适用性开关控制 / 国企受 R7 分支控制）
   if (variant === 'listed') {
-    const off = snapshot.netOffset || {}
-    subTableData[N1_SUB_TABLE_KEYS.listed.netOffset] = [
-      {
-        label: '递延所得税资产',
-        offset_end: nz(off.assetOffsetEnd), net_end: nz(off.assetNetEnd),
-        offset_prior: nz(off.assetOffsetPrior), net_prior: nz(off.assetNetPrior),
-      },
-      {
-        label: '递延所得税负债',
-        offset_end: nz(off.liabOffsetEnd), net_end: nz(off.liabNetEnd),
-        offset_prior: nz(off.liabOffsetPrior), net_prior: nz(off.liabNetPrior),
-      },
-    ]
+    const key = N1_SUB_TABLE_KEYS.listed.netOffset
+    if (!skipped.has(key)) {
+      const off = snapshot.netOffset || {}
+      subTableData[key] = [
+        {
+          label: '递延所得税资产',
+          offset_end: nz(off.assetOffsetEnd), net_end: nz(off.assetNetEnd),
+          offset_prior: nz(off.assetOffsetPrior), net_prior: nz(off.assetNetPrior),
+        },
+        {
+          label: '递延所得税负债',
+          offset_end: nz(off.liabOffsetEnd), net_end: nz(off.liabNetEnd),
+          offset_prior: nz(off.liabOffsetPrior), net_prior: nz(off.liabNetPrior),
+        },
+      ]
+    }
   } else {
-    const na = snapshot.netOffsetAssetRows || []
-    const nl = snapshot.netOffsetLiabilityRows || []
-    subTableData[N1_SUB_TABLE_KEYS.soe.netOffset] = [
-      netOffsetGroupRow(G.asset),
-      ...na.map(netOffsetDataRow),
-      netOffsetSubtotalRow(na),
-      netOffsetGroupRow(G.liability),
-      ...nl.map(netOffsetDataRow),
-      netOffsetSubtotalRow(nl),
-    ]
+    const netKey = N1_SUB_TABLE_KEYS.soe.netOffset
+    if (!skipped.has(netKey)) {
+      const na = snapshot.netOffsetAssetRows || []
+      const nl = snapshot.netOffsetLiabilityRows || []
+      subTableData[netKey] = [
+        netOffsetGroupRow(G.asset),
+        ...na.map(netOffsetDataRow),
+        netOffsetSubtotalRow(na),
+        netOffsetGroupRow(G.liability),
+        ...nl.map(netOffsetDataRow),
+        netOffsetSubtotalRow(nl),
+      ]
+    }
 
-    // ③ 表 3 互抵明细（国企独有；源模板（2）B）
-    subTableData[N1_SUB_TABLE_KEYS.soe.offsetDetail] = (snapshot.offsetDetailRows || []).map(
-      (r) => ({ label: String(r.item ?? ''), amount: nz(r.amount) }),
-    )
+    // ③ 表 3 互抵明细（国企独有；源模板（2）B，纯动态行区域）
+    const detailKey = N1_SUB_TABLE_KEYS.soe.offsetDetail
+    if (!skipped.has(detailKey)) {
+      subTableData[detailKey] = (snapshot.offsetDetailRows || []).map((r) => ({
+        label: String(r.item ?? ''),
+        amount: nz(r.amount),
+      }))
+    }
   }
 
   // ④ 未确认递延所得税资产明细（纯资产侧）
@@ -566,6 +634,20 @@ export function buildN1SyncPayload(
   // ⑥ 说明文本（空则不写 `_note_texts`，避免覆盖附注既有正文）
   const texts = buildN1NoteTexts(snapshot.notes)
   if (texts.length > 0) subTableData._note_texts = texts
+
+  // ⑦ 分支孤儿清理：未选中分支的表必须显式删除，否则用户切换口径后
+  //    附注永久残留另一分支的过时数据（平台实证：有录入区块的条件表必须进 removed）。
+  //    只删**上次由本底稿推过**的表 —— 从未推过就不属本载荷所有，不越权删。
+  const previously = new Set(snapshot.previouslySyncedTables || [])
+  const removedKeys = branch.removed.filter((k) => previously.has(k))
+  if (removedKeys.length > 0) subTableData._removed_table_keys = removedKeys
+
+  // `columns` 键集与 `sub_table_data` 保持一致（投影器按键名匹配列头）
+  const pushedKeys = Object.keys(subTableData).filter((k) => !k.startsWith('_'))
+  const columns: Record<string, ColumnDef[]> = {}
+  for (const k of pushedKeys) {
+    if (allColumns[k]) columns[k] = allColumns[k]
+  }
 
   return {
     wp_id: ctx.wpId,

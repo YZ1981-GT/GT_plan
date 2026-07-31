@@ -42,7 +42,27 @@
         （3）未确认递延所得税资产的可抵扣暂时性差异及可抵扣亏损明细；
         （4）未确认递延所得税资产的可抵扣亏损将于以下年度到期。
         负债段数据来源于递延所得税负债底稿（N3）；表（1）资产段按 N1-2 明细「类别」预填，
-        源模板独有的 3 项（内部交易未实现利润 / 租赁负债 / 购入摊销年限小于税法规定的资产）需人工填列。
+        N1-2 未覆盖的行回退按四表科目叶子余额带出。
+      </div>
+      <div class="branch-picker">
+        <span class="branch-label">表（2）是否适用：</span>
+        <el-radio-group
+          v-model="netOffsetChoice"
+          size="small"
+          :disabled="isReadonly"
+          @change="onNetOffsetApplicableChange"
+        >
+          <el-radio-button value="undecided">未判断</el-radio-button>
+          <el-radio-button value="yes">适用（以抵销后净额列示）</el-radio-button>
+          <el-radio-button value="no">不适用</el-radio-button>
+        </el-radio-group>
+        <el-tag v-if="netOffsetChoice === 'no'" type="info" size="small">
+          源模板「不适用的删除」——已从附注清除该表
+        </el-tag>
+      </div>
+      <div class="branch-picker source-trace" v-if="tbSourceSummary">
+        <span class="branch-label">四表取数来源：</span>
+        <span>{{ tbSourceSummary }}</span>
       </div>
     </div>
 
@@ -98,7 +118,12 @@
     <el-card shadow="never" class="disclosure-card">
       <template #header>
         <div class="card-header">
-          <span>（2）以抵销后净额列示的递延所得税资产或负债（不适用的删除）</span>
+          <span>
+            （2）以抵销后净额列示的递延所得税资产或负债（不适用的删除）
+            <el-tag v-if="netOffsetChoice === 'no'" type="info" size="small">
+              不适用（已从附注清除）
+            </el-tag>
+          </span>
           <el-button size="small" :loading="aiLoading" @click="handleAI('netoffset')">
             <el-icon><MagicStick /></el-icon> AI
           </el-button>
@@ -204,9 +229,11 @@
         <li>本页 4 张表逐字对齐致同源模板 <code>附注披露信息（上市公司）</code>，是附注 {{ N1_NOTE_SECTION.listed }} 的交付物源</li>
         <li>表（1）两级表头：期末余额 / 上年年末余额，各含「可抵扣/应纳税暂时性差异」与「递延所得税资产/负债」两列</li>
         <li>资产段小计 = 段内各项之和；负债段小计同理（源模板 =SUM(B13:B20) / =SUM(B23:B28)）</li>
-        <li>负债段数据来源于递延所得税负债底稿（N3），本页只负责列示</li>
+        <li>负债段数据来源于递延所得税负债底稿（N3），本页只负责列示；四表已入库时按科目 2901 叶子余额自动带出总额级分类</li>
+        <li>四表入库后打开本页，表（1）「递延所得税资产/负债」列自动带出（暂时性差异列需人工，四表推不出税率）；已录数据不被覆盖</li>
+        <li>表（2）顶部「是否适用」对应源模板标题括注「不适用的删除」：选「不适用」后该表从附注清除；保持「未判断」则照旧推送</li>
         <li>表（3）「可抵扣亏损」行与表（4）合计必须相等（源模板 B40=B52 / C40=C52），由勾稽面板实时校验</li>
-        <li>表（4）默认列示审计年度后 5 年（税法一般结转期限）；高新 / 科技型中小企业为 10 年，用「+ 新增行」补足</li>
+        <li>表（4）默认列示 6 个年度（源模板 R46:R51）：期末列的亏损到期于 Y+1~Y+5、上年年末列到期于 Y~Y+4，两列并集即 Y~Y+5，故首行期末列与末行上年年末列填「——」；10 年结转或无使用期限用「+ 新增行」补足</li>
         <li>审计过程（账面价值 / 计税基础 / 适用税率 / 确认依据）在 N1-2 明细表与 N1-4 测算表，不在披露表列示</li>
         <li>编辑后自动同步到附注（防抖 800ms），也可点「同步到附注」立即推送</li>
       </ul>
@@ -301,6 +328,9 @@ const tables = useN1DisclosureTables({
   variant: 'listed',
   allResponses: formData.allResponses,
   auditYear: syncYear,
+  // 四表直通：`loadData()` 内部 await `selfLoad()` → restore() 前预填已就绪
+  adjudicationPrefill: formData.adjudicationPrefill,
+  liabilityPrefill: formData.liabilityPrefill,
 })
 
 const autoSync = useDisclosureAutoSync({ isReadonly: () => isReadonly.value })
@@ -311,6 +341,46 @@ const unrecognizedColumns = computed(() => n1UnrecognizedSegColumns('listed'))
 const lossExpiryColumns = computed(() => n1LossExpirySegColumns('listed'))
 
 const hasCheckError = computed(() => tables.checks.value.some((c) => c.level === 'error'))
+
+/**
+ * 四表取数溯源（消费后端 `tb_source_codes`）：科目集由 `report_config` 规则映射解析
+ * （BS-036 递延所得税资产 / BS-067 递延所得税负债），项目自定义报表行公式时随之变化。
+ */
+const tbSourceSummary = computed(() => {
+  const s = formData.tbSourceCodes.value
+  const parts: string[] = []
+  if (s.asset.codes.length) {
+    parts.push(`递延所得税资产 ${s.asset.codes.join('、')}（报表行 ${s.asset.row_code}）`)
+  }
+  if (s.liability.codes.length) {
+    parts.push(`递延所得税负债 ${s.liability.codes.join('、')}（报表行 ${s.liability.row_code}）`)
+  }
+  return parts.join('； ')
+})
+
+/**
+ * 表（2）适用性三态（源模板 R33「不适用的删除」）。
+ * 与 `tables.netOffsetApplicable`（`boolean | null`）双向映射 —— 用字符串是因为
+ * `el-radio-button` 的 value 不便承载 `null`。
+ */
+const netOffsetChoice = computed<'undecided' | 'yes' | 'no'>({
+  get: () => {
+    const v = tables.netOffsetApplicable.value
+    return v === true ? 'yes' : v === false ? 'no' : 'undecided'
+  },
+  set: (next) => {
+    tables.netOffsetApplicable.value = next === 'yes' ? true : next === 'no' ? false : null
+  },
+})
+
+/** 表（2）适用性变更：持久化 + 触发同步（不适用时该表进 `_removed_table_keys`） */
+function onNetOffsetApplicableChange(): void {
+  const v = tables.netOffsetApplicable.value
+  formData.debouncedSave(tables.itemIds.netOffsetApplicable, {
+    conclusion: v === true ? '1' : v === false ? '0' : null,
+  })
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
+}
 
 // ─── 持久化（整表 JSON，一表一 item）────────────────────────────────────────
 
@@ -577,6 +647,10 @@ onUnmounted(() => {
 .methodology-context { border-left: 4px solid #e6a23c; background: #fdf6ec; padding: 12px 16px; border-radius: 0 6px 6px 0; margin-bottom: 16px; }
 .methodology-text { font-size: var(--wp-font-size, 13px); color: #6b5900; line-height: 1.7; }
 .methodology-text strong { color: #b88230; }
+
+.branch-picker { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.branch-label { font-size: var(--wp-font-size, 13px); color: #b88230; font-weight: 600; }
+.source-trace { font-size: 12px; color: #6b5900; }
 
 .disclosure-card { margin-bottom: 16px; }
 .card-header { display: flex; align-items: center; justify-content: space-between; }

@@ -14,8 +14,25 @@
         <el-button size="small" @click="handleReview">
           <el-icon><Check /></el-icon> 复核
         </el-button>
+        <el-button
+          type="primary"
+          plain
+          size="small"
+          :loading="isSyncing"
+          :disabled="isReadonly || !projectId"
+          data-testid="l6-disclosure-soe-sync"
+          @click="syncToDisclosureNotes"
+        >同步到附注</el-button>
+        <el-button size="small" plain @click="jumpToNote">↩ 附注（八、53）</el-button>
       </div>
     </div>
+
+    <!-- ═══ 共章节说明（L6 与 L5 共 §八、53，按子表名浅合并） ═══ -->
+    <el-alert type="info" :closable="false" show-icon class="shared-section-alert">
+      本表同步到附注 <strong>§八、53 长期应付款</strong> 的子表
+      「①专项应付款期末余额最大的前5 项」—— 与 L5 长期应付款共章节
+      （源模板：【长期应付款与专项应付款的合计数披露详见P5-1】），两个底稿各推自己的子表。
+    </el-alert>
 
     <!-- ═══ 方法论上下文 ═══ -->
     <div class="methodology-context">
@@ -112,10 +129,16 @@
  * - Same auto-pull from L6-2 pattern
  * - Subscribe same EventBus
  */
-import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
+import { computed, inject, onMounted, onUnmounted, onBeforeUnmount, ref } from 'vue'
 import { MagicStick, Check, InfoFilled } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import { useRouter } from 'vue-router'
+import http from '@/utils/http'
 import { eventBus } from '@/utils/eventBus'
 import { useL6FormData } from '../../composables/useL6FormData'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import { buildNoteJumpRoute } from '@/views/composables/noteDisclosureReverseJump'
+import { L5_NOTE_SECTION, buildL6SyncPayload } from '../../composables/l5NoteSectionMap'
 
 const props = defineProps<{
   wpId: string
@@ -128,6 +151,8 @@ const emit = defineEmits<{
 }>()
 
 const openReviewDialog = inject<() => void>('openReviewDialog', () => {})
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+const router = useRouter()
 
 // ─── FormData ───────────────────────────────────────────────────────────────
 
@@ -204,6 +229,53 @@ function loadDisclosureData() {
   disclosureRows.value = rows
 }
 
+// ─── 同步到附注 ──────────────────────────────────────────────────────────────
+
+const isSyncing = ref(false)
+
+/** 占位提示行不得推送（否则附注多一行占位披露数据） */
+const PLACEHOLDER_MARK = '暂无数据'
+
+async function syncToDisclosureNotes(): Promise<void> {
+  if (isSyncing.value || !props.projectId || props.isReadonly) return
+  const rows = disclosureRows.value
+    .filter((r) => String(r.project ?? '').trim() && !r.project.includes(PLACEHOLDER_MARK))
+    .map((r) => ({
+      label: r.project,
+      beginAmount: Number(r.beginBalance) || 0,
+      increase: Number(r.increase) || 0,
+      decrease: Number(r.decrease) || 0,
+    }))
+  if (rows.length === 0) {
+    ElMessage.warning('请先在 L6-2 明细表填写专项应付款数据')
+    return
+  }
+  const payload = buildL6SyncPayload(props.wpId, { variant: 'soe', rows })
+  if (!payload) {
+    ElMessage.warning('当前项目准则不适用国企附注同步')
+    return
+  }
+  isSyncing.value = true
+  try {
+    await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
+    ElMessage.success('已同步到附注（八、53 专项应付款）')
+    eventBus.emit('disclosure:note-text-updated' as any, {
+      wpCode: 'L6',
+      projectId: props.projectId,
+      sectionIds: [L5_NOTE_SECTION.soe],
+    })
+  } catch {
+    ElMessage.warning('同步附注失败，请稍后重试')
+  } finally {
+    isSyncing.value = false
+  }
+}
+
+function jumpToNote() {
+  const route = buildNoteJumpRoute(props.projectId, 'L6', 'soe')
+  if (route) router.push(route)
+}
+
 // ─── Handlers ────────────────────────────────────────────────────────────────
 
 function handleAI(section: string) {
@@ -225,7 +297,11 @@ function fmtAmount(val: number): string {
 // ─── EventBus subscribe: 审定变化刷新 ───────────────────────────────────────
 
 function onAdjudicatedRefresh() {
-  formData.loadData().then(() => loadDisclosureData())
+  formData.loadData().then(() => {
+    loadDisclosureData()
+    // 上游 L6-2 审定数变化 → 本表数据随之变化 → 自动同步（监听实际数据）
+    autoSync.scheduleAutoSync(syncToDisclosureNotes)
+  })
 }
 
 onMounted(async () => {
@@ -237,10 +313,13 @@ onMounted(async () => {
 onUnmounted(() => {
   eventBus.off('substantive:adjudicated', onAdjudicatedRefresh)
 })
+
+onBeforeUnmount(() => { autoSync.cancelPending() })
 </script>
 
 <style scoped>
 .l6-tab-disclosure-soe { padding: 12px; font-size: var(--wp-font-size, 13px); }
+.shared-section-alert { margin-bottom: 12px; }
 .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .section-header-left { display: flex; align-items: center; gap: 8px; }
 .section-header-right { display: flex; align-items: center; gap: 8px; }

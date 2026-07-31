@@ -22,6 +22,8 @@ const props = defineProps<{
   allResponses: Map<string, any>
   isReadonly: boolean
   crossSheet?: ReturnType<typeof import('../composables/useF3CrossSheet').useF3CrossSheet>
+  /** 2201 应付票据 TB 核对标量（后端 render tb_values['2201']），审定表「试算平衡表数」只读回退 seed */
+  tbAmount?: number | null
 }>()
 
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
@@ -48,6 +50,7 @@ const {
   allResponses: toRef(props, 'allResponses') as Ref<Map<string, any>>,
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
   crossSheet: props.crossSheet,
+  tbAmountSeed: toRef(props, 'tbAmount'),
 })
 
 const hasDifference = computed(() => Math.abs(differenceRow.value) > 0.005)

@@ -365,7 +365,7 @@
 /**
  * F1TabAnalysis.vue — F1-4 实质性分析表（对齐 Excel）
  */
-import { computed, inject, reactive, toRef, type Ref } from 'vue'
+import { computed, inject, reactive, toRef, onMounted, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { isChangeRateExceeding } from '../composables/useF1FormulaEngine'
 import {
@@ -469,6 +469,19 @@ function doFillFromTb() {
     ElMessage.info('锚点已有数值或试算表无数据，未覆盖已录入值')
   }
 }
+
+// 打开即从试算表自动带入存货(1401)/应付(2202)锚点（手工优先：fillCrossCycleFromTb
+// 仅在锚点为空时填入，不覆盖已录入值；采购额仍需手工/从 F2 录入）。静默执行，
+// 与 F1-2 明细自动取数一致，实现「四表入库后刷新即有数据」。
+onMounted(() => {
+  if (props.isReadonly) return
+  const c = props.tbContext
+  if (!c) return
+  fillCrossCycleFromTb({
+    inventoryBalance: c.inventoryBalance ?? 0,
+    payableBalance: c.payableBalance ?? 0,
+  })
+})
 
 const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF1AiGenerate(wpIdRef)
 

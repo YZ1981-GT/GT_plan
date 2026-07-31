@@ -86,6 +86,8 @@
 
           :cross-sheet="crossSheet"
 
+          :tb-amount="tbAmount2201"
+
         />
 
 
@@ -446,6 +448,14 @@ const showHtmlToolbar = computed(() => {
 const applicableStandards = useHostApplicableStandards({
   explicit: () => formData.projectContext.value?.applicable_standards,
   htmlData: () => props.htmlData,
+})
+
+// 2201 应付票据 TB 核对标量（render tb_values['2201']，trial_balance/tb_balance）：
+// 供 F3-1 审定表「试算平衡表数」只读回退 seed（四表入库刷新即有核对基准）。
+const tbAmount2201 = computed<number | null>(() => {
+  const tv = props.htmlData?.tb_values ?? (formData.projectContext.value as any)?.tb_values
+  const v = tv?.['2201']
+  return v != null ? (Number(v) || 0) : null
 })
 
 

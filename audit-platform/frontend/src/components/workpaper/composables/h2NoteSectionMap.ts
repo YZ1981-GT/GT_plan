@@ -24,7 +24,7 @@ export const H2_LISTED_SUBTABLE = {
   projectMovement: '重要在建工程项目变动情况',
   projectCont: '重要在建工程项目变动情况（续）：',
   impairment: '在建工程减值准备情况',
-  materials: '项  目',
+  materials: '工程物资',
   /** 所有权受限 / 抵押担保（文本+明细，推送附注） */
   restricted: '所有权或使用权受限的在建工程',
 } as const

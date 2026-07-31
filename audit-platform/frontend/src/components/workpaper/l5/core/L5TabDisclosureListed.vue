@@ -14,6 +14,16 @@
         <el-button size="small" @click="handleReview">
           <el-icon><Check /></el-icon> 复核
         </el-button>
+        <el-button
+          type="primary"
+          plain
+          size="small"
+          :loading="isSyncing"
+          :disabled="isReadonly || !projectId"
+          data-testid="l5-disclosure-listed-sync"
+          @click="syncToDisclosureNotes"
+        >同步到附注</el-button>
+        <el-button size="small" plain @click="jumpToNote">↩ 附注（五、48）</el-button>
       </div>
     </div>
 
@@ -23,6 +33,7 @@
         <strong>上市公司附注披露要求：</strong>
         按款项性质列示长期应付款明细（融资租赁/分期付款/其他），披露合同金额、未确认融资费用、
         账面价值（净额）、到期时间分布、关联方交易及其公允性。数据自动从审定表/明细表拉取。
+        <br />同步到附注仅推「长期应付款」主表（净额）；专项应付款行由 L6 底稿维护。
       </div>
     </div>
 
@@ -139,6 +150,7 @@ import { eventBus } from '@/utils/eventBus'
 import { useL5FormData } from '../../composables/useL5FormData'
 import { calcNetPayable } from '../../composables/useL5FormulaEngine'
 import { L5_NOTE_SECTION, buildL5SyncPayload } from '../../composables/l5NoteSectionMap'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { buildNoteJumpRoute } from '@/views/composables/noteDisclosureReverseJump'
 
 const props = defineProps<{
@@ -152,6 +164,8 @@ const emit = defineEmits<{
 }>()
 
 const openReviewDialog = inject<() => void>('openReviewDialog', () => {})
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+const router = useRouter()
 
 // ─── FormData ───────────────────────────────────────────────────────────────
 
@@ -192,6 +206,7 @@ function updateCategoryRow(index: number, field: 'endBalance' | 'beginBalance', 
   if (index >= 0 && index < categoryRows.value.length) {
     categoryRows.value[index][field] = val
     formData.debouncedSave(`L5-disclosure-listed-cat-${index}-${field}`, { remark: String(val) })
+    autoSync.scheduleAutoSync(syncToDisclosureNotes)
   }
 }
 
@@ -200,6 +215,60 @@ function updateMaturityRow(index: number, val: number) {
     maturityRows.value[index].amount = val
     formData.debouncedSave(`L5-disclosure-listed-maturity-${index}`, { remark: String(val) })
   }
+}
+
+// ─── 同步到附注 ──────────────────────────────────────────────────────────────
+//
+// 🔴 只推**主表**（长期应付款净额 / 专项应付款 / 合计）—— 这是能干净映射的部分。
+//    源模板「（按款项性质列示）」明细表与本组件 categoryRows / 单一 unrecognized 标量
+//    不同构（源为「售后租回 / 分期付款」毛额段 + 逐项未确认融资费用两段），
+//    强推会自造 → 暂不推该明细表（宁缺勿造）。
+//    「专项应付款」行由 L6 底稿负责，此处主表该行值 L5 无数据源 → 0（跨底稿聚合已知限制）。
+const isSyncing = ref(false)
+
+function watchUnrecognized() {
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
+}
+
+watch([unrecognizedEnd, unrecognizedBegin], watchUnrecognized)
+
+function buildSnapshot() {
+  const total = categoryRows.value[categoryRows.value.length - 1] || { endBalance: 0, beginBalance: 0 }
+  const longTermEnd = calcNetPayable(Number(total.endBalance) || 0, Number(unrecognizedEnd.value) || 0)
+  const longTermPrior = calcNetPayable(Number(total.beginBalance) || 0, Number(unrecognizedBegin.value) || 0)
+  return {
+    variant: 'listed' as const,
+    longTerm: { end: longTermEnd, prior: longTermPrior },
+    special: { end: 0, prior: 0 },
+  }
+}
+
+async function syncToDisclosureNotes(): Promise<void> {
+  if (isSyncing.value || !props.projectId || props.isReadonly) return
+  const payload = buildL5SyncPayload(props.wpId, buildSnapshot())
+  if (!payload) {
+    ElMessage.warning('当前项目准则不适用上市附注同步')
+    return
+  }
+  isSyncing.value = true
+  try {
+    await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
+    ElMessage.success('已同步到附注（五、48 长期应付款）')
+    eventBus.emit('disclosure:note-text-updated' as any, {
+      wpCode: 'L5',
+      projectId: props.projectId,
+      sectionIds: [L5_NOTE_SECTION.listed],
+    })
+  } catch {
+    ElMessage.warning('同步附注失败，请稍后重试')
+  } finally {
+    isSyncing.value = false
+  }
+}
+
+function jumpToNote() {
+  const route = buildNoteJumpRoute(props.projectId, 'L5', 'listed')
+  if (route) router.push(route)
 }
 
 function handleAI(section: string) {
@@ -236,6 +305,8 @@ onMounted(async () => {
 onUnmounted(() => {
   eventBus.off('substantive:adjudicated' as any, onAdjudicatedRefresh)
 })
+
+onBeforeUnmount(() => { autoSync.cancelPending() })
 </script>
 
 <style scoped>

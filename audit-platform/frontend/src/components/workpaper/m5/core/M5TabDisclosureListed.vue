@@ -14,6 +14,16 @@
         <el-button size="small" @click="handleReview">
           <el-icon><Check /></el-icon> 复核
         </el-button>
+        <el-button
+          type="primary"
+          plain
+          size="small"
+          :loading="isSyncing"
+          :disabled="isReadonly || !projectId"
+          data-testid="m5-disclosure-listed-sync"
+          @click="syncToDisclosureNotes"
+        >同步到附注</el-button>
+        <el-button size="small" plain @click="jumpToNote">↩ 附注（五、59）</el-button>
       </div>
     </div>
 
@@ -183,13 +193,18 @@
  * - AI辅助 per section title
  * - 企业类型由主入口 GtM5SurplusReserve.vue 的 sheetName 分发决定
  */
-import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
+import { computed, inject, onMounted, onUnmounted, onBeforeUnmount, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, Check } from '@element-plus/icons-vue'
+import { useRouter } from 'vue-router'
+import http from '@/utils/http'
 import { eventBus } from '@/utils/eventBus'
 import { useM5FormData } from '../../composables/useM5FormData'
 import { calcEquityEndBalance } from '../../composables/useM5FormulaEngine'
 import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import { buildMEquitySyncPayload, M_EQUITY_CONFIG } from '../../composables/mEquityChangeNoteSectionMap'
+import { buildNoteJumpRoute } from '@/views/composables/noteDisclosureReverseJump'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -208,6 +223,9 @@ const emit = defineEmits<{
 const openReviewDialog = inject<((sectionId: string, sectionLabel?: string) => void) | null>('openReviewDialog', null)
 const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
 const aiLoading = ref('')
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+const router = useRouter()
+const isSyncing = ref(false)
 
 // ─── FormData ────────────────────────────────────────────────────────────────
 
@@ -264,6 +282,7 @@ function updateRow(index: number, field: 'beginBalance' | 'increase' | 'decrease
   if (index >= 0 && index < dataRows.value.length) {
     dataRows.value[index][field] = val
     formData.debouncedSave(`M5-disclosure-listed-${index}-${field}`, { remark: String(val) })
+    autoSync.scheduleAutoSync(syncToDisclosureNotes)
   }
 }
 
@@ -273,10 +292,52 @@ function getRowClassName({ row }: { row: DisclosureRow; rowIndex: number }): str
 
 function handleStatutoryNoteChange() {
   formData.debouncedSave('M5-disclosure-listed-statutory-note', { remark: statutoryNote.value || null })
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
 }
 
 function handleDiscretionaryNoteChange() {
   formData.debouncedSave('M5-disclosure-listed-discretionary-note', { remark: discretionaryNote.value || null })
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
+}
+
+// ─── 同步到附注（五、59 盈余公积变动表） ─────────────────────────────────────
+
+async function syncToDisclosureNotes(): Promise<void> {
+  if (isSyncing.value || !props.projectId || props.isReadonly) return
+  const payload = buildMEquitySyncPayload(props.wpId, {
+    cycle: 'M5',
+    variant: 'listed',
+    rows: dataRows.value.map((r) => ({
+      label: r.item,
+      begin: Number(r.beginBalance) || 0,
+      increase: Number(r.increase) || 0,
+      decrease: Number(r.decrease) || 0,
+    })),
+    note: [statutoryNote.value, discretionaryNote.value].filter(Boolean).join('\n') || undefined,
+  })
+  if (!payload) {
+    ElMessage.warning('当前项目准则不适用上市附注同步')
+    return
+  }
+  isSyncing.value = true
+  try {
+    await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
+    ElMessage.success(`已同步到附注（${M_EQUITY_CONFIG.M5.section.listed} 盈余公积）`)
+    eventBus.emit('disclosure:note-text-updated' as any, {
+      wpCode: 'M5',
+      projectId: props.projectId,
+      sectionIds: [M_EQUITY_CONFIG.M5.section.listed],
+    })
+  } catch {
+    ElMessage.warning('同步附注失败，请稍后重试')
+  } finally {
+    isSyncing.value = false
+  }
+}
+
+function jumpToNote() {
+  const route = buildNoteJumpRoute(props.projectId, 'M5', 'listed')
+  if (route) router.push(route)
 }
 
 async function handleAI(section: string) {
@@ -346,6 +407,8 @@ onMounted(async () => {
 onUnmounted(() => {
   eventBus.off('substantive:adjudicated' as any, onAdjudicatedRefresh)
 })
+
+onBeforeUnmount(() => { autoSync.cancelPending() })
 </script>
 
 <style scoped>

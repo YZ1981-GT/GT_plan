@@ -1,12 +1,5 @@
 <template>
-  <H6TabDisclosure
-    variant="soe"
-    :wp-id="wpId"
-    :project-id="projectId"
-    :all-responses="allResponses"
-    :is-readonly="isReadonly"
-    :sheet-name="sheetName"
-  />
+  <H6TabDisclosure variant="soe" v-bind="$props" />
 </template>
 
 <script setup lang="ts">

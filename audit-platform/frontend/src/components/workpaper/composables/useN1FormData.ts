@@ -72,6 +72,42 @@ export function useN1FormData(options: UseN1FormDataOptions) {
   /** TB种子数据（资产类：期初/借方/贷方/期末余额） */
   const tbSeed = ref<TbSeedData>({ beginBalance: 0, debitAmount: 0, creditAmount: 0, endBalance: 0 })
 
+  /**
+   * 审定表未审数预填（后端 `_build_adjudication_prefill` 按 1811 子科目归类）。
+   * 结构：{ 暂时性差异类别: {opening, closing} }；仅无持久化时由 N1-1 套用。
+   */
+  const adjudicationPrefill = ref<Record<string, { opening: number; closing: number }>>({})
+
+  /**
+   * 递延所得税负债 TB 种子（后端按报表行 `BS-067` 映射解析出的科目集取数，
+   * 贷方科目已 `abs()` 归一为披露口径正数）。
+   */
+  const tbLiabilitySeed = ref<TbSeedData>({
+    beginBalance: 0,
+    debitAmount: 0,
+    creditAmount: 0,
+    endBalance: 0,
+  })
+
+  /**
+   * 披露表负债段预填（后端 `_build_liability_prefill` 按 2901 叶子子科目归槽）。
+   * 结构：{ 语义槽: {opening, closing} }；槽 → 两版显示名的映射在
+   * `useN1DisclosureTables.N1_LIABILITY_SLOT_LABEL` 单一真源。
+   */
+  const liabilityPrefill = ref<Record<string, { opening: number; closing: number }>>({})
+
+  /**
+   * 取数溯源：报表行规则映射（`report_config`）解析出的科目集。
+   * 供底稿展示「本页取数来自哪些科目、依据哪个报表行」。
+   */
+  const tbSourceCodes = ref<{
+    asset: { row_code: string; codes: string[] }
+    liability: { row_code: string; codes: string[] }
+  }>({
+    asset: { row_code: '', codes: [] },
+    liability: { row_code: '', codes: [] },
+  })
+
   // Per-item debounce timers
   const _debounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
   // Track pending items for flush
@@ -99,21 +135,60 @@ export function useN1FormData(options: UseN1FormDataOptions) {
     }
   }
 
-  /** 从 render-config 响应中提取 html_data.trial_balance 作为 TB 种子 */
+  /** `{槽: {opening, closing}}` 归一（NaN / 缺字段 → 0） */
+  function _normPrefill(raw: unknown): Record<string, { opening: number; closing: number }> {
+    if (!raw || typeof raw !== 'object') return {}
+    const out: Record<string, { opening: number; closing: number }> = {}
+    for (const [k, v] of Object.entries(raw as Record<string, any>)) {
+      out[k] = { opening: Number(v?.opening) || 0, closing: Number(v?.closing) || 0 }
+    }
+    return out
+  }
+
+  function _normTb(raw: any): TbSeedData {
+    return {
+      beginBalance: Number(raw?.begin_balance) || 0,
+      debitAmount: Number(raw?.debit_amount) || 0,
+      creditAmount: Number(raw?.credit_amount) || 0,
+      endBalance: Number(raw?.end_balance) || 0,
+    }
+  }
+
+  /**
+   * 从 render-config 响应提取四表取数种子。
+   *
+   * 🔴 以「首个含 `trial_balance` 的 sheet」为锚点，同一 `html_data` 的兄弟键
+   * （`trial_balance_liability` / `adjudication_prefill` / `liability_prefill` /
+   * `tb_source_codes`）一并抽取；后端未重启导致新键缺失时逐个静默跳过，
+   * 不能让披露表报错。
+   */
   function _applyTbSeedFromRenderConfig(res: any): boolean {
     const cfg = res?.data ?? res
     const sheets: any[] = cfg?.sheets ?? []
     for (const s of sheets) {
-      const tb = s?.html_data?.trial_balance
-      if (tb) {
-        tbSeed.value = {
-          beginBalance: Number(tb.begin_balance) || 0,
-          debitAmount: Number(tb.debit_amount) || 0,
-          creditAmount: Number(tb.credit_amount) || 0,
-          endBalance: Number(tb.end_balance) || 0,
+      const h = s?.html_data
+      const tb = h?.trial_balance
+      if (!tb) continue
+      tbSeed.value = _normTb(tb)
+      if (h?.trial_balance_liability) tbLiabilitySeed.value = _normTb(h.trial_balance_liability)
+      const prefill = _normPrefill(h?.adjudication_prefill)
+      if (Object.keys(prefill).length > 0) adjudicationPrefill.value = prefill
+      const liabPrefill = _normPrefill(h?.liability_prefill)
+      if (Object.keys(liabPrefill).length > 0) liabilityPrefill.value = liabPrefill
+      const src = h?.tb_source_codes
+      if (src && typeof src === 'object') {
+        tbSourceCodes.value = {
+          asset: {
+            row_code: String(src.asset?.row_code ?? ''),
+            codes: Array.isArray(src.asset?.codes) ? src.asset.codes.map(String) : [],
+          },
+          liability: {
+            row_code: String(src.liability?.row_code ?? ''),
+            codes: Array.isArray(src.liability?.codes) ? src.liability.codes.map(String) : [],
+          },
         }
-        return true
       }
+      return true
     }
     return false
   }
@@ -442,6 +517,10 @@ export function useN1FormData(options: UseN1FormDataOptions) {
     isLoading,
     allResponses,
     tbSeed,
+    adjudicationPrefill,
+    tbLiabilitySeed,
+    liabilityPrefill,
+    tbSourceCodes,
     // Actions
     loadData,
     getField,

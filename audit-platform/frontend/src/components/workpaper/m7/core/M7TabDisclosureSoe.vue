@@ -15,6 +15,16 @@
         <el-button size="small" @click="handleReview">
           <el-icon><Check /></el-icon> 复核
         </el-button>
+        <el-button
+          type="primary"
+          plain
+          size="small"
+          :loading="isSyncing"
+          :disabled="isReadonly || !projectId"
+          data-testid="m7-disclosure-soe-sync"
+          @click="syncToDisclosureNotes"
+        >同步到附注</el-button>
+        <el-button size="small" plain @click="jumpToNote">↩ 附注（八、61）</el-button>
       </div>
     </div>
 
@@ -116,12 +126,18 @@
  * - 使用列需区分费用化/资本化
  * - 需披露计提依据（政策文件/行业标准）
  */
-import { computed, inject, onMounted, ref } from 'vue'
+import { computed, inject, onMounted, onBeforeUnmount, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { MagicStick, Check } from '@element-plus/icons-vue'
+import { useRouter } from 'vue-router'
+import http from '@/utils/http'
+import { eventBus } from '@/utils/eventBus'
 import { useM7FormData } from '../../composables/useM7FormData'
 import { useNoteAutoFill } from '../../composables/useNoteAutoFill'
 import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import { buildMEquitySyncPayload, M_EQUITY_CONFIG } from '../../composables/mEquityChangeNoteSectionMap'
+import { buildNoteJumpRoute } from '@/views/composables/noteDisclosureReverseJump'
 
 const props = defineProps<{ wpId: string; projectId: string; isReadonly: boolean }>()
 
@@ -129,6 +145,9 @@ const props = defineProps<{ wpId: string; projectId: string; isReadonly: boolean
 const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', () => {})
 const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
 const aiLoading = ref('')
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+const router = useRouter()
+const isSyncing = ref(false)
 
 // ─── Composables ─────────────────────────────────────────────────────────────
 const formData = useM7FormData({ wpId: computed(() => props.wpId), projectId: computed(() => props.projectId) })
@@ -184,6 +203,7 @@ const autoFill = useNoteAutoFill({
       disclosureRows.value[2].endBalance = v.other ?? 0
       disclosureRows.value[3].endBalance = v.total ?? 0
       lastRefreshTime.value = autoFill.lastRefreshAt.value
+      autoSync.scheduleAutoSync(syncToDisclosureNotes)
     }
   },
 })
@@ -192,10 +212,55 @@ const autoFill = useNoteAutoFill({
 function handlePolicyChange(index: number): void {
   const row = disclosureRows.value[index]
   formData.debouncedSave(`M7-disclosure-soe-row-${index}-policy`, { remark: row.policyBasis || null })
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
 }
 
 function saveDisclosureNote(): void {
   formData.debouncedSave('M7-disclosure-soe-note', { remark: disclosureNote.value || null })
+  autoSync.scheduleAutoSync(syncToDisclosureNotes)
+}
+
+// ─── 同步到附注（八、61 专项储备变动表，含备注列） ───────────────────────────
+// 源模板国企侧「本期减少」为单列 → 组件的费用化/资本化两列合并求和；policyBasis → 备注列
+
+async function syncToDisclosureNotes(): Promise<void> {
+  if (isSyncing.value || !props.projectId || props.isReadonly) return
+  const payload = buildMEquitySyncPayload(props.wpId, {
+    cycle: 'M7',
+    variant: 'soe',
+    rows: disclosureRows.value.map((r) => ({
+      label: r.item,
+      begin: Number(r.beginBalance) || 0,
+      increase: Number(r.increase) || 0,
+      decrease: (Number(r.expenseDecrease) || 0) + (Number(r.capitalDecrease) || 0),
+      end: Number(r.endBalance) || 0,
+      remark: r.policyBasis || '',
+    })),
+    note: disclosureNote.value?.trim() || undefined,
+  })
+  if (!payload) {
+    ElMessage.warning('当前项目准则不适用国企附注同步')
+    return
+  }
+  isSyncing.value = true
+  try {
+    await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
+    ElMessage.success(`已同步到附注（${M_EQUITY_CONFIG.M7.section.soe} 专项储备）`)
+    eventBus.emit('disclosure:note-text-updated' as any, {
+      wpCode: 'M7',
+      projectId: props.projectId,
+      sectionIds: [M_EQUITY_CONFIG.M7.section.soe],
+    })
+  } catch {
+    ElMessage.warning('同步附注失败，请稍后重试')
+  } finally {
+    isSyncing.value = false
+  }
+}
+
+function jumpToNote() {
+  const route = buildNoteJumpRoute(props.projectId, 'M7', 'soe')
+  if (route) router.push(route)
 }
 
 // ─── UI handlers ─────────────────────────────────────────────────────────────
@@ -236,6 +301,8 @@ onMounted(async () => {
   // 数据加载后从审定数据取数刷新
   autoFill.pull()
 })
+
+onBeforeUnmount(() => { autoSync.cancelPending() })
 </script>
 
 <style scoped>
