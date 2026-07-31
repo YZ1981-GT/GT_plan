@@ -385,7 +385,8 @@ import { MagicStick, CircleCheck, WarningFilled, Download, Plus } from '@element
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import { eventBus } from '@/utils/eventBus'
-import { fmtAmount } from '@/stores/displayPrefs'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { DisplayPrefs_Key } from '../../composables/displayPrefsKey'
 import { useK2Adjudication, type K2AdjRow } from '../../composables/useK2Adjudication'
 import { useK2CrossSheet } from '../../composables/useK2CrossSheet'
 import { K2_TEMPLATE_ROW_EXAMPLES } from '../../composables/k2AdjudicationRows'
@@ -419,6 +420,13 @@ const emit = defineEmits<{
 // ─── Inject ───────────────────────────────────────────────────────────────────
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
+
+/**
+ * 金额格式单一真源 = `stores/displayPrefs`（千分符 + 2 位 + 单位偏好 + 0 显示偏好）。
+ * 🔴 `fmtAmount` 是 **store 成员**（不是模块级导出），且 `useDisplayPrefsStore` 是
+ * setup 作用域 composable —— 必须在 setup 顶层取，写进函数体会静默失效。
+ */
+const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 
 // ─── Composables ──────────────────────────────────────────────────────────────
 
@@ -659,10 +667,10 @@ function handleReview(id: string) {
 
 // ─── Formatters ───────────────────────────────────────────────────────────────
 
-/** 金额格式单一真源 = `stores/displayPrefs.fmtAmount`（千分符 + 2 位 + 单位偏好） */
+/** 金额格式单一真源 = `displayPrefs.fmtAmount`（千分符 + 2 位 + 单位偏好） */
 function fmtAmt(val: number | null | undefined): string {
   if (val == null) return '-'
-  return fmtAmount(val)
+  return displayPrefs.fmtAmount(val)
 }
 
 function formatChangeRate(rate: number | null): string {

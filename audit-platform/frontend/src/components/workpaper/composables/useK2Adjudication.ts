@@ -34,6 +34,7 @@ import {
   dropRow,
   findDuplicateLabel,
   foreignRowWarning,
+  labelKey,
   normalizeLabel,
   readNum,
   readRaw,
@@ -308,18 +309,24 @@ export function useK2Adjudication(
     }
     if (!Array.isArray(parsed) || parsed.length === 0) return out
 
-    // 按项目名归集期末余额（同名合并）
-    const byName = new Map<string, number>()
+    // 按项目名归集期末余额 —— 归集键用 `labelKey`（忽略空白差异），
+    // 否则源模板式的「待摊费用」与「待 摊 费用」会被当两个项目、后者覆盖前者
+    const byName = new Map<string, { label: string; amount: number }>()
     for (const item of parsed) {
       if (!item || typeof item !== 'object') continue
       const rec = item as Record<string, unknown>
       const name = normalizeLabel(rec.name as string)
       if (!name) continue
+      const key = labelKey(name)
       const end = Number(rec.endBalance ?? 0)
-      byName.set(name, (byName.get(name) ?? 0) + (Number.isFinite(end) ? end : 0))
+      const prev = byName.get(key)
+      byName.set(key, {
+        label: prev?.label ?? name,
+        amount: (prev?.amount ?? 0) + (Number.isFinite(end) ? end : 0),
+      })
     }
 
-    for (const [name, amount] of byName) {
+    for (const { label: name, amount } of byName.values()) {
       let row = findDuplicateLabel(rowDefs.value, name)
       if (!row) {
         if (amount === 0) { out.unmatched.push(name); continue }
