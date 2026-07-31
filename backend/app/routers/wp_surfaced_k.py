@@ -277,18 +277,26 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
         ],
     },
     # ═══════════════════════════════════════════════════════════════════════
-    # K2 其他流动资产（资产借方 1231；含合同取得成本 / 摊销测算）
+    # K2 其他流动资产（报表行 BS-014 → 实证 TB('1901')；含合同取得成本 / 摊销测算）
+    # 🔴 历史实现写死 1231（应收款项坏账准备），已由报表映射解析取代
     # ═══════════════════════════════════════════════════════════════════════
     "K2": {
         "K2-1": [
-            ("TB 取数（期末余额）", "TB('1231子科目','期末余额')", "取数",
-             "从 tb_balance 1231 叶子子科目取期初/期末余额预填审定表（_build_adjudication_prefill）", "_k2_other_current_assets.py render"),
+            ("报表行科目解析", "BS-014 其他流动资产 → TB('1901','期末余额')", "取数",
+             "报表映射规则链路：report_config.formula → 标准码 → account_mapping 反解 → 客户原始码"
+             "（resolve_report_line_accounts）", "_k2_other_current_assets.py K2_ACCOUNT_SPEC"),
+            ("TB 取数（期末余额）", "TB('1901','期末余额')", "取数",
+             "从 tb_balance **叶子**子科目取期初/期末余额预填审定表动态行"
+             "（build_adjudication_prefill；无科目则返回空清单，宁缺勿造）", "_k2_other_current_assets.py render"),
             ("审定数", "未审数 + 账项调整(AJE) + 重分类调整(RJE)", "计算",
              "buildRow（calcAuditedAmount）", "useK2Adjudication / useK2FormulaEngine.calcAuditedAmount"),
             ("期末余额", "期初 + 借方 − 贷方", "计算",
-             "资产类 1231 期末（calcAssetEndBalance）", "useK2Adjudication / calcAssetEndBalance"),
-            ("合计", "Σ 8 个固定明细行", "计算",
-             "subtotalRow（calcSubtotal）", "useK2Adjudication / calcSubtotal"),
+             "资产类期末（calcAssetEndBalance）", "useK2Adjudication / calcAssetEndBalance"),
+            ("合计", "Σ 全部动态明细行", "计算",
+             "subtotalRow（calcSubtotal）；明细项目行按客户实际情况增删"
+             "（源模板：不存在的项目请删除）", "useK2Adjudication / calcSubtotal"),
+            ("从 K2-2 明细带入", "按项目名称聚合 K2-2 期末余额 → 审定表未审数", "取数",
+             "pullFromDetail（行名精确匹配，审定表无该项目时自动建行）", "useK2Adjudication / pullFromDetail"),
             ("变动率", "(本期审定 − 上期审定) ÷ |上期审定| × 100", "计算",
              "buildRow（calcChangeRate）", "useK2Adjudication / calcChangeRate"),
             ("三角勾稽差额", "期末 − (期初 + 借方 − 贷方)", "logic_check",
