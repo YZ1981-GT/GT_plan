@@ -207,8 +207,12 @@ async def fetch_tb_balance_leaves(ctx: RenderContext) -> list[LeafRow]:
 async def fetch_trial_balance_amounts(
     ctx: RenderContext, standard_codes: list[str]
 ) -> dict[str, dict[str, float]]:
-    """按标准码取 `trial_balance` 未审/审定额，**最长前缀**归属（防父子双计）。"""
-    codes = [c for c in (standard_codes or []) if c]
+    """按标准码取 `trial_balance` 未审/审定额，**最长前缀**归属（防父子双计）。
+
+    入参先 strip —— 空白串是「真前缀」会命中**所有**行（`code.startswith('')` 恒真），
+    必须与空串同样剔除。
+    """
+    codes = [s for c in (standard_codes or []) if (s := str(c or "").strip())]
     if not codes:
         return {}
     out: dict[str, dict[str, float]] = {
