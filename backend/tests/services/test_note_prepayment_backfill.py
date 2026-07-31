@@ -81,7 +81,7 @@ def test_build_tables_strips_header_label_and_keeps_meta(soe_section: dict[str, 
     ]
 
     aging = tables[0]
-    assert aging["headers"] == ["账龄", "金额", "比例（%）", "金额", "比例（%）"]
+    assert aging["headers"] == ["账  龄", "金 额", "比例（%）", "金 额", "比例（%）"]
     assert [g["group"] for g in aging["_column_groups"]] == ["期末数", "期初数"]
     assert aging["guidance"]
     # 无 header_label 假行；每行 values 长度 = 值列数
@@ -118,7 +118,7 @@ def test_rebuild_reports_rename_and_header_change(soe_section: dict[str, Any]) -
     names = [t["name"] for t in new_data["_tables"]]
     assert len(set(names)) == 3
     assert names[2] == "按欠款方归集的期末余额前五名的预付款项"
-    assert new_data["headers"] == ["账龄", "金额", "比例（%）", "金额", "比例（%）"]
+    assert new_data["headers"] == ["账  龄", "金 额", "比例（%）", "金 额", "比例（%）"]
     # 顶层 rows 沿用「= 第一张表」约定，且无 header_label
     assert all(r["row_type"] != "header_label" for r in new_data["rows"])
     assert any("表名" in c for c in changes)
