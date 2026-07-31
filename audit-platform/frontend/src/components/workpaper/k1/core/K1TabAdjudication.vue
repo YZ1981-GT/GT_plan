@@ -5,6 +5,17 @@
       <p>K1-1 审定表汇总其他应收款（不含应收利息、应收股利）原值、坏账准备与净值，按组合/账龄/性质三维度列示，并与 TB、K1-2 明细、K1-4 调整勾稽。</p>
       <div class="sync-toolbar">
         <el-button v-if="!isReadonly" size="small" type="primary" plain @click="handleSyncK12">从 K1-2 同步未审数</el-button>
+        <el-button
+          v-if="!isReadonly"
+          size="small"
+          type="primary"
+          plain
+          :disabled="!hasFourTablePrefill"
+          :loading="fourTableApplying"
+          @click="handlePullFromFourTable"
+        >
+          从四表库带入未审数
+        </el-button>
         <el-button size="small" @click="onExportTemplate">导出模板</el-button>
         <el-button size="small" @click="onExportData">导出数据</el-button>
         <el-upload
@@ -20,6 +31,8 @@
         <el-button size="small" link type="primary" @click="emit('navigate-sheet', 'K1-6')">K1-6 政策 →</el-button>
         <el-button size="small" link type="primary" @click="emit('navigate-sheet', 'K1-8')">K1-8 测算 →</el-button>
       </div>
+      <!-- 四表库取数溯源（报表行 BS-009 → 标准码 → 客户原始码） -->
+      <K1FourTableSourcePanel :source-codes="props.tbSourceCodes" />
       <div v-if="hasK14Data" class="k14-sync-banner">
         <el-tag type="info" size="small">
           K1-4：1221 AJE {{ fmtAmt(k14Sync.receivableAjeNet) }} / RJE {{ fmtAmt(k14Sync.receivableRjeNet) }}；
@@ -398,6 +411,9 @@ import { useK1FormData } from '../../composables/useK1FormData'
 import { useK1CrossSheet } from '../../composables/useK1CrossSheet'
 import { useK1ImportExport } from '../../composables/useK1ImportExport'
 import { useK1AiGenerate } from '../../composables/useK1AiGenerate'
+import { useAgingConfig } from '@/composables/useAgingConfig'
+import K1FourTableSourcePanel from './K1FourTableSourcePanel.vue'
+import type { K1TbSourceCodes } from '../../composables/k1TbSourceCodes'
 import DistributionTripleTable from './K1DistributionTripleTable.vue'
 import K1AdjWideTable from './K1AdjWideTable.vue'
 import {
@@ -413,6 +429,8 @@ const props = defineProps<{
   allResponses: Map<string, any>
   tbData: { unadjusted1221: number; audited1221: number; unadjustedBadDebt: number; auditedBadDebt: number }
   adjudicationPrefill?: K1AdjudicationPrefill | null
+  /** render 下发的取数溯源（报表行 → 标准码 → 原始码），供溯源面板展示 */
+  tbSourceCodes?: K1TbSourceCodes | null
   isReadonly: boolean
 }>()
 
@@ -427,6 +445,9 @@ const allResponsesRef = computed(() => props.allResponses)
 const portfolioDeeplinkHint = ref('')
 const portfolioHighlightRowKey = ref('')
 const receivableTableRef = ref<InstanceType<typeof K1AdjWideTable>>()
+
+// 🔴 setup 作用域 composable —— 必须在函数体外调用（内部依赖 inject / effect scope）
+const agingConfig = useAgingConfig(toRef(props, 'projectId'), 'K1')
 
 const {
   adjudicationSections,
@@ -454,6 +475,8 @@ const {
   projectId: toRef(props, 'projectId'),
   allResponses: allResponsesRef as any,
   tbData: computed(() => props.tbData),
+  // 🔴 账龄段必须透传：不传则 K1-1 固定 5 年段，项目配 3 年段时与 K1-2 档位不一致
+  agingSegments: agingConfig.segments,
   onSave: (itemId, value) => emit('save', itemId, value),
 })
 
@@ -656,6 +679,32 @@ function saveConclusion() {
 function portfolioLinkHint(label: string): string {
   const def = portfolioRowDefs.find((d) => d.label === label)
   return def?.linkHint || ''
+}
+
+/** 四表库预填是否可用（render 在「无持久化未审数」时才下发；空对象视为无） */
+const hasFourTablePrefill = computed(() => {
+  const p = props.adjudicationPrefill
+  return !!p && Object.keys(p).length > 0
+})
+const fourTableApplying = ref(false)
+
+/**
+ * 「从四表库带入未审数」—— 重新套用 render 下发的 `adjudication_prefill`。
+ *
+ * 手工优先仍然生效（`applyAdjudicationPrefill` 内部判 `hasPersistedUnadj`），
+ * 因此本按钮的语义是「首次/清空后重新带入」；FS 三行逐项判定，可单独补齐。
+ */
+async function handlePullFromFourTable(): Promise<void> {
+  if (props.isReadonly || !hasFourTablePrefill.value) return
+  fourTableApplying.value = true
+  try {
+    const ok = applyAdjudicationPrefill(props.adjudicationPrefill)
+    if (ok) ElMessage.success('已从四表库带入未审数（含应收利息/应收股利/报表数核对行）')
+    else ElMessage.info('已有手工录入的未审数，未覆盖；如需重新带入请先清空对应单元格')
+  } finally {
+    await nextTick()
+    fourTableApplying.value = false
+  }
 }
 
 function handleSyncK12() {

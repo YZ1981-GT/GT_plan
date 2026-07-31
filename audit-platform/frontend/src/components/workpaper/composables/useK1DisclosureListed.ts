@@ -87,6 +87,9 @@ export function useK1DisclosureListed(opts: {
   const stageMovements = computed(() => payload.value.stageMovements)
   const top5Rows = computed(() => payload.value.top5Rows)
   const reversalRows = computed(() => payload.value.reversalRows)
+  // ⑧⑨⑩ 三块（源模板 A136-A159）—— 2026-07-31 起也进 §五、8，需暴露给自动同步 watch
+  const govGrantRows = computed(() => payload.value.govGrantRows)
+  const transferRows = computed(() => payload.value.transferRows)
   const continuedInvolvementRows = computed(() => payload.value.continuedInvolvementRows)
   const continuedInvolvementTotals = computed(() =>
     summarizeContinuedInvolvement(payload.value.continuedInvolvementRows),
@@ -601,6 +604,8 @@ export function useK1DisclosureListed(opts: {
     stageMovements,
     top5Rows,
     reversalRows,
+    govGrantRows,
+    transferRows,
     continuedInvolvementRows,
     continuedInvolvementTotals,
     agingTieOut,

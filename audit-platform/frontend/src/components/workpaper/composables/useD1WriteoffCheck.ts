@@ -25,6 +25,11 @@
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import type { ChecklistItem, ChecklistResponse } from './useD1FormData'
+import {
+  D1_BD_PORTFOLIO_KEY,
+  patchD1PortfolioChangeColumns,
+  readD1BadDebtChangeTotals,
+} from './d1AdjudicationModel'
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 类型定义
@@ -545,17 +550,22 @@ export function useD1WriteoffCheck(options: UseD1WriteoffCheckOptions) {
 
   // ─── 跨Spec校验 ─────────────────────────────────────────────────────────
 
-  /** D1-4坏账准备转回变动合计（null=未加载） */
-  const d14ReversalTotal: ComputedRef<number | null> = computed(() => {
-    const raw = allResponses.value.get('D1-adj-bad-debt-reversal')?.remark
-    return raw == null ? null : parseNum(raw)
-  })
+  /**
+   * D1-4 坏账准备转回 / 核销变动合计（null = D1-4 尚无行数据）。
+   *
+   * 🔴 改造前读的是 `D1-adj-bad-debt-reversal` / `-writeoff` —— 那两个键**正是本表
+   * 「同步到 D1-4」时写的**，D1-4（`useD1BadDebt`）从不读也从不写 → 跨表核对退化为
+   * **自比自**（点过同步后差异恒 0），审计师看到的一致是假的。现直接读 D1-4 真实行。
+   */
+  const d14ChangeTotals = computed(() => readD1BadDebtChangeTotals(allResponses.value))
 
-  /** D1-4坏账准备核销变动合计（null=未加载） */
-  const d14WriteoffTotal: ComputedRef<number | null> = computed(() => {
-    const raw = allResponses.value.get('D1-adj-bad-debt-writeoff')?.remark
-    return raw == null ? null : parseNum(raw)
-  })
+  const d14ReversalTotal: ComputedRef<number | null> = computed(() =>
+    d14ChangeTotals.value.present ? d14ChangeTotals.value.reversal : null,
+  )
+
+  const d14WriteoffTotal: ComputedRef<number | null> = computed(() =>
+    d14ChangeTotals.value.present ? d14ChangeTotals.value.writeOff : null,
+  )
 
   /** ECL本期计提总额（null=未加载） */
   const eclCurrentTotal: ComputedRef<number | null> = computed(() => {
@@ -654,28 +664,34 @@ export function useD1WriteoffCheck(options: UseD1WriteoffCheckOptions) {
 
   // ─── P1: 同步到D1-4 ─────────────────────────────────────────────────────
 
-  /** 将本表转回合计同步写入 D1-4 坏账准备明细表转回变动列 */
-  function syncReversalToD14(): void {
+  /**
+   * 把本表合计**真正**回写进 D1-4 坏账准备明细表的变动列。
+   *
+   * 🔴 改造前写的是 `D1-adj-bad-debt-reversal` / `-writeoff` —— D1-4 从不读这两个键，
+   * 故「同步到 D1-4」按钮对 D1-4 毫无影响（只是把值写给了本表自己的核对读取路径，
+   * 造成「同步后差异归零」的假成功）。现按平台落点回写
+   * `D1-bd-portfolio-rows` 的「按组合计提」父行，D1-4 的期末未审随之重算，
+   * 并沿 D1-4 → D1-1 → 披露 → 附注 逐级联动。
+   */
+  function writeBackToD14(patch: { currentReversal?: number; currentWriteOff?: number }): void {
     if (isReadonly.value) return
     const item: ChecklistItem = {
-      item_id: 'D1-adj-bad-debt-reversal',
+      item_id: D1_BD_PORTFOLIO_KEY,
       conclusion: null,
-      remark: String(reversalTotalE.value),
+      remark: patchD1PortfolioChangeColumns(allResponses.value, patch),
     }
-    allResponses.value.set('D1-adj-bad-debt-reversal', item)
+    allResponses.value.set(D1_BD_PORTFOLIO_KEY, item)
     saveImmediate([item])
+  }
+
+  /** 将本表转回合计同步写入 D1-4 坏账准备明细表转回变动列 */
+  function syncReversalToD14(): void {
+    writeBackToD14({ currentReversal: reversalTotalE.value })
   }
 
   /** 将本表核销合计同步写入 D1-4 坏账准备明细表核销变动列 */
   function syncWriteoffToD14(): void {
-    if (isReadonly.value) return
-    const item: ChecklistItem = {
-      item_id: 'D1-adj-bad-debt-writeoff',
-      conclusion: null,
-      remark: String(writeoffTotalC.value),
-    }
-    allResponses.value.set('D1-adj-bad-debt-writeoff', item)
-    saveImmediate([item])
+    writeBackToD14({ currentWriteOff: writeoffTotalC.value })
   }
 
   // ─── Cleanup ───────────────────────────────────────────────────────────

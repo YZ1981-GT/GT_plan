@@ -13,6 +13,9 @@ import {
   K1_DISCLOSURE_SHEET_NAME,
   K1_LISTED_SUBTABLE,
   K1_NOTE_SECTION,
+  K1_NOTE_SUBTOTAL_LABEL_WIDE,
+  K1_NOTE_TOTAL_LABEL,
+  K1_NOTE_TOTAL_LABEL_WIDE,
   K1_SOE_SUBTABLE,
   isK1DisclosureApplicable,
   resolveK1CurrentStandard,
@@ -95,10 +98,39 @@ const stageColumns = (rateHeader: string): ColumnDef[] => flat([
   txt('理由'),
 ])
 
-/** 三阶段变动表共用列头（附注模版为单级 5 列；label 表头由各表首列决定） */
+/**
+ * 三阶段变动表列头 —— **国企侧单级 5 列**。
+ *
+ * 源 xlsx 国企 `A63:E63`（坏账准备计提情况）/ `A77:E77`（账面余额变动）是**一行表头**，
+ * 阶段名与 ECL 释义写在同一格里（`B63 = 第一阶段未来12个月预期信用损失`）→ 确为 `flat`。
+ */
 const stageMovementColumns = (labelHeader: string): ColumnDef[] => flat([
   lbl(labelHeader), amt('第一阶段'), amt('第二阶段'), amt('第三阶段'), amt('合计'),
 ])
+
+/**
+ * 三阶段变动表列头 —— **上市侧两级混合分组**。
+ *
+ * 🔴 源 xlsx 上市 `A91:E92` 是**两行表头**：`A91:A92`（坏账准备）与 `E91:E92`（合计）
+ * 纵向合并 = rowspan=2；`B91/C91/D91` 是阶段名，`B92/C92/D92` 是各阶段 ECL 释义。
+ * 模板与本载荷原先都压成单级 5 列 → 第二行释义整行丢失。
+ *
+ * 落法与 `methodColumns()` 同款：标签列与 `合计` 不带 `group`（且标签列**不打 `flat`**，
+ * 打了会让 `_extract_column_groups` 返回 `[]` 判为显式单级）；`key` 保持既有中文数据键。
+ */
+const LISTED_STAGE_ECL_DESC = {
+  s1: '未来12个月预期信用损失',
+  s2: '整个存续期预期信用损失(未发生信用减值)',
+  s3: '整个存续期预期信用损失(已发生信用减值)',
+} as const
+
+const listedStageMovementColumns = (labelHeader: string): ColumnDef[] => [
+  lbl(labelHeader),
+  amtG('第一阶段', LISTED_STAGE_ECL_DESC.s1, '第一阶段'),
+  amtG('第二阶段', LISTED_STAGE_ECL_DESC.s2, '第二阶段'),
+  amtG('第三阶段', LISTED_STAGE_ECL_DESC.s3, '第三阶段'),
+  amt('合计'),
+]
 
 export const K1_LISTED_COLUMNS: Record<string, ColumnDef[]> = {
   [K1_LISTED_SUBTABLE.aging]: flat([lbl('账龄'), amt('期末余额'), amt('上年年末余额')]),
@@ -119,7 +151,7 @@ export const K1_LISTED_COLUMNS: Record<string, ColumnDef[]> = {
   [K1_LISTED_SUBTABLE.priorStage1]: stageColumns(RATE_12M),
   [K1_LISTED_SUBTABLE.priorStage2]: stageColumns(RATE_LIFETIME),
   [K1_LISTED_SUBTABLE.priorStage3]: stageColumns(RATE_LIFETIME),
-  [K1_LISTED_SUBTABLE.stageMovement]: stageMovementColumns('坏账准备'),
+  [K1_LISTED_SUBTABLE.stageMovement]: listedStageMovementColumns('坏账准备'),
   [K1_LISTED_SUBTABLE.reversal]: flat([
     lbl('单位名称'), txt('转回原因'), txt('收回方式'), txt('原确定坏账准备的依据'), amt('转回或收回金额'),
   ]),
@@ -131,6 +163,18 @@ export const K1_LISTED_COLUMNS: Record<string, ColumnDef[]> = {
     lbl('单位名称'), txt('款项性质'), amt('其他应收款期末余额'), txt('账龄'),
     txt('占其他应收款期末余额合计数的比例(%)'), amt('坏账准备期末余额'),
   ]),
+  // 源 xlsx 上市 ⑧ `A137:E137`
+  [K1_LISTED_SUBTABLE.govGrant]: flat([
+    lbl('单位名称（注：政府补助的发文单位）'), txt('政府补助项目名称'),
+    amt('期末余额'), txt('账龄'), txt('预计收取的时间、金额及依据'),
+  ]),
+  // 源 xlsx 上市 ⑨ `A146:D146`（比国企版多「转移方式」列）
+  [K1_LISTED_SUBTABLE.transfer]: flat([
+    lbl('项  目'), txt('转移方式'), amt('终止确认金额'),
+    amt('与终止确认相关的利得或损失'),
+  ]),
+  // 源 xlsx 上市 ⑩ `A153:B153`（国企版列名是「期末金额」，上市版是「期末数」）
+  [K1_LISTED_SUBTABLE.continuedInvolvement]: flat([lbl('项  目'), amt('期末数')]),
 }
 
 /**
@@ -151,14 +195,15 @@ const methodColumns = (): ColumnDef[] => [
 ]
 
 export const K1_SOE_COLUMNS: Record<string, ColumnDef[]> = {
-  // 源 xlsx `A46:G55`：`B46:D46`（期末数）/ `E46:G46`（期初数）跨列合并
-  [K1_SOE_SUBTABLE.aging]: [
-    lbl('账  龄'),
-    amtG('期末账面余额', '账面余额', '期末数'),
-    amtG('期末坏账准备', '坏账准备', '期末数'),
-    amtG('期初账面余额', '账面余额', '期初数'),
-    amtG('期初坏账准备', '坏账准备', '期初数'),
-  ],
+  /**
+   * 🔴 源 xlsx 国企 `A6:C15` 是**单级 3 列**（`账  龄` / `期末数` / `期初数`），
+   * 行 = 账龄档 + `小  计` + `减：坏账准备` + `合  计`。
+   *
+   * 原先模板与本载荷都是 5 列（期末数/期初数 各含账面余额+坏账准备），那套结构不在
+   * 源模板里 → 载荷不得不把「小计 + 减：坏账准备」两行压进合计行的额外两列。
+   * 现按源模板还原为 3 列，载荷改为忠实推 subtotal / provision / total 三种 kind。
+   */
+  [K1_SOE_SUBTABLE.aging]: flat([lbl('账  龄'), amt('期末数'), amt('期初数')]),
   [K1_SOE_SUBTABLE.methodEnd]: methodColumns(),
   [K1_SOE_SUBTABLE.methodPrior]: methodColumns(),
   // 源 xlsx `A38:E39`：`B38:E38`（期末余额）跨列合并，下辖 4 个子列
@@ -249,22 +294,33 @@ function mapStageRows(rows: K1ListedDisclosurePayloadV2['stage1Rows']) {
     }))
 }
 
-/** 继续涉入：资产区 → 资产小计 → 负债区 → 负债小计（对齐源模板行序） */
+/**
+ * 继续涉入：资产区 → 资产小计 → 负债区 → 负债小计（对齐源模板行序）。
+ *
+ * 金额列名两版不同：国企 §八、9 是「期末金额」（源 xlsx `B117`），
+ * 上市 §五、8 是「期末数」（源 xlsx `B153`）→ 由 `amountKey` 区分，不能共用一个键。
+ */
 function mapContinuedInvolvement(
   snap: { continuedInvolvementRows?: K1ListedDisclosurePayloadV2['continuedInvolvementRows'] },
+  amountKey: '期末金额' | '期末数' = '期末金额',
 ): Record<string, unknown>[] {
   const rows = snap.continuedInvolvementRows || []
   const totals = summarizeContinuedInvolvement(rows)
-  const out: Record<string, unknown>[] = [{ label: '资产：', row_kind: 'header' }]
+  const cell = (label: string, amount?: number, extra?: Record<string, unknown>) => ({
+    label,
+    ...(amount === undefined ? {} : { [amountKey]: amount }),
+    ...(extra || {}),
+  })
+  const out: Record<string, unknown>[] = [cell('资产：', undefined, { row_kind: 'header' })]
   for (const r of rows.filter((x) => x.side === 'asset')) {
-    out.push({ label: r.item || '（未命名）', 期末金额: r.amount })
+    out.push(cell(r.item || '（未命名）', r.amount))
   }
-  out.push({ label: '资产小计', 期末金额: totals.assets, is_total: true })
-  out.push({ label: '负债：', row_kind: 'header' })
+  out.push(cell('资产小计', totals.assets, { is_total: true }))
+  out.push(cell('负债：', undefined, { row_kind: 'header' }))
   for (const r of rows.filter((x) => x.side === 'liability')) {
-    out.push({ label: r.item || '（未命名）', 期末金额: r.amount })
+    out.push(cell(r.item || '（未命名）', r.amount))
   }
-  out.push({ label: '负债小计', 期末金额: totals.liabilities, is_total: true })
+  out.push(cell('负债小计', totals.liabilities, { is_total: true }))
   return out
 }
 
@@ -372,6 +428,38 @@ export function buildK1ListedSubTableData(
         is_total: true,
       },
     ],
+    // ⑧ 应收政府补助情况（源模板逐项披露；合计只对期末余额求和，账龄/时间列为 `--`）
+    [K1_LISTED_SUBTABLE.govGrant]: [
+      ...(snap.govGrantRows || []).map((r) => ({
+        label: r.unitName || '（未命名）',
+        政府补助项目名称: r.projectName,
+        期末余额: r.endBalance,
+        账龄: r.aging,
+        '预计收取的时间、金额及依据': r.expectedCollection,
+      })),
+      {
+        label: K1_NOTE_TOTAL_LABEL,
+        期末余额: (snap.govGrantRows || []).reduce((s, r) => s + _num(r.endBalance), 0),
+        is_total: true,
+      },
+    ],
+    // ⑨ 因金融资产转移而终止确认（上市版比国企版多「转移方式」列）
+    [K1_LISTED_SUBTABLE.transfer]: [
+      ...(snap.transferRows || []).map((r) => ({
+        label: r.item || '（未命名）',
+        转移方式: r.method,
+        终止确认金额: r.derecognizedAmount,
+        与终止确认相关的利得或损失: r.gainLoss,
+      })),
+      {
+        label: K1_NOTE_TOTAL_LABEL,
+        终止确认金额: (snap.transferRows || []).reduce((s, r) => s + _num(r.derecognizedAmount), 0),
+        与终止确认相关的利得或损失: (snap.transferRows || []).reduce((s, r) => s + _num(r.gainLoss), 0),
+        is_total: true,
+      },
+    ],
+    // ⑩ 转移且继续涉入形成的资产、负债（上市金额列名是「期末数」）
+    [K1_LISTED_SUBTABLE.continuedInvolvement]: mapContinuedInvolvement(snap, '期末数'),
     _note_texts: noteTextRows([
       ['listed-audit-note', auditNote],
       ['listed-fund-centralization', snap.fundCentralizationNote || ''],
@@ -414,31 +502,29 @@ export function buildK1SoeSubTableData(
   const methodTotal = snap.methodRows.find((r) => r.rowKey === 'total')
   const notes = snap.notes || {}
   const agingRows = snap.agingRows || []
-  const agingSubtotal = agingRows.find((r) => r.kind === 'subtotal')
-  const agingProvision = agingRows.find((r) => r.kind === 'provision')
 
   return {
-    // 附注「按账龄披露其他应收款项」为「账面余额 + 坏账准备」双列口径，
-    // 底稿账龄表为「金额 + 减：坏账准备行」口径 → 明细行填账面余额，合计行补坏账准备总额。
-    [K1_SOE_SUBTABLE.aging]: [
-      ...agingRows
-        .filter((r) => r.kind === 'data' || r.kind === 'sub')
-        .map((r) => ({
-          label: r.label,
-          期末账面余额: r.endAmount,
-          期初账面余额: r.priorAmount,
-          row_kind: r.kind,
-          segment_key: r.segmentKey,
-        })),
-      {
-        label: '合  计',
-        期末账面余额: _num(agingSubtotal?.endAmount),
-        期末坏账准备: _num(agingProvision?.endAmount),
-        期初账面余额: _num(agingSubtotal?.priorAmount),
-        期初坏账准备: _num(agingProvision?.priorAmount),
-        is_total: true,
-      },
-    ],
+    /**
+     * 附注「按账龄披露其他应收款项」= 源模板单级 3 列（账 龄 / 期末数 / 期初数），
+     * 行含账龄档 + `小  计` + `减：坏账准备` + `合  计`。
+     *
+     * 底稿账龄表本来就有这三行（`kind` 为 `subtotal` / `provision` / `total`），
+     * 旧实现把它们过滤掉再压进合计行的额外两列 —— 现忠实推送，结构与源模板一致。
+     * 合计行字面按源 xlsx A13/A15 用**双空格**「小  计」「合  计」。
+     */
+    [K1_SOE_SUBTABLE.aging]: agingRows.map((r) => ({
+      label:
+        r.kind === 'subtotal'
+          ? K1_NOTE_SUBTOTAL_LABEL_WIDE
+          : r.kind === 'total'
+            ? K1_NOTE_TOTAL_LABEL_WIDE
+            : r.label,
+      期末数: r.endAmount,
+      期初数: r.priorAmount,
+      row_kind: r.kind,
+      segment_key: r.segmentKey,
+      is_total: r.kind === 'total' || r.kind === 'subtotal' || r.kind === 'subtotal1y',
+    })),
     [K1_SOE_SUBTABLE.methodEnd]: (snap.methodRows || []).map((r) => ({
       label: r.label,
       账面余额: r.endBalance,
@@ -589,7 +675,7 @@ export function buildK1SoeSubTableData(
         is_total: true,
       },
     ],
-    [K1_SOE_SUBTABLE.continuedInvolvement]: mapContinuedInvolvement(snap),
+    [K1_SOE_SUBTABLE.continuedInvolvement]: mapContinuedInvolvement(snap, '期末金额'),
     _note_texts: noteTextRows([
       ['soe-audit-note', auditNote],
       ['soe-balance-change', notes.balanceChange || ''],

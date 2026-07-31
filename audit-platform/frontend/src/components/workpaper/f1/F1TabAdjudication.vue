@@ -22,10 +22,26 @@
         class="objective-alert"
       />
 
+      <!-- 四表库取数溯源 -->
+      <F1FourTableSourcePanel
+        :tb-source-codes="tbSourceCodes"
+        :tb-cross-cycle-codes="tbCrossCycleCodes"
+        :trial-balance-amount="trialBalanceAmount"
+        :leaf-amount="tbLeafAmount"
+      />
+
       <!-- 工具栏 -->
       <div class="tab-toolbar">
         <div class="toolbar-left"></div>
         <div class="toolbar-right">
+          <el-button
+            size="small"
+            type="primary"
+            plain
+            :loading="pullingFromTb"
+            :disabled="isReadonly"
+            @click="onPullNatureFromTB"
+          >从四表库带入未审数</el-button>
           <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
             <el-icon><Download /></el-icon>带入调整
           </el-button>
@@ -277,6 +293,8 @@ import type { ChecklistResponse } from '../composables/useF1FormData'
 import GtIndexChip from '../GtIndexChip.vue'
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import F1SheetAttachments from './F1SheetAttachments.vue'
+import F1FourTableSourcePanel from './F1FourTableSourcePanel.vue'
+import type { F1NaturePrefill } from '../composables/useF1Adjudication'
 import type { AgingSegment } from '@/composables/useAgingConfig'
 
 const props = defineProps<{
@@ -289,6 +307,13 @@ const props = defineProps<{
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
   /** 后端 render 提供的 1123 试算数（只读回退 seed） */
   tbAmountSeed?: number
+  /** 科目余额表叶子合计（与 tbAmountSeed 并列，供溯源面板显示两口径差异） */
+  tbLeafAmount?: number
+  /** 四表库「按性质分类」未审数预填（render adjudication_prefill.nature） */
+  naturePrefill?: F1NaturePrefill
+  /** render 下发的取数溯源 */
+  tbSourceCodes?: unknown
+  tbCrossCycleCodes?: unknown
   /** F1 账龄口径单一真源（主入口注入，含表级枚举覆盖） */
   agingSegments?: AgingSegment[]
 }>()
@@ -305,6 +330,8 @@ const {
   crossValidationWarning,
   adjustmentReconcile,
   auditNotes,
+  hasNaturePrefill,
+  pullNatureFromTB,
   updateCell,
   publishAdjudicated,
 } = useF1Adjudication({
@@ -316,8 +343,32 @@ const {
   crossSheet: props.crossSheet,
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
   tbAmountSeed: computed(() => props.tbAmountSeed ?? 0) as unknown as Ref<number>,
+  naturePrefill: computed(() => props.naturePrefill ?? {}) as unknown as Ref<F1NaturePrefill>,
   agingSegments: computed(() => props.agingSegments ?? []) as unknown as Ref<AgingSegment[]>,
 })
+
+const pullingFromTb = ref(false)
+
+/**
+ * 「从四表库带入未审数」：把 render 下发的性质预填持久化为未审数。
+ * 只覆盖预填中出现的性质桶，不清零未出现的桶；四表无数时给中文提示。
+ */
+async function onPullNatureFromTB() {
+  if (props.isReadonly) return
+  if (!hasNaturePrefill.value) {
+    ElMessage.info('四表库暂无预付款项明细科目数据（需先导入科目余额表并完成科目映射）')
+    return
+  }
+  pullingFromTb.value = true
+  try {
+    const applied = pullNatureFromTB()
+    if (applied > 0) {
+      ElMessage.success(`已从四表库带入 ${applied} 个性质分类的未审数（期初/期末）`)
+    }
+  } finally {
+    pullingFromTb.value = false
+  }
+}
 
 const { aiAvailable, loading: aiLoading, generateAndConfirm } = useF1AiGenerate(wpIdRef)
 

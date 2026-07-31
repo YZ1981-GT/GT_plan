@@ -203,8 +203,11 @@ export function useD1Adjustment(options: UseD1AdjustmentOptions) {
     const items: ChecklistItem[] = [
       { item_id: STORAGE_KEY, conclusion: null, remark: serialized },
       { item_id: 'D1-entry-count', conclusion: null, remark: String(rows.value.length) },
-      { item_id: 'D1-adj-bank-acceptance-aje-dr', conclusion: null, remark: String(ajeTotal.value) },
-      { item_id: 'D1-adj-bank-acceptance-rje-dr', conclusion: null, remark: String(rjeTotal.value) },
+      // 🔴 已删除两条死写入 `D1-adj-bank-acceptance-aje-dr` / `-rje-dr`：
+      // 全平台**无任何读取方**，且形状不匹配 `d_cycle_anchor_registry.json` 的 D1 锚点
+      // 正则（后端 seed 会直接丢弃），只是在 checklist_responses 里堆无用行。
+      // 调整分录 → 审定表 AJE/RJE 的真实通路是 EventBus `adjustment:created`
+      // → `useD1Adjudication.onAdjustmentCreated` → `D1-adj-{section}-{slug}-current-{aje|rje}`。
     ]
     allResponses.value.set(STORAGE_KEY, items[0])
     saveImmediate(items)

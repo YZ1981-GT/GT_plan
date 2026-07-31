@@ -29,6 +29,7 @@ import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } fro
 import { ElMessage } from 'element-plus'
 import type { ChecklistItem, ChecklistResponse } from './useD1FormData'
 import { sumColumn, computePledgeRatio, type PledgeRow } from './d1InspectionFormulas'
+import { readD1AdjudicationTotals } from './d1AdjudicationModel'
 import { useD1ImportExport, type ImportResult } from './useD1ImportExport'
 import http from '@/utils/http'
 
@@ -52,8 +53,14 @@ const ROWS_KEY = 'D1-pledge-rows'
 const NOTE_KEY = 'D1-pledge-note'
 const CONCLUSION_KEY = 'D1-pledge-conclusion'
 
-/** 跨Spec审定表净值 key（来自 d1-adjudication-table Spec） */
-const CROSS_SPEC_ADJ_BOOK_VALUE_KEY = 'D1-adj-book-value-current'
+/**
+ * 🔴 已删除常量 `CROSS_SPEC_ADJ_BOOK_VALUE_KEY = 'D1-adj-book-value-current'`。
+ *
+ * 该锚点**全平台无写入方**（审定表实际锚点是 `D1-adj-{gross|bd|net}-{slug}-{field}`，
+ * 且净值/审定数都是 computed 列从不持久化）→ `adjBookValue` 恒 null、`adjDataLoaded`
+ * 恒 false → **质押比例恒显示 N/A、质押预警永不触发**。
+ * 现改由共享模型 `readD1AdjudicationTotals` 现算「三、应收票据净值」期末审定合计。
+ */
 
 /** PledgeRow 数值字段 */
 const NUMERIC_FIELDS: Array<keyof PledgeRow> = ['noteAmount', 'pledgeAmount']
@@ -297,18 +304,15 @@ export function useD1PledgeCheck(options: UseD1PledgeCheckOptions) {
 
   // ─── Computed: 跨Spec审定表净值 ──────────────────────────────────────────
 
-  /** 审定表净值（跨Spec取数）— null表示未加载 */
-  const adjBookValue: ComputedRef<number | null> = computed(() => {
-    const raw = allResponses.value.get(CROSS_SPEC_ADJ_BOOK_VALUE_KEY)?.remark
-    if (raw == null) return null
-    const n = parseNum(raw)
-    return n
-  })
+  const adjTotals = computed(() => readD1AdjudicationTotals(allResponses.value))
 
-  /** 审定表净值数据是否已加载 */
-  const adjDataLoaded: ComputedRef<boolean> = computed(() => {
-    return allResponses.value.has(CROSS_SPEC_ADJ_BOOK_VALUE_KEY)
-  })
+  /** 审定表「三、应收票据净值」期末审定合计（跨表取数）— null 表示审定表尚无数据 */
+  const adjBookValue: ComputedRef<number | null> = computed(() =>
+    adjTotals.value.hasData ? adjTotals.value.netTotal.currentAudited : null,
+  )
+
+  /** 审定表数据是否已加载 */
+  const adjDataLoaded: ComputedRef<boolean> = computed(() => adjTotals.value.hasData)
 
   // ─── Computed: 质押比例 ──────────────────────────────────────────────────
 

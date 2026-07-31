@@ -57,6 +57,7 @@
           :all-responses="allResponses"
           :tb-data="tbData"
           :adjudication-prefill="adjudicationPrefill"
+          :tb-source-codes="tbSourceCodes"
           :is-readonly="isReadonly"
           @save="handleChildSave"
           @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
@@ -258,6 +259,12 @@ import {
 import { createK1RowNavigation, K1RowNavigationKey } from './composables/useK1RowNavigation'
 import { resolveK1BsDate } from './composables/k1PostPaymentFromLedger'
 import type { K1AdjudicationPrefill } from './composables/useK1Adjudication'
+import {
+  k1GrossQueryCodes,
+  k1ProvisionQueryCodes,
+  sumLongestPrefixOnly,
+  type K1TbSourceCodes,
+} from './composables/k1TbSourceCodes'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
@@ -340,6 +347,16 @@ const adjudicationPrefill = computed<K1AdjudicationPrefill | null>(() => {
   const raw = props.htmlData?.adjudication_prefill ?? props.htmlData?.adjudicationPrefill
   if (!raw || typeof raw !== 'object') return null
   return raw as K1AdjudicationPrefill
+})
+
+/**
+ * 四表库取数溯源（报表行 BS-009 → 标准码 → 客户原始码）。
+ * 既供 K1-1 溯源面板展示，也是坏账兜底请求的口径来源（禁止再写死 `1231`）。
+ */
+const tbSourceCodes = computed<K1TbSourceCodes | null>(() => {
+  const raw = props.htmlData?.tb_source_codes ?? props.htmlData?.tbSourceCodes
+  if (!raw || typeof raw !== 'object') return null
+  return raw as K1TbSourceCodes
 })
 
 const wpIdRef = computed(() => props.wpId)
@@ -447,40 +464,43 @@ async function _loadTbData(): Promise<void> {
   }
 
   if (!props.projectId) return
-  try {
+
+  /** 拉某科目前缀的试算平衡表行 → 归一为 `TbCodedAmountRow[]` */
+  async function _fetchTbRows(prefix: string) {
     const res = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
-      params: { account_prefix: '1221', year: props.year },
+      params: { account_prefix: prefix, year: props.year },
       _silent: true,
     } as any)
-    const list: any[] = Array.isArray(res?.data?.data ?? res?.data) ? (res?.data?.data ?? res?.data) : []
-    let u1221 = 0, a1221 = 0
-    for (const item of list) {
-      const code = String(item.standard_account_code ?? item.account_code ?? '')
-      if (code.startsWith('1221')) {
-        u1221 += Number(item.unadjusted_amount ?? 0)
-        a1221 += Number(item.audited_amount ?? 0)
-      }
-    }
-    tbData.value.unadjusted1221 = u1221
-    tbData.value.audited1221 = a1221
+    const list: any[] = Array.isArray(res?.data?.data ?? res?.data)
+      ? (res?.data?.data ?? res?.data)
+      : []
+    return list.map((item) => ({
+      code: String(item.standard_account_code ?? item.account_code ?? ''),
+      unadjusted: Number(item.unadjusted_amount ?? 0),
+      audited: Number(item.audited_amount ?? 0),
+    }))
+  }
+
+  // 原值：口径取自 render 溯源（缺省 1221）；只累加叶子（最长前缀）防父子双计
+  try {
+    const codes = k1GrossQueryCodes(tbSourceCodes.value)
+    const rows = await _fetchTbRows(codes[0].split('-')[0])
+    const sum = sumLongestPrefixOnly(rows, codes)
+    tbData.value.unadjusted1221 = sum.unadjusted
+    tbData.value.audited1221 = sum.audited
   } catch {
     // TB取数失败静默处理
   }
 
-  // 坏账准备（科目号取决于企业会计制度，通常为1231或下挂1221坏账）
+  // 坏账准备：🔴 口径必须是「其他应收款」专属备抵子科目（实证 1231-03），
+  // 而非宽口径 1231 —— 后者会把应收票据/应收账款的坏账一并算进 K1，
+  // 且 trial_balance 里父码 1231 与子码 1231-0x 并存会双计。
   try {
-    const res = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
-      params: { account_prefix: '1231', year: props.year },
-      _silent: true,
-    } as any)
-    const list: any[] = Array.isArray(res?.data?.data ?? res?.data) ? (res?.data?.data ?? res?.data) : []
-    let uBd = 0, aBd = 0
-    for (const item of list) {
-      uBd += Number(item.unadjusted_amount ?? 0)
-      aBd += Number(item.audited_amount ?? 0)
-    }
-    tbData.value.unadjustedBadDebt = uBd
-    tbData.value.auditedBadDebt = aBd
+    const codes = k1ProvisionQueryCodes(tbSourceCodes.value)
+    const rows = await _fetchTbRows(codes[0].split('-')[0])
+    const sum = sumLongestPrefixOnly(rows, codes)
+    tbData.value.unadjustedBadDebt = Math.abs(sum.unadjusted)
+    tbData.value.auditedBadDebt = Math.abs(sum.audited)
   } catch {
     // 静默处理
   }

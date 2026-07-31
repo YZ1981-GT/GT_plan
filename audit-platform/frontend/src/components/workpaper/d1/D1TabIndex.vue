@@ -11,6 +11,7 @@ import { useRouter } from 'vue-router'
 import GtBArchitectureTree from '../GtBArchitectureTree.vue'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
 import { loadCycleWorkpaperCards, type CycleWpCard } from '@/services/cycleDirectory'
+import { D1_ADJ_PREFIX } from '../composables/d1AdjudicationModel'
 
 const D1PreparationHandbookDialog = defineAsyncComponent(() => import('./D1PreparationHandbookDialog.vue'))
 
@@ -41,7 +42,7 @@ const NAV_ROWS: NavRow[] = [
   // 审计计划
   { content: '应收票据实质性程序表 D1A', index_ref: 'D1A', component_type: 'a-program-console', progressKeys: [] },
   // 科目审定
-  { content: '审定表D1-1', index_ref: 'D1-1', component_type: 'd-form-table', progressKeys: ['D1-adj-'] },
+  { content: '审定表D1-1', index_ref: 'D1-1', component_type: 'd-form-table', progressKeys: [D1_ADJ_PREFIX] },
   // 实质性程序
   { content: '按类别明细表D1-2', index_ref: 'D1-2', component_type: 'd-form-table-detail', progressKeys: ['D1-cat-rows'] },
   { content: '按客户明细表D1-3', index_ref: 'D1-3', component_type: 'd-form-table-detail', progressKeys: ['D1-cust-rows'] },

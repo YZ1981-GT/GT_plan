@@ -51,6 +51,8 @@ export interface AdjudicationRow {
   changeRate: number | '' | 'N/A'
   reasonAnalysis: string
   isFromCrossSheet: boolean
+  /** 未审数来自四表库预填（无手工值且 F1-2 未编制时） */
+  isFromFourTable: boolean
   isEditable: boolean
 }
 
@@ -79,11 +81,22 @@ export interface UseF1AdjudicationOptions {
   /** 后端 render 提供的 1123 试算数（审定/未审），无持久化时作只读回退 seed */
   tbAmountSeed?: Ref<number>
   /**
+   * 四表库「按性质分类」未审数预填（render `adjudication_prefill.nature`）。
+   * 优先级：**手工 > F1-2 明细聚合 > 四表库预填**（明细更细且已审定）。
+   */
+  naturePrefill?: Ref<F1NaturePrefill> | ComputedRef<F1NaturePrefill>
+  /**
    * F1 账龄口径（由主入口注入的单一真源，含表级枚举覆盖）。
    * 未注入时回退项目级 useAgingConfig（兼容旧调用）。
    */
   agingSegments?: Ref<AgingSegment[]> | ComputedRef<AgingSegment[]>
 }
+
+/**
+ * 四表库按性质预填形态（后端 `build_nature_prefill` 输出，key = NATURE_ROWS.rowKey）。
+ * 只含**实际出现**的性质桶 → 「只覆盖出现的类别、不清零未出现的类别」。
+ */
+export type F1NaturePrefill = Record<string, { opening?: number; closing?: number }>
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -138,16 +151,20 @@ function buildRow(
   crossSheetCurrent: number,
   crossSheetPrior: number,
   hasDetail: boolean,
+  /** 四表库预填（仅当无手工值且 F1-2 未编制时生效；undefined = 该桶四表无数） */
+  tbPrior?: number,
+  tbCurrent?: number,
 ): AdjudicationRow {
   // 🔴 persist-first：手工录入优先，明细聚合仅作未录入时的自动带入（seed）。
   //   旧逻辑 `cross !== 0 ? cross : manual` 有两个坑：
   //   ① 明细有数时手工修正被静默忽略（无法按分类调整）；
   //   ② 明细真为 0（全部核销）时回退到手工旧值 → 显示幽灵数。
+  //   四表库预填排在**最后**（明细 > 四表）：F1-2 明细按往来单位 + 性质更细且已审定。
   const priorItemId = makeItemId(section, rowKey, 'priorUnadjusted')
   const manualPrior = getResponseNum(allResponses, priorItemId)
   const priorUnadjusted = hasManualEntry(allResponses, priorItemId)
     ? manualPrior
-    : (hasDetail ? crossSheetPrior : manualPrior)
+    : (hasDetail ? crossSheetPrior : (tbPrior ?? manualPrior))
   const priorAje = getResponseNum(allResponses, makeItemId(section, rowKey, 'priorAje'))
   const priorRje = getResponseNum(allResponses, makeItemId(section, rowKey, 'priorRje'))
 
@@ -157,7 +174,7 @@ function buildRow(
   const manualCurrent = getResponseNum(allResponses, currentItemId)
   const currentUnadjusted = hasManualEntry(allResponses, currentItemId)
     ? manualCurrent
-    : (hasDetail ? crossSheetCurrent : manualCurrent)
+    : (hasDetail ? crossSheetCurrent : (tbCurrent ?? manualCurrent))
   const currentAje = getResponseNum(allResponses, makeItemId(section, rowKey, 'currentAje'))
   const currentRje = getResponseNum(allResponses, makeItemId(section, rowKey, 'currentRje'))
 
@@ -171,6 +188,11 @@ function buildRow(
     hasDetail
     && !hasManualEntry(allResponses, currentItemId)
     && (crossSheetCurrent !== 0 || crossSheetPrior !== 0)
+
+  const isFromFourTable =
+    !hasDetail
+    && !hasManualEntry(allResponses, currentItemId)
+    && (tbCurrent !== undefined || tbPrior !== undefined)
 
   return {
     rowKey,
@@ -187,6 +209,7 @@ function buildRow(
     changeRate,
     reasonAnalysis,
     isFromCrossSheet,
+    isFromFourTable,
     isEditable: true,
   }
 }
@@ -218,6 +241,7 @@ function buildSubtotalRow(rows: AdjudicationRow[], label: string): AdjudicationR
     changeRate,
     reasonAnalysis: '',
     isFromCrossSheet: false,
+    isFromFourTable: false,
     isEditable: false,
   }
 }
@@ -227,7 +251,7 @@ function buildSubtotalRow(rows: AdjudicationRow[], label: string): AdjudicationR
 export function useF1Adjudication(options: UseF1AdjudicationOptions) {
   const {
     allResponses, wpId, projectId, saveImmediate, debouncedSave, crossSheet, isReadonly,
-    tbAmountSeed, agingSegments,
+    tbAmountSeed, naturePrefill, agingSegments,
   } = options
 
   let _debounceTimer: ReturnType<typeof setTimeout> | null = null
@@ -257,9 +281,16 @@ export function useF1Adjudication(options: UseF1AdjudicationOptions) {
     const hasDetail = (crossSheet.detailRowCount?.value ?? 0) > 0
 
     // === 区块一：按性质分类 ===
+    // 四表库预填只覆盖**出现的**性质桶（后端 build_nature_prefill 只输出有叶子的桶）
+    const tbNature = naturePrefill?.value ?? {}
     const natureRows: AdjudicationRow[] = NATURE_ROWS.map(({ rowKey, label }) => {
       const aggData = natureAgg[label] || { current: 0, prior: 0 }
-      return buildRow('nature', rowKey, label, responses, aggData.current, aggData.prior, hasDetail)
+      const tb = tbNature[rowKey]
+      return buildRow(
+        'nature', rowKey, label, responses, aggData.current, aggData.prior, hasDetail,
+        tb ? parseNum(tb.opening) : undefined,
+        tb ? parseNum(tb.closing) : undefined,
+      )
     })
 
     const natureSubtotal = buildSubtotalRow(natureRows, '合计')
@@ -428,6 +459,38 @@ export function useF1Adjudication(options: UseF1AdjudicationOptions) {
     debouncedSave(itemId, { remark: strValue })
   }
 
+  // ─── 从四表库带入未审数（显式按钮） ─────────────────────────────────────
+
+  /** 四表库是否有可带入的性质预填（按钮禁用态 / 提示文案用） */
+  const hasNaturePrefill: ComputedRef<boolean> = computed(
+    () => Object.keys(naturePrefill?.value ?? {}).length > 0,
+  )
+
+  /**
+   * 把四表库「按性质分类」预填**持久化**为未审数。
+   *
+   * - 只覆盖预填中**出现**的性质桶，未出现的桶逐字不动（不清零）；
+   * - 幂等：连续调用两次结果相同；
+   * - 只读态直接返回。
+   *
+   * @returns 实际写入的性质桶数（0 = 四表库无数据 / 只读）
+   */
+  function pullNatureFromTB(): number {
+    if (isReadonly.value) return 0
+    const src = naturePrefill?.value ?? {}
+    let applied = 0
+    for (const { rowKey } of NATURE_ROWS) {
+      const bucket = src[rowKey]
+      if (!bucket) continue
+      const opening = parseNum(bucket.opening)
+      const closing = parseNum(bucket.closing)
+      debouncedSave(makeItemId('nature', rowKey, 'priorUnadjusted'), { remark: String(opening) })
+      debouncedSave(makeItemId('nature', rowKey, 'currentUnadjusted'), { remark: String(closing) })
+      applied += 1
+    }
+    return applied
+  }
+
   // ─── publishAdjudicated ──────────────────────────────────────────────
 
   function publishAdjudicated(): void {
@@ -480,6 +543,9 @@ export function useF1Adjudication(options: UseF1AdjudicationOptions) {
     adjustmentReconcile,
     // 审计说明
     auditNotes,
+    // 四表库带入
+    hasNaturePrefill,
+    pullNatureFromTB,
     // 操作
     updateCell,
     publishAdjudicated,

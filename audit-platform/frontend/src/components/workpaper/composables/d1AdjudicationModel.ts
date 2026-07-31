@@ -112,6 +112,22 @@ export function isD1AdjAnchor(itemId: string): boolean {
   return String(itemId ?? '').startsWith(D1_ADJ_PREFIX)
 }
 
+/**
+ * 审定表复核对话框 `section_id`（**与 checklist 锚点是不同命名空间**，但共用前缀，
+ * 故一并在此收敛，防两处各写字面量后漂移）。
+ *
+ * 🔴 这两个值同时是后端 `_SECTION_PROMPTS` 的登记键，改字面量会让 AI 生成退回通用 prompt。
+ */
+export const D1_ADJ_REVIEW_SECTION = {
+  auditNote: `${D1_ADJ_PREFIX}audit-note`,
+  auditConclusion: `${D1_ADJ_PREFIX}audit-conclusion`,
+} as const
+
+/** 单元格级复核 `section_id`（形状与锚点一致，取同一构造器保证不漂移）。 */
+export function d1AdjReviewSectionId(rowKey: string, field: string): string {
+  return d1AdjAnchorByRowKey(rowKey, field)
+}
+
 // ─── 票据种类 ────────────────────────────────────────────────────────────────
 
 export interface D1Category {
@@ -394,6 +410,76 @@ export function readD1BadDebtTotal(map: D1ResponseMap): D1PeriodAmounts {
 /** D1-2 原值**合计**（派生列现算，理由同 `readD1BadDebtTotal`）。 */
 export function readD1CategoryTotal(map: D1ResponseMap): D1PeriodAmounts {
   return d1SumAmounts(Object.values(readD1CategoryAmounts(map)))
+}
+
+/**
+ * D1-4 坏账准备**变动列**合计（转回 / 核销），供 D1-16 转回核销检查表做跨表核对。
+ *
+ * 🔴 改造前 `useD1WriteoffCheck` 把「D1-4 转回变动合计」读成
+ * `D1-adj-bad-debt-reversal` —— 而那个键**正是它自己**「同步到 D1-4」时写的，
+ * D1-4（`useD1BadDebt`）从不读也从不写它 → 变成**自比自**（点过同步后差异恒 0），
+ * 且「同步到 D1-4」按钮对 D1-4 毫无影响。现改为直接读 D1-4 真实行数据。
+ */
+export function readD1BadDebtChangeTotals(map: D1ResponseMap): {
+  reversal: number
+  writeOff: number
+  /** D1-4 是否已有行数据（否则返回 null 语义由调用方决定） */
+  present: boolean
+} {
+  let reversal = 0
+  let writeOff = 0
+  let present = false
+  for (const key of [D1_BD_INDIVIDUAL_KEY, D1_BD_PORTFOLIO_KEY]) {
+    const rows = readJsonArray(map, key)
+    if (rows.length) present = true
+    for (const raw of rows) {
+      // 「转回」口径含「收回」（源模板 D1-4 H 列「转回」；前端另有 currentRecovery 列）
+      reversal += n(raw?.currentReversal) + n(raw?.currentRecovery)
+      writeOff += n(raw?.currentWriteOff)
+    }
+  }
+  return { reversal, writeOff, present }
+}
+
+/**
+ * 把转回 / 核销金额回写进 D1-4「按组合计提」父行（纯函数，返回新的 JSON 串）。
+ *
+ * 供 D1-16 的「同步到 D1-4」按钮真正生效：改造前它写的是 D1-4 从不读的
+ * `D1-adj-bad-debt-*` 键。落点选「按组合计提」父行 —— D1-16 的合计不区分
+ * 单项/组合，而组合是缺省归属；审计师可在 D1-4 内再拆到「其中：」明细行。
+ *
+ * 只覆盖传入的列，其余字段与其它行原样保留（缺行时补出固定父行）。
+ */
+export function patchD1PortfolioChangeColumns(
+  map: D1ResponseMap,
+  patch: { currentReversal?: number; currentWriteOff?: number },
+): string {
+  const rows = readJsonArray(map, D1_BD_PORTFOLIO_KEY)
+  const list = rows.length
+    ? rows.map((r) => ({ ...r }))
+    : [
+        {
+          rowId: 'fixed-portfolio',
+          category: 'portfolio',
+          label: '按组合计提',
+          isSubRow: false,
+          priorUnadjusted: 0,
+          priorAje: 0,
+          priorRje: 0,
+          currentProvision: 0,
+          currentRecovery: 0,
+          currentReversal: 0,
+          currentWriteOff: 0,
+          currentOther: 0,
+          currentAje: 0,
+          currentRje: 0,
+        } as Record<string, unknown>,
+      ]
+  const target =
+    list.find((r) => String(r?.rowId ?? '') === 'fixed-portfolio') ?? list[0]
+  if (patch.currentReversal !== undefined) target.currentReversal = patch.currentReversal
+  if (patch.currentWriteOff !== undefined) target.currentWriteOff = patch.currentWriteOff
+  return JSON.stringify(list)
 }
 
 export interface D1AdjudicationTotals {

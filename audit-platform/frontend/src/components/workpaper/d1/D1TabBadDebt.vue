@@ -8,7 +8,8 @@
  * ECL差异警告（小计行旁黄色 el-alert）
  */
 import { ref, inject, toRef, computed, type Ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import WpAmountInput from '../shared/WpAmountInput.vue'
 import { useD1BadDebt, type BadDebtRow } from '../composables/useD1BadDebt'
 import type { ChecklistResponse } from '../composables/useD1FormData'
 import GtReviewDot from '../GtReviewDot.vue'
@@ -55,6 +56,13 @@ const {
   saveAuditProcedures,
   saveAuditNote,
   saveAuditConclusion,
+  // 按票据种类小计块（源模板 R23/R24 → D1-1 审定表坏账区块取数源）
+  noteTypeRows,
+  noteTypeSubtotal,
+  noteTypeCheck,
+  addNoteTypeRow,
+  removeNoteTypeRow,
+  updateNoteTypeCell,
 } = useD1BadDebt({
   allResponses: toRef(props, 'allResponses') as Ref<Map<string, ChecklistResponse>>,
   wpId: toRef(props, 'wpId') as Ref<string>,
@@ -74,6 +82,31 @@ function fmtAmount(val: number): string {
   if (val === 0) return '-'
   if (val < 0) return `<span class="negative-amount">(${displayPrefs.fmtAmount(Math.abs(val))})</span>`
   return displayPrefs.fmtAmount(val)
+}
+
+// ─── 按票据种类小计块（源模板 D1-4 R23/R24）─────────────────────────────────
+//
+// 该块是**独立于「按单项/按组合」的第二个维度**：主表按计提方法拆，本块按票据种类拆，
+// 源模板专门留这两行去喂 D1-1 审定表坏账区块（`D1-1!B12=D1-4!B23`、`F12=!K23`）。
+// 四表库 1231 只有总额、无票据种类拆分，且按原值比例分摊坏账无审计依据 → 本块手工录入
+// + 与主表合计做勾稽提示（宁缺勿造）。
+
+const noteTypeTableData = computed(() => [...noteTypeRows.value, noteTypeSubtotal.value])
+
+/** 动态行新增须先 prompt 输入票据种类名（平台底稿交互铁律）。 */
+async function onAddNoteTypeRow(): Promise<void> {
+  if (props.isReadonly) return
+  try {
+    const { value } = await ElMessageBox.prompt('请输入票据种类名称', '新增票据种类小计', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      inputPlaceholder: '如：财务公司承兑汇票、信用证',
+      inputValidator: (v: string) => (String(v || '').trim() ? true : '名称不能为空'),
+    })
+    if (addNoteTypeRow(String(value))) ElMessage.success('已新增票据种类行')
+  } catch {
+    /* 用户取消 */
+  }
 }
 
 // ─── Table Data ──────────────────────────────────────────────────────────────
@@ -512,6 +545,153 @@ function onReview(sectionId: string) {
       </el-table>
     </div>
 
+    <!-- 按票据种类小计（源模板 R23/R24 → 喂 D1-1 审定表坏账区块） -->
+    <div class="notetype-section">
+      <div class="notetype-header">
+        <span class="notetype-title">按票据种类小计</span>
+        <el-tag size="small" type="info" effect="plain">
+          源模板 D1-4 R23/R24 —— D1-1 审定表「二、应收票据坏账准备」的取数来源
+        </el-tag>
+        <el-button
+          size="small"
+          type="primary"
+          plain
+          :disabled="isReadonly"
+          style="margin-left:auto"
+          @click="onAddNoteTypeRow"
+        >+ 票据种类</el-button>
+      </div>
+
+      <div class="notetype-hint">
+        本块按<strong>票据种类</strong>拆分（与上表按<strong>计提方法</strong>拆分是两个维度，
+        切的是同一批坏账准备）。四表库 1231 只提供总额、无票据种类拆分，按原值比例分摊没有
+        审计依据，故此处由审计师依据 D1-15 ECL 测算手工填列。
+      </div>
+
+      <el-table
+        :data="noteTypeTableData"
+        row-key="rowId"
+        border
+        size="small"
+        style="width:100%"
+      >
+        <el-table-column label="票据种类" min-width="200">
+          <template #default="{ row }">
+            <span v-if="row.isFixed">{{ row.noteType }}</span>
+            <el-input
+              v-else
+              :model-value="row.noteType"
+              size="small"
+              :disabled="isReadonly"
+              @input="(v: string) => updateNoteTypeCell(row.rowId, 'noteType', v)"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column label="期初余额" align="center">
+          <el-table-column label="期初未审数" align="right" min-width="130">
+            <template #default="{ row }">
+              <span v-if="row.rowId === 'notetype-subtotal'" v-html="fmtAmount(row.priorUnadjusted)" />
+              <WpAmountInput
+                v-else
+                :model-value="row.priorUnadjusted"
+                :disabled="isReadonly"
+                @update:model-value="(v: number) => updateNoteTypeCell(row.rowId, 'priorUnadjusted', v)"
+              />
+            </template>
+          </el-table-column>
+          <el-table-column label="账项调整" align="right" min-width="120">
+            <template #default="{ row }">
+              <span v-if="row.rowId === 'notetype-subtotal'" v-html="fmtAmount(row.priorAje)" />
+              <WpAmountInput
+                v-else
+                :model-value="row.priorAje"
+                :disabled="isReadonly"
+                @update:model-value="(v: number) => updateNoteTypeCell(row.rowId, 'priorAje', v)"
+              />
+            </template>
+          </el-table-column>
+          <el-table-column label="重分类调整" align="right" min-width="120">
+            <template #default="{ row }">
+              <span v-if="row.rowId === 'notetype-subtotal'" v-html="fmtAmount(row.priorRje)" />
+              <WpAmountInput
+                v-else
+                :model-value="row.priorRje"
+                :disabled="isReadonly"
+                @update:model-value="(v: number) => updateNoteTypeCell(row.rowId, 'priorRje', v)"
+              />
+            </template>
+          </el-table-column>
+          <el-table-column label="期初审定数" align="right" min-width="130">
+            <template #default="{ row }">
+              <span class="auto-calc" v-html="fmtAmount(row.priorAudited)" />
+            </template>
+          </el-table-column>
+        </el-table-column>
+        <el-table-column label="期末余额" align="center">
+          <el-table-column label="期末未审数" align="right" min-width="130">
+            <template #default="{ row }">
+              <span v-if="row.rowId === 'notetype-subtotal'" v-html="fmtAmount(row.currentUnadjusted)" />
+              <WpAmountInput
+                v-else
+                :model-value="row.currentUnadjusted"
+                :disabled="isReadonly"
+                @update:model-value="(v: number) => updateNoteTypeCell(row.rowId, 'currentUnadjusted', v)"
+              />
+            </template>
+          </el-table-column>
+          <el-table-column label="账项调整" align="right" min-width="120">
+            <template #default="{ row }">
+              <span v-if="row.rowId === 'notetype-subtotal'" v-html="fmtAmount(row.currentAje)" />
+              <WpAmountInput
+                v-else
+                :model-value="row.currentAje"
+                :disabled="isReadonly"
+                @update:model-value="(v: number) => updateNoteTypeCell(row.rowId, 'currentAje', v)"
+              />
+            </template>
+          </el-table-column>
+          <el-table-column label="重分类调整" align="right" min-width="120">
+            <template #default="{ row }">
+              <span v-if="row.rowId === 'notetype-subtotal'" v-html="fmtAmount(row.currentRje)" />
+              <WpAmountInput
+                v-else
+                :model-value="row.currentRje"
+                :disabled="isReadonly"
+                @update:model-value="(v: number) => updateNoteTypeCell(row.rowId, 'currentRje', v)"
+              />
+            </template>
+          </el-table-column>
+          <el-table-column label="期末审定数" align="right" min-width="130">
+            <template #default="{ row }">
+              <span class="auto-calc" v-html="fmtAmount(row.currentAudited)" />
+            </template>
+          </el-table-column>
+        </el-table-column>
+        <el-table-column label="操作" width="80" align="center">
+          <template #default="{ row }">
+            <el-button
+              v-if="!row.isFixed && row.rowId !== 'notetype-subtotal'"
+              size="small"
+              type="danger"
+              link
+              :disabled="isReadonly"
+              @click="removeNoteTypeRow(row.rowId)"
+            >删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <div
+        class="notetype-check"
+        :class="noteTypeCheck.pending ? 'is-pending' : (noteTypeCheck.ok ? 'is-ok' : 'is-diff')"
+      >
+        <span v-if="noteTypeCheck.pending">
+          ⓘ 勾稽：本块合计应等于上表合计（源模板 R22 = R23 + R24）—— 尚未填列
+        </span>
+        <span v-else>{{ noteTypeCheck.ok ? '✅ ' : '⚠️ ' }}{{ noteTypeCheck.message }}</span>
+      </div>
+    </div>
+
     <!-- 三、审计说明 + 四、审计结论 -->
     <el-card class="audit-opinion-card" shadow="never">
       <template #header>
@@ -762,5 +942,47 @@ function onReview(sectionId: string) {
   display: flex;
   gap: 8px;
   margin-top: 8px;
+}
+
+/* 按票据种类小计块 */
+.notetype-section {
+  margin-top: 16px;
+}
+.notetype-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.notetype-title {
+  font-weight: 600;
+  font-size: var(--wp-font-size, 13px);
+}
+.notetype-hint {
+  font-size: 12px;
+  color: #8a6d3b;
+  background: #fffbe6;
+  border-left: 3px solid #e6a23c;
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  line-height: 1.6;
+}
+.notetype-check {
+  margin-top: 6px;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 3px;
+}
+.notetype-check.is-ok {
+  color: #67c23a;
+  background: #f0f9eb;
+}
+.notetype-check.is-diff {
+  color: #e6a23c;
+  background: #fdf6ec;
+}
+.notetype-check.is-pending {
+  color: #909399;
+  background: #f4f4f5;
 }
 </style>

@@ -35,27 +35,63 @@ export interface H8SyncFromWorkpaperPayload {
   columns?: Record<string, ColumnDef[]>
 }
 
-/** 上市变动表列头随类别动态（项目 + 类别 + 合计），键对齐 buildH8ListedSubTableData */
+/**
+ * 上市变动表列头随类别动态（项目 + 类别 + 合计），键对齐 buildH8ListedSubTableData。
+ *
+ * 🔴 首列必须 `flat: true`：源模板表头是单行，不声明时后端
+ * `_extract_column_groups` 返回 `None` → 回退 `_infer_groups_from_headers` 前缀推断，
+ * 会凭空造出父表头（实测国企侧被推成 `[{group:'本期',start:2,span:2}]`）。
+ * `flat` 标在任意一列即对整表生效。
+ */
 export function buildH8ListedColumns(state: H8ListedSyncSnapshot): Record<string, ColumnDef[]> {
   const cats = state.categories || []
   return {
     [H8_LISTED_SUBTABLE.movement]: [
-      { key: 'label', label: '项目', is_label: true },
+      { key: 'label', label: '项目', is_label: true, flat: true },
       ...cats.map((c) => ({ key: c.label, label: c.label, format: 'amount' as const })),
       { key: '合计', label: '合计', format: 'amount' },
     ],
   }
 }
 
-/** 国企变动表列头（项目/期初余额/本期增加/本期减少/期末余额），键对齐 flattenSoeMovement */
+/**
+ * 国企变动表列头（项目/期初余额/本期增加/本期减少/期末余额），键对齐 flattenSoeMovement。
+ *
+ * 🔴 `flat: true` 同上 —— 缺它时 `本期增加`/`本期减少` 会被前缀推断归到凭空的「本期」父表头下。
+ */
 const H8_SOE_COLUMNS: Record<string, ColumnDef[]> = {
   [H8_SOE_SUBTABLE.movement]: [
-    { key: 'label', label: '项目', is_label: true },
+    { key: 'label', label: '项目', is_label: true, flat: true },
     { key: 'begin', label: '期初余额', format: 'amount' },
     { key: 'increase', label: '本期增加', format: 'amount' },
     { key: 'decrease', label: '本期减少', format: 'amount' },
     { key: 'end', label: '期末余额', format: 'amount' },
   ],
+}
+
+/**
+ * `_note_texts` section → 中文标题。
+ *
+ * 🔴 缺 `title` 时后端 `_format_note_texts` 用 `section` 兜底 → 附注正文会渲染成
+ * `【listed-short-low】` 这类英文键（违反 UI 全中文化）。
+ */
+export const H8_NOTE_TEXT_TITLES: Record<string, string> = {
+  'listed-short-low': '短期租赁及低价值资产租赁费用说明',
+  'listed-impairment': '使用权资产减值情况说明',
+  'soe-impairment': '使用权资产减值情况说明',
+}
+
+/** 构造 `_note_texts`：过滤空白文本 + 补中文 title（两变体共用） */
+export function buildH8NoteTexts(
+  items: ReadonlyArray<{ section: string; text: string | null | undefined }>,
+): Array<{ section: string; title: string; text: string }> {
+  return items
+    .filter((it) => String(it.text ?? '').trim())
+    .map((it) => ({
+      section: it.section,
+      title: H8_NOTE_TEXT_TITLES[it.section] || it.section,
+      text: String(it.text).trim(),
+    }))
 }
 
 export function buildH8ListedSubTableData(state: H8ListedSyncSnapshot): Record<string, Record<string, unknown>[]> {
@@ -77,13 +113,16 @@ export function buildH8ListedSubTableData(state: H8ListedSyncSnapshot): Record<s
     rows.push(row)
   }
 
-  return {
+  const out: Record<string, Record<string, unknown>[]> = {
     [H8_LISTED_SUBTABLE.movement]: rows,
-    _note_texts: [
-      { section: 'listed-short-low', text: state.noteShortLow || '' },
-      { section: 'listed-impairment', text: state.noteImpairment || '' },
-    ] as unknown as Record<string, unknown>[],
   }
+  // 空白文本不产生条目；全空时不产生 `_note_texts` 键
+  const notes = buildH8NoteTexts([
+    { section: 'listed-short-low', text: state.noteShortLow },
+    { section: 'listed-impairment', text: state.noteImpairment },
+  ])
+  if (notes.length) out._note_texts = notes as unknown as Record<string, unknown>[]
+  return out
 }
 
 export function buildH8SoeSubTableData(state: H8SoeSyncSnapshot): Record<string, Record<string, unknown>[]> {
@@ -100,12 +139,14 @@ export function buildH8SoeSubTableData(state: H8SoeSyncSnapshot): Record<string,
       layer: flat.layer,
     })
   }
-  return {
+  const out: Record<string, Record<string, unknown>[]> = {
     [H8_SOE_SUBTABLE.movement]: movementRows,
-    _note_texts: [
-      { section: 'soe-impairment', text: state.noteImpairment || '' },
-    ] as unknown as Record<string, unknown>[],
   }
+  const notes = buildH8NoteTexts([
+    { section: 'soe-impairment', text: state.noteImpairment },
+  ])
+  if (notes.length) out._note_texts = notes as unknown as Record<string, unknown>[]
+  return out
 }
 
 export function buildH8ListedSyncPayloads(

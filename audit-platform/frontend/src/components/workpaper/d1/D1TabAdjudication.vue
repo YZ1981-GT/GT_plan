@@ -28,6 +28,10 @@ import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBring
 import http from '@/utils/http'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import {
+  D1_ADJ_REVIEW_SECTION,
+  d1AdjReviewSectionId,
+} from '../composables/d1AdjudicationModel'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -171,7 +175,7 @@ function handleCellContextMenu(row: AdjudicationDetailRow, column: any, event: M
   event.preventDefault()
   const field = column?.property || 'unknown'
   openReviewDialog({
-    sectionId: `D1-adj-${row.rowKey}-${field}`,
+    sectionId: d1AdjReviewSectionId(row.rowKey, field),
     sectionLabel: `D1-1 审定表 ${row.label} - ${column?.label || field}`,
     relatedData: { rowKey: row.rowKey, field, value: (row as any)[field] },
   })
@@ -402,7 +406,7 @@ async function handleAiConclusion() {
             />
             <div class="note-actions">
               <el-button size="small" :loading="aiNoteLoading" :disabled="isReadonly" @click="handleAiNote">🤖AI</el-button>
-              <GtReviewTrigger section-id="D1-adj-audit-note" />
+              <GtReviewTrigger :section-id="D1_ADJ_REVIEW_SECTION.auditNote" />
             </div>
           </div>
         </div>
@@ -422,7 +426,7 @@ async function handleAiConclusion() {
           />
           <div class="note-actions">
             <el-button size="small" :loading="aiConclusionLoading" :disabled="isReadonly" @click="handleAiConclusion">🤖AI</el-button>
-            <GtReviewTrigger section-id="D1-adj-audit-conclusion" />
+            <GtReviewTrigger :section-id="D1_ADJ_REVIEW_SECTION.auditConclusion" />
           </div>
         </div>
       </div>

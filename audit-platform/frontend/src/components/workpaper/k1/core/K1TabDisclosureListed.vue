@@ -721,7 +721,7 @@
         <div class="card-title-row">
           <span class="card-title">⑧ 应收政府补助情况（逐项披露）</span>
           <div class="head-actions">
-            <el-tag size="small" type="warning">附注去向：计入其他应收款的政府补助</el-tag>
+            <el-tag size="small" type="success">附注去向：五、8·应收政府补助情况</el-tag>
             <el-button size="small" type="primary" link :disabled="isReadonly" @click="disc.addGovGrantRow()">新增行</el-button>
           </div>
         </div>
@@ -786,7 +786,7 @@
         <div class="card-title-row">
           <span class="card-title">⑨ 因金融资产转移而终止确认的其他应收款情况</span>
           <div class="head-actions">
-            <el-tag size="small" type="warning">附注去向：七、金融工具·因转移而终止确认的金融资产</el-tag>
+            <el-tag size="small" type="success">附注去向：五、8·因金融资产转移而终止确认的其他应收款情况</el-tag>
             <el-button size="small" type="primary" link :disabled="isReadonly" @click="disc.addTransferRow()">新增行</el-button>
           </div>
         </div>
@@ -1208,6 +1208,10 @@ watch(
     () => disc.stageMovements,
     () => disc.top5Rows,
     () => disc.reversalRows,
+    // 🔴 ⑧⑨⑩ 三块 2026-07-31 起也进 §五、8（原以为附注真源在别处 → 既没进载荷
+    //    也没进 watch，改了这三块不会触发自动同步 = 半接入）
+    () => disc.govGrantRows,
+    () => disc.transferRows,
     () => disc.continuedInvolvementRows,
     () => disc.noteText,
   ],

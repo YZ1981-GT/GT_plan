@@ -28,9 +28,11 @@ import {
   K1_AGING_ROW_DEFS,
   K1_NATURE_ROW_DEFS,
   K1_PORTFOLIO_COUNT,
-  K1_AGING_COUNT,
   K1_NATURE_COUNT,
+  buildK1AgingRowDefs,
+  type K1AdjRowDef,
 } from './k1AdjudicationModel'
+import type { AgingSegment } from '@/composables/useAgingConfig'
 import { aggregateK12ForK11, type K1DetailRowLike } from './k1AdjudicationSync'
 import {
   computeK11ComboCrossCheck,
@@ -126,12 +128,20 @@ export interface K1AdjudicationPrefillBucket {
   credit?: number
 }
 
+/** 「与经审计的财务报表核对」区（应收利息 / 应收股利 / 报表数）四表预填 */
+export interface K1FsReconciliationPrefill {
+  interest?: number
+  dividend?: number
+  report_total?: number
+}
+
 export interface K1AdjudicationPrefill {
   receivable_total?: K1AdjudicationPrefillBucket
   bad_debt_total?: K1AdjudicationPrefillBucket
   nature?: Record<string, K1AdjudicationPrefillBucket>
   portfolio?: Record<string, K1AdjudicationPrefillBucket>
   portfolio_provision?: Record<string, K1AdjudicationPrefillBucket>
+  fs_reconciliation?: K1FsReconciliationPrefill
 }
 
 export interface UseK1AdjudicationOpts {
@@ -139,6 +149,12 @@ export interface UseK1AdjudicationOpts {
   projectId: Ref<string>
   allResponses: Ref<Map<string, any>>
   tbData?: Ref<{ unadjusted1221: number; audited1221: number; unadjustedBadDebt: number; auditedBadDebt: number }>
+  /**
+   * 项目账龄段（`useAgingConfig(projectId,'K1').segments`）。
+   * 缺省回退 K1 默认 5 年段 —— 但**宿主应当传**，否则项目配 3 年段时
+   * K1-1 与 K1-2 档位不一致（R5 / Property 5）。
+   */
+  agingSegments?: Ref<AgingSegment[]> | ComputedRef<AgingSegment[]>
   onSave?: (itemId: string, value: any) => void
 }
 
@@ -161,10 +177,18 @@ function _round2(n: number): number {
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useK1Adjudication(opts: UseK1AdjudicationOpts) {
-  const { allResponses, onSave, tbData } = opts
+  const { allResponses, onSave, tbData, agingSegments } = opts
 
   const auditNote = ref('')
   const auditConclusion = ref('')
+
+  /** 账龄行定义 —— 跟随项目账龄配置（3年段 / 5年段 / 自定义），缺省 5 年段 */
+  const agingRowDefs: ComputedRef<K1AdjRowDef[]> = computed(() =>
+    buildK1AgingRowDefs(agingSegments?.value),
+  )
+  const agingDataDefs: ComputedRef<K1AdjRowDef[]> = computed(() =>
+    agingRowDefs.value.filter((d) => !d.isSubtotal),
+  )
 
   // ─── 构建行数据 ────────────────────────────────────────────────────────────
 
@@ -242,7 +266,7 @@ export function useK1Adjudication(opts: UseK1AdjudicationOpts) {
   function buildDistributionBlock(
     blockKey: string,
     blockLabel: string,
-    defs: typeof K1_AGING_ROW_DEFS,
+    defs: readonly K1AdjRowDef[],
     grossPrefix: string,
     provPrefix: string,
   ): K1AdjBlockSection {
@@ -374,7 +398,7 @@ export function useK1Adjudication(opts: UseK1AdjudicationOpts) {
   })
 
   const agingDistribution: ComputedRef<K1AdjBlockSection> = computed(() =>
-    buildDistributionBlock('aging', '二、其他应收款账龄分布', K1_AGING_ROW_DEFS, 'aging-gross', 'aging-prov'),
+    buildDistributionBlock('aging', '二、其他应收款账龄分布', agingRowDefs.value, 'aging-gross', 'aging-prov'),
   )
 
   const natureDistribution: ComputedRef<K1AdjBlockSection> = computed(() =>
@@ -517,14 +541,15 @@ export function useK1Adjudication(opts: UseK1AdjudicationOpts) {
       return { applied: false, message: 'K1-2 明细表暂无数据', rowCount: 0 }
     }
     ensurePortfolioLabels()
-    const agg = aggregateK12ForK11(rows)
+    // 🔴 按项目账龄段聚合（按段 key 取值），否则 3 年段的 over3 会丢
+    const agg = aggregateK12ForK11(rows, agingSegments?.value)
 
     K1_PORTFOLIO_ROW_DEFS.forEach((_, i) => {
       _writeUnadj('receivable', `r${i}`, agg.portfolioGross[i] ?? 0)
       _writeUnadj('baddebt', `r${i}`, agg.portfolioProvision[i] ?? 0)
     })
 
-    K1_AGING_ROW_DEFS.filter((d) => !d.isSubtotal).forEach((def, i) => {
+    agingDataDefs.value.forEach((def, i) => {
       _writeUnadj('aging-gross', def.rowKey, agg.agingGross[i] ?? 0)
       _writeUnadj('aging-prov', def.rowKey, _round2(agg.agingProvision[i] ?? 0))
     })
@@ -559,14 +584,51 @@ export function useK1Adjudication(opts: UseK1AdjudicationOpts) {
     onSave?.('K1-1-audited-net', { remark: String(_round2(net)) })
   }
 
+  /** 该 FS 项已有非零持久值 → 不覆盖（逐项手工优先） */
+  function _hasPersistedFs(field: 'interest' | 'dividend' | 'other-total'): boolean {
+    return Math.abs(num(allResponses.value, `K1-1-fs-${field}`)) >= 0.005
+  }
+
+  /**
+   * 「与经审计的财务报表核对」区三项四表预填（应收利息 1132 / 应收股利 1131 /
+   * 报表数 BS-009 口径合计）。
+   *
+   * 与未审数是否已录**互相独立** —— 审计师可能先录了未审数但 FS 三行仍空，
+   * 那三行原本只能手工敲，是四表链路的断点。
+   */
+  function applyFsReconciliationPrefill(
+    fs?: K1FsReconciliationPrefill | null,
+  ): boolean {
+    if (!fs) return false
+    const pairs: Array<['interest' | 'dividend' | 'other-total', number]> = [
+      ['interest', Number(fs.interest) || 0],
+      ['dividend', Number(fs.dividend) || 0],
+      ['other-total', Number(fs.report_total) || 0],
+    ]
+    let wrote = false
+    for (const [field, val] of pairs) {
+      if (Math.abs(val) < 0.005) continue
+      if (_hasPersistedFs(field)) continue
+      writeFsField(field, val)
+      wrote = true
+    }
+    return wrote
+  }
+
   /**
    * 从 render adjudication_prefill 写入期初/未审数。
-   * 仅在无持久化未审数时生效；性质行按 syncKey 映射，组合默认写入账龄组合。
+   * 未审数部分仅在无持久化未审数时生效；性质行按 syncKey 映射，组合默认写入账龄组合。
+   * FS 三行独立按项判定（见 `applyFsReconciliationPrefill`）。
    */
   function applyAdjudicationPrefill(prefill?: K1AdjudicationPrefill | null): boolean {
-    if (!prefill || hasPersistedUnadj()) return false
+    if (!prefill) return false
+
+    const fsWrote = applyFsReconciliationPrefill(prefill.fs_reconciliation)
+    if (hasPersistedUnadj()) return fsWrote
 
     ensurePortfolioLabels()
+    // 🔴 `wrote` 只跟踪**未审数**是否写入 —— 下方「无组合拆分时总额兜底」分支靠它判定，
+    // 若把 fsWrote 混进来会让「只写了 FS 三行」的场景跳过兜底。
     let wrote = false
 
     const natureMap = prefill.nature ?? {}
@@ -630,7 +692,7 @@ export function useK1Adjudication(opts: UseK1AdjudicationOpts) {
     }
 
     if (wrote) persistAuditedTotals()
-    return wrote
+    return wrote || fsWrote
   }
 
   function writeRemark(prefix: string, rowKey: string, text: string): void {
@@ -689,6 +751,8 @@ export function useK1Adjudication(opts: UseK1AdjudicationOpts) {
     agingDistribution,
     natureDistribution,
     portfolioRowDefs,
+    agingRowDefs,
+    agingDataDefs,
     reconciliation,
     tbReconciliation,
     fsReconciliation,
@@ -702,6 +766,7 @@ export function useK1Adjudication(opts: UseK1AdjudicationOpts) {
     syncEndAdjFromK14,
     syncUnadjFromK12,
     applyAdjudicationPrefill,
+    applyFsReconciliationPrefill,
     hasPersistedUnadj,
     ensurePortfolioLabels,
     persistAuditedTotals,

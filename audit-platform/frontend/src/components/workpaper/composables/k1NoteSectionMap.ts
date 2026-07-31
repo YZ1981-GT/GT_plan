@@ -27,12 +27,27 @@ export const K1_DISCLOSURE_SHEET_NAME = {
 } as const satisfies Record<K1DisclosureVariant, string>
 
 /**
+ * 附注合计行字面（**按本章节实证取值**，禁止全局硬套）。
+ *
+ * K1 两版模板与源 xlsx 都是**无空格**的「合计」/「小计」（对比 D2/F1 的「合 计」）；
+ * 唯二例外是国企 §八、9 的「由金融资产转移而终止确认的其他应收款项」与
+ * 「涉及政府补助的应收款项」用了双空格「合  计」（源 xlsx A115 / A130 即如此），
+ * 以及国企账龄表的「小  计」/「合  计」（源 xlsx A13/A15）。
+ * 故合计行字面必须**逐表**取，不能只留一个全局常量。
+ */
+export const K1_NOTE_TOTAL_LABEL = '合计'
+export const K1_NOTE_TOTAL_LABEL_WIDE = '合  计'
+export const K1_NOTE_SUBTOTAL_LABEL_WIDE = '小  计'
+
+/**
  * 与 note_template_listed §五、8 tables[].name **逐字**对齐（K1 其他应收款项部分）。
  * 契约测试见 `__tests__/k1NoteSubtableContract.spec.ts`——改名前先改附注模板。
  *
- * 注意：底稿上市披露表还有「资金集中管理」「应收政府补助」「转移终止确认」「继续涉入」四块，
- * 其附注真源**不在 §五、8**：政府补助 → 附注「计入其他应收款的政府补助」；
- * 转移/继续涉入 → 附注 §七 金融工具「因转移而终止确认的金融资产」。故不在此映射内。
+ * 🔴 `govGrant` / `transfer` / `continuedInvolvement` 三张表 2026-07-31 补入：
+ * 源 xlsx 上市披露 sheet 的 ⑧`A136:E141` / ⑨`A146:D150` / ⑩`A153:B159` 明确列在
+ * 其他应收款披露内，国企 §八、9 也一直有对应三表 —— 上市侧模板却整张缺失（两版不对称），
+ * 底稿早已收集 `govGrantRows`/`transferRows`/`continuedInvolvementRows` 却无处推送。
+ * 已由 `fix_note_k_complex_structure.py` 补入模板（`insert=True`）。
  */
 export const K1_LISTED_SUBTABLE = {
   aging: '按账龄披露',
@@ -48,6 +63,9 @@ export const K1_LISTED_SUBTABLE = {
   writeoffSummary: '本期实际核销的其他应收款情况',
   writeoffDetail: '重要的其他应收款核销情况（逐项披露）',
   top5: '按欠款方归集的其他应收款期末余额前五名单位情况',
+  govGrant: '应收政府补助情况',
+  transfer: '因金融资产转移而终止确认的其他应收款情况',
+  continuedInvolvement: '转移其他应收款且继续涉入形成的资产、负债的金额',
 } as const
 
 /** 与 note_template_soe §八、9 tables[].name **逐字**对齐（K1 其他应收款项部分） */
