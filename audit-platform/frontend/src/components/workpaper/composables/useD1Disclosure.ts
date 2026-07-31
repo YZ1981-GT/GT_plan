@@ -10,9 +10,13 @@
 import { ref, computed, type Ref, type ComputedRef } from 'vue'
 import type { ChecklistItem, ChecklistResponse } from './useD1FormData'
 import {
-  parseNum, calcSubtotal, calcNetValue, safeDivide, calcBadDebtEndBalance,
+  parseNum, calcSubtotal, calcNetValue, safeDivide, calcDisclosureBadDebtEnd,
   deriveClassRows,
 } from './useD1FormulaEngine'
+import {
+  D1_ZERO_AMOUNTS,
+  readD1AdjudicationTotals,
+} from './d1AdjudicationModel'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -95,16 +99,15 @@ function safeParseArray<T>(jsonStr: string | null | undefined): T[] {
   try { const p = JSON.parse(jsonStr); return Array.isArray(p) ? p : [] } catch { return [] }
 }
 
-const CROSS_SHEET_KEYS = {
-  bankEndBalance: 'D1-adj-gross-bank-current-audited',
-  bankPriorBalance: 'D1-adj-gross-bank-prior-audited',
-  bankEndProvision: 'D1-adj-baddebt-bank-current-audited',
-  bankPriorProvision: 'D1-adj-baddebt-bank-prior-audited',
-  commercialEndBalance: 'D1-adj-gross-commercial-current-audited',
-  commercialPriorBalance: 'D1-adj-gross-commercial-prior-audited',
-  commercialEndProvision: 'D1-adj-baddebt-commercial-current-audited',
-  commercialPriorProvision: 'D1-adj-baddebt-commercial-prior-audited',
-} as const
+// 🔴 已删除 `CROSS_SHEET_KEYS`（原有 8 条锚点字面量**全平台无写入方**）：
+//   * `-current-audited` / `-prior-audited` 后缀从不持久化 —— 审定数是 computed 列，
+//     `useD1Adjudication` 只存 `-current-unadj` / `-current-aje` / `-current-rje`；
+//   * 前缀 `baddebt-` 与写入方的 `bd-` 不一致。
+// 结果：披露①分类表的跨表取数**从未生效过**，`crossSheetStatus` 恒 'empty'、主表恒走
+// 手工兜底 → 「四表入库 → D1-2/D1-4 → D1-1」这条链到披露表就断了，附注自然没数。
+// 而两个单测（`useD1Disclosure.pbt.spec.ts` / `useD1DisclosureDerived.spec.ts`）**镜像了
+// 同款错误锚点**播种 fixture，测试恒绿、生产恒死。
+// 现改为唯一真源 `d1AdjudicationModel.readD1AdjudicationTotals`（与审定表同一纯函数）。
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -120,26 +123,35 @@ export function useD1Disclosure(options: UseD1DisclosureOptions) {
       : ['categorySummary', 'badDebtClass', 'badDebtMovement', 'pledged', 'endorsed', 'transfer', 'writeOff']
   )
 
-  // ─── Cross-Sheet Data (Task 2.1) ────────────────────────────────────────
+  // ─── Cross-Sheet Data（唯一真源 = 审定表共享模型）────────────────────────
+  //
+  // 源模板披露①分类表就是从审定表取数：
+  //   上市 B9='审定表D1-1'!I8（银承期末审定原值）/ C9=!I12（坏账）/ D9=B9-C9
+  //        E9=!E8（期初审定原值）/ F9=!E12 / G9=E9-F9
+  //   国企 B8/C8/D8 与 E8/F8/G8 同构
+  // 故此处直接消费 `readD1AdjudicationTotals`（与 D1-1 渲染同一函数、同一口径）。
+  const adjTotals = computed(() => readD1AdjudicationTotals(allResponses.value))
+
+  /** 保留旧字段名供既有调用方/测试消费（银承 + 商承四个口径），值改由共享模型派生。 */
   const crossSheetData = computed(() => {
-    const m = allResponses.value
-    const get = (k: string) => parseNum(m.get(k)?.remark ?? m.get(k)?.conclusion)
+    const t = adjTotals.value
+    const g = (slug: string) => t.gross[slug] ?? D1_ZERO_AMOUNTS
+    const p = (slug: string) => t.provision[slug] ?? D1_ZERO_AMOUNTS
     return {
-      bankEndBalance: get(CROSS_SHEET_KEYS.bankEndBalance),
-      bankPriorBalance: get(CROSS_SHEET_KEYS.bankPriorBalance),
-      bankEndProvision: get(CROSS_SHEET_KEYS.bankEndProvision),
-      bankPriorProvision: get(CROSS_SHEET_KEYS.bankPriorProvision),
-      commercialEndBalance: get(CROSS_SHEET_KEYS.commercialEndBalance),
-      commercialPriorBalance: get(CROSS_SHEET_KEYS.commercialPriorBalance),
-      commercialEndProvision: get(CROSS_SHEET_KEYS.commercialEndProvision),
-      commercialPriorProvision: get(CROSS_SHEET_KEYS.commercialPriorProvision),
+      bankEndBalance: g('bank').currentAudited,
+      bankPriorBalance: g('bank').priorAudited,
+      bankEndProvision: p('bank').currentAudited,
+      bankPriorProvision: p('bank').priorAudited,
+      commercialEndBalance: g('commercial').currentAudited,
+      commercialPriorBalance: g('commercial').priorAudited,
+      commercialEndProvision: p('commercial').currentAudited,
+      commercialPriorProvision: p('commercial').priorAudited,
     }
   })
 
-  const crossSheetStatus = computed<'loaded' | 'empty'>(() => {
-    const d = crossSheetData.value
-    return (d.bankEndBalance || d.commercialEndBalance) ? 'loaded' : 'empty'
-  })
+  const crossSheetStatus = computed<'loaded' | 'empty'>(() =>
+    adjTotals.value.hasData ? 'loaded' : 'empty',
+  )
 
   // ─── Data Loading Helper ─────────────────────────────────────────────────
   function loadRows<T>(itemId: string): T[] {
