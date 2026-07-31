@@ -2,7 +2,7 @@
 
 **最后更新**：2026-07-31
 **当前分支**：`work/2026-05-30-wp-specs`
-**统计**：Active 3（`.kiro/specs/` 实测目录数）/ Archived 505 = 总计 508
+**统计**：Active 4（`.kiro/specs/` 实测目录数）/ Archived 505 = 总计 508
 **最高迁移**：**V133**（以 `migration_status` 实测为准）
 **技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer
 
@@ -30,7 +30,7 @@
 |------|------|------|
 | `d1-four-table-extraction-formula-wiring` | Wave 1~3 ✅ / Wave 4 阻塞 | D1 四表库取数公式接线。Wave 1~3（后端 seed + render 接入 + 公式管理预设）全绿；Wave 4（披露复核+附注同步+浏览器实测）阻塞于灰度开关 `D_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED` 默认 False 待用户决策。真实数据 render 路径已验证通过 |
 | `disclosure-note-follow-actual-content` | 5/13 完成 | 附注跟随底稿实际内容。已完成：空表判定（双侧 38 测试镜像）/ 模板差异五类计算（29 测试）/ legacy 迁移 dry-run 四类分类（32 测试）/ F2 自动同步修复（mounted 防护 bug + 全平台清除 + 覆盖率守卫 + 后端兜底 stale marker 43 测试 + 浏览器实测）/ 缺失链路 Tab 定性→独立立项。**待做**：模板回流写入 / 过期可见性 / legacy 破坏性迁移（阻塞于 columns 补齐）/ 空表折叠 / 全链实测 / 收尾 |
-| `k1-four-table-extraction-and-disclosure-alignment` | 25/27 完成 | K1 四表库取数口径根治 + 披露/附注结构对齐。**已完成**：共享件 `four_table/{report_line_accounts,leaf_aggregation}.py`（D1 薄壳委托、零回归）/ K1 render 改叶子口径 + 备抵精确到 `1231-03`（实测坏账 28,464,225.16→900,217.36 虚增 31.6 倍已修、原值 211,252,631.06→269,885,933.03 少 21.7% 已修）/ `tb_source_codes` 溯源面板 / 「从四表库带入未审数」按钮 + FS 三行预填 / 账龄枚举贯通 K1-1（3年段 `over3` 不再丢）/ 公式预设 +6 条 / 附注 §五、8 补源模板 ⑧⑨⑩ 三表 + 上市变动表两级表头 + 账龄 5 年段、§八、9 账龄表还原源模板 3 列 + 忠实推小计/减坏账/合计 / 三向守卫（源 xlsx ↔ 模板 ↔ 载荷）。**待做**：预填浏览器点选（两个在册项目一个已有持久化数据、一个 401）/ 披露推送→附注落库复核 |
+| `k1-four-table-extraction-and-disclosure-alignment` | **27/27 全完成 + 实测** | K1 四表库取数口径根治 + 披露/附注结构对齐。**已完成**：共享件 `four_table/{report_line_accounts,leaf_aggregation}.py`（D1 薄壳委托、零回归）/ K1 render 改叶子口径 + 备抵精确到 `1231-03`（实测坏账 28,464,225.16→900,217.36 虚增 31.6 倍已修、原值 211,252,631.06→269,885,933.03 少 21.7% 已修）/ `tb_source_codes` 溯源面板 / 「从四表库带入未审数」按钮 + FS 三行预填 / 账龄枚举贯通 K1-1（3年段 `over3` 不再丢）/ 公式预设 +6 条 / 附注 §五、8 补源模板 ⑧⑨⑩ 三表 + 上市变动表两级表头 + 账龄 5 年段、§八、9 账龄表还原源模板 3 列 + 忠实推小计/减坏账/合计 / 三向守卫（源 xlsx ↔ 模板 ↔ 载荷）。**已实测**：render 链路 + 两个项目预填（性质桶之和分文不差等于原值合计、报表数按 BS-009 公式符号加权正确）+ 披露推送→§八、9 落库与读时投影（3 列 flat、_column_groups=[]、小计−减坏账=合计）；实测数据已复原。代码/测试/模板已随并发会话分层提交 |
 | `disclosure-sync-path-buildout` | 缺口 64→24 | 补齐披露 Tab 同步链路。**已完成**：批1 G 循环（G4/G5/G6/G8/G9/G12 接线 + 实测）/ 批2 H 循环（H4Soe/H6×2委托/H7×2）/ 批3 L 循环（L5/L6/L7/L8 接线 + L2/L4 豁免/留缺口）/ 批4 M 部分（M4/M5/M7 标准变动表 6 Tab 接线 + 实测）。**待做**：批5 N 循环（N2/N3/N4/N5 7Tab，但 `n-cycle-tax-disclosure-alignment` 已完成这些→需核实是否已收口）/ 批6 D2·F4·J2 / 收尾归零 |
 
 ---

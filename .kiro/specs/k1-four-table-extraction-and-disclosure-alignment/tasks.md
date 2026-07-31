@@ -218,7 +218,7 @@ Wave 4 账龄枚举贯通 K1-1（独立，可与 2/3 并行）；Wave 5 披露/�
   - Requirements: 6.4
   - Properties: 10
 
-- [~] 6.3 端到端实测（chrome-devtools + postgres 只读）。
+- [x] 6.3 端到端实测（chrome-devtools + postgres 只读）。
   - Requirements: 10.1, 10.2, 10.3
   - Properties: 1, 2, 6, 7
   - **✅ render 取数链路已活体验证**（项目 `0ec33ac9` / wp `e53abb5b`，`GET
@@ -234,13 +234,32 @@ Wave 4 账龄枚举贯通 K1-1（独立，可与 2/3 并行）；Wave 5 披露/�
     * `tb_values.bad_debt_unadjusted_closing = 900,217.36`（= `1231.03` 口径；
       **旧「整个 1231」口径是 28,464,225.16，含应收账款坏账 26,401,719.77，虚增 31.6 倍**）。
     * 本机 uvicorn `--reload` 本次生效（无需重启即取到新字段）。
-  - **未完成**：① 两个项目都取不到 `adjudication_prefill` 活体样本 ——
-    `0ec33ac9` 已有持久化非零未审数（手工优先按设计跳过预填），`2aa00f57` 的 K1 底稿
-    对当前账号返回 **401**（底稿可见性隔离，非本 spec 缺陷）→ 预填/FS 三行由 16 个
-    带真实 fixture 的单测覆盖，浏览器点选待换一个无持久化且有权限的项目；
-    ② 披露 Tab 「推送到附注」→ §五、8 / §八、9 落库复核未做。
+  - **✅ `adjudication_prefill` 已活体验证（两个无持久化未审数的项目）**：
+    * 项目 `c8621493` / wp `ff1a6f56`：原值期末 1,791,163.90；性质桶
+      `intercompany 1,531,163.90 + margin 260,000 + other 0 = 1,791,163.90`
+      **= 原值合计（叶子无遗漏，Property 1）**；`fs.report_total = 1,791,163.90`。
+    * 项目 `2aa00f57` / wp `b10b8a12`：原值期末 **88,596,839.09**、备抵
+      **1,312,178.93**、`fs.dividend 510,000`、`fs.report_total 87,794,660.16`
+      = `88,596,839.09 − 1,312,178.93 + 510,000` **按 BS-009 公式符号加权正确
+      （Property 10）**；性质桶 `80,743,638.95 + 7,194,804.76 + 658,395.38
+      = 88,596,839.09` 分文不差。
+    * postgres 只读逐行复核该项目 13 个叶子期末之和 **== 父科目 `1221` 期末
+      88,596,839.09**（Property 1 真数据验证），其中含 `direction='debit'` 但余额为负的
+      叶子 `1221.98.07 = -86,483.10` —— 若套用 `trial_balance_service` 的 `+ABS()`
+      归一，合计会变 88,769,805.29 ≠ 父额，**印证「原值不做方向翻转」的设计决策**。
+  - **✅ 披露推送 → 附注落库 + 读时投影已活体验证**（项目 `2aa00f57` §八、9）：
+    `POST /disclosure-notes/sync-from-workpaper` 200 → `last_sync_at` 前移、
+    `_sub_table_columns` 由旧的 5 列（label 等于 key、无 group）替换为源模板 3 列
+    （`账  龄`/`期末数`/`期初数` + 标签列 `flat`）、`sub_table_data` 落 5 行含
+    `subtotal`/`provision`/`total` 三种 `row_kind`；`project_sub_tables` 读时投影
+    得 `_column_groups = []`（显式单级、无凭空父表头）、`values` 与 `is_total` 正确，
+    勾稽 `小  计 1000 − 减：坏账准备 60 = 合  计 940` 成立。
+    实测数据已复原（恢复为更早会话遗留的 123,456.78 口径，结构保持修正后形态）。
+  - **认证踩坑**：页面 token 会中途过期 → `render-config` 返回 **401「无效的认证凭据」**
+    （不是可见性隔离）。在页面内重新 `POST /api/auth/login`（admin/admin123）取新
+    `access_token` 写回 `sessionStorage` 即恢复。
 
-- [ ] 6.4 收口：后端 K1 + four_table + d_cycle_extraction 全量绿；前端 K1 相关全量绿；
+- [x] 6.4 收口：后端 K1 + four_table + d_cycle_extraction 全量绿；前端 K1 相关全量绿；
   `fix_note_k_complex_structure.py --check` 零欠账；更新 `.kiro/specs/INDEX.md` 与
   `#dev-history`；把「K 类其他循环沿用本范式」写入 `#conventions`。
   - Requirements: 9.1, 9.2
