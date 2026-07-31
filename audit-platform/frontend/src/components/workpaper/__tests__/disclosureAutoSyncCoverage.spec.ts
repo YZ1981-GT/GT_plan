@@ -45,8 +45,9 @@ const BANNER_ONLY_SOURCES = ['dataUpdatedVisible', 'upstreamUpdatedVisible', 'st
  * 本清单只允许**变短**：新增披露 Tab 必须自带同步链路。
  */
 const MISSING_SYNC_PATH: readonly string[] = [
-  // D2（1）
-  'D2TabDisclosure.vue',
+  // D2（1）已补齐：薄壳 D2TabDisclosure.vue 委托 D2DisclosureNoteBody.vue
+  //   （非标委托：版本切换 + :key 挂载，resolveDelegate 无法识别但链路完整——
+  //    Body 有 useDisclosureAutoSync + syncToDisclosureNotes + scheduleAutoSync）
   // F4（2）已补齐：spec f-cycle-disclosure-parity R6（原为只有手动 syncToNotes、
   // 未接 useDisclosureAutoSync → 用户改数据不点按钮永不进附注）
   // G10 / G11：Listed+SOE 是薄壳，链路在 Base 里 → 由 `resolveDelegate` 解析，不算缺口
@@ -56,38 +57,56 @@ const MISSING_SYNC_PATH: readonly string[] = [
   //   `成本项目N`，已按权威模板 `backend/wp_templates/G/G6 其他债权投资.xlsx`
   //   重写为 6 小节 / 14 张表后接链路。
   // G8 已补齐（Task 2.4）；G9 已补齐（Task 2.5，Base + 2 个薄壳一并转绿）
-  // H4（1）
-  'H4TabDisclosureSoe.vue',
-  // H5（1）
+  // H4（1）已补齐：接入 useDisclosureAutoSync + syncToNotes + buildH4SoeSyncPayloads
+  //   推送到 §八、23 在建工程（与 H2 共享章节），子表「在建工程」汇总行
+  // H5 Listed（1）：note_template_variant_matrix 的 you_qi_zi_chan.listed_standalone=null
+  //   → 上市公司无油气资产附注披露章节，该 Tab 有意无链路（不是缺口）
+  //   后续改为「本版不适用」说明页（同 N4 国企范式）
   'H5TabDisclosureListed.vue',
-  // H6（2）
-  'H6TabDisclosureListed.vue',
-  'H6TabDisclosureSoe.vue',
-  // H7（2）
+  // H6（2）已补齐：改为 v-bind="$props" 薄壳，由 resolveDelegate 解析到 H6TabDisclosure.vue
+  //   （已有 useDisclosureAutoSync + syncToNotes + buildH6*SyncPayloads 完整链路）
+  // 🔴 H7（2）**需结构对齐重建**（暂留缺口）：源模板 §五、24/八、24 是「以成本计量」
+  //   转置矩阵（类别作列 种植业/畜牧养殖业/林业/水产业，行为账面原值/累计折旧/减值准备/
+  //   账面价值明细）+「以公允价值计量」变动表；现有组件只有单行 movementRows，
+  //   无法在不自造披露内容的前提下映射 → 按 G6 范式另立批次重建，不做仓促接线。
   'H7TabDisclosureListed.vue',
   'H7TabDisclosureSoe.vue',
   // J2（2）
   'J2TabDisclosureListed.vue',
   'J2TabDisclosureSoe.vue',
-  // L2（2）
+  // 🔴 L2 应付利息 两版**豁免**（有意无链路，不是缺口）：
+  //   ① `note_template_{listed,soe}.json` 都**没有**「应付利息」独立章节
+  //      （`note_template_variant_matrix.json` 亦无 `ying_fu_li_xi` 条目）；
+  //   ② 新准则下应付利息并入「其他应付款」，披露归 K3 §五、42 / §八、42 的
+  //      子表「应付利息」+「重要的逾期未付利息」，且 K3 源 xlsx 的应付利息行清单
+  //      （分期付息到期还本的长期借款利息 / 企业债券利息 / 短期借款应付利息 /
+  //      划分为金融负债的优先股\永续债利息 / 其中：工具1…）与 L2 源 xlsx **逐字相同**；
+  //   ③ `buildK3SyncPayload` 已实装推这两张表 → L2 再推会**同章节同表名互相覆盖**
+  //      （谁最后保存谁赢，数据随机跳变），比不推更糟。
   'L2TabDisclosureListed.vue',
   'L2TabDisclosureSoe.vue',
-  // L4（2）
+  // 🔴 L4 应付债券（2）**需结构对齐重建**（暂留缺口）：源模板 §五、46/§八、50 是
+  //   「应付债券」主表 +「增减变动」+「（续）」+「优先股/永续债等其他金融工具变动情况」
+  //   两级表头 9 列（期初/本期增加/本期减少/期末 × 数量·账面价值）+ 可转债/其他金融工具
+  //   定性披露段。与 H7 同属多级/转置复杂结构，现有组件不同构，不做仓促自造 →
+  //   按 G6 范式另立批次重建。
   'L4TabDisclosureListed.vue',
   'L4TabDisclosureSoe.vue',
-  // L5（2）
-  'L5TabDisclosureListed.vue',
-  'L5TabDisclosureSoe.vue',
-  // L6（2）
-  'L6TabDisclosureListed.vue',
-  'L6TabDisclosureSoe.vue',
-  // L7（2）
-  'L7TabDisclosureListed.vue',
-  'L7TabDisclosureSoe.vue',
-  // L8（2）
-  'L8TabDisclosureListed.vue',
-  'L8TabDisclosureSoe.vue',
-  // M1（2）
+  // L5（2）已补齐（Task 4.3）：接入 useDisclosureAutoSync + buildL5SyncPayload
+  //   推 §五、48 / §八、53「长期应付款」主表（净额）；专项应付款子表由 L6 推（共章节浅合并）
+  // L6（2）已补齐（Task 4.4）：**无独立章节** —— 专项应付款表在 L5 的 §五、48 / §八、53
+  //   里（源模板 L6 两版都写「【长期应付款与专项应付款的合计数披露详见P5-1】」）。
+  //   两个底稿各推**不同子表**、按 key 浅合并（同 H4→H2 已验证范式）：
+  //   L5 推「长期应付款」主表 + 明细表，L6 推「专项应付款」/「①专项应付款…前5 项」。
+  // L7（2）已补齐（Task 4.5）：`l7NoteSectionMap` 原是**死 import**（组件只 import
+  //   `buildL7SyncPayload` 从未调用），且映射本身 6 处缺陷（上市表名会造孤儿表 /
+  //   sheet 名多「核对」/ 国企列序反 / 位置化 values / columns 键不匹配 / 未表态 flat）
+  //   → 已重写映射 + 两版接线（§五、52 / §八、57）
+  // L8（2）已补齐（Task 4.6）：新建 `l8NoteSectionMap`（§五、67 / §八、68），
+  //   并按源模板 12 行重建行结构（原两版各自造 7 行 / 10 行且互不相同）
+  // 🔴 M1 应付股利（利润）两版**豁免**（同 L2 同理）：附注模板无「应付股利」独立章节，
+  //   披露归 K3 §五、42 / §八、42 的「应付股利」+「重要的超过1年未支付的应付股利」，
+  //   `buildK3SyncPayload` 已实装 → 双推会撞表。
   'M1TabDisclosureListed.vue',
   'M1TabDisclosureSoe.vue',
   // M10（2）
@@ -98,18 +117,17 @@ const MISSING_SYNC_PATH: readonly string[] = [
   'M2TabDisclosureSoe.vue',
   // M3（1）
   'M3TabDisclosureListed.vue',
-  // M4（2）
-  'M4TabDisclosureListed.vue',
-  'M4TabDisclosureSoe.vue',
-  // M5（2）
-  'M5TabDisclosureListed.vue',
-  'M5TabDisclosureSoe.vue',
+  // M4（2）已补齐（Task 5，批 4）：接入 useDisclosureAutoSync + buildMEquitySyncPayload('M4',…)
+  //   推 §五、55 / §八、60「资本公积」标准变动表（项目|期初|本期增加|本期减少|期末）。
+  // M5（2）已补齐（Task 5，批 4）：同范式推 §五、59 / §八、62「盈余公积」变动表；
+  //   国企侧多「国有企业专项披露」文本段并入 _note_texts。
   // M6（2）
   'M6TabDisclosureListed.vue',
   'M6TabDisclosureSoe.vue',
-  // M7（2）
-  'M7TabDisclosureListed.vue',
-  'M7TabDisclosureSoe.vue',
+  // M7（2）已补齐（Task 5，批 4）：推 §五、58 / §八、61「专项储备」变动表。
+  //   源模板附注为标准 5 列（上市）/ 6 列（国企含「备注」）→ 组件 Listed 的「增减原因说明」
+  //   列不进附注（模板无此列，宁缺勿造，留底稿），国企侧「费用化使用/资本化使用」两列
+  //   合并为「本期减少」、「计提依据」→「备注」列（`buildMEquitySyncPayload('M7','soe')`）。
   // M8（2）
   'M8TabDisclosureListed.vue',
   'M8TabDisclosureSoe.vue',
@@ -440,8 +458,14 @@ describe('披露 Tab 同步链路完整性', () => {
   // N 循环税务类补 5 条（N2×2 / N4 上市 / N5×2，n-cycle-tax-disclosure-alignment）→ 42
   // （N4 国企按源模板「附注披露信息：无」豁免留在清单，理由见常量注释）
   // 再删 N3 自造披露 Tab（源模板无披露 sheet，披露与 N1 共节）→ 41
-  it('缺链路数量记录在案（41 个）', () => {
-    expect(MISSING_SYNC_PATH.length).toBe(41)
+  // H6×2 改 v-bind="$props" 委托到 Base → 39；H4 Soe 补齐 → 38
+  // H7×2 一度接线后**撤回**（源模板转置矩阵，需结构对齐重建，不做自造）→ 回 40
+  // L7×2 + L8×2 补齐 → 36（L2×2 / M1×2 仍在清单但已登记豁免理由：披露归 K3 章节）
+  // L6×2 补齐 → 34；L5×2 补齐 → 30
+  // M 循环批 4：M4×2 / M5×2 / M7×2 补齐（标准权益变动表）→ 24
+  //   （M1×2 豁免归 K3、M2/M3/M6/M8/M9/M10 结构不同构留清单）
+  it('缺链路数量记录在案（23 个）', () => {
+    expect(MISSING_SYNC_PATH.length).toBe(23)
   })
 
   /**

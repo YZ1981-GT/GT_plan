@@ -79,28 +79,8 @@ const INFERENCE_FALLBACK_ALLOWLIST: Record<string, { reason: string; tables: str
       '通过经营租赁租出的固定资产',
     ],
   },
-  buildH2ListedColumns: {
-    reason:
-      'H2 在建工程（批 1~4 之外，另有 spec `h2-disclosure-linkage-and-prefill`）：整文件 0 处 flat/group。其中 3 表已被推断塞入凭空父表头 —— 「在建工程减值准备情况」→「本期」、「重要在建工程项目变动情况（续）：」→「工程」；「在建工程明细」的两级表头被压平成 `期末余额-账面余额` 串（应改用 group）。修复须核对源模板表头行数 + 调整 values 同序，不是一行改动',
-    tables: [
-      '在建工程',
-      '在建工程减值准备情况',
-      '在建工程明细',
-      '重要在建工程项目变动情况',
-      '重要在建工程项目变动情况（续）：',
-      '项  目',
-    ],
-  },
-  buildH2SoeColumns: {
-    reason:
-      'H2 在建工程国企版：同上。「（2）重要在建工程项目本期变动情况」被推断塞入「本期」+「工程」两个凭空父表头；「在建工程」/「（1）在建工程情况」为压平的两级表头（`期末余额-账面余额`）',
-    tables: [
-      '在建工程',
-      '（1）在建工程情况',
-      '（2）重要在建工程项目本期变动情况',
-      '（3）本期计提在建工程减值准备情况',
-    ],
-  },
+  // buildH2ListedColumns / buildH2SoeColumns 已由 h2 spec 补齐 flat/group（实扫未声明表 = []）
+  // → 按 R3「已修好的表必须从 allowlist 删除」移出（allowlist 只许缩）。
   buildH8ListedColumns: {
     reason:
       'H8 使用权资产（批 1~4 之外）：变动表列头随类别动态生成，未声明 flat。推断结果为空（类别名无共享前缀）→ 现状无害，补 flat 待 H8 收口',
@@ -186,6 +166,54 @@ const ALLOWLIST_TABLE_CEILING = 62
  * sweep 侧另做**单向** P1（数据键 ⊆ columns 键），见对应用例。
  */
 const P1_ROUTE: Record<string, { spec: string; complete: boolean; note?: string }> = {
+  // H 循环（disclosure-sync-path-buildout Task 3）：H4 国企 + H7 两版同步链路从零建立
+  buildH4SoeColumns: {
+    spec: 'composables/__tests__/hCycleNoteSubtableContract.spec.ts',
+    complete: true,
+    note: 'H4 国企推 **H2 的 §八、23**（共章节浅合并）；两级表头 + 账面价值读时派生',
+  },
+  // L 循环（disclosure-sync-path-buildout Task 4）：L5/L6/L7/L8 同步链路从零建立
+  // （L7 原有映射是死 import 且 6 处缺陷；L8 两版行结构自造且互不相同）
+  buildL5ListedColumns: {
+    spec: 'composables/__tests__/lCycleNoteSubtableContract.spec.ts',
+    complete: true,
+    note: 'L5 只推「长期应付款」主表 + 按款项性质列示；「专项应付款」表由 L6 推（共章节浅合并）',
+  },
+  buildL5SoeColumns: {
+    spec: 'composables/__tests__/lCycleNoteSubtableContract.spec.ts',
+    complete: true,
+    note: '国企主表列头「期末数/期初数」与①前5 项表「期末余额/年初余额」按源 xlsx 分取',
+  },
+  buildL6ListedColumns: {
+    spec: 'composables/__tests__/lCycleNoteSubtableContract.spec.ts',
+    complete: true,
+    note: 'L6 无独立章节 → 推 L5 §五、48 的「专项应付款」子表（6 列含形成原因）',
+  },
+  buildL6SoeColumns: {
+    spec: 'composables/__tests__/lCycleNoteSubtableContract.spec.ts',
+    complete: true,
+    note: '国企侧 5 列（无「形成原因」）；列头取附注模版字面（源 xlsx 是年份占位符）',
+  },
+  buildL7ListedColumns: {
+    spec: 'composables/__tests__/lCycleNoteSubtableContract.spec.ts',
+    complete: true,
+    note: '含反向断言「两版列头必须不同」（上市 期末数/上年年末数；国企 期末余额/期初余额）',
+  },
+  buildL7SoeColumns: {
+    spec: 'composables/__tests__/lCycleNoteSubtableContract.spec.ts',
+    complete: true,
+    note: '载荷把底稿列序（年初/期末）投影为附注口径（期末/期初）',
+  },
+  buildL8ListedColumns: {
+    spec: 'composables/__tests__/lCycleNoteSubtableContract.spec.ts',
+    complete: true,
+    note: '源模板 12 行（3 个派生小计 + 合计）；仅上市侧推资本化说明段',
+  },
+  buildL8SoeColumns: {
+    spec: 'composables/__tests__/lCycleNoteSubtableContract.spec.ts',
+    complete: true,
+    note: '两版行集完全相同（源 xlsx 实证）；国资专项内容留底稿不进附注',
+  },
   buildD1ListedColumns: {
     spec: 'composables/__tests__/d1NoteSubtableContract.spec.ts',
     complete: true,
