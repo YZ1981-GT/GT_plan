@@ -2753,7 +2753,7 @@
       "content_type": "mixed",
       "tables": [
         {
-          "name": "项  目",
+          "name": "资产处置收益（损失以“-”填列）",
           "headers": [
             "项目",
             "本期发生额",
@@ -2781,7 +2781,19 @@
               "row_type": "data"
             },
             {
+              "label": "债务重组中因处置非流动资产产生的利得（损失以“-”填列）",
+              "row_type": "data"
+            },
+            {
               "label": "非货币性资产交换产生的利得（损失以“-”填列）",
+              "row_type": "data"
+            },
+            {
+              "label": "使用权资产处置利得（损失以“-”填列）",
+              "row_type": "data"
+            },
+            {
+              "label": "油气资产处置利得（损失以“-”填列）",
               "row_type": "data"
             },
             {
@@ -2789,28 +2801,41 @@
               "row_type": "data"
             },
             {
-              "label": "可无限量添加行",
-              "row_type": "data"
-            },
-            {
               "label": "合计",
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "current_amount",
+              "label": "本期发生额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_amount",
+              "label": "上期发生额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "反映企业出售划分为持有待售的非流动资产（金融工具、长期股权投资和投资性房地产除外）或处置组时确认的处置利得或损失，以及处置未划分为持有待售的固定资产、在建工程、生产性生物资产及无形资产而产生的处置利得或损失；债务重组中因处置非流动资产产生的利得或损失、非货币性资产交换产生的利得或损失也包括在本项目内。本项目应根据损益类科目「资产处置损益」的发生额分析填列；如为处置损失，以「-」号填列。【源模板提示：①不构成业务的资产组处置（含先持有待售再出售）整体计入资产处置收益，与资产组相关的其他综合收益转入资产处置收益；②构成业务（含子公司、分公司）的处置整体计入投资收益，相关其他综合收益同时转入投资收益；③单项投资性房地产的处置损益计入「其他业务收入/成本」，不计入本项目；④使用权资产、油气资产处置损益计入资产处置收益，不适用的项目可删除对应行。】勾稽：合计 = 各项目行之和，且应与审定表 H10-1 审定数一致；试运行销售损益行应等于「试运行销售损益」明细表合计（收入−成本）。数据来源：明细表 H10-2 / 审定表 H10-1 / 检查表 H10-4。"
         },
         {
-          "name": "项  目",
+          "name": "试运行销售损益",
           "headers": [
             "项目",
-            "本期发生额",
-            "上期发生额"
+            "收入",
+            "成本",
+            "收入",
+            "成本"
           ],
           "rows": [
-            {
-              "label": "项目",
-              "row_type": "header_label"
-            },
             {
               "label": "固定资产试运行销售",
               "row_type": "data"
@@ -2824,14 +2849,61 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true
+            },
+            {
+              "key": "current_income",
+              "label": "收入",
+              "group": "本期发生额",
+              "format": "amount"
+            },
+            {
+              "key": "current_cost",
+              "label": "成本",
+              "group": "本期发生额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_income",
+              "label": "收入",
+              "group": "上期发生额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_cost",
+              "label": "成本",
+              "group": "上期发生额",
+              "format": "amount"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "本期发生额",
+              "start": 1,
+              "span": 2
+            },
+            {
+              "group": "上期发生额",
+              "start": 3,
+              "span": 2
+            }
+          ],
+          "guidance": "试运行销售损益明细（源模板 R27–R31）：两级表头 —— 本期发生额{收入, 成本} / 上期发生额{收入, 成本}。行为 固定资产试运行销售 / 研发样品销售 / 合计。勾稽：合计行 = 各行逐列之和；本表净额（收入−成本）应等于主表「试运行销售损益」行金额。源模板要求说明成本的具体核算方法（在本节说明文字中披露）。数据来源：明细表 H10-2 试运行销售区块。"
         }
       ],
       "text_sections": [
+        "【提示：",
         "1.对于不构成业务的资产组的处置收益，无论直接出售还是先持有待售再出售，均整体计入资产处置收益，与资产组相关的其他综合收益转入资产处置收益。",
         "2.对于业务（包括子公司和分公司）处置的收益，无论直接出售还是先持有待售再出售，均整体计入投资收益，与业务相关的其他综合收益同时转入投资收益。",
-        "3.单项的投资性房地产的处置，无论是直接出售还是先划分为持有待售资产再出售，处置损益均计入“其他业务收入/成本”，不计入“资产处置收益”。】",
-        "试运行销售损益"
+        "3.单项的投资性房地产的处置，无论是直接出售还是先划分为持有待售资产再出售，处置损益均计入“其他业务收入/成本”，不计入“资产处置收益”。",
+        "4.使用权资产、油气资产处置损益计入资产处置收益；不适用项目可删除对应行。】",
+        "#### 试运行销售损益",
+        "（说明成本的具体核算方法。）"
       ],
       "check_presets": [
         "余额",
@@ -2845,7 +2917,9 @@
       "parent_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji",
       "sort_index": 45,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "h9-h10-remaining-disclosure-alignment",
+      "_aligned_at": "2026-07-31 21:09:50"
     },
     {
       "section_number": "三、营业外收入（注：",
@@ -9473,10 +9547,10 @@
         {
           "name": "预付款项按账龄披露",
           "headers": [
-            "账龄",
-            "金额",
+            "账  龄",
+            "金  额",
             "比例%",
-            "金额",
+            "金  额",
             "比例%"
           ],
           "rows": [
@@ -9514,42 +9588,42 @@
           "columns": [
             {
               "key": "label",
-              "label": "账龄",
+              "label": "账  龄",
               "is_label": true
             },
             {
               "key": "end_amount",
-              "label": "金额",
-              "group": "期末余额",
+              "label": "金  额",
+              "group": "期末数",
               "format": "amount"
             },
             {
               "key": "end_pct",
               "label": "比例%",
-              "group": "期末余额",
+              "group": "期末数",
               "format": "percent"
             },
             {
               "key": "prior_amount",
-              "label": "金额",
-              "group": "上年年末余额",
+              "label": "金  额",
+              "group": "上年年末数",
               "format": "amount"
             },
             {
               "key": "prior_pct",
               "label": "比例%",
-              "group": "上年年末余额",
+              "group": "上年年末数",
               "format": "percent"
             }
           ],
           "_column_groups": [
             {
-              "group": "期末余额",
+              "group": "期末数",
               "start": 1,
               "span": 2
             },
             {
-              "group": "上年年末余额",
+              "group": "上年年末数",
               "start": 3,
               "span": 2
             }
@@ -9691,8 +9765,8 @@
       "sort_index": 6,
       "auto_numbering": true,
       "lock_number": false,
-      "_aligned_by": "f1-prepayment-disclosure-template-alignment",
-      "_aligned_at": "2026-07-30 18:45:47"
+      "_aligned_by": "f1-four-table-extraction-and-disclosure-alignment",
+      "_aligned_at": "2026-07-31 21:18:33"
     },
     {
       "section_number": "五、8",
@@ -21729,7 +21803,26 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "end_balance",
+              "label": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_balance",
+              "label": "上年年末余额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "租赁负债列示表（源模板 R7–R13）：按租赁资产类别列示期末余额与上年年末余额，R8–R10 为可扩明细行区（按被审计单位实际租赁类别增删行）。勾稽：小计 = 各类别行之和；合计 = 小计 − 一年内到期的租赁负债；合计应与审定表 H9-1 审定数一致，一年内到期部分与「一年内到期的非流动负债」附注勾稽。本期计提的租赁负债利息费用及其在财务费用—利息支出与资本化之间的分配，在本节说明文字中披露。【源模板提示：①租赁负债利息费用适用借款费用准则；使用权资产于租赁期开始日即达到预定可使用状态，租赁负债相关利息费用不应资本化计入使用权资产，租赁期开始日后租赁负债可视同一般借款。②承租人支付的租金中包含的增值税不属于租赁付款额，不纳入租赁负债与使用权资产的计量。③租赁保证金不属于租赁付款额，应单独作为资产/负债处理。】数据来源：审定表 H9-1 / 明细表 H9-2 / 未确认融资费用明细表 H9-3。"
         }
       ],
       "text_sections": [
@@ -21752,7 +21845,9 @@
       "parent_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi",
       "sort_index": 46,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "h9-h10-remaining-disclosure-alignment",
+      "_aligned_at": "2026-07-31 21:09:50"
     },
     {
       "section_number": "五、48",

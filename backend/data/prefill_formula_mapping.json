@@ -3815,41 +3815,41 @@
     },
     {
       "wp_code": "N3",
-      "wp_name": "所得税费用审定表",
+      "wp_name": "递延所得税负债审定表",
       "sheet": "递延所得税负债审定表N3-1",
       "account_codes": [
-        "6801"
+        "2901"
       ],
       "cells": [
         {
           "cell_ref": "期初余额",
-          "formula": "=TB('6801','期初余额')",
+          "formula": "=TB('2901','期初余额')",
           "formula_type": "TB",
-          "description": "从试算表取所得税费用审定表期初余额"
+          "description": "从试算表取递延所得税负债期初余额（科目 2901；报表行 BS-067 同口径）"
         },
         {
           "cell_ref": "未审数",
-          "formula": "=TB('6801','期末余额')",
+          "formula": "=TB('2901','期末余额')",
           "formula_type": "TB",
-          "description": "从试算表取所得税费用审定表期末余额（未审）"
+          "description": "从试算表取递延所得税负债期末余额（未审）"
         },
         {
           "cell_ref": "AJE调整",
-          "formula": "=ADJ('6801','aje_net')",
+          "formula": "=ADJ('2901','aje_net')",
           "formula_type": "ADJ",
-          "description": "所得税费用审定表审计调整分录净额"
+          "description": "递延所得税负债审计调整分录净额"
         },
         {
           "cell_ref": "RJE调整",
-          "formula": "=ADJ('6801','rje_net')",
+          "formula": "=ADJ('2901','rje_net')",
           "formula_type": "ADJ",
-          "description": "所得税费用审定表重分类调整分录净额"
+          "description": "递延所得税负债重分类调整分录净额"
         },
         {
-          "cell_ref": "上年审定数",
+          "cell_ref": "审定表N3-1_上年审定数",
           "formula": "=PREV('N3','递延所得税负债审定表N3-1','审定数')",
           "formula_type": "PREV",
-          "description": "上年同底稿审定数"
+          "description": "上年同底稿审定数（cell_ref 带 sheet 前缀：page_key 忽略 sheet，同名会遮蔽）"
         }
       ]
     },
@@ -3862,31 +3862,25 @@
       ],
       "cells": [
         {
-          "cell_ref": "期初余额",
-          "formula": "=TB('6403','期初余额')",
-          "formula_type": "TB",
-          "description": "从试算表取税金及附加审定表期初余额"
-        },
-        {
           "cell_ref": "未审数",
-          "formula": "=TB('6403','期末余额')",
+          "formula": "=TB('6403','本期发生额')",
           "formula_type": "TB",
-          "description": "从试算表取税金及附加审定表期末余额（未审）"
+          "description": "从试算表取税金及附加**本期发生额**（报表行 IS-003 = TB('6403','本期发生额')；损益类不取期末余额）"
         },
         {
           "cell_ref": "AJE调整",
           "formula": "=ADJ('6403','aje_net')",
           "formula_type": "ADJ",
-          "description": "税金及附加审定表审计调整分录净额"
+          "description": "税金及附加审计调整分录净额"
         },
         {
           "cell_ref": "RJE调整",
           "formula": "=ADJ('6403','rje_net')",
           "formula_type": "ADJ",
-          "description": "税金及附加审定表重分类调整分录净额"
+          "description": "税金及附加重分类调整分录净额"
         },
         {
-          "cell_ref": "上年审定数",
+          "cell_ref": "审定表N4-1_上年审定数",
           "formula": "=PREV('N4','税金及附加审定表N4-1','审定数')",
           "formula_type": "PREV",
           "description": "上年同底稿审定数"
@@ -3902,31 +3896,37 @@
       ],
       "cells": [
         {
-          "cell_ref": "期初余额",
-          "formula": "=TB('6801','期初余额')",
+          "cell_ref": "未审数",
+          "formula": "=TB('6801','本期发生额')",
           "formula_type": "TB",
-          "description": "从试算表取所得税费用审定表期初余额"
+          "description": "从试算表取所得税费用**本期发生额**（报表行 IS-023 = TB('6801','本期发生额')；损益类不取期末余额）"
         },
         {
-          "cell_ref": "未审数",
-          "formula": "=TB('6801','期末余额')",
+          "cell_ref": "当期所得税费用_本期发生额",
+          "formula": "=TB('6801.01','本期发生额')",
           "formula_type": "TB",
-          "description": "从试算表取所得税费用审定表期末余额（未审）"
+          "description": "科目 6801.01 当期所得税费用本期发生额（活体叶子语义稳定）"
+        },
+        {
+          "cell_ref": "递延所得税费用_本期发生额",
+          "formula": "=TB('6801.02','本期发生额')",
+          "formula_type": "TB",
+          "description": "科目 6801.02 递延所得税费用本期发生额（活体可为负，语义即贷方性质）"
         },
         {
           "cell_ref": "AJE调整",
           "formula": "=ADJ('6801','aje_net')",
           "formula_type": "ADJ",
-          "description": "所得税费用审定表审计调整分录净额"
+          "description": "所得税费用审计调整分录净额"
         },
         {
           "cell_ref": "RJE调整",
           "formula": "=ADJ('6801','rje_net')",
           "formula_type": "ADJ",
-          "description": "所得税费用审定表重分类调整分录净额"
+          "description": "所得税费用重分类调整分录净额"
         },
         {
-          "cell_ref": "上年审定数",
+          "cell_ref": "审定表N5-1_上年审定数",
           "formula": "=PREV('N5','所得税费用审定表N5-1','审定数')",
           "formula_type": "PREV",
           "description": "上年同底稿审定数"
@@ -8427,32 +8427,32 @@
       "wp_name": "递延所得税负债明细",
       "sheet": "明细表N3-2",
       "account_codes": [
-        "1812"
+        "2901"
       ],
       "cells": [
         {
           "cell_ref": "递延负债_期末余额",
-          "formula": "=TB('1812','期末余额')",
+          "formula": "=TB('2901','期末余额')",
           "formula_type": "TB",
-          "description": "递延所得税负债期末余额（1812 无数据，占位）"
+          "description": "递延所得税负债期末余额（原写 1812，该科目码在活体 tb_balance 全库 0 命中）"
         },
         {
           "cell_ref": "递延负债_期初余额",
-          "formula": "=TB('1812','期初余额')",
+          "formula": "=TB('2901','期初余额')",
           "formula_type": "TB",
-          "description": "递延所得税负债期初余额（占位）"
+          "description": "递延所得税负债期初余额"
         },
         {
-          "cell_ref": "上年审定数",
+          "cell_ref": "明细表N3-2_上年审定数",
           "formula": "=PREV('N3','明细表N3-2','审定数')",
           "formula_type": "PREV",
           "description": "递延所得税负债明细上年审定数"
         },
         {
           "cell_ref": "递延负债_本期变动",
-          "formula": "=TB('1812','借方发生额')",
-          "formula_type": "TB",
-          "description": "递延所得税负债本期借方发生额（变动）"
+          "formula": null,
+          "formula_type": "PLACEHOLDER",
+          "description": "本期变动额 = 期末余额 − 期初余额；由前端派生（余额类科目无「借方发生额」列口径，原写 =TB('1812','借方发生额') 双重错误）"
         }
       ]
     },
@@ -8465,28 +8465,16 @@
       ],
       "cells": [
         {
-          "cell_ref": "税金及附加_期末余额",
-          "formula": "=TB('6403','期末余额')",
+          "cell_ref": "税金及附加_本期发生额",
+          "formula": "=TB('6403','本期发生额')",
           "formula_type": "TB",
-          "description": "税金及附加本期累计发生额"
+          "description": "税金及附加本期发生额（损益类；原写 期末余额）"
         },
         {
-          "cell_ref": "税金及附加_期初余额",
-          "formula": "=TB('6403','期初余额')",
-          "formula_type": "TB",
-          "description": "税金及附加上期累计发生额"
-        },
-        {
-          "cell_ref": "上年审定数",
+          "cell_ref": "明细表N4-2_上年审定数",
           "formula": "=PREV('N4','明细表N4-2','审定数')",
           "formula_type": "PREV",
           "description": "税金及附加明细上年审定数"
-        },
-        {
-          "cell_ref": "城建税_期末余额",
-          "formula": "=TB('6403.01','期末余额')",
-          "formula_type": "TB",
-          "description": "城市维护建设税本期发生额"
         }
       ]
     },
@@ -8502,13 +8490,13 @@
           "cell_ref": "税金及附加_审定数",
           "formula": "=WP('N4','税金及附加审定表N4-1','审定数')",
           "formula_type": "WP",
-          "description": "从N4审定表取税金及附加审定数（程序表引用）"
+          "description": "从 N4-1 审定表取税金及附加审定数（本期发生额口径）"
         },
         {
           "cell_ref": "增值税_应交数",
           "formula": "=WP('N2','应交税费审定表N2-1','审定数')",
           "formula_type": "WP",
-          "description": "从N2审定表取应交增值税审定数"
+          "description": "从 N2 审定表取应交税费审定数（各税种费用确认与 N2 计提对应核对）"
         }
       ]
     },
@@ -8521,22 +8509,16 @@
       ],
       "cells": [
         {
-          "cell_ref": "所得税费用_期末余额",
-          "formula": "=TB('6801','期末余额')",
+          "cell_ref": "所得税费用_本期发生额",
+          "formula": "=TB('6801','本期发生额')",
           "formula_type": "TB",
-          "description": "所得税费用本期累计发生额"
-        },
-        {
-          "cell_ref": "所得税费用_期初余额",
-          "formula": "=TB('6801','期初余额')",
-          "formula_type": "TB",
-          "description": "所得税费用上期累计发生额"
+          "description": "所得税费用本期发生额（损益类；原写 期末余额）"
         },
         {
           "cell_ref": "递延所得税资产变动",
-          "formula": "=WP('N1','审定表N1-1','审定数')",
+          "formula": "=WP('N1','递延所得税资产审定表N1-1','审定数')",
           "formula_type": "WP",
-          "description": "从N1审定表取递延所得税资产审定数（用于递延调整计算）"
+          "description": "从 N1 审定表取递延所得税资产审定数（sheet 名补全为源模板 tab 名）"
         }
       ]
     },
@@ -8550,15 +8532,21 @@
       "cells": [
         {
           "cell_ref": "利润总额",
-          "formula": "=TB('6001','期末余额')",
-          "formula_type": "TB",
-          "description": "利润总额（从收入科目取数，用于所得税计算基数）"
+          "formula": null,
+          "formula_type": "PLACEHOLDER",
+          "description": "利润总额取自报表行 IS-022（`ROW('IS-019')+ROW('IS-020')-ROW('IS-021')` 派生行），**不是科目**；prefill 引擎无 ROW/REPORT 解析器故暂为占位。原写 =TB('6001','期末余额') 双重错误：6001 是营业收入，且损益类不取期末余额"
         },
         {
           "cell_ref": "法定税率",
-          "formula": "=WP('N5','所得税费用审定表N5-1','审定数')",
-          "formula_type": "WP",
-          "description": "从N5审定表取所得税费用审定数（参考）"
+          "formula": null,
+          "formula_type": "PLACEHOLDER",
+          "description": "法定税率是项目税务参数（见 N5-6 税收优惠明细表 / 项目基础信息），非公式取数；原写 =WP('N5','所得税费用审定表N5-1','审定数') 取回来是金额而非税率"
+        },
+        {
+          "cell_ref": "当期所得税费用_计算表核对",
+          "formula": "=TB('6801.01','本期发生额')",
+          "formula_type": "TB",
+          "description": "科目 6801.01 当期所得税费用本期发生额，与本表计算结果核对"
         }
       ]
     },
@@ -8568,32 +8556,32 @@
       "sheet": "N5-8递延所得税费用核对表",
       "account_codes": [
         "1811",
-        "1812"
+        "2901"
       ],
       "cells": [
         {
           "cell_ref": "递延资产_期末",
           "formula": "=TB('1811','期末余额')",
           "formula_type": "TB",
-          "description": "递延所得税资产期末余额（核对用）"
+          "description": "递延所得税资产期末余额（核对用；报表行 BS-036 同口径）"
         },
         {
           "cell_ref": "递延资产_期初",
           "formula": "=TB('1811','期初余额')",
           "formula_type": "TB",
-          "description": "递延所得税资产期初余额（核对用）"
+          "description": "递延所得税资产期初余额"
         },
         {
           "cell_ref": "递延负债_期末",
-          "formula": "=TB('1812','期末余额')",
+          "formula": "=TB('2901','期末余额')",
           "formula_type": "TB",
-          "description": "递延所得税负债期末余额（核对用）"
+          "description": "递延所得税负债期末余额（原写 1812，活体 0 命中；报表行 BS-067 同口径）"
         },
         {
           "cell_ref": "递延负债_期初",
-          "formula": "=TB('1812','期初余额')",
+          "formula": "=TB('2901','期初余额')",
           "formula_type": "TB",
-          "description": "递延所得税负债期初余额（核对用）"
+          "description": "递延所得税负债期初余额"
         }
       ]
     }
