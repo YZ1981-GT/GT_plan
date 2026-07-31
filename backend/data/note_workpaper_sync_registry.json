@@ -1,6 +1,6 @@
 {
   "_source": "生成自前端 *NoteSectionMap.ts（唯一真源），勿手工编辑；重生成：python backend/scripts/gen_note_wp_sync_registry.py --write",
-  "generated_at": "2026-07-30T17:17:39.618579+00:00",
+  "generated_at": "2026-07-31T04:30:07.572069+00:00",
   "entries": [
     {
       "wp_code": "D1",
@@ -414,17 +414,49 @@
       "wp_code": "L5",
       "listed": "五、48",
       "soe": "八、53",
-      "sheet_listed": "附注披露信息核对（上市公司）",
-      "sheet_soe": null,
+      "sheet_listed": "附注披露信息（上市公司）",
+      "sheet_soe": "附注披露信息（国企）",
       "source_file": "audit-platform/frontend/src/components/workpaper/composables/l5NoteSectionMap.ts"
     },
     {
       "wp_code": "L7",
       "listed": "五、52",
       "soe": "八、57",
-      "sheet_listed": "附注披露信息核对（上市公司）",
-      "sheet_soe": null,
+      "sheet_listed": "附注披露信息（上市公司）",
+      "sheet_soe": "附注披露信息(国企)",
       "source_file": "audit-platform/frontend/src/components/workpaper/composables/l7NoteSectionMap.ts"
+    },
+    {
+      "wp_code": "L8",
+      "listed": "五、67",
+      "soe": "八、68",
+      "sheet_listed": "附注披露信息（上市公司）",
+      "sheet_soe": "附注披露信息（国企）",
+      "source_file": "audit-platform/frontend/src/components/workpaper/composables/l8NoteSectionMap.ts"
+    },
+    {
+      "wp_code": "M4",
+      "listed": "五、55",
+      "soe": "八、60",
+      "sheet_listed": "附注披露信息（上市公司）",
+      "sheet_soe": "附注披露信息（国有企业）",
+      "source_file": "audit-platform/frontend/src/components/workpaper/composables/m4NoteSectionMap.ts"
+    },
+    {
+      "wp_code": "M5",
+      "listed": "五、59",
+      "soe": "八、62",
+      "sheet_listed": "附注披露信息（上市公司）",
+      "sheet_soe": "附注披露信息（国有企业）",
+      "source_file": "audit-platform/frontend/src/components/workpaper/composables/m5NoteSectionMap.ts"
+    },
+    {
+      "wp_code": "M7",
+      "listed": "五、58",
+      "soe": "八、61",
+      "sheet_listed": "附注披露信息（上市公司）",
+      "sheet_soe": "附注披露信息（国有企业）",
+      "source_file": "audit-platform/frontend/src/components/workpaper/composables/m7NoteSectionMap.ts"
     },
     {
       "wp_code": "N1",

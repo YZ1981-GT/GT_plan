@@ -98,11 +98,12 @@
     "D1-adj-tb-amount",
     "D1-adj-note",
     "D1-adj-conclusion",
-    "re:^D1-adj-(gross|bd)-(bank|commercial)-(prior-unadj|prior-aje|prior-rje|current-unadj|current-aje|current-rje|reason)$",
+    "re:^D1-adj-(gross|bd|net)-[A-Za-z0-9_-]+-(prior-unadj|prior-aje|prior-rje|current-unadj|current-aje|current-rje|reason)$",
     "D1-cat-rows",
     "D1-cust-rows",
     "D1-bd-individual-rows",
-    "D1-bd-portfolio-rows"
+    "D1-bd-portfolio-rows",
+    "D1-bd-notetype-rows"
   ],
   "D3": [
     "D3-adj-trial-balance-amount",

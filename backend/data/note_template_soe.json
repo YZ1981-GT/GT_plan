@@ -8268,15 +8268,13 @@
           "headers": [
             "项目",
             "期初余额",
-            "本期增加",
-            "本期减少",
+            "购置或计提",
+            "自用房地产或存货转入",
+            "处 置",
+            "转为自用房地产",
             "期末余额"
           ],
           "rows": [
-            {
-              "label": "项目",
-              "row_type": "header_label"
-            },
             {
               "label": "一、账面原值合计",
               "is_total": true,
@@ -8342,22 +8340,75 @@
               "label": "2、土地使用权",
               "row_type": "data"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true
+            },
+            {
+              "key": "begin",
+              "label": "期初余额",
+              "format": "amount"
+            },
+            {
+              "key": "buy_or_provision",
+              "label": "购置或计提",
+              "group": "本期增加",
+              "format": "amount"
+            },
+            {
+              "key": "transfer_in",
+              "label": "自用房地产或存货转入",
+              "group": "本期增加",
+              "format": "amount"
+            },
+            {
+              "key": "disposal",
+              "label": "处 置",
+              "group": "本期减少",
+              "format": "amount"
+            },
+            {
+              "key": "transfer_out",
+              "label": "转为自用房地产",
+              "group": "本期减少",
+              "format": "amount"
+            },
+            {
+              "key": "end",
+              "label": "期末余额",
+              "format": "amount"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "本期增加",
+              "start": 2,
+              "span": 2
+            },
+            {
+              "group": "本期减少",
+              "start": 4,
+              "span": 2
+            }
+          ],
+          "guidance": "（1）以成本计量（如无按公允价值计量的投资性房地产，删除此标题）。两级表头：期初余额 + 本期增加{购置或计提, 自用房地产或存货转入} + 本期减少{处 置, 转为自用房地产} + 期末余额。五层结构：一、账面原值合计 → 二、累计折旧和累计摊销合计 → 三、投资性房地产账面净值合计 → 四、投资性房地产减值准备累计金额合计 → 五、投资性房地产账面价值合计，各层下列示 1、房屋、建筑物 / 2、土地使用权。勾稽：各层 期末余额 = 期初余额 + 本期增加 − 本期减少；账面净值 = 账面原值 − 累计折旧和累计摊销；账面价值 = 账面净值 − 减值准备累计金额；各层合计行 = 该层类别行之和。另需说明本期折旧和摊销额、本期减值准备计提额（源模板 ①②）。"
         },
         {
           "name": "以公允价值计量",
           "headers": [
             "项目",
             "期初公允价值",
-            "本期增加",
-            "本期减少",
+            "购置",
+            "自用房地产或存货转入",
+            "公允价值变动损益",
+            "处 置",
+            "转为自用房地产",
             "期末公允价值"
           ],
           "rows": [
-            {
-              "label": "项目",
-              "row_type": "header_label"
-            },
             {
               "label": "一、成本合计",
               "is_total": true,
@@ -8397,10 +8448,70 @@
               "label": "2、土地使用权",
               "row_type": "data"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true
+            },
+            {
+              "key": "begin_fair",
+              "label": "期初公允价值",
+              "format": "amount"
+            },
+            {
+              "key": "buy",
+              "label": "购置",
+              "group": "本期增加",
+              "format": "amount"
+            },
+            {
+              "key": "transfer_in",
+              "label": "自用房地产或存货转入",
+              "group": "本期增加",
+              "format": "amount"
+            },
+            {
+              "key": "fair_change_pl",
+              "label": "公允价值变动损益",
+              "group": "本期增加",
+              "format": "amount"
+            },
+            {
+              "key": "disposal",
+              "label": "处 置",
+              "group": "本期减少",
+              "format": "amount"
+            },
+            {
+              "key": "transfer_out",
+              "label": "转为自用房地产",
+              "group": "本期减少",
+              "format": "amount"
+            },
+            {
+              "key": "end_fair",
+              "label": "期末公允价值",
+              "format": "amount"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "本期增加",
+              "start": 2,
+              "span": 3
+            },
+            {
+              "group": "本期减少",
+              "start": 5,
+              "span": 2
+            }
+          ],
+          "guidance": "（2）以公允价值计量（不适用的删除）。两级表头：期初公允价值 + 本期增加{购置, 自用房地产或存货转入, 公允价值变动损益} + 本期减少{处 置, 转为自用房地产} + 期末公允价值。三层结构：一、成本合计 / 二、公允价值变动合计 / 三、投资性房地产账面价值合计，各层下列示 其中：1、房屋、建筑物 / 2、土地使用权。勾稽：三、投资性房地产账面价值合计 = 一、成本合计 + 二、公允价值变动合计（逐列成立）。（注：①应披露公允价值确认依据。②说明报告期内改变计量模式的投资性房地产转换的原因及其影响。）"
         },
         {
-          "name": "以公允价值计量",
+          "name": "未办妥产权证书的投资性房地产",
           "headers": [
             "项目",
             "账面价值",
@@ -8408,20 +8519,50 @@
           ],
           "rows": [
             {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
               "label": "合计",
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "book_value",
+              "label": "账面价值",
+              "format": "amount"
+            },
+            {
+              "key": "reason",
+              "label": "原因"
+            }
+          ],
+          "guidance": "（3）未办妥产权证书的投资性房地产。按项目列示账面价值及未办妥产权证书的原因。勾稽：合计行 = 各明细行之和；账面价值合计不得超过「以成本计量」五、投资性房地产账面价值合计（或「以公允价值计量」三、投资性房地产账面价值合计）的期末数。"
         }
       ],
       "text_sections": [
-        "### 以成本计量",
+        "#### 以成本计量",
         "① 本期折旧和摊销额XX元。",
         "② 投资性房地产本期减值准备计提额XX元。",
-        "### 以公允价值计量",
+        "#### 以公允价值计量",
         "（注：①应披露公允价值确认依据。②说明报告期内改变计量模式的投资性房地产转换的原因及其影响。）",
-        "### 未办妥产权证书的投资性房地产"
+        "#### 未办妥产权证书的投资性房地产"
       ],
       "check_presets": [
         "LLM审核",
@@ -8439,7 +8580,9 @@
       "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
       "sort_index": 20,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "h3-investment-property-disclosure-alignment",
+      "_aligned_at": "2026-07-31 18:37:19"
     },
     {
       "section_number": "八、22",
@@ -8477,7 +8620,25 @@
               "row_type": "total"
             }
           ],
-          "guidance": "汇总表（源模板 R7–R10）：固定资产 + 固定资产清理 = 合计。勾稽：固定资产行 = 「固定资产情况」表「五、固定资产账面价值合计」的期末/期初余额；固定资产清理行 = 「固定资产清理」表合计（可从 H6 同步）；本表合计 = 资产负债表「固定资产」项目。注意国企口径列名为「期末账面价值 / 期初账面价值」，不同于上市的「期末余额 / 上年年末余额」。"
+          "guidance": "汇总表（源模板 R7–R10）：固定资产 + 固定资产清理 = 合计。勾稽：固定资产行 = 「固定资产情况」表「五、固定资产账面价值合计」的期末/期初余额；固定资产清理行 = 「固定资产清理」表合计（可从 H6 同步）；本表合计 = 资产负债表「固定资产」项目。注意国企口径列名为「期末账面价值 / 期初账面价值」，不同于上市的「期末余额 / 上年年末余额」。",
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "end_carrying",
+              "label": "期末账面价值",
+              "format": "amount"
+            },
+            {
+              "key": "begin_carrying",
+              "label": "期初账面价值",
+              "format": "amount"
+            }
+          ]
         },
         {
           "name": "固定资产情况",
@@ -8675,7 +8836,35 @@
               "row_type": "data"
             }
           ],
-          "guidance": "国企五层结构（源模板 R14–R58）：一、账面原值合计 → 二、累计折旧合计 → 三、固定资产账面净值合计 → 四、固定资产减值准备合计 → 五、固定资产账面价值合计；每层下以「其中：」列示土地资产 / 房屋、建筑物 / 机器设备 / 运输工具 / 电子设备 / 办公设备 / 酒店业家具 / 其他。\n勾稽：期末余额 = 期初余额 + 本期增加 − 本期减少（原值 / 累计折旧 / 减值准备三层各自成立）；账面净值 = 账面原值 − 累计折旧；账面价值 = 账面净值 − 减值准备；各层合计行 = 该层「其中：」各类别之和。\n源模板列示约定：账面净值层与账面价值层的「本期增加 / 本期减少」列填「—」（推导列不作变动分析）；土地资产不计提折旧，累计折旧层该行整行填「—」。"
+          "guidance": "国企五层结构（源模板 R14–R58）：一、账面原值合计 → 二、累计折旧合计 → 三、固定资产账面净值合计 → 四、固定资产减值准备合计 → 五、固定资产账面价值合计；每层下以「其中：」列示土地资产 / 房屋、建筑物 / 机器设备 / 运输工具 / 电子设备 / 办公设备 / 酒店业家具 / 其他。\n勾稽：期末余额 = 期初余额 + 本期增加 − 本期减少（原值 / 累计折旧 / 减值准备三层各自成立）；账面净值 = 账面原值 − 累计折旧；账面价值 = 账面净值 − 减值准备；各层合计行 = 该层「其中：」各类别之和。\n源模板列示约定：账面净值层与账面价值层的「本期增加 / 本期减少」列填「—」（推导列不作变动分析）；土地资产不计提折旧，累计折旧层该行整行填「—」。",
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "begin",
+              "label": "期初余额",
+              "format": "amount"
+            },
+            {
+              "key": "increase",
+              "label": "本期增加",
+              "format": "amount"
+            },
+            {
+              "key": "decrease",
+              "label": "本期减少",
+              "format": "amount"
+            },
+            {
+              "key": "end",
+              "label": "期末余额",
+              "format": "amount"
+            }
+          ]
         },
         {
           "name": "暂时闲置的固定资产情况",
@@ -8694,7 +8883,39 @@
               "row_type": "total"
             }
           ],
-          "guidance": "按资产类别列示暂时闲置固定资产的账面原值、累计折旧、减值准备、账面价值及备注。勾稽：账面价值 = 账面原值 − 累计折旧 − 减值准备；合计行 = 各明细行之和。底稿可从 H1-4 闲置检查表同步。停工项目、闲置资产的减值情况应予特别关注并作出恰当判断。"
+          "guidance": "按资产类别列示暂时闲置固定资产的账面原值、累计折旧、减值准备、账面价值及备注。勾稽：账面价值 = 账面原值 − 累计折旧 − 减值准备；合计行 = 各明细行之和。底稿可从 H1-4 闲置检查表同步。停工项目、闲置资产的减值情况应予特别关注并作出恰当判断。",
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "original_cost",
+              "label": "账面原值",
+              "format": "amount"
+            },
+            {
+              "key": "accum_dep",
+              "label": "累计折旧",
+              "format": "amount"
+            },
+            {
+              "key": "impairment",
+              "label": "减值准备",
+              "format": "amount"
+            },
+            {
+              "key": "carrying",
+              "label": "账面价值",
+              "format": "amount"
+            },
+            {
+              "key": "remark",
+              "label": "备注"
+            }
+          ]
         },
         {
           "name": "未办妥产权证书的固定资产情况",
@@ -8710,7 +8931,24 @@
               "row_type": "total"
             }
           ],
-          "guidance": "披露期末未办妥产权证书的固定资产账面价值及未办妥原因。底稿可从 H1-16 房屋建筑物权属检查表同步（未取得权证、或在建转固且无证号的资产）。勾稽：合计不得超过「固定资产情况」表期末账面价值合计。"
+          "guidance": "披露期末未办妥产权证书的固定资产账面价值及未办妥原因。底稿可从 H1-16 房屋建筑物权属检查表同步（未取得权证、或在建转固且无证号的资产）。勾稽：合计不得超过「固定资产情况」表期末账面价值合计。",
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "carrying",
+              "label": "账面价值",
+              "format": "amount"
+            },
+            {
+              "key": "reason",
+              "label": "未办妥产权证书原因"
+            }
+          ]
         },
         {
           "name": "固定资产清理",
@@ -8727,7 +8965,29 @@
               "row_type": "total"
             }
           ],
-          "guidance": "注：说明转入固定资产清理起始时间已超过1年的固定资产清理进展情况。\n勾稽：合计期末账面价值 = 汇总表「固定资产清理」行期末账面价值；期初同口径核对。底稿可从 H6 固定资产清理底稿同步。"
+          "guidance": "注：说明转入固定资产清理起始时间已超过1年的固定资产清理进展情况。\n勾稽：合计期末账面价值 = 汇总表「固定资产清理」行期末账面价值；期初同口径核对。底稿可从 H6 固定资产清理底稿同步。",
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "end_carrying",
+              "label": "期末账面价值",
+              "format": "amount"
+            },
+            {
+              "key": "begin_carrying",
+              "label": "期初账面价值",
+              "format": "amount"
+            },
+            {
+              "key": "reason",
+              "label": "转入清理的原因"
+            }
+          ]
         }
       ],
       "text_sections": [
@@ -8757,7 +9017,9 @@
       "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
       "sort_index": 21,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "h1-fixed-assets-mapping-and-disclosure-alignment",
+      "_aligned_at": "2026-07-31 12:03:14"
     },
     {
       "section_number": "八、23",
@@ -8769,14 +9031,14 @@
           "name": "在建工程",
           "headers": [
             "项目",
-            "期末余额",
-            "期初余额"
+            "账面余额",
+            "减值准备",
+            "账面价值",
+            "账面余额",
+            "减值准备",
+            "账面价值"
           ],
           "rows": [
-            {
-              "label": "项目",
-              "row_type": "header_label"
-            },
             {
               "label": "在建工程",
               "account_codes": [
@@ -8797,26 +9059,138 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true
+            },
+            {
+              "key": "end_book",
+              "label": "账面余额",
+              "group": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "end_impairment",
+              "label": "减值准备",
+              "group": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "end_carrying",
+              "label": "账面价值",
+              "group": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "begin_book",
+              "label": "账面余额",
+              "group": "期初余额",
+              "format": "amount"
+            },
+            {
+              "key": "begin_impairment",
+              "label": "减值准备",
+              "group": "期初余额",
+              "format": "amount"
+            },
+            {
+              "key": "begin_carrying",
+              "label": "账面价值",
+              "group": "期初余额",
+              "format": "amount"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "期末余额",
+              "start": 1,
+              "span": 3
+            },
+            {
+              "group": "期初余额",
+              "start": 4,
+              "span": 3
+            }
+          ],
+          "guidance": "汇总表（两级表头：期末余额 / 期初余额 各含 账面余额 / 减值准备 / 账面价值）：在建工程 + 工程物资 = 合计。勾稽：账面价值 = 账面余额 − 减值准备；本表合计期末账面价值 = 资产负债表「在建工程」项目。"
         },
         {
           "name": "（1）在建工程情况",
           "headers": [
             "项目",
-            "期末余额",
-            "期初余额"
+            "账面余额",
+            "减值准备",
+            "账面价值",
+            "账面余额",
+            "减值准备",
+            "账面价值"
           ],
           "rows": [
-            {
-              "label": "项目",
-              "row_type": "header_label"
-            },
             {
               "label": "合计",
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true
+            },
+            {
+              "key": "end_book",
+              "label": "账面余额",
+              "group": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "end_impairment",
+              "label": "减值准备",
+              "group": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "end_carrying",
+              "label": "账面价值",
+              "group": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "begin_book",
+              "label": "账面余额",
+              "group": "期初余额",
+              "format": "amount"
+            },
+            {
+              "key": "begin_impairment",
+              "label": "减值准备",
+              "group": "期初余额",
+              "format": "amount"
+            },
+            {
+              "key": "begin_carrying",
+              "label": "账面价值",
+              "group": "期初余额",
+              "format": "amount"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "期末余额",
+              "start": 1,
+              "span": 3
+            },
+            {
+              "group": "期初余额",
+              "start": 4,
+              "span": 3
+            }
+          ],
+          "guidance": "两级表头：期末余额 / 期初余额 各含 账面余额 / 减值准备 / 账面价值。勾稽：账面价值 = 账面余额 − 减值准备（每期独立）；各明细行之和 = 合计行。"
         },
         {
           "name": "（2）重要在建工程项目本期变动情况",
@@ -8865,7 +9239,72 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目名称",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "budget",
+              "label": "预算数",
+              "format": "amount"
+            },
+            {
+              "key": "begin_balance",
+              "label": "期初余额",
+              "format": "amount"
+            },
+            {
+              "key": "increase",
+              "label": "本期增加",
+              "format": "amount"
+            },
+            {
+              "key": "transfer_to_fa",
+              "label": "本期转入固定资产金额",
+              "format": "amount"
+            },
+            {
+              "key": "other_decrease",
+              "label": "本期其他减少金额",
+              "format": "amount"
+            },
+            {
+              "key": "end_balance",
+              "label": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "cum_input_pct",
+              "label": "工程累计投入占预算比例(%)"
+            },
+            {
+              "key": "progress",
+              "label": "工程进度"
+            },
+            {
+              "key": "interest_cap_accum",
+              "label": "利息资本化累计金额",
+              "format": "amount"
+            },
+            {
+              "key": "interest_cap_current",
+              "label": "其中：本期利息资本化金额",
+              "format": "amount"
+            },
+            {
+              "key": "interest_cap_rate",
+              "label": "本期利息资本化率(%)"
+            },
+            {
+              "key": "fund_source",
+              "label": "资金来源"
+            }
+          ],
+          "guidance": "重要在建工程项目本期变动：期末余额 = 期初余额 + 本期增加 − 本期转入固定资产金额 − 本期其他减少金额。含预算数 / 工程累计投入占预算比例(%) / 工程进度 / 利息资本化累计金额（其中本期）/ 本期利息资本化率(%) / 资金来源。"
         },
         {
           "name": "（3）本期计提在建工程减值准备情况",
@@ -8880,7 +9319,25 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "provision_amount",
+              "label": "本期计提金额",
+              "format": "amount"
+            },
+            {
+              "key": "reason",
+              "label": "计提原因"
+            }
+          ],
+          "guidance": "本期计提在建工程减值准备：按项目列示本期计提金额及计提原因。【长期资产减值测试应披露可收回金额的确定方法及关键参数（15号文）。】"
         }
       ],
       "text_sections": [
@@ -8906,7 +9363,9 @@
       "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
       "sort_index": 22,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "h2-construction-in-progress-disclosure-alignment",
+      "_aligned_at": "2026-07-31 12:23:07"
     },
     {
       "section_number": "八、24",
@@ -9899,10 +10358,10 @@
           "rows": [
             {
               "label": "一、递延所得税资产",
-              "row_type": "data"
-            },
-            {
-              "label": "信用减值准备",
+              "account_codes": [
+                "1811"
+              ],
+              "report_row_code": "BS-036",
               "row_type": "data"
             },
             {
@@ -9910,31 +10369,27 @@
               "row_type": "data"
             },
             {
-              "label": "交易性金融工具、衍生金融工具的估值",
-              "row_type": "data"
-            },
-            {
-              "label": "计入其他综合收益的其他金融资产公允价值变动",
-              "row_type": "data"
-            },
-            {
-              "label": "租赁负债",
-              "account_codes": [
-                "2601"
-              ],
-              "report_row_code": "BS-042",
-              "row_type": "data"
-            },
-            {
-              "label": "开办费",
-              "row_type": "data"
-            },
-            {
               "label": "可抵扣亏损",
               "row_type": "data"
             },
             {
-              "label": "……",
+              "label": "内部交易未实现利润",
+              "row_type": "data"
+            },
+            {
+              "label": "公允价值变动",
+              "row_type": "data"
+            },
+            {
+              "label": "租赁负债",
+              "row_type": "data"
+            },
+            {
+              "label": "购入摊销年限小于税法规定的资产",
+              "row_type": "data"
+            },
+            {
+              "label": "其他",
               "row_type": "data"
             },
             {
@@ -9944,28 +10399,30 @@
             },
             {
               "label": "二、递延所得税负债",
-              "row_type": "data"
-            },
-            {
-              "label": "交易性金融工具、衍生金融工具的估值",
-              "row_type": "data"
-            },
-            {
-              "label": "计入其他综合收益的其他金融资产公允价值变动",
-              "row_type": "data"
-            },
-            {
-              "label": "使用权资产",
               "account_codes": [
-                "1641",
-                "1642",
-                "1643"
+                "2901"
               ],
-              "report_row_code": "BS-019",
+              "report_row_code": "BS-067",
               "row_type": "data"
             },
             {
-              "label": "……",
+              "label": "购入摊销年限大于税法规定的资产",
+              "row_type": "data"
+            },
+            {
+              "label": "可供出售金融资产公允价值变动",
+              "row_type": "data"
+            },
+            {
+              "label": "投资性房地产公允价值变动",
+              "row_type": "data"
+            },
+            {
+              "label": "租赁形成",
+              "row_type": "data"
+            },
+            {
+              "label": "其他",
               "row_type": "data"
             },
             {
@@ -10016,10 +10473,10 @@
           "rows": [
             {
               "label": "一、递延所得税资产",
-              "row_type": "data"
-            },
-            {
-              "label": "信用减值准备",
+              "account_codes": [
+                "1811"
+              ],
+              "report_row_code": "BS-036",
               "row_type": "data"
             },
             {
@@ -10027,31 +10484,27 @@
               "row_type": "data"
             },
             {
-              "label": "交易性金融工具、衍生金融工具的估值",
-              "row_type": "data"
-            },
-            {
-              "label": "计入其他综合收益的其他金融资产公允价值变动",
-              "row_type": "data"
-            },
-            {
-              "label": "租赁负债",
-              "account_codes": [
-                "2601"
-              ],
-              "report_row_code": "BS-042",
-              "row_type": "data"
-            },
-            {
-              "label": "开办费",
-              "row_type": "data"
-            },
-            {
               "label": "可抵扣亏损",
               "row_type": "data"
             },
             {
-              "label": "……",
+              "label": "内部交易未实现利润",
+              "row_type": "data"
+            },
+            {
+              "label": "公允价值变动",
+              "row_type": "data"
+            },
+            {
+              "label": "租赁负债",
+              "row_type": "data"
+            },
+            {
+              "label": "购入摊销年限小于税法规定的资产",
+              "row_type": "data"
+            },
+            {
+              "label": "其他",
               "row_type": "data"
             },
             {
@@ -10061,28 +10514,30 @@
             },
             {
               "label": "二、递延所得税负债",
-              "row_type": "data"
-            },
-            {
-              "label": "交易性金融工具、衍生金融工具的估值",
-              "row_type": "data"
-            },
-            {
-              "label": "计入其他综合收益的其他金融资产公允价值变动",
-              "row_type": "data"
-            },
-            {
-              "label": "使用权资产",
               "account_codes": [
-                "1641",
-                "1642",
-                "1643"
+                "2901"
               ],
-              "report_row_code": "BS-019",
+              "report_row_code": "BS-067",
               "row_type": "data"
             },
             {
-              "label": "……",
+              "label": "购入摊销年限大于税法规定的资产",
+              "row_type": "data"
+            },
+            {
+              "label": "可供出售金融资产公允价值变动",
+              "row_type": "data"
+            },
+            {
+              "label": "投资性房地产公允价值变动",
+              "row_type": "data"
+            },
+            {
+              "label": "租赁形成",
+              "row_type": "data"
+            },
+            {
+              "label": "其他",
               "row_type": "data"
             },
             {
@@ -10111,20 +10566,15 @@
               "format": "amount"
             }
           ],
-          "guidance": "源模板（2）B、递延所得税资产和递延所得税负债互抵明细：按项目列示本期互抵金额。仅在以抵销后净额列示时填列。",
-          "rows": [
-            {
-              "label": "……",
-              "row_type": "data"
-            }
-          ]
+          "guidance": "源模板（2）B、递延所得税资产和递延所得税负债互抵明细：按项目列示本期互抵金额。仅在以抵销后净额列示时填列。本表为**纯动态行区域**（源模板 R56:R58 全空，无固定行名）：互抵项目由项目实际情况决定，在底稿披露表按需新增行并自行命名。",
+          "rows": []
         },
         {
           "name": "未确认递延所得税资产明细",
           "headers": [
             "项目",
             "期末余额",
-            "期初余额"
+            "年初余额"
           ],
           "columns": [
             {
@@ -10140,7 +10590,7 @@
             },
             {
               "key": "prior",
-              "label": "期初余额",
+              "label": "年初余额",
               "format": "amount"
             }
           ],
@@ -10166,7 +10616,7 @@
           "headers": [
             "年份",
             "期末余额",
-            "期初余额",
+            "年初余额",
             "备注"
           ],
           "columns": [
@@ -10183,7 +10633,7 @@
             },
             {
               "key": "prior",
-              "label": "期初余额",
+              "label": "年初余额",
               "format": "amount"
             },
             {
@@ -10191,7 +10641,7 @@
               "label": "备注"
             }
           ],
-          "guidance": "【注：无法在资产负债表日确定全部可抵扣亏损情况的，可只填写能确定部分的金额及其到期年度，并在备注栏予以说明。】第 3 列附注口径为「期初余额」（源模板底稿侧称「年初余额」，同一口径）。勾稽：本表「合计」= 上表「可抵扣亏损」行（源模板 B72=B62 / C72=C62）。",
+          "guidance": "【注：无法在资产负债表日确定全部可抵扣亏损情况的，可只填写能确定部分的金额及其到期年度，并在备注栏予以说明。】第 3 列口径为「年初余额」（逐字对齐源模板 C65，与表 1 一致）。年度骨架为 6 行（源模板 R66:R71，首行期末列与末行年初列为「——」）。结转期限长于 5 年（高新技术企业 / 科技型中小企业 10 年）或无使用期限的，按需新增行。勾稽：本表「合计」= 上表「可抵扣亏损」行（源模板 B72=B62 / C72=C62）。",
           "rows": [
             {
               "label": "2025年",
@@ -10215,34 +10665,6 @@
             },
             {
               "label": "2030年",
-              "row_type": "data"
-            },
-            {
-              "label": "2031年",
-              "row_type": "data"
-            },
-            {
-              "label": "2032年",
-              "row_type": "data"
-            },
-            {
-              "label": "2033年",
-              "row_type": "data"
-            },
-            {
-              "label": "2034年",
-              "row_type": "data"
-            },
-            {
-              "label": "2035年",
-              "row_type": "data"
-            },
-            {
-              "label": "……",
-              "row_type": "data"
-            },
-            {
-              "label": "无使用期限",
               "row_type": "data"
             },
             {
@@ -11968,11 +12390,42 @@
           ],
           "rows": [
             {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
               "label": "合计",
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "end_amount",
+              "label": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_amount",
+              "label": "期初余额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "勾稽：合计 = 各项之和，且应与 八、53「长期应付款」表的「减：一年内到期长期应付款项」行金额一致。数据来源 L5-1 审定表。"
         }
       ],
       "text_sections": [],
@@ -11991,7 +12444,9 @@
       "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
       "sort_index": 46,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "fix_note_l_cycle_structure",
+      "_aligned_at": "2026-07-31 10:36:27"
     },
     {
       "section_number": "八、48",
@@ -12377,16 +12832,12 @@
           "name": "长期应付款",
           "headers": [
             "项目",
-            "期末余额",
-            "期初余额"
+            "期末数",
+            "期初数"
           ],
           "rows": [
             {
               "label": "长期应付款",
-              "account_codes": [
-                "2701"
-              ],
-              "report_row_code": "BS-044",
               "row_type": "data"
             },
             {
@@ -12398,34 +12849,53 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "end_amount",
+              "label": "期末数",
+              "format": "amount"
+            },
+            {
+              "key": "prior_amount",
+              "label": "期初数",
+              "format": "amount"
+            }
+          ],
+          "guidance": "勾稽：合计 = 长期应付款 + 专项应付款。两行分别等于下方「按款项性质列示」与「专项应付款」两表的合计（专项应付款由 L6 底稿推送）。数据来源 L5-1 审定表。"
         },
         {
           "name": "①长期应付款项期末余额最大的前5 项",
           "headers": [
             "项目",
             "期末余额",
-            "期初余额"
+            "年初余额"
           ],
           "rows": [
             {
-              "label": "1．",
+              "label": "",
               "row_type": "data"
             },
             {
-              "label": "2．",
+              "label": "",
               "row_type": "data"
             },
             {
-              "label": "3．",
+              "label": "",
               "row_type": "data"
             },
             {
-              "label": "4．",
+              "label": "",
               "row_type": "data"
             },
             {
-              "label": "5．",
+              "label": "",
               "row_type": "data"
             },
             {
@@ -12446,7 +12916,26 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "end_amount",
+              "label": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_amount",
+              "label": "年初余额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "勾稽：小计 = 前 5 项 + 其他；合计 = 小计 − 一年内到期长期应付款项。源模板要求分项披露期末余额最大的前五项（行名按实际单位/项目填列）。数据来源 L5-2 明细表。"
         },
         {
           "name": "①专项应付款期末余额最大的前5 项",
@@ -12459,23 +12948,23 @@
           ],
           "rows": [
             {
-              "label": "1．",
+              "label": "",
               "row_type": "data"
             },
             {
-              "label": "2．",
+              "label": "",
               "row_type": "data"
             },
             {
-              "label": "3．",
+              "label": "",
               "row_type": "data"
             },
             {
-              "label": "4．",
+              "label": "",
               "row_type": "data"
             },
             {
-              "label": "5．",
+              "label": "",
               "row_type": "data"
             },
             {
@@ -12487,14 +12976,43 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "begin_amount",
+              "label": "期初余额",
+              "format": "amount"
+            },
+            {
+              "key": "increase",
+              "label": "本期增加",
+              "format": "amount"
+            },
+            {
+              "key": "decrease",
+              "label": "本期减少",
+              "format": "amount"
+            },
+            {
+              "key": "end_amount",
+              "label": "期末余额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "勾稽：期末余额 = 期初余额 + 本期增加 − 本期减少；合计 = 各项之和。本表由 **L6 专项应付款**底稿推送（与长期应付款共章节，按子表名浅合并）。须说明专项应付款的来源、指定的专门用途与使用限制。源模板要求分项披露年末余额最大的前五项。注：列头取附注模版字面（源 xlsx 写的是 `201X.01.01` / `201X.12.31` 年份占位符）。"
         }
       ],
       "text_sections": [
         "### 长期应付款",
-        "①长期应付款项期末余额最大的前5 项",
+        "#### ①长期应付款项期末余额最大的前5 项",
         "### 专项应付款",
-        "①专项应付款期末余额最大的前5 项",
+        "#### ①专项应付款期末余额最大的前5 项",
         "（注：",
         "（1）应说明专项应付款的来源、指定的专门用途、使用限制等相关内容。如：该专项应付款为财政部按照XX文规定拨付的X项目专用设备购置款。",
         "（2）企业因城镇整体规划、库区建设、棚户区改造、沉陷区治理等公共利益进行搬迁，收到政府从财政预算直接拨付的搬迁补偿款，在专项应付款中核算。）"
@@ -12514,7 +13032,9 @@
       "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
       "sort_index": 52,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "fix_note_l_cycle_structure",
+      "_aligned_at": "2026-07-31 10:36:27"
     },
     {
       "section_number": "八、54",
@@ -13156,13 +13676,6 @@
             },
             {
               "label": "合同负债",
-              "account_codes": [
-                "2205"
-              ],
-              "row_type": "data"
-            },
-            {
-              "label": "……",
               "row_type": "data"
             },
             {
@@ -13170,7 +13683,26 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "end_amount",
+              "label": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_amount",
+              "label": "期初余额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "勾稽：合计 = 各项目之和。数据来源 L7-1 审定表 / L7-2 明细表。注：本表列序为「期末余额 / 期初余额」（附注交付物口径），源模板底稿录入界面为「年初余额 / 期末余额」。"
         }
       ],
       "text_sections": [],
@@ -13186,7 +13718,9 @@
       "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
       "sort_index": 56,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "fix_note_l_cycle_structure",
+      "_aligned_at": "2026-07-31 09:54:24"
     },
     {
       "section_number": "八、58",
@@ -13314,7 +13848,36 @@
               "label": "其中：国有独享资本公积",
               "row_type": "data"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "begin_amount",
+              "label": "期初余额",
+              "format": "amount"
+            },
+            {
+              "key": "increase",
+              "label": "本期增加",
+              "format": "amount"
+            },
+            {
+              "key": "decrease",
+              "label": "本期减少",
+              "format": "amount"
+            },
+            {
+              "key": "end_amount",
+              "label": "期末余额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "勾稽：期末余额 = 期初余额 + 本期增加 − 本期减少；合计 = 各项之和。须逐项说明资本公积增加、减少的原因、依据及金额；转增股本须说明法律程序及决议。数据来源审定表 / 明细表。"
         }
       ],
       "text_sections": [
@@ -13335,7 +13898,9 @@
       "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
       "sort_index": 59,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "fix_note_m_equity_structure",
+      "_aligned_at": "2026-07-31 11:54:48"
     },
     {
       "section_number": "八、61",
@@ -13371,7 +13936,41 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "begin_amount",
+              "label": "期初余额",
+              "format": "amount"
+            },
+            {
+              "key": "increase",
+              "label": "本期增加",
+              "format": "amount"
+            },
+            {
+              "key": "decrease",
+              "label": "本期减少",
+              "format": "amount"
+            },
+            {
+              "key": "end_amount",
+              "label": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "remark",
+              "label": "备注",
+              "format": "text"
+            }
+          ],
+          "guidance": "勾稽：期末余额 = 期初余额 + 本期增加 − 本期减少；合计 = 各项之和。须说明专项储备（安全生产费 / 维简费等）的变动情况与变动原因。"
         }
       ],
       "text_sections": [
@@ -13390,7 +13989,9 @@
       "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
       "sort_index": 60,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "fix_note_m_equity_structure",
+      "_aligned_at": "2026-07-31 11:54:48"
     },
     {
       "section_number": "八、62",
@@ -13433,7 +14034,36 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "begin_amount",
+              "label": "期初余额",
+              "format": "amount"
+            },
+            {
+              "key": "increase",
+              "label": "本期增加",
+              "format": "amount"
+            },
+            {
+              "key": "decrease",
+              "label": "本期减少",
+              "format": "amount"
+            },
+            {
+              "key": "end_amount",
+              "label": "期末余额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "勾稽：期末余额 = 期初余额 + 本期增加 − 本期减少；合计 = 各项之和。须说明盈余公积变动情况与原因；用于转增股本 / 弥补亏损 / 分派股利的须说明决议。"
         }
       ],
       "text_sections": [
@@ -13454,7 +14084,9 @@
       "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
       "sort_index": 61,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "fix_note_m_equity_structure",
+      "_aligned_at": "2026-07-31 11:54:48"
     },
     {
       "section_number": "八、63",
@@ -13973,7 +14605,7 @@
               "row_type": "data"
             },
             {
-              "label": "利息费用净额",
+              "label": "利息费用",
               "row_type": "data"
             },
             {
@@ -13981,15 +14613,27 @@
               "row_type": "data"
             },
             {
+              "label": "利息净支出",
+              "row_type": "data"
+            },
+            {
               "label": "承兑汇票贴息",
               "row_type": "data"
             },
             {
-              "label": "汇兑损益",
+              "label": "汇兑损失",
+              "row_type": "data"
+            },
+            {
+              "label": "减：汇兑收益",
               "row_type": "data"
             },
             {
               "label": "减：汇兑损益资本化",
+              "row_type": "data"
+            },
+            {
+              "label": "汇兑净损失",
               "row_type": "data"
             },
             {
@@ -14001,7 +14645,26 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "current_amount",
+              "label": "本期发生额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_amount",
+              "label": "上期发生额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "勾稽：利息费用 = 利息费用总额 − 利息资本化；利息净支出 = 利息费用 − 利息收入；汇兑净损失 = 汇兑损失 − 汇兑收益 − 汇兑损益资本化；合计 = 利息净支出 + 承兑汇票贴息 + 汇兑净损失 + 手续费及其他。（注：以下不存在的项目可以删除）数据来源 L8-1 审定表 / L8-2 明细表。"
         }
       ],
       "text_sections": [
@@ -14021,7 +14684,9 @@
       "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
       "sort_index": 67,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "fix_note_l_cycle_structure",
+      "_aligned_at": "2026-07-31 09:54:24"
     },
     {
       "section_number": "八、69",

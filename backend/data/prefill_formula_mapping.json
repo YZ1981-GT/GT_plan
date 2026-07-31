@@ -3703,6 +3703,18 @@
           "description": "上年同底稿审定数"
         },
         {
+          "cell_ref": "递延所得税资产明细合计",
+          "formula": "=WP('N1','递延所得税资产明细表N1-2','递延所得税资产期末审定数')",
+          "formula_type": "WP",
+          "description": "审定表各暂时性差异项目未审数按类别汇总自 N1-2 明细表期末递延所得税资产审定数（源模板 N1-1!B7=SUMIF(N1-2)）"
+        },
+        {
+          "cell_ref": "可抵扣亏损可确认额",
+          "formula": "=WP('N1','可用以后年度税前利润弥补的亏损检查表的N1-5','确认递延所得税资产的可弥补亏损')",
+          "formula_type": "WP",
+          "description": "「可抵扣亏损」项目行未审数取自 N1-5 检查表可确认递延所得税资产合计（未确认部分不计入）"
+        },
+        {
           "cell_ref": "税会差异汇总",
           "formula": null,
           "formula_type": "PLACEHOLDER",
@@ -3897,7 +3909,7 @@
       "wp_name": "应收票据分析程序",
       "sheet": "分析程序D1-3",
       "account_codes": [
-        "1131"
+        "1121"
       ],
       "cells": [
         {
@@ -3908,7 +3920,7 @@
         },
         {
           "cell_ref": "本年未审数",
-          "formula": "=TB('1131','期末余额')",
+          "formula": "=TB('1121','期末余额')",
           "formula_type": "TB",
           "description": "从试算表取应收票据期末余额（未审）"
         }
@@ -4106,12 +4118,12 @@
       "wp_name": "应收票据明细表",
       "sheet": "票据明细表D1-4",
       "account_codes": [
-        "1131"
+        "1121"
       ],
       "cells": [
         {
           "cell_ref": "票据余额",
-          "formula": "=TB_AUX('1131','票据类型','期末余额')",
+          "formula": "=TB_AUX('1121','票据类型','期末余额')",
           "formula_type": "TB_AUX",
           "description": "从辅助余额表按票据类型维度取应收票据期末余额"
         }
@@ -4391,30 +4403,6 @@
           "formula": "=TB_SUM('4001~4104','期末余额')",
           "formula_type": "TB_SUM",
           "description": "从试算表取权益期末余额合计（未审）"
-        }
-      ]
-    },
-    {
-      "wp_code": "N1",
-      "wp_name": "税金分析程序",
-      "sheet": "分析程序N1-3",
-      "account_codes": [
-        "2221",
-        "6401",
-        "6403"
-      ],
-      "cells": [
-        {
-          "cell_ref": "上年审定数",
-          "formula": "=PREV('N1','分析程序N1-3','审定数')",
-          "formula_type": "PREV",
-          "description": "上年同底稿分析程序审定数"
-        },
-        {
-          "cell_ref": "本年未审数",
-          "formula": "=TB_SUM('2221~6403','期末余额')",
-          "formula_type": "TB_SUM",
-          "description": "从试算表取税金相关科目期末余额合计（未审）"
         }
       ]
     },
@@ -8177,6 +8165,105 @@
           "formula": "=TB('1811.07','期末余额')",
           "formula_type": "TB",
           "description": "递延所得税资产-租赁年金期末余额"
+        },
+        {
+          "cell_ref": "公允价值变动_期初余额",
+          "formula": "=TB('1811.01','期初余额')",
+          "formula_type": "TB",
+          "description": "递延所得税资产-公允价值变动期初余额（N1-2 期初段与期末段同构，源模板 C/D/E 列对应 I/J/K 列）"
+        },
+        {
+          "cell_ref": "资产减值准备_期初余额",
+          "formula": "=TB('1811.02','期初余额')",
+          "formula_type": "TB",
+          "description": "递延所得税资产-资产减值准备期初余额"
+        },
+        {
+          "cell_ref": "长期职工薪酬_期初余额",
+          "formula": "=TB('1811.03','期初余额')",
+          "formula_type": "TB",
+          "description": "递延所得税资产-长期职工薪酬期初余额"
+        },
+        {
+          "cell_ref": "可抵扣亏损_期初余额",
+          "formula": "=TB('1811.04','期初余额')",
+          "formula_type": "TB",
+          "description": "递延所得税资产-可抵扣亏损期初余额"
+        },
+        {
+          "cell_ref": "预提费用_期初余额",
+          "formula": "=TB('1811.05','期初余额')",
+          "formula_type": "TB",
+          "description": "递延所得税资产-预提费用期初余额"
+        },
+        {
+          "cell_ref": "递延收益_期初余额",
+          "formula": "=TB('1811.06','期初余额')",
+          "formula_type": "TB",
+          "description": "递延所得税资产-递延收益期初余额"
+        },
+        {
+          "cell_ref": "租赁年金_期初余额",
+          "formula": "=TB('1811.07','期初余额')",
+          "formula_type": "TB",
+          "description": "递延所得税资产-租赁年金期初余额"
+        }
+      ]
+    },
+    {
+      "wp_code": "N1",
+      "wp_name": "递延所得税资产（负债）测算表",
+      "sheet": "递延所得税资产（负债）测算表N1-4",
+      "account_codes": [
+        "1811",
+        "2901"
+      ],
+      "cells": [
+        {
+          "cell_ref": "递延所得税资产期末账面余额",
+          "formula": "=TB('1811','期末余额')",
+          "formula_type": "TB",
+          "description": "源模板 N1-4 第 I 列「递延所得税资产期末账面余额（2）」：取科目 1811 期末余额，与第 G 列「应确认递延所得税资产期末余额（1）」比较得第 J 列差异（3）=（1）-（2）"
+        },
+        {
+          "cell_ref": "递延所得税负债期末账面余额",
+          "formula": "=TB('2901','期末余额')",
+          "formula_type": "TB",
+          "description": "源模板 N1-4 第 M 列「递延所得税负债期末账面余额（5）」：取科目 2901 期末余额，与第 K 列「应确认递延所得税负债期末余额（4）」比较得第 N 列差异（6）=（4）-（5）"
+        },
+        {
+          "cell_ref": "递延所得税资产期初账面余额",
+          "formula": "=TB('1811','期初余额')",
+          "formula_type": "TB",
+          "description": "科目 1811 期初余额（供本期变动额 roll-forward 校验：期末−期初=本期确认−本期转回）"
+        },
+        {
+          "cell_ref": "递延所得税负债期初账面余额",
+          "formula": "=TB('2901','期初余额')",
+          "formula_type": "TB",
+          "description": "科目 2901 期初余额（供本期变动额 roll-forward 校验）"
+        }
+      ]
+    },
+    {
+      "wp_code": "N1",
+      "wp_name": "可用以后年度税前利润弥补的亏损检查表",
+      "sheet": "可用以后年度税前利润弥补的亏损检查表的N1-5",
+      "account_codes": [
+        "4104"
+      ],
+      "cells": [
+        {
+          "cell_ref": "期末未分配利润_账面金额",
+          "formula": "=TB('4104','期末余额')",
+          "formula_type": "TB",
+          "description": "源模板 N1-5 R14「期末未分配利润」的账面金额列：取科目 4104 未分配利润期末余额（报表行 BS-088 同口径），审定金额 = 账面金额 + 审计调整（源模板 E14=C14+D14）"
+        },
+        {
+          "cell_ref": "期初未分配利润_账面金额",
+          "formula": "=TB('4104','期初余额')",
+          "formula_type": "TB",
+          "description": "科目 4104 未分配利润期初余额（供本期亏损弥补变动分析）"
         }
       ]
     },
