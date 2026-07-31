@@ -53,7 +53,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, inject, onMounted, onUnmounted, onBeforeUnmount, toRef } from 'vue'
+import { ref, computed, inject, onMounted, onUnmounted, onBeforeUnmount, toRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
@@ -135,15 +135,17 @@ async function syncToNote(): Promise<void> {
   syncing.value = true
   try {
     const year = auditYear.value || (new Date().getFullYear() - 1)
+    // 🔴 按源模板四层结构推送（原实现推自造 4 行 + 位置化 values:[期末,期初]
+    //    → 行标签全不匹配模板，且 2 值塞进 4 个数据列、顺序还与模板相反）。
     const payload = buildH5SyncPayload({
       wpId: props.wpId,
       projectId: props.projectId,
       year,
-      summaryRows: rows.map((r) => ({
-        label: r.item,
-        values: [r.endBalance, r.beginBalance],
-        is_total: r.item === '油气资产净值',
-      })),
+      layerTotals: {
+        cost: rows.find((r) => r.item === '油气资产原值')?.endBalance ?? 0,
+        depletion: rows.find((r) => r.item === '减：累计折耗')?.endBalance ?? 0,
+        impairment: rows.find((r) => r.item === '减：减值准备')?.endBalance ?? 0,
+      },
       soeDisclosureText: soeDisclosureText.value,
     })
     await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
@@ -154,7 +156,9 @@ async function syncToNote(): Promise<void> {
       projectId: props.projectId,
       sectionIds: [H5_NOTE_SECTION.soe],
     })
-    autoSync.scheduleAutoSync(syncToNote)
+    // 🔴 此处**不得**调 scheduleAutoSync(syncToNote)：那是「调度自己」→ 800ms 周期
+    //    重复 POST，且会骗过 disclosureAutoSyncCoverage 守卫（守卫只看有无该调用）。
+    //    自动同步由下方 watch 监听实际数据触发。
   } catch (err: any) {
     if (err?.code !== 'ERR_CANCELED' && err?.name !== 'CanceledError') {
       ElMessage.error('同步失败')
@@ -163,6 +167,15 @@ async function syncToNote(): Promise<void> {
     syncing.value = false
   }
 }
+
+// [auto-sync] 监听**构建载荷所用的实际数据**触发防抖同步。
+// 🔴 不加 `_xxxMounted` 一次性防护：Vue watch 默认 immediate:false，挂载本身不触发；
+//    该防护会吞掉「切走再切回后的第一次编辑」（平台铁律）。
+watch(
+  [() => summaryRows.value, () => soeDisclosureText.value],
+  () => autoSync.scheduleAutoSync(syncToNote),
+  { deep: true },
+)
 
 // ─── 跳转回附注 ──────────────────────────────────────────────────────────────
 function jumpToNote(): void {
