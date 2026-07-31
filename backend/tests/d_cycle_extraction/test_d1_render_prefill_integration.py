@@ -480,9 +480,22 @@ def test_tier_b_provenance_d1_honest():
     # 连接取数溯源
     assert any("gross" in a for a in anchors)  # D1-1 原值 ← D1-2
     assert any("D1-15" in a for a in anchors)  # D1-4 ↔ D1-15 ECL
-    # tb 叶子取数描述可追溯
+    # tb 叶子取数描述可追溯（d1-extraction-chain-completion 起科目由 BS-005 报表映射解析，
+    # 故描述不再写死「tb_balance 1121」，但必须同时点明数据源与实证科目）
     cat = next(e for e in entries if e["anchor"] == "D1-cat-rows")
-    assert "tb_balance 1121" in cat["description"]
+    assert "tb_balance" in cat["description"]
+    assert "1121.01" in cat["description"]  # 实证叶子仍须可追溯
+    assert "BS-005" in cat["description"]   # 科目定位来源
+
+    # 科目定位链路本身必须有一条只读溯源（审计师据此知道科目是怎么定位的）
+    src = next(e for e in entries if e["anchor"] == "tb_source_codes")
+    for token in ("BS-005", "report_config", "account_mapping", "fail-open"):
+        assert token in src["description"], token
+
+    # D1-4 按票据种类小计块（喂审定表坏账区块）必须登记且声明「不从四表库填」
+    nt = next(e for e in entries if e["anchor"] == "D1-bd-notetype-rows")
+    assert "不从四表库填" in nt["description"]
+    assert "宁缺勿造" in nt["description"]
 
 
 # ---------------------------------------------------------------------------

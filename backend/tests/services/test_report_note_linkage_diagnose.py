@@ -33,7 +33,7 @@ def _note(section: str, table_data: dict | None = None) -> SimpleNamespace:
 
 # 已人工对照源模板核实的 seed（见 JSON `_backlog`）。新增条目必须逐节核实后同步此处，
 # 这样「批量臆造 N 条」一定撞红线，而合规的增量维护不会被误伤。
-_VERIFIED_SEED_ROW_CODES = {"BS-002"}
+_VERIFIED_SEED_ROW_CODES = {"BS-002", "BS-005"}
 # 决策 1 下本表只做 stale 定向 + 报表行「关联附注」引用，规模应保持很小
 _MAX_BUSINESS_ENTRIES = 5
 
