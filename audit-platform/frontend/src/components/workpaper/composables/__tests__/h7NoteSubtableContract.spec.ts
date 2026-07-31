@@ -398,7 +398,48 @@ describe('P9 组件：无自调度 / 金额控件合规 / 已接同步链路', (
     it(`${name}：无自造金额格式化（禁 toLocaleString）`, () => {
       expect(src).not.toContain('toLocaleString')
     })
+
+    it(`${name}：🔴 自持久化（H7 宿主无统一 @save 处理器，只 emit 会让录入刷新即丢）`, () => {
+      // 实测踩中：自动同步写进了附注，但 checklist_responses 一条都没有
+      expect(src).toContain('checklist-responses')
+      expect(src).toContain('api.put(')
+      expect(src).toContain("emit('save'")
+      // 保存失败必须给用户提示（纯 catch {} 会让数据丢了没人发现）
+      expect(/catch\s*\{\s*ElMessage\.error/.test(src)).toBe(true)
+    })
+
+    it(`${name}：🔴 不 watch props.allResponses（宿主旧值会覆盖刚录入的数据）`, () => {
+      expect(src).toContain('localResponses')
+      expect(/watch\(\s*responses/.test(src)).toBe(false)
+      expect(/toRef\(props,\s*'allResponses'\)/.test(src)).toBe(false)
+    })
   }
+
+  it('🔴 宿主必须传 :applicable-standards（否则变体门控恒开）+ 接 @save', () => {
+    const host = stripComments(readFileSync(resolve(WP, 'GtH7BiologicalAssets.vue'), 'utf-8'))
+    for (const tag of ['H7TabDisclosureListed', 'H7TabDisclosureSoe']) {
+      const at = host.indexOf(`<${tag}`)
+      expect(at, `宿主未使用 ${tag}`).toBeGreaterThan(0)
+      const block = host.slice(at, host.indexOf('/>', at))
+      expect(block, `${tag} 缺 :applicable-standards`).toContain(':applicable-standards')
+      expect(block, `${tag} 缺 :project-id`).toContain(':project-id')
+      expect(block, `${tag} 缺 @save`).toContain('@save')
+    }
+    // useHostApplicableStandards 必须在 setup 顶层（inject 依赖）
+    expect(host).toContain('useHostApplicableStandards')
+  })
+
+  it('🔴 明细表用 store 成员取 fmtAmount（不是模块命名导出）', () => {
+    // `import { fmtAmount } from '@/stores/displayPrefs'` 会在**运行时**抛
+    // `does not provide an export named 'fmtAmount'` —— Vite 200 / vitest /
+    // get_diagnostics 全绿，只有浏览器挂载才暴露（本 spec 实测踩中）
+    for (const rel of Object.values(TABLES)) {
+      const src = stripComments(readFileSync(resolve(WP, rel), 'utf-8'))
+      expect(src).toContain('useDisplayPrefsStore')
+      expect(/import\s*\{[^}]*\bfmtAmount\b[^}]*\}\s*from\s*'@\/stores\/displayPrefs'/.test(src))
+        .toBe(false)
+    }
+  })
 
   for (const [name, rel] of Object.entries(TABLES)) {
     const src = stripComments(readFileSync(resolve(WP, rel), 'utf-8'))
