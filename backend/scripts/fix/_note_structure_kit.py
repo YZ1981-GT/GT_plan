@@ -303,6 +303,39 @@ def titleize_text_sections(section: dict[str, Any]) -> list[str]:
     return changes
 
 
+def missing_text_sections(section: dict[str, Any], required: list[str]) -> list[str]:
+    """返回 `required` 里尚不存在于 `text_sections` 的段落（按 strip 后逐字比对）。"""
+    paras = section.get("text_sections")
+    existing = {str(p).strip() for p in (paras if isinstance(paras, list) else [])}
+    return [r for r in (required or []) if str(r).strip() not in existing]
+
+
+def ensure_text_sections(section: dict[str, Any], required: list[str]) -> list[str]:
+    """确保 `required` 段落存在 —— **缺失则按序追加到末尾**，已有的一律不动。幂等。
+
+    与 `run_section(text_sections=...)` 的**整表替换**语义不同：这里是「补齐缺段」，
+    用于「源模板有某小节说明、模板 JSON 漏了」的场景（如 K1 上市 ⑧⑨⑩ 三节），
+    避免为补 3 段而手抄整份 47 段（手抄错字会被脚本写回模板，风险远大于收益）。
+
+    ⚠️ 正文段**不要**带 `#### ` 前缀 —— `disclosure_engine._is_table_title_paragraph`
+    见 `#` 即判为标题，标题本身不进任何输出 → 实质披露正文会被静默丢弃。
+    """
+    paras = section.get("text_sections")
+    paras = list(paras) if isinstance(paras, list) else []
+    existing = {str(p).strip() for p in paras}
+    changes: list[str] = []
+    for r in required or []:
+        key = str(r).strip()
+        if not key or key in existing:
+            continue
+        paras.append(r)
+        existing.add(key)
+        changes.append(f"text_sections：追加「{key[:24]}…」")
+    if changes:
+        section["text_sections"] = paras
+    return changes
+
+
 def find_bare_table_name_paragraphs(section: dict[str, Any]) -> list[str]:
     """返回仍会被当正文渲染的裸表名段落（供 validate / 测试）。"""
     names = {str(t.get("name", "")).strip() for t in (section.get("tables") or [])}
@@ -434,8 +467,14 @@ def run_section(
     check: bool,
     drops: list[str] | None = None,
     text_sections: list[str] | None = None,
+    require_text_sections: list[str] | None = None,
 ) -> tuple[list[str], list[str], list[str]]:
-    """处理单个章节，返回 `(changes, warnings, errs)`。"""
+    """处理单个章节，返回 `(changes, warnings, errs)`。
+
+    `text_sections` = **整表替换**（目标清单即真源）；
+    `require_text_sections` = **补齐缺段**（只追加缺的，已有段落不动）。两者可并用，
+    补齐在替换之后执行。
+    """
     doc = json.loads(path.read_text(encoding="utf-8"))
     section = find_section(doc, section_number)
     if section is None:
@@ -448,6 +487,8 @@ def run_section(
                 "text_sections 与目标清单不一致（源模板要求的说明段落缺失或漂移）："
                 f"现 {len(section.get('text_sections') or [])} 段 / 目标 {len(text_sections)} 段"
             )
+        for miss in missing_text_sections(section, require_text_sections or []):
+            errs.append(f"text_sections 缺源模板说明段：「{str(miss).strip()[:30]}…」")
         return [], [], errs
 
     changes = drop_tables(section, drops or [])
@@ -457,6 +498,7 @@ def run_section(
         old = len(section.get("text_sections") or [])
         section["text_sections"] = list(text_sections)
         changes.append(f"text_sections：{old} → {len(text_sections)} 段")
+    changes += ensure_text_sections(section, require_text_sections or [])
     changes += titleize_text_sections(section)
     errs = validate_section(section, expected, forbidden_names=drops)
     if changes and not dry_run and not errs:

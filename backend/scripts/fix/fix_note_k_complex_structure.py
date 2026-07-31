@@ -74,6 +74,7 @@ from _note_structure_kit import (  # noqa: E402
     flat_columns,
     grouped_columns,
     labels_then_total,
+    missing_text_sections,  # re-export：守卫测试查 ⑧⑨⑩ 说明段是否齐备
     rule,
     run_section,
     subtotal_row,
@@ -81,7 +82,12 @@ from _note_structure_kit import (  # noqa: E402
     validate_section,  # re-export：守卫测试做反向自检
 )
 
-__all__ = ["derive_column_groups", "validate_section", "main"]
+__all__ = [
+    "derive_column_groups",
+    "missing_text_sections",
+    "validate_section",
+    "main",
+]
 
 REPO = Path(__file__).resolve().parents[3]
 LISTED = REPO / "backend" / "data" / "note_template_listed.json"
@@ -128,7 +134,9 @@ _STAGE_ROWS = [
     total_row("合计"),
 ]
 
-#: 三阶段变动表列（附注模版为单级 5 列；源 xlsx 第二行是阶段释义，属表头注释非数据）
+#: 三阶段变动表列 —— **国企侧**单级 5 列。
+#: 源 xlsx 国企 `A63:E63` / `A77:E77` 是**一行表头**，阶段释义与阶段名写在同一格里
+#: （`B63 = 第一阶段未来12个月预期信用损失`），故国企侧确为 `flat`。
 def _movement_cols(label_header: str) -> list[dict[str, Any]]:
     return _cols([
         ("label", label_header, None),
@@ -137,6 +145,32 @@ def _movement_cols(label_header: str) -> list[dict[str, Any]]:
         ("第三阶段", "第三阶段", AMOUNT),
         ("合计", "合计", AMOUNT),
     ])
+
+
+#: 三阶段变动表列 —— **上市侧**两级混合分组。
+#:
+#: 🔴 源 xlsx 上市 `A91:E92` 是**两行表头**（`A91:A92` 与 `E91:E92` 纵向合并 = rowspan=2；
+#: `B91/C91/D91` 是阶段名，`B92/C92/D92` 是各阶段的 ECL 释义）→ 模板原先压成单级 5 列，
+#: 第二行的释义整行丢失。现按 `methodColumns()` 同款混合分组落法：
+#:   * 标签列 `坏账准备` 与 `合计` **不带 group**（rowspan=2）
+#:   * 标签列**不打 `flat`** —— 打了 `_extract_column_groups` 会返回 `[]` 判为显式单级
+#:   * `key` 保持既有中文数据键（`第一阶段` 等），只改 `label` + 加 `group`，
+#:     同步载荷行对象就是这些键，改 key 会让整表数据丢落点
+_STAGE1_ECL_DESC = "未来12个月预期信用损失"
+_STAGE2_ECL_DESC = "整个存续期预期信用损失(未发生信用减值)"
+_STAGE3_ECL_DESC = "整个存续期预期信用损失(已发生信用减值)"
+
+
+def _listed_movement_cols(label_header: str) -> list[dict[str, Any]]:
+    return grouped_columns(
+        ("label", label_header),
+        [
+            ("第一阶段", _STAGE1_ECL_DESC, AMOUNT, "第一阶段"),
+            ("第二阶段", _STAGE2_ECL_DESC, AMOUNT, "第二阶段"),
+            ("第三阶段", _STAGE3_ECL_DESC, AMOUNT, "第三阶段"),
+            ("合计", "合计", AMOUNT, None),
+        ],
+    )
 
 
 _ECL_MOVEMENT_ROWS = [
@@ -223,13 +257,17 @@ K1_LISTED_PLAN: list[dict[str, Any]] = [
         blanks_then_total(3),
         KEEP,
     ),
+    # 🔴 行骨架按源 xlsx `A8:A20` = **5 年段 6 档**（原模板只有 3 年段，缺
+    # `3至4年`/`4至5年`/`5年以上`）。`_source=workpaper` 时由载荷整表覆盖（账龄段跟随
+    # 项目 `useAgingConfig` 配置），此处 seed 取源模板默认口径（K1 默认 FIVE_YEAR）。
     rule(
         "按账龄披露",
         _cols([("label", "账龄", None), ("期末余额", "期末余额", AMOUNT),
                ("上年年末余额", "上年年末余额", AMOUNT)]),
         [data_row("1年以内"), data_row("其中：0-X个月"), data_row("X-Y个月"),
          subtotal_row("1年以内小计："), data_row("1至2年"), data_row("2至3年"),
-         data_row("3年以上"), subtotal_row("小计"), data_row("减：坏账准备"),
+         data_row("3至4年"), data_row("4至5年"), data_row("5年以上"),
+         subtotal_row("小计"), data_row("减：坏账准备"),
          total_row("合计")],
         KEEP,
     ),
@@ -261,7 +299,7 @@ K1_LISTED_PLAN: list[dict[str, Any]] = [
     rule("上年年末处于第三阶段的坏账准备", _stage_cols(_RATE_LIFETIME), list(_STAGE_ROWS), KEEP),
     rule(
         "本期计提、收回或转回的坏账准备情况",
-        _movement_cols("坏账准备"),
+        _listed_movement_cols("坏账准备"),
         list(_ECL_MOVEMENT_ROWS),
         KEEP,
     ),
@@ -299,6 +337,63 @@ K1_LISTED_PLAN: list[dict[str, Any]] = [
         blanks_then_total(5),
         KEEP,
     ),
+    # ── 以下 3 张源模板有、模板 JSON 整张缺失（insert=True） ────────────────
+    # 国企侧 §八、9 三张都在（`涉及政府补助的应收款项` / `由金融资产转移而终止确认的…` /
+    # `…转移继续涉入形成的资产、负债的金额`），上市侧却一张都没有 —— 两版本不对称。
+    # 源 xlsx 上市 ⑧`A136:E141` / ⑨`A146:D150` / ⑩`A153:B159` 明确列在其他应收款披露内。
+    rule(
+        "应收政府补助情况",
+        _cols([("label", "单位名称（注：政府补助的发文单位）", None),
+               ("政府补助项目名称", "政府补助项目名称", TEXT),
+               ("期末余额", "期末余额", AMOUNT), ("账龄", "账龄", TEXT),
+               ("预计收取的时间、金额及依据", "预计收取的时间、金额及依据", TEXT)]),
+        blanks_then_total(3),
+        "（信息披露解释性公告2号：对于报告期末按应收金额确认的政府补助，应按补助单位和"
+        "补助项目**逐项**披露应收款项的期末余额、账龄以及预计收取的时间、金额及依据；"
+        "未能在预计时点收到预计金额的，应披露原因。）确认应收款项时应履行重大业务咨询程序。",
+        insert=True,
+    ),
+    rule(
+        "因金融资产转移而终止确认的其他应收款情况",
+        _cols([("label", "项  目", None), ("转移方式", "转移方式", TEXT),
+               ("终止确认金额", "终止确认金额", AMOUNT),
+               ("与终止确认相关的利得或损失", "与终止确认相关的利得或损失", AMOUNT)]),
+        blanks_then_total(3),
+        "【因金融资产转移而终止确认的应收款项，应列示金融资产转移的方式、终止确认的"
+        "应收款项金额，及与终止确认相关的利得或损失。】",
+        insert=True,
+    ),
+    rule(
+        "转移其他应收款且继续涉入形成的资产、负债的金额",
+        _cols([("label", "项  目", None), ("期末数", "期末数", AMOUNT)]),
+        [data_row("资产："), data_row(), subtotal_row("资产小计"),
+         data_row("负债："), data_row(), subtotal_row("负债小计")],
+        "【转移应收款项且继续涉入的，应披露资产转移方式、分项列示继续涉入形成的资产、"
+        "负债的金额。】说明中披露资产转移方式；未全部终止确认的被转移金融资产与相关负债"
+        "之间的关系；已终止确认的金融资产继续涉入的性质及相关风险的信息。",
+        insert=True,
+    ),
+]
+
+#: 源模板上市 ⑧⑨⑩ 的说明段落（模板 JSON 原先只到 ⑦ 资金集中管理）。
+#:
+#: ⚠️ 正文段一律**不加 `#### ` 前缀** —— `disclosure_engine._is_table_title_paragraph`
+#: 见 `#` 即判标题，标题本身不进任何输出 → 实质披露正文会被静默丢弃（H1 上市曾中招）。
+#: 只有「小节标题」才用 `#### `。
+K1_LISTED_REQUIRE_TEXTS = [
+    "#### 应收政府补助情况",
+    "（信息披露解释性公告2号要求：对于报告期末按应收金额确认的政府补助，公司应按补助单位和"
+    "补助项目逐项披露应收款项的期末余额、账龄以及预计收取的时间、金额及依据。如公司未能在"
+    "预计时点收到预计金额的政府补助，公司应披露原因。）",
+    "【确认应收款项时，应履行重大业务咨询程序。】",
+    "#### 因金融资产转移而终止确认的其他应收款情况",
+    "【因金融资产转移而终止确认的应收款项，应列示金融资产转移的方式、终止确认的应收款项"
+    "金额，及与终止确认相关的利得或损失；】",
+    "#### 转移其他应收款且继续涉入形成的资产、负债的金额",
+    "【转移应收款项且继续涉入的，应披露资产转移方式、分项列示继续涉入形成的资产、负债的"
+    "金额。】",
+    "说明：资产转移方式；未全部终止确认的被转移金融资产与相关负债之间的关系，已终止确认的"
+    "金融资产继续涉入的性质及相关风险的信息。",
 ]
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -368,20 +463,23 @@ K1_SOE_PLAN: list[dict[str, Any]] = [
          data_row("减：坏账准备"), total_row("合计")],
         KEEP,
     ),
-    # 源 xlsx 国企 A46:G55 —— B46:D46「期末数」/ E46:G46「期初数」跨列合并
+    # 🔴 源 xlsx 国企 `A6:C15` 是**单级 3 列**（`账  龄` / `期末数` / `期初数`），
+    # 行 = 6 档账龄 + `小  计` + `减：坏账准备` + `合  计`。
+    # 模板原先是 5 列（期末数/期初数 各含账面余额+坏账准备）且行为 3 年段无小计/减坏账行
+    # —— 那套「双列 + 只有合计行」结构不在源模板里，导致同步侧不得不把「小计 + 减：坏账
+    # 准备」两行压进合计行的额外两列（`buildK1SoeSubTableData` 注释自述该 hack）。
+    # 现按源模板还原，同步侧即可忠实推 subtotal / provision / total 三种 kind。
     rule(
         "按账龄披露其他应收款项",
-        grouped_columns(
-            ("label", "账  龄"),
-            [
-                ("期末账面余额", "账面余额", AMOUNT, "期末数"),
-                ("期末坏账准备", "坏账准备", AMOUNT, "期末数"),
-                ("期初账面余额", "账面余额", AMOUNT, "期初数"),
-                ("期初坏账准备", "坏账准备", AMOUNT, "期初数"),
-            ],
-        ),
-        labels_then_total(["1年以内（含1年）", "1至2年", "2至3年", "3年以上"]),
-        KEEP,
+        _cols([("label", "账  龄", None), ("期末数", "期末数", AMOUNT),
+               ("期初数", "期初数", AMOUNT)]),
+        [data_row("1年以内（含1年）"), data_row("1至2年"), data_row("2至3年"),
+         data_row("3至4年"), data_row("4至5年"), data_row("5年以上"),
+         subtotal_row("小  计"), data_row("减：坏账准备"), total_row("合  计")],
+        "源模板国企版账龄表为**单级 3 列**（账龄 / 期末数 / 期初数），行含小  计、"
+        "减：坏账准备、合  计。勾稽：小  计 = K1-1 其他应收款审定期末数；"
+        "小  计 − 减：坏账准备 = 合  计；减：坏账准备 = 三阶段变动表期末余额。"
+        "账龄档随项目账龄配置（3年段 / 5年段 / 自定义），此处 seed 取源模板 5 年段口径。",
     ),
     rule("按坏账准备计提方法分类披露其他应收款项", _method_cols(), list(_METHOD_ROWS), KEEP),
     rule(K1_SOE_METHOD_PRIOR, _method_cols(), list(_METHOD_ROWS), KEEP, aliases=["续："]),
@@ -412,7 +510,11 @@ K1_SOE_PLAN: list[dict[str, Any]] = [
                 ("期初坏账准备", "坏账准备", AMOUNT, "期初数"),
             ],
         ),
-        labels_then_total(["1年以内（含1年）", "1至2年", "2至3年", "3年以上"]),
+        # 源 xlsx `A49:A55` = 6 档账龄 + `合  计`（原模板为 3 年段）
+        labels_then_total(
+            ["1年以内（含1年）", "1至2年", "2至3年", "3至4年", "4至5年", "5年以上"],
+            "合  计",
+        ),
         KEEP,
     ),
     rule(
@@ -726,6 +828,8 @@ SPECS: dict[str, dict[str, Any]] = {
         "section": "五、8",
         "plan": K1_LISTED_PLAN,
         "expected": K1_LISTED_EXPECTED,
+        # 源模板 ⑧⑨⑩ 三小节的说明段落（补齐缺段，不整表替换）
+        "require_text_sections": K1_LISTED_REQUIRE_TEXTS,
     },
     "k1-soe": {
         "label": "K1 其他应收款 · 国企 八、9",
@@ -771,6 +875,7 @@ def _runner(key: str, dry_run: bool, check: bool) -> tuple[list[str], list[str],
         dry_run=dry_run,
         check=check,
         drops=spec.get("drops"),
+        require_text_sections=spec.get("require_text_sections"),
     )
 
 

@@ -1,6 +1,54 @@
 """F1 预付账款 — 专属渲染策略.
 
 component_type = "f1-prepayment"
+
+四表库科目映射链路（三层，DB 只读实证 2026-07-31）
+--------------------------------------------------
+
+::
+
+    tb_balance.account_code             客户**原始码**（点号分级）  1123 / 1123.02.01 / 1231.03
+            │  account_mapping(project_id, original_account_code → standard_account_code)
+            ▼
+    trial_balance.standard_account_code **标准码**（横杠分级）      1123 / 1231-04
+            │  report_config.formula（按 applicable_standard 精确匹配）
+            ▼
+    报表行 BS-008「预付款项」
+      listed_standalone / listed_consolidated / soe_standalone / soe_consolidated
+        一律 = TB('1123','期末余额')        ← 四准则同形，且**不减备抵**
+
+由此得到三条实现口径（全部经实证，勿凭直觉改）：
+
+1. **原值科目必须经报表映射解析 + `account_mapping` 反解**，不能硬编码前缀 ——
+   客户把预付拆到自定义科目时硬编码必落空。实证 `account_mapping` 把
+   `1123` / `1123.01` / `1123.02.*` / `1123.03` / `1123.99` 全部映射到标准码 `1123`，
+   `minimal_prefix_set` 收敛为 `['1123']`。
+2. **备抵科目（坏账准备-预付账款）报表公式里没有** → 走 `fallback_provision=('1231-04',)`；
+   且实证 9 个项目的 `account_mapping` **全部没有** `1231-04` 记录（只有 `-01/-02/-03`
+   与裸 `1231`）→ 反解退化为宽前缀 `1231`，**必须叠名称过滤「预付」**，否则会把
+   应收账款坏账（实证项目 `0ec33ac9` 为 26,401,719.77）算进 F1。过滤后当前数据集为空
+   → 减值准备无预填（宁缺勿造，正确）。
+3. **`1123` 的叶子子科目名带业务语义**，可干净映射到 F1-1「按性质分类」五行：
+
+   ===============  ================================  ===========
+   原始码            科目名                             性质行
+   ===============  ================================  ===========
+   ``1123.01``      预付账款_预付货款                    货款
+   ``1123.02.01``   预付账款_长期资产款_一次购置          设备款
+   ``1123.02.02``   预付账款_长期资产款_分期购置          设备款
+   ``1123.02.03``   预付账款_长期资产款_工程款            工程款
+   ``1123.03``      预付账款_短期待摊费用                服务费
+   ``1123.99``      预付账款_其他                       其他
+   ===============  ================================  ===========
+
+   这正是 F1 与 D3（2203 无性质维度，归档 spec 判定「宁缺勿造不做 prefill」）的本质差异，
+   故 F1 做审定表预填是有据的。
+
+叶子聚合与科目定位一律复用平台共享件 ``app/services/four_table``（K1 spec 建成、D1 已委托），
+禁止再造方言 —— 旧实现的 ``_is_leaf`` 用 ``startswith`` 缺点号边界（``1123.1`` 会被
+``1123.10`` 误判为非叶子；前缀 ``2202`` 会误吃 ``22020``）。
+
+spec: .kiro/specs/f1-four-table-extraction-and-disclosure-alignment/
 """
 
 from __future__ import annotations
@@ -11,71 +59,239 @@ import sqlalchemy as sa
 
 from app.models.audit_platform_models import TbBalance
 from app.services.dataset_query import get_active_filter
+from app.services.four_table import (
+    LeafRow,
+    ReportLineAccounts,
+    ReportLineAccountSpec,
+    aggregate_leaves,
+    filter_by_prefixes,
+    resolve_report_line_accounts,
+    select_leaves,
+    to_leaf_rows,
+)
 
 from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
 
-# 预付账款(资产借方) / 存货 / 应付账款 —— 供 F1-1 试算核对及 F1-4 跨循环取数
-_F1_TB_PREFIXES = ("1123", "1401", "2202")
+#: 预付款项报表行定位规格（原值 BS-008 / 备抵兜底 1231-04 / 宽前缀时叠「预付」名称过滤）
+F1_REPORT_LINE_SPEC = ReportLineAccountSpec(
+    row_code="BS-008",
+    fallback_gross=("1123",),
+    fallback_provision=("1231-04",),
+    provision_name_filter="预付",
+)
+
+#: F1-4 实质性分析跨循环锚点 —— 同样走报表映射规则，不硬编码前缀。
+#:
+#: 🔴 旧实现用前缀 ``1401`` 取「存货余额」是**错的**：标准科目表 ``1401 = 材料采购``，
+#: 存货合计是 ``BS-010 = SUM_TB('1401~1499','期末余额')``（实证两个真实项目的
+#: ``1401`` 均为空 → F1-4「存货余额」与「占存货比重」恒 0，该分析从来算不出）。
+#: 应付账款报表行是 ``BS-045``（``TB('2202','期末余额')``）。
+_F1_INVENTORY_ROW_CODE = "BS-010"
+_F1_INVENTORY_FALLBACK = ("1401~1499",)
+_F1_PAYABLE_ROW_CODE = "BS-045"
+_F1_PAYABLE_FALLBACK = ("2202",)
+
+#: F1-1「按性质分类」行 key（与前端 `useF1Adjudication.NATURE_ROWS` 逐字一致）
+F1_NATURE_ROW_KEYS = ("goods", "construction", "equipment", "service", "other")
+
+#: 性质归类关键字。**顺序即优先级**：`1123.02.03 长期资产款_工程款` 同时含
+#: 「长期资产」与「工程」，源模板口径归「工程款」→ 工程必须先判。
+_NATURE_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("construction", ("工程", "施工", "基建")),
+    ("equipment", ("设备", "长期资产", "购置", "固定资产", "器具")),
+    ("service", ("服务", "待摊", "费用", "保险", "租金", "运费", "咨询")),
+    ("goods", ("货款", "材料", "商品", "采购", "存货", "药品")),
+)
+
+_NATURE_DEFAULT = "other"
 
 
-def _is_leaf(code: str, all_codes: set[str]) -> bool:
-    """叶子科目判定：不存在以 code 为前缀的其它科目码（防父子双算）."""
-    return not any(other != code and other.startswith(code) for other in all_codes)
+# ─────────────────────────── 纯函数（无 DB，可单测） ───────────────────────────
 
 
-async def _fetch_f1_tb_context(ctx: RenderContext) -> dict[str, float]:
-    """从 tb_balance 取 1123(预付)/1401(存货)/2202(应付) 期末余额（v1 借正贷负口径）.
+def sql_prefixes_for_specs(specs) -> list[str]:
+    """把报表公式的科目编号规格转成**宽口径 SQL 前缀**（供 ``LIKE '{p}%'`` 下推）。
 
-    🔴 四表库铁律：tb_balance 存多级子科目（1123 / 1123.01 / 1123.01.01），
-    父子同时累加会双算 → **仅汇总叶子科目**；并把科目过滤下推到 SQL，避免全表扫描。
+    - 单码 ``2202`` → ``2202``
+    - 区间 ``1401~1499`` → 取两端公共前导串 ``14``（宽取，再由
+      :func:`filter_by_code_specs` 做精确收敛）
+
+    区间两端无公共前导（如 ``1401~2202``）时返回两端各自的一级码，仍属宽取。
     """
-    balances: dict[str, float] = {}
+    out: list[str] = []
+    for raw in specs or []:
+        spec = str(raw or "").strip()
+        if not spec:
+            continue
+        if "~" not in spec:
+            out.append(spec)
+            continue
+        lo, _, hi = (p.strip() for p in spec.partition("~"))
+        common = ""
+        for a, b in zip(lo, hi):
+            if a != b:
+                break
+            common += a
+        if common:
+            out.append(common)
+        else:
+            out.extend([lo, hi])
+    return [p for p in dict.fromkeys(out) if p]
+
+
+def filter_by_code_specs(leaves: list[LeafRow], specs) -> list[LeafRow]:
+    """按报表公式的科目编号规格精确过滤叶子（支持单码前缀与 ``lo~hi`` 区间）。纯函数。
+
+    单码走 :func:`filter_by_prefixes` 的严格点号边界；区间按**一级科目段**
+    （首个 ``.`` 之前）字符串比较落在 ``[lo, hi]`` 内 —— 与
+    ``build_trial_balance_code_filter`` 的区间语义一致（``hi`` 含其全部子科目）。
+    """
+    singles = [s for s in (str(x or "").strip() for x in specs or []) if s and "~" not in s]
+    ranges = [
+        tuple(p.strip() for p in str(x).partition("~")[::2])
+        for x in specs or []
+        if "~" in str(x or "")
+    ]
+    picked: dict[str, LeafRow] = {}
+    for row in filter_by_prefixes(leaves, singles):
+        picked[f"{row.dataset_id}|{row.account_code}"] = row
+    for row in leaves or []:
+        head = row.account_code.split(".", 1)[0]
+        for lo, hi in ranges:
+            if lo <= head <= hi:
+                picked[f"{row.dataset_id}|{row.account_code}"] = row
+                break
+    return list(picked.values())
+
+
+def classify_f1_nature(account_name: str) -> str:
+    """按科目名把 `1123` 叶子归入 F1-1 五个性质桶。返回 rowKey。
+
+    未命中任何关键字一律归 ``other``（不丢科目，Property 2）。
+    """
+    name = str(account_name or "")
+    for row_key, hints in _NATURE_RULES:
+        if any(h in name for h in hints):
+            return row_key
+    return _NATURE_DEFAULT
+
+
+def build_nature_prefill(
+    leaves: list[LeafRow],
+    prefixes,
+) -> dict[str, dict[str, float]]:
+    """把 `1123` 叶子按性质归集为 F1-1 预填。
+
+    Returns:
+        ``{rowKey: {"opening": x, "closing": y}}``；只包含**实际出现**的性质桶
+        （前端据此「只覆盖出现的类别、不清零未出现的类别」）。无叶子返回 ``{}``。
+    """
+    picked = filter_by_prefixes(leaves, prefixes)
+    out: dict[str, dict[str, float]] = {}
+    for row in picked:
+        key = classify_f1_nature(row.account_name)
+        bucket = out.setdefault(key, {"opening": 0.0, "closing": 0.0})
+        bucket["opening"] += row.opening
+        bucket["closing"] += row.closing
+    return {k: {kk: round(vv, 2) for kk, vv in v.items()} for k, v in out.items()}
+
+
+def build_impairment_prefill(
+    leaves: list[LeafRow],
+    prefixes,
+    *,
+    name_filter: str | None = None,
+) -> dict[str, float] | None:
+    """备抵科目（坏账准备-预付账款）期初/期末预填。
+
+    Args:
+        leaves: 已 :func:`select_leaves` 的叶子行。
+        prefixes: 备抵侧**原始码**前缀集。
+        name_filter: 反解退化为宽前缀时必须传（如 ``"预付"``），否则会把其它
+            应收科目的坏账算进来。
+
+    Returns:
+        ``{"end": x, "prior": y}``（对聚合结果取绝对值，兼容两种符号约定）；
+        无命中科目返回 ``None``（宁缺勿造 —— 由前端保持手工录入）。
+    """
+    picked = filter_by_prefixes(leaves, prefixes)
+    if name_filter:
+        picked = [r for r in picked if name_filter in (r.account_name or "")]
+    if not picked:
+        return None
+    agg = aggregate_leaves(picked, [r.account_code for r in picked], absolute=True)
+    return {"end": round(agg["closing"], 2), "prior": round(agg["opening"], 2)}
+
+
+# ─────────────────────────── DB 访问（全程 fail-open） ───────────────────────────
+
+
+async def _resolve_f1_accounts(ctx: RenderContext) -> ReportLineAccounts:
+    """解析 F1 原值 / 备抵科目（报表映射规则驱动；内部已 fail-open）。"""
+    return await resolve_report_line_accounts(ctx, F1_REPORT_LINE_SPEC)
+
+
+async def _resolve_line_codes(
+    ctx: RenderContext, row_code: str, fallback
+) -> list[str]:
+    """解析某报表行的科目编号规格（含 ``lo~hi`` 区间），按项目适用准则精确匹配。"""
+    from app.services.four_table.report_line_accounts import fetch_applicable_standards
+    from app.services.report_account_mapping import resolve_report_line_account_codes
+
+    try:
+        standards = await fetch_applicable_standards(ctx)
+        return list(
+            await resolve_report_line_account_codes(
+                ctx.db,
+                ctx.project_id,
+                row_code,
+                fallback=list(fallback),
+                applicable_standards=standards,
+            )
+        )
+    except Exception as e:  # noqa: BLE001
+        logger.debug("F1 render: %s 科目解析失败（用兜底）: %s", row_code, e)
+        return list(fallback)
+
+
+async def _fetch_f1_leaf_rows(ctx: RenderContext, prefixes) -> list[LeafRow]:
+    """按前缀集从 `tb_balance` 取行并筛出叶子（active 数据集，过滤下推到 SQL）。
+
+    🔴 必须把整棵子树都取回来才能判叶子（父行也要），故 SQL 用 ``LIKE '{prefix}%'``
+    宽取，再由 :func:`select_leaves` / :func:`filter_by_prefixes` 做**严格点号边界**收敛。
+    """
+    ps = [p for p in dict.fromkeys(str(p or "").strip() for p in prefixes) if p]
+    if not ps:
+        return []
     try:
         active_filter = await get_active_filter(
             ctx.db, TbBalance.__table__, ctx.project_id, ctx.year or 0
         )
         prefix_filter = sa.or_(
-            *[TbBalance.account_code.like(f"{p}%") for p in _F1_TB_PREFIXES]
+            *[TbBalance.account_code.like(f"{p}%") for p in ps]
         )
         result = await ctx.db.execute(
             sa.select(
                 TbBalance.account_code,
+                TbBalance.account_name,
+                TbBalance.opening_balance,
                 TbBalance.closing_balance,
+                TbBalance.debit_amount,
+                TbBalance.credit_amount,
+                TbBalance.closing_direction,
+                TbBalance.dataset_id,
             ).where(sa.and_(active_filter, prefix_filter))
         )
-        rows = [
-            ((row.account_code or "").strip(), float(row.closing_balance or 0))
-            for row in result.fetchall()
-        ]
-        all_codes = {code for code, _ in rows if code}
-        for code, amount in rows:
-            if not code or not _is_leaf(code, all_codes):
-                continue
-            for prefix in _F1_TB_PREFIXES:
-                if code == prefix or code.startswith(prefix):
-                    balances[prefix] = balances.get(prefix, 0.0) + amount
-                    break
+        return select_leaves(to_leaf_rows(result.fetchall()))
     except Exception as e:  # noqa: BLE001
         logger.warning("F1 render: tb_balance 取数失败: %s", e)
         try:
             await ctx.db.rollback()
         except Exception:
             pass
-    return balances
-
-
-async def _resolve_prepaid_codes(ctx: RenderContext) -> list[str]:
-    """预付款项报表行(BS-008)的源科目编号：参照 report_config 规则映射，回退 1123.
-
-    企业自定义口径（预付拆到其它科目）时，审定表 TB 核对随报表映射走，不硬编码前缀。
-    """
-    from app.services.report_account_mapping import resolve_report_line_account_codes
-
-    return await resolve_report_line_account_codes(
-        ctx.db, ctx.project_id, "BS-008", fallback=["1123"]
-    )
+        return []
 
 
 async def _fetch_f1_1123_audited(
@@ -180,8 +396,12 @@ async def render(ctx: RenderContext) -> dict | None:
         "payable_balance_current": 0.0,
         # F1-1 试算核对预填（预付款项审定/未审；组件只读回退 seed）
         "prepaid_tb_amount": 0.0,
+        # 科目余额表叶子合计（与上一项并列，供溯源面板显示两个口径的差异）
+        "prepaid_tb_leaf_amount": 0.0,
         # TB 核对科目来源（report_config BS-008 规则映射解析结果，供溯源展示）
-        "tb_source_codes": [],
+        "tb_source_codes": {},
+        # F1-4 跨循环锚点科目来源（存货 BS-010 / 应付账款 BS-045）
+        "tb_cross_cycle_codes": {},
     }
 
     try:
@@ -239,21 +459,57 @@ async def render(ctx: RenderContext) -> dict | None:
         except Exception:
             pass
 
-    # TB 取数：F1-1 试算核对预填(1123) + F1-4 存货/应付余额
-    tb_balances = await _fetch_f1_tb_context(ctx)
-    project_context["inventory_balance_current"] = round(tb_balances.get("1401", 0.0), 2)
-    # 应付账款(2202)为负债贷方，tb_balance 借正贷负 → 取绝对值供 F1-4 正数展示
-    project_context["payable_balance_current"] = round(abs(tb_balances.get("2202", 0.0)), 2)
+    # ── 四表库取数（报表映射规则驱动 + 共享叶子聚合，全程 fail-open）─────────────
+    accounts = await _resolve_f1_accounts(ctx)
+    # 取数溯源（前端 F1FourTableSourcePanel 消费；旧版是 list[str] 且前端 0 消费）
+    project_context["tb_source_codes"] = accounts.as_dict()
 
-    # F1-1 试算平衡表数(1123)：优先 trial_balance 审定/未审，回退 tb_balance 期末。
+    # F1-4 跨循环锚点同样走报表映射（存货 BS-010 区间 / 应付账款 BS-045）
+    inventory_specs = await _resolve_line_codes(
+        ctx, _F1_INVENTORY_ROW_CODE, _F1_INVENTORY_FALLBACK
+    )
+    payable_specs = await _resolve_line_codes(
+        ctx, _F1_PAYABLE_ROW_CODE, _F1_PAYABLE_FALLBACK
+    )
+    project_context["tb_cross_cycle_codes"] = {
+        "inventory": {"row_code": _F1_INVENTORY_ROW_CODE, "codes": inventory_specs},
+        "payable": {"row_code": _F1_PAYABLE_ROW_CODE, "codes": payable_specs},
+    }
+
+    leaves = await _fetch_f1_leaf_rows(
+        ctx,
+        list(accounts.gross)
+        + list(accounts.provision)
+        + sql_prefixes_for_specs(inventory_specs)
+        + sql_prefixes_for_specs(payable_specs),
+    )
+
+    # 存货：区间内叶子直接求和 —— 借正贷负下跌价准备(1416)本就是负数，已自然抵减，
+    # 故**不**照抄 listed_standalone 公式里的 `- TB('1416')`（会二次扣减）。
+    inventory_leaves = filter_by_code_specs(leaves, inventory_specs)
+    project_context["inventory_balance_current"] = round(
+        sum(r.closing for r in inventory_leaves), 2
+    )
+    # 应付账款为负债贷方，tb_balance 借正贷负 → 取绝对值供 F1-4 正数展示
+    payable_leaves = filter_by_code_specs(leaves, payable_specs)
+    project_context["payable_balance_current"] = round(
+        abs(sum(r.closing for r in payable_leaves)), 2
+    )
+
+    # F1-1 试算平衡表数：优先 trial_balance 审定/未审（标准码口径），回退 tb_balance 叶子期末。
     # 前端 allResponses 来自 checklist-responses 端点（非本 responses_snapshot），故同时：
     #  ① 注入 responses_snapshot（供确有消费该键的路径使用）
     #  ② 放入 project_context.prepaid_tb_amount 供 F1-1 组件作只读回退 seed（不覆盖手工录入）
-    prepaid_codes = await _resolve_prepaid_codes(ctx)
-    project_context["tb_source_codes"] = prepaid_codes
-    seed_tb = await _fetch_f1_1123_audited(ctx, prepaid_codes)
+    # 🔴 双口径并列下发（审计追溯）：trial_balance 是**重算产物**，可能与科目余额表叶子
+    #   合计不等（实证项目 `2aa00f57`：trial_balance 2,603,836.86 = 科目余额表叶子合计
+    #   1,301,918.43 的 2 倍 —— recalc 把 `dataset_id IS NULL` 的历史行一并计入）。
+    #   两个数都给出来，由 F1FourTableSourcePanel 显示差异，别让审计师只看到一个数。
+    leaf_total = aggregate_leaves(leaves, accounts.gross)["closing"]
+    project_context["prepaid_tb_leaf_amount"] = round(leaf_total, 2)
+
+    seed_tb = await _fetch_f1_1123_audited(ctx, list(accounts.gross_standard))
     if seed_tb is None:
-        seed_tb = tb_balances.get("1123")
+        seed_tb = leaf_total
     if seed_tb is not None and abs(seed_tb) > 1e-9:
         project_context["prepaid_tb_amount"] = round(seed_tb, 2)
         if "F1-adj-trial-balance-amount" not in responses_snapshot:
@@ -269,7 +525,7 @@ async def render(ctx: RenderContext) -> dict | None:
         "soe": "soe" in standards,
     }
 
-    return {
+    result: dict = {
         "sections": sections,
         "adjudication_config": adjudication_config,
         "project_context": project_context,
@@ -277,3 +533,25 @@ async def render(ctx: RenderContext) -> dict | None:
         "responses_snapshot": responses_snapshot,
         "account_code": "1123",
     }
+
+    # F1-1「按性质分类」未审数四表预填（前端优先级：手工 > F1-2 明细聚合 > 四表库）。
+    # 无叶子数据时**整键省略**（宁缺勿造：不写 0 占位，不清空既有值）。
+    nature_prefill = build_nature_prefill(leaves, accounts.gross)
+    if nature_prefill:
+        result["adjudication_prefill"] = {"nature": nature_prefill}
+
+    # 减值准备（坏账准备-预付账款）预填：备抵侧反解退化为宽前缀时**必须**叠名称过滤，
+    # 否则会把应收票据/应收账款/其他应收款的坏账（1231.01/.02/.03）算进 F1。
+    impairment_prefill = build_impairment_prefill(
+        leaves,
+        accounts.provision,
+        name_filter=(
+            None
+            if accounts.provision_exact
+            else F1_REPORT_LINE_SPEC.provision_name_filter
+        ),
+    )
+    if impairment_prefill is not None:
+        result["impairment_prefill"] = impairment_prefill
+
+    return result

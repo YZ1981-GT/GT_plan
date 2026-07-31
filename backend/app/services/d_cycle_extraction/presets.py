@@ -318,13 +318,28 @@ _TIER_B_PROVENANCE: dict[str, list[dict]] = {
     # 另登记 D1 各底稿间连接取数关系（R4.3，只读溯源，复杂归集不压成单条公式）。
     "D1": [
         {
+            "sheet_name": "D1-科目定位",
+            "anchor": "tb_source_codes",
+            "description": (
+                "🔴 D1 全部四表取数的**科目定位**均由报表规则映射驱动（不再硬编码前缀）："
+                "报表行 BS-005「应收票据」→ report_config.formula（按项目 applicable_standard "
+                "精确匹配；实证 soe_standalone 是 TB('1121','期末余额')-TB('1231-01','期末余额')，"
+                "listed_* 只有 TB('1121',…)）→ 标准码 → account_mapping(project_id) 反解 → "
+                "该项目**原始科目码**（tb_balance/tb_aux_balance 存原始码，如 1121.01 / 1231.01）。"
+                "备抵科目按 account_chart(direction='credit') 或名称含「坏账准备/减值准备」拆分。"
+                "任一环失败一律 fail-open 回退 1121 / 1231 前缀（等价改动前行为），"
+                "解析来源见 render 输出的 tb_source_codes.resolved_from。"
+            ),
+        },
+        {
             "sheet_name": "D1-2",
             "anchor": "D1-cat-rows",
             "description": (
-                "原值明细表(按类别) 期初未审/本期增减 ← **tb_balance 1121 叶子子科目**"
-                "（1121.01 银行承兑→fixed-bank / 1121.02 商业承兑→fixed-commercial / 1121.03 "
-                "信用证等→动态行；priorUnadjusted=期初余额, currentIncrease=借方发生额, "
-                "currentDecrease=贷方发生额 → 期末未审=期初+增−减=期末余额，roll-forward 守恒）"
+                "原值明细表(按类别) 期初未审/本期增减 ← **tb_balance 原值科目叶子子科目**"
+                "（科目由 BS-005 报表映射解析，实证 1121.01 银行承兑→fixed-bank / 1121.02 "
+                "商业承兑→fixed-commercial / 1121.03 信用证等→动态行；priorUnadjusted=期初余额, "
+                "currentIncrease=借方发生额, currentDecrease=贷方发生额 → 期末未审=期初+增−减"
+                "=期末余额，roll-forward 守恒，源模板 H11=B11+F11-G11）"
                 "（get_active_filter 数据集版本，只取叶子防双算，手工优先，seed_d1_detail_rows）"
             ),
         },
@@ -332,18 +347,34 @@ _TIER_B_PROVENANCE: dict[str, list[dict]] = {
             "sheet_name": "D1-4",
             "anchor": "D1-bd-portfolio-rows",
             "description": (
-                "坏账准备明细表 按组合计提期初/本期净变动 ← **tb_balance 1231 名称含「应收票据」"
-                "的叶子（1231.01 坏账准备_应收票据）**（credit 备抵，abs 归一为计提口径正值；"
-                "净减少记入本期转回、净增加记入本期计提，roll-forward 守恒）。单项/组合细分与"
-                "五列拆分由 D1-15 ECL 测算细化（宁缺勿造，手工优先，seed_d1_detail_rows）"
+                "坏账准备明细表 按组合计提期初/本期净变动 ← **tb_balance 坏账科目叶子**"
+                "（标准码 1231-01 经 account_mapping 反解到客户原始码，实证 1231.01 "
+                "坏账准备_应收票据；credit 备抵，abs 归一为计提口径正值；净减少记入本期转回、"
+                "净增加记入本期计提，roll-forward 守恒）。**仅当反解退化为宽前缀时才叠名称过滤**"
+                "（防把 1231.02 应收账款 / 1231.03 其他应收款的坏账一并算进来）。"
+                "单项/组合细分与五列拆分由 D1-15 ECL 测算细化（宁缺勿造，手工优先）"
+            ),
+        },
+        {
+            "sheet_name": "D1-4",
+            "anchor": "D1-bd-notetype-rows",
+            "description": (
+                "坏账准备**按票据种类小计**块（源模板 D1-4 R23「银行承兑汇票小计」/ R24「商业承兑"
+                "汇票小计」）—— 专门喂 D1-1 审定表「二、应收票据坏账准备」区块"
+                "（源模板 D1-1!B12='坏账准备明细表D1-4'!B23、F12=!K23）。"
+                "**不从四表库填**：tb_balance 的坏账科目只有总额、无票据种类拆分，按原值比例"
+                "分摊坏账没有审计依据（坏账按单项/组合计量）→ 手工录入 + 与 D1-4 主表合计勾稽提示"
+                "（宁缺勿造）"
             ),
         },
         {
             "sheet_name": "D1-3",
             "anchor": "D1-cust-rows",
             "description": (
-                "客户明细表 期后兑付/回款 ← **序时账 1121 贷方**（资产负债表日后科目 1121 "
-                "贷方发生额 = 票据承兑收款，importPostSettlementFromLedger 按客户名归集）"
+                "客户明细表 期初/借贷发生额/期末 ← **tb_aux_balance 原值科目 aux_type='客户'** "
+                "维度归集（实测 1121.01/.02/.03 均有客户维度；多票据种类同客户按客户名合并、"
+                "票据种类以「/」连接）；期后兑付/回款 ← **序时账 1121 贷方**（资产负债表日后"
+                "贷方发生额 = 票据承兑收款，按客户名归集）"
                 "（一键取数，Tier B 复杂归集，非单条公式）"
             ),
         },

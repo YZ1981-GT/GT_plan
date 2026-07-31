@@ -19,12 +19,15 @@ Requirements: 1.1, 1.6, 1.7, 1.8, 1.9, 1.11
 from __future__ import annotations
 
 import logging
+import types
 from typing import Any
 
 import sqlalchemy as sa
 
-from app.models.audit_platform_models import TbLedger
+from app.models.audit_platform_models import TbLedger  # noqa: F401 — 保留供 _code_predicate 绑定列
 from app.services.dataset_query import get_active_filter
+from app.services.deferred_tax_shared import code_predicate, leaf_rows
+from app.services.report_account_mapping import resolve_report_line_account_codes
 
 from ._context import RenderContext
 
@@ -32,6 +35,28 @@ logger = logging.getLogger(__name__)
 
 _N5_ACCOUNT_CODE = "6801"
 _ADJUDICATED_ITEM_ID = "N5-1-adjudicated-amount"
+
+# 报表行编码（**DB 只读实证**：`report_config` 四套准则一致
+# `IS-023 减：所得税费用 = TB('6801','本期发生额')`）。
+# 🔴 损益类取**本期发生额**，不取期末余额（平台铁律）。
+_N5_ROW_CODE = "IS-023"
+
+
+def _code_predicate(code: str):
+    """本模块查 `tb_ledger`，故绑定其 `account_code` 列。"""
+    return code_predicate(TbLedger.account_code, code)
+
+
+async def _resolve_account_codes(ctx: RenderContext) -> list[str]:
+    """按报表行 `IS-023` 规则映射解析取数科目集（fail-open 回退 `['6801']`）。"""
+    try:
+        codes = await resolve_report_line_account_codes(
+            ctx.db, ctx.project_id, _N5_ROW_CODE, fallback=[_N5_ACCOUNT_CODE]
+        )
+        return [c for c in codes if str(c).strip()] or [_N5_ACCOUNT_CODE]
+    except Exception as e:  # noqa: BLE001 — 映射解析失败按 fallback 处理
+        logger.warning("N5 render: 报表行 %s 科目映射解析失败: %s", _N5_ROW_CODE, e)
+        return [_N5_ACCOUNT_CODE]
 
 N5_SHEETS = [
     {"sheet_name": "底稿目录", "component_type": "n5-income-tax-expense"},
@@ -69,59 +94,152 @@ def _parse_num(v: Any) -> float:
 # ─── TB 取数（损益类！本期发生额，从 tb_ledger）──────────────────────────────
 
 
-async def _fetch_tb_data(ctx: RenderContext) -> dict[str, Any]:
-    """从 tb_ledger 取科目6801所得税费用本期发生额（损益类借方）.
+async def _fetch_tb_data(
+    ctx: RenderContext, codes: list[str] | None = None
+) -> dict[str, Any]:
+    """从 tb_ledger 取所得税费用本期发生额（损益类借方）.
 
-    损益类科目取发生额（与N4/H10/I6/L8同款），不取期末余额。
+    损益类科目取**发生额**（与 N4/H10/I6/L8 同款），不取期末余额 ——
+    `report_config` 实证 `IS-023 减：所得税费用 = TB('6801','本期发生额')`。
+
+    Args:
+        codes: 科目集（来自报表行 `IS-023` 规则映射）；缺省回退 `['6801']`。
     """
+    codes = [c for c in (codes or [_N5_ACCOUNT_CODE]) if str(c).strip()] or [
+        _N5_ACCOUNT_CODE
+    ]
     result: dict[str, Any] = {
         "account_code": _N5_ACCOUNT_CODE,
+        "account_codes": list(codes),
         "account_name": "所得税费用",
         "direction": "debit",
         "debit_occur": 0,
         "credit_occur": 0,
         "period_amount": 0,
+        "source": "none",
     }
     try:
-        active_filter = get_active_filter(ctx.project_id)
-        stmt = (
-            sa.select(
-                sa.func.coalesce(sa.func.sum(TbLedger.debit_amount), 0).label("debit_occur"),
-                sa.func.coalesce(sa.func.sum(TbLedger.credit_amount), 0).label("credit_occur"),
-            )
-            .where(
-                TbLedger.project_id == str(ctx.project_id),
-                TbLedger.account_code.startswith(_N5_ACCOUNT_CODE),
-                active_filter,
-            )
-        )
-        row = (await ctx.db.execute(stmt)).fetchone()
-        if row:
-            debit = _parse_num(row.debit_occur)
-            credit = _parse_num(row.credit_occur)
-            result["debit_occur"] = debit
-            result["credit_occur"] = credit
-            # 损益类借方科目：本期发生额=借方发生额-贷方发生额
-            result["period_amount"] = debit - credit
+        # 🔴 P0 修复：原写 `get_active_filter(ctx.project_id)` —— 真实签名是
+        # `async def get_active_filter(db, table, project_id, year, *, ...)`
+        # → 单参调用必然 TypeError，被下方 `except Exception` 吞成 warning
+        # → 本函数**从上线起恒返回全 0**，而 28 个 N5 测试全绿（它们从不真实调用本函数）。
+        #
+        # 🔴 P0 之二（取数口径）：原实现 sum `tb_ledger` 的「Σ借 − Σ贷」——
+        # 对损益类科目**结构性恒为 0**。活体实证（项目 a7fc75e5 / 6801.01）：
+        #   凭证 0409「计提当期所得税」→ 借方 110,445.40
+        #   凭证 0410「结转损益」      → 贷方 110,445.40
+        # 全年序时账必然包含年末结转损益分录，故借贷两侧金额恒相等。
+        # 平台权威口径 = `trial_balance`（recalc 已按发生额写好，`TB('6801','本期发生额')`
+        # 也是读它）：实测 trial_balance 6801 = 21,151,383.26
+        # = tb_balance 6801 的 **debit_amount**（仅借方）
+        # = 叶子 6801.01 24,891,157.62 + 6801.02 (−3,739,774.36)，逐分相等。
+        result.update(await _fetch_period_amount(ctx, codes))
     except Exception as e:  # noqa: BLE001
         logger.warning("N5 render: TB 取数失败: %s", e)
     return result
 
 
+async def _fetch_period_amount(
+    ctx: RenderContext, codes: list[str]
+) -> dict[str, Any]:
+    """损益类本期发生额：`trial_balance` 优先 → `tb_balance.debit_amount` 叶子兜底。
+
+    🔴 **不用 `tb_ledger` 的借−贷**：全年序时账含年末「结转损益」分录，
+    该差恒为 0（见调用方注释的活体实证）。
+    """
+    from app.models.audit_platform_models import TbBalance, TrialBalance
+
+    # ① trial_balance（与报表 `TB('6801','本期发生额')` 同源，最权威）
+    tb_filter = await get_active_filter(
+        ctx.db, TrialBalance.__table__, ctx.project_id, ctx.year or 0
+    )
+    tb_rows = (
+        await ctx.db.execute(
+            sa.select(
+                TrialBalance.standard_account_code,
+                TrialBalance.unadjusted_amount,
+                TrialBalance.audited_amount,
+            ).where(
+                tb_filter,
+                sa.or_(
+                    *[
+                        code_predicate(TrialBalance.standard_account_code, c)
+                        for c in codes
+                    ]
+                ),
+            )
+        )
+    ).fetchall()
+    leaves = leaf_rows(
+        [
+            types.SimpleNamespace(
+                account_code=r.standard_account_code,
+                unadjusted_amount=r.unadjusted_amount,
+                audited_amount=r.audited_amount,
+            )
+            for r in tb_rows
+        ]
+    )
+    if leaves:
+        amount = sum(_parse_num(r.unadjusted_amount) for r in leaves)
+        if amount:
+            return {
+                "debit_occur": round(amount, 2),
+                "credit_occur": 0.0,
+                "period_amount": round(amount, 2),
+                "source": "trial_balance",
+            }
+
+    # ② tb_balance 借方发生额叶子聚合（trial_balance 未 recalc 时）
+    bal_filter = await get_active_filter(
+        ctx.db, TbBalance.__table__, ctx.project_id, ctx.year or 0
+    )
+    bal_rows = (
+        await ctx.db.execute(
+            sa.select(
+                TbBalance.account_code,
+                TbBalance.debit_amount,
+            ).where(
+                bal_filter,
+                sa.or_(*[code_predicate(TbBalance.account_code, c) for c in codes]),
+            )
+        )
+    ).fetchall()
+    roots = {str(c).strip() for c in codes if "~" not in str(c)}
+    exact = [r for r in bal_rows if (r.account_code or "").strip() in roots]
+    picked = exact or leaf_rows(list(bal_rows))
+    amount = sum(_parse_num(r.debit_amount) for r in picked)
+    return {
+        "debit_occur": round(amount, 2),
+        "credit_occur": 0.0,
+        "period_amount": round(amount, 2),
+        "source": "tb_balance" if picked else "none",
+    }
+
+
 # ─── 主渲染函数 ───────────────────────────────────────────────────────────────
 
 
-async def _build_adjudication_prefill(ctx: RenderContext) -> dict[str, Any] | None:
-    """从 tb_balance 子科目预填审定表 N5-1.
+async def _build_adjudication_prefill(
+    ctx: RenderContext, codes: list[str] | None = None
+) -> dict[str, Any] | None:
+    """从 tb_balance 子科目预填审定表 N5-1（当期 / 递延两行）.
 
-    科目6801所得税费用为损益类借方科目。
-    查 tb_balance 6801% 子科目按名称分类为当期/递延，仅无持久化时注入。
+    科目 6801 所得税费用为损益类借方科目 → 取**发生额**（借−贷）。
+    活体实测子科目 `6801.01 当期所得税费用` / `6801.02 递延所得税费用` 语义清晰且稳定，
+    故按「编码前缀 + 名称关键字」双判据归类。仅无持久化时由前端注入。
     """
     from app.models.audit_platform_models import TbBalance
-    from app.services.dataset_query import get_active_filter as _get_af
 
+    codes = [c for c in (codes or [_N5_ACCOUNT_CODE]) if str(c).strip()] or [
+        _N5_ACCOUNT_CODE
+    ]
     try:
-        af = _get_af(ctx.project_id)
+        # 🔴 P0 修复：原写 `_get_af(ctx.project_id)` 单参调用 → TypeError 被 except 吞
+        # → 本函数**从上线起恒返回 None**，前端 provide/inject 链路虽完整但永远拿不到数据。
+        active_filter = await get_active_filter(
+            ctx.db, TbBalance.__table__, ctx.project_id, ctx.year or 0
+        )
         stmt = (
             sa.select(
                 TbBalance.account_code,
@@ -130,9 +248,8 @@ async def _build_adjudication_prefill(ctx: RenderContext) -> dict[str, Any] | No
                 sa.func.coalesce(TbBalance.credit_amount, 0).label("credit_amount"),
             )
             .where(
-                TbBalance.project_id == str(ctx.project_id),
-                TbBalance.account_code.startswith(_N5_ACCOUNT_CODE),
-                af,
+                active_filter,
+                sa.or_(*[code_predicate(TbBalance.account_code, c) for c in codes]),
             )
             .order_by(TbBalance.account_code)
         )
@@ -144,18 +261,27 @@ async def _build_adjudication_prefill(ctx: RenderContext) -> dict[str, Any] | No
         deferred_period = 0.0
         total_period = 0.0
 
-        for r in rows:
-            code = r.account_code or ""
-            name = (r.account_name or "").lower()
-            debit = _parse_num(r.debit_amount)
-            credit = _parse_num(r.credit_amount)
-            period = debit - credit
+        roots = {str(c).strip() for c in codes if "~" not in str(c)}
+        # 父级科目行单独留作总额；子科目只取**叶子**防与中间级双算
+        parent_rows = [r for r in rows if (r.account_code or "").strip() in roots]
+        sub_rows = leaf_rows([r for r in rows if (r.account_code or "").strip() not in roots])
 
-            if code == _N5_ACCOUNT_CODE:
-                total_period = period
-                continue
+        # 🔴 只取 `debit_amount`（借方发生额），**不做 借−贷**：
+        # 损益类科目的贷方是年末「结转损益」，借−贷恒为 0（活体实证见 _fetch_tb_data 注释）。
+        # 负数借方（如 6801.02 递延 −3,739,774.36）语义即"贷方性质"，直取可保留符号，
+        # 且叶子之和 == 父级 == trial_balance，逐分可验。
+        for r in parent_rows:
+            total_period += _parse_num(r.debit_amount)
 
-            if "递延" in name or code.startswith("6801.02") or code.startswith("680102"):
+        for r in sub_rows:
+            code = (r.account_code or "").strip()
+            name = r.account_name or ""
+            period = _parse_num(r.debit_amount)
+            if (
+                "递延" in name
+                or code.startswith(f"{_N5_ACCOUNT_CODE}.02")
+                or code.startswith(f"{_N5_ACCOUNT_CODE}02")
+            ):
                 deferred_period += period
             else:
                 current_period += period
@@ -232,13 +358,16 @@ async def render(ctx: RenderContext) -> dict[str, Any]:
     except Exception as e:  # noqa: BLE001
         logger.warning("N5 render: project context 查询失败: %s", e)
 
+    # ─── 科目映射（report_config 单一真源，fail-open 回退硬编码科目）──────────
+    codes = await _resolve_account_codes(ctx)
+
     # ─── TB 取数（科目6801所得税费用，损益类，本期发生额！）────────────────
-    tb = await _fetch_tb_data(ctx)
+    tb = await _fetch_tb_data(ctx, codes)
 
     # ─── 审定表预填（仅无已保存数据时） ─────────────────────────────────
     adjudication_prefill: dict[str, Any] | None = None
     if "N5-1-current-row" not in responses_snapshot:
-        adjudication_prefill = await _build_adjudication_prefill(ctx)
+        adjudication_prefill = await _build_adjudication_prefill(ctx, codes)
 
     return {
         "account_code": _N5_ACCOUNT_CODE,
@@ -248,6 +377,12 @@ async def render(ctx: RenderContext) -> dict[str, Any]:
         "adjudicated_amount": adjudicated_amount,
         # TB 发生额数据（科目6801，借方/损益类）
         "trial_balance": tb,
+        # 取数溯源：报表行规则映射解析出的科目集（供前端展示「取数来源」）
+        "tb_source_codes": {
+            "row_code": _N5_ROW_CODE,
+            "codes": codes,
+            "basis": "period",  # 损益类 → 本期发生额
+        },
         # 损益类公式方向元数据
         "formula_direction": {
             "account_code": "6801",
