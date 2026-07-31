@@ -161,13 +161,45 @@ describe('预警高亮显示条件', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('跨Spec差异计算', () => {
+  /**
+   * 🔴 fixture 必须播种 **D1-4 真实行数据**（`D1-bd-portfolio-rows` 的变动列）。
+   *
+   * 改造前这两个用例播种的是 `D1-adj-bad-debt-reversal` / `-writeoff` —— 那两个键
+   * 正是 D1-16 自己「同步到 D1-4」时写的，D1-4（`useD1BadDebt`）从不读也从不写，
+   * 于是跨表核对退化为**自比自**，测试恒绿而真实场景下的差异永远看不出来。
+   */
+  const d14Rows = (patch: { currentReversal?: number; currentWriteOff?: number }) => ({
+    'D1-bd-portfolio-rows': {
+      item_id: 'D1-bd-portfolio-rows',
+      conclusion: null,
+      remark: JSON.stringify([
+        {
+          rowId: 'fixed-portfolio',
+          category: 'portfolio',
+          label: '按组合计提',
+          isSubRow: false,
+          priorUnadjusted: 0,
+          priorAje: 0,
+          priorRje: 0,
+          currentProvision: 0,
+          currentRecovery: 0,
+          currentReversal: patch.currentReversal ?? 0,
+          currentWriteOff: patch.currentWriteOff ?? 0,
+          currentOther: 0,
+          currentAje: 0,
+          currentRje: 0,
+        },
+      ]),
+    },
+  })
+
   it('reversalDiff 正确计算本表合计 - D1-4合计', () => {
     const rows: ReversalRow[] = [
       { id: '1', unitName: '', reason: '', recoveryMethod: '', originalBasis: '', reversalAmount: 500, priorProvisionAmount: 800, reasonabilityAnalysis: '', indexRef: '' },
     ]
     const initial = {
       'D1-writeoff-reversal-rows': { item_id: 'D1-writeoff-reversal-rows', conclusion: null, remark: JSON.stringify(rows) },
-      'D1-adj-bad-debt-reversal': { item_id: 'D1-adj-bad-debt-reversal', conclusion: null, remark: '400' },
+      ...d14Rows({ currentReversal: 400 }),
     }
     const { reversalDiff } = createComposable(initial)
     // 本表500 - D1-4的400 = 100
@@ -180,11 +212,28 @@ describe('跨Spec差异计算', () => {
     ]
     const initial = {
       'D1-writeoff-writeoff-rows': { item_id: 'D1-writeoff-writeoff-rows', conclusion: null, remark: JSON.stringify(rows) },
-      'D1-adj-bad-debt-writeoff': { item_id: 'D1-adj-bad-debt-writeoff', conclusion: null, remark: '300' },
+      ...d14Rows({ currentWriteOff: 300 }),
     }
     const { writeoffDiff } = createComposable(initial)
     // 本表300 - D1-4的300 = 0
     expect(writeoffDiff.value).toBe(0)
+  })
+
+  it('🔴 同步到 D1-4 真正回写 D1-4 行（旧实现写的键 D1-4 从不读）', () => {
+    const rows: ReversalRow[] = [
+      { id: '1', unitName: '', reason: '', recoveryMethod: '', originalBasis: '', reversalAmount: 777, priorProvisionAmount: 900, reasonabilityAnalysis: '', indexRef: '' },
+    ]
+    const api = createComposable({
+      'D1-writeoff-reversal-rows': { item_id: 'D1-writeoff-reversal-rows', conclusion: null, remark: JSON.stringify(rows) },
+    })
+    ;(api as any).syncReversalToD14()
+    const written = (api as any).allResponses.value.get('D1-bd-portfolio-rows')
+    expect(written).toBeTruthy()
+    const parsed = JSON.parse(written.remark)
+    expect(parsed[0].rowId).toBe('fixed-portfolio')
+    expect(parsed[0].currentReversal).toBe(777)
+    // 回写后跨表差异归零（现在是真实一致，不是自比自）
+    expect(api.reversalDiff.value).toBe(0)
   })
 
   it('D1-4 未加载时 diff 为 null', () => {

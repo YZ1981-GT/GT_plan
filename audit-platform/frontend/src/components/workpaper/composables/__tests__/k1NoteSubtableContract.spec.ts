@@ -61,9 +61,15 @@ describe('K1 子表名 ↔ note_template 契约', () => {
 describe('附注 §五、8 / §八、9 结构要求', () => {
   it('两级表头表必须带 _column_groups', () => {
     const needGroups = [
-      ...(listedSection.tables ?? []).filter((t) => t.name === '按款项性质披露'),
+      ...(listedSection.tables ?? []).filter((t) => [
+        '按款项性质披露',
+        // 🔴 2026-07-31 补：源 xlsx 上市 A91:E92 是两行表头（阶段名 + ECL 释义），
+        // 模板与载荷原先都压成单级 5 列 → 第二行释义整行丢失
+        K1_LISTED_SUBTABLE.stageMovement,
+      ].includes(String(t.name))),
       ...(soeSection.tables ?? []).filter((t) => [
-        '按账龄披露其他应收款项',
+        // 🔴 「按账龄披露其他应收款项」已按源 xlsx A6:C15 还原为**单级 3 列**
+        // （原 5 列结构不在源模板里）→ 已移出本清单，改由下方 flat 断言反向锁死
         K1_SOE_SUBTABLE.methodEnd,
         // 🔴 原为裸续表名 `续：`（跨章节撞键 + 附注 TAB 看不出续的是哪张表），
         // 2026-07-31 由 `fix_note_k_complex_structure.py` 正名，引用常量避免再漂移
@@ -76,6 +82,49 @@ describe('附注 §五、8 / §八、9 结构要求', () => {
     expect(needGroups).toHaveLength(7)
     for (const t of needGroups) {
       expect(Array.isArray(t._column_groups), `${t.name} 缺 _column_groups`).toBe(true)
+    }
+  })
+
+  it('源模板单级的表必须显式 flat 且无 _column_groups（反向锁死，防被误加两级）', () => {
+    const flatTables = [
+      K1_SOE_SUBTABLE.aging,          // 源 xlsx A6:C15 = 账 龄 / 期末数 / 期初数
+      K1_SOE_SUBTABLE.eclMovement,    // 源 xlsx A63:E63 一行表头（阶段名+释义同格）
+      K1_SOE_SUBTABLE.balanceMovement,
+    ]
+    for (const name of flatTables) {
+      const tbl = (soeSection.tables ?? []).find((t) => t.name === name)
+      expect(tbl, `模板缺表 ${name}`).toBeDefined()
+      expect(tbl!._column_groups, `${name} 不该有 _column_groups`).toBeUndefined()
+      expect(K1_SOE_COLUMNS[name][0].flat, `${name} 标签列须打 flat`).toBe(true)
+    }
+  })
+
+  it('国企账龄表按源模板还原为 3 列（原 5 列结构不在源模板里）', () => {
+    const tbl = (soeSection.tables ?? []).find((t) => t.name === K1_SOE_SUBTABLE.aging)
+    expect(tbl!.headers).toEqual(['账  龄', '期末数', '期初数'])
+    expect(K1_SOE_COLUMNS[K1_SOE_SUBTABLE.aging].map((c) => c.key)).toEqual([
+      'label', '期末数', '期初数',
+    ])
+    // 反向自检：旧的 5 列键不得残留
+    expect(K1_SOE_COLUMNS[K1_SOE_SUBTABLE.aging].map((c) => c.key)).not.toContain('期末账面余额')
+  })
+
+  it('上市侧补入的 3 张表（源模板 ⑧⑨⑩）子表名与列头对齐模板', () => {
+    const added: Array<[string, string[]]> = [
+      [K1_LISTED_SUBTABLE.govGrant, [
+        '单位名称（注：政府补助的发文单位）', '政府补助项目名称', '期末余额', '账龄',
+        '预计收取的时间、金额及依据',
+      ]],
+      [K1_LISTED_SUBTABLE.transfer, [
+        '项  目', '转移方式', '终止确认金额', '与终止确认相关的利得或损失',
+      ]],
+      [K1_LISTED_SUBTABLE.continuedInvolvement, ['项  目', '期末数']],
+    ]
+    for (const [name, headers] of added) {
+      const tbl = (listedSection.tables ?? []).find((t) => t.name === name)
+      expect(tbl, `§五、8 缺表 ${name}`).toBeDefined()
+      expect(tbl!.headers, `${name} 模板列头`).toEqual(headers)
+      expect(K1_LISTED_COLUMNS[name].map((c) => c.label), `${name} 同步列头`).toEqual(headers)
     }
   })
 

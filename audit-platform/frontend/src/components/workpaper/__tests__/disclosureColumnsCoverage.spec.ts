@@ -80,12 +80,10 @@ const INFERENCE_FALLBACK_ALLOWLIST: Record<string, { reason: string; tables: str
     ],
   },
   // buildH2ListedColumns / buildH2SoeColumns 已由 h2 spec 补齐 flat/group（实扫未声明表 = []）
+  // buildH8ListedColumns 已由 h8-right-of-use-disclosure-alignment 补 flat（Task 7 实测挖出：
+  // 缺 flat 时国企侧被投影成 `_column_groups=[{group:'本期',start:2,span:2}]`，
+  // 即「现状无害」的旧判断只对上市侧成立）
   // → 按 R3「已修好的表必须从 allowlist 删除」移出（allowlist 只许缩）。
-  buildH8ListedColumns: {
-    reason:
-      'H8 使用权资产（批 1~4 之外）：变动表列头随类别动态生成，未声明 flat。推断结果为空（类别名无共享前缀）→ 现状无害，补 flat 待 H8 收口',
-    tables: ['使用权资产'],
-  },
   buildH10SubTableColumns: {
     reason:
       'H10 资产处置收益（批 1~4 之外）：3 表未声明 flat。推断结果均为空（列数 <4）→ 现状无害；且 H10 无 per-cycle columns 键集契约（见 P1_ROUTE 备注）',
@@ -354,10 +352,12 @@ const P1_ROUTE: Record<string, { spec: string; complete: boolean; note?: string 
   buildF2ListedColumns: { spec: '__tests__/f2NoteSectionMap.spec.ts', complete: true },
   buildF2SoeColumns: { spec: '__tests__/f2NoteSectionMap.spec.ts', complete: true },
   buildH1ListedColumns: { spec: 'composables/__tests__/h1NoteSubtableContract.spec.ts', complete: true },
+  buildH3ListedColumns: { spec: 'composables/__tests__/h3NoteSubtableContract.spec.ts', complete: true },
+  buildH3SoeColumns: { spec: 'composables/__tests__/h3NoteSubtableContract.spec.ts', complete: true },
   buildH8ListedColumns: {
-    spec: 'composables/__tests__/hgDisclosureColumns.spec.ts',
-    complete: false,
-    note: '逐表列头有断言，未断言 columns 键集与 sub_table_data 键集相等',
+    spec: 'composables/__tests__/h8NoteSubtableContract.spec.ts',
+    complete: true,
+    note: 'h8-right-of-use-disclosure-alignment：列 key ≡ 模板列 key + 行键 ⊆ columns.key + flat 表态',
   },
   buildI1ListedColumns: {
     spec: 'composables/__tests__/iDisclosureColumns.spec.ts',

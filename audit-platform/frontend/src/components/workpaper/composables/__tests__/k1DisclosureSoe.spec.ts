@@ -155,19 +155,21 @@ describe('k1SoeDisclosureSyncPayload', () => {
     expect(payload).toBeDefined()
     const cols = payload.columns!
     expect(Object.keys(cols)).toContain(K1_SOE_SUBTABLE.aging)
-    // 账龄表是**两级表头**（源 xlsx 国企 B46:D46「期末数」/ E46:G46「期初数」跨列合并）：
-    // `label` 只写叶子列名，父表头走 `group`，`key` 保持既有带期别前缀的中文数据键。
+    // 🔴 账龄表按源 xlsx 国企 `A6:C15` 是**单级 3 列**（账 龄 / 期末数 / 期初数）。
+    // 原先误按「期末数/期初数 各含账面余额+坏账准备」建成 5 列两级 —— 那套结构不在源
+    // 模板里（5 列是下方「账龄组合」表 A46:G55 的形态），导致载荷不得不把「小计 +
+    // 减：坏账准备」两行压进合计行的额外两列。
     const aging = cols[K1_SOE_SUBTABLE.aging]
-    expect(aging.map((c) => c.label)).toEqual([
-      '账  龄', '账面余额', '坏账准备', '账面余额', '坏账准备',
-    ])
-    expect(aging.map((c) => c.key)).toEqual([
-      'label', '期末账面余额', '期末坏账准备', '期初账面余额', '期初坏账准备',
-    ])
-    expect(aging.map((c) => c.group)).toEqual([
-      undefined, '期末数', '期末数', '期初数', '期初数',
-    ])
+    expect(aging.map((c) => c.label)).toEqual(['账  龄', '期末数', '期初数'])
+    expect(aging.map((c) => c.key)).toEqual(['label', '期末数', '期初数'])
+    expect(aging.map((c) => c.group)).toEqual([undefined, undefined, undefined])
     expect(aging[0].is_label).toBe(true)
+    expect(aging[0].flat).toBe(true)
+    // 「账龄组合」才是 7 列两级（源 xlsx B46:D46 期末数 / E46:G46 期初数）
+    const portAging = cols[K1_SOE_SUBTABLE.portfolioAging]
+    expect(portAging.map((c) => c.group)).toEqual([
+      undefined, '期末数', '期末数', '期末数', '期初数', '期初数', '期初数',
+    ])
     // 政府补助表源对齐五列
     expect(cols[K1_SOE_SUBTABLE.govGrant].map((c) => c.label)).toEqual([
       '单位名称', '政府补助项目名称', '期末余额', '期末账龄', '预计收取的时间、金额及依据',
@@ -237,5 +239,60 @@ describe('k1SoeDisclosureSyncPayload', () => {
     )
     expect(payload.agingRows.some((r) => r.kind === 'sub')).toBe(false)
     expect(payload.agingRows.some((r) => r.kind === 'subtotal1y')).toBe(false)
+  })
+})
+
+
+// ─── 2026-07-31：账龄表忠实推送 subtotal / provision / total ──────────────────
+// spec: k1-four-table-extraction-and-disclosure-alignment R8.2 / Property 8
+
+describe('国企账龄表按源模板忠实推送三种结构行', () => {
+  function snapWithAging() {
+    const snap = emptyK1SoePayload()
+    snap.agingRows = [
+      { rowId: 'a1', segmentKey: 'within1', label: '1年以内（含1年）', kind: 'data', endAmount: 600, priorAmount: 500 },
+      { rowId: 'a2', segmentKey: 'y1to2', label: '1至2年', kind: 'data', endAmount: 400, priorAmount: 300 },
+      { rowId: 'a3', segmentKey: 'subtotal', label: '小计', kind: 'subtotal', endAmount: 1000, priorAmount: 800 },
+      { rowId: 'a4', segmentKey: 'provision', label: '减：坏账准备', kind: 'provision', endAmount: 60, priorAmount: 40 },
+      { rowId: 'a5', segmentKey: 'total', label: '合计', kind: 'total', endAmount: 940, priorAmount: 760 },
+    ] as any[]
+    return snap
+  }
+
+  it('小计 / 减：坏账准备 / 合计 三行都在，且用源模板双空格字面', () => {
+    const rows = buildK1SoeSubTableData(snapWithAging())[K1_SOE_SUBTABLE.aging]
+    expect(rows.map((r) => r.label)).toEqual([
+      '1年以内（含1年）', '1至2年', '小  计', '减：坏账准备', '合  计',
+    ])
+    expect(rows.map((r) => r.row_kind)).toEqual([
+      'data', 'data', 'subtotal', 'provision', 'total',
+    ])
+  })
+
+  it('行对象键 = 期末数 / 期初数（与 columns 的 key 逐字一致，Property 8）', () => {
+    const rows = buildK1SoeSubTableData(snapWithAging())[K1_SOE_SUBTABLE.aging]
+    for (const r of rows) {
+      expect(Object.keys(r)).toContain('期末数')
+      expect(Object.keys(r)).toContain('期初数')
+      // 旧的 5 列键不得残留（否则附注拿不到数）
+      expect(Object.keys(r)).not.toContain('期末账面余额')
+    }
+    expect(rows[0].期末数).toBe(600)
+    expect(rows[2].期末数).toBe(1000)
+    expect(rows[3].期末数).toBe(60)
+    expect(rows[4].期末数).toBe(940)
+  })
+
+  it('小计 − 减：坏账准备 = 合计（源模板勾稽）', () => {
+    const rows = buildK1SoeSubTableData(snapWithAging())[K1_SOE_SUBTABLE.aging]
+    const pick = (kind: string) => rows.find((r) => r.row_kind === kind)!
+    expect(Number(pick('subtotal').期末数) - Number(pick('provision').期末数)).toBe(
+      Number(pick('total').期末数),
+    )
+  })
+
+  it('is_total 标在小计与合计行（附注加粗 + 勾稽识别）', () => {
+    const rows = buildK1SoeSubTableData(snapWithAging())[K1_SOE_SUBTABLE.aging]
+    expect(rows.map((r) => !!r.is_total)).toEqual([false, false, true, false, true])
   })
 })
