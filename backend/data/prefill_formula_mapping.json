@@ -2358,41 +2358,53 @@
     },
     {
       "wp_code": "K2",
-      "wp_name": "销售费用审定表",
+      "wp_name": "其他流动资产审定表",
       "sheet": "审定表K2-1",
       "account_codes": [
-        "6601"
+        "1901"
       ],
       "cells": [
         {
           "cell_ref": "期初余额",
-          "formula": "=TB('6601','期初余额')",
+          "formula": "=TB('1901','期初余额')",
           "formula_type": "TB",
-          "description": "从试算表取销售费用审定表期初余额"
+          "description": "从试算表取其他流动资产期初余额。🔴 科目由报表行 BS-014 映射解析（实证四准则均为 TB('1901')）；历史预设整块写的是销售费用 6601，且组件侧写死 1231（应收款项坏账准备），两者都与本科目无关"
         },
         {
           "cell_ref": "未审数",
-          "formula": "=TB('6601','期末余额')",
+          "formula": "=TB('1901','期末余额')",
           "formula_type": "TB",
-          "description": "从试算表取销售费用审定表期末余额（未审）"
+          "description": "从试算表取其他流动资产期末余额（未审）"
         },
         {
           "cell_ref": "AJE调整",
-          "formula": "=ADJ('6601','aje_net')",
+          "formula": "=ADJ('1901','aje_net')",
           "formula_type": "ADJ",
-          "description": "销售费用审定表审计调整分录净额"
+          "description": "其他流动资产审计调整分录净额"
         },
         {
           "cell_ref": "RJE调整",
-          "formula": "=ADJ('6601','rje_net')",
+          "formula": "=ADJ('1901','rje_net')",
           "formula_type": "ADJ",
-          "description": "销售费用审定表重分类调整分录净额"
+          "description": "其他流动资产重分类调整分录净额"
         },
         {
           "cell_ref": "上年审定数",
           "formula": "=PREV('K2','审定表K2-1','审定数')",
           "formula_type": "PREV",
           "description": "上年同底稿审定数"
+        },
+        {
+          "cell_ref": "明细表期末合计",
+          "formula": "=WP('K2','明细表K2-2','期末余额合计')",
+          "formula_type": "WP",
+          "description": "审定表合计与 K2-2 明细表期末合计勾稽（源模板 K2-2 合计行）。🔴 反向不可：K2-2 明细表禁引 WP() 防 K2-1↔K2-2 循环"
+        },
+        {
+          "cell_ref": "合同取得成本期末",
+          "formula": "=WP('K2','合同取得成本明细表K2-4','期末余额合计')",
+          "formula_type": "WP",
+          "description": "合同取得成本（CAS14）期末余额取自 K2-4 明细表合计行，是其他流动资产的组成项目之一"
         }
       ]
     },

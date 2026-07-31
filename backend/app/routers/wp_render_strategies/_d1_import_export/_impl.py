@@ -3383,3 +3383,261 @@ _GENERIC_GUIDANCE: list[str] = [
 def _get_guidance_text(sheet_code: str) -> list[str]:
     """获取 sheet 对应的编制说明文本"""
     return _SHEET_GUIDANCE.get(sheet_code, _GENERIC_GUIDANCE)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# D1-3 原值明细表(按客户) ← tb_aux_balance 客户维度归集
+#
+# spec: .kiro/specs/d1-extraction-chain-completion/ (Requirement 4 / Property 11)
+#
+# 🔴 为什么可以做（实证）：`tb_aux_balance` 对应收票据原值科目**确有客户维度**
+#    （项目 0ec33ac9 的 1121.01/.02/.03 均有 `aux_type='客户'`，共 128 个客户行）。
+#    改造前 D1-3 只有「期后兑付 ← 序时账」一条取数，客户明细全靠手工录几十上百行。
+#
+# 🔴 三条四表库铁律（照 F1 `import-aux-balance` 实现，它是平台的正确范式）：
+#    ① `get_active_filter` 只取 active dataset（aux 数据按数据集版本冗余，实测 2×）；
+#    ② **先锁定单一 aux_type** 再归集（同一科目可能挂多个维度 → 直接 group by aux_name 会双算）；
+#    ③ 科目由 `resolve_d1_account_codes` 从报表映射 BS-005 解析出的**原始码**决定，不硬编码。
+#
+# 宁缺勿造：源模板 D1-3 没有「票据种类」列（列头 = 客户名称/公司代码/关联关系/期初未审数/
+# 账项调整/重分类调整/期初审定数/本期增加/本期减少/期末余额/被审计单位重分类调整/
+# 期末未审余额/账项调整/重分类调整/期末审定数），故同一客户跨票据种类的余额**按客户合并**，
+# 票据种类只在返回 message 里提示，不新增列。
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_D1_AUX_ROW_LIMIT = 500
+# 归集维度偏好关键词（与 F1 `pick_aux_type` 同口径）
+_D1_AUX_PREFERRED_KEYWORDS = ("客户", "往来", "单位", "供应商")
+
+
+def pick_d1_aux_type(candidates) -> str | None:
+    """纯函数：从 `(aux_type, 行数, 余额绝对值合计)` 候选中挑唯一归集维度。
+
+    优先含客户/往来单位关键词的维度；其次余额合计更大者；再次行数更多者。无候选返回 None。
+    """
+    items = [(str(t or ""), int(n or 0), float(amt or 0)) for t, n, amt in candidates]
+    if not items:
+        return None
+    preferred = [
+        it for it in items if any(kw in it[0] for kw in _D1_AUX_PREFERRED_KEYWORDS)
+    ]
+    pool = preferred or items
+    pool.sort(key=lambda it: (abs(it[2]), it[1], it[0]), reverse=True)
+    return pool[0][0]
+
+
+def build_d1_customer_rows_from_aux(aux_entries, *, row_limit: int = _D1_AUX_ROW_LIMIT):
+    """纯函数：客户维度归集结果 → D1-3 行（只含**录入列**，派生列由前端 recalcRow 现算）。
+
+    Args:
+        aux_entries: 每项按位置解构为 `(aux_name, aux_code, opening, debit, credit)`。
+
+    Returns:
+        `list[dict]`，字段与前端 `CustomerRow` 的持久化子集逐字一致
+        （`serializeRows` 不存 `priorAudited`/`currentBalance`/`currentUnadjusted`/
+        `currentAudited` 这些派生列，故此处也不写 —— 写了会被前端覆盖，且违反派生列铁律）。
+        `relationType` 留空：前端按项目关联方名单自动匹配，不在此臆造。
+    """
+    rows: list[dict] = []
+    for name, code, opening, debit, credit in aux_entries:
+        label = str(name or "").strip()
+        if not label:
+            continue
+        if len(rows) >= row_limit:
+            break
+        rows.append(
+            {
+                "rowId": f"dynamic-aux-{uuid4()}",
+                "customerName": label,
+                "companyCode": str(code or "").strip(),
+                "relationType": "",
+                "priorUnadjusted": float(opening or 0),
+                "priorAje": 0,
+                "priorRje": 0,
+                "currentIncrease": float(debit or 0),
+                "currentDecrease": float(credit or 0),
+                "reclassification": 0,
+                "currentAje": 0,
+                "currentRje": 0,
+                "postSettlement": 0,
+            }
+        )
+    return rows
+
+
+async def aggregate_d1_customer_rows_from_aux(
+    db: AsyncSession,
+    project_id: str,
+    year: int,
+    account_prefixes: list[str],
+    *,
+    row_limit: int = _D1_AUX_ROW_LIMIT,
+):
+    """tb_aux_balance 按单一 aux_type 归集 → D1-3 行。
+
+    Returns:
+        `(rows, aux_type, total_units, note_type_codes)`；无数据时 `([], None, 0, [])`。
+    """
+    import sqlalchemy as sa
+
+    from app.models.audit_platform_models import TbAuxBalance
+    from app.services.dataset_query import get_active_filter
+
+    prefixes = [p.strip() for p in (account_prefixes or []) if (p or "").strip()]
+    if not prefixes:
+        return [], None, 0, []
+
+    active_filter = await get_active_filter(
+        db, TbAuxBalance.__table__, project_id, year
+    )
+    base_where = sa.and_(
+        active_filter,
+        sa.or_(*[TbAuxBalance.account_code.startswith(p) for p in prefixes]),
+    )
+
+    # ① 先定维度（防 aux_type 冗余双算）
+    type_rows = (
+        await db.execute(
+            sa.select(
+                TbAuxBalance.aux_type,
+                sa.func.count().label("n"),
+                sa.func.coalesce(
+                    sa.func.sum(
+                        sa.func.abs(sa.func.coalesce(TbAuxBalance.closing_balance, 0))
+                    ),
+                    0,
+                ).label("amt"),
+            )
+            .where(base_where)
+            .group_by(TbAuxBalance.aux_type)
+        )
+    ).fetchall()
+    aux_type = pick_d1_aux_type([(r.aux_type, r.n, r.amt) for r in type_rows])
+    if not aux_type:
+        return [], None, 0, []
+
+    scoped = sa.and_(base_where, TbAuxBalance.aux_type == aux_type)
+
+    # ② 锁定维度后按客户名归集（同客户跨票据种类子科目合并 —— D1-3 是按客户维度的表）
+    agg_rows = (
+        await db.execute(
+            sa.select(
+                TbAuxBalance.aux_name,
+                sa.func.min(TbAuxBalance.aux_code).label("aux_code"),
+                sa.func.coalesce(sa.func.sum(TbAuxBalance.opening_balance), 0).label("opening"),
+                sa.func.coalesce(sa.func.sum(TbAuxBalance.debit_amount), 0).label("debit"),
+                sa.func.coalesce(sa.func.sum(TbAuxBalance.credit_amount), 0).label("credit"),
+            )
+            .where(scoped)
+            .group_by(TbAuxBalance.aux_name)
+            .order_by(TbAuxBalance.aux_name)
+        )
+    ).fetchall()
+
+    # 参与归集的票据种类子科目（仅用于 message 提示，不入行）
+    code_rows = (
+        await db.execute(
+            sa.select(TbAuxBalance.account_code).where(scoped).group_by(TbAuxBalance.account_code)
+        )
+    ).fetchall()
+    note_type_codes = sorted({str(r.account_code or "").strip() for r in code_rows} - {""})
+
+    entries = [
+        (r.aux_name, r.aux_code, r.opening, r.debit, r.credit) for r in agg_rows
+    ]
+    rows = build_d1_customer_rows_from_aux(entries, row_limit=row_limit)
+    return rows, aux_type, len(entries), note_type_codes
+
+
+@router.post("/api/workpapers/{wp_id}/d1/import-aux-balance")
+async def d1_import_aux_balance(
+    wp_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    """从 tb_aux_balance（应收票据原值科目，客户维度）归集导入 D1-3 明细表。
+
+    merge 语义：已存在的客户名称不重复导入（**手工录入优先**，且不覆盖已录的关联方标记 /
+    期后兑付 / 调整列 —— 已存在的行整行原样保留）。
+
+    无客户维度 / 无匹配科目 → `imported_count=0` 且不写库（Property 11，宁缺勿造，不报错）。
+    """
+    import sqlalchemy as sa
+
+    wp_row = (
+        await db.execute(
+            sa.text(
+                "SELECT wp.project_id, p.audit_year "
+                "FROM working_paper wp JOIN projects p ON p.id = wp.project_id "
+                "WHERE wp.id = :wp_id"
+            ),
+            {"wp_id": wp_id},
+        )
+    ).fetchone()
+    if not wp_row:
+        raise HTTPException(404, "底稿不存在")
+
+    project_id = str(wp_row.project_id)
+    year = int(wp_row.audit_year or 0)
+
+    # 科目定位走报表映射（BS-005 → 标准码 → account_mapping → 原始码），fail-open 回退 1121
+    from types import SimpleNamespace
+
+    from app.services.d_cycle_extraction.d1_account_resolver import (
+        resolve_d1_account_codes,
+    )
+
+    codes = await resolve_d1_account_codes(
+        SimpleNamespace(db=db, project_id=project_id, year=year)
+    )
+
+    rows_data, aux_type, total_units, note_type_codes = await aggregate_d1_customer_rows_from_aux(
+        db, project_id, year, codes.gross
+    )
+
+    if not rows_data:
+        return {
+            "ok": True,
+            "imported_count": 0,
+            "rows": [],
+            "tb_source_codes": codes.as_dict(),
+            "message": (
+                f"未找到科目 {'/'.join(codes.gross)} 的辅助余额（客户维度）数据 —— "
+                "该项目辅助余额表可能未导入客户维度，请手工录入或补导四表库"
+            ),
+        }
+
+    item_id = "D1-cust-rows"
+    existing_rows = await _load_remark_json(wp_id, item_id, db) or []
+    if not isinstance(existing_rows, list):
+        existing_rows = []
+    existing_names = {
+        str((r or {}).get("customerName", "")).strip() for r in existing_rows
+    }
+    new_rows = [r for r in rows_data if r["customerName"] not in existing_names]
+    merged = list(existing_rows) + new_rows
+
+    await _upsert_d1_cell(db, wp_id, item_id, json.dumps(merged, ensure_ascii=False))
+    await db.commit()
+
+    truncated = total_units > len(rows_data)
+    msg = (
+        f"从辅助余额表({'/'.join(note_type_codes) or '-'}·{aux_type})归集 "
+        f"{total_units} 个客户，新增 {len(new_rows)} 行"
+        f"（已存在的 {len(existing_names - {''})} 个客户按手工优先保留原值）"
+    )
+    out: dict[str, Any] = {
+        "ok": True,
+        "imported_count": len(new_rows),
+        "total_rows": len(merged),
+        "total_units": total_units,
+        "aux_type": aux_type,
+        "note_type_codes": note_type_codes,
+        "tb_source_codes": codes.as_dict(),
+        "rows": new_rows,
+    }
+    if truncated:
+        out["truncated"] = True
+        msg += f"；超过 {len(rows_data)} 行上限已截断，请按重要性补录其余客户"
+    out["message"] = msg
+    return out
