@@ -359,8 +359,13 @@ import {
   k2ConsistencySummary,
   recalcContractCost,
 } from '../../composables/useK2DisclosureEngine'
+import { K2_ACCOUNT_NAME, K2_GROSS_FALLBACK_STANDARD } from '../../composables/k2AccountScope'
 
-const K2_ACCOUNT_CODE = '1231'
+/**
+ * 科目口径取单一真源（报表行 `BS-014` → 实证 `TB('1901')`）。
+ * 🔴 历史写死 `1231` = 应收款项坏账准备，与其他流动资产无关。
+ */
+const K2_ACCOUNT_CODE = K2_GROSS_FALLBACK_STANDARD
 
 const props = defineProps<{
   wpId: string
@@ -752,10 +757,16 @@ async function handleAiGenerate(key: TextKey): Promise<void> {
   const seg = textSegments.find(s => s.key === key)
   if (!seg) return
   try {
+    // 🔴 `context` 必须是 `dict[str,str]` —— 传字符串会 422 且被 catch 静默吞掉
     const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
       prompt: AI_PROMPTS[key],
-      context: `科目：其他流动资产(1231)；附注章节：${K2_NOTE_SECTION.listed}；变体：上市公司；`
-        + `源模板要求：${seg.requirement}`,
+      context: {
+        accountCode: K2_ACCOUNT_CODE,
+        accountName: K2_ACCOUNT_NAME,
+        noteSection: K2_NOTE_SECTION.listed,
+        variant: '上市公司',
+        requirement: seg.requirement,
+      },
       existingContent: texts[key] || '',
       section: `k2-${key}`,
     })

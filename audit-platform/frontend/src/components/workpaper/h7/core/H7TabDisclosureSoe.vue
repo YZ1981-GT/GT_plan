@@ -110,7 +110,7 @@
  *
  * spec: h7-biological-assets-disclosure-rebuild (Task 7)
  */
-import { computed, inject, onBeforeUnmount, onMounted, ref, toRef, watch } from 'vue'
+import { computed, inject, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import GtIndexChip from '../../GtIndexChip.vue'
@@ -176,10 +176,16 @@ const noteTexts = ref<Record<string, string>>({
 const costRows = computed(() => buildSoeDisplayRows(blocks.value.cost))
 const fairRows = computed(() => buildSoeDisplayRows(blocks.value.fair))
 
-const responses = toRef(props, 'allResponses')
+/**
+ * 本地镜像（H7 循环既有范式）。
+ *
+ * 🔴 **不 watch `props.allResponses`**：宿主的 map 是异步加载的，自持久化后宿主
+ * 未必同步刷新 → watch 触发时会用**旧值**重新 hydrate，把刚录入的数据覆盖掉。
+ */
+const localResponses = ref<Map<string, any>>(new Map(props.allResponses ?? []))
 
 function readRaw(itemId: string): string {
-  const item = responses.value?.get(itemId)
+  const item = localResponses.value.get(itemId)
   return String(item?.remark ?? item?.conclusion ?? '')
 }
 
@@ -220,13 +226,44 @@ function hydrate(): void {
   for (const k of NOTE_KEYS) noteTexts.value[k] = readRaw(NOTE_ITEM_ID[k])
 }
 
-onMounted(hydrate)
-watch(responses, hydrate, { deep: false })
+async function loadOwn(): Promise<void> {
+  try {
+    const list: any = await api.get(`/api/workpapers/${props.wpId}/checklist-responses`)
+    const rows: any[] = Array.isArray(list) ? list : (list?.data ?? [])
+    const m = new Map(localResponses.value)
+    for (const r of rows) {
+      if (String(r?.item_id || '').startsWith('H7-disc-soe')) {
+        m.set(r.item_id, { item_id: r.item_id, conclusion: r.conclusion ?? null, remark: r.remark ?? null })
+      }
+    }
+    localResponses.value = m
+  } catch { /* 读失败时用 props 镜像兜底 */ }
+  hydrate()
+}
 
-function persist(itemId: string, value: unknown): void {
+onMounted(loadOwn)
+
+/**
+ * 持久化。
+ *
+ * 🔴 **自己写库**：H7 宿主 `GtH7BiologicalAssets.vue` 没有任何 `@save` 处理器
+ * （该循环全部 Tab 都自持久化）。只 `emit('save')` 会让录入**只存在于内存**、
+ * 刷新即丢 —— 本 spec 浏览器实测踩中：自动同步写进了附注，但
+ * `checklist_responses` 一条都没有。`emit` 仍保留，供将来接了处理器的宿主用。
+ */
+async function persist(itemId: string, value: unknown): Promise<void> {
   const remark = typeof value === 'string' ? value : JSON.stringify(value)
+  localResponses.value.set(itemId, { item_id: itemId, conclusion: null, remark })
   emit('save', itemId, remark)
   autoSync.scheduleAutoSync(syncToNotes)
+  try {
+    await api.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
+      project_id: props.projectId,
+      items: [{ item_id: itemId, conclusion: null, remark }],
+    })
+  } catch {
+    ElMessage.error('保存失败，请稍后重试')
+  }
 }
 
 function persistMode(mode: Mode): void {

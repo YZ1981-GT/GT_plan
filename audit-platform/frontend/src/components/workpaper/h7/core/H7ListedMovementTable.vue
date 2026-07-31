@@ -75,7 +75,11 @@
  */
 import { computed } from 'vue'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
-import { fmtAmount } from '@/stores/displayPrefs'
+// 🔴 `fmtAmount` 是 store **成员**（`useDisplayPrefsStore().fmtAmount`），不是模块命名导出。
+// 写成 `import { fmtAmount } from '@/stores/displayPrefs'` 会在**运行时**抛
+// `does not provide an export named 'fmtAmount'`（Vite transform 200、vitest 与
+// get_diagnostics 全绿，只有浏览器挂载时才暴露 —— 本 spec 实测踩中）。
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import {
   H7_INDUSTRIES,
   h7CellValue,
@@ -101,6 +105,10 @@ const emit = defineEmits<{
   (e: 'rename', catKey: string): void
   (e: 'remove', catKey: string): void
 }>()
+
+const prefs = useDisplayPrefsStore()
+/** 走平台金额格式单一真源（千分符 + 单位偏好 + showZero 偏好） */
+const fmtAmount = (v: number | null | undefined): string => prefs.fmtAmount(v)
 
 const ordered = computed(() => orderH7Categories(props.categories))
 

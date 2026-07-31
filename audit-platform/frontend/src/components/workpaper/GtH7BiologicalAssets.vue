@@ -319,6 +319,8 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :applicable-standards="applicableStandards"
+          @save="onDisclosureSave"
         />
 
         <!-- 附注披露（国企） -->
@@ -328,6 +330,8 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :applicable-standards="applicableStandards"
+          @save="onDisclosureSave"
         />
 
         <!-- 未匹配 → OnlyOffice fallback -->
@@ -363,6 +367,7 @@
 import { ref, computed, onMounted, provide, toRef, inject, watch, defineAsyncComponent } from 'vue'
 import http from '@/utils/http'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
+import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 import HiFourTableSourcePanel from './shared/HiFourTableSourcePanel.vue'
 import { getHiExtractionSegments } from './composables/hiExtractionSegments'
@@ -439,6 +444,25 @@ function checkIndustryApplicability() {
 const isReadonly = computed(() => !!props.readonly)
 const isLoading = ref(true)
 const allResponses = ref<Map<string, any>>(new Map())
+
+/**
+ * 适用准则（披露 Tab 变体门控）。
+ *
+ * 🔴 必须在 setup 顶层调用（内部 `inject`）。宿主不传时披露门控恒开 →
+ * 可在国企项目编辑上市 Tab（服务端 `detect_standard_conflict` 会 409 兜底，
+ * 但前端应先拦）。
+ */
+const applicableStandards = useHostApplicableStandards({
+  htmlData: () => props.htmlData as Record<string, any> | null | undefined,
+})
+
+/**
+ * 披露 Tab 的保存回传：更新宿主镜像，让其它 Tab 的联动取数看到最新值。
+ * 落库由披露组件自己完成（H7 循环所有 Tab 都自持久化，宿主无统一保存处理器）。
+ */
+function onDisclosureSave(itemId: string, value: any): void {
+  allResponses.value.set(itemId, { item_id: itemId, conclusion: null, remark: value })
+}
 const currentMode = ref<'html' | 'onlyoffice'>('html')
 const modeOptions = [
   { label: '结构化视图', value: 'html' },

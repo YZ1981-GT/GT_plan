@@ -27,6 +27,7 @@
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import http from '@/utils/http'
 import type { ChecklistItem, ChecklistResponse } from './useD1FormData'
 import {
   parseNum,
@@ -127,7 +128,7 @@ function createEmptyRow(): CustomerRow {
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useD1DetailCustomer(options: UseD1DetailCustomerOptions) {
-  const { allResponses, projectId, saveImmediate, isReadonly, relatedParties, bsDate } = options
+  const { allResponses, wpId, projectId, saveImmediate, isReadonly, relatedParties, bsDate } = options
 
   // ─── State ───────────────────────────────────────────────────────────────
 
@@ -412,6 +413,75 @@ export function useD1DetailCustomer(options: UseD1DetailCustomerOptions) {
   }
 
   /**
+   * 从**辅助余额表**（tb_aux_balance，客户维度）一键导入客户明细。
+   *
+   * spec: .kiro/specs/d1-extraction-chain-completion/ (Requirement 4)
+   *
+   * 🔴 为什么可以做（实证）：`tb_aux_balance` 对应收票据原值科目确有客户维度
+   * （项目 0ec33ac9 的 1121.01/.02/.03 均有 `aux_type='客户'`，31 个客户，
+   * 归集合计逐分等于 tb_balance 1121：期初 131,550,200.96 + 借 162,165,634.33
+   * − 贷 273,506,637.11 = 期末 20,209,198.18）。改造前 D1-3 只有「期后兑付 ← 序时账」，
+   * 客户明细全靠手工录几十上百行。
+   *
+   * 后端科目定位走报表映射（BS-005 → 标准码 → account_mapping → 原始码），
+   * merge 语义 = **手工优先**（已存在的客户名整行原样保留，不覆盖关联方标记/期后兑付/调整列）。
+   */
+  async function importFromAuxBalance(): Promise<{ imported: number; totalUnits: number }> {
+    const empty = { imported: 0, totalUnits: 0 }
+    if (isReadonly.value) return empty
+    const wid = wpId?.value
+    if (!wid) {
+      ElMessage.warning('缺少底稿信息，无法取数')
+      return empty
+    }
+    try {
+      const res: any = await http.post(`/api/workpapers/${wid}/d1/import-aux-balance`, {})
+      const data = res?.data ?? res
+      const imported = Number(data?.imported_count ?? 0)
+      const totalUnits = Number(data?.total_units ?? 0)
+      const message = String(data?.message || '')
+      if (imported > 0) {
+        // 后端已落库 → 重新从 allResponses 之外拉取会造成双真源，故直接把新行并入本地
+        const newRows: any[] = Array.isArray(data?.rows) ? data.rows : []
+        const existingNames = new Set(rows.value.map((r) => r.customerName.trim()))
+        const appended = newRows
+          .filter((r) => !existingNames.has(String(r.customerName || '').trim()))
+          .map((r) =>
+            recalcRow({
+              rowId: String(r.rowId || generateRowId()),
+              customerName: String(r.customerName || ''),
+              companyCode: String(r.companyCode || ''),
+              relationType: matchRelatedParty(String(r.customerName || '')),
+              priorUnadjusted: parseNum(r.priorUnadjusted),
+              priorAje: parseNum(r.priorAje),
+              priorRje: parseNum(r.priorRje),
+              priorAudited: 0,
+              currentIncrease: parseNum(r.currentIncrease),
+              currentDecrease: parseNum(r.currentDecrease),
+              currentBalance: 0,
+              reclassification: parseNum(r.reclassification),
+              currentUnadjusted: 0,
+              currentAje: parseNum(r.currentAje),
+              currentRje: parseNum(r.currentRje),
+              currentAudited: 0,
+              postSettlement: parseNum(r.postSettlement),
+            }),
+          )
+        rows.value = [...rows.value, ...appended]
+        // 关联方标记是前端按项目名单匹配出来的，需回存（后端只写空串）
+        persistToResponses()
+        ElMessage.success(message || `已导入 ${imported} 个客户`)
+      } else {
+        ElMessage.info(message || '辅助余额表无客户维度数据')
+      }
+      return { imported, totalUnits }
+    } catch {
+      ElMessage.warning('从辅助余额表取数失败，请稍后重试')
+      return empty
+    }
+  }
+
+  /**
    * 从序时账取期后兑付/回款（资产负债表日后科目 1121 贷方发生额），按客户归集填入 postSettlement。
    *
    * 数据源：GET /projects/{pid}/ledger/entries/1121?year={bsYear+1}&date_from&date_to（贷方=票据减少=承兑收款）
@@ -570,6 +640,7 @@ export function useD1DetailCustomer(options: UseD1DetailCustomerOptions) {
     removeRow,
     updateCell,
     matchRelatedParty,
+    importFromAuxBalance,
     importPostSettlementFromLedger,
     saveAuditProcedures,
     saveAuditNote,

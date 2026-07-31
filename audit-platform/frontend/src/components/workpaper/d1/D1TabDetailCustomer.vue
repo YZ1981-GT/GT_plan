@@ -98,6 +98,7 @@ const {
   addRow,
   removeRow,
   updateCell,
+  importFromAuxBalance,
   importPostSettlementFromLedger,
   saveAuditProcedures,
   saveAuditNote,
@@ -118,6 +119,24 @@ const {
 
 const loadingPostSettlement = ref(false)
 async function onImportPostSettlement() {
+
+const loadingAux = ref(false)
+
+/**
+ * 从辅助余额表（tb_aux_balance 客户维度）一键导入客户明细。
+ *
+ * 科目由后端按报表映射 BS-005 解析（→ 标准码 → account_mapping → 原始码），
+ * merge 语义 = 手工优先（已存在客户整行保留，不覆盖关联方标记 / 期后兑付 / 调整列）。
+ */
+async function onImportFromAux(): Promise<void> {
+  if (props.isReadonly) return
+  loadingAux.value = true
+  try {
+    await importFromAuxBalance()
+  } finally {
+    loadingAux.value = false
+  }
+}
   if (loadingPostSettlement.value) return
   loadingPostSettlement.value = true
   try {
@@ -320,6 +339,23 @@ function onReview(sectionId: string) {
             <el-button size="small">导入数据</el-button>
           </el-upload>
         </el-button-group>
+        <el-tooltip
+          content="从辅助余额表(tb_aux_balance)按客户维度归集应收票据期初/本期增减/期末，科目由报表映射 BS-005 自动解析；已录入的客户保留不覆盖"
+          placement="top"
+        >
+          <span>
+            <el-button
+              type="primary"
+              plain
+              size="small"
+              :loading="loadingAux"
+              :disabled="isReadonly"
+              @click="onImportFromAux"
+            >
+              从辅助余额表导入
+            </el-button>
+          </span>
+        </el-tooltip>
         <el-tooltip content="从次年序时账提取资产负债表日后科目1121贷方（票据承兑收款），按客户归集填入期后兑付列" placement="top">
           <el-button
             type="warning"

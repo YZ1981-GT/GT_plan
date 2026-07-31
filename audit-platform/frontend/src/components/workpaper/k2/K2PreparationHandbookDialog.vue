@@ -54,7 +54,7 @@ function close() {
       :closable="false"
       show-icon
       class="mb12"
-      title="一句话：K2-2 明细立清单 → 合同取得成本(K2-4)按 CAS14 资本化 → 摊销测算(K2-5) → 差异进 K2-3 → 确认回写 K2-1 → 勾稽 TB(1231) → 附注。本弹窗不改各表页内说明。"
+      title="一句话：K2-2 明细立清单 → 合同取得成本(K2-4)按 CAS14 资本化 → 摊销测算(K2-5) → 差异进 K2-3 → 确认回写 K2-1 → 勾稽 TB(其他流动资产,实证1901) → 附注。本弹窗不改各表页内说明。"
     />
 
     <el-tabs v-model="activeTab">

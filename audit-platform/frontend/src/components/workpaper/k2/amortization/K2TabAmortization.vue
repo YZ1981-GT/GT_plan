@@ -496,6 +496,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowDown } from '@element-plus/icons-vue'
 import { fmtAmount } from '@/utils/formatters'
 import http from '@/utils/http'
+import { K2_GROSS_FALLBACK_STANDARD } from '../../composables/k2AccountScope'
 import { eventBus } from '@/utils/eventBus'
 import {
   useK2Amortization,
@@ -707,7 +708,7 @@ function handlePushSuggestedAJE(): void {
   try {
     eventBus.emit('adjustment:created', {
       wpCode: 'K2',
-      accountCode: '1231',
+      accountCode: K2_GROSS_FALLBACK_STANDARD,
       source: 'K2-5-amort-variance',
       suggestedEntries: ajeItems,
       totalVariance: subtotals.value.variance,
@@ -722,7 +723,7 @@ function handlePushSuggestedAJE(): void {
 async function handleAiNote(): Promise<void> {
   try {
     const context: Record<string, string> = {
-      accountCode: '1231',
+      accountCode: K2_GROSS_FALLBACK_STANDARD,
       sheet: 'K2-5',
       rowCount: String(rows.value.length),
       totalCost: String(subtotals.value.cost),
@@ -734,7 +735,7 @@ async function handleAiNote(): Promise<void> {
       expiredCount: String(expiredContracts.value.length),
     }
     const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
-      prompt: '请生成合同取得成本(1231)摊销测算审计说明，概述摊销方法选择依据、测算结果与企业差异分析、是否需要调整',
+      prompt: '请生成合同取得成本摊销测算审计说明，概述摊销方法选择依据、测算结果与企业差异分析、是否需要调整',
       context,
       existingContent: auditNote.value,
       section: 'K2-5-amort-note',
@@ -749,7 +750,7 @@ async function handleAiNote(): Promise<void> {
 async function handleAiConclusion(): Promise<void> {
   try {
     const context: Record<string, string> = {
-      accountCode: '1231',
+      accountCode: K2_GROSS_FALLBACK_STANDARD,
       sheet: 'K2-5',
       totalVariance: String(subtotals.value.variance),
       materiality: String(materiality.value),

@@ -166,7 +166,7 @@
  * selfLoad: 当 htmlData prop 为 null 时自行调 render-config。
  * checklist_responses 前缀: "K2-{sheet}-{field}"
  *
- * 科目：1231其他流动资产（借方/资产类）
+ * 科目：其他流动资产（报表行 BS-014 → 实证 TB('1901')，借方/资产类）
  * 核心：合同取得成本 + 摊销测算引擎（直线法/进度法）+ 资产类三角勾稽
  *
  * Spec: .kiro/specs/k2-other-current-assets/ Task 1.1

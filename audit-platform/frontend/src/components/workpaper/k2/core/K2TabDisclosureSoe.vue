@@ -199,8 +199,13 @@ import {
   buildK2SyncPayload,
 } from '../../composables/k2NoteSectionMap'
 import { checkK2Consistency, k2ConsistencySummary } from '../../composables/useK2DisclosureEngine'
+import { K2_ACCOUNT_NAME, K2_GROSS_FALLBACK_STANDARD } from '../../composables/k2AccountScope'
 
-const K2_ACCOUNT_CODE = '1231'
+/**
+ * 科目口径取单一真源（报表行 `BS-014` → 实证 `TB('1901')`）。
+ * 🔴 历史写死 `1231` = 应收款项坏账准备，与其他流动资产无关。
+ */
+const K2_ACCOUNT_CODE = K2_GROSS_FALLBACK_STANDARD
 
 /** 逐字取自 note_template_soe.json §八、14 text_sections[0] */
 const SOE_REQUIREMENT =
@@ -382,10 +387,16 @@ const AI_PROMPT =
 
 async function handleAiGenerate(): Promise<void> {
   try {
+    // 🔴 `context` 必须是 `dict[str,str]` —— 传字符串会 422 且被 catch 静默吞掉
     const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
       prompt: AI_PROMPT,
-      context: `科目：其他流动资产(1231)；附注章节：${K2_NOTE_SECTION.soe}；变体：国有企业；`
-        + `源模板要求：${SOE_REQUIREMENT}`,
+      context: {
+        accountCode: K2_ACCOUNT_CODE,
+        accountName: K2_ACCOUNT_NAME,
+        noteSection: K2_NOTE_SECTION.soe,
+        variant: '国有企业',
+        requirement: SOE_REQUIREMENT,
+      },
       existingContent: noteText.value || '',
       section: 'k2-soe-note',
     })

@@ -508,6 +508,7 @@ import { ref, computed, toRef, inject, watch } from 'vue'
 import { CircleCheckFilled, CircleCloseFilled } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
+import { K2_GROSS_FALLBACK_STANDARD } from '../../composables/k2AccountScope'
 import {
   useK2ContractCost,
   type K2ContractCostRow,
@@ -766,7 +767,7 @@ function persistConclusion(): void {
 async function handleAiNote(): Promise<void> {
   try {
     const context: Record<string, string> = {
-      accountCode: '1231',
+      accountCode: K2_GROSS_FALLBACK_STANDARD,
       sheet: 'K2-4',
       contractCount: String(rows.value.length),
       capitalizedCount: String(rows.value.filter(r => r.isCapitalized).length),
@@ -789,7 +790,7 @@ async function handleAiNote(): Promise<void> {
 async function handleAiConclusion(): Promise<void> {
   try {
     const context: Record<string, string> = {
-      accountCode: '1231',
+      accountCode: K2_GROSS_FALLBACK_STANDARD,
       sheet: 'K2-4',
       capitalizedCount: String(rows.value.filter(r => r.isCapitalized).length),
       nonCapitalizedCount: String(nonCapitalizedRows.value.length),

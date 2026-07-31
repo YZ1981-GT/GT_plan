@@ -9,7 +9,7 @@
  * - `note_check_preset_formulas.json` F13-1 / F13-1a / F13-2：只对①明细表设勾稽，
  *   故表②合同取得成本、表③碳排放配额变动是**上市条件性披露表**。
  *
- * account_code: 1231
+ * 报表行: BS-014 其他流动资产（实证 TB('1901')；历史误写 account_code 1231 = 坏账准备）
  *
  * spec: .kiro/specs/k2-other-current-assets-disclosure-alignment/ R5
  */
