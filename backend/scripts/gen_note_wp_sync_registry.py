@@ -31,7 +31,18 @@ FRONTEND_SRC = REPO_ROOT / "audit-platform" / "frontend" / "src"
 OUT_PATH = Path(__file__).resolve().parent.parent / "data" / "note_workpaper_sync_registry.json"
 
 # X_NOTE_SECTION = { listed: '五、4', soe: '八、4' }
-_SECTION_BLOCK = re.compile(r"_NOTE_SECTION[^=]*=\s*\{(?P<body>[^}]*)\}", re.S)
+#
+# 🔴 必须锚定 `const/let/var` 声明 + 常量名在 `_NOTE_SECTION` 处收尾（`(?![\w])`）：
+#    ①不锚定声明时，注释里提到常量名会让 `[^=]*=` 跨过注释咬到下一条语句
+#      （与 `_SHEET_CONST` 同款陷阱）；
+#    ②不收尾时 `X_NOTE_SECTION_DISPLAY`（界面展示用、非定位用）也会命中并**覆盖**
+#      真正的定位常量 —— 实测 H10 因此把 `八、75` 写成 `八、75 资产处置收益`，
+#      而 registry 是「同步就绪度看板」的章节定位真源。
+_SECTION_BLOCK = re.compile(
+    r"(?:const|let|var)\s+\w*_NOTE_SECTION(?![\w])"
+    r"(?P<anno>\s*:[^=]{0,200})?\s*=\s*\{(?P<body>[^}]*)\}",
+    re.S,
+)
 _LISTED = re.compile(r"listed\s*:\s*['\"](?P<v>[^'\"]+)['\"]")
 _SOE = re.compile(r"soe\s*:\s*['\"](?P<v>[^'\"]+)['\"]")
 # X_DISCLOSURE_SHEET_LISTED / _SOE / _NAME（sheet 真实 tab 名，尽力提取；找不到留空不臆造）

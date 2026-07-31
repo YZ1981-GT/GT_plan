@@ -58,7 +58,15 @@ from typing import Any
 _BACKEND = Path(__file__).resolve().parent.parent.parent
 DATA_DIR = _BACKEND / "data"
 
-ALIGNED_BY = "f1-prepayment-disclosure-template-alignment"
+#: 本次写入的 `_aligned_by` 标记
+ALIGNED_BY = "f1-four-table-extraction-and-disclosure-alignment"
+
+#: 🔴 `--check` 按**集合**判定而非单值：历史批次写的是归档 spec 名，
+#: 若按单值断言，改 `ALIGNED_BY` 后在重跑脚本前 CI 必红。
+ALIGNED_BY_ACCEPTED = frozenset({
+    ALIGNED_BY,
+    "f1-prepayment-disclosure-template-alignment",
+})
 
 LISTED_PATH = DATA_DIR / "note_template_listed.json"
 SOE_PATH = DATA_DIR / "note_template_soe.json"
@@ -102,15 +110,33 @@ def _blank_rows_then_total(n: int) -> list[dict[str, Any]]:
 
 # ─────────────────────────── 列结构 ───────────────────────────
 
-def _aging_patch(end_group: str, prior_group: str, pct_label: str) -> dict[str, Any]:
-    """按账龄表：账龄 + {金额, 比例} × 期末/期初两组（5 列两级表头）。"""
+#: 两版按账龄表标签列列头（源 xlsx `A8`，**双空格**）
+AGING_LABEL_COL = "账  龄"
+
+
+def _aging_patch(
+    end_group: str,
+    prior_group: str,
+    amount_label: str,
+    pct_label: str,
+    label_col: str = AGING_LABEL_COL,
+) -> dict[str, Any]:
+    """按账龄表：账龄 + {金额, 比例} × 期末/期初两组（5 列两级表头）。
+
+    列头字面**逐字取源 xlsx**（含空格），数据 ``key`` 逐字不变：
+
+    - 上市 ``A8=账  龄`` / ``B8=期末数`` / ``D8=上年年末数`` / ``B9=金  额``（双空格）/ ``C9=比例%``
+    - 国企 ``A8=账  龄`` / ``B8=期末数`` / ``E8=期初数``     / ``B10=金 额``（**单**空格）/ ``C10=比例（%）``
+
+    spec: .kiro/specs/f1-four-table-extraction-and-disclosure-alignment/ R6.1, R6.2
+    """
     return {
-        "headers": ["账龄", "金额", pct_label, "金额", pct_label],
+        "headers": [label_col, amount_label, pct_label, amount_label, pct_label],
         "columns": [
-            {"key": "label", "label": "账龄", "is_label": True},
-            {"key": "end_amount", "label": "金额", "group": end_group, "format": "amount"},
+            {"key": "label", "label": label_col, "is_label": True},
+            {"key": "end_amount", "label": amount_label, "group": end_group, "format": "amount"},
             {"key": "end_pct", "label": pct_label, "group": end_group, "format": "percent"},
-            {"key": "prior_amount", "label": "金额", "group": prior_group, "format": "amount"},
+            {"key": "prior_amount", "label": amount_label, "group": prior_group, "format": "amount"},
             {"key": "prior_pct", "label": pct_label, "group": prior_group, "format": "percent"},
         ],
         "_column_groups": [
@@ -217,7 +243,8 @@ def _listed_plan() -> list[dict[str, Any]]:
     return [
         {
             "aliases": [T_LISTED_AGING],
-            "patch": _aging_patch("期末余额", "上年年末余额", "比例%"),
+            # 源 xlsx `B8=期末数` / `D8=上年年末数`（此前误写「期末余额」/「上年年末余额」）
+            "patch": _aging_patch("期末数", "上年年末数", "金  额", "比例%"),
             "rows": "strip",
         },
         {
@@ -238,7 +265,8 @@ def _soe_plan() -> list[dict[str, Any]]:
     return [
         {
             "aliases": [T_SOE_AGING],
-            "patch": _aging_patch("期末数", "期初数", "比例（%）"),
+            # 源 xlsx `B10=金 额`（**单**空格，与上市的双空格不同）
+            "patch": _aging_patch("期末数", "期初数", "金 额", "比例（%）"),
             "rows": "strip",
         },
         {
@@ -494,7 +522,7 @@ def _process(
     if check_only:
         errs = validate_section(section, section_number)
         log.append(f"_aligned_by={section.get('_aligned_by')!r}")
-        if section.get("_aligned_by") != ALIGNED_BY:
+        if section.get("_aligned_by") not in ALIGNED_BY_ACCEPTED:
             errs.append("尚未对齐（缺 _aligned_by 标记）")
         log.extend(errs or ["结构校验通过"])
         return not errs, log
@@ -517,7 +545,7 @@ def _process(
         log.append("[dry-run] 未写文件")
         return True, log
 
-    if not changes and section.get("_aligned_by") == ALIGNED_BY:
+    if not changes and section.get("_aligned_by") in ALIGNED_BY_ACCEPTED:
         log.append("已对齐且无变更，跳过写入")
         return True, log
 

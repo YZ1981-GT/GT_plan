@@ -25,23 +25,39 @@ import sqlalchemy as sa
 
 from app.models.audit_platform_models import TbBalance
 from app.services.dataset_query import get_active_filter
+from app.services.deferred_tax_shared import (
+    aggregate_by_slot,
+    classify_liability_subaccount,
+    code_predicate,
+    leaf_rows,
+)
+from app.services.report_account_mapping import resolve_report_line_account_codes
 
 from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
 
 _N3_ACCOUNT_CODE = "2901"
+# 报表行编码（**DB 只读实证**：`report_config` 四套准则一致
+# `BS-067 递延所得税负债 = TB('2901','期末余额')`）。
+_N3_ROW_CODE = "BS-067"
 _ADJUDICATED_ITEM_ID = "N3-1-adjudicated-amount"
 _ADJ_ROWS_ITEM_ID = "N3-1-adjudication-rows"
 _TB_PREFILL_ITEM_ID = "N3-1-tb-prefill"
 
+# 🔴 **不含任何披露 sheet**：N3 源模板（`backend/wp_templates/N/N3 递延所得税负债.xlsx`）
+# 只有 底稿目录 / N3A / N3-1 / N3-2 / N3-3 / GT_Custom，`workpaper_sheet_classification`
+# 里 wp_code=N3 亦 0 条附注 sheet。递延所得税负债的附注披露与 **N1 共节**
+# （五、30 / 八、31，N1 表(1) 已含负债段）。原先这里列着「附注披露信息」条目 +
+# 宿主 `isHtmlSheet` 认「附注」→ 该 sheet 一旦出现即渲染空白 Tab（inert 残留，已清）。
+# 守卫：`test_n3_four_table_extraction.py` + 前端 `disclosureAutoSyncCoverage.spec.ts`
+# 的 `CYCLES_WITHOUT_DISCLOSURE.N3`。
 N3_SHEETS = [
     {"sheet_name": "底稿目录", "component_type": "n3-deferred-tax-liabilities"},
     {"sheet_name": "递延所得税负债审计程序表的N3A", "component_type": "n3-deferred-tax-liabilities"},
     {"sheet_name": "递延所得税负债审定表N3-1", "component_type": "n3-deferred-tax-liabilities"},
     {"sheet_name": "递延所得税负债明细表N3-2", "component_type": "n3-deferred-tax-liabilities"},
     {"sheet_name": "调整分录汇总N3-3", "component_type": "n3-deferred-tax-liabilities"},
-    {"sheet_name": "附注披露信息", "component_type": "n3-deferred-tax-liabilities"},
 ]
 
 
@@ -62,10 +78,33 @@ def _parse_num(v: Any) -> float:
 # ─── TB 取数（负债类！期末余额）──────────────────────────────────────────────
 
 
-async def _fetch_tb_data(ctx: RenderContext) -> dict[str, Any]:
-    """从 tb_balance 取科目2901递延所得税负债余额数据（负债类贷方）."""
+async def _resolve_account_codes(ctx: RenderContext) -> list[str]:
+    """按报表行 `BS-067` 规则映射解析取数科目集（fail-open 回退 `['2901']`）。"""
+    try:
+        codes = await resolve_report_line_account_codes(
+            ctx.db, ctx.project_id, _N3_ROW_CODE, fallback=[_N3_ACCOUNT_CODE]
+        )
+        return [c for c in codes if str(c).strip()] or [_N3_ACCOUNT_CODE]
+    except Exception as e:  # noqa: BLE001 — 映射解析失败按 fallback 处理
+        logger.warning("N3 render: 报表行 %s 科目映射解析失败: %s", _N3_ROW_CODE, e)
+        return [_N3_ACCOUNT_CODE]
+
+
+async def _fetch_tb_data(
+    ctx: RenderContext, codes: list[str] | None = None
+) -> dict[str, Any]:
+    """从 tb_balance 取递延所得税负债余额（负债类贷方，`abs()` 归一）。
+
+    🔴 原实现只查 `account_code == '2901'` 精确单行 + `.limit(1)`：
+    客户按子科目挂账（活体实测 `2901.01/.02/.03` 普遍存在）时**恒返回 0**。
+    改为「科目级精确行优先 → 无则叶子子科目聚合」，与 N1 同款。
+    """
+    codes = [c for c in (codes or [_N3_ACCOUNT_CODE]) if str(c).strip()] or [
+        _N3_ACCOUNT_CODE
+    ]
     result: dict[str, Any] = {
         "account_code": _N3_ACCOUNT_CODE,
+        "account_codes": list(codes),
         "account_name": "递延所得税负债",
         "direction": "credit",
         "begin_balance": 0,
@@ -74,29 +113,81 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict[str, Any]:
         "end_balance": 0,
     }
     try:
-        active_filter = await get_active_filter(ctx.db, TbBalance.__table__, ctx.project_id, ctx.year)
-        stmt = (
-            sa.select(
-                TbBalance.opening_balance,
-                TbBalance.debit_amount,
-                TbBalance.credit_amount,
-                TbBalance.closing_balance,
-            )
-            .where(
-                TbBalance.account_code == _N3_ACCOUNT_CODE,
-                active_filter,
-            )
-            .limit(1)
+        active_filter = await get_active_filter(
+            ctx.db, TbBalance.__table__, ctx.project_id, ctx.year or 0
         )
-        row = (await ctx.db.execute(stmt)).fetchone()
-        if row:
-            result["begin_balance"] = abs(_parse_num(row.opening_balance))
-            result["debit_amount"] = _parse_num(row.debit_amount)
-            result["credit_amount"] = _parse_num(row.credit_amount)
-            result["end_balance"] = abs(_parse_num(row.closing_balance))
+        all_rows = (
+            await ctx.db.execute(
+                sa.select(
+                    TbBalance.account_code,
+                    TbBalance.opening_balance,
+                    TbBalance.debit_amount,
+                    TbBalance.credit_amount,
+                    TbBalance.closing_balance,
+                ).where(
+                    active_filter,
+                    sa.or_(*[code_predicate(TbBalance.account_code, c) for c in codes]),
+                )
+            )
+        ).fetchall()
+
+        roots = {str(c).strip() for c in codes if "~" not in str(c)}
+        # ① 科目级精确行（父级即总额，不与子科目双算）
+        rows = [r for r in all_rows if (r.account_code or "").strip() in roots]
+        # ② 无科目级行（客户按子科目挂账）→ 叶子聚合
+        if not rows:
+            rows = leaf_rows(list(all_rows))
+
+        for row in rows:
+            # 负债类：两种符号约定并存（活体实测 2901 期末既有 -233512.19 也有 200530.32）
+            result["begin_balance"] += abs(_parse_num(row.opening_balance))
+            result["debit_amount"] += abs(_parse_num(row.debit_amount))
+            result["credit_amount"] += abs(_parse_num(row.credit_amount))
+            result["end_balance"] += abs(_parse_num(row.closing_balance))
+        for k in ("begin_balance", "debit_amount", "credit_amount", "end_balance"):
+            result[k] = round(result[k], 2)
     except Exception as e:  # noqa: BLE001
         logger.warning("N3 render: TB 取数失败: %s", e)
     return result
+
+
+async def _build_adjudication_prefill(
+    ctx: RenderContext, codes: list[str] | None = None
+) -> dict[str, dict[str, float]]:
+    """从 tb_balance 递延所得税负债 **叶子**子科目按语义槽预填审定表期初/期末。
+
+    复用 N1 已实测的 2901 五语义槽分类（共享模块 `deferred_tax_shared`），
+    **不新造第 3 套**。原实现把 TB 数据全塞进「其他」一行，分类信息全丢。
+
+    只有父级科目（无子科目）→ 返回 ``{}``（不虚构分类，`trial_balance` 给总额做反向校验）。
+    """
+    codes = [c for c in (codes or [_N3_ACCOUNT_CODE]) if str(c).strip()] or [
+        _N3_ACCOUNT_CODE
+    ]
+    try:
+        active_filter = await get_active_filter(
+            ctx.db, TbBalance.__table__, ctx.project_id, ctx.year or 0
+        )
+        rows = (
+            await ctx.db.execute(
+                sa.select(
+                    TbBalance.account_code,
+                    TbBalance.account_name,
+                    TbBalance.opening_balance,
+                    TbBalance.closing_balance,
+                ).where(
+                    active_filter,
+                    sa.or_(*[code_predicate(TbBalance.account_code, c) for c in codes]),
+                )
+            )
+        ).fetchall()
+    except Exception as e:  # noqa: BLE001 — 预填失败按空处理，不阻塞渲染
+        logger.warning("N3 render: 审定表预填 tb_balance 查询失败: %s", e)
+        return {}
+
+    roots = {str(c).strip() for c in codes if "~" not in str(c)}
+    subs = leaf_rows([r for r in rows if (r.account_code or "").strip() not in roots])
+    return aggregate_by_slot(subs, classify_liability_subaccount, absolute=True)
 
 
 # ─── 主渲染函数 ───────────────────────────────────────────────────────────────
@@ -161,10 +252,18 @@ async def render(ctx: RenderContext) -> dict[str, Any]:
     except Exception as e:  # noqa: BLE001
         logger.warning("N3 render: project context 查询失败: %s", e)
 
+    # ─── 科目映射（report_config 单一真源，fail-open 回退硬编码科目）──────────
+    codes = await _resolve_account_codes(ctx)
+
     # ─── TB 取数（科目2901递延所得税负债，贷方/负债类）────────────────────
-    tb = await _fetch_tb_data(ctx)
+    tb = await _fetch_tb_data(ctx, codes)
+
+    # ─── 审定表分类预填（2901 叶子 → 五语义槽，复用 N1 已实测分类）──────────
+    adjudication_prefill = await _build_adjudication_prefill(ctx, codes)
 
     # ─── 审定表 TB 预填种子（仅当无持久化审定表行时注入）──────────────────
+    # 保留既有形态（前端 `useN3Adjudication` 读 `N3-1-tb-prefill`）以零回归；
+    # 分类信息由新增的 `adjudication_prefill` 顶层键承载。
     if _ADJ_ROWS_ITEM_ID not in responses_snapshot:
         responses_snapshot[_TB_PREFILL_ITEM_ID] = {
             "item_id": _TB_PREFILL_ITEM_ID,
@@ -185,8 +284,16 @@ async def render(ctx: RenderContext) -> dict[str, Any]:
         "project_context": project_context,
         "responses_snapshot": responses_snapshot,
         "adjudicated_amount": adjudicated_amount,
-        # TB 余额数据（科目2901，贷方/负债类）
+        # TB 余额数据（科目2901，贷方/负债类，已 abs() 归一）
         "trial_balance": tb,
+        # 审定表按语义槽预填（`{槽: {opening, closing}}`；空 dict = 无子科目）
+        "adjudication_prefill": adjudication_prefill,
+        # 取数溯源：报表行规则映射解析出的科目集（供前端展示「取数来源」）
+        "tb_source_codes": {
+            "row_code": _N3_ROW_CODE,
+            "codes": codes,
+            "basis": "balance",  # 余额类 → 期末余额
+        },
         # 负债类公式方向元数据
         "formula_direction": {
             "account_code": "2901",
