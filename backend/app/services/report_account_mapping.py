@@ -46,6 +46,7 @@ async def resolve_report_line_account_codes(
     row_code: str,
     *,
     fallback: list[str],
+    applicable_standards: list[str] | None = None,
 ) -> list[str]:
     """解析某报表行(row_code)在 report_config 规则映射中的源科目编号。
 
@@ -54,6 +55,17 @@ async def resolve_report_line_account_codes(
         project_id: 项目 ID（用于项目级 ``project:{id}`` 覆盖优先）。
         row_code: 报表行次编码（如货币资金 ``BS-002``）。
         fallback: 无规则映射时的兜底科目编号（保证零回归）。
+        applicable_standards: 可选，项目适用准则（``derive_applicable_standards`` 的输出，
+            如 ``['soe_standalone','soe','standalone']``）。按序精确匹配
+            ``report_config.applicable_standard``，命中即用该准则的公式。
+
+            🔴 为什么需要它：同一 row_code 在不同准则下公式可能**语义不同**。实证
+            ``BS-005 应收票据``：``soe_standalone`` 是
+            ``TB('1121','期末余额') - TB('1231-01','期末余额')``（净额口径），而
+            ``listed_*`` / ``soe_consolidated`` 只有 ``TB('1121','期末余额')``。
+            不传本参数时走原有的「任取一条非项目级配置」路径（``LIMIT 1`` 无
+            ``ORDER BY`` → 取到哪条由行序决定），坏账科目可能整个丢掉。
+            默认 ``None`` = 与改动前逐字等价（零回归）。
 
     Returns:
         科目编号列表（单码或 ``start~end`` 区间）；解析失败或无配置返回 ``fallback`` 副本。
@@ -69,6 +81,24 @@ async def resolve_report_line_account_codes(
                 {"rc": row_code, "std": f"project:{project_id}"},
             )
         ).fetchone()
+        # 项目级无覆盖 → 按项目适用准则精确匹配（若调用方提供）
+        if (row is None or not row.formula) and applicable_standards:
+            for std in applicable_standards:
+                if not std:
+                    continue
+                candidate = (
+                    await db.execute(
+                        sa.text(
+                            "SELECT formula FROM report_config "
+                            "WHERE row_code = :rc AND applicable_standard = :std "
+                            "AND is_deleted = false LIMIT 1"
+                        ),
+                        {"rc": row_code, "std": std},
+                    )
+                ).fetchone()
+                if candidate is not None and candidate.formula:
+                    row = candidate
+                    break
         if row is None or not row.formula:
             row = (
                 await db.execute(

@@ -32,9 +32,36 @@
 5. 两版全部表补 ``guidance``（TAB 页签编制提示）。
 6. ``text_sections``：表标题统一 ``#### `` 前缀（否则被当正文），补齐源模板实质披露文本。
 
-**行集合不动原则**：表 1 的明细行标签保持附注模板既有（md 派生）集合，不改成源 xlsx 的行名——
-附注是交付物，且 ``_source=workpaper`` 时 seed 行会被底稿整表覆盖，行骨架只服务"从未同步过的项目"。
-唯一例外是国企表 2（原为 2 行简写，按源 xlsx 补齐为与表 1 同构的明细）。
+修订内容（spec n1-four-table-extraction-and-disclosure-alignment R5）
+------------------------------------------------------------------
+7. **行集回归源 xlsx**（推翻此前的「行集合不动原则」）。原则原本依据「附注模版 md」，
+   但该目录在本仓库**不存在**（``glob('**/*附注模版*')`` 0 命中）→ 据它的结论不可信，
+   与 F2 存货 Sprint 7 同款推翻。实测偏差：
+
+   - 上市表 1 资产段只有 5 行且含源模板没有的「开办费」，缺「公允价值变动」
+     「购入摊销年限小于税法规定的资产」「其他」；负债段 5 行里 4 行与源模板不符。
+   - 国企表 1 / 表 2 同类偏离，且残留 5 处 ``……`` **占位假数据行**
+     （平台铁律：模板 rows 里的占位说明是假数据行，会渲染成一行空披露数据 → 必删）。
+   - 国企表 2（互抵明细）只有一行 ``……``，而源模板 R56:R58 全空 = **纯动态行区域**。
+   - 国企亏损到期表 11 个年度 + ``……`` + 「无使用期限」，源模板只有 6 个年度。
+
+   资产段 7 项与前端 ``N1_ASSET_ITEMS``、后端 ``_N1_ADJUDICATION_CATEGORIES``
+   **三处同构**（三者独立演进却都收敛到源模板 R13:R19）—— 这是行集正确性的交叉印证。
+
+8. **报表行编码纠错**：原写 ``BS-018``，DB 只读实证 ``BS-018`` 在上市是「流动资产合计」、
+   在国企是「存货」。正确值 ``BS-036``（递延所得税资产）/ ``BS-067``（递延所得税负债），
+   四套准则一致。
+
+9. **剥离底层资产负债科目**：原「租赁负债」行挂 ``account_codes=['2601']``、
+   「使用权资产」行挂 ``['1641','1642','1643']``。这些是**被计量的底层科目**，
+   而本表金额是暂时性差异与递延所得税 —— 一旦取数会把租赁负债余额拉进递延税列。
+   附注行只许挂递延所得税科目（``1811`` / ``2901``）。
+
+10. 删除 ``text_sections`` 中**在句中被截断**的证监会指引段（源模板无此内容）。
+
+**为什么行集仍然值得修**：``_source=workpaper`` 时投影器只渲染底稿推来的
+``sub_table_data``、不与模板 ``_tables`` 合并，故 seed 行只服务「从未同步过的项目」
+与 Word 导出；但那恰恰是现状主导面（全库 346/348 附注章节 ``last_sync_at`` 为 NULL）。
 
 用法::
 
@@ -70,6 +97,57 @@ T_OFFSET_DETAIL = "递延所得税资产和递延所得税负债互抵明细"  #
 T_UNRECOGNIZED_LISTED = "未确认递延所得税资产的可抵扣暂时性差异及可抵扣亏损明细"
 T_UNRECOGNIZED_SOE = "未确认递延所得税资产明细"
 T_LOSS_EXPIRY = "未确认递延所得税资产的可抵扣亏损将于以下年度到期"
+
+# ───────────────── 报表行编码 / 科目白名单（DB 只读实证）─────────────────
+# `report_config` 四套准则（listed/soe × standalone/consolidated）全部一致：
+#   BS-036 递延所得税资产 = TB('1811','期末余额')
+#   BS-067 递延所得税负债 = TB('2901','期末余额')
+# 🔴 曾错写 BS-018（实为 上市「流动资产合计」/ 国企「存货」）→ 守卫已钉死。
+ASSET_ROW_CODE = "BS-036"
+LIABILITY_ROW_CODE = "BS-067"
+ASSET_ACCOUNT_CODES = ["1811"]
+LIABILITY_ACCOUNT_CODES = ["2901"]
+# 附注行只许挂递延所得税科目：本表金额是暂时性差异与递延所得税，
+# 挂底层被计量科目（2601 租赁负债 / 1641~1643 使用权资产）会把其余额拉进递延税列。
+ALLOWED_ACCOUNT_CODES = {"1811", "2901"}
+
+# ───────────────── 源模板行集（唯一裁决者）─────────────────
+# 资产段 = `附注披露信息（上市公司）` R13:R19；国企 R13:R19 用公式引用上市同列，故两版同集。
+# 🔴 与前端 `N1_ASSET_ITEMS`、后端 `_N1_ADJUDICATION_CATEGORIES` 三处同构（交叉印证）。
+SRC_ASSET_ITEMS = [
+    "资产减值准备",
+    "可抵扣亏损",
+    "内部交易未实现利润",
+    "公允价值变动",
+    "租赁负债",
+    "购入摊销年限小于税法规定的资产",
+    "其他",
+]
+
+# 负债段 = 两版 R23:R27。🔴 第 4 项两版用语不同：上市 A26「使用权资产」/ 国企 A26「租赁形成」。
+SRC_LIABILITY_ITEMS = {
+    "listed": [
+        "购入摊销年限大于税法规定的资产",
+        "可供出售金融资产公允价值变动",
+        "投资性房地产公允价值变动",
+        "使用权资产",
+        "其他",
+    ],
+    "soe": [
+        "购入摊销年限大于税法规定的资产",
+        "可供出售金融资产公允价值变动",
+        "投资性房地产公允价值变动",
+        "租赁形成",
+        "其他",
+    ],
+}
+
+# 亏损到期年度骨架 = 源模板 R46:R51 / R66:R71 共 **6 行**。
+# 设计原理：期末（审计年度 Y 末）的亏损到期于 Y+1..Y+5；上年年末（Y-1 末）的到期于 Y..Y+4，
+# 两列并集 = Y..Y+5 → 首行只在上年年末列有值（源模板 B46='——'）、
+# 末行只在期末列有值（源模板 C51='——'）。
+LOSS_EXPIRY_BASE_YEAR = 2025
+LOSS_EXPIRY_YEARS = 6
 
 # ─────────────────────────── 行构造 ───────────────────────────
 
@@ -171,24 +249,45 @@ def _flat_table(
 
 # ═══════════════════════════ 上市 五、30 ═══════════════════════════
 
-# 表 1 行集合 = 附注模板既有（md 派生），仅删首行 header_label 假数据行。
-# 分组标题行保留 row_type=data + account_codes/report_row_code（承载 BS 报表行映射）。
-_LISTED_UNOFFSET_ROWS: list[dict[str, Any]] = [
-    _row("递延所得税资产：", account_codes=["1811"], report_row_code="BS-018"),
-    _row("资产减值准备"),
-    _row("内部交易未实现利润"),
-    _row("开办费"),
-    _row("可抵扣亏损"),
-    _row("租赁负债", account_codes=["2601"], report_row_code="BS-042"),
-    _subtotal(),
-    _row("递延所得税负债："),
-    _row("非同一控制企业合并资产评估增值"),
-    _row("交易性金融工具、衍生金融工具的估值"),
-    _row("计入其他综合收益的应收款项融资公允价值变动"),
-    _row("计入其他综合收益的其他债权投资公允价值变动"),
-    _row("使用权资产", account_codes=["1641", "1642", "1643"], report_row_code="BS-019"),
-    _subtotal(),
-]
+def _two_segment_rows(variant: str, asset_label: str, liability_label: str) -> list[dict[str, Any]]:
+    """资产段（标题 + 7 项 + 小计）+ 负债段（标题 + 5 项 + 小计），共 16 行。
+
+    表 1（未经抵销）与国企表 2（抵销后净额）同构 —— 源模板国企 A36=``=A13`` …
+    A50=``=A27`` 即行标签镜像关系。
+    分组标题行承载 BS 报表行映射（``account_codes`` + ``report_row_code``）。
+    """
+    return [
+        _row(
+            asset_label,
+            account_codes=list(ASSET_ACCOUNT_CODES),
+            report_row_code=ASSET_ROW_CODE,
+        ),
+        *[_row(n) for n in SRC_ASSET_ITEMS],
+        _subtotal(),
+        _row(
+            liability_label,
+            account_codes=list(LIABILITY_ACCOUNT_CODES),
+            report_row_code=LIABILITY_ROW_CODE,
+        ),
+        *[_row(n) for n in SRC_LIABILITY_ITEMS[variant]],
+        _subtotal(),
+    ]
+
+
+def _loss_expiry_rows() -> list[dict[str, Any]]:
+    """6 个年度行 + 合计（源模板 R46:R51 / R66:R71）。"""
+    return [
+        *[
+            _row(f"{y}年")
+            for y in range(LOSS_EXPIRY_BASE_YEAR, LOSS_EXPIRY_BASE_YEAR + LOSS_EXPIRY_YEARS)
+        ],
+        _total(),
+    ]
+
+
+# 上市表 1（源模板 A12「递延所得税资产：」/ A22「递延所得税负债：」，均整行合并）
+def _listed_unoffset_rows() -> list[dict[str, Any]]:
+    return _two_segment_rows("listed", "递延所得税资产：", "递延所得税负债：")
 
 _G_LISTED_UNOFFSET = (
     "递延所得税资产段与递延所得税负债段分别列示，各段末置「小计」。"
@@ -213,25 +312,36 @@ _G_UNRECOGNIZED_LISTED = (
 _G_LOSS_EXPIRY_LISTED = (
     "源模板注：无法在资产负债表日确定全部可抵扣亏损情况的，"
     "可只填写能确定部分的金额及其到期年度，并在备注栏予以说明。"
+    "年度骨架为 6 行（源模板 R46:R51）：期末列的亏损到期于 Y+1~Y+5、"
+    "上年年末列到期于 Y~Y+4，两列并集即 Y~Y+5 —— 故首行期末列、末行上年年末列均为「——」。"
+    "结转期限长于 5 年（高新技术企业 / 科技型中小企业 10 年）或无使用期限的，按需新增行。"
     "勾稽：本表「合计」= 上表「可抵扣亏损」行（源模板 B40=B52 / C40=C52，期末与上年年末各校验一次）。"
 )
 
 
 def build_listed_tables() -> list[dict[str, Any]]:
     return [
-        _unoffset_table("listed", _LISTED_UNOFFSET_ROWS, _G_LISTED_UNOFFSET),
+        _unoffset_table("listed", _listed_unoffset_rows(), _G_LISTED_UNOFFSET),
         _flat_table(
             T_NET_OFFSET,
             [
                 ("label", "项目", None),
                 ("offset_end", "递延所得税资产和负债期末互抵金额", AMT),
                 ("net_end", "抵销后递延所得税资产或负债期末余额", AMT),
-                ("offset_prior", "递延所得税资产和负债上年年末互抵金额", AMT),
-                ("net_prior", "抵销后递延所得税资产或负债上年年末余额", AMT),
+                ("offset_prior", "递延所得税资产和负债期初互抵金额", AMT),
+                ("net_prior", "抵销后递延所得税资产或负债期初余额", AMT),
             ],
             [
-                _row("递延所得税资产", account_codes=["1811"], report_row_code="BS-018"),
-                _row("递延所得税负债"),
+                _row(
+                    "递延所得税资产",
+                    account_codes=list(ASSET_ACCOUNT_CODES),
+                    report_row_code=ASSET_ROW_CODE,
+                ),
+                _row(
+                    "递延所得税负债",
+                    account_codes=list(LIABILITY_ACCOUNT_CODES),
+                    report_row_code=LIABILITY_ROW_CODE,
+                ),
             ],
             _G_NET_OFFSET_LISTED,
         ),
@@ -253,7 +363,7 @@ def build_listed_tables() -> list[dict[str, Any]]:
                 ("prior", "上年年末余额", AMT),
                 ("remark", "备注", None),
             ],
-            [*[_row(f"{y}年") for y in range(2025, 2031)], _total()],
+            _loss_expiry_rows(),
             _G_LOSS_EXPIRY_LISTED,
         ),
     ]
@@ -265,9 +375,11 @@ LISTED_TEXT_SECTIONS = [
     "【提示：连续亏损的情况下，仍将较大金额的未抵扣亏损确认递延所得税资产，"
     "对当期净利润影响较大，甚至扭亏为盈，应当披露相关判断依据】",
     "【提示：产生递延所得税资产的资产减值准备中包括持有待售资产的资产减值准备。】",
-    # 模板既有原文（md 抽取时已被截断，保留原样不自造补全）
-    "按照证监会《监管规则适用指引——会计类第5号》，公司在发行并初始确认可转换债券时，"
-    "**若该可转换债券作为复合金融工具、其金融负债成分的计税基础等于债券票面金额并",
+    # 🔴 已删：md 抽取遗留的证监会《监管规则适用指引——会计类第5号》段落。
+    #    ①源模板 `附注披露信息（上市公司）` 无此内容；②该段**在句中被截断**
+    #    （止于「其金融负债成分的计税基础等于债券票面金额并」）且带 `**` markdown 残迹
+    #    → 落进附注正文与 Word 导出即是一句半截话，交付物层面不可接受。
+    #    宁缺勿造：不自造补全，直接移除。
     f"#### {T_NET_OFFSET}（不适用的删除）",
     f"#### {T_UNRECOGNIZED_LISTED}",
     "注：列示由于未来能否获得足够的应纳税所得额具有不确定性，"
@@ -279,36 +391,14 @@ LISTED_TEXT_SECTIONS = [
 
 # ═══════════════════════════ 国企 八、31 ═══════════════════════════
 
-# 资产段 / 负债段明细行（附注模板既有集合，供表 1 与表 2 共用）
-_SOE_ASSET_DETAIL = [
-    _row("信用减值准备"),
-    _row("资产减值准备"),
-    _row("交易性金融工具、衍生金融工具的估值"),
-    _row("计入其他综合收益的其他金融资产公允价值变动"),
-    _row("租赁负债", account_codes=["2601"], report_row_code="BS-042"),
-    _row("开办费"),
-    _row("可抵扣亏损"),
-    _row("……"),
-]
-
-_SOE_LIABILITY_DETAIL = [
-    _row("交易性金融工具、衍生金融工具的估值"),
-    _row("计入其他综合收益的其他金融资产公允价值变动"),
-    _row("使用权资产", account_codes=["1641", "1642", "1643"], report_row_code="BS-019"),
-    _row("……"),
-]
-
-
 def _soe_two_segment_rows() -> list[dict[str, Any]]:
-    """资产段 + 小计 + 负债段 + 小计（表 1 与表 2 同构）。"""
-    return [
-        _row("一、递延所得税资产"),
-        *[dict(r) for r in _SOE_ASSET_DETAIL],
-        _subtotal(),
-        _row("二、递延所得税负债"),
-        *[dict(r) for r in _SOE_LIABILITY_DETAIL],
-        _subtotal(),
-    ]
+    """资产段 + 小计 + 负债段 + 小计（表 1 与表 2 同构）。
+
+    源模板 A12「一、递延所得税资产」/ 表 2 A45「二、递延所得税负债」；
+    表 1 的负债段标题源模板写 `递延所得税负债：`，附注模板统一为 `二、递延所得税负债`
+    使表 1 与表 2 同构便于对照。
+    """
+    return _two_segment_rows("soe", "一、递延所得税资产", "二、递延所得税负债")
 
 
 _G_SOE_UNOFFSET = (
@@ -329,6 +419,8 @@ _G_SOE_NET_OFFSET = (
 _G_SOE_OFFSET_DETAIL = (
     "源模板（2）B、递延所得税资产和递延所得税负债互抵明细：按项目列示本期互抵金额。"
     "仅在以抵销后净额列示时填列。"
+    "本表为**纯动态行区域**（源模板 R56:R58 全空，无固定行名）：互抵项目由项目实际情况决定，"
+    "在底稿披露表按需新增行并自行命名。"
 )
 
 _G_SOE_UNRECOGNIZED = (
@@ -340,7 +432,9 @@ _G_SOE_UNRECOGNIZED = (
 _G_SOE_LOSS_EXPIRY = (
     "【注：无法在资产负债表日确定全部可抵扣亏损情况的，"
     "可只填写能确定部分的金额及其到期年度，并在备注栏予以说明。】"
-    "第 3 列附注口径为「期初余额」（源模板底稿侧称「年初余额」，同一口径）。"
+    "第 3 列口径为「年初余额」（逐字对齐源模板 C65，与表 1 一致）。"
+    "年度骨架为 6 行（源模板 R66:R71，首行期末列与末行年初列为「——」）。"
+    "结转期限长于 5 年（高新技术企业 / 科技型中小企业 10 年）或无使用期限的，按需新增行。"
     "勾稽：本表「合计」= 上表「可抵扣亏损」行（源模板 B72=B62 / C72=C62）。"
 )
 
@@ -363,12 +457,15 @@ def build_soe_tables() -> list[dict[str, Any]]:
         _flat_table(
             T_OFFSET_DETAIL,
             [("label", "项目", None), ("amount", "本期互抵金额", AMT)],
-            [_row("……")],
+            # 🔴 空行骨架：源模板（2）B 的 R56:R58 **全空** = 纯动态行区域
+            #    （互抵项目由项目实际情况决定，无固定行名）。
+            #    原实现放一行 `……` 会在附注渲染出一行空披露数据。
+            [],
             _G_SOE_OFFSET_DETAIL,
         ),
         _flat_table(
             T_UNRECOGNIZED_SOE,
-            [("label", "项目", None), ("end", "期末余额", AMT), ("prior", "期初余额", AMT)],
+            [("label", "项目", None), ("end", "期末余额", AMT), ("prior", "年初余额", AMT)],
             [_row("可抵扣暂时性差异"), _row("可抵扣亏损"), _total()],
             _G_SOE_UNRECOGNIZED,
         ),
@@ -377,15 +474,13 @@ def build_soe_tables() -> list[dict[str, Any]]:
             [
                 ("label", "年份", None),
                 ("end", "期末余额", AMT),
-                ("prior", "期初余额", AMT),
+                ("prior", "年初余额", AMT),
                 ("remark", "备注", None),
             ],
-            [
-                *[_row(f"{y}年") for y in range(2025, 2036)],
-                _row("……"),
-                _row("无使用期限"),
-                _total(),
-            ],
+            # 🔴 6 个年度（对齐源模板 R66:R71）。原实现有 11 个年度 + `……` + 「无使用期限」，
+            #    源模板均无 —— 10 年结转期（高新技术/科技型中小企业）与「无使用期限」
+            #    由底稿动态增行承载（`addLossExpiryRow` 支持可改名行），语义写入 guidance。
+            _loss_expiry_rows(),
             _G_SOE_LOSS_EXPIRY,
         ),
     ]
@@ -422,7 +517,37 @@ def _find_section(data: dict[str, Any], section_number: str) -> dict[str, Any]:
 
 
 def _describe(tables: list[dict[str, Any]]) -> str:
-    return " / ".join(f"{t['name']}({len(t['headers'])}列)" for t in tables)
+    return " / ".join(
+        f"{t.get('name')}({len(t.get('headers') or [])}列 {len(t.get('rows') or [])}行)"
+        for t in tables
+    )
+
+
+def _row_labels(table: dict[str, Any]) -> list[str]:
+    return [str(r.get("label", "")) for r in (table.get("rows") or [])]
+
+
+def _print_row_diff(old_tables: list[dict[str, Any]], new_tables: list[dict[str, Any]]) -> None:
+    """逐表打印行集差异 —— 本脚本的主要改动面在 rows，只报列数看不出来。"""
+    by_name_old = {t.get("name"): t for t in old_tables}
+    for t in new_tables:
+        name = t.get("name")
+        old = by_name_old.get(name)
+        if old is None:
+            print(f"      + 新表 {name}")
+            continue
+        a, b = _row_labels(old), _row_labels(t)
+        if a == b:
+            continue
+        print(f"      ~ {name}:")
+        removed = [x for x in a if x not in b]
+        added = [x for x in b if x not in a]
+        if removed:
+            print(f"          删 {removed}")
+        if added:
+            print(f"          增 {added}")
+        if not removed and not added:
+            print(f"          仅行序变化 {a} → {b}")
 
 
 def apply(*, check_only: bool = False, dry_run: bool = False) -> bool:
@@ -448,6 +573,15 @@ def apply(*, check_only: bool = False, dry_run: bool = False) -> bool:
             print(f"[{variant}] {section_number} 与源模板不一致：")
             print(f"    现状 {len(old)} 表 → {_describe(old) if old else '(无)'}")
             print(f"    目标 {len(tables)} 表 → {_describe(tables)}")
+            _print_row_diff(old, tables)
+            old_texts = section.get("text_sections") or []
+            if old_texts != list(texts):
+                dropped = [t for t in old_texts if t not in texts]
+                added_t = [t for t in texts if t not in old_texts]
+                if dropped:
+                    print(f"      文本删 {[t[:40] + '…' for t in dropped]}")
+                if added_t:
+                    print(f"      文本增 {[t[:40] + '…' for t in added_t]}")
             continue
 
         section["tables"] = tables

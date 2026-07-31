@@ -312,10 +312,32 @@ _TIER_B_PROVENANCE: dict[str, list[dict]] = {
             ),
         },
     ],
-    # D1：诚实登记——只描述**确实由四表库归集**填充的锚点（D1-3 客户明细期后兑付 ←
-    # 序时账 1121 贷方），且明确声明 D1-1 审定表分类行（银行承兑/商业承兑 × 原值/坏账/净值）
-    # **不做四表库 seed**（宁缺勿造 R3.4）。审定表原值未审由 D1-2 按类别明细 cross-sheet 派生。
+    # D1：实证纠正（d1-four-table-extraction-formula-wiring）——客户科目表叶子层已干净编码
+    # 原值（1121.01/.02/.03）与坏账（1231.01）维度，故 D1-2/D1-4 现由 tb_balance 叶子 seed；
+    # D1-1 审定表分类行经既有 cross-sheet 由 D1-2/D1-4 派生（TB → D1-2/D1-4 → D1-1 链）。
+    # 另登记 D1 各底稿间连接取数关系（R4.3，只读溯源，复杂归集不压成单条公式）。
     "D1": [
+        {
+            "sheet_name": "D1-2",
+            "anchor": "D1-cat-rows",
+            "description": (
+                "原值明细表(按类别) 期初未审/本期增减 ← **tb_balance 1121 叶子子科目**"
+                "（1121.01 银行承兑→fixed-bank / 1121.02 商业承兑→fixed-commercial / 1121.03 "
+                "信用证等→动态行；priorUnadjusted=期初余额, currentIncrease=借方发生额, "
+                "currentDecrease=贷方发生额 → 期末未审=期初+增−减=期末余额，roll-forward 守恒）"
+                "（get_active_filter 数据集版本，只取叶子防双算，手工优先，seed_d1_detail_rows）"
+            ),
+        },
+        {
+            "sheet_name": "D1-4",
+            "anchor": "D1-bd-portfolio-rows",
+            "description": (
+                "坏账准备明细表 按组合计提期初/本期净变动 ← **tb_balance 1231 名称含「应收票据」"
+                "的叶子（1231.01 坏账准备_应收票据）**（credit 备抵，abs 归一为计提口径正值；"
+                "净减少记入本期转回、净增加记入本期计提，roll-forward 守恒）。单项/组合细分与"
+                "五列拆分由 D1-15 ECL 测算细化（宁缺勿造，手工优先，seed_d1_detail_rows）"
+            ),
+        },
         {
             "sheet_name": "D1-3",
             "anchor": "D1-cust-rows",
@@ -325,15 +347,49 @@ _TIER_B_PROVENANCE: dict[str, list[dict]] = {
                 "（一键取数，Tier B 复杂归集，非单条公式）"
             ),
         },
+        # ─── 各底稿间连接取数溯源（R4.3，cross-sheet，非四表库直取）──────────────
         {
             "sheet_name": "D1-1",
-            "anchor": "D1-adj-(gross|bd)-(bank|commercial)-*",
+            "anchor": "D1-adj-gross-(bank|commercial)-*",
             "description": (
-                "审定表分类行（银行承兑汇票/商业承兑汇票 × 原值/坏账准备/净值三区块）未审数"
-                "**不从四表库填**：TB 1121 只有科目总额、无「原值/坏账/净值 × 银行/商业」组合"
-                "维度（宁缺勿造 R3.4）→ 原值未审由 D1-2 按类别明细（D1-cat-rows）cross-sheet "
-                "派生、坏账来自减值模型、净值 = 原值−坏账 computed。可从四表库干净取的仅"
-                "D1-adj-tb-amount（1121 总额），已作 Tier A 可编辑公式 TB('1121','期末余额')。"
+                "审定表 一、原值 各行未审 ← **D1-2 原值明细表小计**（useD1Adjudication "
+                "categoryRows 按种类含「银行」/「商业」匹配 cross-sheet 派生）。D1-2 本身由 "
+                "tb_balance 1121 叶子 seed → 完整链：tb_balance 1121 → D1-2 → D1-1 原值。"
+            ),
+        },
+        {
+            "sheet_name": "D1-1",
+            "anchor": "D1-adj-bd-(bank|commercial)-*",
+            "description": (
+                "审定表 二、坏账准备 各行未审 ← **D1-4 坏账准备明细表小计**（cross-sheet）。"
+                "D1-4 由 tb_balance 1231.01 seed → 链：tb_balance 1231.01 → D1-4 → D1-1 坏账。"
+                "净值 = 原值 − 坏账（computed 不落库）。"
+            ),
+        },
+        {
+            "sheet_name": "D1-1",
+            "anchor": "D1-adj-tb-amount",
+            "description": (
+                "审定表 TB↔审定净值核对行 ← Tier A 可编辑公式 TB('1121','期末余额')（1121 总额，"
+                "trial_balance 审定口径）；供审计师核对审定净值合计与试算平衡表数差异。"
+            ),
+        },
+        {
+            "sheet_name": "D1-4",
+            "anchor": "D1-bd-*-rows ↔ D1-15",
+            "description": (
+                "坏账准备期末合计 ↔ **D1-15 ECL 测算应计提减值合计**（useD1CrossSheet "
+                "eclVsBadDebtDiff：二者理论应一致，差异>阈值提示复核）。ECL 模型是坏账准备"
+                "计提充分性的独立验算源，非四表库直取。"
+            ),
+        },
+        {
+            "sheet_name": "D1-1",
+            "anchor": "D1-endorse-discount-rows（表外披露）",
+            "description": (
+                "已贴现尚未到期「未终止确认」汇票合计 + 已背书转让尚未到期合计 ← **D1-8 背书"
+                "贴现明细表**（useD1CrossSheet discountNotDerecognizedTotal/endorsedTransferTotal，"
+                "表外披露口径，与 D5 应收款项融资勾稽），非四表库直取。"
             ),
         },
     ],

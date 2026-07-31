@@ -277,7 +277,9 @@ async def render(ctx: RenderContext) -> dict | None:
     except Exception as e:  # noqa: BLE001
         logger.warning("F2 render: related_parties 查询失败: %s", e)
 
-    # ─── F2-1 TB 核对标量（存货净额 BS-008，走规则映射） ──────────────────
+    # ─── F2-1 TB 核对标量（存货净额 BS-010，走规则映射） ──────────────────
+    # 🔴 报表行次 BS-010=存货（SUM_TB('1401~1499')）；此前误用 BS-008（预付款项 1123），
+    #    规则解析返回 1123 使 fallback 从未生效 → 核对标量取的是预付款项净额而非存货。
     year = project_context.get("audit_year")
     if year:
         try:
@@ -287,9 +289,8 @@ async def render(ctx: RenderContext) -> dict | None:
             )
 
             codes = await resolve_report_line_account_codes(
-                db, ctx.project_id, "BS-008",
-                fallback=["1401", "1402", "1403", "1404", "1405", "1406",
-                          "1407", "1408", "1409", "1410", "1411", "1412", "1471"],
+                db, ctx.project_id, "BS-010",
+                fallback=["1401~1499"],
             )
             where_clause, code_params = build_trial_balance_code_filter(codes)
             project_context["tb_source_codes"] = codes
@@ -308,6 +309,9 @@ async def render(ctx: RenderContext) -> dict | None:
             if tb_row:
                 audited = float(tb_row.audited or 0)
                 unadjusted = float(tb_row.unadjusted or 0)
+                # 供前端 useF2Adjudication 作 TB 核对标量只读回退 seed（不覆盖手工录入）。
+                # 前端 allResponses 来自 checklist-responses 端点（非 render responses_snapshot），
+                # 故经 project_context.tb_amount 透传，而非注入 responses_snapshot。
                 project_context["tb_amount"] = audited if audited else unadjusted
         except Exception as e:  # noqa: BLE001
             logger.warning("F2 render: trial_balance 存货净额查询失败: %s", e)

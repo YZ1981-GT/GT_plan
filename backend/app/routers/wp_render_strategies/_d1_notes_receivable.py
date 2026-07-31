@@ -18,6 +18,11 @@ import logging
 import sqlalchemy as sa
 
 from app.core.config import settings
+from app.services.d_cycle_extraction.d1_account_resolver import (
+    D1AccountCodes,
+    resolve_d1_account_codes,
+)
+from app.services.d_cycle_extraction.d1_detail_seed import seed_d1_detail_rows
 from app.services.d_cycle_extraction.presets import resolve_effective
 from app.services.d_cycle_extraction.tier_a_seed import (
     seed_tier_a_reconciliation,
@@ -30,6 +35,49 @@ logger = logging.getLogger(__name__)
 
 # D1 wp_code base（Tier A 提取公式 / 锚点登记 key）
 _D1_WP_CODE = "D1"
+
+
+async def _seed_tb_provision_amount(
+    ctx: RenderContext, project_context: dict, codes: D1AccountCodes
+) -> None:
+    """按解析出的**标准码**补 trial_balance 坏账准备核对标量（原地写 project_context）。
+
+    `trial_balance.standard_account_code` 存标准码（实证 `1231-01`），故这里用
+    `codes.provision_standard` 而非原始码。审定优先、审定为 0 回退未审（与原值同口径）。
+    备抵科目在 trial_balance v2 正数口径下存正值，直接取绝对值归一为计提口径。
+    失败 fail-open：不写键，前端按缺省 0 处理（不阻断 render）。
+    """
+    if not codes.provision_standard:
+        return
+    try:
+        like_clauses = " OR ".join(
+            f"standard_account_code LIKE :c{i}" for i in range(len(codes.provision_standard))
+        )
+        params: dict = {
+            f"c{i}": f"{code}%" for i, code in enumerate(codes.provision_standard)
+        }
+        params.update({"pid": str(ctx.project_id), "year": ctx.year})
+        row = (
+            await ctx.db.execute(
+                sa.text(
+                    "SELECT COALESCE(SUM(unadjusted_amount), 0) AS unadjusted, "
+                    "COALESCE(SUM(audited_amount), 0) AS audited "
+                    "FROM trial_balance "
+                    "WHERE project_id = :pid AND year = :year AND is_deleted = false "
+                    f"AND ({like_clauses})"
+                ),
+                params,
+            )
+        ).fetchone()
+        if row is None:
+            return
+        audited = abs(float(row.audited or 0))
+        unadjusted = abs(float(row.unadjusted or 0))
+        project_context["tb_provision_amount"] = audited if audited else unadjusted
+        project_context["tb_provision_amount_unadjusted"] = unadjusted
+        project_context["tb_provision_amount_audited"] = audited
+    except Exception as e:  # noqa: BLE001
+        logger.warning("D1 render: trial_balance 坏账准备查询失败（fail-open）: %s", e)
 
 
 async def render(ctx: RenderContext) -> dict | None:
@@ -138,39 +186,62 @@ async def render(ctx: RenderContext) -> dict | None:
         "responses_snapshot": responses_snapshot,
     }
 
-    # ─── Tier B 四表库审定表预填（D1：宁缺勿造 R3.4，ADDITIVE，灰度开关控制）───────
-    # spec: d-cycle-four-table-extraction-formulas (Task 5.2 / R1.1 R2.3 R3.4 R7.1 R7.2
-    #        / Property 9)
+    # ─── 四表库取数 seed（D1：实证叶子映射，ADDITIVE，灰度开关控制）───────────────
+    # spec: d1-four-table-extraction-formula-wiring (Wave 2 / R1.x R2.x / Property 3, 4)
     #
-    # 【宁缺勿造决策】D1-1 审定表按**票据类型固定分类**（银行承兑汇票 / 商业承兑汇票），
-    # 分原值 / 坏账准备 / 净值三区块（`useD1Adjudication` GROSS_ROWS / BAD_DEBT_ROWS /
-    # NET_VALUE_ROWS，固定 2 行 × 3 区块，非 D6-1 block1 那种动态叶子行）。原值区块未审数
-    # 由 **D1-2 按类别明细（`D1-cat-rows`）经 cross-sheet 派生**（`useD1Adjudication`
-    # categoryRows 按 category 含「银行」/「商业」匹配填入），非从 tb_balance 叶子直接填；
-    # 坏账准备来自减值模型（`D1-bd-*-rows`）；净值 = 原值 − 坏账（computed 不落库）。
-    # trial_balance / tb_balance 1121 **只有科目总额、无「原值/坏账/净值 × 银行/商业」组合
-    # 维度**（分类是审计判断，非科目结构）→ 无法把 TB 干净映射到审定表分类行。故 D1 render
-    # **不返回 adjudication_prefill**（不臆造分类行未审数 = 诚实的部分覆盖，对齐 R3.4）。
+    # 【实证纠正「宁缺勿造」】已归档 spec d-cycle-four-table-extraction-formulas 曾判定
+    # 「TB 1121 只有科目总额、无原值/坏账×银行/商业维度」故不 seed。对入库数据的只读核查
+    # 证明该前提不成立——客户科目表在**叶子层**已干净编码 D1 所需两个维度：
+    #   * 原值：1121.01 银行承兑汇票 / 1121.02 商业承兑汇票 / 1121.03 信用证
+    #     （roll-forward 逐分精确：opening + debit − credit = closing，子科目 closing 之和
+    #      = 1121 closing）。
+    #   * 坏账：1231.01 坏账准备_应收票据（credit 备抵，两种符号约定下 abs 归一）。
+    # 故 D1-2 原值明细 / D1-4 坏账准备明细经 `seed_d1_detail_rows` 从 tb_balance 叶子诚实
+    # 取数 seed 进 responses_snapshot（transient 不落库；手工优先；leaf-only；fail-open），
+    # 前端 useD1DetailCategory / useD1BadDebt 既有 loadFromResponses 路径零改动即消费。
+    # D1-1 审定表原值/坏账未审经既有 cross-sheet 由 D1-2/D1-4 自动派生，净值 = 原值 − 坏账。
     #
-    # D1 四表库数据的正确落点（均为既有链路，本 render 不重复介入，手工优先精度）：
-    #   * D1-1 `D1-adj-tb-amount`（1121 总额，TB↔审定净值核对行）—— 已由 render 上方
-    #     `project_context.tb_amount` seed（前端 `useD1Adjudication` tbSeedAmount 回退），
-    #     并注册为 Tier A **可编辑**公式 `TB('1121','期末余额')`（d_cycle_extraction_presets.json，
-    #     公式管理面板可查可编，求值经 get_active_filter 与 Tier B 同口径）。本 render 不重复 seed。
-    #   * D1-1 分类行未审 ← D1-2 按类别明细（`D1-cat-rows`）**cross-sheet 派生**（银行/商业），
-    #     非四表库直接可填。
-    #   * D1-3 客户明细 `D1-cust-rows` 期后兑付 ← **序时账 1121 贷方**（`importPostSettlementFromLedger`，
-    #     Tier B 复杂归集）—— 前端既有一键取数，非单条公式，本 render 不介入、不与之冲突。
+    # 说明：本 render 仍**不返回** `adjudication_prefill` 键——D1 seed 走 responses_snapshot
+    # 明细行（前端专属组件读 checklist_responses），非 D6 式 adjudication_prefill 顶层键。
+    # 其它既有四表库落点保持不变：
+    #   * D1-1 `D1-adj-tb-amount`（1121 总额 TB↔审定核对行）← Tier A 公式 `TB('1121','期末余额')`
+    #     经 seed_tier_a_reconciliation transient seed（下方，手工优先，与本 seed 各写不同锚点）。
+    #   * D1-3 客户明细 `D1-cust-rows` 期后兑付 ← 序时账 1121 贷方（前端一键取数，本 render 不介入）。
     #
-    # → 因此 D1 render 输出在开关开/关时**逐字节等价**（不新增 adjudication_prefill 或任何键，
-    #   Property 9 天然成立，零回归）。保留此显式分支为决策文档锚点：未来若 D1-1 结构支持
-    #   叶子明细行、或出现可干净映射的四表库维度，可在此接入 Tier B seed。
+    # 灰度关（默认）→ 不进本分支，输出与改动前逐字节等价（Property 3，零回归）。
     if settings.D_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED:
-        logger.debug(
-            "D1 render: 宁缺勿造（R3.4）— 无干净 TB→审定表分类行映射（票据类型固定分类），"
-            "不发 adjudication_prefill（wp_id=%s）",
-            ctx.wp_id,
-        )
+        # ─── D1-2 原值 / D1-4 坏账明细行 transient seed（实证叶子映射）──────────────
+        # 🔴 门控 = 主开关 ∧ 子开关 `D_CYCLE_DETAIL_SEED_ENABLED`（与 D6-2 同款）。
+        # 子开关的语义是 D 循环**通用**的「明细表维度归集 render 自动 seed」（见 config.py：
+        # 打开 D-cycle 明细表且明细行完全空时 transient seed 进 render、不落库、手工优先），
+        # 本 seed 与之完全同类。首版只挂主开关 → 让文档承诺的「发 P0-1、压 P0-2」（开主开关
+        # 拿 Tier A、同时压住明细自动 seed）对 D1 失效：运维为启用 Tier A 而开主开关时会
+        # **静默**连带打开 D1 明细 seed 且无法单独回退。故此处与 D6 收敛为同一门控矩阵。
+        # ─── 科目定位：报表规则映射驱动（spec d1-extraction-chain-completion R1）────
+        # BS-005 应收票据 → report_config.formula → 标准码（1121 / 1231-01）
+        #   → account_mapping 反解 → 该项目**原始码**（tb_balance 存原始码）。
+        # 全程 fail-open：解析失败回退 1121 / 1231 前缀（等价改动前行为）。
+        # 挂在主开关下（不受明细 seed 子开关约束）：`tb_source_codes` 与坏账 TB 核对
+        # 标量属 Tier A 取数溯源，与「明细自动 seed」是两件事。
+        d1_codes = None
+        try:
+            d1_codes = await resolve_d1_account_codes(ctx)
+            html_data["tb_source_codes"] = d1_codes.as_dict()
+        except Exception as e:  # noqa: BLE001
+            logger.warning("D1 render: 科目解析异常（fail-open 用兜底前缀）: %s", e)
+
+        # 坏账准备 TB 核对标量（trial_balance 存**标准码**，故用 provision_standard）：
+        # 原值 tb_amount 已在上方按 1121% 查过；此处按解析结果补齐坏账口径，供
+        # D1-1「二、应收票据坏账准备」区块与 TB 核对（灰度关时不查、行为不变）。
+        if d1_codes is not None:
+            await _seed_tb_provision_amount(ctx, project_context, d1_codes)
+
+        if settings.D_CYCLE_DETAIL_SEED_ENABLED:
+            try:
+                await seed_d1_detail_rows(ctx, responses_snapshot, d1_codes)
+            except Exception as e:  # noqa: BLE001 — 兜底 fail-open，不阻断 render
+                logger.warning("D1 render: 明细 seed 兜底异常（fail-open）: %s", e)
+
         # ─── Tier A 公式驱动 TB 核对行 transient seed（P0-1 主机制）──────────────
         # spec: d-cycle-tier-a-writeback-detail-seed R3（决策1/3 / Property 6/7/10/11/13）
         # 用 resolve_effective 的有效 Tier A 公式（默认 TB('1121','期末余额')）求值 transient
