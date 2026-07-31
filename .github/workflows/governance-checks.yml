@@ -729,6 +729,64 @@ jobs:
       - name: Run note K2 structure contract tests
         run: python -m pytest backend/tests/services/test_note_k2_structure.py -q
 
+  note-f1-four-table:
+    # F1 预付款项：四表库取数口径 + 披露/附注列头字面 + 公式管理预设 守卫
+    # （f1-four-table-extraction-and-disclosure-alignment）
+    # 背景（全部 DB / 源 xlsx 实证）：
+    # ① render 曾用硬编码前缀 + 缺点号边界的 `_is_leaf`（`1123.1` 会被 `1123.10` 误判为非叶子；
+    #    前缀 `2202` 误吃 `22020`），且报表映射解析结果只喂 trial_balance、tb_balance 侧仍硬编码；
+    # ② 完全没有 `adjudication_prefill` —— 而 `1123` 叶子子科目名天然对应 F1-1「按性质分类」
+    #    五行（`.01 预付货款`→货款 / `.02.03 长期资产款_工程款`→工程款 / `.03 短期待摊费用`→服务费）；
+    # ③ 备抵 `1231-04 坏账准备-预付账款` 从未取数，且 `BS-008` 公式不含备抵 → 必须兜底 + 叠「预付」
+    #    名称过滤（实证 9 个项目均无 `1231-04` 映射，宽前缀 `1231` 会把应收账款坏账算进 F1）；
+    # ④ F1-4「存货余额」用前缀 `1401`（**材料采购**，实证两项目均为空）而非 `BS-010` 区间 → 恒 0；
+    # ⑤ 列头字面丢了源 xlsx 空格（`账  龄` / 上市 `金  额` 双空格 / 国企 `金 额` 单空格），
+    #    上市两级表头父组名误写「期末余额/上年年末余额」（源为「期末数/上年年末数」）。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check note F1 section alignment (五、7 / 八、7)
+        run: python backend/scripts/fix/fix_note_prepayment_structure.py --check
+      - name: Check F1 formula presets
+        run: python backend/scripts/fix/fix_f1_prefill_presets.py --check
+      - name: Install test dependencies
+        run: python -m pip install pytest==8.4.2 openpyxl==3.1.5 hypothesis==6.112.1
+      - name: Run F1 four-table extraction guards
+        run: python -m pytest backend/tests/test_f1_four_table_extraction.py backend/tests/four_table -q
+      - name: Run note F1 structure contract tests (three-way vs source xlsx)
+        run: >-
+          python -m pytest
+          backend/tests/services/test_note_prepayment_structure.py
+          backend/tests/services/test_note_prepayment_backfill.py -q
+
+  note-f1-four-table-frontend:
+    # F1 前端守卫：披露列头引常量 / 金额控件迁移 / 上市③二选一 / 勾稽规则集完备
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: audit-platform/frontend/package-lock.json
+      - name: Install deps
+        run: npm ci
+        working-directory: audit-platform/frontend
+      - name: Run F1 disclosure / four-table frontend guards
+        run: >-
+          npx vitest run
+          src/components/workpaper/composables/__tests__/f1DisclosureColumns.spec.ts
+          src/components/workpaper/composables/__tests__/f1NoteSubtableContract.spec.ts
+          src/components/workpaper/composables/__tests__/f1Top5Mode.spec.ts
+          src/components/workpaper/composables/__tests__/f1DisclosureConsistency.spec.ts
+          src/components/workpaper/composables/__tests__/f1AmountInputMigration.spec.ts
+          src/components/workpaper/composables/__tests__/f1FourTableSource.spec.ts
+          src/components/workpaper/__tests__/F1DisclosureMount.spec.ts
+        working-directory: audit-platform/frontend
+
   note-h2-structure:
     # 附注 H2 在建工程章节结构守卫
     # （h2-construction-in-progress-disclosure-alignment Task 6）
@@ -832,6 +890,50 @@ jobs:
       - name: Run H8 disclosure contract tests
         working-directory: audit-platform/frontend
         run: npx vitest run src/components/workpaper/composables/__tests__/h8NoteSubtableContract.spec.ts src/components/workpaper/composables/__tests__/h8Disclosure.spec.ts
+
+  note-h7-structure:
+    # 附注 H7 生产性生物资产章节结构守卫（上市 §五、24 / 国企 §八、24）
+    # （h7-biological-assets-disclosure-rebuild Task 11）
+    # H7 是 H 循环唯一需要**整体重建**的循环：重建前两个披露 Tab 只有单行只读
+    # movementRows（无产业与类别维度），既无 h7NoteSectionMap 也无载荷，
+    # disclosure-sync-path-buildout 曾接线后主动撤回（强推等于自造披露内容）。
+    # 上市两表是列转置 + 两级表头（openpyxl 合并区 A9:A10/B9:C9/…/J9:J10 实证）：
+    # 列 = 项目 + 4 产业（各下辖用户命名的类别列）+ 合计；表1 34 行四层、表2 11 行。
+    # 🔴 `……` 两种语义相反：作列头永远收不到数据 → 丢弃；作行是真实可扩明细行且参与
+    # 小计 → 保留（上市表1 三处、表2 两处）。国企的 `……` 是行形态的「可继续加行」标记，
+    # 动态类别行模型下不需要 → seed 删除（13 行 → 9 行）。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check note H7 section alignment (五、24 / 八、24)
+        run: python backend/scripts/fix/fix_note_h7_biological_assets_structure.py --check
+      - name: Install test dependencies
+        run: python -m pip install pytest==8.4.2 openpyxl==3.1.5
+      - name: Run note H7 structure contract tests
+        run: python -m pytest backend/tests/test_note_h7_biological_assets_structure.py -q
+
+  note-h7-frontend:
+    # H7 披露模型与载荷契约（派生公式 / 类别 key 稳定性 / 两级表头 group /
+    # 行键 ⊆ 列键 / `_note_texts` 中文 title / 无自调度 / WpAmountInput）
+    # + 平台三份回归（同步链路清单、columns 覆盖率、sheet 名 registry）
+    # （h7-biological-assets-disclosure-rebuild Task 11）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: audit-platform/frontend/package-lock.json
+      - name: Install frontend dependencies
+        working-directory: audit-platform/frontend
+        run: npm ci
+      - name: Run H7 disclosure model + contract tests
+        working-directory: audit-platform/frontend
+        run: npx vitest run src/components/workpaper/composables/__tests__/h7DisclosureModel.spec.ts src/components/workpaper/composables/__tests__/h7NoteSubtableContract.spec.ts src/components/workpaper/__tests__/h7-registry-contract.test.ts src/components/workpaper/composables/__tests__/disclosureSheetNameRegistry.spec.ts
 
   note-h9-h10-structure:
     # 附注 H9 租赁负债（五、47 / 八、52）+ H10 资产处置损益（三、资产处置收益（损 / 八、75）
