@@ -94,97 +94,97 @@ Wave 4 账龄枚举贯通 K1-1（独立，可与 2/3 并行）；Wave 5 披露/�
   - Requirements: 2.1, 2.2, 2.3
   - Properties: 1
 
-- [ ] 2.1 改 `_k1_other_receivables.py`：删除 `_K1_ACCOUNT_PREFIXES` 与
+- [x] 2.1 改 `_k1_other_receivables.py`：删除 `_K1_ACCOUNT_PREFIXES` 与
   `_aggregate_prefix_deepest`（死代码直接删），`_fetch_tb_data` 改为
   `resolve_report_line_accounts(BS-009)` + `select_leaves` + `aggregate_leaves`；
   备抵侧取 `abs()`；`account_codes` 由解析结果派生。
   - Requirements: 1.1, 1.3, 2.1, 2.4
   - Properties: 1, 2
 
-- [ ] 2.2 `_build_adjudication_prefill` 改用叶子集合归类款项性质（保证 `1221.11`/`1221.12`
+- [x] 2.2 `_build_adjudication_prefill` 改用叶子集合归类款项性质（保证 `1221.11`/`1221.12`
   进桶）；新增 `_build_fs_reconciliation` 产出 `fs_reconciliation{interest,dividend,report_total}`，
   `report_total` 按 `BS-009` 公式各 `TB()` 前运算符加权求和。
   - Requirements: 2.3, 3.1, 3.3
   - Properties: 1, 10
 
-- [ ] 2.3 `render` 输出新增 `tb_source_codes`；`K1_SHEETS` 两个披露 sheet 名改为源 xlsx
+- [x] 2.3 `render` 输出新增 `tb_source_codes`；`K1_SHEETS` 两个披露 sheet 名改为源 xlsx
   逐字值并引用与 `K1_DISCLOSURE_SHEET_NAME` 同源的常量（避免第二真源）。
   - Requirements: 1.7
   - Properties: 7
 
-- [ ] 2.4 扩展 `backend/tests/test_k1_adjudication_prefill.py`：坏账为 `1231.03` 口径
+- [x] 2.4 扩展 `backend/tests/test_k1_adjudication_prefill.py`：坏账为 `1231.03` 口径
   （断言不含 `1231.02` 金额）、性质桶含保证金押金、FS 三行、手工优先返回空预填、
   以及「灰度/依赖缺失时与改动前等价」的 characterization。
   - Requirements: 1.3, 2.3, 3.1, 3.2, 3.3, 3.5
   - Properties: 1, 2, 3, 4, 10
 
-- [ ] 3.1 `GtK1OtherReceivables.vue`：新增 `tbSourceCodes` computed（读
+- [x] 3.1 `GtK1OtherReceivables.vue`：新增 `tbSourceCodes` computed（读
   `htmlData.tb_source_codes`）；`_loadTbData` 的坏账兜底请求改用
   `tb_source_codes.provision_standard`（无则回退 `1231-03`），并对返回行集只累加
   互不为前缀的最长码（消除父子双计）。
   - Requirements: 4.1, 4.2, 4.3
   - Properties: 1
 
-- [ ] 3.2 新建 `k1/core/K1FourTableSourcePanel.vue`：紧凑单行 bar + 折叠明细，展示
+- [x] 3.2 新建 `k1/core/K1FourTableSourcePanel.vue`：紧凑单行 bar + 折叠明细，展示
   报表行 / 标准码 / 原始码 / 解析来源（`report_config` vs `fallback` 用彩色 tag 中文化），
   挂在 K1-1 审定表顶部 —— 消费 `tb_source_codes`，杜绝 dead output。
   - Requirements: 1.7
   - Properties: 2
 
-- [ ] 3.3 `K1TabAdjudication.vue` + `useK1Adjudication.ts`：新增「从四表库带入未审数」
+- [x] 3.3 `K1TabAdjudication.vue` + `useK1Adjudication.ts`：新增「从四表库带入未审数」
   按钮（与既有「从 K1-2 带入」并列，`:disabled="isReadonly"` + `:loading`）；
   `applyAdjudicationPrefill` 支持 `fs_reconciliation` 三行（逐项手工优先）。
   - Requirements: 3.3, 3.4
   - Properties: 4
 
-- [ ] 3.4 前端单测 `composables/__tests__/useK1AdjudicationPrefill.spec.ts`：
+- [x] 3.4 前端单测 `composables/__tests__/useK1AdjudicationPrefill.spec.ts`：
   FS 三行 seed / 手工优先 / 按钮重新套用只覆盖出现类别不清零。
   - Requirements: 3.2, 3.3, 3.4
   - Properties: 4
 
-- [ ] 4.1 `k1AdjudicationModel.ts`：新增 `buildK1AgingRowDefs(segments)` 纯函数
+- [x] 4.1 `k1AdjudicationModel.ts`：新增 `buildK1AgingRowDefs(segments)` 纯函数
   （data 行 + 小计），`K1_AGING_ROW_DEFS` 保留为 FIVE_YEAR 默认导出以兼容既有引用。
   - Requirements: 5.1, 5.4
   - Properties: 5
 
-- [ ] 4.2 `k1AdjudicationSync.ts`：`aggregateK12ForK11(rows, segmentKeys?)` 参数化段 key
+- [x] 4.2 `k1AdjudicationSync.ts`：`aggregateK12ForK11(rows, segmentKeys?)` 参数化段 key
   （默认 FIVE_YEAR keys 保持旧行为）；`agingBucketLabels(segments?)` 同款。
   - Requirements: 5.2
   - Properties: 5
 
-- [ ] 4.3 `useK1Adjudication` / `K1TabAdjudication` 透传 `useAgingConfig(projectId,'K1')`
+- [x] 4.3 `useK1Adjudication` / `K1TabAdjudication` 透传 `useAgingConfig(projectId,'K1')`
   的 `segments`；扩展 `composables/__tests__/k1AdjudicationSync.spec.ts`：3 年段
   `over3` 不丢、自定义 2~10 段长度一致（PBT，Property 5）。
   - Requirements: 5.1, 5.2, 5.3, 5.4
   - Properties: 5
 
-- [ ] 5.1 扩展 `fix_note_k_complex_structure.py` 的 `K1_LISTED_PLAN`：
+- [x] 5.1 扩展 `fix_note_k_complex_structure.py` 的 `K1_LISTED_PLAN`：
   ① 「按账龄披露」行改源模板 5 年段（补 `3至4年`/`4至5年`/`5年以上`，去 `3年以上`）；
   ② 「本期计提、收回或转回的坏账准备情况」列改两级混合分组
   （新增 `_listed_stage_movement_cols()`，标签列不打 `flat`、`合计` 不带 `group`）。
   - Requirements: 7.1, 7.2
   - Properties: 6, 9
 
-- [ ] 5.2 同脚本追加 3 张上市表（`rule(..., insert=True)`）：
+- [x] 5.2 同脚本追加 3 张上市表（`rule(..., insert=True)`）：
   `应收政府补助情况`（5 列）/ `因金融资产转移而终止确认的其他应收款情况`（4 列）/
   `转移其他应收款且继续涉入形成的资产、负债的金额`（2 列），并追加对应 `text_sections`
   段落（正文段**不写 `#### ` 前缀**，避免被 `_is_table_title_paragraph` 当标题静默丢弃）。
   - Requirements: 7.3, 7.4
   - Properties: 7
 
-- [ ] 5.3 同脚本改 `K1_SOE_PLAN`：「按账龄披露其他应收款项」列改源模板 3 列
+- [x] 5.3 同脚本改 `K1_SOE_PLAN`：「按账龄披露其他应收款项」列改源模板 3 列
   （`账  龄`/`期末数`/`期初数`，`flat`）+ 行补 `小  计`/`减：坏账准备`/`合  计`；
   「账龄组合」行改 6 档。跑 `--dry-run` 复核后 `--check` 归零。
   - Requirements: 8.1, 8.3, 8.4
   - Properties: 6, 9
 
-- [ ] 5.4 `k1NoteSectionMap.ts`：`K1_LISTED_SUBTABLE` 追加 `govGrant` / `transfer` /
+- [x] 5.4 `k1NoteSectionMap.ts`：`K1_LISTED_SUBTABLE` 追加 `govGrant` / `transfer` /
   `continuedInvolvement`（逐字对齐 5.2 的表名）；新增 `K1_NOTE_TOTAL_LABEL` 单一真源
   并收敛载荷里散落的 `'合  计'` / `'合计'` 字面量（按各表源模板实证取值）。
   - Requirements: 7.3, 8.2
   - Properties: 7
 
-- [ ] 5.5 `k1DisclosureSyncPayload.ts`：
+- [x] 5.5 `k1DisclosureSyncPayload.ts`：
   ① listed `stageMovement` 列改两级；
   ② listed 新增 3 表的列头与行映射（`govGrantRows`/`transferRows`/`continuedInvolvementRows`）；
   ③ soe `aging` 改 3 列并忠实推送 `subtotal`/`provision`/`total` 三种 kind，删除
@@ -192,13 +192,13 @@ Wave 4 账龄枚举贯通 K1-1（独立，可与 2/3 并行）；Wave 5 披露/�
   - Requirements: 7.1, 7.3, 8.1, 8.2
   - Properties: 6, 8
 
-- [ ] 5.6 `k1DisclosureModel.ts` + `useK1DisclosureListed.ts`：listed payload 补
+- [x] 5.6 `k1DisclosureModel.ts` + `useK1DisclosureListed.ts`：listed payload 补
   `govGrantRows` / `transferRows`（`continuedInvolvementRows` 已有）；底稿上市披露 Tab
   补对应录入区块（源模板红字作方法论上下文 + 动态增删行 + `WpAmountInput`）。
   - Requirements: 7.3
   - Properties: 7, 8
 
-- [ ] 5.7 守卫三件：
+- [x] 5.7 守卫三件：
   ① 新建 `backend/tests/services/test_note_k1_structure.py`（openpyxl 直读源 xlsx ↔
   模板 headers ↔ 同步 columns **三向**比对四张关键表 + 反向自检）；
   ② `composables/__tests__/k1NoteSubtableContract.spec.ts` 追加 3 表并保持
@@ -207,23 +207,38 @@ Wave 4 账龄枚举贯通 K1-1（独立，可与 2/3 并行）；Wave 5 披露/�
   - Requirements: 9.1, 9.2, 9.3, 9.4
   - Properties: 6, 7, 8, 9
 
-- [ ] 6.1 `prefill_formula_mapping.json` K1-1 块补 6 条（`TB('1231-03','期初余额')` /
+- [x] 6.1 `prefill_formula_mapping.json` K1-1 块补 6 条（`TB('1231-03','期初余额')` /
   `TB('1231-03','期末余额')` / `TB('1131','期末余额')` / `TB('1132','期末余额')` /
   `WP('K1','明细表K1-2','其他应收款余额期末审定数')` /
   `WP('K1','坏账准备明细表K1-3','期末审定数额')`）；K1-2 块保持无 `WP()`。
   - Requirements: 6.1, 6.2, 6.3
 
-- [ ] 6.2 扩展 `backend/tests/formula_management/test_preset_library.py`（或新建 K1 专项）：
+- [x] 6.2 扩展 `backend/tests/formula_management/test_preset_library.py`（或新建 K1 专项）：
   断言 K1 条目归入 `workpaper:K1`、`formula_type=='auto_calc'`、K1-2 无 `WP(`。
   - Requirements: 6.4
   - Properties: 10
 
-- [ ] 6.3 端到端实测（chrome-devtools + postgres 只读，项目 `0ec33ac9`/wp `e53abb5b` 上市模板、
-  项目 `2aa00f57`/wp `b10b8a12` 国企）：K1-1 未审数/坏账/FS 三行有值且坏账 = `1231.03` 口径；
-  两个披露 Tab 触发同步 → §五、8 / §八、9 `last_sync_at` 前移、子表数与
-  `_sub_table_columns` 的 `group`/`flat` 正确；实测数据全部复原。
+- [~] 6.3 端到端实测（chrome-devtools + postgres 只读）。
   - Requirements: 10.1, 10.2, 10.3
   - Properties: 1, 2, 6, 7
+  - **✅ render 取数链路已活体验证**（项目 `0ec33ac9` / wp `e53abb5b`，`GET
+    /api/workpapers/{wp}/render-config` 200）：
+    * `tb_source_codes` = `{row_code: BS-009, gross: ['1221'], provision: ['1231.03'],
+      gross_standard: ['1221'], provision_standard: ['1231-03'],
+      extra: {1131:['1131'], 1132:['1132']}, signed_codes: [[1221,1],[1231-03,-1],[1131,1]],
+      formula: "TB('1221','期末余额') - TB('1231-03','期末余额') + TB('1131','期末余额')",
+      resolved_from: report_config, provision_resolved_from: report_config,
+      provision_exact: true}` —— 报表映射链路全程走通，非兜底。
+    * `tb_values.receivable_unadjusted_closing = 269,885,933.03`（= 父科目 `1221` 期末，
+      叶子口径正确；**旧「最深层级」口径是 211,252,631.06**）。
+    * `tb_values.bad_debt_unadjusted_closing = 900,217.36`（= `1231.03` 口径；
+      **旧「整个 1231」口径是 28,464,225.16，含应收账款坏账 26,401,719.77，虚增 31.6 倍**）。
+    * 本机 uvicorn `--reload` 本次生效（无需重启即取到新字段）。
+  - **未完成**：① 两个项目都取不到 `adjudication_prefill` 活体样本 ——
+    `0ec33ac9` 已有持久化非零未审数（手工优先按设计跳过预填），`2aa00f57` 的 K1 底稿
+    对当前账号返回 **401**（底稿可见性隔离，非本 spec 缺陷）→ 预填/FS 三行由 16 个
+    带真实 fixture 的单测覆盖，浏览器点选待换一个无持久化且有权限的项目；
+    ② 披露 Tab 「推送到附注」→ §五、8 / §八、9 落库复核未做。
 
 - [ ] 6.4 收口：后端 K1 + four_table + d_cycle_extraction 全量绿；前端 K1 相关全量绿；
   `fix_note_k_complex_structure.py --check` 零欠账；更新 `.kiro/specs/INDEX.md` 与
