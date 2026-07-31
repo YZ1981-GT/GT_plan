@@ -16,7 +16,7 @@ import {
   deserializeRows,
   dropRow,
   findDuplicateLabel,
-  foreignRowWarning,
+  findRowForPrefill,
   hasLegacyRowData,
   labelKey,
   migrateLegacyFixedRows,
@@ -41,7 +41,7 @@ const SPEC: DynamicRowsSpec = {
   prefix: 'XX-9',
   legacyRows: [
     { key: 'alpha', label: '甲项目' },
-    { key: 'beta', label: '乙项目', foreignWarning: '乙项目属于别的报表行' },
+    { key: 'beta', label: '乙项目' },
     { key: 'gamma', label: '丙项目' },
   ],
   valueFields: ['begin', 'unadj', 'aje'],
@@ -286,9 +286,11 @@ describe('历史固定行迁移（Property 6）', () => {
 
 describe('四表库 seed（Property 8）', () => {
   it('空预填 → 空结果，绝不产生兜底行', () => {
-    expect(seedRowsFromPrefill(SPEC, [])).toEqual({ rows: [], values: {} })
-    expect(seedRowsFromPrefill(SPEC, null)).toEqual({ rows: [], values: {} })
+    const empty = { rows: [], values: {}, createdRowIds: [], touchedRowIds: [] }
+    expect(seedRowsFromPrefill(SPEC, [])).toEqual(empty)
+    expect(seedRowsFromPrefill(SPEC, null)).toEqual(empty)
     expect(seedRowsFromPrefill(SPEC, undefined, [row('r-1', '既有')]).rows).toHaveLength(1)
+    expect(seedRowsFromPrefill(SPEC, undefined, [row('r-1', '既有')]).createdRowIds).toEqual([])
   })
 
   it('无名科目跳过，不塞「其他」兜底行', () => {
@@ -336,6 +338,79 @@ describe('四表库 seed（Property 8）', () => {
     const got = seedRowsFromPrefill(SPEC, [{ name: '甲' }], [], {}, seededRand(11))
     expect(Object.values(got.values)).toEqual(['0', '0'])
   })
+
+  it('🔴 改名后按**科目码**仍能定位到原行，不重复插行（刷新取数的前提）', () => {
+    const first = seedRowsFromPrefill(
+      SPEC,
+      [{ name: '待摊费用', code: '1901.01', closing_balance: 100 }],
+      [],
+      {},
+      seededRand(17),
+    )
+    // 审计师把行名改成披露口径的简称
+    const renamed = renameRowLabel(first.rows, first.rows[0].rowId, '待摊')
+    const again = seedRowsFromPrefill(
+      SPEC,
+      [{ name: '待摊费用', code: '1901.01', closing_balance: 180 }],
+      renamed,
+      {},
+      seededRand(19),
+    )
+    expect(again.rows).toHaveLength(1)
+    expect(again.rows[0].label).toBe('待摊')          // 用户改的名保留
+    expect(again.createdRowIds).toEqual([])           // 没有重复插行
+    expect(again.touchedRowIds).toEqual([first.rows[0].rowId])
+    expect(again.values[rowFieldItemId(SPEC, first.rows[0].rowId, 'unadj')]).toBe('180')
+  })
+
+  it('四表库新增子科目 → 动态插行；已有行只更新金额', () => {
+    const first = seedRowsFromPrefill(
+      SPEC,
+      [{ name: '待摊费用', code: '1901.01', closing_balance: 100 }],
+      [],
+      {},
+      seededRand(23),
+    )
+    const again = seedRowsFromPrefill(
+      SPEC,
+      [
+        { name: '待摊费用', code: '1901.01', closing_balance: 100 },
+        { name: '预缴企业所得税', code: '1901.02', closing_balance: 55 },
+      ],
+      first.rows,
+      {},
+      seededRand(29),
+    )
+    expect(again.rows.map((r) => r.label)).toEqual(['待摊费用', '预缴企业所得税'])
+    expect(again.createdRowIds).toHaveLength(1)
+    expect(again.touchedRowIds).toHaveLength(2)
+  })
+
+  it('命中同名手工/历史行时回填科目码（下次刷新即可按码定位）', () => {
+    const existing = [row('legacy-1', '待摊费用', 'legacy')]
+    const got = seedRowsFromPrefill(
+      SPEC,
+      [{ name: '待摊费用', code: '1901.01', closing_balance: 10 }],
+      existing,
+      {},
+      seededRand(31),
+    )
+    expect(got.rows).toHaveLength(1)
+    expect(got.rows[0].rowId).toBe('legacy-1')
+    expect(got.rows[0].accountCode).toBe('1901.01')
+    expect(got.rows[0].source).toBe('legacy')   // 来源不被篡改（手工优先仍按 legacy 判定）
+    expect(existing[0].accountCode).toBeUndefined()  // 不改动入参（纯函数）
+  })
+
+  it('findRowForPrefill：科目码优先于行名', () => {
+    const rows = [
+      { rowId: 'r-a', label: '甲', source: 'tb' as const, accountCode: '1901.01' },
+      { rowId: 'r-b', label: '乙', source: 'manual' as const },
+    ]
+    expect(findRowForPrefill(rows, { name: '乙', code: '1901.01' })?.rowId).toBe('r-a')
+    expect(findRowForPrefill(rows, { name: '乙' })?.rowId).toBe('r-b')
+    expect(findRowForPrefill(rows, { name: '丙', code: '1901.99' })).toBeNull()
+  })
 })
 
 // ─── Property 7：删除清理干净 ───────────────────────────────────────────────
@@ -382,7 +457,7 @@ describe('删除行（Property 7）', () => {
 
 // ─── 改名 / 追加 / 外来行警示 ───────────────────────────────────────────────
 
-describe('改名 / 追加 / 外来行警示', () => {
+describe('改名 / 追加', () => {
   it('改名只影响目标行，空名不改', () => {
     const rows = [row('r-1', '甲'), row('r-2', '乙')]
     expect(renameRowLabel(rows, 'r-1', ' 丙 ').map((r) => r.label)).toEqual(['丙', '乙'])
@@ -396,14 +471,6 @@ describe('改名 / 追加 / 外来行警示', () => {
     expect(got.row.label).toBe('乙')
     expect(got.row.source).toBe('manual')
     expect(got.row.rowId).not.toBe('r-1')
-  })
-
-  it('外来行警示只对迁移来的历史行生效（按 rowId 命中）', () => {
-    expect(foreignRowWarning(SPEC, row('beta', '乙项目', 'legacy'))).toBe('乙项目属于别的报表行')
-    // 审计师自己新建的同名行不误报
-    expect(foreignRowWarning(SPEC, row('r-9', '乙项目', 'manual'))).toBeNull()
-    expect(foreignRowWarning(SPEC, row('alpha', '甲项目', 'legacy'))).toBeNull()
-    expect(foreignRowWarning(SPEC, null)).toBeNull()
   })
 })
 

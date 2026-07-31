@@ -25,7 +25,6 @@ import {
   K2_ADJ_PREFIX,
   K2_ADJ_ROWS_SPEC,
   K2_ADJ_VALUE_FIELDS,
-  K2_LEGACY_FOREIGN_WARNINGS,
   K2_LEGACY_ROWS,
   K2_TEMPLATE_ROW_EXAMPLES,
 } from '../k2AdjudicationRows'
@@ -167,16 +166,16 @@ describe('K2-1 动态行规格声明', () => {
     ])
   })
 
-  it('三个外来行有警示文案，其余行没有', () => {
-    const withWarning = K2_LEGACY_ROWS.filter((r) => r.foreignWarning).map((r) => r.key)
-    expect(withWarning).toEqual(['prepayment', 'contract-asset', 'deposit'])
-    expect(Object.keys(K2_LEGACY_FOREIGN_WARNINGS).sort()).toEqual(
-      ['contract-asset', 'deposit', 'prepayment'],
-    )
-    // 每条文案都要写明真实归属循环，便于审计师判断
-    expect(K2_LEGACY_FOREIGN_WARNINGS.prepayment).toContain('BS-008')
-    expect(K2_LEGACY_FOREIGN_WARNINGS['contract-asset']).toContain('D6')
-    expect(K2_LEGACY_FOREIGN_WARNINGS.deposit).toContain('K1')
+  it('历史行是 K2 自己的二级子明细 —— 不得被标成「别的循环科目」', () => {
+    // 共享件已移除 foreignWarning 机制；此处正向锁死：spec 只声明 key/label 两字段
+    for (const r of K2_LEGACY_ROWS) {
+      expect(Object.keys(r).sort()).toEqual(['key', 'label'])
+    }
+    const src = read('composables/k2AdjudicationRows.ts')
+    expect(src).not.toMatch(/foreignWarning/)
+    expect(src).not.toMatch(/口径存疑/)
+    // 反向自检：文件确实声明了这 8 行（防断言空转）
+    expect(src).toContain('receivable-transfer')
   })
 
   it('源模板示例项目仅作输入提示，不得成为固定行', () => {
@@ -184,10 +183,8 @@ describe('K2-1 动态行规格声明', () => {
       '待摊费用', '待抵扣进项税', '房租物业费', '预缴企业所得税',
       '委托贷款', '预缴其他税费', '应收退货成本',
     ])
-    // 示例里不含历史实现自拟的三个外来项目
-    for (const bad of ['预付款项', '合同资产', '押金保证金']) {
-      expect(K2_TEMPLATE_ROW_EXAMPLES).not.toContain(bad)
-    }
+    // 示例是源模板举的例子，与历史 8 行不重合（两者都只是二级子明细的举例）
+    expect(K2_TEMPLATE_ROW_EXAMPLES.length).toBe(7)
   })
 
   it('🔴 useK2Adjudication 不得再有硬编码 8 行枚举', () => {
@@ -231,10 +228,11 @@ describe('useK2Adjudication 动态行行为', () => {
     expect(api.rows.value.map((r) => r.rowKey)).toEqual(['contract-cost', 'deposit'])
     expect(api.rows.value[0].begin).toBe(100000)
     expect(api.rows.value[0].audited).toBe(117000)
+    expect(api.rows.value.every((r) => r.source === 'legacy')).toBe(true)
     expect(saved['K2-1-rows']).toBeTruthy()
-    // 外来行警示已附加
-    expect(api.rows.value[1].foreignWarning).toContain('K1')
-    expect(api.rows.value[0].foreignWarning).toBeNull()
+    // 迁移来的二级子明细行同样可改名 / 可删除（与手工行无差别）
+    expect(api.renameRow('deposit', '押金及保证金').ok).toBe(true)
+    expect(api.removeRow('contract-cost').ok).toBe(true)
   })
 
   it('合计覆盖全部动态行（Property 9）', () => {
@@ -326,6 +324,55 @@ describe('useK2Adjudication 动态行行为', () => {
   it('四表 seed 为空 → 不建任何行', () => {
     expect(setup({}, []).api.rows.value).toHaveLength(0)
     expect(setup({}, undefined).api.rows.value).toHaveLength(0)
+  })
+
+  it('刷新取数：默认只补空值（手工优先），overwrite 才覆盖「四表」来源行', () => {
+    const { api } = setup(
+      {},
+      [{ name: '待摊费用', code: '1901.01', opening_balance: 100, closing_balance: 250 }],
+    )
+    // 审计师手工改了未审数
+    const rowId = api.rows.value[0].rowKey
+    api.updateField(rowId, 'unadj', 999)
+    expect(api.rows.value[0].unadjusted).toBe(999)
+
+    // 默认路径（自动 watch / 「仅补空值」）不覆盖
+    api.seedFromPrefill()
+    expect(api.rows.value[0].unadjusted).toBe(999)
+
+    // 预演能报出「1 行有变化」
+    expect(api.previewSeedFromPrefill()).toMatchObject({ createdCount: 0, changedCount: 1 })
+
+    // 显式刷新 → 该行是 source='tb'，覆盖回四表值
+    api.seedFromPrefill({ overwrite: true })
+    expect(api.rows.value[0].unadjusted).toBe(250)
+  })
+
+  it('刷新取数：手工新增行的录入永不被覆盖', () => {
+    const { api } = setup(
+      {},
+      [{ name: '待摊费用', code: '1901.01', closing_balance: 250 }],
+    )
+    // 手工行与四表某科目同名之外的独立项目
+    const manualId = api.addRow('应收退货成本').rowId!
+    api.updateField(manualId, 'unadj', 777)
+    api.seedFromPrefill({ overwrite: true })
+    expect(api.rows.value.find((r) => r.rowKey === manualId)?.unadjusted).toBe(777)
+  })
+
+  it('刷新取数：四表新增子科目 → 动态插行', () => {
+    const map = ref(mapOf({}))
+    const prefill = ref<any[]>([{ name: '待摊费用', code: '1901.01', closing_balance: 100 }])
+    const api = useK2Adjudication(map as any, { prefill: prefill as any })
+    expect(api.rows.value).toHaveLength(1)
+    // 四表重新入库后多了一个明细子科目
+    prefill.value = [
+      { name: '待摊费用', code: '1901.01', closing_balance: 100 },
+      { name: '预缴企业所得税', code: '1901.02', closing_balance: 55 },
+    ]
+    api.seedFromPrefill()
+    expect(api.rows.value.map((r) => r.label)).toEqual(['待摊费用', '预缴企业所得税'])
+    expect(api.rows.value[1].unadjusted).toBe(55)
   })
 
   it('从 K2-2 明细按行名聚合带入；审定表无该项目时自动建行', () => {
