@@ -526,9 +526,72 @@ jobs:
       - name: Check note deferred-tax section alignment (五、30 / 八、31)
         run: python backend/scripts/fix/fix_note_deferred_tax_structure.py --check
       - name: Install test dependency
-        run: python -m pip install pytest==8.4.2
+        run: python -m pip install pytest==8.4.2 openpyxl==3.1.5
       - name: Run note deferred-tax structure contract tests
         run: python -m pytest backend/tests/services/test_note_deferred_tax_structure.py -q
+      # 行集守卫（n1-four-table-extraction-and-disclosure-alignment R5）：
+      # 上述结构守卫只校验**列**结构，对 `rows[].label` 无断言 → 上市表 1 曾长期携带
+      # 源模板不存在的「开办费」、负债段 5 行里 4 行不符、国企残留 5 处 `……` 占位假行
+      # 而全部测试通过。本步用 openpyxl **直读源 xlsx** 交叉比对行集，并拦
+      # `report_row_code`（须 BS-036 / BS-067，曾错写 BS-018 = 流动资产合计/存货）
+      # 与 `account_codes`（须 1811 / 2901，曾错挂 2601 租赁负债 / 1641~1643 使用权资产）。
+      - name: Run note deferred-tax ROW alignment tests (openpyxl 直读源模板交叉比对)
+        run: python -m pytest backend/tests/services/test_note_deferred_tax_row_alignment.py -q
+
+  n1-four-table-extraction:
+    # N1 四表取数 / 科目映射 / 公式预设守卫
+    # （n1-four-table-extraction-and-disclosure-alignment R1 / R2 / R6 / R7）
+    #
+    # 拦四类已实测缺陷：
+    # 1. **科目硬编码**：render 原写死 `1811`，未走 `report_config` 规则映射
+    #    （DB 实证 `BS-036 递延所得税资产 = TB('1811','期末余额')` 四准则一致），
+    #    项目级自定义映射带不到底稿；且**递延所得税负债 2901 完全没取数** →
+    #    披露表负债段与抵销后净额表在四表入库后依然全空。
+    # 2. **报表行编码三方冲突**：仓库里并存 BS-036 / BS-049 / BS-018 三种写法，
+    #    实测只有 BS-036 正确（BS-049 = 应交税费、BS-018 = 流动资产合计/存货）。
+    # 3. **叶子聚合双算**：科目级父行与子科目同时计入；且原实现只 `like '1811.%'`
+    #    → 平铺层级科目表（`181102`）静默返回空预填。
+    # 4. **公式预设污染**：`prefill_formula_mapping.json` 曾有 `wp_code=N1` 却名为
+    #    「税金分析程序」的块（科目 2221 应交税费 / 6403 税金及附加 + 病态区间
+    #    `TB_SUM('2221~6403')`），且其 `cell_ref`「上年审定数」与 N1-1 块撞键 ——
+    #    `convert_prefill_presets` 的 `page_key` 忽略 sheet，同名必互相遮蔽。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install backend deps
+        run: python -m pip install -r backend/requirements.txt
+      - name: Run N1 account mapping / leaf aggregation / liability prefill guards
+        run: python -m pytest backend/tests/test_n1_account_mapping.py backend/tests/test_n1_adjudication_prefill.py -q
+      - name: Run N1 formula preset purity guard
+        run: python -m pytest backend/tests/formula_management/test_n1_preset_purity.py -q
+
+  n1-disclosure-frontend:
+    # N1 披露表四表直通 / 骨架 / 行镜像 / 二选一分支守卫
+    # （n1-four-table-extraction-and-disclosure-alignment R3 / R4 / R7）
+    #
+    # 拦四类已实测缺陷：
+    # 1. 亏损到期骨架原为 5 行（审计年度 +1~+5），源模板是 **6 行**（Y~Y+5）——
+    #    期末列覆盖 Y+1~Y+5、上年年末列覆盖 Y~Y+4，两列并集 6 年，故源模板
+    #    首行期末列与末行上年年末列写「——」。原实现漏掉上年年末列最早的到期年度。
+    # 2. 国企表（2）A 行标签未跟随表（1）（源模板 A36=`=A13` … A50=`=A27`）。
+    # 3. 披露口径二选一（源模板国企 R7）未实现，两分支表恒同时推送。
+    # 4. 负债段语义槽用中文名作键 → 两版第 4 项用语不同（上市「使用权资产」/
+    #    国企「租赁形成」）必有一版对不上。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install frontend deps
+        working-directory: audit-platform/frontend
+        run: npm ci
+      - name: Run N1 disclosure guards
+        working-directory: audit-platform/frontend
+        run: npx vitest run src/components/workpaper/composables/__tests__/n1DisclosurePrefillAndBranch.spec.ts src/components/workpaper/composables/__tests__/n1NoteSectionMap.spec.ts src/components/workpaper/composables/__tests__/n1NoteSubtableContract.spec.ts
 
   note-n-cycle-tax-structure:
     # 附注 N 循环税务类章节结构守卫（n-cycle-tax-disclosure-alignment R5）
@@ -652,6 +715,27 @@ jobs:
         run: python -m pip install pytest==8.4.2 openpyxl==3.1.5
       - name: Run note H3 structure contract tests
         run: python -m pytest backend/tests/test_note_h3_investment_property_structure.py -q
+
+  note-h5-structure:
+    # 附注 H5 油气资产章节结构守卫（仅国企 §八、25）
+    # （h5-oil-gas-disclosure-alignment Task 7）
+    # 背景：模板结构本就与源模板一致（15 行四层 / 5 列），欠账全在前端载荷侧——
+    # ①推自造 4 行（模板要 15 行四层）②列 3 vs 5 且位置化 values:[期末,期初] 顺序与模板
+    # 相反 → 期末余额落进期初余额列 ③`_note_texts` 放载荷顶层被 pydantic 静默丢弃
+    # ④syncToNote 内自调度 scheduleAutoSync → 周期重复 POST 且骗过覆盖率守卫。
+    # 另固化「上市侧无油气资产章节」（源 xlsx 有上市 sheet，易被误认为缺章节而凭空新建）。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check note H5 section alignment (八、25)
+        run: python backend/scripts/fix/fix_note_h5_oil_gas_structure.py --check
+      - name: Install test dependencies
+        run: python -m pip install pytest==8.4.2 openpyxl==3.1.5
+      - name: Run note H5 structure contract tests
+        run: python -m pytest backend/tests/test_note_h5_oil_gas_structure.py -q
 
   note-l-cycle-structure:
     # 附注 L 循环章节结构守卫（L7 其他非流动负债 五、52/八、57 + L8 财务费用 五、67/八、68）
