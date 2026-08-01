@@ -3,6 +3,7 @@
  */
 import { parseNum } from '@/composables/useG5FormulaEngine'
 import { G5_ITEM_IDS, readCanonicalRaw } from './g5StorageContract'
+import { G5_ACCOUNT_CODE } from './g5Constants'
 
 export interface G5GrossAggregate {
   individualClosing: number
@@ -248,7 +249,7 @@ export async function fetchTb1531AuxByCustomer(
       ?? (new Date().getFullYear() - 1)
     const { data } = await http.get(`/api/projects/${projectId}/ledger/aux-balance-detail`, {
       params: {
-        account_code: '1531',
+        account_code: G5_ACCOUNT_CODE,
         dim_type: '客户',
         year: y,
       },

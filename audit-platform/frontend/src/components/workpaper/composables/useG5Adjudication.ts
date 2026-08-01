@@ -458,6 +458,71 @@ export function useG5Adjudication(opts: {
     }
   }
 
+  /** 从四表库带入未审数（render 下发的 adjudication_prefill） */
+  function pullFromTB(prefill: Array<{ bucket_key: string; label: string; opening: number; closing: number }> | null | undefined): { count: number } {
+    if (isReadonly.value) return { count: 0 }
+    if (!prefill || !prefill.length) return { count: 0 }
+
+    // bucket_key → 审定行 rowKey 映射
+    const BUCKET_TO_ROW: Record<string, { gross: string; provision?: string }> = {
+      'finance_lease': { gross: 'gross-collective-business' },
+      'installment_goods': { gross: 'gross-collective-business' },
+      'installment_service': { gross: 'gross-collective-business' },
+      'deposit': { gross: 'gross-collective-customer' },
+      'loan': { gross: 'gross-collective-customer' },
+      'guarantee': { gross: 'gross-collective-customer' },
+      'other': { gross: 'gross-collective-customer' },
+      'one_year_due': { gross: 'gross-one-year' },
+    }
+
+    // 聚合同一 rowKey 的多桶（如多个桶都归 collective-business）
+    const aggregated: Record<string, { opening: number; closing: number }> = {}
+    for (const item of prefill) {
+      const mapping = BUCKET_TO_ROW[item.bucket_key]
+      if (!mapping) continue
+      const key = mapping.gross
+      if (!aggregated[key]) aggregated[key] = { opening: 0, closing: 0 }
+      aggregated[key].opening += item.opening
+      aggregated[key].closing += item.closing
+    }
+
+    // 写入 store（仅覆盖有数据的行，不清零无数据的行）
+    suppressPersist = true
+    let count = 0
+    for (const [rowKey, vals] of Object.entries(aggregated)) {
+      if (vals.opening === 0 && vals.closing === 0) continue
+      const prev = store.value[rowKey] || {}
+      // 仅 seed 未审数列，不覆盖已有手工值（手工优先）
+      if (prev.closingUnadjusted != null && prev.closingUnadjusted !== 0) continue
+      store.value[rowKey] = {
+        ...prev,
+        openingUnadjusted: vals.opening,
+        closingUnadjusted: vals.closing,
+      }
+      count++
+    }
+
+    // TB 核对行也更新
+    const totalOpening = prefill.reduce((s, p) => s + p.opening, 0)
+    const totalClosing = prefill.reduce((s, p) => s + p.closing, 0)
+    if (totalClosing || totalOpening) {
+      tbValues.value = { opening: totalOpening, closing: totalClosing }
+      const tbPrev = store.value['tb-amount'] || {}
+      if (!tbPrev.closingUnadjusted) {
+        store.value['tb-amount'] = {
+          ...tbPrev,
+          openingUnadjusted: totalOpening,
+          closingUnadjusted: totalClosing,
+        }
+      }
+    }
+
+    store.value = { ...store.value }
+    suppressPersist = false
+    persist()
+    return { count }
+  }
+
   const needsReason = (row: G5AdjudicationRow) => row.reasonRequired
 
   watch(adjudicatedAmount, () => { publishAdjudicated() })
@@ -487,14 +552,15 @@ export function useG5Adjudication(opts: {
     needsReason,
     applyAdjustmentWriteback,
     applyFromDetailTotals,
+    pullFromTB,
     hydrateFromStore,
     publishAdjudicated,
     fetchTrialBalance,
     STORAGE_KEY,
-    /** @deprecated ????UI ?? */
+    /** @deprecated 保留供 UI 层 */
     allRows: rows,
     onCellChange: (_row: G5AdjudicationRow) => { persist() },
-    recalcDerived: () => { /* computed ?? */ },
+    recalcDerived: () => { /* computed 已 */ },
     groups: computed(() => []),
   }
 }

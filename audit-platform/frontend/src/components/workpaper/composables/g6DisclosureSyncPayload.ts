@@ -383,9 +383,14 @@ export interface G6SyncFromWorkpaperPayload {
   columns: Record<string, ColumnDef[]>
 }
 
-function pushText(out: Array<Record<string, string>>, section: string, text: string): void {
+function pushText(
+  out: Array<Record<string, string>>,
+  section: string,
+  title: string,
+  text: string,
+): void {
   const t = txt(text)
-  if (t) out.push({ section, text: t })
+  if (t) out.push({ section, title, text: t })
 }
 
 export function buildG6ListedSubTableData(
@@ -406,9 +411,9 @@ export function buildG6ListedSubTableData(
     if (block) out[name] = buildG6StageRows(block)
   })
   const texts: Array<Record<string, string>> = []
-  pushText(texts, 'listed-fair-value-note', state.fvNote)
-  pushText(texts, 'listed-significant-change', state.significantChangeNote)
-  pushText(texts, 'listed-judgement-basis', state.judgementBasisNote)
+  pushText(texts, 'listed-fair-value-note', '其他债权投资情况说明', state.fvNote)
+  pushText(texts, 'listed-significant-change', '本期减值准备显著变动说明', state.significantChangeNote)
+  pushText(texts, 'listed-judgement-basis', '信用风险显著增加判断依据', state.judgementBasisNote)
   if (texts.length) out._note_texts = texts
   return out
 }

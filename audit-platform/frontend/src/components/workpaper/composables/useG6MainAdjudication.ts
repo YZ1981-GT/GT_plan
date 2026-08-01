@@ -10,7 +10,7 @@
  *   账面价值一年内到期 = 账面一年内 − 减值一年内
  *   差异数 = 账面价值合计期末审定 − 试算平衡表数
  *
- * EventBus: substantive:adjudicated(accountCode='1503')
+ * EventBus: substantive:adjudicated(accountCode='1505')
  */
 import { ref, computed, watch, onMounted, onBeforeUnmount, getCurrentInstance, type Ref } from 'vue'
 import {
@@ -48,6 +48,8 @@ export {
 }
 
 const ITEM_ID_ROWS = 'G6-1-rows'
+// 🔴 持久化 key 不可改名（改了会丢已有项目的 TB 核对数据）。虽然科目已纠正为 1505，
+// 但 checklist_responses.item_id 是稳定标识符，与科目码无逻辑关联。
 const ITEM_ID_TB = 'G6-1-adj-tb-1503'
 const ITEM_ID_NOTE = 'G6-1-adjudication-audit-note'
 const ITEM_ID_CONCLUSION = 'G6-1-adjudication-audit-conclusion'

@@ -11,8 +11,7 @@
  * 审定 = 未审 + 账项调整 + 重分类调整
  */
 
-export const G5_ACCOUNT_CODE = '1531'
-export const G5_ACCOUNT_NAME = '长期应收款'
+export { G5_ACCOUNT_CODE, G5_ACCOUNT_NAME } from './g5Constants'
 
 /** |变动率| 超过该阈值时原因分析必填（对齐 Excel「超过30%」） */
 export const G5_CHANGE_RATE_THRESHOLD = 0.3

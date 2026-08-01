@@ -19,7 +19,9 @@ export const G1_DISCLOSURE_SHEET_NAME = {
   soe: '附注披露信息（国企）',
 } as const satisfies Record<G1DisclosureVariant, string>
 
-export const G1_ACCOUNT_CODE = '1501'
+import { G1_GROSS_FALLBACK_STANDARD } from './g1AccountScope'
+
+export const G1_ACCOUNT_CODE = G1_GROSS_FALLBACK_STANDARD
 
 export function isG1ListedStandard(s: string): boolean {
   const x = String(s).toLowerCase()

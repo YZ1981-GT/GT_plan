@@ -5,7 +5,9 @@
  * × 债务/权益/衍生/理财/结构性存款/基金/其他
  */
 
-export const G1_ACCOUNT_CODE = '1501'
+import { G1_GROSS_FALLBACK_STANDARD } from './g1AccountScope'
+
+export const G1_ACCOUNT_CODE = G1_GROSS_FALLBACK_STANDARD
 
 /** |变动率| 超过该阈值时原因分析必填（模板分析性复核口径） */
 export const G1_CHANGE_RATE_THRESHOLD = 0.3

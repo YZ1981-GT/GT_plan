@@ -3,7 +3,9 @@
  * ①分类 ②衍生 ③FV层次 ④输入值 ⑤L3调节 ⑥非FV项目
  */
 
-export const G1_ACCOUNT_CODE = '1501'
+import { G1_GROSS_FALLBACK_STANDARD } from './g1AccountScope'
+
+export const G1_ACCOUNT_CODE = G1_GROSS_FALLBACK_STANDARD
 
 export type G1DisclosureTabKey =
   | 'classification'

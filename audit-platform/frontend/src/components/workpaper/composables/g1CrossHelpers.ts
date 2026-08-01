@@ -5,6 +5,7 @@ import { parseNum } from './useG1TraFinFormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
 import type { TradingDetailRow } from './useG1Detail'
 import { createEmptyG1AdjustmentRow, type G1AdjustmentRow } from './useG1Adjustment'
+import { G1_GROSS_FALLBACK_STANDARD } from './g1AccountScope'
 
 export const G1_DETAIL_KEY = 'G1-2-rows'
 export const G1_ADJ_KEY = 'G1-3-rows'
@@ -126,7 +127,7 @@ export function pushItemsToG1Adjustment(
       category: '账项调整',
       reportItem: '交易性金融资产',
       accountName: it.accountName || '交易性金融资产',
-      accountCode: '1501',
+      accountCode: G1_GROSS_FALLBACK_STANDARD,
       debitAmount: isDebit ? amt : 0,
       creditAmount: isDebit ? 0 : amt,
       indexRef: it.indexRef,
@@ -146,7 +147,7 @@ export function pushItemsToG1Adjustment(
             wpCode: 'G1',
             entryType: 'AJE',
             amount: Math.max(row.debitAmount, row.creditAmount),
-            accountCode: '1501',
+            accountCode: G1_GROSS_FALLBACK_STANDARD,
             accountName: row.accountName,
             description: row.description,
             debitAmount: row.debitAmount,
