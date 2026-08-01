@@ -519,8 +519,8 @@ async function handleSeedDefaults() {
       '预置常见税种',
       { type: 'info', confirmButtonText: '预置', cancelButtonText: '取消' },
     )
+    // 合计/摘要均为 computed 派生（派生列不持久化），无需额外同步保存
     await seedDefaultRows()
-    await syncSummary()
     ElMessage.success('已预置源模板常见税种')
   } catch {
     // 用户取消

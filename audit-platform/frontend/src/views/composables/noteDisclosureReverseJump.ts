@@ -77,11 +77,11 @@ export const DISCLOSURE_NOTE_SECTION_MAP: Record<string, NoteSectionVariants> = 
   K8: { listed: '五、64', soe: '八、65' },  // 销售费用
   K9: { listed: '五、65', soe: '八、66' },  // 管理费用
   K10: { listed: '五、68', soe: '八、69' }, // 其他收益
-  K12: { listed: '三、营业外收入', soe: '八、76' }, // 营业外收入
+  K12: { listed: '三、营业外收入（注：', soe: '八、76' }, // 营业外收入（listed 章节号是模板 md 截断值，勿「修正」）
   H5: { soe: '八、25' },                    // 油气资产（国企专属，上市无独立章节）
   // 损益类关键词标题（DB 可能截断，由 resolveSectionInList 模糊解析）
-  K11: { listed: '三、资产减值损失', soe: '八、74' }, // 资产减值损失
-  K13: { listed: '三、营业外支出', soe: '八、77' },   // 营业外支出
+  K11: { listed: '三、资产减值损失（损', soe: '八、74' }, // 资产减值损失（listed 章节号是模板 md 截断值，勿「修正」）
+  K13: { listed: '三、营业外支出（注：', soe: '八、77' },   // 营业外支出（listed 章节号是模板 md 截断值，勿「修正」）
   // N1 递延所得税资产（与 N3 递延所得税负债共用同一附注章节；正向跳转默认落 N1）。
   // N3 若将来补披露表，可加 N3 条目指向同一章节号（导航共用，数据所有权见
   // spec n1-disclosure-note-linkage · Decision 1）。

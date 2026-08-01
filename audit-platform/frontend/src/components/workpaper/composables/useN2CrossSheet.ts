@@ -12,8 +12,11 @@
  * 4. accrualToN4 — 各税种计提额 → N4税金及附加 EventBus publish
  *
  * 联动方向：N2-6增值税 → N2-8城建税及附加计税依据
- *           N2各税种计提 → N4税金及附加（'tax-accrual:updated'）
- *           N2-1审定 → N2-2明细（合计交叉验证）
+ *           N2-2各税种本期应交 → N4税金及附加（'tax-accrual:updated'）
+ *           N2-1审定期末合计 ↔ N2-2审定期末合计（源模板 I22 ↔ P25 交叉验证）
+ *
+ * 🔴 读取的 item_id 与字段必须与 useN2Adjudication14 / useN2Detail16 的持久化契约一致，
+ *    键集收敛在 N2_CROSS_SHEET_ITEM_IDS，守卫见 __tests__/n2CrossSheetContract.spec.ts。
  *
  * 科目：2221 应交税费（贷方/负债类！期末=期初+贷方-借方）
  */
@@ -78,7 +81,33 @@ export interface CrossWpReference {
 /** 勾稽匹配阈值（0.01元内视为匹配） */
 const MATCH_THRESHOLD = 0.01
 
-/** 税种 → 测算表 item_id 前缀映射 */
+/**
+ * 🔴 联动读取的 item_id 单一真源 —— 必须与持久化方保持一致，禁写散落字面量。
+ *
+ * 写入方（唯一权威）：
+ * - `N2-1-adjudication-rows`   ← useN2Adjudication14 的 saveField('1', 'adjudication-rows')
+ * - `N2-1-end-audited-total`   ← useN2Adjudication14.saveAndSync 的 saveField('1', 'end-audited-total')
+ * - `N2-2-detail-rows`         ← useN2Detail16 的 saveField('2', 'detail-rows')
+ *
+ * 历史坑：本文件曾读旧模型键 `N2-2-rows` 与 `N2-1-end-balance-total`（全库无人写），
+ * 且按旧字段名 beginning/accrual/payment/creditAmount 取值 → 两侧恒 0 → diff=0
+ * → 勾稽恒报「通过」的**假绿**，比失配更危险。改键时必须同步 crossSheetContract 守卫。
+ */
+export const N2_CROSS_SHEET_ITEM_IDS = {
+  /** N2-1 审定表整行数组（14 列模型 N2Adj14Row 的原始录入字段） */
+  adjudicationRows: 'N2-1-adjudication-rows',
+  /** N2-1 审定期末合计（saveAndSync 回写，仅作无行数据时的回退） */
+  adjudicationEndAuditedTotal: 'N2-1-end-audited-total',
+  /** N2-2 明细表整行数组（16 列模型 N2Detail16Row 的原始录入字段） */
+  detailRows: 'N2-2-detail-rows',
+} as const
+
+/**
+ * 税种 → 测算表结果 item_id 映射。
+ *
+ * 🔴 键必须是 `_normalizeTaxNameForN4` 的**输出名**（规范名），
+ *    因为审定侧是把 N2-1 行的 taxType 归一后再按此表逐税种比对（见 adjudicationVsCalcTables）。
+ */
 const TAX_CALC_TABLE_MAP: Record<string, string> = {
   '增值税': 'N2-6-vat-payable',
   '城建税': 'N2-8-surtax-urban',
@@ -139,6 +168,41 @@ function safeParseRows<T>(jsonStr: string | null | undefined): T[] {
 }
 
 /**
+ * N2-1 审定表单行「期末·审定」派生（源模板 N2-1!I = F+G+H，即 未审+账项调整+重分类）。
+ *
+ * 派生列不持久化（平台铁律），故此处按原始录入字段现算，使勾稽始终实时。
+ * 兼容旧字段名 unadjusted/aje/rje（与 useN2Adjudication14._map14 的兼容口径一致）。
+ */
+function _adjRowEndAudited(r: any): number {
+  return (
+    parseNum(r.endUnadj ?? r.unadjusted)
+    + parseNum(r.endAje ?? r.aje)
+    + parseNum(r.endRje ?? r.rje)
+  )
+}
+
+/**
+ * N2-2 明细表单行「审定·期末」派生（源模板 N2-2!P = M+N−O）：
+ * - M 审定期初 = C 未审期初 + G 期初调整
+ * - N 审定应交 = D 未审应交 + I 账项调整应交 + K 重分类应交
+ * - O 审定已交 = E 未审已交 + J 账项调整已交 + L 重分类已交
+ */
+function _detailRowAudEnd(r: any): number {
+  const m = parseNum(r.unadjBegin) + parseNum(r.beginAdjust)
+  const n = parseNum(r.unadjPayable) + parseNum(r.ajePayable) + parseNum(r.rjePayable)
+  const o = parseNum(r.unadjPaid) + parseNum(r.ajePaid) + parseNum(r.rjePaid)
+  return m + n - o
+}
+
+/**
+ * N2-2 明细表单行「审定·本期应交」派生（源模板 N2-2!N = D+I+K）。
+ * 这是源模板中唯一的「本期应交」口径，供 N4 税金及附加计提核对。
+ */
+function _detailRowAudPayable(r: any): number {
+  return parseNum(r.unadjPayable) + parseNum(r.ajePayable) + parseNum(r.rjePayable)
+}
+
+/**
  * 税种名称归一化（供 N4 联动匹配）。消除 N2/N4 命名分歧：
  * 城市维护建设税/城建税 → 城建税；土地使用税/城镇土地使用税 → 土地使用税；
  * 车船牌照税/车船使用税/车船税 → 车船税；企业所得税/所得税 → 企业所得税；未交增值税/增值税 → 增值税。
@@ -171,38 +235,36 @@ export function useN2CrossSheet(allResponses: Ref<Map<string, ChecklistResponse>
    * N2-1 审定表应交税费合计 应= N2-2 明细表各税种期末合计
    * 差额 = 审定表合计 - 明细表合计
    *
-   * 数据来源：
-   * - N2-1 审定表期末合计: item_id "N2-1-end-balance-total"
-   * - N2-2 明细表行数据: item_id "N2-2-rows"（conclusion=JSON数组）
+   * 对应源模板勾稽：N2-1!I22（审定期末合计） ↔ N2-2!P25（审定期末合计）
+   *
+   * 数据来源（键见 N2_CROSS_SHEET_ITEM_IDS）：
+   * - N2-1 审定表行数据: "N2-1-adjudication-rows"（conclusion=JSON数组）
+   *   回退: "N2-1-end-audited-total"
+   * - N2-2 明细表行数据: "N2-2-detail-rows"（conclusion=JSON数组）
    */
   const adjudicationVsDetail: ComputedRef<AdjudicationVsDetailResult> = computed(() => {
-    // 审定表期末合计。
-    // 🔴 优先直接从 N2-1-adjudication-rows 现算（负债类 期末=期初+贷-借），使勾稽始终实时；
-    //    仅当无行数据时回退已持久化的 N2-1-end-balance-total（saveAndSync 在回写时写入）。
-    const adjResp = allResponses.value.get('N2-1-adjudication-rows')
-    const adjRows = safeParseRows<{ beginning?: number; creditAmount?: number; debitAmount?: number; endBalance?: number }>(adjResp?.conclusion)
+    // 审定表期末审定合计。
+    // 🔴 优先从行数组现算（源模板 I=F+G+H），使勾稽始终实时；派生列不持久化故必须现算。
+    //    仅当无行数据时回退已持久化的 N2-1-end-audited-total（saveAndSync 回写）。
+    const adjResp = allResponses.value.get(N2_CROSS_SHEET_ITEM_IDS.adjudicationRows)
+    const adjRows = safeParseRows<Record<string, unknown>>(adjResp?.conclusion)
     let adjTotal = 0
     if (adjRows.length > 0) {
       for (const row of adjRows) {
-        adjTotal += row.endBalance != null
-          ? parseNum(row.endBalance)
-          : parseNum(row.beginning) + parseNum(row.creditAmount) - parseNum(row.debitAmount)
+        adjTotal += _adjRowEndAudited(row)
       }
     } else {
-      adjTotal = getResponseNum(allResponses.value, 'N2-1-end-balance-total')
+      adjTotal = getResponseNum(allResponses.value, N2_CROSS_SHEET_ITEM_IDS.adjudicationEndAuditedTotal)
     }
 
-    // 明细表各行期末余额汇总。
-    // 🔴 N2-2-rows 存储的是原始录入字段（beginning/accrual/payment），不含计算列 endBalance，
-    //    故不能直接读 row.endBalance（恒 undefined→0），须按负债类公式 期末=期初+计提(贷)-缴纳(借) 现算。
-    const detailResp = allResponses.value.get('N2-2-rows')
-    const detailRows = safeParseRows<{ beginning?: number; accrual?: number; payment?: number; endBalance?: number }>(detailResp?.conclusion)
+    // 明细表各行审定期末汇总。
+    // 🔴 N2-2-detail-rows 只存原始录入列（unadjBegin/beginAdjust/unadj|aje|rje Payable/Paid），
+    //    审定列 M/N/O/P 全是派生列不落库，故必须按源模板 P=M+N−O 现算，不能读 row.audEnd。
+    const detailResp = allResponses.value.get(N2_CROSS_SHEET_ITEM_IDS.detailRows)
+    const detailRows = safeParseRows<Record<string, unknown>>(detailResp?.conclusion)
     let detailTotal = 0
     for (const row of detailRows) {
-      const endBalance = row.endBalance != null
-        ? parseNum(row.endBalance)
-        : parseNum(row.beginning) + parseNum(row.accrual) - parseNum(row.payment)
-      detailTotal += endBalance
+      detailTotal += _detailRowAudEnd(row)
     }
 
     const diff = parseFloat((adjTotal - detailTotal).toFixed(2))
@@ -226,27 +288,29 @@ export function useN2CrossSheet(allResponses: Ref<Map<string, ChecklistResponse>
    * - 土地增值税行 ↔ N2-10 土增税测算结果
    *
    * 数据来源：
-   * - N2-1 审定表各税种行: item_id "N2-1-{税种英文}-audited"
-   * - 各测算表结果: item_id 见 TAX_CALC_TABLE_MAP
+   * - 审定侧：`N2-1-adjudication-rows` 整行数组 → 按 taxType 归一 → **现算**期末审定数
+   *   （源模板 N2-1!I = F+G+H，即 未审+账项调整+重分类；派生列不持久化故必须现算）
+   * - 测算侧：各测算表结果 item_id，见 TAX_CALC_TABLE_MAP
+   *
+   * 🔴 不再读 per-tax 键 `N2-1-{税种}-audited`（本 spec R7.1）：那 6 个键里 5 个**全库无写入方**
+   *    → 审定侧恒 0 → 长期假绿。且**不补 per-tax 写入点**（R7.5）—— 审定数的唯一真源是
+   *    `N2-1-adjudication-rows` 整行数组，再拆一份单税种标量即构成双真源，两者必然漂移。
+   *    故一律按 taxType 现算，与 adjudicationVsDetail / accrualToN4 同口径。
    */
   const adjudicationVsCalcTables: ComputedRef<AdjudicationVsCalcResult[]> = computed(() => {
-    const results: AdjudicationVsCalcResult[] = []
-
-    // 审定表税种行 item_id 映射
-    const adjudicationKeys: Record<string, string> = {
-      '增值税': 'N2-1-vat-audited',
-      '城建税': 'N2-1-urban-maintenance-audited',
-      '教育费附加': 'N2-1-education-surcharge-audited',
-      '地方教育附加': 'N2-1-local-education-audited',
-      '房产税': 'N2-1-property-tax-audited',
-      '土地增值税': 'N2-1-lvt-audited',
+    // 审定侧：按归一化税种名累计期末审定数（同一税种可能拆多行，须累加）
+    const resp = allResponses.value.get(N2_CROSS_SHEET_ITEM_IDS.adjudicationRows)
+    const rows = safeParseRows<Record<string, unknown>>(resp?.conclusion)
+    const auditedByTax = new Map<string, number>()
+    for (const row of rows) {
+      const tax = _normalizeTaxNameForN4(String(row.taxType ?? ''))
+      if (!tax) continue
+      auditedByTax.set(tax, (auditedByTax.get(tax) ?? 0) + _adjRowEndAudited(row))
     }
 
-    for (const [tax, adjItemId] of Object.entries(adjudicationKeys)) {
-      const calcItemId = TAX_CALC_TABLE_MAP[tax]
-      if (!calcItemId) continue
-
-      const adjAmount = getResponseNum(allResponses.value, adjItemId)
+    const results: AdjudicationVsCalcResult[] = []
+    for (const [tax, calcItemId] of Object.entries(TAX_CALC_TABLE_MAP)) {
+      const adjAmount = auditedByTax.get(tax) ?? 0
       const calcAmount = getResponseNum(allResponses.value, calcItemId)
 
       const diff = parseFloat((adjAmount - calcAmount).toFixed(2))
@@ -279,22 +343,24 @@ export function useN2CrossSheet(allResponses: Ref<Map<string, ChecklistResponse>
   // ─── 4. accrualToN4 — 各税种计提额 → N4税金及附加 ─────────────────────
 
   /**
-   * 汇总N2各税种本期计提金额（本期贷方发生额 creditAmount），供N4税金及附加核对。
+   * 汇总N2各税种「本期应交」金额，供N4税金及附加核对。
    * 只输出计入税金及附加的税费（不含增值税/所得税等不进 6403 的税种），并归一化税种名。
    *
-   * 🔴 数据来源修正：useN2Adjudication 存储整行数组于 "N2-1-adjudication-rows"（不写 per-tax
-   *    "N2-1-{税种}-accrual"），故须从行数组现算，否则读 per-tax 键恒 0 → N4↔N2 勾稽全断。
+   * 🔴 数据源 = N2-2 明细表（源模板 N2-2!N「审定·本期应交」= D+I+K），不是 N2-1 审定表：
+   *    源模板 N2-1 是 14 列**双期余额表**（期初/期末各 未审·账项调整·重分类·审定），
+   *    压根没有「本期计提/本期应交」列 —— 本期发生额只存在于 N2-2。
+   *    旧实现读 N2-1 行的 `creditAmount`（自造模型遗留字段，新模型无此列）→ 恒 0 → N2→N4 联动全断。
    */
   const accrualToN4: ComputedRef<AccrualToN4Item[]> = computed(() => {
     // 不进入税金及附加(6403)的税种（增值税/所得税等），排除
     const EXCLUDED = new Set(['增值税', '企业所得税', '代扣代缴外国企业所得税', '代扣代缴个人所得税', '其他'])
-    const resp = allResponses.value.get('N2-1-adjudication-rows')
-    const rows = safeParseRows<{ taxType?: string; creditAmount?: number }>(resp?.conclusion)
+    const resp = allResponses.value.get(N2_CROSS_SHEET_ITEM_IDS.detailRows)
+    const rows = safeParseRows<Record<string, unknown>>(resp?.conclusion)
     const items: AccrualToN4Item[] = []
     for (const row of rows) {
       const tax = _normalizeTaxNameForN4(String(row.taxType ?? ''))
       if (!tax || EXCLUDED.has(tax)) continue
-      items.push({ tax, amount: parseNum(row.creditAmount) })
+      items.push({ tax, amount: _detailRowAudPayable(row) })
     }
     return items
   })

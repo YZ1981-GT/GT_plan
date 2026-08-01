@@ -420,7 +420,9 @@ const formData = useN2FormData({
 
 const lvt = useN2Lvt({
   allResponses: formData.allResponses,
-  saveField: formData.saveField,
+  // 🔴 useN2Lvt 期望 `(sheet, field, value)` → 必须传 setField。
+  //    误传 saveField（`(itemId, {conclusion})`）会让 item_id 写成 '10'、数据整体丢弃。
+  saveField: formData.setField,
   getField: formData.getField,
 })
 

@@ -170,6 +170,11 @@ const props = defineProps<{
   isReadonly?: boolean
   /** 审计年度（缺省回退审计上下文/当前年） */
   year?: number
+  /**
+   * 后端 render html_data —— 取 `adjudication_prefill`（四表归集的未审数）作预填兜底。
+   * 🔴 缺它则审定表未保存时披露表全空（四表→披露链路断裂，2026-08-01 实测）。
+   */
+  htmlData?: any
 }>()
 
 const emit = defineEmits<{ (e: 'navigate', sheetName: string): void }>()
@@ -203,6 +208,8 @@ const formData = useN2FormData({
 const tables = useN2DisclosureTables({
   variant: 'listed',
   allResponses: formData.allResponses,
+  // 四表归集的未审数（审定表未落库时的预填兜底）
+  renderPrefill: computed(() => props.htmlData?.adjudication_prefill),
 })
 
 const autoSync = useDisclosureAutoSync({ isReadonly: () => isReadonly.value })

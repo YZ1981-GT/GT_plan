@@ -44,7 +44,11 @@
         @navigate-sheet="handleNavigate"
       />
 
-      <!-- N2-1 审定表（负债类，85公式，多税种分行） -->
+      <!-- N2-1 审定表（负债类，85公式，多税种分行）
+           🔴 必须传 htmlData：组件靠 `htmlData.adjudication_prefill` 种子四表未审数。
+              漏传 → `props.htmlData` 恒 undefined → `Array.isArray(undefined)` = false
+              → prefill 恒 null → 审定表永远空行、四表入库的数据一步都进不来，
+              且组件不崩、无控制台报错、vitest 与 get_diagnostics 全绿（同「漏传 projectId」范式）。 -->
       <N2TabAdjudication
         v-else-if="currentSheet === 'N2-1'"
         :all-responses="allResponsesRef"
@@ -52,6 +56,7 @@
         :project-id="projectIdRef"
         :is-readonly="isReadonly"
         :year="n2Year"
+        :html-data="props.htmlData"
         @navigate="handleNavigate"
         @navigate-sheet="handleNavigate"
       />
@@ -164,13 +169,15 @@
         @navigate-sheet="handleNavigate"
       />
 
-      <!-- 附注（上市）—— 🔴 必须传 projectId，否则同步（含自动同步）永久静默失败 -->
+      <!-- 附注（上市）—— 🔴 必须传 projectId，否则同步（含自动同步）永久静默失败
+           🔴 也必须传 htmlData：披露表靠 `adjudication_prefill` 在审定表未落库时预填四表数 -->
       <N2TabDisclosureListed
         v-else-if="currentSheet === N2_SHEET_DISCLOSURE_LISTED"
         :all-responses="allResponsesRef"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        :html-data="props.htmlData"
         @navigate="handleNavigate"
       />
 
@@ -181,6 +188,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        :html-data="props.htmlData"
         @navigate="handleNavigate"
       />
 

@@ -225,12 +225,17 @@ export function useN2VatCalc(options: UseN2VatCalcOptions) {
   // ─── 6. 保存应交增值税到独立字段（供N2-8计税依据 + N2-1回填） ──────────────
 
   /**
-   * 同步年度应交增值税到独立字段
-   * - "N2-6-vat-payable" → N2-8 城建税计税依据 (vatToSurtax)
-   * - "N2-1-vat-audited" → N2-1 增值税行
+   * 同步「附加分析区」年度应交增值税到独立字段 `N2-6-analysis-vat-payable`。
+   *
+   * 🔴 **不得写 `N2-6-vat-payable`**（spec n2-vat-calc-source-alignment R6.2 / R6.3）：
+   *    该键是 N2-8 城建税及附加计税依据的唯一真源，口径必须取自**源模板（一）段**
+   *    （销项税额账面 C17 − 进项税额账面 C18），由 `useN2VatSourceCalc.syncVatPayable()` 写入。
+   *    本 composable 是「审计分析（不在源模板）」的按月/季 × 税率矩阵，口径不同；
+   *    两者同写一键会构成双真源并让 N2-8 计税依据在两套口径间静默漂移。
+   *    故此处改写独立键，仅供本区自身展示/对比，不参与跨底稿联动。
    */
   async function syncVatPayable(): Promise<void> {
-    await saveField('6', 'vat-payable', annualSummary.value.totalPayableVat)
+    await saveField('6', 'analysis-vat-payable', annualSummary.value.totalPayableVat)
   }
 
   // ─── Return ────────────────────────────────────────────────────────────────

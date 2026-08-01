@@ -152,6 +152,11 @@ const props = defineProps<{
   allResponses?: Map<string, any>
   isReadonly?: boolean
   year?: number
+  /**
+   * 后端 render html_data —— 取 `adjudication_prefill`（四表归集的未审数）作预填兜底。
+   * 🔴 国企版本期应交/已交只存在于 N2-2 明细表，N2-2 未填时至少带出「期初余额」。
+   */
+  htmlData?: any
 }>()
 
 const emit = defineEmits<{ (e: 'navigate', sheetName: string): void }>()
@@ -181,6 +186,8 @@ const formData = useN2FormData({
 const tables = useN2DisclosureTables({
   variant: 'soe',
   allResponses: formData.allResponses,
+  // 四表归集的未审数（N2-2 明细未填时至少带出期初余额）
+  renderPrefill: computed(() => props.htmlData?.adjudication_prefill),
 })
 
 const autoSync = useDisclosureAutoSync({ isReadonly: () => isReadonly.value })
