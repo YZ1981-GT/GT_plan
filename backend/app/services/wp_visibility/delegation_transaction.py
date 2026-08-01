@@ -384,6 +384,72 @@ class DelegationTransactionService:
             epoch=epoch, idempotent=False,
         )
 
+    async def record_row_visibility_effects(
+        self,
+        *,
+        project_id: UUID,
+        task: "ProcedureRowTask",
+        actor_user_id: UUID,
+        old_assignee_staff_id: UUID | None,
+        new_assignee_staff_id: UUID | None,
+        old_reviewer_staff_id: UUID | None,
+        new_reviewer_staff_id: UUID | None,
+        request_id: str | None = None,
+        reason: str | None = None,
+    ) -> dict:
+        """记录程序行委派/转派的 visibility 副作用（统一历史 + policy epoch + invalidation outbox）。
+
+        由 ProcedureRowDelegationCoordinator 在 TransitionService 成功后同事务调用。
+        不写 task 字段本身（那是 TransitionService 职责）；只写审计历史 + epoch + outbox。
+        """
+        # 判定 action
+        if new_assignee_staff_id is None and old_assignee_staff_id is not None:
+            action = "clear"
+        elif old_assignee_staff_id is None:
+            action = "assign"
+        elif old_assignee_staff_id != new_assignee_staff_id:
+            action = "reassign"
+        elif old_reviewer_staff_id != new_reviewer_staff_id:
+            action = "reviewer_update"
+        else:
+            action = "noop"
+
+        # 判定 target_role
+        if old_assignee_staff_id != new_assignee_staff_id:
+            target_role = "assignee"
+        else:
+            target_role = "reviewer"
+
+        old_user_id = await self._staff_to_user(project_id, old_assignee_staff_id)
+        new_user_id = await self._staff_to_user(project_id, new_assignee_staff_id)
+        scope_before, scope_after = await self._current_scope_pair(project_id, new_user_id or old_user_id)
+
+        await self._record_history(
+            request_id=request_id,
+            project_id=project_id,
+            wp_index_id=task.wp_index_id,
+            wp_id=task.wp_id,
+            layer="row",
+            target_role=target_role,
+            action=action,
+            task_id=task.id,
+            sheet_key=task.sheet_key,
+            old_user_id=old_user_id,
+            new_user_id=new_user_id,
+            old_staff_id=old_assignee_staff_id if target_role == "assignee" else old_reviewer_staff_id,
+            new_staff_id=new_assignee_staff_id if target_role == "assignee" else new_reviewer_staff_id,
+            actor_user_id=actor_user_id,
+            reason=reason,
+            scope_before=scope_before,
+            scope_after=scope_after,
+        )
+        epoch = await self._bump_epoch(
+            project_id, "delegation", request_id, actor_user_id,
+            {"layer": "row", "role": target_role, "action": action, "task_id": str(task.id)},
+        )
+        await self.db.flush()
+        return {"epoch": epoch, "action": action, "target_role": target_role}
+
     # ==================================================================
     # 成员/角色变更入口共用：同事务 epoch + invalidation outbox（Req 14.20）
     # ==================================================================

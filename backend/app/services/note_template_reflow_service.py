@@ -26,8 +26,10 @@ Spec: .kiro/specs/disclosure-note-follow-actual-content/ R2 / Task 2
 
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
@@ -40,9 +42,12 @@ __all__ = [
     "ColumnDrift",
     "RenameCandidate",
     "SectionDiff",
+    "ReflowResult",
     "diff_tables",
     "diff_section",
     "diff_project",
+    "apply_reflow_tables",
+    "apply_reflow_section",
 ]
 
 
@@ -387,6 +392,273 @@ async def diff_section(db: AsyncSession, note_id: str | UUID) -> SectionDiff:
         is_local_override=bool(row["is_local_override"]),
         has_legacy_snapshot=has_legacy,
         notes=tuple(notes),
+    )
+
+
+@dataclass(frozen=True)
+class ReflowResult:
+    """apply_reflow 的返回结果。"""
+
+    note_id: str
+    note_section: str
+    added_tables: tuple[str, ...] = ()
+    renamed_tables: tuple[tuple[str, str], ...] = ()  # (old_name, new_name)
+    columns_updated: tuple[str, ...] = ()
+    skipped_reason: str | None = None
+
+    @property
+    def has_changes(self) -> bool:
+        return bool(self.added_tables or self.renamed_tables or self.columns_updated)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "note_id": self.note_id,
+            "note_section": self.note_section,
+            "added_tables": list(self.added_tables),
+            "renamed_tables": [list(pair) for pair in self.renamed_tables],
+            "columns_updated": list(self.columns_updated),
+            "skipped_reason": self.skipped_reason,
+            "has_changes": self.has_changes,
+        }
+
+
+# ════════════════════════════════════════════════════════════════════
+# 纯函数 apply（不碰 DB，便于单测）
+# ════════════════════════════════════════════════════════════════════
+
+
+def apply_reflow_tables(
+    template_tables: list[dict[str, Any]],
+    sub_table_data: dict[str, Any],
+    columns_map: dict[str, Any],
+    *,
+    include_renamed: list[tuple[str, str]] | None = None,
+) -> dict[str, Any]:
+    """纯函数：把模板差异就地补进 sub_table_data 与 columns_map。
+
+    **只加不覆盖**：
+    - 新增表 → 写空骨架行 + 列头（从模板 `rows`/`columns` 复制）
+    - 列头漂移 → 更新 columns_map（行数据不动）
+    - 确认改名 → 把旧键迁移到新键（行数据保留、列头取模板）
+    - 已有表的行数据**绝不触碰**
+
+    Args:
+        template_tables: 模板 section 的 `tables`
+        sub_table_data: 附注的 sub_table_data（会就地修改）
+        columns_map: 附注的 _sub_table_columns（会就地修改）
+        include_renamed: 用户确认的改名对 `[(old_name, new_name)]`；
+                         None 时自动执行非歧义的 declared 改名
+
+    Returns:
+        `{"added": [...], "renamed": [...], "columns_updated": [...]}`
+    """
+    tpl_by_name: dict[str, dict[str, Any]] = {}
+    for t in template_tables or []:
+        if not isinstance(t, dict):
+            continue
+        name = str(t.get("name") or "")
+        if name:
+            tpl_by_name[name] = t
+
+    note_keys = set(str(k) for k in sub_table_data.keys() if not _is_meta_key(k))
+    added: list[str] = []
+    renamed: list[tuple[str, str]] = []
+    columns_updated: list[str] = []
+
+    # ── 改名（只执行确认的、非歧义的） ──────────────────────────────
+    rename_pairs = include_renamed or []
+    if not rename_pairs:
+        # 自动执行模板 _renamed_from 声明的非歧义改名
+        for name, tpl in tpl_by_name.items():
+            if name in note_keys:
+                continue
+            declared = tpl.get("_renamed_from")
+            olds = [declared] if isinstance(declared, str) else list(declared or [])
+            hits = [o for o in olds if isinstance(o, str) and o in note_keys]
+            if len(hits) == 1:
+                rename_pairs.append((hits[0], name))
+
+    for old_name, new_name in rename_pairs:
+        if old_name not in sub_table_data:
+            continue
+        if new_name in sub_table_data:
+            continue  # 新名已存在 → 跳过，不覆盖
+        # 迁移行数据
+        sub_table_data[new_name] = sub_table_data.pop(old_name)
+        # 迁移列头或用模板列头
+        if old_name in columns_map:
+            columns_map.pop(old_name)
+        tpl = tpl_by_name.get(new_name)
+        if tpl and tpl.get("columns"):
+            columns_map[new_name] = tpl["columns"]
+        renamed.append((old_name, new_name))
+        note_keys.discard(old_name)
+        note_keys.add(new_name)
+
+    # ── 补齐缺失表 ─────────────────────────────────────────────────
+    for name, tpl in tpl_by_name.items():
+        if name in note_keys:
+            continue
+        # 空骨架行（模板的 rows 去除 header_label）
+        rows = []
+        for row in tpl.get("rows") or []:
+            if isinstance(row, dict) and row.get("row_type") == "header_label":
+                continue
+            rows.append(dict(row) if isinstance(row, dict) else row)
+        sub_table_data[name] = rows
+        # 列头
+        if tpl.get("columns"):
+            columns_map[name] = tpl["columns"]
+        added.append(name)
+
+    # ── 修正列头漂移 ───────────────────────────────────────────────
+    for name in note_keys:
+        tpl = tpl_by_name.get(name)
+        if not tpl or not tpl.get("columns"):
+            continue
+        tpl_cols = tpl["columns"]
+        note_cols = columns_map.get(name)
+        # 只在模板有列定义且与附注不同时更新
+        if not note_cols:
+            columns_map[name] = tpl_cols
+            columns_updated.append(name)
+        elif _labels_of(tpl_cols) != _labels_of(note_cols):
+            columns_map[name] = tpl_cols
+            columns_updated.append(name)
+        elif _group_signature(tpl_cols) != _group_signature(note_cols):
+            columns_map[name] = tpl_cols
+            columns_updated.append(name)
+
+    return {
+        "added": added,
+        "renamed": renamed,
+        "columns_updated": columns_updated,
+    }
+
+
+# ════════════════════════════════════════════════════════════════════
+# DB 层写入（apply_reflow_section）
+# ════════════════════════════════════════════════════════════════════
+
+
+async def apply_reflow_section(
+    db: AsyncSession,
+    note_id: str | UUID,
+    *,
+    include_local_override: bool = False,
+    include_renamed: list[tuple[str, str]] | None = None,
+    commit: bool = True,
+) -> ReflowResult:
+    """对单个附注章节执行模板回流（写入）。
+
+    - 只加不覆盖：新增表写空骨架 + 列头；已有表只在列头漂移时更新列头
+    - `is_local_override` 默认跳过
+    - 执行前后记 `template_lineage._reflow_history`
+
+    Spec: disclosure-note-follow-actual-content Task 6
+    """
+    row = (
+        await db.execute(
+            sa.text(
+                "SELECT id, project_id, note_section, section_title, table_data, "
+                "       is_local_override "
+                "FROM disclosure_notes WHERE id = :id AND is_deleted = false"
+            ),
+            {"id": str(note_id)},
+        )
+    ).mappings().first()
+    if not row:
+        raise ValueError(f"disclosure_note not found: {note_id}")
+
+    note_section = str(row["note_section"] or "")
+    section_title = str(row["section_title"] or "")
+
+    # is_local_override 守卫
+    if row["is_local_override"] and not include_local_override:
+        return ReflowResult(
+            note_id=str(row["id"]),
+            note_section=note_section,
+            skipped_reason="is_local_override=true（跳过，需显式包含）",
+        )
+
+    td = dict(row["table_data"]) if isinstance(row["table_data"], dict) else {}
+    sub = dict(td.get("sub_table_data") or {}) if isinstance(td.get("sub_table_data"), dict) else {}
+    cols_map = dict(td.get("_sub_table_columns") or {}) if isinstance(td.get("_sub_table_columns"), dict) else {}
+
+    # legacy 快照警告：仍有 rows/_tables 但无 sub_table_data
+    if not sub and (td.get("rows") or td.get("_tables")):
+        return ReflowResult(
+            note_id=str(row["id"]),
+            note_section=note_section,
+            skipped_reason="legacy 快照未迁移（sub_table_data 为空），请先跑迁移脚本",
+        )
+
+    # 加载模板
+    sections, _tt = await _load_template_sections(db, row["project_id"])
+    tpl = _pick_template_section(sections, note_section, section_title)
+    if tpl is None:
+        return ReflowResult(
+            note_id=str(row["id"]),
+            note_section=note_section,
+            skipped_reason="模板中未找到对应章节",
+        )
+
+    # 执行纯函数回流
+    result = apply_reflow_tables(
+        tpl.get("tables") or [],
+        sub,
+        cols_map,
+        include_renamed=include_renamed,
+    )
+
+    if not result["added"] and not result["renamed"] and not result["columns_updated"]:
+        return ReflowResult(
+            note_id=str(row["id"]),
+            note_section=note_section,
+        )
+
+    # 写回 table_data
+    td["sub_table_data"] = sub
+    td["_sub_table_columns"] = cols_map
+
+    # template_lineage 记账
+    lineage = dict(td.get("_template_lineage") or {}) if isinstance(td.get("_template_lineage"), dict) else {}
+    history = list(lineage.get("_reflow_history") or [])
+    history.append({
+        "at": datetime.now(timezone.utc).isoformat(),
+        "added": result["added"],
+        "renamed": [(o, n) for o, n in result["renamed"]],
+        "columns_updated": result["columns_updated"],
+    })
+    lineage["_reflow_history"] = history
+    td["_template_lineage"] = lineage
+
+    # 更新 DB
+    # 🔴 JSONB 绑定必须 `CAST(:td AS jsonb)` + json.dumps 字符串：
+    # `sa.type_coerce(td, sa.JSON)` 配 `sa.text()` 在 asyncpg 下抛
+    # `Neither 'TypeCoerce' object nor 'Comparator' object has an attribute 'encode'`
+    # （type_coerce 是 SQL 表达式构造器、不是可绑定值）。原写法对真实库 100% 失败，
+    # 单测因用替身 session 未暴露；与 migrate_legacy_note_snapshots 同批修复。
+    await db.execute(
+        sa.text(
+            "UPDATE disclosure_notes SET table_data = CAST(:td AS jsonb), updated_at = :now "
+            "WHERE id = :id"
+        ),
+        {
+            "id": str(row["id"]),
+            "td": json.dumps(td, ensure_ascii=False, default=str),
+            "now": datetime.now(timezone.utc),
+        },
+    )
+    if commit:
+        await db.commit()
+
+    return ReflowResult(
+        note_id=str(row["id"]),
+        note_section=note_section,
+        added_tables=tuple(result["added"]),
+        renamed_tables=tuple(result["renamed"]),
+        columns_updated=tuple(result["columns_updated"]),
     )
 
 

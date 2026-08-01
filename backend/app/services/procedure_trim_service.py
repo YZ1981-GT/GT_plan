@@ -55,6 +55,7 @@ from app.services.procedure_task_transition_service import (
     APPLICABILITY_NOT_APPLICABLE,
     TERMINAL_WORKFLOW_STATES,
     ProcedureTaskTransitionService,
+    scope_state_differs,
 )
 
 logger = logging.getLogger(__name__)
@@ -217,12 +218,19 @@ class ProcedureTrimService:
                 raise HTTPException(status_code=422, detail="scope 条目缺 cycle/wp_index_code")
             if target_status not in _SCOPE_STATUSES:
                 raise HTTPException(status_code=422, detail=f"非法 target_status: {target_status}")
+            # 裁剪理由是审计轨迹的一部分（旧 PUT /procedures/{cycle}/trim 下线后由本条目承载）。
+            # execute 恒为 None，保证 canonical payload 稳定（preview/apply hash 必须一致）。
+            raw_reason = entry.get("skip_reason")
+            skip_reason = str(raw_reason).strip() if raw_reason is not None else ""
             return {
                 "kind": KIND_SCOPE,
                 "key": build_scope_key(cycle, wp_index_code),
                 "cycle": cycle,
                 "wp_index_code": wp_index_code,
                 "target_status": target_status,
+                "skip_reason": (
+                    skip_reason or None
+                ) if target_status in ("skip", "not_applicable") else None,
             }
         if kind == KIND_ROW:
             template_code = str(entry.get("template_code", "")).strip()
@@ -539,10 +547,15 @@ class ProcedureTrimService:
                     would_change += 1
         for sp in plan["scope_plans"]:
             for inst in sp["instances"]:
-                if inst.status == sp["target_status"]:
-                    unchanged += 1
-                else:
+                if scope_state_differs(
+                    inst.status,
+                    inst.skip_reason,
+                    sp["target_status"],
+                    sp["entry"].get("skip_reason"),
+                ):
                     would_change += 1
+                else:
+                    unchanged += 1
             if sp["target_status"] in ("skip", "not_applicable"):
                 for t in sp["cascade_tasks"]:
                     if t.workflow_status in TERMINAL_WORKFLOW_STATES:
@@ -662,7 +675,8 @@ class ProcedureTrimService:
                         inst,
                         status=target_status,
                         actor_user_id=actor_user_id,
-                        reason="scheme_scope_trim",
+                        # 用户填写的裁剪理由（审计轨迹），不写内部动作码
+                        reason=sp["entry"].get("skip_reason"),
                     )
                     if changed:
                         entry_applied += 1

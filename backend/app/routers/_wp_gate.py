@@ -94,7 +94,9 @@ async def enforce_wp_gate(
         review_reason=review_reason,
         request_id=request_id,
     )
-    return await resolve_wp_binding_and_access(db, current_user, req)
+    # procedure-mainline-convergence Task 7.1: 注入持久 epoch cache，撤权 ≤1s 收敛
+    from app.services.wp_visibility.epoch_cache import get_epoch_cache
+    return await resolve_wp_binding_and_access(db, current_user, req, epoch_cache=get_epoch_cache())
 
 
 async def enforce_task_gate(

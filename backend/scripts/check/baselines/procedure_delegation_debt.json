@@ -1,5 +1,5 @@
 {
-  "metadata": {"debt_ceiling": 13},
+  "metadata": {"debt_ceiling": 12},
   "entries": [
     {
       "path": "audit-platform/frontend/src/services/commonApi.ts",
@@ -7,13 +7,6 @@
       "rule": "procedure-instance-id-as-row-task",
       "fingerprint": "sha256:e921876b0882d607096acc6da1f3af3ac2b749fa5871cff8c0e7de97ecea4be0",
       "reason": "Legacy frontend aggregation exposes workpaper-scope ProcedureInstance DTOs as personal tasks until row-task APIs replace it."
-    },
-    {
-      "path": "backend/app/routers/procedures.py",
-      "symbol": "update_execution_status",
-      "rule": "procedure-state-transition-bypass",
-      "fingerprint": "sha256:691587363f5ebd47feee50d9150e3a7b5c83e16c4e35be46dfb4fc66e6041556",
-      "reason": "Legacy endpoint mutates ProcedureInstance.execution_status directly and will be retired behind the transition service."
     },
     {
       "path": "backend/app/routers/wp_relation_router.py",
@@ -29,21 +22,6 @@
       "fingerprint": "sha256:3cc3c3b42c132af68349cb4a057e5eb815e12e7a19e823f67e30e037a54b8443",
       "reason": "Legacy review submission directly marks the related ProcedureInstance completed."
     },
-    {
-      "path": "backend/app/services/procedure_service.py",
-      "symbol": "ProcedureService.get_my_tasks",
-      "rule": "procedure-instance-id-as-row-task",
-      "fingerprint": "sha256:50ef02451728bcfa731d9127bb79f6c8c533cd3e0e9bd9020f52e7df8cf7c95f",
-      "reason": "Legacy service returns workpaper-scope ProcedureInstance records as personal tasks pending row-task materialization."
-    },
-    {
-      "path": "backend/app/services/procedure_service.py",
-      "symbol": "ProcedureService.save_trim",
-      "rule": "procedure-state-transition-bypass",
-      "fingerprint": "sha256:c87be688b59748912944c3d0155de879c67f9d5c98bed77e6190757c05cee6c7",
-      "reason": "Legacy scope trimming updates ProcedureInstance.status directly outside the future transition service."
-    }
-,
     {
       "path": "backend/app/services/procedure_trim_engine.py",
       "symbol": "ProcedureTrimEngine.revert",
@@ -83,8 +61,22 @@
       "path": "audit-platform/frontend/src/components/workpaper/GtAProgramConsole.vue",
       "symbol": "component:GtAProgramConsole",
       "rule": "parallel-my-procedure-tasks-page-route",
-      "fingerprint": "sha256:2ab37b9e326d59ffb0bcfeb3edf94cbd95fae450c46398fd19e6f96c3d8197ff",
+      "fingerprint": "sha256:1a4568db86a26a4d56f8a8252e860257b593ba36dc5d0320357711d7e22dd132",
       "reason": "GtAProgramConsole renders an in-place '程序任务' task-overlay column and submit dialog (Task 14); it is the canonical program console, not a parallel MyProcedureTasks page, so the coarse heuristic match is acknowledged debt."
+    },
+    {
+      "path": "audit-platform/frontend/src/layouts/DefaultLayout.vue",
+      "symbol": "component:DefaultLayout",
+      "rule": "parallel-my-procedure-tasks-page-route",
+      "fingerprint": "sha256:a84853613280e0ae3c68c0bef5ad2c012a9ed52a15f72ff13528ab867f4bb26f",
+      "reason": "DefaultLayout sidebar renders a '程序任务' nav item linking to the canonical MyProcedureTasks route; it is a navigation entry, not a parallel task page."
+    },
+    {
+      "path": "audit-platform/frontend/src/views/MyLeadWorkpapers.vue",
+      "symbol": "component:MyLeadWorkpapers",
+      "rule": "parallel-my-procedure-tasks-page-route",
+      "fingerprint": "sha256:71845fee20cc565de5907234ab34bebd77b81b8f3a9f16402ead417a6c89c184",
+      "reason": "MyLeadWorkpapers shows lead-assigned workpapers and links to the canonical MyProcedureTasks for task detail; it is a complementary view, not a parallel task page."
     },
     {
       "path": "backend/app/services/procedure_backfill_runner.py",

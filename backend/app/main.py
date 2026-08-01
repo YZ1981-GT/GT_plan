@@ -78,6 +78,9 @@ async def lifespan(app: FastAPI):
 
     await _check_gin_index_status()
     await _check_libreoffice_health()
+
+    # procedure-mainline-convergence Task 7.3: rollout fail-fast
+    _validate_procedure_rollout_config()
     await _validate_template_manifest()
     await _run_schema_drift_check()
     await _warm_render_caches()
@@ -365,6 +368,49 @@ async def _check_libreoffice_health() -> None:
         _log.getLogger("audit_platform").debug(
             "[启动] LibreOffice health check skipped: %s", e
         )
+
+
+def _validate_procedure_rollout_config() -> None:
+    """procedure-mainline-convergence Task 7.3: rollout 值域 + 三开关组合 fail-fast。
+
+    非法值或非法组合在 Ready 前失败（sys.exit(1)），不把配置错误带进生产流量。
+    """
+    import logging as _log
+    from app.core.config import settings
+
+    log = _log.getLogger("audit_platform.procedure_rollout")
+    mode = settings.PROCEDURE_ROW_TASK_WRITE_MODE
+    enabled = settings.PROCEDURE_ROW_TASKS_ENABLED
+    dispatcher = settings.PROCEDURE_TASK_DISPATCHER_ENABLED
+
+    VALID_MODES = {"legacy", "dual", "task_source", "paused"}
+    if mode not in VALID_MODES:
+        log.critical(
+            "PROCEDURE_ROW_TASK_WRITE_MODE=%r 非法（合法值: %s），拒绝启动",
+            mode, sorted(VALID_MODES),
+        )
+        sys.exit(1)
+
+    # 非法组合：task_source 模式下必须开启 ENABLED（否则 overlay 不叠加，状态机写入无可见效果）
+    if mode == "task_source" and not enabled:
+        log.critical(
+            "PROCEDURE_ROW_TASK_WRITE_MODE=task_source 但 PROCEDURE_ROW_TASKS_ENABLED=False "
+            "（task overlay 不叠加 → 状态机写入无可见效果），拒绝启动",
+        )
+        sys.exit(1)
+
+    # paused 模式下 dispatcher 必须关闭（drain 态不投递通知）
+    if mode == "paused" and dispatcher:
+        log.critical(
+            "PROCEDURE_ROW_TASK_WRITE_MODE=paused 但 PROCEDURE_TASK_DISPATCHER_ENABLED=True "
+            "（paused 态不应投递通知），拒绝启动",
+        )
+        sys.exit(1)
+
+    log.info(
+        "procedure rollout: mode=%s enabled=%s dispatcher=%s — OK",
+        mode, enabled, dispatcher,
+    )
 
 
 async def _replay_startup_events() -> None:

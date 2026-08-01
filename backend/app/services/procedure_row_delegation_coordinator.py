@@ -147,13 +147,17 @@ class ProcedureRowDelegationCoordinator:
             actor_user_id=actor_user_id,
             reason=reason,
             request_id=request_id,
-            new_reviewer_staff_id=(
-                new_reviewer_staff_id
-                if new_reviewer_staff_id is not None
-                else old_reviewer
-            ),
             delegation_batch_id=delegation_batch_id,
         )
+        # 如果同时指定了新 reviewer 且与当前不同，紧接着 set_reviewer
+        if new_reviewer_staff_id is not None and task.reviewer_staff_id != new_reviewer_staff_id:
+            await self.transition.set_reviewer(
+                task,
+                new_reviewer_staff_id=new_reviewer_staff_id,
+                actor_user_id=actor_user_id,
+                request_id=request_id,
+                delegation_batch_id=delegation_batch_id,
+            )
         return await self._record(
             project_id=project_id,
             task=task,

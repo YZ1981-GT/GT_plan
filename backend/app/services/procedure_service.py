@@ -6,7 +6,6 @@ Phase 9 Task 9.12
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -258,33 +257,11 @@ class ProcedureService:
         await self.db.flush()
         return await self.get_procedures(project_id, cycle)
 
-    async def save_trim(self, project_id: UUID, cycle: str, items: list[dict]) -> int:
-        """保存裁剪结果"""
-        updated = 0
-        for item in items:
-            proc_id = item.get("id")
-            if not proc_id:
-                continue
-            await self.db.execute(
-                sa.update(ProcedureInstance)
-                .where(ProcedureInstance.id == proc_id)
-                .values(
-                    status=item.get("status", "execute"),
-                    skip_reason=item.get("skip_reason"),
-                )
-            )
-            updated += 1
-
-        # 自动保存裁剪方案
-        scheme = ProcedureTrimScheme(
-            project_id=project_id,
-            audit_cycle=cycle,
-            scheme_name=f"裁剪方案-{cycle}-{datetime.now().strftime('%Y%m%d')}",
-            trim_data={item["id"]: {"status": item.get("status"), "skip_reason": item.get("skip_reason")} for item in items if item.get("id")},
-        )
-        self.db.add(scheme)
-        await self.db.flush()
-        return updated
+    # save_trim 已删除（procedure-mainline-convergence 需求 1/3）：
+    # 粗裁写入口收敛到 ProcedureTrimService.preview_scheme/apply_scheme（canonical scope key
+    # + 一次性 preview + 真实 applied），且状态写只经 ProcedureTaskTransitionService。
+    # 旧实现直接 UPDATE ProcedureInstance.status 绕过状态机，且以 UUID 为 key 写
+    # trim_data（参照项目无法转换），已连同 PUT /procedures/{cycle}/trim 一起下线。
 
     async def _existing_custom_codes(
         self, project_id: UUID, cycle: str
@@ -530,60 +507,12 @@ class ProcedureService:
             return None
         return {"id": str(scheme.id), "scheme_name": scheme.scheme_name, "trim_data": scheme.trim_data}
 
-    async def apply_scheme(self, project_id: UUID, cycle: str, source_project_id: UUID) -> int:
-        """应用参照方案"""
-        scheme = await self.get_trim_scheme(source_project_id, cycle)
-        if not scheme or not scheme.get("trim_data"):
-            return 0
-
-        # 获取当前项目的程序列表
-        procs = await self.get_procedures(project_id, cycle)
-        if not procs:
-            await self.init_from_templates(project_id, cycle)
-            procs = await self.get_procedures(project_id, cycle)
-
-        # 按 procedure_code 匹配应用裁剪
-        source_data = scheme["trim_data"]
-        applied = 0
-        for proc in procs:
-            for _, trim_info in source_data.items():
-                if isinstance(trim_info, dict) and trim_info.get("status"):
-                    # 简化：按顺序应用
-                    pass
-            applied += 1
-
-        return applied
-
-    async def batch_apply(self, parent_project_id: UUID, cycle: str, target_ids: list[UUID]) -> dict:
-        """批量应用到子公司"""
-        scheme = await self.get_trim_scheme(parent_project_id, cycle)
-        if not scheme:
-            return {"applied": 0, "failed": [{"reason": "源项目无裁剪方案"}]}
-
-        results = {"applied": 0, "failed": []}
-        for tid in target_ids:
-            try:
-                await self.apply_scheme(tid, cycle, parent_project_id)
-                results["applied"] += 1
-            except Exception as e:
-                results["failed"].append({"project_id": str(tid), "reason": str(e)})
-
-        return results
-
-    async def get_my_tasks(self, project_id: UUID, staff_id: UUID) -> list[dict]:
-        """当前用户被委派的程序列表"""
-        q = (
-            sa.select(ProcedureInstance)
-            .where(
-                ProcedureInstance.project_id == project_id,
-                ProcedureInstance.assigned_to == staff_id,
-                ProcedureInstance.status == "execute",
-                ProcedureInstance.is_deleted == False,  # noqa
-            )
-            .order_by(ProcedureInstance.audit_cycle, ProcedureInstance.sort_order)
-        )
-        rows = (await self.db.execute(q)).scalars().all()
-        return [self._to_dict(r) for r in rows]
+    # apply_scheme / batch_apply 已删除（需求 2/3）：旧实现读 UUID-key trim_data，
+    # 内层循环什么都不做却把 applied 累加成程序总数 = 假成功。参照项目改为前端读源项目
+    # 当前 wp_code+status 构造 canonical entries，再走 procedure-trim/preview|apply。
+    #
+    # get_my_tasks 已删除（需求 3/12）：程序任务真源是 ProcedureRowTask
+    # （/api/my/procedure-row-tasks），把 ProcedureInstance.id 当 task_id 暴露会串线。
 
     def _to_dict(self, p: ProcedureInstance) -> dict:
         return {

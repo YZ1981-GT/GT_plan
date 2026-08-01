@@ -80,8 +80,34 @@ AGGREGATE_PROCEDURE_ROW_TASK = "procedure_row_task"
 _EVENT_TYPE_PREFIX = "procedure_task."
 
 
+SCOPE_STATUS_EXECUTE = "execute"
+SCOPE_TRIMMED_STATUSES = ("skip", "not_applicable")
+SCOPE_STATUSES = (SCOPE_STATUS_EXECUTE, *SCOPE_TRIMMED_STATUSES)
+
+
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def normalize_scope_skip_reason(status: str, reason: str | None) -> str | None:
+    """粗裁理由归一：仅 skip/not_applicable 携带理由，execute 恒为 None。"""
+    if status not in SCOPE_TRIMMED_STATUSES:
+        return None
+    text = str(reason).strip() if reason is not None else ""
+    return text or None
+
+
+def scope_state_differs(
+    current_status: str | None, current_reason: str | None, status: str, reason: str | None
+) -> bool:
+    """粗裁写入是否会造成真实变化（状态或裁剪理由任一不同）。
+
+    纯函数：preview 的 would_change 估算与 apply 的真实 applied 计数共用同一判据，
+    避免"只改理由不改状态"被静默丢弃（审计轨迹会缺理由）。
+    """
+    return (current_status or None) != status or (current_reason or None) != (
+        normalize_scope_skip_reason(status, reason)
+    )
 
 
 class ProcedureTaskTransitionService:
@@ -351,6 +377,10 @@ class ProcedureTaskTransitionService:
         if task.workflow_status != WORKFLOW_CANCELLED:
             raise HTTPException(status_code=409, detail="只有已取消任务可重开")
 
+        # 捕获旧值（_emit 在 mutation 后调用，需要在清空前记录）
+        old_assignee = task.assignee_staff_id
+        old_reviewer = task.reviewer_staff_id
+
         task.workflow_status = WORKFLOW_UNASSIGNED
         task.assignee_staff_id = None
         task.acknowledged_at = None
@@ -374,6 +404,10 @@ class ProcedureTaskTransitionService:
                 **(detail or {}),
                 "set_applicability": set_applicability,
             },
+            old_assignee_staff_id=old_assignee,
+            new_assignee_staff_id=None,
+            old_reviewer_staff_id=old_reviewer,
+            new_reviewer_staff_id=old_reviewer,  # reviewer 不变（只清执行人）
         )
         return True
 
@@ -389,17 +423,15 @@ class ProcedureTaskTransitionService:
     ) -> bool:
         """写 WorkpaperScopeInstance（ProcedureInstance）粗裁状态 execute/skip/not_applicable。
 
-        粗裁状态写入同样收敛到本状态机入口（架构守卫只放行本类）。已是目标状态 → no-op（False）。
+        粗裁状态写入同样收敛到本状态机入口（架构守卫只放行本类）。
+        状态与裁剪理由都未变 → no-op（False）；仅理由变化也算真实变化（审计轨迹必须留痕）。
         """
-        if status not in ("execute", "skip", "not_applicable"):
+        if status not in SCOPE_STATUSES:
             raise HTTPException(status_code=422, detail=f"非法粗裁状态: {status}")
-        if instance.status == status:
+        if not scope_state_differs(instance.status, instance.skip_reason, status, reason):
             return False
         instance.status = status
-        if status in ("skip", "not_applicable"):
-            instance.skip_reason = reason
-        else:
-            instance.skip_reason = None
+        instance.skip_reason = normalize_scope_skip_reason(status, reason)
         instance.updated_at = sa.func.now()
         await self.db.flush()
         return True
@@ -533,6 +565,55 @@ class ProcedureTaskTransitionService:
             reason=r,
             old_assignee_staff_id=old_assignee,
             new_assignee_staff_id=new_assignee_staff_id,
+            delegation_batch_id=delegation_batch_id,
+        )
+        return self._result(task, changed=True)
+
+    # -- set_reviewer（仅变更操作复核人，不改执行人/不递增 assignment_version）----
+
+    async def set_reviewer(
+        self,
+        task: ProcedureRowTask,
+        *,
+        new_reviewer_staff_id: UUID | None,
+        actor_user_id: UUID | None,
+        actor_role: str = ACTOR_DELEGATOR,
+        request_id: str | None = None,
+        expected_lock_version: int | None = None,
+        delegation_batch_id: UUID | None = None,
+        reason: str | None = None,
+    ) -> dict:
+        """仅变更操作复核人（reviewer-only，需求 7）。
+
+        - 仅 Delegator；非终态任务；新旧相同 → no-op。
+        - **不递增 assignment_version**（不需要执行人重新 ack，Req 7 / Property P15）。
+        - lock_version+1（乐观锁保护并发）。
+        - 清除 new_reviewer_staff_id=None 表示移除复核人。
+        """
+        self._require_role(actor_role, ACTOR_DELEGATOR)
+        self._check_lock_version(task, expected_lock_version)
+        if task.workflow_status in TERMINAL_WORKFLOW_STATES:
+            raise HTTPException(status_code=409, detail=f"终态任务不可变更复核人：{task.workflow_status}")
+
+        # 同人 no-op
+        if task.reviewer_staff_id == new_reviewer_staff_id:
+            return self._result(task, changed=False)
+
+        old_reviewer = task.reviewer_staff_id
+        task.reviewer_staff_id = new_reviewer_staff_id
+        # 不改 workflow_status、不改 assignment_version、不清 acknowledged_at
+        task.lock_version = (task.lock_version or 0) + 1
+        task.updated_at = sa.func.now()
+
+        await self._emit(
+            task,
+            event_type="reviewer_changed",
+            from_status=task.workflow_status,
+            to_status=task.workflow_status,
+            actor_user_id=actor_user_id,
+            request_id=request_id,
+            old_reviewer_staff_id=old_reviewer,
+            new_reviewer_staff_id=new_reviewer_staff_id,
             delegation_batch_id=delegation_batch_id,
         )
         return self._result(task, changed=True)

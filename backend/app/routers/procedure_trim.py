@@ -42,6 +42,8 @@ class TrimSchemeEntry(BaseModel):
     cycle: str | None = None
     wp_index_code: str | None = None
     target_status: str | None = None
+    # 粗裁理由（审计轨迹；execute 时忽略）。旧 PUT /procedures/{cycle}/trim 下线后由此承载。
+    skip_reason: str | None = Field(default=None, max_length=500)
     # row
     template_code: str | None = None
     sheet_key: str | None = None

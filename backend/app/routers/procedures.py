@@ -1,6 +1,21 @@
-"""审计程序裁剪与委派 API 路由
+"""审计程序（底稿范围粗裁）读入口 + 自定义程序管理 + 旧写链 410 下线
 
-Phase 9 Task 9.12
+Feature: procedure-mainline-convergence（需求 3、4）
+
+主链约定（本轮收敛后）：
+- **粗裁写入口只有一个**：``POST /api/projects/{pid}/procedure-trim/preview|apply``
+  （canonical scope key + 一次性 preview 凭证 + 真实 applied/unchanged/conflict）。
+- **底稿主编写入口只有一个**：``PUT /api/projects/{pid}/workpaper-leads``。
+- 程序行执行状态只走状态机：``POST /api/projects/{pid}/procedure-row-tasks/{id}/transitions``。
+
+因此本文件的旧写链（trim / apply-scheme / batch-apply / assign / instance execution）
+**稳定返回 410 + 机器可读 error code**，不保留第二套线上写链（Git 与迁移承担回滚）。
+
+授权（需求 4）：
+- 项目写入口（init / custom / custom-with-template / delete custom）统一挂项目级
+  Delegator 守卫 ``require_project_delegator``（fail-closed 403）。
+- 项目读入口（程序列表 / 数据可用性 / 空白模板 / 裁剪方案）至少验证项目成员身份
+  ``require_project_access("readonly")``。
 """
 
 from __future__ import annotations
@@ -12,25 +27,43 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, require_role
+from app.deps import require_project_access
+from app.services.procedure_authorization import (
+    DelegatorContext,
+    require_project_delegator,
+)
 from app.services.procedure_service import ProcedureService
 from app.services.procedure_trim_scope import resolve_subject_data_availability
 
 router = APIRouter(prefix="/api/projects", tags=["procedures"])
 
-# 新增/删除自定义程序 = 项目经理+（系统 admin/partner/signing_partner/manager）。
-# 审计助理(auditor)/qc/eqcr 不得新增自定义程序（设计：项目经理新增自定义程序）。
-_DELEGATOR_ROLES = ["admin", "partner", "signing_partner", "manager"]
+# ── 旧写链 410（需求 3）────────────────────────────────────────────────────────
+# error code 稳定不变，前端/集成方按 code 分流；message 指向 canonical 替代端点。
+GONE_TRIM = "procedure_trim_endpoint_removed"
+GONE_SCHEME = "procedure_apply_scheme_endpoint_removed"
+GONE_BATCH_APPLY = "procedure_batch_apply_endpoint_removed"
+GONE_ASSIGN = "procedure_assign_endpoint_removed"
+GONE_EXECUTION = "procedure_execution_status_endpoint_removed"
+
+_GONE_REPLACEMENTS: dict[str, str] = {
+    GONE_TRIM: "POST /api/projects/{pid}/procedure-trim/preview|apply",
+    GONE_SCHEME: "POST /api/projects/{pid}/procedure-trim/preview|apply（参照项目请先读源项目程序再构造 canonical entries）",
+    GONE_BATCH_APPLY: "POST /api/projects/{pid}/procedure-trim/preview|apply（逐目标项目调用）",
+    GONE_ASSIGN: "PUT /api/projects/{pid}/workpaper-leads",
+    GONE_EXECUTION: "POST /api/projects/{pid}/procedure-row-tasks/{task_id}/transitions",
+}
 
 
-class TrimItem(BaseModel):
-    id: str
-    status: str  # execute / skip / not_applicable
-    skip_reason: str | None = None
-
-
-class TrimRequest(BaseModel):
-    items: list[TrimItem]
+def _gone(code: str) -> HTTPException:
+    """构造稳定的 410 响应（机器可读 code + canonical 替代端点）。"""
+    return HTTPException(
+        status_code=410,
+        detail={
+            "error": code,
+            "message": "该端点已下线，请改用主链端点",
+            "replacement": _GONE_REPLACEMENTS[code],
+        },
+    )
 
 
 class CustomProcedureRequest(BaseModel):
@@ -39,19 +72,12 @@ class CustomProcedureRequest(BaseModel):
     sort_order: int | None = None
 
 
-class AssignRequest(BaseModel):
-    assignments: list[dict]  # [{procedure_id, staff_id}]
-
-
-class BatchApplyRequest(BaseModel):
-    target_project_ids: list[str]
-
-
 @router.get("/{project_id}/procedure-scope/data-availability")
 async def get_procedure_data_availability(
     project_id: UUID,
     year: int = Query(..., description="审计年度"),
-    db: AsyncSession = Depends(get_db), user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_project_access("readonly")),
 ):
     """科目/循环数据可用性，供智能裁剪精确到科目底稿级。
 
@@ -63,7 +89,8 @@ async def get_procedure_data_availability(
 @router.get("/{project_id}/procedures/{cycle}")
 async def get_procedures(
     project_id: UUID, cycle: str,
-    db: AsyncSession = Depends(get_db), user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_project_access("readonly")),
 ):
     svc = ProcedureService(db)
     return await svc.get_procedures(project_id, cycle)
@@ -72,7 +99,8 @@ async def get_procedures(
 @router.post("/{project_id}/procedures/{cycle}/init")
 async def init_procedures(
     project_id: UUID, cycle: str,
-    db: AsyncSession = Depends(get_db), user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    _guard: DelegatorContext = Depends(require_project_delegator),
 ):
     svc = ProcedureService(db)
     result = await svc.init_from_templates(project_id, cycle)
@@ -80,68 +108,17 @@ async def init_procedures(
     return {"count": len(result), "procedures": result}
 
 
-@router.put("/{project_id}/procedures/{cycle}/trim")
-async def save_trim(
-    project_id: UUID, cycle: str, data: TrimRequest,
-    db: AsyncSession = Depends(get_db),
-    user=Depends(require_role(_DELEGATOR_ROLES)),
-):
-    svc = ProcedureService(db)
-    count = await svc.save_trim(project_id, cycle, [i.model_dump() for i in data.items])
-
-    # ── Phase 15: 发布裁剪事件到事件总线 ──
-    try:
-        from app.services.task_event_bus import task_event_bus
-        from app.services.trace_event_service import generate_trace_id
-        for item in data.items:
-            if item.status in ("skip", "not_applicable"):
-                event_type = "trim_applied"
-            else:
-                event_type = "trim_rollback"
-            await task_event_bus.publish(
-                db=db,
-                project_id=project_id,
-                event_type=event_type,
-                task_node_id=None,
-                payload={
-                    "procedure_id": item.id,
-                    "cycle": cycle,
-                    "status": item.status,
-                    "skip_reason": item.skip_reason,
-                    "ref_id": item.id,
-                    "version": "1",
-                },
-                trace_id=generate_trace_id(),
-            )
-    except Exception as _evt_err:
-        import logging
-        logging.getLogger(__name__).warning(f"[EVENT_BUS] trim event publish failed: {_evt_err}")
-
-    # ── Phase 14: trace 留痕 ──
-    try:
-        from app.services.trace_event_service import trace_event_service, generate_trace_id as _gen_tid
-        await trace_event_service.write(
-            db=db,
-            project_id=project_id,
-            event_type="trim_applied",
-            object_type="procedure",
-            object_id=project_id,
-            actor_id=user.id,
-            action=f"save_trim:{cycle}:{count}_items",
-            trace_id=_gen_tid(),
-        )
-    except Exception:
-        pass
-
-    await db.commit()
-    return {"updated": count}
+@router.put("/{project_id}/procedures/{cycle}/trim", status_code=410)
+async def save_trim_gone(project_id: UUID, cycle: str):
+    """已下线：粗裁写入口统一为 procedure-trim/preview|apply（canonical scope key）。"""
+    raise _gone(GONE_TRIM)
 
 
 @router.post("/{project_id}/procedures/{cycle}/custom")
 async def add_custom(
     project_id: UUID, cycle: str, data: CustomProcedureRequest,
     db: AsyncSession = Depends(get_db),
-    user=Depends(require_role(_DELEGATOR_ROLES)),
+    _guard: DelegatorContext = Depends(require_project_delegator),
 ):
     svc = ProcedureService(db)
     try:
@@ -156,7 +133,7 @@ async def add_custom(
 async def delete_custom_procedure(
     project_id: UUID, cycle: str, proc_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user=Depends(require_role(_DELEGATOR_ROLES)),
+    _guard: DelegatorContext = Depends(require_project_delegator),
 ):
     """删除自定义程序（软删 ProcedureInstance + 清理 WpIndex 占位）。"""
     svc = ProcedureService(db)
@@ -172,7 +149,7 @@ async def add_custom_with_template(
     project_id: UUID,
     cycle: str,
     db: AsyncSession = Depends(get_db),
-    user=Depends(require_role(_DELEGATOR_ROLES)),
+    _guard: DelegatorContext = Depends(require_project_delegator),
     procedure_name: str = Query(...),
     procedure_code: str | None = Query(None),
 ):
@@ -222,7 +199,7 @@ async def download_blank_template(
     cycle: str,
     procedure_name: str = Query("自定义底稿"),
     db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
+    user=Depends(require_project_access("readonly")),
 ):
     """生成并下载空白底稿模板 Excel."""
     from io import BytesIO
@@ -485,89 +462,35 @@ async def download_blank_template(
     )
 
 
-@router.put("/{project_id}/procedures/assign")
-async def assign_procedures(
-    project_id: UUID, data: AssignRequest,
-    db: AsyncSession = Depends(get_db),
-    user=Depends(require_role(_DELEGATOR_ROLES)),
-):
-    from app.services.wp_visibility.delegation_transaction import DelegationError
-
-    svc = ProcedureService(db)
-    try:
-        count = await svc.assign_procedures(
-            project_id, data.assignments, actor_user_id=getattr(user, "id", None)
-        )
-    except DelegationError as exc:
-        # fail-closed：委派/映射/scope 校验失败 → 回滚整批并返回 400（不 commit）
-        await db.rollback()
-        raise HTTPException(status_code=400, detail=f"委派校验失败：{exc.reason.value}") from exc
-    await db.commit()
-    return {"assigned": count}
+@router.put("/{project_id}/procedures/assign", status_code=410)
+async def assign_procedures_gone(project_id: UUID):
+    """已下线：底稿主编写入口统一为 PUT /api/projects/{pid}/workpaper-leads。"""
+    raise _gone(GONE_ASSIGN)
 
 
 @router.get("/{project_id}/procedures/{cycle}/trim-scheme")
 async def get_trim_scheme(
     project_id: UUID, cycle: str,
-    db: AsyncSession = Depends(get_db), user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_project_access("readonly")),
 ):
     svc = ProcedureService(db)
     return await svc.get_trim_scheme(project_id, cycle) or {}
 
 
-@router.post("/{project_id}/procedures/{cycle}/apply-scheme")
-async def apply_scheme(
-    project_id: UUID, cycle: str,
-    source_project_id: UUID = Query(...),
-    db: AsyncSession = Depends(get_db),
-    user=Depends(require_role(_DELEGATOR_ROLES)),
-):
-    svc = ProcedureService(db)
-    count = await svc.apply_scheme(project_id, cycle, source_project_id)
-    await db.commit()
-    return {"applied": count}
+@router.post("/{project_id}/procedures/{cycle}/apply-scheme", status_code=410)
+async def apply_scheme_gone(project_id: UUID, cycle: str):
+    """已下线：参照项目必须读源项目当前 wp_code/status 构造 canonical entries 再走 preview/apply。"""
+    raise _gone(GONE_SCHEME)
 
 
-@router.post("/{project_id}/procedures/{cycle}/batch-apply")
-async def batch_apply(
-    project_id: UUID, cycle: str, data: BatchApplyRequest,
-    db: AsyncSession = Depends(get_db),
-    user=Depends(require_role(_DELEGATOR_ROLES)),
-):
-    svc = ProcedureService(db)
-    result = await svc.batch_apply(project_id, cycle, [UUID(t) for t in data.target_project_ids])
-    await db.commit()
-    return result
+@router.post("/{project_id}/procedures/{cycle}/batch-apply", status_code=410)
+async def batch_apply_gone(project_id: UUID, cycle: str):
+    """已下线：批量套用改为逐目标项目调用 canonical preview/apply（真实 applied 可核）。"""
+    raise _gone(GONE_BATCH_APPLY)
 
 
-class ExecutionStatusUpdate(BaseModel):
-    execution_status: str  # not_started / in_progress / completed
-
-
-@router.put("/{project_id}/procedures/instance/{procedure_id}/execution")
-async def update_execution_status(
-    project_id: UUID,
-    procedure_id: UUID,
-    data: ExecutionStatusUpdate,
-    db: AsyncSession = Depends(get_db),
-    user=Depends(get_current_user),
-):
-    """更新程序执行状态（审计助理标记进度）"""
-    from app.models.procedure_models import ProcedureInstance
-    import sqlalchemy as sa
-
-    result = await db.execute(
-        sa.select(ProcedureInstance).where(
-            ProcedureInstance.id == procedure_id,
-            ProcedureInstance.project_id == project_id,
-        )
-    )
-    proc = result.scalar_one_or_none()
-    if not proc:
-        from fastapi import HTTPException
-        raise HTTPException(404, "程序不存在")
-
-    proc.execution_status = data.execution_status
-    await db.flush()
-    await db.commit()
-    return {"id": str(proc.id), "execution_status": proc.execution_status}
+@router.put("/{project_id}/procedures/instance/{procedure_id}/execution", status_code=410)
+async def update_execution_status_gone(project_id: UUID, procedure_id: UUID):
+    """已下线：执行进度是程序行任务真源，只走 ProcedureRowTask 状态机 transitions。"""
+    raise _gone(GONE_EXECUTION)

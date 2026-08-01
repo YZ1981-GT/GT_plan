@@ -258,7 +258,12 @@ class Settings(BaseSettings):
     # expand 阶段默认全部 off/legacy：render-config 只读 overlay 且 task overlay 不改既有读语义。
     # PROCEDURE_ROW_TASKS_ENABLED=True 才在 render-config 上叠加 task overlay（纯读，缺 task 标 materialization_required）。
     PROCEDURE_ROW_TASKS_ENABLED: bool = False
-    PROCEDURE_ROW_TASK_WRITE_MODE: str = "legacy"  # legacy | dual | task-source
+    # procedure-mainline-convergence Task 7.2: 值域统一为下划线 + 新增 paused
+    # legacy = 所有写走旧 ProcedureInstance 路径（默认，向后兼容）
+    # dual = 新旧双写（过渡期数据验证用）
+    # task_source = 只走 ProcedureRowTask 新路径（生产目标态）
+    # paused = 紧急回退态，新路径暂停接受写入（drain + audit），读仍走 task overlay
+    PROCEDURE_ROW_TASK_WRITE_MODE: str = "legacy"  # legacy | dual | task_source | paused
     PROCEDURE_TASK_DISPATCHER_ENABLED: bool = False
 
     # --- visibility-isolation-go-live-hardening Task 3 / R2（组件 H2 DispatcherLifecycle）---

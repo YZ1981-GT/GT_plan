@@ -34,7 +34,6 @@ from app.services.procedure_authorization import (
     normalize_staff_to_user,
     require_staff_active_user,
 )
-from app.services.procedure_materialize_jobs import materialize_job_store
 from app.services.procedure_review_service import ProcedureReviewService
 from app.services.procedure_task_materialization_service import (
     ProcedureTaskMaterializationService,
@@ -84,11 +83,11 @@ async def create_materialize_job(
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    """提交前置 materialize job；同步执行并登记结果。失败 job 不产生 preview。"""
-    job = await materialize_job_store.create(
-        str(project_id), [str(i) for i in body.wp_index_ids]
-    )
-    await materialize_job_store.mark(job.id, "running")
+    """同步物化（兼容旧 materialize-jobs POST 签名，直接返回 succeeded）。
+
+    procedure-mainline-convergence Task 4.2: 不再经进程内 job store 注册/追踪；
+    同步执行完毕后返回 ``{status: "succeeded", ...result}``。
+    """
     svc = ProcedureTaskMaterializationService(db)
     try:
         result = await svc.materialize(
@@ -99,14 +98,11 @@ async def create_materialize_job(
             request_id=body.request_id,
         )
         await db.commit()
-    except Exception as exc:  # noqa: BLE001 — job 失败不产生 preview
+    except Exception as exc:  # noqa: BLE001
         await db.rollback()
-        await materialize_job_store.mark(job.id, "failed", error=str(exc))
-        logger.warning("materialize job 失败 project=%s job=%s: %s", project_id, job.id, exc)
-        updated = await materialize_job_store.get(job.id, str(project_id))
-        return (updated or job).to_dict()
-    updated = await materialize_job_store.mark(job.id, "succeeded", result=result)
-    return (updated or job).to_dict()
+        logger.warning("materialize 失败 project=%s: %s", project_id, exc)
+        return {"status": "failed", "error": str(exc)}
+    return {"status": "succeeded", **(result if isinstance(result, dict) else {})}
 
 
 @router.get("/{project_id}/procedure-row-tasks/materialize-jobs/{job_id}")
@@ -116,11 +112,19 @@ async def get_materialize_job(
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    """查询 materialize job 状态与结果（纯读，不触发任何写）。"""
-    job = await materialize_job_store.get(job_id, str(project_id))
-    if job is None:
-        raise HTTPException(status_code=404, detail="materialize job 不存在")
-    return job.to_dict()
+    """已下线（410）：进程内 job store 不再作为可追踪生产真源。
+
+    procedure-mainline-convergence Task 4.2: materialize 改为同步命令（POST 直接返回 succeeded），
+    job 查询端点不再有追踪意义。
+    """
+    raise HTTPException(
+        status_code=410,
+        detail={
+            "error": "materialize_job_query_removed",
+            "message": "物化改为同步命令，不再支持 job 查询",
+            "replacement": "POST /api/projects/{pid}/procedure-row-tasks/materialize-jobs（直接返回 succeeded）",
+        },
+    )
 
 
 # ---------------------------------------------------------------------------

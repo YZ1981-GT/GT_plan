@@ -51,7 +51,6 @@ from app.services.procedure_authorization import (
     require_staff_active_user,
 )
 from app.services.procedure_definition_importer import canonical_json
-from app.services.procedure_materialize_jobs import materialize_job_store
 from app.services.procedure_operation_preview import consume_and_apply, create_preview
 from app.services.procedure_task_materialization_service import (
     ProcedureTaskMaterializationService,
@@ -102,6 +101,12 @@ class ProcedureDelegationService:
         self.db = db
         self.transition = ProcedureTaskTransitionService(db)
         self.materialization = ProcedureTaskMaterializationService(db)
+        # procedure-mainline-convergence Task 6.2: 批委派的逐 task 操作走 Coordinator
+        # （Coordinator = transition + visibility effects 同事务）
+        from app.services.procedure_row_delegation_coordinator import (
+            ProcedureRowDelegationCoordinator,
+        )
+        self.coordinator = ProcedureRowDelegationCoordinator(db)
 
     # ======================================================================
     # DelegationResolver（确定性展开，Req 4.1 / P11）
@@ -196,19 +201,22 @@ class ProcedureDelegationService:
         tasks: list[ProcedureRowTask],
         *,
         assignee_staff_id: UUID,
+        reviewer_staff_id: UUID | None = None,
         unassigned_only: bool,
         conflict_policy: str,
     ) -> dict:
-        """把目标任务分为 assign / reassign / unchanged / conflict / terminal / skipped_assigned。
+        """把目标任务分为 assign / reassign / reviewer_update / unchanged / conflict / terminal / skipped_assigned。
 
         - terminal（reviewed/cancelled）：不可委派 → 跳过（不计冲突）。
         - workflow=unassigned：首次分配 → assign。
-        - 同执行人：业务 no-op → unchanged（Req 4.8 / P15）。
+        - 同执行人且同复核人：业务 no-op → unchanged（Req 4.8 / P15）。
+        - 同执行人但复核人不同：reviewer_update（Req 7 / 不递增 assignment_version）。
         - 不同执行人：unassigned_only → 跳过；replace_with_reason → reassign；否则 → conflict。
         """
         plan: dict[str, list[ProcedureRowTask]] = {
             "assign": [],
             "reassign": [],
+            "reviewer_update": [],
             "unchanged": [],
             "conflict": [],
             "terminal": [],
@@ -222,7 +230,11 @@ class ProcedureDelegationService:
                 plan["assign"].append(t)
                 continue
             if t.assignee_staff_id == assignee_staff_id:
-                plan["unchanged"].append(t)
+                # 同执行人：检查 reviewer 是否变化
+                if reviewer_staff_id is not None and t.reviewer_staff_id != reviewer_staff_id:
+                    plan["reviewer_update"].append(t)
+                else:
+                    plan["unchanged"].append(t)
                 continue
             # 不同执行人（活动任务）
             if unassigned_only:
@@ -362,35 +374,27 @@ class ProcedureDelegationService:
             await require_staff_active_user(self.db, reviewer_staff_id)
             await assert_sod_distinct(self.db, assignee_staff_id, reviewer_staff_id)
 
-        # -- materialize 前置：cycle/workpaper 存在未物化行 → 触发 job 并返回 pending --
+        # -- materialize 前置：cycle/workpaper 存在未物化行 → 同步物化后直接返回 ready --
+        # (procedure-mainline-convergence Task 4.1: 不再返回 materialization_pending，
+        #  直接同步完成物化并继续构建 ready preview)
         wp_index_ids = await self._candidate_wp_index_ids(project_id, canonical)
         if wp_index_ids:
             pending = await self._count_unmaterialized(project_id, wp_index_ids)
             if pending > 0:
-                job = await materialize_job_store.create(
-                    str(project_id), [str(i) for i in wp_index_ids]
-                )
-                await materialize_job_store.mark(job.id, "running")
-                result = await self.materialization.materialize(
+                await self.materialization.materialize(
                     project_id, wp_index_ids, actor_user_id=actor_user_id
                 )
-                await materialize_job_store.mark(job.id, "succeeded", result=result)
                 logger.info(
-                    "delegation preview 触发前置 materialize project=%s pending=%d job=%s",
-                    project_id, pending, job.id,
+                    "delegation preview 同步前置 materialize project=%s pending=%d",
+                    project_id, pending,
                 )
-                return {
-                    "status": "materialization_pending",
-                    "materialize_job": (await materialize_job_store.get(job.id, str(project_id))).to_dict(),
-                    "preview_id": None,
-                    "message": "已触发前置物化 job；job 成功后请重新请求 preview",
-                }
 
         # -- 解析目标 + 分类 --
         targets = await self.resolve_targets(project_id, canonical)
         plan = self._classify(
             targets,
             assignee_staff_id=assignee_staff_id,
+            reviewer_staff_id=reviewer_staff_id,
             unassigned_only=unassigned_only,
             conflict_policy=conflict_policy,
         )
@@ -433,6 +437,7 @@ class ProcedureDelegationService:
                 "targets": len(targets),
                 "would_assign": len(plan["assign"]),
                 "would_reassign": len(plan["reassign"]),
+                "would_reviewer_update": len(plan["reviewer_update"]),
                 "unchanged": len(plan["unchanged"]),
                 "conflict": len(plan["conflict"]),
                 "terminal": len(plan["terminal"]),
@@ -514,6 +519,7 @@ class ProcedureDelegationService:
             plan = self._classify(
                 targets,
                 assignee_staff_id=assignee_staff_id,
+                reviewer_staff_id=reviewer_staff_id,
                 unassigned_only=unassigned_only,
                 conflict_policy=conflict_policy,
             )
@@ -532,8 +538,9 @@ class ProcedureDelegationService:
                 # 每 task SOD：assignee vs 生效 reviewer（新 reviewer 或既有 reviewer）
                 effective_reviewer = reviewer_staff_id or t.reviewer_staff_id
                 await assert_sod_distinct(db, assignee_staff_id, effective_reviewer)
-                return await self.transition.assign(
+                return await self.coordinator.assign(
                     t,
+                    project_id=project_id,
                     new_assignee_staff_id=assignee_staff_id,
                     actor_user_id=actor_user_id,
                     request_id=request_id,
@@ -546,8 +553,9 @@ class ProcedureDelegationService:
             async def _do_reassign(t: ProcedureRowTask) -> dict:
                 effective_reviewer = reviewer_staff_id or t.reviewer_staff_id
                 await assert_sod_distinct(db, assignee_staff_id, effective_reviewer)
-                return await self.transition.reassign(
+                return await self.coordinator.reassign(
                     t,
+                    project_id=project_id,
                     new_assignee_staff_id=assignee_staff_id,
                     actor_user_id=actor_user_id,
                     reason=(reason or ""),
@@ -555,22 +563,38 @@ class ProcedureDelegationService:
                     delegation_batch_id=batch_id,
                 )
 
+            async def _do_set_reviewer(t: ProcedureRowTask) -> dict:
+                return await self.coordinator.set_reviewer(
+                    t,
+                    project_id=project_id,
+                    new_reviewer_staff_id=reviewer_staff_id,
+                    actor_user_id=actor_user_id,
+                    request_id=request_id,
+                    delegation_batch_id=batch_id,
+                )
+
             for kind, tasks_bucket, action in (
                 ("assign", plan["assign"], _do_assign),
                 ("reassign", plan["reassign"], _do_reassign),
+                ("reviewer_update", plan["reviewer_update"], _do_set_reviewer),
             ):
                 for t in tasks_bucket:
-                    try:
+                    if best_effort:
+                        # best_effort：每任务 savepoint，失败不残留 ORM 修改（Req 8 / Task 6.3）
+                        try:
+                            async with db.begin_nested():
+                                r = await action(t)
+                        except (HTTPException, Exception) as exc:
+                            failed += 1
+                            detail = exc.detail if isinstance(exc, HTTPException) else str(exc)
+                            per_task.append(
+                                {"task_id": str(t.id), "action": kind, "status": "failed",
+                                 "error": detail}
+                            )
+                            continue
+                    else:
+                        # atomic：任一失败整体回滚（由调用方 consume_and_apply 事务保证）
                         r = await action(t)
-                    except HTTPException as exc:
-                        if not best_effort:
-                            raise
-                        failed += 1
-                        per_task.append(
-                            {"task_id": str(t.id), "action": kind, "status": "failed",
-                             "error": exc.detail}
-                        )
-                        continue
                     if r.get("changed"):
                         applied += 1
                         per_task.append(

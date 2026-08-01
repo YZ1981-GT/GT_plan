@@ -279,17 +279,21 @@ async def ensure_project_delegator(
     )
 
 
-def require_project_delegator(
+async def require_project_delegator(
     project_id: UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-):
+) -> DelegatorContext:
     """FastAPI 依赖：项目级 Delegator 守卫（路径参数名 `project_id`）。
 
-    用于 `/api/projects/{project_id}/...` 形态路由。对使用 `{pid}` 的路由，
-    见 `require_project_delegator_pid`。二者共享 `ensure_project_delegator` 核心逻辑。
+    用于 `/api/projects/{project_id}/...` 形态路由（如 `procedures.py`）。对使用
+    `{pid}` 的路由，见 `require_project_delegator_pid`。二者共享
+    `ensure_project_delegator` 核心逻辑。
+
+    必须是 async 并 await：同步依赖返回未 await 的协程会让守卫静默失效（FastAPI 不会
+    替调用方 await 普通函数的返回值）。
     """
-    return ensure_project_delegator(db, current_user, project_id)
+    return await ensure_project_delegator(db, current_user, project_id)
 
 
 async def require_project_delegator_pid(

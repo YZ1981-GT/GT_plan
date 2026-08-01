@@ -705,6 +705,12 @@ class NoteWordExporter:
         # 已由 execute_note_formulas 求值为静态值，此标记作为「产物不留可重算表达式」
         # 的兜底守卫，拦截任何以 '=' 开头的公式串泄漏到交付 docx）。
         self._delivery_flatten: bool = False
+        # disclosure-note-follow-actual-content R4.3: 空表省略
+        import os
+        self._skip_empty_tables: bool = os.getenv(
+            "DISCLOSURE_EMPTY_TABLE_COLLAPSE", ""
+        ).strip().lower() not in {"0", "false", "no", "off", ""}
+        self._skipped_empty_tables: list[str] = []
 
     def _new_document(self) -> Document:
         """优先加载 GTNote 模板 docx；缺失时降级 Document() 兼容（Sprint 2 Task 2.2）."""
@@ -1035,6 +1041,10 @@ class NoteWordExporter:
         过滤掉 export_enabled=false 的表格（用户可在前端选择哪些表导出）。
         workpaper 来源记录先经投影得到 _tables（与模块渲染一致）。
 
+        🔴 空表默认省略（disclosure-note-follow-actual-content R4.3）：
+        投影后的表经 `is_empty_table` 判定为空 → 跳过导出（被省略表名记入
+        `self._skipped_empty_tables` 供导出摘要消费）。只在灰度开关开启时生效。
+
         🔴 空表头补齐（与前端 get_note_detail 读时投影一致）：历史生成/模板绑定合并
         路径产出的部分 table_data 出现 ``headers: []`` 但 rows 非空（每行带 values +
         ``_cell_meta[col].semantic`` 列语义）。``_render_table`` 遇空表头直接 return →
@@ -1042,6 +1052,7 @@ class NoteWordExporter:
         使数据列可渲染（读时派生，不改存量；与前端 note_header_projector 同一纯函数）。
         """
         from app.services.note_header_projector import project_headers
+        from app.services.note_empty_table_detector import is_empty_table
 
         td = self._effective_table_data(note)
         if not isinstance(td, dict):
@@ -1060,7 +1071,12 @@ class NoteWordExporter:
                 source_template=source_template,
                 table_index=idx,
             )
-            result.append(projected if projected is not None else t)
+            final = projected if projected is not None else t
+            # 空表省略（R4.3）：灰度开关 + 空表判定
+            if self._skip_empty_tables and is_empty_table(final.get("rows"), final.get("columns")):
+                self._skipped_empty_tables.append(str(final.get("name") or f"表{idx + 1}"))
+                continue
+            result.append(final)
         return result
 
     def _render_table_at(self, doc: Document, anchor_para, table_data: dict) -> None:

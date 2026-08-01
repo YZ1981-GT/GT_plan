@@ -77,6 +77,8 @@ def register_collaboration_routers(app: FastAPI) -> None:
     from app.routers.procedure_trim import router as procedure_trim_router
     # procedure-delegation-notification / Task 8：三粒度委派 preview/apply API
     from app.routers.procedure_delegations import router as procedure_delegations_router
+    # procedure-mainline-convergence：底稿主编语义 API（替代旧 /procedures/assign）
+    from app.routers.workpaper_leads import router as workpaper_leads_router
     # procedure-delegation-notification / Task 12：程序行任务查询 API（项目级 + 跨项目 + 详情，纯读）
     from app.routers.procedure_task_query import (
         project_query_router as procedure_task_query_router,
@@ -91,6 +93,7 @@ def register_collaboration_routers(app: FastAPI) -> None:
               pmd_router, qcd_router, pd_router, rc2_router, proc_router,
               se_router, forum_router, independence_router, procedure_row_tasks_router,
               procedure_reconcile_router, procedure_trim_router, procedure_delegations_router,
+              workpaper_leads_router,
               procedure_task_query_router, procedure_my_tasks_router,
               procedure_delivery_router, procedure_review_router]:
         app.include_router(r, tags=["团队与看板"])
