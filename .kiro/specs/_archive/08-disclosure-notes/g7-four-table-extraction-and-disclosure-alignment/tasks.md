@@ -225,7 +225,7 @@ Wave 7 实测收口。**G1~G6 / G8~G14 不在本 spec 范围**。
   - Requirements: 8.1, 8.2, 8.3
   - Properties: 8
 
-- [ ] 5.2 两版 `columns` 加 `group`：上市主表 + 国企明细表的 `本期增减变动`（8 子列）、
+- [x] 5.2 两版 `columns` 加 `group`：上市主表 + 国企明细表的 `本期增减变动`（8 子列）、
   `持股比例%` 的 `直接`/`间接`、非全资子公司财务信息的期间分组；
   单行表头的表显式标 `flat`。**`key` 一律不动**（载荷行对象用的就是这些键）。
   - Requirements: 5.1, 5.2, 5.3, 6.6
@@ -251,7 +251,7 @@ Wave 7 实测收口。**G1~G6 / G8~G14 不在本 spec 范围**。
   - Requirements: 7.1, 7.2, 7.3, 7.4
   - Properties: 11
 
-- [ ] 5.6 **固定列数改动态列**：新增 `buildG7SlotColumns(slot, names, sub?)`（稳定 key
+- [x] 5.6 **固定列数改动态列**：新增 `buildG7SlotColumns(slot, names, sub?)`（稳定 key
   `{slot}_{seq}`，改名只改 `label` 不动 `key` —— 🔴 列 key 不能用 label，源模板四个槽位默认叶子名
   相同会撞键，H7 已踩）；替换写死项：上市 `companyColumns`(6) / `associateMatrixColumns`(3)，
   国企 `multiCompanyCurrentPriorColumns`(5) / `soldFsPositionColumns`(2) /
@@ -263,19 +263,19 @@ Wave 7 实测收口。**G1~G6 / G8~G14 不在本 spec 范围**。
   - Requirements: 11.6, 11.7
   - Properties: 18
 
-- [ ] 6.1 新建 `composables/g7NoteSectionMap.ts` 薄壳（章节号内联字面量、对象体内无注释、
+- [x] 6.1 新建 `composables/g7NoteSectionMap.ts` 薄壳（章节号内联字面量、对象体内无注释、
   `G7_DISCLOSURE_SHEET_NAME` 写成单个对象），重跑
   `backend/scripts/gen/gen_note_wp_sync_registry.py --write` 并核 diff
   （只应新增 G7 条目；若带入并发会话改动须逐条确认）。
   - Requirements: 8.4, 8.5
   - Properties: 14
 
-- [ ] 6.2 新建勾稽引擎 `g7DisclosureConsistency.ts`（纯函数，6 条规则见 design）
+- [x] 6.2 新建勾稽引擎 `g7DisclosureConsistency.ts`（纯函数，6 条规则见 design）
   + 面板复用 `WpDisclosureConsistencyPanel`，两个 Tab 接入。
   - Requirements: 5.9
   - Properties: —
 
-- [ ] 6.3 UI 铁律：两个披露 Tab 的 `el-input-number` 全量换 `WpAmountInput`
+- [x] 6.3 UI 铁律：两个披露 Tab 的 `el-input-number` 全量换 `WpAmountInput`
   （改完 **grep 确认归零**，比例/持股比例列不得套用）；自造
   `fmtAmount`/`toLocaleString('zh-CN')` 改
   `inject(DisplayPrefsKey) ?? useDisplayPrefsStore()` 后 `displayPrefs.fmtAmount(v)`
@@ -283,20 +283,20 @@ Wave 7 实测收口。**G1~G6 / G8~G14 不在本 spec 范围**。
   - Requirements: 5.7, 5.8
   - Properties: —
 
-- [ ] 6.4 前端契约 `g7NoteSubtableContract.spec.ts`（复用
+- [x] 6.4 前端契约 `g7NoteSubtableContract.spec.ts`（复用
   `_disclosureSubtableContract.helper` 的 P1~P6）+ `disclosureColumnsCoverage.spec.ts`
   的 `P1_ROUTE` 登记 `buildG7ListedColumns` / `buildG7SoeColumns`
   （🔴 必须零入参可调，否则 sweep 判「flat/group 未表态」）。
   - Requirements: 10.2
   - Properties: 8, 9
 
-- [ ] 6.5 CI：`governance-checks.yml` 新增 job `g7-four-table-extraction`
+- [x] 6.5 CI：`governance-checks.yml` 新增 job `g7-four-table-extraction`
   （后端 `four_table/test_g7_*`）与 `note-g7-structure`
   （脚本 `--check` + `test_note_g7_structure.py` + 前端契约）。
   - Requirements: 10.4
   - Properties: —
 
-- [ ] 6.6 反硬编码守卫 `g7NoHardcode.spec.ts`（读源码，必先 `stripComments()` 且加反向自检）：
+- [x] 6.6 反硬编码守卫 `g7NoHardcode.spec.ts`（读源码，必先 `stripComments()` 且加反向自检）：
   ①`'1511'` / `'1512'` 字面量只许出现在 `g7AccountScope.ts` 与测试 fixture
   ②`G7_NOTE_SECTION` 两个值逐字等于 `note_template_variant_matrix.json` 对应 variant
   ③国企 15 个 `noteSectionId` 逐条存在于 `note_template_soe.json` 的 `section_number` 集合
@@ -308,21 +308,21 @@ Wave 7 实测收口。**G1~G6 / G8~G14 不在本 spec 范围**。
   - Requirements: 11.1, 11.3, 11.4, 11.5, 11.6, 11.7, 11.8
   - Properties: 15, 16, 17, 18
 
-- [ ] 7.1 真实 DB 直跑 render（项目 `2aa00f57` 有 1511/1512 活体）：验证
+- [x] 7.1 真实 DB 直跑 render（项目 `2aa00f57` 有 1511/1512 活体）：验证
   ①叶子和 == 父科目 `1511` 期初 40,459,060.60 ②`impairment` 为正
   （期初 2,840,032.97 / 期末 4,790,032.97）③`tb_source_codes` 含 `BS-024`/`IMP-009`
   ④`adjudication_prefill` 的 `other` 桶 = 损益调整 + 其他权益变动之和，且不摊入前三类。
   - Requirements: 10.3
   - Properties: 1, 3, 6
 
-- [ ] 7.2 浏览器实测（chrome-devtools + postgres 只读）：两版披露 Tab 渲染两级表头、
+- [x] 7.2 浏览器实测（chrome-devtools + postgres 只读）：两版披露 Tab 渲染两级表头、
   `el-input-number` 计数 0、`1234567.5` → `1,234,567.50`、动态行增删、
   推送后复核落库表数 / 列元数据 / `_column_groups` / `_last_sync_sheet` / `_note_texts` title；
   上市侧确认 `五、18` 与 `七、1` **各自落表**（不再是 14 张孤儿）。**实测数据用后完整复原**。
   - Requirements: 10.3, 8.1
   - Properties: 8, 9, 10, 11
 
-- [ ] 7.3 向用户确认 `G7_FOUR_TABLE_EXTRACTION_ENABLED` 的处置（本环境 opt-in vs 全局翻默认，
+- [x] 7.3 向用户确认 `G7_FOUR_TABLE_EXTRACTION_ENABLED` 的处置（本环境 opt-in vs 全局翻默认，
   该开关默认 `False` 使 `tb_leaf_categories` 与「从四表取数」端点运行态全返空），
   裁决结果回写本文件；清理本会话 `tmp_*` 诊断产物。
   - Requirements: 9.1, 9.3

@@ -1,0 +1,52 @@
+{
+  "active": true,
+  "capacity_report_hash": "03297f8f798bc0fa40df3ad5a3f6b6f0ed09f3c45cd6140fa67c8023e0b637a9",
+  "frozen": true,
+  "per_family_families": [
+    "ai",
+    "attachment",
+    "bulk",
+    "editor_callback",
+    "gate_checklist",
+    "gate_dedicated",
+    "gate_detail",
+    "gate_render",
+    "gate_version",
+    "list",
+    "worker"
+  ],
+  "per_project_families": [
+    "ai",
+    "attachment",
+    "bulk",
+    "editor_callback",
+    "gate_checklist",
+    "gate_dedicated",
+    "gate_detail",
+    "gate_render",
+    "gate_version",
+    "list",
+    "worker"
+  ],
+  "per_user_families": [
+    "ai",
+    "attachment",
+    "bulk",
+    "editor_callback",
+    "gate_checklist",
+    "gate_dedicated",
+    "gate_detail",
+    "gate_render",
+    "gate_version",
+    "list",
+    "worker"
+  ],
+  "source_performance_profile_version": "perf-6000-visibility-v1",
+  "thresholds": {
+    "per_family": 60,
+    "per_project": 659,
+    "per_user": 14
+  },
+  "version": "rate-6000-visibility-v1",
+  "window_seconds": 1.0
+}

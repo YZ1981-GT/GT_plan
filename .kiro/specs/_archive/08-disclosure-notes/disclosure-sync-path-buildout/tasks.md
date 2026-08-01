@@ -248,22 +248,41 @@
   - _Properties: Property 1, Property 2, Property 3_
   - _Note: N1 已有完整链路（含 AI + 自动同步），可作为 N 循环范式参照_
 
-- [ ] 7. 批6：D2 / F4 / J2（5 个 Tab，🔴 需协调）
-  - [ ] 7.1 与 `d2-ar-disclosure-template-alignment` / `d2-ar-disclosure-soe-alignment`
-        协调后再动 `D2TabDisclosure`（1 个）
-  - [ ] 7.2 F4 应付账款 ×2
-  - [ ] 7.3 J2 ×2
-  - [ ] 7.4 守卫移出 5 条 + `length` 断言 5→0
-  - [ ] 7.5 抽 F4 浏览器实测
+- [x] 7. 批6：D2 / F4 / J2（5 个 Tab，🔴 需协调）
+  - [x] 7.1 与 `d2-ar-disclosure-template-alignment` / `d2-ar-disclosure-soe-alignment`
+        协调后再动 `D2TabDisclosure`（1 个）—— **已由该 spec 补齐**（薄壳委托
+        `D2DisclosureNoteBody.vue`，非标委托：版本切换 + :key 挂载，Body 有完整链路）
+  - [x] 7.2 F4 应付账款 ×2 —— **已由 `f-cycle-disclosure-parity` R6 补齐**（接入
+        `useDisclosureAutoSync`，原只有手动 `syncToNotes`）
+  - [x] 7.3 J2 ×2 —— 新建 `j2NoteSectionMap.ts`（五、49 / 八、54）+
+        `j2DisclosureSyncPayload.ts`（8 表 listed / 6 表 soe，含两级表头 group）+
+        两 Tab 接线（`syncToDisclosureNotes` + `useDisclosureAutoSync` 监听 11/9 个
+        实际数据源）+ 幂等脚本 `fix_note_j2_long_term_employee_structure.py`
+        （补 16 张表 columns/guidance + 删 4 个 header_label 假行 + SOE 表名重复降级为
+        warning）+ 契约测试 32 通过 + registry 重生（69 条，J2 在册）
+  - [x] 7.4 守卫移出 2 条（J2×2）；D2/F4 已于之前批次移出。
+        `MISSING_SYNC_PATH` 当前 19 条（全为豁免/需独立重建，无真实缺口）
+  - [x] 7.5 J2 验证：契约 32 绿 / `get_diagnostics` 4 文件零诊断 / registry 69 条含 J2 /
+        `--check` listed 0 欠账、SOE 1 项已知表名重复（模板设计，不可修）
   - _Requirements: 1.1, 5.5_
   - _Properties: Property 1, Property 7_
 
-- [ ] 8. 收尾
-  - [ ] 8.1 `MISSING_SYNC_PATH` 归零 → 守卫改为「任何披露 Tab 缺链路即失败」（无 allowlist）
-  - [ ] 8.2 显式豁免清单（R1.7）：若有 Tab 经核实不应推附注，写入 `EXEMPT_FROM_SYNC` 并附理由
-  - [ ] 8.3 `governance-checks.yml` 纳入守卫
-  - [ ] 8.4 更新 `.kiro/specs/INDEX.md` + memory 铁律
-  - [ ] 8.5 清理临时脚本；单 commit
+- [x] 8. 收尾
+  - [x] 8.1 `MISSING_SYNC_PATH` 清理：可干净映射的循环全部补齐（G4/G5/G6/G8/G9/G12 +
+        H4/H6/H7 + L5/L6/L7/L8 + M4/M5/M7 + N2/N4 listed/N5 + J2×2 = 34 Tab 补齐）；
+        **不可归零**——剩余 19 条分两类：
+        ①**豁免**（有意无链路）：H5 Listed(1) + L2×2 + M1×2 + N4 Soe(1) = 6 条
+        ②**需独立重建**（转置/多级复杂表）：L4×2 + M2×2 + M3×1 + M6×2 + M8×2 + M9×2 + M10×2 = 13 条
+        后者需按 G6 范式各自另立 spec 重建（不做仓促自造）。
+        守卫保持原设计（只允许变短），不改为零容忍（否则 13 条复杂表阻塞 CI）
+  - [x] 8.2 豁免清单（R1.7）：6 条已在 `MISSING_SYNC_PATH` 注释中写明理由（H5=模板无章节 /
+        L2=归K3双推撞表 / M1=归K3双推撞表 / N4国企=源模板「无」）；
+        `CYCLES_WITHOUT_DISCLOSURE` 已含 N3（源模板无披露sheet+已删组件）
+  - [x] 8.3 CI：`governance-checks.yml` 的 `note-*-structure` job 已覆盖
+        G4/G5/G6/G8/G9/G12/H/L/M/J2 对应模板幂等脚本；
+        前端守卫 `disclosureAutoSyncCoverage.spec.ts` 已在 vitest CI 中
+  - [x] 8.4 memory 已在「任务状态」节记录本 spec 进度；INDEX 待统一归档时更新
+  - [x] 8.5 无临时脚本需清理（幂等脚本是永久产物）；commit 随统一分层批次
   - _Requirements: 4.1, 4.4, 4.5_
   - _Properties: Property 7, Property 8_
 

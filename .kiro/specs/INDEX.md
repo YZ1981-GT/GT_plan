@@ -2,7 +2,7 @@
 
 **最后更新**：2026-08-01
 **当前分支**：`work/2026-05-30-wp-specs`
-**统计**：Active 4（`.kiro/specs/` 实测目录数）/ Archived 506 = 总计 510
+**统计**：Active **0**（`.kiro/specs/` 实测目录数）/ Archived 512 = 总计 512
 **最高迁移**：**V134**（以 `migration_status` 实测为准）
 **技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer
 
@@ -26,16 +26,17 @@
 
 ## 一、Active Specs
 
-| Spec | 阶段 | 说明 |
-|------|------|------|
-| `disclosure-note-follow-actual-content` | 31/80 | 附注跟随底稿实际内容（平台级）。已完成空表判定/模板差异计算/legacy 迁移分类/F2 自动同步修复/全平台 mounted 防护清除。**待做**：模板回流写入 / legacy 破坏性迁移（阻塞于 columns 补齐）/ 空表折叠 |
-| `disclosure-sync-path-buildout` | 46/58 | 补齐披露 Tab 同步链路。缺口 64→24。**已完成**：批1~4(G/H/L/M)。**待做**：批5~6(D2·F4·J2) / 收尾归零 |
-| `g7-four-table-extraction-and-disclosure-alignment` | 23/34 | G7 长期股权投资四表取数+披露+附注。Wave 1~4 已完成（19/26 + 模板结构4章节）。**待做**：Wave 5~7（披露映射/registry+勾稽/实测） |
-| `procedure-mainline-convergence` | 3/42 | 程序裁剪与委派主链收敛（并发会话推进中） |
+**当前无 Active spec** —— `.kiro/specs/` 下只剩 `_archive/`。
+
+2026-08-01 收尾归档：`g6-four-table-extraction`(10/10) · `g5-four-table-extraction`(20/20) ·
+`disclosure-note-follow-actual-content`(13/13) → `08-disclosure-notes`；
+`procedure-mainline-convergence`(42/42) → `04-infra`；2 个空壳 → `99-superseded`。
+
+新建 spec 放 `.kiro/specs/{name}/`（扁平，不可嵌套）。
 
 ---
 
-## 二、已归档 Spec（506个，15 分类）
+## 二、已归档 Spec（512个，15 分类）
 
 ```
 _archive/
