@@ -88,7 +88,7 @@ describe('noteDisclosureReverseJump', () => {
   it.each([
     ['G13', '三、公允价值变动收益', '八、72'], // 公允价值变动收益
     ['G14', '三、信用减值损失', '八、73'],     // 信用减值损失
-    ['H10', '三、资产处置收益', '八、75'],     // 资产处置收益
+    ['H10', '三、资产处置收益（损', '八、75'], // 资产处置收益（listed 取 note_template 截断值）
   ])('maps 损益类 %s listed→%s soe→%s and builds routes', (wp, listed, soe) => {
     expect(DISCLOSURE_NOTE_SECTION_MAP[wp]).toEqual({ listed, soe })
     expect((buildNoteJumpRoute('p1', wp, 'listed') as any).query).toEqual({ section: listed, noteTemplate: 'listed' })
@@ -106,8 +106,8 @@ describe('noteDisclosureReverseJump', () => {
     ['I4', '五、29', '八、30'], // 长期待摊费用
     ['I6', '五、66', '八、67'], // 研发费用
     ['K1', '五、8', '八、9'],   // 其他应收款
-    ['K11', '三、资产减值损失', '八、74'], // 资产减值损失（损益类关键词）
-    ['K13', '三、营业外支出', '八、77'],   // 营业外支出（损益类关键词）
+    ['K11', '三、资产减值损失（损', '八、74'], // 资产减值损失（listed 取 note_template 截断值）
+    ['K13', '三、营业外支出（注：', '八、77'],   // 营业外支出（listed 取 note_template 截断值）
   ])('对称补齐 %s listed→%s soe→%s and builds routes', (wp, listed, soe) => {
     expect(DISCLOSURE_NOTE_SECTION_MAP[wp]).toEqual({ listed, soe })
     expect((buildNoteJumpRoute('p1', wp, 'listed') as any).query).toEqual({ section: listed, noteTemplate: 'listed' })
@@ -216,5 +216,49 @@ describe('reverse jump · N1 递延所得税资产', () => {
     )
     expect(DISCLOSURE_NOTE_SECTION_MAP.N1.listed).toBe(N1_NOTE_SECTION.listed)
     expect(DISCLOSURE_NOTE_SECTION_MAP.N1.soe).toBe(N1_NOTE_SECTION.soe)
+  })
+
+  // 🔴 损益类「三、」章的 section_number 在 note_template_listed.json 里被 md 重建
+  //    截断为 10 字符（如 `三、资产处置收益（损`），这是既有真源形态、不是错字。
+  //    历史上 K11/K12/K13/H10 写完整名 → sync_from_workpaper 按 (project_id, year,
+  //    note_section) 定位落空、上市侧新建垃圾章节。本守卫锁死「必须能在真源里找到」，
+  //    防止后人把截断值「修正」回完整名。
+  it('所有「三、」listed 章节号都存在于 note_template_listed.json（防截断值被误修正）', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { resolve } = await import('node:path')
+    const tplPath = resolve(__dirname, '../../../../../../backend/data/note_template_listed.json')
+    const raw = readFileSync(tplPath, 'utf-8')
+
+    const known = new Set<string>()
+    const collect = (node: unknown): void => {
+      if (Array.isArray(node)) {
+        node.forEach(collect)
+        return
+      }
+      if (node && typeof node === 'object') {
+        const sn = (node as Record<string, unknown>).section_number
+        if (typeof sn === 'string') known.add(sn)
+        Object.values(node as Record<string, unknown>).forEach(collect)
+      }
+    }
+    collect(JSON.parse(raw))
+
+    // 反向自检：真源解析必须真的拿到内容，否则本断言恒空转
+    expect(known.size).toBeGreaterThan(50)
+    expect(known).toContain('三、资产处置收益（损')
+
+    // H5/M2 等国企专属节没有 listed 值，跳过
+    const listedSections = Object.entries(DISCLOSURE_NOTE_SECTION_MAP)
+      .map(([wp, v]) => [wp, v.listed] as const)
+      .filter((pair): pair is readonly [string, string] => typeof pair[1] === 'string')
+      .filter(([, listed]) => listed.startsWith('三、'))
+
+    // 反向自检：确实取到了「三、」类章节，否则 offenders 恒空
+    expect(listedSections.length).toBeGreaterThan(0)
+
+    const offenders = listedSections
+      .filter(([, listed]) => !known.has(listed))
+      .map(([wp, listed]) => `${wp} -> ${listed}`)
+    expect(offenders).toEqual([])
   })
 })
