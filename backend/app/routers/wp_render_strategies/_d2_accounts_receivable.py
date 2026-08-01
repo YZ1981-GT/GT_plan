@@ -135,6 +135,67 @@ async def render(ctx: RenderContext) -> dict | None:
             "不发 adjudication_prefill（wp_id=%s）",
             wp_id,
         )
+
+        # ─── TB 核对标量（净额口径：原值 1122 − 坏账准备 1231-02）───────────────
+        # 源模板 审定表D2-1 的被比较项是「三、应收账款净值」合计 A27；
+        # report_config BS-006 soe_standalone 同口径。
+        # 给 project_context 下发 tb_amount（净额）供前端 seed 回退，保证
+        # 「灰度开 + Tier A 被停用」时核对行不回落到原值（D1 同款缺陷已实测）。
+        try:
+            _gross_row = (
+                await db.execute(
+                    sa.text(
+                        "SELECT COALESCE(SUM(unadjusted_amount), 0) AS unadjusted, "
+                        "COALESCE(SUM(audited_amount), 0) AS audited "
+                        "FROM trial_balance "
+                        "WHERE project_id = :pid AND year = :year AND is_deleted = false "
+                        "AND standard_account_code LIKE '1122%'"
+                    ),
+                    {"pid": str(ctx.project_id), "year": ctx.year},
+                )
+            ).fetchone()
+            if _gross_row:
+                _aud = float(_gross_row.audited or 0)
+                _unadj = float(_gross_row.unadjusted or 0)
+                project_context["tb_amount"] = _aud if _aud else _unadj
+                project_context["tb_amount_unadjusted"] = _unadj
+                project_context["tb_amount_audited"] = _aud
+        except Exception as e:  # noqa: BLE001
+            logger.warning("D2 render: trial_balance 1122 查询失败: %s", e)
+
+        try:
+            _prov_row = (
+                await db.execute(
+                    sa.text(
+                        "SELECT COALESCE(SUM(unadjusted_amount), 0) AS unadjusted, "
+                        "COALESCE(SUM(audited_amount), 0) AS audited "
+                        "FROM trial_balance "
+                        "WHERE project_id = :pid AND year = :year AND is_deleted = false "
+                        "AND standard_account_code LIKE '1231-02%'"
+                    ),
+                    {"pid": str(ctx.project_id), "year": ctx.year},
+                )
+            ).fetchone()
+            if _prov_row:
+                _p_aud = abs(float(_prov_row.audited or 0))
+                _p_unadj = abs(float(_prov_row.unadjusted or 0))
+                project_context["tb_provision_amount"] = _p_aud if _p_aud else _p_unadj
+                project_context["tb_provision_amount_unadjusted"] = _p_unadj
+                project_context["tb_provision_amount_audited"] = _p_aud
+        except Exception as e:  # noqa: BLE001
+            logger.warning("D2 render: trial_balance 1231-02 查询失败: %s", e)
+
+        # 净额归一（无备抵数据时空操作保灰度等价）
+        from app.routers.wp_render_strategies._d1_notes_receivable import _net_tb_amount
+        _net_tb_amount(project_context)
+
+        # tb_source_codes 取数溯源（前端消费，非 dead output）
+        html_data["tb_source_codes"] = {
+            "gross_standard": ["1122"],
+            "provision_standard": ["1231-02"],
+            "resolved_from": "hardcoded",  # D2 暂未接 resolve_report_line_account_codes
+        }
+
         # ─── Tier A 公式驱动 TB 核对行 transient seed（P0-1 主机制）──────────────
         # spec: d-cycle-tier-a-writeback-detail-seed R3（决策1/3 / Property 6/7/10/11/13）
         # 用 resolve_effective 的有效 Tier A 公式（默认 TB('1122','期末余额')）求值 transient

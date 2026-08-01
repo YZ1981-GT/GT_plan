@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import json
 import logging
+import re
 from typing import Any, Callable, Iterable, Sequence
 from uuid import uuid4
 
@@ -762,28 +763,58 @@ async def _resolve_f1_segments(db: AsyncSession, wp_id: str) -> list[Any]:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 _AUX_ACCOUNT_PREFIX = "1123"
-# 往来单位维度优先关键词（命中则优先作为归集维度）
-_AUX_TYPE_PREFERRED_KEYWORDS = ("客户", "供应商", "往来", "单位", "个人", "职员", "员工")
+
+# 🔴 `pick_aux_type` 已提升为四表库共享件（`app/services/four_table/aux_aggregation`），
+#   K1 是第二个消费者。此处保留同名 re-export：
+#     - G7 的 `from ._f1_import_export import pick_aux_type` 零改动；
+#     - 本文件下方 `aggregate_f1_detail_rows_from_aux` 继续按原名调用。
+#   `_AUX_TYPE_PREFERRED_KEYWORDS` 同样 re-export（既有测试按该名断言关键词表）。
+from app.services.four_table.aux_aggregation import (  # noqa: E402
+    AUX_TYPE_PREFERRED_KEYWORDS as _AUX_TYPE_PREFERRED_KEYWORDS,
+    pick_aux_type,
+)
+
+__all_reexport__ = ("pick_aux_type", "_AUX_TYPE_PREFERRED_KEYWORDS")
 
 
-def pick_aux_type(
-    candidates: Iterable[tuple[str, int, float]],
+#: F1-2「关联方关系」列的枚举值（与 `F1TabDetail.vue` 的 el-option 逐字一致）。
+#: 自动识别命中时写 `其他关联方` —— 写关联方**名称**会让 el-select 显示枚举外的值。
+F1_RELATION_NONE = "非关联方"
+F1_RELATION_MATCHED = "其他关联方"
+
+#: 名称匹配的最短长度下限。中文企业名普遍 ≥6 字；短于此的名单项（如「医药」）
+#: 双向包含会命中几乎所有往来单位 → 自动识别宁漏勿误（误标关联方会污染 F1-6 与披露）。
+_RELATED_PARTY_MIN_LEN = 4
+
+
+def match_related_party(
+    customer_name: str, registry: Sequence[str] | None
 ) -> str | None:
-    """纯函数：从 `(aux_type, 行数, 余额绝对值合计)` 候选中挑唯一归集维度。
+    """纯函数：往来单位名 → 命中的关联方名单项（未命中返回 ``None``）。
 
-    优先含往来单位关键词的维度；其次余额合计更大者；再次行数更多者。
-    无候选返回 None。
+    匹配语义与前端 `useF1Detail.matchRelatedPartyPure`（手动「识别关联方」按钮）一致：
+    去空白 + 忽略大小写 + **双向包含**（客户账套里同一主体常带分店/分公司后缀，
+    名单里也可能只登记简称）。
+
+    两处**有意的差异**（本函数是**自动**路径，误判成本高于漏判）：
+
+    1. 名单项或往来单位名短于 :data:`_RELATED_PARTY_MIN_LEN` 时跳过该项；
+    2. 返回值是命中的**名单项**，由调用方转成枚举值 :data:`F1_RELATION_MATCHED`
+       写入 `relationType`（前端手动路径直接把名单项写进 `relationType`，
+       会让 el-select 显示枚举外的值）。
     """
-    items = [(str(t or ""), int(n or 0), float(amt or 0)) for t, n, amt in candidates]
-    if not items:
+    name = re.sub(r"\s+", "", str(customer_name or ""))
+    if len(name) < _RELATED_PARTY_MIN_LEN:
         return None
-    preferred = [
-        it for it in items
-        if any(kw in it[0] for kw in _AUX_TYPE_PREFERRED_KEYWORDS)
-    ]
-    pool = preferred or items
-    pool.sort(key=lambda it: (abs(it[2]), it[1], it[0]), reverse=True)
-    return pool[0][0]
+    name_lower = name.lower()
+    for raw in registry or ():
+        party = re.sub(r"\s+", "", str(raw or ""))
+        if len(party) < _RELATED_PARTY_MIN_LEN:
+            continue
+        party_lower = party.lower()
+        if name_lower in party_lower or party_lower in name_lower:
+            return party
+    return None
 
 
 def build_f1_detail_rows_from_aux(
@@ -792,6 +823,7 @@ def build_f1_detail_rows_from_aux(
     *,
     row_limit: int = ROW_LIMIT,
     row_id_factory: Callable[[], str] | None = None,
+    related_parties: Sequence[str] | None = None,
 ) -> list[dict]:
     """纯函数：1123 辅助余额归集结果 → F1-2 明细行（账龄按当前枚举段，落首段）。
 
@@ -800,9 +832,14 @@ def build_f1_detail_rows_from_aux(
         segments: 当前有效账龄段（表级覆盖/项目配置），行内 aging 字段按其 key 建桶。
         row_limit: 行数上限（超出截断）。
         row_id_factory: rowId 工厂（默认 uuid4；单测可注入确定性工厂）。
+        related_parties: 项目关联方名单（`related_party_registry`）。缺省 / 空列表时
+            行为与改造前**逐字一致**（全部 `非关联方`）。
 
     账龄不臆造：辅助余额表无账龄维度，故金额整笔落**首段**（通常「1年以内」）并在
     端点返回 message 提示审计师按实际账龄调整（前端 `allocateAging` 可一键改档）。
+
+    关联方不臆造：只按 :func:`match_related_party` 命中名单时标注，并把命中的名单项
+    写进 `remark` 供审计追溯（审计师可在 F1-2 下拉里改判）。
     """
     make_row_id = row_id_factory or (lambda: str(uuid4()))
     seg_keys = [str(getattr(s, "key", "") or "") for s in segments]
@@ -826,12 +863,18 @@ def build_f1_detail_rows_from_aux(
         end_balance = round(opening + debit - credit, 2)
         # 期末优先用账套 closing（含账套自身结转口径），缺失时用滚存值
         end_unadjusted = closing_raw if abs(closing_raw) > 1e-9 else end_balance
+        matched_party = match_related_party(name, related_parties)
+        remark = "由辅助余额表(1123)导入"
+        if matched_party:
+            remark = f"{remark}；关联方名单命中：{matched_party}"
         rows.append({
             "rowId": make_row_id(),
             "customerName": name,
             "companyCode": "",
             "nature": "",
-            "relationType": "非关联方",
+            "relationType": (
+                F1_RELATION_MATCHED if matched_party else F1_RELATION_NONE
+            ),
             "priorUnadjusted": opening,
             "priorAdjustment": 0,
             "priorReclass": 0,
@@ -849,7 +892,7 @@ def build_f1_detail_rows_from_aux(
             "agingAudited": _aging(end_unadjusted),
             "isConfirmed": "",
             "postPeriodSettlement": 0,
-            "remark": "由辅助余额表(1123)导入",
+            "remark": remark,
         })
     return rows
 
@@ -916,9 +959,42 @@ async def aggregate_f1_detail_rows_from_aux(
         (r.aux_name, r.opening, r.debit, r.credit, r.closing) for r in agg_rows
     ]
     rows = build_f1_detail_rows_from_aux(
-        entries, segments, row_limit=row_limit, row_id_factory=row_id_factory
+        entries,
+        segments,
+        row_limit=row_limit,
+        row_id_factory=row_id_factory,
+        related_parties=await _fetch_related_party_names(db, project_id),
     )
     return rows, aux_type, len(entries)
+
+
+async def _fetch_related_party_names(
+    db: AsyncSession, project_id: str
+) -> list[str]:
+    """项目关联方名单（`related_party_registry`）。异常返回 `[]`（fail-open）。
+
+    名单为空 → :func:`build_f1_detail_rows_from_aux` 的 `relationType` 行为与
+    改造前逐字一致，故取不到名单不影响归集本身。
+    """
+    try:
+        rows = (
+            await db.execute(
+                sa.text(
+                    "SELECT name FROM related_party_registry "
+                    "WHERE project_id = :pid AND is_deleted = false "
+                    "AND name IS NOT NULL AND name <> ''"
+                ),
+                {"pid": str(project_id)},
+            )
+        ).fetchall()
+        return [str(r.name) for r in rows if r.name]
+    except Exception as e:  # noqa: BLE001
+        logger.warning("F1 归集: related_party_registry 查询失败: %s", e)
+        try:
+            await db.rollback()
+        except Exception:
+            pass
+        return []
 
 
 @router.post("/api/workpapers/{wp_id}/f1/import-aux-balance")
@@ -974,16 +1050,22 @@ async def f1_import_aux_balance(
     if segments:
         first_label = str(getattr(segments[0], "label", "") or "")
     truncated = total_units > len(rows_data)
+    rp_hits = sum(
+        1 for r in new_rows if r.get("relationType") != F1_RELATION_NONE
+    )
     msg = (
         f"从辅助余额表(1123·{aux_type})归集 {total_units} 个往来单位，"
         f"新增 {len(new_rows)} 行；账龄已整笔落「{first_label}」，请按实际账龄调整。"
     )
+    if rp_hits:
+        msg += f" 其中 {rp_hits} 行按项目关联方名单自动标为关联方，请复核。"
     out: dict[str, Any] = {
         "ok": True,
         "imported_count": len(new_rows),
         "total_rows": len(merged),
         "total_units": total_units,
         "aux_type": aux_type,
+        "related_party_hits": rp_hits,
         "rows": new_rows,
     }
     if truncated:

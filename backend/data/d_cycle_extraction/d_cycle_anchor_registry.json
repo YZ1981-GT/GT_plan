@@ -68,7 +68,7 @@
     "spec": ".kiro/specs/d-cycle-tier-a-writeback-detail-seed/",
     "task": "1.3 前置核实（块 C-2 / 决策4 D6-2 aux 归集形态） (Wave 0)",
     "description": "P0-2 明细表维度归集 render 自动 seed 试点（D6-2）的既有归集形态核实结论（R4.3/R4.4）。",
-    "finding": "D6-2 明细表 tb_aux_balance 1402 客户/合同维度归集原本【仅内联于 HTTP handler】_d6_import_export.py::d6_import_aux_balance（原始 SQL GROUP BY aux_name + 行构建循环），无可复用后端函数。按 R4.4 / 决策4（B）已【抽取为纯函数 + 可复用入口】（不改原端点行为，端点改为委托）。",
+    "finding": "D6-2 明细表 tb_aux_balance 1141 客户/合同维度归集原本【仅内联于 HTTP handler】_d6_import_export.py::d6_import_aux_balance（原始 SQL GROUP BY aux_name + 行构建循环），无可复用后端函数。按 R4.4 / 决策4（B）已【抽取为纯函数 + 可复用入口】（不改原端点行为，端点改为委托）。",
     "reusable_entry": "app.services.d_cycle_extraction.detail_aggregation.aggregate_d6_detail_rows(db, project_id, row_limit=500) → list[D6-2 行 dict]（供 Wave 5 Task 5.1 render seed 按名调用）",
     "pure_function": "app.services.d_cycle_extraction.detail_aggregation.build_d6_detail_rows_from_aux(aux_entries, row_limit=500, row_id_factory=None) → list[dict]（无 I/O，可单测；单测见 tests/d_cycle_extraction/test_d6_detail_aggregation.py）",
     "endpoint_behavior": "原 /api/workpapers/{wp_id}/d6/import-aux-balance 逐字节不变（查询口径、行 schema、merge/persist、返回结构），仅内部委托 aggregate_d6_detail_rows。",

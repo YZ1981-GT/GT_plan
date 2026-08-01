@@ -225,6 +225,40 @@ def build_impairment_prefill(
     return {"end": round(agg["closing"], 2), "prior": round(agg["opening"], 2)}
 
 
+def resolve_impairment_prefill(
+    tb_balance_result: dict[str, float] | None,
+    trial_balance_end: float | None,
+) -> dict[str, float] | None:
+    """合并两条减值准备取数路径（纯函数）。
+
+    为什么需要两条路径（postgres 实证，项目 ``0ec33ac9`` / 2025）：
+
+    - ``account_mapping`` 只有 ``1231→1231`` / ``1231.01→1231-01`` / ``1231.02→1231-02``
+      / ``1231.03→1231-03``，**没有** ``1231-04``；
+    - 而 ``trial_balance`` **确有** ``1231-04 坏账准备-预付账款`` 行。
+
+    → 「标准码 → 反解原始码 → ``tb_balance`` 前缀」路径必然退化为宽前缀 ``1231``，
+    叠「预付」名称过滤后命中为空；而标准码直查 ``trial_balance`` 可精确命中。
+    这也解释了为什么公式预设 ``TB('1231-04','期末余额')``（走 ``trial_balance``）
+    与旧 ``impairment_prefill``（走 ``tb_balance``）口径不同。
+
+    Args:
+        tb_balance_result: :func:`build_impairment_prefill` 的结果（含期初+期末）。
+        trial_balance_end: ``trial_balance`` 标准码口径的**期末**减值准备。
+
+    Returns:
+        - ``tb_balance`` 路径有结果 → 原样返回（它同时给期初+期末，信息更全）；
+        - 否则 ``trial_balance`` 期末非零 → ``{"end": x}``（**故意不含 prior**：
+          ``trial_balance`` v2 无期初列，臆造期初会让披露表「上年年末减值准备」出错）；
+        - 两条都空 → ``None``（宁缺勿造，由前端保持手工录入）。
+    """
+    if tb_balance_result:
+        return tb_balance_result
+    if trial_balance_end is not None and abs(trial_balance_end) > 1e-9:
+        return {"end": round(float(trial_balance_end), 2)}
+    return None
+
+
 # ─────────────────────────── DB 访问（全程 fail-open） ───────────────────────────
 
 
@@ -323,6 +357,56 @@ async def _fetch_f1_1123_audited(
         return audited if abs(audited) > 1e-9 else unadjusted
     except Exception as e:  # noqa: BLE001
         logger.warning("F1 render: trial_balance 1123 取数失败: %s", e)
+        try:
+            await ctx.db.rollback()
+        except Exception:
+            pass
+        return None
+
+
+async def _fetch_provision_from_trial_balance(
+    ctx: RenderContext, standard_codes: list[str]
+) -> float | None:
+    """按备抵**标准码**从 `trial_balance` 取期末减值准备（审定优先、回退未审）。
+
+    与 :func:`_fetch_f1_1123_audited` 同一范式（同一张表、同一过滤器构造），
+    差别只在取绝对值 —— 备抵是贷方科目，两种符号约定下 ``abs`` 同解。
+
+    🔴 **不叠名称过滤**：本路径吃的是标准码（`1231-04` 语义就是「坏账准备-预付账款」），
+    再叠「预付」会把客户命名不含该词的行误杀。名称过滤只属 ``tb_balance`` 宽前缀路径。
+
+    Returns:
+        期末减值准备（绝对值）；无命中行或异常返回 ``None``（fail-open）。
+    """
+    from app.services.report_account_mapping import build_trial_balance_code_filter
+
+    codes = [c for c in (str(x or "").strip() for x in standard_codes or []) if c]
+    if not codes:
+        return None
+    where_clause, params = build_trial_balance_code_filter(codes)
+    try:
+        result = await ctx.db.execute(
+            sa.text(
+                "SELECT unadjusted_amount, audited_amount "
+                "FROM trial_balance "
+                "WHERE project_id = :pid AND year = :year AND is_deleted = false "
+                f"AND {where_clause}"
+            ),
+            {"pid": str(ctx.project_id), "year": ctx.year, **params},
+        )
+        audited = 0.0
+        unadjusted = 0.0
+        found = False
+        for row in result.fetchall():
+            found = True
+            audited += float(row.audited_amount or 0)
+            unadjusted += float(row.unadjusted_amount or 0)
+        if not found:
+            return None
+        picked = audited if abs(audited) > 1e-9 else unadjusted
+        return round(abs(picked), 2)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("F1 render: trial_balance 备抵取数失败: %s", e)
         try:
             await ctx.db.rollback()
         except Exception:
@@ -462,7 +546,15 @@ async def render(ctx: RenderContext) -> dict | None:
     # ── 四表库取数（报表映射规则驱动 + 共享叶子聚合，全程 fail-open）─────────────
     accounts = await _resolve_f1_accounts(ctx)
     # 取数溯源（前端 F1FourTableSourcePanel 消费；旧版是 list[str] 且前端 0 消费）
-    project_context["tb_source_codes"] = accounts.as_dict()
+    source_codes = accounts.as_dict()
+
+    # 备抵第二取数口径：标准码直查 trial_balance（`account_mapping` 常缺 `1231-04`，
+    # 反解必退化为宽前缀 `1231` → tb_balance 路径恒空；标准码路径可精确命中）。
+    provision_trial_amount = await _fetch_provision_from_trial_balance(
+        ctx, list(accounts.provision_standard)
+    )
+    source_codes["provision_trial_amount"] = provision_trial_amount
+    project_context["tb_source_codes"] = source_codes
 
     # F1-4 跨循环锚点同样走报表映射（存货 BS-010 区间 / 应付账款 BS-045）
     inventory_specs = await _resolve_line_codes(
@@ -542,14 +634,17 @@ async def render(ctx: RenderContext) -> dict | None:
 
     # 减值准备（坏账准备-预付账款）预填：备抵侧反解退化为宽前缀时**必须**叠名称过滤，
     # 否则会把应收票据/应收账款/其他应收款的坏账（1231.01/.02/.03）算进 F1。
-    impairment_prefill = build_impairment_prefill(
-        leaves,
-        accounts.provision,
-        name_filter=(
-            None
-            if accounts.provision_exact
-            else F1_REPORT_LINE_SPEC.provision_name_filter
+    impairment_prefill = resolve_impairment_prefill(
+        build_impairment_prefill(
+            leaves,
+            accounts.provision,
+            name_filter=(
+                None
+                if accounts.provision_exact
+                else F1_REPORT_LINE_SPEC.provision_name_filter
+            ),
         ),
+        provision_trial_amount,
     )
     if impairment_prefill is not None:
         result["impairment_prefill"] = impairment_prefill

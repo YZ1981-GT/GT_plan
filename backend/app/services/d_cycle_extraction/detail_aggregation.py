@@ -2,7 +2,7 @@
 
 spec: .kiro/specs/d-cycle-tier-a-writeback-detail-seed/  (Requirements 4.3, 4.4 / 决策4)
 
-**背景（前置核实结论）**：D6-2 明细表的 `tb_aux_balance` 1402 客户/合同维度归集，
+**背景（前置核实结论）**：D6-2 明细表的 `tb_aux_balance` 1141 客户/合同维度归集，
 原本**仅内联于 HTTP handler** `_d6_import_export.py::d6_import_aux_balance`（原始 SQL
 GROUP BY aux_name + 行构建循环），**无可复用后端函数**。按 R4.4 / 决策4（B）：
 若归集仅存在于 HTTP handler，则**先抽取为纯函数（不改原端点行为）** 再供 P0-2 render
@@ -10,10 +10,10 @@ GROUP BY aux_name + 行构建循环），**无可复用后端函数**。按 R4.4
 
 本模块提供两层（收敛铁律：复用同一 SQL，不新造第 3 套四表库读取）：
 
-  * `build_d6_detail_rows_from_aux(...)` —— **纯函数**（无 I/O）：把 1402 归集结果
+  * `build_d6_detail_rows_from_aux(...)` —— **纯函数**（无 I/O）：把 1141 归集结果
     （aux_name / 期初余额 / 期末余额）构建为 D6-2 行 dict（30 列）。可无 DB 单测。
   * `aggregate_d6_detail_rows(db, project_id, ...)` —— **可复用入口**（供 render 按名调用）：
-    执行与原端点**逐字节相同**的 tb_aux_balance 1402 GROUP BY aux_name 查询后调纯函数。
+    执行与原端点**逐字节相同**的 tb_aux_balance 1141 GROUP BY aux_name 查询后调纯函数。
 
 原 HTTP 端点 `d6_import_aux_balance` 改为委托 `aggregate_d6_detail_rows` —— 端点行为
 （查询口径、行 schema、merge/persist、返回结构）逐字节不变。
@@ -32,7 +32,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 # D6-2 明细行上限（与 `_d6_import_export._ROW_LIMIT` 一致；此处独立定义避免端点↔服务循环 import）
 DEFAULT_ROW_LIMIT = 500
 
-# tb_aux_balance 科目 1402 按客户/合同维度（aux_name）归集期初/期末余额。
+# tb_aux_balance 科目 1141 按客户/合同维度（aux_name）归集期初/期末余额。
+# 合同资产科目为 1141；`report_config` 报表行 BS-011 四准则一致。原 `1402` 是在途物资
+# （存货类），属误用。
 # 真实列: opening_balance / closing_balance（无 period_type / balance 列）。
 _AUX_QUERY = """
     SELECT aux_name,
@@ -40,7 +42,7 @@ _AUX_QUERY = """
            COALESCE(SUM(closing_balance), 0) AS current_balance
     FROM tb_aux_balance
     WHERE project_id = :pid
-      AND account_code LIKE '1402%'
+      AND account_code LIKE '1141%'
       AND is_deleted = false
     GROUP BY aux_name
     ORDER BY aux_name
@@ -53,7 +55,7 @@ def build_d6_detail_rows_from_aux(
     row_limit: int = DEFAULT_ROW_LIMIT,
     row_id_factory: Callable[[], str] | None = None,
 ) -> list[dict]:
-    """纯函数：把 1402 归集结果构建为 D6-2 行 dict 列表（30 列，与原端点逐字节一致）.
+    """纯函数：把 1141 归集结果构建为 D6-2 行 dict 列表（30 列，与原端点逐字节一致）.
 
     Args:
         aux_entries: 可迭代的归集条目，每项按位置解构为 `(aux_name, prior_balance, current_balance)`。
@@ -117,7 +119,7 @@ async def aggregate_d6_detail_rows(
 ) -> list[dict]:
     """可复用入口（供 P0-2 render 自动 seed 按名调用 / Wave 5 Task 5.1）.
 
-    执行与原端点 `d6_import_aux_balance` 逐字节相同的 tb_aux_balance 1402 GROUP BY aux_name
+    执行与原端点 `d6_import_aux_balance` 逐字节相同的 tb_aux_balance 1141 GROUP BY aux_name
     查询，然后调 `build_d6_detail_rows_from_aux` 构建 D6-2 行。无归集数据 → 返回 `[]`。
 
     Args:

@@ -4,7 +4,7 @@
 - POST /api/workpapers/{wp_id}/d6/export-template?sheet={sheet_code}  空白模板xlsx
 - POST /api/workpapers/{wp_id}/d6/export-data?sheet={sheet_code}      数据xlsx
 - POST /api/workpapers/{wp_id}/d6/import-data?sheet={sheet_code}      解析xlsx写入
-- POST /api/workpapers/{wp_id}/d6/import-aux-balance                  从tb_aux_balance科目1402导入
+- POST /api/workpapers/{wp_id}/d6/import-aux-balance                  从tb_aux_balance科目1141导入
 
 支持sheets: D6-2, D6-3, D6-5, D6-8
 """
@@ -364,7 +364,11 @@ async def d6_import_aux_balance(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
-    """从 tb_aux_balance（科目1402，按客户/合同维度）批量导入到D6-2"""
+    """从 tb_aux_balance（科目1141，按客户/合同维度）批量导入到D6-2
+
+    合同资产科目为 1141；`report_config` 报表行 BS-011 四准则一致。原 `1402` 是在途物资
+    （存货类），属误用。
+    """
     import sqlalchemy as sa
 
     wp_result = await db.execute(
@@ -385,7 +389,7 @@ async def d6_import_aux_balance(
     )
 
     if not rows_data:
-        return {"ok": True, "imported_count": 0, "message": "未找到科目1402的辅助余额数据"}
+        return {"ok": True, "imported_count": 0, "message": "未找到科目1141的辅助余额数据"}
 
     # Merge模式：保留已有行，追加新客户
     item_id = "D6-2-rows"
@@ -733,10 +737,10 @@ _D6_SHEET_GUIDANCE: dict[str, list[str]] = {
         "D6-2 合同资产明细表 编制说明",
         "",
         "一、本表目的",
-        "按合同/客户维度列示合同资产（科目1402）明细，含30列完整数据。",
+        "按合同/客户维度列示合同资产（科目1141）明细，含30列完整数据。",
         "",
         "二、科目特征",
-        "科目编码：1402 合同资产（借方科目/资产类）",
+        "科目编码：1141 合同资产（借方科目/资产类）",
         "核心公式：期末未审 = 期初审定 + 借方发生 - 贷方发生",
         "",
         "三、填写要求",

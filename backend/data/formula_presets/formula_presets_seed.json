@@ -3310,7 +3310,7 @@
     {
       "target_cell": "IMP-004",
       "expression": "0",
-      "description": "三、合同资产减值准备 — 有合同资产(1402)减值时手工填列",
+      "description": "三、合同资产减值准备 — 有合同资产(1141)减值时手工填列",
       "refs": [],
       "page_key": "report:impairment_provision",
       "formula_type": "auto_calc",

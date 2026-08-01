@@ -37,6 +37,36 @@ logger = logging.getLogger(__name__)
 _D1_WP_CODE = "D1"
 
 
+def _net_tb_amount(project_context: dict) -> None:
+    """把 TB 核对回退标量 ``tb_amount`` 归一为**净额**口径（原值 − 坏账准备）。
+
+    🔴 口径必须与 Tier A 预设 ``D1-adj-tb-amount`` 一致（双证见该预设 description：
+    源模板 ``审定表D1-1`` 的 ``E20=E18-E19`` 比的是「三、应收票据净值」；
+    ``report_config`` 的 BS-005 在 soe_standalone 下亦为 ``TB('1121')-TB('1231-01')``）。
+
+    主路径是 Tier A 公式求值后 transient seed 到锚点；本标量只是**前端 seed 回退**
+    （`GtD1NotesReceivable.tbNotesReceivableAmount`）。此前回退留在原值口径 →
+    一旦用户在公式管理里停用该 Tier A 公式，核对行就回落到原值，
+    重现「差异恰好等于坏账准备」的假差异（实测项目 0ec33ac9：1,162,288.03）。
+
+    原值保留在 ``tb_amount_gross``，供审定表做取数溯源展示（原值 − 坏账 = 净额）。
+    灰度关时本函数不被调用 → render 输出逐字节等价（characterization 零回归）。
+    """
+    # 未解析出坏账准备（该项目无 1231-01 数据 / 查询 fail-open）→ 净额恒等于原值，
+    # 不造 `tb_amount_gross` 溯源键，保持与灰度关时**逐字节等价**（characterization）。
+    if "tb_amount" not in project_context or "tb_provision_amount" not in project_context:
+        return
+    provision = float(project_context.get("tb_provision_amount") or 0)
+    for key in ("", "_unadjusted", "_audited"):
+        gross_key = f"tb_amount{key}"
+        if gross_key not in project_context:
+            continue
+        gross = float(project_context.get(gross_key) or 0)
+        prov = float(project_context.get(f"tb_provision_amount{key}") or 0) if key else provision
+        project_context[f"tb_amount_gross{key}"] = gross
+        project_context[gross_key] = gross - prov
+
+
 async def _seed_tb_provision_amount(
     ctx: RenderContext, project_context: dict, codes: D1AccountCodes
 ) -> None:
@@ -235,6 +265,7 @@ async def render(ctx: RenderContext) -> dict | None:
         # D1-1「二、应收票据坏账准备」区块与 TB 核对（灰度关时不查、行为不变）。
         if d1_codes is not None:
             await _seed_tb_provision_amount(ctx, project_context, d1_codes)
+            _net_tb_amount(project_context)
 
         if settings.D_CYCLE_DETAIL_SEED_ENABLED:
             try:

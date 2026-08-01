@@ -38,13 +38,21 @@ OUT_PATH = Path(__file__).resolve().parent.parent / "data" / "note_workpaper_syn
 #    ②不收尾时 `X_NOTE_SECTION_DISPLAY`（界面展示用、非定位用）也会命中并**覆盖**
 #      真正的定位常量 —— 实测 H10 因此把 `八、75` 写成 `八、75 资产处置收益`，
 #      而 registry 是「同步就绪度看板」的章节定位真源。
+#    ③body 允许**一层嵌套**（`(?:[^{}]|\{[^{}]*\})*`）：G1/G10 一个循环覆盖两个附注
+#      章节，形态是 `listed: { trading: '五、2', derivative: '五、3' }`。原 `[^}]*`
+#      在第一个 `}` 处截断 → `listed:` 后面不是引号 → 两个变体都抽不到 → 整条
+#      wp_code 从 registry 消失（实测 G1/G10 长期缺失）。
 _SECTION_BLOCK = re.compile(
     r"(?:const|let|var)\s+\w*_NOTE_SECTION(?![\w])"
-    r"(?P<anno>\s*:[^=]{0,200})?\s*=\s*\{(?P<body>[^}]*)\}",
+    r"(?P<anno>\s*:[^=]{0,200})?\s*=\s*\{(?P<body>(?:[^{}]|\{[^{}]*\})*)\}",
     re.S,
 )
 _LISTED = re.compile(r"listed\s*:\s*['\"](?P<v>[^'\"]+)['\"]")
 _SOE = re.compile(r"soe\s*:\s*['\"](?P<v>[^'\"]+)['\"]")
+# 嵌套形态：`listed: { trading: '五、2', derivative: '五、3' }`（一个循环两个章节）
+_LISTED_NESTED = re.compile(r"listed\s*:\s*\{(?P<body>[^{}]*)\}")
+_SOE_NESTED = re.compile(r"soe\s*:\s*\{(?P<body>[^{}]*)\}")
+_SUB_ENTRY = re.compile(r"(?P<key>\w+)\s*:\s*['\"](?P<v>[^'\"]+)['\"]")
 # X_DISCLOSURE_SHEET_LISTED / _SOE / _NAME（sheet 真实 tab 名，尽力提取；找不到留空不臆造）
 #
 # 🔴 必须锚定 `const/let/var` 声明：否则文档注释里提到常量名时，`[^=]*=` 会跨过注释
@@ -95,6 +103,23 @@ def _is_section_code(v: str | None) -> bool:
     return bool(v) and bool(re.match(r"^[一二三四五六七八九十]+、", v or ""))
 
 
+def _extract_nested_sections(body: str, pattern: re.Pattern[str]) -> dict[str, str]:
+    """抽 `listed: { trading: '五、2', derivative: '五、3' }` 形态的子章节。
+
+    返回 ``{子键: 章节号}``，只保留通过 :func:`_is_section_code` 的值（防把
+    sheet 名或其它字面量当章节号）。
+    """
+    m = pattern.search(body)
+    if not m:
+        return {}
+    out: dict[str, str] = {}
+    for sub in _SUB_ENTRY.finditer(m.group("body")):
+        v = sub.group("v")
+        if _is_section_code(v):
+            out[sub.group("key")] = v
+    return out
+
+
 _REVERSE_MAP_PATH = (
     FRONTEND_SRC / "views" / "composables" / "noteDisclosureReverseJump.ts"
 )
@@ -141,6 +166,8 @@ def build_entries() -> list[dict]:
             continue
         text = path.read_text(encoding="utf-8")
         listed = soe = None
+        listed_sections: dict[str, str] = {}
+        soe_sections: dict[str, str] = {}
         for block in _SECTION_BLOCK.finditer(text):
             body = block.group("body")
             lm = _LISTED.search(body)
@@ -151,6 +178,16 @@ def build_entries() -> list[dict]:
                 listed = lv if _is_section_code(lv) else None
                 soe = sv if _is_section_code(sv) else None
                 break
+            # 嵌套形态（一个循环两个章节，如 G1 交易性金融资产/衍生金融资产）
+            nested_l = _extract_nested_sections(body, _LISTED_NESTED)
+            nested_s = _extract_nested_sections(body, _SOE_NESTED)
+            if nested_l or nested_s:
+                listed_sections = nested_l
+                soe_sections = nested_s
+                # `listed`/`soe` 取首个子章节保持既有消费方兼容；全集见 *_sections
+                listed = next(iter(nested_l.values()), None)
+                soe = next(iter(nested_s.values()), None)
+                break
         if not (listed or soe):
             continue
         # 反向 map 补全缺失变体（同源，不覆盖已有）
@@ -158,16 +195,20 @@ def build_entries() -> list[dict]:
         listed = listed or rev.get("listed")
         soe = soe or rev.get("soe")
         sheets = _extract_sheet_names(text)
-        entries.append(
-            {
-                "wp_code": wp_code,
-                "listed": listed,
-                "soe": soe,
-                "sheet_listed": sheets.get("listed"),
-                "sheet_soe": sheets.get("soe"),
-                "source_file": str(path.relative_to(REPO_ROOT)).replace("\\", "/"),
-            }
-        )
+        entry = {
+            "wp_code": wp_code,
+            "listed": listed,
+            "soe": soe,
+            "sheet_listed": sheets.get("listed"),
+            "sheet_soe": sheets.get("soe"),
+            "source_file": str(path.relative_to(REPO_ROOT)).replace("\\", "/"),
+        }
+        # 多章节循环：附加字段（可选，既有消费方只读 listed/soe 不受影响）
+        if listed_sections:
+            entry["listed_sections"] = listed_sections
+        if soe_sections:
+            entry["soe_sections"] = soe_sections
+        entries.append(entry)
     return entries
 
 

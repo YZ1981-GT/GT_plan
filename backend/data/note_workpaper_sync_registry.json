@@ -1,6 +1,6 @@
 {
   "_source": "生成自前端 *NoteSectionMap.ts（唯一真源），勿手工编辑；重生成：python backend/scripts/gen_note_wp_sync_registry.py --write",
-  "generated_at": "2026-07-31T14:03:40.276584+00:00",
+  "generated_at": "2026-07-31T15:26:24.901539+00:00",
   "entries": [
     {
       "wp_code": "D1",
@@ -99,6 +99,22 @@
       "source_file": "audit-platform/frontend/src/components/workpaper/composables/f4NoteSectionMap.ts"
     },
     {
+      "wp_code": "G10",
+      "listed": "五、34",
+      "soe": "八、34",
+      "sheet_listed": "附注披露信息（上市公司）",
+      "sheet_soe": "附注披露信息（国企）",
+      "source_file": "audit-platform/frontend/src/components/workpaper/composables/g10NoteSectionMap.ts",
+      "listed_sections": {
+        "trading": "五、34",
+        "derivative": "五、35"
+      },
+      "soe_sections": {
+        "trading": "八、34",
+        "derivative": "八、35"
+      }
+    },
+    {
       "wp_code": "G11",
       "listed": "五、69",
       "soe": "八、70",
@@ -131,12 +147,36 @@
       "source_file": "audit-platform/frontend/src/components/workpaper/composables/g14NoteSectionMap.ts"
     },
     {
+      "wp_code": "G1",
+      "listed": "五、2",
+      "soe": "八、2",
+      "sheet_listed": "附注披露信息（上市公司）",
+      "sheet_soe": "附注披露信息（国企）",
+      "source_file": "audit-platform/frontend/src/components/workpaper/composables/g1NoteSectionMap.ts",
+      "listed_sections": {
+        "trading": "五、2",
+        "derivative": "五、3"
+      },
+      "soe_sections": {
+        "trading": "八、2",
+        "derivative": "八、3"
+      }
+    },
+    {
       "wp_code": "G2",
       "listed": "五、8",
       "soe": "八、9",
       "sheet_listed": "附注披露信息（上市公司）",
       "sheet_soe": "附注披露信息（国企）",
       "source_file": "audit-platform/frontend/src/components/workpaper/composables/g2NoteSectionMap.ts"
+    },
+    {
+      "wp_code": "G3",
+      "listed": "五、8",
+      "soe": "八、9",
+      "sheet_listed": "附注披露信息（上市公司）",
+      "sheet_soe": "附注披露信息（国企）",
+      "source_file": "audit-platform/frontend/src/components/workpaper/composables/g3NoteSectionMap.ts"
     },
     {
       "wp_code": "G4",
@@ -211,12 +251,28 @@
       "source_file": "audit-platform/frontend/src/components/workpaper/composables/h3NoteSectionMap.ts"
     },
     {
+      "wp_code": "H4",
+      "listed": "五、23",
+      "soe": "八、23",
+      "sheet_listed": "附注披露信息（上市公司）",
+      "sheet_soe": "附注披露信息（国有企业）",
+      "source_file": "audit-platform/frontend/src/components/workpaper/composables/h4NoteSectionMap.ts"
+    },
+    {
       "wp_code": "H5",
       "listed": null,
       "soe": "八、25",
       "sheet_listed": null,
       "sheet_soe": "附注披露信息（国有企业）",
       "source_file": "audit-platform/frontend/src/components/workpaper/composables/h5NoteSectionMap.ts"
+    },
+    {
+      "wp_code": "H6",
+      "listed": "五、22",
+      "soe": "八、22",
+      "sheet_listed": "附注披露信息（上市公司）",
+      "sheet_soe": "附注披露信息（国有企业）",
+      "source_file": "audit-platform/frontend/src/components/workpaper/composables/h6NoteSectionMap.ts"
     },
     {
       "wp_code": "H7",

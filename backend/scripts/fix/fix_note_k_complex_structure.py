@@ -110,8 +110,10 @@ def _cols(pairs: list[tuple[str, str, str | None]]) -> list[dict[str, Any]]:
 
 #: 三阶段快照表列（源 xlsx A32:F39 等；第 6 列「理由」附注模板原缺）
 def _stage_cols(rate_label: str) -> list[dict[str, Any]]:
+    # 🔴 源 xlsx 上市 `A32/A41/A51/A63/A72/A82` 均为「类 别」（单空格），
+    # 与国企侧「类  别」（双空格，见 `_method_cols`）不同，逐字取值。
     return _cols([
-        ("label", "类别", None),
+        ("label", "类 别", None),
         ("账面余额", "账面余额", AMOUNT),
         ("预期信用损失率", rate_label, TEXT),
         ("坏账准备", "坏账准备", AMOUNT),
@@ -173,9 +175,11 @@ def _listed_movement_cols(label_header: str) -> list[dict[str, Any]]:
     )
 
 
+#: 上市侧行标签 —— 源 xlsx `A93`/`A94` 为「上年年末余额」/「上年年末余额在本期」
+#: （非国企侧的「期初余额」口径，两版此处用语不同）。
 _ECL_MOVEMENT_ROWS = [
-    data_row("期初余额"),
-    data_row("期初余额在本期"),
+    data_row("上年年末余额"),
+    data_row("上年年末余额在本期"),
     data_row("--转入第二阶段"),
     data_row("--转入第三阶段"),
     data_row("--转回第二阶段"),
@@ -262,7 +266,8 @@ K1_LISTED_PLAN: list[dict[str, Any]] = [
     # 项目 `useAgingConfig` 配置），此处 seed 取源模板默认口径（K1 默认 FIVE_YEAR）。
     rule(
         "按账龄披露",
-        _cols([("label", "账龄", None), ("期末余额", "期末余额", AMOUNT),
+        # 源 xlsx `A7` = 「账 龄」（单空格），非「账龄」。
+        _cols([("label", "账 龄", None), ("期末余额", "期末余额", AMOUNT),
                ("上年年末余额", "上年年末余额", AMOUNT)]),
         [data_row("1年以内"), data_row("其中：0-X个月"), data_row("X-Y个月"),
          subtotal_row("1年以内小计："), data_row("1至2年"), data_row("2至3年"),
@@ -314,7 +319,8 @@ K1_LISTED_PLAN: list[dict[str, Any]] = [
     ),
     rule(
         "本期实际核销的其他应收款情况",
-        _cols([("label", "项目", None), ("核销金额", "核销金额", AMOUNT)]),
+        # 源 xlsx `A113` = 「项  目」（双空格），非「项目」。
+        _cols([("label", "项  目", None), ("核销金额", "核销金额", AMOUNT)]),
         [data_row("实际核销的其他应收款")],
         KEEP,
     ),
@@ -323,7 +329,10 @@ K1_LISTED_PLAN: list[dict[str, Any]] = [
         _cols([("label", "单位名称", None), ("其他应收款性质", "其他应收款性质", TEXT),
                ("核销金额", "核销金额", AMOUNT), ("核销原因", "核销原因", TEXT),
                ("履行的核销程序", "履行的核销程序", TEXT),
-               ("是否由关联交易产生", "是否由关联交易产生", TEXT)]),
+               # 源 xlsx `F116` = 「款项是否由关联交易产生」（比模板原「是否由关联交易
+               # 产生」多「款项」二字）；`B116` 源模板笔误写「应收账款性质」（本 sheet
+               # 是其他应收款）— 保留语义正确的「其他应收款性质」，不照抄笔误。
+               ("是否由关联交易产生", "款项是否由关联交易产生", TEXT)]),
         blanks_then_total(3),
         KEEP,
     ),
@@ -590,7 +599,9 @@ K1_SOE_PLAN: list[dict[str, Any]] = [
     ),
     rule(
         "涉及政府补助的应收款项",
-        _cols([("label", "单位名称", None),
+        # 源 xlsx `A126` = "单位名称\n（注：政府补助的发文单位）"（换行）→ 附注列头
+        # 不放 HTML，改括注纯文本（与上市 R137 一致口径）。
+        _cols([("label", "单位名称（注：政府补助的发文单位）", None),
                ("政府补助项目名称", "政府补助项目名称", TEXT),
                ("期末余额", "期末余额", AMOUNT), ("期末账龄", "期末账龄", TEXT),
                ("预计收取的时间、金额及依据", "预计收取的时间、金额及依据", TEXT)]),

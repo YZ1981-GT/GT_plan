@@ -47,6 +47,10 @@ from app.services.four_table.leaf_aggregation import (
     select_leaves,
     to_leaf_rows,
 )
+from app.services.four_table.k1_detail_seed import (
+    build_k1_bad_debt_seed_from_tb,
+    seed_k1_bad_debt,
+)
 from app.services.four_table.report_line_accounts import (
     ReportLineAccounts,
     ReportLineAccountSpec,
@@ -452,6 +456,14 @@ async def render(ctx: RenderContext) -> dict | None:
     adjudication_prefill: dict = {}
     if not _has_persisted_adjudication(responses_snapshot):
         adjudication_prefill = _build_adjudication_prefill(leaves, accounts)
+
+    # K1-3 坏账准备明细 ← 备抵科目叶子 transient seed（手工优先，fail-open）。
+    # 三阶段拆分不做 seed（客户科目表无信用风险阶段维度，来自 K1-7）。
+    try:
+        bd_seed = build_k1_bad_debt_seed_from_tb(leaves, accounts.provision)
+        seed_k1_bad_debt(responses_snapshot, bd_seed)
+    except Exception as e:  # noqa: BLE001 — fail-open，不影响其余输出
+        logger.warning("K1-3 坏账准备 seed 失败: %s", e)
 
     return {
         "component_type": "k1-other-receivables",

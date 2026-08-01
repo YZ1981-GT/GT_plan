@@ -65,6 +65,13 @@ class ReportLineAccountSpec:
         row_code: 报表行次编码（如其他应收款 ``BS-009``）。
         fallback_gross: 原值兜底**标准码**（报表映射解析失败时用）。
         fallback_provision: 备抵兜底**标准码**。
+        provision_row_code: 备抵科目**独立报表行**编码（可选）。用于「备抵不在原值行公式里、
+            而是自成一行」的循环 —— 实证 G7：``BS-024 长期股权投资 = TB('1511','期末余额')``
+            不引用备抵，减值准备是独立行 ``IMP-009 八、长期股权投资减值准备 =
+            TB('1512','期末余额')``。设了本字段时，仅当 `row_code` 的公式**没解析出备抵码**
+            才去解析它；解析成功则 `provision_resolved_from='report_config'` 且
+            `provision_exact` 由 `account_mapping` 反解决定。默认 ``None`` = 与本字段
+            引入前逐字等价（D1/K1/K2/F1 等既有消费者零回归）。
         provision_name_filter: 备抵侧名称过滤词；仅当反解退化为宽前缀
             （无 `account_mapping` 记录）时由调用方叠加，防把其它科目的坏账算进来。
         extra_standard_codes: 报表公式**未必引用**但底稿需要单列的科目标准码
@@ -75,6 +82,7 @@ class ReportLineAccountSpec:
     row_code: str
     fallback_gross: tuple[str, ...] = ()
     fallback_provision: tuple[str, ...] = ()
+    provision_row_code: str | None = None
     provision_name_filter: str | None = None
     extra_standard_codes: tuple[str, ...] = ()
 
@@ -109,6 +117,9 @@ class ReportLineAccounts:
     resolved_from: str = RESOLVED_FROM_FALLBACK
     provision_resolved_from: str = RESOLVED_FROM_FALLBACK
     provision_exact: bool = False
+    #: 备抵独立报表行（`spec.provision_row_code` 命中时才非空），供溯源展示
+    provision_row_code: str = ""
+    provision_formula: str | None = None
 
     @property
     def use_provision_name_filter(self) -> bool:
@@ -427,6 +438,29 @@ async def resolve_report_line_accounts(
     # 两侧各自标注来源：报表公式可能只引用原值（实证 listed 侧 BS-009 =
     # TB('1221','期末余额') 未减坏账）→ 备抵侧补兜底标准码，该侧口径退化为 fallback。
     gross_from = RESOLVED_FROM_REPORT if gross_std else RESOLVED_FROM_FALLBACK
+
+    # 备抵自成一行的循环（实证 G7：IMP-009 八、长期股权投资减值准备）：原值行公式没引用
+    # 备抵时，改从独立报表行解析，避免把 `1512` 这类科目码写死成兜底字面量。
+    provision_formula: str | None = None
+    if not provision_std and spec.provision_row_code:
+        try:
+            imp_codes = list(
+                await resolve_report_line_account_codes(
+                    ctx.db,
+                    ctx.project_id,
+                    spec.provision_row_code,
+                    fallback=[],
+                    applicable_standards=standards,
+                )
+            )
+        except Exception as e:  # noqa: BLE001 — 解析失败回退 fallback_provision
+            logger.debug("科目解析: 备抵报表行 %s 解析失败: %s", spec.provision_row_code, e)
+            imp_codes = []
+        if imp_codes:
+            # 备抵行公式里的码一律按备抵处理（该行语义即备抵），不再过 split_gross_provision
+            provision_std = imp_codes
+            provision_formula = await _fetch_formula(ctx, spec.provision_row_code, standards)
+
     provision_from = RESOLVED_FROM_REPORT if provision_std else RESOLVED_FROM_FALLBACK
     if not gross_std:
         gross_std = list(spec.fallback_gross)
@@ -459,6 +493,10 @@ async def resolve_report_line_accounts(
         resolved_from=gross_from,
         provision_resolved_from=provision_from,
         provision_exact=provision_exact,
+        provision_row_code=(
+            spec.provision_row_code or "" if provision_formula is not None else ""
+        ),
+        provision_formula=provision_formula,
     )
 
 

@@ -14,7 +14,11 @@
 
 ---
 
-## D6 合同资产（科目 1402）
+## D6 合同资产（科目 1141）
+
+> 🔴 科目码纠正（2026-08-01）：合同资产科目为 `1141`（标准科目表 direction=debit）；
+> `report_config` 报表行 **BS-011 合同资产** 四准则一致 `TB('1141','期末余额')`。
+> 原全循环登记的 `1402` 是**在途物资**（存货类，属 F2 循环）→ 把存货的钱当合同资产取。
 
 ### D6-1 审定表（`useD6Adjudication.ts`，**per-field 存储**）
 
@@ -25,22 +29,22 @@
 
 | 锚点 | sheet | 存储形式 | 四表可填? | 说明 / 四表来源 |
 |---|---|---|---|---|
-| `D6-1-adj-block1-{rowKey}-priorUnadjusted` | D6-1 | per-field | **是（期初未审·原值）** | `tb_balance` 1402 叶子 `opening_balance`（Tier B）|
-| `D6-1-adj-block1-{rowKey}-currentUnadjusted` | D6-1 | per-field | **是（期末未审·原值）** | `tb_balance` 1402 叶子 `closing_balance`（Tier B）|
+| `D6-1-adj-block1-{rowKey}-priorUnadjusted` | D6-1 | per-field | **是（期初未审·原值）** | `tb_balance` 1141 叶子 `opening_balance`（Tier B）|
+| `D6-1-adj-block1-{rowKey}-currentUnadjusted` | D6-1 | per-field | **是（期末未审·原值）** | `tb_balance` 1141 叶子 `closing_balance`（Tier B）|
 | `D6-1-adj-block1-{rowKey}-{priorAje,priorRje,currentAje,currentRje}` | D6-1 | per-field | 否 | 审计判断（账项/重分类调整），不从四表取 |
 | `D6-1-adj-block1-{rowKey}-reasonAnalysis` | D6-1 | per-field | 否 | 文本，原因分析 |
 | `D6-1-adj-block2-{rowKey}-*` | D6-1 | per-field | 否 | block2=坏账准备（减值），来源 D6-3 ECL 模型而非 TB |
 | `D6-1-adj-block1-rowKeys` / `D6-1-adj-block2-rowKeys` | D6-1 | JSON 数组（行键清单） | 否 | 动态行键追踪（结构性，非数值字段）|
 | `D6-1-adj-block1-deduction-*` / `D6-1-adj-block2-deduction-*` | D6-1 | per-field | 否 | 「减：列示于其他非流动资产」扣减行，审计判断 |
-| `D6-1-tb-amount` | D6-1 | per-field | 否（核对用） | 试算表 1402 总额（TB↔审定核对行，非分类未审）|
+| `D6-1-tb-amount` | D6-1 | per-field | 否（核对用） | 试算表 1141 总额（TB↔审定核对行，非分类未审）|
 | `D6-1-note-{explanation,impairmentEval,longTermReason,conclusion}` | D6-1 | per-field（文本）| 否 | 审计说明/结论文本 |
 | block3（净值）全部 | D6-1 | computed（不落库）| 否 | = block1−block2 逐行派生 |
 
-> **四表可填结论（D6-1）**：仅 block1（原值）动态行的 `priorUnadjusted`/`currentUnadjusted` 是四表可填（1402 期初/期末余额）。block2（坏账准备）来自减值模型；调整/文本/净值均不可填。
+> **四表可填结论（D6-1）**：仅 block1（原值）动态行的 `priorUnadjusted`/`currentUnadjusted` 是四表可填（1141 期初/期末余额）。block2（坏账准备）来自减值模型；调整/文本/净值均不可填。
 
 ### D6-2 明细表（`useD6Detail.ts`，**JSON-array-rows** 单键 `D6-2-rows`）
 
-`D6-2-rows` 存 `DetailRow[]` JSON 数组（30 列）。四表取数走 `importFromAuxBalance`（`tb_aux_balance` 1402 按客户/合同维度归集）+ `importPostSettlementFromLedger`（次年序时账 1402 贷方）——属 **Tier B 复杂归集**，非单条可编辑公式（不做 Tier A）。
+`D6-2-rows` 存 `DetailRow[]` JSON 数组（30 列）。四表取数走 `importFromAuxBalance`（`tb_aux_balance` 1141 按客户/合同维度归集）+ `importPostSettlementFromLedger`（次年序时账 1141 贷方）——属 **Tier B 复杂归集**，非单条可编辑公式（不做 Tier A）。
 
 `DetailRow` 关键字段（四表可填 = ★）：
 `rowId, seqNo, contractName, contractType, customerName, companyCode, relatedPartyType,`
@@ -50,7 +54,7 @@
 `ageEnd1y..ageEnd3yAbove(21-24), receivableWithin1y(25), receivableAbove1y(26),`
 `isInConstructionPeriod(27), creditRiskGroup(28), isConfirmed(29), postPeriodSettlement★(30·序时账)`
 
-> ★ = 可由四表库（tb_aux_balance 1402 / 序时账）归集填充；其余为审计判断/账龄/标记/computed。
+> ★ = 可由四表库（tb_aux_balance 1141 / 序时账）归集填充；其余为审计判断/账龄/标记/computed。
 
 ---
 
@@ -249,7 +253,7 @@ per-field 键：`D7-1-adj-{block}-{rowKey}-{field}`，`block∈{nature, aging}`�
 
 | wp_code | 四表可填锚点（Tier B seed 候选） | 明确不可填（审计判断/核对/computed/分类不可拆） |
 |---|---|---|
-| D6 | D6-1 block1 `priorUnadjusted`/`currentUnadjusted`（原值·1402 期初/期末余额）；D6-2 行内 `priorUnadjusted`/`debitAmount`/`creditAmount`/`postPeriodSettlement`（aux/序时账归集，Tier B） | block2 坏账准备（ECL 模型）、所有 AJE/RJE、reasonAnalysis/notes、block3 净值(computed)、tb-amount(核对)、rowKeys(结构) |
+| D6 | D6-1 block1 `priorUnadjusted`/`currentUnadjusted`（原值·1141 期初/期末余额）；D6-2 行内 `priorUnadjusted`/`debitAmount`/`creditAmount`/`postPeriodSettlement`（aux/序时账归集，Tier B） | block2 坏账准备（ECL 模型）、所有 AJE/RJE、reasonAnalysis/notes、block3 净值(computed)、tb-amount(核对)、rowKeys(结构) |
 | D2 | D2-2 行内 `priorUnadjusted`/`debitOccurrence`/`creditOccurrence`/`postPayment`（aux/序时账归集，Tier B） | D2-1 分类行未审（TB 不可按信用风险拆分→宁缺勿造，由 D2-2 SUMIF）、所有 AJE/RJE、reason、tb-amount(核对)、total-aje/rje、confirm-summary、行内 computed 列 |
 | D1 | D1-3 `D1-cust-rows` 行内 `postSettlement`（序时账 1121 贷方期后兑付归集，Tier B）；D1-adj-tb-amount（1121 总额，Tier A 可编辑 `TB('1121','期末余额')`，render 已 seed） | D1-1 分类行未审（TB 不可按票据类型×区块拆分→宁缺勿造，原值由 D1-2 cross-sheet、坏账由减值模型、净值 computed）、所有 AJE/RJE、reason、note/conclusion |
 | D3 | D3-2 `D3-det-rows` 行内 `priorUnadjusted`/期末等（tb_aux_balance 2203 客户维度归集，Tier B）；D3-adj-trial-balance-amount（2203 总额，Tier A 可编辑 `TB('2203','期末余额')`） | D3-1 双区块分类行未审（TB 不可按性质/账龄拆分→宁缺勿造，由 D3-2 SUMIF）、所有 AJE/RJE、reasonAnalysis、note（aging-reason/change-analysis/conclusion）|

@@ -22105,7 +22105,7 @@
         "depends_on_sheets": [],
         "enabled": true,
         "import_order": 10,
-        "item_id": "K1-2-detail-rows",
+        "item_id": "K1-2-rows",
         "storage_field": "remark"
       },
       "jump_route_template": "/workpapers/{wp_id}?sheet=K1-2",

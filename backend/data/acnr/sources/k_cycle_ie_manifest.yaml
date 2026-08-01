@@ -48,9 +48,12 @@ entries:
     depends_on_sheets: []
 
   # ───────────────────────── K1 其他应收款（api_prefix: k1） ─────────────────────────
+  # 🔴 item_id 已修正为前端真实读写键 `K1-2-detail-rows`（原 `K1-2-rows` 从未被
+  #   `useK1Detail.ts` 等 8 处消费方读取，导入导出静默无效）。
+  #   spec: .kiro/specs/k1-extraction-chain-and-note-alignment/
   - sheet_code: K1-2
     api_prefix: k1
-    item_id: K1-2-rows
+    item_id: K1-2-detail-rows
     storage_field: remark
     storage_mode: row_json
     import_order: 10

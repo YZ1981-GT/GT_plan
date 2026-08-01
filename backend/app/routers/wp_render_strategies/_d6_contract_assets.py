@@ -31,7 +31,9 @@ from ._context import RenderContext
 logger = logging.getLogger(__name__)
 
 # D6 合同资产科目前缀（Tier B 审定表原值 block1 未审数取数来源）
-_D6_ACCOUNT_PREFIX = "1402"
+# 合同资产科目为 1141（标准科目表 direction=debit）；`report_config` 报表行 BS-011
+# 四准则一致 `TB('1141','期末余额')`。原 `1402` 是在途物资（存货类，属 F2 循环）→ 误用。
+_D6_ACCOUNT_PREFIX = "1141"
 
 # D6 wp_code base（Tier A 提取公式 / 锚点登记 key）
 _D6_WP_CODE = "D6"
@@ -69,7 +71,7 @@ async def _seed_d6_detail_prefill(
 ) -> list[dict] | None:
     """P0-2：D6-2 明细表维度归集 transient 自动 seed（决策4 / R4 / Property 8/9/11/13）.
 
-    D6-2 明细完全空时，调既有可复用归集 `aggregate_d6_detail_rows`（tb_aux_balance 1402
+    D6-2 明细完全空时，调既有可复用归集 `aggregate_d6_detail_rows`（tb_aux_balance 1141
     客户/合同维度，复用不新造第 3 套四表库读取 / Property 9）得明细行，附 `source:"four-table"`
     标注供前端识别为自动取数，作 `detail_prefill` transient 返回（不落库 / Property 13）。
     手工优先（已有行 → 返回 None 不 seed / Property 8）+ fail-open 空（归集异常 → None / R4.5）。
@@ -284,14 +286,16 @@ async def render(ctx: RenderContext) -> dict | None:
     # bs_date for cutoff / post-period usage
     project_context["bs_date"] = f"{project_context['audit_year']}-12-31" if project_context["audit_year"] else ""
 
-    # ─── TB预填: 科目1402合同资产期末审定/未审 ──────────────────────────
+    # ─── TB预填: 科目1141合同资产期末审定/未审 ──────────────────────────
+    # 合同资产科目为 1141；`report_config` 报表行 BS-011 四准则一致。原 `1402` 是在途物资
+    # （存货类），属误用。
     tb_amount = 0
     try:
         tb_result = await db.execute(
             sa.text(
                 "SELECT COALESCE(SUM(ABS(audited_amount)), SUM(ABS(unadjusted_amount)), 0) AS amount "
                 "FROM trial_balance "
-                "WHERE project_id = :pid AND standard_account_code LIKE '1402%' "
+                "WHERE project_id = :pid AND standard_account_code LIKE '1141%' "
                 "AND is_deleted = false"
             ),
             {"pid": str(ctx.project_id)},
@@ -300,7 +304,7 @@ async def render(ctx: RenderContext) -> dict | None:
         if tb_row and tb_row.amount:
             tb_amount = float(tb_row.amount)
     except Exception as e:
-        logger.warning("D6 render: trial_balance 1402 查询失败: %s", e)
+        logger.warning("D6 render: trial_balance 1141 查询失败: %s", e)
 
     project_context["tb_amount"] = tb_amount
 
@@ -349,7 +353,7 @@ async def render(ctx: RenderContext) -> dict | None:
     # ─── Tier B 四表库审定表预填（ADDITIVE，灰度开关控制）─────────────────
     # spec: d-cycle-four-table-extraction-formulas (R1.1/1.5/1.6/2.3/7.1/7.2)
     # 开关关闭（默认）→ 不返回 adjudication_prefill，render 逐字节等价当前（Property 9）。
-    # 开关开启 → 从 tb_balance 1402 叶子子科目取期初/期末余额，仅在 block1 原值锚点
+    # 开关开启 → 从 tb_balance 1141 叶子子科目取期初/期末余额，仅在 block1 原值锚点
     # 完全为空时并入（手工优先 Property 2），供前端 seed block1 原值 期初/期末未审行。
     # 任一环异常一律 fail-open（省略 adjudication_prefill，不阻断 render）。
     if settings.D_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED:

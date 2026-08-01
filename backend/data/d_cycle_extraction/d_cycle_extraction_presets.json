@@ -14,28 +14,28 @@
   "D6": [
     {
       "anchor": "D6-1-tb-amount",
-      "expression": "TB('1402','期末余额')",
+      "expression": "TB('1141','期末余额')",
       "sheet_name": "D6-1",
       "formula_type": "auto_calc",
-      "description": "试算表 1402 合同资产期末余额（审定数），供 D6-1 审定表 TB↔审定核对行（D6-1-tb-amount）。可表达为单条 TB 公式（Tier A）可编辑；求值经 get_active_filter 数据集版本读取，与 Tier B prefill 同口径。分类未审/原值 block1 属 Tier B 复杂归集（动态 rowKey），不在此。"
+      "description": "试算表 1141 合同资产期末余额（审定数），供 D6-1 审定表 TB↔审定核对行（D6-1-tb-amount）。🔴 科目码纠正（2026-08-01）：原登记 TB('1402','期末余额') —— 1402 是**在途物资**（存货类科目，标准科目表实证），与合同资产无关，取数恒错/恒空。合同资产科目为 1141（标准科目表实证 direction=debit），report_config 的报表行 BS-011 合同资产在四个准则下公式一律 TB('1141','期末余额')。求值经 get_active_filter 数据集版本读取，与 Tier B prefill 同口径。分类未审/原值 block1 属 Tier B 复杂归集（动态 rowKey），不在此。"
     }
   ],
   "D2": [
     {
       "anchor": "D2-adj-tb-amount",
-      "expression": "TB('1122','期末余额')",
+      "expression": "TB('1122','期末余额') - TB('1231-02','期末余额')",
       "sheet_name": "D2-1",
       "formula_type": "auto_calc",
-      "description": "试算表 1122 应收账款期末余额（审定数），供 D2-1 审定表 TB↔审定核对行（D2-adj-tb-amount）。可表达为单条 TB 公式（Tier A）可编辑；求值经 get_active_filter 数据集版本读取，与 Tier B prefill 同口径。审定表按信用风险组合分类（单项计提/账龄组合/客户类型组合）的未审数无法从 TB 按维度拆分（宁缺勿造 R3.4），属 D2-2 明细 SUMIF，不在此。"
+      "description": "试算表应收账款**净额**期末余额（审定数）= 原值 1122 − 坏账准备 1231-02，供 D2-1 审定表 TB↔审定**净值**核对行（D2-adj-tb-amount）。🔴 必须是净额口径（双证）：① 源模板 审定表D2-1 的被比较项是「三、应收账款净值」合计 A27，其逐行为 A22=A8−A15（原值 − 坏账准备）→ TB 侧必然是净额；② report_config 的 BS-006 应收账款在 soe_standalone 下公式正是 TB('1122','期末余额')-TB('1231-02','期末余额')（报表按净额列示）。原登记的 TB('1122','期末余额') 是原值口径 → 核对行必然显示一个恰好等于坏账准备金额的**假差异**（D1 同款缺陷已实测：项目 0ec33ac9 差异 1,162,288.03 = 坏账准备）。求值经 get_active_filter 数据集版本读取；客户科目编码不同时可在公式管理面板按项目改写（Tier A 可编辑）。注：listed_standalone 的 BS-006 用整个 1231（含票据/其他应收款坏账）→ 报表行虚减，属平台级报表配置缺陷，本预设按 soe 口径取细分码 1231-02。审定表按信用风险组合分类（单项计提/账龄组合/客户类型组合）的未审数无法从 TB 按维度拆分（宁缺勿造 R3.4），属 D2-2 明细 SUMIF，不在此。"
     }
   ],
   "D1": [
     {
       "anchor": "D1-adj-tb-amount",
-      "expression": "TB('1121','期末余额')",
+      "expression": "TB('1121','期末余额') - TB('1231-01','期末余额')",
       "sheet_name": "D1-1",
       "formula_type": "auto_calc",
-      "description": "试算表 1121 应收票据期末余额（审定数），供 D1-1 审定表 TB↔审定净值核对行（D1-adj-tb-amount）。可表达为单条 TB 公式（Tier A）可编辑；求值经 get_active_filter 数据集版本读取，与 Tier B prefill 同口径。审定表按票据类型固定分类（银行承兑汇票/商业承兑汇票，原值/坏账/净值三区块）的未审数由 D1-2 按类别明细（D1-cat-rows）SUMIF 派生、非 TB 按维度拆分（宁缺勿造 R3.4），不在此。"
+      "description": "试算表应收票据**净额**期末余额（审定数）= 原值 1121 − 坏账准备 1231-01，供 D1-1 审定表 TB↔审定**净值**核对行（D1-adj-tb-amount）。🔴 必须是净额口径（双证）：① 源模板 D1-1 的差异数 E20=E18-E19，E18 是「三、应收票据净值」小计 → 被比较的「试算平衡表数」E19 必然是净额；② report_config 的 BS-005 应收票据在 soe_standalone 下公式正是 TB('1121','期末余额')-TB('1231-01','期末余额')（报表按净额列示）。原登记的 TB('1121','期末余额') 是原值口径 → 核对行必然显示一个恰好等于坏账准备金额的**假差异**（实测项目 0ec33ac9：审定净值 19,046,910.15 vs 原值 20,209,198.18，差异 1,162,288.03 = 坏账准备）。求值经 get_active_filter 数据集版本读取；客户科目编码不同时可在公式管理面板按项目改写（Tier A 可编辑）。"
     }
   ],
   "D3": [
@@ -63,15 +63,10 @@
       "description": "试算表 6051 其他业务收入审定发生额，供 D4-1 审定表其他小计 TB↔审定核对行（D4-1-adj-tb-6051）。损益类 audited_amount 存审定发生额。可表达为单条 TB 公式（Tier A）可编辑；求值经 get_active_filter 数据集版本读取，与 Tier B prefill 同口径。其他收入明细行由 D4-3 明细（D4-3-rows）聚合、非 TB 按维度拆分（宁缺勿造 R3.4），不在此。"
     }
   ],
-  "D5": [
-    {
-      "anchor": "D5-1-tb-amount",
-      "expression": "TB('1124','期末余额')",
-      "sheet_name": "D5-1",
-      "formula_type": "auto_calc",
-      "description": "试算表 1124 应收款项融资期末余额（审定数），供 D5-1 审定表 TB↔审定核对行（D5-1-tb-amount，试算平衡表数）。可表达为单条 TB 公式（Tier A）可编辑；求值经 get_active_filter 数据集版本读取，与 Tier B prefill 同口径。审定表固定两分类行（应收票据/应收账款）的未审数由 D5-2 明细（D5-2-rows）按类别 SUMIF 聚合（useD5Adjudication categoryAggregation）、非 TB 按维度拆分（宁缺勿造 R3.4），不在此。OCI 公允价值变动减项来自 D5-4，非四表库。"
-    }
-  ],
+  "_D5_removed": {
+    "_why": "🔴 2026-08-01 移除 D5 的 Tier A 预设（原 anchor=D5-1-tb-amount，expression=TB('1124','期末余额')）。依据：①『应收款项融资』是**报表项目**（以公允价值计量且其变动计入其他综合收益的应收票据/应收账款），会计准则**没有对应的一级科目**；②标准科目表实证 `1124` 不存在（1121 应收票据 / 1122 应收账款 / 1123 预付账款 / 1131 应收股利 / 1132 应收利息，无 1124）；③活体四表库实证 `trial_balance` 与 `tb_balance` 的 `1124%` 均为 **0 行** → 该预设求值恒为 0，是一条『看起来有取数、实际永远拿不到数』的假接线。保留它比没有更糟（审计师以为取过数）。→ D5-1 审定表『试算平衡表数』改为手工录入 + 由 D5-2 明细聚合核对（宁缺勿造）。注：`report_config` 的报表行 BS-007 应收款项融资四准则也都写 `TB('1124','期末余额')`，属**平台级报表配置缺陷**（该报表行同样恒为 0），本 spec 只报告不改（影响全部项目报表）。若某客户确实把 FVOCI 部分单设了科目，可在公式管理面板按项目新增 Tier A 公式（用户覆盖优先于预设）。守卫：tests/d_cycle_extraction/test_d_cycle_account_codes.py::test_d5_nonexistent_code_is_not_silently_kept",
+    "_spec": ".kiro/specs/d-cycle-extraction-chain-completion/ Task 1.4 / Requirement 4"
+  },
   "D7": [
     {
       "anchor": "D7-1-adj-aging-trial-balance-currentAudited",

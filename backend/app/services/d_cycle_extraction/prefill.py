@@ -68,7 +68,7 @@ async def build_d_adjudication_prefill(
     Args:
         ctx: RenderContext（需 `db` / `project_id` / `year`）。
         account_prefix: 科目前缀（D1=1121 / D2=1122 / D3=2203 / D4=6001 /
-            D5=1124 / D6=1402 / D7=2205）。
+            D5=1124 / D6=1141 / D7=2205）。
         mode: `'balance'`（余额类，取期初/期末余额）或
             `'occurrence'`（发生额类，取借/贷发生额）。
 
