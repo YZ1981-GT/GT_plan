@@ -1,6 +1,0 @@
-{
-  "db_epoch_recheck_within_1s_denies": true,
-  "epoch_ttl_seconds": 1.0,
-  "no_stale_allow": true,
-  "redis_fast_path_denies_immediately": true
-}
