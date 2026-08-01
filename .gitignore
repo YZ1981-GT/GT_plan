@@ -156,3 +156,9 @@ backend/quarantine_store/
 tools/officecli/bin/
 tools/officecli/_poc*
 tools/officecli/_word_probe*
+
+# 运行时产物（2026-08-01：每次提交都要手工 git restore --staged 排除，故收进忽略）
+# health.json = /health 端点响应快照（含 migration/schema_drift 实时状态，因机器而异）
+backend/health.json
+# Vite 依赖预构建缓存
+.vite/
