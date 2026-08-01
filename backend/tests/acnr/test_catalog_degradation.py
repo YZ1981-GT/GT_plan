@@ -15,7 +15,7 @@ from unittest.mock import patch
 
 import pytest
 
-from backend.app.services.acnr.catalog import (
+from app.services.acnr.catalog import (
     CatalogIndex,
     CatalogLoadError,
     _alert_admin,
@@ -23,7 +23,7 @@ from backend.app.services.acnr.catalog import (
     get_catalog,
     reload_catalog,
 )
-import backend.app.services.acnr.catalog as catalog_module
+import app.services.acnr.catalog as catalog_module
 
 
 # ─── Fixtures ─────────────────────────────────────────────────────────────────
@@ -180,7 +180,7 @@ class TestBranch1HasOldCache:
 
         with patch.dict("os.environ", {"ACNR_CATALOG_PATH": missing_path}):
             with patch(
-                "backend.app.services.acnr.catalog._alert_admin"
+                "app.services.acnr.catalog._alert_admin"
             ) as mock_alert:
                 _load_catalog()
 
@@ -267,7 +267,7 @@ class TestBranch2NoOldCache:
 
         with patch.dict("os.environ", {"ACNR_CATALOG_PATH": missing_path}):
             with patch(
-                "backend.app.services.acnr.catalog._alert_admin"
+                "app.services.acnr.catalog._alert_admin"
             ) as mock_alert:
                 with pytest.raises(CatalogLoadError):
                     _load_catalog()

@@ -49,6 +49,7 @@
             :is-readonly="isReadonly"
             :wp-id="props.wpId"
             :project-id="props.projectId"
+            :inventory-accounts="inventoryAccounts"
             @refresh-complete="formData.debouncedSave('F2-adjudication-data', { item_id: 'F2-adjudication-data', conclusion: 'seeded', remark: null })"
           />
           <F2TabAdjudication
@@ -79,6 +80,7 @@
           :all-responses="allResponses"
           :is-readonly="isReadonly"
           :audit-year="auditYearNum"
+          :inventory-accounts="inventoryAccounts"
         />
 
         <F2TabPolicy
@@ -306,6 +308,16 @@ const tbAmount = computed<number | null>(() => {
   if (fromHtml != null) return Number(fromHtml) || 0
   const ctx = formData.projectContext.value as any
   return ctx?.tb_amount != null ? (Number(ctx.tb_amount) || 0) : null
+})
+
+// 本项目实际存货科目清单（render 输出 project_context.inventory_accounts）
+// —— 替代前端写死清单，供 AJE 科目下拉 / 溯源面板消费（Wave 3）。
+const inventoryAccounts = computed<any[] | null>(() => {
+  const fromHtml = props.htmlData?.project_context?.inventory_accounts
+    ?? props.htmlData?.projectContext?.inventory_accounts
+  if (Array.isArray(fromHtml) && fromHtml.length > 0) return fromHtml
+  const ctx = formData.projectContext.value as any
+  return Array.isArray(ctx?.inventory_accounts) ? ctx.inventory_accounts : null
 })
 
 const hasFourTableData = computed(() => {

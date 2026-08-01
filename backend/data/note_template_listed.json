@@ -1489,7 +1489,7 @@
         "（3）应和相关报表项目明细项“政府补助”金额核对一致。】",
         "## 计入其他应收款的政府补助",
         "（15号文第四十六条 对于报告期末按应收金额确认的政府补助，应披露应收款项的期末余额。如公司未能在预计时点收到预计金额的政府补助，公司应披露原因。）",
-        "**【提示：确认应收款项-政府补助时，应履行重大业务咨询程序。**】",
+        "【提示：确认应收款项-政府补助时，应履行重大业务咨询程序。】",
         "## 计入递延收益的政府补助",
         "（15号文第四十七条 对涉及政府补助的负债项目，在财务报表附注的相关项目下，披露相关期初余额、本期新增补助金额、本期计入营业外收入金额、本期转入其他收益等金额以及期末余额。）",
         "【《关于严格执行企业会计准则 切实做好企业2024年年报工作的通知》：企业应当严格审核把关，对于政府补助的种类、金额应当按照“与资产相关的政府补助”和“与收益相关的政府补助”两类汇总信息进行披露。",
@@ -2343,7 +2343,7 @@
               "account_codes": [
                 "3102"
               ],
-              "report_row_code": "BS-053",
+              "report_row_code": "BS-085",
               "row_type": "data"
             },
             {
@@ -3403,7 +3403,7 @@
               "account_codes": [
                 "2001"
               ],
-              "report_row_code": "BS-031",
+              "report_row_code": "BS-041",
               "row_type": "data"
             },
             {
@@ -3411,7 +3411,7 @@
               "account_codes": [
                 "2501"
               ],
-              "report_row_code": "BS-041",
+              "report_row_code": "BS-061",
               "row_type": "data"
             },
             {
@@ -3419,7 +3419,7 @@
               "account_codes": [
                 "2502"
               ],
-              "report_row_code": "BS-043",
+              "report_row_code": "BS-062",
               "row_type": "data"
             },
             {
@@ -3427,7 +3427,7 @@
               "account_codes": [
                 "2601"
               ],
-              "report_row_code": "BS-042",
+              "report_row_code": "BS-063",
               "row_type": "data"
             },
             {
@@ -3917,7 +3917,7 @@
               "account_codes": [
                 "1121"
               ],
-              "report_row_code": "BS-004",
+              "report_row_code": "BS-005",
               "row_type": "data"
             },
             {
@@ -3925,7 +3925,7 @@
               "account_codes": [
                 "1122"
               ],
-              "report_row_code": "BS-005",
+              "report_row_code": "BS-006",
               "row_type": "data"
             },
             {
@@ -3945,7 +3945,7 @@
                 "1408",
                 "1461"
               ],
-              "report_row_code": "BS-008",
+              "report_row_code": "BS-010",
               "row_type": "data"
             },
             {
@@ -3954,7 +3954,7 @@
                 "1601",
                 "1602"
               ],
-              "report_row_code": "BS-014",
+              "report_row_code": "BS-028",
               "row_type": "data"
             },
             {
@@ -3963,7 +3963,7 @@
                 "1701",
                 "1702"
               ],
-              "report_row_code": "BS-016",
+              "report_row_code": "BS-032",
               "row_type": "data"
             },
             {
@@ -3983,7 +3983,7 @@
               "account_codes": [
                 "2201"
               ],
-              "report_row_code": "BS-032",
+              "report_row_code": "BS-044",
               "row_type": "data"
             },
             {
@@ -3991,7 +3991,7 @@
               "account_codes": [
                 "2202"
               ],
-              "report_row_code": "BS-033",
+              "report_row_code": "BS-045",
               "row_type": "data"
             },
             {
@@ -4188,7 +4188,7 @@
               "account_codes": [
                 "1121"
               ],
-              "report_row_code": "BS-004",
+              "report_row_code": "BS-005",
               "row_type": "data"
             },
             {
@@ -4196,7 +4196,7 @@
               "account_codes": [
                 "1122"
               ],
-              "report_row_code": "BS-005",
+              "report_row_code": "BS-006",
               "row_type": "data"
             },
             {
@@ -4216,7 +4216,7 @@
                 "1408",
                 "1461"
               ],
-              "report_row_code": "BS-008",
+              "report_row_code": "BS-010",
               "row_type": "data"
             },
             {
@@ -4225,7 +4225,7 @@
                 "1601",
                 "1602"
               ],
-              "report_row_code": "BS-014",
+              "report_row_code": "BS-028",
               "row_type": "data"
             },
             {
@@ -4234,7 +4234,7 @@
                 "1701",
                 "1702"
               ],
-              "report_row_code": "BS-016",
+              "report_row_code": "BS-032",
               "row_type": "data"
             },
             {
@@ -4250,7 +4250,7 @@
               "account_codes": [
                 "2001"
               ],
-              "report_row_code": "BS-031",
+              "report_row_code": "BS-041",
               "row_type": "data"
             },
             {
@@ -4258,7 +4258,7 @@
               "account_codes": [
                 "2201"
               ],
-              "report_row_code": "BS-032",
+              "report_row_code": "BS-044",
               "row_type": "data"
             },
             {
@@ -4266,7 +4266,7 @@
               "account_codes": [
                 "2202"
               ],
-              "report_row_code": "BS-033",
+              "report_row_code": "BS-045",
               "row_type": "data"
             },
             {
@@ -4513,7 +4513,7 @@
         "续：",
         "### 多次交易分步处置股权至丧失控制权而减少的子公司",
         "（15号文第三十三条（四），通过多次交易分步处置对子公司投资至丧失控制权的，还应披露以下信息：判断各项交易是否构成“一揽子交易”的原则，前期处置股权的处置时点以及处置价款、处置比例、处置方式、处置价款与处置投资所对应的合并财务报表层面享有该子公司净资产份额的差额等。）",
-        "本公司原持有【A公司】90%股权，2024年10月本公司与甲公司签订股权转让协议，约定于2024年12月向甲公司转让A公司20%股权，于2025年6月向甲公司进一步转让A公司40%股权。截至2025年12月31日，股权转让协议已履行完毕，本公司仅持有A公司30%股权，能够对A公司实施重大影响。本公司将处置A公司股权至丧失控制权的两次交易作为“一揽子交易”进行会计处理【或者，本公司处置A公司股权至丧失控制权的两次交易不属于“一揽子交易”】。（描述分步处置股权的具体情况，**并说明判断为“一揽子交易”的理由（请参考会计政策中的有关披露）或者不属于“一揽子交易”的理由。）**",
+        "本公司原持有【A公司】90%股权，2024年10月本公司与甲公司签订股权转让协议，约定于2024年12月向甲公司转让A公司20%股权，于2025年6月向甲公司进一步转让A公司40%股权。截至2025年12月31日，股权转让协议已履行完毕，本公司仅持有A公司30%股权，能够对A公司实施重大影响。本公司将处置A公司股权至丧失控制权的两次交易作为“一揽子交易”进行会计处理【或者，本公司处置A公司股权至丧失控制权的两次交易不属于“一揽子交易”】。（描述分步处置股权的具体情况，并说明判断为“一揽子交易”的理由（请参考会计政策中的有关披露）或者不属于“一揽子交易”的理由。）",
         "#### 一揽子交易",
         "##### 丧失控制权时点的交易或事项的信息",
         "续（1）：",
@@ -4527,7 +4527,7 @@
         "##### 前期处置股权的交易或事项的信息",
         "（说明不构成一揽子交易的判断依据。）",
         "### （2）参考披露格式2-多次交易分步处置股权至丧失控制权而减少的子公司",
-        "本公司原持有【A公司】90%股权，2024年10月本公司与甲公司签订股权转让协议，约定于2024年12月向甲公司转让A公司20%股权，于2025年5月向甲公司进一步转让A公司40%股权。截至2025年5月30日，股权转让协议已履行完毕，本公司仅持有A公司30%股权，能够对A公司实施重大影响。本公司将处置A公司股权至丧失控制权的两次交易作为“一揽子交易”进行会计处理【或者，本公司处置A公司股权至丧失控制权的两次交易不属于“一揽子交易”】。（描述分步处置股权的具体情况，**并说明判断为“一揽子交易”的理由（请参考会计政策中的有关披露）或者不属于“一揽子交易”的理由。）**",
+        "本公司原持有【A公司】90%股权，2024年10月本公司与甲公司签订股权转让协议，约定于2024年12月向甲公司转让A公司20%股权，于2025年5月向甲公司进一步转让A公司40%股权。截至2025年5月30日，股权转让协议已履行完毕，本公司仅持有A公司30%股权，能够对A公司实施重大影响。本公司将处置A公司股权至丧失控制权的两次交易作为“一揽子交易”进行会计处理【或者，本公司处置A公司股权至丧失控制权的两次交易不属于“一揽子交易”】。（描述分步处置股权的具体情况，并说明判断为“一揽子交易”的理由（请参考会计政策中的有关披露）或者不属于“一揽子交易”的理由。）",
         "①前期和本期处置股权情况",
         "②丧失控制权之日确定为2025年5月30日。（披露确定丧失控制权之日的判断依据）",
         "在丧失控制权之日，合并财务报表层面剩余股权的公允价值的确定方法是：…….。采取的主要假设……。",
@@ -4744,7 +4744,7 @@
               "account_codes": [
                 "3102"
               ],
-              "report_row_code": "BS-053",
+              "report_row_code": "BS-085",
               "row_type": "data"
             },
             {
@@ -4880,7 +4880,7 @@
               "account_codes": [
                 "3102"
               ],
-              "report_row_code": "BS-053",
+              "report_row_code": "BS-085",
               "row_type": "data"
             },
             {
@@ -4924,7 +4924,7 @@
               "account_codes": [
                 "3102"
               ],
-              "report_row_code": "BS-053",
+              "report_row_code": "BS-085",
               "row_type": "data"
             },
             {
@@ -4954,7 +4954,7 @@
               "account_codes": [
                 "3102"
               ],
-              "report_row_code": "BS-053",
+              "report_row_code": "BS-085",
               "row_type": "data"
             },
             {
@@ -5158,7 +5158,7 @@
         "（3）应和相关报表项目明细项“政府补助”金额核对一致。】",
         "## 计入其他应收款的政府补助",
         "（15号文第四十六条 对于报告期末按应收金额确认的政府补助，应披露应收款项的期末余额。如公司未能在预计时点收到预计金额的政府补助，公司应披露原因。）",
-        "**【提示：确认应收款项-政府补助时，应履行重大业务咨询程序。**】",
+        "【提示：确认应收款项-政府补助时，应履行重大业务咨询程序。】",
         "## 计入递延收益的政府补助",
         "（15号文第四十七条 对涉及政府补助的负债项目，在财务报表附注的相关项目下，披露相关期初余额、本期新增补助金额、本期计入营业外收入金额、本期转入其他收益等金额以及期末余额。）",
         "【《关于严格执行企业会计准则 切实做好企业2024年年报工作的通知》：企业应当严格审核把关，对于政府补助的种类、金额应当按照“与资产相关的政府补助”和“与收益相关的政府补助”两类汇总信息进行披露。",
@@ -5367,7 +5367,7 @@
         "（3）应和相关报表项目明细项“政府补助”金额核对一致。】",
         "## 计入其他应收款的政府补助",
         "（15号文第四十六条 对于报告期末按应收金额确认的政府补助，应披露应收款项的期末余额。如公司未能在预计时点收到预计金额的政府补助，公司应披露原因。）",
-        "**【提示：确认应收款项-政府补助时，应履行重大业务咨询程序。**】",
+        "【提示：确认应收款项-政府补助时，应履行重大业务咨询程序。】",
         "## 计入递延收益的政府补助",
         "（15号文第四十七条 对涉及政府补助的负债项目，在财务报表附注的相关项目下，披露相关期初余额、本期新增补助金额、本期计入营业外收入金额、本期转入其他收益等金额以及期末余额。）",
         "【《关于严格执行企业会计准则 切实做好企业2024年年报工作的通知》：企业应当严格审核把关，对于政府补助的种类、金额应当按照“与资产相关的政府补助”和“与收益相关的政府补助”两类汇总信息进行披露。",
@@ -5475,7 +5475,7 @@
         "（3）应和相关报表项目明细项“政府补助”金额核对一致。】",
         "## 计入其他应收款的政府补助",
         "（15号文第四十六条 对于报告期末按应收金额确认的政府补助，应披露应收款项的期末余额。如公司未能在预计时点收到预计金额的政府补助，公司应披露原因。）",
-        "**【提示：确认应收款项-政府补助时，应履行重大业务咨询程序。**】",
+        "【提示：确认应收款项-政府补助时，应履行重大业务咨询程序。】",
         "## 计入递延收益的政府补助",
         "（15号文第四十七条 对涉及政府补助的负债项目，在财务报表附注的相关项目下，披露相关期初余额、本期新增补助金额、本期计入营业外收入金额、本期转入其他收益等金额以及期末余额。）",
         "【《关于严格执行企业会计准则 切实做好企业2024年年报工作的通知》：企业应当严格审核把关，对于政府补助的种类、金额应当按照“与资产相关的政府补助”和“与收益相关的政府补助”两类汇总信息进行披露。",
@@ -5527,7 +5527,7 @@
                 "1506",
                 "1507"
               ],
-              "report_row_code": "BS-011",
+              "report_row_code": "BS-021",
               "row_type": "data"
             },
             {
@@ -5718,7 +5718,7 @@
               "account_codes": [
                 "2001"
               ],
-              "report_row_code": "BS-031",
+              "report_row_code": "BS-041",
               "row_type": "data"
             },
             {
@@ -5730,7 +5730,7 @@
               "account_codes": [
                 "2201"
               ],
-              "report_row_code": "BS-032",
+              "report_row_code": "BS-044",
               "row_type": "data"
             },
             {
@@ -5738,7 +5738,7 @@
               "account_codes": [
                 "2202"
               ],
-              "report_row_code": "BS-033",
+              "report_row_code": "BS-045",
               "row_type": "data"
             },
             {
@@ -5746,7 +5746,7 @@
               "account_codes": [
                 "2241"
               ],
-              "report_row_code": "BS-037",
+              "report_row_code": "BS-050",
               "row_type": "data"
             },
             {
@@ -5762,7 +5762,7 @@
               "account_codes": [
                 "2501"
               ],
-              "report_row_code": "BS-041",
+              "report_row_code": "BS-061",
               "row_type": "data"
             },
             {
@@ -5770,7 +5770,7 @@
               "account_codes": [
                 "2502"
               ],
-              "report_row_code": "BS-043",
+              "report_row_code": "BS-062",
               "row_type": "data"
             },
             {
@@ -5778,7 +5778,7 @@
               "account_codes": [
                 "2601"
               ],
-              "report_row_code": "BS-042",
+              "report_row_code": "BS-063",
               "row_type": "data"
             },
             {
@@ -5786,7 +5786,7 @@
               "account_codes": [
                 "2701"
               ],
-              "report_row_code": "BS-044",
+              "report_row_code": "BS-064",
               "row_type": "data"
             },
             {
@@ -5820,7 +5820,7 @@
               "account_codes": [
                 "2001"
               ],
-              "report_row_code": "BS-031",
+              "report_row_code": "BS-041",
               "row_type": "data"
             },
             {
@@ -5832,7 +5832,7 @@
               "account_codes": [
                 "2201"
               ],
-              "report_row_code": "BS-032",
+              "report_row_code": "BS-044",
               "row_type": "data"
             },
             {
@@ -5840,7 +5840,7 @@
               "account_codes": [
                 "2202"
               ],
-              "report_row_code": "BS-033",
+              "report_row_code": "BS-045",
               "row_type": "data"
             },
             {
@@ -5848,7 +5848,7 @@
               "account_codes": [
                 "2241"
               ],
-              "report_row_code": "BS-037",
+              "report_row_code": "BS-050",
               "row_type": "data"
             },
             {
@@ -5864,7 +5864,7 @@
               "account_codes": [
                 "2501"
               ],
-              "report_row_code": "BS-041",
+              "report_row_code": "BS-061",
               "row_type": "data"
             },
             {
@@ -5872,7 +5872,7 @@
               "account_codes": [
                 "2502"
               ],
-              "report_row_code": "BS-043",
+              "report_row_code": "BS-062",
               "row_type": "data"
             },
             {
@@ -5880,7 +5880,7 @@
               "account_codes": [
                 "2701"
               ],
-              "report_row_code": "BS-044",
+              "report_row_code": "BS-064",
               "row_type": "data"
             },
             {
@@ -5919,7 +5919,7 @@
               "account_codes": [
                 "2001"
               ],
-              "report_row_code": "BS-031",
+              "report_row_code": "BS-041",
               "row_type": "data"
             },
             {
@@ -5954,7 +5954,7 @@
               "account_codes": [
                 "2001"
               ],
-              "report_row_code": "BS-031",
+              "report_row_code": "BS-041",
               "row_type": "data"
             },
             {
@@ -6084,7 +6084,7 @@
               "account_codes": [
                 "2001"
               ],
-              "report_row_code": "BS-031",
+              "report_row_code": "BS-041",
               "row_type": "data"
             },
             {
@@ -6100,7 +6100,7 @@
               "account_codes": [
                 "2501"
               ],
-              "report_row_code": "BS-041",
+              "report_row_code": "BS-061",
               "row_type": "data"
             },
             {
@@ -6108,7 +6108,7 @@
               "account_codes": [
                 "2502"
               ],
-              "report_row_code": "BS-043",
+              "report_row_code": "BS-062",
               "row_type": "data"
             },
             {
@@ -6728,7 +6728,7 @@
               "account_codes": [
                 "1521"
               ],
-              "report_row_code": "BS-013",
+              "report_row_code": "BS-027",
               "row_type": "data"
             },
             {
@@ -6816,7 +6816,7 @@
               "account_codes": [
                 "1521"
               ],
-              "report_row_code": "BS-013",
+              "report_row_code": "BS-027",
               "row_type": "data"
             },
             {
@@ -6946,7 +6946,7 @@
               "account_codes": [
                 "1521"
               ],
-              "report_row_code": "BS-013",
+              "report_row_code": "BS-027",
               "row_type": "data"
             },
             {
@@ -7024,7 +7024,7 @@
                 "1506",
                 "1507"
               ],
-              "report_row_code": "BS-011",
+              "report_row_code": "BS-021",
               "row_type": "data"
             },
             {
@@ -7053,7 +7053,7 @@
               "account_codes": [
                 "2501"
               ],
-              "report_row_code": "BS-041",
+              "report_row_code": "BS-061",
               "row_type": "data"
             },
             {
@@ -7061,7 +7061,7 @@
               "account_codes": [
                 "2502"
               ],
-              "report_row_code": "BS-043",
+              "report_row_code": "BS-062",
               "row_type": "data"
             },
             {
@@ -7069,7 +7069,7 @@
               "account_codes": [
                 "2701"
               ],
-              "report_row_code": "BS-044",
+              "report_row_code": "BS-064",
               "row_type": "data"
             },
             {
@@ -7102,7 +7102,7 @@
                 "1506",
                 "1507"
               ],
-              "report_row_code": "BS-011",
+              "report_row_code": "BS-021",
               "row_type": "data"
             },
             {
@@ -7131,7 +7131,7 @@
               "account_codes": [
                 "2501"
               ],
-              "report_row_code": "BS-041",
+              "report_row_code": "BS-061",
               "row_type": "data"
             },
             {
@@ -7139,7 +7139,7 @@
               "account_codes": [
                 "2502"
               ],
-              "report_row_code": "BS-043",
+              "report_row_code": "BS-062",
               "row_type": "data"
             },
             {
@@ -7147,7 +7147,7 @@
               "account_codes": [
                 "2701"
               ],
-              "report_row_code": "BS-044",
+              "report_row_code": "BS-064",
               "row_type": "data"
             },
             {
@@ -7358,7 +7358,7 @@
       "content_type": "text",
       "tables": [],
       "text_sections": [
-        "（公司应披露**重要**的税收优惠政策及依据，包括企业所得税、增值税等。）",
+        "（公司应披露重要的税收优惠政策及依据，包括企业所得税、增值税等。）",
         "（不适用的项目以及空白表格，删除；表格中“项 目”、“合 计”可以不空格，但全附注要统一。）"
       ],
       "check_presets": [],
@@ -7782,10 +7782,10 @@
               "format": "amount"
             }
           ],
-          "guidance": "【提示：证监会《2014年上市公司年报会计监管报告》，对已背书或贴现且尚未到期的银行承兑汇票予以终止确认后，需在财务报表中补充披露终止确认的票据以及对票据被追索时可能存在的支付风险予以清晰说明。参考披露：用于贴现的银行承兑汇票是由信用等级较高的银行承兑，信用风险和延期付款风险很小，并且票据相关的利率风险已转移给银行，可以判断票据所有权上的主要风险和报酬已经转移，故终止确认。或：用于贴现的银行承兑汇票是由信用等级不高的银行承兑，贴现不影响追索权，票据相关的信用风险和延期付款风险仍没有转移，故未终止确认。】本表可添加行项目。勾稽：各明细行之和 = 合计行（F4-22）。"
+          "guidance": "【提示：证监会《2014年上市公司年报会计监管报告》，对已背书或贴现且尚未到期的银行承兑汇票予以终止确认后，需在财务报表中补充披露终止确认的票据以及对票据被追索时可能存在的支付风险予以清晰说明。参考披露：用于贴现的银行承兑汇票是由信用等级较高的银行承兑，信用风险和延期付款风险很小，并且票据相关的利率风险已转移给银行，可以判断票据所有权上的主要风险和报酬已经转移，故终止确认。或：用于贴现的银行承兑汇票是由信用等级不高的银行承兑，贴现不影响追索权，票据相关的信用风险和延期付款风险仍没有转移，故未终止确认。】（如根据《企业会计准则第23号——金融资产转移》终止确认的应收票据，列示其终止确认的金额，及与终止确认相关的利得和损失）本表可添加行项目。勾稽：各明细行之和 = 合计行（F4-22）。"
         },
         {
-          "name": "期末因出票人未履约而将其转应收账款的票据",
+          "name": "期末因出票人未履约而其转应收账款的票据",
           "headers": [
             "种类",
             "期末转应收账款金额"
@@ -7814,7 +7814,7 @@
               "format": "amount"
             }
           ],
-          "guidance": "（如根据《企业会计准则第23号——金融资产转移》终止确认的应收票据，列示其终止确认的金额，及与终止确认相关的利得和损失）【提示：票据逾期后应转入应收账款并计提坏账准备，账龄应连续计算，故本表只列示商业承兑票据。】勾稽：各明细行之和 = 合计行（F4-23）。"
+          "guidance": "列示期末因出票人未履约而转为应收账款的票据。【提示：票据逾期后应转入应收账款并计提坏账准备，账龄应连续计算，故本表只列示商业承兑票据。】勾稽：各明细行之和 = 合计行（F4-23）。"
         },
         {
           "name": "按坏账计提方法分类（期末余额）",
@@ -8183,7 +8183,7 @@
               "span": 3
             }
           ],
-          "guidance": "组合计提项目：银行承兑汇票。行维度为**出票人类型或账龄**（源模板占位说明），可无限量添加行项目；并需在下方说明按组合计提坏账准备的原因。勾稽：各明细行之和 = 合计行（F4-18）；合计 = 按计提方法分类表「按组合计提坏账准备」行（F4-4、F4-5）。【提示：此处披露未逾期的应收票据计提的坏账准备。若票据逾期，则应转入应收账款并计提坏账准备，账龄应连续计算。】"
+          "guidance": "组合计提项目：银行承兑汇票。行维度为出票人类型或账龄（源模板占位说明），可无限量添加行项目；并需在下方说明按组合计提坏账准备的原因。勾稽：各明细行之和 = 合计行（F4-18）；合计 = 按计提方法分类表「按组合计提坏账准备」行（F4-4、F4-5）。【提示：此处披露未逾期的应收票据计提的坏账准备。若票据逾期，则应转入应收账款并计提坏账准备，账龄应连续计算。】"
         },
         {
           "name": "组合计提项目：商业承兑汇票",
@@ -8270,7 +8270,7 @@
               "span": 3
             }
           ],
-          "guidance": "组合计提项目：商业承兑汇票。行维度为**出票人类型或账龄**（源模板占位说明），可无限量添加行项目；并需在下方说明按组合计提坏账准备的原因。勾稽：各明细行之和 = 合计行（F4-18）；合计 = 按计提方法分类表「按组合计提坏账准备」行（F4-4、F4-5）。【提示：此处披露未逾期的应收票据计提的坏账准备。若票据逾期，则应转入应收账款并计提坏账准备，账龄应连续计算。】"
+          "guidance": "组合计提项目：商业承兑汇票。行维度为出票人类型或账龄（源模板占位说明），可无限量添加行项目；并需在下方说明按组合计提坏账准备的原因。勾稽：各明细行之和 = 合计行（F4-18）；合计 = 按计提方法分类表「按组合计提坏账准备」行（F4-4、F4-5）。【提示：此处披露未逾期的应收票据计提的坏账准备。若票据逾期，则应转入应收账款并计提坏账准备，账龄应连续计算。】"
         },
         {
           "name": "本期计提、收回或转回的坏账准备情况",
@@ -8502,7 +8502,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "d1-notes-receivable-disclosure-alignment",
-      "_aligned_at": "2026-07-30 17:46:49"
+      "_aligned_at": "2026-07-31 23:32:16"
     },
     {
       "section_number": "五、5",
@@ -8570,7 +8570,26 @@
               "is_total": true
             }
           ],
-          "_aligned_by": "d2-ar-disclosure-template-alignment"
+          "_aligned_by": "d2-ar-disclosure-template-alignment",
+          "columns": [
+            {
+              "key": "label",
+              "label": "账 龄",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "end_amount",
+              "label": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_amount",
+              "label": "上年年末余额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "按账龄披露应收账款。勾稽：账龄各档之和 = 合计行（F5-19、F5-24，每个数值列独立）；「其他」列（坏账准备/净额）恒为账面余额 − 坏账准备（F5-11）；预期信用损失率(%) = 坏账准备 ÷ 账面余额 × 100（F5-12、F5-13）。（可根据企业具体会计政策，相应修改账龄组合的划分）"
         },
         {
           "name": "按坏账计提方法分类披露",
@@ -8633,7 +8652,44 @@
               "span": 2
             }
           ],
-          "_aligned_by": "d2-ar-disclosure-template-alignment"
+          "_aligned_by": "d2-ar-disclosure-template-alignment",
+          "columns": [
+            {
+              "key": "label",
+              "label": "类 别",
+              "is_label": true
+            },
+            {
+              "key": "book_amount",
+              "label": "金额",
+              "group": "账面余额",
+              "format": "amount"
+            },
+            {
+              "key": "ratio",
+              "label": "比例(%)",
+              "group": "账面余额",
+              "format": "percent"
+            },
+            {
+              "key": "provision",
+              "label": "金额",
+              "group": "坏账准备",
+              "format": "amount"
+            },
+            {
+              "key": "loss_rate",
+              "label": "预期信用损失率(%)",
+              "group": "坏账准备",
+              "format": "percent"
+            },
+            {
+              "key": "carrying_value",
+              "label": "账面价值",
+              "format": "amount"
+            }
+          ],
+          "guidance": "按坏账计提方法分类披露应收账款。勾稽：比例(%) = 该行账面余额 ÷ 合计行账面余额 × 100（F5-27、F5-29）；预期信用损失率(%) = 坏账准备 ÷ 账面余额 × 100（F5-12）；账面余额 − 坏账准备 = 账面价值（F5-11）；各明细行之和 = 合计行（F5-24、F5-26）；按单项计提行 = 单项计提明细小计、按组合计提行 = 各组合分表小计之和（F5-3、F5-4）。注：填写组合名称。账面余额中的比例按期末该类应收账款除以应收账款合计数计算，坏账准备比例按该类应收账款期末已计提坏账准备除以期末该类应收账款余额计算。"
         },
         {
           "name": "按坏账计提方法分类披露（续：上年年末余额）",
@@ -8696,7 +8752,44 @@
               "span": 2
             }
           ],
-          "_aligned_by": "d2-ar-disclosure-template-alignment"
+          "_aligned_by": "d2-ar-disclosure-template-alignment",
+          "columns": [
+            {
+              "key": "label",
+              "label": "类 别",
+              "is_label": true
+            },
+            {
+              "key": "book_amount",
+              "label": "金额",
+              "group": "账面余额",
+              "format": "amount"
+            },
+            {
+              "key": "ratio",
+              "label": "比例(%)",
+              "group": "账面余额",
+              "format": "percent"
+            },
+            {
+              "key": "provision",
+              "label": "金额",
+              "group": "坏账准备",
+              "format": "amount"
+            },
+            {
+              "key": "loss_rate",
+              "label": "预期信用损失率(%)",
+              "group": "坏账准备",
+              "format": "percent"
+            },
+            {
+              "key": "carrying_value",
+              "label": "账面价值",
+              "format": "amount"
+            }
+          ],
+          "guidance": "按坏账计提方法分类披露应收账款。勾稽：比例(%) = 该行账面余额 ÷ 合计行账面余额 × 100（F5-27、F5-29）；预期信用损失率(%) = 坏账准备 ÷ 账面余额 × 100（F5-12）；账面余额 − 坏账准备 = 账面价值（F5-11）；各明细行之和 = 合计行（F5-24、F5-26）；按单项计提行 = 单项计提明细小计、按组合计提行 = 各组合分表小计之和（F5-3、F5-4）。注：填写组合名称。账面余额中的比例按期末该类应收账款除以应收账款合计数计算，坏账准备比例按该类应收账款期末已计提坏账准备除以期末该类应收账款余额计算。"
         },
         {
           "name": "按单项计提坏账准备的应收账款",
@@ -8732,7 +8825,36 @@
               ]
             }
           ],
-          "_aligned_by": "d2-ar-disclosure-template-alignment"
+          "_aligned_by": "d2-ar-disclosure-template-alignment",
+          "columns": [
+            {
+              "key": "label",
+              "label": "名 称",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "book_amount",
+              "label": "账面余额",
+              "format": "amount"
+            },
+            {
+              "key": "provision",
+              "label": "坏账准备",
+              "format": "amount"
+            },
+            {
+              "key": "loss_rate",
+              "label": "预期信用损失率（%）",
+              "format": "percent"
+            },
+            {
+              "key": "basis",
+              "label": "计提依据",
+              "format": "text"
+            }
+          ],
+          "guidance": "期末单项计提坏账准备的应收账款逐项列示，可无限量添加行项目。勾稽：预期信用损失率(%) = 坏账准备 ÷ 账面余额 × 100（F5-13、F5-29）；各明细行之和 = 合计行（F5-21、F5-24）。完整性：账面余额 ≠ 0 时，名称（债务人名称）、坏账准备、计提依据（理由）列均不应为空（F5-33、F5-34）。"
         },
         {
           "name": "按单项计提坏账准备的应收账款（续：上年年末余额）",
@@ -8768,7 +8890,36 @@
               ]
             }
           ],
-          "_aligned_by": "d2-ar-disclosure-template-alignment"
+          "_aligned_by": "d2-ar-disclosure-template-alignment",
+          "columns": [
+            {
+              "key": "label",
+              "label": "名 称",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "book_amount",
+              "label": "账面余额",
+              "format": "amount"
+            },
+            {
+              "key": "provision",
+              "label": "坏账准备",
+              "format": "amount"
+            },
+            {
+              "key": "loss_rate",
+              "label": "预期信用损失率（%）",
+              "format": "percent"
+            },
+            {
+              "key": "basis",
+              "label": "计提依据",
+              "format": "text"
+            }
+          ],
+          "guidance": "期末单项计提坏账准备的应收账款逐项列示，可无限量添加行项目。勾稽：预期信用损失率(%) = 坏账准备 ÷ 账面余额 × 100（F5-13、F5-29）；各明细行之和 = 合计行（F5-21、F5-24）。完整性：账面余额 ≠ 0 时，名称（债务人名称）、坏账准备、计提依据（理由）列均不应为空（F5-33、F5-34）。"
         },
         {
           "name": "组合计提项目：应收中央企业客户",
@@ -8824,7 +8975,51 @@
               "span": 3
             }
           ],
-          "_aligned_by": "d2-ar-disclosure-template-alignment"
+          "_aligned_by": "d2-ar-disclosure-template-alignment",
+          "columns": [
+            {
+              "key": "label",
+              "label": "账龄",
+              "is_label": true
+            },
+            {
+              "key": "end_amount",
+              "label": "应收账款",
+              "group": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "end_provision",
+              "label": "坏账准备",
+              "group": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "end_loss_rate",
+              "label": "预期信用损失率(%)",
+              "group": "期末余额",
+              "format": "percent"
+            },
+            {
+              "key": "prior_amount",
+              "label": "应收账款",
+              "group": "上年年末余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_provision",
+              "label": "坏账准备",
+              "group": "上年年末余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_loss_rate",
+              "label": "预期信用损失率(%)",
+              "group": "上年年末余额",
+              "format": "percent"
+            }
+          ],
+          "guidance": "组合计提项目分表（按客户类型/账龄等组合方式，逐组合各一张表）。勾稽：各账龄档之和 = 合计行（F5-17、F5-18，每个数值列独立）；本表合计 = 按坏账计提方法分类表「按组合计提」行对应组合的小计（F5-3、F5-4）；预期信用损失率(%)/比例(%) = 坏账准备 ÷ 应收账款 × 100（F5-13、F5-29）。注：填写具体组合名称。"
         },
         {
           "name": "组合计提项目：应收地方国有企业客户",
@@ -8880,7 +9075,51 @@
               "span": 3
             }
           ],
-          "_aligned_by": "d2-ar-disclosure-template-alignment"
+          "_aligned_by": "d2-ar-disclosure-template-alignment",
+          "columns": [
+            {
+              "key": "label",
+              "label": "账龄",
+              "is_label": true
+            },
+            {
+              "key": "end_amount",
+              "label": "应收账款",
+              "group": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "end_provision",
+              "label": "坏账准备",
+              "group": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "end_loss_rate",
+              "label": "预期信用损失率(%)",
+              "group": "期末余额",
+              "format": "percent"
+            },
+            {
+              "key": "prior_amount",
+              "label": "应收账款",
+              "group": "上年年末余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_provision",
+              "label": "坏账准备",
+              "group": "上年年末余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_loss_rate",
+              "label": "预期信用损失率(%)",
+              "group": "上年年末余额",
+              "format": "percent"
+            }
+          ],
+          "guidance": "组合计提项目分表（按客户类型/账龄等组合方式，逐组合各一张表）。勾稽：各账龄档之和 = 合计行（F5-17、F5-18，每个数值列独立）；本表合计 = 按坏账计提方法分类表「按组合计提」行对应组合的小计（F5-3、F5-4）；预期信用损失率(%)/比例(%) = 坏账准备 ÷ 应收账款 × 100（F5-13、F5-29）。注：填写具体组合名称。"
         },
         {
           "name": "组合计提项目：应收海外企业客户",
@@ -8936,7 +9175,51 @@
               "span": 3
             }
           ],
-          "_aligned_by": "d2-ar-disclosure-template-alignment"
+          "_aligned_by": "d2-ar-disclosure-template-alignment",
+          "columns": [
+            {
+              "key": "label",
+              "label": "账龄",
+              "is_label": true
+            },
+            {
+              "key": "end_amount",
+              "label": "应收账款",
+              "group": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "end_provision",
+              "label": "坏账准备",
+              "group": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "end_loss_rate",
+              "label": "预期信用损失率(%)",
+              "group": "期末余额",
+              "format": "percent"
+            },
+            {
+              "key": "prior_amount",
+              "label": "应收账款",
+              "group": "上年年末余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_provision",
+              "label": "坏账准备",
+              "group": "上年年末余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_loss_rate",
+              "label": "预期信用损失率(%)",
+              "group": "上年年末余额",
+              "format": "percent"
+            }
+          ],
+          "guidance": "组合计提项目分表（按客户类型/账龄等组合方式，逐组合各一张表）。勾稽：各账龄档之和 = 合计行（F5-17、F5-18，每个数值列独立）；本表合计 = 按坏账计提方法分类表「按组合计提」行对应组合的小计（F5-3、F5-4）；预期信用损失率(%)/比例(%) = 坏账准备 ÷ 应收账款 × 100（F5-13、F5-29）。注：填写具体组合名称。"
         },
         {
           "name": "组合计提项目：组合4",
@@ -8992,7 +9275,51 @@
               "span": 3
             }
           ],
-          "_aligned_by": "d2-ar-disclosure-template-alignment"
+          "_aligned_by": "d2-ar-disclosure-template-alignment",
+          "columns": [
+            {
+              "key": "label",
+              "label": "账龄",
+              "is_label": true
+            },
+            {
+              "key": "end_amount",
+              "label": "应收账款",
+              "group": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "end_provision",
+              "label": "坏账准备",
+              "group": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "end_loss_rate",
+              "label": "预期信用损失率(%)",
+              "group": "期末余额",
+              "format": "percent"
+            },
+            {
+              "key": "prior_amount",
+              "label": "应收账款",
+              "group": "上年年末余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_provision",
+              "label": "坏账准备",
+              "group": "上年年末余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_loss_rate",
+              "label": "预期信用损失率(%)",
+              "group": "上年年末余额",
+              "format": "percent"
+            }
+          ],
+          "guidance": "组合计提项目分表（按客户类型/账龄等组合方式，逐组合各一张表）。勾稽：各账龄档之和 = 合计行（F5-17、F5-18，每个数值列独立）；本表合计 = 按坏账计提方法分类表「按组合计提」行对应组合的小计（F5-3、F5-4）；预期信用损失率(%)/比例(%) = 坏账准备 ÷ 应收账款 × 100（F5-13、F5-29）。注：填写具体组合名称。"
         },
         {
           "name": "组合计提项目：组合5",
@@ -9048,7 +9375,51 @@
               "span": 3
             }
           ],
-          "_aligned_by": "d2-ar-disclosure-template-alignment"
+          "_aligned_by": "d2-ar-disclosure-template-alignment",
+          "columns": [
+            {
+              "key": "label",
+              "label": "账龄",
+              "is_label": true
+            },
+            {
+              "key": "end_amount",
+              "label": "应收账款",
+              "group": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "end_provision",
+              "label": "坏账准备",
+              "group": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "end_loss_rate",
+              "label": "预期信用损失率(%)",
+              "group": "期末余额",
+              "format": "percent"
+            },
+            {
+              "key": "prior_amount",
+              "label": "应收账款",
+              "group": "上年年末余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_provision",
+              "label": "坏账准备",
+              "group": "上年年末余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_loss_rate",
+              "label": "预期信用损失率(%)",
+              "group": "上年年末余额",
+              "format": "percent"
+            }
+          ],
+          "guidance": "组合计提项目分表（按客户类型/账龄等组合方式，逐组合各一张表）。勾稽：各账龄档之和 = 合计行（F5-17、F5-18，每个数值列独立）；本表合计 = 按坏账计提方法分类表「按组合计提」行对应组合的小计（F5-3、F5-4）；预期信用损失率(%)/比例(%) = 坏账准备 ÷ 应收账款 × 100（F5-13、F5-29）。注：填写具体组合名称。"
         },
         {
           "name": "本期计提、收回或转回的坏账准备情况",
@@ -9087,7 +9458,21 @@
               "is_total": true
             }
           ],
-          "_aligned_by": "d2-ar-disclosure-template-alignment"
+          "_aligned_by": "d2-ar-disclosure-template-alignment",
+          "columns": [
+            {
+              "key": "label",
+              "label": "项 目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "amount",
+              "label": "坏账准备金额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "本期计提、收回或转回的坏账准备情况。勾稽：期末数 = 期初数 + 本期计提 − 本期收回或转回 − 本期核销 − 本期转销 − 其他（源模板 B86 公式；国企侧为 期末数=期初数+计提-收回或转回-转销或核销，F5-6）；期末数 = 分类表坏账准备期末合计（F5-8）；期初数 = 分类表坏账准备期初合计（F5-8a）。「本期转销」「其他」为源模板可选行，无发生额时可删除。"
         },
         {
           "name": "转回或收回金额重要的坏账准备",
@@ -9117,7 +9502,36 @@
               "is_total": true
             }
           ],
-          "_aligned_by": "d2-ar-disclosure-template-alignment"
+          "_aligned_by": "d2-ar-disclosure-template-alignment",
+          "columns": [
+            {
+              "key": "label",
+              "label": "单位名称",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "reversal_reason",
+              "label": "转回原因",
+              "format": "text"
+            },
+            {
+              "key": "recovery_method",
+              "label": "收回方式",
+              "format": "text"
+            },
+            {
+              "key": "original_basis",
+              "label": "原确定坏账准备的依据",
+              "format": "text"
+            },
+            {
+              "key": "amount",
+              "label": "转回或收回金额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "其中，本期坏账准备转回或收回金额重要的（不适用的删除）。勾稽：各明细行之和 = 合计行（F5-30、F5-19）。完整性：转回或收回金额 ≠ 0 时，单位（债务人）名称、转回原因/收回方式（原因、方式）均不应为空（F5-31、F5-32）。注：本期坏账准备收回或转回金额重要的，应披露转回原因、收回方式、确定原坏账准备计提比例的依据及其合理性。"
         },
         {
           "name": "本期实际核销的应收账款情况",
@@ -9131,7 +9545,21 @@
               "row_type": "data"
             }
           ],
-          "_aligned_by": "d2-ar-disclosure-template-alignment"
+          "_aligned_by": "d2-ar-disclosure-template-alignment",
+          "columns": [
+            {
+              "key": "label",
+              "label": "项  目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "amount",
+              "label": "核销金额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "列示本期实际核销的应收账款总额。勾稽：本表（含逐项披露子表）各明细行之和 = 合计行（F5-21）；核销金额应与坏账准备变动表「本期核销」列一致。"
         },
         {
           "name": "重要的应收账款核销情况（逐项披露）",
@@ -9162,7 +9590,41 @@
               "is_total": true
             }
           ],
-          "_aligned_by": "d2-ar-disclosure-template-alignment"
+          "_aligned_by": "d2-ar-disclosure-template-alignment",
+          "columns": [
+            {
+              "key": "label",
+              "label": "单位名称",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "nature",
+              "label": "应收账款性质",
+              "format": "text"
+            },
+            {
+              "key": "amount",
+              "label": "核销金额",
+              "format": "amount"
+            },
+            {
+              "key": "reason",
+              "label": "核销原因",
+              "format": "text"
+            },
+            {
+              "key": "procedure",
+              "label": "履行的核销程序",
+              "format": "text"
+            },
+            {
+              "key": "related",
+              "label": "款项是否由关联交易产生",
+              "format": "text"
+            }
+          ],
+          "guidance": "其中，重要的应收账款核销情况（逐项披露）。勾稽：各明细行之和 = 合计行（F5-21）。完整性：核销金额 ≠ 0 时，单位（债务人）名称、应收账款性质、核销原因、履行的核销程序、是否由关联交易产生（是否因关联交易产生）列均不应为空（F5-33、F5-34）。"
         },
         {
           "name": "按欠款方归集的应收账款和合同资产期末余额前五名单位情况",
@@ -9201,7 +9663,41 @@
               "is_total": true
             }
           ],
-          "_aligned_by": "d2-ar-disclosure-template-alignment"
+          "_aligned_by": "d2-ar-disclosure-template-alignment",
+          "columns": [
+            {
+              "key": "label",
+              "label": "单位名称",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "ar_amount",
+              "label": "应收账款期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "contract_asset_amount",
+              "label": "合同资产期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "total_amount",
+              "label": "应收账款和合同资产期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "ratio",
+              "label": "占应收账款和合同资产期末余额合计数的比例%",
+              "format": "percent"
+            },
+            {
+              "key": "provision",
+              "label": "应收账款坏账准备和合同资产减值准备期末余额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "按欠款方归集的应收账款和合同资产期末余额前五名单位情况。勾稽：各单位行之和 = 合计行（F5-22）；占比 = 该单位应收账款及合同资产期末余额合计 ÷ 应收账款及合同资产期末余额合计数 × 100（F5-37）。"
         },
         {
           "name": "因金融资产转移而终止确认的应收账款情况",
@@ -9230,10 +9726,34 @@
               "is_total": true
             }
           ],
-          "_aligned_by": "d2-ar-disclosure-template-alignment"
+          "_aligned_by": "d2-ar-disclosure-template-alignment",
+          "columns": [
+            {
+              "key": "label",
+              "label": "项  目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "transfer_method",
+              "label": "转移方式",
+              "format": "text"
+            },
+            {
+              "key": "amount",
+              "label": "终止确认金额",
+              "format": "amount"
+            },
+            {
+              "key": "gain_loss",
+              "label": "与终止确认相关的利得或损失",
+              "format": "amount"
+            }
+          ],
+          "guidance": "因金融资产转移而终止确认的应收账款情况。勾稽：各明细行之和 = 合计行（F5-23）。"
         },
         {
-          "name": "转移应收账款且继续涉入形成的资产、负债",
+          "name": "转移应收账款且继续涉入形成的资产、负债的金额",
           "headers": [
             "项  目",
             "资产转移方式",
@@ -9259,7 +9779,31 @@
               "is_total": true
             }
           ],
-          "_aligned_by": "d2-ar-disclosure-template-alignment"
+          "_aligned_by": "d2-ar-disclosure-template-alignment",
+          "columns": [
+            {
+              "key": "label",
+              "label": "项  目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "transfer_method",
+              "label": "资产转移方式",
+              "format": "text"
+            },
+            {
+              "key": "asset_amount",
+              "label": "继续涉入形成的资产金额",
+              "format": "amount"
+            },
+            {
+              "key": "liability_amount",
+              "label": "继续涉入形成的负债金额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "应收账款转移且继续涉入形成的资产、负债的金额（如证券化、保理等，不适用的删除）。资产、负债分块列示，各自小计。"
         }
       ],
       "text_sections": [
@@ -9286,7 +9830,7 @@
         "本年核销应收账款[XX]元，导致坏账准备减少[XX]元。】",
         "### 本期实际核销的应收账款情况",
         "#### 重要的应收账款核销情况（逐项披露）",
-        "【15号文第十九条（四）6，对于其中重要的款项，应**逐项**披露款项性质、核销原因、履行的核销程序及核销金额。实际核销的款项由关联交易产生的，应单独披露；】",
+        "【15号文第十九条（四）6，对于其中重要的款项，应逐项披露款项性质、核销原因、履行的核销程序及核销金额。实际核销的款项由关联交易产生的，应单独披露；】",
         "### 按欠款方归集的应收账款和合同资产期末余额前五名单位情况",
         "【15号文第十九条（四）7，按欠款方集中度，汇总或分别披露期末余额前5名的应收账款和合同资产的期末余额及占应收账款和合同资产期末余额合计数的比例，以及相应计提的坏账准备期末余额。如果公司对同一客户存在合同资产的，应将合同资产与应收账款合并计算。】",
         "汇总披露格式：",
@@ -9321,7 +9865,9 @@
       "parent_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi",
       "sort_index": 4,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "d-cycle-extraction-chain-completion",
+      "_aligned_at": "2026-08-01 09:56:53"
     },
     {
       "section_number": "五、6",
@@ -10049,7 +10595,7 @@
         {
           "name": "按账龄披露",
           "headers": [
-            "账龄",
+            "账 龄",
             "期末余额",
             "上年年末余额"
           ],
@@ -10110,7 +10656,7 @@
           "columns": [
             {
               "key": "label",
-              "label": "账龄",
+              "label": "账 龄",
               "is_label": true,
               "flat": true
             },
@@ -10220,7 +10766,7 @@
         {
           "name": "期末处于第一阶段的坏账准备",
           "headers": [
-            "类别",
+            "类 别",
             "账面余额",
             "未来12个月内的预期信用损失率(%)",
             "坏账准备",
@@ -10262,7 +10808,7 @@
           "columns": [
             {
               "key": "label",
-              "label": "类别",
+              "label": "类 别",
               "is_label": true,
               "flat": true
             },
@@ -10296,7 +10842,7 @@
         {
           "name": "期末处于第二阶段的坏账准备",
           "headers": [
-            "类别",
+            "类 别",
             "账面余额",
             "整个存续期预期信用损失率（%）",
             "坏账准备",
@@ -10338,7 +10884,7 @@
           "columns": [
             {
               "key": "label",
-              "label": "类别",
+              "label": "类 别",
               "is_label": true,
               "flat": true
             },
@@ -10372,7 +10918,7 @@
         {
           "name": "期末处于第三阶段的坏账准备",
           "headers": [
-            "类别",
+            "类 别",
             "账面余额",
             "整个存续期预期信用损失率（%）",
             "坏账准备",
@@ -10414,7 +10960,7 @@
           "columns": [
             {
               "key": "label",
-              "label": "类别",
+              "label": "类 别",
               "is_label": true,
               "flat": true
             },
@@ -10448,7 +10994,7 @@
         {
           "name": "上年年末处于第一阶段的坏账准备",
           "headers": [
-            "类别",
+            "类 别",
             "账面余额",
             "未来12个月内的预期信用损失率(%)",
             "坏账准备",
@@ -10490,7 +11036,7 @@
           "columns": [
             {
               "key": "label",
-              "label": "类别",
+              "label": "类 别",
               "is_label": true,
               "flat": true
             },
@@ -10524,7 +11070,7 @@
         {
           "name": "上年年末处于第二阶段的坏账准备",
           "headers": [
-            "类别",
+            "类 别",
             "账面余额",
             "整个存续期预期信用损失率（%）",
             "坏账准备",
@@ -10566,7 +11112,7 @@
           "columns": [
             {
               "key": "label",
-              "label": "类别",
+              "label": "类 别",
               "is_label": true,
               "flat": true
             },
@@ -10600,7 +11146,7 @@
         {
           "name": "上年年末处于第三阶段的坏账准备",
           "headers": [
-            "类别",
+            "类 别",
             "账面余额",
             "整个存续期预期信用损失率（%）",
             "坏账准备",
@@ -10642,7 +11188,7 @@
           "columns": [
             {
               "key": "label",
-              "label": "类别",
+              "label": "类 别",
               "is_label": true,
               "flat": true
             },
@@ -10684,11 +11230,11 @@
           ],
           "rows": [
             {
-              "label": "期初余额",
+              "label": "上年年末余额",
               "row_type": "data"
             },
             {
-              "label": "期初余额在本期",
+              "label": "上年年末余额在本期",
               "row_type": "data"
             },
             {
@@ -10843,7 +11389,7 @@
         {
           "name": "本期实际核销的其他应收款情况",
           "headers": [
-            "项目",
+            "项  目",
             "核销金额"
           ],
           "rows": [
@@ -10856,7 +11402,7 @@
           "columns": [
             {
               "key": "label",
-              "label": "项目",
+              "label": "项  目",
               "is_label": true,
               "flat": true
             },
@@ -10875,7 +11421,7 @@
             "核销金额",
             "核销原因",
             "履行的核销程序",
-            "是否由关联交易产生"
+            "款项是否由关联交易产生"
           ],
           "rows": [
             {
@@ -10926,7 +11472,7 @@
             },
             {
               "key": "是否由关联交易产生",
-              "label": "是否由关联交易产生",
+              "label": "款项是否由关联交易产生",
               "format": "text"
             }
           ]
@@ -11166,7 +11712,7 @@
       "text_sections": [
         "### 应收利息",
         "#### 应收利息分类",
-        "【提示：仅反映相关金融工具**已到期可收取**但于资产负债表日尚未收到的利息。基于实际利率法计提的金融工具的利息应包含在金融工具的账面余额中。】",
+        "【提示：仅反映相关金融工具已到期可收取但于资产负债表日尚未收到的利息。基于实际利率法计提的金融工具的利息应包含在金融工具的账面余额中。】",
         "#### 重要逾期利息",
         "（15号文第十九条10.对于重要的逾期应收利息，应按借款单位披露应收利息的期末余额、逾期时间和逾期原因、是否发生减值的判断。）",
         "#### 坏账准备计提情况",
@@ -11204,7 +11750,7 @@
         "（注：本表列报本报告期前已全额计提坏账准备，或计提减值准备的比例较大，但在本期又全额收回或转回，或在本期收回或转回比例较大的其他应收款。对本期通过重组等方式收回的金额重大的其他应收款，则应逐笔列报，金额不重大的，可汇总列报。）",
         "#### 本期实际核销的其他应收款情况",
         "##### 重要的其他应收款核销情况（逐项披露）",
-        "【15号文第十九条（四）6，对于其中重要的应收款项，应**逐项**披露款项性质、核销原因、履行的核销程序及核销金额。实际核销的款项由关联交易产生的，应单独披露；】",
+        "【15号文第十九条（四）6，对于其中重要的应收款项，应逐项披露款项性质、核销原因、履行的核销程序及核销金额。实际核销的款项由关联交易产生的，应单独披露；】",
         "#### 按欠款方归集的其他应收款期末余额前五名单位情况",
         "【按欠款方归集的期末余额前五名的其他应收款，应分别披露欠款方名称、期末余额及占其他应收款期末余额合计数的比例、款项的性质、对应的账龄、坏账准备期末余额；】",
         "#### 资金集中管理",
@@ -11241,7 +11787,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "fix_note_k_complex_structure",
-      "_aligned_at": "2026-07-31 20:28:22"
+      "_aligned_at": "2026-08-01 10:41:05"
     },
     {
       "section_number": "五、9",
@@ -15191,7 +15737,7 @@
               "label": "理由"
             }
           ],
-          "guidance": "【15号文第十九条（十一）】披露减值输入值、假设及信用风险是否显著增加的判断依据。勾稽：账面价值 = 账面余额 − 减值准备；减值准备 ≈ 账面余额 × 预期信用损失率；「其中：」下明细之和 = 对应的单项 / 组合计提行；单项 + 组合 = 合计行。🔴 其他债权投资的损失准备在**其他综合收益**中确认，不冲减资产负债表列示的账面价值 → 本区「账面价值」属减值分析口径，不得与资产负债表公允价值列示口径混同（权威模板编制说明第 2、3 条）。按 CAS 22 三阶段披露：一阶段用未来12个月 ECL，二 / 三阶段用整个存续期 ECL；「划分依据」须说明信用风险是否显著增加 / 已发生信用减值的判断。「其中：」为可扩展区（默认 1 行明细 + 预留行），只在「按单项 / 按组合」与下一父行之间填写或插入行，勿改父行 SUM 起止边界。"
+          "guidance": "【15号文第十九条（十一）】披露减值输入值、假设及信用风险是否显著增加的判断依据。勾稽：账面价值 = 账面余额 − 减值准备；减值准备 ≈ 账面余额 × 预期信用损失率；「其中：」下明细之和 = 对应的单项 / 组合计提行；单项 + 组合 = 合计行。🔴 其他债权投资的损失准备在其他综合收益中确认，不冲减资产负债表列示的账面价值 → 本区「账面价值」属减值分析口径，不得与资产负债表公允价值列示口径混同（权威模板编制说明第 2、3 条）。按 CAS 22 三阶段披露：一阶段用未来12个月 ECL，二 / 三阶段用整个存续期 ECL；「划分依据」须说明信用风险是否显著增加 / 已发生信用减值的判断。「其中：」为可扩展区（默认 1 行明细 + 预留行），只在「按单项 / 按组合」与下一父行之间填写或插入行，勿改父行 SUM 起止边界。"
         },
         {
           "name": "期末处于第二阶段的其他债权投资的减值准备",
@@ -15274,7 +15820,7 @@
               "label": "划分依据"
             }
           ],
-          "guidance": "【15号文第十九条（十一）】披露减值输入值、假设及信用风险是否显著增加的判断依据。勾稽：账面价值 = 账面余额 − 减值准备；减值准备 ≈ 账面余额 × 预期信用损失率；「其中：」下明细之和 = 对应的单项 / 组合计提行；单项 + 组合 = 合计行。🔴 其他债权投资的损失准备在**其他综合收益**中确认，不冲减资产负债表列示的账面价值 → 本区「账面价值」属减值分析口径，不得与资产负债表公允价值列示口径混同（权威模板编制说明第 2、3 条）。按 CAS 22 三阶段披露：一阶段用未来12个月 ECL，二 / 三阶段用整个存续期 ECL；「划分依据」须说明信用风险是否显著增加 / 已发生信用减值的判断。「其中：」为可扩展区（默认 1 行明细 + 预留行），只在「按单项 / 按组合」与下一父行之间填写或插入行，勿改父行 SUM 起止边界。"
+          "guidance": "【15号文第十九条（十一）】披露减值输入值、假设及信用风险是否显著增加的判断依据。勾稽：账面价值 = 账面余额 − 减值准备；减值准备 ≈ 账面余额 × 预期信用损失率；「其中：」下明细之和 = 对应的单项 / 组合计提行；单项 + 组合 = 合计行。🔴 其他债权投资的损失准备在其他综合收益中确认，不冲减资产负债表列示的账面价值 → 本区「账面价值」属减值分析口径，不得与资产负债表公允价值列示口径混同（权威模板编制说明第 2、3 条）。按 CAS 22 三阶段披露：一阶段用未来12个月 ECL，二 / 三阶段用整个存续期 ECL；「划分依据」须说明信用风险是否显著增加 / 已发生信用减值的判断。「其中：」为可扩展区（默认 1 行明细 + 预留行），只在「按单项 / 按组合」与下一父行之间填写或插入行，勿改父行 SUM 起止边界。"
         },
         {
           "name": "期末处于第三阶段的其他债权投资的减值准备",
@@ -15357,7 +15903,7 @@
               "label": "划分依据"
             }
           ],
-          "guidance": "【15号文第十九条（十一）】披露减值输入值、假设及信用风险是否显著增加的判断依据。勾稽：账面价值 = 账面余额 − 减值准备；减值准备 ≈ 账面余额 × 预期信用损失率；「其中：」下明细之和 = 对应的单项 / 组合计提行；单项 + 组合 = 合计行。🔴 其他债权投资的损失准备在**其他综合收益**中确认，不冲减资产负债表列示的账面价值 → 本区「账面价值」属减值分析口径，不得与资产负债表公允价值列示口径混同（权威模板编制说明第 2、3 条）。按 CAS 22 三阶段披露：一阶段用未来12个月 ECL，二 / 三阶段用整个存续期 ECL；「划分依据」须说明信用风险是否显著增加 / 已发生信用减值的判断。「其中：」为可扩展区（默认 1 行明细 + 预留行），只在「按单项 / 按组合」与下一父行之间填写或插入行，勿改父行 SUM 起止边界。"
+          "guidance": "【15号文第十九条（十一）】披露减值输入值、假设及信用风险是否显著增加的判断依据。勾稽：账面价值 = 账面余额 − 减值准备；减值准备 ≈ 账面余额 × 预期信用损失率；「其中：」下明细之和 = 对应的单项 / 组合计提行；单项 + 组合 = 合计行。🔴 其他债权投资的损失准备在其他综合收益中确认，不冲减资产负债表列示的账面价值 → 本区「账面价值」属减值分析口径，不得与资产负债表公允价值列示口径混同（权威模板编制说明第 2、3 条）。按 CAS 22 三阶段披露：一阶段用未来12个月 ECL，二 / 三阶段用整个存续期 ECL；「划分依据」须说明信用风险是否显著增加 / 已发生信用减值的判断。「其中：」为可扩展区（默认 1 行明细 + 预留行），只在「按单项 / 按组合」与下一父行之间填写或插入行，勿改父行 SUM 起止边界。"
         },
         {
           "name": "上年年末处于第一阶段的其他债权投资的减值准备",
@@ -15440,7 +15986,7 @@
               "label": "划分依据"
             }
           ],
-          "guidance": "【15号文第十九条（十一）】披露减值输入值、假设及信用风险是否显著增加的判断依据。勾稽：账面价值 = 账面余额 − 减值准备；减值准备 ≈ 账面余额 × 预期信用损失率；「其中：」下明细之和 = 对应的单项 / 组合计提行；单项 + 组合 = 合计行。🔴 其他债权投资的损失准备在**其他综合收益**中确认，不冲减资产负债表列示的账面价值 → 本区「账面价值」属减值分析口径，不得与资产负债表公允价值列示口径混同（权威模板编制说明第 2、3 条）。按 CAS 22 三阶段披露：一阶段用未来12个月 ECL，二 / 三阶段用整个存续期 ECL；「划分依据」须说明信用风险是否显著增加 / 已发生信用减值的判断。「其中：」为可扩展区（默认 1 行明细 + 预留行），只在「按单项 / 按组合」与下一父行之间填写或插入行，勿改父行 SUM 起止边界。"
+          "guidance": "【15号文第十九条（十一）】披露减值输入值、假设及信用风险是否显著增加的判断依据。勾稽：账面价值 = 账面余额 − 减值准备；减值准备 ≈ 账面余额 × 预期信用损失率；「其中：」下明细之和 = 对应的单项 / 组合计提行；单项 + 组合 = 合计行。🔴 其他债权投资的损失准备在其他综合收益中确认，不冲减资产负债表列示的账面价值 → 本区「账面价值」属减值分析口径，不得与资产负债表公允价值列示口径混同（权威模板编制说明第 2、3 条）。按 CAS 22 三阶段披露：一阶段用未来12个月 ECL，二 / 三阶段用整个存续期 ECL；「划分依据」须说明信用风险是否显著增加 / 已发生信用减值的判断。「其中：」为可扩展区（默认 1 行明细 + 预留行），只在「按单项 / 按组合」与下一父行之间填写或插入行，勿改父行 SUM 起止边界。"
         },
         {
           "name": "上年年末处于第二阶段的其他债权投资的减值准备",
@@ -15523,7 +16069,7 @@
               "label": "划分依据"
             }
           ],
-          "guidance": "【15号文第十九条（十一）】披露减值输入值、假设及信用风险是否显著增加的判断依据。勾稽：账面价值 = 账面余额 − 减值准备；减值准备 ≈ 账面余额 × 预期信用损失率；「其中：」下明细之和 = 对应的单项 / 组合计提行；单项 + 组合 = 合计行。🔴 其他债权投资的损失准备在**其他综合收益**中确认，不冲减资产负债表列示的账面价值 → 本区「账面价值」属减值分析口径，不得与资产负债表公允价值列示口径混同（权威模板编制说明第 2、3 条）。按 CAS 22 三阶段披露：一阶段用未来12个月 ECL，二 / 三阶段用整个存续期 ECL；「划分依据」须说明信用风险是否显著增加 / 已发生信用减值的判断。「其中：」为可扩展区（默认 1 行明细 + 预留行），只在「按单项 / 按组合」与下一父行之间填写或插入行，勿改父行 SUM 起止边界。"
+          "guidance": "【15号文第十九条（十一）】披露减值输入值、假设及信用风险是否显著增加的判断依据。勾稽：账面价值 = 账面余额 − 减值准备；减值准备 ≈ 账面余额 × 预期信用损失率；「其中：」下明细之和 = 对应的单项 / 组合计提行；单项 + 组合 = 合计行。🔴 其他债权投资的损失准备在其他综合收益中确认，不冲减资产负债表列示的账面价值 → 本区「账面价值」属减值分析口径，不得与资产负债表公允价值列示口径混同（权威模板编制说明第 2、3 条）。按 CAS 22 三阶段披露：一阶段用未来12个月 ECL，二 / 三阶段用整个存续期 ECL；「划分依据」须说明信用风险是否显著增加 / 已发生信用减值的判断。「其中：」为可扩展区（默认 1 行明细 + 预留行），只在「按单项 / 按组合」与下一父行之间填写或插入行，勿改父行 SUM 起止边界。"
         },
         {
           "name": "上年年末处于第三阶段的其他债权投资的减值准备",
@@ -15606,7 +16152,7 @@
               "label": "划分依据"
             }
           ],
-          "guidance": "【15号文第十九条（十一）】披露减值输入值、假设及信用风险是否显著增加的判断依据。勾稽：账面价值 = 账面余额 − 减值准备；减值准备 ≈ 账面余额 × 预期信用损失率；「其中：」下明细之和 = 对应的单项 / 组合计提行；单项 + 组合 = 合计行。🔴 其他债权投资的损失准备在**其他综合收益**中确认，不冲减资产负债表列示的账面价值 → 本区「账面价值」属减值分析口径，不得与资产负债表公允价值列示口径混同（权威模板编制说明第 2、3 条）。按 CAS 22 三阶段披露：一阶段用未来12个月 ECL，二 / 三阶段用整个存续期 ECL；「划分依据」须说明信用风险是否显著增加 / 已发生信用减值的判断。「其中：」为可扩展区（默认 1 行明细 + 预留行），只在「按单项 / 按组合」与下一父行之间填写或插入行，勿改父行 SUM 起止边界。"
+          "guidance": "【15号文第十九条（十一）】披露减值输入值、假设及信用风险是否显著增加的判断依据。勾稽：账面价值 = 账面余额 − 减值准备；减值准备 ≈ 账面余额 × 预期信用损失率；「其中：」下明细之和 = 对应的单项 / 组合计提行；单项 + 组合 = 合计行。🔴 其他债权投资的损失准备在其他综合收益中确认，不冲减资产负债表列示的账面价值 → 本区「账面价值」属减值分析口径，不得与资产负债表公允价值列示口径混同（权威模板编制说明第 2、3 条）。按 CAS 22 三阶段披露：一阶段用未来12个月 ECL，二 / 三阶段用整个存续期 ECL；「划分依据」须说明信用风险是否显著增加 / 已发生信用减值的判断。「其中：」为可扩展区（默认 1 行明细 + 预留行），只在「按单项 / 按组合」与下一父行之间填写或插入行，勿改父行 SUM 起止边界。"
         },
         {
           "name": "本期计提、收回或转回的减值准备情况",
@@ -16339,7 +16885,7 @@
               "span": 3
             }
           ],
-          "guidance": "组合计提坏账准备按账龄段列示（两级表头：期末余额 / 上年年末余额）。本表是**骨架**：实际每个组合一张表，表名为「组合计提项目：{组合名}」，账龄段随项目账龄配置（3年段 / 5年段 / 自定义）由底稿同步整表覆盖。勾稽：预期信用损失率(%) = 坏账准备 ÷ 长期应收款 × 100；各账龄段之和 = 合计行；各组合表合计行之和 = 坏账准备计提情况表「按组合计提坏账准备」行。"
+          "guidance": "组合计提坏账准备按账龄段列示（两级表头：期末余额 / 上年年末余额）。本表是骨架：实际每个组合一张表，表名为「组合计提项目：{组合名}」，账龄段随项目账龄配置（3年段 / 5年段 / 自定义）由底稿同步整表覆盖。勾稽：预期信用损失率(%) = 坏账准备 ÷ 长期应收款 × 100；各账龄段之和 = 合计行；各组合表合计行之和 = 坏账准备计提情况表「按组合计提坏账准备」行。"
         },
         {
           "name": "本期计提、收回或转回的坏账准备情况",
@@ -16572,15 +17118,19 @@
           "headers": [
             "被投资单位",
             "期初余额（账面价值）",
-            "本期增减变动",
+            "减值准备期初余额",
+            "追加/新增投资",
+            "减少投资",
+            "权益法下确认的投资损益",
+            "其他综合收益调整",
+            "其他权益变动",
+            "宣告发放现金股利或利润",
+            "计提减值准备",
+            "其他",
             "期末余额（账面价值）",
             "减值准备期末余额"
           ],
           "rows": [
-            {
-              "label": "被投资单位",
-              "row_type": "header_label"
-            },
             {
               "label": "①合营企业",
               "row_type": "data"
@@ -16612,12 +17162,97 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "项目",
+              "label": "被投资单位",
+              "is_label": true
+            },
+            {
+              "key": "openingBook",
+              "label": "期初余额（账面价值）",
+              "format": "amount"
+            },
+            {
+              "key": "openingImpairment",
+              "label": "减值准备期初余额",
+              "format": "amount"
+            },
+            {
+              "key": "addition",
+              "label": "追加/新增投资",
+              "group": "本期增减变动",
+              "format": "amount"
+            },
+            {
+              "key": "reduction",
+              "label": "减少投资",
+              "group": "本期增减变动",
+              "format": "amount"
+            },
+            {
+              "key": "equityProfit",
+              "label": "权益法下确认的投资损益",
+              "group": "本期增减变动",
+              "format": "amount"
+            },
+            {
+              "key": "oci",
+              "label": "其他综合收益调整",
+              "group": "本期增减变动",
+              "format": "amount"
+            },
+            {
+              "key": "otherEquity",
+              "label": "其他权益变动",
+              "group": "本期增减变动",
+              "format": "amount"
+            },
+            {
+              "key": "dividend",
+              "label": "宣告发放现金股利或利润",
+              "group": "本期增减变动",
+              "format": "amount"
+            },
+            {
+              "key": "impairment",
+              "label": "计提减值准备",
+              "group": "本期增减变动",
+              "format": "amount"
+            },
+            {
+              "key": "other",
+              "label": "其他",
+              "group": "本期增减变动",
+              "format": "amount"
+            },
+            {
+              "key": "closingBook",
+              "label": "期末余额（账面价值）",
+              "format": "amount"
+            },
+            {
+              "key": "closingImpairment",
+              "label": "减值准备期末余额",
+              "format": "amount"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "本期增减变动",
+              "start": 3,
+              "span": 8
+            }
+          ],
+          "guidance": "长期股权投资变动表（源模板 A8:M11 两级表头）：列 = 被投资单位（标签列）+ 期初余额（账面价值）+ 减值准备期初余额 + 本期增减变动（追加/新增投资、减少投资、权益法下确认的投资损益、其他综合收益调整、其他权益变动、宣告发放现金股利或利润、计提减值准备、其他）+ 期末余额（账面价值）+ 减值准备期末余额。行 = ①合营企业（含动态明细行 `…`）/ 小计 / ②联营企业（含动态明细行 `…`）/ 小计 / 合计。勾稽：期末余额（账面价值）= 期初余额（账面价值）+ 本期增减变动各列代数和 − 计提减值准备 中影响账面价值部分。【长期资产本期进行减值测试的，应披露可收回金额的具体确定方法。可收回金额按公允价值减去处置费用后的净额确定的，应披露公允价值和处置费用的确定方式、关键参数及其确定依据。可收回金额按预计未来现金流量的现值确定的，应披露预测期的年限、预测期及稳定期的关键参数及其确定依据。（15号文第十九条（十九））】数据来源：审定表 G7-1 / 明细表 G7-2。"
         }
       ],
       "text_sections": [
         "### 对子公司投资",
-        "### 对联营、合营企业投资"
+        "### 对联营、合营企业投资",
+        "减值测试说明",
+        "重要合营联营投资披露"
       ],
       "check_presets": [
         "交叉",
@@ -16635,7 +17270,9 @@
       "parent_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi",
       "sort_index": 17,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "fix_note_g7_long_term_equity_structure",
+      "_aligned_at": "2026-08-01 09:37:24"
     },
     {
       "section_number": "五、19",
@@ -17188,7 +17825,7 @@
                 "1601",
                 "1602"
               ],
-              "report_row_code": "BS-014",
+              "report_row_code": "BS-028",
               "row_type": "data"
             },
             {
@@ -17606,11 +18243,11 @@
       "text_sections": [
         "### 固定资产",
         "#### 固定资产情况",
-        "【1、长期资产本期进行减值测试的，应披露可收回金额的具体确定方法。可收回金额按公允价值减去处置费用后的净额确定的，应披露公允价值和处置费用的确定方式、**关键参数及其确定依据**。可收回金额按预计未来现金流量的现值确定的，应披露预测期的年限、预测期及稳定期的**关键参数及其确定依据**。前述信息与以前年度减值测试采用的信息或外部信息明显不一致的，或公司以前年度减值测试采用信息与当年实际情况明显不一致的，应披露差异原因。（15号文第十九条（十九）；",
+        "【1、长期资产本期进行减值测试的，应披露可收回金额的具体确定方法。可收回金额按公允价值减去处置费用后的净额确定的，应披露公允价值和处置费用的确定方式、关键参数及其确定依据。可收回金额按预计未来现金流量的现值确定的，应披露预测期的年限、预测期及稳定期的关键参数及其确定依据。前述信息与以前年度减值测试采用的信息或外部信息明显不一致的，或公司以前年度减值测试采用信息与当年实际情况明显不一致的，应披露差异原因。（15号文第十九条（十九）；",
         "注意：1、本年执行减值测试的，即使未计提减值，也要参照上述要求披露。2、估计可收回金额时通常不应使用重置成本法。",
         "2、说明抵押、担保的固定资产情况。",
         "3、本期发生以明显高于账面价值的价格出售固定资产交易的，应详细说明交易作价的基础和依据，如：估值模型、重要参数的选取依据和估值过程，以及必要的敏感性分析。】",
-        "【提示：在“**其他减少**”中列示本期收到的政府补助冲减固定资产账面价值的金额。对于冲减无形资产或其他资产账面价值的政府补助，比照披露。】",
+        "【提示：在“其他减少”中列示本期收到的政府补助冲减固定资产账面价值的金额。对于冲减无形资产或其他资产账面价值的政府补助，比照披露。】",
         "【提示：非同一控制下企业合并中取得被购买方的资产、负债等应按购买日公允价值计量，因此新并购固定资产的增加应以净额列示。",
         "新并购无形资产或其他资产的增加，相关科目附注比照上述要求进行列示。】",
         "#### 暂时闲置的固定资产情况",
@@ -17665,7 +18302,7 @@
               "account_codes": [
                 "1604"
               ],
-              "report_row_code": "BS-015",
+              "report_row_code": "BS-029",
               "row_type": "data"
             },
             {
@@ -18583,7 +19220,7 @@
               "format": "amount"
             }
           ],
-          "guidance": "使用权资产变动表（源模板 R6–R45）：列 = 资产类别（房屋及建筑物 / 机器设备 / 运输设备 / 其他），行 = 四层结构 —— 一、账面原值 / 二、累计折旧 / 三、减值准备 / 四、账面价值。各层「本期增加金额」「本期减少金额」下的 `……` 行为**可扩明细行**，按被审计单位实际增减事项填列（该行参与本层小计）。勾稽：各层 期末余额 = 期初余额 + 本期增加金额 − 本期减少金额；四、账面价值 1.期末账面价值 = 一、账面原值4.期末余额 − 二、累计折旧4.期末余额 − 三、减值准备4.期末余额，2.期初账面价值 同口径；合计列 = 各资产类别之和。本公司确认与短期租赁和低价值资产租赁相关的租赁费用见对应损益附注。【长期资产本期进行减值测试的，应披露可收回金额的具体确定方法。可收回金额按公允价值减去处置费用后的净额确定的，应披露公允价值和处置费用的确定方式、关键参数及其确定依据。可收回金额按预计未来现金流量的现值确定的，应披露预测期的年限、预测期及稳定期的关键参数及其确定依据。（15号文第十九条（十九））注意：本年执行减值测试的，即使未计提减值，也要参照上述要求披露；估计可收回金额时通常不应使用重置成本法。】数据来源：审定表 H8-1 / 明细表 H8-2 / 折旧测算表 H8-8 / 减值测算表 H8-10。"
+          "guidance": "使用权资产变动表（源模板 R6–R45）：列 = 资产类别（房屋及建筑物 / 机器设备 / 运输设备 / 其他），行 = 四层结构 —— 一、账面原值 / 二、累计折旧 / 三、减值准备 / 四、账面价值。各层「本期增加金额」「本期减少金额」下的 `……` 行为可扩明细行，按被审计单位实际增减事项填列（该行参与本层小计）。勾稽：各层 期末余额 = 期初余额 + 本期增加金额 − 本期减少金额；四、账面价值 1.期末账面价值 = 一、账面原值4.期末余额 − 二、累计折旧4.期末余额 − 三、减值准备4.期末余额，2.期初账面价值 同口径；合计列 = 各资产类别之和。本公司确认与短期租赁和低价值资产租赁相关的租赁费用见对应损益附注。【长期资产本期进行减值测试的，应披露可收回金额的具体确定方法。可收回金额按公允价值减去处置费用后的净额确定的，应披露公允价值和处置费用的确定方式、关键参数及其确定依据。可收回金额按预计未来现金流量的现值确定的，应披露预测期的年限、预测期及稳定期的关键参数及其确定依据。（15号文第十九条（十九））注意：本年执行减值测试的，即使未计提减值，也要参照上述要求披露；估计可收回金额时通常不应使用重置成本法。】数据来源：审定表 H8-1 / 明细表 H8-2 / 折旧测算表 H8-8 / 减值测算表 H8-10。"
         }
       ],
       "text_sections": [
@@ -19107,8 +19744,8 @@
         "### 商誉减值准备",
         "（公司应披露商誉减值测试过程、参数及商誉减值损失的确认方法，包括但不限于以下内容：",
         "1.商誉所属资产组或资产组组合的构成,所属经营分部和依据，以及是否与以前年度保持一致。资产组或资产组组合发生变化的，应披露变化前后的构成，以及导致变化的客观事实及依据。",
-        "2.可收回金额的具体确定方法。可收回金额按公允价值减去处置费用后的净额确定的，应披露公允价值和处置费用的确定方式、关键参数及其确定依据；若可收回金额按预计未来现金流量的现值确定的，**应披露预测期的年限及预测期内的收入增长率、利润率等参数及其确定依据，以及稳定期增长率、利润率、折现率等参数及其确定依据**。前述信息与以前年度减值测试采用的信息或外部信息明显不一致的，或公司以前年度减值测试采用信息与当年实际情况明显不一致的，应披露差异原因。",
-        "3.形成商誉时存在业绩承诺，且报告期或**报告期上一期间**处于业绩承诺期内的，应披露业绩承诺完成情况，以及报告期或报告期上一期间商誉减值情况。（15号文第十九条（二十））",
+        "2.可收回金额的具体确定方法。可收回金额按公允价值减去处置费用后的净额确定的，应披露公允价值和处置费用的确定方式、关键参数及其确定依据；若可收回金额按预计未来现金流量的现值确定的，应披露预测期的年限及预测期内的收入增长率、利润率等参数及其确定依据，以及稳定期增长率、利润率、折现率等参数及其确定依据。前述信息与以前年度减值测试采用的信息或外部信息明显不一致的，或公司以前年度减值测试采用信息与当年实际情况明显不一致的，应披露差异原因。",
+        "3.形成商誉时存在业绩承诺，且报告期或报告期上一期间处于业绩承诺期内的，应披露业绩承诺完成情况，以及报告期或报告期上一期间商誉减值情况。（15号文第十九条（二十））",
         "【注意：即使未计提减值，也要参照上述要求披露】",
         "示例：",
         "商誉系本公司于2X21年1月1日收购XX铁路业务时形成。",
@@ -19660,7 +20297,7 @@
               "account_codes": [
                 "1121"
               ],
-              "report_row_code": "BS-004",
+              "report_row_code": "BS-005",
               "row_type": "data"
             },
             {
@@ -19668,7 +20305,7 @@
               "account_codes": [
                 "1122"
               ],
-              "report_row_code": "BS-005",
+              "report_row_code": "BS-006",
               "row_type": "data"
             },
             {
@@ -19681,7 +20318,7 @@
                 "1408",
                 "1461"
               ],
-              "report_row_code": "BS-008",
+              "report_row_code": "BS-010",
               "row_type": "data"
             },
             {
@@ -19690,7 +20327,7 @@
                 "1601",
                 "1602"
               ],
-              "report_row_code": "BS-014",
+              "report_row_code": "BS-028",
               "row_type": "data"
             },
             {
@@ -19699,7 +20336,7 @@
                 "1701",
                 "1702"
               ],
-              "report_row_code": "BS-016",
+              "report_row_code": "BS-032",
               "row_type": "data"
             },
             {
@@ -19739,7 +20376,7 @@
               "account_codes": [
                 "1121"
               ],
-              "report_row_code": "BS-004",
+              "report_row_code": "BS-005",
               "row_type": "data"
             },
             {
@@ -19747,7 +20384,7 @@
               "account_codes": [
                 "1122"
               ],
-              "report_row_code": "BS-005",
+              "report_row_code": "BS-006",
               "row_type": "data"
             },
             {
@@ -19760,7 +20397,7 @@
                 "1408",
                 "1461"
               ],
-              "report_row_code": "BS-008",
+              "report_row_code": "BS-010",
               "row_type": "data"
             },
             {
@@ -19769,7 +20406,7 @@
                 "1601",
                 "1602"
               ],
-              "report_row_code": "BS-014",
+              "report_row_code": "BS-028",
               "row_type": "data"
             },
             {
@@ -19778,7 +20415,7 @@
                 "1701",
                 "1702"
               ],
-              "report_row_code": "BS-016",
+              "report_row_code": "BS-032",
               "row_type": "data"
             },
             {
@@ -20909,7 +21546,7 @@
               "format": "amount"
             }
           ],
-          "guidance": "上市版按**双期余额**列示（期末余额 / 上年年末余额）。源模板说明：小税（费）种可合并反映；满足条件将当期所得税资产及当期所得税负债以抵销后净额列示时，实交税款大于应交税的超过部分列示为「其他流动资产」，小于时差额列示为「应交税费」。【提示：增值税，根据“应交税费-未交增值税、简易计税、转让金融商品应交增值税、代扣代缴增值税”科目贷方余额计算填列。】勾稽：合计 = 各税项之和（源模板 =SUM(B8:B22)）。",
+          "guidance": "上市版按双期余额列示（期末余额 / 上年年末余额）。源模板说明：小税（费）种可合并反映；满足条件将当期所得税资产及当期所得税负债以抵销后净额列示时，实交税款大于应交税的超过部分列示为「其他流动资产」，小于时差额列示为「应交税费」。【提示：增值税，根据“应交税费-未交增值税、简易计税、转让金融商品应交增值税、代扣代缴增值税”科目贷方余额计算填列。】勾稽：合计 = 各税项之和（源模板 =SUM(B8:B22)）。",
           "rows": [
             {
               "label": "企业所得税",
@@ -21021,7 +21658,7 @@
               "account_codes": [
                 "2241"
               ],
-              "report_row_code": "BS-037",
+              "report_row_code": "BS-050",
               "row_type": "data"
             },
             {
@@ -22174,7 +22811,7 @@
               "format": "text"
             }
           ],
-          "guidance": "勾稽：期末余额 = 期初余额 + 本期增加 − 本期减少；合计 = 各项之和。本表由 **L6 专项应付款**底稿推送（与长期应付款共章节，按子表名浅合并）。须说明专项应付款的来源、指定的专门用途与使用限制。"
+          "guidance": "勾稽：期末余额 = 期初余额 + 本期增加 − 本期减少；合计 = 各项之和。本表由 L6 专项应付款底稿推送（与长期应付款共章节，按子表名浅合并）。须说明专项应付款的来源、指定的专门用途与使用限制。"
         }
       ],
       "text_sections": [
@@ -23917,7 +24554,7 @@
               "format": "amount"
             }
           ],
-          "guidance": "按税费项目列示本期 / 上期发生额。源模板说明：各项税金及附加的计缴标准详见附注四、税项。🔴 国企版源模板此节为「附注披露信息：无」→ **国企不披露税金及附加**，故无国企章节。勾稽：合计 = 各税费项目之和（源模板 =SUM(B8:B16)）。",
+          "guidance": "按税费项目列示本期 / 上期发生额。源模板说明：各项税金及附加的计缴标准详见附注四、税项。🔴 国企版源模板此节为「附注披露信息：无」→ 国企不披露税金及附加，故无国企章节。勾稽：合计 = 各税费项目之和（源模板 =SUM(B8:B16)）。",
           "rows": [
             {
               "label": "消费税",
@@ -24889,7 +25526,7 @@
               "account_codes": [
                 "2202"
               ],
-              "report_row_code": "BS-033",
+              "report_row_code": "BS-045",
               "row_type": "data"
             },
             {
@@ -24901,7 +25538,7 @@
               "account_codes": [
                 "2001"
               ],
-              "report_row_code": "BS-031",
+              "report_row_code": "BS-041",
               "row_type": "data"
             },
             {
@@ -24913,7 +25550,7 @@
               "account_codes": [
                 "2241"
               ],
-              "report_row_code": "BS-037",
+              "report_row_code": "BS-050",
               "row_type": "data"
             },
             {
@@ -25046,7 +25683,7 @@
               "account_codes": [
                 "1122"
               ],
-              "report_row_code": "BS-005",
+              "report_row_code": "BS-006",
               "row_type": "data"
             },
             {
@@ -25070,7 +25707,7 @@
               "account_codes": [
                 "2501"
               ],
-              "report_row_code": "BS-041",
+              "report_row_code": "BS-061",
               "row_type": "data"
             },
             {
@@ -25483,200 +26120,1222 @@
       "scope": "both",
       "sort_order": 700,
       "text_sections": [
-        "## 在子公司中的权益",
-        "### 企业集团的构成",
-        "（15号文第二十九条）",
-        "①子公司的持股比例不同于表决权比例的，应说明表决权比例及差异原因。",
-        "②持有其他主体半数或以下表决权但仍控制该主体、以及公司持有其他主体半数以上表决权但不控制该主体的，公司应披露相关判断和依据。",
-        "③披露确定公司是代理人还是委托人的判断和依据，披露对委托受托经营情况下是否存在控制的判断依据。",
-        "④对合伙企业存在权益性投资，应披露对被投资单位是否具有控制的相关判断依据。",
-        "⑤对于纳入合并范围的重要的结构化主体，应披露控制的相关判断和依据。",
-        "【例如资产证券化，公司应根据《信贷资产证券化试点管理办法》和《企业会计准则第23号-金融资产转移》，披露金融资产证券化业务的主要交易安排及其会计处理。涉及非金融资产的资产证券化业务，参照《信贷资产证券化试点管理办法》和《企业会计准则第23号-金融资产转移》的有关规定，披露资产证券化业务的主要交易安排及其会计处理。同时，应详细说明资产证券化业务的破产隔离条款。",
-        "（本公司于本年度内将一笔金额为[X]元（200Y年：[X]元）的应收账款证券化转让给由XX银行设立的XX信托计划。作为转让的一部分，本公司就该笔应收账款的预期损失向信托计划提供信用担保。因此，本公司继续全额确认应收账款的账面金额并将因转让而收取的现金确认为抵押借款。在200X年12月31日，被转让的应收账款账面金额为[X]元（200Y年：[X]元），而相关负债的账面金额为[X]元。）】",
-        "### 重要的非全资子公司",
-        "（15号文第三十六条（一）、（二））",
-        "【提示：如果单个非全资子公司的少数股东权益对企业集团而言并不重要，则不需要披露该子公司及下述相关信息。】",
-        "持股比例不同于表决权比例的，应说明表决权比例及差异原因",
-        "### 重要非全资子公司的主要财务信息（划分为持有待售的除外）",
-        "（15号文第三十六条（三））",
-        "【提示：如果单个非全资子公司的少数股东权益对企业集团而言并不重要（或，该非全资子公司对企业集团不重要），则不需要披露该子公司及下述相关信息。】",
-        "续（1）：",
-        "续（2）：",
-        "【提示：上述财务数据以合并日子公司可辨认资产和负债的公允价值为基础进行调整；被划分为持有待售资产的，不需要披露该子公司的上述财务信息。】",
-        "### 使用资产和清偿负债存在的重大限制（不适用的删除）",
-        "（15号文第三十七条）",
-        "披露以下信息：",
-        "（1）限制内容，包括对母公司或子公司与集团内其他主体相互转移现金或其他资产的限制，以及对集团内主体之间发放股利或进行利润分配、发放或收回贷款或垫款等的限制；",
-        "（2）子公司少数股东享有保护性权利，并且该保护性权利对使用集团资产或清偿集团负债的能力存在重大限制的，披露限制的性质和程度；",
-        "（3）限制涉及的资产和负债在合并财务报表中的金额。",
-        "### 向纳入合并财务报表范围的结构化主体提供的财务支持或其他支持",
-        "（15号文第三十八条）",
-        "披露与结构化主体相关的风险信息，向结构化主体提供财务支持或其他支持，包括帮助结构化主体取得财务支持：",
-        "（1）有合同约定的，披露财务支持的合同条款包括可能导致企业承担损失的事项或情况；",
-        "（2）在没有合同约定的情况下，披露所提供支持的类型、金额及原因，包括帮助该结构化主体获得财务支持的情况。其中，本期对以前未纳入合并财务报表范围的结构化主体提供了财务支持或其他支持并且该支持导致控制了该结构化主体的，披露决定提供支持的相关因素；",
-        "（3）存在提供支持意图的，披露该意图，包括帮助该结构化主体获得财务支持的意图。",
-        "### 在子公司的所有者权益份额发生变化且仍控制子公司的交易",
-        "（15号文第三十五条，公司在子公司的所有者权益份额发生变化且该变化未影响公司对子公司的控制权的，应披露在子公司所有者权益份额的变化情况、对归属于母公司所有者权益和少数股东权益的影响金额，以及上述金额的计算依据。）",
-        "#### 在子公司所有者权益份额发生变化的情况",
-        "本公司原持有【A公司】90%股权，2025年10月本公司与甲公司签订股权转让协议，约定于2025年12月向甲公司转让A公司20%股权，该股权处置交易未导致本公司丧失对【A公司】的控制权。截至2025年12月31日，股权转让协议已履行完毕，取得交易对价为2600万元，该项交易导致少数股东权益增加2400万元，资本公积增加200万元。",
-        "#### 交易对于少数股东权益及归属于母公司所有者权益的影响",
-        "## 非同一控制下企业合并",
-        "### 本期发生的非同一控制下企业合并",
-        "（分步实现企业合并且在本期取得控制权的交易，应分别说明前期和本期取得股权的时点、成本、比例及方式。）",
-        "【也可文字表述，如下：",
-        "本期内，本公司取得了[B公司][90%]股权，合并成本为现金[   ]元及[其他资产][账面价值[  ]元，根据评估确定合并成本的公允价值[  ]元，购买日确定为8月31日。(披露确定购买日的依据。)(描述合并的具体情况。) 】",
-        "### 合并成本及商誉",
-        "（15号文第三十条（四）、（五）、（六））",
-        "（1）说明合并成本公允价值的确定方法",
-        "（2）说明或有对价的相关条款、购买日确认的或有对价的金额及其确定方法和依据，购买日后或有对价的变动及原因以及业绩承诺的完成情况。被购买方未达到业绩承诺的，应说明该事项对相关商誉减值测试的影响。",
-        "【提示：以前期间发生的企业合并相关或有对价的变动及其原因、影响应在或有对价形成的相关资产、负债项目中予以说明。】",
-        "【提示：证监会《2015 年上市公司年报会计监管报告》，基于业绩承诺实现的可能性、或有对价支付方的信用风险、货币时间价值、可能需支付或返回股权的公允价值等因素，合理估计或有对价的公允价值；披露相关的业绩承诺条款、在购买日及后续期间披露与或有对价公允价值计量相关的信息。】",
-        "（3）对于合并中形成的大额商誉，应说明形成的主要原因。",
-        "### 被购买方于购买日可辨认资产、负债",
-        "（15号文第三十条（七））",
-        "#### [B公司]的可辨认资产和负债[及或有负债]于购买日的公允价值、账面价值如下：",
-        "（1）说明购买日被购买方可辨认资产、负债公允价值的确定方法；",
-        "（2）说明承担的被购买方或有负债的情况。",
-        "【提示：",
-        "1、资产、负债项目可根据重要性原则分类汇总列示；单项不重大的企业合并可汇总列示。",
-        "2、非同一控制下企业合并，购买日，被合并方固定资产不应出现“累计折旧”备抵科目】",
-        "3、根据《企业会计准则解释第5号》，企业应当在附注中披露在非同一控制下的企业合并中取得的被购买方无形资产的公允价值及其公允价值的确定方法。非同一控制下的企业合并中，购买方在对企业合并中取得的被购买方资产进行初始确认时，应当对被购买方拥有的但在**其财务报表中未确认的无形资产进行充分辨认和合理判断。**",
-        "如在企业合并中，确认了被购买方财务报告中未确认的无形资产，建议按照无形资产明细项目（如客户关系、雇佣合同等）进行说明。",
-        "4、根据证监会《监管规则适用指引——会计类第4号》，非同一控制下的企业合并中，无论被购买方在其自身财务报表中对**政府补助**采用总额法还是净额法进行会计处理，**购买方在购买日所确认的被购买方各项可辨认资产和负债的公允价值应保持一致**，确认的合并商誉金额也应一致。购买方对于**被购买方自身的财务报表中因政府补助确认的递延收益，如果相关政府补助款项不存在需要返还的现时义务，则购买方不应将该递延收益单独识别为一项可辨认负债。**】",
-        "### 购买日之前原持有股权按照公允价值重新计量所产生的利得或损失",
-        "【15号文第三十条（九），分步实现的非同一控制下企业合并，还应披露以下信息：",
-        "1.购买日之前原持有股权的取得时点、取得比例、取得成本和取得方式。",
-        "2.购买日之前原持有股权在购买日的账面价值、公允价值，以及按照公允价值重新计量所产生的利得或损失的金额。",
-        "3.购买日之前原持有股权在购买日公允价值的确定方法及主要假设。",
-        "4.购买日之前与原持有股权相关的其他综合收益转入投资收益或留存收益的金额。】",
-        "[本公司原持有[C公司][10%]股权，采用成本法核算。本期，本公司进一步取得了[C公司][80%]股权，支付对价为现金[   ]元及[其他资产][账面价值[  ]元，根据评估确定支付对价的公允价值[  ]元]。（描述合并的具体情况。）] 购买日确定为8月31日。",
-        "【提示：按照证监会《监管规则适用指引——会计类第4号》，对于投资方与联营企业、合营企业之间发生顺流交易产生的未实现内部交易损益，因处置或视同处置联营企业、合营企业股权导致未实现内部交易损益得以实现，投资方应作为股权处置损益计入当期投资收益，前期在投资方合并财务报表中予以抵销的未实现内部交易相关收入、成本或资产处置损益等不予恢复。】",
-        "### 合并对价（或 被购买方可辨认资产、负债公允价值）暂估情况",
-        "（15号文第三十条（八），购买日或合并当期期末无法合理确定合并对价或被购买方可辨认资产、负债公允价值的，应披露该事实和原因、按照暂估价值入账的项目，以及本期对以前期间企业合并相关项目暂估价值进行的调整和相关会计处理。）",
-        "## 反向购买",
-        "（15号文第三十一条，公司以发行股份购买资产等方式实现非上市公司或业务借壳上市并构成反向购买的，还应说明构成反向购买的依据、交易之前公司的资产是否构成业务及其判断依据、合并成本的确定方法、交易中确认的商誉或计入当期的损益或调整权益的金额及其计算过程。）",
-        "【提示：上市公司保留的资产、负债构成业务的，同时还应按照非同一控制下企业合并披露相关信息。】",
-        "## 同一控制下企业合并",
-        "### 本期发生的同一控制下企业合并",
-        "（15号文第三十二条（一）、（二）、（三）、（四））",
-        "（202X年[8]月，本公司以现金[   ]元吸收合并了[A公司]，[A公司]系本公司的母公司——[S公司]的子公司，由于合并前后合并双方均受[S公司]控制且该控制并非暂时性，故本合并属同一控制下的企业合并，合并日确定为[8月31日]。(披露确定合并日的依据。)本公司与[A公司]的吸收合并中取得的资产及负债，均按照合并日在被合并方的账面价值计量。(描述合并的具体情况。) ）",
-        "### 合并成本",
-        "（15号文第三十二条（五）、（六））",
-        "说明或有对价的安排、合并日确认的或有对价的金额及其确定方法和依据，合并日后或有对价的变动及其原因。",
-        "【提示：以前期间发生的企业合并相关或有对价的变动及其原因应在或有对价形成的资产、负债项目中予以说明。】",
-        "### 被合并方的资产、负债",
-        "（15号文第三十二条（七））",
-        "#### [A公司]在合并日、上一会计期间资产负债表日资产及负债的账面价值如下：",
-        "说明企业合并中承担的被合并方或有负债的情况。",
-        "【提示：资产、负债项目可根据重要性原则分类汇总列示；单项不重大的企业合并可汇总列示。】",
-        "【《企业会计准则第20号-企业合并》第十八条，企业合并发生当期的期末，合并方应当披露与同一控制下企业合并有关的下列信息：（1）以支付现金、转让非现金资产以及承担债务作为合并对价的，所支付对价在合并日的账面价值；以发行权益性证券作为合并对价的，合并中发行权益性证券的数量及定价原则，以及参与合并各方交换有表决权股份的比例。（2）合并合同或协议约定将承担被合并方或有负债的情况。（3）被合并方采用的会计政策与合并方不一致所作调整情况的说明。（4）合并后已处置或准备处置被合并方资产、负债的账面价值、处置价格等。】",
-        "## 处置子公司",
-        "### 单次处置至丧失控制权而减少的子公司",
-        "（15号文第三十三条（一）、（二）、（三）、（四））",
-        "续：",
-        "### 多次交易分步处置股权至丧失控制权而减少的子公司",
-        "（15号文第三十三条（四），通过多次交易分步处置对子公司投资至丧失控制权的，还应披露以下信息：判断各项交易是否构成“一揽子交易”的原则，前期处置股权的处置时点以及处置价款、处置比例、处置方式、处置价款与处置投资所对应的合并财务报表层面享有该子公司净资产份额的差额等。）",
-        "本公司原持有【A公司】90%股权，2024年10月本公司与甲公司签订股权转让协议，约定于2024年12月向甲公司转让A公司20%股权，于2025年6月向甲公司进一步转让A公司40%股权。截至2025年12月31日，股权转让协议已履行完毕，本公司仅持有A公司30%股权，能够对A公司实施重大影响。本公司将处置A公司股权至丧失控制权的两次交易作为“一揽子交易”进行会计处理【或者，本公司处置A公司股权至丧失控制权的两次交易不属于“一揽子交易”】。（描述分步处置股权的具体情况，**并说明判断为“一揽子交易”的理由（请参考会计政策中的有关披露）或者不属于“一揽子交易”的理由。）**",
-        "#### 一揽子交易",
-        "##### 丧失控制权时点的交易或事项的信息",
-        "续（1）：",
-        "续（2）：",
-        "##### 前期处置股权的交易或事项的信息",
-        "（说明构成一揽子交易的判断依据。）",
-        "#### 非一揽子交易",
-        "##### 丧失控制权时点的交易或事项的信息",
-        "续（1）：",
-        "续（2）：",
-        "##### 前期处置股权的交易或事项的信息",
-        "（说明不构成一揽子交易的判断依据。）",
-        "### （2）参考披露格式2-多次交易分步处置股权至丧失控制权而减少的子公司",
-        "本公司原持有【A公司】90%股权，2024年10月本公司与甲公司签订股权转让协议，约定于2024年12月向甲公司转让A公司20%股权，于2025年5月向甲公司进一步转让A公司40%股权。截至2025年5月30日，股权转让协议已履行完毕，本公司仅持有A公司30%股权，能够对A公司实施重大影响。本公司将处置A公司股权至丧失控制权的两次交易作为“一揽子交易”进行会计处理【或者，本公司处置A公司股权至丧失控制权的两次交易不属于“一揽子交易”】。（描述分步处置股权的具体情况，**并说明判断为“一揽子交易”的理由（请参考会计政策中的有关披露）或者不属于“一揽子交易”的理由。）**",
-        "①前期和本期处置股权情况",
-        "②丧失控制权之日确定为2025年5月30日。（披露确定丧失控制权之日的判断依据）",
-        "在丧失控制权之日，合并财务报表层面剩余股权的公允价值的确定方法是：…….。采取的主要假设……。",
-        "【参考：剩余股权公允价值的确定",
-        "①存在公开市场报价（如股票市价），可参考公开市场报价作为公允价值。",
-        "②参考购买日增持或丧失控制权日减持股份的价格，进行调整后确定。",
-        "③估值技术。】",
-        "【按照证监会《监管规则适用指引——会计类第5号》，对于投资方与原子公司之间发生逆流交易产生的未实现内部交易损益，因处置或视同处置原子公司，相关未实现内部交易损益已得以实现，在合并财务报表层面投资方应将其计入当期处置子公司损益，同时相应调整投资方相关资产账面价值。】",
-        "## 其他原因导致的合并范围的变动",
-        "（15号文第三十四条）",
-        "说明因其他原因（如新设子公司、清算子公司）导致的合并范围的变动情况。",
-        "## 在合营安排或联营企业中的权益",
-        "### 重要的合营企业或联营企业",
-        "（15号文第三十九条（一）、（二）、（三））",
-        "（1）持股比例不同于表决权比例的，应说明表决权比例及差异原因。",
-        "（2）持有其他主体20%以下表决权但具有重大影响，或者持有其他主体20%或以上表决权但不具有重大影响的，应披露相关判断和依据。",
-        "（3）对合伙企业存在权益性投资，应披露对被投资单位是否具有共同控制或重大影响的相关判断依据。",
-        "### 重要合营企业的主要财务信息（划分为持有待售的除外）",
-        "（15号文第三十九条（四）、（五）、（六））",
-        "（主要财务信息按照权益法调整后的金额披露；不重要的，这里可以不披露。）",
-        "（“调整事项”包括投资形成的正商誉、抵消的未实现内部交易损益、减值准备等；）",
-        "（如果母公司为投资性主体，无需披露下列财务信息。）",
-        "续：",
-        "（注：存在终止经营的净利润的，还应当在本表中单列项目披露）",
-        "### 重要联营企业的主要财务信息（持有待售的除外）",
-        "（15号文第三十九条（四）、（五）、（六））",
-        "（主要财务信息按照权益法调整后的金额披露；不重要的，这里可以不披露。）",
-        "（“调整事项”包括投资形成的正商誉、抵消的未实现内部交易损益 、减值准备等事项；）",
-        "（如果母公司为投资性主体，无需披露下列财务信息。）",
-        "续：",
-        "（注：存在终止经营的净利润的，还应当在本表中单列项目披露）",
-        "### 其他不重要合营企业和联营企业的汇总财务信息",
-        "（15号文第四十条）",
-        "（注：存在终止经营的净利润的，还应当在本表中单列项目披露）",
-        "①（合营企业、联营企业的重要会计政策、会计估计与公司的会计政策、会计估计存在的重大差异说明）",
-        "②（对合营企业具有共同控制的依据说明）",
-        "【提示：被划分为持有待售资产的，不需要披露合营企业或联营企业的上述财务信息。】",
-        "### 合营企业或联营企业向本公司转移资金的能力存在重大限制",
-        "（15号文第四十一条）",
-        "披露该限制的具体情况。",
-        "### 对合营企业或联营企业发生超额亏损的分担额（不适用的删除）",
-        "（15号文第四十二条）",
-        "### 未确认承诺及或有负债",
-        "（15号文第四十三条）",
-        "公司应披露与其对合营企业投资相关的未确认承诺，以及与其对合营企业或联营企业投资相关的或有负债。",
-        "### 重要的共同经营",
-        "（15号文第四十四条）",
-        "① 持股比例或享有的份额不同于表决权比例的，应说明表决权比例及差异原因。",
-        "②共同经营为单独主体的，应披露判断为共同经营的依据。",
-        "## 在未纳入合并财务报表范围的结构化主体中的权益",
-        "（15号文第四十五条）",
-        "### 未纳入合并范围的结构化主体的基础信息",
-        "（未纳入合并财务报表范围的结构化主体的性质、目的、规模、活动及融资方式。）",
-        "### 与权益相关资产负债的账面价值和最大损失敞口",
-        "①在财务报表中确认的与企业在未纳入合并财务报表范围的结构化主体中权益相关的资产和负债的账面价值及其在资产负债表中的列报项目。",
-        "②在未纳入合并财务报表范围的结构化主体中权益的最大损失敞口及其确定方法。企业不能量化最大损失敞口的，应当披露这一事实及其原因。",
-        "③在财务报表中确认的与企业在未纳入合并财务报表范围的结构化主体中权益相关的资产和负债的账面价值与其最大损失敞口的比较。",
-        "④为结构化主体的发起人但在结构化主体中没有权益的情况",
-        "企业发起设立未纳入合并财务报表范围的结构化主体，但资产负债表日在该结构化主体中没有权益的，应披露相关原因。企业不需要披露上述（1）至（2）项要求的信息，但应当披露：",
-        "企业作为该结构化主体发起人的认定依据；",
-        "【存在下列情况的，可能说明企业是结构化主体的发起人：",
-        "企业单独创建了结构化主体；",
-        "企业参与创建结构化主体，并参与结构化设计的过程；",
-        "企业是结构化主体的最主要的服务对象，例如，结构化主体为企业提供资金，或者结构化主体所从事的业务活动是企业主要业务活动的组成部分，企业即使没有发起结构化主体，自身也要开展这些业务活动；",
-        "企业的名称出现在结构化主体的名称或结构化主体发行的证券的名称中；",
-        "其他能够说明企业是结构化主体发起人的情形。】",
-        "并分类披露企业当期从该结构化主体获得的收益、收益类型，以及转移至该结构化主体的所有资产在转移时的账面价值。",
-        "本公司发起多个结构化主体，但在结构化中均不持有权益。2025年，本公司从发起的结构化主体获得收益的情况以及当期向结构化主体转移资产的情况如下表所示：",
-        "### 向未纳入合并财务报表范围的结构化主体提供支持的情况",
-        "（披露向未纳入合并财务报表范围的结构化主体提供财务支持或其他支持的意图，包括帮助该结构化主体获得财务支持的意图。在没有合同约定的情况下，披露提供支持的类型、金额及原因，包括帮助该结构化主体获得财务支持的情况。）",
-        "### 未纳入合并财务报表范围的结构化主体的额外信息披露",
-        "①合同约定企业在特定情况下需要向未纳入合并财务报表范围的结构化主体提供财务支持或其他支持的，披露相关的合同条款及有关信息。",
-        "②因在未纳入合并财务报表范围的结构化主体中持有权益而当期遭受损失的，披露损失的金额，包括计入当期损益的金额和计入其他综合收益的金额。",
-        "③因在未纳入合并财务报表范围的结构化主体中持有权益，如果当期取得与该权益相关的收益，披露收益的类型。收益类型包括：服务费；利息收入；利息分配收入；处置债券或股权的收益；以及向结构化主体转移资产取得的收益等。",
-        "④在合同约定企业和其他主体需要承担未纳入合并财务报表范围结构化主体的损失的情况下，披露企业和其他主体需要承担损失的最大限额以及承担损失的先后顺序。",
-        "⑤披露第三方提供的、对企业在未纳入合并财务报表范围的结构化主体中权益的公允价值或风险可能产生影响的流动性支持、担保、承诺等。",
-        "⑥披露当期未纳入合并财务报表范围的结构化主体在融资活动中遇到的困难，主要是指债务融资或股权融资遇到的困难。",
-        "⑦披露与未纳入合并财务报表范围的结构化主体融资业务有关的信息，包括融资形式（例如商业票据、中长期票据）及其加权平均期限。当结构化主体投资长期资产但资金来源于短期负债时，分析该结构化主体资产和负债的期限结构，并披露这一情况。）",
-        "⑧为交易目的而持有的较小金额的在未合并结构化主体中的权益，如果对于公司而言具有重要性（金额和性质），也应进行披露。"
+        "#### 集团构成及控制判断说明",
+        "说明持股比例与表决权比例的差异及原因；持有其他主体半数或以下表决权但仍控制该主体、或持有半数以上表决权但不控制该主体的相关判断和依据；确定公司是代理人还是委托人的判断和依据；对于纳入合并范围的重要结构化主体，披露控制的相关判断和依据。",
+        "#### 资产证券化及结构化主体交易安排说明",
+        "如适用，说明资产证券化业务的主要交易安排及会计处理，包括破产隔离条款；不适用时标记不适用。",
+        "#### （4）使用资产和清偿负债存在的重大限制",
+        "说明限制的性质和程度，包括对母公司或子公司与集团内其他主体相互转移现金或其他资产的限制、股利分配/贷款或垫款的限制、少数股东保护性权利对使用集团资产或清偿集团负债能力的限制，以及限制涉及的资产和负债在合并财务报表中的金额。",
+        "#### （5）向纳入合并范围的结构化主体提供的财务支持或其他支持",
+        "披露与结构化主体相关的风险信息，包括已提供财务支持或其他支持的合同条款/类型/金额/原因，以及存在提供支持意图时的说明。",
+        "#### （6）所有者权益份额发生变化但仍控制子公司的交易说明",
+        "说明子公司所有者权益份额发生变化的交易背景，及其对归属于母公司所有者权益和少数股东权益的影响金额和计算依据。",
+        "#### 持股比例、重大影响及共同控制判断",
+        "说明持股比例与表决权比例差异原因；持有其他主体20%以下表决权但具有重大影响，或20%以上表决权但不具有重大影响的相关判断和依据；对合营企业具有共同控制的依据。",
+        "#### 重要会计政策和会计估计差异说明",
+        "说明合营企业、联营企业的重要会计政策、会计估计与本公司的会计政策、会计估计存在的重大差异及相应调整。",
+        "#### （5）转移资金能力存在的重大限制",
+        "说明合营企业或联营企业向本公司转移资金的能力存在的重大限制。",
+        "#### （7）未确认承诺及或有负债",
+        "披露与对合营企业投资相关的未确认承诺，以及与对合营企业或联营企业投资相关的或有负债。",
+        "#### 共同经营判断依据",
+        "说明持股比例或享有的份额不同于表决权比例的差异及原因；共同经营为单独主体的，说明判断为共同经营的依据。"
       ],
       "section_id": "chapter-07-zai-qi-ta-zhu-ti-zhong-de-quan-yi-zai-qi-ta-zhu-ti-zhong-de-quan-yi",
       "level": 2,
       "parent_section_id": "chapter-07-zai-qi-ta-zhu-ti-zhong-de-quan-yi",
       "sort_index": 0,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "tables": [
+        {
+          "name": "企业集团的构成",
+          "headers": [
+            "子公司名称",
+            "主要经营地",
+            "注册地",
+            "业务性质",
+            "直接",
+            "间接",
+            "取得方式"
+          ],
+          "columns": [
+            {
+              "key": "name",
+              "label": "子公司名称",
+              "is_label": true
+            },
+            {
+              "key": "region",
+              "label": "主要经营地"
+            },
+            {
+              "key": "registered",
+              "label": "注册地"
+            },
+            {
+              "key": "nature",
+              "label": "业务性质"
+            },
+            {
+              "key": "direct",
+              "label": "直接",
+              "group": "持股比例%",
+              "format": "percent"
+            },
+            {
+              "key": "indirect",
+              "label": "间接",
+              "group": "持股比例%",
+              "format": "percent"
+            },
+            {
+              "key": "method",
+              "label": "取得方式"
+            }
+          ],
+          "rows": [
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "持股比例%",
+              "start": 4,
+              "span": 2
+            }
+          ],
+          "guidance": "企业集团的构成（源 A28:G39）：子公司名称 + 主要经营地 + 注册地 + 业务性质 + 持股比例%（直接/间接）+ 取得方式。数据来源：被投资单位基本信息 G7-4。"
+        },
+        {
+          "name": "重要的非全资子公司",
+          "headers": [
+            "子公司名称",
+            "少数股东持股比例%",
+            "本期归属于少数股东的损益",
+            "本期向少数股东宣告分派的股利",
+            "期末少数股东权益余额"
+          ],
+          "columns": [
+            {
+              "key": "name",
+              "label": "子公司名称",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "minorityRatio",
+              "label": "少数股东持股比例%",
+              "format": "percent"
+            },
+            {
+              "key": "minorityProfit",
+              "label": "本期归属于少数股东的损益",
+              "format": "amount"
+            },
+            {
+              "key": "minorityDividend",
+              "label": "本期向少数股东宣告分派的股利",
+              "format": "amount"
+            },
+            {
+              "key": "minorityEquity",
+              "label": "期末少数股东权益余额",
+              "format": "amount"
+            }
+          ],
+          "rows": [
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            }
+          ],
+          "guidance": "重要的非全资子公司（源 A49:E54）：单个非全资子公司的少数股东权益对企业集团而言不重要时不需要披露。数据来源：被投资单位基本信息 G7-4。"
+        },
+        {
+          "name": "重要非全资子公司主要财务信息—期末数",
+          "headers": [
+            "子公司名称",
+            "流动资产",
+            "非流动资产",
+            "资产合计",
+            "流动负债",
+            "非流动负债",
+            "负债合计"
+          ],
+          "columns": [
+            {
+              "key": "name",
+              "label": "子公司名称",
+              "is_label": true
+            },
+            {
+              "key": "currentAssets",
+              "label": "流动资产",
+              "group": "期末数",
+              "format": "amount"
+            },
+            {
+              "key": "nonCurrentAssets",
+              "label": "非流动资产",
+              "group": "期末数",
+              "format": "amount"
+            },
+            {
+              "key": "totalAssets",
+              "label": "资产合计",
+              "group": "期末数",
+              "format": "amount"
+            },
+            {
+              "key": "currentLiabilities",
+              "label": "流动负债",
+              "group": "期末数",
+              "format": "amount"
+            },
+            {
+              "key": "nonCurrentLiabilities",
+              "label": "非流动负债",
+              "group": "期末数",
+              "format": "amount"
+            },
+            {
+              "key": "totalLiabilities",
+              "label": "负债合计",
+              "group": "期末数",
+              "format": "amount"
+            }
+          ],
+          "rows": [
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "期末数",
+              "start": 1,
+              "span": 6
+            }
+          ],
+          "guidance": "重要非全资子公司主要财务信息—期末数（源 A58:G64）。财务数据以合并日子公司可辨认资产和负债的公允价值为基础调整；被划分为持有待售资产的不需披露。数据来源：被投资单位财务信息 G7-5。"
+        },
+        {
+          "name": "续（1）",
+          "headers": [
+            "子公司名称",
+            "流动资产",
+            "非流动资产",
+            "资产合计",
+            "流动负债",
+            "非流动负债",
+            "负债合计"
+          ],
+          "columns": [
+            {
+              "key": "name",
+              "label": "子公司名称",
+              "is_label": true
+            },
+            {
+              "key": "currentAssets",
+              "label": "流动资产",
+              "group": "期初数",
+              "format": "amount"
+            },
+            {
+              "key": "nonCurrentAssets",
+              "label": "非流动资产",
+              "group": "期初数",
+              "format": "amount"
+            },
+            {
+              "key": "totalAssets",
+              "label": "资产合计",
+              "group": "期初数",
+              "format": "amount"
+            },
+            {
+              "key": "currentLiabilities",
+              "label": "流动负债",
+              "group": "期初数",
+              "format": "amount"
+            },
+            {
+              "key": "nonCurrentLiabilities",
+              "label": "非流动负债",
+              "group": "期初数",
+              "format": "amount"
+            },
+            {
+              "key": "totalLiabilities",
+              "label": "负债合计",
+              "group": "期初数",
+              "format": "amount"
+            }
+          ],
+          "rows": [
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "期初数",
+              "start": 1,
+              "span": 6
+            }
+          ],
+          "guidance": "续（1）—期初数（源 A65:G72），与「期末数」表同构，仅期初口径。数据来源：被投资单位财务信息 G7-5。"
+        },
+        {
+          "name": "续（2）",
+          "headers": [
+            "子公司名称",
+            "营业收入",
+            "净利润",
+            "综合收益总额",
+            "经营活动现金流量",
+            "营业收入",
+            "净利润",
+            "综合收益总额",
+            "经营活动现金流量"
+          ],
+          "columns": [
+            {
+              "key": "name",
+              "label": "子公司名称",
+              "is_label": true
+            },
+            {
+              "key": "currentRevenue",
+              "label": "营业收入",
+              "group": "本期发生额",
+              "format": "amount"
+            },
+            {
+              "key": "currentProfit",
+              "label": "净利润",
+              "group": "本期发生额",
+              "format": "amount"
+            },
+            {
+              "key": "currentComprehensive",
+              "label": "综合收益总额",
+              "group": "本期发生额",
+              "format": "amount"
+            },
+            {
+              "key": "currentCashFlow",
+              "label": "经营活动现金流量",
+              "group": "本期发生额",
+              "format": "amount"
+            },
+            {
+              "key": "priorRevenue",
+              "label": "营业收入",
+              "group": "上期发生额",
+              "format": "amount"
+            },
+            {
+              "key": "priorProfit",
+              "label": "净利润",
+              "group": "上期发生额",
+              "format": "amount"
+            },
+            {
+              "key": "priorComprehensive",
+              "label": "综合收益总额",
+              "group": "上期发生额",
+              "format": "amount"
+            },
+            {
+              "key": "priorCashFlow",
+              "label": "经营活动现金流量",
+              "group": "上期发生额",
+              "format": "amount"
+            }
+          ],
+          "rows": [
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "本期发生额",
+              "start": 1,
+              "span": 4
+            },
+            {
+              "group": "上期发生额",
+              "start": 5,
+              "span": 4
+            }
+          ],
+          "guidance": "续（2）—本期及上期发生额（源 A73:I81）：营业收入/净利润/综合收益总额/经营活动现金流量，本期与上期各一组。数据来源：被投资单位财务信息 G7-5。"
+        },
+        {
+          "name": "未丧失控制权的所有者权益份额变动影响",
+          "headers": [
+            "项  目",
+            "公司1",
+            "公司2",
+            "公司3",
+            "公司4",
+            "公司5",
+            "公司6"
+          ],
+          "columns": [
+            {
+              "key": "item",
+              "label": "项  目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "company1",
+              "label": "公司1",
+              "format": "amount"
+            },
+            {
+              "key": "company2",
+              "label": "公司2",
+              "format": "amount"
+            },
+            {
+              "key": "company3",
+              "label": "公司3",
+              "format": "amount"
+            },
+            {
+              "key": "company4",
+              "label": "公司4",
+              "format": "amount"
+            },
+            {
+              "key": "company5",
+              "label": "公司5",
+              "format": "amount"
+            },
+            {
+              "key": "company6",
+              "label": "公司6",
+              "format": "amount"
+            }
+          ],
+          "rows": [
+            {
+              "label": "购买成本/处置对价：",
+              "row_type": "data"
+            },
+            {
+              "label": "现金",
+              "row_type": "data"
+            },
+            {
+              "label": "非现金资产的公允价值",
+              "row_type": "data"
+            },
+            {
+              "label": "发行或承担的债务的账面价值",
+              "row_type": "data"
+            },
+            {
+              "label": "发行的权益性证券的面值",
+              "row_type": "data"
+            },
+            {
+              "label": "或有对价",
+              "row_type": "data"
+            },
+            {
+              "label": "购买成本/处置对价合计",
+              "row_type": "data"
+            },
+            {
+              "label": "减：按取得/处置的股权比例计算的子公司净资产份额",
+              "row_type": "data"
+            },
+            {
+              "label": "差额",
+              "row_type": "data"
+            },
+            {
+              "label": "其中：调整资本公积",
+              "row_type": "data"
+            },
+            {
+              "label": "调整盈余公积",
+              "row_type": "data"
+            },
+            {
+              "label": "调整未分配利润",
+              "row_type": "data"
+            }
+          ],
+          "guidance": "未丧失控制权的所有者权益份额变动影响（源 A96:G108）：本期在子公司所有者权益份额发生变化但未丧失控制权的交易，按购买成本/处置对价与按比例计算的净资产份额差额，分析对少数股东权益及归属于母公司所有者权益的影响。15号文第三十五条要求披露变化情况、影响金额及计算依据。数据来源：处置子公司测试表 G7-10（NCI 部分股权处置）。"
+        },
+        {
+          "name": "重要的合营企业或联营企业",
+          "headers": [
+            "合营企业或联营企业名称",
+            "主要经营地",
+            "注册地",
+            "业务性质",
+            "直接",
+            "间接",
+            "对合营企业或联营企业投资的会计处理方法"
+          ],
+          "columns": [
+            {
+              "key": "name",
+              "label": "合营企业或联营企业名称",
+              "is_label": true
+            },
+            {
+              "key": "region",
+              "label": "主要经营地"
+            },
+            {
+              "key": "registered",
+              "label": "注册地"
+            },
+            {
+              "key": "nature",
+              "label": "业务性质"
+            },
+            {
+              "key": "direct",
+              "label": "直接",
+              "group": "持股比例(%)",
+              "format": "percent"
+            },
+            {
+              "key": "indirect",
+              "label": "间接",
+              "group": "持股比例(%)",
+              "format": "percent"
+            },
+            {
+              "key": "method",
+              "label": "对合营企业或联营企业投资的会计处理方法"
+            }
+          ],
+          "rows": [
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "持股比例(%)",
+              "start": 4,
+              "span": 2
+            }
+          ],
+          "guidance": "重要的合营企业或联营企业（源 A111:G124）：①合营企业 ②联营企业 分组列示，含主要经营地/注册地/业务性质/持股比例(%)（直接/间接）/会计处理方法。持有其他主体20%以下表决权但具有重大影响，或20%以上表决权但不具有重大影响的，应披露相关判断和依据。数据来源：被投资单位基本信息 G7-4。"
+        },
+        {
+          "name": "重要合营企业主要财务信息",
+          "headers": [
+            "项 目",
+            "期末数",
+            "期初数"
+          ],
+          "columns": [
+            {
+              "key": "item",
+              "label": "项 目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "current",
+              "label": "期末数",
+              "format": "amount"
+            },
+            {
+              "key": "prior",
+              "label": "期初数",
+              "format": "amount"
+            }
+          ],
+          "rows": [
+            {
+              "label": "流动资产",
+              "row_type": "data"
+            },
+            {
+              "label": "其中：现金和现金等价物",
+              "row_type": "data"
+            },
+            {
+              "label": "非流动资产",
+              "row_type": "data"
+            },
+            {
+              "label": "资产合计",
+              "row_type": "data"
+            },
+            {
+              "label": "流动负债",
+              "row_type": "data"
+            },
+            {
+              "label": "非流动负债",
+              "row_type": "data"
+            },
+            {
+              "label": "负债合计",
+              "row_type": "data"
+            },
+            {
+              "label": "净资产",
+              "row_type": "data"
+            },
+            {
+              "label": "  其中：少数股东权益",
+              "row_type": "data"
+            },
+            {
+              "label": "归属于母公司的所有者权益",
+              "row_type": "data"
+            },
+            {
+              "label": "按持股比例计算的净资产份额",
+              "row_type": "data"
+            },
+            {
+              "label": "调整事项",
+              "row_type": "data"
+            },
+            {
+              "label": "  其中：商誉",
+              "row_type": "data"
+            },
+            {
+              "label": "   未实现内部交易损益",
+              "row_type": "data"
+            },
+            {
+              "label": "   减值准备",
+              "row_type": "data"
+            },
+            {
+              "label": "   其他",
+              "row_type": "data"
+            },
+            {
+              "label": "对合营企业权益投资的账面价值 ",
+              "row_type": "data"
+            },
+            {
+              "label": "存在公开报价的权益投资的公允价值 ",
+              "row_type": "data"
+            }
+          ],
+          "guidance": "重要合营企业主要财务信息（源 A132:C151，18 行）：主要财务信息按权益法调整后的金额披露；「调整事项」包括投资形成的正商誉、抵消的未实现内部交易损益、减值准备等。母公司为投资性主体时无需披露。数据来源：被投资单位财务信息 G7-5，权益法调节项来自权益法测算表 G7-14。"
+        },
+        {
+          "name": "续：重要合营企业本期及上期经营成果",
+          "headers": [
+            "项  目",
+            "本期发生额",
+            "上期发生额"
+          ],
+          "columns": [
+            {
+              "key": "item",
+              "label": "项  目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "current",
+              "label": "本期发生额",
+              "format": "amount"
+            },
+            {
+              "key": "prior",
+              "label": "上期发生额",
+              "format": "amount"
+            }
+          ],
+          "rows": [
+            {
+              "label": "营业收入",
+              "row_type": "data"
+            },
+            {
+              "label": "财务费用",
+              "row_type": "data"
+            },
+            {
+              "label": "所得税费用",
+              "row_type": "data"
+            },
+            {
+              "label": "净利润",
+              "row_type": "data"
+            },
+            {
+              "label": "终止经营的净利润",
+              "row_type": "data"
+            },
+            {
+              "label": "其他综合收益",
+              "row_type": "data"
+            },
+            {
+              "label": "综合收益总额",
+              "row_type": "data"
+            },
+            {
+              "label": "企业本期收到的来自合营企业的股利",
+              "row_type": "data"
+            }
+          ],
+          "guidance": "续：重要合营企业本期及上期经营成果（源 A153:C163）。存在终止经营净利润的，应在本表中单列项目披露。数据来源：被投资单位财务信息 G7-5。"
+        },
+        {
+          "name": "重要联营企业主要财务信息",
+          "headers": [
+            "项 目",
+            "期末数",
+            "期初数",
+            "期末数",
+            "期初数",
+            "期末数",
+            "期初数"
+          ],
+          "columns": [
+            {
+              "key": "item",
+              "label": "项 目",
+              "is_label": true
+            },
+            {
+              "key": "c1Current",
+              "label": "期末数",
+              "group": "联营企业1",
+              "format": "amount"
+            },
+            {
+              "key": "c1Prior",
+              "label": "期初数",
+              "group": "联营企业1",
+              "format": "amount"
+            },
+            {
+              "key": "c2Current",
+              "label": "期末数",
+              "group": "联营企业2",
+              "format": "amount"
+            },
+            {
+              "key": "c2Prior",
+              "label": "期初数",
+              "group": "联营企业2",
+              "format": "amount"
+            },
+            {
+              "key": "c3Current",
+              "label": "期末数",
+              "group": "联营企业3",
+              "format": "amount"
+            },
+            {
+              "key": "c3Prior",
+              "label": "期初数",
+              "group": "联营企业3",
+              "format": "amount"
+            }
+          ],
+          "rows": [
+            {
+              "label": "流动资产",
+              "row_type": "data"
+            },
+            {
+              "label": "非流动资产",
+              "row_type": "data"
+            },
+            {
+              "label": "资产合计",
+              "row_type": "data"
+            },
+            {
+              "label": "流动负债",
+              "row_type": "data"
+            },
+            {
+              "label": "非流动负债",
+              "row_type": "data"
+            },
+            {
+              "label": "负债合计",
+              "row_type": "data"
+            },
+            {
+              "label": "净资产",
+              "row_type": "data"
+            },
+            {
+              "label": "  其中：少数股东权益",
+              "row_type": "data"
+            },
+            {
+              "label": "归属于母公司的所有者权益",
+              "row_type": "data"
+            },
+            {
+              "label": "按持股比例计算的净资产份额",
+              "row_type": "data"
+            },
+            {
+              "label": "调整事项",
+              "row_type": "data"
+            },
+            {
+              "label": "  其中：商誉",
+              "row_type": "data"
+            },
+            {
+              "label": "   未实现内部交易损益",
+              "row_type": "data"
+            },
+            {
+              "label": "   减值准备",
+              "row_type": "data"
+            },
+            {
+              "label": "   其他",
+              "row_type": "data"
+            },
+            {
+              "label": "对联营企业权益投资的账面价值",
+              "row_type": "data"
+            },
+            {
+              "label": "存在公开报价的权益投资的公允价值 ",
+              "row_type": "data"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "联营企业1",
+              "start": 1,
+              "span": 2
+            },
+            {
+              "group": "联营企业2",
+              "start": 3,
+              "span": 2
+            },
+            {
+              "group": "联营企业3",
+              "start": 5,
+              "span": 2
+            }
+          ],
+          "guidance": "重要联营企业主要财务信息（源 A169:G187，17 行）：按联营企业分列期末数/期初数，口径与合营企业主要财务信息表一致（不含现金及现金等价物单列行 —— 源模板该行只在合营企业表出现）。数据来源：被投资单位财务信息 G7-5，权益法调节项来自权益法测算表 G7-14。"
+        },
+        {
+          "name": "续：重要联营企业本期及上期经营成果",
+          "headers": [
+            "项  目",
+            "本期发生额",
+            "上期发生额",
+            "本期发生额",
+            "上期发生额",
+            "本期发生额",
+            "上期发生额"
+          ],
+          "columns": [
+            {
+              "key": "item",
+              "label": "项  目",
+              "is_label": true
+            },
+            {
+              "key": "c1Current",
+              "label": "本期发生额",
+              "group": "联营企业1",
+              "format": "amount"
+            },
+            {
+              "key": "c1Prior",
+              "label": "上期发生额",
+              "group": "联营企业1",
+              "format": "amount"
+            },
+            {
+              "key": "c2Current",
+              "label": "本期发生额",
+              "group": "联营企业2",
+              "format": "amount"
+            },
+            {
+              "key": "c2Prior",
+              "label": "上期发生额",
+              "group": "联营企业2",
+              "format": "amount"
+            },
+            {
+              "key": "c3Current",
+              "label": "本期发生额",
+              "group": "联营企业3",
+              "format": "amount"
+            },
+            {
+              "key": "c3Prior",
+              "label": "上期发生额",
+              "group": "联营企业3",
+              "format": "amount"
+            }
+          ],
+          "rows": [
+            {
+              "label": "营业收入",
+              "row_type": "data"
+            },
+            {
+              "label": "净利润",
+              "row_type": "data"
+            },
+            {
+              "label": "终止经营的净利润",
+              "row_type": "data"
+            },
+            {
+              "label": "其他综合收益",
+              "row_type": "data"
+            },
+            {
+              "label": "综合收益总额",
+              "row_type": "data"
+            },
+            {
+              "label": "企业本期收到的来自联营企业的股利",
+              "row_type": "data"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "联营企业1",
+              "start": 1,
+              "span": 2
+            },
+            {
+              "group": "联营企业2",
+              "start": 3,
+              "span": 2
+            },
+            {
+              "group": "联营企业3",
+              "start": 5,
+              "span": 2
+            }
+          ],
+          "guidance": "续：重要联营企业本期及上期经营成果（源 A189:G196）。数据来源：被投资单位财务信息 G7-5。"
+        },
+        {
+          "name": "其他不重要合营企业和联营企业的汇总财务信息",
+          "headers": [
+            "项  目",
+            "期末数/本期发生额",
+            "期初数/上期发生额"
+          ],
+          "columns": [
+            {
+              "key": "item",
+              "label": "项  目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "current",
+              "label": "期末数/本期发生额",
+              "format": "amount"
+            },
+            {
+              "key": "prior",
+              "label": "期初数/上期发生额",
+              "format": "amount"
+            }
+          ],
+          "rows": [
+            {
+              "label": "合营企业：",
+              "row_type": "data"
+            },
+            {
+              "label": "投资账面价值合计",
+              "row_type": "data"
+            },
+            {
+              "label": "下列各项按持股比例计算的合计数 ",
+              "row_type": "data"
+            },
+            {
+              "label": "净利润",
+              "row_type": "data"
+            },
+            {
+              "label": "其他综合收益",
+              "row_type": "data"
+            },
+            {
+              "label": "综合收益总额",
+              "row_type": "data"
+            },
+            {
+              "label": "联营企业：",
+              "row_type": "data"
+            },
+            {
+              "label": "投资账面价值合计",
+              "row_type": "data"
+            },
+            {
+              "label": "下列各项按持股比例计算的合计数 ",
+              "row_type": "data"
+            },
+            {
+              "label": "净利润",
+              "row_type": "data"
+            },
+            {
+              "label": "其他综合收益",
+              "row_type": "data"
+            },
+            {
+              "label": "综合收益总额",
+              "row_type": "data"
+            }
+          ],
+          "guidance": "其他不重要合营企业和联营企业的汇总财务信息（源 A200:C212）：投资账面价值合计取明细表 G7-2；下列各项按持股比例计算的合计数取被投资单位财务信息 G7-5 × 持股比例。"
+        },
+        {
+          "name": "对合营企业或联营企业发生超额亏损的分担额",
+          "headers": [
+            "被投资单位名称",
+            "前期累积未确认的损失份额",
+            "本期未确认的损失份额（或本期实现净利润的分享额）",
+            "本期末累积未确认的损失份额"
+          ],
+          "columns": [
+            {
+              "key": "investee",
+              "label": "被投资单位名称",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "priorUnrecognised",
+              "label": "前期累积未确认的损失份额",
+              "format": "amount"
+            },
+            {
+              "key": "currentUnrecognised",
+              "label": "本期未确认的损失份额（或本期实现净利润的分享额）",
+              "format": "amount"
+            },
+            {
+              "key": "closingUnrecognised",
+              "label": "本期末累积未确认的损失份额",
+              "format": "amount"
+            }
+          ],
+          "rows": [
+            {
+              "label": "合营企业",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "小计",
+              "is_total": true,
+              "row_type": "subtotal"
+            },
+            {
+              "label": "联营企业",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "小计",
+              "is_total": true,
+              "row_type": "subtotal"
+            },
+            {
+              "label": "合  计",
+              "is_total": true,
+              "row_type": "total"
+            }
+          ],
+          "guidance": "对合营企业或联营企业发生超额亏损的分担额（源 A221:D232，不适用的删除）：合营企业、联营企业各自列示前期累积未确认损失份额、本期未确认损失份额（或本期实现净利润的分享额）、本期末累积未确认损失份额，各自小计后合计。数据来源：未确认投资损失测试表 G7-16。"
+        },
+        {
+          "name": "重要的共同经营",
+          "headers": [
+            "共同经营名称",
+            "主要经营地",
+            "注册地",
+            "业务性质",
+            "直接",
+            "间接"
+          ],
+          "columns": [
+            {
+              "key": "name",
+              "label": "共同经营名称",
+              "is_label": true
+            },
+            {
+              "key": "region",
+              "label": "主要经营地"
+            },
+            {
+              "key": "registered",
+              "label": "注册地"
+            },
+            {
+              "key": "nature",
+              "label": "业务性质"
+            },
+            {
+              "key": "direct",
+              "label": "直接",
+              "group": "持股比例或享有的份额(%)",
+              "format": "percent"
+            },
+            {
+              "key": "indirect",
+              "label": "间接",
+              "group": "持股比例或享有的份额(%)",
+              "format": "percent"
+            }
+          ],
+          "rows": [
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "持股比例或享有的份额(%)",
+              "start": 4,
+              "span": 2
+            }
+          ],
+          "guidance": "重要的共同经营（源 A235:F240）：共同经营名称、主要经营地、注册地、业务性质、持股比例/享有的份额(%)（直接/间接）。持股比例或享有份额不同于表决权比例的，应说明表决权比例及差异原因；共同经营为单独主体的，应披露判断为共同经营的依据。数据来源：被投资单位基本信息 G7-4。"
+        }
+      ],
+      "_aligned_by": "fix_note_g7_listed_other_entities_structure",
+      "_aligned_at": "2026-08-01 09:48:33"
     },
     {
       "section_id": "chapter-08-zheng-fu-bu-zhu",
@@ -25710,7 +27369,7 @@
         "（3）应和相关报表项目明细项“政府补助”金额核对一致。】",
         "## 计入其他应收款的政府补助",
         "（15号文第四十六条 对于报告期末按应收金额确认的政府补助，应披露应收款项的期末余额。如公司未能在预计时点收到预计金额的政府补助，公司应披露原因。）",
-        "**【提示：确认应收款项-政府补助时，应履行重大业务咨询程序。**】",
+        "【提示：确认应收款项-政府补助时，应履行重大业务咨询程序。】",
         "## 计入递延收益的政府补助",
         "（15号文第四十七条 对涉及政府补助的负债项目，在财务报表附注的相关项目下，披露相关期初余额、本期新增补助金额、本期计入营业外收入金额、本期转入其他收益等金额以及期末余额。）",
         "【《关于严格执行企业会计准则 切实做好企业2024年年报工作的通知》：企业应当严格审核把关，对于政府补助的种类、金额应当按照“与资产相关的政府补助”和“与收益相关的政府补助”两类汇总信息进行披露。",
@@ -26692,7 +28351,7 @@
       ],
       "text_sections": [
         "【《企业会计准则第30号-财务报表列报》第三十九条 附注一般应当按照下列顺序至少披露：（七）或有和承诺事项、资产负债表日后非调整事项、关联方关系及其交易等需要说明的事项。】",
-        "**【证监会会计部：关于做好2014年度上市公司财务信息披露工作的通知（会计部函〔2014〕674号）：四、对于资产负债表日存在的对外重要承诺事项，公司应在财务报表附注中披露其性质及涉及金额。】**",
+        "【证监会会计部：关于做好2014年度上市公司财务信息披露工作的通知（会计部函〔2014〕674号）：四、对于资产负债表日存在的对外重要承诺事项，公司应在财务报表附注中披露其性质及涉及金额。】",
         "【提示：承诺，指由合同或协议的要求引起的义务，在未来的特定期间内，只要特定条件达到，即发生现金流出、其他资产的减少或负债的增加。对于资产负债表日存在的重大承诺事项，应在财务报表附注中按已签订的尚未履行或尚未完全履行的对外投资合同及有关财务支出、已签订的正在或准备履行的大额发包合同、已签订的正在或准备履行的租赁合同及财务影响、已签订的正在或准备履行的并购协议、已签订的正在或准备履行的重组计划、其他重大财务承诺等分项说明其存在的原因和金额。】",
         "参考披露格式如下：",
         "### 资本承诺",
@@ -26762,7 +28421,7 @@
       "text_sections": [
         "## 重要的承诺事项",
         "【《企业会计准则第30号-财务报表列报》第三十九条 附注一般应当按照下列顺序至少披露：（七）或有和承诺事项、资产负债表日后非调整事项、关联方关系及其交易等需要说明的事项。】",
-        "**【证监会会计部：关于做好2014年度上市公司财务信息披露工作的通知（会计部函〔2014〕674号）：四、对于资产负债表日存在的对外重要承诺事项，公司应在财务报表附注中披露其性质及涉及金额。】**",
+        "【证监会会计部：关于做好2014年度上市公司财务信息披露工作的通知（会计部函〔2014〕674号）：四、对于资产负债表日存在的对外重要承诺事项，公司应在财务报表附注中披露其性质及涉及金额。】",
         "【提示：承诺，指由合同或协议的要求引起的义务，在未来的特定期间内，只要特定条件达到，即发生现金流出、其他资产的减少或负债的增加。对于资产负债表日存在的重大承诺事项，应在财务报表附注中按已签订的尚未履行或尚未完全履行的对外投资合同及有关财务支出、已签订的正在或准备履行的大额发包合同、已签订的正在或准备履行的租赁合同及财务影响、已签订的正在或准备履行的并购协议、已签订的正在或准备履行的重组计划、其他重大财务承诺等分项说明其存在的原因和金额。】",
         "参考披露格式如下：",
         "### 资本承诺",
@@ -26777,7 +28436,7 @@
         "（特别提示：如披露了以上一项或多项承诺事项，则上述语句修改为：）",
         "截至2025年12月31日，本公司不存在其他应披露的承诺事项。",
         "## 或有事项",
-        "【披露资产负债表日存在的**重要**或有事项。】",
+        "【披露资产负债表日存在的重要或有事项。】",
         "【提示：与合营企业或联营企业投资相关的或有负债索引至“附注七、在其他主体中的权益”部分相应内容。】",
         "### 未决诉讼仲裁形成的或有负债及其财务影响",
         "对重大的未决诉讼或仲裁应进行详细说明，披露未决诉讼或仲裁形成的原因、预计产生的财务影响（如无法预计，应说明理由）、获得补偿的可能性等（对本期度涉及的详细说明）。若预期该项披露对企业造成重大不利影响的，无须披露这些信息，但应当披露该未决诉讼、未决仲裁的性质，以及没有披露这些信息的事实和原因。",
@@ -27226,7 +28885,7 @@
         "本期实现的持续经营利润为XX，其中归属于母公司股东的持续经营利润为XX。",
         "（披露企业终止经营的原因、内容、性质等。）",
         "（如果因出售对子公司的投资等原因导致丧失对子公司控制权，且该子公司符合终止经营定义的，应在合并利润表中列报相关终止经营损益，并需披露上述信息。）",
-        "【提示：**处置单一或多个子公司并不必然是终止经营**。终止经营，是指企业满足下列条件之一的、能够单独区分的组成部分，且该组成部分已经处置或划分为持有待售类别：（1）该组成部分代表**一项独立的主要业务**或一个单独的主要经营地区；（2）该组成部分是拟对**一项独立的主要业务**或一个单独的主要经营地区进行处置的一项相关联计划的一部分；（3）该组成部分是**专为转售而取得**的子公司。】",
+        "【提示：处置单一或多个子公司并不必然是终止经营。终止经营，是指企业满足下列条件之一的、能够单独区分的组成部分，且该组成部分已经处置或划分为持有待售类别：（1）该组成部分代表一项独立的主要业务或一个单独的主要经营地区；（2）该组成部分是拟对一项独立的主要业务或一个单独的主要经营地区进行处置的一项相关联计划的一部分；（3）该组成部分是专为转售而取得的子公司。】",
         "（如果对终止经营处置损益进行调整，需披露调整的性质和金额。例如：",
         "本公司就[终止经营项目1]的最终处置条款与买方达成一致，[调整交易价格XX元][向买方支付补偿金XX元]。）",
         "【提示：不符合终止经营定义的持有待售的非流动资产或处置组，其减值损失和转回金额及处置损益应当作为持续经营损益列报；非流动资产或处置组不再继续划分为持有待售类别或非流动资产从持有待售的处置组中移除的，非流动资产或处置组的账面价值调整金额应当在当期利润表中作为持续经营损益列报；终止经营的减值损失和转回金额等经营损益、处置损益及其调整金额应当作为终止经营损益列报。】"
@@ -27488,8 +29147,8 @@
         "【对应的披露要求：",
         "解释3号“八（三）1”，确定报告分部考虑的因素、报告分部的产品和劳务的类型；",
         "解释3号“八（三）2”、“八（三）3”，有关利润、资产、负债计量的相关会计政策。】",
-        "【15号文第七十六条， 公司应披露报告分部的确定依据、分部会计政策、报告分部的财务信息（包括主营业务收入、主营业务成本等），以及分部财务信息合计金额与对应合并财务报表项目的调节过程。**公司无报告分部的，应说明原因**。】",
-        "【上交所重要提醒（关于做好2014年度上市公司财务信息披露工作的通知：**公司不能披露各报告分部的资产总额和负债总额的，应说明原因。】**",
+        "【15号文第七十六条， 公司应披露报告分部的确定依据、分部会计政策、报告分部的财务信息（包括主营业务收入、主营业务成本等），以及分部财务信息合计金额与对应合并财务报表项目的调节过程。公司无报告分部的，应说明原因。】",
+        "【上交所重要提醒（关于做好2014年度上市公司财务信息披露工作的通知：公司不能披露各报告分部的资产总额和负债总额的，应说明原因。】",
         "【提示：应注意与“年报管理层分析”中的信息披露保持一致。证监会《2014 年上市公司年报会计监管报告》，部分上市公司在年报管理层分析中披露主营业务的行业或产品分类，表明其在经营管理方面存在分部，但未在财务报告中提供单独的分部报告，也未说明不提供分部报告信息的原因】"
       ],
       "check_presets": [],
@@ -27587,9 +29246,9 @@
         "【提示：",
         "1、资产、负债项目可根据重要性原则分类汇总列示；单项不重大的企业合并可汇总列示。",
         "2、非同一控制下企业合并，购买日，被合并方固定资产不应出现“累计折旧”备抵科目】",
-        "3、根据《企业会计准则解释第5号》，企业应当在附注中披露在非同一控制下的企业合并中取得的被购买方无形资产的公允价值及其公允价值的确定方法。非同一控制下的企业合并中，购买方在对企业合并中取得的被购买方资产进行初始确认时，应当对被购买方拥有的但在**其财务报表中未确认的无形资产进行充分辨认和合理判断。**",
+        "3、根据《企业会计准则解释第5号》，企业应当在附注中披露在非同一控制下的企业合并中取得的被购买方无形资产的公允价值及其公允价值的确定方法。非同一控制下的企业合并中，购买方在对企业合并中取得的被购买方资产进行初始确认时，应当对被购买方拥有的但在其财务报表中未确认的无形资产进行充分辨认和合理判断。",
         "如在企业合并中，确认了被购买方财务报告中未确认的无形资产，建议按照无形资产明细项目（如客户关系、雇佣合同等）进行说明。",
-        "4、根据证监会《监管规则适用指引——会计类第4号》，非同一控制下的企业合并中，无论被购买方在其自身财务报表中对**政府补助**采用总额法还是净额法进行会计处理，**购买方在购买日所确认的被购买方各项可辨认资产和负债的公允价值应保持一致**，确认的合并商誉金额也应一致。购买方对于**被购买方自身的财务报表中因政府补助确认的递延收益，如果相关政府补助款项不存在需要返还的现时义务，则购买方不应将该递延收益单独识别为一项可辨认负债。**】",
+        "4、根据证监会《监管规则适用指引——会计类第4号》，非同一控制下的企业合并中，无论被购买方在其自身财务报表中对政府补助采用总额法还是净额法进行会计处理，购买方在购买日所确认的被购买方各项可辨认资产和负债的公允价值应保持一致，确认的合并商誉金额也应一致。购买方对于被购买方自身的财务报表中因政府补助确认的递延收益，如果相关政府补助款项不存在需要返还的现时义务，则购买方不应将该递延收益单独识别为一项可辨认负债。】",
         "### 购买日之前原持有股权按照公允价值重新计量所产生的利得或损失",
         "【15号文第三十条（九），分步实现的非同一控制下企业合并，还应披露以下信息：",
         "1.购买日之前原持有股权的取得时点、取得比例、取得成本和取得方式。",
@@ -27623,7 +29282,7 @@
         "续：",
         "### 多次交易分步处置股权至丧失控制权而减少的子公司",
         "（15号文第三十三条（四），通过多次交易分步处置对子公司投资至丧失控制权的，还应披露以下信息：判断各项交易是否构成“一揽子交易”的原则，前期处置股权的处置时点以及处置价款、处置比例、处置方式、处置价款与处置投资所对应的合并财务报表层面享有该子公司净资产份额的差额等。）",
-        "本公司原持有【A公司】90%股权，2024年10月本公司与甲公司签订股权转让协议，约定于2024年12月向甲公司转让A公司20%股权，于2025年6月向甲公司进一步转让A公司40%股权。截至2025年12月31日，股权转让协议已履行完毕，本公司仅持有A公司30%股权，能够对A公司实施重大影响。本公司将处置A公司股权至丧失控制权的两次交易作为“一揽子交易”进行会计处理【或者，本公司处置A公司股权至丧失控制权的两次交易不属于“一揽子交易”】。（描述分步处置股权的具体情况，**并说明判断为“一揽子交易”的理由（请参考会计政策中的有关披露）或者不属于“一揽子交易”的理由。）**",
+        "本公司原持有【A公司】90%股权，2024年10月本公司与甲公司签订股权转让协议，约定于2024年12月向甲公司转让A公司20%股权，于2025年6月向甲公司进一步转让A公司40%股权。截至2025年12月31日，股权转让协议已履行完毕，本公司仅持有A公司30%股权，能够对A公司实施重大影响。本公司将处置A公司股权至丧失控制权的两次交易作为“一揽子交易”进行会计处理【或者，本公司处置A公司股权至丧失控制权的两次交易不属于“一揽子交易”】。（描述分步处置股权的具体情况，并说明判断为“一揽子交易”的理由（请参考会计政策中的有关披露）或者不属于“一揽子交易”的理由。）",
         "#### 一揽子交易",
         "##### 丧失控制权时点的交易或事项的信息",
         "续（1）：",
@@ -27637,7 +29296,7 @@
         "##### 前期处置股权的交易或事项的信息",
         "（说明不构成一揽子交易的判断依据。）",
         "### （2）参考披露格式2-多次交易分步处置股权至丧失控制权而减少的子公司",
-        "本公司原持有【A公司】90%股权，2024年10月本公司与甲公司签订股权转让协议，约定于2024年12月向甲公司转让A公司20%股权，于2025年5月向甲公司进一步转让A公司40%股权。截至2025年5月30日，股权转让协议已履行完毕，本公司仅持有A公司30%股权，能够对A公司实施重大影响。本公司将处置A公司股权至丧失控制权的两次交易作为“一揽子交易”进行会计处理【或者，本公司处置A公司股权至丧失控制权的两次交易不属于“一揽子交易”】。（描述分步处置股权的具体情况，**并说明判断为“一揽子交易”的理由（请参考会计政策中的有关披露）或者不属于“一揽子交易”的理由。）**",
+        "本公司原持有【A公司】90%股权，2024年10月本公司与甲公司签订股权转让协议，约定于2024年12月向甲公司转让A公司20%股权，于2025年5月向甲公司进一步转让A公司40%股权。截至2025年5月30日，股权转让协议已履行完毕，本公司仅持有A公司30%股权，能够对A公司实施重大影响。本公司将处置A公司股权至丧失控制权的两次交易作为“一揽子交易”进行会计处理【或者，本公司处置A公司股权至丧失控制权的两次交易不属于“一揽子交易”】。（描述分步处置股权的具体情况，并说明判断为“一揽子交易”的理由（请参考会计政策中的有关披露）或者不属于“一揽子交易”的理由。）",
         "①前期和本期处置股权情况",
         "②丧失控制权之日确定为2025年5月30日。（披露确定丧失控制权之日的判断依据）",
         "在丧失控制权之日，合并财务报表层面剩余股权的公允价值的确定方法是：…….。采取的主要假设……。",
@@ -27805,7 +29464,7 @@
         "本期实现的持续经营利润为XX，其中归属于母公司股东的持续经营利润为XX。",
         "（披露企业终止经营的原因、内容、性质等。）",
         "（如果因出售对子公司的投资等原因导致丧失对子公司控制权，且该子公司符合终止经营定义的，应在合并利润表中列报相关终止经营损益，并需披露上述信息。）",
-        "【提示：**处置单一或多个子公司并不必然是终止经营**。终止经营，是指企业满足下列条件之一的、能够单独区分的组成部分，且该组成部分已经处置或划分为持有待售类别：（1）该组成部分代表**一项独立的主要业务**或一个单独的主要经营地区；（2）该组成部分是拟对**一项独立的主要业务**或一个单独的主要经营地区进行处置的一项相关联计划的一部分；（3）该组成部分是**专为转售而取得**的子公司。】",
+        "【提示：处置单一或多个子公司并不必然是终止经营。终止经营，是指企业满足下列条件之一的、能够单独区分的组成部分，且该组成部分已经处置或划分为持有待售类别：（1）该组成部分代表一项独立的主要业务或一个单独的主要经营地区；（2）该组成部分是拟对一项独立的主要业务或一个单独的主要经营地区进行处置的一项相关联计划的一部分；（3）该组成部分是专为转售而取得的子公司。】",
         "（如果对终止经营处置损益进行调整，需披露调整的性质和金额。例如：",
         "本公司就[终止经营项目1]的最终处置条款与买方达成一致，[调整交易价格XX元][向买方支付补偿金XX元]。）",
         "【提示：不符合终止经营定义的持有待售的非流动资产或处置组，其减值损失和转回金额及处置损益应当作为持续经营损益列报；非流动资产或处置组不再继续划分为持有待售类别或非流动资产从持有待售的处置组中移除的，非流动资产或处置组的账面价值调整金额应当在当期利润表中作为持续经营损益列报；终止经营的减值损失和转回金额等经营损益、处置损益及其调整金额应当作为终止经营损益列报。】",
@@ -27822,8 +29481,8 @@
         "【对应的披露要求：",
         "解释3号“八（三）1”，确定报告分部考虑的因素、报告分部的产品和劳务的类型；",
         "解释3号“八（三）2”、“八（三）3”，有关利润、资产、负债计量的相关会计政策。】",
-        "【15号文第七十六条， 公司应披露报告分部的确定依据、分部会计政策、报告分部的财务信息（包括主营业务收入、主营业务成本等），以及分部财务信息合计金额与对应合并财务报表项目的调节过程。**公司无报告分部的，应说明原因**。】",
-        "【上交所重要提醒（关于做好2014年度上市公司财务信息披露工作的通知：**公司不能披露各报告分部的资产总额和负债总额的，应说明原因。】**",
+        "【15号文第七十六条， 公司应披露报告分部的确定依据、分部会计政策、报告分部的财务信息（包括主营业务收入、主营业务成本等），以及分部财务信息合计金额与对应合并财务报表项目的调节过程。公司无报告分部的，应说明原因。】",
+        "【上交所重要提醒（关于做好2014年度上市公司财务信息披露工作的通知：公司不能披露各报告分部的资产总额和负债总额的，应说明原因。】",
         "【提示：应注意与“年报管理层分析”中的信息披露保持一致。证监会《2014 年上市公司年报会计监管报告》，部分上市公司在年报管理层分析中披露主营业务的行业或产品分类，表明其在经营管理方面存在分部，但未在财务报告中提供单独的分部报告，也未说明不提供分部报告信息的原因】",
         "### 分部利润或亏损、资产及负债",
         "（对应披露要求：",
@@ -28731,7 +30390,7 @@
         "本年核销应收账款[XX]元，导致坏账准备减少[XX]元。】",
         "### 本期实际核销的应收账款情况",
         "#### 重要的应收账款核销情况（逐项披露）",
-        "【15号文第十九条（四）6，对于其中重要的款项，应**逐项**披露款项性质、核销原因、履行的核销程序及核销金额。实际核销的款项由关联交易产生的，应单独披露；】",
+        "【15号文第十九条（四）6，对于其中重要的款项，应逐项披露款项性质、核销原因、履行的核销程序及核销金额。实际核销的款项由关联交易产生的，应单独披露；】",
         "### 按欠款方归集的应收账款和合同资产期末余额前五名单位情况",
         "【15号文第十九条（四）7，按欠款方集中度，汇总或分别披露期末余额前5名的应收账款和合同资产的期末余额及占应收账款和合同资产期末余额合计数的比例，以及相应计提的坏账准备期末余额。如果公司对同一客户存在合同资产的，应将合同资产与应收账款合并计算。】",
         "汇总披露格式：",
@@ -28775,7 +30434,7 @@
               "account_codes": [
                 "1221"
               ],
-              "report_row_code": "BS-007",
+              "report_row_code": "BS-009",
               "row_type": "data"
             },
             {
@@ -29325,7 +30984,7 @@
       "text_sections": [
         "### 应收利息",
         "#### 应收利息分类",
-        "【提示：仅反映相关金融工具**已到期可收取**但于资产负债表日尚未收到的利息。基于实际利率法计提的金融工具的利息应包含在金融工具的账面余额中。】",
+        "【提示：仅反映相关金融工具已到期可收取但于资产负债表日尚未收到的利息。基于实际利率法计提的金融工具的利息应包含在金融工具的账面余额中。】",
         "#### 重要逾期利息",
         "（15号文第十九条10.对于重要的逾期应收利息，应按借款单位披露应收利息的期末余额、逾期时间和逾期原因、是否发生减值的判断。）",
         "#### 坏账准备计提情况",
@@ -29363,7 +31022,7 @@
         "（注：本表列报本报告期前已全额计提坏账准备，或计提减值准备的比例较大，但在本期又全额收回或转回，或在本期收回或转回比例较大的其他应收款。对本期通过重组等方式收回的金额重大的其他应收款，则应逐笔列报，金额不重大的，可汇总列报。）",
         "#### 本期实际核销的其他应收款情况",
         "##### 重要的其他应收款核销情况（逐项披露）",
-        "【15号文第十九条（四）6，对于其中重要的应收款项，应**逐项**披露款项性质、核销原因、履行的核销程序及核销金额。实际核销的款项由关联交易产生的，应单独披露；】",
+        "【15号文第十九条（四）6，对于其中重要的应收款项，应逐项披露款项性质、核销原因、履行的核销程序及核销金额。实际核销的款项由关联交易产生的，应单独披露；】",
         "#### 按欠款方归集的其他应收款期末余额前五名单位情况",
         "【按欠款方归集的期末余额前五名的其他应收款，应分别披露欠款方名称、期末余额及占其他应收款期末余额合计数的比例、款项的性质、对应的账龄、坏账准备期末余额；】",
         "#### 资金集中管理",

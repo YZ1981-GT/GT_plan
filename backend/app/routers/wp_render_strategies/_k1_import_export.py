@@ -13,14 +13,30 @@ from openpyxl.styles import Font
 from openpyxl.utils import get_column_letter
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.database import get_db
+from app.deps import get_current_user
+from app.models.core import User
+from app.services.four_table.aux_aggregation import aggregate_aux_by_name
+from app.services.four_table.k1_aux_detail import (
+    K1_DETAIL_ROW_LIMIT,
+    build_k1_detail_rows_from_aux,
+    merge_k1_detail_rows,
+)
+from app.services.four_table.report_line_accounts import resolve_report_line_accounts
+
 from ._cycle_import_export_common import (
     build_workbook_template,
     col_val,
     load_json_payload,
+    load_json_rows,
     parse_upload_xlsx,
     safe_float,
     safe_str,
     upsert_json_payload,
+    upsert_json_rows,
     workbook_to_response,
     import_rows_generic,
     create_cycle_import_export_router,
@@ -34,8 +50,12 @@ _K1_2_HEADERS = [
     "1年内", "1-2年", "2-3年", "3-4年", "4-5年", "5年以上",
     "阶段", "坏账准备", "净值", "凭证号", "结论", "备注",
 ]
+# 🔴 字段名逐字对齐前端 `K1DetailRow`（`useK1Detail.ts`）——
+#   `beginBalance`/`endBalance`，不是 `openingBalance`/`closingBalance`。
+#   与四表库自动归集共享件 `four_table.k1_aux_detail.build_k1_detail_rows_from_aux`
+#   产出的行字段名同源，禁止两处各写一套。
 _K1_2_KEYS = [
-    "counterparty", "nature", "relatedParty", "openingBalance", "closingBalance",
+    "counterparty", "nature", "relatedParty", "beginBalance", "endBalance",
     "agingLt1", "aging1to2", "aging2to3", "aging3to4", "aging4to5", "agingGt5",
     "stage", "badDebtProvision", "netValue", "voucherNo", "conclusion", "remark",
 ]
@@ -1179,7 +1199,9 @@ _K1_SPECS: dict[str, dict[str, Any]] = {
         ],
     },
     "K1-2": {
-        "item_id": "K1-2-rows",
+        # 🔴 与前端 `useK1Detail.ts` / `k1CrossHelpers.K1_DETAIL_STORAGE_KEY` 真实读写键
+        #   一致；原 `K1-2-rows` 从未被前端消费，导入永久静默无效。
+        "item_id": "K1-2-detail-rows",
         "storage_field": "remark",
         "title": "K1-2 其他应收款明细表",
         "headers": _K1_2_HEADERS,
@@ -1192,7 +1214,7 @@ _K1_SPECS: dict[str, dict[str, Any]] = {
                 "阶段", "坏账准备", "净值", "凭证号", "结论", "备注",
             ],
             "base_field_keys": [
-                "counterparty", "nature", "relatedParty", "openingBalance", "closingBalance",
+                "counterparty", "nature", "relatedParty", "beginBalance", "endBalance",
                 "stage", "badDebtProvision", "netValue", "voucherNo", "conclusion", "remark",
             ],
         },
@@ -1315,3 +1337,139 @@ _K1_SPECS: dict[str, dict[str, Any]] = {
 }
 
 router = create_cycle_import_export_router(tag="k1-import-export", api_prefix="k1", specs=_K1_SPECS)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# K1-2 明细表 ← tb_aux_balance（科目由 BS-009 报表映射解析，兜底 1221）按往来单位归集
+#
+# 🔴 严格照 F1 `import-aux-balance` 实现（复用共享件 `four_table.aux_aggregation`），
+#   与 F1/G7 同款三条四表库铁律：
+#   ① `get_active_filter` 只取 active dataset；② 先锁定单一 aux_type；
+#   ③ 前缀匹配（子科目形态）。
+# spec: .kiro/specs/k1-extraction-chain-and-note-alignment/
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_K1_2_DETAIL_ITEM_ID = "K1-2-detail-rows"
+
+
+async def _resolve_k1_segments(db: AsyncSession, wp_id: str) -> list[Any]:
+    """K1 有效账龄段：项目级配置（K1 无表级覆盖，异常兜底 THREE_YEAR）。"""
+    from ._cycle_import_export_common import resolve_aging_segments
+
+    return await resolve_aging_segments(db, wp_id, "K1")
+
+
+class _MiniCtx:
+    """`resolve_report_line_accounts` 只按属性访问 `db`/`project_id`（鸭子类型），
+    导入导出端点无需构造完整 `RenderContext`（缺 `working_paper`/`classification`
+    等字段也无妨）。"""
+
+    def __init__(self, db: AsyncSession, project_id: str):
+        self.db = db
+        self.project_id = project_id
+
+
+async def _resolve_k1_gross_prefixes(db: AsyncSession, project_id: str) -> list[str]:
+    """K1 原值科目原始码前缀（走 BS-009 报表映射，兜底 1221）——与 render 同源。"""
+    from app.routers.wp_render_strategies._k1_other_receivables import K1_ACCOUNT_SPEC
+
+    accounts = await resolve_report_line_accounts(_MiniCtx(db, project_id), K1_ACCOUNT_SPEC)
+    return list(accounts.gross) or ["1221"]
+
+
+@router.post("/api/workpapers/{wp_id}/k1/import-aux-balance")
+async def k1_import_aux_balance(
+    wp_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    """从 `tb_aux_balance`（科目 1221，按往来单位维度）归集导入 K1-2 明细表。
+
+    merge 语义：已存在的往来单位名称不重复导入（手工录入优先，不覆盖）。
+    K1 是四表库取数级联的**根**——K1-1 账龄/性质、两个披露表的账龄/性质/前五名
+    均从 K1-2 派生，故本端点是本 spec 的关键补齐点。
+    """
+    wp_row = (
+        await db.execute(
+            sa.text(
+                "SELECT wp.project_id, p.audit_year "
+                "FROM working_paper wp JOIN projects p ON p.id = wp.project_id "
+                "WHERE wp.id = :wp_id"
+            ),
+            {"wp_id": wp_id},
+        )
+    ).fetchone()
+    if not wp_row:
+        raise HTTPException(404, "底稿不存在")
+
+    project_id = str(wp_row.project_id)
+    year = int(wp_row.audit_year or 0)
+
+    gross_prefixes = await _resolve_k1_gross_prefixes(db, project_id)
+    segments = await _resolve_k1_segments(db, wp_id)
+
+    entries, aux_type, total_units = await aggregate_aux_by_name(
+        db, project_id, year, gross_prefixes
+    )
+    if not entries:
+        return {
+            "ok": True,
+            "imported_count": 0,
+            "rows": [],
+            "message": f"未找到科目{gross_prefixes[0]}的辅助余额数据",
+        }
+
+    related_names: set[str] = set()
+    try:
+        rp_rows = (
+            await db.execute(
+                sa.text(
+                    "SELECT name FROM related_party_registry "
+                    "WHERE project_id = :pid AND is_deleted = false "
+                    "AND name IS NOT NULL AND name <> ''"
+                ),
+                {"pid": project_id},
+            )
+        ).fetchall()
+        related_names = {r.name for r in rp_rows if r.name}
+    except Exception:  # noqa: BLE001 — 关联方标注失败不阻断归集
+        try:
+            await db.rollback()
+        except Exception:
+            pass
+
+    source_hint = f"{gross_prefixes[0]}·{aux_type}"
+    rows_data = build_k1_detail_rows_from_aux(
+        entries,
+        segments,
+        related_names,
+        row_limit=K1_DETAIL_ROW_LIMIT,
+        source_hint=source_hint,
+    )
+
+    existing_rows = await load_json_rows(db, wp_id, _K1_2_DETAIL_ITEM_ID, field="remark")
+    merged, added = merge_k1_detail_rows(existing_rows, rows_data)
+
+    await upsert_json_rows(db, wp_id, _K1_2_DETAIL_ITEM_ID, merged, field="remark")
+
+    first_label = ""
+    if segments:
+        first_label = str(getattr(segments[0], "label", "") or "")
+    truncated = total_units > len(rows_data)
+    msg = (
+        f"从辅助余额表({source_hint})归集 {total_units} 个往来单位，"
+        f"新增 {len(added)} 行；账龄已整笔落「{first_label}」，请按实际账龄调整。"
+    )
+    out: dict[str, Any] = {
+        "ok": True,
+        "imported_count": len(added),
+        "total_rows": len(merged),
+        "total_units": total_units,
+        "aux_type": aux_type,
+        "rows": added,
+    }
+    if truncated:
+        out["truncated"] = True
+        msg += f" 超过 {len(rows_data)} 行上限已截断，请按重要性补录其余单位。"
+    out["message"] = msg
+    return out

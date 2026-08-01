@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import pytest
 
-from backend.app.services.acnr.immutability import (
+from app.services.acnr.immutability import (
     AddrIdImmutabilityError,
     check_addr_id_immutable,
     clear_all_project_versions,

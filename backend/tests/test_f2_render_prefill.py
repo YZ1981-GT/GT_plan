@@ -32,8 +32,18 @@ from app.routers.wp_render_strategies._f2_inventory_main import (
     render,
 )
 
-# 资产类存货科目（借方） + 备抵科目 1471
-_ASSET_ACCOUNTS = [c["account"] for c in F2_CATEGORIES if c["account"] != "1471"]
+# 资产类存货科目（借方） + 备抵科目
+#
+# 🔴 归集判据是**科目名称**不是编码（`account_chart` 实测库内并存两版标准存货科目表，
+#   `1405`/`1406`/`1407`/`1408`/`1411`/`1416`/`1461` 名称↔编码完全冲突）→ 构造 tb 行时
+#   必须带 `account_name`。这里用 `F2_CATEGORIES` 的 label 作名称，
+#   13 个 label 与其 rowKey 一一对应（见 `test_f2_category_rules`）。
+_ASSET_ACCOUNTS = [
+    (c["account"], c["label"]) for c in F2_CATEGORIES if c["account"] != "1471"
+]
+_IMPAIRMENT_ACCOUNT = next(
+    (c["account"], c["label"]) for c in F2_CATEGORIES if c["account"] == "1471"
+)
 
 
 # ---------------------------------------------------------------------------
@@ -89,13 +99,16 @@ class _FakeSession:
         return None
 
 
-def _tb_row(code: str, opening: float, closing: float, level: int = 1):
+def _tb_row(code: str, opening: float, closing: float, level: int = 1, name: str = ""):
     return SimpleNamespace(
         account_code=code,
+        account_name=name,
         opening_balance=opening,
         closing_balance=closing,
         debit_amount=0,
         credit_amount=0,
+        closing_direction="debit",
+        dataset_id=None,
         level=level,
     )
 
@@ -143,10 +156,17 @@ def test_property1_closing_total_matches_tb(asset_closings, impair_closing):
     断言 prefill 期末总额 == Σ资产期末 + |1471 期末|。
     """
     rows = [
-        _tb_row(code, opening=0, closing=float(c))
-        for code, c in zip(_ASSET_ACCOUNTS, asset_closings)
+        _tb_row(code, opening=0, closing=float(c), name=name)
+        for (code, name), c in zip(_ASSET_ACCOUNTS, asset_closings)
     ]
-    rows.append(_tb_row("1471", opening=0, closing=float(impair_closing)))
+    rows.append(
+        _tb_row(
+            _IMPAIRMENT_ACCOUNT[0],
+            opening=0,
+            closing=float(impair_closing),
+            name=_IMPAIRMENT_ACCOUNT[1],
+        )
+    )
 
     ctx = _ctx(_FakeSession(tb_rows=rows))
     prefill = _run(_build_adjudication_prefill(ctx))
@@ -165,7 +185,14 @@ def test_property1_closing_total_matches_tb(asset_closings, impair_closing):
 
 def test_property1_impairment_abs_example():
     """定点用例：1471 期末 -55000（贷方）→ 预填取 abs=55000。"""
-    rows = [_tb_row("1471", opening=-30000, closing=-55000)]
+    rows = [
+        _tb_row(
+            _IMPAIRMENT_ACCOUNT[0],
+            opening=-30000,
+            closing=-55000,
+            name=_IMPAIRMENT_ACCOUNT[1],
+        )
+    ]
     ctx = _ctx(_FakeSession(tb_rows=rows))
     prefill = _run(_build_adjudication_prefill(ctx))
     assert prefill["impairment-provision"]["opening"] == pytest.approx(30000)
@@ -191,8 +218,8 @@ def test_property2_prefill_gated_by_persistence(closings, has_persisted):
     否则 adjudication_prefill == tb_values（同结构）。
     """
     rows = [
-        _tb_row(code, opening=0, closing=float(c))
-        for code, c in zip(_ASSET_ACCOUNTS, closings)
+        _tb_row(code, opening=0, closing=float(c), name=name)
+        for (code, name), c in zip(_ASSET_ACCOUNTS, closings)
     ]
     checklist_rows = []
     if has_persisted:
@@ -261,8 +288,8 @@ def test_property2_project_context_bs_date_and_related_parties():
 def test_property3_related_parties_failure_degrades(closings):
     """related_party_registry 查询抛错时，render 仍成功且 related_parties == []。"""
     rows = [
-        _tb_row(code, opening=0, closing=float(c))
-        for code, c in zip(_ASSET_ACCOUNTS, closings)
+        _tb_row(code, opening=0, closing=float(c), name=name)
+        for (code, name), c in zip(_ASSET_ACCOUNTS, closings)
     ]
     project_row = SimpleNamespace(
         client_name="乙公司", audit_year=2024, applicable_standards="CAS"

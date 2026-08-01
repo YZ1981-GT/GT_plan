@@ -7,7 +7,11 @@ import { ref, computed, watch, onBeforeUnmount, getCurrentInstance, type Ref, ty
 import { ElMessage } from 'element-plus'
 import { parseNum, calcSubtotal, isDebitCreditBalanced } from './useF2InvMaiFormulaEngine'
 import type { ChecklistResponse } from './useF2FormData'
-import { F2_INVENTORY_ACCOUNTS } from './f2AccountModel'
+import {
+  F2_INVENTORY_ACCOUNTS,
+  resolveF2InventoryAccounts,
+  type F2InventoryAccountItem,
+} from './f2AccountModel'
 import { eventBus } from '@/utils/eventBus'
 import { api } from '@/services/apiProxy'
 import { adjustments as adjPaths } from '@/services/apiPaths/accounting'
@@ -84,9 +88,15 @@ export function useF2Adjustment(options: {
   auditYear?: Ref<number | undefined>
   /** 直接 HTTP 保存（可选）；缺省仍走 f2:save-items */
   saveItems?: (items: ChecklistResponse[]) => Promise<void>
+  /**
+   * render 输出的 `project_context.inventory_accounts`（本项目实际存货科目）。
+   * 优先于静态 {@link F2_INVENTORY_ACCOUNTS} 用于 AJE 科目下拉，缺失时自动回退。
+   */
+  inventoryAccounts?: Ref<F2InventoryAccountItem[] | null | undefined>
 }) {
-  const { allResponses, isReadonly, projectId, auditYear, saveItems } = options
+  const { allResponses, isReadonly, projectId, auditYear, saveItems, inventoryAccounts } = options
   const readonly = isReadonly ?? ref(false)
+  const accountOptions = computed(() => resolveF2InventoryAccounts(inventoryAccounts?.value))
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
   const pushing = ref(false)
 
@@ -271,11 +281,11 @@ export function useF2Adjustment(options: {
 
     if (field === 'accountCode') {
       row.accountCode = String(value ?? '')
-      const acc = F2_INVENTORY_ACCOUNTS.find((a) => a.code === row.accountCode)
+      const acc = accountOptions.value.find((a) => a.code === row.accountCode)
       if (acc) row.accountName = acc.name
     } else if (field === 'accountName') {
       row.accountName = String(value ?? '')
-      const acc = F2_INVENTORY_ACCOUNTS.find((a) => a.name === row.accountName)
+      const acc = accountOptions.value.find((a) => a.name === row.accountName)
       if (acc) row.accountCode = acc.code
     } else if (field === 'debitAmount' || field === 'creditAmount') {
       ;(row as any)[field] = parseNum(value)
@@ -299,7 +309,7 @@ export function useF2Adjustment(options: {
     creditTotal,
     balanceDiff,
     isBalanced,
-    accountOptions: F2_INVENTORY_ACCOUNTS,
+    accountOptions,
     addRow,
     removeRow,
     updateCell,

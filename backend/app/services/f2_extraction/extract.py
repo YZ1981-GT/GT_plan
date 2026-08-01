@@ -220,56 +220,73 @@ async def extract_f2_category_values(
 # ---------------------------------------------------------------------------
 
 
-def build_default_bindings() -> list[dict]:
-    """生成 F2-1 审定表标准公式绑定（hardcode，不读文件）.
+#: 锚点里「同一 rowKey+field 对应多个科目码」时的分隔符。
+#: 消费方（`_build_adjudication_prefill_v2`）解析前先按它截断，并把值**累加**。
+ANCHOR_ACCOUNT_SEP = "@"
 
-    为每个 F2_CATEGORIES 的 rowKey/account 生成 3 条 binding:
-    - 原值类: TB('{account}','期初余额') / TB('{account}','借方发生额') /
-              TB('{account}','贷方发生额')
-    - 跌价 1471: ABS(TB('1471','期初余额')) / TB('1471','贷方发生额') /
-                 TB('1471','借方发生额')
+_FIELD_MAP_GROSS = {
+    "opening": ("期初余额", False),
+    "increase": ("借方发生额", False),
+    "decrease": ("贷方发生额", False),
+}
+#: 跌价反转：期初取 ABS；计提=贷方（增加）；转回/核销=借方（减少）
+_FIELD_MAP_IMPAIRMENT = {
+    "opening": ("期初余额", True),
+    "increase": ("贷方发生额", False),
+    "decrease": ("借方发生额", False),
+}
+
+
+def build_default_bindings(
+    inventory_accounts: list[dict] | None = None,
+) -> list[dict]:
+    """生成 F2-1 审定表标准公式绑定。
+
+    Args:
+        inventory_accounts: 本项目实际存货科目
+            ``[{"code", "name", "row_key"}]``（render 由 `account_chart` + 名称归类得出）。
+            **给了就按它生成**（一个 rowKey 可能对应多个码，如「周转材料」= 周转材料 +
+            包装物 + 低值易耗品 → 每码一条 binding，锚点用 ``@code`` 后缀区分，
+            消费方累加）。
+
+            为 ``None`` / 空时回退 `F2_CATEGORIES` 的**兜底编码**，行为与改造前一致
+            （零回归）—— 但要注意兜底编码在两版标准科目表下都可能不对，
+            详见 `app.services.f2_extraction.category_rules` 的实证表。
 
     Returns:
-        39 条 binding 列表
+        binding 列表（含 ``anchor`` / ``expression`` / ``formula_type`` / ``row_key``）。
     """
+    if inventory_accounts:
+        pairs = [
+            (str(a.get("row_key") or ""), str(a.get("code") or ""))
+            for a in inventory_accounts
+            if a.get("row_key") and a.get("code")
+        ]
+    else:
+        pairs = [(c["rowKey"], c["account"]) for c in F2_CATEGORIES]
+
     bindings: list[dict] = []
-
-    field_map = {
-        "opening": ("期初余额", False),
-        "increase": ("借方发生额", False),
-        "decrease": ("贷方发生额", False),
-    }
-
-    # 跌价反转
-    impairment_field_map = {
-        "opening": ("期初余额", True),  # ABS
-        "increase": ("贷方发生额", False),  # 计提=贷方
-        "decrease": ("借方发生额", False),  # 转回/核销=借方
-    }
-
-    for cat in F2_CATEGORIES:
-        row_key = cat["rowKey"]
-        account = cat["account"]
-
-        # 判断 block
+    multi = len(pairs) != len({rk for rk, _ in pairs})
+    for row_key, account in pairs:
         if row_key == "impairment-provision":
-            block = "impairment"
-            fm = impairment_field_map
+            block, fm = "impairment", _FIELD_MAP_IMPAIRMENT
         else:
-            block = "gross"
-            fm = field_map
+            block, fm = "gross", _FIELD_MAP_GROSS
 
         for field, (col_name, use_abs) in fm.items():
-            if use_abs:
-                expr = f"ABS(TB('{account}','{col_name}'))"
-            else:
-                expr = f"TB('{account}','{col_name}')"
-
+            expr = (
+                f"ABS(TB('{account}','{col_name}'))"
+                if use_abs
+                else f"TB('{account}','{col_name}')"
+            )
             anchor = f"F2-1-{block}-{row_key}-{field}"
+            if multi:
+                anchor = f"{anchor}{ANCHOR_ACCOUNT_SEP}{account}"
             bindings.append({
                 "anchor": anchor,
                 "expression": expr,
                 "formula_type": "auto_calc",
+                "row_key": row_key,
             })
 
     return bindings

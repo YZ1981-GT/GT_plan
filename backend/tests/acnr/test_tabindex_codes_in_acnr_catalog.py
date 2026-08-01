@@ -53,7 +53,7 @@ from pathlib import Path
 
 import pytest
 
-from backend.app.services.acnr.catalog import list_sheets
+from app.services.acnr.catalog import list_sheets
 
 # ─── Paths ────────────────────────────────────────────────────────────────────
 # test file: backend/tests/acnr/test_tabindex_codes_in_acnr_catalog.py

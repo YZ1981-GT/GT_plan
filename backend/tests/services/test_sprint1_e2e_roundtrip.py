@@ -28,8 +28,10 @@ from pathlib import Path
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[3]
-sys.path.insert(0, str(ROOT / "scripts"))
+# 🔴 parents[2] = backend/（本文件在 backend/tests/services/）；parents[3] 会解到
+#   仓库根 D:\GT_plan，其下没有 scripts/ 目录。
+BACKEND_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(BACKEND_ROOT / "scripts"))
 
 # 0.2 升级函数
 from migrate_disclosure_notes_to_v2 import upgrade_table_data  # noqa: E402

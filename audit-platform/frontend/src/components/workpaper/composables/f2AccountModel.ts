@@ -97,3 +97,72 @@ export function sumImpairmentAjeByRowKey(rows: F2AjeLike[]): Record<string, numb
   }
   return result
 }
+
+/**
+ * 本项目实际存货科目（render 输出 `project_context.inventory_accounts`）。
+ * 与 {@link F2_INVENTORY_ACCOUNTS} 同形（`{code, name}`），供 AJE 科目下拉 /
+ * 溯源面板消费。
+ */
+export interface F2InventoryAccountItem {
+  code: string
+  name: string
+  /** 归类结果 rowKey（`classify_f2_leaf` 输出，两版标准科目表下均按名称归类） */
+  row_key?: string
+}
+
+/**
+ * 解析本项目实际可用的存货科目清单（Wave 3 — 项目科目表下发前端兜底）。
+ *
+ * 🔴 两版标准科目表并存，写死编码在其中一版下必然错位（见
+ * `category_rules.py` docstring 实证）→ 运行时**优先**用后端下发的项目科目表，
+ * 只在缺失（查询失败/项目未建科目表）时回退静态兜底清单。
+ *
+ * @param dynamic render 输出的 `project_context.inventory_accounts`（可能为空/未定义）
+ * @param fallback 静态兜底清单，缺省 {@link F2_INVENTORY_ACCOUNTS}
+ */
+export function resolveF2InventoryAccounts(
+  dynamic: F2InventoryAccountItem[] | null | undefined,
+  fallback: ReadonlyArray<{ code: string; name: string }> = F2_INVENTORY_ACCOUNTS,
+): Array<{ code: string; name: string }> {
+  if (dynamic && dynamic.length > 0) {
+    return dynamic.map((a) => ({ code: a.code, name: a.name }))
+  }
+  return fallback.map((a) => ({ code: a.code, name: a.name }))
+}
+
+/**
+ * 解析「科目编码 → 审定表 rowKey」映射（Wave 3 前端兜底）。
+ *
+ * 优先用项目实际科目表的归类结果（`row_key` 字段，后端按名称分类）；
+ * 缺失时回退静态 {@link F2_ACCOUNT_TO_ROW_KEY}（同样按变体 A 编码假设，仅兜底展示用）。
+ */
+export function resolveF2AccountToRowKey(
+  dynamic: F2InventoryAccountItem[] | null | undefined,
+  fallback: Record<string, string> = F2_ACCOUNT_TO_ROW_KEY,
+): Record<string, string> {
+  if (dynamic && dynamic.length > 0) {
+    const out: Record<string, string> = {}
+    for (const a of dynamic) {
+      if (a.row_key) out[a.code] = a.row_key
+    }
+    return out
+  }
+  return { ...fallback }
+}
+
+/**
+ * 解析「审定表 rowKey → 来源科目编码清单」（Wave 3，供溯源面板展示）。
+ * 一个 rowKey 可能对应多个客户子科目（如「周转材料」= 周转材料+包装物+低值易耗品），
+ * 故返回数组而非单一编码，与静态 {@link F2_ROW_KEY_ACCOUNT}（单一编码假设）不同形。
+ */
+export function resolveF2RowKeyToAccounts(
+  dynamic: F2InventoryAccountItem[] | null | undefined,
+): Record<string, string[]> {
+  const out: Record<string, string[]> = {}
+  if (!dynamic || dynamic.length === 0) return out
+  for (const a of dynamic) {
+    if (!a.row_key) continue
+    ;(out[a.row_key] ||= []).push(a.code)
+  }
+  return out
+}

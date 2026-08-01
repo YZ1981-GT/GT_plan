@@ -20,9 +20,11 @@ from pathlib import Path
 
 import pytest
 
-# 保证可 import scripts/migrate_disclosure_notes_to_v2.py
-ROOT = Path(__file__).resolve().parents[3]
-sys.path.insert(0, str(ROOT / "scripts"))
+# 保证可 import backend/scripts/migrate_disclosure_notes_to_v2.py
+# 🔴 parents[2] = backend/（本文件在 backend/tests/services/），不是 parents[3]
+#   （那会解到仓库根 D:\GT_plan，其下没有 scripts/ 目录）。
+BACKEND_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(BACKEND_ROOT / "scripts"))
 
 from migrate_disclosure_notes_to_v2 import (  # noqa: E402
     VALID_ROW_TYPES,

@@ -8,11 +8,27 @@ import sqlalchemy as sa
 
 from app.models.audit_platform_models import TbBalance
 from app.services.dataset_query import get_active_filter
+from app.services.f2_extraction.category_rules import (
+    classify_f2_leaf,
+    is_f2_impairment_category,
+    top_level_code,
+)
+from app.services.four_table import LeafRow, select_leaves, to_leaf_rows
 
 from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
 
+#: F2-1 审定表分类行（rowKey/label 顺序 = 审定表行序）。
+#:
+#: 🔴 `account` 字段是**兜底 / 展示用，运行时取数一律不据此写死**。
+#:   实证（`account_chart` `source='standard'`，9 个真实项目）：库内并存两个互不兼容的
+#:   标准存货科目表变体，`1405`/`1406`/`1407`/`1408`/`1411`/`1416`/`1451`/`1461`
+#:   的名称↔编码对应完全冲突（同一个 `1406` 一半项目是「库存商品」、另一半是「发出商品」）
+#:   → **不存在一组写死就对的编码**。归集判据见
+#:   `app.services.f2_extraction.category_rules.classify_f2_leaf`（按**科目名称**）。
+#:
+#: spec: .kiro/specs/f2-inventory-account-mapping-and-linkage/
 F2_CATEGORIES = [
     {"rowKey": "raw-materials", "label": "原材料", "account": "1401"},
     {"rowKey": "material-in-transit", "label": "材料采购在途", "account": "1402"},
@@ -30,20 +46,53 @@ F2_CATEGORIES = [
 ]
 
 
-def _row_depth(row, account: str) -> int:
-    """判定 tb_balance 行相对科目的明细层级（越大越深）。
+#: 存货科目一级码区间（报表行 `BS-010 = SUM_TB('1401~1499','期末余额')`）。
+_F2_INVENTORY_CODE_LO = "1401"
+_F2_INVENTORY_CODE_HI = "1499"
 
-    优先用 level 列；无则按 code 的 "." 段数；再无则按是否等于一级科目粗判。
+
+def _is_inventory_code(account_code: str | None) -> bool:
+    """一级科目段落在 `1401~1499` 内（区间口径与报表行 BS-010 一致）。纯函数。"""
+    head = top_level_code(account_code)
+    return bool(head) and _F2_INVENTORY_CODE_LO <= head <= _F2_INVENTORY_CODE_HI
+
+
+def build_category_prefill(
+    leaves: list[LeafRow],
+    chart_names: dict[str, str] | None = None,
+) -> dict[str, dict[str, float]]:
+    """把存货**叶子**行按科目名称归入 F2-1 分类桶（纯函数，可单测）。
+
+    Args:
+        leaves: 已 `select_leaves` 的叶子行（严格点号边界判叶子，共享件口径）。
+        chart_names: ``{一级码: 科目名}``，供叶子名未命中时回退父级名。
+
+    Returns:
+        ``{rowKey: {"opening": x, "closing": y}}``；只含**实际出现**且非全零的桶。
+        备抵桶（`impairment-provision`）取绝对值（两种符号约定同解）。
+
+    不变量（Property 1）：各桶（含 `other`）期末之和 == 全部叶子期末之和。
     """
-    if getattr(row, "level", None) is not None:
-        try:
-            return int(row.level)
-        except (TypeError, ValueError):  # noqa: PERF203
-            pass
-    code = (row.account_code or "").strip()
-    if "." in code:
-        return code.count(".") + 1
-    return 1 if code == account else 2
+    names = chart_names or {}
+    buckets: dict[str, dict[str, float]] = {}
+    for row in leaves or []:
+        if not _is_inventory_code(row.account_code):
+            continue
+        parent = names.get(top_level_code(row.account_code))
+        key = classify_f2_leaf(row.account_name, parent)
+        b = buckets.setdefault(key, {"opening": 0.0, "closing": 0.0})
+        b["opening"] += float(row.opening or 0)
+        b["closing"] += float(row.closing or 0)
+    out: dict[str, dict[str, float]] = {}
+    for key, b in buckets.items():
+        opening, closing = b["opening"], b["closing"]
+        if is_f2_impairment_category(key):
+            opening, closing = abs(opening), abs(closing)
+        opening, closing = round(opening, 2), round(closing, 2)
+        if opening == 0 and closing == 0:
+            continue
+        out[key] = {"opening": opening, "closing": closing}
+    return out
 
 
 async def _build_adjudication_prefill_v2(ctx: RenderContext) -> dict[str, dict]:
@@ -51,7 +100,10 @@ async def _build_adjudication_prefill_v2(ctx: RenderContext) -> dict[str, dict]:
 
     返回结构：{ rowKey: {opening, increase, decrease, closing, formulas, source_codes} }
     """
-    from app.services.f2_extraction.extract import extract_f2_category_values
+    from app.services.f2_extraction.extract import (
+        ANCHOR_ACCOUNT_SEP,
+        extract_f2_category_values,
+    )
     from app.services.f2_extraction.presets import resolve_effective
 
     try:
@@ -59,7 +111,11 @@ async def _build_adjudication_prefill_v2(ctx: RenderContext) -> dict[str, dict]:
     except Exception as e:
         logger.warning("F2 render: resolve_effective 失败, 回退默认绑定: %s", e)
         from app.services.f2_extraction.extract import build_default_bindings
-        effective_bindings = build_default_bindings()
+        # 🔴 按**本项目实际科目表**生成绑定（写死编码在两版标准科目表下都可能错，
+        #   见 `category_rules` 的实证表）；取不到科目表时才回退写死兜底。
+        effective_bindings = build_default_bindings(
+            await build_inventory_accounts(ctx)
+        )
 
     raw_result = await extract_f2_category_values(ctx, effective_bindings)
     # raw_result: {anchor: {value, account, column, is_abs, source_codes}}
@@ -85,6 +141,9 @@ async def _build_adjudication_prefill_v2(ctx: RenderContext) -> dict[str, dict]:
         # 解析策略：去掉 "F2-1-" 前缀，末尾取 field，中间解析 block 和 rowKey
         if not anchor.startswith("F2-1-"):
             continue
+        # 同一 rowKey+field 可能对应多个科目码（如「周转材料」= 周转材料+包装物+
+        # 低值易耗品），锚点带 `@code` 后缀区分 → 解析前截断，值按 `+=` 累加。
+        anchor = anchor.split(ANCHOR_ACCOUNT_SEP, 1)[0]
         remainder = anchor[5:]  # 去掉 "F2-1-"
 
         # 末尾 field
@@ -107,7 +166,9 @@ async def _build_adjudication_prefill_v2(ctx: RenderContext) -> dict[str, dict]:
             continue
 
         entry = by_row[row_key]
-        entry[field] = info["value"]
+        # 🔴 `+=` 不是 `=` —— 一个 rowKey 可能由多个科目码组成（见上方 `@code` 注释），
+        #   写 `=` 会让后来的码覆盖前面的码（周转材料只剩最后一个子类）。
+        entry[field] += info["value"]
         entry["source_codes"].update(info.get("source_codes") or [])
 
         # 从 effective_bindings 取公式表达式
@@ -149,20 +210,32 @@ async def _build_adjudication_prefill_v2(ctx: RenderContext) -> dict[str, dict]:
 async def _build_adjudication_prefill(ctx: RenderContext) -> dict[str, dict[str, float]]:
     """无持久化审定数据时，从 tb_balance 存货科目预填各分类行期初/期末未审数。
 
-    照 J1/D5 范式：
-    - 资产类 1401~1412：opening/closing 直取（存货借方为正）。
-    - 跌价准备 1471 为备抵科目：取绝对值。
-    - 每个分类按 code 前缀归集，优先最深明细层级（二级/三级）汇总，退一级总额，
-      避免层级重复计数。
-    - 查询失败优雅降级返回 {}，不阻断渲染。
+    🔴 归集判据是**科目名称**不是编码 —— 存货科目的编码语义在本平台内不唯一
+    （两版标准科目表并存，`1405`/`1406`/`1407`/`1408`/`1411`/`1416`/`1461` 全部冲突），
+    按编码写死必然整表错位。详见
+    `app.services.f2_extraction.category_rules`。
 
-    返回结构：{ rowKey: {"opening": float, "closing": float}, ... }
+    - 叶子判定委托平台共享件 `four_table.select_leaves`（严格点号边界）——
+      替代旧的 `_row_depth` + `max(by_depth)` 取最深层级（客户科目树参差时会整段丢叶子，
+      与 K1 已修的同款 bug）。
+    - 备抵（跌价准备）由名称识别并取绝对值。
+    - 查询失败优雅降级返回 `{}`，不阻断渲染。
+
+    返回结构：`{ rowKey: {"opening": float, "closing": float}, ... }`
     """
     from app.core.config import settings
 
     if settings.F2_FOUR_TABLE_EXTRACTION_ENABLED:
         return await _build_adjudication_prefill_v2(ctx)
-    tb_values: dict[str, dict[str, float]] = {}
+    leaves = await _fetch_f2_inventory_leaves(ctx)
+    if not leaves:
+        return {}
+    chart_names = await _fetch_inventory_chart_names(ctx)
+    return build_category_prefill(leaves, chart_names)
+
+
+async def _fetch_f2_inventory_leaves(ctx: RenderContext) -> list[LeafRow]:
+    """取本项目 14xx 存货科目的**叶子**行（active 数据集，fail-open）。"""
     try:
         active_filter = await get_active_filter(
             ctx.db, TbBalance.__table__, ctx.project_id, ctx.year
@@ -170,41 +243,107 @@ async def _build_adjudication_prefill(ctx: RenderContext) -> dict[str, dict[str,
         result = await ctx.db.execute(
             sa.select(
                 TbBalance.account_code,
+                TbBalance.account_name,
                 TbBalance.opening_balance,
                 TbBalance.closing_balance,
-                TbBalance.level,
-            ).where(active_filter)
+                TbBalance.debit_amount,
+                TbBalance.credit_amount,
+                TbBalance.closing_direction,
+                TbBalance.dataset_id,
+            ).where(sa.and_(active_filter, TbBalance.account_code.like("14%")))
         )
-        rows = result.fetchall()
+        return select_leaves(to_leaf_rows(result.fetchall()))
     except Exception as e:  # noqa: BLE001 — 预填失败按空处理，不阻塞渲染
         logger.warning("F2 render: 审定表预填 tb_balance 查询失败: %s", e)
+        try:
+            await ctx.db.rollback()
+        except Exception:
+            pass
+        return []
+
+
+async def _fetch_inventory_chart_names(ctx: RenderContext) -> dict[str, str]:
+    """本项目 14xx 一级科目 ``{码: 名}``（供叶子名未命中时回退父级名）。fail-open。"""
+    try:
+        rows = (
+            await ctx.db.execute(
+                sa.text(
+                    "SELECT DISTINCT account_code, account_name FROM account_chart "
+                    "WHERE project_id = :pid AND is_deleted = false "
+                    "AND account_code ~ '^14' AND length(account_code) = 4 "
+                    "AND source = 'client'"
+                ),
+                {"pid": str(ctx.project_id)},
+            )
+        ).fetchall()
+        names = {r.account_code: r.account_name for r in rows if r.account_name}
+        if names:
+            return names
+        # 客户科目表缺失时回退 standard 变体（仍是本项目自己的那一版）
+        rows = (
+            await ctx.db.execute(
+                sa.text(
+                    "SELECT DISTINCT account_code, account_name FROM account_chart "
+                    "WHERE project_id = :pid AND is_deleted = false "
+                    "AND account_code ~ '^14' AND length(account_code) = 4"
+                ),
+                {"pid": str(ctx.project_id)},
+            )
+        ).fetchall()
+        return {r.account_code: r.account_name for r in rows if r.account_name}
+    except Exception as e:  # noqa: BLE001
+        logger.warning("F2 render: account_chart 查询失败: %s", e)
+        try:
+            await ctx.db.rollback()
+        except Exception:
+            pass
         return {}
 
-    for cat in F2_CATEGORIES:
-        account = cat["account"]
-        row_key = cat["rowKey"]
-        # 收集匹配该科目前缀的行（code == account 或 code 以 account 开头的子科目）
-        by_depth: dict[int, list] = {}
-        for r in rows:
-            code = (r.account_code or "").strip()
-            if not code:
-                continue
-            if code == account or code.startswith(account):
-                depth = _row_depth(r, account)
-                by_depth.setdefault(depth, []).append(r)
-        if not by_depth:
+
+async def build_inventory_accounts(ctx: RenderContext) -> list[dict]:
+    """本项目实际存在的存货科目清单（供前端 AJE 科目下拉 / 溯源，替代写死清单）。
+
+    Returns:
+        ``[{"code", "name", "row_key"}]``，按编码升序；查询失败返回 ``[]``
+        （前端回退既有静态清单 → 零回归）。
+    """
+    try:
+        rows = (
+            await ctx.db.execute(
+                sa.text(
+                    "SELECT DISTINCT account_code, account_name FROM account_chart "
+                    "WHERE project_id = :pid AND is_deleted = false "
+                    "AND account_code ~ '^14' "
+                    "ORDER BY account_code"
+                ),
+                {"pid": str(ctx.project_id)},
+            )
+        ).fetchall()
+    except Exception as e:  # noqa: BLE001
+        logger.warning("F2 render: inventory_accounts 查询失败: %s", e)
+        try:
+            await ctx.db.rollback()
+        except Exception:
+            pass
+        return []
+    names = {
+        r.account_code: r.account_name
+        for r in rows
+        if len(str(r.account_code or "")) == 4 and r.account_name
+    }
+    out: list[dict] = []
+    seen: set[str] = set()
+    for r in rows:
+        code = str(r.account_code or "").strip()
+        if not code or code in seen or not _is_inventory_code(code):
             continue
-        # 优先最深明细层级（三级/二级），退一级
-        chosen = by_depth[max(by_depth.keys())]
-        opening = sum(float(r.opening_balance or 0) for r in chosen)
-        closing = sum(float(r.closing_balance or 0) for r in chosen)
-        if account == "1471":  # 跌价准备为备抵科目，取绝对值
-            opening = abs(opening)
-            closing = abs(closing)
-        if opening == 0 and closing == 0:
-            continue
-        tb_values[row_key] = {"opening": opening, "closing": closing}
-    return tb_values
+        seen.add(code)
+        out.append({
+            "code": code,
+            "name": r.account_name or "",
+            "row_key": classify_f2_leaf(r.account_name, names.get(top_level_code(code))),
+        })
+    return out
 
 
 async def render(ctx: RenderContext) -> dict | None:
@@ -315,6 +454,20 @@ async def render(ctx: RenderContext) -> dict | None:
                 project_context["tb_amount"] = audited if audited else unadjusted
         except Exception as e:  # noqa: BLE001
             logger.warning("F2 render: trial_balance 存货净额查询失败: %s", e)
+
+    # ─── 本项目实际存货科目清单（前端 AJE 下拉 / 溯源；替代写死清单）─────────
+    inventory_accounts = await build_inventory_accounts(ctx)
+    project_context["inventory_accounts"] = inventory_accounts
+    # 取数溯源：报表行 + 按名称归类的科目明细（供 F2FourTableSourcePanel 展示）
+    classified: dict[str, list[str]] = {}
+    for item in inventory_accounts:
+        classified.setdefault(item["row_key"], []).append(item["code"])
+    project_context["tb_source_codes"] = {
+        "row_code": "BS-010",
+        "codes": [f"{_F2_INVENTORY_CODE_LO}~{_F2_INVENTORY_CODE_HI}"],
+        "classified_by": "account_name",
+        "classified": classified,
+    }
 
     # ─── F2-1 审定表 TB 子科目预填 ────────────────────────────────────────
     tb_values = await _build_adjudication_prefill(ctx)

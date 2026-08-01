@@ -9,6 +9,7 @@ import type { ChecklistResponse } from '../../composables/useF2FormData'
 import GtIndexChip from '../../GtIndexChip.vue'
 import CycleImportExportDropdown from '../../shared/CycleImportExportDropdown.vue'
 import F2ReviewChip from '../shared/F2ReviewChip.vue'
+import type { F2InventoryAccountItem } from '../../composables/f2AccountModel'
 
 const props = defineProps<{
   wpId: string
@@ -16,6 +17,8 @@ const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
   isReadonly: boolean
   auditYear?: number
+  /** render 输出的本项目实际存货科目清单（替代写死清单，缺失时组件内部自动回退） */
+  inventoryAccounts?: F2InventoryAccountItem[] | null
 }>()
 
 const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
@@ -60,6 +63,7 @@ const {
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
   projectId: toRef(props, 'projectId') as Ref<string>,
   auditYear: auditYearRef,
+  inventoryAccounts: computed(() => props.inventoryAccounts),
 })
 
 // ─── 同步到集中调整登记 ─────────────────────────────────────────────

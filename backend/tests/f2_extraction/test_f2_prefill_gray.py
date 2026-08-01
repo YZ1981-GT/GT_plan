@@ -32,23 +32,39 @@ def _make_ctx(rows):
     return ctx
 
 
-def _make_row(account_code, opening, closing, level=None):
-    """构造 tb_balance 行 mock."""
+def _make_row(account_code, opening, closing, level=None, account_name=""):
+    """构造 tb_balance 行 mock.
+
+    🔴 `account_name` 必填 —— 灰度关路径的归集判据是**科目名称**不是编码
+    （`account_chart` 实测库内并存两版标准存货科目表，编码语义冲突）。
+    """
     row = types.SimpleNamespace()
     row.account_code = account_code
+    row.account_name = account_name
     row.opening_balance = opening
     row.closing_balance = closing
+    row.debit_amount = 0
+    row.credit_amount = 0
+    row.closing_direction = "debit"
+    row.dataset_id = None
     row.level = level
     return row
 
 
 @pytest.fixture
 def mock_active_filter():
-    """Mock get_active_filter 返回简单条件."""
+    """Mock get_active_filter 返回**真实 SA 表达式**。
+
+    🔴 不能返回 `MagicMock()` —— 取数已改为 `sa.and_(active_filter, code.like('14%'))`，
+    `sa.and_` 会拒绝非 SA 表达式（"SQL expression for WHERE/HAVING role expected"），
+    被 fail-open 吞成空结果，让本测试假绿地测不到任何东西。
+    """
+    import sqlalchemy as sa
+
     with patch(
         "app.routers.wp_render_strategies._f2_inventory_main.get_active_filter",
         new_callable=AsyncMock,
-        return_value=MagicMock(),
+        return_value=sa.true(),
     ) as m:
         yield m
 
@@ -62,27 +78,19 @@ def mock_active_filter():
 async def test_gray_off_output_equals_characterization(mock_active_filter):
     """灰度关：输出与旧路径逐字段等价（只含 opening/closing，不含 increase/decrease）."""
     rows = [
-        _make_row("1401", 1000.0, 2000.0, level=1),
-        _make_row("1471", -500.0, -800.0, level=1),
+        _make_row("1403", 1000.0, 2000.0, level=1, account_name="原材料"),
+        _make_row("1416", -500.0, -800.0, level=1, account_name="存货跌价准备"),
     ]
     ctx = _make_ctx(rows)
 
-    # sa.select(...).where(active_filter) 需要 active_filter 是有效 SA 表达式
-    # 用 patch sa.select 让整条链可通
-    select_mock = MagicMock()
-    select_mock.where.return_value = select_mock  # chainable
-
-    with patch(
-        "app.core.config.settings",
-    ) as mock_settings, patch(
-        "app.routers.wp_render_strategies._f2_inventory_main.sa.select",
-        return_value=select_mock,
-    ):
+    # `get_active_filter` 已由 fixture 返回真实 `sa.true()`，整条 select 链可直接跑；
+    # `ctx.db.execute` 是 AsyncMock，恒返回上面构造的 rows（不真连库）。
+    with patch("app.core.config.settings") as mock_settings:
         mock_settings.F2_FOUR_TABLE_EXTRACTION_ENABLED = False
 
         result = await _build_adjudication_prefill(ctx)
 
-    # 旧路径只含 opening/closing
+    # 灰度关路径只含 opening/closing
     assert "raw-materials" in result
     assert set(result["raw-materials"].keys()) == {"opening", "closing"}
     assert result["raw-materials"]["opening"] == 1000.0

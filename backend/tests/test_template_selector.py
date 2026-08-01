@@ -1,6 +1,6 @@
 """Unit tests for backend.app.services.template_selector."""
 
-from backend.app.services.template_selector import (
+from app.services.template_selector import (
     A16_ALL_VERSIONS,
     A16_ALWAYS_REQUIRED,
     A16_CATEGORY_MAP,

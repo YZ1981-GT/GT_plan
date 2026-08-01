@@ -14,6 +14,10 @@ import { computed, ref } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { F2_CATEGORIES, type TbValuesEntry } from '../composables/useF2Adjudication'
 import { F2_ROW_KEY_ACCOUNT } from '../composables/useF2CrossSheet'
+import {
+  resolveF2RowKeyToAccounts,
+  type F2InventoryAccountItem,
+} from '../composables/f2AccountModel'
 import type { ChecklistResponse } from '../composables/useF2FormData'
 
 export interface F2FourTableSourcePanelProps {
@@ -22,6 +26,8 @@ export interface F2FourTableSourcePanelProps {
   isReadonly?: boolean
   wpId?: string
   projectId?: string
+  /** render 输出的本项目实际存货科目清单（供来源科目列展示项目实际子科目，替代单一编码兜底） */
+  inventoryAccounts?: F2InventoryAccountItem[] | null
 }
 
 type F2BlockKey = 'gross' | 'impairment'
@@ -54,15 +60,26 @@ interface SourceRow {
   sourceCodes: string[]
 }
 
+// 本项目实际科目按 rowKey 分组（Wave 3）：一个 rowKey 可能对应多个客户子科目
+// （如「周转材料」= 周转材料+包装物+低值易耗品），故用清单而非单一编码兜底。
+const rowKeyToAccounts = computed(() => resolveF2RowKeyToAccounts(props.inventoryAccounts))
+
+function accountCodeDisplay(rowKey: string): string {
+  const codes = rowKeyToAccounts.value[rowKey]
+  if (codes && codes.length > 0) return codes.join('/')
+  return F2_ROW_KEY_ACCOUNT[rowKey] || ''
+}
+
 const sourceRows = computed<SourceRow[]>(() => {
   if (!props.tbValues) return []
   return F2_CATEGORIES.map((cat) => {
     const entry = props.tbValues![cat.rowKey]
+    const accountCode = accountCodeDisplay(cat.rowKey)
     if (!entry) {
       return {
         rowKey: cat.rowKey,
         label: cat.label,
-        accountCode: F2_ROW_KEY_ACCOUNT[cat.rowKey] || '',
+        accountCode,
         formulaOpening: '',
         opening: 0,
         formulaIncrease: '',
@@ -77,12 +94,12 @@ const sourceRows = computed<SourceRow[]>(() => {
     return {
       rowKey: cat.rowKey,
       label: cat.label,
-      accountCode: F2_ROW_KEY_ACCOUNT[cat.rowKey] || '',
-      formulaOpening: formulas.opening || `TB('${F2_ROW_KEY_ACCOUNT[cat.rowKey] || '?'}','期初余额')`,
+      accountCode,
+      formulaOpening: formulas.opening || `TB('${accountCode || '?'}','期初余额')`,
       opening: entry.opening ?? 0,
-      formulaIncrease: formulas.increase || `TB('${F2_ROW_KEY_ACCOUNT[cat.rowKey] || '?'}','借方发生额')`,
+      formulaIncrease: formulas.increase || `TB('${accountCode || '?'}','借方发生额')`,
       increase: entry.increase ?? 0,
-      formulaDecrease: formulas.decrease || `TB('${F2_ROW_KEY_ACCOUNT[cat.rowKey] || '?'}','贷方发生额')`,
+      formulaDecrease: formulas.decrease || `TB('${accountCode || '?'}','贷方发生额')`,
       decrease: entry.decrease ?? 0,
       closing: entry.closing ?? 0,
       sourceCodes: entry.source_codes || [],

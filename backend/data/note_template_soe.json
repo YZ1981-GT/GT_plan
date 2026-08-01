@@ -1565,7 +1565,110 @@
             "投资额",
             "取得方式"
           ],
-          "rows": []
+          "rows": [
+            {
+              "label": "1",
+              "row_type": "data"
+            },
+            {
+              "label": "2",
+              "row_type": "data"
+            },
+            {
+              "label": "3",
+              "row_type": "data"
+            },
+            {
+              "label": "4",
+              "row_type": "data"
+            },
+            {
+              "label": "5",
+              "row_type": "data"
+            },
+            {
+              "label": "6",
+              "row_type": "data"
+            },
+            {
+              "label": "7",
+              "row_type": "data"
+            },
+            {
+              "label": "8",
+              "row_type": "data"
+            },
+            {
+              "label": "9",
+              "row_type": "data"
+            },
+            {
+              "label": "10",
+              "row_type": "data"
+            }
+          ],
+          "columns": [
+            {
+              "key": "seq",
+              "label": "序号",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "name",
+              "label": "企业名称"
+            },
+            {
+              "key": "level",
+              "label": "级次"
+            },
+            {
+              "key": "enterpriseType",
+              "label": "企业类型"
+            },
+            {
+              "key": "registered",
+              "label": "注册地"
+            },
+            {
+              "key": "region",
+              "label": "主要经营地"
+            },
+            {
+              "key": "nature",
+              "label": "业务性质"
+            },
+            {
+              "key": "paidInCapital",
+              "label": "实收资本",
+              "format": "amount"
+            },
+            {
+              "key": "subscribedRatio",
+              "label": "认缴持股比例（%）",
+              "format": "percent"
+            },
+            {
+              "key": "paidRatio",
+              "label": "实缴持股比例（%）",
+              "format": "percent"
+            },
+            {
+              "key": "votingRights",
+              "label": "享有的表决权（%）",
+              "format": "percent"
+            },
+            {
+              "key": "investmentAmount",
+              "label": "投资额",
+              "format": "amount"
+            },
+            {
+              "key": "method",
+              "label": "取得方式"
+            }
+          ],
+          "guidance": "本期纳入合并报表范围的子公司基本情况（源 A9:M19）：大型企业集团可披露到二级子公司，重要子公司不分级次全部披露。企业类型：1.境内非金融子企业/2.境内金融子企业/3.境外子企业/4.事业单位/5.基建单位；取得方式：1.投资设立/2.同一控制下的企业合并/3.非同一控制下的企业合并/4.其他。持股比例不同于表决权比例的应说明表决权比例及差异原因；级次为在整个中央企业集团内的法人级次。数据来源：被投资单位基本信息 G7-4；投资额←明细表 G7-2。"
         }
       ],
       "text_sections": [
@@ -1584,7 +1687,9 @@
       "parent_section_id": "chapter-07-he-bing-fan-wei-de-bian-hua",
       "sort_index": 0,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "fix_note_g7_soe_scope_change_structure",
+      "_aligned_at": "2026-08-01 10:05:12"
     },
     {
       "section_number": "七、母公司拥有被投资",
@@ -1593,18 +1698,100 @@
       "content_type": "mixed",
       "tables": [
         {
-          "name": "序号",
+          "name": "母公司拥有被投资单位表决权不足半数但能对被投资单位形成控制的原因",
           "headers": [
             "序号",
             "企业名称",
             "认缴持股比例（%）",
-            "享有的表决权（%）",
+            "享有的表决权",
             "注册资本",
             "投资额",
             "级次",
             "纳入合并范围原因"
           ],
-          "rows": []
+          "rows": [
+            {
+              "label": "1",
+              "row_type": "data"
+            },
+            {
+              "label": "2",
+              "row_type": "data"
+            },
+            {
+              "label": "3",
+              "row_type": "data"
+            },
+            {
+              "label": "4",
+              "row_type": "data"
+            },
+            {
+              "label": "5",
+              "row_type": "data"
+            },
+            {
+              "label": "6",
+              "row_type": "data"
+            },
+            {
+              "label": "7",
+              "row_type": "data"
+            },
+            {
+              "label": "8",
+              "row_type": "data"
+            },
+            {
+              "label": "9",
+              "row_type": "data"
+            },
+            {
+              "label": "10",
+              "row_type": "data"
+            }
+          ],
+          "columns": [
+            {
+              "key": "seq",
+              "label": "序号",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "name",
+              "label": "企业名称"
+            },
+            {
+              "key": "subscribedRatio",
+              "label": "认缴持股比例（%）",
+              "format": "percent"
+            },
+            {
+              "key": "votingRights",
+              "label": "享有的表决权",
+              "format": "percent"
+            },
+            {
+              "key": "registeredCapital",
+              "label": "注册资本",
+              "format": "amount"
+            },
+            {
+              "key": "investmentAmount",
+              "label": "投资额",
+              "format": "amount"
+            },
+            {
+              "key": "level",
+              "label": "级次"
+            },
+            {
+              "key": "reason",
+              "label": "纳入合并范围原因"
+            }
+          ],
+          "guidance": "母公司拥有被投资单位表决权不足半数但能对被投资单位形成控制的原因（源 A25:H35）。数据来源：G7-4 表决权≤50%但纳入合并的条件筛选。"
         }
       ],
       "text_sections": [],
@@ -1617,7 +1804,9 @@
       "parent_section_id": "chapter-07-he-bing-fan-wei-de-bian-hua",
       "sort_index": 1,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "fix_note_g7_soe_scope_change_structure",
+      "_aligned_at": "2026-08-01 10:05:12"
     },
     {
       "section_number": "七、母公司直接或通过",
@@ -1626,18 +1815,120 @@
       "content_type": "mixed",
       "tables": [
         {
-          "name": "序号",
+          "name": "母公司直接或通过其他子公司间接拥有被投资单位半数以上的表决权但未能对其形成控制的原因",
           "headers": [
             "序号",
             "企业名称",
             "认缴持股比例（%）",
-            "享有的表决权（%）",
+            "享有的表决权",
             "注册资本",
             "投资额",
             "级次",
             "未纳入合并范围原因"
           ],
-          "rows": []
+          "rows": [
+            {
+              "label": "合营企业",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "联营企业",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "其他（含共同经营等）",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            }
+          ],
+          "columns": [
+            {
+              "key": "seq",
+              "label": "序号",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "name",
+              "label": "企业名称"
+            },
+            {
+              "key": "subscribedRatio",
+              "label": "认缴持股比例（%）",
+              "format": "percent"
+            },
+            {
+              "key": "votingRights",
+              "label": "享有的表决权",
+              "format": "percent"
+            },
+            {
+              "key": "registeredCapital",
+              "label": "注册资本",
+              "format": "amount"
+            },
+            {
+              "key": "investmentAmount",
+              "label": "投资额",
+              "format": "amount"
+            },
+            {
+              "key": "level",
+              "label": "级次"
+            },
+            {
+              "key": "reason",
+              "label": "未纳入合并范围原因"
+            }
+          ],
+          "guidance": "母公司直接或通过其他子公司间接拥有被投资单位半数以上的表决权但未能对其形成控制的原因（源 A37:H52），按合营企业/联营企业/其他（含共同经营等）分组列示。数据来源：G7-4 表决权＞50%但未纳入合并的条件筛选。"
         }
       ],
       "text_sections": [],
@@ -1650,7 +1941,9 @@
       "parent_section_id": "chapter-07-he-bing-fan-wei-de-bian-hua",
       "sort_index": 2,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "fix_note_g7_soe_scope_change_structure",
+      "_aligned_at": "2026-08-01 10:05:12"
     },
     {
       "section_number": "七、重要非全资子公司",
@@ -1668,21 +1961,78 @@
             "当期向少数股东支付的股利",
             "期末累计少数股东权益"
           ],
-          "rows": []
+          "rows": [
+            {
+              "label": "1",
+              "row_type": "data"
+            },
+            {
+              "label": "2",
+              "row_type": "data"
+            },
+            {
+              "label": "3",
+              "row_type": "data"
+            },
+            {
+              "label": "4",
+              "row_type": "data"
+            },
+            {
+              "label": "5",
+              "row_type": "data"
+            }
+          ],
+          "columns": [
+            {
+              "key": "seq",
+              "label": "序号",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "name",
+              "label": "企业名称"
+            },
+            {
+              "key": "minorityRatio",
+              "label": "少数股东持股比例",
+              "format": "percent"
+            },
+            {
+              "key": "minorityProfit",
+              "label": "当期归属于少数股东的损益",
+              "format": "amount"
+            },
+            {
+              "key": "minorityDividend",
+              "label": "当期向少数股东支付的股利",
+              "format": "amount"
+            },
+            {
+              "key": "minorityEquity",
+              "label": "期末累计少数股东权益",
+              "format": "amount"
+            }
+          ],
+          "guidance": "1、少数股东（源 A55:F60）：重要非全资子公司的少数股东持股比例及权益变动。"
         },
         {
           "name": "主要财务信息",
           "headers": [
-            "项目",
-            "A公司",
-            "B公司",
-            "C公司"
+            "项  目",
+            "期末数/本期发生额",
+            "期初数/上期发生额",
+            "期末数/本期发生额",
+            "期初数/上期发生额",
+            "期末数/本期发生额",
+            "期初数/上期发生额",
+            "期末数/本期发生额",
+            "期初数/上期发生额",
+            "期末数/本期发生额",
+            "期初数/上期发生额"
           ],
           "rows": [
-            {
-              "label": "项目",
-              "row_type": "header_label"
-            },
             {
               "label": "流动资产",
               "row_type": "data"
@@ -1693,8 +2043,7 @@
             },
             {
               "label": "资产合计",
-              "is_total": true,
-              "row_type": "total"
+              "row_type": "data"
             },
             {
               "label": "流动负债",
@@ -1706,16 +2055,10 @@
             },
             {
               "label": "负债合计",
-              "is_total": true,
-              "row_type": "total"
+              "row_type": "data"
             },
             {
               "label": "营业收入",
-              "account_codes": [
-                "6001",
-                "6051"
-              ],
-              "report_row_code": "IS-001",
               "row_type": "data"
             },
             {
@@ -1730,7 +2073,102 @@
               "label": "经营活动现金流量",
               "row_type": "data"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "item",
+              "label": "项  目",
+              "is_label": true
+            },
+            {
+              "key": "c1Current",
+              "label": "期末数/本期发生额",
+              "group": "公司1",
+              "format": "amount"
+            },
+            {
+              "key": "c1Prior",
+              "label": "期初数/上期发生额",
+              "group": "公司1",
+              "format": "amount"
+            },
+            {
+              "key": "c2Current",
+              "label": "期末数/本期发生额",
+              "group": "公司2",
+              "format": "amount"
+            },
+            {
+              "key": "c2Prior",
+              "label": "期初数/上期发生额",
+              "group": "公司2",
+              "format": "amount"
+            },
+            {
+              "key": "c3Current",
+              "label": "期末数/本期发生额",
+              "group": "公司3",
+              "format": "amount"
+            },
+            {
+              "key": "c3Prior",
+              "label": "期初数/上期发生额",
+              "group": "公司3",
+              "format": "amount"
+            },
+            {
+              "key": "c4Current",
+              "label": "期末数/本期发生额",
+              "group": "公司4",
+              "format": "amount"
+            },
+            {
+              "key": "c4Prior",
+              "label": "期初数/上期发生额",
+              "group": "公司4",
+              "format": "amount"
+            },
+            {
+              "key": "c5Current",
+              "label": "期末数/本期发生额",
+              "group": "公司5",
+              "format": "amount"
+            },
+            {
+              "key": "c5Prior",
+              "label": "期初数/上期发生额",
+              "group": "公司5",
+              "format": "amount"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "公司1",
+              "start": 1,
+              "span": 2
+            },
+            {
+              "group": "公司2",
+              "start": 3,
+              "span": 2
+            },
+            {
+              "group": "公司3",
+              "start": 5,
+              "span": 2
+            },
+            {
+              "group": "公司4",
+              "start": 7,
+              "span": 2
+            },
+            {
+              "group": "公司5",
+              "start": 9,
+              "span": 2
+            }
+          ],
+          "guidance": "2、主要财务信息（源 A62:L73）：按重要非全资子公司横向展开期末数/本期发生额、期初数/上期发生额对照。数据来源：被投资单位财务信息 G7-5。"
         }
       ],
       "text_sections": [
@@ -1747,7 +2185,9 @@
       "parent_section_id": "chapter-07-he-bing-fan-wei-de-bian-hua",
       "sort_index": 3,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "fix_note_g7_soe_scope_change_structure",
+      "_aligned_at": "2026-08-01 10:05:12"
     },
     {
       "section_number": "七、本期不再纳入合并",
@@ -1766,56 +2206,92 @@
             "表决权比例（%）",
             "本期不再成为子公司的原因"
           ],
-          "rows": []
+          "rows": [
+            {
+              "label": "1",
+              "row_type": "data"
+            },
+            {
+              "label": "2",
+              "row_type": "data"
+            },
+            {
+              "label": "3",
+              "row_type": "data"
+            },
+            {
+              "label": "4",
+              "row_type": "data"
+            },
+            {
+              "label": "5",
+              "row_type": "data"
+            }
+          ],
+          "columns": [
+            {
+              "key": "seq",
+              "label": "序号",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "name",
+              "label": "企业名称"
+            },
+            {
+              "key": "registered",
+              "label": "注册地"
+            },
+            {
+              "key": "nature",
+              "label": "业务性质"
+            },
+            {
+              "key": "holdingRatio",
+              "label": "持股比例（%）",
+              "format": "percent"
+            },
+            {
+              "key": "votingRatio",
+              "label": "表决权比例（%）",
+              "format": "percent"
+            },
+            {
+              "key": "reason",
+              "label": "本期不再成为子公司的原因"
+            }
+          ],
+          "guidance": "（1）原子公司的基本情况（源 A78:G83）。数据来源：处置子公司测试表 G7-11/12。"
         },
         {
           "name": "本期出售的子公司出售日的财务状况",
           "headers": [
-            "公司名称",
-            "A公司",
-            "B公司",
-            "C公司"
+            "项目",
+            "出售日",
+            "期初余额",
+            "出售日",
+            "期初余额"
           ],
           "rows": [
-            {
-              "label": "截止日期",
-              "row_type": "data"
-            },
             {
               "label": "流动资产",
               "row_type": "data"
             },
             {
               "label": "长期股权投资",
-              "account_codes": [
-                "1511"
-              ],
-              "report_row_code": "BS-012",
               "row_type": "data"
             },
             {
               "label": "固定资产",
-              "account_codes": [
-                "1601",
-                "1602"
-              ],
-              "report_row_code": "BS-014",
               "row_type": "data"
             },
             {
               "label": "无形资产",
-              "account_codes": [
-                "1701",
-                "1702"
-              ],
-              "report_row_code": "BS-016",
               "row_type": "data"
             },
             {
               "label": "其他非流动资产",
-              "account_codes": [
-                "1811"
-              ],
               "row_type": "data"
             },
             {
@@ -1830,37 +2306,72 @@
               "label": "所有者权益",
               "row_type": "data"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "item",
+              "label": "项目",
+              "is_label": true
+            },
+            {
+              "key": "c1SaleDate",
+              "label": "出售日",
+              "group": "公司1"
+            },
+            {
+              "key": "c1Opening",
+              "label": "期初余额",
+              "group": "公司1",
+              "format": "amount"
+            },
+            {
+              "key": "c2SaleDate",
+              "label": "出售日",
+              "group": "公司2"
+            },
+            {
+              "key": "c2Opening",
+              "label": "期初余额",
+              "group": "公司2",
+              "format": "amount"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "公司1",
+              "start": 1,
+              "span": 2
+            },
+            {
+              "group": "公司2",
+              "start": 3,
+              "span": 2
+            }
+          ],
+          "guidance": "（2）本期出售的子公司出售日的财务状况（源 A87:F96）。数据来源：处置子公司测试表 G7-11/12。"
         },
         {
-          "name": "本期出售的子公司处置日的经营成果",
+          "name": "本期出售的子公司出售日的经营成果",
           "headers": [
-            "公司名称",
-            "A公司",
-            "B公司",
-            "C公司"
+            "项目",
+            "本年年初-出售日",
+            "上年发生额",
+            "本年年初-出售日",
+            "上年发生额",
+            "本年年初-出售日",
+            "上年发生额",
+            "本年年初-出售日",
+            "上年发生额",
+            "本年年初-出售日",
+            "上年发生额"
           ],
           "rows": [
             {
-              "label": "期间",
-              "row_type": "data"
-            },
-            {
               "label": "营业收入",
-              "account_codes": [
-                "6001",
-                "6051"
-              ],
-              "report_row_code": "IS-001",
               "row_type": "data"
             },
             {
               "label": "营业成本",
-              "account_codes": [
-                "6401",
-                "6402"
-              ],
-              "report_row_code": "IS-002",
               "row_type": "data"
             },
             {
@@ -1877,16 +2388,108 @@
             },
             {
               "label": "所得税费用",
-              "account_codes": [
-                "6801"
-              ],
               "row_type": "data"
             },
             {
               "label": "净利润",
               "row_type": "data"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "item",
+              "label": "项目",
+              "is_label": true
+            },
+            {
+              "key": "aCurrent",
+              "label": "本年年初-出售日",
+              "group": "A公司",
+              "format": "amount"
+            },
+            {
+              "key": "aPrior",
+              "label": "上年发生额",
+              "group": "A公司",
+              "format": "amount"
+            },
+            {
+              "key": "bCurrent",
+              "label": "本年年初-出售日",
+              "group": "B公司",
+              "format": "amount"
+            },
+            {
+              "key": "bPrior",
+              "label": "上年发生额",
+              "group": "B公司",
+              "format": "amount"
+            },
+            {
+              "key": "cCurrent",
+              "label": "本年年初-出售日",
+              "group": "C公司",
+              "format": "amount"
+            },
+            {
+              "key": "cPrior",
+              "label": "上年发生额",
+              "group": "C公司",
+              "format": "amount"
+            },
+            {
+              "key": "dCurrent",
+              "label": "本年年初-出售日",
+              "group": "D公司",
+              "format": "amount"
+            },
+            {
+              "key": "dPrior",
+              "label": "上年发生额",
+              "group": "D公司",
+              "format": "amount"
+            },
+            {
+              "key": "eCurrent",
+              "label": "本年年初-出售日",
+              "group": "E公司",
+              "format": "amount"
+            },
+            {
+              "key": "ePrior",
+              "label": "上年发生额",
+              "group": "E公司",
+              "format": "amount"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "A公司",
+              "start": 1,
+              "span": 2
+            },
+            {
+              "group": "B公司",
+              "start": 3,
+              "span": 2
+            },
+            {
+              "group": "C公司",
+              "start": 5,
+              "span": 2
+            },
+            {
+              "group": "D公司",
+              "start": 7,
+              "span": 2
+            },
+            {
+              "group": "E公司",
+              "start": 9,
+              "span": 2
+            }
+          ],
+          "guidance": "（3）本期出售的子公司出售日的经营成果（源 A98:L106）。若本期因处置部分股权投资或其他原因丧失控制权的，还应按《企业会计准则解释第4号》披露处置后剩余股权在丧失控制权日的公允价值及重新计量利得或损失。数据来源：处置子公司测试表 G7-11/12。"
         }
       ],
       "text_sections": [
@@ -1905,7 +2508,9 @@
       "parent_section_id": "chapter-07-he-bing-fan-wei-de-bian-hua",
       "sort_index": 4,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "fix_note_g7_soe_scope_change_structure",
+      "_aligned_at": "2026-08-01 10:05:12"
     },
     {
       "section_number": "七、本期新纳入合并范",
@@ -1914,13 +2519,73 @@
       "content_type": "mixed",
       "tables": [
         {
-          "name": "公司名称",
+          "name": "本期新纳入合并范围的主体",
           "headers": [
             "公司名称",
             "期末净资产",
             "本期净利润"
           ],
-          "rows": []
+          "rows": [
+            {
+              "label": "1",
+              "row_type": "data"
+            },
+            {
+              "label": "2",
+              "row_type": "data"
+            },
+            {
+              "label": "3",
+              "row_type": "data"
+            },
+            {
+              "label": "4",
+              "row_type": "data"
+            },
+            {
+              "label": "5",
+              "row_type": "data"
+            },
+            {
+              "label": "6",
+              "row_type": "data"
+            },
+            {
+              "label": "7",
+              "row_type": "data"
+            },
+            {
+              "label": "8",
+              "row_type": "data"
+            },
+            {
+              "label": "9",
+              "row_type": "data"
+            },
+            {
+              "label": "10",
+              "row_type": "data"
+            }
+          ],
+          "columns": [
+            {
+              "key": "name",
+              "label": "公司名称",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "closingNetAssets",
+              "label": "期末净资产",
+              "format": "amount"
+            },
+            {
+              "key": "currentNetProfit",
+              "label": "本期净利润",
+              "format": "amount"
+            }
+          ],
+          "guidance": "本期新纳入合并范围的主体（源 A109:D119）。数据来源：G7-4「本期新增=是」筛选。"
         }
       ],
       "text_sections": [
@@ -1935,7 +2600,9 @@
       "parent_section_id": "chapter-07-he-bing-fan-wei-de-bian-hua",
       "sort_index": 5,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "fix_note_g7_soe_scope_change_structure",
+      "_aligned_at": "2026-08-01 10:05:12"
     },
     {
       "section_number": "七、本期发生的同一控",
@@ -1944,21 +2611,89 @@
       "content_type": "mixed",
       "tables": [
         {
-          "name": "公司名称",
+          "name": "本期发生的同一控制下企业合并情况",
           "headers": [
             "公司名称",
             "合并日",
             "账面净资产",
             "交易对价",
             "实际控制人",
-            "本期初至合并日的相关情况"
+            "收入",
+            "净利润",
+            "现金净增加额",
+            "经营活动现金流量净额"
           ],
           "rows": [
             {
-              "label": "公司名称",
-              "row_type": "header_label"
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "name",
+              "label": "公司名称",
+              "is_label": true
+            },
+            {
+              "key": "consolidationDate",
+              "label": "合并日"
+            },
+            {
+              "key": "bookNetAssets",
+              "label": "账面净资产",
+              "format": "amount"
+            },
+            {
+              "key": "consideration",
+              "label": "交易对价",
+              "format": "amount"
+            },
+            {
+              "key": "controller",
+              "label": "实际控制人"
+            },
+            {
+              "key": "revenue",
+              "label": "收入",
+              "group": "本年初至合并日的相关情况",
+              "format": "amount"
+            },
+            {
+              "key": "netProfit",
+              "label": "净利润",
+              "group": "本年初至合并日的相关情况",
+              "format": "amount"
+            },
+            {
+              "key": "cashIncrease",
+              "label": "现金净增加额",
+              "group": "本年初至合并日的相关情况",
+              "format": "amount"
+            },
+            {
+              "key": "operatingCashFlow",
+              "label": "经营活动现金流量净额",
+              "group": "本年初至合并日的相关情况",
+              "format": "amount"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "本年初至合并日的相关情况",
+              "start": 5,
+              "span": 4
+            }
+          ],
+          "guidance": "本期发生的同一控制下企业合并情况（源 A122:J126）：说明合并日的确定依据、支付的对价及被合并方的账面净资产，并披露被合并方自合并当年年初至合并日的收入、净利润、现金流量等情况。"
         }
       ],
       "text_sections": [
@@ -1973,7 +2708,9 @@
       "parent_section_id": "chapter-07-he-bing-fan-wei-de-bian-hua",
       "sort_index": 6,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "fix_note_g7_soe_scope_change_structure",
+      "_aligned_at": "2026-08-01 10:05:12"
     },
     {
       "section_number": "七、本期发生的非同一",
@@ -1989,7 +2726,9 @@
             "购买日的确定依据",
             "购买日前持有被购买方权益比例",
             "形成合并时持有的被购买方权益比例（不含合并后的股权增减）",
-            "购买日被购买方",
+            "账面净资产总额",
+            "可辨认净资产公允价值总额（金额）",
+            "可辨认净资产公允价值总额（确定方法）",
             "交易对价",
             "形成商誉",
             "购买日至期末被购买方的收入",
@@ -1998,14 +2737,93 @@
           ],
           "rows": [
             {
-              "label": "被购买方名称",
-              "row_type": "header_label"
+              "label": "",
+              "row_type": "data"
             },
             {
-              "label": "被购买方名称",
-              "row_type": "header_label"
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "name",
+              "label": "被购买方名称",
+              "is_label": true
+            },
+            {
+              "key": "purchaseDate",
+              "label": "购买日"
+            },
+            {
+              "key": "purchaseDateBasis",
+              "label": "购买日的确定依据"
+            },
+            {
+              "key": "preHoldingRatio",
+              "label": "购买日前持有被购买方权益比例",
+              "format": "percent"
+            },
+            {
+              "key": "atCombinationHoldingRatio",
+              "label": "形成合并时持有的被购买方权益比例（不含合并后的股权增减）",
+              "format": "percent"
+            },
+            {
+              "key": "bookNetAssets",
+              "label": "账面净资产总额",
+              "group": "购买日被购买方",
+              "format": "amount"
+            },
+            {
+              "key": "fvIdentifiableAmount",
+              "label": "可辨认净资产公允价值总额（金额）",
+              "group": "购买日被购买方",
+              "format": "amount"
+            },
+            {
+              "key": "fvIdentifiableMethod",
+              "label": "可辨认净资产公允价值总额（确定方法）",
+              "group": "购买日被购买方"
+            },
+            {
+              "key": "consideration",
+              "label": "交易对价",
+              "format": "amount"
+            },
+            {
+              "key": "goodwill",
+              "label": "形成商誉",
+              "format": "amount"
+            },
+            {
+              "key": "postRevenue",
+              "label": "购买日至期末被购买方的收入",
+              "format": "amount"
+            },
+            {
+              "key": "postProfit",
+              "label": "购买日至期末被购买方的净利润",
+              "format": "amount"
+            },
+            {
+              "key": "postCashFlow",
+              "label": "购买日至期末被购买方的现金流量",
+              "format": "amount"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "购买日被购买方",
+              "start": 5,
+              "span": 3
+            }
+          ],
+          "guidance": "本期发生的非同一控制下企业合并情况（源 A129:M134）：说明购买日或出售日的确定方法、合并日相关交易公允价值的确定方法、商誉的金额及其计算方法。购买日前后持有权益比例、或有对价安排及变动、业绩承诺对商誉减值测试的影响、分步实现企业合并的分别说明前期和本期取得股权的时点/成本/比例/方式。"
         }
       ],
       "text_sections": [
@@ -2020,7 +2838,9 @@
       "parent_section_id": "chapter-07-he-bing-fan-wei-de-bian-hua",
       "sort_index": 7,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "fix_note_g7_soe_scope_change_structure",
+      "_aligned_at": "2026-08-01 10:05:12"
     },
     {
       "section_number": "七、本期发生的吸收合",
@@ -2029,26 +2849,106 @@
       "content_type": "mixed",
       "tables": [
         {
-          "name": "吸收合并的类型",
+          "name": "本期发生的吸收合并",
           "headers": [
             "吸收合并的类型",
-            "并入的主要资产",
-            "并入的主要负债"
+            "项目",
+            "金额",
+            "项目",
+            "金额"
           ],
           "rows": [
-            {
-              "label": "吸收合并的类型",
-              "row_type": "header_label"
-            },
             {
               "label": "同一控制下吸收合并",
               "row_type": "data"
             },
             {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
               "label": "非同一控制下吸收合并",
               "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "type",
+              "label": "吸收合并的类型",
+              "is_label": true
+            },
+            {
+              "key": "assetItem",
+              "label": "项目",
+              "group": "并入的主要资产"
+            },
+            {
+              "key": "assetAmount",
+              "label": "金额",
+              "group": "并入的主要资产",
+              "format": "amount"
+            },
+            {
+              "key": "liabilityItem",
+              "label": "项目",
+              "group": "并入的主要负债"
+            },
+            {
+              "key": "liabilityAmount",
+              "label": "金额",
+              "group": "并入的主要负债",
+              "format": "amount"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "并入的主要资产",
+              "start": 1,
+              "span": 2
+            },
+            {
+              "group": "并入的主要负债",
+              "start": 3,
+              "span": 2
+            }
+          ],
+          "guidance": "本期发生的吸收合并（源 A139:F172）：应分别同一控制下和非同一控制下的吸收合并，披露并入的主要资产、负债项目及其金额。"
         }
       ],
       "text_sections": [
@@ -2063,7 +2963,9 @@
       "parent_section_id": "chapter-07-he-bing-fan-wei-de-bian-hua",
       "sort_index": 8,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "fix_note_g7_soe_scope_change_structure",
+      "_aligned_at": "2026-08-01 10:05:12"
     },
     {
       "section_number": "七、子公司使用企业集",
@@ -2074,7 +2976,8 @@
       "text_sections": [
         "（1）说明限制内容，包括对母公司或子公司与集团内其他主体相互转移现金或其他资产的限制，以及对集团内主体之间发放股利或进行利润分配、发放或收回贷款或垫款等的限制；",
         "（2）子公司少数股东享有保护性权利，并且该保护性权利对使用集团资产或清偿集团负债的能力存在重大限制的，披露限制的性质和程度；",
-        "（3）限制涉及的资产和负债在合并财务报表中的金额。"
+        "（3）限制涉及的资产和负债在合并财务报表中的金额。",
+        "说明：（1）限制内容，包括对母公司或子公司与集团内其他主体相互转移现金或其他资产的限制，以及对集团内主体之间发放股利或进行利润分配、发放或收回贷款或垫款等的限制；（2）子公司少数股东享有保护性权利，并且该保护性权利对使用集团资产或清偿集团负债的能力存在重大限制的，披露限制的性质和程度；（3）限制涉及的资产和负债在合并财务报表中的金额。"
       ],
       "check_presets": [],
       "wide_table_presets": [],
@@ -2085,7 +2988,9 @@
       "parent_section_id": "chapter-07-he-bing-fan-wei-de-bian-hua",
       "sort_index": 9,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "fix_note_g7_soe_scope_change_structure",
+      "_aligned_at": "2026-08-01 10:05:12"
     },
     {
       "section_number": "七、纳入合并财务报表",
@@ -2097,7 +3002,8 @@
         "应披露与结构化主体相关的风险信息，向结构化主体提供财务支持或其他支持，包括帮助结构化主体取得财务支持：",
         "（1）有合同约定的，披露财务支持的合同条款包括可能导致企业承担损失的事项或情况；",
         "（2）在没有合同约定的情况下，披露所提供支持的类型、金额及原因，包括帮助该结构化主体获得财务支持的情况。其中，本期对以前未纳入合并财务报表范围的结构化主体提供了财务支持或其他支持并且该支持导致控制了该结构化主体的，披露决定提供支持的相关因素；",
-        "（3）存在提供支持意图的，披露该意图，包括帮助该结构化主体获得财务支持的意图。"
+        "（3）存在提供支持意图的，披露该意图，包括帮助该结构化主体获得财务支持的意图。",
+        "说明：应披露与结构化主体相关的风险信息，向结构化主体提供财务支持或其他支持，包括帮助结构化主体取得财务支持：（1）有合同约定的，披露财务支持的合同条款包括可能导致企业承担损失的事项或情况；（2）在没有合同约定的情况下，披露所提供支持的类型、金额及原因，包括帮助该结构化主体获得财务支持的情况，其中本期对以前未纳入合并财务报表范围的结构化主体提供了财务支持或其他支持并且该支持导致控制了该结构化主体的，披露决定提供支持的相关因素；（3）存在提供支持意图的，披露该意图，包括帮助该结构化主体获得财务支持的意图。"
       ],
       "check_presets": [],
       "wide_table_presets": [],
@@ -2108,7 +3014,9 @@
       "parent_section_id": "chapter-07-he-bing-fan-wei-de-bian-hua",
       "sort_index": 10,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "fix_note_g7_soe_scope_change_structure",
+      "_aligned_at": "2026-08-01 10:05:12"
     },
     {
       "section_number": "七、母公司在子公司的",
@@ -2119,32 +3027,39 @@
         {
           "name": "母公司在子公司的所有者权益份额发生变化的情况",
           "headers": [
-            "项目",
-            "XX公司",
-            "XX公司",
-            "可无限量加列"
+            "项  目",
+            "公司1",
+            "公司2",
+            "公司3"
           ],
           "rows": [
             {
-              "label": "购买成本/处置对价",
+              "label": "购买成本/处置对价：",
               "row_type": "data"
             },
             {
-              "label": "--现金",
+              "label": "现金",
               "row_type": "data"
             },
             {
-              "label": "--非现金资产的公允价值",
+              "label": "非现金资产的公允价值",
               "row_type": "data"
             },
             {
-              "label": "…",
+              "label": "发行或承担的债务的账面价值",
+              "row_type": "data"
+            },
+            {
+              "label": "发行的权益性证券的面值",
+              "row_type": "data"
+            },
+            {
+              "label": "或有对价",
               "row_type": "data"
             },
             {
               "label": "购买成本/处置对价合计",
-              "is_total": true,
-              "row_type": "total"
+              "row_type": "data"
             },
             {
               "label": "减：按取得/处置的股权比例计算的子公司净资产份额",
@@ -2166,12 +3081,37 @@
               "label": "调整未分配利润",
               "row_type": "data"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "item",
+              "label": "项  目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "company1",
+              "label": "公司1",
+              "format": "amount"
+            },
+            {
+              "key": "company2",
+              "label": "公司2",
+              "format": "amount"
+            },
+            {
+              "key": "company3",
+              "label": "公司3",
+              "format": "amount"
+            }
+          ],
+          "guidance": "（2）交易对于少数股东权益及归属于母公司所有者权益的影响（源 A187:E199）。（1）在子公司所有者权益份额发生变化的情况说明见 text_sections（源 A184:A185，R185 为示例文字，正式披露请改写为项目实际内容）。数据来源：处置子公司测试表 G7-10。"
         }
       ],
       "text_sections": [
         "在子公司所有者权益份额发生变化的情况",
-        "本公司原持有【A公司】90%股权，2023年10月本公司与甲公司签订股权转让协议，约定于2024年12月向甲公司转让A公司20%股权，该股权处置交易未导致本公司丧失对【A公司】的控制权。截至2025年6月30日，股权转让协议已履行完毕，取得交易对价为2600万元，该项交易导致少数股东权益增加2400万元，资本公积增加200万元。"
+        "本公司原持有【A公司】90%股权，2023年10月本公司与甲公司签订股权转让协议，约定于2024年12月向甲公司转让A公司20%股权，该股权处置交易未导致本公司丧失对【A公司】的控制权。截至2025年6月30日，股权转让协议已履行完毕，取得交易对价为2600万元，该项交易导致少数股东权益增加2400万元，资本公积增加200万元。",
+        "（1）在子公司所有者权益份额发生变化的情况说明：说明未丧失控制权的股权变动交易背景、股权比例变化、交易对价，以及对少数股东权益、资本公积的影响。"
       ],
       "check_presets": [],
       "wide_table_presets": [],
@@ -2182,7 +3122,9 @@
       "parent_section_id": "chapter-07-he-bing-fan-wei-de-bian-hua",
       "sort_index": 11,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "fix_note_g7_soe_scope_change_structure",
+      "_aligned_at": "2026-08-01 10:05:12"
     },
     {
       "section_number": "七、子公司向母公司转",
@@ -2195,7 +3137,8 @@
         "1.或有负债的种类及其形成原因，包括已贴现商业承兑汇票、未决诉讼、未决仲裁、对外提供担保等形成的或有负债。",
         "2.经济利益流出不确定性的说明。",
         "3.或有负债预计产生的财务影响，以及获得补偿的可能性；无法预计的，应当说明原因。",
-        "（二）企业通常不应当披露或有资产。但或有资产很可能会给企业带来经济利益的，应当披露其形成的原因、预计产生的财务影响等。】"
+        "（二）企业通常不应当披露或有资产。但或有资产很可能会给企业带来经济利益的，应当披露其形成的原因、预计产生的财务影响等。】",
+        "说明子公司向母公司转移资金（如现金分红、贷款或垫款偿还）的能力是否受到严格限制，包括限制的性质、程度及触发条件；不存在限制的应说明「不适用」。"
       ],
       "check_presets": [],
       "wide_table_presets": [],
@@ -2206,7 +3149,9 @@
       "parent_section_id": "chapter-07-he-bing-fan-wei-de-bian-hua",
       "sort_index": 12,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "fix_note_g7_soe_scope_change_structure",
+      "_aligned_at": "2026-08-01 10:05:12"
     },
     {
       "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
@@ -2806,7 +3751,7 @@
               "format": "percent"
             }
           ],
-          "guidance": "行维度为**出票人类型或账龄**（源模板占位说明），可无限量添加行项目；并需在下方说明按组合计提坏账准备的原因。勾稽：各明细行之和 = 合计行（F4-18）；合计 = 按计提方法分类表「按组合计提坏账准备」行（F4-4、F4-5）。【提示：此处披露未逾期的应收票据计提的坏账准备。若票据逾期，则应转入应收账款并计提坏账准备，账龄应连续计算。】"
+          "guidance": "行维度为出票人类型或账龄（源模板占位说明），可无限量添加行项目；并需在下方说明按组合计提坏账准备的原因。勾稽：各明细行之和 = 合计行（F4-18）；合计 = 按计提方法分类表「按组合计提坏账准备」行（F4-4、F4-5）。【提示：此处披露未逾期的应收票据计提的坏账准备。若票据逾期，则应转入应收账款并计提坏账准备，账龄应连续计算。】"
         },
         {
           "name": "本期计提、收回或转回的应收票据坏账准备情况",
@@ -3020,7 +3965,7 @@
               "format": "amount"
             }
           ],
-          "guidance": "【提示：证监会《2014年上市公司年报会计监管报告》，对已背书或贴现且尚未到期的银行承兑汇票予以终止确认后，需在财务报表中补充披露终止确认的票据以及对票据被追索时可能存在的支付风险予以清晰说明。参考披露：用于贴现的银行承兑汇票是由信用等级较高的银行承兑，信用风险和延期付款风险很小，并且票据相关的利率风险已转移给银行，可以判断票据所有权上的主要风险和报酬已经转移，故终止确认。或：用于贴现的银行承兑汇票是由信用等级不高的银行承兑，贴现不影响追索权，票据相关的信用风险和延期付款风险仍没有转移，故未终止确认。】本表可添加行项目。勾稽：各明细行之和 = 合计行（F4-22）。"
+          "guidance": "【提示：证监会《2014年上市公司年报会计监管报告》，对已背书或贴现且尚未到期的银行承兑汇票予以终止确认后，需在财务报表中补充披露终止确认的票据以及对票据被追索时可能存在的支付风险予以清晰说明。参考披露：用于贴现的银行承兑汇票是由信用等级较高的银行承兑，信用风险和延期付款风险很小，并且票据相关的利率风险已转移给银行，可以判断票据所有权上的主要风险和报酬已经转移，故终止确认。或：用于贴现的银行承兑汇票是由信用等级不高的银行承兑，贴现不影响追索权，票据相关的信用风险和延期付款风险仍没有转移，故未终止确认。】（如根据《企业会计准则第23号——金融资产转移》终止确认的应收票据，列示其终止确认的金额，及与终止确认相关的利得和损失）本表可添加行项目。勾稽：各明细行之和 = 合计行（F4-22）。"
         },
         {
           "name": "期末因出票人未履约而其转为应收账款的票据",
@@ -3052,7 +3997,7 @@
               "format": "amount"
             }
           ],
-          "guidance": "（如根据《企业会计准则第23号——金融资产转移》终止确认的应收票据，列示其终止确认的金额，及与终止确认相关的利得和损失）【提示：票据逾期后应转入应收账款并计提坏账准备，账龄应连续计算，故本表只列示商业承兑票据。】勾稽：各明细行之和 = 合计行（F4-23）。"
+          "guidance": "列示期末因出票人未履约而转为应收账款的票据。【提示：票据逾期后应转入应收账款并计提坏账准备，账龄应连续计算，故本表只列示商业承兑票据。】勾稽：各明细行之和 = 合计行（F4-23）。"
         },
         {
           "name": "本期实际核销的应收票据",
@@ -3173,7 +4118,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "d1-notes-receivable-disclosure-alignment",
-      "_aligned_at": "2026-07-30 17:46:49"
+      "_aligned_at": "2026-07-31 23:32:16"
     },
     {
       "section_number": "八、5",
@@ -3227,7 +4172,26 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "账 龄",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "end_amount",
+              "label": "期末数",
+              "format": "amount"
+            },
+            {
+              "key": "prior_amount",
+              "label": "期初数",
+              "format": "amount"
+            }
+          ],
+          "guidance": "按账龄披露应收账款。勾稽：账龄各档之和 = 合计行（F5-19、F5-24，每个数值列独立）；「其他」列（坏账准备/净额）恒为账面余额 − 坏账准备（F5-11）；预期信用损失率(%) = 坏账准备 ÷ 账面余额 × 100（F5-12、F5-13）。（可根据企业具体会计政策，相应修改账龄组合的划分）"
         },
         {
           "name": "（2）按坏账准备计提方法分类披露应收账款",
@@ -3261,10 +4225,6 @@
               "row_type": "data"
             },
             {
-              "label": "其中：",
-              "row_type": "header_label"
-            },
-            {
               "label": "应收中央企业客户",
               "row_type": "data"
             },
@@ -3277,7 +4237,44 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "类 别",
+              "is_label": true
+            },
+            {
+              "key": "book_amount",
+              "label": "金额",
+              "group": "账面金额",
+              "format": "amount"
+            },
+            {
+              "key": "ratio",
+              "label": "比例(%)",
+              "group": "账面金额",
+              "format": "percent"
+            },
+            {
+              "key": "provision",
+              "label": "金额",
+              "group": "坏账准备",
+              "format": "amount"
+            },
+            {
+              "key": "loss_rate",
+              "label": "预期信用损失率(%)",
+              "group": "坏账准备",
+              "format": "percent"
+            },
+            {
+              "key": "carrying_value",
+              "label": "账面价值",
+              "format": "amount"
+            }
+          ],
+          "guidance": "按坏账计提方法分类披露应收账款。勾稽：比例(%) = 该行账面余额 ÷ 合计行账面余额 × 100（F5-27、F5-29）；预期信用损失率(%) = 坏账准备 ÷ 账面余额 × 100（F5-12）；账面余额 − 坏账准备 = 账面价值（F5-11）；各明细行之和 = 合计行（F5-24、F5-26）；按单项计提行 = 单项计提明细小计、按组合计提行 = 各组合分表小计之和（F5-3、F5-4）。注：填写组合名称。账面余额中的比例按期末该类应收账款除以应收账款合计数计算，坏账准备比例按该类应收账款期末已计提坏账准备除以期末该类应收账款余额计算。"
         },
         {
           "name": "（2）按坏账准备计提方法分类披露应收账款（续：期初数）",
@@ -3311,10 +4308,6 @@
               "row_type": "data"
             },
             {
-              "label": "其中：",
-              "row_type": "header_label"
-            },
-            {
               "label": "应收中央企业客户",
               "row_type": "data"
             },
@@ -3327,7 +4320,44 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "类 别",
+              "is_label": true
+            },
+            {
+              "key": "book_amount",
+              "label": "金额",
+              "group": "账面金额",
+              "format": "amount"
+            },
+            {
+              "key": "ratio",
+              "label": "比例(%)",
+              "group": "账面金额",
+              "format": "percent"
+            },
+            {
+              "key": "provision",
+              "label": "金额",
+              "group": "坏账准备",
+              "format": "amount"
+            },
+            {
+              "key": "loss_rate",
+              "label": "预期信用损失率(%)",
+              "group": "坏账准备",
+              "format": "percent"
+            },
+            {
+              "key": "carrying_value",
+              "label": "账面价值",
+              "format": "amount"
+            }
+          ],
+          "guidance": "按坏账计提方法分类披露应收账款。勾稽：比例(%) = 该行账面余额 ÷ 合计行账面余额 × 100（F5-27、F5-29）；预期信用损失率(%) = 坏账准备 ÷ 账面余额 × 100（F5-12）；账面余额 − 坏账准备 = 账面价值（F5-11）；各明细行之和 = 合计行（F5-24、F5-26）；按单项计提行 = 单项计提明细小计、按组合计提行 = 各组合分表小计之和（F5-3、F5-4）。注：填写组合名称。账面余额中的比例按期末该类应收账款除以应收账款合计数计算，坏账准备比例按该类应收账款期末已计提坏账准备除以期末该类应收账款余额计算。"
         },
         {
           "name": "期末单项计提坏账准备的应收账款",
@@ -3345,7 +4375,41 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "债务人名称",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "end_amount",
+              "label": "账面余额",
+              "format": "amount"
+            },
+            {
+              "key": "provision",
+              "label": "坏账准备",
+              "format": "amount"
+            },
+            {
+              "key": "aging",
+              "label": "账龄",
+              "format": "text"
+            },
+            {
+              "key": "loss_rate",
+              "label": "预期信用损失率（%）",
+              "format": "percent"
+            },
+            {
+              "key": "basis",
+              "label": "计提理由",
+              "format": "text"
+            }
+          ],
+          "guidance": "期末单项计提坏账准备的应收账款逐项列示，可无限量添加行项目。勾稽：预期信用损失率(%) = 坏账准备 ÷ 账面余额 × 100（F5-13、F5-29）；各明细行之和 = 合计行（F5-21、F5-24）。完整性：账面余额 ≠ 0 时，名称（债务人名称）、坏账准备、计提依据（理由）列均不应为空（F5-33、F5-34）。"
         },
         {
           "name": "组合计提项目：应收中央企业客户",
@@ -3400,7 +4464,51 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "账 龄",
+              "is_label": true
+            },
+            {
+              "key": "end_amount",
+              "label": "应收账款",
+              "group": "期末数",
+              "format": "amount"
+            },
+            {
+              "key": "end_ratio",
+              "label": "比例（%）",
+              "group": "期末数",
+              "format": "percent"
+            },
+            {
+              "key": "end_provision",
+              "label": "坏账准备",
+              "group": "期末数",
+              "format": "amount"
+            },
+            {
+              "key": "prior_amount",
+              "label": "应收账款",
+              "group": "期初数",
+              "format": "amount"
+            },
+            {
+              "key": "prior_ratio",
+              "label": "比例（%）",
+              "group": "期初数",
+              "format": "percent"
+            },
+            {
+              "key": "prior_provision",
+              "label": "坏账准备",
+              "group": "期初数",
+              "format": "amount"
+            }
+          ],
+          "guidance": "组合计提项目分表（按客户类型/账龄等组合方式，逐组合各一张表）。勾稽：各账龄档之和 = 合计行（F5-17、F5-18，每个数值列独立）；本表合计 = 按坏账计提方法分类表「按组合计提」行对应组合的小计（F5-3、F5-4）；预期信用损失率(%)/比例(%) = 坏账准备 ÷ 应收账款 × 100（F5-13、F5-29）。注：填写具体组合名称。"
         },
         {
           "name": "组合计提项目：应收海外企业客户",
@@ -3455,7 +4563,51 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "账 龄",
+              "is_label": true
+            },
+            {
+              "key": "end_amount",
+              "label": "应收账款",
+              "group": "期末数",
+              "format": "amount"
+            },
+            {
+              "key": "end_ratio",
+              "label": "比例（%）",
+              "group": "期末数",
+              "format": "percent"
+            },
+            {
+              "key": "end_provision",
+              "label": "坏账准备",
+              "group": "期末数",
+              "format": "amount"
+            },
+            {
+              "key": "prior_amount",
+              "label": "应收账款",
+              "group": "期初数",
+              "format": "amount"
+            },
+            {
+              "key": "prior_ratio",
+              "label": "比例（%）",
+              "group": "期初数",
+              "format": "percent"
+            },
+            {
+              "key": "prior_provision",
+              "label": "坏账准备",
+              "group": "期初数",
+              "format": "amount"
+            }
+          ],
+          "guidance": "组合计提项目分表（按客户类型/账龄等组合方式，逐组合各一张表）。勾稽：各账龄档之和 = 合计行（F5-17、F5-18，每个数值列独立）；本表合计 = 按坏账计提方法分类表「按组合计提」行对应组合的小计（F5-3、F5-4）；预期信用损失率(%)/比例(%) = 坏账准备 ÷ 应收账款 × 100（F5-13、F5-29）。注：填写具体组合名称。"
         },
         {
           "name": "采用余额百分比或其他组合方法计提坏账准备的应收账款",
@@ -3486,7 +4638,51 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "组合名称",
+              "is_label": true
+            },
+            {
+              "key": "end_amount",
+              "label": "账面余额",
+              "group": "期末数",
+              "format": "amount"
+            },
+            {
+              "key": "end_rate",
+              "label": "计提比例（%）",
+              "group": "期末数",
+              "format": "percent"
+            },
+            {
+              "key": "end_provision",
+              "label": "坏账准备",
+              "group": "期末数",
+              "format": "amount"
+            },
+            {
+              "key": "prior_amount",
+              "label": "账面余额",
+              "group": "期初数",
+              "format": "amount"
+            },
+            {
+              "key": "prior_rate",
+              "label": "计提比例（%）",
+              "group": "期初数",
+              "format": "percent"
+            },
+            {
+              "key": "prior_provision",
+              "label": "坏账准备",
+              "group": "期初数",
+              "format": "amount"
+            }
+          ],
+          "guidance": "采用余额百分比或其他组合方法计提坏账准备的应收账款（不适用的删除）。勾稽：各组合名称行之和 = 合计行（F5-22）；计提比例(%) = 坏账准备 ÷ 账面余额 × 100（F5-28）；本表合计 = 按坏账计提方法分类表「按组合计提」行对应组合的小计（F5-3、F5-4）。"
         },
         {
           "name": "（3）本期计提、收回或转回的坏账准备情况",
@@ -3515,15 +4711,47 @@
               "row_type": "data"
             },
             {
-              "label": "……",
-              "row_type": "data"
-            },
-            {
               "label": "合 计",
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "类 别",
+              "is_label": true
+            },
+            {
+              "key": "prior_amount",
+              "label": "期初数",
+              "format": "amount"
+            },
+            {
+              "key": "provision_amount",
+              "label": "计提",
+              "group": "本期变动金额",
+              "format": "amount"
+            },
+            {
+              "key": "reversal_amount",
+              "label": "收回或转回",
+              "group": "本期变动金额",
+              "format": "amount"
+            },
+            {
+              "key": "writeoff_amount",
+              "label": "转销或核销",
+              "group": "本期变动金额",
+              "format": "amount"
+            },
+            {
+              "key": "end_amount",
+              "label": "期末数",
+              "format": "amount"
+            }
+          ],
+          "guidance": "本期计提、收回或转回的坏账准备情况。勾稽：期末数 = 期初数 + 本期计提 − 本期收回或转回 − 本期核销 − 本期转销 − 其他（源模板 B86 公式；国企侧为 期末数=期初数+计提-收回或转回-转销或核销，F5-6）；期末数 = 分类表坏账准备期末合计（F5-8）；期初数 = 分类表坏账准备期初合计（F5-8a）。「本期转销」「其他」为源模板可选行，无发生额时可删除。"
         },
         {
           "name": "收回或转回的坏账准备",
@@ -3539,7 +4767,31 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "债务人名称",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "amount",
+              "label": "转回或收回金额",
+              "format": "amount"
+            },
+            {
+              "key": "cumulative_provision",
+              "label": "转回或收回前累计已计提坏账准备金额",
+              "format": "amount"
+            },
+            {
+              "key": "reason_method",
+              "label": "转回或收回原因、方式",
+              "format": "text"
+            }
+          ],
+          "guidance": "其中，本期坏账准备转回或收回金额重要的（不适用的删除）。勾稽：各明细行之和 = 合计行（F5-30、F5-19）。完整性：转回或收回金额 ≠ 0 时，单位（债务人）名称、转回原因/收回方式（原因、方式）均不应为空（F5-31、F5-32）。注：本期坏账准备收回或转回金额重要的，应披露转回原因、收回方式、确定原坏账准备计提比例的依据及其合理性。"
         },
         {
           "name": "（4）本期实际核销的应收账款",
@@ -3557,7 +4809,41 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "债务人名称",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "nature",
+              "label": "应收账款性质",
+              "format": "text"
+            },
+            {
+              "key": "amount",
+              "label": "核销金额",
+              "format": "amount"
+            },
+            {
+              "key": "reason",
+              "label": "核销原因",
+              "format": "text"
+            },
+            {
+              "key": "procedure",
+              "label": "履行的核销程序",
+              "format": "text"
+            },
+            {
+              "key": "related",
+              "label": "是否因关联交易产生",
+              "format": "text"
+            }
+          ],
+          "guidance": "其中，重要的应收账款核销情况（逐项披露）。勾稽：各明细行之和 = 合计行（F5-21）。完整性：核销金额 ≠ 0 时，单位（债务人）名称、应收账款性质、核销原因、履行的核销程序、是否由关联交易产生（是否因关联交易产生）列均不应为空（F5-33、F5-34）。"
         },
         {
           "name": "（5）按欠款方归集的期末余额前五名的应收账款",
@@ -3573,7 +4859,31 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "债务人名称",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "ar_amount",
+              "label": "账面余额",
+              "format": "amount"
+            },
+            {
+              "key": "ratio",
+              "label": "占应收账款合计的比例（%）",
+              "format": "percent"
+            },
+            {
+              "key": "provision",
+              "label": "坏账准备",
+              "format": "amount"
+            }
+          ],
+          "guidance": "按欠款方归集的应收账款和合同资产期末余额前五名单位情况。勾稽：各单位行之和 = 合计行（F5-22）；占比 = 该单位应收账款及合同资产期末余额合计 ÷ 应收账款及合同资产期末余额合计数 × 100（F5-37）。"
         },
         {
           "name": "（6）由金融资产转移而终止确认的应收账款",
@@ -3588,7 +4898,26 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "债务人名称",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "amount",
+              "label": "终止确认金额",
+              "format": "amount"
+            },
+            {
+              "key": "gain_loss",
+              "label": "与终止确认相关的利得或损失（损失以“-”填列）",
+              "format": "amount"
+            }
+          ],
+          "guidance": "因金融资产转移而终止确认的应收账款情况。勾稽：各明细行之和 = 合计行（F5-23）。"
         },
         {
           "name": "（7）应收账款转移继续涉入形成的资产、负债的金额",
@@ -3598,24 +4927,30 @@
           ],
           "rows": [
             {
-              "label": "资产：",
-              "row_type": "header_label"
-            },
-            {
               "label": "资产小计",
               "is_total": true,
               "row_type": "subtotal"
-            },
-            {
-              "label": "负债：",
-              "row_type": "header_label"
             },
             {
               "label": "负债小计",
               "is_total": true,
               "row_type": "subtotal"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项  目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "amount",
+              "label": "期末金额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "应收账款转移且继续涉入形成的资产、负债的金额（如证券化、保理等，不适用的删除）。资产、负债分块列示，各自小计。"
         }
       ],
       "text_sections": [
@@ -3624,9 +4959,9 @@
         "#### 期末单项计提坏账准备的应收账款",
         "（3）本期计提、收回或转回的坏账准备情况",
         "（4）本期实际核销的应收账款",
-        "（5）按欠款方归集的期末余额前五名的应收账款",
+        "#### （5）按欠款方归集的期末余额前五名的应收账款",
         "（6）由金融资产转移而终止确认的应收账款",
-        "（7）应收账款转移继续涉入形成的资产、负债的金额"
+        "#### （7）应收账款转移继续涉入形成的资产、负债的金额"
       ],
       "check_presets": [
         "LLM审核",
@@ -3648,7 +4983,8 @@
       "sort_index": 4,
       "auto_numbering": true,
       "lock_number": false,
-      "_aligned_by": "d2-ar-disclosure-soe-alignment"
+      "_aligned_by": "d-cycle-extraction-chain-completion",
+      "_aligned_at": "2026-08-01 09:45:39"
     },
     {
       "section_number": "八、6",
@@ -4227,7 +5563,7 @@
               "row_type": "total"
             }
           ],
-          "guidance": "本表为**应收利息**的坏账准备三阶段变动；其他应收款项的三阶段变动见「其他应收款项坏账准备计提情况」。",
+          "guidance": "本表为应收利息的坏账准备三阶段变动；其他应收款项的三阶段变动见「其他应收款项坏账准备计提情况」。",
           "columns": [
             {
               "key": "label",
@@ -4693,7 +6029,7 @@
               "span": 3
             }
           ],
-          "guidance": "按信用风险特征组合计提中的**账龄组合**。两级表头：期末数 / 期初数 各含账面余额（金额、比例%）与坏账准备。勾稽：账龄组合坏账准备 + 其他组合坏账准备 = 按计提方法分类表「按信用风险特征组合计提坏账准备的其他应收款项」行。",
+          "guidance": "按信用风险特征组合计提中的账龄组合。两级表头：期末数 / 期初数 各含账面余额（金额、比例%）与坏账准备。勾稽：账龄组合坏账准备 + 其他组合坏账准备 = 按计提方法分类表「按信用风险特征组合计提坏账准备的其他应收款项」行。",
           "columns": [
             {
               "key": "label",
@@ -5275,7 +6611,7 @@
         {
           "name": "涉及政府补助的应收款项",
           "headers": [
-            "单位名称",
+            "单位名称（注：政府补助的发文单位）",
             "政府补助项目名称",
             "期末余额",
             "期末账龄",
@@ -5304,7 +6640,7 @@
           "columns": [
             {
               "key": "label",
-              "label": "单位名称",
+              "label": "单位名称（注：政府补助的发文单位）",
               "is_label": true,
               "flat": true
             },
@@ -5381,7 +6717,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "fix_note_k_complex_structure",
-      "_aligned_at": "2026-07-31 20:28:22"
+      "_aligned_at": "2026-08-01 10:34:39"
     },
     {
       "section_number": "八、10",
@@ -7550,13 +8886,17 @@
         {
           "name": "长期股权投资分类",
           "headers": [
-            "项目",
-            "期初余额",
+            "项  目",
+            "年初余额",
             "本期增加",
             "本期减少",
             "期末余额"
           ],
           "rows": [
+            {
+              "label": "对子公司投资",
+              "row_type": "data"
+            },
             {
               "label": "对合营企业投资",
               "row_type": "data"
@@ -7566,7 +8906,7 @@
               "row_type": "data"
             },
             {
-              "label": "小计",
+              "label": "小  计",
               "is_total": true,
               "row_type": "subtotal"
             },
@@ -7575,11 +8915,40 @@
               "row_type": "data"
             },
             {
-              "label": "合计",
+              "label": "合  计",
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "item",
+              "label": "项  目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "opening",
+              "label": "年初余额",
+              "format": "amount"
+            },
+            {
+              "key": "increase",
+              "label": "本期增加",
+              "format": "amount"
+            },
+            {
+              "key": "decrease",
+              "label": "本期减少",
+              "format": "amount"
+            },
+            {
+              "key": "closing",
+              "label": "期末余额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "长期股权投资分类（源 A202:F208）：项目 = 对子公司投资/对合营企业投资/对联营企业投资/小计/减：长期股权投资减值准备/合计。数据来源：审定表 G7-1（小计=三类之和；合计=小计−减值准备，与 G7-1「二、减值准备」段勾稽）。"
         },
         {
           "name": "长期股权投资明细",
@@ -7587,15 +8956,18 @@
             "被投资单位",
             "投资成本",
             "期初余额",
-            "本期增减变动",
+            "追加投资",
+            "减少投资",
+            "权益法下确认的投资损益",
+            "其他综合收益调整",
+            "其他权益变动",
+            "宣告发放现金股利或利润",
+            "计提减值准备",
+            "其他",
             "期末余额",
             "减值准备期末余额"
           ],
           "rows": [
-            {
-              "label": "被投资单位",
-              "row_type": "header_label"
-            },
             {
               "label": "一、合营企业",
               "row_type": "data"
@@ -7613,25 +8985,103 @@
               "row_type": "data"
             },
             {
-              "label": "合计",
+              "label": "合  计",
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "investee",
+              "label": "被投资单位",
+              "is_label": true
+            },
+            {
+              "key": "investmentCost",
+              "label": "投资成本",
+              "format": "amount"
+            },
+            {
+              "key": "opening",
+              "label": "期初余额",
+              "format": "amount"
+            },
+            {
+              "key": "addition",
+              "label": "追加投资",
+              "group": "本期增减变动",
+              "format": "amount"
+            },
+            {
+              "key": "reduction",
+              "label": "减少投资",
+              "group": "本期增减变动",
+              "format": "amount"
+            },
+            {
+              "key": "equityProfit",
+              "label": "权益法下确认的投资损益",
+              "group": "本期增减变动",
+              "format": "amount"
+            },
+            {
+              "key": "oci",
+              "label": "其他综合收益调整",
+              "group": "本期增减变动",
+              "format": "amount"
+            },
+            {
+              "key": "otherEquity",
+              "label": "其他权益变动",
+              "group": "本期增减变动",
+              "format": "amount"
+            },
+            {
+              "key": "dividend",
+              "label": "宣告发放现金股利或利润",
+              "group": "本期增减变动",
+              "format": "amount"
+            },
+            {
+              "key": "impairment",
+              "label": "计提减值准备",
+              "group": "本期增减变动",
+              "format": "amount"
+            },
+            {
+              "key": "other",
+              "label": "其他",
+              "group": "本期增减变动",
+              "format": "amount"
+            },
+            {
+              "key": "closing",
+              "label": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "closingImpairment",
+              "label": "减值准备期末余额",
+              "format": "amount"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "本期增减变动",
+              "start": 3,
+              "span": 8
+            }
+          ],
+          "guidance": "长期股权投资明细（源 A210:M222 两级表头）：被投资单位（标签列）+ 投资成本 + 期初余额 + 本期增减变动（追加投资、减少投资、权益法下确认的投资损益、其他综合收益调整、其他权益变动、宣告发放现金股利或利润、计提减值准备、其他）+ 期末余额 + 减值准备期末余额。行 = 一、合营企业（含动态明细行「……」）/ 二、联营企业（含动态明细行「……」）/ 合计（源模板本表无小计层）。若对被投资单位持股比例与其在被投资单位表决权比例不一致，应说明原因（可索引至附注十一、3）。数据来源：明细表 G7-2。"
         },
         {
           "name": "重要合营企业的主要财务信息（划分为持有待售的除外）",
           "headers": [
-            "项目",
-            "（A公司）",
-            "（B公司）",
-            "（C公司）"
+            "项 目",
+            "期末数",
+            "期初数"
           ],
           "rows": [
-            {
-              "label": "项目",
-              "row_type": "header_label"
-            },
             {
               "label": "流动资产",
               "row_type": "data"
@@ -7642,8 +9092,7 @@
             },
             {
               "label": "资产合计",
-              "is_total": true,
-              "row_type": "total"
+              "row_type": "data"
             },
             {
               "label": "流动负债",
@@ -7655,8 +9104,7 @@
             },
             {
               "label": "负债合计",
-              "is_total": true,
-              "row_type": "total"
+              "row_type": "data"
             },
             {
               "label": "净资产",
@@ -7671,49 +9119,52 @@
               "row_type": "data"
             },
             {
-              "label": "对合营企业权益投资的账面价值",
+              "label": "对合营企业权益投资的账面价值 ",
               "row_type": "data"
             },
             {
-              "label": "存在公开报价的权益投资的公允价值",
+              "label": "存在公开报价的权益投资的公允价值 ",
               "row_type": "data"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "item",
+              "label": "项 目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "current",
+              "label": "期末数",
+              "format": "amount"
+            },
+            {
+              "key": "prior",
+              "label": "期初数",
+              "format": "amount"
+            }
+          ],
+          "guidance": "重要合营企业的主要财务信息（源 A229:C241，划分为持有待售的除外）：项目/期末数/期初数，主要财务信息按权益法调整后的金额披露；「调整事项」包括投资形成的正商誉、抵消的未实现内部交易损益、减值准备等。母公司为投资性主体时无需披露。数据来源：被投资单位财务信息 G7-5，权益法调节项来自权益法测算表 G7-14。"
         },
         {
-          "name": "续：",
+          "name": "续：重要合营企业本期及上期经营成果",
           "headers": [
-            "项目",
-            "（A公司）",
-            "（B公司）",
-            "（C公司）"
+            "项  目",
+            "本期发生额",
+            "上期发生额"
           ],
           "rows": [
             {
-              "label": "项目",
-              "row_type": "header_label"
-            },
-            {
               "label": "营业收入",
-              "account_codes": [
-                "6001",
-                "6051"
-              ],
-              "report_row_code": "IS-001",
               "row_type": "data"
             },
             {
               "label": "财务费用",
-              "account_codes": [
-                "6603"
-              ],
               "row_type": "data"
             },
             {
               "label": "所得税费用",
-              "account_codes": [
-                "6801"
-              ],
               "row_type": "data"
             },
             {
@@ -7722,10 +9173,6 @@
             },
             {
               "label": "其他综合收益",
-              "account_codes": [
-                "3102"
-              ],
-              "report_row_code": "BS-053",
               "row_type": "data"
             },
             {
@@ -7736,21 +9183,35 @@
               "label": "企业本期收到的来自合营企业的股利",
               "row_type": "data"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "item",
+              "label": "项  目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "current",
+              "label": "本期发生额",
+              "format": "amount"
+            },
+            {
+              "key": "prior",
+              "label": "上期发生额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "续：重要合营企业本期及上期经营成果（源 A243:C251）。数据来源：被投资单位财务信息 G7-5。"
         },
         {
           "name": "重要联营企业的主要财务信息",
           "headers": [
-            "项目",
-            "（A公司）",
-            "（B公司）",
-            "（C公司）"
+            "项 目",
+            "期末数",
+            "期初数"
           ],
           "rows": [
-            {
-              "label": "项目",
-              "row_type": "header_label"
-            },
             {
               "label": "流动资产",
               "row_type": "data"
@@ -7761,8 +9222,7 @@
             },
             {
               "label": "资产合计",
-              "is_total": true,
-              "row_type": "total"
+              "row_type": "data"
             },
             {
               "label": "流动负债",
@@ -7774,8 +9234,7 @@
             },
             {
               "label": "负债合计",
-              "is_total": true,
-              "row_type": "total"
+              "row_type": "data"
             },
             {
               "label": "净资产",
@@ -7790,35 +9249,44 @@
               "row_type": "data"
             },
             {
-              "label": "对联营企业权益投资的账面价值",
+              "label": "对联营企业权益投资的账面价值 ",
               "row_type": "data"
             },
             {
-              "label": "存在公开报价的权益投资的公允价值",
+              "label": "存在公开报价的权益投资的公允价值 ",
               "row_type": "data"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "item",
+              "label": "项 目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "current",
+              "label": "期末数",
+              "format": "amount"
+            },
+            {
+              "key": "prior",
+              "label": "期初数",
+              "format": "amount"
+            }
+          ],
+          "guidance": "重要联营企业的主要财务信息（源 A257:H269）：口径与重要合营企业主要财务信息表一致，项目/期末数/期初数。数据来源：被投资单位财务信息 G7-5，权益法调节项来自权益法测算表 G7-14。"
         },
         {
-          "name": "续：",
+          "name": "续：重要联营企业本期及上期经营成果",
           "headers": [
-            "项目",
-            "（A公司）",
-            "（B公司）",
-            "（C公司）"
+            "项  目",
+            "本期发生额",
+            "上期发生额"
           ],
           "rows": [
             {
-              "label": "项目",
-              "row_type": "header_label"
-            },
-            {
               "label": "营业收入",
-              "account_codes": [
-                "6001",
-                "6051"
-              ],
-              "report_row_code": "IS-001",
               "row_type": "data"
             },
             {
@@ -7827,10 +9295,6 @@
             },
             {
               "label": "其他综合收益",
-              "account_codes": [
-                "3102"
-              ],
-              "report_row_code": "BS-053",
               "row_type": "data"
             },
             {
@@ -7841,12 +9305,31 @@
               "label": "企业本期收到的来自联营企业的股利",
               "row_type": "data"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "item",
+              "label": "项  目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "current",
+              "label": "本期发生额",
+              "format": "amount"
+            },
+            {
+              "key": "prior",
+              "label": "上期发生额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "续：重要联营企业本期及上期经营成果（源 A271:H277）。数据来源：被投资单位财务信息 G7-5。"
         },
         {
           "name": "不重要合营企业和联营企业的汇总信息",
           "headers": [
-            "项目",
+            "项  目",
             "本期数",
             "上期数"
           ],
@@ -7857,13 +9340,11 @@
             },
             {
               "label": "投资账面价值合计",
-              "is_total": true,
-              "row_type": "total"
+              "row_type": "data"
             },
             {
-              "label": "下列各项按持股比例计算的合计数",
-              "is_total": true,
-              "row_type": "total"
+              "label": "下列各项按持股比例计算的合计数 ",
+              "row_type": "data"
             },
             {
               "label": "净利润",
@@ -7871,10 +9352,6 @@
             },
             {
               "label": "其他综合收益",
-              "account_codes": [
-                "3102"
-              ],
-              "report_row_code": "BS-053",
               "row_type": "data"
             },
             {
@@ -7887,13 +9364,11 @@
             },
             {
               "label": "投资账面价值合计",
-              "is_total": true,
-              "row_type": "total"
+              "row_type": "data"
             },
             {
-              "label": "下列各项按持股比例计算的合计数",
-              "is_total": true,
-              "row_type": "total"
+              "label": "下列各项按持股比例计算的合计数 ",
+              "row_type": "data"
             },
             {
               "label": "净利润",
@@ -7901,17 +9376,32 @@
             },
             {
               "label": "其他综合收益",
-              "account_codes": [
-                "3102"
-              ],
-              "report_row_code": "BS-053",
               "row_type": "data"
             },
             {
               "label": "综合收益总额",
               "row_type": "data"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "item",
+              "label": "项  目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "current",
+              "label": "本期数",
+              "format": "amount"
+            },
+            {
+              "key": "prior",
+              "label": "上期数",
+              "format": "amount"
+            }
+          ],
+          "guidance": "不重要合营企业和联营企业的汇总信息（源 A280:D292）：投资账面价值合计取明细表 G7-2；下列各项按持股比例计算的合计数取被投资单位财务信息 G7-5 × 持股比例。"
         },
         {
           "name": "②对合营企业或联营企业发生超额亏损的分担额",
@@ -7927,6 +9417,18 @@
               "row_type": "data"
             },
             {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
               "label": "小计",
               "is_total": true,
               "row_type": "subtotal"
@@ -7936,31 +9438,65 @@
               "row_type": "data"
             },
             {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
+              "label": "",
+              "row_type": "data"
+            },
+            {
               "label": "小计",
               "is_total": true,
               "row_type": "subtotal"
             },
             {
-              "label": "合计",
+              "label": "合  计",
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "investee",
+              "label": "被投资单位名称",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "priorUnrecognised",
+              "label": "前期累积未确认的损失份额",
+              "format": "amount"
+            },
+            {
+              "key": "currentUnrecognised",
+              "label": "本期未确认的损失份额（或本期实现净利润的分享额）",
+              "format": "amount"
+            },
+            {
+              "key": "closingUnrecognised",
+              "label": "本期末累积未确认的损失份额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "②对合营企业或联营企业发生超额亏损的分担额（源 A301:E312，不适用的删除）：合营企业、联营企业各自列示前期累积未确认损失份额、本期未确认损失份额（或本期实现净利润的分享额）、本期末累积未确认损失份额，各自小计后合计。数据来源：未确认投资损失测试表 G7-16。"
         },
         {
-          "name": "C.在财务报表中确认的与企业在未纳入合并财务报表范围的结构化主体中权益相关的资产和负债的账面价值与其最大损失敞口的比较。",
+          "name": "结构化主体权益的账面价值和最大损失敞口",
           "headers": [
             "项目",
-            "发起规模",
-            "期末数",
-            "期初数",
+            "规模",
+            "账面价值",
+            "最大损失敞口",
+            "账面价值",
+            "最大损失敞口",
             "列报项目"
           ],
           "rows": [
-            {
-              "label": "项目",
-              "row_type": "header_label"
-            },
             {
               "label": "优先级债券",
               "row_type": "data"
@@ -7977,20 +9513,76 @@
               "label": "……",
               "row_type": "data"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "item",
+              "label": "项目",
+              "is_label": true
+            },
+            {
+              "key": "sponsorScale",
+              "label": "规模",
+              "group": "发起"
+            },
+            {
+              "key": "endBookValue",
+              "label": "账面价值",
+              "group": "期末数",
+              "format": "amount"
+            },
+            {
+              "key": "endMaxLoss",
+              "label": "最大损失敞口",
+              "group": "期末数",
+              "format": "amount"
+            },
+            {
+              "key": "beginBookValue",
+              "label": "账面价值",
+              "group": "期初数",
+              "format": "amount"
+            },
+            {
+              "key": "beginMaxLoss",
+              "label": "最大损失敞口",
+              "group": "期初数",
+              "format": "amount"
+            },
+            {
+              "key": "presentationItem",
+              "label": "列报项目"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "发起",
+              "start": 1,
+              "span": 1
+            },
+            {
+              "group": "期末数",
+              "start": 2,
+              "span": 2
+            },
+            {
+              "group": "期初数",
+              "start": 4,
+              "span": 2
+            }
+          ],
+          "guidance": "结构化主体权益的账面价值和最大损失敞口（源 A323:F328）：披露在财务报表中确认的、与企业在未纳入合并财务报表范围的结构化主体中权益相关的资产和负债的账面价值及其列报项目，最大损失敞口及其确定方法（不能量化的应披露事实及原因），以及账面价值与最大损失敞口的比较。"
         },
         {
-          "name": "本公司发起多个结构化主体，但在结构化中均不持有权益。2023年，本公司从发起的结构化主体获得收益的情况以及当期向结构化主体转移资产的情况如下表所示：",
+          "name": "结构化主体获得收益及转移资产情况",
           "headers": [
-            "结构化主体类型",
-            "当期从结构化主体获得的收益",
+            "类型",
+            "服务收费",
+            "向结构化主体出售资产的利得（损失）",
+            "合计",
             "当期向结构化主体转移资产账面价值"
           ],
           "rows": [
-            {
-              "label": "结构化主体<br/>类型",
-              "row_type": "header_label"
-            },
             {
               "label": "信用资产证券化",
               "row_type": "data"
@@ -8004,20 +9596,58 @@
               "row_type": "data"
             },
             {
-              "label": "合计",
+              "label": "合  计",
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "type",
+              "label": "类型",
+              "is_label": true
+            },
+            {
+              "key": "serviceFee",
+              "label": "服务收费",
+              "group": "当期从结构化主体获得的收益",
+              "format": "amount"
+            },
+            {
+              "key": "assetSaleGain",
+              "label": "向结构化主体出售资产的利得（损失）",
+              "group": "当期从结构化主体获得的收益",
+              "format": "amount"
+            },
+            {
+              "key": "incomeTotal",
+              "label": "合计",
+              "group": "当期从结构化主体获得的收益",
+              "format": "amount"
+            },
+            {
+              "key": "transferredAssets",
+              "label": "当期向结构化主体转移资产账面价值",
+              "format": "amount"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "当期从结构化主体获得的收益",
+              "start": 1,
+              "span": 3
+            }
+          ],
+          "guidance": "结构化主体获得收益及转移资产情况（源 A340:D345）：企业作为未纳入合并财务报表范围结构化主体的发起人但没有权益时，应披露认定依据，并分类披露当期从该结构化主体获得的收益、收益类型（服务收费/出售资产利得），以及当期转移至该结构化主体的资产在转移时的账面价值。"
         }
       ],
       "text_sections": [
-        "长期股权投资分类",
-        "长期股权投资明细",
+        "#### 长期股权投资分类",
+        "#### 长期股权投资明细",
         "（注：若对被投资单位持股比例与其在被投资单位表决权比例不一致，应说明原因。可索引至附注十一、3）",
         "重要合营企业的主要财务信息",
-        "重要联营企业的主要财务信息",
-        "不重要合营企业和联营企业的汇总信息",
+        "#### 重要联营企业的主要财务信息",
+        "#### 不重要合营企业和联营企业的汇总信息",
         "在合营企业和联营企业中权益的相关风险",
         "未纳入合并财务报表范围的结构化主体的相关信息"
       ],
@@ -8037,7 +9667,9 @@
       "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
       "sort_index": 17,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "fix_note_g7_soe_structure",
+      "_aligned_at": "2026-08-01 09:53:11"
     },
     {
       "section_number": "八、19",
@@ -8602,7 +10234,7 @@
                 "1601",
                 "1602"
               ],
-              "report_row_code": "BS-014",
+              "report_row_code": "BS-028",
               "row_type": "data"
             },
             {
@@ -9042,7 +10674,7 @@
               "account_codes": [
                 "1604"
               ],
-              "report_row_code": "BS-015",
+              "report_row_code": "BS-029",
               "row_type": "data"
             },
             {
@@ -10443,7 +12075,7 @@
               "span": 2
             }
           ],
-          "guidance": "递延所得税资产和递延所得税负债**不**以抵销后的净额列示时按本表披露（以抵销后净额列示的改填下一张表）。【提示：资产减值准备，含“持有待售资产减值准备”】【注：计入其他综合收益的其他金融资产为计入其他综合收益的其他债权投资、其他权益工具投资。】负债段数据来源于递延所得税负债底稿。勾稽：小计 = 段内各明细项之和。",
+          "guidance": "递延所得税资产和递延所得税负债不以抵销后的净额列示时按本表披露（以抵销后净额列示的改填下一张表）。【提示：资产减值准备，含“持有待售资产减值准备”】【注：计入其他综合收益的其他金融资产为计入其他综合收益的其他债权投资、其他权益工具投资。】负债段数据来源于递延所得税负债底稿。勾稽：小计 = 段内各明细项之和。",
           "rows": [
             {
               "label": "一、递延所得税资产",
@@ -10655,7 +12287,7 @@
               "format": "amount"
             }
           ],
-          "guidance": "源模板（2）B、递延所得税资产和递延所得税负债互抵明细：按项目列示本期互抵金额。仅在以抵销后净额列示时填列。本表为**纯动态行区域**（源模板 R56:R58 全空，无固定行名）：互抵项目由项目实际情况决定，在底稿披露表按需新增行并自行命名。",
+          "guidance": "源模板（2）B、递延所得税资产和递延所得税负债互抵明细：按项目列示本期互抵金额。仅在以抵销后净额列示时填列。本表为纯动态行区域（源模板 R56:R58 全空，无固定行名）：互抵项目由项目实际情况决定，在底稿披露表按需新增行并自行命名。",
           "rows": []
         },
         {
@@ -11828,7 +13460,7 @@
               "format": "amount"
             }
           ],
-          "guidance": "🔴 国企版按**变动口径**列示（期初余额 / 本期应交 / 本期已交 / 期末余额），与上市版的双期余额表结构本质不同，不可互相套用。【提示：增值税，根据“应交税费-未交增值税、简易计税、转让金融商品应交增值税、代扣代缴增值税”科目贷方余额计算填列。】勾稽：每行 期末余额 = 期初余额 + 本期应交 − 本期已交（源模板 =B8+C8-D8）；合计 = 各列之和（源模板 =SUM(B8:B22) 等）。",
+          "guidance": "🔴 国企版按变动口径列示（期初余额 / 本期应交 / 本期已交 / 期末余额），与上市版的双期余额表结构本质不同，不可互相套用。【提示：增值税，根据“应交税费-未交增值税、简易计税、转让金融商品应交增值税、代扣代缴增值税”科目贷方余额计算填列。】勾稽：每行 期末余额 = 期初余额 + 本期应交 − 本期已交（源模板 =B8+C8-D8）；合计 = 各列之和（源模板 =SUM(B8:B22) 等）。",
           "rows": [
             {
               "label": "企业所得税",
@@ -12749,7 +14381,7 @@
         "注：可转换公司债券的转股条件、转股时间说明应详细披露。",
         "【根据中国证券监督管理委员会证监发行字[200x]XX号核准，本公司于200X年X月X日至200X年X月X日公开发行XX份可转换公司债券，每份面值100元，发行总额XXX元，债券期限为X年。",
         "本公司发行的可转换公司债券的票面利率为X%，利息按季支付，200X年X月X日为第一次派息日。转股期自发行之日起(200X年X月X日)X个月后的第一个交易日(200X年X月X日)起(含当日)，至可转换公司债券到期日(200X年X月X日)前一个交易日止(含当日)。持有人可在转股期内申请转股。",
-        "可转换公司债券发行时的初始转股价格为每股人民币X元，本公司在200X年X月X日实施200X年度每股派发现金股息人民币X元及用资本公积每十股转增X股的方案后，可转债初始转股价格相应调整为每股人民币X元。**】**"
+        "可转换公司债券发行时的初始转股价格为每股人民币X元，本公司在200X年X月X日实施200X年度每股派发现金股息人民币X元及用资本公积每十股转增X股的方案后，可转债初始转股价格相应调整为每股人民币X元。】"
       ],
       "check_presets": [
         "交叉",
@@ -13127,7 +14759,7 @@
               "format": "amount"
             }
           ],
-          "guidance": "勾稽：期末余额 = 期初余额 + 本期增加 − 本期减少；合计 = 各项之和。本表由 **L6 专项应付款**底稿推送（与长期应付款共章节，按子表名浅合并）。须说明专项应付款的来源、指定的专门用途与使用限制。源模板要求分项披露年末余额最大的前五项。注：列头取附注模版字面（源 xlsx 写的是 `201X.01.01` / `201X.12.31` 年份占位符）。"
+          "guidance": "勾稽：期末余额 = 期初余额 + 本期增加 − 本期减少；合计 = 各项之和。本表由 L6 专项应付款底稿推送（与长期应付款共章节，按子表名浅合并）。须说明专项应付款的来源、指定的专门用途与使用限制。源模板要求分项披露年末余额最大的前五项。注：列头取附注模版字面（源 xlsx 写的是 `201X.01.01` / `201X.12.31` 年份占位符）。"
         }
       ],
       "text_sections": [
@@ -16257,7 +17889,7 @@
               "account_codes": [
                 "2501"
               ],
-              "report_row_code": "BS-041",
+              "report_row_code": "BS-061",
               "row_type": "data"
             },
             {
@@ -16265,7 +17897,7 @@
               "account_codes": [
                 "2502"
               ],
-              "report_row_code": "BS-043",
+              "report_row_code": "BS-062",
               "row_type": "data"
             },
             {
@@ -16273,7 +17905,7 @@
               "account_codes": [
                 "2601"
               ],
-              "report_row_code": "BS-042",
+              "report_row_code": "BS-063",
               "row_type": "data"
             },
             {
@@ -17436,7 +19068,7 @@
               "account_codes": [
                 "2202"
               ],
-              "report_row_code": "BS-033",
+              "report_row_code": "BS-045",
               "row_type": "data"
             },
             {
@@ -17565,7 +19197,7 @@
               "account_codes": [
                 "1122"
               ],
-              "report_row_code": "BS-005",
+              "report_row_code": "BS-006",
               "row_type": "data"
             },
             {
@@ -17613,7 +19245,7 @@
               "account_codes": [
                 "2501"
               ],
-              "report_row_code": "BS-041",
+              "report_row_code": "BS-061",
               "row_type": "data"
             },
             {
@@ -17637,7 +19269,7 @@
               "account_codes": [
                 "2502"
               ],
-              "report_row_code": "BS-043",
+              "report_row_code": "BS-062",
               "row_type": "data"
             },
             {
@@ -17700,7 +19332,7 @@
               "account_codes": [
                 "1121"
               ],
-              "report_row_code": "BS-004",
+              "report_row_code": "BS-005",
               "row_type": "data"
             },
             {
@@ -17708,7 +19340,7 @@
               "account_codes": [
                 "1122"
               ],
-              "report_row_code": "BS-005",
+              "report_row_code": "BS-006",
               "row_type": "data"
             },
             {
@@ -17737,7 +19369,7 @@
                 "1601",
                 "1602"
               ],
-              "report_row_code": "BS-014",
+              "report_row_code": "BS-028",
               "row_type": "data"
             },
             {
@@ -17746,7 +19378,7 @@
                 "1701",
                 "1702"
               ],
-              "report_row_code": "BS-016",
+              "report_row_code": "BS-032",
               "row_type": "data"
             },
             {
@@ -17754,7 +19386,7 @@
               "account_codes": [
                 "1604"
               ],
-              "report_row_code": "BS-015",
+              "report_row_code": "BS-029",
               "row_type": "data"
             },
             {
