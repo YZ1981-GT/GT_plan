@@ -7556,7 +7556,26 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "end_balance",
+              "label": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_balance",
+              "label": "上年年末余额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "15号文第十九条（一）：分类列示交易性金融资产各类别的期末余额与上年年末余额。对于指定为以公允价值计量且其变动计入当期损益的金融资产，还应披露指定的理由和依据。"
         }
       ],
       "text_sections": [
@@ -7575,7 +7594,8 @@
       "parent_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi",
       "sort_index": 1,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "fix_note_g1_trading_financial_structure"
     },
     {
       "section_number": "五、3",
@@ -7596,7 +7616,26 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "end_balance",
+              "label": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_balance",
+              "label": "上年年末余额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "15号文第十九条（三）：企业衍生金融工具业务具有重要性的，应单独披露衍生金融资产的期初与期末余额，并披露其产生的原因以及相关会计处理。"
         }
       ],
       "text_sections": [
@@ -7615,7 +7654,8 @@
       "parent_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi",
       "sort_index": 2,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "fix_note_g1_trading_financial_structure"
     },
     {
       "section_number": "五、4",
@@ -12190,7 +12230,8 @@
               "span": 3
             }
           ],
-          "guidance": "15 号文第十九条（六）：按组合计提存货跌价准备的，应分类披露不同组合存货的期初余额、期末余额，对应跌价准备的期初余额、期末余额、计提标准和比例。⚠️ 本表与「按库龄组合计提存货跌价准备」在源模版中是「或」的关系（二选一），按实际计提方式只填其中一组，未采用的一组不填。勾稽：比例(%) = 跌价准备 ÷ 账面余额；账面价值 = 账面余额 − 跌价准备。"
+          "guidance": "15 号文第十九条（六）：按组合计提存货跌价准备的，应分类披露不同组合存货的期初余额、期末余额，对应跌价准备的期初余额、期末余额、计提标准和比例。⚠️ 本表与「按库龄组合计提存货跌价准备」在源模版中是「或」的关系（二选一），按实际计提方式只填其中一组，未采用的一组不填。勾稽：比例(%) = 跌价准备 ÷ 账面余额；账面价值 = 账面余额 − 跌价准备。",
+          "exclusive_group": "inventory-provision-portfolio"
         },
         {
           "name": "按组合计提存货跌价准备（续）",
@@ -12275,7 +12316,8 @@
               "span": 3
             }
           ],
-          "guidance": "15 号文第十九条（六）：按组合计提存货跌价准备的，应分类披露不同组合存货的期初余额、期末余额，对应跌价准备的期初余额、期末余额、计提标准和比例。⚠️ 本表与「按库龄组合计提存货跌价准备」在源模版中是「或」的关系（二选一），按实际计提方式只填其中一组，未采用的一组不填。勾稽：比例(%) = 跌价准备 ÷ 账面余额；账面价值 = 账面余额 − 跌价准备。 本表为上年年末余额（续表）。"
+          "guidance": "15 号文第十九条（六）：按组合计提存货跌价准备的，应分类披露不同组合存货的期初余额、期末余额，对应跌价准备的期初余额、期末余额、计提标准和比例。⚠️ 本表与「按库龄组合计提存货跌价准备」在源模版中是「或」的关系（二选一），按实际计提方式只填其中一组，未采用的一组不填。勾稽：比例(%) = 跌价准备 ÷ 账面余额；账面价值 = 账面余额 − 跌价准备。 本表为上年年末余额（续表）。",
+          "exclusive_group": "inventory-provision-portfolio"
         },
         {
           "name": "按库龄组合计提存货跌价准备",
@@ -12360,7 +12402,8 @@
               "span": 3
             }
           ],
-          "guidance": "适用于按库龄组合计提的情形（源模版：对于在同一地区生产和销售且具有相同或类似最终用途的存货合并计提，其中按库龄、保管状态、历史销售折扣及预计未来销售情况等因素计提）。15 号文第十六条（十二）：基于库龄确认可变现净值的，应披露各库龄组合可变现净值的计算方法和确定依据。⚠️ 与「按组合计提存货跌价准备」是「或」的关系（二选一）。行标签为库龄段（1年以内 / 1至2年 / …）。"
+          "guidance": "适用于按库龄组合计提的情形（源模版：对于在同一地区生产和销售且具有相同或类似最终用途的存货合并计提，其中按库龄、保管状态、历史销售折扣及预计未来销售情况等因素计提）。15 号文第十六条（十二）：基于库龄确认可变现净值的，应披露各库龄组合可变现净值的计算方法和确定依据。⚠️ 与「按组合计提存货跌价准备」是「或」的关系（二选一）。行标签为库龄段（1年以内 / 1至2年 / …）。",
+          "exclusive_group": "inventory-provision-portfolio"
         },
         {
           "name": "按库龄组合计提存货跌价准备（续）",
@@ -12445,7 +12488,8 @@
               "span": 3
             }
           ],
-          "guidance": "适用于按库龄组合计提的情形（源模版：对于在同一地区生产和销售且具有相同或类似最终用途的存货合并计提，其中按库龄、保管状态、历史销售折扣及预计未来销售情况等因素计提）。15 号文第十六条（十二）：基于库龄确认可变现净值的，应披露各库龄组合可变现净值的计算方法和确定依据。⚠️ 与「按组合计提存货跌价准备」是「或」的关系（二选一）。行标签为库龄段（1年以内 / 1至2年 / …）。 本表为上年年末余额（续表）。"
+          "guidance": "适用于按库龄组合计提的情形（源模版：对于在同一地区生产和销售且具有相同或类似最终用途的存货合并计提，其中按库龄、保管状态、历史销售折扣及预计未来销售情况等因素计提）。15 号文第十六条（十二）：基于库龄确认可变现净值的，应披露各库龄组合可变现净值的计算方法和确定依据。⚠️ 与「按组合计提存货跌价准备」是「或」的关系（二选一）。行标签为库龄段（1年以内 / 1至2年 / …）。 本表为上年年末余额（续表）。",
+          "exclusive_group": "inventory-provision-portfolio"
         },
         {
           "name": "确认为存货的数据资源",
@@ -22851,8 +22895,8 @@
           "name": "长期应付职工薪酬",
           "headers": [
             "项目",
-            "期末余额",
-            "上年年末余额"
+            "期末数",
+            "期初数"
           ],
           "rows": [
             {
@@ -22885,7 +22929,26 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "end",
+              "label": "期末数",
+              "format": "amount"
+            },
+            {
+              "key": "begin",
+              "label": "期初数",
+              "format": "amount"
+            }
+          ],
+          "guidance": "按 CAS 9 列示长期应付职工薪酬各组成项目的期末数与期初数。不适用的项目删除。"
         },
         {
           "name": "设定受益计划义务现值：",
@@ -22947,7 +23010,26 @@
               "label": "五、期末余额",
               "row_type": "data"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "cur",
+              "label": "本期金额",
+              "format": "amount"
+            },
+            {
+              "key": "prior",
+              "label": "上期金额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "按 CAS 9 六要素（当期服务成本/过去服务成本/结算利得损失/利息净额/精算利得损失/计划资产回报/资产上限影响/结算消除/已支付福利）分解设定受益计划义务现值变动。"
         },
         {
           "name": "计划资产：",
@@ -22993,7 +23075,26 @@
               "label": "五、期末余额",
               "row_type": "data"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "cur",
+              "label": "本期金额",
+              "format": "amount"
+            },
+            {
+              "key": "prior",
+              "label": "上期金额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "分解计划资产变动情况（利息净额/计划资产回报/资产上限影响变动/结算消除/已支付福利等）。"
         },
         {
           "name": "设定受益计划净负债（净资产）：",
@@ -23023,7 +23124,26 @@
               "label": "五、期末余额",
               "row_type": "data"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "cur",
+              "label": "本期金额",
+              "format": "amount"
+            },
+            {
+              "key": "prior",
+              "label": "上期金额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "设定受益计划净负债（净资产）= 义务现值 − 计划资产公允价值。各要素合计应与义务现值表、计划资产表对应项目勾稽一致。"
         },
         {
           "name": "未折现的离职后福利预计到期分析：",
@@ -23053,19 +23173,30 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "amount",
+              "label": "金额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "列示未折现的离职后福利在各期间的预计到期金额（一年以内/一到两年/二到五年/五年以上）。"
         },
         {
           "name": "计划资产",
           "headers": [
             "项目",
-            "计划资产的公允价值"
+            "期末数",
+            "期初数"
           ],
           "rows": [
-            {
-              "label": "项目",
-              "row_type": "header_label"
-            },
             {
               "label": "现金和现金等价物",
               "row_type": "data"
@@ -23111,14 +23242,41 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true
+            },
+            {
+              "key": "end",
+              "label": "期末数",
+              "group": "计划资产的公允价值",
+              "format": "amount"
+            },
+            {
+              "key": "begin",
+              "label": "期初数",
+              "group": "计划资产的公允价值",
+              "format": "amount"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "计划资产的公允价值",
+              "start": 1,
+              "span": 2
+            }
+          ],
+          "guidance": "按资产类型列示计划资产的公允价值构成。权益工具投资按行业类型或公司规模或地域等分类；债务工具投资按发行人类型或信用评级或地域等分类。"
         },
         {
           "name": "精算假设",
           "headers": [
             "项目",
-            "期末",
-            "上年年末"
+            "期末数",
+            "期初数"
           ],
           "rows": [
             {
@@ -23145,20 +23303,36 @@
               "label": "……",
               "row_type": "data"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "end",
+              "label": "期末数",
+              "format": "percent"
+            },
+            {
+              "key": "begin",
+              "label": "期初数",
+              "format": "percent"
+            }
+          ],
+          "guidance": "列示期末与期初的重大精算假设（折现率/死亡率/预计平均寿命/离职率/薪酬预期增长率等）。"
         },
         {
           "name": "敏感性分析",
           "headers": [
             "项目",
             "假设的变动幅度",
-            "对设定受益义务现值的影响"
+            "计划负债增加",
+            "计划负债减少"
           ],
           "rows": [
-            {
-              "label": "项目",
-              "row_type": "header_label"
-            },
             {
               "label": "折现率",
               "row_type": "data"
@@ -23179,7 +23353,39 @@
               "label": "薪酬的预期增长率",
               "row_type": "data"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true
+            },
+            {
+              "key": "delta",
+              "label": "假设的变动幅度",
+              "format": "percent"
+            },
+            {
+              "key": "up",
+              "label": "计划负债增加",
+              "group": "对设定受益义务现值的影响",
+              "format": "amount"
+            },
+            {
+              "key": "down",
+              "label": "计划负债减少",
+              "group": "对设定受益义务现值的影响",
+              "format": "amount"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "对设定受益义务现值的影响",
+              "start": 2,
+              "span": 2
+            }
+          ],
+          "guidance": "假设发生合理可能的变动时，对设定受益义务现值的影响（计划负债增加/计划负债减少）。进行敏感度分析所采用的方法和假设应与以前年度比较，如发生变动说明原因。"
         }
       ],
       "text_sections": [
@@ -23220,7 +23426,9 @@
       "parent_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi",
       "sort_index": 48,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "disclosure-sync-path-buildout-j2",
+      "_aligned_at": "2026-08-01 14:20:07"
     },
     {
       "section_number": "五、50",

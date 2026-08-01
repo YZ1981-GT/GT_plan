@@ -3339,7 +3339,26 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "end_fair_value",
+              "label": "期末公允价值",
+              "format": "amount"
+            },
+            {
+              "key": "prior_fair_value",
+              "label": "期初公允价值",
+              "format": "amount"
+            }
+          ],
+          "guidance": "按分类/指定为FVTPL两大类列示交易性金融资产，分项目披露期末及期初公允价值。应披露公允价值确认依据。"
         }
       ],
       "text_sections": [
@@ -3357,7 +3376,8 @@
       "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
       "sort_index": 1,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "fix_note_g1_trading_financial_structure"
     },
     {
       "section_number": "八、3",
@@ -3378,7 +3398,26 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "end_balance",
+              "label": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_balance",
+              "label": "期初余额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "披露金额较大的前十项衍生金融资产及其产生的原因，其余汇总填列。"
         }
       ],
       "text_sections": [
@@ -3396,7 +3435,8 @@
       "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
       "sort_index": 2,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "fix_note_g1_trading_financial_structure"
     },
     {
       "section_number": "八、4",
@@ -14800,10 +14840,10 @@
           "name": "长期应付职工薪酬",
           "headers": [
             "项目",
-            "期初余额",
+            "期初数",
             "本期增加",
             "本期减少",
-            "期末余额"
+            "期末数"
           ],
           "rows": [
             {
@@ -14823,14 +14863,47 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "begin",
+              "label": "期初数",
+              "format": "amount"
+            },
+            {
+              "key": "increase",
+              "label": "本期增加",
+              "format": "amount"
+            },
+            {
+              "key": "decrease",
+              "label": "本期减少",
+              "format": "amount"
+            },
+            {
+              "key": "end",
+              "label": "期末数",
+              "format": "amount"
+            }
+          ],
+          "guidance": "按 CAS 9 列示长期应付职工薪酬各构成项目的增减变动（期初数/本期增加/本期减少/期末数）。不适用的项目删除。"
         },
         {
           "name": "设定受益计划义务现值",
           "headers": [
             "项目",
-            "本期金额",
-            "上期金额"
+            "本期",
+            "上期",
+            "本期",
+            "上期",
+            "本期",
+            "上期"
           ],
           "rows": [
             {
@@ -14885,7 +14958,68 @@
               "label": "五、期末余额",
               "row_type": "data"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true
+            },
+            {
+              "key": "dbo_cur",
+              "label": "本期",
+              "group": "义务现值",
+              "format": "amount"
+            },
+            {
+              "key": "dbo_prior",
+              "label": "上期",
+              "group": "义务现值",
+              "format": "amount"
+            },
+            {
+              "key": "asset_cur",
+              "label": "本期",
+              "group": "计划资产的公允价值",
+              "format": "amount"
+            },
+            {
+              "key": "asset_prior",
+              "label": "上期",
+              "group": "计划资产的公允价值",
+              "format": "amount"
+            },
+            {
+              "key": "net_cur",
+              "label": "本期",
+              "group": "设定受益计划净负债",
+              "format": "amount"
+            },
+            {
+              "key": "net_prior",
+              "label": "上期",
+              "group": "设定受益计划净负债",
+              "format": "amount"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "义务现值",
+              "start": 1,
+              "span": 2
+            },
+            {
+              "group": "计划资产的公允价值",
+              "start": 3,
+              "span": 2
+            },
+            {
+              "group": "设定受益计划净负债",
+              "start": 5,
+              "span": 2
+            }
+          ],
+          "guidance": "按 CAS 9 六要素分解义务现值、计划资产公允价值、净负债三组并列变动情况（各含本期金额/上期金额），并按当期服务成本/过去服务成本/结算利得损失/利息净额/精算利得损失/计划资产回报/资产上限影响/结算消除/已支付福利分解。"
         },
         {
           "name": "计划资产",
@@ -14931,7 +15065,26 @@
               "label": "五、期末余额",
               "row_type": "data"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "cur",
+              "label": "本期金额",
+              "format": "amount"
+            },
+            {
+              "key": "prior",
+              "label": "上期金额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "分解计划资产变动情况（利息净额/计划资产回报/资产上限影响变动/结算消除/已支付福利等）。"
         },
         {
           "name": "设定受益计划净负债（净资产）",
@@ -14961,7 +15114,26 @@
               "label": "五、期末余额",
               "row_type": "data"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "cur",
+              "label": "本期金额",
+              "format": "amount"
+            },
+            {
+              "key": "prior",
+              "label": "上期金额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "设定受益计划净负债（净资产）= 义务现值 − 计划资产公允价值。各要素合计应与义务现值表、计划资产表对应项目勾稽一致。"
         },
         {
           "name": "未折现的离职后福利预计到期分析",
@@ -14991,19 +15163,30 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "amount",
+              "label": "金额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "列示未折现的离职后福利在各期间的预计到期金额（一年以内/一到两年/二到五年/五年以上）。"
         },
         {
           "name": "计划资产",
           "headers": [
             "项目",
-            "计划资产的公允价值"
+            "期末数",
+            "期初数"
           ],
           "rows": [
-            {
-              "label": "项目",
-              "row_type": "header_label"
-            },
             {
               "label": "现金和现金等价物",
               "row_type": "data"
@@ -15049,7 +15232,34 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true
+            },
+            {
+              "key": "end",
+              "label": "期末数",
+              "group": "计划资产的公允价值",
+              "format": "amount"
+            },
+            {
+              "key": "begin",
+              "label": "期初数",
+              "group": "计划资产的公允价值",
+              "format": "amount"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "计划资产的公允价值",
+              "start": 1,
+              "span": 2
+            }
+          ],
+          "guidance": "按资产类型列示计划资产的公允价值构成。权益工具投资按行业类型或公司规模或地域等分类；债务工具投资按发行人类型或信用评级或地域等分类。"
         },
         {
           "name": "精算假设",
@@ -15083,20 +15293,36 @@
               "label": "……",
               "row_type": "data"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "end",
+              "label": "期末数",
+              "format": "percent"
+            },
+            {
+              "key": "begin",
+              "label": "期初数",
+              "format": "percent"
+            }
+          ],
+          "guidance": "列示期末与期初的重大精算假设（折现率/死亡率/预计平均寿命/离职率/薪酬预期增长率等）。"
         },
         {
           "name": "敏感性分析",
           "headers": [
             "项目",
             "假设的变动幅度",
-            "对设定受益义务现值的影响"
+            "计划负债增加",
+            "计划负债减小"
           ],
           "rows": [
-            {
-              "label": "项目",
-              "row_type": "header_label"
-            },
             {
               "label": "折现率",
               "row_type": "data"
@@ -15117,7 +15343,39 @@
               "label": "薪酬的预期增长率",
               "row_type": "data"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true
+            },
+            {
+              "key": "delta",
+              "label": "假设的变动幅度",
+              "format": "percent"
+            },
+            {
+              "key": "up",
+              "label": "计划负债增加",
+              "group": "对设定受益义务现值的影响",
+              "format": "amount"
+            },
+            {
+              "key": "down",
+              "label": "计划负债减小",
+              "group": "对设定受益义务现值的影响",
+              "format": "amount"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "对设定受益义务现值的影响",
+              "start": 2,
+              "span": 2
+            }
+          ],
+          "guidance": "假设发生合理可能的变动时，对设定受益义务现值的影响（计划负债增加/计划负债减小）。进行敏感度分析所采用的方法和假设应与以前年度比较，如发生变动说明原因。"
         }
       ],
       "text_sections": [
@@ -15156,7 +15414,9 @@
       "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
       "sort_index": 53,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "disclosure-sync-path-buildout-j2",
+      "_aligned_at": "2026-08-01 14:21:42"
     },
     {
       "section_number": "八、55",
