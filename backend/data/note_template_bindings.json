@@ -36772,7 +36772,7 @@
         },
         {
           "table_index": 3,
-          "table_name": "期末因出票人未履约而将其转应收账款的票据",
+          "table_name": "期末因出票人未履约而其转应收账款的票据",
           "header_normalize": [
             {
               "text": "种类",
