@@ -8,7 +8,7 @@
       <summary>编制提示</summary>
       <div class="guidance-content">
         <p>1. （1）按账龄列示：期末数/期初数各含账面余额（金额+比例（%））与减值准备；账面余额自 F1-2 审定账龄聚合，减值准备逐段录入。行序 = 各账龄段 → 小计 → 减：减值准备 → 合计。</p>
-        <p>2. （2）账龄超过1年的大额预付款项：债权单位可填；债务单位/余额/账龄自 F1-5 带入，须补「未结算的原因」。</p>
+        <p>2. （2）账龄超过1年的大额预付款项：四列全部自 F1-5 带入（债务单位 ← 债务人名称、期末余额 ← <b>审定余额</b>即已扣坏账准备、账龄 ← 账龄、未结算的原因 ← 未偿还或未结转的原因），债权单位缺省为被审计单位名称；本表可就地覆盖，覆盖值不回写 F1-5。F1-5 尚无行时暂由 F1-2「超1年」行派生（「来源」列会标 F1-2）。</p>
         <p>3. （3）按欠款方归集的期末余额前五名：按期末余额降序；减值准备可手工录入。</p>
         <p>4. 账龄档数随项目账龄枚举（3年段 / 5年段 / 自定义）自动适配，在 F1-2 明细表切换；超1年行的账龄下拉同步排除首档。</p>
         <p>5. 「同步到附注」推送至附注模块「{{ noteSectionId }} 预付款项」——逐段减值准备聚合为一行。</p>
@@ -176,8 +176,13 @@
         <GtIndexChip value="wp:F1-5" :context-project-id="projectId" />
       </h4>
       <div class="methodology-context">
-        源模板口径：债权单位 / 债务单位 / 期末余额 / 账龄 / 未结算的原因，五列齐备。
-        债务单位、期末余额、账龄自 F1-5「账龄1年以上的大额预付账款检查表」带入；
+        源模板口径（`附注披露信息(国企)` R18 逐格公式）：本表四列全部自 F1-5 带入 ——
+        债务单位 ← F1-5「债务人名称」、<b>期末余额 ← F1-5「审定余额」（= 期末余额 − 计提坏账准备）</b>、
+        账龄 ← F1-5「账龄」、未结算的原因 ← F1-5「未偿还或未结转的原因」；
+        债权单位缺省为被审计单位名称。以上均可在本表就地覆盖（覆盖值只存披露表，不回写 F1-5）。
+        <template v-if="!over1FromLongTermSheet">
+          <br>当前 F1-5 尚无行 → 暫由 F1-2 明细的「超 1 年」行派生（口径为明细期末审定数，未扣坏账）。
+        </template>
         完整性校验：期末余额 ≠ 0 的行四列均不得为空。
       </div>
       <el-table :data="over1TableData" size="small" border stripe>
@@ -191,9 +196,22 @@
                 :model-value="row.creditorUnit"
                 size="small"
                 :disabled="isReadonly"
+                :placeholder="clientName || '填写债权单位'"
                 @change="(v: string) => updateOver1Field(row.rowId, 'creditorUnit', v)"
               />
             </template>
+          </template>
+        </el-table-column>
+        <el-table-column label="来源" width="82" align="center">
+          <template #default="{ row }">
+            <el-tag
+              v-if="row.rowId !== '__total__'"
+              size="small"
+              :type="OVER1_SOURCE_TAG[row.source]?.type ?? 'info'"
+              effect="plain"
+            >
+              {{ OVER1_SOURCE_TAG[row.source]?.text ?? '手工' }}
+            </el-tag>
           </template>
         </el-table-column>
         <el-table-column label="债务单位" min-width="140">
@@ -424,11 +442,24 @@ const props = withDefaults(defineProps<{
   tbSourceCodes?: unknown
   /** 报表「预付款项」期末数（render project_context.prepaid_tb_amount），供 F7-1 勾稽 */
   reportAmount?: number
+  /**
+   * 被审计单位名称（render project_context.client_name）——②表「债权单位」缺省值。
+   * 源 xlsx A18 = `RIGHT($A$3,…)`，本列在源模板里本就是自动带出的。
+   */
+  clientName?: string
 }>(), {
   applicableStandards: () => [],
   impairmentPrefill: null,
   reportAmount: 0,
+  clientName: '',
 })
+
+/** ②表行来源 tag（UI 全中文化） */
+const OVER1_SOURCE_TAG: Record<string, { text: string; type: 'success' | 'warning' | 'info' }> = {
+  'f1-5': { text: 'F1-5', type: 'success' },
+  'f1-2': { text: 'F1-2', type: 'warning' },
+  manual: { text: '手工', type: 'info' },
+}
 
 const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
 const noteSectionId = F1_NOTE_SECTION.soe
@@ -477,6 +508,7 @@ const {
   updateAgingBadDebt,
   over1YearRows,
   over1YearTotal,
+  over1FromLongTermSheet,
   addOver1Row,
   removeOver1Row,
   updateOver1Field,
@@ -499,6 +531,7 @@ const {
   applicableStandards: toRef(props, 'applicableStandards') as unknown as Ref<string[]>,
   impairmentPrefill: computed(() => props.impairmentPrefill ?? null) as unknown as
     Ref<{ end: number; prior: number } | null>,
+  clientName: computed(() => props.clientName ?? '') as unknown as Ref<string>,
 })
 
 // ─── 披露内部勾稽（规则全取 F7-1~F7-14 + 国企附加四表库比对）──────────────────

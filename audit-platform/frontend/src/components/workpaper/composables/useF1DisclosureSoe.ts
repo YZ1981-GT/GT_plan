@@ -26,6 +26,9 @@ export interface F1SoeAgingRow {
   priorBadDebt: number
 }
 
+/** ②表行来源（只读展示，不进附注载荷） */
+export type F1SoeOver1Source = 'f1-5' | 'f1-2' | 'manual'
+
 export interface F1SoeOver1Row {
   rowId: string
   creditorUnit: string
@@ -34,6 +37,23 @@ export interface F1SoeOver1Row {
   agingLabel: string
   reason: string
   fromCrossSheet: boolean
+  source: F1SoeOver1Source
+}
+
+/** F1-5「账龄1年以上的大额预付账款检查表」持久化行（`F1-lt-rows`）的取用子集 */
+export interface F1LongTermSourceRow {
+  customerName: string
+  endBalance: number
+  badDebtProvision: number
+  aging: string
+  reason: string
+}
+
+/** F1-2 明细派生的「超1年」行（`crossSheet.longTermRows`），F1-5 为空时的回退源 */
+export interface F1CrossLongTermRow {
+  customerName: string
+  endAudited: number
+  agingDescription: string
 }
 
 export interface F1SoeTop5Row {
@@ -61,6 +81,14 @@ export interface UseF1DisclosureSoeOptions {
    * （宁缺勿造）。此处只做两件事：① 溯源展示；② 勾稽「逐段合计 vs 四表库期末」。
    */
   impairmentPrefill?: Ref<{ end: number; prior: number } | null>
+  /**
+   * 被审计单位名称（render `project_context.client_name`）。
+   *
+   * 源 xlsx `附注披露信息(国企)` A18~A20 是 `=RIGHT($A$3,LEN($A$3)-SEARCH("：",$A$3))`
+   * —— 即从底稿目录「被审计单位：XXX」截出的主体名 → ②表「债权单位」列**本就是自动带出**的，
+   * 不该让审计师逐行敲。改造前该列恒空，导致校验预设 `F7-9`（soe）恒不通过。
+   */
+  clientName?: Ref<string>
 }
 
 const PREFIX = 'F1-note-soe-'
@@ -68,6 +96,11 @@ const ITEM_OVER1_ROWS = `${PREFIX}over1-rows`
 const ITEM_OVER1_META = `${PREFIX}over1-meta`
 const ITEM_AGING_BAD_DEBT = `${PREFIX}aging-bad-debt`
 const ITEM_TOP5_BAD_DEBT = `${PREFIX}top5-bad-debt`
+/** F1-5 长期挂款检查表持久化键（②表的权威数据源） */
+const ITEM_LONG_TERM_ROWS = 'F1-lt-rows'
+
+/** 账龄缺省描述（源模板②表本身不含账龄枚举，只是一段文字） */
+const OVER1_AGING_FALLBACK = '1年以上'
 
 /** 国企首档带「（含1年）」；其余档位取共享表（per-section 覆盖范式）。 */
 const F1_SOE_AGING_OVERRIDES: Readonly<Record<string, string>> = SOE_AGING_OVERRIDES
@@ -89,10 +122,106 @@ function safeParseJson<T>(jsonStr: string | null | undefined, fallback: T): T {
   }
 }
 
+/** F1-5 行是否有效（债务人名称非空即算一行，金额可为 0） */
+function isValidLongTermRow(r: F1LongTermSourceRow): boolean {
+  return String(r?.customerName ?? '').trim() !== ''
+}
+
+/**
+ * 国企披露②表行集构造（纯函数，零 Vue 依赖）。
+ *
+ * 🔴 源模板逐格实证（`附注披露信息(国企)` R18）——②表四列**全部**指向 F1-5：
+ *
+ * | ②表列 | 源公式 | F1-5 列 |
+ * |---|---|---|
+ * | 债权单位 | `=RIGHT($A$3,…)` | —（被审计单位名） |
+ * | 债务单位 | `='长期挂款检查表F1-5'!A6` | A 债务人名称 |
+ * | 期末余额 | `='长期挂款检查表F1-5'!J6` | **J 审定余额** = B 期末余额 − I 计提坏账准备 |
+ * | 账龄 | `='长期挂款检查表F1-5'!C6` | C 账龄 |
+ * | 未结算的原因 | `='长期挂款检查表F1-5'!E6` | E 未偿还或未结转的原因 |
+ *
+ * 改造前本表读的是 `crossSheet.longTermRows`（由 F1-2 明细**派生**）：
+ * 「期末余额」用未扣坏账的 `endAudited`、「账龄」是自动拼接串、「未结算的原因」
+ * 另存一份 meta 与 F1-5 已有的 `reason` 列构成**重复录入**。
+ *
+ * 优先级（三层，逐字段独立）：`metaMap` 手工覆盖 > 源行值 > 缺省值。
+ * F1-5 有有效行则用 F1-5，否则回退 F1-2 派生行（升级零回归）。
+ */
+export function buildSoeOver1Rows(input: {
+  longTermSheetRows: readonly F1LongTermSourceRow[]
+  crossSheetRows: readonly F1CrossLongTermRow[]
+  dynamicRows: readonly F1SoeOver1Row[]
+  metaMap: Readonly<Record<string, Over1Meta>>
+  defaultCreditorUnit: string
+}): F1SoeOver1Row[] {
+  const {
+    longTermSheetRows = [],
+    crossSheetRows = [],
+    dynamicRows = [],
+    metaMap = {},
+    defaultCreditorUnit = '',
+  } = input
+  const fallbackCreditor = String(defaultCreditorUnit ?? '').trim()
+  const metaOf = (name: string): Over1Meta => metaMap[name] || {}
+  const pickCreditor = (meta: Over1Meta, own?: string): string =>
+    String(meta.creditorUnit ?? '').trim()
+    || String(own ?? '').trim()
+    || fallbackCreditor
+
+  const ltRows = longTermSheetRows.filter(isValidLongTermRow)
+
+  const sourced: F1SoeOver1Row[] = ltRows.length
+    ? ltRows.map((r) => {
+        const name = String(r.customerName).trim()
+        const meta = metaOf(name)
+        return {
+          rowId: `lt-${name}`,
+          creditorUnit: pickCreditor(meta),
+          debtorUnit: name,
+          // 源 J 列 = B − I（不信任持久化的 auditedBalance，按定义现算）
+          endBalance: parseNum(r.endBalance) - parseNum(r.badDebtProvision),
+          agingLabel:
+            String(meta.agingLabel ?? '').trim()
+            || String(r.aging ?? '').trim()
+            || OVER1_AGING_FALLBACK,
+          reason:
+            String(meta.reason ?? '').trim() || String(r.reason ?? '').trim(),
+          fromCrossSheet: true,
+          source: 'f1-5' as const,
+        }
+      })
+    : crossSheetRows.map((r) => {
+        const name = String(r.customerName ?? '').trim()
+        const meta = metaOf(name)
+        return {
+          rowId: `cs-lt-${name}`,
+          creditorUnit: pickCreditor(meta),
+          debtorUnit: name,
+          endBalance: parseNum(r.endAudited),
+          agingLabel:
+            String(meta.agingLabel ?? '').trim()
+            || String(r.agingDescription ?? '').trim()
+            || OVER1_AGING_FALLBACK,
+          reason: String(meta.reason ?? '').trim(),
+          fromCrossSheet: true,
+          source: 'f1-2' as const,
+        }
+      })
+
+  const manual: F1SoeOver1Row[] = dynamicRows.map((r) => ({
+    ...r,
+    creditorUnit: pickCreditor({}, r.creditorUnit),
+    fromCrossSheet: false,
+    source: 'manual' as const,
+  }))
+
+  return [...sourced, ...manual]
+}
+
 export function useF1DisclosureSoe(options: UseF1DisclosureSoeOptions) {
   const {
     allResponses, debouncedSave, crossSheet, isReadonly, applicableStandards,
-    impairmentPrefill,
+    impairmentPrefill, clientName,
   } = options
   const eventListeners: Array<{ event: string; handler: (e: Event) => void }> = []
 
@@ -203,6 +332,7 @@ export function useF1DisclosureSoe(options: UseF1DisclosureSoeOptions) {
         agingLabel: r.agingLabel || '',
         reason: r.reason || '',
         fromCrossSheet: false,
+        source: 'manual' as const,
       }))
     },
     { immediate: true },
@@ -214,23 +344,36 @@ export function useF1DisclosureSoe(options: UseF1DisclosureSoeOptions) {
     { immediate: true },
   )
 
-  const over1YearRows: ComputedRef<F1SoeOver1Row[]> = computed(() => {
-    const ltRows = crossSheet.longTermRows?.value ?? []
-    const cs = ltRows.map((r) => {
-      const name = r.customerName || ''
-      const meta = over1MetaMap.value[name] || {}
-      return {
-        rowId: `cs-lt-${name}`,
-        creditorUnit: meta.creditorUnit || '',
-        debtorUnit: name,
-        endBalance: parseNum(r.endAudited),
-        agingLabel: meta.agingLabel || r.agingDescription || '1年以上',
-        reason: meta.reason || '',
-        fromCrossSheet: true,
-      }
-    })
-    return [...cs, ...over1DynamicRows.value]
+  /** F1-5 持久化行（②表权威数据源；只读，披露表永不回写 F1-5） */
+  const longTermSheetRows: ComputedRef<F1LongTermSourceRow[]> = computed(() => {
+    const raw = safeParseJson<Array<Record<string, unknown>>>(
+      allResponses.value.get(ITEM_LONG_TERM_ROWS)?.remark,
+      [],
+    )
+    if (!Array.isArray(raw)) return []
+    return raw.map((r) => ({
+      customerName: String((r as any)?.customerName ?? ''),
+      endBalance: parseNum((r as any)?.endBalance),
+      badDebtProvision: parseNum((r as any)?.badDebtProvision),
+      aging: String((r as any)?.aging ?? ''),
+      reason: String((r as any)?.reason ?? (r as any)?.unsettledReason ?? ''),
+    }))
   })
+
+  /** ②表是否已由 F1-5 驱动（UI 用于提示口径来源） */
+  const over1FromLongTermSheet: ComputedRef<boolean> = computed(
+    () => longTermSheetRows.value.some(isValidLongTermRow),
+  )
+
+  const over1YearRows: ComputedRef<F1SoeOver1Row[]> = computed(() =>
+    buildSoeOver1Rows({
+      longTermSheetRows: longTermSheetRows.value,
+      crossSheetRows: crossSheet.longTermRows?.value ?? [],
+      dynamicRows: over1DynamicRows.value,
+      metaMap: over1MetaMap.value,
+      defaultCreditorUnit: clientName?.value ?? '',
+    }),
+  )
 
   const over1YearTotal = computed(() => ({
     endBalance: calcSubtotal(over1YearRows.value.map((r) => r.endBalance)),
@@ -282,6 +425,7 @@ export function useF1DisclosureSoe(options: UseF1DisclosureSoeOptions) {
         agingLabel: '',
         reason: '',
         fromCrossSheet: false,
+        source: 'manual',
       },
     ]
     persistOver1Dynamic()
@@ -435,6 +579,8 @@ export function useF1DisclosureSoe(options: UseF1DisclosureSoeOptions) {
     updateAgingBadDebt,
     over1YearRows,
     over1YearTotal,
+    over1FromLongTermSheet,
+    longTermSheetRows,
     addOver1Row,
     removeOver1Row,
     updateOver1Field,

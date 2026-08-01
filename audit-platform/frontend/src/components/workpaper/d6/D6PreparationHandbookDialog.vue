@@ -54,7 +54,7 @@ function close() {
       :closable="false"
       show-icon
       class="mb12"
-      title="一句话：D6-2 明细立清单(可从四表库取数) → 检查/政策/ECL 减值测算 → 差异进 D6-4 → 确认回写 D6-1 → 勾稽 TB(1402) → 附注。本弹窗不改各表页内说明。"
+      title="一句话：D6-2 明细立清单(可从四表库取数) → 检查/政策/ECL 减值测算 → 差异进 D6-4 → 确认回写 D6-1 → 勾稽 TB(1141) → 附注。本弹窗不改各表页内说明。"
     />
 
     <el-tabs v-model="activeTab">

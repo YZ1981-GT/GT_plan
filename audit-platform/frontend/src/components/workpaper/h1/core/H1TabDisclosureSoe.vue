@@ -316,17 +316,19 @@
           从 H6-2 同步明细
         </el-button>
       </div>
-      <div class="note-block">
-        <div class="note-label">注：超 1 年清理进展</div>
-        <el-input
-          v-model="state.clearingNote"
-          type="textarea"
-          :rows="2"
-          :disabled="isReadonly"
-          :placeholder="CLEARING_NOTE_PLACEHOLDER"
-          @change="persistAll"
-        />
-      </div>
+      <WpNoteTextArea
+        v-model="state.clearingNote"
+        label="注：超 1 年清理进展"
+        testid-prefix="h1-soe-clearing"
+        :min-rows="2"
+        :max-rows="6"
+        :disabled="isReadonly"
+        :placeholder="CLEARING_NOTE_PLACEHOLDER"
+        :ai-loading="aiLoadingSection === 'clearing'"
+        @change="persistAll"
+        @ai="runAi('clearing')"
+        @review="openReview('clearing')"
+      />
     </el-card>
 
     <!-- F 已提足折旧仍在使用 -->
@@ -397,6 +399,9 @@ import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
 import GtIndexChip from '../../GtIndexChip.vue'
+import WpNoteTextArea from '../../shared/disclosure/WpNoteTextArea.vue'
+import { useHCycleDisclosureAi } from '../../composables/useHCycleDisclosureAi'
+import { H_CYCLE_NOTE_AI_SECTIONS } from '../../composables/hCycleNoteAiSections'
 import H1DisclosureConsistencyPanel from './H1DisclosureConsistencyPanel.vue'
 import { checkH1SoeConsistency } from '../../composables/h1DisclosureConsistency'
 import {
@@ -579,6 +584,23 @@ watch(
   },
   { immediate: true },
 )
+
+// ─── 披露说明 AI 辅助 + 复核（原本无 AI 按钮） ───────────────────────────────
+const { aiLoadingSection: aiLoadingRef, runAi, openReview } = useHCycleDisclosureAi({
+  wpCode: 'H1',
+  variant: 'soe',
+  wpId: () => props.wpId,
+  isReadonly: () => props.isReadonly,
+  noteSectionId,
+  labels: H_CYCLE_NOTE_AI_SECTIONS.H1.soe,
+  fields: {
+    clearing: {
+      get: () => state.clearingNote || '',
+      set: (v) => { state.clearingNote = v; persistAll() },
+    },
+  },
+})
+const aiLoadingSection = computed(() => aiLoadingRef.value)
 
 function persistAll(): void {
   if (props.isReadonly) return

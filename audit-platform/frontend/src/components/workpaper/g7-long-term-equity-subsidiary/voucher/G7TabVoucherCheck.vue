@@ -7,7 +7,7 @@
           v-if="!isReadonly && wpId && projectId"
           :project-id="projectId"
           :workpaper-id="wpId"
-          account-code="1511"
+          :account-code="G7_GROSS_FALLBACK_STANDARD"
           phase="final"
           :year="auditYear"
           @filled="onSampleFilled"
@@ -439,6 +439,7 @@ import { useG7SubImportExport } from '../../composables/useG7SubImportExport'
 import { WorkpaperRuntimeContextKey } from '../../composables/useWorkpaperScaffold'
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
+import { G7_GROSS_FALLBACK_STANDARD } from '../../composables/g7AccountScope'
 
 const props = defineProps<{
   htmlData: Record<string, any> | null
@@ -852,7 +853,7 @@ async function handleAi(section: string): Promise<void> {
         existingContent: conclusionText.value,
         relatedContext: {
           sheet: 'G7-18',
-          accountCode: '1511',
+          accountCode: G7_GROSS_FALLBACK_STANDARD,
           rowCount: rows.value.length,
           abnormalCount: abnormalCount.value,
           debitTotal: debitTotal.value,

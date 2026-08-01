@@ -252,6 +252,7 @@ import http from '@/utils/http'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useChecklistPersistence } from '@/composables/workpaper/useChecklistPersistence'
 import { collectChecklistResponses, toChecklistPatch } from '@/composables/workpaper/checklistPersistenceHelpers'
+import { autoSeedK1DetailFromAux } from './composables/useK1DetailAutoSeed'
 import {
   WorkpaperRuntimeContextKey,
   type WorkpaperRuntimeContext,
@@ -522,6 +523,16 @@ async function selfLoad(): Promise<void> {
     console.warn('[GtK1OtherReceivables] selfLoad failed:', err)
   } finally {
     isLoading.value = false
+  }
+
+  // K1-2 空表时自动从四表库（辅助余额）归集，级联到 K1-1/披露表的账龄/性质/前五名。
+  // 非空表跳过（不覆盖手工数据）；失败静默不打断页面。
+  if (props.wpId) {
+    void autoSeedK1DetailFromAux({
+      wpId: props.wpId,
+      allResponses: allResponses.value,
+      reload: () => persistence.load(),
+    })
   }
 }
 

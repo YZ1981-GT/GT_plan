@@ -86,7 +86,9 @@ export const D2_TABLE_NAMES = {
     writeOffDetail: '重要的应收账款核销情况（逐项披露）',
     top5: '按欠款方归集的应收账款和合同资产期末余额前五名单位情况',
     derecognized: '因金融资产转移而终止确认的应收账款情况',
-    continuedInvolvement: '转移应收账款且继续涉入形成的资产、负债',
+    // 🔴 源模板 R172 字面「…形成的资产、负债的金额」（漏「的金额」二字，2026-08-01 实证修正；
+    // 旧名进 D2_LISTED_OBSOLETE_TABLE_KEYS 供孤儿清理）。
+    continuedInvolvement: '转移应收账款且继续涉入形成的资产、负债的金额',
   },
   soe: {
     aging: '（1）按账龄披露应收账款',
@@ -125,6 +127,8 @@ export const D2_SOE_PRIOR_SUFFIX = '（续：期初数）'
 export const D2_LISTED_OBSOLETE_TABLE_KEYS: readonly string[] = [
   '按坏账计提方法分类披露（上年年末金额）',
   '按单项计提坏账准备的应收账款（上年年末金额）',
+  // 2026-08-01 实证：源模板 R172 字面漏「的金额」，改名后旧键需清理。
+  '转移应收账款且继续涉入形成的资产、负债',
 ]
 
 /**

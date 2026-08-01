@@ -10,7 +10,7 @@
           <div class="title-actions">
             <el-button size="small" type="success" :loading="syncing" :disabled="!hasAdjudicatedData" @click="syncToNote">同步到附注</el-button>
             <el-button size="small" type="primary" plain @click="jumpToNote">↩ 跳转回附注（八、25）</el-button>
-            <el-button size="small" type="default" link @click="handleReview('H5-disc-S')">💬 复核</el-button>
+            <el-button size="small" type="default" link @click="openReview('disclosure')">💬 复核</el-button>
           </div>
         </div>
       </template>
@@ -33,11 +33,23 @@
         </el-table>
       </div>
 
+      <WpDisclosureConsistencyPanel :results="consistencyChecks" :project-id="projectId" />
+
       <!-- 国企特殊披露 -->
       <div class="note-section">
-        <h4>补充披露（国资监管要求）</h4>
-        <el-input v-model="soeDisclosureText" type="textarea" :autosize="{ minRows: 4, maxRows: 12 }"
-          placeholder="国企特殊披露内容（产能利用率、储量变动、安全生产投入等）..." :disabled="isReadonly" />
+        <WpNoteTextArea
+          v-model="soeDisclosureText"
+          label="补充披露（国资监管要求）"
+          testid-prefix="h5-soe-disclosure"
+          :min-rows="4"
+          :max-rows="12"
+          :disabled="isReadonly"
+          placeholder="国企特殊披露内容（产能利用率、储量变动、安全生产投入等）..."
+          :ai-loading="aiLoadingSection === 'disclosure'"
+          @change="persistText"
+          @ai="runAi('disclosure')"
+          @review="openReview('disclosure')"
+        />
       </div>
     </el-card>
 
@@ -62,14 +74,38 @@ import { useAuditContext } from '@/composables/useAuditContext'
 import { buildH5SyncPayload, H5_NOTE_SECTION } from '../../composables/h5NoteSectionMap'
 import { buildNoteJumpRoute } from '@/views/composables/noteDisclosureReverseJump'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import WpNoteTextArea from '../../shared/disclosure/WpNoteTextArea.vue'
+import WpDisclosureConsistencyPanel from '../../shared/disclosure/WpDisclosureConsistencyPanel.vue'
+import { buildH5Checks } from '../../composables/h5DisclosureConsistency'
+import { useHCycleDisclosureAi } from '../../composables/useHCycleDisclosureAi'
+import { H_CYCLE_NOTE_AI_SECTIONS } from '../../composables/hCycleNoteAiSections'
 
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean }>()
 const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
-const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 const router = useRouter()
 const { year: auditYear } = useAuditContext()
 
 const soeDisclosureText = ref('')
+
+// 🔴 原实现里 `soeDisclosureText` 只在「同步到附注」时随载荷推出去，**底稿侧从不落库**
+// → 未同步就刷新即丢，AI 生成的文本同样存不下来。此处补齐 hydrate + persist。
+const H5_SOE_TEXT_ITEM = 'H5-disc-soe-text'
+const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
+
+function persistText(): void {
+  if (props.isReadonly) return
+  saveResponse(H5_SOE_TEXT_ITEM, { remark: soeDisclosureText.value || '' })
+}
+
+watch(
+  () => props.allResponses,
+  () => {
+    const persisted = String(props.allResponses.get(H5_SOE_TEXT_ITEM)?.remark ?? '')
+    if (persisted && !soeDisclosureText.value) soeDisclosureText.value = persisted
+  },
+  { immediate: true, deep: true },
+)
+
 const syncing = ref(false)
 const adjudicatedData = ref<{ costAudited: number; depletionAudited: number; impairmentAudited: number; netValue: number } | null>(null)
 
@@ -123,7 +159,33 @@ const summaryRows = computed(() => {
   ]
 })
 
-function handleReview(id: string) { openReviewDialog(id) }
+// ─── 披露说明 AI 辅助 + 复核（原本无 AI 按钮；复核原传字符串签名错误） ────────
+const { aiLoadingSection: aiLoadingRef, runAi, openReview } = useHCycleDisclosureAi({
+  wpCode: 'H5',
+  variant: 'soe',
+  wpId: () => props.wpId,
+  isReadonly: () => props.isReadonly,
+  noteSectionId: H5_NOTE_SECTION.soe,
+  labels: H_CYCLE_NOTE_AI_SECTIONS.H5.soe,
+  fields: {
+    disclosure: {
+      get: () => soeDisclosureText.value || '',
+      set: (v) => { soeDisclosureText.value = v; persistText() },
+    },
+  },
+})
+const aiLoadingSection = computed(() => aiLoadingRef.value)
+
+const consistencyChecks = computed(() => {
+  const rows = summaryRows.value
+  const find = (item: string) => rows.find((r) => r.item === item)?.endBalance ?? null
+  return buildH5Checks({
+    cost: find('油气资产原值'),
+    depletion: find('减：累计折耗'),
+    impairment: find('减：减值准备'),
+    netValue: find('油气资产净值'),
+  })
+})
 
 // ─── 同步到附注 ──────────────────────────────────────────────────────────────
 async function syncToNote(): Promise<void> {

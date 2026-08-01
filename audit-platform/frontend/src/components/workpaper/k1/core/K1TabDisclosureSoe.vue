@@ -57,7 +57,14 @@
       @navigate-sheet="(s) => emit('navigate-sheet', s)"
     />
 
-    <!-- 勾稽告警 T1/T8/T9/T10/T11/T12 -->
+    <!-- 勾稽告警 T1/T8/T9/T10/T11/T12/F8-48 -->
+    <el-alert
+      v-if="dis.summaryTieOut.value.applicable && !dis.summaryTieOut.value.matched"
+      type="warning"
+      :closable="false"
+      class="tie-out-alert"
+      :title="`F8-48 汇总表明细行之和 ${fmt(dis.summaryTieOut.value.sum)} ≠ 合计 ${fmt(dis.summaryFigures.value.total)}（差额 ${fmt(dis.summaryTieOut.value.diff)}）`"
+    />
     <el-alert
       v-if="!dis.agingTieOut.value.matched"
       type="warning"
@@ -865,7 +872,8 @@
         <li><b>⑨⑩ 转移 / 继续涉入</b>：国企源模板转移表<b>无</b>「转移方式」列（上市版才有）；损失以「-」填列。</li>
         <li><b>⑪ 政府补助</b>：国企附注为文字 + 表，逐项披露发文单位、项目、期末余额、期末账龄与预计收取依据。</li>
         <li><b>资金集中管理</b>：国企附注独立成 §八、8「应收资金集中管理款」章节，不在本表内披露。</li>
-        <li><b>同步范围</b>：「同步至附注」写入 八、9 的 14 张子表 + 文字段落。</li>
+        <li><b>汇总表「其他应收款」</b>：由 K1-1「与经审计的财务报表核对」区三行推送；三项全为 0 时不推送。</li>
+        <li><b>同步范围</b>：「同步至附注」写入 八、9 的汇总表 + 14 张子表 + 文字段落（共 15 张子表）。</li>
       </ul>
     </details>
   </div>

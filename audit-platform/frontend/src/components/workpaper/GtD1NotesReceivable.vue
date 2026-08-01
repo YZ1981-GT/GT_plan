@@ -122,6 +122,8 @@
 
         :tb-seed-amount="tbNotesReceivableAmount"
 
+        :tb-seed-provenance="tbNotesReceivableProvenance"
+
       />
 
       <D1TabDetailCategory
@@ -625,11 +627,41 @@ const relatedParties = computed<string[]>(() => {
 
 const d1ReviewSection = computed(() => resolveD1ReviewSection(currentSheet.value))
 
-// 试算平衡表应收票据(1121)数：由 render 提供，供 D1-1 审定表 TB 差异行预填
+/**
+ * 试算平衡表应收票据**净额**（原值 1121 − 坏账准备 1231-01）：由 render 提供，
+ * 供 D1-1 审定表 TB↔审定净值核对行做 seed 回退。
+ *
+ * 🔴 净额口径（不是原值）：源模板 `审定表D1-1` 的差异数 `E20=E18-E19`，E18 是
+ * 「三、应收票据净值」小计 → 被比较的「试算平衡表数」必然是净额；`report_config`
+ * 的 BS-005 在 soe_standalone 下公式亦为 `TB('1121')-TB('1231-01')`。取原值会让核对行
+ * 显示一个恰好等于坏账准备的**假差异**（实测项目 0ec33ac9：1,162,288.03）。
+ *
+ * 主路径是 Tier A 公式 `D1-adj-tb-amount` 求值后 transient seed 到锚点；本值仅在
+ * 该公式缺失/被停用时兜底，两者同口径。
+ */
 const tbNotesReceivableAmount = computed<number>(() => {
   const ctx = props.htmlData?.project_context ?? props.htmlData?.projectContext
   const v = Number(ctx?.tb_amount)
   return Number.isFinite(v) ? v : 0
+})
+
+/** TB 核对行取数溯源：原值 / 坏账准备 / 净额，供审定表 tooltip 展示（可追溯口径）。 */
+const tbNotesReceivableProvenance = computed<{
+  gross: number; provision: number; net: number; hasProvision: boolean
+}>(() => {
+  const ctx = props.htmlData?.project_context ?? props.htmlData?.projectContext
+  const num = (v: unknown): number => {
+    const n = Number(v)
+    return Number.isFinite(n) ? n : 0
+  }
+  const hasProvision = ctx?.tb_amount_gross !== undefined
+  const gross = hasProvision ? num(ctx?.tb_amount_gross) : num(ctx?.tb_amount)
+  return {
+    gross,
+    provision: num(ctx?.tb_provision_amount),
+    net: num(ctx?.tb_amount),
+    hasProvision,
+  }
 })
 
 // 资产负债表日（render 提供）：供 D1-3 期后兑付取数窗口

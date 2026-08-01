@@ -32,8 +32,6 @@
         </el-button>
         <el-button size="small" type="primary" plain :disabled="!projectId" @click="jumpToNote('listed')">↩ 跳转回附注（五、25）</el-button>
         <el-button size="small" :disabled="!projectId" @click="checkNoteConsistency(false)">✅ 校对附注</el-button>
-        <el-button size="small" type="primary" plain @click="emit('open-ai', 'disclosure-listed')">AI 辅助</el-button>
-        <el-button size="small" @click="emit('open-review', 'disclosure-listed')">复核</el-button>
         <span class="chip-wrap"><GtIndexChip value="wp:H8-1" :context-project-id="projectId" /></span>
         <span class="chip-wrap"><GtIndexChip value="wp:H8-2" :context-project-id="projectId" /></span>
         <span class="chip-wrap"><GtIndexChip value="wp:H8-10" :context-project-id="projectId" /></span>
@@ -125,52 +123,64 @@
     <section class="block guidance-block">
       <h4 class="sub-title">披露提示与说明</h4>
       <el-alert type="info" :closable="false" class="guide-alert">{{ H8_LISTED_GUIDANCE.shortLow }}</el-alert>
-      <div class="note-field">
-        <label>短期/低价值租赁费用说明</label>
-        <el-input
-          v-model="noteShortLow"
-          type="textarea"
-          :autosize="{ minRows: 2, maxRows: 6 }"
-          :disabled="isReadonly"
-          :placeholder="H8_LISTED_GUIDANCE.shortLow"
-          @change="persist"
-        />
-      </div>
+      <WpNoteTextArea
+        v-model="noteShortLow"
+        label="短期/低价值租赁费用说明"
+        testid-prefix="h8-listed-shortLow"
+        :min-rows="2"
+        :max-rows="6"
+        :disabled="isReadonly"
+        :placeholder="H8_LISTED_GUIDANCE.shortLow"
+        :ai-loading="aiLoadingSection === 'shortLow'"
+        @change="persist"
+        @ai="runAi('shortLow')"
+        @review="openReview('shortLow')"
+      />
       <el-alert type="info" :closable="false" class="guide-alert">{{ H8_LISTED_GUIDANCE.impairment }}</el-alert>
       <el-alert type="warning" :closable="false" class="guide-alert warn">{{ H8_LISTED_GUIDANCE.impairmentNote }}</el-alert>
-      <div class="note-field">
-        <label>减值测试披露说明</label>
-        <el-input
-          v-model="noteImpairment"
-          type="textarea"
-          :autosize="{ minRows: 3, maxRows: 8 }"
-          :disabled="isReadonly"
-          :placeholder="H8_LISTED_GUIDANCE.impairment"
-          @change="persist"
-        />
-      </div>
+      <WpNoteTextArea
+        v-model="noteImpairment"
+        label="减值测试披露说明"
+        testid-prefix="h8-listed-impairment"
+        :min-rows="3"
+        :max-rows="8"
+        :disabled="isReadonly"
+        :placeholder="H8_LISTED_GUIDANCE.impairment"
+        :ai-loading="aiLoadingSection === 'impairment'"
+        @change="persist"
+        @ai="runAi('impairment')"
+        @review="openReview('impairment')"
+      />
     </section>
 
     <el-card shadow="never" class="audit-card">
-      <template #header><span class="card-title">审计说明</span></template>
-      <el-input
+      <WpNoteTextArea
         v-model="auditNote"
-        type="textarea"
-        :autosize="{ minRows: 4 }"
+        card
+        label="审计说明"
+        testid-prefix="h8-listed-auditNote"
+        :min-rows="4"
         :disabled="isReadonly"
         placeholder="说明取数来源（H8-1/H8-2）、分类口径、与附注勾稽情况…"
+        :ai-loading="aiLoadingSection === 'auditNote'"
         @change="persist"
+        @ai="runAi('auditNote')"
+        @review="openReview('auditNote')"
       />
     </el-card>
     <el-card shadow="never" class="audit-card">
-      <template #header><span class="card-title">审计结论</span></template>
-      <el-input
+      <WpNoteTextArea
         v-model="auditConclusion"
-        type="textarea"
-        :autosize="{ minRows: 2 }"
+        card
+        label="审计结论"
+        testid-prefix="h8-listed-auditConclusion"
+        :min-rows="2"
         :disabled="isReadonly"
         placeholder="本表披露是否恰当、完整…"
+        :ai-loading="aiLoadingSection === 'auditConclusion'"
         @change="persist"
+        @ai="runAi('auditConclusion')"
+        @review="openReview('auditConclusion')"
       />
     </el-card>
 
@@ -190,13 +200,16 @@
  * H8TabDisclosureListed — 使用权资产附注披露（上市公司）
  * HTML 主表 + 同步附注五、25；OO 不再作为唯一编辑面
  */
-import { ref, toRef, onBeforeUnmount } from 'vue'
+import { computed, ref, toRef, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import { useHCycleDisclosureAi } from '../../composables/useHCycleDisclosureAi'
+import { H8_NOTE_AI_SECTIONS } from '../../composables/h8NoteAiSections'
+import WpNoteTextArea from '../../shared/disclosure/WpNoteTextArea.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { useH8ListedDisclosure } from '../../composables/useH8Disclosure'
 import {
@@ -222,8 +235,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'save', itemId: string, value: any): void
-  (e: 'open-ai', section: string): void
-  (e: 'open-review', section: string): void
 }>()
 
 const noteSectionId = H8_NOTE_SECTION.listed
@@ -263,6 +274,27 @@ const {
   allResponses: toRef(props, 'allResponses'),
   onSave: (id, v) => { emit('save', id, v); autoSync.scheduleAutoSync(syncToNotes) },
 })
+
+// ─── 披露说明 AI 辅助 + 复核 ─────────────────────────────────────────────────
+// 🔴 原实现是 `emit('open-ai', …)` / `emit('open-review', …)`，而宿主
+// `GtH8RightOfUseAssets.vue` 只声明了 change / navigate-sheet / refresh-complete / save
+// → 两个按钮可见可点、**零网络请求**（`get_diagnostics` 与 vitest 全绿，
+// 只有浏览器实测才暴露）。现改接共享 `useDisclosureNoteAi`（真调 review-dialog/ai-generate）。
+const { aiLoadingSection: aiLoadingRef, runAi, openReview } = useHCycleDisclosureAi({
+  wpCode: 'H8',
+  variant: 'listed',
+  wpId: () => props.wpId,
+  isReadonly: () => props.isReadonly,
+  noteSectionId,
+  labels: H8_NOTE_AI_SECTIONS.listed,
+  fields: {
+    shortLow: { get: () => noteShortLow.value || '', set: (v) => { noteShortLow.value = v; persist() } },
+    impairment: { get: () => noteImpairment.value || '', set: (v) => { noteImpairment.value = v; persist() } },
+    auditNote: { get: () => auditNote.value || '', set: (v) => { auditNote.value = v; persist() } },
+    auditConclusion: { get: () => auditConclusion.value || '', set: (v) => { auditConclusion.value = v; persist() } },
+  },
+})
+const aiLoadingSection = computed(() => aiLoadingRef.value)
 
 function fmt(n: number): string {
   return (Number(n) || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })

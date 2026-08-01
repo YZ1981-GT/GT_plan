@@ -155,8 +155,14 @@ import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useG7ConsolLinkageEntry } from './composables/g7ConsolLinkageEntry'
 
-const G7_ACCOUNT_CODE = '1511'
-const G7_IMPAIRMENT_CODE = '1512'
+// 🔴 科目码单一真源：运行态取 render 下发的 tb_source_codes（报表映射解析结果），
+//    常量只作兜底。禁在本文件写字面量科目码（R11.1 / Property 15）。
+import {
+  g7AccountCode,
+  g7ImpairmentAccountCode,
+  isG7GrossCode,
+} from './composables/g7AccountScope'
+import type { TbSourceCodes } from './composables/shared/tbSourceCodes'
 
 // ─── defineAsyncComponent 懒加载所有子组件 ───────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
@@ -321,6 +327,16 @@ function handleLinkageChanged(): void {
   void linkageStale.refreshStale()
 }
 
+/** 四表取数溯源（render 下发；snake_case 为准，camelCase 回退） */
+const tbSourceCodes = computed<TbSourceCodes | null>(() => {
+  const ctx = (resolvedHtmlData.value?.project_context
+    ?? resolvedHtmlData.value?.projectContext
+    ?? {}) as Record<string, any>
+  const raw = ctx.tb_source_codes ?? ctx.tbSourceCodes
+  return raw && typeof raw === 'object' ? (raw as TbSourceCodes) : null
+})
+provide('g7TbSourceCodes', tbSourceCodes)
+
 /** 审定发布：仅保存后 writebackTb=true 才回写 TB；打开/编辑中的广播不改试算表 */
 function handleG7Adjudicated(e: Event): void {
   const detail = (e as CustomEvent<{
@@ -330,15 +346,20 @@ function handleG7Adjudicated(e: Event): void {
     impairmentAmount?: number
     writebackTb?: boolean
   }>).detail
-  if (detail?.accountCode !== G7_ACCOUNT_CODE) return
+  const src = tbSourceCodes.value
+  // 事件过滤按解析出的原值科目口径（点号边界），不比字面量
+  if (!isG7GrossCode(detail?.accountCode, src)) return
   if (detail.writebackTb !== true) return
   const amount = Number(detail.adjudicatedAmount)
   if (Number.isFinite(amount)) {
-    void formData.writebackTB(amount, G7_ACCOUNT_CODE)
+    void formData.writebackTB(amount, g7AccountCode(src))
   }
   const impairAmt = Number(detail.impairmentAmount)
   if (Number.isFinite(impairAmt)) {
-    void formData.writebackTB(impairAmt, detail.impairmentAccountCode || G7_IMPAIRMENT_CODE)
+    void formData.writebackTB(
+      impairAmt,
+      detail.impairmentAccountCode || g7ImpairmentAccountCode(src),
+    )
   }
 }
 

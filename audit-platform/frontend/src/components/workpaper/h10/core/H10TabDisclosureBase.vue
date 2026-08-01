@@ -22,6 +22,8 @@
       </div>
     </div>
 
+    <WpDisclosureConsistencyPanel :results="consistencyChecks" :project-id="projectId" />
+
     <details class="guidance-details" open>
       <summary>📋 编制提示</summary>
       <div class="guidance-content">
@@ -203,6 +205,8 @@ import { useRouter } from 'vue-router'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { useH10Disclosure } from '../../composables/useH10Disclosure'
+import WpDisclosureConsistencyPanel from '../../shared/disclosure/WpDisclosureConsistencyPanel.vue'
+import { buildH10RowChecks } from '../../composables/h10DisclosureConsistency'
 import { buildH10SyncPayloads } from '../../composables/h10DisclosureSyncPayload'
 import { H10_NOTE_SECTION, H10_NOTE_SECTION_DISPLAY } from '../../composables/h10NoteSectionMap'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
@@ -256,6 +260,8 @@ const reconcileAlertType = computed(() => {
   if (d == null) return 'success'
   return Math.abs(d) > 0.005 ? 'warning' : 'success'
 })
+
+const consistencyChecks = computed(() => buildH10RowChecks(dis.rows.value))
 
 const lastSyncedNonRecurring = ref<{ current: number; nonRecurring: number; diff: number } | null>(null)
 

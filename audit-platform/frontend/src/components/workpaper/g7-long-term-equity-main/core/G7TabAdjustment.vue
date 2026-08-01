@@ -334,8 +334,22 @@
  * - 导入导出 (sheet='G7-3', useG7ImportExport)
  * - 与集中调整分录模块双向同步，保存时按 1511/1512 分流回写 G7-1
  */
-import { ref, computed, inject, onMounted, onBeforeUnmount, watch } from 'vue'
+import {
+  ref,
+  computed,
+  inject,
+  onMounted,
+  onBeforeUnmount,
+  watch,
+  type ComputedRef,
+} from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
+import {
+  G7_ADJUSTMENT_ACCOUNT_OPTIONS,
+  g7AccountCode,
+  g7ImpairmentAccountCode,
+} from '../../composables/g7AccountScope'
+import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
 import { isDebitCreditBalanced, parseNum } from '../../composables/useG7FormulaEngine'
 import { useG7ImportExport } from '../../composables/useG7ImportExport'
 import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
@@ -400,13 +414,20 @@ const fileInputRef = ref<HTMLInputElement | null>(null)
 const syncing = ref(false)
 const lastSyncMsg = ref('')
 const auditYear = useWorkpaperAuditYear()
+
+/** 科目码单一真源（宿主 provide 的四表溯源 → 解析结果；常量只作兜底）*/
+const tbSourceCodes = inject<ComputedRef<TbSourceCodes | null>>(
+  'g7TbSourceCodes',
+  computed(() => null),
+)
+const accountGross = computed(() => g7AccountCode(tbSourceCodes.value))
+const accountImpairment = computed(() => g7ImpairmentAccountCode(tbSourceCodes.value))
 const ROWS_KEY = 'G7-3-rows'
 const categoryOptions = ['账项调整', '报表调整', '其他'] as const
+// 前四条（长投原值 / 减值准备 / 投资收益 / 资产减值损失）取共享声明，
+// 与 g7AdjustmentModel 的归一化清单同源；此处只补本 Tab 额外提供的对方科目。
 const accountOptions = [
-  { code: '1511', name: '长期股权投资' },
-  { code: '1512', name: '长期股权投资减值准备' },
-  { code: '6111', name: '投资收益' },
-  { code: '6701', name: '资产减值损失' },
+  ...G7_ADJUSTMENT_ACCOUNT_OPTIONS,
   { code: '1012', name: '银行存款' },
   { code: '1122', name: '应收账款' },
   { code: '2241', name: '其他应付款' },
@@ -505,7 +526,7 @@ function createEntry(description = ''): G7AdjustmentEntry {
     entryType: 'AJE',
     date: '',
     summary: description,
-    accountCode: '1511',
+    accountCode: accountGross.value,
     accountName: '长期股权投资',
     debitAmount: 0,
     creditAmount: 0,
@@ -647,11 +668,11 @@ async function handleRemoveEntry(id: string): Promise<void> {
   }
 }
 
-function aggregateAccount(codePrefix: '1511' | '1512'): { ajeTotal: number; rjeTotal: number } {
-  return aggregateAccountPure(entries.value, codePrefix)
+function aggregateAccount(codePrefix: string): { ajeTotal: number; rjeTotal: number } {
+  return aggregateAccountPure(entries.value, codePrefix, tbSourceCodes.value)
 }
 
-function dispatchWriteback(accountCode: '1511' | '1512', totals: { ajeTotal: number; rjeTotal: number }): void {
+function dispatchWriteback(accountCode: string, totals: { ajeTotal: number; rjeTotal: number }): void {
   window.dispatchEvent(new CustomEvent('g7:adjustment-writeback', {
     detail: {
       accountCode,
@@ -694,8 +715,8 @@ async function persistAdjudicationWriteback(
   } catch {
     data = structuredClone(props.htmlData?.adjudication || { groups: [] })
   }
-  const byInvesteeGross = aggregateByInvestee(entries.value, '1511')
-  const byInvesteeImpair = aggregateByInvestee(entries.value, '1512')
+  const byInvesteeGross = aggregateByInvestee(entries.value, accountGross.value, tbSourceCodes.value)
+  const byInvesteeImpair = aggregateByInvestee(entries.value, accountImpairment.value, tbSourceCodes.value)
   const saveItems: any[] = [{
     item_id: 'G7-1-adjustment-writeback',
     conclusion: null,
@@ -708,8 +729,8 @@ async function persistAdjudicationWriteback(
     }),
   }]
   if (Array.isArray(data?.groups) && data.groups.length > 0) {
-    const appliedGross = applyInvesteeWritebackToGroups(data.groups, byInvesteeGross, '1511')
-    const appliedImpair = applyInvesteeWritebackToGroups(data.groups, byInvesteeImpair, '1512')
+    const appliedGross = applyInvesteeWritebackToGroups(data.groups, byInvesteeGross, accountGross.value, tbSourceCodes.value)
+    const appliedImpair = applyInvesteeWritebackToGroups(data.groups, byInvesteeImpair, accountImpairment.value, tbSourceCodes.value)
     if (!appliedGross) {
       const investmentGroup = data.groups.find((group: any) =>
         !['impairment', 'total'].includes(group.id || group.groupType),
@@ -762,13 +783,13 @@ function pushToA13(): void {
   }
   eventBus.emit('a13:push-misstatement', {
     wpCode: 'G7-3',
-    accountCode: '1511',
+    accountCode: accountGross.value,
     accountName: '长期股权投资',
     projectId: props.projectId,
     source: 'G7-3 调整分录汇总',
     entries: rows.map((e) => ({
       description: e.description || e.summary || 'G7 长期股权投资调整',
-      accountCode: e.accountCode || '1511',
+      accountCode: e.accountCode || accountGross.value,
       accountName: e.accountName || '长期股权投资',
       debitAmount: parseNum(e.debitAmount),
       creditAmount: parseNum(e.creditAmount),
@@ -852,11 +873,11 @@ async function handleSaveWriteback(): Promise<void> {
   }
   try {
     await persistEntries()
-    const gross = aggregateAccount('1511')
-    const impairment = aggregateAccount('1512')
+    const gross = aggregateAccount(accountGross.value)
+    const impairment = aggregateAccount(accountImpairment.value)
     await persistAdjudicationWriteback(gross, impairment)
-    dispatchWriteback('1511', gross)
-    dispatchWriteback('1512', impairment)
+    dispatchWriteback(accountGross.value, gross)
+    dispatchWriteback(accountImpairment.value, impairment)
     publishCreatedEvents()
     const pushed = await pushToAdjustmentModule()
     isDirty.value = false
@@ -1072,7 +1093,7 @@ function generateLocalConclusion(): void {
     (suggestedDraftCount.value
       ? `其中建议草稿 ${suggestedDraftCount.value} 行，需确认采纳或清除。`
       : '') +
-    ` 1511 净影响 AJE ${fmt(aggregateAccount('1511').ajeTotal)} / RJE ${fmt(aggregateAccount('1511').rjeTotal)}。`
+    ` 1511 净影响 AJE ${fmt(aggregateAccount(accountGross.value).ajeTotal)} / RJE ${fmt(aggregateAccount(accountGross.value).rjeTotal)}。`
   auditConclusion.value = auditConclusion.value
     ? `${auditConclusion.value}\n${draft}`
     : draft

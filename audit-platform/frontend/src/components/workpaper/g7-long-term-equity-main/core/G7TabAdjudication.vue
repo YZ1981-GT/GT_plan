@@ -10,6 +10,18 @@
           :readonly="isReadonly"
           :can-edit="canEditCtx"
         />
+        <el-tooltip :disabled="g7ExtractionEnabled" content="四表取数未启用" placement="top">
+          <el-button
+            size="small"
+            type="primary"
+            plain
+            :disabled="isReadonly || !g7ExtractionEnabled"
+            :loading="seedingFromFourTable"
+            @click="handleSeedFromFourTable"
+          >
+            <el-icon><Refresh /></el-icon>从四表库带入未审数
+          </el-button>
+        </el-tooltip>
         <el-button size="small" type="primary" plain :loading="adjPullGross.loading.value" @click="openBringInGross">
           <el-icon><Download /></el-icon>带入调整(原值)
         </el-button>
@@ -27,6 +39,14 @@
     <el-alert type="info" :closable="false" show-icon class="audit-objective">
       审计目标：按控制类型（子公司/合营/联营）分层汇总长期股权投资的期初、期末审定金额，验证未审数、AJE、RJE 调整的完整准确；投资合计勾稽科目1511、减值准备勾稽科目1512，净值勾稽 1511−1512。
     </el-alert>
+
+    <!-- 四表库取数溯源面板（对齐 K1/K2 范式，位于 TB info-bar 之上） -->
+    <WpFourTableSourcePanel
+      :source-codes="tbSourceCodes"
+      gross-label="长期股权投资原值"
+      provision-label="长期股权投资减值准备"
+      fallback-row-code="BS-024"
+    />
 
     <!-- TB取数信息条 -->
     <div class="tb-info-bar">
@@ -498,9 +518,18 @@
  * - 借贷发生额驱动期末未审；变动原因分析列
  * - 监听 g7:adjustment-writeback 回写期末 AJE/RJE
  */
-import { ref, reactive, computed, watch, inject, onMounted, onBeforeUnmount } from 'vue'
-import { ArrowDown, Download } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import {
+  ref,
+  reactive,
+  computed,
+  watch,
+  inject,
+  onMounted,
+  onBeforeUnmount,
+  type ComputedRef,
+} from 'vue'
+import { ArrowDown, Download, Refresh } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { parseNum, calcAdjustedAmount, calcChangeRate, calcDebitBalance } from '../../composables/useG7FormulaEngine'
 import {
   normalizeG7DetailRows,
@@ -516,6 +545,23 @@ import G7ConsolLinkageEntryDialog from './G7ConsolLinkageEntryDialog.vue'
 import { pullG7_14ForDetail } from '../../composables/g7EquityMethodPullToDetail'
 import { calcClosingReconVariance } from '../../composables/useG7EquityMethodFormulaEngine'
 import { normalizeInvesteeKey } from '../../composables/g7EquityMethodCrossSheet'
+import {
+  G7_ACCOUNT_NAME,
+  G7_PROVISION_ACCOUNT_NAME,
+  g7AccountCode,
+  g7ImpairmentAccountCode,
+  g7TrialBalancePrefix,
+  isG7GrossCode,
+  isG7ProvisionCode,
+} from '../../composables/g7AccountScope'
+import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
+import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
+import {
+  seedG7AdjudicationFromPrefill,
+  previewSeedG7Adjudication,
+  type G7AdjudicationPrefill,
+  type SeedOptions,
+} from '../../composables/g7FourTableSeed'
 import { api } from '@/services/apiProxy'
 
 const props = defineProps<{
@@ -537,8 +583,27 @@ const STORAGE_KEY_PREFIX = 'g7-adjudication-collapse-'
 const DATA_KEY = 'G7-1-adjudication-data'
 const NOTE_KEY = 'G7-1-adjudication-audit-note'
 const CONCLUSION_KEY = 'G7-1-adjudication-audit-conclusion'
-const ACCOUNT_GROSS = '1511'
-const ACCOUNT_IMPAIRMENT = '1512'
+
+/**
+ * 四表取数溯源（宿主 provide，render 下发）。科目码一律由它派生 —— 见
+ * `composables/g7AccountScope.ts`；本文件不得出现字面量科目码（R11.1 / Property 15）。
+ */
+const tbSourceCodes = inject<ComputedRef<TbSourceCodes | null>>(
+  'g7TbSourceCodes',
+  computed(() => null),
+)
+const accountGross = computed(() => g7AccountCode(tbSourceCodes.value))
+const accountImpairment = computed(() => g7ImpairmentAccountCode(tbSourceCodes.value))
+
+/** 四表库审定表预填（render 下发 adjudication_prefill；灰度关或无数据时为 null） */
+const adjudicationPrefill = computed<G7AdjudicationPrefill | null>(
+  () => (props.htmlData as any)?.adjudication_prefill ?? null,
+)
+
+/** 灰度开关：四表取数是否启用 */
+const g7ExtractionEnabled = computed<boolean>(
+  () => !!(props.htmlData as any)?.project_context?.g7_extraction_enabled,
+)
 
 type ControlType = 'subsidiary' | 'joint_venture' | 'associate'
 type EditableGroupType = 'subsidiary' | 'joint_venture' | 'associate' | 'impairment'
@@ -588,6 +653,7 @@ const tbImpairment = ref(0)
 const scrollContainerRef = ref<HTMLElement>()
 const isDirty = ref(false)
 const saving = ref(false)
+const seedingFromFourTable = ref(false)
 /** G7-3 回写命中行（短暂高亮） */
 const writebackHitIds = ref<Set<string>>(new Set())
 let writebackHitTimer: ReturnType<typeof setTimeout> | null = null
@@ -831,10 +897,10 @@ function publishAdjudicated(opts?: { writebackTb?: boolean }): void {
   const jvSub = calcGroupSubtotal(groups.find(g => g.id === 'joint_venture')?.rows ?? [])
   const assocSub = calcGroupSubtotal(groups.find(g => g.id === 'associate')?.rows ?? [])
   const payload = {
-    accountCode: ACCOUNT_GROSS,
+    accountCode: accountGross.value,
     /** 1511 回写原值（投资合计），不是净值 */
     adjudicatedAmount: investmentTotalRow.value.closingAdjusted,
-    impairmentAccountCode: ACCOUNT_IMPAIRMENT,
+    impairmentAccountCode: accountImpairment.value,
     impairmentAmount: impair.closingAdjusted,
     netAmount: netValueRow.value.closingAdjusted,
     writebackTb: opts?.writebackTb === true,
@@ -910,11 +976,11 @@ const {
 } = useAdjudicationBringIn({
   projectId: computed(() => props.projectId) as any,
   year: useAuditContext().year as any,
-  subjectPrefix: '1511',
+  subjectPrefix: accountGross.value,
   direction: 'debit',
-  subjectCode: '1511',
+  subjectCode: accountGross.value,
   wpCode: 'G7',
-  subjectLabel: '长期股权投资原值(1511)',
+  subjectLabel: `${G7_ACCOUNT_NAME}原值(${accountGross.value})`,
   rows: bringInRowsGross,
   updateCell: bringInUpdateCell,
   totalAudited: () => investmentTotalRow.value.closingAdjusted,
@@ -928,11 +994,11 @@ const {
 } = useAdjudicationBringIn({
   projectId: computed(() => props.projectId) as any,
   year: useAuditContext().year as any,
-  subjectPrefix: '1512',
+  subjectPrefix: accountImpairment.value,
   direction: 'credit',
-  subjectCode: '1512',
+  subjectCode: accountImpairment.value,
   wpCode: 'G7',
-  subjectLabel: '长期股权投资减值准备(1512)',
+  subjectLabel: `${G7_PROVISION_ACCOUNT_NAME}(${accountImpairment.value})`,
   rows: bringInRowsImpair,
   updateCell: bringInUpdateCell,
   totalAudited: () =>
@@ -1199,6 +1265,64 @@ async function saveAll(): Promise<void> {
   await persistTable(true)
 }
 
+/**
+ * 从四表库带入未审数（审定表预填），调用 g7FourTableSeed 纯函数。
+ * - 无数据时 toast「四表库无该科目数据」
+ * - 有数据时弹确认对话框（可选「仅补空值」vs「覆盖」）
+ * - 填充后 toast 结果 + 触发 schedulePersist
+ * - roll_forward_ok=false 的桶额外 warning toast
+ */
+async function handleSeedFromFourTable(): Promise<void> {
+  if (!adjudicationPrefill.value) {
+    ElMessage.warning('四表库无该科目数据')
+    return
+  }
+  const preview = previewSeedG7Adjudication(groups, adjudicationPrefill.value)
+  if (preview.length === 0) {
+    ElMessage.info('四表库无可填充的格子（已有值均已保留）')
+    return
+  }
+  seedingFromFourTable.value = true
+  try {
+    const action = await ElMessageBox.confirm(
+      `四表库预填将影响 ${preview.length} 个格子，请选择填充方式：`,
+      '从四表库带入未审数',
+      {
+        confirmButtonText: '覆盖已有值',
+        cancelButtonText: '仅补空值',
+        distinguishCancelAndClose: true,
+        type: 'info',
+      },
+    ).then(() => 'overwrite' as const).catch((action: string) => {
+      if (action === 'cancel') return 'onlyEmpty' as const
+      return 'close' as const
+    })
+    if (action === 'close') return
+
+    const options: SeedOptions = { overwrite: action === 'overwrite' }
+    const result = seedG7AdjudicationFromPrefill(groups, adjudicationPrefill.value, options)
+
+    // toast 结果
+    const parts: string[] = []
+    if (result.filled > 0) parts.push(`填充 ${result.filled} 组`)
+    if (result.skipped > 0) parts.push(`跳过 ${result.skipped} 格（已有值）`)
+    ElMessage.success(parts.length ? parts.join('，') : '已从四表库带入未审数')
+
+    // roll_forward_ok=false 的桶额外 warning
+    if (result.warnings.length > 0) {
+      for (const w of result.warnings) {
+        ElMessage.warning(w)
+      }
+    }
+
+    // 触发保存
+    isDirty.value = true
+    schedulePersist()
+  } finally {
+    seedingFromFourTable.value = false
+  }
+}
+
 function pickTbAmount(row: any): number {
   return parseNum(row?.unadjusted_amount ?? row?.audited_amount ?? row?.closing_balance)
 }
@@ -1213,8 +1337,10 @@ async function fetchTrialBalance(): Promise<void> {
 
   if (!props.projectId) return
   try {
+    // 前缀由「原值 + 备抵」科目码的最长公共前缀派生（不写死 '151'），
+    // 一次拉回两组后在前端按 g7AccountScope 的点号边界谓词分流
     const res = await api.get(`/api/projects/${props.projectId}/trial-balance`, {
-      params: { account_prefix: '151' },
+      params: { account_prefix: g7TrialBalancePrefix(tbSourceCodes.value) },
       _silent: true,
     } as any)
     const list: any[] = Array.isArray(res?.data ?? res)
@@ -1222,28 +1348,29 @@ async function fetchTrialBalance(): Promise<void> {
       : (res?.data?.items ?? [])
 
     const codeOf = (it: any) => String(it.standard_account_code ?? it.account_code ?? '')
-    const exact1511 = list.find(it => codeOf(it) === ACCOUNT_GROSS)
-    const exact1512 = list.find(it => codeOf(it) === ACCOUNT_IMPAIRMENT)
+    const src = tbSourceCodes.value
+    const exactGross = list.find(it => codeOf(it) === accountGross.value)
+    const exactImpair = list.find(it => codeOf(it) === accountImpairment.value)
 
-    if (exact1511) {
-      tbGross.value = pickTbAmount(exact1511)
+    if (exactGross) {
+      tbGross.value = pickTbAmount(exactGross)
     } else if (list.length) {
       tbGross.value = list
-        .filter(it => /^1511/.test(codeOf(it)) && !/^1512/.test(codeOf(it)))
+        .filter(it => isG7GrossCode(codeOf(it), src) && !isG7ProvisionCode(codeOf(it), src))
         .reduce((s, it) => s + pickTbAmount(it), 0)
     }
 
-    if (exact1512) {
-      tbImpairment.value = pickTbAmount(exact1512)
+    if (exactImpair) {
+      tbImpairment.value = pickTbAmount(exactImpair)
     } else if (list.length) {
       tbImpairment.value = list
-        .filter(it => /^1512/.test(codeOf(it)))
+        .filter(it => isG7ProvisionCode(codeOf(it), src))
         .reduce((s, it) => s + pickTbAmount(it), 0)
     }
   } catch {
     try {
       const res = await api.get('/api/trial-balance/query', {
-        params: { project_id: props.projectId, account_code: ACCOUNT_GROSS },
+        params: { project_id: props.projectId, account_code: accountGross.value },
         _silent: true,
       } as any)
       const items = res?.data?.items ?? res?.data ?? res?.items ?? []
@@ -1264,10 +1391,10 @@ function onAdjustmentWriteback(ev: Event): void {
   if (!detail) return
   const aje = parseNum(detail.ajeTotal)
   const rje = parseNum(detail.rjeTotal)
-  const code = String(detail.accountCode || ACCOUNT_GROSS)
+  const code = String(detail.accountCode || accountGross.value)
   const byInvestee = Array.isArray(detail.byInvestee) ? detail.byInvestee : []
 
-  if (code.startsWith(ACCOUNT_IMPAIRMENT)) {
+  if (isG7ProvisionCode(code, tbSourceCodes.value)) {
     const impair = groups.find(g => g.id === 'impairment')
     if (!impair || impair.rows.length === 0) return
     if (byInvestee.length) {
@@ -1408,12 +1535,12 @@ async function loadAuditResponses(): Promise<void> {
     if (detailRows) applyG7DetailRows(detailRows, false)
     if (writeback?.gross) {
       onAdjustmentWriteback(new CustomEvent('g7:adjustment-writeback', {
-        detail: { accountCode: ACCOUNT_GROSS, ...writeback.gross, silent: true },
+        detail: { accountCode: accountGross.value, ...writeback.gross, silent: true },
       }))
     }
     if (writeback?.impairment) {
       onAdjustmentWriteback(new CustomEvent('g7:adjustment-writeback', {
-        detail: { accountCode: ACCOUNT_IMPAIRMENT, ...writeback.impairment, silent: true },
+        detail: { accountCode: accountImpairment.value, ...writeback.impairment, silent: true },
       }))
     }
   } catch { /* silent */ }

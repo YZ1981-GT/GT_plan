@@ -15,6 +15,7 @@ import {
 import type { K1StageMovementRow } from './useK1BadDebt'
 import { parseK13Payload, recalcStageClosing } from './useK1BadDebt'
 import { parseK1StageRowsFromMap, type K1StageRow } from './useK1StageCheck'
+import { buildK1BalanceMovementRows, migrateK1MovementRows } from './k1StageMovementRows'
 import { buildDisclosureAgingLabelMap } from './disclosureAgingLabels'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -545,8 +546,20 @@ export function buildTop5FromK1Detail(details: K1DetailPartial[], limit = 5): K1
   }))
 }
 
-export function readK13StageMovements(raw: unknown): K1StageMovementRow[] {
-  return parseK13Payload(raw).stageMovements
+/**
+ * K1-3 坏账准备明细表的三阶段变动 → 披露表消费。
+ *
+ * 🔴 K1-3 底稿本身固定用 `listed` 口径存储（`useK1BadDebt.defaultStageMovements`），
+ * 但两个披露 Tab 消费时表头标签口径不同（上市附注「上年年末余额」/ 国企附注
+ * 「期初余额」，源 xlsx `A93` vs `A64`）→ 读取时按 `variant` 重新打标签
+ * （`migrateK1MovementRows` 按 key 对齐，金额不受影响，只换 label）。
+ */
+export function readK13StageMovements(
+  raw: unknown,
+  variant: 'listed' | 'soe' = 'listed',
+): K1StageMovementRow[] {
+  const rows = parseK13Payload(raw).stageMovements
+  return migrateK1MovementRows(rows, 'provision', variant)
 }
 
 /** K1-9 转回检查行 → 披露表转回行（`accumProvision` = 转回前累计已计提坏账准备） */
@@ -727,6 +740,32 @@ export function readAdjudicationTotals(map: Map<string, any>): {
   }
 }
 
+/**
+ * 附注汇总表「其他应收款」（应收利息 / 应收股利 / 其他应收款 / 合计）三行来源。
+ *
+ * 与 `useK1Adjudication.fsReconciliation` 同源（读同一批 K1-1「与经审计的财务报表
+ * 核对」区持久化字段），供两个披露 composable 在同步时推送汇总表（条件表：三项全
+ * 为 0/缺失时不推送，见 `buildK1SummaryRows`）。
+ */
+export interface K1SummaryFigures {
+  interest: number
+  dividend: number
+  otherReceivable: number
+  total: number
+}
+
+export function readK1SummaryFigures(map: Map<string, any>): K1SummaryFigures {
+  const get = (k: string) => parseNum(map.get(k)?.remark ?? map.get(k)?.value)
+  const interest = get('K1-1-fs-interest')
+  const dividend = get('K1-1-fs-dividend')
+  // 「其他应收款」净值优先取 K1-1（三）净值审定合计；无持久化时退化为报表数减利息/股利。
+  const netAudited = get('K1-1-audited-net')
+  const fsOtherTotal = get('K1-1-fs-other-total')
+  const otherReceivable = netAudited || (fsOtherTotal ? fsOtherTotal - interest - dividend : 0)
+  const total = fsOtherTotal || interest + dividend + otherReceivable
+  return { interest, dividend, otherReceivable, total }
+}
+
 export function autoFillFromK1Sources(
   payload: K1ListedDisclosurePayloadV2,
   map: Map<string, any>,
@@ -768,7 +807,7 @@ export function autoFillFromK1Sources(
 
   const k13Raw = map.get('K1-3-baddebt-rows')?.remark
   if (k13Raw && (force || !payload.stageMovements.length)) {
-    payload.stageMovements = readK13StageMovements(k13Raw)
+    payload.stageMovements = readK13StageMovements(k13Raw, 'listed')
   }
 
   const k9Raw = map.get('K1-9-writeoff')?.remark
@@ -817,6 +856,24 @@ export function calcNatureTieOut(
   const totalGross = summarizeNatureRows(natureRows).endGross
   const diff = Math.round((totalGross - adjReceivable) * 100) / 100
   return { totalGross, diff, matched: Math.abs(diff) < 0.01 }
+}
+
+/**
+ * F8-48 勾稽：汇总表「其他应收款」三明细行（应收利息 + 应收股利 + 其他应收款）之和
+ * = 合计行。三项全 0（未启用）时视为不适用（`applicable:false`），不告警。
+ */
+export function calcSummaryTieOut(fs: K1SummaryFigures): {
+  applicable: boolean
+  sum: number
+  diff: number
+  matched: boolean
+} {
+  const nonZero = [fs.interest, fs.dividend, fs.otherReceivable, fs.total]
+    .some((v) => Math.abs(v) >= 0.005)
+  if (!nonZero) return { applicable: false, sum: 0, diff: 0, matched: true }
+  const sum = Math.round((fs.interest + fs.dividend + fs.otherReceivable) * 100) / 100
+  const diff = Math.round((sum - fs.total) * 100) / 100
+  return { applicable: true, sum, diff, matched: Math.abs(diff) < 0.01 }
 }
 
 /** T3 勾稽：1 年以内月度细分合计 = 1 年以内（期末/上年年末各校验，仅存在细分行时生效） */
@@ -1221,30 +1278,30 @@ export function splitK1DetailByProvisionMethod(
   return { individualNames, individualDetails, portfolioDetails }
 }
 
+/**
+ * 阶段迁移方向 → 源模板 10 行行集的 key（`k1StageMovementRows.buildK1BalanceMovementRows`）。
+ *
+ * 源模板只有 4 个迁移行（转入二/转入三/转回二/转回一），`2→3` 与 `1→3` 折叠进
+ * `to3`；`3→1` 与 `2→1` 折叠进 `back1`（与 `k1StageMovementRows.LEGACY_TO_NEW`
+ * 的折叠口径一致，勿各写一份）。
+ */
 const BALANCE_TRANSFER_KEY: Record<string, string> = {
-  '1-2': 's1-s2',
-  '1-3': 's1-s3',
-  '2-1': 's2-s1',
-  '2-3': 's2-s3',
-  '3-1': 's3-s1',
-  '3-2': 's3-s2',
+  '1-2': 'to2',
+  '1-3': 'to3',
+  '2-1': 'back1',
+  '2-3': 'to3',
+  '3-1': 'back1',
+  '3-2': 'back2',
 }
 
 /** 国企附注：账面余额三阶段变动行定义（对齐 Excel 77~87） */
+/**
+ * 国企附注「账面余额三阶段变动」行集 —— 委托 `k1StageMovementRows.buildK1BalanceMovementRows`
+ * （源模板 10 行，修掉原两对重复标签 `—转入第三阶段`×2/`—转回第一阶段`×2）。
+ * 保留导出名与零参签名，既有引用零改动。
+ */
 export function defaultBalanceStageMovements(): K1StageMovementRow[] {
-  return [
-    { key: 'opening', label: '期初余额', stage1: 0, stage2: 0, stage3: 0, editable: false },
-    { key: 's1-s2', label: '—转入第二阶段', stage1: 0, stage2: 0, stage3: 0, editable: false },
-    { key: 's1-s3', label: '—转入第三阶段', stage1: 0, stage2: 0, stage3: 0, editable: false },
-    { key: 's2-s1', label: '—转回第一阶段', stage1: 0, stage2: 0, stage3: 0, editable: false },
-    { key: 's2-s3', label: '—转入第三阶段', stage1: 0, stage2: 0, stage3: 0, editable: false },
-    { key: 's3-s1', label: '—转回第一阶段', stage1: 0, stage2: 0, stage3: 0, editable: false },
-    { key: 's3-s2', label: '—转回第二阶段', stage1: 0, stage2: 0, stage3: 0, editable: false },
-    { key: 'addition', label: '本期新增', stage1: 0, stage2: 0, stage3: 0, editable: true },
-    { key: 'collection', label: '本期收回或核销', stage1: 0, stage2: 0, stage3: 0, editable: true },
-    { key: 'other', label: '其他变动', stage1: 0, stage2: 0, stage3: 0, editable: true },
-    { key: 'closing', label: '期末余额', stage1: 0, stage2: 0, stage3: 0, editable: false },
-  ]
+  return buildK1BalanceMovementRows()
 }
 
 function stageAmtKey(stage: 1 | 2 | 3): 'stage1' | 'stage2' | 'stage3' {
@@ -1278,7 +1335,9 @@ export function buildBalanceStageMovementsFromK17(
   const movements = defaultBalanceStageMovements().map((r) => ({ ...r }))
   const opening = movements.find((r) => r.key === 'opening')!
   const addition = movements.find((r) => r.key === 'addition')!
-  const collection = movements.find((r) => r.key === 'collection')!
+  // 🔴 源模板行是「本期终止确认」（key: derecognition），旧实现叫 collection
+  // （对应旧「本期收回或核销」行，语义窄化为终止确认——净减金额记入本行）。
+  const collection = movements.find((r) => r.key === 'derecognition')!
 
   for (const sr of stageRows) {
     const name = sr.counterparty.trim()
@@ -1504,8 +1563,13 @@ export function parseK1SoePayload(
     individualDetailRows: Array.isArray(parsed.individualDetailRows) ? parsed.individualDetailRows : [],
     portfolioAgingRows: Array.isArray(parsed.portfolioAgingRows) ? parsed.portfolioAgingRows : [],
     otherPortfolioRows: recomputeOtherPortfolioRows(migrateOtherPortfolioRows(parsed.otherPortfolioRows)),
-    stageMovements: Array.isArray(parsed.stageMovements) ? parsed.stageMovements : [],
-    balanceStageMovements: Array.isArray(parsed.balanceStageMovements) ? parsed.balanceStageMovements : [],
+    // 持久化披露载荷可能还是旧行集（13/11 行）——按 key 迁移到源模板 12/10 行，金额不丢。
+    stageMovements: Array.isArray(parsed.stageMovements) && parsed.stageMovements.length
+      ? migrateK1MovementRows(parsed.stageMovements, 'provision', 'soe')
+      : [],
+    balanceStageMovements: Array.isArray(parsed.balanceStageMovements) && parsed.balanceStageMovements.length
+      ? migrateK1MovementRows(parsed.balanceStageMovements, 'balance')
+      : [],
     reversalRows: Array.isArray(parsed.reversalRows) ? parsed.reversalRows : [],
     writeoffDetailRows: Array.isArray(parsed.writeoffDetailRows) ? parsed.writeoffDetailRows : [],
     top5Rows: Array.isArray(parsed.top5Rows) ? parsed.top5Rows : [],
@@ -1571,7 +1635,7 @@ export function autoFillSoeFromK1Sources(
   }
 
   if (k13Raw && (force || !payload.stageMovements.length)) {
-    payload.stageMovements = readK13StageMovements(k13Raw)
+    payload.stageMovements = readK13StageMovements(k13Raw, 'soe')
   }
 
   const k17Rows = parseK1StageRowsFromMap(map)

@@ -156,17 +156,19 @@
       <h4 class="sub-title">披露提示与说明（减值 / 抵押 / 高价出售）</h4>
       <el-alert type="info" :closable="false" class="guide-alert">{{ H1_LISTED_GUIDANCE.impairment }}</el-alert>
       <el-alert type="warning" :closable="false" class="guide-alert warn">{{ H1_LISTED_GUIDANCE.impairmentNote }}</el-alert>
-      <div class="note-field">
-        <label>减值测试披露说明</label>
-        <el-input
-          v-model="noteImpairment"
-          type="textarea"
-          :autosize="{ minRows: 3, maxRows: 8 }"
-          :disabled="isReadonly"
-          :placeholder="H1_LISTED_GUIDANCE.impairment"
-          @change="scheduleSave"
-        />
-      </div>
+      <WpNoteTextArea
+        v-model="noteImpairment"
+        label="减值测试披露说明"
+        testid-prefix="h1-listed-impairment"
+        :min-rows="3"
+        :max-rows="8"
+        :disabled="isReadonly"
+        :placeholder="H1_LISTED_GUIDANCE.impairment"
+        :ai-loading="aiLoadingSection === 'impairment'"
+        @change="scheduleSave"
+        @ai="runAi('impairment')"
+        @review="openReview('impairment')"
+      />
 
       <el-alert type="info" :closable="false" class="guide-alert">{{ H1_LISTED_GUIDANCE.mortgage }}</el-alert>
       <div class="note-field">
@@ -210,28 +212,35 @@
             </template>
           </el-table-column>
         </el-table>
-        <el-input
+        <WpNoteTextArea
           v-model="noteMortgage"
-          type="textarea"
-          :autosize="{ minRows: 2, maxRows: 6 }"
+          label="抵押、担保固定资产情况说明"
+          testid-prefix="h1-listed-mortgage"
+          :min-rows="2"
+          :max-rows="6"
           :disabled="isReadonly"
           :placeholder="H1_LISTED_GUIDANCE.mortgage"
+          :ai-loading="aiLoadingSection === 'mortgage'"
           @change="scheduleSave"
+          @ai="runAi('mortgage')"
+          @review="openReview('mortgage')"
         />
       </div>
 
       <el-alert type="info" :closable="false" class="guide-alert">{{ H1_LISTED_GUIDANCE.sale }}</el-alert>
-      <div class="note-field">
-        <label>明显高于账面价值出售交易说明</label>
-        <el-input
-          v-model="noteSale"
-          type="textarea"
-          :autosize="{ minRows: 2, maxRows: 6 }"
-          :disabled="isReadonly"
-          :placeholder="H1_LISTED_GUIDANCE.sale"
-          @change="scheduleSave"
-        />
-      </div>
+      <WpNoteTextArea
+        v-model="noteSale"
+        label="明显高于账面价值出售交易说明"
+        testid-prefix="h1-listed-sale"
+        :min-rows="2"
+        :max-rows="6"
+        :disabled="isReadonly"
+        :placeholder="H1_LISTED_GUIDANCE.sale"
+        :ai-loading="aiLoadingSection === 'sale'"
+        @change="scheduleSave"
+        @ai="runAi('sale')"
+        @review="openReview('sale')"
+      />
 
       <el-alert type="info" :closable="false" class="guide-alert">{{ H1_LISTED_GUIDANCE.govSubsidyOtherDec }}</el-alert>
       <el-alert type="info" :closable="false" class="guide-alert">{{ H1_LISTED_GUIDANCE.mergeNet }}</el-alert>
@@ -367,13 +376,18 @@
           @change="scheduleSave"
         />
       </div>
-      <el-input
+      <WpNoteTextArea
         v-model="govSubsidy.text"
-        type="textarea"
-        :autosize="{ minRows: 2, maxRows: 4 }"
+        label="政府补助冲减固定资产说明"
+        testid-prefix="h1-listed-govSubsidy"
+        :min-rows="2"
+        :max-rows="4"
         :disabled="isReadonly"
         :placeholder="formatGovSubsidyLine(govSubsidy.amount)"
+        :ai-loading="aiLoadingSection === 'govSubsidy'"
         @change="scheduleSave"
+        @ai="runAi('govSubsidy')"
+        @review="openReview('govSubsidy')"
       />
       <p class="guide-text">{{ H1_LISTED_GUIDANCE.govSubsidyHint }}</p>
     </section>
@@ -454,17 +468,20 @@
           </template>
         </el-table-column>
       </el-table>
-      <div class="note-field" style="margin-top:10px">
-        <label>超 1 年清理进展说明</label>
-        <el-input
-          v-model="noteClearing"
-          type="textarea"
-          :autosize="{ minRows: 2, maxRows: 6 }"
-          :disabled="isReadonly"
-          :placeholder="H1_LISTED_GUIDANCE.clearingProgress"
-          @change="scheduleSave"
-        />
-      </div>
+      <WpNoteTextArea
+        v-model="noteClearing"
+        label="超 1 年清理进展说明"
+        testid-prefix="h1-listed-clearing"
+        style="margin-top:10px"
+        :min-rows="2"
+        :max-rows="6"
+        :disabled="isReadonly"
+        :placeholder="H1_LISTED_GUIDANCE.clearingProgress"
+        :ai-loading="aiLoadingSection === 'clearing'"
+        @change="scheduleSave"
+        @ai="runAi('clearing')"
+        @review="openReview('clearing')"
+      />
     </section>
 
     <details class="compile-hint">
@@ -492,6 +509,9 @@ import { eventBus } from '@/utils/eventBus'
 import { api } from '@/services/apiProxy'
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
+import WpNoteTextArea from '../../shared/disclosure/WpNoteTextArea.vue'
+import { useHCycleDisclosureAi } from '../../composables/useHCycleDisclosureAi'
+import { H_CYCLE_NOTE_AI_SECTIONS } from '../../composables/hCycleNoteAiSections'
 import H1DisclosureConsistencyPanel from './H1DisclosureConsistencyPanel.vue'
 import {
   checkH1ListedConsistency,
@@ -606,6 +626,24 @@ const noteImpairment = ref('')
 const noteMortgage = ref('')
 const noteSale = ref('')
 const noteClearing = ref('')
+
+// ─── 披露说明 AI 辅助 + 复核（原本 5 个文本域全无 AI 按钮） ──────────────────
+const { aiLoadingSection: aiLoadingRef, runAi, openReview } = useHCycleDisclosureAi({
+  wpCode: 'H1',
+  variant: 'listed',
+  wpId: () => props.wpId,
+  isReadonly: () => isReadonly.value,
+  noteSectionId: H1_NOTE_SECTION.listed,
+  labels: H_CYCLE_NOTE_AI_SECTIONS.H1.listed,
+  fields: {
+    impairment: { get: () => noteImpairment.value || '', set: (v) => { noteImpairment.value = v; scheduleSave() } },
+    mortgage: { get: () => noteMortgage.value || '', set: (v) => { noteMortgage.value = v; scheduleSave() } },
+    sale: { get: () => noteSale.value || '', set: (v) => { noteSale.value = v; scheduleSave() } },
+    govSubsidy: { get: () => govSubsidy.text || '', set: (v) => { govSubsidy.text = v; scheduleSave() } },
+    clearing: { get: () => noteClearing.value || '', set: (v) => { noteClearing.value = v; scheduleSave() } },
+  },
+})
+const aiLoadingSection = computed(() => aiLoadingRef.value)
 
 const movementRowDefs = H1_LISTED_MOVEMENT_ROWS
 

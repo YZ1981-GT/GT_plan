@@ -234,7 +234,7 @@
       :project-id="projectId"
       :is-readonly="isReadonly"
       storage-key="G7-11-voucher-samples"
-      account-code="1511"
+      :account-code="G7_GROSS_FALLBACK_STANDARD"
       title="处置凭证抽查（G7-11）"
       :html-data="htmlData"
     />
@@ -269,6 +269,7 @@ import {
   pickBookValueFromG710,
   type G7DisposalSingleRow,
 } from './g7DisposalSingleModel'
+import { G7_GROSS_FALLBACK_STANDARD } from '../../composables/g7AccountScope'
 
 const props = defineProps<{
   htmlData: Record<string, any> | null

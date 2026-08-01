@@ -10,7 +10,7 @@
  * - 结论/状态/选择类字段立即保存（saveImmediate）
  * - 批量保存（saveBatch）
  * - 组件卸载时 flush 未保存数据（onScopeDispose）
- * - trial_balance 回写：writebackTrialBalance（科目1402合同资产）
+ * - trial_balance 回写：writebackTrialBalance（科目1141合同资产）
  * - selfLoad逻辑（render-config?force_component_type=d6-contract-assets）
  */
 import { ref, onScopeDispose, type Ref } from 'vue'
@@ -212,18 +212,22 @@ export function useD6FormData(options: UseD6FormDataOptions) {
 
   // ─── trial_balance 回写 ──────────────────────────────────────────────────
 
-  /** 回写审定数到 trial_balance（科目 1402 合同资产）并发布 EventBus */
+  /** 回写审定数到 trial_balance（科目 1141 合同资产）并发布 EventBus
+   *
+   * 合同资产科目为 1141；`report_config` 报表行 BS-011 四准则一致。
+   * 原 `1402` 是在途物资（存货类），属误用。
+   */
   async function writebackTrialBalance(auditedAmount: number): Promise<void> {
     if (!projectId.value) return
     try {
       await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: '1402',
+        account_code: '1141',
         audited_amount: auditedAmount,
       })
       // 发布 EventBus 通知审定数变更
       try {
         window.dispatchEvent(new CustomEvent('substantive:adjudicated', {
-          detail: { wpCode: 'D6', accountCode: '1402', auditedAmount },
+          detail: { wpCode: 'D6', accountCode: '1141', auditedAmount },
         }))
       } catch { /* EventBus publish 失败不阻塞 */ }
     } catch {

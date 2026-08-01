@@ -7,7 +7,7 @@
     <details class="guidance-details">
       <summary>📋 编制提示</summary>
       <div class="guidance-content">
-        <p>1. 本表为 D6 合同资产审定表（科目1402/1403），含三区块：一、合同资产原值；二、合同资产坏账准备；三、合同资产净值。</p>
+        <p>1. 本表为 D6 合同资产审定表（科目1141/1403），含三区块：一、合同资产原值；二、合同资产坏账准备；三、合同资产净值。</p>
         <p>2. 区块一取自 D6-2 明细表按合同类型聚合，区块二取自 D6-3 减值准备明细按分类聚合，浅蓝背景单元格为跨sheet自动取数，不可手工编辑。</p>
         <p>3. 区块三净值 = 区块一原值 − 区块二坏账准备（灰色底纹列为自动计算，不可录入）；净值≠原值−坏账时黄色告警。</p>
         <p>4. 依 CAS14 收入准则确认合同资产，减值按 CAS22 ECL 模型计提；变动率超过30%需在审计说明中分析原因，并与试算平衡表核对一致。</p>
@@ -237,7 +237,7 @@
 
     <!-- 核对行：与试算平衡表核对 -->
     <div class="tb-check-row">
-      <span class="tb-label">与试算平衡表核对（科目1402）：</span>
+      <span class="tb-label">与试算平衡表核对（科目1141）：</span>
       <span>{{ fmtAmount(trialBalanceAmount) }}</span>
       <el-tag v-if="trialBalanceDiff !== 0" type="danger" size="small" class="diff-tag">差异 {{ fmtAmount(trialBalanceDiff) }}</el-tag>
       <el-tag v-else type="success" size="small" class="diff-tag">核对一致</el-tag>
@@ -343,7 +343,7 @@
     v-model="bringInVisible"
     :matches="adjPull.matches.value"
     :row-options="bringInRowOptions"
-    subject-label="1402 合同资产"
+    subject-label="1141 合同资产"
     :loading="adjPull.loading.value"
     @apply="onBringInApply"
   />
@@ -424,7 +424,9 @@ const { generateAndConfirm, aiAvailable, loading: aiLoading } = useD6AiGenerate(
 
 const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务暂不可用')
 
-// ─── 从集中登记带入调整（1402 合同资产，资产借方；带入区块一原值 dynamic 行期末 AJE/RJE） ─
+// ─── 从集中登记带入调整（1141 合同资产，资产借方；带入区块一原值 dynamic 行期末 AJE/RJE） ─
+// 合同资产科目为 1141；report_config 报表行 BS-011 四准则一致。原 `1402` 是在途物资
+// （存货类），属误用。
 const bringInRows = computed(() => {
   const block1 = blocks.value.find((b) => b.blockKey === 'block1')
   return (block1?.rows ?? [])
@@ -440,11 +442,11 @@ const {
 } = useAdjudicationBringIn({
   projectId: toRef(props, 'projectId') as any,
   year: useAuditContext().year as any,
-  subjectPrefix: '1402',
+  subjectPrefix: '1141',
   direction: 'debit',
-  subjectCode: '1402',
+  subjectCode: '1141',
   wpCode: 'D6',
-  subjectLabel: '合同资产(1402)',
+  subjectLabel: '合同资产(1141)',
   rows: bringInRows,
   updateCell: (rowKey: string, field: any, value: number) =>
     updateCell('block1', rowKey, field === 'rje' ? 'currentRje' : 'currentAje', value),

@@ -12,7 +12,7 @@
  * - classificationRows computed（附加分类行）
  * - totalRow computed（总合计=SUM所有明细行）
  * - addRow/removeRow/updateCell
- * - importFromAuxBalance（调后端API从tb_aux_balance科目1402按客户/合同维度导入）
+ * - importFromAuxBalance（调后端API从tb_aux_balance科目1141按客户/合同维度导入）
  * - searchFilter + filteredRows computed（按合同名称/客户名称模糊搜索）
  *
  * Requirements: 5.1-5.14, 6.1-6.8, 7.1-7.5
@@ -479,7 +479,10 @@ export function useD6Detail(options: UseD6DetailOptions) {
 
   /**
    * 调后端 POST /api/workpapers/{wpId}/d6/import-aux-balance
-   * 从 tb_aux_balance 科目1402 按客户/合同维度导入明细行
+   * 从 tb_aux_balance 科目1141 按客户/合同维度导入明细行
+   *
+   * 合同资产科目为 1141；`report_config` 报表行 BS-011 四准则一致。
+   * 原 `1402` 是在途物资（存货类），属误用。
    */
   async function importFromAuxBalance(): Promise<void> {
     if (!wpId.value) return
@@ -492,7 +495,7 @@ export function useD6Detail(options: UseD6DetailOptions) {
       const importedData: any[] = Array.isArray(res) ? res : (res?.data ?? res?.rows ?? [])
 
       if (importedData.length === 0) {
-        ElMessage.info('未找到科目1402的辅助余额数据')
+        ElMessage.info('未找到科目1141的辅助余额数据')
         return
       }
 
@@ -544,7 +547,7 @@ export function useD6Detail(options: UseD6DetailOptions) {
 
   /**
    * 从次年序时账导入期后结转金额
-   * (1402贷方=合同资产转为应收，按客户名归集)
+   * (1141贷方=合同资产转为应收，按客户名归集)
    */
   async function importPostSettlementFromLedger(bsDate?: string): Promise<void> {
     if (!wpId.value || !projectId.value) return
@@ -557,12 +560,12 @@ export function useD6Detail(options: UseD6DetailOptions) {
     try {
       const res = await api.get(
         `/api/workpapers/${wpId.value}/ledger/entries`,
-        { params: { account_code: '1402', year: nextYear, date_from: dateFrom, date_to: dateTo, direction: 'credit' } },
+        { params: { account_code: '1141', year: nextYear, date_from: dateFrom, date_to: dateTo, direction: 'credit' } },
       )
       const entries: any[] = Array.isArray(res) ? res : (res?.data ?? res?.entries ?? [])
 
       if (entries.length === 0) {
-        ElMessage.info('未找到科目1402的期后贷方发生数据')
+        ElMessage.info('未找到科目1141的期后贷方发生数据')
         return
       }
 
@@ -594,7 +597,7 @@ export function useD6Detail(options: UseD6DetailOptions) {
 
       if (filled > 0) {
         persistRows()
-        ElMessage.success(`期后结转金额已填入${filled}行（${dateFrom}至${dateTo}，科目1402贷方）`)
+        ElMessage.success(`期后结转金额已填入${filled}行（${dateFrom}至${dateTo}，科目1141贷方）`)
       } else {
         ElMessage.warning(`序时账有${grouped.size}个客户的期后数据，但未匹配到D6-2明细行（按客户名称/合同名称匹配）`)
       }

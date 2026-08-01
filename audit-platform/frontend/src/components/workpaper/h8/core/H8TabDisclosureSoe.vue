@@ -31,8 +31,6 @@
         </el-button>
         <el-button size="small" type="primary" plain :disabled="!projectId" @click="jumpToNote('soe')">↩ 跳转回附注（八、26）</el-button>
         <el-button size="small" :disabled="!projectId" @click="checkNoteConsistency(false)">✅ 校对附注</el-button>
-        <el-button size="small" type="primary" plain @click="emit('open-ai', 'disclosure-soe')">AI 辅助</el-button>
-        <el-button size="small" @click="emit('open-review', 'disclosure-soe')">复核</el-button>
         <span class="chip-wrap"><GtIndexChip value="wp:H8-1" :context-project-id="projectId" /></span>
         <span class="chip-wrap"><GtIndexChip value="wp:H8-2" :context-project-id="projectId" /></span>
         <span class="chip-wrap"><GtIndexChip value="wp:H8-10" :context-project-id="projectId" /></span>
@@ -111,42 +109,54 @@
       </el-table>
     </section>
 
+    <WpDisclosureConsistencyPanel :results="consistencyChecks" :project-id="projectId" />
+
     <section class="block guidance-block">
       <h4 class="sub-title">披露提示</h4>
       <el-alert type="info" :closable="false" class="guide-alert">{{ H8_SOE_GUIDANCE.impairment }}</el-alert>
-      <div class="note-field">
-        <label>减值测试披露说明</label>
-        <el-input
-          v-model="noteImpairment"
-          type="textarea"
-          :autosize="{ minRows: 3, maxRows: 8 }"
-          :disabled="isReadonly"
-          :placeholder="H8_SOE_GUIDANCE.impairment"
-          @change="persist"
-        />
-      </div>
+      <WpNoteTextArea
+        v-model="noteImpairment"
+        label="减值测试披露说明"
+        testid-prefix="h8-soe-impairment"
+        :min-rows="3"
+        :max-rows="8"
+        :disabled="isReadonly"
+        :placeholder="H8_SOE_GUIDANCE.impairment"
+        :ai-loading="aiLoadingSection === 'impairment'"
+        @change="persist"
+        @ai="runAi('impairment')"
+        @review="openReview('impairment')"
+      />
     </section>
 
     <el-card shadow="never" class="audit-card">
-      <template #header><span class="card-title">审计说明</span></template>
-      <el-input
+      <WpNoteTextArea
         v-model="auditNote"
-        type="textarea"
-        :autosize="{ minRows: 4 }"
+        card
+        label="审计说明"
+        testid-prefix="h8-soe-auditNote"
+        :min-rows="4"
         :disabled="isReadonly"
         placeholder="说明分类口径、取数来源及与附注勾稽…"
+        :ai-loading="aiLoadingSection === 'auditNote'"
         @change="persist"
+        @ai="runAi('auditNote')"
+        @review="openReview('auditNote')"
       />
     </el-card>
     <el-card shadow="never" class="audit-card">
-      <template #header><span class="card-title">审计结论</span></template>
-      <el-input
+      <WpNoteTextArea
         v-model="auditConclusion"
-        type="textarea"
-        :autosize="{ minRows: 2 }"
+        card
+        label="审计结论"
+        testid-prefix="h8-soe-auditConclusion"
+        :min-rows="2"
         :disabled="isReadonly"
         placeholder="本表披露是否恰当、完整…"
+        :ai-loading="aiLoadingSection === 'auditConclusion'"
         @change="persist"
+        @ai="runAi('auditConclusion')"
+        @review="openReview('auditConclusion')"
       />
     </el-card>
 
@@ -166,13 +176,18 @@
 /**
  * H8TabDisclosureSoe — 使用权资产附注披露（国企）
  */
-import { ref, toRef, onBeforeUnmount } from 'vue'
+import { computed, ref, toRef, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import { useHCycleDisclosureAi } from '../../composables/useHCycleDisclosureAi'
+import { H8_NOTE_AI_SECTIONS } from '../../composables/h8NoteAiSections'
+import WpNoteTextArea from '../../shared/disclosure/WpNoteTextArea.vue'
+import WpDisclosureConsistencyPanel from '../../shared/disclosure/WpDisclosureConsistencyPanel.vue'
+import { buildH8SoeChecks } from '../../composables/h8DisclosureConsistency'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { useH8SoeDisclosure } from '../../composables/useH8Disclosure'
 import {
@@ -198,8 +213,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'save', itemId: string, value: any): void
-  (e: 'open-ai', section: string): void
-  (e: 'open-review', section: string): void
 }>()
 
 const noteSectionId = H8_NOTE_SECTION.soe
@@ -233,6 +246,25 @@ const {
   allResponses: toRef(props, 'allResponses'),
   onSave: (id, v) => { emit('save', id, v); autoSync.scheduleAutoSync(syncToNotes) },
 })
+
+// ─── 披露说明 AI 辅助 + 复核 ─────────────────────────────────────────────────
+// 见 H8TabDisclosureListed 同款注释：原 `emit('open-ai'|'open-review')` 宿主零处理 = 死按钮。
+const { aiLoadingSection: aiLoadingRef, runAi, openReview } = useHCycleDisclosureAi({
+  wpCode: 'H8',
+  variant: 'soe',
+  wpId: () => props.wpId,
+  isReadonly: () => props.isReadonly,
+  noteSectionId,
+  labels: H8_NOTE_AI_SECTIONS.soe,
+  fields: {
+    impairment: { get: () => noteImpairment.value || '', set: (v) => { noteImpairment.value = v; persist() } },
+    auditNote: { get: () => auditNote.value || '', set: (v) => { auditNote.value = v; persist() } },
+    auditConclusion: { get: () => auditConclusion.value || '', set: (v) => { auditConclusion.value = v; persist() } },
+  },
+})
+const aiLoadingSection = computed(() => aiLoadingRef.value)
+
+const consistencyChecks = computed(() => buildH8SoeChecks(layers.value))
 
 function fmt(n: number): string {
   return (Number(n) || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })

@@ -58,7 +58,10 @@ const T = {
     main: '应收票据',
     pledged: '期末已质押的应收票据',
     endorsed: '期末已背书或贴现但尚未到期的应收票据',
-    transfer: '期末因出票人未履约而将其转应收账款的票据',
+    // 🔴 逐字取源模板 R31「（3）期末因出票人未履约而其转应收账款的票据」——**无「将」**；
+    //    国企侧源模板 R74 是「而其转为应收账款」（多「为」），两版措辞本就不同。
+    //    旧名（含「将」）见 D1_LEGACY_OBSOLETE_TABLES，同步时清孤儿子表。
+    transfer: '期末因出票人未履约而其转应收账款的票据',
     classEnd: '按坏账计提方法分类（期末余额）',
     classPrior: '按坏账计提方法分类（续：上年年末余额）',
     individualEnd: '按单项计提坏账准备的应收票据（期末余额）',
@@ -90,6 +93,21 @@ const T = {
 export const D1_LISTED_SUBTABLE = T.listed
 /** 国企 八、4 子表名映射。 */
 export const D1_SOE_SUBTABLE = T.soe
+
+/**
+ * 历史表名（本循环曾推送过、现已改名/退役的键）。
+ *
+ * 附注 `sub_table_data` 以**表名为键**，改名后旧键会永久残留成孤儿子表
+ * （模板已无该名 → 投影器不渲染，但库里一直躺着过时数据）。同步时随载荷发
+ * `_removed_table_keys`，由后端删除。
+ *
+ * 🔴 只登记**确定由 D1 推送过**的表名（同章节可能被别的底稿推送，越权删会打断对方）。
+ * 守卫：`__tests__/d1NoteSubtableContract.spec.ts`（旧名不得复活为当前表名）。
+ */
+export const D1_LEGACY_OBSOLETE_TABLES: Record<D1DisclosureVariant, readonly string[]> = {
+  listed: ['期末因出票人未履约而将其转应收账款的票据'],
+  soe: [],
+}
 
 /**
  * 主表（分类总表）表名。
@@ -729,6 +747,12 @@ export function buildD1SyncPayload(
 
   // ⑧ 文本框内容
   subTableData._note_texts = buildNoteTexts(snapshot.notes)
+
+  // ⑨ 孤儿子表清理：改名/退役的历史表名交后端删除。
+  //    与本次推送键求差集 —— 若某历史名又成了当前表名（改回去），绝不能删掉刚推的表。
+  const pushed = new Set(Object.keys(subTableData))
+  const removed = D1_LEGACY_OBSOLETE_TABLES[variant].filter((k) => !pushed.has(k))
+  if (removed.length) subTableData._removed_table_keys = removed
 
   return {
     wp_id: wpId,

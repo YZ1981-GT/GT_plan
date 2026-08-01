@@ -19,11 +19,13 @@ import {
   calcMovementTieOut,
   calcNatureTieOut,
   calcPriorProvisionTieOut,
+  calcSummaryTieOut,
   calcTop5ProportionCheck,
   calcWithinOneYearTieOut,
   emptyK1ListedPayload,
   parseK1ListedPayload,
   readAdjudicationTotals,
+  readK1SummaryFigures,
   recomputeStageEclRows,
   serializeK1ListedPayload,
   stageBlocksProvisionTotal,
@@ -103,6 +105,9 @@ export function useK1DisclosureListed(opts: {
   )
   /** T3：1 年以内月度细分合计 = 1 年以内 */
   const withinOneYearTieOut = computed(() => calcWithinOneYearTieOut(payload.value.agingRows))
+  /** F8-48：汇总表三明细行之和 = 合计行 */
+  const summaryFigures = computed(() => readK1SummaryFigures(allResponses.value))
+  const summaryTieOut = computed(() => calcSummaryTieOut(summaryFigures.value))
 
   /** 期末三阶段坏账合计（③ 三张表 total 行之和） */
   const endStageProvisionTotal = computed(() =>
@@ -543,6 +548,7 @@ export function useK1DisclosureListed(opts: {
       _standards(),
       getSyncSnapshot(),
       noteText.value,
+      readK1SummaryFigures(allResponses.value),
     )
     if (!payloads.length) {
       ElMessage.warning('当前项目准则不适用上市附注同步')
@@ -611,6 +617,8 @@ export function useK1DisclosureListed(opts: {
     agingTieOut,
     natureTieOut,
     withinOneYearTieOut,
+    summaryFigures,
+    summaryTieOut,
     provisionTieOut,
     priorProvisionTieOut,
     movementTieOut,

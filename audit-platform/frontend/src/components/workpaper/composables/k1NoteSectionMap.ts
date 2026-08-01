@@ -50,6 +50,13 @@ export const K1_NOTE_SUBTOTAL_LABEL_WIDE = '小  计'
  * 已由 `fix_note_k_complex_structure.py` 补入模板（`insert=True`）。
  */
 export const K1_LISTED_SUBTABLE = {
+  /**
+   * 汇总表「其他应收款」（源 xlsx `A5:C20` 首表，行 = 应收利息/应收股利/其他应收款/合计）。
+   * 该表同时承载 G2（应收利息）/ G3（应收股利）/ K1（其他应收款）三个底稿的推送 ——
+   * K1 只在 `fs_reconciliation` 有值时推送（条件表语义），无值不推且不进
+   * `_removed_table_keys`（可能由 G2/G3 承载，越权删会打断对方）。
+   */
+  summary: '其他应收款',
   aging: '按账龄披露',
   nature: '按款项性质披露',
   stage1: '期末处于第一阶段的坏账准备',
@@ -70,6 +77,8 @@ export const K1_LISTED_SUBTABLE = {
 
 /** 与 note_template_soe §八、9 tables[].name **逐字**对齐（K1 其他应收款项部分） */
 export const K1_SOE_SUBTABLE = {
+  /** 同上市侧 `K1_LISTED_SUBTABLE.summary`，源 xlsx 国企侧首表也叫「其他应收款」。 */
+  summary: '其他应收款',
   aging: '按账龄披露其他应收款项',
   methodEnd: '按坏账准备计提方法分类披露其他应收款项',
   /**

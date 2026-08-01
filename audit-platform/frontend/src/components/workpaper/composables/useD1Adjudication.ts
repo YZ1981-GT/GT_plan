@@ -66,7 +66,18 @@ export interface TrialBalanceDiffRow {
   tbAmount: number
   auditedAmount: number
   diff: number
+  /**
+   * 是否核对一致（按分容差判定）。
+   *
+   * 🔴 不能在模板里写 `diff === 0`：金额经多层浮点求和会带 1e-9 级噪声
+   * （实测 净值 19,046,910.15 与 TB 数完全相等时 `diff` 仍为 -3.7e-9），
+   * 界面显示 `0.00` 却打红「✗ 存在差异」。金额精度到分，故容差取 0.005。
+   */
+  matched: boolean
 }
+
+/** 金额核对容差（元）—— 金额精度到分，半分以内视为一致。 */
+export const D1_ADJ_AMOUNT_TOLERANCE = 0.005
 
 /** 审定表小计 ↔ 上游明细底稿合计的勾稽提示行（非阻断，仅展示差异）。 */
 export interface CrossCheckRow {
@@ -289,7 +300,15 @@ export function useD1Adjudication(options: UseD1AdjudicationOptions) {
       : (tbSeedAmount?.value ?? 0)
     const netSection = adjudicationSections.value.find(s => s.sectionKey === 'net-value')
     const auditedAmount = netSection?.subtotalRow.currentAudited ?? 0
-    return { tbAmount, auditedAmount, diff: auditedAmount - tbAmount }
+    // 差异按分取整，消除浮点噪声（与显示口径一致；源模板 D1-1 E20=E18-E19）
+    const rawDiff = auditedAmount - tbAmount
+    const diff = Math.round(rawDiff * 100) / 100
+    return {
+      tbAmount,
+      auditedAmount,
+      diff,
+      matched: Math.abs(rawDiff) <= D1_ADJ_AMOUNT_TOLERANCE,
+    }
   })
 
   // ─── Audit Note & Conclusion ─────────────────────────────────────────────

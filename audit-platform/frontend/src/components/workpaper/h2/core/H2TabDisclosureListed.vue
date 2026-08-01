@@ -242,17 +242,19 @@
           </template>
         </el-table-column>
       </el-table>
-      <div class="note-field">
-        <label>资金来源补充说明</label>
-        <el-input
-          v-model="noteFundSource"
-          type="textarea"
-          :autosize="{ minRows: 2, maxRows: 4 }"
-          :disabled="isReadonly"
-          :placeholder="H2_LISTED_GUIDANCE.fundSource"
-          @change="scheduleSave"
-        />
-      </div>
+      <WpNoteTextArea
+        v-model="noteFundSource"
+        label="资金来源补充说明"
+        testid-prefix="h2-listed-fundSource"
+        :min-rows="2"
+        :max-rows="4"
+        :disabled="isReadonly"
+        :placeholder="H2_LISTED_GUIDANCE.fundSource"
+        :ai-loading="aiLoadingSection === 'fundSource'"
+        @change="scheduleSave"
+        @ai="runAi('fundSource')"
+        @review="openReview('fundSource')"
+      />
     </section>
 
     <!-- ══════ ③减值 ══════ -->
@@ -300,18 +302,22 @@
           </template>
         </el-table-column>
       </el-table>
-      <div class="note-field">
-        <label>减值测试披露说明</label>
-        <el-input
-          v-model="noteImpairment"
-          type="textarea"
-          :autosize="{ minRows: 3, maxRows: 8 }"
-          :disabled="isReadonly"
-          :placeholder="H2_LISTED_GUIDANCE.impairment"
-          @change="scheduleSave"
-        />
-      </div>
+      <WpNoteTextArea
+        v-model="noteImpairment"
+        label="减值测试披露说明"
+        testid-prefix="h2-listed-impairment"
+        :min-rows="3"
+        :max-rows="8"
+        :disabled="isReadonly"
+        :placeholder="H2_LISTED_GUIDANCE.impairment"
+        :ai-loading="aiLoadingSection === 'impairment'"
+        @change="scheduleSave"
+        @ai="runAi('impairment')"
+        @review="openReview('impairment')"
+      />
     </section>
+
+    <WpDisclosureConsistencyPanel :results="consistencyChecks" :project-id="projectId" />
 
     <!-- ══════ （2）工程物资 ══════ -->
     <section class="block">
@@ -391,17 +397,19 @@
         </el-table-column>
       </el-table>
       <p v-else class="hint">暂无抵押项目；请在 H2-2 勾选「是否抵押=是」后点「从 H2-2 同步抵押」。</p>
-      <div class="note-field">
-        <label>抵押、担保在建工程情况说明</label>
-        <el-input
-          v-model="noteMortgage"
-          type="textarea"
-          :autosize="{ minRows: 2, maxRows: 6 }"
-          :disabled="isReadonly"
-          :placeholder="H2_LISTED_GUIDANCE.mortgage"
-          @change="scheduleSave"
-        />
-      </div>
+      <WpNoteTextArea
+        v-model="noteMortgage"
+        label="抵押、担保在建工程情况说明"
+        testid-prefix="h2-listed-mortgage"
+        :min-rows="2"
+        :max-rows="6"
+        :disabled="isReadonly"
+        :placeholder="H2_LISTED_GUIDANCE.mortgage"
+        :ai-loading="aiLoadingSection === 'mortgage'"
+        @change="scheduleSave"
+        @ai="runAi('mortgage')"
+        @review="openReview('mortgage')"
+      />
     </section>
 
     <details class="compile-hint">
@@ -430,6 +438,11 @@ import { useRouter } from 'vue-router'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
+import WpNoteTextArea from '../../shared/disclosure/WpNoteTextArea.vue'
+import { useHCycleDisclosureAi } from '../../composables/useHCycleDisclosureAi'
+import { H_CYCLE_NOTE_AI_SECTIONS } from '../../composables/hCycleNoteAiSections'
+import WpDisclosureConsistencyPanel from '../../shared/disclosure/WpDisclosureConsistencyPanel.vue'
+import { buildH2ListedChecks } from '../../composables/h2DisclosureConsistency'
 import { H2_NOTE_SECTION } from '../../composables/h2NoteSectionMap'
 import { buildH2ListedSyncPayloads, type H2ListedSyncSnapshot } from '../../composables/h2DisclosureSyncPayload'
 import {
@@ -492,6 +505,31 @@ const mortgageRows = ref<ListedMortgageRow[]>([])
 const noteImpairment = ref('')
 const noteFundSource = ref('')
 const noteMortgage = ref('')
+
+// ─── 披露说明 AI 辅助 + 复核（原本 3 个文本域全无 AI 按钮） ──────────────────
+const { aiLoadingSection: aiLoadingRef, runAi, openReview } = useHCycleDisclosureAi({
+  wpCode: 'H2',
+  variant: 'listed',
+  wpId: () => props.wpId,
+  isReadonly: () => isReadonly.value,
+  noteSectionId: H2_NOTE_SECTION.listed,
+  labels: H_CYCLE_NOTE_AI_SECTIONS.H2.listed,
+  fields: {
+    fundSource: { get: () => noteFundSource.value || '', set: (v) => { noteFundSource.value = v; scheduleSave() } },
+    impairment: { get: () => noteImpairment.value || '', set: (v) => { noteImpairment.value = v; scheduleSave() } },
+    mortgage: { get: () => noteMortgage.value || '', set: (v) => { noteMortgage.value = v; scheduleSave() } },
+  },
+})
+const aiLoadingSection = computed(() => aiLoadingRef.value)
+
+const consistencyChecks = computed(() =>
+  buildH2ListedChecks({
+    summary: [...summary],
+    detailRows: detailRows.value,
+    projectRows: projectRows.value,
+    impairmentRows: impairmentRows.value,
+  }),
+)
 
 const summaryDisplay = computed(() => {
   const tot = listedSummaryTotal(summary)

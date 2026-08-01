@@ -1,6 +1,13 @@
 /**
  * G7-3 调整分录 — 纯函数（normalize / 汇总 / 按被投资单位回写）
  */
+import {
+  G7_ADJUSTMENT_ACCOUNT_OPTIONS,
+  G7_GROSS_FALLBACK_STANDARD,
+  g7CodeMatchesPrefix,
+  isG7ProvisionCode,
+} from '../../composables/g7AccountScope'
+import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
 import { parseNum } from '../../composables/useG7FormulaEngine'
 
 export const G7_ADJUSTMENT_PUSHED_EVENT = 'g7:adjustment-pushed'
@@ -40,11 +47,14 @@ export interface InvesteeAccountTotals extends AccountTotals {
   investeeName: string
 }
 
+/**
+ * 调整分录可选科目 —— 与 `G7TabAdjustment.vue` 共用同一份声明
+ * （`composables/g7AccountScope.G7_ADJUSTMENT_ACCOUNT_OPTIONS`）。
+ * 改造前两处各写一份 4 条列表，改一处必漏另一处。
+ */
 const ACCOUNT_DEFAULTS = [
-  { code: '1511', name: '长期股权投资' },
-  { code: '1512', name: '长期股权投资减值准备' },
-  { code: '6111', name: '投资收益' },
-  { code: '6701', name: '资产减值损失' },
+  ...G7_ADJUSTMENT_ACCOUNT_OPTIONS,
+  // 以下为本模块归一化时额外识别的对方科目（不进 Tab 的下拉选项）
   { code: '6301', name: '营业外收入' },
   { code: '1012', name: '银行存款' },
   { code: '1122', name: '应收账款' },
@@ -132,7 +142,7 @@ export function normalizeG73Entry(
   const knownByName = ACCOUNT_DEFAULTS.find((item) =>
     String(raw?.accountName || '').includes(item.name),
   )
-  const accountCode = String(raw?.accountCode || knownByName?.code || '1511')
+  const accountCode = String(raw?.accountCode || knownByName?.code || G7_GROSS_FALLBACK_STANDARD)
   const known = ACCOUNT_DEFAULTS.find((item) => item.code === accountCode)
   const description = String(raw?.description || raw?.summary || '')
   const sourceKind = inferSourceKind(raw)
@@ -167,14 +177,15 @@ export function aggregateAccount(
     creditAmount?: number
     category?: string
   }>,
-  codePrefix: '1511' | '1512',
+  codePrefix: string,
+  tbSource?: TbSourceCodes | null,
 ): AccountTotals {
   let ajeTotal = 0
   let rjeTotal = 0
   for (const entry of entries) {
-    if (!String(entry.accountCode || '').startsWith(codePrefix)) continue
+    if (!g7CodeMatchesPrefix(entry.accountCode, codePrefix)) continue
     const debitMinusCredit = parseNum(entry.debitAmount) - parseNum(entry.creditAmount)
-    const amount = codePrefix === '1512' ? -debitMinusCredit : debitMinusCredit
+    const amount = isG7ProvisionCode(codePrefix, tbSource) ? -debitMinusCredit : debitMinusCredit
     if (entry.category === '报表调整') rjeTotal += amount
     else ajeTotal += amount
   }
@@ -194,16 +205,17 @@ export function aggregateByInvestee(
     investeeName?: string
     description?: string
   }>,
-  codePrefix: '1511' | '1512',
+  codePrefix: string,
+  tbSource?: TbSourceCodes | null,
 ): InvesteeAccountTotals[] {
   const map = new Map<string, AccountTotals>()
   for (const entry of entries) {
-    if (!String(entry.accountCode || '').startsWith(codePrefix)) continue
+    if (!g7CodeMatchesPrefix(entry.accountCode, codePrefix)) continue
     const name = String(entry.investeeName || '').trim()
       || extractInvesteeFromDescription(String(entry.description || ''))
       || '（未指定）'
     const debitMinusCredit = parseNum(entry.debitAmount) - parseNum(entry.creditAmount)
-    const amount = codePrefix === '1512' ? -debitMinusCredit : debitMinusCredit
+    const amount = isG7ProvisionCode(codePrefix, tbSource) ? -debitMinusCredit : debitMinusCredit
     const cur = map.get(name) || { ajeTotal: 0, rjeTotal: 0 }
     if (entry.category === '报表调整') cur.rjeTotal += amount
     else cur.ajeTotal += amount
@@ -231,10 +243,11 @@ export function extractInvesteeFromDescription(description: string): string {
 export function applyInvesteeWritebackToGroups(
   groups: Array<{ id?: string; groupType?: string; rows?: any[] }> | null | undefined,
   byInvestee: InvesteeAccountTotals[],
-  codePrefix: '1511' | '1512',
+  codePrefix: string,
+  tbSource?: TbSourceCodes | null,
 ): boolean {
   if (!groups?.length || !byInvestee.length) return false
-  const targetGroups = codePrefix === '1512'
+  const targetGroups = isG7ProvisionCode(codePrefix, tbSource)
     ? groups.filter(g => g.id === 'impairment' || g.groupType === 'impairment')
     : groups.filter(g => !['impairment', 'total'].includes(String(g.id || g.groupType || '')))
 

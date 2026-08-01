@@ -7,7 +7,7 @@
   <details class="guidance-details">
     <summary>📋 编制提示</summary>
     <div class="guidance-content">
-      <p>1. 合同资产（科目1402）附注依 CAS14 收入准则及 CAS22 减值准则披露，按上市公司版（5子节）/ 国企版（3子节）分别列报。</p>
+      <p>1. 合同资产（科目1141）附注依 CAS14 收入准则及 CAS22 减值准则披露，按上市公司版（5子节）/ 国企版（3子节）分别列报。</p>
       <p>2. 表内浅蓝背景单元格为跨sheet自动取数（来源 D6-1 审定表 / D6-3 减值明细 / D6-8 测算），不可手工编辑。</p>
       <p>3. 上市公司版需披露分类构成、减值计提情况、单项与组合明细及计提转回核销变动；国企版仅需披露分类及减值变动。</p>
       <p>4. 各子节说明文本将双向回写至附注模块，请与审定表、减值明细及测算保持勾稽一致。</p>
@@ -348,11 +348,24 @@
             />
             <span v-else class="group-name">{{ group.groupName || `组合${gIdx + 1}` }}</span>
             <el-button v-if="!isReadonly" size="small" @click="addGroupedDetailRow(group.groupName)">添加行</el-button>
+            <el-button v-if="!isReadonly" size="small" type="primary" plain @click="onFillGroupAgingBands(gIdx)">按账龄段生成</el-button>
+            <el-tag size="small" type="info" effect="plain">账龄口径：{{ agingBandLabels.join(' / ') }}</el-tag>
           </div>
           <el-table :data="padRows(group.rows)" size="small" border>
-            <el-table-column label="账  龄" width="120">
+            <el-table-column label="账  龄" width="140">
               <template #default="{ row }">
-                <el-input v-if="!isReadonly && !row._isPad" :model-value="row.label" size="small" @input="(v: string) => updateGroupedCell(gIdx, row.rowId, 'label', v)" />
+                <el-select
+                  v-if="!isReadonly && !row._isPad"
+                  :model-value="row.label"
+                  size="small"
+                  filterable
+                  allow-create
+                  default-first-option
+                  placeholder="选择账龄段（可自定义）"
+                  @change="(v: string) => updateGroupedCell(gIdx, row.rowId, 'label', v || '')"
+                >
+                  <el-option v-for="label in agingBandLabels" :key="label" :label="label" :value="label" />
+                </el-select>
                 <span v-else>{{ row.label }}</span>
               </template>
             </el-table-column>
@@ -617,6 +630,7 @@ import type { ChecklistResponse } from '../composables/useD6FormData'
 import type useD6CrossSheet from '../composables/useD6CrossSheet'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { checkNoteConsistencyGeneric } from '../composables/noteConsistencyCheck'
+import { useAgingConfig } from '@/composables/useAgingConfig'
 
 // @ts-ignore
 import GtIndexChip from '../GtIndexChip.vue'
@@ -640,7 +654,7 @@ const { year: auditYear } = useAuditContext()
 
 const {
   listedSections, soeSections, showListed, showSoe, activeVariant,
-  groupedDetails, addGroup, addGroupedDetailRow, updateGroupName, updateGroupedCell, removeGroupedRow,
+  groupedDetails, addGroup, addGroupedDetailRow, fillGroupAgingBands, updateGroupName, updateGroupedCell, removeGroupedRow,
   majorChangeRows, addMajorChangeRow, updateMajorChangeCell, removeMajorChangeRow,
   mainFormat, setMainFormat,
   impairmentPriorRows, addImpairmentPriorRow, updateImpairmentPriorCell, removeImpairmentPriorRow,
@@ -657,6 +671,18 @@ const {
 
 if (props.variant) {
   activeVariant.value = props.variant
+}
+
+// ─── 账龄枚举（3年段 / 5年段 / 自定义，项目账龄配置为唯一真源）────────────────
+// 附注模板国企侧组合分表行维度本就是账龄段（源模板「工程施工」「质量保证金」
+// 两张组合分表 headers=「账 龄」），此前只有自由文本输入，与 D1/D2/D7 割裂。
+const { segments: d6AgingSegments } = useAgingConfig(computed(() => props.projectId) as unknown as Ref<string>, 'D6')
+const agingBandLabels = computed<string[]>(() => d6AgingSegments.value.map(s => s.label))
+
+function onFillGroupAgingBands(groupIndex: number): void {
+  const added = fillGroupAgingBands(groupIndex, agingBandLabels.value)
+  if (added > 0) ElMessage.success(`已按账龄段补齐 ${added} 行`)
+  else ElMessage.info('账龄段已齐备，无需新增')
 }
 
 // ─── 保存后自动同步到附注（防抖/非阻塞/失败静默）──────────────────────────────
@@ -878,7 +904,7 @@ async function syncToDisclosureNotes(): Promise<void> {
     window.dispatchEvent(new CustomEvent('disclosure:note-text-updated', {
       detail: {
         wpCode: 'D6',
-        accountCode: '1402',
+        accountCode: '1141',
         projectId: props.projectId,
         section: variant,
         sectionIds: [D6_NOTE_SECTION[variant]],

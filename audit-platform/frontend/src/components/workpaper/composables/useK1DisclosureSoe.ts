@@ -35,7 +35,9 @@ import {
   type K1Top5DisclosureRow,
   type K1TransferRow,
   type K1WriteoffDisclosureRow,
+  calcSummaryTieOut,
   readAdjudicationTotals,
+  readK1SummaryFigures,
 } from './k1DisclosureModel'
 import { buildK1SoeSyncPayloads } from './k1DisclosureSyncPayload'
 import {
@@ -96,6 +98,9 @@ export function useK1DisclosureSoe(opts: {
   const balanceStageTieOut = computed(() =>
     calcBalanceStageTieOut(payload.value.balanceStageMovements, adjudication.value.receivableEnd),
   )
+  /** F8-48：汇总表三明细行之和 = 合计行 */
+  const summaryFigures = computed(() => readK1SummaryFigures(allResponses.value))
+  const summaryTieOut = computed(() => calcSummaryTieOut(summaryFigures.value))
 
   const eclClosingTotal = computed(() => {
     const closing = payload.value.stageMovements.find((r) => r.key === 'closing')
@@ -505,6 +510,7 @@ export function useK1DisclosureSoe(opts: {
       _standards(),
       getSyncSnapshot(),
       noteText.value,
+      readK1SummaryFigures(allResponses.value),
     )
     if (!payloads.length) {
       ElMessage.warning('当前项目准则不适用国企附注同步')
@@ -571,6 +577,8 @@ export function useK1DisclosureSoe(opts: {
     agingTieOut,
     methodTieOut,
     balanceStageTieOut,
+    summaryFigures,
+    summaryTieOut,
     provisionTieOut,
     individualTieOut,
     portfolioSplitTieOut,

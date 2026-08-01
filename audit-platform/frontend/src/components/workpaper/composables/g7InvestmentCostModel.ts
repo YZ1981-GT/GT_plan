@@ -12,6 +12,7 @@ import {
   G713_BARGAIN_SOURCE_KIND,
   type SuggestedAdjustmentLine,
 } from '../g7-long-term-equity-method/calculation/g7EquityMethodCalcModel'
+import { G7_GROSS_FALLBACK_STANDARD } from './g7AccountScope'
 
 export type InvestmentCostRowLike = Partial<InvestmentCostTestRow> & {
   investeeName?: string
@@ -292,7 +293,7 @@ export function buildBargainSuggestedAdjustments(
       description: desc,
       category: '账项调整',
       reportItem: '长期股权投资',
-      accountCode: '1511',
+      accountCode: G7_GROSS_FALLBACK_STANDARD,
       accountName: '长期股权投资',
       debitAmount: amt,
       creditAmount: 0,

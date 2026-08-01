@@ -508,7 +508,7 @@
       :project-id="projectId"
       :is-readonly="isReadonly"
       storage-key="G7-10-voucher-samples"
-      account-code="1511"
+      :account-code="G7_GROSS_FALLBACK_STANDARD"
       title="后续计量凭证抽查（G7-10）"
       :html-data="htmlData"
     />
@@ -549,6 +549,7 @@ import G7VoucherSampleSection from '../../g7-shared/G7VoucherSampleSection.vue'
 import http from '@/utils/http'
 import { extractG7AiText } from '../../composables/g7AiText'
 import { api } from '@/services/apiProxy'
+import { G7_GROSS_FALLBACK_STANDARD } from '../../composables/g7AccountScope'
 
 const props = defineProps<{
   htmlData: Record<string, any> | null

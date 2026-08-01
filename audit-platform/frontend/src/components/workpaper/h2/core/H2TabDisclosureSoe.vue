@@ -266,17 +266,21 @@
           </template>
         </el-table-column>
       </el-table>
-      <div class="note-field">
-        <label>减值补充说明</label>
-        <el-input
-          v-model="noteImpairment"
-          type="textarea"
-          :autosize="{ minRows: 2, maxRows: 6 }"
-          :disabled="isReadonly"
-          placeholder="可补充减值测试方法、关键参数等（按需）"
-          @change="scheduleSave"
-        />
-      </div>
+      <WpDisclosureConsistencyPanel :results="consistencyChecks" :project-id="projectId" />
+
+      <WpNoteTextArea
+        v-model="noteImpairment"
+        label="减值补充说明"
+        testid-prefix="h2-soe-impairment"
+        :min-rows="2"
+        :max-rows="6"
+        :disabled="isReadonly"
+        placeholder="可补充减值测试方法、关键参数等（按需）"
+        :ai-loading="aiLoadingSection === 'impairment'"
+        @change="scheduleSave"
+        @ai="runAi('impairment')"
+        @review="openReview('impairment')"
+      />
     </section>
 
     <details class="compile-hint">
@@ -304,6 +308,11 @@ import { useRouter } from 'vue-router'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
+import WpNoteTextArea from '../../shared/disclosure/WpNoteTextArea.vue'
+import { useHCycleDisclosureAi } from '../../composables/useHCycleDisclosureAi'
+import { H_CYCLE_NOTE_AI_SECTIONS } from '../../composables/hCycleNoteAiSections'
+import WpDisclosureConsistencyPanel from '../../shared/disclosure/WpDisclosureConsistencyPanel.vue'
+import { buildH2SoeChecks } from '../../composables/h2DisclosureConsistency'
 import { H2_NOTE_SECTION } from '../../composables/h2NoteSectionMap'
 import { buildH2SoeSyncPayloads, type H2SoeSyncSnapshot } from '../../composables/h2DisclosureSyncPayload'
 import {
@@ -353,6 +362,28 @@ const detailRows = ref<SoeDetailRow[]>([])
 const projectRows = ref<SoeProjectRow[]>([])
 const impairmentRows = ref<SoeImpairmentRow[]>([])
 const noteImpairment = ref('')
+
+// ─── 披露说明 AI 辅助 + 复核（原本无 AI 按钮） ───────────────────────────────
+const { aiLoadingSection: aiLoadingRef, runAi, openReview } = useHCycleDisclosureAi({
+  wpCode: 'H2',
+  variant: 'soe',
+  wpId: () => props.wpId,
+  isReadonly: () => isReadonly.value,
+  noteSectionId: H2_NOTE_SECTION.soe,
+  labels: H_CYCLE_NOTE_AI_SECTIONS.H2.soe,
+  fields: {
+    impairment: { get: () => noteImpairment.value || '', set: (v) => { noteImpairment.value = v; scheduleSave() } },
+  },
+})
+const aiLoadingSection = computed(() => aiLoadingRef.value)
+
+const consistencyChecks = computed(() =>
+  buildH2SoeChecks({
+    detailRows: detailRows.value,
+    projectRows: projectRows.value,
+    impairmentRows: impairmentRows.value,
+  }),
+)
 
 const summaryDisplay = computed(() => {
   const tot = soeSummaryTotal(summary)

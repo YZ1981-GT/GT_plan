@@ -41,6 +41,19 @@ export interface TbSourceCodes {
   provision_exact?: boolean
   /** 是否叠加了备抵名称过滤（保守口径） */
   use_provision_name_filter?: boolean
+  /**
+   * 备抵**独立报表行**行次（如长期股权投资减值准备 `IMP-009`）。
+   * 仅「原值行公式不引用备抵、备抵自成一行」的循环才有值（G7 / H·I 类的 `IMP-xxx`）；
+   * 为空串表示该侧走了兜底码。
+   */
+  provision_row_code?: string
+  /** 备抵报表行的公式原文 */
+  provision_formula?: string | null
+  /**
+   * 叶子和 vs 父科目行金额的两口径自检。不相等时两个数都暴露（不静默取其一），
+   * 供审计追溯 —— 差异通常意味着客户科目树被改动或数据集不一致。
+   */
+  parent_check?: { leaf_sum: number; parent: number; diff: number }
 }
 
 /** 中文化解析来源（UI 全中文化铁律） */

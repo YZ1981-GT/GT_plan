@@ -236,6 +236,35 @@ export function useD6Disclosure(options: UseD6DisclosureOptions) {
     persistGroupedDetails()
   }
 
+  /**
+   * 按项目账龄段（枚举账龄：3年段 / 5年段 / 自定义）批量补齐某组合的行。
+   *
+   * 附注模板国企侧「组合计提项目」的行维度本就是账龄段（源模板「工程施工」/
+   * 「质量保证金」两张组合分表 headers=「账 龄」），此前只有自由文本输入，
+   * 账龄口径与 D1/D2/D7 割裂。只补缺失段，不覆盖已有行的金额（Requirements 6.3）。
+   */
+  function fillGroupAgingBands(groupIndex: number, segmentLabels: readonly string[]): number {
+    let added = 0
+    groupedDetails.value = groupedDetails.value.map((g, idx) => {
+      if (idx !== groupIndex) return g
+      const existing = new Set(g.rows.map(r => String(r.label || '').trim()).filter(Boolean))
+      const newRows: DisclosureRow[] = []
+      for (const label of segmentLabels) {
+        if (existing.has(label)) continue
+        newRows.push({
+          rowId: generateRowId(), label,
+          balance: 0, provision: 0, lossRate: 0,
+          priorBalance: 0, priorProvision: 0, priorLossRate: 0,
+        })
+        added += 1
+      }
+      if (newRows.length === 0) return g
+      return { ...g, rows: [...g.rows, ...newRows] }
+    })
+    if (added > 0) persistGroupedDetails()
+    return added
+  }
+
   function addGroupedDetailRow(groupName: string): void {
     groupedDetails.value = groupedDetails.value.map(g => {
       if (g.groupName !== groupName) return g
@@ -494,7 +523,7 @@ export function useD6Disclosure(options: UseD6DisclosureOptions) {
           // 按 key 含 'soe' 派生对应章节 → useNoteRefresh 定向刷新
           eventBus.emit('disclosure:note-text-updated' as any, {
             wpCode: 'D6',
-            accountCode: '1402',
+            accountCode: '1141',
             section: key,
             sectionIds: [key.includes('soe') ? '八、11' : '五、10'],
             text: newTexts[key],
@@ -532,6 +561,7 @@ export function useD6Disclosure(options: UseD6DisclosureOptions) {
     groupedDetails,
     addGroup,
     addGroupedDetailRow,
+    fillGroupAgingBands,
     updateGroupName,
     updateGroupedCell,
     removeGroupedRow,

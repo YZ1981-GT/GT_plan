@@ -4,7 +4,7 @@
   <details class="guidance-details">
     <summary>📋 编制提示</summary>
     <div class="guidance-content">
-      <p>1. 本表对合同资产（科目1402）本期增减变动及期后结转情况执行凭证级细节测试。</p>
+      <p>1. 本表对合同资产（科目1141）本期增减变动及期后结转情况执行凭证级细节测试。</p>
       <p>2. 核对结果5项：①记账凭证与原始凭证核对 ②合同/协议存在性 ③履约进度是否恰当 ④计量是否准确 ⑤分类是否正确。绿色=通过，灰色=未核对。</p>
       <p>3. 抽样参数区记录测试总体、抽样方法与目标样本量，进度条实时反映已抽取比例。</p>
       <p>4. 检查比例汇总的账面金额取自 D6-2 期末审定合计（浅蓝背景为跨sheet自动取数），检查比例不足时需扩大样本。</p>
@@ -376,7 +376,7 @@
   <!-- 抽凭引擎 -->
   <GtVoucherSamplingEngine
     v-if="showSamplingDialog"
-    account-code="1402"
+    account-code="1141"
     phase="final"
     :workpaper-id="props.wpId"
     :project-id="props.projectId"

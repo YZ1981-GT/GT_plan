@@ -769,9 +769,11 @@ export function useD6Adjudication(options: UseD6AdjudicationOptions) {
     const auditedAmount = block3.blockTotalRow.currentAudited
 
     try {
+      // 合同资产科目为 1141（report_config 报表行 BS-011 四准则一致）；
+      // 原 `1402` 是在途物资（存货类），属误用。
       eventBus.emit('substantive:adjudicated' as any, {
         wpCode: 'D6',
-        accountCode: '1402',
+        accountCode: '1141',
         auditedAmount,
       })
     } catch { /* EventBus publish failure should not block */ }
@@ -783,7 +785,7 @@ export function useD6Adjudication(options: UseD6AdjudicationOptions) {
     if (!payload || payload.wpCode !== 'D6') return
 
     const { entryType, amount, accountCode } = payload
-    if (accountCode !== '1402') return
+    if (accountCode !== '1141') return
 
     // Determine which field to update based on entryType
     const field = entryType === 'AJE' ? 'currentAje' : 'currentRje'

@@ -23,6 +23,7 @@
  *
  * spec: .kiro/specs/f1-four-table-extraction-and-disclosure-alignment/ R8
  */
+import { WP_CHECK_TOLERANCE } from './shared/disclosureConsistency'
 
 export type F1CheckLevel = 'pass' | 'warning' | 'error' | 'skipped'
 
@@ -41,8 +42,8 @@ export interface F1CheckResult {
   refs: string[]
 }
 
-/** 相等类容差：0.01 元 */
-export const F1_AMOUNT_TOLERANCE = 0.01
+/** 相等类容差：0.01 元。委托平台共用常量（`shared/disclosureConsistency.ts`）。 */
+export const F1_AMOUNT_TOLERANCE = WP_CHECK_TOLERANCE
 /** 比例类容差：0.01 个百分点 */
 export const F1_PCT_TOLERANCE = 0.01
 

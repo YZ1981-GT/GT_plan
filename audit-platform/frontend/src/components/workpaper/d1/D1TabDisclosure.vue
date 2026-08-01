@@ -711,26 +711,37 @@ function updateBadDebtClassFixed(period: 'end' | 'prior', source: 'single' | 'ba
 
 // ─── Section Labels ──────────────────────────────────────────────────────────
 
+/**
+ * 小节标题 —— **逐字取自源模板披露 sheet 的小节标题行**。
+ *
+ * 🔴 两版措辞本就不同（上市「而其转应收账款」/ 国企「而其转为应收账款」；
+ *    上市「按坏账计提方法分类」/ 国企「坏账准备计提情况」），按版各守其源，不做统一。
+ * 🔴 上市主表（源模板 R6「应收票据」）**不带小节编号**，编号自「（1）期末已质押」起 —— 
+ *    此前把它标成「（1）」，与质押表撞号（同一页出现两个「（1）」）。
+ * 守卫：`composables/__tests__/d1DisclosureSectionLabels.spec.ts`。
+ */
 const sectionLabels = computed<Record<string, string>>(() => {
   if (props.variant === 'soe') {
+    // 源模板「附注披露信息（国企）」R5 / R11 / R45 / R60 / R66 / R74 / R80
     return {
       categorySummary: '（1）应收票据分类',
-      badDebtClass: '（2）按坏账准备计提方法分类披露',
+      badDebtClass: '（2）坏账准备计提情况',
       badDebtMovement: '（3）本期计提、收回或转回的应收票据坏账准备情况',
       pledged: '（4）期末已质押的应收票据',
-      endorsed: '（5）期末已背书或贴现且在资产负债表日尚未到期的应收票据',
-      transfer: '（6）期末因出票人未履约而将其转应收账款的票据',
+      endorsed: '（5）期末已背书或贴现但尚未到期的应收票据',
+      transfer: '（6）期末因出票人未履约而其转为应收账款的票据',
       writeOff: '（7）本期实际核销的应收票据',
     }
   }
+  // 源模板「附注披露信息（上市公司）」R6 / R14 / R20 / R31 / R37 / R92 / R107
   return {
+    categorySummary: '应收票据',
     pledged: '（1）期末已质押的应收票据',
-    endorsed: '（2）期末已背书或贴现且未到期的应收票据',
-    transfer: '（3）期末因出票人未履约而转为应收账款的票据',
-    badDebtClass: '（4）按坏账准备计提方法分类披露',
+    endorsed: '（2）期末已背书或贴现但尚未到期的应收票据',
+    transfer: '（3）期末因出票人未履约而其转应收账款的票据',
+    badDebtClass: '（4）按坏账计提方法分类',
     badDebtMovement: '（5）本期计提、收回或转回的坏账准备情况',
     writeOff: '（6）本期实际核销的应收票据情况',
-    categorySummary: '（1）应收票据按票据种类分类',
   }
 })
 

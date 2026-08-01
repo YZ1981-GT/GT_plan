@@ -6,7 +6,10 @@
     <div class="guidance-content">
       <p>1. 记录审计过程中发现的需要调整的会计分录，确保借贷平衡。</p>
       <p>2. "账项调整"(AJE)：涉及科目余额的调整，影响审定数；"报表调整"(RJE)：仅影响报表列报的重分类调整。</p>
-      <p>3. 合同资产相关调整科目：1402 合同资产 / 1403 合同资产减值准备。</p>
+      <!-- 科目码依据（标准科目表实证）：1141 合同资产（借）/ 1142 合同资产减值准备（贷）；
+           部分客户把合同资产减值并入 1231-05 坏账准备-合同资产。
+           原文案写的 1403 是「原材料」（存货类），属误用。 -->
+      <p>3. 合同资产相关调整科目：1141 合同资产 / 1142 合同资产减值准备（或 1231-05 坏账准备-合同资产）。</p>
       <p>4. 借贷合计必须平衡（借方合计=贷方合计），不平衡时无法确认。</p>
       <p>5. 确认后的调整分录将同步更新 D6-1 审定表的 AJE/RJE 列。</p>
       <p>6. 可选中分录推送至 A13 错报汇总表。</p>
@@ -28,7 +31,7 @@
       <el-tooltip placement="top" :show-after="300">
         <template #content>
           本表与调整分录模块双向联动。<br/>
-          此处新增的分录会自动同步至调整分录模块(科目1402/1403)，<br/>
+          此处新增的分录会自动同步至调整分录模块(科目1141/1142)，<br/>
           调整分录模块中涉及合同资产科目的分录也会自动回写至此表。
         </template>
         <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">
@@ -157,7 +160,7 @@
           v-if="!isReadonly"
           :model-value="row.accountName"
           size="small"
-          placeholder="如 1402-合同资产"
+          placeholder="如 1141-合同资产"
           @change="(val: string) => updateCell(row.rowId, 'accountName', val)"
         />
         <span v-else>{{ row.accountName || '-' }}</span>

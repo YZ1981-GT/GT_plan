@@ -151,6 +151,7 @@
           :impairment-prefill="f1ImpairmentPrefill"
           :tb-source-codes="f1TbSourceCodes"
           :report-amount="f1TbAmountSeed"
+          :client-name="f1ClientName"
         />
 
         <F1TabConfirmationProcedure
@@ -287,6 +288,18 @@ const f1TbSourceCodes = computed(() => {
 const f1TbCrossCycleCodes = computed(() => {
   const ctx = props.htmlData?.project_context ?? props.htmlData?.projectContext ?? {}
   return ctx.tb_cross_cycle_codes
+})
+
+/**
+ * 被审计单位名称 —— 国企披露②表「债权单位」列的缺省值。
+ *
+ * 源 xlsx `附注披露信息(国企)` A18~A20 = `=RIGHT($A$3,LEN($A$3)-SEARCH("：",$A$3))`
+ * （从底稿目录「被审计单位：XXX」截出）。这里改读 render 已下发的
+ * `project_context.client_name`，不去解析底稿目录 sheet 的单元格。
+ */
+const f1ClientName = computed<string>(() => {
+  const ctx = props.htmlData?.project_context ?? props.htmlData?.projectContext ?? {}
+  return String(ctx.client_name ?? ctx.clientName ?? '').trim()
 })
 
 /**

@@ -253,14 +253,14 @@ const crossSheet = useD6CrossSheet({ allResponses })
 const globalAlerts = computed(() => {
   const alerts: Array<{ type: 'warning' | 'info' | 'success'; message: string; excludeSheets: string[] }> = []
 
-  // D6-1审定合计↔TB 1402差异
+  // D6-1审定合计↔TB 1141差异
   const tbAmount = crossSheet.blockTotals.value.block3.total
   const tbStored = allResponses.value.get('D6-1-tb-amount')?.remark
   const tbRef = tbStored ? parseFloat(tbStored) : 0
   if (tbRef > 0 && Math.abs(tbAmount - tbRef) > 1) {
     alerts.push({
       type: 'warning',
-      message: `D6-1审定净值合计(${tbAmount.toLocaleString()}) ↔ 试算平衡表1402(${tbRef.toLocaleString()}) 差异 ${(tbAmount - tbRef).toLocaleString()}`,
+      message: `D6-1审定净值合计(${tbAmount.toLocaleString()}) ↔ 试算平衡表1141(${tbRef.toLocaleString()}) 差异 ${(tbAmount - tbRef).toLocaleString()}`,
       excludeSheets: ['D6-1'],
     })
   }

@@ -3,6 +3,12 @@
  */
 import { parseNum } from '../../composables/useG7EquityMethodFormulaEngine'
 import type { EquityMethodCalcRow } from '../../composables/useG7EquityMethodFormData'
+import {
+  G7_ACCOUNT_NAME,
+  G7_GROSS_FALLBACK_STANDARD,
+  G7_PROVISION_ACCOUNT_NAME,
+  G7_PROVISION_FALLBACK_STANDARD,
+} from '../../composables/g7AccountScope'
 
 /** 分位容差：忽略浮点噪声；重要性未设置时亦作默认阈值 */
 export const G714_PENNY_THRESHOLD = 0.005
@@ -236,7 +242,7 @@ export function resolveUnexplainedCounterAccount(nature: UnexplainedNature): {
     case 'investmentIncome':
       return { code: '6111', name: '投资收益' }
     case 'impairment':
-      return { code: '1512', name: '长期股权投资减值准备' }
+      return { code: G7_PROVISION_FALLBACK_STANDARD, name: G7_PROVISION_ACCOUNT_NAME }
     case 'oci':
       return { code: '4003', name: '其他综合收益' }
     case 'capitalReserve':
@@ -264,10 +270,10 @@ function pushBalancedPair(
   const amt = Math.abs(opts.amount)
   if (amt < G714_PENNY_THRESHOLD) return
   // bookTooHigh：长投账面偏高 → 贷 1511 / 借 对方
-  const debitCode = opts.bookTooHigh ? opts.counterCode : '1511'
-  const debitName = opts.bookTooHigh ? opts.counterName : '长期股权投资'
-  const creditCode = opts.bookTooHigh ? '1511' : opts.counterCode
-  const creditName = opts.bookTooHigh ? '长期股权投资' : opts.counterName
+  const debitCode = opts.bookTooHigh ? opts.counterCode : G7_GROSS_FALLBACK_STANDARD
+  const debitName = opts.bookTooHigh ? opts.counterName : G7_ACCOUNT_NAME
+  const creditCode = opts.bookTooHigh ? G7_GROSS_FALLBACK_STANDARD : opts.counterCode
+  const creditName = opts.bookTooHigh ? G7_ACCOUNT_NAME : opts.counterName
   out.push({
     id: lineId(`${opts.source}-dr`),
     investeeName: opts.investeeName,

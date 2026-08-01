@@ -22,6 +22,16 @@
         >
           从源表取数
         </el-button>
+        <el-tooltip :disabled="g7ExtractionEnabled" content="四表取数未启用" placement="top">
+          <el-button
+            size="small"
+            :disabled="isReadonly || !g7ExtractionEnabled"
+            :loading="isSeedingFromFourTable"
+            @click="handleSeedFromFourTable"
+          >
+            从四表库带入
+          </el-button>
+        </el-tooltip>
         <el-button
           type="primary"
           size="small"
@@ -149,6 +159,23 @@
                   新增被投资单位
                 </el-button>
               </div>
+              <div v-if="table.slotConfig" class="add-row-actions">
+                <el-button size="small" :disabled="isReadonly" @click="addSlotEntity(table.slotConfig)">
+                  新增列
+                </el-button>
+                <el-tag
+                  v-for="name in entitySlotNames(table.slotConfig)"
+                  :key="name"
+                  size="small"
+                  class="slot-entity-tag"
+                  closable
+                  :disable-transitions="true"
+                  @close="removeSlotEntity(table.slotConfig, name)"
+                  @click="renameSlotEntity(table.slotConfig, name)"
+                >
+                  {{ name }}
+                </el-tag>
+              </div>
             </header>
 
             <p v-if="table.description" class="table-description">
@@ -195,7 +222,7 @@
                 </el-table-column>
 
                 <el-table-column
-                  v-for="column in table.columns"
+                  v-for="column in tableColumns(table)"
                   :key="column.key"
                   :label="column.label"
                   :width="column.width"
@@ -319,8 +346,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, toRef, watch } from 'vue'
-import { ElMessage } from 'element-plus'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, toRef, watch, inject, type ComputedRef } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { api } from '@/services/apiProxy'
 import { useDecimalCalc } from '@/composables/useDecimalCalc'
@@ -343,7 +370,10 @@ import {
   G7_LISTED_DISCLOSURE_SECTIONS,
   buildG7ListedColumns,
   buildG7ListedSyncData,
+  buildG7ListedSyncPayloads,
+  markG7ListedSynced,
   createG7ListedDisclosureState,
+  resolveG7ListedTableColumns,
   type G7DisclosureColumnType,
   type G7DisclosureNarrative,
   type G7DisclosureRow,
@@ -352,8 +382,15 @@ import {
   type G7ListedDisclosureState,
 } from './g7ListedDisclosureModel'
 import { tableMetaSources } from './g7DisclosureTableMeta'
+import { seedG7MovementFromLeafCategories, type G7LeafBucketSlot } from '../../composables/g7FourTableSeed'
+// 🔴 科目码单一真源：运行态取宿主 provide 的 tb_source_codes（报表映射解析结果），
+//    常量只作兜底。本文件不得出现字面量科目码（R11.1 / Property 15）。
+import {
+  g7AccountCode,
+  isG7GrossCode,
+} from '../../composables/g7AccountScope'
+import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
 
-const ACCOUNT_CODE = '1511'
 const RESPONSE_KEY = 'G7-main-disclosure-listed-v2'
 const NOTE_SECTION_ID = '五、18'
 const SHEET_NAME = '附注披露信息（上市公司）'
@@ -382,11 +419,22 @@ const props = defineProps<{
   isReadonly: boolean
 }>()
 
+/** 四表取数溯源（宿主 provide）→ 科目码 */
+const tbSourceCodes = inject<ComputedRef<TbSourceCodes | null>>(
+  'g7TbSourceCodes',
+  computed(() => null),
+)
+const accountCode = computed(() => g7AccountCode(tbSourceCodes.value))
+
 const sections = G7_LISTED_DISCLOSURE_SECTIONS
 const state = reactive<G7ListedDisclosureState>(createG7ListedDisclosureState())
 const hydrated = ref(false)
 const isRefreshing = ref(false)
 const lastRefreshHint = ref('')
+const isSeedingFromFourTable = ref(false)
+const g7ExtractionEnabled = computed(() =>
+  !!(props.htmlData as any)?.project_context?.g7_extraction_enabled,
+)
 let hydrateInFlight: Promise<void> | null = null
 const isSyncing = ref(false)
 const savePhase = ref<SavePhase>(SAVE_PHASE.IDLE)
@@ -443,6 +491,15 @@ const reconciliationDiff = computed(() => {
 
 function tableRows(table: G7DisclosureTable): G7DisclosureRow[] {
   return state.tables[table.id] ?? []
+}
+
+/**
+ * 该表的**有效**列集：无 `slotConfig` 时原样返回静态 `table.columns`；有 `slotConfig`
+ * 时按 `state.entitySlots` 动态生成（Task 5.6，Property 18）。UI 渲染、`addRow` 新行取值、
+ * `computedCell` 求和均须走它，不能再读 `table.columns`（会退回写死的默认实体名）。
+ */
+function tableColumns(table: G7DisclosureTable): G7DisclosureColumn[] {
+  return resolveG7ListedTableColumns(table, state.entitySlots)
 }
 
 function tableMeta(table: G7DisclosureTable) {
@@ -504,7 +561,7 @@ function addRow(table: G7DisclosureTable, group: 'joint-venture' | 'associate' =
   if (rows.length >= (table.maxRows ?? 100)) return
   const dataRows = rows.filter(row => row.kind === 'data')
   const id = `${table.id}-manual-${Date.now()}-${dataRows.length + 1}`
-  const values = Object.fromEntries(table.columns.map(column => [column.key, column.type === 'text' ? '' : null]))
+  const values = Object.fromEntries(tableColumns(table).map(column => [column.key, column.type === 'text' ? '' : null]))
   const nextRow: G7DisclosureRow = { id, label: '', values, kind: 'data' }
 
   if (table.id === 'investment-movement') {
@@ -545,6 +602,85 @@ function removeRow(table: G7DisclosureTable, rowId: string): void {
   scheduleSave()
 }
 
+/** 该槎位当前的实体名清单（缺省回退默认清单，与 `resolveG7ListedTableColumns` 同源）。 */
+function entitySlotNames(slotConfig: { slot: string }): string[] {
+  return state.entitySlots?.[slotConfig.slot] ?? []
+}
+
+async function addSlotEntity(slotConfig: { slot: string }): Promise<void> {
+  if (props.isReadonly) return
+  try {
+    const { value } = await ElMessageBox.prompt(
+      '请输入新增实体名称（如公司名称）',
+      '新增列',
+      { confirmButtonText: '创建', cancelButtonText: '取消' },
+    )
+    const name = String(value ?? '').trim()
+    if (!name) {
+      ElMessage.warning('名称不能为空')
+      return
+    }
+    const names = entitySlotNames(slotConfig)
+    if (names.includes(name)) {
+      ElMessage.warning('该名称已存在，请改用其它名称或先重命名现有列')
+      return
+    }
+    if (!state.entitySlots) state.entitySlots = {}
+    state.entitySlots[slotConfig.slot] = [...names, name]
+    scheduleSave()
+  } catch {
+    // 用户取消
+  }
+}
+
+async function renameSlotEntity(slotConfig: { slot: string }, current: string): Promise<void> {
+  if (props.isReadonly) return
+  try {
+    const { value } = await ElMessageBox.prompt(
+      '请输入新的实体名称',
+      '修改列名',
+      { inputValue: current, confirmButtonText: '保存', cancelButtonText: '取消' },
+    )
+    const name = String(value ?? '').trim()
+    if (!name) {
+      ElMessage.warning('名称不能为空')
+      return
+    }
+    const names = entitySlotNames(slotConfig)
+    if (name !== current && names.includes(name)) {
+      ElMessage.warning('该名称已存在，请改用其它名称')
+      return
+    }
+    if (!state.entitySlots) state.entitySlots = {}
+    // 🔴 只改显示名，key 仍是 `{slot}_{seq}`（seq = 数组下标 + 1）不变，数据不因改名丢落点。
+    state.entitySlots[slotConfig.slot] = names.map(n => (n === current ? name : n))
+    scheduleSave()
+  } catch {
+    // 用户取消
+  }
+}
+
+async function removeSlotEntity(slotConfig: { slot: string }, name: string): Promise<void> {
+  if (props.isReadonly) return
+  const names = entitySlotNames(slotConfig)
+  if (names.length <= 1) {
+    ElMessage.warning('至少保留一列')
+    return
+  }
+  try {
+    await ElMessageBox.confirm(`删除后「${name}」列的数据将同时清除，是否继续？`, '删除列', {
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+  } catch {
+    return
+  }
+  if (!state.entitySlots) return
+  state.entitySlots[slotConfig.slot] = names.filter(n => n !== name)
+  scheduleSave()
+}
+
 function serialisableState(): G7ListedDisclosureState {
   return {
     version: 2,
@@ -561,6 +697,12 @@ function serialisableState(): G7ListedDisclosureState {
     ),
     texts: { ...state.texts },
     updatedAt: new Date().toISOString(),
+    previouslySyncedTables: Object.fromEntries(
+      Object.entries(state.previouslySyncedTables ?? {}).map(([k, v]) => [k, [...v]]),
+    ),
+    entitySlots: Object.fromEntries(
+      Object.entries(state.entitySlots ?? {}).map(([k, v]) => [k, [...v]]),
+    ),
   }
 }
 
@@ -570,6 +712,34 @@ function scheduleSave(options?: { userEdit?: boolean }): void {
   savePhase.value = SAVE_PHASE.PENDING
   if (saveTimer) clearTimeout(saveTimer)
   saveTimer = setTimeout(() => void persist(), 600)
+}
+
+async function handleSeedFromFourTable(): Promise<void> {
+  if (isSeedingFromFourTable.value || props.isReadonly) return
+  isSeedingFromFourTable.value = true
+  try {
+    const cats = (props.htmlData as any)?.tb_leaf_categories
+    const buckets: Record<string, G7LeafBucketSlot> | null = cats?.buckets ?? null
+    if (!buckets || !Object.keys(buckets).length) {
+      ElMessage.info('四表库无长期股权投资分类数据（灰度未启用或科目无余额）')
+      return
+    }
+    const TABLE_ID = 'investment-movement'
+    const rows = state.tables[TABLE_ID]
+    if (!rows?.length) {
+      ElMessage.warning('主表行为空，请先初始化')
+      return
+    }
+    const { filled, skipped } = seedG7MovementFromLeafCategories(rows, buckets)
+    if (filled > 0) {
+      scheduleSave({ userEdit: false })
+      ElMessage.success(`已从四表库带入 ${filled} 个格子（跳过已有值 ${skipped} 个）`)
+    } else {
+      ElMessage.info(`四表库数据与主表无可填充交集（已有值 ${skipped} 个未覆盖）`)
+    }
+  } finally {
+    isSeedingFromFourTable.value = false
+  }
 }
 
 async function refreshLoadedVersion(): Promise<void> {
@@ -641,6 +811,16 @@ function applySavedState(saved: Partial<G7ListedDisclosureState>): void {
     }
   }
   if (saved.texts && typeof saved.texts === 'object') Object.assign(state.texts, saved.texts)
+  if (saved.previouslySyncedTables && typeof saved.previouslySyncedTables === 'object') {
+    state.previouslySyncedTables = Object.fromEntries(
+      Object.entries(saved.previouslySyncedTables).map(([k, v]) => [k, Array.isArray(v) ? [...v] : []]),
+    )
+  }
+  if (saved.entitySlots && typeof saved.entitySlots === 'object') {
+    state.entitySlots = Object.fromEntries(
+      Object.entries(saved.entitySlots).map(([k, v]) => [k, Array.isArray(v) ? [...v] : []]),
+    )
+  }
 }
 
 function parseSavedRemark(remark: unknown): boolean {
@@ -726,7 +906,7 @@ function allNarrativeText(): string {
 function dispatchNoteUpdated(): void {
   window.dispatchEvent(new CustomEvent('disclosure:note-text-updated', {
     detail: {
-      accountCode: ACCOUNT_CODE,
+      accountCode: accountCode.value,
       projectId: props.projectId,
       wpId: props.wpId,
       sheetName: SHEET_NAME,
@@ -754,7 +934,7 @@ async function fillAiDraft(narrative: G7DisclosureNarrative): Promise<void> {
       sectionTitle: narrative.title,
       sourceRows: narrative.sourceRows,
       disclosureType: 'listed',
-      accountCode: ACCOUNT_CODE,
+      accountCode: accountCode.value,
       instruction: narrative.placeholder,
     },
     `AI生成：${narrative.title}`,
@@ -764,26 +944,35 @@ async function fillAiDraft(narrative: G7DisclosureNarrative): Promise<void> {
   onNarrativeChange()
 }
 
+// 🔴 R8.1：改多章节 payload（对齐国企侧已有范式），不再把 15 张表全推 `五、18`
+// （其中 14 张在该章节是孤儿表；子公司权益/合营联营权益/共同经营三区块归 `七、1`）。
 async function syncToDisclosureNotes(): Promise<void> {
   if (isSyncing.value || props.isReadonly || !props.projectId) return
   isSyncing.value = true
   try {
     await persist()
+    const payloads = buildG7ListedSyncPayloads(serialisableState())
     const result: any = await api.post(
-      `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,
+      `/api/projects/${props.projectId}/disclosure-notes/sync-batch-from-workpaper`,
       {
         wp_id: props.wpId,
-        sheet_name: SHEET_NAME,
-        section_id: NOTE_SECTION_ID,
         current_standard: 'listed',
         year: resolveAuditYear(props.htmlData as Record<string, any> | null),
-        sub_table_data: buildG7ListedSyncData(serialisableState()),
-        columns: buildG7ListedColumns(),
+        items: payloads.map(payload => ({
+          sheet_name: payload.sheetName,
+          section_id: payload.noteSectionId,
+          sub_table_data: payload.subTableData,
+          columns: buildG7ListedColumns(state.entitySlots),
+        })),
       },
     )
     const data = result?.data ?? result
+    state.previouslySyncedTables = markG7ListedSynced(serialisableState(), payloads)
+    await persist()
     dispatchNoteUpdated()
-    ElMessage.success(`已同步 ${Number(data?.rows_synced ?? 0)} 行到附注模块「${NOTE_SECTION_ID} 长期股权投资」`)
+    ElMessage.success(
+      `已同步 ${Number(data?.rows_synced ?? 0)} 行到 ${Number(data?.sections_synced ?? payloads.length)} 个附注章节（含 ${NOTE_SECTION_ID} 长期股权投资与 七、1 在其他主体中的权益）`,
+    )
   } catch {
     ElMessage.warning('同步附注失败，请检查附注章节映射后重试')
   } finally {
@@ -793,7 +982,7 @@ async function syncToDisclosureNotes(): Promise<void> {
 
 function handleAdjudicated(event: Event): void {
   const detail = (event as CustomEvent).detail
-  if (detail?.accountCode !== ACCOUNT_CODE) return
+  if (!isG7GrossCode(detail?.accountCode, tbSourceCodes.value)) return
   applyAdjudicated(detail.adjudicatedAmount)
 }
 

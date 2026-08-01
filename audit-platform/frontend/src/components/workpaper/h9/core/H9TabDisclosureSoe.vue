@@ -35,8 +35,6 @@
           取数并同步
         </el-button>
         <el-button size="small" type="primary" plain :disabled="!projectId" @click="jumpToNote('soe')">↩ 跳转回附注（八、52）</el-button>
-        <el-button size="small" type="primary" plain @click="emit('open-ai', 'disclosure-soe')">AI 辅助</el-button>
-        <el-button size="small" @click="emit('open-review', 'disclosure-soe')">复核</el-button>
         <span class="chip-wrap"><GtIndexChip value="wp:H9-1" :context-project-id="projectId" /></span>
         <span class="chip-wrap"><GtIndexChip value="wp:H9-2" :context-project-id="projectId" /></span>
         <span class="chip-wrap"><GtIndexChip value="wp:H9-3" :context-project-id="projectId" /></span>
@@ -83,6 +81,8 @@
       <p class="hint">净额 = 租赁付款额 − 未确认融资费用 − 重分类至一年内到期（公式列）。</p>
     </el-card>
 
+    <WpDisclosureConsistencyPanel :results="consistencyChecks" :project-id="projectId" />
+
     <section class="guidance-block">
       <h4 class="sub-title">【提示】</h4>
       <el-alert
@@ -93,39 +93,49 @@
         class="guide-alert"
         :title="`${i + 1}、${t}`"
       />
-      <div class="note-field">
-        <label>补充披露说明（可选，同步至附注文本）</label>
-        <el-input
-          v-model="state.supplementNote"
-          type="textarea"
-          :autosize="{ minRows: 2, maxRows: 6 }"
-          :disabled="isReadonly"
-          placeholder="如有额外披露事项可在此填写；CAS21 提示见上方，无需重复粘贴。"
-          @change="persist"
-        />
-      </div>
+      <WpNoteTextArea
+        v-model="state.supplementNote"
+        label="补充披露说明（可选，同步至附注文本）"
+        testid-prefix="h9-soe-supplementNote"
+        :min-rows="2"
+        :max-rows="6"
+        :disabled="isReadonly"
+        placeholder="如有额外披露事项可在此填写；CAS21 提示见上方，无需重复粘贴。"
+        :ai-loading="aiLoadingSection === 'supplementNote'"
+        @change="persist"
+        @ai="runAi('supplementNote')"
+        @review="openReview('supplementNote')"
+      />
     </section>
 
     <el-card shadow="never" class="audit-card">
-      <template #header><span class="card-title">审计说明</span></template>
-      <el-input
+      <WpNoteTextArea
         v-model="state.auditNote"
-        type="textarea"
-        :autosize="{ minRows: 3 }"
+        card
+        label="审计说明"
+        testid-prefix="h9-soe-auditNote"
+        :min-rows="3"
         :disabled="isReadonly"
         placeholder="说明取数来源（H9-1/H9-2/H9-3）、与附注勾稽情况…"
+        :ai-loading="aiLoadingSection === 'auditNote'"
         @change="persist"
+        @ai="runAi('auditNote')"
+        @review="openReview('auditNote')"
       />
     </el-card>
     <el-card shadow="never" class="audit-card">
-      <template #header><span class="card-title">审计结论</span></template>
-      <el-input
+      <WpNoteTextArea
         v-model="state.auditConclusion"
-        type="textarea"
-        :autosize="{ minRows: 2 }"
+        card
+        label="审计结论"
+        testid-prefix="h9-soe-auditConclusion"
+        :min-rows="2"
         :disabled="isReadonly"
         placeholder="本表披露是否恰当、完整…"
+        :ai-loading="aiLoadingSection === 'auditConclusion'"
         @change="persist"
+        @ai="runAi('auditConclusion')"
+        @review="openReview('auditConclusion')"
       />
     </el-card>
 
@@ -152,6 +162,11 @@ import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import { useHCycleDisclosureAi } from '../../composables/useHCycleDisclosureAi'
+import { H9_NOTE_AI_SECTIONS } from '../../composables/h9NoteAiSections'
+import WpDisclosureConsistencyPanel from '../../shared/disclosure/WpDisclosureConsistencyPanel.vue'
+import { buildH9SoeChecks } from '../../composables/h9DisclosureConsistency'
+import WpNoteTextArea from '../../shared/disclosure/WpNoteTextArea.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { useH9SoeDisclosure } from '../../composables/useH9Disclosure'
 import {
@@ -171,8 +186,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'save', itemId: string, value: any): void
-  (e: 'open-ai', section: string): void
-  (e: 'open-review', section: string): void
 }>()
 
 const noteSectionId = H9_NOTE_SECTION.soe
@@ -195,6 +208,31 @@ const { state, persist, pullFromSources, updateLine } = useH9SoeDisclosure({
 })
 
 const displayRows = computed(() => buildSoeDisplayRows(state.value))
+
+const consistencyChecks = computed(() => buildH9SoeChecks(state.value))
+
+// ─── 披露说明 AI 辅助 + 复核 ─────────────────────────────────────────────────
+// 见 H9TabDisclosureListed 同款注释：原 `emit('open-ai'|'open-review')` 宿主零处理 = 死按钮。
+const { aiLoadingSection: aiLoadingRef, runAi, openReview } = useHCycleDisclosureAi({
+  wpCode: 'H9',
+  variant: 'soe',
+  wpId: () => props.wpId,
+  isReadonly: () => props.isReadonly,
+  noteSectionId,
+  labels: H9_NOTE_AI_SECTIONS.soe,
+  fields: {
+    supplementNote: {
+      get: () => state.value.supplementNote || '',
+      set: (v) => { state.value.supplementNote = v; persist() },
+    },
+    auditNote: { get: () => state.value.auditNote || '', set: (v) => { state.value.auditNote = v; persist() } },
+    auditConclusion: {
+      get: () => state.value.auditConclusion || '',
+      set: (v) => { state.value.auditConclusion = v; persist() },
+    },
+  },
+})
+const aiLoadingSection = computed(() => aiLoadingRef.value)
 
 function fmt(n: number | null | undefined): string {
   if (n == null || n === ('' as any)) return ''

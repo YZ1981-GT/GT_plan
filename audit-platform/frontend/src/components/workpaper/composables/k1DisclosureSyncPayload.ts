@@ -27,6 +27,7 @@ import {
   summarizeNatureRows,
   type K1ListedDisclosurePayloadV2,
   type K1SoeDisclosurePayloadV2,
+  type K1SummaryFigures,
 } from './k1DisclosureModel'
 import type { K1StageMovementRow } from './useK1BadDebt'
 import type { ColumnDef } from './disclosureColumnDefs'
@@ -90,7 +91,8 @@ const RATE_12M = '未来12个月内的预期信用损失率(%)'
 const RATE_LIFETIME = '整个存续期预期信用损失率（%）'
 
 const stageColumns = (rateHeader: string): ColumnDef[] => flat([
-  lbl('类别'),
+  // 源 xlsx `A32/A41/A51/A63/A72/A82` = 「类 别」（单空格，与国企侧「类  别」不同）。
+  lbl('类 别'),
   amt('账面余额'),
   txtG('预期信用损失率', rateHeader),
   amt('坏账准备'),
@@ -133,7 +135,9 @@ const listedStageMovementColumns = (labelHeader: string): ColumnDef[] => [
 ]
 
 export const K1_LISTED_COLUMNS: Record<string, ColumnDef[]> = {
-  [K1_LISTED_SUBTABLE.aging]: flat([lbl('账龄'), amt('期末余额'), amt('上年年末余额')]),
+  [K1_LISTED_SUBTABLE.summary]: flat([lbl('项目'), amt('期末余额'), amt('上年年末余额')]),
+  // 源 xlsx `A7` = 「账 龄」（单空格）。
+  [K1_LISTED_SUBTABLE.aging]: flat([lbl('账 龄'), amt('期末余额'), amt('上年年末余额')]),
   // 源 xlsx `A22:G28`：`B22:D22`（期末数）/ `E22:G22`（上年年末数）跨列合并 = 真两级表头；
   // 父表头取附注模版口径「期末金额」/「上年年末金额」（附注是交付物）。
   [K1_LISTED_SUBTABLE.nature]: [
@@ -155,9 +159,13 @@ export const K1_LISTED_COLUMNS: Record<string, ColumnDef[]> = {
   [K1_LISTED_SUBTABLE.reversal]: flat([
     lbl('单位名称'), txt('转回原因'), txt('收回方式'), txt('原确定坏账准备的依据'), amt('转回或收回金额'),
   ]),
-  [K1_LISTED_SUBTABLE.writeoffSummary]: flat([lbl('项目'), amt('核销金额')]),
+  // 源 xlsx `A113` = 「项  目」（双空格）。
+  [K1_LISTED_SUBTABLE.writeoffSummary]: flat([lbl('项  目'), amt('核销金额')]),
   [K1_LISTED_SUBTABLE.writeoffDetail]: flat([
-    lbl('单位名称'), txt('其他应收款性质'), amt('核销金额'), txt('核销原因'), txt('履行的核销程序'), txt('是否由关联交易产生'),
+    lbl('单位名称'), txt('其他应收款性质'), amt('核销金额'), txt('核销原因'), txt('履行的核销程序'),
+    // 源 xlsx `F116` = 「款项是否由关联交易产生」（比原「是否由关联交易产生」多「款项」）；
+    // `key` 保持既有行数据键不变，只改显示 `label`（改 key 会让整表数据丢落点）。
+    { key: '是否由关联交易产生', label: '款项是否由关联交易产生' },
   ]),
   [K1_LISTED_SUBTABLE.top5]: flat([
     lbl('单位名称'), txt('款项性质'), amt('其他应收款期末余额'), txt('账龄'),
@@ -203,6 +211,7 @@ export const K1_SOE_COLUMNS: Record<string, ColumnDef[]> = {
    * 源模板里 → 载荷不得不把「小计 + 减：坏账准备」两行压进合计行的额外两列。
    * 现按源模板还原为 3 列，载荷改为忠实推 subtotal / provision / total 三种 kind。
    */
+  [K1_SOE_SUBTABLE.summary]: flat([lbl('项目'), amt('期末余额'), amt('期初余额')]),
   [K1_SOE_SUBTABLE.aging]: flat([lbl('账  龄'), amt('期末数'), amt('期初数')]),
   [K1_SOE_SUBTABLE.methodEnd]: methodColumns(),
   [K1_SOE_SUBTABLE.methodPrior]: methodColumns(),
@@ -247,8 +256,9 @@ export const K1_SOE_COLUMNS: Record<string, ColumnDef[]> = {
     lbl('债务人名称'), txt('款项性质'), amt('账面余额'), txt('账龄'),
     txt('占其他应收款项合计的比例（%）'), amt('坏账准备'),
   ]),
+  // 源 xlsx `A126` = "单位名称\n（注：政府补助的发文单位）"（换行）→ 括注纯文本。
   [K1_SOE_SUBTABLE.govGrant]: flat([
-    lbl('单位名称'), txt('政府补助项目名称'), amt('期末余额'), txt('期末账龄'), txt('预计收取的时间、金额及依据'),
+    lbl('单位名称（注：政府补助的发文单位）'), txt('政府补助项目名称'), amt('期末余额'), txt('期末账龄'), txt('预计收取的时间、金额及依据'),
   ]),
   [K1_SOE_SUBTABLE.transfer]: flat([
     lbl('债务人名称'), amt('终止确认金额'), amt('与终止确认相关的利得或损失'),
@@ -324,10 +334,42 @@ function mapContinuedInvolvement(
   return out
 }
 
-function noteTextRows(entries: Array<[string, string]>): Record<string, unknown>[] {
+/**
+ * 汇总表「其他应收款」三行 + 合计（条件表：三项全为 0/缺失时返回 `null` 不推送）。
+ *
+ * Requirement 4.1, 4.4 / Property 9：K1-1「与经审计的财务报表核对」区无值时，
+ * 该表可能由 G2（应收利息）/ G3（应收股利）底稿承载 —— 调用方须据此判断是否
+ * 进 `_removed_table_keys`（本函数只负责判断是否推送，不管理 removed 语义）。
+ */
+function buildK1SummaryRows(
+  fs: K1SummaryFigures,
+  endKey: string,
+  otherLabel: string,
+): Record<string, unknown>[] | null {
+  const nonZero = [fs.interest, fs.dividend, fs.otherReceivable, fs.total]
+    .some((v) => Math.abs(_num(v)) >= 0.005)
+  if (!nonZero) return null
+  // K1-1「与经审计的财务报表核对」区仅追踪当期，无上年年末/期初对应值 → 只填期末列，
+  // 上年年末/期初列留空（该表若由 G2/G3 底稿承载，两处底稿各自补齐自己那两行的期初列）。
+  return [
+    { label: '应收利息', [endKey]: fs.interest },
+    { label: '应收股利', [endKey]: fs.dividend },
+    { label: otherLabel, [endKey]: fs.otherReceivable },
+    { label: '合计', [endKey]: fs.total, is_total: true },
+  ]
+}
+
+/**
+ * 构造 `_note_texts` 条目（`[section, title, text]` 三元组）。
+ *
+ * 🔴 必须带中文 `title` —— 后端 `_format_note_texts` 缺 title 时回退到英文
+ * `section` 键，附注正文会渲染成 `【listed-audit-note】` 这类英文键（K1 两版原全部
+ * 缺失）。空文本过滤；全部为空时不产生 `_note_texts` 键（Property 8）。
+ */
+function noteTextRows(entries: Array<[string, string, string]>): Record<string, unknown>[] {
   return entries
-    .filter(([, text]) => String(text ?? '').trim())
-    .map(([section, text]) => ({ section, text })) as unknown as Record<string, unknown>[]
+    .filter(([, , text]) => String(text ?? '').trim())
+    .map(([section, title, text]) => ({ section, title, text })) as unknown as Record<string, unknown>[]
 }
 
 // ─── 上市同步 ─────────────────────────────────────────────────────────────────
@@ -335,11 +377,15 @@ function noteTextRows(entries: Array<[string, string]>): Record<string, unknown>
 export function buildK1ListedSubTableData(
   snap: K1ListedDisclosurePayloadV2,
   auditNote = '',
+  fs: K1SummaryFigures = { interest: 0, dividend: 0, otherReceivable: 0, total: 0 },
 ): Record<string, Record<string, unknown>[]> {
   const natureTotal = summarizeNatureRows(snap.natureRows || [])
   const notes = snap.notes || {}
+  const summaryRows = buildK1SummaryRows(fs, '期末余额', '其他应收款')
 
   return {
+    // 条件表：K1-1「与经审计的财务报表核对」区无值时不推送（可能由 G2/G3 承载）。
+    ...(summaryRows ? { [K1_LISTED_SUBTABLE.summary]: summaryRows } : {}),
     [K1_LISTED_SUBTABLE.aging]: (snap.agingRows || []).map((r) => ({
       label: r.label,
       期末余额: r.endAmount,
@@ -461,14 +507,14 @@ export function buildK1ListedSubTableData(
     // ⑩ 转移且继续涉入形成的资产、负债（上市金额列名是「期末数」）
     [K1_LISTED_SUBTABLE.continuedInvolvement]: mapContinuedInvolvement(snap, '期末数'),
     _note_texts: noteTextRows([
-      ['listed-audit-note', auditNote],
-      ['listed-fund-centralization', snap.fundCentralizationNote || ''],
-      ['listed-balance-change', notes.balanceChange || ''],
-      ['listed-ecl-basis', notes.eclBasis || ''],
-      ['listed-writeoff-note', notes.writeoffNote || ''],
-      ['listed-transfer-note', notes.transferNote || ''],
-      ['listed-stage2-none-end', snap.stage2NoneEnd ? K1_STAGE2_NONE_TEXT_END : ''],
-      ['listed-stage2-none-prior', snap.stage2NonePrior ? K1_STAGE2_NONE_TEXT_PRIOR : ''],
+      ['listed-audit-note', '审计说明', auditNote],
+      ['listed-fund-centralization', '资金集中管理', snap.fundCentralizationNote || ''],
+      ['listed-balance-change', '本期账面余额显著变动说明', notes.balanceChange || ''],
+      ['listed-ecl-basis', '坏账准备计提金额及信用风险显著增加评估依据', notes.eclBasis || ''],
+      ['listed-writeoff-note', '核销说明', notes.writeoffNote || ''],
+      ['listed-transfer-note', '金融资产转移说明', notes.transferNote || ''],
+      ['listed-stage2-none-end', '期末第二阶段说明', snap.stage2NoneEnd ? K1_STAGE2_NONE_TEXT_END : ''],
+      ['listed-stage2-none-prior', '上年年末第二阶段说明', snap.stage2NonePrior ? K1_STAGE2_NONE_TEXT_PRIOR : ''],
     ]),
   }
 }
@@ -478,6 +524,7 @@ export function buildK1ListedSyncPayloads(
   applicableStandards: readonly string[] | null | undefined,
   snap: K1ListedDisclosurePayloadV2,
   auditNote = '',
+  fs?: K1SummaryFigures,
 ): K1SyncFromWorkpaperPayload[] {
   const variant: K1DisclosureVariant = 'listed'
   if (!isK1DisclosureApplicable(variant, applicableStandards)) return []
@@ -487,7 +534,7 @@ export function buildK1ListedSyncPayloads(
       sheet_name: K1_DISCLOSURE_SHEET_NAME.listed,
       section_id: K1_NOTE_SECTION.listed,
       current_standard: resolveK1CurrentStandard(variant, applicableStandards),
-      sub_table_data: buildK1ListedSubTableData(snap, auditNote),
+      sub_table_data: buildK1ListedSubTableData(snap, auditNote, fs),
       columns: K1_LISTED_COLUMNS,
     },
   ]
@@ -498,12 +545,16 @@ export function buildK1ListedSyncPayloads(
 export function buildK1SoeSubTableData(
   snap: K1SoeDisclosurePayloadV2,
   auditNote = '',
+  fs: K1SummaryFigures = { interest: 0, dividend: 0, otherReceivable: 0, total: 0 },
 ): Record<string, Record<string, unknown>[]> {
   const methodTotal = snap.methodRows.find((r) => r.rowKey === 'total')
   const notes = snap.notes || {}
   const agingRows = snap.agingRows || []
+  const summaryRows = buildK1SummaryRows(fs, '期末余额', '其他应收款项')
 
   return {
+    // 条件表：K1-1「与经审计的财务报表核对」区无值时不推送（可能由 G2/G3 承载）。
+    ...(summaryRows ? { [K1_SOE_SUBTABLE.summary]: summaryRows } : {}),
     /**
      * 附注「按账龄披露其他应收款项」= 源模板单级 3 列（账 龄 / 期末数 / 期初数），
      * 行含账龄档 + `小  计` + `减：坏账准备` + `合  计`。
@@ -677,10 +728,10 @@ export function buildK1SoeSubTableData(
     ],
     [K1_SOE_SUBTABLE.continuedInvolvement]: mapContinuedInvolvement(snap, '期末金额'),
     _note_texts: noteTextRows([
-      ['soe-audit-note', auditNote],
-      ['soe-balance-change', notes.balanceChange || ''],
-      ['soe-ecl-basis', notes.eclBasis || ''],
-      ['soe-transfer-note', notes.transferNote || ''],
+      ['soe-audit-note', '审计说明', auditNote],
+      ['soe-balance-change', '本期账面余额显著变动说明', notes.balanceChange || ''],
+      ['soe-ecl-basis', '坏账准备计提金额及信用风险显著增加评估依据', notes.eclBasis || ''],
+      ['soe-transfer-note', '继续涉入说明', notes.transferNote || ''],
     ]),
     _tie_out: [{
       method_total_balance: methodTotal?.endBalance ?? 0,
@@ -694,6 +745,7 @@ export function buildK1SoeSyncPayloads(
   applicableStandards: readonly string[] | null | undefined,
   snap: K1SoeDisclosurePayloadV2,
   auditNote = '',
+  fs?: K1SummaryFigures,
 ): K1SyncFromWorkpaperPayload[] {
   const variant: K1DisclosureVariant = 'soe'
   if (!isK1DisclosureApplicable(variant, applicableStandards)) return []
@@ -703,7 +755,7 @@ export function buildK1SoeSyncPayloads(
       sheet_name: K1_DISCLOSURE_SHEET_NAME.soe,
       section_id: K1_NOTE_SECTION.soe,
       current_standard: resolveK1CurrentStandard(variant, applicableStandards),
-      sub_table_data: buildK1SoeSubTableData(snap, auditNote),
+      sub_table_data: buildK1SoeSubTableData(snap, auditNote, fs),
       columns: K1_SOE_COLUMNS,
     },
   ]

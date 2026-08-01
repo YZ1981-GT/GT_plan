@@ -55,7 +55,14 @@
       <template v-if="disc.lastSyncHint.value"> · 取数 {{ disc.lastSyncHint.value }}</template>
     </el-alert>
 
-    <!-- 勾稽告警区（T1/T3/T4/T4prior/T5/T6/T7/T12） -->
+    <!-- 勾稽告警区（T1/T3/T4/T4prior/T5/T6/T7/T12/F8-48） -->
+    <el-alert
+      v-if="disc.summaryTieOut.value.applicable && !disc.summaryTieOut.value.matched"
+      type="warning"
+      :closable="false"
+      class="tie-alert"
+      :title="`F8-48 汇总表明细行之和 ${fmt(disc.summaryTieOut.value.sum)} ≠ 合计 ${fmt(disc.summaryFigures.value.total)}（差 ${fmt(disc.summaryTieOut.value.diff)}）`"
+    />
     <el-alert
       v-if="!disc.agingTieOut.value.matched && disc.agingTieOut.value.subtotal"
       type="warning"
@@ -685,7 +692,12 @@
 
     <!-- ⑦ 资金集中管理 -->
     <el-card shadow="never" class="disclosure-card">
-      <template #header><span class="card-title">⑦ 资金集中管理</span></template>
+      <template #header>
+        <div class="card-title-row">
+          <span class="card-title">⑦ 资金集中管理</span>
+          <el-button size="small" type="primary" link :disabled="isReadonly" @click="onAiNote('fundCentralization')">🤖 AI</el-button>
+        </div>
+      </template>
       <div class="fund-row">
         <span>因资金集中管理列报于其他应收款的金额：</span>
         <el-input-number
@@ -967,9 +979,9 @@
         <li><b>⑤ 核销</b>：汇总金额由逐项明细自动求和；重要核销须逐项披露，关联交易产生的单独披露。</li>
         <li><b>⑥ 前五名</b>：占比分母为账龄小计；占比合计超 100% 会告警。</li>
         <li><b>⑦ 资金集中管理</b>：仅文字披露（附注 五、8 无独立表），需考虑对「非经营性资金占有和其他关联资金往来的专项说明」的影响。</li>
-        <li><b>⑧ 应收政府补助</b>：附注真源为「计入其他应收款的政府补助」章节，<b>不推送</b> 五、8；本表用于底稿留痕与该章节人工填列。</li>
-        <li><b>⑨⑩ 转移终止确认 / 继续涉入</b>：附注真源为 七、金融工具章节，<b>不推送</b> 五、8。</li>
-        <li><b>同步范围</b>：「同步至附注」写入 五、8 的账龄/性质/6 张三阶段/变动/转回/核销/前五名共 13 张子表 + 文字段落。</li>
+        <li><b>⑧⑨⑩ 应收政府补助 / 转移终止确认 / 继续涉入</b>：源模板 R136-R160 明确列在其他应收款披露内，<b>推送</b>至 五、8（模板 2026-07-31 已补齐这三张表）。</li>
+        <li><b>汇总表「其他应收款」</b>：由 K1-1「与经审计的财务报表核对」区（应收利息/应收股利/报表数）三行推送；三项全为 0 时不推送（可能由 G2/G3 承载，见下条）。</li>
+        <li><b>同步范围</b>：「同步至附注」写入 五、8 的汇总表/账龄/性质/6 张三阶段/变动/转回/核销/前五名/政府补助/转移终止确认/继续涉入共 17 张子表 + 文字段落。</li>
         <li>G2 应收利息 / G3 应收股利明细亦挂在 五、8 章节下，请勿覆盖其已同步数据。</li>
       </ul>
     </details>
@@ -1029,6 +1041,7 @@ const AI_SECTION_BY_NOTE: Record<string, K1AiSection> = {
   eclBasis: 'disclosure-ecl-basis',
   writeoffNote: 'disclosure-writeoff-note',
   transferNote: 'disclosure-transfer-note',
+  fundCentralization: 'disclosure-fund-centralization',
 }
 
 // 跳转回附注模块（披露表 → 附注为单向推送；此处仅导航，方便相互编辑确认）
@@ -1164,9 +1177,13 @@ async function onAddNature(): Promise<void> {
 async function onAiNote(key: keyof typeof AI_SECTION_BY_NOTE | string): Promise<void> {
   const section = AI_SECTION_BY_NOTE[String(key)]
   if (!section) return
+  // fundCentralization 不走通用 notes 键（专属字段 fundCentralizationNote）。
+  const existing = key === 'fundCentralization'
+    ? disc.payload.value.fundCentralizationNote
+    : disc.noteSection(String(key))
   const text = await ai.generateAndConfirm(
     section,
-    disc.noteSection(String(key)),
+    existing,
     {
       其他应收款期末审定: disc.adjudication.value.receivableEnd,
       坏账准备期末审定: disc.adjudication.value.badDebtEnd,
@@ -1175,10 +1192,13 @@ async function onAiNote(key: keyof typeof AI_SECTION_BY_NOTE | string): Promise<
       本期核销合计: disc.payload.value.writeoffSummaryAmount,
       本期转回合计: reversalTotal.value,
       终止确认合计: transferTotals.value.amount,
+      资金集中管理金额: disc.payload.value.fundCentralizationAmount,
     },
     'AI 生成附注披露段落',
   )
-  if (text) disc.updateNoteSection(String(key), text)
+  if (!text) return
+  if (key === 'fundCentralization') disc.updateFundCentralization('note', text)
+  else disc.updateNoteSection(String(key), text)
 }
 
 function handleReview(id: string): void {

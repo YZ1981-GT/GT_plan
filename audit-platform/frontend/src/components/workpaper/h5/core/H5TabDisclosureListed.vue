@@ -8,7 +8,7 @@
         <div class="section-title">
           <span>附注披露 — 上市公司版</span>
           <div class="title-actions">
-            <el-button size="small" type="default" link @click="handleReview('H5-disc-L')">💬 复核</el-button>
+            <el-button size="small" type="default" link @click="openReview('disclosure')">💬 复核</el-button>
           </div>
         </div>
       </template>
@@ -57,9 +57,19 @@
 
       <!-- 文字性披露 -->
       <div class="note-section">
-        <h4>（三）补充披露</h4>
-        <el-input v-model="disclosureText" type="textarea" :autosize="{ minRows: 4, maxRows: 12 }"
-          placeholder="补充披露内容（折耗方法、储量信息等）..." :disabled="isReadonly" />
+        <WpNoteTextArea
+          v-model="disclosureText"
+          label="（三）补充披露"
+          testid-prefix="h5-listed-disclosure"
+          :min-rows="4"
+          :max-rows="12"
+          :disabled="isReadonly"
+          placeholder="补充披露内容（折耗方法、储量信息等）..."
+          :ai-loading="aiLoadingSection === 'disclosure'"
+          @change="persistText"
+          @ai="runAi('disclosure')"
+          @review="openReview('disclosure')"
+        />
       </div>
     </el-card>
 
@@ -75,13 +85,42 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, inject, onMounted, onUnmounted, toRef } from 'vue'
+import { ref, computed, inject, onMounted, onUnmounted, toRef, watch } from 'vue'
 import { eventBus } from '@/utils/eventBus'
+import WpNoteTextArea from '../../shared/disclosure/WpNoteTextArea.vue'
+import { useHCycleDisclosureAi } from '../../composables/useHCycleDisclosureAi'
+import { H_CYCLE_NOTE_AI_SECTIONS } from '../../composables/hCycleNoteAiSections'
+import { H5_NOTE_SECTION } from '../../composables/h5NoteSectionMap'
 
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean }>()
-const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 
 const disclosureText = ref('')
+
+// 🔴 原实现里 `disclosureText` **完全没有持久化路径**（无 `saveResponse`、无 watch）
+// → 用户填的补充披露刷新即丢，AI 生成的文本同样存不下来。此处补齐 hydrate + persist。
+const H5_LISTED_TEXT_ITEM = 'H5-disc-listed-text'
+const saveResponse = inject<(id: string, val: any) => void>('saveResponse', () => {})
+
+function readPersistedText(): string {
+  const raw = props.allResponses.get(H5_LISTED_TEXT_ITEM)
+  return String(raw?.remark ?? '')
+}
+
+function persistText(): void {
+  if (props.isReadonly) return
+  saveResponse(H5_LISTED_TEXT_ITEM, { remark: disclosureText.value || '' })
+}
+
+watch(
+  () => props.allResponses,
+  () => {
+    const persisted = readPersistedText()
+    // 只在本地为空时回填，避免宿主异步刷新覆盖用户刚录入的内容
+    if (persisted && !disclosureText.value) disclosureText.value = persisted
+  },
+  { immediate: true, deep: true },
+)
+
 const adjudicatedData = ref<{ costAudited: number; depletionAudited: number; netValue: number } | null>(null)
 
 const hasAdjudicatedData = computed(() => adjudicatedData.value !== null || props.allResponses.has('H5-1-cost-rows'))
@@ -106,6 +145,23 @@ onMounted(() => {
 onUnmounted(() => {
   eventBus.off('substantive:adjudicated', onAdjudicated)
 })
+
+// ─── 披露说明 AI 辅助 + 复核（原本无 AI 按钮） ───────────────────────────────
+const { aiLoadingSection: aiLoadingRef, runAi, openReview } = useHCycleDisclosureAi({
+  wpCode: 'H5',
+  variant: 'listed',
+  wpId: () => props.wpId,
+  isReadonly: () => props.isReadonly,
+  noteSectionId: H5_NOTE_SECTION.listed ?? '五、油气资产',
+  labels: H_CYCLE_NOTE_AI_SECTIONS.H5.listed,
+  fields: {
+    disclosure: {
+      get: () => disclosureText.value || '',
+      set: (v) => { disclosureText.value = v; persistText() },
+    },
+  },
+})
+const aiLoadingSection = computed(() => aiLoadingRef.value)
 
 // 从allResponses中获取审定数据构建附注表格
 const costNoteRows = computed(() => {
@@ -139,7 +195,9 @@ const depletionNoteRows = computed(() => {
   return [{ item: '累计折耗合计', beginBalance: 0, provision: 0, endBalance: 0 }]
 })
 
-function handleReview(id: string) { openReviewDialog(id) }
+// 复核入口统一走 `useHCycleDisclosureAi().openReview`（平台 `openReviewDialog` 的
+// 规范签名是**对象入参**，见 `composables/useReviewDialogProvider.ts`；
+// 原实现 `openReviewDialog('H5-disc-L')` 传字符串 → 弹窗拿不到 sectionId）。
 function fmtAmt(val: number | null | undefined): string { return val == null ? '-' : val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
 </script>
 

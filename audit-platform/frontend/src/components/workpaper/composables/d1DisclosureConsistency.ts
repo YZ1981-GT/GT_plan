@@ -28,8 +28,10 @@
  * spec: .kiro/specs/d1-notes-receivable-disclosure-alignment/ R10
  */
 
-/** 金额容差：1 分 */
-export const D1_AMOUNT_TOLERANCE = 0.01
+import { WP_CHECK_TOLERANCE } from './shared/disclosureConsistency'
+
+/** 金额容差：1 分。委托平台共用常量（`shared/disclosureConsistency.ts`）。 */
+export const D1_AMOUNT_TOLERANCE = WP_CHECK_TOLERANCE
 /** 比率容差：0.01 个百分点（内部存分数 → 1e-4） */
 export const D1_RATE_TOLERANCE = 0.0001
 

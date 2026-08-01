@@ -35,8 +35,6 @@
           取数并同步
         </el-button>
         <el-button size="small" type="primary" plain :disabled="!projectId" @click="jumpToNote('listed')">↩ 跳转回附注（五、47）</el-button>
-        <el-button size="small" type="primary" plain @click="emit('open-ai', 'disclosure-listed')">AI 辅助</el-button>
-        <el-button size="small" @click="emit('open-review', 'disclosure-listed')">复核</el-button>
         <span class="chip-wrap"><GtIndexChip value="wp:H9-1" :context-project-id="projectId" /></span>
         <span class="chip-wrap"><GtIndexChip value="wp:H9-2" :context-project-id="projectId" /></span>
         <span class="chip-wrap"><GtIndexChip :value="`Note:${noteSectionId}`" :context-project-id="projectId" /></span>
@@ -149,13 +147,18 @@
           />
         </el-form-item>
       </div>
-      <el-input
+      <WpNoteTextArea
         :model-value="interestNoteDisplay"
-        type="textarea"
-        :autosize="{ minRows: 2, maxRows: 6 }"
-        :readonly="isReadonly"
+        label="租赁负债利息费用说明"
+        testid-prefix="h9-listed-interestNote"
+        :min-rows="2"
+        :max-rows="6"
+        :disabled="isReadonly"
         :placeholder="H9_LISTED_GUIDANCE.interest"
+        :ai-loading="aiLoadingSection === 'interestNote'"
         @update:model-value="onInterestNoteEdit"
+        @ai="runAi('interestNote')"
+        @review="openReview('interestNote')"
       />
       <p class="hint">默认按上方金额自动生成万元口径说明；手动改写后将覆盖自动文本。</p>
     </el-card>
@@ -173,25 +176,33 @@
     </section>
 
     <el-card shadow="never" class="audit-card">
-      <template #header><span class="card-title">审计说明</span></template>
-      <el-input
+      <WpNoteTextArea
         v-model="state.auditNote"
-        type="textarea"
-        :autosize="{ minRows: 3 }"
+        card
+        label="审计说明"
+        testid-prefix="h9-listed-auditNote"
+        :min-rows="3"
         :disabled="isReadonly"
         placeholder="说明取数来源（H9-1/H9-2）、分类口径、与附注勾稽情况…"
+        :ai-loading="aiLoadingSection === 'auditNote'"
         @change="persist"
+        @ai="runAi('auditNote')"
+        @review="openReview('auditNote')"
       />
     </el-card>
     <el-card shadow="never" class="audit-card">
-      <template #header><span class="card-title">审计结论</span></template>
-      <el-input
+      <WpNoteTextArea
         v-model="state.auditConclusion"
-        type="textarea"
-        :autosize="{ minRows: 2 }"
+        card
+        label="审计结论"
+        testid-prefix="h9-listed-auditConclusion"
+        :min-rows="2"
         :disabled="isReadonly"
         placeholder="本表披露是否恰当、完整…"
+        :ai-loading="aiLoadingSection === 'auditConclusion'"
         @change="persist"
+        @ai="runAi('auditConclusion')"
+        @review="openReview('auditConclusion')"
       />
     </el-card>
 
@@ -218,6 +229,9 @@ import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import { useHCycleDisclosureAi } from '../../composables/useHCycleDisclosureAi'
+import { H9_NOTE_AI_SECTIONS } from '../../composables/h9NoteAiSections'
+import WpNoteTextArea from '../../shared/disclosure/WpNoteTextArea.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { useH9ListedDisclosure } from '../../composables/useH9Disclosure'
 import {
@@ -239,8 +253,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'save', itemId: string, value: any): void
-  (e: 'open-ai', section: string): void
-  (e: 'open-review', section: string): void
 }>()
 
 const noteSectionId = H9_NOTE_SECTION.listed
@@ -302,6 +314,28 @@ function onInterestNoteEdit(v: string) {
   state.value.interestNoteOverride = v
   persist()
 }
+
+// ─── 披露说明 AI 辅助 + 复核 ─────────────────────────────────────────────────
+// 🔴 原实现是 `emit('open-ai'|'open-review', …)`，而宿主 `GtH9LeaseLiabilities.vue`
+// 只声明了 change / navigate-sheet / refresh-complete / save → 两个按钮零网络请求。
+// 现改接共享 `useDisclosureNoteAi`（真调 review-dialog/ai-generate）。
+const { aiLoadingSection: aiLoadingRef, runAi, openReview } = useHCycleDisclosureAi({
+  wpCode: 'H9',
+  variant: 'listed',
+  wpId: () => props.wpId,
+  isReadonly: () => props.isReadonly,
+  noteSectionId,
+  labels: H9_NOTE_AI_SECTIONS.listed,
+  fields: {
+    interestNote: { get: () => interestNoteDisplay.value || '', set: (v) => onInterestNoteEdit(v) },
+    auditNote: { get: () => state.value.auditNote || '', set: (v) => { state.value.auditNote = v; persist() } },
+    auditConclusion: {
+      get: () => state.value.auditConclusion || '',
+      set: (v) => { state.value.auditConclusion = v; persist() },
+    },
+  },
+})
+const aiLoadingSection = computed(() => aiLoadingRef.value)
 
 function handlePull() {
   const res = pullFromSources()

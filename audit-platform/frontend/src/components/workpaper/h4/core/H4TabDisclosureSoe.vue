@@ -132,14 +132,18 @@
     </section>
 
     <section class="block">
-      <label class="note-label">附注披露说明</label>
-      <el-input
+      <WpNoteTextArea
         v-model="noteText"
-        type="textarea"
-        :autosize="{ minRows: 2, maxRows: 6 }"
+        label="附注披露说明"
+        testid-prefix="h4-soe-note"
+        :min-rows="2"
+        :max-rows="6"
         :disabled="isReadonly"
         placeholder="说明在建工程与工程物资汇总口径；重大增减、减值及与 J2-1 勾稽情况。"
+        :ai-loading="aiLoadingSection === 'note'"
         @change="scheduleSave"
+        @ai="runAi('note')"
+        @review="openReview('note')"
       />
     </section>
 
@@ -168,6 +172,9 @@ import { api } from '@/services/apiProxy'
 import { buildNoteJumpRoute } from '@/views/composables/noteDisclosureReverseJump'
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
+import WpNoteTextArea from '../../shared/disclosure/WpNoteTextArea.vue'
+import { useHCycleDisclosureAi } from '../../composables/useHCycleDisclosureAi'
+import { H_CYCLE_NOTE_AI_SECTIONS } from '../../composables/hCycleNoteAiSections'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { H2_NOTE_SECTION } from '../../composables/h2NoteSectionMap'
 import {
@@ -202,6 +209,21 @@ const router = useRouter()
 
 const summary = reactive<H4SoeSummaryRow[]>(createDefaultH4SoeSummary())
 const noteText = ref('')
+
+// ─── 披露说明 AI 辅助 + 复核（原本无 AI 按钮） ───────────────────────────────
+const { aiLoadingSection: aiLoadingRef, runAi, openReview } = useHCycleDisclosureAi({
+  wpCode: 'H4',
+  variant: 'soe',
+  wpId: () => props.wpId,
+  isReadonly: () => isReadonly.value,
+  noteSectionId: H2_NOTE_SECTION.soe,
+  labels: H_CYCLE_NOTE_AI_SECTIONS.H4.soe,
+  fields: {
+    note: { get: () => noteText.value || '', set: (v) => { noteText.value = v; scheduleSave() } },
+  },
+})
+const aiLoadingSection = computed(() => aiLoadingRef.value)
+
 const isSyncing = ref(false)
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 let unsubBus: (() => void) | null = null

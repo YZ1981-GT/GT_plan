@@ -23,6 +23,16 @@
         >
           从源表取数
         </el-button>
+        <el-tooltip :disabled="g7ExtractionEnabled" content="四表取数未启用" placement="top">
+          <el-button
+            size="small"
+            :disabled="isReadonly || !g7ExtractionEnabled"
+            :loading="isSeedingFromFourTable"
+            @click="handleSeedFromFourTable"
+          >
+            从四表库带入
+          </el-button>
+        </el-tooltip>
         <el-button
           type="primary"
           size="small"
@@ -332,7 +342,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, toRef, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, toRef, watch, inject, type ComputedRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { api } from '@/services/apiProxy'
@@ -366,8 +376,15 @@ import {
   type G7SoeDisclosureState,
 } from './g7SoeDisclosureModel'
 import { tableMetaSources } from './g7DisclosureTableMeta'
+import { seedG7MovementFromLeafCategories, type G7LeafBucketSlot } from '../../composables/g7FourTableSeed'
+// 🔴 科目码单一真源：运行态取宿主 provide 的 tb_source_codes（报表映射解析结果），
+//    常量只作兜底。本文件不得出现字面量科目码（R11.1 / Property 15）。
+import {
+  g7AccountCode,
+  isG7GrossCode,
+} from '../../composables/g7AccountScope'
+import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
 
-const ACCOUNT_CODE = '1511'
 const RESPONSE_KEY = 'G7-main-disclosure-soe-v2'
 const SHEET_NAME = '附注披露信息（国企）'
 const CURRENT_STANDARD = 'soe'
@@ -398,12 +415,23 @@ const props = defineProps<{
   isReadonly: boolean
 }>()
 
+/** 四表取数溯源（宿主 provide）→ 科目码 */
+const tbSourceCodes = inject<ComputedRef<TbSourceCodes | null>>(
+  'g7TbSourceCodes',
+  computed(() => null),
+)
+const accountCode = computed(() => g7AccountCode(tbSourceCodes.value))
+
 const sections = G7_SOE_DISCLOSURE_SECTIONS
 const state = reactive<G7SoeDisclosureState>(createG7SoeDisclosureState())
 const hydrated = ref(false)
 const isSyncing = ref(false)
 const isRefreshing = ref(false)
 const lastRefreshHint = ref('')
+const isSeedingFromFourTable = ref(false)
+const g7ExtractionEnabled = computed(() =>
+  !!(props.htmlData as any)?.project_context?.g7_extraction_enabled,
+)
 let hydrateInFlight: Promise<void> | null = null
 const savePhase = ref<SavePhase>(SAVE_PHASE.IDLE)
 const activeSections = ref<string[]>(
@@ -616,6 +644,34 @@ function scheduleSave(options?: { userEdit?: boolean }): void {
   saveTimer = setTimeout(() => void persist(), 600)
 }
 
+async function handleSeedFromFourTable(): Promise<void> {
+  if (isSeedingFromFourTable.value || props.isReadonly) return
+  isSeedingFromFourTable.value = true
+  try {
+    const cats = (props.htmlData as any)?.tb_leaf_categories
+    const buckets: Record<string, G7LeafBucketSlot> | null = cats?.buckets ?? null
+    if (!buckets || !Object.keys(buckets).length) {
+      ElMessage.info('四表库无长期股权投资分类数据（灰度未启用或科目无余额）')
+      return
+    }
+    const TABLE_ID = 'lte-movement'
+    const rows = state.tables[TABLE_ID]
+    if (!rows?.length) {
+      ElMessage.warning('主表行为空，请先初始化')
+      return
+    }
+    const { filled, skipped } = seedG7MovementFromLeafCategories(rows, buckets)
+    if (filled > 0) {
+      scheduleSave({ userEdit: false })
+      ElMessage.success(`已从四表库带入 ${filled} 个格子（跳过已有值 ${skipped} 个）`)
+    } else {
+      ElMessage.info(`四表库数据与主表无可填充交集（已有值 ${skipped} 个未覆盖）`)
+    }
+  } finally {
+    isSeedingFromFourTable.value = false
+  }
+}
+
 async function refreshLoadedVersion(): Promise<void> {
   if (!props.wpId) return
   try {
@@ -774,7 +830,7 @@ function dispatchNoteUpdated(): void {
   const payloads = buildG7SoeSyncPayloads(serialisableState())
   window.dispatchEvent(new CustomEvent('disclosure:note-text-updated', {
     detail: {
-      accountCode: ACCOUNT_CODE,
+      accountCode: accountCode.value,
       projectId: props.projectId,
       wpId: props.wpId,
       sheetName: SHEET_NAME,
@@ -802,7 +858,7 @@ async function fillAiDraft(narrative: G7DisclosureNarrative): Promise<void> {
       sectionTitle: narrative.title,
       sourceRows: narrative.sourceRows,
       disclosureType: 'soe',
-      accountCode: ACCOUNT_CODE,
+      accountCode: accountCode.value,
       instruction: narrative.placeholder,
     },
     `AI生成：${narrative.title}`,
@@ -846,7 +902,7 @@ async function syncToDisclosureNotes(): Promise<void> {
 
 function handleAdjudicated(event: Event): void {
   const detail = (event as CustomEvent).detail
-  if (detail?.accountCode !== ACCOUNT_CODE) return
+  if (!isG7GrossCode(detail?.accountCode, tbSourceCodes.value)) return
   applyAdjudicated(detail.adjudicatedAmount)
 }
 

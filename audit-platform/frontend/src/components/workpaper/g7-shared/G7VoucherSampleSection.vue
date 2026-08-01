@@ -100,6 +100,7 @@ import {
   type G7VoucherSampleRow,
   type G7VoucherSample,
 } from '../composables/g7VoucherSample'
+import { G7_GROSS_FALLBACK_STANDARD } from '../composables/g7AccountScope'
 
 const props = withDefaults(defineProps<{
   wpId: string
@@ -112,7 +113,7 @@ const props = withDefaults(defineProps<{
   htmlData?: Record<string, any> | null
 }>(), {
   auditYear: 0,
-  accountCode: '1511',
+  accountCode: G7_GROSS_FALLBACK_STANDARD,
   title: '凭证抽查',
   htmlData: null,
 })

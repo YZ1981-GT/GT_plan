@@ -16,6 +16,7 @@ export type K1AiSection =
   | 'disclosure-ecl-basis'
   | 'disclosure-writeoff-note'
   | 'disclosure-transfer-note'
+  | 'disclosure-fund-centralization'
 
 export interface K1AiGenerateParams {
   section: K1AiSection

@@ -503,6 +503,7 @@ import {
   sumG72ImpairmentClosing,
   sumImpairmentAmounts,
 } from './g7ImpairmentTestModel'
+import { G7_PROVISION_FALLBACK_STANDARD } from '../../composables/g7AccountScope'
 
 const props = defineProps<{
   htmlData: Record<string, any> | null
@@ -948,7 +949,7 @@ function persistRows(): void {
     window.dispatchEvent(new CustomEvent('impairment:calculated', {
       detail: {
         wpCode: 'G7',
-        accountCode: '1512',
+        accountCode: G7_PROVISION_FALLBACK_STANDARD,
         totalRequiredProvision: totalImpairment,
         projectId: props.projectId,
         wpId: props.wpId,

@@ -174,7 +174,7 @@ export function useD6Adjustment(options: UseD6AdjustmentOptions) {
         wpCode: 'D6',
         entryType: row.category === '报表调整' ? 'RJE' : 'AJE',
         amount: Math.max(row.debitAmount, row.creditAmount),
-        accountCode: row.accountName || '1402',
+        accountCode: row.accountName || '1141',
         description: row.description,
       }
       try {

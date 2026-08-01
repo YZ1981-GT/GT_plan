@@ -163,17 +163,19 @@
         </el-table-column>
       </el-table>
 
-      <div class="note-field">
-        <label>{{ ui.noteLabel }}</label>
-        <el-input
-          v-model="state.clearingNote"
-          type="textarea"
-          :autosize="{ minRows: 2, maxRows: 6 }"
-          :disabled="isReadonly"
-          :placeholder="H6_CLEARING_PROGRESS_HINT"
-          @change="scheduleSave"
-        />
-      </div>
+      <WpNoteTextArea
+        v-model="state.clearingNote"
+        :label="ui.noteLabel"
+        :testid-prefix="`h6-${variant}-clearing`"
+        :min-rows="2"
+        :max-rows="6"
+        :disabled="isReadonly"
+        :placeholder="H6_CLEARING_PROGRESS_HINT"
+        :ai-loading="aiLoadingSection === 'clearing'"
+        @change="scheduleSave"
+        @ai="runAi('clearing')"
+        @review="openReview('clearing')"
+      />
     </section>
 
     <details class="compile-hint">
@@ -199,6 +201,9 @@ import { useRouter } from 'vue-router'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
+import WpNoteTextArea from '../../shared/disclosure/WpNoteTextArea.vue'
+import { useHCycleDisclosureAi } from '../../composables/useHCycleDisclosureAi'
+import { H_CYCLE_NOTE_AI_SECTIONS } from '../../composables/hCycleNoteAiSections'
 import {
   H6_CLEARING_PROGRESS_HINT,
   H6_NOTE_SECTION,
@@ -303,6 +308,24 @@ const state = reactive(createDefaultState())
 const isSyncing = ref(false)
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 let unsubAdj: (() => void) | null = null
+
+// ─── 披露说明 AI 辅助 + 复核（原本无 AI 按钮） ───────────────────────────────
+// H6 只有这一个披露组件（Listed/Soe 是 `v-bind="$props"` 薄壳），故 variant 由 props 决定。
+const { aiLoadingSection: aiLoadingRef, runAi, openReview } = useHCycleDisclosureAi({
+  wpCode: 'H6',
+  variant: props.variant,
+  wpId: () => props.wpId,
+  isReadonly: () => isReadonly.value,
+  noteSectionId: H6_NOTE_SECTION[props.variant],
+  labels: H_CYCLE_NOTE_AI_SECTIONS.H6[props.variant],
+  fields: {
+    clearing: {
+      get: () => state.clearingNote || '',
+      set: (v) => { state.clearingNote = v; scheduleSave() },
+    },
+  },
+})
+const aiLoadingSection = computed(() => aiLoadingRef.value)
 
 const summaryDisplay = computed(() => buildSummaryDisplay(state))
 const clearingDisplay = computed(() => buildClearingDisplay(state.clearingRows))

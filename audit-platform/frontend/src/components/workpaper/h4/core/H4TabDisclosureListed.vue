@@ -102,14 +102,18 @@
     </section>
 
     <section class="block">
-      <label class="note-label">附注披露说明</label>
-      <el-input
+      <WpNoteTextArea
         v-model="noteText"
-        type="textarea"
-        :autosize="{ minRows: 2, maxRows: 6 }"
+        label="附注披露说明"
+        testid-prefix="h4-listed-note"
+        :min-rows="2"
+        :max-rows="6"
         :disabled="isReadonly"
         placeholder="说明工程物资分类依据、减值计提情况；如无重大变动可简述。"
+        :ai-loading="aiLoadingSection === 'note'"
         @change="scheduleSave"
+        @ai="runAi('note')"
+        @review="openReview('note')"
       />
     </section>
 
@@ -136,6 +140,9 @@ import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
+import WpNoteTextArea from '../../shared/disclosure/WpNoteTextArea.vue'
+import { useHCycleDisclosureAi } from '../../composables/useHCycleDisclosureAi'
+import { H_CYCLE_NOTE_AI_SECTIONS } from '../../composables/hCycleNoteAiSections'
 import {
   H4_LISTED_ITEM,
   buildH4ListedMaterialsDisplay,
@@ -168,6 +175,21 @@ const { pullListedMaterials, listedCrossCheck, significantNoteDraft } = useH4Dis
 
 const materials = reactive<H4ListedMaterialRow[]>(createDefaultH4ListedMaterials())
 const noteText = ref('')
+
+// ─── 披露说明 AI 辅助 + 复核（原本无 AI 按钮） ───────────────────────────────
+const { aiLoadingSection: aiLoadingRef, runAi, openReview } = useHCycleDisclosureAi({
+  wpCode: 'H4',
+  variant: 'listed',
+  wpId: () => props.wpId,
+  isReadonly: () => isReadonly.value,
+  noteSectionId: H2_NOTE_SECTION.listed,
+  labels: H_CYCLE_NOTE_AI_SECTIONS.H4.listed,
+  fields: {
+    note: { get: () => noteText.value || '', set: (v) => { noteText.value = v; scheduleSave() } },
+  },
+})
+const aiLoadingSection = computed(() => aiLoadingRef.value)
+
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 let unsubscribe: (() => void) | null = null
 

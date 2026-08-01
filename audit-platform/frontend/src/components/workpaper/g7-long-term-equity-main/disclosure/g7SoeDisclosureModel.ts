@@ -11,6 +11,9 @@
  *
  * 禁止再按虚构的「上市5节 + 国企3节 / 统一17列」建模。
  */
+import { dataTableNames, buildRemovedTableKeys } from '../../composables/disclosureSyncedTables'
+import { buildG7SlotColumns, dynamicRowCount, type G7SlotSubColumn } from '../../composables/g7SlotColumns'
+
 export type G7DisclosureValue = string | number | null
 export type G7DisclosureColumnType = 'text' | 'number' | 'percent'
 
@@ -19,6 +22,10 @@ export interface G7DisclosureColumn {
   label: string
   type?: G7DisclosureColumnType
   width?: number
+  /** 两级表头父分组名（禁含 '/'，只支持单级）；与 `flat` 二选一表态。 */
+  group?: string
+  /** 源模板本就是单行表头 —— 显式标注禁止前缀推断凭空造父表头。 */
+  flat?: boolean
 }
 
 export interface G7DisclosureRow {
@@ -39,11 +46,17 @@ export interface G7DisclosureTable {
   /** 与 note_template_soe.json 中 tables[].name 对齐的同步键；缺省回退 title */
   templateTableKey?: string
   sourceRows: string
+  /** 静态列（无 slotConfig 时的最终列集；有 slotConfig 时仅作初始态取值参考） */
   columns: G7DisclosureColumn[]
   rows: G7DisclosureRow[]
   description?: string
   dynamic?: boolean
   maxRows?: number
+  /**
+   * 声明该表「按被投资单位/子公司横向展开」，列集改由 `state.entitySlots[slot]`
+   * 动态生成（Task 5.6，Property 18），不再写死列数。
+   */
+  slotConfig?: { slot: string; sub?: G7SlotSubColumn[] }
 }
 
 export interface G7DisclosureNarrative {
@@ -72,6 +85,16 @@ export interface G7SoeDisclosureState {
   tables: Record<string, G7DisclosureRow[]>
   texts: Record<string, string>
   updatedAt?: string
+  /**
+   * 上次同步成功时按章节推送的数据子表名清单（`{noteSectionId: string[]}`）。
+   * 供 `buildG7SoeSyncPayloads` 计算 `_removed_table_keys` 差集（Task 5.5）。
+   */
+  previouslySyncedTables?: Record<string, string[]>
+  /**
+   * 动态槎位实体名清单（`{slot: string[]}`），供带 `slotConfig` 的表生成动态列
+   * （Task 5.6）。缺省用各槎位默认实体名。
+   */
+  entitySlots?: Record<string, string[]>
 }
 
 export interface G7SoeSyncPayload {
@@ -85,10 +108,26 @@ function cols(items: Array<[string, string, G7DisclosureColumnType?, number?]>):
   return items.map(([key, label, type = 'text', width]) => ({ key, label, type, width }))
 }
 
+/** 带两级表头分组的列定义：`(key, label, type, group|undefined)`。 */
+function groupedCols(
+  items: Array<[string, string, G7DisclosureColumnType, string | undefined]>,
+): G7DisclosureColumn[] {
+  return items.map(([key, label, type, group]) => ({ key, label, type, group }))
+}
+
+/** 显式标注单行表头（禁前缀推断凭空造父表头）；标签列（首列，通常 type='text'）也需要标注。 */
+function flatCols(columns: G7DisclosureColumn[]): G7DisclosureColumn[] {
+  return columns.map(c => ({ ...c, flat: true }))
+}
+
 function valuesFor(columns: G7DisclosureColumn[]): Record<string, G7DisclosureValue> {
   return Object.fromEntries(columns.map(col => [col.key, col.type === 'text' ? '' : null]))
 }
 
+/**
+ * 生成 `count` 行空占位行。`count` 由调用方传入 `dynamicRowCount(seedRowCount)`
+ * 得出（Requirement 11.7）——无数据时给 1 行空行，不写死 3/5/10。
+ */
 function blankRows(
   prefix: string,
   count: number,
@@ -102,6 +141,17 @@ function blankRows(
     kind: 'data',
     source: source?.(index),
   }))
+}
+
+/** 生成 N 行空行 + 对应 id 列表（供分组小计 `sumRows` 动态引用，配合 `dynamicRowCount`）。 */
+function blankRowsWithIds(
+  prefix: string,
+  count: number,
+  columns: G7DisclosureColumn[],
+  source?: (index: number) => string,
+): { rows: G7DisclosureRow[]; ids: string[] } {
+  const rows = blankRows(prefix, count, columns, source)
+  return { rows, ids: rows.map(r => r.id) }
 }
 
 function metricRows(
@@ -139,7 +189,7 @@ function groupRow(id: string, label: string, columns: G7DisclosureColumn[]): G7D
   return { id, label, values: valuesFor(columns), kind: 'group' }
 }
 
-const subsidiaryBasicColumns = cols([
+const subsidiaryBasicColumns = flatCols(cols([
   ['level', '级次', 'text', 80],
   ['enterpriseType', '企业类型', 'text', 100],
   ['registeredPlace', '注册地', 'text', 110],
@@ -151,76 +201,98 @@ const subsidiaryBasicColumns = cols([
   ['votingRights', '享有的表决权(%)', 'percent', 130],
   ['investmentAmount', '投资额', 'number', 120],
   ['acquisitionMethod', '取得方式', 'text', 120],
-])
+]))
 
-const controlExceptionColumns = cols([
+const controlExceptionColumns = flatCols(cols([
   ['subscribedRatio', '认缴持股比例(%)', 'percent', 130],
   ['votingRights', '享有的表决权(%)', 'percent', 120],
   ['registeredCapital', '注册资本', 'number', 120],
   ['investmentAmount', '投资额', 'number', 120],
   ['level', '级次', 'text', 80],
   ['reason', '原因说明', 'text', 220],
-])
+]))
 
-const minorityColumns = cols([
+const minorityColumns = flatCols(cols([
   ['holdingRatio', '少数股东持股比例', 'percent', 130],
   ['currentProfit', '当期归属于少数股东的损益', 'number', 160],
   ['dividend', '当期向少数股东支付的股利', 'number', 160],
   ['closingEquity', '期末累计少数股东权益', 'number', 150],
-])
+]))
 
-const currentPriorColumns = cols([
+const currentPriorColumns = flatCols(cols([
   ['current', '期末数/本期发生额', 'number', 140],
   ['prior', '期初数/上期发生额', 'number', 140],
-])
+]))
 
-const multiCompanyCurrentPriorColumns = cols([
-  ['c1Current', '公司1-期末/本期', 'number', 130],
-  ['c1Prior', '公司1-期初/上期', 'number', 130],
-  ['c2Current', '公司2-期末/本期', 'number', 130],
-  ['c2Prior', '公司2-期初/上期', 'number', 130],
-  ['c3Current', '公司3-期末/本期', 'number', 130],
-  ['c3Prior', '公司3-期初/上期', 'number', 130],
-  ['c4Current', '公司4-期末/本期', 'number', 130],
-  ['c4Prior', '公司4-期初/上期', 'number', 130],
-  ['c5Current', '公司5-期末/本期', 'number', 130],
-  ['c5Prior', '公司5-期初/上期', 'number', 130],
-])
+/** 「非全资子公司主要财务信息」槎位（源模板按重要非全资子公司横向展开，字面 `公司1..N`）。 */
+const MINORITY_FS_SLOT = 'minority-fs-company'
+const MINORITY_FS_SLOT_DEFAULT_NAMES = ['公司1', '公司2', '公司3', '公司4', '公司5']
+const MINORITY_FS_SUB: G7SlotSubColumn[] = [
+  { key: 'current', label: '期末/本期' },
+  { key: 'prior', label: '期初/上期' },
+]
 
-const formerSubsidiaryColumns = cols([
+/** 由槎位实体名生成矩阵列（每实体 期末/本期·期初/上期 两子列，按实体名分组）。 */
+function multiCompanyCurrentPriorColumnsFor(names: readonly string[]): G7DisclosureColumn[] {
+  const slotCols = buildG7SlotColumns(MINORITY_FS_SLOT, names, MINORITY_FS_SUB)
+  return groupedCols(slotCols.map(c => [
+    c.key,
+    c.subLabel ?? '',
+    'number' as G7DisclosureColumnType,
+    c.entityName,
+  ]))
+}
+
+const formerSubsidiaryColumns = flatCols(cols([
   ['registeredPlace', '注册地', 'text', 110],
   ['businessNature', '业务性质', 'text', 110],
   ['holdingRatio', '持股比例(%)', 'percent', 110],
   ['votingRights', '表决权比例(%)', 'percent', 120],
   ['reason', '本期不再成为子公司的原因', 'text', 220],
-])
+]))
 
-const soldFsPositionColumns = cols([
-  ['c1SaleDate', '公司1-出售日', 'number', 120],
-  ['c1Opening', '公司1-期初余额', 'number', 120],
-  ['c2SaleDate', '公司2-出售日', 'number', 120],
-  ['c2Opening', '公司2-期初余额', 'number', 120],
-])
+/** 「本期出售的子公司出售日的财务状况」槎位（源模板按出售子公司横向展开，字面 `公司1..N`）。 */
+const SOLD_FS_POSITION_SLOT = 'sold-fs-position-company'
+const SOLD_FS_POSITION_SLOT_DEFAULT_NAMES = ['公司1', '公司2']
+const SOLD_FS_POSITION_SUB: G7SlotSubColumn[] = [
+  { key: 'saleDate', label: '出售日' },
+  { key: 'opening', label: '期初余额' },
+]
 
-const soldFsResultColumns = cols([
-  ['aCurrent', 'A公司-本年年初至出售日', 'number', 150],
-  ['aPrior', 'A公司-上年发生额', 'number', 130],
-  ['bCurrent', 'B公司-本年年初至出售日', 'number', 150],
-  ['bPrior', 'B公司-上年发生额', 'number', 130],
-  ['cCurrent', 'C公司-本年年初至出售日', 'number', 150],
-  ['cPrior', 'C公司-上年发生额', 'number', 130],
-  ['dCurrent', 'D公司-本年年初至出售日', 'number', 150],
-  ['dPrior', 'D公司-上年发生额', 'number', 130],
-  ['eCurrent', 'E公司-本年年初至出售日', 'number', 150],
-  ['ePrior', 'E公司-上年发生额', 'number', 130],
-])
+function soldFsPositionColumnsFor(names: readonly string[]): G7DisclosureColumn[] {
+  const slotCols = buildG7SlotColumns(SOLD_FS_POSITION_SLOT, names, SOLD_FS_POSITION_SUB)
+  return groupedCols(slotCols.map(c => [
+    c.key,
+    c.subLabel ?? '',
+    'number' as G7DisclosureColumnType,
+    c.entityName,
+  ]))
+}
 
-const newEntityColumns = cols([
+/** 「本期出售的子公司出售日的经营成果」槎位（源模板字面 `A~E公司`，本质仍是横向展开）。 */
+const SOLD_FS_RESULT_SLOT = 'sold-fs-result-company'
+const SOLD_FS_RESULT_SLOT_DEFAULT_NAMES = ['A公司', 'B公司', 'C公司', 'D公司', 'E公司']
+const SOLD_FS_RESULT_SUB: G7SlotSubColumn[] = [
+  { key: 'current', label: '本年年初至出售日' },
+  { key: 'prior', label: '上年发生额' },
+]
+
+function soldFsResultColumnsFor(names: readonly string[]): G7DisclosureColumn[] {
+  const slotCols = buildG7SlotColumns(SOLD_FS_RESULT_SLOT, names, SOLD_FS_RESULT_SUB)
+  return groupedCols(slotCols.map(c => [
+    c.key,
+    c.subLabel ?? '',
+    'number' as G7DisclosureColumnType,
+    c.entityName,
+  ]))
+}
+
+const newEntityColumns = flatCols(cols([
   ['closingNetAssets', '期末净资产', 'number', 130],
   ['currentNetProfit', '本期净利润', 'number', 130],
-])
+]))
 
-const commonControlColumns = cols([
+const commonControlColumns = flatCols(cols([
   ['consolidationDate', '合并日', 'text', 110],
   ['bookNetAssets', '账面净资产', 'number', 120],
   ['consideration', '交易对价', 'number', 120],
@@ -229,9 +301,9 @@ const commonControlColumns = cols([
   ['netProfit', '本年初至合并日-净利润', 'number', 140],
   ['cashIncrease', '现金净增加额', 'number', 120],
   ['operatingCashFlow', '经营活动现金流量净额', 'number', 160],
-])
+]))
 
-const nonCommonControlColumns = cols([
+const nonCommonControlColumns = flatCols(cols([
   ['purchaseDate', '购买日', 'text', 110],
   ['purchaseDateBasis', '购买日的确定依据', 'text', 150],
   ['preHolding', '购买日前持有权益比例(%)', 'percent', 150],
@@ -244,97 +316,125 @@ const nonCommonControlColumns = cols([
   ['postRevenue', '购买日至期末收入', 'number', 140],
   ['postProfit', '购买日至期末净利润', 'number', 140],
   ['postCashFlow', '购买日至期末现金流量', 'number', 150],
-])
+]))
 
-const absorptionColumns = cols([
+const absorptionColumns = flatCols(cols([
   ['assetItem', '并入主要资产-项目', 'text', 140],
   ['assetAmount', '并入主要资产-金额', 'number', 140],
   ['liabilityItem', '并入主要负债-项目', 'text', 140],
   ['liabilityAmount', '并入主要负债-金额', 'number', 140],
-])
+]))
 
-const ownershipChangeImpactColumns = cols([
-  ['company1', '公司1', 'number', 120],
-  ['company2', '公司2', 'number', 120],
-  ['company3', '公司3', 'number', 120],
-])
+/** 「母公司在子公司的所有者权益份额发生变化的情况」槎位（源模板字面 `公司1..N`）。 */
+const OWNERSHIP_CHANGE_SLOT = 'ownership-change-company'
+const OWNERSHIP_CHANGE_SLOT_DEFAULT_NAMES = ['公司1', '公司2', '公司3']
 
-const classificationColumns = cols([
+function ownershipChangeImpactColumnsFor(names: readonly string[]): G7DisclosureColumn[] {
+  const slotCols = buildG7SlotColumns(OWNERSHIP_CHANGE_SLOT, names)
+  return flatCols(slotCols.map(c => ({
+    key: c.key,
+    label: c.entityName,
+    type: 'number' as G7DisclosureColumnType,
+  })))
+}
+
+const classificationColumns = flatCols(cols([
   ['opening', '年初余额', 'number', 120],
   ['increase', '本期增加', 'number', 120],
   ['decrease', '本期减少', 'number', 120],
   ['closing', '期末余额', 'number', 120],
+]))
+
+/** 「长期股权投资明细」本期增减变动（8 子列，与上市侧 `movementColumns` 同分组名）。 */
+const MOVEMENT_GROUP = '本期增减变动'
+
+const movementColumns = groupedCols([
+  ['investmentCost', '投资成本', 'number', undefined],
+  ['opening', '期初余额', 'number', undefined],
+  ['addition', '追加投资', 'number', MOVEMENT_GROUP],
+  ['reduction', '减少投资', 'number', MOVEMENT_GROUP],
+  ['equityProfit', '权益法下确认的投资损益', 'number', MOVEMENT_GROUP],
+  ['oci', '其他综合收益调整', 'number', MOVEMENT_GROUP],
+  ['otherEquity', '其他权益变动', 'number', MOVEMENT_GROUP],
+  ['dividend', '宣告发放现金股利或利润', 'number', MOVEMENT_GROUP],
+  ['impairment', '计提减值准备', 'number', MOVEMENT_GROUP],
+  ['other', '其他', 'number', MOVEMENT_GROUP],
+  ['closing', '期末余额', 'number', undefined],
+  ['closingImpairment', '减值准备期末余额', 'number', undefined],
 ])
 
-const movementColumns = cols([
-  ['investmentCost', '投资成本', 'number', 120],
-  ['opening', '期初余额', 'number', 120],
-  ['addition', '追加投资', 'number', 110],
-  ['reduction', '减少投资', 'number', 110],
-  ['equityProfit', '权益法下确认的投资损益', 'number', 155],
-  ['oci', '其他综合收益调整', 'number', 135],
-  ['otherEquity', '其他权益变动', 'number', 120],
-  ['dividend', '宣告发放现金股利或利润', 'number', 165],
-  ['impairment', '计提减值准备', 'number', 120],
-  ['other', '其他', 'number', 100],
-  ['closing', '期末余额', 'number', 120],
-  ['closingImpairment', '减值准备期末余额', 'number', 145],
-])
-
-const jvFsColumns = cols([
+const jvFsColumns = flatCols(cols([
   ['current', '期末数', 'number', 120],
   ['prior', '期初数', 'number', 120],
-])
+]))
 
-const jvPlColumns = cols([
+const jvPlColumns = flatCols(cols([
   ['current', '本期发生额', 'number', 120],
   ['prior', '上期发生额', 'number', 120],
-])
+]))
 
-const associateFsMatrixColumns = cols([
-  ['jv2Current', '合营企业2-期末', 'number', 130],
-  ['jv2Prior', '合营企业2-期初', 'number', 130],
-  ['a1Current', '联营企业1-期末', 'number', 130],
-  ['a1Prior', '联营企业1-期初', 'number', 130],
-  ['a2Current', '联营企业2-期末', 'number', 130],
-  ['a2Prior', '联营企业2-期初', 'number', 130],
-])
+/** 「重要联营企业主要财务信息」矩阵槎位（源模板按合营企业2/联营企业1/2 横向展开）。 */
+const ASSOCIATE_FS_SLOT = 'associate-fs-company'
+const ASSOCIATE_FS_SLOT_DEFAULT_NAMES = ['合营企业2', '联营企业1', '联营企业2']
+const ASSOCIATE_FS_SUB: G7SlotSubColumn[] = [
+  { key: 'current', label: '期末' },
+  { key: 'prior', label: '期初' },
+]
 
-const associatePlMatrixColumns = cols([
-  ['jv2Current', '合营企业2-本期', 'number', 130],
-  ['jv2Prior', '合营企业2-上期', 'number', 130],
-  ['a1Current', '联营企业1-本期', 'number', 130],
-  ['a1Prior', '联营企业1-上期', 'number', 130],
-  ['a2Current', '联营企业2-本期', 'number', 130],
-  ['a2Prior', '联营企业2-上期', 'number', 130],
-])
+function associateFsMatrixColumnsFor(names: readonly string[]): G7DisclosureColumn[] {
+  const slotCols = buildG7SlotColumns(ASSOCIATE_FS_SLOT, names, ASSOCIATE_FS_SUB)
+  return groupedCols(slotCols.map(c => [
+    c.key,
+    c.subLabel ?? '',
+    'number' as G7DisclosureColumnType,
+    c.entityName,
+  ]))
+}
 
-const aggregateColumns = cols([
+/** 「续：重要联营企业经营成果」矩阵槎位（同上，子列为本期/上期）。 */
+const ASSOCIATE_PL_SLOT = 'associate-pl-company'
+const ASSOCIATE_PL_SLOT_DEFAULT_NAMES = ['合营企业2', '联营企业1', '联营企业2']
+const ASSOCIATE_PL_SUB: G7SlotSubColumn[] = [
+  { key: 'current', label: '本期' },
+  { key: 'prior', label: '上期' },
+]
+
+function associatePlMatrixColumnsFor(names: readonly string[]): G7DisclosureColumn[] {
+  const slotCols = buildG7SlotColumns(ASSOCIATE_PL_SLOT, names, ASSOCIATE_PL_SUB)
+  return groupedCols(slotCols.map(c => [
+    c.key,
+    c.subLabel ?? '',
+    'number' as G7DisclosureColumnType,
+    c.entityName,
+  ]))
+}
+
+const aggregateColumns = flatCols(cols([
   ['current', '本期数', 'number', 120],
   ['prior', '上期数', 'number', 120],
-])
+]))
 
-const unrecognizedLossColumns = cols([
+const unrecognizedLossColumns = flatCols(cols([
   ['priorCumulative', '前期累积未确认的损失份额', 'number', 170],
   ['currentUnrecognized', '本期未确认的损失份额（或本期实现净利润的分享额）', 'number', 220],
   ['closingCumulative', '本期末累积未确认的损失份额', 'number', 170],
-])
+]))
 
-const structuredExposureColumns = cols([
+const structuredExposureColumns = flatCols(cols([
   ['sponsorScale', '发起规模', 'text', 110],
   ['closingCarrying', '期末账面价值', 'number', 130],
   ['closingMaxLoss', '期末最大损失敞口', 'number', 140],
   ['openingCarrying', '期初账面价值', 'number', 130],
   ['openingMaxLoss', '期初最大损失敞口', 'number', 140],
   ['presentationItem', '列报项目', 'text', 120],
-])
+]))
 
-const sponsorIncomeColumns = cols([
+const sponsorIncomeColumns = flatCols(cols([
   ['serviceFee', '服务收费', 'number', 120],
   ['assetSaleGain', '向结构化主体出售资产的利得(损失)', 'number', 200],
   ['total', '合计', 'number', 110],
   ['transferredAssets', '当期向结构化主体转移资产账面价值', 'number', 200],
-])
+]))
 
 const minorityFsLabels = [
   '流动资产', '非流动资产', '资产合计', '流动负债', '非流动负债', '负债合计',
@@ -470,11 +570,11 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
         columns: controlExceptionColumns,
         rows: [
           groupRow('nc-jv-group', '合营企业', controlExceptionColumns),
-          ...blankRows('nc-jv', 3, controlExceptionColumns, index => `G7-4 合营条件筛选 第${23 + index}行`),
+          ...blankRows('nc-jv', dynamicRowCount(1), controlExceptionColumns, index => `G7-4 合营条件筛选 第${23 + index}行`),
           groupRow('nc-assoc-group', '联营企业', controlExceptionColumns),
-          ...blankRows('nc-assoc', 3, controlExceptionColumns, index => `G7-4 联营条件筛选 第${29 + index}行`),
+          ...blankRows('nc-assoc', dynamicRowCount(1), controlExceptionColumns, index => `G7-4 联营条件筛选 第${29 + index}行`),
           groupRow('nc-other-group', '其他', controlExceptionColumns),
-          ...blankRows('nc-other', 2, controlExceptionColumns),
+          ...blankRows('nc-other', dynamicRowCount(1), controlExceptionColumns),
         ],
         dynamic: true,
         maxRows: 40,
@@ -498,7 +598,7 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
         templateTableKey: '少数股东',
         sourceRows: 'A54:F60',
         columns: minorityColumns,
-        rows: blankRows('minority', 5, minorityColumns),
+        rows: blankRows('minority', dynamicRowCount(1), minorityColumns),
         dynamic: true,
         maxRows: 30,
       },
@@ -507,8 +607,9 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
         title: '2、主要财务信息',
         templateTableKey: '主要财务信息',
         sourceRows: 'A61:L73',
-        columns: multiCompanyCurrentPriorColumns,
-        rows: metricRows('minority-fs', minorityFsLabels, multiCompanyCurrentPriorColumns),
+        columns: multiCompanyCurrentPriorColumnsFor(MINORITY_FS_SLOT_DEFAULT_NAMES),
+        slotConfig: { slot: MINORITY_FS_SLOT, sub: MINORITY_FS_SUB },
+        rows: metricRows('minority-fs', minorityFsLabels, multiCompanyCurrentPriorColumnsFor(MINORITY_FS_SLOT_DEFAULT_NAMES)),
         description: '横向按重要非全资子公司展开期末/期初（或本期/上期）对照。',
       },
     ],
@@ -560,16 +661,18 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
         title: '（2）本期出售的子公司出售日的财务状况',
         templateTableKey: '本期出售的子公司出售日的财务状况',
         sourceRows: 'A85:F96',
-        columns: soldFsPositionColumns,
-        rows: metricRows('sold-position', soldPositionLabels, soldFsPositionColumns),
+        columns: soldFsPositionColumnsFor(SOLD_FS_POSITION_SLOT_DEFAULT_NAMES),
+        slotConfig: { slot: SOLD_FS_POSITION_SLOT, sub: SOLD_FS_POSITION_SUB },
+        rows: metricRows('sold-position', soldPositionLabels, soldFsPositionColumnsFor(SOLD_FS_POSITION_SLOT_DEFAULT_NAMES)),
       },
       {
         id: 'former-subsidiary-results',
         title: '（3）本期出售的子公司出售日的经营成果',
         templateTableKey: '本期出售的子公司处置日的经营成果',
         sourceRows: 'A97:L106',
-        columns: soldFsResultColumns,
-        rows: metricRows('sold-result', soldResultLabels, soldFsResultColumns),
+        columns: soldFsResultColumnsFor(SOLD_FS_RESULT_SLOT_DEFAULT_NAMES),
+        slotConfig: { slot: SOLD_FS_RESULT_SLOT, sub: SOLD_FS_RESULT_SUB },
+        rows: metricRows('sold-result', soldResultLabels, soldFsResultColumnsFor(SOLD_FS_RESULT_SLOT_DEFAULT_NAMES)),
       },
     ],
     narratives: [
@@ -631,7 +734,7 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
         templateTableKey: '公司名称',
         sourceRows: 'A122:J126',
         columns: commonControlColumns,
-        rows: blankRows('common-control', 3, commonControlColumns),
+        rows: blankRows('common-control', dynamicRowCount(1), commonControlColumns),
         dynamic: true,
         maxRows: 20,
       },
@@ -662,7 +765,7 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
         templateTableKey: '本期发生的非同一控制下企业合并情况',
         sourceRows: 'A129:M134',
         columns: nonCommonControlColumns,
-        rows: blankRows('non-common-control', 3, nonCommonControlColumns),
+        rows: blankRows('non-common-control', dynamicRowCount(1), nonCommonControlColumns),
         dynamic: true,
         maxRows: 20,
       },
@@ -691,7 +794,7 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
         templateTableKey: '吸收合并的类型',
         sourceRows: 'A141:F156',
         columns: absorptionColumns,
-        rows: blankRows('abs-cc', 5, absorptionColumns),
+        rows: blankRows('abs-cc', dynamicRowCount(1), absorptionColumns),
         dynamic: true,
         maxRows: 20,
       },
@@ -700,7 +803,7 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
         title: '非同一控制下吸收合并',
         sourceRows: 'A157:F172',
         columns: absorptionColumns,
-        rows: blankRows('abs-ncc', 5, absorptionColumns),
+        rows: blankRows('abs-ncc', dynamicRowCount(1), absorptionColumns),
         dynamic: true,
         maxRows: 20,
       },
@@ -754,8 +857,9 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
         title: '（2）交易对于少数股东权益及归属于母公司所有者权益的影响',
         templateTableKey: '母公司在子公司的所有者权益份额发生变化的情况',
         sourceRows: 'A186:E199',
-        columns: ownershipChangeImpactColumns,
-        rows: metricRows('ownership-impact', ownershipImpactLabels, ownershipChangeImpactColumns),
+        columns: ownershipChangeImpactColumnsFor(OWNERSHIP_CHANGE_SLOT_DEFAULT_NAMES),
+        slotConfig: { slot: OWNERSHIP_CHANGE_SLOT },
+        rows: metricRows('ownership-impact', ownershipImpactLabels, ownershipChangeImpactColumnsFor(OWNERSHIP_CHANGE_SLOT_DEFAULT_NAMES)),
       },
     ],
     narratives: [
@@ -841,19 +945,23 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
         templateTableKey: '长期股权投资明细',
         sourceRows: 'A209:M222',
         columns: movementColumns,
-        rows: [
-          groupRow('mv-jv-group', '一、合营企业', movementColumns),
-          ...blankRows('mv-jv', 3, movementColumns, () => '合营企业'),
-          groupRow('mv-assoc-group', '二、联营企业', movementColumns),
-          ...blankRows('mv-assoc', 3, movementColumns, () => '联营企业'),
-          {
-            id: 'mv-total',
-            label: '合计',
-            values: valuesFor(movementColumns),
-            kind: 'total',
-            sumRows: ['mv-jv-1', 'mv-jv-2', 'mv-jv-3', 'mv-assoc-1', 'mv-assoc-2', 'mv-assoc-3'],
-          },
-        ],
+        rows: (() => {
+          const jv = blankRowsWithIds('mv-jv', dynamicRowCount(1), movementColumns, () => '合营企业')
+          const assoc = blankRowsWithIds('mv-assoc', dynamicRowCount(1), movementColumns, () => '联营企业')
+          return [
+            groupRow('mv-jv-group', '一、合营企业', movementColumns),
+            ...jv.rows,
+            groupRow('mv-assoc-group', '二、联营企业', movementColumns),
+            ...assoc.rows,
+            {
+              id: 'mv-total',
+              label: '合计',
+              values: valuesFor(movementColumns),
+              kind: 'total',
+              sumRows: [...jv.ids, ...assoc.ids],
+            },
+          ]
+        })(),
         dynamic: true,
         maxRows: 40,
       },
@@ -879,16 +987,26 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
         title: '（4）重要联营企业的主要财务信息',
         templateTableKey: '重要联营企业的主要财务信息',
         sourceRows: 'A253:H269',
-        columns: associateFsMatrixColumns,
-        rows: annotateEquityBridgeSources(metricRows('assoc-fs', associateFsLabels, associateFsMatrixColumns, '被投资单位财务信息（合营、联营）G7-5')),
+        columns: associateFsMatrixColumnsFor(ASSOCIATE_FS_SLOT_DEFAULT_NAMES),
+        slotConfig: { slot: ASSOCIATE_FS_SLOT, sub: ASSOCIATE_FS_SUB },
+        rows: annotateEquityBridgeSources(metricRows(
+          'assoc-fs', associateFsLabels,
+          associateFsMatrixColumnsFor(ASSOCIATE_FS_SLOT_DEFAULT_NAMES),
+          '被投资单位财务信息（合营、联营）G7-5',
+        )),
       },
       {
         id: 'important-associate-pl',
         title: '续：重要联营企业经营成果',
         templateTableKey: '续：重要联营企业经营成果',
         sourceRows: 'A270:H277',
-        columns: associatePlMatrixColumns,
-        rows: metricRows('assoc-pl', associatePlLabels, associatePlMatrixColumns, '被投资单位财务信息（合营、联营）G7-5'),
+        columns: associatePlMatrixColumnsFor(ASSOCIATE_PL_SLOT_DEFAULT_NAMES),
+        slotConfig: { slot: ASSOCIATE_PL_SLOT, sub: ASSOCIATE_PL_SUB },
+        rows: metricRows(
+          'assoc-pl', associatePlLabels,
+          associatePlMatrixColumnsFor(ASSOCIATE_PL_SLOT_DEFAULT_NAMES),
+          '被投资单位财务信息（合营、联营）G7-5',
+        ),
       },
       {
         id: 'insignificant-aggregate',
@@ -917,33 +1035,43 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
         templateTableKey: '②对合营企业或联营企业发生超额亏损的分担额',
         sourceRows: 'A301:E312',
         columns: unrecognizedLossColumns,
-        rows: [
-          groupRow('ul-jv-group', '合营企业', unrecognizedLossColumns),
-          ...blankRows('ul-jv', 3, unrecognizedLossColumns, index => `未确认投资损失测试表G7-16 第${12 + index}行`),
-          {
-            id: 'ul-jv-subtotal',
-            label: '小计',
-            values: valuesFor(unrecognizedLossColumns),
-            kind: 'subtotal',
-            sumRows: ['ul-jv-1', 'ul-jv-2', 'ul-jv-3'],
-          },
-          groupRow('ul-assoc-group', '联营企业', unrecognizedLossColumns),
-          ...blankRows('ul-assoc', 3, unrecognizedLossColumns, index => `未确认投资损失测试表G7-16 第${17 + index}行`),
-          {
-            id: 'ul-assoc-subtotal',
-            label: '小计',
-            values: valuesFor(unrecognizedLossColumns),
-            kind: 'subtotal',
-            sumRows: ['ul-assoc-1', 'ul-assoc-2', 'ul-assoc-3'],
-          },
-          {
-            id: 'ul-total',
-            label: '合计',
-            values: valuesFor(unrecognizedLossColumns),
-            kind: 'total',
-            sumRows: ['ul-jv-subtotal', 'ul-assoc-subtotal'],
-          },
-        ],
+        rows: (() => {
+          const jv = blankRowsWithIds(
+            'ul-jv', dynamicRowCount(1), unrecognizedLossColumns,
+            index => `未确认投资损失测试表G7-16 第${12 + index}行`,
+          )
+          const assoc = blankRowsWithIds(
+            'ul-assoc', dynamicRowCount(1), unrecognizedLossColumns,
+            index => `未确认投资损失测试表G7-16 第${17 + index}行`,
+          )
+          return [
+            groupRow('ul-jv-group', '合营企业', unrecognizedLossColumns),
+            ...jv.rows,
+            {
+              id: 'ul-jv-subtotal',
+              label: '小计',
+              values: valuesFor(unrecognizedLossColumns),
+              kind: 'subtotal',
+              sumRows: jv.ids,
+            },
+            groupRow('ul-assoc-group', '联营企业', unrecognizedLossColumns),
+            ...assoc.rows,
+            {
+              id: 'ul-assoc-subtotal',
+              label: '小计',
+              values: valuesFor(unrecognizedLossColumns),
+              kind: 'subtotal',
+              sumRows: assoc.ids,
+            },
+            {
+              id: 'ul-total',
+              label: '合计',
+              values: valuesFor(unrecognizedLossColumns),
+              kind: 'total',
+              sumRows: ['ul-jv-subtotal', 'ul-assoc-subtotal'],
+            },
+          ]
+        })(),
         dynamic: true,
         maxRows: 40,
       },
@@ -957,7 +1085,7 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
           { id: 'se-senior', label: '优先级债券', values: valuesFor(structuredExposureColumns), kind: 'data' },
           { id: 'se-sub', label: '次级债券', values: valuesFor(structuredExposureColumns), kind: 'data' },
           { id: 'se-cds', label: '信用违约互换（负债）', values: valuesFor(structuredExposureColumns), kind: 'data' },
-          ...blankRows('se-other', 2, structuredExposureColumns),
+          ...blankRows('se-other', dynamicRowCount(1), structuredExposureColumns),
         ],
         dynamic: true,
         maxRows: 20,
@@ -968,18 +1096,21 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
         templateTableKey: '本公司发起多个结构化主体，但在结构化中均不持有权益。2023年，本公司从发起的结构化主体获得收益的情况以及当期向结构化主体转移资产的情况如下表所示：',
         sourceRows: 'A340:E345',
         columns: sponsorIncomeColumns,
-        rows: [
-          { id: 'si-abs', label: '信用资产证券化', values: valuesFor(sponsorIncomeColumns), kind: 'data' },
-          { id: 'si-fund', label: '投资基金', values: valuesFor(sponsorIncomeColumns), kind: 'data' },
-          ...blankRows('si-other', 2, sponsorIncomeColumns),
-          {
-            id: 'si-total',
-            label: '合计',
-            values: valuesFor(sponsorIncomeColumns),
-            kind: 'total',
-            sumRows: ['si-abs', 'si-fund', 'si-other-1', 'si-other-2'],
-          },
-        ],
+        rows: (() => {
+          const other = blankRowsWithIds('si-other', dynamicRowCount(1), sponsorIncomeColumns)
+          return [
+            { id: 'si-abs', label: '信用资产证券化', values: valuesFor(sponsorIncomeColumns), kind: 'data' },
+            { id: 'si-fund', label: '投资基金', values: valuesFor(sponsorIncomeColumns), kind: 'data' },
+            ...other.rows,
+            {
+              id: 'si-total',
+              label: '合计',
+              values: valuesFor(sponsorIncomeColumns),
+              kind: 'total',
+              sumRows: ['si-abs', 'si-fund', ...other.ids],
+            },
+          ]
+        })(),
         dynamic: true,
         maxRows: 20,
       },
@@ -1046,6 +1177,47 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
   },
 ]
 
+/** 各 `slot` 的初始默认实体名（缺省态取值参考，仅在 `state.entitySlots` 未声明该 slot 时生效）。 */
+const G7_SOE_DEFAULT_SLOT_NAMES: Record<string, string[]> = {
+  [MINORITY_FS_SLOT]: MINORITY_FS_SLOT_DEFAULT_NAMES,
+  [SOLD_FS_POSITION_SLOT]: SOLD_FS_POSITION_SLOT_DEFAULT_NAMES,
+  [SOLD_FS_RESULT_SLOT]: SOLD_FS_RESULT_SLOT_DEFAULT_NAMES,
+  [OWNERSHIP_CHANGE_SLOT]: OWNERSHIP_CHANGE_SLOT_DEFAULT_NAMES,
+  [ASSOCIATE_FS_SLOT]: ASSOCIATE_FS_SLOT_DEFAULT_NAMES,
+  [ASSOCIATE_PL_SLOT]: ASSOCIATE_PL_SLOT_DEFAULT_NAMES,
+}
+
+/**
+ * 解析某表的**有效**列集：无 `slotConfig` 时原样返回 `table.columns`（静态表）；
+ * 有 `slotConfig` 时按 `entitySlots[slot]`（缺省回退该 slot 的默认实体名）动态生成
+ * （Task 5.6，Property 18 —— 列数随 `names` 长度变化，`key` 改名后保持不变）。
+ *
+ * 无 `sub` 子列 → 单值列（无跨期分组，`flatCols`）；有 `sub` → 每实体两子列按实体名分组
+ * （两级表头）。泛化实现避免新增槎位时还要各写一份 if 分支。
+ */
+export function resolveG7SoeTableColumns(
+  table: G7DisclosureTable,
+  entitySlots?: Record<string, string[]>,
+): G7DisclosureColumn[] {
+  const slotConfig = table.slotConfig
+  if (!slotConfig) return table.columns
+  const names = entitySlots?.[slotConfig.slot] ?? G7_SOE_DEFAULT_SLOT_NAMES[slotConfig.slot] ?? []
+  const slotCols = buildG7SlotColumns(slotConfig.slot, names, slotConfig.sub)
+  if (!slotConfig.sub?.length) {
+    return flatCols(slotCols.map(c => ({
+      key: c.key,
+      label: c.entityName,
+      type: 'number' as G7DisclosureColumnType,
+    })))
+  }
+  return groupedCols(slotCols.map(c => [
+    c.key,
+    c.subLabel ?? '',
+    'number' as G7DisclosureColumnType,
+    c.entityName,
+  ]))
+}
+
 export function createG7SoeDisclosureState(): G7SoeDisclosureState {
   const tables: Record<string, G7DisclosureRow[]> = {}
   const texts: Record<string, string> = {}
@@ -1060,7 +1232,11 @@ export function createG7SoeDisclosureState(): G7SoeDisclosureState {
     }
     for (const narrative of section.narratives ?? []) texts[narrative.id] = ''
   }
-  return { version: 2, tables, texts }
+  const entitySlots: Record<string, string[]> = {}
+  for (const [slot, names] of Object.entries(G7_SOE_DEFAULT_SLOT_NAMES)) {
+    entitySlots[slot] = [...names]
+  }
+  return { version: 2, tables, texts, previouslySyncedTables: {}, entitySlots }
 }
 
 /** 物化 sumRows / diffRows，供同步与单测使用（与 UI computedCell 口径一致）。 */

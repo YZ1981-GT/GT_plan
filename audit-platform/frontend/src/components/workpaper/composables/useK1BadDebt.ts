@@ -13,6 +13,7 @@
 import { ref, computed, type Ref, type ComputedRef } from 'vue'
 import { parseNum } from './useD2FormulaEngine'
 import { calcAuditedAmount, calcSubtotal } from './useK1FormulaEngine'
+import { buildK1ProvisionMovementRows, migrateK1MovementRows } from './k1StageMovementRows'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -161,22 +162,14 @@ function createSubRow(label = ''): K1BadDebtMainRow {
   })
 }
 
+/**
+ * 坏账准备三阶段变动行集 —— 委托 `k1StageMovementRows.buildK1ProvisionMovementRows`
+ * （源模板 12 行）。保留导出名与零参签名，既有引用（`emptyPayload` 等）零改动；
+ * K1-3 底稿本身不分变体，固定用 `'listed'` 口径（源 xlsx 底稿 K1-3 sheet 与上市
+ * 附注共用同一张三阶段滚动表用语）。
+ */
 export function defaultStageMovements(): K1StageMovementRow[] {
-  return [
-    { key: 'opening', label: '期初余额', stage1: 0, stage2: 0, stage3: 0, editable: true },
-    { key: 's1-s2', label: '第一阶段→第二阶段', stage1: 0, stage2: 0, stage3: 0, editable: true },
-    { key: 's1-s3', label: '第一阶段→第三阶段', stage1: 0, stage2: 0, stage3: 0, editable: true },
-    { key: 's2-s1', label: '第二阶段→第一阶段', stage1: 0, stage2: 0, stage3: 0, editable: true },
-    { key: 's2-s3', label: '第二阶段→第三阶段', stage1: 0, stage2: 0, stage3: 0, editable: true },
-    { key: 's3-s1', label: '第三阶段→第一阶段', stage1: 0, stage2: 0, stage3: 0, editable: true },
-    { key: 's3-s2', label: '第三阶段→第二阶段', stage1: 0, stage2: 0, stage3: 0, editable: true },
-    { key: 'provision', label: '本年计提', stage1: 0, stage2: 0, stage3: 0, editable: true },
-    { key: 'reversal', label: '本年转回', stage1: 0, stage2: 0, stage3: 0, editable: true },
-    { key: 'writeoff', label: '本年核销', stage1: 0, stage2: 0, stage3: 0, editable: true },
-    { key: 'fx', label: '汇兑差异', stage1: 0, stage2: 0, stage3: 0, editable: true },
-    { key: 'other', label: '其他', stage1: 0, stage2: 0, stage3: 0, editable: true },
-    { key: 'closing', label: '期末余额', stage1: 0, stage2: 0, stage3: 0, editable: false },
-  ]
+  return buildK1ProvisionMovementRows('listed')
 }
 
 function emptyPayload(): K1BadDebtPayloadV2 {
@@ -251,9 +244,7 @@ export function parseK13Payload(raw: unknown): K1BadDebtPayloadV2 {
     const mainRows = Array.isArray(p.mainRows)
       ? p.mainRows.map((r) => recalcK1BadDebtMainRow({ ...createFixedMainRow('individual', ''), ...r }))
       : base.mainRows
-    const stageMovements = Array.isArray(p.stageMovements) && p.stageMovements.length
-      ? p.stageMovements.map((r) => ({ ...r, editable: r.key !== 'closing' }))
-      : defaultStageMovements()
+    const stageMovements = migrateK1MovementRows(p.stageMovements, 'provision', 'listed')
     return {
       version: 2,
       mainRows,

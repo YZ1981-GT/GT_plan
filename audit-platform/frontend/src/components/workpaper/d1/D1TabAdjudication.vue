@@ -28,6 +28,7 @@ import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBring
 import http from '@/utils/http'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import WpAmountInput from '../shared/WpAmountInput.vue'
 import {
   D1_ADJ_REVIEW_SECTION,
   d1AdjReviewSectionId,
@@ -42,6 +43,8 @@ const props = defineProps<{
   isReadonly: boolean
   sheetName?: string
   tbSeedAmount?: number
+  /** TB 核对行取数溯源（原值 / 坏账准备 / 净额），由宿主从 render 的 project_context 派生 */
+  tbSeedProvenance?: { gross: number; provision: number; net: number; hasProvision: boolean }
 }>()
 
 // ─── Inject ──────────────────────────────────────────────────────────────────
@@ -256,26 +259,20 @@ async function handleAiConclusion() {
           </el-table-column>
           <el-table-column label="期初AJE" width="100" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="row.isEditable && !isReadonly && !row.isFromCrossSheet"
                 :model-value="row.priorAje"
-                size="small"
-                :controls="false"
-                :precision="2"
-                @change="(v: number) => updateCell(row.rowKey, 'prior-aje', v || 0)"
+                @update:model-value="(v: number) => updateCell(row.rowKey, 'prior-aje', v || 0)"
               />
               <span v-else v-html="fmtAmount(row.priorAje)" />
             </template>
           </el-table-column>
           <el-table-column label="期初RJE" width="100" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="row.isEditable && !isReadonly && !row.isFromCrossSheet"
                 :model-value="row.priorRje"
-                size="small"
-                :controls="false"
-                :precision="2"
-                @change="(v: number) => updateCell(row.rowKey, 'prior-rje', v || 0)"
+                @update:model-value="(v: number) => updateCell(row.rowKey, 'prior-rje', v || 0)"
               />
               <span v-else v-html="fmtAmount(row.priorRje)" />
             </template>
@@ -292,39 +289,30 @@ async function handleAiConclusion() {
               <el-tooltip v-if="row.isFromCrossSheet" :content="getCrossSheetTooltip(row)" placement="top">
                 <span :class="getCellClass(row, 'currentUnadjusted')" v-html="fmtAmount(row.currentUnadjusted)" />
               </el-tooltip>
-              <el-input-number
+              <WpAmountInput
                 v-else-if="row.isEditable && !isReadonly"
                 :model-value="row.currentUnadjusted"
-                size="small"
-                :controls="false"
-                :precision="2"
-                @change="(v: number) => updateCell(row.rowKey, 'current-unadj', v || 0)"
+                @update:model-value="(v: number) => updateCell(row.rowKey, 'current-unadj', v || 0)"
               />
               <span v-else v-html="fmtAmount(row.currentUnadjusted)" />
             </template>
           </el-table-column>
           <el-table-column label="期末AJE" width="100" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="row.isEditable && !isReadonly && !row.isFromCrossSheet"
                 :model-value="row.currentAje"
-                size="small"
-                :controls="false"
-                :precision="2"
-                @change="(v: number) => updateCell(row.rowKey, 'current-aje', v || 0)"
+                @update:model-value="(v: number) => updateCell(row.rowKey, 'current-aje', v || 0)"
               />
               <span v-else v-html="fmtAmount(row.currentAje)" />
             </template>
           </el-table-column>
           <el-table-column label="期末RJE" width="100" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="row.isEditable && !isReadonly && !row.isFromCrossSheet"
                 :model-value="row.currentRje"
-                size="small"
-                :controls="false"
-                :precision="2"
-                @change="(v: number) => updateCell(row.rowKey, 'current-rje', v || 0)"
+                @update:model-value="(v: number) => updateCell(row.rowKey, 'current-rje', v || 0)"
               />
               <span v-else v-html="fmtAmount(row.currentRje)" />
             </template>
@@ -365,15 +353,24 @@ async function handleAiConclusion() {
       <!-- 试算平衡表 -->
       <div class="trial-balance-section">
         <h4 class="section-title">试算平衡表核对</h4>
+        <!-- 取数溯源：源模板 E20=E18-E19 比的是「三、应收票据净值」→ TB 侧必须取净额。
+             展示原值 − 坏账准备 = 净额，便于审计师追溯口径（四表库来源见下方科目）。 -->
+        <div v-if="tbSeedProvenance?.hasProvision" class="tb-provenance">
+          <el-tag size="small" type="info" effect="plain">取数口径：净额</el-tag>
+          <span class="tb-provenance-text">
+            原值 <span v-html="fmtAmount(tbSeedProvenance.gross)" />
+            − 坏账准备 <span v-html="fmtAmount(tbSeedProvenance.provision)" />
+            = <strong v-html="fmtAmount(tbSeedProvenance.net)" />
+          </span>
+        </div>
         <div class="tb-row">
           <span class="tb-label">试算平衡表数:</span>
-          <el-input-number
+          <!-- 🔴 可编辑金额只能用 WpAmountInput：el-input-number 的 :formatter 在
+               本平台 EP 版本下不存在（千分符从不生效），见平台级数值格式铁律 -->
+          <WpAmountInput
             v-if="!isReadonly"
             :model-value="trialBalanceDiff.tbAmount"
-            size="small"
-            :controls="false"
-            :precision="2"
-            @change="(v: number) => updateCell('tb', 'amount', v || 0)"
+            @update:model-value="(v: number) => updateCell('tb', 'amount', v || 0)"
           />
           <span v-else v-html="fmtAmount(trialBalanceDiff.tbAmount)" />
         </div>
@@ -381,10 +378,11 @@ async function handleAiConclusion() {
           <span class="tb-label">审定表审定数:</span>
           <span style="font-weight: 600" v-html="fmtAmount(trialBalanceDiff.auditedAmount)" />
         </div>
-        <div class="tb-row" :class="{ 'diff-warning': trialBalanceDiff.diff !== 0 }">
+        <!-- 🔴 一致性判定必须走 matched（按分容差）：浮点噪声会让 diff 显示 0.00 却打红 -->
+        <div class="tb-row" :class="{ 'diff-warning': !trialBalanceDiff.matched }">
           <span class="tb-label">差异:</span>
           <span v-html="fmtAmount(trialBalanceDiff.diff)" />
-          <el-tag v-if="trialBalanceDiff.diff === 0" type="success" size="small" style="margin-left:8px">✓ 一致</el-tag>
+          <el-tag v-if="trialBalanceDiff.matched" type="success" size="small" style="margin-left:8px">✓ 一致</el-tag>
           <el-tag v-else type="danger" size="small" style="margin-left:8px">✗ 存在差异</el-tag>
         </div>
       </div>
@@ -509,6 +507,22 @@ async function handleAiConclusion() {
   background: #fafafa;
   border: 1px solid #ebeef5;
   border-radius: 4px;
+}
+
+.tb-provenance {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 6px 10px;
+  border-left: 3px solid #e6a23c;
+  background: #fdf6ec;
+  font-size: 12px;
+}
+
+.tb-provenance-text {
+  color: #606266;
+  font-variant-numeric: tabular-nums;
 }
 
 .tb-row {

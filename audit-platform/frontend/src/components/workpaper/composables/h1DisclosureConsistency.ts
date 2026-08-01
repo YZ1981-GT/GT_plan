@@ -32,6 +32,10 @@ import {
   type TitleCertRow,
 } from './h1ListedDisclosureModel'
 import {
+  eqCheck as sharedEqCheck,
+  WP_CHECK_TOLERANCE,
+} from './shared/disclosureConsistency'
+import {
   H1_SOE_CATEGORIES,
   clearingSubtotal,
   fullyDepSubtotal,
@@ -44,8 +48,11 @@ import {
   type H1SoeLayer,
 } from './h1SoeDisclosureModel'
 
-/** 金额容差：1 分 */
-export const H1_AMOUNT_TOLERANCE = 0.01
+/**
+ * 金额容差：1 分。委托平台共用常量（`shared/disclosureConsistency.ts`），
+ * 不再各写各的 0.01 —— H1 的既有测试覆盖此常量，改成委托后零回归。
+ */
+export const H1_AMOUNT_TOLERANCE = WP_CHECK_TOLERANCE
 
 export type H1CheckLevel = 'ok' | 'warn' | 'error'
 

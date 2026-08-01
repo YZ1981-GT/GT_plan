@@ -2,14 +2,18 @@
  * H6 固定资产清理披露表 ↔ 附注章节映射
  *
  * H6 披露表是 H1「固定资产」附注中「固定资产清理」子表的编制桥：
- * - 上市 → 附注「五、15」子表「固定资产清理」
+ * - 上市 → 附注「五、22」子表「固定资产清理」
  * - 国企 → 附注「八、22」子表「固定资产清理」
  * 合计数（固定资产+清理）仍以 H1-1 / H1 附注汇总为准。
+ *
+ * ⚠️ 章节号是**内联字符串字面量**（原写 `= H1_NOTE_SECTION` 导致 H6 从
+ * `note_workpaper_sync_registry.json` 整条消失 —— 生成器用 text-scan 抽
+ * `listed: '…'`，标识符引用扫不到）。与 H1 的一致性由
+ * `__tests__/h4h6NoteSectionMapShell.spec.ts` 交叉锁死；常量对象体内不得写注释。
  */
 import {
   H1_DISCLOSURE_SHEET_NAME,
   H1_LISTED_SUBTABLE,
-  H1_NOTE_SECTION,
   isH1DisclosureApplicable,
   resolveH1CurrentStandard,
   type H1DisclosureVariant,
@@ -17,7 +21,10 @@ import {
 
 export type H6DisclosureVariant = H1DisclosureVariant
 
-export const H6_NOTE_SECTION = H1_NOTE_SECTION
+export const H6_NOTE_SECTION = {
+  listed: '五、22',
+  soe: '八、22',
+} as const satisfies Record<H6DisclosureVariant, string>
 
 export const H6_DISCLOSURE_SHEET_NAME = {
   listed: '附注披露信息（上市公司）',

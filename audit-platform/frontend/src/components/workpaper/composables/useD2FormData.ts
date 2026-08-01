@@ -28,7 +28,7 @@ export type ChecklistResponse = ChecklistItem
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
-export function useD2FormData(wpId: Ref<string>, projectId?: Ref<string>) {
+export function useD2FormData(wpId: Ref<string>, projectId?: Ref<string>, htmlData?: Ref<any>) {
   const persistence = useChecklistPersistence({ wpId, projectId, debounceMs: 2000 })
   const allResponses = persistence.responses
   const loading = ref(false)
@@ -48,29 +48,45 @@ export function useD2FormData(wpId: Ref<string>, projectId?: Ref<string>) {
       }
       persistence.hydrate(d2Responses)
 
-      // 自动取试算平衡表 1122 科目余额
+      // 自动取试算平衡表 1122 科目余额 → D2-adj-tb-amount 锚点（seed 回退）
+      // 🔴 主路径是 Tier A 公式（灰度开时由 render `seed_tier_a_reconciliation` 写入），
+      //    此处只是前端自行 seed 的**回退**（灰度关/公式被停用时兜底）。
+      //    **优先读 render 下发的 `project_context.tb_amount`（净额口径）**，
+      //    只在无下发时才自行查 TB API（灰度关时 render 不下发，保持原值回退行为不变）。
+      //    口径说明：审定表 D2-1 比的是「三、应收账款净值」合计 A27（原值 − 坏账准备），
+      //    取原值会产生恰好等于坏账准备的假差异（D1 同款缺陷已实测）。
       if (projectId?.value) {
         try {
-          // 先取项目审计年度
-          let year = new Date().getFullYear() - 1
-          try {
-            const projRes = await api.get(`/api/projects/${projectId.value}`)
-            const proj = projRes?.data ?? projRes
-            if (proj?.audit_year) year = Number(proj.audit_year)
-          } catch { /* fallback */ }
-
-          const tbRes = await api.get(`/api/projects/${projectId.value}/trial-balance`, {
-            params: { year },
-          })
-          const tbData = Array.isArray(tbRes?.data) ? tbRes.data : (Array.isArray(tbRes) ? tbRes : [])
-          const tbRow = tbData.find((r: any) => r.standard_account_code === '1122')
-          if (tbRow) {
-            const tbAmount = Number(tbRow.audited_amount ?? tbRow.unadjusted_amount ?? 0)
+          const renderTbAmount = (htmlData?.value as any)?.project_context?.tb_amount
+          if (renderTbAmount !== undefined && renderTbAmount !== null) {
+            // render 已下发净额（灰度开时），直接用
             allResponses.value.set('D2-adj-tb-amount', {
               item_id: 'D2-adj-tb-amount',
               conclusion: null,
-              remark: String(tbAmount),
+              remark: String(Number(renderTbAmount)),
             })
+          } else {
+            // 灰度关 / render 未下发：自行查 TB 回退（原值口径，与改动前行为一致）
+            let year = new Date().getFullYear() - 1
+            try {
+              const projRes = await api.get(`/api/projects/${projectId.value}`)
+              const proj = projRes?.data ?? projRes
+              if (proj?.audit_year) year = Number(proj.audit_year)
+            } catch { /* fallback */ }
+
+            const tbRes = await api.get(`/api/projects/${projectId.value}/trial-balance`, {
+              params: { year },
+            })
+            const tbData = Array.isArray(tbRes?.data) ? tbRes.data : (Array.isArray(tbRes) ? tbRes : [])
+            const tbRow = tbData.find((r: any) => r.standard_account_code === '1122')
+            if (tbRow) {
+              const tbAmount = Number(tbRow.audited_amount ?? tbRow.unadjusted_amount ?? 0)
+              allResponses.value.set('D2-adj-tb-amount', {
+                item_id: 'D2-adj-tb-amount',
+                conclusion: null,
+                remark: String(tbAmount),
+              })
+            }
           }
         } catch {
           // trial_balance 取数失败不阻断加载

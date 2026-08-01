@@ -337,7 +337,7 @@ const canStartAiReview = computed(() => {
   return allowedRoles.includes(currentRole.value)
 })
 
-const formData = useD2FormData(toRef(props, 'wpId'), toRef(props, 'projectId'))
+const formData = useD2FormData(toRef(props, 'wpId'), toRef(props, 'projectId'), toRef(props, 'htmlData'))
 const allResponses = computed(() => formData.allResponses.value)
 const saving = formData.saving
 
