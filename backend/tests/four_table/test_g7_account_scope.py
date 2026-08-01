@@ -464,3 +464,60 @@ class TestBucketDefsPayload:
         assert BUCKET_OTHER in keys
         assert BUCKET_IMPAIRMENT in keys
         assert all(d["label"] for d in defs), "每个桶都要有中文标签"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 5) 反硬编码守卫：_G7_ACCOUNT_PREFIX 不得再被 render 用作输出值
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+class TestNoHardcodedPrefixInRenderOutput:
+    """🔴 R11.8 / Task 6.6：`_G7_ACCOUNT_PREFIX` 已删，render 输出的 account_code
+    必须来自报表映射解析结果而非常量前缀。
+
+    读源码断言 render 函数里不引用 `_G7_ACCOUNT_PREFIX` / `_G7_IMPAIRMENT_PREFIX`。
+    必须先 stripComments() 再判 —— 解释性注释会提到旧常量名。
+    """
+
+    @staticmethod
+    def _strip_comments(src: str) -> str:
+        """去掉 Python 行注释 + 多行字符串（docstring 也视为注释）。"""
+        import re
+        # 去掉 # 开头行注释
+        src = re.sub(r'#[^\n]*', '', src)
+        # 去掉三引号多行字符串/docstring
+        src = re.sub(r'"""[\s\S]*?"""', '', src)
+        src = re.sub(r"'''[\s\S]*?'''", '', src)
+        return src
+
+    def test_render_source_does_not_reference_prefix_constants(self):
+        """render 函数体（去注释后）不得引用已删除的旧前缀常量。"""
+        import inspect
+        source = inspect.getsource(g7.render)
+        stripped = self._strip_comments(source)
+        assert "_G7_ACCOUNT_PREFIX" not in stripped, (
+            "render 函数仍引用 _G7_ACCOUNT_PREFIX —— "
+            "account_code 应来自 resolve_report_line_accounts 的结果，不是常量"
+        )
+        assert "_G7_IMPAIRMENT_PREFIX" not in stripped, (
+            "render 函数仍引用 _G7_IMPAIRMENT_PREFIX —— "
+            "impairment_account_code 应来自解析结果，不是常量"
+        )
+
+    def test_reverse_self_check_render_does_output_account_code(self):
+        """反向自检：render 确实输出 account_code 键（如果不输出，上面的断言空转）。"""
+        import inspect
+        source = inspect.getsource(g7.render)
+        assert "account_code" in source, "render 应含 account_code 输出"
+        assert "resolved_account_code" in source or "accounts.gross" in source, (
+            "render 应从 resolve_report_line_accounts 结果取科目码"
+        )
+
+    def test_module_level_no_prefix_constants(self):
+        """模块级也不得再有这两个常量（Wave 1 已删，防复活）。"""
+        assert not hasattr(g7, "_G7_ACCOUNT_PREFIX"), (
+            "_G7_ACCOUNT_PREFIX 复活了！科目码由 G7_ACCOUNT_SPEC + 报表映射解析获得"
+        )
+        assert not hasattr(g7, "_G7_IMPAIRMENT_PREFIX"), (
+            "_G7_IMPAIRMENT_PREFIX 复活了！"
+        )

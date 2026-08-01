@@ -207,33 +207,33 @@ class TestG7AuxLinkage:
         )
 
 
-# ─── Test 5: G6 (1531.02) 部分 =AUX 示例 ──────────────────────────────────
+# ─── Test 5: G6 不再含 =AUX（2026-08-01 纠错：1531 是长期应收款非 G6 科目）───
 
 
 class TestG6PartialAux:
-    """G6 (1531.02) 含 1-2 个 =AUX 示例（Sprint 0.X 实测）"""
+    """G6 科目已纠正为 1505，旧 1531.02 AUX 硬编码已删除"""
 
-    def test_g6_has_at_least_one_aux(self, g_cells):
+    def test_g6_has_no_aux(self, g_cells):
         g6_aux = [
             c for c in g_cells
             if c["wp_code"] == "G6"
             and c["formula"]
             and c["formula"].startswith("=AUX(")
         ]
-        assert len(g6_aux) >= 1, (
-            f"G6 应至少含 1 个 =AUX cell（1531.02 实测）, 实际 {len(g6_aux)}"
+        assert len(g6_aux) == 0, (
+            f"G6 不应含 =AUX cell（1531 是长期应收款非 G6 科目）, 实际 {len(g6_aux)}"
         )
 
-    def test_g6_aux_uses_1531_02(self, g_cells):
-        g6_aux = [
+    def test_g6_uses_1505(self, g_cells):
+        g6_tb = [
             c for c in g_cells
             if c["wp_code"] == "G6"
             and c["formula"]
-            and c["formula"].startswith("=AUX(")
+            and c["formula"].startswith("=TB(")
         ]
-        for c in g6_aux:
-            assert "'1531.02'" in c["formula"], (
-                f"G6 =AUX 应使用 '1531.02' account_code: {c['formula']}"
+        for c in g6_tb:
+            assert "'1505'" in c["formula"], (
+                f"G6 =TB 应使用 '1505' account_code: {c['formula']}"
             )
 
 
@@ -265,7 +265,7 @@ class TestPerSheetMinimums:
     @pytest.mark.parametrize("sheet,min_cells,description", [
         ("明细表G1-2", 10, "G1 交易性金融资产明细表 ≥ 10 cell"),
         ("明细表G4-2", 6, "G4 债权投资明细表 + ECL 测试参数 ≥ 6 cell"),
-        ("明细表G6-2", 10, "G6 其他债权投资明细表 ≥ 10 cell"),
+        ("明细表G6-2", 5, "G6 其他债权投资明细表 ≥ 5 cell"),
         ("明细表G7-2", 15, "G7 长期股权投资明细表 ≥ 15 cell（含 =AUX 客户链路）"),
         ("明细表G8-2", 6, "G8 其他权益工具投资明细表 ≥ 6 cell"),
     ])
