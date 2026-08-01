@@ -170,6 +170,11 @@
 .gt-de-table-tabs :deep(.el-tabs__item:not(.is-active)) { color: var(--el-text-color-regular); background: transparent; }
 .gt-de-table-tabs :deep(.el-tabs__item:not(.is-active):hover) { background: #f4f0fa; color: #4b2d77; }
 .gt-de-tab-label { display: inline-block; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: middle; }
+.gt-de-tab-label--empty { opacity: 0.55; }
+.gt-de-tab-empty-tag { display: inline-block; margin-left: 4px; font-size: 10px; line-height: 14px; padding: 0 4px; border-radius: 3px; background: var(--el-fill-color-lighter, #f0f0f0); color: var(--el-text-color-secondary, #909399); vertical-align: middle; }
+/* ── 空表提示 ── */
+.gt-de-empty-table-hint { margin-bottom: 12px; }
+.gt-de-empty-table-hint .el-alert { background: var(--el-fill-color-lighter, #f8f8fa); border: 1px dashed var(--el-border-color-lighter, #e0e0e0); }
 .gt-trace-popover-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 2000; background: transparent; }
 .gt-trace-popover-container { position: absolute; z-index: 2001; }
 /* ── Stale banner ── */

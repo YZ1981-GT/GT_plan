@@ -84,6 +84,8 @@
       <span v-if="reconciliationDiff !== 0">请核对子公司/合营/联营分类及减值口径。</span>
     </el-alert>
 
+    <WpDisclosureConsistencyPanel :results="consistencyChecks" :project-id="projectId" />
+
     <el-skeleton v-if="!hydrated" :rows="12" animated />
 
     <template v-else>
@@ -141,7 +143,23 @@
                     <h4>{{ table.title }}</h4>
                   </div>
                   <div v-if="table.dynamic" class="add-row-actions">
-                    <template v-if="table.id === 'lte-movement' || table.id === 'unrecognized-losses'">
+                    <template v-if="table.slotConfig">
+                      <el-button size="small" :disabled="isReadonly" @click="addSlotEntity(table.slotConfig)">
+                        新增列
+                      </el-button>
+                      <el-tag
+                        v-for="name in entitySlotNames(table.slotConfig)"
+                        :key="name"
+                        size="small"
+                        closable
+                        :disable-transitions="true"
+                        @close="removeSlotEntity(table.slotConfig, name)"
+                        @click="renameSlotEntity(table.slotConfig, name)"
+                      >
+                        {{ name }}
+                      </el-tag>
+                    </template>
+                    <template v-else-if="table.id === 'lte-movement' || table.id === 'unrecognized-losses'">
                       <el-button
                         size="small"
                         :disabled="isReadonly || tableRows(table).length >= (table.maxRows ?? 100)"
@@ -212,7 +230,7 @@
                     </el-table-column>
 
                     <el-table-column
-                      v-for="column in table.columns"
+                      v-for="column in effectiveColumns(table)"
                       :key="column.key"
                       :label="column.label"
                       :width="column.width"
@@ -238,15 +256,21 @@
                           @change="scheduleSave"
                         />
                         <el-input-number
-                          v-else
+                          v-else-if="column.type === 'percent'"
                           v-model="row.values[column.key]"
                           size="small"
                           controls-position="right"
-                          :precision="column.type === 'percent' ? 4 : 2"
-                          :min="column.type === 'percent' ? 0 : undefined"
-                          :max="column.type === 'percent' ? 100 : undefined"
+                          :precision="4"
+                          :min="0"
+                          :max="100"
                           :disabled="isReadonly"
                           @change="scheduleSave"
+                        />
+                        <WpAmountInput
+                          v-else
+                          :model-value="row.values[column.key]"
+                          :disabled="isReadonly"
+                          @update:model-value="row.values[column.key] = $event; scheduleSave()"
                         />
                       </template>
                     </el-table-column>
@@ -343,7 +367,7 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, toRef, watch, inject, type ComputedRef } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { api } from '@/services/apiProxy'
 import { useDecimalCalc } from '@/composables/useDecimalCalc'
@@ -368,6 +392,7 @@ import {
   buildG7SoeSyncPayloads,
   createG7SoeDisclosureState,
   g7SoeChapterSections,
+  resolveG7SoeTableColumns,
   type G7DisclosureColumnType,
   type G7DisclosureNarrative,
   type G7DisclosureRow,
@@ -384,6 +409,11 @@ import {
   isG7GrossCode,
 } from '../../composables/g7AccountScope'
 import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
+import WpDisclosureConsistencyPanel from '../../shared/disclosure/WpDisclosureConsistencyPanel.vue'
+import WpAmountInput from '../../shared/WpAmountInput.vue'
+import { DisplayPrefs_Key } from '../../composables/displayPrefsKey'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { buildG7ConsistencyChecks, type G7ConsistencyInput } from '../../composables/g7DisclosureConsistency'
 
 const RESPONSE_KEY = 'G7-main-disclosure-soe-v2'
 const SHEET_NAME = '附注披露信息（国企）'
@@ -509,6 +539,56 @@ const reconciliationDiff = computed(() => {
   return Number(decimalSub(disclosureClosingTotal.value, adjudicatedAmount.value))
 })
 
+const consistencyChecks = computed(() => {
+  // 国企分类表：从 lte-classification 表提取行
+  const classRows = (state.tables['lte-classification'] ?? [])
+    .filter(r => !r.isStructure && r.id !== 'lte-subtotal' && r.id !== 'lte-impairment' && r.id !== 'lte-total')
+  const classSubtotalRow = (state.tables['lte-classification'] ?? []).find(r => r.id === 'lte-subtotal')
+  const classImpairmentRow = (state.tables['lte-classification'] ?? []).find(r => r.id === 'lte-impairment')
+  const classTotalRow = (state.tables['lte-classification'] ?? []).find(r => r.id === 'lte-total')
+
+  // 主表（明细表）：从 lte-detail 表提取行
+  const mainRows = (state.tables['lte-detail'] ?? [])
+    .filter(r => r.id !== 'lte-detail-total' && !r.isStructure)
+    .map(r => ({
+      name: String(r.values?.['项目'] ?? r.label ?? ''),
+      openingBook: Number(r.values?.['openingBook'] ?? 0) || null,
+      totalIncrease: (() => {
+        const keys = ['addition', 'equityProfit', 'oci', 'otherEquity', 'other']
+        const vals = keys.map(k => Number(r.values?.[k] ?? 0) || 0)
+        const sum = vals.reduce((a, b) => a + b, 0)
+        return sum || null
+      })(),
+      totalDecrease: (() => {
+        const keys = ['reduction', 'dividend', 'impairment']
+        const vals = keys.map(k => Number(r.values?.[k] ?? 0) || 0)
+        const sum = vals.reduce((a, b) => a + b, 0)
+        return sum || null
+      })(),
+      closingBook: Number(r.values?.['closingBook'] ?? 0) || null,
+    }))
+
+  const mainTotal = (state.tables['lte-detail'] ?? []).find(r => r.id === 'lte-detail-total')
+  const mainClosingTotal = mainTotal ? (Number(mainTotal.values?.['closingBook'] ?? 0) || null) : null
+
+  const input: G7ConsistencyInput = {
+    classificationRows: classRows.map(r => ({
+      label: String(r.label ?? ''),
+      endAmount: Number(r.values?.['closing'] ?? 0) || null,
+    })),
+    classificationSubtotal: classSubtotalRow ? (Number(classSubtotalRow.values?.['closing'] ?? 0) || null) : null,
+    classificationImpairment: classImpairmentRow ? (Number(classImpairmentRow.values?.['closing'] ?? 0) || null) : null,
+    classificationTotal: classTotalRow ? (Number(classTotalRow.values?.['closing'] ?? 0) || null) : null,
+    mainTableRows: mainRows,
+    mainTableClosingTotal: mainClosingTotal,
+    adjudicatedAmount: adjudicatedAmount.value,
+    disclosureImpairmentEnd: classImpairmentRow ? (Number(classImpairmentRow.values?.['closing'] ?? 0) || null) : null,
+    g7_17ImpairmentTotal: null,
+    excessLoss: null,
+  }
+  return buildG7ConsistencyChecks(input)
+})
+
 function tableRows(table: G7DisclosureTable): G7DisclosureRow[] {
   return state.tables[table.id] ?? []
 }
@@ -552,9 +632,12 @@ function computedCell(
   return Number(decimalSum(...values))
 }
 
+// 🔴 金额格式单一真源 = displayPrefs store 成员（不是模块级导出）
+const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
+
 function fmtAmount(value: number | null): string {
   if (value == null || !Number.isFinite(value)) return '—'
-  return value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return displayPrefs.fmtAmount(value)
 }
 
 function formatCell(value: G7DisclosureValue, type?: G7DisclosureColumnType): string {
@@ -572,7 +655,7 @@ function addRow(table: G7DisclosureTable, group: 'joint-venture' | 'associate' =
   if (rows.length >= (table.maxRows ?? 100)) return
   const dataRows = rows.filter(row => row.kind === 'data')
   const id = `${table.id}-manual-${Date.now()}-${dataRows.length + 1}`
-  const values = Object.fromEntries(table.columns.map(column => [column.key, column.type === 'text' ? '' : null]))
+  const values = Object.fromEntries(effectiveColumns(table).map(column => [column.key, column.type === 'text' ? '' : null]))
   const nextRow: G7DisclosureRow = { id, label: '', values, kind: 'data' }
 
   if (table.id === 'lte-movement') {
@@ -617,6 +700,93 @@ function removeRow(table: G7DisclosureTable, rowId: string): void {
   scheduleSave()
 }
 
+// ── 动态列（按被投资单位/公司横向展开）管理 ──────────────────────────────
+// Task 5.6 / Property 18：列数由数据决定，key 稳定 {slot}_{seq}，改名只改 label。
+
+/** 该槎位当前的实体名清单（缺省回退默认清单，与 resolveG7SoeTableColumns 同源）。 */
+function entitySlotNames(slotConfig: { slot: string }): string[] {
+  return state.entitySlots?.[slotConfig.slot] ?? []
+}
+
+/** 解析某表的有效列集（slotConfig 时动态生成）。 */
+function effectiveColumns(table: G7DisclosureTable) {
+  return resolveG7SoeTableColumns(table, state.entitySlots)
+}
+
+async function addSlotEntity(slotConfig: { slot: string }): Promise<void> {
+  if (props.isReadonly) return
+  try {
+    const { value } = await ElMessageBox.prompt(
+      '请输入新增实体名称（如公司名称）',
+      '新增列',
+      { confirmButtonText: '创建', cancelButtonText: '取消' },
+    )
+    const name = String(value ?? '').trim()
+    if (!name) {
+      ElMessage.warning('名称不能为空')
+      return
+    }
+    const names = entitySlotNames(slotConfig)
+    if (names.includes(name)) {
+      ElMessage.warning('该名称已存在，请改用其它名称或先重命名现有列')
+      return
+    }
+    if (!state.entitySlots) state.entitySlots = {}
+    state.entitySlots[slotConfig.slot] = [...names, name]
+    scheduleSave()
+  } catch {
+    // 用户取消
+  }
+}
+
+async function renameSlotEntity(slotConfig: { slot: string }, current: string): Promise<void> {
+  if (props.isReadonly) return
+  try {
+    const { value } = await ElMessageBox.prompt(
+      '请输入新的实体名称',
+      '修改列名',
+      { inputValue: current, confirmButtonText: '保存', cancelButtonText: '取消' },
+    )
+    const name = String(value ?? '').trim()
+    if (!name) {
+      ElMessage.warning('名称不能为空')
+      return
+    }
+    const names = entitySlotNames(slotConfig)
+    if (name !== current && names.includes(name)) {
+      ElMessage.warning('该名称已存在，请改用其它名称')
+      return
+    }
+    if (!state.entitySlots) state.entitySlots = {}
+    // 🔴 只改显示名，key 仍是 `{slot}_{seq}` 不变，数据不因改名丢落点。
+    state.entitySlots[slotConfig.slot] = names.map(n => (n === current ? name : n))
+    scheduleSave()
+  } catch {
+    // 用户取消
+  }
+}
+
+async function removeSlotEntity(slotConfig: { slot: string }, name: string): Promise<void> {
+  if (props.isReadonly) return
+  const names = entitySlotNames(slotConfig)
+  if (names.length <= 1) {
+    ElMessage.warning('至少保留一列')
+    return
+  }
+  try {
+    await ElMessageBox.confirm(`删除后「${name}」列的数据将同时清除，是否继续？`, '删除列', {
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+  } catch {
+    return
+  }
+  if (!state.entitySlots) return
+  state.entitySlots[slotConfig.slot] = names.filter(n => n !== name)
+  scheduleSave()
+}
+
 function serialisableState(): G7SoeDisclosureState {
   return {
     version: 2,
@@ -633,6 +803,10 @@ function serialisableState(): G7SoeDisclosureState {
     ),
     texts: { ...state.texts },
     updatedAt: new Date().toISOString(),
+    previouslySyncedTables: state.previouslySyncedTables ? { ...state.previouslySyncedTables } : undefined,
+    entitySlots: state.entitySlots
+      ? Object.fromEntries(Object.entries(state.entitySlots).map(([k, v]) => [k, [...v]]))
+      : undefined,
   }
 }
 
@@ -741,6 +915,12 @@ function applySavedState(saved: Partial<G7SoeDisclosureState>): void {
     }
   }
   if (saved.texts && typeof saved.texts === 'object') Object.assign(state.texts, saved.texts)
+  if (saved.entitySlots && typeof saved.entitySlots === 'object') {
+    if (!state.entitySlots) state.entitySlots = {}
+    for (const [slot, names] of Object.entries(saved.entitySlots)) {
+      if (Array.isArray(names)) state.entitySlots[slot] = [...names]
+    }
+  }
 }
 
 function parseSavedRemark(remark: unknown): boolean {

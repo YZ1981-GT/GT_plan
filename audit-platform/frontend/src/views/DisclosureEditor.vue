@@ -487,7 +487,7 @@
                 <el-tabs v-model="activeTableTab" type="card" size="small" class="gt-de-table-tabs">
                   <el-tab-pane v-for="(tbl, ti) in currentNoteTables" :key="ti" :name="String(ti)">
                     <template #label>
-                      <span class="gt-de-tab-label" :title="getTableTabFullName(tbl, ti)">{{ getTableTabLabel(tbl, ti) }}</span>
+                      <span class="gt-de-tab-label" :class="{ 'gt-de-tab-label--empty': isTableEmpty(tbl) }" :title="getTableTabFullName(tbl, ti)">{{ getTableTabLabel(tbl, ti) }}<span v-if="isTableEmpty(tbl)" class="gt-de-tab-empty-tag">空</span></span>
                     </template>
                   </el-tab-pane>
                 </el-tabs>
@@ -508,6 +508,12 @@
                 </el-popover>
               </div>
               <!-- 当前表格 -->
+              <div v-if="isActiveTableEmpty" class="gt-de-empty-table-hint">
+                <el-alert type="info" :closable="false" show-icon>
+                  <template #title>本期无此情形</template>
+                  <span>此表当前无业务数据。如有需要可直接编辑填写。</span>
+                </el-alert>
+              </div>
               <el-table ref="deTableRef" v-if="activeTableData?.rows?.length || activeTableData?.headers?.length" :data="activeTableData.rows || []"
                 border size="small" class="gt-de-note-table gt-compact-table" style="margin-bottom: 12px"
                 :style="{ fontSize: displayPrefs.fontConfig.tableFont }"
@@ -1248,6 +1254,7 @@ import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
 import SharedTemplatePicker from '@/components/shared/SharedTemplatePicker.vue'
 import NoteReadinessPanel from '@/components/disclosure/NoteReadinessPanel.vue'
 import StructureEditor from '@/components/formula/StructureEditor.vue'
+import { isEmptyTable, type EmptyTableRow, type EmptyTableColumnDef } from '@/views/composables/disclosureEmptyTable'
 import UnifiedImportDialog from '@/components/import/UnifiedImportDialog.vue'
 import NoteRichTextEditor from '@/components/NoteRichTextEditor.vue'
 import { marked } from 'marked'
@@ -2124,6 +2131,17 @@ function getTableTabLabel(tbl: any, idx: number): string {
   const full = getTableTabFullName(tbl, idx)
   return full.length > 14 ? full.slice(0, 14) + '…' : full
 }
+
+/** 空表判定：灰度开关关闭时恒返回 false（Property 10）。 */
+const EMPTY_TABLE_COLLAPSE_ENABLED: boolean =
+  import.meta.env.VITE_DISCLOSURE_EMPTY_TABLE_COLLAPSE !== 'false' // 默认开（开发环境可见）
+function isTableEmpty(tbl: any): boolean {
+  if (!EMPTY_TABLE_COLLAPSE_ENABLED) return false
+  return isEmptyTable(tbl?.rows as EmptyTableRow[], tbl?.columns as EmptyTableColumnDef[] ?? null)
+}
+
+/** 当前活跃表是否为空表 */
+const isActiveTableEmpty = computed(() => isTableEmpty(activeTableData.value))
 
 function getCellValue(row: any, colIdx: number): any {
   const cells = row.cells || row.values || []

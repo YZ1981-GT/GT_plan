@@ -19,6 +19,9 @@
         <el-button size="small" :disabled="!!props.readonly" :loading="tbLoading" @click="onFetchTb">
           取试算 1531
         </el-button>
+        <el-button size="small" type="success" plain :disabled="!!props.readonly || !hasPrefill" :loading="prefillLoading" @click="onPullFromTB">
+          从四表库带入未审数
+        </el-button>
         <el-tag size="small" :type="Math.abs(adjudication.variance.value) > 0.01 ? 'danger' : 'success'">
           差异 {{ fmtAmount(adjudication.variance.value) }}
         </el-tag>
@@ -28,6 +31,16 @@
         <GtReviewTrigger section-id="g5-1-adjudication" />
       </div>
     </div>
+
+    <!-- 四表库溯源面板 -->
+    <WpFourTableSourcePanel
+      v-if="tbSourceCodes"
+      :gross-label="'长期应收款'"
+      :gross-standard="tbSourceCodes.gross_standard"
+      :resolved-from="tbSourceCodes.resolved_from"
+      :applicable-standard="tbSourceCodes.applicable_standard"
+      :report-row-code="'BS-023'"
+    />
 
     <el-alert type="info" :closable="false" show-icon class="audit-objective">
       审计目标：核实长期应收款余额、坏账准备及净额的存在、完整与准确；确认单项/组合划分恰当；扣除一年内到期后与试算 1531 勾稽，为报表列报及附注提供审定依据。
@@ -249,6 +262,7 @@ import GtIndexChip from '../../GtIndexChip.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import G5AuditTextCards from '../G5AuditTextCards.vue'
 import G5ImportExportDropdown from '../G5ImportExportDropdown.vue'
+import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
 
 const props = defineProps<{
   htmlData?: any
@@ -262,7 +276,22 @@ const readonlyRef = computed(() => !!props.readonly)
 const htmlDataRef = toRef(props, 'htmlData')
 const syncing = ref(false)
 const tbLoading = ref(false)
+const prefillLoading = ref(false)
 const emit = defineEmits<{ imported: [] }>()
+
+// ─── 四表库溯源 ─────────────────────────────────────────────────
+const tbSourceCodes = computed(() => {
+  const hd = props.htmlData
+  return hd?.tb_source_codes ?? null
+})
+const adjudicationPrefill = computed(() => {
+  const hd = props.htmlData
+  return hd?.adjudication_prefill ?? null
+})
+const hasPrefill = computed(() => {
+  const pf = adjudicationPrefill.value
+  return Array.isArray(pf) && pf.length > 0
+})
 
 const adjudication = useG5Adjudication({
   wpId: props.wpId,
@@ -324,6 +353,26 @@ async function onFetchTb(): Promise<void> {
     else ElMessage.success(`已取试算 1531：${amt.toLocaleString('zh-CN', { minimumFractionDigits: 2 })}`)
   } finally {
     tbLoading.value = false
+  }
+}
+
+async function onPullFromTB(): Promise<void> {
+  if (props.readonly) return
+  const pf = adjudicationPrefill.value
+  if (!pf || !pf.length) {
+    ElMessage.warning('四表库无预填数据（可能未入库或科目 1531 无余额）')
+    return
+  }
+  prefillLoading.value = true
+  try {
+    const { count } = adjudication.pullFromTB(pf)
+    if (count > 0) {
+      ElMessage.success(`已从四表库带入 ${count} 个性质桶未审数`)
+    } else {
+      ElMessage.info('所有行已有手工值，未覆盖（手工优先）')
+    }
+  } finally {
+    prefillLoading.value = false
   }
 }
 

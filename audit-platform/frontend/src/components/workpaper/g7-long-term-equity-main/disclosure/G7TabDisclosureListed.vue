@@ -81,6 +81,8 @@
       <span v-if="reconciliationDiff !== 0">请核对合营、联营投资范围及与审定表的口径差异。</span>
     </el-alert>
 
+    <WpDisclosureConsistencyPanel :results="consistencyChecks" :project-id="projectId" />
+
     <el-skeleton v-if="!hydrated" :rows="10" animated />
 
     <el-collapse v-else v-model="activeSections" class="sections">
@@ -244,15 +246,21 @@
                       @change="scheduleSave"
                     />
                     <el-input-number
-                      v-else
+                      v-else-if="column.type === 'percent'"
                       v-model="row.values[column.key]"
                       size="small"
                       controls-position="right"
-                      :precision="column.type === 'percent' ? 4 : 2"
-                      :min="column.type === 'percent' ? 0 : undefined"
-                      :max="column.type === 'percent' ? 100 : undefined"
+                      :precision="4"
+                      :min="0"
+                      :max="100"
                       :disabled="isReadonly"
                       @change="scheduleSave"
+                    />
+                    <WpAmountInput
+                      v-else
+                      :model-value="row.values[column.key]"
+                      :disabled="isReadonly"
+                      @update:model-value="row.values[column.key] = $event; scheduleSave()"
                     />
                   </template>
                 </el-table-column>
@@ -390,6 +398,11 @@ import {
   isG7GrossCode,
 } from '../../composables/g7AccountScope'
 import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
+import WpDisclosureConsistencyPanel from '../../shared/disclosure/WpDisclosureConsistencyPanel.vue'
+import WpAmountInput from '../../shared/WpAmountInput.vue'
+import { DisplayPrefs_Key } from '../../composables/displayPrefsKey'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { buildG7ConsistencyChecks, type G7ConsistencyInput } from '../../composables/g7DisclosureConsistency'
 
 const RESPONSE_KEY = 'G7-main-disclosure-listed-v2'
 const NOTE_SECTION_ID = '五、18'
@@ -489,6 +502,42 @@ const reconciliationDiff = computed(() => {
   return Number(decimalSub(disclosureClosingTotal.value, adjudicatedAmount.value))
 })
 
+const consistencyChecks = computed(() => {
+  const mainRows = (state.tables['investment-movement'] ?? [])
+    .filter(r => r.id !== 'investment-total' && !r.isStructure)
+    .map(r => ({
+      name: String(r.values?.['项目'] ?? r.label ?? ''),
+      openingBook: Number(r.values?.['openingBook'] ?? 0) || null,
+      totalIncrease: (() => {
+        const keys = ['addition', 'equityProfit', 'oci', 'otherEquity', 'other']
+        const vals = keys.map(k => Number(r.values?.[k] ?? 0) || 0)
+        const sum = vals.reduce((a, b) => a + b, 0)
+        return sum || null
+      })(),
+      totalDecrease: (() => {
+        const keys = ['reduction', 'dividend', 'impairment']
+        const vals = keys.map(k => Number(r.values?.[k] ?? 0) || 0)
+        const sum = vals.reduce((a, b) => a + b, 0)
+        return sum || null
+      })(),
+      closingBook: Number(r.values?.['closingBook'] ?? 0) || null,
+    }))
+
+  const input: G7ConsistencyInput = {
+    classificationRows: [],
+    classificationSubtotal: null,
+    classificationImpairment: null,
+    classificationTotal: null,
+    mainTableRows: mainRows,
+    mainTableClosingTotal: disclosureClosingTotal.value || null,
+    adjudicatedAmount: adjudicatedAmount.value,
+    disclosureImpairmentEnd: null,
+    g7_17ImpairmentTotal: null,
+    excessLoss: null,
+  }
+  return buildG7ConsistencyChecks(input)
+})
+
 function tableRows(table: G7DisclosureTable): G7DisclosureRow[] {
   return state.tables[table.id] ?? []
 }
@@ -541,9 +590,12 @@ function computedCell(
   return Number(decimalSum(...values))
 }
 
+// 🔴 金额格式单一真源 = displayPrefs store 成员（不是模块级导出）
+const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
+
 function fmtAmount(value: number | null): string {
   if (value == null || !Number.isFinite(value)) return '—'
-  return value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return displayPrefs.fmtAmount(value)
 }
 
 function formatCell(value: G7DisclosureValue, type?: G7DisclosureColumnType): string {

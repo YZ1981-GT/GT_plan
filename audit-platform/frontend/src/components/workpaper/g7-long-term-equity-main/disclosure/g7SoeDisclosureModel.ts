@@ -46,6 +46,8 @@ export interface G7DisclosureTable {
   /** 与 note_template_soe.json 中 tables[].name 对齐的同步键；缺省回退 title */
   templateTableKey?: string
   sourceRows: string
+  /** 标签列头文字（须与 note_template headers[0] 逐字一致）。缺省 '项目'。 */
+  labelHeader?: string
   /** 静态列（无 slotConfig 时的最终列集；有 slotConfig 时仅作初始态取值参考） */
   columns: G7DisclosureColumn[]
   rows: G7DisclosureRow[]
@@ -510,7 +512,7 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
         columns: subsidiaryBasicColumns,
         rows: blankRows(
           'subsidiary-basic',
-          3,
+          dynamicRowCount(1),
           subsidiaryBasicColumns,
           index => `被投资单位基本信息G7-4 第${12 + index}行；投资额←明细表G7-2`,
         ),
@@ -544,7 +546,7 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
         columns: controlExceptionColumns,
         rows: blankRows(
           'control-below-half',
-          5,
+          dynamicRowCount(1),
           controlExceptionColumns,
           index => `G7-4 条件筛选（表决权≤50%）第${12 + index}行`,
         ),
@@ -649,7 +651,7 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
         columns: formerSubsidiaryColumns,
         rows: blankRows(
           'former-sub',
-          5,
+          dynamicRowCount(1),
           formerSubsidiaryColumns,
           index => `处置子公司测试表G7-11 第${9 + index}行`,
         ),
@@ -708,7 +710,7 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
         columns: newEntityColumns,
         rows: blankRows(
           'new-entity',
-          10,
+          dynamicRowCount(1),
           newEntityColumns,
           index => `G7-4「本期新增=是」筛选 第${12 + index}行`,
         ),
@@ -891,6 +893,7 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
         id: 'lte-classification',
         title: '长期股权投资分类',
         templateTableKey: '长期股权投资分类',
+        labelHeader: '项  目',
         sourceRows: 'A201:F208',
         columns: classificationColumns,
         rows: [
@@ -943,6 +946,7 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
         id: 'lte-movement',
         title: '（1）长期股权投资明细',
         templateTableKey: '长期股权投资明细',
+        labelHeader: '被投资单位',
         sourceRows: 'A209:M222',
         columns: movementColumns,
         rows: (() => {
@@ -969,6 +973,7 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
         id: 'important-jv-fs',
         title: '（3）重要合营企业的主要财务信息（划分为持有待售的除外）',
         templateTableKey: '重要合营企业的主要财务信息（划分为持有待售的除外）',
+        labelHeader: '项 目',
         sourceRows: 'A225:D241',
         columns: jvFsColumns,
         rows: annotateEquityBridgeSources(metricRows('jv-fs', jvFsLabels, jvFsColumns, '被投资单位财务信息（合营、联营）G7-5')),
@@ -977,7 +982,8 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
       {
         id: 'important-jv-pl',
         title: '续：重要合营企业经营成果',
-        templateTableKey: '续：',
+        templateTableKey: '续：重要合营企业本期及上期经营成果',
+        labelHeader: '项  目',
         sourceRows: 'A242:D251',
         columns: jvPlColumns,
         rows: metricRows('jv-pl', jvPlLabels, jvPlColumns, '被投资单位财务信息（合营、联营）G7-5'),
@@ -986,6 +992,7 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
         id: 'important-associate-fs',
         title: '（4）重要联营企业的主要财务信息',
         templateTableKey: '重要联营企业的主要财务信息',
+        labelHeader: '项 目',
         sourceRows: 'A253:H269',
         columns: associateFsMatrixColumnsFor(ASSOCIATE_FS_SLOT_DEFAULT_NAMES),
         slotConfig: { slot: ASSOCIATE_FS_SLOT, sub: ASSOCIATE_FS_SUB },
@@ -998,7 +1005,8 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
       {
         id: 'important-associate-pl',
         title: '续：重要联营企业经营成果',
-        templateTableKey: '续：重要联营企业经营成果',
+        templateTableKey: '续：重要联营企业本期及上期经营成果',
+        labelHeader: '项  目',
         sourceRows: 'A270:H277',
         columns: associatePlMatrixColumnsFor(ASSOCIATE_PL_SLOT_DEFAULT_NAMES),
         slotConfig: { slot: ASSOCIATE_PL_SLOT, sub: ASSOCIATE_PL_SUB },
@@ -1012,6 +1020,7 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
         id: 'insignificant-aggregate',
         title: '（5）不重要合营企业和联营企业的汇总信息',
         templateTableKey: '不重要合营企业和联营企业的汇总信息',
+        labelHeader: '项  目',
         sourceRows: 'A279:D292',
         columns: aggregateColumns,
         rows: [
@@ -1033,6 +1042,7 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
         id: 'unrecognized-losses',
         title: '超额亏损未确认损失份额',
         templateTableKey: '②对合营企业或联营企业发生超额亏损的分担额',
+        labelHeader: '被投资单位名称',
         sourceRows: 'A301:E312',
         columns: unrecognizedLossColumns,
         rows: (() => {
@@ -1078,7 +1088,7 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
       {
         id: 'unconsolidated-structured-exposure',
         title: '未纳入合并范围结构化主体的账面价值与最大损失敞口',
-        templateTableKey: 'C.在财务报表中确认的与企业在未纳入合并财务报表范围的结构化主体中权益相关的资产和负债的账面价值与其最大损失敞口的比较。',
+        templateTableKey: '结构化主体权益的账面价值和最大损失敞口',
         sourceRows: 'A323:G328',
         columns: structuredExposureColumns,
         rows: [
@@ -1093,7 +1103,8 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
       {
         id: 'sponsor-income',
         title: '发起人从结构化主体获得的收益及转移资产',
-        templateTableKey: '本公司发起多个结构化主体，但在结构化中均不持有权益。2023年，本公司从发起的结构化主体获得收益的情况以及当期向结构化主体转移资产的情况如下表所示：',
+        templateTableKey: '结构化主体获得收益及转移资产情况',
+        labelHeader: '类型',
         sourceRows: 'A340:E345',
         columns: sponsorIncomeColumns,
         rows: (() => {
@@ -1321,13 +1332,21 @@ export function buildG7SoeColumns(): Record<string, import('../../composables/di
   const result: Record<string, import('../../composables/disclosureColumnDefs').ColumnDef[]> = {}
   for (const section of G7_SOE_DISCLOSURE_SECTIONS) {
     for (const table of section.tables ?? []) {
+      const columns = table.columns
+      // 🔴 Property 9: flat/group 必须在同步载荷 columns 与模板 seed 两处都表态。
+      // 有 group 的表 → 标签列不标 flat（混合分组：标签列 rowspan=2，其余列按 group 聚合）。
+      // 无 group 的表 → 标签列标 flat（显式单级表头，抑制后端前缀推断）。
+      const hasGroup = columns.some(c => c.group)
+      const labelText = table.labelHeader ?? '项目'
       result[syncTableKey(table)] = [
-        { key: '项目', label: '项目', is_label: true },
-        ...table.columns.map((c) => ({
+        { key: '项目', label: labelText, is_label: true, ...(hasGroup ? {} : { flat: true }) },
+        ...columns.map((c) => ({
           key: c.key,
           label: c.label,
           format: (c.type === 'number' ? 'amount' : c.type === 'percent' ? 'percent' : 'text') as
             'amount' | 'percent' | 'text',
+          ...(c.group ? { group: c.group } : {}),
+          ...(c.flat ? { flat: true } : {}),
         })),
       ]
     }

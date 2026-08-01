@@ -5,7 +5,7 @@
 import http from '@/utils/http'
 import {
   projects as P_proj, staff as P_staff, procedures as P_proc,
-  procedureRowTasks as P_prt,
+  procedureRowTasks as P_prt, workpaperLeads as P_leads,
   dashboard as P_dash, disclosureNotes as P_dn, users as P_usr,
   system as P_sys, recycleBin as P_rb, knowledge as P_kb,
   admin as P_admin, auth as P_auth, attachments as P_att,
@@ -225,6 +225,32 @@ export async function applyProcedureTrim(
 ): Promise<any> {
   const { data } = await http.post(P_prt.trimApply(projectId), {
     preview_id: previewId, request_id: requestId, entries, scheme_id: schemeId ?? null,
+  })
+  return data?.data ?? data
+}
+
+// ── canonical 粗裁（ProcedureTrimming.vue 主链入口）────────────────────────────
+// 与 previewProcedureTrim/applyProcedureTrim 走同一端点，但签名更贴合粗裁页调用方。
+// entries 里每条包含 kind/cycle/wp_index_code/target_status/skip_reason。
+
+/** 粗裁 canonical preview：构造 scope entries → 创建一次性 preview 凭证。 */
+export async function canonicalTrimPreview(
+  projectId: string,
+  entries: Array<{ kind: string; cycle: string; wp_index_code: string; target_status: string; skip_reason?: string | null }>,
+): Promise<any> {
+  const { data } = await http.post(P_prt.trimPreview(projectId), { entries })
+  return data?.data ?? data
+}
+
+/** 粗裁 canonical apply：消费 preview + request_id 幂等。 */
+export async function canonicalTrimApply(
+  projectId: string,
+  entries: Array<{ kind: string; cycle: string; wp_index_code: string; target_status: string; skip_reason?: string | null }>,
+  previewId: string,
+  requestId: string,
+): Promise<any> {
+  const { data } = await http.post(P_prt.trimApply(projectId), {
+    entries, preview_id: previewId, request_id: requestId,
   })
   return data?.data ?? data
 }
@@ -709,13 +735,17 @@ export async function applyProcedureScheme(projectId: string, cycle: string, sou
   return data
 }
 
-/** 委派审计程序给执行人（裁剪后分配） */
+/** 设置底稿主编（Workpaper Lead API，替代旧 procedures/assign）。
+ *
+ * 调用新端点 PUT /api/projects/{pid}/workpaper-leads（procedure-mainline-convergence 需求 5）。
+ * 兼容旧签名以便 ProcedureTrimming.vue onAssigneeChange 零改动消费。
+ */
 export async function assignProcedures(
   projectId: string,
-  assignments: { procedure_id: string; staff_id: string }[],
-): Promise<{ assigned: number }> {
-  const { data } = await http.put(P_proc.assign(projectId), { assignments })
-  return data
+  assignments: { procedure_id: string; staff_id: string | null; request_id?: string }[],
+): Promise<{ updated: number }> {
+  const { data } = await http.put(P_leads.set(projectId), { assignments })
+  return data?.data ?? data
 }
 
 // ── 知识库（全局+项目级） ──

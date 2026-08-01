@@ -24,7 +24,7 @@ export {
   workpapers, wpReviews, wpMapping, wpAI, wpFineRules, wpManuals,
   wpDependencies, workpaperSummary, templates, procedures, procedureRowTasks, reviews,
   templateLibrary, templateLibraryMgmt, customTemplates, sharedConfig,
-  excelHtml, jobs,
+  excelHtml, jobs, workpaperLeads,
 } from './workpaper'
 
 export {
@@ -67,7 +67,7 @@ import {
   workpapers, wpReviews, wpMapping, wpAI, wpFineRules, wpManuals,
   wpDependencies, workpaperSummary, templates, procedures, reviews,
   templateLibrary, templateLibraryMgmt, customTemplates, sharedConfig,
-  excelHtml, jobs,
+  excelHtml, jobs, workpaperLeads,
 } from './workpaper'
 import {
   staff, workHours, workHourEntries, notifications, pbc, confirmations,
@@ -111,7 +111,7 @@ export const API = {
   noteLocks, dataLock, noteGroupTemplate, noteCustomSections,
   templateLibraryMgmt,
   customQuery, systemDicts, adminLogs,
-  officePreview, acnr,
+  officePreview, acnr, workpaperLeads,
 } as const
 
 export default API

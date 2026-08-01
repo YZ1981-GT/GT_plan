@@ -6,6 +6,9 @@
         <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
           <el-icon><Download /></el-icon>带入调整
         </el-button>
+        <el-button size="small" plain :disabled="isReadonly || !hasTbPrefill" @click="seedFromFourTable" title="从四表库（科目1505）带入审定表公允价值段未审数">
+          从四表库带入未审数
+        </el-button>
         <span class="chip-wrap"><GtIndexChip value="wp:G6-1" :context-project-id="props.projectId" /></span>
         <span class="chip-wrap"><GtIndexChip value="wp:G6-2" :context-project-id="props.projectId" /></span>
         <span class="chip-wrap"><GtIndexChip value="wp:G6-3" :context-project-id="props.projectId" /></span>
@@ -17,7 +20,7 @@
       type="info"
       :closable="false"
       show-icon
-      title="审计目标：确认其他债权投资(FVOCI-Debt)公允价值与摊余成本审定余额准确完整，减值(ECL)计量恰当，账面价值合计与试算表科目1503勾稽一致。"
+      title="审计目标：确认其他债权投资(FVOCI-Debt)公允价值与摊余成本审定余额准确完整，减值(ECL)计量恰当，账面价值合计与试算表科目1505勾稽一致。"
       style="margin-bottom: 12px"
     />
 
@@ -55,6 +58,14 @@
       <p>③ 「单项/按组合计提坏账准备」在成本/利息层表示按 ECL 评估方式归类的余额，减值金额仅填在（四）减值准备</p>
       <p>④ 差异数 = 其他债权投资账面价值合计 − 试算平衡表数（应为 0）</p>
     </div>
+
+    <!-- 四表库取数溯源面板（无备抵科目 → 不传 provisionLabel） -->
+    <WpFourTableSourcePanel
+      :source-codes="tbSourceCodes"
+      gross-label="其他债权投资"
+      report-row="BS-022"
+      hint="CAS22 FVOCI-Debt 减值在OCI确认，不冲减资产负债表账面价值，故无备抵科目行"
+    />
 
     <details class="prep-hint">
       <summary>📋 编制提示（如何编制）</summary>
@@ -249,6 +260,8 @@
  */
 import { ref, computed, toRef, inject, watch } from 'vue'
 import { Download } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
 import { useG6MainAdjudication } from '../../composables/useG6MainAdjudication'
 import type { G6AdjudicationRow } from '../../composables/useG6MainAdjudication'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
@@ -307,16 +320,45 @@ const {
 } = useAdjudicationBringIn({
   projectId: toRef(props, 'projectId') as any,
   year: useAuditContext().year as any,
-  subjectPrefix: '1503',
+  subjectPrefix: '1505',
   direction: 'debit',
-  subjectCode: '1503',
+  subjectCode: '1505',
   wpCode: 'G6',
-  subjectLabel: '其他债权投资(1503)',
+  subjectLabel: '其他债权投资(1505)',
   rows: bringInRows,
   updateCell: (rowKey: string, _field: any, value: number) =>
     adj.updateCell(rowKey, 'closingAdjustment', value),
   totalAudited: () => adj.carryingNetRow.value?.closingAudited ?? 0,
 })
+
+// ─── 从四表库带入未审数（科目 1505，仅 block1 公允价值段）─────────────────
+const adjudicationPrefill = computed(() => {
+  const pf = props.htmlData?.adjudication_prefill
+  return Array.isArray(pf) ? pf : null
+})
+const hasTbPrefill = computed(() => !!(adjudicationPrefill.value && adjudicationPrefill.value.length > 0))
+
+function seedFromFourTable(): void {
+  const prefill = adjudicationPrefill.value
+  if (!prefill || prefill.length === 0 || isReadonly.value) return
+  // G6 四表预填仅 block1 公允价值段的期初/期末未审数
+  // 由于全库 1505 余额为 0，此处仅设好链路，有数据后自动生效
+  for (const row of prefill) {
+    if (row.block !== 'block1') continue
+    // 找到审定表中匹配的叶子行并填入未审数
+    const match = adj.rows.value.find(
+      (r) => r.editable && r.kind === 'leaf' && r.label === row.name,
+    )
+    if (match) {
+      adj.updateCell(match.rowKey, 'openingUnadjusted', row.opening_balance ?? 0)
+      adj.updateCell(match.rowKey, 'closingUnadjusted', row.closing_balance ?? 0)
+    }
+  }
+  ElMessage.success(`已从四表库带入 ${prefill.filter(r => r.block === 'block1').length} 个项目的未审数`)
+}
+
+// ─── 四表库溯源面板（消费 render 下发的 tb_source_codes，证明非 dead output）───
+const tbSourceCodes = computed(() => props.htmlData?.tb_source_codes ?? null)
 
 const classificationSummary = computed(() =>
   parseG6ClassificationSummary(allResponses.value.get(G6_CLASSIFICATION_SUMMARY_KEY)),

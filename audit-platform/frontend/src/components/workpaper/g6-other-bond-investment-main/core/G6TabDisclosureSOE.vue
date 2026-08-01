@@ -703,7 +703,7 @@ const G6_SOE_COLUMNS: Record<string, ColumnDef[]> = {
   ],
 }
 
-function buildSyncData(): Record<string, Record<string, unknown>[]> {
+function buildSyncData(): Record<string, Record<string, unknown>[] | string[]> {
   return {
     其他债权投资情况: [
       ...balanceRows.value.map(row => ({
@@ -729,40 +729,11 @@ function buildSyncData(): Record<string, Record<string, unknown>[]> {
       impairment: n(row.impairment),
       row_type: 'data',
     })),
-    减值准备计提情况: stageBlocks.value.flatMap(block =>
-      stageMethods.flatMap(method =>
-        (method === 'individual' ? block.individual : block.portfolio).details.map(row => ({
-          stage: block.stage,
-          method,
-          label: row.name,
-          book_balance: n(row.bookBalance),
-          impairment: n(row.impairment),
-          book_value: bookValue(row.bookBalance, row.impairment),
-          reason: row.reason,
-          row_type: 'data',
-        })),
-      ),
-    ),
-    减值准备变动: [
-      ...movementRows.value.map(row => ({
-        label: row.item,
-        stage1: n(row.stage1),
-        stage2: n(row.stage2),
-        stage3: n(row.stage3),
-        total: movementTotal(row),
-        row_type: 'data',
-      })),
-      {
-        label: '期末余额',
-        stage1: closingByStage('stage1'),
-        stage2: closingByStage('stage2'),
-        stage3: closingByStage('stage3'),
-        total: movementClosing.value,
-        row_type: 'subtotal',
-        is_total: true,
-      },
-    ],
-    _note_texts: [{ section: 'soe-audit-note', text: noteText.value }],
+    // 🔴 国企减值准备计提情况交叉引用 G5 §八、15（附注模板 text_section 明确写
+    // 「参照附注八、15 债权投资（3）减值准备计提情况进行披露」），不推三阶段表。
+    // 底稿仍录入（审计证据），但不进附注。历史孤儿通过 _removed_table_keys 清理。
+    _removed_table_keys: ['减值准备计提情况', '减值准备变动'],
+    _note_texts: [{ section: 'soe-audit-note', title: '其他债权投资审计说明', text: noteText.value }],
   }
 }
 

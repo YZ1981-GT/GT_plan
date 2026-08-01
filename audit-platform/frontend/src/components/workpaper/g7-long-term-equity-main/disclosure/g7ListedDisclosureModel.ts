@@ -42,6 +42,8 @@ export interface G7DisclosureTable {
   /** 与 note_template_listed.json 中 tables[].name 对齐的同步键；缺省回退 title */
   templateTableKey?: string
   sourceRows: string
+  /** 标签列头文字（须与 note_template headers[0] 逐字一致）。缺省 '项目'。 */
+  labelHeader?: string
   /** 静态列（无 slotConfig 时的最终列集；有 slotConfig 时仅作初始态取值参考） */
   columns: G7DisclosureColumn[]
   rows: G7DisclosureRow[]
@@ -329,6 +331,7 @@ export const G7_LISTED_DISCLOSURE_SECTIONS: G7DisclosureSection[] = [
         id: 'investment-movement',
         title: '长期股权投资本期增减变动',
         templateTableKey: '长期股权投资',
+        labelHeader: '被投资单位',
         sourceRows: 'A8:M23',
         columns: movementColumns,
         // 🔴 Task 5.3：补源模板 R12「①合营企业」/ R16「②联营企业」分组标签行
@@ -931,8 +934,9 @@ export function buildG7ListedColumns(
       // 🔴 flat/group 必须在此处透传（同步载荷）与模板 seed 两处都表态（Property 9）：
       // 只加一侧会让另一路径继续被 `_infer_groups_from_headers` 前缀推断出凭空父表头。
       const hasGroup = columns.some(c => c.group)
+      const labelText = table.labelHeader ?? '项目'
       result[key] = [
-        { key: '项目', label: '项目', is_label: true, ...(hasGroup ? {} : { flat: true }) },
+        { key: '项目', label: labelText, is_label: true, ...(hasGroup ? {} : { flat: true }) },
         ...columns.map((c) => ({
           key: c.key,
           label: c.label,

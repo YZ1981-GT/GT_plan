@@ -16,6 +16,10 @@ import { ref, reactive, computed, inject, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { GenerateWorkpaperAiText } from '../composables/useWorkpaperScaffold'
 import GtIndexChip from '../GtIndexChip.vue'
+import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
+import { J2_NOTE_SECTION, J2_DISCLOSURE_SHEET_NAME } from '../composables/j2NoteSectionMap'
+import { buildJ2SoeSyncPayload } from '../composables/j2DisclosureSyncPayload'
+import { useAuditContext } from '@/composables/useAuditContext'
 
 interface RespItem { item_id: string; conclusion: string | null; remark: string | null }
 const props = defineProps<{
@@ -233,6 +237,59 @@ async function aiGen(target: 'term' | 'dbp' | 'sens') {
 
 onMounted(load)
 watch(() => props.allResponses, load, { deep: false })
+
+// ── 同步到附注 ──────────────────────────────────────────────────────────────
+const { projectId: ctxProjectId, auditYear } = useAuditContext()
+const { scheduleAutoSync } = useDisclosureAutoSync({ isReadonly: () => isReadonly.value })
+
+async function syncToDisclosureNotes() {
+  if (!props.wpId || !props.projectId) return
+  const payload = buildJ2SoeSyncPayload({
+    summaryRows: [...summaryRows],
+    changeRows: changeRows.filter(r => r.kind === 'leaf').map(r => ({
+      key: r.key,
+      label: r.label,
+      dboCur: r.dboCur,
+      dboPrior: r.dboPrior,
+      assetCur: r.assetCur,
+      assetPrior: r.assetPrior,
+      netCur: r.netCur,
+      netPrior: r.netPrior,
+    })),
+    maturityRows: [...maturityRows],
+    assetCompRows: [...assetCompRows],
+    assumeRows: [...assumeRows],
+    sensRows: [...sensRows],
+    noteTerm: noteTerm.value,
+    noteDbp: noteDbp.value,
+    noteSens: noteSens.value,
+    summaryEndFn: (r) => n(r.begin) + n(r.increase) - n(r.decrease),
+  })
+  try {
+    const { default: axios } = await import('axios')
+    await axios.post(`/api/workpapers/${props.wpId}/sync-from-workpaper`, {
+      project_id: props.projectId,
+      year: auditYear.value,
+      ...payload,
+    })
+  } catch { /* 失败静默 */ }
+}
+
+// Watch actual data sources for auto-sync
+watch(
+  [
+    () => JSON.stringify(summaryRows),
+    () => JSON.stringify(changeRows),
+    () => JSON.stringify(maturityRows),
+    () => JSON.stringify(assetCompRows),
+    () => JSON.stringify(assumeRows),
+    () => JSON.stringify(sensRows),
+    noteTerm,
+    noteDbp,
+    noteSens,
+  ],
+  () => { scheduleAutoSync(syncToDisclosureNotes) },
+)
 </script>
 
 <template>
@@ -246,6 +303,7 @@ watch(() => props.allResponses, load, { deep: false })
     <div class="title-row">
       <h3 class="doc-title">长期应付职工薪酬/设定受益计划净资产附注披露信息（国有企业）</h3>
       <GtIndexChip value="wp:J2-1" :context-project-id="projectId" />
+      <el-button size="small" type="success" plain :disabled="isReadonly" @click="syncToDisclosureNotes">同步到附注</el-button>
     </div>
 
     <!-- A 长期应付职工薪酬汇总 -->

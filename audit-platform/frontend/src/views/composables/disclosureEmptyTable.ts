@@ -141,3 +141,45 @@ export function emptyTableNames(tables: unknown): string[] {
   }
   return out
 }
+
+
+/**
+ * 互斥披露组判定（Requirement 4.5 / Property 9）：
+ * 同一 `exclusive_group` 的表构成「或」关系（源模版用「或：」表达），
+ * 只要组内有一张非空，其余空表不触发「未完成」提示。
+ *
+ * @param tables 投影后的表列表（含 `exclusive_group` 字段）
+ * @param emptyNames 空表名集合（`emptyTableNames` 输出）
+ * @returns 被互斥组豁免的空表名集合（这些表不应报「未完成」）
+ */
+export function exclusiveGroupExemptions(
+  tables: readonly { name?: unknown; exclusive_group?: unknown }[],
+  emptyNames: ReadonlySet<string> | readonly string[],
+): Set<string> {
+  const emptySet = emptyNames instanceof Set ? emptyNames : new Set(emptyNames)
+  const exempted = new Set<string>()
+
+  // 按 exclusive_group 分组
+  const groups = new Map<string, string[]>()
+  for (const t of tables) {
+    const group = String(t.exclusive_group ?? '').trim()
+    if (!group) continue
+    const name = String(t.name ?? '').trim()
+    if (!name) continue
+    const arr = groups.get(group) ?? []
+    arr.push(name)
+    groups.set(group, arr)
+  }
+
+  // 组内有非空表 → 其余空表被豁免
+  for (const [, members] of groups) {
+    const hasNonEmpty = members.some(n => !emptySet.has(n))
+    if (hasNonEmpty) {
+      for (const n of members) {
+        if (emptySet.has(n)) exempted.add(n)
+      }
+    }
+  }
+
+  return exempted
+}

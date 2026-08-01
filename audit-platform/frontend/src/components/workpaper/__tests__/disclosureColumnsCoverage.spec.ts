@@ -106,39 +106,12 @@ const INFERENCE_FALLBACK_ALLOWLIST: Record<string, { reason: string; tables: str
   },
   // buildG7ListedColumns 已由 g7-four-table-extraction-and-disclosure-alignment
   // Task 5.2 补齐 flat/group（实扫未声明表 = []）→ 按 R3「已修好必删」移出。
-  buildG7SoeColumns: {
-    reason:
-      'G7 国企版：22 表全未声明，13 表被推断塞入凭空父表头（「当期」/「公司」/「购买日」/「并入主要」/「期末」/「期初」/「本期」/「A~E公司-」等），同为压平两级表头形态 → 属 G7 专项工作',
-    tables: [
-      'C.在财务报表中确认的与企业在未纳入合并财务报表范围的结构化主体中权益相关的资产和负债的账面价值与其最大损失敞口的比较。',
-      '②对合营企业或联营企业发生超额亏损的分担额',
-      '不重要合营企业和联营企业的汇总信息',
-      '主要财务信息',
-      '公司名称',
-      '原子公司的基本情况',
-      '吸收合并的类型',
-      '少数股东',
-      '序号',
-      '本公司发起多个结构化主体，但在结构化中均不持有权益。2023年，本公司从发起的结构化主体获得收益的情况以及当期向结构化主体转移资产的情况如下表所示：',
-      '本期出售的子公司出售日的财务状况',
-      '本期出售的子公司处置日的经营成果',
-      '本期发生的非同一控制下企业合并情况',
-      '本期纳入合并报表范围的子公司基本情况',
-      '母公司在子公司的所有者权益份额发生变化的情况',
-      '续：',
-      '续：重要联营企业经营成果',
-      '重要合营企业的主要财务信息（划分为持有待售的除外）',
-      '重要联营企业的主要财务信息',
-      '长期股权投资分类',
-      '长期股权投资明细',
-      '非同一控制下吸收合并',
-    ],
-  },
+  // buildG7SoeColumns: 已全部补齐 flat/group 表态（Task 5.2）。
 }
 
 /** allowlist 天花板：只许缩不许扩（新增循环必须直接声明 flat/group） */
-const ALLOWLIST_BUILDER_CEILING = 8
-const ALLOWLIST_TABLE_CEILING = 62
+const ALLOWLIST_BUILDER_CEILING = 2
+const ALLOWLIST_TABLE_CEILING = 11
 
 /**
  * Property 1（columns 键 ≡ sub_table_data 数据键）**双向**断言需要真实业务快照，
@@ -355,14 +328,14 @@ const P1_ROUTE: Record<string, { spec: string; complete: boolean; note?: string 
     note: '逐表列头有断言，未断言 columns 键集与 sub_table_data 键集相等',
   },
   buildG7ListedColumns: {
-    spec: 'composables/__tests__/hgDisclosureColumns.spec.ts',
-    complete: false,
-    note: 'G7 列头有断言，键集相等未覆盖（G7 专项工作）',
+    spec: 'composables/__tests__/g7NoteSubtableContract.spec.ts',
+    complete: true,
+    note: 'G7 上市 §五、18：13 列两级表头（本期增减变动 8 子列）+ 动态列（entitySlots）零入参可调',
   },
   buildG7SoeColumns: {
-    spec: 'composables/__tests__/hgDisclosureColumns.spec.ts',
-    complete: false,
-    note: 'G7 列头有断言，键集相等未覆盖（G7 专项工作）',
+    spec: 'composables/__tests__/g7NoteSubtableContract.spec.ts',
+    complete: true,
+    note: 'G7 国企 §八、18 + §七、*：10 表明细两级 group + flat 表态 + 动态列',
   },
   buildH10SubTableColumns: {
     spec: 'composables/__tests__/h9h10NoteSubtableContract.spec.ts',

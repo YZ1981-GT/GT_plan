@@ -69,9 +69,9 @@ const MISSING_SYNC_PATH: readonly string[] = [
   //   movementRows」整体重建为源模板结构（上市 = 产业分组的两级表头列转置表，34 行 / 11 行；
   //   国企 = 4 产业 + 可扩类别行 5 列表），并建立 h7NoteSectionMap / h7DisclosureSyncPayload
   //   与自动同步 → 按「清单只许变短」移出。
-  // J2（2）
-  'J2TabDisclosureListed.vue',
-  'J2TabDisclosureSoe.vue',
+  // J2（2）已补齐（spec disclosure-sync-path-buildout 批6）：
+  //   两版接 useDisclosureAutoSync + syncToDisclosureNotes + buildJ2Listed/SoeSyncPayload
+  //   推 §五、49 / §八、54「长期应付职工薪酬/设定受益计划净资产」
   // 🔴 L2 应付利息 两版**豁免**（有意无链路，不是缺口）：
   //   ① `note_template_{listed,soe}.json` 都**没有**「应付利息」独立章节
   //      （`note_template_variant_matrix.json` 亦无 `ying_fu_li_xi` 条目）；
@@ -463,8 +463,9 @@ describe('披露 Tab 同步链路完整性', () => {
   // M 循环批 4：M4×2 / M5×2 / M7×2 补齐（标准权益变动表）→ 24
   //   （M1×2 豁免归 K3、M2/M3/M6/M8/M9/M10 结构不同构留清单）
   // H7×2 整体重建后补齐（h7-biological-assets-disclosure-rebuild）→ 21
-  it('缺链路数量记录在案（21 个）', () => {
-    expect(MISSING_SYNC_PATH.length).toBe(21)
+  // J2×2 补齐（disclosure-sync-path-buildout 批6）→ 19
+  it('缺链路数量记录在案（19 个）', () => {
+    expect(MISSING_SYNC_PATH.length).toBe(19)
   })
 
   /**

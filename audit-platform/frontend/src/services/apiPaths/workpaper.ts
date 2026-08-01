@@ -169,11 +169,21 @@ export const templates = {
 
 export const procedures = {
   list: (pid: string, cycle: string) => `/api/projects/${pid}/procedures/${cycle}`,
+  /** @deprecated 已下线（410）→ 改用 procedureRowTasks.trimPreview/trimApply */
   trim: (pid: string, cycle: string) => `/api/projects/${pid}/procedures/${cycle}/trim`,
   init: (pid: string, cycle: string) => `/api/projects/${pid}/procedures/${cycle}/init`,
   custom: (pid: string, cycle: string) => `/api/projects/${pid}/procedures/${cycle}/custom`,
+  /** @deprecated 已下线（410）→ 改用 procedureRowTasks.trimPreview/trimApply 构造 canonical entries */
   applyScheme: (pid: string, cycle: string) => `/api/projects/${pid}/procedures/${cycle}/apply-scheme`,
+  /** @deprecated 已下线（410）→ 改用 workpaperLeads */
   assign: (pid: string) => `/api/projects/${pid}/procedures/assign`,
+} as const
+
+// ─── 底稿主编（procedure-mainline-convergence 需求 5）────────────────────────
+
+export const workpaperLeads = {
+  /** PUT：批量设置/清除底稿主编（替代旧 procedures.assign） */
+  set: (pid: string) => `/api/projects/${pid}/workpaper-leads`,
 } as const
 
 // ─── 程序行任务（procedure-delegation-notification / Task 12，V105 真源） ─────────

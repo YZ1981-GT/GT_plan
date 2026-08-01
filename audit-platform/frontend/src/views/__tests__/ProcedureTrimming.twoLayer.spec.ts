@@ -14,6 +14,8 @@ import { ROLE_TERMS } from '@/components/workpaper/composables/procedureConsoleO
 const mocks = vi.hoisted(() => ({
   getProcedures: vi.fn(),
   updateProcedureTrim: vi.fn(),
+  canonicalTrimPreview: vi.fn(),
+  canonicalTrimApply: vi.fn(),
   initProcedures: vi.fn(),
   addCustomProcedure: vi.fn(),
   applyProcedureScheme: vi.fn(),
@@ -30,6 +32,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/services/commonApi', () => ({
   getProcedures: mocks.getProcedures,
   updateProcedureTrim: mocks.updateProcedureTrim,
+  canonicalTrimPreview: mocks.canonicalTrimPreview,
+  canonicalTrimApply: mocks.canonicalTrimApply,
   initProcedures: mocks.initProcedures,
   addCustomProcedure: mocks.addCustomProcedure,
   applyProcedureScheme: mocks.applyProcedureScheme,
@@ -41,9 +45,16 @@ vi.mock('@/services/commonApi', () => ({
 vi.mock('@/services/staffApi', () => ({ listAssignments: mocks.listAssignments }))
 vi.mock('@/utils/errorHandler', () => ({ handleApiError: vi.fn() }))
 vi.mock('@/utils/http', () => ({ default: { get: vi.fn(), post: vi.fn() } }))
+vi.mock('@/composables/usePermissionMatrix', () => ({
+  usePermissionMatrix: () => ({ currentRole: { value: 'manager' } }),
+}))
+vi.mock('@/composables/useAuditContext', () => ({
+  useAuditContext: () => ({ year: { value: 2025 } }),
+}))
 vi.mock('vue-router', () => ({
-  useRoute: () => ({ params: { projectId: 'project-1' } }),
+  useRoute: () => ({ params: { projectId: 'project-1' }, query: {} }),
   useRouter: () => ({ push: mocks.routerPush }),
+  onBeforeRouteLeave: vi.fn(),
 }))
 vi.mock('element-plus', () => ({
   ElMessage: Object.assign(

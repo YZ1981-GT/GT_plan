@@ -480,10 +480,11 @@ import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowDown } from '@element-plus/icons-vue'
 import {
-  getProcedures, updateProcedureTrim, initProcedures,
-  addCustomProcedure, applyProcedureScheme, listProjects,
+  getProcedures, initProcedures,
+  addCustomProcedure, listProjects,
   assignProcedures,
   previewProcedureDelegation, applyProcedureDelegation,
+  canonicalTrimPreview, canonicalTrimApply,
 } from '@/services/commonApi'
 import { listAssignments } from '@/services/staffApi'
 import { ROLE_TERMS, newRequestId } from '@/components/workpaper/composables/procedureConsoleOverlay'
@@ -717,7 +718,7 @@ function batchSetAll(status: 'execute' | 'not_applicable') {
   }
 }
 
-// 保存裁剪
+// 保存裁剪（canonical preview → apply 两阶段）
 // promptDelegate=true（点击「保存粗裁」按钮）保存成功后弹窗确认是否前往人员委派界面；
 // 智能裁剪等内部调用传 false，不打断流程
 async function saveTrim(promptDelegate = false) {
@@ -731,14 +732,41 @@ async function saveTrim(promptDelegate = false) {
   saving.value = true
   let ok = false
   try {
-    await updateProcedureTrim(projectId.value, activeCycle.value,
-      procedures.value.map(p => ({ id: p.id, status: p._applicable ? 'execute' : 'not_applicable', skip_reason: p.skip_reason })))
+    // 构建 canonical scope entries（粗裁：每条 procedure 对应一条 scope entry）
+    const entries = procedures.value.map(p => ({
+      kind: 'scope' as const,
+      cycle: activeCycle.value,
+      wp_index_code: p.wp_code || p.procedure_code,
+      target_status: p._applicable ? 'execute' : 'not_applicable',
+      skip_reason: p._applicable ? undefined : (p.skip_reason || undefined),
+    }))
+
+    // 阶段 1：preview（一次性凭证）
+    const preview = await canonicalTrimPreview(projectId.value, entries)
+    const previewId: string = preview.preview_id
+
+    // 409 migration_conflict → 要求重新预览
+    if (preview.migration_conflicts?.length > 0) {
+      ElMessage.warning(`${preview.migration_conflicts.length} 个条目含旧 UUID 无法自动转换，请联系管理员`)
+      return
+    }
+
+    // 阶段 2：apply（消费 preview 凭证 + request_id 幂等）
+    const requestId = newRequestId()
+    const result = await canonicalTrimApply(projectId.value, entries, previewId, requestId)
+
     // 保存成功 → 刷新初始快照，isDirty 归位
     originalSnapshot = JSON.parse(JSON.stringify(procedures.value))
-    ElMessage.success('裁剪已保存，保留执行的程序已加入待执行底稿库')
+    const applied = result.applied ?? result.changed ?? 0
+    const unchanged = result.unchanged ?? 0
+    ElMessage.success(`裁剪已保存（变更 ${applied}，未变 ${unchanged}），保留执行的程序已加入待执行底稿库`)
     ok = true
   } catch (e: any) {
-    handleApiError(e, '保存裁剪')
+    if (e?.response?.status === 409) {
+      ElMessage.warning('目标版本已变化或预览过期，请重试')
+    } else {
+      handleApiError(e, '保存裁剪')
+    }
   } finally { saving.value = false }
 
   // 保存成功且来自按钮点击 → 确认后跳转人员委派（委派矩阵）界面
@@ -1231,14 +1259,25 @@ async function confirmSmartTrim() {
           const reason = decide(p)
           if (reason) {
             totalTrim++
-            return { id: p.id, status: 'not_applicable', skip_reason: reason }
+            return { id: p.id, wp_code: p.wp_code || p.procedure_code, status: 'not_applicable', skip_reason: reason }
           }
           const keepApplicable = p.status !== 'not_applicable' && p.status !== 'skip'
           if (keepApplicable) totalKeep++
-          return { id: p.id, status: p.status || 'execute', skip_reason: p.skip_reason || '' }
+          return { id: p.id, wp_code: p.wp_code || p.procedure_code, status: p.status || 'execute', skip_reason: p.skip_reason || '' }
         }).filter((it: any) => it.id)
         if (items.length > 0) {
-          await updateProcedureTrim(projectId.value, cyc, items)
+          // 走 canonical preview/apply（同 saveTrim）
+          const entries = items.map((it: any) => ({
+            kind: 'scope' as const,
+            cycle: cyc,
+            wp_index_code: it.wp_code || it.id,
+            target_status: it.status,
+            skip_reason: it.skip_reason || undefined,
+          }))
+          const pv = await canonicalTrimPreview(projectId.value, entries)
+          if (pv?.preview_id) {
+            await canonicalTrimApply(projectId.value, entries, pv.preview_id, newRequestId())
+          }
         }
       } catch {
         failedCycles.push(cyc)
@@ -1256,12 +1295,38 @@ async function confirmSmartTrim() {
   else ElMessage.info(`[${scopeLabel}] 未发现可裁剪的程序${failedCycles.length ? `（${failedCycles.join('/')} 失败）` : ''}`)
 }
 
-// 参照其他项目
+// 参照其他项目（需求 2：读源项目当前 wp_code/status 构造 canonical entries，不消费 UUID scheme）
 async function applyRef() {
   if (!refProjectId.value) return
   try {
-    await applyProcedureScheme(projectId.value, activeCycle.value, refProjectId.value)
-    ElMessage.success('已应用参照方案')
+    // 阶段 1：读源项目当前循环程序（wp_code + status）
+    let sourceProcs = await getProcedures(refProjectId.value, activeCycle.value)
+    if (!sourceProcs || sourceProcs.length === 0) {
+      ElMessage.warning('参照项目该循环无程序数据')
+      return
+    }
+    // 阶段 2：以源项目 wp_code+status 为蓝本，按 wp_code 匹配当前项目的程序
+    const sourceMap = new Map(sourceProcs.map((p: any) => [p.wp_code || p.procedure_code, p]))
+    const entries = procedures.value.map(p => {
+      const src = sourceMap.get(p.wp_code || p.procedure_code)
+      const applicable = src ? (src.status !== 'not_applicable' && src.status !== 'skip') : p._applicable
+      return {
+        kind: 'scope' as const,
+        cycle: activeCycle.value,
+        wp_index_code: p.wp_code || p.procedure_code,
+        target_status: applicable ? 'execute' : 'not_applicable',
+        skip_reason: applicable ? undefined : (src?.skip_reason || '参照项目裁剪'),
+      }
+    })
+    // 阶段 3：canonical preview/apply
+    const preview = await canonicalTrimPreview(projectId.value, entries)
+    if (!preview?.preview_id) {
+      ElMessage.warning('预览创建失败')
+      return
+    }
+    const result = await canonicalTrimApply(projectId.value, entries, preview.preview_id, newRequestId())
+    const applied = result.applied ?? result.changed ?? 0
+    ElMessage.success(`已应用参照方案（变更 ${applied} 条）`)
     showRefDialog.value = false
     await loadProcedures()
   } catch (e: any) { handleApiError(e, '应用参照') }
