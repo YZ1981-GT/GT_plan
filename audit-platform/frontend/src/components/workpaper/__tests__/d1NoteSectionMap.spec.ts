@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   D1_NOTE_SECTION,
   D1_DISCLOSURE_SHEET_NAME,
+  D1_LISTED_SUBTABLE,
+  D1_LEGACY_OBSOLETE_TABLES,
   resolveD1CurrentStandard,
   buildD1SyncPayload,
   buildNoteTexts,
@@ -85,7 +87,8 @@ describe('d1NoteSectionMap', () => {
     const p = buildD1SyncPayload('listed', 'wp-1', null, snap())
     expect(p.sub_table_data['期末已质押的应收票据']).toBeDefined()
     expect(p.sub_table_data['期末已背书或贴现但尚未到期的应收票据']).toBeDefined()
-    expect(p.sub_table_data['期末因出票人未履约而将其转应收账款的票据']).toBeDefined()
+    // 表名取共享常量（曾硬编码旧名「…而将其转应收账款…」，改名后这条断言会假绿）
+    expect(p.sub_table_data[D1_LISTED_SUBTABLE.transfer]).toBeDefined()
     expect(p.sub_table_data['按坏账计提方法分类（期末余额）']).toBeDefined()
     expect(p.sub_table_data['按坏账计提方法分类（续：上年年末余额）']).toBeDefined()
     expect(p.sub_table_data['本期实际核销的应收票据情况']).toBeDefined()
@@ -94,6 +97,25 @@ describe('d1NoteSectionMap', () => {
       if (key.startsWith('_')) continue
       expect(p.columns[key], `${key} 缺列头`).toBeDefined()
     }
+  })
+
+  it('上市载荷带 _removed_table_keys 清历史表名（改名后旧键不会永久残留成孤儿表）', () => {
+    const p = buildD1SyncPayload('listed', 'wp-1', null, snap())
+    expect(p.sub_table_data._removed_table_keys)
+      .toEqual([...D1_LEGACY_OBSOLETE_TABLES.listed])
+    // 反向自检：清单非空，否则本断言与下面的「不误删」都是空转
+    expect(D1_LEGACY_OBSOLETE_TABLES.listed.length).toBeGreaterThan(0)
+    // 待删键与本次推送键无交集（否则会把刚推的表当孤儿删掉）
+    const pushed = Object.keys(p.sub_table_data).filter(k => !k.startsWith('_'))
+    for (const k of p.sub_table_data._removed_table_keys as string[]) {
+      expect(pushed).not.toContain(k)
+    }
+  })
+
+  it('国企无历史表名 → 不带 _removed_table_keys 键（不发空数组）', () => {
+    const p = buildD1SyncPayload('soe', 'wp-1', null, snap())
+    expect(D1_LEGACY_OBSOLETE_TABLES.soe).toEqual([])
+    expect('_removed_table_keys' in p.sub_table_data).toBe(false)
   })
 
   it('listed 覆盖模板 14 张表（含单项/组合/变动/转回/核销逐项）', () => {

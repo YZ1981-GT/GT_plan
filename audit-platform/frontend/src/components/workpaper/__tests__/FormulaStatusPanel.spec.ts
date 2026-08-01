@@ -56,7 +56,7 @@ function fullResponse() {
         id: 'f-1',
         sheet_name: 'D6-1',
         target_cell: 'D6-1-block1-priorUnadjusted',
-        expression: "TB('1402','期初余额')",
+        expression: "TB('1141','期初余额')",
         category: null,
         description: '期初未审',
         formula_type: 'auto_calc',
@@ -71,7 +71,7 @@ function fullResponse() {
           wp_code: 'D6',
           sheet_name: 'D6-1',
           anchor: 'D6-1-block1-endUnadjusted',
-          expression: "TB('1402','期末余额')",
+          expression: "TB('1141','期末余额')",
           formula_type: 'auto_calc',
           description: '合同资产原值-期末未审',
           source: 'preset',
@@ -82,7 +82,7 @@ function fullResponse() {
           wp_code: 'D6',
           sheet_name: 'D6-1',
           anchor: 'D6-1-block1-priorUnadjusted',
-          expression: "TB('1402','期初余额')",
+          expression: "TB('1141','期初余额')",
           formula_type: 'auto_calc',
           description: '期初未审',
           source: 'custom',
@@ -95,7 +95,7 @@ function fullResponse() {
           wp_code: 'D6',
           sheet_name: 'D6-2',
           anchor: 'D6-2-rows',
-          description: '明细 ← tb_aux_balance 1402 归集',
+          description: '明细 ← tb_aux_balance 1141 归集',
           source: 'prefill',
           editable: false,
           tier: 'B',
@@ -224,7 +224,7 @@ describe('FormulaStatusPanel', () => {
     expect(url).toBe('/api/workpapers/wp-1/formulas')
     expect(body.target_cell).toBe('D6-1-block1-endUnadjusted')
     expect(body.sheet_name).toBe('D6-1')
-    expect(body.expression).toBe("TB('1402','期末余额')")
+    expect(body.expression).toBe("TB('1141','期末余额')")
     expect(body.year).toBe(2025)
     expect(body.category).toBeNull()
     expect(mockSuccess).toHaveBeenCalled()

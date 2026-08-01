@@ -42,7 +42,9 @@ from app.services.d_cycle_extraction.presets import (
 
 # (module, wp_code, anchor, expression, has_project_tb_amount)
 _CYCLES = [
-    (d1, "D1", "D1-adj-tb-amount", "TB('1121','期末余额')", True),
+    # D1 是**净额**口径（原值 1121 − 坏账准备 1231-01）：源模板 审定表D1-1 的
+    # E20=E18-E19 比的是「三、应收票据净值」，取原值会产生恰好等于坏账准备的假差异。
+    (d1, "D1", "D1-adj-tb-amount", "TB('1121','期末余额') - TB('1231-01','期末余额')", True),
     (d2, "D2", "D2-adj-tb-amount", "TB('1122','期末余额')", False),
     (d3, "D3", "D3-adj-trial-balance-amount", "TB('2203','期末余额')", False),
     (d5, "D5", "D5-1-tb-amount", "TB('1124','期末余额')", True),
@@ -88,6 +90,12 @@ class _FakeSession:
         if "related_party_registry" in s:
             return _FakeResult(rows=[SimpleNamespace(name="关联方甲")])
         if "trial_balance" in s:
+            # 🔴 D1 会查两次 trial_balance：原值（1121，前缀内联在 SQL）与坏账准备
+            #    （1231-01，走绑定参数 :c0）。不区分则两次返回同值 → 净额恒为 0，
+            #    本用例的「seed 值 ≡ project_context.tb_amount」断言必红。
+            #    坏账侧返回 None（该 fake 项目无 1231-01 数据）→ tb_amount 保持原值口径。
+            if any(str(v).startswith("1231") for v in (params or {}).values()):
+                return _FakeResult(one=None)
             # 覆盖 D1(unadjusted/audited) / D5(amount) / D7(amt) 各自 fetchone 列
             return _FakeResult(
                 one=SimpleNamespace(

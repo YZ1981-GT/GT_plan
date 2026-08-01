@@ -10,8 +10,10 @@ spec: .kiro/specs/d1-notes-receivable-disclosure-alignment/ Task 2.1
 """
 from __future__ import annotations
 
+import functools
 import importlib.util
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -147,6 +149,16 @@ def test_guidance_present(variant: str, name: str, tbl: dict) -> None:
 
 
 @pytest.mark.parametrize(("variant", "name", "tbl"), ALL_TABLES, ids=TABLE_IDS)
+def test_guidance_has_no_markdown_bold(variant: str, name: str, tbl: dict) -> None:
+    """guidance 是纯文本渲染（TAB 提示 / Word 导出都不解析 markdown）。
+
+    🔴 平台级 `fix_note_bold_markers.py` 会剥离 `**`；若本循环脚本又写回，
+    两个幂等脚本会互相打架（2026-07-31 实测：组合计提表 guidance 一天内被改两次）。
+    """
+    assert "**" not in str(tbl.get("guidance") or ""), f"{name} guidance 残留 markdown 粗体"
+
+
+@pytest.mark.parametrize(("variant", "name", "tbl"), ALL_TABLES, ids=TABLE_IDS)
 def test_no_placeholder_or_header_label_rows(variant: str, name: str, tbl: dict) -> None:
     """占位说明与压扁的第二行表头都不得留在 rows 里（会渲染成一行空披露数据）。"""
     bad_labels = {"可无限量添加行", "出票人类型或账龄", "……", "..."}
@@ -189,7 +201,7 @@ def test_two_level_header_groups(variant: str, name: str, want_groups: list[str]
 @pytest.mark.parametrize(
     ("variant", "name"),
     [
-        ("listed", "期末因出票人未履约而将其转应收账款的票据"),
+        ("listed", "期末因出票人未履约而其转应收账款的票据"),
         ("soe", "期末因出票人未履约而其转为应收账款的票据"),
     ],
 )
@@ -198,6 +210,115 @@ def test_transfer_table_lists_commercial_only(variant: str, name: str) -> None:
     rows = _table(variant, name).get("rows") or []
     labels = [str(r.get("label", "")) for r in rows]
     assert labels == ["商业承兑票据", "合计"]
+
+
+# ─── 表名 ↔ 源 xlsx 小节标题逐字交叉比对 ──────────────────────────────────────
+#
+# 🔴 这是 2026-07-31 复核补的守卫：上市「转应收账款」表名此前多一个「将」
+#    （源模板 R31 是「而其转应收账款」），既有断言全是**自证**（拿脚本常量比模板），
+#    源模板从未参与裁决 → 漂移零成本。此处直读源 xlsx，让源模板成为裁决者。
+
+SRC_XLSX = _BACKEND / "wp_templates" / "D" / "D1 应收票据.xlsx"
+SRC_SHEET = {"listed": "附注披露信息（上市公司）", "soe": "附注披露信息（国企）"}
+
+
+def _norm_source_title(raw: str) -> str:
+    """源模板小节标题 → 附注表名口径。
+
+    去掉：小节编号「（N）」、引子「其中：」/「其中，」、行文尾巴「如下」、结尾冒号。
+    """
+    s = str(raw or "").strip()
+    s = re.sub(r"^[（(]\s*\d+\s*[）)]\s*", "", s)
+    s = re.sub(r"^其中[：，:,]\s*", "", s)
+    s = s.replace("如下", "")
+    return s.rstrip("：:").strip()
+
+
+@functools.lru_cache(maxsize=4)
+def _source_titles(variant: str) -> tuple[frozenset[str], frozenset[str]]:
+    """返回（归一后标题集, 原始 A 列文本集）。"""
+    openpyxl = pytest.importorskip("openpyxl")
+    wb = openpyxl.load_workbook(SRC_XLSX, data_only=False, read_only=True)
+    try:
+        ws = wb[SRC_SHEET[variant]]
+        raw = {
+            str(row[0]).strip()
+            for row in ws.iter_rows(min_col=1, max_col=1, values_only=True)
+            if row and isinstance(row[0], str) and str(row[0]).strip()
+        }
+    finally:
+        wb.close()
+    return frozenset(_norm_source_title(r) for r in raw), frozenset(raw)
+
+
+# {variant: {表名常量键: 该表名必须逐字等于源模板某个小节标题}}
+# 只登记「表名应与源模板标题完全对应」的表；双期拆表（名字带「（期末余额）」等
+# 期间后缀）与派生名不在此列。
+SOURCE_TITLE_TABLES = {
+    "listed": ["pledged", "endorsed", "transfer", "movement",
+               "reversal", "writeoff_amount", "writeoff_detail"],
+    "soe": ["main", "individual_end", "portfolio", "movement", "reversal",
+            "pledged", "endorsed", "transfer", "writeoff_amount", "writeoff_detail"],
+}
+
+
+@pytest.mark.parametrize(
+    ("variant", "key"),
+    [(v, k) for v, keys in SOURCE_TITLE_TABLES.items() for k in keys],
+    ids=[f"{v}:{k}" for v, keys in SOURCE_TITLE_TABLES.items() for k in keys],
+)
+def test_table_name_matches_source_sheet_title(variant: str, key: str) -> None:
+    names = FIX.L if variant == "listed" else FIX.S
+    expected = names[key]
+    normalized, _raw = _source_titles(variant)
+    assert expected in normalized, (
+        f"{variant}.{key} 表名「{expected}」在源模板 {SRC_SHEET[variant]} 找不到对应小节标题"
+    )
+    # 模板 JSON 与脚本常量同名（防只改脚本没落盘）
+    assert expected in {str(t.get("name", "")) for t in _tables(variant)}
+
+
+def test_source_title_crosscheck_is_not_vacuous() -> None:
+    """反向自检：正则失效 / 读空表时上面的断言会全绿，这里钉死它非空且真能识别漂移。"""
+    normalized, raw = _source_titles("listed")
+    assert len(raw) > 30 and len(normalized) > 30
+    # 归一确实在做事（原始串带小节编号，归一后不带）
+    assert "（1）期末已质押的应收票据" in raw
+    assert "（1）期末已质押的应收票据" not in normalized
+    # 已修掉的旧名（多一个「将」）不在源模板里 → 该守卫能抓住这次的回归
+    for legacy in FIX.LEGACY_TABLE_NAMES["listed"]["transfer"]:
+        assert legacy not in normalized, f"旧表名「{legacy}」竟在源模板中，映射需重判"
+
+
+def test_legacy_table_names_are_not_current_names() -> None:
+    """历史表名不得同时是当前表名，否则同步会把刚推的表当孤儿删掉。"""
+    for variant, mapping in FIX.LEGACY_TABLE_NAMES.items():
+        names = FIX.L if variant == "listed" else FIX.S
+        current = set(names.values())
+        for key, legacy_list in mapping.items():
+            assert key in names, f"{variant}.{key} 不是表名常量键"
+            for legacy in legacy_list:
+                assert legacy not in current, f"{variant} 历史名「{legacy}」仍是当前表名"
+
+
+# ─── guidance 归属（源模板括注挂在正确的表上）────────────────────────────────
+
+@pytest.mark.parametrize("variant", VARIANTS)
+def test_derecognition_note_belongs_to_endorsed_table(variant: str) -> None:
+    """源模板「（如根据准则23号终止确认…）」紧跟**已背书或贴现**表（上市 R27 / 国企 R72-73）。
+
+    该括注讲的是本表两列（终止确认 / 未终止确认金额）的口径，与下一张「转应收账款」
+    表无关；此前误挂在 transfer 表 guidance 上。
+    """
+    names = FIX.L if variant == "listed" else FIX.S
+    endorsed = str(_table(variant, names["endorsed"]).get("guidance") or "")
+    transfer = str(_table(variant, names["transfer"]).get("guidance") or "")
+
+    assert "企业会计准则第23号" in endorsed and "终止确认的金额" in endorsed
+    assert "第23号" not in transfer, "准则23号括注不属于「转应收账款」表"
+    # 两张表的 guidance 各自仍有本表勾稽（防把内容搬空）
+    assert "F4-22" in endorsed
+    assert "F4-23" in transfer
 
 
 @pytest.mark.parametrize(

@@ -103,7 +103,7 @@ def _wp(wp_code_present: bool = True):
     )
 
 
-def _wp_formula(target_cell, *, expression="TB('1402','期末余额')",
+def _wp_formula(target_cell, *, expression="TB('1141','期末余额')",
                 sheet_name="D6-1", category=None,
                 formula_type="auto_calc", description="用户公式", wp=None):
     """构造 WpFormula-like（同时满足 _formula_to_dict 与 resolve_effective._formula_to_binding）。"""
@@ -127,7 +127,7 @@ def _wp_formula(target_cell, *, expression="TB('1402','期末余额')",
     )
 
 
-def _preset(anchor, *, expression="TB('1402','期末余额')", sheet_name="D6-1"):
+def _preset(anchor, *, expression="TB('1141','期末余额')", sheet_name="D6-1"):
     return {
         "wp_code": "D6", "sheet_name": sheet_name, "anchor": anchor,
         "expression": expression, "formula_type": "auto_calc",
@@ -168,7 +168,7 @@ def test_get_merges_preset_custom_disabled_and_tier_b(monkeypatch):
         "D6": [_preset("D6-1-tb-amount"), _preset("D6-1-note-conclusion")],
     })
     user_formulas = [
-        _wp_formula("D6-1-note-conclusion", expression="SUM_TB('1402~1403','期末余额')", wp=wp),
+        _wp_formula("D6-1-note-conclusion", expression="SUM_TB('1141~1403','期末余额')", wp=wp),
         _wp_formula("D6-1-note-explanation", category="__disabled__", wp=wp),  # 禁用
     ]
     db = _FakeSession(wp=wp, wp_code="D6", user_formulas=user_formulas)
@@ -183,7 +183,7 @@ def test_get_merges_preset_custom_disabled_and_tier_b(monkeypatch):
     tier_a = {b["anchor"]: b for b in ext["tierA"]}
     assert tier_a["D6-1-tb-amount"]["source"] == SOURCE_PRESET
     assert tier_a["D6-1-note-conclusion"]["source"] == SOURCE_CUSTOM
-    assert tier_a["D6-1-note-conclusion"]["expression"] == "SUM_TB('1402~1403','期末余额')"
+    assert tier_a["D6-1-note-conclusion"]["expression"] == "SUM_TB('1141~1403','期末余额')"
     assert tier_a["D6-1-note-explanation"]["source"] == SOURCE_DISABLED
     # 每条 Tier A 均标 tier=A；本 fake session 未设 project_year → GET 求值走 fail-open
     # （拿不到 audit_year）→ value=None（Task 3.1 求值填 value 的 no-year 分支 / R2.3）。
@@ -199,7 +199,7 @@ def test_get_merges_preset_custom_disabled_and_tier_b(monkeypatch):
         assert b["source"] == "prefill"
         assert b["value"] is None
     # 描述明确指向四表库来源（来源可溯 / Property 11）
-    assert any("tb_balance 1402" in b["description"] for b in ext["tierB"])
+    assert any("tb_balance 1141" in b["description"] for b in ext["tierB"])
 
 
 def test_get_surfaces_semantic_labels_p1_4(monkeypatch):
@@ -264,7 +264,7 @@ def test_get_tier_a_value_fail_open_single_binding(monkeypatch):
     wp = _wp()
     _patch_presets(monkeypatch, {
         "D6": [
-            _preset("D6-1-tb-amount", expression="TB('1402','期末余额')"),
+            _preset("D6-1-tb-amount", expression="TB('1141','期末余额')"),
             _preset("D6-1-note-conclusion", expression="TB('9999','期末余额')"),
         ],
     })
@@ -507,7 +507,7 @@ def test_put_unsupported_function_returns_422(monkeypatch):
 
     body = router_mod.FormulaSaveRequest(
         sheet_name="D6-1", target_cell="D6-1-tb-amount",
-        expression="AUX('1402','客户','期末余额')", year=2025,
+        expression="AUX('1141','客户','期末余额')", year=2025,
     )
 
     with pytest.raises(HTTPException) as ei:

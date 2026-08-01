@@ -1,13 +1,16 @@
-"""G7 长期股权投资 TB 取数：叶子汇总（防父子双算）+ 1512 减值准备补齐.
+"""G7-1 审定表 TB 取数：叶子聚合 + fail-open。
 
-覆盖 `_g7_long_term_equity_main` 的三个单元：
-    1. `_is_leaf`      —— 纯函数叶子判定（口径与 F1/H2/H4/D-cycle prefill 一致）
-    2. `_sum_leaf_by_prefix` —— 纯同步汇总（父子共存时只算叶子）
-    3. `_fetch_tb_values`    —— 薄封装（假 db + monkeypatch get_active_filter）
+**2026-08-01 改写**：原文件测的是已删除的自造实现
+（`_is_leaf` / `_sum_leaf_by_prefix` / `_fetch_tb_values`）。旧实现的前缀判定
+`code.startswith(prefix)` 缺点号边界（`1511` 会误命中 `15110`），科目前缀也硬编码，
+现已换成 `four_table` 共享件 + `G7_ACCOUNT_SPEC` 报表映射解析。
 
-真实数据背景（postgres 实证）：tb_balance 里 1511 同时存在父级 `1511` 与子级
-`1511.01/1511.02/1511.03/1511.04` 及三级 `1511.04.01/1511.04.02`，前缀累加会把
-父子同时计入 → opening/closing 虚增 2~3 倍。
+断言意图逐条保留：父子共存只算叶子 / 备抵独立汇总 / 键名向后兼容 / 无匹配返 {} /
+异常 fail-open。新增：备抵负值 abs 归一、点号边界。
+
+真实数据背景（postgres 实证，项目 `2aa00f57`）：`tb_balance` 同时存父级 `1511`
+与子级 `1511.01` / `1511.03`，父子同时累加会虚增；`1512` 期末为
+**−4,790,032.97**（负值存储 + credit 方向）。
 """
 
 from __future__ import annotations
@@ -18,109 +21,140 @@ from uuid import uuid4
 import pytest
 
 from app.routers.wp_render_strategies import _g7_long_term_equity_main as g7
-from app.routers.wp_render_strategies._g7_long_term_equity_main import (
-    _fetch_tb_values,
-    _is_leaf,
-    _sum_leaf_by_prefix,
+from app.services.four_table.leaf_aggregation import LeafRow
+from app.services.four_table.report_line_accounts import (
+    RESOLVED_FROM_REPORT,
+    ReportLineAccounts,
 )
 
 
-# ---------------------------------------------------------------------------
-# 1) _is_leaf 纯函数
-# ---------------------------------------------------------------------------
+def _accounts(gross=("1511",), provision=("1512",)) -> ReportLineAccounts:
+    return ReportLineAccounts(
+        gross=list(gross),
+        provision=list(provision),
+        gross_standard=list(gross),
+        provision_standard=list(provision),
+        row_code="BS-024",
+        resolved_from=RESOLVED_FROM_REPORT,
+    )
 
 
-def test_is_leaf_three_level_only_deepest_is_leaf():
-    """`{'1511','1511.01','1511.01.01'}` 中只有 `1511.01.01` 是叶子。"""
-    codes = {"1511", "1511.01", "1511.01.01"}
-    assert _is_leaf("1511.01.01", codes) is True
-    assert _is_leaf("1511.01", codes) is False
-    assert _is_leaf("1511", codes) is False
-
-
-def test_is_leaf_empty_and_single_boundary():
-    """空集合 / 单元素边界：自身不算自身的前缀 → 是叶子。"""
-    assert _is_leaf("1511", set()) is True
-    assert _is_leaf("1511", {"1511"}) is True
-
-
-def test_is_leaf_siblings_are_all_leaves():
-    """兄弟科目互不为前缀 → 各自都是叶子（父级不是）。"""
-    codes = {"1511", "1511.01", "1511.02"}
-    assert _is_leaf("1511.01", codes) is True
-    assert _is_leaf("1511.02", codes) is True
-    assert _is_leaf("1511", codes) is False
+def _leaf(code, opening=0.0, closing=0.0, name="", debit=0.0, credit=0.0) -> LeafRow:
+    return LeafRow(
+        account_code=code,
+        account_name=name,
+        opening=opening,
+        closing=closing,
+        debit=debit,
+        credit=credit,
+    )
 
 
 # ---------------------------------------------------------------------------
-# 2) _sum_leaf_by_prefix 纯同步汇总
+# 1) build_g7_tb_values —— 纯函数
 # ---------------------------------------------------------------------------
 
 
-def test_sum_leaf_parent_child_only_leaves_counted():
-    """父 1511=100、子 1511.01=60 / 1511.02=40 → closing=100 而不是 200。"""
-    rows = [
-        ("1511", 10.0, 100.0),
-        ("1511.01", 6.0, 60.0),
-        ("1511.02", 4.0, 40.0),
+def test_tb_values_only_sums_leaves():
+    """父子共存时只算叶子：父 1511=100 / 子 60+40 → closing=100（非 200）。
+
+    入参 `leaves` 已由 `select_leaves` 过滤，这里直接给叶子集验证聚合口径。
+    """
+    all_rows = [_leaf("1511", 10.0, 100.0), _leaf("1511.01", 6.0, 60.0), _leaf("1511.02", 4.0, 40.0)]
+    leaves = [_leaf("1511.01", 6.0, 60.0), _leaf("1511.02", 4.0, 40.0)]
+    tb = g7.build_g7_tb_values(_accounts(), all_rows, leaves)
+    assert tb["closing"] == pytest.approx(100.0)
+    assert tb["opening"] == pytest.approx(10.0)
+    assert tb["source_codes"]["gross"] == ["1511.01", "1511.02"]
+
+
+def test_tb_values_impairment_grouped_separately():
+    """1512 减值准备独立汇总进 impairment / impairment_opening。"""
+    leaves = [
+        _leaf("1511.01", 6.0, 60.0),
+        _leaf("1512.01", 1.0, 12.0),
+        _leaf("1512.02", 2.0, 8.0),
     ]
-    opening, closing, leaf_codes = _sum_leaf_by_prefix(rows, "1511")
-    assert closing == pytest.approx(100.0)
-    assert opening == pytest.approx(10.0)
-    assert leaf_codes == ["1511.01", "1511.02"]
+    tb = g7.build_g7_tb_values(_accounts(), leaves, leaves)
+    assert tb["closing"] == pytest.approx(60.0)
+    assert tb["impairment"] == pytest.approx(20.0)
+    assert tb["impairment_opening"] == pytest.approx(3.0)
+    assert tb["source_codes"] == {
+        "gross": ["1511.01"],
+        "impairment": ["1512.01", "1512.02"],
+    }
 
 
-def test_sum_leaf_three_level_nested():
-    """三级嵌套：只算最深层（1511.04.01 + 1511.04.02），中间级 1511.04 与父级都不计。"""
-    rows = [
-        ("1511", 0.0, 500.0),
-        ("1511.04", 0.0, 300.0),
-        ("1511.04.01", 0.0, 200.0),
-        ("1511.04.02", 0.0, 100.0),
+def test_tb_values_provision_negative_storage_normalised():
+    """🔴 备抵负值存储必须 abs 归一（活体 1512 期末 −4,790,032.97）。
+
+    不归一会让前端「减值准备」列显负数，与审定表「二、减值准备」段的正数口径相反。
+    """
+    leaves = [
+        _leaf("1511.01", 40459060.60, 40459060.60),
+        _leaf("1512", -2840032.97, -4790032.97, name="长期股权投资减值准备"),
     ]
-    _opening, closing, leaf_codes = _sum_leaf_by_prefix(rows, "1511")
-    assert closing == pytest.approx(300.0)
-    assert leaf_codes == ["1511.04.01", "1511.04.02"]
+    tb = g7.build_g7_tb_values(_accounts(), leaves, leaves)
+    assert tb["impairment_opening"] == pytest.approx(2840032.97)
+    assert tb["impairment"] == pytest.approx(4790032.97)
 
 
-def test_sum_leaf_parent_only_is_itself_leaf():
-    """只有父级一行（无子科目）→ 父级即叶子，正常计入。"""
-    rows = [("1511", 8.0, 88.0)]
-    opening, closing, leaf_codes = _sum_leaf_by_prefix(rows, "1511")
-    assert (opening, closing) == (pytest.approx(8.0), pytest.approx(88.0))
-    assert leaf_codes == ["1511"]
+def test_tb_values_prefix_requires_dot_boundary():
+    """前缀 `1511` 不得命中 `15110`（与 `1511` 无父子关系的另一科目）。"""
+    leaves = [_leaf("1511", 0.0, 100.0), _leaf("15110", 0.0, 999.0)]
+    tb = g7.build_g7_tb_values(_accounts(), leaves, leaves)
+    assert tb["closing"] == pytest.approx(100.0)
+    assert tb["source_codes"]["gross"] == ["1511"]
 
 
-def test_sum_leaf_prefix_groups_do_not_cross_contaminate():
-    """1511 组与 1512 组互不污染。"""
-    rows = [
-        ("1511", 0.0, 100.0),
-        ("1511.01", 0.0, 100.0),
-        ("1512", 0.0, 30.0),
-    ]
-    _o1, c1, codes1 = _sum_leaf_by_prefix(rows, "1511")
-    _o2, c2, codes2 = _sum_leaf_by_prefix(rows, "1512")
-    assert (c1, codes1) == (pytest.approx(100.0), ["1511.01"])
-    assert (c2, codes2) == (pytest.approx(30.0), ["1512"])
+def test_tb_values_keeps_legacy_keys():
+    """向后兼容：原有键名与含义不变（前端 fetchTrialBalance 已在读）。"""
+    leaves = [_leaf("1511", 7.0, 77.0)]
+    tb = g7.build_g7_tb_values(_accounts(), leaves, leaves)
+    assert set(tb) == {
+        "opening",
+        "closing",
+        "impairment",
+        "impairment_opening",
+        "source_codes",
+    }
+    assert (tb["opening"], tb["closing"]) == (pytest.approx(7.0), pytest.approx(77.0))
+    assert tb["impairment"] == pytest.approx(0.0)
 
 
-def test_sum_leaf_no_candidate_returns_zero():
-    """无匹配前缀 → (0,0,[])。"""
-    assert _sum_leaf_by_prefix([("1601", 1.0, 2.0)], "1511") == (0.0, 0.0, [])
-    assert _sum_leaf_by_prefix([], "1511") == (0.0, 0.0, [])
-
-
-def test_sum_leaf_none_amounts_treated_as_zero():
-    """金额为 None 视为 0，不抛异常。"""
-    rows = [("1511.01", None, None), ("1511.02", None, 5.0)]
-    opening, closing, leaf_codes = _sum_leaf_by_prefix(rows, "1511")  # type: ignore[arg-type]
-    assert opening == pytest.approx(0.0)
-    assert closing == pytest.approx(5.0)
-    assert leaf_codes == ["1511.01", "1511.02"]
+def test_tb_values_no_match_returns_empty_dict():
+    """无匹配科目 → 降级返回 {}（宁缺勿造，前端允许手填）。"""
+    assert g7.build_g7_tb_values(_accounts(), [], []) == {}
+    other = [_leaf("1601", 1.0, 2.0)]
+    assert g7.build_g7_tb_values(_accounts(), other, other) == {}
+    assert g7.build_g7_tb_values(None, [], []) == {}
 
 
 # ---------------------------------------------------------------------------
-# 3) _fetch_tb_values 薄封装（假 db + monkeypatch get_active_filter）
+# 2) build_g7_source_codes —— 溯源 + 两口径自检
+# ---------------------------------------------------------------------------
+
+
+def test_source_codes_exposes_parent_check_both_sides():
+    """叶子和 == 父额时 diff=0；不等时两个数都暴露（不静默取其一）。"""
+    all_rows = [_leaf("1511", 0.0, 100.0), _leaf("1511.01", 0.0, 60.0), _leaf("1511.02", 0.0, 40.0)]
+    leaves = [_leaf("1511.01", 0.0, 60.0), _leaf("1511.02", 0.0, 40.0)]
+    src = g7.build_g7_source_codes(_accounts(), all_rows, leaves)
+    assert src["row_code"] == "BS-024"
+    assert src["gross_standard"] == ["1511"]
+    assert src["parent_check"] == {"leaf_sum": 100.0, "parent": 100.0, "diff": 0.0}
+
+    bad_rows = [_leaf("1511", 0.0, 120.0), _leaf("1511.01", 0.0, 60.0)]
+    bad = g7.build_g7_source_codes(_accounts(), bad_rows, [_leaf("1511.01", 0.0, 60.0)])
+    assert bad["parent_check"] == {"leaf_sum": 60.0, "parent": 120.0, "diff": -60.0}
+
+
+def test_source_codes_empty_without_accounts():
+    assert g7.build_g7_source_codes(None, [], []) == {}
+
+
+# ---------------------------------------------------------------------------
+# 3) _load_g7_leaves —— fail-open（假 db + monkeypatch）
 # ---------------------------------------------------------------------------
 
 
@@ -147,9 +181,15 @@ class _FakeDb:
         return _FakeResult(self._rows)
 
 
-def _row(code, opening, closing):
+def _tb_row(code, opening, closing, name=""):
     return SimpleNamespace(
-        account_code=code, opening_balance=opening, closing_balance=closing
+        account_code=code,
+        account_name=name,
+        opening_balance=opening,
+        closing_balance=closing,
+        debit_amount=None,
+        credit_amount=None,
+        closing_direction="debit",
     )
 
 
@@ -158,81 +198,58 @@ def _ctx(db):
 
 
 @pytest.fixture(autouse=True)
-def _stub_active_filter(monkeypatch):
-    """get_active_filter 是 async 且要求真实 dataset，测试里替换为恒真条件。"""
+def _stub_deps(monkeypatch):
+    """`get_active_filter` 要求真实 dataset；科目解析要求 report_config → 均打桩。"""
 
     async def _fake_filter(_db, _table, _project_id, _year):
         import sqlalchemy as sa
 
         return sa.true()
 
+    async def _fake_resolve(_ctx, _spec):
+        return _accounts()
+
     monkeypatch.setattr(g7, "get_active_filter", _fake_filter)
+    monkeypatch.setattr(g7, "resolve_report_line_accounts", _fake_resolve)
 
 
 @pytest.mark.asyncio
-async def test_fetch_tb_values_only_sums_leaves():
-    """父子共存时只算叶子：父 1511=100 / 子 60+40 → closing=100（非 200）。"""
+async def test_load_leaves_single_query_and_leaf_filter():
+    """一次查询取回两组；父子共存时 leaves 只含叶子。"""
     db = _FakeDb(
         [
-            _row("1511", 10.0, 100.0),
-            _row("1511.01", 6.0, 60.0),
-            _row("1511.02", 4.0, 40.0),
+            _tb_row("1511", 10.0, 100.0),
+            _tb_row("1511.01", 6.0, 60.0),
+            _tb_row("1511.02", 4.0, 40.0),
         ]
     )
-    tb = await _fetch_tb_values(_ctx(db))
-    assert tb["closing"] == pytest.approx(100.0)
-    assert tb["opening"] == pytest.approx(10.0)
-    assert tb["source_codes"]["gross"] == ["1511.01", "1511.02"]
-    assert db.calls == 1  # 一次查询取回两组
+    accounts, all_rows, leaves = await g7._load_g7_leaves(_ctx(db))
+    assert accounts is not None
+    assert db.calls == 1
+    assert len(all_rows) == 3
+    assert {r.account_code for r in leaves} == {"1511.01", "1511.02"}
 
 
 @pytest.mark.asyncio
-async def test_fetch_tb_values_impairment_grouped_separately():
-    """1512 减值准备独立汇总进 impairment / impairment_opening。"""
-    db = _FakeDb(
-        [
-            _row("1511.01", 6.0, 60.0),
-            _row("1512", 0.0, 0.0),
-            _row("1512.01", 1.0, 12.0),
-            _row("1512.02", 2.0, 8.0),
-        ]
-    )
-    tb = await _fetch_tb_values(_ctx(db))
-    assert tb["closing"] == pytest.approx(60.0)
-    assert tb["impairment"] == pytest.approx(20.0)
-    assert tb["impairment_opening"] == pytest.approx(3.0)
-    assert tb["source_codes"] == {
-        "gross": ["1511.01"],
-        "impairment": ["1512.01", "1512.02"],
-    }
-
-
-@pytest.mark.asyncio
-async def test_fetch_tb_values_keeps_legacy_keys():
-    """向后兼容：原有 opening/closing 键名与含义不变。"""
-    db = _FakeDb([_row("1511", 7.0, 77.0)])
-    tb = await _fetch_tb_values(_ctx(db))
-    assert set(tb) == {
-        "opening",
-        "closing",
-        "impairment",
-        "impairment_opening",
-        "source_codes",
-    }
-    assert (tb["opening"], tb["closing"]) == (pytest.approx(7.0), pytest.approx(77.0))
-    assert tb["impairment"] == pytest.approx(0.0)
-
-
-@pytest.mark.asyncio
-async def test_fetch_tb_values_no_match_returns_empty_dict():
-    """无匹配科目 → 保持降级语义返回 {}（前端允许手填）。"""
-    db = _FakeDb([_row("1601", 1.0, 2.0)])
-    assert await _fetch_tb_values(_ctx(db)) == {}
-    assert await _fetch_tb_values(_ctx(_FakeDb([]))) == {}
-
-
-@pytest.mark.asyncio
-async def test_fetch_tb_values_fail_open_on_exception():
-    """异常 fail-open：返回 {} 不抛出（不阻断 render）。"""
+async def test_load_leaves_fail_open_on_query_exception():
+    """查询异常 fail-open：返回空行集不抛出（不阻断 render）。"""
     db = _FakeDb([], raise_exc=RuntimeError("db down"))
-    assert await _fetch_tb_values(_ctx(db)) == {}
+    accounts, all_rows, leaves = await g7._load_g7_leaves(_ctx(db))
+    assert accounts is not None  # 科目已解析成功
+    assert (all_rows, leaves) == ([], [])
+    assert g7.build_g7_tb_values(accounts, all_rows, leaves) == {}
+
+
+@pytest.mark.asyncio
+async def test_load_leaves_fail_open_on_resolve_exception(monkeypatch):
+    """科目解析异常 fail-open：accounts 为 None，取数键全空。"""
+
+    async def _boom(_ctx, _spec):
+        raise RuntimeError("report_config down")
+
+    monkeypatch.setattr(g7, "resolve_report_line_accounts", _boom)
+    accounts, all_rows, leaves = await g7._load_g7_leaves(_ctx(_FakeDb([])))
+    assert accounts is None
+    assert (all_rows, leaves) == ([], [])
+    assert g7.build_g7_tb_values(accounts, all_rows, leaves) == {}
+    assert g7.build_g7_adjudication_prefill(accounts, leaves) == {}

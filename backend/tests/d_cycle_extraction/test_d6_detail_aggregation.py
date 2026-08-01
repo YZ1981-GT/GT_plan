@@ -2,7 +2,7 @@
 
 spec: .kiro/specs/d-cycle-tier-a-writeback-detail-seed/  (Requirements 4.3, 4.4 / 决策4)
 
-前置核实结论：D6-2 明细表 `tb_aux_balance` 1402 客户/合同维度归集原本**仅内联于 HTTP
+前置核实结论：D6-2 明细表 `tb_aux_balance` 1141 客户/合同维度归集原本**仅内联于 HTTP
 handler** `d6_import_aux_balance`，无可复用后端函数。按 R4.4 已抽取为纯函数
 `build_d6_detail_rows_from_aux`（无 I/O）+ 可复用入口 `aggregate_d6_detail_rows`（供
 P0-2 render 自动 seed 按名调用），原端点改为委托、行为逐字节不变。
@@ -176,18 +176,18 @@ def _run(coro):
     return asyncio.run(coro)
 
 
-def test_aggregate_queries_1402_and_builds_rows():
-    """可复用入口：查询 tb_aux_balance 1402 → 构建 D6-2 行。"""
+def test_aggregate_queries_1141_and_builds_rows():
+    """可复用入口：查询 tb_aux_balance 1141 → 构建 D6-2 行。"""
     aux = [
         SimpleNamespace(aux_name="合同A", prior_balance=100.0, current_balance=200.0),
         SimpleNamespace(aux_name="合同B", prior_balance=0.0, current_balance=50.0),
     ]
     db = _FakeSession(aux)
     rows = _run(aggregate_d6_detail_rows(db, "proj-1", row_id_factory=_seq_factory()))
-    # 查询命中 tb_aux_balance + 科目 1402 + 传入 project_id
+    # 查询命中 tb_aux_balance + 科目 1141 + 传入 project_id
     sql, params = db.executed[0]
     assert "tb_aux_balance" in sql
-    assert "1402" in sql
+    assert "1141" in sql
     assert params == {"pid": "proj-1"}
     # 构建结果
     assert [r["contractName"] for r in rows] == ["合同A", "合同B"]
@@ -196,7 +196,7 @@ def test_aggregate_queries_1402_and_builds_rows():
 
 
 def test_aggregate_empty_aux_returns_empty():
-    """无 1402 归集数据 → 返回空列表（端点据此返回 imported_count=0）。"""
+    """无 1141 归集数据 → 返回空列表（端点据此返回 imported_count=0）。"""
     db = _FakeSession([])
     rows = _run(aggregate_d6_detail_rows(db, "proj-1"))
     assert rows == []

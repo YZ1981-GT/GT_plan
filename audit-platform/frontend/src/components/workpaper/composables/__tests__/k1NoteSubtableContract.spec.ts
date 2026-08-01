@@ -16,7 +16,13 @@ import {
   K1_NOTE_SECTION,
   K1_SOE_SUBTABLE,
 } from '../k1NoteSectionMap'
-import { K1_LISTED_COLUMNS, K1_SOE_COLUMNS } from '../k1DisclosureSyncPayload'
+import {
+  K1_LISTED_COLUMNS,
+  K1_SOE_COLUMNS,
+  buildK1ListedSubTableData,
+  buildK1SoeSubTableData,
+} from '../k1DisclosureSyncPayload'
+import { emptyK1ListedPayload, emptyK1SoePayload } from '../k1DisclosureModel'
 import type { ColumnDef } from '../disclosureColumnDefs'
 
 interface NoteTable { name?: string; headers?: string[]; guidance?: string; _column_groups?: unknown }
@@ -221,6 +227,98 @@ describe('附注 §五、8 / §八、9 结构要求', () => {
       '涉及政府补助的应收款项',
     ]) {
       expect(soeNames.has(name), `缺表 ${name}`).toBe(true)
+    }
+  })
+
+  // ─── k1-extraction-chain-and-note-alignment：openpyxl 直读源 xlsx 逐字比对
+  //     （字面钉死，防再次漂移回「账龄」「项目」「类别」等看似合理但错的写法）───
+  it('五处标签逐字对齐源 xlsx（Requirement 6.1, 6.3, 6.4, 6.7）', () => {
+    // R7：账 龄（单空格）
+    expect(firstHeader(listedSection, K1_LISTED_SUBTABLE.aging)).toBe('账 龄')
+    // R32/R41/R51/R63/R72/R82：类 别（单空格，国企侧是双空格「类  别」）
+    for (const name of [
+      K1_LISTED_SUBTABLE.stage1, K1_LISTED_SUBTABLE.stage2, K1_LISTED_SUBTABLE.stage3,
+      K1_LISTED_SUBTABLE.priorStage1, K1_LISTED_SUBTABLE.priorStage2, K1_LISTED_SUBTABLE.priorStage3,
+    ]) {
+      expect(firstHeader(listedSection, name), name).toBe('类 别')
+    }
+    // R113：项  目（双空格，非「项目」）
+    expect(firstHeader(listedSection, K1_LISTED_SUBTABLE.writeoffSummary)).toBe('项  目')
+    // F116：款项是否由关联交易产生（比「是否由关联交易产生」多「款项」二字）
+    const writeoffDetail = listedSection.tables?.find(
+      (t) => t.name === K1_LISTED_SUBTABLE.writeoffDetail,
+    )
+    expect(writeoffDetail?.headers?.[5]).toBe('款项是否由关联交易产生')
+    expect(
+      K1_LISTED_COLUMNS[K1_LISTED_SUBTABLE.writeoffDetail].find((c) => c.key === '是否由关联交易产生')
+        ?.label,
+    ).toBe('款项是否由关联交易产生')
+    // A126：单位名称（注：政府补助的发文单位）—— 源换行改括注纯文本
+    expect(firstHeader(soeSection, K1_SOE_SUBTABLE.govGrant)).toBe(
+      '单位名称（注：政府补助的发文单位）',
+    )
+  })
+
+  // ─── Property 4：三阶段变动表行标签逐字对齐模板 rows（k1-extraction-chain-and-note-alignment） ───
+  // ─── Property 8：_note_texts 全部带中文 title（k1-extraction-chain-and-note-alignment） ───
+  it('_note_texts 每条带中文 title，且空文本被过滤（Property 8）', () => {
+    const listedPayload = buildK1ListedSubTableData(
+      emptyK1ListedPayload(),
+      '审计说明文字',
+    )
+    const listedTexts = listedPayload._note_texts as unknown as Array<{ section: string; title: string; text: string }>
+    expect(listedTexts.length).toBeGreaterThan(0)
+    for (const t of listedTexts) {
+      expect(t.title, t.section).toBeTruthy()
+      expect(t.title, t.section).not.toMatch(/^[a-z0-9-]+$/i)
+    }
+    expect(listedTexts.find((t) => t.section === 'listed-audit-note')?.title).toBe('审计说明')
+
+    const soePayload = buildK1SoeSubTableData(emptyK1SoePayload(), '国企审计说明')
+    const soeTexts = soePayload._note_texts as unknown as Array<{ section: string; title: string; text: string }>
+    expect(soeTexts.length).toBeGreaterThan(0)
+    for (const t of soeTexts) {
+      expect(t.title, t.section).toBeTruthy()
+      expect(t.title, t.section).not.toMatch(/^[a-z0-9-]+$/i)
+    }
+
+    // 全空时不产生 _note_texts 键
+    const emptyPayload = buildK1ListedSubTableData(emptyK1ListedPayload())
+    expect(emptyPayload._note_texts).toEqual([])
+  })
+
+  it('三阶段变动表行标签逐字对齐模板 rows（Property 4）', () => {
+    const listedRows = listedSection.tables?.find(
+      (t) => t.name === K1_LISTED_SUBTABLE.stageMovement,
+    ) as unknown as { rows?: Array<{ label: string }> }
+    expect(listedRows?.rows?.map((r) => r.label)).toEqual([
+      '上年年末余额', '上年年末余额在本期',
+      '--转入第二阶段', '--转入第三阶段', '--转回第二阶段', '--转回第一阶段',
+      '本期计提', '本期转回', '本期转销', '本期核销', '其他变动', '期末余额',
+    ])
+
+    const soeEclRows = soeSection.tables?.find(
+      (t) => t.name === K1_SOE_SUBTABLE.eclMovement,
+    ) as unknown as { rows?: Array<{ label: string }> }
+    expect(soeEclRows?.rows?.map((r) => r.label)).toEqual([
+      '期初余额', '期初余额在本期',
+      '—转入第二阶段', '—转入第三阶段', '—转回第二阶段', '—转回第一阶段',
+      '本期计提', '本期转回', '本期转销', '本期核销', '其他变动', '期末余额',
+    ])
+
+    const soeBalanceRows = soeSection.tables?.find(
+      (t) => t.name === K1_SOE_SUBTABLE.balanceMovement,
+    ) as unknown as { rows?: Array<{ label: string }> }
+    expect(soeBalanceRows?.rows?.map((r) => r.label)).toEqual([
+      '期初余额', '期初余额在本期',
+      '—转入第二阶段', '—转入第三阶段', '—转回第二阶段', '—转回第一阶段',
+      '本期新增', '本期终止确认', '其他变动', '期末余额',
+    ])
+
+    // 无重复标签
+    for (const rows of [listedRows?.rows, soeEclRows?.rows, soeBalanceRows?.rows]) {
+      const labels = (rows ?? []).map((r) => r.label)
+      expect(new Set(labels).size).toBe(labels.length)
     }
   })
 })

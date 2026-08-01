@@ -49,8 +49,8 @@ function setup(opts: {
 }
 
 const PREFILL: AdjudicationPrefillRow[] = [
-  { code: '1402.01', name: '合同资产-工程A', opening_balance: 800, closing_balance: 1000, block: 'block1', source: 'four-table' },
-  { code: '1402.02', name: '合同资产-工程B', opening_balance: 300, closing_balance: 250, block: 'block1', source: 'four-table' },
+  { code: '1141.01', name: '合同资产-工程A', opening_balance: 800, closing_balance: 1000, block: 'block1', source: 'four-table' },
+  { code: '1141.02', name: '合同资产-工程B', opening_balance: 300, closing_balance: 250, block: 'block1', source: 'four-table' },
 ]
 
 describe('useD6Adjudication — 四表库预填 seed', () => {

@@ -126,7 +126,7 @@ def _patch_presets(monkeypatch, wp_code, bindings):
     monkeypatch.setattr(presets_mod, "load_presets", _fake_load)
 
 
-def _preset_binding(anchor, *, expression="TB('1402','期末余额')", sheet_name="D6-1"):
+def _preset_binding(anchor, *, expression="TB('1141','期末余额')", sheet_name="D6-1"):
     return {
         "wp_code": "D6", "sheet_name": sheet_name, "anchor": anchor,
         "expression": expression, "formula_type": "auto_calc",
@@ -134,7 +134,7 @@ def _preset_binding(anchor, *, expression="TB('1402','期末余额')", sheet_nam
     }
 
 
-def _fake_formula(target_cell, *, expression="TB('1402','期末余额')", category=None):
+def _fake_formula(target_cell, *, expression="TB('1141','期末余额')", category=None):
     return SimpleNamespace(
         target_cell=target_cell, expression=expression, sheet_name="D6-1",
         category=category, description="", formula_type="auto_calc",
@@ -154,15 +154,15 @@ def _fake_formula(target_cell, *, expression="TB('1402','期末余额')", catego
 def test_pbt_p1_leaf_only(monkeypatch, k, grandchild, amt):
     """任意 k 个子科目（可选给首个添加孙级）→ prefill 只含叶子，排除 rollup 中间级。"""
     _patch_prefill_filter(monkeypatch)
-    rows = [_tb_row(f"1402.{i:02d}", f"子{i}", closing=amt) for i in range(1, k + 1)]
+    rows = [_tb_row(f"1141.{i:02d}", f"子{i}", closing=amt) for i in range(1, k + 1)]
     expected = {r.code for r in rows}
     if grandchild:
-        # 给 1402.01 添加孙级 → 1402.01 变为 rollup 中间级被排除
-        rows.append(_tb_row("1402.01.01", "孙", closing=amt))
-        expected.discard("1402.01")
-        expected.add("1402.01.01")
+        # 给 1141.01 添加孙级 → 1141.01 变为 rollup 中间级被排除
+        rows.append(_tb_row("1141.01.01", "孙", closing=amt))
+        expected.discard("1141.01")
+        expected.add("1141.01.01")
     result = _run(build_d_adjudication_prefill(
-        _ctx(_FakeTbSession(rows)), account_prefix="1402", mode=MODE_BALANCE
+        _ctx(_FakeTbSession(rows)), account_prefix="1141", mode=MODE_BALANCE
     ))
     assert {r["code"] for r in result} == expected
     # 合计 = 叶子数 × amt（不含 rollup 双计）
@@ -183,7 +183,7 @@ def test_pbt_p5_precedence(monkeypatch, has_user, disabled):
         if disabled:
             users.append(_fake_formula("D6-1-tb-amount", category="__disabled__"))
         else:
-            users.append(_fake_formula("D6-1-tb-amount", expression="TB('1402','期初余额')"))
+            users.append(_fake_formula("D6-1-tb-amount", expression="TB('1141','期初余额')"))
     result = _run(resolve_effective(_FakeFormulaSession(users), uuid4(), "D6", uuid4()))
     # 每锚点唯一
     anchors = [b["anchor"] for b in result]
@@ -225,8 +225,8 @@ def test_pbt_p8_empty_wpcode_always_false(anchor):
 def test_pbt_p10_resolve_tb_idempotent(monkeypatch, amt):
     """同一四表库快照多次求值同一 TB 公式 → 结果恒一致。"""
     _patch_eval_filter(monkeypatch)
-    sess = _FakeTbSession([_tb_eval_row("1402", audited=amt)])
-    v1 = _run(_resolve_tb(sess, uuid4(), 2025, "1402", "期末余额"))
-    v2 = _run(_resolve_tb(sess, uuid4(), 2025, "1402", "期末余额"))
-    v3 = _run(_resolve_tb(sess, uuid4(), 2025, "1402", "期末余额"))
+    sess = _FakeTbSession([_tb_eval_row("1141", audited=amt)])
+    v1 = _run(_resolve_tb(sess, uuid4(), 2025, "1141", "期末余额"))
+    v2 = _run(_resolve_tb(sess, uuid4(), 2025, "1141", "期末余额"))
+    v3 = _run(_resolve_tb(sess, uuid4(), 2025, "1141", "期末余额"))
     assert v1 == v2 == v3 == Decimal(str(amt))

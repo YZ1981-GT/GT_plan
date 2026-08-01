@@ -110,9 +110,10 @@ describe('k1DisclosureSyncPayload', () => {
     // 首列为标签列，表头取自 note_template 首列语义
     expect(aging[0].is_label).toBe(true)
     expect(aging[0].key).toBe('label')
-    expect(aging[0].label).toBe('账龄')
+    // 源 xlsx `A7` = 「账 龄」（单空格，非「账龄」；k1-extraction-chain-and-note-alignment 修正）
+    expect(aging[0].label).toBe('账 龄')
     // value 列 key 与行对象中文键逐字一致，且非英文键当 header
-    expect(aging.map((c) => c.label)).toEqual(['账龄', '期末余额', '上年年末余额'])
+    expect(aging.map((c) => c.label)).toEqual(['账 龄', '期末余额', '上年年末余额'])
     // 单级表头的表必须显式 flat（否则后端退化到前缀推断，凭空造父表头）
     expect(aging.some((c) => c.flat === true)).toBe(true)
     // 性质表是**两级表头**（源 xlsx A22:G28 的 B22:D22 / E22:G22 跨列合并）：

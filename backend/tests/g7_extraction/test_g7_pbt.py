@@ -16,15 +16,16 @@ from decimal import Decimal
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from app.routers.wp_render_strategies._g7_long_term_equity_main import (
-    _build_g7_leaf_categories,
-    _classify_leaf,
-    _is_leaf,
-    _sum_leaf_by_prefix,
-)
+from app.routers.wp_render_strategies import _g7_long_term_equity_main as g7
 from app.routers.wp_render_strategies._g7_long_term_equity_main_import_export import (
     build_g7_detail_rows_from_aux,
 )
+from app.services.four_table.leaf_aggregation import (
+    LeafRow,
+    aggregate_leaves,
+    select_leaves,
+)
+from app.services.four_table.report_line_accounts import ReportLineAccounts
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -67,44 +68,50 @@ _st_amount = st.floats(min_value=-1e6, max_value=1e6, allow_nan=False, allow_inf
     )
 )
 def test_property1_leaf_sum_no_double_count(codes_and_amounts):
-    """对任意含父子层级的科目集，_sum_leaf_by_prefix 的合计等于仅叶子科目金额之和；
-    任一被其它 code 作为前缀的 code 不参与求和。
-    """
-    # Build rows as (code, opening, closing)
-    rows = [(code, opening, closing) for code, opening, closing in codes_and_amounts]
+    """对任意含父子层级的科目集，共享件的叶子聚合等于仅叶子科目金额之和；
+    任一存在「本码 + `.`」子科目的 code 不参与求和。
 
+    2026-08-01：被测对象由已删除的 `_sum_leaf_by_prefix` 换成
+    `four_table/leaf_aggregation`（点号边界口径），断言意图不变。
+    """
     # Deduplicate by code (keep first occurrence)
     seen: set[str] = set()
-    unique_rows: list[tuple[str, float, float]] = []
-    for code, opening, closing in rows:
+    unique_rows: list[LeafRow] = []
+    for code, opening, closing in codes_and_amounts:
         if code not in seen:
             seen.add(code)
-            unique_rows.append((code, opening, closing))
+            unique_rows.append(
+                LeafRow(account_code=code, opening=opening, closing=closing)
+            )
 
-    # Run function under test
-    opening_total, closing_total, leaf_codes = _sum_leaf_by_prefix(unique_rows, "1511")
+    leaves = select_leaves(unique_rows)
+    agg = aggregate_leaves(leaves, ["1511"])
+    leaf_codes = {r.account_code for r in leaves}
 
-    # Determine expected leaf set
-    all_codes = {code for code, _, _ in unique_rows}
+    # Determine expected leaf set（点号边界：只有 `code + '.'` 前缀的兄弟才算子科目）
+    all_codes = {r.account_code for r in unique_rows}
     expected_opening = 0.0
     expected_closing = 0.0
-    expected_leaves: list[str] = []
-    for code, opening, closing in unique_rows:
-        if _is_leaf(code, all_codes):
-            expected_opening += float(opening or 0)
-            expected_closing += float(closing or 0)
-            expected_leaves.append(code)
+    expected_leaves: set[str] = set()
+    for row in unique_rows:
+        prefix = row.account_code + "."
+        if any(c != row.account_code and c.startswith(prefix) for c in all_codes):
+            continue
+        expected_opening += float(row.opening or 0)
+        expected_closing += float(row.closing or 0)
+        expected_leaves.add(row.account_code)
 
-    # Property: totals match leaf-only sums
-    assert abs(opening_total - expected_opening) < 1e-6
-    assert abs(closing_total - expected_closing) < 1e-6
-    assert set(leaf_codes) == set(expected_leaves)
+    assert abs(agg["opening"] - expected_opening) < 1e-6
+    assert abs(agg["closing"] - expected_closing) < 1e-6
+    assert leaf_codes == expected_leaves
 
-    # Property: no code that is a prefix of another is in leaf_codes
+    # Property: 任一叶子都不存在 `本码 + '.'` 的子科目
     for lc in leaf_codes:
         for other in all_codes:
             if other != lc:
-                assert not other.startswith(lc), f"{lc} is prefix of {other} but was counted"
+                assert not other.startswith(lc + "."), (
+                    f"{lc} 是 {other} 的父科目却被计入"
+                )
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -188,14 +195,24 @@ def test_property3_single_aux_type_no_cross_add(names, types, amounts):
 )
 def test_property5_gray_off_zero_write(project_id, year, monkeypatch):
     """G7_FOUR_TABLE_EXTRACTION_ENABLED=False 时，取数端点返回 imported_count=0
-    且 render 不注入 tb_leaf_categories。
+    且 render 不注入 tb_leaf_categories / adjudication_prefill。
+
+    2026-08-01：门控从纯函数移到 render 编排层（纯函数可脱开关单测）→
+    本属性改为「开关为 False 时 render 的两个键分别为 None / {}」。
     """
     from app.core.config import settings as app_settings
 
     monkeypatch.setattr(app_settings, "G7_FOUR_TABLE_EXTRACTION_ENABLED", False, raising=False)
+    assert app_settings.G7_FOUR_TABLE_EXTRACTION_ENABLED is False
 
-    ctx = types.SimpleNamespace(db=None, project_id=project_id, year=year)
-    result = asyncio.run(_build_g7_leaf_categories(ctx))
+    # 纯函数本身不看开关：给它数据它就算（门控在 render）
+    accounts = ReportLineAccounts(
+        gross=["1511"], provision=["1512"],
+        gross_standard=["1511"], provision_standard=["1512"], row_code="BS-024",
+    )
+    leaves = [LeafRow("1511.01", "长期股权投资_对子公司的投资", closing=1.0)]
+    assert g7.build_g7_leaf_categories(accounts, leaves) is not None
 
-    # Property: render returns None (no injection) when flag is off
-    assert result is None
+    # 无数据时一律空（宁缺勿造），与开关无关
+    assert g7.build_g7_leaf_categories(accounts, []) is None
+    assert g7.build_g7_adjudication_prefill(accounts, []) == {}

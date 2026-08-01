@@ -177,11 +177,17 @@ describe('useH10Disclosure', () => {
 
     const payloads = buildH10SyncPayloads('wp-1', 'listed', [], disc.getSyncSnapshot())
     expect(payloads).toHaveLength(1)
-    expect(payloads[0].section_id).toBe('三、资产处置收益')
-    const main = payloads[0].sub_table_data['项  目']
+    // 章节号是 md 截断值（模板 section_number 实为「三、资产处置收益（损」10 字符），
+    // sync_from_workpaper 按此精确定位；H10_NOTE_SECTION_DISPLAY 才是给用户看的展示值。
+    expect(payloads[0].section_id).toBe('三、资产处置收益（损')
+    // 表名是 H10_MAIN_SUBTABLE（原「项  目」是表头首格泄漏的孤儿表名，已修正）
+    const main = payloads[0].sub_table_data['资产处置收益（损失以“-”填列）']
     expect(main.some((r) => r.row_key === 'fixed_asset_disposal')).toBe(true)
     expect(main.some((r) => r.row_key === 'trial_operation_sales' && r.current_amount === 20)).toBe(true)
-    expect(payloads[0].sub_table_data._trial_detail?.[0]?.current_amount).toBe(20)
+    // 试运行明细走真表名 H10_TRIAL_SUBTABLE（原 `_trial_detail` 双写绕过键是孤儿，已删除）
+    const trial = payloads[0].sub_table_data['试运行销售损益']
+    expect(trial?.[0]?.current_income).toBe(30)
+    expect(trial?.[0]?.current_cost).toBe(10)
     expect(payloads[0].sub_table_data._note_texts?.[0]?.text).toBe('测试附注')
   })
 })

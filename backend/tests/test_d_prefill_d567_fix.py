@@ -162,58 +162,71 @@ def test_d567_wp_code_to_account_mapping(
 def test_d567_no_other_d_entries_corrupted(all_entries: list[dict]) -> None:
     """非审定表的 D5/D6/D7 衍生 entry（分析程序 / 子明细）应保持业务一致。
 
-    - 分析程序：cells_count==2 且 wp_name 含 "分析程序"，三条业务对齐：
-        D5 → 应收款项融资分析程序 / D6 → 合同资产分析程序 / D7 → 合同负债分析程序
-    - 子明细：D5 → 应收款项融资子科目明细（cells_count==2）
-    """
-    # 分析程序 3 条
-    analysis_expected = {
-        "D5": "应收款项融资分析程序",
-        "D6": "合同资产分析程序",
-        "D7": "合同负债分析程序",
-    }
-    found_analysis: dict[str, dict] = {}
-    found_subdetail: dict[str, dict] = {}
+    🔴 2026-08-01 修正（spec d-cycle-extraction-chain-completion Wave 5）：原断言
+    强制要求 D5/D6「分析程序」与 D5「子科目明细」entry 存在，但 openpyxl 直读源模板
+    实证——`D5 应收款项融资.xlsx` 与 `D6 合同资产.xlsx` 都**没有独立的分析程序 sheet**
+    （D5 sheets = 底稿目录/D5A/审定表D5/附注×2/明细表D5-2/调整分录D5-3/公允价值测算D5-4；
+    D6 sheets 同理只有明细表/减值明细/调整分录/关联方/检查表/测算表，无「分析程序」）；
+    D5 的「票据类/应收账款类子科目」（112401/112402）在审定表/明细表均无对应子科目
+    编码结构。原条目的 `sheet` 字段全部是虚构值（`分析程序D5-3`/`分析程序D6-3`/
+    `审定表D5-1`，源模板均不存在），且与 D7 的真实 sheet 名环形错位
+    （D5→抄D7、D6→抄D5、D7→抄D6 的 sheet 名与 `PREV()` wp_code）。
 
+    按 Requirement 7.1（sheet 名须与源模板真实 sheet 名逐字一致）与「宁缺勿造」原则，
+    已删除这些虚构条目而非修正到另一个虚构值。D7 的分析程序 entry（`合同负债分析表D7-4`，
+    源模板真实存在）保留且已核实 sheet 名。
+    """
     for entry in all_entries:
         wp_code = entry.get("wp_code")
         wp_name = entry.get("wp_name", "")
+        sheet = entry.get("sheet", "")
         if wp_code not in {"D5", "D6", "D7"}:
             continue
-        cells_count = len(entry.get("cells", []))
+        # D5/D6 不应再有「分析程序」/「子科目明细」条目（源模板无对应 sheet）
+        if wp_code in {"D5", "D6"}:
+            assert "分析程序" not in wp_name, (
+                f"wp_code={wp_code} 不应有分析程序 entry（源模板无此 sheet），"
+                f"发现 wp_name='{wp_name}' sheet='{sheet}'"
+            )
+        if wp_code == "D5":
+            assert "子科目明细" not in wp_name, (
+                f"D5 不应有子科目明细 entry（112401/112402 无对应实现），"
+                f"发现 sheet='{sheet}'"
+            )
+        # D7 的分析程序条目若存在，sheet 名必须是源模板真实值
+        if wp_code == "D7" and "分析程序" in wp_name:
+            assert sheet == "合同负债分析表D7-4", (
+                f"D7 分析程序 sheet 名错位：实际 '{sheet}'（源模板真实 sheet 名为 "
+                f"合同负债分析表D7-4）"
+            )
 
-        if "分析程序" in wp_name:
-            assert cells_count == 2, (
-                f"wp_code={wp_code} 分析程序 entry 的 cells_count 应为 2，实际 {cells_count}"
-            )
-            assert wp_code not in found_analysis, (
-                f"wp_code={wp_code} 分析程序 entry 重复"
-            )
-            found_analysis[wp_code] = entry
-        elif "子科目明细" in wp_name:
-            assert cells_count == 2, (
-                f"wp_code={wp_code} 子明细 entry 的 cells_count 应为 2，实际 {cells_count}"
-            )
-            assert wp_code not in found_subdetail, (
-                f"wp_code={wp_code} 子明细 entry 重复"
-            )
-            found_subdetail[wp_code] = entry
 
-    # 分析程序三条齐全且 wp_name 业务对齐
-    assert set(found_analysis.keys()) == {"D5", "D6", "D7"}, (
-        f"分析程序 entry 缺失，找到的 wp_code: {sorted(found_analysis.keys())}"
-    )
-    for wp_code, expected_name in analysis_expected.items():
-        actual_name = found_analysis[wp_code]["wp_name"]
-        assert actual_name == expected_name, (
-            f"wp_code={wp_code} 分析程序 wp_name 业务错位：期望 '{expected_name}'，实际 '{actual_name}'"
+def test_d567_sheet_names_match_source_template(all_entries: list[dict]) -> None:
+    """D5/D6/D7 全部条目的 `sheet` 字段必须与源模板真实 sheet 名逐字一致。
+
+    补的守卫：原 `test_d567_audited_entries_aligned` 只校验 wp_code/wp_name/科目码
+    三元组，**从未读过 `sheet` 字段** —— 这正是三循环环形错位（D5→抄D7 的 sheet 名、
+    D6→抄D5 的、D7→抄D6 的）能存在的根因，靠 openpyxl 直读源 xlsx 交叉锁死。
+    """
+    openpyxl = pytest.importorskip("openpyxl")
+    root = _REPO_ROOT / "backend" / "wp_templates" / "D"
+    source_sheets = {
+        "D5": set(openpyxl.load_workbook(root / "D5 应收款项融资.xlsx", read_only=True).sheetnames),
+        "D6": set(openpyxl.load_workbook(root / "D6 合同资产.xlsx", read_only=True).sheetnames),
+        "D7": set(openpyxl.load_workbook(root / "D7 合同负债.xlsx", read_only=True).sheetnames),
+    }
+    # 反向自检：源模板真的读到了内容（防止路径错导致空集合让断言恒真）
+    for wp_code, sheets in source_sheets.items():
+        assert len(sheets) > 3, f"{wp_code} 源模板 sheet 集合过小：{sheets}"
+
+    checked = 0
+    for entry in all_entries:
+        wp_code = entry.get("wp_code")
+        if wp_code not in source_sheets:
+            continue
+        sheet = str(entry.get("sheet", ""))
+        assert sheet in source_sheets[wp_code], (
+            f"wp_code={wp_code} 的 sheet「{sheet}」不在源模板真实 sheet 集合中"
         )
-
-    # 子明细 D5-1 存在且 wp_name 业务对齐
-    assert "D5" in found_subdetail, "D5 子科目明细 entry 缺失"
-    assert found_subdetail["D5"]["wp_name"] == "应收款项融资子科目明细", (
-        f"D5 子明细 wp_name 业务错位：实际 '{found_subdetail['D5']['wp_name']}'"
-    )
-    # D6/D7 在第三段无对应子明细（业务设计如此），不应出现
-    assert "D6" not in found_subdetail, "D6 不应出现在子明细段"
-    assert "D7" not in found_subdetail, "D7 不应出现在子明细段"
+        checked += 1
+    assert checked >= 3, "反向自检：至少应检查到 D5/D6/D7 各一条 entry"

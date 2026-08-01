@@ -46,7 +46,12 @@ from app.services.d_cycle_extraction.presets import (
 from app.services.wp_formula_eval_service import find_unsupported_formula_functions
 
 _D2_ANCHOR = "D2-adj-tb-amount"
-_D2_EXPRESSION = "TB('1122','期末余额')"
+# 🔴 **净额**口径（原值 1122 − 坏账准备 1231-02），非原值。双证：
+#   ① 源模板 `审定表D2-1` 被比较项是「三、应收账款净值」合计 A27（逐行 A22=A8−A15）；
+#   ② `report_config` 的 BS-006 在 soe_standalone 下公式正是
+#      `TB('1122','期末余额') - TB('1231-02','期末余额')`。
+# 取原值会让核对行显示一个恰好等于坏账准备的假差异（D1 同款缺陷已实测）。
+_D2_EXPRESSION = "TB('1122','期末余额') - TB('1231-02','期末余额')"
 
 # D2 render characterization 基线顶层键
 _BASELINE_KEYS = {"sheet_name", "project_context", "responses_snapshot"}
@@ -91,6 +96,14 @@ class _FakeSession:
             return _FakeResult(rows=self.rp_rows)
         if "from projects" in s or "projects where" in s:
             return _FakeResult(one=self.project_row)
+        if "trial_balance" in s:
+            # D2 查两次 trial_balance（原值 1122 / 坏账 1231-02），按 params 区分
+            wants_provision = any(
+                str(v).startswith("1231") for v in (params or {}).values()
+            )
+            if wants_provision:
+                return _FakeResult(one=SimpleNamespace(unadjusted=500.0, audited=600.0))
+            return _FakeResult(one=SimpleNamespace(unadjusted=10000.0, audited=12000.0))
         return _FakeResult()
 
     async def rollback(self):
@@ -146,15 +159,25 @@ def test_flag_off_baseline_keys_no_prefill(monkeypatch):
 
 
 def test_flag_on_still_no_prefill_ningquewuzao(monkeypatch):
-    """开关开启 → D2 **仍不返回** adjudication_prefill（宁缺勿造 R3.4，分类行不可从 TB 拆分）。"""
+    """开关开启 → D2 **仍不返回** adjudication_prefill（宁缺勿造 R3.4，分类行不可从 TB 拆分）。
+
+    🔴 开关开时 **新增** project_context 的 tb_amount / tb_provision_amount + tb_source_codes
+    （净额口径，与 D1 同范式）—— 这是 additive 行为，非对等。`adjudication_prefill` 仍不输出。
+    """
     _enable_flag(monkeypatch)
     result = _run(d2.render(_ctx(_session())))
     assert "adjudication_prefill" not in result
-    assert set(result.keys()) == _BASELINE_KEYS
+    # 灰度开时新增 tb_source_codes（additive），不再与 BASELINE_KEYS 等价
+    assert "tb_source_codes" in result, "灰度开时 D2 应下发 tb_source_codes（取数溯源）"
+    assert result["project_context"].get("tb_amount") is not None, (
+        "灰度开时 D2 应下发 project_context.tb_amount（净额 seed 回退）"
+    )
 
 
-def test_flag_on_off_byte_equivalent(monkeypatch):
-    """开关开/关 D2 render 输出逐字节等价（D2 不新增任何键，Property 9 天然成立）。"""
+def test_flag_on_off_additive_only(monkeypatch):
+    """开关开 → D2 render 只 additive 增键（tb_source_codes + project_context.tb_*），
+    不改既有键（sheet_name / responses_snapshot 逐字节等价）。
+    """
     checklist = [
         _checklist_row("D2-adj-individual-current-unadjusted", remark="123456"),
         _checklist_row("D2-detail-rows", remark='[{"customerName":"甲"}]'),
@@ -163,8 +186,13 @@ def test_flag_on_off_byte_equivalent(monkeypatch):
     off = _run(d2.render(_ctx(_session(checklist_rows=list(checklist)))))
     _enable_flag(monkeypatch)
     on = _run(d2.render(_ctx(_session(checklist_rows=list(checklist)))))
-    assert off == on
     assert "adjudication_prefill" not in on
+    # 既有键不变
+    assert off["sheet_name"] == on["sheet_name"]
+    assert off["responses_snapshot"] == on["responses_snapshot"]
+    # project_context：off 没 tb_amount，on 有（additive）
+    for k in off["project_context"]:
+        assert off["project_context"][k] == on["project_context"][k], f"既有键 {k} 不应改变"
 
 
 # ---------------------------------------------------------------------------

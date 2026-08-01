@@ -11,9 +11,9 @@ D1 的 KEY BOUNDARY（宁缺勿造 R3.4）：
     **只有科目总额、无「原值/坏账/净值 × 银行/商业」组合维度** → 无法把 TB 干净映射到分类行
     → D1 render **不返回 adjudication_prefill**（不臆造）。
   * 因此 D1 render 输出在开关开/关时**逐字节等价**（Property 9 天然成立，零回归）。
-  * 唯一可从四表库干净取的是 `D1-adj-tb-amount`（1121 总额）—— 已由 render 的
+  * 唯一可从四表库干净取的是 `D1-adj-tb-amount`（应收票据**净额**）—— 已由 render 的
     `project_context.tb_amount` seed（前端 tbSeedAmount 回退），且注册为 Tier A **可编辑**
-    公式 `TB('1121','期末余额')`。
+    公式 `TB('1121','期末余额') - TB('1231-01','期末余额')`（口径依据见 `_D1_EXPRESSION`）。
   * D1-3 客户明细期后兑付（`importPostSettlementFromLedger` 序时账 1121 贷方）为前端既有
     一键取数，本 render 不介入、不冲突（手工优先精度）。
 
@@ -40,7 +40,14 @@ from app.services.d_cycle_extraction.presets import (
 from app.services.wp_formula_eval_service import find_unsupported_formula_functions
 
 _D1_ANCHOR = "D1-adj-tb-amount"
-_D1_EXPRESSION = "TB('1121','期末余额')"
+# 🔴 **净额**口径（原值 1121 − 坏账准备 1231-01），非原值。双证：
+#   ① 源模板 `审定表D1-1` 的差异数 `E20=E18-E19`，E18 是「三、应收票据净值」小计
+#      → 被比较的「试算平衡表数」E19 必然是净额；
+#   ② `report_config` 的 BS-005 应收票据在 soe_standalone 下公式正是
+#      `TB('1121','期末余额') - TB('1231-01','期末余额')`（报表按净额列示）。
+# 原登记的原值口径会让核对行显示一个恰好等于坏账准备的**假差异**
+# （实测项目 0ec33ac9：审定净值 19,046,910.15 vs 原值 20,209,198.18，差 1,162,288.03）。
+_D1_EXPRESSION = "TB('1121','期末余额') - TB('1231-01','期末余额')"
 
 # D1 render characterization 基线顶层键
 _BASELINE_KEYS = {"sheet_name", "project_context", "responses_snapshot"}
@@ -80,12 +87,16 @@ class _FakeSession:
         project_row=None,
         rp_rows=None,
         tb_row=None,
+        tb_provision_row=None,
         tb_balance_rows=None,
     ):
         self.checklist_rows = checklist_rows or []
         self.project_row = project_row
         self.rp_rows = rp_rows or []
         self.tb_row = tb_row
+        # 坏账准备（1231-01）行；默认 None → `_seed_tb_provision_amount` 不写键，
+        # `_net_tb_amount` 空操作 → 灰度开/关逐字节等价（零回归基线不变）
+        self.tb_provision_row = tb_provision_row
         # tb_balance 叶子行（供 seed_d1_detail_rows 的 1121/1231 查询）；默认空 → seed no-op
         self.tb_balance_rows = tb_balance_rows or []
 
@@ -96,6 +107,14 @@ class _FakeSession:
         if "related_party_registry" in s:
             return _FakeResult(rows=self.rp_rows)
         if "trial_balance" in s:
+            # 🔴 原值（1121，前缀内联在 SQL 里）与坏账准备（1231-01，走绑定参数 :c0）
+            #    是**两个**查询。此前不区分 → 两次都返回同一行，坏账 == 原值
+            #    → 净额恒为 0，把 `_net_tb_amount` 的守卫变成噪声。
+            wants_provision = any(
+                str(v).startswith("1231") for v in (params or {}).values()
+            )
+            if wants_provision:
+                return _FakeResult(one=self.tb_provision_row)
             return _FakeResult(one=self.tb_row)
         if "from projects" in s or "projects where" in s:
             return _FakeResult(one=self.project_row)
@@ -334,7 +353,11 @@ def test_no_fabricated_classification_rows(monkeypatch):
 
 
 def test_tb_amount_seeded_in_project_context(monkeypatch):
-    """既有 TB(1121) seed 路径保留：project_context.tb_amount 由 render 提供（审定优先，回退未审）。"""
+    """既有 TB seed 路径保留：project_context.tb_amount 由 render 提供（审定优先，回退未审）。
+
+    fake session 无 1231-01 坏账行 → `_net_tb_amount` 空操作，tb_amount 保持原值口径
+    （净额转换本身由 `test_net_tb_amount_*` 覆盖）。
+    """
     _enable_flag(monkeypatch)
     result = _run(d1.render(_ctx(_session())))
     pc = result["project_context"]
@@ -342,6 +365,7 @@ def test_tb_amount_seeded_in_project_context(monkeypatch):
     assert pc["tb_amount"] == 1200.0
     assert pc["tb_amount_unadjusted"] == 1000.0
     assert pc["tb_amount_audited"] == 1200.0
+    assert "tb_amount_gross" not in pc, "无坏账数据时不得造溯源键（零回归）"
 
 
 def test_coexist_with_existing_detail_seed(monkeypatch):
@@ -367,15 +391,18 @@ def test_coexist_with_existing_detail_seed(monkeypatch):
 
 
 def test_d1_preset_passes_both_gates(monkeypatch):
-    """D1 预设 D1-adj-tb-amount / TB('1121','期末余额') 通过锚点合法性 + 受支持函数双门。"""
+    """D1 预设（净额口径）通过锚点合法性 + 受支持函数双门。"""
     _reset_presets_cache(monkeypatch)
     presets = load_presets("D1")
-    assert len(presets) == 1, "Task 5.2：D1 应有且仅有 1 条 Tier A 预设（1121 总额，宁缺勿造）"
+    assert len(presets) == 1, "D1 应有且仅有 1 条 Tier A 预设（应收票据净额，宁缺勿造）"
     entry = presets[0]
     assert entry["anchor"] == _D1_ANCHOR
     assert entry["expression"] == _D1_EXPRESSION
     assert is_known_anchor("D1", entry["anchor"]) is True
     assert find_unsupported_formula_functions(entry["expression"]) == []
+    # 口径守卫：必须同时含原值与坏账准备两项且是减项（原值口径会产生假差异）
+    assert "TB('1121'" in entry["expression"] and "- TB('1231-01'" in entry["expression"]
+    assert "净额" in entry["description"], "description 须写明净额口径与依据"
 
 
 def test_resolve_effective_returns_d1_preset(monkeypatch):
@@ -570,3 +597,62 @@ def _wp_formula(target_cell, *, expression, sheet_name="D1-1", wp=None):
 
 def _user():
     return SimpleNamespace(id=uuid4(), username="tester")
+
+
+# ---------------------------------------------------------------------------
+# TB 核对回退标量口径（净额，必须与 Tier A 预设同口径）
+# ---------------------------------------------------------------------------
+
+
+def test_net_tb_amount_converts_gross_to_net():
+    """`_net_tb_amount` 把 tb_amount 三个口径全部转净额，并留 gross 供溯源。"""
+    pc = {
+        "tb_amount": 20209198.18,
+        "tb_amount_unadjusted": 20209198.18,
+        "tb_amount_audited": 20209198.18,
+        "tb_provision_amount": 1162288.03,
+        "tb_provision_amount_unadjusted": 1162288.03,
+        "tb_provision_amount_audited": 1162288.03,
+    }
+    d1._net_tb_amount(pc)
+
+    # 实测项目 0ec33ac9 的活体值：净额 = 原值 − 坏账准备
+    assert round(pc["tb_amount"], 2) == 19046910.15
+    assert round(pc["tb_amount_unadjusted"], 2) == 19046910.15
+    assert round(pc["tb_amount_audited"], 2) == 19046910.15
+    # 原值保留供审定表取数溯源（前端 tbSeedProvenance 消费，非 dead output）
+    assert round(pc["tb_amount_gross"], 2) == 20209198.18
+    assert round(pc["tb_amount_gross_audited"], 2) == 20209198.18
+
+
+def test_net_tb_amount_noop_without_provision():
+    """无 tb_amount 或无坏账准备 → **完全不动** project_context。
+
+    🔴 后者是零回归要求：该项目没有 1231-01 数据时净额恒等于原值，
+    若仍造 `tb_amount_gross` 溯源键，`test_flag_on_off_byte_equivalent_when_no_tb_leaves`
+    的灰度开/关逐字节等价即被打破。
+    """
+    empty: dict = {}
+    d1._net_tb_amount(empty)
+    assert empty == {}
+
+    no_prov = {"tb_amount": 100.0}
+    d1._net_tb_amount(no_prov)
+    assert no_prov == {"tb_amount": 100.0}
+
+
+def test_net_tb_amount_matches_tier_a_preset_semantics(monkeypatch):
+    """回退标量与 Tier A 预设**同口径**：都是 原值 − 坏账准备。
+
+    🔴 两者口径分叉是本 spec 实测抓出的缺陷：预设已改净额，而 render 下发的
+    seed 回退仍是原值 → 用户在公式管理停用该 Tier A 公式后，核对行回落到原值，
+    重现「差异恰好等于坏账准备」的假差异。
+    """
+    _reset_presets_cache(monkeypatch)
+    expression = load_presets("D1")[0]["expression"]
+    assert "TB('1121'" in expression and "- TB('1231-01'" in expression
+
+    pc = {"tb_amount": 500.0, "tb_provision_amount": 120.0}
+    d1._net_tb_amount(pc)
+    assert pc["tb_amount"] == 380.0, "回退标量须与预设一样做减项"
+    assert pc["tb_amount_gross"] == 500.0

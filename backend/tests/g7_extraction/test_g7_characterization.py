@@ -1,67 +1,106 @@
-"""Wave 0 / Task 1.2 — 零回归基线（characterization）。
+"""G7 零回归基线（characterization）。
 
-锁定本 spec 依赖的既有语义，后续每波复跑防回归：
-- `_is_leaf` / `_sum_leaf_by_prefix`：叶子过滤无父子双算（Property 1 / 15 基石）。
-- `g7_consol_linkage_service` 关键函数签名存在且语义常量（只填空 / 不自动生成抵消分录）。
+**2026-08-01 改写**：原文件锁的是已删除的自造实现
+（`_is_leaf` / `_sum_leaf_by_prefix` / `_G7_ACCOUNT_PREFIX` 常量断言）。
+那套实现有两个真缺陷 —— 前缀判定缺点号边界（`1511` 误命中 `15110`）、科目前缀硬编码，
+已由 spec `g7-four-table-extraction-and-disclosure-alignment` Wave 1 换成
+`four_table` 共享件 + 报表映射解析。
+
+本文件保留**断言意图**（叶子过滤无父子双算 / 合并联动服务语义不变），
+只把被测对象换成共享件与新纯函数；另新增旧实现缺陷的**反向自检**，
+防止有人把缺边界的判定改回来。
 """
 
 from __future__ import annotations
 
 import inspect
 
-from app.routers.wp_render_strategies._g7_long_term_equity_main import (
-    _G7_ACCOUNT_PREFIX,
-    _G7_IMPAIRMENT_PREFIX,
-    _is_leaf,
-    _sum_leaf_by_prefix,
+from app.services.four_table.leaf_aggregation import (
+    LeafRow,
+    aggregate_leaves,
+    filter_by_prefixes,
+    select_leaves,
 )
 
 
-class TestLeafFilter:
-    def test_is_leaf_true_for_terminal_code(self):
-        codes = {"1511", "1511.01", "1511.02"}
-        assert _is_leaf("1511.01", codes) is True
-        assert _is_leaf("1511.02", codes) is True
+def _row(code: str, opening: float = 0.0, closing: float = 0.0) -> LeafRow:
+    return LeafRow(account_code=code, opening=opening, closing=closing)
 
-    def test_is_leaf_false_for_parent(self):
-        codes = {"1511", "1511.01", "1511.04", "1511.04.01"}
-        assert _is_leaf("1511", codes) is False
-        assert _is_leaf("1511.04", codes) is False
-        assert _is_leaf("1511.04.01", codes) is True
+
+class TestLeafFilter:
+    """叶子过滤无父子双算（原断言意图逐条保留，被测对象换成共享件）。"""
+
+    def test_leaf_true_for_terminal_code(self):
+        rows = [_row("1511"), _row("1511.01"), _row("1511.02")]
+        leaves = {r.account_code for r in select_leaves(rows)}
+        assert leaves == {"1511.01", "1511.02"}
+
+    def test_leaf_false_for_parent(self):
+        rows = [_row("1511"), _row("1511.01"), _row("1511.04"), _row("1511.04.01")]
+        leaves = {r.account_code for r in select_leaves(rows)}
+        assert "1511" not in leaves
+        assert "1511.04" not in leaves
+        assert "1511.04.01" in leaves
 
     def test_sum_leaf_no_double_count(self):
         # 父 1511=999（应被忽略）+ 两叶子 1511.01=100 / 1511.02=200
         rows = [
-            ("1511", 900.0, 999.0),
-            ("1511.01", 40.0, 100.0),
-            ("1511.02", 60.0, 200.0),
+            _row("1511", 900.0, 999.0),
+            _row("1511.01", 40.0, 100.0),
+            _row("1511.02", 60.0, 200.0),
         ]
-        opening, closing, leaf_codes = _sum_leaf_by_prefix(rows, "1511")
-        assert closing == 300.0  # 100 + 200，父级不计入
-        assert opening == 100.0  # 40 + 60
-        assert leaf_codes == ["1511.01", "1511.02"]
+        agg = aggregate_leaves(select_leaves(rows), ["1511"])
+        assert agg["closing"] == 300.0  # 100 + 200，父级不计入
+        assert agg["opening"] == 100.0  # 40 + 60
 
     def test_sum_leaf_multilevel(self):
         rows = [
-            ("1511.04", 0.0, 500.0),  # 父级
-            ("1511.04.01", 0.0, 300.0),  # 叶子
-            ("1511.04.02", 0.0, 200.0),  # 叶子
+            _row("1511.04", 0.0, 500.0),  # 父级
+            _row("1511.04.01", 0.0, 300.0),  # 叶子
+            _row("1511.04.02", 0.0, 200.0),  # 叶子
         ]
-        _, closing, leaf_codes = _sum_leaf_by_prefix(rows, "1511")
-        assert closing == 500.0  # 300 + 200，1511.04 父级不计入
-        assert leaf_codes == ["1511.04.01", "1511.04.02"]
+        leaves = select_leaves(rows)
+        assert {r.account_code for r in leaves} == {"1511.04.01", "1511.04.02"}
+        assert aggregate_leaves(leaves, ["1511"])["closing"] == 500.0
 
     def test_sum_leaf_empty(self):
-        opening, closing, leaf_codes = _sum_leaf_by_prefix([], "1511")
-        assert (opening, closing, leaf_codes) == (0.0, 0.0, [])
+        agg = aggregate_leaves(select_leaves([]), ["1511"])
+        assert agg == {"opening": 0.0, "closing": 0.0, "debit": 0.0, "credit": 0.0}
 
-    def test_prefix_constants(self):
-        assert _G7_ACCOUNT_PREFIX == "1511"
-        assert _G7_IMPAIRMENT_PREFIX == "1512"
+    def test_prefix_requires_dot_boundary(self):
+        """🔴 反向自检：旧实现 `code.startswith(prefix)` 会把 `15110` 算进 `1511`。
+
+        `15110` 是与 `1511` 无父子关系的另一科目（客户平铺编码时真实存在）。
+        共享件 `filter_by_prefixes` 要求 ``code == p or code.startswith(p + '.')``。
+        """
+        rows = [_row("1511", 0.0, 100.0), _row("15110", 0.0, 999.0)]
+        picked = {r.account_code for r in filter_by_prefixes(rows, ["1511"])}
+        assert picked == {"1511"}, "前缀匹配必须有点号边界，不得命中 15110"
+        # 旧口径反证：无边界时会多算
+        assert {r.account_code for r in rows if r.account_code.startswith("1511")} == {
+            "1511",
+            "15110",
+        }
+
+    def test_account_codes_not_hardcoded_in_render_strategy(self):
+        """🔴 R11.2：render 策略不得再用常量前缀当输出值。
+
+        科目一律经 `G7_ACCOUNT_SPEC` + 报表映射解析；旧常量
+        `_G7_ACCOUNT_PREFIX` / `_G7_IMPAIRMENT_PREFIX` 必须已删除。
+        """
+        from app.routers.wp_render_strategies import _g7_long_term_equity_main as g7
+
+        assert not hasattr(g7, "_G7_ACCOUNT_PREFIX")
+        assert not hasattr(g7, "_G7_IMPAIRMENT_PREFIX")
+        assert g7.G7_ACCOUNT_SPEC.row_code == "BS-024"
+        assert g7.G7_ACCOUNT_SPEC.provision_row_code == "IMP-009"
+        # 兜底码只许出现在 spec 声明里（fail-open 用），不得散落
+        assert g7.G7_ACCOUNT_SPEC.fallback_gross == ("1511",)
+        assert g7.G7_ACCOUNT_SPEC.fallback_provision == ("1512",)
 
 
 class TestConsolLinkageServiceSemantics:
-    """Property 15：合并联动服务映射 / 比例 / 只填空 / 不自动生成抵消分录逐字节不变。"""
+    """合并联动服务映射 / 比例 / 只填空 / 不自动生成抵消分录逐字节不变。"""
 
     def test_key_functions_exist(self):
         from app.services import g7_consol_linkage_service as svc

@@ -5,7 +5,7 @@ spec: .kiro/specs/d-cycle-tier-a-writeback-detail-seed/
 
 D6 render 在**主开关 ∧ 子开关**（`D_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED` ∧
 `D_CYCLE_DETAIL_SEED_ENABLED`）均开、且 D6-2 明细表**完全空**时，调既有可复用归集
-`aggregate_d6_detail_rows`（tb_aux_balance 1402 客户/合同维度，Wave0 抽取的纯函数入口，
+`aggregate_d6_detail_rows`（tb_aux_balance 1141 客户/合同维度，Wave0 抽取的纯函数入口，
 复用不新造第 3 套四表库读取）**transient seed** 明细行进 render 返回 `detail_prefill`
 ——只进返回 payload、**不落 checklist_responses/DB**（对齐 D6 Tier B `adjudication_prefill`）。
 
@@ -14,7 +14,7 @@ D6 render 在**主开关 ∧ 子开关**（`D_CYCLE_FOUR_TABLE_EXTRACTION_ENABLE
     D6-2 已有任一行 → 不 seed（不覆盖手工/既有一键取数）；子开关关 → 无 detail seed；
     主开关关（即便子开关开）→ 无 detail seed（被主开关 AND / "发 P0-1、压 P0-2"）。
   * **Property 9（复用既有函数不新造）**：seed 调 `aggregate_d6_detail_rows`（既有归集），
-    SQL 命中 tb_aux_balance + 1402（原端点逐字节相同的复用聚合，非新造读取）。
+    SQL 命中 tb_aux_balance + 1141（原端点逐字节相同的复用聚合，非新造读取）。
   * **Property 11（fail-open）**：归集查询异常 / 无 aux 数据 → 无 detail_prefill，render 正常。
   * **Property 13（seed 全程 transient 不落库）**：detail seed 只进返回 detail_prefill，
     fake session 无任何 INSERT/UPDATE 写。
@@ -103,7 +103,7 @@ def _checklist_row(item_id: str, conclusion: str = "", remark: str = ""):
 
 
 def _aux_row(aux_name, prior, current):
-    """tb_aux_balance 1402 归集行（labels: aux_name/prior_balance/current_balance）。"""
+    """tb_aux_balance 1141 归集行（labels: aux_name/prior_balance/current_balance）。"""
     return SimpleNamespace(
         aux_name=aux_name, prior_balance=prior, current_balance=current
     )
@@ -260,8 +260,8 @@ def test_detail_seed_reuses_aggregate_function(monkeypatch):
     result = _run(d6.render(_ctx(db)))
     assert called.get("hit") is True, "detail seed 必须调既有 aggregate_d6_detail_rows"
     assert "detail_prefill" in result
-    # 复用既有归集 SQL（tb_aux_balance 1402），非新造第 3 套读取
-    assert any("tb_aux_balance" in sql and "1402" in sql for sql in db.executed_sql)
+    # 复用既有归集 SQL（tb_aux_balance 1141），非新造第 3 套读取
+    assert any("tb_aux_balance" in sql and "1141" in sql for sql in db.executed_sql)
 
 
 # ---------------------------------------------------------------------------
@@ -279,7 +279,7 @@ def test_aggregation_error_fails_open(monkeypatch):
 
 
 def test_no_aux_data_no_seed(monkeypatch):
-    """无 1402 归集数据 → 无 detail_prefill（aggregate 返回 []，fail-open 空 / R4.5）。"""
+    """无 1141 归集数据 → 无 detail_prefill（aggregate 返回 []，fail-open 空 / R4.5）。"""
     _set_gates(monkeypatch, main=True, sub=True)
     _isolate_p0_1(monkeypatch)
     result = _run(d6.render(_ctx(_session(aux_rows=[]))))

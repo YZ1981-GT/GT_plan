@@ -72,18 +72,40 @@ class TestProperty1AnalysisSheetCoverage:
     and a TB/TB_SUM cell.
     """
 
+    # 🔴 2026-08-01 修正（spec d-cycle-extraction-chain-completion Wave 5）：
+    # 原判据 `"分析程序" in sheet` 假设所有循环的分析程序 sheet 都叫「分析程序Dx-y」，
+    # 但 openpyxl 直读源模板实证——D2/D3/D7 的真实 sheet 名带具体业务前缀
+    # （「应收账款分析表D2-5」「预收账款分析表D3-4」「合同负债分析表D7-4」，压根不含
+    # 「分析程序」字样，此前用虚构 sheet 名 `分析程序D2-5`/`分析程序D3-3` 硬凑字符串
+    # 匹配）；D5/D6 源模板**没有**独立分析程序 sheet（只有审定表/明细表/调整分录/
+    # 减值测算等）；D0 的 `分析程序D0-3` 同样是虚构值（源模板真实 D0-3 是「跟函函证
+    # 过程控制」）。改为显式登记「有该结构的循环 → 真实 sheet 名子串」，
+    # 无该结构的循环不再强制要求。
+    _ANALYSIS_SHEET_HINT = {
+        "D1": None,  # D1 无独立分析程序 sheet（明细表已覆盖趋势分析）
+        "D2": "分析表",
+        "D3": "分析表",
+        "D4": "分析程序",  # D4 源模板真实存在「分析程序D4-3」（收入循环，未在本 spec 复核）
+        "D5": None,  # 源模板无此 sheet（审定表D5/明细表D5-2/公允价值测算D5-4）
+        "D6": None,  # 源模板无此 sheet
+        "D7": "分析表",
+    }
+
     def test_each_d_cycle_wp_has_analysis_sheet_entry(self):
-        """Each D0-D7 wp_code has at least one Analysis_Sheet (分析程序) entry."""
+        """有分析程序结构的 D 循环（D2/D3/D4/D7）在 prefill 中有对应 entry；
+        D1/D5/D6 无该结构，不强制要求（源模板逐一核实无此 sheet）。
+        """
         mappings = PREFILL_DATA["mappings"]
 
-        for wp_code in D_CYCLE_WP_CODES:
-            # Find Analysis_Sheet entries for this wp_code
+        for wp_code, hint in self._ANALYSIS_SHEET_HINT.items():
+            if hint is None:
+                continue
             analysis_entries = [
                 m for m in mappings
-                if m["wp_code"] == wp_code and "分析程序" in m.get("sheet", "")
+                if m["wp_code"] == wp_code and hint in m.get("sheet", "")
             ]
             assert len(analysis_entries) >= 1, (
-                f"{wp_code} missing Analysis_Sheet (分析程序) entry in prefill_formula_mapping"
+                f"{wp_code} missing Analysis_Sheet entry (expect sheet containing '{hint}')"
             )
 
     def test_analysis_sheet_has_prev_and_tb(self):

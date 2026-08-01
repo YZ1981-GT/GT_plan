@@ -101,7 +101,7 @@ def _wp():
 
 
 def _saved_formula(target_cell, *, sheet_name="D6-1", wp=None,
-                   formula_type="auto_calc", expression="TB('1402','期末余额')"):
+                   formula_type="auto_calc", expression="TB('1141','期末余额')"):
     return SimpleNamespace(
         id=uuid4(),
         project_id=(wp.project_id if wp else uuid4()),
@@ -184,7 +184,7 @@ def test_put_auto_calc_currently_writes_parsed_data_for_d_cycle_anchor(monkeypat
     db = _FakeSession(wp=wp, wp_code="D6", user_formulas=[])
     body = router_mod.FormulaSaveRequest(
         sheet_name="D6-1", target_cell="D6-1-tb-amount",
-        expression="TB('1402','期末余额')", year=2025,
+        expression="TB('1141','期末余额')", year=2025,
     )
 
     resp = _run(router_mod.save_formula(wp.id, body, db=db, user=_user()))
@@ -215,7 +215,7 @@ def test_put_auto_calc_dcycle_anchor_flag_gated_parsed_data_write(monkeypatch):
     db = _FakeSession(wp=wp, wp_code="D6", user_formulas=[])
     body = router_mod.FormulaSaveRequest(
         sheet_name="D6-1", target_cell="D6-1-tb-amount",
-        expression="TB('1402','期末余额')", year=2025,
+        expression="TB('1141','期末余额')", year=2025,
     )
     _run(router_mod.save_formula(wp.id, body, db=db, user=_user()))
     assert len(calls_off) == 1, "主开关关时 D-cycle 锚点仍写 parsed_data（零回归）"
@@ -238,7 +238,7 @@ def test_put_logic_check_does_not_write_parsed_data(monkeypatch):
     db = _FakeSession(wp=wp, wp_code="D6", user_formulas=[])
     body = router_mod.FormulaSaveRequest(
         sheet_name="D6-1", target_cell="D6-1-tb-amount",
-        expression="TB('1402','期末余额')", year=2025,
+        expression="TB('1141','期末余额')", year=2025,
         formula_type="logic_check",
     )
     resp = _run(router_mod.save_formula(wp.id, body, db=db, user=_user()))
@@ -258,7 +258,7 @@ def _get_session(wp, wp_code="D6", user_formulas=None, project_year=None):
     )
 
 
-def _preset(anchor, *, sheet_name="D6-1", expression="TB('1402','期末余额')"):
+def _preset(anchor, *, sheet_name="D6-1", expression="TB('1141','期末余额')"):
     return {
         "wp_code": "D6", "sheet_name": sheet_name, "anchor": anchor,
         "expression": expression, "formula_type": "auto_calc",

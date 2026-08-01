@@ -267,3 +267,70 @@ def test_disclosure_sheet_names_match_source_xlsx_literals():
     # 反向自检：旧的错误写法不得残留
     assert "附注披露信息（上市公司）" not in names
     assert "附注披露信息（国有企业）" not in names
+
+
+# ─────────────────── K1-3 坏账准备 render seed（k1-extraction-chain-and-note-alignment） ───────────────────
+#
+# spec: .kiro/specs/k1-extraction-chain-and-note-alignment/
+# Requirements 2.1, 2.4 / Property 3
+#
+# 复用本文件顶部的 `_leaves()` fixture（真实项目 0ec33ac9/2025 科目树）：
+# 备抵叶子仅 `1231.03`（期初 639230.01 / 期末 900217.36），期末 - 期初 = 260987.35
+# 为净增（贷方计提），故应归入 `currentProvision`。
+
+
+def test_k1_bad_debt_seed_from_real_fixture_isolates_other_receivable():
+    from app.services.four_table.k1_detail_seed import build_k1_bad_debt_seed_from_tb
+
+    accounts = _accounts()
+    p = build_k1_bad_debt_seed_from_tb(_leaves(), accounts.provision)
+    assert p is not None
+    portfolio = next(r for r in p["mainRows"] if r["category"] == "portfolio")
+    assert portfolio["priorBook"] == PROV_OPENING
+    assert portfolio["currentBook"] == PROV_CLOSING
+    # 不得混入 1231.02（应收账款坏账）
+    assert portfolio["currentBook"] != WHOLE_1231_CLOSING
+
+
+def test_k1_bad_debt_seed_fail_open_on_empty_provision():
+    from app.services.four_table.k1_detail_seed import build_k1_bad_debt_seed_from_tb
+
+    assert build_k1_bad_debt_seed_from_tb([], []) is None
+    assert build_k1_bad_debt_seed_from_tb(_leaves(), []) is None
+
+
+def test_render_seeds_k1_3_when_no_manual_data():
+    """characterization：render 在无手工 K1-3 数据时写入 seed，
+    且不影响既有 `adjudication_prefill` / `tb_values` / `tb_source_codes` 输出键。"""
+    from app.services.four_table.k1_detail_seed import (
+        K1_BAD_DEBT_ITEM_ID,
+        build_k1_bad_debt_seed_from_tb,
+        seed_k1_bad_debt,
+    )
+
+    accounts = _accounts()
+    responses_snapshot: dict = {}
+    p = build_k1_bad_debt_seed_from_tb(_leaves(), accounts.provision)
+    assert seed_k1_bad_debt(responses_snapshot, p) is True
+    assert K1_BAD_DEBT_ITEM_ID in responses_snapshot
+
+
+def test_render_seed_skipped_when_manual_k1_3_present():
+    import json as _json
+
+    from app.services.four_table.k1_detail_seed import (
+        K1_BAD_DEBT_ITEM_ID,
+        build_k1_bad_debt_seed_from_tb,
+        seed_k1_bad_debt,
+    )
+
+    manual = {"version": 2, "mainRows": [
+        {"category": "portfolio", "isSubRow": False, "priorBook": 42.0},
+    ]}
+    responses_snapshot = {
+        K1_BAD_DEBT_ITEM_ID: {"conclusion": "", "remark": _json.dumps(manual)}
+    }
+    accounts = _accounts()
+    p = build_k1_bad_debt_seed_from_tb(_leaves(), accounts.provision)
+    assert seed_k1_bad_debt(responses_snapshot, p) is False
+    assert _json.loads(responses_snapshot[K1_BAD_DEBT_ITEM_ID]["remark"]) == manual

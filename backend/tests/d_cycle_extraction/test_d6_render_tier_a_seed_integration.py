@@ -12,9 +12,9 @@ spec: .kiro/specs/d-cycle-tier-a-writeback-detail-seed/
     seed，顶层键与 characterization 基线一致。
   * **主机制 + 写对字段（Property 6 / R3.7）**：主开关开 + 默认预设 → seed
     responses_snapshot["D6-1-tb-amount"]["remark"]。
-  * **Property 7（默认预设等价 tb_amount）**：默认预设 `TB('1402','期末余额')` 求值
+  * **Property 7（默认预设等价 tb_amount）**：默认预设 `TB('1141','期末余额')` 求值
     = project_context.tb_amount 口径。
-  * **编辑即生效**：用户 custom 公式（`TB('1402','年初余额')`）→ seed 按新公式取数（期初余额）。
+  * **编辑即生效**：用户 custom 公式（`TB('1141','年初余额')`）→ seed 按新公式取数（期初余额）。
   * **手工优先（Property 6 / R3.2）**：D6-1-tb-amount 持久层已有非空 remark → 不覆盖。
   * **disabled 跳过（R3.3）**：user 禁用绑定 → 不 seed。
   * **fail-open（Property 11 / R3.4）**：year 缺失 / resolve_effective 异常 / 求值有 eval_errors
@@ -233,7 +233,7 @@ def test_flag_on_seeds_tb_amount_to_remark(monkeypatch):
 
 
 def test_property7_default_preset_equiv_tb_amount(monkeypatch):
-    """Property 7：默认预设 TB('1402','期末余额') 求值 = project_context.tb_amount 口径。"""
+    """Property 7：默认预设 TB('1141','期末余额') 求值 = project_context.tb_amount 口径。"""
     _enable(monkeypatch)
     _reset_presets(monkeypatch)
     _patch_filters(monkeypatch)
@@ -244,11 +244,11 @@ def test_property7_default_preset_equiv_tb_amount(monkeypatch):
 
 
 def test_edited_custom_formula_takes_effect(monkeypatch):
-    """编辑即生效：用户 custom 公式 TB('1402','年初余额') → seed 按新公式取期初余额。"""
+    """编辑即生效：用户 custom 公式 TB('1141','年初余额') → seed 按新公式取期初余额。"""
     _enable(monkeypatch)
     _reset_presets(monkeypatch)
     _patch_filters(monkeypatch)
-    user = [_user_formula(_ANCHOR, expression="TB('1402','年初余额')")]
+    user = [_user_formula(_ANCHOR, expression="TB('1141','年初余额')")]
     result = _run(d6.render(_ctx(_session(user_formulas=user))))
     # 年初余额 → opening_balance = 12345.67
     assert result["responses_snapshot"][_ANCHOR]["remark"] == "12345.67"

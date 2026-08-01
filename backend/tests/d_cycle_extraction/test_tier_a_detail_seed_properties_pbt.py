@@ -162,7 +162,7 @@ def _wp():
 
 
 def _saved(target_cell, *, sheet_name="D6-1", wp=None, formula_type="auto_calc",
-           expression="TB('1402','期末余额')"):
+           expression="TB('1141','期末余额')"):
     return SimpleNamespace(
         id=uuid4(), project_id=(wp.project_id if wp else uuid4()),
         wp_id=(wp.id if wp else uuid4()), sheet_name=sheet_name,
@@ -208,7 +208,7 @@ def _patch_save(monkeypatch, *, saved, evaluated, eval_errors=None):
     return write_calls
 
 
-def _body(target_cell, *, sheet_name="D6-1", expression="TB('1402','期末余额')",
+def _body(target_cell, *, sheet_name="D6-1", expression="TB('1141','期末余额')",
           formula_type="auto_calc"):
     return router_mod.FormulaSaveRequest(
         sheet_name=sheet_name, target_cell=target_cell, expression=expression,
@@ -364,9 +364,9 @@ def test_pbt_p4_resolve_tb_via_active_filter_same_project_year(monkeypatch, year
 
     monkeypatch.setattr(eval_mod, "get_active_filter", _fake_filter)
     pid = uuid4()
-    sess = _EvalSession([_tb_eval_row("1402", audited=audited)])
+    sess = _EvalSession([_tb_eval_row("1141", audited=audited)])
 
-    val = _run(_resolve_tb(sess, pid, year, "1402", "期末余额"))
+    val = _run(_resolve_tb(sess, pid, year, "1141", "期末余额"))
 
     assert val == Decimal(str(audited))
     assert len(calls) == 1
@@ -405,7 +405,7 @@ class _GetSession:
         return None
 
 
-def _preset(anchor, *, expression="TB('1402','期末余额')", sheet_name="D6-1"):
+def _preset(anchor, *, expression="TB('1141','期末余额')", sheet_name="D6-1"):
     return {
         "wp_code": "D6", "sheet_name": sheet_name, "anchor": anchor,
         "expression": expression, "formula_type": "auto_calc",
@@ -442,7 +442,7 @@ def test_pbt_p5_get_tier_a_value_single_fail_open(monkeypatch, fail_flags, value
         # 保证锚点唯一：仅取前 len(anchors) 条
         if i >= len(anchors):
             break
-        expr = f"TB('{'9999' if fail else '1402'}','期末余额')"
+        expr = f"TB('{'9999' if fail else '1141'}','期末余额')"
         if fail:
             fail_exprs.add(expr)
         bindings.append(_preset(anchor, expression=expr))
@@ -781,7 +781,7 @@ def test_pbt_p8_detail_seed_gating_truth_table(monkeypatch, main, sub, has_rows)
 @given(n=st.integers(min_value=1, max_value=5))
 def test_pbt_p9_detail_seed_reuses_aggregate_function(monkeypatch, n):
     """任意 n 条 aux 归集 → detail seed 调既有 aggregate_d6_detail_rows（复用不新造），
-    SQL 命中 tb_aux_balance + 1402，detail_prefill 行数 = n。"""
+    SQL 命中 tb_aux_balance + 1141，detail_prefill 行数 = n。"""
     _set_gates(monkeypatch, main=True, sub=True)
     _isolate_p0_1(monkeypatch)
     aux = [_aux_row(f"c{i}", float(i), float(i + 1)) for i in range(n)]
@@ -797,7 +797,7 @@ def test_pbt_p9_detail_seed_reuses_aggregate_function(monkeypatch, n):
     result = _run(d6.render(_detail_ctx(db)))
     assert called["hit"] is True, "必调既有 aggregate_d6_detail_rows（复用不新造 / Property 9）"
     assert len(result["detail_prefill"]) == n
-    assert any("tb_aux_balance" in s and "1402" in s for s in db.executed_sql)
+    assert any("tb_aux_balance" in s and "1141" in s for s in db.executed_sql)
 
 
 # ---------------------------------------------------------------------------

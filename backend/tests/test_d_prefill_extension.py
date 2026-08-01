@@ -20,8 +20,12 @@ D_CYCLE_MINIMUM_CELLS = 566  # D 循环完成后最低 cells 数
 EXPECTED_NEW_CELLS = 30
 
 # 5 个新增 sheet 的标识
+# 🔴 2026-08-01 修正（spec d-cycle-extraction-chain-completion Wave 5）：
+# 原「应收账款明细表D2-2」条目已删除 —— openpyxl 直读源模板实证该 sheet 名不存在
+# （D2 真实明细表 sheet 名是「明细表D2-2」），其 10 个 AUX('1122','客户','TOPn',...)
+# 客户排名取数在 D2-2 底稿无对应实现（`useD2Detail` 无 TOPn 排名概念），
+# 按「宁缺勿造」删除而非修正到虚构表名下。
 NEW_SHEET_NAMES = [
-    "应收账款明细表D2-2",
     "坏账准备明细表D2-3",
     "主营业务收入明细表D4-2",
     "营业收入账面金额与ERP系统核对记录D4-13",
@@ -61,17 +65,17 @@ def test_new_sheets_exist(prefill_data):
         assert sheet_name in all_sheets, f"Sheet '{sheet_name}' not found in mappings"
 
 
-def test_d2_2_has_10_aux_cells(prefill_data):
-    """D2-2 明细表有 10 个 AUX 类型 cell"""
+def test_d2_2_customer_topn_entry_removed(prefill_data):
+    """D2-2 客户 TOPn 排名条目（虚构 sheet 名 + 无对应底稿实现）已删除。
+
+    🔴 2026-08-01 修正：原断言要求「应收账款明细表D2-2」下 10 个 AUX('1122','客户',
+    'TOPn',...) cell 存在，但该 sheet 名从未在源模板出现过（真实 sheet 名是
+    「明细表D2-2」），且 D2-2 底稿（`useD2Detail`）没有客户 TOP1~TOP5 排名字段 ——
+    这是一条编造的取数说明，删除比保留更诚实。
+    """
     mappings = prefill_data["mappings"]
-    d2_2 = [m for m in mappings if m["sheet"] == "应收账款明细表D2-2"]
-    assert len(d2_2) == 1, f"Expected 1 D2-2 mapping, got {len(d2_2)}"
-    cells = d2_2[0]["cells"]
-    assert len(cells) == 10, f"Expected 10 cells for D2-2, got {len(cells)}"
-    for cell in cells:
-        assert cell["formula_type"] == "AUX", (
-            f"D2-2 cell '{cell['cell_ref']}' has type '{cell['formula_type']}', expected AUX"
-        )
+    ghost = [m for m in mappings if m["sheet"] == "应收账款明细表D2-2"]
+    assert ghost == [], f"虚构 sheet「应收账款明细表D2-2」不应再存在于 prefill mapping：{ghost}"
 
 
 def test_d2_3_has_5_cells(prefill_data):

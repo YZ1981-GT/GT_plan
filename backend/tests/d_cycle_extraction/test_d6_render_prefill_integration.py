@@ -171,7 +171,7 @@ def test_flag_off_ignores_tb_balance_rows(monkeypatch):
     """开关关闭时，即便 tb_balance 有叶子子科目，也不返回 adjudication_prefill。"""
     _disable_flag(monkeypatch)
     _patch_active_filter(monkeypatch)
-    rows = [_tb_leaf("1402.01", "合同资产-明细", opening=800.0, closing=1000.0)]
+    rows = [_tb_leaf("1141.01", "合同资产-明细", opening=800.0, closing=1000.0)]
     result = _run(d6.render(_ctx(_session(tb_balance_rows=rows))))
     assert "adjudication_prefill" not in result
 
@@ -186,8 +186,8 @@ def test_flag_on_returns_prefill_rows(monkeypatch):
     _enable_flag(monkeypatch)
     _patch_active_filter(monkeypatch)
     rows = [
-        _tb_leaf("1402.01", "工程类合同资产", opening=800.0, closing=1000.0),
-        _tb_leaf("1402.02", "服务类合同资产", opening=200.0, closing=300.0),
+        _tb_leaf("1141.01", "工程类合同资产", opening=800.0, closing=1000.0),
+        _tb_leaf("1141.02", "服务类合同资产", opening=200.0, closing=300.0),
     ]
     result = _run(d6.render(_ctx(_session(tb_balance_rows=rows))))
     assert "adjudication_prefill" in result
@@ -195,7 +195,7 @@ def test_flag_on_returns_prefill_rows(monkeypatch):
     assert isinstance(prefill, list)
     assert len(prefill) == 2
     # 按 abs(closing) 降序
-    assert [r["code"] for r in prefill] == ["1402.01", "1402.02"]
+    assert [r["code"] for r in prefill] == ["1141.01", "1141.02"]
     first = prefill[0]
     assert first["name"] == "工程类合同资产"
     assert first["opening_balance"] == 800.0
@@ -212,13 +212,13 @@ def test_flag_on_leaf_only_no_double_count(monkeypatch):
     _enable_flag(monkeypatch)
     _patch_active_filter(monkeypatch)
     rows = [
-        _tb_leaf("1402.01", "合同资产-中间级", opening=800.0, closing=1000.0),
-        _tb_leaf("1402.01.01", "合同资产-明细", opening=800.0, closing=1000.0),
+        _tb_leaf("1141.01", "合同资产-中间级", opening=800.0, closing=1000.0),
+        _tb_leaf("1141.01.01", "合同资产-明细", opening=800.0, closing=1000.0),
     ]
     result = _run(d6.render(_ctx(_session(tb_balance_rows=rows))))
     prefill = result["adjudication_prefill"]
     assert len(prefill) == 1
-    assert prefill[0]["code"] == "1402.01.01"
+    assert prefill[0]["code"] == "1141.01.01"
     assert sum(r["closing_balance"] for r in prefill) == 1000.0
 
 
@@ -249,7 +249,7 @@ def test_property2_existing_perfield_unadjusted_blocks_prefill(monkeypatch):
     """block1 某行已有 currentUnadjusted 非空 → 不返回 adjudication_prefill（手工优先）。"""
     _enable_flag(monkeypatch)
     _patch_active_filter(monkeypatch)
-    rows = [_tb_leaf("1402.01", "工程类合同资产", opening=800.0, closing=1000.0)]
+    rows = [_tb_leaf("1141.01", "工程类合同资产", opening=800.0, closing=1000.0)]
     checklist = [
         _checklist_row("D6-1-adj-block1-row-abc-currentUnadjusted", remark="500000"),
     ]
@@ -263,7 +263,7 @@ def test_property2_existing_rowkeys_blocks_prefill(monkeypatch):
     """block1 行键清单非空 → 视为已建行 → 不预填。"""
     _enable_flag(monkeypatch)
     _patch_active_filter(monkeypatch)
-    rows = [_tb_leaf("1402.01", "工程类合同资产", opening=800.0, closing=1000.0)]
+    rows = [_tb_leaf("1141.01", "工程类合同资产", opening=800.0, closing=1000.0)]
     checklist = [
         _checklist_row("D6-1-adj-block1-rowKeys", remark='["row-abc","row-def"]'),
     ]
@@ -277,7 +277,7 @@ def test_property2_empty_rowkeys_does_not_block(monkeypatch):
     """block1 行键清单为空数组 → 视为未填 → 仍预填。"""
     _enable_flag(monkeypatch)
     _patch_active_filter(monkeypatch)
-    rows = [_tb_leaf("1402.01", "工程类合同资产", opening=800.0, closing=1000.0)]
+    rows = [_tb_leaf("1141.01", "工程类合同资产", opening=800.0, closing=1000.0)]
     checklist = [_checklist_row("D6-1-adj-block1-rowKeys", remark="[]")]
     result = _run(
         d6.render(_ctx(_session(checklist_rows=checklist, tb_balance_rows=rows)))
@@ -290,7 +290,7 @@ def test_property2_block2_or_note_data_does_not_block(monkeypatch):
     """block2（坏账准备）/ note 文本已填不影响 block1 原值预填（手工优先仅针对 block1）。"""
     _enable_flag(monkeypatch)
     _patch_active_filter(monkeypatch)
-    rows = [_tb_leaf("1402.01", "工程类合同资产", opening=800.0, closing=1000.0)]
+    rows = [_tb_leaf("1141.01", "工程类合同资产", opening=800.0, closing=1000.0)]
     checklist = [
         _checklist_row("D6-1-adj-block2-row-x-currentUnadjusted", remark="123"),
         _checklist_row("D6-1-note-conclusion", remark="结论文本"),
@@ -310,7 +310,7 @@ def test_property2_block1_adjustment_only_still_prefills(monkeypatch):
     """
     _enable_flag(monkeypatch)
     _patch_active_filter(monkeypatch)
-    rows = [_tb_leaf("1402.01", "工程类合同资产", opening=800.0, closing=1000.0)]
+    rows = [_tb_leaf("1141.01", "工程类合同资产", opening=800.0, closing=1000.0)]
     checklist = [
         _checklist_row("D6-1-adj-block1-row-abc-currentAje", remark="100"),
     ]

@@ -53,7 +53,12 @@ const STATE = {
 
 describe('H6 复用 H1 章节（无独立章节）', () => {
   it('H6 章节号 === H1 章节号（固定资产）', () => {
-    expect(H6_NOTE_SECTION).toBe(H1_NOTE_SECTION)
+    // 🔴 不再断言引用相等（`toBe`）：H6_NOTE_SECTION 曾写 `= H1_NOTE_SECTION`
+    // （标识符引用），但 `gen_note_wp_sync_registry.py` 用 text-scan 抽
+    // `listed: '…'` 字面量 → 标识符引用扫不到，H6 从 registry 整条消失
+    // （本 spec `h-cycle-legacy-cleanup-and-platform-hygiene` R4 修复）。
+    // 现改为**内联字面量**且值与 H1 一致，断言改用值相等。
+    expect(H6_NOTE_SECTION).toStrictEqual(H1_NOTE_SECTION)
     expect(H6_NOTE_SECTION.listed).toBe('五、22')
     expect(H6_NOTE_SECTION.soe).toBe('八、22')
   })

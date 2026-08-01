@@ -254,15 +254,28 @@ def test_d4_get_endpoint_surfaces_both_tier_a(monkeypatch):
 # ---------------------------------------------------------------------------
 
 
+def test_d5_has_no_tier_a_preset(monkeypatch):
+    """🔴 D5 应收款项融资**没有** Tier A 预设（2026-08-01 移除，Requirement 4）。
+
+    「应收款项融资」是报表项目（FVOCI 计量的应收票据/应收账款），准则无对应一级科目：
+    标准科目表无 `1124`，活体 `trial_balance` / `tb_balance` 的 `1124%` 均 0 行
+    → 原预设 `TB('1124','期末余额')` 求值恒为 0，是「看起来有取数、实际永远拿不到数」
+    的假接线，保留比没有更糟。D5-1 的「试算平衡表数」改手工录入 + D5-2 明细聚合核对。
+
+    守卫在此钉死，防日后凭「常识」把 1124 加回来。
+    """
+    _reset_presets_cache(monkeypatch)
+    assert load_presets("D5") == [], "D5 不应有 Tier A 预设（1124 是不存在的科目码）"
+
+
 @pytest.mark.parametrize(
     "wp_code,anchor,expression,sheet",
     [
-        ("D5", "D5-1-tb-amount", "TB('1124','期末余额')", "D5-1"),
         ("D7", "D7-1-adj-aging-trial-balance-currentAudited", "TB('2205','期末余额')", "D7-1"),
     ],
 )
 def test_single_scalar_preset_passes_gates(monkeypatch, wp_code, anchor, expression, sheet):
-    """D5/D7 预设 = 1 条 TB 标量，通过锚点合法性 + 受支持函数双门。"""
+    """D7 预设 = 1 条 TB 标量，通过锚点合法性 + 受支持函数双门。"""
     _reset_presets_cache(monkeypatch)
     presets = load_presets(wp_code)
     assert len(presets) == 1, f"{wp_code} 应有且仅有 1 条 Tier A 预设（TB 总额，宁缺勿造）"
@@ -277,7 +290,6 @@ def test_single_scalar_preset_passes_gates(monkeypatch, wp_code, anchor, express
 @pytest.mark.parametrize(
     "wp_code,anchor,expression",
     [
-        ("D5", "D5-1-tb-amount", "TB('1124','期末余额')"),
         ("D7", "D7-1-adj-aging-trial-balance-currentAudited", "TB('2205','期末余额')"),
     ],
 )
@@ -307,11 +319,16 @@ def test_single_scalar_resolve_effective(monkeypatch, wp_code, anchor, expressio
 # ---------------------------------------------------------------------------
 
 
+# 🔴 2026-08-01：D5 从 2 条增至 3 条 —— 新增一条「D5-1-tb-amount 预设已移除」的诚实化
+# 说明（Requirement 4，1124 是不存在的科目码，同 D1 假差异缺陷同期修正）。D4/D7 不变。
+_EXPECTED_TIER_B_COUNT = {"D4": 2, "D5": 3, "D7": 2}
+
+
 @pytest.mark.parametrize("wp_code", ["D4", "D5", "D7"])
 def test_tier_b_provenance_honest(wp_code):
     """tier_b_provenance 登记 明细归集来源 + 审定表分类不填声明，全部只读。"""
     entries = tier_b_provenance(wp_code)
-    assert len(entries) == 2
+    assert len(entries) == _EXPECTED_TIER_B_COUNT[wp_code]
     for e in entries:
         assert e["editable"] is False
         assert e["source"] == "prefill"
@@ -333,7 +350,7 @@ def test_get_endpoint_surfaces_tier_b(monkeypatch, wp_code):
     db = _FormulaFakeSession(wp=wp, wp_code=wp_code, user_formulas=[])
     resp = _run(router_mod.list_formulas(wp.id, db=db, _user=_user()))
     tier_b = resp["extraction"]["tierB"]
-    assert len(tier_b) == 2
+    assert len(tier_b) == _EXPECTED_TIER_B_COUNT[wp_code]
     for e in tier_b:
         assert e["editable"] is False
         assert e["tier"] == "B"

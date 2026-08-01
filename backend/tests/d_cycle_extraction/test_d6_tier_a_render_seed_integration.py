@@ -14,7 +14,7 @@ spec: .kiro/specs/d-cycle-tier-a-writeback-detail-seed/
   * **Property 6（手工优先 + 写对字段）**：主开关开 + 无既有值 → seed 写入前端读取字段
     （`remark`，见 `_seed_fields.map`）；持久层已有非空 remark → 不覆盖（手工优先）；
     source=disabled → 不 seed。
-  * **Property 7（默认预设 seed 等价 tb_amount）**：默认预设 `TB('1402','期末余额')` 求值
+  * **Property 7（默认预设 seed 等价 tb_amount）**：默认预设 `TB('1141','期末余额')` 求值
     = trial_balance 审定核对标量，与 project_context.tb_amount 口径一致。
   * **Property 11（fail-open）**：resolver 异常 / evaluator 异常 / eval_errors / year 缺失
     → 该锚点不 seed（静默沿用 project_context.tb_amount），始终不阻断 render。
@@ -156,7 +156,7 @@ def _mock_evaluator(monkeypatch, *, value=Decimal("98765.43"), errs=None, raises
     monkeypatch.setattr(d6, "evaluate_wp_formula_expression", _fake_eval)
 
 
-def _binding(anchor=_TB_ANCHOR, expression="TB('1402','期末余额')", source=SOURCE_PRESET):
+def _binding(anchor=_TB_ANCHOR, expression="TB('1141','期末余额')", source=SOURCE_PRESET):
     return {
         "wp_code": "D6",
         "sheet_name": "D6-1",
@@ -255,7 +255,7 @@ def test_flag_on_unregistered_seed_field_skipped(monkeypatch):
 
 
 def test_default_preset_seed_matches_tb_amount(monkeypatch):
-    """默认预设 TB('1402','期末余额') 求值 = trial_balance 审定核对标量,
+    """默认预设 TB('1141','期末余额') 求值 = trial_balance 审定核对标量,
     与 project_context.tb_amount 口径一致（默认行为不变 / R3.6 / Property 7）。"""
     _enable_flag(monkeypatch)
     _isolate_tier_b(monkeypatch)
@@ -345,7 +345,7 @@ def test_custom_formula_seed_overrides_default(monkeypatch):
     _enable_flag(monkeypatch)
     _isolate_tier_b(monkeypatch)
     # 用户改公式（如 期末余额→年初余额），resolve_effective 返回 source=custom
-    _mock_resolver(monkeypatch, [_binding(expression="TB('1402','年初余额')", source=SOURCE_CUSTOM)])
+    _mock_resolver(monkeypatch, [_binding(expression="TB('1141','年初余额')", source=SOURCE_CUSTOM)])
     _mock_evaluator(monkeypatch, value=Decimal("42000"))
     result = _run(d6.render(_ctx(_session())))
     assert result["responses_snapshot"][_TB_ANCHOR]["remark"] == "42000"

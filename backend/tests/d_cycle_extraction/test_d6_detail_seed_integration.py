@@ -8,7 +8,7 @@ spec: .kiro/specs/d-cycle-tier-a-writeback-detail-seed/
     `D_CYCLE_DETAIL_SEED_ENABLED` ∧ D6-2 明细表完全空 时并入 `detail_prefill`；
     已有任一行 → 不 seed；子开关关 / 主开关关 → 无 detail seed。
   * **Property 9（复用不新造）**：明细 seed 调既有 `aggregate_d6_detail_rows`
-    （tb_aux_balance 1402 客户/合同维度），不新造第 3 套四表库读取。
+    （tb_aux_balance 1141 客户/合同维度），不新造第 3 套四表库读取。
   * **Property 11（fail-open）**：归集查询异常 → 空 detail seed（省略 detail_prefill），
     不阻断 render。
   * **Property 13（transient 不落库）**：detail_prefill 只进 render 返回 payload，

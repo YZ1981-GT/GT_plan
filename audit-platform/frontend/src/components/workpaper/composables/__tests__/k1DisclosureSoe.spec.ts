@@ -170,9 +170,10 @@ describe('k1SoeDisclosureSyncPayload', () => {
     expect(portAging.map((c) => c.group)).toEqual([
       undefined, '期末数', '期末数', '期末数', '期初数', '期初数', '期初数',
     ])
-    // 政府补助表源对齐五列
+    // 政府补助表源对齐五列（源 xlsx `A126` 换行 → 括注纯文本，k1-extraction-chain-and-note-alignment 修正）
     expect(cols[K1_SOE_SUBTABLE.govGrant].map((c) => c.label)).toEqual([
-      '单位名称', '政府补助项目名称', '期末余额', '期末账龄', '预计收取的时间、金额及依据',
+      '单位名称（注：政府补助的发文单位）', '政府补助项目名称', '期末余额', '期末账龄',
+      '预计收取的时间、金额及依据',
     ])
     // 转回表含国企专有的「转回或收回前累计已计提坏账准备金额」列
     expect(cols[K1_SOE_SUBTABLE.reversal].map((c) => c.label)).toEqual([

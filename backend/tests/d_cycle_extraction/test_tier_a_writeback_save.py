@@ -88,7 +88,7 @@ def _wp():
 
 
 def _saved_formula(target_cell, *, sheet_name="D6-1", wp=None,
-                   formula_type="auto_calc", expression="TB('1402','期末余额')"):
+                   formula_type="auto_calc", expression="TB('1141','期末余额')"):
     return SimpleNamespace(
         id=uuid4(),
         project_id=(wp.project_id if wp else uuid4()),
@@ -161,7 +161,7 @@ def _patch_save_path(monkeypatch, *, saved, evaluated=123.45, eval_errors=None):
     return {"write": write_calls, "eval": eval_calls, "linkage": linkage_calls}
 
 
-def _body(target_cell, *, sheet_name="D6-1", expression="TB('1402','期末余额')"):
+def _body(target_cell, *, sheet_name="D6-1", expression="TB('1141','期末余额')"):
     return router_mod.FormulaSaveRequest(
         sheet_name=sheet_name, target_cell=target_cell,
         expression=expression, year=2025,

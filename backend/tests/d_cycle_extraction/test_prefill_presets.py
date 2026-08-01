@@ -101,7 +101,7 @@ def _patch_active_filter(monkeypatch):
     monkeypatch.setattr(prefill_mod, "get_active_filter", _fake_filter)
 
 
-def _fake_formula(target_cell, *, expression="TB('1402','期末余额')",
+def _fake_formula(target_cell, *, expression="TB('1141','期末余额')",
                   sheet_name="D6-1", category=None, description="", formula_type="auto_calc"):
     return SimpleNamespace(
         target_cell=target_cell,
@@ -119,17 +119,17 @@ def _fake_formula(target_cell, *, expression="TB('1402','期末余额')",
 
 
 def test_property1_leaf_only_excludes_rollup(monkeypatch):
-    """中间级 1402.01 与其子 1402.01.01 同时存在时，只取叶子 1402.01.01（防双算）。"""
+    """中间级 1141.01 与其子 1141.01.01 同时存在时，只取叶子 1141.01.01（防双算）。"""
     _patch_active_filter(monkeypatch)
     rows = [
-        _tb_row("1402.01", "合同资产-中间级", closing=1000.0, opening=800.0),
-        _tb_row("1402.01.01", "合同资产-明细", closing=1000.0, opening=800.0),
+        _tb_row("1141.01", "合同资产-中间级", closing=1000.0, opening=800.0),
+        _tb_row("1141.01.01", "合同资产-明细", closing=1000.0, opening=800.0),
     ]
     result = _run(build_d_adjudication_prefill(
-        _ctx(_FakeTbSession(rows)), account_prefix="1402", mode=MODE_BALANCE
+        _ctx(_FakeTbSession(rows)), account_prefix="1141", mode=MODE_BALANCE
     ))
     assert len(result) == 1
-    assert result[0]["code"] == "1402.01.01"
+    assert result[0]["code"] == "1141.01.01"
     # 合计不含 rollup 双计
     assert sum(r["closing_balance"] for r in result) == 1000.0
 
@@ -138,31 +138,31 @@ def test_property1_multiple_independent_leaves_all_kept(monkeypatch):
     """多个互不为前缀的叶子科目全部保留。"""
     _patch_active_filter(monkeypatch)
     rows = [
-        _tb_row("1402.01", "甲", closing=100.0),
-        _tb_row("1402.02", "乙", closing=200.0),
-        _tb_row("1402.03", "丙", closing=300.0),
+        _tb_row("1141.01", "甲", closing=100.0),
+        _tb_row("1141.02", "乙", closing=200.0),
+        _tb_row("1141.03", "丙", closing=300.0),
     ]
     result = _run(build_d_adjudication_prefill(
-        _ctx(_FakeTbSession(rows)), account_prefix="1402", mode=MODE_BALANCE
+        _ctx(_FakeTbSession(rows)), account_prefix="1141", mode=MODE_BALANCE
     ))
-    assert {r["code"] for r in result} == {"1402.01", "1402.02", "1402.03"}
+    assert {r["code"] for r in result} == {"1141.01", "1141.02", "1141.03"}
     # 降序（按 abs(closing)）
-    assert [r["code"] for r in result] == ["1402.03", "1402.02", "1402.01"]
+    assert [r["code"] for r in result] == ["1141.03", "1141.02", "1141.01"]
 
 
 def test_skip_zero_and_no_name(monkeypatch):
     """零余额与无名称子科目被跳过（R1.4）。"""
     _patch_active_filter(monkeypatch)
     rows = [
-        _tb_row("1402.01", "有效", closing=500.0),
-        _tb_row("1402.02", "零余额", closing=0.0, opening=0.0),
-        _tb_row("1402.03", "", closing=999.0),  # 无名称
+        _tb_row("1141.01", "有效", closing=500.0),
+        _tb_row("1141.02", "零余额", closing=0.0, opening=0.0),
+        _tb_row("1141.03", "", closing=999.0),  # 无名称
     ]
     result = _run(build_d_adjudication_prefill(
-        _ctx(_FakeTbSession(rows)), account_prefix="1402", mode=MODE_BALANCE
+        _ctx(_FakeTbSession(rows)), account_prefix="1141", mode=MODE_BALANCE
     ))
     assert len(result) == 1
-    assert result[0]["code"] == "1402.01"
+    assert result[0]["code"] == "1141.01"
 
 
 def test_occurrence_mode_returns_debit_credit(monkeypatch):
@@ -185,8 +185,8 @@ def test_occurrence_mode_returns_debit_credit(monkeypatch):
 def test_invalid_mode_returns_empty(monkeypatch):
     _patch_active_filter(monkeypatch)
     result = _run(build_d_adjudication_prefill(
-        _ctx(_FakeTbSession([_tb_row("1402.01", "甲", closing=1.0)])),
-        account_prefix="1402", mode="bogus",
+        _ctx(_FakeTbSession([_tb_row("1141.01", "甲", closing=1.0)])),
+        account_prefix="1141", mode="bogus",
     ))
     assert result == []
 
@@ -199,7 +199,7 @@ def test_invalid_mode_returns_empty(monkeypatch):
 def test_property4_no_subaccounts_returns_empty(monkeypatch):
     _patch_active_filter(monkeypatch)
     result = _run(build_d_adjudication_prefill(
-        _ctx(_FakeTbSession([])), account_prefix="1402", mode=MODE_BALANCE
+        _ctx(_FakeTbSession([])), account_prefix="1141", mode=MODE_BALANCE
     ))
     assert result == []
 
@@ -208,7 +208,7 @@ def test_property4_query_error_fails_open_empty(monkeypatch):
     _patch_active_filter(monkeypatch)
     result = _run(build_d_adjudication_prefill(
         _ctx(_FakeTbSession(raise_on_execute=True)),
-        account_prefix="1402", mode=MODE_BALANCE,
+        account_prefix="1141", mode=MODE_BALANCE,
     ))
     assert result == []
 
@@ -232,7 +232,7 @@ def _patch_presets(monkeypatch, wp_code, bindings):
     monkeypatch.setattr(presets_mod, "load_presets", _fake_load)
 
 
-def _preset_binding(anchor, *, expression="TB('1402','期末余额')", sheet_name="D6-1"):
+def _preset_binding(anchor, *, expression="TB('1141','期末余额')", sheet_name="D6-1"):
     return {
         "wp_code": "D6", "sheet_name": sheet_name, "anchor": anchor,
         "expression": expression, "formula_type": "auto_calc",
@@ -253,11 +253,11 @@ def test_property5_preset_only_survives(monkeypatch):
 def test_property5_custom_overrides_preset(monkeypatch):
     """同锚点用户 custom 覆盖预设，source=custom，表达式为用户值。"""
     _patch_presets(monkeypatch, "D6", [_preset_binding("D6-1-tb-amount")])
-    user = _fake_formula("D6-1-tb-amount", expression="SUM_TB('1402~1403','期末余额')")
+    user = _fake_formula("D6-1-tb-amount", expression="SUM_TB('1141~1403','期末余额')")
     result = _run(resolve_effective(_FakeFormulaSession([user]), uuid4(), "D6", uuid4()))
     assert len(result) == 1
     assert result[0]["source"] == SOURCE_CUSTOM
-    assert result[0]["expression"] == "SUM_TB('1402~1403','期末余额')"
+    assert result[0]["expression"] == "SUM_TB('1141~1403','期末余额')"
 
 
 def test_property5_disabled_marker_category(monkeypatch):
@@ -282,9 +282,9 @@ def test_property5_each_anchor_unique(monkeypatch):
     """每锚点唯一：多个预设 + 用户，锚点集合不重复。"""
     _patch_presets(monkeypatch, "D6", [
         _preset_binding("D6-1-tb-amount"),
-        _preset_binding("D6-1-note-conclusion", expression="TB('1402','期末余额')"),
+        _preset_binding("D6-1-note-conclusion", expression="TB('1141','期末余额')"),
     ])
-    user = _fake_formula("D6-1-tb-amount", expression="TB('1402','期初余额')")
+    user = _fake_formula("D6-1-tb-amount", expression="TB('1141','期初余额')")
     result = _run(resolve_effective(_FakeFormulaSession([user]), uuid4(), "D6", uuid4()))
     anchors = [b["anchor"] for b in result]
     assert len(anchors) == len(set(anchors))  # 无重复
@@ -338,7 +338,7 @@ def test_load_presets_real_json_d6_tier_a(monkeypatch):
     """交付的 d_cycle_extraction_presets.json：D6 含单条 Tier A 预设；D2 含单条（Task 5.1）。
 
     读真实文件（非 monkeypatch），确认 D6 Tier A 预设 `D6-1-tb-amount` →
-    `TB('1402','期末余额')`（Task 4.3）与 D2 Tier A 预设 `D2-adj-tb-amount` →
+    `TB('1141','期末余额')`（Task 4.3）与 D2 Tier A 预设 `D2-adj-tb-amount` →
     `TB('1122','期末余额')`（Task 5.1，宁缺勿造：仅 1122 总额标量可编辑，分类行不注册）；
     未登记/空码仍解析为 []。
     """
@@ -351,7 +351,7 @@ def test_load_presets_real_json_d6_tier_a(monkeypatch):
     assert len(d6) == 1
     entry = d6[0]
     assert entry["anchor"] == "D6-1-tb-amount"
-    assert entry["expression"] == "TB('1402','期末余额')"
+    assert entry["expression"] == "TB('1141','期末余额')"
     assert entry["sheet_name"] == "D6-1"
     assert entry["formula_type"] == "auto_calc"
     assert entry["source"] == SOURCE_PRESET
@@ -361,7 +361,9 @@ def test_load_presets_real_json_d6_tier_a(monkeypatch):
     assert len(d2) == 1
     d2_entry = d2[0]
     assert d2_entry["anchor"] == "D2-adj-tb-amount"
-    assert d2_entry["expression"] == "TB('1122','期末余额')"
+    # 净额口径（原值 1122 − 坏账准备 1231-02）：源模板 D2-1 比的是「三、应收账款净值」，
+    # `report_config` BS-006 soe_standalone 公式同此。取原值会产生假差异（D1 同款已实测）。
+    assert d2_entry["expression"] == "TB('1122','期末余额') - TB('1231-02','期末余额')"
     assert d2_entry["sheet_name"] == "D2-1"
     assert d2_entry["source"] == SOURCE_PRESET
     assert d2_entry["tier"] == "A"

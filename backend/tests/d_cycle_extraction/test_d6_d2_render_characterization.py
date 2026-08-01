@@ -200,8 +200,14 @@ def test_d6_render_disclosure_visibility_and_snapshot():
 
 
 def test_d2_render_top_level_keys_baseline():
-    """D2 render 顶层键锁定（轻量 html_data）——尚无 adjudication_prefill。"""
-    result = _run(d2.render(_ctx(_d2_session())))
+    """D2 render 顶层键锁定（灰度**关**时）——无 adjudication_prefill / 无 tb_source_codes。"""
+    from app.core.config import settings
+    old = settings.D_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED
+    try:
+        settings.D_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED = False
+        result = _run(d2.render(_ctx(_d2_session())))
+    finally:
+        settings.D_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED = old
     assert set(result.keys()) == {"sheet_name", "project_context", "responses_snapshot"}
     assert "adjudication_prefill" not in result
 

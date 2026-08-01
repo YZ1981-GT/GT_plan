@@ -334,7 +334,7 @@ def test_g7_detail_seed_reuses_existing_aggregation_no_third_reader():
     聚合函数（必要时先从 HTTP handler 抽出的纯函数），render seed 只按名调用它。
 
     Wave 5（Task 5.1）已落地：D6 render 的 `_seed_d6_detail_prefill` 调既有可复用归集
-    `aggregate_d6_detail_rows`（tb_aux_balance 1402 客户/合同维度，`detail_aggregation.py`
+    `aggregate_d6_detail_rows`（tb_aux_balance 1141 客户/合同维度，`detail_aggregation.py`
     用原端点逐字节相同的 `sa.text` SQL，不 import 四表库 ORM），transient seed `detail_prefill`。
     产出方 `_d6_contract_assets.py` 只按名调用归集函数、不 import 四表 ORM → 本守卫转绿（移除 xfail）。
     """

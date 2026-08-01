@@ -54,6 +54,11 @@ const NON_DISCLOSURE_BUILDERS: Record<string, string> = {
     'useF4Detail：返回底稿明细表 UI 列 `F4DetailColumn[]`（prop/minWidth/editable），非附注 ColumnDef；F4 披露列头在 f4NoteSectionMap',
   buildF4AuditColumns:
     'useF4Detail：同上，审定账龄段 UI 列，非附注 ColumnDef',
+  buildG7SlotColumns:
+    'composables/g7SlotColumns：返回槎位描述 `G7SlotColumn[]`（key/seq/entityName），'
+    + '不是 ColumnDef——由 g7ListedDisclosureModel/g7SoeDisclosureModel 的 '
+    + 'companyColumnsFor/associateMatrixColumnsFor 等再转换成 ColumnDef，'
+    + '真正的披露 builder 是 buildG7ListedColumns/buildG7SoeColumns',
 }
 
 /**
@@ -99,27 +104,8 @@ const INFERENCE_FALLBACK_ALLOWLIST: Record<string, { reason: string; tables: str
       '确认为无形资产的数据资源',
     ],
   },
-  buildG7ListedColumns: {
-    reason:
-      'G7 长期股权投资/合并范围（批 1~4 之外，列头在 g7ListedDisclosureModel）：15 表全未声明。8 表被推断塞入凭空父表头（「其他」/「持股比例-」/「本期」/「公司」/「上期」等），且多处用 `公司1-期末/本期` 形态把两级表头压平成串 → 应改 group，属 G7 专项工作',
-    tables: [
-      '续（1）—期初数',
-      '续（2）—本期及上期发生额',
-      '续：重要合营企业本期及上期经营成果',
-      '续：重要联营企业本期及上期经营成果',
-      '重要共同经营基本情况',
-      '长期股权投资',
-      '（1）企业集团的构成',
-      '（1）重要的合营企业或联营企业',
-      '（2）重要合营企业主要财务信息—资产负债及权益法调节',
-      '（2）重要的非全资子公司',
-      '（3）重要联营企业主要财务信息—资产负债及权益法调节',
-      '（3）重要非全资子公司主要财务信息—期末数',
-      '（4）其他不重要合营企业和联营企业的汇总财务信息',
-      '（6）对合营企业或联营企业发生超额亏损的分担额',
-      '（6）未丧失控制权的所有者权益份额变动影响',
-    ],
-  },
+  // buildG7ListedColumns 已由 g7-four-table-extraction-and-disclosure-alignment
+  // Task 5.2 补齐 flat/group（实扫未声明表 = []）→ 按 R3「已修好必删」移出。
   buildG7SoeColumns: {
     reason:
       'G7 国企版：22 表全未声明，13 表被推断塞入凭空父表头（「当期」/「公司」/「购买日」/「并入主要」/「期末」/「期初」/「本期」/「A~E公司-」等），同为压平两级表头形态 → 属 G7 专项工作',

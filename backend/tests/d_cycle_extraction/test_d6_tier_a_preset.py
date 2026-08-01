@@ -4,7 +4,8 @@ spec: .kiro/specs/d-cycle-four-table-extraction-formulas/
       (Requirements 3.1, 3.4 / Property 5, 8, 11)
 
 Task 4.3 交付：`d_cycle_extraction_presets.json` D6 加入唯一一条可表达为单条公式的
-简单总额提取 `D6-1-tb-amount` → `TB('1402','期末余额')`（对照 Wave0 anchor registry），
+简单总额提取 `D6-1-tb-amount` → `TB('1141','期末余额')`（对照 Wave0 anchor registry；
+科目码于 2026-08-01 由误用的 `1402 在途物资` 纠正为 `1141 合同资产`，见下方 `_D6_EXPRESSION`），
 并在公式管理面板（`GET /api/workpapers/{wp_id}/formulas` 的 `extraction.tierA`）展示。
 
 本测试**读真实预设文件**（不 monkeypatch `load_presets`），断言：
@@ -37,7 +38,11 @@ from app.services.d_cycle_extraction.presets import (
 from app.services.wp_formula_eval_service import find_unsupported_formula_functions
 
 _D6_ANCHOR = "D6-1-tb-amount"
-_D6_EXPRESSION = "TB('1402','期末余额')"
+# 🔴 合同资产科目是 `1141`（标准科目表实证 direction=debit；`report_config` 的报表行
+#    BS-011 四准则一律 `TB('1141','期末余额')`）。原登记的 `1402` 是**在途物资**（存货类），
+#    活体实证该码有数（12 行 / 136,268.13）→ 错误预设会把存货的钱当合同资产带进审定表。
+#    守卫：test_d_cycle_account_codes.py::test_d6_preset_points_to_contract_asset
+_D6_EXPRESSION = "TB('1141','期末余额')"
 
 
 def _run(coro):
@@ -129,7 +134,7 @@ def _user():
 
 
 def test_d6_preset_entry_passes_both_gates(monkeypatch):
-    """D6 预设 `D6-1-tb-amount` / `TB('1402','期末余额')` 通过锚点合法性 + 受支持函数双门。"""
+    """D6 预设 `D6-1-tb-amount` / `TB('1141','期末余额')` 通过锚点合法性 + 受支持函数双门。"""
     _reset_presets_cache(monkeypatch)
     presets = load_presets("D6")
     assert len(presets) == 1, "Task 4.3：D6 应有且仅有 1 条 Tier A 预设（诚实，唯一清晰候选）"
@@ -168,13 +173,13 @@ def test_resolve_effective_user_override_becomes_custom(monkeypatch):
     """用户同锚点公式覆盖预设 → source=custom（读时收敛 Property 5）。"""
     _reset_presets_cache(monkeypatch)
     wp = _wp()
-    user = _wp_formula(_D6_ANCHOR, expression="TB('1402','期初余额')", wp=wp)
+    user = _wp_formula(_D6_ANCHOR, expression="TB('1141','期初余额')", wp=wp)
     db = _FakeSession(wp=wp, wp_code="D6", user_formulas=[user])
     result = _run(resolve_effective(db, wp.id, "D6", wp.project_id))
 
     assert len(result) == 1
     assert result[0]["source"] == SOURCE_CUSTOM
-    assert result[0]["expression"] == "TB('1402','期初余额')"
+    assert result[0]["expression"] == "TB('1141','期初余额')"
 
 
 # ---------------------------------------------------------------------------
@@ -234,7 +239,7 @@ def test_d2_has_tb_amount_tier_a_preset(monkeypatch):
     assert len(presets) == 1, "Task 5.1：D2 应有且仅有 1 条 Tier A 预设（1122 总额，宁缺勿造）"
     entry = presets[0]
     assert entry["anchor"] == "D2-adj-tb-amount"
-    assert entry["expression"] == "TB('1122','期末余额')"
+    assert entry["expression"] == "TB(\'1122\',\'期末余额\') - TB(\'1231-02\',\'期末余额\')"
     # 双门：锚点合法 + 表达式仅受支持函数
     assert is_known_anchor("D2", entry["anchor"]) is True
     assert find_unsupported_formula_functions(entry["expression"]) == []
