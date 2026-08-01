@@ -406,6 +406,86 @@ jobs:
       - name: Run D1 note Word export two-level header guard
         run: python -m pytest backend/tests/services/test_note_word_export_d1.py -q
 
+  d1-extraction-chain:
+    # D1「四表库入库 → 底稿刷新取数 → 披露表 → 附注」链路守卫
+    # （spec d1-extraction-chain-completion）。此前该链路中间断裂多处且测试恒绿：
+    # 1. 科目映射：取数硬编码 `1121`/`1231`+名称关键字，与报表规则（BS-005 经
+    #    report_config → 标准码 → account_mapping 反解原始码）脱节 → 客户自定义编码即取不到数
+    # 2. 跨表锚点：披露①分类表读 `-current-audited` 后缀（审定数是 computed **从不持久化**）、
+    #    前缀写 `baddebt-` 而实际是 `bd-` → 全平台无写入方，而两份 fixture 以**同款错误键**
+    #    播种 → 测试恒绿、生产恒死
+    # 3. Tier A 预设口径：`D1-adj-tb-amount` 原登记原值 `TB('1121')`，而源模板 D1-1
+    #    E20=E18-E19 比的是**净值** → 核对行必然显示一个恰好等于坏账准备的假差异
+    # 4. 表名/文案漂移：既有守卫全是自证（脚本常量 ↔ 模板 JSON），源模板从未参与裁决
+    #    → 上市「转应收账款」表名多一个「将」、披露页 7 条小节标题 5 条漂移且撞小节号
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: python -m pip install -r backend/requirements.txt
+      - name: Run D cycle extraction suite (D1 account resolver / detail seed / aux import)
+        run: python -m pytest backend/tests/d_cycle_extraction -q
+      - name: Run note D1 structure guard (含源 xlsx 表名交叉比对)
+        run: python -m pytest backend/tests/test_note_d1_structure.py -q
+
+  d1-extraction-chain-frontend:
+    # 前端侧：共享锚点模型单一真源 + 披露页小节标题 ↔ 源模板 + 子表名契约
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: audit-platform/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install deps
+        run: npm ci
+      - name: Run D1 chain guards
+        run: npx vitest run --silent=true d1 D1
+
+  d-cycle-extraction-chain:
+    # D2/D3/D5/D6/D7 取数科目 P0 修正 + 公式预设/溯源登记诚实化守卫
+    # （d-cycle-extraction-chain-completion Wave 1/5）。
+    # 背景：D6 预设取错整个科目族（1402 在途物资 vs 1141 合同资产，活体实证 1402 有
+    # 12 行数据 → 不是恒空是显示错数）；D2 缺减备抵（假差异）；D5 引用不存在的科目
+    # 1124（已移除并诚实化）；D5/D6/D7 三循环公式预设 sheet 名与 PREV() 环形错位
+    # + 7 条彻底虚构的取数条目（客户 TOPn 排名等，源模板逐一核实后删除）。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: python -m pip install -r backend/requirements.txt
+      - name: Run D-cycle account code guards (含 openpyxl 源 xlsx 交叉比对)
+        run: python -m pytest backend/tests/d_cycle_extraction -q
+      - name: Run prefill_formula_mapping D5/D6/D7 sheet-name guards
+        run: python -m pytest backend/tests/test_d_prefill_d567_fix.py backend/tests/test_d_cycle_revenue_properties.py backend/tests/test_d567_prefill_property.py backend/tests/test_d_prefill_extension.py -q
+
+  note-d2-structure:
+    # 附注 D2 应收账款章节结构守卫（d-cycle-extraction-chain-completion Wave 2）
+    # 背景：D2 的表名/行骨架已由并发会话两个归档 spec 处理过，但两者都只做了同步载荷，
+    # 没把 columns/guidance 写回模板 JSON —— 上市 17 表、国企 13 表全缺，且国企侧
+    # 残留 4 处占位行/header_label 假行。本 job 还顺带抓出上市表名漂移
+    # 「转移应收账款且继续涉入形成的资产、负债」漏「的金额」二字（源模板 R172 实证）。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: python -m pip install pytest==8.4.2 openpyxl
+      - name: Check note D2 section alignment (五、5 / 八、5)
+        run: python backend/scripts/fix/fix_note_d2_ar_structure.py --check
+      - name: Run note D2 structure contract tests
+        run: python -m pytest backend/tests/test_note_d2_structure.py -q
+
   applicable-standards-wiring:
     # 适用准则前端全链守卫（applicable-standards-frontend-wiring R1/R4）
     # 背景：DB 权威源是 `projects.applicable_standard_v2 = {entity_type, scope, stage}`，
@@ -850,6 +930,130 @@ jobs:
       - name: Run note H5 structure contract tests
         run: python -m pytest backend/tests/test_note_h5_oil_gas_structure.py -q
 
+  note-bold-marker-hygiene:
+    # 平台级：附注模板不得残留 markdown 粗体标记 `**`
+    # （h-cycle-legacy-cleanup-and-platform-hygiene R1）
+    # 背景：`rebuild_note_from_md.py` 把 md 的 `**` 原样搬进 `text_sections` /
+    # `tables[].guidance`，而附注正文 `text_content` 与 docx 导出都按纯文本渲染
+    # → 用户看到字面的 `**`。实测 58 处 / 69 对（listed 49 / soe 9）。
+    # 🔴 只做**成对**剥离：两段 `**` 是不成对的脱敏占位（`诉讼金额为**元`），
+    # 无脑 replace 会破坏语义。守卫双向锁死（成对必抓 / 不成对必放行）。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check no paired bold markers in note templates
+        run: python backend/scripts/fix/fix_note_bold_markers.py --check
+      - name: Install test dependencies
+        run: python -m pip install pytest==8.4.2 hypothesis==6.112.1
+      - name: Run bold-marker hygiene tests
+        run: python -m pytest backend/tests/test_note_bold_marker_hygiene.py -q
+
+  h-cycle-ai-wiring:
+    # H 循环披露 Tab 的 AI / 复核接线守卫
+    # （h-cycle-legacy-cleanup-and-platform-hygiene R2 / R3）
+    # 三种「按钮可见可点但零网络请求」的形态（各已实测）：
+    # ① marker stub 空转（只写 ai-trigger checklist 标记）—— K5/K7 曾中招
+    # ② 孤儿事件 `emit('open-ai')` 而宿主未声明处理器 —— **H8/H9 四个 Tab**，本 spec 修
+    # ③ context 传字符串（后端要 dict[str,str] → 422 被 catch 静默吞）—— K3 曾中招
+    # 另拦：H1/H2/H4/H5/H6 披露文本域缺 AI 按钮；H5 两版文本无持久化（刷新即丢）。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: audit-platform/frontend/package-lock.json
+      - name: Install frontend dependencies
+        working-directory: audit-platform/frontend
+        run: npm ci
+      - name: Run H cycle AI wiring guard
+        working-directory: audit-platform/frontend
+        run: npx vitest run src/components/workpaper/composables/__tests__/hDisclosureAiWiring.spec.ts
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: python -m pip install pytest==8.4.2
+      - name: Run H cycle prompt registration guard
+        run: python -m pytest backend/tests/test_review_dialog_h_cycle_prompts.py -q
+
+  note-section-map-naming:
+    # 平台级：凡有披露映射/载荷文件的循环都必须能被 registry 生成器扫到
+    # （h-cycle-legacy-cleanup-and-platform-hygiene R4）
+    # 三种让循环从 note_workpaper_sync_registry.json 静默消失的根因（各已实测）：
+    # ① 缺 {code}NoteSectionMap.ts 薄壳（H4）
+    # ② 章节号写成标识符引用而非内联字面量（G3 / H6）
+    # ③ 一个循环覆盖两个章节的嵌套形态未被生成器支持（G1 / G10）
+    # 本 spec 把 entries 从 62 补到 67，并加守卫防再次退化。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: audit-platform/frontend/package-lock.json
+      - name: Install frontend dependencies
+        working-directory: audit-platform/frontend
+        run: npm ci
+      - name: Run registry naming coverage guards
+        working-directory: audit-platform/frontend
+        run: npx vitest run src/components/workpaper/composables/__tests__/noteSectionMapNamingCoverage.spec.ts src/components/workpaper/composables/__tests__/h4h6NoteSectionMapShell.spec.ts src/components/workpaper/composables/__tests__/disclosureSheetNameRegistry.spec.ts
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Regenerate registry and assert no drift
+        run: |
+          python backend/scripts/gen_note_wp_sync_registry.py --write
+          git diff --exit-code backend/data/note_workpaper_sync_registry.json
+
+  note-report-row-code:
+    # 平台级：附注 report_row_code 与 report_config 编号体系一致性守卫
+    # （h-cycle-legacy-cleanup-and-platform-hygiene R6）
+    # 背景：134 行陈旧编号（固定资产→BS-014 实为其他流动资产、短期借款→BS-031
+    # 实为使用权资产等），位移量不一致（14/10/1/2/12），已按 report_config.row_name
+    # 反查重映射（92 处）。今日 inert（全部同时带 account_codes），
+    # DISCLOSURE_NOTE_FORMULA_ENABLED 开启后才会实际生效，须守住不再漂移。
+    # 反查索引物化自 report_config DB 表（CI 无 DB，用 committed 快照）。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check no stale report_row_code (offline snapshot)
+        run: python backend/scripts/fix/remap_note_report_row_codes.py --check
+      - name: Install test dependencies
+        run: python -m pip install pytest==8.4.2
+      - name: Run report_row_code alignment tests
+        run: python -m pytest backend/tests/test_note_report_row_code_alignment.py -q
+
+  h-cycle-consistency:
+    # H 循环披露内部勾稽引擎守卫
+    # （h-cycle-legacy-cleanup-and-platform-hygiene R5）
+    # 平台共用勾稽件在 shared/disclosureConsistency.ts（容差 0.01 元 / null → skip）；
+    # H1/D1/F1 已改委托共用容差常量（零回归）；H2/H5/H8/H9/H10 新建规则文件并接入
+    # WpDisclosureConsistencyPanel（H3/H7 的合计是自派生 sumOf，无独立第二来源可比对，
+    # 宁缺勿造未建）。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: audit-platform/frontend/package-lock.json
+      - name: Install frontend dependencies
+        working-directory: audit-platform/frontend
+        run: npm ci
+      - name: Run H cycle consistency guard
+        working-directory: audit-platform/frontend
+        run: npx vitest run src/components/workpaper/composables/__tests__/hDisclosureConsistency.spec.ts src/components/workpaper/composables/__tests__/h1DisclosureConsistency.spec.ts
+
   note-h8-structure:
     # 附注 H8 使用权资产章节结构守卫（上市 §五、25 / 国企 §八、26）
     # （h8-right-of-use-disclosure-alignment Task 6）
@@ -1075,6 +1279,47 @@ jobs:
           src/components/workpaper/composables/__tests__/k7NoteSectionMap.spec.ts
           src/components/workpaper/composables/__tests__/k6NoteSectionMap.spec.ts
           src/components/workpaper/composables/__tests__/k6NoteBlocksWiring.spec.ts
+          src/components/workpaper/composables/__tests__/k1NoteSubtableContract.spec.ts
+        working-directory: audit-platform/frontend
+
+  k1-extraction-and-note-alignment:
+    # K1 其他应收款：四表库取数级联补齐（K1-2 辅助余额归集端点 + K1-3 备抵叶子 seed）+
+    # 三阶段变动表行集重建（源模板 12/10 行）+ 附注汇总表推送 + item_id 一致性守卫。
+    # spec: .kiro/specs/k1-extraction-chain-and-note-alignment/
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: python -m pip install pytest==8.4.2 openpyxl==3.1.5 hypothesis==6.135.26
+      - name: Run four_table shared services tests (aux_aggregation / k1_aux_detail / k1_detail_seed)
+        run: python -m pytest backend/tests/four_table -q
+      - name: Run K1 aux-balance import endpoint + item_id consistency guards
+        run: >-
+          python -m pytest
+          backend/tests/test_k1_import_aux_balance.py
+          backend/tests/test_k1_import_export_item_ids.py
+          backend/tests/test_k1_adjudication_prefill.py
+          -q
+      - name: Run K1 formula preset guards
+        run: python -m pytest backend/tests/formula_management/test_k1_formula_presets.py -q
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: audit-platform/frontend/package-lock.json
+      - name: Install frontend deps
+        run: npm ci
+        working-directory: audit-platform/frontend
+      - name: Run K1 extraction chain frontend guards
+        run: >-
+          npx vitest run
+          src/components/workpaper/composables/__tests__/useK1DetailAutoSeed.spec.ts
+          src/components/workpaper/composables/__tests__/k1StageMovementRows.spec.ts
+          src/components/workpaper/composables/__tests__/k1SummaryTable.spec.ts
+          src/components/workpaper/composables/__tests__/k1DisclosureAiWiring.spec.ts
           src/components/workpaper/composables/__tests__/k1NoteSubtableContract.spec.ts
         working-directory: audit-platform/frontend
 
