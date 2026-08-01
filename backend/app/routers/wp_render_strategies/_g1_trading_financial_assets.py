@@ -1,13 +1,25 @@
 """G1 交易性金融资产 — 专属渲染策略.
 
 componentType: g1-trading-financial-assets
-科目 1501 交易性金融资产（借方/资产类）。
 
-除返回 checklist 快照外，为 G1-1 审定表自动取数：
-- 1501 交易性金融资产 的期初/期末余额（tb_balance，get_active_filter）
-供前端 G1-1 审定表试算表列（只读）seed。
-并回读已持久化的审定数（EventBus substantive:adjudicated 落库的独立 item_id），
-供 render 回填 seed，避免刷新后丢失。
+科目映射链路（report_config DB 实证，四准则完全一致）：
+  BS-003 交易性金融资产 = TB('1101','期末余额')
+  BS-004 衍生金融资产   = TB('1102','期末余额')
+
+G1-1 审定表三大部分：
+  （一）投资成本：按金融资产分类 × 品种(债务/权益/衍生/理财/结构性存款/基金/其他)
+  （二）累计公允价值变动：同维度
+  （三）账面余额（公允价值）：= (一) + (二)
+
+四表取数逻辑：
+  1. 从 report_config 解析 BS-003 → 标准码 1101
+  2. account_mapping 反解 → 原始码前缀集
+  3. tb_balance 按前缀取叶子科目（select_leaves + filter_by_prefixes）
+  4. 叶子按名称分类到 stock/fund/bond/derivative/other（classify_g1_leaf）
+  5. 聚合出 adjudication_prefill 供审定表 seed
+  6. 输出 tb_source_codes 供溯源面板
+
+交易性金融资产不计提减值准备（以公允价值计量，变动计入当期损益），故无 provision。
 """
 
 from __future__ import annotations
@@ -18,13 +30,34 @@ import sqlalchemy as sa
 
 from app.models.audit_platform_models import TbBalance
 from app.services.dataset_query import get_active_filter
+from app.services.four_table import (
+    LeafRow,
+    ReportLineAccountSpec,
+    aggregate_leaves,
+    filter_by_prefixes,
+    parent_totals,
+    resolve_report_line_accounts,
+    select_leaves,
+    to_leaf_rows,
+)
 
 from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
 
-# G1-1 审定表 TB 取数科目（前缀匹配，兼容明细科目如 150101）
-_G1_ACCOUNT_PREFIX = "1501"
+# ─────────────────────────────────────────────────────────────────────────────
+# 科目定位规格（单一真源）
+# ─────────────────────────────────────────────────────────────────────────────
+
+G1_ACCOUNT_SPEC = ReportLineAccountSpec(
+    row_code="BS-003",            # 交易性金融资产，四准则一致 TB('1101','期末余额')
+    fallback_gross=("1101",),     # 无 account_mapping 时的兜底前缀
+    # 交易性金融资产无备抵（以公允价值计量，不计提减值准备）
+)
+
+#: 衍生金融资产报表行（G1 底稿同时管理 1101 交易性 + 1102 衍生）
+_G1_DERIVATIVE_ROW_CODE = "BS-004"
+_G1_DERIVATIVE_FALLBACK = ("1102",)
 
 # EventBus 审定值持久化的独立 item_id（render 回读 seed）
 _ADJUDICATED_ITEM_ID = "G1-1-adjudicated-amount"
@@ -44,78 +77,191 @@ G1_MEASURE_TYPES = [
 ]
 
 
-async def _fetch_tb_values(ctx: RenderContext) -> dict:
-    """取 1501 交易性金融资产 期初/期末余额，按父科目前缀聚合。
+# ─────────────────────────────────────────────────────────────────────────────
+# 纯函数：叶子科目分类
+# ─────────────────────────────────────────────────────────────────────────────
 
-    返回 {"opening": float, "closing": float, "by_category": [...]}，
-    by_category 按子科目分类映射到投资品种（stock/fund/bond/derivative/other），
-    供前端 G1-1 审定表分行预填 seed。
+
+def classify_g1_leaf(name: str, code: str) -> str:
+    """根据科目名称/编码将子科目映射到 G1 投资品种分类。
+
+    名称优先（按关键字判定），编码兜底。判定顺序有意义：
+    - 衍生必须先于其他（「衍生金融资产_成本」含「成本」但不是 cost）
+    - 债券/票据先于通用「其他」
+    """
+    n = (name or "").lower()
+    # 名称关键词优先
+    if any(kw in n for kw in ("衍生", "期权", "期货", "远期", "互换", "掉期")):
+        return "derivative"
+    if any(kw in n for kw in ("股票", "股权", "股份")):
+        return "stock"
+    if any(kw in n for kw in ("基金",)):
+        return "fund"
+    if any(kw in n for kw in ("理财", "信托", "结构性存款")):
+        return "fund"
+    if any(kw in n for kw in ("债券", "债", "票据")):
+        return "bond"
+    # 编码兜底（致同常见惯例）
+    c = (code or "").strip()
+    # 去掉 1101 前缀后看首段
+    for prefix in ("1101.", "1101"):
+        if c.startswith(prefix) and len(c) > len(prefix):
+            suffix = c[len(prefix):].lstrip(".")
+            if suffix.startswith("01"):
+                return "stock"
+            if suffix.startswith("02"):
+                return "fund"
+            if suffix.startswith("03"):
+                return "bond"
+            if suffix.startswith("04"):
+                return "derivative"
+            break
+    return "other"
+
+
+def build_g1_adjudication_prefill(
+    leaves: list[LeafRow],
+) -> dict:
+    """从 1101 叶子科目构建 G1-1 审定表分行预填。
+
+    输出形态（键名对齐 G1_INVEST_TYPES.rowKey）：
+    {
+      "stock": {"opening": ..., "closing": ..., "codes": [...], "names": [...]},
+      "fund": {...},
+      ...
+    }
+    无叶子时返回 {}（宁缺勿造）。
+    """
+    if not leaves:
+        return {}
+
+    buckets: dict[str, dict] = {}
+    for leaf in leaves:
+        cat = classify_g1_leaf(leaf.account_name, leaf.account_code)
+        if cat not in buckets:
+            buckets[cat] = {"opening": 0.0, "closing": 0.0, "codes": [], "names": []}
+        buckets[cat]["opening"] += leaf.opening
+        buckets[cat]["closing"] += leaf.closing
+        buckets[cat]["codes"].append(leaf.account_code)
+        if leaf.account_name and leaf.account_name not in buckets[cat]["names"]:
+            buckets[cat]["names"].append(leaf.account_name)
+
+    # 只输出有值的桶（宁缺勿造）
+    return {k: v for k, v in buckets.items() if v["opening"] != 0 or v["closing"] != 0}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 四表取数主入口
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+async def _fetch_tb_data(ctx: RenderContext) -> dict:
+    """取 1101 交易性金融资产的 tb_balance 数据，走共享件叶子聚合。
+
+    返回:
+        {
+            "tb_values": {"opening": ..., "closing": ..., "by_category": [...]},
+            "tb_source_codes": {...},
+            "adjudication_prefill": {...},
+        }
     取数失败降级为空 dict，前端允许手填。
     """
-    tb: dict = {}
+    result: dict = {"tb_values": {}, "tb_source_codes": {}, "adjudication_prefill": {}}
+
     try:
+        # Step 1: 解析报表行 → 科目码（ctx 即 RenderContext，内含 db/project_id）
+        accounts = await resolve_report_line_accounts(ctx, G1_ACCOUNT_SPEC)
+
+        # Step 2: 从 tb_balance 取所有相关行
         active_filter = await get_active_filter(
             ctx.db, TbBalance.__table__, ctx.project_id, ctx.year
         )
-        result = await ctx.db.execute(
+        # 用原始码前缀集查询
+        query_prefixes = accounts.gross if accounts.gross else list(G1_ACCOUNT_SPEC.fallback_gross)
+        if not query_prefixes:
+            return result
+
+        # 构建 OR 条件：code == prefix OR code LIKE 'prefix.%'
+        conditions = []
+        for p in query_prefixes:
+            conditions.append(TbBalance.account_code == p)
+            conditions.append(TbBalance.account_code.like(f"{p}.%"))
+
+        rows = await ctx.db.execute(
             sa.select(
                 TbBalance.account_code,
                 TbBalance.account_name,
                 TbBalance.opening_balance,
                 TbBalance.closing_balance,
-                TbBalance.level,
-            ).where(active_filter)
+                TbBalance.debit_amount,
+                TbBalance.credit_amount,
+                TbBalance.closing_direction,
+                TbBalance.dataset_id,
+            ).where(sa.and_(active_filter, sa.or_(*conditions)))
         )
-        opening = 0.0
-        closing = 0.0
-        matched = False
+        all_rows = to_leaf_rows(rows.fetchall())
+
+        if not all_rows:
+            # 输出溯源信息（即使无数据）
+            result["tb_source_codes"] = accounts.as_dict()
+            return result
+
+        # Step 3: 取叶子
+        leaves = select_leaves(all_rows)
+        filtered_leaves = filter_by_prefixes(leaves, query_prefixes)
+
+        # Step 4: 聚合
+        agg = aggregate_leaves(filtered_leaves, query_prefixes)
+
+        # 父科目勾稽
+        parent = parent_totals(all_rows, query_prefixes[0] if len(query_prefixes) == 1 else "")
+        parent_check = None
+        if parent.get("closing", 0) != 0 or parent.get("opening", 0) != 0:
+            leaf_sum_closing = sum(r.closing for r in filtered_leaves)
+            parent_check = {
+                "leaf_sum": leaf_sum_closing,
+                "parent": parent.get("closing", 0),
+                "diff": round(leaf_sum_closing - parent.get("closing", 0), 2),
+            }
+
+        # Step 5: 分类构建 by_category（兼容既有前端消费）
         by_category: list[dict] = []
-        for row in result.fetchall():
-            code = (row.account_code or "").strip()
-            if code == _G1_ACCOUNT_PREFIX or code.startswith(_G1_ACCOUNT_PREFIX):
-                opening += float(row.opening_balance or 0)
-                closing += float(row.closing_balance or 0)
-                matched = True
-                # 子科目分类映射（非汇总行）
-                if code != _G1_ACCOUNT_PREFIX and (row.level or 0) >= 2:
-                    name = (row.account_name or "").lower()
-                    category = _classify_g1_sub_account(name, code)
-                    by_category.append({
-                        "account_code": code,
-                        "account_name": row.account_name or "",
-                        "category": category,
-                        "opening": float(row.opening_balance or 0),
-                        "closing": float(row.closing_balance or 0),
-                    })
-        if matched:
-            tb = {"opening": opening, "closing": closing, "by_category": by_category}
+        for leaf in filtered_leaves:
+            category = classify_g1_leaf(leaf.account_name, leaf.account_code)
+            by_category.append({
+                "account_code": leaf.account_code,
+                "account_name": leaf.account_name,
+                "category": category,
+                "opening": leaf.opening,
+                "closing": leaf.closing,
+            })
+
+        # Step 6: 构建预填
+        adjudication_prefill = build_g1_adjudication_prefill(filtered_leaves)
+
+        # Step 7: 溯源
+        source_codes = accounts.as_dict()
+        source_codes["gross"] = [r.account_code for r in filtered_leaves]
+        if parent_check:
+            source_codes["parent_check"] = parent_check
+
+        result["tb_values"] = {
+            "opening": agg["opening"],
+            "closing": agg["closing"],
+            "by_category": by_category,
+        }
+        result["tb_source_codes"] = source_codes
+        result["adjudication_prefill"] = adjudication_prefill
+
     except Exception as e:  # noqa: BLE001 — 取数失败降级为空，前端允许手填
         logger.warning("G1 TB fetch failed: %s", e)
-    return tb
+
+    return result
 
 
-def _classify_g1_sub_account(name: str, code: str) -> str:
-    """根据科目名称/编码将子科目映射到G1投资品种分类。"""
-    # 按名称关键词优先
-    if any(kw in name for kw in ("股票", "股权", "股份")):
-        return "stock"
-    if any(kw in name for kw in ("基金", "理财", "信托")):
-        return "fund"
-    if any(kw in name for kw in ("债券", "债", "票据")):
-        return "bond"
-    if any(kw in name for kw in ("衍生", "期权", "期货", "远期", "互换", "掉期")):
-        return "derivative"
-    # 按科目编码后缀（致同惯例：01股票02基金03债券04衍生）
-    suffix = code[len(_G1_ACCOUNT_PREFIX):]
-    if suffix.startswith("01"):
-        return "stock"
-    if suffix.startswith("02"):
-        return "fund"
-    if suffix.startswith("03"):
-        return "bond"
-    if suffix.startswith("04"):
-        return "derivative"
-    return "other"
+# ─────────────────────────────────────────────────────────────────────────────
+# render 主入口
+# ─────────────────────────────────────────────────────────────────────────────
 
 
 async def render(ctx: RenderContext) -> dict | None:
@@ -149,7 +295,7 @@ async def render(ctx: RenderContext) -> dict | None:
     project_context: dict = {
         "client_name": "",
         "audit_year": "",
-        "account_code": _G1_ACCOUNT_PREFIX,
+        "account_code": "1101",
         "bs_date": "",
         "related_parties": [],
         "applicable_standards": [],
@@ -196,7 +342,15 @@ async def render(ctx: RenderContext) -> dict | None:
     except Exception:  # noqa: BLE001 — 表可能不存在
         pass
 
-    tb_values = await _fetch_tb_values(ctx)
+    # 四表取数（交易性金融资产 1101）
+    tb_data = await _fetch_tb_data(ctx)
+    tb_values = tb_data["tb_values"]
+    tb_source_codes = tb_data["tb_source_codes"]
+    adjudication_prefill = tb_data["adjudication_prefill"]
+
+    # 溯源信息注入 project_context
+    project_context["tb_source_codes"] = tb_source_codes
+    project_context["tb_amount"] = tb_values.get("closing", 0) if tb_values else 0
 
     return {
         "component_type": "g1-trading-financial-assets",
@@ -204,10 +358,14 @@ async def render(ctx: RenderContext) -> dict | None:
         "measure_types": G1_MEASURE_TYPES,
         "project_context": project_context,
         "responses_snapshot": responses_snapshot,
-        "account_code": _G1_ACCOUNT_PREFIX,
+        "account_code": "1101",
         "prefix": "G1",
-        # G1-1 审定表试算表列只读 seed（真接线：render→html_data→FormData→组件 watch）
+        # G1-1 审定表试算表列只读 seed（四表共享件取数）
         "tb_values": tb_values,
+        # 审定表分行预填（按叶子科目名称归类到投资品种）
+        "adjudication_prefill": adjudication_prefill,
+        # 取数溯源（前端 WpFourTableSourcePanel 消费）
+        "tb_source_codes": tb_source_codes,
         # 审定数回读 seed（EventBus 持久化后刷新不丢失）
         "adjudicated_amount": adjudicated_amount,
     }

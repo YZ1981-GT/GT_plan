@@ -1,21 +1,19 @@
 """G4 债权投资(main组) — 专属渲染策略.
 
 componentType: g4-bond-investment-main
-科目 1501 债权投资（借方/资产类，以摊余成本计量的金融资产 CAS22 AC 类）。
+
+科目映射链路（report_config DB 实证，四准则一致）：
+  BS-021 债权投资 = TB('1504','期末余额')
+  标准科目 1504 债权投资（借方/资产类，以摊余成本计量的金融资产 CAS22 AC 类）
 
 覆盖 8 个 sheet（sheetName v-if dispatch 主入口 GtG4BondInvestmentMain.vue 分发）：
     G4A 实质性程序表 / G4-1 审定表 / G4-2 明细表(44列→5区段) /
     G4-3 调整分录汇总 / G4-4 利息测算表 /
     附注披露信息（上市公司）/ 附注披露信息（国企）/ 底稿目录
 
-render 策略的关键作用：
-1. 让 component_type 命中 RENDERER_DISPATCH，避免多 sheet dispatch 循环把 G4 各 sheet
-   误判为非白名单而重写成 onlyoffice-sheet（否则专属组件被吞掉）。
-2. 返回 8 个 sheet 的配置（componentType / sheetName / columns / rows）供前端分发。
-3. 为 G4-1 审定表自动取数：1501 债权投资 的期初/期末余额（tb_balance，
-   get_active_filter）供前端审定表试算表列（只读）seed。
-4. 回读已持久化的审定数（EventBus substantive:adjudicated 落库的独立 item_id），
-   供 render 回填 seed，避免刷新后丢失。
+四表取数：
+  1. resolve_report_line_accounts → 标准码 1504
+  2. tb_balance 叶子聚合 → tb_values / tb_source_codes / adjudication_prefill
 """
 
 from __future__ import annotations
@@ -26,21 +24,34 @@ import sqlalchemy as sa
 
 from app.models.audit_platform_models import TbBalance
 from app.services.dataset_query import get_active_filter
+from app.services.four_table import (
+    LeafRow,
+    ReportLineAccountSpec,
+    aggregate_leaves,
+    filter_by_prefixes,
+    parent_totals,
+    resolve_report_line_accounts,
+    select_leaves,
+    to_leaf_rows,
+)
 
 from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
 
-# G4-1 审定表 TB 取数科目（前缀匹配，兼容明细科目如 150101）
-_G4_ACCOUNT_PREFIX = "1501"
+# ─────────────────────────────────────────────────────────────────────────────
+# 科目定位规格
+# ─────────────────────────────────────────────────────────────────────────────
 
-# EventBus 审定值持久化的独立 item_id（render 回读 seed）
+G4_ACCOUNT_SPEC = ReportLineAccountSpec(
+    row_code="BS-021",            # 债权投资，四准则一致 TB('1504','期末余额')
+    fallback_gross=("1504",),
+    # 债权投资减值准备：report_config 有 IMP-005 但实务中与 G14 信用减值共管
+    # 此处不做备抵预填（减值由 G4 ECL 测试表 + G14 联动）
+)
+
 _ADJUDICATED_ITEM_ID = "G4-1-adjudicated-amount"
 
-# 8 个 sheet 配置：sheetName（与源 xlsx tab 名一致）/ code（前端正则提取分发键）/
-# componentType（G4A 复用 a-program-console，其余走主入口子组件）。
-# columns / rows 的具体列定义由 render schema yaml + 前端 composable 提供，
-# 此处返回轻量占位供主入口 sheetName dispatch 命中。
 G4_MAIN_SHEETS = [
     {
         "code": "G4A",
@@ -109,37 +120,138 @@ G4_MAIN_SHEETS = [
 ]
 
 
-async def _fetch_tb_values(ctx: RenderContext) -> dict:
-    """取 1501 债权投资 期初/期末余额，按父科目前缀聚合。
+# ─────────────────────────────────────────────────────────────────────────────
+# 纯函数：叶子科目分类
+# ─────────────────────────────────────────────────────────────────────────────
 
-    返回 {"opening": float, "closing": float}，取数失败降级为空 dict，前端允许手填。
-    """
-    tb: dict[str, float] = {}
+
+def classify_g4_leaf(name: str, code: str) -> str:
+    """根据子科目名称分类债权投资。"""
+    n = (name or "").lower()
+    if any(kw in n for kw in ("国债", "政府债", "地方债")):
+        return "government-bond"
+    if any(kw in n for kw in ("企业债", "公司债", "可转债")):
+        return "corporate-bond"
+    if any(kw in n for kw in ("银行", "金融债", "同业")):
+        return "financial-bond"
+    if any(kw in n for kw in ("信托", "资管", "理财")):
+        return "trust-plan"
+    return "other"
+
+
+def build_g4_adjudication_prefill(leaves: list[LeafRow]) -> dict:
+    """从 1504 叶子构建审定表预填。按投资项目逐行。"""
+    if not leaves:
+        return {}
+    items: list[dict] = []
+    for leaf in leaves:
+        if leaf.opening != 0 or leaf.closing != 0:
+            items.append({
+                "account_code": leaf.account_code,
+                "account_name": leaf.account_name,
+                "category": classify_g4_leaf(leaf.account_name, leaf.account_code),
+                "opening": leaf.opening,
+                "closing": leaf.closing,
+            })
+    if not items:
+        return {}
+    return {
+        "items": items,
+        "total_opening": sum(i["opening"] for i in items),
+        "total_closing": sum(i["closing"] for i in items),
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 四表取数
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+async def _fetch_tb_data(ctx: RenderContext) -> dict:
+    """取 1504 债权投资的四表数据。"""
+    result: dict = {"tb_values": {}, "tb_source_codes": {}, "adjudication_prefill": {}}
+
     try:
+        accounts = await resolve_report_line_accounts(ctx, G4_ACCOUNT_SPEC)
+
         active_filter = await get_active_filter(
             ctx.db, TbBalance.__table__, ctx.project_id, ctx.year
         )
-        result = await ctx.db.execute(
+        query_prefixes = accounts.gross if accounts.gross else list(G4_ACCOUNT_SPEC.fallback_gross)
+        if not query_prefixes:
+            return result
+
+        conditions = []
+        for p in query_prefixes:
+            conditions.append(TbBalance.account_code == p)
+            conditions.append(TbBalance.account_code.like(f"{p}.%"))
+
+        rows = await ctx.db.execute(
             sa.select(
                 TbBalance.account_code,
+                TbBalance.account_name,
                 TbBalance.opening_balance,
                 TbBalance.closing_balance,
-            ).where(active_filter)
+                TbBalance.debit_amount,
+                TbBalance.credit_amount,
+                TbBalance.closing_direction,
+                TbBalance.dataset_id,
+            ).where(sa.and_(active_filter, sa.or_(*conditions)))
         )
-        opening = 0.0
-        closing = 0.0
-        matched = False
-        for row in result.fetchall():
-            code = (row.account_code or "").strip()
-            if code == _G4_ACCOUNT_PREFIX or code.startswith(_G4_ACCOUNT_PREFIX):
-                opening += float(row.opening_balance or 0)
-                closing += float(row.closing_balance or 0)
-                matched = True
-        if matched:
-            tb = {"opening": opening, "closing": closing}
-    except Exception as e:  # noqa: BLE001 — 取数失败降级为空，前端允许手填
+        all_rows = to_leaf_rows(rows.fetchall())
+
+        if not all_rows:
+            result["tb_source_codes"] = accounts.as_dict()
+            return result
+
+        leaves = select_leaves(all_rows)
+        filtered_leaves = filter_by_prefixes(leaves, query_prefixes)
+        agg = aggregate_leaves(filtered_leaves, query_prefixes)
+
+        # 父科目勾稽
+        parent = parent_totals(all_rows, query_prefixes[0] if len(query_prefixes) == 1 else "")
+        parent_check = None
+        if parent.get("closing", 0) != 0 or parent.get("opening", 0) != 0:
+            leaf_sum = sum(r.closing for r in filtered_leaves)
+            parent_check = {
+                "leaf_sum": leaf_sum,
+                "parent": parent.get("closing", 0),
+                "diff": round(leaf_sum - parent.get("closing", 0), 2),
+            }
+
+        adjudication_prefill = build_g4_adjudication_prefill(filtered_leaves)
+
+        source_codes = accounts.as_dict()
+        source_codes["gross"] = [r.account_code for r in filtered_leaves]
+        if parent_check:
+            source_codes["parent_check"] = parent_check
+
+        result["tb_values"] = {
+            "opening": agg["opening"],
+            "closing": agg["closing"],
+            "by_category": [
+                {
+                    "account_code": leaf.account_code,
+                    "account_name": leaf.account_name,
+                    "category": classify_g4_leaf(leaf.account_name, leaf.account_code),
+                    "opening": leaf.opening,
+                    "closing": leaf.closing,
+                }
+                for leaf in filtered_leaves
+            ],
+        }
+        result["tb_source_codes"] = source_codes
+        result["adjudication_prefill"] = adjudication_prefill
+
+    except Exception as e:  # noqa: BLE001
         logger.warning("G4 TB fetch failed: %s", e)
-    return tb
+
+    return result
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# render 主入口
+# ─────────────────────────────────────────────────────────────────────────────
 
 
 async def render(ctx: RenderContext) -> dict | None:
@@ -163,7 +275,6 @@ async def render(ctx: RenderContext) -> dict | None:
                 "conclusion": row.conclusion or "",
                 "remark": row.remark or "",
             }
-        # 审定值回读：EventBus substantive:adjudicated 落库的独立 item_id
         adjudicated_amount = responses_snapshot.get(_ADJUDICATED_ITEM_ID, {}).get(
             "conclusion", ""
         )
@@ -173,12 +284,13 @@ async def render(ctx: RenderContext) -> dict | None:
     project_context: dict = {
         "client_name": "",
         "audit_year": "",
-        "account_code": _G4_ACCOUNT_PREFIX,
+        "account_code": "1504",
+        "applicable_standards": [],
     }
     try:
         proj_result = await db.execute(
             sa.text(
-                "SELECT client_name, audit_year "
+                "SELECT client_name, audit_year, applicable_standard_v2 "
                 "FROM projects WHERE id = :pid"
             ),
             {"pid": str(ctx.project_id)},
@@ -187,33 +299,50 @@ async def render(ctx: RenderContext) -> dict | None:
         if proj_row:
             project_context["client_name"] = proj_row.client_name or ""
             project_context["audit_year"] = str(proj_row.audit_year or "")
+            raw_std = proj_row.applicable_standard_v2
+            if raw_std:
+                if isinstance(raw_std, dict):
+                    std_type = raw_std.get("type", "")
+                    if std_type:
+                        project_context["applicable_standards"] = [std_type]
+                elif isinstance(raw_std, str):
+                    project_context["applicable_standards"] = [raw_std]
     except Exception as e:  # noqa: BLE001
         logger.warning("G4 render: project context 失败: %s", e)
 
-    tb_values = await _fetch_tb_values(ctx)
+    # 四表取数
+    tb_data = await _fetch_tb_data(ctx)
+    tb_values = tb_data["tb_values"]
+    tb_source_codes = tb_data["tb_source_codes"]
+    adjudication_prefill = tb_data["adjudication_prefill"]
 
-    # ─── 同循环底稿目录（G 循环全部底稿，跨底稿跳转） ──────────────────
-    from app.services.wp_cycle_directory import build_cycle_workpapers
+    project_context["tb_source_codes"] = tb_source_codes
+    project_context["tb_amount"] = tb_values.get("closing", 0) if tb_values else 0
 
-    cycle_workpapers = await build_cycle_workpapers(
-        db=db,
-        project_id=ctx.project_id,
-        audit_cycle="G",
-        current_wp_id=wp_id,
-    )
+    # 同循环底稿目录（G 循环全部底稿，跨底稿跳转）
+    cycle_workpapers: list = []
+    try:
+        from app.services.wp_cycle_directory import build_cycle_workpapers
+
+        cycle_workpapers = await build_cycle_workpapers(
+            db=db,
+            project_id=ctx.project_id,
+            audit_cycle="G",
+            current_wp_id=wp_id,
+        )
+    except Exception:  # noqa: BLE001
+        pass
 
     return {
         "component_type": "g4-bond-investment-main",
-        # 8 个 sheet 配置（componentType / sheetName / columns / rows）
         "sheets": G4_MAIN_SHEETS,
         "project_context": project_context,
         "responses_snapshot": responses_snapshot,
-        "account_code": _G4_ACCOUNT_PREFIX,
+        "account_code": "1504",
         "prefix": "G4",
-        # G4-1 审定表试算表列只读 seed（真接线：render→html_data→FormData→组件 watch）
         "tb_values": tb_values,
-        # 审定数回读 seed（EventBus 持久化后刷新不丢失）
+        "adjudication_prefill": adjudication_prefill,
+        "tb_source_codes": tb_source_codes,
         "adjudicated_amount": adjudicated_amount,
-        # 同循环底稿目录（G0/G1/.../G14 跨底稿跳转）
         "cycle_workpapers": cycle_workpapers,
     }
