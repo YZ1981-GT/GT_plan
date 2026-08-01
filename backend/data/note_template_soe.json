@@ -11831,6 +11831,10 @@
           "guidance": "🔴 国企版按**变动口径**列示（期初余额 / 本期应交 / 本期已交 / 期末余额），与上市版的双期余额表结构本质不同，不可互相套用。【提示：增值税，根据“应交税费-未交增值税、简易计税、转让金融商品应交增值税、代扣代缴增值税”科目贷方余额计算填列。】勾稽：每行 期末余额 = 期初余额 + 本期应交 − 本期已交（源模板 =B8+C8-D8）；合计 = 各列之和（源模板 =SUM(B8:B22) 等）。",
           "rows": [
             {
+              "label": "企业所得税",
+              "row_type": "data"
+            },
+            {
               "label": "增值税",
               "row_type": "data"
             },
@@ -11843,11 +11847,15 @@
               "row_type": "data"
             },
             {
-              "label": "企业所得税",
+              "label": "土地增值税",
               "row_type": "data"
             },
             {
               "label": "城市维护建设税",
+              "row_type": "data"
+            },
+            {
+              "label": "车船牌照税",
               "row_type": "data"
             },
             {
@@ -11859,15 +11867,19 @@
               "row_type": "data"
             },
             {
-              "label": "个人所得税",
+              "label": "教育费附加",
               "row_type": "data"
             },
             {
-              "label": "教育费附加（含地方教育费附加）",
+              "label": "矿产资源补偿费",
               "row_type": "data"
             },
             {
-              "label": "其他税费",
+              "label": "代扣代缴外国企业所得税",
+              "row_type": "data"
+            },
+            {
+              "label": "代扣代缴个人所得税",
               "row_type": "data"
             },
             {
@@ -11897,7 +11909,7 @@
       "sort_index": 40,
       "auto_numbering": true,
       "lock_number": false,
-      "_aligned_by": "n-cycle-tax-disclosure-alignment"
+      "_aligned_by": "n2-disclosure-and-extraction-alignment"
     },
     {
       "section_number": "八、42",

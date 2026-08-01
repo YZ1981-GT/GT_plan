@@ -19,6 +19,13 @@
           G1-8+G1-10 联合写入
         </el-button>
         <el-button size="small" type="primary" :disabled="isReadonly" @click="cls.addRow()">新增项目</el-button>
+        <G1ImportExportDropdown
+          v-if="wpId"
+          :wp-id="wpId"
+          sheet="G1-9"
+          :disabled="isReadonly"
+          @imported="emit('imported')"
+        />
         <span class="chip-wrap"><GtIndexChip value="wp:G1-2" /></span>
         <span class="chip-wrap"><GtIndexChip value="wp:G1-8" /></span>
         <span class="chip-wrap"><GtIndexChip value="wp:G1-10" /></span>
@@ -300,6 +307,7 @@ import { useG1Classification } from '../../composables/useG1Classification'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import GtIndexChip from '../../GtIndexChip.vue'
 import G1AuditTextCards from '../G1AuditTextCards.vue'
+import G1ImportExportDropdown from '../G1ImportExportDropdown.vue'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -307,6 +315,8 @@ const props = defineProps<{
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
   wpId?: string
 }>()
+
+const emit = defineEmits<{ imported: [] }>()
 
 const wpId = computed(() => props.wpId ?? '')
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})

@@ -72,17 +72,25 @@
       <el-table-column label="序号" width="55" align="center">
         <template #default="{ $index }">{{ $index + 1 }}</template>
       </el-table-column>
-      <el-table-column label="类型" width="75" align="center">
-        <template #default="{ row }">
-          <el-tag :type="row.type === 'AJE' ? 'primary' : 'warning'" size="small">
-            {{ row.type }}
-          </el-tag>
+      <el-table-column label="类别" width="120" align="center">
+        <template #default="{ row, $index }">
+          <el-select
+            v-if="!isReadonly"
+            :model-value="row.category"
+            size="small"
+            placeholder="类别"
+            style="width:100%"
+            @change="(val: string) => handleFieldChange($index, 'category', val)"
+          >
+            <el-option v-for="opt in categoryOptions" :key="opt" :label="opt" :value="opt" />
+          </el-select>
+          <span v-else>{{ row.category || '—' }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="摘要" min-width="180">
+      <el-table-column label="调整事项说明" min-width="180">
         <template #default="{ row, $index }">
           <template v-if="!isReadonly">
-            <el-input :model-value="row.description" size="small" placeholder="输入摘要"
+            <el-input :model-value="row.description" size="small" placeholder="调整事项说明"
               @input="(val: string) => handleFieldChange($index, 'description', val)" />
           </template>
           <span v-else>{{ row.description || '—' }}</span>
@@ -106,7 +114,7 @@
           <span v-else>{{ row.accountName || '—' }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="借方金额" width="125" align="right">
+      <el-table-column label="借方调整金额" width="125" align="right">
         <template #default="{ row, $index }">
           <template v-if="!isReadonly">
             <el-input-number :model-value="row.debitAmount" :controls="false" :min="0" size="small"
@@ -116,7 +124,7 @@
           <span v-else>{{ fmtAmount(row.debitAmount) }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="贷方金额" width="125" align="right">
+      <el-table-column label="贷方调整金额" width="125" align="right">
         <template #default="{ row, $index }">
           <template v-if="!isReadonly">
             <el-input-number :model-value="row.creditAmount" :controls="false" :min="0" size="small"
@@ -126,7 +134,43 @@
           <span v-else>{{ fmtAmount(row.creditAmount) }}</span>
         </template>
       </el-table-column>
-      <el-table-column v-if="!isReadonly" label="操作" width="65" align="center">
+      <el-table-column label="报表项目" min-width="130">
+        <template #default="{ row, $index }">
+          <template v-if="!isReadonly">
+            <el-input :model-value="row.reportItem" size="small" placeholder="对应报表项目"
+              @input="(val: string) => handleFieldChange($index, 'reportItem', val)" />
+          </template>
+          <span v-else>{{ row.reportItem || '—' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="附注项目" min-width="130">
+        <template #default="{ row, $index }">
+          <template v-if="!isReadonly">
+            <el-input :model-value="row.noteItem" size="small" placeholder="对应附注项目"
+              @input="(val: string) => handleFieldChange($index, 'noteItem', val)" />
+          </template>
+          <span v-else>{{ row.noteItem || '—' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="索引号" width="110">
+        <template #default="{ row, $index }">
+          <template v-if="!isReadonly">
+            <el-input :model-value="row.indexNo" size="small" placeholder="索引号"
+              @input="(val: string) => handleFieldChange($index, 'indexNo', val)" />
+          </template>
+          <span v-else>{{ row.indexNo || '—' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="备注" min-width="130">
+        <template #default="{ row, $index }">
+          <template v-if="!isReadonly">
+            <el-input :model-value="row.remark" size="small" placeholder="备注"
+              @input="(val: string) => handleFieldChange($index, 'remark', val)" />
+          </template>
+          <span v-else>{{ row.remark || '—' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column v-if="!isReadonly" label="操作" width="65" align="center" fixed="right">
         <template #default="{ $index }">
           <el-button text type="danger" size="small" @click="handleRemoveEntry($index)">删除</el-button>
         </template>
@@ -163,6 +207,8 @@
         <li><strong>负债类特点</strong>：贷方增加（计提增加应交税费），借方减少（缴纳减少应交税费）</li>
         <li><strong>净影响</strong>：仅统计科目编码为"2221"的分录行的净增减（贷方-借方）</li>
         <li><strong>A13联动</strong>：保存并发布后通知 A13 审计调整汇总底稿更新</li>
+        <li><strong>类别</strong>：每笔调整应标注类别（报表调整/账项调整/其他）并填列对应报表项目、附注项目与索引号</li>
+        <li class="a27-tip"><strong>源模板 A27：</strong>调整分录应说明调整事项、对应报表/附注项目、借贷方向及金额，并注明索引号便于追溯</li>
       </ul>
     </details>
   </div>
@@ -223,15 +269,31 @@ const formData = useN2FormData({
 
 type AdjustmentType = 'AJE' | 'RJE'
 
+/** 调整类别（源模板 N2-3 类别列） */
+type AdjustmentCategory = '报表调整' | '账项调整' | '其他'
+
 interface AdjustmentEntry {
   id: string
   type: AdjustmentType
+  /** 类别：报表调整/账项调整/其他 */
+  category: AdjustmentCategory | ''
   description: string
   accountCode: string
   accountName: string
   debitAmount: number
   creditAmount: number
+  /** 对应报表项目 */
+  reportItem: string
+  /** 对应附注项目 */
+  noteItem: string
+  /** 索引号（便于追溯） */
+  indexNo: string
+  /** 备注 */
+  remark: string
 }
+
+/** 类别下拉选项 */
+const categoryOptions: AdjustmentCategory[] = ['报表调整', '账项调整', '其他']
 
 interface BalanceState {
   totalDebit: number
@@ -330,11 +392,16 @@ function handleAddEntry() {
   entries.value.push({
     id: `adj-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     type: activeType.value,
+    category: '',
     description: '',
     accountCode: '',
     accountName: '',
     debitAmount: 0,
     creditAmount: 0,
+    reportItem: '',
+    noteItem: '',
+    indexNo: '',
+    remark: '',
   })
 }
 

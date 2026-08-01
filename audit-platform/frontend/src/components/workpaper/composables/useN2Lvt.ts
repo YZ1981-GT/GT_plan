@@ -42,8 +42,20 @@ export interface N2LvtRow {
   projectName: string
   /** 转让收入 */
   transferIncome: number
-  /** 扣除项目金额 */
+  /** 扣除项目金额（可手填，或由扣除明细弹窗回填合计） */
   deductItems: number
+  /** 扣除明细·取得土地使用权支付金额 */
+  landCost: number
+  /** 扣除明细·开发成本 */
+  devCost: number
+  /** 扣除明细·开发费用 */
+  devExpense: number
+  /** 扣除明细·与转让相关税金 */
+  relatedTax: number
+  /** 扣除明细·财政部规定的加计扣除（加计20%，公式=(取得土地+开发成本)×20%） */
+  additionalDeduction: number
+  /** 扣除明细合计（公式=取得土地+开发成本+开发费用+相关税金+加计扣除） */
+  deductionDetailTotal: number
   /** 增值额（公式：收入-扣除） */
   appreciation: number
   /** 增值率（公式：增值额/扣除项目） */
@@ -56,6 +68,20 @@ export interface N2LvtRow {
   taxAmount: number
   /** 匹配的税率档次描述 */
   bracketLabel: string
+}
+
+/** 面积参考表行（辅助按面积分摊扣除项目） */
+export interface N2LvtAreaRow {
+  /** 项目类型（数量/收入/单价/成本） */
+  key: string
+  /** 可销售面积 */
+  sellable: number
+  /** 已售面积 */
+  sold: number
+  /** 未售面积（公式：可销售 - 已售） */
+  unsold: number
+  /** 索引 */
+  indexNo: string
 }
 
 /** 土增税汇总 */
@@ -81,6 +107,9 @@ export const LVT_BRACKETS: LvtBracket[] = [
   { maxRate: 2.00, taxRate: 0.50, quickDeductCoef: 0.15, label: '100%~200%: 50%/15%' },
   { maxRate: Infinity, taxRate: 0.60, quickDeductCoef: 0.35, label: '>200%: 60%/35%' },
 ]
+
+/** 面积参考表固定行（数量/收入/单价/成本） */
+export const AREA_ROW_KEYS = ['数量', '收入', '单价', '成本'] as const
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -133,6 +162,14 @@ export function useN2Lvt(options: UseN2LvtOptions) {
       const transferIncome = parseNum(r.transferIncome)
       const deductItems = parseNum(r.deductItems)
 
+      // 扣除明细 5 子项（加计扣除自动=(取得土地+开发成本)×20%）
+      const landCost = parseNum(r.landCost)
+      const devCost = parseNum(r.devCost)
+      const devExpense = parseNum(r.devExpense)
+      const relatedTax = parseNum(r.relatedTax)
+      const additionalDeduction = (landCost + devCost) * 0.20
+      const deductionDetailTotal = landCost + devCost + devExpense + relatedTax + additionalDeduction
+
       // 增值额 = 转让收入 - 扣除项目
       const appreciation = transferIncome - deductItems
       // 增值率 = 增值额 / 扣除项目（除零保护）
@@ -147,6 +184,12 @@ export function useN2Lvt(options: UseN2LvtOptions) {
         projectName: r.projectName || '',
         transferIncome,
         deductItems,
+        landCost,
+        devCost,
+        devExpense,
+        relatedTax,
+        additionalDeduction,
+        deductionDetailTotal,
         appreciation,
         appreciationRate,
         taxRate: bracket.taxRate,
@@ -217,6 +260,78 @@ export function useN2Lvt(options: UseN2LvtOptions) {
   }
 
   /**
+   * 更新指定行的扣除明细（5子项）并回填 deductItems = 明细合计。
+   * 加计扣除自动=(取得土地+开发成本)×20%，合计写入 deductItems（扣除项目金额）。
+   */
+  async function updateDeductionDetail(
+    rowId: string,
+    detail: { landCost: number; devCost: number; devExpense: number; relatedTax: number },
+  ): Promise<void> {
+    const stored = getField('10', 'lvt-rows') || []
+    const raw: any[] = Array.isArray(stored) ? [...stored] : []
+    const idx = raw.findIndex(r => r.id === rowId)
+    if (idx < 0) return
+
+    const landCost = parseNum(detail.landCost)
+    const devCost = parseNum(detail.devCost)
+    const devExpense = parseNum(detail.devExpense)
+    const relatedTax = parseNum(detail.relatedTax)
+    const additionalDeduction = (landCost + devCost) * 0.20
+    const total = landCost + devCost + devExpense + relatedTax + additionalDeduction
+
+    raw[idx] = {
+      ...raw[idx],
+      landCost,
+      devCost,
+      devExpense,
+      relatedTax,
+      // 回填扣除项目金额 = 扣除明细合计
+      deductItems: total,
+    }
+    await saveField('10', 'lvt-rows', raw)
+  }
+
+  // ─── 面积参考表（辅助按面积分摊扣除项目，item_id N2-10-area） ──────────────
+
+  /** 各项目测算行（公式列自动计算 + 四级累进自动匹配）之外的面积参考数据 */
+  const areaRows: ComputedRef<N2LvtAreaRow[]> = computed(() => {
+    const stored = getField('10', 'area')
+    const rawRows: any[] = stored && Array.isArray(stored.rows) ? stored.rows : []
+    return AREA_ROW_KEYS.map((key) => {
+      const r = rawRows.find((x: any) => x.key === key) || {}
+      const sellable = parseNum(r.sellable)
+      const sold = parseNum(r.sold)
+      return {
+        key,
+        sellable,
+        sold,
+        // 未售面积 = 可销售面积 - 已售面积（公式列）
+        unsold: sellable - sold,
+        indexNo: r.indexNo || '',
+      }
+    })
+  })
+
+  /**
+   * 更新面积参考表某行字段（可销售面积/已售面积/索引，未售面积自动计算）
+   */
+  async function updateAreaRow(
+    key: string,
+    field: 'sellable' | 'sold' | 'indexNo',
+    value: any,
+  ): Promise<void> {
+    const stored = getField('10', 'area')
+    const rawRows: any[] = stored && Array.isArray(stored.rows) ? [...stored.rows] : []
+    const idx = rawRows.findIndex((x: any) => x.key === key)
+    if (idx >= 0) {
+      rawRows[idx] = { ...rawRows[idx], key, [field]: value }
+    } else {
+      rawRows.push({ key, [field]: value })
+    }
+    await saveField('10', 'area', { rows: rawRows })
+  }
+
+  /**
    * 同步土增税合计到独立字段（供N2-1回填）
    */
   async function syncTotal(): Promise<void> {
@@ -231,6 +346,9 @@ export function useN2Lvt(options: UseN2LvtOptions) {
     addRow,
     removeRow,
     updateRow,
+    updateDeductionDetail,
+    areaRows,
+    updateAreaRow,
     syncTotal,
   }
 }

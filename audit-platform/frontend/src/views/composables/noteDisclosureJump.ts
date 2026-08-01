@@ -928,6 +928,18 @@ export function resolveNoteDisclosureJumpTarget(note: unknown): NoteDisclosureJu
     }
   }
 
+  // N2 应交税费（五、42/43 / 八、42/43）须在通用 sheet 回退之前
+  if (isN2TaxesPayableNoteSection(section)) {
+    const variant = section.startsWith('八') || std.startsWith('soe') ? 'soe' : 'listed'
+    return {
+      sheet: variant === 'listed' ? N2_DISCLOSURE_SHEET_LISTED : N2_DISCLOSURE_SHEET_SOE,
+      wpId,
+      variant,
+      reason: `章节 ${section}`,
+      wpCode: 'N2',
+    }
+  }
+
   // I5 其他非流动资产（五、31 / 八、32）
   if (isI5OtherNoncurrentNoteSection(section)) {
     const variant = section.startsWith('八') || std.startsWith('soe') ? 'soe' : 'listed'

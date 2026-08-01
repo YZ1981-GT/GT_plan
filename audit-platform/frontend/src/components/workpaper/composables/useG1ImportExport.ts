@@ -27,6 +27,7 @@ export type G1ImportableSheet =
   | 'G1-5'
   | 'G1-6'
   | 'G1-7'
+  | 'G1-9'
   | 'G1-10'
   | 'G1-11'
   | 'G1-12'
@@ -44,6 +45,7 @@ export const G1_IMPORTABLE_SHEETS: { code: G1ImportableSheet; label: string }[] 
   { code: 'G1-5', label: 'G1-5 收益测算表' },
   { code: 'G1-6', label: 'G1-6 公允价值测试表' },
   { code: 'G1-7', label: 'G1-7 第三层次调节表' },
+  { code: 'G1-9', label: 'G1-9 分类的适当性检查表' },
   { code: 'G1-10', label: 'G1-10 合同现金流量特征分析' },
   { code: 'G1-11', label: 'G1-11 有价证券监盘表' },
   { code: 'G1-12', label: 'G1-12 盘点倒轧表' },

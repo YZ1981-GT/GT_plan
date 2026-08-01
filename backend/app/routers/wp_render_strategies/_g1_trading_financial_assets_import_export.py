@@ -231,6 +231,20 @@ _G1_14_KEYS = [
     "seq", "instrumentName", "instrumentType", "notionalAmount", "term", "counterparty", "margin", "isHedging", "accountingAppropriateness", "complianceConclusion",
 ]
 
+# ── G1-9 分类的适当性检查表（对齐 useG1Classification.G1ClassificationRow）──
+_G1_9_HEADERS = [
+    "序号", "投资项目", "期末账面价值",
+    "交易性①近期出售或回购", "交易性②组合短期获利模式", "交易性③衍生工具",
+    "债务工具SPPI不通过", "权益工具投资", "初始指定消除会计错配",
+    "其他说明", "索引号",
+]
+_G1_9_KEYS = [
+    "seq", "investItem", "closingBookValue",
+    "tradingNearTermSale", "tradingPortfolioShortTerm", "tradingDerivative",
+    "debtSppiFail", "equityInstrument", "designatedMismatch",
+    "other", "indexRef",
+]
+
 # ── G1-10 合同现金流量特征分析（7 分区 × 多 sheet，对齐 useG1ContractCashflow）──
 _G1_10_BOND_HEADERS = [
     "序号", "投资项目", "账面/面值", "票面利率",
@@ -631,6 +645,20 @@ _G1_SPECS: dict[str, dict[str, Any]] = {
             "G1-14 衍生工具核查 编制说明",
             "",
             "类型填 option/futures/swap/forward（期权/期货/互换/远期）；会计处理适当性填 appropriate/inappropriate/needs-review。",
+        ],
+    },
+    "G1-9": {
+        "item_id": "G1-9-rows",
+        "storage_field": "conclusion",
+        "title": "G1-9 分类的适当性检查表",
+        "headers": _G1_9_HEADERS,
+        "field_keys": _G1_9_KEYS,
+        "guidance": [
+            "G1-9 分类适当性检查 编制说明",
+            "",
+            "分类依据六列填 yes / no / na（是/否/不适用）；至少一列为 yes 才具备 FVTPL 分类依据。",
+            "投资项目/期末账面价值可从 G1-2 明细同步（前端「从 G1-2 取数」按钮）；也可从 G1-8/G1-10 结论一键写入。",
+            "其他说明用于补充依据；索引号可填对应工作底稿引用。",
         ],
     },
 }

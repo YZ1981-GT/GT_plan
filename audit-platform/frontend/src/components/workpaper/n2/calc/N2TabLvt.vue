@@ -74,6 +74,11 @@
         </template>
       </el-table-column>
       <el-table-column label="扣除项目金额" width="140" align="right">
+        <template #header>
+          <el-tooltip content="可手填，或点击扣除明细按五项归集自动回填合计" placement="top">
+            <span class="formula-col-header">扣除项目金额</span>
+          </el-tooltip>
+        </template>
         <template #default="{ row }">
           <el-input-number
             :model-value="row.deductItems"
@@ -84,6 +89,13 @@
             style="width: 120px"
             @change="(val: number) => lvt.updateRow(row.id, 'deductItems', val ?? 0)"
           />
+        </template>
+      </el-table-column>
+      <el-table-column label="扣除明细" width="100" align="center">
+        <template #default="{ row }">
+          <el-button size="small" type="primary" plain @click="openDeductDialog(row)">
+            <el-icon><Document /></el-icon> 明细
+          </el-button>
         </template>
       </el-table-column>
       <el-table-column label="增值额" width="130" align="right">
@@ -212,6 +224,142 @@
       />
     </el-card>
 
+    <!-- ═══ 面积参考表（辅助按面积分摊扣除项目） ═══ -->
+    <el-card shadow="never" class="area-card">
+      <template #header>
+        <div class="card-header">
+          <span>面积参考表（辅助按面积分摊扣除项目）</span>
+          <el-tag type="info" size="small">未售面积自动计算</el-tag>
+        </div>
+      </template>
+      <el-table :data="lvt.areaRows.value" border size="small" style="width: 100%">
+        <el-table-column prop="key" label="项目" width="120" />
+        <el-table-column label="可销售面积(㎡)" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              :model-value="row.sellable"
+              :disabled="isReadonly"
+              :controls="false"
+              :precision="2"
+              size="small"
+              style="width: 130px"
+              @change="(val: number) => lvt.updateAreaRow(row.key, 'sellable', val ?? 0)"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column label="已售面积(㎡)" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              :model-value="row.sold"
+              :disabled="isReadonly"
+              :controls="false"
+              :precision="2"
+              size="small"
+              style="width: 130px"
+              @change="(val: number) => lvt.updateAreaRow(row.key, 'sold', val ?? 0)"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column label="未售面积(㎡)" align="right">
+          <template #header>
+            <el-tooltip content="公式：可销售面积 - 已售面积" placement="top">
+              <span class="formula-col-header">未售面积(㎡)</span>
+            </el-tooltip>
+          </template>
+          <template #default="{ row }">
+            <span class="formula-cell" :class="{ 'formula-cell--negative': row.unsold < 0 }">
+              {{ fmtAmount(row.unsold) }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="索引" width="160">
+          <template #default="{ row }">
+            <el-input
+              :model-value="row.indexNo"
+              size="small"
+              :disabled="isReadonly"
+              placeholder="底稿索引"
+              @change="(val: string) => lvt.updateAreaRow(row.key, 'indexNo', val)"
+            />
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
+    <!-- ═══ 扣除明细弹窗（5子项 + 加计20% + 合计回填） ═══ -->
+    <el-dialog
+      v-model="deductDialogVisible"
+      title="扣除项目明细"
+      width="560px"
+      append-to-body
+    >
+      <div class="deduct-dialog-body">
+        <div class="deduct-item">
+          <span class="deduct-label">取得土地使用权支付金额</span>
+          <el-input-number
+            v-model="deductForm.landCost"
+            :disabled="isReadonly"
+            :controls="false"
+            :precision="2"
+            size="small"
+            style="width: 200px"
+          />
+        </div>
+        <div class="deduct-item">
+          <span class="deduct-label">开发成本</span>
+          <el-input-number
+            v-model="deductForm.devCost"
+            :disabled="isReadonly"
+            :controls="false"
+            :precision="2"
+            size="small"
+            style="width: 200px"
+          />
+        </div>
+        <div class="deduct-item">
+          <span class="deduct-label">开发费用</span>
+          <el-input-number
+            v-model="deductForm.devExpense"
+            :disabled="isReadonly"
+            :controls="false"
+            :precision="2"
+            size="small"
+            style="width: 200px"
+          />
+        </div>
+        <div class="deduct-item">
+          <span class="deduct-label">与转让相关税金</span>
+          <el-input-number
+            v-model="deductForm.relatedTax"
+            :disabled="isReadonly"
+            :controls="false"
+            :precision="2"
+            size="small"
+            style="width: 200px"
+          />
+        </div>
+        <div class="deduct-item deduct-item--auto">
+          <span class="deduct-label">
+            <el-tooltip content="公式：(取得土地使用权支付金额 + 开发成本) × 20%" placement="top">
+              <span class="formula-col-header">财政部规定的加计扣除（加计20%）</span>
+            </el-tooltip>
+          </span>
+          <span class="deduct-auto-value">{{ fmtAmount(deductAdditional) }}</span>
+        </div>
+        <el-divider />
+        <div class="deduct-item deduct-item--total">
+          <span class="deduct-label">扣除项目合计</span>
+          <span class="deduct-total-value">{{ fmtAmount(deductTotal) }}</span>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="deductDialogVisible = false">取消</el-button>
+        <el-button type="primary" :disabled="isReadonly" @click="confirmDeductDetail">
+          确认回填扣除项目金额
+        </el-button>
+      </template>
+    </el-dialog>
+
     <!-- ═══ 编制提示 ═══ -->
     <details class="n2-details-tip">
       <summary>编制提示</summary>
@@ -242,9 +390,9 @@
  * - 回填N2-1
  * - Uses useN2Lvt composable
  */
-import { ref, computed, inject, onMounted } from 'vue'
+import { ref, reactive, computed, inject, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { MagicStick, ChatDotSquare, Plus, Delete } from '@element-plus/icons-vue'
+import { MagicStick, ChatDotSquare, Plus, Delete, Document } from '@element-plus/icons-vue'
 import { useN2FormData } from '../../composables/useN2FormData'
 import { useN2Lvt, LVT_BRACKETS } from '../../composables/useN2Lvt'
 
@@ -280,6 +428,52 @@ const lvt = useN2Lvt({
 
 const isReadonly = computed(() => props.isReadonly ?? false)
 const auditNote = ref('')
+
+// ─── 扣除明细弹窗 ─────────────────────────────────────────────────────────────
+
+const deductDialogVisible = ref(false)
+const deductDialogRowId = ref('')
+const deductForm = reactive({ landCost: 0, devCost: 0, devExpense: 0, relatedTax: 0 })
+
+/** 加计扣除（自动=(取得土地+开发成本)×20%） */
+const deductAdditional = computed(
+  () => (numVal(deductForm.landCost) + numVal(deductForm.devCost)) * 0.20,
+)
+/** 扣除项目合计（自动） */
+const deductTotal = computed(
+  () =>
+    numVal(deductForm.landCost) +
+    numVal(deductForm.devCost) +
+    numVal(deductForm.devExpense) +
+    numVal(deductForm.relatedTax) +
+    deductAdditional.value,
+)
+
+function numVal(v: any): number {
+  const n = Number(v)
+  return Number.isFinite(n) ? n : 0
+}
+
+function openDeductDialog(row: any) {
+  deductDialogRowId.value = row.id
+  deductForm.landCost = numVal(row.landCost)
+  deductForm.devCost = numVal(row.devCost)
+  deductForm.devExpense = numVal(row.devExpense)
+  deductForm.relatedTax = numVal(row.relatedTax)
+  deductDialogVisible.value = true
+}
+
+async function confirmDeductDetail() {
+  if (!deductDialogRowId.value) return
+  await lvt.updateDeductionDetail(deductDialogRowId.value, {
+    landCost: deductForm.landCost,
+    devCost: deductForm.devCost,
+    devExpense: deductForm.devExpense,
+    relatedTax: deductForm.relatedTax,
+  })
+  deductDialogVisible.value = false
+  ElMessage.success('扣除明细已回填扣除项目金额')
+}
 
 // ─── Format ──────────────────────────────────────────────────────────────────
 
@@ -335,7 +529,7 @@ function handleReview() {
   openReviewDialog?.('N2-10-土地增值税测算')
 }
 
-/** 合计行 */
+/** 合计行（列序：项目0/转让收入1/扣除项目2/扣除明细3/增值额4/增值率5/税率6/速算7/应交8/档次9/操作10） */
 function getSummaryRow({ columns }: { columns: any[] }) {
   const sums: string[] = []
   const s = lvt.summary.value
@@ -344,8 +538,8 @@ function getSummaryRow({ columns }: { columns: any[] }) {
     const map: Record<number, number> = {
       1: s.totalTransferIncome,
       2: s.totalDeductItems,
-      3: s.totalAppreciation,
-      7: s.totalTaxAmount,
+      4: s.totalAppreciation,
+      8: s.totalTaxAmount,
     }
     sums[index] = map[index] != null ? fmtAmount(map[index]) : ''
   })
@@ -501,6 +695,50 @@ onMounted(async () => {
 /* ─── 结论卡片 ─── */
 .conclusion-card {
   margin-top: 16px;
+}
+
+/* ─── 面积参考表 ─── */
+.area-card {
+  margin-top: 16px;
+}
+
+/* ─── 扣除明细弹窗 ─── */
+.deduct-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.deduct-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.deduct-label {
+  color: #606266;
+  font-size: var(--wp-font-size, 13px);
+}
+
+.deduct-item--auto .deduct-auto-value {
+  color: #409eff;
+  font-weight: 600;
+}
+
+.deduct-item--total {
+  padding: 4px 0;
+}
+
+.deduct-item--total .deduct-label {
+  font-weight: 600;
+  color: #303133;
+}
+
+.deduct-total-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: #409eff;
 }
 
 /* ─── 编制提示 ─── */

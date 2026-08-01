@@ -32,6 +32,26 @@
       </div>
     </div>
 
+    <!-- ═══ 二、审计过程 ═══ -->
+    <el-card shadow="never" class="check-card">
+      <template #header>
+        <div class="card-header">
+          <span>二、审计过程</span>
+          <el-button size="small" @click="handleAiAssist">
+            <el-icon><MagicStick /></el-icon> AI
+          </el-button>
+        </div>
+      </template>
+      <el-input
+        v-model="auditProcess"
+        type="textarea"
+        :autosize="{ minRows: 4, maxRows: 10 }"
+        :readonly="isReadonly"
+        placeholder="记录税收政策检查的审计过程：获取的资料、执行的检查程序、检查范围及依据等..."
+        @change="handleProcessChange"
+      />
+    </el-card>
+
     <!-- ═══ Section 1: 税收优惠检查 ═══ -->
     <el-card shadow="never" class="check-card">
       <template #header>
@@ -252,6 +272,7 @@ interface CheckItem {
 
 const isReadonly = computed(() => props.isReadonly ?? false)
 const overallConclusion = ref('')
+const auditProcess = ref('')
 
 // 税收优惠检查项
 const taxIncentiveItems = ref<CheckItem[]>([
@@ -324,6 +345,10 @@ function handleConclusionChange() {
   formData.debouncedSave('N2-4-conclusion', { remark: overallConclusion.value || null })
 }
 
+function handleProcessChange() {
+  formData.debouncedSave('N2-4-process', { remark: auditProcess.value || null })
+}
+
 // ─── AI / 复核 ──────────────────────────────────────────────────────────────
 
 function handleAiAssist() {
@@ -360,6 +385,8 @@ function restoreData(): void {
   }
   const conclusionResp = formData.allResponses.value.get('N2-4-conclusion')
   if (conclusionResp?.remark) overallConclusion.value = conclusionResp.remark
+  const processResp = formData.allResponses.value.get('N2-4-process')
+  if (processResp?.remark) auditProcess.value = processResp.remark
 }
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────

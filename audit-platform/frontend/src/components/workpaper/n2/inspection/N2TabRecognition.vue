@@ -4,9 +4,12 @@
     <div class="section-header">
       <div class="section-title">
         <span>应交税金认定表 N2-5</span>
-        <el-tag type="info" size="small">54×15 矩阵</el-tag>
+        <el-tag type="info" size="small">认定矩阵</el-tag>
+        <el-tag type="success" size="small">已填 {{ diffStats.filled }}/{{ diffStats.total }}</el-tag>
+        <el-tag v-if="diffStats.withDiff > 0" type="danger" size="small">差异 {{ diffStats.withDiff }}</el-tag>
       </div>
       <div class="section-actions">
+        <el-button v-if="!isReadonly" size="small" type="primary" plain @click="addTaxRow">＋ 新增税种行</el-button>
         <el-button size="small" @click="handleAiAssist">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
@@ -41,6 +44,26 @@
         <span class="val-stat-label">✗ 不满足</span>
       </div>
     </div>
+
+    <!-- ═══ 二、审计过程 ═══ -->
+    <el-card shadow="never" class="process-card">
+      <template #header>
+        <div class="card-header">
+          <span>二、审计过程</span>
+          <el-button size="small" @click="handleAiAssist">
+            <el-icon><MagicStick /></el-icon> AI
+          </el-button>
+        </div>
+      </template>
+      <el-input
+        v-model="auditProcess"
+        type="textarea"
+        :autosize="{ minRows: 4, maxRows: 10 }"
+        :readonly="isReadonly"
+        placeholder="记录认定测试的审计过程：各税种交叉验证依据、测算表核对情况、发现的问题等..."
+        @change="handleProcessChange"
+      />
+    </el-card>
 
     <!-- ═══ 认定矩阵表格 ═══ -->
     <div class="matrix-wrapper">
@@ -152,7 +175,7 @@
  * - ✓已验证/⚠待验证/✗不满足 三级判定
  */
 import { ref, computed, inject, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, ChatDotSquare } from '@element-plus/icons-vue'
 import { useN2FormData } from '../../composables/useN2FormData'
 
@@ -181,6 +204,10 @@ const formData = useN2FormData({
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const isReadonly = computed(() => props.isReadonly ?? false)
+const auditProcess = ref('')
+
+/** 用户自定义新增税种（源模板固定税种之外） */
+const customTaxTypes = ref<string[]>([])
 
 /** 6 个认定维度 */
 const ASSERTIONS = [
@@ -266,9 +293,12 @@ function handleRemarkChange(rowId: string, val: string) {
 
 // ─── Matrix rows ─────────────────────────────────────────────────────────────
 
+/** 全部税种 = 源模板固定税种 + 用户自定义税种 */
+const allTaxTypes = computed(() => [...TAX_TYPES, ...customTaxTypes.value])
+
 const matrixRows = computed<MatrixRow[]>(() => {
   const rows: MatrixRow[] = []
-  for (const tax of TAX_TYPES) {
+  for (const tax of allTaxTypes.value) {
     for (const period of PERIODS) {
       const id = `${tax}-${period}`
       rows.push({
@@ -296,6 +326,57 @@ const validationStats = computed(() => {
   }
   return { verified, pending, failed }
 })
+
+// ─── Diff stats（已填/总数/差异）─────────────────────────────────────────────
+
+const diffStats = computed(() => {
+  const total = matrixRows.value.length * ASSERTIONS.length
+  let filled = 0
+  let withDiff = 0
+  for (const row of matrixRows.value) {
+    for (const assertion of ASSERTIONS) {
+      const v = getCellValue(row.id, assertion.key)
+      if (v) filled++
+      if (v === '✗') withDiff++
+    }
+  }
+  return { filled, total, withDiff }
+})
+
+// ─── 新增税种行 ───────────────────────────────────────────────────────────────
+
+async function addTaxRow() {
+  try {
+    const { value } = await ElMessageBox.prompt('请输入新增税种名称', '新增税种行', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      inputPattern: /\S+/,
+      inputErrorMessage: '税种名称不能为空',
+    })
+    const name = (value || '').trim()
+    if (!name) return
+    if (allTaxTypes.value.includes(name)) {
+      ElMessage.warning('该税种已存在')
+      return
+    }
+    // 一次性为该税种补齐全部期间行（含期初/期末），等价于 begin/end 成对新增
+    customTaxTypes.value.push(name)
+    persistCustomTaxes()
+    ElMessage.success(`已新增税种 ${name}（含 ${PERIODS.length} 个期间行）`)
+  } catch {
+    // 用户取消
+  }
+}
+
+function persistCustomTaxes() {
+  formData.debouncedSave('N2-5-custom-taxes', {
+    conclusion: JSON.stringify(customTaxTypes.value),
+  })
+}
+
+function handleProcessChange() {
+  formData.debouncedSave('N2-5-process', { remark: auditProcess.value || null })
+}
 
 // ─── Row class ───────────────────────────────────────────────────────────────
 
@@ -361,6 +442,15 @@ function restoreData(): void {
       }
     } catch { /* ignore */ }
   }
+  const customResp = formData.allResponses.value.get('N2-5-custom-taxes')
+  if (customResp?.conclusion) {
+    try {
+      const arr = JSON.parse(customResp.conclusion)
+      if (Array.isArray(arr)) customTaxTypes.value = arr.filter((x) => typeof x === 'string')
+    } catch { /* ignore */ }
+  }
+  const processResp = formData.allResponses.value.get('N2-5-process')
+  if (processResp?.remark) auditProcess.value = processResp.remark
 }
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
@@ -446,6 +536,18 @@ onMounted(async () => {
 .val-stat--ok .val-stat-count { color: #67c23a; }
 .val-stat--pending .val-stat-count { color: #e6a23c; }
 .val-stat--fail .val-stat-count { color: #f56c6c; }
+
+/* ─── 审计过程卡片 ─── */
+.process-card {
+  margin-bottom: 16px;
+}
+
+.process-card .card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-weight: 600;
+}
 
 /* ─── Matrix wrapper ─── */
 .matrix-wrapper {

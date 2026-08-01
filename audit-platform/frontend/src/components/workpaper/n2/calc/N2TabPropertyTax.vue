@@ -23,10 +23,10 @@
     <div class="methodology-context">
       <div class="methodology-text">
         <strong>房产税测算逻辑：</strong>
-        从价计征 = 房产原值 × (1 - 扣除比例) × 1.2%；
+        从价计征 = (房产原值 - 不计税原值) × (1 - 扣除比例) × 1.2% × 当年月份/12；
         从租计征 = 租金收入 × 12%。
         扣除比例由各省规定（10%~30%），需选择适用地区。
-        自有自用房产按从价，出租房产按从租。
+        自有自用房产按从价，出租房产按从租。新增/处置房产按实际持有月份折算。
       </div>
     </div>
 
@@ -112,6 +112,26 @@
           <span v-else class="cell-na">—</span>
         </template>
       </el-table-column>
+      <el-table-column label="不计税原值" width="130" align="right">
+        <template #header>
+          <el-tooltip content="从价计征时使用：房产原值中免于计税的部分（如按规定不计税的设备/地下建筑）" placement="top">
+            <span class="formula-col-header">不计税原值</span>
+          </el-tooltip>
+        </template>
+        <template #default="{ row }">
+          <el-input-number
+            v-if="row.method === '从价'"
+            :model-value="row.deductibleOriginalValue"
+            :disabled="isReadonly"
+            :controls="false"
+            :precision="2"
+            size="small"
+            style="width: 110px"
+            @change="(val: number) => propertyTax.updateRow(row.id, 'deductibleOriginalValue', val ?? 0)"
+          />
+          <span v-else class="cell-na">—</span>
+        </template>
+      </el-table-column>
       <el-table-column label="租金收入" width="140" align="right">
         <template #header>
           <el-tooltip content="从租计征时使用：年租金收入" placement="top">
@@ -151,9 +171,30 @@
           <span v-else class="cell-na">—</span>
         </template>
       </el-table-column>
+      <el-table-column label="当年月份" width="100" align="center">
+        <template #header>
+          <el-tooltip content="当年实际纳税义务月份（1~12），新增/处置房产按实际持有月数，用于部分年度房产税" placement="top">
+            <span class="formula-col-header">当年月份</span>
+          </el-tooltip>
+        </template>
+        <template #default="{ row }">
+          <el-input-number
+            :model-value="row.months"
+            :min="1"
+            :max="12"
+            :step="1"
+            :disabled="isReadonly"
+            :controls="false"
+            :precision="0"
+            size="small"
+            style="width: 72px"
+            @change="(val: number) => propertyTax.updateRow(row.id, 'months', val ?? 12)"
+          />
+        </template>
+      </el-table-column>
       <el-table-column label="应交房产税" width="140" align="right">
         <template #header>
-          <el-tooltip content="从价=原值×(1-扣除比例)×1.2%；从租=租金×12%" placement="top">
+          <el-tooltip content="从价=(原值-不计税原值)×(1-扣除比例)×1.2%×月份/12；从租=租金×12%" placement="top">
             <span class="formula-col-header">应交房产税</span>
           </el-tooltip>
         </template>
@@ -232,11 +273,12 @@
     <details class="n2-details-tip">
       <summary>编制提示</summary>
       <ul>
-        <li>从价计征：自有自用房产 = 房产原值 × (1 - 扣除比例) × 1.2%</li>
+        <li>从价计征：自有自用房产 = (房产原值 - 不计税原值) × (1 - 扣除比例) × 1.2% × 当年月份/12</li>
         <li>从租计征：出租房产 = 年租金收入 × 12%</li>
+        <li>不计税原值：房产原值中按规定免于计税的部分（如独立设备、地下建筑等），从价时可填</li>
+        <li>当年月份：新增/处置房产按实际持有月数（1~12）折算，全年持有填12</li>
         <li>扣除比例各省不同：北京/上海30%、浙江/江苏30%、广东20%等</li>
         <li>关注房产原值是否含土地出让金（部分地区要求含）</li>
-        <li>新增/处置房产的月份确认（纳税义务始末）</li>
         <li>测算结果自动回填N2-1房产税行，联动N4税金及附加</li>
       </ul>
     </details>
@@ -340,12 +382,12 @@ function handleReview() {
   openReviewDialog?.('N2-9-房产税测算')
 }
 
-/** 合计行 */
+/** 合计行（应交房产税列现为第7列：名称0/方式1/原值2/不计税原值3/租金4/扣除比例5/月份6/应交7/操作8） */
 function getSummaryRow({ columns }: { columns: any[] }) {
   const sums: string[] = []
   columns.forEach((_col: any, index: number) => {
     if (index === 0) { sums[index] = '合计'; return }
-    if (index === 5) { sums[index] = fmtAmount(propertyTax.summary.value.total); return }
+    if (index === 7) { sums[index] = fmtAmount(propertyTax.summary.value.total); return }
     sums[index] = ''
   })
   return sums

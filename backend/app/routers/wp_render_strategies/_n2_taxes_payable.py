@@ -69,7 +69,7 @@ def _parse_num(v: Any) -> float:
 # ─── TB 取数（负债类！期末余额）──────────────────────────────────────────────
 
 
-async def _fetch_tb_data(ctx: RenderContext) -> dict[str, Any]:
+async def _fetch_tb_data(ctx: RenderContext, year: str | None = None) -> dict[str, Any]:
     """从 tb_balance 取科目2221应交税费余额数据（负债类贷方）."""
     result: dict[str, Any] = {
         "account_code": _N2_ACCOUNT_CODE,
@@ -84,27 +84,127 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict[str, Any]:
         active_filter = get_active_filter(ctx.project_id)
         stmt = (
             sa.select(
-                TbBalance.opening_balance.label("begin_balance"),
+                TbBalance.opening_balance,
                 TbBalance.debit_amount,
                 TbBalance.credit_amount,
-                TbBalance.closing_balance.label("end_balance"),
+                TbBalance.closing_balance,
             )
             .where(
                 TbBalance.project_id == str(ctx.project_id),
                 TbBalance.account_code == _N2_ACCOUNT_CODE,
                 active_filter,
             )
-            .limit(1)
         )
+        # year 列为 Integer，需转型；非数字则跳过 year 过滤（不崩）
+        if year:
+            try:
+                stmt = stmt.where(TbBalance.year == int(year))
+            except (ValueError, TypeError):
+                pass
+        stmt = stmt.limit(1)
         row = (await ctx.db.execute(stmt)).fetchone()
         if row:
-            result["begin_balance"] = _parse_num(row.begin_balance)
+            # 读取真实列 opening_balance/closing_balance，输出键保持 begin_balance/end_balance（前端兼容）
+            result["begin_balance"] = _parse_num(row.opening_balance)
             result["debit_amount"] = _parse_num(row.debit_amount)
             result["credit_amount"] = _parse_num(row.credit_amount)
-            result["end_balance"] = _parse_num(row.end_balance)
+            result["end_balance"] = _parse_num(row.closing_balance)
     except Exception as e:  # noqa: BLE001
         logger.warning("N2 render: TB 取数失败: %s", e)
     return result
+
+
+# ─── 审定表预填（从 tb_balance 2221% 叶子子科目按税种归类）────────────────────
+
+
+def _classify_tax_type(account_name: str | None) -> str:
+    """按科目名称归类税种。
+
+    注意关键词包含关系导致的顺序敏感：
+    「土地增值税」含「增值税」→ 必须先判 lvt；
+    「城镇土地使用税」含「土地」→ 先判 land-use；
+    「地方教育」需先于「教育费附加」判定。
+    """
+    name = account_name or ""
+    if "土地增值税" in name:
+        return "lvt"
+    if "城镇土地使用税" in name or "土地使用" in name:
+        return "land-use"
+    if "城市维护建设" in name or "城建" in name:
+        return "urban"
+    if "增值税" in name:
+        return "urban"
+    if "地方教育" in name:
+        return "local-education"
+    if "教育费附加" in name or "教育" in name:
+        return "education"
+    if "消费税" in name:
+        return "consumption"
+    if "企业所得税" in name:
+        return "cit"
+    if "个人所得税" in name:
+        return "iit"
+    if "印花税" in name:
+        return "stamp"
+    if "房产税" in name:
+        return "property"
+    if "车船税" in name:
+        return "vehicle"
+    return "other"
+
+
+async def _build_adjudication_prefill(
+    ctx: RenderContext, year: str | None = None
+) -> dict[str, float]:
+    """从 tb_balance 科目2221%叶子子科目按税种预填审定表未审数（期初/期末）。
+
+    - 查 2221% 全部子科目，优先取叶子（不是其他 code 前缀者），退而取全部；
+      叶子检测天然选出最深层明细（三级退二级退一级）。
+    - 按科目名称 `_classify_tax_type` 归类税种。
+    - 负债类贷方，金额取 abs() 规避借正贷负符号。
+    - 返回 {N2-1-{taxtype}-audited: 期末abs, N2-1-{taxtype}-opening: 期初abs}。
+    """
+    prefill: dict[str, float] = {}
+    try:
+        active_filter = get_active_filter(ctx.project_id)
+        stmt = sa.select(
+            TbBalance.account_code,
+            TbBalance.account_name,
+            TbBalance.opening_balance,
+            TbBalance.closing_balance,
+        ).where(
+            TbBalance.project_id == str(ctx.project_id),
+            TbBalance.account_code.like(f"{_N2_ACCOUNT_CODE}%"),
+            active_filter,
+        )
+        if year:
+            try:
+                stmt = stmt.where(TbBalance.year == int(year))
+            except (ValueError, TypeError):
+                pass
+        rows = (await ctx.db.execute(stmt)).fetchall()
+        if not rows:
+            return prefill
+        codes = [r.account_code for r in rows]
+        # 叶子 = 不是其他 code 前缀者（选出最深层明细）
+        leaves = [
+            r
+            for r in rows
+            if not any(other != r.account_code and other.startswith(r.account_code) for other in codes)
+        ]
+        if not leaves:
+            leaves = list(rows)
+        for r in leaves:
+            tt = _classify_tax_type(r.account_name)
+            opening = abs(_parse_num(r.opening_balance))
+            closing = abs(_parse_num(r.closing_balance))
+            ak = f"N2-1-{tt}-audited"
+            ok = f"N2-1-{tt}-opening"
+            prefill[ak] = round(prefill.get(ak, 0.0) + closing, 2)
+            prefill[ok] = round(prefill.get(ok, 0.0) + opening, 2)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("N2 render: adjudication prefill 构建失败: %s", e)
+    return prefill
 
 
 # ─── 主渲染函数 ───────────────────────────────────────────────────────────────
@@ -169,8 +269,32 @@ async def render(ctx: RenderContext) -> dict[str, Any]:
     except Exception as e:  # noqa: BLE001
         logger.warning("N2 render: project context 查询失败: %s", e)
 
+    # bs_date
+    audit_year = project_context.get("audit_year")
+    project_context["bs_date"] = f"{audit_year}-12-31" if audit_year else None  # type: ignore[assignment]
+
+    # 关联方
+    related_parties: list[str] = []
+    try:
+        rp_rows = (await ctx.db.execute(
+            sa.text(
+                "SELECT party_name FROM related_party_registry "
+                "WHERE project_id = :pid AND is_deleted = false"
+            ),
+            {"pid": str(ctx.project_id)},
+        )).fetchall()
+        related_parties = [r.party_name for r in rp_rows]
+    except Exception:  # noqa: BLE001
+        pass
+    project_context["related_parties"] = related_parties  # type: ignore[assignment]
+
     # ─── TB 取数（科目2221应交税费，贷方/负债类）────────────────────
-    tb = await _fetch_tb_data(ctx)
+    tb = await _fetch_tb_data(ctx, year=audit_year)
+
+    # ─── 审定表预填（仅无持久化 N2-1-adjudication-rows 时，不覆盖用户编辑）───
+    adjudication_prefill: dict[str, float] = {}
+    if "N2-1-adjudication-rows" not in responses_snapshot:
+        adjudication_prefill = await _build_adjudication_prefill(ctx, year=audit_year)
 
     return {
         "account_code": _N2_ACCOUNT_CODE,
@@ -178,6 +302,8 @@ async def render(ctx: RenderContext) -> dict[str, Any]:
         "project_context": project_context,
         "responses_snapshot": responses_snapshot,
         "adjudicated_amount": adjudicated_amount,
+        # 审定表预填（按税种从 tb_balance 2221% 叶子子科目归类，仅无持久化时非空）
+        "adjudication_prefill": adjudication_prefill,
         # TB 余额数据（科目2221，贷方/负债类）
         "trial_balance": tb,
         # 负债类公式方向元数据

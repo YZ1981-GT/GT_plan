@@ -7,8 +7,13 @@
       show-icon
       class="audit-objective"
       title="审计目标"
-      description="确认应交税费（2221）各税种期末余额的完整性与准确性：计提、缴纳记录完整，适用税率与计税依据正确，多税种测算（增值税/城建税及附加/房产税/土增税等）与明细表勾稽一致，期末余额已按 N2-1 审定并回写试算表。"
-    />
+    >
+      <ul class="ao-list">
+        <li><strong>完整性（负债类重点）</strong>：应交税费（2221）各税种期末余额均已完整入账，无漏计提。</li>
+        <li><strong>准确性</strong>：适用税率与计税依据正确，各税种测算（增值税/城建税及附加/房产税/土增税等）与明细表勾稽一致。</li>
+        <li><strong>计价</strong>：期初/期末未审数经账项调整、重分类调整后得出审定数，变动合理并已回写试算表。</li>
+      </ul>
+    </el-alert>
 
     <!-- ═══ Section Header ═══ -->
     <div class="section-header">
@@ -17,223 +22,235 @@
         <el-tag type="danger" size="small" class="liability-tag">负债类·贷方</el-tag>
       </div>
       <div class="section-actions">
-        <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
-          <el-icon><Download /></el-icon>
-          带入调整
-        </el-button>
-        <el-button size="small" @click="handleAiAssist">
-          <el-icon><MagicStick /></el-icon>
-          AI辅助
-        </el-button>
-        <el-button size="small" @click="handleReview">
-          <el-icon><ChatDotSquare /></el-icon>
-          复核
+        <el-button size="small" :disabled="isReadonly" :loading="writebackLoading" type="primary" @click="handleWritebackTB">
+          回写审定数
         </el-button>
       </div>
     </div>
 
-    <!-- ═══ 负债类科目公式提示 ═══ -->
+    <!-- ═══ 负债类公式提示 ═══ -->
     <div class="liability-formula-badge">
       <el-icon><WarningFilled /></el-icon>
-      <span>⚠️ 负债类贷方科目：期末余额 = 期初余额 + 本期贷方（计提）− 本期借方（缴纳）</span>
+      <span>负债类贷方科目：期初/期末审定 = 未审 + 账项调整 + 重分类；变动率 = 变动额 ÷ 期初（&gt;30% 黄字、&gt;50% 红字预警）</span>
     </div>
 
-    <!-- ═══ 主数据表格 ═══ -->
+    <!-- ═══ 14列主数据表格（嵌套分组表头） ═══ -->
     <el-table
-      :data="tableData"
+      :data="rows"
       border
       size="small"
       show-summary
       :summary-method="getSummaries"
-      highlight-current-row
       class="adjudication-table"
-      :row-class-name="getRowClassName"
     >
-      <!-- 税种列 -->
-      <el-table-column prop="taxType" label="税种" min-width="120" fixed>
-        <template #default="{ row }">
-          <span class="tax-type-cell">{{ row.taxType }}</span>
-        </template>
-      </el-table-column>
-
-      <!-- 期初余额 -->
-      <el-table-column prop="beginning" label="期初余额" min-width="120" align="right">
-        <template #default="{ row }">
-          <el-input-number
+      <!-- 项目 -->
+      <el-table-column prop="taxType" label="项目" min-width="120" fixed>
+        <template #default="{ row, $index }">
+          <el-input
             v-if="!isReadonly"
-            v-model="row.beginning"
-            :controls="false"
-            :precision="2"
+            :model-value="row.taxType"
             size="small"
-            class="cell-input"
-            @change="(val: number | undefined) => handleCellChange(row.taxType, 'beginning', val ?? 0)"
+            placeholder="项目"
+            @input="(val: string) => handleUpdate($index, 'taxType', val)"
           />
-          <span v-else class="cell-value">{{ fmtAmount(row.beginning) }}</span>
+          <span v-else class="tax-type-cell">{{ row.taxType }}</span>
         </template>
       </el-table-column>
 
-      <!-- 本期贷方(计提) -->
-      <el-table-column prop="creditAmount" label="本期贷方(计提)" min-width="130" align="right">
-        <template #default="{ row }">
-          <el-input-number
+      <!-- 期初数 分组 -->
+      <el-table-column label="期初数" align="center">
+        <el-table-column label="未审" min-width="110" align="right">
+          <template #default="{ row, $index }">
+            <el-input-number
+              v-if="!isReadonly"
+              :model-value="row.beginUnadj"
+              :controls="false"
+              :precision="2"
+              size="small"
+              class="cell-input"
+              @change="(val: number | undefined) => handleUpdate($index, 'beginUnadj', val ?? 0)"
+            />
+            <span v-else class="cell-value">{{ fmtAmount(row.beginUnadj) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="账项调整" min-width="110" align="right">
+          <template #default="{ row, $index }">
+            <el-input-number
+              v-if="!isReadonly"
+              :model-value="row.beginAje"
+              :controls="false"
+              :precision="2"
+              size="small"
+              class="cell-input"
+              @change="(val: number | undefined) => handleUpdate($index, 'beginAje', val ?? 0)"
+            />
+            <span v-else class="cell-value">{{ fmtAmount(row.beginAje) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="重分类" min-width="110" align="right">
+          <template #default="{ row, $index }">
+            <el-input-number
+              v-if="!isReadonly"
+              :model-value="row.beginRje"
+              :controls="false"
+              :precision="2"
+              size="small"
+              class="cell-input"
+              @change="(val: number | undefined) => handleUpdate($index, 'beginRje', val ?? 0)"
+            />
+            <span v-else class="cell-value">{{ fmtAmount(row.beginRje) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column min-width="120" align="right">
+          <template #header>
+            <span class="formula-header" title="期初审定 = 未审 + 账项调整 + 重分类">期初审定</span>
+          </template>
+          <template #default="{ row }">
+            <el-tooltip content="期初审定 = 未审 + 账项调整 + 重分类" placement="top">
+              <span class="formula-cell">{{ fmtAmount(row.beginAudited) }}</span>
+            </el-tooltip>
+          </template>
+        </el-table-column>
+      </el-table-column>
+
+      <!-- 期末数 分组 -->
+      <el-table-column label="期末数" align="center">
+        <el-table-column label="未审" min-width="110" align="right">
+          <template #default="{ row, $index }">
+            <el-input-number
+              v-if="!isReadonly"
+              :model-value="row.endUnadj"
+              :controls="false"
+              :precision="2"
+              size="small"
+              class="cell-input"
+              @change="(val: number | undefined) => handleUpdate($index, 'endUnadj', val ?? 0)"
+            />
+            <span v-else class="cell-value">{{ fmtAmount(row.endUnadj) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="账项调整" min-width="110" align="right">
+          <template #default="{ row, $index }">
+            <el-input-number
+              v-if="!isReadonly"
+              :model-value="row.endAje"
+              :controls="false"
+              :precision="2"
+              size="small"
+              class="cell-input"
+              @change="(val: number | undefined) => handleUpdate($index, 'endAje', val ?? 0)"
+            />
+            <span v-else class="cell-value">{{ fmtAmount(row.endAje) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="重分类" min-width="110" align="right">
+          <template #default="{ row, $index }">
+            <el-input-number
+              v-if="!isReadonly"
+              :model-value="row.endRje"
+              :controls="false"
+              :precision="2"
+              size="small"
+              class="cell-input"
+              @change="(val: number | undefined) => handleUpdate($index, 'endRje', val ?? 0)"
+            />
+            <span v-else class="cell-value">{{ fmtAmount(row.endRje) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column min-width="120" align="right">
+          <template #header>
+            <span class="formula-header" title="期末审定 = 未审 + 账项调整 + 重分类">期末审定</span>
+          </template>
+          <template #default="{ row }">
+            <el-tooltip content="期末审定 = 未审 + 账项调整 + 重分类" placement="top">
+              <span class="formula-cell">{{ fmtAmount(row.endAudited) }}</span>
+            </el-tooltip>
+          </template>
+        </el-table-column>
+      </el-table-column>
+
+      <!-- 变动 分组 -->
+      <el-table-column label="变动" align="center">
+        <el-table-column min-width="110" align="right">
+          <template #header>
+            <span class="formula-header" title="未审变动额 = 期末未审 − 期初未审">未审变动额</span>
+          </template>
+          <template #default="{ row }">
+            <span class="formula-cell">{{ fmtAmount(row.unadjChange) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column min-width="100" align="right">
+          <template #header>
+            <span class="formula-header" title="未审变动率 = 未审变动额 ÷ 期初未审">未审变动率</span>
+          </template>
+          <template #default="{ row }">
+            <span :class="['formula-cell', rateClass(row.unadjRate)]">{{ fmtRate(row.unadjRate) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column min-width="110" align="right">
+          <template #header>
+            <span class="formula-header" title="审定变动额 = 期末审定 − 期初审定">审定变动额</span>
+          </template>
+          <template #default="{ row }">
+            <span class="formula-cell">{{ fmtAmount(row.auditedChange) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column min-width="100" align="right">
+          <template #header>
+            <span class="formula-header" title="审定变动率 = 审定变动额 ÷ 期初审定">审定变动率</span>
+          </template>
+          <template #default="{ row }">
+            <span :class="['formula-cell', rateClass(row.auditedRate)]">{{ fmtRate(row.auditedRate) }}</span>
+          </template>
+        </el-table-column>
+      </el-table-column>
+
+      <!-- 原因分析 -->
+      <el-table-column prop="reason" label="原因分析" min-width="170">
+        <template #default="{ row, $index }">
+          <el-input
             v-if="!isReadonly"
-            v-model="row.creditAmount"
-            :controls="false"
-            :precision="2"
+            :model-value="row.reason"
+            type="textarea"
+            :autosize="{ minRows: 1, maxRows: 4 }"
             size="small"
-            class="cell-input"
-            @change="(val: number | undefined) => handleCellChange(row.taxType, 'creditAmount', val ?? 0)"
+            placeholder="变动原因说明"
+            @input="(val: string) => handleUpdate($index, 'reason', val)"
           />
-          <span v-else class="cell-value">{{ fmtAmount(row.creditAmount) }}</span>
-        </template>
-      </el-table-column>
-
-      <!-- 本期借方(缴纳) -->
-      <el-table-column prop="debitAmount" label="本期借方(缴纳)" min-width="130" align="right">
-        <template #default="{ row }">
-          <el-input-number
-            v-if="!isReadonly"
-            v-model="row.debitAmount"
-            :controls="false"
-            :precision="2"
-            size="small"
-            class="cell-input"
-            @change="(val: number | undefined) => handleCellChange(row.taxType, 'debitAmount', val ?? 0)"
-          />
-          <span v-else class="cell-value">{{ fmtAmount(row.debitAmount) }}</span>
-        </template>
-      </el-table-column>
-
-      <!-- 期末余额（公式列） -->
-      <el-table-column label="期末余额" min-width="120" align="right">
-        <template #header>
-          <span class="formula-header" title="期末 = 期初 + 贷方 − 借方（负债类）">
-            期末余额
-          </span>
-        </template>
-        <template #default="{ row }">
-          <el-tooltip content="期末 = 期初 + 贷方 − 借方（负债类贷方科目）" placement="top">
-            <span class="formula-cell">{{ fmtAmount(row.endBalance) }}</span>
-          </el-tooltip>
-        </template>
-      </el-table-column>
-
-      <!-- 未审数 -->
-      <el-table-column prop="unadjusted" label="未审数" min-width="120" align="right">
-        <template #default="{ row }">
-          <el-input-number
-            v-if="!isReadonly"
-            v-model="row.unadjusted"
-            :controls="false"
-            :precision="2"
-            size="small"
-            class="cell-input"
-            @change="(val: number | undefined) => handleCellChange(row.taxType, 'unadjusted', val ?? 0)"
-          />
-          <span v-else class="cell-value">{{ fmtAmount(row.unadjusted) }}</span>
-        </template>
-      </el-table-column>
-
-      <!-- AJE -->
-      <el-table-column prop="aje" label="AJE" min-width="100" align="right">
-        <template #default="{ row }">
-          <el-input-number
-            v-if="!isReadonly"
-            v-model="row.aje"
-            :controls="false"
-            :precision="2"
-            size="small"
-            class="cell-input"
-            @change="(val: number | undefined) => handleCellChange(row.taxType, 'aje', val ?? 0)"
-          />
-          <span v-else class="cell-value">{{ fmtAmount(row.aje) }}</span>
-        </template>
-      </el-table-column>
-
-      <!-- RJE -->
-      <el-table-column prop="rje" label="RJE" min-width="100" align="right">
-        <template #default="{ row }">
-          <el-input-number
-            v-if="!isReadonly"
-            v-model="row.rje"
-            :controls="false"
-            :precision="2"
-            size="small"
-            class="cell-input"
-            @change="(val: number | undefined) => handleCellChange(row.taxType, 'rje', val ?? 0)"
-          />
-          <span v-else class="cell-value">{{ fmtAmount(row.rje) }}</span>
-        </template>
-      </el-table-column>
-
-      <!-- 审定数（公式列） -->
-      <el-table-column label="审定数" min-width="120" align="right">
-        <template #header>
-          <span class="formula-header" title="审定数 = 未审 + AJE + RJE">
-            审定数
-          </span>
-        </template>
-        <template #default="{ row }">
-          <el-tooltip content="审定数 = 未审数 + AJE + RJE" placement="top">
-            <span class="formula-cell">{{ fmtAmount(row.audited) }}</span>
-          </el-tooltip>
+          <span v-else class="cell-value">{{ row.reason || '—' }}</span>
         </template>
       </el-table-column>
     </el-table>
 
-    <!-- ═══ 交叉验证区 ═══ -->
-    <div class="cross-validation-section">
-      <div class="cv-title">交叉验证</div>
-      <div class="cv-indicators">
-        <!-- N2-1 vs N2-2明细 -->
-        <div class="cv-item" :class="adjudicationVsDetail.isMatch ? 'cv-match' : 'cv-diff'">
-          <span class="cv-label">N2-1 vs N2-2明细</span>
-          <span v-if="adjudicationVsDetail.isMatch" class="cv-badge cv-badge-ok">✓ 一致</span>
-          <span v-else class="cv-badge cv-badge-err">
-            ⚠ 差异 {{ fmtAmount(adjudicationVsDetail.diff) }}
-          </span>
-        </div>
+    <!-- ═══ 新增/删除项目行 ═══ -->
+    <div v-if="!isReadonly" class="row-ops-bar">
+      <el-button size="small" @click="handleAddRow">+ 新增项目行</el-button>
+      <el-button size="small" @click="handleRemoveLast" :disabled="rows.length === 0">删除末行</el-button>
+    </div>
 
-        <!-- N2-1 vs 各测算表 -->
-        <div
-          v-for="item in adjudicationVsCalcTables"
-          :key="item.tax"
-          class="cv-item"
-          :class="item.isMatch ? 'cv-match' : 'cv-diff'"
-        >
-          <span class="cv-label">N2-1 {{ item.tax }} vs 测算表</span>
-          <span v-if="item.isMatch" class="cv-badge cv-badge-ok">✓</span>
-          <span v-else class="cv-badge cv-badge-err">
-            ⚠ {{ fmtAmount(item.diff) }}
-          </span>
+    <!-- ═══ 试算平衡勾稽行（TB 2221期末 vs 审定合计） ═══ -->
+    <div class="tb-recon-bar" :class="tbRecon.status">
+      <div class="tb-recon-title">试算平衡勾稽</div>
+      <div class="tb-recon-cells">
+        <div class="tb-recon-cell">
+          <span class="trc-label">试算表 2221 期末余额</span>
+          <span class="trc-value">{{ tbClosing == null ? '（未取数）' : fmtAmount(tbClosing) }}</span>
+        </div>
+        <div class="tb-recon-cell">
+          <span class="trc-label">审定期末合计</span>
+          <span class="trc-value">{{ fmtAmount(total.endAudited) }}</span>
+        </div>
+        <div class="tb-recon-cell">
+          <span class="trc-label">差异</span>
+          <span class="trc-value">{{ tbClosing == null ? '—' : fmtAmount(tbRecon.diff) }}</span>
+          <el-tag v-if="tbClosing == null" type="info" size="small" effect="plain">待取数</el-tag>
+          <el-tag v-else-if="tbRecon.matched" type="success" size="small" effect="plain">✓ 勾稽一致</el-tag>
+          <el-tag v-else type="danger" size="small" effect="plain">⚠ 存在差异</el-tag>
         </div>
       </div>
     </div>
 
-    <!-- ═══ TB回写 + N4联动 ═══ -->
-    <div class="action-bar">
-      <el-button
-        type="primary"
-        size="small"
-        :disabled="isReadonly"
-        :loading="writebackLoading"
-        @click="handleWritebackTB"
-      >
-        回写审定数
-      </el-button>
-      <div class="n4-linkage-indicator">
-        <span class="n4-label">N4联动状态：</span>
-        <span v-if="n4LinkageStatus === 'synced'" class="n4-badge n4-badge-ok">
-          ✓ 已同步
-        </span>
-        <span v-else-if="n4LinkageStatus === 'pending'" class="n4-badge n4-badge-warn">
-          ⚠ 待同步
-        </span>
-        <span v-else class="n4-badge n4-badge-na">— N4未编制</span>
-      </div>
-    </div>
-
-    <!-- ═══ 跨底稿联动（cross_wp_ref GtIndexChip）Task 6.2 ═══ -->
+    <!-- ═══ 跨底稿联动（cross_wp_ref GtIndexChip）N4 联动 ═══ -->
     <div class="cross-wp-links">
       <span class="cross-wp-label">cross_wp_ref 税金联动：</span>
       <GtIndexChip value="N4-1" :context-project-id="props.projectId" />
@@ -241,7 +258,7 @@
       <GtIndexChip value="N2-6" :context-project-id="props.projectId" />
       <span class="cross-wp-desc">增值税测算</span>
       <GtIndexChip value="N2-8" :context-project-id="props.projectId" />
-      <span class="cross-wp-desc">城建税及附加测算</span>
+      <span class="cross-wp-desc">其他税费测算</span>
       <GtIndexChip value="N2-9" :context-project-id="props.projectId" />
       <span class="cross-wp-desc">房产税测算</span>
       <GtIndexChip value="N2-10" :context-project-id="props.projectId" />
@@ -253,32 +270,38 @@
       <template #header>
         <div class="notes-header">
           <span>审计说明与结论</span>
-          <el-button size="small" @click="handleNotesAi">
-            <el-icon><MagicStick /></el-icon>
-            AI辅助
-          </el-button>
         </div>
       </template>
       <div class="notes-field">
-        <label class="field-label">审计说明</label>
+        <div class="field-label-row">
+          <label class="field-label">审计说明</label>
+          <el-button size="small" text type="primary" :loading="noteAiLoading" :disabled="isReadonly" @click="handleNoteAi">
+            <el-icon><MagicStick /></el-icon> AI辅助说明
+          </el-button>
+        </div>
         <el-input
-          v-model="auditNotes"
+          v-model="auditNote"
           type="textarea"
           :autosize="{ minRows: 3, maxRows: 8 }"
           placeholder="请输入审计说明..."
           :disabled="isReadonly"
-          @change="handleNotesSave"
+          @change="saveNote"
         />
       </div>
       <div class="notes-field">
-        <label class="field-label">审计结论</label>
+        <div class="field-label-row">
+          <label class="field-label">审计结论</label>
+          <el-button size="small" text type="primary" :loading="conclusionAiLoading" :disabled="isReadonly" @click="handleConclusionAi">
+            <el-icon><MagicStick /></el-icon> AI辅助结论
+          </el-button>
+        </div>
         <el-input
           v-model="auditConclusion"
           type="textarea"
           :autosize="{ minRows: 2, maxRows: 5 }"
           placeholder="请输入审计结论..."
           :disabled="isReadonly"
-          @change="handleConclusionSave"
+          @change="saveConclusion"
         />
       </div>
     </el-card>
@@ -287,55 +310,41 @@
     <details class="n2-details-tip">
       <summary>编制提示</summary>
       <ul>
-        <li>应交税费（2221）为<strong>负债类贷方科目</strong>：期末 = 期初 + 贷方（计提）− 借方（缴纳）</li>
-        <li>审定数 = 未审数 + AJE调整 + RJE重分类</li>
-        <li>各测算表（N2-6增值税/N2-8城建税/N2-9房产税/N2-10土增税）测算结果应与本表对应行一致</li>
-        <li>城建税/教育费附加/房产税/土地使用税/印花税/土增税计提联动N4税金及附加</li>
-        <li>"回写审定数"将合计审定数回写至试算表（科目2221期末余额）</li>
-        <li>「带入调整」：按科目2221拉取调整分录，逐笔选目标税种行累加到 AJE/RJE，带入后自动联动披露与附注</li>
+        <li>应交税费（2221）为<strong>负债类贷方科目</strong>，本表按"期初数 / 期末数 / 变动 / 原因分析"四大块对齐源模板。</li>
+        <li>期初审定 = 期初未审 + 期初账项调整 + 期初重分类；期末审定 = 期末未审 + 期末账项调整 + 期末重分类。</li>
+        <li>变动额 = 期末 − 期初；变动率 = 变动额 ÷ 期初，超 30% 黄字提示、超 50% 红字预警，需在原因分析列说明。</li>
+        <li>底部试算平衡勾稽：审定期末合计应与试算表科目 2221 期末余额一致。</li>
+        <li>各测算表（N2-6 增值税 / N2-8 城建税及附加 / N2-9 房产税 / N2-10 土增税）测算结果应与本表对应行勾稽。</li>
+        <li>"回写审定数"将审定期末合计回写至试算表（科目 2221 期末余额），并通知 N4 税金及附加联动。</li>
       </ul>
     </details>
-
-    <!-- ═══ 带入调整 弹窗 ═══ -->
-    <AdjudicationBringInDialog
-      v-model="bringInVisible"
-      :matches="adjPull.matches.value"
-      :row-options="bringInRowOptions"
-      subject-label="2221 应交税费"
-      :loading="adjPull.loading.value"
-      @apply="onBringInApply"
-    />
   </div>
 </template>
 
 <script setup lang="ts">
 /**
- * N2TabAdjudication — N2-1 应交税费审定表
+ * N2TabAdjudication — N2-1 应交税费审定表（14 列源模板对齐版）
  *
- * Spec: .kiro/specs/n2-taxes-payable/
- * Task: 4.2
- * Requirements: 2.1-2.8
+ * 源结构：项目 + 期初数(未审/账项调整/重分类/审定auto) + 期末数(同4列)
+ *         + 变动(未审变动额/率 + 审定变动额/率) + 原因分析
  *
- * 核心职责：
- * - 11税种行 + 合计行，85公式覆盖
- * - 负债类期末余额 = 期初 + 贷方 − 借方
- * - 审定数 = 未审 + AJE + RJE
- * - 与N2-2明细、各测算表(N2-6/N2-8/N2-9/N2-10)交叉验证
- * - TB回写(2221期末余额) + N4联动提示
- * - 审计说明+结论+复核
+ * - beginAudited = beginUnadj + beginAje + beginRje；endAudited 同理
+ * - 变动率 >30% 黄字、>50% 红字
+ * - 底部试算平衡勾稽（TB 2221 期末 vs 审定合计）
+ * - TB 回写 + GtIndexChip N4 联动
+ * - 审计说明+结论（AI 真回填）
+ * - item_id：N2-1-adjudication-rows / N2-1-note / N2-1-conclusion
+ * - 向后兼容旧字段名（beginning/creditAmount/debitAmount/unadjusted/aje/rje）
+ * - 消费 render htmlData.adjudication_prefill（无持久化时种子未审期初/期末）
  *
- * 科目：2221应交税费（贷方/负债类！）
+ * 科目：2221 应交税费（贷方/负债类！）
  */
-import { ref, computed, inject, watch } from 'vue'
-import { ElMessage } from 'element-plus'
-import { MagicStick, ChatDotSquare, WarningFilled, Download } from '@element-plus/icons-vue'
+import { ref, computed, watch } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { MagicStick, WarningFilled } from '@element-plus/icons-vue'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
 import { useN2FormData } from '../../composables/useN2FormData'
-import { useN2Adjudication, type N2TaxType } from '../../composables/useN2Adjudication'
-import { useN2CrossSheet } from '../../composables/useN2CrossSheet'
-import { useAuditContext } from '@/composables/useAuditContext'
-import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
-import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
+import { useN2Adjudication14 } from '../../composables/useN2Adjudication'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -344,16 +353,11 @@ const props = defineProps<{
   projectId: string
   allResponses: Map<string, any>
   isReadonly?: boolean
+  year?: string
+  htmlData?: any
 }>()
 
-// ─── Inject 复核对话 ─────────────────────────────────────────────────────────
-
-const openReviewDialog = inject<((section: string) => void) | undefined>(
-  'openReviewDialog',
-  undefined,
-)
-
-// ─── useN2FormData（内部保存逻辑） ───────────────────────────────────────────
+// ─── FormData ────────────────────────────────────────────────────────────────
 
 const wpIdRef = computed(() => props.wpId)
 const projectIdRef = computed(() => props.projectId)
@@ -363,157 +367,181 @@ const formData = useN2FormData({
   projectId: projectIdRef,
 })
 
-// ─── Composables ─────────────────────────────────────────────────────────────
+// ─── prefill / TB 取数 ───────────────────────────────────────────────────────
+
+const prefill = computed<any[] | null>(() => {
+  const pf = props.htmlData?.adjudication_prefill
+  return Array.isArray(pf) ? pf : null
+})
+
+const tbClosing = computed<number | null>(() => {
+  const hd = props.htmlData
+  const raw =
+    hd?.tb_closing_2221 ??
+    hd?.tb_closing ??
+    hd?.trial_balance?.closing_balance ??
+    hd?.trial_balance?.['2221']?.closing_balance ??
+    null
+  if (raw == null) return null
+  const n = Number(raw)
+  return Number.isFinite(n) ? n : null
+})
+
+// ─── Composable（14列模型） ─────────────────────────────────────────────────
 
 const allResponsesRef = computed(() => props.allResponses)
 
 const {
   rows,
   total,
-  rowValidations,
   updateRow,
+  addRow,
+  removeRow,
   saveAndSync,
-} = useN2Adjudication({
+} = useN2Adjudication14({
   allResponses: allResponsesRef,
   saveField: formData.setField,
   getField: formData.getField,
-  writebackTB: formData.writebackTB,
-})
-
-const {
-  adjudicationVsDetail,
-  adjudicationVsCalcTables,
-  accrualToN4,
-  publishTaxAccrualUpdated,
-} = useN2CrossSheet(allResponsesRef)
-
-// ─── 带入调整（adjustment-collaboration-and-propagation） ─────────────────────
-// 审定表按科目(2221)拉取调整分录，逐笔分配到目标税种行的 AJE/RJE 列（累加），
-// 带入后发 substantive:adjudicated → 披露表 + 附注自动刷新。
-const {
-  adjPull,
-  visible: bringInVisible,
-  rowOptions: bringInRowOptions,
-  open: openBringInAdjustment,
-  apply: onBringInApply,
-} = useAdjudicationBringIn({
-  projectId: projectIdRef as any,
-  year: useAuditContext().year as any,
-  subjectPrefix: '2221',
-  direction: 'credit', // 负债贷方：净发生额 = 贷 − 借
-  subjectCode: '2221',
-  wpCode: 'N2',
-  subjectLabel: '应交税费(2221)',
-  rows: computed(() => rows.value.map((r) => ({ rowKey: r.taxType, name: r.taxType, aje: r.aje, rje: r.rje }))),
-  updateCell: (rowKey: string, field: any, value: number) => { void updateRow(rowKey as N2TaxType, field, value) },
-  totalAudited: () => total.value.audited,
+  writebackTB: (amt: number) => formData.writebackTB(amt, props.year),
+  prefill,
 })
 
 // ─── 审计说明/结论 ───────────────────────────────────────────────────────────
 
-/**
- * 从父级 selfLoad 注入的 allResponses（render-config responses_snapshot 已含全部
- * checklist_responses）读取审计说明/结论文本。此前从 useN2FormData 自建实例的
- * getField 读取，但该实例未 loadResponses → 刷新后审计说明/结论不回显。
- * 统一改从 props.allResponses 读取（与 useN2Adjudication 行数据同源）。
- */
 function _readResponseText(itemId: string): string {
   const r = props.allResponses?.get?.(itemId) as any
   const v = r?.conclusion ?? r?.remark
   return typeof v === 'string' ? v : ''
 }
 
-const auditNotes = ref<string>(_readResponseText('N2-1-audit-notes') || (formData.getField('1', 'audit-notes') ?? ''))
-const auditConclusion = ref<string>(_readResponseText('N2-1-audit-conclusion') || (formData.getField('1', 'audit-conclusion') ?? ''))
+const auditNote = ref<string>(_readResponseText('N2-1-note'))
+const auditConclusion = ref<string>(_readResponseText('N2-1-conclusion'))
 
-// selfLoad 异步完成后 allResponses 才填充；在用户未编辑时补齐回显。
-watch(() => props.allResponses, () => {
-  if (!auditNotes.value) auditNotes.value = _readResponseText('N2-1-audit-notes')
-  if (!auditConclusion.value) auditConclusion.value = _readResponseText('N2-1-audit-conclusion')
-}, { deep: true })
-
-// ─── 表格数据 ────────────────────────────────────────────────────────────────
-
-const tableData = computed(() => rows.value)
-
-// ─── TB回写 loading ──────────────────────────────────────────────────────────
-
-const writebackLoading = ref(false)
-
-// ─── N4 联动状态 ─────────────────────────────────────────────────────────────
-
-const n4LinkageStatus = computed<'synced' | 'pending' | 'none'>(() => {
-  const accruals = accrualToN4.value
-  const hasAnyAccrual = accruals.some(a => a.amount !== 0)
-  if (!hasAnyAccrual) return 'none'
-  return 'synced'
-})
-
-// ─── 只读判断 ────────────────────────────────────────────────────────────────
+watch(
+  () => props.allResponses,
+  () => {
+    if (!auditNote.value) auditNote.value = _readResponseText('N2-1-note')
+    if (!auditConclusion.value) auditConclusion.value = _readResponseText('N2-1-conclusion')
+  },
+  { deep: true },
+)
 
 const isReadonly = computed(() => props.isReadonly ?? false)
+const writebackLoading = ref(false)
+const noteAiLoading = ref(false)
+const conclusionAiLoading = ref(false)
 
-// ─── 格式化金额 ──────────────────────────────────────────────────────────────
+// ─── 试算平衡勾稽 ────────────────────────────────────────────────────────────
+
+const tbRecon = computed(() => {
+  if (tbClosing.value == null) {
+    return { diff: 0, matched: false, status: 'trc-pending' }
+  }
+  const diff = total.value.endAudited - tbClosing.value
+  const matched = Math.abs(diff) <= 0.01
+  return { diff, matched, status: matched ? 'trc-ok' : 'trc-diff' }
+})
+
+// ─── 格式化 ──────────────────────────────────────────────────────────────────
 
 function fmtAmount(val: number | null | undefined): string {
   if (val == null || val === 0) return '—'
+  if (val < 0) {
+    return `(${Math.abs(val).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
+  }
   return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-// ─── 单元格变更 → 保存 ──────────────────────────────────────────────────────
+function fmtRate(rate: number | null | undefined): string {
+  if (rate == null || rate === 0) return '—'
+  return `${(rate * 100).toFixed(2)}%`
+}
 
-async function handleCellChange(
-  taxType: N2TaxType,
-  field: 'beginning' | 'creditAmount' | 'debitAmount' | 'unadjusted' | 'aje' | 'rje',
-  value: number,
-) {
-  await updateRow(taxType, field, value)
+function rateClass(rate: number | null | undefined): string {
+  const a = Math.abs(Number(rate) || 0)
+  if (a > 0.5) return 'rate-red'
+  if (a > 0.3) return 'rate-yellow'
+  return ''
+}
+
+// ─── 单元格变更 ──────────────────────────────────────────────────────────────
+
+async function handleUpdate(index: number, field: any, value: any) {
+  await updateRow(index, field, value)
+}
+
+// ─── 新增/删除行 ─────────────────────────────────────────────────────────────
+
+async function handleAddRow() {
+  try {
+    const { value: taxType } = await ElMessageBox.prompt(
+      '请输入项目名称（如：增值税、城建税、房产税）',
+      '新增项目行',
+      {
+        confirmButtonText: '确认新增',
+        cancelButtonText: '取消',
+        inputPattern: /\S+/,
+        inputErrorMessage: '项目名称不能为空',
+        inputPlaceholder: '项目名称',
+      },
+    )
+    await addRow(taxType)
+    ElMessage.success(`已新增项目：${taxType}`)
+  } catch {
+    // 用户取消
+  }
+}
+
+async function handleRemoveLast() {
+  if (rows.value.length === 0) return
+  try {
+    await ElMessageBox.confirm('确认删除末行项目？', '确认删除', {
+      type: 'warning',
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+    })
+    await removeRow(rows.value.length - 1)
+    ElMessage.success('已删除末行')
+  } catch {
+    // 用户取消
+  }
 }
 
 // ─── 合计行 ──────────────────────────────────────────────────────────────────
 
 function getSummaries({ columns }: { columns: any[] }) {
   const sums: string[] = []
+  const t = total.value
+  const map: Record<number, string> = {
+    1: fmtAmount(t.beginUnadj),
+    2: fmtAmount(t.beginAje),
+    3: fmtAmount(t.beginRje),
+    4: fmtAmount(t.beginAudited),
+    5: fmtAmount(t.endUnadj),
+    6: fmtAmount(t.endAje),
+    7: fmtAmount(t.endRje),
+    8: fmtAmount(t.endAudited),
+    9: fmtAmount(t.unadjChange),
+    10: fmtRate(t.unadjRate),
+    11: fmtAmount(t.auditedChange),
+    12: fmtRate(t.auditedRate),
+  }
   columns.forEach((_col: any, idx: number) => {
-    if (idx === 0) {
-      sums[idx] = '合计'
-      return
-    }
-    const t = total.value
-    const map: Record<number, number> = {
-      1: t.beginning,
-      2: t.credit,
-      3: t.debit,
-      4: t.endBalance,
-      5: t.unadjusted,
-      6: t.aje,
-      7: t.rje,
-      8: t.audited,
-    }
-    const val = map[idx]
-    sums[idx] = val != null ? fmtAmount(val) : ''
+    if (idx === 0) { sums[idx] = '合计'; return }
+    sums[idx] = map[idx] ?? ''
   })
   return sums
 }
 
-// ─── 行样式（校验失败红色） ──────────────────────────────────────────────────
-
-function getRowClassName({ row }: { row: any }): string {
-  const validation = rowValidations.value.find(v => v.taxType === row.taxType)
-  if (validation && !validation.isValid) return 'row-validation-error'
-  return ''
-}
-
-// ─── TB回写 ──────────────────────────────────────────────────────────────────
+// ─── TB 回写 ─────────────────────────────────────────────────────────────────
 
 async function handleWritebackTB() {
   writebackLoading.value = true
   try {
     await saveAndSync()
-    publishTaxAccrualUpdated()
-    ElMessage.success('审定数已回写试算表（科目2221期末余额）')
+    ElMessage.success('审定期末合计已回写试算表（科目 2221 期末余额）')
   } catch (err: any) {
-    ElMessage.error(`回写失败：${err.message || '未知错误'}`)
+    ElMessage.error(`回写失败：${err?.message || '未知错误'}`)
   } finally {
     writebackLoading.value = false
   }
@@ -521,60 +549,90 @@ async function handleWritebackTB() {
 
 // ─── 审计说明/结论保存 ───────────────────────────────────────────────────────
 
-async function handleNotesSave() {
-  await formData.setField('1', 'audit-notes', auditNotes.value)
+async function saveNote() {
+  await formData.setField('1', 'note', auditNote.value)
 }
 
-async function handleConclusionSave() {
-  await formData.setField('1', 'audit-conclusion', auditConclusion.value)
+async function saveConclusion() {
+  await formData.setField('1', 'conclusion', auditConclusion.value)
 }
 
-// ─── AI辅助 ──────────────────────────────────────────────────────────────────
+// ─── AI 真回填（context 值全部转 String） ────────────────────────────────────
 
-function handleAiAssist() {
-  import('@/utils/http').then(({ default: h }) => {
-    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
-      section: 'n2-adjudication',
-      prompt: '请基于应交税费底稿数据，给出审计分析建议',
-      context: { wpId: props.wpId },
-    }).catch(() => {})
-  })
-}
-
-function handleNotesAi() {
-  import('@/utils/http').then(({ default: h }) => {
-    h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
-      section: 'n2-adjudication',
-      prompt: '请基于应交税费底稿数据，给出审计分析建议',
-      context: { wpId: props.wpId },
-    }).catch(() => {})
-  })
-}
-
-// ─── 复核对话 ────────────────────────────────────────────────────────────────
-
-function handleReview() {
-  if (openReviewDialog) {
-    openReviewDialog('N2-1-审定表')
-  } else {
-    ElMessage.info('复核对话未配置')
+function _buildAiContext(): Record<string, string> {
+  const t = total.value
+  return {
+    科目: '2221 应交税费（负债类）',
+    期初审定合计: String(t.beginAudited.toFixed(2)),
+    期末审定合计: String(t.endAudited.toFixed(2)),
+    审定变动额: String(t.auditedChange.toFixed(2)),
+    审定变动率: `${(t.auditedRate * 100).toFixed(2)}%`,
+    试算表期末余额: tbClosing.value == null ? '未取数' : String(tbClosing.value.toFixed(2)),
+    试算平衡勾稽: tbClosing.value == null ? '待取数' : (tbRecon.value.matched ? '一致' : '存在差异'),
   }
 }
 
-// ─── 监听审定数变化 → 自动触发N4联动事件 ─────────────────────────────────────
+async function _aiGenerate(section: string, prompt: string, existing: string): Promise<string> {
+  const h = (await import('@/utils/http')).default
+  const res: any = await h.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+    section,
+    prompt,
+    existingContent: existing || '',
+    context: _buildAiContext(),
+  })
+  return res?.data?.data?.content ?? res?.data?.content ?? res?.content ?? ''
+}
 
-watch(
-  () => total.value.audited,
-  () => {
-    publishTaxAccrualUpdated()
-  },
-  { immediate: false },
-)
+async function handleNoteAi() {
+  noteAiLoading.value = true
+  try {
+    const text = await _aiGenerate(
+      'n2-adjudication-note',
+      '请基于应交税费审定表的期初/期末审定数、变动率及试算平衡勾稽情况，撰写审计说明。',
+      auditNote.value,
+    )
+    if (text) {
+      auditNote.value = text
+      await saveNote()
+      ElMessage.success('AI 已生成审计说明')
+    } else {
+      ElMessage.warning('AI 未返回内容')
+    }
+  } catch {
+    ElMessage.warning('AI 生成失败')
+  } finally {
+    noteAiLoading.value = false
+  }
+}
+
+async function handleConclusionAi() {
+  conclusionAiLoading.value = true
+  try {
+    const text = await _aiGenerate(
+      'n2-adjudication-conclusion',
+      '请基于应交税费审定表数据与勾稽结果，给出审计结论。',
+      auditConclusion.value,
+    )
+    if (text) {
+      auditConclusion.value = text
+      await saveConclusion()
+      ElMessage.success('AI 已生成审计结论')
+    } else {
+      ElMessage.warning('AI 未返回内容')
+    }
+  } catch {
+    ElMessage.warning('AI 生成失败')
+  } finally {
+    conclusionAiLoading.value = false
+  }
+}
 </script>
 
 <style scoped>
-.audit-objective { margin-bottom: 16px; }
-.audit-objective :deep(.el-alert__description) { font-size: var(--wp-font-size, 13px); line-height: 1.6; }
+.audit-objective { margin-bottom: 14px; }
+.audit-objective :deep(.el-alert__content) { padding: 2px 0; }
+.ao-list { padding-left: 18px; line-height: 1.55; font-size: 12px; margin: 0; }
+
 .n2-adjudication {
   padding: 12px;
   font-size: var(--wp-font-size, 13px);
@@ -597,9 +655,7 @@ watch(
   color: #303133;
 }
 
-.liability-tag {
-  font-size: 11px;
-}
+.liability-tag { font-size: 11px; }
 
 .section-actions {
   display: flex;
@@ -629,35 +685,23 @@ watch(
   flex-shrink: 0;
 }
 
-/* ─── 表格样式 ─── */
-.adjudication-table {
-  margin-bottom: 16px;
-}
+/* ─── 表格 ─── */
+.adjudication-table { margin-bottom: 12px; }
 
-:deep(.adjudication-table .el-table) {
-  font-size: var(--wp-font-size, 13px);
-}
+:deep(.adjudication-table .el-table) { font-size: var(--wp-font-size, 13px); }
 
-.tax-type-cell {
-  font-weight: 500;
-  color: #303133;
-}
+.tax-type-cell { font-weight: 500; color: #303133; }
 
-.cell-input {
-  width: 100%;
-}
+.cell-input { width: 100%; }
 
 :deep(.cell-input .el-input__inner) {
   text-align: right;
   font-size: var(--wp-font-size, 13px);
 }
 
-.cell-value {
-  font-size: var(--wp-font-size, 13px);
-  color: #606266;
-}
+.cell-value { font-size: var(--wp-font-size, 13px); color: #606266; }
 
-/* ─── 公式列样式（虚线下划线+cursor:help） ─── */
+/* ─── 公式列样式 ─── */
 .formula-header {
   border-bottom: 1px dashed #409eff;
   cursor: help;
@@ -673,127 +717,60 @@ watch(
   padding-bottom: 1px;
 }
 
-/* ─── 校验失败行红色高亮 ─── */
-:deep(.row-validation-error) {
-  background-color: #fef0f0 !important;
+/* ─── 变动率高亮 ─── */
+.rate-yellow { color: #e6a23c !important; font-weight: 700; }
+.rate-red { color: #f56c6c !important; font-weight: 700; }
+
+/* ─── 新增/删除行 ─── */
+.row-ops-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
 }
 
-:deep(.row-validation-error:hover > td) {
-  background-color: #fde2e2 !important;
-}
-
-/* ─── 交叉验证区 ─── */
-.cross-validation-section {
+/* ─── 试算平衡勾稽行 ─── */
+.tb-recon-bar {
   margin-bottom: 16px;
-  padding: 14px 16px;
-  background: #fafbfc;
-  border: 1px solid #ebeef5;
+  padding: 12px 16px;
   border-radius: 8px;
+  border: 1px solid #ebeef5;
+  background: #fafbfc;
 }
 
-.cv-title {
+.tb-recon-bar.trc-ok {
+  background: #f0f9eb;
+  border-color: #e1f3d8;
+}
+
+.tb-recon-bar.trc-diff {
+  background: #fef0f0;
+  border-color: #fde2e2;
+}
+
+.tb-recon-title {
   font-size: var(--wp-font-size, 13px);
-  font-weight: 500;
+  font-weight: 600;
   color: #303133;
   margin-bottom: 10px;
 }
 
-.cv-indicators {
+.tb-recon-cells {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 28px;
+  align-items: center;
 }
 
-.cv-item {
+.tb-recon-cell {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 12px;
 }
 
-.cv-match {
-  background: #e8f5e9;
-  border: 1px solid #a5d6a7;
-}
+.trc-label { color: #606266; font-size: 12px; }
+.trc-value { font-weight: 600; color: #303133; }
 
-.cv-diff {
-  background: #fef0f0;
-  border: 1px solid #fab6b6;
-}
-
-.cv-label {
-  color: #606266;
-  font-size: 12px;
-}
-
-.cv-badge {
-  font-weight: 600;
-  font-size: 12px;
-}
-
-.cv-badge-ok {
-  color: #43a047;
-}
-
-.cv-badge-err {
-  color: #f56c6c;
-}
-
-/* ─── 操作栏 ─── */
-.action-bar {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 16px;
-  padding: 10px 16px;
-  background: #f5f7fa;
-  border-radius: 6px;
-}
-
-.n4-linkage-indicator {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: var(--wp-font-size, 13px);
-}
-
-.n4-label {
-  color: #606266;
-}
-
-.n4-badge {
-  font-weight: 500;
-  font-size: 12px;
-  padding: 2px 8px;
-  border-radius: 4px;
-}
-
-.n4-badge-ok {
-  background: #e8f5e9;
-  color: #43a047;
-  border: 1px solid #a5d6a7;
-}
-
-.n4-badge-warn {
-  background: #fff3e0;
-  color: #e65100;
-  border: 1px solid #ffcc80;
-}
-
-.n4-badge-na {
-  background: #f5f5f5;
-  color: #9e9e9e;
-  border: 1px solid #e0e0e0;
-}
-
-/* ─── 审计说明卡片 ─── */
-.audit-notes-card {
-  margin-bottom: 16px;
-}
-
-/* ─── 跨底稿联动 cross_wp_ref ─── */
+/* ─── 跨底稿联动 ─── */
 .cross-wp-links {
   display: flex;
   flex-wrap: wrap;
@@ -807,16 +784,11 @@ watch(
   font-size: 12px;
 }
 
-.cross-wp-label {
-  color: #0369a1;
-  font-weight: 500;
-  margin-right: 4px;
-}
+.cross-wp-label { color: #0369a1; font-weight: 500; margin-right: 4px; }
+.cross-wp-desc { color: #64748b; margin-right: 8px; }
 
-.cross-wp-desc {
-  color: #64748b;
-  margin-right: 8px;
-}
+/* ─── 审计说明卡片 ─── */
+.audit-notes-card { margin-bottom: 16px; }
 
 .notes-header {
   display: flex;
@@ -827,12 +799,14 @@ watch(
   color: #303133;
 }
 
-.notes-field {
-  margin-bottom: 12px;
-}
+.notes-field { margin-bottom: 12px; }
+.notes-field:last-child { margin-bottom: 0; }
 
-.notes-field:last-child {
-  margin-bottom: 0;
+.field-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
 }
 
 .field-label {
@@ -840,7 +814,6 @@ watch(
   font-size: var(--wp-font-size, 13px);
   font-weight: 500;
   color: #606266;
-  margin-bottom: 6px;
 }
 
 /* ─── 编制提示折叠 ─── */

@@ -286,13 +286,14 @@ export function useN2FormData(options: UseN2FormDataOptions) {
    *
    * 并发布 EventBus 'substantive:adjudicated' 事件通知其他组件（附注/N4联动等）。
    */
-  async function writebackTB(auditedAmount: number): Promise<void> {
+  async function writebackTB(auditedAmount: number, year?: string): Promise<void> {
     if (!projectId.value) return
     try {
       await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
         account_code: ACCOUNT_CODE,
         audited_amount: auditedAmount,
         direction: 'credit', // 负债类贷方科目，期末余额
+        year: year || undefined,
       })
       // 发布 EventBus 通知审定数变更（附注/N4税金及附加等组件订阅刷新）
       eventBus.emit('substantive:adjudicated', {

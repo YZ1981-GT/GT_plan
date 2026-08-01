@@ -33,6 +33,10 @@ export interface N2PropertyTaxRow {
   method: PropertyTaxMethod
   /** 房产原值（从价时使用） */
   originalValue: number
+  /** 不计税原值（从价时使用，从原值中扣减的免税部分，默认0） */
+  deductibleOriginalValue: number
+  /** 当年纳税义务月份（1~12，用于部分年度房产税，默认12） */
+  months: number
   /** 租金收入（从租时使用） */
   rentIncome: number
   /** 扣除比例（从价时使用，0.10~0.30） */
@@ -111,12 +115,15 @@ export function useN2PropertyTax(options: UseN2PropertyTaxOptions) {
     return raw.map((r: any) => {
       const method: PropertyTaxMethod = r.method === '从租' ? '从租' : '从价'
       const originalValue = parseNum(r.originalValue)
+      const deductibleOriginalValue = parseNum(r.deductibleOriginalValue)
+      const monthsRaw = parseNum(r.months)
+      const months = monthsRaw >= 1 && monthsRaw <= 12 ? monthsRaw : 12
       const rentIncome = parseNum(r.rentIncome)
       const deductRate = parseNum(r.deductRate) || defaultDeductRate.value
 
-      // 根据计税方式计算
+      // 根据计税方式计算（从价含不计税原值扣减 + 月份因子）
       const taxAmount = method === '从价'
-        ? calcPropertyTaxByValue(originalValue, deductRate)
+        ? calcPropertyTaxByValue(originalValue, deductRate, deductibleOriginalValue, months)
         : calcPropertyTaxByRent(rentIncome)
 
       return {
@@ -124,6 +131,8 @@ export function useN2PropertyTax(options: UseN2PropertyTaxOptions) {
         propertyName: r.propertyName || '',
         method,
         originalValue,
+        deductibleOriginalValue,
+        months,
         rentIncome,
         deductRate,
         taxAmount,
@@ -161,6 +170,8 @@ export function useN2PropertyTax(options: UseN2PropertyTaxOptions) {
       propertyName,
       method,
       originalValue: 0,
+      deductibleOriginalValue: 0,
+      months: 12,
       rentIncome: 0,
       deductRate: defaultDeductRate.value,
     })
@@ -183,7 +194,7 @@ export function useN2PropertyTax(options: UseN2PropertyTaxOptions) {
    */
   async function updateRow(
     rowId: string,
-    field: 'propertyName' | 'method' | 'originalValue' | 'rentIncome' | 'deductRate',
+    field: 'propertyName' | 'method' | 'originalValue' | 'deductibleOriginalValue' | 'months' | 'rentIncome' | 'deductRate',
     value: any,
   ): Promise<void> {
     const stored = getField('9', 'property-rows') || []

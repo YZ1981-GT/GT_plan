@@ -20912,6 +20912,10 @@
           "guidance": "上市版按**双期余额**列示（期末余额 / 上年年末余额）。源模板说明：小税（费）种可合并反映；满足条件将当期所得税资产及当期所得税负债以抵销后净额列示时，实交税款大于应交税的超过部分列示为「其他流动资产」，小于时差额列示为「应交税费」。【提示：增值税，根据“应交税费-未交增值税、简易计税、转让金融商品应交增值税、代扣代缴增值税”科目贷方余额计算填列。】勾稽：合计 = 各税项之和（源模板 =SUM(B8:B22)）。",
           "rows": [
             {
+              "label": "企业所得税",
+              "row_type": "data"
+            },
+            {
               "label": "增值税",
               "row_type": "data"
             },
@@ -20920,15 +20924,43 @@
               "row_type": "data"
             },
             {
-              "label": "企业所得税",
+              "label": "资源税",
               "row_type": "data"
             },
             {
-              "label": "个人所得税",
+              "label": "土地增值税",
               "row_type": "data"
             },
             {
               "label": "城市维护建设税",
+              "row_type": "data"
+            },
+            {
+              "label": "车船牌照税",
+              "row_type": "data"
+            },
+            {
+              "label": "房产税",
+              "row_type": "data"
+            },
+            {
+              "label": "土地使用税",
+              "row_type": "data"
+            },
+            {
+              "label": "教育费附加",
+              "row_type": "data"
+            },
+            {
+              "label": "矿产资源补偿费",
+              "row_type": "data"
+            },
+            {
+              "label": "代扣代缴外国企业所得税",
+              "row_type": "data"
+            },
+            {
+              "label": "代扣代缴个人所得税",
               "row_type": "data"
             },
             {
@@ -20960,7 +20992,7 @@
       "sort_index": 40,
       "auto_numbering": true,
       "lock_number": false,
-      "_aligned_by": "n-cycle-tax-disclosure-alignment"
+      "_aligned_by": "n2-disclosure-and-extraction-alignment"
     },
     {
       "section_number": "五、42",

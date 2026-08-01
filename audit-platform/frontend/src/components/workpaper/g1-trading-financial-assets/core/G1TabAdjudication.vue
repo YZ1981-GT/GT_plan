@@ -3,7 +3,7 @@
     <div class="section-head">
       <h3 class="sheet-title">G1-1 交易性金融资产审定表</h3>
       <div class="head-actions tab-toolbar">
-        <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
+        <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="handleOpenBringIn">
           <el-icon><Download /></el-icon>带入调整
         </el-button>
         <G1ImportExportDropdown
@@ -94,6 +94,7 @@
         <li>审定＝未审＋账项调整；变动额／变动率自动计算；|变动率|&gt;{{ Math.round(G1_CHANGE_RATE_THRESHOLD * 100) }}% 时原因分析必填。</li>
         <li>账面余额合计（减一年以上到期）应与试算平衡表 1501 勾稽，差异为 0。</li>
         <li>「带入调整」：可从集中登记按科目 1501 拉取调整分录，逐笔分配到各成本/公允价值明细行的期末账项调整，带入后审定数自动更新并联动附注。</li>
+        <li>「带入调整」会自动排除已在 G1-3 明细行中同步过的分录（避免与 G1-3「确认调整」净额回写重复计入）；如需重新分摊，请在 G1-3 调整即可，无需再从此处带入。</li>
       </ul>
     </details>
 
@@ -245,7 +246,7 @@
 
     <AdjudicationBringInDialog
       v-model="bringInVisible"
-      :matches="adjPull.matches.value"
+      :matches="bringInMatchesFiltered"
       :row-options="bringInRowOptions"
       subject-label="1501 交易性金融资产"
       :loading="adjPull.loading.value"
@@ -331,6 +332,56 @@ const {
     updateField(rowKey, 'closingAdjustment', value),
   totalAudited: () => totalRow.value.closingAudited,
 })
+
+// ─── 重复计算防护：G1-3「从调整分录模块同步」也会按 sourceGroupId 拉取集中登记的同一批分录，
+// 若该分录已作为 G1-3 明细行存在（sourceGroupId 命中），此处「带入」再累加到审定表会造成
+// 同一笔调整被计两次（G1-3 明细合计 + 审定表账项调整）。过滤掉已在 G1-3 同步过的分录组，
+// 并提示用户改为在 G1-3「确认调整」后自动回写（G1-3 已有的净额回写链路见 publishAdjustment）。
+const g1_3SyncedGroupIds = computed<Set<string>>(() => {
+  const ids = new Set<string>()
+  try {
+    const raw = props.allResponses?.get?.('G1-3-rows')
+    const jsonStr = raw?.remark || raw?.conclusion
+    if (!jsonStr) return ids
+    const parsed = JSON.parse(jsonStr)
+    if (Array.isArray(parsed)) {
+      for (const r of parsed) {
+        if (r?.sourceGroupId) ids.add(String(r.sourceGroupId))
+      }
+    }
+  } catch {
+    /* silent */
+  }
+  return ids
+})
+
+const bringInDuplicateCount = computed(
+  () => adjPull.matches.value.filter((m) => g1_3SyncedGroupIds.value.has(m.entry_group_id)).length,
+)
+
+/** 过滤掉已在 G1-3 明细行中存在（sourceGroupId 命中）的分录，避免与审定表重复计算 */
+const bringInMatchesFiltered = computed(() =>
+  adjPull.matches.value.filter((m) => !g1_3SyncedGroupIds.value.has(m.entry_group_id)),
+)
+
+async function handleOpenBringIn() {
+  await openBringInAdjustment()
+  if (!bringInVisible.value) return // 无命中分录（open() 内已提示），无需继续
+  if (bringInMatchesFiltered.value.length === 0 && bringInDuplicateCount.value > 0) {
+    // 全部命中分录均已在 G1-3 同步过，无可带入项：关闭弹窗并提示改用 G1-3 净额回写
+    bringInVisible.value = false
+    ElMessage.warning(
+      `命中的 ${bringInDuplicateCount.value} 笔调整分录均已在 G1-3 明细行中同步，`
+      + '请在 G1-3 点击「确认调整」按净额自动回写审定表，避免重复计算',
+    )
+    return
+  }
+  if (bringInDuplicateCount.value > 0) {
+    ElMessage.warning(
+      `已自动排除 ${bringInDuplicateCount.value} 笔已在 G1-3 明细行中同步的分录，避免重复计算`,
+    )
+  }
+}
 
 const allocVisible = ref(false)
 const allocRows = ref<Array<{ rowKey: string; label: string; amount: number }>>([])

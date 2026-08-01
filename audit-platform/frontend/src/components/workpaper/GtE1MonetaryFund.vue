@@ -415,7 +415,13 @@ const currentSheet = computed(() => {
   return name
 })
 
-const dualMode = useG1DualMode({ wpId: wpIdRef })
+const dualMode = useG1DualMode({
+  wpId: wpIdRef,
+  currentSheet,
+  availableSheets: computed(() => []),
+  sheetName: computed(() => props.sheetName || ''),
+  projectId: computed(() => props.projectId),
+})
 
 /**
  * E1-3 双 variant: sheetName 含"仅人民币"→rmb，含"人民币及外币"→multi

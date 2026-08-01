@@ -64,20 +64,37 @@ export function calcSurtax(vat: number, consumptionTax: number, rate: number): n
 /**
  * 计算房产税从价计征（Property P6）
  *
- * 公式：应交房产税 = 房产原值 × (1 - 扣除比例) × 1.2%
+ * 公式（完整）：应交房产税 = (房产原值 - 不计税原值) × (1 - 扣除比例) × 1.2% × 月份/12
+ * 公式（简化，全年自用且无不计税部分）：房产原值 × (1 - 扣除比例) × 1.2%
  *
  * 扣除比例由各省/自治区/直辖市确定，一般为 10%~30%（即 0.10~0.30）。
  * 常见：北京30%、上海20%~30%、广东20%、浙江30%。
+ *
+ * 不计税原值：房产原值中免于计税的部分（如独立于房屋的机器设备、地下建筑等按规定不计税部分）。
+ * 月份：当年实际纳税义务月份（新增/处置房产按实际持有月数，1~12），用于计算部分年度房产税。
+ *
+ * ⚠️ 向后兼容：仅传 2 个参数时 deductibleOriginalValue 默认 0、months 默认 12，
+ * 退化为 原值 × (1 - 扣除比例) × 1.2%（保证既有 PBT n2-pbt-p6-property-tax 稳定）。
  *
  * 来源：N2-9 房产税测算表
  * 法规依据：《房产税暂行条例》第三条、第四条
  *
  * @param originalValue - 房产原值（原始购置价或重置完全价值）
  * @param deductRate - 扣除比例（0.10~0.30，各省规定）
+ * @param deductibleOriginalValue - 不计税原值（默认 0）
+ * @param months - 当年纳税义务月份（默认 12，即全年）
  * @returns 年应交房产税（从价计征）
  */
-export function calcPropertyTaxByValue(originalValue: number, deductRate: number): number {
-  return safe(originalValue) * (1 - safe(deductRate)) * 0.012
+export function calcPropertyTaxByValue(
+  originalValue: number,
+  deductRate: number,
+  deductibleOriginalValue: number = 0,
+  months: number = 12,
+): number {
+  const taxableValue = safe(originalValue) - safe(deductibleOriginalValue)
+  const m = safe(months)
+  const monthFactor = m > 0 ? m / 12 : 1
+  return taxableValue * (1 - safe(deductRate)) * 0.012 * monthFactor
 }
 
 // ─── 房产税从租 ────────────────────────────────────────────

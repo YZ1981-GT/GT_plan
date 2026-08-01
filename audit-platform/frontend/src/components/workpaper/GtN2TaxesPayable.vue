@@ -4,22 +4,23 @@
     <template v-else>
       <div v-if="isHtmlSheet && currentSheet !== 'N2' && currentSheet !== '底稿目录'" class="n2-taxes-payable-toolbar">
         <el-segmented
-          :model-value="dualMode.currentMode.value"
-          :options="dualMode.modeOptions"
+          v-model="renderMode"
+          :options="renderModeOptions"
           size="small"
-          @change="dualMode.onModeChange"
         />
-        <el-tag v-if="!dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
+        <el-tag v-if="!dualMode.ooAvailable.value" size="small" type="warning">OO不可用</el-tag>
       </div>
 
       <!-- 双模式：HTML sheet 切到 OnlyOffice -->
       <GtOnlyOfficeSheet
-        v-if="isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'"
+        v-if="isHtmlSheet && renderMode === 'onlyoffice'"
+        :key="props.sheetName"
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :sheet-name="props.sheetName || ''"
         :readonly="isReadonly"
         style="height: calc(100vh - 180px)"
+        @fallback="onOoFallback"
       />
 
       <!-- N2A 程序表 → OnlyOffice fallback -->
@@ -50,6 +51,7 @@
         :wp-id="wpIdRef"
         :project-id="projectIdRef"
         :is-readonly="isReadonly"
+        :year="n2Year"
         @navigate="handleNavigate"
         @navigate-sheet="handleNavigate"
       />
@@ -60,6 +62,7 @@
         :all-responses="allResponsesRef"
         :wp-id="props.wpId"
         :is-readonly="isReadonly"
+        :year="n2Year"
         @navigate="handleNavigate"
         @navigate-sheet="handleNavigate"
       />
@@ -100,6 +103,7 @@
         :all-responses="allResponsesRef"
         :wp-id="props.wpId"
         :is-readonly="isReadonly"
+        :year="n2Year"
         @navigate="handleNavigate"
         @navigate-sheet="handleNavigate"
       />
@@ -110,6 +114,7 @@
         :all-responses="allResponsesRef"
         :wp-id="props.wpId"
         :is-readonly="isReadonly"
+        :year="n2Year"
         @navigate="handleNavigate"
         @navigate-sheet="handleNavigate"
       />
@@ -120,6 +125,7 @@
         :all-responses="allResponsesRef"
         :wp-id="props.wpId"
         :is-readonly="isReadonly"
+        :year="n2Year"
         @navigate="handleNavigate"
         @navigate-sheet="handleNavigate"
       />
@@ -130,6 +136,7 @@
         :all-responses="allResponsesRef"
         :wp-id="props.wpId"
         :is-readonly="isReadonly"
+        :year="n2Year"
         @navigate="handleNavigate"
         @navigate-sheet="handleNavigate"
       />
@@ -140,6 +147,7 @@
         :all-responses="allResponsesRef"
         :wp-id="props.wpId"
         :is-readonly="isReadonly"
+        :year="n2Year"
         @navigate="handleNavigate"
         @navigate-sheet="handleNavigate"
       />
@@ -151,6 +159,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        :year="n2Year"
         @navigate="handleNavigate"
         @navigate-sheet="handleNavigate"
       />
@@ -207,6 +216,7 @@ import {
   isN2HtmlSheet,
   normalizeN2SheetName,
 } from './composables/n2SheetRouting'
+import { useN2DualMode, type N2RenderMode } from './composables/useN2DualMode'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
 // ─── defineAsyncComponent lazy 加载子组件 ────────────────────────────────────
@@ -257,19 +267,21 @@ const projectIdRef = computed(() => props.projectId)
 const allResponses = ref<Map<string, any>>(new Map())
 const allResponsesRef = computed(() => allResponses.value)
 const isReadonly = computed(() => !!props.readonly)
+
+// ─── Year 提取（供子组件抽凭/TB用） ────────────────────────────────────────
+const n2Year = computed(() => {
+  // 优先从 htmlData.project_context.audit_year
+  const ctxYear = props.htmlData?.project_context?.audit_year
+  if (ctxYear) return String(ctxYear)
+  // 从 allResponses 解析（后端 render 可能注入）
+  const yearItem = allResponses.value.get('N2-project-year')
+  if (yearItem?.conclusion) return yearItem.conclusion
+  // 兜底当前年份
+  return String(new Date().getFullYear())
+})
+
 // ─── Runtime Boundary（GtWpRenderer 统一提供 版本/复核/AI + 挂真实 Host） ───
 const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
-
-// ─── 双模式 ──────────────────────────────────────────────────────────────────
-const dualMode = {
-  currentMode: ref<'html' | 'onlyoffice'>('html'),
-  modeOptions: [
-    { label: 'HTML', value: 'html' },
-    { label: 'OnlyOffice', value: 'onlyoffice' },
-  ],
-  isOoAvailable: ref(true),
-  onModeChange: () => {},
-}
 
 // ─── sheetName 分发（纯函数，见 composables/n2SheetRouting.ts）───────────────
 // 🔴 原实现有两处缺陷，已随 spec n-cycle-tax-disclosure-alignment 修掉：
@@ -286,6 +298,25 @@ const isHtmlSheet = computed(() => {
   if (SKIP_SHEETS.some(sk => (props.sheetName || '').includes(sk))) return false
   return isN2HtmlSheet(currentSheet.value)
 })
+
+// ─── 双模式（真实 composable，复用 useWorkpaperEntryDualMode） ────────────────
+const dualMode = useN2DualMode({
+  currentSheet,
+  sheetName: computed(() => props.sheetName || ''),
+  reloadAllResponses: selfLoad,
+})
+
+const renderMode = computed<N2RenderMode>({
+  get: () => dualMode.mode.value,
+  set: (v) => { void dualMode.switchMode(v) },
+})
+
+const renderModeOptions = computed(() => [
+  { label: 'HTML', value: 'html' as N2RenderMode },
+  { label: 'OnlyOffice', value: 'onlyoffice' as N2RenderMode, disabled: !dualMode.ooAvailable.value },
+])
+
+function onOoFallback() { void dualMode.switchMode('html') }
 
 // ─── selfLoad（bundle内嵌场景 htmlData 为 null 时自加载） ─────────────────────
 /**

@@ -14,7 +14,9 @@
         <el-button size="small" type="primary" plain @click="openHandbook('preparation')">
           📖 编制手册
         </el-button>
-        <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
+        <el-tag v-if="isHtmlSheet && dualMode.fetchingConfig.value" size="small" type="info">拉取中…</el-tag>
+        <el-tag v-else-if="isHtmlSheet && renderMode === 'onlyoffice' && dualMode.ooConfigReady.value" size="small" type="success">已拉取</el-tag>
+        <el-tag v-else-if="isHtmlSheet && !dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
       </div>
 
       <!-- 全局勾稽告警（排除当前tab特定告警，避免重复） -->
@@ -149,6 +151,7 @@
         :is-readonly="isReadonly"
         :debounced-save="formData.debouncedSave"
         :wp-id="props.wpId"
+        @imported="onSheetImported"
       />
 
       <G1TabContractCashflow
@@ -425,6 +428,7 @@ const dualMode = useG1DualMode({
   currentSheet,
   availableSheets,
   sheetName: sheetNameRef,
+  projectId: computed(() => props.projectId),
   reloadAll: () => formData.loadAll(),
 })
 

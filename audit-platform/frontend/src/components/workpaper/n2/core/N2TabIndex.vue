@@ -1,341 +1,736 @@
 <template>
   <div class="n2-tab-index">
-    <!-- 编制信息由页面级头部统一渲染，此处不重复 -->
-
-    <!-- ═══ 目录卡（标题 + 复核 + 编制/使用手册 + 进度条 → 跨表结论口径 → 编制提示） ═══ -->
-    <div class="n2-dir">
-      <div class="index-header">
-        <h3 class="title">N2 底稿目录</h3>
-        <GtReviewTrigger section-id="N2-index-directory" />
-        <div class="handbook-btns">
-          <el-button size="small" type="primary" plain @click="openHandbook('preparation')">📖 编制手册</el-button>
-          <el-button size="small" @click="openHandbook('usage')">使用手册</el-button>
-        </div>
-        <div class="progress-wrap">
-          <span>编制进度 {{ completedCount }}/{{ totalCount }}</span>
-          <el-progress :percentage="progressPercent" :stroke-width="10" />
-        </div>
-      </div>
-
-      <N2PreparationHandbookDialog v-model="handbookVisible" :initial-tab="handbookTab" />
-
-      <div class="conclusion-board" data-testid="n2-conclusion-board">
-        <div class="board-head">
-          <strong>跨表结论口径</strong>
-          <el-tag size="small" :type="conclusionWorstType">{{ conclusionWorstLabel }}</el-tag>
-          <span class="board-meta">已填 {{ conclusionFilledCount }}/{{ conclusionSheets.length }}</span>
-        </div>
-        <div class="board-tags">
-          <el-tag
-            v-for="c in conclusionSheets"
-            :key="c.code"
-            size="small"
-            class="concl-tag clickable"
-            :type="c.filled ? 'success' : 'info'"
-            effect="plain"
-            @click="emit('navigate', c.sheetKey)"
-          >
-            {{ c.code }} {{ c.filled ? '已填' : '未填' }}
-          </el-tag>
-        </div>
-        <p v-if="conclusionHasUnfilled" class="board-hint">存在未填审计结论，请点击标签跳转补全审计说明与结论。</p>
-      </div>
-
-      <details class="methodology-hint">
-        <summary>编制提示</summary>
-        <ul>
-          <li>应交税费为<strong>负债类贷方科目</strong>（2221）：期末 = 期初 + 贷方（计提）− 借方（缴纳），取期末余额</li>
-          <li>多税种归集：增值税/城建税及附加/房产税/土地增值税/出口退税等，审定表按税种分行独立审定</li>
-          <li>增值税测算（N2-6）：应交增值税 = 销项税额 −（进项税额 − 进项转出）；结果作城建税及附加计税依据</li>
-          <li>城建税及附加（N2-8）计税依据 =（增值税 + 消费税）；税率市区 7% / 县城 5% / 其他 1% + 教育费附加 3% + 地方教育附加 2%</li>
-          <li>审定期末回写 TB(2221)；各税种本期计提额供 N4 税金及附加费用核对；各表填妥"审计说明或结论"后目录标签转为"已填"</li>
-        </ul>
-      </details>
+    <!-- ═══ 顶部标识头 ═══ -->
+    <div class="n2-header-bar">
+      <span class="header-code">底稿编码 N2</span>
+      <span class="header-sep">|</span>
+      <span class="header-subject">科目 2221 应交税费</span>
+      <span class="header-sep">|</span>
+      <span class="header-direction">负债类 / 贷方</span>
     </div>
 
-    <!-- ═══ 底稿架构（4 阶段泳道） ═══ -->
-    <div class="n2-arch">
-      <div class="arch-header">
-        <h4 class="arch-title">底稿架构</h4>
-        <span class="arch-hint">点击卡片可跳转至对应底稿</span>
-      </div>
-      <GtBArchitectureTree
-        :wp-id="wpId"
-        :project-id="projectId"
-        :active-sheet="''"
-        :html-data="archHtmlData"
-        @navigate="handleNavigate"
-      />
+    <!-- ═══ 负债类贷方科目醒目标注 ═══ -->
+    <div class="n2-liability-badge">
+      <el-icon><WarningFilled /></el-icon>
+      <span>应交税费为负债类贷方科目（期末 = 期初 + 贷方 − 借方），涵盖增值税/城建税/房产税/土地增值税/出口退税等多税种</span>
     </div>
 
-    <!-- ═══ 本循环底稿目录（N 循环其他科目，可跳转） ═══ -->
-    <div v-if="cycleWorkpapers.length" class="n2-cycle">
-      <div class="cycle-header">
-        <h4 class="cycle-title">本循环底稿目录</h4>
-        <span class="cycle-hint">点击可跳转至同循环其他底稿（灰色表示尚未生成）</span>
+    <!-- ═══ 蓝色渐变操作引导区 ═══ -->
+    <div class="n2-guide">
+      <div class="n2-guide-header">
+        <el-icon><InfoFilled /></el-icon>
+        <span>操作步骤引导</span>
       </div>
-      <div class="cycle-grid">
+      <div class="n2-guide-steps">
+        <div class="step-item">
+          <span class="step-num">①</span>
+          <span class="step-text">填写审定表（N2-1）确认各税种期末余额（负债类：期初+贷方−借方）</span>
+        </div>
+        <div class="step-item">
+          <span class="step-num">②</span>
+          <span class="step-text">录入明细（N2-2）按税种逐项列示计提/缴纳/期末</span>
+        </div>
+        <div class="step-item">
+          <span class="step-num">③</span>
+          <span class="step-text">完成增值税测算（N2-6）+ 其他税费测算（N2-8/N2-9/N2-10）</span>
+        </div>
+        <div class="step-item">
+          <span class="step-num">④</span>
+          <span class="step-text">税收政策检查（N2-4）+ 认定表（N2-5）+ 检查表（N2-11）+ 附注</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ 总体进度 ═══ -->
+    <div class="n2-progress-section">
+      <div class="progress-info">
+        <span>编制进度</span>
+        <span class="progress-text">{{ completedCount }} / {{ effectiveTotal }} ({{ progressPercent }}%)</span>
+      </div>
+      <el-progress :percentage="progressPercent" :stroke-width="8" :show-text="false" />
+    </div>
+
+    <!-- ═══ 多税种统计仪表板 ═══ -->
+    <div class="n2-tax-dashboard">
+      <div class="dashboard-title">各税种完成状态</div>
+      <div class="dashboard-cards">
         <div
-          v-for="wp in cycleWorkpapers"
-          :key="wp.wp_code"
-          class="cycle-card"
-          :class="{ 'is-current': wp.is_current, 'is-disabled': !wp.wp_id }"
-          @click="onCycleCardClick(wp)"
+          v-for="card in taxStatusCards"
+          :key="card.tax"
+          class="tax-card"
+          :class="[`tax-card--${card.status}`]"
         >
-          <div class="cycle-card-top">
-            <span class="cycle-code">{{ wp.wp_code }}</span>
-            <el-tag v-if="wp.is_current" size="small" effect="plain" class="cycle-current-tag">当前</el-tag>
+          <div class="tax-card-name">{{ card.tax }}</div>
+          <div class="tax-card-status">
+            <span v-if="card.status === 'done'" class="status-icon status-done">✓</span>
+            <span v-else-if="card.status === 'warn'" class="status-icon status-warn">⚠</span>
+            <span v-else class="status-icon status-pending">○</span>
+            <span class="status-label">{{ card.label }}</span>
           </div>
-          <span class="cycle-name" :title="wp.wp_name">{{ wp.wp_name }}</span>
         </div>
       </div>
     </div>
+
+    <!-- ═══ 底稿目录表格 ═══ -->
+    <el-card shadow="never" class="n2-index-card">
+      <template #header>
+        <span class="card-title">致同会计师事务所 / 应交税费底稿</span>
+      </template>
+      <el-table
+        :data="sheetRows"
+        border
+        size="small"
+        highlight-current-row
+        style="width: 100%"
+        :row-class-name="getRowClassName"
+        @row-click="handleRowClick"
+      >
+        <el-table-column prop="seq" label="序号" width="60" align="center" />
+        <el-table-column prop="name" label="内容" min-width="240">
+          <template #default="{ row }">
+            <span :class="row.skip ? 'sheet-name-skip' : 'sheet-name-link'">{{ row.name }}</span>
+            <el-tag v-if="row.isCore" size="small" type="danger" class="core-tag">核心</el-tag>
+            <el-tag v-if="row.skip" size="small" type="info" class="skip-tag">OnlyOffice</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="索引号" width="100" align="center">
+          <template #default="{ row }">
+            <GtIndexChip v-if="row.code" :value="row.code" />
+            <span v-else class="no-index">—</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="进度" width="140" align="center">
+          <template #default="{ row }">
+            <template v-if="!row.skip">
+              <el-progress
+                :percentage="row.progress"
+                :stroke-width="6"
+                :show-text="false"
+                :color="getProgressColor(row.progress)"
+                style="width: 80px; display: inline-block"
+              />
+              <span class="progress-label">{{ row.progress }}%</span>
+            </template>
+            <span v-else class="skip-label">跳过</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="联动" width="80" align="center">
+          <template #default="{ row }">
+            <span v-if="row.linkageStatus === 'matched'" class="linkage-badge linkage-ok">✓</span>
+            <span v-else-if="row.linkageStatus === 'diff'" class="linkage-badge linkage-warn">⚠</span>
+            <span v-else class="linkage-badge linkage-na">—</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="80" align="center">
+          <template #default="{ row }">
+            <el-button
+              v-if="!row.skip"
+              type="primary"
+              link
+              size="small"
+              @click.stop="handleNavigate(row)"
+            >
+              进入
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
+    <!-- ═══ 编制提示（折叠） ═══ -->
+    <details class="n2-details-tip">
+      <summary>编制提示</summary>
+      <ul>
+        <li>应交税费（2221）为<strong>负债类贷方科目</strong>：期末 = 期初 + 本期贷方（计提增加）− 本期借方（缴纳减少）</li>
+        <li>本底稿涵盖<strong>多税种测算</strong>：增值税/城建税及附加/房产税/土地增值税/出口退税</li>
+        <li>增值税核心公式：应交增值税 = 销项税额 −（进项税额 − 进项转出）</li>
+        <li>城建税及附加计税依据取自N2-6增值税测算结果，城建税率分市区7%/县城5%/其他1%</li>
+        <li>房产税：从价=原值×(1−扣除比例)×1.2%；从租=租金×12%</li>
+        <li>土地增值税：四级超率累进（30%/40%/50%/60%），增值率=增值额/扣除项目</li>
+        <li>各税种计提联动N4税金及附加（通过EventBus 'tax-accrual:updated'）</li>
+        <li>O1A原底稿/出口退税额复核示例为参考性辅助sheet，走OnlyOffice</li>
+      </ul>
+    </details>
   </div>
 </template>
 
 <script setup lang="ts">
 /**
- * N2TabIndex.vue — N2 应交税费底稿目录（严格镜像 N1 标准）
+ * N2TabIndex — N2 应交税费底稿目录
  *
- * 结构：目录卡（标题+复核+编制/使用手册+进度→跨表结论口径→编制提示）
- *       + 底稿架构 4 阶段泳道（GtBArchitectureTree）+ 本循环底稿目录 grid。
- * 编制信息由页面级头部渲染，此处不重复。自包含：自行拉取 checklist-responses。
+ * 18 行 sheet 目录（2 行标记 skip：O1A原底稿、出口退税额复核示例）。
+ * 有效sheet 16 个，进度条展示 n/16 完成度。
+ * 多税种统计仪表板：增值税/城建税/房产税/土地增值税/出口退税 完成状态。
+ * 联动状态列：从 useN2CrossSheet 获取各sheet勾稽状态。
+ * 点击行 emit navigate 事件（由 GtN2TaxesPayable 监听切换 sheetName）。
  *
- * 负债类贷方科目（2221 应交税费）— 取期末余额，多税种归集。
+ * Requirements: 1.2, 1.11
  */
-import { computed, ref, onMounted, defineAsyncComponent } from 'vue'
-import { useRouter } from 'vue-router'
-import http from '@/utils/http'
-import { loadCycleWorkpaperCards, type CycleWpCard } from '@/services/cycleDirectory'
-import GtReviewTrigger from '../../GtReviewTrigger.vue'
-import GtBArchitectureTree from '../../GtBArchitectureTree.vue'
-
-const N2PreparationHandbookDialog = defineAsyncComponent(() => import('../N2PreparationHandbookDialog.vue'))
+import { computed } from 'vue'
+import { InfoFilled, WarningFilled } from '@element-plus/icons-vue'
+import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
+import { useN2CrossSheet } from '../../composables/useN2CrossSheet'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
+
 const props = defineProps<{
   wpId: string
   projectId: string
-  isReadonly: boolean
+  allResponses: Map<string, any>
+  isReadonly?: boolean
 }>()
 
 const emit = defineEmits<{
-  (e: 'navigate', sheetName: string): void
+  (e: 'navigate', sheetCode: string): void
 }>()
 
-const router = useRouter()
+// ─── CrossSheet 联动 ─────────────────────────────────────────────────────────
 
-// ─── 编制/使用手册弹窗 ─────────────────────────────────────────────────────────
-const handbookVisible = ref(false)
-const handbookTab = ref<'preparation' | 'usage'>('preparation')
-function openHandbook(tab: 'preparation' | 'usage') {
-  handbookTab.value = tab
-  handbookVisible.value = true
-}
+const allResponsesRef = computed(() => props.allResponses)
+const {
+  adjudicationVsDetail,
+  adjudicationVsCalcTables,
+} = useN2CrossSheet(allResponsesRef)
 
-// ─── 自包含：拉取本底稿 checklist-responses（主入口不持有 allResponses） ─────────
-const responses = ref<Map<string, any>>(new Map())
-onMounted(async () => {
-  if (!props.wpId) return
-  try {
-    const res: any = await http.get(`/api/workpapers/${props.wpId}/checklist-responses`)
-    const list = res?.data?.items ?? res?.items ?? res?.data ?? res
-    const map = new Map<string, any>()
-    if (Array.isArray(list)) {
-      for (const it of list) {
-        if (it?.item_id) map.set(it.item_id, it)
-      }
-    }
-    responses.value = map
-  } catch {
-    /* silent：拉取失败则看板全显未填 */
-  }
-})
+// ─── Types ───────────────────────────────────────────────────────────────────
 
-// ─── Sheet 行定义 ─────────────────────────────────────────────────────────────
+type LinkageStatus = 'matched' | 'diff' | 'none'
+
 interface SheetRow {
+  seq: number
   name: string
   code: string
   sheetKey: string
   progress: number
+  isCore: boolean
+  skip: boolean
+  linkageStatus: LinkageStatus
 }
 
-/** 按 responses 中以指定前缀存储的字段数计算完成度。 */
-function calcSheetProgress(prefix: string, expectedFields: number): number {
-  const map = responses.value
-  if (!map || map.size === 0) return 0
-  let count = 0
-  for (const key of map.keys()) {
-    if (key.startsWith(prefix)) count++
+// ─── 进度动态化：sheet 编码 → item_id 数组映射 ───────────────────────────────
+
+/**
+ * 每张 sheet 的完成判定依据的 item_id 列表。
+ * 全部填写 → 100%（completed）；部分填写 → 50%（in-progress）；未填 → 0%（pending）。
+ */
+const SHEET_PROGRESS_KEYS: Record<string, string[]> = {
+  'N2-1': ['N2-1-adjudication-rows', 'N2-1-conclusion'],
+  'N2-2': ['N2-2-detail-rows'],
+  'N2-3': ['N2-3-entries'],
+  'N2-4': ['N2-4-process'],
+  'N2-5': ['N2-5-process'],
+  'N2-6': ['N2-6-output-calc', 'N2-6-input-calc'],
+  'N2-7': ['N2-7-total'],
+  'N2-8': ['N2-8-manual-rows'],
+  'N2-9': ['N2-9-rows'],
+  'N2-10': ['N2-10-area'],
+  'N2-11': ['N2-11-voucher-check'],
+}
+
+/** 附注/其他非编码 sheet 的完成判定（按 sheetKey 映射） */
+const SHEET_KEY_PROGRESS_KEYS: Record<string, string[]> = {
+  '附注上市': ['N2-note-listed'],
+  '附注国企': ['N2-note-soe'],
+}
+
+/** 判断单个 item 是否已填写（非空、非空数组/对象字符串） */
+function _isFilled(itemId: string): boolean {
+  const r = props.allResponses.get(itemId) as any
+  if (!r) return false
+  const v = r.conclusion ?? r.remark
+  if (v == null) return false
+  const s = String(v).trim()
+  return s !== '' && s !== '[]' && s !== '{}' && s !== 'null'
+}
+
+/** 依据 item_id 列表计算完成百分比 */
+function _progressFromKeys(keys: string[] | undefined): number {
+  if (!keys || keys.length === 0) return 0
+  let filled = 0
+  for (const k of keys) {
+    if (_isFilled(k)) filled++
   }
-  if (count === 0) return 0
-  if (count >= expectedFields) return 100
-  return Math.min(Math.round((count / expectedFields) * 100), 99)
+  if (filled === 0) return 0
+  if (filled >= keys.length) return 100
+  return 50
 }
 
-const allSheets = computed<SheetRow[]>(() => [
-  { name: '应交税费实质性程序表', code: 'N2A', sheetKey: '应交税费审计程序表N2A', progress: calcSheetProgress('N2-N2A-', 5) },
-  { name: '审定表', code: 'N2-1', sheetKey: '应交税费审定表N2-1', progress: calcSheetProgress('N2-1-', 8) },
-  { name: '明细表', code: 'N2-2', sheetKey: '应交税费明细表N2-2', progress: calcSheetProgress('N2-2-', 6) },
-  { name: '调整分录汇总', code: 'N2-3', sheetKey: '调整分录汇总表N2-3', progress: calcSheetProgress('N2-3-', 4) },
-  { name: '税收政策检查', code: 'N2-4', sheetKey: '税收政策检查N2-4', progress: calcSheetProgress('N2-4-', 4) },
-  { name: '应交税金认定表', code: 'N2-5', sheetKey: '应交税金认定表N2-5', progress: calcSheetProgress('N2-5-', 4) },
-  { name: '增值税测算表', code: 'N2-6', sheetKey: '增值税测算表N2-6', progress: calcSheetProgress('N2-6-', 6) },
-  { name: '出口退税核对表', code: 'N2-7', sheetKey: '出口退税核对表N2-7', progress: calcSheetProgress('N2-7-', 4) },
-  { name: '应交其他税费测算表', code: 'N2-8', sheetKey: '应交其他税费测算表N2-8', progress: calcSheetProgress('N2-8-', 6) },
-  { name: '房产税测算表', code: 'N2-9', sheetKey: '房产税测算表N2-9', progress: calcSheetProgress('N2-9-', 4) },
-  { name: '土地增值税测算表', code: 'N2-10', sheetKey: '土地增值税测算表N2-10', progress: calcSheetProgress('N2-10-', 4) },
-  { name: '应交税费检查表', code: 'N2-11', sheetKey: '应交税费检查表N2-11', progress: calcSheetProgress('N2-11-', 4) },
-  { name: '附注披露信息（上市公司）', code: '附注上市', sheetKey: '附注披露信息（上市公司）', progress: calcSheetProgress('N2-disclosure-listed-', 3) },
-  { name: '附注披露信息（国企）', code: '附注国企', sheetKey: '附注披露信息（国企）', progress: calcSheetProgress('N2-disclosure-soe-', 3) },
-])
+/** 按 sheet 编码计算进度（completed / in-progress / pending → 100 / 50 / 0） */
+function progressByCode(code: string): number {
+  return _progressFromKeys(SHEET_PROGRESS_KEYS[code])
+}
 
-// ─── 进度计算 ─────────────────────────────────────────────────────────────────
-const totalCount = computed(() => allSheets.value.length)
-const completedCount = computed(() => allSheets.value.filter(r => r.progress >= 100).length)
+/** 按 sheetKey 计算进度（用于无编码的附注等 sheet） */
+function progressByKey(sheetKey: string): number {
+  return _progressFromKeys(SHEET_KEY_PROGRESS_KEYS[sheetKey])
+}
+
+// ─── Sheet 目录行定义（18行，2行 skip） ──────────────────────────────────────
+
+const sheetRows = computed<SheetRow[]>(() => {
+  // 联动状态计算
+  const hasData = props.allResponses.size > 0
+  const detailMatch = adjudicationVsDetail.value.isMatch
+  const calcMatches = adjudicationVsCalcTables.value
+
+  // N2-1审定表需同时与明细和各测算表勾稽
+  const n2_1Linkage: LinkageStatus =
+    detailMatch && calcMatches.every(c => c.isMatch)
+      ? 'matched'
+      : (hasData ? 'diff' : 'none')
+
+  const n2_2Linkage: LinkageStatus =
+    detailMatch ? 'matched' : (hasData ? 'diff' : 'none')
+
+  // 找到特定税种的测算勾稽状态
+  const findCalcStatus = (tax: string): LinkageStatus => {
+    const item = calcMatches.find(c => c.tax === tax)
+    if (!item) return 'none'
+    return item.isMatch ? 'matched' : (hasData ? 'diff' : 'none')
+  }
+
+  return [
+    { seq: 1, name: '底稿目录', code: '', sheetKey: '底稿目录', progress: 100, isCore: false, skip: false, linkageStatus: 'none' },
+    { seq: 2, name: '应交税费实质性程序表', code: 'N2A', sheetKey: '应交税费实质性程序表N2A', progress: progressByCode('N2A'), isCore: false, skip: false, linkageStatus: 'none' },
+    { seq: 3, name: '应交税费审定表', code: 'N2-1', sheetKey: '审定表N2-1', progress: progressByCode('N2-1'), isCore: true, skip: false, linkageStatus: n2_1Linkage },
+    { seq: 4, name: '应交税费明细表', code: 'N2-2', sheetKey: '明细表N2-2', progress: progressByCode('N2-2'), isCore: true, skip: false, linkageStatus: n2_2Linkage },
+    { seq: 5, name: '调整分录汇总', code: 'N2-3', sheetKey: '调整分录汇总N2-3', progress: progressByCode('N2-3'), isCore: false, skip: false, linkageStatus: 'none' },
+    { seq: 6, name: '税收政策检查', code: 'N2-4', sheetKey: '税收政策检查N2-4', progress: progressByCode('N2-4'), isCore: false, skip: false, linkageStatus: 'none' },
+    { seq: 7, name: '应交税金认定表', code: 'N2-5', sheetKey: '认定表N2-5', progress: progressByCode('N2-5'), isCore: false, skip: false, linkageStatus: 'none' },
+    { seq: 8, name: '增值税测算表', code: 'N2-6', sheetKey: '增值税测算表N2-6', progress: progressByCode('N2-6'), isCore: true, skip: false, linkageStatus: findCalcStatus('增值税') },
+    { seq: 9, name: '出口退税核对表', code: 'N2-7', sheetKey: '出口退税核对表N2-7', progress: progressByCode('N2-7'), isCore: false, skip: false, linkageStatus: 'none' },
+    { seq: 10, name: '其他税费测算表', code: 'N2-8', sheetKey: '其他税费测算表N2-8', progress: progressByCode('N2-8'), isCore: true, skip: false, linkageStatus: findCalcStatus('城建税') },
+    { seq: 11, name: '房产税测算表', code: 'N2-9', sheetKey: '房产税测算表N2-9', progress: progressByCode('N2-9'), isCore: false, skip: false, linkageStatus: findCalcStatus('房产税') },
+    { seq: 12, name: '土地增值税测算表', code: 'N2-10', sheetKey: '土地增值税测算表N2-10', progress: progressByCode('N2-10'), isCore: false, skip: false, linkageStatus: findCalcStatus('土地增值税') },
+    { seq: 13, name: '应交税费检查表', code: 'N2-11', sheetKey: '应交税费检查表N2-11', progress: progressByCode('N2-11'), isCore: false, skip: false, linkageStatus: 'none' },
+    { seq: 14, name: '附注披露信息（上市公司）', code: '', sheetKey: '附注上市', progress: progressByKey('附注上市'), isCore: false, skip: false, linkageStatus: 'none' },
+    { seq: 15, name: '附注披露信息（国有企业）', code: '', sheetKey: '附注国企', progress: progressByKey('附注国企'), isCore: false, skip: false, linkageStatus: 'none' },
+    { seq: 16, name: 'O1A原底稿', code: '', sheetKey: 'O1A原底稿', progress: 0, isCore: false, skip: true, linkageStatus: 'none' },
+    { seq: 17, name: '出口退税额复核示例', code: '', sheetKey: '出口退税额复核示例', progress: 0, isCore: false, skip: true, linkageStatus: 'none' },
+  ]
+})
+
+// ─── 进度计算（有效sheet = 排除 skip 的 16 个，再排除目录自身 = 15 个计量对象） ─
+
+const effectiveSheets = computed(() => sheetRows.value.filter(r => !r.skip && r.seq !== 1))
+const effectiveTotal = computed(() => effectiveSheets.value.length)
+const completedCount = computed(() => effectiveSheets.value.filter(r => r.progress >= 100).length)
 const progressPercent = computed(() => {
-  if (totalCount.value === 0) return 0
-  const avg = allSheets.value.reduce((sum, r) => sum + r.progress, 0) / totalCount.value
+  if (effectiveTotal.value === 0) return 0
+  const avg = effectiveSheets.value.reduce((s, r) => s + r.progress, 0) / effectiveTotal.value
   return Math.round(avg)
 })
 
-// ─── 底稿架构泳道（GtBArchitectureTree 数据源） ───────────────────────────────
-const COMPONENT_TYPE_MAP: Record<string, string> = {
-  N2A: 'a-program-console',
-  '附注上市': 'c-note-table',
-  '附注国企': 'c-note-table',
-}
-function sheetStatus(progress: number): string {
-  if (progress >= 100) return 'completed'
-  if (progress > 0) return 'in_progress'
-  return 'pending'
-}
-const archHtmlData = computed(() => ({
-  navigation_rows: allSheets.value.map((s, i) => ({
-    seq: i + 1,
-    content: s.sheetKey,
-    sheet_name: s.sheetKey,
-    index_ref: s.code,
-    component_type: COMPONENT_TYPE_MAP[s.code] ?? 'd-form-table',
-    status: sheetStatus(s.progress),
-  })),
-}))
+// ─── 多税种统计仪表板 ────────────────────────────────────────────────────────
 
-// ─── 跨表结论口径看板 ─────────────────────────────────────────────────────────
-/** 有审计结论/说明的 sheet（程序表、调整分录、附注不计入；审定/明细/测算/检查计入） */
-const N2_CONCLUSION_CODES = new Set(['N2-1', 'N2-2', 'N2-4', 'N2-5', 'N2-6', 'N2-7', 'N2-8', 'N2-9', 'N2-10', 'N2-11'])
+interface TaxStatusCard {
+  tax: string
+  status: 'done' | 'warn' | 'pending'
+  label: string
+}
 
-/**
- * includes(`${code}-`) 兼容不同存储前缀深度，尾部连字符保证边界安全；
- * 并排除更长兄弟编码（如 N5-6 的 N5-6-1/N5-6-2）误算——本科目无重叠，作统一防御。
- */
-function isConclusionFilled(code: string): boolean {
-  const map = responses.value
-  if (!map?.size) return false
-  const token = `${code}-`
-  const longer = Array.from(N2_CONCLUSION_CODES).filter(c => c !== code && c.startsWith(token))
-  for (const [key, val] of map.entries()) {
-    if (!key.includes(token)) continue
-    if (longer.some(lc => key.includes(`${lc}-`))) continue
-    if (!/conclusion|audit-note|note/i.test(key)) continue
-    const text = (val?.remark ?? val?.conclusion ?? '') as string
-    if (typeof text === 'string' && text.trim().length > 0) return true
+const taxStatusCards = computed<TaxStatusCard[]>(() => {
+  const hasData = props.allResponses.size > 0
+  const calcResults = adjudicationVsCalcTables.value
+
+  function getStatus(taxName: string): TaxStatusCard {
+    const match = calcResults.find(c => c.tax === taxName)
+    if (!hasData || !match) return { tax: taxName, status: 'pending', label: '待编制' }
+    return match.isMatch
+      ? { tax: taxName, status: 'done', label: '已核对' }
+      : { tax: taxName, status: 'warn', label: '有差异' }
   }
-  return false
-}
 
-const conclusionSheets = computed(() =>
-  allSheets.value
-    .filter(s => N2_CONCLUSION_CODES.has(s.code))
-    .map(s => ({ code: s.code, sheetKey: s.sheetKey, filled: isConclusionFilled(s.code) })),
-)
-const conclusionFilledCount = computed(() => conclusionSheets.value.filter(c => c.filled).length)
-const conclusionHasUnfilled = computed(() => conclusionSheets.value.some(c => !c.filled))
-const conclusionWorstLabel = computed(() => {
-  if (conclusionFilledCount.value === 0) return '结论未填'
-  if (conclusionHasUnfilled.value) return `结论未齐 ${conclusionSheets.value.length - conclusionFilledCount.value} 项`
-  return '总体已齐'
-})
-const conclusionWorstType = computed<'success' | 'warning' | 'info'>(() => {
-  if (conclusionFilledCount.value === 0) return 'info'
-  if (conclusionHasUnfilled.value) return 'warning'
-  return 'success'
+  // 出口退税独立判断（无测算交叉验证，仅看N2-7是否有数据）
+  const exportRefundStatus: TaxStatusCard = hasData && props.allResponses.has('N2-7-total')
+    ? { tax: '出口退税', status: 'done', label: '已核对' }
+    : { tax: '出口退税', status: 'pending', label: '待编制' }
+
+  return [
+    getStatus('增值税'),
+    getStatus('城建税'),
+    getStatus('房产税'),
+    getStatus('土地增值税'),
+    exportRefundStatus,
+  ]
 })
 
 // ─── 交互 ────────────────────────────────────────────────────────────────────
-function handleNavigate(sheetName: string) {
-  if (sheetName) emit('navigate', sheetName)
+
+function handleRowClick(row: SheetRow) {
+  if (row.skip) return
+  if (props.isReadonly && row.progress === 0) return
+  emit('navigate', row.sheetKey)
 }
 
-// ─── 本循环底稿目录（N 循环其他科目，跨底稿跳转；canonical 源模板过滤污染） ───
-const cycleWorkpapers = ref<CycleWpCard[]>([])
-async function loadCycleWorkpapers(): Promise<void> {
-  cycleWorkpapers.value = await loadCycleWorkpaperCards(props.projectId, 'N', props.wpId)
+function handleNavigate(row: SheetRow) {
+  emit('navigate', row.sheetKey)
 }
-function onCycleCardClick(wp: CycleWpCard): void {
-  if (!wp.wp_id || wp.is_current || !props.projectId) return
-  router.push({ name: 'WorkpaperEditor', params: { projectId: props.projectId, wpId: wp.wp_id } })
+
+function getRowClassName({ row }: { row: SheetRow }): string {
+  if (row.skip) return 'skip-row'
+  if (row.progress >= 100) return 'completed-row'
+  return ''
 }
-onMounted(loadCycleWorkpapers)
+
+function getProgressColor(percent: number): string {
+  if (percent >= 100) return '#67c23a'
+  if (percent >= 50) return '#409eff'
+  return '#e6e8eb'
+}
 </script>
 
 <style scoped>
 .n2-tab-index {
-  padding: 16px;
+  padding: 12px;
   font-size: var(--wp-font-size, 13px);
 }
 
-/* ─── 目录卡 ─── */
-.n2-dir { margin-bottom: 20px; }
-.index-header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
-.title { margin: 0; font-size: 16px; font-weight: 600; color: #303133; }
-.handbook-btns { display: flex; gap: 6px; }
-.progress-wrap { flex: 1; min-width: 200px; }
-.conclusion-board {
-  margin-bottom: 12px;
-  padding: 10px 12px;
+/* ─── 顶部标识头 ─── */
+.n2-header-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  margin-bottom: 16px;
+  background: #f5f7fa;
+  border: 1px solid #dcdfe6;
+  border-radius: 6px;
+  font-size: var(--wp-font-size, 13px);
+}
+
+.header-code {
+  font-weight: 600;
+  color: #303133;
+}
+
+.header-sep {
+  color: #c0c4cc;
+}
+
+.header-subject {
+  color: #606266;
+}
+
+.header-direction {
+  font-weight: 500;
+  color: #e6a23c;
+}
+
+/* ─── 负债类贷方科目醒目标注 ─── */
+.n2-liability-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  margin-bottom: 16px;
+  background: linear-gradient(135deg, #fce4ec 0%, #f8bbd0 100%);
+  border: 1px solid #f48fb1;
+  border-left: 4px solid #e91e63;
+  border-radius: 6px;
+  font-size: var(--wp-font-size, 13px);
+  font-weight: 500;
+  color: #880e4f;
+}
+
+.n2-liability-badge .el-icon {
+  font-size: 16px;
+  color: #e91e63;
+  flex-shrink: 0;
+}
+
+/* ─── 蓝色渐变引导区 ─── */
+.n2-guide {
+  background: linear-gradient(135deg, #e8f4fd 0%, #d6eaf8 100%);
+  border: 1px solid #b3d9f2;
+  border-radius: 8px;
+  padding: 14px 20px;
+  margin-bottom: 16px;
+}
+
+.n2-guide-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+  color: #1a73e8;
+  margin-bottom: 10px;
+  font-size: var(--wp-font-size, 13px);
+}
+
+.n2-guide-steps {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px 24px;
+}
+
+.step-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--wp-font-size, 13px);
+  color: #374151;
+}
+
+.step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #1a73e8;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.step-text {
+  font-size: var(--wp-font-size, 13px);
+}
+
+/* ─── 进度条区 ─── */
+.n2-progress-section {
+  margin-bottom: 16px;
+  padding: 12px 16px;
   background: #f5f7fa;
   border-radius: 6px;
-  border-left: 3px solid #409eff;
 }
-.board-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
-.board-meta { font-size: 12px; color: #909399; }
-.board-tags { display: flex; flex-wrap: wrap; gap: 6px; }
-.concl-tag.clickable { cursor: pointer; }
-.board-hint { margin: 8px 0 0; font-size: 12px; color: #e6a23c; }
-.methodology-hint { margin-top: 12px; font-size: 12px; color: #606266; }
-.methodology-hint summary { cursor: pointer; font-weight: 500; color: #303133; }
-.methodology-hint ul { padding-left: 20px; margin: 8px 0 0; line-height: 1.8; }
 
-/* ─── 底稿架构 ─── */
-.n2-arch { margin-top: 16px; }
-.arch-header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
-.arch-title { margin: 0; font-size: 16px; font-weight: 600; color: #303133; }
-.arch-hint { font-size: 12px; color: #909399; }
-
-/* ─── 本循环底稿目录 ─── */
-.n2-cycle { margin-top: 28px; }
-.cycle-header { display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px; }
-.cycle-title { margin: 0; font-size: 16px; font-weight: 600; color: #303133; }
-.cycle-hint { font-size: 12px; color: #909399; }
-.cycle-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
-.cycle-card {
+.progress-info {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 10px 12px;
-  border: 1px solid var(--gt-color-border-purple, #e8e4f0);
-  border-radius: 8px;
-  background: #fff;
-  cursor: pointer;
-  transition: all 0.2s;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: var(--wp-font-size, 13px);
+  color: #606266;
 }
-.cycle-card:hover { border-color: var(--gt-color-primary, #4b2d77); box-shadow: 0 2px 8px rgba(75, 45, 119, 0.12); transform: translateY(-2px); }
-.cycle-card.is-current { border-color: var(--gt-color-primary, #4b2d77); background: var(--gt-color-primary-bg, #f4f0fa); box-shadow: 0 0 0 1px var(--gt-color-primary, #4b2d77); cursor: default; }
-.cycle-card.is-disabled { opacity: 0.5; cursor: not-allowed; }
-.cycle-card.is-disabled:hover { border-color: var(--gt-color-border-purple, #e8e4f0); box-shadow: none; transform: none; }
-.cycle-card-top { display: flex; align-items: center; gap: 6px; }
-.cycle-code { font-size: var(--wp-font-size, 13px); font-weight: 700; color: var(--gt-color-primary, #4b2d77); }
-.cycle-current-tag { margin-left: auto; }
-.cycle-name { font-size: var(--wp-font-size, 13px); line-height: 1.4; color: #303133; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+.progress-text {
+  font-weight: 600;
+  color: #303133;
+}
+
+/* ─── 多税种统计仪表板 ─── */
+.n2-tax-dashboard {
+  margin-bottom: 16px;
+  padding: 14px 16px;
+  background: #fafbfc;
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+}
+
+.dashboard-title {
+  font-size: var(--wp-font-size, 13px);
+  font-weight: 500;
+  color: #303133;
+  margin-bottom: 10px;
+}
+
+.dashboard-cards {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+}
+
+.tax-card {
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid #e4e7ed;
+  background: #fff;
+  text-align: center;
+  transition: box-shadow 0.2s;
+}
+
+.tax-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.tax-card--done {
+  border-color: #a5d6a7;
+  background: #e8f5e9;
+}
+
+.tax-card--warn {
+  border-color: #ffcc80;
+  background: #fff3e0;
+}
+
+.tax-card--pending {
+  border-color: #e4e7ed;
+  background: #fafafa;
+}
+
+.tax-card-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: #303133;
+  margin-bottom: 6px;
+}
+
+.tax-card-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.status-icon {
+  font-size: var(--wp-font-size, 13px);
+  font-weight: 600;
+}
+
+.status-done {
+  color: #43a047;
+}
+
+.status-warn {
+  color: #e65100;
+}
+
+.status-pending {
+  color: #bdbdbd;
+}
+
+.status-label {
+  font-size: 11px;
+  color: #909399;
+}
+
+/* ─── 目录卡片 ─── */
+.n2-index-card {
+  margin-bottom: 16px;
+}
+
+.card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.sheet-name-link {
+  color: #1a73e8;
+  cursor: pointer;
+  font-size: var(--wp-font-size, 13px);
+}
+
+.sheet-name-link:hover {
+  text-decoration: underline;
+}
+
+.sheet-name-skip {
+  color: #c0c4cc;
+  font-size: var(--wp-font-size, 13px);
+  text-decoration: line-through;
+}
+
+.no-index {
+  color: #c0c4cc;
+}
+
+.core-tag {
+  margin-left: 8px;
+  font-size: 11px;
+  vertical-align: middle;
+}
+
+.skip-tag {
+  margin-left: 8px;
+  font-size: 11px;
+  vertical-align: middle;
+}
+
+.progress-label {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 12px;
+  color: #909399;
+  width: 32px;
+}
+
+.skip-label {
+  font-size: 12px;
+  color: #c0c4cc;
+  font-style: italic;
+}
+
+/* ─── 联动状态 badge ─── */
+.linkage-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  font-size: var(--wp-font-size, 13px);
+  font-weight: 600;
+}
+
+.linkage-ok {
+  background: #e8f5e9;
+  color: #43a047;
+  border: 1px solid #a5d6a7;
+}
+
+.linkage-warn {
+  background: #fff3e0;
+  color: #e65100;
+  border: 1px solid #ffcc80;
+}
+
+.linkage-na {
+  background: #f5f5f5;
+  color: #bdbdbd;
+  border: 1px solid #e0e0e0;
+}
+
+:deep(.skip-row) {
+  background-color: #f9f9f9 !important;
+  opacity: 0.6;
+}
+
+:deep(.skip-row:hover) {
+  cursor: not-allowed !important;
+}
+
+:deep(.completed-row) {
+  background-color: #f0f9eb !important;
+}
+
+:deep(.el-table) {
+  font-size: var(--wp-font-size, 13px);
+}
+
+:deep(.el-table .el-table__row) {
+  cursor: pointer;
+}
+
+:deep(.el-table .el-table__row:hover) {
+  background-color: #ecf5ff !important;
+}
+
+/* ─── 编制提示折叠 ─── */
+.n2-details-tip {
+  margin-top: 12px;
+  padding: 12px 16px;
+  background: #fafafa;
+  border: 1px solid #ebeef5;
+  border-radius: 6px;
+  font-size: var(--wp-font-size, 13px);
+  color: #606266;
+}
+
+.n2-details-tip summary {
+  cursor: pointer;
+  font-weight: 500;
+  color: #303133;
+  margin-bottom: 8px;
+}
+
+.n2-details-tip ul {
+  padding-left: 20px;
+  margin: 8px 0 0;
+  line-height: 1.8;
+}
 </style>
