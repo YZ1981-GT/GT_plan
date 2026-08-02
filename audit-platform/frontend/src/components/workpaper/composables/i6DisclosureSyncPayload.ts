@@ -25,11 +25,11 @@ export interface I6SyncFromWorkpaperPayload {
   columns?: Record<string, ColumnDef[]>
 }
 
-// 研发费用按性质表列头（项目/本期发生额/上期发生额），上市国企同构
+// 研发费用按性质表列头（项目/本期发生额/上期发生额），上市国企同构，flat 单行表头
 const I6_EXPENSE_COLUMNS: ColumnDef[] = [
-  { key: 'label', label: '项目', is_label: true },
-  { key: '本期发生额', label: '本期发生额', format: 'amount' },
-  { key: '上期发生额', label: '上期发生额', format: 'amount' },
+  { key: 'label', label: '项目', is_label: true, flat: true },
+  { key: '本期发生额', label: '本期发生额', format: 'amount', flat: true },
+  { key: '上期发生额', label: '上期发生额', format: 'amount', flat: true },
 ]
 
 export interface I6DisclosureSyncSnapshot {
@@ -71,17 +71,17 @@ export function buildI6ExpenseSubTable(rows: I6DisclosureRow[]): Record<string, 
 }
 
 function buildNoteTexts(snap: I6DisclosureSyncSnapshot, variant: I6DisclosureVariant): Record<string, unknown>[] {
-  const notes: Array<{ section: string; text: string }> = []
-  const push = (section: string, text?: string) => {
+  const notes: Array<{ section: string; title: string; text: string }> = []
+  const push = (section: string, title: string, text?: string) => {
     const t = (text || '').trim()
-    if (t) notes.push({ section, text: t })
+    if (t) notes.push({ section, title, text: t })
   }
 
   if (variant === 'listed') {
-    push('listed-capitalization', snap.capitalizationNote)
-    push('listed-projects', snap.projectsNote)
+    push('listed-capitalization', '研发支出资本化情况说明', snap.capitalizationNote)
+    push('listed-projects', '重要研发项目说明', snap.projectsNote)
   } else {
-    push('soe-supplement', snap.supplementNote)
+    push('soe-supplement', '研发费用补充说明', snap.supplementNote)
   }
 
   return notes as unknown as Record<string, unknown>[]

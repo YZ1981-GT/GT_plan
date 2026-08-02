@@ -93,26 +93,26 @@
             </el-table-column>
             <el-table-column label="期初余额" width="100" align="right">
               <template #default="{ row }">
-                <el-input-number v-if="!isReadonly" :model-value="row.beginBalance" :controls="false" size="small" style="width:100%" @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'beginBalance', v)" />
+                <WpAmountInput v-if="!isReadonly" :model-value="row.beginBalance" size="small" :disabled="isReadonly" style="width:100%" @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'beginBalance', v)" />
                 <span v-else class="amount-cell">{{ fmtAmt(row.beginBalance) }}</span>
               </template>
             </el-table-column>
             <el-table-column label="本期增加" align="center">
               <el-table-column label="企业合并形成的" width="110" align="right">
                 <template #default="{ row }">
-                  <el-input-number v-if="!isReadonly" :model-value="row.incBusinessCombination ?? 0" :controls="false" size="small" style="width:100%" @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'incBusinessCombination', v)" />
+                  <WpAmountInput v-if="!isReadonly" :model-value="row.incBusinessCombination ?? 0" size="small" :disabled="isReadonly" style="width:100%" @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'incBusinessCombination', v)" />
                   <span v-else class="amount-cell">{{ fmtAmt(row.incBusinessCombination ?? 0) }}</span>
                 </template>
               </el-table-column>
               <el-table-column label="合营取得" width="100" align="right">
                 <template #default="{ row }">
-                  <el-input-number v-if="!isReadonly" :model-value="row.incJoint ?? 0" :controls="false" size="small" style="width:100%" @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'incJoint', v)" />
+                  <WpAmountInput v-if="!isReadonly" :model-value="row.incJoint ?? 0" size="small" :disabled="isReadonly" style="width:100%" @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'incJoint', v)" />
                   <span v-else class="amount-cell">{{ fmtAmt(row.incJoint ?? 0) }}</span>
                 </template>
               </el-table-column>
               <el-table-column label="其他" width="90" align="right">
                 <template #default="{ row }">
-                  <el-input-number v-if="!isReadonly" :model-value="row.incOther ?? 0" :controls="false" size="small" style="width:100%" @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'incOther', v)" />
+                  <WpAmountInput v-if="!isReadonly" :model-value="row.incOther ?? 0" size="small" :disabled="isReadonly" style="width:100%" @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'incOther', v)" />
                   <span v-else class="amount-cell">{{ fmtAmt(row.incOther ?? 0) }}</span>
                 </template>
               </el-table-column>
@@ -120,13 +120,13 @@
             <el-table-column label="本期减少" align="center">
               <el-table-column label="处置" width="90" align="right">
                 <template #default="{ row }">
-                  <el-input-number v-if="!isReadonly" :model-value="row.decDisposal ?? 0" :controls="false" size="small" style="width:100%" @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'decDisposal', v)" />
+                  <WpAmountInput v-if="!isReadonly" :model-value="row.decDisposal ?? 0" size="small" :disabled="isReadonly" style="width:100%" @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'decDisposal', v)" />
                   <span v-else class="amount-cell">{{ fmtAmt(row.decDisposal ?? 0) }}</span>
                 </template>
               </el-table-column>
               <el-table-column label="其他" width="90" align="right">
                 <template #default="{ row }">
-                  <el-input-number v-if="!isReadonly" :model-value="row.decOther ?? 0" :controls="false" size="small" style="width:100%" @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'decOther', v)" />
+                  <WpAmountInput v-if="!isReadonly" :model-value="row.decOther ?? 0" size="small" :disabled="isReadonly" style="width:100%" @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'decOther', v)" />
                   <span v-else class="amount-cell">{{ fmtAmt(row.decOther ?? 0) }}</span>
                 </template>
               </el-table-column>
@@ -160,20 +160,20 @@
             </el-table-column>
             <el-table-column label="期初余额" width="100" align="right">
               <template #default="{ row }">
-                <el-input-number v-if="!isReadonly" :model-value="row.beginBalance" :controls="false" size="small" style="width:100%" @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'beginBalance', v)" />
+                <WpAmountInput v-if="!isReadonly" :model-value="row.beginBalance" size="small" :disabled="isReadonly" style="width:100%" @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'beginBalance', v)" />
                 <span v-else class="amount-cell">{{ fmtAmt(row.beginBalance) }}</span>
               </template>
             </el-table-column>
             <el-table-column label="本期增加" align="center">
               <el-table-column label="计提" width="100" align="right">
                 <template #default="{ row }">
-                  <el-input-number v-if="!isReadonly" :model-value="row.increase" :controls="false" size="small" style="width:100%" @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'increase', v)" />
+                  <WpAmountInput v-if="!isReadonly" :model-value="row.increase" size="small" :disabled="isReadonly" style="width:100%" @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'increase', v)" />
                   <span v-else class="amount-cell">{{ fmtAmt(row.increase) }}</span>
                 </template>
               </el-table-column>
               <el-table-column label="其他" width="90" align="right">
                 <template #default="{ row }">
-                  <el-input-number v-if="!isReadonly" :model-value="row.impIncOther ?? 0" :controls="false" size="small" style="width:100%" @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'impIncOther', v)" />
+                  <WpAmountInput v-if="!isReadonly" :model-value="row.impIncOther ?? 0" size="small" :disabled="isReadonly" style="width:100%" @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'impIncOther', v)" />
                   <span v-else class="amount-cell">{{ fmtAmt(row.impIncOther ?? 0) }}</span>
                 </template>
               </el-table-column>
@@ -181,13 +181,13 @@
             <el-table-column label="本期减少" align="center">
               <el-table-column label="处置" width="90" align="right">
                 <template #default="{ row }">
-                  <el-input-number v-if="!isReadonly" :model-value="row.impDecDisposal ?? 0" :controls="false" size="small" style="width:100%" @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'impDecDisposal', v)" />
+                  <WpAmountInput v-if="!isReadonly" :model-value="row.impDecDisposal ?? 0" size="small" :disabled="isReadonly" style="width:100%" @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'impDecDisposal', v)" />
                   <span v-else class="amount-cell">{{ fmtAmt(row.impDecDisposal ?? 0) }}</span>
                 </template>
               </el-table-column>
               <el-table-column label="其他" width="90" align="right">
                 <template #default="{ row }">
-                  <el-input-number v-if="!isReadonly" :model-value="row.impDecOther ?? 0" :controls="false" size="small" style="width:100%" @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'impDecOther', v)" />
+                  <WpAmountInput v-if="!isReadonly" :model-value="row.impDecOther ?? 0" size="small" :disabled="isReadonly" style="width:100%" @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'impDecOther', v)" />
                   <span v-else class="amount-cell">{{ fmtAmt(row.impDecOther ?? 0) }}</span>
                 </template>
               </el-table-column>
@@ -250,7 +250,7 @@
             </el-table-column>
             <el-table-column prop="amount" label="分摊商誉账面" width="130" align="right">
               <template #default="{ row }">
-                <el-input-number v-if="!isReadonly" v-model="row.amount" :controls="false" size="small" @change="(v: number) => handleDynamicChange(section.key, row.rowId, 'amount', v)" />
+                <WpAmountInput v-if="!isReadonly" v-model="row.amount" size="small" :disabled="isReadonly" @change="(v: number) => handleDynamicChange(section.key, row.rowId, 'amount', v)" />
                 <span v-else class="amount-cell">{{ fmtAmt(row.amount) }}</span>
               </template>
             </el-table-column>
@@ -431,13 +431,13 @@
         </el-table-column>
         <el-table-column label="商誉减值金额" width="140" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               v-model="row.impairmentAmount"
-              :controls="false"
               size="small"
+              :disabled="isReadonly"
               style="width:100%"
-              @change="(v: number) => updatePerformanceRow(row.rowId, 'impairmentAmount', v ?? 0)"
+              @change="(v: number) => updatePerformanceRow(row.rowId, 'impairmentAmount', v)"
             />
             <span v-else class="amount-cell">{{ fmtAmt(row.impairmentAmount) }}</span>
           </template>
@@ -488,7 +488,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, inject, toRef, onMounted, onUnmounted, onBeforeUnmount } from 'vue'
+import { ref, computed, inject, toRef, watch, onMounted, onUnmounted, onBeforeUnmount } from 'vue'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
@@ -503,6 +503,7 @@ import {
 } from '../../composables/useI3Disclosure'
 import { resolveI3NoteSectionTarget } from '../../composables/i3NoteSectionMap'
 import { buildI3ListedSyncPayloads } from '../../composables/i3DisclosureSyncPayload'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 const props = defineProps<{
   wpId: string
@@ -520,6 +521,7 @@ const emit = defineEmits<{
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+const displayPrefs = useDisplayPrefsStore()
 const router = useRouter()
 // 跳转回附注模块（披露表 → 附注为单向推送；此处仅导航，方便相互编辑确认）
 function jumpToNote(target: DisclosureVariant): void {
@@ -727,7 +729,7 @@ function getPlaceholder(key: string): string {
 }
 
 function fmtAmt(v: number): string {
-  return (Number(v) || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return displayPrefs.fmtAmount(Number(v) || 0)
 }
 
 function handleReview(id: string) {
@@ -763,13 +765,25 @@ async function syncToNotes() {
       sheet: '附注披露（上市公司）',
     })
     ElMessage.success(`已同步至附注 ${noteTarget.sectionId}（${rows} 行）`)
-    autoSync.scheduleAutoSync(syncToNotes)
   } catch (e: any) {
     ElMessage.error(e?.message || '同步失败')
   } finally {
     isSyncing.value = false
   }
 }
+
+watch(
+  [
+    () => bookValueRows.value,
+    () => impairmentRows.value,
+    () => sectionRows.value,
+    () => sectionNotes.value,
+    () => performanceRows.value,
+    () => assumptionParamRows.value,
+  ],
+  () => autoSync.scheduleAutoSync(syncToNotes),
+  { deep: true },
+)
 
 onBeforeUnmount(() => autoSync.cancelPending())
 </script>

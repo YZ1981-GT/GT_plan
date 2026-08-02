@@ -18,14 +18,30 @@ export const I1_DISCLOSURE_SHEET_NAME = {
   soe: '附注披露信息（国有企业）',
 } as const satisfies Record<I1DisclosureVariant, string>
 
-/** 与 note_template tables[].name 一致 */
+/** 与 note_template tables[].name 一致（正名后，对齐 fix_note_i_cycle_structure.py） */
 export const I1_LISTED_SUBTABLE = {
   movement: '无形资产情况',
+  important: '重要单项无形资产',
+  dataResource: '确认为无形资产的数据资源',
+  titleCert: '未办妥产权证书的土地使用权情况',
 } as const
 
 export const I1_SOE_SUBTABLE = {
   movement: '无形资产情况',
+  dataResource: '确认为无形资产的数据资源',
 } as const
+
+/**
+ * 旧表名清单（正名前），用于 `_removed_table_keys` 清理孤儿。
+ * - 表2 原是 90 字符段落文本泄漏名
+ * - 表4 原是表头首格「项  目」
+ */
+export const I1_LEGACY_OBSOLETE_TABLES = [
+  '⑥（按照《知识产权相关会计信息披露规定》（财会〔2018〕30号），应当单独披露对企业财务报表具有重要影响的单项无形资产的内容、账面价值和剩余摊销期限。）',
+  '项  目',
+  '⑥重要单项无形资产',
+  '未办妥权属证书的土地使用权',
+] as const
 
 export function isListedStandard(s: string): boolean {
   const x = String(s).toLowerCase()

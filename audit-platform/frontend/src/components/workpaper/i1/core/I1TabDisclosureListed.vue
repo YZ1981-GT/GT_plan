@@ -94,13 +94,12 @@
             </template>
             <template #default="{ row }">
               <template v-if="row.kind === 'section'">—</template>
-              <el-input-number
+              <WpAmountInput
                 v-else-if="row.editable && !isReadonly"
                 :model-value="rawCell(movement, row.key, cat.key)"
-                :controls="false"
                 size="small"
                 style="width:100%"
-                @update:model-value="(v: number | undefined) => updateMovement(row.key, cat.key, v ?? 0)"
+                @change="(v: number) => updateMovement(row.key, cat.key, v)"
               />
               <span v-else class="formula-cell">{{ fmt(cellOf(row, cat.key)) }}</span>
             </template>
@@ -162,13 +161,12 @@
         <el-table-column prop="label" label="项目" min-width="160" />
         <el-table-column label="金额" min-width="140" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.field && !isReadonly"
               :model-value="(dataResource as any)[row.field]"
-              :controls="false"
               size="small"
               style="width:100%"
-              @update:model-value="(v: number | undefined) => updateDataResource(row.field, v ?? 0)"
+              @change="(v: number) => updateDataResource(row.field, v)"
             />
             <span v-else class="formula-cell">{{ fmt(row.value) }}</span>
           </template>
@@ -198,7 +196,7 @@
         </el-table-column>
         <el-table-column label="账面价值" width="140" align="right">
           <template #default="{ row }">
-            <el-input-number v-model="row.bookValue" :controls="false" size="small" :disabled="isReadonly" style="width:100%" @change="persist" />
+            <WpAmountInput v-model="row.bookValue" size="small" :disabled="isReadonly" style="width:100%" @change="persist" />
           </template>
         </el-table-column>
         <el-table-column label="剩余摊销期限(月)" width="140" align="right">
@@ -228,7 +226,7 @@
         </el-table-column>
         <el-table-column label="账面价值" width="140" align="right">
           <template #default="{ row }">
-            <el-input-number v-model="row.bookValue" :controls="false" size="small" :disabled="isReadonly" style="width:100%" @change="persist" />
+            <WpAmountInput v-model="row.bookValue" size="small" :disabled="isReadonly" style="width:100%" @change="persist" />
           </template>
         </el-table-column>
         <el-table-column label="原因" min-width="180">
@@ -465,13 +463,33 @@ async function syncToNotes() {
       sheet: '附注披露信息（上市公司）',
     })
     ElMessage.success(`已同步至附注 ${noteSectionId}（${rows} 行）`)
-    autoSync.scheduleAutoSync(syncToNotes)
   } catch (e: any) {
     ElMessage.error(e?.message || '同步失败')
   } finally {
     isSyncing.value = false
   }
 }
+
+watch(
+  [
+    () => categories.value,
+    () => movement.value,
+    () => noteRdRatio.value,
+    () => noteIndefinite.value,
+    () => noteMortgage.value,
+    () => noteImpairment.value,
+    () => noteSale.value,
+    () => noteImportant.value,
+    () => titleCertRows.value,
+    () => importantRows.value,
+    () => dataResource.value,
+    () => noteDataResource.value,
+    () => auditNote.value,
+    () => auditConclusion.value,
+  ],
+  () => autoSync.scheduleAutoSync(syncToNotes),
+  { deep: true },
+)
 
 onBeforeUnmount(() => autoSync.cancelPending())
 </script>

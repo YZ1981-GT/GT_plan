@@ -27,6 +27,9 @@ export const I5_SOE_SUBTABLE = {
   main: '其他非流动资产',
 } as const
 
+/** I5 无旧名需清理（表名未变更） */
+export const I5_LEGACY_OBSOLETE_TABLES: readonly string[] = []
+
 /** 源表默认分类（注：不存在的项目请删除） */
 export const I5_DEFAULT_DISCLOSURE_CATEGORIES = [
   '预付土地出让金',

@@ -16,19 +16,31 @@ export const I2_DISCLOSURE_SHEET_NAME = {
   soe: '附注披露（国有企业）',
 } as const satisfies Record<I2DisclosureVariant, string>
 
-/** 与 note_template tables[].name 一致 */
+/** 与 note_template tables[].name 一致（正名后，对齐 fix_note_i_cycle_structure.py） */
 export const I2_LISTED_SUBTABLE = {
-  /** 研发投入按性质（费用化/资本化） */
-  nature: '研发投入按性质',
-  /** 开发支出项目滚动 */
+  /** 研发支出（按费用性质披露 — 费用化/资本化） */
+  nature: '研发支出',
+  /** 开发支出（变动表） */
   movement: '开发支出',
+  /** 开发支出（续：资本化情况） */
+  capDetail: '开发支出（续：资本化情况）',
+  /** 重要的资本化研发项目 */
   important: '重要的资本化研发项目',
+  /** 开发支出减值准备 */
   impairment: '开发支出减值准备',
 } as const
 
 export const I2_SOE_SUBTABLE = {
   movement: '开发支出',
 } as const
+
+/**
+ * 旧表名清单（用于 `_removed_table_keys` 清理孤儿）。
+ * - 表1 原名「研发投入按性质」→ 正名为「研发支出」
+ */
+export const I2_LEGACY_OBSOLETE_TABLES = [
+  '研发投入按性质',
+] as const
 
 function isListedStandard(s: string): boolean {
   const x = String(s).toLowerCase()

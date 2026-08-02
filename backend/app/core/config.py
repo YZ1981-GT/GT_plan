@@ -364,7 +364,7 @@ class Settings(BaseSettings):
     # 复用 d_cycle_extraction 模块（presets/anchor_registry/tier_a_seed/prefill）。
     # 默认 False = 零回归：render 不输出 adjudication_segment_prefill 等取数字段，
     # 既有功能逐字节不变。各底稿取数环节异常一律 fail-open 不阻断 render。
-    HI_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED: bool = False
+    HI_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED: bool = True
 
     # --- lmn-four-table-extraction ---
     # L/M/N 循环审定表四表库取数灰度开关：L1-L8 + M1/M2 从 tb_balance 取期初/期末余额

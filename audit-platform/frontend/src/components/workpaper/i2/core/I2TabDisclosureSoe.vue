@@ -58,20 +58,20 @@
         </el-table-column>
         <el-table-column label="期初余额" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.beginBalance" size="small" :controls="false" :precision="2" style="width:100%" @change="onMovementChange(row)" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.beginBalance" :disabled="isReadonly" @change="onMovementChange(row)" />
             <span v-else>{{ fmtNum(row.beginBalance) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="本期增加" align="center">
           <el-table-column label="内部开发支出" width="120" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" v-model="row.increaseInternal" size="small" :controls="false" :precision="2" style="width:100%" @change="onMovementChange(row)" />
+              <WpAmountInput v-if="!isReadonly" v-model="row.increaseInternal" :disabled="isReadonly" @change="onMovementChange(row)" />
               <span v-else>{{ fmtNum(row.increaseInternal) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="其他" width="100" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" v-model="row.increaseOther" size="small" :controls="false" :precision="2" style="width:100%" @change="onMovementChange(row)" />
+              <WpAmountInput v-if="!isReadonly" v-model="row.increaseOther" :disabled="isReadonly" @change="onMovementChange(row)" />
               <span v-else>{{ fmtNum(row.increaseOther) }}</span>
             </template>
           </el-table-column>
@@ -79,19 +79,19 @@
         <el-table-column label="本期减少" align="center">
           <el-table-column label="确认为无形资产" width="120" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" v-model="row.decreaseToIntangible" size="small" :controls="false" :precision="2" style="width:100%" @change="onMovementChange(row)" />
+              <WpAmountInput v-if="!isReadonly" v-model="row.decreaseToIntangible" :disabled="isReadonly" @change="onMovementChange(row)" />
               <span v-else>{{ fmtNum(row.decreaseToIntangible) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="转入当期损益" width="120" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" v-model="row.decreaseToExpense" size="small" :controls="false" :precision="2" style="width:100%" @change="onMovementChange(row)" />
+              <WpAmountInput v-if="!isReadonly" v-model="row.decreaseToExpense" :disabled="isReadonly" @change="onMovementChange(row)" />
               <span v-else>{{ fmtNum(row.decreaseToExpense) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="其他" width="100" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" v-model="row.decreaseOther" size="small" :controls="false" :precision="2" style="width:100%" @change="onMovementChange(row)" />
+              <WpAmountInput v-if="!isReadonly" v-model="row.decreaseOther" :disabled="isReadonly" @change="onMovementChange(row)" />
               <span v-else>{{ fmtNum(row.decreaseOther) }}</span>
             </template>
           </el-table-column>
@@ -143,7 +143,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, toRef, inject, onBeforeUnmount } from 'vue'
+import { ref, toRef, inject, watch, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
@@ -236,13 +236,23 @@ async function syncToNotes() {
       variant: 'soe',
     })
     ElMessage.success(`已同步至附注 ${noteTarget.value?.sectionId || '八、28'}（${rows} 行）`)
-    autoSync.scheduleAutoSync(syncToNotes)
   } catch (e: any) {
     ElMessage.error(e?.message || '同步失败')
   } finally {
     isSyncing.value = false
   }
 }
+
+watch(
+  [
+    () => disc.movementRows,
+    () => disc.noteText,
+    () => disc.auditNote,
+    () => disc.auditConclusion,
+  ],
+  () => autoSync.scheduleAutoSync(syncToNotes),
+  { deep: true },
+)
 
 function handleReview() { openReviewDialog('I2-附注披露-国企') }
 

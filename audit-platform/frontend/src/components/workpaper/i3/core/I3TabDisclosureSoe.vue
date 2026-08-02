@@ -84,11 +84,11 @@
             </el-table-column>
             <el-table-column label="期初余额" width="120" align="right">
               <template #default="{ row }">
-                <el-input-number
+                <WpAmountInput
                   v-if="!isReadonly && isEditableMatrix(section.key)"
                   :model-value="row.beginBalance"
-                  :controls="false"
                   size="small"
+                  :disabled="isReadonly"
                   style="width:100%"
                   @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'beginBalance', v)"
                 />
@@ -97,11 +97,11 @@
             </el-table-column>
             <el-table-column label="本期增加" width="120" align="right">
               <template #default="{ row }">
-                <el-input-number
+                <WpAmountInput
                   v-if="!isReadonly && isEditableMatrix(section.key)"
                   :model-value="row.increase"
-                  :controls="false"
                   size="small"
+                  :disabled="isReadonly"
                   style="width:100%"
                   @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'increase', v)"
                 />
@@ -110,11 +110,11 @@
             </el-table-column>
             <el-table-column label="本期减少" width="120" align="right">
               <template #default="{ row }">
-                <el-input-number
+                <WpAmountInput
                   v-if="!isReadonly && isEditableMatrix(section.key)"
                   :model-value="row.decrease"
-                  :controls="false"
                   size="small"
+                  :disabled="isReadonly"
                   style="width:100%"
                   @change="(v: number) => handleMatrixEdit(section.key, row.rowId, 'decrease', v)"
                 />
@@ -160,7 +160,7 @@
             </el-table-column>
             <el-table-column prop="amount" label="分摊商誉额" width="120" align="right">
               <template #default="{ row }">
-                <el-input-number v-if="!isReadonly" v-model="row.amount" :controls="false" size="small" @change="(v: number) => handleDynamicChange(section.key, row.rowId, 'amount', v)" />
+                <WpAmountInput v-if="!isReadonly" v-model="row.amount" size="small" :disabled="isReadonly" @change="(v: number) => handleDynamicChange(section.key, row.rowId, 'amount', v)" />
                 <span v-else class="amount-cell">{{ fmtAmt(row.amount) }}</span>
               </template>
             </el-table-column>
@@ -211,7 +211,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, inject, toRef, onMounted, onUnmounted, onBeforeUnmount } from 'vue'
+import { ref, computed, inject, toRef, watch, onMounted, onUnmounted, onBeforeUnmount } from 'vue'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
@@ -226,6 +226,7 @@ import {
 } from '../../composables/useI3Disclosure'
 import { resolveI3NoteSectionTarget } from '../../composables/i3NoteSectionMap'
 import { buildI3SoeSyncPayloads } from '../../composables/i3DisclosureSyncPayload'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 const props = defineProps<{
   wpId: string
@@ -243,6 +244,7 @@ const emit = defineEmits<{
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+const displayPrefs = useDisplayPrefsStore()
 const router = useRouter()
 // 跳转回附注模块（披露表 → 附注为单向推送；此处仅导航，方便相互编辑确认）
 function jumpToNote(target: DisclosureVariant): void {
@@ -407,7 +409,7 @@ function getPlaceholder(key: string): string {
 }
 
 function fmtAmt(v: number): string {
-  return (Number(v) || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return displayPrefs.fmtAmount(Number(v) || 0)
 }
 
 function handleReview(id: string) {
@@ -443,13 +445,23 @@ async function syncToNotes() {
       sheet: '附注披露（国有企业）',
     })
     ElMessage.success(`已同步至附注 ${noteTarget.sectionId}（${rows} 行）`)
-    autoSync.scheduleAutoSync(syncToNotes)
   } catch (e: any) {
     ElMessage.error(e?.message || '同步失败')
   } finally {
     isSyncing.value = false
   }
 }
+
+watch(
+  [
+    () => bookValueRows.value,
+    () => impairmentRows.value,
+    () => sectionRows.value,
+    () => sectionNotes.value,
+  ],
+  () => autoSync.scheduleAutoSync(syncToNotes),
+  { deep: true },
+)
 
 onBeforeUnmount(() => autoSync.cancelPending())
 </script>

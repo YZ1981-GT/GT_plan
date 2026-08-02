@@ -85,7 +85,8 @@ describe('i4DisclosureSyncPayload', () => {
     })
     const mov = data['长期待摊费用']
     expect(mov).toHaveLength(2)
-    expect(mov[0].本期减少).toBe(20)
+    expect(mov[0].本期摊销).toBe(15)
+    expect(mov[0].其他减少).toBe(5)
     expect(mov[1].label).toBe('合计')
     expect(mov[1].is_total).toBe(true)
   })

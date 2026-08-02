@@ -139,19 +139,19 @@
         </el-table-column>
         <el-table-column label="上期未审(B)" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="row.isEditable && !isReadonly" :model-value="row.上期未审" size="small" :controls="false" @change="(v: number) => onCellChange(row, '上期未审', v)" />
+            <WpAmountInput v-if="row.isEditable && !isReadonly" :model-value="row.上期未审" :disabled="isReadonly" @change="(v: number) => onCellChange(row, '上期未审', v)" />
             <span v-else>{{ fmtAmount(row.上期未审) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="上期AJE(C)" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="row.isEditable && !isReadonly" :model-value="row.上期AJE" size="small" :controls="false" @change="(v: number) => onCellChange(row, '上期AJE', v)" />
+            <WpAmountInput v-if="row.isEditable && !isReadonly" :model-value="row.上期AJE" :disabled="isReadonly" @change="(v: number) => onCellChange(row, '上期AJE', v)" />
             <span v-else>{{ fmtAmount(row.上期AJE) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="上期RJE(D)" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="row.isEditable && !isReadonly" :model-value="row.上期RJE" size="small" :controls="false" @change="(v: number) => onCellChange(row, '上期RJE', v)" />
+            <WpAmountInput v-if="row.isEditable && !isReadonly" :model-value="row.上期RJE" :disabled="isReadonly" @change="(v: number) => onCellChange(row, '上期RJE', v)" />
             <span v-else>{{ fmtAmount(row.上期RJE) }}</span>
           </template>
         </el-table-column>
@@ -162,19 +162,19 @@
         </el-table-column>
         <el-table-column label="本期未审(F)" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="row.isEditable && !isReadonly" :model-value="row.本期未审" size="small" :controls="false" @change="(v: number) => onCellChange(row, '本期未审', v)" />
+            <WpAmountInput v-if="row.isEditable && !isReadonly" :model-value="row.本期未审" :disabled="isReadonly" @change="(v: number) => onCellChange(row, '本期未审', v)" />
             <span v-else>{{ fmtAmount(row.本期未审) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="本期AJE(G)" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="row.isEditable && !isReadonly" :model-value="row.本期AJE" size="small" :controls="false" @change="(v: number) => onCellChange(row, '本期AJE', v)" />
+            <WpAmountInput v-if="row.isEditable && !isReadonly" :model-value="row.本期AJE" :disabled="isReadonly" @change="(v: number) => onCellChange(row, '本期AJE', v)" />
             <span v-else>{{ fmtAmount(row.本期AJE) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="本期RJE(H)" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="row.isEditable && !isReadonly" :model-value="row.本期RJE" size="small" :controls="false" @change="(v: number) => onCellChange(row, '本期RJE', v)" />
+            <WpAmountInput v-if="row.isEditable && !isReadonly" :model-value="row.本期RJE" :disabled="isReadonly" @change="(v: number) => onCellChange(row, '本期RJE', v)" />
             <span v-else>{{ fmtAmount(row.本期RJE) }}</span>
           </template>
         </el-table-column>

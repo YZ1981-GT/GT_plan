@@ -37,11 +37,11 @@
       <el-tag size="small" type="info">目标章节 {{ disc.noteTarget.value.chipValue }}</el-tag>
       <span v-if="disc.reconcileDiff.value != null" class="reconcile">
         与明细期末差
-        <b :class="{ 'text-danger': Math.abs(disc.reconcileDiff.value) > 0.01 }">{{ fmtAmt(disc.reconcileDiff.value) }}</b>
+        <b :class="{ 'text-danger': Math.abs(disc.reconcileDiff.value) > 0.01 }">{{ displayPrefs.fmtAmount(disc.reconcileDiff.value) }}</b>
       </span>
       <span v-if="disc.reconcileVsAdj.value != null" class="reconcile">
         与审定合计差
-        <b :class="{ 'text-danger': Math.abs(disc.reconcileVsAdj.value) > 0.01 }">{{ fmtAmt(disc.reconcileVsAdj.value) }}</b>
+        <b :class="{ 'text-danger': Math.abs(disc.reconcileVsAdj.value) > 0.01 }">{{ displayPrefs.fmtAmount(disc.reconcileVsAdj.value) }}</b>
       </span>
     </div>
 
@@ -71,66 +71,62 @@
         <el-table-column label="期末数">
           <el-table-column label="账面余额" width="120" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!isReadonly"
-                :model-value="row.endGross"
-                :controls="false"
+                v-model="row.endGross"
                 size="small"
-                :precision="2"
+                :disabled="isReadonly"
                 @change="(v: number) => disc.updateCell(row.rowId, 'endGross', v ?? 0)"
               />
-              <span v-else class="amt">{{ fmtAmt(row.endGross) }}</span>
+              <span v-else class="amt">{{ displayPrefs.fmtAmount(row.endGross) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="减值准备" width="110" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!isReadonly"
-                :model-value="row.endImpairment"
-                :controls="false"
+                v-model="row.endImpairment"
                 size="small"
-                :precision="2"
+                :disabled="isReadonly"
                 @change="(v: number) => disc.updateCell(row.rowId, 'endImpairment', v ?? 0)"
               />
-              <span v-else class="amt">{{ fmtAmt(row.endImpairment) }}</span>
+              <span v-else class="amt">{{ displayPrefs.fmtAmount(row.endImpairment) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="账面价值" width="120" align="right">
             <template #default="{ row }">
-              <span class="formula-cell" title="= 账面余额 − 减值准备">{{ fmtAmt(row.endBookValue) }}</span>
+              <span class="formula-cell" title="= 账面余额 − 减值准备">{{ displayPrefs.fmtAmount(row.endBookValue) }}</span>
             </template>
           </el-table-column>
         </el-table-column>
         <el-table-column label="上年年末数">
           <el-table-column label="账面余额" width="120" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!isReadonly"
-                :model-value="row.priorGross"
-                :controls="false"
+                v-model="row.priorGross"
                 size="small"
-                :precision="2"
+                :disabled="isReadonly"
                 @change="(v: number) => disc.updateCell(row.rowId, 'priorGross', v ?? 0)"
               />
-              <span v-else class="amt">{{ fmtAmt(row.priorGross) }}</span>
+              <span v-else class="amt">{{ displayPrefs.fmtAmount(row.priorGross) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="减值准备" width="110" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!isReadonly"
-                :model-value="row.priorImpairment"
-                :controls="false"
+                v-model="row.priorImpairment"
                 size="small"
-                :precision="2"
+                :disabled="isReadonly"
                 @change="(v: number) => disc.updateCell(row.rowId, 'priorImpairment', v ?? 0)"
               />
-              <span v-else class="amt">{{ fmtAmt(row.priorImpairment) }}</span>
+              <span v-else class="amt">{{ displayPrefs.fmtAmount(row.priorImpairment) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="账面价值" width="120" align="right">
             <template #default="{ row }">
-              <span class="formula-cell" title="= 账面余额 − 减值准备">{{ fmtAmt(row.priorBookValue) }}</span>
+              <span class="formula-cell" title="= 账面余额 − 减值准备">{{ displayPrefs.fmtAmount(row.priorBookValue) }}</span>
             </template>
           </el-table-column>
         </el-table-column>
@@ -213,6 +209,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import { useI5Disclosure } from '../../composables/useI5Disclosure'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 const props = defineProps<{
   wpId: string
@@ -226,6 +223,8 @@ const emit = defineEmits<{
   'navigate-sheet': [sheetName: string]
   'save': [itemId: string, value: any]
 }>()
+
+const displayPrefs = useDisplayPrefsStore()
 
 const variant = ref<'listed'>('listed')
 const disc = useI5Disclosure(
@@ -281,8 +280,7 @@ function getSummary({ columns }: { columns: any[] }): string[] {
 }
 
 function fmtAmt(val: number | null | undefined): string {
-  if (val == null || Math.abs(val) < 1e-9) return '-'
-  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return displayPrefs.fmtAmount(val ?? 0)
 }
 
 const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })

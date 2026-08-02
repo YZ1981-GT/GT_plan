@@ -5,6 +5,7 @@
  */
 import {
   I1_DISCLOSURE_SHEET_NAME,
+  I1_LEGACY_OBSOLETE_TABLES,
   I1_LISTED_SUBTABLE,
   I1_NOTE_SECTION,
   I1_SOE_SUBTABLE,
@@ -52,32 +53,32 @@ export function buildI1ListedColumns(state: I1ListedSyncSnapshot): Record<string
   ]
   return {
     [I1_LISTED_SUBTABLE.movement]: movement,
-    '⑥重要单项无形资产': [
-      { key: 'label', label: '项目', is_label: true },
-      { key: '账面价值', label: '账面价值', format: 'amount' },
-      { key: '剩余摊销期限', label: '剩余摊销期限' },
+    [I1_LISTED_SUBTABLE.important]: [
+      { key: 'label', label: '项  目', is_label: true, flat: true },
+      { key: '账面价值', label: '账面价值', format: 'amount', flat: true },
+      { key: '剩余摊销期限', label: '剩余摊销期限', flat: true },
     ],
-    '未办妥权属证书的土地使用权': [
-      { key: 'label', label: '项目', is_label: true },
-      { key: '账面价值', label: '账面价值', format: 'amount' },
-      { key: '未办妥产权证书原因', label: '未办妥产权证书原因' },
+    [I1_LISTED_SUBTABLE.titleCert]: [
+      { key: 'label', label: '项  目', is_label: true, flat: true },
+      { key: '账面价值', label: '账面价值', format: 'amount', flat: true },
+      { key: '未办妥产权证书原因', label: '未办妥产权证书原因', flat: true },
     ],
-    '确认为无形资产的数据资源': [
-      { key: 'label', label: '项目', is_label: true },
-      { key: '外购的数据资源无形资产', label: '外购的数据资源无形资产', format: 'amount' },
-      { key: '自行开发的数据资源无形资产', label: '自行开发的数据资源无形资产', format: 'amount' },
-      { key: '其他方式取得的数据资源无形资产', label: '其他方式取得的数据资源无形资产', format: 'amount' },
-      { key: '合计', label: '合计', format: 'amount' },
+    [I1_LISTED_SUBTABLE.dataResource]: [
+      { key: 'label', label: '项目', is_label: true, flat: true },
+      { key: '外购的数据资源无形资产', label: '外购的数据资源无形资产', format: 'amount', flat: true },
+      { key: '自行开发的数据资源无形资产', label: '自行开发的数据资源无形资产', format: 'amount', flat: true },
+      { key: '其他方式取得的数据资源无形资产', label: '其他方式取得的数据资源无形资产', format: 'amount', flat: true },
+      { key: '合计', label: '合计', format: 'amount', flat: true },
     ],
     '本期摊销费用归属': [
-      { key: 'label', label: '项目', is_label: true },
-      { key: '生产成本', label: '生产成本', format: 'amount' },
-      { key: '制造费用', label: '制造费用', format: 'amount' },
-      { key: '销售费用', label: '销售费用', format: 'amount' },
-      { key: '管理费用', label: '管理费用', format: 'amount' },
-      { key: '研发费用', label: '研发费用', format: 'amount' },
-      { key: '其他', label: '其他', format: 'amount' },
-      { key: '合计', label: '合计', format: 'amount' },
+      { key: 'label', label: '项目', is_label: true, flat: true },
+      { key: '生产成本', label: '生产成本', format: 'amount', flat: true },
+      { key: '制造费用', label: '制造费用', format: 'amount', flat: true },
+      { key: '销售费用', label: '销售费用', format: 'amount', flat: true },
+      { key: '管理费用', label: '管理费用', format: 'amount', flat: true },
+      { key: '研发费用', label: '研发费用', format: 'amount', flat: true },
+      { key: '其他', label: '其他', format: 'amount', flat: true },
+      { key: '合计', label: '合计', format: 'amount', flat: true },
     ],
   }
 }
@@ -131,21 +132,21 @@ export function buildI1ListedSubTableData(state: I1ListedSyncSnapshot): Record<s
   const out: Record<string, Record<string, unknown>[]> = {
     [I1_LISTED_SUBTABLE.movement]: rows,
     _note_texts: [
-      { section: 'listed-rd-ratio', text: state.noteRdRatio || '' },
-      { section: 'listed-indefinite', text: state.noteIndefinite || '' },
-      { section: 'listed-mortgage', text: state.noteMortgage || '' },
-      { section: 'listed-impairment', text: state.noteImpairment || '' },
-      { section: 'listed-sale', text: state.noteSale || '' },
-      { section: 'listed-important', text: state.noteImportant || '' },
-      { section: 'listed-data-resource', text: state.noteDataResource || '' },
-      { section: 'listed-amort-alloc', text: state.amortAlloc ? formatAmortAllocNote(state.amortAlloc) : '' },
-    ] as unknown as Record<string, unknown>[],
+      { section: 'listed-rd-ratio', title: '研发投入比例说明', text: state.noteRdRatio || '' },
+      { section: 'listed-indefinite', title: '使用寿命不确定的无形资产说明', text: state.noteIndefinite || '' },
+      { section: 'listed-mortgage', title: '用于担保的无形资产', text: state.noteMortgage || '' },
+      { section: 'listed-impairment', title: '无形资产减值说明', text: state.noteImpairment || '' },
+      { section: 'listed-sale', title: '通过政府补助取得的土地使用权', text: state.noteSale || '' },
+      { section: 'listed-important', title: '重要单项无形资产说明', text: state.noteImportant || '' },
+      { section: 'listed-data-resource', title: '数据资源说明', text: state.noteDataResource || '' },
+      { section: 'listed-amort-alloc', title: '本期摊销费用归属', text: state.amortAlloc ? formatAmortAllocNote(state.amortAlloc) : '' },
+    ].filter((n) => (n.text || '').trim()) as unknown as Record<string, unknown>[],
   }
   if (importantRows.length) {
-    out['⑥重要单项无形资产'] = importantRows
+    out[I1_LISTED_SUBTABLE.important] = importantRows
   }
   if (titleRows.length) {
-    out['未办妥权属证书的土地使用权'] = titleRows
+    out[I1_LISTED_SUBTABLE.titleCert] = titleRows
   }
   if (state.dataResource) {
     const dr = { ...state.dataResource, note: state.noteDataResource || state.dataResource.note || '' }
@@ -154,7 +155,7 @@ export function buildI1ListedSubTableData(state: I1ListedSyncSnapshot): Record<s
       + Math.abs(Number(dr.costIncRd) || 0)
       + Math.abs(Number(dr.costIncOther) || 0) > 0.005
     if (hasDr) {
-      out['确认为无形资产的数据资源'] = buildDataResourceSubTableRows(dr)
+      out[I1_LISTED_SUBTABLE.dataResource] = buildDataResourceSubTableRows(dr)
     }
   }
   if (state.amortAlloc && Math.abs(state.amortAlloc.total) > 0.005) {
@@ -189,15 +190,15 @@ export function buildI1SoeSubTableData(state: I1SoeSyncSnapshot): Record<string,
   return {
     [I1_SOE_SUBTABLE.movement]: movementRows,
     _note_texts: [
-      { section: 'soe-indefinite', text: state.noteIndefinite || '' },
-      { section: 'soe-mortgage', text: state.noteMortgage || '' },
-      { section: 'soe-valuation', text: state.noteValuation || '' },
-      { section: 'soe-impairment', text: state.noteImpairment || '' },
-      { section: 'soe-not-ready', text: state.noteNotReady || '' },
-      { section: 'soe-sale', text: state.noteSale || '' },
-      { section: 'soe-title', text: state.noteTitle || '' },
-      { section: 'soe-amort-alloc', text: state.amortAlloc ? formatAmortAllocNote(state.amortAlloc) : '' },
-    ] as unknown as Record<string, unknown>[],
+      { section: 'soe-indefinite', title: '使用寿命不确定的无形资产说明', text: state.noteIndefinite || '' },
+      { section: 'soe-mortgage', title: '用于担保的无形资产', text: state.noteMortgage || '' },
+      { section: 'soe-valuation', title: '无形资产计量方法', text: state.noteValuation || '' },
+      { section: 'soe-impairment', title: '无形资产减值说明', text: state.noteImpairment || '' },
+      { section: 'soe-not-ready', title: '尚未达到可使用状态的无形资产', text: state.noteNotReady || '' },
+      { section: 'soe-sale', title: '通过政府补助取得的土地使用权', text: state.noteSale || '' },
+      { section: 'soe-title', title: '未办妥产权证书的土地使用权', text: state.noteTitle || '' },
+      { section: 'soe-amort-alloc', title: '本期摊销费用归属', text: state.amortAlloc ? formatAmortAllocNote(state.amortAlloc) : '' },
+    ].filter((n) => (n.text || '').trim()) as unknown as Record<string, unknown>[],
   }
 }
 

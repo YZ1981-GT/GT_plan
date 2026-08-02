@@ -90,3 +90,43 @@ export function removeI1Category(
 export function defaultI1CategoryKeys(): string[] {
   return I1_DEFAULT_CATEGORIES.map((c) => c.key)
 }
+
+/**
+ * 历史 key 映射：listed/soe 模型用的短 key → categoryScope 标准 key。
+ * 已持久化的 checklist_responses 里用的是短 key，消费时需通过此表翻译。
+ */
+export const I1_LEGACY_KEY_MAP: Record<string, string> = {
+  land: 'land_use_right',
+  housing: 'housing_use_right',
+  knowhow: 'patent_free_tech',
+  mining: 'mining_right',
+  franchise: 'franchise',
+  patent: 'patent',
+  trademark: 'trademark',
+  copyright: 'copyright',
+  software: 'software',
+  data: 'data_resource',
+  other: 'other',
+  // SOE 额外
+  exploration: 'mining_right',  // 探矿权并入矿产权
+}
+
+/** 标准 key → 历史短 key（反向映射，用于写入兼容） */
+export const I1_STANDARD_TO_LEGACY: Record<string, string> = {
+  land_use_right: 'land',
+  housing_use_right: 'housing',
+  patent_free_tech: 'knowhow',
+  mining_right: 'mining',
+  franchise: 'franchise',
+  patent: 'patent',
+  trademark: 'trademark',
+  copyright: 'copyright',
+  software: 'software',
+  data_resource: 'data',
+  other: 'other',
+}
+
+/** 归一化任意 key 到标准 key（不认识的原样返回） */
+export function normalizeI1CategoryKey(key: string): string {
+  return I1_LEGACY_KEY_MAP[key] ?? key
+}

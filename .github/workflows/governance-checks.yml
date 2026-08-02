@@ -1867,3 +1867,58 @@ jobs:
         run: npm ci
       - name: Run J-cycle frontend contract tests
         run: npx vitest run src/components/workpaper/composables/__tests__/jMaturityBandsNotAging.spec.ts src/components/workpaper/composables/__tests__/dbpDynamicRows.spec.ts
+
+  note-i-cycle-structure:
+    # 附注 I 循环（I1~I6）× 2 变体 = 12 章节结构守卫
+    # （i-cycle-four-table-extraction-and-disclosure-alignment Task 4.6 / 7.2）
+    # 背景：I 类六循环的附注表 columns/guidance 原全缺、表名有段落文本泄漏，
+    # 幂等脚本修订后需守卫防退化。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install test dependencies
+        run: pip install pytest openpyxl
+      - name: Run I-cycle note structure tests
+        run: python -m pytest backend/tests/test_note_i_cycle_structure.py -q
+      - name: Check idempotent script (12 sections)
+        run: python backend/scripts/fix/fix_note_i_cycle_structure.py --check
+
+  i-cycle-extraction:
+    # I 循环四表取数与科目映射守卫
+    # （i-cycle-four-table-extraction-and-disclosure-alignment Task 1.6 / 2.3）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install test dependencies
+        run: pip install pytest hypothesis
+      - name: Run I-cycle account & extraction tests
+        run: python -m pytest backend/tests/four_table/test_i_cycle_accounts.py backend/tests/four_table/test_i1_asset_categories.py backend/tests/four_table/test_i_cycle_leaf_aggregation.py -q
+      - name: Run I-cycle formula preset tests
+        run: python -m pytest backend/tests/test_i_cycle_formula_presets.py -q
+
+  i-cycle-frontend:
+    # I 循环前端契约 + 接线守卫
+    # （i-cycle-four-table-extraction-and-disclosure-alignment Task 5.6 / 7.1）
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: audit-platform/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: audit-platform/frontend/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Run I-cycle frontend tests
+        run: npx vitest run src/components/workpaper/composables/__tests__/iCycleNoteSubtableContract.spec.ts src/components/workpaper/composables/__tests__/iCycleDisclosureWiring.spec.ts src/components/workpaper/composables/__tests__/iDisclosureColumns.spec.ts src/components/workpaper/composables/__tests__/iCycleAccountScope.spec.ts src/components/workpaper/composables/__tests__/i1CategoryScope.spec.ts

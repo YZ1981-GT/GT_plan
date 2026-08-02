@@ -5,6 +5,7 @@
  */
 import {
   I2_DISCLOSURE_SHEET_NAME,
+  I2_LEGACY_OBSOLETE_TABLES,
   I2_LISTED_SUBTABLE,
   I2_NOTE_SECTION,
   I2_SOE_SUBTABLE,
@@ -35,21 +36,21 @@ export interface I2SyncFromWorkpaperPayload {
 
 // 研发投入按性质表（本期/上期 × 费用化/资本化），label 取自 I2TabDisclosureListed
 const I2_NATURE_COLUMNS: ColumnDef[] = [
-  { key: 'label', label: '项目', is_label: true },
-  { key: '本期费用化金额', label: '本期费用化', format: 'amount' },
-  { key: '本期资本化金额', label: '本期资本化', format: 'amount' },
-  { key: '上期费用化金额', label: '上期费用化', format: 'amount' },
-  { key: '上期资本化金额', label: '上期资本化', format: 'amount' },
+  { key: 'label', label: '项  目', is_label: true, flat: true },
+  { key: '本期费用化金额', label: '本期费用化', format: 'amount', flat: true },
+  { key: '本期资本化金额', label: '本期资本化', format: 'amount', flat: true },
+  { key: '上期费用化金额', label: '上期费用化', format: 'amount', flat: true },
+  { key: '上期资本化金额', label: '上期资本化', format: 'amount', flat: true },
 ]
 
 // 上市开发支出滚动表（两级表头扁平合并）
 const I2_LISTED_MOVEMENT_COLUMNS: ColumnDef[] = [
-  { key: 'label', label: '项目', is_label: true },
+  { key: 'label', label: '项  目', is_label: true },
   { key: '期初余额', label: '期初数', format: 'amount' },
-  { key: '本期增加_内部开发支出', label: '本期增加-内部开发', format: 'amount' },
-  { key: '本期增加_其他', label: '本期增加-其他', format: 'amount' },
-  { key: '本期减少_确认为无形资产', label: '本期减少-转无形资产', format: 'amount' },
-  { key: '本期减少_计入当期损益', label: '本期减少-计入损益', format: 'amount' },
+  { key: '本期增加_内部开发支出', label: '内部开发支出', group: '本期增加', format: 'amount' },
+  { key: '本期增加_其他', label: '其他增加', group: '本期增加', format: 'amount' },
+  { key: '本期减少_确认为无形资产', label: '确认为无形资产', group: '本期减少', format: 'amount' },
+  { key: '本期减少_计入当期损益', label: '计入当期损益', group: '本期减少', format: 'amount' },
   { key: '期末余额', label: '期末数', format: 'amount' },
   { key: '资本化开始时点', label: '资本化开始时点' },
   { key: '资本化的具体依据', label: '资本化依据' },
@@ -58,32 +59,40 @@ const I2_LISTED_MOVEMENT_COLUMNS: ColumnDef[] = [
 
 // 重要资本化研发项目表
 const I2_IMPORTANT_COLUMNS: ColumnDef[] = [
-  { key: 'label', label: '项目', is_label: true },
-  { key: '研发进度', label: '研发进度' },
-  { key: '预计完成时间', label: '预计完成时间' },
-  { key: '预计经济利益产生方式', label: '预计经济利益产生方式' },
-  { key: '开始资本化的时点', label: '开始资本化时点' },
-  { key: '开始资本化的具体依据', label: '资本化具体依据' },
+  { key: 'label', label: '项  目', is_label: true, flat: true },
+  { key: '研发进度', label: '研发进度', flat: true },
+  { key: '预计完成时间', label: '预计完成时间', flat: true },
+  { key: '预计经济利益产生方式', label: '预计经济利益产生方式', flat: true },
+  { key: '开始资本化的时点', label: '开始资本化时点', flat: true },
+  { key: '开始资本化的具体依据', label: '资本化具体依据', flat: true },
 ]
 
 // 减值准备分项表
 const I2_IMPAIRMENT_COLUMNS: ColumnDef[] = [
-  { key: 'label', label: '项目', is_label: true },
-  { key: '期初余额', label: '期初余额', format: 'amount' },
-  { key: '本期计提', label: '本期计提', format: 'amount' },
-  { key: '本期减少', label: '本期减少', format: 'amount' },
-  { key: '期末余额', label: '期末余额', format: 'amount' },
+  { key: 'label', label: '项  目', is_label: true, flat: true },
+  { key: '期初余额', label: '期初余额', format: 'amount', flat: true },
+  { key: '本期计提', label: '本期计提', format: 'amount', flat: true },
+  { key: '本期减少', label: '本期减少', format: 'amount', flat: true },
+  { key: '期末余额', label: '期末余额', format: 'amount', flat: true },
+]
+
+// 开发支出（续：资本化情况）— 4 列 flat（对齐 fix_note_i_cycle_structure.py）
+const I2_CAP_DETAIL_COLUMNS: ColumnDef[] = [
+  { key: 'label', label: '项  目', is_label: true, flat: true },
+  { key: '资本化开始时点', label: '资本化开始时点', flat: true },
+  { key: '资本化的具体依据', label: '资本化的具体依据', flat: true },
+  { key: '截至期末的研发进度', label: '截至期末的研发进度', flat: true },
 ]
 
 // 国企开发支出滚动表（本期减少三分列：转无形资产/转入当期损益/其他）
 const I2_SOE_MOVEMENT_COLUMNS: ColumnDef[] = [
-  { key: 'label', label: '项目', is_label: true },
+  { key: 'label', label: '项  目', is_label: true },
   { key: '期初余额', label: '期初数', format: 'amount' },
-  { key: '本期增加_内部开发支出', label: '本期增加-内部开发', format: 'amount' },
-  { key: '本期增加_其他', label: '本期增加-其他', format: 'amount' },
-  { key: '本期减少_确认为无形资产', label: '本期减少-转无形资产', format: 'amount' },
-  { key: '本期减少_转入当期损益', label: '本期减少-转入当期损益', format: 'amount' },
-  { key: '本期减少_其他', label: '本期减少-其他', format: 'amount' },
+  { key: '本期增加_内部开发支出', label: '内部开发支出', group: '本期增加', format: 'amount' },
+  { key: '本期增加_其他', label: '其他增加', group: '本期增加', format: 'amount' },
+  { key: '本期减少_确认为无形资产', label: '确认为无形资产', group: '本期减少', format: 'amount' },
+  { key: '本期减少_转入当期损益', label: '转入当期损益', group: '本期减少', format: 'amount' },
+  { key: '本期减少_其他', label: '其他减少', group: '本期减少', format: 'amount' },
   { key: '期末余额', label: '期末数', format: 'amount' },
   { key: '资本化开始时点', label: '资本化开始时点' },
   { key: '资本化的具体依据', label: '资本化依据' },
@@ -257,16 +266,28 @@ export function buildI2ListedSubTableData(snap: I2ListedSyncSnapshot): Record<st
     [I2_LISTED_SUBTABLE.nature]: buildI2ListedNatureSubTable(snap.natureRows),
     [I2_LISTED_SUBTABLE.movement]: buildI2ListedMovementSubTable(snap.movementRows),
   }
+  // 续：资本化情况（从 movementRows 提取有资本化信息的项目）
+  const capDetailRows = (snap.movementRows || [])
+    .filter((r) => !r.isTotal && (r.capStartDate || r.capBasis || r.progress))
+    .map((r) => ({
+      label: r.name || '（未命名）',
+      资本化开始时点: r.capStartDate || '',
+      资本化的具体依据: r.capBasis || '',
+      截至期末的研发进度: r.progress || '',
+    }))
+  if (capDetailRows.length) out[I2_LISTED_SUBTABLE.capDetail] = capDetailRows
+
   const important = buildI2ImportantSubTable(snap.importantRows)
   if (important.length) out[I2_LISTED_SUBTABLE.important] = important
   const impair = buildI2ImpairmentSubTable(snap.impairmentRows)
   if (impair.length > 1) out[I2_LISTED_SUBTABLE.impairment] = impair
 
-  const notes: Array<Record<string, string>> = []
-  if (snap.noteText.trim()) notes.push({ section: 'listed-main', text: snap.noteText.trim() })
-  if (snap.noteCap.trim()) notes.push({ section: 'listed-cap-important', text: snap.noteCap.trim() })
-  if (snap.noteImpairTest.trim()) notes.push({ section: 'listed-impair-test', text: snap.noteImpairTest.trim() })
-  if (snap.notePurchased.trim()) notes.push({ section: 'listed-purchased-rd', text: snap.notePurchased.trim() })
+  const notes: Array<Record<string, string>> = [
+    { section: 'listed-main', title: '开发支出说明', text: (snap.noteText || '').trim() },
+    { section: 'listed-cap-important', title: '重要资本化研发项目说明', text: (snap.noteCap || '').trim() },
+    { section: 'listed-impair-test', title: '开发支出减值测试', text: (snap.noteImpairTest || '').trim() },
+    { section: 'listed-purchased-rd', title: '购买式研发说明', text: (snap.notePurchased || '').trim() },
+  ].filter((n) => n.text)
   if (notes.length) out._note_texts = notes as unknown as Record<string, unknown>[]
   return out
 }
@@ -275,8 +296,9 @@ export function buildI2SoeSubTableData(snap: I2SoeSyncSnapshot): Record<string, 
   const out: Record<string, Record<string, unknown>[]> = {
     [I2_SOE_SUBTABLE.movement]: buildI2SoeMovementSubTable(snap.movementRows),
   }
-  if (snap.noteText.trim()) {
-    out._note_texts = [{ section: 'soe-main', text: snap.noteText.trim() }] as unknown as Record<string, unknown>[]
+  const noteText = (snap.noteText || '').trim()
+  if (noteText) {
+    out._note_texts = [{ section: 'soe-main', title: '开发支出说明', text: noteText }] as unknown as Record<string, unknown>[]
   }
   return out
 }
@@ -296,6 +318,7 @@ export function buildI2ListedSyncPayloads(
     columns: {
       [I2_LISTED_SUBTABLE.nature]: I2_NATURE_COLUMNS,
       [I2_LISTED_SUBTABLE.movement]: I2_LISTED_MOVEMENT_COLUMNS,
+      [I2_LISTED_SUBTABLE.capDetail]: I2_CAP_DETAIL_COLUMNS,
       [I2_LISTED_SUBTABLE.important]: I2_IMPORTANT_COLUMNS,
       [I2_LISTED_SUBTABLE.impairment]: I2_IMPAIRMENT_COLUMNS,
     },

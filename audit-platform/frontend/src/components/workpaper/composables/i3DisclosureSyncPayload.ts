@@ -26,16 +26,39 @@ export interface I3SyncFromWorkpaperPayload {
   columns?: Record<string, ColumnDef[]>
 }
 
-// 商誉账面价值/减值变动表（被投资单位/期初/增/减/期末）
-const I3_MOVEMENT_COLUMNS: ColumnDef[] = [
+// 商誉账面原值变动表（两级表头：本期增加/本期减少含子列）
+const I3_BOOK_VALUE_COLUMNS: ColumnDef[] = [
   { key: 'label', label: '被投资单位名称或形成商誉的事项', is_label: true },
   { key: '期初余额', label: '期初余额', format: 'amount' },
-  { key: '本期增加', label: '本期增加', format: 'amount' },
-  { key: '本期减少', label: '本期减少', format: 'amount' },
+  { key: 'inc_merge', label: '企业合并形成', group: '本期增加', format: 'amount' },
+  { key: 'inc_jv', label: '取得构成业务的共同经营的利益份额形成', group: '本期增加', format: 'amount' },
+  { key: 'inc_other', label: '其他', group: '本期增加', format: 'amount' },
+  { key: 'dec_disposal', label: '处置', group: '本期减少', format: 'amount' },
+  { key: 'dec_other', label: '其他', group: '本期减少', format: 'amount' },
   { key: '期末余额', label: '期末余额', format: 'amount' },
 ]
 
-// 关键假设参数表（资产组/毛利率/增长率/折现率）
+// 商誉减值准备变动表（两级表头）
+const I3_IMPAIRMENT_COLUMNS: ColumnDef[] = [
+  { key: 'label', label: '被投资单位名称或形成商誉的事项', is_label: true },
+  { key: '期初余额', label: '期初余额', format: 'amount' },
+  { key: 'inc_provision', label: '计提', group: '本期增加', format: 'amount' },
+  { key: 'inc_other', label: '其他增加', group: '本期增加', format: 'amount' },
+  { key: 'dec_disposal', label: '处置', group: '本期减少', format: 'amount' },
+  { key: 'dec_other', label: '其他减少', group: '本期减少', format: 'amount' },
+  { key: '期末余额', label: '期末余额', format: 'amount' },
+]
+
+// 国企商誉变动表 flat 5 列（对齐 fix_note_i_cycle_structure.py I3_SOE_TABLE1/2）
+const I3_SOE_FLAT_COLUMNS: ColumnDef[] = [
+  { key: 'label', label: '被投资单位名称或形成商誉的事项', is_label: true, flat: true },
+  { key: '期初余额', label: '期初余额', format: 'amount', flat: true },
+  { key: '本期增加', label: '本期增加', format: 'amount', flat: true },
+  { key: '本期减少', label: '本期减少', format: 'amount', flat: true },
+  { key: '期末余额', label: '期末余额', format: 'amount', flat: true },
+]
+
+// 关键假设参数表（资产组/毛利率/增长率/折现率）— 模板侧动态结构不固化 columns
 const I3_ASSUMPTION_COLUMNS: ColumnDef[] = [
   { key: 'label', label: '资产组/业务', is_label: true },
   { key: '毛利率', label: '毛利率' },
@@ -45,9 +68,9 @@ const I3_ASSUMPTION_COLUMNS: ColumnDef[] = [
 
 // 业绩承诺表（项目/业绩承诺完成情况/商誉减值金额）
 const I3_PERFORMANCE_COLUMNS: ColumnDef[] = [
-  { key: 'label', label: '项目', is_label: true },
-  { key: '业绩承诺完成情况', label: '业绩承诺完成情况' },
-  { key: '商誉减值金额', label: '商誉减值金额', format: 'amount' },
+  { key: 'label', label: '项目', is_label: true, flat: true },
+  { key: '业绩承诺完成情况', label: '业绩承诺完成情况', flat: true },
+  { key: '商誉减值金额', label: '商誉减值金额', format: 'amount', flat: true },
 ]
 
 export interface I3DisclosureSyncSnapshot {
@@ -209,8 +232,8 @@ export function buildI3ListedSyncPayloads(
     current_standard: resolveI3CurrentStandard(variant, applicableStandards),
     sub_table_data: buildI3ListedSubTableData(snap),
     columns: {
-      [I3_LISTED_SUBTABLE.bookValue]: I3_MOVEMENT_COLUMNS,
-      [I3_LISTED_SUBTABLE.impairment]: I3_MOVEMENT_COLUMNS,
+      [I3_LISTED_SUBTABLE.bookValue]: I3_BOOK_VALUE_COLUMNS,
+      [I3_LISTED_SUBTABLE.impairment]: I3_IMPAIRMENT_COLUMNS,
       [I3_LISTED_SUBTABLE.assumptions]: I3_ASSUMPTION_COLUMNS,
       [I3_LISTED_SUBTABLE.performance]: I3_PERFORMANCE_COLUMNS,
     },
@@ -231,8 +254,8 @@ export function buildI3SoeSyncPayloads(
     current_standard: resolveI3CurrentStandard(variant, applicableStandards),
     sub_table_data: buildI3SoeSubTableData(snap),
     columns: {
-      [I3_SOE_SUBTABLE.bookValue]: I3_MOVEMENT_COLUMNS,
-      [I3_SOE_SUBTABLE.impairment]: I3_MOVEMENT_COLUMNS,
+      [I3_SOE_SUBTABLE.bookValue]: I3_SOE_FLAT_COLUMNS,
+      [I3_SOE_SUBTABLE.impairment]: I3_SOE_FLAT_COLUMNS,
     },
   }]
 }

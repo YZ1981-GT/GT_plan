@@ -98,13 +98,10 @@
       <el-table-column label="期初数" align="center">
         <el-table-column label="未审数" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!row._footer && !isReadonly"
               :model-value="row.beginUnadj"
-              size="small"
-              :controls="false"
-              :precision="2"
-              style="width:100%"
+              :disabled="isReadonly"
               @change="(v: number) => updateRow(row.rowId, 'beginUnadj', v ?? 0)"
             />
             <span v-else :class="{ 'footer-text': row._footer }">{{ fmtAmount(row.beginUnadj) }}</span>
@@ -112,13 +109,10 @@
         </el-table-column>
         <el-table-column label="账项调整" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!row._footer && !isReadonly"
               :model-value="row.beginAdj"
-              size="small"
-              :controls="false"
-              :precision="2"
-              style="width:100%"
+              :disabled="isReadonly"
               @change="(v: number) => updateRow(row.rowId, 'beginAdj', v ?? 0)"
             />
             <span v-else :class="{ 'footer-text': row._footer }">{{ fmtAmount(row.beginAdj) }}</span>
@@ -134,13 +128,10 @@
       <el-table-column label="期末数" align="center">
         <el-table-column label="未审数" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!row._footer && !isReadonly"
               :model-value="row.endUnadj"
-              size="small"
-              :controls="false"
-              :precision="2"
-              style="width:100%"
+              :disabled="isReadonly"
               @change="(v: number) => updateRow(row.rowId, 'endUnadj', v ?? 0)"
             />
             <span v-else :class="{ 'footer-text': row._footer, 'warn-diff': row.projectName === '差异' && hasTbDiff }">
@@ -151,12 +142,9 @@
         <el-table-column label="账项调整" width="130" align="right">
           <template #default="{ row }">
             <div v-if="!row._footer && !isReadonly" class="adj-cell">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.endAdj"
-                size="small"
-                :controls="false"
-                :precision="2"
-                style="width:100%"
+                :disabled="isReadonly"
                 @change="(v: number) => updateRow(row.rowId, 'endAdj', v ?? 0)"
               />
               <el-tag v-if="row.ajeApprox" size="small" type="warning" effect="plain">近似</el-tag>

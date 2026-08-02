@@ -75,13 +75,13 @@ describe('i5DisclosureSyncPayload', () => {
     })
     const main = data['其他非流动资产']
     expect(main).toHaveLength(2)
-    expect(main[0].期末余额).toBe(90)
-    expect(main[0].上年年末余额).toBe(50)
+    expect(main[0].end_carrying).toBe(90)
+    expect(main[0].prior_carrying).toBe(50)
     expect(main[1].label).toBe('合计')
     expect(main[1].is_total).toBe(true)
   })
 
-  it('国企子表：期末/期初余额', () => {
+  it('国企子表：期末/年初余额', () => {
     const data = buildI5SoeSubTableData({
       rows: [{
         rowId: '1',
@@ -98,7 +98,7 @@ describe('i5DisclosureSyncPayload', () => {
     })
     const main = data['其他非流动资产']
     expect(main[0].期末余额).toBe(30)
-    expect(main[0].期初余额).toBe(12)
+    expect(main[0].年初余额).toBe(12)
   })
 
   it('同步载荷章节：上市五、31 / 国企八、32', () => {

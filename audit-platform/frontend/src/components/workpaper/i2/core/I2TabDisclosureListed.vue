@@ -68,25 +68,25 @@
         </el-table-column>
         <el-table-column label="本期费用化" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.currentExpensed" size="small" :controls="false" :precision="2" style="width:100%" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.currentExpensed" :disabled="isReadonly" />
             <span v-else>{{ fmtNum(row.currentExpensed) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="本期资本化" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.currentCapitalized" size="small" :controls="false" :precision="2" style="width:100%" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.currentCapitalized" :disabled="isReadonly" />
             <span v-else>{{ fmtNum(row.currentCapitalized) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="上期费用化" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.priorExpensed" size="small" :controls="false" :precision="2" style="width:100%" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.priorExpensed" :disabled="isReadonly" />
             <span v-else>{{ fmtNum(row.priorExpensed) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="上期资本化" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.priorCapitalized" size="small" :controls="false" :precision="2" style="width:100%" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.priorCapitalized" :disabled="isReadonly" />
             <span v-else>{{ fmtNum(row.priorCapitalized) }}</span>
           </template>
         </el-table-column>
@@ -112,20 +112,20 @@
         </el-table-column>
         <el-table-column label="期初数" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.beginBalance" size="small" :controls="false" :precision="2" style="width:100%" @change="onMovementChange(row)" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.beginBalance" :disabled="isReadonly" @change="onMovementChange(row)" />
             <span v-else>{{ fmtNum(row.beginBalance) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="本期增加" align="center">
           <el-table-column label="内部开发" width="110" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" v-model="row.increaseInternal" size="small" :controls="false" :precision="2" style="width:100%" @change="onMovementChange(row)" />
+              <WpAmountInput v-if="!isReadonly" v-model="row.increaseInternal" :disabled="isReadonly" @change="onMovementChange(row)" />
               <span v-else>{{ fmtNum(row.increaseInternal) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="其他" width="100" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" v-model="row.increaseOther" size="small" :controls="false" :precision="2" style="width:100%" @change="onMovementChange(row)" />
+              <WpAmountInput v-if="!isReadonly" v-model="row.increaseOther" :disabled="isReadonly" @change="onMovementChange(row)" />
               <span v-else>{{ fmtNum(row.increaseOther) }}</span>
             </template>
           </el-table-column>
@@ -133,13 +133,13 @@
         <el-table-column label="本期减少" align="center">
           <el-table-column label="转无形资产" width="110" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" v-model="row.decreaseToIntangible" size="small" :controls="false" :precision="2" style="width:100%" @change="onMovementChange(row)" />
+              <WpAmountInput v-if="!isReadonly" v-model="row.decreaseToIntangible" :disabled="isReadonly" @change="onMovementChange(row)" />
               <span v-else>{{ fmtNum(row.decreaseToIntangible) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="计入损益" width="110" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" v-model="row.decreaseToExpense" size="small" :controls="false" :precision="2" style="width:100%" @change="onMovementChange(row)" />
+              <WpAmountInput v-if="!isReadonly" v-model="row.decreaseToExpense" :disabled="isReadonly" @change="onMovementChange(row)" />
               <span v-else>{{ fmtNum(row.decreaseToExpense) }}</span>
             </template>
           </el-table-column>
@@ -225,19 +225,19 @@
         </el-table-column>
         <el-table-column label="期初余额" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.beginBalance" size="small" :controls="false" :precision="2" style="width:100%" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.beginBalance" :disabled="isReadonly" />
             <span v-else>{{ fmtNum(row.beginBalance) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="本期计提" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.provision" size="small" :controls="false" :precision="2" style="width:100%" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.provision" :disabled="isReadonly" />
             <span v-else>{{ fmtNum(row.provision) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="本期减少" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.decrease" size="small" :controls="false" :precision="2" style="width:100%" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.decrease" :disabled="isReadonly" />
             <span v-else>{{ fmtNum(row.decrease) }}</span>
           </template>
         </el-table-column>
@@ -288,7 +288,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, toRef, inject, onBeforeUnmount } from 'vue'
+import { ref, toRef, inject, watch, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
@@ -384,13 +384,29 @@ async function syncToNotes() {
       variant: 'listed',
     })
     ElMessage.success(`已同步至附注 ${noteTarget.value?.sectionId || '五、27'}（${rows} 行）`)
-    autoSync.scheduleAutoSync(syncToNotes)
   } catch (e: any) {
     ElMessage.error(e?.message || '同步失败')
   } finally {
     isSyncing.value = false
   }
 }
+
+watch(
+  [
+    () => disc.natureRows,
+    () => disc.movementRows,
+    () => disc.importantRows,
+    () => disc.impairmentRows,
+    () => disc.noteText,
+    () => disc.noteCap,
+    () => disc.noteImpairTest,
+    () => disc.notePurchased,
+    () => disc.auditNote,
+    () => disc.auditConclusion,
+  ],
+  () => autoSync.scheduleAutoSync(syncToNotes),
+  { deep: true },
+)
 
 function handleReview() { openReviewDialog('I2-附注披露-上市') }
 

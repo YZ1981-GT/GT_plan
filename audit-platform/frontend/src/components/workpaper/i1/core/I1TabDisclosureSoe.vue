@@ -52,13 +52,13 @@
         <el-table-column prop="label" label="项目" min-width="200" />
         <el-table-column label="期初余额" min-width="120" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.kind === 'detail' && !isReadonly && block.layer !== 'carrying'"
               :model-value="row.begin"
-              :controls="false"
+              :disabled="isReadonly || block.layer === 'carrying'"
               size="small"
               style="width:100%"
-              @update:model-value="(v: number | undefined) => updateCategory(block.layer, row.key, 'begin', v ?? 0)"
+              @change="(v: number) => updateCategory(block.layer, row.key, 'begin', v)"
             />
             <span v-else class="formula-cell">{{ fmt(row.begin) }}</span>
           </template>
@@ -66,13 +66,13 @@
         <el-table-column label="本期增加" min-width="120" align="right">
           <template #default="{ row }">
             <template v-if="layerMeta(block.layer).movementNa">—</template>
-            <el-input-number
+            <WpAmountInput
               v-else-if="row.kind === 'detail' && !isReadonly"
               :model-value="row.increase"
-              :controls="false"
+              :disabled="isReadonly"
               size="small"
               style="width:100%"
-              @update:model-value="(v: number | undefined) => updateCategory(block.layer, row.key, 'increase', v ?? 0)"
+              @change="(v: number) => updateCategory(block.layer, row.key, 'increase', v)"
             />
             <span v-else class="formula-cell">{{ fmt(row.increase) }}</span>
           </template>
@@ -80,13 +80,13 @@
         <el-table-column label="本期减少" min-width="120" align="right">
           <template #default="{ row }">
             <template v-if="layerMeta(block.layer).movementNa">—</template>
-            <el-input-number
+            <WpAmountInput
               v-else-if="row.kind === 'detail' && !isReadonly"
               :model-value="row.decrease"
-              :controls="false"
+              :disabled="isReadonly"
               size="small"
               style="width:100%"
-              @update:model-value="(v: number | undefined) => updateCategory(block.layer, row.key, 'decrease', v ?? 0)"
+              @change="(v: number) => updateCategory(block.layer, row.key, 'decrease', v)"
             />
             <span v-else class="formula-cell">{{ fmt(row.decrease) }}</span>
           </template>
@@ -139,7 +139,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, toRef, onBeforeUnmount } from 'vue'
+import { ref, toRef, watch, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
@@ -325,13 +325,30 @@ async function syncToNotes() {
       sheet: '附注披露信息（国有企业）',
     })
     ElMessage.success(`已同步至附注 ${noteSectionId}（${rows} 行）`)
-    autoSync.scheduleAutoSync(syncToNotes)
   } catch (e: any) {
     ElMessage.error(e?.message || '同步失败')
   } finally {
     isSyncing.value = false
   }
 }
+
+watch(
+  [
+    () => layers.value,
+    () => noteIndefinite.value,
+    () => noteMortgage.value,
+    () => noteValuation.value,
+    () => noteImpairment.value,
+    () => noteNotReady.value,
+    () => noteSale.value,
+    () => noteTitle.value,
+    () => amortAlloc.value,
+    () => auditNote.value,
+    () => auditConclusion.value,
+  ],
+  () => autoSync.scheduleAutoSync(syncToNotes),
+  { deep: true },
+)
 
 onBeforeUnmount(() => autoSync.cancelPending())
 </script>

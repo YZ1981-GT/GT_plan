@@ -18,14 +18,22 @@ export const I6_DISCLOSURE_SHEET_NAME = {
   soe: '附注披露（国有企业）',
 } as const satisfies Record<I6DisclosureVariant, string>
 
-/** 与 note_template tables[].name 一致 */
+/** 与 note_template tables[].name 一致（国企表名补「（按费用性质列示）」） */
 export const I6_LISTED_SUBTABLE = {
   expenseByNature: '研发费用（按费用性质列示）',
 } as const
 
 export const I6_SOE_SUBTABLE = {
-  expenseByNature: '研发费用',
+  expenseByNature: '研发费用（按费用性质列示）',
 } as const
+
+/**
+ * 旧表名清单（用于 `_removed_table_keys` 清理孤儿）。
+ * - 国企原名「研发费用」→ 正名为「研发费用（按费用性质列示）」
+ */
+export const I6_LEGACY_OBSOLETE_TABLES = [
+  '研发费用',
+] as const
 
 /** 披露默认费用性质（对齐附注模板首行） */
 export const I6_DEFAULT_DISCLOSURE_CATEGORIES = [

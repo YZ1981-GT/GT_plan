@@ -185,28 +185,26 @@
         <el-table-column label="未审滚动（期初/增/摊/减/期末）" align="center">
           <el-table-column prop="beginBalance" label="期初" min-width="100" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="row.isEditable !== false && !isReadonly"
                 :model-value="row.beginBalance"
                 size="small"
-                :controls="false"
-                :precision="2"
+                :disabled="isReadonly"
                 class="amt-input"
-                @change="(v: number | undefined) => onCellChange(row.rowId, 'beginBalance', v ?? 0)"
+                @change="(v: number) => onCellChange(row.rowId, 'beginBalance', v)"
               />
               <span v-else>{{ fmtAmount(row.beginBalance) }}</span>
             </template>
           </el-table-column>
           <el-table-column prop="increase" label="本期增加" min-width="100" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="row.isEditable !== false && !isReadonly"
                 :model-value="row.increase"
                 size="small"
-                :controls="false"
-                :precision="2"
+                :disabled="isReadonly"
                 class="amt-input"
-                @change="(v: number | undefined) => onCellChange(row.rowId, 'increase', v ?? 0)"
+                @change="(v: number) => onCellChange(row.rowId, 'increase', v)"
               />
               <span v-else>{{ fmtAmount(row.increase) }}</span>
             </template>
@@ -216,29 +214,26 @@
               <el-tooltip content="可自 I4-6/I4-7 测算同步" placement="top"><span class="hint-h">本期摊销</span></el-tooltip>
             </template>
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="row.isEditable !== false && !isReadonly"
                 :model-value="row.amortization"
                 size="small"
-                :controls="false"
-                :precision="2"
-                :min="0"
+                :disabled="isReadonly"
                 class="amt-input"
-                @change="(v: number | undefined) => onCellChange(row.rowId, 'amortization', v ?? 0)"
+                @change="(v: number) => onCellChange(row.rowId, 'amortization', v)"
               />
               <span v-else>{{ fmtAmount(row.amortization) }}</span>
             </template>
           </el-table-column>
           <el-table-column prop="decrease" label="本期减少" min-width="100" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="row.isEditable !== false && !isReadonly"
                 :model-value="row.decrease"
                 size="small"
-                :controls="false"
-                :precision="2"
+                :disabled="isReadonly"
                 class="amt-input"
-                @change="(v: number | undefined) => onCellChange(row.rowId, 'decrease', v ?? 0)"
+                @change="(v: number) => onCellChange(row.rowId, 'decrease', v)"
               />
               <span v-else>{{ fmtAmount(row.decrease) }}</span>
             </template>
@@ -258,42 +253,39 @@
         <el-table-column label="未审 · 调整 · 审定" align="center">
           <el-table-column prop="unadjusted" label="未审" min-width="100" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="row.isEditable !== false && !isReadonly"
                 :model-value="row.unadjusted"
                 size="small"
-                :controls="false"
-                :precision="2"
+                :disabled="isReadonly"
                 class="amt-input"
-                @change="(v: number | undefined) => onCellChange(row.rowId, 'unadjusted', v ?? 0)"
+                @change="(v: number) => onCellChange(row.rowId, 'unadjusted', v)"
               />
               <span v-else>{{ fmtAmount(row.unadjusted) }}</span>
             </template>
           </el-table-column>
           <el-table-column prop="aje" label="AJE" min-width="90" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="row.isEditable !== false && !isReadonly"
                 :model-value="row.aje"
                 size="small"
-                :controls="false"
-                :precision="2"
+                :disabled="isReadonly"
                 class="amt-input"
-                @change="(v: number | undefined) => onCellChange(row.rowId, 'aje', v ?? 0)"
+                @change="(v: number) => onCellChange(row.rowId, 'aje', v)"
               />
               <span v-else>{{ fmtAmount(row.aje) }}</span>
             </template>
           </el-table-column>
           <el-table-column prop="rje" label="RJE" min-width="90" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="row.isEditable !== false && !isReadonly"
                 :model-value="row.rje"
                 size="small"
-                :controls="false"
-                :precision="2"
+                :disabled="isReadonly"
                 class="amt-input"
-                @change="(v: number | undefined) => onCellChange(row.rowId, 'rje', v ?? 0)"
+                @change="(v: number) => onCellChange(row.rowId, 'rje', v)"
               />
               <span v-else>{{ fmtAmount(row.rje) }}</span>
             </template>
@@ -313,14 +305,13 @@
         <el-table-column label="与上期审定比较" align="center">
           <el-table-column prop="priorAudited" label="上期审定" min-width="100" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="row.isEditable !== false && !isReadonly"
                 :model-value="row.priorAudited"
                 size="small"
-                :controls="false"
-                :precision="2"
+                :disabled="isReadonly"
                 class="amt-input"
-                @change="(v: number | undefined) => onCellChange(row.rowId, 'priorAudited', v ?? 0)"
+                @change="(v: number) => onCellChange(row.rowId, 'priorAudited', v)"
               />
               <span v-else>{{ fmtAmount(row.priorAudited) }}</span>
             </template>

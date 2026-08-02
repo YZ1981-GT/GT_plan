@@ -27,6 +27,9 @@ export const I4_SOE_SUBTABLE = {
   movement: '长期待摊费用',
 } as const
 
+/** I4 无旧名需清理（表名未变更） */
+export const I4_LEGACY_OBSOLETE_TABLES: readonly string[] = []
+
 /** 披露默认类别（对齐源表/附注模板首行） */
 export const I4_DEFAULT_DISCLOSURE_CATEGORIES = [
   '使用权资产改良及维护支出',

@@ -70,52 +70,48 @@
         </el-table-column>
         <el-table-column label="期初余额" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
-              :model-value="row.beginBalance"
-              :controls="false"
+              v-model="row.beginBalance"
               size="small"
-              :precision="2"
-              @change="(v: number) => disc.updateCell(row.rowId, 'beginBalance', v ?? 0)"
+              :disabled="isReadonly"
+              @change="(v: number) => disc.updateCell(row.rowId, 'beginBalance', v)"
             />
             <span v-else class="amt">{{ fmtAmt(row.beginBalance) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="本期增加额" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
-              :model-value="row.increase"
-              :controls="false"
+              v-model="row.increase"
               size="small"
-              :precision="2"
-              @change="(v: number) => disc.updateCell(row.rowId, 'increase', v ?? 0)"
+              :disabled="isReadonly"
+              @change="(v: number) => disc.updateCell(row.rowId, 'increase', v)"
             />
             <span v-else class="amt">{{ fmtAmt(row.increase) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="本期摊销额" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
-              :model-value="row.amortization"
-              :controls="false"
+              v-model="row.amortization"
               size="small"
-              :precision="2"
-              @change="(v: number) => disc.updateCell(row.rowId, 'amortization', v ?? 0)"
+              :disabled="isReadonly"
+              @change="(v: number) => disc.updateCell(row.rowId, 'amortization', v)"
             />
             <span v-else class="amt">{{ fmtAmt(row.amortization) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="其他减少额" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
-              :model-value="row.otherDecrease"
-              :controls="false"
+              v-model="row.otherDecrease"
               size="small"
-              :precision="2"
-              @change="(v: number) => disc.updateCell(row.rowId, 'otherDecrease', v ?? 0)"
+              :disabled="isReadonly"
+              @change="(v: number) => disc.updateCell(row.rowId, 'otherDecrease', v)"
             />
             <span v-else class="amt">{{ fmtAmt(row.otherDecrease) }}</span>
           </template>

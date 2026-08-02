@@ -201,11 +201,10 @@
         </el-table-column>
         <el-table-column prop="beginBalance" label="期初余额" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.isEditable && !isReadonly"
               v-model="row.beginBalance"
               size="small"
-              :controls="false"
               @change="onCellChange('cost', row.rowId, 'beginBalance', $event)"
             />
             <span v-else :class="{ 'subtotal-text': row.isSubtotal }">{{ fmtAmount(row.beginBalance) }}</span>
@@ -213,11 +212,10 @@
         </el-table-column>
         <el-table-column prop="increase" label="本期增加" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.isEditable && !isReadonly"
               v-model="row.increase"
               size="small"
-              :controls="false"
               @change="onCellChange('cost', row.rowId, 'increase', $event)"
             />
             <span v-else :class="{ 'subtotal-text': row.isSubtotal }">{{ fmtAmount(row.increase) }}</span>
@@ -225,11 +223,10 @@
         </el-table-column>
         <el-table-column prop="decrease" label="本期减少" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.isEditable && !isReadonly"
               v-model="row.decrease"
               size="small"
-              :controls="false"
               @change="onCellChange('cost', row.rowId, 'decrease', $event)"
             />
             <span v-else :class="{ 'subtotal-text': row.isSubtotal }">{{ fmtAmount(row.decrease) }}</span>
@@ -251,11 +248,10 @@
         </el-table-column>
         <el-table-column prop="unadjusted" label="未审数" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.isEditable && !isReadonly"
               v-model="row.unadjusted"
               size="small"
-              :controls="false"
               @change="onCellChange('cost', row.rowId, 'unadjusted', $event)"
             />
             <span v-else :class="{ 'subtotal-text': row.isSubtotal }">{{ fmtAmount(row.unadjusted) }}</span>
@@ -263,11 +259,10 @@
         </el-table-column>
         <el-table-column prop="aje" label="AJE" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.isEditable && !isReadonly"
               v-model="row.aje"
               size="small"
-              :controls="false"
               @change="onCellChange('cost', row.rowId, 'aje', $event)"
             />
             <span v-else :class="{ 'subtotal-text': row.isSubtotal }">{{ fmtAmount(row.aje) }}</span>
@@ -275,11 +270,10 @@
         </el-table-column>
         <el-table-column prop="rje" label="RJE" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.isEditable && !isReadonly"
               v-model="row.rje"
               size="small"
-              :controls="false"
               @change="onCellChange('cost', row.rowId, 'rje', $event)"
             />
             <span v-else :class="{ 'subtotal-text': row.isSubtotal }">{{ fmtAmount(row.rje) }}</span>
@@ -341,11 +335,10 @@
         </el-table-column>
         <el-table-column prop="beginBalance" label="期初余额" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.isEditable && !isReadonly"
               v-model="row.beginBalance"
               size="small"
-              :controls="false"
               @change="onCellChange('amort', row.rowId, 'beginBalance', $event)"
             />
             <span v-else :class="{ 'subtotal-text': row.isSubtotal }">{{ fmtAmount(row.beginBalance) }}</span>
@@ -353,11 +346,10 @@
         </el-table-column>
         <el-table-column prop="increase" label="本期增加" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.isEditable && !isReadonly"
               v-model="row.increase"
               size="small"
-              :controls="false"
               @change="onCellChange('amort', row.rowId, 'increase', $event)"
             />
             <span v-else :class="{ 'subtotal-text': row.isSubtotal }">{{ fmtAmount(row.increase) }}</span>
@@ -365,11 +357,10 @@
         </el-table-column>
         <el-table-column prop="decrease" label="本期减少" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.isEditable && !isReadonly"
               v-model="row.decrease"
               size="small"
-              :controls="false"
               @change="onCellChange('amort', row.rowId, 'decrease', $event)"
             />
             <span v-else :class="{ 'subtotal-text': row.isSubtotal }">{{ fmtAmount(row.decrease) }}</span>
@@ -391,11 +382,10 @@
         </el-table-column>
         <el-table-column prop="unadjusted" label="未审数" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.isEditable && !isReadonly"
               v-model="row.unadjusted"
               size="small"
-              :controls="false"
               @change="onCellChange('amort', row.rowId, 'unadjusted', $event)"
             />
             <span v-else :class="{ 'subtotal-text': row.isSubtotal }">{{ fmtAmount(row.unadjusted) }}</span>
@@ -403,11 +393,10 @@
         </el-table-column>
         <el-table-column prop="aje" label="AJE" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.isEditable && !isReadonly"
               v-model="row.aje"
               size="small"
-              :controls="false"
               @change="onCellChange('amort', row.rowId, 'aje', $event)"
             />
             <span v-else :class="{ 'subtotal-text': row.isSubtotal }">{{ fmtAmount(row.aje) }}</span>
@@ -415,11 +404,10 @@
         </el-table-column>
         <el-table-column prop="rje" label="RJE" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.isEditable && !isReadonly"
               v-model="row.rje"
               size="small"
-              :controls="false"
               @change="onCellChange('amort', row.rowId, 'rje', $event)"
             />
             <span v-else :class="{ 'subtotal-text': row.isSubtotal }">{{ fmtAmount(row.rje) }}</span>
@@ -478,11 +466,10 @@
         </el-table-column>
         <el-table-column prop="beginBalance" label="期初余额" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.isEditable && !isReadonly"
               v-model="row.beginBalance"
               size="small"
-              :controls="false"
               @change="onCellChange('impairment', row.rowId, 'beginBalance', $event)"
             />
             <span v-else :class="{ 'subtotal-text': row.isSubtotal }">{{ fmtAmount(row.beginBalance) }}</span>
@@ -490,11 +477,10 @@
         </el-table-column>
         <el-table-column prop="increase" label="本期增加" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.isEditable && !isReadonly"
               v-model="row.increase"
               size="small"
-              :controls="false"
               @change="onCellChange('impairment', row.rowId, 'increase', $event)"
             />
             <span v-else :class="{ 'subtotal-text': row.isSubtotal }">{{ fmtAmount(row.increase) }}</span>
@@ -502,11 +488,10 @@
         </el-table-column>
         <el-table-column prop="decrease" label="本期减少" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.isEditable && !isReadonly"
               v-model="row.decrease"
               size="small"
-              :controls="false"
               @change="onCellChange('impairment', row.rowId, 'decrease', $event)"
             />
             <span v-else :class="{ 'subtotal-text': row.isSubtotal }">{{ fmtAmount(row.decrease) }}</span>
@@ -528,11 +513,10 @@
         </el-table-column>
         <el-table-column prop="unadjusted" label="未审数" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.isEditable && !isReadonly"
               v-model="row.unadjusted"
               size="small"
-              :controls="false"
               @change="onCellChange('impairment', row.rowId, 'unadjusted', $event)"
             />
             <span v-else :class="{ 'subtotal-text': row.isSubtotal }">{{ fmtAmount(row.unadjusted) }}</span>
@@ -540,11 +524,10 @@
         </el-table-column>
         <el-table-column prop="aje" label="AJE" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.isEditable && !isReadonly"
               v-model="row.aje"
               size="small"
-              :controls="false"
               @change="onCellChange('impairment', row.rowId, 'aje', $event)"
             />
             <span v-else :class="{ 'subtotal-text': row.isSubtotal }">{{ fmtAmount(row.aje) }}</span>
@@ -552,11 +535,10 @@
         </el-table-column>
         <el-table-column prop="rje" label="RJE" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.isEditable && !isReadonly"
               v-model="row.rje"
               size="small"
-              :controls="false"
               @change="onCellChange('impairment', row.rowId, 'rje', $event)"
             />
             <span v-else :class="{ 'subtotal-text': row.isSubtotal }">{{ fmtAmount(row.rje) }}</span>
@@ -1396,10 +1378,10 @@ function fmtPct(rate: number | null | undefined): string {
   font-weight: 600;
   background: #f8fafc;
 }
-.adjudication-table :deep(.el-input-number) {
+.adjudication-table :deep(.wp-amount-input) {
   width: 100%;
 }
-.adjudication-table :deep(.el-input-number .el-input__inner) {
+.adjudication-table :deep(.wp-amount-input .el-input__inner) {
   text-align: right;
   font-size: var(--wp-font-size, 13px);
 }

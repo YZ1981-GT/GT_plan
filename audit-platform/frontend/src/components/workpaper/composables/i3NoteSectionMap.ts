@@ -18,18 +18,30 @@ export const I3_DISCLOSURE_SHEET_NAME = {
   soe: '附注披露（国有企业）',
 } as const satisfies Record<I3DisclosureVariant, string>
 
-/** 与 note_template tables[].name 一致 */
+/** 与 note_template tables[].name 一致（正名后，对齐 fix_note_i_cycle_structure.py） */
 export const I3_LISTED_SUBTABLE = {
   bookValue: '商誉账面原值',
   impairment: '商誉减值准备',
-  assumptions: '资产组的可收回金额是依据管理层编制的五年期预测，采用未来现金流量折合现值计算。超过该五年期的现金流量采用以下所述的估计增长率作出推算。采用未来现金流量折现方法所运用的假设主要包括：',
-  performance: '业绩承诺完成及对应商誉减值情况如下：',
+  assumptions: '商誉减值测试关键假设',
+  performance: '业绩承诺完成及商誉减值情况',
 } as const
 
 export const I3_SOE_SUBTABLE = {
-  bookValue: '（1）商誉账面原值',
+  bookValue: '（1）商誉账面价值',
   impairment: '（2）商誉减值准备',
 } as const
+
+/**
+ * 旧表名清单（用于 `_removed_table_keys` 清理孤儿）。
+ * - listed 表3 原是 90 字符段落文本泄漏名
+ * - listed 表4 原带尾冒号和「对应/如下」
+ * - soe 表1 原名「（1）商誉账面原值」→ 改为「…账面价值」
+ */
+export const I3_LEGACY_OBSOLETE_TABLES = [
+  '资产组的可收回金额是依据管理层编制的五年期预测，采用未来现金流量折合现值计算。超过该五年期的现金流量采用以下所述的估计增长率作出推算。采用未来现金流量折现方法所运用的假设主要包括：',
+  '业绩承诺完成及对应商誉减值情况如下：',
+  '（1）商誉账面原值',
+] as const
 
 export function isListedStandard(s: string): boolean {
   const x = String(s).toLowerCase()

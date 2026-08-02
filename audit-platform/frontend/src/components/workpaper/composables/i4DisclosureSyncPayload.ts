@@ -29,24 +29,25 @@ export interface I4SyncFromWorkpaperPayload {
   columns?: Record<string, ColumnDef[]>
 }
 
-// 上市变动表列头（项目/期初/本期增加/本期减少/期末），逐字对齐 buildI4ListedSubTableData 行键
+// 上市变动表列头 — 两级表头：「本期减少」下辖「本期摊销」/「其他减少」
 const I4_LISTED_COLUMNS: ColumnDef[] = [
-  { key: 'label', label: '项目', is_label: true },
-  { key: '期初余额', label: '期初余额', format: 'amount' },
+  { key: 'label', label: '项  目', is_label: true },
+  { key: '期初余额', label: '期初数', format: 'amount' },
   { key: '本期增加', label: '本期增加', format: 'amount' },
-  { key: '本期减少', label: '本期减少', format: 'amount' },
-  { key: '期末余额', label: '期末余额', format: 'amount' },
+  { key: '本期摊销', label: '本期摊销', group: '本期减少', format: 'amount' },
+  { key: '其他减少', label: '其他减少', group: '本期减少', format: 'amount' },
+  { key: '期末余额', label: '期末数', format: 'amount' },
 ]
 
-// 国企变动表列头（摊销/其他减少分列 + 原因），逐字对齐 buildI4SoeSubTableData 行键
+// 国企变动表列头（7 列 flat：摊销/其他减少分列 + 原因）
 const I4_SOE_COLUMNS: ColumnDef[] = [
-  { key: 'label', label: '项目', is_label: true },
-  { key: '期初余额', label: '期初余额', format: 'amount' },
-  { key: '本期增加额', label: '本期增加额', format: 'amount' },
-  { key: '本期摊销额', label: '本期摊销额', format: 'amount' },
-  { key: '其他减少额', label: '其他减少额', format: 'amount' },
-  { key: '期末余额', label: '期末余额', format: 'amount' },
-  { key: '其他减少的原因', label: '其他减少的原因' },
+  { key: 'label', label: '项  目', is_label: true, flat: true },
+  { key: '期初余额', label: '期初余额', format: 'amount', flat: true },
+  { key: '本期增加额', label: '本期增加额', format: 'amount', flat: true },
+  { key: '本期摊销额', label: '本期摊销额', format: 'amount', flat: true },
+  { key: '其他减少额', label: '其他减少额', format: 'amount', flat: true },
+  { key: '期末余额', label: '期末余额', format: 'amount', flat: true },
+  { key: '其他减少的原因', label: '其他减少的原因', flat: true },
 ]
 
 export interface I4DisclosureSyncSnapshot {
@@ -75,35 +76,36 @@ export function buildI4ListedSubTableData(state: I4DisclosureSyncSnapshot): Reco
     .filter((r) => r.item || Math.abs(_num(r.beginBalance) + _num(r.increase) + _num(r.amortization) + _num(r.otherDecrease)) > 0.005)
     .map((r) => {
       const end = calcI4DisclosureEnd(r)
-      const decrease = _num(r.amortization) + _num(r.otherDecrease)
       return {
         label: r.item || '（未命名）',
         期初余额: _num(r.beginBalance),
         本期增加: _num(r.increase),
-        本期减少: decrease,
+        本期摊销: _num(r.amortization),
+        其他减少: _num(r.otherDecrease),
         期末余额: end,
         is_total: false,
       }
     })
 
   const totals = summarizeI4Disclosure(state.rows || [])
-  const totalDecrease = totals.amortization + totals.otherDecrease
   dataRows.push({
     label: '合计',
     期初余额: totals.beginBalance,
     本期增加: totals.increase,
-    本期减少: totalDecrease,
+    本期摊销: totals.amortization,
+    其他减少: totals.otherDecrease,
     期末余额: totals.endBalance,
     is_total: true,
   })
 
-  const footnote = state.footnote || buildI4ListedFootnote(state.currentPortion ?? 0)
+  const notes = [
+    { section: 'listed-current-portion', title: '一年内到期部分说明', text: (state.footnote || buildI4ListedFootnote(state.currentPortion ?? 0)).trim() },
+    { section: 'listed-other', title: '长期待摊费用补充说明', text: (state.otherNote || '').trim() },
+  ].filter((n) => n.text)
+
   return {
     [I4_LISTED_SUBTABLE.movement]: dataRows,
-    _note_texts: [
-      { section: 'listed-current-portion', text: footnote },
-      { section: 'listed-other', text: state.otherNote || '' },
-    ] as unknown as Record<string, unknown>[],
+    ...(notes.length ? { _note_texts: notes as unknown as Record<string, unknown>[] } : {}),
   }
 }
 
@@ -136,11 +138,13 @@ export function buildI4SoeSubTableData(state: I4DisclosureSyncSnapshot): Record<
     is_total: true,
   })
 
+  const notes = [
+    { section: 'soe-other', title: '长期待摊费用补充说明', text: (state.otherNote || '').trim() },
+  ].filter((n) => n.text)
+
   return {
     [I4_SOE_SUBTABLE.movement]: dataRows,
-    _note_texts: [
-      { section: 'soe-other', text: state.otherNote || '' },
-    ] as unknown as Record<string, unknown>[],
+    ...(notes.length ? { _note_texts: notes as unknown as Record<string, unknown>[] } : {}),
   }
 }
 

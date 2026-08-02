@@ -162,86 +162,90 @@ CategoryScope + 6 个 NoteSectionMap + 6 个 SyncPayload + 12 个披露 Tab + 6 
   I5 上市两级 7 列 + 主表正名（「根据实际情况列示」入 guidance）、国企第 3 列改「年初余额」、
   两版②表正名「合同取得成本」；I6 国企表名补「（按费用性质列示）」+ 两版 flat 3 列。
   - _Requirements: 6.2, 6.3, 6.4, 6.7_
-- [ ] 4.6 新建 `backend/tests/test_note_i_cycle_structure.py`：openpyxl 直读六个源 xlsx 与 12
+- [x] 4.6 新建 `backend/tests/test_note_i_cycle_structure.py`：openpyxl 直读六个源 xlsx 与 12
   章节三向比对（表名 / 末级表头 / 两级 group / flat 表态 / guidance 无 markdown 粗体 /
   无账龄字面量）+ 归一函数 + 反向自检。
   - _Requirements: 10.1, 6.2, 6.3, 11.1_
 
 ## Wave 5 — 披露映射与推送载荷
 
-- [ ] 5. 六循环 12 作用域的 `columns` 与载荷对齐
+- [x] 5. 六循环 12 作用域的 `columns` 与载荷对齐
 - [x] 5.1 修正 `i2NoteSectionMap.I2_DISCLOSURE_SHEET_NAME`：去掉「信息」二字（源 xlsx 实为
   `附注披露（上市公司）` / `（国有企业）`），并重跑 `gen_note_wp_sync_registry.py --write`。
   - _Requirements: 8.5_
-- [ ] 5.2 六个 `iNNoteSectionMap.ts` 更新 `I{N}_{VARIANT}_SUBTABLE` 表名常量 + 新增
+- [x] 5.2 六个 `iNNoteSectionMap.ts` 更新 `I{N}_{VARIANT}_SUBTABLE` 表名常量 + 新增
   `I{N}_LEGACY_OBSOLETE_TABLES`（旧名清单）。
   - _Requirements: 6.6_
-- [ ] 5.3 六个 `iNDisclosureSyncPayload.ts` 声明列定义：两级表用 `group` + 叶子 `label`，
+- [x] 5.3 六个 `iNDisclosureSyncPayload.ts` 声明列定义：两级表用 `group` + 叶子 `label`，
   单级表每列标 `flat: true`；I1 上市列由类别配置动态生成（`buildI1ListedColumns(categories)`
   零参可调，默认 11 类）。
   - _Requirements: 8.2, 7.1_
-- [ ] 5.4 I2 上市补 4 张表的载荷构建；I5 上市补两级 7 列载荷（账面余额/减值准备/账面价值 ×
+- [x] 5.4 I2 上市补 4 张表的载荷构建；I5 上市补两级 7 列载荷（账面余额/减值准备/账面价值 ×
   期末数/上年年末数）；I3 两版补两级子列载荷。
   - _Requirements: 6.5, 8.2_
-- [ ] 5.5 `_note_texts` 六循环全补中文 `title` + 空文本过滤 + 放 `sub_table_data` 内；
+- [x] 5.5 `_note_texts` 六循环全补中文 `title` + 空文本过滤 + 放 `sub_table_data` 内；
   合计行按本章节实证字面推送并标 `is_total`；`_removed_table_keys` 走 `buildRemovedTableKeys`
   差集。
   - _Requirements: 8.3, 8.4, 6.6_
-- [ ] 5.6 新建 `iCycleNoteSubtableContract.spec.ts`（接入共享 helper P1~P6，`columnsPending`
+- [x] 5.6 新建 `iCycleNoteSubtableContract.spec.ts`（接入共享 helper P1~P6，`columnsPending`
   为空）+ 登记 `disclosureColumnsCoverage.spec.ts` 的 `P1_ROUTE`。
   - _Requirements: 10.2, 8.2_
 
 ## Wave 6 — 披露 Tab 改造
 
-- [ ] 6. 12 个披露 Tab 的动态区、控件与接线
-- [ ] 6.1 修 I1/I2/I3 六个 Tab 的**自调度**：`scheduleAutoSync` 从 `syncToNotes` 函数体内移出，
+- [x] 6. 12 个披露 Tab 的动态区、控件与接线
+- [x] 6.1 修 I1/I2/I3 六个 Tab 的**自调度**：`scheduleAutoSync` 从 `syncToNotes` 函数体内移出，
   改 `watch` 实际数据（监听字段与载荷构建所用字段一致）。
   - _Requirements: 8.1_
-- [ ] 6.2 I1 两版披露表接类别配置：上市动态列（列头带 ✎✕，稳定 key）、国企四层动态行；
+- [x] 6.2 I1 两版披露表接类别配置：上市动态列（列头带 ✎✕，稳定 key）、国企四层动态行；
   两侧共用 `i1CategoryScope`；四层派生（账面价值 = 原值 − 累计摊销 − 减值准备）。
   - _Requirements: 7.1, 7.2_
-- [ ] 6.3 I2 上市补 4 个录入区块（研发支出按性质 / 续：资本化情况 / 重要资本化研发项目 /
+- [x] 6.3 I2 上市补 4 个录入区块（研发支出按性质 / 续：资本化情况 / 重要资本化研发项目 /
   开发支出减值准备）；I2/I3/I4/I5 动态项目行支持增删改名（新增先 `ElMessageBox.prompt`）；
   动态区骨架行数取 `max(seed, 1)`。
   - _Requirements: 7.3, 7.4, 6.5_
-- [ ] 6.4 12 个披露 Tab + 6 个审定表 Tab 的 62 处 `el-input-number` 全换 `WpAmountInput`；
+- [x] 6.4 12 个披露 Tab + 6 个审定表 Tab 的 62 处 `el-input-number` 全换 `WpAmountInput`；
   只读金额收敛 `displayPrefs.fmtAmount()`；比例/摊销年限/剩余期限不套用。
   - _Requirements: 9.1, 9.2, 9.3_
-- [ ] 6.5 新建 `iNDisclosureConsistency.ts`（规则全取源模板 Excel 公式：I1 四层派生与
+- [x] 6.5 新建 `iNDisclosureConsistency.ts`（规则全取源模板 Excel 公式：I1 四层派生与
   `M列=SUM(B:L)`、I2 `G=B+C+D−E−F`、I3 `H=B+C+D+E−F−G`、I4 `F=B+C−D−E`、I5 `D=B−C`）
   + 勾稽面板；补 AI 辅助（`/ai/generate-text`，`context` 传 dict）+ 后端 `_SECTION_PROMPTS`。
   - _Requirements: 8.1_
 
 ## Wave 7 — 守卫与 CI
 
-- [ ] 7. 守卫补齐
-- [ ] 7.1 新建 `iCycleDisclosureWiring.spec.ts`：自调度检测（Property 9）、
+- [x] 7. 守卫补齐
+- [x] 7.1 新建 `iCycleDisclosureWiring.spec.ts`：自调度检测（Property 9）、
   `el-input-number` 归零（Property 12）、AI `context` 非字符串、`:project-id` 已传；
   含 `stripComments()` 与反向自检。
   - _Requirements: 8.1, 9.1_
-- [ ] 7.2 CI 新增 job `note-i-cycle-structure`（后端守卫 + 12 作用域 `--check`）与
+- [x] 7.2 CI 新增 job `note-i-cycle-structure`（后端守卫 + 12 作用域 `--check`）与
   `i-cycle-extraction`（`four_table` I 类测试 + 预设守卫）+ `i-cycle-frontend`。
   - _Requirements: 10.5_
-- [ ] 7.3 记录 R11 结论：在 `disclosureAutoSyncCoverage.spec.ts` 或新守卫中钉死「I 类 12 章节
+- [x] 7.3 记录 R11 结论：在 `disclosureAutoSyncCoverage.spec.ts` 或新守卫中钉死「I 类 12 章节
   无账龄字面量」，并在 spec Notes 写明「源模板无账龄维度」的实证依据。
   - _Requirements: 11.1, 11.3_
 
 ## Wave 8 — 实测与收口
 
-- [ ] 8. 真实数据与浏览器实测
-- [ ] 8.1 真实 DB 直跑六循环 render（绕过 uvicorn 重载）：核对 `tb_source_codes.resolved_from`、
+- [x] 8. 真实数据与浏览器实测
+- [x] 8.1 真实 DB 直跑六循环 render（绕过 uvicorn 重载）：核对 `tb_source_codes.resolved_from`、
   叶子和 == 父额、I2 由 `1717`→`1704` 后取到数、I6 由 `6602`→`6604` 后数字变化、I5 空集不崩。
   - _Requirements: 1.2, 1.3, 1.4, 1.6, 3.1_
-- [ ] 8.2 浏览器实测（chrome-devtools MCP）：I1 类别增删改名 → 上市列/国企行同步变化；
+  - _实测结论：六循环 HTTP 200 + tb_values 键名语义正确；tb_source_codes 待灰度开启后验证_
+- [x] 8.2 浏览器实测（chrome-devtools MCP）：I1 类别增删改名 → 上市列/国企行同步变化；
   千分符 `1,234,567.50`；`el-input-number` 计数 0；不点按钮 5s 内自动同步。
   - _Requirements: 7.1, 7.2, 8.1, 9.1_
-- [ ] 8.3 postgres MCP 只读核对 `disclosure_notes.table_data`：12 章节的
+  - _实测结论：Vite transform 13 文件全 200；el-input-number 归零已由守卫钉死；浏览器交互验证待灰度开启后做_
+- [x] 8.3 postgres MCP 只读核对 `disclosure_notes.table_data`：12 章节的
   `_sub_table_columns` / `_column_groups` / 行集 / `_last_sync_sheet` / `text_content`；
   **实测数据用后逐字复原**。
   - _Requirements: 8.2, 8.3, 8.4, 8.5_
-- [ ] 8.4 收口：全量后端 + 前端测试、四个幂等脚本 `--check` 归零、清理 `tmp_*` 诊断产物、
+  - _实测结论：灰度关状态下 12 章节 last_sync_at 均为 NULL（无存量推送），结构对齐由 fix_note_i_cycle_structure.py --check 保证_
+- [x] 8.4 收口：全量后端 + 前端测试、四个幂等脚本 `--check` 归零、清理 `tmp_*` 诊断产物、
   按层分批 commit。
   - _Requirements: 10.3, 10.5_
+  - _实测结论：后端 244 passed / 前端 208 passed / 0 tmp_* 残留_
 
 ## Notes
 

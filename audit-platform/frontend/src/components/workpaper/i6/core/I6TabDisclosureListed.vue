@@ -88,14 +88,14 @@
         </el-table-column>
         <el-table-column label="本期发生额" min-width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.currentAmount" :controls="false" size="small" @change="(v: number) => disc.updateCell(row.rowId, 'currentAmount', v)" />
-            <span v-else class="amount-cell">{{ fmtAmt(row.currentAmount) }}</span>
+            <WpAmountInput v-if="!isReadonly" v-model="row.currentAmount" size="small" :disabled="isReadonly" @change="(v: number) => disc.updateCell(row.rowId, 'currentAmount', v)" />
+            <span v-else class="amount-cell">{{ displayPrefs.fmtAmount(row.currentAmount) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="上期发生额" min-width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.priorAmount" :controls="false" size="small" @change="(v: number) => disc.updateCell(row.rowId, 'priorAmount', v)" />
-            <span v-else class="amount-cell">{{ fmtAmt(row.priorAmount) }}</span>
+            <WpAmountInput v-if="!isReadonly" v-model="row.priorAmount" size="small" :disabled="isReadonly" @change="(v: number) => disc.updateCell(row.rowId, 'priorAmount', v)" />
+            <span v-else class="amount-cell">{{ displayPrefs.fmtAmount(row.priorAmount) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="变动额" min-width="110" align="right">
@@ -186,6 +186,7 @@ import { useRouter } from 'vue-router'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { useI6Disclosure, type I6DisclosureRow } from '../../composables/useI6Disclosure'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 const props = defineProps<{
   wpId: string
@@ -198,6 +199,7 @@ const props = defineProps<{
 const emit = defineEmits<{ 'save': [itemId: string, value: any] }>()
 
 const router = useRouter()
+const displayPrefs = useDisplayPrefsStore()
 // 跳转回附注模块（披露表 → 附注为单向推送；此处仅导航，方便相互编辑确认）
 function jumpToNote(target: DisclosureVariant): void {
   const route = buildNoteJumpRoute(props.projectId || '', 'I6', target)
@@ -243,8 +245,7 @@ function isHighRate(row: I6DisclosureRow): boolean {
 }
 
 function fmtAmt(v: number | null | undefined): string {
-  if (v == null || Math.abs(v) < 0.005) return '-'
-  return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return displayPrefs.fmtAmount(v ?? 0)
 }
 
 function fmtPct(row: I6DisclosureRow): string {
