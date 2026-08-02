@@ -12,8 +12,8 @@ export const I2_NOTE_SECTION = {
 } as const satisfies Record<I2DisclosureVariant, string>
 
 export const I2_DISCLOSURE_SHEET_NAME = {
-  listed: '附注披露信息（上市公司）',
-  soe: '附注披露信息（国有企业）',
+  listed: '附注披露（上市公司）',
+  soe: '附注披露（国有企业）',
 } as const satisfies Record<I2DisclosureVariant, string>
 
 /** 与 note_template tables[].name 一致 */

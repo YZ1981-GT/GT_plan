@@ -170,7 +170,7 @@ CategoryScope + 6 个 NoteSectionMap + 6 个 SyncPayload + 12 个披露 Tab + 6 
 ## Wave 5 — 披露映射与推送载荷
 
 - [ ] 5. 六循环 12 作用域的 `columns` 与载荷对齐
-- [ ] 5.1 修正 `i2NoteSectionMap.I2_DISCLOSURE_SHEET_NAME`：去掉「信息」二字（源 xlsx 实为
+- [x] 5.1 修正 `i2NoteSectionMap.I2_DISCLOSURE_SHEET_NAME`：去掉「信息」二字（源 xlsx 实为
   `附注披露（上市公司）` / `（国有企业）`），并重跑 `gen_note_wp_sync_registry.py --write`。
   - _Requirements: 8.5_
 - [ ] 5.2 六个 `iNNoteSectionMap.ts` 更新 `I{N}_{VARIANT}_SUBTABLE` 表名常量 + 新增
