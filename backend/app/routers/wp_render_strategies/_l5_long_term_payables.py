@@ -22,8 +22,9 @@ import logging
 
 import sqlalchemy as sa
 
+from app.services.l_cycle_extraction.render_support import build_l_tb_payload
+
 from ._context import RenderContext
-from ._lmn_tb_helper import fetch_tb_for_balance
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +86,8 @@ async def render(ctx: RenderContext) -> dict | None:
         logger.warning("L5 render: project context 查询失败: %s", e)
 
     # ─── TB 取数（L 循环四表取数 spec） ─────────────────────────────────────
-    tb = await fetch_tb_for_balance(ctx, "2701")
+    tb_payload = await build_l_tb_payload(ctx, "L5")
+    resolved_code = "/".join(tb_payload["tb_source_codes"].get("gross_standard") or [])
 
     return {
         "sheet_name": ctx.classification.sheet_name if ctx.classification else "",
@@ -93,7 +95,7 @@ async def render(ctx: RenderContext) -> dict | None:
         "responses_snapshot": responses_snapshot,
         # 负债类公式方向元数据（前端可用于初始化校验）
         "formula_direction": {
-            "account_code": "2701",
+            "account_code": resolved_code,
             "account_name": "长期应付款",
             "direction": "credit",  # 贷方/负债类
             "end_balance_formula": "begin + credit - debit",  # 期末=期初+贷方-借方
@@ -104,5 +106,5 @@ async def render(ctx: RenderContext) -> dict | None:
             "direction": "debit",  # 借方/备抵类
             "end_balance_formula": "begin + debit - credit",  # 期末=期初+借方-贷方
         },
-        "trial_balance": tb,
+        **tb_payload,
     }

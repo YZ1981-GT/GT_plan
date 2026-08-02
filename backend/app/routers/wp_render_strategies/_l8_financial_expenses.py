@@ -29,8 +29,9 @@ import sqlalchemy as sa
 from app.models.audit_platform_models import TbLedger
 from app.services.dataset_query import get_active_filter
 
+from app.services.l_cycle_extraction.render_support import build_l_tb_payload
+
 from ._context import RenderContext
-from ._lmn_tb_helper import fetch_tb_for_income
 
 logger = logging.getLogger(__name__)
 
@@ -197,7 +198,11 @@ async def render(ctx: RenderContext) -> dict | None:
     )
 
     # ─── TB 取数（L 循环四表取数 spec） ─────────────────────────────────────
-    tb = await fetch_tb_for_income(ctx, "6603")
+    # 🔴 改造前此处用 fetch_tb_for_income(ctx, "6603") → debit-credit 恒 0
+    #    （含年末结转损益的全年账 debit == credit，DB 实证 543,020,073.49 双侧相等）。
+    #    现改走 trial_balance 本期发生额权威口径。
+    tb_payload = await build_l_tb_payload(ctx, "L8")
+    resolved_code = "/".join(tb_payload["tb_source_codes"].get("gross_standard") or [])
 
     return {
         "sheet_name": ctx.classification.sheet_name if ctx.classification else "",
@@ -205,12 +210,13 @@ async def render(ctx: RenderContext) -> dict | None:
         "responses_snapshot": responses_snapshot,
         # 损益类公式方向元数据（前端可用于初始化校验）
         "formula_direction": {
-            "account_code": "6603",
+            "account_code": resolved_code,
             "account_name": "财务费用",
             "direction": "debit",  # 借方/损益类费用
-            "occurrence_formula": "debit_occur - credit_occur",  # 发生额=借方发生-贷方发生
+            "occurrence_formula": "trial_balance.unadjusted_amount（本期发生额权威口径）",
         },
-        # tb_ledger 发生额（前端审定表 seed 数据）
+        # tb_ledger 发生额（前端审定表 seed 数据 —— 保留兼容，但已知恒 0 问题）
         "occurrence_from_ledger": occurrence_data,
-        "trial_balance": tb,
+        **tb_payload,
     }
+

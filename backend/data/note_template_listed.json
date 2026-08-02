@@ -21024,7 +21024,7 @@
         {
           "name": "短期借款分类",
           "headers": [
-            "项目",
+            "项  目",
             "期末余额",
             "上年年末余额"
           ],
@@ -21050,10 +21050,29 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项  目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "end_amount",
+              "label": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_amount",
+              "label": "上年年末余额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "（用于抵押、质押的财产应予披露。）"
         },
         {
-          "name": "借款单位",
+          "name": "（2）逾期借款情况",
           "headers": [
             "借款单位",
             "期末余额",
@@ -21067,7 +21086,36 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "借款单位",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "end_amount",
+              "label": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "rate",
+              "label": "借款利率",
+              "format": "percent"
+            },
+            {
+              "key": "overdue_period",
+              "label": "逾期时间",
+              "format": "text"
+            },
+            {
+              "key": "overdue_rate",
+              "label": "逾期利率",
+              "format": "percent"
+            }
+          ],
+          "guidance": "汇总披露逾期借款（包括从长期借款转入的）的期末余额。对于重要的逾期借款，按借款单位列示借款期末余额、借款利率、逾期时间及逾期利率。"
         }
       ],
       "text_sections": [
@@ -21089,7 +21137,9 @@
       "parent_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi",
       "sort_index": 32,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "fix_note_l1_short_term_loans_structure.py",
+      "_aligned_at": "2026-08-02 22:39:36"
     },
     {
       "section_number": "五、34",
@@ -22582,7 +22632,26 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "end_amount",
+              "label": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_amount",
+              "label": "上年年末余额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "一年内到期的各项非流动负债按类别分别列示。"
         },
         {
           "name": "一年内到期的长期借款",
@@ -22613,7 +22682,26 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "end_amount",
+              "label": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_amount",
+              "label": "上年年末余额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "一年内到期的各项非流动负债按类别分别列示。"
         },
         {
           "name": "一年内到期的应付债券",
@@ -22630,18 +22718,47 @@
               "is_total": true,
               "row_type": "subtotal"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "债券名称",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "face_value",
+              "label": "面值",
+              "format": "amount"
+            },
+            {
+              "key": "issue_date",
+              "label": "发行日期",
+              "format": "text"
+            },
+            {
+              "key": "term",
+              "label": "债券期限",
+              "format": "text"
+            },
+            {
+              "key": "issue_amount",
+              "label": "发行金额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "一年内到期的各项非流动负债按类别分别列示。"
         },
         {
           "name": "一年内到期的应付债券（续）",
           "headers": [
             "债券名称",
             "期初余额",
-            "本期发行",
             "按面值计提利息",
             "溢折价摊销",
             "本期偿还",
-            "期末余额"
+            "期末余额",
+            "是否违约"
           ],
           "rows": [
             {
@@ -22649,10 +22766,49 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "债券名称",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "begin_balance",
+              "label": "期初余额",
+              "format": "amount"
+            },
+            {
+              "key": "interest_accrual",
+              "label": "按面值计提利息",
+              "format": "amount"
+            },
+            {
+              "key": "premium_amort",
+              "label": "溢折价摊销",
+              "format": "amount"
+            },
+            {
+              "key": "repay_current",
+              "label": "本期偿还",
+              "format": "amount"
+            },
+            {
+              "key": "end_balance",
+              "label": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "is_default",
+              "label": "是否违约",
+              "format": "text"
+            }
+          ],
+          "guidance": "一年内到期的各项非流动负债按类别分别列示。"
         },
         {
-          "name": "项  目",
+          "name": "一年内到期的长期应付款",
           "headers": [
             "项目",
             "期末余额",
@@ -22664,7 +22820,26 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "end_amount",
+              "label": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_amount",
+              "label": "上年年末余额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "一年内到期的各项非流动负债按类别分别列示。"
         }
       ],
       "text_sections": [
@@ -22687,7 +22862,9 @@
       "parent_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi",
       "sort_index": 42,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "fix_note_l3_l4_structure.py",
+      "_aligned_at": "2026-08-02 22:42:54"
     },
     {
       "section_number": "五、44",
@@ -22894,10 +23071,10 @@
         {
           "name": "长期借款",
           "headers": [
-            "项目",
-            "期末余额",
+            "项  目",
+            "余额",
             "利率区间",
-            "上年年末余额",
+            "余额",
             "利率区间"
           ],
           "rows": [
@@ -22931,7 +23108,51 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项  目",
+              "is_label": true
+            },
+            {
+              "key": "end_amount",
+              "label": "余额",
+              "group": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "end_rate_range",
+              "label": "利率区间",
+              "group": "期末余额",
+              "format": "text"
+            },
+            {
+              "key": "prior_amount",
+              "label": "余额",
+              "group": "上年年末余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_rate_range",
+              "label": "利率区间",
+              "group": "上年年末余额",
+              "format": "text"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "期末余额",
+              "start": 1,
+              "span": 2
+            },
+            {
+              "group": "上年年末余额",
+              "start": 3,
+              "span": 2
+            }
+          ],
+          "guidance": "按借款种类分类列示（质押/抵押/保证/信用），同时列示利率区间。减：一年内到期的长期借款。"
         }
       ],
       "text_sections": [
@@ -22953,7 +23174,9 @@
       "parent_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi",
       "sort_index": 44,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "fix_note_l3_l4_structure.py",
+      "_aligned_at": "2026-08-02 22:42:54"
     },
     {
       "section_number": "五、46",
@@ -22974,7 +23197,26 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "end_amount",
+              "label": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_amount",
+              "label": "上年年末余额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "按面值/溢折价/应计利息列示应付债券期末与上年年末余额。15 号文：应付债券披露面值、利率、期限、发行日期、还本付息方式等基本情况。"
         },
         {
           "name": "应付债券的增减变动（不包括划分为金融负债的优先股、永续债等其他金融工具）",
@@ -22992,7 +23234,41 @@
               "is_total": true,
               "row_type": "subtotal"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "债券名称",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "face_value",
+              "label": "面值",
+              "format": "amount"
+            },
+            {
+              "key": "coupon_rate",
+              "label": "票面利率",
+              "format": "percent"
+            },
+            {
+              "key": "issue_date",
+              "label": "发行日期",
+              "format": "text"
+            },
+            {
+              "key": "term",
+              "label": "债券期限",
+              "format": "text"
+            },
+            {
+              "key": "issue_amount",
+              "label": "发行金额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "应付债券基本信息：逐只列示债券名称、面值、票面利率、发行日期、债券期限、发行金额。15 号文第三十八条相关条款。"
         },
         {
           "name": "应付债券（续）",
@@ -23021,21 +23297,65 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "债券名称",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "begin_balance",
+              "label": "期初余额",
+              "format": "amount"
+            },
+            {
+              "key": "issue_current",
+              "label": "本期发行",
+              "format": "amount"
+            },
+            {
+              "key": "interest_accrual",
+              "label": "按面值计提利息",
+              "format": "amount"
+            },
+            {
+              "key": "premium_amort",
+              "label": "溢折价摊销",
+              "format": "amount"
+            },
+            {
+              "key": "repay_current",
+              "label": "本期偿还",
+              "format": "amount"
+            },
+            {
+              "key": "end_balance",
+              "label": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "is_default",
+              "label": "是否违约",
+              "format": "text"
+            }
+          ],
+          "guidance": "应付债券变动明细（续表）：期末余额 = 期初余额 + 本期发行 + 按面值计提利息 + 溢折价摊销 − 本期偿还。「是否违约」注明到期未能偿还的情况。"
         },
         {
-          "name": "参考披露格式：",
+          "name": "（3）划分为金融负债的其他金融工具",
           "headers": [
-            "发行在外的金融工具",
-            "发行时间",
-            "会计分类",
-            "股利率或利息率",
-            "发行价格",
-            "数量",
-            "金额",
-            "到期日或续期情况",
-            "转股条件",
-            "转换情况"
+            "项目",
+            "期初余额",
+            "本期增加",
+            "本期计提利息",
+            "本期减少",
+            "期末余额",
+            "票面利率（股息率）",
+            "发行日",
+            "期限",
+            "转股/赎回条件"
           ],
           "rows": [
             {
@@ -23059,22 +23379,72 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "begin_balance",
+              "label": "期初余额",
+              "format": "amount"
+            },
+            {
+              "key": "issue_current",
+              "label": "本期增加",
+              "format": "amount"
+            },
+            {
+              "key": "interest_current",
+              "label": "本期计提利息",
+              "format": "amount"
+            },
+            {
+              "key": "repay_current",
+              "label": "本期减少",
+              "format": "amount"
+            },
+            {
+              "key": "end_balance",
+              "label": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "dividend_yield",
+              "label": "票面利率（股息率）",
+              "format": "percent"
+            },
+            {
+              "key": "issue_date",
+              "label": "发行日",
+              "format": "text"
+            },
+            {
+              "key": "term",
+              "label": "期限",
+              "format": "text"
+            },
+            {
+              "key": "condition",
+              "label": "转股/赎回条件",
+              "format": "text"
+            }
+          ],
+          "guidance": "划分为金融负债的优先股、永续债等其他金融工具增减变动情况。逐只列示面值、票面利率（股息率）、发行日期、期限及转股/赎回条件。15 号文第三十七条：公开发行的金融工具按类别披露条款和条件。"
         },
         {
           "name": "期末发行在外的优先股、永续债等其他金融工具变动情况",
           "headers": [
             "发行在外的金融工具",
-            "期初余额",
+            "期初",
             "本期增加",
             "本期减少",
-            "期末余额"
+            "期末"
           ],
           "rows": [
-            {
-              "label": "发行在外的金融工具",
-              "row_type": "header_label"
-            },
             {
               "label": "工具1",
               "row_type": "data"
@@ -23084,7 +23454,36 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "发行在外的金融工具",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "begin_count",
+              "label": "期初",
+              "format": "amount"
+            },
+            {
+              "key": "increase_count",
+              "label": "本期增加",
+              "format": "amount"
+            },
+            {
+              "key": "decrease_count",
+              "label": "本期减少",
+              "format": "amount"
+            },
+            {
+              "key": "end_count",
+              "label": "期末",
+              "format": "amount"
+            }
+          ],
+          "guidance": "期末发行在外的优先股、永续债等其他金融工具数量变动情况。如无发行在外的优先股/永续债，本表可删除。"
         }
       ],
       "text_sections": [
@@ -23128,7 +23527,9 @@
       "parent_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi",
       "sort_index": 45,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "fix_note_l3_l4_structure.py",
+      "_aligned_at": "2026-08-02 22:43:45"
     },
     {
       "section_number": "五、47",
