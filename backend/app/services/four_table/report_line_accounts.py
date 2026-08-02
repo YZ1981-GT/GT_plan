@@ -77,6 +77,23 @@ class ReportLineAccountSpec:
         extra_standard_codes: 报表公式**未必引用**但底稿需要单列的科目标准码
             （如 K1-1「与经审计的财务报表核对」区要单列 ``1131`` 应收股利 /
             ``1132`` 应收利息）。它们不并入 `gross`，单独放 `extra`。
+        is_liability: **负债 / 权益类循环置 True**。
+
+            🔴 为什么需要：:func:`split_gross_provision` 把
+            ``account_chart.direction == 'credit'`` 一律判为备抵 —— 这对**资产**循环
+            成立（原值借方、备抵贷方），但**负债循环的原值本身就是贷方**。实证 J 类：
+            4 个项目的 ``account_chart`` 里 ``2211 应付职工薪酬`` / ``2705 长期应付职工
+            薪酬`` 均为 ``direction='credit'`` → 原值被整体误判成备抵 → ``gross`` 变空、
+            ``resolved_from`` 谎报 ``fallback``、且 ``provision_standard`` 里出现
+            ``2211`` → 溯源面板把「应付职工薪酬」显示成备抵科目。
+            （第 5 个项目 ``account_chart`` 无该科目行才侥幸走对，即缺陷被数据掩盖。）
+
+            置 True 时**跳过备抵拆分**，公式解析出的码全部归 ``gross``；备抵仍可经
+            :attr:`provision_row_code` 从独立报表行取。默认 ``False`` = 与本字段引入前
+            逐字等价（D1/K1/K2/F1/F2/G7 等既有资产类消费者零回归）。
+
+            适用范围：J1/J2、K3~K7（应付利息/股利/其他应付款等）、L1~L8（长期借款/
+            应付债券/长期应付款）、M（权益类）—— 凡「原值贷方」的循环。
     """
 
     row_code: str
@@ -85,6 +102,7 @@ class ReportLineAccountSpec:
     provision_row_code: str | None = None
     provision_name_filter: str | None = None
     extra_standard_codes: tuple[str, ...] = ()
+    is_liability: bool = False
 
 
 @dataclass(frozen=True)
@@ -428,7 +446,15 @@ async def resolve_report_line_accounts(
     signed = extract_signed_codes(formula)
 
     chart_rows = await fetch_standard_chart_rows(ctx)
-    gross_std, provision_std = split_gross_provision(codes, chart_rows)
+    if spec.is_liability:
+        # 负债/权益循环：原值本身是贷方，不能按 direction=='credit' 判备抵
+        # （否则原值被整体误判成备抵，gross 变空 → resolved_from 谎报 fallback）。
+        # 备抵仍可经 spec.provision_row_code 从独立报表行取。
+        gross_std, provision_std = [
+            c for c in dict.fromkeys((codes or [])) if (c or "").strip()
+        ], []
+    else:
+        gross_std, provision_std = split_gross_provision(codes, chart_rows)
 
     # 附加科目（如 1131/1132）不参与原值口径 —— 从 gross 里摘出去单列
     extra_std = [c for c in (spec.extra_standard_codes or ()) if c]

@@ -1,0 +1,123 @@
+{
+  "acceptance_result": {
+    "deny_probes_present": true,
+    "error_allow": 0,
+    "error_allow_pass": true,
+    "error_rate_pass": true,
+    "gate_p95_pass": true,
+    "list_p95_pass": true
+  },
+  "acceptance_targets": {
+    "error_allow": 0,
+    "error_rate": 0.01,
+    "gate_p95_seconds": 1.0,
+    "list_p95_seconds": 2.0
+  },
+  "cache_consistency": {
+    "db_epoch_recheck_within_1s_denies": true,
+    "epoch_ttl_seconds": 1.0,
+    "no_stale_allow": true,
+    "redis_fast_path_denies_immediately": true
+  },
+  "extrapolation_basis": "p95 measured under connection-pool saturation (the security-critical serialization point); literal 6000 simultaneous clients NOT run on dev box; achieved 64 in-flight over 6000 requests is the largest honest representative concurrency on this host",
+  "feature": "visibility-isolation-go-live-hardening",
+  "freeze_gate": {
+    "measurement_only_inert": true,
+    "missing_hash_refuses_activation": true,
+    "no_thresholds_refused": true,
+    "nonpositive_threshold_refused": true,
+    "valid_freeze_active": true,
+    "version_mismatch_refused": true
+  },
+  "honesty_note": "literal 6000 simultaneous HTTP clients NOT fabricated; achieved concurrency + extrapolation basis documented; frozen profile bound by measured CapacityReport hash",
+  "methodology": "in-process real services (resolve_wp_binding_and_access / WorkpaperListQueryService) against real PostgreSQL audit_platform; closed-loop bounded in-flight concurrency",
+  "performance_profile": {
+    "achieved_inflight_concurrency": 64,
+    "action_mix": {
+      "ai": 0.08,
+      "attachment": 0.08,
+      "bulk": 0.05,
+      "editor_callback": 0.08,
+      "gate_checklist": 0.12,
+      "gate_dedicated": 0.08,
+      "gate_detail": 0.08,
+      "gate_render": 0.16,
+      "gate_version": 0.08,
+      "list": 0.14,
+      "worker": 0.05
+    },
+    "config_digest": "ad3e5f8d0ecdce3afba9e28374cb280d0c40fdad463bc7f7555a24ea3f333ec0",
+    "data_scale": "1 project x N wp_index (mixed cycles) x working_paper",
+    "duration": "fixed total request budget (closed-loop), not wall-clock bounded",
+    "project_distribution": "single active project, mixed audit cycles D/E/F, lead+admin+restricted principals",
+    "ramp": "staged ramp to max achievable in-flight; bounded by asyncpg pool serialization",
+    "request_rate": "closed-loop: fixed in-flight concurrency window, back-to-back requests",
+    "target_concurrency": 6000,
+    "total_requests": 6000,
+    "version": "perf-6000-golive-v1"
+  },
+  "production_reads_only_frozen": {
+    "default_limiter_inert": true,
+    "inert_never_limits": true
+  },
+  "rate_limit_acceptance": {
+    "family": "gate_render",
+    "over_threshold_429": true,
+    "per_user_isolated": true,
+    "recovers_after_window": true,
+    "resource_independent": true,
+    "retry_after_valid": true,
+    "within_threshold_no_false_limit": true
+  },
+  "rate_limit_profile": {
+    "activation_binding": "is_active iff frozen AND capacity_report_hash present & equal to source CapacityReport.content_hash(); missing report/hash refuses activation",
+    "active": true,
+    "capacity_report_hash_recorded_in": "manifest run notes (volatile per measurement)",
+    "frozen": true,
+    "per_family_families": [
+      "ai",
+      "attachment",
+      "bulk",
+      "editor_callback",
+      "gate_checklist",
+      "gate_dedicated",
+      "gate_detail",
+      "gate_render",
+      "gate_version",
+      "list",
+      "worker"
+    ],
+    "per_project_families": [
+      "ai",
+      "attachment",
+      "bulk",
+      "editor_callback",
+      "gate_checklist",
+      "gate_dedicated",
+      "gate_detail",
+      "gate_render",
+      "gate_version",
+      "list",
+      "worker"
+    ],
+    "per_user_families": [
+      "ai",
+      "attachment",
+      "bulk",
+      "editor_callback",
+      "gate_checklist",
+      "gate_dedicated",
+      "gate_detail",
+      "gate_render",
+      "gate_version",
+      "list",
+      "worker"
+    ],
+    "source_performance_profile_version": "perf-6000-golive-v1",
+    "threshold_derivation": "per_family=ceil(tput/11*1.0*2.0); per_user=ceil(tput/64*1.0*2.0); per_project=ceil(tput*1.0*2.0)",
+    "version": "rate-6000-golive-v1",
+    "window_seconds": 1.0
+  },
+  "requirement": "R4 真实容量验收与冻结生产 Rate_Limit_Profile",
+  "task": "5"
+}

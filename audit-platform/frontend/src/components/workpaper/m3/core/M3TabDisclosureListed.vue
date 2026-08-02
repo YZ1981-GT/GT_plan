@@ -46,39 +46,30 @@
         <el-table-column prop="item" label="项目" min-width="160" />
         <el-table-column label="期初金额" min-width="130" align="right">
           <template #default="{ row, $index }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.beginAmount"
-              :controls="false"
-              size="small"
-              style="width:100%"
-              @change="(val: number | undefined) => updateTreasuryRow($index, 'beginAmount', val ?? 0)"
+              @update:model-value="(val: number) => updateTreasuryRow($index, 'beginAmount', val)"
             />
             <span v-else>{{ fmtAmount(row.beginAmount) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="本期回购增加" min-width="130" align="right">
           <template #default="{ row, $index }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.repurchaseIncrease"
-              :controls="false"
-              size="small"
-              style="width:100%"
-              @change="(val: number | undefined) => updateTreasuryRow($index, 'repurchaseIncrease', val ?? 0)"
+              @update:model-value="(val: number) => updateTreasuryRow($index, 'repurchaseIncrease', val)"
             />
             <span v-else>{{ fmtAmount(row.repurchaseIncrease) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="本期注销减少" min-width="130" align="right">
           <template #default="{ row, $index }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.cancelDecrease"
-              :controls="false"
-              size="small"
-              style="width:100%"
-              @change="(val: number | undefined) => updateTreasuryRow($index, 'cancelDecrease', val ?? 0)"
+              @update:model-value="(val: number) => updateTreasuryRow($index, 'cancelDecrease', val)"
             />
             <span v-else>{{ fmtAmount(row.cancelDecrease) }}</span>
           </template>
@@ -187,6 +178,7 @@
  * 科目：4002 库存股（**借方/权益备抵类！**）
  */
 import { computed, inject, onMounted, onUnmounted, ref, watch } from 'vue'
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, Check } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
