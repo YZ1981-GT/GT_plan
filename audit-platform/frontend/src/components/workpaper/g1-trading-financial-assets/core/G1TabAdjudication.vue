@@ -59,6 +59,13 @@
         将净额 <b>{{ fmt(lastWritebackNet) }}</b> 分摊至「投资成本 · 交易性」下各品种。
         合计须接近净额；差额自动留在默认「其他」行。
       </p>
+      <!-- 四表库取数溯源（口径：期末余额） -->
+      <WpFourTableSourcePanel
+        :source-codes="tbSourceCodes"
+        gross-label="交易性金融资产"
+        fallback-row-code="BS-003"
+      />
+
       <el-table :data="allocRows" border size="small" max-height="360">
         <el-table-column prop="label" label="目标行" min-width="220" />
         <el-table-column label="分摊金额" width="160">
@@ -267,6 +274,7 @@ import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBring
 import GtIndexChip from '../../GtIndexChip.vue'
 import G1AuditTextCards from '../G1AuditTextCards.vue'
 import G1ImportExportDropdown from '../G1ImportExportDropdown.vue'
+import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -276,6 +284,14 @@ const props = defineProps<{
   htmlData?: any
 }>()
 
+
+/**
+ * 四表库取数溯源（消费 render 下发的 `tb_source_codes`，消除 dead output）。
+ *
+ * 科目由后端按**科目名**逐项目解析（`four_table/g_cycle_specs.G1_SPEC`），
+ * 取数口径 = 期末余额。前端单一真源见 `composables/gCycleAccountScope.ts`。
+ */
+const tbSourceCodes = computed(() => props.htmlData?.tb_source_codes ?? null)
 const emit = defineEmits<{ imported: [] }>()
 
 const wpId = computed(() => props.wpId ?? '')

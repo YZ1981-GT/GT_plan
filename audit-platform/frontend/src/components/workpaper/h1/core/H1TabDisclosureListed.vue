@@ -518,10 +518,12 @@ import {
   listedMovementTotal,
 } from '../../composables/h1DisclosureConsistency'
 import {
+  H1_DISCLOSURE_SHEET_NAME,
   H1_NOTE_SECTION,
   resolveH1CurrentStandardFromProject,
   resolveH1VariantFromTemplateType,
 } from '../../composables/h1NoteSectionMap'
+import { useRestrictedAssetsSync } from '../../composables/useRestrictedAssetsSync'
 import { buildH1ListedSyncPayloads, type H1ListedSyncSnapshot } from '../../composables/h1DisclosureSyncPayload'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { pullH6ClearingForH1Listed } from '../../composables/h1SoeClearingH6Pull'
@@ -1227,6 +1229,27 @@ function getSnapshot(): H1ListedSyncSnapshot {
   }
 }
 
+/**
+ * 受限资产共享表（listed `五、32`）的「固定资产」段。
+ *
+ * 数据源 = H1-16/H1-17 权属检查带入的抵押行（`H1-listed-mortgage-rows` /
+ * `H1-soe-restricted-rows`，`checklist_responses` 里的底稿事实，与变体无关）。
+ * 该来源**只有期末口径** → 只推主表、不推「（续：上年年末）」。
+ * 采集逻辑在 `restrictedAssetsSources.ts`，网络与 fail closed 提示在共享 composable。
+ */
+const syncRestrictedAssets = useRestrictedAssetsSync({
+  owner: 'BS-028',
+  variant: () => 'listed',
+  wpId: () => props.wpId,
+  projectId: () => props.projectId,
+  responses: () => props.allResponses as unknown as Map<string, { remark?: string | null }>,
+  applicableStandards: () => [
+    resolveH1CurrentStandardFromProject('listed', props.templateType, props.reportScope),
+  ],
+  sheetNames: H1_DISCLOSURE_SHEET_NAME,
+  isReadonly: () => isReadonly.value,
+})
+
 async function syncToNotes() {
   if (isSyncing.value || isReadonly.value || !props.projectId || !props.wpId) return
   if (variantMismatch.value) {
@@ -1253,6 +1276,8 @@ async function syncToNotes() {
       rows += Number(data?.rows_synced ?? 0)
     }
     ElMessage.success(`已同步 ${rows} 行到附注「${noteSectionId}」`)
+    // 受限资产共享表的「固定资产」段（跨循环共享表，只替换本段、他段原样保留）
+    await syncRestrictedAssets()
   } catch {
     ElMessage.warning('同步附注失败，请稍后重试')
   } finally {

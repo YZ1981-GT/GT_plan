@@ -21,10 +21,17 @@ import {
 import { ratioOf } from '../composables/useD1FormulaEngine'
 import {
   buildD1SyncPayload,
+  D1_DISCLOSURE_SHEET_NAME,
   D1_NOTE_SECTION,
   D1_MAIN_SUBTABLE,
   type D1DisclosureSnapshot,
 } from '../composables/d1NoteSectionMap'
+import {
+  buildRestrictedAssetsPayloads,
+  RESTRICTED_ASSETS_NOTE_SECTION,
+  RESTRICTED_ASSETS_OWNERS,
+  summarizeRestrictedRows,
+} from '../composables/restrictedAssetsNoteSectionMap'
 import type { ChecklistResponse } from '../composables/useD1FormData'
 import type { Ref } from 'vue'
 import { useAgingConfig, PRESET_SEGMENTS } from '@/composables/useAgingConfig'
@@ -1060,11 +1067,76 @@ async function syncToDisclosureNotes(): Promise<void> {
       },
     }))
     ElMessage.success(`已同步 ${rows} 行到附注模块「${D1_NOTE_SECTION[props.variant]} 应收票据」`)
+    await syncRestrictedAssetsToNote()
     await checkNoteConsistency(true)
   } catch {
     ElMessage.warning('同步附注失败，请稍后重试')
   } finally {
     isSyncing.value = false
+  }
+}
+
+/**
+ * 受限资产 → 附注 `五、32`（上市）/ `八、93`（国企）的**第二个 payload**。
+ *
+ * 🔴 该表是**跨循环共享表**（货币资金 / 应收票据 / 应收账款 / 应收款项融资 / 存货 /
+ * 固定资产 / 在建工程 / 无形资产 各一段），D1 只负责 `BS-005 应收票据` 段，
+ * 载荷带 `_row_scope` → 服务端只替换该段、段外行原样保留。
+ *
+ * 数据源 = 本页「期末已质押的应收票据」表（质押即所有权/使用权受限）。
+ * 该表**只有期末口径**（`pledgedAmount`，无上年年末）→ `priorAmount` 不声明，
+ * 共享件据此**只推 listed 主表、不推「（续：上年年末）」**（推 0 会覆盖审计师
+ * 在附注续表手填的上年年末值）。
+ *
+ * 无质押票据（表空或全零）时返回 `[]` → 不推（空推送会把段恢复成模板骨架）。
+ * 失败静默不盖主提示。
+ */
+async function syncRestrictedAssetsToNote(): Promise<void> {
+  const payloads = buildRestrictedAssetsPayloads(
+    props.variant,
+    props.wpId || '',
+    hostApplicableStandards.value,
+    {
+      ownerRowCode: 'BS-005',
+      rows: summarizeRestrictedRows(
+        RESTRICTED_ASSETS_OWNERS['BS-005'],
+        // 只取明细行，不含合计行（合计由附注表自己的合计行承担）
+        pledgedRows.value.map((r: any) => ({
+          endAmount: Number(r.pledgedAmount) || 0,
+          // 受限原因：本表按票据种类分行，原因即「已质押」+ 种类
+          reason: String(r.category || '').trim() ? `已质押（${String(r.category).trim()}）` : '已质押',
+        })),
+      ),
+    },
+    D1_DISCLOSURE_SHEET_NAME,
+  )
+  if (!payloads.length) return
+  for (const payload of payloads) {
+    try {
+      const resp: any = await http.post(
+        `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,
+        payload,
+      )
+      const data = resp?.data ?? resp
+      const unresolved: string[] = data?.row_scope_unresolved || []
+      if (unresolved.length) {
+        // fail closed 是静默跳过 → 必须让审计师知道这张表没同步成功
+        ElMessage.warning(`受限资产未能同步（段边界解析失败）：${unresolved.join('、')}`)
+        continue
+      }
+      window.dispatchEvent(new CustomEvent('disclosure:note-text-updated', {
+        detail: {
+          wpCode: 'D1',
+          accountCode: '1121',
+          projectId: props.projectId,
+          section: props.variant,
+          sectionIds: [RESTRICTED_ASSETS_NOTE_SECTION[props.variant]],
+        },
+      }))
+    } catch {
+      ElMessage.warning('受限资产同步附注失败，请稍后重试')
+      return
+    }
   }
 }
 </script>

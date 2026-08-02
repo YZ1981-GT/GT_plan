@@ -30,6 +30,23 @@ export const E1_DISCLOSURE_SHEET_NAME = {
   soe: '附注披露信息(国企)',
 } as const satisfies Record<E1DisclosureVariant, string>
 
+/**
+ * ②表在附注模板里的表名（逐字，`sub_table_data` 以表名为键 → 错一个字就产生孤儿表）。
+ *
+ * 国企 `八、1` 模板已有该表；上市 `五、1` 由 `fix_note_e1_monetary_fund_structure.py`
+ * 按用户裁决补建（两版同名同结构，列头 label 按变体分开）。
+ */
+export const E1_RESTRICTED_TABLE = '受限制的货币资金明细'
+
+/**
+ * 合计行字面 —— 按**本章节实证**取值。
+ *
+ * 🔴 平台的 `DISCLOSURE_TOTAL_LABEL`（`合 计`，带空格）**不可全局硬套**：
+ * 附注模板 `五、1`/`八、1` 的合计行字面是 `合计`（无空格），而源 xlsx 底稿侧是
+ * `合  计`（两空格）→ 底稿 UI 用源模板字面、同步载荷投影成附注字面（D3 同款教训）。
+ */
+export const E1_NOTE_TOTAL_LABEL = '合计'
+
 export function resolveE1CurrentStandard(
   variant: E1DisclosureVariant,
   applicableStandards: readonly string[] | null | undefined,
@@ -48,28 +65,75 @@ export function resolveE1CurrentStandard(
 }
 
 const AMT = 'amount' as const
-const TXT = 'text' as const
 
 // ─── 列头元数据（逐字取自附注模板 五、1/八、1 + E1TabDisclosure 披露表列）──────
 // listed 主表：项目/期末余额/上年年末余额（模板 五、1 headers）
+// 🔴 必须显式标 `flat`（单级表头）—— 否则 `_infer_groups_from_headers` 可能凭空
+// 推出父表头；且 **seed 与推送两处都要加**（H8 踩过只加一侧的坑）。
 const MAIN_COLUMNS_LISTED: ColumnDef[] = [
-  { key: 'label', label: '项目', is_label: true },
+  { key: 'label', label: '项目', is_label: true, flat: true },
   { key: 'end_amount', label: '期末余额', format: AMT },
   { key: 'prior_amount', label: '上年年末余额', format: AMT },
 ]
 // soe 主表：项目/期末余额/期初余额（模板 八、1 headers）
 const MAIN_COLUMNS_SOE: ColumnDef[] = [
-  { key: 'label', label: '项目', is_label: true },
+  { key: 'label', label: '项目', is_label: true, flat: true },
   { key: 'end_amount', label: '期末余额', format: AMT },
   { key: 'prior_amount', label: '期初余额', format: AMT },
 ]
-// soe 受限表：项目/期末余额/期初余额 + 受限原因（原因为审计师录入的真实披露内容，非杜撰）
-const RESTRICTED_COLUMNS: ColumnDef[] = [
-  { key: 'label', label: '项目', is_label: true },
+/**
+ * ②表列头 —— **3 列，逐字对齐源 xlsx**（国企 R16「项 目/期末余额/年初余额」）。
+ *
+ * 🔴 底稿的「受限原因」列**不推送到附注**：源模板②表只有 3 列，受限事由按 R13 括注
+ * 「应单独说明」的要求写在**文字说明段**里（`_note_texts` 的「受限及境外款项说明」）。
+ * 平台铁律：附注是交付物，列结构随附注模版；底稿可多留审计列，同步时投影成附注形状。
+ * 改造前载荷推 4 列（含 `reason`）而模板只有 3 列 = 孤儿列。
+ */
+const RESTRICTED_COLUMNS_LISTED: ColumnDef[] = [
+  { key: 'label', label: '项目', is_label: true, flat: true },
+  { key: 'end_amount', label: '期末余额', format: AMT },
+  { key: 'prior_amount', label: '上年年末余额', format: AMT },
+]
+const RESTRICTED_COLUMNS_SOE: ColumnDef[] = [
+  { key: 'label', label: '项目', is_label: true, flat: true },
   { key: 'end_amount', label: '期末余额', format: AMT },
   { key: 'prior_amount', label: '期初余额', format: AMT },
-  { key: 'reason', label: '受限原因', format: TXT },
 ]
+
+/** 主表表名（两版同名，模板 五、1 / 八、1 的 `tables[0].name`） */
+export const E1_MAIN_TABLE = '货币资金'
+
+/**
+ * 子表名映射 `{语义键: 模板表名}` —— 供契约测试与孤儿表判定。
+ * 🔴 值必须与 `note_template_*.json` 的 `tables[].name` **逐字一致**，
+ * 否则同步产出孤儿子表（附注 TAB 永空 + 底稿数据丢失）。
+ */
+export const E1_LISTED_SUBTABLE = Object.freeze({
+  main: E1_MAIN_TABLE,
+  restricted: E1_RESTRICTED_TABLE,
+})
+export const E1_SOE_SUBTABLE = Object.freeze({
+  main: E1_MAIN_TABLE,
+  restricted: E1_RESTRICTED_TABLE,
+})
+
+/**
+ * 列定义（**零入参**）—— 平台 `disclosureColumnsCoverage` 的 sweep 用空入参调用
+ * 所有 `build*Columns` 导出，故不得设必填参数。
+ */
+export function buildE1ListedColumns(): Record<string, ColumnDef[]> {
+  return {
+    [E1_MAIN_TABLE]: MAIN_COLUMNS_LISTED,
+    [E1_RESTRICTED_TABLE]: RESTRICTED_COLUMNS_LISTED,
+  }
+}
+
+export function buildE1SoeColumns(): Record<string, ColumnDef[]> {
+  return {
+    [E1_MAIN_TABLE]: MAIN_COLUMNS_SOE,
+    [E1_RESTRICTED_TABLE]: RESTRICTED_COLUMNS_SOE,
+  }
+}
 
 // ─── 快照行类型（组件层传入，字段与 E1TabDisclosure 行接口对齐）───────────────
 export interface E1MainRowLike {
@@ -85,13 +149,30 @@ export interface E1RestrictedRowLike {
   reason: string
 }
 
+/** 一段披露说明（按源模板分段，每段带中文 title）。 */
+export interface E1NoteSectionLike {
+  key: string
+  title: string
+  text: string
+}
+
 export interface E1DisclosureSnapshot {
   /** 主披露表行（含合计/其中：存放境外，label 直接来自披露表） */
   mainRows: E1MainRowLike[]
-  /** 受限制货币资金明细（仅 soe），可空 */
+  /**
+   * ② 受限制的货币资金明细。
+   * 🔴 **两变体都推**（用户裁决 2026-08-01：上市侧也建该表 —— 校验预设 listed 侧的
+   * F1-4/F1-5/F1-6 明确引用②表）。**条件表语义**：空数组 = 不推该表且进
+   * `_removed_table_keys`（有录入区块的条件表，K7 范式）。
+   */
   restrictedRows?: E1RestrictedRowLike[]
-  /** 披露说明文本（文本框内容），与披露表保持一致后同步到附注 text_content */
-  noteText: string
+  /**
+   * 披露说明（按源模板分段）。上市 2 段 / 国企 2 段，见 `e1DisclosureScope.e1NoteTexts`。
+   * 空文本段自动过滤，不产生空 `_note_texts` 条目。
+   */
+  noteSections?: E1NoteSectionLike[]
+  /** @deprecated 旧版单一说明框；仍支持以兼容存量调用方，等价于单段「货币资金说明」。 */
+  noteText?: string
 }
 
 export interface E1SyncPayload {
@@ -128,28 +209,48 @@ export function buildE1SyncPayload(
   })
 
   const subTableData: Record<string, unknown> = {
-    货币资金: snapshot.mainRows.map(mainRow),
-    _note_texts: buildNoteTexts(variant, snapshot.noteText),
+    [E1_MAIN_TABLE]: snapshot.mainRows.map(mainRow),
+    _note_texts: buildNoteTexts(variant, snapshot),
   }
 
+  // 列定义单一真源 = 零参 builder（契约测试与覆盖率 sweep 读的也是它，禁在此另写一份）
+  const allColumns = variant === 'soe' ? buildE1SoeColumns() : buildE1ListedColumns()
   const columns: Record<string, ColumnDef[]> = {
-    货币资金: variant === 'soe' ? MAIN_COLUMNS_SOE : MAIN_COLUMNS_LISTED,
+    [E1_MAIN_TABLE]: allColumns[E1_MAIN_TABLE],
   }
 
-  if (variant === 'soe') {
-    const restricted = snapshot.restrictedRows ?? []
+  // ② 受限制的货币资金明细 —— **两变体都推**（用户裁决）。
+  //
+  // 🔴 `undefined` 与 `[]` 语义必须区分（K3 vs K7 铁律）：
+  //  - `undefined` = 调用方**不管**这张表 → 跳过，**不进** `_removed_table_keys`
+  //    （表可能由别的底稿承载，越权删会打断对方）
+  //  - `[]`        = 调用方**管这张表但当前为空** → 不推空表**且进** `_removed_table_keys`
+  //    （否则用户填过再删空，附注会永久残留上次推送的过时明细，K7 已实测复现）
+  const restricted = snapshot.restrictedRows
+  const removedTableKeys: string[] = []
+  if (restricted && restricted.length) {
     const endTotal = restricted.reduce((s, r) => s + num(r.endingAmount), 0)
     const openTotal = restricted.reduce((s, r) => s + num(r.openingAmount), 0)
-    subTableData['受限制的货币资金明细'] = [
+    subTableData[E1_RESTRICTED_TABLE] = [
+      // `reason` 不进附注（源模板②表只有 3 列，事由走文字说明段）
       ...restricted.map((r) => ({
         label: r.item,
         end_amount: num(r.endingAmount),
         prior_amount: num(r.openingAmount),
-        reason: String(r.reason ?? ''),
       })),
-      { label: '合计', end_amount: endTotal, prior_amount: openTotal, reason: '', is_total: true },
+      {
+        label: E1_NOTE_TOTAL_LABEL,
+        end_amount: endTotal,
+        prior_amount: openTotal,
+        is_total: true,
+      },
     ]
-    columns['受限制的货币资金明细'] = RESTRICTED_COLUMNS
+    columns[E1_RESTRICTED_TABLE] = allColumns[E1_RESTRICTED_TABLE]
+  } else if (restricted) {
+    removedTableKeys.push(E1_RESTRICTED_TABLE)
+  }
+  if (removedTableKeys.length) {
+    subTableData._removed_table_keys = removedTableKeys
   }
 
   return {
@@ -162,12 +263,31 @@ export function buildE1SyncPayload(
   }
 }
 
-/** 披露说明 → _note_texts（仅非空），保证附注 text_content 与披露表文本框一致。 */
+/**
+ * 披露说明 → `_note_texts`（**仅非空段**），保证附注 `text_content` 与披露表一致。
+ *
+ * 🔴 每条必须带**中文 `title`** —— 后端 `_format_note_texts` 缺 title 时用 `section`
+ * 兜底，附注正文会渲染成 `【listed-note】` 这类英文键（违反 UI 全中文化铁律）。
+ */
 export function buildNoteTexts(
   variant: E1DisclosureVariant,
-  noteText: string,
+  /** 分段快照；也接受旧签名的裸字符串（单一说明框）以保持公开 API 兼容 */
+  input: Pick<E1DisclosureSnapshot, 'noteSections' | 'noteText'> | string | null | undefined,
 ): Array<{ section: string; title: string; text: string }> {
-  const text = String(noteText ?? '').trim()
+  const snapshot: Pick<E1DisclosureSnapshot, 'noteSections' | 'noteText'> =
+    typeof input === 'string' ? { noteText: input } : (input ?? {})
+  const sections = snapshot.noteSections
+  if (sections && sections.length) {
+    return sections
+      .map((s) => ({
+        section: `${variant}-note-${s.key}`,
+        title: String(s.title ?? '').trim() || '货币资金说明',
+        text: String(s.text ?? '').trim(),
+      }))
+      .filter((s) => !!s.text)
+  }
+  // 兼容旧签名：单一说明框
+  const text = String(snapshot.noteText ?? '').trim()
   if (!text) return []
   return [{ section: `${variant}-note`, title: '货币资金说明', text }]
 }

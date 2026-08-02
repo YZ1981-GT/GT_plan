@@ -12,10 +12,54 @@
       <el-tag v-if="showProvision && src.use_provision_name_filter" size="small" type="warning">
         已叠加「{{ provisionFilterLabel }}」名称过滤
       </el-tag>
+      <el-tag v-if="absentSlotLabels.length" size="small" type="info">
+        本项目无「{{ absentSlotLabels.join('、') }}」科目
+      </el-tag>
       <el-button size="small" link type="primary" @click="expanded = !expanded">
         {{ expanded ? '收起明细' : '展开明细' }}
       </el-button>
     </div>
+
+    <!-- 🔴 报表公式与本项目科目表冲突：以科目表为准，但必须让审计师看见 -->
+    <el-alert
+      v-if="conflictTexts.length"
+      type="warning"
+      show-icon
+      :closable="false"
+      class="src-alert"
+    >
+      <template #title>报表公式引用的科目与本项目科目表不一致（已按科目表取数）</template>
+      <ul class="src-alert-list">
+        <li v-for="(t, i) in conflictTexts" :key="i">{{ t }}</li>
+      </ul>
+    </el-alert>
+
+    <!-- 客户仍在用旧准则科目 → 需人工按业务模式与合同现金流量特征（SPPI）判断归属 -->
+    <el-alert
+      v-if="unmappedTexts.length"
+      type="info"
+      show-icon
+      :closable="false"
+      class="src-alert"
+    >
+      <template #title>本项目存在旧准则同族科目，需人工确认归属后再取数</template>
+      <ul class="src-alert-list">
+        <li v-for="(t, i) in unmappedTexts" :key="i">{{ t }}</li>
+      </ul>
+      <p class="src-alert-note">
+        新准则下这类科目按业务模式与合同现金流量特征拆分到不同报表项目，属会计判断，
+        系统不做自动推断 —— 请在科目映射界面处理。
+      </p>
+    </el-alert>
+
+    <el-alert
+      v-if="chartUnavailable"
+      type="warning"
+      show-icon
+      :closable="false"
+      class="src-alert"
+      title="本项目科目表未导入或读取失败 —— 当前口径为兜底科目码，取数结果仅供参考"
+    />
 
     <el-collapse-transition>
       <div v-show="expanded" class="src-detail">
@@ -55,10 +99,13 @@ import { computed, ref } from 'vue'
 import {
   hasTbSourceCodes,
   tbCodeListText,
+  tbConflictTexts,
   tbExtraEntries,
   tbResolvedFromLabel,
   tbResolvedFromTagType,
+  tbSemanticSlots,
   tbSignedFormulaText,
+  tbUnmappedTexts,
   type TbSourceCodes,
 } from '../composables/shared/tbSourceCodes'
 
@@ -103,6 +150,36 @@ const formulaText = computed(() => tbSignedFormulaText(src.value))
 const hints = computed(() => props.hints || [])
 
 const resolvedFromLabel = tbResolvedFromLabel
+
+// ── 语义解析新增的审计追溯信号（`semantic_account_resolver` 起可用）──────────
+// 旧的报表映射路径（`report_line_accounts`）不发这些字段 → 全部为空、界面无变化，
+// 故本节改动对 K1/K2/F1 等既有消费者是**零回归**的纯增量。
+
+/** 报表公式与本项目科目表冲突（实证 `report_config` 有 4 行错码） */
+const conflictTexts = computed(() => tbConflictTexts(src.value))
+
+/** 客户仍在用的旧准则同族科目（需人工按 SPPI 判断归属） */
+const unmappedTexts = computed(() => tbUnmappedTexts(src.value))
+
+/**
+ * 本项目科目表不可用。
+ *
+ * 🔴 只在**显式为 false** 时告警 —— 旧路径不发该字段（`undefined`），
+ * 不能把「字段缺失」当成「科目表坏了」。
+ */
+const chartUnavailable = computed(() => src.value.chart_available === false)
+
+/**
+ * 本项目确实没有的槽（`found === false`）。
+ *
+ * 这是**正确行为**（宁缺勿造），用 info tag 提示而非报错 —— 让审计师知道
+ * 「这里是空的，因为本项目没有这个科目」，而不是误以为余额为 0 或取数失败。
+ */
+const absentSlotLabels = computed(() =>
+  tbSemanticSlots(src.value)
+    .filter((s) => s.found === false)
+    .map((s) => s.label || s.key),
+)
 
 interface SrcRow {
   role: string
@@ -198,5 +275,21 @@ const rows = computed<SrcRow[]>(() => {
 .src-hint :deep(code) {
   background: #fff3cd;
   padding: 0 3px;
+}
+
+.src-alert {
+  margin-top: 6px;
+}
+
+.src-alert-list {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  line-height: 1.7;
+}
+
+.src-alert-note {
+  margin: 6px 0 0;
+  color: #606266;
+  line-height: 1.6;
 }
 </style>

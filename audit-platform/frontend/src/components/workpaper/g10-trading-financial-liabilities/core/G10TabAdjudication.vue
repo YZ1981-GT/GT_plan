@@ -101,6 +101,13 @@
         <strong>{{ group.groupName }}</strong>
         <span class="group-sub">期末审定 {{ fmt(group.subtotal.closingAdjusted) }} · 变动 {{ fmt(group.subtotal.changeAmount) }}</span>
       </div>
+      <!-- 四表库取数溯源（口径：期末余额） -->
+      <WpFourTableSourcePanel
+        :source-codes="tbSourceCodes"
+        gross-label="交易性金融负债"
+        fallback-row-code="BS-042"
+      />
+
       <el-table
         v-show="!group.collapsed"
         :data="[...group.rows, group.subtotal]"
@@ -291,8 +298,11 @@ import {
 import { G10_ACCOUNT_ALIASES, G10_VIRTUAL_SCROLL_THRESHOLD } from '../../composables/g10Constants'
 import { g10AccountLabel } from '../../composables/g10TbResolve'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
+import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
 
 const props = defineProps<{
+  /** render 下发的本 sheet html_data（含 tb_source_codes） */
+  htmlData?: Record<string, any> | null
   allResponses: Map<string, ChecklistResponse>
   wpId: string
   projectId: string
@@ -300,6 +310,14 @@ const props = defineProps<{
   debouncedSave: (id: string, d: Partial<ChecklistResponse>) => void
 }>()
 
+
+/**
+ * 四表库取数溯源（消费 render 下发的 `tb_source_codes`，消除 dead output）。
+ *
+ * 科目由后端按**科目名**逐项目解析（`four_table/g_cycle_specs.G10_SPEC`），
+ * 取数口径 = 期末余额。前端单一真源见 `composables/gCycleAccountScope.ts`。
+ */
+const tbSourceCodes = computed(() => props.htmlData?.tb_source_codes ?? null)
 const emit = defineEmits<{ imported: [] }>()
 
 const validateLoading = ref(false)

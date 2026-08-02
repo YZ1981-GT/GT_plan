@@ -279,7 +279,8 @@ import {
   type I1ListedCategoryPreset,
 } from '../../composables/i1DisclosureEnhance'
 import { buildI1ListedSyncPayloads } from '../../composables/i1DisclosureSyncPayload'
-import { I1_NOTE_SECTION } from '../../composables/i1NoteSectionMap'
+import { I1_DISCLOSURE_SHEET_NAME, I1_NOTE_SECTION } from '../../composables/i1NoteSectionMap'
+import { useRestrictedAssetsSync } from '../../composables/useRestrictedAssetsSync'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 
 const props = defineProps<{
@@ -408,6 +409,27 @@ function handlePull(overwriteNotes: boolean) {
   ElMessage({ type: res.count ? 'success' : 'warning', message: res.message })
 }
 
+/**
+ * 受限资产共享表（listed `五、32`）的「无形资产」段。
+ *
+ * 数据源 = I1-8 无形资产权属检查表（`I1-8-rows`，取 `mortgageRestricted='Y'` 的行、
+ * 金额取「抵押价值」`mortgageValue`，与 `useI1TitleCheck.totalMortgage` 同口径）。
+ * 该表**只有期末口径** → 只推主表、不推「（续：上年年末）」。
+ *
+ * 🔴 与本页「未办妥权属证书的土地使用权」是**两种不同披露**：权属证书未办妥 ≠
+ * 所有权/使用权受到限制，故 `titleCertRows` 绝不进受限资产表。
+ */
+const syncRestrictedAssets = useRestrictedAssetsSync({
+  owner: 'BS-032',
+  variant: () => 'listed',
+  wpId: () => props.wpId,
+  projectId: () => props.projectId,
+  responses: () => props.allResponses as unknown as Map<string, { remark?: string | null }>,
+  applicableStandards: () => props.applicableStandards,
+  sheetNames: I1_DISCLOSURE_SHEET_NAME,
+  isReadonly: () => props.isReadonly,
+})
+
 async function syncToNotes() {
   if (isSyncing.value || props.isReadonly || !props.projectId || !props.wpId) return
   if (prepValidation.value.blocking.length) {
@@ -463,6 +485,8 @@ async function syncToNotes() {
       sheet: '附注披露信息（上市公司）',
     })
     ElMessage.success(`已同步至附注 ${noteSectionId}（${rows} 行）`)
+    // 受限资产共享表的「无形资产」段（跨循环共享表，只替换本段、他段原样保留）
+    await syncRestrictedAssets()
   } catch (e: any) {
     ElMessage.error(e?.message || '同步失败')
   } finally {
@@ -470,24 +494,42 @@ async function syncToNotes() {
   }
 }
 
+/**
+ * 自动同步专用包装 —— **绝不弹模态确认框**。
+ *
+ * 🔴 修掉一处预存在缺陷：原实现在 `syncToNotes()` **内部**调
+ * `autoSync.scheduleAutoSync(syncToNotes)` = 调度自己 → 点一次同步就进入
+ * 800ms 周期的无限 POST（直到组件卸载 `cancelPending`）。平台守卫
+ * `disclosureAutoSyncCoverage` 的自递归检测只认 `syncToDisclosureNotes` 这个函数名，
+ * 故 I1 用 `syncToNotes` 命名逃过了那一轮清理。
+ *
+ * 现改为监听**实际数据**（与 `buildI1ListedSyncPayloads` 所用字段一致）；
+ * 有阻断项/编制提示时自动路径直接跳过（提示只在手动点按钮时弹）。
+ */
+async function autoSyncToNotes(): Promise<void> {
+  if (prepValidation.value.blocking.length || prepValidation.value.warnings.length) return
+  await syncToNotes()
+}
+
 watch(
   [
-    () => categories.value,
-    () => movement.value,
-    () => noteRdRatio.value,
-    () => noteIndefinite.value,
-    () => noteMortgage.value,
-    () => noteImpairment.value,
-    () => noteSale.value,
-    () => noteImportant.value,
-    () => titleCertRows.value,
-    () => importantRows.value,
-    () => dataResource.value,
-    () => noteDataResource.value,
-    () => auditNote.value,
-    () => auditConclusion.value,
+    categories,
+    movement,
+    titleCertRows,
+    importantRows,
+    dataResource,
+    amortAlloc,
+    noteRdRatio,
+    noteIndefinite,
+    noteMortgage,
+    noteImpairment,
+    noteSale,
+    noteImportant,
+    noteDataResource,
+    auditNote,
+    auditConclusion,
   ],
-  () => autoSync.scheduleAutoSync(syncToNotes),
+  () => autoSync.scheduleAutoSync(autoSyncToNotes),
   { deep: true },
 )
 

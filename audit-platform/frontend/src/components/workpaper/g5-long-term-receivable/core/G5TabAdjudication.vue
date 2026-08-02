@@ -32,14 +32,19 @@
       </div>
     </div>
 
-    <!-- 四表库溯源面板 -->
+    <!--
+      四表库溯源面板。
+
+      🔴 2026-08-01 修：原先传的 `gross-standard` / `resolved-from` /
+      `applicable-standard` / `report-row-code` **全不是本面板的 prop**，且**没传
+      `source-codes`** → 面板内部 `visible` 恒为 false，**本面板从未渲染过**。
+      未知属性会静默落到根元素当 HTML 属性，Volar / vitest / Vite 全绿查不出。
+      面板真实 prop 见 `shared/WpFourTableSourcePanel.vue` 的 defineProps。
+    -->
     <WpFourTableSourcePanel
-      v-if="tbSourceCodes"
-      :gross-label="'长期应收款'"
-      :gross-standard="tbSourceCodes.gross_standard"
-      :resolved-from="tbSourceCodes.resolved_from"
-      :applicable-standard="tbSourceCodes.applicable_standard"
-      :report-row-code="'BS-023'"
+      :source-codes="tbSourceCodes"
+      gross-label="长期应收款"
+      fallback-row-code="BS-023"
     />
 
     <el-alert type="info" :closable="false" show-icon class="audit-objective">

@@ -25,10 +25,59 @@ import { useE1AiGenerate } from '../composables/useE1AiGenerate'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
-import { buildE1SyncPayload, E1_NOTE_SECTION, type E1DisclosureSnapshot } from '../composables/e1NoteSectionMap'
+import {
+  buildE1SyncPayload,
+  E1_DISCLOSURE_SHEET_NAME,
+  E1_NOTE_SECTION,
+  type E1DisclosureSnapshot,
+} from '../composables/e1NoteSectionMap'
+import { buildE1FxSyncPayload, E1_FX_NOTE_SECTION } from '../composables/e1FxNoteSectionMap'
+import {
+  buildRestrictedAssetsPayloads,
+  RESTRICTED_ASSETS_NOTE_SECTION,
+  RESTRICTED_ASSETS_OWNERS,
+  summarizeRestrictedRows,
+} from '../composables/restrictedAssetsNoteSectionMap'
+import {
+  E1_DEFAULT_CURRENCIES,
+  E1_FX_GROUPS,
+  E1_FX_SIMPLE_GROUP_LABEL,
+  e1BaseCurrencyLabel,
+  e1ForeignCurrencies,
+} from '../composables/e1CurrencyScope'
+import {
+  e1LegacyNoteKey,
+  e1MainColumns,
+  e1MainRows,
+  e1NoteTextKey,
+  e1NoteTexts,
+  e1SummableRows,
+} from '../composables/e1DisclosureScope'
+import WpAmountInput from '../shared/WpAmountInput.vue'
+import WpDisclosureConsistencyPanel from '../shared/disclosure/WpDisclosureConsistencyPanel.vue'
+import {
+  buildE1MisstatementPayload,
+  computeE1Consistency,
+} from '../composables/e1DisclosureConsistency'
+import {
+  E1_UNRESTRICTED,
+  customBucketKey,
+  e1RestrictedMapKey,
+  e1RestrictedRowId,
+  normalizeRestrictedPrefill,
+  parseManualMap,
+  pendingUnclassified,
+  resolveRestrictedRows,
+  restrictedTotals,
+  serializeManualMap,
+  unrestrictedLeaves,
+  type E1RestrictedManualMap,
+  type E1RestrictedRow,
+} from '../composables/e1RestrictedScope'
 import { amountFormatter, amountParser } from '../composables/wpAmountInput'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
+import { useHostApplicableStandards } from '../composables/hostApplicableStandards'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -41,11 +90,31 @@ const props = defineProps<{
   isReadonly: boolean
   sheetName?: string
   variant?: 'listed' | 'soe'
+  /**
+   * render-config 的 `html_data`（**snake_case**）。
+   * 🔴 必须由宿主显式传入 —— 漏传会让 `restricted_prefill` 恒 undefined、
+   * 受限资金四表取数静默失效（N2 已踩过同款「宿主漏传 :html-data」）。
+   */
+  htmlData?: Record<string, any> | null
+  /**
+   * 适用准则（`soe_standalone` / `listed_consolidated` …）。
+   * 决定同步载荷的 `current_standard` —— 漏传会让它永远退化成 `*_standalone`，
+   * 合并报表项目的附注被按个别报表口径写入。
+   */
+  applicableStandards?: string[]
 }>()
 
 // ─── Inject ──────────────────────────────────────────────────────────────────
 
 const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
+/**
+ * 适用准则：`props.applicableStandards` > 本 sheet 的 `html_data.project_context` > runtime。
+ * 🔴 必须在 setup 顶层调用（内部 `inject`）。
+ */
+const applicableStandards = useHostApplicableStandards({
+  explicit: () => props.applicableStandards,
+  htmlData: () => props.htmlData,
+})
 const { generateText, isGenerating } = useE1AiGenerate(toRef(props, 'wpId') as Ref<string>)
 const router = useRouter()
 // 审计年度（单一真源 projectStore），用于同步到附注时定位正确年度的附注记录，
@@ -55,17 +124,11 @@ const { year: auditYear } = useAuditContext()
 // 保存后自动同步到附注（防抖/非阻塞/失败静默/只读 gate；与手动按钮同源 syncToDisclosureNotes）
 const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 onBeforeUnmount(() => autoSync.cancelPending())
-// 数据变更后自动同步：此前只创建了 autoSync 实例却从不调 scheduleAutoSync（接了一半，
-// 等于没接）→ 补触发，对齐 G3/L1/L3 范式监听实际数据 + mounted 防护。
-// 监听源与 syncToDisclosureNotes 构建 snapshot 所用字段一致（disclosureRows /
-// restrictedRows / noteText / variant），保证「改了什么就同步什么」。
-watch(
-  [disclosureRows, restrictedRows, noteText, variant],
-  () => {
-    autoSync.scheduleAutoSync(syncToDisclosureNotes)
-  },
-  { deep: true },
-)
+// 🔴 自动同步的 watch 注册在文件末尾（syncToDisclosureNotes 之后）——不能放在这里：
+// `<script setup>` 的 const 有 TDZ，watch 的依赖数组在 setup 期即求值，若引用
+// disclosureRows / restrictedRows / noteText / variant 这些后面才声明的 const
+// 会抛 ReferenceError 导致整个披露 Tab 挂载失败（get_diagnostics 查不出）。
+// 守卫：composables/__tests__/e1SetupOrder.spec.ts
 
 // 跳转回附注模块（披露表 → 附注为单向推送；此处仅导航，方便相互编辑确认）
 // 上市→五、1 / 国企→八、1，可自由切换上市↔国企
@@ -78,7 +141,8 @@ function jumpToNote(target: DisclosureVariant): void {
   router.push(route)
 }
 
-type DisclosureVariant = 'listed' | 'soe'
+// DisclosureVariant 由 noteDisclosureReverseJump 统一导出（见文件头 import），
+// 此处不再本地重复声明，避免同名类型双真源。
 
 const variant = computed<DisclosureVariant>(() => {
   if (props.variant) return props.variant
@@ -99,32 +163,15 @@ interface DisclosureRow {
   openingAmount: number
 }
 
-// 上市公司披露项目（对照源模板"附注披露信息(上市公司)"）
-const LISTED_ITEMS = [
-  { key: 'cash', label: '库存现金', crossKey: 'E1-adj-total-1001' },
-  { key: 'bank', label: '银行存款', crossKey: 'E1-adj-total-1002' },
-  { key: 'finance_co', label: '存放财务公司款项', crossKey: '' },
-  { key: 'other_mf', label: '其他货币资金', crossKey: 'E1-adj-total-1012' },
-  { key: 'accrued', label: '存款应计利息', crossKey: '' },
-  { key: 'digital', label: '数字货币', crossKey: '' },
-  { key: 'total', label: '合计', crossKey: '' },
-  { key: 'overseas', label: '其中：存放境外', crossKey: '' },
-]
+// 披露主表行与列头的**单一真源** = composables/e1DisclosureScope.ts
+// （行标签逐字取自源 xlsx 并带 sourceRef，供后端守卫做三向比对；
+//  改造前此处内联两套 ITEMS，且 overseas 行写的是缩写「其中：存放境外」
+//  与源模板/附注的「其中：存放在境外的款项总额」不一致）
+const disclosureItems = computed(() => e1MainRows(variant.value))
 
-// 国企披露项目（对照源模板"附注披露信息(国企)"：现金/银行存款/其他货币资金/数字货币/合计）
-const SOE_ITEMS = [
-  { key: 'cash', label: '现金', crossKey: 'E1-adj-total-1001' },
-  { key: 'bank', label: '银行存款', crossKey: 'E1-adj-total-1002' },
-  { key: 'other_mf', label: '其他货币资金', crossKey: 'E1-adj-total-1012' },
-  { key: 'digital', label: '数字货币', crossKey: '' },
-  { key: 'total', label: '合计', crossKey: '' },
-]
-
-const disclosureItems = computed(() => (variant.value === 'soe' ? SOE_ITEMS : LISTED_ITEMS))
-
-// 列标签（上市：期末数/期初数；国企：期末余额/年初余额）
-const endingLabel = computed(() => (variant.value === 'soe' ? '期末余额' : '期末数'))
-const openingLabel = computed(() => (variant.value === 'soe' ? '年初余额' : '期初数'))
+const endingLabel = computed(() => e1MainColumns(variant.value).ending)
+const openingLabel = computed(() => e1MainColumns(variant.value).opening)
+const itemColumnLabel = computed(() => e1MainColumns(variant.value).label)
 
 // 审计目标（按版本）
 const objective = computed(() =>
@@ -169,9 +216,10 @@ const disclosureRows = computed<(DisclosureRow & { openingPrefilled: boolean })[
   return items.map(item => {
     let endingAmount = effEnding(item)
     let openingAmount = effOpening(item)
-    // Total row: sum of above items (excluding overseas)
-    if (item.key === 'total') {
-      const subs = items.filter(i => !['total', 'overseas'].includes(i.key))
+    // 合计行 = 参与合计的行之和（排除合计行自身与「其中：」备注行，
+    // 由 e1SummableRows 按真源的 isTotal/isMemo 判定，不在此处硬编码 key）
+    if (item.isTotal) {
+      const subs = e1SummableRows(variant.value)
       endingAmount = subs.reduce((sum, i) => sum + effEnding(i), 0)
       openingAmount = subs.reduce((sum, i) => sum + effOpening(i), 0)
     }
@@ -181,7 +229,7 @@ const disclosureRows = computed<(DisclosureRow & { openingPrefilled: boolean })[
       crossKey: item.crossKey,
       endingAmount,
       openingAmount,
-      openingPrefilled: item.key === 'total' ? false : isOpeningPrefilled(item),
+      openingPrefilled: item.isTotal ? false : isOpeningPrefilled(item),
     }
   })
 })
@@ -206,14 +254,19 @@ interface ForeignCurrencyRow {
   openRmb: number
 }
 
-const SIMPLE_CURRENCIES = ['美元', '日元', '澳元', '欧元']
-const DETAILED_CURRENCIES = ['人民币', '美元', '日元', '澳元', '欧元']
-// 对齐源模板「附注披露信息(上市公司)」外币性质货币资金项目分组（库存现金/银行存款/
-// 银行存款中：财务公司存款/其他货币资金），详细版为源模板标准结构。
-const DETAILED_PROJECTS = ['库存现金', '银行存款', '银行存款中：财务公司存款', '其他货币资金']
+// 币种与外币分组的**单一真源** = composables/e1CurrencyScope.ts
+// （改造前此处内联三份常量，违反「避免硬编码」铁律；E 类无账龄维度，
+//  币种与受限类别就是本循环对应的枚举维度）
+const BASE_CURRENCY_LABEL = e1BaseCurrencyLabel()
+/** 简版：只列外币（源模板 R25「外币性货币项目」派生表不含记账本位币） */
+const SIMPLE_CURRENCIES = e1ForeignCurrencies().map((c) => c.label)
+/** 详细版：源模板 R35 原币表逐币种列示（含记账本位币） */
+const DETAILED_CURRENCIES = E1_DEFAULT_CURRENCIES.map((c) => c.label)
+/** 详细版分组 = 源模板 R38/R44/R50/R56 四段 */
+const DETAILED_PROJECTS = E1_FX_GROUPS.map((g) => g.label)
 
 function createCurrencyRow(groupId: string, currency: string, suffix: string): ForeignCurrencyRow {
-  const isRmb = currency === '人民币'
+  const isRmb = currency === BASE_CURRENCY_LABEL
   return {
     id: `fc-currency-${suffix}`,
     groupId,
@@ -232,7 +285,7 @@ function createCurrencyRow(groupId: string, currency: string, suffix: string): F
 
 function createDefaultForeignRows(mode: ForeignCurrencyMode): ForeignCurrencyRow[] {
   const stamp = Date.now()
-  const projects = mode === 'detailed' ? DETAILED_PROJECTS : ['货币资金']
+  const projects = mode === 'detailed' ? DETAILED_PROJECTS : [E1_FX_SIMPLE_GROUP_LABEL]
   const currencies = mode === 'detailed' ? DETAILED_CURRENCIES : SIMPLE_CURRENCIES
   return projects.flatMap((item, projectIndex) => {
     const groupId = `fc-group-${mode}-${stamp}-${projectIndex}`
@@ -279,7 +332,7 @@ function normalizeForeignRows(rows: any[]): ForeignCurrencyRow[] {
     return {
       id,
       groupId,
-      item: isGroup ? String(raw.item || '货币资金：') : currency,
+      item: isGroup ? String(raw.item || `${E1_FX_SIMPLE_GROUP_LABEL}：`) : currency,
       currency,
       isGroup,
       indent: !isGroup,
@@ -439,63 +492,288 @@ function removeFcRow(row: ForeignCurrencyRow): void {
   scheduleSave()
 }
 
-// ─── SOE Restricted Table ────────────────────────────────────────────────────
+// ─── ② 受限制的货币资金明细（两变体共用）─────────────────────────────────────
+//
+// 用户裁决（2026-08-01）：上市侧**也要**这张表 —— 源 xlsx 上市披露 sheet 只有
+// R18/R19 文字，但校验预设 listed 侧的 F1-4/F1-5/F1-6 三条明确引用「②受限制的
+// 货币资金明细表」，其中 F1-5/F1-6 是与现金流量表补充资料③表的跨科目勾稽
+// （只有表格化才能自动校验）→ 按平台铁律「校验预设是列结构裁决者」补建。
+//
+// 🔴 取数是**动态**的：受限资金没有独立标准科目，客户各自用二级/三级子科目承载、
+// 命名千差万别 → 后端按 BS-002 映射规则取货币资金三族叶子，逐叶子按科目名分类；
+// 判不出来的落「待归类」面板交审计师点选，**既不静默丢弃也不臆造归属**。
+// 单一真源：composables/e1RestrictedScope.ts + four_table/e1_restricted_buckets.py
 
-interface RestrictedRow {
-  id: string
-  item: string
-  openingAmount: number
-  endingAmount: number
-  reason: string
-}
+/** render 下发的受限取数载荷（扁平叶子清单 + 自动分类标记 + 桶定义） */
+const restrictedPrefill = computed(() =>
+  normalizeRestrictedPrefill(props.htmlData?.restricted_prefill),
+)
 
-const restrictedRows = ref<RestrictedRow[]>([])
+/** 人工归类 map：原始科目码 → bucketKey | '__unrestricted__' */
+const restrictedManualMap = ref<E1RestrictedManualMap>({})
+/** 已持久化的行（保留审计师录入的受限原因与纯手工行） */
+const restrictedPersisted = ref<E1RestrictedRow[]>([])
 
 function loadRestricted(): void {
-  const key = `${storagePrefix.value}-restricted`
-  const resp = props.allResponses.get(key)
-  if (resp?.remark) {
-    try {
-      const parsed = JSON.parse(resp.remark)
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        restrictedRows.value = parsed.map((r: any) => ({
-          id: r.id || `restr-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-          item: String(r.item || ''),
-          openingAmount: Number(r.openingAmount) || 0,
-          // 旧结构仅有 amount，迁移时视为期末金额。
-          endingAmount: Number(r.endingAmount ?? r.amount) || 0,
-          reason: String(r.reason || ''),
-        }))
-        return
-      }
-    } catch {}
+  restrictedManualMap.value = parseManualMap(
+    props.allResponses.get(e1RestrictedMapKey(variant.value))?.remark,
+  )
+  const resp = props.allResponses.get(`${storagePrefix.value}-restricted`)
+  if (!resp?.remark) {
+    restrictedPersisted.value = []
+    return
   }
-  // 无持久化数据时，按源模板"受限制的货币资金明细"预置标准项目行
-  const defaults = [
-    '银行承兑汇票保证金',
-    '信用证保证金',
-    '履约保证金',
-    '用于担保的定期存款或通知存款',
-    '存放境外且资金汇回受到限制的款项',
-  ]
-  restrictedRows.value = defaults.map((item, i) => ({
-    id: `restr-${Date.now()}-${i}`,
-    item,
-    openingAmount: 0,
-    endingAmount: 0,
-    reason: '',
-  }))
+  try {
+    const parsed = JSON.parse(resp.remark)
+    if (!Array.isArray(parsed)) {
+      restrictedPersisted.value = []
+      return
+    }
+    restrictedPersisted.value = parsed.map((r: any, i: number) => ({
+      // 兼容旧结构：旧版是 {id,item,openingAmount,endingAmount,reason}，
+      // 无 bucketKey → 按 item 名建自定义类别（不丢审计师已录入的数据）
+      id: String(r.id || e1RestrictedRowId(String(r.bucketKey || 'legacy'), i)),
+      bucketKey: String(r.bucketKey || customBucketKey(String(r.item || ''))),
+      label: String(r.label || r.item || ''),
+      openingAmount: Number(r.openingAmount) || 0,
+      // 更旧的结构只有 amount，迁移时视为期末金额
+      endingAmount: Number(r.endingAmount ?? r.amount) || 0,
+      reason: String(r.reason || ''),
+      codes: Array.isArray(r.codes) ? r.codes.map((c: unknown) => String(c)) : [],
+      fromFourTable: !!r.fromFourTable,
+    }))
+  } catch {
+    restrictedPersisted.value = []
+  }
 }
-if (variant.value === 'soe') loadRestricted()
+loadRestricted()
+
+/** ②表行 = 四表自动分类 ⊕ 人工归类 ⊕ 纯手工行（读时推导，不持久化派生值） */
+const restrictedRows = computed<E1RestrictedRow[]>(() =>
+  resolveRestrictedRows({
+    prefill: restrictedPrefill.value,
+    manualMap: restrictedManualMap.value,
+    existingRows: restrictedPersisted.value,
+  }),
+)
+
+/** 仍待归类的叶子（四表新增科目自动出现在这里） */
+const restrictedPending = computed(() =>
+  pendingUnclassified(restrictedPrefill.value, restrictedManualMap.value),
+)
+
+/** 被标「不受限」的叶子（金额进 F1-5/F1-6 勾稽差额侧，不隐藏） */
+const restrictedExcluded = computed(() =>
+  unrestrictedLeaves(restrictedPrefill.value, restrictedManualMap.value),
+)
+
+/** ②表合计（源 xlsx R23「合  计」；校验预设 F1-4 要求合计 = 明细之和） */
+const restrictedTotal = computed(() => restrictedTotals(restrictedRows.value))
+
+// ─── 披露内部勾稽（规则全部取自校验预设 F1-1~F1-6 + 源 xlsx 表内公式）──────────
+
+/** 报表「货币资金」四表口径金额（render 下发 `tb_values`，拿不到则 null 不误报） */
+const tbValues = computed<Record<string, number>>(
+  () => (props.htmlData?.tb_values as Record<string, number>) || {},
+)
+
+const consistencyResults = computed(() =>
+  computeE1Consistency({
+    variant: variant.value,
+    mainRows: disclosureRows.value.map((r) => {
+      const def = disclosureItems.value.find((d) => d.key === r.key)
+      return {
+        key: r.key,
+        label: r.label,
+        endingAmount: r.endingAmount,
+        openingAmount: r.openingAmount,
+        isTotal: def?.isTotal,
+        isMemo: def?.isMemo,
+      }
+    }),
+    restrictedRows: restrictedRows.value.map((r) => ({
+      label: r.label,
+      endingAmount: r.endingAmount,
+      openingAmount: r.openingAmount,
+    })),
+    reportEnding: Number.isFinite(tbValues.value.total_closing)
+      ? tbValues.value.total_closing
+      : null,
+    reportOpening: Number.isFinite(tbValues.value.total_opening)
+      ? tbValues.value.total_opening
+      : null,
+    // 外币原币表**两变体都有**（源 xlsx 逐格实证 R25~R62 逐字相同）。
+    //
+    // 🔴 纠正一处早先的误判：曾把 `fxRows` 限定为上市变体，理由写成「国企版没有
+    // 这两张表」。真因不是源模板缺表，而是**本组件把外币区 `v-if` 到了上市变体**
+    // → 国企 Tab 拿到的是未渲染的默认骨架（金额全 0）→ 源模板 B16「主表合计 =
+    // 原币表人民币合计」拿 0 比主表，产出假「不一致」。根因已修（外币区两变体都渲染），
+    // 故这里恢复两变体都传。国企的对应勾稽单元格是 R12 列 E
+    // `=B12-'附注披露信息(上市公司)'!D62`，口径同为「主表合计 − 原币表人民币合计」。
+    fxRows: foreignCurrencyRows.value.map((r) => ({
+      groupSlot: r.groupId,
+      currencyKey: r.currency,
+      currencyLabel: r.item,
+      isGroup: r.isGroup,
+      endRmb: r.isGroup ? groupRmb(r, 'endRmb') : r.endRmb,
+      endForeign: r.endForeign,
+    })),
+    // 现金及现金等价物在现金流量表补充资料③表，E1 披露表拿不到 → 传 null，
+    // 引擎会 skip 并给出推算值供人工核对（不伪造）
+    cashEquivalentsEnding: null,
+    cashEquivalentsOpening: null,
+  }),
+)
+
+/** 勾稽差异（error 级）→ A13 未更正错报汇总。skip（跨底稿取数未就绪）不推。 */
+const consistencyErrorCount = computed(
+  () => consistencyResults.value.filter((r) => r.level === 'error').length,
+)
+
+function pushConsistencyToA13(): void {
+  const payload = buildE1MisstatementPayload(consistencyResults.value)
+  if (!payload) {
+    ElMessage.info('当前无超出容差的勾稽差异，无需推送错报')
+    return
+  }
+  eventBus.emit('a13:push-misstatement', payload)
+  ElMessage.success(`已推送 ${payload.items.length} 项勾稽差异到 A13 未更正错报汇总`)
+}
+
+/** 模板里用的「不受限」哨兵值（模板不能直接引 import 的常量名以外的标识） */
+const E1_UNRESTRICTED_KEY = E1_UNRESTRICTED
+
+/** 桶下拉选项（中文标签只来自后端 bucketDefs，前端不抄第二份） */
+const restrictedBucketOptions = computed(() =>
+  restrictedPrefill.value.bucketDefs.map((d) => ({ value: d.key, label: d.label })),
+)
+
+/** 把某叶子归入某类别 / 标记不受限（人工归类优先于自动分类） */
+function assignRestricted(code: string, target: string): void {
+  if (props.isReadonly || !code || !target) return
+  restrictedManualMap.value = { ...restrictedManualMap.value, [code]: target }
+  scheduleSave()
+}
+
+/** 撤销人工归类（回到自动分类结果 / 回到待归类） */
+function resetRestrictedAssignment(code: string): void {
+  if (props.isReadonly) return
+  const next = { ...restrictedManualMap.value }
+  delete next[code]
+  restrictedManualMap.value = next
+  scheduleSave()
+}
+
+/** 新建自定义受限类别（源 xlsx R22 的 `…` 即动态插行语义，须先输名称） */
+async function addRestrictedRow(): Promise<void> {
+  if (props.isReadonly) return
+  try {
+    const { value } = await ElMessageBox.prompt('请输入受限制货币资金项目名称', '新增受限项目', {
+      confirmButtonText: '添加',
+      cancelButtonText: '取消',
+      inputValidator: (input) => {
+        const name = String(input || '').trim()
+        if (!name) return '项目名称不能为空'
+        if (restrictedRows.value.some((r) => r.label === name)) return '已存在同名类别'
+        return true
+      },
+    })
+    const name = value.trim()
+    const bucketKey = customBucketKey(name)
+    restrictedPersisted.value = [
+      ...restrictedPersisted.value,
+      {
+        id: e1RestrictedRowId(bucketKey, restrictedPersisted.value.length),
+        bucketKey,
+        label: name,
+        openingAmount: 0,
+        endingAmount: 0,
+        reason: '',
+        codes: [],
+        fromFourTable: false,
+      },
+    ]
+    scheduleSave()
+  } catch (error) {
+    if (!isPromptCancel(error)) ElMessage.error('新增受限项目失败')
+  }
+}
+
+function removeRestrictedRow(id: string): void {
+  if (props.isReadonly) return
+  const row = restrictedRows.value.find((r) => r.id === id)
+  if (!row) return
+  // 四表命中行不能直接删（它由叶子归集而来）→ 引导改用「标记不受限」
+  if (row.fromFourTable) {
+    ElMessage.warning('该行由四表科目归集而来，请在「待归类科目」面板把相关科目标记为不受限')
+    return
+  }
+  restrictedPersisted.value = restrictedPersisted.value.filter((r) => r.bucketKey !== row.bucketKey)
+  scheduleSave()
+}
+
+/** 更新某行的手工字段（受限原因；纯手工行还可改金额） */
+function updateRestrictedCell(
+  id: string,
+  field: 'reason' | 'openingAmount' | 'endingAmount',
+  value: string | number,
+): void {
+  if (props.isReadonly) return
+  const row = restrictedRows.value.find((r) => r.id === id)
+  if (!row) return
+  if (field !== 'reason' && row.fromFourTable) return // 四表金额只读
+  const idx = restrictedPersisted.value.findIndex((r) => r.bucketKey === row.bucketKey)
+  const base: E1RestrictedRow =
+    idx >= 0 ? { ...restrictedPersisted.value[idx] } : { ...row }
+  if (field === 'reason') base.reason = String(value)
+  else base[field] = Number(value) || 0
+  restrictedPersisted.value =
+    idx >= 0
+      ? [
+          ...restrictedPersisted.value.slice(0, idx),
+          base,
+          ...restrictedPersisted.value.slice(idx + 1),
+        ]
+      : [...restrictedPersisted.value, base]
+  scheduleSave()
+}
+
+function restrictedSummary(): string[] {
+  return [
+    '合  计',
+    displayPrefs.fmtAmount(restrictedTotal.value.opening),
+    displayPrefs.fmtAmount(restrictedTotal.value.ending),
+    '',
+    '',
+  ]
+}
 
 // ─── Note Text ───────────────────────────────────────────────────────────────
 
-const noteText = ref('')
+/**
+ * 披露说明**按源模板分段**（上市 2 段 / 国企 2 段，定义见 e1DisclosureScope）。
+ * 改造前是单一 `noteText` 输入框 → 附注 `text_content` 只能拿到一段。
+ */
+const noteTexts = ref<Record<string, string>>({})
+
+/** 当前变体的段定义 */
+const noteTextDefs = computed(() => e1NoteTexts(variant.value))
 
 function loadNote(): void {
-  const key = `${storagePrefix.value}-note`
-  const resp = props.allResponses.get(key)
-  noteText.value = resp?.remark || ''
+  const next: Record<string, string> = {}
+  let anyNew = false
+  for (const def of e1NoteTexts(variant.value)) {
+    const v = props.allResponses.get(e1NoteTextKey(variant.value, def.key))?.remark || ''
+    next[def.key] = v
+    if (v) anyNew = true
+  }
+  // 迁移：旧版单一说明框的内容承接到首段（受限及境外款项说明），不丢已写的字
+  if (!anyNew) {
+    const legacy = props.allResponses.get(e1LegacyNoteKey(variant.value))?.remark || ''
+    const first = e1NoteTexts(variant.value)[0]
+    if (legacy && first) next[first.key] = legacy
+  }
+  noteTexts.value = next
 }
 loadNote()
 
@@ -516,7 +794,7 @@ watch(variant, () => {
   loadNote()
   loadAuditText()
   loadForeignCurrency()
-  if (variant.value === 'soe') loadRestricted()
+  loadRestricted()
 })
 
 // ─── Debounce Save ───────────────────────────────────────────────────────────
@@ -536,10 +814,12 @@ function persistAll(): void {
   items.push({ item_id: openingsKey, conclusion: null, remark: openingsJson })
   props.allResponses.set(openingsKey, items[items.length - 1])
 
-  // Note
-  const noteKey = `${storagePrefix.value}-note`
-  items.push({ item_id: noteKey, conclusion: null, remark: noteText.value })
-  props.allResponses.set(noteKey, items[items.length - 1])
+  // 披露说明（按源模板分段，逐段独立持久化）
+  for (const def of noteTextDefs.value) {
+    const k = e1NoteTextKey(variant.value, def.key)
+    items.push({ item_id: k, conclusion: null, remark: noteTexts.value[def.key] || '' })
+    props.allResponses.set(k, items[items.length - 1])
+  }
 
   // 审计说明
   const auditNoteKey = `${storagePrefix.value}-audit-note`
@@ -551,19 +831,35 @@ function persistAll(): void {
   items.push({ item_id: auditConcKey, conclusion: null, remark: auditConclusion.value })
   props.allResponses.set(auditConcKey, items[items.length - 1])
 
-  // SOE restricted
-  if (variant.value === 'soe') {
-    const rKey = `${storagePrefix.value}-restricted`
-    const rJson = JSON.stringify(restrictedRows.value.map(row => ({
-      id: row.id,
-      item: row.item,
-      openingAmount: row.openingAmount,
-      endingAmount: row.endingAmount,
-      reason: row.reason,
-    })))
-    items.push({ item_id: rKey, conclusion: null, remark: rJson })
-    props.allResponses.set(rKey, items[items.length - 1])
-  }
+  // ② 受限制的货币资金明细（**两变体都存** —— 用户裁决上市侧也建该表）
+  // 🔴 只持久化「手工侧」数据：受限原因 + 纯手工行的金额。四表命中行的金额是
+  // 读时由叶子归集而来的派生值，不落库（平台铁律：派生列读时推导）。
+  const rKey = `${storagePrefix.value}-restricted`
+  const rJson = JSON.stringify(
+    restrictedRows.value
+      .filter(row => row.reason || !row.fromFourTable)
+      .map(row => ({
+        id: row.id,
+        bucketKey: row.bucketKey,
+        label: row.label,
+        openingAmount: row.fromFourTable ? 0 : row.openingAmount,
+        endingAmount: row.fromFourTable ? 0 : row.endingAmount,
+        reason: row.reason,
+        codes: row.fromFourTable ? [] : row.codes,
+        fromFourTable: row.fromFourTable,
+      })),
+  )
+  items.push({ item_id: rKey, conclusion: null, remark: rJson })
+  props.allResponses.set(rKey, items[items.length - 1])
+
+  // 人工归类 map（叶子科目码 → 类别 / 不受限）——「各项目科目命名不同」的关键状态
+  const mapKey = e1RestrictedMapKey(variant.value)
+  items.push({
+    item_id: mapKey,
+    conclusion: null,
+    remark: serializeManualMap(restrictedManualMap.value),
+  })
+  props.allResponses.set(mapKey, items[items.length - 1])
 
   // 上市与国企分别保存简版、详细版及当前模式。
   const fcKey = `${storagePrefix.value}-foreign-currency`
@@ -598,10 +894,23 @@ function updateOpening(key: string, val: number): void {
   scheduleSave()
 }
 
-function updateNote(val: string): void {
+function updateNote(sectionKey: string, val: string): void {
   if (props.isReadonly) return
-  noteText.value = val
+  noteTexts.value = { ...noteTexts.value, [sectionKey]: val }
   scheduleSave()
+}
+
+/** 某段披露说明的 AI 生成（prompt 取自段定义，含口径与「不得虚构」约束）。 */
+async function generateNoteText(def: { key: string; title: string; aiPrompt: string }): Promise<void> {
+  if (props.isReadonly) return
+  const text = await generateText({
+    section: `e1-disclosure-${variant.value}-note-${def.key}`,
+    prompt: def.aiPrompt,
+    context: buildAiContext(),
+    existingContent: noteTexts.value[def.key] || '',
+    confirmTitle: `AI生成${def.title}`,
+  })
+  if (text) updateNote(def.key, text)
 }
 
 function updateAuditNote(val: string): void {
@@ -613,53 +922,6 @@ function updateAuditNote(val: string): void {
 function updateAuditConclusion(val: string): void {
   if (props.isReadonly) return
   auditConclusion.value = val
-  scheduleSave()
-}
-
-async function addRestrictedRow(): Promise<void> {
-  if (props.isReadonly) return
-  try {
-    const { value } = await ElMessageBox.prompt('请输入受限制货币资金项目名称', '新增受限项目', {
-      confirmButtonText: '添加',
-      cancelButtonText: '取消',
-      inputValidator: input => input.trim() ? true : '项目名称不能为空',
-    })
-    restrictedRows.value = [...restrictedRows.value, {
-      id: `restr-${Date.now()}`,
-      item: value.trim(),
-      openingAmount: 0,
-      endingAmount: 0,
-      reason: '',
-    }]
-    scheduleSave()
-  } catch (error) {
-    if (!isPromptCancel(error)) ElMessage.error('新增受限项目失败')
-  }
-}
-
-function restrictedSummary({ columns }: any): string[] {
-  return columns.map((column: any, index: number) => {
-    if (index === 0) return '合 计'
-    if (index === 1) return displayPrefs.fmtAmount(restrictedRows.value.reduce((s, r) => s + r.openingAmount, 0))
-    if (index === 2) return displayPrefs.fmtAmount(restrictedRows.value.reduce((s, r) => s + r.endingAmount, 0))
-    return ''
-  })
-}
-
-function removeRestrictedRow(id: string): void {
-  if (props.isReadonly) return
-  restrictedRows.value = restrictedRows.value.filter(r => r.id !== id)
-  scheduleSave()
-}
-
-function updateRestrictedCell(id: string, field: keyof Omit<RestrictedRow, 'id'>, value: string | number): void {
-  if (props.isReadonly) return
-  const idx = restrictedRows.value.findIndex(r => r.id === id)
-  if (idx === -1) return
-  const row = { ...restrictedRows.value[idx] }
-  if (field === 'openingAmount' || field === 'endingAmount') row[field] = Number(value) || 0
-  else row[field] = String(value)
-  restrictedRows.value = [...restrictedRows.value.slice(0, idx), row, ...restrictedRows.value.slice(idx + 1)]
   scheduleSave()
 }
 
@@ -685,8 +947,19 @@ function buildAiContext(): Record<string, unknown> {
       期初折算率: row.openRate,
       期初人民币: row.openRmb,
     }),
-    受限资金: variant.value === 'soe' ? restrictedRows.value : [],
-    附注说明: noteText.value,
+    // ②表两变体都有（用户裁决）；只给类别/金额/原因，不给内部 key
+    受限资金: restrictedRows.value.map(r => ({
+      项目: r.label,
+      期末金额: r.endingAmount,
+      期初金额: r.openingAmount,
+      受限原因: r.reason,
+      来源科目: r.codes.join('、'),
+    })),
+    受限资金合计: restrictedTotal.value,
+    待归类科目: restrictedPending.value.map(l => ({ 科目: `${l.code} ${l.name}`, 期末: l.closing })),
+    附注说明: Object.fromEntries(
+      noteTextDefs.value.map(d => [d.title, noteTexts.value[d.key] || '']),
+    ),
   }
 }
 
@@ -712,6 +985,57 @@ async function generateAuditText(kind: 'note' | 'conclusion'): Promise<void> {
 // 保证附注模块表格与文本与披露表保持一致（单向推送，走 sync_from_workpaper）。
 const isSyncing = ref(false)
 
+/**
+ * 外币货币性项目 → 附注 `五、73`/`八、92` 的**第二个 payload**（K6 国企侧范式）。
+ *
+ * 🔴 该附注表是**跨循环共享表**（货币资金/应收账款/短期借款/长期借款/应付债券 各一段），
+ * 故载荷带 `_row_scope` 走平台级**行级合并** —— 只替换货币资金段（`BS-002`），
+ * 段外行由服务端原样保留。段边界解析不出时服务端 fail closed 整表跳过。
+ *
+ * 无外币明细（或默认骨架全零）时 `buildE1FxSyncPayload` 返回 null → 不推
+ * （空推送会把段恢复成模板骨架，等于清掉审计师在附注模块手填的货币资金段）。
+ * 失败静默：外币段是附加推送，不能让它的失败盖掉主章节「已同步」的提示。
+ */
+async function syncFxSectionToNote(year: number | undefined): Promise<void> {
+  const fxPayload = buildE1FxSyncPayload(variant.value, props.wpId || '', applicableStandards.value, {
+    fxRows: foreignCurrencyRows.value.map((r) => ({
+      groupId: r.groupId,
+      currency: r.currency,
+      isGroup: r.isGroup,
+      endForeign: r.endForeign,
+      endRate: r.endRate,
+      endRmb: r.endRmb,
+    })),
+  })
+  if (!fxPayload) return
+  try {
+    const resp: any = await http.post(
+      `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,
+      year ? { ...fxPayload, year } : fxPayload,
+    )
+    const data = resp?.data ?? resp
+    const unresolved: string[] = data?.row_scope_unresolved || []
+    if (unresolved.length) {
+      // fail closed 是静默跳过 → 必须让审计师知道这张表没同步成功
+      ElMessage.warning(`外币货币性项目未能同步（段边界解析失败）：${unresolved.join('、')}`)
+      return
+    }
+    if (data && (data.success || data.section_id)) {
+      eventBus.emit('disclosure:note-text-updated', {
+        wpCode: 'E1',
+        variant: variant.value,
+        accountCode: '1001',
+        projectId: props.projectId,
+        sectionIds: [E1_FX_NOTE_SECTION[variant.value]],
+        timestamp: Date.now(),
+      })
+    }
+  } catch (err: any) {
+    if (err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError' || err?.__CANCEL__) return
+    ElMessage.warning('外币货币性项目同步附注失败，请稍后重试')
+  }
+}
+
 async function syncToDisclosureNotes(): Promise<void> {
   if (isSyncing.value || !props.projectId || props.isReadonly) return
   isSyncing.value = true
@@ -723,17 +1047,27 @@ async function syncToDisclosureNotes(): Promise<void> {
         endingAmount: r.endingAmount,
         openingAmount: r.openingAmount,
       })),
-      restrictedRows: variant.value === 'soe'
-        ? restrictedRows.value.map(r => ({
-            item: r.item,
-            openingAmount: r.openingAmount,
-            endingAmount: r.endingAmount,
-            reason: r.reason,
-          }))
-        : undefined,
-      noteText: noteText.value,
+      // ②表**两变体都推**（用户裁决 2026-08-01：上市侧也建该表）。
+      // 条件表语义：无行时不推空表，由 e1NoteSectionMap 放进 _removed_table_keys。
+      restrictedRows: restrictedRows.value.map(r => ({
+        item: r.label,
+        openingAmount: r.openingAmount,
+        endingAmount: r.endingAmount,
+        reason: r.reason,
+      })),
+      // 按源模板分段推送（每段带中文 title，否则附注正文会渲染成英文键）
+      noteSections: noteTextDefs.value.map(d => ({
+        key: d.key,
+        title: d.title,
+        text: noteTexts.value[d.key] || '',
+      })),
     }
-    const payload = buildE1SyncPayload(variant.value, props.wpId || '', null, snapshot)
+    const payload = buildE1SyncPayload(
+      variant.value,
+      props.wpId || '',
+      applicableStandards.value,
+      snapshot,
+    )
     // 显式携带审计年度，定位到项目审计年度的附注记录（否则后端默认取服务器当前年）
     const yr = Number(auditYear.value) || undefined
     const resp: any = await http.post(
@@ -758,6 +1092,8 @@ async function syncToDisclosureNotes(): Promise<void> {
     } else {
       ElMessage.warning('同步附注返回异常')
     }
+    await syncFxSectionToNote(yr)
+    await syncRestrictedAssetsToNote(yr)
   } catch (err: any) {
     // 重复点击被请求去重取消（axios cancel / ERR_CANCELED）：首个请求仍在进行，静默忽略不吓用户
     if (err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError' || err?.__CANCEL__) return
@@ -766,6 +1102,87 @@ async function syncToDisclosureNotes(): Promise<void> {
     isSyncing.value = false
   }
 }
+
+/**
+ * 受限资产 → 附注 `五、32`（上市，双期两张表）/ `八、93`（国企）的**第三个 payload**。
+ *
+ * 🔴 该表也是**跨循环共享表**（货币资金/应收票据/应收账款/应收款项融资/存货/
+ * 固定资产/在建工程/无形资产 各一段，owner 横跨 E1/D1/D2/D5/F2/H1/H2/I1），
+ * E1 只负责 `BS-002 货币资金` 段，载荷带 `_row_scope`。
+ *
+ * 数据源 = 本页 ②表「受限制的货币资金明细」—— 它按受限类别分行（银行承兑保证金 /
+ * 信用证保证金 / 境外受限 …），而附注该表是**按资产类别**披露 → 归纳成**一行**
+ * 「货币资金」（金额求和、受限原因去重拼接），类别明细留在 `五、1`/`八、1` 的 ②表。
+ *
+ * 无受限资金（②表空或全零）时 `buildRestrictedAssetsPayloads` 返回 `[]` → 不推
+ * （空推送会把段恢复成模板骨架，等于清掉审计师手填内容）。失败静默不盖主提示。
+ */
+async function syncRestrictedAssetsToNote(year: number | undefined): Promise<void> {
+  const payloads = buildRestrictedAssetsPayloads(
+    variant.value,
+    props.wpId || '',
+    applicableStandards.value,
+    {
+      ownerRowCode: 'BS-002',
+      rows: summarizeRestrictedRows(
+        RESTRICTED_ASSETS_OWNERS['BS-002'],
+        restrictedRows.value.map((r) => ({
+          endAmount: r.endingAmount,
+          priorAmount: r.openingAmount,
+          reason: r.reason,
+        })),
+      ),
+    },
+    E1_DISCLOSURE_SHEET_NAME,
+  )
+  if (!payloads.length) return
+  const sectionId = RESTRICTED_ASSETS_NOTE_SECTION[variant.value]
+  for (const payload of payloads) {
+    try {
+      const resp: any = await http.post(
+        `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,
+        year ? { ...payload, year } : payload,
+      )
+      const data = resp?.data ?? resp
+      const unresolved: string[] = data?.row_scope_unresolved || []
+      if (unresolved.length) {
+        // fail closed 是静默跳过 → 必须让审计师知道这张表没同步成功
+        ElMessage.warning(`受限资产未能同步（段边界解析失败）：${unresolved.join('、')}`)
+        continue
+      }
+      if (data && (data.success || data.section_id)) {
+        eventBus.emit('disclosure:note-text-updated', {
+          wpCode: 'E1',
+          variant: variant.value,
+          accountCode: '1001',
+          projectId: props.projectId,
+          sectionIds: [sectionId],
+          timestamp: Date.now(),
+        })
+      }
+    } catch (err: any) {
+      if (err?.code === 'ERR_CANCELED' || err?.name === 'CanceledError' || err?.__CANCEL__) return
+      ElMessage.warning('受限资产同步附注失败，请稍后重试')
+      return
+    }
+  }
+}
+
+// ─── 数据变更后自动同步到附注 ─────────────────────────────────────────────────
+// 🔴 必须注册在此处（全部被监听 const 与 syncToDisclosureNotes 均已声明之后）：
+// `<script setup>` 的 const 有 TDZ，watch 依赖数组在 setup 期即求值，放到文件顶部
+// 会抛 ReferenceError 让整个披露 Tab 挂不上（get_diagnostics/vitest/Vite 全查不出）。
+// 监听源与 syncToDisclosureNotes 构建 snapshot 所用字段一致（disclosureRows /
+// restrictedRows / noteTexts / variant），保证「改了什么就同步什么」。
+watch(
+  // `foreignCurrencyRows` 也在监听源里 —— 外币段经 `syncFxSectionToNote` 推 五、73/八、92，
+  // 不加它则「改了外币不同步」（与「监听源须和载荷构建字段一致」铁律相符）
+  [disclosureRows, restrictedRows, noteTexts, variant, foreignCurrencyRows],
+  () => {
+    autoSync.scheduleAutoSync(syncToDisclosureNotes)
+  },
+  { deep: true },
+)
 
 // ─── Cleanup ─────────────────────────────────────────────────────────────────
 
@@ -863,13 +1280,22 @@ onBeforeUnmount(() => {
         </el-table-column>
       </el-table>
 
-      <!-- Listed: 外币性质货币资金项目 -->
+      <!--
+        外币性质货币资金项目 + 货币资金（原币）—— **两变体都有**。
+        🔴 源 xlsx 逐格实证（openpyxl，2026-08-02）：「附注披露信息(上市公司)」与
+        「附注披露信息(国企)」的 R25~R62 两张外币表**逐字相同**（表名/两级表头/
+        四个分组/五个币种/合计公式全同），只有 R17 的汇率中间价提示块是上市侧独有。
+        改造前这里写 `v-if="variant === 'listed'"` → 国企 Tab 完全没有外币录入位置，
+        而国企 sheet 的勾稽单元格 R12 列 E 恰恰是 `=B12-'附注披露信息(上市公司)'!D62`
+        （主表合计 − 原币表人民币合计），可见国企版同样要求填这两张表。
+      -->
+      <h4 class="section-title" style="margin-top:20px">外币性质货币资金项目</h4>
       <template v-if="variant === 'listed'">
-        <h4 class="section-title" style="margin-top:20px">外币性质货币资金项目</h4>
         <div class="amber-context" style="margin-bottom:10px">
           <span class="amber-icon">📌</span>
           <span class="amber-text">（提示：(1) 截止202X年12月31日，人民币对汇率中间价按中国人民银行公布的汇率折算。(2) 本集团不存在抵押、质押或冻结以及存放在境外且资金汇回受到限制的款项。）</span>
         </div>
+      </template>
         <!-- 版本切换：详细版=源模板结构（库存现金/银行存款/银行存款中：财务公司存款/其他货币资金 × 币种）；简版=货币资金合计 × 币种 -->
         <div class="fc-toolbar">
           <el-segmented
@@ -932,71 +1358,216 @@ onBeforeUnmount(() => {
             </el-table-column>
           </el-table-column>
         </el-table>
-      </template>
 
-      <!-- SOE: Restricted table -->
-      <template v-if="variant === 'soe'">
-        <h4 class="section-title">受限制货币资金明细</h4>
-        <div class="amber-context" style="margin-bottom:10px">
-          <span class="amber-icon">📌</span>
-          <span class="amber-text">（提示：列示保证金、担保存款、冻结款项及存放境外且资金汇回受限等不符合现金及现金等价物条件或使用受限的款项，须与 E1-1 审定表"受限/境外款项"及报表附注勾稽一致。）</span>
+      <!-- ② 受限制的货币资金明细（两变体共用；用户裁决 2026-08-01 上市侧也建该表） -->
+      <h4 class="section-title">② 受限制的货币资金明细</h4>
+      <div class="amber-context" style="margin-bottom:10px">
+        <span class="amber-icon">📌</span>
+        <span class="amber-text">（提示：列示保证金、担保存款、冻结款项及存放境外且资金汇回受限等不符合现金及现金等价物条件或使用受限的款项。校验预设 F1-4：合计 = 各明细行之和；F1-5/F1-6：本表合计 = 报表货币资金 − 现金流量表补充资料「现金及现金等价物余额」。）</span>
+      </div>
+
+      <el-table
+        :data="restrictedRows"
+        border
+        size="small"
+        style="width: 100%; max-width: 900px"
+        show-summary
+        :summary-method="restrictedSummary"
+      >
+        <el-table-column :label="itemColumnLabel" min-width="200">
+          <template #default="{ row }">
+            <span>{{ row.label }}</span>
+            <el-tag v-if="row.fromFourTable" size="small" type="success" effect="plain" class="src-tag">四表</el-tag>
+            <el-tooltip v-if="row.codes.length" :content="`来源科目：${row.codes.join('、')}`" placement="top">
+              <span class="code-hint">{{ row.codes.length }} 个科目</span>
+            </el-tooltip>
+          </template>
+        </el-table-column>
+        <el-table-column :label="openingLabel" width="150" align="right">
+          <template #default="{ row }">
+            <span v-if="row.fromFourTable" class="derived-cell">{{ displayPrefs.fmtAmount(row.openingAmount) }}</span>
+            <WpAmountInput
+              v-else
+              :model-value="row.openingAmount"
+              :disabled="isReadonly"
+              @update:model-value="(val: number) => updateRestrictedCell(row.id, 'openingAmount', val)"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column :label="endingLabel" width="150" align="right">
+          <template #default="{ row }">
+            <span v-if="row.fromFourTable" class="derived-cell">{{ displayPrefs.fmtAmount(row.endingAmount) }}</span>
+            <WpAmountInput
+              v-else
+              :model-value="row.endingAmount"
+              :disabled="isReadonly"
+              @update:model-value="(val: number) => updateRestrictedCell(row.id, 'endingAmount', val)"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column label="受限原因" min-width="180">
+          <template #default="{ row }">
+            <el-input
+              :model-value="row.reason"
+              :disabled="isReadonly"
+              size="small"
+              placeholder="按实际受限情形填写"
+              @input="(val: string) => updateRestrictedCell(row.id, 'reason', val)"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="70" align="center">
+          <template #default="{ row }">
+            <el-button
+              v-if="!isReadonly && !row.fromFourTable"
+              type="danger"
+              text
+              size="small"
+              @click="removeRestrictedRow(row.id)"
+            >删除</el-button>
+          </template>
+        </el-table-column>
+        <template #empty>
+          <span class="empty-hint">暂无受限资金。四表入库后若识别不出受限科目，请在下方「待归类科目」面板点选归类。</span>
+        </template>
+      </el-table>
+      <el-button v-if="!isReadonly" size="small" class="add-btn" @click="addRestrictedRow">+ 新增受限类别</el-button>
+
+      <!-- 待归类科目：「各项目科目命名不同」的兜底通道 -->
+      <details v-if="restrictedPending.length || restrictedExcluded.length" class="pending-details" open>
+        <summary>
+          🔎 待归类科目
+          <el-tag size="small" type="warning" effect="plain">{{ restrictedPending.length }} 项待处理</el-tag>
+          <el-tag v-if="restrictedExcluded.length" size="small" type="info" effect="plain">
+            {{ restrictedExcluded.length }} 项已标为不受限
+          </el-tag>
+        </summary>
+        <div class="pending-body">
+          <div class="pending-hint">
+            以下货币资金子科目按科目名判不出受限类别（各项目命名习惯不同，平台不臆造归属）。
+            请逐项点选归入某类，或标记为「不受限」。已处理项不再出现在此处。
+          </div>
+          <el-table :data="restrictedPending" border size="small" style="width:100%; max-width:900px" max-height="280">
+            <el-table-column label="来源科目" min-width="220">
+              <template #default="{ row }">
+                <span class="ft-code">{{ row.code }}</span>
+                <span class="ft-name">{{ row.name }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column :label="openingLabel" width="140" align="right">
+              <template #default="{ row }">{{ displayPrefs.fmtAmount(row.opening) }}</template>
+            </el-table-column>
+            <el-table-column :label="endingLabel" width="140" align="right">
+              <template #default="{ row }">{{ displayPrefs.fmtAmount(row.closing) }}</template>
+            </el-table-column>
+            <el-table-column label="归类为" width="240">
+              <template #default="{ row }">
+                <el-select
+                  :disabled="isReadonly"
+                  size="small"
+                  placeholder="选择受限类别"
+                  style="width:100%"
+                  @change="(val: string) => assignRestricted(row.code, val)"
+                >
+                  <el-option
+                    v-for="opt in restrictedBucketOptions"
+                    :key="opt.value"
+                    :label="opt.label"
+                    :value="opt.value"
+                  />
+                </el-select>
+              </template>
+            </el-table-column>
+            <el-table-column label="不受限" width="90" align="center">
+              <template #default="{ row }">
+                <el-button
+                  v-if="!isReadonly"
+                  text
+                  size="small"
+                  @click="assignRestricted(row.code, E1_UNRESTRICTED_KEY)"
+                >标记</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+
+          <template v-if="restrictedExcluded.length">
+            <div class="pending-hint" style="margin-top:10px">
+              已标记为「不受限」的科目（金额仍参与 F1-5/F1-6 勾稽的差额侧，不隐藏）：
+            </div>
+            <el-table :data="restrictedExcluded" border size="small" style="width:100%; max-width:760px" max-height="220">
+              <el-table-column label="来源科目" min-width="220">
+                <template #default="{ row }">
+                  <span class="ft-code">{{ row.code }}</span>
+                  <span class="ft-name">{{ row.name }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column :label="endingLabel" width="140" align="right">
+                <template #default="{ row }">{{ displayPrefs.fmtAmount(row.closing) }}</template>
+              </el-table-column>
+              <el-table-column label="操作" width="90" align="center">
+                <template #default="{ row }">
+                  <el-button v-if="!isReadonly" text size="small" @click="resetRestrictedAssignment(row.code)">撤销</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+          </template>
         </div>
-        <el-table :data="restrictedRows" border size="small" style="width: 100%; max-width: 780px" show-summary :summary-method="restrictedSummary">
-          <el-table-column label="项目" width="220">
-            <template #default="{ row }">
-              <el-input :model-value="row.item" :disabled="isReadonly" size="small"
-                @change="(val: string) => updateRestrictedCell(row.id, 'item', val)" />
-            </template>
-          </el-table-column>
-          <el-table-column label="年初余额" width="150" align="right">
-            <template #default="{ row }">
-              <el-input :model-value="row.openingAmount" :disabled="isReadonly"
-                :formatter="amountFormatter" :parser="amountParser"
-                size="small" class="amt-input" style="width:100%"
-                @change="(val: string) => updateRestrictedCell(row.id, 'openingAmount', Number(val) || 0)" />
-            </template>
-          </el-table-column>
-          <el-table-column label="期末余额" width="150" align="right">
-            <template #default="{ row }">
-              <el-input :model-value="row.endingAmount" :disabled="isReadonly"
-                :formatter="amountFormatter" :parser="amountParser"
-                size="small" class="amt-input" style="width:100%"
-                @change="(val: string) => updateRestrictedCell(row.id, 'endingAmount', Number(val) || 0)" />
-            </template>
-          </el-table-column>
-          <el-table-column label="受限原因" min-width="160">
-            <template #default="{ row }">
-              <el-input :model-value="row.reason" :disabled="isReadonly" size="small"
-                @change="(val: string) => updateRestrictedCell(row.id, 'reason', val)" />
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" width="70" align="center">
-            <template #default="{ row }">
-              <el-button v-if="!isReadonly" type="danger" text size="small"
-                @click="removeRestrictedRow(row.id)">删除</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-        <el-button v-if="!isReadonly" size="small" class="add-btn" @click="addRestrictedRow">+ 添加行</el-button>
-      </template>
+      </details>
 
-      <!-- 附注说明（卡片式） -->
-      <el-card class="opinion-card" shadow="never">
+      <!-- 披露内部勾稽：规则全部取自校验预设 F1-1~F1-6 + 源 xlsx 表内公式 -->
+      <WpDisclosureConsistencyPanel
+        :results="consistencyResults"
+        :project-id="projectId"
+        title="披露勾稽（校验预设 F1-1~F1-6）"
+      />
+      <div v-if="consistencyErrorCount > 0" class="consistency-actions">
+        <span class="consistency-hint">
+          存在 {{ consistencyErrorCount }} 项超出容差的勾稽差异，可推送到 A13 未更正错报汇总。
+        </span>
+        <el-button
+          type="warning"
+          size="small"
+          plain
+          :disabled="isReadonly"
+          @click="pushConsistencyToA13"
+        >推送差异到 A13 错报</el-button>
+      </div>
+
+      <!-- 附注说明：按源模板分段（上市 2 段 / 国企 2 段），每段配 AI 辅助 -->
+      <el-card
+        v-for="def in noteTextDefs"
+        :key="def.key"
+        class="opinion-card"
+        shadow="never"
+      >
         <template #header>
           <div class="opinion-header">
-            <span class="opinion-title">附注说明</span>
+            <span class="opinion-title">{{ def.title }}</span>
             <div class="opinion-chips">
+              <el-button
+                type="primary"
+                text
+                size="small"
+                :loading="isGenerating(`e1-disclosure-${variant}-note-${def.key}`)"
+                :disabled="isReadonly"
+                @click="generateNoteText(def)"
+              >🤖 AI 辅助</el-button>
               <GtIndexChip value="wp:E1-1" :context-project-id="projectId" />
             </div>
           </div>
         </template>
+        <!-- 源模板指引（编制提示，不进附注正文） -->
+        <div class="amber-context" style="margin-bottom:8px">
+          <span class="amber-icon">📌</span>
+          <span class="amber-text">{{ def.guidance }}</span>
+        </div>
         <el-input
-          :model-value="noteText"
+          :model-value="noteTexts[def.key] || ''"
           :disabled="isReadonly"
           type="textarea"
           :autosize="{ minRows: 3, maxRows: 14 }"
-          placeholder="填写货币资金附注说明（受限/境外/回收风险等）"
-          @change="updateNote"
+          :placeholder="def.placeholder"
+          @input="(val: string) => updateNote(def.key, val)"
         />
       </el-card>
 
@@ -1155,5 +1726,66 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   align-items: center;
   font-weight: 500;
+}
+
+/* ② 受限表：四表来源标记与派生只读格 */
+.src-tag { margin-left: 6px; }
+.code-hint {
+  margin-left: 6px;
+  font-size: 12px;
+  color: #909399;
+  cursor: help;
+  border-bottom: 1px dashed #c0c4cc;
+}
+.derived-cell {
+  color: #606266;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.empty-hint {
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.6;
+}
+
+/* 待归类科目面板 */
+.pending-details {
+  margin-top: 12px;
+  border: 1px solid #faecd8;
+  border-left: 3px solid #e6a23c;
+  background: #fdf6ec;
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+.pending-details summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #b88230;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pending-body { margin-top: 10px; }
+.pending-hint {
+  font-size: 12px;
+  color: #606266;
+  line-height: 1.6;
+  margin-bottom: 8px;
+}
+.ft-code { font-weight: 600; color: #303133; margin-right: 6px; }
+.ft-name { color: #606266; }
+
+/* 勾稽差异推 A13 */
+.consistency-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: -4px 0 12px;
+}
+.consistency-hint {
+  font-size: 12px;
+  color: #b88230;
+  line-height: 1.6;
 }
 </style>

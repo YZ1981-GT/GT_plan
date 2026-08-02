@@ -614,11 +614,20 @@ async function handleImportE0Lists() {
       if (c.entity_name) data.updateField(row._row_id!, 'entity_name', c.entity_name)
       if (c.confirm_index) data.updateField(row._row_id!, 'confirm_index', c.confirm_index)
       if (c.account_type) data.updateField(row._row_id!, 'account_type', c.account_type)
+      // 账号/理财产品名称：源模板 E0-1 E 列，是 F 列 SUMIF 的匹配键，必须带过来
+      if (c.account_no) data.updateField(row._row_id!, 'account_no', c.account_no)
+      if (c.currency) data.updateField(row._row_id!, 'currency', c.currency)
       if (c.amount != null) data.updateField(row._row_id!, 'amount', c.amount)
       ;(row as any)._source = 'auto'
     }
     handleSave()
-    ElMessage.success(`已从发函清单带入 ${res.candidates.length} 个账户`)
+    ElMessage.success(`已从发函记录表带入 ${res.candidates.length} 条`)
+    // 品种靠兜底值推出（源模板「所属科目」「借款类型」两列都缺）→ 明示提示，不静默归类
+    if (res.typeFallbackLists?.length) {
+      ElMessage.warning(
+        `${res.typeFallbackLists.join('、')} 缺「所属科目」列，品种已按默认值填入，请复核（长期借款需手工改正）`,
+      )
+    }
   } catch (e: any) {
     ElMessage.warning('从发函清单带入失败：' + (e?.message || '未知错误'))
   } finally {

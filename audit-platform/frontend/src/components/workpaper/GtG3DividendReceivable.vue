@@ -53,6 +53,7 @@
       </CycleTabProcedure>
 
       <G3TabAdjudication
+        :html-data="props.htmlData"
         v-else-if="currentSheet === 'G3-1'"
         :wp-id="props.wpId"
         :project-id="props.projectId"

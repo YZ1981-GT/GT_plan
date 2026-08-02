@@ -73,6 +73,13 @@
         <strong>{{ group.groupName }}</strong>
         <span class="group-sub">期末 {{ fmt(group.subtotal.closingAdjusted) }}</span>
       </div>
+      <!-- 四表库取数溯源（口径：期末余额） -->
+      <WpFourTableSourcePanel
+        :source-codes="tbSourceCodes"
+        gross-label="其他权益工具投资"
+        fallback-row-code="BS-025"
+      />
+
       <el-table
         v-show="!group.collapsed"
         :data="group.rows"
@@ -278,8 +285,11 @@ import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn
 import { useAuditContext } from '@/composables/useAuditContext'
 import { jumpToG8Sheet } from '../../composables/g8CrossHelpers'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
+import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
 
 const props = defineProps<{
+  /** render 下发的本 sheet html_data（含 tb_source_codes） */
+  htmlData?: Record<string, any> | null
   allResponses: Map<string, ChecklistResponse>
   wpId: string
   projectId: string
@@ -287,6 +297,14 @@ const props = defineProps<{
   debouncedSave: (id: string, d: Partial<ChecklistResponse>) => void
 }>()
 
+
+/**
+ * 四表库取数溯源（消费 render 下发的 `tb_source_codes`，消除 dead output）。
+ *
+ * 科目由后端按**科目名**逐项目解析（`four_table/g_cycle_specs.G8_SPEC`），
+ * 取数口径 = 期末余额。前端单一真源见 `composables/gCycleAccountScope.ts`。
+ */
+const tbSourceCodes = computed(() => props.htmlData?.tb_source_codes ?? null)
 const jumpToSection = inject<((sheetName: string) => void) | null>('jumpToSection', null)
 const validateLoading = ref(false)
 

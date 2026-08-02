@@ -16,6 +16,18 @@
         <el-button size="small" :disabled="isReadonly" :loading="syncing" @click="onSyncSupporting">
           从 G2-2/G2-3 汇总未审
         </el-button>
+        <el-tooltip :content="fourTableHint" placement="top">
+          <el-button
+            size="small"
+            type="success"
+            plain
+            :disabled="isReadonly || !hasFourTablePrefill"
+            :loading="seeding"
+            @click="onPullFromFourTable"
+          >
+            从四表库带入未审数
+          </el-button>
+        </el-tooltip>
         <el-button size="small" :disabled="isReadonly" :loading="tbLoading" @click="onFetchTb">
           取试算 1132
         </el-button>
@@ -45,6 +57,34 @@
         <li>「带入调整」：可从集中登记按科目 1132 拉取调整分录，逐笔分配到各原值/坏账明细行的期末账项调整，带入后审定数自动更新并联动附注。</li>
       </ul>
     </details>
+
+    <!-- 四表库取数溯源（口径：期末余额） -->
+
+    <WpFourTableSourcePanel
+
+      :source-codes="tbSourceCodes"
+
+      gross-label="应收利息"
+
+    />
+
+    <!-- 待归类科目（四表有余额但无法归到审定行 → 交审计师分配，绝不兜底塞「其他」） -->
+    <el-alert
+      v-if="unclassifiedLeaves.length"
+      type="warning"
+      :closable="false"
+      class="unclassified-alert"
+    >
+      <template #title>
+        四表库有 {{ unclassifiedLeaves.length }} 个应收利息子科目无法自动归到审定表行，请手工分配
+      </template>
+      <ul class="unclassified-list">
+        <li v-for="u in unclassifiedLeaves" :key="u.code">
+          {{ u.code }} {{ u.name }} — 期末 {{ fmt(u.amount) }}
+        </li>
+      </ul>
+    </el-alert>
+
 
     <el-table
       :data="rows"
@@ -214,7 +254,7 @@
 
 <script setup lang="ts">
 import { ref, toRef, computed, inject } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download } from '@element-plus/icons-vue'
 import {
   useG2Adjudication,
@@ -228,8 +268,24 @@ import GtIndexChip from '../GtIndexChip.vue'
 import G2ImportExportDropdown from './G2ImportExportDropdown.vue'
 import G2AuditTextCards from './G2AuditTextCards.vue'
 import type { ChecklistResponse } from '../composables/useF1FormData'
+import WpFourTableSourcePanel from '../shared/WpFourTableSourcePanel.vue'
+import {
+  G2_SEED_SPEC,
+  buildGSeedCells,
+  normalizeGAdjPrefill,
+} from '../composables/gCycleAdjudicationSeed'
+import {
+  describeAdjPrefillConflicts,
+  describeAdjPrefillPlan,
+  planAdjudicationPrefill,
+  planHasWork,
+  resolveAdjPrefillWrites,
+} from '../composables/shared/adjudicationPrefillPlan'
+import { G2_ADJUDICATION_ITEMS } from '../composables/g2AdjudicationItems'
 
 const props = defineProps<{
+  /** render 下发的本 sheet html_data（含 tb_source_codes） */
+  htmlData?: Record<string, any> | null
   allResponses: Map<string, ChecklistResponse>
   isReadonly: boolean
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
@@ -237,6 +293,14 @@ const props = defineProps<{
   projectId?: string
 }>()
 
+
+/**
+ * 四表库取数溯源（消费 render 下发的 `tb_source_codes`，消除 dead output）。
+ *
+ * 科目由后端按**科目名**逐项目解析（`four_table/g_cycle_specs.G2_SPEC`），
+ * 取数口径 = 期末余额。前端单一真源见 `composables/gCycleAccountScope.ts`。
+ */
+const tbSourceCodes = computed(() => props.htmlData?.tb_source_codes ?? null)
 const emit = defineEmits<{ imported: [] }>()
 
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
@@ -292,6 +356,102 @@ function onSyncSupporting() {
   }
 }
 
+// ─── 从四表库带入未审数 ───────────────────────────────────────────────────────
+//
+// 🔴 只落「一、应收利息原值」段。原因写在 `G2_SEED_SPEC` 的 docstring 里：
+//    ① 单项/组合是减值方法的会计判断，四表里没有 → 默认落「按组合计提」并明示；
+//    ② 坏账准备在 1231 科目族（D/K 循环管），G2_SPEC 无 provision 槽 → 永不 seed。
+
+const seeding = ref(false)
+
+const fourTablePrefill = computed(() =>
+  normalizeGAdjPrefill(props.htmlData?.adjudication_prefill),
+)
+
+const seedResult = computed(() => buildGSeedCells(fourTablePrefill.value, {
+  ...G2_SEED_SPEC,
+  labelOf: (k) => G2_ADJUDICATION_ITEMS.find((d) => d.rowKey === k)?.label ?? k,
+}))
+
+const unclassifiedLeaves = computed(() => seedResult.value.unclassified)
+
+const hasFourTablePrefill = computed(() => seedResult.value.cells.length > 0)
+
+const fourTableHint = computed(() =>
+  hasFourTablePrefill.value
+    ? '把四表库（tb_balance 应收利息叶子科目）的期初 / 期末余额带入「原值」段未审数；已录入的格不覆盖'
+    : '四表库暂无该科目数据（需先导入余额表，或本项目无应收利息科目）',
+)
+
+/** 读某格当前值（G2 行数据由 rowStore 派生，直接从渲染行读即可） */
+function readCurrentCell(cell: { rowKey: string; field: string }): number | null {
+  const row = adj.dataRows.value.find((r) => r.rowKey === cell.rowKey)
+  if (!row) return null
+  const v = (row as unknown as Record<string, unknown>)[cell.field]
+  return v == null || v === 0 ? null : Number(v)
+}
+
+async function onPullFromFourTable(): Promise<void> {
+  if (props.isReadonly) return
+  const { cells, usedDefaults } = seedResult.value
+  if (!cells.length) {
+    ElMessage.info('四表库暂无应收利息数据可带入')
+    return
+  }
+  const plan = planAdjudicationPrefill(cells, readCurrentCell, {
+    unclassified: seedResult.value.unclassified,
+    absentSlots: seedResult.value.absentSlots,
+  })
+  if (!planHasWork(plan)) {
+    ElMessage.info(describeAdjPrefillPlan(plan))
+    return
+  }
+
+  let mode: 'fill-blank' | 'overwrite' = 'fill-blank'
+  const notice = usedDefaults.length ? `\n\n⚠️ ${G2_SEED_SPEC.defaultNote}` : ''
+  if (plan.conflicts.length) {
+    try {
+      const action = await ElMessageBox.confirm(
+        `以下 ${plan.conflicts.length} 格已有录入且与四表不一致：\n`
+        + `${describeAdjPrefillConflicts(plan)}\n\n`
+        + '「覆盖」以四表数据替换；「仅补空值」保留已录入数据、只填空白格。'
+        + notice,
+        '从四表库带入未审数',
+        {
+          confirmButtonText: '覆盖',
+          cancelButtonText: '仅补空值',
+          distinguishCancelAndClose: true,
+          type: 'warning',
+        },
+      )
+      if (action === 'confirm') mode = 'overwrite'
+    } catch (e) {
+      if (e === 'close') return
+      mode = 'fill-blank'
+    }
+  } else if (notice) {
+    try {
+      await ElMessageBox.confirm(
+        `将带入 ${plan.writes.length} 格未审数。${notice}`,
+        '从四表库带入未审数',
+        { confirmButtonText: '带入', cancelButtonText: '取消', type: 'info' },
+      )
+    } catch {
+      return
+    }
+  }
+
+  seeding.value = true
+  try {
+    for (const w of resolveAdjPrefillWrites(plan, mode)) {
+      adj.updateField(w.rowKey, w.field as G2AdjEditableField, w.amount)
+    }
+    ElMessage.success(describeAdjPrefillPlan(plan))
+  } finally {
+    seeding.value = false
+  }
+}
+
 async function onFetchTb() {
   tbLoading.value = true
   try {
@@ -339,6 +499,8 @@ function fmtRate(v: number | '' | 'N/A' | undefined): string {
 .sheet-title { margin: 0; font-size: 15px; font-weight: 600; }
 .head-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .objective-alert { margin-bottom: 10px; }
+.unclassified-alert { margin-bottom: 10px; }
+.unclassified-list { margin: 6px 0 0; padding-left: 18px; line-height: 1.6; font-size: 12px; }
 .prep-hint { margin-bottom: 12px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }
 .prep-hint summary { cursor: pointer; font-weight: 500; color: #409eff; }
 .prep-hint ul { margin: 8px 0 0; padding-left: 18px; color: #606266; line-height: 1.6; }

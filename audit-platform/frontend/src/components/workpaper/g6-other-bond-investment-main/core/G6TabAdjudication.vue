@@ -6,9 +6,18 @@
         <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
           <el-icon><Download /></el-icon>带入调整
         </el-button>
-        <el-button size="small" plain :disabled="isReadonly || !hasTbPrefill" @click="seedFromFourTable" title="从四表库（科目1505）带入审定表公允价值段未审数">
-          从四表库带入未审数
-        </el-button>
+        <el-tooltip :content="fourTableHint" placement="top">
+          <el-button
+            size="small"
+            type="success"
+            plain
+            :disabled="isReadonly || !hasTbPrefill"
+            :loading="seeding"
+            @click="seedFromFourTable"
+          >
+            从四表库带入未审数
+          </el-button>
+        </el-tooltip>
         <span class="chip-wrap"><GtIndexChip value="wp:G6-1" :context-project-id="props.projectId" /></span>
         <span class="chip-wrap"><GtIndexChip value="wp:G6-2" :context-project-id="props.projectId" /></span>
         <span class="chip-wrap"><GtIndexChip value="wp:G6-3" :context-project-id="props.projectId" /></span>
@@ -20,7 +29,7 @@
       type="info"
       :closable="false"
       show-icon
-      title="审计目标：确认其他债权投资(FVOCI-Debt)公允价值与摊余成本审定余额准确完整，减值(ECL)计量恰当，账面价值合计与试算表科目1505勾稽一致。"
+      :title="`审计目标：确认其他债权投资(FVOCI-Debt)公允价值与摊余成本审定余额准确完整，减值(ECL)计量恰当，账面价值合计与试算表科目${G6_ACCOUNT_CODE}勾稽一致。`"
       style="margin-bottom: 12px"
     />
 
@@ -59,12 +68,19 @@
       <p>④ 差异数 = 其他债权投资账面价值合计 − 试算平衡表数（应为 0）</p>
     </div>
 
-    <!-- 四表库取数溯源面板（无备抵科目 → 不传 provisionLabel） -->
+    <!--
+      四表库取数溯源面板（无备抵科目 → 不传 provisionLabel）。
+
+      🔴 2026-08-01 修：原先写 `report-row` / `hint`，而面板真实 prop 是
+      `fallback-row-code` / `hints`（**复数、数组**）→ 报表行兜底与提示文案静默失效。
+    -->
     <WpFourTableSourcePanel
       :source-codes="tbSourceCodes"
       gross-label="其他债权投资"
-      report-row="BS-022"
-      hint="CAS22 FVOCI-Debt 减值在OCI确认，不冲减资产负债表账面价值，故无备抵科目行"
+      fallback-row-code="BS-022"
+      :hints="[
+        'CAS22 FVOCI-Debt 减值在其他综合收益确认，不冲减资产负债表账面价值，故无备抵科目行。',
+      ]"
     />
 
     <details class="prep-hint">
@@ -260,15 +276,31 @@
  */
 import { ref, computed, toRef, inject, watch } from 'vue'
 import { Download } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
+import {
+  G6_FV_PLACEHOLDER_ROWS,
+  buildG6FvSeedCells,
+  normalizeGAdjPrefill,
+} from '../../composables/gCycleAdjudicationSeed'
+import {
+  describeAdjPrefillConflicts,
+  describeAdjPrefillPlan,
+  planAdjudicationPrefill,
+  planHasWork,
+  resolveAdjPrefillWrites,
+} from '../../composables/shared/adjudicationPrefillPlan'
 import { useG6MainAdjudication } from '../../composables/useG6MainAdjudication'
 import type { G6AdjudicationRow } from '../../composables/useG6MainAdjudication'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
-import { G6_CHANGE_RATE_THRESHOLD } from '../../composables/g6AdjudicationItems'
+import {
+  G6_ACCOUNT_CODE,
+  G6_ADJUDICATION_ITEMS,
+  G6_CHANGE_RATE_THRESHOLD,
+} from '../../composables/g6AdjudicationItems'
 import {
   G6_CLASSIFICATION_SUMMARY_KEY,
   parseG6ClassificationSummary,
@@ -305,7 +337,9 @@ const adj = useG6MainAdjudication({
   htmlData: toRef(props, 'htmlData'),
 })
 
-// ─── 从集中登记带入调整（1503 其他债权投资，资产借方；带入期末账项调整，单列合并 AJE/RJE） ───
+// ─── 从集中登记带入调整（其他债权投资，资产借方；带入期末账项调整，单列合并 AJE/RJE） ───
+// 🔴 科目码走 `G6_ACCOUNT_CODE` 单一真源：原写死 '1505'（= 债权投资减值准备，G4 的备抵）
+//    → 从集中登记按 1505 拉调整分录，拉的是别的科目。
 const bringInRows = computed(() =>
   adj.rows.value
     .filter((r) => r.editable && r.kind === 'leaf')
@@ -320,41 +354,121 @@ const {
 } = useAdjudicationBringIn({
   projectId: toRef(props, 'projectId') as any,
   year: useAuditContext().year as any,
-  subjectPrefix: '1505',
+  subjectPrefix: G6_ACCOUNT_CODE,
   direction: 'debit',
-  subjectCode: '1505',
+  subjectCode: G6_ACCOUNT_CODE,
   wpCode: 'G6',
-  subjectLabel: '其他债权投资(1505)',
+  subjectLabel: `其他债权投资(${G6_ACCOUNT_CODE})`,
   rows: bringInRows,
   updateCell: (rowKey: string, _field: any, value: number) =>
     adj.updateCell(rowKey, 'closingAdjustment', value),
   totalAudited: () => adj.carryingNetRow.value?.closingAudited ?? 0,
 })
 
-// ─── 从四表库带入未审数（科目 1505，仅 block1 公允价值段）─────────────────
-const adjudicationPrefill = computed(() => {
-  const pf = props.htmlData?.adjudication_prefill
-  return Array.isArray(pf) ? pf : null
-})
-const hasTbPrefill = computed(() => !!(adjudicationPrefill.value && adjudicationPrefill.value.length > 0))
+// ─── 从四表库带入未审数（「一、公允价值」段的 4 个占位行）─────────────────
+//
+// 🔴 **本按钮此前是死的**：后端 `_g6_other_bond_investment_main` 全文没有
+//    `adjudication_prefill` 这个键 → `hasTbPrefill` 恒 false、按钮永久禁用。
+//    2026-08-02 后端补齐（`four_table/g_cycle_adjudication_prefill`），载荷形态
+//    也从「数组 + block 字段」改为统一的「逐叶子明细」，故此处整段重写。
+//
+// 🔴 旧实现还有一处必然失配：按 `r.label === row.name` 匹配行，而 G6 的公允价值段
+//    行标签是**静态占位名**（`投资项目1..4`），永远不可能等于客户子科目名
+//    → 即便后端有数据也一格都填不进去。现改为按叶子顺序逐一落占位行。
 
-function seedFromFourTable(): void {
-  const prefill = adjudicationPrefill.value
-  if (!prefill || prefill.length === 0 || isReadonly.value) return
-  // G6 四表预填仅 block1 公允价值段的期初/期末未审数
-  // 由于全库 1505 余额为 0，此处仅设好链路，有数据后自动生效
-  for (const row of prefill) {
-    if (row.block !== 'block1') continue
-    // 找到审定表中匹配的叶子行并填入未审数
-    const match = adj.rows.value.find(
-      (r) => r.editable && r.kind === 'leaf' && r.label === row.name,
-    )
-    if (match) {
-      adj.updateCell(match.rowKey, 'openingUnadjusted', row.opening_balance ?? 0)
-      adj.updateCell(match.rowKey, 'closingUnadjusted', row.closing_balance ?? 0)
+const seeding = ref(false)
+
+const fourTablePrefill = computed(() =>
+  normalizeGAdjPrefill(props.htmlData?.adjudication_prefill),
+)
+
+const seedResult = computed(() => buildG6FvSeedCells(
+  fourTablePrefill.value,
+  (k) => G6_ADJUDICATION_ITEMS.find((d) => d.rowKey === k)?.label ?? k,
+))
+
+const hasTbPrefill = computed(() => seedResult.value.cells.length > 0)
+
+const fourTableHint = computed(() =>
+  hasTbPrefill.value
+    ? `把四表库（tb_balance 科目 ${G6_ACCOUNT_CODE} 叶子科目）的期初 / 期末余额带入`
+      + '「一、公允价值」段未审数；已录入的格不覆盖'
+    : `四表库暂无科目 ${G6_ACCOUNT_CODE} 数据（需先导入余额表，或本项目无其他债权投资科目）`,
+)
+
+function readCurrentCell(cell: { rowKey: string; field: string }): number | null {
+  const row = adj.rows.value.find((r) => r.rowKey === cell.rowKey)
+  if (!row) return null
+  const v = (row as unknown as Record<string, unknown>)[cell.field]
+  return v == null || v === 0 ? null : Number(v)
+}
+
+async function seedFromFourTable(): Promise<void> {
+  if (isReadonly.value) return
+  const { cells, mappings, unclassified, absentSlots } = seedResult.value
+  if (!cells.length) {
+    ElMessage.info(`四表库暂无科目 ${G6_ACCOUNT_CODE} 数据可带入`)
+    return
+  }
+  const plan = planAdjudicationPrefill(cells, readCurrentCell, { unclassified, absentSlots })
+  if (!planHasWork(plan)) {
+    ElMessage.info(describeAdjPrefillPlan(plan))
+    return
+  }
+
+  const mapText = mappings
+    .map((m) => `· ${G6_ADJUDICATION_ITEMS.find((d) => d.rowKey === m.rowKey)?.label ?? m.rowKey}`
+      + ` ← ${m.code} ${m.name}`)
+    .join('\n')
+  const overflow = unclassified.length
+    ? `\n\n⚠️ 「一、公允价值」段只有 ${G6_FV_PLACEHOLDER_ROWS.length} 个项目行（源模板行数限制），`
+      + `另有 ${unclassified.length} 个子科目未落行，请手工处理：\n`
+      + unclassified.map((u) => `· ${u.code} ${u.name} — 期末 ${fmt(u.amount)}`).join('\n')
+    : ''
+
+  let mode: 'fill-blank' | 'overwrite' = 'fill-blank'
+  if (plan.conflicts.length) {
+    try {
+      const action = await ElMessageBox.confirm(
+        `占位行与来源子科目对应关系：\n${mapText}\n\n`
+        + `以下 ${plan.conflicts.length} 格已有录入且与四表不一致：\n`
+        + `${describeAdjPrefillConflicts(plan)}\n\n`
+        + '「覆盖」以四表数据替换；「仅补空值」保留已录入数据、只填空白格。'
+        + overflow,
+        '从四表库带入未审数',
+        {
+          confirmButtonText: '覆盖',
+          cancelButtonText: '仅补空值',
+          distinguishCancelAndClose: true,
+          type: 'warning',
+        },
+      )
+      if (action === 'confirm') mode = 'overwrite'
+    } catch (e) {
+      if (e === 'close') return
+      mode = 'fill-blank'
+    }
+  } else {
+    try {
+      await ElMessageBox.confirm(
+        `将带入 ${plan.writes.length} 格未审数。\n\n占位行与来源子科目对应关系：\n${mapText}${overflow}`,
+        '从四表库带入未审数',
+        { confirmButtonText: '带入', cancelButtonText: '取消', type: 'info' },
+      )
+    } catch {
+      return
     }
   }
-  ElMessage.success(`已从四表库带入 ${prefill.filter(r => r.block === 'block1').length} 个项目的未审数`)
+
+  seeding.value = true
+  try {
+    for (const w of resolveAdjPrefillWrites(plan, mode)) {
+      adj.updateCell(w.rowKey, w.field as 'openingUnadjusted' | 'closingUnadjusted', w.amount)
+    }
+    ElMessage.success(describeAdjPrefillPlan(plan))
+  } finally {
+    seeding.value = false
+  }
 }
 
 // ─── 四表库溯源面板（消费 render 下发的 tb_source_codes，证明非 dead output）───

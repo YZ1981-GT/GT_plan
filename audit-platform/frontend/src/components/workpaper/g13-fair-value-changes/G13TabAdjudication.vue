@@ -78,6 +78,19 @@
       title="本期调整数已取自 G13-3 账项调整 overlay（确认调整后同步）；未审数仍自 G13-2 汇总。"
     />
 
+    <!-- 四表库取数溯源（口径：本期发生额） -->
+
+    <WpFourTableSourcePanel
+
+      :source-codes="tbSourceCodes"
+
+      gross-label="公允价值变动损益"
+
+      fallback-row-code="IS-015"
+
+    />
+
+
     <el-table :data="tableRows" border size="small" style="font-size:13px" max-height="520"
       :row-class-name="rowClassName">
       <el-table-column label="项目" prop="label" min-width="260" fixed>
@@ -234,8 +247,11 @@ import GtIndexChip from '../GtIndexChip.vue'
 import GtReviewDot from '../GtReviewDot.vue'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
 import GCycleGuideStrip from '../shared/GCycleGuideStrip.vue'
+import WpFourTableSourcePanel from '../shared/WpFourTableSourcePanel.vue'
 
 const props = defineProps<{
+  /** render 下发的本 sheet html_data（含 tb_source_codes） */
+  htmlData?: Record<string, any> | null
   allResponses: Map<string, ChecklistResponse>
   wpId: string
   projectId: string
@@ -243,6 +259,14 @@ const props = defineProps<{
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
 }>()
 
+
+/**
+ * 四表库取数溯源（消费 render 下发的 `tb_source_codes`，消除 dead output）。
+ *
+ * 科目由后端按**科目名**逐项目解析（`four_table/g_cycle_specs.G13_SPEC`），
+ * 取数口径 = 本期发生额。前端单一真源见 `composables/gCycleAccountScope.ts`。
+ */
+const tbSourceCodes = computed(() => props.htmlData?.tb_source_codes ?? null)
 const jumpToSection = inject<((sheetName: string) => void) | null>('jumpToSection', null)
 
 const adj = useG13Adjudication({

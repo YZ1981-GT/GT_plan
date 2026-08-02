@@ -41,6 +41,21 @@
       </ul>
     </details>
 
+    <!-- 四表库取数溯源（口径：期末余额） -->
+
+    <WpFourTableSourcePanel
+
+      :source-codes="tbSourceCodes"
+
+      gross-label="债权投资"
+
+      provision-label="债权投资减值准备"
+
+      fallback-row-code="BS-021"
+
+    />
+
+
     <el-table
       :data="adj.rows.value"
       border
@@ -204,6 +219,7 @@ import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import G4AuditTextCards from '../G4AuditTextCards.vue'
+import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
 
 const props = defineProps<{
   htmlData: Record<string, any> | null
@@ -213,6 +229,14 @@ const props = defineProps<{
   allResponses?: Map<string, ChecklistResponse>
 }>()
 
+
+/**
+ * 四表库取数溯源（消费 render 下发的 `tb_source_codes`，消除 dead output）。
+ *
+ * 科目由后端按**科目名**逐项目解析（`four_table/g_cycle_specs.G4_SPEC`），
+ * 取数口径 = 期末余额。前端单一真源见 `composables/gCycleAccountScope.ts`。
+ */
+const tbSourceCodes = computed(() => props.htmlData?.tb_source_codes ?? null)
 const openReviewDialog = inject<(sectionId: string) => void>('openReviewDialog', () => {})
 const allResponses = ref<Map<string, ChecklistResponse>>(new Map())
 

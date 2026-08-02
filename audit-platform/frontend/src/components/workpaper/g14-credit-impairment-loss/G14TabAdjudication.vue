@@ -103,6 +103,13 @@
     />
 
     <div class="table-wrap">
+      <!-- 四表库取数溯源（口径：本期发生额） -->
+      <WpFourTableSourcePanel
+        :source-codes="tbSourceCodes"
+        gross-label="信用减值损失"
+        fallback-row-code="IS-016"
+      />
+
       <el-table
         :data="tableRows"
         border
@@ -336,8 +343,11 @@ import GtIndexChip from '../GtIndexChip.vue'
 import GtReviewDot from '../GtReviewDot.vue'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
 import GCycleGuideStrip from '../shared/GCycleGuideStrip.vue'
+import WpFourTableSourcePanel from '../shared/WpFourTableSourcePanel.vue'
 
 const props = defineProps<{
+  /** render 下发的本 sheet html_data（含 tb_source_codes） */
+  htmlData?: Record<string, any> | null
   allResponses: Map<string, ChecklistResponse>
   wpId: string
   projectId: string
@@ -345,6 +355,14 @@ const props = defineProps<{
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
 }>()
 
+
+/**
+ * 四表库取数溯源（消费 render 下发的 `tb_source_codes`，消除 dead output）。
+ *
+ * 科目由后端按**科目名**逐项目解析（`four_table/g_cycle_specs.G14_SPEC`），
+ * 取数口径 = 本期发生额。前端单一真源见 `composables/gCycleAccountScope.ts`。
+ */
+const tbSourceCodes = computed(() => props.htmlData?.tb_source_codes ?? null)
 const jumpToSection = inject<((sheetName: string) => void) | null>('jumpToSection', null)
 
 const adj = useG14Adjudication({

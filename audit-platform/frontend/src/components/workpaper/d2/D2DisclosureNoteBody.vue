@@ -33,6 +33,8 @@ import { useRouter } from 'vue-router'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
 import { dataTableNames } from '../composables/disclosureSyncedTables'
+import { D2_DISCLOSURE_SHEET_NAME } from '../composables/d2NoteSectionMap'
+import { useRestrictedAssetsSync } from '../composables/useRestrictedAssetsSync'
 
 const props = withDefaults(defineProps<{
   variant: D2DisclosureVariant
@@ -430,6 +432,25 @@ function onImportLegacy(): void {
 
 const isSyncing = ref(false)
 
+/**
+ * 受限资产共享表（listed `五、32` / soe `八、93`）的「应收账款」段。
+ *
+ * 数据源 = D2-12 质押检查表（`D2-pledge-rows`，`checklist_responses` 里的底稿事实，
+ * 与 listed/soe 变体无关）。该表**只有期末口径** → 只推 listed 主表、不推续表。
+ * 采集逻辑在 `restrictedAssetsSources.ts`，网络与 fail closed 提示在共享 composable。
+ */
+const syncRestrictedAssets = useRestrictedAssetsSync({
+  owner: 'BS-006',
+  variant: () => props.variant,
+  wpId: () => props.wpId,
+  projectId: () => props.projectId,
+  responses: () => props.allResponses as unknown as Map<string, { remark?: string | null }>,
+  applicableStandards: () => props.applicableStandards,
+  sheetNames: D2_DISCLOSURE_SHEET_NAME,
+  isReadonly: () => props.isReadonly,
+  year: () => auditYear.value,
+})
+
 async function syncToDisclosureNotes(): Promise<void> {
   if (isSyncing.value || !props.projectId || props.isReadonly) return
   isSyncing.value = true
@@ -474,6 +495,8 @@ async function syncToDisclosureNotes(): Promise<void> {
       },
     }))
     ElMessage.success(`已同步 ${rows} 行到附注模块「${D2_NOTE_SECTION[props.variant]} 应收账款」`)
+    // 受限资产共享表的「应收账款」段（跨循环共享表，只替换本段、他段原样保留）
+    await syncRestrictedAssets()
     await checkNoteConsistency(true)
   } catch {
     ElMessage.warning('同步附注失败，请稍后重试')

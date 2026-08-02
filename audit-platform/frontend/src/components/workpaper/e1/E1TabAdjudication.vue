@@ -15,7 +15,8 @@
  *
  * Requirements: 1.1-1.7, 12.1-12.5
  */
-import { ref, inject, toRef, onMounted, watch, type Ref } from 'vue'
+import { ref, computed, inject, toRef, onMounted, watch, type Ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   useE1Adjudication,
   type UseE1BaseOptions,
@@ -25,6 +26,14 @@ import GtIndexChip from '../GtIndexChip.vue'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useE1AiGenerate } from '../composables/useE1AiGenerate'
+import WpSemanticAccountSourcePanel from '../shared/WpSemanticAccountSourcePanel.vue'
+import {
+  E1_SLOT_ORDER,
+  describeE1PrefillPlan,
+  normalizeE1AdjudicationPrefill,
+  planE1AdjudicationPrefill,
+  resolveE1PrefillWrites,
+} from '../composables/e1AdjudicationPrefill'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -37,6 +46,12 @@ const props = defineProps<{
   isReadonly: boolean
   sheetName?: string
   bsDate?: string
+  /**
+   * render-config 的 `html_data`（**snake_case**）。
+   * 🔴 必须由宿主显式传入 —— 漏传会让 `adjudication_prefill` / `tb_source_codes`
+   * 恒 undefined，「从四表库带入未审数」与溯源面板静默失效（N2/E1 披露 Tab 同款坑）。
+   */
+  htmlData?: Record<string, any> | null
 }>()
 
 // ─── Inject ──────────────────────────────────────────────────────────────────
@@ -61,7 +76,96 @@ const {
   isRateExceeding,
   hasDifference,
   saveVarianceNote,
+  applyFourTablePrefill,
+  getVal,
 } = useE1Adjudication(options)
+
+// ─── 四表取数（溯源 + 带入未审数）───────────────────────────────────────────────
+
+/**
+ * render 下发的科目定位溯源（`semantic_account_resolver` 口径）。
+ *
+ * 🔴 后端把它放在 **`html_data.project_context.tb_source_codes`**
+ * （`_e1_monetary_fund` 的 `project_context["tb_source_codes"] = ...`，这样每个 sheet
+ * 都拿得到），**不是** `html_data` 顶层 —— 只读顶层会让溯源面板恒不渲染
+ * （又一个 dead output，浏览器实测才暴露）。同时兼容顶层以防后端日后上提。
+ */
+const tbSourceCodes = computed(
+  () => props.htmlData?.project_context?.tb_source_codes ?? props.htmlData?.tb_source_codes ?? null,
+)
+
+/** render 下发的审定表未审数预填（按语义槽） */
+const fourTablePrefill = computed(() =>
+  normalizeE1AdjudicationPrefill(props.htmlData?.adjudication_prefill),
+)
+
+/** 至少有一个槽命中科目才让按钮可点（否则四表库压根没有货币资金数据） */
+const hasFourTablePrefill = computed(() =>
+  Object.values(fourTablePrefill.value).some((s) => s.found),
+)
+
+const isPrefilling = ref(false)
+
+/**
+ * 从四表库带入未审数。
+ *
+ * 计划由纯函数 `planE1AdjudicationPrefill` 生成：空值直接补、已有值不同则弹确认、
+ * `found=false` 的槽整槽跳过（「本项目无此科目」≠ 0）。
+ */
+async function pullFromFourTable(): Promise<void> {
+  if (props.isReadonly || isPrefilling.value) return
+  const plan = planE1AdjudicationPrefill(
+    fourTablePrefill.value,
+    (itemId) => getVal(itemId).remark,
+  )
+  if (!plan.writes.length && !plan.conflicts.length) {
+    ElMessage.info(describeE1PrefillPlan(plan))
+    return
+  }
+  let mode: 'fill-blank' | 'overwrite' = 'fill-blank'
+  if (plan.conflicts.length) {
+    const detail = plan.conflicts
+      .slice(0, 6)
+      .map(
+        (c) =>
+          `${c.label}（${c.period === 'opening' ? '期初' : '期末'}）：现有 `
+          + `${displayPrefs.fmtAmount(c.current)} → 四表 ${displayPrefs.fmtAmount(c.numeric)}`,
+      )
+      .join('\n')
+    try {
+      const action = await ElMessageBox.confirm(
+        `有 ${plan.conflicts.length} 项已录入数据与四表库不一致：\n${detail}`
+          + `${plan.conflicts.length > 6 ? '\n…' : ''}\n\n`
+          + '「覆盖」以四表数据替换；「仅补空值」保留已录入数据、只填空白项。',
+        '从四表库带入未审数',
+        {
+          confirmButtonText: '覆盖',
+          cancelButtonText: '仅补空值',
+          distinguishCancelAndClose: true,
+          type: 'warning',
+        },
+      )
+      if (action === 'confirm') mode = 'overwrite'
+    } catch (e) {
+      // cancel = 仅补空值；close(×) = 放弃
+      if (e !== 'cancel') return
+    }
+  }
+  const writes = resolveE1PrefillWrites(plan, mode)
+  if (!writes.length) {
+    ElMessage.info('无需补填（已录入数据均已保留）')
+    return
+  }
+  isPrefilling.value = true
+  try {
+    const n = await applyFourTablePrefill(writes)
+    ElMessage.success(`已带入 ${n} 项未审数。${describeE1PrefillPlan(plan)}`)
+  } catch {
+    ElMessage.error('带入失败，请稍后重试')
+  } finally {
+    isPrefilling.value = false
+  }
+}
 
 const wpIdRef = toRef(props, 'wpId') as Ref<string>
 const { generateText, isGenerating } = useE1AiGenerate(wpIdRef)
@@ -198,9 +302,29 @@ function getRowClass({ row }: { row: AdjRow }): string {
       class="objective-alert"
     />
 
+    <!-- 四表取数科目溯源（消费 render 下发的 tb_source_codes，回答「这个数取自哪个科目」）-->
+    <WpSemanticAccountSourcePanel
+      :source="tbSourceCodes"
+      :slot-order="E1_SLOT_ORDER"
+      title="四表取数科目溯源（货币资金）"
+      hint="科目按「列报项目名称」在本项目自己的科目表里定位（客户科目表优先、标准科目表兜底），不写死科目码 —— 各项目科目编码并不一致。「存放财务公司款项」「数字货币」按准则解释15号属可增设项目，本项目没有对应科目时如实显示「本项目无此科目」，不取 0。"
+    />
+
     <!-- 工具栏 -->
     <div class="tab-toolbar">
-      <div class="toolbar-left"></div>
+      <div class="toolbar-left">
+        <el-button
+          type="primary"
+          plain
+          size="small"
+          :disabled="isReadonly || !hasFourTablePrefill"
+          :loading="isPrefilling"
+          :title="hasFourTablePrefill
+            ? '按四表库（tb_balance 叶子科目）合计补填各项目未审数；已录入的数据不会被静默覆盖'
+            : '四表库暂无货币资金数据（需先导入余额表）'"
+          @click="pullFromFourTable"
+        >📥 从四表库带入未审数</el-button>
+      </div>
       <div class="toolbar-right">
         <span class="chip-wrap"><GtIndexChip value="wp:E1-2" :context-project-id="projectId" /></span>
         <span class="chip-wrap"><GtIndexChip value="wp:E1-3" :context-project-id="projectId" /></span>

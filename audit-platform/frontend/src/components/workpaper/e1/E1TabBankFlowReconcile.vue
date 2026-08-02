@@ -26,6 +26,8 @@ import GtVoucherSamplingEngine from '../voucher-sampling/GtVoucherSamplingEngine
 import E1IpoSheetChrome from './E1IpoSheetChrome.vue'
 import http from '@/utils/http'
 import { amountFormatter, amountParser } from '../composables/wpAmountInput'
+import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 const props = defineProps<{
   wpId: string
@@ -39,6 +41,12 @@ const props = defineProps<{
 }>()
 
 const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
+
+/**
+ * 金额格式单一真源 = `stores/displayPrefs` 的 `fmtAmount()`（千分符 + 2 位小数 + 单位偏好）。
+ * **必须在 setup 顶层取**（`useDisplayPrefsStore` 是 setup 作用域 composable，写进函数体静默失效）。
+ */
+const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 
 const options: UseE1BaseOptions = {
   wpId: toRef(props, 'wpId') as unknown as Ref<string>,
@@ -193,8 +201,9 @@ function fmtRate(v: number | null | undefined): string {
   return `${(v * 100).toFixed(2)}%`
 }
 
+/** 只读金额一律走平台单一真源（原自造 `toLocaleString` 绕过了单位/showZero 偏好）。 */
 function fmtAmt(v: number): string {
-  return Number(v || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return displayPrefs.fmtAmount(v)
 }
 
 const filteredStatements = computed(() => {

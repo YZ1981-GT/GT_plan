@@ -443,6 +443,27 @@ export function useE1Adjudication(options: UseE1BaseOptions) {
     scheduleSave()
   }
 
+  /**
+   * 「从四表库带入未审数」落库。
+   *
+   * 🔴 写的是**跨 sheet 聚合键**（`E1-cash-detail-*` / `E1-bank-detail-*` / `E1-digital-*`），
+   * 不是 `E1-adj-*` —— 审定表未审数列本来就读那些键（见 `cashUnaudited` 等 computed）。
+   * 而 `flushSave` 只收集 `E1-adj-` 前缀，故这些键**必须在此显式提交**，
+   * 否则只改内存、刷新即丢（与 E1 早期 `E1-adj-total-*` 只在回写时写入是同款坑）。
+   *
+   * 计划由纯函数 `planE1AdjudicationPrefill` 生成（含「无该科目则跳过」「已有值不静默覆盖」）。
+   */
+  async function applyFourTablePrefill(
+    writes: ReadonlyArray<{ itemId: string; value: string }>,
+  ): Promise<number> {
+    if (isReadonly.value || !writes.length) return 0
+    const items: ChecklistItem[] = writes.map((w) => setLocal(w.itemId, w.value))
+    await debouncedSave(items)
+    // 未审数变了 → 审定数/合计/差异随之变化，触发一次常规保存与 TB 回写
+    scheduleSave()
+    return items.length
+  }
+
   // ─── TB Writeback (debounce 2s, by accountCode) ──────────────────────
 
   /**
@@ -621,6 +642,8 @@ export function useE1Adjudication(options: UseE1BaseOptions) {
     hasDifference,
     updateCell,
     saveVarianceNote,
+    applyFourTablePrefill,
+    getVal,
     writebackTrialBalance,
     publishAdjudicated,
     hydrate,

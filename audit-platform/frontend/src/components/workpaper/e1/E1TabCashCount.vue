@@ -26,7 +26,7 @@ import type { UseE1BaseOptions } from '../composables/useE1Adjudication'
 import GtIndexChip from '../GtIndexChip.vue'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
-import { amountFormatter, amountParser } from '../composables/wpAmountInput'
+import WpAmountInput from '../shared/WpAmountInput.vue'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -481,16 +481,11 @@ function asFx(row: any): FxCountRow { return row }
             </el-table-column>
             <el-table-column label="原币金额" width="130" align="right">
               <template #default="{ row }">
-                <el-input-number
-                  :model-value="asFx(row).fcAmount"
-                  :disabled="isReadonly"
-                  :controls="false"
-                  :precision="2"
-                  :formatter="amountFormatter"
-                  :parser="amountParser"
-                  size="small"
-                  @change="(val: number) => updateCell(row.id, 'fcAmount', val ?? 0)"
-                />
+                <WpAmountInput
+ :model-value="asFx(row).fcAmount"
+ :disabled="isReadonly"
+ size="small"
+ @change="(val: number) => updateCell(row.id, 'fcAmount', val ?? 0)" />
               </template>
             </el-table-column>
             <el-table-column label="汇率" width="100" align="center">
@@ -535,40 +530,25 @@ function asFx(row: any): FxCountRow { return row }
           </template>
           <el-descriptions :column="2" border size="small" class="roll-forward-grid">
             <el-descriptions-item label="报表日现金账面余额">
-              <el-input-number
-                :model-value="rmbSummary.reportDateBookBalance"
-                :disabled="isReadonly"
-                :controls="false"
-                :precision="2"
-                :formatter="amountFormatter"
-                :parser="amountParser"
-                size="small"
-                @change="(val: number) => updateRollForward('reportDateBookBalance', val)"
-              />
+              <WpAmountInput
+ :model-value="rmbSummary.reportDateBookBalance"
+ :disabled="isReadonly"
+ size="small"
+ @change="(val: number) => updateRollForward('reportDateBookBalance', val)" />
             </el-descriptions-item>
             <el-descriptions-item label="报表日至盘点日前一日累计收入">
-              <el-input-number
-                :model-value="rmbSummary.cumulativeIncome"
-                :disabled="isReadonly"
-                :controls="false"
-                :precision="2"
-                :formatter="amountFormatter"
-                :parser="amountParser"
-                size="small"
-                @change="(val: number) => updateRollForward('cumulativeIncome', val)"
-              />
+              <WpAmountInput
+ :model-value="rmbSummary.cumulativeIncome"
+ :disabled="isReadonly"
+ size="small"
+ @change="(val: number) => updateRollForward('cumulativeIncome', val)" />
             </el-descriptions-item>
             <el-descriptions-item label="报表日至盘点日前一日累计支出">
-              <el-input-number
-                :model-value="rmbSummary.cumulativeExpense"
-                :disabled="isReadonly"
-                :controls="false"
-                :precision="2"
-                :formatter="amountFormatter"
-                :parser="amountParser"
-                size="small"
-                @change="(val: number) => updateRollForward('cumulativeExpense', val)"
-              />
+              <WpAmountInput
+ :model-value="rmbSummary.cumulativeExpense"
+ :disabled="isReadonly"
+ size="small"
+ @change="(val: number) => updateRollForward('cumulativeExpense', val)" />
             </el-descriptions-item>
             <el-descriptions-item label="盘点日前一日账面余额（公式）" class-name="formula-item">
               <span class="formula-value" title="报表日现金账面余额 + 累计收入 - 累计支出">
@@ -576,52 +556,32 @@ function asFx(row: any): FxCountRow { return row }
               </span>
             </el-descriptions-item>
             <el-descriptions-item label="收入凭证未记账">
-              <el-input-number
-                :model-value="rmbSummary.receiptVoucherUnposted"
-                :disabled="isReadonly"
-                :controls="false"
-                :precision="2"
-                :formatter="amountFormatter"
-                :parser="amountParser"
-                size="small"
-                @change="(val: number) => updateRollForward('receiptVoucherUnposted', val)"
-              />
+              <WpAmountInput
+ :model-value="rmbSummary.receiptVoucherUnposted"
+ :disabled="isReadonly"
+ size="small"
+ @change="(val: number) => updateRollForward('receiptVoucherUnposted', val)" />
             </el-descriptions-item>
             <el-descriptions-item label="支出凭证未记账">
-              <el-input-number
-                :model-value="rmbSummary.paymentVoucherUnposted"
-                :disabled="isReadonly"
-                :controls="false"
-                :precision="2"
-                :formatter="amountFormatter"
-                :parser="amountParser"
-                size="small"
-                @change="(val: number) => updateRollForward('paymentVoucherUnposted', val)"
-              />
+              <WpAmountInput
+ :model-value="rmbSummary.paymentVoucherUnposted"
+ :disabled="isReadonly"
+ size="small"
+ @change="(val: number) => updateRollForward('paymentVoucherUnposted', val)" />
             </el-descriptions-item>
             <el-descriptions-item label="未做凭证收入">
-              <el-input-number
-                :model-value="rmbSummary.unvoucheredIncome"
-                :disabled="isReadonly"
-                :controls="false"
-                :precision="2"
-                :formatter="amountFormatter"
-                :parser="amountParser"
-                size="small"
-                @change="(val: number) => updateRollForward('unvoucheredIncome', val)"
-              />
+              <WpAmountInput
+ :model-value="rmbSummary.unvoucheredIncome"
+ :disabled="isReadonly"
+ size="small"
+ @change="(val: number) => updateRollForward('unvoucheredIncome', val)" />
             </el-descriptions-item>
             <el-descriptions-item label="未做凭证支出">
-              <el-input-number
-                :model-value="rmbSummary.unvoucheredExpense"
-                :disabled="isReadonly"
-                :controls="false"
-                :precision="2"
-                :formatter="amountFormatter"
-                :parser="amountParser"
-                size="small"
-                @change="(val: number) => updateRollForward('unvoucheredExpense', val)"
-              />
+              <WpAmountInput
+ :model-value="rmbSummary.unvoucheredExpense"
+ :disabled="isReadonly"
+ size="small"
+ @change="(val: number) => updateRollForward('unvoucheredExpense', val)" />
             </el-descriptions-item>
             <el-descriptions-item label="盘点日应有数（公式）" class-name="formula-item">
               <span class="formula-value" title="盘点日前一日账面余额 + 收入凭证未记账 - 支出凭证未记账 + 未做凭证收入 - 未做凭证支出">
@@ -661,16 +621,11 @@ function asFx(row: any): FxCountRow { return row }
                 />
               </el-descriptions-item>
               <el-descriptions-item label="报表日原币账面">
-                <el-input-number
-                  :model-value="rmbSummary.reportDateForeignBookBalance"
-                  :disabled="isReadonly"
-                  :controls="false"
-                  :precision="2"
-                  :formatter="amountFormatter"
-                  :parser="amountParser"
-                  size="small"
-                  @change="(val: number) => updateRollForward('reportDateForeignBookBalance', val)"
-                />
+                <WpAmountInput
+ :model-value="rmbSummary.reportDateForeignBookBalance"
+ :disabled="isReadonly"
+ size="small"
+ @change="(val: number) => updateRollForward('reportDateForeignBookBalance', val)" />
               </el-descriptions-item>
               <el-descriptions-item label="应有本位币（公式）" class-name="formula-item">
                 <span class="formula-value" title="报表日原币账面 × 期末汇率">

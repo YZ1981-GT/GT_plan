@@ -6,6 +6,18 @@
         <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
           <el-icon><Download /></el-icon>带入调整
         </el-button>
+        <el-tooltip :content="fourTableHint" placement="top">
+          <el-button
+            size="small"
+            type="success"
+            plain
+            :disabled="isReadonly || !hasFourTablePrefill"
+            :loading="seeding"
+            @click="onPullFromFourTable"
+          >
+            从四表库带入未审数
+          </el-button>
+        </el-tooltip>
         <G11ImportExportDropdown :wp-id="wpId" sheet="G11-1" @imported="emit('imported')" />
         <GtReviewTrigger section-id="G11-1-adjudication" />
         <el-button size="small" :loading="adj.aiLoading.value" :disabled="isReadonly" @click="adj.generateAiAnalysis()">🤖 AI</el-button>
@@ -43,6 +55,40 @@
       G11-1 与 G11-2 明细汇总一致
     </el-alert>
 
+    <!-- 待归类科目（四表有发生额但科目名对不上 18 行细目 → 交审计师分配，绝不塞「其他」行） -->
+    <el-alert
+      v-if="unclassifiedLeaves.length"
+      type="warning"
+      :closable="false"
+      class="cross-alert"
+    >
+      <template #title>
+        四表库有 {{ unclassifiedLeaves.length }} 个投资收益子科目无法按科目名归到 18 行细目，请判断归属
+        （合计 {{ fmt(unclassifiedTotal) }}）
+      </template>
+      <ul class="unclassified-list">
+        <li v-for="u in unclassifiedLeaves" :key="u.code">
+          {{ u.code }} {{ u.name }} — 本期 {{ fmt(u.amount) }}
+        </li>
+      </ul>
+      <div class="unclassified-actions">
+        <el-button
+          size="small"
+          type="warning"
+          plain
+          :disabled="isReadonly"
+          :loading="seeding"
+          @click="onFallbackToOther"
+        >
+          全部归入「{{ G11_FALLBACK_ROW.label }}」行
+        </el-button>
+        <span class="unclassified-tip">
+          源模板 G11-1 第 18 行即「其他」（无「成本法核算的长期股权投资收益」行），
+          成本法下的被投资单位分红应列于此；如属其他细目请手工填列。
+        </span>
+      </div>
+    </el-alert>
+
     <details class="guidance-details">
       <summary>📋 编制提示</summary>
       <div class="guidance-content">
@@ -58,6 +104,13 @@
         <strong>{{ group.groupName }}</strong>
         <span class="group-sub">本期 {{ fmt(group.subtotal.currentAudited) }}</span>
       </div>
+      <!-- 四表库取数溯源（口径：本期发生额） -->
+      <WpFourTableSourcePanel
+        :source-codes="tbSourceCodes"
+        gross-label="投资收益"
+        fallback-row-code="IS-011"
+      />
+
       <el-table v-show="!group.collapsed" :data="group.rows" border size="small" style="font-size:13px" max-height="420"
         :row-class-name="rowClassName">
         <el-table-column label="项目" prop="label" min-width="200" fixed>
@@ -199,13 +252,30 @@
 
 <script setup lang="ts">
 import { computed, inject, toRef, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download } from '@element-plus/icons-vue'
 import { useG11Adjudication } from '../../composables/useG11Adjudication'
 import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { dispatchG11OfferDisclosurePull } from '../../composables/g11DisclosureSync'
-import { G11_AUDIT_GUIDANCE_ROWS } from '../../composables/g11Constants'
+import {
+  G11_ADJUDICATION_ITEMS,
+  G11_AUDIT_GUIDANCE_ROWS,
+} from '../../composables/g11Constants'
+import {
+  G11_FALLBACK_ROW,
+  G11_SEED_SPEC,
+  buildExplicitFallbackCells,
+  buildGSeedCells,
+  normalizeGAdjPrefill,
+} from '../../composables/gCycleAdjudicationSeed'
+import {
+  describeAdjPrefillConflicts,
+  describeAdjPrefillPlan,
+  planAdjudicationPrefill,
+  planHasWork,
+  resolveAdjPrefillWrites,
+} from '../../composables/shared/adjudicationPrefillPlan'
 import { resolveG11SheetLabel } from '../../composables/g11SheetLabels'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import G11ImportExportDropdown from '../G11ImportExportDropdown.vue'
@@ -214,8 +284,11 @@ import GtIndexChip from '../../GtIndexChip.vue'
 import GtReviewDot from '../../GtReviewDot.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import GCycleGuideStrip from '../../shared/GCycleGuideStrip.vue'
+import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
 
 const props = defineProps<{
+  /** render 下发的本 sheet html_data（含 tb_source_codes） */
+  htmlData?: Record<string, any> | null
   allResponses: Map<string, ChecklistResponse>
   wpId: string
   projectId: string
@@ -223,6 +296,14 @@ const props = defineProps<{
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
 }>()
 
+
+/**
+ * 四表库取数溯源（消费 render 下发的 `tb_source_codes`，消除 dead output）。
+ *
+ * 科目由后端按**科目名**逐项目解析（`four_table/g_cycle_specs.G11_SPEC`），
+ * 取数口径 = 本期发生额。前端单一真源见 `composables/gCycleAccountScope.ts`。
+ */
+const tbSourceCodes = computed(() => props.htmlData?.tb_source_codes ?? null)
 const emit = defineEmits<{ imported: [] }>()
 
 const guidanceRows = G11_AUDIT_GUIDANCE_ROWS
@@ -264,6 +345,127 @@ const {
   },
   totalAudited: () => adj.totalRow.value.currentAudited,
 })
+
+// ─── 从四表库带入未审数（6111 本期发生额，按子科目名归到 18 行细目）─────────
+//
+// 🔴 口径是**本期发生额贷方单侧**，不是 `debit - credit` —— 含年末结转损益的全年账上
+//    借贷两侧恒相等、差额结构性为 0（N4/N5 实证 9 个项目全中）。见后端
+//    `g_cycle_specs.G_PL_POSITIVE_SIDE`。
+//
+// 🔴 归类不命中的叶子**不落「其他」行**：「其他」是源模板真实披露行，把不明投资收益
+//    堆进去会让附注失真。未命中一律进上方「待归类」提示条由审计师分配。
+
+const seeding = ref(false)
+
+const fourTablePrefill = computed(() =>
+  normalizeGAdjPrefill(props.htmlData?.adjudication_prefill),
+)
+
+const seedResult = computed(() => buildGSeedCells(fourTablePrefill.value, {
+  ...G11_SEED_SPEC,
+  labelOf: (k) => G11_ADJUDICATION_ITEMS.find((d) => d.rowKey === k)?.label ?? k,
+}))
+
+const unclassifiedLeaves = computed(() => seedResult.value.unclassified)
+const unclassifiedTotal = computed(() =>
+  unclassifiedLeaves.value.reduce((s, u) => s + u.amount, 0),
+)
+const hasFourTablePrefill = computed(() => seedResult.value.cells.length > 0)
+
+const fourTableHint = computed(() =>
+  hasFourTablePrefill.value
+    ? '把四表库（tb_balance 投资收益叶子科目本期发生额）按子科目名带入对应细目行的本期未审数；已录入的格不覆盖'
+    : '四表库暂无可归类的投资收益数据（需先导入余额表；子科目名无法归到 18 行细目时见下方待归类提示）',
+)
+
+function readCurrentCell(cell: { rowKey: string; field: string }): number | null {
+  const row = adj.dataRows.value.find((r) => r.rowKey === cell.rowKey)
+  if (!row) return null
+  const v = (row as unknown as Record<string, unknown>)[cell.field]
+  return v == null || v === 0 ? null : Number(v)
+}
+
+async function onPullFromFourTable(): Promise<void> {
+  if (props.isReadonly) return
+  const { cells, unclassified, absentSlots } = seedResult.value
+  if (!cells.length) {
+    ElMessage.info('四表库暂无可归类的投资收益数据可带入')
+    return
+  }
+  const plan = planAdjudicationPrefill(cells, readCurrentCell, { unclassified, absentSlots })
+  if (!planHasWork(plan)) {
+    ElMessage.info(describeAdjPrefillPlan(plan))
+    return
+  }
+
+  let mode: 'fill-blank' | 'overwrite' = 'fill-blank'
+  if (plan.conflicts.length) {
+    try {
+      const action = await ElMessageBox.confirm(
+        `以下 ${plan.conflicts.length} 格已有录入且与四表不一致：\n`
+        + `${describeAdjPrefillConflicts(plan)}\n\n`
+        + '「覆盖」以四表数据替换；「仅补空值」保留已录入数据、只填空白格。',
+        '从四表库带入未审数',
+        {
+          confirmButtonText: '覆盖',
+          cancelButtonText: '仅补空值',
+          distinguishCancelAndClose: true,
+          type: 'warning',
+        },
+      )
+      if (action === 'confirm') mode = 'overwrite'
+    } catch (e) {
+      if (e === 'close') return
+      mode = 'fill-blank'
+    }
+  }
+
+  seeding.value = true
+  try {
+    for (const w of resolveAdjPrefillWrites(plan, mode)) {
+      adj.updateField(w.rowKey, w.field as 'currentUnadjusted', w.amount)
+    }
+    ElMessage.success(describeAdjPrefillPlan(plan))
+  } finally {
+    seeding.value = false
+  }
+}
+
+/**
+ * 待归类科目一键归入「其他」行 —— **审计师显式动作**，不是自动兜底。
+ *
+ * 源模板 `审定表G11-1` R24 逐字「其他」，且 18 行里没有「成本法核算的长期股权投资收益」
+ * → 成本法分红的正确落点就是它。但归属仍是判断，故只在审计师点击后写入。
+ */
+async function onFallbackToOther(): Promise<void> {
+  if (props.isReadonly) return
+  const pending = unclassifiedLeaves.value
+  if (!pending.length) return
+  const cells = buildExplicitFallbackCells(pending, G11_FALLBACK_ROW, G11_SEED_SPEC, 'current')
+  const plan = planAdjudicationPrefill(cells, readCurrentCell)
+  try {
+    await ElMessageBox.confirm(
+      `将把以下 ${pending.length} 个子科目的本期发生额合计 ${fmt(unclassifiedTotal.value)} `
+      + `写入「${G11_FALLBACK_ROW.label}」行的本期未审数：\n`
+      + pending.map((u) => `· ${u.code} ${u.name} — ${fmt(u.amount)}`).join('\n')
+      + '\n\n若其中有科目实际属于其他细目行，请取消后手工填列。',
+      `归入「${G11_FALLBACK_ROW.label}」行`,
+      { confirmButtonText: '确认归入', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return
+  }
+  seeding.value = true
+  try {
+    // 显式动作 → 覆盖既有值（审计师已在确认框看到金额）
+    for (const w of resolveAdjPrefillWrites(plan, 'overwrite')) {
+      adj.updateField(w.rowKey, w.field as 'currentUnadjusted', w.amount)
+    }
+    ElMessage.success(`已归入「${G11_FALLBACK_ROW.label}」行 ${fmt(unclassifiedTotal.value)}`)
+  } finally {
+    seeding.value = false
+  }
+}
 
 const publishLoading = ref(false)
 
@@ -309,6 +511,9 @@ function fmtRate(rate: number | null): string {
 .toolbar-right { display: flex; gap: 6px; align-items: center; }
 .chip-wrap { display: inline-flex; align-items: center; }
 .cross-alert { margin-bottom: 8px; }
+.unclassified-list { margin: 6px 0 0; padding-left: 18px; line-height: 1.6; font-size: 12px; }
+.unclassified-actions { margin-top: 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.unclassified-tip { font-size: 12px; color: #909399; line-height: 1.5; }
 .guidance-details { margin-bottom: 8px; font-size: 12px; color: #606266; }
 .group-block { margin-bottom: 8px; }
 .group-head { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: #f5f7fa; cursor: pointer; border-radius: 4px; }

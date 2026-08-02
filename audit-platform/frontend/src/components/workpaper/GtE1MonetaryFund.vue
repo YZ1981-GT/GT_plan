@@ -76,7 +76,7 @@
       />
 
       <!-- E1-1 审定表 -->
-      <E1TabAdjudication v-else-if="currentSheet === 'E1-1'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :save-immediate="saveImmediate" :debounced-save="debouncedSave" :is-readonly="isReadonly" :bs-date="bsDate" />
+      <E1TabAdjudication v-else-if="currentSheet === 'E1-1'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :save-immediate="saveImmediate" :debounced-save="debouncedSave" :is-readonly="isReadonly" :bs-date="bsDate" :html-data="props.htmlData" />
       <!-- E1-2 现金明细 -->
       <E1TabCashDetail v-else-if="currentSheet === 'E1-2'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :save-immediate="saveImmediate" :debounced-save="debouncedSave" :is-readonly="isReadonly" :bs-date="bsDate" />
       <!-- E1-3 银行存款明细(双variant) -->
@@ -116,9 +116,9 @@
       <!-- E1-26~32 IPO/舞弊应对 -->
       <E1TabIpoSpecial v-else-if="ipoSheetCode" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :save-immediate="saveImmediate" :debounced-save="debouncedSave" :is-readonly="isReadonly" :bs-date="bsDate" :sheet-code="ipoSheetCode" />
       <!-- 附注(上市) -->
-      <E1TabDisclosure v-else-if="currentSheet === '附注上市'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :save-immediate="saveImmediate" :debounced-save="debouncedSave" :is-readonly="isReadonly" :bs-date="bsDate" variant="listed" />
+      <E1TabDisclosure v-else-if="currentSheet === '附注上市'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :save-immediate="saveImmediate" :debounced-save="debouncedSave" :is-readonly="isReadonly" :bs-date="bsDate" :html-data="props.htmlData" :applicable-standards="applicableStandards" variant="listed" />
       <!-- 附注(国企) -->
-      <E1TabDisclosure v-else-if="currentSheet === '附注国企'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :save-immediate="saveImmediate" :debounced-save="debouncedSave" :is-readonly="isReadonly" :bs-date="bsDate" variant="soe" />
+      <E1TabDisclosure v-else-if="currentSheet === '附注国企'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :save-immediate="saveImmediate" :debounced-save="debouncedSave" :is-readonly="isReadonly" :bs-date="bsDate" :html-data="props.htmlData" :applicable-standards="applicableStandards" variant="soe" />
       <!-- Fallback: 未匹配 → OnlyOffice (全高) -->
       <GtOnlyOfficeSheet
         v-else
@@ -151,6 +151,7 @@ import { ref, computed, onMounted, provide, toRef, inject, defineAsyncComponent 
 import type { Ref } from 'vue'
 import http from '@/utils/http'
 import { eventBus } from '@/utils/eventBus'
+import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 import { useG1DualMode } from './composables/useG1DualMode'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
@@ -209,6 +210,15 @@ const isLoading = ref(false)
 const isReadonly = computed(() => !!props.readonly)
 const wpIdRef = computed(() => props.wpId)
 const bsDate = ref('')
+
+/**
+ * 适用准则（平台单一入口）：`html_data.project_context.applicable_standards`
+ * → runtime context。决定披露载荷的 `current_standard`（合并 vs 个别报表）。
+ * 🔴 setup 顶层调用（内部 `inject`）。
+ */
+const applicableStandards = useHostApplicableStandards({
+  htmlData: () => props.htmlData,
+})
 
 // ─── 编制/使用手册弹窗（对齐 G1）───────────────────────────────────────────────
 const handbookVisible = ref(false)

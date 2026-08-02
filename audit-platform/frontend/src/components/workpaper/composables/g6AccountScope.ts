@@ -1,50 +1,58 @@
 /**
- * G6 其他债权投资 — 科目映射单一真源
+ * G6 其他债权投资 — 科目定位（**薄壳**，委托 `gCycleAccountScope`）。
  *
- * 权威链路：report_config BS-022 四准则一致 = TB('1505','期末余额')
- * 无备抵科目（CAS22 FVOCI-Debt 减值在 OCI 确认，不冲减资产负债表账面价值）。
+ * 🔴 **2026-08-01 纠错 + 去双真源**
  *
- * 运行态一律取 render 下发的 `tb_source_codes.gross_standard`，
- * 常量只作兜底 + 展示（与 g7AccountScope.ts / k2AccountScope.ts 同范式）。
+ * 本文件原先写 `G6_GROSS_FALLBACK_STANDARD = '1505'`，依据是 `report_config` 的
+ * `BS-022 = TB('1505','期末余额')`。但 `account_chart` + `trial_balance.account_name`
+ * 双向实证 **`1505` 实为「债权投资减值准备」**（G4 的备抵），其他债权投资的真实科目是
+ * **`1506`**。根因是 `report_config` 的 BS-022 / BS-025 / BS-026 **连续偏移一位**
+ * （平台标准科目表在 `1504 债权投资` 与 `1506 其他债权投资` 之间插了
+ * `1505 债权投资减值准备`，且其他非流动金融资产跳到 `1519`）。
  *
- * 历史纠错（2026-08-01）：
- *   - 后端 render 原取 '1503'（旧准则"可供出售金融资产"已废止）
- *   - 公式预设审定表原取 '1510'（标准科目表无此码）
- *   - 公式预设明细表原取 '1531'（长期应收款，属 L 循环）
- *   三处互相矛盾且均非权威真源 report_config 的 1505。
+ * 同时本文件与 `gCycleAccountScope.ts` 构成双真源 → 改为薄壳委托，
+ * 科目声明只在 `gCycleAccountScope.ts` 一处（与后端 `g_cycle_specs.py` 对称）。
+ *
+ * 无备抵槽（CAS22 FVOCI-Debt 减值在 OCI 确认，不冲减资产负债表账面价值）。
  */
+import { gCycleScope } from './gCycleAccountScope'
+import type { TbSourceCodes } from './shared/tbSourceCodes'
 
-/** G6 对应的报表行编码 */
-export const G6_REPORT_ROW_CODE = 'BS-022'
+const SCOPE = gCycleScope('G6')!
 
-/** 原值兜底标准科目码（report_config 解析失败时回退） */
-export const G6_GROSS_FALLBACK_STANDARD = '1505'
+/** G6 对应的报表行编码（仅展示 / 溯源用，不是定位依据） */
+export const G6_REPORT_ROW_CODE = SCOPE.spec.reportRowCode as string
 
-/** render 下发的科目溯源结构 */
-export interface G6TbSourceCodes {
-  gross_standard: string[]
-  resolved_from: 'report_config' | 'fallback'
-}
+/** 原值兜底标准科目码（仅 render 未下发时用；实证真值 1506） */
+export const G6_GROSS_FALLBACK_STANDARD = SCOPE.primaryFallback
 
 /**
- * 运行态获取 G6 原值查询科目码列表。
- * 优先取 render 下发的 tb_source_codes.gross_standard，缺失时回退常量。
+ * render 下发的科目溯源结构。
+ *
+ * 后端已改为语义解析（`slots` 结构 + 向后兼容的扁平投影），故直接复用平台共享类型。
  */
+export type G6TbSourceCodes = TbSourceCodes
+
+/** 运行态获取 G6 原值查询科目码列表（缺失时回退兜底码） */
 export function g6GrossQueryCodes(
   tbSourceCodes?: G6TbSourceCodes | null,
 ): string[] {
-  if (tbSourceCodes?.gross_standard?.length) {
-    return tbSourceCodes.gross_standard
-  }
-  return [G6_GROSS_FALLBACK_STANDARD]
+  return SCOPE.queryCodes(tbSourceCodes)
+}
+
+/** 首个科目码（展示 / 请求参数用） */
+export function g6AccountCode(tbSourceCodes?: G6TbSourceCodes | null): string {
+  return SCOPE.accountCode(tbSourceCodes) || G6_GROSS_FALLBACK_STANDARD
 }
 
 /**
- * 获取首个科目码（展示 / 请求参数用）。
+ * 本项目是否**确实没有**其他债权投资科目。
+ *
+ * `true` 时界面须提示「本项目无此科目」而不是显示 0 —— 后端解析不到时是
+ * 宁缺勿造地返空，与「余额为 0」语义不同。
  */
-export function g6AccountCode(
+export function isG6AccountAbsent(
   tbSourceCodes?: G6TbSourceCodes | null,
-): string {
-  const codes = g6GrossQueryCodes(tbSourceCodes)
-  return codes[0] || G6_GROSS_FALLBACK_STANDARD
+): boolean {
+  return SCOPE.isAccountAbsent(tbSourceCodes)
 }

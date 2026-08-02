@@ -405,10 +405,12 @@ import { H_CYCLE_NOTE_AI_SECTIONS } from '../../composables/hCycleNoteAiSections
 import H1DisclosureConsistencyPanel from './H1DisclosureConsistencyPanel.vue'
 import { checkH1SoeConsistency } from '../../composables/h1DisclosureConsistency'
 import {
+  H1_DISCLOSURE_SHEET_NAME,
   H1_NOTE_SECTION,
   resolveH1CurrentStandardFromProject,
   resolveH1VariantFromTemplateType,
 } from '../../composables/h1NoteSectionMap'
+import { useRestrictedAssetsSync } from '../../composables/useRestrictedAssetsSync'
 import { buildH1SoeSyncPayload } from '../../composables/h1DisclosureSyncPayload'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import {
@@ -835,6 +837,26 @@ onUnmounted(() => {
   eventBus.off('substantive:adjudicated', onH6Adjudicated)
 })
 
+/**
+ * 受限资产共享表（soe `八、93`）的「固定资产」段。
+ *
+ * 数据源与上市侧同一批底稿事实（H1-16/H1-17 抵押行同时写入
+ * `H1-soe-restricted-rows` 与 `H1-listed-mortgage-rows`），只有期末口径。
+ * soe 表含第 3 列「受限原因」→ 由 `restrictedAssetsSources` 归纳后一并推送。
+ */
+const syncRestrictedAssets = useRestrictedAssetsSync({
+  owner: 'BS-028',
+  variant: () => 'soe',
+  wpId: () => props.wpId,
+  projectId: () => props.projectId,
+  responses: () => props.allResponses as unknown as Map<string, { remark?: string | null }>,
+  applicableStandards: () => [
+    resolveH1CurrentStandardFromProject('soe', props.templateType, props.reportScope),
+  ],
+  sheetNames: H1_DISCLOSURE_SHEET_NAME,
+  isReadonly: () => props.isReadonly,
+})
+
 async function syncToNotes() {
   if (isSyncing.value || !props.projectId || props.isReadonly) return
   if (variantMismatch.value) {
@@ -870,6 +892,8 @@ async function syncToNotes() {
       section: noteSectionId,
       sectionIds: [noteSectionId],
     })
+    // 受限资产共享表的「固定资产」段（跨循环共享表，只替换本段、他段原样保留）
+    await syncRestrictedAssets()
   } catch {
     ElMessage.warning('同步附注失败，请稍后重试')
   } finally {

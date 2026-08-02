@@ -18,7 +18,8 @@ import { ElMessage } from 'element-plus'
 import GtIndexChip from '../GtIndexChip.vue'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
-import { amountFormatter, amountParser } from '../composables/wpAmountInput'
+import WpAmountInput from '../shared/WpAmountInput.vue'
+
 import E1CreditOcrConfirmDialog, {
   type CreditOcrFields,
 } from './E1CreditOcrConfirmDialog.vue'
@@ -400,16 +401,14 @@ onBeforeUnmount(() => {
         </el-table-column>
         <el-table-column label="征信金额" width="150" align="right">
           <template #default="{ row }">
-            <el-input-number :model-value="(row as CheckRow).creditAmount" :disabled="isReadonly"
-              :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small"
-              @change="(val: number) => updateCheckCell(row.id, 'creditAmount', val ?? 0)" />
+            <WpAmountInput :model-value="(row as CheckRow).creditAmount" :disabled="isReadonly" size="small"
+ @change="(val: number) => updateCheckCell(row.id, 'creditAmount', val ?? 0)" />
           </template>
         </el-table-column>
         <el-table-column label="账面金额" width="150" align="right">
           <template #default="{ row }">
-            <el-input-number :model-value="(row as CheckRow).bookAmount" :disabled="isReadonly"
-              :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small"
-              @change="(val: number) => updateCheckCell(row.id, 'bookAmount', val ?? 0)" />
+            <WpAmountInput :model-value="(row as CheckRow).bookAmount" :disabled="isReadonly" size="small"
+ @change="(val: number) => updateCheckCell(row.id, 'bookAmount', val ?? 0)" />
           </template>
         </el-table-column>
         <el-table-column label="差异" width="130" align="right" class-name="auto-calc-col">

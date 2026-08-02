@@ -125,6 +125,7 @@ export type HtmlComponentType =
   | 'confirmation-diff-checklist'
   | 'confirmation-fraud-risk'
   | 'confirmation-reliability'
+  | 'confirmation-wealth-list'
   | 'b50-risk-assessment'
   | 'b22a-control-matrix'
   | 'b22b-deficiency-evaluation'
@@ -330,6 +331,7 @@ const GtConfirmationAlternativeL05 = defineAsyncComponent(() => import('./confir
 const GtConfirmationDiffChecklist = defineAsyncComponent(() => import('./confirmation/diffChecklist/GtConfirmationDiffChecklist.vue'))
 const GtConfirmationFraudRisk = defineAsyncComponent(() => import('./confirmation/fraudRisk/GtConfirmationFraudRisk.vue'))
 const GtConfirmationReliability = defineAsyncComponent(() => import('./confirmation/reliability/GtConfirmationReliability.vue'))
+const GtConfirmationWealthList = defineAsyncComponent(() => import('./confirmation/wealthList/GtConfirmationWealthList.vue'))
 const GtB50RiskAssessment = defineAsyncComponent(() => import('./GtB50RiskAssessment.vue'))
 const GtB22AControlMatrix = defineAsyncComponent(() => import('./GtB22AControlMatrix.vue'))
 const GtB22BDeficiencyEvaluation = defineAsyncComponent(() => import('./GtB22BDeficiencyEvaluation.vue'))
@@ -801,6 +803,14 @@ contextProps: 'form-type' as const,
     component: GtConfirmationReliability,
     icon: '🔐',
     label: '回函可靠性验证',
+    emits: ['save'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'confirmation-wealth-list',
+    component: GtConfirmationWealthList,
+    icon: '💰',
+    label: '理财产品发函记录表',
     emits: ['save'],
     contextProps: 'standard',
   },

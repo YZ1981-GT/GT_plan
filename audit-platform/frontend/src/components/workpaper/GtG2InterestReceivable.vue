@@ -57,6 +57,7 @@
 
       <!-- G2-1 审定表 -->
       <G2TabAdjudication
+        :html-data="props.htmlData"
         v-else-if="currentSheet === 'G2-1'"
         :all-responses="allResponsesRef"
         :is-readonly="isReadonly"

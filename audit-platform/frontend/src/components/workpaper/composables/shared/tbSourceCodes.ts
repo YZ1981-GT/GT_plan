@@ -15,8 +15,38 @@
  * spec: .kiro/specs/k2-four-table-extraction-and-dynamic-rows/ R1.7
  */
 
-/** 解析来源：报表规则映射 / 兜底 */
-export type TbResolvedFrom = 'report_config' | 'fallback'
+/**
+ * 解析来源。
+ *
+ * 前两个来自 `report_line_accounts`（报表映射规则驱动）；
+ * 后三个来自 `semantic_account_resolver`（**语义驱动、逐项目**，2026-08-01 新增）——
+ * 因为标准码在项目间并不一致（`account_mapping` 同一原始码在不同项目映射到不同标准码；
+ * 平台标准科目表本身各项目也不同），科目须按**科目名**在该项目自己的科目表里定位。
+ */
+export type TbResolvedFrom =
+  | 'report_config'
+  | 'fallback'
+  /** 客户科目表按名称命中（最权威 —— 客户真实在用的科目） */
+  | 'account_chart_client'
+  /** 平台标准科目表按名称命中 */
+  | 'account_chart_standard'
+  /** 本项目确实没有该科目（**不是**取数失败，界面须显式区分） */
+  | 'none'
+
+/** 语义解析的单个槽（`semantic_account_resolver.ResolvedSlot`） */
+export interface TbSemanticSlot {
+  key: string
+  label: string
+  is_provision?: boolean
+  codes?: string[]
+  standard_codes?: string[]
+  /** `[[科目码, 科目名], ...]` 命中明细 */
+  matched?: Array<[string, string]>
+  resolved_from?: TbResolvedFrom
+  /** 名称是否**精确**命中（false = 走了包含匹配，展示时应提示复核） */
+  exact?: boolean
+  found?: boolean
+}
 
 export interface TbSourceCodes {
   /** 报表行次（如其他应收款 `BS-009`、其他流动资产 `BS-014`） */
@@ -54,16 +84,91 @@ export interface TbSourceCodes {
    * 供审计追溯 —— 差异通常意味着客户科目树被改动或数据集不一致。
    */
   parent_check?: { leaf_sum: number; parent: number; diff: number }
+
+  // ── 语义解析专属（`semantic_account_resolver.SemanticAccountResult.as_dict()`）──
+  /** 各语义槽（原值 / 备抵 / 累计折旧 …）。扁平字段是本对象主槽的投影 */
+  slots?: Record<string, TbSemanticSlot>
+  /** 报表公式解析出的标准码（**仅提示**，不是定位依据） */
+  report_config_codes?: string[]
+  /**
+   * `report_config` 给的码与按科目名定位的结果不一致：`[[槽键, 报表码, 实际码], ...]`。
+   * 实证 `report_config` 有 4 行错码（BS-022/025/026 连续偏移、IS-016↔IS-017 互换）
+   * → 以名称结果为准，这里暴露差异供溯源面板橙色告警。
+   */
+  conflicts?: Array<[string, string, string]>
+  /**
+   * 本项目存在的**旧准则**同族科目 `[[码, 科目名], ...]`，需人工按 SPPI 拆分。
+   * 代码不做跨准则推断（那是会计判断，见 G4-5/G4-6、G6-7/G6-8 底稿）。
+   */
+  unmapped_candidates?: Array<[string, string]>
+  /** 本项目科目表是否可用。false = 未导入 / 查询失败（须与「无此科目」区分） */
+  chart_available?: boolean
 }
 
 /** 中文化解析来源（UI 全中文化铁律） */
 export function tbResolvedFromLabel(v: string | undefined | null): string {
-  return v === 'report_config' ? '报表规则映射' : '兜底科目'
+  switch (v) {
+    case 'report_config':
+      return '报表规则映射'
+    case 'account_chart_client':
+      return '客户科目表'
+    case 'account_chart_standard':
+      return '标准科目表'
+    case 'none':
+      return '本项目无此科目'
+    default:
+      return '兜底科目'
+  }
 }
 
-/** 解析来源 → el-tag type */
-export function tbResolvedFromTagType(v: string | undefined | null): 'success' | 'warning' {
-  return v === 'report_config' ? 'success' : 'warning'
+/**
+ * 解析来源 → el-tag type。
+ *
+ * 🔴 `none`（本项目无此科目）用 `info` 而非 `danger` —— 它是**正确行为**
+ * （宁缺勿造，不取错），不是错误；真正需要告警的是 `conflicts`。
+ */
+export function tbResolvedFromTagType(
+  v: string | undefined | null,
+): 'success' | 'warning' | 'info' {
+  switch (v) {
+    case 'report_config':
+    case 'account_chart_client':
+    case 'account_chart_standard':
+      return 'success'
+    case 'none':
+      return 'info'
+    default:
+      return 'warning'
+  }
+}
+
+/** 是否存在 `report_config` 与实际科目的冲突（溯源面板据此渲染告警条） */
+export function hasTbConflicts(src: TbSourceCodes | null | undefined): boolean {
+  return !!(src?.conflicts && src.conflicts.length)
+}
+
+/** 冲突的中文说明（逐条） */
+export function tbConflictTexts(src: TbSourceCodes | null | undefined): string[] {
+  return (src?.conflicts || []).map(
+    ([slot, reportCode, actualCode]) =>
+      `${slot}：报表公式引用 ${reportCode}，但本项目该科目实为 ${actualCode}（已按科目表取数）`,
+  )
+}
+
+/** 需人工映射的旧准则科目说明（逐条） */
+export function tbUnmappedTexts(src: TbSourceCodes | null | undefined): string[] {
+  return (src?.unmapped_candidates || []).map(
+    ([code, name]) => `${code} ${name}`,
+  )
+}
+
+/** 语义槽列表（按声明顺序；`found=false` 的槽也返回，供界面显示「无此科目」） */
+export function tbSemanticSlots(
+  src: TbSourceCodes | null | undefined,
+): TbSemanticSlot[] {
+  const slots = src?.slots
+  if (!slots) return []
+  return Object.keys(slots).map((k) => slots[k])
 }
 
 /** 科目码集 → 展示串（空集显示占位符） */

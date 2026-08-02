@@ -19,14 +19,22 @@
  */
 
 /**
- * G6 其他债权投资科目码（报表行 BS-022 = TB('1505','期末余额')，四准则一致）。
- * 2026-08-01 从 '1503'（旧准则"可供出售金融资产"已废止）纠正。
+ * G6 其他债权投资科目码 —— **委托 `g6AccountScope` 单一真源**。
  *
- * 注：AJE 回写分类逻辑里的 '150302'/'150304'/'150305' 保持不变 ——
- * 那些是客户原始子科目编码（account_mapping 映射前），EventBus 调整分录汇总
- * 传来的是原始码不是标准码。
+ * 🔴 本常量原写死 `'1505'`，依据是 `report_config` 的 `BS-022 = TB('1505')`，
+ * 但 `account_chart` + `trial_balance.account_name` 双证 **`1505` 实为「债权投资减值准备」**
+ * （G4 的备抵科目），其他债权投资真值是 **`1506`**（`report_config` 该行连续偏移一位：
+ * BS-022→1505 / BS-025→1506 / BS-026→1507，真值 1506 / 1507 / 1519）。
+ *
+ * 错码不是「只是显示不对」—— 本常量同时用于
+ * ① `useG6MainAdjudication` 发布 `substantive:adjudicated` 的 `accountCode`
+ *   （审定数会被记到债权投资减值准备名下）
+ * ② `/api/trial-balance/query?account_code=` 的 TB 核对取数（查的是别的科目）。
+ *
+ * 注：AJE 回写分类逻辑里的 `'150302'/'150304'/'150305'` 是**客户原始子科目编码**
+ * （`account_mapping` 映射前），EventBus 调整分录汇总传的是原始码不是标准码，保持不变。
  */
-export const G6_ACCOUNT_CODE = '1505'
+export { G6_GROSS_FALLBACK_STANDARD as G6_ACCOUNT_CODE } from './g6AccountScope'
 
 /** Excel 编制说明：变动比例超过 30% 需分析 */
 export const G6_CHANGE_RATE_THRESHOLD = 0.3

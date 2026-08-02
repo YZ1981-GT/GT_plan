@@ -64,6 +64,17 @@
       title="检测到非零期初账项/重分类调整。期初调整仅用于前期差错更正或重述；可点「显示期初调整列」查看并复核。"
     />
 
+    <!-- 四表库取数溯源（口径：期末余额） -->
+
+    <WpFourTableSourcePanel
+
+      :source-codes="tbSourceCodes"
+
+      gross-label="应收股利"
+
+    />
+
+
     <el-table
       :data="tableData"
       border
@@ -449,8 +460,11 @@ import GtIndexChip from '../GtIndexChip.vue'
 import G3ImportExportDropdown from './G3ImportExportDropdown.vue'
 import G3AuditTextCards from './G3AuditTextCards.vue'
 import type { ChecklistResponse } from '../composables/useF1FormData'
+import WpFourTableSourcePanel from '../shared/WpFourTableSourcePanel.vue'
 
 const props = defineProps<{
+  /** render 下发的本 sheet html_data（含 tb_source_codes） */
+  htmlData?: Record<string, any> | null
   wpId: string
   projectId: string
   allResponses: Map<string, ChecklistResponse>
@@ -460,6 +474,14 @@ const props = defineProps<{
   auditYear?: number | string | null
 }>()
 
+
+/**
+ * 四表库取数溯源（消费 render 下发的 `tb_source_codes`，消除 dead output）。
+ *
+ * 科目由后端按**科目名**逐项目解析（`four_table/g_cycle_specs.G3_SPEC`），
+ * 取数口径 = 期末余额。前端单一真源见 `composables/gCycleAccountScope.ts`。
+ */
+const tbSourceCodes = computed(() => props.htmlData?.tb_source_codes ?? null)
 const emit = defineEmits<{ imported: [] }>()
 
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)

@@ -18,8 +18,14 @@ export interface ColumnDef {
   /** true=标签列（承载行名 label），投影为第一列 */
   is_label?: boolean
   align?: 'left' | 'center' | 'right'
-  /** 渲染格式提示（可选） */
-  format?: 'amount' | 'percent' | 'text'
+  /**
+   * 渲染格式提示（可选）。
+   *
+   * `rate` = 汇率/折算率（4 位小数，**不套金额千分符与「元」单位**）——
+   * 附注模板早已在用（如 `五、73`/`八、92` 外币货币性项目的「折算汇率」列），
+   * 此处补全类型以免推送侧与模板侧的 `columns` 出现 format 分叉。
+   */
+  format?: 'amount' | 'percent' | 'text' | 'rate'
   /** 分组父表头（如 '期末余额'），相邻且同 group 的列在渲染时合并为两级表头 */
   group?: string
   /**

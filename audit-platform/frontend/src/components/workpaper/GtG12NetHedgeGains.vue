@@ -32,6 +32,7 @@
       />
 
       <G12TabAdjudication
+        :html-data="props.htmlData"
         v-else-if="currentSheet === 'G12-1'"
         :all-responses="formData.allResponses.value"
         :wp-id="props.wpId"

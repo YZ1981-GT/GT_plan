@@ -313,7 +313,8 @@ import { useHCycleDisclosureAi } from '../../composables/useHCycleDisclosureAi'
 import { H_CYCLE_NOTE_AI_SECTIONS } from '../../composables/hCycleNoteAiSections'
 import WpDisclosureConsistencyPanel from '../../shared/disclosure/WpDisclosureConsistencyPanel.vue'
 import { buildH2SoeChecks } from '../../composables/h2DisclosureConsistency'
-import { H2_NOTE_SECTION } from '../../composables/h2NoteSectionMap'
+import { H2_DISCLOSURE_SHEET_NAME, H2_NOTE_SECTION } from '../../composables/h2NoteSectionMap'
+import { useRestrictedAssetsSync } from '../../composables/useRestrictedAssetsSync'
 import { buildH2SoeSyncPayloads, type H2SoeSyncSnapshot } from '../../composables/h2DisclosureSyncPayload'
 import {
   H2_SOE_ITEM,
@@ -635,6 +636,23 @@ function getSnapshot(): H2SoeSyncSnapshot {
   }
 }
 
+/**
+ * 受限资产共享表的「在建工程」段 —— **只在 soe `八、93`** 有落点
+ * （listed `五、32` 无该行，共享件的 `isRestrictedAssetsOwnerApplicable` 亦双重保险）。
+ *
+ * 数据源 = H2-2 明细 `isMortgaged='Y'` 带入的抵押行（`H2-listed-mortgage-rows`，
+ * 键名带 `listed` 是历史命名，内容是与变体无关的底稿事实），只有期末口径。
+ */
+const syncRestrictedAssets = useRestrictedAssetsSync({
+  owner: 'BS-029',
+  variant: () => 'soe',
+  wpId: () => props.wpId,
+  projectId: () => props.projectId,
+  responses: () => props.allResponses as unknown as Map<string, { remark?: string | null }>,
+  sheetNames: H2_DISCLOSURE_SHEET_NAME,
+  isReadonly: () => isReadonly.value,
+})
+
 async function syncToNotes() {
   if (isSyncing.value || isReadonly.value || !props.projectId || !props.wpId) return
   persistAll()
@@ -655,6 +673,8 @@ async function syncToNotes() {
       rows += Number(data?.rows_synced ?? 0)
     }
     ElMessage.success(`已同步 ${rows} 行到附注「${noteSectionId}」`)
+    // 受限资产共享表的「在建工程」段（跨循环共享表，只替换本段、他段原样保留）
+    await syncRestrictedAssets()
   } catch {
     ElMessage.warning('同步附注失败，请稍后重试')
   } finally {
