@@ -76,9 +76,16 @@ def test_g12_service_import():
 
 
 def test_g12_render_module_constants():
+    """科目定位改走规格声明，`_G12_ACCOUNT_PREFIX` 常量已删。
+
+    `IS-014 净敞口套期收益` 的 formula 为 None → 兜底 `6103`。
+    🔴 公式预设曾错写 `6115`（= 资产处置损益，H10 的科目），故断言排除它。
+    """
     from app.routers.wp_render_strategies import _g12_net_hedge_gains as mod
 
-    assert mod._G12_ACCOUNT_PREFIX == "6103"
+    assert not hasattr(mod, "_G12_ACCOUNT_PREFIX"), "旧硬编码前缀常量不得复活"
+    assert tuple(mod.G12_ACCOUNT_SPEC.fallback_gross) == ("6103",)
+    assert "6115" not in tuple(mod.G12_ACCOUNT_SPEC.fallback_gross)
     assert mod._ADJUDICATED_ITEM_ID == "G12-1-adjudicated-amount"
 
 

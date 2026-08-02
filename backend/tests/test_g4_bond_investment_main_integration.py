@@ -73,10 +73,19 @@ class TestG4MainRenderStructure:
             elif sheet["code"] in measurement_codes:
                 assert sheet["group"] == "measurement", f"{sheet['code']} 应为 measurement 组"
 
-    def test_account_prefix_is_1501(self):
-        from app.routers.wp_render_strategies._g4_bond_investment_main import _G4_ACCOUNT_PREFIX
+    def test_account_spec_is_bond_investment_1504(self):
+        """科目定位改走规格声明，不再有 `_G4_ACCOUNT_PREFIX` 常量。
 
-        assert _G4_ACCOUNT_PREFIX == "1501"
+        🔴 原断言 ``_G4_ACCOUNT_PREFIX == "1501"`` 钉死的是**错码**
+        —— `1501` 是旧准则「持有至到期投资」，债权投资真值 `1504`
+        （`account_chart` + `trial_balance.account_name` 双证）。
+        """
+        from app.routers.wp_render_strategies import _g4_bond_investment_main as mod
+
+        assert not hasattr(mod, "_G4_ACCOUNT_PREFIX"), "旧硬编码前缀常量不得复活"
+        assert mod.G4_ACCOUNT_SPEC.row_code == "BS-021"
+        assert tuple(mod.G4_ACCOUNT_SPEC.fallback_gross) == ("1504",)
+        assert "1501" not in tuple(mod.G4_ACCOUNT_SPEC.fallback_gross)
 
     def test_adjudicated_item_id_format(self):
         from app.routers.wp_render_strategies._g4_bond_investment_main import _ADJUDICATED_ITEM_ID

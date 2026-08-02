@@ -105,22 +105,27 @@ class TestL0PollutionF0A:
 
 
 class TestE05Conflict:
-    """E0-5 双 sheet：均以 E0-5 结尾 → 均走编码尾码 override['E0-5'] = d-form-table（无冲突）。"""
+    """E0-5 一码两表：`银行函证其他信息核对表E0-5` 在源 xlsx 里是 **hidden** sheet
+    （不在 `底稿目录` 的 9 项索引里）→ 按**完整 sheet_name** 精确 skip；
+    `应付银行承兑汇票发函记录表E0-5` 是真实底稿 → 仍走编码尾码 `override['E0-5']`。
 
-    def test_bank_info_check_e05(self, overrides):
-        assert (
-            resolve_sheet_ovr("银行函证其他信息核对表E0-5", "E0", overrides) == "d-form-table"
-        )
+    见 `test_e0_hidden_sheets_skipped.py`（以 openpyxl `sheet_state` 为裁决者）。
+    """
+
+    def test_bank_info_check_e05_skipped_by_full_name(self, overrides):
+        # 隐藏 sheet：render-config 在 componentType 解析**之前**按完整 sheet_name skip
+        assert overrides.get("银行函证其他信息核对表E0-5") == "skip"
 
     def test_bank_accept_send_record_e05(self, overrides):
         assert (
             resolve_sheet_ovr("应付银行承兑汇票发函记录表E0-5", "E0", overrides) == "d-form-table"
         )
 
-    def test_both_e05_same_result(self, overrides):
-        a = resolve_sheet_ovr("银行函证其他信息核对表E0-5", "E0", overrides)
-        b = resolve_sheet_ovr("应付银行承兑汇票发函记录表E0-5", "E0", overrides)
-        assert a == b == "d-form-table"
+    def test_code_tail_e05_must_not_be_skip(self, overrides):
+        """反向自检：**禁止**按编码 `E0-5` skip —— 那会连真实的
+        `应付银行承兑汇票发函记录表E0-5` 一起误伤（wp_render_config L722 按尾码判 skip）。
+        """
+        assert overrides.get("E0-5") == "d-form-table"
 
 
 class TestE0Rebuild:
@@ -132,13 +137,28 @@ class TestE0Rebuild:
             ("函证结果汇总表E0-1", "E0", "confirmation-summary"),
             ("核实被函证单位信息E0-2", "E0", "confirmation-entity-verify"),
             ("跟函函证过程控制E0-7", "E0", "confirmation-followup"),
-            ("邮件传真回函核对记录F1-12", "E0", "confirmation-reliability"),
             ("函证程序表E0A", "E0", "a-program-console"),
-            ("理财产品发函记录表E0-6", "E0", "d-form-table"),
+            # E0-6 由通用 d-form-table 升级为专属组件（用户裁决 2026-08-02：通用表格
+            # 无法承载看板/受限告警/汇总键完整性校验）。sheet_name 与编码尾码两处
+            # override 必须同时指向专属类型 —— sheet_name override 优先级更高，
+            # 只改编码那一处会被它静默遮蔽。
+            ("理财产品发函记录表E0-6", "E0", "confirmation-wealth-list"),
         ],
     )
     def test_e0_sheet_resolution(self, overrides, sheet_name, wp_code, expected):
         assert resolve_sheet_ovr(sheet_name, wp_code, overrides) == expected
+
+    def test_e06_both_override_paths_point_to_dedicated(self, overrides):
+        """E0-6 的两条 override 路径（sheet_name 精确 / 编码尾码）必须一致。
+
+        反向自检意义：sheet_name override 优先于编码尾码（同 D0-7 范式），
+        若只改编码那一处，本断言会因 sheet_name 仍是 d-form-table 而失败。
+        """
+        assert overrides.get("理财产品发函记录表E0-6") == "confirmation-wealth-list"
+        assert overrides.get("E0-6") == "confirmation-wealth-list"
+        assert resolve_sheet_ovr("理财产品发函记录表E0-6", "E0", overrides) == (
+            "confirmation-wealth-list"
+        )
 
 
 class TestNonFallbackGuard:
@@ -156,7 +176,6 @@ class TestNonFallbackGuard:
         ("函证结果汇总表E0-1", "E0"),
         ("核实被函证单位信息E0-2", "E0"),
         ("跟函函证过程控制E0-7", "E0"),
-        ("邮件传真回函核对记录F1-12", "E0"),
         ("函证程序表E0A", "E0"),
     ]
 
@@ -177,6 +196,10 @@ class TestSkipOverrides:
         [
             "函证程序表-原版本备份",
             "函证结果汇总表E0-1（原）",
+            # 源 xlsx 里同为 hidden、且不在「底稿目录」9 项索引内 → 不属于 E0 底稿集合
+            "回函情况汇编",
+            "银行函证其他信息核对表E0-5",
+            "邮件传真回函核对记录F1-12",
         ],
     )
     def test_legacy_sheets_skipped(self, overrides, sheet_name):

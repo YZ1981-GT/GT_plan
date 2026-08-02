@@ -25,11 +25,16 @@ import pytest
 class TestG3RenderStructure:
     """验证 render 策略静态配置（无数据库）."""
 
-    def test_account_prefix_is_1131(self):
-        from app.routers.wp_render_strategies._g3_dividend_receivable import (
-            _G3_ACCOUNT_PREFIX,
-        )
-        assert _G3_ACCOUNT_PREFIX == "1131"
+    def test_account_spec_falls_back_to_1131(self):
+        """科目定位改走规格声明，`_G3_ACCOUNT_PREFIX` 常量已删。
+
+        G3 在 `report_config` **无独立报表行**（soe 侧 `BS-016 其中：应收股利`
+        formula 为 None，listed 侧该行是「一年内到期的非流动资产」）→ 兜底 `1131`。
+        """
+        from app.routers.wp_render_strategies import _g3_dividend_receivable as mod
+
+        assert not hasattr(mod, "_G3_ACCOUNT_PREFIX"), "旧硬编码前缀常量不得复活"
+        assert tuple(mod.G3_ACCOUNT_SPEC.fallback_gross) == ("1131",)
 
     def test_adjudicated_item_id_format(self):
         from app.routers.wp_render_strategies._g3_dividend_receivable import (

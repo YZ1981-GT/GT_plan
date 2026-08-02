@@ -232,3 +232,64 @@ def test_no_fabricated_pull_or_source_columns(e0_schema, manifest, sheet):
             f"{sheet}.{cell} 疑似臆造取数/来源列: {field}"
         )
         assert field == spec_cols[cell]["field"], f"{sheet}.{cell} field 偏离源模板"
+
+
+# ─── E0-4 借款发函记录表：枚举决策与源模板三向锁死（2026-08-02） ─────────────────
+#
+# 背景：改造前 O 列「借款类型」被声明为 enum ['短期借款','长期借款',
+# '一年内到期的长期借款','其他']，那是把 A 列「所属科目」的语义抄了一份 ——
+# 源模板 O 列既无数据有效性、也无示例值、更无任何公式消费方；而**真正**驱动
+# E0-1「发函金额（原币）」取数的是 A 列。本组守卫把这个结论钉在源 xlsx 上。
+
+_E0_TEMPLATE = _BACKEND / "wp_templates" / "E" / "E0 货币资金 - 函证（Leap应对措施-函证）.xlsx"
+_E0_4_SHEET = "借款发函记录表E0-4"
+
+
+@pytest.fixture(scope="module")
+def e0_workbook():
+    openpyxl = pytest.importorskip("openpyxl")
+    if not _E0_TEMPLATE.exists():
+        pytest.skip(f"真实模板缺失：{_E0_TEMPLATE}")
+    wb = openpyxl.load_workbook(str(_E0_TEMPLATE), data_only=False)
+    yield wb
+    wb.close()
+
+
+def test_e0_1_amount_lookup_keys_are_account_subject_and_loan_account(e0_workbook):
+    """源模板钉死：E0-1 发函金额对 E0-4 的取数键 = A 列(所属科目) + G 列(借款账号)。"""
+    f8 = str(e0_workbook["函证结果汇总表E0-1"]["F8"].value or "")
+    assert f"'{_E0_4_SHEET}'!$I:$I" in f8, "求和列应为 I 列（余额）"
+    assert f"'{_E0_4_SHEET}'!$A:$A" in f8, "品种条件列应为 A 列（所属科目）"
+    assert f"'{_E0_4_SHEET}'!$G:$G" in f8, "账号条件列应为 G 列（借款账号）"
+    assert '"短期借款"' in f8 and '"长期借款"' in f8, "品种字面量应为 短期借款/长期借款"
+
+
+def test_e0_4_account_subject_enum_is_anchored_to_source_formula(e0_schema, manifest, e0_workbook):
+    """A 列 enum 的每个取值都必须在源模板 E0-1 公式里出现（非臆造）。"""
+    f8 = str(e0_workbook["函证结果汇总表E0-1"]["F8"].value or "")
+    for src in (manifest["sheets"][_E0_4_SHEET]["cell_columns"]["A"],
+                _columns(e0_schema, _E0_4_SHEET)["A"]):
+        assert src["type"] == "enum", "A 列应为枚举（防选错值导致 E0-1 取数恒 0）"
+        assert src["enum"], "A 列 enum 不得为空"
+        for option in src["enum"]:
+            assert f'"{option}"' in f8, f"A 列枚举项 {option} 在源模板 E0-1 公式里无依据"
+
+
+def test_e0_4_loan_type_must_not_declare_enum(e0_schema, manifest, e0_workbook):
+    """O 列「借款类型」不得声明枚举；并反向自检源模板确实无依据。"""
+    for src in (manifest["sheets"][_E0_4_SHEET]["cell_columns"]["O"],
+                _columns(e0_schema, _E0_4_SHEET)["O"]):
+        assert src["type"] == "text", "O 列无源依据，应为自由文本"
+        assert "enum" not in src, "O 列不得声明枚举（改造前的臆造枚举不可复活）"
+
+    ws = e0_workbook[_E0_4_SHEET]
+    # 反向自检 1：本 sheet 无任何数据有效性
+    assert len(list(ws.data_validations.dataValidation)) == 0
+    # 反向自检 2：O 列数据区无示例值
+    assert all(ws[f"O{r}"].value in (None, "") for r in range(6, 17))
+    # 反向自检 3：全工作簿无公式引用 E0-4 的 O 列
+    for sheet in e0_workbook.worksheets:
+        for row in sheet.iter_rows():
+            for cell in row:
+                if isinstance(cell.value, str) and f"'{_E0_4_SHEET}'!$O" in cell.value:
+                    pytest.fail(f"{sheet.title}!{cell.coordinate} 引用了 E0-4 的 O 列")

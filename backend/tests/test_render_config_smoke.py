@@ -21,6 +21,7 @@ import pytest
 
 from app.services.wp_classification_service import (
     _WP_CODE_OVERRIDE,
+    VALID_COMPONENT_TYPES,
     derive_component_type,
 )
 
@@ -34,15 +35,25 @@ _ALL_OVERRIDE_CODES = list(_WP_CODE_OVERRIDE.keys())
 
 @pytest.mark.parametrize("wp_code", _ALL_OVERRIDE_CODES)
 def test_wp_code_override_returns_nonempty_component_type(wp_code: str):
-    """每个 _WP_CODE_OVERRIDE 条目的 componentType 非空且非 skip。"""
+    """每个 _WP_CODE_OVERRIDE 条目的 componentType 非空、合法且在白名单内。
+
+    2026-08-02 修正：原断言写的是 ``expected_ct != "skip"``（理由「已注册底稿应有专用
+    组件」）。该前提在 2026-06-18 写下时成立，此后 ``skip`` 已成为平台一等值 ——
+    它在 ``VALID_COMPONENT_TYPES`` 白名单内，被 ``wp_render_config.py``
+    L708/L722/L727 消费，用于把「源模板隐藏 sheet / 遗留备份 / 占位辅助 sheet」
+    从 render-config 剔除（当前 250+ 条，如 `GT_Custom`、`函证程序表-原版本备份`、
+    A/B/S 各 bundle 的子码）。故原断言对绝大多数条目恒红、零信号，属镜像了过时
+    假设的失效守卫 → 改为白名单断言（真正能拦住拼错的 componentType）。
+    """
     expected_ct = _WP_CODE_OVERRIDE[wp_code]
     assert expected_ct, f"_WP_CODE_OVERRIDE['{wp_code}'] 值为空"
-    assert expected_ct != "skip", (
-        f"_WP_CODE_OVERRIDE['{wp_code}'] 不应映射为 skip（已注册底稿应有专用组件）"
-    )
     # 值必须是合法标识符格式（kebab-case）
     assert all(c.isalnum() or c == "-" for c in expected_ct), (
         f"componentType '{expected_ct}' 包含非法字符"
+    )
+    assert expected_ct in VALID_COMPONENT_TYPES, (
+        f"_WP_CODE_OVERRIDE['{wp_code}'] = '{expected_ct}' 不在 "
+        "VALID_COMPONENT_TYPES 白名单内（拼错或漏注册组件）"
     )
 
 

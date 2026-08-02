@@ -29,14 +29,20 @@ _PATHS = [
 # report_config 查不到（如「其他货币资金」是货币资金子分类，不是独立报表行）。
 _MANUAL_ALLOWLIST: dict[str, str] = {
     "listed|三、重要会计政策、会|资本公积|BS-052": "ambiguous：BS-079/BS-083 两码同名『资本公积』",
-    "listed|五、1|其他货币资金|BS-002": "not_found：『其他货币资金』是货币资金子分类，report_config 无独立行",
-    "soe|八、18|其他综合收益|BS-053": "ambiguous：BS-085/BS-115 两码同名『其他综合收益』",
+    # 移出（2026-08-02）：`listed|五、1|其他货币资金|BS-002` 与
+    # `soe|八、18|其他综合收益|BS-053` —— 两处的 `report_row_code` 已被
+    # e1-four-table-extraction / g7-four-table-extraction 两个 spec 重写章节时去掉
+    # （现为 `null` → 不再进 ambiguous/not_found 清单）。按守卫要求「已消失必移出」。
     "soe|八、31|递延所得税负债|BS-067": "ambiguous：BS-067/BS-096 两码同名『递延所得税负债』",
     "soe|八、81|短期借款|BS-031": "ambiguous：BS-041/BS-055 两码同名『短期借款』",
     "soe|八、91|短期借款|BS-031": "ambiguous：BS-041/BS-055 两码同名『短期借款』",
     "soe|八、91|其他应付款|BS-037": "ambiguous：BS-050/BS-075 两码同名『其他应付款』",
     "soe|八、92|短期借款|BS-031": "ambiguous：BS-041/BS-055 两码同名『短期借款』",
-    "soe|八、93|存货|BS-008": "ambiguous：BS-010/BS-018 两码同名『存货』",
+    # 🔴 `BS-008` → `BS-010`：restricted-assets-note-row-scope-rollout Task 3 纠错
+    #    （`BS-008` 实为**预付款项**）。改完仍在 allowlist 里 —— 因为「存货」这个标签
+    #    在 report_config 里本身 ambiguous（BS-010 资产项 / BS-018 另一处同名行），
+    #    标签反查无法唯一定解，故 owner code 由本 spec 按公式实证钉死。
+    "soe|八、93|存货|BS-010": "ambiguous：BS-010/BS-018 两码同名『存货』；已按 report_config 公式实证选 BS-010",
 }
 
 
