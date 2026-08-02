@@ -11,6 +11,13 @@
         <li><b>分类：</b>管理费用已记录于恰当账户并恰当列报。</li>
       </ol>
     </el-alert>
+    <!-- 四表库取数溯源面板 -->
+    <WpFourTableSourcePanel
+      v-if="props.tbSourceCodes"
+      :source-codes="props.tbSourceCodes"
+      gross-label="管理费用"
+    />
+
 
     <!-- ═══ Section标题 + AI + 复核 ═══ -->
     <div class="section-header">
@@ -298,6 +305,7 @@
  * Spec: .kiro/specs/k9-admin-expenses/ | Task: 4.2
  * Requirements: 2.1-2.7
  */
+import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
 import { computed, inject, toRef, ref, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, CircleCheckFilled, WarningFilled, ChatDotSquare, Download } from '@element-plus/icons-vue'
@@ -314,7 +322,8 @@ const props = defineProps<{
   allResponses: Map<string, any>
   tbData: { unadjusted6602: number; audited6602: number }
   /** tb_balance 6602 明细子科目预填（来自后端 render adjudication_prefill） */
-  prefill?: Array<{ name: string; unadjustedDebit: number; unadjustedCredit: number }>
+  prefill?: Array<{ name: string; unadjustedDebit: number; unadjustedCredit: number   tbSourceCodes?: Record<string, any> | null
+}>
   isReadonly: boolean
 }>()
 

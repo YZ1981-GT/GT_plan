@@ -144,7 +144,7 @@ describe('K5 Integration — useK5Adjudication 审定公式', () => {
       ['K5-1-r0-aje', { remark: '2000' }],
       ['K5-1-r0-rje', { remark: '0' }],
     ]))
-    const tbData = ref({ unadjusted2701: 0, audited2701: 0 })
+    const tbData = ref({ unadjusted: 0, audited: 0 })
     const saveResponse = vi.fn()
 
     const adj = useK5Adjudication({ allResponses, tbData, saveResponse })
@@ -167,7 +167,7 @@ describe('K5 Integration — useK5Adjudication 审定公式', () => {
       ['K5-1-r4-begin', { remark: '80000' }],   // 弃置义务
       ['K5-1-r5-begin', { remark: '10000' }],   // 其他
     ]))
-    const tbData = ref({ unadjusted2701: 0, audited2701: 0 })
+    const tbData = ref({ unadjusted: 0, audited: 0 })
     const saveResponse = vi.fn()
 
     const adj = useK5Adjudication({ allResponses, tbData, saveResponse })
@@ -179,7 +179,7 @@ describe('K5 Integration — useK5Adjudication 审定公式', () => {
 
     // All zeros → trivially balanced
     const allResponses = ref(new Map<string, any>())
-    const tbData = ref({ unadjusted2701: 0, audited2701: 0 })
+    const tbData = ref({ unadjusted: 0, audited: 0 })
     const saveResponse = vi.fn()
 
     const adj = useK5Adjudication({ allResponses, tbData, saveResponse })
@@ -195,12 +195,12 @@ describe('K5 Integration — useK5Adjudication 审定公式', () => {
       ['K5-1-r0-aje', { remark: '5000' }],
       ['K5-1-r0-rje', { remark: '0' }],
     ]))
-    const tbData = ref({ unadjusted2701: 0, audited2701: 105000 })
+    const tbData = ref({ unadjusted: 0, audited: 105000 })
     const saveResponse = vi.fn()
 
     const adj = useK5Adjudication({ allResponses, tbData, saveResponse })
     // subtotal.audited = 105000 (only r0 has data)
-    // tb.audited2701 = 105000 → match
+    // tb.audited = 105000 → match
     expect(adj.tbReconciliation.value.isMatch).toBe(true)
   })
 
@@ -212,7 +212,7 @@ describe('K5 Integration — useK5Adjudication 审定公式', () => {
       ['K5-1-r0-aje', { remark: '0' }],
       ['K5-1-r0-rje', { remark: '0' }],
     ]))
-    const tbData = ref({ unadjusted2701: 0, audited2701: 200000 })
+    const tbData = ref({ unadjusted: 0, audited: 200000 })
     const saveResponse = vi.fn()
 
     const adj = useK5Adjudication({ allResponses, tbData, saveResponse })
@@ -229,7 +229,7 @@ describe('K5 Integration — useK5Adjudication 审定公式', () => {
       ['K5-1-r0-aje', { remark: '5000' }],
       ['K5-1-r0-rje', { remark: '0' }],
     ]))
-    const tbData = ref({ unadjusted2701: 0, audited2701: 0 })
+    const tbData = ref({ unadjusted: 0, audited: 0 })
     const saveResponse = vi.fn()
 
     const adj = useK5Adjudication({ allResponses, tbData, saveResponse })
@@ -244,7 +244,7 @@ describe('K5 Integration — useK5Adjudication 审定公式', () => {
       ['K5-1-r1-aje', { remark: '10000' }],
       ['K5-1-r1-rje', { remark: '0' }],
     ]))
-    const tbData = ref({ unadjusted2701: 0, audited2701: 0 })
+    const tbData = ref({ unadjusted: 0, audited: 0 })
     const saveResponse = vi.fn()
 
     const adj = useK5Adjudication({ allResponses, tbData, saveResponse })
@@ -259,7 +259,7 @@ describe('K5 Integration — useK5Adjudication 审定公式', () => {
       ['K5-1-r4-aje', { remark: '3000' }],
       ['K5-1-r4-rje', { remark: '1000' }],
     ]))
-    const tbData = ref({ unadjusted2701: 0, audited2701: 0 })
+    const tbData = ref({ unadjusted: 0, audited: 0 })
     const saveResponse = vi.fn()
 
     const adj = useK5Adjudication({ allResponses, tbData, saveResponse })
@@ -278,7 +278,7 @@ describe('K5 Integration — TB回写(2701) + EventBus', () => {
     vi.restoreAllMocks()
   })
 
-  it('writebackTB2701 calls PUT with account_code=2701', async () => {
+  it('writebackTB calls PUT with account_code=2701', async () => {
     const mockApi = { put: vi.fn().mockResolvedValue({}), get: vi.fn().mockResolvedValue({}) }
     const mockEventBus = { emit: vi.fn(), on: vi.fn(), off: vi.fn() }
     vi.doMock('@/services/apiProxy', () => ({ api: mockApi }))
@@ -293,7 +293,7 @@ describe('K5 Integration — TB回写(2701) + EventBus', () => {
       sheetPrefix: '1',
     })
 
-    await formData.writebackTB2701(600000)
+    await formData.writebackTB(600000)
 
     expect(mockApi.put).toHaveBeenCalledWith(
       '/api/projects/proj-001/trial-balance/writeback',
@@ -301,7 +301,7 @@ describe('K5 Integration — TB回写(2701) + EventBus', () => {
     )
   })
 
-  it('writebackTB2701 emits substantive:adjudicated with 2701/K5', async () => {
+  it('writebackTB emits substantive:adjudicated with 2701/K5', async () => {
     const mockApi = { put: vi.fn().mockResolvedValue({}), get: vi.fn().mockResolvedValue({}) }
     const mockEventBus = { emit: vi.fn(), on: vi.fn(), off: vi.fn() }
     vi.doMock('@/services/apiProxy', () => ({ api: mockApi }))
@@ -316,7 +316,7 @@ describe('K5 Integration — TB回写(2701) + EventBus', () => {
       sheetPrefix: '1',
     })
 
-    await formData.writebackTB2701(1200000)
+    await formData.writebackTB(1200000)
 
     expect(mockEventBus.emit).toHaveBeenCalledWith(
       'substantive:adjudicated',
@@ -328,7 +328,7 @@ describe('K5 Integration — TB回写(2701) + EventBus', () => {
     )
   })
 
-  it('writebackTB2701 updates local tbData.audited2701', async () => {
+  it('writebackTB updates local tbData.audited', async () => {
     const mockApi = { put: vi.fn().mockResolvedValue({}), get: vi.fn().mockResolvedValue({}) }
     const mockEventBus = { emit: vi.fn(), on: vi.fn(), off: vi.fn() }
     vi.doMock('@/services/apiProxy', () => ({ api: mockApi }))
@@ -343,12 +343,12 @@ describe('K5 Integration — TB回写(2701) + EventBus', () => {
       sheetPrefix: '1',
     })
 
-    expect(formData.tbData.value.audited2701).toBe(0)
-    await formData.writebackTB2701(2500000)
-    expect(formData.tbData.value.audited2701).toBe(2500000)
+    expect(formData.tbData.value.audited).toBe(0)
+    await formData.writebackTB(2500000)
+    expect(formData.tbData.value.audited).toBe(2500000)
   })
 
-  it('writebackTB2701 zero amount is valid (全部转销)', async () => {
+  it('writebackTB zero amount is valid (全部转销)', async () => {
     const mockApi = { put: vi.fn().mockResolvedValue({}), get: vi.fn().mockResolvedValue({}) }
     const mockEventBus = { emit: vi.fn(), on: vi.fn(), off: vi.fn() }
     vi.doMock('@/services/apiProxy', () => ({ api: mockApi }))
@@ -363,7 +363,7 @@ describe('K5 Integration — TB回写(2701) + EventBus', () => {
       sheetPrefix: '1',
     })
 
-    await formData.writebackTB2701(0)
+    await formData.writebackTB(0)
 
     expect(mockApi.put).toHaveBeenCalledWith(
       '/api/projects/proj-004/trial-balance/writeback',

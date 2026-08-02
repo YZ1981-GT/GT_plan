@@ -10,6 +10,13 @@
         <li><b>列报与披露：</b>预计负债及或有事项已按 CAS13 恰当列报披露。</li>
       </ol>
     </el-alert>
+    <!-- 四表库取数溯源面板 -->
+    <WpFourTableSourcePanel
+      v-if="props.tbSourceCodes"
+      :source-codes="props.tbSourceCodes"
+      gross-label="预计负债"
+    />
+
 
     <!-- ═══ Section标题 + AI + 复核 ═══ -->
     <div class="section-header">
@@ -50,7 +57,7 @@
     <div v-if="!tbReconciliation.isMatch" class="reconciliation-alert">
       <el-alert type="error" :closable="false" show-icon>
         <template #title>
-          TB勾稽不平：审定合计 {{ fmtNum(subtotalRow.audited) }} vs TB审定(2701) {{ fmtNum(tbData.audited2701) }}，差异 {{ fmtNum(tbReconciliation.diff) }}
+          TB勾稽不平：审定合计 {{ fmtNum(subtotalRow.audited) }} vs TB审定 {{ fmtNum(tbData.audited) }}，差异 {{ fmtNum(tbReconciliation.diff) }}
         </template>
       </el-alert>
     </div>
@@ -243,6 +250,8 @@
  * Spec: .kiro/specs/k5-provisions/ | Task: 4.2
  * Requirements: 2.1-2.8
  */
+import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
+import { k5AccountCode } from '../../composables/k5AccountScope'
 import { computed, toRef } from 'vue'
 import { MagicStick, CircleCheckFilled, WarningFilled, Download } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -262,6 +271,7 @@ const props = defineProps<{
   tbData: K5TbData
   prefill?: Array<Record<string, unknown>>
   isReadonly: boolean
+  tbSourceCodes?: Record<string, any> | null
 }>()
 
 const emit = defineEmits<{
@@ -297,9 +307,9 @@ const {
 const { adjPull, visible: bringInVisible, rowOptions: bringInRowOptions, open: openBringInAdjustment, apply: onBringInApply } = useAdjudicationBringIn({
   projectId: toRef(props, 'projectId') as any,
   year: useAuditContext().year as any,
-  subjectPrefix: '2701',
+  subjectPrefix: k5AccountCode(props.tbSourceCodes as any),
   direction: 'credit', // 负债贷方：净发生额 = 贷 − 借
-  subjectCode: '2701',
+  subjectCode: k5AccountCode(props.tbSourceCodes as any),
   wpCode: 'K5',
   subjectLabel: '预计负债(2701)',
   rows: computed(() => rows.value.map(r => ({ rowKey: r.rowKey, name: r.label, aje: r.aje, rje: r.rje }))),
@@ -421,7 +431,7 @@ function classifySubAccount(name: string): number {
 async function prefillFromTbSubAccounts(): Promise<void> {
   try {
     const res = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
-      params: { account_prefix: '2701' },
+      params: { account_prefix: k5AccountCode(props.tbSourceCodes as any) },
       _silent: true,
     } as any)
     const list: any[] = Array.isArray(res?.data?.data ?? res?.data) ? (res?.data?.data ?? res?.data) : []
@@ -435,7 +445,7 @@ async function prefillFromTbSubAccounts(): Promise<void> {
     const details: string[] = []
     for (const item of list) {
       const code = String(item.standard_account_code ?? item.account_code ?? '')
-      if (!code.startsWith('2701')) continue
+      if (!code.startsWith(k5AccountCode(props.tbSourceCodes as any))) continue
       const name = String(item.account_name ?? item.standard_account_name ?? code)
       const amt = Math.abs(Number(item.unadjusted_amount ?? item.closing_balance ?? 0))
       if (amt <= 0) continue
@@ -486,7 +496,7 @@ async function prefillFromTbSubAccounts(): Promise<void> {
 
 const reportReconciliationRows = computed(() => {
   const audited = subtotalRow.value.audited
-  const tbAudited = props.tbData.audited2701
+  const tbAudited = props.tbData.audited
   const detailTotal = detailEndTotal.value
   const tbDiff = audited - tbAudited
   const detailDiff = detailTotal ? (audited - detailTotal) : 0

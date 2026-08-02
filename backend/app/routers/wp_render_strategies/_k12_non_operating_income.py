@@ -1,249 +1,81 @@
 """K12 营业外收入 — 专属渲染策略.
 
-component_type = "k12-non-operating-income"
+componentType: k12-non-operating-income
 
-科目6301营业外收入（**损益类/贷方科目**）— K循环损益类最简底稿
-**损益类取数逻辑**：从tb_ledger取发生额（credit_amount/debit_amount），NOT 期末余额！
-净发生额 = 贷方发生(收入增加) - 借方发生(收入红冲/冲回)
+科目定位走报表映射规则链路（共享件 `four_table/report_line_accounts.py` +
+声明真源 `four_table/k_cycle_specs.py`）::
 
-6301营业外收入为贷方科目：贷方=收入增加。
-与日常活动无关的利得：政府补助/债务重组利得/资产盘盈/罚款收入/捐赠利得等。
+    报表行 IS-020（上市）/ IS-041（国企）「加：营业外收入」
+      四准则一致：TB('6301','本期发生额')
 
-与K8(6601)/K9(6602)/K11(6701)同款损益类处理逻辑（方向相反：贷方科目）。
+🔴 **已修正：原实现的「净发生额 = 贷方 − 借方」在全年账上恒为 0**
+（收益类是反向写法，同样恒零；成因与逐行实证见
+`four_table/pl_occurrence.py` 模块 docstring）。
+权威口径 = `trial_balance`，兜底取 `tb_balance.credit_amount`（贷方科目）。
 
-Requirements: 1.6, 5.1
+🔴 **符号处理**：`trial_balance` 中收益类符号在项目间不统一 —— 实证 `6301`
+在项目 `005a6f2d` 为 `-305,414.30`、在 `37814426` 为 `+0.01`
+（「借正贷负」与「正数口径」两种约定并存）。裁决依据取自报表语义：
+`IS-020 加：营业外收入` 前置运算符是 `+`，即报表期望正数贡献
+→ 按 `normalize_for_report` 取绝对值，`raw_sign` 留证。
+
+**分类边界**：与日常活动**无关**的利得计入营业外收入（6301）；
+与日常活动**相关**的政府补助等计入其他收益（6117，K10 循环）。
+
+spec: .kiro/specs/k-cycle-four-table-extraction-and-disclosure-completion/
+      Requirements 3.1~3.4, 1.1, 2.1~2.3 / Property 5, 6, 7
 """
+
 from __future__ import annotations
 
-import logging
-
-import sqlalchemy as sa
-
-from app.models.audit_platform_models import TbBalance, TbLedger
-from app.services.dataset_query import get_active_filter
+from app.services.four_table.k_cycle_specs import K_CYCLE_SPECS
+from app.services.four_table.pl_render import render_pl_cycle
 
 from ._context import RenderContext
 
-logger = logging.getLogger(__name__)
+K12_SPEC = K_CYCLE_SPECS["K12"]
 
-# 科目：6301营业外收入（损益类/贷方=收入增加，借方=收入冲回/红冲）
-_K12_ACCOUNT_PREFIX = "6301"
+#: 披露 sheet 名 = 源 xlsx 真实中文 tab 名（openpyxl 实测）。国企侧是「国企」。
+K12_DISCLOSURE_SHEET_LISTED = "附注披露信息（上市公司）"
+K12_DISCLOSURE_SHEET_SOE = "附注披露信息（国企）"
 
 K12_SHEETS = [
     {"sheet_name": "底稿目录", "component_type": "k12-non-operating-income"},
-    {"sheet_name": "营业外收入实质性程序表K12A", "component_type": "k12-non-operating-income"},
+    {"sheet_name": "实质性程序表K12A", "component_type": "k12-non-operating-income"},
     {"sheet_name": "审定表K12-1", "component_type": "k12-non-operating-income"},
+    {
+        "sheet_name": K12_DISCLOSURE_SHEET_LISTED,
+        "component_type": "k12-non-operating-income",
+    },
+    {
+        "sheet_name": K12_DISCLOSURE_SHEET_SOE,
+        "component_type": "k12-non-operating-income",
+    },
     {"sheet_name": "明细表K12-2", "component_type": "k12-non-operating-income"},
     {"sheet_name": "调整分录汇总K12-3", "component_type": "k12-non-operating-income"},
     {"sheet_name": "营业外收入检查表K12-4", "component_type": "k12-non-operating-income"},
-    {"sheet_name": "附注披露信息（上市公司）", "component_type": "k12-non-operating-income"},
-    {"sheet_name": "附注披露信息（国有企业）", "component_type": "k12-non-operating-income"},
 ]
 
-
-async def _fetch_tb_income_statement(ctx: RenderContext) -> dict:
-    """损益类6301：从tb_ledger取发生额（非期末余额！）.
-
-    6301营业外收入为贷方科目：
-    - 贷方发生 = 收入增加（政府补助/盘盈/罚款收入等）
-    - 借方发生 = 收入冲回/红冲
-    - 净发生额 = 贷方 - 借方（正数=净收入）
-    - 审定数 = 净发生额
-
-    **关键区别**：K12用tb_ledger取数（非tb_balance），且方向为贷方科目(贷-借)。
-    与K8/K9/K11（借方科目，借-贷）方向相反。
-    """
-    tb: dict[str, float] = {}
-
-    # 从 tb_ledger 取贷方发生额/借方发生额汇总
-    try:
-        active_filter = await get_active_filter(
-            ctx.db, TbLedger.__table__, ctx.project_id, ctx.year
-        )
-        result = await ctx.db.execute(
-            sa.select(
-                sa.func.sum(TbLedger.debit_amount).label("total_debit"),
-                sa.func.sum(TbLedger.credit_amount).label("total_credit"),
-            ).where(
-                active_filter,
-                TbLedger.account_code.startswith(_K12_ACCOUNT_PREFIX),
-            )
-        )
-        row = result.fetchone()
-        if row and (row.total_debit is not None or row.total_credit is not None):
-            debit = float(row.total_debit or 0)
-            credit = float(row.total_credit or 0)
-            tb = {
-                "unadjusted_debit": debit,
-                "unadjusted_credit": credit,
-                # 6301贷方科目：净发生额=贷方-借方（收入类！）
-                "audited_amount": credit - debit,
-            }
-    except Exception as e:  # noqa: BLE001
-        logger.warning("K12 TB income statement fetch (tb_ledger) failed: %s", e)
-
-    # 补充：从 trial_balance 取未审数/审定数（如存在）
-    try:
-        result = await ctx.db.execute(
-            sa.text("""
-                SELECT SUM(unadjusted_amount) AS unadjusted, SUM(audited_amount) AS audited
-                FROM trial_balance
-                WHERE project_id = :pid AND year = :year AND is_deleted = false
-                  AND standard_account_code LIKE '6301%'
-            """),
-            {"pid": str(ctx.project_id), "year": ctx.year},
-        )
-        row = result.fetchone()
-        if row:
-            if row.unadjusted is not None:
-                tb["trial_balance_unadjusted"] = float(row.unadjusted)
-            if row.audited is not None:
-                tb["trial_balance_audited"] = float(row.audited)
-    except Exception as e:  # noqa: BLE001
-        logger.warning("K12 trial_balance fetch failed: %s", e)
-
-    return tb
-
-
-async def _build_adjudication_prefill(ctx: RenderContext) -> list[dict]:
-    """从 tb_balance 6301 明细子科目预填 K12-1 审定表行（损益贷方取发生额）.
-
-    6301 营业外收入为贷方科目：净发生额 = 贷方 - 借方。
-    返回 [{name, unadjustedDebit, unadjustedCredit}]，前端在无持久化行时据此建行。
-    """
-    rows: list[dict] = []
-    try:
-        active_filter = await get_active_filter(
-            ctx.db, TbBalance.__table__, ctx.project_id, ctx.year
-        )
-        result = await ctx.db.execute(
-            sa.select(
-                TbBalance.account_code.label("code"),
-                TbBalance.account_name.label("name"),
-                sa.func.sum(TbBalance.debit_amount).label("debit"),
-                sa.func.sum(TbBalance.credit_amount).label("credit"),
-            )
-            .where(
-                active_filter,
-                TbBalance.account_code.startswith(_K12_ACCOUNT_PREFIX),
-                TbBalance.account_code != _K12_ACCOUNT_PREFIX,
-            )
-            .group_by(TbBalance.account_code, TbBalance.account_name)
-        )
-        raw = [
-            {
-                "code": (r.code or "").strip(),
-                "name": (r.name or "").strip(),
-                "debit": float(r.debit or 0),
-                "credit": float(r.credit or 0),
-            }
-            for r in result.fetchall()
-        ]
-        all_codes = [x["code"] for x in raw if x["code"]]
-
-        def _is_leaf(code: str) -> bool:
-            if not code:
-                return True
-            return not any(c != code and c.startswith(code) for c in all_codes)
-
-        leaves = [x for x in raw if _is_leaf(x["code"])]
-        leaves.sort(key=lambda x: x["credit"], reverse=True)
-        for x in leaves:
-            name = x["name"]
-            debit = x["debit"]
-            credit = x["credit"]
-            if not name or (abs(debit) < 0.005 and abs(credit) < 0.005):
-                continue
-            rows.append({
-                "name": name,
-                "unadjustedDebit": debit,
-                "unadjustedCredit": credit,
-            })
-    except Exception as e:  # noqa: BLE001
-        logger.warning("K12 adjudication prefill build failed: %s", e)
-    return rows
-
-
-async def _load_project_context(ctx: RenderContext) -> dict:
-    """加载项目上下文."""
-    project_ctx: dict = {}
-    try:
-        result = await ctx.db.execute(
-            sa.text("""
-                SELECT p.client_name, p.audit_year, p.business_category, p.applicable_standard_v2 AS applicable_standards
-                FROM working_paper wp
-                JOIN projects p ON wp.project_id = p.id
-                WHERE wp.id = :wp_id
-            """),
-            {"wp_id": str(ctx.wp_id)},
-        )
-        row = result.fetchone()
-        if row:
-            project_ctx["client_name"] = row.client_name or ""
-            project_ctx["audit_year"] = str(row.audit_year) if row.audit_year else ""
-            project_ctx["business_category"] = row.business_category or ""
-            project_ctx["applicable_standards"] = row.applicable_standards or ""
-    except Exception as e:  # noqa: BLE001
-        logger.warning("K12 project context load failed: %s", e)
-    return project_ctx
+K12_META = {
+    "sheet_count": len(K12_SHEETS),
+    "wp_code": "K12",
+    "special_rules": {
+        "income_statement": True,
+        "account_direction": "credit",  # 贷方科目！（vs K11/K13 借方）
+        "net_formula": "trial_balance 本期发生额（权威）/ tb_balance 贷方发生额（兜底）",
+        "source_table": "trial_balance + tb_balance 叶子",
+        "non_operating_classification": True,
+        "vs_other_gains": "6117(K10)",  # 与日常活动相关的计入其他收益
+    },
+}
 
 
 async def render(ctx: RenderContext) -> dict | None:
-    """K12营业外收入渲染策略：损益类取发生额（贷方科目！贷-借）.
-
-    核心特殊：
-    1. **损益类取发生额**非余额（从tb_ledger取数！）
-    2. **贷方科目**：净发生额=贷方-借方（与K8/K9/K11借方科目方向相反）
-    3. 营业外收入分类核对（vs其他收益6117/K10）
-    4. K循环损益类最简底稿（9 sheets）
-    """
-    # 1. 加载 checklist_responses 快照
-    responses_snapshot: dict = {}
-    try:
-        result = await ctx.db.execute(
-            sa.text(
-                "SELECT item_id, conclusion, remark FROM checklist_responses "
-                "WHERE wp_id = :wp_id AND item_id LIKE :pfx LIMIT 5000"
-            ),
-            {"wp_id": str(ctx.wp_id), "pfx": "K12-%"},
-        )
-        for row in result.fetchall():
-            responses_snapshot[row.item_id] = {
-                "conclusion": row.conclusion or "",
-                "remark": row.remark or "",
-            }
-    except Exception as e:  # noqa: BLE001
-        logger.warning("K12 render responses load failed: %s", e)
-
-    # 2. 获取TB数据（损益类！取发生额，从tb_ledger）
-    tb_values = await _fetch_tb_income_statement(ctx)
-
-    # 3. 加载项目上下文
-    project_context = await _load_project_context(ctx)
-
-    # 4. 审定表预填充
-    adjudication_prefill = await _build_adjudication_prefill(ctx)
-
-    return {
-        "component_type": "k12-non-operating-income",
-        "adjudication_prefill": adjudication_prefill,
-        "account_codes": ["6301"],
-        "income_statement": True,  # 标识损益类
-        "responses_snapshot": responses_snapshot,
-        "tb_values": tb_values,
-        "project_context": project_context,
-        "prefix": "K12",
-        "sheets": K12_SHEETS,
-        "meta": {
-            "sheet_count": 8,
-            "wp_code": "K12",
-            "special_rules": {
-                "income_statement": True,
-                "account_direction": "credit",  # 贷方科目！（vs K8/K11借方）
-                "net_formula": "贷方发生-借方发生",
-                "source_table": "tb_ledger",  # 从tb_ledger取数（非tb_balance）
-                "non_operating_classification": True,
-                "vs_other_gains": "6117(K10)",  # 与日常活动相关的计入其他收益
-            },
-        },
-    }
+    """K12 营业外收入渲染策略：损益类取本期发生额（贷方科目）+ 取数溯源."""
+    return await render_pl_cycle(
+        ctx,
+        K12_SPEC,
+        component_type="k12-non-operating-income",
+        sheets=K12_SHEETS,
+        meta=K12_META,
+    )

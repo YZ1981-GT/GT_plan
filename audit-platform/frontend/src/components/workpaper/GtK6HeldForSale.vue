@@ -57,7 +57,8 @@
           :tb-data="tbData"
           :is-readonly="isReadonly"
           @save="handleChildSave"
-          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
+          @navigate-sheet="(s: string) =          :tb-source-codes="tbSourceCodes"
+        > emit('navigate-sheet', s)"
         />
 
         <!-- K6-2 明细表 -->
@@ -181,6 +182,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, provide, inject, defineAsyncComponent, toRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
+import { k6QueryCodes } from './composables/k6AccountScope'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { eventBus } from '@/utils/eventBus'
 import { useChecklistPersistence } from '@/composables/workpaper/useChecklistPersistence'
@@ -335,9 +337,19 @@ async function handleChildSave(itemId: string, value: unknown): Promise<void> {
 }
 
 // ─── TB回写（实际调 trial_balance writeback + EventBus）─────────────────────
-/** 科目 1481 持有待售资产(借方) / 2605 持有待售负债(贷方) */
-const ACCOUNT_CODE_ASSET = '1481'
-const ACCOUNT_CODE_LIABILITY = '2605'
+/**
+ * 🔴 K6 是「宁缺勿造」循环（三表零命中），科目码由 k6AccountScope 提供。
+ * 当 tb_source_codes 解析不出科目时，scope 函数返回空数组 → writebackTB
+ * 不应发出请求（否则写入不存在的科目码）。
+ */
+const k6AssetCode = computed(() => {
+  const codes = k6QueryCodes((props.htmlData as any)?.tb_source_codes)
+  return codes[0] || ''
+})
+const k6LiabCode = computed(() => {
+  const codes = k6QueryCodes((props.htmlData as any)?.tb_source_codes?.liability)
+  return codes[0] || ''
+})
 
 /**
  * writebackTB: 审定数回写 trial_balance 双科目 + 发布 substantive:adjudicated。
@@ -348,11 +360,11 @@ async function writebackTB(assetAudited: number, liabilityAudited: number): Prom
   try {
     await Promise.all([
       http.put(`/api/projects/${props.projectId}/trial-balance/writeback`, {
-        account_code: ACCOUNT_CODE_ASSET,
+        account_code: k6AssetCode.value,
         audited_amount: assetAudited,
       }),
       http.put(`/api/projects/${props.projectId}/trial-balance/writeback`, {
-        account_code: ACCOUNT_CODE_LIABILITY,
+        account_code: k6LiabCode.value,
         audited_amount: liabilityAudited,
       }),
     ])
@@ -386,14 +398,14 @@ async function _loadTbData(): Promise<void> {
   try {
     // 持有待售资产科目 1481
     const resAsset = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
-      params: { account_prefix: '1481', year: props.year },
+      params: { account_prefix: k6AssetCodes[0] || '', year: props.year },
       _silent: true,
     } as any)
     const listAsset: any[] = Array.isArray(resAsset?.data?.data ?? resAsset?.data) ? (resAsset?.data?.data ?? resAsset?.data) : []
     let uAsset = 0, aAsset = 0
     for (const item of listAsset) {
       const code = String(item.standard_account_code ?? item.account_code ?? '')
-      if (code.startsWith('1481')) {
+      if (k6AssetCodes.some((c: string) => code === c || code.startsWith(c + '.'))) {
         uAsset += Number(item.unadjusted_amount ?? 0)
         aAsset += Number(item.audited_amount ?? 0)
       }
@@ -403,14 +415,14 @@ async function _loadTbData(): Promise<void> {
 
     // 持有待售负债科目 2605
     const resLiab = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
-      params: { account_prefix: '2605', year: props.year },
+      params: { account_prefix: k6LiabCodes[0] || '', year: props.year },
       _silent: true,
     } as any)
     const listLiab: any[] = Array.isArray(resLiab?.data?.data ?? resLiab?.data) ? (resLiab?.data?.data ?? resLiab?.data) : []
     let uLiab = 0, aLiab = 0
     for (const item of listLiab) {
       const code = String(item.standard_account_code ?? item.account_code ?? '')
-      if (code.startsWith('2605')) {
+      if (k6LiabCodes.some((c: string) => code === c || code.startsWith(c + '.'))) {
         uLiab += Math.abs(Number(item.unadjusted_amount ?? 0))
         aLiab += Math.abs(Number(item.audited_amount ?? 0))
       }
@@ -423,6 +435,9 @@ async function _loadTbData(): Promise<void> {
 }
 
 // ─── selfLoad（统一 Persistence Adapter） ─────────────────────────────────────
+/** 四表取数溯源（render 下发，供审定表 Tab 展示来源科目与报表行） */
+const tbSourceCodes = computed(() => props.htmlData?.tb_source_codes ?? null)
+
 async function selfLoad(): Promise<void> {
   try {
     const snapshot = props.htmlData

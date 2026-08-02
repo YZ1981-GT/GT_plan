@@ -10,6 +10,13 @@
         <li><b>分类与列报：</b>与营业收入/其他收益的划分恰当，列报披露充分。</li>
       </ol>
     </el-alert>
+    <!-- 四表库取数溯源面板 -->
+    <WpFourTableSourcePanel
+      v-if="props.tbSourceCodes"
+      :source-codes="props.tbSourceCodes"
+      gross-label="营业外收入"
+    />
+
 
     <!-- ═══ 跨底稿引用（GtIndexChip：K12-1 → TB） ═══ -->
     <div class="cross-ref-bar">
@@ -406,6 +413,7 @@
  * Spec: .kiro/specs/k12-non-operating-income/ Task 4.2
  * Requirements: 2.1-2.7
  */
+import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
 import { ref, defineAsyncComponent, watch, toRef, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, Download } from '@element-plus/icons-vue'
@@ -428,7 +436,8 @@ const props = defineProps<{
   allResponses: Map<string, any>
   tbData: { unadjusted6301: number; audited6301: number }
   isReadonly: boolean
-  prefill?: Array<{ name: string; unadjustedDebit: number; unadjustedCredit: number }>
+  prefill?: Array<{ name: string; unadjustedDebit: number; unadjustedCredit: number   tbSourceCodes?: Record<string, any> | null
+}>
 }>()
 
 const emit = defineEmits<{

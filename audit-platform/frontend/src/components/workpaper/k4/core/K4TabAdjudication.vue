@@ -16,6 +16,13 @@
         <li><b>列报与披露：</b>已按企业会计准则规定作出恰当列报。</li>
       </ol>
     </el-alert>
+    <!-- 四表库取数溯源面板 -->
+    <WpFourTableSourcePanel
+      v-if="props.tbSourceCodes"
+      :source-codes="props.tbSourceCodes"
+      gross-label="其他流动负债"
+    />
+
 
     <!-- ═══ 审定表主表 ═══ -->
     <el-card shadow="never" class="block-card">
@@ -23,7 +30,7 @@
         <div class="section-title">
           <span>K4-1 其他流动负债审定表</span>
           <div class="title-actions">
-            <el-button size="small" type="warning" plain :disabled="isReadonly" :loading="adjPull.loading.value" @click="openBringInAdjustment">
+            <el-button size="small" type="warning" plain :disabled="isReadonly || !k4Code" :loading="adjPull.loading.value" @click="openBringInAdjustment">
               <el-icon><Download /></el-icon> 带入调整
             </el-button>
             <el-button size="small" type="primary" link @click="handleAiGenerate('adj-main')">
@@ -263,6 +270,8 @@
  * 科目：2245 其他流动负债（**贷方/负债类**）
  * ⚠️ 负债类！期末=期初+贷方-借方（与资产类相反）
  */
+import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
+import { k4QueryCodes } from '../../composables/k4AccountScope'
 import { ref, computed, inject, toRef } from 'vue'
 import { MagicStick, Download } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
@@ -283,6 +292,7 @@ const props = defineProps<{
   tbData: { unadjusted2245: number; audited2245: number }
   prefill?: Array<Record<string, unknown>>
   isReadonly: boolean
+  tbSourceCodes?: Record<string, any> | null
 }>()
 
 const emit = defineEmits<{
@@ -290,6 +300,8 @@ const emit = defineEmits<{
   (e: 'navigate-sheet', sheetName: string): void
 }>()
 
+// K4 是宁缺勿造循环（三表零命中），科目码从 scope 取（无科目时返空串 → 带入调整按钮禁用）
+const k4Code = computed(() => k4QueryCodes(props.tbSourceCodes)[0] || '')
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
 const allResponsesRef = computed(() => props.allResponses)
@@ -321,9 +333,9 @@ const isReadonly = computed(() => props.isReadonly)
 const { adjPull, visible: bringInVisible, rowOptions: bringInRowOptions, open: openBringInAdjustment, apply: onBringInApply } = useAdjudicationBringIn({
   projectId: toRef(props, 'projectId') as any,
   year: useAuditContext().year as any,
-  subjectPrefix: '2245',
+  subjectPrefix: k4Code,
   direction: 'credit', // 负债贷方：净发生额 = 贷 − 借
-  subjectCode: '2245',
+  subjectCode: k4Code,
   wpCode: 'K4',
   subjectLabel: '其他流动负债(2245)',
   rows: computed(() => rows.value.map(r => ({ rowKey: r.rowKey, name: r.label, aje: r.aje, rje: r.rje }))),
@@ -379,6 +391,10 @@ function saveConclusion() {
 // ─── TB回写 + saveAll + EventBus ─────────────────────────────────────────────
 
 async function handleWritebackTB() {
+  if (!k4Code.value) {
+    // 宁缺勿造：无科目时不写库（三表零命中）
+    return
+  }
   publishing.value = true
   try {
     const auditedTotal = getAuditedTotal()
@@ -390,7 +406,7 @@ async function handleWritebackTB() {
     try {
       eventBus.emit('substantive:adjudicated', {
         wpCode: 'K4',
-        accountCode: '2245',
+        accountCode: k4Code,
         projectId: props.projectId,
         auditedAmount: auditedTotal,
         adjudicatedAmount: auditedTotal,

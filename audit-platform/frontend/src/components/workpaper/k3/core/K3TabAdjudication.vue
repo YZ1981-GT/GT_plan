@@ -16,6 +16,13 @@
         <li><b>列报与披露：</b>已按企业会计准则规定作出恰当列报。</li>
       </ol>
     </el-alert>
+    <!-- 四表库取数溯源面板 -->
+    <WpFourTableSourcePanel
+      v-if="props.tbSourceCodes"
+      :source-codes="props.tbSourceCodes"
+      gross-label="其他应付款"
+    />
+
 
     <!-- 一、按性质分类 -->
     <el-card shadow="never" class="block-card">
@@ -344,6 +351,7 @@
  * 科目：2241 其他应付款（**贷方/负债类**）
  * ⚠️ 负债类！期末=期初+贷方-借方（与资产类相反）
  */
+import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
 import { ref, computed, inject, toRef, watch } from 'vue'
 import { MagicStick, Download } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
@@ -362,6 +370,7 @@ const props = defineProps<{
   tbData: { unadjusted2241: number; audited2241: number }
   prefill?: Array<Record<string, unknown>>
   isReadonly: boolean
+  tbSourceCodes?: Record<string, any> | null
 }>()
 
 const emit = defineEmits<{

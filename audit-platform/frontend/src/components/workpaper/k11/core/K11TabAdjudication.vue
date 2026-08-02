@@ -10,6 +10,13 @@
         <li><b>分类与列报：</b>已记录于恰当账户并恰当列报披露。</li>
       </ol>
     </el-alert>
+    <!-- 四表库取数溯源面板 -->
+    <WpFourTableSourcePanel
+      v-if="props.tbSourceCodes"
+      :source-codes="props.tbSourceCodes"
+      gross-label="资产减值损失"
+    />
+
 
     <!-- ═══ Section标题 + AI + 复核 ═══ -->
     <div class="section-header">
@@ -364,6 +371,7 @@
  * Spec: .kiro/specs/k11-asset-impairment-loss/ | Task: 4.2
  * Requirements: 2.1-2.8
  */
+import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
 import { computed, toRef, watch, onMounted, type Ref } from 'vue'
 import { MagicStick, CircleCheckFilled, WarningFilled, Download } from '@element-plus/icons-vue'
 import { useK11Adjudication, type K11AdjRow } from '../../composables/useK11Adjudication'
@@ -381,7 +389,8 @@ const props = defineProps<{
   allResponses: Map<string, any>
   tbData: { unadjusted6701: number; audited6701: number }
   isReadonly: boolean
-  prefill?: Array<{ name: string; unadjustedDebit: number; unadjustedCredit: number }>
+  prefill?: Array<{ name: string; unadjustedDebit: number; unadjustedCredit: number   tbSourceCodes?: Record<string, any> | null
+}>
 }>()
 
 // 父组件模板绑定会自动解包 ref → 子组件收到纯 Map；重新包成 ref 供 composable 使用

@@ -70,7 +70,8 @@
           :prefill="adjudicationPrefill"
           :is-readonly="isReadonly"
           @save="handleChildSave"
-          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
+          @navigate-sheet="(s: string) =          :tb-source-codes="tbSourceCodes"
+        > emit('navigate-sheet', s)"
         />
 
         <!-- K3-2 明细表 -->
@@ -255,6 +256,10 @@ const tbData = ref({
 const adjudicationPrefill = computed(() =>
   Array.isArray(props.htmlData?.adjudication_prefill) ? props.htmlData.adjudication_prefill : []
 )
+
+/** 四表取数溯源（render 下发，供审定表 Tab 展示来源科目与报表行） */
+const tbSourceCodes = computed(() => props.htmlData?.tb_source_codes ?? null)
+
 
 // ─── 跨sheet勾稽引擎（全局告警banner消费） ────────────────────────────────────
 const { adjudicationVsDetail, longOutstandingVsDetail, largeAmountVsDetail } = useK3CrossSheet(allResponses)

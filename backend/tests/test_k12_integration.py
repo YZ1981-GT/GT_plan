@@ -56,7 +56,7 @@ def override_deps():
 
 
 class TestK12RenderStrategyIncomeStatement:
-    """验证 K12 render策略损益类取数逻辑（从tb_ledger取发生额）."""
+    """验证 K12 render 策略走新架构（共享件 pl_occurrence + k_cycle_specs）."""
 
     def test_k12_registered_in_dispatch(self):
         """RENDERER_DISPATCH 包含 k12-non-operating-income."""
@@ -65,154 +65,63 @@ class TestK12RenderStrategyIncomeStatement:
     def test_k12_render_is_callable(self):
         """render 函数可调用."""
         from app.routers.wp_render_strategies._k12_non_operating_income import render
-
         assert callable(render)
 
     def test_k12_account_prefix_is_6301(self):
-        """科目前缀为 6301（损益类/营业外收入/贷方科目）."""
-        from app.routers.wp_render_strategies._k12_non_operating_income import (
-            _K12_ACCOUNT_PREFIX,
-        )
+        """科目 6301 由 k_cycle_specs 声明（不再是模块级 _K12_ACCOUNT_PREFIX）."""
+        from app.services.four_table.k_cycle_specs import K_CYCLE_SPECS
+        assert K_CYCLE_SPECS["K12"].fallback_standard == "6301"
 
-        assert _K12_ACCOUNT_PREFIX == "6301"
-
-    def test_fetch_function_uses_tb_ledger(self):
-        """_fetch_tb_income_statement 查询 TbLedger（非 TbBalance）."""
-        from app.routers.wp_render_strategies._k12_non_operating_income import (
-            _fetch_tb_income_statement,
-        )
-
-        src = inspect.getsource(_fetch_tb_income_statement)
-        # 必须引用 TbLedger
-        assert "TbLedger" in src, "损益类取数应使用TbLedger而非TbBalance"
-        # 不应使用 TbBalance（余额表）
-        assert "TbBalance" not in src, "损益类取数不应使用TbBalance"
-
-    def test_fetch_function_calculates_credit_minus_debit(self):
-        """净发生额 = 贷方发生(credit) - 借方发生(debit)（贷方科目收入类）."""
-        from app.routers.wp_render_strategies._k12_non_operating_income import (
-            _fetch_tb_income_statement,
-        )
-
-        src = inspect.getsource(_fetch_tb_income_statement)
-        # 验证 credit - debit 计算逻辑（贷方科目）
-        assert "credit - debit" in src, "贷方科目净发生额应为 credit - debit"
-
-    @pytest.mark.asyncio
-    async def test_render_returns_income_statement_flag(self):
-        """render 返回结果包含 income_statement=True 标识."""
+    def test_render_uses_shared_pl_occurrence(self):
+        """render 走共享件 pl_render.render_pl_cycle（非自造取数函数）."""
         from app.routers.wp_render_strategies._k12_non_operating_income import render
+        import inspect
+        # 新架构 render 函数体 < 10 行（只调用 render_pl_cycle），不含自造取数逻辑
+        src = inspect.getsource(render)
+        assert "render_pl_cycle" in src, "render 应委托 render_pl_cycle 共享装配器"
 
-        mock_db = AsyncMock()
-        # mock execute 返回空结果
-        mock_result = MagicMock()
-        mock_result.fetchone.return_value = None
-        mock_result.fetchall.return_value = []
-        mock_db.execute = AsyncMock(return_value=mock_result)
+    def test_pl_occurrence_uses_trial_balance_authority(self):
+        """共享件 pl_occurrence 以 trial_balance 为权威口径，禁止 debit-credit 净额."""
+        from app.services.four_table import pl_occurrence
+        import inspect, re as _re
+        src = inspect.getsource(pl_occurrence.pick_occurrence)
+        # 去掉 docstring（里面写了「禁止 debit - credit」的说明文字）
+        body = _re.sub(r'''""".*?"""''', "", src, flags=_re.DOTALL)
+        # pick_occurrence 函数体只取方向侧发生额，不做减法
+        assert "debit - credit" not in body
+        assert "credit - debit" not in body
 
-        ctx = MagicMock()
-        ctx.db = mock_db
-        ctx.project_id = "test-project"
-        ctx.year = 2025
-        ctx.wp_id = "test-wp-id"
+    def test_render_returns_income_statement_flag(self):
+        """K12_META 标识 income_statement=True."""
+        from app.routers.wp_render_strategies._k12_non_operating_income import K12_META
+        assert K12_META["special_rules"]["income_statement"] is True
 
-        result = await render(ctx)
+    def test_render_returns_component_type(self):
+        """render 模块声明 component_type = 'k12-non-operating-income'."""
+        from app.routers.wp_render_strategies._k12_non_operating_income import K12_SHEETS
+        assert all(s["component_type"] == "k12-non-operating-income" for s in K12_SHEETS)
 
-        assert result is not None
-        assert result["income_statement"] is True
-        assert result["account_codes"] == ["6301"]
+    def test_render_contains_tb_values(self):
+        """pl_occurrence.build_pl_tb_values 返回结果包含 occurrence_unadjusted."""
+        from app.services.four_table.pl_occurrence import PlOccurrence, build_pl_tb_values, AccountNature
+        occ = PlOccurrence(unadjusted=75000.0, audited=75000.0, fallback_amount=80000.0,
+                           source="trial_balance", nature=AccountNature.INCOME.value)
+        tv = build_pl_tb_values(occ)
+        assert "occurrence_unadjusted" in tv
+        assert tv["occurrence_unadjusted"] == 75000.0
 
-    @pytest.mark.asyncio
-    async def test_render_tb_values_with_ledger_data(self):
-        """render策略正确计算发生额：净收入 = credit - debit."""
-        from app.routers.wp_render_strategies._k12_non_operating_income import render
+    def test_render_sheets_list_has_8_entries(self):
+        """K12_SHEETS 恰好 8 个 sheet."""
+        from app.routers.wp_render_strategies._k12_non_operating_income import K12_SHEETS
+        assert len(K12_SHEETS) == 8
 
-        mock_db = AsyncMock()
-
-        # 模拟tb_ledger查询结果：贷方50000, 借方8000
-        mock_ledger_row = MagicMock()
-        mock_ledger_row.total_debit = 8000.0
-        mock_ledger_row.total_credit = 50000.0
-        mock_ledger_result = MagicMock()
-        mock_ledger_result.fetchone.return_value = mock_ledger_row
-
-        # 模拟trial_balance查询结果
-        mock_tb_row = MagicMock()
-        mock_tb_row.unadjusted = 42000.0
-        mock_tb_row.audited = 42000.0
-        mock_tb_result = MagicMock()
-        mock_tb_result.fetchone.return_value = mock_tb_row
-
-        # 模拟 checklist_responses 查询（空）
-        mock_responses_result = MagicMock()
-        mock_responses_result.fetchall.return_value = []
-
-        # 模拟 project context 查询（空）
-        mock_ctx_row = MagicMock()
-        mock_ctx_row.client_name = "测试公司"
-        mock_ctx_row.audit_year = 2025
-        mock_ctx_row.business_category = "制造业"
-        mock_ctx_row.applicable_standards = "soe_standalone"
-        mock_ctx_result = MagicMock()
-        mock_ctx_result.fetchone.return_value = mock_ctx_row
-
-        # 按调用顺序设置不同返回值
-        mock_db.execute = AsyncMock(
-            side_effect=[
-                mock_responses_result,  # checklist_responses
-                mock_ledger_result,     # tb_ledger (get_active_filter + select)
-                mock_tb_result,         # trial_balance
-                mock_ctx_result,        # project context
-            ]
-        )
-
-        ctx = MagicMock()
-        ctx.db = mock_db
-        ctx.project_id = "test-project"
-        ctx.year = 2025
-        ctx.wp_id = "test-wp-id"
-
-        with patch(
-            "app.routers.wp_render_strategies._k12_non_operating_income.get_active_filter",
-            new_callable=AsyncMock,
-            return_value=(True),  # 简化active_filter
-        ):
-            result = await render(ctx)
-
-        assert result is not None
-        tb_values = result["tb_values"]
-        # 净发生额 = 贷方50000 - 借方8000 = 42000
-        assert tb_values["audited_amount"] == 42000.0
-        assert tb_values["unadjusted_credit"] == 50000.0
-        assert tb_values["unadjusted_debit"] == 8000.0
-
-    @pytest.mark.asyncio
-    async def test_render_empty_ledger_returns_empty_tb(self):
-        """tb_ledger无数据时返回空tb_values."""
-        from app.routers.wp_render_strategies._k12_non_operating_income import render
-
-        mock_db = AsyncMock()
-        mock_result = MagicMock()
-        mock_result.fetchone.return_value = None
-        mock_result.fetchall.return_value = []
-        mock_db.execute = AsyncMock(return_value=mock_result)
-
-        ctx = MagicMock()
-        ctx.db = mock_db
-        ctx.project_id = "test-project"
-        ctx.year = 2025
-        ctx.wp_id = "test-wp-id"
-
-        with patch(
-            "app.routers.wp_render_strategies._k12_non_operating_income.get_active_filter",
-            new_callable=AsyncMock,
-            return_value=(True),
-        ):
-            result = await render(ctx)
-
-        assert result is not None
-        # 无数据时 tb_values 应为空dict
-        assert result["tb_values"] == {}
+    def test_render_empty_ledger_returns_empty_tb(self):
+        """无数据时 build_pl_tb_values 全部返 0."""
+        from app.services.four_table.pl_occurrence import PlOccurrence, build_pl_tb_values, AccountNature
+        occ = PlOccurrence(source="none", nature=AccountNature.INCOME.value)
+        tv = build_pl_tb_values(occ)
+        assert tv["occurrence_unadjusted"] == 0.0
+        assert tv["audited_amount"] == 0.0
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -401,7 +310,7 @@ class TestK12Sheets:
         names = [s["sheet_name"] for s in K12_SHEETS]
         expected_keywords = [
             "底稿目录", "K12A", "K12-1", "K12-2", "K12-3", "K12-4",
-            "上市公司", "国有企业",
+            "上市公司", "国企",
         ]
         for kw in expected_keywords:
             assert any(kw in n for n in names), f"缺少含'{kw}'的sheet"

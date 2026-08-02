@@ -1,255 +1,148 @@
-"""K10 其他收益底稿 — 专属 HTML 渲染策略（损益类！取发生额）
+"""K10 其他收益 — 专属渲染策略.
 
-component_type = "k10-other-income"
-科目 6117 其他收益 — 损益类贷方科目，从 tb_ledger 取本期发生额（贷方发生-借方发生）。
+componentType: k10-other-income
 
-**损益类取数逻辑**：从tb_ledger取发生额（credit_amount/debit_amount），NOT 期末余额！
-净发生额 = 贷方发生(收益增加) - 借方发生(收益红冲/冲回)
+科目定位走报表映射规则链路（共享件 `four_table/report_line_accounts.py` +
+声明真源 `four_table/k_cycle_specs.py`）::
 
-6117其他收益为贷方科目：贷方=收益增加。
-与日常活动相关的政府补助→其他收益(6117)；与日常活动无关→营业外收入(6301,K12)。
+    报表行 IS-010（上市）/ IS-030（国企）「加：其他收益」
+      四准则一致：TB('6117','本期发生额')
 
-与K12(6301)同款损益类贷方科目处理逻辑（方向一致：贷-借）。
+🔴 **已修正：原实现的「净发生额 = 贷方 − 借方」在全年账上恒为 0**
+（收益类是反向写法，同样恒零；成因与逐行实证见
+`four_table/pl_occurrence.py` 模块 docstring）。
+原实现还从 `tb_ledger` 全表 SUM 取发生额 —— 序时账含年末结转损益分录，
+两侧同样相等，换表不解决问题。
+权威口径 = `trial_balance`，兜底取 `tb_balance.credit_amount`（贷方科目）。
 
-Spec: .kiro/specs/k10-other-income/
-Requirements: 1.6, 6.1
+🔴 **符号处理**：`trial_balance` 中 `6117` 在项目 `005a6f2d` 为 `-146,477.91`、
+在 `37814426` 为 `+15,712.56`（两种存储约定并存）。裁决依据取自报表语义：
+`IS-010 加：其他收益` 前置运算符是 `+` → 按 `normalize_for_report` 取绝对值，
+`raw_sign` 留证。
+
+**与 K7 递延收益的勾稽**：其他收益的主要来源是政府补助分摊
+（递延收益 2401 → 其他收益 6117），由 K10-4 政府补助核对表与
+K7-4 分摊测算表双向核对。
+
+**⚠️ `responses_key` 是 `allResponses` 而非 `responses_snapshot`** ——
+前端 `GtK10OtherIncome` 已在读该键，改键名会静默断链。
+
+spec: .kiro/specs/k-cycle-four-table-extraction-and-disclosure-completion/
+      Requirements 3.1~3.4, 1.1, 2.1~2.3 / Property 5, 6, 7
 """
+
 from __future__ import annotations
 
 import logging
 
 import sqlalchemy as sa
 
-from app.models.audit_platform_models import TbBalance, TbLedger
-from app.services.dataset_query import get_active_filter
+from app.services.four_table.k_cycle_specs import K_CYCLE_SPECS
+from app.services.four_table.pl_render import render_pl_cycle
 
 from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
 
-# 科目：6117其他收益（损益类/贷方=收益增加，借方=收益冲回/红冲）
-_K10_ACCOUNT_PREFIX = "6117"
+K10_SPEC = K_CYCLE_SPECS["K10"]
+
+#: 披露 sheet 名 = 源 xlsx 真实中文 tab 名（openpyxl 实测）。国企侧是「国企」。
+K10_DISCLOSURE_SHEET_LISTED = "附注披露信息（上市公司）"
+K10_DISCLOSURE_SHEET_SOE = "附注披露信息（国企）"
 
 K10_SHEETS = [
     {"sheet_name": "底稿目录", "component_type": "k10-other-income"},
-    {"sheet_name": "其他收益实质性程序表K10A", "component_type": "k10-other-income"},
+    {"sheet_name": "实质性程序表K10A", "component_type": "k10-other-income"},
     {"sheet_name": "审定表K10-1", "component_type": "k10-other-income"},
+    {"sheet_name": K10_DISCLOSURE_SHEET_LISTED, "component_type": "k10-other-income"},
+    {"sheet_name": K10_DISCLOSURE_SHEET_SOE, "component_type": "k10-other-income"},
     {"sheet_name": "明细表K10-2", "component_type": "k10-other-income"},
     {"sheet_name": "调整分录汇总K10-3", "component_type": "k10-other-income"},
     {"sheet_name": "政府补助核对表K10-4", "component_type": "k10-other-income"},
     {"sheet_name": "应收政府补助检查表K10-5", "component_type": "k10-other-income"},
     {"sheet_name": "其他收益检查表K10-6", "component_type": "k10-other-income"},
-    {"sheet_name": "附注披露信息（上市公司）", "component_type": "k10-other-income"},
-    {"sheet_name": "附注披露信息（国有企业）", "component_type": "k10-other-income"},
 ]
 
+K10_META = {
+    "sheet_count": len(K10_SHEETS),
+    "wp_code": "K10",
+    "special_rules": {
+        "income_statement": True,
+        "account_direction": "credit",  # 贷方科目！
+        "net_formula": "trial_balance 本期发生额（权威）/ tb_balance 贷方发生额（兜底）",
+        "source_table": "trial_balance + tb_balance 叶子",
+        "government_grant_crosscheck": "K7(2401 递延收益分摊)",
+        "vs_non_operating_income": "6301(K12)",  # 与日常活动无关的计入营业外收入
+    },
+}
 
-async def _fetch_tb_income_statement(ctx: RenderContext) -> dict:
-    """损益类6117：从tb_ledger取发生额（非期末余额！）.
 
-    6117其他收益为贷方科目：
-    - 贷方发生 = 收益增加（政府补助-即征即退/财政贴息/研发补助/稳岗补贴等）
-    - 借方发生 = 收益冲回/红冲
-    - 净发生额 = 贷方 - 借方（正数=净收益）
-    - 审定数 = 净发生额
+async def _load_k7_cross_check(ctx: RenderContext) -> dict:
+    """K10↔K7 交叉验证：递延收益（2401）本期减少额 ≈ 其他收益中的政府补助分摊。
 
-    **关键区别**：K10用tb_ledger取数（非tb_balance），方向为贷方科目(贷-借)。
-    与K12(6301)方向一致，与K13(6711借方科目，借-贷)方向相反。
+    从 `tb_balance` 取 `2401` 的借方发生额（递延收益减少 = 分摊进损益）。
+    仅供 K10-4 政府补助核对表参考展示，不做强约束（两者可能存在时间差异）。
+    fail-open：查不到返 `None`。
     """
-    tb: dict[str, float] = {}
-
-    # 从 tb_ledger 取贷方发生额/借方发生额汇总
-    try:
-        active_filter = await get_active_filter(
-            ctx.db, TbLedger.__table__, ctx.project_id, ctx.year
-        )
-        result = await ctx.db.execute(
-            sa.select(
-                sa.func.sum(TbLedger.debit_amount).label("total_debit"),
-                sa.func.sum(TbLedger.credit_amount).label("total_credit"),
-            ).where(
-                active_filter,
-                TbLedger.account_code.startswith(_K10_ACCOUNT_PREFIX),
-            )
-        )
-        row = result.fetchone()
-        if row and (row.total_debit is not None or row.total_credit is not None):
-            debit = float(row.total_debit or 0)
-            credit = float(row.total_credit or 0)
-            tb = {
-                "unadjusted_debit": debit,
-                "unadjusted_credit": credit,
-                # 6117贷方科目：净发生额=贷方-借方（收益类！）
-                "audited_amount": credit - debit,
-            }
-    except Exception as e:  # noqa: BLE001
-        logger.warning("K10 TB income statement fetch (tb_ledger) failed: %s", e)
-
-    # 补充：从 trial_balance 取未审数/审定数（如存在）
-    try:
-        result = await ctx.db.execute(
-            sa.text("""
-                SELECT SUM(unadjusted_amount) AS unadjusted, SUM(audited_amount) AS audited
-                FROM trial_balance
-                WHERE project_id = :pid AND year = :year AND is_deleted = false
-                  AND standard_account_code LIKE '6117%'
-            """),
-            {"pid": str(ctx.project_id), "year": ctx.year},
-        )
-        row = result.fetchone()
-        if row:
-            if row.unadjusted is not None:
-                tb["trial_balance_unadjusted"] = float(row.unadjusted)
-            if row.audited is not None:
-                tb["trial_balance_audited"] = float(row.audited)
-    except Exception as e:  # noqa: BLE001
-        logger.warning("K10 trial_balance fetch failed: %s", e)
-
-    return tb
-
-
-async def _build_adjudication_prefill(ctx: RenderContext) -> list[dict]:
-    """从 tb_balance 6117 明细子科目预填 K10-1 审定表行（损益贷方取发生额）.
-
-    6117 其他收益为贷方科目：净发生额 = 贷方 - 借方。
-    返回 [{name, unadjustedDebit, unadjustedCredit}]，前端在无持久化行时据此建行。
-    """
-    rows: list[dict] = []
-    try:
-        active_filter = await get_active_filter(
-            ctx.db, TbBalance.__table__, ctx.project_id, ctx.year
-        )
-        result = await ctx.db.execute(
-            sa.select(
-                TbBalance.account_code.label("code"),
-                TbBalance.account_name.label("name"),
-                sa.func.sum(TbBalance.debit_amount).label("debit"),
-                sa.func.sum(TbBalance.credit_amount).label("credit"),
-            )
-            .where(
-                active_filter,
-                TbBalance.account_code.startswith(_K10_ACCOUNT_PREFIX),
-                TbBalance.account_code != _K10_ACCOUNT_PREFIX,
-            )
-            .group_by(TbBalance.account_code, TbBalance.account_name)
-        )
-        raw = [
-            {
-                "code": (r.code or "").strip(),
-                "name": (r.name or "").strip(),
-                "debit": float(r.debit or 0),
-                "credit": float(r.credit or 0),
-            }
-            for r in result.fetchall()
-        ]
-        all_codes = [x["code"] for x in raw if x["code"]]
-
-        def _is_leaf(code: str) -> bool:
-            if not code:
-                return True
-            return not any(c != code and c.startswith(code) for c in all_codes)
-
-        leaves = [x for x in raw if _is_leaf(x["code"])]
-        leaves.sort(key=lambda x: x["credit"], reverse=True)
-        for x in leaves:
-            name = x["name"]
-            debit = x["debit"]
-            credit = x["credit"]
-            if not name or (abs(debit) < 0.005 and abs(credit) < 0.005):
-                continue
-            rows.append({
-                "name": name,
-                "unadjustedDebit": debit,
-                "unadjustedCredit": credit,
-            })
-    except Exception as e:  # noqa: BLE001
-        logger.warning("K10 adjudication prefill build failed: %s", e)
-    return rows
-
-
-async def _load_project_context(ctx: RenderContext) -> dict:
-    """加载项目上下文."""
-    project_ctx: dict = {}
-    try:
-        result = await ctx.db.execute(
-            sa.text("""
-                SELECT p.client_name, p.audit_year, p.business_category, p.applicable_standard_v2 AS applicable_standards
-                FROM working_paper wp
-                JOIN projects p ON wp.project_id = p.id
-                WHERE wp.id = :wp_id
-            """),
-            {"wp_id": str(ctx.wp_id)},
-        )
-        row = result.fetchone()
-        if row:
-            project_ctx["client_name"] = row.client_name or ""
-            project_ctx["audit_year"] = str(row.audit_year) if row.audit_year else ""
-            project_ctx["business_category"] = row.business_category or ""
-            project_ctx["applicable_standards"] = row.applicable_standards or ""
-    except Exception as e:  # noqa: BLE001
-        logger.warning("K10 project context load failed: %s", e)
-    return project_ctx
-
-
-async def render(ctx: RenderContext) -> dict | None:
-    """K10其他收益渲染策略：损益类取发生额（贷方科目！贷-借）.
-
-    核心特殊：
-    1. **损益类取发生额**非余额（从tb_ledger取数！）
-    2. **贷方科目**：净发生额=贷方-借方（与K12(6301)方向一致）
-    3. 政府补助核对（与K7递延收益分摊一致性校验）
-    4. K循环损益类底稿（10 sheets）
-    """
-    # 1. 加载 checklist_responses 快照（K10- 前缀项）
-    all_responses: dict[str, dict] = {}
     try:
         result = await ctx.db.execute(
             sa.text(
-                "SELECT item_id, conclusion, remark, wp_ref "
-                "FROM checklist_responses "
-                "WHERE wp_id = :wp_id AND item_id LIKE :pfx LIMIT 5000"
+                """
+                SELECT SUM(b.debit_amount) AS k7_amortization
+                FROM tb_balance b
+                JOIN ledger_datasets d ON d.id = b.dataset_id AND d.status = 'active'
+                WHERE b.project_id = :pid
+                  AND (b.account_code = '2401' OR b.account_code LIKE '2401.%')
+                """
             ),
-            {"wp_id": str(ctx.wp_id), "pfx": "K10-%"},
+            {"pid": str(ctx.project_id)},
         )
-        for row in result.fetchall():
-            all_responses[row.item_id] = {
-                "item_id": row.item_id,
-                "conclusion": row.conclusion or "",
-                "remark": row.remark or "",
-                "wp_ref": row.wp_ref or "",
-            }
+        row = result.fetchone()
+        if row and row.k7_amortization is not None:
+            return {"k7_deferred_income_amortization": float(row.k7_amortization)}
     except Exception as e:  # noqa: BLE001
-        logger.warning("K10 render responses load failed wp_id=%s: %s", ctx.wp_id, e)
+        logger.warning("K10: K7 交叉验证查询失败（fail-open）: %s", e)
+    return {"k7_deferred_income_amortization": None}
 
-    # 2. 获取TB数据（损益类！取发生额，从tb_ledger）
-    tb_values = await _fetch_tb_income_statement(ctx)
 
-    # 3. 加载项目上下文
-    project_context = await _load_project_context(ctx)
+async def _load_applicable_standards(ctx: RenderContext) -> dict:
+    """K10 额外需要 `applicable_standard_v2`（披露变体门控用）。失败返 ``{}``。"""
+    try:
+        result = await ctx.db.execute(
+            sa.text(
+                """
+                SELECT p.applicable_standard_v2 AS applicable_standards
+                FROM working_paper wp
+                JOIN projects p ON wp.project_id = p.id
+                WHERE wp.id = :wp_id
+                """
+            ),
+            {"wp_id": str(ctx.wp_id)},
+        )
+        row = result.fetchone()
+        if row is not None:
+            return {"applicable_standards": row.applicable_standards or ""}
+    except Exception as e:  # noqa: BLE001
+        logger.warning("K10 其他收益: applicable_standard_v2 加载失败: %s", e)
+    return {}
 
-    # 4. 审定表明细子科目预填（从 tb_balance 6117 明细取发生额）
-    adjudication_prefill = await _build_adjudication_prefill(ctx)
 
-    return {
-        "component_type": "k10-other-income",
-        "account_codes": ["6117"],
-        "income_statement": True,  # 标识损益类
-        "allResponses": all_responses,
-        "tb_values": tb_values,
-        "adjudication_prefill": adjudication_prefill,
-        "project_context": project_context,
-        "prefix": "K10",
-        "sheets": K10_SHEETS,
-        "meta": {
-            "sheet_count": 10,
-            "wp_code": "K10",
-            "special_rules": {
-                "income_statement": True,
-                "account_direction": "credit",  # 贷方科目！
-                "net_formula": "贷方发生-借方发生",
-                "source_table": "tb_ledger",  # 从tb_ledger取数（非tb_balance）
-                "grant_reconcile": True,  # 政府补助核对（与K7递延收益联动）
-                "vs_non_operating": "6301(K12)",  # 与日常活动无关计入营业外收入
-            },
-        },
-    }
+async def _load_extra_context(ctx: RenderContext) -> dict:
+    """K10 额外上下文：applicable_standards + K7 交叉验证。"""
+    extra: dict = {}
+    extra.update(await _load_applicable_standards(ctx))
+    extra.update(await _load_k7_cross_check(ctx))
+    return extra
+
+
+async def render(ctx: RenderContext) -> dict | None:
+    """K10 其他收益渲染策略：损益类取本期发生额（贷方科目）+ 取数溯源."""
+    return await render_pl_cycle(
+        ctx,
+        K10_SPEC,
+        component_type="k10-other-income",
+        sheets=K10_SHEETS,
+        meta=K10_META,
+        responses_key="allResponses",
+        extra_project_context=_load_extra_context,
+    )

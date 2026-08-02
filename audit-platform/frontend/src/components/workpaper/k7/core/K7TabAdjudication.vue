@@ -10,6 +10,13 @@
         <li><b>列报与披露：</b>递延收益及政府补助已恰当列报披露。</li>
       </ol>
     </el-alert>
+    <!-- 四表库取数溯源面板 -->
+    <WpFourTableSourcePanel
+      v-if="props.tbSourceCodes"
+      :source-codes="props.tbSourceCodes"
+      gross-label="递延收益"
+    />
+
 
     <!-- ═══ Section标题 + AI + 复核 ═══ -->
     <div class="section-header">
@@ -347,6 +354,7 @@
  * 科目：2401 递延收益（**贷方/负债类**）
  * ⚠️ 负债类！期末=期初+收到(贷方增加)-分摊(借方减少)
  */
+import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
 import { computed, inject, toRef, type Ref } from 'vue'
 import { MagicStick, CircleCheckFilled, WarningFilled, Download } from '@element-plus/icons-vue'
 import { ElMessageBox } from 'element-plus'
@@ -362,6 +370,7 @@ const props = defineProps<{
   tbData: { unadjusted2401: number; audited2401: number }
   prefill?: Array<Record<string, unknown>>
   isReadonly: boolean
+  tbSourceCodes?: Record<string, any> | null
 }>()
 
 // 父组件模板绑定会自动解包顶层 ref → 子组件收到纯 Map；重新包成 ref 供 composable 使用

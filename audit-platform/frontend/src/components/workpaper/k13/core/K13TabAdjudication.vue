@@ -10,6 +10,13 @@
         <li><b>分类与列报：</b>分类恰当、列报披露充分，关注税前扣除性（捐赠/罚款等）。</li>
       </ol>
     </el-alert>
+    <!-- 四表库取数溯源面板 -->
+    <WpFourTableSourcePanel
+      v-if="props.tbSourceCodes"
+      :source-codes="props.tbSourceCodes"
+      gross-label="营业外支出"
+    />
+
 
     <!-- ═══ 跨底稿引用（GtIndexChip：K13-1 → TB） ═══ -->
     <div class="cross-ref-bar">
@@ -371,6 +378,7 @@
  * Spec: .kiro/specs/k13-non-operating-expense/ Task 4.2
  * Requirements: 2.1-2.7
  */
+import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
 import { ref, inject, defineAsyncComponent, watch, toRef, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, Download } from '@element-plus/icons-vue'
@@ -393,7 +401,8 @@ const props = defineProps<{
   allResponses: Map<string, any>
   tbData: { unadjusted6711: number; audited6711: number }
   isReadonly: boolean
-  prefill?: Array<{ name: string; unadjustedDebit: number; unadjustedCredit: number }>
+  prefill?: Array<{ name: string; unadjustedDebit: number; unadjustedCredit: number   tbSourceCodes?: Record<string, any> | null
+}>
 }>()
 
 const emit = defineEmits<{

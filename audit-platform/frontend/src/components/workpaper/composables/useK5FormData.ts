@@ -8,7 +8,7 @@
  * 职责：
  * - selfLoad(): bundle内嵌场景从 render-config 加载上下文 + checklist_responses
  * - loadTbData(): 从 trial_balance 获取科目 2701 未审/审定数据
- * - writebackTB2701(): 审定数回写 trial_balance(2701) + EventBus 'substantive:adjudicated'
+ * - writebackTB(): 审定数回写 trial_balance(2701) + EventBus 'substantive:adjudicated'
  * - checklist_responses 持久化: GET/PUT /api/workpapers/:wpId/checklist-responses
  * - item_id 命名: 前缀 "K5-{sheet}-{field}"（如 "K5-1-audited-total", "K5-2-detail-row-1"）
  * - debounce/即时保存: 文本字段 debounce 2s，枚举/结论即时保存
@@ -24,6 +24,12 @@ import { useChecklistPersistence } from '@/composables/workpaper/useChecklistPer
 import { decodeRemark } from '@/composables/workpaper/remarkCodec'
 import { collectK5Responses, toK5PersistencePatch } from '../k5/k5Persistence'
 import { eventBus } from '@/utils/eventBus'
+import {
+  K5_ACCOUNT_NAME,
+  k5AccountCode,
+  k5QueryCodes,
+  type K5TbSourceCodes,
+} from './k5AccountScope'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -34,17 +40,15 @@ export interface ChecklistItem {
 }
 
 export interface K5TbData {
-  /** 2701预计负债 未审数 */
-  unadjusted2701: number
-  /** 2701预计负债 审定数 */
-  audited2701: number
+  /** 预计负债未审数（科目由报表行 BS-068/BS-094 映射解析） */
+  unadjusted: number
+  /** 预计负债审定数 */
+  audited: number
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const DEBOUNCE_MS = 2000
-/** 科目：2701 预计负债（贷方/负债类） */
-const ACCOUNT_CODE_2701 = '2701'
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -66,7 +70,7 @@ export function useK5FormData(params: {
     debounceMs: DEBOUNCE_MS,
   })
   const allResponses = persistence.responses
-  const tbData = ref<K5TbData>({ unadjusted2701: 0, audited2701: 0 })
+  const tbData = ref<K5TbData>({ unadjusted: 0, audited: 0 })
   const renderMeta = ref<Record<string, any>>({})
 
   // ─── selfLoad ──────────────────────────────────────────────────────────────
@@ -120,31 +124,46 @@ export function useK5FormData(params: {
     }
   }
 
-  // ─── loadTbData: 从 trial_balance 获取 2701 数据 ───────────────────────────
+  // ─── 科目定位（单一真源） ──────────────────────────────────────────────────
+
+  /** render 下发的取数溯源（报表映射解析结果）。缺失时 scope 函数自动兜底。 */
+  const tbSourceCodes = computed<K5TbSourceCodes | null>(
+    () => (renderMeta.value?.tb_source_codes as K5TbSourceCodes | undefined) ?? null,
+  )
+
+  /** 本项目实际使用的科目码（`trial_balance` 标准码口径），供回写与 EventBus 用。 */
+  const accountCode = computed(() => k5AccountCode(tbSourceCodes.value))
+
+  // ─── loadTbData: 从 trial_balance 取预计负债数据 ────────────────────────────
 
   /**
-   * 从 trial_balance 获取科目 2701 的未审数和审定数。
+   * 从 trial_balance 获取预计负债的未审数和审定数。
    * 优先从 renderMeta seed 读取，否则请求 TB 端点。
    *
-   * 科目：2701 预计负债（贷方/负债类）
+   * 🔴 科目由报表行 `BS-068`（上市）/ `BS-094`（国企）映射解析，兜底 `2801`。
+   * 历史实现写死 `2701` = **长期应付款**（L5 科目），取到的是别的循环的余额。
    */
   async function loadTbData(): Promise<void> {
     if (!projectId.value) return
 
-    // 优先从 render-config seed 取值
-    const seededUnadj = renderMeta.value?.tb_values?.provisions_2701_unadjusted
-    const seededAudited = renderMeta.value?.tb_values?.provisions_2701_audited
+    // 优先从 render-config seed 取值（键名不含科目码，见后端 `_KEY`）
+    // 旧键兼容：一个月后可删 `provisions_2701_*` fallback
+    const seededUnadj = renderMeta.value?.tb_values?.provisions_unadjusted
+      ?? renderMeta.value?.tb_values?.provisions_2701_unadjusted
+    const seededAudited = renderMeta.value?.tb_values?.provisions_audited
+      ?? renderMeta.value?.tb_values?.provisions_2701_audited
     if (seededUnadj != null) {
       tbData.value = {
-        unadjusted2701: Number(seededUnadj) || 0,
-        audited2701: Number(seededAudited) || 0,
+        unadjusted: Number(seededUnadj) || 0,
+        audited: Number(seededAudited) || 0,
       }
       return
     }
 
+    const codes = k5QueryCodes(tbSourceCodes.value)
     try {
       const res = await api.get(`/api/projects/${projectId.value}/trial-balance`, {
-        params: { account_prefix: '2701', year: year.value },
+        params: { account_prefix: codes[0], year: year.value },
         _silent: true,
       } as any)
       const list: any[] = Array.isArray(res?.data ?? res) ? (res?.data ?? res) : (res?.data?.items ?? [])
@@ -155,53 +174,54 @@ export function useK5FormData(params: {
 
       for (const item of list) {
         const code = String(item.standard_account_code ?? item.account_code ?? '')
-        if (code.startsWith(ACCOUNT_CODE_2701)) {
-          unadjusted += Number(item.unadjusted_amount ?? 0)
-          audited += Number(item.audited_amount ?? 0)
-          found = true
-        }
+        if (!codes.some((c) => code === c || code.startsWith(c))) continue
+        unadjusted += Number(item.unadjusted_amount ?? 0)
+        audited += Number(item.audited_amount ?? 0)
+        found = true
       }
 
-      tbData.value = { unadjusted2701: unadjusted, audited2701: audited }
+      tbData.value = { unadjusted, audited }
 
       if (!found) {
-        ElMessage.warning('科目2701预计负债未在试算表中找到，请先导入试算表')
+        ElMessage.warning(`科目${codes.join('/')}（${K5_ACCOUNT_NAME}）未在试算表中找到，请先导入试算表`)
       }
     } catch {
-      tbData.value = { unadjusted2701: 0, audited2701: 0 }
+      tbData.value = { unadjusted: 0, audited: 0 }
     }
   }
 
-  // ─── writebackTB2701（2701 预计负债 负债口径） ──────────────────────────────
+  // ─── writebackTB（预计负债 负债口径） ───────────────────────────────────────
 
   /**
-   * 审定数回写 trial_balance：科目2701预计负债（贷方/负债类）。
+   * 审定数回写 trial_balance。
    * 回写成功后发布 EventBus 'substantive:adjudicated' 通知附注刷新。
    *
-   * ⚠️ 负债类2701！正数口径回写（v2 trial_balance 正数，无需取反）。
-   * 负债类方向：期末=期初+计提-转销
+   * 🔴 科目码取自 {@link k5AccountCode}（报表映射解析结果，兜底 `2801`）。
+   * 历史实现写死 `2701` → 把**预计负债审定数写进长期应付款**，污染 L5 的
+   * `trial_balance` 口径。这不是显示问题，是数据污染。
    *
-   * Req 2.7: WHEN 审定数变化时 SHALL 回写trial_balance(2701)+发布'substantive:adjudicated'
+   * ⚠️ 负债类！正数口径回写（v2 trial_balance 正数，无需取反）。
+   * 负债类方向：期末=期初+计提-转销
    */
-  async function writebackTB2701(auditedAmount: number): Promise<void> {
+  async function writebackTB(auditedAmount: number): Promise<void> {
     if (!projectId.value) return
     isSaving.value = true
     try {
       await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: ACCOUNT_CODE_2701,
+        account_code: accountCode.value,
         audited_amount: auditedAmount,
       })
 
       // EventBus publish 'substantive:adjudicated'
       eventBus.emit('substantive:adjudicated', {
-        accountCode: ACCOUNT_CODE_2701,
+        accountCode: accountCode.value,
         auditedAmount,
         wpCode: 'K5',
         timestamp: Date.now(),
       })
 
       // 同步更新本地 tbData
-      tbData.value.audited2701 = auditedAmount
+      tbData.value.audited = auditedAmount
     } catch {
       ElMessage.warning('审定数回写失败，请手动确认试算表数据')
     } finally {
@@ -279,11 +299,11 @@ export function useK5FormData(params: {
    * 外部设置 TB 值（从 render 策略 seed 或组件 watch 调用）。
    */
   function setTbValues(values: Partial<K5TbData>): void {
-    if (values.unadjusted2701 != null) {
-      tbData.value.unadjusted2701 = values.unadjusted2701
+    if (values.unadjusted != null) {
+      tbData.value.unadjusted = values.unadjusted
     }
-    if (values.audited2701 != null) {
-      tbData.value.audited2701 = values.audited2701
+    if (values.audited != null) {
+      tbData.value.audited = values.audited
     }
   }
 
@@ -303,7 +323,7 @@ export function useK5FormData(params: {
     saveResponse,
     saveResponses,
     getResponse,
-    writebackTB2701,
+    writebackTB,
     loadTbData,
     // Extras
     debouncedSave,

@@ -67,10 +67,10 @@ class TestK8RenderStrategy:
         assert callable(render)
 
     def test_k8_account_prefix(self):
-        """科目前缀为 6601（损益类/销售费用）."""
-        from app.routers.wp_render_strategies._k8_selling_expenses import _K8_ACCOUNT_PREFIX
+        """科目前缀为 6601（损益类/销售费用），从声明真源取。"""
+        from app.services.four_table.k_cycle_specs import K_CYCLE_SPECS
 
-        assert _K8_ACCOUNT_PREFIX == "6601"
+        assert K_CYCLE_SPECS["K8"].fallback_standard == "6601"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -111,7 +111,8 @@ class TestK8Sheets:
             "K8-7",
             "K8-8",
             "上市公司",
-            "国有企业",
+            # 🔴 源 xlsx tab 名是「国企」而非「国有企业」（openpyxl 实测 wb.sheetnames）
+            "国企",
         ]
         for kw in expected_keywords:
             assert any(kw in n for n in names), f"缺少含'{kw}'的sheet"

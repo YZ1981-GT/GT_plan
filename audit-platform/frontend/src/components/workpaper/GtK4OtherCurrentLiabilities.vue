@@ -72,7 +72,8 @@
           :prefill="adjudicationPrefill"
           :is-readonly="isReadonly"
           @save="handleChildSave"
-          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
+          @navigate-sheet="(s: string) =          :tb-source-codes="tbSourceCodes"
+        > emit('navigate-sheet', s)"
         />
 
         <!-- K4-2 明细表 -->
@@ -152,7 +153,7 @@
  * selfLoad: 当 htmlData prop 为 null 时自行调 render-config。
  * checklist_responses 前缀: "K4-{sheet}-{field}"
  *
- * 科目：2245其他流动负债（贷方/负债类）
+ * 科目由报表行 BS-058/BS-081 映射解析（三表零命中 → 宁缺勿造）
  * 核心：期末=期初+贷方-借方（负债类！方向与资产类相反）
  *       完整性认定为主
  *
@@ -162,6 +163,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, inject, defineAsyncComponent, toRef, provide } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
+import { k4QueryCodes } from './composables/k4AccountScope'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useChecklistPersistence } from '@/composables/workpaper/useChecklistPersistence'
 import { collectChecklistResponses, toChecklistPatch } from '@/composables/workpaper/checklistPersistenceHelpers'
@@ -208,8 +210,8 @@ const persistence = useChecklistPersistence({ wpId: wpIdRef, projectId: projectI
 const allResponses = persistence.responses
 const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
 const tbData = ref({
-  unadjusted2245: 0,
-  audited2245: 0,
+  unadjusted: 0,
+  audited: 0,
 })
 
 /** K4-1 审定表明细子科目预填（来自后端 render adjudication_prefill） */
@@ -217,16 +219,20 @@ const adjudicationPrefill = computed(() =>
   Array.isArray(props.htmlData?.adjudication_prefill) ? props.htmlData.adjudication_prefill : []
 )
 
+/** 四表取数溯源（render 下发，供审定表 Tab 展示来源科目与报表行） */
+const tbSourceCodes = computed(() => props.htmlData?.tb_source_codes ?? null)
+
+
 // ─── 全局告警区（跨sheet汇总） ──────────────────────────────────────────────
 const globalAlerts = computed(() => {
   const alerts: Array<{ type: 'warning' | 'error' | 'info' | 'success'; message: string }> = []
 
   // K4-1 审定合计 vs TB(2245)
   const k41Audited = getResponseNum('K4-1-audited-total')
-  if (k41Audited > 0 && tbData.value.audited2245 > 0) {
-    const diff = Math.abs(k41Audited - tbData.value.audited2245)
+  if (k41Audited > 0 && tbData.value.audited > 0) {
+    const diff = Math.abs(k41Audited - tbData.value.audited)
     if (diff > 1) {
-      alerts.push({ type: 'warning', message: `K4-1 审定合计（${fmtAmtGlobal(k41Audited)}）与 TB 2245 审定数（${fmtAmtGlobal(tbData.value.audited2245)}）差异 ${fmtAmtGlobal(diff)} 元` })
+      alerts.push({ type: 'warning', message: `K4-1 审定合计（${fmtAmtGlobal(k41Audited)}）与 TB 审定数（其他流动负债）（${fmtAmtGlobal(tbData.value.audited)}）差异 ${fmtAmtGlobal(diff)} 元` })
     }
   }
 
@@ -346,25 +352,25 @@ async function handleChildSave(itemId: string, value: unknown): Promise<void> {
   }
 }
 
-// ─── TB自动取数（2245其他流动负债） ─────────────────────────────────────────────
+// ─── TB自动取数（其他流动负债，宁缺勿造 → 优先从 render seed 取） ─────────────────────────────────────────────
 async function _loadTbData(): Promise<void> {
   if (!props.projectId) return
   try {
     const res = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
-      params: { account_prefix: '2245', year: props.year },
+      params: { account_prefix: k4QueryCodes((props.htmlData as any)?.tb_source_codes)[0] || '', year: props.year },
       _silent: true,
     } as any)
     const list: any[] = Array.isArray(res?.data?.data ?? res?.data) ? (res?.data?.data ?? res?.data) : []
-    let u2245 = 0, a2245 = 0
+    let uVal = 0, aVal = 0
     for (const item of list) {
       const code = String(item.standard_account_code ?? item.account_code ?? '')
-      if (code.startsWith('2245')) {
-        u2245 += Number(item.unadjusted_amount ?? 0)
-        a2245 += Number(item.audited_amount ?? 0)
+      if (k4Codes.some((c: string) => code === c || code.startsWith(c + '.'))) {
+        uVal += Number(item.unadjusted_amount ?? 0)
+        aVal += Number(item.audited_amount ?? 0)
       }
     }
-    tbData.value.unadjusted2245 = u2245
-    tbData.value.audited2245 = a2245
+    tbData.value.unadjusted = u2245
+    tbData.value.audited = a2245
   } catch {
     // TB取数失败静默处理
   }

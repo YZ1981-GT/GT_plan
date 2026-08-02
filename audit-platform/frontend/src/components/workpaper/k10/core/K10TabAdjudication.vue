@@ -10,6 +10,13 @@
         <li><b>分类与列报：</b>已记录于恰当账户并按 CAS16 恰当列报披露。</li>
       </ol>
     </el-alert>
+    <!-- 四表库取数溯源面板 -->
+    <WpFourTableSourcePanel
+      v-if="props.tbSourceCodes"
+      :source-codes="props.tbSourceCodes"
+      gross-label="其他收益"
+    />
+
 
     <!-- ═══ 蓝色渐变引导区 ═══ -->
     <div class="k10-guide">
@@ -356,6 +363,7 @@
  * - 底部：审计说明 + 结论 + 复核入口
  * - 每个section AI辅助按钮
  */
+import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
 import { computed, inject, toRef, defineAsyncComponent } from 'vue'
 import { InfoFilled, MagicStick, Download } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -376,7 +384,8 @@ const props = defineProps<{
   allResponses: Map<string, any>
   tbData?: { unadjusted6117: number; audited6117: number }
   isReadonly: boolean
-  prefill?: Array<{ name: string; unadjustedDebit: number; unadjustedCredit: number }>
+  prefill?: Array<{ name: string; unadjustedDebit: number; unadjustedCredit: number   tbSourceCodes?: Record<string, any> | null
+}>
 }>()
 
 const emit = defineEmits<{

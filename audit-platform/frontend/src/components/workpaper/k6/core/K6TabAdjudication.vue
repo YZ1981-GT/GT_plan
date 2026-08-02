@@ -3,7 +3,7 @@
     <!-- ═══ 方法论上下文（琥珀色左边线+浅黄背景） ═══ -->
     <div class="methodology-context">
       <p><strong>CAS42 持有待售</strong>：持有待售资产按账面价值与公允价值减去出售费用后的净额孰低计量。
-        资产科目1481（借方）期末=期初+增加-减少-减值；负债科目2605（贷方）期末=期初+增加-减少。
+        持有待售资产（借方）期末=期初+增加-减少-减值；持有待售负债（贷方）期末=期初+增加-减少。
         审定数=未审数+AJE+RJE。三角勾稽要求期末(公式)与审定数一致或差异合理。</p>
     </div>
 
@@ -17,8 +17,15 @@
         <li><b>列报与披露：</b>持有待售分类、计量及终止经营已按 CAS42 恰当列报披露。</li>
       </ol>
     </el-alert>
+    <!-- 四表库取数溯源面板 -->
+    <WpFourTableSourcePanel
+      v-if="props.tbSourceCodes"
+      :source-codes="props.tbSourceCodes"
+      gross-label="持有待售资产和负债"
+    />
 
-    <!-- ═══ 持有待售资产区块（1481，借方/资产类） ═══ -->
+
+    <!-- ═══ 持有待售资产区块（CAS42 列报重分类，借方/资产类） ═══ -->
     <div v-for="section in adjudicationSections" :key="section.sectionKey" class="adj-section">
       <div class="section-header">
         <h4 class="section-title">{{ section.sectionLabel }}</h4>
@@ -202,7 +209,7 @@
         @click="handleWritebackTB"
       >
         <el-icon><Upload /></el-icon>
-        审定数回写TB（1481资产 + 2605负债）
+        审定数回写TB（持有待售资产 + 负债）
       </el-button>
       <el-button
         size="small"
@@ -213,11 +220,11 @@
       >
         从K6-3带入AJE/RJE
       </el-button>
-      <el-button size="small" type="warning" plain :disabled="isReadonly" :loading="assetAdjPull.loading.value" @click="openAssetBringIn">
-        <el-icon><Download /></el-icon> 带入调整(资产1481)
+      <el-button size="small" type="warning" plain :disabled="isReadonly || !k6AssetPrefix" :loading="assetAdjPull.loading.value" @click="openAssetBringIn">
+        <el-icon><Download /></el-icon> 带入调整(资产)
       </el-button>
-      <el-button size="small" type="warning" plain :disabled="isReadonly" :loading="liabAdjPull.loading.value" @click="openLiabBringIn">
-        <el-icon><Download /></el-icon> 带入调整(负债2605)
+      <el-button size="small" type="warning" plain :disabled="isReadonly || !k6LiabPrefix" :loading="liabAdjPull.loading.value" @click="openLiabBringIn">
+        <el-icon><Download /></el-icon> 带入调整(负债)
       </el-button>
       <span class="tb-hint">
         资产审定合计: {{ fmtAmt(getAssetAuditedTotal()) }} |
@@ -234,7 +241,7 @@
       style="margin-bottom:12px"
     >
       <template #title>
-        已从试算平衡表获取：资产(1481)未审 {{ fmtAmt(props.tbData.unadjustedAsset) }}，负债(2605)未审 {{ fmtAmt(props.tbData.unadjustedLiability) }}。
+        已从试算平衡表获取：资产未审 {{ fmtAmt(props.tbData.unadjustedAsset) }}，负债未审 {{ fmtAmt(props.tbData.unadjustedLiability) }}。
         <el-button size="small" type="primary" link @click="seedFromTb">一键填入未审数</el-button>
       </template>
     </el-alert>
@@ -287,13 +294,13 @@
     <details class="k6-details-tip">
       <summary>编制提示</summary>
       <ul>
-        <li><strong>资产区块(1481)</strong>：期末 = 期初 + 增加 − 减少 − 减值（借方/资产类）</li>
-        <li><strong>负债区块(2605)</strong>：期末 = 期初 + 增加 − 减少（贷方/负债类）</li>
+        <li><strong>持有待售资产区块</strong>：期末 = 期初 + 增加 − 减少 − 减值（借方/资产类）</li>
+        <li><strong>持有待售负债区块</strong>：期末 = 期初 + 增加 − 减少（贷方/负债类）</li>
         <li>审定数 = 未审数 + AJE + RJE</li>
         <li>三角勾稽：期末(公式) 应与 审定数 一致或差异合理</li>
         <li>减值列仅资产区块使用（CAS42孰低法）</li>
-        <li>回写TB分别写入1481(资产)和2605(负债)</li>
-        <li>「带入调整」：资产(1481)/负债(2605)各按科目拉取调整分录，逐笔选目标行累加到 AJE/RJE，带入后自动联动披露/附注</li>
+        <li>回写TB分别写入持有待售资产和负债科目</li>
+        <li>「带入调整」：资产/负债各按科目拉取调整分录，逐笔选目标行累加到 AJE/RJE，带入后自动联动披露/附注</li>
       </ul>
     </details>
 
@@ -301,7 +308,7 @@
       v-model="assetBringInVisible"
       :matches="assetAdjPull.matches.value"
       :row-options="assetBringInRowOptions"
-      subject-label="1481 持有待售资产"
+      subject-label="持有待售资产"
       :loading="assetAdjPull.loading.value"
       @apply="onAssetBringInApply"
     />
@@ -309,7 +316,7 @@
       v-model="liabBringInVisible"
       :matches="liabAdjPull.matches.value"
       :row-options="liabBringInRowOptions"
-      subject-label="2605 持有待售负债"
+      subject-label="持有待售负债"
       :loading="liabAdjPull.loading.value"
       @apply="onLiabBringInApply"
     />
@@ -324,7 +331,7 @@
  * Requirements: 2.1-2.8
  *
  * 功能：
- * - 双区块el-table：持有待售资产(1481借方) + 持有待售负债(2605贷方)
+ * - 双区块el-table：持有待售资产(借方) + 持有待售负债(贷方)
  * - 资产类期末=期初+增加-减少-减值；负债类期末=期初+增加-减少
  * - 审定数=未审+AJE+RJE
  * - 三角勾稽红色高亮（reconciliation.isBalanced → red text）
@@ -334,6 +341,8 @@
  * - AI按钮 section标题右侧
  * - 方法论上下文(琥珀色左边线+浅黄背景)
  */
+import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
+import { k6QueryCodes, K6_FALLBACK_STANDARD } from '../../composables/k6AccountScope'
 import { ref, computed, inject, toRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import { MagicStick, View, Upload, QuestionFilled, Download } from '@element-plus/icons-vue'
@@ -349,6 +358,7 @@ const props = defineProps<{
   allResponses: Map<string, any>
   tbData: { unadjustedAsset: number; auditedAsset: number; unadjustedLiability: number; auditedLiability: number }
   isReadonly: boolean
+  tbSourceCodes?: Record<string, any> | null
 }>()
 
 const emit = defineEmits<{
@@ -356,6 +366,9 @@ const emit = defineEmits<{
   (e: 'navigate-sheet', sheetName: string): void
 }>()
 
+// 科目码从 scope 取（K6 是宁缺勿造循环，三表零命中时返回空串 → 带入调整按钮禁用）
+const k6AssetPrefix = computed(() => k6QueryCodes(props.tbSourceCodes)[0] || '')
+const k6LiabPrefix = computed(() => k6QueryCodes(props.tbSourceCodes?.liability)[0] || '')
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 const writebackTBFn = inject<(asset: number, liability: number) => Promise<void>>('k6WritebackTB', async () => {})
 const allResponsesRef = computed(() => props.allResponses)
@@ -379,7 +392,7 @@ const {
 
 const publishing = ref(false)
 
-// ─── 从集中登记带入调整（K6 双科目：资产1481借方 + 负债2605贷方，两独立流） ─────
+// ─── 从集中登记带入调整（K6 双科目：资产借方 + 负债贷方，科目由 k6AccountScope 提供） ─────
 const assetSectionRows = computed(() => adjudicationSections.value.find(s => s.sectionKey === 'asset')?.rows ?? [])
 const liabSectionRows = computed(() => adjudicationSections.value.find(s => s.sectionKey === 'liability')?.rows ?? [])
 
@@ -392,11 +405,11 @@ const {
 } = useAdjudicationBringIn({
   projectId: toRef(props, 'projectId') as any,
   year: useAuditContext().year as any,
-  subjectPrefix: '1481',
+  subjectPrefix: k6AssetPrefix,
   direction: 'debit', // 持有待售资产（借方）：净发生额 = 借 − 贷
-  subjectCode: '1481',
+  subjectCode: k6AssetPrefix,
   wpCode: 'K6',
-  subjectLabel: '持有待售资产(1481)',
+  subjectLabel: '持有待售资产',
   rows: computed(() => assetSectionRows.value.map(r => ({ rowKey: r.rowKey, name: r.label, aje: r.aje, rje: r.rje }))),
   updateCell: (rowKey: string, field: any, value: number) => onFieldChange('asset', rowKey, field, value),
   totalAudited: () => getAssetAuditedTotal(),
@@ -411,11 +424,11 @@ const {
 } = useAdjudicationBringIn({
   projectId: toRef(props, 'projectId') as any,
   year: useAuditContext().year as any,
-  subjectPrefix: '2605',
+  subjectPrefix: k6LiabPrefix,
   direction: 'credit', // 持有待售负债（贷方）：净发生额 = 贷 − 借
-  subjectCode: '2605',
+  subjectCode: k6LiabPrefix,
   wpCode: 'K6',
-  subjectLabel: '持有待售负债(2605)',
+  subjectLabel: '持有待售负债',
   rows: computed(() => liabSectionRows.value.map(r => ({ rowKey: r.rowKey, name: r.label, aje: r.aje, rje: r.rje }))),
   updateCell: (rowKey: string, field: any, value: number) => onFieldChange('liability', rowKey, field, value),
   totalAudited: () => getLiabilityAuditedTotal(),
@@ -476,6 +489,10 @@ function saveConclusion() {
 // ─── TB回写 ─────────────────────────────────────────────────────────────────
 
 async function handleWritebackTB() {
+  if (!k6AssetPrefix.value && !k6LiabPrefix.value) {
+    // 宁缺勿造：无科目时不写库（三表零命中）
+    return
+  }
   publishing.value = true
   try {
     const assetAudited = getAssetAuditedTotal()
@@ -487,7 +504,7 @@ async function handleWritebackTB() {
     emit('save', 'K6-1-audited-liability', { remark: String(liabilityAudited) })
     // 同步减值合计（供K6-5交叉验证）
     persistImpairmentTotal()
-    ElMessage.success(`审定数已回写TB：资产(1481)=${fmtAmt(assetAudited)}，负债(2605)=${fmtAmt(liabilityAudited)}`)
+    ElMessage.success(`审定数已回写TB：资产=${fmtAmt(assetAudited)}，负债=${fmtAmt(liabilityAudited)}`)
   } catch {
     ElMessage.error('TB回写失败')
   } finally {

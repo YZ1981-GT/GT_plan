@@ -58,7 +58,8 @@
           :prefill="adjudicationPrefill"
           :is-readonly="isReadonly"
           @save="handleChildSave"
-          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
+          @navigate-sheet="(s: string) =          :tb-source-codes="tbSourceCodes"
+        > emit('navigate-sheet', s)"
         />
 
         <!-- K5-2 明细表 -->
@@ -184,6 +185,7 @@
 import { ref, computed, inject, onMounted, defineAsyncComponent, toRef, provide } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
+import { k5QueryCodes } from './composables/k5AccountScope'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useChecklistPersistence } from '@/composables/workpaper/useChecklistPersistence'
 import {
@@ -238,8 +240,8 @@ const persistence = useChecklistPersistence({
 const allResponses = persistence.responses
 const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
 const tbData = ref({
-  unadjusted2701: 0,
-  audited2701: 0,
+  unadjusted: 0,
+  audited: 0,
 })
 
 /** K5-1 审定表明细子科目预填（来自后端 render adjudication_prefill） */
@@ -342,25 +344,42 @@ async function handleChildSave(itemId: string, value: unknown): Promise<void> {
   }
 }
 
-// ─── TB自动取数（2701预计负债） ─────────────────────────────────────────────────
+// ─── TB自动取数（预计负债） ────────────────────────────────────────────────────
+/**
+ * 🔴 科目码取自 `k5AccountScope`（报表行 BS-068/BS-094 映射解析，兜底 2801）。
+ * 历史实现写死 `2701` = 长期应付款（L5 科目）→ 取到别的循环的余额当预计负债显示。
+ *
+ * render 已下发 `tb_values.provisions_*`，本函数只在 seed 缺失时兜底请求。
+ */
+/** 四表取数溯源 */
+const tbSourceCodes = computed(() => (props.htmlData as any)?.tb_source_codes ?? null)
+
 async function _loadTbData(): Promise<void> {
   if (!props.projectId) return
+
+  const seededUnadj = (props.htmlData as any)?.tb_values?.provisions_unadjusted
+  if (seededUnadj != null) {
+    tbData.value.unadjusted = Number(seededUnadj) || 0
+    tbData.value.audited = Number((props.htmlData as any)?.tb_values?.provisions_audited ?? 0) || 0
+    return
+  }
+
+  const codes = k5QueryCodes((props.htmlData as any)?.tb_source_codes)
   try {
     const res = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
-      params: { account_prefix: '2701', year: props.year },
+      params: { account_prefix: codes[0], year: props.year },
       _silent: true,
     } as any)
     const list: any[] = Array.isArray(res?.data?.data ?? res?.data) ? (res?.data?.data ?? res?.data) : []
-    let u2701 = 0, a2701 = 0
+    let uProvision = 0, aProvision = 0
     for (const item of list) {
       const code = String(item.standard_account_code ?? item.account_code ?? '')
-      if (code.startsWith('2701')) {
-        u2701 += Number(item.unadjusted_amount ?? 0)
-        a2701 += Number(item.audited_amount ?? 0)
-      }
+      if (!codes.some((c) => code === c || code.startsWith(c))) continue
+      uProvision += Number(item.unadjusted_amount ?? 0)
+      aProvision += Number(item.audited_amount ?? 0)
     }
-    tbData.value.unadjusted2701 = u2701
-    tbData.value.audited2701 = a2701
+    tbData.value.unadjusted = uProvision
+    tbData.value.audited = aProvision
   } catch {
     // TB取数失败静默处理
   }

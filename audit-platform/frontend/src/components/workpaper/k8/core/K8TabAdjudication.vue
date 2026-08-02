@@ -11,6 +11,13 @@
         <li><b>分类：</b>销售费用已记录于恰当账户并恰当列报。</li>
       </ol>
     </el-alert>
+    <!-- 四表库取数溯源面板 -->
+    <WpFourTableSourcePanel
+      v-if="props.tbSourceCodes"
+      :source-codes="props.tbSourceCodes"
+      gross-label="销售费用"
+    />
+
 
     <!-- ═══ Section标题 + AI + 复核 ═══ -->
     <div class="section-header">
@@ -319,6 +326,7 @@
  * Spec: .kiro/specs/k8-selling-expenses/ | Task: 4.2
  * Requirements: 2.1-2.7
  */
+import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
 import { computed, inject, toRef, defineAsyncComponent, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, CircleCheckFilled, WarningFilled, ChatDotSquare, Download } from '@element-plus/icons-vue'
@@ -336,7 +344,8 @@ const props = defineProps<{
   allResponses: Map<string, any>
   tbData: { unadjusted6601: number; audited6601: number }
   isReadonly: boolean
-  prefill?: Array<{ name: string; unadjustedDebit: number; unadjustedCredit: number }>
+  prefill?: Array<{ name: string; unadjustedDebit: number; unadjustedCredit: number   tbSourceCodes?: Record<string, any> | null
+}>
 }>()
 
 // 父组件模板绑定会自动解包 ref → 子组件收到纯 Map；重新包成 ref 供 composable 使用

@@ -1,54 +1,11 @@
+import { legacyCalcIncomeStatementOccurrence } from './shared/plAdjudicationModel'
 /**
- * K13 营业外支出 — 公式引擎（纯函数，无副作用）
- * 科目：6711营业外支出（**损益类/借方科目**）
- * 核心特征：取发生额非余额！支出类发生额 = 借方发生 - 贷方发生(红冲)
- *   - 6711为借方科目：借方=支出增加，贷方=支出冲回/红冲
- *   - 与K12(6301营业外收入贷方)方向相反！
- *     K12: 净额 = 贷方 - 借方（贷方科目，收入增加）
- *     K13: 净额 = 借方 - 贷方（借方科目，支出增加）
- *   - TB回写发生额而非期末余额
- *   - 注意：损益类没有"期末余额"概念，只有发生额！
- * 营业外支出分类：与日常活动无关的损失（非流动资产处置损失/捐赠支出/罚款滞纳金/债务重组损失/资产盘亏损失等）
- * Spec: .kiro/specs/k13-non-operating-expense/
+ * 🔴 已收敛到共享模型 `shared/plAdjudicationModel.ts`。
+ * 此处保留导出名以免破坏消费方 import，内部委托共享实现。
+ * 后端已保证对侧为 0，故 debit - credit（或 credit - debit）= 非零侧 = unadjusted。
  */
-
-/**
- * 安全数字解析：NaN/null/undefined/Infinity → 0
- * 所有公式函数内部调用以防御非法输入
- */
-export function parseNum(v: unknown): number {
-  if (v === null || v === undefined || v === '') return 0
-  if (typeof v === 'number') return Number.isFinite(v) ? v : 0
-  const s = String(v).trim()
-  if (!s || s === 'NaN') return 0
-  const n = Number(s)
-  return Number.isFinite(n) ? n : 0
-}
-
-/**
- * CP-K13-01: 审定数 = 未审数 + AJE调整 + RJE重分类
- * 适用：审定表K13-1各营业外支出明细行审定列
- * 公式：audited = unadjusted + AJE + RJE
- * Validates: Requirements 2.3, 6.3
- */
-export function calcAuditedAmount(unadj: number, aje: number, rje: number): number {
-  return parseNum(unadj) + parseNum(aje) + parseNum(rje)
-}
-
-/**
- * CP-K13-02: 损益类支出发生额（6711借方科目）
- * 支出类发生额 = 借方发生额 - 贷方发生额（红冲）
- *   - 借方=支出增加（营业外支出确认：非流动资产处置损失/捐赠支出/罚款滞纳金/债务重组损失/资产盘亏损失等）
- *   - 贷方=支出冲回/红冲（错误冲销或期末结转损益）
- * 重要：取发生额而非期末余额！损益类科目期末余额为0（已结转）
- * 数据来源：tb_ledger明细科目发生额汇总
- *
- * ⚠️ 方向注意：K13是借方科目(debit - credit)，与K12(credit - debit)相反！
- *
- * Validates: Requirements 2.4, 5.1-5.3, 6.4
- */
-export function calcIncomeStatementOccurrence(debitOcc: number, creditOcc: number): number {
-  return parseNum(debitOcc) - parseNum(creditOcc)
+export function calcIncomeStatementOccurrence(a: number, b: number): number {
+  return legacyCalcIncomeStatementOccurrence(a, b)
 }
 
 /**

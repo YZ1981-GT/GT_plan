@@ -57,7 +57,8 @@
           :is-readonly="isReadonly"
           :prefill="adjudicationPrefill"
           @save="handleChildSave"
-          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
+          @navigate-sheet="(s: string) =          :tb-source-codes="tbSourceCodes"
+        > emit('navigate-sheet', s)"
         />
 
         <!-- K12-2 明细表（26列3区段，27行） -->
@@ -275,6 +276,9 @@ async function _loadTbData(): Promise<void> {
 }
 
 // ─── selfLoad（统一 Persistence Adapter） ─────────────────────────────────────
+/** 四表取数溯源（render 下发，供审定表 Tab 展示来源科目与报表行） */
+const tbSourceCodes = computed(() => props.htmlData?.tb_source_codes ?? null)
+
 async function selfLoad(): Promise<void> {
   try {
     const snapshot = props.htmlData

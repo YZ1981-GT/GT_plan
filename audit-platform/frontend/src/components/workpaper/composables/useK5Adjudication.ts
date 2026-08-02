@@ -168,7 +168,7 @@ export function useK5Adjudication(params: UseK5AdjudicationParams) {
 
   const tbReconciliation = computed(() => {
     const auditedTotal = subtotalRow.value.audited
-    const tbAudited = tbData.value.audited2701
+    const tbAudited = tbData.value.audited
     const diff = auditedTotal - tbAudited
     return { diff, isMatch: Math.abs(diff) < 0.01 }
   })

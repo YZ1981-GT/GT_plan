@@ -283,13 +283,15 @@ export function useK12FormData(opts: {
     // 优先从 render-config seed 取值
     const seeded = renderMeta.value?.tb_values
     if (seeded) {
+      // 🔴 新架构优先：occurrence_unadjusted 是 trial_balance 权威口径
+      const _occurrence = parseNum(seeded.occurrence_unadjusted ?? 0)
       const credit = parseNum(seeded.unadjusted_credit ?? seeded.lending_amount ?? 0)
       const debit = parseNum(seeded.unadjusted_debit ?? seeded.borrowing_amount ?? 0)
       tbData.value = {
         unadjustedCredit: credit,
         unadjustedDebit: debit,
         unadjustedNet: credit - debit, // 贷方科目！贷-借
-        auditedAmount: parseNum(seeded.audited_amount ?? 0),
+        auditedAmount: parseNum(seeded.occurrence_audited ?? seeded.audited_amount ?? 0),
       }
       return
     }
