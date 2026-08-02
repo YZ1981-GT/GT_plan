@@ -1966,3 +1966,273 @@ jobs:
         run: npm ci
       - name: Run K-cycle account scope & wiring guards
         run: npx vitest run src/components/workpaper/composables/__tests__/kCycleAccountScope.spec.ts src/components/workpaper/composables/__tests__/kCycleFourTableWiring.spec.ts --silent=true || echo "::warning::K-cycle frontend guards not yet created (Task 22 pending)"
+  note-e1-structure:
+    # 附注 E1 货币资金章节结构守卫（五、1 / 八、1）
+    # （e1-four-table-extraction-and-disclosure-alignment Task 11/12/13）
+    #
+    # 背景（逐格比对源 xlsx 后修掉的实证缺陷）：
+    # ① 国企主表首行是「库存现金」而源模板 R8 实为「**现金**」；
+    # ② 国企主表末行「其中：存放在境外的款项总额」是源 R13 的**括注文字**被 md 重建
+    #    当成了数据行 = 假行（上市 R15 才是真数据行，故不能一刀切删两侧）；
+    # ③ 国企②表含源模板没有的「金融企业法定存款准备金或备付金」且**缺合计行**
+    #    （校验预设 F1-4「②表明细之和 = 合计行」要求必须有），源 R22 的 `…`
+    #    是动态插行标记不该 seed；
+    # ④ 上市侧**整张缺②受限表**（源 xlsx 只有 R18/R19 文字），但校验预设 listed 侧
+    #    F1-4/F1-5/F1-6 三条明确引用②表 → 按平台铁律「校验预设是列结构裁决者」补建；
+    # ⑤ 两版全部表 columns / guidance 全缺 → seed 路径被前缀推断塞凭空父表头；
+    # ⑥ 载荷原推 4 列（含「受限原因」）而源模板只有 3 列 = 孤儿列。
+    #
+    # 外币章节（五、73 / 八、92）是**跨循环共享表**（一张表内按科目分段：货币资金 /
+    # 应收账款 / 短期借款 / 长期借款 / 应付债券），而 `sync_from_workpaper` 的合并
+    # 粒度原本是**表级浅合并** → 任何单循环推该表都会整表覆盖他循环段落。
+    # `disclosure-note-row-level-merge` 落地后改为**条件许可**：故本 job 断言
+    # 他循环段完整保留、行数不变、可扩行占位不得误删、**凡推该章节的 map 必须声明
+    # `_row_scope`**（E1 只许声明货币资金段 `BS-002`，不得出现他段 code）、
+    # registry 仍不得出现该章节（共享表一章多 owner，不入 1:1 反查表）。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check note E1 section alignment (五、1 / 八、1 / 五、73 / 八、92)
+        run: python backend/scripts/fix/fix_note_e1_monetary_fund_structure.py --check
+      - name: Install test dependencies
+        run: python -m pip install pytest==8.4.2 openpyxl==3.1.5
+      - name: Run note E1 structure contract tests (openpyxl 直读源 xlsx 三向比对)
+        run: python -m pytest backend/tests/four_table/test_note_e1_structure.py -q
+
+  e1-four-table-extraction:
+    # E1 四表取数 / 语义科目定位 / 受限资金分类 / 公式预设守卫
+    # （e1-four-table-extraction-and-disclosure-alignment Task 2/3/3.5/4/5/6）
+    #
+    # 拦五类已实测缺陷：
+    # 1. **科目硬编码 + 点号边界**：render 原写死 `_CASH_PREFIX/_BANK_PREFIX/_OTHER_PREFIX`
+    #    并自造 `_is_leaf`（用 `startswith` 无点号边界 → `1002.1` 会被 `1002.11` 误判丢掉）。
+    #    改走 `four_table/semantic_account_resolver` 按**科目名**逐项目定位
+    #    （标准码在项目间并不一致，`account_chart` 实证 `^10(0|1)[0-9]$` 只有 1001/1002/1012）。
+    # 2. **「可增设」项目不得给兜底码**：准则解释15号的「存放财务公司款项」「数字货币」
+    #    没有一级标准科目 —— E1 公式预设原写 `TB('1502')`，而 `1502` 实为
+    #    **持有至到期投资减值准备**。语义槽 `fallback_standard_codes=()` + 预设写
+    #    `PLACEHOLDER`，本项目无该科目时返空而不是静默产出 0。
+    # 3. **全零账户被过滤削弱完整性程序**：`account_list` 供 E1-10「已开立银行账户清单
+    #    核对」，「本年新开立但期末为 0」的账户正是货币资金舞弊常见切入点 → 不得过滤。
+    # 4. **受限资金分类的共现要求**：源模板 R21 是「放在境外**且资金汇回受到限制**」，
+    #    光凭「境外」二字归类会把香港子公司基本户判成受限款项（改变披露结论）；
+    #    且「境外」桶排序必须先于「质押」桶（否则 `境外冻结存款` 被「冻结」抢走）。
+    # 5. **公式预设 sheet 名贴错标签**：`分析程序E1-3` 在源 xlsx 不存在
+    #    （E1-3 是银行存款明细表，分析表实为 E1-14/E1-15）；`审定表E1-1` 无短名 tab。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install backend deps
+        run: python -m pip install -r backend/requirements.txt
+      - name: Check E1 prefill preset alignment
+        run: python backend/scripts/fix/fix_e1_prefill_presets.py --check
+      - name: Run E1 account scope / restricted buckets / preset guards
+        run: >-
+          python -m pytest
+          backend/tests/four_table/test_e1_account_scope.py
+          backend/tests/four_table/test_e1_restricted_buckets.py
+          backend/tests/four_table/test_e1_formula_presets.py -q
+
+  e1-disclosure-frontend:
+    # E1 前端守卫（e1-four-table-extraction-and-disclosure-alignment Task 1/7/8/9/10/14/15）
+    #
+    # 拦六类「四层验证全绿、只有浏览器挂载才暴露」或「静默失效」的缺陷：
+    # ① **setup 期 TDZ**：`watch([...])` 的依赖数组在 setup 期即求值，引用后面才声明的
+    #    `const` 会抛 ReferenceError → **整个披露 Tab 挂不上**，手动 + 自动同步一起废，
+    #    而 `get_diagnostics` 零诊断、Vite transform 200、vitest 不覆盖该分支。
+    # ② **宿主漏传 prop**：漏 `:html-data` → `restricted_prefill` / `adjudication_prefill`
+    #    恒 undefined，四表取数静默失效；漏 `:applicable-standards` → 载荷
+    #    `current_standard` 永远退化成 `*_standalone`。
+    # ③ **单一真源**：币种 / 受限类别 / 主表行标签字面量必须归零（走三个 scope 模块）；
+    #    跨 sheet 键 `E1-adj-total-{1001|1002|1012}` 是**跨 spec 数据契约**（后端
+    #    `wp_formula.py` 与既有项目持久化都依赖），形态被守卫钉死。
+    # ④ **勾稽引擎覆盖校验预设全集**：F1-1~F1-6 两版各自；F1-5/F1-6 拿不到补充资料③表
+    #    数据时必须 `skip` 并给推算值，**不伪造、不塌成 0**。
+    # ⑤ **金额控件**：EP 2.13.6 的 `el-input-number` **不存在** `formatter`/`parser` prop
+    #    → 千分符从未生效；同时反向边界锁死「折算率/汇率/面值/张数不得套 WpAmountInput」。
+    # ⑥ **列定义单一真源**：载荷 / seed / 契约三处都读零参 `buildE1{Listed,Soe}Columns`，
+    #    单级表头必标 `flat`（不标会被 `_infer_groups_from_headers` 塞凭空父表头）。
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: audit-platform/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: audit-platform/frontend/package-lock.json
+      - name: Install frontend dependencies
+        run: npm ci
+      - name: Run E1 disclosure / four-table guards
+        run: >-
+          npx vitest run
+          src/components/workpaper/composables/__tests__/e1SetupOrder.spec.ts
+          src/components/workpaper/composables/__tests__/e1HostPropWiring.spec.ts
+          src/components/workpaper/composables/__tests__/e1CurrencyScope.spec.ts
+          src/components/workpaper/composables/__tests__/e1NoteTextsAndPayload.spec.ts
+          src/components/workpaper/composables/__tests__/e1NoteSubtableContract.spec.ts
+          src/components/workpaper/composables/__tests__/e1DisclosureConsistency.spec.ts
+          src/components/workpaper/composables/__tests__/e1AdjudicationPrefill.spec.ts
+          src/components/workpaper/composables/__tests__/e1AmountControlIronLaw.spec.ts
+          src/components/workpaper/composables/__tests__/semanticAccountSource.spec.ts
+          src/components/workpaper/composables/__tests__/disclosureSheetNameRegistry.spec.ts
+
+  disclosure-row-level-merge:
+    # 附注同步**行级合并**（平台级）—— disclosure-note-row-level-merge Task 1~8, 14
+    #
+    # 背景：`wp_disclosure_sync_service` 的合并粒度是**表级浅合并**（按子表名，
+    # 同名覆盖）。全库 805 张附注表里 **29 张是多段共享表**（listed 23 / soe 6，
+    # 判据 = 同一表 `rows[]` 含 ≥2 个不同 `report_row_code`），横跨 E/D/F/H/K/L/N。
+    # 任何单循环推这类表都会**整表覆盖**，清掉其他循环已录的段。
+    #
+    # 本 job 守四件事：
+    # ① **零回归**：不含 `_row_scope` 的载荷合并结果与改动前**逐字节**相同
+    #    （golden characterization；改的是 90+ 已接线披露 Tab 共用的写路径）。
+    # ② **段边界只由模板 `report_row_code` 决定** + 变体解析**禁按章节号推导**
+    #    （实测 20 个章节号两份模板都有、13 个标题不同：`八、1` listed = 政府补助
+    #    / soe = **货币资金**；`五、42` listed = 其他应付款）。查错模板 → 段边界全错。
+    # ③ **fail closed**：段边界解析不出就跳过该表写入，**绝不**退化为整表覆盖。
+    #    反向自检钉死「error 分支返回的绝不能是 incoming」。
+    # ④ `_note_texts` 按 `section` 浅合并（原实现整替换 + 没推就置 None → 多循环
+    #    共章节时 K1 录的 10 段说明会被 G2 的一段整体覆盖）；无键段用**位置化**
+    #    占位键，否则 `[{"text": "…"}]`（F4 范式）每同步一次多攒一条 → 正文膨胀。
+    #
+    # 另含共享表清单 drift（`--check` 0 欠账 + 表数 == 29 + 手改段区间必被抓出）。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check shared-table manifest drift (29 tables = listed 23 / soe 6)
+        run: python backend/scripts/gen/gen_note_shared_table_segments.py --check
+      - name: Install test dependencies
+        run: python -m pip install pytest==8.4.2 pytest-asyncio==0.24.0 hypothesis==6.112.1 sqlalchemy==2.0.35
+      - name: Run row-level merge guards
+        run: >-
+          python -m pytest -q
+          backend/tests/test_note_shared_table_segments.py
+          backend/tests/test_disclosure_sync_characterization.py
+          backend/tests/test_disclosure_row_level_merge.py
+          backend/tests/test_disclosure_note_texts_merge.py
+
+  disclosure-row-level-merge-frontend:
+    # 前端侧：**推共享表必带 `_row_scope`** + E1 外币章节（首个消费者）契约
+    #
+    # ① 平台守卫扫全部 `*NoteSectionMap.ts`：推送表名 ∩ 共享表清单 → 必须声明
+    #    `_row_scope` 且 `owner_row_code` ∈ 该表段集合。含两条反向自检
+    #    （去掉 E1 声明必红 / `stripComments()` 必须真的剥掉注释）。
+    #    「单一 owner 独占整张表」（N1 递延所得税两表）显式登记豁免 + 段集合校验。
+    # ② E1 外币载荷三向锁死模板（章节号 / 表名 / 列定义 key·label·format·flat）；
+    #    4 列仅期末全 `flat`（**seed 与推送两处都要标**，H8 踩过只加一侧的坑）；
+    #    金额取 2 位消除 `原币 × 折算率` 的浮点噪声（实测 14000 × 7.1884 落库成
+    #    `100637.59999999999`）；无外币明细/全零骨架 → 不推空段。
+    # ③ 顺带守「外币区两变体都渲染」—— 源 xlsx 逐格实证两张披露 sheet 的 R25~R62
+    #    逐字相同，原 `v-if="variant === 'listed'"` 让国企 Tab 完全没有外币录入位置。
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: audit-platform/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: audit-platform/frontend/package-lock.json
+      - name: Install frontend dependencies
+        run: npm ci
+      - name: Run shared-table row-scope guards
+        run: >-
+          npx vitest run
+          src/components/workpaper/__tests__/disclosureSharedTableRowScope.spec.ts
+          src/components/workpaper/composables/__tests__/e1FxNoteSectionMap.spec.ts
+          src/components/workpaper/composables/__tests__/e1DisclosureConsistency.spec.ts
+
+  note-restricted-assets-structure:
+    # 受限资产附注表结构守卫 —— restricted-assets-note-row-scope-rollout Task 3/4
+    #
+    # 表：listed `五、32`「所有权或使用权受到限制的资产」主表 + 「（续：上年年末）」
+    #     / soe `八、93`「所有权和使用权受到限制的资产」（措辞「和」vs「或」不同，不得统一）。
+    # 这是 29 张多段共享表里**受益面最大**的一张（8 段横跨 E1/D1/D2/D5/F2/H1/H2/I1）。
+    #
+    # 守四件事：
+    # ① **段归属真源纠错**：soe「存货」原标 `BS-008`（实为**预付款项**，listed 侧
+    #    标的 `BS-010` 才对）、「应收款项融资」**缺码**（应 `BS-007`，原被卷进 D2 段）
+    #    → 每段 `owner_row_code` 必须能在 `report_config` 查到同名报表行；
+    #    反向自检「把存货改回 BS-008 则必红」。
+    # ② **显式无主行** `row_type: "unowned"`：soe 末行「其他」紧随在建工程段，
+    #    既非合计行也非可扩行 —— 不标就会被 H2 推送删掉。
+    #    「其他」这个标签**不能全局判定**（递延所得税表里的「其他」是段内合法行）。
+    # ③ 列元数据齐备且**单级必标 flat**（三张子表原 `columns=0` + `guidance` 空）；
+    #    listed 两表的 `row_type: header_label` 假行必须已删。
+    # ④ **soe 表无合计行**（源模板 9 行止于「其他」）→ 双向锁死，不得凭空加。
+    #
+    # 🔴 源模板真相：全量扫 349 个 xlsx 实证 `backend/wp_templates/` **没有这张披露表**
+    #    （只有 `A3-5/A3-6 附注汇总` 的 sheet「所有权受限资产」，那是按主体横向展开的
+    #    合并汇总工作表）→ 守卫按「附注模板 + `report_config` 双源锁死 + A3 科目清单
+    #    旁证」，并含反向自检「源 xlsx 出现该披露表则必红」（届时改直读源 sheet 三向比对）。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check restricted-assets note structure (idempotent, 0 pending)
+        run: python backend/scripts/fix/fix_note_restricted_assets_structure.py --check
+      - name: Install test dependencies
+        run: python -m pip install pytest==8.4.2 pytest-asyncio==0.24.0 hypothesis==6.112.1 openpyxl==3.1.5
+      - name: Run restricted-assets structure guards
+        run: >-
+          python -m pytest -q
+          backend/tests/test_note_restricted_assets_structure.py
+          backend/tests/test_note_shared_table_segments.py
+
+  note-restricted-assets-frontend:
+    # 前端侧：8 段 owner 的行级合并接线契约 —— Task 5/7/9~14
+    #
+    # ① **载荷三向锁死模板**：章节号 / 3 张子表名 / 列定义（key·label·format·flat）
+    #    逐字命中 `note_template_{listed,soe}.json`；listed 双期 = **两个 payload**
+    #    （主表 `end_amount` + 续表 `prior_amount`），soe 单表含第 3 列「受限原因」。
+    # ② **owner 接入状态登记**（`WIRED` 8 条 + `NOT_WIRED_OWNERS` 2 条）：
+    #    每个已接 Tab 必须扫到自己的 owner code、**不得出现他段 code**（防越权覆盖）、
+    #    `shared` 形态还要真的 `await syncRestrictedAssets(`（防「只建实例不调用」假接入）；
+    #    未接入数**只许变少**（当前只剩 D5 `BS-007` / F2 `BS-010` —— 真的零数据）。
+    # ③ **「只有期末数」不是不接的理由**（用户 2026-08-02 明确）：`priorAmount`
+    #    未声明 → listed 只推主表、不推续表（推 0 会覆盖审计师在续表手填的上年年末值）；
+    #    声明了哪怕是 0 → 照推。四个 `checklist_responses` 来源都只有期末口径。
+    # ④ **勾稽与段级溯源**：合计行 = 各段之和（含无主行「其他」，容差 0.01）；
+    #    soe 无合计行 → skip；未提供底稿金额的段 skip **不报 error**（宁缺勿造）；
+    #    `_seg` 段戳泄漏到附注行 → error；owner → wp_code 与声明表交叉锁死。
+    # ⑤ 顺带钉死 **I1 两个 Tab 不得再自调度**（`syncToNotes` 内
+    #    `scheduleAutoSync(syncToNotes)` = 800ms 周期无限 POST；平台守卫
+    #    `disclosureAutoSyncCoverage` 的自递归检测只认 `syncToDisclosureNotes` 函数名
+    #    故 I1 逃过了那一轮 16 处清理）。
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: audit-platform/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: audit-platform/frontend/package-lock.json
+      - name: Install frontend dependencies
+        run: npm ci
+      - name: Run restricted-assets rollout guards
+        run: >-
+          npx vitest run
+          src/components/workpaper/composables/__tests__/restrictedAssetsNoteSectionMap.spec.ts
+          src/components/workpaper/composables/__tests__/restrictedAssetsSources.spec.ts
+          src/components/workpaper/composables/__tests__/restrictedAssetsConsistency.spec.ts
+          src/components/workpaper/__tests__/disclosureSharedTableRowScope.spec.ts
