@@ -1,5 +1,11 @@
 <template>
   <div class="m4-tab-adjudication">
+    <!-- 四表库取数溯源面板 -->
+    <WpFourTableSourcePanel
+      v-if="props.tbSourceCodes"
+      :source-codes="props.tbSourceCodes"
+      gross-label="资本公积"
+    />
     <!-- ═══ 标题 + DualMode + AI/复核 ═══ -->
     <div class="section-header">
       <div class="section-header-left">
@@ -526,6 +532,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, Check, Download } from '@element-plus/icons-vue'
 import { useM4FormData } from '../../composables/useM4FormData'
 import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
+import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
 import {
   useM4Adjudication,
   type M4AdjudicationRow,
@@ -542,6 +549,7 @@ const props = defineProps<{
   wpId: string
   projectId: string
   isReadonly: boolean
+  tbSourceCodes?: Record<string, any> | null
 }>()
 
 const emit = defineEmits<{

@@ -38,48 +38,69 @@
       </template>
       <el-table :data="capitalChangeRows" border size="small" style="width: 100%">
         <el-table-column prop="item" label="股份性质" min-width="160" />
-        <el-table-column label="期初数（万股）" min-width="130" align="right">
+        <el-table-column label="期初数（万股）" min-width="120" align="right">
           <template #default="{ row, $index }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.beginShares"
-              :controls="false"
-              size="small"
-              style="width:100%"
-              @change="(val: number | undefined) => updateCapitalRow($index, 'beginShares', val ?? 0)"
+              @update:model-value="(val: number) => updateCapitalRow($index, 'beginShares', val)"
             />
             <span v-else>{{ fmtShares(row.beginShares) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="本期增加（万股）" min-width="130" align="right">
+        <el-table-column label="发行新股" min-width="110" align="right">
           <template #default="{ row, $index }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
-              :model-value="row.increaseShares"
-              :controls="false"
-              size="small"
-              style="width:100%"
-              @change="(val: number | undefined) => updateCapitalRow($index, 'increaseShares', val ?? 0)"
+              :model-value="row.issueNew"
+              @update:model-value="(val: number) => updateCapitalRow($index, 'issueNew', val)"
             />
-            <span v-else>{{ fmtShares(row.increaseShares) }}</span>
+            <span v-else>{{ fmtShares(row.issueNew) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="本期减少（万股）" min-width="130" align="right">
+        <el-table-column label="送股" min-width="100" align="right">
           <template #default="{ row, $index }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
-              :model-value="row.decreaseShares"
-              :controls="false"
-              size="small"
-              style="width:100%"
-              @change="(val: number | undefined) => updateCapitalRow($index, 'decreaseShares', val ?? 0)"
+              :model-value="row.bonusShares"
+              @update:model-value="(val: number) => updateCapitalRow($index, 'bonusShares', val)"
             />
-            <span v-else>{{ fmtShares(row.decreaseShares) }}</span>
+            <span v-else>{{ fmtShares(row.bonusShares) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="期末数（万股）" min-width="130" align="right">
+        <el-table-column label="公积金转股" min-width="110" align="right">
+          <template #default="{ row, $index }">
+            <WpAmountInput
+              v-if="!isReadonly"
+              :model-value="row.reserveToShares"
+              @update:model-value="(val: number) => updateCapitalRow($index, 'reserveToShares', val)"
+            />
+            <span v-else>{{ fmtShares(row.reserveToShares) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="其他" min-width="100" align="right">
+          <template #default="{ row, $index }">
+            <WpAmountInput
+              v-if="!isReadonly"
+              :model-value="row.otherChange"
+              @update:model-value="(val: number) => updateCapitalRow($index, 'otherChange', val)"
+            />
+            <span v-else>{{ fmtShares(row.otherChange) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="小计" min-width="110" align="right">
           <template #header>
-            <el-tooltip content="公式: 期初 + 本期增加 − 本期减少" placement="top">
+            <el-tooltip content="小计 = 发行新股 + 送股 + 公积金转股 + 其他" placement="top">
+              <span class="formula-col-header">小计</span>
+            </el-tooltip>
+          </template>
+          <template #default="{ row }">
+            <span class="formula-value">{{ fmtShares(row.issueNew + row.bonusShares + row.reserveToShares + row.otherChange) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="期末数（万股）" min-width="120" align="right">
+          <template #header>
+            <el-tooltip content="期末 = 期初 + 小计" placement="top">
               <span class="formula-col-header">期末数</span>
             </el-tooltip>
           </template>
@@ -87,7 +108,7 @@
             <span class="formula-value">{{ fmtShares(row.endShares) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="占比" width="90" align="center">
+        <el-table-column label="占比" width="80" align="center">
           <template #default="{ row }">
             <span>{{ row.ratio ? `${(row.ratio * 100).toFixed(2)}%` : '—' }}</span>
           </template>
@@ -191,6 +212,9 @@ import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import { useM2FormData } from '../../composables/useM2FormData'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import { buildM2ListedSyncPayload, type M2ListedRow } from '../../composables/m2NoteSectionMap'
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 
 const props = defineProps<{
   wpId: string
@@ -213,29 +237,58 @@ const formData = useM2FormData({
   projectId: computed(() => props.projectId),
 })
 
+// ─── 同步链路 ───────────────────────────────────────────────────────────────
+
+async function syncToDisclosureNotes(): Promise<void> {
+  const rows: M2ListedRow[] = capitalChangeRows.value
+    .filter((r) => r.item !== '三、股份总数') // 合计行由载荷构建
+    .map((r) => ({
+      label: r.item,
+      beginShares: r.beginShares,
+      issueNew: r.issueNew ?? 0,
+      bonusShares: r.bonusShares ?? 0,
+      reserveToShares: r.reserveToShares ?? 0,
+      otherChange: r.otherChange ?? 0,
+    }))
+  const payload = buildM2ListedSyncPayload(props.wpId, rows, {
+    restricted: restrictedNote.value,
+    changeReason: changeReasonNote.value,
+    eps: epsNote.value,
+  })
+  if (!payload) return
+  try {
+    const { default: request } = await import('@/utils/request')
+    await request.post(`/api/workpapers/${props.wpId}/sync-from-workpaper`, payload)
+  } catch { /* fail-open */ }
+}
+
+const { scheduleAutoSync } = useDisclosureAutoSync(syncToDisclosureNotes)
+
 // ─── State ───────────────────────────────────────────────────────────────────
 
 interface CapitalRow {
   item: string
   beginShares: number
-  increaseShares: number
-  decreaseShares: number
+  issueNew: number
+  bonusShares: number
+  reserveToShares: number
+  otherChange: number
   endShares: number
   ratio: number
 }
 
 const capitalChangeRows = ref<CapitalRow[]>([
-  { item: '一、有限售条件股份', beginShares: 0, increaseShares: 0, decreaseShares: 0, endShares: 0, ratio: 0 },
-  { item: '  1.国家持股', beginShares: 0, increaseShares: 0, decreaseShares: 0, endShares: 0, ratio: 0 },
-  { item: '  2.国有法人持股', beginShares: 0, increaseShares: 0, decreaseShares: 0, endShares: 0, ratio: 0 },
-  { item: '  3.其他内资持股', beginShares: 0, increaseShares: 0, decreaseShares: 0, endShares: 0, ratio: 0 },
-  { item: '  4.外资持股', beginShares: 0, increaseShares: 0, decreaseShares: 0, endShares: 0, ratio: 0 },
-  { item: '二、无限售条件股份', beginShares: 0, increaseShares: 0, decreaseShares: 0, endShares: 0, ratio: 0 },
-  { item: '  1.人民币普通股（A股）', beginShares: 0, increaseShares: 0, decreaseShares: 0, endShares: 0, ratio: 0 },
-  { item: '  2.境内上市外资股（B股）', beginShares: 0, increaseShares: 0, decreaseShares: 0, endShares: 0, ratio: 0 },
-  { item: '  3.境外上市外资股（H股）', beginShares: 0, increaseShares: 0, decreaseShares: 0, endShares: 0, ratio: 0 },
-  { item: '  4.其他', beginShares: 0, increaseShares: 0, decreaseShares: 0, endShares: 0, ratio: 0 },
-  { item: '三、股份总数', beginShares: 0, increaseShares: 0, decreaseShares: 0, endShares: 0, ratio: 0 },
+  { item: '一、有限售条件股份', beginShares: 0, issueNew: 0, bonusShares: 0, reserveToShares: 0, otherChange: 0, endShares: 0, ratio: 0 },
+  { item: '  1.国家持股', beginShares: 0, issueNew: 0, bonusShares: 0, reserveToShares: 0, otherChange: 0, endShares: 0, ratio: 0 },
+  { item: '  2.国有法人持股', beginShares: 0, issueNew: 0, bonusShares: 0, reserveToShares: 0, otherChange: 0, endShares: 0, ratio: 0 },
+  { item: '  3.其他内资持股', beginShares: 0, issueNew: 0, bonusShares: 0, reserveToShares: 0, otherChange: 0, endShares: 0, ratio: 0 },
+  { item: '  4.外资持股', beginShares: 0, issueNew: 0, bonusShares: 0, reserveToShares: 0, otherChange: 0, endShares: 0, ratio: 0 },
+  { item: '二、无限售条件股份', beginShares: 0, issueNew: 0, bonusShares: 0, reserveToShares: 0, otherChange: 0, endShares: 0, ratio: 0 },
+  { item: '  1.人民币普通股（A股）', beginShares: 0, issueNew: 0, bonusShares: 0, reserveToShares: 0, otherChange: 0, endShares: 0, ratio: 0 },
+  { item: '  2.境内上市外资股（B股）', beginShares: 0, issueNew: 0, bonusShares: 0, reserveToShares: 0, otherChange: 0, endShares: 0, ratio: 0 },
+  { item: '  3.境外上市外资股（H股）', beginShares: 0, issueNew: 0, bonusShares: 0, reserveToShares: 0, otherChange: 0, endShares: 0, ratio: 0 },
+  { item: '  4.其他', beginShares: 0, issueNew: 0, bonusShares: 0, reserveToShares: 0, otherChange: 0, endShares: 0, ratio: 0 },
+  { item: '三、股份总数', beginShares: 0, issueNew: 0, bonusShares: 0, reserveToShares: 0, otherChange: 0, endShares: 0, ratio: 0 },
 ])
 
 const restrictedNote = ref('')
@@ -246,30 +299,32 @@ const epsNote = ref('')
 
 function recalcEndAndRatio(): void {
   const totalEnd = capitalChangeRows.value.reduce((sum, row) => {
-    const end = row.beginShares + row.increaseShares - row.decreaseShares
+    const end = row.beginShares + row.issueNew + row.bonusShares + row.reserveToShares + row.otherChange
     return sum + end
   }, 0)
 
   capitalChangeRows.value.forEach(row => {
-    row.endShares = row.beginShares + row.increaseShares - row.decreaseShares
+    row.endShares = row.beginShares + row.issueNew + row.bonusShares + row.reserveToShares + row.otherChange
     row.ratio = totalEnd > 0 ? row.endShares / totalEnd : 0
   })
 }
 
 // ─── Handlers ────────────────────────────────────────────────────────────────
 
-function updateCapitalRow(index: number, field: 'beginShares' | 'increaseShares' | 'decreaseShares', val: number) {
+function updateCapitalRow(index: number, field: 'beginShares' | 'issueNew' | 'bonusShares' | 'reserveToShares' | 'otherChange', val: number) {
   if (index >= 0 && index < capitalChangeRows.value.length) {
     capitalChangeRows.value[index][field] = val
     recalcEndAndRatio()
     formData.debouncedSave('M2-disclosure-listed-capital-rows', {
       remark: JSON.stringify(capitalChangeRows.value),
     })
+    scheduleAutoSync()
   }
 }
 
 function handleNoteChange(section: string, value: string) {
   formData.debouncedSave(`M2-disclosure-listed-${section}`, { remark: value || null })
+  scheduleAutoSync()
 }
 
 // section → { ref, 持久化key } 映射
@@ -288,8 +343,7 @@ function buildContext(): Record<string, string> {
     披露类型: '上市公司股本附注（单位：万股）',
     科目: '4001 股本',
     期末股份总数万股: totalRow ? fmtShares(totalRow.endShares) : '—',
-    本期增加万股: totalRow ? fmtShares(totalRow.increaseShares) : '—',
-    本期减少万股: totalRow ? fmtShares(totalRow.decreaseShares) : '—',
+    本期增加小计万股: totalRow ? fmtShares(totalRow.issueNew + totalRow.bonusShares + totalRow.reserveToShares + totalRow.otherChange) : '—',
   }
 }
 
@@ -327,7 +381,17 @@ function _restoreFromResponses(): void {
     try {
       const parsed = JSON.parse(rowData.remark)
       if (Array.isArray(parsed) && parsed.length > 0) {
-        capitalChangeRows.value = parsed
+        // 旧版兼容：旧字段 increaseShares/decreaseShares → 新结构 issueNew（作为兜底映射）
+        capitalChangeRows.value = parsed.map((r: any) => ({
+          item: r.item ?? '',
+          beginShares: r.beginShares ?? 0,
+          issueNew: r.issueNew ?? r.increaseShares ?? 0,
+          bonusShares: r.bonusShares ?? 0,
+          reserveToShares: r.reserveToShares ?? 0,
+          otherChange: r.otherChange ?? 0,
+          endShares: r.endShares ?? 0,
+          ratio: r.ratio ?? 0,
+        }))
         recalcEndAndRatio()
       }
     } catch { /* ignore */ }

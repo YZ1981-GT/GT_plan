@@ -125,9 +125,8 @@ const MISSING_SYNC_PATH: readonly string[] = [
   //   合并为「本期减少」、「计提依据」→「备注」列（`buildMEquitySyncPayload('M7','soe')`）。
   // M8（2）已补齐（Task 10）：接入 useDisclosureAutoSync + buildM8SyncPayload
   //   推 §五、60 / §八、94「一般风险准备」5 列 flat 变动表。
-  // M9（2）
-  'M9TabDisclosureListed.vue',
-  'M9TabDisclosureSoe.vue',
+  // M9（2）已补齐（Task 12）：接入 useDisclosureAutoSync + buildM9Listed/SoeSyncPayload
+  //   推 §五、57「其他综合收益」两级 8 列 / §八、79「OCI 各项目」两级 7 列。
   // N2 两版已补齐（spec n-cycle-tax-disclosure-alignment Task 4）：
   //   原两组件是复制粘贴关系，上市误用国企变动口径，两版都无同步链路
   // N3 已**删除**披露 Tab：源模板 `N3 递延所得税负债.xlsx` 无「附注披露信息」sheet
@@ -463,8 +462,10 @@ describe('披露 Tab 同步链路完整性', () => {
   //   （M1×2 豁免归 K3、M2/M3/M6/M8/M9/M10 结构不同构留清单）
   // H7×2 整体重建后补齐（h7-biological-assets-disclosure-rebuild）→ 21
   // J2×2 补齐（disclosure-sync-path-buildout 批6）→ 19
-  it('缺链路数量记录在案（19 个）', () => {
-    expect(MISSING_SYNC_PATH.length).toBe(19)
+  // M1×2 + M2×2 + M3×1 + M6×2 + M8×2 + M10×2 补齐（m-cycle spec Wave 1~2）→ 8
+  // M9×2 补齐（Task 12）→ 6
+  it('缺链路数量记录在案（6 个）', () => {
+    expect(MISSING_SYNC_PATH.length).toBe(6)
   })
 
   /**

@@ -1,6 +1,6 @@
 {
   "_source": "生成自前端 *NoteSectionMap.ts（唯一真源），勿手工编辑；重生成：python backend/scripts/gen_note_wp_sync_registry.py --write",
-  "generated_at": "2026-08-02T08:06:04.067811+00:00",
+  "generated_at": "2026-08-02T13:39:21.018645+00:00",
   "entries": [
     {
       "wp_code": "D1",
@@ -515,12 +515,28 @@
       "source_file": "audit-platform/frontend/src/components/workpaper/composables/l8NoteSectionMap.ts"
     },
     {
+      "wp_code": "M10",
+      "listed": "五、54",
+      "soe": "八、59",
+      "sheet_listed": "附注披露信息（上市公司）",
+      "sheet_soe": "附注披露信息（国有企业）",
+      "source_file": "audit-platform/frontend/src/components/workpaper/composables/m10NoteSectionMap.ts"
+    },
+    {
       "wp_code": "M1",
       "listed": "五、42",
       "soe": "八、42",
       "sheet_listed": "附注披露信息（上市公司）",
       "sheet_soe": "附注披露信息（国有企业）",
       "source_file": "audit-platform/frontend/src/components/workpaper/composables/m1NoteSectionMap.ts"
+    },
+    {
+      "wp_code": "M2",
+      "listed": "五、53",
+      "soe": "八、58",
+      "sheet_listed": "附注披露信息（上市公司）",
+      "sheet_soe": "附注披露信息（国有企业）",
+      "source_file": "audit-platform/frontend/src/components/workpaper/composables/m2NoteSectionMap.ts"
     },
     {
       "wp_code": "M3",
@@ -569,6 +585,14 @@
       "sheet_listed": "附注披露信息（上市公司）",
       "sheet_soe": "附注披露信息（国有企业）",
       "source_file": "audit-platform/frontend/src/components/workpaper/composables/m8NoteSectionMap.ts"
+    },
+    {
+      "wp_code": "M9",
+      "listed": "五、57",
+      "soe": "八、79",
+      "sheet_listed": "附注披露信息（上市公司）",
+      "sheet_soe": "附注披露信息（国有企业）",
+      "source_file": "audit-platform/frontend/src/components/workpaper/composables/m9NoteSectionMap.ts"
     },
     {
       "wp_code": "N1",

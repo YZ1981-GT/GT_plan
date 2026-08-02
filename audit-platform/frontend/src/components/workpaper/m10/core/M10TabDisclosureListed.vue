@@ -47,12 +47,9 @@
         <el-table-column label="期初余额" width="140" align="right">
           <template #default="{ row, $index }">
             <template v-if="!row._isTotal && !isReadonly">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.beginBalance"
-                :controls="false"
-                size="small"
-                style="width: 100%"
-                @change="(val: number | undefined) => updateInstrumentRow($index, 'beginBalance', val ?? 0)"
+                @update:model-value="(val: number) => updateInstrumentRow($index, 'beginBalance', val)"
               />
             </template>
             <span v-else :class="{ 'formula-value': row._isTotal }">{{ fmtAmount(row.beginBalance) }}</span>
@@ -67,12 +64,9 @@
           </template>
           <template #default="{ row, $index }">
             <template v-if="!row._isTotal && !isReadonly">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.issuance"
-                :controls="false"
-                size="small"
-                style="width: 100%"
-                @change="(val: number | undefined) => updateInstrumentRow($index, 'issuance', val ?? 0)"
+                @update:model-value="(val: number) => updateInstrumentRow($index, 'issuance', val)"
               />
             </template>
             <span v-else :class="{ 'formula-value': row._isTotal }">{{ fmtAmount(row.issuance) }}</span>
@@ -87,12 +81,9 @@
           </template>
           <template #default="{ row, $index }">
             <template v-if="!row._isTotal && !isReadonly">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.redemption"
-                :controls="false"
-                size="small"
-                style="width: 100%"
-                @change="(val: number | undefined) => updateInstrumentRow($index, 'redemption', val ?? 0)"
+                @update:model-value="(val: number) => updateInstrumentRow($index, 'redemption', val)"
               />
             </template>
             <span v-else :class="{ 'formula-value': row._isTotal }">{{ fmtAmount(row.redemption) }}</span>
@@ -102,12 +93,9 @@
         <el-table-column label="应付利息/股息" width="140" align="right">
           <template #default="{ row, $index }">
             <template v-if="!row._isTotal && !isReadonly">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.interestDividend"
-                :controls="false"
-                size="small"
-                style="width: 100%"
-                @change="(val: number | undefined) => updateInstrumentRow($index, 'interestDividend', val ?? 0)"
+                @update:model-value="(val: number) => updateInstrumentRow($index, 'interestDividend', val)"
               />
             </template>
             <span v-else :class="{ 'formula-value': row._isTotal }">{{ fmtAmount(row.interestDividend) }}</span>
@@ -225,6 +213,9 @@ import { eventBus } from '@/utils/eventBus'
 import { useM10FormData } from '../../composables/useM10FormData'
 import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import { calcEquityEndBalance } from '../../composables/useM10FormulaEngine'
+import WpAmountInput from '../../shared/WpAmountInput.vue'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import { buildM10ListedSyncPayload, type M10BasicRow, type M10MovementRow, type M10HoldersRow } from '../../composables/m10NoteSectionMap'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -248,6 +239,46 @@ const formData = useM10FormData({
   wpId: computed(() => props.wpId),
   projectId: computed(() => props.projectId),
 })
+
+// ─── 同步链路 ───────────────────────────────────────────────────────────────
+
+async function syncToDisclosureNotes(): Promise<void> {
+  // M10 Listed Tab 当前只有一张变动表（暂无基本情况表/持有者信息表独立录入）
+  // 将变动表数据映射到三表载荷
+  const movementRows: M10MovementRow[] = dataRows.value.map((r: any) => ({
+    label: r.item || '',
+    beginQty: 0,  // UI 暂无数量维度
+    beginValue: Number(r.beginBalance) || 0,
+    increaseQty: 0,
+    increaseValue: Number(r.issuance) || 0,
+    decreaseQty: 0,
+    decreaseValue: Number(r.redemption) || 0,
+  }))
+  // 基本情况表（空载荷，待 Tab 增强后填充）
+  const basicRows: M10BasicRow[] = movementRows.map((r) => ({
+    label: r.label,
+    issueTime: '',
+    classification: '',
+    dividendRate: '',
+    issuePrice: 0,
+    quantity: 0,
+    amount: r.beginValue,
+    maturity: '',
+    conversionTerms: '',
+    conversionStatus: '',
+  }))
+  // 持有者信息表（空载荷）
+  const holdersRows: M10HoldersRow[] = []
+  const noteText = [termsSummary.value, distributionNote.value, otherDisclosure.value].filter(Boolean).join('\n\n')
+  const payload = buildM10ListedSyncPayload(props.wpId, basicRows, movementRows, holdersRows, noteText || undefined)
+  if (!payload) return
+  try {
+    const { default: request } = await import('@/utils/request')
+    await request.post(`/api/workpapers/${props.wpId}/sync-from-workpaper`, payload)
+  } catch { /* fail-open */ }
+}
+
+const { scheduleAutoSync } = useDisclosureAutoSync(syncToDisclosureNotes)
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
@@ -304,6 +335,7 @@ function updateInstrumentRow(index: number, field: 'beginBalance' | 'issuance' |
   if (index >= 0 && index < dataRows.value.length) {
     dataRows.value[index][field] = val
     formData.debouncedSave(`M10-disclosure-listed-${index}-${field}`, { remark: String(val) })
+    scheduleAutoSync()
   }
 }
 
@@ -313,14 +345,17 @@ function getRowClassName({ row }: { row: InstrumentRow; rowIndex: number }): str
 
 function handleTermsSummaryChange() {
   formData.debouncedSave('M10-disclosure-listed-terms-summary', { remark: termsSummary.value || null })
+  scheduleAutoSync()
 }
 
 function handleDistributionNoteChange() {
   formData.debouncedSave('M10-disclosure-listed-distribution-note', { remark: distributionNote.value || null })
+  scheduleAutoSync()
 }
 
 function handleOtherDisclosureChange() {
   formData.debouncedSave('M10-disclosure-listed-other-disclosure', { remark: otherDisclosure.value || null })
+  scheduleAutoSync()
 }
 
 const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')

@@ -43,6 +43,7 @@
             :wp-id="props.wpId"
             :project-id="props.projectId"
             :is-readonly="isReadonly"
+            :tb-source-codes="props.htmlData?.tb_source_codes"
             @navigate="handleNavigate"
           />
           <!-- M5-2 明细表（法定+任意盈余公积） -->

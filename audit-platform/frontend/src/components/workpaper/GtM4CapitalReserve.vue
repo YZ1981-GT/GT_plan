@@ -43,6 +43,7 @@
             :wp-id="props.wpId"
             :project-id="props.projectId"
             :is-readonly="isReadonly"
+            :tb-source-codes="props.htmlData?.tb_source_codes"
             @navigate="handleNavigate"
           />
           <!-- M4-2 明细表（资本溢价+其他资本公积，24列区段Tab） -->

@@ -40,26 +40,20 @@
         <el-table-column prop="item" label="股东名称/项目" min-width="180" />
         <el-table-column label="期末数" min-width="140" align="right">
           <template #default="{ row, $index }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.endAmount"
-              :controls="false"
-              size="small"
-              style="width:100%"
-              @change="(val: number | undefined) => updateDetailRow($index, 'endAmount', val ?? 0)"
+              @update:model-value="(val: number) => updateDetailRow($index, 'endAmount', val)"
             />
             <span v-else>{{ fmtAmount(row.endAmount) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="上年年末数" min-width="140" align="right">
           <template #default="{ row, $index }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.priorYearEnd"
-              :controls="false"
-              size="small"
-              style="width:100%"
-              @change="(val: number | undefined) => updateDetailRow($index, 'priorYearEnd', val ?? 0)"
+              @update:model-value="(val: number) => updateDetailRow($index, 'priorYearEnd', val)"
             />
             <span v-else>{{ fmtAmount(row.priorYearEnd) }}</span>
           </template>
@@ -160,6 +154,7 @@ import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import { useM1FormData } from '../../composables/useM1FormData'
 import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 
 const props = defineProps<{
   wpId: string
@@ -174,6 +169,28 @@ const emit = defineEmits<{
 const openReviewDialog = inject<((sectionId: string, sectionLabel?: string) => void) | null>('openReviewDialog', null)
 const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
 const aiLoading = ref('')
+
+// ─── 同步链路（浅合并推 K3 §五、42 的应付股利两张子表） ─────────────────────
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import { buildM1SyncPayload, type M1DividendRow, type M1OverdueRow } from '../../composables/m1NoteSectionMap'
+
+async function syncToDisclosureNotes(): Promise<void> {
+  const dividendRows: M1DividendRow[] = detailRows.value.map((r: any) => ({
+    label: r.item || r.label || '',
+    endAmount: Number(r.endAmount) || 0,
+    priorAmount: Number(r.priorAmount) || 0,
+  }))
+  // 如果有超1年明细则推（从 overdueNote 暂不构造结构行，待后续增加录入区块）
+  const overdueRows: M1OverdueRow[] = []
+  const payload = buildM1SyncPayload(props.wpId, 'listed', dividendRows, overdueRows)
+  if (!payload) return
+  try {
+    const { default: request } = await import('@/utils/request')
+    await request.post(`/api/workpapers/${props.wpId}/sync-from-workpaper`, payload)
+  } catch { /* fail-open */ }
+}
+
+const { scheduleAutoSync } = useDisclosureAutoSync(syncToDisclosureNotes)
 
 // ─── FormData ───────────────────────────────────────────────────────────────
 
@@ -203,19 +220,23 @@ function updateDetailRow(index: number, field: 'endAmount' | 'priorYearEnd', val
   if (index >= 0 && index < detailRows.value.length) {
     detailRows.value[index][field] = val
     formData.debouncedSave(`M1-disclosure-listed-${index}-${field}`, { remark: String(val) })
+    scheduleAutoSync()
   }
 }
 
 function handleOverdueNoteChange() {
   formData.debouncedSave('M1-disclosure-listed-overdue', { remark: overdueNote.value || null })
+  scheduleAutoSync()
 }
 
 function handlePolicyNoteChange() {
   formData.debouncedSave('M1-disclosure-listed-policy', { remark: policyNote.value || null })
+  scheduleAutoSync()
 }
 
 function handlePlanNoteChange() {
   formData.debouncedSave('M1-disclosure-listed-plan', { remark: planNote.value || null })
+  scheduleAutoSync()
 }
 
 function handleConclusionChange() {

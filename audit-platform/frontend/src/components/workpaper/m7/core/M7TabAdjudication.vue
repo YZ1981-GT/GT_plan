@@ -1,5 +1,11 @@
 <template>
   <div class="m7-tab-adjudication">
+    <!-- 四表库取数溯源面板 -->
+    <WpFourTableSourcePanel
+      v-if="props.tbSourceCodes"
+      :source-codes="props.tbSourceCodes"
+      gross-label="专项储备"
+    />
     <!-- ═══ 标题 + AI/复核 ═══ -->
     <div class="section-header">
       <div class="section-header-left">
@@ -318,8 +324,9 @@ import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBring
 import { useVersionTrail } from '../../composables/useVersionTrail'
 import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import { eventBus } from '@/utils/eventBus'
+import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
 
-const props = defineProps<{ wpId: string; projectId: string; isReadonly: boolean }>()
+const props = defineProps<{ wpId: string; projectId: string; isReadonly: boolean; tbSourceCodes?: Record<string, any> | null }>()
 const emit = defineEmits<{ (e: 'navigate', sheetName: string): void; (e: 'save'): void }>()
 
 // ─── Inject复核对话 ──────────────────────────────────────────────────────────

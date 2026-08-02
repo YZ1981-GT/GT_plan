@@ -41,26 +41,20 @@
         <el-table-column prop="item" label="项目" min-width="200" />
         <el-table-column label="年初余额" min-width="140" align="right">
           <template #default="{ row, $index }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.beginBalance"
-              :controls="false"
-              size="small"
-              style="width:100%"
-              @change="(val: number | undefined) => updateDetailRow($index, 'beginBalance', val ?? 0)"
+              @update:model-value="(val: number) => updateDetailRow($index, 'beginBalance', val)"
             />
             <span v-else>{{ fmtAmount(row.beginBalance) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="期末余额" min-width="140" align="right">
           <template #default="{ row, $index }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.endBalance"
-              :controls="false"
-              size="small"
-              style="width:100%"
-              @change="(val: number | undefined) => updateDetailRow($index, 'endBalance', val ?? 0)"
+              @update:model-value="(val: number) => updateDetailRow($index, 'endBalance', val)"
             />
             <span v-else>{{ fmtAmount(row.endBalance) }}</span>
           </template>
@@ -142,6 +136,7 @@ import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import { useM1FormData } from '../../composables/useM1FormData'
 import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 
 const props = defineProps<{
   wpId: string
@@ -156,6 +151,26 @@ const emit = defineEmits<{
 const openReviewDialog = inject<((sectionId: string, sectionLabel?: string) => void) | null>('openReviewDialog', null)
 const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
 const aiLoading = ref('')
+
+// ─── 同步链路（浅合并推 K3 §八、42 的应付股利子表） ──────────────────────────
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import { buildM1SyncPayload, type M1DividendRow } from '../../composables/m1NoteSectionMap'
+
+async function syncToDisclosureNotes(): Promise<void> {
+  const dividendRows: M1DividendRow[] = detailRows.value.map((r: any) => ({
+    label: r.item || r.label || '',
+    endAmount: Number(r.endAmount) || 0,
+    priorAmount: Number(r.priorAmount) || 0,
+  }))
+  const payload = buildM1SyncPayload(props.wpId, 'soe', dividendRows)
+  if (!payload) return
+  try {
+    const { default: request } = await import('@/utils/request')
+    await request.post(`/api/workpapers/${props.wpId}/sync-from-workpaper`, payload)
+  } catch { /* fail-open */ }
+}
+
+const { scheduleAutoSync } = useDisclosureAutoSync(syncToDisclosureNotes)
 
 // ─── FormData ───────────────────────────────────────────────────────────────
 
@@ -183,15 +198,18 @@ function updateDetailRow(index: number, field: 'beginBalance' | 'endBalance', va
   if (index >= 0 && index < detailRows.value.length) {
     detailRows.value[index][field] = val
     formData.debouncedSave(`M1-disclosure-soe-${index}-${field}`, { remark: String(val) })
+    scheduleAutoSync()
   }
 }
 
 function handleSoeCapitalNoteChange() {
   formData.debouncedSave('M1-disclosure-soe-capital', { remark: soeCapitalNote.value || null })
+  scheduleAutoSync()
 }
 
 function handleDistributionNoteChange() {
   formData.debouncedSave('M1-disclosure-soe-distribution', { remark: distributionNote.value || null })
+  scheduleAutoSync()
 }
 
 function handleConclusionChange() {

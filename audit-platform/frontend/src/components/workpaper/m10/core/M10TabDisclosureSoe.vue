@@ -47,12 +47,9 @@
         <el-table-column label="期初余额" width="140" align="right">
           <template #default="{ row, $index }">
             <template v-if="!row._isTotal && !isReadonly">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.beginBalance"
-                :controls="false"
-                size="small"
-                style="width: 100%"
-                @change="(val: number | undefined) => updateRow($index, 'beginBalance', val ?? 0)"
+                @update:model-value="(val: number) => updateRow($index, 'beginBalance', val)"
               />
             </template>
             <span v-else :class="{ 'formula-value': row._isTotal }">{{ fmtAmount(row.beginBalance) }}</span>
@@ -67,12 +64,9 @@
           </template>
           <template #default="{ row, $index }">
             <template v-if="!row._isTotal && !isReadonly">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.issuance"
-                :controls="false"
-                size="small"
-                style="width: 100%"
-                @change="(val: number | undefined) => updateRow($index, 'issuance', val ?? 0)"
+                @update:model-value="(val: number) => updateRow($index, 'issuance', val)"
               />
             </template>
             <span v-else :class="{ 'formula-value': row._isTotal }">{{ fmtAmount(row.issuance) }}</span>
@@ -87,12 +81,9 @@
           </template>
           <template #default="{ row, $index }">
             <template v-if="!row._isTotal && !isReadonly">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.redemption"
-                :controls="false"
-                size="small"
-                style="width: 100%"
-                @change="(val: number | undefined) => updateRow($index, 'redemption', val ?? 0)"
+                @update:model-value="(val: number) => updateRow($index, 'redemption', val)"
               />
             </template>
             <span v-else :class="{ 'formula-value': row._isTotal }">{{ fmtAmount(row.redemption) }}</span>
@@ -189,6 +180,9 @@ import { eventBus } from '@/utils/eventBus'
 import { useM10FormData } from '../../composables/useM10FormData'
 import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import { calcEquityEndBalance } from '../../composables/useM10FormulaEngine'
+import WpAmountInput from '../../shared/WpAmountInput.vue'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import { buildM10SoeSyncPayload, type M10MovementRow } from '../../composables/m10NoteSectionMap'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -212,6 +206,29 @@ const formData = useM10FormData({
   wpId: computed(() => props.wpId),
   projectId: computed(() => props.projectId),
 })
+
+// ─── 同步链路 ───────────────────────────────────────────────────────────────
+
+async function syncToDisclosureNotes(): Promise<void> {
+  const rows: M10MovementRow[] = dataRows.value.map((r) => ({
+    label: r.item,
+    beginQty: 0,  // UI 暂无数量维度
+    beginValue: r.beginBalance,
+    increaseQty: 0,
+    increaseValue: r.issuance,
+    decreaseQty: 0,
+    decreaseValue: r.redemption,
+  }))
+  const noteText = [classificationBasis.value, soeSpecialNote.value].filter(Boolean).join('\n\n')
+  const payload = buildM10SoeSyncPayload(props.wpId, rows, noteText || undefined)
+  if (!payload) return
+  try {
+    const { default: request } = await import('@/utils/request')
+    await request.post(`/api/workpapers/${props.wpId}/sync-from-workpaper`, payload)
+  } catch { /* fail-open */ }
+}
+
+const { scheduleAutoSync } = useDisclosureAutoSync(syncToDisclosureNotes)
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
@@ -261,6 +278,7 @@ function updateRow(index: number, field: 'beginBalance' | 'issuance' | 'redempti
   if (index >= 0 && index < dataRows.value.length) {
     dataRows.value[index][field] = val
     formData.debouncedSave(`M10-disclosure-soe-${index}-${field}`, { remark: String(val) })
+    scheduleAutoSync()
   }
 }
 
@@ -270,10 +288,12 @@ function getRowClassName({ row }: { row: DisclosureRow; rowIndex: number }): str
 
 function handleClassificationBasisChange() {
   formData.debouncedSave('M10-disclosure-soe-classification-basis', { remark: classificationBasis.value || null })
+  scheduleAutoSync()
 }
 
 function handleSoeSpecialNoteChange() {
   formData.debouncedSave('M10-disclosure-soe-special-note', { remark: soeSpecialNote.value || null })
+  scheduleAutoSync()
 }
 
 const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')

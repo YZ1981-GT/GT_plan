@@ -41,39 +41,30 @@
         <el-table-column prop="item" label="出资人/出资方式" min-width="180" />
         <el-table-column label="期初余额" min-width="130" align="right">
           <template #default="{ row, $index }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.beginAmount"
-              :controls="false"
-              size="small"
-              style="width:100%"
-              @change="(val: number | undefined) => updateCapitalRow($index, 'beginAmount', val ?? 0)"
+              @update:model-value="(val: number) => updateCapitalRow($index, 'beginAmount', val)"
             />
             <span v-else>{{ fmtAmount(row.beginAmount) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="本期增加" min-width="130" align="right">
           <template #default="{ row, $index }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.increaseAmount"
-              :controls="false"
-              size="small"
-              style="width:100%"
-              @change="(val: number | undefined) => updateCapitalRow($index, 'increaseAmount', val ?? 0)"
+              @update:model-value="(val: number) => updateCapitalRow($index, 'increaseAmount', val)"
             />
             <span v-else>{{ fmtAmount(row.increaseAmount) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="本期减少" min-width="130" align="right">
           <template #default="{ row, $index }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.decreaseAmount"
-              :controls="false"
-              size="small"
-              style="width:100%"
-              @change="(val: number | undefined) => updateCapitalRow($index, 'decreaseAmount', val ?? 0)"
+              @update:model-value="(val: number) => updateCapitalRow($index, 'decreaseAmount', val)"
             />
             <span v-else>{{ fmtAmount(row.decreaseAmount) }}</span>
           </template>
@@ -193,6 +184,9 @@ import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import { useM2FormData } from '../../composables/useM2FormData'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import { buildM2SoeSyncPayload, type M2SoeRow } from '../../composables/m2NoteSectionMap'
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 
 const props = defineProps<{
   wpId: string
@@ -214,6 +208,32 @@ const formData = useM2FormData({
   wpId: computed(() => props.wpId),
   projectId: computed(() => props.projectId),
 })
+
+// ─── 同步链路 ───────────────────────────────────────────────────────────────
+
+async function syncToDisclosureNotes(): Promise<void> {
+  const rows: M2SoeRow[] = capitalChangeRows.value
+    .filter((r) => r.item !== '合计') // 合计行由载荷构建
+    .map((r) => ({
+      label: r.item,
+      beginAmount: r.beginAmount,
+      beginRatio: r.ratio ? (r.ratio * 100).toFixed(2) : '',
+      increase: r.increaseAmount,
+      decrease: r.decreaseAmount,
+    }))
+  const payload = buildM2SoeSyncPayload(props.wpId, rows, {
+    stateCapital: stateCapitalNote.value,
+    method: methodNote.value,
+    registration: registrationNote.value,
+  })
+  if (!payload) return
+  try {
+    const { default: request } = await import('@/utils/request')
+    await request.post(`/api/workpapers/${props.wpId}/sync-from-workpaper`, payload)
+  } catch { /* fail-open */ }
+}
+
+const { scheduleAutoSync } = useDisclosureAutoSync(syncToDisclosureNotes)
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
@@ -267,11 +287,13 @@ function updateCapitalRow(index: number, field: 'beginAmount' | 'increaseAmount'
     formData.debouncedSave('M2-disclosure-soe-capital-rows', {
       remark: JSON.stringify(capitalChangeRows.value),
     })
+    scheduleAutoSync()
   }
 }
 
 function handleNoteChange(section: string, value: string) {
   formData.debouncedSave(`M2-disclosure-soe-${section}`, { remark: value || null })
+  scheduleAutoSync()
 }
 
 // section → { ref, 持久化key } 映射

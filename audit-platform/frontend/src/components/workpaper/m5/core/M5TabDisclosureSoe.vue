@@ -57,12 +57,9 @@
         <el-table-column label="期初余额" width="140" align="right">
           <template #default="{ row, $index }">
             <template v-if="!row._isTotal && !isReadonly">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.beginBalance"
-                :controls="false"
-                size="small"
-                style="width: 100%"
-                @change="(val: number | undefined) => updateRow($index, 'beginBalance', val ?? 0)"
+                @update:model-value="(val: number) => updateRow($index, 'beginBalance', val)"
               />
             </template>
             <span v-else :class="{ 'formula-value': row._isTotal }">{{ fmtAmount(row.beginBalance) }}</span>
@@ -77,12 +74,9 @@
           </template>
           <template #default="{ row, $index }">
             <template v-if="!row._isTotal && !isReadonly">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.increase"
-                :controls="false"
-                size="small"
-                style="width: 100%"
-                @change="(val: number | undefined) => updateRow($index, 'increase', val ?? 0)"
+                @update:model-value="(val: number) => updateRow($index, 'increase', val)"
               />
             </template>
             <span v-else :class="{ 'formula-value': row._isTotal }">{{ fmtAmount(row.increase) }}</span>
@@ -97,12 +91,9 @@
           </template>
           <template #default="{ row, $index }">
             <template v-if="!row._isTotal && !isReadonly">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.decrease"
-                :controls="false"
-                size="small"
-                style="width: 100%"
-                @change="(val: number | undefined) => updateRow($index, 'decrease', val ?? 0)"
+                @update:model-value="(val: number) => updateRow($index, 'decrease', val)"
               />
             </template>
             <span v-else :class="{ 'formula-value': row._isTotal }">{{ fmtAmount(row.decrease) }}</span>
@@ -222,6 +213,7 @@ import { eventBus } from '@/utils/eventBus'
 import { useM5FormData } from '../../composables/useM5FormData'
 import { calcEquityEndBalance } from '../../composables/useM5FormulaEngine'
 import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { buildMEquitySyncPayload, M_EQUITY_CONFIG } from '../../composables/mEquityChangeNoteSectionMap'
 import { buildNoteJumpRoute } from '@/views/composables/noteDisclosureReverseJump'

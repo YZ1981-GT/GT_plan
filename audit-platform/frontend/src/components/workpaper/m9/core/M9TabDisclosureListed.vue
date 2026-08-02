@@ -41,26 +41,20 @@
         <el-table-column prop="item" label="项目" min-width="200" />
         <el-table-column label="本期税前发生额" min-width="130" align="right">
           <template #default="{ row, $index }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.preTaxAmount"
-              :controls="false"
-              size="small"
-              style="width:100%"
-              @change="(val: number | undefined) => updateNonReclassRow($index, 'preTaxAmount', val ?? 0)"
+              @update:model-value="(val: number) => updateNonReclassRow($index, 'preTaxAmount', val)"
             />
             <span v-else>{{ fmtAmount(row.preTaxAmount) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="所得税影响" min-width="120" align="right">
           <template #default="{ row, $index }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.taxEffect"
-              :controls="false"
-              size="small"
-              style="width:100%"
-              @change="(val: number | undefined) => updateNonReclassRow($index, 'taxEffect', val ?? 0)"
+              @update:model-value="(val: number) => updateNonReclassRow($index, 'taxEffect', val)"
             />
             <span v-else>{{ fmtAmount(row.taxEffect) }}</span>
           </template>
@@ -72,13 +66,10 @@
         </el-table-column>
         <el-table-column label="上年同期" min-width="120" align="right">
           <template #default="{ row, $index }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.priorYearAmount"
-              :controls="false"
-              size="small"
-              style="width:100%"
-              @change="(val: number | undefined) => updateNonReclassRow($index, 'priorYearAmount', val ?? 0)"
+              @update:model-value="(val: number) => updateNonReclassRow($index, 'priorYearAmount', val)"
             />
             <span v-else>{{ fmtAmount(row.priorYearAmount) }}</span>
           </template>
@@ -100,26 +91,20 @@
         <el-table-column prop="item" label="项目" min-width="200" />
         <el-table-column label="本期税前发生额" min-width="130" align="right">
           <template #default="{ row, $index }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.preTaxAmount"
-              :controls="false"
-              size="small"
-              style="width:100%"
-              @change="(val: number | undefined) => updateReclassRow($index, 'preTaxAmount', val ?? 0)"
+              @update:model-value="(val: number) => updateReclassRow($index, 'preTaxAmount', val)"
             />
             <span v-else>{{ fmtAmount(row.preTaxAmount) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="所得税影响" min-width="120" align="right">
           <template #default="{ row, $index }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.taxEffect"
-              :controls="false"
-              size="small"
-              style="width:100%"
-              @change="(val: number | undefined) => updateReclassRow($index, 'taxEffect', val ?? 0)"
+              @update:model-value="(val: number) => updateReclassRow($index, 'taxEffect', val)"
             />
             <span v-else>{{ fmtAmount(row.taxEffect) }}</span>
           </template>
@@ -131,13 +116,10 @@
         </el-table-column>
         <el-table-column label="上年同期" min-width="120" align="right">
           <template #default="{ row, $index }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.priorYearAmount"
-              :controls="false"
-              size="small"
-              style="width:100%"
-              @change="(val: number | undefined) => updateReclassRow($index, 'priorYearAmount', val ?? 0)"
+              @update:model-value="(val: number) => updateReclassRow($index, 'priorYearAmount', val)"
             />
             <span v-else>{{ fmtAmount(row.priorYearAmount) }}</span>
           </template>
@@ -239,7 +221,10 @@ import { MagicStick, Check } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
 import { useM9FormData } from '../../composables/useM9FormData'
 import { calcAfterTaxNet } from '../../composables/useM9OciEngine'
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import { buildM9ListedSyncPayload, type M9ListedRow } from '../../composables/m9NoteSectionMap'
 
 const props = defineProps<{
   wpId: string
@@ -261,6 +246,38 @@ const formData = useM9FormData({
   wpId: computed(() => props.wpId),
   projectId: computed(() => props.projectId),
 })
+
+// ─── 同步链路 ───────────────────────────────────────────────────────────────
+
+function _mapToListedRows(rows: DisclosureRow[]): M9ListedRow[] {
+  return rows
+    .filter((r) => !r.item.includes('小计') && !r.item.includes('合计'))
+    .map((r) => ({
+      label: r.item,
+      beginAmount: r.priorYearAmount,
+      preTax: r.preTaxAmount,
+      transferToPl: 0,
+      taxEffect: r.taxEffect,
+      afterTaxParent: r.preTaxAmount - r.taxEffect, // 税后归母 = 税前 - 所得税
+      afterTaxMinority: 0,
+    }))
+}
+
+async function syncToDisclosureNotes(): Promise<void> {
+  const bsRows = [
+    ...(_mapToListedRows(nonReclassRows.value)),
+    ...(_mapToListedRows(reclassRows.value)),
+  ]
+  // 上市版两表同数据（资产负债表视角 + 利润表视角），当前 UI 未区分
+  const payload = buildM9ListedSyncPayload(props.wpId, bsRows, bsRows)
+  if (!payload) return
+  try {
+    const { default: request } = await import('@/utils/request')
+    await request.post(`/api/workpapers/${props.wpId}/sync-from-workpaper`, payload)
+  } catch { /* fail-open */ }
+}
+
+const { scheduleAutoSync } = useDisclosureAutoSync(syncToDisclosureNotes)
 
 // ─── State: 不可重分类OCI行 ─────────────────────────────────────────────────
 
@@ -320,6 +337,7 @@ function updateNonReclassRow(index: number, field: keyof DisclosureRow, val: num
   if (index >= 0 && index < nonReclassRows.value.length) {
     (nonReclassRows.value[index] as any)[field] = val
     formData.debouncedSave(`M9-disclosure-listed-nonReclass-${index}-${field}`, { remark: String(val) })
+    scheduleAutoSync()
   }
 }
 
@@ -327,15 +345,18 @@ function updateReclassRow(index: number, field: keyof DisclosureRow, val: number
   if (index >= 0 && index < reclassRows.value.length) {
     (reclassRows.value[index] as any)[field] = val
     formData.debouncedSave(`M9-disclosure-listed-reclass-${index}-${field}`, { remark: String(val) })
+    scheduleAutoSync()
   }
 }
 
 function handleOciRemarkChange() {
   formData.debouncedSave('M9-disclosure-listed-remark', { remark: ociRemarkNote.value || null })
+  scheduleAutoSync()
 }
 
 function handleTransferNoteChange() {
   formData.debouncedSave('M9-disclosure-listed-transfer', { remark: transferNote.value || null })
+  scheduleAutoSync()
 }
 
 const LISTED_NOTE_TARGETS: Record<string, { get: () => string; set: (v: string) => void; save: () => void }> = {

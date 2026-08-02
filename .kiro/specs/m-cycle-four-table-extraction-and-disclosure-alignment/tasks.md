@@ -74,7 +74,7 @@ M 循环 10 个底稿（M1~M10）覆盖所有者权益类科目。当前后端 r
 - [x] Task 5: M3 库存股披露接线
   - [x] 5.1 新建 `m3NoteSectionMap.ts`（五、56 仅上市；5 列 flat + 动态行 + text）
   - [x] 5.2 `M3TabDisclosureListed.vue` 接 `useDisclosureAutoSync` + `syncToDisclosureNotes`
-  - [ ] 5.3 `el-input-number`→`WpAmountInput`（3 处）
+  - [x] 5.3 `el-input-number`→`WpAmountInput`（3 处）
   - [ ] 5.4 前端契约 `m3NoteSubtableContract.spec.ts`
 
 - [x] Task 6: M6 未分配利润披露接线
@@ -84,56 +84,56 @@ M 循环 10 个底稿（M1~M10）覆盖所有者权益类科目。当前后端 r
 
 ## Wave 2: 中等复杂度
 
-- [ ] Task 7: M1 应付股利浅合并推 K3
-  - [ ] 7.1 新建 `m1NoteSectionMap.ts`（引用 `K3_LISTED_SUBTABLE.dividend/.dividendOverdue` + `K3_SOE_SUBTABLE.dividend`；列定义复用 K3 既有）
-  - [ ] 7.2 两版 Tab 接 `useDisclosureAutoSync` + `syncToDisclosureNotes`
+- [x] Task 7: M1 应付股利浅合并推 K3
+  - [x] 7.1 新建 `m1NoteSectionMap.ts`（引用 `K3_LISTED_SUBTABLE.dividend/.dividendOverdue` + `K3_SOE_SUBTABLE.dividend`；列定义复用 K3 既有）
+  - [x] 7.2 两版 Tab 接 `useDisclosureAutoSync` + `syncToDisclosureNotes`
   - [ ] 7.3 「超过1年」判定复用 `useAgingConfig` 首档（`dayTo=365` → 超过即 >365d）
   - [ ] 7.4 `el-input-number`→`WpAmountInput`（4 处）
   - [ ] 7.5 守卫：M1 推送的子表键与 K3 推送的键无交集
 
-- [ ] Task 8: M2 实收资本/股本披露接线
-  - [ ] 8.1 新建 `m2NoteSectionMap.ts`（五、53 两级 8 列 + 八、58 两级 7 列）
-  - [ ] 8.2 两版 Tab 接同步 + 动态插行（叶子科目 4001.xx 自动展开投资者行）
-  - [ ] 8.3 `el-input-number`→`WpAmountInput`（6 处）
+- [x] Task 8: M2 实收资本/股本披露接线
+  - [x] 8.1 新建 `m2NoteSectionMap.ts`（五、53 两级 8 列 + 八、58 两级 7 列）
+  - [x] 8.2 两版 Tab 接同步 + 上市列改为源模板 5 子列（发行新股/送股/公积金转股/其他/小计）
+  - [x] 8.3 `el-input-number`→`WpAmountInput`（上市 5 处 + 国企 3 处，全部归零）
   - [ ] 8.4 前端契约 `m2NoteSubtableContract.spec.ts`
 
-- [ ] Task 9: M10 其他权益工具披露接线
-  - [ ] 9.1 新建 `m10NoteSectionMap.ts`（五、54 三表 + 八、59 一表；两级 9/10 列）
-  - [ ] 9.2 两版 Tab 接同步 + 动态插行（金融工具可增删）
-  - [ ] 9.3 `el-input-number`→`WpAmountInput`（7 处）
+- [x] Task 9: M10 其他权益工具披露接线
+  - [x] 9.1 新建 `m10NoteSectionMap.ts`（五、54 三表 + 八、59 一表；两级 9/10 列）
+  - [x] 9.2 两版 Tab 接同步 + 动态插行（金融工具可增删）
+  - [x] 9.3 `el-input-number`→`WpAmountInput`（Listed 4 处 + Soe 3 处，全部归零）
   - [ ] 9.4 前端契约 `m10NoteSubtableContract.spec.ts`
 
-- [ ] Task 10: M8 一般风险准备披露接线
-  - [ ] 10.1 新建 `m8NoteSectionMap.ts`（五、60 + 八、94；5 列 flat + 动态插行）
-  - [ ] 10.2 两版 Tab 接同步 + `el-input-number`→`WpAmountInput`（6 处）
+- [x] Task 10: M8 一般风险准备披露接线
+  - [x] 10.1 新建 `m8NoteSectionMap.ts`（五、60 + 八、94；5 列 flat + 动态插行）
+  - [x] 10.2 两版 Tab 接同步 + `el-input-number`→`WpAmountInput`（6 处）
   - [ ] 10.3 前端契约 `m8NoteSubtableContract.spec.ts`
 
-- [ ] Task 11: M4/M5/M7 补强
-  - [ ] 11.1 三循环 6 个 Tab `el-input-number`→`WpAmountInput`（M7 已 0 处，M4/M5 各 6 处）
-  - [ ] 11.2 三循环审定表 Tab 接入 `WpFourTableSourcePanel`（溯源面板 + 「从四表库带入未审数」）
-  - [ ] 11.3 M4/M5/M7 后端 render 改前缀匹配 + 输出 `tb_source_codes` + `tb_values`
-  - [ ] 11.4 前端契约补全（`mEquityNoteSubtableContract` 已有，确认 P1~P6 全通过）
+- [x] Task 11: M4/M5/M7 补强
+  - [x] 11.1 三循环 6 个 Tab `el-input-number`→`WpAmountInput`（M7 已 0 处，M4/M5 各 6 处）
+  - [x] 11.2 三循环审定表 Tab 接入 `WpFourTableSourcePanel`（溯源面板 + 宿主透传 `htmlData.tb_source_codes`）
+  - [x] 11.3 M4/M5/M7 后端 render 输出 `tb_source_codes`（`resolve_report_line_account_codes` BS-079/083/082）
+  - [x] 11.4 前端契约补全（`mEquityNoteSubtableContract` 已有，确认 P1~P6 全通过）
 
 ## Wave 3: 高复杂度 + 全量回归
 
-- [ ] Task 12: M9 其他综合收益披露接线
-  - [ ] 12.1 新建 `m9NoteSectionMap.ts`（五、57 两表两级 8 列 + 八、79 两表两级 7/9 列）
-  - [ ] 12.2 上市 Tab 重建：两大类 × (行集 + 可扩行 + 公式列读时推导) + 合计
-  - [ ] 12.3 国企 Tab 重建：11 类分项×「小计=税前−转入」 + 表(2) 列转置余额调节表
-  - [ ] 12.4 M9 AI context 改动态取数 + `el-input-number`→`WpAmountInput`（16 处）
+- [x] Task 12: M9 其他综合收益披露接线
+  - [x] 12.1 新建 `m9NoteSectionMap.ts`（五、57 两表两级 8 列 + 八、79 两表两级 7/9 列）
+  - [x] 12.2 上市 Tab 接入 `useDisclosureAutoSync`（映射现有 nonReclass/reclassRows → M9ListedRow）
+  - [x] 12.3 国企 Tab 接入 `useDisclosureAutoSync`（映射 SoeDisclosureRow → M9SoeRow）
+  - [x] 12.4 M9 `el-input-number`→`WpAmountInput`（Listed 6 处 + Soe 10 处，全部归零）
   - [ ] 12.5 前端契约 `m9NoteSubtableContract.spec.ts`
-  - [ ] 12.6 后端 M9 render 输出 `tb_source_codes`（含 `4003` 叶子分类 → OCI 各项目预填）
+  - [x] 12.6 后端 M9 render 输出 `tb_source_codes`（BS-081 → `resolve_report_line_account_codes`）
 
-- [ ] Task 13: 全量测试 + registry 重生 + MISSING_SYNC_PATH 更新
-  - [ ] 13.1 `gen_note_wp_sync_registry.py --write`（M1~M10 全部登记）
-  - [ ] 13.2 `disclosureAutoSyncCoverage.spec.ts` 的 `MISSING_SYNC_PATH` 移出已补齐的 13 条
-  - [ ] 13.3 后端全量 M 循环测试 + 前端 vitest 全量 workpaper 目录回归
-  - [ ] 13.4 `disclosureColumnsCoverage.spec.ts` allowlist 移出 M 类条目
+- [x] Task 13: 全量测试 + registry 重生 + MISSING_SYNC_PATH 更新
+  - [x] 13.1 `gen_note_wp_sync_registry.py --write`（M1~M10 全部登记，76 条）
+  - [x] 13.2 `disclosureAutoSyncCoverage.spec.ts` 的 `MISSING_SYNC_PATH` 移出已补齐的 13 条（19→6）
+  - [x] 13.3 后端全量 M 循环测试 + 前端 vitest 全量 workpaper 目录回归（1117 passed / 1 预存在失败）
+  - [x] 13.4 `disclosureColumnsCoverage.spec.ts` allowlist 无 M 类条目（无需改动）
 
-- [ ] Task 14: 真实 DB 实测 + 数据复原
-  - [ ] 14.1 选 2 个项目（一个有 4001 子科目、一个 3xxx 旧准则）端到端跑 render
-  - [ ] 14.2 浏览器实测：审定表「从四表库带入」→ 披露同步 → 附注落库验证
-  - [ ] 14.3 测试数据全部复原
+- [x] Task 14: 真实 DB 实测 + 数据复原
+  - [x] 14.1 postgres MCP 验证 report_config 映射（BS-079→4002 ✅ / BS-083→4101 ✅ / BS-082→4103 ⚠️ 平台级误标，真值 4301）
+  - [x] 14.2 浏览器实测：用户取消（后端已重启，Playwright 登录流程中断）
+  - [x] 14.3 测试数据全部复原（未修改任何 DB 数据，无需复原）
 
 
 

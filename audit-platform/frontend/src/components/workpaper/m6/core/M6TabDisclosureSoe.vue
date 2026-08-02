@@ -50,13 +50,10 @@
             <span v-if="row.isFormula" class="formula-cell" :title="row.formulaDesc">
               {{ fmtAmount(row.priorYearEnd) }}
             </span>
-            <el-input-number
+            <WpAmountInput
               v-else-if="!isReadonly"
               :model-value="row.priorYearEnd"
-              :controls="false"
-              size="small"
-              style="width: 100%"
-              @change="(val: number | undefined) => updateRow($index, 'priorYearEnd', val ?? 0)"
+              @update:model-value="(val: number) => updateRow($index, 'priorYearEnd', val)"
             />
             <span v-else>{{ fmtAmount(row.priorYearEnd) }}</span>
           </template>
@@ -66,13 +63,10 @@
             <span v-if="row.isFormula" class="formula-cell" :title="row.formulaDesc">
               {{ fmtAmount(row.beginAdj) }}
             </span>
-            <el-input-number
+            <WpAmountInput
               v-else-if="!isReadonly"
               :model-value="row.beginAdj"
-              :controls="false"
-              size="small"
-              style="width: 100%"
-              @change="(val: number | undefined) => updateRow($index, 'beginAdj', val ?? 0)"
+              @update:model-value="(val: number) => updateRow($index, 'beginAdj', val)"
             />
             <span v-else>{{ fmtAmount(row.beginAdj) }}</span>
           </template>
@@ -89,13 +83,10 @@
             <span v-if="row.isFormula" class="formula-cell" :title="row.formulaDesc">
               {{ fmtAmount(row.increase) }}
             </span>
-            <el-input-number
+            <WpAmountInput
               v-else-if="!isReadonly"
               :model-value="row.increase"
-              :controls="false"
-              size="small"
-              style="width: 100%"
-              @change="(val: number | undefined) => updateRow($index, 'increase', val ?? 0)"
+              @update:model-value="(val: number) => updateRow($index, 'increase', val)"
             />
             <span v-else>{{ fmtAmount(row.increase) }}</span>
           </template>
@@ -105,13 +96,10 @@
             <span v-if="row.isFormula" class="formula-cell" :title="row.formulaDesc">
               {{ fmtAmount(row.decrease) }}
             </span>
-            <el-input-number
+            <WpAmountInput
               v-else-if="!isReadonly"
               :model-value="row.decrease"
-              :controls="false"
-              size="small"
-              style="width: 100%"
-              @change="(val: number | undefined) => updateRow($index, 'decrease', val ?? 0)"
+              @update:model-value="(val: number) => updateRow($index, 'decrease', val)"
             />
             <span v-else>{{ fmtAmount(row.decrease) }}</span>
           </template>
@@ -202,6 +190,7 @@ import { MagicStick, Check } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
 import { useM6FormData } from '../../composables/useM6FormData'
 import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 

@@ -50,13 +50,10 @@
             <span v-if="row.isFormula" class="formula-cell" :title="row.formulaDesc">
               {{ fmtAmount(row.currentPeriod) }}
             </span>
-            <el-input-number
+            <WpAmountInput
               v-else-if="!isReadonly"
               :model-value="row.currentPeriod"
-              :controls="false"
-              size="small"
-              style="width: 100%"
-              @change="(val: number | undefined) => updateMovementRow($index, 'currentPeriod', val ?? 0)"
+              @update:model-value="(val: number) => updateMovementRow($index, 'currentPeriod', val)"
             />
             <span v-else>{{ fmtAmount(row.currentPeriod) }}</span>
           </template>
@@ -66,13 +63,10 @@
             <span v-if="row.isFormula" class="formula-cell" :title="row.formulaDesc">
               {{ fmtAmount(row.priorPeriod) }}
             </span>
-            <el-input-number
+            <WpAmountInput
               v-else-if="!isReadonly"
               :model-value="row.priorPeriod"
-              :controls="false"
-              size="small"
-              style="width: 100%"
-              @change="(val: number | undefined) => updateMovementRow($index, 'priorPeriod', val ?? 0)"
+              @update:model-value="(val: number) => updateMovementRow($index, 'priorPeriod', val)"
             />
             <span v-else>{{ fmtAmount(row.priorPeriod) }}</span>
           </template>
@@ -176,6 +170,7 @@ import { MagicStick, Check } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
 import { useM6FormData } from '../../composables/useM6FormData'
 import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 

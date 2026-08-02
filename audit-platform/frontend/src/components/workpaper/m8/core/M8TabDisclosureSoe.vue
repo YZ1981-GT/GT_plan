@@ -55,13 +55,9 @@
           </template>
           <template #default="{ row, $index }">
             <template v-if="row._rowType === 'data' && !isReadonly">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.beginBalance"
-                :controls="false"
-                :precision="2"
-                size="small"
-                style="width:100%"
-                @change="(val: number | undefined) => updateDataRow($index, 'beginBalance', val ?? 0)"
+                @update:model-value="(val: number) => updateDataRow($index, 'beginBalance', val)"
               />
             </template>
             <span v-else :class="{ 'formula-value': row._rowType === 'total' }">
@@ -74,13 +70,9 @@
         <el-table-column label="本期增加" width="140" align="right">
           <template #default="{ row, $index }">
             <template v-if="row._rowType === 'data' && !isReadonly">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.currentIncrease"
-                :controls="false"
-                :precision="2"
-                size="small"
-                style="width:100%"
-                @change="(val: number | undefined) => updateDataRow($index, 'currentIncrease', val ?? 0)"
+                @update:model-value="(val: number) => updateDataRow($index, 'currentIncrease', val)"
               />
             </template>
             <span v-else :class="{ 'formula-value': row._rowType === 'total' }">
@@ -93,13 +85,9 @@
         <el-table-column label="本期减少" width="140" align="right">
           <template #default="{ row, $index }">
             <template v-if="row._rowType === 'data' && !isReadonly">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.currentDecrease"
-                :controls="false"
-                :precision="2"
-                size="small"
-                style="width:100%"
-                @change="(val: number | undefined) => updateDataRow($index, 'currentDecrease', val ?? 0)"
+                @update:model-value="(val: number) => updateDataRow($index, 'currentDecrease', val)"
               />
             </template>
             <span v-else :class="{ 'formula-value': row._rowType === 'total' }">
@@ -205,6 +193,7 @@ import { useVersionTrail } from '../../composables/useVersionTrail'
 import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import { eventBus } from '@/utils/eventBus'
 import { calcEquityEndBalance, calcSubtotal } from '../../composables/useM8FormulaEngine'
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 
 const props = defineProps<{ wpId: string; projectId: string; isReadonly: boolean }>()
 const emit = defineEmits<{ (e: 'navigate', sheetName: string): void }>()
@@ -213,6 +202,27 @@ const emit = defineEmits<{ (e: 'navigate', sheetName: string): void }>()
 const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', () => {})
 const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
 const aiLoading = ref('')
+
+// ─── 同步链路 ───────────────────────────────────────────────────────────────
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import { buildM8SyncPayload, type M8DisclosureRow } from '../../composables/m8NoteSectionMap'
+
+async function syncToDisclosureNotes(): Promise<void> {
+  const rows: M8DisclosureRow[] = dataRows.value.map((r: any) => ({
+    label: r.item || r.label || '',
+    begin: Number(r.beginAmount) || 0,
+    increase: Number(r.increaseAmount) || 0,
+    decrease: Number(r.decreaseAmount) || 0,
+  }))
+  const payload = buildM8SyncPayload(props.wpId, 'soe', rows, disclosureNote.value)
+  if (!payload) return
+  try {
+    const { default: request } = await import('@/utils/request')
+    await request.post(`/api/workpapers/${props.wpId}/sync-from-workpaper`, payload)
+  } catch { /* fail-open */ }
+}
+
+const { scheduleAutoSync } = useDisclosureAutoSync(syncToDisclosureNotes)
 
 // ─── Composables ─────────────────────────────────────────────────────────────
 const formData = useM8FormData({
@@ -290,15 +300,18 @@ function updateDataRow(tableIndex: number, field: keyof DisclosureDataRow, val: 
   if (tableIndex >= 0 && tableIndex < dataRows.value.length) {
     (dataRows.value[tableIndex] as any)[field] = val
     formData.debouncedSave(`M8-disclosure-soe-row-${tableIndex}-${field}`, { remark: String(val) })
+    scheduleAutoSync()
   }
 }
 
 function handleNoteChange(): void {
   formData.debouncedSave('M8-disclosure-soe-note', { remark: disclosureNote.value || null })
+  scheduleAutoSync()
 }
 
 function handleSoeSpecialNoteChange(): void {
   formData.debouncedSave('M8-disclosure-soe-special', { remark: soeSpecialNote.value || null })
+  scheduleAutoSync()
 }
 
 async function handleAI(section: string): Promise<void> {

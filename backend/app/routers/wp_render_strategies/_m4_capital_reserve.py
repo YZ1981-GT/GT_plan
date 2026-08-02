@@ -31,12 +31,14 @@ import sqlalchemy as sa
 
 from app.models.audit_platform_models import TbBalance
 from app.services.dataset_query import get_active_filter
+from app.services.report_account_mapping import resolve_report_line_account_codes
 
 from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
 
 _M4_ACCOUNT_CODE = "4002"
+_M4_ROW_CODE = "BS-079"  # 资本公积报表行（listed_standalone；soe 为 BS-113）
 _ADJUDICATED_ITEM_ID = "M4-1-adjudicated-amount"
 
 M4_SHEETS = [
@@ -197,6 +199,21 @@ async def render(ctx: RenderContext) -> dict[str, Any]:
     # ─── TB 取数（科目4002资本公积）─────────────────────────────────────
     tb = await _fetch_tb_data(ctx)
 
+    # ─── 取数溯源：报表行解析科目集 ───────────────────────────────────────
+    try:
+        resolved_codes = await resolve_report_line_account_codes(
+            ctx.db, ctx.project_id, _M4_ROW_CODE,
+            fallback=[_M4_ACCOUNT_CODE],
+        )
+    except Exception:  # noqa: BLE001
+        resolved_codes = [_M4_ACCOUNT_CODE]
+    tb_source_codes = {
+        "row_code": _M4_ROW_CODE,
+        "codes": resolved_codes,
+        "resolved_from": "report_config" if resolved_codes != [_M4_ACCOUNT_CODE] else "fallback",
+        "basis": "balance",
+    }
+
     # ─── 公式校验（从快照提取结构化数据行）────────────────────────────────
     formula_errors: list[dict[str, Any]] = []
     formula_rows: list[dict[str, Any]] = []
@@ -226,6 +243,8 @@ async def render(ctx: RenderContext) -> dict[str, Any]:
         "adjudicated_amount": adjudicated_amount,
         # TB 余额数据（科目4002，贷方/权益类）
         "trial_balance": tb,
+        # 取数溯源（供前端 WpFourTableSourcePanel 展示）
+        "tb_source_codes": tb_source_codes,
         # 权益类公式方向元数据（前端可用于初始化校验）
         "formula_direction": {
             "account_code": "4002",

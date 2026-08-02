@@ -41,39 +41,30 @@
         <el-table-column prop="item" label="项目" min-width="220" fixed />
         <el-table-column label="期初余额" min-width="120" align="right">
           <template #default="{ row, $index }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.beginBalance"
-              :controls="false"
-              size="small"
-              style="width:100%"
-              @change="(val: number | undefined) => updateNonReclassRow($index, 'beginBalance', val ?? 0)"
+              @update:model-value="(val: number) => updateNonReclassRow($index, 'beginBalance', val)"
             />
             <span v-else>{{ fmtAmount(row.beginBalance) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="本期税前发生" min-width="120" align="right">
           <template #default="{ row, $index }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.preTaxAmount"
-              :controls="false"
-              size="small"
-              style="width:100%"
-              @change="(val: number | undefined) => updateNonReclassRow($index, 'preTaxAmount', val ?? 0)"
+              @update:model-value="(val: number) => updateNonReclassRow($index, 'preTaxAmount', val)"
             />
             <span v-else>{{ fmtAmount(row.preTaxAmount) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="所得税影响" min-width="110" align="right">
           <template #default="{ row, $index }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.taxEffect"
-              :controls="false"
-              size="small"
-              style="width:100%"
-              @change="(val: number | undefined) => updateNonReclassRow($index, 'taxEffect', val ?? 0)"
+              @update:model-value="(val: number) => updateNonReclassRow($index, 'taxEffect', val)"
             />
             <span v-else>{{ fmtAmount(row.taxEffect) }}</span>
           </template>
@@ -85,26 +76,20 @@
         </el-table-column>
         <el-table-column label="转入损益" min-width="110" align="right">
           <template #default="{ row, $index }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.transferToPL"
-              :controls="false"
-              size="small"
-              style="width:100%"
-              @change="(val: number | undefined) => updateNonReclassRow($index, 'transferToPL', val ?? 0)"
+              @update:model-value="(val: number) => updateNonReclassRow($index, 'transferToPL', val)"
             />
             <span v-else>{{ fmtAmount(row.transferToPL) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="转入留存收益" min-width="110" align="right">
           <template #default="{ row, $index }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.transferToRetained"
-              :controls="false"
-              size="small"
-              style="width:100%"
-              @change="(val: number | undefined) => updateNonReclassRow($index, 'transferToRetained', val ?? 0)"
+              @update:model-value="(val: number) => updateNonReclassRow($index, 'transferToRetained', val)"
             />
             <span v-else>{{ fmtAmount(row.transferToRetained) }}</span>
           </template>
@@ -133,39 +118,30 @@
         <el-table-column prop="item" label="项目" min-width="220" fixed />
         <el-table-column label="期初余额" min-width="120" align="right">
           <template #default="{ row, $index }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.beginBalance"
-              :controls="false"
-              size="small"
-              style="width:100%"
-              @change="(val: number | undefined) => updateReclassRow($index, 'beginBalance', val ?? 0)"
+              @update:model-value="(val: number) => updateReclassRow($index, 'beginBalance', val)"
             />
             <span v-else>{{ fmtAmount(row.beginBalance) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="本期税前发生" min-width="120" align="right">
           <template #default="{ row, $index }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.preTaxAmount"
-              :controls="false"
-              size="small"
-              style="width:100%"
-              @change="(val: number | undefined) => updateReclassRow($index, 'preTaxAmount', val ?? 0)"
+              @update:model-value="(val: number) => updateReclassRow($index, 'preTaxAmount', val)"
             />
             <span v-else>{{ fmtAmount(row.preTaxAmount) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="所得税影响" min-width="110" align="right">
           <template #default="{ row, $index }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.taxEffect"
-              :controls="false"
-              size="small"
-              style="width:100%"
-              @change="(val: number | undefined) => updateReclassRow($index, 'taxEffect', val ?? 0)"
+              @update:model-value="(val: number) => updateReclassRow($index, 'taxEffect', val)"
             />
             <span v-else>{{ fmtAmount(row.taxEffect) }}</span>
           </template>
@@ -177,26 +153,20 @@
         </el-table-column>
         <el-table-column label="转入损益" min-width="110" align="right">
           <template #default="{ row, $index }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.transferToPL"
-              :controls="false"
-              size="small"
-              style="width:100%"
-              @change="(val: number | undefined) => updateReclassRow($index, 'transferToPL', val ?? 0)"
+              @update:model-value="(val: number) => updateReclassRow($index, 'transferToPL', val)"
             />
             <span v-else>{{ fmtAmount(row.transferToPL) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="转入留存收益" min-width="110" align="right">
           <template #default="{ row, $index }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.transferToRetained"
-              :controls="false"
-              size="small"
-              style="width:100%"
-              @change="(val: number | undefined) => updateReclassRow($index, 'transferToRetained', val ?? 0)"
+              @update:model-value="(val: number) => updateReclassRow($index, 'transferToRetained', val)"
             />
             <span v-else>{{ fmtAmount(row.transferToRetained) }}</span>
           </template>
@@ -329,7 +299,10 @@ import { MagicStick, Check } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
 import { useM9FormData } from '../../composables/useM9FormData'
 import { calcAfterTaxNet } from '../../composables/useM9OciEngine'
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import { buildM9SoeSyncPayload, type M9SoeRow } from '../../composables/m9NoteSectionMap'
 
 const props = defineProps<{
   wpId: string
@@ -351,6 +324,37 @@ const formData = useM9FormData({
   wpId: computed(() => props.wpId),
   projectId: computed(() => props.projectId),
 })
+
+// ─── 同步链路 ───────────────────────────────────────────────────────────────
+
+function _mapToSoeRows(rows: SoeDisclosureRow[]): M9SoeRow[] {
+  return rows
+    .filter((r) => !r.item.includes('小计') && !r.item.includes('合计'))
+    .map((r) => ({
+      label: r.item,
+      endPreTax: r.preTaxAmount,
+      endTax: r.taxEffect,
+      endNet: r.preTaxAmount - r.taxEffect, // 税后净额 = 税前 - 所得税
+      priorPreTax: 0, // 上期数据暂无独立录入（beginBalance 是期初余额非上期发生额）
+      priorTax: 0,
+      priorNet: 0,
+    }))
+}
+
+async function syncToDisclosureNotes(): Promise<void> {
+  const rows = [
+    ...(_mapToSoeRows(nonReclassRows.value)),
+    ...(_mapToSoeRows(reclassRows.value)),
+  ]
+  const payload = buildM9SoeSyncPayload(props.wpId, rows)
+  if (!payload) return
+  try {
+    const { default: request } = await import('@/utils/request')
+    await request.post(`/api/workpapers/${props.wpId}/sync-from-workpaper`, payload)
+  } catch { /* fail-open */ }
+}
+
+const { scheduleAutoSync } = useDisclosureAutoSync(syncToDisclosureNotes)
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -424,6 +428,7 @@ function updateNonReclassRow(index: number, field: keyof SoeDisclosureRow, val: 
   if (index >= 0 && index < nonReclassRows.value.length) {
     (nonReclassRows.value[index] as any)[field] = val
     formData.debouncedSave(`M9-disclosure-soe-nonReclass-${index}-${field}`, { remark: String(val) })
+    scheduleAutoSync()
   }
 }
 
@@ -431,19 +436,23 @@ function updateReclassRow(index: number, field: keyof SoeDisclosureRow, val: num
   if (index >= 0 && index < reclassRows.value.length) {
     (reclassRows.value[index] as any)[field] = val
     formData.debouncedSave(`M9-disclosure-soe-reclass-${index}-${field}`, { remark: String(val) })
+    scheduleAutoSync()
   }
 }
 
 function handleSoeCapitalNoteChange() {
   formData.debouncedSave('M9-disclosure-soe-capital', { remark: soeCapitalNote.value || null })
+  scheduleAutoSync()
 }
 
 function handleTransferNoteChange() {
   formData.debouncedSave('M9-disclosure-soe-transfer', { remark: transferNote.value || null })
+  scheduleAutoSync()
 }
 
 function handleConclusionNoteChange() {
   formData.debouncedSave('M9-disclosure-soe-conclusion', { remark: conclusionNote.value || null })
+  scheduleAutoSync()
 }
 
 const SOE_NOTE_TARGETS: Record<string, { get: () => string; set: (v: string) => void; save: () => void }> = {

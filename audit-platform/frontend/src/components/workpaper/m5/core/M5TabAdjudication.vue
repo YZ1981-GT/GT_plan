@@ -1,5 +1,11 @@
 <template>
   <div class="m5-tab-adjudication">
+    <!-- 四表库取数溯源面板 -->
+    <WpFourTableSourcePanel
+      v-if="props.tbSourceCodes"
+      :source-codes="props.tbSourceCodes"
+      gross-label="盈余公积"
+    />
     <!-- ═══ 标题 + DualMode + AI/复核 ═══ -->
     <div class="section-header">
       <div class="section-header-left">
@@ -325,6 +331,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick, Check, Download } from '@element-plus/icons-vue'
 import { useM5FormData } from '../../composables/useM5FormData'
 import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
+import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
 import {
   useM5Adjudication,
   type M5AdjudicationRow,
@@ -335,7 +342,7 @@ import { useAuditContext } from '@/composables/useAuditContext'
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import { eventBus } from '@/utils/eventBus'
 
-const props = defineProps<{ wpId: string; projectId: string; isReadonly: boolean }>()
+const props = defineProps<{ wpId: string; projectId: string; isReadonly: boolean; tbSourceCodes?: Record<string, any> | null }>()
 const emit = defineEmits<{ (e: 'navigate', sheetName: string): void; (e: 'save'): void }>()
 
 const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', () => {})
