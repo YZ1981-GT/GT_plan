@@ -13,6 +13,14 @@
       class="objective-alert"
     />
 
+    <WpFourTableSourcePanel
+      :source-codes="tbSourceCodes"
+      :gross-label="sourceConfig.grossLabel"
+      :provision-label="sourceConfig.provisionLabel"
+      :fallback-row-code="sourceConfig.fallbackRowCode"
+      :hints="sourceConfig.hints"
+    />
+
     <el-alert
       v-if="linkagePanel.i2DataReady && !linkagePanel.vrI601Status.isValid"
       type="error"
@@ -280,6 +288,8 @@ import { resolveI6DisclosureVisibility } from '../../composables/i6ApplicableShe
 import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
 import { useAuditContext } from '@/composables/useAuditContext'
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
+import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
+import { getICycleSourceConfig, extractTbSourceCodes } from '../../composables/useICycleFourTableSource'
 
 const props = defineProps<{
   wpId: string
@@ -288,6 +298,7 @@ const props = defineProps<{
   tbData: { unadjusted6602: number; audited6602: number }
   isReadonly: boolean
   applicableStandards?: string[]
+  htmlData?: Record<string, unknown> | null
 }>()
 
 const emit = defineEmits<{
@@ -296,6 +307,9 @@ const emit = defineEmits<{
 }>()
 
 const openReviewDialog = inject<(section?: string) => void>('openReviewDialog', () => {})
+
+const sourceConfig = getICycleSourceConfig('I6')
+const tbSourceCodes = computed(() => extractTbSourceCodes(props.htmlData))
 
 const adj = useI6Adjudication({
   allResponses: computed(() => props.allResponses),

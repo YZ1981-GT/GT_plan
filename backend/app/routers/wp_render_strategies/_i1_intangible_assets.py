@@ -20,19 +20,11 @@ import logging
 
 import sqlalchemy as sa
 
-from app.models.audit_platform_models import TbBalance, TrialBalance
-from app.services.dataset_query import get_active_filter
+from app.services.four_table.i_cycle_extraction import load_i_cycle_extraction
 
 from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
-
-# 科目前缀：1701无形资产(借方/资产) + 1702累计摊销(贷方/备抵) + 1703减值准备(贷方/备抵)
-_I1_ACCOUNT_PREFIXES = {
-    "1701": ("cost_unadjusted", "cost_audited"),         # 无形资产原值
-    "1702": ("amort_unadjusted", "amort_audited"),       # 累计摊销
-    "1703": ("impair_unadjusted", "impair_audited"),     # 无形资产减值准备
-}
 
 I1_SHEETS = [
     {"sheet_name": "底稿目录", "component_type": "i1-intangible-assets"},
@@ -55,78 +47,25 @@ I1_SHEETS = [
 ]
 
 
-async def _fetch_tb_data(ctx: RenderContext) -> dict:
-    """取科目1701+1702+1703的期初/期末余额及未审数/审定数.
+async def _fetch_tb_data(ctx: RenderContext):
+    """取 I1 三段（原值 / 累计摊销 / 减值准备）的四表数据。
 
-    1701无形资产：借方/资产类，期末=期初+借-贷
-    1702累计摊销：贷方/备抵类，期末=期初+贷-借
-    1703减值准备：贷方/备抵类，期末=期初+贷-借
+    🔴 改造要点（详见 `four_table/i_cycle_accounts` 模块 docstring）：
+
+    - 科目定位走**报表行动态解析**（项目级覆盖 → 按准则 → 行名校验），不再硬编码前缀；
+    - 聚合走**叶子口径** —— 改造前对每个 `startswith('1701')` 的行累加，而 `tb_balance` 里
+      `1701` 与 `1701.01~.06` 并存且父行恰等于子行之和 → 实证**恰好 2 倍虚增**；
+    - 备抵段（1702/1703）`credit` 为计提、`debit` 为转回，聚合结果取绝对值。
+
+    Returns:
+        ``(tb_values, extraction)`` —— `tb_values` 键名与改造前逐字一致（前端零改动）。
     """
-    tb: dict[str, float] = {}
-
-    # 从 tb_balance 取期初/期末/借/贷
     try:
-        active_filter = await get_active_filter(
-            ctx.db, TbBalance.__table__, ctx.project_id, ctx.year
-        )
-        result = await ctx.db.execute(
-            sa.select(
-                TbBalance.account_code,
-                TbBalance.opening_balance,
-                TbBalance.closing_balance,
-                TbBalance.debit_amount,
-                TbBalance.credit_amount,
-            ).where(
-                active_filter,
-                sa.or_(
-                    TbBalance.account_code.startswith("1701"),
-                    TbBalance.account_code.startswith("1702"),
-                    TbBalance.account_code.startswith("1703"),
-                ),
-            )
-        )
-        for row in result.fetchall():
-            code = (row.account_code or "").strip()
-            for prefix, (unadj_key, _audited_key) in _I1_ACCOUNT_PREFIXES.items():
-                if code == prefix or code.startswith(prefix):
-                    tb[f"{unadj_key}_opening"] = tb.get(f"{unadj_key}_opening", 0.0) + float(row.opening_balance or 0)
-                    tb[f"{unadj_key}_closing"] = tb.get(f"{unadj_key}_closing", 0.0) + float(row.closing_balance or 0)
-                    tb[f"{unadj_key}_debit"] = tb.get(f"{unadj_key}_debit", 0.0) + float(row.debit_amount or 0)
-                    tb[f"{unadj_key}_credit"] = tb.get(f"{unadj_key}_credit", 0.0) + float(row.credit_amount or 0)
-                    break
-    except Exception as e:  # noqa: BLE001
-        logger.warning("I1 TB balance fetch failed: %s", e)
-
-    # 从 trial_balance 取未审数+审定数（ORM + get_active_filter 口径统一）
-    try:
-        tb_filter = await get_active_filter(
-            ctx.db, TrialBalance.__table__, ctx.project_id, ctx.year
-        )
-        result = await ctx.db.execute(
-            sa.select(
-                TrialBalance.standard_account_code,
-                TrialBalance.unadjusted_amount,
-                TrialBalance.audited_amount,
-            ).where(
-                tb_filter,
-                sa.or_(
-                    TrialBalance.standard_account_code.like("1701%"),
-                    TrialBalance.standard_account_code.like("1702%"),
-                    TrialBalance.standard_account_code.like("1703%"),
-                ),
-            )
-        )
-        for row in result.fetchall():
-            code = (row.standard_account_code or "").strip()
-            for prefix, (unadj_key, audited_key) in _I1_ACCOUNT_PREFIXES.items():
-                if code == prefix or code.startswith(prefix):
-                    tb[unadj_key] = tb.get(unadj_key, 0.0) + float(row.unadjusted_amount or 0)
-                    tb[audited_key] = tb.get(audited_key, 0.0) + float(row.audited_amount or 0)
-                    break
-    except Exception as e:  # noqa: BLE001
-        logger.warning("I1 trial_balance fetch failed: %s", e)
-
-    return tb
+        extraction = await load_i_cycle_extraction(ctx, "I1")
+    except Exception as e:  # noqa: BLE001 — 取数失败不阻断 render
+        logger.warning("I1 四表取数失败: %s", e)
+        return {}, None
+    return dict(extraction.tb_values), extraction
 
 
 async def _load_project_context(ctx: RenderContext) -> dict:
@@ -177,14 +116,23 @@ async def render(ctx: RenderContext) -> dict | None:
         logger.warning("I1 render responses load failed: %s", e)
 
     # 2. 获取TB数据（1701无形资产 + 1702累计摊销 + 1703减值准备）
-    tb_values = await _fetch_tb_data(ctx)
+    tb_values, extraction = await _fetch_tb_data(ctx)
 
     # 3. 加载项目上下文
     project_context = await _load_project_context(ctx)
 
+    # 科目码改由解析结果给出（项目自定义映射生效），解析失败才回退默认三段
+    account_codes = ["1701", "1702", "1703"]
+    if extraction is not None:
+        resolved_codes = [
+            c for seg in extraction.accounts.segments for c in seg.original
+        ]
+        if resolved_codes:
+            account_codes = resolved_codes
+
     payload = {
         "component_type": "i1-intangible-assets",
-        "account_codes": ["1701", "1702", "1703"],
+        "account_codes": account_codes,
         "responses_snapshot": responses_snapshot,
         "tb_values": tb_values,
         "project_context": project_context,
@@ -193,22 +141,22 @@ async def render(ctx: RenderContext) -> dict | None:
         "meta": {"sheet_count": 17, "wp_code": "I1"},
     }
 
-    # ─── 灰度：H/I 四表取数增强（三科目三段） ─────────────────────────────
+    # ─── 灰度：H/I 四表取数增强（三段 × 类别 + 取数溯源） ──────────────────
+    # 🔴 只有这几个**新增**键受开关控制；`tb_values` 的口径修正（叶子聚合 + 科目动态解析）
+    #    不受控制 —— 它修的是既有输出的错误值（父子双计），不是新能力。
     from app.core.config import settings
     if settings.HI_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED:
         try:
             import asyncio
-            from app.services.d_cycle_extraction.prefill import build_d_adjudication_prefill
-            segments = []
-            for prefix, seg_name in [("1701", "cost"), ("1702", "amort"), ("1703", "impairment")]:
-                items = await asyncio.wait_for(
-                    build_d_adjudication_prefill(ctx, account_prefix=prefix, mode="balance"),
-                    timeout=5.0,
-                )
-                if items:
-                    segments.append({"segment": seg_name, "account_prefix": prefix, "mode": "balance", "items": items})
-            if segments:
-                payload["adjudication_segment_prefill"] = {"segments": segments, "enabled": True}
+            if extraction is not None:
+                payload["tb_source_codes"] = extraction.source_codes_payload()
+                if extraction.adjudication_prefill:
+                    payload["adjudication_prefill"] = extraction.adjudication_prefill
+                    payload["tb_leaf_categories"] = [
+                        row
+                        for seg in extraction.adjudication_prefill.get("segments", [])
+                        for row in seg.get("rows", [])
+                    ]
                 payload["hi_extraction_enabled"] = True
             # Tier A transient seed（TB核对行）
             from app.services.d_cycle_extraction.tier_a_seed import seed_tier_a_reconciliation

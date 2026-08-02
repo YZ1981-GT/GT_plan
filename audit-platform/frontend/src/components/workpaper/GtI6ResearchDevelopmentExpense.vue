@@ -66,6 +66,7 @@
           :tb-data="tbData"
           :is-readonly="isReadonly"
           :applicable-standards="applicableStandards"
+          :html-data="props.htmlData"
           @save="handleChildSave"
           @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />

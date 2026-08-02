@@ -2,15 +2,18 @@
 
 component_type = "i5-other-noncurrent-assets"
 
-科目1911其他非流动资产（借方/资产类）— 最简标准底稿
-返回 allResponses + tb_values(1911) + projectContext + sheets元数据
+其他非流动资产（借方/资产类）— 最简标准底稿。
+🔴 **无标准科目**：`account_chart` 无「其他非流动资产」科目，`report_config` 的
+`BS-040`/`BS-050` 公式为 None（`1911` 是历史错码，全库不存在）→ 取数按
+「宁缺勿造」返回空集，审定表/披露表回退手工编制。
+返回 allResponses + tb_values + projectContext + sheets元数据
 
 I5核心特点：
 - 最简单标准底稿（9 sheets），无特殊逻辑
 - 标准资产类三角勾稽：期末=期初+增加-减少
 - 审定=未审+AJE+RJE
 
-联动：TB回写(1911) + 附注EventBus + substantive:adjudicated
+联动：TB回写（按解析出的科目，通常为空） + 附注EventBus + substantive:adjudicated
 
 Requirements: 1.1-1.10, 2.1-2.7
 """
@@ -20,17 +23,12 @@ import logging
 
 import sqlalchemy as sa
 
-from app.models.audit_platform_models import TbBalance, TrialBalance
-from app.services.dataset_query import get_active_filter
+from app.services.four_table.i_cycle_extraction import load_i_cycle_extraction
 
 from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
 
-# 科目：1911其他非流动资产（借方/资产类）
-_I5_ACCOUNT_PREFIXES = {
-    "1911": ("other_noncurrent_assets_1911_unadjusted", "other_noncurrent_assets_1911_audited"),
-}
 
 I5_SHEETS = [
     {"sheet_name": "底稿目录", "component_type": "i5-other-noncurrent-assets"},
@@ -44,69 +42,25 @@ I5_SHEETS = [
 ]
 
 
-async def _fetch_tb_data(ctx: RenderContext) -> dict:
-    """取科目1911其他非流动资产的期初/期末余额及未审数/审定数.
+async def _fetch_tb_data(ctx: RenderContext):
+    """取 I5 的四表数据（走 `four_table` 共享件，科目按项目动态解析）。
 
-    1911其他非流动资产：借方/资产类，期末=期初+借-贷
-    标准资产类三角勾稽：期末=期初+增加-减少
+    🔴 改造要点（详见 `four_table/i_cycle_accounts` 模块 docstring）：
+
+    - 科目定位走**报表行动态解析**（项目级覆盖 → 按准则 → 行名校验），不再硬编码前缀；
+    - 聚合走**叶子口径**（改造前父科目与子科目一起累加 → 实证恰好 2 倍虚增）；
+    - 科目由 `1911`（全库不存在）改为**无兜底码** —— 其他非流动资产无标准科目、
+      且报表行公式为 None（`BS-050` 在 listed 下语义是「合同负债」，行名校验拦住）。
+
+    Returns:
+        ``(tb_values, extraction)`` —— `tb_values` 键名与改造前逐字一致（前端零改动）。
     """
-    tb: dict[str, float] = {}
-
-    # 从 tb_balance 取期初/期末/借/贷
     try:
-        active_filter = await get_active_filter(
-            ctx.db, TbBalance.__table__, ctx.project_id, ctx.year
-        )
-        result = await ctx.db.execute(
-            sa.select(
-                TbBalance.account_code,
-                TbBalance.opening_balance,
-                TbBalance.closing_balance,
-                TbBalance.debit_amount,
-                TbBalance.credit_amount,
-            ).where(
-                active_filter,
-                TbBalance.account_code.startswith("1911"),
-            )
-        )
-        for row in result.fetchall():
-            code = (row.account_code or "").strip()
-            for prefix, (unadj_key, _audited_key) in _I5_ACCOUNT_PREFIXES.items():
-                if code == prefix or code.startswith(prefix):
-                    tb[f"{unadj_key}_opening"] = tb.get(f"{unadj_key}_opening", 0.0) + float(row.opening_balance or 0)
-                    tb[f"{unadj_key}_closing"] = tb.get(f"{unadj_key}_closing", 0.0) + float(row.closing_balance or 0)
-                    tb[f"{unadj_key}_debit"] = tb.get(f"{unadj_key}_debit", 0.0) + float(row.debit_amount or 0)
-                    tb[f"{unadj_key}_credit"] = tb.get(f"{unadj_key}_credit", 0.0) + float(row.credit_amount or 0)
-                    break
-    except Exception as e:  # noqa: BLE001
-        logger.warning("I5 TB balance fetch failed: %s", e)
-
-    # 从 trial_balance 取未审数+审定数（ORM + get_active_filter 口径统一）
-    try:
-        tb_filter = await get_active_filter(
-            ctx.db, TrialBalance.__table__, ctx.project_id, ctx.year
-        )
-        result = await ctx.db.execute(
-            sa.select(
-                TrialBalance.standard_account_code,
-                TrialBalance.unadjusted_amount,
-                TrialBalance.audited_amount,
-            ).where(
-                tb_filter,
-                TrialBalance.standard_account_code.like("1911%"),
-            )
-        )
-        for row in result.fetchall():
-            code = (row.standard_account_code or "").strip()
-            for prefix, (unadj_key, audited_key) in _I5_ACCOUNT_PREFIXES.items():
-                if code == prefix or code.startswith(prefix):
-                    tb[unadj_key] = tb.get(unadj_key, 0.0) + float(row.unadjusted_amount or 0)
-                    tb[audited_key] = tb.get(audited_key, 0.0) + float(row.audited_amount or 0)
-                    break
-    except Exception as e:  # noqa: BLE001
-        logger.warning("I5 trial_balance fetch failed: %s", e)
-
-    return tb
+        extraction = await load_i_cycle_extraction(ctx, "I5")
+    except Exception as e:  # noqa: BLE001 — 取数失败不阻断 render
+        logger.warning("I5 四表取数失败: %s", e)
+        return {}, None
+    return dict(extraction.tb_values), extraction
 
 
 async def _load_project_context(ctx: RenderContext) -> dict:
@@ -134,7 +88,7 @@ async def _load_project_context(ctx: RenderContext) -> dict:
 
 
 async def render(ctx: RenderContext) -> dict | None:
-    """I5其他非流动资产渲染策略：allResponses + projectContext + TB数据(1911).
+    """I5其他非流动资产渲染策略：allResponses + projectContext + TB数据（无标准科目时为空）.
 
     支持selfLoad模式：前端selfLoad时调用render-config获取tb_values种子数据。
     最简标准底稿：标准资产类三角勾稽，期末=期初+增加-减少。
@@ -157,15 +111,20 @@ async def render(ctx: RenderContext) -> dict | None:
     except Exception as e:  # noqa: BLE001
         logger.warning("I5 render responses load failed: %s", e)
 
-    # 2. 获取TB数据（1911其他非流动资产）
-    tb_values = await _fetch_tb_data(ctx)
+    # 2. 获取TB数据（其他非流动资产：无标准科目 → 宁缺勿造）
+    tb_values, extraction = await _fetch_tb_data(ctx)
 
     # 3. 加载项目上下文
     project_context = await _load_project_context(ctx)
 
+    # 科目码改由解析结果给出（项目自定义映射生效），解析失败才回退
+    account_codes = [
+        c for seg in (extraction.accounts.segments if extraction else ()) for c in seg.original
+    ]
+
     payload = {
         "component_type": "i5-other-noncurrent-assets",
-        "account_codes": ["1911"],
+        "account_codes": account_codes,
         "responses_snapshot": responses_snapshot,
         "tb_values": tb_values,
         "project_context": project_context,
@@ -188,16 +147,11 @@ async def render(ctx: RenderContext) -> dict | None:
     if settings.HI_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED:
         try:
             import asyncio
-            from app.services.d_cycle_extraction.prefill import build_d_adjudication_prefill
-            segment_prefill = await asyncio.wait_for(
-                build_d_adjudication_prefill(ctx, account_prefix="1911", mode="balance"),
-                timeout=5.0,
-            )
-            payload["adjudication_segment_prefill"] = {
-                "segments": [{"segment": "cost", "account_prefix": "1911", "mode": "balance", "items": segment_prefill}],
-                "enabled": True,
-            }
-            payload["hi_extraction_enabled"] = True
+            if extraction is not None:
+                payload["tb_source_codes"] = extraction.source_codes_payload()
+                if extraction.adjudication_prefill:
+                    payload["adjudication_prefill"] = extraction.adjudication_prefill
+                payload["hi_extraction_enabled"] = True
             # Tier A transient seed（TB核对行）
             from app.services.d_cycle_extraction.tier_a_seed import seed_tier_a_reconciliation
             from app.services.d_cycle_extraction.presets import resolve_effective

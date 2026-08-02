@@ -41,6 +41,14 @@
       </div>
     </div>
 
+    <WpFourTableSourcePanel
+      :source-codes="tbSourceCodes"
+      :gross-label="sourceConfig.grossLabel"
+      :provision-label="sourceConfig.provisionLabel"
+      :fallback-row-code="sourceConfig.fallbackRowCode"
+      :hints="sourceConfig.hints"
+    />
+
     <el-alert
       v-for="w in newAcquisitionWarnings"
       :key="'acq-' + w.rowId"
@@ -431,6 +439,8 @@ import { Download } from '@element-plus/icons-vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import I3SheetImportExport from '../shared/I3SheetImportExport.vue'
+import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
+import { getICycleSourceConfig, extractTbSourceCodes } from '../../composables/useICycleFourTableSource'
 
 const props = defineProps<{
   wpId: string
@@ -439,6 +449,7 @@ const props = defineProps<{
   tbData: { unadjusted1711: number; audited1711: number }
   isReadonly: boolean
   year?: number
+  htmlData?: Record<string, unknown> | null
 }>()
 
 const emit = defineEmits<{
@@ -448,6 +459,9 @@ const emit = defineEmits<{
 
 const openReviewDialog = inject<(section?: string) => void>('openReviewDialog', () => {})
 const isReadonly = computed(() => Boolean(props.isReadonly))
+
+const sourceConfig = getICycleSourceConfig('I3')
+const tbSourceCodes = computed(() => extractTbSourceCodes(props.htmlData))
 const projectId = computed(() => props.projectId)
 const asOfYear = computed(() => props.year || new Date().getFullYear())
 const quickConclusion = ref('')

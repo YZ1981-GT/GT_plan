@@ -67,6 +67,7 @@
           :cross-sheet-cost-audited="adjudicationFromDetail.costAudited"
           :cross-sheet-amort-audited="adjudicationFromDetail.amortAudited"
           :cross-sheet-impair-audited="adjudicationFromDetail.impairAudited"
+          :html-data="props.htmlData"
           @save="handleChildSave"
           @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />

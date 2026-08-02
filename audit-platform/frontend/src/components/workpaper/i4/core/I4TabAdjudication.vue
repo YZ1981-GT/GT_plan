@@ -43,6 +43,14 @@
       </div>
     </div>
 
+    <WpFourTableSourcePanel
+      :source-codes="tbSourceCodes"
+      :gross-label="sourceConfig.grossLabel"
+      :provision-label="sourceConfig.provisionLabel"
+      :fallback-row-code="sourceConfig.fallbackRowCode"
+      :hints="sourceConfig.hints"
+    />
+
     <el-alert
       v-if="reconciliationStatus === 'mismatch'"
       type="error"
@@ -440,6 +448,8 @@ import { useAuditContext } from '@/composables/useAuditContext'
 import { Download } from '@element-plus/icons-vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
+import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
+import { getICycleSourceConfig, extractTbSourceCodes } from '../../composables/useICycleFourTableSource'
 
 const props = defineProps<{
   wpId: string
@@ -447,7 +457,11 @@ const props = defineProps<{
   allResponses: Map<string, any>
   tbData: { unadjusted1801: number; audited1801: number; priorAudited1801?: number }
   isReadonly: boolean
+  htmlData?: Record<string, unknown> | null
 }>()
+
+const sourceConfig = getICycleSourceConfig('I4')
+const tbSourceCodes = computed(() => extractTbSourceCodes(props.htmlData))
 
 const emit = defineEmits<{
   'navigate-sheet': [sheetName: string]

@@ -33,6 +33,14 @@
       <el-button size="small" @click="emit('navigate-sheet', '附注上市')">附注 →</el-button>
     </div>
 
+    <WpFourTableSourcePanel
+      :source-codes="tbSourceCodes"
+      :gross-label="sourceConfig.grossLabel"
+      :provision-label="sourceConfig.provisionLabel"
+      :fallback-row-code="sourceConfig.fallbackRowCode"
+      :hints="sourceConfig.hints"
+    />
+
     <div class="tb-display">
       <el-descriptions :column="4" border size="small">
         <el-descriptions-item label="TB未审(1717)">{{ fmtAmount(tbData.unadjusted1717) }}</el-descriptions-item>
@@ -269,6 +277,8 @@ import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn
 import { useAuditContext } from '@/composables/useAuditContext'
 import { Download } from '@element-plus/icons-vue'
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
+import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
+import { getICycleSourceConfig, extractTbSourceCodes } from '../../composables/useICycleFourTableSource'
 import http from '@/utils/http'
 
 const props = defineProps<{
@@ -278,10 +288,14 @@ const props = defineProps<{
   allResponses: Map<string, any>
   saveResponse: (sheetCode: string, data: Record<string, any>) => Promise<void>
   isReadonly?: boolean
+  htmlData?: Record<string, unknown> | null
 }>()
 
 const emit = defineEmits<{ save: []; 'navigate-sheet': [sheetName: string]; imported: [] }>()
 const openReviewDialog = inject<(section: string) => void>('openReviewDialog', () => {})
+
+const sourceConfig = getICycleSourceConfig('I2')
+const tbSourceCodes = computed(() => extractTbSourceCodes(props.htmlData))
 
 const tbData = computed<I2TbData>(() => {
   const raw = props.allResponses.get('I2-tb-data')

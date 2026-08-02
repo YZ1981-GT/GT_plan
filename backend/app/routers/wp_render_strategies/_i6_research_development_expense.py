@@ -2,13 +2,16 @@
 
 component_type = "i6-research-development-expense"
 
-科目6602研发费用（**损益类/借方科目**）— I循环唯一损益类底稿
-**损益类取数逻辑**：从tb_ledger取发生额（borrowing_amount/lending_amount），NOT tb_balance期末余额！
-净发生额 = 借方发生(费用增加) - 贷方发生(费用冲回/结转)
+科目6604研发费用（**损益类/借方科目**）— I循环唯一损益类底稿
+🔴 `6602` 是**管理费用**（全库借方 6.24 亿），历史实现取错科目族，已按
+`report_config` 的 `IS-006`/`IS-024` = `TB('6604','本期发生额')` 纠正。
+**损益类取数逻辑**：取本期发生额（`trial_balance` 优先、`tb_balance` 借方回退），
+NOT `tb_balance` 期末余额，也 **NOT** `debit - credit` —— 含年末结转损益分录时
+借贷两侧恒相等，净额恒为 0（平台级铁律）。
 
 与H10(6115资产处置损益)同款处理逻辑。
 
-联动：TB回写(**发生额**6602) + I6↔I2双向(VR-I6-01) + 附注EventBus
+联动：TB回写(**发生额**6604) + I6↔I2双向(VR-I6-01) + 附注EventBus
 
 Requirements: 1.1-1.10, 2.1-2.8, 4.1-4.7, 10.1-10.4
 """
@@ -18,15 +21,12 @@ import logging
 
 import sqlalchemy as sa
 
-from app.models.audit_platform_models import TbBalance
-from app.services.dataset_query import get_active_filter
+from app.services.four_table.i_cycle_extraction import load_i_cycle_extraction
 
 from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
 
-# 科目：6602研发费用（损益类/借方=费用增加，贷方=费用冲回）
-_I6_ACCOUNT_PREFIX = "6602"
 
 I6_SHEETS = [
     {"sheet_name": "底稿目录", "component_type": "i6-research-development-expense"},
@@ -42,67 +42,26 @@ I6_SHEETS = [
 ]
 
 
-async def _fetch_tb_income_statement(ctx: RenderContext) -> dict:
-    """损益类6602：从tb_ledger取发生额（非tb_balance期末余额！）.
+async def _fetch_tb_income_statement(ctx: RenderContext):
+    """取 I6 的四表数据（走 `four_table` 共享件，科目按项目动态解析）。
 
-    6602研发费用为借方科目：
-    - 借方发生 = 费用增加
-    - 贷方发生 = 费用冲回/结转
-    - 净发生额 = 借方 - 贷方（正数=净费用）
-    - 审定数 = 净发生额
+    🔴 改造要点（详见 `four_table/i_cycle_accounts` 模块 docstring）：
 
-    与H10(6115)同款损益类处理。
+    - 科目定位走**报表行动态解析**（项目级覆盖 → 按准则 → 行名校验），不再硬编码前缀；
+    - 聚合走**叶子口径**（改造前父科目与子科目一起累加 → 实证恰好 2 倍虚增）；
+    - 科目由 `6602`（**管理费用**，全库借方 6.24 亿）纠正为 `6604` 研发费用；
+    - 损益类取**本期发生额**（`trial_balance` 优先、`tb_balance` 借方回退）——
+      禁用 `debit - credit`：含年末结转损益分录时两侧恒相等 → 恒为 0。
+
+    Returns:
+        ``(tb_values, extraction)`` —— `tb_values` 键名与改造前逐字一致（前端零改动）。
     """
-    tb: dict[str, float] = {}
-
-    # 从 tb_balance 取借方发生额/贷方发生额（debit_amount/credit_amount 即为本期发生额）
     try:
-        active_filter = await get_active_filter(
-            ctx.db, TbBalance.__table__, ctx.project_id, ctx.year
-        )
-        result = await ctx.db.execute(
-            sa.select(
-                sa.func.sum(TbBalance.debit_amount).label("total_debit"),
-                sa.func.sum(TbBalance.credit_amount).label("total_credit"),
-            ).where(
-                active_filter,
-                TbBalance.account_code.startswith(_I6_ACCOUNT_PREFIX),
-            )
-        )
-        row = result.fetchone()
-        if row and (row.total_debit is not None or row.total_credit is not None):
-            debit = float(row.total_debit or 0)
-            credit = float(row.total_credit or 0)
-            tb = {
-                "unadjusted_debit": debit,
-                "unadjusted_credit": credit,
-                # 6602借方科目：净发生额=借方-贷方
-                "audited_amount": debit - credit,
-            }
-    except Exception as e:  # noqa: BLE001
-        logger.warning("I6 TB income statement fetch failed: %s", e)
-
-    # 补充：从 trial_balance 取未审数/审定数（如存在）
-    try:
-        result = await ctx.db.execute(
-            sa.text("""
-                SELECT SUM(unadjusted_amount) AS unadjusted, SUM(audited_amount) AS audited
-                FROM trial_balance
-                WHERE project_id = :pid AND year = :year AND is_deleted = false
-                  AND standard_account_code LIKE '6602%'
-            """),
-            {"pid": str(ctx.project_id), "year": ctx.year},
-        )
-        row = result.fetchone()
-        if row:
-            if row.unadjusted is not None:
-                tb["trial_balance_unadjusted"] = float(row.unadjusted)
-            if row.audited is not None:
-                tb["trial_balance_audited"] = float(row.audited)
-    except Exception as e:  # noqa: BLE001
-        logger.warning("I6 trial_balance fetch failed: %s", e)
-
-    return tb
+        extraction = await load_i_cycle_extraction(ctx, "I6")
+    except Exception as e:  # noqa: BLE001 — 取数失败不阻断 render
+        logger.warning("I6 四表取数失败: %s", e)
+        return {}, None
+    return dict(extraction.tb_values), extraction
 
 
 async def _load_project_context(ctx: RenderContext) -> dict:
@@ -156,14 +115,19 @@ async def render(ctx: RenderContext) -> dict | None:
         logger.warning("I6 render responses load failed: %s", e)
 
     # 2. 获取TB数据（损益类！取发生额）
-    tb_values = await _fetch_tb_income_statement(ctx)
+    tb_values, extraction = await _fetch_tb_income_statement(ctx)
 
     # 3. 加载项目上下文
     project_context = await _load_project_context(ctx)
 
+    # 科目码改由解析结果给出（项目自定义映射生效），解析失败才回退
+    account_codes = [
+        c for seg in (extraction.accounts.segments if extraction else ()) for c in seg.original
+    ]
+
     payload = {
         "component_type": "i6-research-development-expense",
-        "account_codes": ["6602"],
+        "account_codes": account_codes,
         "income_statement": True,  # 标识损益类
         "responses_snapshot": responses_snapshot,
         "tb_values": tb_values,
@@ -176,8 +140,8 @@ async def render(ctx: RenderContext) -> dict | None:
             "special_rules": {
                 "income_statement": True,
                 "account_direction": "debit",
-                "net_formula": "借方发生-贷方发生",
-                "source_table": "tb_ledger/tb_balance发生额列",
+                "net_formula": "本期发生额（禁用 借方-贷方：含结转损益时恒为 0）",
+                "source_table": "trial_balance 本期发生额优先 / tb_balance 借方回退",
                 "cross_wp_linkage": "I6↔I2双向(VR-I6-01)",
                 "monthly_matrix": True,
                 "cutoff_test_bidirectional": True,
@@ -190,16 +154,11 @@ async def render(ctx: RenderContext) -> dict | None:
     if settings.HI_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED:
         try:
             import asyncio
-            from app.services.d_cycle_extraction.prefill import build_d_adjudication_prefill
-            segment_prefill = await asyncio.wait_for(
-                build_d_adjudication_prefill(ctx, account_prefix="6602", mode="occurrence"),
-                timeout=5.0,
-            )
-            payload["adjudication_segment_prefill"] = {
-                "segments": [{"segment": "cost", "account_prefix": "6602", "mode": "occurrence", "items": segment_prefill}],
-                "enabled": True,
-            }
-            payload["hi_extraction_enabled"] = True
+            if extraction is not None:
+                payload["tb_source_codes"] = extraction.source_codes_payload()
+                if extraction.adjudication_prefill:
+                    payload["adjudication_prefill"] = extraction.adjudication_prefill
+                payload["hi_extraction_enabled"] = True
             # Tier A transient seed（TB核对行）
             from app.services.d_cycle_extraction.tier_a_seed import seed_tier_a_reconciliation
             from app.services.d_cycle_extraction.presets import resolve_effective

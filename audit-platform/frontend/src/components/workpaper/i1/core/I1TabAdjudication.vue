@@ -124,6 +124,14 @@
       </div>
     </div>
 
+    <WpFourTableSourcePanel
+      :source-codes="tbSourceCodes"
+      :gross-label="sourceConfig.grossLabel"
+      :provision-label="sourceConfig.provisionLabel"
+      :fallback-row-code="sourceConfig.fallbackRowCode"
+      :hints="sourceConfig.hints"
+    />
+
     <!-- 交叉验证警告 -->
     <div v-if="hasCrossWarning" class="cross-validation-warning">
       <el-badge :value="crossWarningCount" type="warning" class="cross-badge">
@@ -819,6 +827,8 @@ import { eventBus } from '@/utils/eventBus'
 import { Download } from '@element-plus/icons-vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
+import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
+import { getICycleSourceConfig, extractTbSourceCodes } from '../../composables/useICycleFourTableSource'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -838,7 +848,11 @@ const props = defineProps<{
   crossSheetCostAudited?: number
   crossSheetAmortAudited?: number
   crossSheetImpairAudited?: number
+  htmlData?: Record<string, unknown> | null
 }>()
+
+const sourceConfig = getICycleSourceConfig('I1')
+const tbSourceCodes = computed(() => extractTbSourceCodes(props.htmlData))
 
 // ─── Emits ───────────────────────────────────────────────────────────────────
 

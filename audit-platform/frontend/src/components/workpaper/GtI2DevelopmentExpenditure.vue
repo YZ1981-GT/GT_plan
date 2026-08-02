@@ -91,6 +91,7 @@
           :all-responses="allResponses"
           :save-response="saveResponse"
           :is-readonly="isReadonly"
+          :html-data="props.htmlData"
           @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
           @save="() => { emit('save'); scheduleAutoSnapshot() }"
           @imported="() => void selfLoad()"

@@ -64,6 +64,7 @@
           :all-responses="allResponses"
           :tb-data="tbData"
           :is-readonly="isReadonly"
+          :html-data="props.htmlData"
           @save="handleChildSave"
           @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
