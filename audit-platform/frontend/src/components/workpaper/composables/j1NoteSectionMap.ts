@@ -15,9 +15,11 @@
  *   现已改模板（`fix_note_j1_employee_comp_structure.py`，`consol_note_sections_soe`
  *   五-41-3 的 title 即「设定提存计划列示」，是致同原本措辞）→ 前端键不变即自动对齐。
  *
- * 列头（Decision 2，仍有效）：
- *   组件列头「上年年末数 / 期末数」（上市源模板口径）不外溢到附注，
- *   columns label 一律用附注交付口径「期初余额 / 期末余额」。
+ * 列头（Decision 2 已废止，2026-08-02 j-cycle-four-table spec Task 7+11）：
+ *   原 Decision 2 "组件列头「上年年末数 / 期末数」不外溢到附注"——
+ *   已推翻：附注模板 五、40 已按源模板改为上市口径（`上年年末数`/`期末数`），
+ *   同步列定义拆两版：`buildJ1ListedColumns()` / `buildJ1SoeColumns()`。
+ *   key 不变（`期初余额`/`期末余额`=数据键），只有 label 按变体拆。
  *
  * Spec: .kiro/specs/j1-disclosure-template-alignment/（前身 j1-disclosure-note-linkage）
  */
@@ -56,10 +58,23 @@ export const J1_NOTE_HEADERS = ['项目', '期初余额', '本期增加', '本�
 //    会反猜出一个源模板**不存在**的「本期」父表头（与 F2 房企 3 表同款缺陷，
 //    spec disclosure-columns-coverage-rollout R3.1/R3.4）。标在标签列即对整表生效。
 //
-// 列定义收敛到共享 `disclosureColumnDefs.ColumnDef`（原本地 interface 无 `flat`/`format`
-// 字段，无法表达单级声明与金额格式；经查无任何消费方 import 该本地类型）。
+// 列 key 不变（数据键），只有 label 按变体拆：
+//   上市（源 R6）：上年年末数 / 本期增加 / 本期减少 / 期末数
+//   国企（源 R8）：期初余额 / 本期增加 / 本期减少 / 期末余额
 
-export function j1MovementColumns(): ColumnDef[] {
+/** 上市口径列定义（源 xlsx「附注披露信息（上市公司）」R6 逐字） */
+export function buildJ1ListedColumns(): ColumnDef[] {
+  return defineColumns([
+    { key: '项目', label: '项目', is_label: true, flat: true },
+    { key: '期初余额', label: '上年年末数', format: 'amount' },
+    { key: '本期增加', label: '本期增加', format: 'amount' },
+    { key: '本期减少', label: '本期减少', format: 'amount' },
+    { key: '期末余额', label: '期末数', format: 'amount' },
+  ])
+}
+
+/** 国企口径列定义（源 xlsx「附注披露信息（国有企业）」R8 逐字） */
+export function buildJ1SoeColumns(): ColumnDef[] {
   return defineColumns([
     { key: '项目', label: '项目', is_label: true, flat: true },
     { key: '期初余额', label: '期初余额', format: 'amount' },
@@ -67,6 +82,14 @@ export function j1MovementColumns(): ColumnDef[] {
     { key: '本期减少', label: '本期减少', format: 'amount' },
     { key: '期末余额', label: '期末余额', format: 'amount' },
   ])
+}
+
+/**
+ * @deprecated 兼容旧调用方 —— 返回国企口径（历史默认）。新代码按变体调用 `buildJ1ListedColumns()`
+ * 或 `buildJ1SoeColumns()`。零入参可调满足 `disclosureColumnsCoverage` sweep。
+ */
+export function j1MovementColumns(): ColumnDef[] {
+  return buildJ1SoeColumns()
 }
 
 // ─── current_standard 解析 ───────────────────────────────────────────────────

@@ -8,7 +8,11 @@
  */
 
 import { defineColumns, type ColumnDef } from './disclosureColumnDefs'
-import { J2_NOTE_SECTION, J2_DISCLOSURE_SHEET_NAME } from './j2NoteSectionMap'
+import {
+  J2_NOTE_SECTION,
+  J2_DISCLOSURE_SHEET_NAME,
+  J2_NET_ASSET_NOTE_SECTION,
+} from './j2NoteSectionMap'
 
 // ── 子表名常量（逐字取自模板 tables[].name） ─────────────────────────────────
 
@@ -25,12 +29,27 @@ export const J2_LISTED_SUBTABLE = {
 
 export const J2_SOE_SUBTABLE = {
   summary: '长期应付职工薪酬',
-  change: '设定受益计划义务现值',
+  change: '设定受益计划情况',
   maturity: '未折现的离职后福利预计到期分析',
   assetComp: '计划资产',
   assume: '精算假设',
   sens: '敏感性分析',
 } as const
+
+/**
+ * 🔴 八、54 被删的两张上市结构误抄表 —— 同步载荷不再推送，且经
+ * `_removed_table_keys` 清理存量孤儿子表。
+ *
+ * tables[2] `计划资产`（变动表 rows=9，与 tables[5] 构成表同名 → sub_table_data
+ * 以表名为键必丢整表 → P0 三号），tables[3] `设定受益计划净负债（净资产）`（上市
+ * 结构的独立三表，国企源模板是横向 7 列合一 = tables[1]）。
+ */
+export const J2_SOE_LEGACY_OBSOLETE_TABLES = [
+  '计划资产：',                     // 旧名（变动表带尾冒号，与 J2_LISTED_SUBTABLE.asset 相同）
+  '设定受益计划净负债（净资产）：',  // 旧名（listed 版带尾冒号）
+  '设定受益计划义务现值',            // 曾用名（改名为 `设定受益计划情况` 前的 soe 版）
+  '设定受益计划净负债（净资产）',    // soe 版无尾冒号
+] as const
 
 // ── Listed 列定义 ─────────────────────────────────────────────────────────────
 
@@ -111,12 +130,12 @@ function soeSummaryCols(): ColumnDef[] {
 function soeChangeCols(): ColumnDef[] {
   return defineColumns([
     { key: 'label', label: '项目', is_label: true },
-    { key: 'dbo_cur', label: '本期', format: 'amount', group: '义务现值' },
-    { key: 'dbo_prior', label: '上期', format: 'amount', group: '义务现值' },
-    { key: 'asset_cur', label: '本期', format: 'amount', group: '计划资产的公允价值' },
-    { key: 'asset_prior', label: '上期', format: 'amount', group: '计划资产的公允价值' },
-    { key: 'net_cur', label: '本期', format: 'amount', group: '设定受益计划净负债' },
-    { key: 'net_prior', label: '上期', format: 'amount', group: '设定受益计划净负债' },
+    { key: 'dbo_cur', label: '本期金额', format: 'amount', group: '设定受益计划义务现值' },
+    { key: 'dbo_prior', label: '上期金额', format: 'amount', group: '设定受益计划义务现值' },
+    { key: 'asset_cur', label: '本期金额', format: 'amount', group: '计划资产的公允价值' },
+    { key: 'asset_prior', label: '上期金额', format: 'amount', group: '计划资产的公允价值' },
+    { key: 'net_cur', label: '本期金额', format: 'amount', group: '设定受益计划净负债（净资产）' },
+    { key: 'net_prior', label: '上期金额', format: 'amount', group: '设定受益计划净负债（净资产）' },
   ])
 }
 
@@ -285,5 +304,82 @@ export function buildJ2SoeSyncPayload(snapshot: J2SoeSnapshot) {
     sheet_name: J2_DISCLOSURE_SHEET_NAME.soe,
     sub_table_data,
     _sub_table_columns: buildJ2SoeColumns(),
+    _removed_table_keys: [...J2_SOE_LEGACY_OBSOLETE_TABLES],
+  }
+}
+
+// ── 净资产分支（五、17）列定义 ────────────────────────────────────────────────
+
+export const J2_NET_ASSET_SUBTABLE = '设定受益计划净资产' as const
+
+function netAssetColumns(): ColumnDef[] {
+  return defineColumns([
+    { key: 'label', label: '项目', is_label: true, flat: true },
+    { key: 'begin', label: '期初余额', format: 'amount' },
+    { key: 'increase', label: '本期增加', format: 'amount' },
+    { key: 'decrease', label: '本期减少', format: 'amount' },
+    { key: 'end', label: '期末余额', format: 'amount' },
+  ])
+}
+
+/**
+ * 五、17 设定受益计划净资产：仅在上市侧净负债表期末为负（= 净资产）时推送。
+ * variant_matrix: soe 侧为 null → 国企不推此章节。
+ *
+ * 行集从 Listed 汇总表中取 `dbp_net` 行的绝对值（净资产时期末为负数，取绝正显示）。
+ */
+export interface J2NetAssetSnapshot {
+  /** 设定受益计划净资产余额（begin/increase/decrease/end，均取绝对值） */
+  dbpNetRow: { begin: number; increase: number; decrease: number; end: number }
+  /** 其他长期职工福利净资产（可选，不适用时传 null 或全 0 → 不推行） */
+  otherLtRow?: { begin: number; increase: number; decrease: number; end: number } | null
+}
+
+export function buildJ2NetAssetPayload(snapshot: J2NetAssetSnapshot) {
+  const rows: Array<Record<string, unknown>> = [
+    {
+      label: '设定受益计划净资产',
+      begin: Math.abs(snapshot.dbpNetRow.begin),
+      increase: Math.abs(snapshot.dbpNetRow.increase),
+      decrease: Math.abs(snapshot.dbpNetRow.decrease),
+      end: Math.abs(snapshot.dbpNetRow.end),
+    },
+  ]
+
+  if (snapshot.otherLtRow) {
+    const o = snapshot.otherLtRow
+    const hasValue = o.begin !== 0 || o.increase !== 0 || o.decrease !== 0 || o.end !== 0
+    if (hasValue) {
+      rows.push({
+        label: '符合设定受益计划条件的其他长期职工福利的净资产',
+        begin: Math.abs(o.begin),
+        increase: Math.abs(o.increase),
+        decrease: Math.abs(o.decrease),
+        end: Math.abs(o.end),
+      })
+    }
+  }
+
+  // 合计行
+  const total = rows.reduce(
+    (acc, r) => ({
+      begin: acc.begin + (r.begin as number),
+      increase: acc.increase + (r.increase as number),
+      decrease: acc.decrease + (r.decrease as number),
+      end: acc.end + (r.end as number),
+    }),
+    { begin: 0, increase: 0, decrease: 0, end: 0 },
+  )
+  rows.push({ label: '合计', is_total: true, ...total })
+
+  const sub_table_data: Record<string, unknown> = {
+    [J2_NET_ASSET_SUBTABLE]: rows,
+  }
+
+  return {
+    note_section: J2_NET_ASSET_NOTE_SECTION.listed!,
+    sheet_name: J2_DISCLOSURE_SHEET_NAME.listed,
+    sub_table_data,
+    _sub_table_columns: { [J2_NET_ASSET_SUBTABLE]: netAssetColumns() },
   }
 }

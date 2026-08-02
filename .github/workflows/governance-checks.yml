@@ -1815,3 +1815,55 @@ jobs:
         run: python -m pip install pytest==8.4.2
       - name: Run note M-equity structure contract tests
         run: python -m pytest backend/tests/test_note_m_equity_structure.py -q
+
+  note-j2-structure:
+    # 附注 J2 设定受益计划章节结构守卫（五、49 / 八、54 / 五、17）
+    # （j-cycle-four-table-extraction-and-disclosure-alignment Task 8/9）
+    # 背景：八、54 原有两张上市结构误抄表（计划资产/净负债）与构成表同名 → sub_table_data
+    # 键冲突丢整表；7 列合并表的 group/叶子 label/行集与源模板不一致；上市「五、49」
+    # 缺源模板 R27/R28 两行。幂等脚本 + 三向比对（openpyxl 直读源 xlsx）。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check note J2 section alignment (五、49 / 八、54 / 五、17)
+        run: python backend/scripts/fix/fix_note_j2_dbp_structure.py --check
+      - name: Install test dependency
+        run: python -m pip install pytest==8.4.2
+      - name: Run note J2 structure contract tests
+        run: python -m pytest backend/tests/four_table/test_note_j1_j2_structure.py -q
+
+  j-cycle-four-table:
+    # J 循环四表取数后端守卫（科目单一真源 + 叶子口径 + 公式预设）
+    # （j-cycle-four-table-extraction-and-disclosure-alignment Task 4/6）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check J-cycle prefill presets alignment
+        run: python backend/scripts/fix/fix_j_cycle_prefill_presets.py --check
+      - name: Install test dependency
+        run: python -m pip install pytest==8.4.2
+      - name: Run J-cycle account scope & formula presets tests
+        run: python -m pytest backend/tests/four_table/test_j_cycle_account_scope.py backend/tests/four_table/test_j_cycle_formula_presets.py -q
+
+  j-cycle-frontend:
+    # J 循环前端守卫（科目零字面量 + 到期分段≠账龄 + 动态行 + 契约）
+    # （j-cycle-four-table-extraction-and-disclosure-alignment Task 16）
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: audit-platform/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        run: npm ci
+      - name: Run J-cycle frontend contract tests
+        run: npx vitest run src/components/workpaper/composables/__tests__/jMaturityBandsNotAging.spec.ts src/components/workpaper/composables/__tests__/dbpDynamicRows.spec.ts

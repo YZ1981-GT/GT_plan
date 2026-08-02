@@ -20,3 +20,12 @@ export const J2_NOTE_SECTION = {
   listed: '五、49',
   soe: '八、54',
 } as const
+
+/**
+ * 设定受益计划净资产落点（五、17）。仅上市侧净资产状态时推。
+ * variant_matrix: soe 侧为 null → 不推。
+ */
+export const J2_NET_ASSET_NOTE_SECTION = {
+  listed: '五、17',
+  soe: null,
+} as const

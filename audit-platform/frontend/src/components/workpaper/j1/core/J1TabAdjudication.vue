@@ -19,9 +19,23 @@
         @click="writebackTB">
         回写试算平衡表（2211）
       </el-button>
+      <el-button size="small" type="primary" plain
+        :disabled="isReadonly || !hasFourTablePrefill"
+        :loading="fourTableApplying"
+        @click="handlePullFromFourTable">
+        从四表库带入未审数
+      </el-button>
       <span class="chip-wrap"><GtIndexChip value="wp:J1-1" :context-project-id="projectId" /></span>
       <el-tag size="small" type="info">共 {{ groups.length }} 组分类</el-tag>
     </div>
+
+    <!-- 四表库溯源面板 -->
+    <WpFourTableSourcePanel
+      :source-codes="tbSourceCodes"
+      gross-label="应付职工薪酬原值"
+      fallback-row-code="BS-069"
+      :hints="['科目 2211，报表行 BS-069（国企）/ BS-051（上市），无备抵科目。']"
+    />
 
     <template v-if="true">
       <!-- 各分类分组 -->
@@ -59,15 +73,13 @@
             <el-table-column label="未审数" width="100" align="right">
               <template #default="{ row }">
                 <template v-if="row.id?.startsWith('subtotal')">{{ fmtAmount(row.beginUnadj) }}</template>
-                <el-input-number v-else v-model="row.beginUnadj" :disabled="isReadonly"
-                  size="small" :controls="false" :precision="2" @change="onCellChange(row)" />
+                <WpAmountInput v-else v-model="row.beginUnadj" :disabled="isReadonly" @change="onCellChange(row)" />
               </template>
             </el-table-column>
             <el-table-column label="调整" width="90" align="right">
               <template #default="{ row }">
                 <template v-if="row.id?.startsWith('subtotal')">{{ fmtAmount(row.beginAje) }}</template>
-                <el-input-number v-else v-model="row.beginAje" :disabled="isReadonly"
-                  size="small" :controls="false" :precision="2" @change="onCellChange(row)" />
+                <WpAmountInput v-else v-model="row.beginAje" :disabled="isReadonly" @change="onCellChange(row)" />
               </template>
             </el-table-column>
             <el-table-column label="审定数" width="100" align="right" class-name="auto-calc-col">
@@ -81,15 +93,13 @@
             <el-table-column label="未审数" width="100" align="right">
               <template #default="{ row }">
                 <template v-if="row.id?.startsWith('subtotal')">{{ fmtAmount(row.endUnadj) }}</template>
-                <el-input-number v-else v-model="row.endUnadj" :disabled="isReadonly"
-                  size="small" :controls="false" :precision="2" @change="onCellChange(row)" />
+                <WpAmountInput v-else v-model="row.endUnadj" :disabled="isReadonly" @change="onCellChange(row)" />
               </template>
             </el-table-column>
             <el-table-column label="调整" width="90" align="right">
               <template #default="{ row }">
                 <template v-if="row.id?.startsWith('subtotal')">{{ fmtAmount(row.endAje) }}</template>
-                <el-input-number v-else v-model="row.endAje" :disabled="isReadonly"
-                  size="small" :controls="false" :precision="2" @change="onCellChange(row)" />
+                <WpAmountInput v-else v-model="row.endAje" :disabled="isReadonly" @change="onCellChange(row)" />
               </template>
             </el-table-column>
             <el-table-column label="审定数" width="100" align="right" class-name="auto-calc-col">
@@ -243,10 +253,14 @@ import { Download } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import { useJ1Adjudication, type AdjudicationRow } from '@/composables/workpaper/j1/useJ1Adjudication'
+import { normalizeJ1Label, recalcAdjudicationRow } from '@/composables/workpaper/j1/useJ1Adjudication'
 import GtIndexChip from '../../GtIndexChip.vue'
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
 import { useAuditContext } from '@/composables/useAuditContext'
+import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
+import WpAmountInput from '../../shared/WpAmountInput.vue'
+import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
 
 interface ChecklistItem { item_id: string; conclusion: string | null; remark: string | null }
 
@@ -307,6 +321,81 @@ const tbBalance = ref(0)
 const tbUnadjusted = ref(0)
 const tbDiff = computed(() => grandTotal.value.endAudited - tbBalance.value)
 const tbUnadjDiff = computed(() => grandTotal.value.endUnadj - tbUnadjusted.value)
+
+/** 四表库溯源 */
+const tbSourceCodes = computed<TbSourceCodes | null>(() => {
+  const src = props.htmlData?.tb_source_codes
+  return src && typeof src === 'object' ? (src as TbSourceCodes) : null
+})
+
+/** 从四表库带入未审数 */
+const fourTableApplying = ref(false)
+const hasFourTablePrefill = computed(() => {
+  const pf = props.htmlData?.adjudication_prefill
+  return Array.isArray(pf) && pf.length > 0
+})
+
+async function handlePullFromFourTable() {
+  if (isReadonly) return
+  const pf = props.htmlData?.adjudication_prefill as Array<Record<string, unknown>> | undefined
+  if (!pf || pf.length === 0) return
+  try {
+    await ElMessageBox.confirm(
+      `四表库已解析出 ${pf.length} 个子科目叶子行，是否带入未审数？\n仅覆盖空值行，手工录入不受影响。`,
+      '从四表库带入未审数',
+      { confirmButtonText: '带入', cancelButtonText: '取消', type: 'info' },
+    )
+  } catch { return }
+  fourTableApplying.value = true
+  try {
+    let inserted = 0
+    for (const item of pf) {
+      const code = String(item.account_code || '')
+      const label = String(item.label || '')
+      // Find existing row: account_code priority, then normalized label
+      let existing = code ? rows.value.find(r => r.id === `tb-${code}`) : undefined
+      if (!existing) existing = rows.value.find(r => normalizeJ1Label(r.label) === normalizeJ1Label(label))
+      if (existing) {
+        // Only fill if both unadj are 0 (never overwrite hand-entered)
+        if (Math.abs(existing.endUnadj) < 0.005 && Math.abs(existing.beginUnadj) < 0.005) {
+          existing.endUnadj = Number(item.end_unadj) || 0
+          existing.beginUnadj = Number(item.begin_unadj) || 0
+          recalcAdjudicationRow(existing)
+          inserted++
+        }
+      } else {
+        // Insert new row
+        const category = String(item.category || 'short_term') as AdjudicationRow['category']
+        const newRow: AdjudicationRow = {
+          id: `tb-${code || `auto-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`}`,
+          label,
+          category,
+          indent: 0,
+          beginUnadj: Number(item.begin_unadj) || 0,
+          beginAje: 0,
+          beginAudited: 0,
+          endUnadj: Number(item.end_unadj) || 0,
+          endAje: 0,
+          endAudited: 0,
+          unadjVsPriorDiff: 0,
+          unadjVsPriorRate: 0,
+          auditedVsPriorDiff: 0,
+          auditedVsPriorRate: 0,
+          changeDiff: 0,
+          changeRate: 0,
+          analysis: '',
+        }
+        recalcAdjudicationRow(newRow)
+        rows.value.push(newRow)
+        inserted++
+      }
+    }
+    commitRows()
+    ElMessage.success(`已从四表库带入 ${inserted} 行未审数`)
+  } finally {
+    fourTableApplying.value = false
+  }
+}
 
 /** 从 J1-2 明细带入未审数（覆盖行清单，保留同名行的调整/原因分析） */
 async function pullFromDetailWithConfirm() {

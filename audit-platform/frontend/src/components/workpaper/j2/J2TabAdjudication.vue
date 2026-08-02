@@ -15,13 +15,16 @@
  * Spec: .kiro/specs/j2-defined-benefit-plan/
  */
 import { ref, reactive, computed, inject, onMounted, watch } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download } from '@element-plus/icons-vue'
 import type { GenerateWorkpaperAiText } from '../composables/useWorkpaperScaffold'
 import GtIndexChip from '../GtIndexChip.vue'
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import { useAdjudicationBringIn } from '../composables/useAdjudicationBringIn'
 import { useAuditContext } from '@/composables/useAuditContext'
+import WpFourTableSourcePanel from '../shared/WpFourTableSourcePanel.vue'
+import WpAmountInput from '../shared/WpAmountInput.vue'
+import type { TbSourceCodes } from '../composables/shared/tbSourceCodes'
 
 interface RespItem { item_id: string; conclusion: string | null; remark: string | null }
 
@@ -215,6 +218,59 @@ async function aiGenerate(kind: 'note' | 'conclusion') {
 const tbAmount = ref(0)
 const tbDiff = computed(() => mainTotal.value.endAudited - tbAmount.value)
 
+// ─── 四表库溯源 ───────────────────────────────────────────────────────────────
+const tbSourceCodes = computed<TbSourceCodes | null>(() => {
+  const src = props.htmlData?.tb_source_codes
+  return src && typeof src === 'object' ? (src as TbSourceCodes) : null
+})
+
+// ─── 从四表库带入未审数 ───────────────────────────────────────────────────────
+const fourTableApplying = ref(false)
+const hasFourTablePrefill = computed(() => {
+  const pf = props.htmlData?.adjudication_prefill
+  return Array.isArray(pf) && pf.length > 0
+})
+
+async function handlePullFromFourTable() {
+  if (isReadonly.value) return
+  const pf = props.htmlData?.adjudication_prefill as Array<Record<string, unknown>> | undefined
+  if (!pf || pf.length === 0) return
+  try {
+    await ElMessageBox.confirm(
+      `四表库已解析出 ${pf.length} 个子科目叶子行，是否带入未审数？\n仅覆盖空值行，手工录入不受影响。`,
+      '从四表库带入未审数',
+      { confirmButtonText: '带入', cancelButtonText: '取消', type: 'info' },
+    )
+  } catch { return }
+  fourTableApplying.value = true
+  try {
+    let inserted = 0
+    // Group prefill items by top_row_key and sum into corresponding mainRow
+    const grouped = new Map<string, { opening: number; closing: number }>()
+    for (const item of pf) {
+      const topKey = String(item.top_row_key || 'dbp')
+      const cur = grouped.get(topKey) || { opening: 0, closing: 0 }
+      cur.opening += Number(item.opening_balance) || 0
+      cur.closing += Number(item.closing_balance) || 0
+      grouped.set(topKey, cur)
+    }
+    for (const [topKey, vals] of grouped) {
+      const row = mainRows.find(r => r.key === topKey)
+      if (!row) continue
+      // Only fill if both unadj are 0 (never overwrite hand-entered/history)
+      if (Math.abs(n(row.endUnadj)) < 0.005 && Math.abs(n(row.beginUnadj)) < 0.005) {
+        row.endUnadj = Math.abs(vals.closing)
+        row.beginUnadj = Math.abs(vals.opening)
+        inserted++
+      }
+    }
+    if (inserted > 0) scheduleSave()
+    ElMessage.success(`已从四表库带入 ${inserted} 行未审数`)
+  } finally {
+    fourTableApplying.value = false
+  }
+}
+
 // ─── 加载 ─────────────────────────────────────────────────────────────────────
 function parseJson<T>(itemId: string, fallback: T): T {
   const raw = props.allResponses?.get(itemId)?.remark
@@ -252,16 +308,23 @@ function load() {
     const dbp = mainRows.find(r => r.key === 'dbp')!
     dbp.endUnadj = n(tb.unadjusted_amount) || n(tb.audited_amount)
   }
-  // Prefill seed（从 tb_balance 2221 子科目期末余额合计 seed 到设定受益计划行）
+  // Prefill seed（从 tb_balance 2705 叶子按 top_row_key 分组 seed 到对应行）
   if (!anyMain) {
-    const pf = Array.isArray(props.htmlData?.adjudication_prefill) ? props.htmlData.adjudication_prefill : []
+    const pf = Array.isArray(props.htmlData?.adjudication_prefill) ? props.htmlData.adjudication_prefill as Array<Record<string, unknown>> : []
     if (pf.length > 0) {
-      const totalClosing = pf.reduce((s: number, p: any) => s + (Number(p.closing_balance) || 0), 0)
-      const totalOpening = pf.reduce((s: number, p: any) => s + (Number(p.opening_balance) || 0), 0)
-      if (totalClosing !== 0 || totalOpening !== 0) {
-        const dbp = mainRows.find(r => r.key === 'dbp')!
-        if (n(dbp.endUnadj) === 0) dbp.endUnadj = Math.abs(totalClosing)
-        if (n(dbp.beginUnadj) === 0) dbp.beginUnadj = Math.abs(totalOpening)
+      const grouped = new Map<string, { opening: number; closing: number }>()
+      for (const item of pf) {
+        const topKey = String(item.top_row_key || 'dbp')
+        const cur = grouped.get(topKey) || { opening: 0, closing: 0 }
+        cur.opening += Number(item.opening_balance) || 0
+        cur.closing += Number(item.closing_balance) || 0
+        grouped.set(topKey, cur)
+      }
+      for (const [topKey, vals] of grouped) {
+        const row = mainRows.find(r => r.key === topKey)
+        if (!row) continue
+        if (n(row.endUnadj) === 0) row.endUnadj = Math.abs(vals.closing)
+        if (n(row.beginUnadj) === 0) row.beginUnadj = Math.abs(vals.opening)
       }
     }
   }
@@ -324,8 +387,22 @@ watch(() => props.allResponses, load, { deep: false })
       <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
         <el-icon><Download /></el-icon>带入调整
       </el-button>
+      <el-button size="small" type="primary" plain
+        :disabled="isReadonly || !hasFourTablePrefill"
+        :loading="fourTableApplying"
+        @click="handlePullFromFourTable">
+        从四表库带入未审数
+      </el-button>
       <span class="chip-wrap"><GtIndexChip value="wp:J2-2" :context-project-id="projectId" /></span>
     </div>
+
+    <!-- 四表库溯源面板 -->
+    <WpFourTableSourcePanel
+      :source-codes="tbSourceCodes"
+      gross-label="长期应付职工薪酬原值"
+      fallback-row-code="BS-093"
+      :hints="['科目 2705，报表行 BS-093（国企）/ BS-067（上市），无备抵科目。']"
+    />
 
     <!-- 审计目标 -->
     <el-alert type="info" :closable="false" show-icon class="audit-objective">
@@ -347,13 +424,13 @@ watch(() => props.allResponses, load, { deep: false })
         <el-table-column label="期初数" align="center">
           <el-table-column label="未审数" width="110" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" v-model="row.beginUnadj" :controls="false" :precision="2" size="small" @change="scheduleSave" />
+              <WpAmountInput v-if="!isReadonly" v-model="row.beginUnadj" @change="scheduleSave" />
               <span v-else>{{ fmt(row.beginUnadj) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="账项调整" width="100" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" v-model="row.beginAje" :controls="false" :precision="2" size="small" @change="scheduleSave" />
+              <WpAmountInput v-if="!isReadonly" v-model="row.beginAje" @change="scheduleSave" />
               <span v-else>{{ fmt(row.beginAje) }}</span>
             </template>
           </el-table-column>
@@ -364,13 +441,13 @@ watch(() => props.allResponses, load, { deep: false })
         <el-table-column label="期末数" align="center">
           <el-table-column label="未审数" width="110" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" v-model="row.endUnadj" :controls="false" :precision="2" size="small" @change="scheduleSave" />
+              <WpAmountInput v-if="!isReadonly" v-model="row.endUnadj" @change="scheduleSave" />
               <span v-else>{{ fmt(row.endUnadj) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="账项调整" width="100" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" v-model="row.endAje" :controls="false" :precision="2" size="small" @change="scheduleSave" />
+              <WpAmountInput v-if="!isReadonly" v-model="row.endAje" @change="scheduleSave" />
               <span v-else>{{ fmt(row.endAje) }}</span>
             </template>
           </el-table-column>
@@ -418,7 +495,7 @@ watch(() => props.allResponses, load, { deep: false })
         <el-table-column prop="label" label="项目" min-width="200" />
         <el-table-column label="金额" width="160" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.amount" :controls="false" :precision="2" size="small" @change="scheduleSave" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.amount" @change="scheduleSave" />
             <span v-else>{{ fmt(row.amount) }}</span>
           </template>
         </el-table-column>
@@ -435,13 +512,13 @@ watch(() => props.allResponses, load, { deep: false })
         <el-table-column label="设定受益计划义务现值" align="center">
           <el-table-column label="未审数" width="110" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly && !row.group" v-model="row.dboUnadj" :controls="false" :precision="2" size="small" @change="scheduleSave" />
+              <WpAmountInput v-if="!isReadonly && !row.group" v-model="row.dboUnadj" @change="scheduleSave" />
               <span v-else>{{ fmt(row.dboUnadj) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="账项调整" width="100" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly && !row.group" v-model="row.dboAje" :controls="false" :precision="2" size="small" @change="scheduleSave" />
+              <WpAmountInput v-if="!isReadonly && !row.group" v-model="row.dboAje" @change="scheduleSave" />
               <span v-else>{{ fmt(row.dboAje) }}</span>
             </template>
           </el-table-column>
@@ -451,7 +528,7 @@ watch(() => props.allResponses, load, { deep: false })
         </el-table-column>
         <el-table-column label="计划资产公允价值" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly && !row.group" v-model="row.planAsset" :controls="false" :precision="2" size="small" @change="scheduleSave" />
+            <WpAmountInput v-if="!isReadonly && !row.group" v-model="row.planAsset" @change="scheduleSave" />
             <span v-else>{{ fmt(row.planAsset) }}</span>
           </template>
         </el-table-column>
@@ -466,13 +543,13 @@ watch(() => props.allResponses, load, { deep: false })
         <el-table-column prop="label" label="项目" min-width="200" />
         <el-table-column label="期末未审数" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.unadj" :controls="false" :precision="2" size="small" @change="scheduleSave" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.unadj" @change="scheduleSave" />
             <span v-else>{{ fmt(row.unadj) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="账项调整" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.aje" :controls="false" :precision="2" size="small" @change="scheduleSave" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.aje" @change="scheduleSave" />
             <span v-else>{{ fmt(row.aje) }}</span>
           </template>
         </el-table-column>
@@ -481,7 +558,7 @@ watch(() => props.allResponses, load, { deep: false })
         </el-table-column>
         <el-table-column label="期初数" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.begin" :controls="false" :precision="2" size="small" @change="scheduleSave" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.begin" @change="scheduleSave" />
             <span v-else>{{ fmt(row.begin) }}</span>
           </template>
         </el-table-column>
@@ -519,13 +596,13 @@ watch(() => props.allResponses, load, { deep: false })
         </el-table-column>
         <el-table-column label="对DBO影响·负债增加" width="150" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.up" :controls="false" :precision="2" size="small" @change="scheduleSave" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.up" @change="scheduleSave" />
             <span v-else>{{ fmt(row.up) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="对DBO影响·负债减少" width="150" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.down" :controls="false" :precision="2" size="small" @change="scheduleSave" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.down" @change="scheduleSave" />
             <span v-else>{{ fmt(row.down) }}</span>
           </template>
         </el-table-column>

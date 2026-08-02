@@ -13,13 +13,20 @@
  *  各区块 JSON 持久化到 checklist_responses.remark（item_id J2-soe-*）。
  */
 import { ref, reactive, computed, inject, onMounted, watch } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { addDynamicRow, hasLabelConflict } from '../composables/shared/dbpDynamicRows'
 import type { GenerateWorkpaperAiText } from '../composables/useWorkpaperScaffold'
 import GtIndexChip from '../GtIndexChip.vue'
+import WpAmountInput from '../shared/WpAmountInput.vue'
+import WpFourTableSourcePanel from '../shared/WpFourTableSourcePanel.vue'
+import J2DisclosureConsistencyPanel from './J2DisclosureConsistencyPanel.vue'
 import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
 import { J2_NOTE_SECTION, J2_DISCLOSURE_SHEET_NAME } from '../composables/j2NoteSectionMap'
 import { buildJ2SoeSyncPayload } from '../composables/j2DisclosureSyncPayload'
 import { useAuditContext } from '@/composables/useAuditContext'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { buildJ2SoeConsistency, type J2SoeConsistencyInput } from '../composables/j2DisclosureConsistency'
+import type { TbSourceCodes } from '../composables/shared/tbSourceCodes'
 
 interface RespItem { item_id: string; conclusion: string | null; remark: string | null }
 const props = defineProps<{
@@ -33,6 +40,12 @@ const props = defineProps<{
 const isReadonly = computed(() => props.isReadonly ?? false)
 const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
 
+/** 四表库取数溯源（render 下发，证明非 dead output） */
+const tbSourceCodes = computed<TbSourceCodes | null>(() => {
+  const src = props.htmlData?.tb_source_codes
+  return src && typeof src === 'object' ? (src as TbSourceCodes) : null
+})
+
 const KEY = {
   summary: 'J2-soe-summary', change: 'J2-soe-change', maturity: 'J2-soe-maturity',
   assets: 'J2-soe-assets', assume: 'J2-soe-assumptions', sens: 'J2-soe-sensitivity',
@@ -40,7 +53,9 @@ const KEY = {
 }
 
 function n(v: unknown): number { const x = typeof v === 'number' ? v : parseFloat(String(v ?? '')); return Number.isFinite(x) ? x : 0 }
-function fmt(v: number | null | undefined): string { if (v === null || v === undefined || v === 0) return '-'; return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }
+/** 只读金额统一走平台单一真源（千分符 + 单位偏好） */
+const displayPrefs = useDisplayPrefsStore()
+function fmt(v: number | null | undefined): string { return displayPrefs.fmtAmount(v ?? 0) }
 function fmtPct(v: number | null | undefined): string { if (v === null || v === undefined) return '-'; return (v * 100).toFixed(2) + '%' }
 
 // ── A 汇总表（期初/本期增加/本期减少/期末，期末=期初+增-减） ─────────────────────
@@ -87,6 +102,139 @@ const changeRows = reactive<MoveRow[]>([
   mv('end', '五、期末余额', 0, 'grand'),
 ])
 const changeMap = computed(() => { const m: Record<string, MoveRow> = {}; for (const r of changeRows) m[r.key] = r; return m })
+
+// ── B-4 动态行：四、其他变动 ─────────────────────────────────────────────────
+// Spec: { group: 'other', parentKey: 'other', defaultLabel: '', minRows: 0 }
+const FIXED_OTHER_KEYS = new Set(['other_settle', 'other_paid'])
+
+/** 判断是否为四、其他变动区块的动态行（可删除） */
+function isOtherDynamic(row: MoveRow): boolean {
+  return row.kind === 'leaf' && row.key.startsWith('other_') && !FIXED_OTHER_KEYS.has(row.key)
+}
+
+async function addOtherRow() {
+  if (isReadonly.value) return
+  try {
+    const { value } = await ElMessageBox.prompt('请输入变动项目名称', '新增其他变动行', {
+      confirmButtonText: '确认', cancelButtonText: '取消', inputPlaceholder: '例如：合同变更',
+    })
+    if (!value?.trim()) return
+    const label = value.trim()
+    // Check for label conflict among other_* leaf rows
+    const otherLeaves = changeRows.filter(r => r.key.startsWith('other_') && r.kind === 'leaf')
+    if (otherLeaves.some(r => r.label === label)) {
+      ElMessage.warning('已存在同名行，请使用不同名称')
+      return
+    }
+    // Find insertion point: before 'end' row
+    const endIdx = changeRows.findIndex(r => r.key === 'end')
+    const dynRows = otherLeaves.filter(r => !FIXED_OTHER_KEYS.has(r.key))
+    const existing = dynRows.map(r => ({ key: r.key, label: r.label, group: 'other', seq: parseInt(r.key.replace('other_', ''), 10) || 0 }))
+    const newDyn = addDynamicRow(existing, 'other', label)
+    const newRow = mv(newDyn.key, label, 1, 'leaf')
+    changeRows.splice(endIdx, 0, newRow)
+    // Update parent children list
+    const otherParent = changeRows.find(r => r.key === 'other')
+    if (otherParent?.children && !otherParent.children.includes(newDyn.key)) {
+      otherParent.children.push(newDyn.key)
+    }
+    scheduleSave()
+  } catch { /* cancelled */ }
+}
+
+function removeOtherRow(key: string) {
+  if (isReadonly.value) return
+  const idx = changeRows.findIndex(r => r.key === key)
+  if (idx >= 0) {
+    changeRows.splice(idx, 1)
+    // Remove from parent children
+    const otherParent = changeRows.find(r => r.key === 'other')
+    if (otherParent?.children) {
+      const ci = otherParent.children.indexOf(key)
+      if (ci >= 0) otherParent.children.splice(ci, 1)
+    }
+    scheduleSave()
+  }
+}
+
+function renameOtherRow(row: MoveRow, newLabel: string) {
+  if (isReadonly.value || !newLabel.trim()) return
+  const label = newLabel.trim()
+  const otherLeaves = changeRows.filter(r => r.key.startsWith('other_') && r.kind === 'leaf')
+  if (hasLabelConflict(
+    otherLeaves.map(r => ({ key: r.key, label: r.label, group: 'other', seq: 0 })),
+    label,
+    row.key,
+  )) {
+    ElMessage.warning('已存在同名行，请使用不同名称')
+    return
+  }
+  row.label = label
+  scheduleSave()
+}
+
+// ── D 动态行：计划资产构成子类别（equity/debt 分组下） ─────────────────────────
+// Spec equity: { group: 'equity', parentKey: 'equity', defaultLabel: '', minRows: 0 }
+// Spec debt:   { group: 'debt', parentKey: 'debt', defaultLabel: '', minRows: 0 }
+
+function isAssetDynamic(row: AssetRow): boolean {
+  return row.indent === 1 && (row.key.startsWith('equity_') || row.key.startsWith('debt_'))
+}
+
+async function addAssetSubRow(group: 'equity' | 'debt') {
+  if (isReadonly.value) return
+  try {
+    const groupLabel = group === 'equity' ? '权益工具' : '债务工具'
+    const { value } = await ElMessageBox.prompt(`请输入${groupLabel}投资子类别名称`, `新增${groupLabel}子类别`, {
+      confirmButtonText: '确认', cancelButtonText: '取消', inputPlaceholder: '例如：银行理财产品',
+    })
+    if (!value?.trim()) return
+    const label = value.trim()
+    const groupRows = assetCompRows.filter(r => r.key.startsWith(`${group}_`))
+    if (groupRows.some(r => r.label === label)) {
+      ElMessage.warning('已存在同名子类别，请使用不同名称')
+      return
+    }
+    const existing = groupRows.map(r => ({ key: r.key, label: r.label, group, seq: parseInt(r.key.replace(`${group}_`, ''), 10) || 0 }))
+    const newDyn = addDynamicRow(existing, group, label)
+    // Find insertion point: after last item of this group, before next top-level item
+    const groupParentIdx = assetCompRows.findIndex(r => r.key === group)
+    let insertIdx = groupParentIdx + 1
+    while (insertIdx < assetCompRows.length && assetCompRows[insertIdx].key.startsWith(`${group}_`)) {
+      insertIdx++
+    }
+    const newRow: AssetRow = { key: newDyn.key, label, indent: 1, end: 0, begin: 0 }
+    assetCompRows.splice(insertIdx, 0, newRow)
+    scheduleSave()
+  } catch { /* cancelled */ }
+}
+
+function removeAssetSubRow(key: string) {
+  if (isReadonly.value) return
+  const idx = assetCompRows.findIndex(r => r.key === key)
+  if (idx >= 0) {
+    assetCompRows.splice(idx, 1)
+    scheduleSave()
+  }
+}
+
+function renameAssetSubRow(row: AssetRow, newLabel: string) {
+  if (isReadonly.value || !newLabel.trim()) return
+  const label = newLabel.trim()
+  const group = row.key.split('_')[0]
+  const groupRows = assetCompRows.filter(r => r.key.startsWith(`${group}_`))
+  if (hasLabelConflict(
+    groupRows.map(r => ({ key: r.key, label: r.label, group, seq: 0 })),
+    label,
+    row.key,
+  )) {
+    ElMessage.warning('已存在同名子类别，请使用不同名称')
+    return
+  }
+  row.label = label
+  scheduleSave()
+}
+
 function isAssetCol(col: MoveCol): boolean { return col === 'assetCur' || col === 'assetPrior' }
 /** 递归解析单元格值：leaf 直取（asset N/A 返 null）；sum 累加子项；grand = 期初+二+三+四 */
 function cellValue(row: MoveRow, col: MoveCol): number | null {
@@ -123,12 +271,24 @@ const assetCompRows = reactive<AssetRow[]>([
   { key: 'debt_2', label: '2、……', indent: 1, end: 0, begin: 0 },
   { key: 'other', label: '其他', indent: 0, end: 0, begin: 0 },
 ])
-// 合计 = 现金 + 权益工具投资(小计) + 债务工具投资(小计) + 其他（不重复计子项）
-const assetCompTotal = computed(() => {
-  const keys = ['cash', 'equity', 'debt', 'other']
+// 合计 = 现金 + 权益工具投资(=Σ子项) + 债务工具投资(=Σ子项) + 其他
+// 父行 equity/debt 是动态派生的子项合计
+const assetGroupSum = computed(() => {
+  const equitySubs = assetCompRows.filter(r => r.key.startsWith('equity_'))
+  const debtSubs = assetCompRows.filter(r => r.key.startsWith('debt_'))
   return {
-    end: assetCompRows.filter(r => keys.includes(r.key)).reduce((s, r) => s + n(r.end), 0),
-    begin: assetCompRows.filter(r => keys.includes(r.key)).reduce((s, r) => s + n(r.begin), 0),
+    equityEnd: equitySubs.reduce((s, r) => s + n(r.end), 0),
+    equityBegin: equitySubs.reduce((s, r) => s + n(r.begin), 0),
+    debtEnd: debtSubs.reduce((s, r) => s + n(r.end), 0),
+    debtBegin: debtSubs.reduce((s, r) => s + n(r.begin), 0),
+  }
+})
+const assetCompTotal = computed(() => {
+  const cash = assetCompRows.find(r => r.key === 'cash')
+  const other = assetCompRows.find(r => r.key === 'other')
+  return {
+    end: n(cash?.end) + assetGroupSum.value.equityEnd + assetGroupSum.value.debtEnd + n(other?.end),
+    begin: n(cash?.begin) + assetGroupSum.value.equityBegin + assetGroupSum.value.debtBegin + n(other?.begin),
   }
 })
 
@@ -166,9 +326,63 @@ function assignRows<T extends object>(target: T[], saved: unknown) {
 }
 function load() {
   assignRows(summaryRows, parseJson(KEY.summary, null))
-  assignRows(changeRows, parseJson(KEY.change, null))
+
+  // Restore changeRows — including dynamically added other_* rows
+  const savedChange = parseJson<MoveRow[] | null>(KEY.change, null)
+  if (Array.isArray(savedChange)) {
+    // Restore existing fixed rows
+    assignRows(changeRows, savedChange)
+    // Restore dynamic other_* rows that were added by user
+    const endIdx = changeRows.findIndex(r => r.key === 'end')
+    const otherParent = changeRows.find(r => r.key === 'other')
+    for (const s of savedChange) {
+      if (s.key.startsWith('other_') && !FIXED_OTHER_KEYS.has(s.key) && s.key !== 'other_etc' && !changeRows.some(r => r.key === s.key)) {
+        const newRow = mv(s.key, s.label, 1, 'leaf')
+        Object.assign(newRow, s)
+        newRow.indent = 1
+        newRow.kind = 'leaf'
+        const insertAt = endIdx >= 0 ? changeRows.findIndex(r => r.key === 'end') : changeRows.length
+        changeRows.splice(insertAt, 0, newRow)
+        if (otherParent?.children && !otherParent.children.includes(s.key)) {
+          otherParent.children.push(s.key)
+        }
+      }
+    }
+    // Remove the placeholder other_etc row if dynamic rows exist
+    const hasDynOther = changeRows.some(r => isOtherDynamic(r))
+    if (hasDynOther) {
+      const etcIdx = changeRows.findIndex(r => r.key === 'other_etc')
+      if (etcIdx >= 0) changeRows.splice(etcIdx, 1)
+      if (otherParent?.children) {
+        const ci = otherParent.children.indexOf('other_etc')
+        if (ci >= 0) otherParent.children.splice(ci, 1)
+      }
+    }
+  }
+
   assignRows(maturityRows, parseJson(KEY.maturity, null))
-  assignRows(assetCompRows, parseJson(KEY.assets, null))
+
+  // Restore assetCompRows — including dynamically added equity_*/debt_* rows
+  const savedAssets = parseJson<AssetRow[] | null>(KEY.assets, null)
+  if (Array.isArray(savedAssets)) {
+    assignRows(assetCompRows, savedAssets)
+    // Restore dynamic sub-rows for equity/debt
+    for (const s of savedAssets) {
+      const isEquitySub = s.key.startsWith('equity_') && s.key !== 'equity_1' && s.key !== 'equity_2'
+      const isDebtSub = s.key.startsWith('debt_') && s.key !== 'debt_1' && s.key !== 'debt_2'
+      if ((isEquitySub || isDebtSub) && !assetCompRows.some(r => r.key === s.key)) {
+        const group = s.key.split('_')[0]
+        const groupParentIdx = assetCompRows.findIndex(r => r.key === group)
+        let insertIdx = groupParentIdx + 1
+        while (insertIdx < assetCompRows.length && assetCompRows[insertIdx].key.startsWith(`${group}_`)) {
+          insertIdx++
+        }
+        const newRow: AssetRow = { key: s.key, label: s.label || '', indent: 1, end: n(s.end), begin: n(s.begin) }
+        assetCompRows.splice(insertIdx, 0, newRow)
+      }
+    }
+  }
+
   assignRows(assumeRows, parseJson(KEY.assume, null))
   assignRows(sensRows, parseJson(KEY.sens, null))
   const t = props.allResponses?.get(KEY.noteTerm)?.remark; if (t) noteTerm.value = t
@@ -234,6 +448,32 @@ async function aiGen(target: 'term' | 'dbp' | 'sens') {
     }
   } catch { ElMessage.warning('AI 生成失败，请稍后重试') } finally { aiLoading.value = '' }
 }
+
+// ── 勾稽引擎 ────────────────────────────────────────────────────────────────
+const consistency = computed(() => {
+  const endRow = changeMap.value['end']
+  const input: J2SoeConsistencyInput = {
+    summaryEnds: {
+      dbpNet: sumEnd(summaryRows.find(r => r.key === 'dbp_net')!),
+      otherLtNet: sumEnd(summaryRows.find(r => r.key === 'other_lt_net')!),
+      termination: sumEnd(summaryRows.find(r => r.key === 'termination')!),
+      total: summaryTotal.value.end,
+    },
+    changeEnd: {
+      dbo: cellValue(endRow, 'dboCur') ?? 0,
+      asset: cellValue(endRow, 'assetCur') ?? 0,
+      net: cellValue(endRow, 'netCur') ?? 0,
+    },
+    changeCalcEnd: {
+      dbo: ['begin', 'pl', 'oci', 'other'].reduce((s, k) => s + (cellValue(changeMap.value[k], 'dboCur') ?? 0), 0),
+      asset: ['begin', 'pl', 'oci', 'other'].reduce((s, k) => s + (cellValue(changeMap.value[k], 'assetCur') ?? 0), 0),
+      net: ['begin', 'pl', 'oci', 'other'].reduce((s, k) => s + (cellValue(changeMap.value[k], 'netCur') ?? 0), 0),
+    },
+    maturityTotal: maturityTotal.value,
+    assetCompTotal: assetCompTotal.value.end,
+  }
+  return buildJ2SoeConsistency(input)
+})
 
 onMounted(load)
 watch(() => props.allResponses, load, { deep: false })
@@ -306,6 +546,20 @@ watch(
       <el-button size="small" type="success" plain :disabled="isReadonly" @click="syncToDisclosureNotes">同步到附注</el-button>
     </div>
 
+    <WpFourTableSourcePanel
+      :source-codes="tbSourceCodes"
+      gross-label="长期应付职工薪酬原值"
+      fallback-row-code="BS-093"
+      :hints="['科目 2705（设定受益计划），报表行 BS-093（国企）；无备抵科目。']"
+    />
+
+    <!-- 披露内部勾稽 -->
+    <J2DisclosureConsistencyPanel
+      :result="consistency"
+      :project-id="projectId"
+      :default-expanded="consistency.errorCount > 0"
+    />
+
     <!-- A 长期应付职工薪酬汇总 -->
     <h4 class="sec-title">长期应付职工薪酬（不适用的删除）</h4>
     <el-table :data="summaryRows" border size="small" class="wp-table" style="max-width: 860px">
@@ -314,19 +568,19 @@ watch(
       </el-table-column>
       <el-table-column label="期初数" width="130" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" v-model="row.begin" :controls="false" :precision="2" size="small" @change="scheduleSave" />
+          <WpAmountInput v-if="!isReadonly" v-model="row.begin" @change="scheduleSave" />
           <span v-else>{{ fmt(row.begin) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="本期增加" width="130" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" v-model="row.increase" :controls="false" :precision="2" size="small" @change="scheduleSave" />
+          <WpAmountInput v-if="!isReadonly" v-model="row.increase" @change="scheduleSave" />
           <span v-else>{{ fmt(row.increase) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="本期减少" width="130" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" v-model="row.decrease" :controls="false" :precision="2" size="small" @change="scheduleSave" />
+          <WpAmountInput v-if="!isReadonly" v-model="row.decrease" @change="scheduleSave" />
           <span v-else>{{ fmt(row.decrease) }}</span>
         </template>
       </el-table-column>
@@ -348,19 +602,29 @@ watch(
       :row-class-name="({ row }) => row.kind !== 'leaf' ? 'group-row' : ''">
       <el-table-column label="项  目" min-width="300" fixed>
         <template #default="{ row }">
-          <span :style="{ paddingLeft: row.indent * 16 + 'px', fontWeight: row.kind !== 'leaf' ? 600 : 400 }">{{ row.label }}</span>
+          <span v-if="row.key === 'other'" :style="{ fontWeight: 600 }" class="group-label-with-btn">
+            {{ row.label }}
+            <el-button v-if="!isReadonly" type="primary" link size="small" class="add-row-btn" @click="addOtherRow">＋ 新增</el-button>
+          </span>
+          <span v-else-if="isOtherDynamic(row)" class="dynamic-row-label" :style="{ paddingLeft: row.indent * 16 + 'px' }">
+            <el-input v-if="!isReadonly" :model-value="row.label" size="small" class="inline-label-input"
+              @change="(v: string) => renameOtherRow(row, v)" />
+            <span v-else>{{ row.label }}</span>
+            <el-button v-if="!isReadonly" type="danger" link size="small" class="del-row-btn" @click="removeOtherRow(row.key)">✕</el-button>
+          </span>
+          <span v-else :style="{ paddingLeft: row.indent * 16 + 'px', fontWeight: row.kind !== 'leaf' ? 600 : 400 }">{{ row.label }}</span>
         </template>
       </el-table-column>
       <el-table-column label="设定受益计划义务现值" align="center">
         <el-table-column label="本期金额" width="130" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="editable(row, 'dboCur')" v-model="row.dboCur" :controls="false" :precision="2" size="small" @change="scheduleSave" />
+            <WpAmountInput v-if="editable(row, 'dboCur')" v-model="row.dboCur" @change="scheduleSave" />
             <span v-else>{{ fmt(cellValue(row, 'dboCur')) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="上期金额" width="130" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="editable(row, 'dboPrior')" v-model="row.dboPrior" :controls="false" :precision="2" size="small" @change="scheduleSave" />
+            <WpAmountInput v-if="editable(row, 'dboPrior')" v-model="row.dboPrior" @change="scheduleSave" />
             <span v-else>{{ fmt(cellValue(row, 'dboPrior')) }}</span>
           </template>
         </el-table-column>
@@ -368,13 +632,13 @@ watch(
       <el-table-column label="计划资产的公允价值" align="center">
         <el-table-column label="本期金额" width="130" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="editable(row, 'assetCur')" v-model="row.assetCur" :controls="false" :precision="2" size="small" @change="scheduleSave" />
+            <WpAmountInput v-if="editable(row, 'assetCur')" v-model="row.assetCur" @change="scheduleSave" />
             <span v-else class="na-cell">{{ row.assetNa ? '—' : fmt(cellValue(row, 'assetCur')) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="上期金额" width="130" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="editable(row, 'assetPrior')" v-model="row.assetPrior" :controls="false" :precision="2" size="small" @change="scheduleSave" />
+            <WpAmountInput v-if="editable(row, 'assetPrior')" v-model="row.assetPrior" @change="scheduleSave" />
             <span v-else class="na-cell">{{ row.assetNa ? '—' : fmt(cellValue(row, 'assetPrior')) }}</span>
           </template>
         </el-table-column>
@@ -382,13 +646,13 @@ watch(
       <el-table-column label="设定受益计划净负债（净资产）" align="center">
         <el-table-column label="本期金额" width="130" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="editable(row, 'netCur')" v-model="row.netCur" :controls="false" :precision="2" size="small" @change="scheduleSave" />
+            <WpAmountInput v-if="editable(row, 'netCur')" v-model="row.netCur" @change="scheduleSave" />
             <span v-else>{{ fmt(cellValue(row, 'netCur')) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="上期金额" width="130" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="editable(row, 'netPrior')" v-model="row.netPrior" :controls="false" :precision="2" size="small" @change="scheduleSave" />
+            <WpAmountInput v-if="editable(row, 'netPrior')" v-model="row.netPrior" @change="scheduleSave" />
             <span v-else>{{ fmt(cellValue(row, 'netPrior')) }}</span>
           </template>
         </el-table-column>
@@ -408,7 +672,7 @@ watch(
       <el-table-column prop="label" label="项  目" min-width="200" />
       <el-table-column label="金额" width="160" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" v-model="row.amount" :controls="false" :precision="2" size="small" @change="scheduleSave" />
+          <WpAmountInput v-if="!isReadonly" v-model="row.amount" @change="scheduleSave" />
           <span v-else>{{ fmt(row.amount) }}</span>
         </template>
       </el-table-column>
@@ -420,17 +684,33 @@ watch(
     <el-table :data="assetCompRows" border size="small" class="wp-table" style="max-width: 620px"
       :row-class-name="({ row }) => row.group ? 'group-row' : ''">
       <el-table-column label="项  目" min-width="240">
-        <template #default="{ row }"><span :style="{ paddingLeft: row.indent * 16 + 'px', fontWeight: row.group ? 600 : 400 }">{{ row.label }}</span></template>
+        <template #default="{ row }">
+          <span v-if="row.key === 'equity' || row.key === 'debt'" class="group-label-with-btn" :style="{ fontWeight: 600 }">
+            {{ row.label }}
+            <el-button v-if="!isReadonly" type="primary" link size="small" class="add-row-btn" @click="addAssetSubRow(row.key)">＋ 新增</el-button>
+          </span>
+          <span v-else-if="isAssetDynamic(row)" class="dynamic-row-label" :style="{ paddingLeft: row.indent * 16 + 'px' }">
+            <el-input v-if="!isReadonly" :model-value="row.label" size="small" class="inline-label-input"
+              @change="(v: string) => renameAssetSubRow(row, v)" />
+            <span v-else>{{ row.label }}</span>
+            <el-button v-if="!isReadonly" type="danger" link size="small" class="del-row-btn" @click="removeAssetSubRow(row.key)">✕</el-button>
+          </span>
+          <span v-else :style="{ paddingLeft: row.indent * 16 + 'px', fontWeight: row.group ? 600 : 400 }">{{ row.label }}</span>
+        </template>
       </el-table-column>
       <el-table-column label="期末数" width="150" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" v-model="row.end" :controls="false" :precision="2" size="small" @change="scheduleSave" />
+          <span v-if="row.key === 'equity'" class="formula-cell" title="= Σ 子类别">{{ fmt(assetGroupSum.equityEnd) }}</span>
+          <span v-else-if="row.key === 'debt'" class="formula-cell" title="= Σ 子类别">{{ fmt(assetGroupSum.debtEnd) }}</span>
+          <WpAmountInput v-else-if="!isReadonly" v-model="row.end" @change="scheduleSave" />
           <span v-else>{{ fmt(row.end) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="期初数" width="150" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" v-model="row.begin" :controls="false" :precision="2" size="small" @change="scheduleSave" />
+          <span v-if="row.key === 'equity'" class="formula-cell" title="= Σ 子类别">{{ fmt(assetGroupSum.equityBegin) }}</span>
+          <span v-else-if="row.key === 'debt'" class="formula-cell" title="= Σ 子类别">{{ fmt(assetGroupSum.debtBegin) }}</span>
+          <WpAmountInput v-else-if="!isReadonly" v-model="row.begin" @change="scheduleSave" />
           <span v-else>{{ fmt(row.begin) }}</span>
         </template>
       </el-table-column>
@@ -470,13 +750,13 @@ watch(
       <el-table-column label="对设定受益义务现值的影响" align="center">
         <el-table-column label="计划负债增加" width="150" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.up" :controls="false" :precision="2" size="small" @change="scheduleSave" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.up" @change="scheduleSave" />
             <span v-else>{{ fmt(row.up) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="计划负债减小" width="150" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.down" :controls="false" :precision="2" size="small" @change="scheduleSave" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.down" @change="scheduleSave" />
             <span v-else>{{ fmt(row.down) }}</span>
           </template>
         </el-table-column>
@@ -519,6 +799,11 @@ watch(
 .na-cell { color: #c0c4cc; }
 :deep(.auto-calc-col) { background-color: #f5f7fa !important; }
 .formula-cell { border-bottom: 1px dashed #409eff; cursor: help; }
+.group-label-with-btn { display: inline-flex; align-items: center; gap: 8px; }
+.add-row-btn { font-size: 12px; padding: 0; }
+.dynamic-row-label { display: inline-flex; align-items: center; gap: 4px; width: 100%; }
+.inline-label-input { flex: 1; max-width: 220px; }
+.del-row-btn { font-size: 12px; padding: 0; color: #f56c6c; }
 .note-wrap { margin-top: 12px; }
 .note-hd { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 13px; font-weight: 600; color: #303133; }
 .guidance-details { margin-top: 16px; border-left: 3px solid #409eff; background: #ecf5ff; border-radius: 4px; padding: 8px 12px; }

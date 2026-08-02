@@ -105,30 +105,26 @@ const MISSING_SYNC_PATH: readonly string[] = [
   // 🔴 M1 应付股利（利润）两版**豁免**（同 L2 同理）：附注模板无「应付股利」独立章节，
   //   披露归 K3 §五、42 / §八、42 的「应付股利」+「重要的超过1年未支付的应付股利」，
   //   `buildK3SyncPayload` 已实装 → 双推会撞表。
-  'M1TabDisclosureListed.vue',
-  'M1TabDisclosureSoe.vue',
-  // M10（2）
-  'M10TabDisclosureListed.vue',
-  'M10TabDisclosureSoe.vue',
-  // M2（2）
-  'M2TabDisclosureListed.vue',
-  'M2TabDisclosureSoe.vue',
-  // M3（1）
-  'M3TabDisclosureListed.vue',
+  // M1（2）已补齐（Task 7，本 spec）：浅合并推 K3 §五、42/八、42
+  //   接入 useDisclosureAutoSync + buildK3SyncPayloads（应付股利相关子表）。
+  // M10（2）已补齐：接入 useDisclosureAutoSync + buildM10ListedSyncPayload / buildM10SoeSyncPayload
+  //   推 §五、54「其他权益工具」（上市三表）/ §八、59（国企单表）。
+  // M2（2）已补齐：接入 useDisclosureAutoSync + buildM2ListedSyncPayload / buildM2SoeSyncPayload
+  //   推 §五、53「股本」两级 8 列 / §八、58「实收资本」两级 7 列。
+  // M3（1）已补齐（Task 5）：接入 useDisclosureAutoSync + buildM3SyncPayload
+  //   推 §五、56「库存股」5 列 flat 变动表。
   // M4（2）已补齐（Task 5，批 4）：接入 useDisclosureAutoSync + buildMEquitySyncPayload('M4',…)
   //   推 §五、55 / §八、60「资本公积」标准变动表（项目|期初|本期增加|本期减少|期末）。
   // M5（2）已补齐（Task 5，批 4）：同范式推 §五、59 / §八、62「盈余公积」变动表；
   //   国企侧多「国有企业专项披露」文本段并入 _note_texts。
-  // M6（2）
-  'M6TabDisclosureListed.vue',
-  'M6TabDisclosureSoe.vue',
+  // M6（2）已补齐（Task 6）：接入 useDisclosureAutoSync + buildM6SyncPayload
+  //   推 §五、61 / §八、63「未分配利润」固定行。
   // M7（2）已补齐（Task 5，批 4）：推 §五、58 / §八、61「专项储备」变动表。
   //   源模板附注为标准 5 列（上市）/ 6 列（国企含「备注」）→ 组件 Listed 的「增减原因说明」
   //   列不进附注（模板无此列，宁缺勿造，留底稿），国企侧「费用化使用/资本化使用」两列
   //   合并为「本期减少」、「计提依据」→「备注」列（`buildMEquitySyncPayload('M7','soe')`）。
-  // M8（2）
-  'M8TabDisclosureListed.vue',
-  'M8TabDisclosureSoe.vue',
+  // M8（2）已补齐（Task 10）：接入 useDisclosureAutoSync + buildM8SyncPayload
+  //   推 §五、60 / §八、94「一般风险准备」5 列 flat 变动表。
   // M9（2）
   'M9TabDisclosureListed.vue',
   'M9TabDisclosureSoe.vue',
@@ -163,6 +159,9 @@ const MISSING_SYNC_PATH: readonly string[] = [
 const CYCLES_WITHOUT_DISCLOSURE: Readonly<Record<string, string>> = {
   N3: '源模板 N3 递延所得税负债.xlsx 仅 底稿目录/N3A/N3-1/N3-2/N3-3/GT_Custom，无附注披露 sheet；'
     + '递延所得税负债披露与 N1 共节（五、30 / 八、31，N1 表(1) 含负债段）',
+  J3: '源模板 J3 股份支付.xlsx 仅 底稿目录/J3A/J3-1/J3-2/J3-3/GT_Custom，无附注披露 sheet；'
+    + '附注「十二、股份支付」（listed 5 节 6 表）与「八、83」（soe 3 表）无底稿数据来源，'
+    + '属平台级结构缺口，待用户裁决',
 }
 
 /**
