@@ -11540,10 +11540,10 @@
         {
           "name": "无形资产情况",
           "headers": [
-            "项目",
+            "项  目",
             "期初余额",
-            "本期增加额",
-            "本期减少额",
+            "本期增加",
+            "本期减少",
             "期末余额"
           ],
           "rows": [
@@ -11743,7 +11743,36 @@
               "label": "……",
               "row_type": "data"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "项目",
+              "label": "项  目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "begin",
+              "label": "期初余额",
+              "format": "amount"
+            },
+            {
+              "key": "increase",
+              "label": "本期增加",
+              "format": "amount"
+            },
+            {
+              "key": "decrease",
+              "label": "本期减少",
+              "format": "amount"
+            },
+            {
+              "key": "end",
+              "label": "期末余额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "根据企业实际情况逐层列示原价、累计摊销、减值准备及账面价值。"
         },
         {
           "name": "确认为无形资产的数据资源",
@@ -11863,7 +11892,8 @@
               "label": "2.期初账面价值",
               "row_type": "data"
             }
-          ]
+          ],
+          "guidance": "根据《企业数据资源相关会计处理暂行规定》（财会〔2023〕11号），列示确认为无形资产的数据资源的账面原值、累计摊销、减值准备及账面价值。"
         }
       ],
       "text_sections": [
@@ -11895,7 +11925,9 @@
       "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
       "sort_index": 26,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "i-cycle-four-table-extraction-and-disclosure-alignment",
+      "_aligned_at": "2026-08-02 14:17:30"
     },
     {
       "section_number": "八、28",
@@ -11906,17 +11938,16 @@
         {
           "name": "开发支出",
           "headers": [
-            "项目",
+            "项  目",
             "期初余额",
-            "本期增加",
-            "本期减少",
+            "内部开发支出",
+            "其他",
+            "确认为无形资产",
+            "转入当期损益",
+            "其他",
             "期末余额"
           ],
           "rows": [
-            {
-              "label": "项目",
-              "row_type": "header_label"
-            },
             {
               "label": "合计",
               "is_total": true,
@@ -11926,7 +11957,67 @@
               "label": "其中：数据资源",
               "row_type": "data"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "项目",
+              "label": "项  目",
+              "is_label": true
+            },
+            {
+              "key": "begin",
+              "label": "期初余额",
+              "format": "amount"
+            },
+            {
+              "key": "inc_internal",
+              "label": "内部开发支出",
+              "group": "本期增加",
+              "format": "amount"
+            },
+            {
+              "key": "inc_other",
+              "label": "其他",
+              "group": "本期增加",
+              "format": "amount"
+            },
+            {
+              "key": "dec_intangible",
+              "label": "确认为无形资产",
+              "group": "本期减少",
+              "format": "amount"
+            },
+            {
+              "key": "dec_expense",
+              "label": "转入当期损益",
+              "group": "本期减少",
+              "format": "amount"
+            },
+            {
+              "key": "dec_other",
+              "label": "其他",
+              "group": "本期减少",
+              "format": "amount"
+            },
+            {
+              "key": "end",
+              "label": "期末余额",
+              "format": "amount"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "本期增加",
+              "start": 2,
+              "span": 2
+            },
+            {
+              "group": "本期减少",
+              "start": 4,
+              "span": 3
+            }
+          ],
+          "guidance": "根据企业实际发生的开发支出逐项列示各项目的期初期末变动情况。"
         }
       ],
       "text_sections": [
@@ -11946,7 +12037,9 @@
       "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
       "sort_index": 27,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "i-cycle-four-table-extraction-and-disclosure-alignment",
+      "_aligned_at": "2026-08-02 14:11:32"
     },
     {
       "section_number": "八、29",
@@ -11955,7 +12048,7 @@
       "content_type": "mixed",
       "tables": [
         {
-          "name": "（1）商誉账面原值",
+          "name": "（1）商誉账面价值",
           "headers": [
             "被投资单位名称或形成商誉的事项",
             "期初余额",
@@ -11969,7 +12062,36 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "项目",
+              "label": "被投资单位名称或形成商誉的事项",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "begin",
+              "label": "期初余额",
+              "format": "amount"
+            },
+            {
+              "key": "increase",
+              "label": "本期增加",
+              "format": "amount"
+            },
+            {
+              "key": "decrease",
+              "label": "本期减少",
+              "format": "amount"
+            },
+            {
+              "key": "end",
+              "label": "期末余额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "根据企业实际情况逐项填列商誉账面价值的变动。"
         },
         {
           "name": "（2）商誉减值准备",
@@ -11986,7 +12108,36 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "项目",
+              "label": "被投资单位名称或形成商誉的事项",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "begin",
+              "label": "期初余额",
+              "format": "amount"
+            },
+            {
+              "key": "increase",
+              "label": "本期增加",
+              "format": "amount"
+            },
+            {
+              "key": "decrease",
+              "label": "本期减少",
+              "format": "amount"
+            },
+            {
+              "key": "end",
+              "label": "期末余额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "说明：商誉的减值测试方法和减值准备计提方法，详细说明减值原因、减值金额确认依据。"
         }
       ],
       "text_sections": [
@@ -12009,7 +12160,9 @@
       "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
       "sort_index": 28,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "i-cycle-four-table-extraction-and-disclosure-alignment",
+      "_aligned_at": "2026-08-02 14:04:57"
     },
     {
       "section_number": "八、30",
@@ -12020,7 +12173,7 @@
         {
           "name": "长期待摊费用",
           "headers": [
-            "项目",
+            "项  目",
             "期初余额",
             "本期增加额",
             "本期摊销额",
@@ -12038,7 +12191,46 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "项目",
+              "label": "项  目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "begin",
+              "label": "期初余额",
+              "format": "amount"
+            },
+            {
+              "key": "increase",
+              "label": "本期增加额",
+              "format": "amount"
+            },
+            {
+              "key": "amort",
+              "label": "本期摊销额",
+              "format": "amount"
+            },
+            {
+              "key": "other_decrease",
+              "label": "其他减少额",
+              "format": "amount"
+            },
+            {
+              "key": "end",
+              "label": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "reason",
+              "label": "其他减少的原因",
+              "format": "text"
+            }
+          ],
+          "guidance": "根据企业实际发生的长期待摊费用逐项列示各项目的期初期末变动情况及其他减少的原因。"
         }
       ],
       "text_sections": [],
@@ -12055,7 +12247,9 @@
       "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
       "sort_index": 29,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "i-cycle-four-table-extraction-and-disclosure-alignment",
+      "_aligned_at": "2026-08-02 13:55:52"
     },
     {
       "section_number": "八、31",
@@ -12468,9 +12662,9 @@
         {
           "name": "其他非流动资产",
           "headers": [
-            "项目",
+            "项  目",
             "期末余额",
-            "期初余额"
+            "年初余额"
           ],
           "rows": [
             {
@@ -12501,7 +12695,26 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "项目",
+              "label": "项  目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "end",
+              "label": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "begin",
+              "label": "年初余额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "根据企业实际发生的其他非流动资产逐项列示。"
         },
         {
           "name": "[披露与合同取得成本有关的资产相关的信息，包括确定该资产金额所做的判断、该资产的摊销方法、按该资产主要类别披露的期末账面价值以及本期确认的摊销及减值损失金额等。例如：",
@@ -12530,7 +12743,7 @@
         }
       ],
       "text_sections": [
-        "[披露与合同取得成本有关的资产相关的信息，包括确定该资产金额所做的判断、该资产的摊销方法、按该资产主要类别披露的期末账面价值以及本期确认的摊销及减值损失金额等。例如：",
+        "#### [披露与合同取得成本有关的资产相关的信息，包括确定该资产金额所做的判断、该资产的摊销方法、按该资产主要类别披露的期末账面价值以及本期确认的摊销及减值损失金额等。例如：",
         "本公司管理层预计，为了取得XX合同而支付给中介机构的增量佣金支出可以收回。因此，本公司将相关金额资本化确认为合同取得成本，在相关收入确认时进行摊销。2020年，这些佣金支出在发生时被确认为销售费用。]",
         "[本公司将摊销期限未超过一年的合同取得成本于其发生时计入当期损益。]"
       ],
@@ -12546,7 +12759,9 @@
       "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
       "sort_index": 31,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "i-cycle-four-table-extraction-and-disclosure-alignment",
+      "_aligned_at": "2026-08-02 13:57:14"
     },
     {
       "section_number": "八、33",
@@ -13282,11 +13497,15 @@
               "row_type": "data"
             },
             {
-              "label": "其中：医疗保险费及生育保险费",
+              "label": "其中：医疗保险费",
               "row_type": "data"
             },
             {
               "label": "工伤保险费",
+              "row_type": "data"
+            },
+            {
+              "label": "生育保险费",
               "row_type": "data"
             },
             {
@@ -13454,8 +13673,8 @@
       "sort_index": 39,
       "auto_numbering": true,
       "lock_number": false,
-      "_aligned_by": "j1-disclosure-template-alignment",
-      "_aligned_at": "2026-07-30 16:19:46"
+      "_aligned_by": "j-cycle-four-table-extraction-and-disclosure-alignment",
+      "_aligned_at": "2026-08-02 14:11:32"
     },
     {
       "section_number": "八、41",
@@ -14847,7 +15066,7 @@
           ],
           "rows": [
             {
-              "label": "离职后福利-设定受益计划净负债",
+              "label": "设定受益计划净负债",
               "row_type": "data"
             },
             {
@@ -14855,7 +15074,7 @@
               "row_type": "data"
             },
             {
-              "label": "其他长期福利",
+              "label": "一年后支付的辞退福利",
               "row_type": "data"
             },
             {
@@ -14895,15 +15114,15 @@
           "guidance": "按 CAS 9 列示长期应付职工薪酬各构成项目的增减变动（期初数/本期增加/本期减少/期末数）。不适用的项目删除。"
         },
         {
-          "name": "设定受益计划义务现值",
+          "name": "设定受益计划情况",
           "headers": [
             "项目",
-            "本期",
-            "上期",
-            "本期",
-            "上期",
-            "本期",
-            "上期"
+            "本期金额",
+            "上期金额",
+            "本期金额",
+            "上期金额",
+            "本期金额",
+            "上期金额"
           ],
           "rows": [
             {
@@ -14923,7 +15142,7 @@
               "row_type": "data"
             },
             {
-              "label": "3．结算利得（损失以“-”表示）",
+              "label": "3．结算利得（损失以\"-\"表示）",
               "row_type": "data"
             },
             {
@@ -14935,7 +15154,19 @@
               "row_type": "data"
             },
             {
-              "label": "1．精算利得（损失以“-”表示）",
+              "label": "设定受益计划净负债（净资产）的重新计量",
+              "row_type": "data"
+            },
+            {
+              "label": "1．精算利得（损失以\"-\"表示）",
+              "row_type": "data"
+            },
+            {
+              "label": "2．计划资产的回报（计入利息净额的除外）",
+              "row_type": "data"
+            },
+            {
+              "label": "3．资产上限影响的变动（计入利息净额的除外）",
               "row_type": "data"
             },
             {
@@ -14967,44 +15198,44 @@
             },
             {
               "key": "dbo_cur",
-              "label": "本期",
-              "group": "义务现值",
+              "label": "本期金额",
+              "group": "设定受益计划义务现值",
               "format": "amount"
             },
             {
               "key": "dbo_prior",
-              "label": "上期",
-              "group": "义务现值",
+              "label": "上期金额",
+              "group": "设定受益计划义务现值",
               "format": "amount"
             },
             {
               "key": "asset_cur",
-              "label": "本期",
+              "label": "本期金额",
               "group": "计划资产的公允价值",
               "format": "amount"
             },
             {
               "key": "asset_prior",
-              "label": "上期",
+              "label": "上期金额",
               "group": "计划资产的公允价值",
               "format": "amount"
             },
             {
               "key": "net_cur",
-              "label": "本期",
-              "group": "设定受益计划净负债",
+              "label": "本期金额",
+              "group": "设定受益计划净负债（净资产）",
               "format": "amount"
             },
             {
               "key": "net_prior",
-              "label": "上期",
-              "group": "设定受益计划净负债",
+              "label": "上期金额",
+              "group": "设定受益计划净负债（净资产）",
               "format": "amount"
             }
           ],
           "_column_groups": [
             {
-              "group": "义务现值",
+              "group": "设定受益计划义务现值",
               "start": 1,
               "span": 2
             },
@@ -15014,126 +15245,12 @@
               "span": 2
             },
             {
-              "group": "设定受益计划净负债",
+              "group": "设定受益计划净负债（净资产）",
               "start": 5,
               "span": 2
             }
           ],
           "guidance": "按 CAS 9 六要素分解义务现值、计划资产公允价值、净负债三组并列变动情况（各含本期金额/上期金额），并按当期服务成本/过去服务成本/结算利得损失/利息净额/精算利得损失/计划资产回报/资产上限影响/结算消除/已支付福利分解。"
-        },
-        {
-          "name": "计划资产",
-          "headers": [
-            "项目",
-            "本期金额",
-            "上期金额"
-          ],
-          "rows": [
-            {
-              "label": "一、期初余额",
-              "row_type": "data"
-            },
-            {
-              "label": "二、计入当期损益的设定受益成本",
-              "row_type": "data"
-            },
-            {
-              "label": "1．利息净额",
-              "row_type": "data"
-            },
-            {
-              "label": "三、计入其他综合收益的设定受益成本",
-              "row_type": "data"
-            },
-            {
-              "label": "1．计划资产的回报（计入利息净额的除外）",
-              "row_type": "data"
-            },
-            {
-              "label": "2．资产上限影响的变动（计入利息净额的除外）",
-              "row_type": "data"
-            },
-            {
-              "label": "四、其他变动",
-              "row_type": "data"
-            },
-            {
-              "label": "……",
-              "row_type": "data"
-            },
-            {
-              "label": "五、期末余额",
-              "row_type": "data"
-            }
-          ],
-          "columns": [
-            {
-              "key": "label",
-              "label": "项目",
-              "is_label": true,
-              "flat": true
-            },
-            {
-              "key": "cur",
-              "label": "本期金额",
-              "format": "amount"
-            },
-            {
-              "key": "prior",
-              "label": "上期金额",
-              "format": "amount"
-            }
-          ],
-          "guidance": "分解计划资产变动情况（利息净额/计划资产回报/资产上限影响变动/结算消除/已支付福利等）。"
-        },
-        {
-          "name": "设定受益计划净负债（净资产）",
-          "headers": [
-            "项目",
-            "本期金额",
-            "上期金额"
-          ],
-          "rows": [
-            {
-              "label": "一、期初余额",
-              "row_type": "data"
-            },
-            {
-              "label": "二、计入当期损益的设定受益成本",
-              "row_type": "data"
-            },
-            {
-              "label": "三、计入其他综合收益的设定受益成本",
-              "row_type": "data"
-            },
-            {
-              "label": "四、其他变动",
-              "row_type": "data"
-            },
-            {
-              "label": "五、期末余额",
-              "row_type": "data"
-            }
-          ],
-          "columns": [
-            {
-              "key": "label",
-              "label": "项目",
-              "is_label": true,
-              "flat": true
-            },
-            {
-              "key": "cur",
-              "label": "本期金额",
-              "format": "amount"
-            },
-            {
-              "key": "prior",
-              "label": "上期金额",
-              "format": "amount"
-            }
-          ],
-          "guidance": "设定受益计划净负债（净资产）= 义务现值 − 计划资产公允价值。各要素合计应与义务现值表、计划资产表对应项目勾稽一致。"
         },
         {
           "name": "未折现的离职后福利预计到期分析",
@@ -15379,7 +15496,7 @@
         }
       ],
       "text_sections": [
-        "（1、辞退福利的性质、内容及计算依据详见附注八、39；2、说明其他长期职工福利的性质及计算依据）",
+        "（1、辞退福利的性质、内容及计算依据详见附注八、40；2、说明其他长期职工福利的性质及计算依据）",
         "### 设定受益计划变动情况",
         "#### 设定受益计划义务现值",
         "#### 计划资产",
@@ -15415,8 +15532,8 @@
       "sort_index": 53,
       "auto_numbering": true,
       "lock_number": false,
-      "_aligned_by": "disclosure-sync-path-buildout-j2",
-      "_aligned_at": "2026-08-01 14:21:42"
+      "_aligned_by": "j-cycle-four-table-extraction-and-disclosure-alignment",
+      "_aligned_at": "2026-08-02 15:50:02"
     },
     {
       "section_number": "八、55",
@@ -15746,22 +15863,73 @@
           "name": "实收资本",
           "headers": [
             "投资者名称",
-            "期初余额",
+            "投资金额",
+            "所占比例（%）",
             "本期增加",
             "本期减少",
-            "期末余额"
+            "投资金额",
+            "所占比例（%）"
           ],
           "rows": [
             {
-              "label": "投资者名称",
-              "row_type": "header_label"
-            },
-            {
               "label": "合计",
-              "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "投资者名称",
+              "is_label": true
+            },
+            {
+              "key": "begin_amount",
+              "label": "投资金额",
+              "group": "年初余额",
+              "format": "amount"
+            },
+            {
+              "key": "begin_ratio",
+              "label": "所占比例（%）",
+              "group": "年初余额",
+              "format": "text"
+            },
+            {
+              "key": "increase",
+              "label": "本期增加",
+              "format": "amount"
+            },
+            {
+              "key": "decrease",
+              "label": "本期减少",
+              "format": "amount"
+            },
+            {
+              "key": "end_amount",
+              "label": "投资金额",
+              "group": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "end_ratio",
+              "label": "所占比例（%）",
+              "group": "期末余额",
+              "format": "text"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "年初余额",
+              "start": 1,
+              "span": 2
+            },
+            {
+              "group": "期末余额",
+              "start": 5,
+              "span": 2
+            }
+          ],
+          "guidance": "源模板 M2 实收资本（国企）：投资者名称、年初余额（投资金额+占比）、本期增减、期末余额（投资金额+占比）。动态插行区：按投资者展开。"
         }
       ],
       "text_sections": [
@@ -15781,7 +15949,9 @@
       "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
       "sort_index": 57,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "fix_note_m_equity_structure",
+      "_aligned_at": "2026-08-02 15:45:58"
     },
     {
       "section_number": "八、59",
@@ -15793,22 +15963,99 @@
           "name": "其他权益工具",
           "headers": [
             "发行在外的金融工具",
-            "期初",
-            "本期增加",
-            "本期减少",
-            "期末"
+            "数量",
+            "账面价值",
+            "数量",
+            "账面价值",
+            "数量",
+            "账面价值",
+            "数量",
+            "账面价值"
           ],
           "rows": [
             {
-              "label": "发行在外的金融工具",
-              "row_type": "header_label"
-            },
-            {
               "label": "合计",
-              "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "发行在外的金融工具",
+              "is_label": true
+            },
+            {
+              "key": "begin_qty",
+              "label": "数量",
+              "group": "期初余额",
+              "format": "amount"
+            },
+            {
+              "key": "begin_value",
+              "label": "账面价值",
+              "group": "期初余额",
+              "format": "amount"
+            },
+            {
+              "key": "increase_qty",
+              "label": "数量",
+              "group": "本期增加",
+              "format": "amount"
+            },
+            {
+              "key": "increase_value",
+              "label": "账面价值",
+              "group": "本期增加",
+              "format": "amount"
+            },
+            {
+              "key": "decrease_qty",
+              "label": "数量",
+              "group": "本期减少",
+              "format": "amount"
+            },
+            {
+              "key": "decrease_value",
+              "label": "账面价值",
+              "group": "本期减少",
+              "format": "amount"
+            },
+            {
+              "key": "end_qty",
+              "label": "数量",
+              "group": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "end_value",
+              "label": "账面价值",
+              "group": "期末余额",
+              "format": "amount"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "期初余额",
+              "start": 1,
+              "span": 2
+            },
+            {
+              "group": "本期增加",
+              "start": 3,
+              "span": 2
+            },
+            {
+              "group": "本期减少",
+              "start": 5,
+              "span": 2
+            },
+            {
+              "group": "期末余额",
+              "start": 7,
+              "span": 2
+            }
+          ],
+          "guidance": "源模板 M10 其他权益工具（国企）：期初/本期增加/本期减少/期末 各数量·账面价值。"
         }
       ],
       "text_sections": [
@@ -15827,7 +16074,9 @@
       "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
       "sort_index": 58,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "fix_note_m_equity_structure",
+      "_aligned_at": "2026-08-02 15:45:58"
     },
     {
       "section_number": "八、60",
@@ -16149,10 +16398,6 @@
               "row_type": "data"
             },
             {
-              "label": "……",
-              "row_type": "data"
-            },
-            {
               "label": "本期减少额",
               "row_type": "data"
             },
@@ -16177,14 +16422,29 @@
               "row_type": "data"
             },
             {
-              "label": "……",
-              "row_type": "data"
-            },
-            {
               "label": "本期期末余额",
               "row_type": "data"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "current",
+              "label": "本期金额",
+              "format": "amount"
+            },
+            {
+              "key": "prior",
+              "label": "上期金额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "源模板 M6 未分配利润（国企）：企业应详细披露各项调整原因。"
         }
       ],
       "text_sections": [
@@ -16206,7 +16466,9 @@
       "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
       "sort_index": 62,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "fix_note_m_equity_structure",
+      "_aligned_at": "2026-08-02 14:20:10"
     },
     {
       "section_number": "八、64",
@@ -16546,7 +16808,7 @@
       "content_type": "mixed",
       "tables": [
         {
-          "name": "研发费用",
+          "name": "研发费用（按费用性质列示）",
           "headers": [
             "项目",
             "本期发生额",
@@ -16578,7 +16840,26 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "项目",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "本期发生额",
+              "label": "本期发生额",
+              "format": "amount"
+            },
+            {
+              "key": "上期发生额",
+              "label": "上期发生额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "根据企业实际发生的研发费用按费用性质逐项列示。"
         }
       ],
       "text_sections": [],
@@ -16594,7 +16875,9 @@
       "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
       "sort_index": 66,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "i-cycle-four-table-extraction-and-disclosure-alignment",
+      "_aligned_at": "2026-08-02 13:49:01"
     },
     {
       "section_number": "八、68",
@@ -17654,14 +17937,14 @@
           "name": "其他综合收益各项目及其所得税影响和转入损益情况",
           "headers": [
             "项目",
-            "本期发生额",
-            "上期发生额"
+            "税前金额",
+            "所得税",
+            "税后净额",
+            "税前金额",
+            "所得税",
+            "税后净额"
           ],
           "rows": [
-            {
-              "label": "项目",
-              "row_type": "header_label"
-            },
             {
               "label": "一、以后不能重分类进损益的其他综合收益",
               "row_type": "data"
@@ -17846,7 +18129,63 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true
+            },
+            {
+              "key": "end_pre_tax",
+              "label": "税前金额",
+              "group": "本期发生额",
+              "format": "amount"
+            },
+            {
+              "key": "end_tax",
+              "label": "所得税",
+              "group": "本期发生额",
+              "format": "amount"
+            },
+            {
+              "key": "end_net",
+              "label": "税后净额",
+              "group": "本期发生额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_pre_tax",
+              "label": "税前金额",
+              "group": "上期发生额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_tax",
+              "label": "所得税",
+              "group": "上期发生额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_net",
+              "label": "税后净额",
+              "group": "上期发生额",
+              "format": "amount"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "本期发生额",
+              "start": 1,
+              "span": 3
+            },
+            {
+              "group": "上期发生额",
+              "start": 4,
+              "span": 3
+            }
+          ],
+          "guidance": "源模板 M9 其他综合收益（国企）表(1)：其他综合收益各项目及其所得税影响和转入损益情况。一、以后不能重分类进损益的 / 二、以后将重分类进损益的 / 合计。"
         }
       ],
       "text_sections": [
@@ -17866,7 +18205,9 @@
       "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
       "sort_index": 78,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "fix_note_m_equity_structure",
+      "_aligned_at": "2026-08-02 15:46:26"
     },
     {
       "section_number": "八、80",
@@ -19667,6 +20008,74 @@
       "sort_index": 92,
       "auto_numbering": true,
       "lock_number": false
+    },
+    {
+      "section_number": "八、94",
+      "section_title": "一般风险准备",
+      "account_name": "一般风险准备",
+      "content_type": "table",
+      "tables": [
+        {
+          "name": "一般风险准备",
+          "headers": [
+            "项目",
+            "期初余额",
+            "本期增加",
+            "本期减少",
+            "期末余额"
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "begin_amount",
+              "label": "期初余额",
+              "format": "amount"
+            },
+            {
+              "key": "increase",
+              "label": "本期增加",
+              "format": "amount"
+            },
+            {
+              "key": "decrease",
+              "label": "本期减少",
+              "format": "amount"
+            },
+            {
+              "key": "end_amount",
+              "label": "期末余额",
+              "format": "amount"
+            }
+          ],
+          "rows": [
+            {
+              "label": "合计",
+              "row_type": "total"
+            }
+          ],
+          "guidance": "源模板 M8 一般风险准备：一般风险准备变动情况说明。（适用于金融企业，依照相关金融监管制度计提的一般风险准备。）"
+        }
+      ],
+      "text_sections": [
+        "说明：一般风险准备的变动情况及原因。"
+      ],
+      "check_presets": [],
+      "wide_table_presets": [],
+      "scope": "both",
+      "sort_order": 594,
+      "section_id": "chapter-08-cai-wu-bao-biao-xiang-mu-zhu-shi-yi-ban-feng-xian-zhun-bei",
+      "level": 2,
+      "parent_section_id": "chapter-08-cai-wu-bao-biao-xiang-mu-zhu-shi",
+      "sort_index": 93,
+      "auto_numbering": true,
+      "lock_number": false,
+      "_aligned_by": "fix_note_m_equity_structure",
+      "_aligned_at": "2026-08-02 14:20:10"
     },
     {
       "section_id": "chapter-09-huo-you-shi-xiang",

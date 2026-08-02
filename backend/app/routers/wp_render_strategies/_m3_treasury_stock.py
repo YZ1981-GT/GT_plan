@@ -36,7 +36,7 @@ from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
 
-_M3_ACCOUNT_CODE = "4002"
+_M3_ACCOUNT_CODE = "4201"
 _ADJUDICATED_ITEM_ID = "M3-1-adjudicated-amount"
 
 M3_SHEETS = [
@@ -148,7 +148,7 @@ def detect_negative_balances(
 
 
 async def _fetch_tb_data(ctx: RenderContext) -> dict[str, Any]:
-    """查 tb_balance 科目 4002 的期初/借方/贷方余额.
+    """查 tb_balance 科目 4201 的期初/借方/贷方余额.
 
     库存股为权益备抵借方科目：
     - debit_amount → 本期借方发生额（回购增加）
@@ -167,10 +167,7 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict[str, Any]:
                 TbBalance.credit_amount,
             ).where(
                 active_filter,
-                sa.or_(
-                    TbBalance.account_code == _M3_ACCOUNT_CODE,
-                    TbBalance.account_code.startswith(_M3_ACCOUNT_CODE),
-                ),
+                TbBalance.account_code.like(_M3_ACCOUNT_CODE + "%"),
             )
         )
         total_debit = 0.0

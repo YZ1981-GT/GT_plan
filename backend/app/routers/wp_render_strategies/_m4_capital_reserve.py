@@ -108,27 +108,25 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict[str, Any]:
         "end_balance": 0,
     }
     try:
-        active_filter = get_active_filter(ctx.project_id)
-        stmt = (
-            sa.select(
-                TbBalance.opening_balance.label("begin_balance"),
-                TbBalance.debit_amount,
-                TbBalance.credit_amount,
-                TbBalance.closing_balance.label("end_balance"),
-            )
-            .where(
-                TbBalance.project_id == str(ctx.project_id),
-                TbBalance.account_code == _M4_ACCOUNT_CODE,
-                active_filter,
-            )
-            .limit(1)
+        active_filter = await get_active_filter(
+            ctx.db, TbBalance.__table__, ctx.project_id, ctx.year or 0
         )
-        row = (await ctx.db.execute(stmt)).fetchone()
-        if row:
-            result["begin_balance"] = _parse_num(row.begin_balance)
-            result["debit_amount"] = _parse_num(row.debit_amount)
-            result["credit_amount"] = _parse_num(row.credit_amount)
-            result["end_balance"] = _parse_num(row.end_balance)
+        stmt = sa.select(
+            TbBalance.opening_balance.label("begin_balance"),
+            TbBalance.debit_amount,
+            TbBalance.credit_amount,
+            TbBalance.closing_balance.label("end_balance"),
+        ).where(
+            TbBalance.project_id == str(ctx.project_id),
+            TbBalance.account_code.like(_M4_ACCOUNT_CODE + "%"),
+            active_filter,
+        )
+        rows = (await ctx.db.execute(stmt)).fetchall()
+        for row in rows:
+            result["begin_balance"] += _parse_num(row.begin_balance)
+            result["debit_amount"] += _parse_num(row.debit_amount)
+            result["credit_amount"] += _parse_num(row.credit_amount)
+            result["end_balance"] += _parse_num(row.end_balance)
     except Exception as e:  # noqa: BLE001
         logger.warning("M4 render: TB 取数失败: %s", e)
     return result

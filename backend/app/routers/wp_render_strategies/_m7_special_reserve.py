@@ -8,7 +8,7 @@ M7 前端组件 GtM7SpecialReserve 为自加载组件（子组件各自拉取 ch
 关键作用是：让 component_type 在 RENDERER_DISPATCH 中命中，避免多 sheet dispatch
 循环把 M7 各 sheet 误判为非白名单而重写成 onlyoffice-sheet。
 
-科目4201专项储备（**贷方/权益类！**）：期末=期初+贷方-借方
+科目4301专项储备（**贷方/权益类！**）：期末=期初+贷方-借方
 M股东权益循环中的权益类科目。计提（安全生产费）时贷方增加，使用时借方减少。
 安全生产费按产量/营业收入分档计提。资本性支出联动H1固定资产。
 数据持久化在 checklist_responses 表，item_id 前缀为 "M7-*"。
@@ -31,7 +31,7 @@ from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
 
-_M7_ACCOUNT_CODE = "4201"
+_M7_ACCOUNT_CODE = "4301"
 _ADJUDICATED_ITEM_ID = "M7-1-adjudicated-amount"
 
 M7_SHEETS = [
@@ -93,7 +93,7 @@ def validate_equity_formula(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 async def _fetch_tb_data(ctx: RenderContext) -> dict[str, Any]:
-    """从 tb_balance 取科目4201专项储备余额数据."""
+    """从 tb_balance 取科目4301专项储备余额数据."""
     result: dict[str, Any] = {
         "account_code": _M7_ACCOUNT_CODE,
         "account_name": "专项储备",
@@ -104,27 +104,26 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict[str, Any]:
         "end_balance": 0,
     }
     try:
-        active_filter = get_active_filter(ctx.project_id)
-        stmt = (
-            sa.select(
-                TbBalance.opening_balance.label("begin_balance"),
-                TbBalance.debit_amount,
-                TbBalance.credit_amount,
-                TbBalance.closing_balance.label("end_balance"),
-            )
-            .where(
-                TbBalance.project_id == str(ctx.project_id),
-                TbBalance.account_code == _M7_ACCOUNT_CODE,
-                active_filter,
-            )
-            .limit(1)
+        active_filter = await get_active_filter(
+            ctx.db, TbBalance.__table__, ctx.project_id, ctx.year or 0
         )
-        row = (await ctx.db.execute(stmt)).fetchone()
-        if row:
-            result["begin_balance"] = _parse_num(row.begin_balance)
-            result["debit_amount"] = _parse_num(row.debit_amount)
-            result["credit_amount"] = _parse_num(row.credit_amount)
-            result["end_balance"] = _parse_num(row.end_balance)
+        stmt = sa.select(
+            TbBalance.opening_balance.label("begin_balance"),
+            TbBalance.debit_amount,
+            TbBalance.credit_amount,
+            TbBalance.closing_balance.label("end_balance"),
+        ).where(
+            TbBalance.project_id == str(ctx.project_id),
+            TbBalance.account_code.like(_M7_ACCOUNT_CODE + "%"),
+            active_filter,
+        )
+        rows = (await ctx.db.execute(stmt)).fetchall()
+        # 聚合所有叶子行
+        for row in rows:
+            result["begin_balance"] += _parse_num(row.begin_balance)
+            result["debit_amount"] += _parse_num(row.debit_amount)
+            result["credit_amount"] += _parse_num(row.credit_amount)
+            result["end_balance"] += _parse_num(row.end_balance)
     except Exception as e:  # noqa: BLE001
         logger.warning("M7 render: TB 取数失败: %s", e)
     return result
@@ -226,7 +225,7 @@ async def render(ctx: RenderContext) -> dict[str, Any]:
         "trial_balance": tb,
         # 权益类公式方向元数据（前端可用于初始化校验）
         "formula_direction": {
-            "account_code": "4201",
+            "account_code": "4301",
             "account_name": "专项储备",
             "direction": "credit",  # 贷方/权益类！
             "end_balance_formula": "begin + credit - debit",  # 期末=期初+贷方-借方

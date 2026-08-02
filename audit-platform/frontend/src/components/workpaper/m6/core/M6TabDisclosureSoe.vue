@@ -219,6 +219,30 @@ const openReviewDialog = inject<((sectionId: string, sectionLabel?: string) => v
 const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
 const aiLoading = ref('')
 
+// ─── 同步链路 ───────────────────────────────────────────────────────────────
+
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import { buildM6SyncPayload, type M6DisclosureRow } from '../../composables/m6NoteSectionMap'
+
+async function syncToDisclosureNotes(): Promise<void> {
+  const rows: M6DisclosureRow[] = movementRows.value
+    .filter((r) => !r.isFormula || r.key === 'end-retained')
+    .map((r) => ({
+      label: r.item.trim(),
+      current: r.currentPeriod,
+      prior: r.priorPeriod,
+    }))
+  const noteText = riskReserveNote.value || ''
+  const payload = buildM6SyncPayload(props.wpId, 'soe', rows, noteText)
+  if (!payload) return
+  try {
+    const { default: request } = await import('@/utils/request')
+    await request.post(`/api/workpapers/${props.wpId}/sync-from-workpaper`, payload)
+  } catch { /* fail-open */ }
+}
+
+const { scheduleAutoSync } = useDisclosureAutoSync(syncToDisclosureNotes)
+
 // ─── FormData ───────────────────────────────────────────────────────────────
 
 const formData = useM6FormData({
@@ -316,15 +340,18 @@ function updateRow(index: number, field: 'priorYearEnd' | 'beginAdj' | 'increase
     movementRows.value[index][field] = val
     recalcFormulas()
     formData.debouncedSave(`M6-disclosure-soe-${movementRows.value[index].key}-${field}`, { remark: String(val) })
+    scheduleAutoSync()
   }
 }
 
 function handleRiskReserveNoteChange() {
   formData.debouncedSave('M6-disclosure-soe-risk-reserve', { remark: riskReserveNote.value || null })
+  scheduleAutoSync()
 }
 
 function handleSoeDistributionNoteChange() {
   formData.debouncedSave('M6-disclosure-soe-distribution', { remark: soeDistributionNote.value || null })
+  scheduleAutoSync()
 }
 
 async function handleAI(section: string) {

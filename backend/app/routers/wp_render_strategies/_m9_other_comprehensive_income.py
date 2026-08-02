@@ -8,7 +8,7 @@ M9 前端组件 GtM9OtherComprehensiveIncome 为自加载组件（子组件各�
 关键作用是：让 component_type 在 RENDERER_DISPATCH 中命中，避免多 sheet dispatch
 循环把 M9 各 sheet 误判为非白名单而重写成 onlyoffice-sheet。
 
-科目4103其他综合收益（**贷方/权益类！**）：期末=期初+贷方-借方
+科目4003其他综合收益（**贷方/权益类！**）：期末=期初+贷方-借方
 M股东权益循环中的权益类科目。OCI增加时贷方增加，重分类进损益/减少时借方减少。
 OCI汇聚多来源：G8其他权益工具投资公允价值变动（不可重分类）、J2设定受益计划重计量
 （不可重分类）、其他债权投资公允变动/现金流量套期/外币折算差额（可重分类）。
@@ -33,7 +33,7 @@ from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
 
-_M9_ACCOUNT_CODE = "4103"
+_M9_ACCOUNT_CODE = "4003"
 _ADJUDICATED_ITEM_ID = "M9-1-adjudicated-amount"
 
 M9_SHEETS = [
@@ -118,7 +118,7 @@ def validate_after_tax_net(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 async def _fetch_tb_data(ctx: RenderContext) -> dict[str, Any]:
-    """从 tb_balance 取科目4103其他综合收益余额数据."""
+    """从 tb_balance 取科目4003其他综合收益余额数据."""
     result: dict[str, Any] = {
         "account_code": _M9_ACCOUNT_CODE,
         "account_name": "其他综合收益",
@@ -141,17 +141,16 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict[str, Any]:
             )
             .where(
                 TbBalance.project_id == str(ctx.project_id),
-                TbBalance.account_code == _M9_ACCOUNT_CODE,
+                TbBalance.account_code.like(_M9_ACCOUNT_CODE + "%"),
                 active_filter,
             )
-            .limit(1)
         )
-        row = (await ctx.db.execute(stmt)).fetchone()
-        if row:
-            result["begin_balance"] = _parse_num(row.begin_balance)
-            result["debit_amount"] = _parse_num(row.debit_amount)
-            result["credit_amount"] = _parse_num(row.credit_amount)
-            result["end_balance"] = _parse_num(row.end_balance)
+        rows = (await ctx.db.execute(stmt)).fetchall()
+        for row in rows:
+            result["begin_balance"] += _parse_num(row.begin_balance)
+            result["debit_amount"] += _parse_num(row.debit_amount)
+            result["credit_amount"] += _parse_num(row.credit_amount)
+            result["end_balance"] += _parse_num(row.end_balance)
     except Exception as e:  # noqa: BLE001
         logger.warning("M9 render: TB 取数失败: %s", e)
     return result
@@ -218,7 +217,7 @@ async def render(ctx: RenderContext) -> dict[str, Any]:
     except Exception as e:  # noqa: BLE001
         logger.warning("M9 render: project context 查询失败: %s", e)
 
-    # ─── TB 取数（科目4103其他综合收益）─────────────────────────────────
+    # ─── TB 取数（科目4003其他综合收益）─────────────────────────────────
     tb = await _fetch_tb_data(ctx)
 
     # ─── 公式校验（从快照提取结构化数据行）────────────────────────────────
@@ -262,11 +261,11 @@ async def render(ctx: RenderContext) -> dict[str, Any]:
         "project_context": project_context,
         "responses_snapshot": responses_snapshot,
         "adjudicated_amount": adjudicated_amount,
-        # TB 余额数据（科目4103，贷方/权益类）
+        # TB 余额数据（科目4003，贷方/权益类）
         "trial_balance": tb,
         # 权益类公式方向元数据（前端可用于初始化校验）
         "formula_direction": {
-            "account_code": "4103",
+            "account_code": "4003",
             "account_name": "其他综合收益",
             "direction": "credit",  # 贷方/权益类！
             "end_balance_formula": "begin + credit - debit",  # 期末=期初+贷方-借方

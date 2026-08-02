@@ -1797,3 +1797,21 @@ jobs:
             exit 0
           fi
           echo "✅ 无 legacy 附注快照残留"
+
+  note-m-equity-structure:
+    # 附注 M 循环（权益类）章节结构守卫
+    # （m-cycle-four-table-extraction-and-disclosure-alignment Task 4）
+    # 背景：M 循环 11 个章节原本 columns 全缺、两级表头被压扁成单级、
+    # 五、60 一般风险准备甚至 tables=0（整章零表格）、八、94 新建。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check note M-equity section alignment (幂等脚本 --check)
+        run: python backend/scripts/fix/fix_note_m_equity_structure.py --check
+      - name: Install test dependency
+        run: python -m pip install pytest==8.4.2
+      - name: Run note M-equity structure contract tests
+        run: python -m pytest backend/tests/test_note_m_equity_structure.py -q

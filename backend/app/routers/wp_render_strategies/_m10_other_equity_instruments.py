@@ -33,7 +33,7 @@ from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
 
-_M10_ACCOUNT_CODE = "4003"
+_M10_ACCOUNT_CODE = "4401"
 _ADJUDICATED_ITEM_ID = "M10-1-adjudicated-amount"
 
 M10_SHEETS = [
@@ -95,7 +95,7 @@ def validate_equity_formula(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 async def _fetch_tb_data(ctx: RenderContext) -> dict[str, Any]:
-    """从 tb_balance 取科目4003其他权益工具余额数据."""
+    """从 tb_balance 取科目4401其他权益工具余额数据."""
     result: dict[str, Any] = {
         "account_code": _M10_ACCOUNT_CODE,
         "account_name": "其他权益工具",
@@ -118,17 +118,16 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict[str, Any]:
             )
             .where(
                 TbBalance.project_id == str(ctx.project_id),
-                TbBalance.account_code == _M10_ACCOUNT_CODE,
+                TbBalance.account_code.like(_M10_ACCOUNT_CODE + "%"),
                 active_filter,
             )
-            .limit(1)
         )
-        row = (await ctx.db.execute(stmt)).fetchone()
-        if row:
-            result["begin_balance"] = _parse_num(row.begin_balance)
-            result["debit_amount"] = _parse_num(row.debit_amount)
-            result["credit_amount"] = _parse_num(row.credit_amount)
-            result["end_balance"] = _parse_num(row.end_balance)
+        rows = (await ctx.db.execute(stmt)).fetchall()
+        for row in rows:
+            result["begin_balance"] += _parse_num(row.begin_balance)
+            result["debit_amount"] += _parse_num(row.debit_amount)
+            result["credit_amount"] += _parse_num(row.credit_amount)
+            result["end_balance"] += _parse_num(row.end_balance)
     except Exception as e:  # noqa: BLE001
         logger.warning("M10 render: TB 取数失败: %s", e)
     return result
@@ -229,7 +228,7 @@ async def render(ctx: RenderContext) -> dict[str, Any]:
         "trial_balance": tb,
         # 权益类公式方向元数据（前端可用于初始化校验）
         "formula_direction": {
-            "account_code": "4003",
+            "account_code": "4401",
             "account_name": "其他权益工具",
             "direction": "credit",  # 贷方/权益类！
             "end_balance_formula": "begin + credit - debit",  # 期末=期初+贷方-借方

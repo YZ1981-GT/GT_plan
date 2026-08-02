@@ -2087,7 +2087,8 @@
       "sheet": "审定表I1-1",
       "account_codes": [
         "1701",
-        "1702"
+        "1702",
+        "1703"
       ],
       "cells": [
         {
@@ -2128,7 +2129,7 @@
         },
         {
           "cell_ref": "上年审定数",
-          "formula": "=PREV('I1','审定表I1-1','审定数')",
+          "formula": "=PREV('I1','审定表I1','审定数')",
           "formula_type": "PREV",
           "description": "上年同底稿审定数"
         }
@@ -2136,33 +2137,33 @@
     },
     {
       "wp_code": "I2",
-      "wp_name": "商誉审定表",
+      "wp_name": "开发支出审定表",
       "sheet": "审定表I2-1",
       "account_codes": [
-        "1711"
+        "1704"
       ],
       "cells": [
         {
           "cell_ref": "期初余额",
-          "formula": "=TB('1711','期初余额')",
+          "formula": "=TB('1704','期初余额')",
           "formula_type": "TB",
           "description": "从试算表取商誉审定表期初余额"
         },
         {
           "cell_ref": "未审数",
-          "formula": "=TB('1711','期末余额')",
+          "formula": "=TB('1704','期末余额')",
           "formula_type": "TB",
           "description": "从试算表取商誉审定表期末余额（未审）"
         },
         {
           "cell_ref": "AJE调整",
-          "formula": "=ADJ('1711','aje_net')",
+          "formula": "=ADJ('1704','aje_net')",
           "formula_type": "ADJ",
           "description": "商誉审定表审计调整分录净额"
         },
         {
           "cell_ref": "RJE调整",
-          "formula": "=ADJ('1711','rje_net')",
+          "formula": "=ADJ('1704','rje_net')",
           "formula_type": "ADJ",
           "description": "商誉审定表重分类调整分录净额"
         },
@@ -2176,33 +2177,33 @@
     },
     {
       "wp_code": "I3",
-      "wp_name": "长期待摊费用审定表",
+      "wp_name": "商誉审定表",
       "sheet": "审定表I3-1",
       "account_codes": [
-        "1801"
+        "1711"
       ],
       "cells": [
         {
           "cell_ref": "期初余额",
-          "formula": "=TB('1801','期初余额')",
+          "formula": "=TB('1711','期初余额')",
           "formula_type": "TB",
           "description": "从试算表取长期待摊费用审定表期初余额"
         },
         {
           "cell_ref": "未审数",
-          "formula": "=TB('1801','期末余额')",
+          "formula": "=TB('1711','期末余额')",
           "formula_type": "TB",
           "description": "从试算表取长期待摊费用审定表期末余额（未审）"
         },
         {
           "cell_ref": "AJE调整",
-          "formula": "=ADJ('1801','aje_net')",
+          "formula": "=ADJ('1711','aje_net')",
           "formula_type": "ADJ",
           "description": "长期待摊费用审定表审计调整分录净额"
         },
         {
           "cell_ref": "RJE调整",
-          "formula": "=ADJ('1801','rje_net')",
+          "formula": "=ADJ('1711','rje_net')",
           "formula_type": "ADJ",
           "description": "长期待摊费用审定表重分类调整分录净额"
         },
@@ -2216,33 +2217,33 @@
     },
     {
       "wp_code": "I4",
-      "wp_name": "开发支出审定表",
+      "wp_name": "长期待摊费用审定表",
       "sheet": "审定表I4-1",
       "account_codes": [
-        "1703"
+        "1801"
       ],
       "cells": [
         {
           "cell_ref": "期初余额",
-          "formula": "=TB('1703','期初余额')",
+          "formula": "=TB('1801','期初余额')",
           "formula_type": "TB",
           "description": "从试算表取开发支出审定表期初余额"
         },
         {
           "cell_ref": "未审数",
-          "formula": "=TB('1703','期末余额')",
+          "formula": "=TB('1801','期末余额')",
           "formula_type": "TB",
           "description": "从试算表取开发支出审定表期末余额（未审）"
         },
         {
           "cell_ref": "AJE调整",
-          "formula": "=ADJ('1703','aje_net')",
+          "formula": "=ADJ('1801','aje_net')",
           "formula_type": "ADJ",
           "description": "开发支出审定表审计调整分录净额"
         },
         {
           "cell_ref": "RJE调整",
-          "formula": "=ADJ('1703','rje_net')",
+          "formula": "=ADJ('1801','rje_net')",
           "formula_type": "ADJ",
           "description": "开发支出审定表重分类调整分录净额"
         },
@@ -2258,34 +2259,8 @@
       "wp_code": "I5",
       "wp_name": "其他非流动资产审定表",
       "sheet": "审定表I5-1",
-      "account_codes": [
-        "1811"
-      ],
+      "account_codes": [],
       "cells": [
-        {
-          "cell_ref": "期初余额",
-          "formula": "=TB('1811','期初余额')",
-          "formula_type": "TB",
-          "description": "从试算表取其他非流动资产审定表期初余额"
-        },
-        {
-          "cell_ref": "未审数",
-          "formula": "=TB('1811','期末余额')",
-          "formula_type": "TB",
-          "description": "从试算表取其他非流动资产审定表期末余额（未审）"
-        },
-        {
-          "cell_ref": "AJE调整",
-          "formula": "=ADJ('1811','aje_net')",
-          "formula_type": "ADJ",
-          "description": "其他非流动资产审定表审计调整分录净额"
-        },
-        {
-          "cell_ref": "RJE调整",
-          "formula": "=ADJ('1811','rje_net')",
-          "formula_type": "ADJ",
-          "description": "其他非流动资产审定表重分类调整分录净额"
-        },
         {
           "cell_ref": "上年审定数",
           "formula": "=PREV('I5','审定表I5-1','审定数')",
@@ -2299,30 +2274,30 @@
       "wp_name": "研发费用审定表",
       "sheet": "审定表I6-1",
       "account_codes": [
-        "6602"
+        "6604"
       ],
       "cells": [
         {
           "cell_ref": "期初余额",
-          "formula": "=TB('6602','期初余额')",
+          "formula": "=TB('6604','期初余额')",
           "formula_type": "TB",
           "description": "从试算表取研发费用审定表期初余额"
         },
         {
           "cell_ref": "未审数",
-          "formula": "=TB('6602','期末余额')",
+          "formula": "=TB('6604','期末余额')",
           "formula_type": "TB",
           "description": "从试算表取研发费用审定表期末余额（未审）"
         },
         {
           "cell_ref": "AJE调整",
-          "formula": "=ADJ('6602','aje_net')",
+          "formula": "=ADJ('6604','aje_net')",
           "formula_type": "ADJ",
           "description": "研发费用审定表审计调整分录净额"
         },
         {
           "cell_ref": "RJE调整",
-          "formula": "=ADJ('6602','rje_net')",
+          "formula": "=ADJ('6604','rje_net')",
           "formula_type": "ADJ",
           "description": "研发费用审定表重分类调整分录净额"
         },
@@ -2371,6 +2346,18 @@
           "formula": "=PREV('J1','审定表J1-1','审定数')",
           "formula_type": "PREV",
           "description": "上年同底稿审定数"
+        },
+        {
+          "cell_ref": "明细表J1-2期末合计",
+          "formula": "=WP('J1','明细表J1-2 ','期末审定合计')",
+          "formula_type": "WP",
+          "description": "从明细表J1-2取期末审定合计（底稿间联动）"
+        },
+        {
+          "cell_ref": "计提情况J1-6本期贷方",
+          "formula": "=WP('J1','计提情况检查表J1-6','本期贷方合计')",
+          "formula_type": "WP",
+          "description": "从计提情况检查表J1-6取本期贷方合计"
         }
       ]
     },
@@ -2379,30 +2366,30 @@
       "wp_name": "长期应付职工薪酬审定表",
       "sheet": "审定表J2-1",
       "account_codes": [
-        "2611"
+        "2705"
       ],
       "cells": [
         {
           "cell_ref": "期初余额",
-          "formula": "=TB('2611','期初余额')",
+          "formula": "=TB('2705','期初余额')",
           "formula_type": "TB",
           "description": "从试算表取长期应付职工薪酬审定表期初余额"
         },
         {
           "cell_ref": "未审数",
-          "formula": "=TB('2611','期末余额')",
+          "formula": "=TB('2705','期末余额')",
           "formula_type": "TB",
           "description": "从试算表取长期应付职工薪酬审定表期末余额（未审）"
         },
         {
           "cell_ref": "AJE调整",
-          "formula": "=ADJ('2611','aje_net')",
+          "formula": "=ADJ('2705','aje_net')",
           "formula_type": "ADJ",
           "description": "长期应付职工薪酬审定表审计调整分录净额"
         },
         {
           "cell_ref": "RJE调整",
-          "formula": "=ADJ('2611','rje_net')",
+          "formula": "=ADJ('2705','rje_net')",
           "formula_type": "ADJ",
           "description": "长期应付职工薪酬审定表重分类调整分录净额"
         },
@@ -2411,13 +2398,19 @@
           "formula": "=PREV('J2','审定表J2-1','审定数')",
           "formula_type": "PREV",
           "description": "上年同底稿审定数"
+        },
+        {
+          "cell_ref": "明细表J2-2期末合计",
+          "formula": "=WP('J2','明细表J2-2','期末审定合计')",
+          "formula_type": "WP",
+          "description": "从明细表J2-2取期末审定合计（底稿间联动）"
         }
       ]
     },
     {
       "wp_code": "J3",
       "wp_name": "股份支付审定表",
-      "sheet": "审定表J3-1",
+      "sheet": "股份支付情况表J3-1",
       "account_codes": [
         "2211"
       ],
@@ -3623,33 +3616,33 @@
     },
     {
       "wp_code": "M1",
-      "wp_name": "实收资本审定表",
+      "wp_name": "应付股利审定表",
       "sheet": "审定表M1-1",
       "account_codes": [
-        "4001"
+        "2232"
       ],
       "cells": [
         {
           "cell_ref": "期初余额",
-          "formula": "=TB('4001','期初余额')",
+          "formula": "=TB('2232','期初余额')",
           "formula_type": "TB",
           "description": "从试算表取实收资本审定表期初余额"
         },
         {
           "cell_ref": "未审数",
-          "formula": "=TB('4001','期末余额')",
+          "formula": "=TB('2232','期末余额')",
           "formula_type": "TB",
           "description": "从试算表取实收资本审定表期末余额（未审）"
         },
         {
           "cell_ref": "AJE调整",
-          "formula": "=ADJ('4001','aje_net')",
+          "formula": "=ADJ('2232','aje_net')",
           "formula_type": "ADJ",
           "description": "实收资本审定表审计调整分录净额"
         },
         {
           "cell_ref": "RJE调整",
-          "formula": "=ADJ('4001','rje_net')",
+          "formula": "=ADJ('2232','rje_net')",
           "formula_type": "ADJ",
           "description": "实收资本审定表重分类调整分录净额"
         },
@@ -3663,33 +3656,33 @@
     },
     {
       "wp_code": "M2",
-      "wp_name": "资本公积审定表",
+      "wp_name": "实收资本（股本）审定表",
       "sheet": "审定表M2-1",
       "account_codes": [
-        "4002"
+        "4001"
       ],
       "cells": [
         {
           "cell_ref": "期初余额",
-          "formula": "=TB('4002','期初余额')",
+          "formula": "=TB('4001','期初余额')",
           "formula_type": "TB",
           "description": "从试算表取资本公积审定表期初余额"
         },
         {
           "cell_ref": "未审数",
-          "formula": "=TB('4002','期末余额')",
+          "formula": "=TB('4001','期末余额')",
           "formula_type": "TB",
           "description": "从试算表取资本公积审定表期末余额（未审）"
         },
         {
           "cell_ref": "AJE调整",
-          "formula": "=ADJ('4002','aje_net')",
+          "formula": "=ADJ('4001','aje_net')",
           "formula_type": "ADJ",
           "description": "资本公积审定表审计调整分录净额"
         },
         {
           "cell_ref": "RJE调整",
-          "formula": "=ADJ('4002','rje_net')",
+          "formula": "=ADJ('4001','rje_net')",
           "formula_type": "ADJ",
           "description": "资本公积审定表重分类调整分录净额"
         },
@@ -3703,33 +3696,33 @@
     },
     {
       "wp_code": "M3",
-      "wp_name": "盈余公积审定表",
+      "wp_name": "库存股审定表",
       "sheet": "审定表M3-1",
       "account_codes": [
-        "4101"
+        "4201"
       ],
       "cells": [
         {
           "cell_ref": "期初余额",
-          "formula": "=TB('4101','期初余额')",
+          "formula": "=TB('4201','期初余额')",
           "formula_type": "TB",
           "description": "从试算表取盈余公积审定表期初余额"
         },
         {
           "cell_ref": "未审数",
-          "formula": "=TB('4101','期末余额')",
+          "formula": "=TB('4201','期末余额')",
           "formula_type": "TB",
           "description": "从试算表取盈余公积审定表期末余额（未审）"
         },
         {
           "cell_ref": "AJE调整",
-          "formula": "=ADJ('4101','aje_net')",
+          "formula": "=ADJ('4201','aje_net')",
           "formula_type": "ADJ",
           "description": "盈余公积审定表审计调整分录净额"
         },
         {
           "cell_ref": "RJE调整",
-          "formula": "=ADJ('4101','rje_net')",
+          "formula": "=ADJ('4201','rje_net')",
           "formula_type": "ADJ",
           "description": "盈余公积审定表重分类调整分录净额"
         },
@@ -3743,33 +3736,33 @@
     },
     {
       "wp_code": "M4",
-      "wp_name": "未分配利润审定表",
+      "wp_name": "资本公积审定表",
       "sheet": "审定表M4-1",
       "account_codes": [
-        "4104"
+        "4002"
       ],
       "cells": [
         {
           "cell_ref": "期初余额",
-          "formula": "=TB('4104','期初余额')",
+          "formula": "=TB('4002','期初余额')",
           "formula_type": "TB",
           "description": "从试算表取未分配利润审定表期初余额"
         },
         {
           "cell_ref": "未审数",
-          "formula": "=TB('4104','期末余额')",
+          "formula": "=TB('4002','期末余额')",
           "formula_type": "TB",
           "description": "从试算表取未分配利润审定表期末余额（未审）"
         },
         {
           "cell_ref": "AJE调整",
-          "formula": "=ADJ('4104','aje_net')",
+          "formula": "=ADJ('4002','aje_net')",
           "formula_type": "ADJ",
           "description": "未分配利润审定表审计调整分录净额"
         },
         {
           "cell_ref": "RJE调整",
-          "formula": "=ADJ('4104','rje_net')",
+          "formula": "=ADJ('4002','rje_net')",
           "formula_type": "ADJ",
           "description": "未分配利润审定表重分类调整分录净额"
         },
@@ -3783,33 +3776,33 @@
     },
     {
       "wp_code": "M5",
-      "wp_name": "其他综合收益审定表",
+      "wp_name": "盈余公积审定表",
       "sheet": "审定表M5-1",
       "account_codes": [
-        "3102"
+        "4101"
       ],
       "cells": [
         {
           "cell_ref": "期初余额",
-          "formula": "=TB('3102','期初余额')",
+          "formula": "=TB('4101','期初余额')",
           "formula_type": "TB",
           "description": "从试算表取其他综合收益审定表期初余额"
         },
         {
           "cell_ref": "未审数",
-          "formula": "=TB('3102','期末余额')",
+          "formula": "=TB('4101','期末余额')",
           "formula_type": "TB",
           "description": "从试算表取其他综合收益审定表期末余额（未审）"
         },
         {
           "cell_ref": "AJE调整",
-          "formula": "=ADJ('3102','aje_net')",
+          "formula": "=ADJ('4101','aje_net')",
           "formula_type": "ADJ",
           "description": "其他综合收益审定表审计调整分录净额"
         },
         {
           "cell_ref": "RJE调整",
-          "formula": "=ADJ('3102','rje_net')",
+          "formula": "=ADJ('4101','rje_net')",
           "formula_type": "ADJ",
           "description": "其他综合收益审定表重分类调整分录净额"
         },
@@ -3823,33 +3816,33 @@
     },
     {
       "wp_code": "M6",
-      "wp_name": "库存股审定表",
+      "wp_name": "未分配利润审定表",
       "sheet": "审定表M6-1",
       "account_codes": [
-        "4003"
+        "4104"
       ],
       "cells": [
         {
           "cell_ref": "期初余额",
-          "formula": "=TB('4003','期初余额')",
+          "formula": "=TB('4104','期初余额')",
           "formula_type": "TB",
           "description": "从试算表取库存股审定表期初余额"
         },
         {
           "cell_ref": "未审数",
-          "formula": "=TB('4003','期末余额')",
+          "formula": "=TB('4104','期末余额')",
           "formula_type": "TB",
           "description": "从试算表取库存股审定表期末余额（未审）"
         },
         {
           "cell_ref": "AJE调整",
-          "formula": "=ADJ('4003','aje_net')",
+          "formula": "=ADJ('4104','aje_net')",
           "formula_type": "ADJ",
           "description": "库存股审定表审计调整分录净额"
         },
         {
           "cell_ref": "RJE调整",
-          "formula": "=ADJ('4003','rje_net')",
+          "formula": "=ADJ('4104','rje_net')",
           "formula_type": "ADJ",
           "description": "库存股审定表重分类调整分录净额"
         },
@@ -3946,30 +3939,30 @@
       "wp_name": "其他综合收益审定表",
       "sheet": "审定表M9-1",
       "account_codes": [
-        "4401"
+        "4003"
       ],
       "cells": [
         {
           "cell_ref": "期初余额",
-          "formula": "=TB('4401','期初余额')",
+          "formula": "=TB('4003','期初余额')",
           "formula_type": "TB",
           "description": "从试算表取其他综合收益审定表期初余额"
         },
         {
           "cell_ref": "未审数",
-          "formula": "=TB('4401','期末余额')",
+          "formula": "=TB('4003','期末余额')",
           "formula_type": "TB",
           "description": "从试算表取其他综合收益审定表期末余额（未审）"
         },
         {
           "cell_ref": "AJE调整",
-          "formula": "=ADJ('4401','aje_net')",
+          "formula": "=ADJ('4003','aje_net')",
           "formula_type": "ADJ",
           "description": "其他综合收益审定表审计调整分录净额"
         },
         {
           "cell_ref": "RJE调整",
-          "formula": "=ADJ('4401','rje_net')",
+          "formula": "=ADJ('4003','rje_net')",
           "formula_type": "ADJ",
           "description": "其他综合收益审定表重分类调整分录净额"
         },
@@ -3986,30 +3979,30 @@
       "wp_name": "其他权益工具审定表",
       "sheet": "审定表M10-1",
       "account_codes": [
-        "4001"
+        "4401"
       ],
       "cells": [
         {
           "cell_ref": "期初余额",
-          "formula": "=TB('4001','期初余额')",
+          "formula": "=TB('4401','期初余额')",
           "formula_type": "TB",
           "description": "从试算表取其他权益工具审定表期初余额"
         },
         {
           "cell_ref": "未审数",
-          "formula": "=TB('4001','期末余额')",
+          "formula": "=TB('4401','期末余额')",
           "formula_type": "TB",
           "description": "从试算表取其他权益工具审定表期末余额（未审）"
         },
         {
           "cell_ref": "AJE调整",
-          "formula": "=ADJ('4001','aje_net')",
+          "formula": "=ADJ('4401','aje_net')",
           "formula_type": "ADJ",
           "description": "其他权益工具审定表审计调整分录净额"
         },
         {
           "cell_ref": "RJE调整",
-          "formula": "=ADJ('4001','rje_net')",
+          "formula": "=ADJ('4401','rje_net')",
           "formula_type": "ADJ",
           "description": "其他权益工具审定表重分类调整分录净额"
         },
@@ -4564,32 +4557,9 @@
       ]
     },
     {
-      "wp_code": "I1",
-      "wp_name": "无形资产分析程序",
-      "sheet": "分析程序I1-3",
-      "account_codes": [
-        "1701",
-        "1702"
-      ],
-      "cells": [
-        {
-          "cell_ref": "上年审定数",
-          "formula": "=PREV('I1','分析程序I1-3','审定数')",
-          "formula_type": "PREV",
-          "description": "上年同底稿分析程序审定数"
-        },
-        {
-          "cell_ref": "本年未审数",
-          "formula": "=TB_SUM('1701~1702','期末余额')",
-          "formula_type": "TB_SUM",
-          "description": "从试算表取无形资产期末余额合计（未审）"
-        }
-      ]
-    },
-    {
       "wp_code": "J1",
       "wp_name": "职工薪酬分析程序",
-      "sheet": "分析程序J1-3",
+      "sheet": "调整分录汇总表J1-3",
       "account_codes": [
         "2211"
       ],
@@ -4653,31 +4623,6 @@
           "formula": "=TB_SUM('2001~2501','期末余额')",
           "formula_type": "TB_SUM",
           "description": "从试算表取债务期末余额合计（未审）"
-        }
-      ]
-    },
-    {
-      "wp_code": "M1",
-      "wp_name": "权益分析程序",
-      "sheet": "分析程序M1-3",
-      "account_codes": [
-        "4001",
-        "4101",
-        "4103",
-        "4104"
-      ],
-      "cells": [
-        {
-          "cell_ref": "上年审定数",
-          "formula": "=PREV('M1','分析程序M1-3','审定数')",
-          "formula_type": "PREV",
-          "description": "上年同底稿分析程序审定数"
-        },
-        {
-          "cell_ref": "本年未审数",
-          "formula": "=TB_SUM('4001~4104','期末余额')",
-          "formula_type": "TB_SUM",
-          "description": "从试算表取权益期末余额合计（未审）"
         }
       ]
     },
@@ -6453,31 +6398,31 @@
       "wp_name": "开发支出明细表",
       "sheet": "明细表I2-2",
       "account_codes": [
-        "1801",
-        "6602"
+        "1704",
+        "5301"
       ],
       "cells": [
         {
           "cell_ref": "开发支出_期初",
-          "formula": "=TB('1801','期初余额')",
+          "formula": "=TB('1704','期初余额')",
           "formula_type": "TB",
           "description": "开发支出科目期初余额（资本化在途部分）"
         },
         {
           "cell_ref": "开发支出_期末",
-          "formula": "=TB('1801','期末余额')",
+          "formula": "=TB('1704','期末余额')",
           "formula_type": "TB",
           "description": "开发支出科目期末余额（未审）"
         },
         {
           "cell_ref": "开发支出_本期借方",
-          "formula": "=TB('1801','本期借方')",
+          "formula": "=TB('1704','本期借方')",
           "formula_type": "TB",
           "description": "本期资本化新增（借方）"
         },
         {
           "cell_ref": "开发支出_本期贷方",
-          "formula": "=TB('1801','本期贷方')",
+          "formula": "=TB('1704','本期贷方')",
           "formula_type": "TB",
           "description": "本期转入无形资产或转销（贷方）"
         },
@@ -6500,8 +6445,7 @@
       "wp_name": "商誉明细表",
       "sheet": "明细表I3-2",
       "account_codes": [
-        "1711",
-        "1712"
+        "1711"
       ],
       "cells": [
         {
@@ -6535,24 +6479,6 @@
           "description": "商誉账面原值本期贷方发生额（处置/转出）"
         },
         {
-          "cell_ref": "商誉减值_期初",
-          "formula": "=TB('1712','期初余额')",
-          "formula_type": "TB",
-          "description": "商誉减值准备期初余额（贷方，冲减商誉）"
-        },
-        {
-          "cell_ref": "商誉减值_期末",
-          "formula": "=TB('1712','期末余额')",
-          "formula_type": "TB",
-          "description": "商誉减值准备期末余额（贷方）"
-        },
-        {
-          "cell_ref": "商誉减值_本期贷方",
-          "formula": "=TB('1712','本期贷方')",
-          "formula_type": "TB",
-          "description": "商誉减值准备本期计提（贷方发生额）"
-        },
-        {
           "cell_ref": "上年商誉减值_审定",
           "formula": "=PREV('I3','明细表I3-2','减值审定数')",
           "formula_type": "PREV",
@@ -6565,8 +6491,7 @@
       "wp_name": "长期待摊费用明细表",
       "sheet": "明细表I4-2",
       "account_codes": [
-        "1801",
-        "1811"
+        "1801"
       ],
       "cells": [
         {
@@ -6580,18 +6505,6 @@
           "formula": "=TB('1801','期末余额')",
           "formula_type": "TB",
           "description": "长期待摊费用科目期末余额（未审）"
-        },
-        {
-          "cell_ref": "其他非流动资产_期初",
-          "formula": "=TB('1811','期初余额')",
-          "formula_type": "TB",
-          "description": "其他非流动资产科目期初余额"
-        },
-        {
-          "cell_ref": "其他非流动资产_期末",
-          "formula": "=TB('1811','期末余额')",
-          "formula_type": "TB",
-          "description": "其他非流动资产科目期末余额（未审）"
         }
       ]
     },
@@ -6650,36 +6563,36 @@
       "wp_name": "研发费用月度明细",
       "sheet": "明细表I6-2",
       "account_codes": [
-        "6602"
+        "6604"
       ],
       "cells": [
         {
           "cell_ref": "研发费用_期初",
-          "formula": "=TB('6602','期初余额')",
+          "formula": "=TB('6604','期初余额')",
           "formula_type": "TB",
           "description": "研发费用期初余额（一般为 0，损益类）"
         },
         {
           "cell_ref": "研发费用_期末",
-          "formula": "=TB('6602','期末余额')",
+          "formula": "=TB('6604','期末余额')",
           "formula_type": "TB",
           "description": "研发费用期末累计金额（费用化总额）"
         },
         {
           "cell_ref": "1月研发费用",
-          "formula": "=LEDGER('6602','debit','1月')",
+          "formula": "=LEDGER('6604','debit','1月')",
           "formula_type": "LEDGER",
           "description": "研发费用1月借方发生额"
         },
         {
           "cell_ref": "6月研发费用",
-          "formula": "=LEDGER('6602','debit','6月')",
+          "formula": "=LEDGER('6604','debit','6月')",
           "formula_type": "LEDGER",
           "description": "研发费用6月借方发生额"
         },
         {
           "cell_ref": "12月研发费用",
-          "formula": "=LEDGER('6602','debit','12月')",
+          "formula": "=LEDGER('6604','debit','12月')",
           "formula_type": "LEDGER",
           "description": "研发费用12月借方发生额"
         },
@@ -6696,7 +6609,7 @@
       "wp_name": "研发项目资本化时点判断",
       "sheet": "研发项目资本化时点判断I2-6",
       "account_codes": [
-        "1801"
+        "1704"
       ],
       "cells": [
         {
@@ -7226,56 +7139,7 @@
       "account_codes": [
         "2211"
       ],
-      "cells": [
-        {
-          "cell_ref": "工资奖金津贴补贴_期末余额",
-          "formula": "=AUX('2211','成本中心','010102','期末余额')",
-          "formula_type": "AUX",
-          "description": "按成本中心取工资奖金津贴补贴期末余额（成本中心010102=管理部门工资）"
-        },
-        {
-          "cell_ref": "工资奖金津贴补贴_期初余额",
-          "formula": "=AUX('2211','成本中心','010102','期初余额')",
-          "formula_type": "AUX",
-          "description": "按成本中心取工资奖金津贴补贴期初余额"
-        },
-        {
-          "cell_ref": "职工福利费_期末余额",
-          "formula": "=AUX('2211','成本中心','010106','期末余额')",
-          "formula_type": "AUX",
-          "description": "按成本中心取职工福利费期末余额（成本中心010106=福利费）"
-        },
-        {
-          "cell_ref": "职工福利费_期初余额",
-          "formula": "=AUX('2211','成本中心','010106','期初余额')",
-          "formula_type": "AUX",
-          "description": "按成本中心取职工福利费期初余额"
-        },
-        {
-          "cell_ref": "社会保险费_期末余额",
-          "formula": "=AUX('2211','成本中心','010306','期末余额')",
-          "formula_type": "AUX",
-          "description": "按成本中心取社会保险费期末余额（成本中心010306=社保）"
-        },
-        {
-          "cell_ref": "社会保险费_期初余额",
-          "formula": "=AUX('2211','成本中心','010306','期初余额')",
-          "formula_type": "AUX",
-          "description": "按成本中心取社会保险费期初余额"
-        },
-        {
-          "cell_ref": "住房公积金_期末余额",
-          "formula": "=AUX('2211','成本中心','010402','期末余额')",
-          "formula_type": "AUX",
-          "description": "按成本中心取住房公积金期末余额（成本中心010402=公积金）"
-        },
-        {
-          "cell_ref": "住房公积金_期初余额",
-          "formula": "=AUX('2211','成本中心','010402','期初余额')",
-          "formula_type": "AUX",
-          "description": "按成本中心取住房公积金期初余额"
-        }
-      ]
+      "cells": []
     },
     {
       "wp_code": "J1",
@@ -7414,48 +7278,6 @@
       ],
       "cells": [
         {
-          "cell_ref": "生产成本_成本中心010102",
-          "formula": "=AUX('2211','成本中心','010102','期末余额')",
-          "formula_type": "AUX",
-          "description": "按成本中心010102取薪酬分配到生产成本"
-        },
-        {
-          "cell_ref": "制造费用_成本中心010106",
-          "formula": "=AUX('2211','成本中心','010106','期末余额')",
-          "formula_type": "AUX",
-          "description": "按成本中心010106取薪酬分配到制造费用"
-        },
-        {
-          "cell_ref": "管理费用_成本中心010306",
-          "formula": "=AUX('2211','成本中心','010306','期末余额')",
-          "formula_type": "AUX",
-          "description": "按成本中心010306取薪酬分配到管理费用"
-        },
-        {
-          "cell_ref": "销售费用_成本中心010402",
-          "formula": "=AUX('2211','成本中心','010402','期末余额')",
-          "formula_type": "AUX",
-          "description": "按成本中心010402取薪酬分配到销售费用"
-        },
-        {
-          "cell_ref": "研发费用_成本中心010502",
-          "formula": "=AUX('2211','成本中心','010502','期末余额')",
-          "formula_type": "AUX",
-          "description": "按成本中心010502取薪酬分配到研发费用"
-        },
-        {
-          "cell_ref": "在建工程_成本中心010602",
-          "formula": "=AUX('2211','成本中心','010602','期末余额')",
-          "formula_type": "AUX",
-          "description": "按成本中心010602取薪酬分配到在建工程"
-        },
-        {
-          "cell_ref": "其他_成本中心010702",
-          "formula": "=AUX('2211','成本中心','010702','期末余额')",
-          "formula_type": "AUX",
-          "description": "按成本中心010702取薪酬分配到其他"
-        },
-        {
           "cell_ref": "合计_期末余额",
           "formula": "=TB('2211','期末余额')",
           "formula_type": "TB",
@@ -7468,24 +7290,24 @@
       "wp_name": "长期应付职工薪酬明细表",
       "sheet": "明细表J2-2",
       "account_codes": [
-        "2611"
+        "2705"
       ],
       "cells": [
         {
           "cell_ref": "设定受益计划_期末余额",
-          "formula": "=TB('2611','期末余额')",
+          "formula": "=TB('2705','期末余额')",
           "formula_type": "TB",
           "description": "从试算表取长期应付职工薪酬期末余额（设定受益计划）"
         },
         {
           "cell_ref": "设定受益计划_期初余额",
-          "formula": "=TB('2611','期初余额')",
+          "formula": "=TB('2705','期初余额')",
           "formula_type": "TB",
           "description": "从试算表取长期应付职工薪酬期初余额"
         },
         {
           "cell_ref": "设定提存计划_本期贷方",
-          "formula": "=TB('2611','贷方发生额')",
+          "formula": "=TB('2705','贷方发生额')",
           "formula_type": "TB",
           "description": "从试算表取长期应付职工薪酬本期贷方发生额（设定提存计划计提）"
         },
@@ -8275,62 +8097,7 @@
         "4001.03",
         "4001.05"
       ],
-      "cells": [
-        {
-          "cell_ref": "国有资本_014021_期末余额",
-          "formula": "=AUX('4001.01','客户','014021','期末余额')",
-          "formula_type": "AUX",
-          "description": "国有资本 客户=014021 期末余额（实测 4001.01 aux_type=客户）"
-        },
-        {
-          "cell_ref": "国有资本_606362_期末余额",
-          "formula": "=AUX('4001.01','客户','606362','期末余额')",
-          "formula_type": "AUX",
-          "description": "国有资本 客户=606362 期末余额"
-        },
-        {
-          "cell_ref": "国有资本_JTNB001_期末余额",
-          "formula": "=AUX('4001.01','客户','JTNB001','期末余额')",
-          "formula_type": "AUX",
-          "description": "国有资本 客户=JTNB001 期末余额"
-        },
-        {
-          "cell_ref": "民营资本_07120032_期末余额",
-          "formula": "=AUX('4001.03','客户','07120032','期末余额')",
-          "formula_type": "AUX",
-          "description": "民营资本 客户=07120032 期末余额（实测 4001.03 aux_type=客户）"
-        },
-        {
-          "cell_ref": "民营资本_09280004_期末余额",
-          "formula": "=AUX('4001.03','客户','09280004','期末余额')",
-          "formula_type": "AUX",
-          "description": "民营资本 客户=09280004 期末余额"
-        },
-        {
-          "cell_ref": "民营资本_16400001_期末余额",
-          "formula": "=AUX('4001.03','客户','16400001','期末余额')",
-          "formula_type": "AUX",
-          "description": "民营资本 客户=16400001 期末余额"
-        },
-        {
-          "cell_ref": "民营资本_SHGD096_期末余额",
-          "formula": "=AUX('4001.03','客户','SHGD096','期末余额')",
-          "formula_type": "AUX",
-          "description": "民营资本 客户=SHGD096 期末余额"
-        },
-        {
-          "cell_ref": "个人资本_16400002_期末余额",
-          "formula": "=AUX('4001.05','客户','16400002','期末余额')",
-          "formula_type": "AUX",
-          "description": "个人资本 客户=16400002 期末余额（实测 4001.05 aux_type=客户）"
-        },
-        {
-          "cell_ref": "个人资本_783604_期末余额",
-          "formula": "=AUX('4001.05','客户','783604','期末余额')",
-          "formula_type": "AUX",
-          "description": "个人资本 客户=783604 期末余额"
-        }
-      ]
+      "cells": []
     },
     {
       "wp_code": "M4",

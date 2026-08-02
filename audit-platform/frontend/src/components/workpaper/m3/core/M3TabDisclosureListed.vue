@@ -208,6 +208,32 @@ const openReviewDialog = inject<((sectionId: string, sectionLabel?: string) => v
 const generateAiText = inject<GenerateWorkpaperAiText>('generateAiText', async () => '')
 const aiLoading = ref('')
 
+// ─── 同步链路 ───────────────────────────────────────────────────────────────
+
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import { buildM3SyncPayload, type M3DisclosureRow as M3Row } from '../../composables/m3NoteSectionMap'
+
+async function syncToDisclosureNotes(): Promise<void> {
+  const rows: M3Row[] = treasuryChangeRows.value.map((r) => ({
+    label: r.item,
+    begin: r.beginAmount,
+    increase: r.repurchaseIncrease,
+    decrease: r.cancelDecrease,
+  }))
+  const payload = buildM3SyncPayload(
+    props.wpId,
+    rows,
+    { purpose: purposeNote.value, execution: executionNote.value, equityImpact: equityImpactNote.value },
+  )
+  if (!payload) return
+  try {
+    const { default: request } = await import('@/utils/request')
+    await request.post(`/api/workpapers/${props.wpId}/sync-from-workpaper`, payload)
+  } catch { /* fail-open: 同步失败不打断编辑 */ }
+}
+
+const { scheduleAutoSync } = useDisclosureAutoSync(syncToDisclosureNotes)
+
 // ─── FormData ───────────────────────────────────────────────────────────────
 
 const formData = useM3FormData({
@@ -254,11 +280,13 @@ function updateTreasuryRow(index: number, field: 'beginAmount' | 'repurchaseIncr
     formData.debouncedSave('M3-disclosure-listed-treasury-rows', {
       remark: JSON.stringify(treasuryChangeRows.value),
     })
+    scheduleAutoSync()
   }
 }
 
 function handleNoteChange(section: string, value: string) {
   formData.debouncedSave(`M3-disclosure-listed-${section}`, { remark: value || null })
+  scheduleAutoSync()
 }
 
 /**
@@ -317,6 +345,7 @@ async function handlePullFromAdjudication() {
     import('element-plus').then(({ ElMessage }) => {
       ElMessage.success(`已从审定表/明细表带入：期初${fmtAmount(totalBegin)}，回购+${fmtAmount(totalRepurchase)}，注销-${fmtAmount(totalCancel)}`)
     })
+    scheduleAutoSync()
   }
 }
 
@@ -332,7 +361,7 @@ async function handleAI(section: string) {
   try {
     const sumRow = treasuryChangeRows.value[0]
     const context: Record<string, string> = {
-      科目: '4002 库存股（权益备抵类·借方，附注披露-上市公司）',
+      科目: '4201 库存股（权益备抵类·借方，附注披露-上市公司）',
       期初金额: fmtAmount(sumRow?.beginAmount || 0),
       本期回购增加: fmtAmount(sumRow?.repurchaseIncrease || 0),
       本期注销减少: fmtAmount(sumRow?.cancelDecrease || 0),
