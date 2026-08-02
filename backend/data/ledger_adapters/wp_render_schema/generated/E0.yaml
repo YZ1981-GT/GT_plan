@@ -874,7 +874,10 @@ sheets:
       columns:
         A:
           field: account_subject
-          type: text
+          type: enum
+          enum:
+          - 短期借款
+          - 长期借款
           label: 所属科目
         B:
           field: index_no
@@ -934,12 +937,7 @@ sheets:
           label: 备注
         O:
           field: loan_type
-          type: enum
-          enum:
-          - 短期借款
-          - 长期借款
-          - 一年内到期的长期借款
-          - 其他
+          type: text
           label: 借款类型
         P:
           field: accrued_interest

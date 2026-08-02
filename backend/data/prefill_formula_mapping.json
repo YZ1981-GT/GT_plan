@@ -366,7 +366,7 @@
     {
       "wp_code": "E1",
       "wp_name": "货币资金审定表",
-      "sheet": "审定表E1-1",
+      "sheet": "货币资金审定表E1-1",
       "account_codes": [
         "1001",
         "1002",
@@ -375,15 +375,15 @@
       "cells": [
         {
           "cell_ref": "期初余额",
-          "formula": "=TB_SUM('1001~1012','期初余额')",
-          "formula_type": "TB_SUM",
-          "description": "从试算表取货币资金（库存现金+银行存款+其他货币资金）期初余额合计"
+          "formula": "=TB('1001','期初余额') + TB('1002','期初余额') + TB('1012','期初余额')",
+          "formula_type": "TB",
+          "description": "货币资金期初余额合计 = 库存现金 + 银行存款 + 其他货币资金（与 report_config 的 BS-002 公式逐字同构；原 TB_SUM('1001~1012') 在客户存在 1003/1011 时会虚增）"
         },
         {
           "cell_ref": "未审数",
-          "formula": "=TB_SUM('1001~1012','期末余额')",
-          "formula_type": "TB_SUM",
-          "description": "从试算表取货币资金期末余额合计（未审）"
+          "formula": "=TB('1001','期末余额') + TB('1002','期末余额') + TB('1012','期末余额')",
+          "formula_type": "TB",
+          "description": "货币资金期末余额合计（未审）= 库存现金 + 银行存款 + 其他货币资金（对齐 report_config BS-002）"
         },
         {
           "cell_ref": "库存现金_期初",
@@ -435,9 +435,39 @@
         },
         {
           "cell_ref": "上年审定数",
-          "formula": "=PREV('E1','审定表E1-1','审定数')",
+          "formula": "=PREV('E1','货币资金审定表E1-1','审定数')",
           "formula_type": "PREV",
           "description": "上年同底稿审定数"
+        },
+        {
+          "cell_ref": "现金明细表期末合计",
+          "formula": "=WP('E1','现金明细表E1-2','期末余额合计')",
+          "formula_type": "WP",
+          "description": "库存现金审定未审数来源 = E1-2 现金明细表期末余额合计"
+        },
+        {
+          "cell_ref": "银行及其他货币资金明细表期末合计",
+          "formula": "=WP('E1','银行存款及其他货币资金明细表(人民币及外币)E1-3','期末余额合计')",
+          "formula_type": "WP",
+          "description": "银行存款 + 其他货币资金审定未审数来源 = E1-3 明细表期末余额合计（E1-3 按银行账户逐户列示，合计应与 TB(1002)+TB(1012) 勾稽）"
+        },
+        {
+          "cell_ref": "数字货币明细表期末合计",
+          "formula": "=WP('E1','数字货币明细表E1-4','期末余额合计')",
+          "formula_type": "WP",
+          "description": "数字货币审定未审数来源 = E1-4 数字货币明细表期末余额合计（数字货币无一级标准科目，按科目名在本项目科目表定位，见 e_cycle_specs）"
+        },
+        {
+          "cell_ref": "本期借方发生额",
+          "formula": "=TB('1001','本期借方') + TB('1002','本期借方') + TB('1012','本期借方')",
+          "formula_type": "TB",
+          "description": "货币资金本期借方发生额合计（收款；供 E1-14 分析与 E1-23 收支检查）"
+        },
+        {
+          "cell_ref": "本期贷方发生额",
+          "formula": "=TB('1001','本期贷方') + TB('1002','本期贷方') + TB('1012','本期贷方')",
+          "formula_type": "TB",
+          "description": "货币资金本期贷方发生额合计（付款；供 E1-14 分析与 E1-23 收支检查）"
         }
       ]
     },
@@ -1105,22 +1135,20 @@
       "sheet": "审定表G4-1",
       "account_codes": [
         "1504",
-        "1505",
-        "1506",
-        "1507"
+        "1505"
       ],
       "cells": [
         {
           "cell_ref": "期初余额",
-          "formula": "=TB_SUM('1504~1507','期初余额')",
-          "formula_type": "TB_SUM",
-          "description": "从试算表取债权投资审定表期初余额合计"
+          "formula": "=TB('1504','期初余额')",
+          "formula_type": "TB",
+          "description": "从试算表取债权投资期初余额"
         },
         {
           "cell_ref": "未审数",
-          "formula": "=TB_SUM('1504~1507','期末余额')",
-          "formula_type": "TB_SUM",
-          "description": "从试算表取债权投资审定表期末余额合计（未审）"
+          "formula": "=TB('1504','期末余额')",
+          "formula_type": "TB",
+          "description": "从试算表取债权投资期末余额（未审）"
         },
         {
           "cell_ref": "AJE调整",
@@ -1271,30 +1299,30 @@
       "wp_name": "其他债权投资审定表",
       "sheet": "审定表G6-1",
       "account_codes": [
-        "1505"
+        "1506"
       ],
       "cells": [
         {
           "cell_ref": "期初余额",
-          "formula": "=TB('1505','期初余额')",
+          "formula": "=TB('1506','期初余额')",
           "formula_type": "TB",
           "description": "从试算表取其他债权投资审定表期初余额"
         },
         {
           "cell_ref": "未审数",
-          "formula": "=TB('1505','期末余额')",
+          "formula": "=TB('1506','期末余额')",
           "formula_type": "TB",
           "description": "从试算表取其他债权投资审定表期末余额（未审）"
         },
         {
           "cell_ref": "AJE调整",
-          "formula": "=ADJ('1505','aje_net')",
+          "formula": "=ADJ('1506','aje_net')",
           "formula_type": "ADJ",
           "description": "其他债权投资审定表审计调整分录净额"
         },
         {
           "cell_ref": "RJE调整",
-          "formula": "=ADJ('1505','rje_net')",
+          "formula": "=ADJ('1506','rje_net')",
           "formula_type": "ADJ",
           "description": "其他债权投资审定表重分类调整分录净额"
         },
@@ -1369,30 +1397,30 @@
       "wp_name": "其他权益工具投资审定表",
       "sheet": "审定表G8-1",
       "account_codes": [
-        "1506"
+        "1507"
       ],
       "cells": [
         {
           "cell_ref": "期初余额",
-          "formula": "=TB('1506','期初余额')",
+          "formula": "=TB('1507','期初余额')",
           "formula_type": "TB",
           "description": "从试算表取其他权益工具投资审定表期初余额"
         },
         {
           "cell_ref": "未审数",
-          "formula": "=TB('1506','期末余额')",
+          "formula": "=TB('1507','期末余额')",
           "formula_type": "TB",
           "description": "从试算表取其他权益工具投资审定表期末余额（未审）"
         },
         {
           "cell_ref": "AJE调整",
-          "formula": "=ADJ('1506','aje_net')",
+          "formula": "=ADJ('1507','aje_net')",
           "formula_type": "ADJ",
           "description": "其他权益工具投资审定表审计调整分录净额"
         },
         {
           "cell_ref": "RJE调整",
-          "formula": "=ADJ('1506','rje_net')",
+          "formula": "=ADJ('1507','rje_net')",
           "formula_type": "ADJ",
           "description": "其他权益工具投资审定表重分类调整分录净额"
         },
@@ -1409,30 +1437,30 @@
       "wp_name": "其他非流动金融资产审定表",
       "sheet": "审定表G9-1",
       "account_codes": [
-        "1507"
+        "1519"
       ],
       "cells": [
         {
           "cell_ref": "期初余额",
-          "formula": "=TB('1507','期初余额')",
+          "formula": "=TB('1519','期初余额')",
           "formula_type": "TB",
           "description": "从试算表取其他非流动金融资产审定表期初余额"
         },
         {
           "cell_ref": "未审数",
-          "formula": "=TB('1507','期末余额')",
+          "formula": "=TB('1519','期末余额')",
           "formula_type": "TB",
           "description": "从试算表取其他非流动金融资产审定表期末余额（未审）"
         },
         {
           "cell_ref": "AJE调整",
-          "formula": "=ADJ('1507','aje_net')",
+          "formula": "=ADJ('1519','aje_net')",
           "formula_type": "ADJ",
           "description": "其他非流动金融资产审定表审计调整分录净额"
         },
         {
           "cell_ref": "RJE调整",
-          "formula": "=ADJ('1507','rje_net')",
+          "formula": "=ADJ('1519','rje_net')",
           "formula_type": "ADJ",
           "description": "其他非流动金融资产审定表重分类调整分录净额"
         },
@@ -1493,14 +1521,8 @@
       ],
       "cells": [
         {
-          "cell_ref": "期初余额",
-          "formula": "=TB('6111','期初余额')",
-          "formula_type": "TB",
-          "description": "从试算表取投资收益审定表期初余额"
-        },
-        {
           "cell_ref": "未审数",
-          "formula": "=TB('6111','期末余额')",
+          "formula": "=TB('6111','本期发生额')",
           "formula_type": "TB",
           "description": "从试算表取投资收益审定表期末余额（未审）"
         },
@@ -1529,30 +1551,24 @@
       "wp_name": "净敞口套期收益审定表",
       "sheet": "审定表G12-1",
       "account_codes": [
-        "6115"
+        "6103"
       ],
       "cells": [
         {
-          "cell_ref": "期初余额",
-          "formula": "=TB('6115','期初余额')",
-          "formula_type": "TB",
-          "description": "从试算表取净敞口套期收益审定表期初余额"
-        },
-        {
           "cell_ref": "未审数",
-          "formula": "=TB('6115','期末余额')",
+          "formula": "=TB('6103','本期发生额')",
           "formula_type": "TB",
           "description": "从试算表取净敞口套期收益审定表期末余额（未审）"
         },
         {
           "cell_ref": "AJE调整",
-          "formula": "=ADJ('6115','aje_net')",
+          "formula": "=ADJ('6103','aje_net')",
           "formula_type": "ADJ",
           "description": "净敞口套期收益审定表审计调整分录净额"
         },
         {
           "cell_ref": "RJE调整",
-          "formula": "=ADJ('6115','rje_net')",
+          "formula": "=ADJ('6103','rje_net')",
           "formula_type": "ADJ",
           "description": "净敞口套期收益审定表重分类调整分录净额"
         },
@@ -1573,14 +1589,8 @@
       ],
       "cells": [
         {
-          "cell_ref": "期初余额",
-          "formula": "=TB('6101','期初余额')",
-          "formula_type": "TB",
-          "description": "从试算表取公允价值变动收益审定表期初余额"
-        },
-        {
           "cell_ref": "未审数",
-          "formula": "=TB('6101','期末余额')",
+          "formula": "=TB('6101','本期发生额')",
           "formula_type": "TB",
           "description": "从试算表取公允价值变动收益审定表期末余额（未审）"
         },
@@ -1609,30 +1619,24 @@
       "wp_name": "信用减值损失审定表",
       "sheet": "审定表G14-1",
       "account_codes": [
-        "6701"
+        "6702"
       ],
       "cells": [
         {
-          "cell_ref": "期初余额",
-          "formula": "=TB('6701','期初余额')",
-          "formula_type": "TB",
-          "description": "从试算表取信用减值损失审定表期初余额"
-        },
-        {
           "cell_ref": "未审数",
-          "formula": "=TB('6701','期末余额')",
+          "formula": "=TB('6702','本期发生额')",
           "formula_type": "TB",
           "description": "从试算表取信用减值损失审定表期末余额（未审）"
         },
         {
           "cell_ref": "AJE调整",
-          "formula": "=ADJ('6701','aje_net')",
+          "formula": "=ADJ('6702','aje_net')",
           "formula_type": "ADJ",
           "description": "信用减值损失审定表审计调整分录净额"
         },
         {
           "cell_ref": "RJE调整",
-          "formula": "=ADJ('6701','rje_net')",
+          "formula": "=ADJ('6702','rje_net')",
           "formula_type": "ADJ",
           "description": "信用减值损失审定表重分类调整分录净额"
         },
@@ -4234,7 +4238,7 @@
     {
       "wp_code": "E1",
       "wp_name": "货币资金分析程序",
-      "sheet": "分析程序E1-3",
+      "sheet": "货币资金分析表E1-14",
       "account_codes": [
         "1001",
         "1002",
@@ -4242,15 +4246,15 @@
       ],
       "cells": [
         {
-          "cell_ref": "上年审定数",
-          "formula": "=PREV('E1','分析程序E1-3','审定数')",
+          "cell_ref": "分析表上年审定数",
+          "formula": "=PREV('E1','货币资金分析表E1-14','审定数')",
           "formula_type": "PREV",
           "description": "上年同底稿分析程序审定数"
         },
         {
-          "cell_ref": "本年未审数",
-          "formula": "=TB_SUM('1001~1012','期末余额')",
-          "formula_type": "TB_SUM",
+          "cell_ref": "分析表本年未审数",
+          "formula": "=TB('1001','期末余额') + TB('1002','期末余额') + TB('1012','期末余额')",
+          "formula_type": "TB",
           "description": "从试算表取货币资金期末余额合计（未审）"
         }
       ]
@@ -4277,35 +4281,6 @@
           "formula": "=TB_SUM('1401~1499','期末余额')",
           "formula_type": "TB_SUM",
           "description": "从试算表取存货期末余额合计（未审，报表行 BS-010 口径）"
-        }
-      ]
-    },
-    {
-      "wp_code": "G1",
-      "wp_name": "交易性金融资产分析程序",
-      "sheet": "分析程序G1-3",
-      "account_codes": [
-        "1101",
-        "1102"
-      ],
-      "cells": [
-        {
-          "cell_ref": "上年审定数",
-          "formula": "=PREV('G1','分析程序G1-3','审定数')",
-          "formula_type": "PREV",
-          "description": "上年同底稿分析程序审定数"
-        },
-        {
-          "cell_ref": "本年未审数_交易性",
-          "formula": "=TB('1101','期末余额')",
-          "formula_type": "TB",
-          "description": "从试算表取交易性金融资产(1101)期末余额"
-        },
-        {
-          "cell_ref": "本年未审数_衍生",
-          "formula": "=TB('1102','期末余额')",
-          "formula_type": "TB",
-          "description": "从试算表取衍生金融资产(1102)期末余额"
         }
       ]
     },
@@ -4478,25 +4453,22 @@
       "wp_code": "E1",
       "wp_name": "数字货币明细表",
       "sheet": "数字货币明细表E1-4",
-      "account_codes": [
-        "1502"
-      ],
-      "applies_when": "tb_account_exists:1502",
+      "account_codes": [],
       "cells": [
         {
-          "cell_ref": "_total_target_数字货币",
-          "formula": "=TB('1502','期末余额')",
-          "formula_type": "TB",
-          "description": "汇总驱动: 数字货币期末余额合计(供前端横幅展示, 不写入 Univer)"
+          "cell_ref": "数字货币期末合计",
+          "formula": "=PLACEHOLDER('数字货币期末余额合计')",
+          "formula_type": "PLACEHOLDER",
+          "description": "数字货币期末余额合计 —— 无独立一级标准科目（准则解释15号：在「货币资金」项下增设二级科目核算），故不写死科目码；由 render 语义槽 `digital` 按科目名（数字货币/数字人民币）在**本项目**科目表里定位后下发。本项目无该科目时前端显示「本项目无此科目」而非 0。"
         },
         {
-          "cell_ref": "_total_target_数字货币_期初",
-          "formula": "=TB('1502','期初余额')",
-          "formula_type": "TB",
-          "description": "汇总驱动: 数字货币期初余额合计"
+          "cell_ref": "数字货币期初合计",
+          "formula": "=PLACEHOLDER('数字货币期初余额合计')",
+          "formula_type": "PLACEHOLDER",
+          "description": "数字货币期初余额合计（同上，语义槽动态定位）"
         }
       ],
-      "notes": "applies_when=tb_account_exists:1502 — chain_orchestrator 加载 sheet 前检查 tb_balance 是否存在 account_code='1502' 记录,无则隐藏整 sheet (F4.2 sheet 过滤规则); 明细行 R10-R16 (数字货币账户级)由用户从 1502 辅助维度逐项导入,不预填; R17 合计行 = SUM(R10:R16) 由 _is_formula_cell 守护跳过。"
+      "notes": "改造前本块引用 TB('1502')，而 1502 实为「持有至到期投资减值准备」= 取错整个科目族（活体全库仅 1 行 / 1 项目）。原 applies_when='tb_account_exists:1502' 已删除 —— 全仓 grep 实证该形态无任何 Python 消费方（chain_orchestrator 的同名字段读的是 project_flags 里的 flag 名，属 B60 平台字段机制），所谓「无 1502 则隐藏整 sheet」从未实现。明细行 R10-R16 由用户逐项录入；R17 合计行是 SUM 公式，由 _is_formula_cell 守护跳过。"
     },
     {
       "wp_code": "D2",
@@ -6589,13 +6561,13 @@
           "cell_ref": "债权投资_期初",
           "formula": "=TB('1504','期初余额')",
           "formula_type": "TB",
-          "description": "1501 债权投资期初余额"
+          "description": "1504 债权投资期初余额"
         },
         {
           "cell_ref": "债权投资_期末",
           "formula": "=TB('1504','期末余额')",
           "formula_type": "TB",
-          "description": "1501 债权投资期末余额（未审）"
+          "description": "1504 债权投资期末余额（未审）"
         },
         {
           "cell_ref": "AJE调整",
@@ -6614,12 +6586,6 @@
           "formula": "=PREV('G4','审定表G4-1','审定数')",
           "formula_type": "PREV",
           "description": "上年同底稿审定数"
-        },
-        {
-          "cell_ref": "应计利息_期末",
-          "formula": "=TB('1501.03','期末余额')",
-          "formula_type": "TB",
-          "description": "1501.03 应计利息子科目期末"
         }
       ]
     },
@@ -6628,30 +6594,30 @@
       "wp_name": "其他债权投资明细表",
       "sheet": "明细表G6-2",
       "account_codes": [
-        "1505"
+        "1506"
       ],
       "cells": [
         {
           "cell_ref": "其他债权投资_期初",
-          "formula": "=TB('1505','期初余额')",
+          "formula": "=TB('1506','期初余额')",
           "formula_type": "TB",
-          "description": "1505 其他债权投资期初余额"
+          "description": "1506 其他债权投资期初余额"
         },
         {
           "cell_ref": "其他债权投资_期末",
-          "formula": "=TB('1505','期末余额')",
+          "formula": "=TB('1506','期末余额')",
           "formula_type": "TB",
-          "description": "1505 其他债权投资期末余额（未审）"
+          "description": "1506 其他债权投资期末余额（未审）"
         },
         {
           "cell_ref": "AJE调整",
-          "formula": "=ADJ('1505','aje_net')",
+          "formula": "=ADJ('1506','aje_net')",
           "formula_type": "ADJ",
           "description": "其他债权投资审计调整净额"
         },
         {
           "cell_ref": "RJE调整",
-          "formula": "=ADJ('1505','rje_net')",
+          "formula": "=ADJ('1506','rje_net')",
           "formula_type": "ADJ",
           "description": "其他债权投资重分类调整净额"
         },
@@ -6766,36 +6732,18 @@
       "wp_name": "其他权益工具投资明细表",
       "sheet": "明细表G8-2",
       "account_codes": [
-        "1506"
+        "1507"
       ],
       "cells": [
         {
           "cell_ref": "FVOCI_1521_期末",
-          "formula": "=TB('1506','期末余额')",
+          "formula": "=TB('1507','期末余额')",
           "formula_type": "TB",
-          "description": "1521 其他权益工具投资期末"
-        },
-        {
-          "cell_ref": "FVOCI_1525_期末",
-          "formula": "=TB('1525','期末余额')",
-          "formula_type": "TB",
-          "description": "1525 其他权益工具投资子科目期末"
-        },
-        {
-          "cell_ref": "FVOCI_1526_期末",
-          "formula": "=TB('1526','期末余额')",
-          "formula_type": "TB",
-          "description": "1526 其他权益工具投资子科目期末"
-        },
-        {
-          "cell_ref": "FVOCI_1527_期末",
-          "formula": "=TB('1527','期末余额')",
-          "formula_type": "TB",
-          "description": "1527 其他权益工具投资子科目期末"
+          "description": "1507 其他权益工具投资期末"
         },
         {
           "cell_ref": "AJE调整",
-          "formula": "=ADJ('1506','aje_net')",
+          "formula": "=ADJ('1507','aje_net')",
           "formula_type": "ADJ",
           "description": "其他权益工具投资审计调整净额"
         },
@@ -6847,7 +6795,7 @@
         },
         {
           "cell_ref": "投资收益_期末",
-          "formula": "=TB('6111','期末余额')",
+          "formula": "=TB('6111','本期发生额')",
           "formula_type": "TB",
           "description": "6111 投资收益期末（未审）"
         }
@@ -6875,7 +6823,7 @@
         },
         {
           "cell_ref": "公允价值变动收益_期末",
-          "formula": "=TB('6101','期末余额')",
+          "formula": "=TB('6101','本期发生额')",
           "formula_type": "TB",
           "description": "6101 公允价值变动损益期末（未审）"
         },
@@ -6892,7 +6840,7 @@
       "wp_name": "信用减值损失明细",
       "sheet": "明细分析表G14-2",
       "account_codes": [
-        "6701"
+        "6702"
       ],
       "cells": [
         {
@@ -6909,9 +6857,9 @@
         },
         {
           "cell_ref": "信用减值损失_期末",
-          "formula": "=TB('6701','期末余额')",
+          "formula": "=TB('6702','本期发生额')",
           "formula_type": "TB",
-          "description": "6701 信用减值损失期末（未审）"
+          "description": "6702 信用减值损失期末（未审）"
         }
       ]
     },
@@ -8487,6 +8435,134 @@
           "description": "递延所得税负债期初余额"
         }
       ]
+    },
+    {
+      "wp_code": "E1",
+      "wp_name": "附注披露信息(上市公司)",
+      "sheet": "附注披露信息(上市公司)",
+      "account_codes": [
+        "1001",
+        "1002",
+        "1012"
+      ],
+      "cells": [
+        {
+          "cell_ref": "披露上市_库存现金_期末",
+          "formula": "=WP('E1','货币资金审定表E1-1','库存现金_审定数')",
+          "formula_type": "WP",
+          "description": "源 xlsx B8 = '货币资金审定表E1-1'!G7（库存现金审定数）"
+        },
+        {
+          "cell_ref": "披露上市_库存现金_期初",
+          "formula": "=WP('E1','货币资金审定表E1-1','库存现金_期初审定数')",
+          "formula_type": "WP",
+          "description": "源 xlsx C8 = '货币资金审定表E1-1'!D7"
+        },
+        {
+          "cell_ref": "披露上市_银行存款_期末",
+          "formula": "=WP('E1','货币资金审定表E1-1','银行存款_审定数')",
+          "formula_type": "WP",
+          "description": "源 xlsx B9 = '货币资金审定表E1-1'!G10"
+        },
+        {
+          "cell_ref": "披露上市_银行存款_期初",
+          "formula": "=WP('E1','货币资金审定表E1-1','银行存款_期初审定数')",
+          "formula_type": "WP",
+          "description": "源 xlsx C9 = '货币资金审定表E1-1'!D10"
+        },
+        {
+          "cell_ref": "披露上市_存放财务公司款项_期末",
+          "formula": "=WP('E1','货币资金审定表E1-1','存放财务公司款项_审定数')",
+          "formula_type": "WP",
+          "description": "源 xlsx B10 = '货币资金审定表E1-1'!G9。按准则解释15号「可在货币资金项目之下增设『其中：存放财务公司款项』单独列示」→ 无独立一级标准科目，由 render 语义槽 `finance_co` 按科目名定位"
+        },
+        {
+          "cell_ref": "披露上市_其他货币资金_期末",
+          "formula": "=WP('E1','货币资金审定表E1-1','其他货币资金_审定数')",
+          "formula_type": "WP",
+          "description": "源 xlsx B11 = '货币资金审定表E1-1'!G11"
+        },
+        {
+          "cell_ref": "披露上市_其他货币资金_期初",
+          "formula": "=WP('E1','货币资金审定表E1-1','其他货币资金_期初审定数')",
+          "formula_type": "WP",
+          "description": "源 xlsx C11 = '货币资金审定表E1-1'!D11"
+        },
+        {
+          "cell_ref": "披露上市_存款应计利息_期末",
+          "formula": "=WP('E1','货币资金审定表E1-1','存款应计利息_审定数')",
+          "formula_type": "WP",
+          "description": "源 xlsx B12 = G14+G15+G16（审定表应计利息三行之和）。按源模板提示：应计利息指按实际利率法计提、尚未到付息期的部分，不含逾期未收利息（列示于「应收利息」），且不属现金及现金等价物"
+        },
+        {
+          "cell_ref": "披露上市_合计_期末",
+          "formula": "=PLACEHOLDER('货币资金披露合计（表内 SUM，勿覆盖）')",
+          "formula_type": "PLACEHOLDER",
+          "description": "源 xlsx B14 = SUM(B8:B13) —— 表内合计公式，不由 prefill 写入"
+        },
+        {
+          "cell_ref": "披露上市_原币表勾稽差异",
+          "formula": "=PLACEHOLDER('主表合计 − 原币表人民币合计（应为 0）')",
+          "formula_type": "PLACEHOLDER",
+          "description": "源 xlsx B16 = B14 − D62 —— 这是**勾稽校验行**不是披露行，由披露表勾稽面板计算，不推送到附注"
+        }
+      ],
+      "notes": "改造前两张披露 sheet 零预设（公式管理页空白）。主表各行取自 E1-1 审定数，与源 xlsx 的跨 sheet 引用逐格对应。外币两表（R25 外币性货币项目 / R35 原币表）取自 E1-2 / E1-3 的币种维度，其 SUMIF 形态无法用 prefill 词汇表达 → 由前端披露表按币种枚举聚合，不在此处预设。"
+    },
+    {
+      "wp_code": "E1",
+      "wp_name": "附注披露信息(国企)",
+      "sheet": "附注披露信息(国企)",
+      "account_codes": [
+        "1001",
+        "1002",
+        "1012"
+      ],
+      "cells": [
+        {
+          "cell_ref": "披露国企_现金_期末",
+          "formula": "=WP('E1','现金明细表E1-2','期末余额合计')",
+          "formula_type": "WP",
+          "description": "源 xlsx B8 = '现金明细表E1-2'!G22（国企版首行字面是「现金」）"
+        },
+        {
+          "cell_ref": "披露国企_现金_期初",
+          "formula": "=WP('E1','现金明细表E1-2','期初余额合计')",
+          "formula_type": "WP",
+          "description": "源 xlsx C8 = '现金明细表E1-2'!B22"
+        },
+        {
+          "cell_ref": "披露国企_银行存款_期末",
+          "formula": "=WP('E1','银行存款及其他货币资金明细表(人民币及外币)E1-3','银行存款期末合计')",
+          "formula_type": "WP",
+          "description": "源 xlsx B9 = E1-3!AB42 + AB43"
+        },
+        {
+          "cell_ref": "披露国企_银行存款_期初",
+          "formula": "=WP('E1','银行存款及其他货币资金明细表(人民币及外币)E1-3','银行存款期初合计')",
+          "formula_type": "WP",
+          "description": "源 xlsx C9 = E1-3!G43 + G42"
+        },
+        {
+          "cell_ref": "披露国企_其他货币资金_期末",
+          "formula": "=WP('E1','银行存款及其他货币资金明细表(人民币及外币)E1-3','其他货币资金期末合计')",
+          "formula_type": "WP",
+          "description": "源 xlsx B10 = E1-3!AB44"
+        },
+        {
+          "cell_ref": "披露国企_其他货币资金_期初",
+          "formula": "=WP('E1','银行存款及其他货币资金明细表(人民币及外币)E1-3','其他货币资金期初合计')",
+          "formula_type": "WP",
+          "description": "源 xlsx C10 = E1-3!G44"
+        },
+        {
+          "cell_ref": "披露国企_受限资金_期末合计",
+          "formula": "=PLACEHOLDER('受限制货币资金期末合计（按受限类别动态归集）')",
+          "formula_type": "PLACEHOLDER",
+          "description": "源 xlsx「受限制的货币资金明细」B23 合计。各类别行由 render 的 restricted_prefill 按**叶子科目名**动态分类归集（客户命名千差万别，无法写死科目码）；未命中的叶子进「待归类」面板交审计师点选。校验预设 F1-5：②表合计.期末 = 报表货币资金期末 − 补充资料③表「期末现金及现金等价物余额」"
+        }
+      ],
+      "notes": "国企版主表首行字面是「现金」（非「库存现金」），列头是「期末余额 / 年初余额」（非「期末数 / 期初数」）—— 与上市版不同，见源 xlsx R7/R8。受限制货币资金明细表的类别行走动态分类，见 four_table/e1_restricted_buckets.py。"
     }
   ]
 }

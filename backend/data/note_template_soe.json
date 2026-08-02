@@ -3187,18 +3187,18 @@
           ],
           "rows": [
             {
-              "label": "库存现金",
+              "label": "现金",
+              "row_type": "data",
               "account_codes": [
                 "1001"
-              ],
-              "row_type": "data"
+              ]
             },
             {
               "label": "银行存款",
+              "row_type": "data",
               "account_codes": [
                 "1002"
-              ],
-              "row_type": "data"
+              ]
             },
             {
               "label": "其他货币资金",
@@ -3216,13 +3216,27 @@
               "label": "合计",
               "is_total": true,
               "row_type": "total"
+            }
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
             },
             {
-              "label": "其中：存放在境外的款项总额",
-              "row_type": "data",
-              "account_codes": []
+              "key": "end_amount",
+              "label": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_amount",
+              "label": "期初余额",
+              "format": "amount"
             }
-          ]
+          ],
+          "guidance": "取数：现金/银行存款/其他货币资金取自 E1-1 货币资金审定表各科目审定数（跨 sheet 键 E1-adj-total-1001/1002/1012）。源模板括注：如有因抵押、质押或冻结等对使用有限制、存放在境外、有潜在回收风险的款项应单独说明；企业持有由中国人民银行发行的数字人民币，可单独增加「数字货币」二级明细项目（《企业会计准则解释第15号》财会〔2021〕35号）。勾稽（校验预设 F1-1/F1-2/F1-3）：报表货币资金期末/期初 = 本表合计行期末/期初余额；合计行 = 各明细行之和。"
         },
         {
           "name": "受限制的货币资金明细",
@@ -3234,35 +3248,49 @@
           "rows": [
             {
               "label": "银行承兑汇票保证金",
-              "row_type": "data",
-              "account_codes": []
+              "row_type": "data"
             },
             {
               "label": "信用证保证金",
-              "row_type": "data",
-              "account_codes": []
+              "row_type": "data"
             },
             {
               "label": "履约保证金",
-              "row_type": "data",
-              "account_codes": []
+              "row_type": "data"
             },
             {
               "label": "用于担保的定期存款或通知存款",
-              "row_type": "data",
-              "account_codes": []
+              "row_type": "data"
             },
             {
               "label": "放在境外且资金汇回受到限制的款项",
-              "row_type": "data",
-              "account_codes": []
+              "row_type": "data"
             },
             {
-              "label": "金融企业法定存款准备金或备付金",
-              "row_type": "data",
-              "account_codes": []
+              "label": "合计",
+              "is_total": true,
+              "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "end_amount",
+              "label": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_amount",
+              "label": "期初余额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "列示保证金、担保存款、冻结款项及存放境外且资金汇回受限等不符合现金及现金等价物条件或使用受限的款项。类别行由底稿②表按科目名动态归集（受限资金无独立标准科目，各项目子科目命名不同，判不出来的科目在底稿「待归类科目」面板由审计师点选归类）；源模板类别之外可动态增行。受限事由不设列，按源模板括注要求写在本节文字说明「受限及境外款项说明」中。勾稽（校验预设 F1-4/F1-5/F1-6）：合计行 = 各明细行之和（每个数值列独立校验）；合计行期末 = 报表货币资金期末 − 现金流量表补充资料「期末现金及现金等价物余额」；合计行期初同理。"
         }
       ],
       "text_sections": [
@@ -3283,7 +3311,9 @@
       "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
       "sort_index": 0,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "e1-four-table-extraction-and-disclosure-alignment",
+      "_aligned_at": "2026-08-02 12:09:45"
     },
     {
       "section_number": "八、2",
@@ -20069,7 +20099,31 @@
               "label": "……",
               "row_type": "data"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "end_fc",
+              "label": "期末外币余额",
+              "format": "amount"
+            },
+            {
+              "key": "rate",
+              "label": "折算汇率",
+              "format": "rate"
+            },
+            {
+              "key": "end_rmb",
+              "label": "期末折算人民币余额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "本表跨循环共享：按科目分段列示外币货币性项目（货币资金 / 应收账款 / 短期借款 / 长期借款 / 应付债券 等），各段下按币种列「其中：」明细，段末留可扩行。货币资金段可对照 E1 底稿披露表的「外币性货币项目」与「货币资金（原币）」两表填列（底稿侧为 7 列含期初，本表为 4 列仅期末，故只取期末口径）。折算汇率取资产负债表日中国人民银行公布的人民币汇率中间价。同步机制：本表已启用平台级「行级合并」—— 各循环推送时声明 `_row_scope` 只负责自己那一段（货币资金段 = BS-002，由 E1 底稿推送），段外行原样保留，段边界解析不出时整表跳过写入而不退化为整表覆盖。尚未接入的段仍可在附注模块直接填列，不会被他循环的推送清掉。"
         }
       ],
       "text_sections": [],
@@ -20082,7 +20136,9 @@
       "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
       "sort_index": 91,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "e1-four-table-extraction-and-disclosure-alignment",
+      "_aligned_at": "2026-08-02 16:17:47"
     },
     {
       "section_number": "八、93",
@@ -20129,6 +20185,7 @@
               "account_codes": [
                 "1124"
               ],
+              "report_row_code": "BS-007",
               "row_type": "data"
             },
             {
@@ -20141,7 +20198,7 @@
                 "1408",
                 "1461"
               ],
-              "report_row_code": "BS-008",
+              "report_row_code": "BS-010",
               "row_type": "data"
             },
             {
@@ -20172,12 +20229,33 @@
             },
             {
               "label": "其他",
-              "row_type": "data"
+              "row_type": "unowned"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "end_carrying",
+              "label": "期末账面价值",
+              "format": "amount"
+            },
+            {
+              "key": "reason",
+              "label": "受限原因",
+              "format": "text"
+            }
+          ],
+          "guidance": "按资产类别列示期末账面价值与受限原因。受限原因须写明抵押/质押/查封/冻结/扣押的具体情形与对应借款或担保合同，货币资金段可对照 E1 底稿「受限制的货币资金明细」填列。本表跨循环共享：每一行归属一个循环，段归属由 report_row_code 声明 —— 货币资金 BS-002（E1）/ 应收票据 BS-005（D1）/ 应收账款 BS-006（D2）/ 存货 BS-010（F2）/ 固定资产 BS-028（H1）/ 无形资产 BS-032（I1）。各循环推送时声明 sub_table_data._row_scope 只替换自己那一段，段外行原样保留；段边界解析不出时整表跳过写入而不退化为整表覆盖。另有 应收款项融资 BS-007（D5）与 在建工程 BS-029（H2）两段为国企版专有。末行「其他」是表级兜底行，不属于任何循环（模板标 row_type=unowned），由审计师在附注模块直接填列，行级合并不会覆盖它。"
         }
       ],
-      "text_sections": [],
+      "text_sections": [
+        "【提示：说明各项资产受限的原因（抵押、质押、查封、冻结、扣押等），并与借款、担保等相关披露交叉核对。】"
+      ],
       "check_presets": [],
       "wide_table_presets": [],
       "scope": "both",
@@ -20187,7 +20265,9 @@
       "parent_section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi",
       "sort_index": 92,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "fix_note_restricted_assets_structure.py",
+      "_aligned_at": "2026-08-02 17:33:22"
     },
     {
       "section_number": "八、94",

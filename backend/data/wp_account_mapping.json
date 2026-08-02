@@ -77,33 +77,33 @@
     {
       "wp_code": "E0-3",
       "cycle": "E",
-      "wp_name": "跟函控制",
+      "wp_name": "货币资金发函记录表",
       "account_codes": [
         "1002"
       ],
-      "account_name": "跟函控制",
+      "account_name": "货币资金发函",
       "report_row": null,
       "note_section": null
     },
     {
       "wp_code": "E0-4",
       "cycle": "E",
-      "wp_name": "差异调节",
+      "wp_name": "借款发函记录表",
       "account_codes": [
         "1002"
       ],
-      "account_name": "差异调节",
+      "account_name": "借款发函",
       "report_row": null,
       "note_section": null
     },
     {
       "wp_code": "E0-5",
       "cycle": "E",
-      "wp_name": "替代程序",
+      "wp_name": "应付银行承兑汇票发函记录表",
       "account_codes": [
         "1002"
       ],
-      "account_name": "替代程序",
+      "account_name": "应付票据发函",
       "report_row": null,
       "note_section": null
     },

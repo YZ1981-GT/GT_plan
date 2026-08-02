@@ -1,0 +1,1057 @@
+{
+  "_source": "note_template_listed.json + note_template_soe.json",
+  "_generator": "backend/scripts/gen/gen_note_shared_table_segments.py",
+  "_criterion": "同一张表的 rows[] 中出现 >=2 个不同的 report_row_code",
+  "_note": "本清单只供守卫与前端消费；服务端运行期直接读模板，不读本清单（清单陈旧会让 fail closed 误判）。",
+  "counts": {
+    "listed": 23,
+    "soe": 6
+  },
+  "tables": [
+    {
+      "variant": "listed",
+      "section_number": "三、重要会计政策、会",
+      "section_title": "重要会计政策、会计估计的变更",
+      "table_name": "本期会计政策变更的累积影响",
+      "row_count": 8,
+      "segments": [
+        {
+          "row_code": "BS-052",
+          "label": "资本公积",
+          "start": 3,
+          "end": 4,
+          "data_end": 4
+        },
+        {
+          "row_code": "BS-085",
+          "label": "其他综合收益",
+          "start": 4,
+          "end": 8,
+          "data_end": 8
+        }
+      ]
+    },
+    {
+      "variant": "listed",
+      "section_number": "三、现金流量表项目注",
+      "section_title": "现金流量表项目注释",
+      "table_name": "项  目",
+      "row_count": 6,
+      "segments": [
+        {
+          "row_code": "BS-041",
+          "label": "短期借款",
+          "start": 1,
+          "end": 2,
+          "data_end": 2
+        },
+        {
+          "row_code": "BS-061",
+          "label": "长期借款",
+          "start": 2,
+          "end": 3,
+          "data_end": 3
+        },
+        {
+          "row_code": "BS-062",
+          "label": "应付债券",
+          "start": 3,
+          "end": 4,
+          "data_end": 4
+        },
+        {
+          "row_code": "BS-063",
+          "label": "租赁负债",
+          "start": 4,
+          "end": 6,
+          "data_end": 5
+        }
+      ]
+    },
+    {
+      "variant": "listed",
+      "section_number": "三、非同一控制下企业",
+      "section_title": "非同一控制下企业合并",
+      "table_name": "项  目",
+      "row_count": 19,
+      "segments": [
+        {
+          "row_code": "BS-002",
+          "label": "货币资金",
+          "start": 2,
+          "end": 3,
+          "data_end": 3
+        },
+        {
+          "row_code": "BS-005",
+          "label": "应收票据",
+          "start": 3,
+          "end": 4,
+          "data_end": 4
+        },
+        {
+          "row_code": "BS-006",
+          "label": "应收账款",
+          "start": 4,
+          "end": 6,
+          "data_end": 6
+        },
+        {
+          "row_code": "BS-010",
+          "label": "存货",
+          "start": 6,
+          "end": 7,
+          "data_end": 7
+        },
+        {
+          "row_code": "BS-028",
+          "label": "固定资产",
+          "start": 7,
+          "end": 8,
+          "data_end": 8
+        },
+        {
+          "row_code": "BS-032",
+          "label": "无形资产",
+          "start": 8,
+          "end": 12,
+          "data_end": 12
+        },
+        {
+          "row_code": "BS-044",
+          "label": "应付票据",
+          "start": 12,
+          "end": 13,
+          "data_end": 13
+        },
+        {
+          "row_code": "BS-045",
+          "label": "应付账款",
+          "start": 13,
+          "end": 19,
+          "data_end": 19
+        }
+      ]
+    },
+    {
+      "variant": "listed",
+      "section_number": "三、同一控制下企业合",
+      "section_title": "同一控制下企业合并",
+      "table_name": "项  目",
+      "row_count": 21,
+      "segments": [
+        {
+          "row_code": "BS-002",
+          "label": "货币资金",
+          "start": 2,
+          "end": 3,
+          "data_end": 3
+        },
+        {
+          "row_code": "BS-005",
+          "label": "应收票据",
+          "start": 3,
+          "end": 4,
+          "data_end": 4
+        },
+        {
+          "row_code": "BS-006",
+          "label": "应收账款",
+          "start": 4,
+          "end": 6,
+          "data_end": 6
+        },
+        {
+          "row_code": "BS-010",
+          "label": "存货",
+          "start": 6,
+          "end": 7,
+          "data_end": 7
+        },
+        {
+          "row_code": "BS-028",
+          "label": "固定资产",
+          "start": 7,
+          "end": 8,
+          "data_end": 8
+        },
+        {
+          "row_code": "BS-032",
+          "label": "无形资产",
+          "start": 8,
+          "end": 11,
+          "data_end": 11
+        },
+        {
+          "row_code": "BS-041",
+          "label": "短期借款",
+          "start": 11,
+          "end": 12,
+          "data_end": 12
+        },
+        {
+          "row_code": "BS-044",
+          "label": "应付票据",
+          "start": 12,
+          "end": 13,
+          "data_end": 13
+        },
+        {
+          "row_code": "BS-045",
+          "label": "应付账款",
+          "start": 13,
+          "end": 21,
+          "data_end": 21
+        }
+      ]
+    },
+    {
+      "variant": "listed",
+      "section_number": "三、在合营安排或联营",
+      "section_title": "在合营安排或联营企业中的权益",
+      "table_name": "项  目",
+      "row_count": 9,
+      "segments": [
+        {
+          "row_code": "IS-001",
+          "label": "营业收入",
+          "start": 1,
+          "end": 6,
+          "data_end": 6
+        },
+        {
+          "row_code": "BS-085",
+          "label": "其他综合收益",
+          "start": 6,
+          "end": 9,
+          "data_end": 9
+        }
+      ]
+    },
+    {
+      "variant": "listed",
+      "section_number": "三、在合营安排或联营",
+      "section_title": "在合营安排或联营企业中的权益",
+      "table_name": "项  目",
+      "row_count": 7,
+      "segments": [
+        {
+          "row_code": "IS-001",
+          "label": "营业收入",
+          "start": 1,
+          "end": 4,
+          "data_end": 4
+        },
+        {
+          "row_code": "BS-085",
+          "label": "其他综合收益",
+          "start": 4,
+          "end": 7,
+          "data_end": 7
+        }
+      ]
+    },
+    {
+      "variant": "listed",
+      "section_number": "三、风险管理目标和政",
+      "section_title": "风险管理目标和政策",
+      "table_name": "",
+      "row_count": 6,
+      "segments": [
+        {
+          "row_code": "BS-003",
+          "label": "交易性金融资产",
+          "start": 0,
+          "end": 1,
+          "data_end": 1
+        },
+        {
+          "row_code": "BS-021",
+          "label": "债权投资",
+          "start": 1,
+          "end": 6,
+          "data_end": 5
+        }
+      ]
+    },
+    {
+      "variant": "listed",
+      "section_number": "三、风险管理目标和政",
+      "section_title": "风险管理目标和政策",
+      "table_name": "项  目",
+      "row_count": 15,
+      "segments": [
+        {
+          "row_code": "BS-041",
+          "label": "短期借款",
+          "start": 2,
+          "end": 4,
+          "data_end": 4
+        },
+        {
+          "row_code": "BS-044",
+          "label": "应付票据",
+          "start": 4,
+          "end": 5,
+          "data_end": 5
+        },
+        {
+          "row_code": "BS-045",
+          "label": "应付账款",
+          "start": 5,
+          "end": 6,
+          "data_end": 6
+        },
+        {
+          "row_code": "BS-050",
+          "label": "其他应付款",
+          "start": 6,
+          "end": 9,
+          "data_end": 9
+        },
+        {
+          "row_code": "BS-061",
+          "label": "长期借款",
+          "start": 9,
+          "end": 10,
+          "data_end": 10
+        },
+        {
+          "row_code": "BS-062",
+          "label": "应付债券",
+          "start": 10,
+          "end": 11,
+          "data_end": 11
+        },
+        {
+          "row_code": "BS-063",
+          "label": "租赁负债",
+          "start": 11,
+          "end": 12,
+          "data_end": 12
+        },
+        {
+          "row_code": "BS-064",
+          "label": "长期应付款",
+          "start": 12,
+          "end": 15,
+          "data_end": 14
+        }
+      ]
+    },
+    {
+      "variant": "listed",
+      "section_number": "三、风险管理目标和政",
+      "section_title": "风险管理目标和政策",
+      "table_name": "项  目",
+      "row_count": 15,
+      "segments": [
+        {
+          "row_code": "BS-041",
+          "label": "短期借款",
+          "start": 2,
+          "end": 4,
+          "data_end": 4
+        },
+        {
+          "row_code": "BS-044",
+          "label": "应付票据",
+          "start": 4,
+          "end": 5,
+          "data_end": 5
+        },
+        {
+          "row_code": "BS-045",
+          "label": "应付账款",
+          "start": 5,
+          "end": 6,
+          "data_end": 6
+        },
+        {
+          "row_code": "BS-050",
+          "label": "其他应付款",
+          "start": 6,
+          "end": 9,
+          "data_end": 9
+        },
+        {
+          "row_code": "BS-061",
+          "label": "长期借款",
+          "start": 9,
+          "end": 10,
+          "data_end": 10
+        },
+        {
+          "row_code": "BS-062",
+          "label": "应付债券",
+          "start": 10,
+          "end": 11,
+          "data_end": 11
+        },
+        {
+          "row_code": "BS-064",
+          "label": "长期应付款",
+          "start": 11,
+          "end": 15,
+          "data_end": 14
+        }
+      ]
+    },
+    {
+      "variant": "listed",
+      "section_number": "三、风险管理目标和政",
+      "section_title": "风险管理目标和政策",
+      "table_name": "项  目",
+      "row_count": 10,
+      "segments": [
+        {
+          "row_code": "BS-041",
+          "label": "其中：短期借款",
+          "start": 2,
+          "end": 6,
+          "data_end": 6
+        },
+        {
+          "row_code": "BS-002",
+          "label": "其中：货币资金",
+          "start": 6,
+          "end": 8,
+          "data_end": 8
+        },
+        {
+          "row_code": "BS-041",
+          "label": "其中：短期借款",
+          "start": 8,
+          "end": 10,
+          "data_end": 9
+        }
+      ]
+    },
+    {
+      "variant": "listed",
+      "section_number": "三、资本管理",
+      "section_title": "资本管理",
+      "table_name": "项  目",
+      "row_count": 10,
+      "segments": [
+        {
+          "row_code": "BS-041",
+          "label": "短期借款",
+          "start": 0,
+          "end": 3,
+          "data_end": 3
+        },
+        {
+          "row_code": "BS-061",
+          "label": "长期借款",
+          "start": 3,
+          "end": 4,
+          "data_end": 4
+        },
+        {
+          "row_code": "BS-062",
+          "label": "应付债券",
+          "start": 4,
+          "end": 10,
+          "data_end": 10
+        }
+      ]
+    },
+    {
+      "variant": "listed",
+      "section_number": "三、金融资产转移",
+      "section_title": "金融资产转移",
+      "table_name": "项  目（本期金额）",
+      "row_count": 19,
+      "segments": [
+        {
+          "row_code": "BS-003",
+          "label": "交易性金融资产：",
+          "start": 1,
+          "end": 11,
+          "data_end": 11
+        },
+        {
+          "row_code": "BS-027",
+          "label": "投资性房地产：",
+          "start": 11,
+          "end": 19,
+          "data_end": 18
+        }
+      ]
+    },
+    {
+      "variant": "listed",
+      "section_number": "三、金融资产转移",
+      "section_title": "金融资产转移",
+      "table_name": "项  目<br/>（上期金额）",
+      "row_count": 19,
+      "segments": [
+        {
+          "row_code": "BS-003",
+          "label": "交易性金融资产：",
+          "start": 1,
+          "end": 11,
+          "data_end": 11
+        },
+        {
+          "row_code": "BS-027",
+          "label": "投资性房地产：",
+          "start": 11,
+          "end": 19,
+          "data_end": 18
+        }
+      ]
+    },
+    {
+      "variant": "listed",
+      "section_number": "三、金融资产转移",
+      "section_title": "金融资产转移",
+      "table_name": "项  目（期末余额）",
+      "row_count": 11,
+      "segments": [
+        {
+          "row_code": "BS-021",
+          "label": "债权投资",
+          "start": 1,
+          "end": 7,
+          "data_end": 7
+        },
+        {
+          "row_code": "BS-061",
+          "label": "长期借款",
+          "start": 7,
+          "end": 8,
+          "data_end": 8
+        },
+        {
+          "row_code": "BS-062",
+          "label": "应付债券",
+          "start": 8,
+          "end": 9,
+          "data_end": 9
+        },
+        {
+          "row_code": "BS-064",
+          "label": "长期应付款",
+          "start": 9,
+          "end": 11,
+          "data_end": 10
+        }
+      ]
+    },
+    {
+      "variant": "listed",
+      "section_number": "三、金融资产转移",
+      "section_title": "金融资产转移",
+      "table_name": "项  目（上年年末余额）",
+      "row_count": 11,
+      "segments": [
+        {
+          "row_code": "BS-021",
+          "label": "债权投资",
+          "start": 1,
+          "end": 7,
+          "data_end": 7
+        },
+        {
+          "row_code": "BS-061",
+          "label": "长期借款",
+          "start": 7,
+          "end": 8,
+          "data_end": 8
+        },
+        {
+          "row_code": "BS-062",
+          "label": "应付债券",
+          "start": 8,
+          "end": 9,
+          "data_end": 9
+        },
+        {
+          "row_code": "BS-064",
+          "label": "长期应付款",
+          "start": 9,
+          "end": 11,
+          "data_end": 10
+        }
+      ]
+    },
+    {
+      "variant": "listed",
+      "section_number": "五、30",
+      "section_title": "递延所得税资产与递延所得税负债",
+      "table_name": "未经抵销的递延所得税资产和递延所得税负债",
+      "row_count": 16,
+      "segments": [
+        {
+          "row_code": "BS-036",
+          "label": "递延所得税资产：",
+          "start": 0,
+          "end": 9,
+          "data_end": 9
+        },
+        {
+          "row_code": "BS-067",
+          "label": "递延所得税负债：",
+          "start": 9,
+          "end": 16,
+          "data_end": 16
+        }
+      ]
+    },
+    {
+      "variant": "listed",
+      "section_number": "五、30",
+      "section_title": "递延所得税资产与递延所得税负债",
+      "table_name": "以抵销后净额列示的递延所得税资产或负债",
+      "row_count": 2,
+      "segments": [
+        {
+          "row_code": "BS-036",
+          "label": "递延所得税资产",
+          "start": 0,
+          "end": 1,
+          "data_end": 1
+        },
+        {
+          "row_code": "BS-067",
+          "label": "递延所得税负债",
+          "start": 1,
+          "end": 2,
+          "data_end": 2
+        }
+      ]
+    },
+    {
+      "variant": "listed",
+      "section_number": "五、32",
+      "section_title": "所有权或使用权受到限制的资产",
+      "table_name": "所有权或使用权受到限制的资产",
+      "row_count": 8,
+      "segments": [
+        {
+          "row_code": "BS-002",
+          "label": "货币资金",
+          "start": 0,
+          "end": 1,
+          "data_end": 1
+        },
+        {
+          "row_code": "BS-005",
+          "label": "应收票据",
+          "start": 1,
+          "end": 2,
+          "data_end": 2
+        },
+        {
+          "row_code": "BS-006",
+          "label": "应收账款",
+          "start": 2,
+          "end": 3,
+          "data_end": 3
+        },
+        {
+          "row_code": "BS-010",
+          "label": "存货",
+          "start": 3,
+          "end": 4,
+          "data_end": 4
+        },
+        {
+          "row_code": "BS-028",
+          "label": "固定资产",
+          "start": 4,
+          "end": 5,
+          "data_end": 5
+        },
+        {
+          "row_code": "BS-032",
+          "label": "无形资产",
+          "start": 5,
+          "end": 8,
+          "data_end": 7
+        }
+      ]
+    },
+    {
+      "variant": "listed",
+      "section_number": "五、32",
+      "section_title": "所有权或使用权受到限制的资产",
+      "table_name": "所有权或使用权受到限制的资产（续：上年年末）",
+      "row_count": 8,
+      "segments": [
+        {
+          "row_code": "BS-002",
+          "label": "货币资金",
+          "start": 0,
+          "end": 1,
+          "data_end": 1
+        },
+        {
+          "row_code": "BS-005",
+          "label": "应收票据",
+          "start": 1,
+          "end": 2,
+          "data_end": 2
+        },
+        {
+          "row_code": "BS-006",
+          "label": "应收账款",
+          "start": 2,
+          "end": 3,
+          "data_end": 3
+        },
+        {
+          "row_code": "BS-010",
+          "label": "存货",
+          "start": 3,
+          "end": 4,
+          "data_end": 4
+        },
+        {
+          "row_code": "BS-028",
+          "label": "固定资产",
+          "start": 4,
+          "end": 5,
+          "data_end": 5
+        },
+        {
+          "row_code": "BS-032",
+          "label": "无形资产",
+          "start": 5,
+          "end": 8,
+          "data_end": 7
+        }
+      ]
+    },
+    {
+      "variant": "listed",
+      "section_number": "五、71",
+      "section_title": "现金流量表补充资料",
+      "table_name": "资产负债表中的列报项目和相关信息",
+      "row_count": 7,
+      "segments": [
+        {
+          "row_code": "BS-045",
+          "label": "应付账款",
+          "start": 0,
+          "end": 2,
+          "data_end": 2
+        },
+        {
+          "row_code": "BS-041",
+          "label": "短期借款",
+          "start": 2,
+          "end": 4,
+          "data_end": 4
+        },
+        {
+          "row_code": "BS-050",
+          "label": "其他应付款",
+          "start": 4,
+          "end": 7,
+          "data_end": 6
+        }
+      ]
+    },
+    {
+      "variant": "listed",
+      "section_number": "五、73",
+      "section_title": "外币货币性项目",
+      "table_name": "外币货币性项目",
+      "row_count": 16,
+      "segments": [
+        {
+          "row_code": "BS-002",
+          "label": "货币资金",
+          "start": 0,
+          "end": 5,
+          "data_end": 5
+        },
+        {
+          "row_code": "BS-006",
+          "label": "应收账款",
+          "start": 5,
+          "end": 10,
+          "data_end": 10
+        },
+        {
+          "row_code": "BS-061",
+          "label": "长期借款",
+          "start": 10,
+          "end": 16,
+          "data_end": 16
+        }
+      ]
+    },
+    {
+      "variant": "listed",
+      "section_number": "十四、分部报告",
+      "section_title": "分部报告",
+      "table_name": "本期或本期期末",
+      "row_count": 15,
+      "segments": [
+        {
+          "row_code": "IS-001",
+          "label": "营业收入",
+          "start": 0,
+          "end": 4,
+          "data_end": 4
+        },
+        {
+          "row_code": "IS-002",
+          "label": "营业成本",
+          "start": 4,
+          "end": 15,
+          "data_end": 15
+        }
+      ]
+    },
+    {
+      "variant": "listed",
+      "section_number": "十四、分部报告",
+      "section_title": "分部报告",
+      "table_name": "上期或上期期末",
+      "row_count": 15,
+      "segments": [
+        {
+          "row_code": "IS-001",
+          "label": "营业收入",
+          "start": 0,
+          "end": 4,
+          "data_end": 4
+        },
+        {
+          "row_code": "IS-002",
+          "label": "营业成本",
+          "start": 4,
+          "end": 15,
+          "data_end": 15
+        }
+      ]
+    },
+    {
+      "variant": "soe",
+      "section_number": "八、31",
+      "section_title": "递延所得税资产和递延所得税负债",
+      "table_name": "未经抵销的递延所得税资产和递延所得税负债",
+      "row_count": 16,
+      "segments": [
+        {
+          "row_code": "BS-036",
+          "label": "一、递延所得税资产",
+          "start": 0,
+          "end": 9,
+          "data_end": 9
+        },
+        {
+          "row_code": "BS-067",
+          "label": "二、递延所得税负债",
+          "start": 9,
+          "end": 16,
+          "data_end": 16
+        }
+      ]
+    },
+    {
+      "variant": "soe",
+      "section_number": "八、31",
+      "section_title": "递延所得税资产和递延所得税负债",
+      "table_name": "以抵销后净额列示的递延所得税资产或负债",
+      "row_count": 16,
+      "segments": [
+        {
+          "row_code": "BS-036",
+          "label": "一、递延所得税资产",
+          "start": 0,
+          "end": 9,
+          "data_end": 9
+        },
+        {
+          "row_code": "BS-067",
+          "label": "二、递延所得税负债",
+          "start": 9,
+          "end": 16,
+          "data_end": 16
+        }
+      ]
+    },
+    {
+      "variant": "soe",
+      "section_number": "八、81",
+      "section_title": "现金流量表项目注释",
+      "table_name": "筹资活动产生的各项负债的变动情况",
+      "row_count": 5,
+      "segments": [
+        {
+          "row_code": "BS-031",
+          "label": "短期借款",
+          "start": 0,
+          "end": 1,
+          "data_end": 1
+        },
+        {
+          "row_code": "BS-061",
+          "label": "长期借款",
+          "start": 1,
+          "end": 2,
+          "data_end": 2
+        },
+        {
+          "row_code": "BS-062",
+          "label": "应付债券",
+          "start": 2,
+          "end": 3,
+          "data_end": 3
+        },
+        {
+          "row_code": "BS-063",
+          "label": "租赁负债",
+          "start": 3,
+          "end": 5,
+          "data_end": 4
+        }
+      ]
+    },
+    {
+      "variant": "soe",
+      "section_number": "八、91",
+      "section_title": "合并现金流量表相关事项",
+      "table_name": "资产负债表中的列报项目和相关信息",
+      "row_count": 7,
+      "segments": [
+        {
+          "row_code": "BS-045",
+          "label": "应付账款",
+          "start": 0,
+          "end": 2,
+          "data_end": 2
+        },
+        {
+          "row_code": "BS-031",
+          "label": "短期借款",
+          "start": 2,
+          "end": 4,
+          "data_end": 4
+        },
+        {
+          "row_code": "BS-037",
+          "label": "其他应付款",
+          "start": 4,
+          "end": 7,
+          "data_end": 6
+        }
+      ]
+    },
+    {
+      "variant": "soe",
+      "section_number": "八、92",
+      "section_title": "外币货币性项目",
+      "table_name": "外币货币性项目",
+      "row_count": 25,
+      "segments": [
+        {
+          "row_code": "BS-002",
+          "label": "货币资金",
+          "start": 0,
+          "end": 5,
+          "data_end": 5
+        },
+        {
+          "row_code": "BS-006",
+          "label": "应收账款",
+          "start": 5,
+          "end": 10,
+          "data_end": 10
+        },
+        {
+          "row_code": "BS-031",
+          "label": "短期借款",
+          "start": 10,
+          "end": 15,
+          "data_end": 15
+        },
+        {
+          "row_code": "BS-061",
+          "label": "长期借款",
+          "start": 15,
+          "end": 20,
+          "data_end": 20
+        },
+        {
+          "row_code": "BS-062",
+          "label": "应付债券",
+          "start": 20,
+          "end": 25,
+          "data_end": 25
+        }
+      ]
+    },
+    {
+      "variant": "soe",
+      "section_number": "八、93",
+      "section_title": "所有权和使用权受到限制的资产",
+      "table_name": "所有权和使用权受到限制的资产",
+      "row_count": 9,
+      "segments": [
+        {
+          "row_code": "BS-002",
+          "label": "货币资金",
+          "start": 0,
+          "end": 1,
+          "data_end": 1
+        },
+        {
+          "row_code": "BS-005",
+          "label": "应收票据",
+          "start": 1,
+          "end": 2,
+          "data_end": 2
+        },
+        {
+          "row_code": "BS-006",
+          "label": "应收账款",
+          "start": 2,
+          "end": 3,
+          "data_end": 3
+        },
+        {
+          "row_code": "BS-007",
+          "label": "应收款项融资",
+          "start": 3,
+          "end": 4,
+          "data_end": 4
+        },
+        {
+          "row_code": "BS-010",
+          "label": "存货",
+          "start": 4,
+          "end": 5,
+          "data_end": 5
+        },
+        {
+          "row_code": "BS-028",
+          "label": "固定资产",
+          "start": 5,
+          "end": 6,
+          "data_end": 6
+        },
+        {
+          "row_code": "BS-032",
+          "label": "无形资产",
+          "start": 6,
+          "end": 7,
+          "data_end": 7
+        },
+        {
+          "row_code": "BS-029",
+          "label": "在建工程",
+          "start": 7,
+          "end": 9,
+          "data_end": 8
+        }
+      ]
+    }
+  ]
+}
