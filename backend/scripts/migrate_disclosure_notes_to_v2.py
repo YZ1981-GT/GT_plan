@@ -54,6 +54,10 @@ VALID_ROW_TYPES = (
     "total",
     "dynamic_detail",
     "formula",
+    # 「不属于任何段」的表级兜底行（多段共享表的行级合并据此排除该行）。
+    # 与 `tests/services/test_note_template_row_type.VALID_ROW_TYPES` 保持一致。
+    # spec: restricted-assets-note-row-scope-rollout Requirement 2
+    "unowned",
 )
 
 #: label 关键字 → row_type（顺序即优先级；「小计」判定须先于默认 data）。
