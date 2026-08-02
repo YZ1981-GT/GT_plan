@@ -122,6 +122,35 @@ const ALLOWLIST_TABLE_CEILING = 11
  * sweep 侧另做**单向** P1（数据键 ⊆ columns 键），见对应用例。
  */
 const P1_ROUTE: Record<string, { spec: string; complete: boolean; note?: string }> = {
+  // E 循环（e1-four-table-extraction-and-disclosure-alignment Task 10）：
+  // E1 列定义原为模块私有常量、未导出 → 覆盖率 sweep 扫不到；本次提为零参 builder
+  // 并作为载荷/seed/契约的单一真源
+  buildE1ListedColumns: {
+    spec: 'composables/__tests__/e1NoteSubtableContract.spec.ts',
+    complete: true,
+    note: '上市 §五、1，2 张表（主表 + ②受限表按用户裁决补建）；3 列单级必标 flat；「受限原因」不进附注走 _note_texts',
+  },
+  buildE1SoeColumns: {
+    spec: 'composables/__tests__/e1NoteSubtableContract.spec.ts',
+    complete: true,
+    note: '国企 §八、1，末列「期初余额」（上市为「上年年末余额」），两版列头必须不同',
+  },
+  // 外币货币性项目（disclosure-note-row-level-merge Task 10）：**跨循环共享表**，
+  // 一张表内按科目分段，E1 只负责货币资金段（`BS-002`）→ 载荷带 `_row_scope`
+  // 走平台级行级合并。两变体列定义相同（源 xlsx 两张披露 sheet 的外币区逐字一致）。
+  buildE1FxColumns: {
+    spec: 'composables/__tests__/e1FxNoteSectionMap.spec.ts',
+    complete: true,
+    note: '§五、73 / §八、92「外币货币性项目」，4 列仅期末全 flat；含「折算汇率」列（format=rate）',
+  },
+  // 受限资产（restricted-assets-note-row-scope-rollout Task 5/7）：**八循环共享表**，
+  // listed 双期拆两张表（主表期末 + 续表上年年末）、soe 单表 3 列含「受限原因」。
+  // 每个 owner 只推自己那一段（E1 = BS-002 货币资金），载荷带 `_row_scope`。
+  buildRestrictedAssetsColumns: {
+    spec: 'composables/__tests__/restrictedAssetsNoteSectionMap.spec.ts',
+    complete: true,
+    note: '§五、32（主表 + 续表）/ §八、93，3 张子表全 flat；listed 无「受限原因」列（源模板 2 列）',
+  },
   // H 循环（disclosure-sync-path-buildout Task 3）：H4 国企 + H7 两版同步链路从零建立
   buildH4SoeColumns: {
     spec: 'composables/__tests__/hCycleNoteSubtableContract.spec.ts',

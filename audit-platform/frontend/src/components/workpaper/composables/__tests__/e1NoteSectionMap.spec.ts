@@ -65,20 +65,26 @@ describe('e1NoteSectionMap', () => {
     expect(total.end_amount).toBe(4703168.26)
   })
 
-  it('soe payload → 八、1 主表 + 受限制的货币资金明细(含受限原因+合计)', () => {
+  it('soe payload → 八、1 主表 + 受限制的货币资金明细(3 列, 含合计)', () => {
     const p = buildE1SyncPayload('soe', 'wp-2', ['soe_standalone'], soeSnapshot())
     expect(p.section_id).toBe('八、1')
     expect(p.sheet_name).toBe('附注披露信息(国企)')
     expect(Object.keys(p.sub_table_data)).toEqual(['货币资金', '_note_texts', '受限制的货币资金明细'])
     // 主表列头（期初余额，非上年年末余额）
     expect(p.columns['货币资金'].map(c => c.label)).toEqual(['项目', '期末余额', '期初余额'])
-    // 受限表列头（含受限原因）
-    expect(p.columns['受限制的货币资金明细'].map(c => c.label)).toEqual(['项目', '期末余额', '期初余额', '受限原因'])
+    // 🔴 ②表推 **3 列**（此前推 4 列含「受限原因」= 孤儿列：源 xlsx 国企②表 R16 与附注
+    // 模板都只有 3 列）。受限事由按源 R13 括注「应单独说明」的要求写在**文字说明段**
+    // （`_note_texts` 的「受限及境外款项说明」），不作表列。
+    // 平台铁律：附注是交付物，列结构随附注模版；底稿可多留审计列，同步时投影成附注形状。
+    // spec: e1-four-table-extraction-and-disclosure-alignment R5.7 / Task 11
+    expect(p.columns['受限制的货币资金明细'].map(c => c.label)).toEqual(['项目', '期末余额', '期初余额'])
     const rst = p.sub_table_data['受限制的货币资金明细'] as any[]
     expect(rst).toHaveLength(3) // 2 明细 + 合计
-    expect(rst[0]).toEqual({ label: '银行承兑汇票保证金', end_amount: 10, prior_amount: 5, reason: '开立银行承兑汇票' })
+    expect(rst[0]).toEqual({ label: '银行承兑汇票保证金', end_amount: 10, prior_amount: 5 })
+    // 行对象也不再带 reason（否则会以 `_sub_table_columns` 外的杂键落进附注）
+    expect(rst[0]).not.toHaveProperty('reason')
     const total = rst[2]
-    expect(total).toEqual({ label: '合计', end_amount: 13, prior_amount: 5, reason: '', is_total: true })
+    expect(total).toEqual({ label: '合计', end_amount: 13, prior_amount: 5, is_total: true })
   })
 
   it('buildNoteTexts: 非空文本→带标题条目；空→[]', () => {

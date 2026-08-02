@@ -110,6 +110,7 @@ describe('htmlRendererRegistry — 注册表完整性', () => {
       'confirmation-diff-checklist',
       'confirmation-fraud-risk',
       'confirmation-reliability',
+      'confirmation-wealth-list',
       'b50-risk-assessment',
       'b22a-control-matrix',
       'b22b-deficiency-evaluation',
