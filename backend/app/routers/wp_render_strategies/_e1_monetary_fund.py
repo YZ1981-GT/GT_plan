@@ -19,15 +19,34 @@ import sqlalchemy as sa
 
 from app.models.audit_platform_models import TbBalance
 from app.services.dataset_query import get_active_filter
+from app.services.four_table import (
+    LeafRow,
+    aggregate_leaves,
+    classify_e1_restricted_leaf,
+    fetch_tb_subtree,
+    filter_by_prefixes,
+    parent_totals,
+    resolve_semantic_accounts,
+    select_leaves,
+)
+from app.services.four_table.e_cycle_specs import (
+    E1_MONETARY_FUND_SPEC,
+    E1_SLOT_BANK,
+    E1_SLOT_CASH,
+    E1_SLOT_OTHER,
+    E1_TOTAL_SLOT_KEYS,
+)
+from app.services.four_table.e1_restricted_buckets import bucket_defs_payload
 
 from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
 
-# E1 货币资金科目：库存现金/银行存款/其他货币资金（均为资产/借方科目）
-_CASH_PREFIX = "1001"
-_BANK_PREFIX = "1002"
-_OTHER_PREFIX = "1012"
+#: 明细预填的三个基础槽（现金/银行/其他货币资金），键名与前端既有契约一致
+_DETAIL_SLOT_KEYS: tuple[str, ...] = (E1_SLOT_CASH, E1_SLOT_BANK, E1_SLOT_OTHER)
+
+#: 金额零值判定阈值（分以下视为 0）
+_ZERO_EPS = 0.005
 
 
 def _num(value: object) -> float:
@@ -40,129 +59,301 @@ def _num(value: object) -> float:
         return 0.0
 
 
-async def _fetch_leaf_accounts(
-    ctx: RenderContext, prefix: str, year: int
-) -> list[dict]:
-    """取某科目前缀下的**叶子**子科目余额行（借正贷负，资产类：借为正）。
+def _is_all_zero(row: LeafRow) -> bool:
+    """四项金额全为 0（无期初、无发生、无期末）。"""
+    return (
+        abs(row.opening) < _ZERO_EPS
+        and abs(row.debit) < _ZERO_EPS
+        and abs(row.credit) < _ZERO_EPS
+        and abs(row.closing) < _ZERO_EPS
+    )
 
-    叶子判定：其 account_code 不是任何其它 code 的前缀（铁律「只汇总叶子」，
-    避免 tb_balance 中间级 rollup 与其子科目同时计入导致双算）。
-    若该前缀下只有一级科目（无子科目），则一级科目自身即叶子。
 
-    返回 [{code, name, currency, opening, increase, decrease, ending}]，
-    资产类：increase = 借方发生额、decrease = 贷方发生额、ending = 期末余额。
+async def _fetch_currency_map(
+    ctx: RenderContext, year: int, prefixes: list[str]
+) -> dict[str, str]:
+    """取 `account_code → currency_code` 映射（外币披露表需要，`LeafRow` 不含该列）。
+
+    单独一条轻量查询，不动共享件 `fetch_tb_subtree` 的列集（其它循环不需要币种）。
+    fail-open：失败返 {}，币种降级为空串。
     """
+    ps = [p for p in (str(x or "").strip() for x in prefixes or []) if p]
+    if not ps:
+        return {}
     try:
         active_filter = await get_active_filter(
-            ctx.db, TbBalance.__table__, ctx.project_id, year
+            ctx.db, TbBalance.__table__, ctx.project_id, year or 0
         )
+        prefix_filter = sa.or_(*[TbBalance.account_code.like(f"{p}%") for p in ps])
         result = await ctx.db.execute(
             sa.select(
                 TbBalance.account_code.label("code"),
-                sa.func.max(TbBalance.account_name).label("name"),
                 sa.func.max(TbBalance.currency_code).label("currency"),
-                sa.func.sum(TbBalance.opening_balance).label("opening"),
-                sa.func.sum(TbBalance.debit_amount).label("debit"),
-                sa.func.sum(TbBalance.credit_amount).label("credit"),
-                sa.func.sum(TbBalance.closing_balance).label("closing"),
             )
-            .where(active_filter, TbBalance.account_code.startswith(prefix))
+            .where(sa.and_(active_filter, prefix_filter))
             .group_by(TbBalance.account_code)
         )
-        raw = [
-            {
-                "code": (r.code or "").strip(),
-                "name": (r.name or "").strip(),
-                "currency": (r.currency or "").strip(),
-                "opening": _num(r.opening),
-                "increase": _num(r.debit),
-                "decrease": _num(r.credit),
-                "ending": _num(r.closing),
-            }
+        return {
+            (r.code or "").strip(): (r.currency or "").strip()
             for r in result.fetchall()
-        ]
-    except Exception as e:  # noqa: BLE001
-        logger.warning("E1 four-table leaf fetch failed (%s): %s", prefix, e)
-        return []
-
-    if not raw:
-        return []
-
-    all_codes = [x["code"] for x in raw if x["code"]]
-
-    def _is_leaf(code: str) -> bool:
-        if not code:
-            return True
-        return not any(c != code and c.startswith(code) for c in all_codes)
-
-    leaves = [x for x in raw if _is_leaf(x["code"])]
-    # 过滤全零空账户（无期初、无发生、无期末）：这些子科目对底稿无意义
-    leaves = [
-        x
-        for x in leaves
-        if abs(x["opening"]) >= 0.005
-        or abs(x["increase"]) >= 0.005
-        or abs(x["decrease"]) >= 0.005
-        or abs(x["ending"]) >= 0.005
-    ]
-    leaves.sort(key=lambda x: x["code"])
-    return leaves
+            if (r.code or "").strip()
+        }
+    except Exception as e:  # noqa: BLE001 — fail-open
+        logger.warning("E1 render: currency map 查询失败: %s", e)
+        try:
+            await ctx.db.rollback()
+        except Exception:  # noqa: BLE001
+            pass
+        return {}
 
 
-async def _build_four_table_prefill(ctx: RenderContext, year: int) -> dict:
-    """从四表库（tb_balance）提取 E1 明细预填数据 + 取数来源公式。
+def build_e1_slot_leaves(
+    subtree: list[LeafRow], accounts
+) -> dict[str, list[LeafRow]]:
+    """把整棵子树按语义槽分组并筛出叶子。纯函数。
 
-    对齐 J1/K9 审定表预填铁律：底稿明细行应从四表库自动提取，而非空表手填。
-    每条记录附带 ``source``（人可读来源）与 ``formula``（TB() 取数公式），
-    供前端「四表取数」公式管理面板展示与编辑。
+    🔴 叶子筛选在**全子树**上做（`select_leaves` 需要看到兄弟行才能判叶子），
+    再按各槽的原始码前缀分配 —— 反过来先分组再筛叶子会因看不到兄弟而误判。
 
-    返回：
-    - cash:  1001 库存现金 叶子（按币种/子科目）
-    - bank:  1002 银行存款 叶子（每个 = 一个银行账户）
-    - other: 1012 其他货币资金 叶子（受限类别/保证金）
-    - account_list: 银行账户清单（供 E1-10 核对）
+    Returns:
+        ``{slot_key: [LeafRow, ...]}``；槽未命中科目时为空列表。
     """
-    cash = await _fetch_leaf_accounts(ctx, _CASH_PREFIX, year)
-    bank = await _fetch_leaf_accounts(ctx, _BANK_PREFIX, year)
-    other = await _fetch_leaf_accounts(ctx, _OTHER_PREFIX, year)
+    leaves = select_leaves(subtree)
+    out: dict[str, list[LeafRow]] = {}
+    for slot_key, slot in (accounts.slots or {}).items():
+        codes = list(slot.codes or [])
+        picked = filter_by_prefixes(leaves, codes) if codes else []
+        out[slot_key] = sorted(picked, key=lambda r: r.account_code)
+    return out
 
-    def _decorate(rows: list[dict]) -> list[dict]:
-        out: list[dict] = []
-        for r in rows:
-            code = r["code"]
-            out.append(
+
+def build_e1_detail_rows(
+    slot_leaves: dict[str, list[LeafRow]],
+    currency_map: dict[str, str],
+) -> dict[str, list[dict]]:
+    """三个基础槽的明细预填行（前端 `four_table_prefill.{cash,bank,other}`）。
+
+    字段与既有前端契约逐字一致（`code/name/currency/opening/increase/decrease/
+    ending/source/formula/formulaOpening`），零回归。
+
+    **过滤全零账户**：这些子科目对金额明细无意义。注意银行账户清单
+    （`build_e1_account_list`）**不做**此过滤 —— 见其 docstring。
+    """
+    out: dict[str, list[dict]] = {}
+    for slot_key in _DETAIL_SLOT_KEYS:
+        rows: list[dict] = []
+        for r in slot_leaves.get(slot_key, []):
+            if _is_all_zero(r):
+                continue
+            rows.append(
                 {
-                    **r,
-                    "source": f"tb_balance:{code} {r['name']}",
-                    # 期末余额取数公式（四表库叶子源，只读）
-                    "formula": f"TB('{code}','期末余额')",
-                    "formulaOpening": f"TB('{code}','期初余额')",
+                    "code": r.account_code,
+                    "name": r.account_name,
+                    "currency": currency_map.get(r.account_code, ""),
+                    "opening": r.opening,
+                    "increase": r.debit,
+                    "decrease": r.credit,
+                    "ending": r.closing,
+                    "source": f"tb_balance:{r.account_code} {r.account_name}",
+                    "formula": f"TB('{r.account_code}','期末余额')",
+                    "formulaOpening": f"TB('{r.account_code}','期初余额')",
                 }
             )
-        return out
+        out[slot_key] = rows
+    return out
 
-    cash_rows = _decorate(cash)
-    bank_rows = _decorate(bank)
-    other_rows = _decorate(other)
 
-    # 银行账户清单（1002 叶子 = 银行账户，供 E1-10 核对完整性）
-    account_list = [
-        {"code": r["code"], "name": r["name"], "ending": r["ending"]}
-        for r in bank
+def build_e1_account_list(
+    slot_leaves: dict[str, list[LeafRow]],
+    currency_map: dict[str, str],
+) -> list[dict]:
+    """银行账户清单（供 E1-10「已开立银行账户清单核对」）。纯函数。
+
+    🔴 **不过滤零余额账户** —— 与金额明细口径故意不同：银行账户**完整性**核对
+    恰恰要看「本年新开立但期末余额为 0」的账户（体外账户/未入账账户是货币资金
+    舞弊的常见切入点）。旧实现统一过滤全零行，把这些账户从清单里抹掉，
+    反而削弱了完整性程序。
+    """
+    return [
+        {
+            "code": r.account_code,
+            "name": r.account_name,
+            "currency": currency_map.get(r.account_code, ""),
+            "opening": r.opening,
+            "ending": r.closing,
+            "isZeroBalance": _is_all_zero(r),
+        }
+        for r in slot_leaves.get(E1_SLOT_BANK, [])
     ]
 
+
+def build_e1_tb_values(slot_leaves: dict[str, list[LeafRow]]) -> dict[str, float]:
+    """各槽的叶子聚合金额 + 三族合计（供审定表 TB 核对与披露主表）。纯函数。"""
+    out: dict[str, float] = {}
+    total_open = 0.0
+    total_close = 0.0
+    for slot_key, rows in slot_leaves.items():
+        agg = {
+            "opening": sum(r.opening for r in rows),
+            "closing": sum(r.closing for r in rows),
+        }
+        out[f"{slot_key}_opening"] = agg["opening"]
+        out[f"{slot_key}_closing"] = agg["closing"]
+        if slot_key in E1_TOTAL_SLOT_KEYS:
+            total_open += agg["opening"]
+            total_close += agg["closing"]
+    out["total_opening"] = total_open
+    out["total_closing"] = total_close
+    return out
+
+
+def build_e1_adjudication_prefill(
+    slot_leaves: dict[str, list[LeafRow]], accounts
+) -> dict[str, dict]:
+    """审定表 E1-1 未审数预填（按语义槽，仅无持久化时套用）。纯函数。
+
+    每槽给 ``{opening, closing, accountCode, accountCodes, found}``；
+    ``found=False`` 表示本项目无该科目 → 前端显示「本项目无此科目」而非 0。
+    """
+    out: dict[str, dict] = {}
+    for slot_key, slot in (accounts.slots or {}).items():
+        rows = slot_leaves.get(slot_key, [])
+        codes = list(slot.codes or [])
+        out[slot_key] = {
+            "opening": sum(r.opening for r in rows),
+            "closing": sum(r.closing for r in rows),
+            "accountCode": codes[0] if codes else "",
+            "accountCodes": codes,
+            "found": bool(slot.found),
+        }
+    return out
+
+
+def build_e1_restricted_prefill(
+    slot_leaves: dict[str, list[LeafRow]], accounts
+) -> dict:
+    """受限制货币资金动态取数（映射规则驱动 + 逐叶子按名称分类）。纯函数。
+
+    候选集**只来自货币资金三族的叶子**（受限资金必然是货币资金的一部分，
+    校验预设 F1-5「②表合计 = 报表货币资金 − 现金及现金等价物」即此含义），
+    不跨族去猜。
+
+    🔴 **下发扁平叶子清单而不是预聚合的桶**：审计师可在「待归类科目」面板把叶子
+    改归到别的类别，若后端只给聚合值，前端就无法重算被改动桶的余额（预聚合是
+    有损表示）。故这里给逐叶子明细 + ``autoBucket`` 自动分类标记，聚合全部由前端
+    按「人工归类 > 自动分类」做，单一真源、无不可重算状态。
+
+    ``autoBucket=None`` 表示按名称判不出来 —— 交审计师点选归类，
+    **既不静默丢弃也不臆造归属**（宁缺勿造）。
+
+    全零叶子不下发：活体项目有 50+ 个零余额空壳分支户，全下发会淹没面板；
+    金额为 0 不影响「叶子和 == 三族合计」的求和恒等式。
+
+    Returns:
+        ``{leaves: [{code,name,opening,closing,slot,autoBucket}],
+        bucketDefs: [...], source: {...}}``
+    """
+    leaves: list[dict] = []
+    for slot_key in E1_TOTAL_SLOT_KEYS:
+        for r in slot_leaves.get(slot_key, []):
+            if _is_all_zero(r):
+                continue
+            leaves.append(
+                {
+                    "code": r.account_code,
+                    "name": r.account_name,
+                    "opening": r.opening,
+                    "closing": r.closing,
+                    "slot": slot_key,
+                    "autoBucket": classify_e1_restricted_leaf(r.account_name),
+                }
+            )
     return {
-        "cash": cash_rows,
-        "bank": bank_rows,
-        "other": other_rows,
-        "account_list": account_list,
-        "meta": {
-            "as_of": f"{year}-12-31" if year else "",
-            "cash_count": len(cash_rows),
-            "bank_count": len(bank_rows),
-            "other_count": len(other_rows),
-            "note": "资产/借方科目：本期增加=借方发生额，本期减少=贷方发生额，期末=期末余额（借正）。仅取叶子子科目，全零空账户已过滤。",
+        "leaves": leaves,
+        "bucketDefs": bucket_defs_payload(),
+        "source": {
+            "report_row_code": accounts.row_code,
+            "chart_available": bool(accounts.chart_available),
         },
+    }
+
+
+def build_e1_parent_check(
+    subtree: list[LeafRow], accounts
+) -> dict[str, dict[str, float]]:
+    """「叶子和 == 父科目额」勾稽自检（不阻断，供 UI 提示数据质量）。纯函数。"""
+    leaves = select_leaves(subtree)
+    out: dict[str, dict[str, float]] = {}
+    for slot_key, slot in (accounts.slots or {}).items():
+        for code in slot.codes or []:
+            # 🔴 `setdefault` 而非赋值：同一科目码理论上可被多个槽声明（如客户把
+            # 「数字货币」挂在 1012 下），此时应保留**首个**声明它的槽，
+            # 否则最后一个槽会把 `slot` 标签覆盖成误导值（实测曾把三个码都标成 `digital`）。
+            if code in out:
+                continue
+            parent = parent_totals(subtree, code)
+            leaf = aggregate_leaves(leaves, [code])
+            out.setdefault(
+                code,
+                {
+                    "slot": slot_key,
+                    "parent_closing": parent["closing"],
+                    "leaf_closing": leaf["closing"],
+                    "diff": round(leaf["closing"] - parent["closing"], 2),
+                },
+            )
+    return out
+
+
+async def _build_four_table_extraction(ctx: RenderContext, year: int) -> dict:
+    """从四表库提取 E1 全套取数结果（明细预填 + 审定预填 + 受限分类 + 溯源）。
+
+    科目定位走 `four_table.resolve_semantic_accounts`（**按科目名逐项目定位**）——
+    标准码在项目间并不一致、且「数字货币」「存放财务公司款项」没有一级标准科目，
+    写死任何码都会在部分项目取空或取错（详见 `e_cycle_specs` 模块 docstring）。
+
+    Returns:
+        ``{four_table_prefill, adjudication_prefill, restricted_prefill,
+        tb_values, tb_source_codes}``
+    """
+    accounts = await resolve_semantic_accounts(ctx, E1_MONETARY_FUND_SPEC)
+
+    all_prefixes: list[str] = []
+    for slot in (accounts.slots or {}).values():
+        all_prefixes.extend(slot.codes or [])
+    all_prefixes = [p for p in dict.fromkeys(all_prefixes) if p]
+
+    subtree = await fetch_tb_subtree(ctx.db, ctx.project_id, year, all_prefixes)
+    currency_map = await _fetch_currency_map(ctx, year, all_prefixes)
+
+    slot_leaves = build_e1_slot_leaves(subtree, accounts)
+    detail = build_e1_detail_rows(slot_leaves, currency_map)
+    account_list = build_e1_account_list(slot_leaves, currency_map)
+
+    source_codes = accounts.as_dict()
+    source_codes["parent_check"] = build_e1_parent_check(subtree, accounts)
+
+    return {
+        "four_table_prefill": {
+            **detail,
+            "account_list": account_list,
+            "meta": {
+                "as_of": f"{year}-12-31" if year else "",
+                "cash_count": len(detail.get(E1_SLOT_CASH, [])),
+                "bank_count": len(detail.get(E1_SLOT_BANK, [])),
+                "other_count": len(detail.get(E1_SLOT_OTHER, [])),
+                "account_count": len(account_list),
+                "note": (
+                    "资产/借方科目：本期增加=借方发生额，本期减少=贷方发生额，"
+                    "期末=期末余额（借正）。仅取叶子子科目；金额明细已过滤全零账户，"
+                    "但银行账户清单保留零余额账户以支持 E1-10 完整性核对。"
+                ),
+            },
+        },
+        "adjudication_prefill": build_e1_adjudication_prefill(slot_leaves, accounts),
+        "restricted_prefill": build_e1_restricted_prefill(slot_leaves, accounts),
+        "tb_values": build_e1_tb_values(slot_leaves),
+        "tb_source_codes": source_codes,
     }
 
 
@@ -228,40 +419,7 @@ async def render(ctx: RenderContext) -> dict | None:
     except Exception as e:  # noqa: BLE001
         logger.warning("E1 render: project context 查询失败: %s", e)
 
-    # ─── 试算平衡表「货币资金」（参照报表规则映射 BS-002，而非硬编码前缀）─────
-    # 科目编号从 report_config 规则映射解析（项目级覆盖→标准级），兼容企业自定义映射；
-    # 无配置时回退 1001/1002/1012（零回归）。审定表以此为「试算平衡表数」核对基准。
     year = project_context.get("audit_year")
-    if year:
-        try:
-            from app.services.report_account_mapping import (
-                resolve_report_line_account_codes,
-                build_trial_balance_code_filter,
-            )
-
-            codes = await resolve_report_line_account_codes(
-                db, ctx.project_id, "BS-002", fallback=["1001", "1002", "1012"]
-            )
-            where_clause, code_params = build_trial_balance_code_filter(codes)
-            project_context["tb_source_codes"] = codes  # 供前端/追溯展示规则映射来源
-            tb_row = (
-                await db.execute(
-                    sa.text(
-                        "SELECT COALESCE(SUM(audited_amount), 0) AS audited, "
-                        "COALESCE(SUM(unadjusted_amount), 0) AS unadjusted "
-                        "FROM trial_balance "
-                        "WHERE project_id = :pid AND year = :year AND is_deleted = false "
-                        f"AND {where_clause}"
-                    ),
-                    {"pid": str(ctx.project_id), "year": int(year), **code_params},
-                )
-            ).fetchone()
-            if tb_row:
-                audited = float(tb_row.audited or 0)
-                unadjusted = float(tb_row.unadjusted or 0)
-                project_context["tb_amount"] = audited if audited else unadjusted
-        except Exception as e:  # noqa: BLE001
-            logger.warning("E1 render: trial_balance 货币资金查询失败: %s", e)
 
     # ─── 关联方清单 ──────────────────────────────────────────────────────
     try:
@@ -279,32 +437,42 @@ async def render(ctx: RenderContext) -> dict | None:
     except Exception as e:  # noqa: BLE001
         logger.warning("E1 render: related_parties 查询失败: %s", e)
 
-    # ─── 四表库明细预填（现金/银行/其他货币资金 叶子子科目 + 取数公式）────
-    four_table_prefill: dict = {
-        "cash": [], "bank": [], "other": [], "account_list": [], "meta": {}
+    # ─── 四表库取数（语义科目定位 → 叶子聚合 → 明细/审定/受限预填 + 溯源）────
+    extraction: dict = {
+        "four_table_prefill": {
+            "cash": [], "bank": [], "other": [], "account_list": [], "meta": {}
+        },
+        "adjudication_prefill": {},
+        "restricted_prefill": {
+            "leaves": [],
+            "bucketDefs": bucket_defs_payload(),
+            "source": {},
+        },
+        "tb_values": {},
+        "tb_source_codes": {},
     }
     if year:
         try:
-            four_table_prefill = await _build_four_table_prefill(ctx, int(year))
-        except Exception as e:  # noqa: BLE001
-            logger.warning("E1 render: four_table_prefill 构建失败: %s", e)
+            extraction = await _build_four_table_extraction(ctx, int(year))
+        except Exception as e:  # noqa: BLE001 — fail-open，取数失败不阻断底稿打开
+            logger.warning("E1 render: 四表取数构建失败: %s", e)
 
-    # ─── 期初 TB（供审定表期初核对）───────────────────────────────────────
-    # trial_balance 无期初列，故期初取 tb_balance 期初余额叶子合计（复用 four_table_prefill 已做叶子提取，
-    # 与明细表 seed 同源，保证审定期初合计 ≈ 期初 TB 数，期初差异归零）。
-    try:
-        tb_opening = 0.0
-        for _grp in ("cash", "bank", "other"):
-            for _row in four_table_prefill.get(_grp, []) or []:
-                tb_opening += float(_row.get("opening") or 0)
-        project_context["tb_amount_opening"] = tb_opening
-    except Exception as e:  # noqa: BLE001
-        logger.warning("E1 render: tb_amount_opening 汇总失败: %s", e)
-        project_context["tb_amount_opening"] = 0
+    tb_values = extraction.get("tb_values") or {}
+    # 供前端/追溯展示科目定位来源（含 conflicts / unmapped_candidates / parent_check）
+    project_context["tb_source_codes"] = extraction.get("tb_source_codes") or {}
+    # 审定表「试算平衡表数」核对基准 —— 取 tb_balance 三族**叶子**合计。
+    # 🔴 不用 trial_balance：该表存在旧版 recalc 写入的父子双算陈旧数据
+    # （见 four_table/tb_query.fetch_trial_balance_amounts 的警示），
+    # 而叶子口径有「叶子和 == 父额」自检（parent_check）可验证。
+    project_context["tb_amount"] = _num(tb_values.get("total_closing"))
+    project_context["tb_amount_opening"] = _num(tb_values.get("total_opening"))
 
     return {
         "sheet_name": ctx.classification.sheet_name if ctx.classification else "",
         "project_context": project_context,
         "responses_snapshot": responses_snapshot,
-        "four_table_prefill": four_table_prefill,
+        "four_table_prefill": extraction.get("four_table_prefill") or {},
+        "adjudication_prefill": extraction.get("adjudication_prefill") or {},
+        "restricted_prefill": extraction.get("restricted_prefill") or {},
+        "tb_values": tb_values,
     }

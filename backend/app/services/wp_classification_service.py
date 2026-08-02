@@ -67,6 +67,7 @@ VALID_COMPONENT_TYPES: set[str] = {
     "confirmation-alternative-d06",
     "confirmation-reliability",
     "confirmation-fraud-risk",
+    "confirmation-wealth-list",
     "a1-11-signing-form",
     "a1-12-dual-checklist",
     "b50-risk-assessment",

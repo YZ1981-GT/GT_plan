@@ -42,6 +42,8 @@ _CONFIRMATION_FORMAT_MAP: dict[str, str] = {
     "confirmation-alternative-k06": "alternative-k06-v1",
     "confirmation-reliability": "reliability-v1",
     "confirmation-fraud-risk": "fraud-risk-d08-v1",
+    # E0-6 理财产品发函记录表（专属组件，见前端 confirmation/wealthList/）
+    "confirmation-wealth-list": "wealth-list-v1",
 }
 
 

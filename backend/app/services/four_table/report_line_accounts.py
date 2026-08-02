@@ -77,7 +77,7 @@ class ReportLineAccountSpec:
         extra_standard_codes: 报表公式**未必引用**但底稿需要单列的科目标准码
             （如 K1-1「与经审计的财务报表核对」区要单列 ``1131`` 应收股利 /
             ``1132`` 应收利息）。它们不并入 `gross`，单独放 `extra`。
-        is_liability: **负债 / 权益类循环置 True**。
+        is_liability: **负债 / 权益类循环置 True**（备抵拆分整体跳过）。
 
             🔴 为什么需要：:func:`split_gross_provision` 把
             ``account_chart.direction == 'credit'`` 一律判为备抵 —— 这对**资产**循环
@@ -94,6 +94,23 @@ class ReportLineAccountSpec:
 
             适用范围：J1/J2、K3~K7（应付利息/股利/其他应付款等）、L1~L8（长期借款/
             应付债券/长期应付款）、M（权益类）—— 凡「原值贷方」的循环。
+
+            与 :attr:`gross_direction` 的关系：本字段是「整体跳过备抵拆分」的强断言
+            （该循环确定无同报表行备抵）；``gross_direction`` 是「保留拆分但把方向
+            判定改为相对主体方向」的弱形式（负债类报表行仍可能引用备抵科目）。
+            两者同时声明时 ``is_liability`` 优先。
+        gross_direction: 本报表行**主体科目的方向**（``'debit'`` / ``'credit'``）。
+
+            🔴 **负债 / 权益 / 收入类报表行必须声明 ``'credit'``**。备抵判定的第一条
+            规则是「``account_chart.direction == 'credit'`` 即备抵」—— 这条只对
+            **资产类**成立（借方原值 `1121` + 贷方备抵 `1231`）。对负债类会 100% 误判：
+            实证 ``BS-044 应付票据 = TB('2201')``，而 `2201` 在 `account_chart` 里
+            方向就是 credit → 被判成备抵 → ``gross_standard`` 为空 →
+            ``resolved_from`` 退化成 ``fallback``（金额恰好因兜底码相同而正确，
+            但溯源失真，且报表公式一旦改科目就取错）。
+
+            声明 ``'credit'`` 后备抵判定改为「方向为 ``debit`` 或名称含备抵关键字」。
+            默认 ``None`` = 与本字段引入前逐字等价（D1/K1/K2/F1 等既有消费者零回归）。
     """
 
     row_code: str
@@ -103,6 +120,7 @@ class ReportLineAccountSpec:
     provision_name_filter: str | None = None
     extra_standard_codes: tuple[str, ...] = ()
     is_liability: bool = False
+    gross_direction: str | None = None
 
 
 @dataclass(frozen=True)
@@ -226,12 +244,24 @@ def _is_provision_code(
     code: str,
     name_by_code: dict[str, str],
     direction_by_code: dict[str, str],
+    gross_direction: str | None = None,
 ) -> bool:
-    """单码备抵判定：方向为贷方，或科目名含备抵关键字，或落在备抵码族。"""
+    """单码备抵判定。
+
+    「备抵」= 与主体科目方向**相反**的抵减科目。故方向判定必须相对于主体方向：
+
+    - ``gross_direction`` 未声明（默认，资产类语义）→ 沿用历史行为「credit 即备抵」。
+    - ``gross_direction='credit'``（负债 / 权益 / 收入类）→ 「debit 才可能是备抵」。
+    - ``gross_direction='debit'`` → 与默认等价，显式声明更清晰。
+
+    方向不命中时再看科目名关键字与备抵码族（`1231`）。
+    """
     c = (code or "").strip()
     if not c:
         return False
-    if (direction_by_code.get(c) or "").strip().lower() == "credit":
+    direction = (direction_by_code.get(c) or "").strip().lower()
+    opposite = "debit" if (gross_direction or "").strip().lower() == "credit" else "credit"
+    if direction == opposite:
         return True
     name = name_by_code.get(c) or ""
     if any(h in name for h in _PROVISION_NAME_HINTS):
@@ -242,18 +272,28 @@ def _is_provision_code(
 def split_gross_provision(
     codes: list[str],
     chart_rows: list[dict] | None = None,
+    gross_direction: str | None = None,
 ) -> tuple[list[str], list[str]]:
     """把报表公式解析出的标准码集拆为 (原值码集, 备抵码集)。纯函数。
 
-    判定优先级：`account_chart.direction == 'credit'` → 科目名含「坏账准备/减值准备/
-    信用减值」→ 码族前缀 `1231`。三者皆不命中即归原值。
+    判定优先级：方向与主体**相反** → 科目名含「坏账准备/减值准备/信用减值」→
+    码族前缀 `1231`。三者皆不命中即归原值。
 
     Args:
         codes: 标准码集（`resolve_report_line_account_codes` 的返回值）。
         chart_rows: ``[{"account_code","account_name","direction"}, ...]``（source='standard'）。
+        gross_direction: 主体科目方向（``'credit'`` 用于负债 / 权益 / 收入类报表行）。
+            见 :func:`_is_provision_code`。
 
     Returns:
         ``(gross, provision)``。两集合无交集，并集 == 去重后的 ``codes``（保持入参顺序）。
+
+        🔴 **刻意不做「gross 空则整体回退」的安全网**（2026-08-02 移除）：那条兜底
+        会让两个反向自检同时失效 —— `test_split_reverse_selfcheck_chart_actually_used`
+        （证明 `chart_rows` 真的参与判定）与 `test_liability_flag_actually_changes_split`
+        （证明 `ReportLineAccountSpec.is_liability` 确有必要）。负债 / 权益类报表行
+        必须**显式**声明 :attr:`ReportLineAccountSpec.is_liability` 或
+        :attr:`ReportLineAccountSpec.gross_direction`；静默兜底只会掩盖漏声明。
     """
     rows = chart_rows or []
 
@@ -273,7 +313,7 @@ def split_gross_provision(
         if not c or c in seen:
             continue
         seen.add(c)
-        if _is_provision_code(c, name_by_code, direction_by_code):
+        if _is_provision_code(c, name_by_code, direction_by_code, gross_direction):
             provision.append(c)
         else:
             gross.append(c)
@@ -454,7 +494,9 @@ async def resolve_report_line_accounts(
             c for c in dict.fromkeys((codes or [])) if (c or "").strip()
         ], []
     else:
-        gross_std, provision_std = split_gross_provision(codes, chart_rows)
+        gross_std, provision_std = split_gross_provision(
+            codes, chart_rows, spec.gross_direction
+        )
 
     # 附加科目（如 1131/1132）不参与原值口径 —— 从 gross 里摘出去单列
     extra_std = [c for c in (spec.extra_standard_codes or ()) if c]

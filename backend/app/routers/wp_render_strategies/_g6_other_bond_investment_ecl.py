@@ -19,6 +19,9 @@ import logging
 
 import sqlalchemy as sa
 
+from app.services.four_table.g_cycle_specs import G6_SPEC
+from app.services.four_table.semantic_account_resolver import resolve_primary_code
+
 from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
@@ -98,11 +101,15 @@ async def render(ctx: RenderContext) -> dict | None:
     except Exception as e:  # noqa: BLE001
         logger.warning("G6-ECL render: checklist_responses 回读失败: %s", e)
 
+    # 🔴 科目码由语义定位逐项目解析（原写死 "1503" = 可供出售金融资产，旧准则已废止）。
+    #    单一真源 `four_table/g_cycle_specs.G6_SPEC`；本项目无其他债权投资科目时为空串。
+    account_code = await resolve_primary_code(ctx, G6_SPEC)
+
     # 项目上下文（客户/年度/科目）
     project_context: dict = {
         "client_name": "",
         "audit_year": "",
-        "account_code": "1503",
+        "account_code": account_code,
     }
     try:
         proj_result = await db.execute(
@@ -125,6 +132,6 @@ async def render(ctx: RenderContext) -> dict | None:
         "sheets": G6_ECL_SHEETS,
         "project_context": project_context,
         "responses_snapshot": responses_snapshot,
-        "account_code": "1503",
+        "account_code": account_code,
         "prefix": "G6-ECL",
     }

@@ -25,6 +25,7 @@ import sqlalchemy as sa
 from app.models.audit_platform_models import TbBalance
 from app.services.dataset_query import get_active_filter
 from app.services.four_table import (
+    build_g_adjudication_prefill,
     LeafRow,
     ReportLineAccountSpec,
     aggregate_leaves,
@@ -139,28 +140,6 @@ def classify_g4_leaf(name: str, code: str) -> str:
     return "other"
 
 
-def build_g4_adjudication_prefill(leaves: list[LeafRow]) -> dict:
-    """从 1504 叶子构建审定表预填。按投资项目逐行。"""
-    if not leaves:
-        return {}
-    items: list[dict] = []
-    for leaf in leaves:
-        if leaf.opening != 0 or leaf.closing != 0:
-            items.append({
-                "account_code": leaf.account_code,
-                "account_name": leaf.account_name,
-                "category": classify_g4_leaf(leaf.account_name, leaf.account_code),
-                "opening": leaf.opening,
-                "closing": leaf.closing,
-            })
-    if not items:
-        return {}
-    return {
-        "items": items,
-        "total_opening": sum(i["opening"] for i in items),
-        "total_closing": sum(i["closing"] for i in items),
-    }
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 四表取数
@@ -219,9 +198,12 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict:
                 "diff": round(leaf_sum - parent.get("closing", 0), 2),
             }
 
-        adjudication_prefill = build_g4_adjudication_prefill(filtered_leaves)
 
         source_codes = accounts.as_dict()
+        # 审定表「从四表库带入未审数」统一载荷（逐叶子明细，归类在前端做）
+        result["adjudication_prefill"] = build_g_adjudication_prefill(
+            "G4", accounts, all_rows
+        )
         source_codes["gross"] = [r.account_code for r in filtered_leaves]
         if parent_check:
             source_codes["parent_check"] = parent_check
@@ -241,7 +223,6 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict:
             ],
         }
         result["tb_source_codes"] = source_codes
-        result["adjudication_prefill"] = adjudication_prefill
 
     except Exception as e:  # noqa: BLE001
         logger.warning("G4 TB fetch failed: %s", e)
@@ -314,7 +295,6 @@ async def render(ctx: RenderContext) -> dict | None:
     tb_data = await _fetch_tb_data(ctx)
     tb_values = tb_data["tb_values"]
     tb_source_codes = tb_data["tb_source_codes"]
-    adjudication_prefill = tb_data["adjudication_prefill"]
 
     project_context["tb_source_codes"] = tb_source_codes
     project_context["tb_amount"] = tb_values.get("closing", 0) if tb_values else 0
@@ -341,7 +321,7 @@ async def render(ctx: RenderContext) -> dict | None:
         "account_code": "1504",
         "prefix": "G4",
         "tb_values": tb_values,
-        "adjudication_prefill": adjudication_prefill,
+        "adjudication_prefill": tb_data["adjudication_prefill"],
         "tb_source_codes": tb_source_codes,
         "adjudicated_amount": adjudicated_amount,
         "cycle_workpapers": cycle_workpapers,

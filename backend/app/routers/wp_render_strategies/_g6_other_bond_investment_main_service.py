@@ -19,33 +19,75 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.audit_platform_models import TbBalance, TrialBalance
 from app.services.dataset_query import get_active_filter
+from app.services.four_table.g_cycle_specs import G6_SPEC
+from app.services.four_table.leaf_aggregation import (
+    filter_by_prefixes,
+    select_leaves,
+    to_leaf_rows,
+)
+from app.services.four_table.semantic_account_resolver import (
+    ResolverContext,
+    resolve_semantic_accounts,
+)
 
 logger = logging.getLogger(__name__)
-
-# 科目前缀：1503 其他债权投资
-_ACCOUNT_PREFIX = "1503"
 
 # 公式验证容差
 _TOLERANCE = 0.01
 
 
 class G6OtherBondInvestmentMainService:
-    """G6 其他债权投资(main组) 业务逻辑服务."""
+    """G6 其他债权投资(main组) 业务逻辑服务.
+
+    🔴 **2026-08-01 修掉取错科目族**：原 ``_ACCOUNT_PREFIX = "1503"`` 用于
+    ``LIKE '1503%'`` 取数，而 ``1503`` 实为「可供出售金融资产」（旧准则，已废止）；
+    其他债权投资的科目是 ``1506``（`account_chart` + `trial_balance.account_name` 双证，
+    而 `report_config` 的 `BS-022` 写的 ``1505`` 实为「债权投资减值准备」）。
+
+    且不改成写死 ``1506`` —— 标准码在项目间并不一致（详见
+    `four_table/semantic_account_resolver` 模块 docstring），一律按科目名逐项目解析。
+    """
 
     def __init__(self, db: AsyncSession):
         self.db = db
+
+    # ─── 科目定位（语义驱动，逐项目）───────────────────────────────────────────
+
+    async def _resolve_codes(
+        self, project_id: UUID, year: int | None = None
+    ) -> tuple[list[str], list[str]]:
+        """解析本项目「其他债权投资」科目。
+
+        Returns:
+            ``(原始码前缀集, 标准码集)``；本项目无该科目时返回 ``([], [])``
+            —— 调用方据此返回空结果（**宁缺勿造**，不得退化为宽前缀取错数）。
+        """
+        try:
+            result = await resolve_semantic_accounts(
+                ResolverContext(db=self.db, project_id=project_id, year=year),
+                G6_SPEC,
+            )
+        except Exception as e:  # noqa: BLE001 — fail-open，取数失败不阻断 render
+            logger.warning("G6 service: 科目语义定位失败: %s", e)
+            return [], []
+        slot = result.slots.get("gross")
+        if slot is None or not slot.found:
+            return [], []
+        return list(slot.codes), list(slot.standard_codes)
 
     # ─── TB 取数 ─────────────────────────────────────────────────────────────
 
     async def get_trial_balance_data(
         self, project_id: UUID, year: int | None
     ) -> dict[str, Any]:
-        """查 trial_balance 科目 1503% 的审定相关字段.
+        """查 trial_balance 里「其他债权投资」科目的审定相关字段.
+
+        科目由 :meth:`_resolve_codes` 按科目名逐项目解析（原写死 ``LIKE '1503%'``）。
 
         返回 {
             "rows": [
                 {
-                    "standard_account_code": "1503",
+                    "standard_account_code": "1506",
                     "unadjusted_amount": ...,
                     "aje_adjustment": ...,
                     "audited_amount": ...,
@@ -59,6 +101,17 @@ class G6OtherBondInvestmentMainService:
         }
         """
         rows: list[dict] = []
+        _originals, standard_codes = await self._resolve_codes(project_id, year)
+        if not standard_codes:
+            # 本项目无该科目 → 空结果（不退化为宽前缀，避免把别的科目族算进来）
+            return {
+                "rows": [],
+                "summary": {
+                    "total_unadjusted": 0.0,
+                    "total_aje_adjustment": 0.0,
+                    "total_audited": 0.0,
+                },
+            }
         try:
             active_filter = await get_active_filter(
                 self.db, TrialBalance.__table__, project_id, year
@@ -71,7 +124,7 @@ class G6OtherBondInvestmentMainService:
                     TrialBalance.audited_amount,
                 ).where(
                     active_filter,
-                    TrialBalance.standard_account_code.like(f"{_ACCOUNT_PREFIX}%"),
+                    TrialBalance.standard_account_code.in_(standard_codes),
                 )
             )
             for row in result.fetchall():
@@ -102,10 +155,20 @@ class G6OtherBondInvestmentMainService:
     async def get_tb_balance_data(
         self, project_id: UUID, year: int | None
     ) -> dict[str, float]:
-        """取 tb_balance 1503% 的期初/期末余额聚合.
+        """取 tb_balance 里「其他债权投资」的期初/期末余额聚合（**只汇总叶子科目**）.
 
-        返回 {"opening": float, "closing": float}
+        🔴 修掉两个缺陷：① 科目族错（原 ``1503`` = 可供出售金融资产）
+        ② 原 ``code.startswith(_ACCOUNT_PREFIX)`` **缺点号边界** —— 前缀 ``1506``
+        会误命中 ``15060``（不同科目）；且**父子双算**（父科目行与其子科目一起加）。
+        现改用共享件 `select_leaves` + `filter_by_prefixes`（与
+        `trial_balance_service.recalc` 同语义）。
+
+        返回 {"opening": float, "closing": float}；本项目无该科目或无数据时返回 ``{}``
+        （调用方据此区分「无科目」与「余额为 0」）。
         """
+        originals, _standard = await self._resolve_codes(project_id, year)
+        if not originals:
+            return {}
         try:
             active_filter = await get_active_filter(
                 self.db, TbBalance.__table__, project_id, year
@@ -113,21 +176,22 @@ class G6OtherBondInvestmentMainService:
             result = await self.db.execute(
                 sa.select(
                     TbBalance.account_code,
+                    TbBalance.account_name,
                     TbBalance.opening_balance,
                     TbBalance.closing_balance,
+                    TbBalance.debit_amount,
+                    TbBalance.credit_amount,
+                    TbBalance.closing_direction,
+                    TbBalance.dataset_id,
                 ).where(active_filter)
             )
-            opening = 0.0
-            closing = 0.0
-            matched = False
-            for row in result.fetchall():
-                code = (row.account_code or "").strip()
-                if code == _ACCOUNT_PREFIX or code.startswith(_ACCOUNT_PREFIX):
-                    opening += float(row.opening_balance or 0)
-                    closing += float(row.closing_balance or 0)
-                    matched = True
-            if matched:
-                return {"opening": opening, "closing": closing}
+            leaves = select_leaves(to_leaf_rows(result.fetchall()))
+            picked = filter_by_prefixes(leaves, originals)
+            if picked:
+                return {
+                    "opening": sum(r.opening for r in picked),
+                    "closing": sum(r.closing for r in picked),
+                }
         except Exception as e:  # noqa: BLE001
             logger.warning("G6 service: TB余额取数失败: %s", e)
         return {}

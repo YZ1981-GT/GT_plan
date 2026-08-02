@@ -2,9 +2,15 @@
 
 componentType: g14-credit-impairment-loss
 
-科目映射链路（account_chart 实证 6702=信用减值损失）：
-  IS-016 信用减值损失 = TB('6702','本期发生额')（科目表 6702=信用减值损失）
-  标准科目 6702 信用减值损失（借贷双方/损益类）
+科目定位：**语义驱动、逐项目**（单一真源 `four_table/g_cycle_specs.G14_SPEC`）。
+
+`account_chart` 实证 ``6702 = 信用减值损失`` / ``6701 = 资产减值损失``；
+而 `report_config` 的 ``IS-016 信用减值损失 = TB('6701')`` 与
+``IS-017 资产减值损失 = TB('6702')`` **整整互换** → 不能以报表公式为定位依据，
+改按科目名在本项目科目表里定位，报表公式降级为提示 + 冲突检测。
+
+损益类科目：`tb_balance.closing_balance` 在含年末结转损益的全年账上恒为 0，
+取数须看发生额（`debit` / `credit`）。
 """
 
 from __future__ import annotations
@@ -16,15 +22,16 @@ import sqlalchemy as sa
 from app.models.audit_platform_models import TbBalance
 from app.services.dataset_query import get_active_filter
 from app.services.four_table import (
+    build_g_adjudication_prefill,
     LeafRow,
-    ReportLineAccountSpec,
     aggregate_leaves,
     filter_by_prefixes,
     parent_totals,
-    resolve_report_line_accounts,
+    resolve_semantic_accounts,
     select_leaves,
     to_leaf_rows,
 )
+from app.services.four_table.g_cycle_specs import G14_SPEC
 
 from ._context import RenderContext
 
@@ -34,10 +41,15 @@ logger = logging.getLogger(__name__)
 # 科目定位规格
 # ─────────────────────────────────────────────────────────────────────────────
 
-G14_ACCOUNT_SPEC = ReportLineAccountSpec(
-    row_code="IS-016",
-    fallback_gross=("6702",),
-)
+#: 🔴 科目定位改走**语义驱动**（单一真源 `four_table/g_cycle_specs.G14_SPEC`）。
+#:
+#: 原实现用 ``ReportLineAccountSpec(row_code="IS-016", fallback_gross=("6702",))``
+#: —— 兜底码是对的，但 **兜底永远用不上**：`report_config` 的 `IS-016 信用减值损失`
+#: 写的是 ``TB('6701')``（= 资产减值损失，K11 的科目），解析成功后就以它为准。
+#: 实证 `IS-016` 与 `IS-017 资产减值损失 = TB('6702')` **整整互换**（铁证：同库
+#: `CFSS-003 = TB('6701')` / `CFSS-004 = TB('6702')` 是对的，利润表两行自相矛盾），
+#: 活体差额 6701 = 3,876,759.84 vs 6702 = 126,151,230.15（虚减 1.22 亿）。
+G14_ACCOUNT_SPEC = G14_SPEC
 
 _ADJUDICATED_ITEM_ID = "G14-1-adjudicated-amount"
 
@@ -62,13 +74,15 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict:
     result: dict = {"tb_values": {}, "tb_source_codes": {}, "adjudication_prefill": {}}
 
     try:
-        accounts = await resolve_report_line_accounts(ctx, G14_ACCOUNT_SPEC)
+        accounts = await resolve_semantic_accounts(ctx, G14_ACCOUNT_SPEC)
 
         active_filter = await get_active_filter(
             ctx.db, TbBalance.__table__, ctx.project_id, ctx.year
         )
-        query_prefixes = accounts.gross if accounts.gross else list(G14_ACCOUNT_SPEC.fallback_gross)
+        # 本项目无「信用减值损失」科目时返空（宁缺勿造，不退化为宽前缀）
+        query_prefixes = accounts.codes_of("gross")
         if not query_prefixes:
+            result["tb_source_codes"] = accounts.as_dict()
             return result
 
         conditions = []
@@ -110,6 +124,10 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict:
             }
 
         source_codes = accounts.as_dict()
+        # 审定表「从四表库带入未审数」统一载荷（逐叶子明细，归类在前端做）
+        result["adjudication_prefill"] = build_g_adjudication_prefill(
+            "G14", accounts, all_rows
+        )
         source_codes["gross"] = [r.account_code for r in filtered_leaves]
         if parent_check:
             source_codes["parent_check"] = parent_check
@@ -200,5 +218,7 @@ async def render(ctx: RenderContext) -> dict | None:
         "adjudicated_amount": adjudicated_amount,
         "tb_values": tb_values,
         "tb_source_codes": tb_source_codes,
+        # 审定表「从四表库带入未审数」（逐叶子明细；空 dict = 四表库无该科目数据）
+        "adjudication_prefill": tb_data["adjudication_prefill"],
         "sheets": G14_SHEETS,
     }

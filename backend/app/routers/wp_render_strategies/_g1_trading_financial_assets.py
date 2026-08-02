@@ -15,9 +15,16 @@ G1-1 审定表三大部分：
   1. 从 report_config 解析 BS-003 → 标准码 1101
   2. account_mapping 反解 → 原始码前缀集
   3. tb_balance 按前缀取叶子科目（select_leaves + filter_by_prefixes）
-  4. 叶子按名称分类到 stock/fund/bond/derivative/other（classify_g1_leaf）
-  5. 聚合出 adjudication_prefill 供审定表 seed
-  6. 输出 tb_source_codes 供溯源面板
+  4. 叶子按名称分类到 stock/fund/bond/derivative/other（classify_g1_leaf），供 by_category
+  5. 输出 tb_source_codes 供溯源面板
+  6. 输出 adjudication_prefill 供 G1-1「从四表库带入未审数」
+
+🔴 `adjudication_prefill` **不做桶预聚合**：G1-1 的行维度是
+``(投资成本 / 累计公允价值变动) × (交易性 / 划分为 / 指定为) × 7 品种``，
+其中「分类」是会计判断、四表里没有，「品种」的客户叶子名多为银行户名/部门
+（`classify_g1_leaf` 全归 `other` 是设计如此，品种靠 G1-2 明细 SUMIF 回流）。
+故统一由 `four_table/g_cycle_adjudication_prefill` 下发**逐叶子明细**，
+归类与「待归类」交前端 `gCycleAdjudicationSeed.ts` 处理。
 
 交易性金融资产不计提减值准备（以公允价值计量，变动计入当期损益），故无 provision。
 """
@@ -31,6 +38,7 @@ import sqlalchemy as sa
 from app.models.audit_platform_models import TbBalance
 from app.services.dataset_query import get_active_filter
 from app.services.four_table import (
+    build_g_adjudication_prefill,
     LeafRow,
     ReportLineAccountSpec,
     aggregate_leaves,
@@ -118,36 +126,6 @@ def classify_g1_leaf(name: str, code: str) -> str:
             break
     return "other"
 
-
-def build_g1_adjudication_prefill(
-    leaves: list[LeafRow],
-) -> dict:
-    """从 1101 叶子科目构建 G1-1 审定表分行预填。
-
-    输出形态（键名对齐 G1_INVEST_TYPES.rowKey）：
-    {
-      "stock": {"opening": ..., "closing": ..., "codes": [...], "names": [...]},
-      "fund": {...},
-      ...
-    }
-    无叶子时返回 {}（宁缺勿造）。
-    """
-    if not leaves:
-        return {}
-
-    buckets: dict[str, dict] = {}
-    for leaf in leaves:
-        cat = classify_g1_leaf(leaf.account_name, leaf.account_code)
-        if cat not in buckets:
-            buckets[cat] = {"opening": 0.0, "closing": 0.0, "codes": [], "names": []}
-        buckets[cat]["opening"] += leaf.opening
-        buckets[cat]["closing"] += leaf.closing
-        buckets[cat]["codes"].append(leaf.account_code)
-        if leaf.account_name and leaf.account_name not in buckets[cat]["names"]:
-            buckets[cat]["names"].append(leaf.account_name)
-
-    # 只输出有值的桶（宁缺勿造）
-    return {k: v for k, v in buckets.items() if v["opening"] != 0 or v["closing"] != 0}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -237,10 +215,13 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict:
             })
 
         # Step 6: 构建预填
-        adjudication_prefill = build_g1_adjudication_prefill(filtered_leaves)
 
         # Step 7: 溯源
         source_codes = accounts.as_dict()
+        # 审定表「从四表库带入未审数」统一载荷（逐叶子明细，归类在前端做）
+        result["adjudication_prefill"] = build_g_adjudication_prefill(
+            "G1", accounts, all_rows
+        )
         source_codes["gross"] = [r.account_code for r in filtered_leaves]
         if parent_check:
             source_codes["parent_check"] = parent_check
@@ -251,7 +232,6 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict:
             "by_category": by_category,
         }
         result["tb_source_codes"] = source_codes
-        result["adjudication_prefill"] = adjudication_prefill
 
     except Exception as e:  # noqa: BLE001 — 取数失败降级为空，前端允许手填
         logger.warning("G1 TB fetch failed: %s", e)
@@ -346,7 +326,6 @@ async def render(ctx: RenderContext) -> dict | None:
     tb_data = await _fetch_tb_data(ctx)
     tb_values = tb_data["tb_values"]
     tb_source_codes = tb_data["tb_source_codes"]
-    adjudication_prefill = tb_data["adjudication_prefill"]
 
     # 溯源信息注入 project_context
     project_context["tb_source_codes"] = tb_source_codes
@@ -363,7 +342,7 @@ async def render(ctx: RenderContext) -> dict | None:
         # G1-1 审定表试算表列只读 seed（四表共享件取数）
         "tb_values": tb_values,
         # 审定表分行预填（按叶子科目名称归类到投资品种）
-        "adjudication_prefill": adjudication_prefill,
+        "adjudication_prefill": tb_data["adjudication_prefill"],
         # 取数溯源（前端 WpFourTableSourcePanel 消费）
         "tb_source_codes": tb_source_codes,
         # 审定数回读 seed（EventBus 持久化后刷新不丢失）

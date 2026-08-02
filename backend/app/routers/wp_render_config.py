@@ -185,6 +185,7 @@ _CONFIRMATION_COMPONENTS: set[str] = {
     "confirmation-alternative-k06",
     "confirmation-reliability",
     "confirmation-fraud-risk",
+    "confirmation-wealth-list",
 }
 
 # ─── OnlyOffice HTML 白名单：这些 componentType 即使无 renderer 也继续走 grid 兜底，

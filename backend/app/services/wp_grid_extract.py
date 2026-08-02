@@ -370,6 +370,98 @@ def extract_grid(file_path: str | Path, sheet_name: str) -> dict:
         wb.close()
 
 
+#: 编制信息行的标签关键词。判据不是「整行文本包含关键词」，而是「某格以关键词开头
+#: 且后面还有分隔符/取值」——见 :func:`_looks_like_prep_label` 的说明。
+#:
+#: 🔴 这份清单**必须与改造前的子串关键词逐字相同、不得扩充**。新判据因此是旧判据的
+#: 真子集（格以关键词开头 ⇒ 整行必含该关键词），从而结构性地保证「只可能少删行，
+#: 绝不多删」。实测扩充过 ``页次/索引号/会计期间/复核日`` 后，2722 张 sheet 里有
+#: 83 张反而多删 1~3 行（``底稿目录`` / ``A3 合并报表试算`` 等），已回退。
+_PREP_LABEL_KEYWORDS = (
+    "致同",
+    "被审计单位",
+    "编制人",
+    "编制日",
+    "截止日",
+    "复核人",
+)
+
+
+def _looks_like_prep_label(text: str) -> bool:
+    """单个格子是否是「编制信息标签」（如 ``截止日：202X年12月31日`` / ``被审计单位：``）。
+
+    两个条件同时满足才算：
+
+    1. 以 :data:`_PREP_LABEL_KEYWORDS` 之一**开头**（不是「包含」）——
+       故列头 ``报表截止日`` 不算（关键词不在开头），数据行里描述性长文本
+       ``…被审计单位的风险评估流程…`` 也不算。
+    2. 关键词之后仍有内容（``：``/``:``/空格+取值）——故裸列头 ``索引号``
+       不算（关键词后为空）。
+
+    这两条是修掉「列头行被当成编制信息行删掉」的关键（2026-08-02）：
+    旧实现按整行子串命中，``报表截止日``（含「截止日」）会让 E0-3~E0-6
+    四张发函记录表的列头行连同上方全部被裁掉，前端只剩无表头空网格。
+    """
+    t = (text or "").strip()
+    if not t:
+        return False
+    for kw in _PREP_LABEL_KEYWORDS:
+        if t.startswith(kw):
+            rest = t[len(kw):].strip()
+            if rest:
+                return True
+            # 「被审计单位：」这类只有标签没有取值的形态：原文以分隔符结尾即算
+            if t[len(kw):] and t[len(kw):][0] in ("：", ":"):
+                return True
+    return False
+
+
+def _looks_like_field_label(text: str) -> bool:
+    """单个格子是否是「短标签：取值」形态（不限关键词）。
+
+    编制信息行整行都是这种形态（``客户名称：`` / ``会计期间：202X年度`` /
+    ``复核日期：2025.X.X`` / ``索引：A1-13-1`` / ``页次：1``），但关键词表只覆盖
+    其中几个，故需要这个通用形态一起投票。
+
+    三重约束把内容格排除在外：无换行 + 全长 ≤30 + 冒号出现在第 1~12 字符。
+    反例（必须判 False）：``审计报告：致同审字（2021）第310A0001号；\\n专项报告：…``
+    ——A1-11「文号规则」的数据格，带换行且很长，早期实现漏了这两条约束时
+    该表的数据行会被重新误删。
+    """
+    t = (text or "").strip()
+    if not t or "\n" in t or len(t) > 30:
+        return False
+    for sep in ("：", ":"):
+        idx = t.find(sep)
+        if 1 <= idx <= 12:
+            return True
+    return False
+
+
+def _is_prep_info_row(texts: list[str]) -> bool:
+    """整行是否是编制信息行（而不是列头行 / 数据行）。
+
+    两条同时成立：
+
+    1. **至少一格**是关键词锚定的编制信息标签（:func:`_looks_like_prep_label`）
+       —— 这一条保证本判据是旧子串判据的子集（见 :data:`_PREP_LABEL_KEYWORDS`）。
+    2. 「关键词标签 ∪ 短标签形态」的格数**过半**。
+
+    过半票是必要的 —— ``核实被函证单位信息E0-2`` 的列头行里有一格叫
+    ``被审计单位提供的被函证单位信息及核对（…）``，单看那一格会误判成标签，
+    但它在 6 个列头里只占 1 个；``B50-2 财务报表层次风险`` 的数据行同理
+    （首格是 ``被审计单位的风险评估流程未识别出…``）。
+    """
+    if not texts:
+        return False
+    if not any(_looks_like_prep_label(t) for t in texts):
+        return False
+    labelish = sum(
+        1 for t in texts if _looks_like_prep_label(t) or _looks_like_field_label(t)
+    )
+    return labelish * 2 >= len(texts)
+
+
 def strip_standard_header(grid: dict) -> dict:
     """裁剪致同标准表头行（事务所名/表名/编制信息行）。
 
@@ -381,7 +473,10 @@ def strip_standard_header(grid: dict) -> dict:
       (可能还有空行)
 
     这些信息已由平台 GtWpPreparationHeader 组件显示，grid 中无需重复。
-    自动检测含特征关键词的最大行号，删除其及之前的所有行并重编坐标。
+    自动检测**编制信息行**的最大行号，删除其及之前的所有行并重编坐标。
+
+    列头行永不被裁剪：判定走 :func:`_is_prep_info_row`（过半格为编制信息标签），
+    不再用「整行包含关键词」的子串命中。
     """
     import re
 
@@ -392,16 +487,15 @@ def strip_standard_header(grid: dict) -> dict:
     max_col = grid.get("max_col", 0)
     max_row = grid.get("max_row", 0)
 
-    # 检测表头结束行——只有明确的编制信息行才裁剪
-    # "索引号"可能是数据列标题，不作为表头判据
-    _HEADER_KEYWORDS = ("致同", "被审计单位", "编制人", "编制日", "截止日", "复核人")
     skip = 0
     for r in range(1, min(8, max_row + 1)):
-        row_text = " ".join(
-            str(cells.get(f"{chr(64 + c)}{r}", {}).get("v", ""))
-            for c in range(1, min(15, max_col + 1))
-        ).lower()
-        if any(kw in row_text for kw in _HEADER_KEYWORDS):
+        texts = []
+        for c in range(1, min(15, max_col + 1)):
+            v = cells.get(f"{_col_letter(c)}{r}", {}).get("v", "")
+            s = str(v).strip() if v is not None else ""
+            if s:
+                texts.append(s)
+        if _is_prep_info_row(texts):
             skip = r
 
     if skip == 0:

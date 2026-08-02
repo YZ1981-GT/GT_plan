@@ -16,6 +16,7 @@ import sqlalchemy as sa
 from app.models.audit_platform_models import TbBalance
 from app.services.dataset_query import get_active_filter
 from app.services.four_table import (
+    build_g_adjudication_prefill,
     LeafRow,
     ReportLineAccountSpec,
     aggregate_leaves,
@@ -113,11 +114,15 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict:
             }
 
         source_codes = accounts.as_dict()
+        # 审定表「从四表库带入未审数」统一载荷（逐叶子明细，归类在前端做）
+        result["adjudication_prefill"] = build_g_adjudication_prefill(
+            "G12", accounts, all_rows
+        )
         source_codes["gross"] = [r.account_code for r in filtered_leaves]
         if parent_check:
             source_codes["parent_check"] = parent_check
 
-        # 损益类取数：debit_amount（发生额）
+        # 损益类取数：本期发生额（收益类正方向 = 贷方；见 g_cycle_specs.G_PL_POSITIVE_SIDE）
         result["tb_values"] = {
             "opening": agg["opening"],
             "closing": agg["closing"],
@@ -203,5 +208,7 @@ async def render(ctx: RenderContext) -> dict | None:
         "adjudicated_amount": adjudicated_amount,
         "tb_values": tb_values,
         "tb_source_codes": tb_source_codes,
+        # 审定表「从四表库带入未审数」（逐叶子明细；空 dict = 四表库无该科目数据）
+        "adjudication_prefill": tb_data["adjudication_prefill"],
         "sheets": G12_SHEETS,
     }

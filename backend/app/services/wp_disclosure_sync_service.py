@@ -11,10 +11,11 @@ from __future__ import annotations
 
 import json
 import logging
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, Mapping
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -29,6 +30,15 @@ from app.models.report_models import (
 )
 from app.services.conflict_resolution_service import (
     _check_manual_override_before_propagate,
+)
+from app.services.note_shared_table_segments import (
+    SEG_KEY,
+    find_segment,
+    find_stamped_window,
+    has_discontiguous_stamp,
+    resolve_template_variant,
+    stamp_baseline_rows,
+    template_rows,
 )
 from app.services.note_sub_table_projector import normalize_sub_table_data
 from app.services.standard_unification_service import (
@@ -162,6 +172,301 @@ def _drop_removed_tables(
         if removed_any:
             dropped.append(key)
     return dropped
+
+
+#: 行级合并的元数据键（随 ``sub_table_data`` 走，不改 request schema）
+ROW_SCOPE_KEY = "_row_scope"
+
+
+@dataclass(frozen=True)
+class RowScope:
+    """载荷声明的「本次只负责这张表的这一段」。
+
+    ``owner_row_code`` 是模板段首行的 ``report_row_code``（如货币资金段 = ``BS-002``）。
+    """
+
+    table_name: str
+    owner_row_code: str
+
+
+def _extract_row_scope(
+    sub_table_data: dict[str, Any] | None,
+) -> tuple[dict[str, Any], dict[str, RowScope]]:
+    """分离表格数据与行级合并声明 ``_row_scope``（对称 :func:`_extract_removed_table_keys`）。
+
+    形态::
+
+        {"_row_scope": {"外币货币性项目": {"owner_row_code": "BS-002"}}}
+
+    非法形态（整体非 dict / 单条非 dict / 缺 ``owner_row_code`` / 表名以 ``_`` 开头）
+    一律**丢弃该条声明 + warning** → 该表退回既有的表级覆盖语义（声明无效 ≠ 共享表，
+    退回原语义是既有行为，不引入新风险）。
+
+    spec: disclosure-note-row-level-merge Requirements 1.1 / 1.4
+    """
+    data = dict(sub_table_data or {})
+    raw = data.pop(ROW_SCOPE_KEY, None)
+    scopes: dict[str, RowScope] = {}
+    if raw is None:
+        return data, scopes
+    if not isinstance(raw, dict):
+        logger.warning(
+            "wp_disclosure_sync: %s 形态非法（期望对象，实为 %s）→ 忽略",
+            ROW_SCOPE_KEY, type(raw).__name__,
+        )
+        return data, scopes
+    for table_name, spec in raw.items():
+        name = str(table_name or "").strip()
+        if not name or name.startswith("_"):
+            logger.warning("wp_disclosure_sync: %s 表名非法 %r → 忽略", ROW_SCOPE_KEY, table_name)
+            continue
+        owner = ""
+        if isinstance(spec, Mapping):
+            owner = str(spec.get("owner_row_code") or "").strip()
+        if not owner:
+            logger.warning(
+                "wp_disclosure_sync: %s['%s'] 缺 owner_row_code → 忽略（退回表级覆盖）",
+                ROW_SCOPE_KEY, name,
+            )
+            continue
+        scopes[name] = RowScope(table_name=name, owner_row_code=owner)
+    return data, scopes
+
+
+def _merge_rows_by_scope(
+    existing_rows: list[Any] | None,
+    incoming_rows: list[Any],
+    *,
+    scope: RowScope,
+    variant: str | None,
+    section_number: str,
+) -> tuple[list[Any], str | None]:
+    """段内整段替换、**段外原样保留**。
+
+    Returns:
+        ``(merged_rows, error)``。``error`` 非空表示段边界解析失败 → 调用方
+        **跳过该表写入**（fail closed，Requirement 2.2），绝不回退整表覆盖
+        —— 回退会静默清掉他循环已录的段。
+
+    基线选择（Requirement 4）：
+      - ``existing_rows`` 非空 → 用它（不回退模板，否则抹掉他人已录数据）
+      - 为空 → 用模板骨架（``stamp_baseline_rows``），使他段在附注里仍有标签可见
+
+    段窗口定位：
+      - 基线里有 ``_seg == owner_row_code`` 的连续段 → 用它（Requirement 3.4）
+      - 否则（首次 / 历史数据无戳）→ 用模板下标并按基线长度裁剪（Requirement 4.3）
+
+    ``incoming_rows`` 为空 → 段恢复模板骨架（Requirement 3.6），**不是删段**。
+    """
+    owner = scope.owner_row_code
+    baseline: list[Any] = [
+        dict(r) if isinstance(r, Mapping) else r for r in (existing_rows or [])
+    ]
+
+    if not variant:
+        return baseline, "variant_unresolved"
+    tpl = template_rows(variant, section_number, scope.table_name)
+    if tpl is None:
+        return baseline, "template_table_not_found"
+    tpl_seg = find_segment(tpl, owner)
+    if tpl_seg is None:
+        return baseline, "owner_row_code_not_in_template"
+
+    baseline_source = "existing"
+    if not baseline:
+        baseline = stamp_baseline_rows(tpl)
+        baseline_source = "template"
+
+    stamped = find_stamped_window(baseline, owner)
+    if stamped is not None:
+        start, end = stamped
+        window_source = "stamp"
+        if has_discontiguous_stamp(baseline, owner):
+            logger.warning(
+                "wp_disclosure_sync: 段 %s 在 section=%s table=%s 的落库行里不连续 → "
+                "只替换首个连续区间 [%d,%d)（脏数据，另需 data-hygiene）",
+                owner, section_number, scope.table_name, start, end,
+            )
+    else:
+        # 🔴 用 `data_end` 而非 `end`：段尾的表级汇总行（合计/小计）**不属于本段**，
+        # 否则 owner 一推数据就把合计行删掉（实测 13 个段的尾部挂着这类行）。
+        start = min(tpl_seg.start, len(baseline))
+        end = max(start, min(tpl_seg.data_end, len(baseline)))
+        window_source = "template_index"
+
+    if incoming_rows:
+        seg_rows: list[Any] = [
+            {**dict(r), SEG_KEY: owner} for r in incoming_rows if isinstance(r, Mapping)
+        ]
+    else:
+        # 空推送 → 段恢复模板骨架（标签留、数值空），段不消失；同样只到 data_end
+        seg_rows = stamp_baseline_rows(tpl)[tpl_seg.start:tpl_seg.data_end]
+
+    merged = list(baseline[:start]) + seg_rows + list(baseline[end:])
+    logger.info(
+        "wp_disclosure_sync: row-level merge section=%s table=%s owner=%s "
+        "window=[%d,%d) window_source=%s baseline=%s rows_in=%d rows_out=%d total=%d",
+        section_number, scope.table_name, owner, start, end, window_source,
+        baseline_source, len(incoming_rows or []), len(seg_rows), len(merged),
+    )
+    return merged, None
+
+
+def _apply_row_scoped_merge(
+    merged_sub: dict[str, Any],
+    clean_sub_table_data: dict[str, Any],
+    row_scopes: dict[str, RowScope],
+    *,
+    variant: str | None,
+    section_number: str,
+    baselines: dict[str, Any],
+) -> tuple[list[str], list[str]]:
+    """把行级合并套进表级合并结果（原地修改 ``merged_sub``）。
+
+    未声明 ``_row_scope`` 的表**一行都不改**（Property 1 零回归的支点）。
+
+    Args:
+        merged_sub: 表级合并结果（scoped 表的值会被本函数改写）。
+        clean_sub_table_data: 本次推送（提供 incoming 行）。
+        baselines: **落库既有**子表（提供 baseline 行）。🔴 不能用 ``merged_sub``
+            当基线 —— 调用方已把 incoming 写进去了，那样基线就是 incoming 本身。
+
+    Returns:
+        ``(row_scoped_tables, row_scope_unresolved)``
+    """
+    scoped: list[str] = []
+    unresolved: list[str] = []
+    for key, scope in row_scopes.items():
+        if key not in clean_sub_table_data:
+            continue  # 孤立声明已在调用方剔除；双保险
+        incoming = clean_sub_table_data.get(key)
+        prev = baselines.get(key)
+        merged_rows, err = _merge_rows_by_scope(
+            prev if isinstance(prev, list) else None,
+            incoming if isinstance(incoming, list) else [],
+            scope=scope,
+            variant=variant,
+            section_number=section_number,
+        )
+        if err:
+            unresolved.append(key)
+            logger.warning(
+                "wp_disclosure_sync: 行级合并失败 section=%s table=%s owner=%s reason=%s "
+                "→ 跳过该表写入（fail closed）",
+                section_number, key, scope.owner_row_code, err,
+            )
+            # fail closed：既有数据原样保留；本来没有该表就不要凭空创建
+            if isinstance(prev, list):
+                merged_sub[key] = prev
+            else:
+                merged_sub.pop(key, None)
+            continue
+        merged_sub[key] = merged_rows
+        scoped.append(key)
+    return scoped, unresolved
+
+
+#: 显式删除叙述段的元数据键（对称 ``_removed_table_keys``）
+REMOVED_TEXT_SECTIONS_KEY = "_removed_text_sections"
+
+
+def _extract_removed_text_sections(
+    sub_table_data: dict[str, Any] | None,
+) -> tuple[dict[str, Any], list[str]]:
+    """分离表格数据与「待删除叙述段」``_removed_text_sections``。
+
+    `_note_texts` 改为按 ``section`` 浅合并后，底稿删掉某段说明不再自动消失
+    → 需要与 ``_removed_table_keys`` 同款的显式删除语义。
+    """
+    data = dict(sub_table_data or {})
+    raw = data.pop(REMOVED_TEXT_SECTIONS_KEY, None)
+    keys: list[str] = []
+    if isinstance(raw, (list, tuple, set)):
+        for item in raw:
+            # 只认字符串：`str(None)` == "None" 会造出一个假 section 名
+            if not isinstance(item, str):
+                continue
+            name = item.strip()
+            if name and name not in keys:
+                keys.append(name)
+    return data, keys
+
+
+def _note_text_key(item: Any) -> str:
+    """叙述段的合并键：``section`` 优先，退 ``title``。两者皆空 → ``""``。"""
+    if not isinstance(item, Mapping):
+        return ""
+    return str(item.get("section") or item.get("title") or "").strip()
+
+
+#: 无 `section`/`title` 段的位置化占位键前缀（不可能与真实 section 名冲突）
+_ANON_TEXT_KEY = "\x00anon"
+
+
+def _note_text_merge_keys(items: list[Any]) -> list[str]:
+    """逐条算合并键；无键段退化为「第 n 条无键段」的**位置化**占位键。
+
+    位置化是必须的：存量有循环推 ``[{"text": "…"}]``（无 section 也无 title，F4 范式）。
+    若把无键段一律「原样保留 + 追加」，每次同步都会多攒一条 → 附注正文无限膨胀。
+    """
+    out: list[str] = []
+    anon = 0
+    for item in items:
+        key = _note_text_key(item)
+        if not key:
+            key = f"{_ANON_TEXT_KEY}{anon}"
+            anon += 1
+        out.append(key)
+    return out
+
+
+def _merge_note_texts(
+    existing: list[Any] | None,
+    incoming: list[Any] | None,
+    removed_sections: Any = (),
+) -> list[dict[str, Any]]:
+    """按 ``section`` 键浅合并叙述段（Requirement 5.1 / 5.3 / 5.5）。
+
+    - 同 ``section`` → incoming 覆盖
+    - 未推送的 ``section`` → **保留**（多循环共章节时不再被他人整体覆盖）
+    - ``removed_sections`` 里的 ``section`` → 删除；**推送优先**（本次推了就不删）
+    - 段序稳定：既有顺序在前、新 section 追加在后（``text_content`` 重排不跳动）
+
+    🔴 零回归论证：单 owner 场景下既有键集 ⊆ 推送键集 → 合并结果 ≡ 整替换。
+    """
+    inc = [i for i in (incoming or []) if isinstance(i, Mapping)]
+    exist = [e for e in (existing or []) if isinstance(e, Mapping)]
+    inc_keys = _note_text_merge_keys(inc)
+    exist_keys = _note_text_merge_keys(exist)
+    pushed_keys = set(inc_keys)
+    removed = {
+        str(s).strip()
+        for s in (removed_sections or ())
+        if str(s).strip() and str(s).strip() not in pushed_keys
+    }
+    inc_by_key: dict[str, Any] = {}
+    for key, item in zip(inc_keys, inc):
+        inc_by_key[key] = item  # 同键重复 → 取最后一条
+
+    out: list[dict[str, Any]] = []
+    used: set[str] = set()
+    # ① 既有顺序在前（被推送的**原位**替换、被删的丢弃、其余原样保留）
+    for key, item in zip(exist_keys, exist):
+        if not key.startswith(_ANON_TEXT_KEY) and key in removed:
+            continue
+        if key in inc_by_key:
+            if key in used:
+                continue  # 既有重复键只保留首个位置
+            out.append(dict(inc_by_key[key]))
+            used.add(key)
+            continue
+        out.append(dict(item))
+    # ② 新 section 追加在后（保持载荷内顺序）
+    for key, item in zip(inc_keys, inc):
+        if key not in used:
+            out.append(dict(item))
+            used.add(key)
+    return out
 
 
 def _format_note_texts(note_texts: list[dict[str, Any]]) -> str:
@@ -434,11 +739,21 @@ async def sync_from_workpaper(
     now = datetime.now(timezone.utc)
     clean_sub_table_data, note_texts = _extract_note_texts(sub_table_data)
     clean_sub_table_data, removed_table_keys = _extract_removed_table_keys(clean_sub_table_data)
+    clean_sub_table_data, removed_text_sections = _extract_removed_text_sections(
+        clean_sub_table_data
+    )
+    # 行级合并声明（多段共享表）：不声明就一行不改，走原表级覆盖路径
+    clean_sub_table_data, row_scopes = _extract_row_scope(clean_sub_table_data)
+    for _orphan in [k for k in row_scopes if k not in clean_sub_table_data]:
+        logger.warning(
+            "wp_disclosure_sync: %s['%s'] 声明的表不在本次推送里 → 忽略该条声明",
+            ROW_SCOPE_KEY, _orphan,
+        )
+        row_scopes.pop(_orphan, None)
     # 入库前归一为 {key: list[dict]} 规范形态：拒绝表对象包装 / 位置化 values 行
     # 落库（否则投影器读时取不出业务键 → 附注整表丢失）。
     clean_sub_table_data = normalize_sub_table_data(clean_sub_table_data, sub_table_columns)
     rows_synced = _count_rows_synced(clean_sub_table_data)
-    formatted_texts = _format_note_texts(note_texts)
 
     # ─── 查现有记录 ───────────────────────────────────────────────────
     stmt = sa.select(DisclosureNote).where(
@@ -481,12 +796,32 @@ async def sync_from_workpaper(
     new_table_data: dict[str, Any] = dict(note.table_data) if note and note.table_data else {}
     existing_sub = new_table_data.get("sub_table_data")
     existing_sub = existing_sub if isinstance(existing_sub, dict) else {}
+    # 段边界必须按变体查模板：🔴 禁止按章节号推导（20 个章节号两份模板都有、13 个标题不同）
+    row_scope_variant = (
+        resolve_template_variant(
+            current_standard, note.source_template if note is not None else None
+        )
+        if row_scopes
+        else None
+    )
+    row_scoped_tables: list[str] = []
+    row_scope_unresolved: list[str] = []
     if clean_sub_table_data:
         # 浅合并：保留未推送的既有子表，同名 key 覆盖。
         # 显式推送 ``{table_key: []}`` 表示该表"空行"有效状态（区别于删除），照常覆盖。
         merged_sub = dict(existing_sub)
         for key, rows in clean_sub_table_data.items():
             merged_sub[key] = rows
+        # ★ 行级合并（多段共享表）：只对声明了 `_row_scope` 的表生效
+        if row_scopes:
+            row_scoped_tables, row_scope_unresolved = _apply_row_scoped_merge(
+                merged_sub,
+                clean_sub_table_data,
+                row_scopes,
+                variant=row_scope_variant,
+                section_number=section_id,
+                baselines=existing_sub,
+            )
         new_table_data["sub_table_data"] = merged_sub
     else:
         # 空载荷 no-op：绝不清空既有子表（表格丢失主因修复）。
@@ -530,8 +865,21 @@ async def sync_from_workpaper(
     new_table_data["_last_sync_wp_id"] = str(wp_id)
     new_table_data["_last_sync_sheet"] = sheet_name
     new_table_data["_last_sync_at"] = now.isoformat()
-    if note_texts:
-        new_table_data["_note_texts"] = note_texts
+
+    # ── 叙述段按 `section` 浅合并（原实现是整列表替换）──────────────────────
+    #   多循环共用同一附注章节时（G2/G3/K1 共用 五、8/八、9），整替换会让
+    #   K1 录的 10 段说明被 G2 的一段整体覆盖。删除走显式 `_removed_text_sections`。
+    existing_note_texts = new_table_data.get("_note_texts")
+    merged_note_texts = _merge_note_texts(
+        existing_note_texts if isinstance(existing_note_texts, list) else [],
+        note_texts,
+        removed_text_sections,
+    )
+    if merged_note_texts:
+        new_table_data["_note_texts"] = merged_note_texts
+    else:
+        new_table_data.pop("_note_texts", None)
+    formatted_texts = _format_note_texts(merged_note_texts)
 
     content_type = ContentType.table
     if formatted_texts or (note and note.content_type == ContentType.mixed):
@@ -620,16 +968,24 @@ async def sync_from_workpaper(
                     "created": False,
                     "blocked_by_manual_override": True,
                     "texts_synced": 0,
+                    # 被守卫拦下 → 一行都没写，行级合并同样未发生
+                    "row_scoped_tables": [],
+                    "row_scope_unresolved": [],
                 }
             # decision in ('auto_resolved', 'allow') → 继续走更新分支
         note.table_data = new_table_data
         note.content_type = content_type
         if formatted_texts:
             note.text_content = formatted_texts
-        else:
-            # 披露底稿未推送叙述（_note_texts 缺失或空）→ 清空残留文本（如旧 AI 草稿），
-            # 使 text_content 完全由披露底稿联动驱动，预设为空。
+        elif note_texts or removed_text_sections:
+            # 本次**确实**推了叙述（或显式删段）而合并后为空（全被删 / 文本全空）
+            # → 如实清空，保持 text_content 由底稿联动驱动
             note.text_content = None
+        else:
+            # 🔴 本次未推送叙述 → **保留既有**（Requirement 5.2）。
+            #   原实现无条件置 None：多循环共章节时会清掉他循环刚推的说明，
+            #   也会清掉审计师在附注模块 AI 填充/手工编辑的正文。
+            pass
         note.last_sync_source = "workpaper"
         note.last_sync_wp_id = wp_id
         note.last_sync_at = now
@@ -655,6 +1011,11 @@ async def sync_from_workpaper(
         "revived": revived,
         "blocked_by_manual_override": blocked_by_manual_override,
         "texts_synced": len(note_texts),
+        # additive（行级合并）：本次走行级合并的表 / 段边界解析失败被跳过的表。
+        # `row_scope_unresolved` 必须进返回值而非只进日志 —— fail closed 是静默跳过，
+        # 前端据此提示审计师「这张表没同步成功」，否则又是一个 dead path。
+        "row_scoped_tables": row_scoped_tables,
+        "row_scope_unresolved": row_scope_unresolved,
     }
 
 
@@ -763,8 +1124,15 @@ class WpDisclosureSyncService:
             ConflictError: 附注侧有更新的手动编辑
         """
         now = datetime.now(timezone.utc)
-        # 先剥离元数据键（`_removed_table_keys`），保证新建/更新两条分支入库形态一致
+        # 先剥离元数据键（`_removed_table_keys` / `_row_scope`），保证新建/更新两条分支入库形态一致
         incoming_raw, html_removed_keys = _extract_removed_table_keys(sub_table_data)
+        incoming_raw, html_row_scopes = _extract_row_scope(incoming_raw)
+        for _orphan in [k for k in html_row_scopes if k not in incoming_raw]:
+            logger.warning(
+                "sync_from_html: %s['%s'] 声明的表不在本次推送里 → 忽略该条声明",
+                ROW_SCOPE_KEY, _orphan,
+            )
+            html_row_scopes.pop(_orphan, None)
 
         # 1. 查映射：通过 sheet_name 推导 section_id
         mapping = await self._get_section_mapping(db, wp_id, sheet_name)
@@ -802,6 +1170,17 @@ class WpDisclosureSyncService:
 
         if note is None:
             # 无现有记录 → 新建（标题/科目名优先查附注模板，避免用章节号当标题）
+            if html_row_scopes:
+                # 新建分支拿不到变体（无 `_current_standard` / 无 `source_template`）→
+                # 无法定位段窗口。此时附注里**没有任何他人数据**，表级写入不会污染谁，
+                # 故按现状整表写入，仅记 warning：他段骨架本次不会预置
+                # （下一次同步走更新分支即会补齐）。行级合并的实际消费者
+                # （E1 等）走 `sync_from_workpaper`，不经本分支。
+                logger.warning(
+                    "sync_from_html: 新建章节 %s 声明了 %s 但无变体可解析 → "
+                    "本次按整表写入，他段骨架不预置：%s",
+                    section_id, ROW_SCOPE_KEY, sorted(html_row_scopes),
+                )
             html_title, html_account = _resolve_section_meta(section_id, None)
             note = DisclosureNote(
                 project_id=project_id,
@@ -859,8 +1238,28 @@ class WpDisclosureSyncService:
         existing_table_data = dict(note.table_data) if note.table_data else {}
         # 该入口的 sub_table_data 未做逐值类型约束（dict），归一后再落库
         incoming_sub = normalize_sub_table_data(incoming_raw, sub_table_columns)
+        html_row_scoped: list[str] = []
+        html_row_scope_unresolved: list[str] = []
         if incoming_sub:
-            existing_table_data["sub_table_data"] = incoming_sub
+            merged_html_sub = dict(incoming_sub)
+            if html_row_scopes:
+                prev_sub_for_scope = existing_table_data.get("sub_table_data")
+                prev_sub_for_scope = (
+                    prev_sub_for_scope if isinstance(prev_sub_for_scope, dict) else {}
+                )
+                # 该入口无 `current_standard` 形参 → 变体取落库元数据，再退 source_template
+                html_variant = resolve_template_variant(
+                    existing_table_data.get("_current_standard"), note.source_template
+                )
+                html_row_scoped, html_row_scope_unresolved = _apply_row_scoped_merge(
+                    merged_html_sub,
+                    incoming_sub,
+                    html_row_scopes,
+                    variant=html_variant,
+                    section_number=section_id,
+                    baselines=prev_sub_for_scope,
+                )
+            existing_table_data["sub_table_data"] = merged_html_sub
         else:
             # 空载荷 no-op：绝不清空既有子表（与 sync_from_workpaper 同款防护）。
             prev_sub = existing_table_data.get("sub_table_data")
@@ -913,6 +1312,9 @@ class WpDisclosureSyncService:
             "section_id": section_id,
             "synced_at": now.isoformat(),
             "created": False,
+            # additive（行级合并）：与 `sync_from_workpaper` 同名同义
+            "row_scoped_tables": html_row_scoped,
+            "row_scope_unresolved": html_row_scope_unresolved,
         }
 
     async def _get_section_mapping(

@@ -20,6 +20,9 @@ import logging
 
 import sqlalchemy as sa
 
+from app.services.four_table.g_cycle_specs import G4_SPEC
+from app.services.four_table.semantic_account_resolver import resolve_primary_code
+
 from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
@@ -88,11 +91,14 @@ async def render(ctx: RenderContext) -> dict | None:
     except Exception as e:  # noqa: BLE001
         logger.warning("G4 SPPI render: checklist_responses 失败: %s", e)
 
+    # 🔴 科目码由语义定位逐项目解析（原写死 "1501" = 持有至到期投资，旧准则、G6 域）。
+    account_code = await resolve_primary_code(ctx, G4_SPEC)
+
     # 项目上下文
     project_context: dict = {
         "client_name": "",
         "audit_year": "",
-        "account_code": "1501",
+        "account_code": account_code,
     }
     try:
         proj_result = await db.execute(
@@ -115,6 +121,6 @@ async def render(ctx: RenderContext) -> dict | None:
         "sheets": G4_SPPI_SHEETS,
         "project_context": project_context,
         "responses_snapshot": responses_snapshot,
-        "account_code": "1501",
+        "account_code": account_code,
         "prefix": "G4",
     }

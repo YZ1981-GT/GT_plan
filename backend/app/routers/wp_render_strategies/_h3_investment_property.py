@@ -1,8 +1,21 @@
 """H3 投资性房地产 — 专属渲染策略.
 
-科目1503投资性房地产（借方/资产类）+ 成本模式下1504累计折旧（贷方/资产备抵类）
-返回 allResponses + projectContext + TB数据(1503+1504) + measurement_model
-双计量模式(成本/公允价值)控制前端显隐
+四表取数走**语义驱动的逐项目科目定位**（`four_table/semantic_account_resolver`），
+四个槽：原值 / 累计折旧 / 累计摊销 / 减值准备。返回 allResponses + projectContext
++ tb_values + tb_source_codes + measurement_model；双计量模式(成本/公允价值)控制前端显隐。
+
+🔴 **2026-08-01 修掉的三个缺陷**（详见 `four_table/h3_account_scope` 的 docstring）：
+
+1. **取错整个科目族** —— 原 `_H3_ACCOUNT_PREFIXES` 写 ``{"1503": 原值, "1504": 累计折旧}``，
+   而 ``1503 = 可供出售金融资产``（G6 域）、``1504 = 债权投资``（G4 域）。
+   投资性房地产真实科目族是 ``1521 / 1525 / 1526 / 1527``。
+2. **缺两个槽** —— 累计摊销（土地使用权）与减值准备完全没取。
+3. **叶子判定缺点号边界** —— ``c.startswith(code)`` 会让 ``15210`` 被当成 ``1521`` 的子科目；
+   改用 `leaf_aggregation.select_leaves`（与 `trial_balance_service.recalc` 同语义）。
+
+且不再写死标准码：`account_mapping` 实证同一原始码 ``1525 投资性房地产累计折旧`` 在
+1 个项目映射到 ``1521``（并入母科目）、在 4 个项目映射到 ``1525``（独立）
+→ 按码取数在部分项目必然取空或混算。
 """
 from __future__ import annotations
 
@@ -10,18 +23,25 @@ import logging
 
 import sqlalchemy as sa
 
-from app.models.audit_platform_models import TbBalance, TrialBalance
+from app.models.audit_platform_models import TbBalance
 from app.services.dataset_query import get_active_filter
+from app.services.four_table.h3_account_scope import (
+    H3_ACCOUNT_SPEC,
+    H3_SLOT_KEY_PREFIX,
+)
+from app.services.four_table.leaf_aggregation import (
+    aggregate_leaves,
+    select_leaves,
+    to_leaf_rows,
+)
+from app.services.four_table.semantic_account_resolver import (
+    SemanticAccountResult,
+    resolve_semantic_accounts,
+)
 
 from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
-
-# 科目前缀：1503投资性房地产(借方) + 1504投资性房地产累计折旧(贷方/备抵，仅成本模式)
-_H3_ACCOUNT_PREFIXES = {
-    "1503": ("ip_unadjusted", "ip_audited"),        # 投资性房地产原值
-    "1504": ("dep_unadjusted", "dep_audited"),      # 累计折旧（成本模式）
-}
 
 H3_SHEETS = [
     {"sheet_name": "底稿目录", "component_type": "h3-investment-property"},
@@ -45,9 +65,79 @@ H3_SHEETS = [
 ]
 
 
-async def _fetch_tb_data(ctx: RenderContext) -> dict:
-    """取科目1503+1504的期初/期末余额及未审数（仅汇总叶子科目防双算）."""
-    tb: dict[str, float] = {}
+def build_h3_tb_values(
+    accounts: SemanticAccountResult,
+    tb_rows,
+    trial_rows,
+) -> dict[str, float]:
+    """按语义槽聚合四表金额。纯函数（可独立单测，无 DB）。
+
+    输出键沿用既有契约（``ip_*`` / ``dep_*``）并**新增** ``amort_*`` / ``impair_*``::
+
+        {slot_prefix}_unadjusted_opening / _closing / _debit / _credit   ← tb_balance 叶子
+        {slot_prefix}_unadjusted / {slot_prefix}_audited                 ← trial_balance
+
+    Args:
+        accounts: :func:`resolve_semantic_accounts` 的结果（逐项目定位）。
+        tb_rows: `tb_balance` 全量行（**不要预先按科目过滤** —— 叶子判定需要看到
+            全部兄弟行，否则父子双算）。
+        trial_rows: `trial_balance` 行（``standard_account_code`` / ``unadjusted_amount``
+            / ``audited_amount``）。
+
+    Returns:
+        金额字典。某槽在本项目无对应科目时该槽**不产生任何键**（而非产生 0）——
+        让前端能区分「本项目无此科目」与「余额为 0」。
+    """
+    leaves = select_leaves(to_leaf_rows(tb_rows))
+    out: dict[str, float] = {}
+
+    for slot_key, prefix in H3_SLOT_KEY_PREFIX.items():
+        slot = accounts.slots.get(slot_key)
+        if slot is None or not slot.found:
+            continue
+        agg = aggregate_leaves(leaves, slot.codes)
+        out[f"{prefix}_unadjusted_opening"] = agg["opening"]
+        out[f"{prefix}_unadjusted_closing"] = agg["closing"]
+        out[f"{prefix}_unadjusted_debit"] = agg["debit"]
+        out[f"{prefix}_unadjusted_credit"] = agg["credit"]
+
+    # trial_balance：按**标准码**精确匹配（不用 LIKE 前缀 —— 会把兄弟科目族吃进来）
+    by_code: dict[str, tuple[float, float]] = {}
+    for row in trial_rows or []:
+        get = row.get if isinstance(row, dict) else (lambda k, _r=row: getattr(_r, k, None))
+        code = str(get("standard_account_code") or "").strip()
+        if not code:
+            continue
+        prev = by_code.get(code, (0.0, 0.0))
+        by_code[code] = (
+            prev[0] + float(get("unadjusted_amount") or 0),
+            prev[1] + float(get("audited_amount") or 0),
+        )
+
+    for slot_key, prefix in H3_SLOT_KEY_PREFIX.items():
+        slot = accounts.slots.get(slot_key)
+        if slot is None or not slot.found:
+            continue
+        wanted = set(slot.standard_codes)
+        if not wanted:
+            continue
+        unadj = sum(v[0] for c, v in by_code.items() if c in wanted)
+        audited = sum(v[1] for c, v in by_code.items() if c in wanted)
+        out[f"{prefix}_unadjusted"] = unadj
+        out[f"{prefix}_audited"] = audited
+
+    return out
+
+
+async def _fetch_tb_data(ctx: RenderContext) -> tuple[dict, SemanticAccountResult]:
+    """按语义槽取投资性房地产四表数据（原值 / 累计折旧 / 累计摊销 / 减值准备）。
+
+    Returns:
+        ``(tb_values, accounts)`` —— ``accounts`` 供 render 下发 `tb_source_codes` 溯源。
+    """
+    accounts = await resolve_semantic_accounts(ctx, H3_ACCOUNT_SPEC)
+
+    tb_rows: list = []
     try:
         active_filter = await get_active_filter(
             ctx.db, TbBalance.__table__, ctx.project_id, ctx.year
@@ -55,62 +145,39 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict:
         result = await ctx.db.execute(
             sa.select(
                 TbBalance.account_code,
+                TbBalance.account_name,
                 TbBalance.opening_balance,
                 TbBalance.closing_balance,
                 TbBalance.debit_amount,
                 TbBalance.credit_amount,
+                TbBalance.closing_direction,
+                TbBalance.dataset_id,
             ).where(active_filter)
         )
-        all_rows = result.fetchall()
-
-        # 只取叶子科目防止父子双算（叶子=该code不是任何其它code的前缀）
-        all_codes = {(r.account_code or "").strip() for r in all_rows}
-        relevant_rows = []
-        for row in all_rows:
-            code = (row.account_code or "").strip()
-            is_relevant = any(code == pfx or code.startswith(pfx) for pfx in _H3_ACCOUNT_PREFIXES)
-            if not is_relevant:
-                continue
-            # 叶子判定：没有其它 code 以本 code 为前缀
-            is_leaf = not any(c != code and c.startswith(code) for c in all_codes)
-            if is_leaf:
-                relevant_rows.append(row)
-
-        for row in relevant_rows:
-            code = (row.account_code or "").strip()
-            for prefix, (unadj_key, audited_key) in _H3_ACCOUNT_PREFIXES.items():
-                if code == prefix or code.startswith(prefix):
-                    tb[f"{unadj_key}_opening"] = tb.get(f"{unadj_key}_opening", 0.0) + float(row.opening_balance or 0)
-                    tb[f"{unadj_key}_closing"] = tb.get(f"{unadj_key}_closing", 0.0) + float(row.closing_balance or 0)
-                    tb[f"{unadj_key}_debit"] = tb.get(f"{unadj_key}_debit", 0.0) + float(row.debit_amount or 0)
-                    tb[f"{unadj_key}_credit"] = tb.get(f"{unadj_key}_credit", 0.0) + float(row.credit_amount or 0)
-                    break
+        tb_rows = list(result.fetchall())
     except Exception as e:  # noqa: BLE001
         logger.warning("H3 TB balance fetch failed: %s", e)
 
-    # 从trial_balance取未审数
-    try:
-        active_filter_tb = await get_active_filter(
-            ctx.db, TrialBalance.__table__, ctx.project_id, ctx.year
-        ) if hasattr(TrialBalance, '__table__') else None
-        result = await ctx.db.execute(
-            sa.text("""
-                SELECT standard_account_code, unadjusted_amount, audited_amount
-                FROM trial_balance
-                WHERE project_id = :pid AND year = :year AND is_deleted = false
-                  AND (standard_account_code LIKE '1503%' OR standard_account_code LIKE '1504%')
-            """),
-            {"pid": str(ctx.project_id), "year": ctx.year},
-        )
-        for row in result.fetchall():
-            code = (row.standard_account_code or "").strip()
-            for prefix, (unadj_key, audited_key) in _H3_ACCOUNT_PREFIXES.items():
-                if code == prefix or code.startswith(prefix):
-                    tb[unadj_key] = tb.get(unadj_key, 0.0) + float(row.unadjusted_amount or 0)
-                    tb[audited_key] = tb.get(audited_key, 0.0) + float(row.audited_amount or 0)
-                    break
-    except Exception as e:  # noqa: BLE001
-        logger.warning("H3 trial_balance fetch failed: %s", e)
+    trial_rows: list = []
+    standard_codes = sorted(
+        {c for slot in accounts.slots.values() for c in slot.standard_codes if c}
+    )
+    if standard_codes:
+        try:
+            result = await ctx.db.execute(
+                sa.text(
+                    "SELECT standard_account_code, unadjusted_amount, audited_amount "
+                    "FROM trial_balance "
+                    "WHERE project_id = :pid AND year = :year AND is_deleted = false "
+                    "  AND standard_account_code = ANY(:codes)"
+                ),
+                {"pid": str(ctx.project_id), "year": ctx.year, "codes": standard_codes},
+            )
+            trial_rows = list(result.fetchall())
+        except Exception as e:  # noqa: BLE001
+            logger.warning("H3 trial_balance fetch failed: %s", e)
+
+    tb = build_h3_tb_values(accounts, tb_rows, trial_rows)
 
     # 从trial_balance取6051其他业务收入审定发生额（供前端租金勾稽）
     try:
@@ -129,7 +196,7 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict:
         logger.warning("H3 tb_6051 fetch failed: %s", e)
         tb["tb_6051_audited"] = None
 
-    return tb
+    return tb, accounts
 
 
 async def _load_project_context(ctx: RenderContext) -> dict:
@@ -203,18 +270,25 @@ async def render(ctx: RenderContext) -> dict | None:
     except Exception as e:  # noqa: BLE001
         logger.warning("H3 render responses load failed: %s", e)
 
-    tb_values = await _fetch_tb_data(ctx)
+    tb_values, accounts = await _fetch_tb_data(ctx)
     project_context = await _load_project_context(ctx)
     measurement_model = await _load_measurement_model(ctx)
 
     # 将 tb_6051_audited 从 tb_values 提升到 project_context（前端消费语义更清晰）
     project_context["tb_6051_audited"] = tb_values.pop("tb_6051_audited", None)
+    # 取数溯源（本项目实际命中的科目 + 报表行 + 与 report_config 的冲突）
+    project_context["tb_source_codes"] = accounts.as_dict()
 
     return {
         "component_type": "h3-investment-property",
-        "account_codes": ["1503", "1504"],
+        # 🔴 原写死 ["1503","1504"]（= 可供出售金融资产 / 债权投资，另两个循环的科目）
+        #    改为本项目实际定位到的科目码；无该科目时为空列表（宁缺勿造）
+        "account_codes": sorted(
+            {c for slot in accounts.slots.values() for c in slot.codes if c}
+        ),
         "responses_snapshot": responses_snapshot,
         "tb_values": tb_values,
+        "tb_source_codes": accounts.as_dict(),
         "project_context": project_context,
         "measurement_model": measurement_model,
         "prefix": "H3",

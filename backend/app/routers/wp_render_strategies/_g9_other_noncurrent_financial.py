@@ -2,8 +2,12 @@
 
 componentType: g9-other-noncurrent-financial
 
-科目映射链路（report_config DB 实证，四准则一致）：
-  BS-026 其他非流动金融资产 = TB('1507','期末余额')
+科目映射链路（**语义驱动、逐项目**，单一真源 `four_table/g_cycle_specs.G9_SPEC`）：
+  槽「其他非流动金融资产」→ 真值标准码 **1519**
+
+🔴 `report_config` 的 ``BS-026 = TB('1507')`` **是错码**（1507 实为「其他权益工具投资」，
+连续偏移一位）。且 `1519` 只在 4 个项目的标准科目表里 —— 另 6 个项目解析为空，
+届时 `adjudication_prefill` 返 ``{}``，前端显示「四表库暂无该科目数据」（正确行为）。
 
 G9-1 审定表：动态行（从 G9-2 明细表联动），按公允价值列示各投资项目。
 无备抵（以公允价值计量，不计提减值准备；信用减值由 G14 管理）。
@@ -18,15 +22,16 @@ import sqlalchemy as sa
 from app.models.audit_platform_models import TbBalance
 from app.services.dataset_query import get_active_filter
 from app.services.four_table import (
+    build_g_adjudication_prefill,
     LeafRow,
-    ReportLineAccountSpec,
     aggregate_leaves,
     filter_by_prefixes,
     parent_totals,
-    resolve_report_line_accounts,
+    resolve_semantic_accounts,
     select_leaves,
     to_leaf_rows,
 )
+from app.services.four_table.g_cycle_specs import G9_SPEC
 
 from ._context import RenderContext
 
@@ -36,11 +41,15 @@ logger = logging.getLogger(__name__)
 # 科目定位规格
 # ─────────────────────────────────────────────────────────────────────────────
 
-G9_ACCOUNT_SPEC = ReportLineAccountSpec(
-    row_code="BS-026",            # 其他非流动金融资产，四准则一致 TB('1507','期末余额')
-    fallback_gross=("1507",),
-    # 无备抵（FVTPL / FVOCI 计量，不单独计提减值）
-)
+#: 🔴 科目定位改走**语义驱动**（单一真源 `four_table/g_cycle_specs.G9_SPEC`）。
+#:
+#: 原用 ``fallback_gross=("1507",)`` + `report_config` 的 ``BS-026 = TB('1507')`` ——
+#: 两者都错：`account_chart` + `trial_balance.account_name` 双证 **``1507`` 实为
+#: 「其他权益工具投资」（G8 的科目）**，其他非流动金融资产的真实科目是 **``1519``**。
+#: 且 ``1519`` 只在 4 个项目的标准科目表里 → 另 6 个项目解析为空是**正确行为**
+#: （写死任何码都会在这些项目里静默产出 0）。
+#: 无备抵槽（FVTPL / FVOCI 计量，不单独计提减值）。
+G9_ACCOUNT_SPEC = G9_SPEC
 
 _ADJUDICATED_ITEM_ID = "G9-1-adjudicated-amount"
 
@@ -77,28 +86,6 @@ def classify_g9_leaf(name: str, code: str) -> str:
     return "other"
 
 
-def build_g9_adjudication_prefill(leaves: list[LeafRow]) -> dict:
-    """从 1507 叶子构建审定表预填。按投资项目逐行。"""
-    if not leaves:
-        return {}
-    items: list[dict] = []
-    for leaf in leaves:
-        if leaf.opening != 0 or leaf.closing != 0:
-            items.append({
-                "account_code": leaf.account_code,
-                "account_name": leaf.account_name,
-                "category": classify_g9_leaf(leaf.account_name, leaf.account_code),
-                "opening": leaf.opening,
-                "closing": leaf.closing,
-            })
-    if not items:
-        return {}
-    return {
-        "items": items,
-        "total_opening": sum(i["opening"] for i in items),
-        "total_closing": sum(i["closing"] for i in items),
-    }
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 四表取数
@@ -110,13 +97,15 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict:
     result: dict = {"tb_values": {}, "tb_source_codes": {}, "adjudication_prefill": {}}
 
     try:
-        accounts = await resolve_report_line_accounts(ctx, G9_ACCOUNT_SPEC)
+        accounts = await resolve_semantic_accounts(ctx, G9_ACCOUNT_SPEC)
 
         active_filter = await get_active_filter(
             ctx.db, TbBalance.__table__, ctx.project_id, ctx.year
         )
-        query_prefixes = accounts.gross if accounts.gross else list(G9_ACCOUNT_SPEC.fallback_gross)
+        # 本项目无「其他非流动金融资产」科目时返空（宁缺勿造，不退化为宽前缀）
+        query_prefixes = accounts.codes_of("gross")
         if not query_prefixes:
+            result["tb_source_codes"] = accounts.as_dict()
             return result
 
         conditions = []
@@ -157,9 +146,12 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict:
                 "diff": round(leaf_sum - parent.get("closing", 0), 2),
             }
 
-        adjudication_prefill = build_g9_adjudication_prefill(filtered_leaves)
 
         source_codes = accounts.as_dict()
+        # 审定表「从四表库带入未审数」统一载荷（逐叶子明细，归类在前端做）
+        result["adjudication_prefill"] = build_g_adjudication_prefill(
+            "G9", accounts, all_rows
+        )
         source_codes["gross"] = [r.account_code for r in filtered_leaves]
         if parent_check:
             source_codes["parent_check"] = parent_check
@@ -179,7 +171,6 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict:
             ],
         }
         result["tb_source_codes"] = source_codes
-        result["adjudication_prefill"] = adjudication_prefill
 
     except Exception as e:  # noqa: BLE001
         logger.warning("G9 TB fetch failed: %s", e)
@@ -246,7 +237,6 @@ async def render(ctx: RenderContext) -> dict | None:
     tb_data = await _fetch_tb_data(ctx)
     tb_values = tb_data["tb_values"]
     tb_source_codes = tb_data["tb_source_codes"]
-    adjudication_prefill = tb_data["adjudication_prefill"]
 
     project_context["tb_source_codes"] = tb_source_codes
     project_context["tb_amount"] = tb_values.get("closing", 0) if tb_values else 0
@@ -259,7 +249,7 @@ async def render(ctx: RenderContext) -> dict | None:
         "responses_snapshot": responses_snapshot,
         "adjudicated_amount": adjudicated_amount,
         "tb_values": tb_values,
-        "adjudication_prefill": adjudication_prefill,
+        "adjudication_prefill": tb_data["adjudication_prefill"],
         "tb_source_codes": tb_source_codes,
         # 兼容既有前端读 trial_balance 键
         "trial_balance": {

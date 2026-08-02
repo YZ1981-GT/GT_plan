@@ -64,9 +64,12 @@ from app.services.four_table import (
     ReportLineAccounts,
     ReportLineAccountSpec,
     aggregate_leaves,
+    filter_by_code_specs,
     filter_by_prefixes,
+    parent_totals,
     resolve_report_line_accounts,
     select_leaves,
+    sql_prefixes_for_specs,
     to_leaf_rows,
 )
 
@@ -111,59 +114,11 @@ _NATURE_DEFAULT = "other"
 # ─────────────────────────── 纯函数（无 DB，可单测） ───────────────────────────
 
 
-def sql_prefixes_for_specs(specs) -> list[str]:
-    """把报表公式的科目编号规格转成**宽口径 SQL 前缀**（供 ``LIKE '{p}%'`` 下推）。
-
-    - 单码 ``2202`` → ``2202``
-    - 区间 ``1401~1499`` → 取两端公共前导串 ``14``（宽取，再由
-      :func:`filter_by_code_specs` 做精确收敛）
-
-    区间两端无公共前导（如 ``1401~2202``）时返回两端各自的一级码，仍属宽取。
-    """
-    out: list[str] = []
-    for raw in specs or []:
-        spec = str(raw or "").strip()
-        if not spec:
-            continue
-        if "~" not in spec:
-            out.append(spec)
-            continue
-        lo, _, hi = (p.strip() for p in spec.partition("~"))
-        common = ""
-        for a, b in zip(lo, hi):
-            if a != b:
-                break
-            common += a
-        if common:
-            out.append(common)
-        else:
-            out.extend([lo, hi])
-    return [p for p in dict.fromkeys(out) if p]
-
-
-def filter_by_code_specs(leaves: list[LeafRow], specs) -> list[LeafRow]:
-    """按报表公式的科目编号规格精确过滤叶子（支持单码前缀与 ``lo~hi`` 区间）。纯函数。
-
-    单码走 :func:`filter_by_prefixes` 的严格点号边界；区间按**一级科目段**
-    （首个 ``.`` 之前）字符串比较落在 ``[lo, hi]`` 内 —— 与
-    ``build_trial_balance_code_filter`` 的区间语义一致（``hi`` 含其全部子科目）。
-    """
-    singles = [s for s in (str(x or "").strip() for x in specs or []) if s and "~" not in s]
-    ranges = [
-        tuple(p.strip() for p in str(x).partition("~")[::2])
-        for x in specs or []
-        if "~" in str(x or "")
-    ]
-    picked: dict[str, LeafRow] = {}
-    for row in filter_by_prefixes(leaves, singles):
-        picked[f"{row.dataset_id}|{row.account_code}"] = row
-    for row in leaves or []:
-        head = row.account_code.split(".", 1)[0]
-        for lo, hi in ranges:
-            if lo <= head <= hi:
-                picked[f"{row.dataset_id}|{row.account_code}"] = row
-                break
-    return list(picked.values())
+# 🔴 `sql_prefixes_for_specs` / `filter_by_code_specs` 已提升为四表库共享件
+#   （`app/services/four_table/leaf_aggregation`）—— F5 的 `IS-002` 是
+#   `SUM_TB('6401~6499')` 区间口径，需要同款能力，不得再抄一份。
+#   此处保留同名 re-export：F1 既有测试与本文件下方调用点零改动。
+#   spec: .kiro/specs/f-cycle-four-table-extraction-and-disclosure-completion/
 
 
 def classify_f1_nature(account_name: str) -> str:

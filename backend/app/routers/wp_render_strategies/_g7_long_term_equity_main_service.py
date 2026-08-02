@@ -29,11 +29,24 @@ from app.models.audit_platform_models import TbBalance, TrialBalance
 from app.models.audit_platform_schemas import EventPayload, EventType
 from app.services.dataset_query import get_active_filter
 from app.services.event_bus import event_bus
+from app.services.four_table.g_cycle_specs import G7_SPEC
+from app.services.four_table.leaf_aggregation import (
+    filter_by_prefixes,
+    select_leaves,
+    to_leaf_rows,
+)
+from app.services.four_table.semantic_account_resolver import (
+    ResolverContext,
+    resolve_semantic_accounts,
+)
 
 logger = logging.getLogger(__name__)
 
-# 科目前缀：1511 长期股权投资
-_ACCOUNT_PREFIX = "1511"
+#: 科目定位单一真源 = `four_table/g_cycle_specs.G7_SPEC`（按科目名逐项目解析）。
+#: 原写死 ``_ACCOUNT_PREFIX = "1511"`` —— 码本身是对的，但①违反「科目单一真源」铁律
+#: （main 策略与 service 层两处各写一份，改一处漏一处）②``code.startswith("1511")``
+#: 缺点号边界会误命中 ``15110``（不同科目）且父子双算。
+_G7_FALLBACK_PREFIX = "1511"
 
 # EventBus 审定值持久化的独立 item_id
 _ADJUDICATED_ITEM_ID = "G7-1-adjudicated-amount"
@@ -125,12 +138,38 @@ class G7LongTermEquityMainService:
         c = sum(float(x or 0) for x in credits)
         return abs(d - c) < _TOLERANCE
 
+    # ─── 科目定位（语义驱动，逐项目）───────────────────────────────────────────
+
+    async def _resolve_codes(
+        self, project_id: UUID, year: int | None = None
+    ) -> tuple[list[str], list[str]]:
+        """解析本项目「长期股权投资」科目。
+
+        Returns:
+            ``(原始码前缀集, 标准码集)``；本项目无该科目时返回 ``([], [])``。
+            科目表整体不可用时由解析器降级为兜底码（见 `semantic_account_resolver`）。
+        """
+        try:
+            result = await resolve_semantic_accounts(
+                ResolverContext(db=self.db, project_id=project_id, year=year),
+                G7_SPEC,
+            )
+        except Exception as e:  # noqa: BLE001 — fail-open，取数失败不阻断 render
+            logger.warning("G7 service: 科目语义定位失败: %s", e)
+            return [], []
+        slot = result.slots.get("gross")
+        if slot is None or not slot.found:
+            return [], []
+        return list(slot.codes), list(slot.standard_codes)
+
     # ─── TB 取数（trial_balance 审定相关字段） ─────────────────────────────────
 
     async def get_trial_balance_data(
         self, project_id: UUID, year: int | None
     ) -> dict[str, Any]:
-        """查 trial_balance 科目 1511% 的审定相关字段.
+        """查 trial_balance 里「长期股权投资」的审定相关字段.
+
+        科目由 :meth:`_resolve_codes` 按科目名逐项目解析（原写死 ``LIKE '1511%'``）。
 
         返回 {
             "rows": [{"standard_account_code", "unadjusted_amount", "aje_adjustment", "audited_amount"}],
@@ -141,34 +180,46 @@ class G7LongTermEquityMainService:
         assert self.db is not None, "db session required for async operations"
         rows: list[dict] = []
         balance: dict[str, float] = {}
+        originals, standard_codes = await self._resolve_codes(project_id, year)
 
-        # 1. 从 trial_balance 取审定相关字段
-        try:
-            active_filter = await get_active_filter(
-                self.db, TrialBalance.__table__, project_id, year
-            )
-            result = await self.db.execute(
-                sa.select(
-                    TrialBalance.standard_account_code,
-                    TrialBalance.unadjusted_amount,
-                    TrialBalance.aje_adjustment,
-                    TrialBalance.audited_amount,
-                ).where(
-                    active_filter,
-                    TrialBalance.standard_account_code.like(f"{_ACCOUNT_PREFIX}%"),
+        # 1. 从 trial_balance 取审定相关字段（本项目无该科目则跳过，不退化为宽前缀）
+        if standard_codes:
+            try:
+                active_filter = await get_active_filter(
+                    self.db, TrialBalance.__table__, project_id, year
                 )
-            )
-            for row in result.fetchall():
-                rows.append({
-                    "standard_account_code": row.standard_account_code or "",
-                    "unadjusted_amount": float(row.unadjusted_amount or 0),
-                    "aje_adjustment": float(row.aje_adjustment or 0),
-                    "audited_amount": float(row.audited_amount or 0),
-                })
-        except Exception as e:  # noqa: BLE001
-            logger.warning("G7 service: trial_balance取数失败: %s", e)
+                result = await self.db.execute(
+                    sa.select(
+                        TrialBalance.standard_account_code,
+                        TrialBalance.unadjusted_amount,
+                        TrialBalance.aje_adjustment,
+                        TrialBalance.audited_amount,
+                    ).where(
+                        active_filter,
+                        TrialBalance.standard_account_code.in_(standard_codes),
+                    )
+                )
+                for row in result.fetchall():
+                    rows.append({
+                        "standard_account_code": row.standard_account_code or "",
+                        "unadjusted_amount": float(row.unadjusted_amount or 0),
+                        "aje_adjustment": float(row.aje_adjustment or 0),
+                        "audited_amount": float(row.audited_amount or 0),
+                    })
+            except Exception as e:  # noqa: BLE001
+                logger.warning("G7 service: trial_balance取数失败: %s", e)
 
-        # 2. 从 tb_balance 取期初/期末余额
+        # 2. 从 tb_balance 取期初/期末余额（叶子口径）
+        if not originals:
+            return {
+                "rows": rows,
+                "summary": {
+                    "total_unadjusted": sum(r["unadjusted_amount"] for r in rows),
+                    "total_aje_adjustment": sum(r["aje_adjustment"] for r in rows),
+                    "total_audited": sum(r["audited_amount"] for r in rows),
+                },
+                "balance": {},
+            }
         try:
             active_filter_tb = await get_active_filter(
                 self.db, TbBalance.__table__, project_id, year
@@ -176,21 +227,24 @@ class G7LongTermEquityMainService:
             result_tb = await self.db.execute(
                 sa.select(
                     TbBalance.account_code,
+                    TbBalance.account_name,
                     TbBalance.opening_balance,
                     TbBalance.closing_balance,
+                    TbBalance.debit_amount,
+                    TbBalance.credit_amount,
+                    TbBalance.closing_direction,
+                    TbBalance.dataset_id,
                 ).where(active_filter_tb)
             )
-            opening = 0.0
-            closing = 0.0
-            matched = False
-            for row in result_tb.fetchall():
-                code = (row.account_code or "").strip()
-                if code == _ACCOUNT_PREFIX or code.startswith(_ACCOUNT_PREFIX):
-                    opening += float(row.opening_balance or 0)
-                    closing += float(row.closing_balance or 0)
-                    matched = True
-            if matched:
-                balance = {"opening": opening, "closing": closing}
+            # 🔴 叶子口径 + 点号边界（共享件）：原 `code.startswith("1511")` 既父子双算
+            #    又会误命中 `15110`（不同科目）
+            leaves = select_leaves(to_leaf_rows(result_tb.fetchall()))
+            picked = filter_by_prefixes(leaves, originals)
+            if picked:
+                balance = {
+                    "opening": sum(r.opening for r in picked),
+                    "closing": sum(r.closing for r in picked),
+                }
         except Exception as e:  # noqa: BLE001
             logger.warning("G7 service: tb_balance取数失败: %s", e)
 
@@ -264,14 +318,17 @@ class G7LongTermEquityMainService:
 
         try:
             project_id = UUID(project_id_str) if project_id_str else wp_id
+            # 事件载荷里的科目码也走语义解析（下游联动按科目匹配，写死会串味）
+            _orig, _std = await self._resolve_codes(project_id, year)
+            event_codes = _orig or [_G7_FALLBACK_PREFIX]
             payload = EventPayload(
                 event_type=EventType.WORKPAPER_SAVED,
                 project_id=project_id,
                 year=year,
-                account_codes=[_ACCOUNT_PREFIX],
+                account_codes=event_codes,
                 extra={
                     "event_name": "substantive:adjudicated",
-                    "account_code": _ACCOUNT_PREFIX,
+                    "account_code": event_codes[0],
                     "adjudicated_amount": total_adjudicated,
                     "by_control_type": {
                         "subsidiary": self.parse_num(by_control_type.get("subsidiary")),
