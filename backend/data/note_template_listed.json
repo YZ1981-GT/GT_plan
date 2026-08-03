@@ -2452,12 +2452,31 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "产生公允价值变动收益的来源",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "current_amount",
+              "label": "本期发生额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_amount",
+              "label": "上期发生额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "以下不存在的项目可以删除。公允价值变动收益按产生来源分类列示本期发生额与上期发生额。"
         },
         {
           "name": "项  目",
           "headers": [
-            "项目",
+            "产生公允价值变动收益的来源",
             "本期发生额",
             "上期发生额"
           ],
@@ -2499,7 +2518,26 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "产生公允价值变动收益的来源",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "current_amount",
+              "label": "本期发生额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_amount",
+              "label": "上期发生额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "以下不存在的项目可以删除。公允价值变动收益按产生来源分类列示本期发生额与上期发生额。"
         }
       ],
       "text_sections": [
@@ -2539,7 +2577,9 @@
       "parent_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji",
       "sort_index": 42,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "g-cycle-extraction-mapping-and-disclosure-alignment",
+      "_aligned_at": "2026-08-03 13:44:03"
     },
     {
       "section_number": "三、信用减值损失",
@@ -2600,7 +2640,26 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "current_amount",
+              "label": "本期发生额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_amount",
+              "label": "上期发生额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "损失以「—」号填列，以下不存在的项目可以删除。信用减值损失按 CAS 22 预期信用损失模型分来源列示。"
         }
       ],
       "text_sections": [],
@@ -2617,7 +2676,9 @@
       "parent_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji",
       "sort_index": 43,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "g-cycle-extraction-mapping-and-disclosure-alignment",
+      "_aligned_at": "2026-08-03 13:44:03"
     },
     {
       "section_number": "三、资产减值损失（损",
@@ -3252,7 +3313,66 @@
       "sort_index": 48,
       "auto_numbering": true,
       "lock_number": false,
-      "_aligned_by": "n-cycle-tax-disclosure-alignment"
+      "_aligned_by": "n-cycle-note-template-and-disclosure-completion",
+      "_tables": [
+        {
+          "name": "所得税费用明细",
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "current",
+              "label": "本期发生额",
+              "format": "amount"
+            },
+            {
+              "key": "prior",
+              "label": "上期发生额",
+              "format": "amount"
+            }
+          ],
+          "rows": [
+            {
+              "label": "按税法及相关规定计算的当期所得税"
+            },
+            {
+              "label": "递延所得税费用"
+            },
+            {
+              "label": "合计",
+              "is_total": true
+            }
+          ],
+          "guidance": "所得税费用等于第二行至倒数第二行之和。「对以前期间当期所得税的调整」是指对以前年度所得税进行汇算清缴的结果与以前年度确认的金额不同而调整本年所得税费用的金额。「不可抵扣的成本、费用和损失」「未确认可抵扣亏损和可抵扣暂时性差异的纳税影响」不应为负数。不适用项目可删除，「其他」金额不应过大。"
+        },
+        {
+          "name": "所得税费用与利润总额的关系",
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "current",
+              "label": "本期发生额",
+              "format": "amount"
+            },
+            {
+              "key": "prior",
+              "label": "上期发生额",
+              "format": "amount"
+            }
+          ],
+          "rows": [],
+          "guidance": "所得税费用与利润总额的关系列示。调整项行标签从所得税费用明细表 N5-2 动态取值。不适用项目可删除。"
+        }
+      ]
     },
     {
       "section_number": "三、现金流量表项目注",
@@ -20732,7 +20852,200 @@
       "sort_index": 29,
       "auto_numbering": true,
       "lock_number": false,
-      "_aligned_by": "n1-deferred-tax-disclosure-template-alignment"
+      "_aligned_by": "n-cycle-note-template-and-disclosure-completion",
+      "_tables": [
+        {
+          "name": "未经抵销的递延所得税资产和递延所得税负债",
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true
+            },
+            {
+              "key": "end_diff",
+              "label": "可抵扣/应纳税暂时性差异",
+              "group": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "end_tax",
+              "label": "递延所得税资产/负债",
+              "group": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_diff",
+              "label": "可抵扣/应纳税暂时性差异",
+              "group": "上年年末余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_tax",
+              "label": "递延所得税资产/负债",
+              "group": "上年年末余额",
+              "format": "amount"
+            }
+          ],
+          "rows": [
+            {
+              "label": "递延所得税资产：",
+              "row_type": "section_header"
+            },
+            {
+              "label": "资产减值准备"
+            },
+            {
+              "label": "可抵扣亏损"
+            },
+            {
+              "label": "内部交易未实现利润"
+            },
+            {
+              "label": "公允价值变动"
+            },
+            {
+              "label": "租赁负债"
+            },
+            {
+              "label": "购入摊销年限小于税法规定的资产"
+            },
+            {
+              "label": "其他"
+            },
+            {
+              "label": "小计",
+              "is_total": true
+            },
+            {
+              "label": "递延所得税负债：",
+              "row_type": "section_header"
+            },
+            {
+              "label": "购入摊销年限大于税法规定的资产"
+            },
+            {
+              "label": "可供出售金融资产公允价值变动"
+            },
+            {
+              "label": "投资性房地产公允价值变动"
+            },
+            {
+              "label": "使用权资产"
+            },
+            {
+              "label": "其他"
+            },
+            {
+              "label": "小计",
+              "is_total": true
+            }
+          ],
+          "guidance": "递延所得税资产和递延所得税负债不以抵销后的净额列示时使用本表。资产段按可抵扣暂时性差异类别列示，负债段按应纳税暂时性差异类别列示。连续亏损情况下仍确认较大金额 DTA 须披露判断依据。资产减值准备含持有待售资产减值准备。"
+        },
+        {
+          "name": "以抵销后净额列示的递延所得税资产或负债",
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "offset_end",
+              "label": "递延所得税资产和负债期末互抵金额",
+              "format": "amount"
+            },
+            {
+              "key": "net_end",
+              "label": "抵销后递延所得税资产或负债期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "offset_prior",
+              "label": "递延所得税资产和负债期初互抵金额",
+              "format": "amount"
+            },
+            {
+              "key": "net_prior",
+              "label": "抵销后递延所得税资产或负债期初余额",
+              "format": "amount"
+            }
+          ],
+          "rows": [
+            {
+              "label": "递延所得税资产"
+            },
+            {
+              "label": "递延所得税负债"
+            }
+          ],
+          "guidance": "递延所得税资产和递延所得税负债以抵销后的净额列示时使用本表（不适用的删除）。"
+        },
+        {
+          "name": "未确认递延所得税资产的可抵扣暂时性差异及可抵扣亏损明细",
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "end",
+              "label": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior",
+              "label": "上年年末余额",
+              "format": "amount"
+            }
+          ],
+          "rows": [
+            {
+              "label": "可抵扣暂时性差异"
+            },
+            {
+              "label": "可抵扣亏损"
+            },
+            {
+              "label": "合计",
+              "is_total": true
+            }
+          ],
+          "guidance": "列示由于未来能否获得足够的应纳税所得额具有不确定性，因此没有确认为递延所得税资产的可抵扣暂时性差异和可抵扣亏损。"
+        },
+        {
+          "name": "未确认递延所得税资产的可抵扣亏损将于以下年度到期",
+          "columns": [
+            {
+              "key": "label",
+              "label": "年份",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "end",
+              "label": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior",
+              "label": "上年年末余额",
+              "format": "amount"
+            },
+            {
+              "key": "remark",
+              "label": "备注",
+              "format": "text"
+            }
+          ],
+          "rows": [],
+          "guidance": "列示未确认递延所得税资产的可抵扣亏损将于以下年度到期的情况。年份为动态生成（审计年度+1 至+5 + 无使用期限）。"
+        }
+      ]
     },
     {
       "section_number": "五、31",
@@ -21281,15 +21594,45 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "begin_balance",
+              "label": "期初余额",
+              "format": "amount"
+            },
+            {
+              "key": "current_increase",
+              "label": "本期增加",
+              "format": "amount"
+            },
+            {
+              "key": "current_decrease",
+              "label": "本期减少",
+              "format": "amount"
+            },
+            {
+              "key": "end_balance",
+              "label": "期末余额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "对于指定为以公允价值计量且其变动计入当期损益的金融负债，需区分企业自身信用风险变动引起的公允价值变动金额计入其他综合收益和全部利得或损失计入当期损益两种情况（CAS 37 第41-43条）。"
         },
         {
           "name": "1、对于指定为以公允价值计量且其变动计入当期损益的金融负债，应单独列示期初余额、期末余额，并披露指定的理由和依据。",
           "headers": [
             "项目",
             "期初余额",
-            "期末余额",
-            "指定的理由和依据"
+            "本期增加",
+            "本期减少",
+            "期末余额"
           ],
           "rows": [
             {
@@ -21297,15 +21640,45 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "begin_balance",
+              "label": "期初余额",
+              "format": "amount"
+            },
+            {
+              "key": "current_increase",
+              "label": "本期增加",
+              "format": "amount"
+            },
+            {
+              "key": "current_decrease",
+              "label": "本期减少",
+              "format": "amount"
+            },
+            {
+              "key": "end_balance",
+              "label": "期末余额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "对于指定为以公允价值计量且其变动计入当期损益的金融负债，需区分企业自身信用风险变动引起的公允价值变动金额计入其他综合收益和全部利得或损失计入当期损益两种情况（CAS 37 第41-43条）。"
         },
         {
           "name": "对于指定为以公允价值计量且其变动计入当期损益的金融负债，2025年公允价值的变动情况如下表所示：",
           "headers": [
             "项目",
-            "2025年公允价值变动额",
-            "因自身信用风险变动引起的公允价值本年变动额",
-            "因自身信用风险变动引起的公允价值累计变动额"
+            "期初余额",
+            "本期增加",
+            "本期减少",
+            "期末余额"
           ],
           "rows": [
             {
@@ -21317,14 +21690,43 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "begin_balance",
+              "label": "期初余额",
+              "format": "amount"
+            },
+            {
+              "key": "current_increase",
+              "label": "本期增加",
+              "format": "amount"
+            },
+            {
+              "key": "current_decrease",
+              "label": "本期减少",
+              "format": "amount"
+            },
+            {
+              "key": "end_balance",
+              "label": "期末余额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "对于指定为以公允价值计量且其变动计入当期损益的金融负债，需区分企业自身信用风险变动引起的公允价值变动金额计入其他综合收益和全部利得或损失计入当期损益两种情况（CAS 37 第41-43条）。"
         }
       ],
       "text_sections": [
         "[对于指定为以公允价值计量且其变动计入当期损益的金融负债，",
-        "1、对于指定为以公允价值计量且其变动计入当期损益的金融负债，应单独列示期初余额、期末余额，并披露指定的理由和依据。",
+        "#### 1、对于指定为以公允价值计量且其变动计入当期损益的金融负债，应单独列示期初余额、期末余额，并披露指定的理由和依据。",
         "2、需区分企业自身信用风险变动引起的该金融负债公允价值变动金额计入其他综合收益和该金融负债 (包括企业自身信用风险变动的影响) 的全部利得或损失计入当期损益两种",
-        "对于指定为以公允价值计量且其变动计入当期损益的金融负债，2025年公允价值的变动情况如下表所示："
+        "#### 对于指定为以公允价值计量且其变动计入当期损益的金融负债，2025年公允价值的变动情况如下表所示："
       ],
       "check_presets": [
         "余额",
@@ -21338,7 +21740,9 @@
       "parent_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi",
       "sort_index": 33,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "g-cycle-extraction-mapping-and-disclosure-alignment",
+      "_aligned_at": "2026-08-03 13:44:03"
     },
     {
       "section_number": "五、35",
@@ -22349,7 +22753,76 @@
       "sort_index": 40,
       "auto_numbering": true,
       "lock_number": false,
-      "_aligned_by": "n2-disclosure-and-extraction-alignment"
+      "_aligned_by": "n-cycle-note-template-and-disclosure-completion",
+      "_tables": [
+        {
+          "name": "应交税费",
+          "columns": [
+            {
+              "key": "label",
+              "label": "税项",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "end",
+              "label": "期末余额",
+              "format": "amount"
+            },
+            {
+              "key": "prior",
+              "label": "上年年末余额",
+              "format": "amount"
+            }
+          ],
+          "rows": [
+            {
+              "label": "企业所得税"
+            },
+            {
+              "label": "增值税"
+            },
+            {
+              "label": "消费税"
+            },
+            {
+              "label": "资源税"
+            },
+            {
+              "label": "土地增值税"
+            },
+            {
+              "label": "城市维护建设税"
+            },
+            {
+              "label": "车船牌照税"
+            },
+            {
+              "label": "房产税"
+            },
+            {
+              "label": "土地使用税"
+            },
+            {
+              "label": "教育费附加"
+            },
+            {
+              "label": "矿产资源补偿费"
+            },
+            {
+              "label": "代扣代缴外国企业所得税"
+            },
+            {
+              "label": "代扣代缴个人所得税"
+            },
+            {
+              "label": "合计",
+              "is_total": true
+            }
+          ],
+          "guidance": "小税（费）种可合并反映。增值税根据「应交税费-未交增值税、简易计税、转让金融商品应交增值税、代扣代缴增值税」科目贷方余额计算填列。对于满足条件将当期所得税资产及当期所得税负债以抵销后的净额列示的情况，超过部分列示为「其他流动资产」。"
+        }
+      ]
     },
     {
       "section_number": "五、42",
@@ -25962,14 +26435,12 @@
           "name": "营业收入和营业成本",
           "headers": [
             "项目",
-            "本期发生额",
-            "上期发生额"
+            "收入",
+            "成本",
+            "收入",
+            "成本"
           ],
           "rows": [
-            {
-              "label": "项目",
-              "row_type": "header_label"
-            },
             {
               "label": "主营业务",
               "row_type": "data"
@@ -25983,20 +26454,62 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true
+            },
+            {
+              "key": "end_revenue",
+              "label": "收入",
+              "group": "本期发生额",
+              "format": "amount"
+            },
+            {
+              "key": "end_cost",
+              "label": "成本",
+              "group": "本期发生额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_revenue",
+              "label": "收入",
+              "group": "上期发生额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_cost",
+              "label": "成本",
+              "group": "上期发生额",
+              "format": "amount"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "本期发生额",
+              "start": 1,
+              "span": 2
+            },
+            {
+              "group": "上期发生额",
+              "start": 3,
+              "span": 2
+            }
+          ],
+          "guidance": "按源模板要求填列主营业务与其他业务的本期/上期收入和成本。"
         },
         {
           "name": "营业收入、营业成本按行业（或产品类型）划分",
           "headers": [
             "主要产品类型（或行业）",
-            "本期发生额",
-            "上期发生额"
+            "收入",
+            "成本",
+            "收入",
+            "成本"
           ],
           "rows": [
-            {
-              "label": "主要产品类型（或行业）",
-              "row_type": "header_label"
-            },
             {
               "label": "主营业务：",
               "row_type": "data"
@@ -26040,20 +26553,62 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "主要产品类型（或行业）",
+              "is_label": true
+            },
+            {
+              "key": "end_revenue",
+              "label": "收入",
+              "group": "本期发生额",
+              "format": "amount"
+            },
+            {
+              "key": "end_cost",
+              "label": "成本",
+              "group": "本期发生额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_revenue",
+              "label": "收入",
+              "group": "上期发生额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_cost",
+              "label": "成本",
+              "group": "上期发生额",
+              "format": "amount"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "本期发生额",
+              "start": 1,
+              "span": 2
+            },
+            {
+              "group": "上期发生额",
+              "start": 3,
+              "span": 2
+            }
+          ],
+          "guidance": "按主要产品类型或行业划分营业收入、营业成本。"
         },
         {
           "name": "营业收入、营业成本按地区划分",
           "headers": [
             "主要经营地区",
-            "本期发生额",
-            "上期发生额"
+            "收入",
+            "成本",
+            "收入",
+            "成本"
           ],
           "rows": [
-            {
-              "label": "主要经营地区",
-              "row_type": "header_label"
-            },
             {
               "label": "东北",
               "row_type": "data"
@@ -26071,23 +26626,66 @@
               "is_total": true,
               "row_type": "subtotal"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "主要经营地区",
+              "is_label": true
+            },
+            {
+              "key": "end_revenue",
+              "label": "收入",
+              "group": "本期发生额",
+              "format": "amount"
+            },
+            {
+              "key": "end_cost",
+              "label": "成本",
+              "group": "本期发生额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_revenue",
+              "label": "收入",
+              "group": "上期发生额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_cost",
+              "label": "成本",
+              "group": "上期发生额",
+              "format": "amount"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "本期发生额",
+              "start": 1,
+              "span": 2
+            },
+            {
+              "group": "上期发生额",
+              "start": 3,
+              "span": 2
+            }
+          ],
+          "guidance": "按主要经营地区划分营业收入、营业成本（不适用的删除）。"
         },
         {
-          "name": "营业收入、营业成本按商品转让时间划分",
+          "name": "营业收入、营业成本按分解信息",
           "headers": [
             "项目",
-            "本期发生额"
+            "收入",
+            "成本",
+            "收入",
+            "成本",
+            "收入",
+            "成本",
+            "收入",
+            "成本"
           ],
           "rows": [
-            {
-              "label": "项目",
-              "row_type": "header_label"
-            },
-            {
-              "label": "项目",
-              "row_type": "header_label"
-            },
             {
               "label": "主营业务",
               "row_type": "data"
@@ -26121,14 +26719,92 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true
+            },
+            {
+              "key": "cat0_revenue",
+              "label": "收入",
+              "group": "消费品",
+              "format": "amount"
+            },
+            {
+              "key": "cat0_cost",
+              "label": "成本",
+              "group": "消费品",
+              "format": "amount"
+            },
+            {
+              "key": "cat1_revenue",
+              "label": "收入",
+              "group": "汽车",
+              "format": "amount"
+            },
+            {
+              "key": "cat1_cost",
+              "label": "成本",
+              "group": "汽车",
+              "format": "amount"
+            },
+            {
+              "key": "cat2_revenue",
+              "label": "收入",
+              "group": "能源",
+              "format": "amount"
+            },
+            {
+              "key": "cat2_cost",
+              "label": "成本",
+              "group": "能源",
+              "format": "amount"
+            },
+            {
+              "key": "cat3_revenue",
+              "label": "收入",
+              "group": "其他",
+              "format": "amount"
+            },
+            {
+              "key": "cat3_cost",
+              "label": "成本",
+              "group": "其他",
+              "format": "amount"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "消费品",
+              "start": 1,
+              "span": 2
+            },
+            {
+              "group": "汽车",
+              "start": 3,
+              "span": 2
+            },
+            {
+              "group": "能源",
+              "start": 5,
+              "span": 2
+            },
+            {
+              "group": "其他",
+              "start": 7,
+              "span": 2
+            }
+          ],
+          "guidance": "在确定对收入进行分解的类别时，企业应当考虑其在下列情况下是如何列报和披露与收入有关的信息：①在财务报表之外披露的信息，例如，在企业的业绩公告、年报或向投资者报送的相关资料中披露的收入信息；②管理层为评价经营分部的财务业绩所定期复核的信息；以及③企业或企业的财务报表使用者在评价企业的财务业绩或作出资源分配决策时，所使用的类似于上述①和②的信息类型的其他信息。企业在对收入信息进行分解时，可以采用的类别包括但不限于：商品类型、经营地区、市场或客户类型、合同类型（例如，固定造价合同、成本加成合同等）、商品转让的时间（例如，在某一时点转让或在某一时段内转让）、合同期限（例如，长期合同、短期合同等）、销售渠道（例如，直接销售或通过经销商销售等）等。④租赁收入需单独披露。"
         },
         {
-          "name": "分摊至尚未履行的履约义务的交易价格为xxx元，截止xx年xx月xx日，对于上述金额确认为收入的预计时间如下：",
+          "name": "与剩余履约义务有关的信息",
           "headers": [
             "年度",
-            "2026年",
-            "2027年",
+            "{audit_year+1}年",
+            "{audit_year+2}年",
             "合计"
           ],
           "rows": [
@@ -26136,47 +26812,110 @@
               "label": "xx合同预计将确认的收入",
               "row_type": "data"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "年度",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "year1",
+              "label": "{audit_year+1}年",
+              "format": "amount"
+            },
+            {
+              "key": "year2",
+              "label": "{audit_year+2}年",
+              "format": "amount"
+            },
+            {
+              "key": "total",
+              "label": "合计",
+              "format": "amount"
+            }
+          ],
+          "guidance": "披露与剩余履约义务有关的下列信息：①分摊至本期末尚未履行（或部分未履行）履约义务的交易价格总额；②上述金额确认为收入的预计时间，企业可以按照对于剩余履约义务的期间而言最恰当的时间段为基础提供有关预计时间的定量信息，或者使用定性信息进行说明。说明：是否存在任何对价金额未纳入交易价格，从而未纳入对于分摊至剩余履约义务的交易价格所需披露的信息之中，例如，由于将可变对价计入交易价格的限制要求而未计入交易价格的可变对价。如果公司采用了简化操作方法，该方法满足下列条件之一可适用：一是该项履约义务是原预计合同期限不超过一年的合同中的一部分。二是企业有权对该履约义务下已转让的商品向客户发出账单，且账单金额能够代表企业累计至今已履约部分转移给客户的价值。企业应当提供定性信息以说明采用了上述简化操作方法。"
         },
         {
           "name": "试运行销售收入",
           "headers": [
             "项目",
-            "本期发生额",
-            "上期发生额"
+            "收入",
+            "成本",
+            "收入",
+            "成本"
           ],
           "rows": [
             {
-              "label": "项目",
-              "row_type": "header_label"
-            },
-            {
-              "label": "固定资产试运行销售",
+              "label": "固定资产试运行收入",
               "row_type": "data"
             },
             {
-              "label": "研发样品销售",
+              "label": "研发样品销售收入",
               "row_type": "data"
-            },
-            {
-              "label": "合计",
-              "is_total": true,
-              "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true
+            },
+            {
+              "key": "end_revenue",
+              "label": "收入",
+              "group": "本期发生额",
+              "format": "amount"
+            },
+            {
+              "key": "end_cost",
+              "label": "成本",
+              "group": "本期发生额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_revenue",
+              "label": "收入",
+              "group": "上期发生额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_cost",
+              "label": "成本",
+              "group": "上期发生额",
+              "format": "amount"
+            }
+          ],
+          "_column_groups": [
+            {
+              "group": "本期发生额",
+              "start": 1,
+              "span": 2
+            },
+            {
+              "group": "上期发生额",
+              "start": 3,
+              "span": 2
+            }
+          ],
+          "guidance": "企业会计准则解释第15号规定，企业应当按照《企业会计准则第1号——存货》、《企业会计准则第14号——收入》、《企业会计准则第30号——财务报表列报》等规定，判断试运行销售是否属于企业的日常活动，并在财务报表中分别日常活动和非日常活动列示试运行销售的相关收入和成本，属于日常活动的，在“营业收入”和“营业成本”项目列示；属于非日常活动的，在“资产处置收益”等项目列示。同时企业应当在附注中单独披露。"
         }
       ],
       "text_sections": [
-        "营业收入和营业成本",
+        "#### （1）营业收入和营业成本",
         "（披露本公司前期已经履行 (或部分履行) 的履约义务在本期调整的收入。例如：",
         "本公司在2025年确认的、源自前期已经履行 (或部分履行) 的履约义务的收入金额为XX元，主要是由于与XX客户签订的XX合同的估计完工进度发生了变化。）",
-        "营业收入、营业成本按行业（或产品类型）划分",
-        "营业收入、营业成本按地区划分（不适用的，删除）",
-        "营业收入、营业成本按商品转让时间划分",
-        "履约义务的说明",
-        "与剩余履约义务有关的信息",
-        "重大合同变更【或重大交易价格调整】",
-        "试运行销售收入"
+        "#### （2）营业收入、营业成本按行业（或产品类型）划分",
+        "#### （3）营业收入、营业成本按地区划分",
+        "#### （4）营业收入、营业成本按分解信息",
+        "#### （5）履约义务的说明",
+        "（披露与履约义务相关的信息，包括履约义务通常的履行时间、重要的支付条款、企业承诺转让的商品的性质（包括说明企业是否作为代理人）、企业承担的预期将退还给客户的款项等类似义务、质量保证的类型及相关义务等。）",
+        "#### （6）与剩余履约义务有关的信息",
+        "#### （7）重大合同变更",
+        "（披露重大合同变更或重大交易价格调整相关的信息、会计处理方法及对收入的影响金额。）",
+        "#### （8）试运行销售收入"
       ],
       "check_presets": [],
       "wide_table_presets": [],
@@ -26187,7 +26926,9 @@
       "parent_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi",
       "sort_index": 61,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "d4-four-table-extraction-and-disclosure-alignment",
+      "_aligned_at": "2026-08-03 12:45:17"
     },
     {
       "section_number": "五、63",
@@ -26279,7 +27020,61 @@
       "sort_index": 62,
       "auto_numbering": true,
       "lock_number": false,
-      "_aligned_by": "n-cycle-tax-disclosure-alignment"
+      "_aligned_by": "n-cycle-note-template-and-disclosure-completion",
+      "_tables": [
+        {
+          "name": "税金及附加",
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "current",
+              "label": "本期发生额",
+              "format": "amount"
+            },
+            {
+              "key": "prior",
+              "label": "上期发生额",
+              "format": "amount"
+            }
+          ],
+          "rows": [
+            {
+              "label": "消费税"
+            },
+            {
+              "label": "城市维护建设税"
+            },
+            {
+              "label": "教育费附加"
+            },
+            {
+              "label": "地方教育附加"
+            },
+            {
+              "label": "房产税"
+            },
+            {
+              "label": "城镇土地使用税"
+            },
+            {
+              "label": "车船税"
+            },
+            {
+              "label": "印花税"
+            },
+            {
+              "label": "合计",
+              "is_total": true
+            }
+          ],
+          "guidance": "各项税金及附加的计缴标准详见附注四、税项。"
+        }
+      ]
     },
     {
       "section_number": "五、64",
@@ -26745,7 +27540,26 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "current_amount",
+              "label": "本期发生额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_amount",
+              "label": "上期发生额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "以下不存在的项目可以删除。对于业务处置的收益（含子公司和分公司），无论直接出售还是先持有待售再出售，均整体计入投资收益。"
         },
         {
           "name": "项  目",
@@ -26792,7 +27606,26 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "current_amount",
+              "label": "本期发生额",
+              "format": "amount"
+            },
+            {
+              "key": "prior_amount",
+              "label": "上期发生额",
+              "format": "amount"
+            }
+          ],
+          "guidance": "以下不存在的项目可以删除。对于业务处置的收益（含子公司和分公司），无论直接出售还是先持有待售再出售，均整体计入投资收益。"
         }
       ],
       "text_sections": [
@@ -26811,7 +27644,9 @@
       "parent_section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi",
       "sort_index": 68,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "g-cycle-extraction-mapping-and-disclosure-alignment",
+      "_aligned_at": "2026-08-03 13:44:03"
     },
     {
       "section_number": "五、70",
