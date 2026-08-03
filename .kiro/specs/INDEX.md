@@ -36,7 +36,7 @@
 | `e0-send-list-dedicated-components` | 0/18（三件套已立，2026-08-02 复盘扩写 + 同步 A-否） | E0 发函清单专属组件。范围由四张收窄为**三张**（E0-3/E0-4/E0-5 → `confirmation-send-list-e03/e04/e05`）—— E0-6 已由 `e0-confirmation-completion` 落地 `confirmation-wealth-list`，原 `confirmation-send-list-e06` **撤回**，改为符合度核查（Task 17，8 项）；「三 + 一」命名不统一是**有意接受**并写进两份 Glossary。解 grid 兜底污染（`extract_grid(data_only=True)` 把公式缓存值 `XX银行`/`0` 当数据渲染）、E1-3 段语义取数（两版行号完全不同故禁硬编码行号）、K 列金额口径三态可切换；**R16 E0-3 函证范围完整性红线**（准则明文「包括零余额账户和在本期内注销的账户」，三处依据 = `E0A` 程序 1 + `E0-1!O28/O29` + `回函情况汇编` 编制说明 2/3，数据齐备但平台零校验）。**随 A-否 关闭两个待裁决**：R15 由「翻转 override 查表顺序」改为**只钉死全名 `skip` 不变式**（实证 skip 判定 L709 全名优先、componentType 判定 L749 尾码优先，两者顺序相反使当前配置已正确）→ Task 14 降级、不再阻塞 Task 5；R17 资金归集勾稽**永久留遗留**（对侧表不实现） |
 | `e0-send-list-dedicated-components` | 0/18（三件套已立，2026-08-02 复盘扩写） | E0 发函清单专属组件。范围由四张收窄为**三张**（E0-3/E0-4/E0-5 → `confirmation-send-list-e03/e04/e05`）—— E0-6 已由 `e0-confirmation-completion` 落地 `confirmation-wealth-list`，原 `confirmation-send-list-e06` **撤回**，改为符合度核查（Task 17，8 项）；「三 + 一」命名不统一是**有意接受**并写进两份 Glossary。解 grid 兜底污染（`extract_grid(data_only=True)` 把公式缓存值 `XX银行`/`0` 当数据渲染）、E1-3 段语义取数（两版行号完全不同故禁硬编码行号）、K 列金额口径三态可切换；新增 **R16 E0-3 函证范围完整性红线**（准则明文「包括零余额账户和在本期内注销的账户」，双依据 = `E0A` 程序 1 + `E0-1!O28`，数据齐备但平台零校验）+ **R17 资金归集链路登记** |
 | `g-cycle-extraction-mapping-and-disclosure-alignment` | 7/30 | G 循环四表映射与披露对齐（含 `report_config` 4 处错码修复）—— **并发会话在推进** |
-| `d4-four-table-extraction-and-disclosure-alignment` | 0/33 | D4 营业收入四表取数与披露/附注对齐 —— **并发会话** |
+| `d4-four-table-extraction-and-disclosure-alignment` | **33/33** | D4 营业收入四表取数与披露/附注对齐 |
 | `h-cycle-four-table-extraction-and-account-mapping` | 0/25 | H 类四表取数与科目映射收口 —— **并发会话** |
 | `f-cycle-four-table-extraction-and-disclosure-completion` | 0/16 | F 类四表取数与披露/附注收口 —— **并发会话** |
 

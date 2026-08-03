@@ -166,9 +166,12 @@ def test_flag_off_baseline_keys_no_prefill(monkeypatch, wp_code):
     assert "adjudication_prefill" not in result
 
 
-@pytest.mark.parametrize("wp_code", ["D4", "D5", "D7"])
+@pytest.mark.parametrize("wp_code", ["D5", "D7"])
 def test_flag_on_still_no_prefill_ningquewuzao(monkeypatch, wp_code):
-    """开关开启 → **仍不返回** adjudication_prefill（宁缺勿造 R3.4，分类/明细行 SUMIF 不可从 TB 拆分）。"""
+    """开关开启 → **仍不返回** adjudication_prefill（宁缺勿造 R3.4，分类/明细行 SUMIF 不可从 TB 拆分）。
+    注：D4 已推翻「宁缺勿造」（2026-08 实证：9 项目存在业务板块级子科目 + 源模板 4 行空白可扩行），
+    故 D4 不参与本断言。
+    """
     mod, baseline, sheet_name, _ = _CYCLES[wp_code]
     _enable_flag(monkeypatch, mod)
     result = _run(mod.render(_ctx(_session(), sheet_name)))
@@ -176,9 +179,12 @@ def test_flag_on_still_no_prefill_ningquewuzao(monkeypatch, wp_code):
     assert set(result.keys()) == baseline
 
 
-@pytest.mark.parametrize("wp_code", ["D4", "D5", "D7"])
+@pytest.mark.parametrize("wp_code", ["D5", "D7"])
 def test_flag_on_off_byte_equivalent(monkeypatch, wp_code):
-    """开关开/关 render 输出逐字节等价（不新增任何键，Property 9 天然成立）。"""
+    """开关开/关 render 输出逐字节等价（不新增任何键，Property 9 天然成立）。
+    注：D4 已推翻「宁缺勿造」（2026-08），开关开时新增 tb_values/adjudication_prefill/segment_prefill
+    + project_context.tb_source_codes → 不再与关闭时逐字节等价。
+    """
     mod, _baseline, sheet_name, _ = _CYCLES[wp_code]
     checklist = [
         _checklist_row(f"{wp_code}-1-adj-note", remark="123456"),
@@ -190,6 +196,26 @@ def test_flag_on_off_byte_equivalent(monkeypatch, wp_code):
     on = _run(mod.render(_ctx(_session(checklist_rows=list(checklist)), sheet_name)))
     assert off == on
     assert "adjudication_prefill" not in on
+
+
+def test_d4_flag_on_outputs_four_table_keys(monkeypatch):
+    """D4 开关开启 → 输出 tb_values / adjudication_prefill / segment_prefill + project_context.tb_source_codes。
+    推翻依据：9 项目存在业务板块级子科目 + D4-1 源模板主营/其他各 4 行空白可扩行。
+    （fake session 无 tb_balance 数据 → 叶子为空 → 各项返回空/None，但键必须存在）
+    """
+    mod = _CYCLES["D4"][0]
+    sheet_name = _CYCLES["D4"][2]
+    _enable_flag(monkeypatch, mod)
+    result = _run(mod.render(_ctx(_session(), sheet_name)))
+    # 新增三个顶层键
+    assert "tb_values" in result
+    assert "adjudication_prefill" in result
+    assert "segment_prefill" in result
+    # tb_source_codes 在 project_context 内（踩坑铁律）
+    assert "tb_source_codes" in result["project_context"]
+    # fake session 无叶子数据 → 空集合（宁缺勿造：无可映射叶子时返回空）
+    assert result["adjudication_prefill"] == []
+    assert result["segment_prefill"] == []
 
 
 @pytest.mark.parametrize("wp_code", ["D4", "D5", "D7"])

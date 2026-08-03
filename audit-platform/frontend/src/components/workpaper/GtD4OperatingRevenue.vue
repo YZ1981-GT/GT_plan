@@ -43,7 +43,7 @@
         :is-readonly="isReadonly"
       />
       <!-- D4-1 审定表 -->
-      <D4TabAdjudication v-else-if="currentSheet === 'D4-1'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
+      <D4TabAdjudication v-else-if="currentSheet === 'D4-1'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" :html-data="props.htmlData" />
       <!-- D4-2 主营明细 -->
       <D4TabRevenueDetail v-else-if="currentSheet === 'D4-2'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
       <!-- D4-3 其他明细 -->
@@ -96,8 +96,8 @@
       <D4TabOtherCheck v-else-if="currentSheet === 'D4-35'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
       <D4TabOtherCutoff v-else-if="currentSheet === 'D4-36'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
       <!-- 附注（上市/国企） -->
-      <D4TabDisclosureListed v-else-if="currentSheet === '附注上市'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
-      <D4TabDisclosureSoe v-else-if="currentSheet === '附注国企'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" />
+      <D4TabDisclosureListed v-else-if="currentSheet === '附注上市'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" :html-data="props.htmlData" :applicable-standards="applicableStandards" />
+      <D4TabDisclosureSoe v-else-if="currentSheet === '附注国企'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :is-readonly="isReadonly" :html-data="props.htmlData" :applicable-standards="applicableStandards" />
       <!-- Fallback: 未匹配的 sheetName 默认显示目录 -->
       <D4TabIndex
         v-else
@@ -143,6 +143,7 @@ import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useD4ReviewThreads } from './composables/useD4ReviewThreads'
 import { useD4EntryDualMode, type D4RenderMode } from './composables/useD4EntryDualMode'
 import { isSkipWorkpaperSheet } from './composables/workpaperSkipSheets'
+import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 import GtOnlyOfficeSheet from './GtOnlyOfficeSheet.vue'
 
 // ─── Lazy-loaded child components ────────────────────────────────────────────
@@ -224,6 +225,14 @@ const emit = defineEmits<{
 // ─── Composables ─────────────────────────────────────────────────────────────
 
 const isReadonly = computed(() => !!props.readonly)
+
+/**
+ * 适用准则：htmlData > runtime context（scaffold 从 render-config 顶层注入）。
+ * 🔴 setup 顶层调用（内部 `inject`）。
+ */
+const applicableStandards = useHostApplicableStandards({
+  htmlData: () => props.htmlData,
+})
 
 const formData = useD4FormData({
   wpId: toRef(props, 'wpId'),

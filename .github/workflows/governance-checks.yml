@@ -319,6 +319,23 @@ jobs:
       - name: Run note G-cycle structure contract tests
         run: python -m pytest backend/tests/services/test_note_g_cycle_structure.py -q
 
+  note-g-liability-pl-structure:
+    # 附注 G10/G11/G13/G14（交易性金融负债 / 投资收益 / 公允价值变动收益 / 信用减值损失）
+    # 披露章节结构守卫。8 个章节 12 张表的 columns(flat) + guidance 补齐。
+    # spec: g-cycle-extraction-mapping-and-disclosure-alignment Wave 5
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check G10/G11/G13/G14 note structure alignment
+        run: python backend/scripts/fix/fix_note_g_liability_and_pl_structure.py --check
+      - name: Install test dependency
+        run: python -m pip install pytest==8.4.2
+      - name: Run G liability/PL structure guard tests
+        run: python -m pytest backend/tests/test_note_g_liability_and_pl_structure.py -q
+
   disclosure-sync-wiring:
     # 两类"只有浏览器实测才暴露"的披露同步接线缺陷静态守卫
     # （j1-disclosure-template-alignment Task 17 横向推广，2026-07-30）
@@ -2236,3 +2253,204 @@ jobs:
           src/components/workpaper/composables/__tests__/restrictedAssetsSources.spec.ts
           src/components/workpaper/composables/__tests__/restrictedAssetsConsistency.spec.ts
           src/components/workpaper/__tests__/disclosureSharedTableRowScope.spec.ts
+
+  # ─── E0 函证精细打磨守卫（e0-confirmation-completion） ────────────────────────
+
+  e0-confirmation-source-facts:
+    # 后端：openpyxl 三向守卫 + 预设 --check + meta/override 交叉 + hidden⇒skip 不变式
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install backend dependencies
+        run: pip install -r requirements.txt openpyxl
+      - name: Run E0 source template facts guard
+        run: >-
+          python -m pytest
+          tests/test_e0_source_template_facts.py
+          tests/test_e0_hidden_sheets_skipped.py
+          tests/test_confirmation_meta_override_alignment.py
+          tests/test_e0_formula_presets.py
+          -v --tb=short
+
+  e0-confirmation-frontend:
+    # 前端：品种矩阵 + 受限联动 + 列集 golden + confirmationColumnSpec
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: audit-platform/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: audit-platform/frontend/package-lock.json
+      - name: Install frontend dependencies
+        run: npm ci
+      - name: Run E0 confirmation frontend guards
+        run: >-
+          npx vitest run
+          src/components/workpaper/confirmation/__tests__/confirmationColumnSpec.spec.ts
+          src/components/workpaper/confirmation/__tests__/e0SummaryMatrix.spec.ts
+          src/components/workpaper/confirmation/__tests__/e0RestrictedToE1.spec.ts
+
+  e0-send-list-source-facts:
+    # E0 发函清单源模板事实守卫 + E1-3 段结构 + F3-2 列集 + render/迁移 + 注册交叉 + skip 不变式
+    # (e0-send-list-dedicated-components Wave 1~2)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: python -m pip install pytest==8.4.2 hypothesis==6.152.4 openpyxl==3.1.5 pyyaml==6.0.2
+      - name: Run E0 send list source facts
+        run: >-
+          python -m pytest
+          backend/tests/test_e0_send_list_source_facts.py
+          backend/tests/test_e1_3_segment_facts.py
+          backend/tests/test_f3_2_notes_source_facts.py
+          backend/tests/test_e0_send_list_specs.py
+          backend/tests/test_e1_3_segments.py
+          backend/tests/test_e0_send_list_render.py
+          backend/tests/test_sheet_override_resolution.py
+          backend/tests/test_e0_send_list_columns.py
+          -q
+
+
+  # ─── E1 孤儿组件接线 ───────────────────────────────────────────────────────
+  e1-orphan-wiring:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Backend OCR endpoints import check
+        run: |
+          cd backend
+          python -c "from app.routers.wp_render_strategies._e1_cutoff_ocr import router; from app.routers.wp_render_strategies._e1_large_check_ocr import router as r2; print('OK')"
+
+  e1-orphan-wiring-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install deps
+        run: cd audit-platform/frontend && npm ci --prefer-offline
+      - name: E1 dispatch + legacy + platform guard
+        run: |
+          cd audit-platform/frontend
+          npx vitest run \
+            src/components/workpaper/__tests__/e1SheetDispatch.spec.ts \
+            src/components/workpaper/composables/__tests__/e1IpoLegacyMigration.spec.ts \
+            src/components/workpaper/__tests__/cycleTabComponentWiring.spec.ts \
+            -q
+
+  f-cycle-four-table:
+    # F3/F4/F5 四表取数守卫 + 分类桶守卫 + 公式预设守卫
+    # （f-cycle-four-table-extraction-and-disclosure-completion R1~R5/R8）
+    #
+    # 拦四类已实测缺陷：
+    # 1. 硬编码科目前缀 `2201`/`2202`/`6401` 不走报表行解析
+    # 2. `code.startswith(prefix)` 无点号边界（父子双算）
+    # 3. 损益类 debit−credit 含年末结转恒为 0（正确=叶子 debit_amount 之和）
+    # 4. 公式预设科目码语义错误（F2 `1402`=在途物资描述为「生产成本」）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install backend deps
+        run: python -m pip install -r backend/requirements.txt
+      - name: Run F3/F4/F5 classification bucket guards
+        run: python -m pytest backend/tests/four_table/test_f345_classification.py -q
+      - name: Run F-cycle formula preset guards
+        run: python -m pytest backend/tests/test_f_cycle_formula_presets.py -q
+      - name: Check F-cycle preset alignment (--check)
+        run: python backend/scripts/fix/fix_f_cycle_prefill_presets.py --check
+
+  note-f-cycle-structure:
+    # 附注 F 类四章节结构守卫（F3 五、36/八、36 + F4 五、37/八、37）
+    # + F1 五、7/八、7 + F2 五、9/八、10
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: python -m pip install pytest==8.4.2 openpyxl
+      - name: Check note F3 structure alignment (五、36 / 八、36)
+        run: python backend/scripts/fix/fix_note_notes_payable_structure.py --check
+      - name: Check note F4 structure alignment (五、37 / 八、37)
+        run: python backend/scripts/fix/fix_note_accounts_payable_structure.py --check
+      - name: Run F3/F4 note structure contract tests
+        run: python -m pytest backend/tests/services/test_note_notes_payable_structure.py backend/tests/services/test_note_accounts_payable_structure.py -q
+
+  f-cycle-frontend:
+    # F3/F4/F5 前端守卫：科目单一真源 + 字面量清零 + 溯源面板
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: audit-platform/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install deps
+        run: npm ci
+      - name: Run F3/F4/F5 account scope guards
+        run: npx vitest run src/components/workpaper/composables/__tests__/f345AccountScope.spec.ts --silent=true
+
+  note-d4-structure:
+    # 附注 D4 营业收入章节结构守卫
+    # （d4-four-table-extraction-and-disclosure-alignment Task 7.4 / Req 9.8）
+    # 背景：五、62（上市）/ 八、64（国企）共 11 张披露表从未对齐过，
+    # `fix_note_d4_revenue_structure.py` 补齐 columns（两级 group / 单级 flat）、
+    # guidance、text_sections 标题化、表名 aliases 改名、(6) 年度列、试运行行名、
+    # 删 header_label 假行。此处在 CI 拦住回退。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check note D4 revenue section alignment (五、62 / 八、64)
+        run: python backend/scripts/fix/fix_note_d4_revenue_structure.py --check
+      - name: Install test dependency
+        run: python -m pip install pytest==8.4.2 openpyxl==3.1.5
+      - name: Run note D4 structure contract tests
+        run: python -m pytest backend/tests/test_note_d4_revenue_structure.py -q
+
+  d4-four-table-extraction:
+    # D4 四表取数 + 公式预设守卫
+    # （d4-four-table-extraction-and-disclosure-alignment Task 7.4 / Req 9.8）
+    # 背景：D4 营业收入取数链路（report_config IS-001/IS-002 区间展开 →
+    # account_mapping 反解 → select_leaves → 镜像配对 → 审定表/披露表预填）
+    # + 公式预设口径（发生额非余额、区间非单码、按 sheet 唯一、防成环）。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install backend deps
+        run: python -m pip install -r backend/requirements.txt
+      - name: Run D4 extraction suite (account scope / occurrence / render prefill)
+        run: python -m pytest backend/tests/d4_extraction/ -v --tb=short
+      - name: Run D4 note structure guard
+        run: python -m pytest backend/tests/test_note_d4_revenue_structure.py -v --tb=short
+      - name: Run D4 formula presets guard
+        run: python -m pytest backend/tests/test_d4_formula_presets.py -v --tb=short

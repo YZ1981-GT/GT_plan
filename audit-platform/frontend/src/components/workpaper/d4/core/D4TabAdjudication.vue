@@ -9,12 +9,15 @@
  * Requirements: 2.1-2.10, 19.1, 21.1
  */
 import { computed, ref, inject, toRef, type Ref } from 'vue'
-import { Download } from '@element-plus/icons-vue'
+import { Download, Refresh } from '@element-plus/icons-vue'
 import { useD4Adjudication, type AdjudicationRow, type AdjudicationSection } from '../../composables/useD4Adjudication'
 import { isChangeRateExceeding } from '../../composables/useD4FormulaEngine'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import { D4_MAIN_REVENUE_STANDARD, D4_OTHER_REVENUE_STANDARD, D4_REVENUE_ACCOUNT_NAME } from '../../composables/d4AccountScope'
+import WpFourTableSourcePanel from '@/components/workpaper/shared/WpFourTableSourcePanel.vue'
+import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -25,6 +28,7 @@ const props = defineProps<{
   projectId: string
   allResponses: Map<string, any>
   isReadonly: boolean
+  htmlData?: any
 }>()
 
 // ─── 复核对话注入 ─────────────────────────────────────────────────────
@@ -64,6 +68,14 @@ function fmtRate(rate: number | '' | 'N/A'): string {
   return (rate * 100).toFixed(1) + '%'
 }
 
+// ─── 四表取数溯源 + 预填 ─────────────────────────────────────────────
+const tbSourceCodes = computed<TbSourceCodes | null>(
+  () => props.htmlData?.project_context?.tb_source_codes ?? null,
+)
+const adjudicationPrefill = computed(
+  () => props.htmlData?.adjudication_prefill ?? null,
+)
+
 // ─── Composable ───────────────────────────────────────────────────────
 const {
   sections,
@@ -78,11 +90,14 @@ const {
   addProductRow,
   removeProductRow,
   publishAdjudicated,
+  hasPrefillData,
+  previewSeedFromPrefill,
 } = useD4Adjudication({
   wpId: toRef(props, 'wpId') as Ref<string>,
   projectId: toRef(props, 'projectId') as Ref<string>,
   allResponses: toRef(props, 'allResponses') as Ref<Map<string, any>>,
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
+  adjudicationPrefill,
 })
 
 // ─── 从集中登记带入调整（6001+6051 营业收入，损益贷方；带入期末 AJE/RJE） ────────
@@ -107,11 +122,11 @@ const {
 } = useAdjudicationBringIn({
   projectId: toRef(props, 'projectId') as any,
   year: useAuditContext().year as any,
-  subjectPrefix: ['6001', '6051'],
+  subjectPrefix: [D4_MAIN_REVENUE_STANDARD, D4_OTHER_REVENUE_STANDARD],
   direction: 'credit',
-  subjectCode: '6001',
+  subjectCode: D4_MAIN_REVENUE_STANDARD,
   wpCode: 'D4',
-  subjectLabel: '营业收入(6001/6051)',
+  subjectLabel: `${D4_REVENUE_ACCOUNT_NAME}(${D4_MAIN_REVENUE_STANDARD}/${D4_OTHER_REVENUE_STANDARD})`,
   rows: bringInRows,
   updateCell: (rowKey: string, field: any, value: number) =>
     updateCell(rowKey, field === 'rje' ? 'currentRje' : 'currentAje', value),
@@ -212,6 +227,15 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
 <template>
   <div class="d4-tab-adjudication">
     <div class="import-export-bar">
+      <el-button
+        size="small"
+        type="success"
+        plain
+        :disabled="isReadonly || !hasPrefillData"
+        @click="previewSeedFromPrefill"
+      >
+        <el-icon><Refresh /></el-icon>从四表库带入未审数
+      </el-button>
       <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
         <el-icon><Download /></el-icon>带入调整
       </el-button>
@@ -223,6 +247,13 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
         </el-upload>
       </el-button-group>
     </div>
+
+    <!-- 四表库取数溯源面板（消 dead output：消费 project_context.tb_source_codes） -->
+    <WpFourTableSourcePanel
+      :source-codes="tbSourceCodes"
+      gross-label="营业收入原值"
+      fallback-row-code="IS-001"
+    />
 
     <!-- 编制提示 -->
     <details class="guidance-details">

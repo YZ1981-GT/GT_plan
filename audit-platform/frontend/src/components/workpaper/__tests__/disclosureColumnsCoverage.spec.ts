@@ -405,6 +405,28 @@ const P1_ROUTE: Record<string, { spec: string; complete: boolean; note?: string 
       '14 张表全部登记且列头逐字对齐模板；六张阶段表名与损失率/末列名随三阶段块生成，'
       + 'columns 键集随快照变化，故未做全表键集恒等（已断言两级表头恰 3 张、其余显式 flat）',
   },
+  // ── spec d4-four-table-extraction-and-disclosure-alignment（D4 营业收入）──────
+  buildD4TwoPeriodColumns: {
+    spec: 'composables/__tests__/d4NoteSubtableContract.spec.ts',
+    complete: true,
+    note:
+      'D4 (1)(2)(3)(8) 四种两级表头（5 列：项目+本期发生额{收入,成本}+上期发生额{收入,成本}）；'
+      + '零入参默认 variant=main，各变体叶子列名按源模板分取',
+  },
+  buildD4TransposeColumns: {
+    spec: 'composables/__tests__/d4NoteSubtableContract.spec.ts',
+    complete: true,
+    note:
+      'D4 (4) 分解信息列转置：动态类别列（稳定 key {slot}_{seq}）+ 行=在某一时点/时段/租赁收入；'
+      + '零入参使用默认类别列表',
+  },
+  buildD4ObligationColumns: {
+    spec: 'composables/__tests__/d4NoteSubtableContract.spec.ts',
+    complete: true,
+    note:
+      'D4 (6) 与剩余履约义务有关的信息：动态年度列（由审计年度派生）+ 合计列；'
+      + '零入参默认 auditYear=2025',
+  },
 }
 
 // ────────────────────────── 发现 ──────────────────────────

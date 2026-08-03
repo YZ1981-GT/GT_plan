@@ -3,17 +3,32 @@
  *
  * 双版本(listed/soe)共用逻辑：
  * - Section 1: 营业收入和营业成本（跨sheet取数 D4-1审定/D4-2明细/M循环成本）
- * - Section 2: 合同收入分解（按商品类型/服务类型/地区/时段，动态行）
- * - Section 3: 前五大客户收入（动态行+自动占比）
- * - Section 4(listed): 合同资产/负债变动说明
- * - Section 5(soe): 分产品/分地区收入
+ * - Section 2: 按行业（或产品类型）划分（动态行，4 数据列）
+ * - Section 3: 按地区划分（动态行，4 数据列）
+ * - Section 4(listed): 收入分解信息（时点/时段）
+ * - Section 4(soe): 分产品/分地区收入
+ *
+ * 🔴 两版（3）按地区叶子列名不同（Property 12）：
+ *   - listed: 主营业务收入/主营业务成本（源模板 R37）
+ *   - soe: 收入/成本（源模板 R31）
+ *   列定义由 `d4DisclosureModel.ts` 的 `buildD4TwoPeriodColumns(variant)` 统一管理。
  *
  * 持久化：checklist_responses batch API，item_id前缀 D4-disc-{variant}-
  * 跨sheet读取：从allResponses map读D4-1/D4-2审定数
  * EventBus: disclosure:note-text-updated 双向同步附注模块
+ *
+ * spec: d4-four-table-extraction-and-disclosure-alignment (Task 5.2)
+ * Requirements: 4.2, 4.3, 4.8
  */
 import { ref, computed, watch, onBeforeUnmount, onMounted, inject, type Ref, type ComputedRef } from 'vue'
+import { D4_MAIN_REVENUE_STANDARD } from './d4AccountScope'
 import { parseNum, calcSubtotal } from './useD4FormulaEngine'
+import {
+  D4_DEFAULT_CATEGORIES,
+  D4_TRANSPOSE_CHECK_ITEMS,
+  nextD4CategoryKey,
+  type D4TransposeCategory,
+} from './d4DisclosureModel'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -35,30 +50,12 @@ export interface ContractRevenueRow {
   priorAmount: number
 }
 
-export interface Top5CustomerRow {
-  rowId: string
-  rank: number
-  name: string
-  amount: number
-  proportion: number
-  isRelatedParty: boolean
-}
-
 export interface ProductRegionRow {
   rowId: string
   dimension: string
   type: '产品' | '地区' | '时段'
   currentAmount: number
   priorAmount: number
-}
-
-export interface ContractBalanceRow {
-  rowId: string
-  item: string
-  endBalance: number
-  beginBalance: number
-  changeAmount: number
-  reason: string
 }
 
 export interface UseD4DisclosureOptions {
@@ -395,11 +392,74 @@ export function useD4Disclosure(options: UseD4DisclosureOptions) {
     persist(SECTION2_KEY, JSON.stringify(section2Rows.value))
   }
 
-  // ─── Section 3: 前五大客户收入（动态行） ──────────────────────────────
-  const section3Rows = ref<Top5CustomerRow[]>([])
+  /**
+   * 从四表配对（segment_prefill）带入按行业/产品类型数据到 Section 2。
+   *
+   * 规则：
+   * - 已有手工值的行（category 非空且金额非零）不覆盖
+   * - segment_prefill 的 `label` → `category`
+   * - segment_prefill 的 `current_revenue` → `currentAmount`（收入金额）
+   * - segment_prefill 的 `current_cost` → `priorAmount`（成本金额；
+   *   field naming 沿用 composable 既有命名：currentAmount=本期收入, priorAmount=本期成本）
+   *
+   * spec: d4-four-table-extraction-and-disclosure-alignment (Fix 3)
+   */
+  function seedSection2FromSegmentPrefill(segmentPrefill: any[] | null | undefined): number {
+    if (isReadonly.value) return 0
+    if (!segmentPrefill || !Array.isArray(segmentPrefill) || segmentPrefill.length === 0) return 0
+
+    // 已有手工数据的类别名集合（已有值的不覆盖）
+    const existingCategories = new Set(
+      section2Rows.value
+        .filter(r => r.category && (r.currentAmount !== 0 || r.priorAmount !== 0))
+        .map(r => r.category)
+    )
+
+    let seeded = 0
+    const newRows: ContractRevenueRow[] = [...section2Rows.value]
+
+    for (const seg of segmentPrefill) {
+      const label = String(seg.label ?? '').trim()
+      if (!label) continue
+      if (existingCategories.has(label)) continue
+
+      // 查找已有同名空行（可能之前加了行名但未填金额）
+      const existingIdx = newRows.findIndex(r => r.category === label)
+      if (existingIdx !== -1) {
+        // 只填入金额（不覆盖已有非零值）
+        const existing = newRows[existingIdx]
+        if (existing.currentAmount === 0 && seg.current_revenue != null) {
+          existing.currentAmount = parseNum(seg.current_revenue)
+          seeded++
+        }
+        if (existing.priorAmount === 0 && seg.current_cost != null) {
+          existing.priorAmount = parseNum(seg.current_cost)
+          seeded++
+        }
+      } else {
+        // 新建行
+        newRows.push({
+          rowId: genRowId('s2'),
+          category: label,
+          currentAmount: parseNum(seg.current_revenue),
+          priorAmount: parseNum(seg.current_cost),
+        })
+        seeded++
+      }
+    }
+
+    if (seeded > 0) {
+      section2Rows.value = newRows
+      persist(SECTION2_KEY, JSON.stringify(newRows))
+    }
+    return seeded
+  }
+
+  // ─── Section 3: 按地区划分（动态行） ──────────────────────────────
+  const section3Rows = ref<any[]>([])
 
   function loadSection3() {
-    const rows = safeParseArray<Top5CustomerRow>(getResp(SECTION3_KEY))
+    const rows = safeParseArray<any>(getResp(SECTION3_KEY))
     section3Rows.value = rows.map((r, i) => ({
       rowId: r.rowId || genRowId('s3'),
       rank: i + 1,
@@ -460,83 +520,151 @@ export function useD4Disclosure(options: UseD4DisclosureOptions) {
     persist(SECTION3_KEY, JSON.stringify(section3Rows.value))
   }
 
-  // ─── Section 4: 合同资产/负债变动(listed) 或 分产品分地区(soe) ────────
-  const section4Rows = ref<(ContractBalanceRow | ProductRegionRow)[]>([])
+  // ─── Section 4: 列转置 + 动态类别列 ──────────────────────────────────────
+  // 源模板（4）结构（openpyxl 合并区实证）：
+  //   列 = 动态类别（消费品/汽车/能源/其他，各含 收入+成本 子列）
+  //   行 = 在某一时点确认 / 在某一时段确认 / 租赁收入（固定检查项）
+  //   列 key 使用稳定标识 `{slot}_{seq}`（H7 范式，禁用 label 作 key）
+  //
+  // 🔴 Property 16: 列转置 key 稳定且不撞
+  // 🔴 Req 4.4: 类别可增删改名，ElMessageBox.prompt 必须先输入名称再创建
+
+  /** 持久化的列转置数据结构 */
+  interface Section4TransposeData {
+    categories: D4TransposeCategory[]
+    cells: Record<string, number | null>
+  }
+
+  const section4Categories = ref<D4TransposeCategory[]>([...D4_DEFAULT_CATEGORIES])
+  const section4Cells = ref<Record<string, number | null>>({})
+
+  /** 生成单元格 key：`{catKey}_{rowIdx}_{revenue|cost}` */
+  function s4CellKey(catKey: string, rowIdx: number, type: 'revenue' | 'cost'): string {
+    return `${catKey}_${rowIdx}_${type}`
+  }
 
   function loadSection4() {
-    const rows = safeParseArray<any>(getResp(SECTION4_KEY))
-    if (variant === 'listed') {
-      section4Rows.value = rows.map((r: any) => ({
-        rowId: r.rowId || genRowId('s4'),
-        item: r.item || '',
-        endBalance: parseNum(r.endBalance),
-        beginBalance: parseNum(r.beginBalance),
-        changeAmount: parseNum(r.changeAmount),
-        reason: r.reason || '',
-      }))
-    } else {
-      section4Rows.value = rows.map((r: any) => ({
-        rowId: r.rowId || genRowId('s4'),
-        dimension: r.dimension || '',
-        type: r.type || '产品',
-        currentAmount: parseNum(r.currentAmount),
-        priorAmount: parseNum(r.priorAmount),
-      }))
+    const raw = getResp(SECTION4_KEY)
+    if (!raw) {
+      section4Categories.value = [...D4_DEFAULT_CATEGORIES]
+      section4Cells.value = {}
+      return
+    }
+    try {
+      const data: Section4TransposeData = typeof raw === 'string' ? JSON.parse(raw) : raw
+      if (Array.isArray(data?.categories) && data.categories.length > 0) {
+        section4Categories.value = data.categories
+      } else {
+        section4Categories.value = [...D4_DEFAULT_CATEGORIES]
+      }
+      section4Cells.value = data?.cells && typeof data.cells === 'object' ? { ...data.cells } : {}
+    } catch {
+      section4Categories.value = [...D4_DEFAULT_CATEGORIES]
+      section4Cells.value = {}
     }
   }
 
   watch(() => allResponses.value.get(prefix + SECTION4_KEY)?.remark, loadSection4, { immediate: true })
 
-  const section4Total = computed(() => {
-    if (variant === 'listed') {
-      const rows = section4Rows.value as ContractBalanceRow[]
-      return {
-        endBalance: calcSubtotal(rows.map(r => r.endBalance)),
-        beginBalance: calcSubtotal(rows.map(r => r.beginBalance)),
-        changeAmount: calcSubtotal(rows.map(r => r.changeAmount)),
-      }
-    } else {
-      const rows = section4Rows.value as ProductRegionRow[]
-      return {
-        currentAmount: calcSubtotal(rows.map(r => r.currentAmount)),
-        priorAmount: calcSubtotal(rows.map(r => r.priorAmount)),
+  function persistSection4(): void {
+    const data: Section4TransposeData = {
+      categories: section4Categories.value,
+      cells: section4Cells.value,
+    }
+    persist(SECTION4_KEY, JSON.stringify(data))
+  }
+
+  /** 获取单元格值 */
+  function getSection4Cell(catKey: string, rowIdx: number, type: 'revenue' | 'cost'): number | null {
+    return section4Cells.value[s4CellKey(catKey, rowIdx, type)] ?? null
+  }
+
+  /** 更新单元格值 */
+  function updateSection4Cell(catKey: string, rowIdx: number, type: 'revenue' | 'cost', value: number | null): void {
+    if (isReadonly.value) return
+    section4Cells.value[s4CellKey(catKey, rowIdx, type)] = value
+    persistSection4()
+  }
+
+  /** 添加类别（必须先命名） */
+  function addSection4Category(label: string): void {
+    if (isReadonly.value) return
+    const key = nextD4CategoryKey(section4Categories.value)
+    section4Categories.value.push({ key, label })
+    persistSection4()
+  }
+
+  /** 删除类别（同时清理关联 cells） */
+  function removeSection4Category(catKey: string): void {
+    if (isReadonly.value) return
+    section4Categories.value = section4Categories.value.filter(c => c.key !== catKey)
+    // 清理该类别下的所有 cell
+    const keysToRemove = Object.keys(section4Cells.value).filter(k => k.startsWith(catKey + '_'))
+    for (const k of keysToRemove) {
+      delete section4Cells.value[k]
+    }
+    persistSection4()
+  }
+
+  /** 重命名类别 */
+  function renameSection4Category(catKey: string, newLabel: string): void {
+    if (isReadonly.value) return
+    const cat = section4Categories.value.find(c => c.key === catKey)
+    if (cat) {
+      cat.label = newLabel
+      persistSection4()
+    }
+  }
+
+  /** 行合计（某个检查项行在所有类别下的收入/成本合计） */
+  function section4RowTotal(rowIdx: number, type: 'revenue' | 'cost'): number | null {
+    let sum: number | null = null
+    for (const cat of section4Categories.value) {
+      const v = section4Cells.value[s4CellKey(cat.key, rowIdx, type)]
+      if (v !== null && v !== undefined) {
+        sum = (sum ?? 0) + v
       }
     }
+    return sum
+  }
+
+  /** 列合计（某个类别在所有检查项行下的收入/成本合计） */
+  function section4ColTotal(catKey: string, type: 'revenue' | 'cost'): number | null {
+    let sum: number | null = null
+    for (let i = 0; i < D4_TRANSPOSE_CHECK_ITEMS.length; i++) {
+      const v = section4Cells.value[s4CellKey(catKey, i, type)]
+      if (v !== null && v !== undefined) {
+        sum = (sum ?? 0) + v
+      }
+    }
+    return sum
+  }
+
+  // 兼容旧接口（section4Rows / section4Total / addSection4Row / removeSection4Row / updateSection4）
+  // 这些现在仅作为兼容垫片，真正的列转置数据通过上方函数管理
+  const section4Rows = computed(() => {
+    return D4_TRANSPOSE_CHECK_ITEMS.map((item, idx) => ({
+      rowId: `s4-check-${idx}`,
+      item,
+      rowIdx: idx,
+    }))
   })
 
-  function addSection4Row(type?: '产品' | '地区' | '时段'): void {
-    if (isReadonly.value) return
-    if (variant === 'listed') {
-      (section4Rows.value as ContractBalanceRow[]).push({
-        rowId: genRowId('s4'), item: '', endBalance: 0, beginBalance: 0, changeAmount: 0, reason: '',
-      })
-    } else {
-      (section4Rows.value as ProductRegionRow[]).push({
-        rowId: genRowId('s4'), dimension: '', type: type || '产品', currentAmount: 0, priorAmount: 0,
-      })
+  const section4Total = computed(() => {
+    let totalRevenue: number | null = null
+    let totalCost: number | null = null
+    for (let i = 0; i < D4_TRANSPOSE_CHECK_ITEMS.length; i++) {
+      const rv = section4RowTotal(i, 'revenue')
+      const cv = section4RowTotal(i, 'cost')
+      if (rv !== null) totalRevenue = (totalRevenue ?? 0) + rv
+      if (cv !== null) totalCost = (totalCost ?? 0) + cv
     }
-    persist(SECTION4_KEY, JSON.stringify(section4Rows.value))
-  }
+    return { totalRevenue, totalCost }
+  })
 
-  function removeSection4Row(rowId: string): void {
-    if (isReadonly.value) return
-    section4Rows.value = section4Rows.value.filter(r => r.rowId !== rowId)
-    persist(SECTION4_KEY, JSON.stringify(section4Rows.value))
-  }
-
-  function updateSection4(rowId: string, field: string, value: any): void {
-    if (isReadonly.value) return
-    const idx = section4Rows.value.findIndex(r => r.rowId === rowId)
-    if (idx === -1) return
-    const numFields = ['endBalance', 'beginBalance', 'changeAmount', 'currentAmount', 'priorAmount']
-    ;(section4Rows.value[idx] as any)[field] = numFields.includes(field) ? parseNum(value) : value
-    // 自动计算changeAmount
-    if (variant === 'listed' && (field === 'endBalance' || field === 'beginBalance')) {
-      const row = section4Rows.value[idx] as ContractBalanceRow
-      row.changeAmount = row.endBalance - row.beginBalance
-    }
-    persist(SECTION4_KEY, JSON.stringify(section4Rows.value))
-  }
+  function addSection4Row(): void { /* no-op: rows are fixed check items */ }
+  function removeSection4Row(_rowId: string): void { /* no-op: rows are fixed check items */ }
+  function updateSection4(_rowId: string, _field: string, _value: any): void { /* no-op: use updateSection4Cell */ }
 
   // ─── Notes (per section) ─────────────────────────────────────────────
   const noteTexts = ref<Record<string, string>>({})
@@ -559,7 +687,7 @@ export function useD4Disclosure(options: UseD4DisclosureOptions) {
       window.dispatchEvent(new CustomEvent('disclosure:note-text-updated', {
         detail: {
           wpCode: 'D4',
-          accountCode: '6001',
+          accountCode: D4_MAIN_REVENUE_STANDARD,
           projectId: projectId.value,
           section: `${variant}-${key}`,
           sectionIds: [variant === 'soe' ? '八、64' : '五、62'],
@@ -609,18 +737,29 @@ export function useD4Disclosure(options: UseD4DisclosureOptions) {
     addSection2Row,
     removeSection2Row,
     updateSection2,
+    seedSection2FromSegmentPrefill,
     // Section 3
     section3Rows,
     section3Total,
     addSection3Row,
     removeSection3Row,
     updateSection3,
-    // Section 4
+    // Section 4 — 列转置
     section4Rows: section4Rows as Ref<any[]>,
     section4Total,
     addSection4Row,
     removeSection4Row,
     updateSection4,
+    // 列转置专用接口
+    section4Categories,
+    section4Cells,
+    getSection4Cell,
+    updateSection4Cell,
+    addSection4Category,
+    removeSection4Category,
+    renameSection4Category,
+    section4RowTotal,
+    section4ColTotal,
     // Notes
     noteTexts,
     updateNote,

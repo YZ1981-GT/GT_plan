@@ -2,35 +2,62 @@
 /**
  * D4TabDisclosureListed — 附注披露（上市公司版）
  *
- * 4子节卡片:
- * (一) 营业收入和营业成本（跨sheet自动取数 D4-1/D4-2/M循环）
- * (二) 合同收入分解（按商品/服务/地区/时段，动态行）
- * (三) 前五大客户收入（动态行+自动占比+关联方标记）
- * (四) 合同资产/合同负债变动（动态行+自动差额）
+ * 8 小节卡片（源模板 `附注披露信息（上市公司）` A1:I85）:
+ * (1) 营业收入和营业成本（跨sheet自动取数 D4-1/D4-2/M循环，4 数据列）
+ * (2) 营业收入、营业成本按行业（或产品类型）划分（动态行，4 数据列）
+ * (3) 营业收入、营业成本按地区划分（动态行，4 数据列；叶子列名 = 主营业务收入/主营业务成本，源 R37）
+ * (4) 营业收入、营业成本按分解信息（收入时点/时段）
+ * (5)~(8) 文字说明区
  *
- * 底部：审计说明textarea + AI辅助按钮 + 编制提示折叠
+ * 🔴 两版（3）叶子列名不得统一（Property 12 / Req 4.3）：
+ *   上市 = 主营业务收入/主营业务成本（源 R37）
+ *   国企 = 收入/成本（源 R31）
+ *
+ * spec: d4-four-table-extraction-and-disclosure-alignment (Task 5.2)
+ * Requirements: 4.2, 4.3, 4.8
  */
 import { ref, computed, onMounted, onBeforeUnmount, inject } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useDebounceFn } from '@vueuse/core'
 import http from '@/utils/http'
-import { useD4Disclosure, type ContractBalanceRow } from '../../composables/useD4Disclosure'
+import { useDisplayPrefsStore, DisplayPrefs_Key } from '@/stores/displayPrefs'
+import WpAmountInput from '../../shared/WpAmountInput.vue'
+import { useD4Disclosure } from '../../composables/useD4Disclosure'
+import { useD4DisclosureAi } from '../../composables/useD4DisclosureAi'
 import { buildD4SyncPayload, D4_NOTE_SECTION, type D4DisclosureSnapshot } from '../../composables/d4NoteSectionMap'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import { parseNum } from '../../composables/useD4FormulaEngine'
 import { getDisclosureNoteDetail } from '@/services/auditPlatformApi'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import { D4_MAIN_REVENUE_STANDARD, D4_OTHER_REVENUE_STANDARD, D4_MAIN_COST_STANDARD, D4_OTHER_COST_STANDARD } from '../../composables/d4AccountScope'
+import {
+  D4_TRANSPOSE_CHECK_ITEMS,
+  buildD4ObligationColumns,
+  deriveObligationTotal,
+  getObligationYearKeys,
+  buildD4TwoPeriodColumns,
+  type D4ObligationRow,
+  type D4TwoPeriodRow,
+} from '../../composables/d4DisclosureModel'
 
 const props = defineProps<{
   wpId: string
   projectId: string
   allResponses: Map<string, any>
   isReadonly: boolean
+  htmlData?: any
+  applicableStandards?: string[]
 }>()
 
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
+
+/**
+ * 🔴 金额格式单一真源 = displayPrefs store 成员（不是模块级导出）。
+ * setup 顶层 inject —— 写进函数体会静默失效（useDisplayPrefsStore 是 setup 作用域 composable）。
+ */
+const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 
 // ─── Debounced batch save ──────────────────────────────────────────────────
 const pendingItems = ref<any[]>([])
@@ -88,9 +115,14 @@ const {
   crossSheetRevenue, crossSheetCost,
   isRefreshing, lastRefreshTime, refreshFromTb,
   section1Data, section1Total, grossMarginRate, priorGrossMarginRate,
-  section2Rows, section2Total, addSection2Row, removeSection2Row, updateSection2,
+  section2Rows, section2Total, addSection2Row, removeSection2Row, updateSection2, seedSection2FromSegmentPrefill,
   section3Rows, section3Total, addSection3Row, removeSection3Row, updateSection3,
   section4Rows, section4Total, addSection4Row, removeSection4Row, updateSection4,
+  // 列转置专用
+  section4Categories, section4Cells,
+  getSection4Cell, updateSection4Cell,
+  addSection4Category, removeSection4Category, renameSection4Category,
+  section4RowTotal, section4ColTotal,
   noteTexts, updateNote,
 } = useD4Disclosure({
   allResponses: allResponsesRef,
@@ -100,6 +132,154 @@ const {
   saveBatch,
   isReadonly: isReadonlyRef,
 })
+
+// ─── 列转置辅助常量 ─────────────────────────────────────────────────────────
+const transposeCheckItems = D4_TRANSPOSE_CHECK_ITEMS
+
+// ─── （6）剩余履约义务结构化表 ─────────────────────────────────────────────────
+const SECTION6_KEY = 'D4-disc-listed-section6-rows'
+const obligationYearKeys = computed(() => getObligationYearKeys(auditYear.value))
+const obligationColumns = computed(() => buildD4ObligationColumns(auditYear.value))
+
+const section6Rows = computed<D4ObligationRow[]>(() => {
+  const raw = props.allResponses?.get(SECTION6_KEY)
+  if (raw && typeof raw === 'string') {
+    try { return JSON.parse(raw) } catch { return [] }
+  }
+  if (Array.isArray(raw)) return raw
+  return []
+})
+
+function persistSection6(rows: D4ObligationRow[]): void {
+  saveBatch([{ item_id: SECTION6_KEY, conclusion: JSON.stringify(rows) }])
+}
+
+function addSection6Row(): void {
+  const rows = [...section6Rows.value, { label: '' } as D4ObligationRow]
+  persistSection6(rows)
+}
+
+function removeSection6Row(idx: number): void {
+  const rows = [...section6Rows.value]
+  rows.splice(idx, 1)
+  persistSection6(rows)
+}
+
+function updateSection6Cell(idx: number, field: string, value: string | number | null): void {
+  const rows = section6Rows.value.map((r, i) => (i === idx ? { ...r, [field]: value } : r))
+  persistSection6(rows)
+}
+
+function getSection6Total(field: string): number | null {
+  if (field === 'total') {
+    // total of totals = sum of each row's total
+    let sum: number | null = null
+    for (const row of section6Rows.value) {
+      const t = deriveObligationTotal(row, auditYear.value)
+      if (t !== null) { sum = (sum ?? 0) + t }
+    }
+    return sum
+  }
+  let sum: number | null = null
+  for (const row of section6Rows.value) {
+    const v = row[field]
+    if (typeof v === 'number') { sum = (sum ?? 0) + v }
+  }
+  return sum
+}
+
+// ─── （8）试运行销售收入结构化表（仅上市） ──────────────────────────────────────
+const SECTION8_KEY = 'D4-disc-listed-section8-rows'
+const TRIAL_RUN_FIXED_ROWS = ['固定资产试运行收入', '研发样品销售收入'] as const
+
+const section8Rows = computed<D4TwoPeriodRow[]>(() => {
+  const raw = props.allResponses?.get(SECTION8_KEY)
+  let parsed: D4TwoPeriodRow[] = []
+  if (raw && typeof raw === 'string') {
+    try { parsed = JSON.parse(raw) } catch { /* empty */ }
+  } else if (Array.isArray(raw)) {
+    parsed = raw
+  }
+  // Ensure fixed rows exist
+  if (parsed.length === 0) {
+    parsed = TRIAL_RUN_FIXED_ROWS.map(label => ({
+      label,
+      endRevenue: null, endCost: null, priorRevenue: null, priorCost: null,
+    }))
+  }
+  return parsed
+})
+
+function persistSection8(rows: D4TwoPeriodRow[]): void {
+  saveBatch([{ item_id: SECTION8_KEY, conclusion: JSON.stringify(rows) }])
+}
+
+function updateSection8Cell(idx: number, field: keyof D4TwoPeriodRow, value: number | null): void {
+  const rows = section8Rows.value.map((r, i) => (i === idx ? { ...r, [field]: value } : r))
+  persistSection8(rows)
+}
+
+// ─── （2）从四表配对带入处理器 ─────────────────────────────────────────────────
+
+/**
+ * 从 render 下发的 segment_prefill 带入按行业/产品类型数据。
+ * 手工已填的行不覆盖。
+ * spec: d4-four-table-extraction-and-disclosure-alignment (Fix 3)
+ */
+function handleSeedFromSegmentPrefill(): void {
+  const segmentPrefill = props.htmlData?.segment_prefill
+  if (!segmentPrefill || !Array.isArray(segmentPrefill) || segmentPrefill.length === 0) {
+    ElMessage.info('暂无四表配对数据（请确认四表已入库且灰度开关已开启）')
+    return
+  }
+  const count = seedSection2FromSegmentPrefill(segmentPrefill)
+  if (count > 0) {
+    ElMessage.success(`已从四表配对带入 ${count} 项数据`)
+  } else {
+    ElMessage.info('所有行已有手工数据，未覆盖')
+  }
+}
+
+// ─── （4）类别操作处理器（ElMessageBox.prompt 先命名再创建）─────────────────────
+async function handleAddCategory(): Promise<void> {
+  try {
+    const { value } = await ElMessageBox.prompt('请输入新增类别名称', '添加分解类别', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      inputPattern: /\S+/,
+      inputErrorMessage: '类别名称不能为空',
+    })
+    if (value?.trim()) {
+      addSection4Category(value.trim())
+    }
+  } catch { /* 用户取消 */ }
+}
+
+async function handleRenameCategory(catKey: string, currentLabel: string): Promise<void> {
+  try {
+    const { value } = await ElMessageBox.prompt('请输入新名称', `重命名类别「${currentLabel}」`, {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      inputValue: currentLabel,
+      inputPattern: /\S+/,
+      inputErrorMessage: '类别名称不能为空',
+    })
+    if (value?.trim() && value.trim() !== currentLabel) {
+      renameSection4Category(catKey, value.trim())
+    }
+  } catch { /* 用户取消 */ }
+}
+
+async function handleRemoveCategory(catKey: string, label: string): Promise<void> {
+  try {
+    await ElMessageBox.confirm(
+      `确定删除类别「${label}」？该类别下所有已录入的收入/成本数据将一并删除。`,
+      '删除分解类别',
+      { confirmButtonText: '确定删除', cancelButtonText: '取消', type: 'warning' },
+    )
+    removeSection4Category(catKey)
+  } catch { /* 用户取消 */ }
+}
 
 // ─── 同步到附注 / 跳转回附注 ─────────────────────────────────────────────────
 const VARIANT: DisclosureVariant = 'listed'
@@ -129,11 +309,23 @@ function buildSnapshot(): D4DisclosureSnapshot {
     regionRows: section3Rows.value.map((r: any) => ({
       label: r.name, currentRevenue: parseNum(r.amount), currentCost: parseNum(r.proportion),
     })),
-    timingRows: (section4Rows.value as any[]).map((r: any) => ({
-      label: r.item || r.dimension || '',
-      currentRevenue: parseNum(r.endBalance ?? r.currentAmount),
-      currentCost: parseNum(r.beginBalance ?? r.priorAmount),
-    })),
+    timingRows: D4_TRANSPOSE_CHECK_ITEMS.map((checkLabel) => {
+      const row: Record<string, string | number | null> = { label: checkLabel }
+      let totalRev = 0
+      let totalCost = 0
+      for (const cat of section4Categories.value) {
+        const rv = getSection4Cell(checkLabel, cat.key, 'revenue')
+        const cv = getSection4Cell(checkLabel, cat.key, 'cost')
+        row[`${cat.key}_revenue`] = rv
+        row[`${cat.key}_cost`] = cv
+        totalRev += (typeof rv === 'number' ? rv : 0)
+        totalCost += (typeof cv === 'number' ? cv : 0)
+      }
+      row.total_revenue = totalRev
+      row.total_cost = totalCost
+      return row
+    }),
+    timingCategories: section4Categories.value.map((c: any) => ({ key: c.key, label: c.label })),
     notes: { ...noteTexts.value },
   }
 }
@@ -150,7 +342,7 @@ async function syncToDisclosureNotes(): Promise<void> {
     const data = result?.data ?? result
     const rows = Number(data?.rows_synced ?? 0)
     window.dispatchEvent(new CustomEvent('disclosure:note-text-updated', {
-      detail: { wpCode: 'D4', accountCode: '6001', projectId: props.projectId, section: VARIANT, sectionIds: [D4_NOTE_SECTION[VARIANT]] },
+      detail: { wpCode: 'D4', accountCode: D4_MAIN_REVENUE_STANDARD, projectId: props.projectId, section: VARIANT, sectionIds: [D4_NOTE_SECTION[VARIANT]] },
     }))
     ElMessage.success(`已同步 ${rows} 行到附注模块「${D4_NOTE_SECTION[VARIANT]} 营业收入和营业成本」`)
     await checkNoteConsistency(true)
@@ -210,9 +402,7 @@ async function checkNoteConsistency(silent = false): Promise<void> {
 
 // ─── Format helpers ──────────────────────────────────────────────────────────
 function fmtAmt(v: number): string {
-  if (v === 0) return '-'
-  if (v < 0) return `(${Math.abs(v).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
-  return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return displayPrefs.fmtAmount(v)
 }
 
 function fmtPct(v: number): string {
@@ -221,43 +411,26 @@ function fmtPct(v: number): string {
 }
 
 // ─── AI 辅助生成 ─────────────────────────────────────────────────────────────
-const aiLoading = ref(false)
-
-async function aiGenerate(noteKey: string, task: string) {
-  if (aiLoading.value || props.isReadonly) return
-  aiLoading.value = true
-  try {
-    const res = await http.post(`/api/workpapers/${props.wpId}/d4/ai-generate`, {
-      section: 'adj-note',
-      existingContent: noteTexts.value[noteKey] || '',
-      relatedContext: {
-        task,
-        variant: 'listed',
-        revenue: crossSheetRevenue.value,
-        cost: crossSheetCost.value,
-      },
-    }, { _silent: true } as any)
-    const data = res.data?.data ?? res.data
-    if (data?.generated_text) {
-      updateNote(noteKey, data.generated_text)
-    }
-  } catch { /* silent - AI不可用时不报错 */ }
-  finally { aiLoading.value = false }
-}
+const { aiLoading, aiGenerate } = useD4DisclosureAi({
+  wpId: computed(() => props.wpId),
+  variant: 'listed',
+  getNoteText: (k) => noteTexts.value[k] || '',
+  setNoteText: (k, v) => updateNote(k, v),
+})
 
 // ─── 公式管理 ────────────────────────────────────────────────────────────────
 const showFormulaDrawer = ref(false)
 
 // 公式映射表：描述每个自动填充单元格的数据来源
 const formulaMap = [
-  { field: '主营业务-本期收入', source: 'trial_balance', formula: 'SUM(audited_amount WHERE standard_account_code=6001)', account: '6001' },
-  { field: '其他业务-本期收入', source: 'trial_balance', formula: 'SUM(audited_amount WHERE standard_account_code=6051)', account: '6051' },
-  { field: '主营业务-本期成本', source: 'trial_balance', formula: 'SUM(audited_amount WHERE standard_account_code=6401)', account: '6401' },
-  { field: '其他业务-本期成本', source: 'trial_balance', formula: 'SUM(audited_amount WHERE standard_account_code=6402)', account: '6402' },
-  { field: '主营业务-上期收入', source: 'trial_balance(year-1)', formula: 'SUM(audited_amount WHERE code=6001, year=prior)', account: '6001' },
-  { field: '其他业务-上期收入', source: 'trial_balance(year-1)', formula: 'SUM(audited_amount WHERE code=6051, year=prior)', account: '6051' },
-  { field: '主营业务-上期成本', source: 'trial_balance(year-1)', formula: 'SUM(audited_amount WHERE code=6401, year=prior)', account: '6401' },
-  { field: '其他业务-上期成本', source: 'trial_balance(year-1)', formula: 'SUM(audited_amount WHERE code=6402, year=prior)', account: '6402' },
+  { field: '主营业务-本期收入', source: 'trial_balance', formula: `SUM(audited_amount WHERE standard_account_code=${D4_MAIN_REVENUE_STANDARD})`, account: D4_MAIN_REVENUE_STANDARD },
+  { field: '其他业务-本期收入', source: 'trial_balance', formula: `SUM(audited_amount WHERE standard_account_code=${D4_OTHER_REVENUE_STANDARD})`, account: D4_OTHER_REVENUE_STANDARD },
+  { field: '主营业务-本期成本', source: 'trial_balance', formula: `SUM(audited_amount WHERE standard_account_code=${D4_MAIN_COST_STANDARD})`, account: D4_MAIN_COST_STANDARD },
+  { field: '其他业务-本期成本', source: 'trial_balance', formula: `SUM(audited_amount WHERE standard_account_code=${D4_OTHER_COST_STANDARD})`, account: D4_OTHER_COST_STANDARD },
+  { field: '主营业务-上期收入', source: 'trial_balance(year-1)', formula: `SUM(audited_amount WHERE code=${D4_MAIN_REVENUE_STANDARD}, year=prior)`, account: D4_MAIN_REVENUE_STANDARD },
+  { field: '其他业务-上期收入', source: 'trial_balance(year-1)', formula: `SUM(audited_amount WHERE code=${D4_OTHER_REVENUE_STANDARD}, year=prior)`, account: D4_OTHER_REVENUE_STANDARD },
+  { field: '主营业务-上期成本', source: 'trial_balance(year-1)', formula: `SUM(audited_amount WHERE code=${D4_MAIN_COST_STANDARD}, year=prior)`, account: D4_MAIN_COST_STANDARD },
+  { field: '其他业务-上期成本', source: 'trial_balance(year-1)', formula: `SUM(audited_amount WHERE code=${D4_OTHER_COST_STANDARD}, year=prior)`, account: D4_OTHER_COST_STANDARD },
   { field: '毛利率', source: '计算', formula: '(总收入 - 总成本) / 总收入 × 100%', account: '-' },
 ]
 </script>
@@ -370,6 +543,7 @@ const formulaMap = [
         <div class="section-header-row">
           <span class="section-title">(2) 营业收入、营业成本按行业（或产品类型）划分</span>
           <div class="header-actions">
+            <el-button size="small" :disabled="isReadonly" @click="handleSeedFromSegmentPrefill">从四表配对带入</el-button>
             <el-button size="small" :disabled="isReadonly" @click="addSection2Row">+ 添加行</el-button>
           </div>
         </div>
@@ -381,11 +555,17 @@ const formulaMap = [
             <span v-else>{{ row.category || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="本期收入" min-width="110" align="right">
-          <template #default="{ row }"><el-input v-if="!isReadonly" :model-value="row.currentAmount" size="small" type="number" @change="(v: string) => updateSection2(row.rowId, 'currentAmount', v)" /><span v-else>{{ fmtAmt(row.currentAmount) }}</span></template>
+        <el-table-column label="本期收入" min-width="100" align="right">
+          <template #default="{ row }"><WpAmountInput v-if="!isReadonly" :model-value="row.currentAmount" size="small" @update:model-value="(v: number) => updateSection2(row.rowId, 'currentAmount', v)" /><span v-else>{{ fmtAmt(row.currentAmount) }}</span></template>
         </el-table-column>
-        <el-table-column label="本期成本" min-width="110" align="right">
-          <template #default="{ row }"><el-input v-if="!isReadonly" :model-value="row.priorAmount" size="small" type="number" @change="(v: string) => updateSection2(row.rowId, 'priorAmount', v)" /><span v-else>{{ fmtAmt(row.priorAmount) }}</span></template>
+        <el-table-column label="本期成本" min-width="100" align="right">
+          <template #default="{ row }"><WpAmountInput v-if="!isReadonly" :model-value="row.priorAmount" size="small" @update:model-value="(v: number) => updateSection2(row.rowId, 'priorAmount', v)" /><span v-else>{{ fmtAmt(row.priorAmount) }}</span></template>
+        </el-table-column>
+        <el-table-column label="上期收入" min-width="100" align="right">
+          <template #default="{ row }"><span class="placeholder-cell">-</span></template>
+        </el-table-column>
+        <el-table-column label="上期成本" min-width="100" align="right">
+          <template #default="{ row }"><span class="placeholder-cell">-</span></template>
         </el-table-column>
         <el-table-column width="50" align="center">
           <template #default="{ row }"><el-button v-if="!isReadonly" type="danger" size="small" link @click="removeSection2Row(row.rowId)">删</el-button></template>
@@ -412,11 +592,18 @@ const formulaMap = [
             <span v-else>{{ row.name || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="本期收入" min-width="110" align="right">
-          <template #default="{ row }"><el-input v-if="!isReadonly" :model-value="row.amount" size="small" type="number" @change="(v: string) => updateSection3(row.rowId, 'amount', v)" /><span v-else>{{ fmtAmt(row.amount) }}</span></template>
+        <!-- 🔴 上市（3）按地区叶子列名 = 主营业务收入/主营业务成本（源 R37），与国企「收入/成本」不同（Property 12） -->
+        <el-table-column label="主营业务收入" min-width="110" align="right">
+          <template #default="{ row }"><WpAmountInput v-if="!isReadonly" :model-value="row.amount" size="small" @update:model-value="(v: number) => updateSection3(row.rowId, 'amount', v)" /><span v-else>{{ fmtAmt(row.amount) }}</span></template>
         </el-table-column>
-        <el-table-column label="本期成本" min-width="110" align="right">
-          <template #default="{ row }"><el-input v-if="!isReadonly" :model-value="row.proportion" size="small" type="number" @change="(v: string) => updateSection3(row.rowId, 'proportion', v)" /><span v-else>{{ fmtAmt(row.proportion) }}</span></template>
+        <el-table-column label="主营业务成本" min-width="110" align="right">
+          <template #default="{ row }"><WpAmountInput v-if="!isReadonly" :model-value="row.proportion" size="small" @update:model-value="(v: number) => updateSection3(row.rowId, 'proportion', v)" /><span v-else>{{ fmtAmt(row.proportion) }}</span></template>
+        </el-table-column>
+        <el-table-column label="上期主营业务收入" min-width="110" align="right">
+          <template #default="{ row }"><span class="placeholder-cell">-</span></template>
+        </el-table-column>
+        <el-table-column label="上期主营业务成本" min-width="110" align="right">
+          <template #default="{ row }"><span class="placeholder-cell">-</span></template>
         </el-table-column>
         <el-table-column width="50" align="center">
           <template #default="{ row }"><el-button v-if="!isReadonly" type="danger" size="small" link @click="removeSection3Row(row.rowId)">删</el-button></template>
@@ -426,13 +613,13 @@ const formulaMap = [
       <div class="note-area"><el-input :model-value="noteTexts['note-3']" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" placeholder="说明..." :disabled="isReadonly" @input="(v: string) => updateNote('note-3', v)" /></div>
     </el-card>
 
-    <!-- (4) 收入分解信息（时点/时段） -->
+    <!-- (4) 营业收入、营业成本按分解信息 — 列转置 + 动态类别列 -->
     <el-card class="section-card" shadow="never">
       <template #header>
         <div class="section-header-row">
           <span class="section-title">(4) 营业收入、营业成本按分解信息</span>
           <div class="header-actions">
-            <el-button size="small" :disabled="isReadonly" @click="addSection4Row()">+ 添加行</el-button>
+            <el-button size="small" :disabled="isReadonly" @click="handleAddCategory">+ 添加类别</el-button>
           </div>
         </div>
       </template>
@@ -440,23 +627,69 @@ const formulaMap = [
         <p>企业应考虑：①财务报表之外披露的收入信息；②管理层定期复核的经营分部信息；③使用者评价财务业绩的信息类型。</p>
         <p>分解类别包括：商品类型、经营地区、客户类型、合同类型（固定造价/成本加成）、转让时间（时点/时段）、合同期限、销售渠道等。租赁收入需单独披露。</p>
       </div>
-      <el-table :data="(section4Rows as any[])" border size="small" class="disclosure-table">
-        <el-table-column label="项目" min-width="160">
-          <template #default="{ row }">
-            <el-input v-if="!isReadonly" :model-value="row.item || row.dimension || ''" size="small" placeholder="如：在某一时点确认/在某一时段确认/租赁收入..." @change="(v: string) => updateSection4(row.rowId, 'item', v)" />
-            <span v-else>{{ row.item || row.dimension || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="本期收入" min-width="110" align="right">
-          <template #default="{ row }"><el-input v-if="!isReadonly" :model-value="row.endBalance || row.currentAmount || 0" size="small" type="number" @change="(v: string) => updateSection4(row.rowId, 'endBalance', v)" /><span v-else>{{ fmtAmt(row.endBalance || row.currentAmount || 0) }}</span></template>
-        </el-table-column>
-        <el-table-column label="本期成本" min-width="110" align="right">
-          <template #default="{ row }"><el-input v-if="!isReadonly" :model-value="row.beginBalance || row.priorAmount || 0" size="small" type="number" @change="(v: string) => updateSection4(row.rowId, 'beginBalance', v)" /><span v-else>{{ fmtAmt(row.beginBalance || row.priorAmount || 0) }}</span></template>
-        </el-table-column>
-        <el-table-column width="50" align="center">
-          <template #default="{ row }"><el-button v-if="!isReadonly" type="danger" size="small" link @click="removeSection4Row(row.rowId)">删</el-button></template>
-        </el-table-column>
-      </el-table>
+      <!-- 列转置表格：行=检查项，列=动态类别（各含收入+成本子列）+ 合计 -->
+      <div class="transpose-table-wrapper">
+        <table class="transpose-table">
+          <thead>
+            <tr class="group-header-row">
+              <th rowspan="2" class="label-th">项 目</th>
+              <th v-for="cat in section4Categories" :key="cat.key" colspan="2" class="group-th">
+                <span class="cat-label">{{ cat.label }}</span>
+                <span v-if="!isReadonly" class="cat-actions">
+                  <el-button size="small" link @click="handleRenameCategory(cat.key, cat.label)" title="重命名">✎</el-button>
+                  <el-button size="small" link type="danger" @click="handleRemoveCategory(cat.key, cat.label)" title="删除">✕</el-button>
+                </span>
+              </th>
+              <th colspan="2" class="group-th total-group-th">合计</th>
+            </tr>
+            <tr class="leaf-header-row">
+              <template v-for="cat in section4Categories" :key="'hdr-' + cat.key">
+                <th class="leaf-th">收入</th>
+                <th class="leaf-th">成本</th>
+              </template>
+              <th class="leaf-th total-leaf-th">收入</th>
+              <th class="leaf-th total-leaf-th">成本</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(checkItem, rowIdx) in transposeCheckItems" :key="rowIdx">
+              <td class="label-td">{{ checkItem }}</td>
+              <template v-for="cat in section4Categories" :key="cat.key + '-' + rowIdx">
+                <td class="amount-td">
+                  <WpAmountInput
+                    v-if="!isReadonly"
+                    :model-value="getSection4Cell(cat.key, rowIdx, 'revenue')"
+                    size="small"
+                    @update:model-value="(v: number) => updateSection4Cell(cat.key, rowIdx, 'revenue', v || null)"
+                  />
+                  <span v-else>{{ fmtAmt(getSection4Cell(cat.key, rowIdx, 'revenue') ?? 0) }}</span>
+                </td>
+                <td class="amount-td">
+                  <WpAmountInput
+                    v-if="!isReadonly"
+                    :model-value="getSection4Cell(cat.key, rowIdx, 'cost')"
+                    size="small"
+                    @update:model-value="(v: number) => updateSection4Cell(cat.key, rowIdx, 'cost', v || null)"
+                  />
+                  <span v-else>{{ fmtAmt(getSection4Cell(cat.key, rowIdx, 'cost') ?? 0) }}</span>
+                </td>
+              </template>
+              <td class="amount-td total-td">{{ fmtAmt(section4RowTotal(rowIdx, 'revenue') ?? 0) }}</td>
+              <td class="amount-td total-td">{{ fmtAmt(section4RowTotal(rowIdx, 'cost') ?? 0) }}</td>
+            </tr>
+            <!-- 合计行 -->
+            <tr class="total-row">
+              <td class="label-td font-bold">合 计</td>
+              <template v-for="cat in section4Categories" :key="'tot-' + cat.key">
+                <td class="amount-td font-bold">{{ fmtAmt(section4ColTotal(cat.key, 'revenue') ?? 0) }}</td>
+                <td class="amount-td font-bold">{{ fmtAmt(section4ColTotal(cat.key, 'cost') ?? 0) }}</td>
+              </template>
+              <td class="amount-td total-td font-bold">{{ fmtAmt(section4Total.totalRevenue ?? 0) }}</td>
+              <td class="amount-td total-td font-bold">{{ fmtAmt(section4Total.totalCost ?? 0) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
       <div class="note-area"><el-input :model-value="noteTexts['note-4']" type="textarea" :autosize="{ minRows: 2, maxRows: 6 }" placeholder="说明：收入分解维度选择依据..." :disabled="isReadonly" @input="(v: string) => updateNote('note-4', v)" /></div>
     </el-card>
 
@@ -465,7 +698,7 @@ const formulaMap = [
       <template #header>
         <div class="section-header-row">
           <span class="section-title">(5) 履约义务的说明</span>
-          <el-button size="small" :disabled="isReadonly || aiLoading" :loading="aiLoading" @click="aiGenerate('note-5', '根据项目合同信息，生成履约义务相关披露文本')">🤖 AI生成</el-button>
+          <el-button size="small" :disabled="isReadonly || aiLoading" :loading="aiLoading" @click="aiGenerate('note-5')">🤖 AI生成</el-button>
         </div>
       </template>
       <div class="method-context">
@@ -474,12 +707,15 @@ const formulaMap = [
       <el-input :model-value="noteTexts['note-5'] || ''" type="textarea" :autosize="{ minRows: 4, maxRows: 12 }" placeholder="请填写履约义务相关信息..." :disabled="isReadonly" @input="(v: string) => updateNote('note-5', v)" />
     </el-card>
 
-    <!-- (6) 与剩余履约义务有关的信息 -->
+    <!-- (6) 与剩余履约义务有关的信息 — STRUCTURED TABLE + 文本说明 -->
     <el-card class="section-card" shadow="never">
       <template #header>
         <div class="section-header-row">
           <span class="section-title">(6) 与剩余履约义务有关的信息</span>
-          <el-button size="small" :disabled="isReadonly || aiLoading" :loading="aiLoading" @click="aiGenerate('note-6', '生成剩余履约义务披露文本，包含交易价格总额和确认时间')">🤖 AI生成</el-button>
+          <div class="header-actions">
+            <el-button size="small" :disabled="isReadonly" @click="addSection6Row">+ 添加行</el-button>
+            <el-button size="small" :disabled="isReadonly || aiLoading" :loading="aiLoading" @click="aiGenerate('note-6')">🤖 AI生成</el-button>
+          </div>
         </div>
       </template>
       <div class="method-context">
@@ -487,7 +723,38 @@ const formulaMap = [
         <p>说明是否存在任何对价金额未纳入交易价格（如因可变对价限制要求而未计入的部分）。</p>
         <p>简化操作方法适用条件：一是原预计合同期限不超过一年；二是企业有权发出账单且账单金额能代表已履约部分价值。采用简化方法的应提供定性说明。</p>
       </div>
-      <el-input :model-value="noteTexts['note-6'] || ''" type="textarea" :autosize="{ minRows: 4, maxRows: 12 }" placeholder="披露分摊至尚未履行的履约义务的交易价格总额及确认为收入的预计时间..." :disabled="isReadonly" @input="(v: string) => updateNote('note-6', v)" />
+      <!-- 结构化表：年度 + 动态年度列（由审计年度派生） + 合计 -->
+      <el-table :data="section6Rows" border size="small" class="disclosure-table" style="margin-bottom: 8px;">
+        <el-table-column label="年 度" min-width="180">
+          <template #default="{ row, $index }">
+            <el-input v-if="!isReadonly" :model-value="row.label" size="small" placeholder="如：xx合同预计将确认的收入" @change="(v: string) => updateSection6Cell($index, 'label', v)" />
+            <span v-else>{{ row.label || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column v-for="yk in obligationYearKeys" :key="yk" :label="obligationColumns.find((c: any) => c.key === yk)?.label || yk" min-width="110" align="right">
+          <template #default="{ row, $index }">
+            <WpAmountInput v-if="!isReadonly" :model-value="row[yk]" size="small" @update:model-value="(v: number) => updateSection6Cell($index, yk, v || null)" />
+            <span v-else>{{ fmtAmt(row[yk] ?? 0) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="合计" min-width="110" align="right">
+          <template #default="{ row }">
+            <span class="font-bold">{{ fmtAmt(deriveObligationTotal(row, auditYear) ?? 0) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column width="50" align="center">
+          <template #default="{ $index }"><el-button v-if="!isReadonly" type="danger" size="small" link @click="removeSection6Row($index)">删</el-button></template>
+        </el-table-column>
+      </el-table>
+      <!-- 合计行 -->
+      <div v-if="section6Rows.length > 0" class="subtotal-row">
+        合计：<template v-for="yk in obligationYearKeys" :key="'s6t-' + yk">
+          {{ obligationColumns.find((c: any) => c.key === yk)?.label }} <span class="font-bold">{{ fmtAmt(getSection6Total(yk) ?? 0) }}</span>&nbsp;/&nbsp;
+        </template>
+        总计 <span class="font-bold">{{ fmtAmt(getSection6Total('total') ?? 0) }}</span>
+      </div>
+      <!-- 文本说明区（保留原有 textarea） -->
+      <div class="note-area"><el-input :model-value="noteTexts['note-6'] || ''" type="textarea" :autosize="{ minRows: 4, maxRows: 12 }" placeholder="披露分摊至尚未履行的履约义务的交易价格总额及确认为收入的预计时间..." :disabled="isReadonly" @input="(v: string) => updateNote('note-6', v)" /></div>
     </el-card>
 
     <!-- (7) 重大合同变更或重大交易价格调整 -->
@@ -495,21 +762,57 @@ const formulaMap = [
       <template #header>
         <div class="section-header-row">
           <span class="section-title">(7) 重大合同变更【或重大交易价格调整】</span>
-          <el-button size="small" :disabled="isReadonly || aiLoading" :loading="aiLoading" @click="aiGenerate('note-7', '生成重大合同变更披露文本')">🤖 AI生成</el-button>
+          <el-button size="small" :disabled="isReadonly || aiLoading" :loading="aiLoading" @click="aiGenerate('note-7')">🤖 AI生成</el-button>
         </div>
       </template>
       <el-input :model-value="noteTexts['note-7'] || ''" type="textarea" :autosize="{ minRows: 3, maxRows: 10 }" placeholder="披露重大合同变更或重大交易价格调整相关的信息、会计处理方法及对收入的影响金额。" :disabled="isReadonly" @input="(v: string) => updateNote('note-7', v)" />
     </el-card>
 
-    <!-- (8) 试运行销售收入 -->
+    <!-- (8) 试运行销售收入 — STRUCTURED TABLE + 文本说明（仅上市，Req 4.6） -->
     <el-card class="section-card" shadow="never">
       <template #header>
         <div class="section-header-row">
           <span class="section-title">(8) 试运行销售收入</span>
-          <el-button size="small" :disabled="isReadonly || aiLoading" :loading="aiLoading" @click="aiGenerate('note-8', '生成试运行销售收入披露文本')">🤖 AI生成</el-button>
+          <el-button size="small" :disabled="isReadonly || aiLoading" :loading="aiLoading" @click="aiGenerate('note-8')">🤖 AI生成</el-button>
         </div>
       </template>
-      <el-input :model-value="noteTexts['note-8'] || ''" type="textarea" :autosize="{ minRows: 3, maxRows: 10 }" placeholder="披露试运行期间的销售收入及相关会计处理（如适用）。" :disabled="isReadonly" @input="(v: string) => updateNote('note-8', v)" />
+      <div class="method-context">
+        <p>企业应当按照《企业会计准则解释第15号》的规定，将试运行销售相关收入和成本分别确认为营业收入和营业成本，不应将试运行销售相关收入抵销相关成本后的净额冲减固定资产成本。</p>
+      </div>
+      <!-- 结构化表：5 列两级（项 目 + 本期发生额{收入,成本} + 上期发生額{收入,成本}） -->
+      <el-table :data="section8Rows" border size="small" class="disclosure-table" style="margin-bottom: 8px;">
+        <el-table-column prop="label" label="项 目" min-width="180" />
+        <el-table-column label="收入" min-width="110" align="right">
+          <template #header><span class="col-group-label">本期发生额</span><br/><span>收入</span></template>
+          <template #default="{ row, $index }">
+            <WpAmountInput v-if="!isReadonly" :model-value="row.endRevenue" size="small" @update:model-value="(v: number) => updateSection8Cell($index, 'endRevenue', v || null)" />
+            <span v-else>{{ fmtAmt(row.endRevenue ?? 0) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="成本" min-width="110" align="right">
+          <template #header><span class="col-group-label">本期发生额</span><br/><span>成本</span></template>
+          <template #default="{ row, $index }">
+            <WpAmountInput v-if="!isReadonly" :model-value="row.endCost" size="small" @update:model-value="(v: number) => updateSection8Cell($index, 'endCost', v || null)" />
+            <span v-else>{{ fmtAmt(row.endCost ?? 0) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="收入" min-width="110" align="right">
+          <template #header><span class="col-group-label">上期发生额</span><br/><span>收入</span></template>
+          <template #default="{ row, $index }">
+            <WpAmountInput v-if="!isReadonly" :model-value="row.priorRevenue" size="small" @update:model-value="(v: number) => updateSection8Cell($index, 'priorRevenue', v || null)" />
+            <span v-else>{{ fmtAmt(row.priorRevenue ?? 0) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="成本" min-width="110" align="right">
+          <template #header><span class="col-group-label">上期发生额</span><br/><span>成本</span></template>
+          <template #default="{ row, $index }">
+            <WpAmountInput v-if="!isReadonly" :model-value="row.priorCost" size="small" @update:model-value="(v: number) => updateSection8Cell($index, 'priorCost', v || null)" />
+            <span v-else>{{ fmtAmt(row.priorCost ?? 0) }}</span>
+          </template>
+        </el-table-column>
+      </el-table>
+      <!-- 文本说明区 -->
+      <div class="note-area"><el-input :model-value="noteTexts['note-8'] || ''" type="textarea" :autosize="{ minRows: 3, maxRows: 10 }" placeholder="披露试运行期间的销售收入及相关会计处理（如适用）。" :disabled="isReadonly" @input="(v: string) => updateNote('note-8', v)" /></div>
     </el-card>
 
     <!-- 报表校对区 -->
@@ -574,4 +877,22 @@ const formulaMap = [
 .reconcile-diff { background: #fef0f0; }
 .reconcile-diff .reconcile-value { color: #f56c6c; }
 .reconcile-note { font-size: 12px; color: #909399; margin-top: 8px; }
+/* 列转置表格样式 */
+.transpose-table-wrapper { overflow-x: auto; margin-bottom: 8px; }
+.transpose-table { width: 100%; border-collapse: collapse; font-size: var(--wp-font-size, 13px); border: 1px solid #ebeef5; }
+.transpose-table th, .transpose-table td { border: 1px solid #ebeef5; padding: 6px 8px; text-align: center; }
+.transpose-table .group-header-row th { background: #f5f7fa; font-weight: 600; }
+.transpose-table .leaf-header-row th { background: #fafafa; font-weight: normal; font-size: 12px; }
+.transpose-table .label-th { min-width: 130px; text-align: left; }
+.transpose-table .label-td { text-align: left; white-space: nowrap; font-weight: 500; }
+.transpose-table .group-th { position: relative; min-width: 160px; }
+.transpose-table .total-group-th { background: #f0f9eb !important; }
+.transpose-table .total-leaf-th { background: #f0f9eb !important; }
+.transpose-table .amount-td { min-width: 80px; }
+.transpose-table .total-td { background: #f0f9eb; }
+.transpose-table .total-row td { background: #fafafa; border-top: 2px solid #dcdfe6; }
+.cat-label { margin-right: 4px; }
+.cat-actions { display: inline-flex; gap: 2px; opacity: 0.6; }
+.cat-actions:hover { opacity: 1; }
+.col-group-label { font-size: 11px; color: #909399; font-weight: normal; }
 </style>

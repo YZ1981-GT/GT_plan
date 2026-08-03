@@ -1,36 +1,69 @@
 /**
  * useD4Adjudication — D4-1 审定表核心逻辑 composable
  *
- * Spec: .kiro/specs/d4-operating-revenue/
- * Task: 6.1
+ * Spec: .kiro/specs/d4-four-table-extraction-and-disclosure-alignment/
+ * Task: 4.2 (接 adjudication_prefill + dynamicAdjudicationRows 共享件 + previewSeedFromPrefill)
  *
  * 职责：
- * - 双区块固定行（主营产品行+小计 / 其他项目行+小计 / 营业收入合计）
- * - sections computed（从crossSheet聚合值填入）
- * - trialBalanceRow + differenceRow（TB科目6001+6051）
- * - mainCrossValidation / otherCrossValidation 警告
- * - updateCell + addProductRow/removeProductRow
- * - publishAdjudicated（EventBus → TB回写6001+6051）
- * - onAdjustmentCreated监听
+ * - 接后端 `adjudication_prefill`（html_data 输出，Task 2.1）
+ * - 使用共享 `dynamicAdjudicationRows` 动态行基础设施（K2 范式）
+ * - `previewSeedFromPrefill` 行为：
+ *   ・新子科目自动插行
+ *   ・已有行金额变化弹确认（可选「仅补空值」）
+ *   ・手工/历史行永不覆盖（Req 3.4）
+ * - 双区块（主营/其他）+ 小计/合计/TB核对/差异
+ * - crossSheet 聚合（D4-2/D4-3/D4-4）
+ * - EventBus 发布审定数（TB 回写 6001/6051）
  *
- * Requirements: 2.1-2.10, 18.1
+ * Requirements: 3.2, 3.4, 3.5
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
+import { ElMessageBox } from 'element-plus'
+import { D4_MAIN_REVENUE_STANDARD, D4_OTHER_REVENUE_STANDARD, isMainRevenueCode, isOtherRevenueCode } from './d4AccountScope'
+import { D4_ADJ_ROWS_SPEC, D4_ADJ_PREFIX } from './d4AdjudicationRows'
 import {
   parseNum,
   calcAuditedAmount,
   calcSubtotal,
-  calcChangeRate,
 } from './useD4FormulaEngine'
+import {
+  type DynamicAdjRow,
+  type DynamicRowPrefillItem,
+  type SeedFromPrefillResult,
+  resolveInitialRows,
+  serializeRows,
+  deserializeRows,
+  seedRowsFromPrefill,
+  findRowForPrefill,
+  findDuplicateLabel,
+  appendManualRow,
+  dropRow,
+  renameRowLabel,
+  rowsItemId,
+  rowFieldItemId,
+  readNum,
+  readRaw,
+  normalizeLabel,
+} from './shared/dynamicAdjudicationRows'
 import type { ChecklistResponse } from './useD4FormData'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+/** 基础选项（兼容其他 D4 composable 的 `UseD4BaseOptions` 导入） */
 export interface UseD4BaseOptions {
   wpId: Ref<string>
   projectId: Ref<string>
   allResponses: Ref<Map<string, ChecklistResponse>>
   isReadonly?: Ref<boolean>
+}
+
+export interface UseD4AdjudicationOptions extends UseD4BaseOptions {
+  /** 后端 render 下发的 `adjudication_prefill`（html_data 顶层） */
+  adjudicationPrefill?: Ref<DynamicRowPrefillItem[] | null | undefined>
+  /** 保存字段值到 checklist_responses */
+  saveField?: (itemId: string, value: { remark?: string; conclusion?: string | null }) => void
+  /** 批量保存 */
+  saveBatch?: (items: Array<{ item_id: string; remark?: string; conclusion?: string | null }>) => void
 }
 
 export interface AdjudicationRow {
@@ -40,13 +73,15 @@ export interface AdjudicationRow {
   currentUnadjusted: number
   currentAje: number
   currentRje: number
-  currentAudited: number    // = 未审 + AJE + RJE (auto)
+  currentAudited: number
   priorUnadjusted: number
   priorAje: number
   priorRje: number
-  priorAudited: number      // = 未审 + AJE + RJE (auto)
+  priorAudited: number
   isFromCrossSheet: boolean
   isEditable: boolean
+  /** 动态行对象（仅内部使用） */
+  _dynamicRow?: DynamicAdjRow
 }
 
 export interface AdjudicationSection {
@@ -56,16 +91,30 @@ export interface AdjudicationSection {
   subtotalRow: AdjudicationRow
 }
 
+/** previewSeedFromPrefill 的预览结果 */
+export interface PrefillPreviewItem {
+  label: string
+  code?: string
+  isNew: boolean
+  currentValue: number
+  prefillValue: number
+  /** 该行是否有手工录入（手工永不覆盖） */
+  isManual: boolean
+  /** 该行金额是否有变化 */
+  hasChange: boolean
+}
+
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const ADJ_STORAGE_KEY = 'D4-1-adj-rows'
 const BALANCE_TOLERANCE = 0.005
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+/**
+ * 旧模型行清单 itemId（兼容迁移前的 `D4-1-adj-rows` JSON）。
+ * 新模型使用共享件的 `{prefix}-rows` = `D4-1-rows`。
+ */
+const LEGACY_ADJ_STORAGE_KEY = 'D4-1-adj-rows'
 
-function generateRowKey(): string {
-  return `row-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`
-}
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function safeParseRows<T>(jsonStr: string | null | undefined): T[] {
   if (!jsonStr) return []
@@ -77,44 +126,352 @@ function safeParseRows<T>(jsonStr: string | null | undefined): T[] {
   }
 }
 
-interface StoredAdjRow {
-  rowKey: string
-  label: string
-  isFixed: boolean
-  sectionKey: 'main-revenue' | 'other-revenue'
-  currentUnadjusted: number
-  currentAje: number
-  currentRje: number
-  priorUnadjusted: number
-  priorAje: number
-  priorRje: number
-  isFromCrossSheet: boolean
+/**
+ * 从旧 JSON 格式迁移到动态行模型。
+ * 旧格式 = `[{rowKey, label, sectionKey, currentUnadjusted, ...}]` 整行序列化。
+ * 新格式 = `DynamicAdjRow[]` 清单 + per-field 键。
+ */
+function migrateLegacyD4Rows(
+  responses: Map<string, unknown> | null | undefined,
+): { rows: DynamicAdjRow[]; fieldValues: Record<string, string> } | null {
+  const legacyResp = responses?.get(LEGACY_ADJ_STORAGE_KEY) as Record<string, unknown> | undefined
+  const raw = legacyResp?.remark as string | undefined
+  if (!raw) return null
+
+  interface LegacyRow {
+    rowKey: string
+    label: string
+    sectionKey: string
+    currentUnadjusted?: number
+    currentAje?: number
+    currentRje?: number
+    priorUnadjusted?: number
+    priorAje?: number
+    priorRje?: number
+    isFromCrossSheet?: boolean
+  }
+
+  const legacyRows = safeParseRows<LegacyRow>(raw)
+  if (legacyRows.length === 0) return null
+
+  const dynamicRows: DynamicAdjRow[] = []
+  const fieldValues: Record<string, string> = {}
+
+  for (const lr of legacyRows) {
+    if (!lr.rowKey || !lr.label) continue
+    const row: DynamicAdjRow = {
+      rowId: lr.rowKey,
+      label: normalizeLabel(lr.label),
+      source: lr.isFromCrossSheet ? 'tb' : 'manual',
+    }
+    dynamicRows.push(row)
+
+    // 迁移金额值到 per-field 键
+    const prefix = D4_ADJ_PREFIX
+    if (lr.currentUnadjusted)
+      fieldValues[`${prefix}-${lr.rowKey}-currentUnadjusted`] = String(lr.currentUnadjusted)
+    if (lr.currentAje)
+      fieldValues[`${prefix}-${lr.rowKey}-currentAje`] = String(lr.currentAje)
+    if (lr.currentRje)
+      fieldValues[`${prefix}-${lr.rowKey}-currentRje`] = String(lr.currentRje)
+    if (lr.priorUnadjusted)
+      fieldValues[`${prefix}-${lr.rowKey}-priorUnadjusted`] = String(lr.priorUnadjusted)
+    if (lr.priorAje)
+      fieldValues[`${prefix}-${lr.rowKey}-priorAje`] = String(lr.priorAje)
+    if (lr.priorRje)
+      fieldValues[`${prefix}-${lr.rowKey}-priorRje`] = String(lr.priorRje)
+  }
+
+  return { rows: dynamicRows, fieldValues }
 }
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
-export function useD4Adjudication(options: UseD4BaseOptions) {
-  const { wpId, projectId, allResponses, isReadonly } = options
+export function useD4Adjudication(options: UseD4AdjudicationOptions) {
+  const {
+    wpId,
+    projectId,
+    allResponses,
+    isReadonly,
+    adjudicationPrefill,
+    saveField,
+    saveBatch,
+  } = options
   const readonly = isReadonly ?? ref(false)
 
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
   const eventListeners: Array<{ event: string; handler: (e: Event) => void }> = []
+
+  // ─── Dynamic rows state ──────────────────────────────────────────────
+
+  const dynamicRows = ref<DynamicAdjRow[]>([])
+  const hasPrefillData = computed(() => {
+    const pf = adjudicationPrefill?.value
+    return Array.isArray(pf) && pf.length > 0
+  })
+
+  // ─── Initialize rows (from responses or migration) ──────────────────
+
+  function initRows(): void {
+    const responses = allResponses.value
+
+    // 1. 尝试从新模型读取（`D4-1-rows`）
+    const newModelItemId = rowsItemId(D4_ADJ_ROWS_SPEC)
+    const stored = readRaw(responses as Map<string, unknown>, newModelItemId)
+    if (stored.trim()) {
+      dynamicRows.value = deserializeRows(stored)
+      return
+    }
+
+    // 2. 尝试从旧 JSON 模型迁移
+    const migrated = migrateLegacyD4Rows(responses as Map<string, unknown>)
+    if (migrated && migrated.rows.length > 0) {
+      dynamicRows.value = migrated.rows
+      // 持久化迁移结果
+      persistRowList(migrated.rows)
+      // 迁移字段值
+      for (const [key, val] of Object.entries(migrated.fieldValues)) {
+        responses.set(key, { item_id: key, conclusion: null, remark: val } as any)
+      }
+      return
+    }
+
+    // 3. 共享件的 resolveInitialRows（处理 legacyRows 迁移，D4 为空数组所以跳过）
+    const resolved = resolveInitialRows(D4_ADJ_ROWS_SPEC, responses as Map<string, unknown>)
+    dynamicRows.value = resolved.rows
+    if (resolved.migrated) {
+      persistRowList(resolved.rows)
+    }
+  }
+
+  // 首次初始化
+  initRows()
+
+  // 监听 allResponses 变化时重新初始化（宿主保存后重建 allResponses）
+  watch(allResponses, () => { initRows() }, { deep: false })
+
+  // ─── Persist helpers ─────────────────────────────────────────────────
+
+  function persistRowList(rows: DynamicAdjRow[]): void {
+    const itemId = rowsItemId(D4_ADJ_ROWS_SPEC)
+    const json = serializeRows(rows)
+    allResponses.value.set(itemId, { item_id: itemId, conclusion: null, remark: json } as any)
+    debounceSave()
+  }
+
+  function persistFieldValue(rowId: string, field: string, value: string | number): void {
+    const itemId = rowFieldItemId(D4_ADJ_ROWS_SPEC, rowId, field)
+    const strVal = String(value ?? 0)
+    allResponses.value.set(itemId, { item_id: itemId, conclusion: null, remark: strVal } as any)
+    debounceSave()
+  }
+
+  // ─── Read field value from responses ─────────────────────────────────
+
+  function getRowFieldValue(rowId: string, field: string): number {
+    const itemId = rowFieldItemId(D4_ADJ_ROWS_SPEC, rowId, field)
+    return readNum(allResponses.value as Map<string, unknown>, itemId)
+  }
+
+  // ─── Seed from prefill (Req 3.5) ────────────────────────────────────
+
+  /**
+   * 从四表预填数据建行 + 填充金额。
+   *
+   * @param overwrite - 为 true 时覆盖四表行的已有值；为 false 时仅补空值。
+   *                    **手工行（source='manual'）永不覆盖**（Req 3.4）。
+   */
+  function seedFromPrefill(opts: { overwrite: boolean } = { overwrite: false }): void {
+    const prefill = adjudicationPrefill?.value
+    if (!prefill || prefill.length === 0) return
+
+    const result = seedRowsFromPrefill(
+      D4_ADJ_ROWS_SPEC,
+      prefill,
+      dynamicRows.value,
+      // D4 损益类：opening_balance = 上期发生额 → priorUnadjusted
+      //           closing_balance = 本期发生额 → currentUnadjusted
+      { opening: 'priorUnadjusted', closing: 'currentUnadjusted' },
+    )
+
+    // 更新行清单
+    dynamicRows.value = result.rows
+    persistRowList(result.rows)
+
+    // 写入字段值（手工优先 / 仅补空值 按 overwrite 判定）
+    for (const [itemId, val] of Object.entries(result.values)) {
+      const rowId = extractRowIdFromItemId(itemId)
+      const row = result.rows.find(r => r.rowId === rowId)
+
+      // 🔴 手工行永不覆盖（Req 3.4）
+      if (row?.source === 'manual') continue
+
+      const existing = readNum(allResponses.value as Map<string, unknown>, itemId)
+      if (!opts.overwrite && existing !== 0) continue // 仅补空值模式
+
+      allResponses.value.set(itemId, { item_id: itemId, conclusion: null, remark: val } as any)
+    }
+
+    debounceSave()
+  }
+
+  /**
+   * 预览 seed 效果 —— 弹确认对话框（Req 3.5）。
+   *
+   * 行为：
+   * - 新子科目 → 显示将要自动插入的行
+   * - 已有行金额变化 → 显示变化明细，用户可选「全部覆盖」或「仅补空值」
+   * - 手工行 → 显示「保持不变」
+   */
+  async function previewSeedFromPrefill(): Promise<void> {
+    const prefill = adjudicationPrefill?.value
+    if (!prefill || prefill.length === 0) return
+
+    const preview: PrefillPreviewItem[] = []
+    let hasNewRows = false
+    let hasChanges = false
+
+    for (const p of prefill) {
+      const label = normalizeLabel(p.name)
+      if (!label) continue
+
+      const existingRow = findRowForPrefill(dynamicRows.value, p)
+      const prefillValue = Number(p.closing_balance) || 0
+
+      if (!existingRow) {
+        // 新子科目 → 自动插行
+        hasNewRows = true
+        preview.push({
+          label,
+          code: p.code,
+          isNew: true,
+          currentValue: 0,
+          prefillValue,
+          isManual: false,
+          hasChange: true,
+        })
+      } else {
+        const currentValue = getRowFieldValue(existingRow.rowId, 'currentUnadjusted')
+        const isManual = existingRow.source === 'manual'
+        const changed = Math.abs(currentValue - prefillValue) > BALANCE_TOLERANCE
+
+        preview.push({
+          label,
+          code: p.code,
+          isNew: false,
+          currentValue,
+          prefillValue,
+          isManual,
+          hasChange: changed && !isManual,
+        })
+
+        if (changed && !isManual) hasChanges = true
+      }
+    }
+
+    // 只有新行且无变化 → 直接插行，无需确认
+    if (hasNewRows && !hasChanges) {
+      seedFromPrefill({ overwrite: false })
+      return
+    }
+
+    // 有变化 → 弹确认
+    if (hasChanges) {
+      const changedItems = preview.filter(p => p.hasChange && !p.isNew && !p.isManual)
+      const newItems = preview.filter(p => p.isNew)
+
+      let message = ''
+      if (newItems.length > 0) {
+        message += `<p><b>新增 ${newItems.length} 行：</b>${newItems.map(i => i.label).join('、')}</p>`
+      }
+      if (changedItems.length > 0) {
+        message += `<p><b>${changedItems.length} 行金额有变化：</b></p><ul>`
+        for (const item of changedItems.slice(0, 5)) {
+          message += `<li>${item.label}：${item.currentValue.toFixed(2)} → ${item.prefillValue.toFixed(2)}</li>`
+        }
+        if (changedItems.length > 5) {
+          message += `<li>…等共 ${changedItems.length} 项</li>`
+        }
+        message += '</ul>'
+        message += '<p>手工录入的行将保持不变。</p>'
+      }
+
+      try {
+        const action = await ElMessageBox.confirm(message, '四表取数预览', {
+          dangerouslyUseHTMLString: true,
+          confirmButtonText: '全部覆盖',
+          cancelButtonText: '仅补空值',
+          distinguishCancelAndClose: true,
+          type: 'info',
+        })
+        // 确认 → 全部覆盖
+        seedFromPrefill({ overwrite: true })
+      } catch (action) {
+        if (action === 'cancel') {
+          // 取消 = 仅补空值
+          seedFromPrefill({ overwrite: false })
+        }
+        // close = 关闭对话框，不做任何操作
+      }
+    }
+  }
+
+  // ─── Row operations (dynamic rows) ───────────────────────────────────
+
+  function addRow(label: string, sectionKey: 'main-revenue' | 'other-revenue'): DynamicAdjRow | null {
+    if (readonly.value) return null
+    const normalized = normalizeLabel(label)
+    if (!normalized) return null
+
+    // 撞名检查
+    if (findDuplicateLabel(dynamicRows.value, normalized)) return null
+
+    const { rows, row } = appendManualRow(dynamicRows.value)
+    // 设置行标签
+    const updatedRows = rows.map(r => r.rowId === row.rowId ? { ...r, label: normalized } : r)
+    dynamicRows.value = updatedRows
+    persistRowList(updatedRows)
+    return row
+  }
+
+  function removeRow(rowId: string): void {
+    if (readonly.value) return
+    const result = dropRow(
+      D4_ADJ_ROWS_SPEC,
+      dynamicRows.value,
+      allResponses.value as Map<string, unknown>,
+      rowId,
+    )
+    dynamicRows.value = result.rows
+    persistRowList(result.rows)
+
+    // 清理字段键
+    for (const removedId of result.removedItemIds) {
+      allResponses.value.delete(removedId)
+    }
+    debounceSave()
+  }
+
+  function renameRow(rowId: string, newLabel: string): boolean {
+    if (readonly.value) return false
+    const normalized = normalizeLabel(newLabel)
+    if (!normalized) return false
+
+    // 撞名检查（排除自身）
+    if (findDuplicateLabel(dynamicRows.value, normalized, rowId)) return false
+
+    dynamicRows.value = renameRowLabel(dynamicRows.value, rowId, normalized)
+    persistRowList(dynamicRows.value)
+    return true
+  }
 
   // ─── Audit note / conclusion ─────────────────────────────────────────
 
   const auditNote = ref('')
   const auditConclusion = ref('')
 
-  // ─── Load stored rows ────────────────────────────────────────────────
-
-  const storedRows = computed<StoredAdjRow[]>(() => {
-    const resp = allResponses.value.get(ADJ_STORAGE_KEY)
-    return safeParseRows<StoredAdjRow>(resp?.remark)
-  })
-
   // ─── CrossSheet data (from allResponses D4-2/D4-3/D4-4) ─────────────
 
-  /** Parse D4-2 rows for main revenue aggregation */
   const mainRevenueByProduct = computed<Record<string, { current: number; prior: number }>>(() => {
     const resp = allResponses.value.get('D4-2-rows')
     const rows = safeParseRows<any>(resp?.remark)
@@ -132,7 +489,6 @@ export function useD4Adjudication(options: UseD4BaseOptions) {
     return result
   })
 
-  /** Parse D4-3 rows for other revenue aggregation */
   const otherRevenueByItem = computed<Record<string, { current: number; prior: number }>>(() => {
     const resp = allResponses.value.get('D4-3-rows')
     const rows = safeParseRows<any>(resp?.remark)
@@ -148,7 +504,6 @@ export function useD4Adjudication(options: UseD4BaseOptions) {
     return result
   })
 
-  /** Parse D4-4 adjustment totals */
   const adjustmentTotals = computed(() => {
     const resp = allResponses.value.get('D4-4-rows')
     const rows = safeParseRows<any>(resp?.remark)
@@ -156,8 +511,8 @@ export function useD4Adjudication(options: UseD4BaseOptions) {
     for (const row of rows) {
       const code = row.accountName || row.accountCode || ''
       const amount = parseNum(row.debitAmount) - parseNum(row.creditAmount)
-      const isMain = code.includes('6001')
-      const isOther = code.includes('6051')
+      const isMain = code.includes(D4_MAIN_REVENUE_STANDARD)
+      const isOther = code.includes(D4_OTHER_REVENUE_STANDARD)
       if (isMain) {
         if (row.category === 'AJE' || row.entryType === 'AJE') mainAje += amount
         else mainRje += amount
@@ -169,154 +524,54 @@ export function useD4Adjudication(options: UseD4BaseOptions) {
     return { mainAje, mainRje, otherAje, otherRje }
   })
 
-  // ─── Sections computed ───────────────────────────────────────────────
+  // ─── Sections computed (combining dynamic rows + crossSheet) ─────────
 
   const sections: ComputedRef<AdjudicationSection[]> = computed(() => {
-    const stored = storedRows.value
-    const mainByProduct = mainRevenueByProduct.value
-    const otherByItem = otherRevenueByItem.value
+    const rows = dynamicRows.value
     const adjTotals = adjustmentTotals.value
 
-    // === Main Revenue Section ===
-    const mainProducts = Object.keys(mainByProduct)
-    const mainStoredRows = stored.filter(r => r.sectionKey === 'main-revenue')
+    // 按科目码分组（主营 6001 / 其他 6051）
     const mainRows: AdjudicationRow[] = []
-
-    // Use crossSheet products to populate rows
-    for (const product of mainProducts) {
-      const data = mainByProduct[product]
-      const existingStored = mainStoredRows.find(r => r.label === product)
-      mainRows.push({
-        rowKey: existingStored?.rowKey || `main-${product}`,
-        label: product,
-        isFixed: false,
-        currentUnadjusted: data.current,
-        currentAje: adjTotals.mainAje,
-        currentRje: adjTotals.mainRje,
-        currentAudited: calcAuditedAmount(data.current, 0, 0), // AJE/RJE at subtotal level
-        priorUnadjusted: data.prior,
-        priorAje: existingStored ? parseNum(existingStored.priorAje) : 0,
-        priorRje: existingStored ? parseNum(existingStored.priorRje) : 0,
-        priorAudited: calcAuditedAmount(data.prior, existingStored ? parseNum(existingStored.priorAje) : 0, existingStored ? parseNum(existingStored.priorRje) : 0),
-        isFromCrossSheet: true,
-        isEditable: false,
-      })
-    }
-
-    // Add manually added rows (not from crossSheet)
-    for (const sr of mainStoredRows) {
-      if (!mainProducts.includes(sr.label) && !sr.isFromCrossSheet) {
-        mainRows.push({
-          rowKey: sr.rowKey,
-          label: sr.label,
-          isFixed: sr.isFixed,
-          currentUnadjusted: parseNum(sr.currentUnadjusted),
-          currentAje: parseNum(sr.currentAje),
-          currentRje: parseNum(sr.currentRje),
-          currentAudited: calcAuditedAmount(parseNum(sr.currentUnadjusted), parseNum(sr.currentAje), parseNum(sr.currentRje)),
-          priorUnadjusted: parseNum(sr.priorUnadjusted),
-          priorAje: parseNum(sr.priorAje),
-          priorRje: parseNum(sr.priorRje),
-          priorAudited: calcAuditedAmount(parseNum(sr.priorUnadjusted), parseNum(sr.priorAje), parseNum(sr.priorRje)),
-          isFromCrossSheet: false,
-          isEditable: true,
-        })
-      }
-    }
-
-    const mainSubtotal: AdjudicationRow = {
-      rowKey: 'main-subtotal',
-      label: '主营业务收入小计',
-      isFixed: true,
-      currentUnadjusted: calcSubtotal(mainRows.map(r => r.currentUnadjusted)),
-      currentAje: adjTotals.mainAje,
-      currentRje: adjTotals.mainRje,
-      currentAudited: calcAuditedAmount(
-        calcSubtotal(mainRows.map(r => r.currentUnadjusted)),
-        adjTotals.mainAje,
-        adjTotals.mainRje,
-      ),
-      priorUnadjusted: calcSubtotal(mainRows.map(r => r.priorUnadjusted)),
-      priorAje: calcSubtotal(mainRows.map(r => r.priorAje)),
-      priorRje: calcSubtotal(mainRows.map(r => r.priorRje)),
-      priorAudited: calcAuditedAmount(
-        calcSubtotal(mainRows.map(r => r.priorUnadjusted)),
-        calcSubtotal(mainRows.map(r => r.priorAje)),
-        calcSubtotal(mainRows.map(r => r.priorRje)),
-      ),
-      isFromCrossSheet: false,
-      isEditable: false,
-    }
-
-    // === Other Revenue Section ===
-    const otherItems = Object.keys(otherByItem)
-    const otherStoredRows = stored.filter(r => r.sectionKey === 'other-revenue')
     const otherRows: AdjudicationRow[] = []
 
-    for (const item of otherItems) {
-      const data = otherByItem[item]
-      const existingStored = otherStoredRows.find(r => r.label === item)
-      otherRows.push({
-        rowKey: existingStored?.rowKey || `other-${item}`,
-        label: item,
-        isFixed: false,
-        currentUnadjusted: data.current,
-        currentAje: adjTotals.otherAje,
-        currentRje: adjTotals.otherRje,
-        currentAudited: calcAuditedAmount(data.current, 0, 0),
-        priorUnadjusted: data.prior,
-        priorAje: existingStored ? parseNum(existingStored.priorAje) : 0,
-        priorRje: existingStored ? parseNum(existingStored.priorRje) : 0,
-        priorAudited: calcAuditedAmount(data.prior, existingStored ? parseNum(existingStored.priorAje) : 0, existingStored ? parseNum(existingStored.priorRje) : 0),
-        isFromCrossSheet: true,
-        isEditable: false,
-      })
-    }
+    for (const r of rows) {
+      const code = r.accountCode || ''
+      const isOther = isOtherRevenueCode(code)
 
-    // Add manually added rows (not from crossSheet)
-    for (const sr of otherStoredRows) {
-      if (!otherItems.includes(sr.label) && !sr.isFromCrossSheet) {
-        otherRows.push({
-          rowKey: sr.rowKey,
-          label: sr.label,
-          isFixed: sr.isFixed,
-          currentUnadjusted: parseNum(sr.currentUnadjusted),
-          currentAje: parseNum(sr.currentAje),
-          currentRje: parseNum(sr.currentRje),
-          currentAudited: calcAuditedAmount(parseNum(sr.currentUnadjusted), parseNum(sr.currentAje), parseNum(sr.currentRje)),
-          priorUnadjusted: parseNum(sr.priorUnadjusted),
-          priorAje: parseNum(sr.priorAje),
-          priorRje: parseNum(sr.priorRje),
-          priorAudited: calcAuditedAmount(parseNum(sr.priorUnadjusted), parseNum(sr.priorAje), parseNum(sr.priorRje)),
-          isFromCrossSheet: false,
-          isEditable: true,
-        })
+      const currentUnadj = getRowFieldValue(r.rowId, 'currentUnadjusted')
+      const priorUnadj = getRowFieldValue(r.rowId, 'priorUnadjusted')
+      const currentAje = getRowFieldValue(r.rowId, 'currentAje')
+      const currentRje = getRowFieldValue(r.rowId, 'currentRje')
+      const priorAje = getRowFieldValue(r.rowId, 'priorAje')
+      const priorRje = getRowFieldValue(r.rowId, 'priorRje')
+
+      const adjRow: AdjudicationRow = {
+        rowKey: r.rowId,
+        label: r.label,
+        isFixed: false,
+        currentUnadjusted: currentUnadj,
+        currentAje,
+        currentRje,
+        currentAudited: calcAuditedAmount(currentUnadj, currentAje, currentRje),
+        priorUnadjusted: priorUnadj,
+        priorAje,
+        priorRje,
+        priorAudited: calcAuditedAmount(priorUnadj, priorAje, priorRje),
+        isFromCrossSheet: r.source === 'tb',
+        isEditable: r.source !== 'tb' || true, // 所有行可编辑 AJE/RJE
+        _dynamicRow: r,
+      }
+
+      if (isOther) {
+        otherRows.push(adjRow)
+      } else {
+        // 默认归入主营（无科目码的手工行也归主营）
+        mainRows.push(adjRow)
       }
     }
 
-    const otherSubtotal: AdjudicationRow = {
-      rowKey: 'other-subtotal',
-      label: '其他业务收入小计',
-      isFixed: true,
-      currentUnadjusted: calcSubtotal(otherRows.map(r => r.currentUnadjusted)),
-      currentAje: adjTotals.otherAje,
-      currentRje: adjTotals.otherRje,
-      currentAudited: calcAuditedAmount(
-        calcSubtotal(otherRows.map(r => r.currentUnadjusted)),
-        adjTotals.otherAje,
-        adjTotals.otherRje,
-      ),
-      priorUnadjusted: calcSubtotal(otherRows.map(r => r.priorUnadjusted)),
-      priorAje: calcSubtotal(otherRows.map(r => r.priorAje)),
-      priorRje: calcSubtotal(otherRows.map(r => r.priorRje)),
-      priorAudited: calcAuditedAmount(
-        calcSubtotal(otherRows.map(r => r.priorUnadjusted)),
-        calcSubtotal(otherRows.map(r => r.priorAje)),
-        calcSubtotal(otherRows.map(r => r.priorRje)),
-      ),
-      isFromCrossSheet: false,
-      isEditable: false,
-    }
+    const mainSubtotal: AdjudicationRow = buildSubtotalRow('main-subtotal', '主营业务收入小计', mainRows, adjTotals.mainAje, adjTotals.mainRje)
+    const otherSubtotal: AdjudicationRow = buildSubtotalRow('other-subtotal', '其他业务收入小计', otherRows, adjTotals.otherAje, adjTotals.otherRje)
 
     return [
       {
@@ -333,6 +588,36 @@ export function useD4Adjudication(options: UseD4BaseOptions) {
       },
     ]
   })
+
+  function buildSubtotalRow(
+    rowKey: string,
+    label: string,
+    rows: AdjudicationRow[],
+    sectionAje: number,
+    sectionRje: number,
+  ): AdjudicationRow {
+    const currentUnadj = calcSubtotal(rows.map(r => r.currentUnadjusted))
+    const priorUnadj = calcSubtotal(rows.map(r => r.priorUnadjusted))
+    return {
+      rowKey,
+      label,
+      isFixed: true,
+      currentUnadjusted: currentUnadj,
+      currentAje: sectionAje,
+      currentRje: sectionRje,
+      currentAudited: calcAuditedAmount(currentUnadj, sectionAje, sectionRje),
+      priorUnadjusted: priorUnadj,
+      priorAje: calcSubtotal(rows.map(r => r.priorAje)),
+      priorRje: calcSubtotal(rows.map(r => r.priorRje)),
+      priorAudited: calcAuditedAmount(
+        priorUnadj,
+        calcSubtotal(rows.map(r => r.priorAje)),
+        calcSubtotal(rows.map(r => r.priorRje)),
+      ),
+      isFromCrossSheet: false,
+      isEditable: false,
+    }
+  }
 
   // ─── Grand Total Row ─────────────────────────────────────────────────
 
@@ -391,7 +676,6 @@ export function useD4Adjudication(options: UseD4BaseOptions) {
     const d4_2_rows = safeParseRows<any>(d4_2_resp.remark)
     if (d4_2_rows.length === 0) return null
 
-    // D4-2 subtotal audited
     let d4_2_total = 0
     for (const row of d4_2_rows) {
       const months = Array.isArray(row.months) ? row.months.map(parseNum) : []
@@ -426,78 +710,16 @@ export function useD4Adjudication(options: UseD4BaseOptions) {
     return null
   })
 
-  // ─── Row Operations ──────────────────────────────────────────────────
+  // ─── Cell update ─────────────────────────────────────────────────────
 
   function updateCell(rowKey: string, field: string, value: number): void {
     if (readonly.value) return
-    const stored = safeParseRows<StoredAdjRow>(allResponses.value.get(ADJ_STORAGE_KEY)?.remark)
-    const idx = stored.findIndex(r => r.rowKey === rowKey)
-    if (idx === -1) return
-    ;(stored[idx] as any)[field] = value
-    persistRows(stored)
-  }
-
-  function addProductRow(): void {
-    if (readonly.value) return
-    const stored = safeParseRows<StoredAdjRow>(allResponses.value.get(ADJ_STORAGE_KEY)?.remark)
-    stored.push({
-      rowKey: generateRowKey(),
-      label: '',
-      isFixed: false,
-      sectionKey: 'main-revenue',
-      currentUnadjusted: 0,
-      currentAje: 0,
-      currentRje: 0,
-      priorUnadjusted: 0,
-      priorAje: 0,
-      priorRje: 0,
-      isFromCrossSheet: false,
-    })
-    persistRows(stored)
-  }
-
-  function removeProductRow(rowKey: string): void {
-    if (readonly.value) return
-    const stored = safeParseRows<StoredAdjRow>(allResponses.value.get(ADJ_STORAGE_KEY)?.remark)
-    const filtered = stored.filter(r => r.rowKey !== rowKey)
-    persistRows(filtered)
-  }
-
-  // ─── Persist / Save ──────────────────────────────────────────────────
-
-  function persistRows(rows: StoredAdjRow[]): void {
-    const json = JSON.stringify(rows)
-    allResponses.value.set(ADJ_STORAGE_KEY, {
-      item_id: ADJ_STORAGE_KEY,
-      conclusion: null,
-      remark: json,
-    })
-    debounceSave()
-  }
-
-  function debounceSave(): void {
-    if (debounceTimer) clearTimeout(debounceTimer)
-    debounceTimer = setTimeout(() => {
-      debounceTimer = null
-      flushSave()
-    }, 2000)
-  }
-
-  function flushSave(): void {
-    try {
-      const items = [
-        allResponses.value.get(ADJ_STORAGE_KEY),
-        allResponses.value.get('D4-1-adj-note'),
-        allResponses.value.get('D4-1-adj-conclusion'),
-      ].filter(Boolean)
-      window.dispatchEvent(new CustomEvent('d4:save-items', { detail: { items } }))
-    } catch { /* silent */ }
+    persistFieldValue(rowKey, field, value)
   }
 
   // ─── EventBus: publishAdjudicated ────────────────────────────────────
 
   function publishAdjudicated(): void {
-    const total = grandTotalRow.value
     const mainSub = sections.value[0]?.subtotalRow
     const otherSub = sections.value[1]?.subtotalRow
 
@@ -519,14 +741,14 @@ export function useD4Adjudication(options: UseD4BaseOptions) {
         window.dispatchEvent(new CustomEvent('d4:writeback-trial-balance', {
           detail: {
             projectId: projectId.value,
-            accountCode: '6001',
+            accountCode: D4_MAIN_REVENUE_STANDARD,
             auditedAmount: mainSub?.currentAudited ?? 0,
           },
         }))
         window.dispatchEvent(new CustomEvent('d4:writeback-trial-balance', {
           detail: {
             projectId: projectId.value,
-            accountCode: '6051',
+            accountCode: D4_OTHER_REVENUE_STANDARD,
             auditedAmount: otherSub?.currentAudited ?? 0,
           },
         }))
@@ -557,12 +779,12 @@ export function useD4Adjudication(options: UseD4BaseOptions) {
   )
 
   watch(auditNote, (val) => {
-    allResponses.value.set('D4-1-adj-note', { item_id: 'D4-1-adj-note', conclusion: null, remark: val })
+    allResponses.value.set('D4-1-adj-note', { item_id: 'D4-1-adj-note', conclusion: null, remark: val } as any)
     debounceSave()
   })
 
   watch(auditConclusion, (val) => {
-    allResponses.value.set('D4-1-adj-conclusion', { item_id: 'D4-1-adj-conclusion', conclusion: null, remark: val })
+    allResponses.value.set('D4-1-adj-conclusion', { item_id: 'D4-1-adj-conclusion', conclusion: null, remark: val } as any)
     debounceSave()
   })
 
@@ -572,50 +794,26 @@ export function useD4Adjudication(options: UseD4BaseOptions) {
   window.addEventListener('adjustment:created', adjustmentHandler)
   eventListeners.push({ event: 'adjustment:created', handler: adjustmentHandler })
 
-  // ─── D4-2/D4-3 行同步监听（Task 22.1） ────────────────────────────────
+  // ─── Debounce / Save ─────────────────────────────────────────────────
 
-  const syncRowHandler = (e: Event) => {
-    const detail = (e as CustomEvent).detail
-    if (!detail) return
-    const { section, action, product, item } = detail
-    const name = product || item || ''
-    if (!name) return
-
-    const targetSection = section === 'main-revenue' ? 'main-revenue' : 'other-revenue'
-
-    if (action === 'add') {
-      // 添加一行到审定表，标记为 isFromCrossSheet
-      const stored = safeParseRows<StoredAdjRow>(allResponses.value.get(ADJ_STORAGE_KEY)?.remark)
-      // 避免重复添加
-      if (stored.some(r => r.label === name && r.sectionKey === targetSection)) return
-      stored.push({
-        rowKey: generateRowKey(),
-        label: name,
-        isFixed: false,
-        sectionKey: targetSection,
-        currentUnadjusted: 0,
-        currentAje: 0,
-        currentRje: 0,
-        priorUnadjusted: 0,
-        priorAje: 0,
-        priorRje: 0,
-        isFromCrossSheet: true,
-      })
-      persistRows(stored)
-    } else if (action === 'remove') {
-      const stored = safeParseRows<StoredAdjRow>(allResponses.value.get(ADJ_STORAGE_KEY)?.remark)
-      const row = stored.find(r => r.label === name && r.sectionKey === targetSection && r.isFromCrossSheet)
-      if (row) {
-        // AJE/RJE 非零时不自动删除（需用户确认）
-        if (row.currentAje === 0 && row.currentRje === 0 && row.priorAje === 0 && row.priorRje === 0) {
-          const filtered = stored.filter(r => r.rowKey !== row.rowKey)
-          persistRows(filtered)
-        }
-      }
-    }
+  function debounceSave(): void {
+    if (debounceTimer) clearTimeout(debounceTimer)
+    debounceTimer = setTimeout(() => {
+      debounceTimer = null
+      flushSave()
+    }, 2000)
   }
-  window.addEventListener('d4:sync-row', syncRowHandler)
-  eventListeners.push({ event: 'd4:sync-row', handler: syncRowHandler })
+
+  function flushSave(): void {
+    try {
+      const items = [
+        allResponses.value.get(rowsItemId(D4_ADJ_ROWS_SPEC)),
+        allResponses.value.get('D4-1-adj-note'),
+        allResponses.value.get('D4-1-adj-conclusion'),
+      ].filter(Boolean)
+      window.dispatchEvent(new CustomEvent('d4:save-items', { detail: { items } }))
+    } catch { /* silent */ }
+  }
 
   onBeforeUnmount(() => {
     if (debounceTimer) {
@@ -628,22 +826,64 @@ export function useD4Adjudication(options: UseD4BaseOptions) {
     }
   })
 
+  // ─── Backward-compat wrappers (旧 API，供 D4TabAdjudication.vue 过渡用) ───
+
+  /** @deprecated 使用 `addRow(label, sectionKey)` 替代 */
+  function addProductRow(): void {
+    addRow('', 'main-revenue')
+  }
+
+  /** @deprecated 使用 `removeRow(rowId)` 替代 */
+  function removeProductRow(rowKey: string): void {
+    removeRow(rowKey)
+  }
+
   // ─── Return ──────────────────────────────────────────────────────────
 
   return {
+    // Dynamic rows (new API)
+    dynamicRows,
+    hasPrefillData,
+    seedFromPrefill,
+    previewSeedFromPrefill,
+    addRow,
+    removeRow,
+    renameRow,
+
+    // Backward-compat (旧 API)
+    addProductRow,
+    removeProductRow,
+
+    // Sections / totals
     sections,
     grandTotalRow,
     trialBalanceRow,
     differenceRow,
+
+    // Cross validation
     mainCrossValidation,
     otherCrossValidation,
+
+    // Audit note
     auditNote,
     auditConclusion,
+
+    // Operations
     updateCell,
-    addProductRow,
-    removeProductRow,
     publishAdjudicated,
   }
+}
+
+// ─── Internal helper ─────────────────────────────────────────────────────────
+
+/** 从 `{prefix}-{rowId}-{field}` 中提取 rowId */
+function extractRowIdFromItemId(itemId: string): string {
+  // 格式: D4-1-{rowId}-{field}
+  const prefix = `${D4_ADJ_PREFIX}-`
+  if (!itemId.startsWith(prefix)) return ''
+  const rest = itemId.slice(prefix.length)
+  const lastDash = rest.lastIndexOf('-')
+  return lastDash > 0 ? rest.slice(0, lastDash) : rest
 }
 
 export default useD4Adjudication

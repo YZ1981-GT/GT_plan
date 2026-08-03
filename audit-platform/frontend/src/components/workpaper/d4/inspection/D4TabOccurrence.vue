@@ -23,6 +23,7 @@ import D4WalkthroughMatrix from './D4WalkthroughMatrix.vue'
 import GtOnlyOfficeSheet from '../../GtOnlyOfficeSheet.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
+import { D4_MAIN_REVENUE_STANDARD } from '../../composables/d4AccountScope'
 import { Plus, Download } from '@element-plus/icons-vue'
 
 // 抽凭引擎（懒加载，避免首屏体积）
@@ -163,7 +164,7 @@ async function openLedgerImport() {
   ledgerDialogVisible.value = true
   try {
     const res = await http.get(`/api/projects/${props.projectId}/auto-data/`, {
-      params: { source: 'tb_ledger', account_prefix: '6001' },
+      params: { source: 'tb_ledger', account_prefix: D4_MAIN_REVENUE_STANDARD },
       _silent: true,
     } as any)
     ledgerEntries.value = res.data?.data ?? res.data ?? []
@@ -732,7 +733,7 @@ ensureActiveTab()
       width="90%" top="5vh" destroy-on-close>
       <GtVoucherSamplingEngine
         v-if="samplingDialogVisible"
-        account-code="6001"
+        :account-code="D4_MAIN_REVENUE_STANDARD"
         phase="final"
         :workpaper-id="wpId"
         :project-id="projectId"

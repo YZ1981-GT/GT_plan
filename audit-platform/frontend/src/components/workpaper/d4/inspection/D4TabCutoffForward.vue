@@ -14,6 +14,7 @@ import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 import { Plus } from '@element-plus/icons-vue'
 import type { ExtractedVoucher, FillMode } from '../../composables/useCutoffAutoSampling'
+import { D4_MAIN_REVENUE_STANDARD } from '../../composables/d4AccountScope'
 
 const GtCutoffAutoSampling = defineAsyncComponent(() => import('../../cutoff/GtCutoffAutoSampling.vue'))
 
@@ -319,7 +320,7 @@ function rowClassName({ row }: { row: any }) { return row.isCutoff === false ? '
       <GtCutoffAutoSampling
         v-if="showCutoffPanel"
         :key="`d4-17-${cutoffDate}`"
-        account-code="6001"
+        :account-code="D4_MAIN_REVENUE_STANDARD"
         cutoff-direction="window"
         :default-conditions="cutoffPanelDefaults"
         :workpaper-id="wpId"
