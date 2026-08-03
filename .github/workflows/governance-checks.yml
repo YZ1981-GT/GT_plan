@@ -2511,8 +2511,13 @@ jobs:
         run: python -m pytest backend/tests/test_h_cycle_formula_presets.py -q --tb=short
       - name: H-cycle no maturity buckets (Property 13)
         run: python -m pytest backend/tests/test_h_cycle_no_maturity_buckets.py -q --tb=short
+      - name: H-cycle tb_values key contract (后端产出键 ⊇ 前端消费键)
+        run: python -m pytest backend/tests/test_h_cycle_tb_values_key_contract.py -q --tb=short
       - name: H-cycle prefill presets --check
         run: python -m scripts.fix.fix_h_cycle_prefill_presets --check
+        working-directory: backend
+      - name: HI source panel v-if chain --check (宿主 sheet 分发链不得被打断)
+        run: python -m scripts.fix.fix_hi_source_panel_vif_chain --check
         working-directory: backend
 
   h-cycle-four-table-frontend:
@@ -2529,6 +2534,12 @@ jobs:
       - run: npm ci
       - name: H5 note section map
         run: npx vitest run src/components/workpaper/composables/__tests__/h5NoteSectionMap.spec.ts --reporter=verbose
+      - name: H-cycle account scope 跨前后端交叉锁死
+        run: npx vitest run src/components/workpaper/composables/__tests__/hCycleAccountScope.spec.ts --reporter=verbose
+      - name: H9 披露动态行
+        run: npx vitest run src/components/workpaper/composables/__tests__/h9DisclosureDynamicRows.spec.ts --reporter=verbose
+      - name: 平台级 —— 宿主 sheet 分发链完整性
+        run: npx vitest run src/components/workpaper/__tests__/hostSheetDispatchChain.spec.ts --reporter=verbose
 
 
   semantic-resolver-coverage:
@@ -2545,3 +2556,20 @@ jobs:
       - run: pip install pytest -q
       - name: Semantic resolver coverage guard
         run: python -m pytest tests/four_table/test_semantic_resolver_coverage.py -v --tb=short
+
+
+  render-fetch-smoke:
+    # 取数路径冒烟：判据 = 取数没走进 fail-open 分支（捕获 WARNING 即红）
+    # 对照实验：同一 regression 旧测试集 989 全绿放过，本 job 判红并点名策略
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pytest -q
+      - name: Render fetch smoke (fail-open detection)
+        run: python -m pytest tests/four_table/test_render_fetch_smoke.py -v --tb=short
