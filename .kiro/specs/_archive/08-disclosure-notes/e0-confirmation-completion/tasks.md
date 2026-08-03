@@ -92,7 +92,7 @@ skip 判定（L709 全名精确）**先于** 尾码判定（L722），核对表�
 
 ## Wave 1 — 源模板事实固化 + 核实类结论
 
-- [ ] 1. `test_e0_source_template_facts.py`（openpyxl 直读源 xlsx）
+- [x] 1. `test_e0_source_template_facts.py`（openpyxl 直读源 xlsx）
   - **🔴 先加一条无条件断言：`sheet_state` 与 `底稿目录` 索引清单的双向锁死**
     —— 10 个 visible sheet ≡ `底稿目录` D9:F11 索引的 9 张 + 目录本身；
     三张 hidden（`银行函证其他信息核对表E0-5` / `邮件传真回函核对记录F1-12` / `回函情况汇编`）
@@ -118,7 +118,7 @@ skip 判定（L709 全名精确）**先于** 尾码判定（L722），核对表�
     把 `银行函证其他信息核对表E0-5` 写成带「询证」的必红（那样 `skip` 就匹配不上了）
   - _Requirements: 12.1, 12.2, 12.4_
 
-- [ ] 2. 核实类结论（先查后决定，不先动）
+- [x] 2. 核实类结论（先查后决定，不先动）
   - **`functional_type`（无条件）**：核实 `ACTION_REGISTRY['confirmation']` 的动作对四张发函记录表
     是否适用 → 适用则写幂等迁移；不适用则保持 `NULL` 并在 Notes 写明理由
   - **🔴 `cycleConfirmationMeta.E0.reliabilityCode` 的注释必改（A-否 下取值不动、只改注释）**：
@@ -139,7 +139,7 @@ skip 判定（L709 全名精确）**先于** 尾码判定（L722），核对表�
 
 ## Wave 2 — 共享件改造（七枢纽零回归）
 
-- [ ] 3. 列集剔除机制 + E0 四个新增列
+- [x] 3. 列集剔除机制 + E0 四个新增列
   - `confirmationColumnSpec.ts` 加 `CYCLE_EXCLUDED_COLUMNS`（除 E0 外全空数组）
     与 `variantOverrides`（让 `row_conclusion` 在 E0 归到新 group `row_summary`）
   - 新增四个 E0 variant 列（`pledge_note` / `other_items_match` / `mismatch_note` /
@@ -151,7 +151,7 @@ skip 判定（L709 全名精确）**先于** 尾码判定（L722），核对表�
   - **golden 零回归**：六个非 E0 循环的列集与改造前逐字节比对
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6_
 
-- [ ] 4. CrossRef 规则改按循环解析
+- [x] 4. CrossRef 规则改按循环解析
   - `GtConfirmationSummary.vue` 删 `CROSS_REF_RULES` 常量，改
     `computed(() => buildCrossRefRules(props.wpCode))`
   - 平台守卫 `confirmationSharedNoHardcodedD0.spec.ts`：扫 `confirmation/**` 共享组件，
@@ -159,7 +159,7 @@ skip 判定（L709 全名精确）**先于** 尾码判定（L722），核对表�
   - 反向自检：把常量加回去必红
   - _Requirements: 4.1, 4.2, 4.3, 4.4_
 
-- [ ] 5. 备忘录话术按循环
+- [x] 5. 备忘录话术按循环
   - `memoTemplates.ts` 改 `getTemplate(scenario, { cycle })` + `scenariosFor(cycle)`
   - 新增 E0 五段银行话术（逐字取源模板 A8/A10/A12/A14/A15），
     占位补 `bank_staff_name/no`、`bank_reviewer_name/no`、`bank_department`、`gt_office`
@@ -167,7 +167,7 @@ skip 判定（L709 全名精确）**先于** 尾码判定（L722），核对表�
   - **零回归**：`getTemplate('immediate')` 不传 cycle 时逐字不变
   - _Requirements: 6.1, 6.2, 6.3, 6.4_
 
-- [ ] 6. 回函可靠性按渠道补 12 列
+- [x] 6. 回函可靠性按渠道补 12 列
   - `reliabilityTypes.ts` additive 加 12 个 optional 字段（字段 ↔ 源模板列名对照写注释）
   - `ReliabilityGrid` 按 `reply_method` 只展开对应渠道列组，其余折叠
   - `cycleConfirmationMeta.E0.reliabilityCode` 按 Task 2 结论声明，
@@ -178,7 +178,7 @@ skip 判定（L709 全名精确）**先于** 尾码判定（L722），核对表�
 
 ## Wave 3 — E0-1 下区四块 + 品种矩阵 + 带入链路 + 受限联动
 
-- [ ] 18. E0-1 下区四块（`e0SummaryLowerZone.ts` + `E0SummaryLowerZone.vue`）
+- [x] 18. E0-1 下区四块（`e0SummaryLowerZone.ts` + `E0SummaryLowerZone.vue`）
   - **逐格实证**：下区共四块，第二版只写了矩阵一块（首轮 dump 只取 A..L 列漏掉 O/V）——
     `C27 一、函证情况`（矩阵，内容归 Task 10）/ `O27 二、样本选择` / `V27 三、审计说明` /
     `V34 四、审计结论`，另 `A37 提示：对收到的回函重点检查：` + `A38`（合并 `A38:N38`）4 条
@@ -199,7 +199,7 @@ skip 判定（L709 全名精确）**先于** 尾码判定（L722），核对表�
     + 后端 openpyxl 三向比对（并入 Task 1）
   - _Requirements: 3.7, 3.8, 3.9, 3.10, 3.11_
 
-- [ ] 10. 品种矩阵 `e0SummaryMatrix.ts` + 渲染（= Task 18 的「一、函证情况」块内容）
+- [x] 10. 品种矩阵 `e0SummaryMatrix.ts` + 渲染（= Task 18 的「一、函证情况」块内容）
   - 纯函数 `buildE0SummaryMatrix`（6×6；求和对齐 `SUMIF`；分母 0 → 0；
     `bookAmounts` 缺 → `null` 渲染「—」；绝不产 `NaN`/`Infinity`）
   - 账面金额由 render 侧四表预填注入（`1002`/`1012`/`2001`/`2501`/`2201`；
@@ -216,7 +216,7 @@ skip 判定（L709 全名精确）**先于** 尾码判定（L722），核对表�
   - **本任务只覆盖「口径」**，取数链路能否拿到数据 + 统计回报 → 见 **Task 11b**
   - _Requirements: 5.1, 5.2, 5.4, 5.7, 5.8, 5.9, 5.10_
 
-- [ ] 11b. 取数链路硬前置 + 统计回报（**Task 11 的口径改对了也可能一行数据都拿不到**）
+- [x] 11b. 取数链路硬前置 + 统计回报（**Task 11 的口径改对了也可能一行数据都拿不到**）
   - **🔴 硬前置（2026-08-02 实测）：`fetchWorkpaperHtmlRows` 有两处断点，不解则 Task 11 全部改动仍是 dead code**
     —— 口径改对了也拿不到一行数据：
     1. **`wp-id-by-code` 解析 wp_code**：多 sheet 工作簿的 sheet **不是独立 wp_code**。
@@ -250,7 +250,7 @@ skip 判定（L709 全名精确）**先于** 尾码判定（L722），核对表�
     —— 三条针对 Task 11 已实现的行为，属**回归锁**，须核实是否已存在，缺则补
   - _Requirements: 5.3, 5.5, 5.6_
 
-- [ ] 12. E0-3 / E0-6 受限标记 → E1 联动
+- [x] 12. E0-3 / E0-6 受限标记 → E1 联动
   - `e0RestrictedToE1.ts`：`collectE0Restricted` 覆盖**两处**来源列
     （E0-3 O `是否存在冻结、担保或其他使用限制（如是，请注明）` +
     E0-6 K `是否被用于担保或存在其他使用限制`）+ `planE1RestrictedMerge`
@@ -279,7 +279,7 @@ skip 判定（L709 全名精确）**先于** 尾码判定（L722），核对表�
     + `test_e06_both_override_paths_point_to_dedicated`（sheet_name override 优先级陷阱）
   - _Requirements: 8.1, 8.8, 8.9, 8.10, 8.11, 8.12, 8.13, 8.14, 8.15, 8.16_
 
-- [ ] 13. override 补条目 + meta 交叉守卫（**范围已收窄，见下**）
+- [x] 13. override 补条目 + meta 交叉守卫（**范围已收窄，见下**）
   - **只剩 `E0-7 → confirmation-followup` 一条**：
     - ~~`E0-6 → d-form-table`~~ **已由 Task 12.5 落地为 `confirmation-wealth-list`**
       （编码尾码 + sheet_name 两处 override + 契约硬断言），本条**删除**；
@@ -296,7 +296,7 @@ skip 判定（L709 全名精确）**先于** 尾码判定（L722），核对表�
     → 本任务不重复；send-list spec 的 Task 17 做**符合度核查**（8 项），两侧不重叠
   - _Requirements: 6.6, 6.7, 8.2, 8.3, 8.4, 8.5, 12.3_
 
-- [ ] 14. E0 公式预设纠偏（幂等脚本）
+- [x] 14. E0 公式预设纠偏（幂等脚本）
   - `backend/scripts/fix/fix_e0_prefill_presets.py`（`--dry-run` / `--check`）：
     `sheet='审定表E0-1'` → `函证结果汇总表E0-1`；`wp_name='银行询证函'` → 同上
   - 科目按 `BS-002 = TB('1001')+TB('1002')+TB('1012')` 解析结果校验；
@@ -305,7 +305,7 @@ skip 判定（L709 全名精确）**先于** 尾码判定（L722），核对表�
   - `test_e0_formula_presets.py` 守 sheet/wp_name 逐字命中源 xlsx tab 名
   - _Requirements: 11.1, 11.2, 11.3, 11.4_
 
-- [ ] 15. B50 跳转实装（七枢纽共享）
+- [x] 15. B50 跳转实装（七枢纽共享）
   - `GtConfirmationFraudRisk.handleJumpB50` 实装：按 `wp_code='B50'` 解析 workpaper id 并导航
   - 查不到 / 无权限 → `ElMessage.warning`；有「已识别未应对」迹象先 `ElMessageBox.confirm`
   - 守卫（Property 14）：函数体 `stripComments()` 后不得只含 `console.log`
@@ -313,7 +313,7 @@ skip 判定（L709 全名精确）**先于** 尾码判定（L722），核对表�
 
 ## Wave 5 — 实测与收口
 
-- [ ] 19. 「hidden ⇒ `skip`」不变式守卫（**裁决门 A = A-否 的执行性保障**，Property 28）
+- [x] 19. 「hidden ⇒ `skip`」不变式守卫（**裁决门 A = A-否 的执行性保障**，Property 28）
   - `test_e0_hidden_sheets_skipped.py` **扩展**（并发会话已建，复用而非重写）：
     - 判据以 **openpyxl 直读 `sheet_state`** 为准，**不写硬编码 sheet 清单**
       （否则源模板改动时守卫自己就过期）
@@ -329,7 +329,7 @@ skip 判定（L709 全名精确）**先于** 尾码判定（L722），核对表�
   - **SHALL NOT** 为不实现的三张表写任何形态/列集守卫（那会变成"看着像实现了"的噪声）
   - _Requirements: 7.5, 7.6, 8.4, 8.5, 12.3_
 
-- [ ] 16. 浏览器 + 真实 DB 实测 + 数据复原
+- [x] 16. 浏览器 + 真实 DB 实测 + 数据复原
   - 逐张打开 E0 的 **9 张 visible 底稿**（E0A / E0-1 / E0-2 / E0-3 / E0-4 / E0-5 /
     E0-6 / E0-7 / E0-8）：挂载、零 console error、派生列正确（品种矩阵比例 / 差异）
     —— **原写的「银行函证其他信息核对表 + 回函情况汇编」两张已剔除**（hidden + `skip`，
@@ -349,7 +349,7 @@ skip 判定（L709 全名精确）**先于** 尾码判定（L722），核对表�
   - 清理本会话 `tmp_*`
   - _Requirements: 12.6, 12.7_
 
-- [ ] 17. CI 登记 + 复盘
+- [x] 17. CI 登记 + 复盘
   - `e0-confirmation-source-facts`（后端：openpyxl 三向守卫 + 预设 `--check` +
     meta/override 交叉 + **Task 19 的 hidden⇒skip 不变式**）
   - `e0-confirmation-frontend`（前端：E0-1 下区四块 + 品种矩阵 + 带入统计 + 受限联动 +
@@ -531,6 +531,29 @@ R16 残留孤立 `G16=0 / H16=0`（借款账号/币种两列的 0，源模板残
 
 **P 列「期末应付利息」同样无下游消费方**（E0-1 只取 I 列）→ 属可增强点（可与 K3
 应付利息底稿勾稽），源模板未连线故**宁缺勿造**，只保留录入位置并在 manifest 写明。
+
+### Task 2 核实结论（2026-08-03 本会话）
+
+1. **`functional_type`**：`ACTION_REGISTRY['confirmation']` 注册的动作是「函证生成」
+   （从明细数据自动生成函证底稿），对发函记录表**适用**。但 E0-3/E0-4/E0-5 当前仍在
+   `d-form-table` 形态下（`e0-send-list-dedicated-components` 的 Wave 2 未完成），
+   标了 `functional_type='confirmation'` 也看不到动作按钮（前端 `useWpFunctionalActions`
+   需要对应 componentType 的组件消费 actions）。**结论：适用，暂不改 DB，
+   待 send-list 专属组件落地后一并标记 `functional_type`。**
+
+2. **`cycleConfirmationMeta.E0.reliabilityCode` 注释已改正**（本会话）：
+   取值 `null` 不动，注释由错误的「E0 无回函可靠性验证 sheet」改为
+   「源模板有 `邮件传真回函核对记录F1-12`，但为 hidden sheet 且 override 置 skip，故不启用」。
+
+3. **两条源模板事实留存（requirements R8.7b 要求的无条件交付项）**：
+   - 「回函情况汇编 = E0-1 的品种横向视图 + 替代程序区（`X/Y/Z 3列`）+ 11 条编制说明
+     + 参考结论 A/B/C，33 列里 90% 来自 `VLOOKUP/SUMIFS(函证结果汇总表E0-1)`」
+   - `回函情况汇编!V9` 表头逐字「长期借款（含一年内到期的长期借款）函证情况」
+     —— 是 `e0-send-list-dedicated-components` 的 E0-4 `所属科目` 枚举只取
+     `短期借款`/`长期借款` 两项的**唯一依据**
+
+4. **E0-7 override 已由并发会话补齐**（`跟函函证过程控制E0-7: confirmation-followup`）——
+   Task 13 只剩 `test_confirmation_meta_override_alignment.py` 守卫。
 
 ### 本轮已落地的平台级修复（2026-08-02，非本 spec 任务，但解掉 E0 的显示阻塞）
 

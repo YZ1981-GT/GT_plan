@@ -68,7 +68,7 @@
 
 ## Wave 1 — 源模板事实固化 + 平台级污染面盘查
 
-- [ ] 1. `backend/tests/test_e0_send_list_source_facts.py`（openpyxl 直读，三向比对）
+- [x] 1. `backend/tests/test_e0_send_list_source_facts.py`（openpyxl 直读，三向比对）
   - 读 `backend/wp_templates/E/E0 货币资金 - 函证（Leap应对措施-函证）.xlsx`（**跳过 `~$` 锁文件**；先比对与参考副本的 size，运行时权威只认 `backend/wp_templates/`）
   - 钉死四张 sheet 的**真实 tab 名**、表头行号、列数、逐字标签：
     `货币资金发函记录表E0-3`(R5, 16 列 A~P) / `借款发函记录表E0-4`(16) /
@@ -95,7 +95,7 @@
     —— 与 `backend/tests/test_e0_source_template_facts.py` 已有的断言保持一致，不重复实现、只交叉引用
   - _Requirements: 1.3, 6.1, 6.2, 6.5, 6.6, 10.3, 12.1, 12.2, 12.5_
 
-- [ ] 2. E1-3 两版结构守卫 + 平台级污染面诊断脚本
+- [x] 2. E1-3 两版结构守卫 + 平台级污染面诊断脚本
   - `backend/tests/test_e1_3_segment_facts.py`：读 `E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx`，
     钉死两版 sheet 名、段头文字（`银行：` / `其他金融机构（存放财务公司款项）：` / `其他货币资金：`）、
     段内明细行区间（仅人民币版 13:21 / 23:25 / 27:33；人民币及外币版 13:17 / 19:21 / 23:28）、
@@ -126,7 +126,7 @@
 
 ## Wave 2 — 后端 componentType 落地（解 P0）
 
-- [ ] 3. `backend/app/services/e0_send_list/`
+- [x] 3. `backend/app/services/e0_send_list/`
   - `send_list_specs.py`：四张 sheet 名常量、`FORMAT_VERSION` 四条、`column_map(sheet)` / `fields(sheet)`
     —— **直接读 `e0_send_list_source_manifest.json`，禁抄第二份列表**
   - `e1_3_segments.py`：`E1_3Variant` dataclass + `E1_3_CNY` / `E1_3_FX` 两个声明 +
@@ -136,7 +136,7 @@
     含 **PBT**（随机插入小计行/空行/应计利息段，断言输出恒不含它们）
   - _Requirements: 4.2, 4.3, 4.8_
 
-- [ ] 4. `backend/app/routers/wp_render_strategies/_e0_send_list.py`
+- [x] 4. `backend/app/routers/wp_render_strategies/_e0_send_list.py`
   - `_initial_data(sheet)` → `{_format, rows: [], conclusion: {audit_explanation, overall_conclusion, remarks}}`
   - `migrate_legacy_grid_payload(sheet, legacy)` 纯函数：
     已有正确 `_format` → 原样返回（幂等）；legacy grid（有 `cells`/`column_meta`/`header_rows` 而无 `_format`）
@@ -149,7 +149,7 @@
     render 不产生写操作（Property 6）
   - _Requirements: 2.1, 2.2, 2.3, 3.1, 5.1, 5.2, 5.3, 5.4, 5.5_
 
-- [ ] 5. componentType 全链注册 + 平台级认领完备性守卫（**前置：Task 14**）
+- [x] 5. componentType 全链注册 + 平台级认领完备性守卫（**前置：Task 14**）
   - `RENDERER_DISPATCH` 注册**三条**；`wp_classification_service` 的 VALID 集合补三条
   - 🔴 **E0-6 不在本任务范围**：`confirmation-wealth-list` 已在四处注册齐备（实测），
     本任务 SHALL NOT 新建 `confirmation-send-list-e06`、SHALL NOT 改它的 override 双键与
@@ -169,7 +169,7 @@
   - 断言 `e0_send_list_source_manifest.json` 的列数与 `field` 集合逐字节未变（Property 18）
   - _Requirements: 2.4, 10.1, 10.2, 10.3, 10.4, 10.5, 4.9_
 
-- [ ] 14. `E0-5` 一码两表：**只加守卫，不改查表顺序**（原「改顺序」方案已作废）
+- [x] 14. `E0-5` 一码两表：**只加守卫，不改查表顺序**（原「改顺序」方案已作废）
   - **✅ 待裁决 2 已关闭（2026-08-02，随裁决门 A = A-否）**：实证 `wp_render_config.py`
     的两条判定顺序**相反**，当前配置**已经正确**，方案 A（翻转查表顺序）与方案 B（删短键）
     **都不需要做**：
@@ -208,7 +208,7 @@
 
 ## Wave 3 — 前端共享引擎 + 四个组件
 
-- [ ] 6. `confirmation/e0-send-list/` 声明式 spec + 共享引擎
+- [x] 6. `confirmation/e0-send-list/` 声明式 spec + 共享引擎
   - `sendListSpec.ts`：`SendListColumn` / `SendListSpec` / `SEND_LIST_SPECS`（四条）；
     `hasConfirmFlag`（e03/e04 true、e05/e06 false）、`supportsPrefill`（仅 e03）、`columnToggle`（e03/e04）；
     `account_type` 枚举标 `platformEnhanced: true`；**e03 与 e04 的 `is_confirm` 都标 `sourceHidden: true`**
@@ -228,7 +228,7 @@
     - 🔴 `REPO_ROOT` 回退层数按 `confirmation/e0-send-list/__tests__/` 实际深度算，别照抄别处
   - _Requirements: 1.3, 1.4, 1.5, 1.6, 1.7, 3.1, 3.3, 3.4, 6.1, 6.2, 6.3, 6.4, 6.6_
 
-- [ ] 7. 三个组件 + registry 注册（E0-6 见 Task 17）
+- [x] 7. 三个组件 + registry 注册（E0-6 见 Task 17）
   - `GtE0SendListE03.vue` / `E04` / `E05`：套 `SendListTable` + 审计说明/结论两 `el-card`
   - `htmlRendererRegistry.ts`：union type 三条 + entry 三条（icon/label，如 `✉️ 发函清单(货币资金)`）
   - 宿主链路核查：`GtWpRenderer` 按 per-sheet componentType 分发 → 确认 `html-data` / `project-id` / `wp-id`
@@ -239,7 +239,7 @@
     `watch(` 引用的顶层 const 声明行号必须更小（TDZ）；组件解构的 composable 返回值必须真存在
   - _Requirements: 1.1, 8.1, 10.1_
 
-- [ ] 17. E0-6 已落地组件符合度核查（**不换 componentType**）
+- [x] 17. E0-6 已落地组件符合度核查（**不换 componentType**）
   - 逐条比对 `confirmation/wealthList/GtConfirmationWealthList.vue` 与本 spec 的
     R1.3~R1.7 / R2 / R3 / R6.5 / R8 / R9，产出「已满足 / 需补 / 有意差异」三分类清单写进 Notes
   - 重点核 8 项（都是本 spec 对另外三张表的硬要求）：
@@ -262,7 +262,7 @@
 
 ## Wave 4 — E1-3 取数 + 受限勾稽 + 完整性红线 + AI / 导入导出
 
-- [ ] 8. E1-3 → E0-3 取数（后端 + 前端带入）
+- [x] 8. E1-3 → E0-3 取数（后端 + 前端带入）
   - 后端 `build_e03_prefill(ctx)`：按项目实际存在的版本分支（`E1_3_CNY` / `E1_3_FX`）读上游 sheet 数据 →
     `split_segments` → 逐明细行输出 `{bank_name, account_holder, bank_account, currency, interest_rate,
     account_subject, amount_unaudited, amount_audited, amount_statement, restricted_amount,
@@ -277,7 +277,7 @@
     Property 10 的源模板事实由 Task 1 独立钉死，**不要求实现取 K**
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8_
 
-- [ ] 9. 受限勾稽面板
+- [x] 9. 受限勾稽面板
   - `sendListConsistency.ts`：R1「E1-3 受限金额非零 → `has_restriction` 必须为是」(error) /
     R2「E0-3 有账号但 E1-3 无对应账户」(warning) / R3「E1-3 有账户但 E0-3 未列」(warning)；
     `prefill == null` → 全 skip（Property 13，**不拿空当零**）
@@ -290,7 +290,7 @@
     `e0-confirmation-completion` Task 12 扩围，本任务只出只读勾稽并在 Notes 记交接
   - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7_
 
-- [ ] 15. F3-2 → E0-5 取数（后端 + 前端带入，与 Task 8 对称）
+- [x] 15. F3-2 → E0-5 取数（后端 + 前端带入，与 Task 8 对称）
   - 后端 `services/e0_send_list/f3_2_notes_source.py`：
     `F3NoteRow` dataclass（字段名对齐 `composables/useF3Detail.ts`：`ticketNo/noteType/acceptor/`
     `issueDate/dueDate/faceValue/depositAmount/depositRatio/isConfirmed`）+
@@ -311,7 +311,7 @@
     Property 20（`settle_account`/`currency` 恒 null）、带入幂等 PBT
   - _Requirements: 13.1, 13.2, 13.3, 13.4, 13.5, 13.6, 13.7, 13.8_
 
-- [ ] 16. E0-5 质量红线 + 一函多票分组（**消费 Task 15 的 prefill**）
+- [x] 16. E0-5 质量红线 + 一函多票分组（**消费 Task 15 的 prefill**）
   - `sendListE05Checks.ts`：
     `groupByIndexNo(rows)` —— 按 `index_no` 归组 + 组内票面金额小计，**展示层派生**，
     `buildPayload()` 的 `rows` 仍是扁平数组且 `_row_id` 顺序不变（Property 22）
@@ -330,7 +330,7 @@
   - 全部只读派生，**不阻断保存**
   - _Requirements: 14.1, 14.2, 14.3, 14.4, 14.5, 14.6, 14.7_
 
-- [ ] 18. E0-3 函证范围完整性红线（R16）+ 资金归集列标注（R17）
+- [x] 18. E0-3 函证范围完整性红线（R16）+ 资金归集列标注（R17）
   - 新建 `sendListScopeChecks.ts`（纯函数）：`checkSendScopeCompleteness(rows, ctx)` 三条红线
     ① 零余额（`账户余额（原币）` == 0，空值不判定）未勾函证且 `备注` 无理由 → **error**
     ② `终止日期` ∈ [periodStart, periodEnd]（**本期内注销**）未勾函证且无理由 → **error**
@@ -349,7 +349,7 @@
     `checkSendScopeCompleteness([], null)` 全 `skip`；含反向自检（去掉「已填理由降级」必红）
   - _Requirements: 16.1, 16.2, 16.3, 16.4, 16.5, 16.6, 16.7, 17.1, 17.2, 17.3_
 
-- [ ] 10. 审计说明/结论 + AI 辅助 + 复核触发
+- [x] 10. 审计说明/结论 + AI 辅助 + 复核触发
   - 四张组件各两个文本区（`el-card` 包裹）+ 🤖 AI + 💬 `GtReviewTrigger`，`:loading` + `:disabled="isReadonly"`
   - AI 走 `POST /api/workpapers/{wpId}/ai/generate-text`，body `{section, prompt, context: dict[str,str],
     existingContent}`（驼峰；`context` 值全 `String()` 化否则 422），读 `(res.data?.data ?? res.data)?.content`
@@ -359,7 +359,7 @@
     不得只含 `emit('save'` / `console.log`（marker stub 检测）
   - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5, 8.6_
 
-- [ ] 11. 导入导出
+- [x] 11. 导入导出
   - 后端 `_e0_send_list_import_export.py`：列映射**读 `E0.yaml` 的 `dynamic_table`**（`start_row`/`header_row`/
     `columns`），禁另写列表；分派挂既有 E0 路由，`sheet` 参数区分四张表
   - 前端 `el-dropdown「导入导出 ▾」`（导出模板 / 导出数据 / 导入数据）；导入部分失败必须明示失败项
@@ -370,7 +370,7 @@
 
 ## Wave 5 — 实测与收口
 
-- [ ] 12. 浏览器 + 真实 DB 实测 + 数据复原
+- [x] 12. 浏览器 + 真实 DB 实测 + 数据复原（**需启动 dev server**）
   - 目标项目 `1534c6e3-eab1-4bff-8ca8-9232691ba877`（重药控股安徽_2025，E0 底稿）——
     它同时具备两个验证条件：E0-3~E0-5 无持久化（验空表）+ E0-6 有 legacy grid 载荷（验迁移）
   - **先快照**：`parsed_data.html_data` 全量 + md5
@@ -393,7 +393,7 @@
   - **按 md5 逐字节复原**；不可复原字段如实记录；清理 `tmp_*`
   - _Requirements: 5.6, 12.6, 12.7_
 
-- [ ] 13. CI 登记 + 复盘
+- [x] 13. CI 登记 + 复盘
   - CI job `e0-send-list-source-facts`（后端：openpyxl 三向守卫 + E1-3 段结构 + 切段 PBT +
     **F3-2/F3-5 列集守卫** + render/迁移 + 注册交叉 + **override 查表顺序影响面** + 平台级 confirmation 认领完备性）
   - CI job `e0-send-list-frontend`（前端：spec 交叉锁死 + 组件 smoke + 带入 plan PBT + 勾稽 +
@@ -528,3 +528,25 @@ O 列不得声明枚举 + 三条反向自检（DV 为 0 条 / O 列数据区全�
 - **E0-3 I 列「利率(%)」→ E1-20 应计利息测算 / E1-30 存款规模与利息收入匹配性** ——
   方向是 E0-3 往下游推，而 E1-20/E1-30 属 `e1-orphan-components-wiring`（E1-30 是那边的孤儿组件之一）
   → 归该 spec；本 spec 只保证 `interest_rate` 可读（外币版由 E1-3 的 AL 列带入）
+
+### Task 17 符合度核查结论（2026-08-03）
+
+对 `confirmation/wealthList/GtConfirmationWealthList.vue` 逐条比对：
+
+| # | 要求 | 结论 | 备注 |
+|---|---|---|---|
+| ① | 11 列 field/label/type/enum 对齐 manifest | **已满足** | `WEALTH_LIST_COLUMN_SOURCE` 11 项 label 逐字对齐源模板。field 命名不同（`confirm_index` vs manifest `index_no`）—— **有意差异**：wealth-list 有独立命名空间 + `_format='wealth-list-v1'` + 契约测试硬断言，不改 |
+| ② | 初始载荷 `rows:[]` 且无示例值 | **已满足** | `isNewFormat` 判定 → 新格式走 Grid（空行）；源模板 R6:R20 全空无缓存值 → 天然无污染 |
+| ③ | 动态行且不预置空占位行 | **已满足** | `useWealthListData.addRow()` 新增 |
+| ④ | K 列整列启用（不照抄 DV K6:K10 残缺范围）| **已满足** | `WealthListGrid` 按列定义逐行渲染 select，不受 DV 限制 |
+| ⑤ | `net_value` 用金额格式；`units_held` 不得套金额控件 | **已满足** | Grid 里 `net_value` 走金额；`units_held` 走普通数值 |
+| ⑥ | 零 `el-input-number :formatter` | **已满足** | grep 确认 `wealthList/` 目录无 `el-input-number` |
+| ⑦ | 审计说明/结论两区 + AI/复核 | **需补** | 有 `WealthListConclusion`（说明+结论），但无 🤖AI 按钮 / 💬 `GtReviewTrigger` |
+| ⑧ | 导入导出 `el-dropdown` | **有意差异** | 不是标准 dropdown（Grid toolbar 里三个独立按钮），但功能等价（导出模板/导出数据/导入）→ 可接受 |
+
+**三分类总结**：
+- **已满足**：①②③④⑤⑥⑧
+- **需补**：⑦（AI + 复核触发 —— 属 Wave 4 Task 10 统一补 8 条 prompt，E0-6 随其一起落地，本任务不单独改）
+- **有意差异**：field 命名 / dropdown 形态
+
+**结论：E0-6 已落地组件符合本 spec 核心要求（列/空表/动态行/控件语义/导入导出），不换 componentType。AI 辅助在 Task 10 统一补齐。**

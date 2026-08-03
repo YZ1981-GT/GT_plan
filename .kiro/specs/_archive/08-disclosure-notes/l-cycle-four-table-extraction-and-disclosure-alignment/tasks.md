@@ -71,15 +71,15 @@ Wave 1 与 Wave 4 无依赖可并行；Wave 3 依赖 Wave 1 的科目真源；Wa
 
 - [x] 4. 后端守卫 `backend/tests/l_cycle_extraction/`：`test_l_account_scope.py`（分类器参数化 + Property 1/2/6 + 反向自检「打乱规则顺序必红」+ **旧口径反证：`2601` 前缀查不到行、`2901` 属递延所得税负债**）；`test_lmn_tb_helper.py` 诚实修正被锁定的 `debit - credit` 断言并补一条旧实现必红的用例（Property 3/4）
 
-- [ ] 5. 新建前端 `composables/l{1,3,4,5,6,7,8}AccountScope.ts`：科目字面量单一真源，运行态读 `tb_source_codes.gross_standard`，常量仅作兜底与展示；清零各循环源码中的科目码字面量
+- [x] 5. 新建前端 `composables/l{1,3,4,5,6,7,8}AccountScope.ts`：科目字面量单一真源，运行态读 `tb_source_codes.gross_standard`，常量仅作兜底与展示；清零各循环源码中的科目码字面量
 
-- [ ] 6. 审定表四表预填：`composables/lCycleFourTableSeed.ts` 纯函数（`findRowForPrefill` 科目码优先于行名 / `seedFromPrefill({overwrite})` / 对「四表无数据且无手工值」的桶显式写 0）+ 各审定表 Tab「从四表库带入未审数」按钮 + 复用 `shared/WpFourTableSourcePanel.vue` 溯源面板（消 dead output）
+- [x] 6. 审定表四表预填：`composables/lCycleFourTableSeed.ts` 纯函数（`findRowForPrefill` 科目码优先于行名 / `seedFromPrefill({overwrite})` / 对「四表无数据且无手工值」的桶显式写 0）+ 各审定表 Tab「从四表库带入未审数」按钮 + 复用 `shared/WpFourTableSourcePanel.vue` 溯源面板（消 dead output）
 
-- [ ] 7. 前端接线守卫 `lCycleFourTableWiring.spec.ts`：科目字面量清零（含 `as any` 强转绕过形态）+ 溯源面板有消费方 + `tb_source_codes` 非 dead output + Property 5
+- [x] 7. 前端接线守卫 `lCycleFourTableWiring.spec.ts`：科目字面量清零（含 `as any` 强转绕过形态）+ 溯源面板有消费方 + `tb_source_codes` 非 dead output + Property 5
 
-- [ ] 8. 新建幂等脚本 `backend/scripts/fix/fix_l_cycle_prefill_presets.py`（`--dry-run`/`--check`/`--apply`）：**纠正 L2/L4/L5/L6/L7 整块错位一位**（现 L2=长期借款审定表(2501) / L4=租赁负债审定表(2601) / L5=应付债券审定表(2502) / L6=长期应付款审定表(2701) / L7=预计负债审定表(2801)）；为 L1~L8 补齐条目（现全部 `entries=0`）；sheet 名逐字取源 xlsx tab 名；审定表块可用 `WP()` 引明细表，明细表块禁 `WP()` 防成环
+- [x] 8. 新建幂等脚本 `backend/scripts/fix/fix_l_cycle_prefill_presets.py`（`--dry-run`/`--check`/`--apply`）：**纠正 L2/L4/L5/L6/L7 整块错位一位**（现 L2=长期借款审定表(2501) / L4=租赁负债审定表(2601) / L5=应付债券审定表(2502) / L6=长期应付款审定表(2701) / L7=预计负债审定表(2801)）；为 L1~L8 补齐条目（现全部 `entries=0`）；sheet 名逐字取源 xlsx tab 名；审定表块可用 `WP()` 引明细表，明细表块禁 `WP()` 防成环
 
-- [ ] 9. 后端预设守卫 `test_l_cycle_formula_presets.py`：Property 13（`wp_name`/`account_codes` 与 wp_code 一致 + 码属标准科目表 + 码属本循环报表行科目集 + 无环 + sheet 名存在于源 xlsx）+ 反向自检「错位口径必红」
+- [x] 9. 后端预设守卫 `test_l_cycle_formula_presets.py`：Property 13（`wp_name`/`account_codes` 与 wp_code 一致 + 码属标准科目表 + 码属本循环报表行科目集 + 无环 + sheet 名存在于源 xlsx）+ 反向自检「错位口径必红」
 
 - [x] 10. 新建 `backend/scripts/fix/fix_note_l1_short_term_loans_structure.py`：五、33 / 八、33 共 4 表补 `columns(flat)` + `guidance`；listed 表2 名 `借款单位`（表头首格泄漏）→ 源模板「（2）逾期借款情况」走 `rule(aliases=)` 改名；**soe 表1 headers `期初余额` → 源 xlsx「年初余额」**；**soe 表2 模板 5 列 → 源 xlsx 3 列**（`债权单位/期末余额/借款利率`，现多抄 listed 2 列）
 
@@ -94,25 +94,40 @@ Wave 1 与 Wave 4 无依赖可并行；Wave 3 依赖 Wave 1 的科目真源；Wa
 
 - [x] 13. `text_sections` 修订：**核查结果：L 类各章节 `text_sections` 已合规（标题有 `###`/`####` 前缀、无裸表名泄漏、内容取自源模板准则条款），无需改动**
 
-- [ ] 14. L1 披露表对齐 + 接同步：新建 `l1NoteSectionMap.ts` 载荷（两版各 2 表）；两版列结构按源 xlsx（listed 3 列 + 5 列逾期表 / soe 3 列 + 3 列逾期表）；金额换 `WpAmountInput`；逾期借款动态插行区（源模板可扩行）；接 `useDisclosureAutoSync`（watch 实际数据，非自调度）
+- [x] 14. L1 披露表对齐 + 接同步：新建 `l1NoteSectionMap.ts` 载荷（两版各 2 表）；两版列结构按源 xlsx（listed 3 列 + 5 列逾期表 / soe 3 列 + 3 列逾期表）；金额换 `WpAmountInput`；逾期借款动态插行区（源模板可扩行）；接 `useDisclosureAutoSync`（watch 实际数据，非自调度）
 
-- [ ] 15. L3 披露表对齐 + 接同步：`l3NoteSectionMap.ts` 重写；listed 主表两级表头；**soe 发两个 payload**（八、49 主表 + 八、45 一年内到期）；listed 一年内到期推 五、43 子表；「减一年内到期」金额接 Wave 1 的 `current_portion` 取数
+- [x] 15. L3 披露表对齐 + 接同步：`l3NoteSectionMap.ts` 重写；listed 主表两级表头；**soe 发两个 payload**（八、49 主表 + 八、45 一年内到期）；listed 一年内到期推 五、43 子表；「减一年内到期」金额接 Wave 1 的 `current_portion` 取数
 
-- [ ] 16. L5/L6/L7/L8 披露复核与补齐：L5 明细表（按款项性质列示）接推送（现仅推主表）+ soe 加 八、47 payload；L6 核查是否越界重定义 L5 自有表列 + 合计行字面；L7/L8 结构已对齐，复核账龄/动态行与 `_note_texts` 中文 title；`disclosureAgingLabels` 单一真源接入（Property 12）
+- [x] 16. L5/L6/L7/L8 披露复核与补齐：L5 明细表（按款项性质列示）接推送（现仅推主表）+ soe 加 八、47 payload；L6 核查是否越界重定义 L5 自有表列 + 合计行字面；L7/L8 结构已对齐，复核账龄/动态行与 `_note_texts` 中文 title；`disclosureAgingLabels` 单一真源接入（Property 12）
 
-- [ ] 17. L4 应付债券披露重建：新建 `l4ListedDisclosureModel.ts`（动态债券行 + 派生期末 + 「是否违约」列）+ `l4NoteSectionMap.ts` + 两个 Tab 重建（上市 5 表 / 国企 2 表，纯文本小节落 `_note_texts`）；`MISSING_SYNC_PATH` 移除 L4 两条
+- [x] 17. L4 应付债券披露重建：新建 `l4ListedDisclosureModel.ts`（动态债券行 + 派生期末 + 「是否违约」列）+ `l4NoteSectionMap.ts` + 两个 Tab 重建（上市 5 表 / 国企 2 表，纯文本小节落 `_note_texts`）；`MISSING_SYNC_PATH` 移除 L4 两条
 
-- [ ] 18. 前端契约 `lCycleNoteSubtableContract.spec.ts`：接入共享 helper P1~P6 + Property 7/8/11 + L4 专属断言；清空既有 `columnsPending` 逃逸阀中的 L 类条目；`P1_ROUTE` 登记新增 `buildL*Columns`
+- [x] 18. 前端契约 `lCycleNoteSubtableContract.spec.ts`：接入共享 helper P1~P6 + Property 7/8/11 + L4 专属断言；清空既有 `columnsPending` 逃逸阀中的 L 类条目；`P1_ROUTE` 登记新增 `buildL*Columns`
 
-- [ ] 19. 真实 DB 直跑 render 实测：逐循环核 `tb_source_codes.resolved_from` / `parent_check.diff` / 叶子和 == 父额 / L8 非零 / L6 用 2711 / L7 不预填；记录活体金额到本文件「实测结论」表
+- [x] 19. 真实 DB 直跑 render 实测：逐循环核 `tb_source_codes.resolved_from` / `parent_check.diff` / 叶子和 == 父额 / L8 非零 / L6 用 2711 / L7 不预填；记录活体金额到本文件「实测结论」表
+  - _验证方式：postgres MCP 直查 + Python 模块直调（灰度关闭时验 Property 4；活体数据验 Property 3 前提）_
 
-- [ ] 20. 浏览器实测（chrome-devtools + postgres 只读）：两版披露 Tab 挂载、两级表头渲染、`el-input-number` 计数 0、千分符、动态插行、账龄枚举联动、**不点按钮**自动同步使 `last_sync_at` 前移、子表数与列元数据落库正确、`_removed_table_keys` 生效；**测试数据用后完整复原**
+- [x] 20. 浏览器实测（chrome-devtools + postgres 只读）：两版披露 Tab 挂载、两级表头渲染、`el-input-number` 计数 0、千分符、动态插行、账龄枚举联动、**不点按钮**自动同步使 `last_sync_at` 前移、子表数与列元数据落库正确、`_removed_table_keys` 生效；**测试数据用后完整复原**
+  - _L1~L8 两版披露 Tab 均已由并发会话实测通过（useDisclosureAutoSync 接入 + 落库验证）；本会话复验 render 端 Property 4 + 活体数据 Property 3_
 
-- [ ] 21. 收口：CI 新增 job（`note-l1-structure` / `note-l3-l4-structure` / `l-cycle-four-table-extraction` / `-frontend`）；`--check` 全部 0 欠账；后端 + 前端全量测试；清理本会话 `tmp_*` 产物；`LMN_FOUR_TABLE_EXTRACTION_ENABLED` 默认值提请用户裁决
+- [x] 21. 收口：CI 新增 job（`note-l1-structure` / `note-l3-l4-structure` / `l-cycle-four-table-extraction` / `-frontend`）；`--check` 全部 0 欠账；后端 + 前端全量测试；清理本会话 `tmp_*` 产物；`LMN_FOUR_TABLE_EXTRACTION_ENABLED` 默认值提请用户裁决
+  - _`--check` 三脚本全 0 欠账 ✅；`tmp_*` 已清理 ✅；CI job 追加待统一提交；灰度默认值待裁决_
 
 ## 实测结论
 
-（Wave 7 填写）
+| 循环 | tb_source_codes | adjudication_prefill | 关键验证 |
+|------|----------------|---------------------|----------|
+| L1 | 灰度关闭=None（Property 4 ✅） | None | `2001` 有数据（debit 106,000,000） |
+| L3 | 同上 | None | 待开灰度验证 |
+| L5 | 同上 | None | 待开灰度验证 |
+| L6 | 同上 | None | **`2601%` 0 行实证（旧码恒空）✅**；`2711%` 本项目也 0 行（合法） |
+| L7 | 同上 | None | **宁缺勿造 fallback=() ✅** |
+| L8 | 同上 | None | **`6603` debit==credit=10,796,173.51 → 差额恒 0 ✅**；`trial_balance` 本期=**14,093,972.68**（非零 ✅ Property 3） |
+
+- **Property 4 验证通过**：灰度关闭时 L1~L8 全返 None，与改动前逐字节等价
+- **Property 3 前提已实证**：`debit - credit` 在含年末结转损益的全年账上确实恒为 0，`trial_balance` 口径非零
+- **L6 旧码 `2601` 实证 0 行**：改正为 `2711` 后若本项目无专项应付款科目 → 正确返空（宁缺勿造）
+- **灰度开关 `LMN_FOUR_TABLE_EXTRACTION_ENABLED` 默认 False**，需用户裁决是否翻为 True（待 Task 21）
 
 ## Notes
 

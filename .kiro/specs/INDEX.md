@@ -1,9 +1,9 @@
 # 致同审计作业平台 — Spec 开发索引
 
-**最后更新**：2026-08-02
+**最后更新**：2026-08-03
 **当前分支**：`work/2026-05-30-wp-specs`
-**统计**：Active **7**（`.kiro/specs/` 实测目录数）/ Archived 512 = 总计 519
-**最高迁移**：**V134**（以 `migration_status` 实测为准）
+**统计**：Active **2**（`.kiro/specs/` 实测目录数）/ Archived 531 = 总计 533
+**最高迁移**：**V136**（以 `migration_status` 实测为准）
 **技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer
 
 ---
@@ -28,49 +28,55 @@
 
 | spec | 进度 | 一句话 |
 |------|------|--------|
-| `e1-four-table-extraction-and-disclosure-alignment` | **20/20 完成，待 commit** | E1 货币资金四表取数 + 披露/附注对齐。实测修掉 2 个平台级 P0（`semantic_account_resolver` 多槽被报表公式兜底污染 → 货币资金合计虚增一倍）+ 2 个前端缺陷。外币章节按选项 A 收口，推送移交下一条 |
-| `disclosure-note-row-level-merge` | **15/15 完成 + 真实 DB & 浏览器实测，待 commit** | 平台级**行级合并**：载荷声明 `sub_table_data._row_scope` 即只替换自己那一段，段外行原样保留、fail closed 不退化整表覆盖。段边界读模板**已有**的 `rows[].report_row_code`，不新造标识。全库 **29 张**多段共享表（listed 23 / soe 6），首个消费者 = E1 外币章节。另修 `_note_texts` 整替换 + 段可写区排除表级合计行 |
-| `restricted-assets-note-row-scope-rollout` | **16/16 完成 + 真实 DB & 浏览器实测，待 commit** | 受限资产附注表（listed `五、32` 主表+续表 / soe `八、93`）行级合并接入 —— 29 张共享表里**受益面最大**的一张（8 段横跨 E1/D1/D2/D5/F2/H1/H2/I1，改造前**零 pusher**）。**8 段接了 6 段**（只有 D5/F2 真的零数据）；平台补强 `row_type: "unowned"`；修 soe 两处 `report_row_code` 错码/缺码；新增声明式来源表 + 一行接线 composable + 勾稽与段级溯源；顺带修掉 I1 两 Tab 的自调度无限 POST |
-| `e1-orphan-components-wiring` | 0/14（三件套已立） | E1 有 **8 个组件已按源模板写好却从未渲染**（~225 KB）：`E1-19` 指向了 E1-18 的组件、IPO/舞弊组 E1-26/29/30/31/32 全走通用扁平表、两个 OCR 弹窗无父级。接线（props 签名已一致 + legacy 键回退已内建）+ 顺手收口金额控件/AI/披露门控/预设 + **新增平台级孤儿组件守卫** |
-| `e0-confirmation-completion` | 2/18（三件套已按逐 sheet 精读**重写**，2026-08-02 复盘 + **裁决门 A 已关闭 = A-否**） | E0 货币资金函证精细打磨。逐格读源 xlsx（20 tab）后**三次推翻自己的前提**：①`reliabilityCode: null` 的注释错（`邮件传真回函核对记录F1-12` 就是可靠性表，只是 hidden）②sheet 名真实为 `银行函证其他信息核对表E0-5`（无「询证」）③**`sheet_state` 实证只有 10 张 visible** = `底稿目录` 索引的 9 张 + 目录。**用户裁决 A-否（三张 hidden 底稿不实现）** → R1（13 要项表）/ R7.1·R7.5 / R8.6 与 **Wave 6（Task 7/8/9，~39 KB）已删除**，口径存档在 R1 与 design §1。交付范围：**E0-1 下区四块**（一、函证情况 6×6 矩阵 / 二、样本选择 3 段固定说明 + 未函证理由录入 / 三、审计说明 3 条小标题 / 四、审计结论 + 提示 4 条，第二版只写了矩阵是因首轮 dump 漏了 O/V 列；两处「一句话拆两格」须合并渲染）、E0-1 缺 4 列多 8 列、`GtConfirmationSummary` 写死 `D0-5/D0-6/D0-7`、`handleJumpB50` 是 stub、E0-3/E0-6 受限标记→E1 ②表联动、备忘录改银行口径（工号+公示制度核对）、**可靠性按渠道补 12 列照做**（共享件增强，实测改在 D0-7 上做）、**新增 Task 19 钉死「hidden ⇒ `skip`」不变式**（特别是核对表的全名 `skip` 条目不得删 —— componentType 解析是尾码优先，删了会渲染出列集不符的多余页签）。已完成 2 项：Task 12.5 E0-6 专属组件 `confirmation-wealth-list` 全链、Task 11 `importE0ListsToSummary` 口径纠偏（124→357 行，原 `[ ]` 是假红）；新拆 Task 11b（取数链路两处硬前置，不解则 Task 11 全是 dead code） |
-| `e0-send-list-dedicated-components` | 0/18（三件套已立，2026-08-02 复盘扩写 + 同步 A-否） | E0 发函清单专属组件。范围由四张收窄为**三张**（E0-3/E0-4/E0-5 → `confirmation-send-list-e03/e04/e05`）—— E0-6 已由 `e0-confirmation-completion` 落地 `confirmation-wealth-list`，原 `confirmation-send-list-e06` **撤回**，改为符合度核查（Task 17，8 项）；「三 + 一」命名不统一是**有意接受**并写进两份 Glossary。解 grid 兜底污染（`extract_grid(data_only=True)` 把公式缓存值 `XX银行`/`0` 当数据渲染）、E1-3 段语义取数（两版行号完全不同故禁硬编码行号）、K 列金额口径三态可切换；**R16 E0-3 函证范围完整性红线**（准则明文「包括零余额账户和在本期内注销的账户」，三处依据 = `E0A` 程序 1 + `E0-1!O28/O29` + `回函情况汇编` 编制说明 2/3，数据齐备但平台零校验）。**随 A-否 关闭两个待裁决**：R15 由「翻转 override 查表顺序」改为**只钉死全名 `skip` 不变式**（实证 skip 判定 L709 全名优先、componentType 判定 L749 尾码优先，两者顺序相反使当前配置已正确）→ Task 14 降级、不再阻塞 Task 5；R17 资金归集勾稽**永久留遗留**（对侧表不实现） |
-| `e0-send-list-dedicated-components` | 0/18（三件套已立，2026-08-02 复盘扩写） | E0 发函清单专属组件。范围由四张收窄为**三张**（E0-3/E0-4/E0-5 → `confirmation-send-list-e03/e04/e05`）—— E0-6 已由 `e0-confirmation-completion` 落地 `confirmation-wealth-list`，原 `confirmation-send-list-e06` **撤回**，改为符合度核查（Task 17，8 项）；「三 + 一」命名不统一是**有意接受**并写进两份 Glossary。解 grid 兜底污染（`extract_grid(data_only=True)` 把公式缓存值 `XX银行`/`0` 当数据渲染）、E1-3 段语义取数（两版行号完全不同故禁硬编码行号）、K 列金额口径三态可切换；新增 **R16 E0-3 函证范围完整性红线**（准则明文「包括零余额账户和在本期内注销的账户」，双依据 = `E0A` 程序 1 + `E0-1!O28`，数据齐备但平台零校验）+ **R17 资金归集链路登记** |
-| `g-cycle-extraction-mapping-and-disclosure-alignment` | 7/30 | G 循环四表映射与披露对齐（含 `report_config` 4 处错码修复）—— **并发会话在推进** |
-| `d4-four-table-extraction-and-disclosure-alignment` | **33/33** | D4 营业收入四表取数与披露/附注对齐 |
-| `h-cycle-four-table-extraction-and-account-mapping` | 0/25 | H 类四表取数与科目映射收口 —— **并发会话** |
-| `f-cycle-four-table-extraction-and-disclosure-completion` | 0/16 | F 类四表取数与披露/附注收口 —— **并发会话** |
+| `f0-confirmation-linkage-and-structural-enhancement` | 19/31（含 1 个 `[-]` 在跑） | F0 存货循环函证联动增强：矩阵自动聚合 + F0-5/F0-6 供应商自动带入 + B50/A13 推送 + F0-7 可靠性结构化。**复盘退回 3 项 + Wave 7 返工 9 项**（矩阵三个入参仍传 `undefined` → 4 个百分比行恒 `-`；5 个新模块 4 个零消费方）—— **并发会话在推进，勿碰** |
+| `report-config-account-code-integrity` | 0/12（三件套已立） | **`report_config` 科目码完整性**。全表对账（132 条 `TB()` 引用 / 102 行）扫出 **13 行错码**，远超此前手工发现的 6 处 —— **权益段 BS-081~BS-090 是一整块错位**（BS-082 其他权益工具取到其他综合收益 / BS-084 库存股取到零命中码 / BS-085 / BS-086 专项储备取到本年利润 / BS-090 少数股东权益取到库存股），另 BS-033 开发支出取到无形资产减值准备、BS-053 与 BS-067 同认领 `2901` **跨行双算**、IMP-008 取到旧准则科目、IMP-017 把商誉原值当备抵。并查出 **`V136` 是失效迁移**（前提错、`WHERE` 从不命中）。核心交付是**平台级一致性守卫**（这张表此前零校验，错码可静默存在数年）。BS-014 口径待用户裁决 |
 
-> 🔴 最后 4 条是**并发会话**的活跃 spec，本会话未触碰。跨会话协作时不要并行推进同一 spec
+> 🔴 `f0-*` 由**并发会话**推进，本会话未触碰。跨会话协作时不要并行推进同一 spec
 > （memory 已实证并发会话会互相回退同一文件）。
 
-2026-08-01 收尾归档：`g6-four-table-extraction`(10/10) · `g5-four-table-extraction`(20/20) ·
-`disclosure-note-follow-actual-content`(13/13) → `08-disclosure-notes`；
-`procedure-mainline-convergence`(42/42) → `04-infra`；2 个空壳 → `99-superseded`。
+**2026-08-03 归档（4 个，→ `08-disclosure-notes`）**：
+`h-cycle-four-table-extraction-and-account-mapping`(25/25) ·
+`d4-four-table-extraction-and-disclosure-alignment`(33/33) ·
+`n-cycle-note-template-and-disclosure-completion`(13/13) ·
+**`semantic-account-resolver-full-rollout`(31/31)** —— 结论是「应立即迁移的策略 = 0 个」，
+交付物是**三道守卫**而非批量迁移：定向裁决交叉锁死（未迁移清单 ⊆ 已登记裁决理由，
+33 条逐条带实证）· 旧制编码数据触发守卫（旧制码一带非零余额即打红，把「该迁移了」
+交给数据判断）· F2 展示元数据错码纠正。
 
 新建 spec 放 `.kiro/specs/{name}/`（扁平，不可嵌套）。
 
 ---
 
-## 二、已归档 Spec（512个，15 分类）
+## 二、已归档 Spec（530个，15 分类）
 
 ```
 _archive/
 ├── 01-phase-foundation/              24
 ├── 02-workpaper-cycles/              16
 ├── 03-refinement-rounds/              9
-├── 04-infra/                          2
+├── 04-infra/                          3
 ├── 04-infra-architecture/            36
 ├── 05-business-features/            234
 ├── 06-engineering-governance/        13
 ├── 07-workpaper-slimdown/            22
-├── 08-disclosure-notes/              53
+├── 08-disclosure-notes/              75
 ├── 09-consolidation-phases/           5
 ├── 10-A~S-workpaper-all-cycles-complete/ 31
 ├── 11-confirmation-d0-module/        11
 ├── 12-2026-06-23-batch/              12
 ├── 13-2026-06-29-batch/              33
-└── 99-superseded/                     5
+└── 99-superseded/                     7
 ```
+
+### 最近归档（2026-08-03）
+
+**→ 08-disclosure-notes（+3）**
+
+| Spec | 说明 |
+|------|------|
+| h-cycle-four-table-extraction-and-account-mapping | H1~H10 语义科目定位收口（25/25 + 复盘 5 项 + 浏览器实测）：修 3 个「取错整个科目族」P0（H3 `1503/1504`→`1521/1525/1526/1527`、H8 `1901` 待处理财产损溢→`1641/1642/1643`、H9 `2205` 合同负债→`2601/2602`）；实测挖出 `parent_check` 揭示的 `trial_balance` 父子双算平台级缺陷 |
+| d4-four-table-extraction-and-disclosure-alignment | D4 营业收入四表取数与披露/附注对齐（33/33） |
+| n-cycle-note-template-and-disclosure-completion | N 循环附注模板与披露收口（13/13） |
 
 ### 最近归档（2026-08-01，第四批）
 

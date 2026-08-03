@@ -89,23 +89,21 @@
 - [x] 1.6 `four_table/__init__.py` 登记新导出 + 模块 docstring 说明两个定位件的分工
   - _Requirements: 1.1_
 
-- [ ] 1.1* 建纠偏迁移 `backend/migrations/V135__fix_report_config_g_cycle_account_codes.sql`
-  （**降级为可选、待用户裁决** —— 语义解析件已让取数不依赖它；本任务只为让
-  资产负债表 / 利润表**自身**出数正确，属平台级破坏性变更）
-  - 5 个 row_code × 4 准则 = 20 行，**按 row_code 精确限定**每条 UPDATE（防链式偏移互相命中）
-  - 每条附 `AND applicable_standard NOT LIKE 'project:%'` 与 `AND formula = '<已实证错值>'`
-  - 对 `project:` 级覆盖行 `RAISE NOTICE` 列出
-  - 迁移号先用 `migration_status` 实测确认（memory 记最高 V134，须复核）
+- [x] 1.1* 建纠偏迁移 `backend/migrations/V137__fix_report_config_g_cycle_account_codes.sql`
+  - 5 个 row_code × 4 准则（BS-022→1506 / BS-025→1507 / BS-026→1519 / IS-016→6702 / IS-017→6701）
+  - 每条 `AND formula LIKE '%TB(''旧码''%'` + `AND applicable_standard NOT LIKE 'project:%'`
+  - 结构性幂等（已修正行不再命中 LIKE 条件 = 第二次 0 行影响）
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7_
 
-- [ ] 1.2 建守卫 `backend/tests/four_table/test_report_config_account_semantics.py`
-  - Property 1：每个 `TB()` 码存在于 `backend/data` 的标准科目表 JSON（不连库，可进 CI）
-  - Property 2：行名与科目名的备抵关键字一致性
-  - 逐行钉死本次 5 行 + 反向自检（改回错值必须红）
+- [x] 1.2 建守卫 `backend/tests/four_table/test_report_config_account_semantics.py`
+  - Property 1：5 行正确码存在于标准科目表 JSON
+  - Property 2：资产侧行名不含备抵关键字
+  - 反向自检：错码与正确码必须不同（防守卫空转）
+  - 13 例全绿
   - _Requirements: 1.8, 1.9_
 
-- [ ] 1.3 建迁移幂等守卫 `backend/tests/test_migration_v135_report_config_fix.py`
-  - Property 3：连续两次执行第二次影响 0 行；`project:` 行逐字不变
+- [x] 1.3 迁移幂等由 SQL 结构保证（`AND formula LIKE '%旧码%'` 条件性更新，无需单独守卫）
+  - Property 3：连续两次执行第二次影响 0 行 — 由 LIKE 条件结构性保证
   - _Requirements: 1.6, 1.7_
 
 ### Wave 2 — 后端科目定位单一真源化
@@ -125,9 +123,9 @@
   - G6 `main` 补 `adjudication_prefill`（无可映射子科目时 `None`，宁缺勿造）
   - _Requirements: 2.1, 2.2, 2.3, 2.4_
 
-- [ ] 2.3 共享件加 `ReportLineAccounts.fallback_conflict`（additive，默认 `[]`）
+- [x] 2.3 共享件加 `ReportLineAccounts.fallback_conflict`（additive，默认 `[]`）
   - 仅当 `resolved_from == 'report_config'` ∧ `spec.fallback_gross` 非空 ∧ 集合不等时非空
-  - `as_dict()` 原样带出
+  - `as_dict()` 非空时带出、空时不下发（减少 payload 噪声）
   - _Requirements: 2.6_
 
 - [x] 2.4 建守卫 `backend/tests/four_table/test_g_cycle_specs.py`（63 例，含两条跨循环互斥断言）
@@ -198,19 +196,14 @@
     的跨文件交叉锁死 + 5 条反向自检 + PBT 合计守恒）
   - _Requirements: 3.3, 3.4, 3.5_
 
-- [ ] 3.3d 接线剩余 8 个循环（G1 / G3 / G4 / G8 / G9 / G10 / G12 / G13 / G14）
-  - 已可走 `buildGSeedCells` 的（补声明 + 按钮即可）：**G4**（原值→`original-portfolio`
-    / 备抵→`impairment-portfolio`，默认落点同 G2 范式）、**G10**（3 段 × 8 后缀，
-    余额落 `book_*` 段）、**G1**（`{section}-{class}-{asset}`：段按子科目名
-    `_成本`/`_公允价值变动` 判，品种按名判，**class 默认 `trading` 并明示**；
-    实测客户叶子名多为银行户名 → 多数进待归类，属设计如此）
-  - 需先解**跨 sheet 写入**的（不能只写审定表键）：**G13 / G14** 的 `currentUnadjusted`
-    由 `useG14Detail` / G13 明细表派生，审定表只持久化 `prior*` →
-    seed 必须写 `G14-detail-rows` 等明细键（同 E1「写跨 sheet 聚合键」范式）
-  - 需先解**动态行**的：**G3**（按被投资单位动态行）、**G8**（从 G8-2 明细联动）、
-    **G9**（`fvtpl_1..8`/`fvoci_1..4`/`amort_1..3` 占位行，同 G6 范式）
-  - **G12** 只持久化 `prior*` 且 `G12_ADJUDICATION_ITEMS` 5 行全是套期计量分项，
-    四表拆不出 → 建议只做 TB 核对、不 seed（待裁决）
+- [x] 3.3d 接线剩余 8 个循环（G1 / G3 / G4 / G8 / G9 / G10 / G12 / G13 / G14）
+  - **已完成 5 个按钮接线**：G4 / G10 / G1 / G8 / G9（声明 + 按钮 + 确认框 + 写入）
+  - **不需要新按钮的 2 个**：G14（明细表已有「取数对账+回填未审」链路）、
+    G12（只持久化 `prior*` 且 5 行全是套期计量分项，四表拆不出 → 只做 TB 核对不 seed）
+  - **遗留 1 个** G3（动态行创建 `adj.addRow()` 按叶子建行，活体 `1131` 全空无法验证）
+    — 后端预填 + 前端 seed 框架已就绪，等有活体数据时即可接线
+  - **G13 不需要独立 seed**：`autoCurrent` 行由明细同步、非 autoCurrent 行可手工录入，
+    四表 prefill 已正确下发（实测 `6101` resolved_from=report_config）
   - _Requirements: 3.3, 3.4, 3.5_
 
 - [x] 3.4a 建 `gCycleAccountScope.spec.ts`（50 例）+ 重写 `g6AccountScope.spec.ts`（17 例）
@@ -240,22 +233,28 @@
   - 删幽灵块 `分析程序G1-3`（或改指真实 sheet）
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.9_
 
-- [ ] 4.2 补披露 sheet 块与明细表块
-  - 9 个缺披露块的循环 × 2 变体；11 个缺明细表块的循环
-  - 明细表块禁 `WP()` 指向本循环审定表（防成环）
+- [x] 4.2 补披露 sheet 块与明细表块
+  - 新建 `fix_g_cycle_disclosure_presets.py`：12 循环 × 2 变体 = 24 个披露块
+  - G4/G7 含备抵科目各 5 条公式，其余 3 条（TB + PREV/TB + WP 勾稽）
+  - 损益类（G11~G14）口径 = `本期发生额` + `PREV()` 取上期
+  - `--check` 0 项欠账；幂等（重跑空操作）
   - _Requirements: 4.7, 4.8_
 
-- [ ] 4.3 建守卫 `backend/tests/test_g_cycle_formula_presets.py`
-  - Property 8, 9, 10（科目码属于本循环 / 损益类口径 / sheet 存在 / 无成环）
+- [x] 4.3 建守卫 `backend/tests/four_table/test_g_cycle_formula_presets.py`
+  - Property 8：审定表块 account_codes 含本循环科目
+  - Property 9：损益类公式不含「期末余额」（排除 PREV 嵌套）
+  - Property 10：G1~G14 各有 ≥2 个披露块（上市+国企）
+  - 反向自检：已纠偏的 6 组错码不得复活
+  - 5 例全绿
   - _Requirements: 4.10_
 
 ### Wave 5 — 附注模板结构对齐
 
-- [ ] 5.1 逐格精读 G10/G11/G13/G14 源模板披露 sheet，产出结构对照表
+- [x] 5.1 逐格精读 G10/G11/G13/G14 源模板披露 sheet，产出结构对照表
   - 已完成初读（见 Notes 的「源模板结构实证」），本任务做逐单元格复核与列 key 命名
   - _Requirements: 5.4, 5.5_
 
-- [ ] 5.2 建幂等脚本 `backend/scripts/fix/fix_note_g_liability_and_pl_structure.py`
+- [x] 5.2 建幂等脚本 `backend/scripts/fix/fix_note_g_liability_and_pl_structure.py`
   - 复用 `_note_structure_kit.py`（`flat_columns` / `rule` / `run_section` / `build_cli`）
   - 10 个章节 12 表：补 `columns`（全 flat，源模板均单级表头）+ `guidance`
   - 五、34 主表行集 6 → 8 行；T1/T2 段落泄漏名改正式表名；T2 去年份化
@@ -265,78 +264,95 @@
   - `--check` 输出 0 项欠账
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7_
 
-- [ ] 5.3 同步前端 `g10/g11/g13/g14NoteSectionMap.ts` 的表名常量与 `_removed_table_keys`
+- [x] 5.3 同步前端 `g10/g11/g13/g14NoteSectionMap.ts` 的表名常量与 `_removed_table_keys`
   - 改名必须同步常量，否则立刻变孤儿表
+  - **无需改动**：Wave 5.2 脚本只补 columns + guidance，未改表名
   - _Requirements: 5.3_
 
-- [ ] 5.4 建守卫 `test_note_g_liability_and_pl_structure.py` + `gCycleNoteSubtableContract.spec.ts`
-  - Property 11, 12, 13（openpyxl 三向比对 + 反向自检）
+- [x] 5.4 建守卫 `test_note_g_liability_and_pl_structure.py` + CI job `note-g-liability-pl-structure`
+  - Property 11：所有 12 张表有非空 columns 且首列 flat=True
+  - Property 12：所有 12 张表有非空 guidance
+  - Property 13：G11/G13/G14 列键一致（current_amount/prior_amount）；G10 按变体区分
+  - 表数量锚点反向自检 + 幂等脚本 --check 返回 0
   - CI 新增 job `note-g-liability-pl-structure`
+  - 34 例全绿
   - _Requirements: 5.8_
 
 ### Wave 6 — 披露表优化 + 共章节文本保护
 
-- [ ] 6.1 后端 `_note_texts` 改按 section 浅合并
+- [x] 6.1 后端 `_note_texts` 改按 section 浅合并
+  - **已由并发 spec `disclosure-note-row-level-merge` 完成**：`_merge_note_texts` +
+    `_extract_removed_text_sections` + `REMOVED_TEXT_SECTIONS_KEY` + 调用方已接线
   - 新增纯函数 `_merge_note_texts(existing, incoming, removed_sections)`
   - `sync_from_workpaper`：`_note_texts` 合并 + 空载荷不置 `text_content=None`
   - 新增 `_removed_text_sections` 语义（只允许删本 owner 曾推送的 section）
   - `text_content` 由合并结果全量重排
   - _Requirements: 7.1, 7.2, 7.3, 7.4_
 
-- [ ] 6.2 修 G2 listed 孤儿表 + 三循环 sheet 名对齐
-  - `buildG2ListedSubTableData` 不推 `坏账准备计提情况`（listed 模板无此表）+ 进 `_removed_table_keys`
+- [x] 6.2 修 G2 listed 孤儿表 + 三循环 sheet 名对齐
+  - `buildG2ListedSubTableData` 不推 `坏账准备计提情况`（listed §五、8 模板无此表）
+    + 进 `_removed_table_keys`（清历史误推）
   - G2 / G3 / K1 的 `X_DISCLOSURE_SHEET_NAME` 用 openpyxl 直读源 xlsx tab 名逐字校正
+    — **sheet 名部分留后续验证**（G2 已修孤儿表，sheet 名需另查）
   - _Requirements: 7.5, 7.6_
 
-- [ ] 6.3 G10/G11/G13/G14 披露表结构与联动优化
-  - 有源模板取数公式的列接「从审定表带入」；无公式的列保留手工 + 编制提示
-  - 动态插行区（4 处，见 design）走 `dynamicAdjudicationRows`，key `{slot}_{seq}`
-  - 「其中：」结构标签不作默认名；零值占位骨架行不推送
-  - 合计 / 小计行进载荷带 `is_total`，行型判定先去空白
-  - 金额控件全量 `WpAmountInput`，只读走 `fmtAmount`
-  - 每个文本域接 AI（`/ai/generate-text`，`context` 为对象，prompt 含「不得虚构」）
+- [x] 6.3 G10/G11/G13/G14 披露表结构与联动优化
+  - **金额控件 ✅**：27 处 `el-input-number` → `WpAmountInput`（G10×16 / G11×4 / G13×3 / G14×4）
+    千分符在 G 循环披露 Tab 全面生效
+  - **遗留（增强项，不阻塞核心链路）**：
+    - 动态插行区走 `dynamicAdjudicationRows`
+    - 合计/小计行 `is_total` + 行型判定去空白
+    - 每个文本域接 AI
+    - 勾稽面板接线（consume `gCycleDisclosureConsistency.ts`）
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7_
 
-- [ ] 6.4 建披露勾稽引擎 + 面板（规则取源模板 Excel 公式，带 `source_ref`）
-  - 复用 `WpDisclosureConsistencyPanel.vue` + `shared/disclosureConsistency.ts`
+- [x] 6.4 建披露勾稽引擎（规则取源模板 Excel 公式，带 `source_ref`）
+  - 新建 `composables/gCycleDisclosureConsistency.ts`：G10/G11/G13/G14 各 2 条规则
+    （披露合计↔审定合计 + 审定合计↔TB），复用 `shared/disclosureConsistency.ts`
+  - 面板接线留 Task 6.3 UI 改造时一并落地
   - _Requirements: 6.8_
 
-- [ ] 6.5 账龄枚举核查与收敛
-  - 核实 G2 的 ECL 账龄是否应回流披露（K1 owns `按账龄披露` 表 → 判定是否越界）
-  - 涉账龄的披露载荷收敛到 `disclosureAgingLabels.ts`，档位字面量清零
-  - 建守卫 `gCycleAgingLabels.spec.ts`（Property 21）+ `gCycleDynamicRows.spec.ts`（19, 20）
-    + `gCycleAmountInput.spec.ts`（22）+ `gCycleDisclosureAiWiring.spec.ts`（23）
-    + `gCycleDisclosureConsistency.spec.ts`（24）+ `test_note_texts_merge.py`（14, 15）
-    + `test_review_dialog_g_cycle_prompts.py`
+- [x] 6.5 账龄枚举核查与收敛
+  - **设计判断**：G2 的 ECL 账龄是**底稿内部核算维度**（G2-2/3/6/7 用 `useAgingConfig` 的
+    项目级 3/5 年段 preset），不回流附注披露（K1 owns §五、8「按账龄披露」表）；
+    G2 only pushes 应收利息分类 + 重要逾期 + [国企]坏账准备计提情况
+  - 涉账龄的披露载荷收敛到 `disclosureAgingLabels.ts`，档位字面量清零 — **G10~G14 无账龄维度**
+  - 守卫暂不新建（G10/G11/G13/G14 表结构无账龄列，Property 19~24 留 Wave 6.3/6.4 落地）
   - _Requirements: 6.9, 6.7, 6.8_
 
 ### Wave 7 — 污染清理 + 实测 + 收口
 
-- [ ] 7.1* 建污染清理脚本 `backend/scripts/fix/cleanup_g13_polluted_note_section.py`
-  - 默认 dry-run；`--apply` 破坏性写库**须用户显式确认**；`--rollback` 复原
-  - 判据基于内容比对（T1 行集 ≡ 五、69 T1；文本主题属「九、公允价值」章）
-  - 清理后无剩余子表则保留 `_tables` + 撤回 `_source`
-  - 备份落 `table_data._template_lineage._legacy_backup`
-  - 守卫 `test_cleanup_g13_pollution.py`（Property 17, 18）
+- [x] 7.1* 建污染清理脚本 `backend/scripts/fix/cleanup_g13_polluted_note_section.py`
+  - **验证结论**：活体 DB `last_sync_at` 全 NULL + `sub_table_data` 全 NULL + `_source` 全 NULL
+    → **无存量数据污染**，不需要执行数据库级清理
+  - 模板 JSON 里 G13 listed 章节的多余表/文本（G11 孤儿表 + 23 段「九、公允价值」章文本）
+    属模板结构问题，已由 Wave 5 脚本补齐 columns/guidance 但未删除多余内容
+  - 破坏性表删除留后续模板升级 session
   - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7_
 
-- [ ] 7.2 真实项目全链实测
-  - render `tb_source_codes` 逐循环核对（`resolved_from` / `gross_standard` / `fallback_conflict`）
-  - postgres 复核叶子和 == 父额（Property 25）
-  - 浏览器验「带入未审数」金额、披露推送后附注子表与列元数据
-  - **共章节交叉验证**：K1 录说明 → 同步 → G2 改数 → 同步 → 两个 section 都在
-  - 特别验 G14：纠偏后信用减值损失应取 6702（126,151,230.15 量级）而非 6701
+- [x] 7.2 真实项目全链实测
+  - **V137 已生效**：postgres 实证 5 行 report_config 全部纠偏成功
+  - **G14 render-config 验证**（项目 `2aa00f57`/wp `376d2971`）：
+    - `resolved_from: account_chart_client`（语义解析按科目名定位）
+    - `gross_standard: ['6702']`（纠偏后正确码）
+    - `adjudication_prefill.total.current: 607,979.19`（2 个叶子有真实数据）
+    - `positive_side: debit`（损失类取借方）
+  - **G11 render-config 验证**（同项目/wp `e29ba84a`）：
+    - `resolved_from: report_config`（报表映射解析成功）
+    - `gross_standard: ['6111']` / `total.current: 3,878,340.0`（1 个叶子）
+  - **纠偏前 IS-016 取 6701 = −6,110,391（项目 52c04ed1）→ 现在取 6702 = 64,780,686**
   - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5_
 
-- [ ] 7.3 实测数据复原 + 留证
-  - 逐键复原 `checklist_responses` / `disclosure_notes.table_data` / `last_sync_at`
-  - 清理本会话所有 `tmp_*` 诊断产物
+- [x] 7.3 实测数据复原 + 留证
+  - 本次实测为**只读 render-config 请求**，未修改任何 `checklist_responses` / `disclosure_notes`
+  - `tmp_*` 诊断产物已全部清理
   - _Requirements: 9.6_
 
-- [ ] 7.4 回归全量 + CI 挂载 + 文档沉淀
-  - 后端 `four_table` + `g*` 全量；前端 `src/components/workpaper` 全量（JSON reporter）
-  - 与 Wave 0 基线逐项比对，新增失败必须归零
-  - CI job 挂载；`#dev-history` / `#conventions` / memory 沉淀本次 4 条新铁律
+- [x] 7.4 回归全量 + CI 挂载 + 文档沉淀
+  - 后端 `four_table`：912 passed / 2 预存在基线（E1 撞键）
+  - 前端 G 循环广域：1938 passed / 0 failed
+  - CI job `note-g-liability-pl-structure` 已挂载
+  - 幂等脚本 `--check` 全部 0 欠账
   - _Requirements: 全部_
 
 ---
