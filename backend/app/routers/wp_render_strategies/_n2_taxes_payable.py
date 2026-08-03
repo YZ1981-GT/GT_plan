@@ -27,6 +27,8 @@ from app.models.audit_platform_models import TbBalance
 from app.services.dataset_query import get_active_filter
 
 from ._context import RenderContext
+from app.services.four_table import resolve_semantic_accounts
+from app.services.four_table.n_cycle_specs import N2_SPEC
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +73,13 @@ def _parse_num(v: Any) -> float:
 
 async def _fetch_tb_data(ctx: RenderContext, year: str | None = None) -> dict[str, Any]:
     """从 tb_balance 取科目2221应交税费余额数据（负债类贷方）."""
+
+    # 科目定位（语义驱动，additive）
+    try:
+        _sem_accounts = await resolve_semantic_accounts(ctx, N2_SPEC)
+    except Exception:  # noqa: BLE001
+        _sem_accounts = None
+
     result: dict[str, Any] = {
         "account_code": _N2_ACCOUNT_CODE,
         "account_name": "应交税费",
@@ -116,6 +125,9 @@ async def _fetch_tb_data(ctx: RenderContext, year: str | None = None) -> dict[st
             result["end_balance"] = _parse_num(row.closing_balance)
     except Exception as e:  # noqa: BLE001
         logger.warning("N2 render: TB 取数失败: %s", e)
+    if _sem_accounts:
+        result.setdefault('tb_source_codes', _sem_accounts.as_dict())
+
     return result
 
 

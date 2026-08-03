@@ -16,6 +16,8 @@ from app.services.f2_extraction.category_rules import (
 from app.services.four_table import LeafRow, select_leaves, to_leaf_rows
 
 from ._context import RenderContext
+from app.services.four_table import resolve_semantic_accounts
+from app.services.four_table.f_cycle_specs import F2_SPEC
 
 logger = logging.getLogger(__name__)
 
@@ -204,6 +206,9 @@ async def _build_adjudication_prefill_v2(ctx: RenderContext) -> dict[str, dict]:
             "source_codes": sorted(entry["source_codes"]),
         }
 
+    if _sem_accounts:
+        result.setdefault('tb_source_codes', _sem_accounts.as_dict())
+
     return result
 
 
@@ -347,6 +352,13 @@ async def build_inventory_accounts(ctx: RenderContext) -> list[dict]:
 
 
 async def render(ctx: RenderContext) -> dict | None:
+
+    # 科目定位（语义驱动，additive）
+    try:
+        _sem_accounts = await resolve_semantic_accounts(ctx, F2_SPEC)
+    except Exception:  # noqa: BLE001
+        _sem_accounts = None
+
     wp_id = ctx.wp_id
     db = ctx.db
 
