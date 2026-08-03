@@ -33,6 +33,8 @@ from app.models.audit_platform_models import TbBalance
 from app.services.dataset_query import get_active_filter
 
 from ._context import RenderContext
+from app.services.four_table import resolve_semantic_accounts
+from app.services.four_table.m_cycle_specs import M3_SPEC
 
 logger = logging.getLogger(__name__)
 
@@ -155,6 +157,13 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict[str, Any]:
     - credit_amount → 本期贷方发生额（注销/再售减少）
     - 期末余额 = 期初 + 借方 - 贷方
     """
+
+    # 科目定位（语义驱动）
+    try:
+        _sem_accounts = await resolve_semantic_accounts(ctx, M3_SPEC)
+    except Exception:  # noqa: BLE001
+        _sem_accounts = None
+
     tb: dict[str, Any] = {}
     try:
         active_filter = await get_active_filter(

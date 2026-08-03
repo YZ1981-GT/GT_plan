@@ -27,6 +27,8 @@ from app.services.dataset_query import get_active_filter
 from app.services.report_account_mapping import resolve_report_line_account_codes
 
 from ._context import RenderContext
+from app.services.four_table import resolve_semantic_accounts
+from app.services.four_table.n_cycle_specs import N1_SPEC
 
 logger = logging.getLogger(__name__)
 

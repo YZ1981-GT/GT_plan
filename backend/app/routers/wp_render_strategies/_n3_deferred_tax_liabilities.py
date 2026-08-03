@@ -34,6 +34,8 @@ from app.services.deferred_tax_shared import (
 from app.services.report_account_mapping import resolve_report_line_account_codes
 
 from ._context import RenderContext
+from app.services.four_table import resolve_semantic_accounts
+from app.services.four_table.n_cycle_specs import N3_SPEC
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +101,13 @@ async def _fetch_tb_data(
     客户按子科目挂账（活体实测 `2901.01/.02/.03` 普遍存在）时**恒返回 0**。
     改为「科目级精确行优先 → 无则叶子子科目聚合」，与 N1 同款。
     """
+
+    # 科目定位（语义驱动）
+    try:
+        _sem_accounts = await resolve_semantic_accounts(ctx, N3_SPEC)
+    except Exception:  # noqa: BLE001
+        _sem_accounts = None
+
     codes = [c for c in (codes or [_N3_ACCOUNT_CODE]) if str(c).strip()] or [
         _N3_ACCOUNT_CODE
     ]
@@ -148,6 +157,10 @@ async def _fetch_tb_data(
             result[k] = round(result[k], 2)
     except Exception as e:  # noqa: BLE001
         logger.warning("N3 render: TB 取数失败: %s", e)
+        if _sem_accounts:
+
+            result['tb_source_codes'] = _sem_accounts.as_dict()
+
     return result
 
 

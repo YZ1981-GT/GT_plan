@@ -34,6 +34,8 @@ from app.services.dataset_query import get_active_filter
 from app.services.report_account_mapping import resolve_report_line_account_codes
 
 from ._context import RenderContext
+from app.services.four_table import resolve_semantic_accounts
+from app.services.four_table.m_cycle_specs import M4_SPEC
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +102,13 @@ def validate_equity_formula(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 async def _fetch_tb_data(ctx: RenderContext) -> dict[str, Any]:
     """从 tb_balance 取科目4002资本公积余额数据."""
+
+    # 科目定位（语义驱动）
+    try:
+        _sem_accounts = await resolve_semantic_accounts(ctx, M4_SPEC)
+    except Exception:  # noqa: BLE001
+        _sem_accounts = None
+
     result: dict[str, Any] = {
         "account_code": _M4_ACCOUNT_CODE,
         "account_name": "资本公积",
@@ -131,6 +140,10 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict[str, Any]:
             result["end_balance"] += _parse_num(row.end_balance)
     except Exception as e:  # noqa: BLE001
         logger.warning("M4 render: TB 取数失败: %s", e)
+        if _sem_accounts:
+
+            result['tb_source_codes'] = _sem_accounts.as_dict()
+
     return result
 
 

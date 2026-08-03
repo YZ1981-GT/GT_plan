@@ -30,6 +30,8 @@ from app.services.deferred_tax_shared import code_predicate, leaf_rows
 from app.services.report_account_mapping import resolve_report_line_account_codes
 
 from ._context import RenderContext
+from app.services.four_table import resolve_semantic_accounts
+from app.services.four_table.n_cycle_specs import N4_SPEC
 
 logger = logging.getLogger(__name__)
 
