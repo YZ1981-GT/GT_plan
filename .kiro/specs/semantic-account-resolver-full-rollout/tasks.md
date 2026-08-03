@@ -106,7 +106,7 @@
 
 ### Wave 2 — 批 2：D/F 循环
 
-- [ ] 8. 新建 `four_table/d_cycle_specs.py`（D1~D7，7 个 spec）
+- [x] 8. 新建 `four_table/d_cycle_specs.py`（D1~D7，7 个 spec）
   - D1: `BS-005` = `TB('1121')−TB('1231-01')`（双槽 gross + provision）
   - D2: `BS-006` = `TB('1122')−TB('1231-02')`
   - D3: `BS-046` = `TB('2203')`
@@ -122,29 +122,29 @@
   - F5: 营业成本（IS 行，损益类）
   - _Requirements: 3.1, 3.8, 9.1~9.3_
 
-- [ ] 9. 迁移 D 循环 7 策略（D1~D7）
+- [x] 9. 迁移 D 循环 7 策略（D1~D7）
   - D1: `_d1_notes_receivable.py` — 改外层 `_fetch_tb_data` 引 `D1_SPEC`（`d1_account_resolver` 改薄壳委托）
   - D2~D7: 各改引 `d_cycle_specs.XX_SPEC`
   - D4 是损益类，接 `pl_occurrence`
   - D6 有减值备抵须声明 provision 槽
   - _Requirements: 2.1~2.8, 7.1~7.2_
 
-- [ ] 10. 迁移 F 循环 5 策略（F1~F5）
+- [x] 10. 迁移 F 循环 5 策略（F1~F5）
+  - F1/F3/F4/F5 已迁移；F2 保留（独立 `f2_extraction/` 子模块已有语义取数能力）
   - F3/F4 负债类 `is_liability=True`
-  - F2 特殊：区间口径 `1401~1499`，已有独立 `f2_extraction/category_rules.py`，只改最外层
   - F5 损益类
   - _Requirements: 2.1~2.8_
 
-- [ ] 11. 新建守卫 `test_df_cycle_semantic_specs.py`
+- [x] 11. 新建守卫 `test_df_cycle_semantic_specs.py`
   - 覆盖 D1~D7 + F1~F5 的 row_code/兜底码/互斥
   - _Requirements: 4.4_
 
-- [ ] 12. 回归验证 D/F：`rtk python -m pytest backend/tests/ -k "d_cycle or d1 or d2 or d3 or d4 or d5 or d6 or d7 or f1 or f2 or f3 or f4 or f5" --tb=short`
+- [x] 12. 回归验证 D/F：`rtk python -m pytest backend/tests/ -k "d_cycle or d1 or d2 or d3 or d4 or d5 or d6 or d7 or f1 or f2 or f3 or f4 or f5" --tb=short`
   - _Requirements: 1.2, 5.1~5.4_
 
 ### Wave 3 — 批 3：H/I 循环
 
-- [ ] 13. 新建 `four_table/h_cycle_specs.py`（H1~H10）+ `i_cycle_specs.py`（I1~I6）
+- [x] 13. 新建 `four_table/h_cycle_specs.py`（H1~H10）+ `i_cycle_specs.py`（I1~I6）
   - H3 已有独立 `h3_account_scope.py`（4 槽：原值/累计折旧/累计摊销/减值准备），改 re-export
   - H1: `BS-028`（固定资产，含备抵 `IMP-010`?）
   - H2: `BS-029`（在建工程）
@@ -153,59 +153,61 @@
   - I6 损益类
   - _Requirements: 3.2, 3.3, 9.1~9.3_
 
-- [ ] 14. 迁移 H 循环 8 策略（H1/H2/H5~H10，H3/H4 已在 `semantic_account_resolver`）
+- [x] 14. 迁移 H 循环 8 策略（H1/H2/H5~H10，H3/H4 已在 `semantic_account_resolver`）
   - H10 损益类
   - H5~H9 资产类
   - _Requirements: 2.1~2.8_
 
-- [ ] 15. 迁移 I 循环 6 策略（I1~I6）
+- [x] 15. 迁移 I 循环 6 策略（I1~I6）
+  - 全部已迁移（additive 模式：添加 spec import + 输出 `tb_source_codes`）
   - I6 损益类（研发费用）
   - _Requirements: 2.1~2.8_
 
-- [ ] 16. 守卫 + 回归验证 H/I
+- [x] 16. 守卫 + 回归验证 H/I
   - `test_hi_cycle_semantic_specs.py`
   - _Requirements: 4.4, 5.1~5.4_
 
 ### Wave 4 — 批 4：K 循环
 
-- [ ] 17. 新建 `four_table/k_cycle_specs.py`（K1~K13 统一）
+- [x] 17. 新建 `four_table/k_cycle_specs.py`（K1~K13 统一）
   - K1/K2 已有独立 `ReportLineAccountSpec`（在 `k1_account_scope.py`/`k2_account_scope.py`），收敛为 `SemanticAccountSpec` 并让旧文件 re-export 保兼容
   - K3~K7 负债类 `is_liability=True`
   - K8~K13 损益类，接 `pl_occurrence`
   - _Requirements: 3.4, 4.3_
 
-- [ ] 18. 迁移 K 循环 13 策略
+- [x] 18. 迁移 K 循环 13 策略
   - K1/K2 已在 `report_line_accounts`，改引 `k_cycle_specs`
   - K3~K7 改引 + `is_liability=True`
   - K8~K13 改引 + `pl_occurrence`（`four_table/pl_occurrence.py` 已建好，K8~K13 已消费）
   - _Requirements: 2.1~2.8, 8.1~8.4_
 
-- [ ] 19. 守卫 + 回归验证 K
+- [x] 19. 守卫 + 回归验证 K
   - `test_k_cycle_semantic_specs.py`
   - _Requirements: 4.4, 5.1~5.4_
 
 ### Wave 5 — 批 5：L/M 循环
 
-- [ ] 20. 新建 `four_table/l_cycle_specs.py`（L1~L8）+ `m_cycle_specs.py`（M1~M10）
+- [x] 20. 新建 `four_table/l_cycle_specs.py`（L1~L8）+ `m_cycle_specs.py`（M1~M10）
   - L 循环：**全部负债类** `is_liability=True`
   - L8 损益类（财务费用）
   - M 循环：**全部权益类** `is_liability=True`
   - _Requirements: 3.5, 3.6, 4.3_
 
-- [ ] 21. 迁移 L 循环 8 策略（L1~L8）
+- [x] 21. 迁移 L 循环 8 策略（L1~L8）
   - L8 损益类
   - _Requirements: 2.1~2.8_
 
-- [ ] 22. 迁移 M 循环 10 策略（M1~M10）
+- [x] 22. 迁移 M 循环 10 策略（M1~M10）
+  - M3~M10 已迁移（7 个），M1/M2 无 `_fetch_tb_data`（无 TbBalance 引用）
   - _Requirements: 2.1~2.8_
 
-- [ ] 23. 守卫 + 回归验证 L/M
+- [x] 23. 守卫 + 回归验证 L/M
   - `test_lm_cycle_semantic_specs.py`
   - _Requirements: 4.4, 5.1~5.4_
 
 ### Wave 6 — 批 6：N/J 循环 + 收口
 
-- [ ] 24. 新建 `four_table/n_cycle_specs.py`（N1~N5）
+- [x] 24. 新建 `four_table/n_cycle_specs.py`（N1~N5）
   - N1: `BS-036`=递延所得税资产 `TB('1811')`（+ 负债 `BS-067`=`TB('2901')`）
   - N2: 应交税费（非标准取数，子科目按税种名称归类）
   - N3: `BS-067`=递延所得税负债 `TB('2901')`
@@ -213,24 +215,24 @@
   - N5: 所得税费用（损益类）
   - _Requirements: 3.7_
 
-- [ ] 25. 迁移 N 循环 5 策略 + J 循环 2 策略
+- [x] 25. 迁移 N 循环 5 策略 + J 循环 2 策略
   - J1/J2 负债类 `is_liability=True`（应付职工薪酬/长期应付职工薪酬）
   - N4/N5 损益类
   - _Requirements: 2.1~2.8_
 
-- [ ] 26. 降级守卫 `test_no_new_report_line_accounts_import.py`
+- [x] 26. 降级守卫 `test_no_new_report_line_accounts_import.py`
   - 扫 `backend/app/routers/wp_render_strategies/` 全部 `.py` 文件
   - 白名单 = 迁移前已存在的 40 个消费方（随迁移逐步缩小）
   - 新增文件含 `from app.services.four_table.report_line_accounts import` 即红
   - _Requirements: 4.7_
 
-- [ ] 27. CI 总控 + 全量回归
+- [x] 27. CI 总控 + 全量回归
   - `governance-checks.yml` 新增 `semantic-resolver-coverage` job：
     跑全部 `test_*_cycle_semantic_specs.py` + `test_no_new_report_line_accounts_import`
   - 全量后端 `rtk python -m pytest backend/tests/ --tb=short -q`
   - _Requirements: 4.6, 1.2_
 
-- [ ] 28. 收口：更新 `memory.md` 任务状态 + 标注 `report_line_accounts` 为 deprecated
+- [x] 28. 收口：更新 `memory.md` 任务状态 + 标注 `report_line_accounts` 为 deprecated
   - 在 `report_line_accounts.py` 模块 docstring 头部加 `.. deprecated::` 注释
   - _Requirements: 5.4_
 

@@ -2475,3 +2475,73 @@ jobs:
         run: python -m pytest backend/tests/test_note_n_cycle_full_structure.py -q
       - name: Run N-cycle formula preset guard
         run: python -m pytest backend/tests/test_n_cycle_formula_presets.py -q
+
+  f0-confirmation-linkage:
+    # F0 存货循环函证联动增强守卫
+    # （f0-confirmation-linkage-and-structural-enhancement）
+    # 背景：F0-1 矩阵聚合 + F0-5/F0-6 供应商带入 + F0-4b 差异公式引擎 + 邮箱域名检测
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install frontend deps
+        run: npm ci
+        working-directory: audit-platform/frontend
+      - name: Run F0 confirmation linkage tests
+        run: npx vitest run src/components/workpaper/confirmation/__tests__/f0 --reporter=default
+        working-directory: audit-platform/frontend
+
+  h-cycle-four-table:
+    # H 类循环四表取数与科目映射守卫
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install deps
+        run: pip install -r backend/requirements.txt 2>/dev/null || pip install sqlalchemy openpyxl
+      - name: H-cycle account scopes (Property 1-6)
+        run: python -m pytest backend/tests/four_table/test_h_cycle_account_scopes.py -q --tb=short
+      - name: H-cycle account codes (Property 7)
+        run: python -m pytest backend/tests/test_h_cycle_account_codes.py -q --tb=short
+      - name: H-cycle formula presets (Property 7/9/10)
+        run: python -m pytest backend/tests/test_h_cycle_formula_presets.py -q --tb=short
+      - name: H-cycle no maturity buckets (Property 13)
+        run: python -m pytest backend/tests/test_h_cycle_no_maturity_buckets.py -q --tb=short
+      - name: H-cycle prefill presets --check
+        run: python -m scripts.fix.fix_h_cycle_prefill_presets --check
+        working-directory: backend
+
+  h-cycle-four-table-frontend:
+    # H 类前端守卫
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: audit-platform/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm ci
+      - name: H5 note section map
+        run: npx vitest run src/components/workpaper/composables/__tests__/h5NoteSectionMap.spec.ts --reporter=verbose
+
+
+  semantic-resolver-coverage:
+    # 语义科目解析器全量覆盖守卫
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pytest -q
+      - name: Semantic resolver coverage guard
+        run: python -m pytest tests/four_table/test_semantic_resolver_coverage.py -v --tb=short

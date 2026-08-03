@@ -1,5 +1,11 @@
 """报表映射规则驱动的科目定位（跨循环共享）。
 
+.. deprecated:: 2026-08-03
+   本模块已被 ``semantic_account_resolver`` 取代。新循环应直接使用
+   ``resolve_semantic_accounts`` + per-cycle ``_specs.py`` 的 ``SemanticAccountSpec``。
+   存量消费方保留兼容（白名单见 ``test_semantic_resolver_coverage.py``），
+   但不再接受新增引用。
+
 **为什么不能硬编码科目前缀**
 
 四表库入库后的科目关系是三层，DB 只读实证如下::
@@ -156,6 +162,10 @@ class ReportLineAccounts:
     #: 备抵独立报表行（`spec.provision_row_code` 命中时才非空），供溯源展示
     provision_row_code: str = ""
     provision_formula: str | None = None
+    #: 当 `resolved_from == 'report_config'` 且 spec 有兜底码且两者不等时，
+    #: 填入不一致描述 —— 供溯源面板展示「报表规则码与兜底码冲突」告警。
+    #: 默认空 = 无冲突（或未走报表映射）。additive，既有消费者零回归。
+    fallback_conflict: list[str] = field(default_factory=list)
 
     @property
     def use_provision_name_filter(self) -> bool:
@@ -185,6 +195,9 @@ class ReportLineAccounts:
         out = asdict(self)
         out["signed_codes"] = [[c, s] for c, s in self.signed_codes]
         out["use_provision_name_filter"] = self.use_provision_name_filter
+        # fallback_conflict 空列表时不下发（减少 payload 噪声）
+        if not out.get("fallback_conflict"):
+            out.pop("fallback_conflict", None)
         return out
 
 
@@ -548,6 +561,16 @@ async def resolve_report_line_accounts(
         originals, _ = await to_original_codes_with_flag(ctx, [code])
         extra[code] = originals or [normalize_standard_prefix(code)]
 
+    # 冲突检测：报表映射成功 + 调用方有兜底码 + 两者码集不等 → 提示面板
+    conflict: list[str] = []
+    if gross_from == RESOLVED_FROM_REPORT and spec.fallback_gross:
+        fb_set = set(spec.fallback_gross)
+        resolved_set = set(gross_std)
+        if fb_set != resolved_set:
+            conflict.append(
+                f"原值：报表规则解析 {sorted(resolved_set)} ≠ 兜底声明 {sorted(fb_set)}"
+            )
+
     return ReportLineAccounts(
         gross=gross or [normalize_standard_prefix(c) for c in spec.fallback_gross],
         provision=provision
@@ -565,6 +588,7 @@ async def resolve_report_line_accounts(
             spec.provision_row_code or "" if provision_formula is not None else ""
         ),
         provision_formula=provision_formula,
+        fallback_conflict=conflict,
     )
 
 
