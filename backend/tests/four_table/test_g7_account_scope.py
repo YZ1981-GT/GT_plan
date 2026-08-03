@@ -178,7 +178,7 @@ class TestAccountResolution:
         db = _FakeSession(
             formulas={"BS-024": BS_024_FORMULA, "IMP-009": IMP_009_FORMULA}
         )
-        acc = _run(resolve_report_line_accounts(_ctx(db), g7.G7_ACCOUNT_SPEC))
+        acc = _run(resolve_report_line_accounts(_ctx(db), g7.G7_RLA_SPEC))
         assert acc.gross_standard == ["1511"]
         assert acc.provision_standard == ["1512"]
         assert acc.resolved_from == RESOLVED_FROM_REPORT
@@ -193,7 +193,7 @@ class TestAccountResolution:
     def test_provision_falls_back_when_imp_row_absent(self):
         """listed 侧无 IMP-009 行 → 回退兜底标准码，provision_resolved_from=fallback。"""
         db = _FakeSession(formulas={"BS-024": BS_024_FORMULA})
-        acc = _run(resolve_report_line_accounts(_ctx(db), g7.G7_ACCOUNT_SPEC))
+        acc = _run(resolve_report_line_accounts(_ctx(db), g7.G7_RLA_SPEC))
         assert acc.provision_standard == ["1512"]
         assert acc.provision_resolved_from == RESOLVED_FROM_FALLBACK
         assert acc.provision_row_code == ""
@@ -207,13 +207,13 @@ class TestAccountResolution:
                 "IMP-009": {"soe_standalone": IMP_009_FORMULA},
             }
         )
-        acc = _run(resolve_report_line_accounts(_ctx(db), g7.G7_ACCOUNT_SPEC))
+        acc = _run(resolve_report_line_accounts(_ctx(db), g7.G7_RLA_SPEC))
         assert acc.provision_standard == ["1512"]
         assert any(c.startswith("IMP-009|soe_standalone") for c in db.report_calls)
 
     def test_gross_falls_back_when_no_config(self):
         """report_config 全空 → 两侧都回退兜底码，gross 恒非空（Property 3）。"""
-        acc = _run(resolve_report_line_accounts(_ctx(_FakeSession()), g7.G7_ACCOUNT_SPEC))
+        acc = _run(resolve_report_line_accounts(_ctx(_FakeSession()), g7.G7_RLA_SPEC))
         assert acc.gross_standard == ["1511"]
         assert acc.provision_standard == ["1512"]
         assert acc.resolved_from == RESOLVED_FROM_FALLBACK
@@ -225,16 +225,28 @@ class TestAccountResolution:
             formulas={"BS-024": BS_024_FORMULA, "IMP-009": IMP_009_FORMULA},
             raise_on=raise_on,
         )
-        acc = _run(resolve_report_line_accounts(_ctx(db), g7.G7_ACCOUNT_SPEC))
+        acc = _run(resolve_report_line_accounts(_ctx(db), g7.G7_RLA_SPEC))
         assert acc.gross, "gross 恒非空"
         assert acc.provision
 
     def test_spec_declares_report_rows_not_prefixes(self):
         """🔴 R11.2：科目由报表行声明，旧常量前缀必须已删。"""
-        assert g7.G7_ACCOUNT_SPEC.row_code == "BS-024"
-        assert g7.G7_ACCOUNT_SPEC.provision_row_code == "IMP-009"
+        assert g7.G7_RLA_SPEC.row_code == "BS-024"
+        assert g7.G7_RLA_SPEC.provision_row_code == "IMP-009"
         assert not hasattr(g7, "_G7_ACCOUNT_PREFIX")
         assert not hasattr(g7, "_G7_IMPAIRMENT_PREFIX")
+
+    def test_rla_spec_drift_guard(self):
+        """🔴 G7_RLA_SPEC 与 G7_SPEC（SemanticAccountSpec）兜底码必须一致，防漂移。"""
+        from app.services.four_table.g_cycle_specs import G7_SPEC
+        # gross 兜底码一致
+        gross_slot = next(s for s in G7_SPEC.slots if s.key == "gross")
+        assert g7.G7_RLA_SPEC.fallback_gross == gross_slot.fallback_standard_codes
+        # provision 兜底码一致
+        prov_slot = next(s for s in G7_SPEC.slots if s.key == "provision")
+        assert g7.G7_RLA_SPEC.fallback_provision == prov_slot.fallback_standard_codes
+        # row_code 一致
+        assert g7.G7_RLA_SPEC.row_code == G7_SPEC.row_code
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -245,7 +257,7 @@ class TestAccountResolution:
 class TestLeafAggregation:
     def _acc(self):
         db = _FakeSession(formulas={"BS-024": BS_024_FORMULA, "IMP-009": IMP_009_FORMULA})
-        return _run(resolve_report_line_accounts(_ctx(db), g7.G7_ACCOUNT_SPEC))
+        return _run(resolve_report_line_accounts(_ctx(db), g7.G7_RLA_SPEC))
 
     def test_leaf_sum_equals_parent_amount(self):
         """🔴 Property 1：叶子和 == 父科目行金额（活体逐分相等）。"""
@@ -298,7 +310,7 @@ class TestLeafAggregation:
 class TestAdjudicationPrefill:
     def _acc(self):
         db = _FakeSession(formulas={"BS-024": BS_024_FORMULA, "IMP-009": IMP_009_FORMULA})
-        return _run(resolve_report_line_accounts(_ctx(db), g7.G7_ACCOUNT_SPEC))
+        return _run(resolve_report_line_accounts(_ctx(db), g7.G7_RLA_SPEC))
 
     def test_live_shape(self):
         out = g7.build_g7_adjudication_prefill(self._acc(), LIVE_LEAVES)
@@ -408,7 +420,7 @@ class TestAdjudicationPrefill:
 class TestSourceCodesShape:
     def test_keys(self):
         db = _FakeSession(formulas={"BS-024": BS_024_FORMULA, "IMP-009": IMP_009_FORMULA})
-        acc = _run(resolve_report_line_accounts(_ctx(db), g7.G7_ACCOUNT_SPEC))
+        acc = _run(resolve_report_line_accounts(_ctx(db), g7.G7_RLA_SPEC))
         src = g7.build_g7_source_codes(acc, LIVE_ALL_ROWS, LIVE_LEAVES)
         # 🔴 键名逐字对齐平台共享视图模型 `composables/shared/tbSourceCodes.ts`
         #    （报表行次是 `row_code`，不得再造 `report_row` 这类第二名字）

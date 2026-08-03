@@ -18,14 +18,14 @@ from app.services.dataset_query import get_active_filter
 from app.services.four_table import (
     build_g_adjudication_prefill,
     LeafRow,
-    ReportLineAccountSpec,
     aggregate_leaves,
     filter_by_prefixes,
     parent_totals,
-    resolve_report_line_accounts,
+    resolve_semantic_accounts,
     select_leaves,
     to_leaf_rows,
 )
+from app.services.four_table.g_cycle_specs import G11_SPEC
 
 from ._context import RenderContext
 
@@ -35,10 +35,8 @@ logger = logging.getLogger(__name__)
 # 科目定位规格
 # ─────────────────────────────────────────────────────────────────────────────
 
-G11_ACCOUNT_SPEC = ReportLineAccountSpec(
-    row_code="IS-011",
-    fallback_gross=("6111",),
-)
+#: G11 科目定位改走**语义驱动**（单一真源 `four_table/g_cycle_specs.G11_SPEC`）。
+G11_ACCOUNT_SPEC = G11_SPEC
 
 _ADJUDICATED_ITEM_ID = "G11-1-adjudicated-amount"
 
@@ -65,13 +63,14 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict:
     result: dict = {"tb_values": {}, "tb_source_codes": {}, "adjudication_prefill": {}}
 
     try:
-        accounts = await resolve_report_line_accounts(ctx, G11_ACCOUNT_SPEC)
+        accounts = await resolve_semantic_accounts(ctx, G11_ACCOUNT_SPEC)
 
         active_filter = await get_active_filter(
             ctx.db, TbBalance.__table__, ctx.project_id, ctx.year
         )
-        query_prefixes = accounts.gross if accounts.gross else list(G11_ACCOUNT_SPEC.fallback_gross)
+        query_prefixes = accounts.codes_of("gross")
         if not query_prefixes:
+            result["tb_source_codes"] = accounts.as_dict()
             return result
 
         conditions = []

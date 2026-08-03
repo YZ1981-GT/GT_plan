@@ -19,7 +19,6 @@ from app.routers.wp_render_strategies._g5_long_term_receivable import (
     G5_ACCOUNT_SPEC,
     build_g5_adjudication_prefill,
     build_g5_leaf_categories,
-    build_g5_source_codes,
     build_g5_tb_values,
 )
 
@@ -122,28 +121,31 @@ class TestBuildG5Functions:
         assert "guarantee" in keys
         assert "deposit" not in keys  # 期初期末都是 0
 
-    def test_build_source_codes(self):
-        result = build_g5_source_codes(["1531"], "report_config", "soe_standalone")
-        assert result["gross_standard"] == "1531"
-        assert result["resolved_from"] == "report_config"
-        assert result["applicable_standard"] == "soe_standalone"
+    def test_build_source_codes_uses_semantic_resolver(self):
+        """迁移后溯源由 SemanticAccountResult.as_dict() 生成，旧 build_g5_source_codes 已删。"""
+        # 确认旧函数已删除
+        import app.routers.wp_render_strategies._g5_long_term_receivable as g5mod
+        assert not hasattr(g5mod, "build_g5_source_codes")
 
 
 # ────────────────────────── Spec 正确性 ──────────────────────────
 
 
 class TestG5AccountSpec:
-    """ReportLineAccountSpec 声明正确."""
+    """SemanticAccountSpec 声明正确（已从 ReportLineAccountSpec 迁移到语义解析件）."""
 
     def test_row_code(self):
         assert G5_ACCOUNT_SPEC.row_code == "BS-023"
 
-    def test_fallback_gross(self):
-        assert G5_ACCOUNT_SPEC.fallback_gross == ("1531",)
+    def test_fallback_standard_codes(self):
+        """G5 兜底码 = 1531."""
+        gross_slot = G5_ACCOUNT_SPEC.slots[0]
+        assert gross_slot.fallback_standard_codes == ("1531",)
 
-    def test_no_provision_row_code(self):
-        """G5 无独立备抵报表行."""
-        assert G5_ACCOUNT_SPEC.provision_row_code is None
+    def test_no_provision_slot(self):
+        """G5 无独立备抵槽."""
+        keys = [s.key for s in G5_ACCOUNT_SPEC.slots]
+        assert "provision" not in keys
 
 
 # ────────────────────────── 反向自检 ──────────────────────────

@@ -22,10 +22,13 @@ from app.services.four_table.g5_nature_buckets import (
     bucket_defs_payload,
     classify_g5_leaf,
 )
-from app.services.four_table.report_line_accounts import (
-    ReportLineAccountSpec,
+from app.services.four_table.g_cycle_specs import G5_SPEC
+from app.services.four_table import (
+    resolve_semantic_accounts,
+    select_leaves,
+    filter_by_prefixes,
+    to_leaf_rows,
 )
-from app.services.report_account_mapping import resolve_report_line_account_codes
 
 from ._context import RenderContext
 
@@ -36,19 +39,11 @@ logger = logging.getLogger(__name__)
 _G5_ACCOUNT_PREFIX = "1531"  # 兜底常量，仅 fallback
 _ADJUDICATED_ITEM_ID = "G5-1-adjudicated-amount"
 
-G5_ACCOUNT_SPEC = ReportLineAccountSpec(
-    row_code="BS-023",
-    fallback_gross=("1531",),
-)
+#: 科目定位改走**语义驱动**（单一真源 `four_table/g_cycle_specs.G5_SPEC`）。
+G5_ACCOUNT_SPEC = G5_SPEC
 
 
 # ─── Pure functions ───────────────────────────────────────────────────────────
-
-
-def _is_leaf(code: str, all_codes: set[str]) -> bool:
-    """判断是否叶子（无更深层子科目）."""
-    prefix = code + "."
-    return not any(c.startswith(prefix) for c in all_codes if c != code)
 
 
 def build_g5_tb_values(leaves: list[dict]) -> dict:
@@ -97,38 +92,29 @@ def build_g5_adjudication_prefill(categories: dict) -> list[dict]:
     return prefill
 
 
-def build_g5_source_codes(
-    resolved_codes: list[str],
-    resolved_from: str,
-    applicable_standard: str | None = None,
-) -> dict:
-    """构建 tb_source_codes 溯源字段."""
-    return {
-        "gross_standard": resolved_codes[0] if resolved_codes else _G5_ACCOUNT_PREFIX,
-        "resolved_from": resolved_from,
-        "applicable_standard": applicable_standard or "",
-    }
-
-
 # ─── Data fetch ───────────────────────────────────────────────────────────────
 
 
 async def _load_leaves(ctx: RenderContext, codes: list[str]) -> list[dict]:
-    """获取叶子科目行（select_leaves 逻辑内联以避免循环依赖）."""
+    """获取叶子科目行 — 改用共享件 `select_leaves` + `filter_by_prefixes`。
+
+    🔴 旧实现用自造 `_is_leaf` + 无点号边界 `LIKE '{code}%'`，前者会在参差树丢叶子
+    （`_row_depth` 只取最深，`1531.01` 无子科目时被 `1531.02.01` 深度挤掉），
+    后者会让 `1531` 误命中 `15310` 这类不同科目。改用共享件消除两类缺陷。
+    """
     leaves: list[dict] = []
     try:
         active_filter = await get_active_filter(
             ctx.db, TbBalance.__table__, ctx.project_id, ctx.year
         )
-        # 构建 LIKE 条件
-        like_clauses = []
+        # 构建 OR 条件：code == prefix OR code LIKE 'prefix.%'（点号边界）
+        conditions = []
         for code in codes:
-            like_clauses.append(TbBalance.account_code.like(f"{code}%"))
+            conditions.append(TbBalance.account_code == code)
+            conditions.append(TbBalance.account_code.like(f"{code}.%"))
 
-        if not like_clauses:
+        if not conditions:
             return []
-
-        combined_filter = sa.or_(*like_clauses) if len(like_clauses) > 1 else like_clauses[0]
 
         result = await ctx.db.execute(
             sa.select(
@@ -136,24 +122,19 @@ async def _load_leaves(ctx: RenderContext, codes: list[str]) -> list[dict]:
                 TbBalance.account_name,
                 TbBalance.opening_balance,
                 TbBalance.closing_balance,
-            ).where(sa.and_(active_filter, combined_filter))
+                TbBalance.dataset_id,
+            ).where(sa.and_(active_filter, sa.or_(*conditions)))
         )
-        rows = result.fetchall()
+        all_rows = to_leaf_rows(result.fetchall())
+        # 共享件叶子判定 + 前缀过滤
+        filtered = filter_by_prefixes(select_leaves(all_rows), codes)
 
-        # 收集所有 codes 来判定叶子
-        all_codes = {r.account_code.strip() for r in rows if r.account_code}
-
-        for row in rows:
-            code = (row.account_code or "").strip()
-            if not code:
-                continue
-            if not _is_leaf(code, all_codes):
-                continue
+        for row in filtered:
             leaves.append({
-                "account_code": code,
-                "account_name": (row.account_name or "").strip(),
-                "opening_balance": float(row.opening_balance or 0),
-                "closing_balance": float(row.closing_balance or 0),
+                "account_code": row.account_code,
+                "account_name": row.account_name,
+                "opening_balance": row.opening,
+                "closing_balance": row.closing,
             })
     except Exception as e:  # noqa: BLE001
         logger.warning("G5 leaf fetch failed: %s", e)
@@ -219,22 +200,10 @@ async def render(ctx: RenderContext) -> dict | None:
     except Exception as e:  # noqa: BLE001
         logger.warning("G5 render: project context 失败: %s", e)
 
-    # ─── 四表取数（共享件路径） ────────────────────────────────────────────
-    resolved_codes: list[str] = list(G5_ACCOUNT_SPEC.fallback_gross)
-    resolved_from = "fallback"
-    try:
-        parsed = await resolve_report_line_account_codes(
-            db,
-            ctx.project_id,
-            G5_ACCOUNT_SPEC.row_code,
-            fallback=list(G5_ACCOUNT_SPEC.fallback_gross),
-            applicable_standards=[applicable_standard] if applicable_standard else None,
-        )
-        if parsed:
-            resolved_codes = parsed
-            resolved_from = "report_config"
-    except Exception as e:  # noqa: BLE001
-        logger.warning("G5 resolve_report_line_account_codes 失败 (降级 fallback): %s", e)
+    # ─── 四表取数（语义驱动科目定位） ────────────────────────────────────────
+    accounts = await resolve_semantic_accounts(ctx, G5_ACCOUNT_SPEC)
+    resolved_codes = accounts.codes_of("gross") or [_G5_ACCOUNT_PREFIX]
+    tb_source_codes = accounts.as_dict()
 
     # 获取叶子
     leaves = await _load_leaves(ctx, resolved_codes)
@@ -243,7 +212,6 @@ async def render(ctx: RenderContext) -> dict | None:
     tb_values = build_g5_tb_values(leaves)
     leaf_categories = build_g5_leaf_categories(leaves)
     adjudication_prefill = build_g5_adjudication_prefill(leaf_categories)
-    tb_source_codes = build_g5_source_codes(resolved_codes, resolved_from, applicable_standard)
 
     return {
         "component_type": "g5-long-term-receivable",

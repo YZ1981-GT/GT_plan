@@ -41,23 +41,21 @@ from app.services.four_table.leaf_aggregation import (
     select_leaves,
     to_leaf_rows,
 )
-from app.services.four_table.report_line_accounts import (
-    ReportLineAccountSpec,
-    ReportLineAccounts,
-    resolve_report_line_accounts,
-)
+from app.services.four_table import resolve_semantic_accounts
+from app.services.four_table.g_cycle_specs import G7_SPEC
 
 from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
 
-#: G7 科目定位规格（**单一真源**）—— 运行态科目一律由报表映射解析，禁在别处写前缀。
-#:
-#: - ``BS-024 长期股权投资 = TB('1511','期末余额')``：四准则完全一致（DB 实证）。
-#: - 备抵**自成一行**：``IMP-009 八、长期股权投资减值准备 = TB('1512','期末余额')``
-#:   （仅 ``soe_standalone`` 有公式；``soe_consolidated`` 为 NULL、listed 两条无该行
-#:   → 解析落空时回退 ``fallback_provision``，此时 ``provision_exact=False``）。
-G7_ACCOUNT_SPEC = ReportLineAccountSpec(
+#: G7 科目定位改走**语义驱动**（单一真源 `four_table/g_cycle_specs.G7_SPEC`）。
+#: G7_SPEC 声明双槽 `gross`（长期股权投资 1511）+ `provision`（减值准备 1512）。
+G7_ACCOUNT_SPEC = G7_SPEC
+
+#: 🔴 过渡期兼容：旧 `ReportLineAccountSpec` 形态，供守卫测试直接调
+#: `resolve_report_line_accounts` 验证旧路径行为（待测试全面迁移后删除）。
+from app.services.four_table.report_line_accounts import ReportLineAccountSpec as _RLA
+G7_RLA_SPEC = _RLA(
     row_code="BS-024",
     fallback_gross=("1511",),
     provision_row_code="IMP-009",
@@ -134,25 +132,38 @@ def _r2(v: float) -> float:
     return round(float(v or 0), 2)
 
 
+def _extract_codes(accounts, slot_key: str) -> list[str]:
+    """从 SemanticAccountResult 或 ReportLineAccounts 提取科目码前缀集。"""
+    if hasattr(accounts, "codes_of"):
+        return accounts.codes_of(slot_key)
+    # ReportLineAccounts 兼容（测试 fixture 仍会传入）
+    if slot_key == "gross":
+        return list(getattr(accounts, "gross", []))
+    if slot_key == "provision":
+        return list(getattr(accounts, "provision", []))
+    return []
+
+
 async def _load_g7_leaves(
     ctx: RenderContext,
-) -> tuple[ReportLineAccounts | None, list[LeafRow], list[LeafRow]]:
+) -> tuple[object | None, list[LeafRow], list[LeafRow]]:
     """解析 G7 科目 + 一次查询取回 `tb_balance` 行。全程 fail-open。
 
     Returns:
         ``(accounts, all_rows, leaves)``；解析或查询失败时 ``(accounts_or_None, [], [])``。
 
-    🔴 叶子判定与前缀匹配一律走共享件 `four_table/leaf_aggregation`
-    （`select_leaves` 用 ``code + '.'`` 边界）—— 旧实现的 ``code.startswith(prefix)``
-    会让前缀 `1511` 误命中 `15110` 这类不同科目。
+    🔴 已迁移到 `semantic_account_resolver`：返回的 accounts 是 `SemanticAccountResult`，
+    下游消费方通过 `.codes_of("gross")` / `.codes_of("provision")` 取科目码前缀集。
+    为兼容旧消费方（`build_g7_tb_values` / `build_g7_leaf_categories` / `build_g7_source_codes`
+    读 `accounts.gross` / `accounts.provision` 属性），本函数返回一个适配对象。
     """
     try:
-        accounts = await resolve_report_line_accounts(ctx, G7_ACCOUNT_SPEC)
+        accounts = await resolve_semantic_accounts(ctx, G7_ACCOUNT_SPEC)
     except Exception as e:  # noqa: BLE001 — 解析失败不阻断 render
         logger.warning("G7 科目解析失败: %s", e)
         return None, [], []
 
-    prefixes = list(accounts.gross) + list(accounts.provision)
+    prefixes = list(accounts.codes_of("gross")) + list(accounts.codes_of("provision"))
     if not prefixes:
         return accounts, [], []
 
@@ -165,7 +176,7 @@ async def _load_g7_leaves(
         prefix_filter = sa.or_(
             *[TbBalance.account_code.like(f"{p}%") for p in prefixes]
         )
-        result = await ctx.db.execute(
+        result_rows = await ctx.db.execute(
             sa.select(
                 TbBalance.account_code,
                 TbBalance.account_name,
@@ -176,7 +187,7 @@ async def _load_g7_leaves(
                 TbBalance.closing_direction,
             ).where(sa.and_(active_filter, prefix_filter))
         )
-        all_rows = to_leaf_rows(result.fetchall())
+        all_rows = to_leaf_rows(result_rows.fetchall())
     except Exception as e:  # noqa: BLE001 — 取数失败降级为空，前端允许手填
         logger.warning("G7 tb_balance 取数失败: %s", e)
         return accounts, [], []
@@ -185,42 +196,38 @@ async def _load_g7_leaves(
 
 
 def build_g7_tb_values(
-    accounts: ReportLineAccounts | None,
+    accounts: object | None,
     all_rows: list[LeafRow],
     leaves: list[LeafRow],
 ) -> dict:
     """G7-1 审定表 TB 核对列的只读 seed（纯函数）。
 
-    键名与本函数引入前逐字一致（前端 `G7TabAdjudication.fetchTrialBalance` 已在读
-    ``opening`` / ``closing`` / ``impairment``），仅口径改为「报表映射解析 + 叶子聚合」。
-
-    备抵侧 ``absolute=True``：`1512` 活体为**负值存储**（项目 `2aa00f57` 期末
-    −4,790,032.97），不归一会让前端「减值准备」列显负数，与审定表「二、减值准备」段的
-    正数口径相反。
-
+    备抵侧 ``absolute=True``：`1512` 活体为**负值存储**，不归一会让前端显负数。
     无命中返回 ``{}``（宁缺勿造，前端手填）。
     """
     if accounts is None or not leaves:
         return {}
-    gross = aggregate_leaves(leaves, accounts.gross)
-    provision = aggregate_leaves(leaves, accounts.provision, absolute=True)
-    gross_codes = sorted(r.account_code for r in filter_by_prefixes(leaves, accounts.gross))
-    prov_codes = sorted(
-        r.account_code for r in filter_by_prefixes(leaves, accounts.provision)
+    gross_codes = _extract_codes(accounts, "gross")
+    prov_codes = _extract_codes(accounts, "provision")
+    gross = aggregate_leaves(leaves, gross_codes)
+    provision = aggregate_leaves(leaves, prov_codes, absolute=True)
+    gross_leaf_codes = sorted(r.account_code for r in filter_by_prefixes(leaves, gross_codes))
+    prov_leaf_codes = sorted(
+        r.account_code for r in filter_by_prefixes(leaves, prov_codes)
     )
-    if not gross_codes and not prov_codes:
+    if not gross_leaf_codes and not prov_leaf_codes:
         return {}
     return {
         "opening": _r2(gross["opening"]),
         "closing": _r2(gross["closing"]),
         "impairment": _r2(provision["closing"]),
         "impairment_opening": _r2(provision["opening"]),
-        "source_codes": {"gross": gross_codes, "impairment": prov_codes},
+        "source_codes": {"gross": gross_leaf_codes, "impairment": prov_leaf_codes},
     }
 
 
 def build_g7_leaf_categories(
-    accounts: ReportLineAccounts | None, leaves: list[LeafRow]
+    accounts: object | None, leaves: list[LeafRow]
 ) -> dict | None:
     """叶子科目 → 业务桶合计（纯函数）。分类走单一真源 `g7_investment_buckets`。
 
@@ -233,11 +240,13 @@ def build_g7_leaf_categories(
     """
     if accounts is None or not leaves:
         return None
-    picked = filter_by_prefixes(leaves, list(accounts.gross) + list(accounts.provision))
+    gross_codes = _extract_codes(accounts, "gross")
+    prov_codes = _extract_codes(accounts, "provision")
+    picked = filter_by_prefixes(leaves, list(gross_codes) + list(prov_codes))
     if not picked:
         return None
 
-    provision_prefixes = set(accounts.provision)
+    provision_prefixes = set(prov_codes)
     buckets: dict[str, dict] = {}
     unmapped: list[dict] = []
     for row in picked:
@@ -309,7 +318,7 @@ def build_g7_leaf_categories(
 
 
 def build_g7_adjudication_prefill(
-    accounts: ReportLineAccounts | None, leaves: list[LeafRow]
+    accounts: object | None, leaves: list[LeafRow]
 ) -> dict:
     """G7-1 审定表「未审数」四表预填（纯函数）。
 
@@ -377,52 +386,41 @@ def build_g7_adjudication_prefill(
 
 
 def build_g7_source_codes(
-    accounts: ReportLineAccounts | None,
+    accounts: object | None,
     all_rows: list[LeafRow],
     leaves: list[LeafRow],
 ) -> dict:
     """取数溯源（供前端 `WpFourTableSourcePanel` 与审计追溯）。纯函数。
 
-    含「叶子和 vs 父科目额」两口径自检 —— 不相等时两个数都暴露，不静默取其一。
+    含「叶子和 vs 父科目额」两口径自检。
+    已迁移到 SemanticAccountResult，直接用 `accounts.as_dict()` 输出标准溯源格式，
+    并附加 G7 特有的 `parent_check`。
     """
     if accounts is None:
         return {}
+    gross_codes = _extract_codes(accounts, "gross")
+    prov_codes = _extract_codes(accounts, "provision")
     gross_leaf_codes = sorted(
-        r.account_code for r in filter_by_prefixes(leaves, accounts.gross)
+        r.account_code for r in filter_by_prefixes(leaves, gross_codes)
     )
     prov_leaf_codes = sorted(
-        r.account_code for r in filter_by_prefixes(leaves, accounts.provision)
+        r.account_code for r in filter_by_prefixes(leaves, prov_codes)
     )
-    leaf_sum = _r2(aggregate_leaves(leaves, accounts.gross)["closing"])
+    leaf_sum = _r2(aggregate_leaves(leaves, gross_codes)["closing"])
     parent = 0.0
-    for prefix in accounts.gross:
+    for prefix in gross_codes:
         parent += parent_totals(all_rows, prefix)["closing"]
     parent = _r2(parent)
-    # 🔴 字段名对齐平台共享视图模型 `composables/shared/tbSourceCodes.ts`
-    #    （真源 = `ReportLineAccounts.as_dict()`）：报表行次键名是 `row_code`。
-    #    同一含义不得再造第二个键名（如 `report_row`），否则前端要认两套。
-    return {
-        "row_code": accounts.row_code,
-        "gross_standard": list(accounts.gross_standard),
-        "provision_standard": list(accounts.provision_standard),
-        "gross": gross_leaf_codes,
-        "provision": prov_leaf_codes,
-        "extra": dict(accounts.extra),
-        "signed_codes": [[c, s] for c, s in accounts.signed_codes],
-        "resolved_from": accounts.resolved_from,
-        "provision_resolved_from": accounts.provision_resolved_from,
-        "provision_exact": accounts.provision_exact,
-        "use_provision_name_filter": accounts.use_provision_name_filter,
-        "formula": accounts.formula,
-        # ── G7 additive（备抵自成报表行 + 叶子/父额两口径自检）──────────────
-        "provision_row_code": accounts.provision_row_code,
-        "provision_formula": accounts.provision_formula,
-        "parent_check": {
-            "leaf_sum": leaf_sum,
-            "parent": parent,
-            "diff": _r2(leaf_sum - parent),
-        },
+    # 基于 SemanticAccountResult.as_dict() 输出标准溯源格式 + G7 扩展字段
+    base = accounts.as_dict()
+    base["gross"] = gross_leaf_codes
+    base["provision"] = prov_leaf_codes
+    base["parent_check"] = {
+        "leaf_sum": leaf_sum,
+        "parent": parent,
+        "diff": _r2(leaf_sum - parent),
     }
+    return base
 
 
 async def render(ctx: RenderContext) -> dict | None:
@@ -458,19 +456,11 @@ async def render(ctx: RenderContext) -> dict | None:
 
     # 科目 + tb_balance 一次取回（fail-open）；下面的取数键全部由它派生
     accounts, all_rows, leaves = await _load_g7_leaves(ctx)
-    # 🔴 account_code 来自报表映射解析结果，不再是常量前缀（避免硬编码 / R11.2）
-    resolved_account_code = (
-        accounts.gross[0] if accounts and accounts.gross
-        else (G7_ACCOUNT_SPEC.fallback_gross[0] if G7_ACCOUNT_SPEC.fallback_gross else "")
-    )
-    resolved_impairment_code = (
-        accounts.provision[0] if accounts and accounts.provision
-        else (
-            G7_ACCOUNT_SPEC.fallback_provision[0]
-            if G7_ACCOUNT_SPEC.fallback_provision
-            else ""
-        )
-    )
+    # 🔴 account_code 来自语义解析结果，不再是常量前缀
+    gross_codes = _extract_codes(accounts, "gross") if accounts else []
+    prov_codes = _extract_codes(accounts, "provision") if accounts else []
+    resolved_account_code = gross_codes[0] if gross_codes else "1511"
+    resolved_impairment_code = prov_codes[0] if prov_codes else "1512"
 
     project_context: dict = {
         "client_name": "",

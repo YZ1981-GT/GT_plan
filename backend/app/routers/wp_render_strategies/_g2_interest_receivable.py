@@ -32,14 +32,14 @@ from app.services.dataset_query import get_active_filter
 from app.services.four_table import (
     build_g_adjudication_prefill,
     LeafRow,
-    ReportLineAccountSpec,
     aggregate_leaves,
     filter_by_prefixes,
     parent_totals,
-    resolve_report_line_accounts,
+    resolve_semantic_accounts,
     select_leaves,
     to_leaf_rows,
 )
+from app.services.four_table.g_cycle_specs import G2_SPEC
 
 from ._context import RenderContext
 
@@ -49,14 +49,9 @@ logger = logging.getLogger(__name__)
 # 科目定位规格
 # ─────────────────────────────────────────────────────────────────────────────
 
-#: G2 应收利息无独立报表行（新准则下不单列），直接用 fallback
-#: 选一个不存在的 row_code 让 resolve 必然 fallback（fail-open 设计）
-G2_ACCOUNT_SPEC = ReportLineAccountSpec(
-    row_code="BS-015",            # 「其中：应收利息」—— formula 通常为 None
-    fallback_gross=("1132",),
-    # 应收利息坏账准备：实务中可能挂在 1231 族，但无独立标准码映射
-    # 底稿从 G2-7 坏账测算表联动取数，这里不做备抵预填
-)
+#: G2 科目定位改走**语义驱动**（单一真源 `four_table/g_cycle_specs.G2_SPEC`）。
+#: G2 应收利息无独立报表行（`row_code=None`）。
+G2_ACCOUNT_SPEC = G2_SPEC
 
 _ADJUDICATED_ITEM_ID = "G2-1-adjudicated-amount"
 
@@ -96,13 +91,14 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict:
     result: dict = {"tb_values": {}, "tb_source_codes": {}, "adjudication_prefill": {}}
 
     try:
-        accounts = await resolve_report_line_accounts(ctx, G2_ACCOUNT_SPEC)
+        accounts = await resolve_semantic_accounts(ctx, G2_ACCOUNT_SPEC)
 
         active_filter = await get_active_filter(
             ctx.db, TbBalance.__table__, ctx.project_id, ctx.year
         )
-        query_prefixes = accounts.gross if accounts.gross else list(G2_ACCOUNT_SPEC.fallback_gross)
+        query_prefixes = accounts.codes_of("gross")
         if not query_prefixes:
+            result["tb_source_codes"] = accounts.as_dict()
             return result
 
         # 构建查询条件（点号边界）

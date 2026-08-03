@@ -185,18 +185,20 @@
       "sheet": "营业收入审定表D4-1",
       "account_codes": [
         "6001",
-        "6051"
+        "6051",
+        "6401",
+        "6402"
       ],
       "cells": [
         {
           "cell_ref": "期初余额",
-          "formula": "=TB_SUM('6001~6051','期初余额')",
+          "formula": "=TB_SUM('6001~6099','本期发生额')",
           "formula_type": "TB_SUM",
           "description": "从试算表取营业收入审定表期初余额合计"
         },
         {
           "cell_ref": "未审数",
-          "formula": "=TB_SUM('6001~6051','期末余额')",
+          "formula": "=TB_SUM('6001~6099','本期发生额')",
           "formula_type": "TB_SUM",
           "description": "从试算表取营业收入审定表期末余额合计（未审）"
         },
@@ -217,8 +219,39 @@
           "formula": "=PREV('D4','营业收入审定表D4-1','审定数')",
           "formula_type": "PREV",
           "description": "上年同底稿审定数"
+        },
+        {
+          "cell_ref": "营业成本本期发生额",
+          "formula": "=TB_SUM('6401~6499','本期发生额')",
+          "formula_type": "TB_SUM",
+          "description": "营业成本本期发生额（IS-002 口径 SUM_TB('6401~6499','本期发生额')）"
+        },
+        {
+          "cell_ref": "主营业务成本本期发生额",
+          "formula": "=TB('6401','本期发生额')",
+          "formula_type": "TB",
+          "description": "主营业务成本本期发生额（6401 前缀）"
+        },
+        {
+          "cell_ref": "其他业务成本本期发生额",
+          "formula": "=TB('6402','本期发生额')",
+          "formula_type": "TB",
+          "description": "其他业务成本本期发生额（6402 前缀）"
+        },
+        {
+          "cell_ref": "明细表D4-2合计",
+          "formula": "=WP('D4','主营业务收入明细表D4-2','全年收入合计')",
+          "formula_type": "WP",
+          "description": "审定表引用主营业务收入明细表D4-2全年合计"
+        },
+        {
+          "cell_ref": "明细表D4-3合计",
+          "formula": "=WP('D4','其他业务收入明细表D4-3','全年收入合计')",
+          "formula_type": "WP",
+          "description": "审定表引用其他业务收入明细表D4-3全年合计"
         }
-      ]
+      ],
+      "sheet_name": "营业收入审定表D4-1"
     },
     {
       "wp_code": "D6",
@@ -707,7 +740,7 @@
     {
       "wp_code": "F1",
       "wp_name": "预付账款附注披露信息（国企）",
-      "sheet": "附注披露信息(国企)",
+      "sheet": "附注披露信息（国企）",
       "account_codes": [
         "1123",
         "1231-04"
@@ -769,13 +802,13 @@
       "cells": [
         {
           "cell_ref": "期初余额",
-          "formula": "=TB_SUM('1401~1461','期初余额')",
+          "formula": "=TB_SUM('1401~1499','期初余额')",
           "formula_type": "TB_SUM",
           "description": "从试算表取存货（原材料+在产品+库存商品+工程物资+委托加工+存货跌价准备）期初余额合计"
         },
         {
           "cell_ref": "未审数",
-          "formula": "=TB_SUM('1401~1461','期末余额')",
+          "formula": "=TB_SUM('1401~1499','期末余额')",
           "formula_type": "TB_SUM",
           "description": "从试算表取存货期末余额合计（未审）"
         },
@@ -866,6 +899,36 @@
           "formula": "=PREV('F3','审定表F3-1','审定数')",
           "formula_type": "PREV",
           "description": "上年同底稿审定数"
+        },
+        {
+          "cell_ref": "期末未审数",
+          "formula": "=TB('2201','期末余额')",
+          "formula_type": "TB",
+          "description": "应付票据期末未审余额"
+        },
+        {
+          "cell_ref": "明细合计期末",
+          "formula": "=WP('F3','明细表F3-2','期末审定余额合计')",
+          "formula_type": "WP",
+          "description": "审定表期末数来源 = F3-2 明细表期末审定余额合计（源模板 F3-1 B/F/G/H/I 列 SUMPRODUCT 自 F3-2）"
+        },
+        {
+          "cell_ref": "明细合计期初",
+          "formula": "=WP('F3','明细表F3-2','期初审定余额合计')",
+          "formula_type": "WP",
+          "description": "审定表期初数来源 = F3-2 明细表期初审定余额合计"
+        },
+        {
+          "cell_ref": "明细银行承兑合计",
+          "formula": "=WP('F3','明细表F3-2','银行承兑汇票审定余额合计')",
+          "formula_type": "WP",
+          "description": "审定表银行承兑行 = F3-2 按票据种类筛选的银行承兑汇票合计"
+        },
+        {
+          "cell_ref": "明细商业承兑合计",
+          "formula": "=WP('F3','明细表F3-2','商业承兑汇票审定余额合计')",
+          "formula_type": "WP",
+          "description": "审定表商业承兑行 = F3-2 按票据种类筛选的商业承兑汇票合计"
         }
       ]
     },
@@ -906,71 +969,36 @@
           "formula": "=PREV('F4','审定表F4-1','审定数')",
           "formula_type": "PREV",
           "description": "上年同底稿审定数"
-        }
-      ]
-    },
-    {
-      "wp_code": "F5",
-      "wp_name": "营业成本审定表",
-      "sheet": "审定表F5-1",
-      "account_codes": [
-        "6401",
-        "6402"
-      ],
-      "cells": [
+        },
         {
-          "cell_ref": "期初余额",
-          "formula": "=TB('6401','期初余额')",
+          "cell_ref": "期末未审数",
+          "formula": "=TB('2202','期末余额')",
           "formula_type": "TB",
-          "description": "从试算表取主营业务成本期初累计发生额"
+          "description": "应付账款期末未审余额"
         },
         {
-          "cell_ref": "未审数",
-          "formula": "=TB('6401','期末余额')",
-          "formula_type": "TB",
-          "description": "从试算表取主营业务成本期末累计发生额（未审）"
-        },
-        {
-          "cell_ref": "其他业务成本_期初",
-          "formula": "=TB('6402','期初余额')",
-          "formula_type": "TB",
-          "description": "其他业务成本期初累计发生额"
-        },
-        {
-          "cell_ref": "其他业务成本_未审数",
-          "formula": "=TB('6402','期末余额')",
-          "formula_type": "TB",
-          "description": "其他业务成本期末累计发生额（未审）"
-        },
-        {
-          "cell_ref": "AJE调整",
-          "formula": "=ADJ('6401','aje_net')",
-          "formula_type": "ADJ",
-          "description": "营业成本审计调整分录净额"
-        },
-        {
-          "cell_ref": "RJE调整",
-          "formula": "=ADJ('6401','rje_net')",
-          "formula_type": "ADJ",
-          "description": "营业成本重分类调整分录净额"
-        },
-        {
-          "cell_ref": "上年审定数",
-          "formula": "=PREV('F5','审定表F5-1','审定数')",
-          "formula_type": "PREV",
-          "description": "上年同底稿审定数"
-        },
-        {
-          "cell_ref": "折旧",
-          "formula": "=WP('H1','折旧分配分析表H1-13','生产成本折旧')",
+          "cell_ref": "明细合计期末",
+          "formula": "=WP('F4','明细表F4-2','期末审定余额合计')",
           "formula_type": "WP",
-          "description": "从固定资产底稿折旧分配表取生产成本中的折旧金额"
+          "description": "按性质区期末数 = F4-2 明细表期末审定余额合计（源模板 F/G/H 列 SUMIF 自 F4-2）"
         },
         {
-          "cell_ref": "薪酬",
-          "formula": "=WP('J1','审定表','生产人员薪酬')",
+          "cell_ref": "明细合计期初",
+          "formula": "=WP('F4','明细表F4-2','期初审定余额合计')",
           "formula_type": "WP",
-          "description": "从应付职工薪酬底稿取生产人员薪酬"
+          "description": "按性质区期初数 = F4-2 明细表期初审定余额合计"
+        },
+        {
+          "cell_ref": "明细按账龄合计",
+          "formula": "=WP('F4','明细表F4-2','按账龄汇总合计')",
+          "formula_type": "WP",
+          "description": "按账龄区期末数 = F4-2 明细表按账龄汇总（源模板引 明细表F4-2!N32:X32）"
+        },
+        {
+          "cell_ref": "长期挂账审定合计",
+          "formula": "=WP('F4','长期挂账检查表F4-5','审定余额合计')",
+          "formula_type": "WP",
+          "description": "账龄超1年重要应付账款审定合计（← F4-5 长期挂账检查表）"
         }
       ]
     },
@@ -3117,10 +3145,10 @@
     },
     {
       "wp_code": "L2",
-      "wp_name": "长期借款审定表",
+      "wp_name": "应付利息审定表",
       "sheet": "审定表L2-1",
       "account_codes": [
-        "2501"
+        "2231"
       ],
       "cells": [
         {
@@ -3197,10 +3225,10 @@
     },
     {
       "wp_code": "L4",
-      "wp_name": "租赁负债审定表",
+      "wp_name": "应付债券审定表",
       "sheet": "审定表L4-1",
       "account_codes": [
-        "2601"
+        "2502"
       ],
       "cells": [
         {
@@ -3237,10 +3265,10 @@
     },
     {
       "wp_code": "L5",
-      "wp_name": "应付债券审定表",
+      "wp_name": "长期应付款审定表",
       "sheet": "审定表L5-1",
       "account_codes": [
-        "2502"
+        "2701"
       ],
       "cells": [
         {
@@ -3277,10 +3305,10 @@
     },
     {
       "wp_code": "L6",
-      "wp_name": "长期应付款审定表",
+      "wp_name": "专项应付款审定表",
       "sheet": "审定表L6-1",
       "account_codes": [
-        "2701"
+        "2711"
       ],
       "cells": [
         {
@@ -3317,11 +3345,9 @@
     },
     {
       "wp_code": "L7",
-      "wp_name": "预计负债审定表",
+      "wp_name": "其他非流动负债审定表",
       "sheet": "审定表L7-1",
-      "account_codes": [
-        "2801"
-      ],
+      "account_codes": [],
       "cells": [
         {
           "cell_ref": "期初余额",
@@ -4124,11 +4150,12 @@
         },
         {
           "cell_ref": "本年未审数",
-          "formula": "=TB_SUM('6001~6051','期末余额')",
+          "formula": "=TB_SUM('6001~6099','本期发生额')",
           "formula_type": "TB_SUM",
           "description": "从试算表取营业收入期末余额合计（未审）"
         }
-      ]
+      ],
+      "sheet_name": "分析程序D4-3"
     },
     {
       "wp_code": "D7",
@@ -4193,23 +4220,6 @@
           "formula": "=TB('1121','期末余额')",
           "formula_type": "TB",
           "description": "从试算表取应收票据期末余额（未审）。勾稽：本表合计期末未审 = 期初未审 + 本期增加 − 本期减少（源模板 H11=B11+F11-G11）"
-        }
-      ]
-    },
-    {
-      "wp_code": "D4",
-      "wp_name": "营业收入明细表",
-      "sheet": "收入明细表D4-4",
-      "account_codes": [
-        "6001",
-        "6051"
-      ],
-      "cells": [
-        {
-          "cell_ref": "收入明细",
-          "formula": "=TB_AUX('6001','客户','期末余额')",
-          "formula_type": "TB_AUX",
-          "description": "从辅助余额表按客户维度取主营业务收入明细"
         }
       ]
     },
@@ -4566,7 +4576,8 @@
           "formula_type": "PREV",
           "description": "上年同底稿主营业务收入全年合计"
         }
-      ]
+      ],
+      "sheet_name": "主营业务收入明细表D4-2"
     },
     {
       "wp_code": "D4",
@@ -4595,7 +4606,8 @@
           "formula_type": "LEDGER",
           "description": "从序时账取 6001 开头科目全年贷方发生额合计"
         }
-      ]
+      ],
+      "sheet_name": "营业收入账面金额与ERP系统核对记录D4-13"
     },
     {
       "wp_code": "D4",
@@ -4628,6 +4640,131 @@
           "formula": "=LEDGER_DETAIL('6001','1月','<0')",
           "formula_type": "LEDGER_DETAIL",
           "description": "从序时账取次年1月主营业务收入红字冲销明细"
+        }
+      ],
+      "sheet_name": "营业收入截止测试（账到单据）D4-17"
+    },
+    {
+      "wp_code": "D4",
+      "wp_name": "D4 附注披露信息（上市公司）",
+      "sheet": "附注披露信息（上市公司）",
+      "sheet_name": "附注披露信息（上市公司）",
+      "account_codes": [
+        "6001",
+        "6051",
+        "6401",
+        "6402"
+      ],
+      "cells": [
+        {
+          "cell_ref": "主营业务收入本期",
+          "formula": "=TB('6001','本期发生额')",
+          "formula_type": "TB",
+          "description": "披露表主营业务收入本期发生额"
+        },
+        {
+          "cell_ref": "其他业务收入本期",
+          "formula": "=TB('6051','本期发生额')",
+          "formula_type": "TB",
+          "description": "披露表其他业务收入本期发生额"
+        },
+        {
+          "cell_ref": "营业收入合计本期",
+          "formula": "=TB_SUM('6001~6099','本期发生额')",
+          "formula_type": "TB_SUM",
+          "description": "披露表营业收入合计本期发生额（IS-001）"
+        },
+        {
+          "cell_ref": "主营业务成本本期",
+          "formula": "=TB('6401','本期发生额')",
+          "formula_type": "TB",
+          "description": "披露表主营业务成本本期发生额"
+        },
+        {
+          "cell_ref": "其他业务成本本期",
+          "formula": "=TB('6402','本期发生额')",
+          "formula_type": "TB",
+          "description": "披露表其他业务成本本期发生额"
+        },
+        {
+          "cell_ref": "营业成本合计本期",
+          "formula": "=TB_SUM('6401~6499','本期发生额')",
+          "formula_type": "TB_SUM",
+          "description": "披露表营业成本合计本期发生额（IS-002）"
+        },
+        {
+          "cell_ref": "上年主营业务收入",
+          "formula": "=PREV('D4','附注披露信息（上市公司）','主营业务收入本期')",
+          "formula_type": "PREV",
+          "description": "上年主营业务收入（取上年同页）"
+        },
+        {
+          "cell_ref": "上年营业成本合计",
+          "formula": "=PREV('D4','附注披露信息（上市公司）','营业成本合计本期')",
+          "formula_type": "PREV",
+          "description": "上年营业成本合计（取上年同页）"
+        }
+      ]
+    },
+    {
+      "wp_code": "D4",
+      "wp_name": "D4 附注披露信息（国企）",
+      "sheet": "附注披露信息（国企）",
+      "sheet_name": "附注披露信息（国企）",
+      "account_codes": [
+        "6001",
+        "6051",
+        "6401",
+        "6402"
+      ],
+      "cells": [
+        {
+          "cell_ref": "主营业务收入本期",
+          "formula": "=TB('6001','本期发生额')",
+          "formula_type": "TB",
+          "description": "披露表主营业务收入本期发生额"
+        },
+        {
+          "cell_ref": "其他业务收入本期",
+          "formula": "=TB('6051','本期发生额')",
+          "formula_type": "TB",
+          "description": "披露表其他业务收入本期发生额"
+        },
+        {
+          "cell_ref": "营业收入合计本期",
+          "formula": "=TB_SUM('6001~6099','本期发生额')",
+          "formula_type": "TB_SUM",
+          "description": "披露表营业收入合计本期发生额（IS-001）"
+        },
+        {
+          "cell_ref": "主营业务成本本期",
+          "formula": "=TB('6401','本期发生额')",
+          "formula_type": "TB",
+          "description": "披露表主营业务成本本期发生额"
+        },
+        {
+          "cell_ref": "其他业务成本本期",
+          "formula": "=TB('6402','本期发生额')",
+          "formula_type": "TB",
+          "description": "披露表其他业务成本本期发生额"
+        },
+        {
+          "cell_ref": "营业成本合计本期",
+          "formula": "=TB_SUM('6401~6499','本期发生额')",
+          "formula_type": "TB_SUM",
+          "description": "披露表营业成本合计本期发生额（IS-002）"
+        },
+        {
+          "cell_ref": "上年主营业务收入",
+          "formula": "=PREV('D4','附注披露信息（国企）','主营业务收入本期')",
+          "formula_type": "PREV",
+          "description": "上年主营业务收入（取上年同页）"
+        },
+        {
+          "cell_ref": "上年营业成本合计",
+          "formula": "=PREV('D4','附注披露信息（国企）','营业成本合计本期')",
+          "formula_type": "PREV",
+          "description": "上年营业成本合计（取上年同页）"
         }
       ]
     },
@@ -4829,13 +4966,13 @@
           "cell_ref": "账面数量_库存商品",
           "formula": "=LEDGER('1403','期末数量')",
           "formula_type": "LEDGER",
-          "description": "库存商品账面数量（盘点底数）"
+          "description": "原材料（1403；标准科目表两变体均为「原材料」，非「库存商品」）"
         },
         {
           "cell_ref": "账面金额_库存商品",
           "formula": "=LEDGER('1403','期末金额')",
           "formula_type": "LEDGER",
-          "description": "库存商品账面金额（盘点底数）"
+          "description": "原材料（1403；标准科目表两变体均为「原材料」，非「库存商品」）"
         }
       ]
     },
@@ -5015,7 +5152,7 @@
           "cell_ref": "生产成本_期初",
           "formula": "=TB('1402','期初余额')",
           "formula_type": "TB",
-          "description": "在产品（生产成本）期初"
+          "description": "在途物资（1402；源模板引此为「生产成本」科目，标准科目表两变体均为「在途物资」）"
         },
         {
           "cell_ref": "生产成本_本期入",
@@ -5080,25 +5217,25 @@
       "cells": [
         {
           "cell_ref": "存货成本_A类",
-          "formula": "=AUX('1403','存货分类','A类','期末余额')",
+          "formula": "=AUX('1403','存货分类','XX分类','期末余额')",
           "formula_type": "AUX",
           "description": "A 类存货账面成本（按存货分类维度）"
         },
         {
           "cell_ref": "存货成本_B类",
-          "formula": "=AUX('1403','存货分类','B类','期末余额')",
+          "formula": "=AUX('1403','存货分类','XX分类','期末余额')",
           "formula_type": "AUX",
           "description": "B 类存货账面成本"
         },
         {
           "cell_ref": "跌价准备_A类",
-          "formula": "=AUX('1461','存货分类','A类','期末余额')",
+          "formula": "=AUX('1461','存货分类','XX分类','期末余额')",
           "formula_type": "AUX",
           "description": "A 类已计提跌价准备"
         },
         {
           "cell_ref": "跌价准备_B类",
-          "formula": "=AUX('1461','存货分类','B类','期末余额')",
+          "formula": "=AUX('1461','存货分类','XX分类','期末余额')",
           "formula_type": "AUX",
           "description": "B 类已计提跌价准备"
         },
@@ -5120,13 +5257,13 @@
       "cells": [
         {
           "cell_ref": "长库龄_账面金额",
-          "formula": "=AUX('1403','库龄','长库龄','期末余额')",
+          "formula": "=AUX('1403','库龄','XX分类','期末余额')",
           "formula_type": "AUX",
           "description": "库龄分析维度 → 长库龄账面金额（依赖项目 aux_type=库龄）"
         },
         {
           "cell_ref": "呆滞_账面金额",
-          "formula": "=AUX('1403','库龄','呆滞','期末余额')",
+          "formula": "=AUX('1403','库龄','XX分类','期末余额')",
           "formula_type": "AUX",
           "description": "库龄分析维度 → 呆滞账面金额"
         }
@@ -5232,21 +5369,39 @@
         },
         {
           "cell_ref": "应付票据_供应商TOP1",
-          "formula": "=AUX('2201','供应商','TOP1','期末余额')",
+          "formula": "=AUX('2201','供应商','XX单位','期末余额')",
           "formula_type": "AUX",
           "description": "应付票据按供应商维度 → TOP1"
         },
         {
           "cell_ref": "应付票据_供应商TOP2",
-          "formula": "=AUX('2201','供应商','TOP2','期末余额')",
+          "formula": "=AUX('2201','供应商','XX单位','期末余额')",
           "formula_type": "AUX",
           "description": "应付票据按供应商维度 → TOP2"
         },
         {
           "cell_ref": "应付票据_供应商TOP3",
-          "formula": "=AUX('2201','供应商','TOP3','期末余额')",
+          "formula": "=AUX('2201','供应商','XX单位','期末余额')",
           "formula_type": "AUX",
           "description": "应付票据按供应商维度 → TOP3"
+        },
+        {
+          "cell_ref": "明细期初余额",
+          "formula": "=TB('2201','期初余额')",
+          "formula_type": "TB",
+          "description": "明细表期初未审余额合计核对数（与总账勾稽）"
+        },
+        {
+          "cell_ref": "明细期末余额",
+          "formula": "=TB('2201','期末余额')",
+          "formula_type": "TB",
+          "description": "明细表期末未审余额合计核对数"
+        },
+        {
+          "cell_ref": "明细供应商期末余额",
+          "formula": "=AUX('2201','供应商','XX单位','期末余额')",
+          "formula_type": "AUX",
+          "description": "按供应商（辅助维度）取某单位期末余额（逐行取数走批量导入，本条供单户复核）"
         }
       ]
     },
@@ -5272,21 +5427,39 @@
         },
         {
           "cell_ref": "应付账款_供应商TOP1",
-          "formula": "=AUX('2202','供应商','TOP1','期末余额')",
+          "formula": "=AUX('2202','供应商','XX单位','期末余额')",
           "formula_type": "AUX",
           "description": "应付账款按供应商 → TOP1"
         },
         {
           "cell_ref": "应付账款_供应商TOP2",
-          "formula": "=AUX('2202','供应商','TOP2','期末余额')",
+          "formula": "=AUX('2202','供应商','XX单位','期末余额')",
           "formula_type": "AUX",
           "description": "应付账款按供应商 → TOP2"
         },
         {
           "cell_ref": "应付账款_供应商TOP3",
-          "formula": "=AUX('2202','供应商','TOP3','期末余额')",
+          "formula": "=AUX('2202','供应商','XX单位','期末余额')",
           "formula_type": "AUX",
           "description": "应付账款按供应商 → TOP3"
+        },
+        {
+          "cell_ref": "明细期初余额",
+          "formula": "=TB('2202','期初余额')",
+          "formula_type": "TB",
+          "description": "明细表期初未审余额合计核对数（与总账勾稽）"
+        },
+        {
+          "cell_ref": "明细期末余额",
+          "formula": "=TB('2202','期末余额')",
+          "formula_type": "TB",
+          "description": "明细表期末未审余额合计核对数"
+        },
+        {
+          "cell_ref": "明细供应商期末余额",
+          "formula": "=AUX('2202','供应商','XX单位','期末余额')",
+          "formula_type": "AUX",
+          "description": "按供应商（辅助维度）取某单位期末余额（逐行取数走批量导入，本条供单户复核）"
         }
       ]
     },
@@ -8563,6 +8736,1214 @@
         }
       ],
       "notes": "国企版主表首行字面是「现金」（非「库存现金」），列头是「期末余额 / 年初余额」（非「期末数 / 期初数」）—— 与上市版不同，见源 xlsx R7/R8。受限制货币资金明细表的类别行走动态分类，见 four_table/e1_restricted_buckets.py。"
+    },
+    {
+      "wp_code": "E1",
+      "wp_name": "利息收入月度分析",
+      "sheet": "利息收入月度分析E1-15",
+      "account_codes": [
+        "1002"
+      ],
+      "description": "E1-15 利息收入月度分析。按银行账户每月余额×利率测算利息，与账面利息收入核对。",
+      "cells": [
+        {
+          "cell_ref": "银行存款余额",
+          "formula": "TB('1002','期末余额')",
+          "formula_type": "TB",
+          "description": "银行存款期末余额（1002），用于利率测算基数"
+        },
+        {
+          "cell_ref": "银行存款期初余额",
+          "formula": "TB('1002','期初余额')",
+          "formula_type": "TB",
+          "description": "银行存款期初余额（1002），用于年度平均余额计算"
+        }
+      ]
+    },
+    {
+      "wp_code": "E1",
+      "wp_name": "应计利息测算",
+      "sheet": "银行存款及其他货币资金应计利息测算E1-20",
+      "account_codes": [
+        "1002",
+        "1012"
+      ],
+      "description": "E1-20 应计利息测算。按余额×利率÷360 逐日测算应计利息。利率/天数由审计师手工录入。",
+      "cells": [
+        {
+          "cell_ref": "E1-20_银行存款余额",
+          "formula": "TB('1002','期末余额')",
+          "formula_type": "TB",
+          "description": "银行存款期末余额，作为利息测算基数"
+        },
+        {
+          "cell_ref": "其他货币资金余额",
+          "formula": "TB('1012','期末余额')",
+          "formula_type": "TB",
+          "description": "其他货币资金期末余额（结构性存款等），作为利息测算基数"
+        },
+        {
+          "cell_ref": "利率",
+          "formula": "PLACEHOLDER",
+          "formula_type": "PLACEHOLDER",
+          "description": "年利率由审计师根据银行合同/回函手工录入，四表推不出"
+        }
+      ]
+    },
+    {
+      "wp_code": "E1",
+      "wp_name": "现金交易分析",
+      "sheet": "现金交易分析E1-26",
+      "account_codes": [
+        "1001"
+      ],
+      "description": "E1-26 现金交易分析（IPO/舞弊应对）。分析现金收支异常模式。",
+      "cells": [
+        {
+          "cell_ref": "库存现金余额",
+          "formula": "TB('1001','期末余额')",
+          "formula_type": "TB",
+          "description": "库存现金期末余额，用于与现金交易规模对比"
+        }
+      ]
+    },
+    {
+      "wp_code": "E1",
+      "wp_name": "现金截止测试",
+      "sheet": "现金截止测试E1-27",
+      "account_codes": [
+        "1001"
+      ],
+      "description": "E1-27 现金截止测试（IPO/舞弊应对）。核查期末现金收支跨期。",
+      "cells": [
+        {
+          "cell_ref": "E1-27_库存现金余额",
+          "formula": "TB('1001','期末余额')",
+          "formula_type": "TB",
+          "description": "库存现金期末审定余额，作为截止金额参照基数"
+        }
+      ]
+    },
+    {
+      "wp_code": "E1",
+      "wp_name": "现金收支检查表",
+      "sheet": "现金收支检查表E1-28",
+      "account_codes": [
+        "1001"
+      ],
+      "description": "E1-28 现金收支检查表（IPO/舞弊应对）。检查大额现金收支合理性。",
+      "cells": [
+        {
+          "cell_ref": "E1-28_库存现金余额",
+          "formula": "TB('1001','期末余额')",
+          "formula_type": "TB",
+          "description": "库存现金期末余额，用于大额收支占比计算"
+        }
+      ]
+    },
+    {
+      "wp_code": "E1",
+      "wp_name": "银行账户分析",
+      "sheet": "银行账户分析E1-29",
+      "account_codes": [
+        "1002"
+      ],
+      "description": "E1-29 银行账户分析（IPO/舞弊应对）。多维度分析银行账户开立地、多年指标。",
+      "cells": [
+        {
+          "cell_ref": "E1-29_银行存款余额",
+          "formula": "TB('1002','期末余额')",
+          "formula_type": "TB",
+          "description": "银行存款期末余额，用于各账户占比分析"
+        }
+      ]
+    },
+    {
+      "wp_code": "E1",
+      "wp_name": "存款规模与利息收入匹配性分析",
+      "sheet": "存款规模与利息收入匹配性分析E1-30",
+      "account_codes": [
+        "1002"
+      ],
+      "description": "E1-30 存款规模与利息收入匹配性（IPO/舞弊应对）。按日余额×年利率/360 测算。",
+      "cells": [
+        {
+          "cell_ref": "E1-30_银行存款余额",
+          "formula": "TB('1002','期末余额')",
+          "formula_type": "TB",
+          "description": "银行存款期末余额，用于与测算利息收入匹配性对比"
+        }
+      ]
+    },
+    {
+      "wp_code": "E1",
+      "wp_name": "银行流水双向核对表",
+      "sheet": "银行流水双向核对表E1-31",
+      "account_codes": [
+        "1002"
+      ],
+      "description": "E1-31 银行流水双向核对（IPO/舞弊应对）。账→流/流→账双向匹配。明细 sheet 禁 WP() 防环。",
+      "cells": [
+        {
+          "cell_ref": "E1-31_银行存款余额",
+          "formula": "TB('1002','期末余额')",
+          "formula_type": "TB",
+          "description": "银行存款期末余额，用于流水覆盖率计算基数"
+        }
+      ]
+    },
+    {
+      "wp_code": "E1",
+      "wp_name": "董监高及关键岗位流水核查",
+      "sheet": "董监高及关键岗位流水核查E1-32",
+      "account_codes": [
+        "1002"
+      ],
+      "description": "E1-32 董监高关键岗位流水核查（IPO/舞弊应对）。明细 sheet 禁 WP() 防环。",
+      "cells": [
+        {
+          "cell_ref": "E1-32_银行存款余额",
+          "formula": "TB('1002','期末余额')",
+          "formula_type": "TB",
+          "description": "银行存款期末余额参照（核查金额占比用）"
+        }
+      ]
+    },
+    {
+      "wp_code": "F3",
+      "wp_name": "应付票据附注披露信息（上市公司）",
+      "sheet": "附注披露信息(上市公司)",
+      "account_codes": [
+        "2201"
+      ],
+      "items": [
+        {
+          "cell_ref": "披露期末合计",
+          "formula": "=TB('2201','期末余额')",
+          "formula_type": "TB",
+          "description": "附注披露表期末合计核对数（= 报表行 BS-044）"
+        },
+        {
+          "cell_ref": "披露审定期末",
+          "formula": "=WP('F3','审定表F3-1','期末审定数')",
+          "formula_type": "WP",
+          "description": "附注披露表期末数来源 = 审定表期末审定数"
+        }
+      ]
+    },
+    {
+      "wp_code": "F3",
+      "wp_name": "应付票据附注披露信息（国企）",
+      "sheet": "附注披露信息（国企）",
+      "account_codes": [
+        "2201"
+      ],
+      "items": [
+        {
+          "cell_ref": "披露soe期末合计",
+          "formula": "=TB('2201','期末余额')",
+          "formula_type": "TB",
+          "description": "国企附注披露表期末合计核对数"
+        },
+        {
+          "cell_ref": "披露soe审定期末",
+          "formula": "=WP('F3','审定表F3-1','期末审定数')",
+          "formula_type": "WP",
+          "description": "国企附注披露表期末数来源 = 审定表期末审定数"
+        }
+      ]
+    },
+    {
+      "wp_code": "F4",
+      "wp_name": "应付账款附注披露信息（上市公司）",
+      "sheet": "附注披露信息(上市公司)",
+      "account_codes": [
+        "2202"
+      ],
+      "items": [
+        {
+          "cell_ref": "披露按性质合计",
+          "formula": "=TB('2202','期末余额')",
+          "formula_type": "TB",
+          "description": "上市披露按性质主表合计核对数（= 报表行 BS-045）"
+        },
+        {
+          "cell_ref": "披露长期挂账合计",
+          "formula": "=WP('F4','长期挂账检查表F4-5','审定余额合计')",
+          "formula_type": "WP",
+          "description": "上市披露「账龄超过1年的重要应付账款」合计来源"
+        }
+      ]
+    },
+    {
+      "wp_code": "F4",
+      "wp_name": "应付账款附注披露信息（国企）",
+      "sheet": "附注披露信息（国企）",
+      "account_codes": [
+        "2202"
+      ],
+      "items": [
+        {
+          "cell_ref": "披露soe期末合计",
+          "formula": "=TB('2202','期末余额')",
+          "formula_type": "TB",
+          "description": "国企披露按账龄主表合计核对数（= 报表行 BS-045）"
+        },
+        {
+          "cell_ref": "披露soe长期挂账合计",
+          "formula": "=WP('F4','长期挂账检查表F4-5','审定余额合计')",
+          "formula_type": "WP",
+          "description": "国企披露「账龄超过1年的重要应付账款」合计来源"
+        }
+      ]
+    },
+    {
+      "wp_code": "F5",
+      "wp_name": "营业成本审定表",
+      "sheet": "营业务成本审定表F5-1",
+      "account_codes": [
+        "6401~6499"
+      ],
+      "items": [
+        {
+          "cell_ref": "本期发生额",
+          "formula": "=TB_SUM('6401~6499','本期发生额')",
+          "formula_type": "TB_SUM",
+          "description": "营业成本本期发生额合计（报表行 IS-002 口径；覆盖 6401 主营 + 6402/6404 其他业务成本）。🔴 损益类无「期初/期末余额」概念，用「本期发生额」。"
+        },
+        {
+          "cell_ref": "上年发生额",
+          "formula": "=PREV('F5','营业务成本审定表F5-1','本期审定发生额')",
+          "formula_type": "PREV",
+          "description": "上年 F5-1 审定表本期审定发生额（比较数）"
+        },
+        {
+          "cell_ref": "主营明细合计",
+          "formula": "=WP('F5','主营业务成本月度明细表F5-2','审定发生额合计')",
+          "formula_type": "WP",
+          "description": "主营业务成本明细合计（← F5-2，源模板 F5-1 引 F5-2 月度汇总行）"
+        },
+        {
+          "cell_ref": "其他业务成本合计",
+          "formula": "=WP('F5','其他业务成本明细表F5-3','审定发生额合计')",
+          "formula_type": "WP",
+          "description": "其他业务成本明细合计（← F5-3）"
+        },
+        {
+          "cell_ref": "调整分录合计",
+          "formula": "=WP('F5','调整分录汇总F5-4','调整分录净额')",
+          "formula_type": "WP",
+          "description": "AJE/RJE 净调整额（← F5-4 调整分录汇总）"
+        },
+        {
+          "cell_ref": "期初余额",
+          "formula": "=TB('6401','本期发生额')",
+          "formula_type": "TB",
+          "description": "从试算表取主营业务成本期初累计发生额"
+        },
+        {
+          "cell_ref": "未审数",
+          "formula": "=TB('6401','本期发生额')",
+          "formula_type": "TB",
+          "description": "从试算表取主营业务成本期末累计发生额（未审）"
+        },
+        {
+          "cell_ref": "其他业务成本_期初",
+          "formula": "=TB('6402','本期发生额')",
+          "formula_type": "TB",
+          "description": "其他业务成本期初累计发生额"
+        },
+        {
+          "cell_ref": "其他业务成本_未审数",
+          "formula": "=TB('6402','本期发生额')",
+          "formula_type": "TB",
+          "description": "其他业务成本期末累计发生额（未审）"
+        },
+        {
+          "cell_ref": "AJE调整",
+          "formula": "=ADJ('6401','aje_net')",
+          "formula_type": "ADJ",
+          "description": "营业成本审计调整分录净额"
+        },
+        {
+          "cell_ref": "RJE调整",
+          "formula": "=ADJ('6401','rje_net')",
+          "formula_type": "ADJ",
+          "description": "营业成本重分类调整分录净额"
+        },
+        {
+          "cell_ref": "上年审定数",
+          "formula": "=PREV('F5','审定表F5-1','审定数')",
+          "formula_type": "PREV",
+          "description": "上年同底稿审定数"
+        },
+        {
+          "cell_ref": "折旧",
+          "formula": "=WP('H1','折旧分配分析表H1-13','生产成本折旧')",
+          "formula_type": "WP",
+          "description": "从固定资产底稿折旧分配表取生产成本中的折旧金额"
+        },
+        {
+          "cell_ref": "薪酬",
+          "formula": "=WP('J1','审定表','生产人员薪酬')",
+          "formula_type": "WP",
+          "description": "从应付职工薪酬底稿取生产人员薪酬"
+        }
+      ]
+    },
+    {
+      "wp_code": "G10",
+      "wp_name": "交易性金融负债披露（上市）",
+      "sheet": "附注披露信息（上市公司）",
+      "account_codes": [
+        "2101"
+      ],
+      "cells": [
+        {
+          "cell_ref": "交易性金融负债_期末",
+          "description": "披露表交易性金融负债期末余额",
+          "formula": "=TB('2101','期末余额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "交易性金融负债_期初",
+          "description": "披露表交易性金融负债期初余额",
+          "formula": "=TB('2101','期初余额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "审定表核对",
+          "description": "从审定表G10-1取期末审定合计（勾稽用）",
+          "formula": "=WP('G10','审定表G10-1','审定合计_期末')",
+          "formula_type": "WP"
+        }
+      ]
+    },
+    {
+      "wp_code": "G10",
+      "wp_name": "交易性金融负债披露（国企）",
+      "sheet": "附注披露信息（国企）",
+      "account_codes": [
+        "2101"
+      ],
+      "cells": [
+        {
+          "cell_ref": "交易性金融负债_期末",
+          "description": "披露表交易性金融负债期末余额",
+          "formula": "=TB('2101','期末余额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "交易性金融负债_期初",
+          "description": "披露表交易性金融负债期初余额",
+          "formula": "=TB('2101','期初余额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "审定表核对",
+          "description": "从审定表G10-1取期末审定合计（勾稽用）",
+          "formula": "=WP('G10','审定表G10-1','审定合计_期末')",
+          "formula_type": "WP"
+        }
+      ]
+    },
+    {
+      "wp_code": "G11",
+      "wp_name": "投资收益披露（上市）",
+      "sheet": "附注披露信息（上市公司）",
+      "account_codes": [
+        "6111"
+      ],
+      "cells": [
+        {
+          "cell_ref": "投资收益_本期",
+          "description": "披露表投资收益本期发生额",
+          "formula": "=TB('6111','本期发生额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "投资收益_上期",
+          "description": "披露表投资收益上期发生额",
+          "formula": "=PREV('G11','审定表G11-1','投资收益_本期')",
+          "formula_type": "PREV"
+        },
+        {
+          "cell_ref": "审定表核对",
+          "description": "从审定表G11-1取期末审定合计（勾稽用）",
+          "formula": "=WP('G11','审定表G11-1','审定合计_期末')",
+          "formula_type": "WP"
+        }
+      ]
+    },
+    {
+      "wp_code": "G11",
+      "wp_name": "投资收益披露（国企）",
+      "sheet": "附注披露信息（国企）",
+      "account_codes": [
+        "6111"
+      ],
+      "cells": [
+        {
+          "cell_ref": "投资收益_本期",
+          "description": "披露表投资收益本期发生额",
+          "formula": "=TB('6111','本期发生额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "投资收益_上期",
+          "description": "披露表投资收益上期发生额",
+          "formula": "=PREV('G11','审定表G11-1','投资收益_本期')",
+          "formula_type": "PREV"
+        },
+        {
+          "cell_ref": "审定表核对",
+          "description": "从审定表G11-1取期末审定合计（勾稽用）",
+          "formula": "=WP('G11','审定表G11-1','审定合计_期末')",
+          "formula_type": "WP"
+        }
+      ]
+    },
+    {
+      "wp_code": "G12",
+      "wp_name": "净敞口套期收益披露（上市）",
+      "sheet": "附注披露信息（上市公司）",
+      "account_codes": [
+        "6103"
+      ],
+      "cells": [
+        {
+          "cell_ref": "净敞口套期收益_本期",
+          "description": "披露表净敞口套期收益本期发生额",
+          "formula": "=TB('6103','本期发生额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "净敞口套期收益_上期",
+          "description": "披露表净敞口套期收益上期发生额",
+          "formula": "=PREV('G12','审定表G12-1','净敞口套期收益_本期')",
+          "formula_type": "PREV"
+        },
+        {
+          "cell_ref": "审定表核对",
+          "description": "从审定表G12-1取期末审定合计（勾稽用）",
+          "formula": "=WP('G12','审定表G12-1','审定合计_期末')",
+          "formula_type": "WP"
+        }
+      ]
+    },
+    {
+      "wp_code": "G12",
+      "wp_name": "净敞口套期收益披露（国企）",
+      "sheet": "附注披露信息（国企）",
+      "account_codes": [
+        "6103"
+      ],
+      "cells": [
+        {
+          "cell_ref": "净敞口套期收益_本期",
+          "description": "披露表净敞口套期收益本期发生额",
+          "formula": "=TB('6103','本期发生额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "净敞口套期收益_上期",
+          "description": "披露表净敞口套期收益上期发生额",
+          "formula": "=PREV('G12','审定表G12-1','净敞口套期收益_本期')",
+          "formula_type": "PREV"
+        },
+        {
+          "cell_ref": "审定表核对",
+          "description": "从审定表G12-1取期末审定合计（勾稽用）",
+          "formula": "=WP('G12','审定表G12-1','审定合计_期末')",
+          "formula_type": "WP"
+        }
+      ]
+    },
+    {
+      "wp_code": "G13",
+      "wp_name": "公允价值变动收益披露（上市）",
+      "sheet": "附注披露信息（上市公司）",
+      "account_codes": [
+        "6101"
+      ],
+      "cells": [
+        {
+          "cell_ref": "公允价值变动收益_本期",
+          "description": "披露表公允价值变动收益本期发生额",
+          "formula": "=TB('6101','本期发生额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "公允价值变动收益_上期",
+          "description": "披露表公允价值变动收益上期发生额",
+          "formula": "=PREV('G13','审定表G13-1','公允价值变动收益_本期')",
+          "formula_type": "PREV"
+        },
+        {
+          "cell_ref": "审定表核对",
+          "description": "从审定表G13-1取期末审定合计（勾稽用）",
+          "formula": "=WP('G13','审定表G13-1','审定合计_期末')",
+          "formula_type": "WP"
+        }
+      ]
+    },
+    {
+      "wp_code": "G13",
+      "wp_name": "公允价值变动收益披露（国企）",
+      "sheet": "附注披露信息（国企）",
+      "account_codes": [
+        "6101"
+      ],
+      "cells": [
+        {
+          "cell_ref": "公允价值变动收益_本期",
+          "description": "披露表公允价值变动收益本期发生额",
+          "formula": "=TB('6101','本期发生额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "公允价值变动收益_上期",
+          "description": "披露表公允价值变动收益上期发生额",
+          "formula": "=PREV('G13','审定表G13-1','公允价值变动收益_本期')",
+          "formula_type": "PREV"
+        },
+        {
+          "cell_ref": "审定表核对",
+          "description": "从审定表G13-1取期末审定合计（勾稽用）",
+          "formula": "=WP('G13','审定表G13-1','审定合计_期末')",
+          "formula_type": "WP"
+        }
+      ]
+    },
+    {
+      "wp_code": "G14",
+      "wp_name": "信用减值损失披露（上市）",
+      "sheet": "附注披露信息（上市公司）",
+      "account_codes": [
+        "6702"
+      ],
+      "cells": [
+        {
+          "cell_ref": "信用减值损失_本期",
+          "description": "披露表信用减值损失本期发生额",
+          "formula": "=TB('6702','本期发生额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "信用减值损失_上期",
+          "description": "披露表信用减值损失上期发生额",
+          "formula": "=PREV('G14','审定表G14-1','信用减值损失_本期')",
+          "formula_type": "PREV"
+        },
+        {
+          "cell_ref": "审定表核对",
+          "description": "从审定表G14-1取期末审定合计（勾稽用）",
+          "formula": "=WP('G14','审定表G14-1','审定合计_期末')",
+          "formula_type": "WP"
+        }
+      ]
+    },
+    {
+      "wp_code": "G14",
+      "wp_name": "信用减值损失披露（国企）",
+      "sheet": "附注披露信息（国企）",
+      "account_codes": [
+        "6702"
+      ],
+      "cells": [
+        {
+          "cell_ref": "信用减值损失_本期",
+          "description": "披露表信用减值损失本期发生额",
+          "formula": "=TB('6702','本期发生额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "信用减值损失_上期",
+          "description": "披露表信用减值损失上期发生额",
+          "formula": "=PREV('G14','审定表G14-1','信用减值损失_本期')",
+          "formula_type": "PREV"
+        },
+        {
+          "cell_ref": "审定表核对",
+          "description": "从审定表G14-1取期末审定合计（勾稽用）",
+          "formula": "=WP('G14','审定表G14-1','审定合计_期末')",
+          "formula_type": "WP"
+        }
+      ]
+    },
+    {
+      "wp_code": "G2",
+      "wp_name": "应收利息披露（上市）",
+      "sheet": "附注披露信息（上市公司）",
+      "account_codes": [
+        "1132"
+      ],
+      "cells": [
+        {
+          "cell_ref": "应收利息_期末",
+          "description": "披露表应收利息期末余额",
+          "formula": "=TB('1132','期末余额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "应收利息_期初",
+          "description": "披露表应收利息期初余额",
+          "formula": "=TB('1132','期初余额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "审定表核对",
+          "description": "从审定表G2-1取期末审定合计（勾稽用）",
+          "formula": "=WP('G2','审定表G2-1','审定合计_期末')",
+          "formula_type": "WP"
+        }
+      ]
+    },
+    {
+      "wp_code": "G2",
+      "wp_name": "应收利息披露（国企）",
+      "sheet": "附注披露信息（国企）",
+      "account_codes": [
+        "1132"
+      ],
+      "cells": [
+        {
+          "cell_ref": "应收利息_期末",
+          "description": "披露表应收利息期末余额",
+          "formula": "=TB('1132','期末余额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "应收利息_期初",
+          "description": "披露表应收利息期初余额",
+          "formula": "=TB('1132','期初余额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "审定表核对",
+          "description": "从审定表G2-1取期末审定合计（勾稽用）",
+          "formula": "=WP('G2','审定表G2-1','审定合计_期末')",
+          "formula_type": "WP"
+        }
+      ]
+    },
+    {
+      "wp_code": "G3",
+      "wp_name": "应收股利披露（上市）",
+      "sheet": "附注披露信息（上市公司）",
+      "account_codes": [
+        "1131"
+      ],
+      "cells": [
+        {
+          "cell_ref": "应收股利_期末",
+          "description": "披露表应收股利期末余额",
+          "formula": "=TB('1131','期末余额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "应收股利_期初",
+          "description": "披露表应收股利期初余额",
+          "formula": "=TB('1131','期初余额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "审定表核对",
+          "description": "从审定表G3-1取期末审定合计（勾稽用）",
+          "formula": "=WP('G3','审定表G3-1','审定合计_期末')",
+          "formula_type": "WP"
+        }
+      ]
+    },
+    {
+      "wp_code": "G3",
+      "wp_name": "应收股利披露（国企）",
+      "sheet": "附注披露信息（国企）",
+      "account_codes": [
+        "1131"
+      ],
+      "cells": [
+        {
+          "cell_ref": "应收股利_期末",
+          "description": "披露表应收股利期末余额",
+          "formula": "=TB('1131','期末余额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "应收股利_期初",
+          "description": "披露表应收股利期初余额",
+          "formula": "=TB('1131','期初余额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "审定表核对",
+          "description": "从审定表G3-1取期末审定合计（勾稽用）",
+          "formula": "=WP('G3','审定表G3-1','审定合计_期末')",
+          "formula_type": "WP"
+        }
+      ]
+    },
+    {
+      "wp_code": "G4",
+      "wp_name": "债权投资披露（上市）",
+      "sheet": "附注披露信息（上市公司）",
+      "account_codes": [
+        "1504",
+        "1505"
+      ],
+      "cells": [
+        {
+          "cell_ref": "债权投资_期末",
+          "description": "披露表债权投资期末余额",
+          "formula": "=TB('1504','期末余额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "债权投资_期初",
+          "description": "披露表债权投资期初余额",
+          "formula": "=TB('1504','期初余额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "债权投资减值准备_期末",
+          "description": "披露表债权投资减值准备期末余额",
+          "formula": "=TB('1505','期末余额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "债权投资减值准备_期初",
+          "description": "披露表债权投资减值准备期初余额",
+          "formula": "=TB('1505','期初余额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "审定表核对",
+          "description": "从审定表G4-1取期末审定合计（勾稽用）",
+          "formula": "=WP('G4','审定表G4-1','审定合计_期末')",
+          "formula_type": "WP"
+        }
+      ]
+    },
+    {
+      "wp_code": "G4",
+      "wp_name": "债权投资披露（国企）",
+      "sheet": "附注披露信息（国企）",
+      "account_codes": [
+        "1504",
+        "1505"
+      ],
+      "cells": [
+        {
+          "cell_ref": "债权投资_期末",
+          "description": "披露表债权投资期末余额",
+          "formula": "=TB('1504','期末余额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "债权投资_期初",
+          "description": "披露表债权投资期初余额",
+          "formula": "=TB('1504','期初余额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "债权投资减值准备_期末",
+          "description": "披露表债权投资减值准备期末余额",
+          "formula": "=TB('1505','期末余额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "债权投资减值准备_期初",
+          "description": "披露表债权投资减值准备期初余额",
+          "formula": "=TB('1505','期初余额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "审定表核对",
+          "description": "从审定表G4-1取期末审定合计（勾稽用）",
+          "formula": "=WP('G4','审定表G4-1','审定合计_期末')",
+          "formula_type": "WP"
+        }
+      ]
+    },
+    {
+      "wp_code": "G6",
+      "wp_name": "其他债权投资披露（上市）",
+      "sheet": "附注披露信息（上市公司）",
+      "account_codes": [
+        "1506"
+      ],
+      "cells": [
+        {
+          "cell_ref": "其他债权投资_期末",
+          "description": "披露表其他债权投资期末余额",
+          "formula": "=TB('1506','期末余额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "其他债权投资_期初",
+          "description": "披露表其他债权投资期初余额",
+          "formula": "=TB('1506','期初余额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "审定表核对",
+          "description": "从审定表G6-1取期末审定合计（勾稽用）",
+          "formula": "=WP('G6','审定表G6-1','审定合计_期末')",
+          "formula_type": "WP"
+        }
+      ]
+    },
+    {
+      "wp_code": "G6",
+      "wp_name": "其他债权投资披露（国企）",
+      "sheet": "附注披露信息（国企）",
+      "account_codes": [
+        "1506"
+      ],
+      "cells": [
+        {
+          "cell_ref": "其他债权投资_期末",
+          "description": "披露表其他债权投资期末余额",
+          "formula": "=TB('1506','期末余额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "其他债权投资_期初",
+          "description": "披露表其他债权投资期初余额",
+          "formula": "=TB('1506','期初余额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "审定表核对",
+          "description": "从审定表G6-1取期末审定合计（勾稽用）",
+          "formula": "=WP('G6','审定表G6-1','审定合计_期末')",
+          "formula_type": "WP"
+        }
+      ]
+    },
+    {
+      "wp_code": "G7",
+      "wp_name": "长期股权投资披露（上市）",
+      "sheet": "附注披露信息（上市公司）",
+      "account_codes": [
+        "1511",
+        "1512"
+      ],
+      "cells": [
+        {
+          "cell_ref": "长期股权投资_期末",
+          "description": "披露表长期股权投资期末余额",
+          "formula": "=TB('1511','期末余额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "长期股权投资_期初",
+          "description": "披露表长期股权投资期初余额",
+          "formula": "=TB('1511','期初余额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "长期股权投资减值准备_期末",
+          "description": "披露表长期股权投资减值准备期末余额",
+          "formula": "=TB('1512','期末余额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "长期股权投资减值准备_期初",
+          "description": "披露表长期股权投资减值准备期初余额",
+          "formula": "=TB('1512','期初余额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "审定表核对",
+          "description": "从长期股权投资审定表G7-1取期末审定合计（勾稽用）",
+          "formula": "=WP('G7','长期股权投资审定表G7-1','审定合计_期末')",
+          "formula_type": "WP"
+        }
+      ]
+    },
+    {
+      "wp_code": "G7",
+      "wp_name": "长期股权投资披露（国企）",
+      "sheet": "附注披露信息（国企）",
+      "account_codes": [
+        "1511",
+        "1512"
+      ],
+      "cells": [
+        {
+          "cell_ref": "长期股权投资_期末",
+          "description": "披露表长期股权投资期末余额",
+          "formula": "=TB('1511','期末余额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "长期股权投资_期初",
+          "description": "披露表长期股权投资期初余额",
+          "formula": "=TB('1511','期初余额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "长期股权投资减值准备_期末",
+          "description": "披露表长期股权投资减值准备期末余额",
+          "formula": "=TB('1512','期末余额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "长期股权投资减值准备_期初",
+          "description": "披露表长期股权投资减值准备期初余额",
+          "formula": "=TB('1512','期初余额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "审定表核对",
+          "description": "从长期股权投资审定表G7-1取期末审定合计（勾稽用）",
+          "formula": "=WP('G7','长期股权投资审定表G7-1','审定合计_期末')",
+          "formula_type": "WP"
+        }
+      ]
+    },
+    {
+      "wp_code": "G8",
+      "wp_name": "其他权益工具投资披露（上市）",
+      "sheet": "附注披露信息（上市公司）",
+      "account_codes": [
+        "1507"
+      ],
+      "cells": [
+        {
+          "cell_ref": "其他权益工具投资_期末",
+          "description": "披露表其他权益工具投资期末余额",
+          "formula": "=TB('1507','期末余额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "其他权益工具投资_期初",
+          "description": "披露表其他权益工具投资期初余额",
+          "formula": "=TB('1507','期初余额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "审定表核对",
+          "description": "从审定表G8-1取期末审定合计（勾稽用）",
+          "formula": "=WP('G8','审定表G8-1','审定合计_期末')",
+          "formula_type": "WP"
+        }
+      ]
+    },
+    {
+      "wp_code": "G8",
+      "wp_name": "其他权益工具投资披露（国企）",
+      "sheet": "附注披露信息（国企）",
+      "account_codes": [
+        "1507"
+      ],
+      "cells": [
+        {
+          "cell_ref": "其他权益工具投资_期末",
+          "description": "披露表其他权益工具投资期末余额",
+          "formula": "=TB('1507','期末余额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "其他权益工具投资_期初",
+          "description": "披露表其他权益工具投资期初余额",
+          "formula": "=TB('1507','期初余额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "审定表核对",
+          "description": "从审定表G8-1取期末审定合计（勾稽用）",
+          "formula": "=WP('G8','审定表G8-1','审定合计_期末')",
+          "formula_type": "WP"
+        }
+      ]
+    },
+    {
+      "wp_code": "G9",
+      "wp_name": "其他非流动金融资产披露（上市）",
+      "sheet": "附注披露信息（上市公司）",
+      "account_codes": [
+        "1519"
+      ],
+      "cells": [
+        {
+          "cell_ref": "其他非流动金融资产_期末",
+          "description": "披露表其他非流动金融资产期末余额",
+          "formula": "=TB('1519','期末余额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "其他非流动金融资产_期初",
+          "description": "披露表其他非流动金融资产期初余额",
+          "formula": "=TB('1519','期初余额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "审定表核对",
+          "description": "从审定表G9-1取期末审定合计（勾稽用）",
+          "formula": "=WP('G9','审定表G9-1','审定合计_期末')",
+          "formula_type": "WP"
+        }
+      ]
+    },
+    {
+      "wp_code": "G9",
+      "wp_name": "其他非流动金融资产披露（国企）",
+      "sheet": "附注披露信息（国企）",
+      "account_codes": [
+        "1519"
+      ],
+      "cells": [
+        {
+          "cell_ref": "其他非流动金融资产_期末",
+          "description": "披露表其他非流动金融资产期末余额",
+          "formula": "=TB('1519','期末余额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "其他非流动金融资产_期初",
+          "description": "披露表其他非流动金融资产期初余额",
+          "formula": "=TB('1519','期初余额')",
+          "formula_type": "TB"
+        },
+        {
+          "cell_ref": "审定表核对",
+          "description": "从审定表G9-1取期末审定合计（勾稽用）",
+          "formula": "=WP('G9','审定表G9-1','审定合计_期末')",
+          "formula_type": "WP"
+        }
+      ]
+    },
+    {
+      "wp_code": "N2",
+      "sheet": "附注披露信息（上市公司）",
+      "wp_name": "应交税费附注披露（上市）",
+      "description": "从 N2-1 审定表取各税种期末审定数与期初，填入上市披露表。源模板公式 ='应交税费审定表N2-1'!I7~I19（审定数）、E7~E19（期初）。",
+      "cells": [
+        {
+          "cell_ref": "税种期末审定数",
+          "formula": "WP('N2','应交税费审定表N2-1','期末审定数')",
+          "formula_type": "WP",
+          "description": "各税种期末审定数（源模板 R8~R22 从 N2-1 的 I 列取值）"
+        },
+        {
+          "cell_ref": "上年年末余额",
+          "formula": "PREV('N2','附注披露信息（上市公司）','期末余额')",
+          "formula_type": "PREV",
+          "description": "上年年末余额 = 上年同期的期末审定数"
+        }
+      ]
+    },
+    {
+      "wp_code": "N2",
+      "sheet": "附注披露信息（国企）",
+      "wp_name": "应交税费附注披露（国企）",
+      "description": "从 N2-2 明细表取各税种期初/本期应交/本期已交，填入国企披露表。源模板公式 ='应交税费明细表N2-2'!M10~M22/N/O。期末=期初+本期应交-本期已交。",
+      "cells": [
+        {
+          "cell_ref": "期初余额",
+          "formula": "WP('N2','应交税费明细表N2-2','期初余额')",
+          "formula_type": "WP",
+          "description": "各税种期初余额（N2-2 M 列）"
+        },
+        {
+          "cell_ref": "本期应交",
+          "formula": "WP('N2','应交税费明细表N2-2','本期应交')",
+          "formula_type": "WP",
+          "description": "各税种本期应交金额（N2-2 N 列）"
+        },
+        {
+          "cell_ref": "本期已交",
+          "formula": "WP('N2','应交税费明细表N2-2','本期已交')",
+          "formula_type": "WP",
+          "description": "各税种本期已交金额（N2-2 O 列）"
+        }
+      ]
+    },
+    {
+      "wp_code": "N4",
+      "sheet": "附注披露信息（上市公司）",
+      "wp_name": "税金及附加附注披露（上市）",
+      "description": "从 N4-1 审定表取各税种本期审定数，上期由 PREV 取。源模板公式 ='税金及附加审定表N4-1'!I7~I14（本期审定）、E7~E14（上期）。",
+      "cells": [
+        {
+          "cell_ref": "本期发生额",
+          "formula": "WP('N4','税金及附加审定表N4-1','本期审定数')",
+          "formula_type": "WP",
+          "description": "各税种本期发生额（N4-1 I 列审定数）"
+        },
+        {
+          "cell_ref": "上期发生额",
+          "formula": "PREV('N4','附注披露信息（上市公司）','本期发生额')",
+          "formula_type": "PREV",
+          "description": "上期发生额 = 上年同期的本期审定数"
+        }
+      ]
+    },
+    {
+      "wp_code": "N5",
+      "sheet": "附注披露信息（上市公司）",
+      "wp_name": "所得税费用附注披露（上市）",
+      "description": "表(1)从 N5-1 取当期/递延两行；表(2)从 N5-2 取利润总额到所得税调整项12行。源模板 R9~R10 公式 ='所得税费用审定表N5-1'!I7/I8；R14~R25 公式 ='所得税费用明细表N5-2'!A9~A20/B/D。",
+      "cells": [
+        {
+          "cell_ref": "当期所得税本期发生额",
+          "formula": "WP('N5','所得税费用审定表N5-1','当期所得税审定数')",
+          "formula_type": "WP",
+          "description": "表(1) R9 当期所得税（N5-1 I7）"
+        },
+        {
+          "cell_ref": "递延所得税本期发生额",
+          "formula": "WP('N5','所得税费用审定表N5-1','递延所得税审定数')",
+          "formula_type": "WP",
+          "description": "表(1) R10 递延所得税费用（N5-1 I8）"
+        },
+        {
+          "cell_ref": "利润总额到所得税调整项",
+          "formula": "WP('N5','所得税费用明细表N5-2','各行利润到所得税调整')",
+          "formula_type": "WP",
+          "description": "表(2) R14~R25 调整明细（N5-2 A9~A20 行标签 + B/D 金额）"
+        },
+        {
+          "cell_ref": "上期发生额",
+          "formula": "PREV('N5','附注披露信息（上市公司）','本期发生额')",
+          "formula_type": "PREV",
+          "description": "上期发生额"
+        }
+      ]
+    },
+    {
+      "wp_code": "N5",
+      "sheet": "附注披露信息（国企",
+      "wp_name": "所得税费用附注披露（国企）",
+      "description": "表(1)从 N5-1 取当期/递延/其他三行；表(2)从 N5-2 取14行调整项。源模板 R8~R10 公式 ='所得税费用审定表N5-1'!I7/I8；R15~R28 公式 ='所得税费用明细表N5-2'!A9~A22/B/D。",
+      "cells": [
+        {
+          "cell_ref": "当期所得税费用本期",
+          "formula": "WP('N5','所得税费用审定表N5-1','当期所得税审定数')",
+          "formula_type": "WP",
+          "description": "表(1) R8 当期所得税费用"
+        },
+        {
+          "cell_ref": "递延所得税调整本期",
+          "formula": "WP('N5','所得税费用审定表N5-1','递延所得税审定数')",
+          "formula_type": "WP",
+          "description": "表(1) R9 递延所得税调整"
+        },
+        {
+          "cell_ref": "会计利润与所得税调整项",
+          "formula": "WP('N5','所得税费用明细表N5-2','各行利润到所得税调整')",
+          "formula_type": "WP",
+          "description": "表(2) R15~R28 调整明细（N5-2 A9~A22 行标签 + B/D 金额）"
+        },
+        {
+          "cell_ref": "上期发生额",
+          "formula": "PREV('N5','附注披露信息（国企','本期发生额')",
+          "formula_type": "PREV",
+          "description": "上期发生额"
+        }
+      ]
     }
   ]
 }

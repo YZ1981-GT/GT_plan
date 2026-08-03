@@ -40,14 +40,14 @@ from app.services.dataset_query import get_active_filter
 from app.services.four_table import (
     build_g_adjudication_prefill,
     LeafRow,
-    ReportLineAccountSpec,
     aggregate_leaves,
     filter_by_prefixes,
     parent_totals,
-    resolve_report_line_accounts,
+    resolve_semantic_accounts,
     select_leaves,
     to_leaf_rows,
 )
+from app.services.four_table.g_cycle_specs import G1_SPEC
 
 from ._context import RenderContext
 
@@ -57,15 +57,10 @@ logger = logging.getLogger(__name__)
 # 科目定位规格（单一真源）
 # ─────────────────────────────────────────────────────────────────────────────
 
-G1_ACCOUNT_SPEC = ReportLineAccountSpec(
-    row_code="BS-003",            # 交易性金融资产，四准则一致 TB('1101','期末余额')
-    fallback_gross=("1101",),     # 无 account_mapping 时的兜底前缀
-    # 交易性金融资产无备抵（以公允价值计量，不计提减值准备）
-)
-
-#: 衍生金融资产报表行（G1 底稿同时管理 1101 交易性 + 1102 衍生）
-_G1_DERIVATIVE_ROW_CODE = "BS-004"
-_G1_DERIVATIVE_FALLBACK = ("1102",)
+#: 科目定位改走**语义驱动**（单一真源 `four_table/g_cycle_specs.G1_SPEC`）。
+#: G1 底稿同时管理交易性金融资产（1101）与衍生金融资产（1102），
+#: G1_SPEC 声明了双槽 `gross`（交易性金融资产）+ `derivative`（衍生金融资产）。
+G1_ACCOUNT_SPEC = G1_SPEC
 
 # EventBus 审定值持久化的独立 item_id（render 回读 seed）
 _ADJUDICATED_ITEM_ID = "G1-1-adjudicated-amount"
@@ -147,16 +142,17 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict:
     result: dict = {"tb_values": {}, "tb_source_codes": {}, "adjudication_prefill": {}}
 
     try:
-        # Step 1: 解析报表行 → 科目码（ctx 即 RenderContext，内含 db/project_id）
-        accounts = await resolve_report_line_accounts(ctx, G1_ACCOUNT_SPEC)
+        # Step 1: 解析科目码（语义驱动，逐项目定位）
+        accounts = await resolve_semantic_accounts(ctx, G1_ACCOUNT_SPEC)
 
         # Step 2: 从 tb_balance 取所有相关行
         active_filter = await get_active_filter(
             ctx.db, TbBalance.__table__, ctx.project_id, ctx.year
         )
-        # 用原始码前缀集查询
-        query_prefixes = accounts.gross if accounts.gross else list(G1_ACCOUNT_SPEC.fallback_gross)
+        # 用原始码前缀集查询（语义解析件返 codes_of）
+        query_prefixes = accounts.codes_of("gross")
         if not query_prefixes:
+            result["tb_source_codes"] = accounts.as_dict()
             return result
 
         # 构建 OR 条件：code == prefix OR code LIKE 'prefix.%'
