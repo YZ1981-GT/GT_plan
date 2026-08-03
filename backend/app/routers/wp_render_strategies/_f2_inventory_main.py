@@ -28,7 +28,15 @@ logger = logging.getLogger(__name__)
 #:   → **不存在一组写死就对的编码**。归集判据见
 #:   `app.services.f2_extraction.category_rules.classify_f2_leaf`（按**科目名称**）。
 #:
+#: 2026-08-03 修正两处**全库零命中**的码（连 `is_deleted=true` 的行也没有 →
+#:   声明它们连「展示」都不成立）：`合同履约成本` `1410`→`1472`、
+#:   `商品进销差价` `1412`→`1408`。存在性由
+#:   `backend/tests/four_table/test_f2_display_account_codes.py` 钉死。
+#:   🔴 修正只作用于展示 / 兜底元数据，取数真源仍是 `classify_f2_leaf`（按名称），
+#:   不得据此把取数改回按码。
+#:
 #: spec: .kiro/specs/f2-inventory-account-mapping-and-linkage/
+#:       .kiro/specs/semantic-account-resolver-full-rollout/ (Task 29)
 F2_CATEGORIES = [
     {"rowKey": "raw-materials", "label": "原材料", "account": "1401"},
     {"rowKey": "material-in-transit", "label": "材料采购在途", "account": "1402"},
@@ -39,9 +47,16 @@ F2_CATEGORIES = [
     {"rowKey": "goods-in-transit", "label": "发出商品", "account": "1407"},
     {"rowKey": "dev-products", "label": "开发产品", "account": "1408"},
     {"rowKey": "dev-costs", "label": "开发成本", "account": "1409"},
-    {"rowKey": "contract-performance", "label": "合同履约成本", "account": "1410"},
+    # `合同履约成本` 只在 CAS 2006 变体里有一级码 `1472`（`standard` 6 个项目实证）；
+    # 旧变体没有该科目 → 取数仍靠名称归类，此处只是展示 / 兜底。
+    {"rowKey": "contract-performance", "label": "合同履约成本", "account": "1472"},
     {"rowKey": "consumable-bio", "label": "消耗性生物资产", "account": "1411"},
-    {"rowKey": "price-difference", "label": "商品进销差价", "account": "1412"},
+    # 🔴 `商品进销差价` **项目间不一致**：`1408`（旧变体，client 4 / standard 3 项目）
+    #    与 `1407`（CAS 2006 变体，client 1 / standard 5 项目）两个码都真实存在。
+    #    此处取 client 表多数口径 `1408`，**仅展示**（client 表恒为会计口径）。
+    #    与上方 `dev-products` 同为 `1408` 是展示元数据的已知重叠 —— `开发产品`
+    #    在 `account_chart` 全库任何码都查不到（房企专用类别），故不占用真码。
+    {"rowKey": "price-difference", "label": "商品进销差价", "account": "1408"},
     {"rowKey": "impairment-provision", "label": "存货跌价准备", "account": "1471"},
 ]
 

@@ -53,7 +53,11 @@ N1_SPEC = SemanticAccountSpec(
 )
 
 N2_SPEC = SemanticAccountSpec(
-    row_code="BS-052",
+    # 🔴 2026-08-03 修正：原写 `BS-052` 实为**一年内到期的非流动负债**
+    # （公式 `TB('2501')` = 长期借款，本身也是 `report_config` 的一处错码）
+    # → 单槽规格下层③会把应交税费静默解析成 2501 长期借款。
+    # 应交税费真实行 = `BS-049` = `TB('2221')`，与本槽兜底码一致（2221 双表 8/10 项目对账通过）。
+    row_code="BS-049",
     slots=(
         SemanticAccountSlot(
             key="gross", names=("应交税费",),

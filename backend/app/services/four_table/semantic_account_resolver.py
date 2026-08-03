@@ -130,11 +130,31 @@ class SemanticAccountSpec:
         slots: 语义槽集合，顺序即展示顺序。
         legacy_standard_names: 同族**旧准则**科目名。命中时不并入任何槽，
             只放 ``unmapped_candidates`` 提示需人工映射（见模块 docstring 的边界说明）。
+        trust_report_config: 是否允许**层③（报表公式给的码）**参与定位。
+
+            默认 ``True``。声明 ``False`` 用于「该报表行的公式已被 DB 实证为错码」
+            的场景 —— 此时 ``row_code`` 仍要如实填（溯源展示 + `conflicts` 检测靠它），
+            但**不得**用它的公式去定位科目。
+
+            🔴 **实证背景（2026-08-03，权益类 5 处错码）**::
+
+                BS-082 其他权益工具 = TB('4003')  ← 4003 实为「其他综合收益」
+                BS-085 其他综合收益 = TB('4102')  ← 4102 全库两张科目表都不存在
+                BS-086 专项储备     = TB('4103')  ← 4103 实为「本年利润」
+                BS-084 减：库存股   = TB('4005')  ← 4005 全库不存在（库存股是 4201）
+                BS-090 少数股东权益 = TB('4201')  ← 4201 实为「库存股」
+                EQ-015 （五）专项储备 = TB('4201') 增减 ← 同上
+
+            与已记录的 `BS-022/025/026` 连续偏移、`IS-016↔IS-017` 互换同族。
+            其中 `TB('4103')` 尤其危险：4103 **确实存在**于科目表（本年利润），
+            层③要求「码在本项目科目表里存在」这道闸拦不住它 → 会静默取到本年利润。
+            故对这些行必须显式关闭层③，靠层①②（按名称）+ 层④（自己声明的兜底码）。
     """
 
     row_code: str | None
     slots: tuple[SemanticAccountSlot, ...]
     legacy_standard_names: tuple[str, ...] = ()
+    trust_report_config: bool = True
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -605,7 +625,10 @@ async def resolve_semantic_accounts(
     #
     # 多槽规格下正确语义 = 槽要么按名称命中、要么用**自己声明的**兜底码（层④）、
     # 否则 `found=False` 由调用方显示「本项目无此科目」（宁缺勿造）。
-    allow_report_config_tier = len(spec.slots) == 1
+    #
+    # 第二道闸 `spec.trust_report_config`：该报表行公式已被实证为错码时显式关闭层③
+    # （权益类 5 处错码，见 `SemanticAccountSpec.trust_report_config` 文档）。
+    allow_report_config_tier = len(spec.slots) == 1 and spec.trust_report_config
 
     for slot in spec.slots:
         # ① 客户科目表按名称

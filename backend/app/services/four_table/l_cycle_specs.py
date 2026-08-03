@@ -61,13 +61,25 @@ L2_SPEC = SemanticAccountSpec(
     slots=(_liability("gross", ("应付利息",), ("2231",), "应付利息"),),
 )
 
+# 🔴 2026-08-03 修正：L3~L8 的 row_code 原本整体**偏移一位**（对账 `report_config`）——
+# L3 指的 `BS-060` 实为节标题「非流动负债：」、L4 指的 `BS-061` 实为长期借款、
+# L7 指的 `BS-066` 实为递延收益（K7 的行）、L8 指的 `IS-009` 实为利息收入。
+# 正确落点（均已 DB 对账，公式与本文件兜底码一致）::
+#     BS-060 非流动负债：（节标题，无公式）
+#     BS-061 长期借款      TB('2501')
+#     BS-062 应付债券      TB('2502')
+#     BS-063 租赁负债      TB('2601')-TB('2602')   ← H9
+#     BS-064 长期应付款    TB('2701')
+#     BS-065 预计负债      TB('2801')              ← K5
+#     BS-066 递延收益      TB('2811')              ← K7
+#     BS-068 其他非流动负债 TB('2911')
 L3_SPEC = SemanticAccountSpec(
-    row_code="BS-060",
+    row_code="BS-061",
     slots=(_liability("gross", ("长期借款",), ("2501",), "长期借款"),),
 )
 
 L4_SPEC = SemanticAccountSpec(
-    row_code="BS-061",
+    row_code="BS-062",
     slots=(_liability("gross", ("应付债券",), ("2502",), "应付债券"),),
 )
 
@@ -77,21 +89,24 @@ L5_SPEC = SemanticAccountSpec(
 )
 
 L6_SPEC = SemanticAccountSpec(
-    row_code="BS-065",
+    # 专项应付款在资产负债表**无独立行**（实务并入长期应付款 `BS-064`）——
+    # 原声明 `BS-065` 实为**预计负债**（K5 的行，公式 `TB('2801')`）→ 层③会取到 2801。
+    row_code=None,
     slots=(_liability("gross", ("专项应付款",), ("2711",), "专项应付款"),),
 )
 
 L7_SPEC = SemanticAccountSpec(
-    row_code="BS-066",
+    row_code="BS-068",  # 其他非流动负债 = TB('2911')（原写 BS-066 实为递延收益/K7）
     slots=(
         # 🔴 2801 已被 K5 预计负债认领（DB 实证：account_chart 5 条 / tb_balance 39 行）
-        #    其他非流动负债在实务中是**报表行**、由多个明细科目归集 → 宁缺勿造不给兜底码
+        #    其他非流动负债在实务中是**报表行**、由多个明细科目归集 → 宁缺勿造不给兜底码。
+        #    row_code 改正后层③可用 `BS-068` 的 `TB('2911')`（要求该码在本项目存在）。
         _liability("gross", ("其他非流动负债",), (), "其他非流动负债"),
     ),
 )
 
 L8_SPEC = SemanticAccountSpec(
-    row_code="IS-009",
+    row_code="IS-007",  # 财务费用 = TB('6603')（原写 IS-009 实为利息收入，公式 None）
     slots=(
         SemanticAccountSlot(
             key="gross", names=("财务费用",),

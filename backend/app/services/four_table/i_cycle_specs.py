@@ -80,18 +80,27 @@ I4_SPEC = SemanticAccountSpec(
 )
 
 I5_SPEC = SemanticAccountSpec(
-    row_code="BS-039",
+    # 🔴 2026-08-03 修正：原写 `BS-039` 实为**资产总计**（公式 `ROW('BS-015')+ROW('BS-038')`）。
+    # 其他非流动资产真实行 = `BS-037` = `TB('1911')`；`1911` 全库两张科目表都不存在
+    # → 层③找不到码，落回空兜底 → `found=False`（宁缺勿造），与改前行为等价但溯源如实。
+    row_code="BS-037",
     slots=(_gross("gross", ("其他非流动资产",), (), "其他非流动资产"),),
 )
 
 I6_SPEC = SemanticAccountSpec(
-    row_code="IS-007",
+    # 🔴 2026-08-03 修正：原写 `IS-007` 实为**财务费用**（公式 `TB('6603')`，L8 的行）
+    # → 单槽规格下层③会把研发费用静默解析成 6603 财务费用。
+    # 研发费用真实行 = `IS-006` = `TB('6604')`。
+    row_code="IS-006",
+    # 🔴 但**不信层③**：`6604` 在 `account_chart` 里 standard 侧 6 个项目叫「研发费用」，
+    #    client 侧有 1 个项目叫**「勘探费用」** → 对那个项目按 6604 取数会拿到勘探费用。
+    #    故只靠层①②（按科目名逐项目定位），名称不中就 `found=False`。
+    trust_report_config=False,
     slots=(
         SemanticAccountSlot(
             key="gross", names=("研发费用", "研究开发费用"),
             exclude_names=(),
-            # 🔴 不给兜底码：`6602` 是**管理费用**（已被 K9 按 DB 实证认领），
-            #    研发费用在本平台的标准码未经实证 → 宁缺勿造，靠科目名逐项目定位
+            # 不给兜底码，理由同上（`6602` 是管理费用，已被 K9 按 DB 实证认领）
             fallback_standard_codes=(),
             label="研发费用",
         ),
