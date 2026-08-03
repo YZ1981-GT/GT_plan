@@ -170,7 +170,7 @@
 
 ### Wave 3 — 批 3：H/I 循环
 
-- [ ] 13. 新建 `four_table/h_cycle_specs.py`（H1~H10）+ `i_cycle_specs.py`（I1~I6）
+- [x] 13. 新建 `four_table/h_cycle_specs.py`（H1~H10）+ `i_cycle_specs.py`（I1~I6）
   - H3 已有独立 `h3_account_scope.py`（4 槽：原值/累计折旧/累计摊销/减值准备），改 re-export
   - H1: `BS-028`（固定资产，含备抵 `IMP-010`?）
   - H2: `BS-029`（在建工程）
@@ -178,6 +178,7 @@
   - I 循环全部资产类（I1~I6：无形资产/开发支出/商誉/长期待摊/其他非流动资产/研发费用）
   - I6 损益类
   - _Requirements: 3.2, 3.3, 9.1~9.3_
+  - ✅ 实证：h_cycle_specs.py（并发会话已建，自带 DB 实证表）+ i_cycle_specs.py（本会话建，兜底码已按 postgres 双向对账修正：I2 1711→1704 / I3 1721→1711 / I5 撤兜底）
 
 - [ ] 14. 迁移 H 循环 8 策略（H1/H2/H5~H10，H3/H4 已在 `semantic_account_resolver`）
   - H10 损益类
@@ -195,11 +196,12 @@
 
 ### Wave 4 — 批 4：K 循环
 
-- [ ] 17. 新建 `four_table/k_cycle_specs.py`（K1~K13 统一）
+- [x] 17. 新建 `four_table/k_cycle_specs.py`（K1~K13 统一）
   - K1/K2 已有独立 `ReportLineAccountSpec`（在 `k1_account_scope.py`/`k2_account_scope.py`），收敛为 `SemanticAccountSpec` 并让旧文件 re-export 保兼容
   - K3~K7 负债类 `is_liability=True`
   - K8~K13 损益类，接 `pl_occurrence`
   - _Requirements: 3.4, 4.3_
+  - ✅ 实证：k_cycle_specs.py（并发会话已建，docstring 有三方交叉实证表）+ 本会话补 `to_semantic_spec()` / `semantic_spec_of()` 桥接
 
 - [ ] 18. 迁移 K 循环 13 策略
   - K1/K2 已在 `report_line_accounts`，改引 `k_cycle_specs`
@@ -213,11 +215,12 @@
 
 ### Wave 5 — 批 5：L/M 循环
 
-- [ ] 20. 新建 `four_table/l_cycle_specs.py`（L1~L8）+ `m_cycle_specs.py`（M1~M10）
+- [x] 20. 新建 `four_table/l_cycle_specs.py`（L1~L8）+ `m_cycle_specs.py`（M1~M10）
   - L 循环：**全部负债类** `is_liability=True`
   - L8 损益类（财务费用）
   - M 循环：**全部权益类** `is_liability=True`
   - _Requirements: 3.5, 3.6, 4.3_
+  - ✅ 实证：l_cycle_specs.py + m_cycle_specs.py（本会话建，兜底码已 DB 实证；L7 撤 2801 因与 K5 撞码 / M 循环 7 处码按实证改正 / M8 撤 4302 因全库零命中）
 
 - [ ] 21. 迁移 L 循环 8 策略（L1~L8）
   - L8 损益类
@@ -233,13 +236,14 @@
 
 ### Wave 6 — 批 6：N/J 循环 + 收口
 
-- [ ] 24. 新建 `four_table/n_cycle_specs.py`（N1~N5）
+- [x] 24. 新建 `four_table/n_cycle_specs.py`（N1~N5）
   - N1: `BS-036`=递延所得税资产 `TB('1811')`（+ 负债 `BS-067`=`TB('2901')`）
   - N2: 应交税费（非标准取数，子科目按税种名称归类）
   - N3: `BS-067`=递延所得税负债 `TB('2901')`
   - N4: 税金及附加（损益类）
   - N5: 所得税费用（损益类）
   - _Requirements: 3.7_
+  - ✅ 实证：n_cycle_specs.py（本会话建，N1~N5 兜底码 1811/2221/2901/6403/6801 全部 DB 对账通过）
 
 - [ ] 25. 迁移 N 循环 5 策略 + J 循环 2 策略
   - J1/J2 负债类 `is_liability=True`（应付职工薪酬/长期应付职工薪酬）
@@ -263,6 +267,28 @@
   - _Requirements: 5.4_
 
 ---
+
+### 🔴 迁移类任务（9/10/14/15/18/21/22/25）与其守卫（11/12/16/19/23）的处置
+
+**不是「还没做」，是 2026-08-03 postgres 对账后判定「不该机械做」**，依据三条：
+
+1. **买不到东西** —— 这些科目的标准码在项目间基本一致（如 K3 `2241` 在 10 个项目标准表
+   + 8 个客户表完全相同，零差异），语义定位与硬编码取到同一结果。
+2. **会丢变体行号** —— K 循环现走 `KCycleSpec.spec_for(standards)` 按 listed/soe 选
+   `row_code`（K5 是 `BS-068` vs `BS-094`）；`semantic_spec_of()` 桥接硬编码 `row_code_soe`
+   → 换过去对上市项目就是 regression。
+3. **下游属性不兼容** —— K3 有 4 个纯函数读 `accounts.gross` / `.gross_standard`
+   （`ReportLineAccounts` 字段），与本会话已弄坏并回退的 F1/F3/F4/F5 **完全同形**。
+
+**真该迁的是「码在项目间不一致 / 客户仍用旧准则科目」那些**。定名单的方法（未做）：
+把各策略**生产代码里的硬编码前缀**逐个按 `account_chart` 双向对账
+（本会话只对了 spec 声明的码，生产代码的前缀还没对）。已知候选信号：
+`4001`/`4101`/`4401`/`4301` 一码两义（client=会计口径 / standard=成本类口径，5 个项目
+走 standard 会取到生产成本·制造费用·工程施工·研发支出）。
+
+守卫部分**已由两个新文件实质覆盖**：
+- `test_render_fetch_smoke.py`(48 例) —— 43 个取数函数的 fail-open 检测
+- `test_cycle_specs_account_evidence.py`(138 例) —— 码↔名实证对账冻结
 
 ## Notes
 
