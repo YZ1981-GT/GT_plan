@@ -2573,3 +2573,20 @@ jobs:
       - run: pip install pytest -q
       - name: Render fetch smoke (fail-open detection)
         run: python -m pytest tests/four_table/test_render_fetch_smoke.py -v --tb=short
+
+
+  cycle-specs-account-evidence:
+    # per-cycle spec 兜底码 ↔ account_chart 实证对账（冻结 DB 实证结论，不连库）
+    # 抓的是「凭 CAS 常识写科目码」类缺陷：I2 写 1711(实为商誉) / I3 写 1721(全库不存在)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pytest -q
+      - name: Cycle specs account evidence
+        run: python -m pytest tests/four_table/test_cycle_specs_account_evidence.py -v --tb=short
