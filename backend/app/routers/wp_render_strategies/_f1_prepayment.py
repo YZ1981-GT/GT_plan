@@ -67,12 +67,11 @@ from app.services.four_table import (
     filter_by_code_specs,
     filter_by_prefixes,
     parent_totals,
-    resolve_semantic_accounts,
+    resolve_report_line_accounts,
     select_leaves,
     sql_prefixes_for_specs,
     to_leaf_rows,
 )
-from app.services.four_table.f_cycle_specs import F1_SPEC
 
 from ._context import RenderContext
 
@@ -220,7 +219,7 @@ def resolve_impairment_prefill(
 
 async def _resolve_f1_accounts(ctx: RenderContext) -> ReportLineAccounts:
     """解析 F1 原值 / 备抵科目（报表映射规则驱动；内部已 fail-open）。"""
-    return await resolve_semantic_accounts(ctx, F1_REPORT_LINE_SPEC)
+    return await resolve_report_line_accounts(ctx, F1_REPORT_LINE_SPEC)
 
 
 async def _resolve_line_codes(

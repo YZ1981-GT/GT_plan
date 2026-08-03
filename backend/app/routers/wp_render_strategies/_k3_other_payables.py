@@ -61,8 +61,6 @@ from app.services.four_table.tb_fetch import (
 )
 
 from ._context import RenderContext
-from app.services.four_table import resolve_semantic_accounts
-from app.services.four_table.k_cycle_specs import semantic_spec_of
 
 logger = logging.getLogger(__name__)
 
@@ -203,13 +201,6 @@ async def _load_related_parties(ctx: RenderContext) -> list[dict]:
 
 async def render(ctx: RenderContext) -> dict | None:
     """K3 其他应付款渲染策略：allResponses + projectContext + TB数据 + 取数溯源."""
-
-    # 科目定位（语义驱动，additive）
-    _sem_spec = semantic_spec_of("K3")
-    try:
-        _sem_accounts = await resolve_semantic_accounts(ctx, _sem_spec) if _sem_spec else None
-    except Exception:  # noqa: BLE001
-        _sem_accounts = None
 
     responses_snapshot = await load_responses_snapshot(ctx, "K3", limit=2000, label=_LABEL)
 

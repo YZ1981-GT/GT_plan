@@ -20,8 +20,6 @@ import sqlalchemy as sa
 from app.services.four_table.i_cycle_extraction import load_i_cycle_extraction
 
 from ._context import RenderContext
-from app.services.four_table import resolve_semantic_accounts
-from app.services.four_table.i_cycle_specs import I2_SPEC
 
 logger = logging.getLogger(__name__)
 
@@ -62,12 +60,6 @@ async def _fetch_tb_data(ctx: RenderContext):
     Returns:
         ``(tb_values, extraction)`` —— `tb_values` 键名与改造前逐字一致（前端零改动）。
     """
-
-    # 科目定位（语义驱动）
-    try:
-        _sem_accounts = await resolve_semantic_accounts(ctx, I2_SPEC)
-    except Exception:  # noqa: BLE001
-        _sem_accounts = None
 
     try:
         extraction = await load_i_cycle_extraction(ctx, "I2")

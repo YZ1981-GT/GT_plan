@@ -2,7 +2,8 @@
 
 🔴 M 循环**全部为权益类**（`is_liability=True`）—— 原值贷方，不做备抵拆分。
 
-科目映射真源 = `report_config` DB 实证 + `m-cycle-four-table-…` spec：
+科目映射真源 = **平台 DB 实证值**（取自各 render 策略里 `m-cycle-…` spec Wave 1
+已做真实 DB 核对并 push 的 `_MX_ACCOUNT_CODE` 常量）：
   M1  应付股利 `BS-048` = `TB('2232')`（负债类）
   M2  实收资本 `BS-070` = `TB('4001')`
   M3  库存股   `BS-071` = `TB('4002')`（借方，唯一例外）
@@ -15,6 +16,12 @@
   M10 其他权益工具 `BS-077` = `TB('4301')`
 
 spec: .kiro/specs/semantic-account-resolver-full-rollout/
+
+.. warning::
+   🔴 **本文件的兜底码尚未逐项 DB 实证**（未核 `report_config` / `account_chart` /
+   `tb_balance` 三方）。当前**没有任何 render 策略用它驱动取数**，故不影响运行。
+   接线前必须逐个循环按平台铁律核对真源，否则会重演「取错整个科目族」级缺陷
+   （已实证教训：本文件 M 循环 7/7 兜底码曾与平台实证值全不符，已按 DB 值修正）。
 """
 from __future__ import annotations
 
@@ -41,17 +48,17 @@ M2_SPEC = SemanticAccountSpec(
 
 M3_SPEC = SemanticAccountSpec(
     row_code="BS-071",
-    slots=(_equity("gross", ("库存股",), ("4002",), "库存股"),),
+    slots=(_equity("gross", ("库存股",), ("4201",), "库存股"),),
 )
 
 M4_SPEC = SemanticAccountSpec(
     row_code="BS-072",
-    slots=(_equity("gross", ("资本公积",), ("4101",), "资本公积"),),
+    slots=(_equity("gross", ("资本公积",), ("4002",), "资本公积"),),
 )
 
 M5_SPEC = SemanticAccountSpec(
     row_code="BS-074",
-    slots=(_equity("gross", ("盈余公积",), ("4102",), "盈余公积"),),
+    slots=(_equity("gross", ("盈余公积",), ("4101",), "盈余公积"),),
 )
 
 M6_SPEC = SemanticAccountSpec(
@@ -61,22 +68,22 @@ M6_SPEC = SemanticAccountSpec(
 
 M7_SPEC = SemanticAccountSpec(
     row_code="BS-075",
-    slots=(_equity("gross", ("专项储备",), ("4103",), "专项储备"),),
+    slots=(_equity("gross", ("专项储备",), ("4301",), "专项储备"),),
 )
 
 M8_SPEC = SemanticAccountSpec(
     row_code="BS-076",
-    slots=(_equity("gross", ("一般风险准备",), ("4201",), "一般风险准备"),),
+    slots=(_equity("gross", ("一般风险准备",), ("4302",), "一般风险准备"),),
 )
 
 M9_SPEC = SemanticAccountSpec(
     row_code="BS-073",
-    slots=(_equity("gross", ("其他综合收益",), ("4401",), "其他综合收益"),),
+    slots=(_equity("gross", ("其他综合收益",), ("4003",), "其他综合收益"),),
 )
 
 M10_SPEC = SemanticAccountSpec(
     row_code="BS-077",
-    slots=(_equity("gross", ("其他权益工具",), ("4301",), "其他权益工具"),),
+    slots=(_equity("gross", ("其他权益工具",), ("4401",), "其他权益工具"),),
 )
 
 

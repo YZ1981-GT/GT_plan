@@ -59,7 +59,6 @@ from app.services.four_table.report_line_accounts import (
 )
 
 from ._context import RenderContext
-from app.services.four_table.semantic_account_resolver import SemanticAccountSlot, SemanticAccountSpec, resolve_semantic_accounts
 
 logger = logging.getLogger(__name__)
 

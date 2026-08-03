@@ -6,9 +6,16 @@
   I3 `BS-034` = `TB('1721','期末余额')`（商誉）+ 备抵 `IMP-012`=`TB('1722')`
   I4 `BS-035` = `TB('1801','期末余额')`（长期待摊费用）
   I5 `BS-039` = `TB('1901','期末余额')`（其他非流动资产）— 🔴 与 K2 共用 1901
+  I6 研发费用 — 🔴 标准码未实证，不给兜底码（`6602` 是管理费用，属 K9）
   I6 研发费用（IS 行，损益类）
 
 spec: .kiro/specs/semantic-account-resolver-full-rollout/
+
+.. warning::
+   🔴 **本文件的兜底码尚未逐项 DB 实证**（未核 `report_config` / `account_chart` /
+   `tb_balance` 三方）。当前**没有任何 render 策略用它驱动取数**，故不影响运行。
+   接线前必须逐个循环按平台铁律核对真源，否则会重演「取错整个科目族」级缺陷
+   （已实证教训：本文件 M 循环 7/7 兜底码曾与平台实证值全不符，已按 DB 值修正）。
 """
 from __future__ import annotations
 
@@ -67,7 +74,11 @@ I6_SPEC = SemanticAccountSpec(
     slots=(
         SemanticAccountSlot(
             key="gross", names=("研发费用", "研究开发费用"),
-            exclude_names=(), fallback_standard_codes=("6602",), label="研发费用",
+            exclude_names=(),
+            # 🔴 不给兜底码：`6602` 是**管理费用**（已被 K9 按 DB 实证认领），
+            #    研发费用在本平台的标准码未经实证 → 宁缺勿造，靠科目名逐项目定位
+            fallback_standard_codes=(),
+            label="研发费用",
         ),
     ),
 )

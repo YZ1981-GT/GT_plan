@@ -41,8 +41,6 @@ from app.services.four_table.k_cycle_specs import K_CYCLE_SPECS
 from app.services.four_table.pl_render import render_pl_cycle
 
 from ._context import RenderContext
-from app.services.four_table import resolve_semantic_accounts
-from app.services.four_table.k_cycle_specs import semantic_spec_of
 
 K8_SPEC = K_CYCLE_SPECS["K8"]
 
@@ -91,13 +89,6 @@ K8_META = {
 
 async def render(ctx: RenderContext) -> dict | None:
     """K8 销售费用渲染策略：损益类取本期发生额（借方科目）+ 取数溯源."""
-
-    # 科目定位（语义驱动，additive）
-    _sem_spec = semantic_spec_of("K8")
-    try:
-        _sem_accounts = await resolve_semantic_accounts(ctx, _sem_spec) if _sem_spec else None
-    except Exception:  # noqa: BLE001
-        _sem_accounts = None
 
     return await render_pl_cycle(
         ctx,

@@ -24,8 +24,6 @@ import sqlalchemy as sa
 from app.services.four_table.i_cycle_extraction import load_i_cycle_extraction
 
 from ._context import RenderContext
-from app.services.four_table import resolve_semantic_accounts
-from app.services.four_table.i_cycle_specs import I6_SPEC
 
 logger = logging.getLogger(__name__)
 

@@ -30,8 +30,6 @@ from app.services.deferred_tax_shared import code_predicate, leaf_rows
 from app.services.report_account_mapping import resolve_report_line_account_codes
 
 from ._context import RenderContext
-from app.services.four_table import resolve_semantic_accounts
-from app.services.four_table.n_cycle_specs import N5_SPEC
 
 logger = logging.getLogger(__name__)
 
@@ -108,12 +106,6 @@ async def _fetch_tb_data(
         codes: 科目集（来自报表行 `IS-023` 规则映射）；缺省回退 `['6801']`。
     """
 
-    # 科目定位（语义驱动）
-    try:
-        _sem_accounts = await resolve_semantic_accounts(ctx, N5_SPEC)
-    except Exception:  # noqa: BLE001
-        _sem_accounts = None
-
     codes = [c for c in (codes or [_N5_ACCOUNT_CODE]) if str(c).strip()] or [
         _N5_ACCOUNT_CODE
     ]
@@ -145,10 +137,6 @@ async def _fetch_tb_data(
         result.update(await _fetch_period_amount(ctx, codes))
     except Exception as e:  # noqa: BLE001
         logger.warning("N5 render: TB 取数失败: %s", e)
-        if _sem_accounts:
-
-            result['tb_source_codes'] = _sem_accounts.as_dict()
-
     return result
 
 

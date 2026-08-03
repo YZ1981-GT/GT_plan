@@ -14,6 +14,12 @@ L8 财务费用为损益类。
   L8 财务费用（IS 行，损益类）
 
 spec: .kiro/specs/semantic-account-resolver-full-rollout/
+
+.. warning::
+   🔴 **本文件的兜底码尚未逐项 DB 实证**（未核 `report_config` / `account_chart` /
+   `tb_balance` 三方）。当前**没有任何 render 策略用它驱动取数**，故不影响运行。
+   接线前必须逐个循环按平台铁律核对真源，否则会重演「取错整个科目族」级缺陷
+   （已实证教训：本文件 M 循环 7/7 兜底码曾与平台实证值全不符，已按 DB 值修正）。
 """
 from __future__ import annotations
 
@@ -62,7 +68,11 @@ L6_SPEC = SemanticAccountSpec(
 
 L7_SPEC = SemanticAccountSpec(
     row_code="BS-066",
-    slots=(_liability("gross", ("其他非流动负债",), ("2801",), "其他非流动负债"),),
+    slots=(
+        # 🔴 2801 已被 K5 预计负债认领（DB 实证：account_chart 5 条 / tb_balance 39 行）
+        #    其他非流动负债在实务中是**报表行**、由多个明细科目归集 → 宁缺勿造不给兜底码
+        _liability("gross", ("其他非流动负债",), (), "其他非流动负债"),
+    ),
 )
 
 L8_SPEC = SemanticAccountSpec(

@@ -42,8 +42,6 @@ from app.services.four_table.report_line_accounts import (
 )
 
 from ._context import RenderContext
-from app.services.four_table import resolve_semantic_accounts
-from app.services.four_table.j_cycle_account_scope import j_semantic_spec_of
 
 logger = logging.getLogger(__name__)
 
@@ -289,13 +287,6 @@ async def render(ctx: RenderContext) -> dict | None:
     负债类贷方：从 trial_balance 读取 2221 余额，
     从 checklist_responses 读取精算假设、ISA620评估、审定表数据。
     """
-
-    # 科目定位（语义驱动，additive）
-    _sem_spec = j_semantic_spec_of("J2")
-    try:
-        _sem_accounts = await resolve_semantic_accounts(ctx, _sem_spec) if _sem_spec else None
-    except Exception:  # noqa: BLE001
-        _sem_accounts = None
 
     responses_snapshot: dict = {}
     tb_data: dict = {}

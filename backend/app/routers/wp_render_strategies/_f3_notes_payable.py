@@ -45,10 +45,9 @@ from app.services.four_table import (
     fetch_trial_balance_amounts,
     leaf_sign_map,
     resolve_leaf_totals,
-    resolve_semantic_accounts,
+    resolve_report_line_accounts,
     select_leaves,
 )
-from app.services.four_table.f_cycle_specs import F3_SPEC
 from app.services.four_table.f3_note_categories import (
     build_f3_bucket_prefill,
     build_f3_leaf_categories,
@@ -74,7 +73,13 @@ F3_SHEETS = [
 
 #: 应付票据科目定位规格。``BS-044`` 在四准则下公式一致（``TB('2201','期末余额')``）；
 #: 无备抵科目（应付票据是负债，不计提减值），故不声明 ``fallback_provision``。
-F3_ACCOUNT_SPEC = F3_SPEC
+F3_ACCOUNT_SPEC = ReportLineAccountSpec(
+    row_code="BS-044",
+    fallback_gross=("2201",),
+    # 🔴 负债类必须声明 —— 否则 `split_gross_provision` 按「credit 即备抵」把 2201
+    #   判成备抵科目，`gross_standard` 为空 → resolved_from 退化成 fallback。
+    gross_direction="credit",
+)
 
 #: 兜底科目码（仅 `report_config` 解析失败时用；**不得**作为查询主路径）
 _F3_FALLBACK_CODE = "2201"
@@ -226,7 +231,7 @@ def build_f3_leaf_category_payload(
 
 async def _resolve_f3_accounts(ctx: RenderContext) -> ReportLineAccounts:
     """解析 F3 科目（报表映射规则驱动；共享件内部已 fail-open）。"""
-    return await resolve_semantic_accounts(ctx, F3_ACCOUNT_SPEC)
+    return await resolve_report_line_accounts(ctx, F3_ACCOUNT_SPEC)
 
 
 def _primary_code(accounts: ReportLineAccounts) -> str:
