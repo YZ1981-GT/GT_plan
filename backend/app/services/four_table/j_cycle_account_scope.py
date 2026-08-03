@@ -577,6 +577,49 @@ def select_scope_leaves(rows, prefixes) -> list:
     return out
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# SemanticAccountSpec 声明（供 resolve_semantic_accounts 使用）
+# ─────────────────────────────────────────────────────────────────────────────
+
+from .semantic_account_resolver import SemanticAccountSlot, SemanticAccountSpec
+
+J1_SEMANTIC_SPEC = SemanticAccountSpec(
+    row_code="BS-069",  # 国企行号（在册项目绝大多数是 soe）
+    slots=(
+        SemanticAccountSlot(
+            key="gross",
+            names=("应付职工薪酬", "短期应付职工薪酬"),
+            exclude_names=(),
+            fallback_standard_codes=("2211",),
+            label="应付职工薪酬",
+        ),
+    ),
+)
+
+J2_SEMANTIC_SPEC = SemanticAccountSpec(
+    row_code="BS-093",  # 国企行号
+    slots=(
+        SemanticAccountSlot(
+            key="gross",
+            names=("长期应付职工薪酬",),
+            exclude_names=(),
+            fallback_standard_codes=("2705",),
+            label="长期应付职工薪酬",
+        ),
+    ),
+)
+
+
+def j_semantic_spec_of(wp_code: str) -> SemanticAccountSpec | None:
+    """按 wp_code 取 J 循环的 SemanticAccountSpec。"""
+    code = str(wp_code or "").strip().upper()
+    if code == "J1":
+        return J1_SEMANTIC_SPEC
+    if code == "J2":
+        return J2_SEMANTIC_SPEC
+    return None
+
+
 __all__ = [
     "CAT_POST_EMPLOYMENT",
     "CAT_SEVERANCE",

@@ -262,6 +262,39 @@ def no_account_cycle_codes() -> list[str]:
     return [c for c, s in K_CYCLE_SPECS.items() if not s.has_account]
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# SemanticAccountSpec 转换（供 resolve_semantic_accounts 调用方使用）
+# ─────────────────────────────────────────────────────────────────────────────
+
+from .semantic_account_resolver import SemanticAccountSlot, SemanticAccountSpec
+
+_PROVISION_WORDS = ("减值准备", "坏账准备", "跌价准备")
+
+
+def to_semantic_spec(kspec: KCycleSpec) -> SemanticAccountSpec:
+    """将 KCycleSpec → SemanticAccountSpec（用于 resolve_semantic_accounts）。"""
+    return SemanticAccountSpec(
+        row_code=kspec.row_code_soe,  # 默认用国企行号（在册项目绝大多数是 soe）
+        slots=(
+            SemanticAccountSlot(
+                key="gross",
+                names=(kspec.account_name,),
+                exclude_names=_PROVISION_WORDS,
+                fallback_standard_codes=(kspec.fallback_standard,) if kspec.fallback_standard else (),
+                label=kspec.account_name,
+            ),
+        ),
+    )
+
+
+def semantic_spec_of(wp_code: str) -> SemanticAccountSpec | None:
+    """按 wp_code 取 SemanticAccountSpec（K3~K13）。未登记返 None。"""
+    kspec = get_k_cycle_spec(wp_code)
+    if kspec is None:
+        return None
+    return to_semantic_spec(kspec)
+
+
 __all__ = [
     "EMPTY_REASON_NO_ACCOUNT",
     "K6_LIABILITY_ROW_CODE_LISTED",
@@ -274,4 +307,6 @@ __all__ = [
     "get_k_cycle_spec",
     "no_account_cycle_codes",
     "pl_cycle_codes",
+    "semantic_spec_of",
+    "to_semantic_spec",
 ]
