@@ -41,9 +41,10 @@ from app.services.four_table import (
     fetch_trial_balance_amounts,
     leaf_sign_map,
     resolve_leaf_totals,
-    resolve_report_line_accounts,
+    resolve_semantic_accounts,
     select_leaves,
 )
+from app.services.four_table.f_cycle_specs import F4_SPEC
 from app.services.four_table.f4_nature_buckets import (
     build_f4_leaf_natures,
     build_f4_nature_prefill,
@@ -70,12 +71,7 @@ F4_SHEETS = [
 ]
 
 #: 应付账款科目定位规格（``BS-045`` 四准则公式一致；负债无备抵科目）
-F4_ACCOUNT_SPEC = ReportLineAccountSpec(
-    row_code="BS-045",
-    fallback_gross=("2202",),
-    # 🔴 负债类必须声明（见 `ReportLineAccountSpec.gross_direction` 的说明）
-    gross_direction="credit",
-)
+F4_ACCOUNT_SPEC = F4_SPEC
 
 _F4_FALLBACK_CODE = "2202"
 _CROSS_CHECK_TOLERANCE = 0.01
@@ -305,4 +301,4 @@ async def render(ctx: RenderContext) -> dict | None:
 
 async def _resolve_f4_accounts(ctx: RenderContext) -> ReportLineAccounts:
     """解析 F4 科目（报表映射规则驱动；共享件内部已 fail-open）。"""
-    return await resolve_report_line_accounts(ctx, F4_ACCOUNT_SPEC)
+    return await resolve_semantic_accounts(ctx, F4_ACCOUNT_SPEC)

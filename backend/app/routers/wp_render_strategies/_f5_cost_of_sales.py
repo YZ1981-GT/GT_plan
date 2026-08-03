@@ -48,10 +48,11 @@ from app.services.four_table import (
     fetch_tb_subtree,
     fetch_trial_balance_amounts,
     filter_by_code_specs,
-    resolve_report_line_accounts,
+    resolve_semantic_accounts,
     select_leaves,
     sql_prefixes_for_specs,
 )
+from app.services.four_table.f_cycle_specs import F5_SPEC
 from app.services.four_table.f5_cost_segments import (
     build_f5_leaf_segments,
     build_f5_segment_prefill,
@@ -68,10 +69,7 @@ logger = logging.getLogger(__name__)
 #: ⚠️ 该区间**过宽** —— 会把 ``6403 税金及附加``（独立报表行 ``IS-003``）圈进来。
 #: 收敛靠 `f5_cost_segments.classify_f5_leaf` 按名称归类 + 未命中不并入
 #: （实证：排除后与 `trial_balance` 的 6401+6402+6404 分文不差）。
-F5_ACCOUNT_SPEC = ReportLineAccountSpec(
-    row_code="IS-002",
-    fallback_gross=("6401~6499",),
-)
+F5_ACCOUNT_SPEC = F5_SPEC
 
 #: 存货报表行（供 F5-7 成本倒轧表取原材料 / 在产品 / 产成品）
 _F5_INVENTORY_SPEC = ReportLineAccountSpec(
@@ -295,7 +293,7 @@ async def render(ctx: RenderContext) -> dict | None:
         logger.warning("F5 render: related_parties failed: %s", e)
 
     # ─── 四表取数：营业成本（IS-002 区间口径，按名称收敛）────────────────────
-    accounts = await resolve_report_line_accounts(ctx, F5_ACCOUNT_SPEC)
+    accounts = await resolve_semantic_accounts(ctx, F5_ACCOUNT_SPEC)
     cost_specs = list(accounts.gross) or list(F5_ACCOUNT_SPEC.fallback_gross)
     cost_rows = await fetch_tb_subtree(
         ctx.db, ctx.project_id, ctx.year, sql_prefixes_for_specs(cost_specs)
@@ -320,7 +318,7 @@ async def render(ctx: RenderContext) -> dict | None:
     )
 
     # ─── F5-7 成本倒轧：原材料 / 在产品 / 产成品（走 F2 分类真源，不猜编码）──────
-    inv_accounts = await resolve_report_line_accounts(ctx, _F5_INVENTORY_SPEC)
+    inv_accounts = await resolve_semantic_accounts(ctx, _F5_INVENTORY_SPEC)
     inv_specs = list(inv_accounts.gross) or list(_F5_INVENTORY_SPEC.fallback_gross)
     inv_rows = await fetch_tb_subtree(
         ctx.db, ctx.project_id, ctx.year, sql_prefixes_for_specs(inv_specs)
