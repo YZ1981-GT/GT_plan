@@ -1,8 +1,8 @@
 # 致同审计作业平台 — Spec 开发索引
 
-**最后更新**：2026-08-03
+**最后更新**：2026-08-04
 **当前分支**：`work/2026-05-30-wp-specs`
-**统计**：Active **2**（`.kiro/specs/` 实测目录数）/ Archived 531 = 总计 533
+**统计**：Active **3**（`.kiro/specs/` 实测目录数）/ Archived 532 = 总计 535
 **最高迁移**：**V136**（以 `migration_status` 实测为准）
 **技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer
 
@@ -28,11 +28,19 @@
 
 | spec | 进度 | 一句话 |
 |------|------|--------|
-| `f0-confirmation-linkage-and-structural-enhancement` | 19/31（含 1 个 `[-]` 在跑） | F0 存货循环函证联动增强：矩阵自动聚合 + F0-5/F0-6 供应商自动带入 + B50/A13 推送 + F0-7 可靠性结构化。**复盘退回 3 项 + Wave 7 返工 9 项**（矩阵三个入参仍传 `undefined` → 4 个百分比行恒 `-`；5 个新模块 4 个零消费方）—— **并发会话在推进，勿碰** |
+| `f0-confirmation-linkage-and-structural-enhancement` | 28/31（含 1 个 `[-]` + 2 个 `[~]` 在跑） | F0 存货循环函证联动增强：矩阵自动聚合 + F0-5/F0-6 供应商自动带入 + B50/A13 推送 + F0-7 可靠性结构化。**复盘退回 3 项 + Wave 7 返工 9 项**（矩阵三个入参仍传 `undefined` → 4 个百分比行恒 `-`；5 个新模块 4 个零消费方）—— **并发会话在推进，勿碰** |
+| `g0-confirmation-source-alignment` | 13/23（并发会话在推进，勿碰） | **G0 投资循环函证源模板对齐**。逐格精读 10 张 sheet（全 visible）后实证：**G0-1 下区四块完全缺失**（品种×8 指标矩阵 / 样本选择 6 项 / 审计说明 5 项 / 审计结论），而其 8 个指标公式与 F0-1 逐条同构 → 泛化复用而非再抄一份；`CrossWorkpaperNav.vue` 写死 `D0-*` 而 `buildCrossWorkpaperNavDefs` 零消费方；`diffSecuritiesCode='G0-3S'` 指向不存在的底稿（`wp_index` 实测无 G0-3S/G0-6/G0-7/G0-8）；G0 预设 `sheet='审定表G0-1'`（源 xlsx 无此 tab）+ `TB_SUM('1101~1511')` 把应收/存货全扫进投资循环；G0A **程序分类丢失**导致备选与 IPO 专项 4 条默认勾选，且 `procedure_table_templates.json` 有**两个 G0A**（12 条正确 + 8 条自造死数据）。三个裁决门待用户回答 |
 | `report-config-account-code-integrity` | 0/12（三件套已立） | **`report_config` 科目码完整性**。全表对账（132 条 `TB()` 引用 / 102 行）扫出 **13 行错码**，远超此前手工发现的 6 处 —— **权益段 BS-081~BS-090 是一整块错位**（BS-082 其他权益工具取到其他综合收益 / BS-084 库存股取到零命中码 / BS-085 / BS-086 专项储备取到本年利润 / BS-090 少数股东权益取到库存股），另 BS-033 开发支出取到无形资产减值准备、BS-053 与 BS-067 同认领 `2901` **跨行双算**、IMP-008 取到旧准则科目、IMP-017 把商誉原值当备抵。并查出 **`V136` 是失效迁移**（前提错、`WHERE` 从不命中）。核心交付是**平台级一致性守卫**（这张表此前零校验，错码可静默存在数年）。BS-014 口径待用户裁决 |
 
 > 🔴 `f0-*` 由**并发会话**推进，本会话未触碰。跨会话协作时不要并行推进同一 spec
 > （memory 已实证并发会话会互相回退同一文件）。
+
+**2026-08-04 归档（1 个，→ `11-confirmation-d0-module`）**：
+`h0-confirmation-source-fidelity-and-linkage`(24/24) —— H0 固定资产循环函证源模板保真度与联动补齐。
+逐格精读 9 张 sheet（**全 visible**）后修掉三个 P0（「账户/交易」下拉三处互不一致且无 H 类科目 /
+H0-1 下区四块完全缺失 / H0-5 四段编号与源模板全部错位），并在真实库直跑与浏览器实测中挖出
+**6 个额外缺陷**（其中 2 个是活的错数：H3 裸通名兜底把固定资产累计折旧扣进投资性房地产致账面金额为负；
+H0 聚合忽略 `closing_direction` 把 contra 子科目加成正数）。
 
 **2026-08-03 归档（4 个，→ `08-disclosure-notes`）**：
 `h-cycle-four-table-extraction-and-account-mapping`(25/25) ·
@@ -47,7 +55,7 @@
 
 ---
 
-## 二、已归档 Spec（530个，15 分类）
+## 二、已归档 Spec（532个，15 分类）
 
 ```
 _archive/
