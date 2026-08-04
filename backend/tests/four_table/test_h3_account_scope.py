@@ -372,3 +372,153 @@ class TestEndToEnd:
         for key in H3_SLOT_KEY_PREFIX:
             assert got.slots[key].found is False
         assert build_h3_tb_values(got, [], []) == {}
+
+
+# ─────────────── 裸名兜底导致跨循环串味（2026-08-04 真实库实证修复） ───────────────
+
+#: standard 科目表实证形态：**没有** `1525/1526`，但有裸名 `累计折旧`(1602) 与 `累计摊销`(1702)。
+#: 全库统计：裸名 `累计折旧` = 1602（standard 10 项目 / client 7 项目），
+#: 裸名 `累计摊销` = 1702（standard 10 / client 8）；`1525/1526` 只在 4~5 个项目里有。
+STANDARD_ROWS_WITHOUT_IP_PROVISIONS = [
+    ChartRow("1521", "投资性房地产", "standard", "debit"),
+    ChartRow("1601", "固定资产", "standard", "debit"),
+    ChartRow("1602", "累计折旧", "standard", "debit"),
+    ChartRow("1603", "固定资产减值准备", "standard", "debit"),
+    ChartRow("1701", "无形资产", "standard", "debit"),
+    ChartRow("1702", "累计摊销", "standard", "debit"),
+]
+
+
+class TestGenericNameDoesNotLeakAcrossCycles:
+    """🔴 `累计折旧`/`累计摊销` 裸名属固定资产/无形资产，不得被投资性房地产认领。
+
+    修复前实测三个项目的投资性房地产账面金额为负：
+    `4f6dbc36` −21,601,944.08 / `df5b8403` −11,322,704.22 / `f064f5e4` −21,864,702.78。
+    """
+
+    def test_accum_dep_does_not_declare_bare_generic_name(self):
+        by_key = {s.key: s for s in H3_ACCOUNT_SPEC.slots}
+        assert "累计折旧" not in by_key["accum_dep"].names
+        assert by_key["accum_dep"].names == ("投资性房地产累计折旧",)
+
+    def test_accum_amort_does_not_declare_bare_generic_name(self):
+        by_key = {s.key: s for s in H3_ACCOUNT_SPEC.slots}
+        assert "累计摊销" not in by_key["accum_amort"].names
+        assert by_key["accum_amort"].names == ("投资性房地产累计摊销",)
+
+    def test_standard_chart_without_1525_yields_no_accum_dep(self):
+        """科目表缺 1525 → accum_dep 无命中（而不是抓走固定资产的 1602）。"""
+        by_key = {s.key: s for s in H3_ACCOUNT_SPEC.slots}
+        rows, _ = match_slot_in_chart(
+            by_key["accum_dep"], STANDARD_ROWS_WITHOUT_IP_PROVISIONS
+        )
+        assert rows == [], [r.account_code for r in rows]
+
+    def test_standard_chart_without_1526_yields_no_accum_amort(self):
+        by_key = {s.key: s for s in H3_ACCOUNT_SPEC.slots}
+        rows, _ = match_slot_in_chart(
+            by_key["accum_amort"], STANDARD_ROWS_WITHOUT_IP_PROVISIONS
+        )
+        assert rows == [], [r.account_code for r in rows]
+
+    def test_gross_still_resolves_in_such_chart(self):
+        """原值仍能定位到 1521 —— 修复只关掉备抵串味，不影响原值。"""
+        rows, exact = match_slot_in_chart(
+            H3_ACCOUNT_SPEC.slots[0], STANDARD_ROWS_WITHOUT_IP_PROVISIONS
+        )
+        assert exact is True
+        assert [r.account_code for r in rows] == ["1521"]
+
+    def test_client_chart_with_1525_1526_unchanged(self):
+        """反向零回归：科目表有专名科目时，命中结果与修复前逐字相同。"""
+        by_key = {s.key: s for s in H3_ACCOUNT_SPEC.slots}
+        dep, dep_exact = match_slot_in_chart(by_key["accum_dep"], CLIENT_ROWS)
+        amo, amo_exact = match_slot_in_chart(by_key["accum_amort"], CLIENT_ROWS)
+        assert ([r.account_code for r in dep], dep_exact) == (["1525"], True)
+        assert ([r.account_code for r in amo], amo_exact) == (["1526"], True)
+
+    def test_reverse_selfcheck_bare_name_would_hit_1602(self):
+        """反向自检：若把裸名加回去，accum_dep 必然精确命中 1602（证明本组断言非空转）。"""
+        from dataclasses import replace
+
+        by_key = {s.key: s for s in H3_ACCOUNT_SPEC.slots}
+        regressed = replace(
+            by_key["accum_dep"], names=("投资性房地产累计折旧", "累计折旧")
+        )
+        rows, exact = match_slot_in_chart(regressed, STANDARD_ROWS_WITHOUT_IP_PROVISIONS)
+        assert exact is True
+        assert [r.account_code for r in rows] == ["1602"], "裸名未命中 1602 → 前提失效"
+
+    def test_h1_keeps_bare_generic_name_as_rightful_owner(self):
+        """H1 保留裸名 `累计折旧` 是对的 —— 1602 本就是固定资产累计折旧。"""
+        from app.services.four_table.h1_account_scope import H1_ACCOUNT_SPEC
+
+        by_key = {s.key: s for s in H1_ACCOUNT_SPEC.slots}
+        assert by_key["accum_dep"].names == ("累计折旧",)
+        rows, exact = match_slot_in_chart(
+            by_key["accum_dep"], STANDARD_ROWS_WITHOUT_IP_PROVISIONS
+        )
+        assert exact is True
+        assert [r.account_code for r in rows] == ["1602"]
+
+    def test_h8_bare_name_removed_but_behavior_unchanged_where_specific_exists(self):
+        """H8 同款裸名已删（潜伏态）；有专名科目时命中不变。"""
+        from app.services.four_table.h8_account_scope import H8_ACCOUNT_SPEC
+
+        by_key = {s.key: s for s in H8_ACCOUNT_SPEC.slots}
+        assert by_key["accum_dep"].names == ("使用权资产累计折旧",)
+        rows, exact = match_slot_in_chart(
+            by_key["accum_dep"],
+            STANDARD_ROWS_WITHOUT_IP_PROVISIONS
+            + [ChartRow("1652", "使用权资产累计折旧", "client", "debit")],
+        )
+        assert exact is True
+        assert [r.account_code for r in rows] == ["1652"]
+
+    def test_h5_keeps_bare_name_because_1632_is_its_own(self):
+        """H5 保留裸名 `累计折耗` 是对的 —— 全库裸名 `累计折耗` 唯一对应 1632（油气资产）。"""
+        from app.services.four_table.h5_account_scope import H5_ACCOUNT_SPEC
+
+        by_key = {s.key: s for s in H5_ACCOUNT_SPEC.slots}
+        assert "累计折耗" in by_key["accum_depletion"].names
+
+
+    def test_h9_unearned_finance_requires_owner_prefix(self):
+        """H9 同款：裸名 `未确认融资费用` 同时对应 2602(租赁负债) 与 2702(长期应付款)。
+
+        DB 实证：`2702` 在 standard 侧 7 个项目 / client 侧 4 个项目都叫
+        `未确认融资费用`（`df5b8403` client 侧直接叫「长期应付款未确认融资费用」），
+        只按裸名定位会把 L5 的 contra 扣进租赁负债。当前 `2702` 全库余额为空 → 潜伏态。
+        """
+        from app.services.four_table.h9_account_scope import H9_ACCOUNT_SPEC
+
+        by_key = {s.key: s for s in H9_ACCOUNT_SPEC.slots}
+        slot = by_key["unearned_finance"]
+        assert "未确认融资费用" not in slot.names, "裸名会串到长期应付款的 2702"
+        assert slot.names == ("租赁负债未确认融资费用",)
+        assert slot.fallback_standard_codes == ("2602",)
+
+        rows = [
+            ChartRow("2651", "租赁负债", "client", "credit"),
+            ChartRow("2702", "未确认融资费用", "client", "credit"),
+        ]
+        hit, _ = match_slot_in_chart(slot, rows)
+        assert hit == [], [r.account_code for r in hit]
+
+    def test_h9_reverse_selfcheck_bare_name_would_hit_2702(self):
+        """反向自检：裸名加回去必然命中 2702（证明上条断言非空转）。"""
+        from dataclasses import replace
+
+        from app.services.four_table.h9_account_scope import H9_ACCOUNT_SPEC
+
+        by_key = {s.key: s for s in H9_ACCOUNT_SPEC.slots}
+        regressed = replace(
+            by_key["unearned_finance"], names=("未确认融资费用",), exclude_names=()
+        )
+        rows = [
+            ChartRow("2651", "租赁负债", "client", "credit"),
+            ChartRow("2702", "未确认融资费用", "client", "credit"),
+        ]
+        hit, exact = match_slot_in_chart(regressed, rows)
+        assert exact is True
+        assert [r.account_code for r in hit] == ["2702"]

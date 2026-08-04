@@ -15,12 +15,19 @@ CONFIRMATION_DICT_KEYS = [
     "consistency_status",
     "confirmation_followup_scenario",
     "yes_no_na",
+    # ── 源模板 DV 驱动的三个枚举（h0-confirmation-source-fidelity-and-linkage R7） ──
+    "confirmation_send_channel",
+    "confirmation_sample_purpose",
+    "confirmation_addr_verify",
+    "confirmation_subject",
 ]
 
 EXPECTED_COUNTS = {
-    "confirmation_account_type": 13,
+    # 13 → 22：追加 H 循环 9 个品种（R1.2，additive，原 13 项一字不动）
+    "confirmation_account_type": 22,
     "confirmation_method": 2,
-    "confirmation_reply_method": 4,
+    # 4 → 7：追加源模板 X0-2!P7 的三个取值（R7.6）
+    "confirmation_reply_method": 7,
     "yes_no": 2,
     "confirmation_match": 3,
     "sampling_method": 4,
@@ -28,6 +35,11 @@ EXPECTED_COUNTS = {
     "consistency_status": 3,
     "confirmation_followup_scenario": 2,
     "yes_no_na": 3,
+    "confirmation_send_channel": 4,
+    "confirmation_sample_purpose": 5,
+    "confirmation_addr_verify": 6,
+    # 13 → 22：追加 H 循环 9 个品种（R1.4）
+    "confirmation_subject": 22,
 }
 
 
@@ -61,6 +73,19 @@ class TestConfirmationDicts:
         assert len(values) == len(set(values)), f"{dict_key}: duplicate values found"
 
     def test_all_confirmation_dicts_present(self):
-        """所有 10 个函证枚举 key 都存在"""
+        """所有函证枚举 key 都存在"""
         for key in CONFIRMATION_DICT_KEYS:
             assert key in _DICTS
+
+    def test_send_channel_is_not_confirmation_method(self):
+        """发函渠道与积极式/消极式是两个不同维度，两个枚举都必须存在且取值不重叠。
+
+        源模板 X0-2!C7「函证方式」是发函渠道（邮寄/跟函/电子函证/其他），
+        准则 1312 的积极式/消极式是程序层面概念（X0A 程序 1）。
+        混用会让 X0-1 的「函证方式」列（VLOOKUP 自 X0-2!C）拿到错误维度的取值。
+        """
+        channel_labels = {e["label"] for e in _DICTS["confirmation_send_channel"]}
+        method_labels = {e["label"] for e in _DICTS["confirmation_method"]}
+        assert channel_labels == {"邮寄", "跟函", "电子函证", "其他"}
+        assert method_labels == {"积极式", "消极式"}
+        assert not (channel_labels & method_labels), "两个维度的取值不得重叠"
