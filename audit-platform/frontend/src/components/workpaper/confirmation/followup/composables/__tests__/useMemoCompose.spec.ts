@@ -38,6 +38,11 @@ describe('useMemoCompose', () => {
         confirm_contact: '张财务',
         confirm_identity_verified: '是',
         confirm_location: '财务部办公室',
+        // ── 源模板 X0-3 A10/A13 要求的要素（h0 spec R9.1/R9.2 补入模板后必填） ──
+        followup_staff: '王审计',
+        escort_desc: '在无被审计单位人员陪同下独立',
+        confirm_staff_no: 'FIN-0088',
+        received_confirm_index: 'D0-1-001',
       })
 
       const { text, missingFields } = compose(row)
@@ -49,6 +54,9 @@ describe('useMemoCompose', () => {
       expect(text).toContain('张财务')
       expect(text).toContain('财务部办公室')
       expect(text).toContain('正常业务流程')
+      // 陪同情况与工号是串通舞弊防范的关键证据，必须出现在备忘录里
+      expect(text).toContain('无被审计单位人员陪同')
+      expect(text).toContain('FIN-0088')
     })
 
     it('缺失字段保留占位符并报告', () => {
@@ -84,11 +92,16 @@ describe('useMemoCompose', () => {
         follow_call_date: '2026-06-20',
         follow_call_phone: '0755-12345678',
         follow_call_result: '对方确认余额无误',
+        followup_staff: '王审计',
+        escort_desc: '与被审计单位财务部张主管一同',
+        leave_staff_no: 'FIN-0102',
+        received_office: '审计二部',
       })
 
       const { text, missingFields } = compose(row)
 
       expect(missingFields).toHaveLength(0)
+      expect(text).toContain('FIN-0102')
       expect(text).toContain('2026-06-18')
       expect(text).toContain('中海地产')
       expect(text).toContain('李经理')
@@ -122,6 +135,9 @@ describe('useMemoCompose', () => {
         confirm_contact: '联系人',
         confirm_identity_verified: '是',
         confirm_location: '办公室',
+        followup_staff: '王审计',
+        escort_desc: '独立',
+        confirm_staff_no: 'X-1',
         later_received: true,
         received_date: '2026-06-25',
         received_office: '审计二部',

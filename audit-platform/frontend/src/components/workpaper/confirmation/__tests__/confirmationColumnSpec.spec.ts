@@ -10,6 +10,7 @@ import {
   resolveConfirmationColumns,
   BASE_CONFIRMATION_COLUMNS,
   CYCLE_VARIANT_COLUMNS,
+  CYCLE_EXCLUDED_COLUMNS,
   CORE_COLUMN_KEYS,
   VARIANT_COLUMN_DEFS,
   type ConfirmCycle,
@@ -32,14 +33,58 @@ describe('Property 3: resolveConfirmationColumns ⊆ manifest', () => {
     }
   })
 
-  it('resolve 结果 = BASE ∪ variant（逐 cycle 验证集合相等）', () => {
+  it('resolve 结果 = (BASE − EXCLUDED) ∪ variant（逐 cycle 验证集合相等）', () => {
     for (const cycle of ALL_CYCLES) {
       const resolved = resolveConfirmationColumns(cycle).map((c) => c.key)
-      const baseKeys = BASE_CONFIRMATION_COLUMNS.map((c) => c.key)
-      const variantKeys = CYCLE_VARIANT_COLUMNS[cycle] ?? []
-      const expected = new Set([...baseKeys, ...variantKeys])
-      expect(new Set(resolved)).toEqual(expected)
+      const excludedKeys = new Set(CYCLE_EXCLUDED_COLUMNS[cycle] ?? [])
+      const baseKeys = BASE_CONFIRMATION_COLUMNS.map((c) => c.key).filter((k) => !excludedKeys.has(k))
+      // 🔴 variant 的**注册 key ≠ 列 key**（H0 的 `h0_row_conclusion` 注册项承载列 `row_conclusion`，
+      // 以便与 K0/L0 共享同一持久化字段而 group 不同）→ 期望集合必须取 def.key 而非注册 key。
+      const variantColKeys = (CYCLE_VARIANT_COLUMNS[cycle] ?? [])
+        .map((k) => VARIANT_COLUMN_DEFS[k]?.key)
+        .filter((k): k is string => !!k)
+      const expected = new Set([...baseKeys, ...variantColKeys])
+      expect(new Set(resolved), `${cycle} 列集不符`).toEqual(expected)
     }
+  })
+
+  it('golden 零回归：五个未声明 EXCLUDED 的循环列集逐字节不变', () => {
+    // 🔴 H0 已于 h0-confirmation-source-fidelity-and-linkage R6.2 声明 3 项剔除
+    //    （contact_person/contact_phone/currency —— 源模板 H0-1 28 列无此三列），
+    //    故从本 golden 集合移出，改由下方 H0 专项断言覆盖。
+    // 🔴 G0 同理：g0-confirmation-source-alignment R2.2 声明同样的 3 项剔除
+    //    （源模板 G0-1 28 列亦无 联系人/联系电话/币种，二者在 G0-2 的 F/G 列）。
+    const NO_EXCLUSION_CYCLES: ConfirmCycle[] = ['D0', 'F0', 'K0', 'L0']
+    for (const cycle of NO_EXCLUSION_CYCLES) {
+      const excluded = CYCLE_EXCLUDED_COLUMNS[cycle]
+      expect(excluded, `${cycle} EXCLUDED 不为空数组`).toEqual([])
+      // 无剔除 → 结果逐字等于 BASE ∪ variant
+      const resolved = resolveConfirmationColumns(cycle)
+      const baseKeys = BASE_CONFIRMATION_COLUMNS.map((c) => c.key)
+      const variantColKeys = (CYCLE_VARIANT_COLUMNS[cycle] ?? [])
+        .map((k) => VARIANT_COLUMN_DEFS[k]?.key)
+        .filter((k): k is string => !!k)
+      const resolvedKeys = resolved.map((c) => c.key)
+      for (const k of baseKeys) {
+        expect(resolvedKeys).toContain(k)
+      }
+      for (const k of variantColKeys) {
+        expect(resolvedKeys).toContain(k)
+      }
+      expect(resolvedKeys.length).toBe(baseKeys.length + variantColKeys.length)
+    }
+  })
+
+  it('H0 剔除三项源模板不存在的列，且总数守恒', () => {
+    expect(CYCLE_EXCLUDED_COLUMNS.H0).toEqual(['contact_person', 'contact_phone', 'currency'])
+    const keys = resolveConfirmationColumns('H0').map((c) => c.key)
+    expect(keys).not.toContain('contact_person')
+    expect(keys).not.toContain('contact_phone')
+    expect(keys).not.toContain('currency')
+    const variantColKeys = new Set(
+      (CYCLE_VARIANT_COLUMNS.H0 ?? []).map((k) => VARIANT_COLUMN_DEFS[k]?.key).filter(Boolean),
+    )
+    expect(keys.length).toBe(BASE_CONFIRMATION_COLUMNS.length - 3 + variantColKeys.size)
   })
 })
 
@@ -113,9 +158,11 @@ describe('Property 9: 每字段可追溯源模板出处', () => {
     const registered = allRegisteredConfirmationKeys()
     // 从类型推导不可能，但可检查 spec 数据完整性
     // 至少确保 BASE + variant + extra 键齐全
+    // 🔴 取 def.key 而非注册 key —— 注册 key 只是本文件内的索引名
+    // （`h0_row_conclusion` 承载列 `row_conclusion`），manifest 登记的是列 key。
     const allColKeys = new Set([
       ...BASE_CONFIRMATION_COLUMNS.map((c) => c.key),
-      ...Object.keys(VARIANT_COLUMN_DEFS),
+      ...Object.values(VARIANT_COLUMN_DEFS).map((d) => d.key),
     ])
     for (const k of allColKeys) {
       expect(registered.has(k), `字段 "${k}" 在 manifest/extra 中不可追溯`).toBe(true)
@@ -197,6 +244,9 @@ describe('Property 2: 新字段不进 Sync_Field_Set', () => {
       'row_conclusion', 'send_memo', 'account_no', 'fx_rate',
       'amount_orig', 'confirmed_amount_orig',
       'term_book', 'term_reply', 'term_match', 'term_note',
+      // h0-confirmation-source-fidelity-and-linkage R7.2：发函渠道
+      // （源模板「函证方式」列；与驱动同步的 confirmation_method 是两个不同字段）
+      'send_channel',
     ]
 
     for (const key of NEW_ADDITIVE_KEYS) {
