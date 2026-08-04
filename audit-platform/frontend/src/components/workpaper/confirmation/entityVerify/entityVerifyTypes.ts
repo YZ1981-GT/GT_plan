@@ -93,6 +93,35 @@ export interface EntityVerifyRow {
   qcc_support_index?: string
   /** 企查查-备注 — X0-2 */
   qcc_remark?: string
+
+  // ─── 被审计单位提供侧缺列（源模板 X0-2 E6/H6） ────────────────────────────
+  // 🔴 上面的 `qcc_zipcode`/`qcc_email_fax` 是**企查查侧**（源外增强）；
+  //    源模板「被审计单位提供的被函证单位信息」块本身也有邮编与邮箱/传真两列。
+  // spec: h0-confirmation-source-fidelity-and-linkage R8.2
+
+  /** 邮编（被审计单位提供）— 源模板 X0-2!E6 */
+  provided_zipcode?: string
+  /** 邮箱/传真（被审计单位提供）— 源模板 X0-2!H6 */
+  provided_email_fax?: string
+
+  // ─── 第二次发函的被函证单位信息（源模板 X0-2 AF6:AK6 六列） ────────────────
+  // 第一次发函被退回后，重新核实到的单位信息。改造前平台只有二次发函的
+  // 日期/方式/结果/退回原因，**没有重新核实到的单位信息落笔位置**。
+  // 全部 optional：旧 `entity-verify-v1` 载荷读回为 undefined，写回不产生 undefined 键。
+  // spec: h0-confirmation-source-fidelity-and-linkage R8.1
+
+  /** 第二次发函-地址 — 源模板 AF6 */
+  second_entity_address?: string
+  /** 第二次发函-邮编 — 源模板 AG6 */
+  second_entity_zipcode?: string
+  /** 第二次发函-联系人 — 源模板 AH6 */
+  second_contact_person?: string
+  /** 第二次发函-联系电话 — 源模板 AI6 */
+  second_contact_phone?: string
+  /** 第二次发函-传真 — 源模板 AJ6 */
+  second_fax?: string
+  /** 第二次发函-信息是否核查一致 — 源模板 AK6（是/否） */
+  second_info_verified?: '是' | '否'
 }
 
 /** D0-2 进度指标 */

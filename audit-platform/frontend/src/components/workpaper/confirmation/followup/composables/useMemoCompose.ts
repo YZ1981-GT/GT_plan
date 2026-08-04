@@ -20,6 +20,15 @@ const FIELD_LABELS: Record<string, string> = {
   received_date: '回函收回日期',
   received_office: '收回办公室',
   received_confirm_index: '函证索引号',
+  // ── 源模板 X0-3 要求但改造前缺失的要素（h0 spec R9.1~R9.3） ──
+  followup_staff: '跟函人员',
+  escort_desc: '陪同情况',           // A10：与被审计单位XX一同 / 无人陪同独立前往
+  confirm_staff_no: '处理人工号',     // A13：工号为[XX]（如有）
+  leave_staff_no: '留函接收人工号',   // A17
+  callback_staff: '回访人员',         // A18
+  callback_date: '回访日期',
+  callback_phone: '对外公开电话',
+  callback_result: '回访结果',
 }
 
 export function useMemoCompose() {

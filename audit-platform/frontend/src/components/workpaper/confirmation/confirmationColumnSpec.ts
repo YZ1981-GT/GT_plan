@@ -22,6 +22,7 @@ export type ColumnGroup =
   | 'reply_amount' // 回函金额确认
   | 'alternative' // 未收到回函的替代程序
   | 'send_memo' // 发函询证纪要（K0/L0）
+  | 'row_summary' // 行级汇总与审计结论（E0）
 
 export const COLUMN_GROUP_LABELS: Record<ColumnGroup, string> = {
   send_info: '发函信息',
@@ -29,6 +30,7 @@ export const COLUMN_GROUP_LABELS: Record<ColumnGroup, string> = {
   reply_amount: '回函金额确认',
   alternative: '未收到回函的替代程序',
   send_memo: '发函询证纪要',
+  row_summary: '行级审计结论',
 }
 
 export interface ColumnDef {
@@ -105,6 +107,45 @@ const VARIANT_COLUMN_DEFS: Record<string, ColumnDef> = {
   fx_rate: { key: 'fx_rate', label: '汇率', group: 'reply_amount', width: 90, align: 'right', kind: 'number', source: 'E0-1·汇率' },
   confirmed_amount_orig: { key: 'confirmed_amount_orig', label: '可确认金额（原币）', group: 'reply_amount', minWidth: 130, align: 'right', kind: 'amount', source: 'E0-1·可确认金额（原币）' },
 
+  // E0 尾部四列（源模板 Z~AD，不属于前四组）
+  /**
+   * H0 行级审计结论 —— 源模板 H0-1 AB 列（AB5:AB7 rowspan，五段之外的独立末列）。
+   *
+   * 注册 key 用 `h0_row_conclusion` 以免与 K0/L0 的 `row_conclusion` def 冲突，
+   * 但列 `key` 仍是 `row_conclusion` —— 与 COMMON_KEYS 同字段，故 `resolve ⊆ manifest` 恒成立，
+   * 且与 K0/L0 共享同一持久化字段（同一语义不该两个字段）。
+   * group 用 `row_summary`（「行级审计结论」）而非 K0/L0 的 `send_memo`（「发函询证纪要」）——
+   * H0 源模板的 AB 列不在发函询证纪要段内。
+   * spec: h0-confirmation-source-fidelity-and-linkage R6.1
+   */
+  h0_row_conclusion: { key: 'row_conclusion', label: '审计结论', group: 'row_summary', minWidth: 140, kind: 'text', source: 'H0-1·AB列·审计结论' },
+
+  /**
+   * G0 行级审计结论 —— 源模板 G0-1 AB 列（`AB5:AB7` rowspan，五段之外的独立末列）。
+   *
+   * 与 `h0_row_conclusion` 同形（列 `key` 同为 `row_conclusion`，group 同为 `row_summary`），
+   * 另立注册 key 只为让 `source` 如实指向 G0-1；不可复用 H0 那条，否则溯源标注会串枢纽。
+   * spec: g0-confirmation-source-alignment R2.1
+   */
+  g0_row_conclusion: { key: 'row_conclusion', label: '审计结论', group: 'row_summary', minWidth: 140, kind: 'text', source: 'G0-1·AB列·审计结论' },
+
+  pledge_note: { key: 'pledge_note', label: '抵押质押等事项回函说明', group: 'row_summary', minWidth: 160, kind: 'text', source: 'E0-1·Z列·抵押质押等事项回函说明' },
+  other_items_match: { key: 'other_items_match', label: '其他函证事项回函是否相符', group: 'row_summary', width: 130, align: 'center', kind: 'select', source: 'E0-1·AA列·其他函证事项回函是否相符' },
+  mismatch_note: { key: 'mismatch_note', label: '函证不符事项说明', group: 'row_summary', minWidth: 160, kind: 'text', source: 'E0-1·AB列·函证不符事项说明' },
+  e0_row_conclusion: { key: 'e0_row_conclusion', label: '审计结论', group: 'row_summary', minWidth: 140, kind: 'text', source: 'E0-1·AD列·审计结论' },
+
+  /**
+   * 发函渠道 —— 源模板 X0-1「函证方式」列（X0-2!C 列 VLOOKUP 而来）。
+   *
+   * 🔴 为什么另立字段而不复用 `confirmation_method`：
+   * 源模板的「函证方式」DV 是 `邮寄/跟函/电子函证/其他`（渠道），而平台既有
+   * `confirmation_method` 是 `积极式/消极式`（准则 1312 的程序层面概念）**且驱动**
+   * `ConfirmationDetail` 的可确认金额派生（「消极式 + 未回函 → 视同相符」）。
+   * 把 `confirmation_method` 改绑渠道枚举会让该派生分支永久失效。
+   * spec: h0-confirmation-source-fidelity-and-linkage R7.2（含设计更正记录）
+   */
+  send_channel: { key: 'send_channel', label: '函证方式', group: 'send_info', width: 100, kind: 'select', source: 'X0-1·函证方式（渠道，X0-2!C 列带入）' },
+
   // H0 条款口径（决策 4：文本载体，不改 amount 类型）
   term_book: { key: 'term_book', label: '账面合同条款', group: 'reply_amount', minWidth: 140, kind: 'text', source: 'H0-1·金额或合同条款(账面侧)' },
   term_reply: { key: 'term_reply', label: '回函合同条款', group: 'reply_amount', minWidth: 140, kind: 'text', source: 'H0-1·金额或合同条款(回函侧)' },
@@ -115,12 +156,103 @@ const VARIANT_COLUMN_DEFS: Record<string, ColumnDef> = {
 /** 枢纽 → 启用的 variant 列 key（源模板没有的不进集合） */
 export const CYCLE_VARIANT_COLUMNS: Record<ConfirmCycle, string[]> = {
   D0: [],
-  E0: ['account_no', 'amount_orig', 'fx_rate', 'confirmed_amount_orig'],
+  E0: ['account_no', 'amount_orig', 'fx_rate', 'confirmed_amount_orig', 'pledge_note', 'other_items_match', 'mismatch_note', 'e0_row_conclusion'],
   F0: [],
-  G0: [],
-  H0: ['term_book', 'term_reply', 'term_match', 'term_note'],
+  // G0：源模板「函证方式」（渠道，G0-2!C 的 DV 实测为 `邮寄/跟函/电子函证/其他`）+ AB 列审计结论
+  G0: ['send_channel', 'g0_row_conclusion'],
+  // H0：条款口径 4 列 + 源模板「函证方式」（渠道）+ AB 列审计结论
+  H0: ['send_channel', 'term_book', 'term_reply', 'term_match', 'term_note', 'h0_row_conclusion'],
   K0: ['send_memo', 'row_conclusion'],
   L0: ['send_memo', 'row_conclusion'],
+}
+
+/**
+ * 枢纽 → 需从 BASE 剔除的列 key
+ * （源模板没有该列 → 空列噪声，Requirement 2.5）
+ * 除 E0 外全为空数组 → 其余六个循环列集逐字节不变（零回归支点）
+ */
+export const CYCLE_EXCLUDED_COLUMNS: Record<ConfirmCycle, string[]> = {
+  D0: [],
+  E0: [
+    'sample_purpose',    // E0-1 源模板无「选取样本目的」
+    'contact_person',    // E0-1 源模板无「联系人」
+    'contact_phone',     // E0-1 源模板无「联系电话」
+    'use_alternative',   // E0-1 无替代程序区（替代程序在「回函情况汇编」）
+    'alt_confirmed',
+    'alt_unconfirmed',
+    'alt_ref_index',
+    'remark',            // E0-1 源模板无「备注」
+  ],
+  F0: [],
+  // G0-1 源模板 28 列中**没有**联系人 / 联系电话（它们在 G0-2 的 F/G 列）与币种 →
+  // 保留会形成三列空列噪声（g0 spec R2.2）。仅影响渲染，不删除既有持久化字段值。
+  G0: ['contact_person', 'contact_phone', 'currency'],
+  // H0-1 源模板 28 列中**没有**联系人 / 联系电话（它们在 H0-2）与币种 →
+  // 保留会形成三列空列噪声（Requirement 2.5 / h0 spec R6.2）。
+  // 🔴 仅影响渲染，不删除既有持久化字段值（h0 spec R6.3 / Property 18）。
+  H0: ['contact_person', 'contact_phone', 'currency'],
+  K0: [],
+  L0: [],
+}
+
+/**
+ * 枢纽 → 列 label 覆盖（各枢纽源模板用词不同不强行统一，Requirement 8.3）
+ *
+ * 🔴 **SHALL NOT 改 `BASE_CONFIRMATION_COLUMNS` 的 label** —— 那会波及其余六枢纽。
+ * 本表只有 `G0` / `H0` 两个 key ⇒ 其余五个循环 `resolveConfirmationColumns` 输出逐字节不变
+ * （零回归支点，守卫 Property 17 / g0 spec Property 3）。
+ *
+ * H0 的 13 处偏差逐条取自源模板 `函证结果汇总表H0-1` 第 6 行表头
+ * （openpyxl 直读实证，守卫用后端导出的 fixture 交叉锁死）。
+ * spec: h0-confirmation-source-fidelity-and-linkage R6.4 / R6.5 / R7.3
+ *
+ * G0 的 11 处偏差逐条取自源模板 `函证结果汇总表G0-1` 第 6 行表头
+ * （守卫 `backend/tests/test_g0_source_template_facts.py::TestSummaryUpperZone` 已固化源侧事实）。
+ * spec: g0-confirmation-source-alignment R2.3
+ */
+export const CYCLE_COLUMN_LABEL_OVERRIDES: Partial<Record<ConfirmCycle, Readonly<Record<string, string>>>> = {
+  G0: Object.freeze({
+    confirm_index: '询证函索引号',        // 源 B5（BASE 写「函证索引号」）
+    account_type: '账户/交易',            // 源 E6（BASE 写「科目」）—— 亦是下区矩阵的品种维度
+    amount: '账面期末余额',               // 源 F6（BASE 写「函证金额」）
+    entity_address: '收件地址',           // 源 J6（BASE 写「地址」）
+    send_addr_match: '地址核查是否一致',   // 源 K6（BASE 写「收件地址核查是否一致」）
+    is_replied: '是否收到回函',           // 源 L6（BASE 写「是否已回函」；源含「（√）」，DV 实为 是/否 故不带勾号）
+    match_status: '是否相符',             // 源 N6（BASE 写「相符情况」）
+    reply_date: '回函日期',               // 源 O6（BASE 写「收函日期」）
+    reply_from_addr: '回函地址',          // 源 Q6（BASE 写「回函发出地址」）
+    difference: '差异',                   // 源 T6（BASE 写「差异金额」）
+    remark: '其他说明/备注',              // 源 W6（BASE 写「备注」）
+    use_alternative: '是否采取替代程序',   // 源 X6（源含「（√）」，同 is_replied 处理）
+    alt_confirmed: '替代后可确认金额',     // 源 Y6（BASE 写「替代程序确认金额」）
+    alt_ref_index: '替代程序索引号',       // 源 AA6（BASE 写「替代程序索引」）
+    // 🔴 源模板「函证方式」是**渠道**（G0-2!C 的 DV 实测 `邮寄/跟函/电子函证/其他`，
+    //    经 VLOOKUP 带入 G0-1!G），故与 H0 同法：渠道走 variant 列 `send_channel`，
+    //    本列承载准则 1312 的积极式/消极式，显式区分避免两列同名。
+    confirmation_method: '函证类型（积极式/消极式）',
+    // 🔴 `diff_ref_index` 的源字面是「调节索引（G0-3）」，其中 G0-3 是**源模板 tab 名索引号笔误**
+    //    （底稿目录裁决为 G0-4）→ 该列 label 的处置归 g0 spec Task 10/11（裁决门 B），此处不先落。
+  }),
+  H0: Object.freeze({
+    confirm_index: '询证函索引号',      // 源 B6
+    account_type: '账户/交易',          // 源 E6（BASE 写「科目」）
+    amount: '金额或合同条款',            // 源 F6（BASE 写「函证金额」）
+    entity_address: '收件地址',          // 源 J6（BASE 写「地址」）
+    send_addr_match: '地址核查是否一致',  // 源 K6（BASE 写「收件地址核查是否一致」）
+    is_replied: '是否收到回函',          // 源 L6（BASE 写「是否已回函」）
+    match_status: '是否相符',            // 源 N6（BASE 写「相符情况」）
+    reply_date: '回函日期',              // 源 O6（BASE 写「收函日期」）
+    reply_amount: '回函金额/条款',        // 源 S6（BASE 写「回函金额」）
+    difference: '差异（金额/条款）',      // 源 T6（BASE 写「差异金额」）
+    confirmed_amount: '可确认金额/条款',  // 源 U6（BASE 写「可确认金额」）
+    diff_ref_index: '差异核对索引（H0-4）', // 源 V6（BASE 写「差异调节表索引」）
+    remark: '其他说明/备注',             // 源 W6（BASE 写「备注」）
+    alt_confirmed: '替代后可确认金额',    // 源 Y6（BASE 写「替代程序确认金额」）
+    alt_ref_index: '替代程序索引号',      // 源 AA6（BASE 写「替代程序索引」，少一个「号」）
+    // 🔴 源模板「函证方式」是渠道（见 VARIANT_COLUMN_DEFS.send_channel），
+    //    本列承载的是准则 1312 的积极式/消极式，故显式区分避免两列同名。
+    confirmation_method: '函证类型（积极式/消极式）',
+  }),
 }
 
 const BASE_BY_KEY: Record<string, ColumnDef> = Object.fromEntries(
@@ -128,23 +260,41 @@ const BASE_BY_KEY: Record<string, ColumnDef> = Object.fromEntries(
 )
 
 /**
- * 纯函数：返回该枢纽应渲染的列 = BASE ∪ CYCLE_VARIANT_COLUMNS[cycle]
+ * 纯函数：返回该枢纽应渲染的列 = (BASE − EXCLUDED) ∪ CYCLE_VARIANT_COLUMNS[cycle]
  * variant 列插到其 group 内既有 BASE 列之后，保持分段表头顺序。
+ * 最后按 CYCLE_COLUMN_LABEL_OVERRIDES 覆盖 label（浅拷贝，不 mutate 常量对象）。
  */
 export function resolveConfirmationColumns(cycle: ConfirmCycle): ColumnDef[] {
   const variantKeys = CYCLE_VARIANT_COLUMNS[cycle] ?? []
-  if (!variantKeys.length) return [...BASE_CONFIRMATION_COLUMNS]
+  const excludedKeys = new Set(CYCLE_EXCLUDED_COLUMNS[cycle] ?? [])
 
-  const variantDefs = variantKeys
-    .map((k) => VARIANT_COLUMN_DEFS[k])
-    .filter((d): d is ColumnDef => !!d)
+  // BASE 过滤掉该枢纽不要的列
+  const filteredBase = excludedKeys.size
+    ? BASE_CONFIRMATION_COLUMNS.filter((c) => !excludedKeys.has(c.key))
+    : BASE_CONFIRMATION_COLUMNS
 
-  // 分 group 合并：先 BASE 该 group 列，再该 group 的 variant 列，保持 group 顺序
-  const groupOrder: ColumnGroup[] = ['send_info', 'reply_info', 'reply_amount', 'alternative', 'send_memo']
-  const result: ColumnDef[] = []
-  for (const g of groupOrder) {
-    result.push(...BASE_CONFIRMATION_COLUMNS.filter((c) => c.group === g))
-    result.push(...variantDefs.filter((c) => c.group === g))
+  let result: ColumnDef[]
+  if (!variantKeys.length) {
+    result = [...filteredBase]
+  } else {
+    const variantDefs = variantKeys
+      .map((k) => VARIANT_COLUMN_DEFS[k])
+      .filter((d): d is ColumnDef => !!d)
+
+    // 分 group 合并：先 BASE 该 group 列，再该 group 的 variant 列，保持 group 顺序
+    const groupOrder: ColumnGroup[] = ['send_info', 'reply_info', 'reply_amount', 'alternative', 'send_memo', 'row_summary']
+    result = []
+    for (const g of groupOrder) {
+      result.push(...filteredBase.filter((c) => c.group === g))
+      result.push(...variantDefs.filter((c) => c.group === g))
+    }
+  }
+
+  // label 覆盖 —— 🔴 必须浅拷贝新对象，直接写 col.label 会污染 BASE/VARIANT 常量，
+  // 使后续对其它枢纽的调用也拿到 H0 的用词（Property 17）。
+  const overrides = CYCLE_COLUMN_LABEL_OVERRIDES[cycle]
+  if (overrides) {
+    result = result.map((c) => (overrides[c.key] ? { ...c, label: overrides[c.key] } : c))
   }
   return result
 }

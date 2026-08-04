@@ -1,10 +1,16 @@
 /**
  * navigateToCycleSheet — 同项目函证套件内跨表跳转
  * wp-id-by-code → WorkpaperEditor；可选附带 confirm_index query 供定位
+ *
+ * 🔴 必须用 `@/services/apiProxy` 的 `api`（直接返回业务数据）。
+ *    `@/utils/http` 的默认导出返回 **AxiosResponse**（payload 在 `.data`），
+ *    照 apiProxy 的形态读 `res.wp_id` 恒为 undefined → 永远走「未找到 X 底稿」分支。
+ *    该错配曾让本函数（以及 E0-6「跳转汇总表」）静默失效；平台 20+ 处
+ *    `wp-id-by-code` 取数一律用 apiProxy，照抄它。
  */
 import type { Router } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import api from '@/utils/http'
+import { api } from '@/services/apiProxy'
 
 export async function navigateToCycleSheet(options: {
   router: Router

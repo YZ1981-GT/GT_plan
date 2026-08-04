@@ -6,7 +6,7 @@
         <el-button size="small" type="primary" :icon="Plus" :disabled="readonly" @click="$emit('add')">
           新增
         </el-button>
-        <el-button size="small" type="danger" :icon="Delete" :disabled="readonly || !selectedIds.length" @click="$emit('delete')">
+        <el-button size="small" type="danger" :icon="Delete" :disabled="readonly || !selectedIds.length" @click="handleDeleteClick">
           删除
         </el-button>
         <el-button size="small" :icon="Download" :disabled="readonly" @click="$emit('import-d01')">
@@ -267,8 +267,9 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
+  /** 🔴 携带勾选行 ID：选中态在本组件内（selectedIds），父组件拿不到 → 不带载荷父层无法实装删除 */
   (e: 'add'): void
-  (e: 'delete'): void
+  (e: 'delete', rowIds: string[]): void
   (e: 'save'): void
   (e: 'update', rowId: string, field: string, value: any): void
   (e: 'import-d01'): void
@@ -294,6 +295,13 @@ const displayRows = computed(() => {
 
 function handleSelectionChange(selection: DiffReconcileRow[]) {
   selectedIds.value = selection.map((r) => r._row_id!).filter(Boolean)
+}
+
+function handleDeleteClick() {
+  if (!selectedIds.value.length) return
+  emit('delete', [...selectedIds.value])
+  selectedIds.value = []
+  tableRef.value?.clearSelection?.()
 }
 
 // ─── 合计行 ──────────────────────────────────────────────────────────────────

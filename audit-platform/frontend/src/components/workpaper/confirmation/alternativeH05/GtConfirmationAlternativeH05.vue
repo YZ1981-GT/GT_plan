@@ -36,10 +36,10 @@
         </div>
       </div>
 
-      <!-- 顶部说明 -->
+      <!-- 顶部说明（源模板编制说明第 ③ 条，字面见 h05SourceFidelity） -->
       <div class="gt-confirmation-alternative-h05__header-tip">
         <el-alert type="info" :closable="true" show-icon>
-          提示③：对回函可能性不高的、余额重大的，发函同时执行替代程序。
+          {{ headerTip }}
         </el-alert>
       </div>
 
@@ -71,92 +71,53 @@
             {{ selectedCompany.entity_name || '未命名公司' }} — 检查详情
           </div>
 
-          <!-- 抽样配置 -->
-          <div class="detail-section">
-            <div class="detail-section__header">一、样本选取标准与规模</div>
+          <!-- 一、样本选取标准与规模（6 字段全部由 H05_SAMPLING_FIELDS 驱动，标签/占位逐字源模板） -->
+          <div class="detail-section" data-testid="h05-section-sampling">
+            <div class="detail-section__header">{{ sectionTitles.sampling }}</div>
             <el-form
               :model="selectedCompany.sampling || {}"
-              label-width="100px"
+              label-width="140px"
               size="small"
               :disabled="readonly"
             >
               <el-row :gutter="12">
-                <el-col :span="12">
-                  <el-form-item label="测试范围">
-                    <el-input
-                      v-model="selectedCompany.sampling!.test_scope"
-                      type="textarea"
-                      :rows="2"
-                      placeholder="如固定资产借方发生额所有凭证共XX笔金额XX、贷方发生额所有凭证共XX笔金额XX"
-                      @change="markDirty"
-                    />
-                  </el-form-item>
-                </el-col>
-                <el-col :span="12">
-                  <el-form-item label="特定样本">
-                    <el-input
-                      v-model="selectedCompany.sampling!.specific_samples"
-                      type="textarea"
-                      :rows="2"
-                      placeholder="XX金额以上（大额）、关联方/关联交易形成的款项、XX异常款项全部测试，共XX笔"
-                      @change="markDirty"
-                    />
-                  </el-form-item>
-                </el-col>
-              </el-row>
-              <el-row :gutter="12">
-                <el-col :span="12">
-                  <el-form-item label="抽样总体">
-                    <el-input
-                      v-model="selectedCompany.sampling!.sampling_population"
-                      placeholder="测试总体扣除特定样本以外的样本，共XX笔、金额XX"
-                      @change="markDirty"
-                    />
-                  </el-form-item>
-                </el-col>
-                <el-col :span="12">
-                  <el-form-item label="样本量">
-                    <el-input
-                      v-model="selectedCompany.sampling!.sample_size"
-                      placeholder="抽取XX笔"
-                      @change="markDirty"
-                    />
-                  </el-form-item>
-                </el-col>
-              </el-row>
-              <el-row :gutter="12">
-                <el-col :span="12">
-                  <el-form-item label="抽样方法">
+                <el-col v-for="f in samplingFields" :key="f.field" :span="12">
+                  <el-form-item :label="f.label">
                     <el-select
-                      v-model="selectedCompany.sampling!.sampling_method"
-                      placeholder="选择抽样方法"
+                      v-if="f.control === 'select'"
+                      v-model="selectedCompany.sampling![f.field]"
+                      :placeholder="f.placeholder"
                       @change="markDirty"
                     >
-                      <el-option value="随机选样" label="随机选样" />
-                      <el-option value="系统选样" label="系统选样" />
-                      <el-option value="货币单元抽样" label="货币单元抽样" />
-                      <el-option value="随意选样" label="随意选样（非统计抽样适用）" />
+                      <el-option v-for="opt in f.options || []" :key="opt" :value="opt" :label="opt" />
                     </el-select>
-                  </el-form-item>
-                </el-col>
-                <el-col :span="12">
-                  <el-form-item label="抽样过程">
                     <el-input
-                      v-model="selectedCompany.sampling!.sampling_process"
-                      type="textarea"
-                      :rows="2"
-                      placeholder="使用IDEA（XX抽样工具）选择XX数量占比XX%的样本进行测试"
+                      v-else
+                      v-model="selectedCompany.sampling![f.field]"
+                      :type="f.control === 'textarea' ? 'textarea' : 'text'"
+                      :rows="f.control === 'textarea' ? 2 : undefined"
+                      :placeholder="f.placeholder"
                       @change="markDirty"
                     />
+                    <div v-if="f.hint" class="detail-section__field-hint">{{ f.hint }}</div>
                   </el-form-item>
                 </el-col>
               </el-row>
             </el-form>
           </div>
 
-          <!-- 余额汇总 -->
-          <div class="detail-section">
-            <div class="detail-section__header">二、余额汇总与检查比例</div>
+          <!-- 二、检查过程记录（源模板 A10；R11:R19 为空白自由区，下列结构化内容为平台增强） -->
+          <div class="detail-section" data-testid="h05-section-check-record">
+            <div class="detail-section__header">{{ sectionTitles.check_record }}</div>
+
+            <!-- 源外增强标注（方法论上下文，琥珀色左边线） -->
+            <div class="src-hint" data-testid="h05-source-extra-notice">
+              <div class="src-hint__badge">{{ sourceExtraBadge }}</div>
+              <div class="src-hint__body">{{ sourceExtraReason }}</div>
+            </div>
+
+            <!-- 2.1 余额汇总与检查比例（平台增强） -->
+            <div class="detail-subsection__header">余额汇总与检查比例</div>
             <div class="balance-cards">
               <!-- 左卡：余额数据 -->
               <div class="balance-card balance-card--data">
@@ -251,11 +212,9 @@
                 </div>
               </div>
             </div>
-          </div>
 
-          <!-- 4 区块检查表 -->
-          <div class="detail-section">
-            <div class="detail-section__header">三、检查过程记录</div>
+            <!-- 2.2 四区块结构化检查表（平台增强） -->
+            <div class="detail-subsection__header">结构化检查记录</div>
             <CheckBlock
               v-for="bt in blockTypes"
               :key="bt"
@@ -270,13 +229,26 @@
               @update-field="(rowId: string, field: string, val: any) => data.updateBlockField(selectedCompany!._company_id!, bt, rowId, field, val)"
               @ocr-upload="(rowId: string, file: File) => handleRowOcr(bt, rowId, file)"
             />
+
+            <!-- 2.3 自由记录区（对应源模板 R11:R19 空白自由区） -->
+            <div class="detail-subsection__header">{{ checkRecordFreeLabel }}</div>
+            <el-input
+              v-model="checkRecordFree"
+              type="textarea"
+              :autosize="{ minRows: 5 }"
+              :disabled="readonly"
+              :placeholder="checkRecordFreePlaceholder"
+              :data-persist-key="checkRecordFreeKey"
+              data-testid="h05-check-record-free"
+              @change="markDirty"
+            />
           </div>
 
-          <!-- 审计结论 -->
-          <div class="detail-section">
+          <!-- 三、审计说明（源模板 A20） -->
+          <div class="detail-section" data-testid="h05-section-audit-note">
             <div class="detail-section__header">
-              <span>四、审计说明与结论</span>
-              <GtReviewTrigger section-id="H0-5-conclusion" label="复核" style="margin-left: 8px" />
+              <span>{{ sectionTitles.audit_note }}</span>
+              <GtReviewTrigger section-id="H0-5-audit-note" label="复核" style="margin-left: 8px" />
               <el-button
                 v-if="!readonly"
                 type="primary"
@@ -289,50 +261,70 @@
                 AI 智能填充
               </el-button>
             </div>
-            <el-form
-              :model="selectedCompany.conclusion || {}"
-              label-width="80px"
-              size="small"
-              :disabled="readonly"
-            >
-              <el-form-item label="审计说明">
-                <el-input
-                  v-model="selectedCompany.conclusion!.audit_note"
-                  type="textarea"
-                  :rows="3"
-                  placeholder="概述：（1）程序的测试情况、结果；（2）拟调整事项及其调整分录、未调整事项及其影响，审计范围受到限制情况及其影响。"
-                  @change="markDirty"
-                />
-              </el-form-item>
-              <el-form-item label="审计结论">
-                <el-radio-group v-model="selectedCompany.conclusion!.conclusion_type" @change="markDirty">
-                  <el-radio value="A">A - 替代程序结果支持余额</el-radio>
-                  <el-radio value="B">B - 部分事项待进一步确认</el-radio>
-                  <el-radio value="C">C - 存在重大异常需扩大程序</el-radio>
-                </el-radio-group>
-              </el-form-item>
-              <el-form-item v-if="selectedCompany.conclusion?.conclusion_type" label="结论文本">
-                <el-input
-                  v-model="selectedCompany.conclusion!.conclusion_text"
-                  type="textarea"
-                  :rows="2"
-                  @change="markDirty"
-                />
-              </el-form-item>
-              <!-- 异常未决提示 -->
-              <el-alert
-                v-if="data.hasAbnormal(selectedCompany)"
-                type="warning"
-                :closable="false"
-                show-icon
-                class="mt-8"
-              >
-                当前存在异常行，请确认是否需要调整或扩大替代程序范围。
-              </el-alert>
-            </el-form>
+            <el-card shadow="never" class="detail-card">
+              <el-form label-width="80px" size="small" :disabled="readonly">
+                <el-form-item label="审计说明">
+                  <el-input
+                    v-model="selectedCompany.conclusion!.audit_note"
+                    type="textarea"
+                    :autosize="{ minRows: 3 }"
+                    :placeholder="auditNotePlaceholder"
+                    @change="markDirty"
+                  />
+                </el-form-item>
+              </el-form>
+            </el-card>
+          </div>
+
+          <!-- 四、审计结论（源模板 A23） -->
+          <div class="detail-section" data-testid="h05-section-conclusion">
+            <div class="detail-section__header">
+              <span>{{ sectionTitles.conclusion }}</span>
+              <GtReviewTrigger section-id="H0-5-conclusion" label="复核" style="margin-left: 8px" />
+            </div>
+            <el-card shadow="never" class="detail-card">
+              <el-form label-width="80px" size="small" :disabled="readonly">
+                <el-form-item label="审计结论">
+                  <el-radio-group v-model="selectedCompany.conclusion!.conclusion_type" @change="markDirty">
+                    <el-radio value="A">A - 替代程序结果支持余额</el-radio>
+                    <el-radio value="B">B - 部分事项待进一步确认</el-radio>
+                    <el-radio value="C">C - 存在重大异常需扩大程序</el-radio>
+                  </el-radio-group>
+                </el-form-item>
+                <el-form-item v-if="selectedCompany.conclusion?.conclusion_type" label="结论文本">
+                  <el-input
+                    v-model="selectedCompany.conclusion!.conclusion_text"
+                    type="textarea"
+                    :autosize="{ minRows: 2 }"
+                    @change="markDirty"
+                  />
+                </el-form-item>
+                <!-- 异常未决提示 -->
+                <el-alert
+                  v-if="data.hasAbnormal(selectedCompany)"
+                  type="warning"
+                  :closable="false"
+                  show-icon
+                  class="mt-8"
+                >
+                  当前存在异常行，请确认是否需要调整或扩大替代程序范围。
+                </el-alert>
+              </el-form>
+            </el-card>
           </div>
         </div>
       </template>
+
+      <!-- 编制说明（源模板 A28 起，逐字；折叠于底部） -->
+      <details class="gt-confirmation-alternative-h05__guidance" data-testid="h05-guidance">
+        <summary>{{ guidanceTitle }}</summary>
+        <div v-for="g in guidanceGroups" :key="g.anchor" class="guidance-group">
+          <div class="guidance-group__title">{{ g.title }}</div>
+          <ul class="guidance-group__list">
+            <li v-for="(it, idx) in g.items" :key="`${g.anchor}-${idx}`">{{ it.text }}</li>
+          </ul>
+        </div>
+      </details>
     </template>
 
     <!-- 隐藏文件选择器 -->
@@ -353,6 +345,18 @@ import { useAlternativeH05Data } from './composables/useAlternativeH05Data'
 import { useH0ImportExport } from './composables/useH0ImportExport'
 import type { AlternativeCompany, BlockType, CheckRow } from '../alternativeD05/alternativeD05Types'
 import { BLOCK_COLUMN_CONFIGS_H05 } from './blockColumnConfigsH05'
+import {
+  H05_SAMPLING_FIELDS,
+  H05_SECTION_TITLES,
+  H05_GUIDANCE_GROUPS,
+  H05_GUIDANCE_TITLE,
+  H05_HEADER_TIP,
+  H05_SOURCE_EXTRA_BADGE,
+  H05_SOURCE_EXTRA_REASON,
+  H05_CHECK_RECORD_FREE_KEY,
+  H05_CHECK_RECORD_FREE_LABEL,
+  H05_CHECK_RECORD_FREE_PLACEHOLDER,
+} from './h05SourceFidelity'
 import {
   WorkpaperRuntimeContextKey,
   type WorkpaperRuntimeContext,
@@ -484,11 +488,49 @@ const data = useAlternativeH05Data({
 const blockTypes: BlockType[] = ['block1', 'block2', 'block3', 'block4']
 const blockConfigs = BLOCK_COLUMN_CONFIGS_H05
 
+// ─── 源模板字面（单一真源 h05SourceFidelity，模板内禁内联字面量） ──────────────
+
+const samplingFields = H05_SAMPLING_FIELDS
+const guidanceGroups = H05_GUIDANCE_GROUPS
+const guidanceTitle = H05_GUIDANCE_TITLE
+const headerTip = H05_HEADER_TIP
+const sourceExtraBadge = H05_SOURCE_EXTRA_BADGE
+const sourceExtraReason = H05_SOURCE_EXTRA_REASON
+const checkRecordFreeKey = H05_CHECK_RECORD_FREE_KEY
+const checkRecordFreeLabel = H05_CHECK_RECORD_FREE_LABEL
+const checkRecordFreePlaceholder = H05_CHECK_RECORD_FREE_PLACEHOLDER
+
+/** 区块标题按 key 索引，供模板直接取用。 */
+const sectionTitles = Object.fromEntries(
+  H05_SECTION_TITLES.map((s) => [s.key, s.title]),
+) as Record<'sampling' | 'check_record' | 'audit_note' | 'conclusion', string>
+
+/** 审计说明占位取源模板「2、概述」两条（逐字拼接）。 */
+const auditNotePlaceholder = (() => {
+  const overview = H05_GUIDANCE_GROUPS.find((g) => g.anchor === 'A34')
+  if (!overview) return ''
+  return `${overview.title}：${overview.items.map((i) => i.text).join('')}`
+})()
+
 // ─── 选中公司 ────────────────────────────────────────────────────────────────
 
 const selectedCompany = computed<AlternativeCompany | undefined>(() => {
   if (!data.selectedCompanyId.value) return data.companies.value[0]
   return data.companies.value.find((c) => c._company_id === data.selectedCompanyId.value)
+})
+
+/**
+ * 检查过程自由记录（源模板 R11:R19 空白自由区）。
+ * 落在 `AlternativeCompany.check_record_free`，随 `buildPayload()` 一起持久化到 html_data。
+ */
+const checkRecordFree = computed<string>({
+  get: () => selectedCompany.value?.check_record_free ?? '',
+  set: (val: string) => {
+    const company = selectedCompany.value
+    if (!company) return
+    company.check_record_free = val
+    data.isDirty.value = true
+  },
 })
 
 function getBlockRows(company: AlternativeCompany, blockType: BlockType): CheckRow[] {
@@ -1094,6 +1136,80 @@ defineExpose({
   border-radius: 3px;
   display: flex;
   align-items: center;
+}
+
+/* 二级小节标题（「二、检查过程记录」内部分区） */
+.detail-subsection__header {
+  font-size: var(--wp-font-size, 13px);
+  font-weight: 600;
+  color: var(--el-text-color-regular);
+  margin: 12px 0 6px;
+  padding-left: 6px;
+  border-left: 3px solid var(--el-color-primary-light-5);
+}
+
+/* 字段级源模板提示（如样本量计算器说明） */
+.detail-section__field-hint {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  line-height: 1.5;
+  margin-top: 2px;
+}
+
+/* 源模板方法论上下文 / 源外增强标注（琥珀色左边线 + 浅黄背景） */
+.src-hint {
+  border-left: 3px solid #e6a23c;
+  background: #fdf6ec;
+  padding: 6px 10px;
+  border-radius: 3px;
+  margin-bottom: 10px;
+}
+
+.src-hint__badge {
+  font-size: 12px;
+  font-weight: 600;
+  color: #b88230;
+  margin-bottom: 2px;
+}
+
+.src-hint__body {
+  font-size: 12px;
+  color: var(--el-text-color-regular);
+  line-height: 1.6;
+}
+
+.detail-card {
+  --el-card-padding: 10px;
+}
+
+/* 编制说明折叠（底部） */
+.gt-confirmation-alternative-h05__guidance {
+  margin-top: 16px;
+  font-size: 12px;
+  color: var(--el-text-color-regular);
+  border-top: 1px dashed var(--el-border-color);
+  padding-top: 8px;
+}
+
+.gt-confirmation-alternative-h05__guidance > summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--el-text-color-secondary);
+}
+
+.guidance-group {
+  margin-top: 8px;
+}
+
+.guidance-group__title {
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.guidance-group__list {
+  margin: 0;
+  padding-left: 18px;
+  line-height: 1.7;
 }
 
 .ratio-display {

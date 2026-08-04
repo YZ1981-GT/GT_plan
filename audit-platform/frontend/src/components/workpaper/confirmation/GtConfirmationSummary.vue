@@ -63,6 +63,20 @@
         <div class="gt-confirmation-summary__toolbar">
           <ConfirmationTabs :tabs="data.accountTabs.value" :active-tab="data.activeTab.value" @update:active-tab="data.activeTab.value = $event" />
           <div class="gt-confirmation-summary__toolbar-right">
+            <!--
+              H0：按源模板七条 VLOOKUP 从 H0-2 带入（被询证单位名称/函证方式/收件地址/
+              地址核查是否一致/回函方式/回函发出地址/发函地址与回函地址是否一致）。
+              spec: h0-confirmation-source-fidelity-and-linkage R5.1
+            -->
+            <el-button
+              v-if="!readonly && isH0"
+              size="small"
+              :loading="h0Pulling"
+              title="按源模板 VLOOKUP 关系，从 H0-2 核实被函证单位信息带入 7 列（匹配键=询证函索引号）"
+              @click="handleH0PullFromEntityVerify"
+            >
+              从 H0-2 带入
+            </el-button>
             <el-tag
               v-if="syncStatusSummary.total > 0"
               size="small"
@@ -123,6 +137,119 @@
           />
         </template>
 
+        <!-- F0 函证情况矩阵（4品种×8指标，从 grid + F0-5/F0-6 自动聚合） -->
+        <div v-if="isF0" class="gt-confirmation-summary__f0-matrix">
+          <el-collapse v-model="expandedSections">
+            <el-collapse-item title="一、函证情况" name="f0-matrix">
+              <div class="gt-confirmation-summary__f0-matrix-table">
+                <el-table v-loading="f0SourcesLoading" :data="f0MatrixTableData" border size="small" style="width: 100%">
+                  <el-table-column prop="label" label="项目" width="260" fixed />
+                  <el-table-column
+                    v-for="cat in F0_MATRIX_CATEGORIES"
+                    :key="cat"
+                    :label="cat"
+                    align="right"
+                    min-width="130"
+                  >
+                    <template #default="{ row }">
+                      <!-- 账面金额行：可手工填写（四表取不到时的唯一入口） -->
+                      <el-input
+                        v-if="row.editable && !readonly"
+                        :model-value="row[cat] === null ? '' : String(row[cat])"
+                        size="small"
+                        placeholder="—"
+                        style="text-align:right"
+                        @change="(v: string) => handleF0MatrixOverride(cat, row.label, v)"
+                      />
+                      <span v-else-if="row[cat] === null" class="f0-matrix-empty">-</span>
+                      <span v-else-if="row.kind === 'ratio'" class="f0-matrix-ratio">{{ (row[cat] * 100).toFixed(2) }}%</span>
+                      <span v-else class="f0-matrix-amount">{{ fmtMatrixAmount(row[cat]) }}</span>
+                    </template>
+                  </el-table-column>
+                </el-table>
+                <div class="gt-confirmation-summary__f0-matrix-hint">
+                  <el-text type="info" size="small">
+                    发函金额 / 回函确认金额 / 替代测试确认金额均按源模板公式自上区明细表聚合（依次取「金额」「可确认金额」「替代后可确认金额」三列）；账面金额取自 F1/F3/F4 审定表（可手工覆盖）。「-」表示数据缺失。
+                  </el-text>
+                  <div v-if="f0SourceHint" style="margin-top:4px">
+                    <el-text type="success" size="small">{{ f0SourceHint }}</el-text>
+                    <el-button link size="small" :loading="f0SourcesLoading" style="margin-left:8px" @click="loadF0Sources">🔄 刷新取数</el-button>
+                  </div>
+                  <!-- 取数失败如实暴露（_silent 不弹窗，但不能连提示都没有） -->
+                  <div v-if="f0SourceErrors.length" style="margin-top:4px">
+                    <el-text type="warning" size="small">
+                      取数未完成：{{ f0SourceErrors.join('；') }}
+                    </el-text>
+                  </div>
+                  <!-- 勾稽：上区「替代后可确认金额」合计 ?= F0-5 + F0-6 凭证金额合计 -->
+                  <div v-if="f0AltCheck && f0AltCheck.level !== 'no-data'" style="margin-top:4px">
+                    <el-tag :type="f0AltCheck.level === 'ok' ? 'success' : 'danger'" size="small" effect="plain">
+                      {{ f0AltCheck.level === 'ok' ? '替代确认勾稽通过' : '替代确认勾稽不符' }}
+                    </el-tag>
+                    <el-text :type="f0AltCheck.level === 'ok' ? 'success' : 'danger'" size="small" style="margin-left:6px">
+                      {{ f0AltCheck.message }}
+                    </el-text>
+                  </div>
+                  <div v-if="f0AltOverlapCount > 0" style="margin-top:4px">
+                    <el-text type="warning" size="small">
+                      提示：有 {{ f0AltOverlapCount }} 行「可确认金额」与「替代后可确认金额」相等（积极式未回函行由替代金额派生），
+                      末行比例按源模板公式 (替代+回函)/账面 计算时该部分会计入两次，请复核该行 Y 列口径。
+                    </el-text>
+                  </div>
+                </div>
+              </div>
+            </el-collapse-item>
+          </el-collapse>
+        </div>
+
+        <!--
+          H0（固定资产循环函证）下区四块专属组件：
+          一、函证情况（品种×8指标矩阵）/ 二、样本选择 / 三、审计说明 / 四、审计结论
+          源模板 `函证结果汇总表H0-1` R28~R37 + R42~R69。
+          🔴 `v-if="isH0"` 门控 → 其余六枢纽模板逐字节不变。
+          spec: h0-confirmation-source-fidelity-and-linkage R2.1
+        -->
+        <H0SummaryLowerZone
+          v-if="isH0"
+          ref="h0LowerRef"
+          :rows="data.rows.value"
+          :readonly="readonly"
+          :responses="h0Responses"
+          :book-amounts="h0BookAmounts"
+          :book-source-codes="h0BookSourceCodes"
+          :book-conflicts="h0BookConflicts"
+          :category-options="h0CategoryOptions"
+          :refreshing="h0Refreshing"
+          :ai-loading-key="h0AiLoadingKey"
+          @save="handleH0LowerSave"
+          @ai-generate="handleH0LowerAi"
+          @review="handleH0LowerReview"
+          @refresh-book-amounts="handleH0RefreshBookAmounts"
+        />
+
+        <!--
+          G0（投资循环函证）下区专属组件：
+          一、函证情况（8 品种 × 8 指标矩阵）/ 三、审计说明（5 项）/ 四、审计结论 / 编制说明
+          🔴 **不含「二、样本选择」** —— 那由下方既有 `ConfirmationSampling`（`isG0` → 6 项）承担，
+             两处都渲染会让同一份 `SamplingConfig` 有两个录入口（双真源）。
+          🔴 `v-if="isG0"` 门控 → 其余六枢纽模板逐字节不变。
+          spec: g0-confirmation-source-alignment R3.1~R3.5 / R3.7~R3.11
+        -->
+        <G0SummaryLowerZone
+          v-if="isG0"
+          ref="g0LowerRef"
+          :rows="data.rows.value"
+          :readonly="readonly"
+          :responses="g0Responses"
+          :book-amounts="g0Sources?.bookAmounts"
+          :diagnostics="g0Sources?.diagnostics"
+          :refreshing="g0SourcesLoading"
+          :ai-loading-key="g0AiLoadingKey"
+          @save="handleG0LowerSave"
+          @ai-generate="handleG0LowerAi"
+          @refresh-book-amounts="loadG0Sources"
+        />
+
         <!-- 辅助区（默认折叠） -->
         <el-collapse v-model="expandedSections">
           <el-collapse-item title="样本选择" name="sampling">
@@ -130,6 +257,7 @@
               :data="data.sampling.value"
               :readonly="readonly"
               :dict-data="dictData"
+              :cycle="confirmCycle"
               :total-count="data.rows.value.length"
               :total-amount="data.rows.value.reduce((sum, r) => sum + (r.amount || 0), 0)"
               :sample-count="data.rows.value.length"
@@ -196,12 +324,42 @@ import { ref, computed, defineAsyncComponent, onMounted, onUnmounted, onBeforeUn
 import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
+// 🔴 与 `http` 并存是有意的：`http.get()` 返回 AxiosResponse（payload 在 .data），
+//    `api.get()` 直接返回业务数据。跨底稿取数一律用 `api`（平台 20+ 处同形）。
+import { api } from '@/services/apiProxy'
 import { useConfirmationData } from './composables/useConfirmationData'
 import { useViewMode } from './composables/useViewMode'
 import { syncHubFromSummary, hubStatusToRowPatch, accountTypeToHubType, rowToHubStatus } from './coordination/syncHubFromSummary'
 import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
 import { emitConfirmationCompletedFromSummary, isConfirmationInFlight } from './coordination/emitConfirmationCompleted'
 import { importE0ListsToSummary } from './coordination/importE0ListsToSummary'
+import { buildCrossRefRules, getCycleConfirmationMeta } from './coordination/cycleConfirmationMeta'
+import { CONFIRMATION_DICTS, fallbackOptions } from './coordination/confirmationDicts'
+import H0SummaryLowerZone from './H0SummaryLowerZone.vue'
+import { H0_SLOT_LABELS } from './h0SummaryMatrix'
+import G0SummaryLowerZone from '../g0-confirmation/G0SummaryLowerZone.vue'
+import {
+  loadG0MatrixSources,
+  type G0MatrixSources,
+} from '../g0-confirmation/g0MatrixDataSources'
+import { G0_AUDIT_NOTE_DEFS, G0_LOWER_KEY_PREFIX } from '../g0-confirmation/g0SummaryLowerZone'
+import {
+  describeH0PullResult,
+  pullH0SummaryFromEntityVerify,
+} from './h0SummaryFromEntityVerify'
+import type { EntityVerifyRow } from './entityVerify/entityVerifyTypes'
+import {
+  buildF0SummaryMatrix,
+  checkAltConsistency,
+  detectAltOverlapRows,
+  F0_MATRIX_CATEGORIES,
+  F0_MATRIX_LABELS,
+  type F0MatrixCell,
+  type F0Category,
+  type F0Metric,
+  type F0AltConsistency,
+} from './composables/f0SummaryAggregation'
+import { loadF0MatrixSources, matrixOverrideItemId, type F0MatrixSources } from './composables/f0MatrixDataSources'
 import type { ConfirmationRow } from './confirmationTypes'
 
 import ConfirmationDashboard from './ConfirmationDashboard.vue'
@@ -247,6 +405,478 @@ const confirmCycle = computed<import('./confirmationColumnSpec').ConfirmCycle>((
 // E0（货币资金/借款）循环：提供「从发函清单（E0-3~E0-6）带入」入口
 const isE0 = computed(() => confirmCycle.value === 'E0')
 const importingLists = ref(false)
+
+// F0（存货循环函证）：矩阵聚合
+const isF0 = computed(() => confirmCycle.value === 'F0')
+
+// ─── H0（固定资产循环函证）下区四块 ─────────────────────────────────────────
+
+const isH0 = computed(() => confirmCycle.value === 'H0')
+const h0LowerRef = ref<{ applyAiText: (key: string, text: string) => void } | null>(null)
+const h0Responses = ref<Record<string, string>>({})
+const h0Refreshing = ref(false)
+const h0AiLoadingKey = ref<string | null>(null)
+
+/**
+ * 后端加法式注入的按品种账面金额（`_inject_h0_book_amounts`）。
+ *
+ * 🔴 两态必须可区分（h0 spec R3.8 / Error Handling）：
+ * - **键不存在** = 注入整体失败 / 未取数 → 前端渲染「未取数，可手填」
+ * - 键存在且值为 `null` = 本项目科目表无该科目 → 渲染「本项目无此科目」
+ * 故此处用 `?.` 取值后**不做 `?? {}` 兜底成空对象**：`undefined` 与 `{}` 语义不同。
+ */
+const h0BookAmounts = computed<Record<string, number | null> | undefined>(() => {
+  const v = props.htmlData?.project_context?.h0_book_amounts
+  return v && typeof v === 'object' ? (v as Record<string, number | null>) : undefined
+})
+const h0BookSourceCodes = computed<Record<string, Record<string, unknown>> | undefined>(() => {
+  const v = props.htmlData?.project_context?.h0_book_source_codes
+  return v && typeof v === 'object' ? (v as Record<string, Record<string, unknown>>) : undefined
+})
+/**
+ * `report_config` 与项目科目表的冲突告警。
+ *
+ * 🔴 后端下发的是**三元组** `[槽键, 报表公式给的码集合, 按名定位到的实际码]`
+ * （`SemanticAccountResult.conflicts`），直接 `String(...)` 会渲染成
+ * `impairment,1601,1602,1606,1603` 这种读不出含义的裸串（浏览器实测暴露）。
+ * 审计 UI 必须能追溯逻辑 → 在此翻成中文句子。
+ */
+const h0BookConflicts = computed<string[]>(() => {
+  const v = props.htmlData?.project_context?.h0_book_conflicts
+  if (!Array.isArray(v)) return []
+  return v.map((c) => {
+    if (Array.isArray(c) && c.length >= 3) {
+      const [slot, reportCodes, actualCodes] = c.map((x) => String(x ?? ''))
+      const label = H0_SLOT_LABELS[slot] || slot
+      return `「${label}」槽：报表行公式引用 ${reportCodes || '（空）'}，`
+        + `而本项目科目表按名定位到 ${actualCodes || '（无）'} —— 已以科目表为准，请复核报表行公式。`
+    }
+    return String(c)
+  })
+})
+
+/** 矩阵可选品种 = 「账户/交易」枚举（品种名不在其中则按品种 SUMIF 恒空） */
+const h0CategoryOptions = computed<string[]>(
+  () => [...fallbackOptions(CONFIRMATION_DICTS.ACCOUNT_TYPE)],
+)
+
+/** 拉取下区录入值（矩阵品种列 / 样本选择 / 审计说明 / 结论 的 checklist responses） */
+async function loadH0Responses() {
+  if (!isH0.value || !props.wpId) return
+  try {
+    // 🔴 必须带 `/api` 前缀 —— `utils/http` 的 baseURL 是 `/`，且 vite 只代理 `/api`；
+    //    漏掉会打到 dev server 拿回 index.html（200 + HTML），`Array.isArray` 判否后
+    //    静默变成空 map（本函数改造前即如此，浏览器实测暴露）。
+    const res = await http.get(`/api/workpapers/${props.wpId}/checklist-responses`)
+    const list = (res.data?.data ?? res.data ?? []) as Array<Record<string, any>>
+    const map: Record<string, string> = {}
+    for (const item of Array.isArray(list) ? list : []) {
+      const id = String(item.item_id ?? item.itemId ?? '')
+      if (!id.startsWith('H0-1-')) continue
+      const v = item.remark ?? item.conclusion ?? item.value ?? ''
+      map[id] = v === null || v === undefined ? '' : String(v)
+    }
+    h0Responses.value = map
+  } catch (e: any) {
+    console.warn('[GtConfirmationSummary] H0 下区录入值加载失败:', e?.message)
+  }
+}
+
+/**
+ * 下区录入落库。
+ *
+ * 🔴🔴 **不能** `emit('save', { itemId, value })`：`confirmation-summary` 的宿主 save
+ * 处理器把载荷整体写成该 sheet 的 `parsed_data.html_data[sheetName]` —— 浏览器实测
+ * （项目 `c8621493`）曾把 `html_data['函证结果汇总表H0-1']` 整体覆盖成
+ * `{"itemId":"H0-1-matrix-seq","value":"4"}`，**连带清掉函证行**。
+ * 下区录入是 itemId 维度的，必须直接走平台标准 `checklist-responses` PUT
+ * （与 `useF2FormData.saveImmediate` 等 40+ 处同形）。
+ */
+async function handleH0LowerSave(itemId: string, value: string) {
+  h0Responses.value = { ...h0Responses.value, [itemId]: value }
+  if (!props.wpId) return
+  try {
+    const payload: Record<string, any> = {
+      items: [{ item_id: itemId, remark: value, conclusion: null }],
+    }
+    // 空字符串会让后端 UUID 校验 422；缺省时服务端按底稿解析 project_id
+    if (props.projectId) payload.project_id = props.projectId
+    await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, payload)
+  } catch (e: any) {
+    console.warn('[GtConfirmationSummary] H0 下区录入保存失败:', e?.message)
+    ElMessage.warning('保存失败：' + (e?.message || '网络错误'))
+  }
+}
+
+/** 重新拉 render-config 让后端重算账面金额（四表重新入库后用） */
+async function handleH0RefreshBookAmounts() {
+  if (!props.wpId) {
+    ElMessage.warning('缺少底稿标识，无法刷新取数')
+    return
+  }
+  h0Refreshing.value = true
+  try {
+    await http.get(`/workpapers/${props.wpId}/render-config`)
+    ElMessage.success('已请求后端重算账面金额，请刷新页面查看最新取数')
+  } catch (e: any) {
+    ElMessage.error(`刷新取数失败：${e?.message || '未知错误'}`)
+  } finally {
+    h0Refreshing.value = false
+  }
+}
+
+/** 下区审计说明/结论的 AI 辅助（走平台唯一正解端点 /ai/generate-text） */
+async function handleH0LowerAi(aiSection: string, key: string) {
+  if (!props.wpId) {
+    ElMessage.warning('缺少底稿标识，无法调用 AI')
+    return
+  }
+  h0AiLoadingKey.value = key
+  try {
+    // H0 专属 AI 端点（`_h0_confirmation_ai.py`）；section 必须在其
+    // `_SUPPORTED_SECTIONS` 已登记，否则 400。载荷字段名为
+    // `existingContent` / `relatedContext`（驼峰），传错会被静默忽略。
+    const res = await http.post(`/workpapers/${props.wpId}/h0/ai-generate`, {
+      section: aiSection,
+      existingContent: h0Responses.value[key] ?? '',
+      relatedContext: {
+        底稿编码: String(props.wpCode || 'H0-1'),
+        函证行数: String(data.rows.value.length),
+        已回函行数: String(data.rows.value.filter((r: ConfirmationRow) => r.is_replied === '是' || r.is_replied === true).length),
+        不符行数: String(data.rows.value.filter((r: ConfirmationRow) => r.match_status === '不符').length),
+      },
+    })
+    const content = String((res.data?.data ?? res.data)?.content ?? '')
+    if (!content) {
+      ElMessage.warning('AI 未返回内容')
+      return
+    }
+    h0LowerRef.value?.applyAiText(key, content)
+    ElMessage.success('AI 已生成，请复核后保存')
+  } catch (e: any) {
+    ElMessage.error(`AI 生成失败：${e?.message || '未知错误'}`)
+  } finally {
+    h0AiLoadingKey.value = null
+  }
+}
+
+// ─── H0：从 H0-2 带入 7 列（源模板 VLOOKUP） ────────────────────────────────
+
+const h0Pulling = ref(false)
+
+async function handleH0PullFromEntityVerify() {
+  if (!props.projectId) {
+    ElMessage.warning('缺少项目标识，无法定位 H0-2')
+    return
+  }
+  if (!data.rows.value.length) {
+    ElMessage.warning('请先在明细表录入函证行')
+    return
+  }
+
+  let mode: 'fill_blank' | 'overwrite' = 'fill_blank'
+  try {
+    await ElMessageBox.confirm(
+      '「仅补空值」保留已填内容（推荐，手工优先）；「覆盖全部」用 H0-2 的值覆盖本表这 7 列。',
+      '从 H0-2 带入',
+      {
+        confirmButtonText: '仅补空值',
+        cancelButtonText: '覆盖全部',
+        distinguishCancelAndClose: true,
+        type: 'info',
+      },
+    )
+  } catch (e: any) {
+    if (e === 'close' || e?.toString?.() === 'close') return // 右上角关闭 = 取消
+    mode = 'overwrite'
+  }
+
+  h0Pulling.value = true
+  try {
+    const entityRows = await fetchH0EntityVerifyRows()
+    if (!entityRows.length) {
+      ElMessage.warning('H0-2 尚无核实记录，或该底稿未编制')
+      return
+    }
+    const result = pullH0SummaryFromEntityVerify({
+      summaryRows: data.rows.value,
+      entityRows,
+      mode,
+    })
+    if (result.matched > 0) {
+      // 持久化：与本组件其它写入路径同源（buildPayload + emit save）
+      emit('save', data.buildPayload())
+    }
+    const msg = describeH0PullResult(result)
+    if (result.matched > 0) ElMessage.success(msg)
+    else ElMessage.info(msg)
+  } catch (e: any) {
+    ElMessage.error(`带入失败：${e?.message || '未知错误'}`)
+  } finally {
+    h0Pulling.value = false
+  }
+}
+
+/**
+ * 读 H0-2 的 entity-verify-v1 行（按 wp_code 解析底稿 → 取 html_data）。
+ *
+ * 🔴 两处踩坑（2026-08-04 浏览器实测暴露，改造前该按钮恒报「未找到底稿 H0-2」）：
+ * 1. **端点** —— 平台按 wp_code 解析底稿的唯一入口是
+ *    `/api/custom-query/wp-id-by-code?project_id=&wp_code=`（20+ 处在用）；
+ *    `/projects/{id}/workpapers/wp-id-by-code` 不存在。
+ * 2. **http 客户端** —— 必须用 `@/services/apiProxy` 的 `api`（直接返回业务数据）；
+ *    `@/utils/http` 返回 AxiosResponse，`res.wp_id` 恒 undefined。
+ *    且 `utils/http` 的 baseURL 是 `/`、vite 只代理 `/api` → 漏前缀会拿回 index.html。
+ */
+async function fetchH0EntityVerifyRows(): Promise<EntityVerifyRow[]> {
+  const meta = getCycleConfirmationMeta(props.wpCode)
+  const idRes = await api.get<{ wp_id?: string }>('/api/custom-query/wp-id-by-code', {
+    params: { project_id: props.projectId, wp_code: meta.entityVerifyCode },
+    _silent: true,
+  } as any)
+  const wpId = (idRes as any)?.wp_id
+  if (!wpId) throw new Error(`未找到底稿 ${meta.entityVerifyCode}`)
+
+  const cfg = await api.get<any>(`/api/workpapers/${wpId}/render-config`, { _silent: true } as any)
+  const sheets = cfg?.sheets ?? cfg?.data?.sheets ?? []
+  for (const sheet of sheets) {
+    const hd = sheet?.html_data ?? sheet?.htmlData
+    if (hd && hd._format === 'entity-verify-v1' && Array.isArray(hd.rows)) {
+      return hd.rows as EntityVerifyRow[]
+    }
+  }
+  return []
+}
+
+function handleH0LowerReview(key: string) {
+  eventBus.emit('wp:review-request', {
+    wpId: props.wpId,
+    wpCode: props.wpCode,
+    sectionId: `H0-1-lower-${key}`,
+  } as any)
+}
+
+// ─── G0（投资循环函证）下区（矩阵 + 审计说明 + 审计结论 + 编制说明） ─────────
+// spec: g0-confirmation-source-alignment Task 9（R3.1~R3.5 / R3.7~R3.11）
+// 🔴 「二、样本选择」不在这里 —— 由 `ConfirmationSampling`（`:cycle` → isG0 → 6 项）承担。
+
+const isG0 = computed(() => confirmCycle.value === 'G0')
+const g0LowerRef = ref<{ applyAiText: (key: string, text: string) => void } | null>(null)
+const g0Responses = ref<Record<string, string>>({})
+const g0Sources = ref<G0MatrixSources | null>(null)
+const g0SourcesLoading = ref(false)
+const g0AiLoadingKey = ref<string | null>(null)
+
+/**
+ * 拉取下区**已持久化**录入值（审计说明 5 段 / 结论 / 矩阵手工覆盖 / 自定义品种）。
+ *
+ * 🔴 必须走 `/checklist-responses`（持久化），**不能**用 `html_data.responses_snapshot` ——
+ * 后者含 Tier A 公式预设（`TB('1504')` 等）的 transient 种子，一旦被
+ * `parseG0ManualOverrides` 当成手工覆盖，那 5 个在客户科目表根本不存在的品种就会把
+ * 「本项目无此科目」压成假 0（`Number(null) === 0` 同族坑）。
+ * 三级优先级 = 手工编辑值 > 语义定位值(tb_amount) > prefill 种子。
+ */
+async function loadG0Responses() {
+  if (!isG0.value || !props.wpId) return
+  try {
+    // 🔴 必须带 `/api` 前缀 —— `utils/http` 的 baseURL 是 `/`，且 vite 只代理 `/api`；
+    //    漏掉会打到 dev server 拿回 index.html（200 + HTML），`Array.isArray` 判否后
+    //    静默变成空 map（既有 `loadH0Responses` 就漏了 `/api`，已在报告中登记）。
+    const res = await http.get(`/api/workpapers/${props.wpId}/checklist-responses`)
+    const list = (res.data?.data ?? res.data ?? []) as Array<Record<string, any>>
+    const map: Record<string, string> = {}
+    for (const item of Array.isArray(list) ? list : []) {
+      const id = String(item.item_id ?? item.itemId ?? '')
+      if (!id.startsWith('G0-1-')) continue
+      const v = item.remark ?? item.conclusion ?? item.value ?? ''
+      map[id] = v === null || v === undefined ? '' : String(v)
+    }
+    g0Responses.value = map
+  } catch (e: any) {
+    console.warn('[GtConfirmationSummary] G0 下区录入值加载失败:', e?.message)
+  }
+}
+
+/** 并行拉 G1/G4/G5/G6/G7/G8/G9/G10 的 `project_context.tb_amount` 作矩阵账面金额 */
+async function loadG0Sources() {
+  if (!isG0.value) return
+  g0SourcesLoading.value = true
+  try {
+    g0Sources.value = await loadG0MatrixSources(props.projectId)
+  } finally {
+    g0SourcesLoading.value = false
+  }
+}
+
+/** 下区录入落库（单条，交由宿主 save 处理器写 checklist_responses） */
+function handleG0LowerSave(itemId: string, value: string) {
+  g0Responses.value = { ...g0Responses.value, [itemId]: value }
+  emit('save', { itemId, value })
+}
+
+/** 下区审计说明/结论的 AI 辅助（通用端点 /ai/generate-text，context 值必须全为字符串） */
+async function handleG0LowerAi(aiSection: string, key: string) {
+  if (!props.wpId) {
+    ElMessage.warning('缺少底稿标识，无法调用 AI')
+    return
+  }
+  g0AiLoadingKey.value = key
+  try {
+    const noteDef = G0_AUDIT_NOTE_DEFS.find((d) => d.key === key)
+    const itemId = noteDef
+      ? `${G0_LOWER_KEY_PREFIX}audit-note-${noteDef.seq}`
+      : `${G0_LOWER_KEY_PREFIX}conclusion`
+    const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: aiSection,
+      prompt: noteDef
+        ? `请按源模板口径撰写 G0-1 投资循环函证结果汇总表「${noteDef.title}」的内容，只使用下方上下文中的事实，无数据处写「[待补充]」，不得虚构金额或结论。`
+        : '请按源模板口径撰写 G0-1 投资循环函证的审计结论，只使用下方上下文中的事实，无数据处写「[待补充]」，不得虚构金额或结论。',
+      existingContent: g0Responses.value[itemId] ?? '',
+      context: {
+        底稿编码: String(props.wpCode || 'G0-1'),
+        函证行数: String(data.rows.value.length),
+        已回函行数: String(
+          data.rows.value.filter((r: ConfirmationRow) => r.is_replied === '是' || r.is_replied === true).length,
+        ),
+        不符行数: String(data.rows.value.filter((r: ConfirmationRow) => r.match_status === '不符').length),
+        账面金额已取数品种: (g0Sources.value?.diagnostics.bookResolved ?? []).join('、') || '无',
+      },
+    })
+    const content = String((res.data?.data ?? res.data)?.content ?? '')
+    if (!content) {
+      ElMessage.warning('AI 未返回内容')
+      return
+    }
+    g0LowerRef.value?.applyAiText(key, content)
+    ElMessage.success('AI 已生成，请复核后保存')
+  } catch (e: any) {
+    ElMessage.error(`AI 生成失败：${e?.message || '未知错误'}`)
+  } finally {
+    g0AiLoadingKey.value = null
+  }
+}
+
+// F0 矩阵数据源（账面金额 ← F1/F3/F4 tb_amount；替代确认 ← F0-5/F0-6 companies）
+const f0Sources = ref<F0MatrixSources | null>(null)
+const f0SourcesLoading = ref(false)
+
+/** 手工覆盖（仅「本期（期末）账面金额」行可填），持久化到 F0-1-matrix-{品种}-{指标} */
+const f0ManualOverrides = ref<Record<string, number>>({})
+
+async function loadF0Sources() {
+  if (!isF0.value) return
+  f0SourcesLoading.value = true
+  try {
+    f0Sources.value = await loadF0MatrixSources(props.projectId, props.wpId)
+  } finally {
+    f0SourcesLoading.value = false
+  }
+}
+
+onMounted(() => {
+  if (isH0.value) void loadH0Responses()
+  if (isF0.value) void loadF0Sources()
+  if (isG0.value) {
+    void loadG0Responses()
+    void loadG0Sources()
+  }
+})
+
+// F0 矩阵：从 grid rows + 四表账面额 + 替代程序合计实时聚合 4品种 × 8指标
+const f0Matrix = computed<F0MatrixCell[][] | null>(() => {
+  if (!isF0.value) return null
+  return buildF0SummaryMatrix({
+    rows: data.rows.value,
+    bookAmounts: f0Sources.value?.bookAmounts,
+    manualOverrides: f0ManualOverrides.value,
+  })
+})
+
+/**
+ * F0 替代确认金额勾稽：上区 Y 列合计 ?= F0-5 + F0-6 凭证金额合计。
+ *
+ * 矩阵 R36 一律按源模板 SUMIF(E,品种,Y) 取上区 Y 列；F0-5/F0-6 底稿合计只用来
+ * 提示「Y 列漏填 / 替代程序底稿漏编」，绝不反推品种归属（Task 28 已删该编造逻辑）。
+ */
+const f0AltCheck = computed<F0AltConsistency | null>(() => {
+  if (!isF0.value) return null
+  return checkAltConsistency({
+    rows: data.rows.value,
+    altF05Totals: f0Sources.value?.altF05Totals,
+    altF06Totals: f0Sources.value?.altF06Totals,
+  })
+})
+
+/** R37「回函和替代确认金额占账面金额的比例」双算风险行（U 与 Y 相等的未回函行） */
+const f0AltOverlapCount = computed(() => {
+  if (!isF0.value) return 0
+  return detectAltOverlapRows(data.rows.value).length
+})
+
+/** 写入手工覆盖并持久化（空值 = 撤销覆盖，回落自动取数值） */
+function handleF0MatrixOverride(category: F0Category, metric: F0Metric, raw: unknown) {
+  const key = `${category}::${metric}`
+  const num = Number(raw)
+  const itemId = matrixOverrideItemId(category, metric)
+
+  if (raw === '' || raw == null || !Number.isFinite(num)) {
+    delete f0ManualOverrides.value[key]
+    emit('save', { itemId, value: '' })
+    return
+  }
+  f0ManualOverrides.value = { ...f0ManualOverrides.value, [key]: num }
+  emit('save', { itemId, value: String(num) })
+}
+
+/** 溯源提示：账面金额取数状态 */
+const f0SourceHint = computed(() => {
+  const d = f0Sources.value?.diagnostics
+  if (!d) return ''
+  const parts: string[] = []
+  if (d.bookResolved.length) parts.push(`账面金额已取数：${d.bookResolved.join('、')}`)
+  if (d.bookMissing.length) parts.push(`待手工填写：${d.bookMissing.join('、')}`)
+  if (d.altF05Found || d.altF06Found) {
+    const found = [d.altF05Found ? 'F0-5' : '', d.altF06Found ? 'F0-6' : ''].filter(Boolean)
+    parts.push(`替代程序已带入：${found.join('、')}`)
+  }
+  return parts.join('　|　')
+})
+
+/**
+ * 取数错误提示。
+ *
+ * 🔴 `loadF0MatrixSources` 全程 `_silent: true`（不弹 ElMessage 打断用户），
+ * 错误都收进 `diagnostics.errors`。上一版**只渲染 bookResolved/bookMissing 从不渲染 errors**
+ * → 取数整条链路失效时界面只显示「待手工填写」，与「本项目确实没这科目」不可区分，
+ * 排查时也看不到线索（2026-08-03 实测正是这样掩盖了 http/apiProxy 形态错用）。
+ */
+const f0SourceErrors = computed(() => f0Sources.value?.diagnostics.errors ?? [])
+
+// F0 矩阵转为 el-table 行数据（按指标行 × 品种列）
+const f0MatrixTableData = computed(() => {
+  if (!f0Matrix.value) return []
+  return F0_MATRIX_LABELS.map((label, metricIdx) => {
+    const firstCell = f0Matrix.value![0][metricIdx]
+    const row: Record<string, unknown> = {
+      label,
+      kind: firstCell.kind,
+      editable: firstCell.editable,
+    }
+    for (let catIdx = 0; catIdx < F0_MATRIX_CATEGORIES.length; catIdx++) {
+      const cell = f0Matrix.value![catIdx][metricIdx]
+      row[F0_MATRIX_CATEGORIES[catIdx]] = cell.value
+    }
+    return row
+  })
+})
+
+/** F0 矩阵金额格式化 */
+function fmtMatrixAmount(v: number | null): string {
+  if (v === null || v === undefined) return '-'
+  return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+
 
 // ─── 数据核心 ────────────────────────────────────────────────────────────────
 
@@ -384,13 +1014,9 @@ const formulaRules = [
   { field: '回函率', formula: '= 已回函笔数 / 已发函笔数 × 100%', source: '看板汇总' },
   { field: '函证覆盖率（科目总体）', formula: '= 函证发出总额 / 科目审定总额 × 100%（需接入试算表审定总额，暂未计算）', source: '待接入 TB' },
 ]
-const crossRefRules = [
-  { field: '函证金额', target: 'TB 试算表', rule: '应与科目审定余额(audited_amount)核对一致' },
-  { field: '差异金额', target: 'D0-4 差异调节', rule: '不符项跳转到 D0-4 差异调节表编制' },
-  { field: '替代确认', target: 'D0-5/D0-6', rule: '未回函项跳转到替代程序底稿确认' },
-  { field: '回函可靠性', target: 'D0-7', rule: '电子回函需跳转 D0-7 验证可靠性' },
-  { field: '舞弊风险', target: 'D0-8/B50', rule: '异常迹象需记录到 D0-8 并汇总至 B50 风险评估' },
-]
+// Task 4: CrossRef 规则改按循环动态解析（e0-confirmation-completion R4），不再写死 D0-*
+// props.wpCode 是响应式 prop，切换循环时 computed 自动重算
+const crossRefRules = computed(() => buildCrossRefRules(props.wpCode))
 
 /** 默认展开：数据充分(≥3条)时展开看板，数据少时折叠（减少视觉干扰） */
 const expandedSections = ref<string[]>(data.rows.value.length >= 3 ? ['dashboard'] : [])
@@ -418,12 +1044,25 @@ const dashboardTitle = computed(() => {
   return `函证情况统计（${count} 条函证）`
 })
 
-// TODO: dictData 从 useDictStore 获取（暂用内置默认值，用户可自定义输入扩展）
+/**
+ * 枚举取值 —— 单一真源 `CONFIRMATION_DICT_FALLBACK`（coordination/confirmationDicts.ts）。
+ *
+ * 🔴 改造前这里是 4 行内置字面量数组，且**与后端 system_dicts 不一致**：
+ * `confirmation_account_type` 只有 7 项（后端 22 项）→ H 循环品种
+ * （固定资产/工程物资/使用权资产/租赁负债…）一个都选不出来 → H0-1 下区矩阵
+ * 按「账户/交易」列 SUMIF 分品种，品种名选不出即恒空。
+ * spec: h0-confirmation-source-fidelity-and-linkage R1.1/R1.3
+ *
+ * 「函证方式」列绑 SEND_CHANNEL（发函渠道，源模板 X0-2!C7）而非 METHOD（积极式/消极式）——
+ * 源模板 X0-1!G 列由 VLOOKUP 自 X0-2!C 列带入，两处必须同枚举。
+ */
 const dictData = ref<Record<string, any[]>>({
-  confirmation_account_type: ['应收账款', '应付账款', '银行存款', '合同负债', '其他应收款', '预付账款', '长期应收款'],
-  confirmation_method: ['积极式', '消极式'],
-  confirmation_reply_method: ['邮寄', '传真', '电子邮件', '第三方平台', '当面递交'],
-  confirmation_match: ['相符', '不符', '未回函', '部分相符'],
+  [CONFIRMATION_DICTS.ACCOUNT_TYPE]: [...fallbackOptions(CONFIRMATION_DICTS.ACCOUNT_TYPE)],
+  [CONFIRMATION_DICTS.METHOD]: [...fallbackOptions(CONFIRMATION_DICTS.METHOD)],
+  [CONFIRMATION_DICTS.SEND_CHANNEL]: [...fallbackOptions(CONFIRMATION_DICTS.SEND_CHANNEL)],
+  [CONFIRMATION_DICTS.SAMPLE_PURPOSE]: [...fallbackOptions(CONFIRMATION_DICTS.SAMPLE_PURPOSE)],
+  [CONFIRMATION_DICTS.REPLY_METHOD]: [...fallbackOptions(CONFIRMATION_DICTS.REPLY_METHOD)],
+  [CONFIRMATION_DICTS.MATCH_STATUS]: [...fallbackOptions(CONFIRMATION_DICTS.MATCH_STATUS)],
 })
 
 // ─── 事件处理 ────────────────────────────────────────────────────────────────
@@ -434,6 +1073,7 @@ function handleAdd() {
   hasInteracted.value = true
   try {
     data.addRow()
+    markDirty()
   } catch (e: any) {
     console.warn('[GtConfirmationSummary] handleAdd error:', e?.message)
   }
@@ -555,6 +1195,7 @@ function handleDelete() {
   hasInteracted.value = true
   data.deleteRows(selectedIds.value)
   selectedIds.value = []
+  markDirty()
 }
 
 /**
@@ -722,10 +1363,12 @@ function handleRowClick(row: ConfirmationRow) {
 function handleFieldUpdate(field: string, value: any) {
   if (!currentRow.value?._row_id) return
   data.updateField(currentRow.value._row_id, field, value)
+  markDirty()
 }
 
 function handleGridUpdate(rowId: string, field: string, value: any) {
   data.updateField(rowId, field, value)
+  markDirty()
 }
 
 function handleSamplingUpdate(field: string, value: any) {

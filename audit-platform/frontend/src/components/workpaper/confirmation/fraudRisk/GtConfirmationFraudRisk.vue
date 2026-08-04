@@ -66,10 +66,13 @@
 
 <script setup lang="ts">
 import { computed, ref, defineAsyncComponent } from 'vue'
-import { ElMessage } from 'element-plus'
+import { useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import http from '@/utils/http'
 import { useFraudRiskData } from './composables/useFraudRiskData'
 import { useFraudSignalCollector } from '../coordination/useFraudSignalCollector'
 import { filterSummaryRows, fetchWorkpaperHtmlRows, fetchConfirmationSummaryRows } from '../coordination/importFromSummary'
+import { navigateToCycleSheet } from '../coordination/navigateToCycleSheet'
 import type { FraudSignal } from '../coordination/useFraudSignalCollector'
 import FraudRiskDashboard from './FraudRiskDashboard.vue'
 import FraudRiskChecklist from './FraudRiskChecklist.vue'
@@ -147,9 +150,24 @@ function handleExport() {
   console.log('[GtConfirmationFraudRisk] Excel 导出')
 }
 
+/**
+ * 按舞弊迹象条目的 `source_ref` 索引号跨底稿跳转（如 H0-1 / H0-4 / H0-6）。
+ *
+ * 🔴 索引号取自条目自身的 `source_ref`（自动填充时写入本循环的真实编码），
+ *    故此处**不得**写 `'D0-1'` 一类字面量 —— 本组件被七个函证枢纽共享。
+ * 索引号可能带说明后缀（如 `H0-1 低回函率`），取首段编码即可。
+ */
 function handleJumpRef(ref: string) {
-  // TODO: 跨底稿跳转（通过 useConfirmationNavigation）
-  console.log('[GtConfirmationFraudRisk] 跳转索引:', ref)
+  const targetWpCode = String(ref || '').trim().split(/[\s，,、/|]+/)[0]
+  if (!targetWpCode) {
+    ElMessage.info('该条目未登记来源索引号')
+    return
+  }
+  void navigateToCycleSheet({
+    router,
+    projectId: props.projectId,
+    targetWpCode,
+  })
 }
 
 // ─── 舞弊信号收集器 ──────────────────────────────────────────────────────────
@@ -297,9 +315,49 @@ function _ruleFallbackFill(items: any[]) {
   ElMessage.success('上游底稿无可用信号，已用规则预填第 7/10/14/15 条，请逐项确认')
 }
 
+const router = useRouter()
+
 function handleJumpB50() {
-  // TODO: 跳转 B50 风险评估底稿
-  console.log('[GtConfirmationFraudRisk] 跳转 B50')
+  // Task 15: B50 跳转实装（e0-confirmation-completion R10，七枢纽共享）
+  if (!props.projectId) {
+    ElMessage.warning('缺少项目上下文，无法跳转')
+    return
+  }
+
+  // 检查是否有「已识别但无应对措施」的迹象
+  const items = data.items.value
+  const unaddressed = items.filter(
+    (item: any) => item.identified === '是' && !item.response,
+  )
+  if (unaddressed.length > 0) {
+    ElMessageBox.confirm(
+      `有 ${unaddressed.length} 条已识别的舞弊迹象尚未填写应对措施，是否仍要跳转？`,
+      '提示',
+      { confirmButtonText: '继续跳转', cancelButtonText: '返回补齐', type: 'warning' },
+    ).then(() => doJumpB50()).catch(() => { /* 用户取消 */ })
+  } else {
+    doJumpB50()
+  }
+}
+
+async function doJumpB50() {
+  try {
+    // 按 wp_code='B50' 查该项目的 B50 底稿 ID
+    const res = await http.get(`/api/projects/${props.projectId}/workpapers`, {
+      params: { wp_code: 'B50' },
+    })
+    const wpList = res.data?.data ?? res.data ?? []
+    const b50 = Array.isArray(wpList) ? wpList[0] : wpList
+    if (!b50?.id) {
+      ElMessage.warning('该项目暂无 B50 风险评估底稿')
+      return
+    }
+    router.push({
+      path: `/projects/${props.projectId}/workpapers/${b50.id}/edit`,
+    })
+  } catch (err: any) {
+    ElMessage.warning(err?.message || 'B50 底稿跳转失败（查询异常或无权限）')
+  }
 }
 </script>
 

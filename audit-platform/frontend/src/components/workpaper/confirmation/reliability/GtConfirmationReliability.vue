@@ -81,7 +81,10 @@
 
 <script setup lang="ts">
 import { ref, computed, defineAsyncComponent } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { getCycleConfirmationMeta } from '../coordination/cycleConfirmationMeta'
+import { navigateToCycleSheet } from '../coordination/navigateToCycleSheet'
 import { useReliabilityData } from './composables/useReliabilityData'
 import { mapSummaryToReliabilityRow } from './composables/mapD01ReliabilityRow'
 import { filterSummaryRows, defaultElectronicReplyFilter } from '../coordination/importFromSummary'
@@ -105,6 +108,9 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'save', payload: any): void
 }>()
+
+// 🔴 setup 顶层取（useRouter 是 setup 作用域 composable，写进函数体静默失效）
+const router = useRouter()
 
 // ─── 格式检测 ────────────────────────────────────────────────────────────────
 
@@ -353,9 +359,19 @@ async function handleExportData() {
   }
 }
 
+/**
+ * 跳转本循环的函证结果汇总表。
+ * 🔴 目标编码按 `getCycleConfirmationMeta(wpCode).summaryCode` 派生（D0-1/E0-1/…/L0-1），
+ *    禁写 `'D0-1'` 字面量 —— 该组件被七个函证枢纽共享。
+ */
 function handleJumpD01(confirmIndex: string) {
-  // TODO: 跨底稿跳转 D0-1
-  console.log('[GtConfirmationReliability] 跳转 D0-1:', confirmIndex)
+  const meta = getCycleConfirmationMeta(props.wpCode)
+  void navigateToCycleSheet({
+    router,
+    projectId: props.projectId,
+    targetWpCode: meta.summaryCode,
+    confirmIndex,
+  })
 }
 
 function handleAuditNoteUpdate(field: string, value: string) {

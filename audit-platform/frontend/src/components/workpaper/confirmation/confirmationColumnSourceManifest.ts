@@ -154,10 +154,18 @@ const COMMON_KEYS: string[] = [
  */
 export const CONFIRMATION_SOURCE_MANIFEST: Record<ConfirmCycle, string[]> = {
   D0: [...COMMON_KEYS],
-  E0: [...COMMON_KEYS, 'account_no', 'amount_orig', 'fx_rate', 'confirmed_amount_orig'],
+  E0: [...COMMON_KEYS, 'account_no', 'amount_orig', 'fx_rate', 'confirmed_amount_orig', 'pledge_note', 'other_items_match', 'mismatch_note', 'e0_row_conclusion'],
   F0: [...COMMON_KEYS],
-  G0: [...COMMON_KEYS],
-  H0: [...COMMON_KEYS, 'term_book', 'term_reply', 'term_match', 'term_note'],
+  // G0 的 `send_channel` = 源模板「函证方式」列（G0-2!C7:C19 的 DV 实证为渠道
+  // `邮寄/跟函/电子函证/其他`，经 VLOOKUP 带入 G0-1!G），与承载积极式/消极式的
+  // `confirmation_method` 是两个维度 → 源列「函证方式」由 send_channel 承载。
+  // spec: g0-confirmation-source-alignment R2.3
+  G0: [...COMMON_KEYS, 'send_channel'],
+  // H0 的 `send_channel` = 源模板「函证方式」列（DV 实证为渠道 邮寄/跟函/电子函证/其他，
+  // 见 X0-2!C7），与承载积极式/消极式的 `confirmation_method` 是两个维度 →
+  // 源列「函证方式」由 send_channel 承载，故在此登记出处。
+  // spec: h0-confirmation-source-fidelity-and-linkage R7.2
+  H0: [...COMMON_KEYS, 'send_channel', 'term_book', 'term_reply', 'term_match', 'term_note'],
   K0: [...COMMON_KEYS, 'send_memo'],
   L0: [...COMMON_KEYS, 'send_memo'],
 }

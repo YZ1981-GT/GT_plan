@@ -70,27 +70,30 @@ const BLOCK4_COLUMNS: BlockColumnDef[] = [
 ]
 
 export const BLOCK_COLUMN_CONFIGS_H05: Record<string, BlockConfig> = {
+  // 🔴 title 必须与 coordination/alternativeBlockManifest.ALTERNATIVE_BLOCK_MANIFEST.H05
+  // 逐字一致（守卫 __tests__/alternativeH05SourceFidelity.spec.ts）。
+  // 四区块均为源外增强：源模板 H0-5「二、检查过程记录」R11:R19 是空白自由记录区。
   block1: {
     blockType: 'block1',
-    title: '1、期后验收/权属证据检查',
+    title: '①验收权属检查',
     columns: BLOCK1_COLUMNS,
     tips: ['①检查期后验收单、权属证书与账面记录核对'],
   },
   block2: {
     blockType: 'block2',
-    title: '2、期末余额支持性证据',
+    title: '②采购证据检查',
     columns: BLOCK2_COLUMNS,
     tips: ['②检查采购合同、发票、付款凭证等支持性证据'],
   },
   block3: {
     blockType: 'block3',
-    title: '3、本期新增资产检查',
+    title: '③新增资产检查',
     columns: BLOCK3_COLUMNS,
     tips: ['③检查请购审批、到货验收、转固手续'],
   },
   block4: {
     blockType: 'block4',
-    title: '4、抵押担保/融资租赁证据',
+    title: '④抵押/租赁证据',
     columns: BLOCK4_COLUMNS,
     tips: ['④与 H1/L1/L3 抵质押信息交叉核对'],
   },

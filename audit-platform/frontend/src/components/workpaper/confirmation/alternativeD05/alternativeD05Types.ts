@@ -137,6 +137,13 @@ export interface AlternativeCompany {
   block3_rows?: CheckRow[]
   block4_rows?: CheckRow[]
 
+  /**
+   * 检查过程自由记录（对应源模板「二、检查过程记录」的空白自由区）。
+   * H0-5 首个消费者（键语义见 `alternativeH05/h05SourceFidelity.H05_CHECK_RECORD_FREE_KEY`）；
+   * optional 故其余替代程序套别零回归。
+   */
+  check_record_free?: string
+
   /** 审计结论 */
   conclusion?: AuditConclusion
 }

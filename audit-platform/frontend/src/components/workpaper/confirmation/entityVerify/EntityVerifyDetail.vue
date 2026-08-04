@@ -35,6 +35,21 @@
                 <el-input :model-value="row.contact_phone" :disabled="readonly" @update:model-value="(v) => emitUpdate('contact_phone', v)" />
               </el-form-item>
             </el-col>
+            <!--
+              源模板 X0-2 的「被审计单位提供的被函证单位信息」块含邮编与邮箱/传真两列
+              （E6/H6）——改造前平台只在企查查侧有这两列，提供侧无落笔位置。
+              spec: h0-confirmation-source-fidelity-and-linkage R8.2
+            -->
+            <el-col :span="12">
+              <el-form-item label="邮编">
+                <el-input :model-value="row.provided_zipcode" :disabled="readonly" @update:model-value="(v) => emitUpdate('provided_zipcode', v)" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="邮箱/传真">
+                <el-input :model-value="row.provided_email_fax" :disabled="readonly" @update:model-value="(v) => emitUpdate('provided_email_fax', v)" />
+              </el-form-item>
+            </el-col>
           </el-row>
         </el-form>
       </el-collapse-item>
@@ -124,8 +139,26 @@
           <template v-if="row.address_match === 'inconsistent'">
             <el-row :gutter="16">
               <el-col :span="12">
-                <el-form-item label="地址核实结果">
-                  <el-input :model-value="row.address_verify_result" :disabled="readonly" @update:model-value="(v) => emitUpdate('address_verify_result', v)" />
+                <!--
+                  源模板 X0-2!L7 数据验证给了 6 个固定核实方式（发票/合同地址核实、
+                  电话核实、官网/公告查询、地图查询、邮件确认、其他方式）——
+                  改造前是自由文本，审计师各写各的，无法按方式统计。
+                  `allow-create` 保留自由输入（历史值仍可显示）。
+                  spec: h0-confirmation-source-fidelity-and-linkage R8.3 / R7.5
+                -->
+                <el-form-item label="地址核实方式">
+                  <el-select
+                    :model-value="row.address_verify_result"
+                    :disabled="readonly"
+                    filterable
+                    allow-create
+                    default-first-option
+                    clearable
+                    placeholder="请选择核实方式"
+                    @update:model-value="(v: any) => emitUpdate('address_verify_result', v)"
+                  >
+                    <el-option v-for="opt in addrVerifyOptions" :key="opt" :label="opt" :value="opt" />
+                  </el-select>
                 </el-form-item>
               </el-col>
               <el-col :span="12">
@@ -214,6 +247,48 @@
             <el-col v-if="row.second_result === '退回'" :span="12">
               <el-form-item label="退回原因">
                 <el-input :model-value="row.second_return_reason" :disabled="readonly" @update:model-value="(v) => emitUpdate('second_return_reason', v)" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+
+          <!--
+            第二次发函的被函证单位信息（源模板 X0-2 AF6:AK6 六列）。
+            第一次被退回后重新核实到的地址/邮编/联系人/电话/传真 + 是否核查一致；
+            改造前平台无这六列落笔位置。
+            spec: h0-confirmation-source-fidelity-and-linkage R8.1 / R8.5
+          -->
+          <div class="entity-verify-detail__subhead">第二次发函的被函证单位信息（重新核实）</div>
+          <el-row :gutter="16">
+            <el-col :span="12">
+              <el-form-item label="地址">
+                <el-input :model-value="row.second_entity_address" :disabled="readonly" @update:model-value="(v) => emitUpdate('second_entity_address', v)" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="邮编">
+                <el-input :model-value="row.second_entity_zipcode" :disabled="readonly" @update:model-value="(v) => emitUpdate('second_entity_zipcode', v)" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="联系人">
+                <el-input :model-value="row.second_contact_person" :disabled="readonly" @update:model-value="(v) => emitUpdate('second_contact_person', v)" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="联系电话">
+                <el-input :model-value="row.second_contact_phone" :disabled="readonly" @update:model-value="(v) => emitUpdate('second_contact_phone', v)" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="传真">
+                <el-input :model-value="row.second_fax" :disabled="readonly" @update:model-value="(v) => emitUpdate('second_fax', v)" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="信息核查一致">
+                <el-select :model-value="row.second_info_verified" :disabled="readonly" clearable placeholder="请选择" @update:model-value="(v: any) => emitUpdate('second_info_verified', v)">
+                  <el-option label="是" value="是" /><el-option label="否" value="否" />
+                </el-select>
               </el-form-item>
             </el-col>
           </el-row>
@@ -347,6 +422,16 @@
         </el-form>
       </el-collapse-item>
     </el-collapse>
+
+    <!--
+      源模板 X0-2 C25/C26 两条审计说明（电子函证方式的核对豁免与记录要求）——
+      只读方法论上下文，就地展示避免审计师对电子函证做无谓的地址核对。
+      spec: h0-confirmation-source-fidelity-and-linkage R8.6
+    -->
+    <div class="entity-verify-detail__src-hint">
+      <div class="entity-verify-detail__src-hint-title">审计说明（源模板）</div>
+      <p v-for="(t, i) in SOURCE_AUDIT_NOTES" :key="i">{{ t }}</p>
+    </div>
   </div>
 </template>
 
@@ -354,6 +439,20 @@
 import { ref, computed } from 'vue'
 import type { EntityVerifyRow } from './entityVerifyTypes'
 import FieldHintIcon from './FieldHintIcon.vue'
+import { CONFIRMATION_DICTS, fallbackOptions } from '../coordination/confirmationDicts'
+
+/**
+ * 地址不一致的核实方式 —— 源模板 X0-2!L7 数据验证 6 项，单一真源在
+ * `CONFIRMATION_DICT_FALLBACK`（六枢纽同构）。
+ * spec: h0-confirmation-source-fidelity-and-linkage R7.5 / R8.3
+ */
+const addrVerifyOptions = fallbackOptions(CONFIRMATION_DICTS.ADDR_VERIFY)
+
+/** 源模板 X0-2 C25/C26 两条审计说明（逐字，只读方法论上下文） */
+const SOURCE_AUDIT_NOTES = [
+  '1.采用电子函证方式的无需核对发函地址信息，无需核对回函发出地址、回函寄件人信息等；',
+  '2.采用电子函证方式的应记录并检查回函能够证明电子地址或身份的信息，关注被审计单位、注册会计师和被询证者在电子询证函平台操作的具体时间、回函经办人（如适用）、意见反馈等信息（如适用）',
+]
 
 const props = defineProps<{
   row: EntityVerifyRow | null
@@ -405,5 +504,29 @@ function getDictOptions(dictKey: string): string[] {
   content: '*';
   color: var(--el-color-danger);
   margin-right: 4px;
+}
+.entity-verify-detail__subhead {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--el-text-color-regular);
+  margin: 4px 0 8px;
+  padding-left: 6px;
+  border-left: 3px solid var(--el-color-primary-light-5);
+}
+.entity-verify-detail__src-hint {
+  margin-top: 12px;
+  border-left: 3px solid #e6a23c;
+  background: #fdf6ec;
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--el-text-color-regular);
+}
+.entity-verify-detail__src-hint-title {
+  font-weight: 500;
+  margin-bottom: 3px;
+}
+.entity-verify-detail__src-hint p {
+  margin: 0;
 }
 </style>

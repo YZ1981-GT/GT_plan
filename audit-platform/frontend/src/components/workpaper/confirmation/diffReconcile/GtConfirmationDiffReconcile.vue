@@ -93,11 +93,15 @@
 
 <script setup lang="ts">
 import { ref, computed, defineAsyncComponent } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useDiffReconcileData } from './composables/useDiffReconcileData'
 import { useDiffAnalysis } from './composables/useDiffAnalysis'
 import { useD01DiffImport } from './composables/useD01DiffImport'
 import { filterSummaryRows, defaultDiffFilter } from '../coordination/importFromSummary'
+import { CONFIRMATION_DICTS, fallbackSelectOptions } from '../coordination/confirmationDicts'
+import { getCycleConfirmationMeta } from '../coordination/cycleConfirmationMeta'
+import { navigateToCycleSheet } from '../coordination/navigateToCycleSheet'
 import type { DiffReconcileRow } from './diffReconcileTypes'
 
 import DiffReconcileDashboard from './DiffReconcileDashboard.vue'
@@ -119,6 +123,9 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'save', payload: any): void
 }>()
+
+// 🔴 setup 顶层取（useRouter 是 setup 作用域 composable，写进函数体静默失效）
+const router = useRouter()
 
 // ─── 格式检测 ────────────────────────────────────────────────────────────────
 
@@ -151,22 +158,14 @@ const d01Import = useD01DiffImport({
 
 // ─── 字典选项 ────────────────────────────────────────────────────────────────
 
-// TODO: 从 useDictStore 获取（暂用硬编码默认值）
-const subjectOptions = computed(() => [
-  { value: '应收账款', label: '应收账款' },
-  { value: '合同负债', label: '合同负债' },
-  { value: '销售收入', label: '销售收入' },
-  { value: '应收票据', label: '应收票据' },
-  { value: '合同资产', label: '合同资产' },
-  { value: '预付账款', label: '预付账款' },
-  { value: '应付账款', label: '应付账款' },
-  { value: '预收账款', label: '预收账款' },
-  { value: '其他应收款', label: '其他应收款' },
-  { value: '其他应付款', label: '其他应付款' },
-  { value: '银行存款', label: '银行存款' },
-  { value: '短期借款', label: '短期借款' },
-  { value: '长期借款', label: '长期借款' },
-])
+/**
+ * 「账户/交易」列取值 —— 单一真源 `CONFIRMATION_DICT_FALLBACK[SUBJECT]`。
+ *
+ * 🔴 改造前这里是 13 项硬编码字面量，**无一个 H 循环科目** →
+ * H0-4 差异核对表在固定资产循环上选不出固定资产/工程物资/使用权资产/租赁负债。
+ * spec: h0-confirmation-source-fidelity-and-linkage R1.4
+ */
+const subjectOptions = computed(() => fallbackSelectOptions(CONFIRMATION_DICTS.SUBJECT))
 
 const diffTypeOptions = computed(() => [
   { value: 'time', label: '时间性差异' },
@@ -181,8 +180,14 @@ function handleAdd() {
   data.addRow()
 }
 
-function handleDelete() {
-  // TODO: 获取选中行 ID
+/** 删除勾选行（行 ID 由 DiffReconcileMaster 随 delete 事件上报）。 */
+function handleDelete(rowIds: string[]) {
+  if (!rowIds?.length) {
+    ElMessage.info('请先勾选要删除的差异行')
+    return
+  }
+  data.deleteRows(rowIds)
+  ElMessage.success(`已删除 ${rowIds.length} 行`)
 }
 
 function handleSave() {
@@ -293,9 +298,19 @@ async function handleExportTemplate() {
   }
 }
 
+/**
+ * 跳转本循环的函证结果汇总表。
+ * 🔴 目标编码按 `getCycleConfirmationMeta(wpCode).summaryCode` 派生，禁写 `'D0-1'` 字面量
+ *    —— 本组件被 D0/F0/G0/H0/K0/L0 六个循环共享（E0 无独立差异表）。
+ */
 function handleJumpD01(confirmIndex: string) {
-  // TODO: 跨底稿跳转 D0-1
-  console.log('[GtConfirmationDiffReconcile] 跳转 D0-1:', confirmIndex)
+  const meta = getCycleConfirmationMeta(props.wpCode)
+  void navigateToCycleSheet({
+    router,
+    projectId: props.projectId,
+    targetWpCode: meta.summaryCode,
+    confirmIndex,
+  })
 }
 
 function handleAuditNoteUpdate(field: string, value: string) {

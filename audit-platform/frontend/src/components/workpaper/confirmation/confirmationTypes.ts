@@ -32,8 +32,20 @@ export interface ConfirmationRow {
   amount?: number
   /** 币种 */
   currency?: string
-  /** 函证方式（积极式/消极式） */
+  /**
+   * 函证类型（积极式/消极式）—— 准则 1312 的程序层面概念。
+   *
+   * 🔴 **不是**源模板 X0-1「函证方式」列（那是发函渠道，见 `send_channel`）。
+   * 本字段驱动 `computeConfirmedAmount` 的「消极式 + 未回函 → 视同相符」分支，
+   * 改绑渠道枚举会让该派生失效。
+   */
   confirmation_method?: string
+  /**
+   * 发函渠道（邮寄/跟函/电子函证/其他）—— 源模板 X0-1「函证方式」列，
+   * 由 VLOOKUP 自 X0-2!C 列带入。optional，旧 `confirmation-v1` 载荷读回为 undefined。
+   * spec: h0-confirmation-source-fidelity-and-linkage R7.2
+   */
+  send_channel?: string
   /** 发函日期 */
   send_date?: string
   /** 收函日期 */
@@ -143,18 +155,33 @@ export interface DashboardMetrics {
 // ─── 抽样区块 ────────────────────────────────────────────────────────────────
 
 export interface SamplingData {
-  /** 抽样方式 */
+  /** 抽样方式（源模板「抽样方法」同名沿用） */
   sampling_method?: string
   /** 抽样范围 */
   sampling_scope?: string
-  /** 抽样标准 */
+  /** 抽样标准（G0 读回映射 → `specific_samples`） */
   sampling_criteria?: string
-  /** 样本量 */
+  /** 样本量（G0 读回映射 → `sample_size`） */
   sampling_size?: string
   /** 抽样结果 */
   sampling_result?: string
-  /** 抽样结论 */
+  /** 抽样结论（源模板无对应项，作源外增强字段保留） */
   sampling_conclusion?: string
+
+  // ─── 源模板 6 项对齐字段（**additive**，与替代程序族 `SamplingConfig` 同名同源） ───
+  // spec: g0-confirmation-source-alignment R3.6 / R3.6.1 / R3.6.3
+  // 🔴 字段对**全部七枢纽**都可读写（数据模型不按枢纽分叉），只有渲染由 `isG0` 门控 —— 否则
+  //    其余枢纽已存的 6 项数据会读不回来。持久化随 `sampling` 整体 JSON 往返，无需迁移。
+  /** 测试总体（源 `G0-1!J20`）。🔴 不可复用 `SamplingConfig.test_scope` —— 那是 G0-6 的「测试范围」5 点选项，语义不同 */
+  test_population?: string
+  /** 特定样本（源 `G0-1!J21`） */
+  specific_samples?: string
+  /** 抽样总体（源 `G0-1!J22`） */
+  sampling_population?: string
+  /** 确定的抽样样本量（源 `G0-1!J23`） */
+  sample_size?: string
+  /** 抽样过程（源 `G0-1!J26`） */
+  sampling_process?: string
 }
 
 // ─── 审计说明区块（5 专题） ──────────────────────────────────────────────────

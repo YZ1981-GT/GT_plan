@@ -129,38 +129,23 @@
                 <el-icon style="margin-left:4px;color:#909399;cursor:help"><QuestionFilled /></el-icon>
               </el-tooltip>
             </h4>
-            <el-form :model="row" label-width="140px" size="small" :disabled="readonly">
-              <el-form-item>
+            <!--
+              三项核对点标签逐字取源模板 X0-3 A23:A25（单一真源
+              `followupEnums.FOLLOWUP_CONTROL_CHECKPOINTS`）。
+              改造前是意译短标签，丢了「和处理人员」「及权限」两层语义。
+              spec: h0-confirmation-source-fidelity-and-linkage R9.4
+            -->
+            <el-form :model="row" label-width="250px" size="small" :disabled="readonly">
+              <el-form-item v-for="cp in CONTROL_CHECKPOINTS" :key="cp.field">
                 <template #label>
-                  <el-tooltip content="是否了解了对方单位处理函证回复的内部流程（收函→核对→签章→寄回）" placement="top">
-                    <span style="cursor:help;border-bottom:1px dashed #909399">了解处理流程</span>
+                  <el-tooltip :content="cp.hint" placement="top">
+                    <span style="cursor:help;border-bottom:1px dashed #909399">{{ cp.label }}</span>
                   </el-tooltip>
                 </template>
-                <el-select :model-value="row.control_process" @update:model-value="update('control_process', $event)">
-                  <el-option value="yes" label="是" />
-                  <el-option value="no" label="否" />
-                  <el-option value="na" label="不适用" />
-                </el-select>
-              </el-form-item>
-              <el-form-item>
-                <template #label>
-                  <el-tooltip content="是否核实了回复人的身份及其是否有权代表公司确认函证内容" placement="top">
-                    <span style="cursor:help;border-bottom:1px dashed #909399">确认身份权限</span>
-                  </el-tooltip>
-                </template>
-                <el-select :model-value="row.control_identity" @update:model-value="update('control_identity', $event)">
-                  <el-option value="yes" label="是" />
-                  <el-option value="no" label="否" />
-                  <el-option value="na" label="不适用" />
-                </el-select>
-              </el-form-item>
-              <el-form-item>
-                <template #label>
-                  <el-tooltip content="观察到对方是否按正常业务流程处理了回函（非临时指派、非异常加急操作）" placement="top">
-                    <span style="cursor:help;border-bottom:1px dashed #909399">按正常流程处理</span>
-                  </el-tooltip>
-                </template>
-                <el-select :model-value="row.control_normal_flow" @update:model-value="update('control_normal_flow', $event)">
+                <el-select
+                  :model-value="(row as any)[cp.field]"
+                  @update:model-value="update(cp.field, $event)"
+                >
                   <el-option value="yes" label="是" />
                   <el-option value="no" label="否" />
                   <el-option value="na" label="不适用" />
@@ -272,6 +257,7 @@ import { ref } from 'vue'
 import { QuestionFilled } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import type { FollowupRow } from './followupTypes'
+import { FOLLOWUP_CONTROL_CHECKPOINTS as CONTROL_CHECKPOINTS } from './followupEnums'
 
 const props = defineProps<{
   row: FollowupRow | null
