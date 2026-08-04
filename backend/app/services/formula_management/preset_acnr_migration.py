@@ -49,8 +49,14 @@ LEGACY_ALIAS_MAP: dict[str, str] = {
 # 未迁移函数白名单（Ledger 标待迁移，Req 24.3/24.4）——尚无 ACNR grammar_v1 等价。
 # 新增未登记的未迁移函数 → drift guard CI 失败（见
 # tests/formula_management/test_preset_acnr_migration_drift_guard.py）。
+# 🔴 `PLACEHOLDER` 是**有意**永久 pending 的伪函数（非待迁移）——
+#    语义 = 「该单元格的值无法用单一科目码的公式表达，取数真源在别处」，
+#    故 grammar_v1 里不会（也不应）有等价函数头。存量用法：
+#    N1「税会差异汇总」/ E1 数字货币两条（准则解释15号「可增设」项，无一级标准科目）/
+#    N3 递延负债本期变动 / H0-1 两条（九品种口径，真源
+#    `four_table/h0_book_amounts` 按项目科目表语义定位）。
 PENDING_FUNCTION_ALLOWLIST: frozenset[str] = frozenset(
-    {"ADJ", "LEDGER", "LEDGER_DETAIL", "COUNT_LEDGER"}
+    {"ADJ", "LEDGER", "LEDGER_DETAIL", "COUNT_LEDGER", "PLACEHOLDER"}
 )
 
 # 归一化状态

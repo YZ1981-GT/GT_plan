@@ -174,17 +174,65 @@ _DICTS: dict[str, list[dict[str, str]]] = {
         {"value": "time_deposit",           "label": "定期存款",     "color": ""},
         {"value": "financial_product",      "label": "理财产品",     "color": ""},
         {"value": "other_monetary",         "label": "其他货币资金", "color": ""},
+        # ── H 循环（固定资产循环函证 H0）品种 ──
+        # 🔴 标签逐字取 wp_system_map.json 的 business_cycles[固定资产循环].accounts，
+        #    不得自拟简称（H0-1 下区矩阵按本列 SUMIF 分品种，品种名不在此枚举内则永远聚合不到行）。
+        #    「资产处置损益」(H10) 是损益类不函证，故不在此列。
+        #    spec: h0-confirmation-source-fidelity-and-linkage R1.1/R1.2/R1.6
+        {"value": "fixed_assets",                "label": "固定资产",       "color": ""},
+        {"value": "construction_in_progress",    "label": "在建工程",       "color": ""},
+        {"value": "investment_property",         "label": "投资性房地产",   "color": ""},
+        {"value": "engineering_materials",       "label": "工程物资",       "color": ""},
+        {"value": "oil_gas_assets",              "label": "油气资产",       "color": ""},
+        {"value": "fixed_assets_clearing",       "label": "固定资产清理",   "color": ""},
+        {"value": "productive_biological_assets", "label": "生产性生物资产", "color": ""},
+        {"value": "right_of_use_assets",         "label": "使用权资产",     "color": ""},
+        {"value": "lease_liabilities",           "label": "租赁负债",       "color": ""},
         {"value": "other",                  "label": "其他",         "color": "info"},
     ],
     "confirmation_method": [
+        # 🔴 这是准则 1312 的**程序层面**概念（X0A 程序 1「以积极方式…进行函证」），
+        #    与源模板 X0-2!C7 的「函证方式」（发函渠道）是两个不同维度 —— 后者见
+        #    confirmation_send_channel。两者都保留，不得互相替代。
         {"value": "positive",  "label": "积极式", "color": ""},
         {"value": "negative",  "label": "消极式", "color": "info"},
+    ],
+    # ── 发函渠道（源模板 X0-2!C7 数据验证，D0/F0/G0/H0/K0/L0 六枢纽取值完全同构） ──
+    # X0-1 的「函证方式」列由 VLOOKUP 自 X0-2!C 列带入 → 两处必须绑定同一枚举。
+    "confirmation_send_channel": [
+        {"value": "mail",       "label": "邮寄",     "color": ""},
+        {"value": "followup",   "label": "跟函",     "color": "success"},
+        {"value": "electronic", "label": "电子函证", "color": "info"},
+        {"value": "other",      "label": "其他",     "color": "info"},
+    ],
+    # ── 选取样本目的（源模板 X0-1!C8 数据验证，六枢纽同构） ──
+    # 🔴 标签逐字保留源模板的空格与标点不一致（"A. 大额" 有空格 / "B.异常" 无空格）。
+    "confirmation_sample_purpose": [
+        {"value": "large_amount",         "label": "A. 大额",   "color": "warning"},
+        {"value": "abnormal",             "label": "B.异常",    "color": "danger"},
+        {"value": "zero_balance",         "label": "C.余额为0", "color": "info"},
+        {"value": "long_aging",           "label": "D.账龄长",  "color": "warning"},
+        {"value": "random",               "label": "E.随机",    "color": ""},
+    ],
+    # ── 地址不一致的核实方式（源模板 X0-2!L7 数据验证，六枢纽同构） ──
+    "confirmation_addr_verify": [
+        {"value": "invoice_contract",     "label": "发票/合同地址核实", "color": ""},
+        {"value": "phone",                "label": "电话核实",          "color": ""},
+        {"value": "website_announcement", "label": "官网/公告查询",     "color": ""},
+        {"value": "map",                  "label": "地图查询",          "color": ""},
+        {"value": "email",                "label": "邮件确认",          "color": ""},
+        {"value": "other",                "label": "其他方式",          "color": "info"},
     ],
     "confirmation_reply_method": [
         {"value": "original_mail", "label": "原件寄回", "color": ""},
         {"value": "fax",           "label": "传真",     "color": "info"},
         {"value": "email",         "label": "电子邮件", "color": "info"},
         {"value": "in_person",     "label": "当面确认", "color": ""},
+        # ── 源模板取值（X0-2!P7「回函方式」，六枢纽同构） ──
+        # spec: h0-confirmation-source-fidelity-and-linkage R7.6
+        {"value": "paper_original",     "label": "纸质原件", "color": ""},
+        {"value": "electronic_platform", "label": "电子函证", "color": "info"},
+        {"value": "other_medium",       "label": "其他介质", "color": "info"},
     ],
     "yes_no": [
         {"value": "yes", "label": "是", "color": "success"},
@@ -236,6 +284,18 @@ _DICTS: dict[str, list[dict[str, str]]] = {
         {"value": "银行存款",     "label": "银行存款",     "color": ""},
         {"value": "短期借款",     "label": "短期借款",     "color": ""},
         {"value": "长期借款",     "label": "长期借款",     "color": ""},
+        # ── H 循环（固定资产循环函证 H0-4 差异核对表）品种 ──
+        # 与 confirmation_account_type 的 H 类 9 项标签逐字一致（同一份品种，两个字典）。
+        # spec: h0-confirmation-source-fidelity-and-linkage R1.4
+        {"value": "固定资产",       "label": "固定资产",       "color": ""},
+        {"value": "在建工程",       "label": "在建工程",       "color": ""},
+        {"value": "投资性房地产",   "label": "投资性房地产",   "color": ""},
+        {"value": "工程物资",       "label": "工程物资",       "color": ""},
+        {"value": "油气资产",       "label": "油气资产",       "color": ""},
+        {"value": "固定资产清理",   "label": "固定资产清理",   "color": ""},
+        {"value": "生产性生物资产", "label": "生产性生物资产", "color": ""},
+        {"value": "使用权资产",     "label": "使用权资产",     "color": ""},
+        {"value": "租赁负债",       "label": "租赁负债",       "color": ""},
     ],
     "confirmation_diff_type": [
         {"value": "time",       "label": "时间性差异", "color": "info"},

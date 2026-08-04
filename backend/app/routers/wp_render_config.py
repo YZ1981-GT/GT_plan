@@ -51,6 +51,7 @@ from app.routers.wp_render_config_helpers import (  # noqa: F401
     _HEURISTIC_TO_SHEET_CONTENT_TYPE,
     _confirmation_initial_data,
     _inject_confirmation_population,
+    _inject_h0_book_amounts,
     _extract_field_sources,
     _has_custom_procedure,
     _infer_sheet_type_by_heuristic,
@@ -886,6 +887,16 @@ async def _get_render_config_impl(
                     db, project_id, _prog_year, sheet_html_data
                 )
             except Exception:  # noqa: BLE001 — 注入失败不阻断渲染
+                pass
+            # H0-1 下区矩阵账面金额（按品种语义定位取数）。
+            # 🔴 内部按 wp_code 前缀门控，仅 H0 生效 → 其余六枢纽载荷逐字节不变。
+            #    走加法式注入而非 RENDERER_DISPATCH，否则会劫持全部七枢纽。
+            # spec: h0-confirmation-source-fidelity-and-linkage R3.5/R3.6
+            try:
+                await _inject_h0_book_amounts(
+                    db, project_id, _prog_year, wp_code, sheet_html_data
+                )
+            except Exception:  # noqa: BLE001 — 注入失败不阻断渲染（键不存在=未取数）
                 pass
         sheets.append({"sheet_name": cls.sheet_name, "componentType": component_type,
                        "schema": sheet_schema, "html_data": sheet_html_data,

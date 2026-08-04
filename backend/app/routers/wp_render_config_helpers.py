@@ -133,6 +133,53 @@ async def _inject_confirmation_population(
         ctx["population_amount"] = population
 
 
+async def _inject_h0_book_amounts(
+    db: AsyncSession,
+    project_id: UUID | str,
+    year: int | None,
+    wp_code: str | None,
+    sheet_html_data: dict,
+) -> None:
+    """向 **H0-1** 的 ``confirmation-summary`` htmlData 加法式注入按品种账面金额。
+
+    用于源模板 `函证结果汇总表H0-1` 下区「一、函证情况」矩阵 R30
+    「本期（期末）账面金额」行的自动取数（可手工覆盖）。
+
+    🔴 **为什么走加法式注入而不是 RENDERER_DISPATCH**：
+    ``confirmation-summary`` 是 **七枢纽共享** componentType，注册进
+    ``RENDERER_DISPATCH`` 会让 D0/E0/F0/G0/K0/L0 的载荷一起改道。本函数沿用
+    :func:`_inject_confirmation_population` 的通道，并按 ``wp_code`` 前缀门控。
+
+    契约（h0-confirmation-source-fidelity-and-linkage R3.5/R3.6/Property 10）：
+    - ``wp_code`` 前缀非 ``H0`` → 直接 return（其余六枢纽载荷逐字节不变）
+    - 只写 ``project_context.h0_book_amounts`` / ``h0_book_source_codes``，
+      不改 ``rows``/``_format``/其它字段
+    - 「注入整体失败」与「解析成功但本项目无此科目」必须可区分：
+      前者**键不存在**，后者键存在且值为 ``None``（前端分别渲染
+      「未取数（可手填）」与「本项目无此科目」）
+    """
+    if not isinstance(sheet_html_data, dict):
+        return
+    if not str(wp_code or "").strip().upper().startswith("H0"):
+        return
+
+    from app.services.four_table.h0_book_amounts import (
+        ResolverContext,
+        resolve_h0_book_amounts,
+    )
+
+    result = await resolve_h0_book_amounts(
+        ResolverContext(db=db, project_id=project_id, year=year)
+    )
+    ctx = sheet_html_data.setdefault("project_context", {})
+    if not isinstance(ctx, dict):
+        return
+    ctx["h0_book_amounts"] = result.amounts
+    ctx["h0_book_source_codes"] = result.source_codes
+    if result.conflicts:
+        ctx["h0_book_conflicts"] = result.conflicts
+
+
 def inject_applicable_standards(sheets: list[dict], standards: list[str]) -> int:
     """向每个 sheet 的 ``html_data.project_context`` 统一注入 ``applicable_standards``。
 
