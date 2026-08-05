@@ -1,0 +1,21 @@
+{
+  "exact_playwright_plan": {
+    "assertions": "fresh context per role + login; deep-link render-config allow=200/deny=404; scope-internal-not-delegated AND scope-external-delegated both denied; no name/body flash + '资源不存在或不可访问' placeholder; console error=0; revocation refresh ≤1s.",
+    "harness": "audit-platform/frontend/e2e/task6-role-acceptance.spec.ts",
+    "per_role_new_context": [
+      "Admin",
+      "Supervisor",
+      "Workpaper_Lead",
+      "Row_Assignee",
+      "Operation_Reviewer",
+      "History_Lead",
+      "History_Row",
+      "plain Restricted"
+    ],
+    "seed": "backend/scripts/e2e/task6_role_acceptance_seed.py"
+  },
+  "lane": "playwright_fresh_context_browser",
+  "reason": "dev servers (9980/3030) not available in this run; browser lane not executed.",
+  "status": "GAP_deferred",
+  "substitute": "8-role authorization matrix proven at API/gate level (role_matrix_gate.json)."
+}
