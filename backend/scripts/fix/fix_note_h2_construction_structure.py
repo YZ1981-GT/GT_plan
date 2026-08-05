@@ -191,7 +191,7 @@ def _listed_plan() -> list[dict[str, Any]]:
 
 # 国企汇总表行（剥离 header_label，保留 account_codes / report_row_code）
 _SOE_SUMMARY_ROWS: list[dict[str, Any]] = [
-    {"label": "在建工程", "account_codes": ["1604"], "report_row_code": "BS-015", "row_type": "data"},
+    {"label": "在建工程", "account_codes": ["1604"], "report_row_code": "BS-029", "row_type": "data"},
     {"label": "工程物资", "account_codes": ["1605"], "row_type": "data"},
     total_row(),
 ]
