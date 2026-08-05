@@ -2479,19 +2479,41 @@ jobs:
   f0-confirmation-linkage:
     # F0 存货循环函证联动增强守卫
     # （f0-confirmation-linkage-and-structural-enhancement）
-    # 背景：F0-1 矩阵聚合 + F0-5/F0-6 供应商带入 + F0-4b 差异公式引擎 + 邮箱域名检测
+    # 背景：F0-1 矩阵聚合 + F0-5/F0-6 供应商带入 + 差异公式恒等式 + 邮箱域名检测
+    # Task 30：setup-node 与 npm ci 形态已对齐平台主流前端 job（含 npm 缓存）
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+          cache: npm
+          cache-dependency-path: audit-platform/frontend/package-lock.json
       - name: Install frontend deps
         run: npm ci
         working-directory: audit-platform/frontend
       - name: Run F0 confirmation linkage tests
         run: npx vitest run src/components/workpaper/confirmation/__tests__/f0 --reporter=default
         working-directory: audit-platform/frontend
+      - name: Run diff checklist A-I formula PBT guard
+        # Task 24：删 F0 重复引擎后，恒等式 PBT 补在既有实现处
+        run: npx vitest run src/components/workpaper/confirmation/diffChecklist --reporter=default
+        working-directory: audit-platform/frontend
+      - name: Run fraud risk preset regression
+        # Task 27：预置 19 条文字改为源模板真源后的前端回归
+        run: npx vitest run src/components/workpaper/confirmation/fraudRisk --reporter=default
+        working-directory: audit-platform/frontend
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install openpyxl
+        run: pip install openpyxl
+      - name: Fraud risk preset source fidelity (openpyxl 直读源模板)
+        # Task 27：19 条迹象文字 ↔ 六张 fraud-risk sheet 交叉锁死
+        run: python -m pytest backend/tests/test_fraud_risk_presets_source_fidelity.py -q
+      - name: F0 review-dialog prompt withdrawal guard
+        # Task 29：撤回的 6 条 F0 prompt 不得回填成 dead config
+        run: python -m pytest backend/tests/test_f0_review_prompts.py -q
 
   h-cycle-four-table:
     # H 类循环四表取数与科目映射守卫
@@ -2543,7 +2565,9 @@ jobs:
 
 
   semantic-resolver-coverage:
-    # 语义科目解析器全量覆盖守卫
+    # 语义科目解析器全量覆盖守卫（真消费基线 + spec 类型安全 + 兜底码跨循环互斥）
+    # 另含 Task 31 的裁决交叉锁死：未迁移策略清单必须 ⊆ 定向名单里「已裁决不迁移」的集合，
+    # 且名单不得有孤儿条目（登记了理由但该策略已迁移/文件不存在）。不连库。
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -2590,3 +2614,486 @@ jobs:
       - run: pip install pytest -q
       - name: Cycle specs account evidence
         run: python -m pytest tests/four_table/test_cycle_specs_account_evidence.py -v --tb=short
+      # F2 的 `account` 字段是展示/兜底元数据（取数走 classify_f2_leaf 按名称），
+      # 但「只是展示」不等于可以写全库零命中的码：1410/1412 曾如此（Task 29 已修）。
+      - run: pip install -r requirements.txt -q 2>/dev/null || pip install sqlalchemy -q
+      - name: F2 display account codes exist in account_chart
+        run: python -m pytest tests/four_table/test_f2_display_account_codes.py -v --tb=short
+      # 旧制编码守卫的**不连库**部分（行级判定纯函数 + 白名单反向锁死 + skip 可见性）。
+      # 连库部分在下面的 legacy-encoding-balances job 里跑；这里保证即使 DB job
+      # 挂了/被删，判定逻辑与白名单锁死仍有人守。
+      - name: Legacy-encoding guard (pure predicate + whitelist integrity)
+        run: >-
+          python -m pytest
+          tests/four_table/test_legacy_encoding_balances_stay_zero.py
+          -k "not TestLiveDatabase" -v --tb=short
+
+
+  legacy-encoding-balances:
+    # 数据触发型守卫：旧《企业会计制度》(2001) 编码（3xxx 权益 / 5xxx 损益）
+    # 一旦带非零余额即打红 —— 那就是启动 N4/N5/F5/M 语义迁移的信号
+    # （那些策略硬编码 CAS 2006 码 6403/6801/6401，旧制码带真余额时会静默少算）。
+    # 白名单按「码 + 科目名」两元组匹配（同一个 3201 在旧制是利润分配、
+    # 在 CAS 2006 是套期工具），按码放行会把真正的触发条件一起放掉。
+    # 🔴 只读，不写库；`-rs` 让「PG 不可达」的 skip 原因出现在日志里（静默 skip 是假绿源）。
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: audit_platform
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt -q
+      - name: Run migrations (four-table schema)
+        run: python -c "import asyncio; from app.core.migration_runner import MigrationRunner; asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform').run_pending())"
+      - name: Legacy encoding balances stay zero (live DB, read-only)
+        run: >-
+          python -m pytest
+          tests/four_table/test_legacy_encoding_balances_stay_zero.py
+          -v --tb=short -rs
+
+  h0-confirmation-fidelity:
+    # H0 固定资产循环函证源模板保真度守卫
+    # （h0-confirmation-source-fidelity-and-linkage R12.6）
+    # 五个后端守卫 + 公式预设幂等脚本 --check：
+    # 1. 源模板事实（9 sheet 全 visible / H0-1 28 列 / 下区四块 / 五处真实 DV
+    #    逐格 `coord in dv.sqref` 判定 —— openpyxl 打印的 JF/JK/TG 镜像列 sqref 不可采信）；
+    # 2. 枚举 additive（既有取值必须是新列表前缀，否则存量项目已录数据落到枚举外）；
+    # 3. 九品种账面金额语义定位（源码不得出现 H 类标准码作查询前缀）；
+    # 4. 加法式注入（其余六枢纽 html_data 注入前后逐字节不变）；
+    # 5. 公式预设：sheet 必须指向源模板真实 tab（`审定表H0-1` 源模板不存在）+
+    #    九品种口径禁写死单一科目码。
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt -q
+      - name: H0 source template facts (openpyxl direct read)
+        run: python -m pytest tests/test_h0_source_template_facts.py -q
+      - name: H0 confirmation dicts (additive, DV cross-lock)
+        run: python -m pytest tests/test_confirmation_dicts_h0.py tests/test_confirmation_dicts.py -q
+      - name: H0 book amounts (semantic account resolution)
+        run: python -m pytest tests/four_table/test_h0_book_amounts.py -q
+      - name: H0 book amount injection (six-hub zero regression)
+        run: python -m pytest tests/test_h0_book_amount_injection.py -q
+      - name: H0 prefill presets
+        run: python -m pytest tests/test_h0_prefill_presets.py -q
+      - name: H0 prefill presets idempotent check
+        run: python scripts/fix/fix_h0_prefill_presets.py --check
+      - name: PLACEHOLDER formula_type whitelists stay in sync
+        run: >-
+          python -m pytest
+          tests/test_h_prefill_extension.py
+          tests/formula_management/test_pbt_p22_preset_grammar.py
+          tests/formula_management/test_preset_acnr_migration_drift_guard.py -q
+      - name: H cycle semantic account scope (generic-name leak guard)
+        run: python -m pytest tests/four_table/test_h3_account_scope.py tests/four_table/test_h0_book_amounts.py -q
+
+  h0-confirmation-frontend:
+    # H0 函证前端守卫（h0-confirmation-source-fidelity-and-linkage R12.4）
+    # 覆盖四条改造线：
+    # - 字典单一真源（两个共享组件的品种字面量数组必须归零）
+    # - H0-1 下区矩阵/固定文字（动态品种列 + 稳定 key cat_{seq} + 单调计数器）
+    # - 列集 override（只有 H0 一个 key；六枢纽输出快照零回归；BASE 常量不被污染）
+    # - H0-2 带入映射（sourceColumnIndex 与源模板 VLOOKUP col_index_num 交叉锁死）
+    # - H0-5 源模板保真（四段编号 / 6 抽样字段 / 源外增强标注 / manifest title 对齐）
+    # - 四个 stub 实装（跳转目标按循环派生，禁 'D0-1' 字面量）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: audit-platform/frontend/package-lock.json
+      - name: Install deps
+        run: npm ci
+        working-directory: audit-platform/frontend
+      - name: Run H0 confirmation frontend guards
+        run: >-
+          npx vitest run
+          src/components/workpaper/confirmation/__tests__/h0DictConsumption.spec.ts
+          src/components/workpaper/confirmation/__tests__/h0SummaryMatrix.spec.ts
+          src/components/workpaper/confirmation/__tests__/h0SummaryLowerZone.spec.ts
+          src/components/workpaper/confirmation/__tests__/h0SummaryFromEntityVerify.spec.ts
+          src/components/workpaper/confirmation/__tests__/confirmationColumnSpecH0.spec.ts
+          src/components/workpaper/confirmation/__tests__/confirmationColumnSpec.spec.ts
+          src/components/workpaper/confirmation/__tests__/entityVerifyH0Columns.spec.ts
+          src/components/workpaper/confirmation/__tests__/memoTemplatesH0.spec.ts
+          src/components/workpaper/confirmation/__tests__/confirmationStubWiring.spec.ts
+          src/components/workpaper/confirmation/alternativeH05/__tests__/alternativeH05SourceFidelity.spec.ts
+        working-directory: audit-platform/frontend
+
+  g0-confirmation-alignment:
+    # G0 投资循环函证源模板对齐（g0-confirmation-source-alignment Task 22）
+    # 四个后端守卫 + 两个幂等脚本 --check：
+    # 1. 源模板事实：10 sheet 全 visible / G0-1 上区 28 列 5 段 / 下区四块锚点与 8 指标 /
+    #    G0-2 三段 / G0-3 与 F0-8 对 D0 逐行相等 / G0A 12 条含程序分类 / G0-6 三区块两级表头 /
+    #    **7 条源缺陷存在性**（前端 g0SourceDefects.spec.ts 断言平台侧已按意图处置，两侧缺一即红）；
+    # 2. G0A 程序分类：12 条 content/ref_index/program_category 逐字 + `get_template('G0A')`
+    #    返回 12 条版本（根级 8 条是死数据）+ applicable_default 分布零回归；
+    # 3. 公式预设：sheet 必须指向源模板真实 tab（`审定表G0-1` 源模板不存在）+ 禁跨科目族
+    #    区间 `TB_SUM('1101~1511')` + cell_ref 按 TS 函数规则断言（不比对字面量）；
+    # 4. 下区 AI/复核 prompt：期望 id 全部从前端 g0SummaryLowerZone.ts 派生，拦孤儿 prompt。
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt -q
+      - name: G0 source template facts (openpyxl direct read + 7 defects exist)
+        run: python -m pytest tests/test_g0_source_template_facts.py -q
+      - name: G0A procedure template (program_category + runtime authority)
+        run: python -m pytest tests/test_g0a_procedure_template.py -q
+      - name: G0 prefill presets
+        run: python -m pytest tests/test_g0_prefill_presets.py -q
+      - name: G0 review / AI prompts (derived from frontend section keys)
+        run: python -m pytest tests/test_g0_review_prompts.py -q
+      - name: G0A program_category idempotent check
+        run: python scripts/fix/fix_g0a_program_category.py --check
+      - name: G0 prefill presets idempotent check
+        run: python scripts/fix/fix_g0_prefill_presets.py --check
+
+  g0-confirmation-alignment-frontend:
+    # G0 函证前端守卫（g0-confirmation-source-alignment Task 22）
+    # 覆盖六条改造线：
+    # - 品种矩阵（8 指标 × 8 品种；与 F0 的**同源性**断言 = D-2 分叉对冲，防两副本各自漂移）
+    # - 下区四块（文字逐字对源格；样本选择 6 项只导出不渲染 = 防双真源）
+    # - 列集与标签覆盖（只加 G0 键；六枢纽输出零回归；BASE 常量不被 mutate）
+    # - sheet 定位/展示分离（三处 tab 名索引号笔误 → 展示 G0-4/G0-5/G0-8 + tooltip）
+    # - 源缺陷双向（9 条逐条：源侧存在性交叉后端用例名 × 平台侧 platformEvidence 查符号）
+    # - G0-6 三区块对齐源模板 + 源外增强逐列登记（数据零丢失）
+    # - G0-6 **段结构**（源模板恰四个带序号的段、「二」是检查过程记录；源外增强段禁占段号）
+    #   + 两组 5 点选项（B7 末项「全部」/ C15 末项「其他」，只差末项）
+    #   —— 这一维此前无任何守卫，导致「列守卫全绿」被误当成「整表已对齐」
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: audit-platform/frontend/package-lock.json
+      - name: Install deps
+        run: npm ci
+        working-directory: audit-platform/frontend
+      - name: Run G0 confirmation frontend guards
+        run: >-
+          npx vitest run
+          src/components/workpaper/g0-confirmation
+          src/components/workpaper/confirmation/k0-confirmation/__tests__/k0LowerZoneSpec.spec.ts
+          src/components/workpaper/confirmation/alternativeD05
+          src/components/workpaper/confirmation/__tests__/g0SharedComponentCoverage.spec.ts
+          src/components/workpaper/confirmation/__tests__/confirmationColumnSpec.spec.ts
+          src/components/workpaper/confirmation/coordination/__tests__/crossWorkpaperNav.spec.ts
+          src/components/workpaper/confirmation/coordination/__tests__/cycleConfirmationMeta.spec.ts
+          src/components/workpaper/__tests__/GtG0Confirmation.integration.spec.ts
+        working-directory: audit-platform/frontend
+
+  sampling-compliance-backend:
+    # 抽样/抽凭合规闭环 —— 后端守卫（sampling-compliance-closure Wave 1/2，Task 23）
+    # 覆盖：
+    # 1. 抽样框数据集绑定（`stats.dataset_id` 取值等于真实 active 数据集；`dataset_stale`
+    #    三态判定 —— 空 ⇒ false、相等 ⇒ false、不等 ⇒ true，改造前的既有记录永不告警）；
+    # 2. `POST /sampling/voucher-evaluation` upsert 幂等 + 授权先于任何写入
+    #    （403/404 时目标 log 的 `extraction_criteria` 与 `updated_at` 均无变化）；
+    # 3. canonical 守卫扩面：`backend/app/**` 全仓对 legacy `WpSamplingEngine` /
+    #    `wp_sampling_engine` 零引用（读源码前先剥注释 + 反向自检，防守卫自身注释被数成引用）；
+    # 4. 登记表投影：`sampled_vouchers` 同批次防重（唯一索引 + ON CONFLICT DO NOTHING）、
+    #    fail-open 必留 WARNING（caplog 断言，防 fail-open 变静默黑洞）、构造点确实存在；
+    # 5. `sampling_config` 软弃用：`SamplingConfig(` 实例化计数不增 + docstring 含
+    #    `.. deprecated::`（判据用 `(?<!class )` 排除 ORM 类声明本身）。
+    #
+    # 🔴 连库用例走「单次 asyncio.run 取快照 + 断言同步」范式：连接池绑定首个事件循环，
+    # 第二次 run 必炸成 `AttributeError: 'NoneType' object has no attribute 'send'`。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: python -m pip install pytest==8.4.2 hypothesis==6.112.1
+      # 🔴🔴 连库文件必须**各自独立 pytest 进程**：连接池绑定首个事件循环，同一进程里
+      # 第二个连库文件必炸 `AttributeError: 'NoneType' object has no attribute 'send'`，
+      # 而 fixture 会把它 `except → skip` → **连库断言静默不执行 = 假绿**。
+      # 2026-08-04 实测：`test_sampling_registry_service.py` 单独跑 47 passed，
+      # 与 `test_sampling_dataset_binding.py` 同进程则 7 个连库断言被跳过。
+      - name: Run dataset binding guard (own process, DB-touching)
+        run: python -m pytest backend/tests/test_sampling_dataset_binding.py -q -rs --tb=short
+      - name: Assert dataset binding guard did not skip DB assertions
+        run: |
+          python -m pytest backend/tests/test_sampling_dataset_binding.py -q -rs --tb=no \
+            | tee /tmp/sampling_db1.txt
+          if grep -q "数据库不可用" /tmp/sampling_db1.txt; then
+            echo "::error::连库断言被静默跳过（事件循环污染），守卫无效"
+            exit 1
+          fi
+      - name: Run sampling registry projection guard (own process, DB-touching)
+        run: python -m pytest backend/tests/test_sampling_registry_service.py -q -rs --tb=short
+      - name: Assert registry guard did not skip DB assertions
+        run: |
+          python -m pytest backend/tests/test_sampling_registry_service.py -q -rs --tb=no \
+            | tee /tmp/sampling_db2.txt
+          if grep -q "数据库不可用" /tmp/sampling_db2.txt; then
+            echo "::error::连库断言被静默跳过（事件循环污染），守卫无效"
+            exit 1
+          fi
+      - name: Run evaluation endpoint + canonical + deprecation guards (no DB)
+        run: >-
+          python -m pytest
+          backend/tests/test_sampling_evaluation_endpoint.py
+          backend/tests/test_voucher_sampling_canonical_guard.py
+          backend/tests/test_sampling_config_deprecation.py
+          -q --tb=short
+
+  sampling-compliance-frontend:
+    # 抽样/抽凭合规闭环 —— 前端守卫（sampling-compliance-closure Wave 1/3，Task 23）
+    # 覆盖：
+    # 1. A13 错报类型通路：`misstatementType` 缺省等价（既有 ~35 个推送点行为逐字节不变）、
+    #    非法值回退 `factual` 而非透传（透传会让后端 enum 拒绝**整批**推送）、
+    #    去重 hash 含类型维度（否则同金额同描述的 factual 与 projected 互相吞掉）；
+    # 2. 抽样评价持久化与回读：新抽样清空回读评价、推断错报推送的金额与类型、
+    #    结论未确认不得推送；
+    # 3. 跨底稿重复抽凭显式确认三出口 + **剔除后覆盖率分母（总体）不变**
+    #    （用剩余样本当分母会虚高到 100%，那正是本功能要避免的问题）；
+    # 4. 宿主方法学收口覆盖率单调收敛（Property 15/16）+ 方法学 bar 渲染门控与
+    #    金额格式化（Property 17）+ 共享接线件（只读不写库 / 无实质内容不写空壳）。
+    #
+    # 🔴 覆盖率守卫的 allowlist 只许变短：修好一个宿主就删一条豁免并下调
+    # `ALLOWED_EXCUSE_BASELINE`；守卫自带「不得残留已修好的豁免」一条强制收敛。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: audit-platform/frontend/package-lock.json
+      - name: Install deps
+        run: npm ci
+        working-directory: audit-platform/frontend
+      - name: Run sampling compliance frontend guards
+        run: >-
+          npx vitest run
+          src/__tests__/a13MisstatementType.spec.ts
+          src/components/workpaper/__tests__/voucherSamplingEvaluation.spec.ts
+          src/components/workpaper/__tests__/crossWorkpaperDuplicateConfirm.spec.ts
+          src/components/workpaper/composables/shared/__tests__/samplingFillTarget.spec.ts
+          src/components/workpaper/composables/shared/__tests__/useSamplingMethodologyPersist.spec.ts
+          src/components/workpaper/shared/__tests__/WpSamplingMethodologyBar.spec.ts
+          src/components/workpaper/__tests__/samplingHostMethodologyCoverage.spec.ts
+        working-directory: audit-platform/frontend
+  deliverable-lineage-wiring-backend:
+    # 交付件溯源接线与回填闭环 —— 后端守卫（deliverable-lineage-wiring-and-writeback-closure Task 16）
+    # 覆盖 Wave 1 + Wave 2 全部 Property：
+    # 1. 锚点扫描/写入互逆 + 块定位降级链（anchor→marker→none 三态均不抛）；
+    # 2. **生产导出路径**真的写了锚点（Property 1/2）—— 历史假绿正是
+    #    `write_section_anchors` 实现正确、28 条属性测试全绿，但全仓零生产调用方
+    #    ⇒ 表恒空、`/section-states` 返空、回填恒全空。故守卫必须走 exporter 真实路径，
+    #    只测纯函数本身**永远发现不了「没人调用它」**；
+    # 3. 章节状态落库（Property 3）+ 反向自检「不接线则表恒空」；
+    # 4. 回填零行不计成功、五类互斥完备（Property 9/10）；
+    # 5. 人工编辑检测哈希域 + 就地替换（Property 7/8）—— 反向自检复现
+    #    「拿 source_snapshot_hash 比块文本」必须打红（两个哈希域不可互换）；
+    # 6. 能力矩阵单一真源（Property 11）+ `financial_report*` 永不可回写；
+    # 7. 正向输出零回归（Property 24 档 1）：报表 xlsx / 报告正文导出器
+    #    **源码级**不引用任何注入符号（xlsx 内含时间戳与 zip 顺序，跑两次比字节天然不稳）；
+    # 8. OO 编辑留痕（Property 13/14/15）：快照继承不洗白 stale、编辑人如实记录
+    #    （解析不出记 None，**禁止**回退 created_by）、doc_key 确定性且与席位同源。
+    #
+    # 🔴 读源码型守卫一律先剥注释：本 spec 的说明注释里写了被禁形态的反例
+    #    （`int(time.time())` / `ADD COLUMN IF NOT EXISTS`），不剥则守卫自己打红自己
+    #    （2026-08-04 同一坑踩了两次，Python 与 SQL 各一次）。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: python -m pip install pytest==8.4.2 pytest-asyncio==0.24.0 hypothesis==6.112.1 python-docx==1.1.2 aiosqlite==0.20.0 sqlalchemy==2.0.36
+      - name: Run anchor scan + export wiring guards
+        run: >-
+          python -m pytest
+          backend/tests/test_section_anchor_scan.py
+          backend/tests/test_note_export_anchor_wiring.py
+          -q --tb=short
+      - name: Run section state persist + contract guards
+        run: >-
+          python -m pytest
+          backend/tests/test_deliverable_section_state_persist.py
+          backend/tests/test_deliverable_section_state_contract.py
+          -q --tb=short
+      - name: Run writeback rowcount + refresh in-place guards
+        run: >-
+          python -m pytest
+          backend/tests/test_deliverable_writeback_rowcount.py
+          backend/tests/test_deliverable_refresh_inplace.py
+          -q --tb=short
+      - name: Run capability matrix + zero-regression guards
+        run: >-
+          python -m pytest
+          backend/tests/test_deliverable_capabilities_matrix.py
+          backend/tests/test_deliverable_lineage_zero_regression.py
+          -q --tb=short
+      - name: Run OO edit provenance guards (Wave 2)
+        run: >-
+          python -m pytest
+          backend/tests/test_deliverable_oo_edit_provenance.py
+          -q --tb=short
+      # 合规护栏接线（Wave 2 Task 15）：表格数字 / 章节标题必须被拒并留痕。
+      # 反向自检钉死「主流程硬编码 ChangeKind.TEXT」这一历史缺陷形态 ——
+      # 硬编码时 130 行护栏零生产调用方，rejected 恒空、需求 8.4 留痕从未产生。
+      - name: Run writeback guardrail wiring guards (Wave 2)
+        run: >-
+          python -m pytest
+          backend/tests/test_deliverable_writeback_guardrail.py
+          -q --tb=short
+      # 报告正文段落锚点与回填适配器（Wave 3 Task 17/18/19）：
+      # 1. 章节定位以**真实致同源模板**为判据（中文序号会随可选段落漂移、
+      #    docx 标题不带「段」字，故名称表必须从 SECTION_ID_MAP 派生）；
+      # 2. 锚点命名空间隔离 —— sec_rb_* 必须对附注回填的扫描器不可见，
+      #    否则附注回填会把报告正文文字写进 disclosure_notes；
+      # 3. 回填上游按 doc_type 走适配器，主流程不得再硬编码 DisclosureNote；
+      # 4. JSONB 写入判据必须查 **DB 列真值** —— 就地改嵌套对象 + 整体重赋值时
+      #    新旧值相等 ⇒ 工作单元判无净变更 ⇒ 内存看着对、列没写进去。
+      - name: Run report body anchors + writeback adapters (Wave 3)
+        run: >-
+          python -m pytest
+          backend/tests/test_report_body_section_blocks.py
+          backend/tests/test_writeback_target_adapters.py
+          -q --tb=short
+      # 真实链路验收脚本的腐烂防护（Wave 3 Task 20）：CI 不连库，故只静态自检
+      # 「可 import + --help 可解析」。真实验收（--apply 写库并自动复原）由人工
+      # 在有库环境执行；本 spec 已在真实项目上跑过 18/18 全 PASS。
+      - name: Smoke-check live verification scripts (no DB)
+        run: >-
+          python backend/scripts/diagnose/verify_report_body_writeback_live.py --help
+          && python backend/scripts/diagnose/verify_deliverable_lineage_live.py --help
+      # xlsx 差异告警（Wave 4 Task 21/22）：
+      # 1. 三态判定收敛在 should_block_confirm ——「非空即拒绝」会把
+      #    `{"diffs": []}`（已比对且一致）误判成有差异，使配了映射的报表永远确认不了；
+      # 2. 解析失败必须 fail-closed —— 否则弄坏一个映射文件即可绕过需求 10.4；
+      # 3. **接线**必须存在且只挂 OO 保存路径 —— Task 21 交付时零生产调用方，
+      #    `drift_report` 恒 NULL、闸门恒放行（「additive 列 + 未接线 = 死列」）；
+      #    挂到生成路径会让「映射坐标与模板布局不一致」的配置问题变成业务阻塞；
+      # 4. 基线归因：既存差异不得被归因为手工改动（审计场景里误指控比不告警更坏）。
+      # 5. **映射保真**（2026-08-05 修正）：差异检测的映射解析必须与 exporter 同源
+      #    （逐 sheet 扫内联 `{{row:}}` 占位符、按**真实 sheet 名**取值）。
+      #    资产负债表拆「主表 + 续表」而 cell_mapping.json 两侧共用 `balance_sheet`
+      #    键且坐标重叠（主表 C6=货币资金 / 续表 C6=短期借款），按 sheet_aliases 只取
+      #    第一个匹配 sheet 会让续表 49 个 row_code 全去主表取值 ⇒ 报出「应付票据拿到
+      #    应收票据余额」这类系统性假差异（真实库 22 处全由此而来）。
+      #    判据落在**真实模板文件**上：同一 (sheet, 坐标) 不得对应多个 row_code、
+      #    主表/续表必须是不同 sheet 名、每个 spec 的 row_name 与模板同行 A 列一致。
+      - name: Run financial report drift + wiring guards (Wave 4)
+        run: >-
+          python -m pytest
+          backend/tests/test_financial_report_drift.py
+          backend/tests/test_financial_report_drift_wiring.py
+          backend/tests/test_financial_report_drift_mapping.py
+          -q --tb=short
+      # 复用了 exporter 的模板加载与 sheet 解析（只读私有方法）⇒ 报表导出侧需一并回归
+      - name: Run report exporter + cell mapping regression (Wave 4)
+        run: >-
+          python -m pytest
+          backend/tests/test_report_excel_exporter.py
+          backend/tests/test_financial_template_cell_mapping.py
+          -q --tb=short
+      # 溯源可视化（Wave 4 Task 23/24）：
+      # 1. 版本链派生字段 —— `is_stale` 必须三态（缺 hash 时返 None，
+      #    退化成布尔会让历史版本一律显示「与上游一致」= 骗人）；
+      #    编辑人只能取 `edited_by`（`created_by` 在 OO 路径只是回调处理占位）；
+      # 2. 三件套一致性能指出**哪一类**滞后；无严格多数时不得凭空指名。
+      - name: Run lineage visualization guards (Wave 4)
+        run: >-
+          python -m pytest
+          backend/tests/test_deliverable_version_chain_view.py
+          backend/tests/test_trio_consistency_lagging.py
+          -q --tb=short
+      - name: Run pre-existing lineage suites (no regression)
+        run: >-
+          python -m pytest
+          backend/tests/test_deliverable_lineage_e2e.py
+          backend/tests/test_deliverable_lineage_properties.py
+          backend/tests/test_deliverable_lineage_characterization.py
+          backend/tests/test_content_control_injector.py
+          -q --tb=short
+
+  deliverable-lineage-wiring-frontend:
+    # 交付件溯源接线与回填闭环 —— 前端门控守卫（Task 16 / Property 11、12）
+    # 覆盖：
+    # 1. 能力矩阵**跨前后端交叉锁死** —— 守卫直读后端 `deliverable_capabilities.py`
+    #    抽两个 frozenset 成员，与前端消费点比对；一旦分叉即打红
+    #    （双真源改一处另一处不红，是平台反复踩的漂移范式）；
+    # 2. 前端不得自写 doc_type 白名单（只消费后端下发的布尔），
+    #    合法例外仅「提示文案措辞」；
+    # 3. 无锚点提示（Property 12）：`/section-states` 返空 ⇒ 明确提示且不渲染空下拉
+    #    —— `hasNoAnchors` 曾只声明 `ref(false)` 从不赋值 = 死 prop；
+    # 4. `WritebackResultPanel` 五桶齐全（written/rejected/conflicts/skipped/failed），
+    #    有 failed 时不得出成功 Toast。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: audit-platform/frontend/package-lock.json
+      - name: Install deps
+        run: npm ci
+        working-directory: audit-platform/frontend
+      - name: Run deliverable capability gating guards
+        run: >-
+          npx vitest run
+          src/components/deliverable/__tests__/deliverableCapabilityGating.spec.ts
+          src/components/deliverable/__tests__/LineagePanel.spec.ts
+          src/components/deliverable/__tests__/WritebackPanel.spec.ts
+        working-directory: audit-platform/frontend
+      # 溯源展示守卫（Wave 4 Task 22/23/24/25）：
+      # 1. `created_via` 中文化，且**交叉锁死**后端全部实参 —— 后端新增一种来源
+      #    而前端漏加标签即打红（`refresh_stale` 就是这条守卫抓出来的）；
+      # 2. `is_stale` 三态：不得用 v-else 兜底把「未知」渲染成确定结论；
+      # 3. 差异告警可见性与后端 should_block_confirm 同口径（`{"diffs":[]}` 不告警），
+      #    文案中性归因，不得断言「有人改了数字」；
+      # 4. 三件套三列对照的中文名与后端 `_TRIO_LABEL` 逐字一致；
+      # 5. 行级溯源抽屉复用 useDeliverableLineage（504 文案不得写两份），
+      #    链条阶段顺序固定，空阶段/无锚点必须给明确原因。
+      - name: Run lineage display guards (Wave 4)
+        run: >-
+          npx vitest run
+          src/components/deliverable/__tests__/deliverableLineageDisplay.spec.ts
+        working-directory: audit-platform/frontend

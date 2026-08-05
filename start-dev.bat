@@ -46,7 +46,7 @@ echo       Done.
 
 :: ─── [2/5] start backend ─────────────────────────────────────
 echo [2/5] Starting backend on :%BACKEND_PORT% ...
-start "%BACKEND_TITLE%" /min cmd /k "title %BACKEND_TITLE% && cd /d "%BACKEND_DIR%" && "%PY%" run_uvicorn.py app.main:app --host 0.0.0.0 --port %BACKEND_PORT% --reload --reload-dir app --reload-exclude "*.pyc" --reload-exclude "__pycache__" --reload-exclude ".hypothesis" --log-level warning"
+start "%BACKEND_TITLE%" /min cmd /k "title %BACKEND_TITLE% && cd /d "%BACKEND_DIR%" && "%PY%" run_uvicorn.py app.main:app --host 0.0.0.0 --port %BACKEND_PORT% --reload --reload-dir app --reload-delay 2.0 --reload-exclude "*.pyc" --reload-exclude "__pycache__" --reload-exclude ".hypothesis" --reload-exclude "*.json" --reload-exclude "tmp_*" --log-level warning"
 
 :: ─── [3/5] wait for backend ──────────────────────────────────
 echo [3/5] Waiting for backend health (max 30s, typically 8-15s)...
