@@ -2537,22 +2537,26 @@
     {
       "wp_code": "K0",
       "wp_name": "管理循环函证",
-      "sheet": "审定表K0-1",
+      "sheet": "函证结果汇总表K0-1",
       "account_codes": [
-        "1221"
+        "1221",
+        "1231-03",
+        "1131",
+        "2241",
+        "2231"
       ],
       "cells": [
         {
-          "cell_ref": "期初余额",
-          "formula": "=TB('1221','期初余额')",
-          "formula_type": "TB",
-          "description": "从试算表取管理循环函证期初余额"
+          "cell_ref": "K0-1-matrix-其他应收款-book_amount",
+          "formula": "=PLACEHOLDER('其他应收款本期（期末）账面金额')",
+          "formula_type": "PLACEHOLDER",
+          "description": "品种「其他应收款」本期（期末）账面金额（源模板 函证结果汇总表K0-1!E29，该行无公式=手填）。取数真源 = 相邻 K1 审定表 render-config 的 `project_context.tb_amount`（走 semantic_account_resolver 按科目名在**本项目**科目表定位 + 叶子聚合，期末余额口径）。报表行 BS-009 —— soe_standalone 是**净额口径** TB('1221')-TB('1231-03')+TB('1131')，其余三准则为 TB('1221')；参考科目码 1221/1231-03/1131 **仅作展示与筛选，运行态不据此取数**（R4.5）。纠偏：原写 =TB('1221','期初余额') 且 cell_ref 是审定表口径的「期初余额」—— ①函证枢纽无审定表，sheet 名『审定表K0-1』在源 xlsx 不存在；②单个 TB() 表达不出 BS-009 的净额口径（漏减备抵 1231-03、漏加 1131）；③cell_ref 是手工覆盖键，写 TB() 会让按码取到的 0 伪装成审计师手填值，压住语义定位拿到的 undefined → 「本项目无此科目」与「余额为 0」不可区分（R4.4）。"
         },
         {
-          "cell_ref": "未审数",
-          "formula": "=TB('1221','期末余额')",
-          "formula_type": "TB",
-          "description": "从试算表取管理循环函证期末余额（未审）"
+          "cell_ref": "K0-1-matrix-其他应付款-book_amount",
+          "formula": "=PLACEHOLDER('其他应付款本期（期末）账面金额')",
+          "formula_type": "PLACEHOLDER",
+          "description": "品种「其他应付款」本期（期末）账面金额（源模板 函证结果汇总表K0-1!F29，该行无公式=手填）。取数真源 = 相邻 K3 审定表 render-config 的 `project_context.tb_amount`（走 semantic_account_resolver 按科目名在**本项目**科目表定位 + 叶子聚合，期末余额口径）。报表行 **BS-050** = TB('2241')+TB('2231')（*_standalone；*_consolidated 仅 2241）；🔴 必须按 row_code 精确匹配 —— BS-075 在 soe 侧 row_name 也叫「其他应付款」但 formula 为 NULL，在 listed 侧 row_name 竟是「股本」，按 row_name 匹配必踩（同 K2 的 BS-014/BS-017 同名坑）。参考科目码 2241/2231 **仅作展示与筛选，运行态不据此取数**（R4.5）。"
         }
       ]
     },
