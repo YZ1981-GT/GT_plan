@@ -29,7 +29,7 @@ const BLOCK1_COLUMNS: BlockColumnDef[] = [
   { field: 'business_desc', label: '业务内容', width: 140, type: 'text', group: '记账凭证' },
   { field: 'counter_account', label: '对方科目', width: 100, type: 'text', group: '记账凭证' },
   { field: 'detail_account', label: '明细科目', width: 100, type: 'text', group: '记账凭证' },
-  { field: 'debit_amount', label: '借方金额', width: 110, type: 'number', sumField: true, group: '记账凭证', align: 'right' },
+  { field: 'debit_amount', label: '借方金额', width: 110, type: 'number', render: 'amount', sumField: true, group: '记账凭证', align: 'right' },
   // 销售合同/销售订单分组
   { field: 'contract_no', label: '合同号', width: 110, type: 'text', group: '销售合同/销售订单' },
   // 出库单分组
@@ -43,13 +43,13 @@ const BLOCK1_COLUMNS: BlockColumnDef[] = [
   { field: 'transport_company', label: '运输公司', width: 110, type: 'text', group: '运输单' },
   { field: 'transport_address', label: '运输地址', width: 130, type: 'text', group: '运输单' },
   // 客户验收单/出库单（发货单）分组
-  { field: 'acceptance_amount', label: '确认金额', width: 110, type: 'number', sumField: true, group: '客户验收单/出库单', align: 'right' },
+  { field: 'acceptance_amount', label: '确认金额', width: 110, type: 'number', render: 'amount', sumField: true, group: '客户验收单/出库单', align: 'right' },
   { field: 'acceptance_signer', label: '签收人', width: 90, type: 'text', group: '客户验收单/出库单' },
   { field: 'acceptance_stamp_type', label: '盖章类型', width: 90, type: 'text', group: '客户验收单/出库单' },
   { field: 'acceptance_stamp_entity', label: '盖章单位', width: 110, type: 'text', group: '客户验收单/出库单' },
   // 销售发票分组
   { field: 'invoice_receiver', label: '收票方名称', width: 120, type: 'text', group: '销售发票' },
-  { field: 'invoice_amount', label: '金额', width: 110, type: 'number', sumField: true, group: '销售发票', align: 'right' },
+  { field: 'invoice_amount', label: '金额', width: 110, type: 'number', render: 'amount', sumField: true, group: '销售发票', align: 'right' },
   // 其他
   { field: 'other_evidence', label: '……', width: 100, type: 'text', group: '其他证据' },
   // 索引/异常
@@ -67,11 +67,11 @@ const BLOCK2_COLUMNS: BlockColumnDef[] = [
   { field: 'business_desc', label: '业务内容', width: 140, type: 'text', group: '记账凭证' },
   { field: 'counter_account', label: '对方科目', width: 100, type: 'text', group: '记账凭证' },
   { field: 'detail_account', label: '明细科目', width: 100, type: 'text', group: '记账凭证' },
-  { field: 'credit_amount', label: '贷方金额', width: 110, type: 'number', sumField: true, group: '记账凭证', align: 'right' },
+  { field: 'credit_amount', label: '贷方金额', width: 110, type: 'number', render: 'amount', sumField: true, group: '记账凭证', align: 'right' },
   // 银行回单分组
   { field: 'bank_summary', label: '摘要', width: 120, type: 'text', group: '银行回单' },
   { field: 'bank_payer', label: '付款方', width: 120, type: 'text', group: '银行回单' },
-  { field: 'bank_amount', label: '金额', width: 110, type: 'number', sumField: true, group: '银行回单', align: 'right' },
+  { field: 'bank_amount', label: '金额', width: 110, type: 'number', render: 'amount', sumField: true, group: '银行回单', align: 'right' },
   // 承兑汇票分组
   { field: 'bill_endorser', label: '前手名称', width: 110, type: 'text', group: '承兑汇票' },
   { field: 'bill_issuer', label: '出票人', width: 110, type: 'text', group: '承兑汇票' },
@@ -91,7 +91,7 @@ const BLOCK3_COLUMNS: BlockColumnDef[] = [
   { field: 'voucher_no', label: '编号', width: 90, type: 'text', group: '记账凭证' },
   { field: 'product_name', label: '品名', width: 100, type: 'text', group: '记账凭证' },
   { field: 'product_qty', label: '数量', width: 70, type: 'number', group: '记账凭证', align: 'right' },
-  { field: 'product_amount', label: '金额', width: 110, type: 'number', sumField: true, group: '记账凭证', align: 'right' },
+  { field: 'product_amount', label: '金额', width: 110, type: 'number', render: 'amount', sumField: true, group: '记账凭证', align: 'right' },
   // 销售订单/销售合同分组
   { field: 'order_contract_no', label: '订单号/合同号', width: 120, type: 'text', group: '销售订单/销售合同' },
   // 出库单分组
@@ -121,7 +121,7 @@ const BLOCK4_COLUMNS: BlockColumnDef[] = [
   { field: 'voucher_no', label: '凭证编号', width: 100, type: 'text', group: '记账凭证' },
   { field: 'business_desc', label: '业务内容', width: 140, type: 'text', group: '记账凭证' },
   { field: 'counter_account', label: '对方科目', width: 100, type: 'text', group: '记账凭证' },
-  { field: 'receipt_amount', label: '金额', width: 110, type: 'number', sumField: true, group: '记账凭证', align: 'right' },
+  { field: 'receipt_amount', label: '金额', width: 110, type: 'number', render: 'amount', sumField: true, group: '记账凭证', align: 'right' },
   // 银行回单分组
   { field: 'bank_payer', label: '付款方', width: 120, type: 'text', group: '银行回单' },
   // 销售发票分组

@@ -6,6 +6,16 @@
         <p class="sheet-sub">科目 1503 · 审定 = 未审 + 账项调整 · 与 TB / G8-2 / G8-3 / G8-4 勾稽</p>
       </div>
       <div class="g8-actions">
+        <el-tooltip :content="fourTableHint" placement="top">
+          <el-button
+            size="small"
+            :disabled="isReadonly || !hasFourTablePrefill"
+            :loading="seeding"
+            @click="onPullFromFourTable"
+          >
+            从四表库带入未审数
+          </el-button>
+        </el-tooltip>
         <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
           <el-icon><Download /></el-icon>带入调整
         </el-button>
@@ -273,7 +283,7 @@
  * 勾稽：TB / G8-2 明细 / G8-3 调整回写 / G8-4 公允合计
  */
 import { computed, inject, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download } from '@element-plus/icons-vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import GtReviewDot from '../../GtReviewDot.vue'
@@ -284,6 +294,17 @@ import { useG8Adjudication } from '../../composables/useG8Adjudication'
 import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { jumpToG8Sheet } from '../../composables/g8CrossHelpers'
+import {
+  buildG8FvSeedCells,
+  normalizeGAdjPrefill,
+} from '../../composables/gCycleAdjudicationSeed'
+import {
+  describeAdjPrefillConflicts,
+  describeAdjPrefillPlan,
+  planAdjudicationPrefill,
+  planHasWork,
+  resolveAdjPrefillWrites,
+} from '../../composables/shared/adjudicationPrefillPlan'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
 
@@ -357,6 +378,80 @@ const conclusionProxy = computed({
 const rowCount = computed(() =>
   adj.groupedRows.value.reduce((n, g) => n + (g.rows?.length ?? 0), 0),
 )
+
+// ─── 从四表库带入未审数（1507 期初+期末，按叶子顺序落 10 个占位行，同 G6 范式）──────
+
+const seeding = ref(false)
+
+const fourTablePrefill = computed(() =>
+  normalizeGAdjPrefill(props.htmlData?.adjudication_prefill),
+)
+
+const seedResult = computed(() => buildG8FvSeedCells(
+  fourTablePrefill.value,
+  (k) => adj.dataRows.value.find((r) => r.rowKey === k)?.label ?? k,
+))
+
+const hasFourTablePrefill = computed(() => seedResult.value.cells.length > 0)
+
+const fourTableHint = computed(() =>
+  hasFourTablePrefill.value
+    ? '把四表库（tb_balance 其他权益工具投资叶子余额）按顺序带入占位行的期初/期末未审数；已录入的格不覆盖'
+    : '四表库暂无其他权益工具投资科目数据（需先导入余额表）',
+)
+
+function readCurrentCellG8(cell: { rowKey: string; field: string }): number | null {
+  const row = adj.dataRows.value.find((r) => r.rowKey === cell.rowKey)
+  if (!row) return null
+  const v = (row as unknown as Record<string, unknown>)[cell.field]
+  return v == null || v === 0 ? null : Number(v)
+}
+
+async function onPullFromFourTable(): Promise<void> {
+  if (props.isReadonly) return
+  const { cells, unclassified, absentSlots } = seedResult.value
+  if (!cells.length) {
+    ElMessage.info('四表库暂无其他权益工具投资科目数据可带入')
+    return
+  }
+  const plan = planAdjudicationPrefill(cells, readCurrentCellG8, { unclassified, absentSlots })
+  if (!planHasWork(plan)) {
+    ElMessage.info(describeAdjPrefillPlan(plan))
+    return
+  }
+
+  let mode: 'fill-blank' | 'overwrite' = 'fill-blank'
+  if (plan.conflicts.length) {
+    try {
+      const action = await ElMessageBox.confirm(
+        `以下 ${plan.conflicts.length} 格已有录入且与四表不一致：\n`
+        + `${describeAdjPrefillConflicts(plan)}\n\n`
+        + '「覆盖」以四表数据替换；「仅补空值」保留已录入数据、只填空白格。',
+        '从四表库带入未审数',
+        {
+          confirmButtonText: '覆盖',
+          cancelButtonText: '仅补空值',
+          distinguishCancelAndClose: true,
+          type: 'warning',
+        },
+      )
+      if (action === 'confirm') mode = 'overwrite'
+    } catch (e) {
+      if (e === 'close') return
+      mode = 'fill-blank'
+    }
+  }
+
+  seeding.value = true
+  try {
+    for (const w of resolveAdjPrefillWrites(plan, mode)) {
+      adj.updateField(w.rowKey, w.field as 'openingUnadjusted' | 'closingUnadjusted', w.amount)
+    }
+    ElMessage.success(describeAdjPrefillPlan(plan))
+  } finally {
+    seeding.value = false
+  }
+}
 
 function fmt(v: number | null | undefined): string {
   if (v == null || Number.isNaN(v)) return '—'

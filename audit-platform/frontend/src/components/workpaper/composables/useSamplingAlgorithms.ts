@@ -63,6 +63,13 @@ export interface SamplingConfig {
   voucherTypeFilter: string[]
   summaryKeyword: string
   excludeExtracted: boolean
+  /**
+   * 排除范围（sampling-compliance-closure R5.5）：
+   * - `'workpaper'`（默认，零回归）= 仅排除**当前底稿**已抽过的凭证
+   * - `'project'` = 叠加排除**全项目**已抽凭证（来自 `sampled_vouchers` 登记表），
+   *   用于避免同一凭证被多个循环重复抽取（该问题此前项目层面发现不了）
+   */
+  excludeScope?: 'workpaper' | 'project'
   /** 抽样单位：分录行（默认）或整张凭证（按凭证号聚合，抽中带出完整分录） */
   samplingUnit?: 'ledger_line' | 'voucher'
   // ─── 方法学增强（可选，向后兼容）─────────────────────────────────
@@ -112,6 +119,19 @@ export interface SampledVoucher {
   actualMisstatement?: string
   /** 特定选取原因：审计师对该凭证标注的选取理由，随样本回填（R6.5） */
   selectionReason?: string
+  // ─── 辅助维度往来单位（后端 tb_aux_ledger 补全，R6.5 客户名称）───────────
+  /**
+   * 往来单位名称（客户/供应商/往来单位/职员），由后端按
+   * 「凭证号 + 日期 + 科目 + 借贷金额」精确匹配辅助明细账得出。
+   *
+   * `null` 有三种成因且**不可互相替代**：该科目本无辅助维度 / 未匹配到 /
+   * 一键多名（此时 `partyAmbiguous` 为 true）。一律不猜，留空由审计师填。
+   */
+  partyName?: string | null
+  /** 命中的辅助维度类型（如「客户」「供应商」），供 UI 标注来源 */
+  partyAuxType?: string | null
+  /** 该行匹配到多个往来单位 → 后端刻意不写名称，前端应提示人工确认 */
+  partyAmbiguous?: boolean
 }
 
 export interface CoverageStats {

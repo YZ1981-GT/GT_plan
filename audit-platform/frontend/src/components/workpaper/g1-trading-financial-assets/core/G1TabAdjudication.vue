@@ -3,6 +3,16 @@
     <div class="section-head">
       <h3 class="sheet-title">G1-1 交易性金融资产审定表</h3>
       <div class="head-actions tab-toolbar">
+        <el-tooltip :content="fourTableHint" placement="top">
+          <el-button
+            size="small"
+            :disabled="isReadonly || !hasFourTablePrefill"
+            :loading="seeding"
+            @click="onPullFromFourTable"
+          >
+            从四表库带入未审数
+          </el-button>
+        </el-tooltip>
         <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="handleOpenBringIn">
           <el-icon><Download /></el-icon>带入调整
         </el-button>
@@ -264,12 +274,24 @@
 
 <script setup lang="ts">
 import { computed, toRef, inject, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download } from '@element-plus/icons-vue'
 import { useG1Adjudication } from '../../composables/useG1Adjudication'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import {
+  G1_SEED_SPEC,
+  buildGSeedCells,
+  normalizeGAdjPrefill,
+} from '../../composables/gCycleAdjudicationSeed'
+import {
+  describeAdjPrefillConflicts,
+  describeAdjPrefillPlan,
+  planAdjudicationPrefill,
+  planHasWork,
+  resolveAdjPrefillWrites,
+} from '../../composables/shared/adjudicationPrefillPlan'
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import G1AuditTextCards from '../G1AuditTextCards.vue'
@@ -396,6 +418,84 @@ async function handleOpenBringIn() {
     ElMessage.warning(
       `已自动排除 ${bringInDuplicateCount.value} 笔已在 G1-3 明细行中同步的分录，避免重复计算`,
     )
+  }
+}
+
+// ─── 从四表库带入未审数（1101 期初+期末，按子科目名判段，默认「投资成本·交易性·其他」）───
+//
+// G1 三维度中 section（成本/FV变动）可从子科目名推断，class（交易性/划分为/指定为）
+// 与 product（股票/债券等）是会计判断 → 默认 trading + other。
+// 多分类/多品种时须审计师用分摊对话框分配。
+
+const seeding = ref(false)
+
+const fourTablePrefill = computed(() =>
+  normalizeGAdjPrefill(props.htmlData?.adjudication_prefill),
+)
+
+const seedResult = computed(() => buildGSeedCells(fourTablePrefill.value, {
+  ...G1_SEED_SPEC,
+  labelOf: (k) => rows.value.find((r) => r.rowKey === k)?.label ?? k,
+}))
+
+const hasFourTablePrefill = computed(() => seedResult.value.cells.length > 0)
+
+const fourTableHint = computed(() =>
+  hasFourTablePrefill.value
+    ? '把四表库（tb_balance 交易性金融资产叶子余额）带入对应行的期初/期末未审数；已录入的格不覆盖'
+    : '四表库暂无交易性金融资产科目数据（需先导入余额表）',
+)
+
+function readCurrentCellG1(cell: { rowKey: string; field: string }): number | null {
+  const row = rows.value.find((r) => r.rowKey === cell.rowKey)
+  if (!row) return null
+  const v = (row as unknown as Record<string, unknown>)[cell.field]
+  return v == null || v === 0 ? null : Number(v)
+}
+
+async function onPullFromFourTable(): Promise<void> {
+  if (props.isReadonly) return
+  const { cells, unclassified, absentSlots } = seedResult.value
+  if (!cells.length) {
+    ElMessage.info('四表库暂无交易性金融资产科目数据可带入')
+    return
+  }
+  const plan = planAdjudicationPrefill(cells, readCurrentCellG1, { unclassified, absentSlots })
+  if (!planHasWork(plan)) {
+    ElMessage.info(describeAdjPrefillPlan(plan))
+    return
+  }
+
+  let mode: 'fill-blank' | 'overwrite' = 'fill-blank'
+  if (plan.conflicts.length) {
+    try {
+      const action = await ElMessageBox.confirm(
+        `以下 ${plan.conflicts.length} 格已有录入且与四表不一致：\n`
+        + `${describeAdjPrefillConflicts(plan)}\n\n`
+        + '「覆盖」以四表数据替换；「仅补空值」保留已录入数据、只填空白格。',
+        '从四表库带入未审数',
+        {
+          confirmButtonText: '覆盖',
+          cancelButtonText: '仅补空值',
+          distinguishCancelAndClose: true,
+          type: 'warning',
+        },
+      )
+      if (action === 'confirm') mode = 'overwrite'
+    } catch (e) {
+      if (e === 'close') return
+      mode = 'fill-blank'
+    }
+  }
+
+  seeding.value = true
+  try {
+    for (const w of resolveAdjPrefillWrites(plan, mode)) {
+      updateField(w.rowKey, w.field as 'openingUnadjusted' | 'closingUnadjusted', w.amount)
+    }
+    ElMessage.success(describeAdjPrefillPlan(plan))
+  } finally {
+    seeding.value = false
   }
 }
 

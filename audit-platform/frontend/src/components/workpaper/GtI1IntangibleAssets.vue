@@ -49,28 +49,29 @@
         />
 
         <!-- I1-1 审定表 -->
-        <HiFourTableSourcePanel
-          v-if="props.htmlData?.hi_extraction_enabled"
-          :wp-code="'I1'"
-          :segments="getHiExtractionSegments('I1')"
-          :all-responses="allResponses"
-          :is-readonly="isReadonly"
-          @refresh-complete="selfLoad()"
-        />
-        <I1TabAdjudication
-          v-else-if="currentSheet === 'I1-1'"
-          :wp-id="props.wpId"
-          :project-id="props.projectId"
-          :all-responses="allResponses"
-          :tb-data="tbData"
-          :is-readonly="isReadonly"
-          :cross-sheet-cost-audited="adjudicationFromDetail.costAudited"
-          :cross-sheet-amort-audited="adjudicationFromDetail.amortAudited"
-          :cross-sheet-impair-audited="adjudicationFromDetail.impairAudited"
-          :html-data="props.htmlData"
-          @save="handleChildSave"
-          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
-        />
+        <template v-else-if="currentSheet === 'I1-1'">
+          <HiFourTableSourcePanel
+            v-if="props.htmlData?.hi_extraction_enabled"
+            :wp-code="'I1'"
+            :segments="getHiExtractionSegments('I1')"
+            :all-responses="allResponses"
+            :is-readonly="isReadonly"
+            @refresh-complete="selfLoad()"
+          />
+          <I1TabAdjudication
+            :wp-id="props.wpId"
+            :project-id="props.projectId"
+            :all-responses="allResponses"
+            :tb-data="tbData"
+            :is-readonly="isReadonly"
+            :cross-sheet-cost-audited="adjudicationFromDetail.costAudited"
+            :cross-sheet-amort-audited="adjudicationFromDetail.amortAudited"
+            :cross-sheet-impair-audited="adjudicationFromDetail.impairAudited"
+            :html-data="props.htmlData"
+            @save="handleChildSave"
+            @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
+          />
+        </template>
 
         <!-- I1-2 明细表 -->
         <I1TabDetail

@@ -50,14 +50,29 @@
           :year="year"
           :deliverable-status="deliverableStatus"
           :has-no-anchors="hasNoAnchors"
+          :supports-section-refresh="supportsSectionRefresh"
         />
+        <!--
+          回填面板按后端能力标志门控（需求 6.1）：
+          xlsx 财务报表 / 报告正文（Wave 3 前）不支持回填 → 不渲染面板，
+          避免「点了提示成功但 DB 没变」的假成功。
+        -->
         <WritebackResultPanel
+          v-if="supportsWriteback"
           :project-id="projectId"
           :word-export-task-id="taskId"
           :year="year"
           :deliverable-status="deliverableStatus"
           @open-conflict-dialog="onOpenConflictDialog"
           @writeback-complete="onWritebackComplete"
+        />
+        <el-alert
+          v-else
+          type="info"
+          :closable="false"
+          show-icon
+          class="onlyoffice-editor__no-writeback"
+          :title="writebackUnsupportedTitle"
         />
       </div>
     </div>
@@ -109,9 +124,13 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { Close } from '@element-plus/icons-vue'
-import { fetchOnlyOfficeConfig, fetchOnlyOfficeHealth } from '@/services/deliverableApi'
+import {
+  fetchOnlyOfficeConfig,
+  fetchOnlyOfficeHealth,
+  fetchSectionStates,
+} from '@/services/deliverableApi'
 import {
   AUTO_FOLLOW_ENABLED,
   createLineageAutoFollow,
@@ -135,6 +154,15 @@ const props = defineProps<{
   showWatermark?: boolean
   /** 出品物当前状态（终态检测） */
   deliverableStatus?: string
+  /** 交付件类型（doc_type），用于入口门控展示 */
+  docType?: string
+  /**
+   * 能力标志（需求 6.1/6.2）：由后端 `deliverable_capabilities` 单一真源下发。
+   * 前端只消费不判断 —— 禁止在此写 doc_type 白名单。
+   * 缺省 false：xlsx 报表等不支持回填的类型不再出现「回填到附注模块」按钮。
+   */
+  supportsWriteback?: boolean
+  supportsSectionRefresh?: boolean
 }>()
 
 const emit = defineEmits<{ close: [] }>()
@@ -154,6 +182,22 @@ const hasNoAnchors = ref(false)
 // 冲突弹窗状态
 const conflictDialogVisible = ref(false)
 const currentConflicts = ref<WritebackConflict[]>([])
+
+/**
+ * 不支持回填时的说明文案（需求 6.3）：必须说明**为什么**不支持 + 正确做法，
+ * 不能只把按钮藏掉让审计师以为功能坏了。财务报表是派生结果，改数字必须走
+ * 调整分录（AJE/RJE），否则等于绕过审计逻辑。
+ */
+const writebackUnsupportedTitle = computed(() => {
+  const dt = props.docType || ''
+  if (dt.startsWith('financial_report')) {
+    return '财务报表数字来源于试算表与调整分录，不支持从出品物回填；如需修改金额请回底稿录入 AJE/RJE 后重新生成报表。'
+  }
+  if (dt === 'audit_report') {
+    return '报告正文回填能力尚未开放（规划中），本版本可在线编辑并保存为新版本，但改动不会写回报告数据。'
+  }
+  return '该类型交付件不支持回填到上游模块，编辑结果仅保存为交付件新版本。'
+})
 
 let editorInstance: any = null
 // 真·光标跟随溯源句柄（默认关闭 AUTO_FOLLOW_ENABLED，P0 live 验证通过后开启）
@@ -230,9 +274,27 @@ function onWritebackComplete(_result: WritebackResult) {
   lineagePanelRef.value?.refresh()
 }
 
+/**
+ * 探测本交付件有无章节锚点（需求 6.5）。
+ *
+ * 🔴 `hasNoAnchors` 曾只声明 `ref(false)` 从不赋值 → LineagePanel 的「无锚点」
+ * 提示分支永不触发（旧版本交付件用户看到的是空白章节下拉，没有任何解释）。
+ * 判据 = `/section-states` 返回的 sections 为空数组（该端点在 Task 4 接线后
+ * 对新生成交付件必非空）。fail-open：查询异常时保持 false（不误报无锚点）。
+ */
+async function probeAnchors(): Promise<void> {
+  try {
+    const states = await fetchSectionStates(props.projectId, props.taskId)
+    hasNoAnchors.value = states.length === 0
+  } catch {
+    hasNoAnchors.value = false
+  }
+}
+
 onMounted(async () => {
   document.addEventListener('fullscreenchange', onFullscreenChange)
   document.addEventListener('webkitfullscreenchange', onFullscreenChange)
+  void probeAnchors()
   try {
     const health = await fetchOnlyOfficeHealth(props.projectId)
     if (!health.enabled || !health.available) {

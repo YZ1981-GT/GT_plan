@@ -18,6 +18,14 @@
       title="审计目标：核实工程物资（科目1605）原值及减值准备期末余额的存在、完整与计价；审定净值=原值−减值；与 H4-2/TB/报表勾稽，为列报提供审定依据。"
     />
 
+    <!-- 四表取数科目溯源面板 -->
+    <WpSemanticAccountSourcePanel
+      :source="htmlData?.tb_source_codes"
+      :slot-order="['gross', 'cip']"
+      :slot-labels="{ gross: '工程物资', cip: '在建工程（核对用）' }"
+      hint="科目定位：含于 BS-029，工程物资 = 1605"
+    />
+
     <div class="tab-toolbar">
       <div class="toolbar-left">
         <el-button
@@ -412,6 +420,7 @@ import { useAuditContext } from '@/composables/useAuditContext'
 import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
+import WpSemanticAccountSourcePanel from '../../shared/WpSemanticAccountSourcePanel.vue'
 
 const props = defineProps<{
   wpId: string

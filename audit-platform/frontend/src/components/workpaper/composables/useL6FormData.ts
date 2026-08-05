@@ -39,7 +39,9 @@ export interface UseL6FormDataOptions {
 
 const DEBOUNCE_MS = 2000
 const ITEM_PREFIX = 'L6-'
-const ACCOUNT_CODE = '2601' // 专项应付款（贷方/负债类）
+import { L6_GROSS_FALLBACK_STANDARD } from './l6AccountScope'
+
+const ACCOUNT_CODE = L6_GROSS_FALLBACK_STANDARD // 专项应付款 2711（纠正：原 2601 是租赁负债）
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 

@@ -126,15 +126,21 @@ export function buildG2SoeSyncPayloads(
   ]
 }
 
-/** 上市：子表结构与国企相同，章节/标准不同；备注 section 标记 listed */
+/** 上市：子表结构与国企相同（应收利息分类 + 重要逾期利息），但**不含**「坏账准备计提情况」
+ * —— 该表只存在于国企 §八、9，上市 §五、8 模板无此表（推了会成孤儿子表）。
+ * 🔴 同时用 `_removed_table_keys` 清理曾经误推的历史数据（spec: g-cycle Task 6.2）。
+ */
 export function buildG2ListedSubTableData(
   snap: G2SoeSyncSnapshot,
 ): Record<string, Record<string, unknown>[]> {
   const data = buildG2SoeSubTableData(snap)
+  // 从国企构建结果中移除「坏账准备计提情况」（listed 模板无此表）
+  const { '坏账准备计提情况': _removed, ...withoutEcl } = data
   return {
-    ...data,
+    ...withoutEcl,
     _note_texts: [{ section: 'listed-audit-note', text: snap.auditNote }],
-  }
+    _removed_table_keys: ['坏账准备计提情况'],
+  } as any
 }
 
 export function buildG2ListedSyncPayloads(

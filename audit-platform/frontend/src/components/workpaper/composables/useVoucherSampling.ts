@@ -21,9 +21,10 @@
  *
  * Requirements: 1.7, 1.8, 2.2, 3.9, 4.2, 4.5, 7.1, 7.2, 7.3, 7.4, 8.3, 9.1, 9.2, 9.3, 10.3, 10.4
  */
-import { ref, computed, type Ref, type ComputedRef } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
+import { eventBus } from '@/utils/eventBus'
 import { useAuthStore } from '@/stores/auth'
 import {
   validateSamplingConfig,
@@ -49,11 +50,33 @@ import { useVersionTrail } from './useVersionTrail'
 
 // ─── Interfaces ──────────────────────────────────────────────────────────────
 
+/** 跨底稿重复抽凭项（后端 `cross_workpaper_duplicates` 的一条，R8.1） */
+export interface CrossWpDuplicate {
+  voucherNo: string
+  /** 抽过它的底稿编码（去重排序）；取不到 wp_code 时为空数组 */
+  wpCodes: string[]
+  /** 涉及的批次数 */
+  batchCount: number
+}
+
+/**
+ * 审计师对跨底稿重复项的处置（R8.5/8.7）：
+ * - `keep_all` 保留全部（有意交叉复核）
+ * - `removed` 剔除重复项（避免样本浪费与覆盖率虚高）
+ * - `none` 本次未涉及重复 / 用户取消了抽样
+ */
+export type DuplicateDecision = 'keep_all' | 'removed' | 'none'
+
 export interface VoucherSamplingOptions {
   projectId: Ref<string>
   year: Ref<number>
   workpaperId: Ref<string>
   accountCode: string
+  /**
+   * 宿主底稿编码（如 'D2'），仅用于推断错报推送 A13 时的 source_wp_code 溯源。
+   * 缺省为空串 → 该字段留 null（不用科目码冒充底稿编码，否则错报汇总的来源列不可信）。
+   */
+  wpCode?: string
   phase: Ref<Phase>
   defaultMethod?: SamplingMethod
   /** 初始期间月份 1-12（如期后默认 [1,2,3]） */
@@ -232,6 +255,60 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
   } | null>(null)
   /** 后端方法学权威快照（含 algo_version）；抽样后由 triggerSampling 填充，回填时留痕 */
   const methodologySnapshot = ref<Record<string, any> | null>(null)
+  /**
+   * 抽样框数据集版本（R1）：本次抽样所依据的 active 序时账版本 id。
+   * null = 未识别到已激活账套版本（如尚未导入账套）→ 该批次无法据 seed 复算，
+   * UI 如实提示但不阻断抽样（"先建底稿后导账套"是合法工作流）。
+   */
+  const datasetId = ref<string | null>(null)
+  /**
+   * 跨底稿重复抽凭（R8）：本次样本中被**其它底稿**抽取登记过的凭证。
+   *
+   * 重复抽同一张凭证有时是有意的（不同循环从不同认定角度检查同一笔交易），有时是
+   * 样本浪费（覆盖率虚高）→ 由审计师在弹窗里判断，不由配置项静默决定。
+   */
+  const crossWpDuplicates = ref<CrossWpDuplicate[]>([])
+  /** 审计师对重复项的处置（随回填留痕落库，R8.7） */
+  const duplicateDecision = ref<DuplicateDecision>('none')
+  /**
+   * 评价来源批次（R2.7）：抽样评价从既有批次回读时标注来源，供审计师区分
+   * "这是上一批次的结论"与"这是刚算出来的结论"。执行新抽样后清空（R2.8）。
+   */
+  const loadedFromBatch = ref<{
+    logId: string
+    batchId: string | null
+    evaluatedAt: string | null
+  } | null>(null)
+  /**
+   * 结论人工确认标识（R18.7：确认前不定稿）。
+   *
+   * 原先是 `GtVoucherSamplingEngine.vue` 的组件级 ref，现收进 composable 作单一真源 ——
+   * 回读既有批次评价时必须能还原该状态（R2.7），组件级 ref 随 destroy-on-close 消失。
+   */
+  const conclusionConfirmed = ref(false)
+  /** 本批次推断错报已推送至 A13 的时间戳（R3.7 防重复计入错报汇总） */
+  const a13PushedAt = ref<string | null>(null)
+  /**
+   * 抑制一次「结论变化 ⇒ 人工确认失效」：仅供回读既有评价时使用。
+   * 回读会先写 samplingConclusion 再写 conclusionConfirmed，若不抑制，watch 会把
+   * 刚还原的确认状态立刻打回 false（表现为"上次确认过的结论重开后又要再确认一遍"）。
+   */
+  let suppressConfirmInvalidateOnce = false
+
+  // 任一次错报推断/结论重算（录入实际错报、重新推断、重抽、重新抽样清空）都会使
+  // 上一次的人工确认失效，强制审计师对最新结论重新确认后方可定稿。
+  watch(samplingConclusion, () => {
+    if (suppressConfirmInvalidateOnce) {
+      suppressConfirmInvalidateOnce = false
+      return
+    }
+    conclusionConfirmed.value = false
+  })
+
+  /** 人工确认当前结论（R18.7 门禁的唯一放开入口） */
+  function confirmConclusion(): void {
+    conclusionConfirmed.value = true
+  }
 
   // ─── 真实操作者解析（Req9）──────────────────────────────────────────────
   // edit_trail 本地 actor 用当前登录用户（乐观展示）；权威 actor 由后端持久化时以
@@ -500,6 +577,8 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
           voucher_type_filter: config.value.voucherTypeFilter,
           summary_keyword: config.value.summaryKeyword,
           exclude_extracted: config.value.excludeExtracted,
+          // R5.5 排除范围：缺省 'workpaper' 与改造前行为逐字节等价
+          exclude_scope: config.value.excludeScope ?? 'workpaper',
           sampling_unit: config.value.samplingUnit ?? 'ledger_line',
         },
       }
@@ -523,6 +602,15 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
       // 记录种子
       seedUsed.value = responseSeedUsed
 
+      // R1：记录抽样框数据集版本；未识别时如实提示（不阻断）
+      const rawDatasetId = statsData.dataset_id ?? statsData.datasetId ?? null
+      datasetId.value = rawDatasetId != null ? String(rawDatasetId) : null
+      if (datasetId.value === null) {
+        ElMessage.info(
+          '未识别到已激活账套版本，本次抽样无法绑定抽样框版本（后续无法据随机种子复算）',
+        )
+      }
+
       // 映射为 SampledVoucher（默认全选、phase取当前阶段）
       sampledVouchers.value = items.map((item: any) => ({
         id: item.id != null ? String(item.id) : undefined,  // 序时账行 id（P3 行级排除）
@@ -534,6 +622,12 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
         accountCode: item.account_code ?? item.accountCode ?? '',
         accountName: item.account_name ?? item.accountName ?? null,
         counterpartAccount: item.counterpart_account ?? item.counterpartAccount ?? null,
+        // 往来单位（后端按 tb_aux_ledger 精确匹配补全）。三态语义见
+        // SampledVoucher.partyName 的注释：null 不区分「无此维度／未匹配／歧义」，
+        // 歧义单独由 partyAmbiguous 表达 —— 不能用「有没有名字」反推。
+        partyName: item.party_name ?? item.partyName ?? null,
+        partyAuxType: item.party_aux_type ?? item.partyAuxType ?? null,
+        partyAmbiguous: Boolean(item.party_ambiguous ?? item.partyAmbiguous ?? false),
         voucherType: item.voucher_type ?? item.voucherType ?? null,
         accountingPeriod: item.accounting_period ?? item.accountingPeriod ?? null,
         checkResult: '',
@@ -592,10 +686,34 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
       // 每次新抽样重置上一批次的错报推断状态（历史批次由后端留存，不受影响）
       misstatementResult.value = null
       samplingConclusion.value = null
+      // R2.8：同时清空"评价来自哪个批次"的标注 —— 否则界面会把上一批次的结论
+      // 挂到全新样本上（结论与样本不匹配，是比无结论更坏的状态）
+      loadedFromBatch.value = null
 
       // 截断提示
       if (truncated) {
         ElMessage.warning('抽样结果超过500条，已截断显示')
+      }
+
+      // R8：跨底稿重复抽凭 → 弹窗要求审计师显式判断（在打开预览**之前**）
+      crossWpDuplicates.value = (data?.cross_workpaper_duplicates ?? []).map(
+        (d: any) => ({
+          voucherNo: String(d.voucher_no ?? d.voucherNo ?? ''),
+          wpCodes: Array.isArray(d.wp_codes ?? d.wpCodes)
+            ? (d.wp_codes ?? d.wpCodes).map((c: any) => String(c))
+            : [],
+          batchCount: Number(d.batch_count ?? d.batchCount ?? 0) || 0,
+        }),
+      )
+      duplicateDecision.value = 'none'
+      if (crossWpDuplicates.value.length > 0) {
+        const proceed = await confirmCrossWpDuplicates()
+        if (!proceed) {
+          // 用户取消：放弃本次抽样结果（不打开预览，不留半套样本）
+          sampledVouchers.value = []
+          coverageStats.value = null
+          return
+        }
       }
 
       // 打开预览弹窗
@@ -604,6 +722,107 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
       ElMessage.error(err?.message || '抽样执行失败，请稍后重试')
     } finally {
       loading.value = false
+    }
+  }
+
+  // ─── 跨底稿重复抽凭确认（R8）────────────────────────────────────────────
+
+  /** 重复项清单文案：>10 条截断显示并给出总数（R8.4） */
+  function buildDuplicateSummary(dups: CrossWpDuplicate[], maxLines = 10): string {
+    const shown = dups.slice(0, maxLines)
+    const lines = shown.map((d) => {
+      const where = d.wpCodes.length ? d.wpCodes.join('、') : '未知底稿'
+      return `${d.voucherNo}（已被 ${where} 抽取）`
+    })
+    if (dups.length > shown.length) {
+      lines.push(`……另有 ${dups.length - shown.length} 张，共 ${dups.length} 张`)
+    }
+    return lines.join('<br/>')
+  }
+
+  /**
+   * 弹窗要求审计师对跨底稿重复项显式表态（R8.5）。
+   *
+   * 三出口：保留全部（有意交叉复核）／剔除重复项／取消本次抽样。
+   * 返回 true = 继续打开预览；false = 放弃本次抽样结果。
+   */
+  async function confirmCrossWpDuplicates(): Promise<boolean> {
+    const dups = crossWpDuplicates.value
+    const dupSet = new Set(dups.map((d) => d.voucherNo))
+    const body =
+      `本次抽到的 <b>${dups.length}</b> 张凭证已被本项目其它底稿抽查过：<br/><br/>` +
+      buildDuplicateSummary(dups) +
+      '<br/><br/>重复抽查可能是有意的交叉复核，也可能造成样本浪费与覆盖率虚高，' +
+      '请判断如何处置（本次选择将随抽凭留痕归档）。'
+
+    try {
+      const action = await ElMessageBox.confirm(body, '跨底稿重复抽凭确认', {
+        dangerouslyUseHTMLString: true,
+        distinguishCancelAndClose: true,
+        confirmButtonText: '保留全部',
+        cancelButtonText: '剔除重复项',
+        type: 'warning',
+      })
+      void action
+      duplicateDecision.value = 'keep_all'
+      ElMessage.info(`已保留全部样本（含 ${dups.length} 张重复凭证）`)
+      return true
+    } catch (action) {
+      if (action === 'cancel') {
+        // 「剔除重复项」：移除重复凭证并按剩余样本重算覆盖率展示（R8.6）
+        const before = sampledVouchers.value.length
+        sampledVouchers.value = sampledVouchers.value.filter(
+          (v) => !dupSet.has(v.voucherNo),
+        )
+        duplicateDecision.value = 'removed'
+        recomputeCoverageAfterRemoval()
+        const removed = before - sampledVouchers.value.length
+        if (sampledVouchers.value.length === 0) {
+          ElMessage.warning(
+            `剔除 ${removed} 张重复凭证后已无剩余样本，请调整过滤条件或增大样本量后重抽`,
+          )
+          coverageStats.value = null
+          return false
+        }
+        ElMessage.warning(
+          `已剔除 ${removed} 张重复凭证，实际样本量降为 ${sampledVouchers.value.length} 笔`,
+        )
+        return true
+      }
+      // 关闭 / ESC → 取消本次抽样
+      duplicateDecision.value = 'none'
+      ElMessage.info('已取消本次抽样')
+      return false
+    }
+  }
+
+  /**
+   * 剔除重复项后按剩余样本重算覆盖率展示（R8.6）。
+   *
+   * 分母（总体笔数/金额）**不变** —— 总体没变，变的只是样本；用变小的分母会让覆盖率
+   * 虚高，正是本功能要避免的问题。
+   */
+  function recomputeCoverageAfterRemoval(): void {
+    const stats = coverageStats.value
+    if (!stats) return
+    const sampleCount = sampledVouchers.value.length
+    const sampleAmount = sampledVouchers.value.reduce((sum, v) => {
+      const debit = v.debitAmount ? parseFloat(v.debitAmount) || 0 : 0
+      const credit = v.creditAmount ? parseFloat(v.creditAmount) || 0 : 0
+      return sum + Math.max(Math.abs(debit), Math.abs(credit))
+    }, 0)
+    const popCount = stats.populationCount || 0
+    const popAmount = parseFloat(stats.populationAmount) || 0
+    coverageStats.value = {
+      ...stats,
+      sampleCount,
+      sampleAmount: sampleAmount.toFixed(2),
+      countCoverageRate: popCount
+        ? ((sampleCount / popCount) * 100).toFixed(2)
+        : '0.00',
+      amountCoverageRate: popAmount
+        ? ((sampleAmount / popAmount) * 100).toFixed(2)
+        : '0.00',
     }
   }
 
@@ -713,10 +932,25 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
             conclusion: samplingConclusion.value?.message ?? null,
             // 方法学算法版本留痕（后端权威快照），支持未来漂移追溯（Req6.3）
             algo_version: methodologySnapshot.value?.algo_version ?? null,
+            // R1.3 抽样框版本留痕：序时账重导后据此判定该批次已不可复算。
+            // 取本次 extract 返回值；未识别时为 null（不兜底）。
+            dataset_id: datasetId.value,
+            // R2.5：回填时若已完成推断，评价随留痕一并落库（省一次往返）
+            evaluation: buildEvaluationPayload(),
+            // R8.7：跨底稿重复抽凭的审计判断留痕（keep_all / removed / none）
+            duplicate_decision: duplicateDecision.value,
+            duplicate_voucher_nos: crossWpDuplicates.value.map((d) => d.voucherNo),
+            // 🔴 必须含 population_amount / sample_amount：后端
+            // `sampling_registry_service.build_record_fields` 从
+            // `coverage_stats.population_amount` 投影 `sampling_records.
+            // population_total_amount`（CAS 1314 的「总体金额」记录项）。
+            // 只发两个 rate 会让该列恒为 NULL —— 映射声明了但取不到值。
             coverage_stats: coverageStats.value
               ? {
                   count_rate: coverageStats.value.countCoverageRate,
                   amount_rate: coverageStats.value.amountCoverageRate,
+                  population_amount: coverageStats.value.populationAmount,
+                  sample_amount: coverageStats.value.sampleAmount,
                 }
               : null,
             filters: {
@@ -802,11 +1036,13 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
   function parseCoverageStats(item: any): CoverageStats {
     const criteria = item.extraction_criteria ?? item.extractionCriteria ?? {}
     const cs = criteria.coverage_stats ?? criteria.coverageStats ?? {}
+    // 金额两项读回写入侧的同名 key（写 `population_amount` 却读不回来，就成了
+    // 平台已踩过的「写一个键读另一个键」）。改造前的既有记录无这两个 key → '0'。
     return {
       populationCount: item.total_matched ?? item.totalMatched ?? 0,
-      populationAmount: '0',
+      populationAmount: String(cs.population_amount ?? cs.populationAmount ?? '0'),
       sampleCount: item.filled_count ?? item.filledCount ?? 0,
-      sampleAmount: '0',
+      sampleAmount: String(cs.sample_amount ?? cs.sampleAmount ?? '0'),
       countCoverageRate: String(cs.count_rate ?? cs.countCoverageRate ?? '0.00'),
       amountCoverageRate: String(cs.amount_rate ?? cs.amountCoverageRate ?? '0.00'),
     }
@@ -928,6 +1164,210 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
     }
   }
 
+  // ─── 抽样评价持久化与回读（R2）──────────────────────────────────────────
+
+  /** 偏差笔数：实际错报 > 0 的已检查样本数（CAS 1314 的"偏差/错报笔数"记录项） */
+  function countDeviations(): number {
+    return sampledVouchers.value.filter(
+      (v) => v.checkResult !== '' && Number(v.actualMisstatement ?? 0) > 0,
+    ).length
+  }
+
+  /**
+   * 构造评价载荷（R2.3 形状）。尚无推断结果时返回 null —— 「没算」与「算出来是 0」
+   * 是两件事，返回全 0 会让复核人误以为已评价且无错报。
+   */
+  function buildEvaluationPayload(): Record<string, unknown> | null {
+    const r = misstatementResult.value
+    if (!r) return null
+    const conclusion = samplingConclusion.value
+    return {
+      projected: r.projected,
+      known_high_value: r.knownHighValue,
+      basic_precision: r.basicPrecision,
+      incremental_allowance: r.incrementalAllowance,
+      upper_limit: r.upperLimit,
+      tolerable_misstatement: config.value.tolerableMisstatement ?? null,
+      checked_sample_count: checkedSampleCount.value,
+      unchecked_sample_count: uncheckedSampleCount.value,
+      deviation_count: countDeviations(),
+      conclusion_code: conclusion
+        ? conclusion.accepted
+          ? 'acceptable'
+          : 'not_acceptable'
+        : 'undetermined',
+      conclusion_message: conclusion?.message ?? null,
+      conclusion_confirmed: conclusionConfirmed.value,
+      algo_version: methodologySnapshot.value?.algo_version ?? null,
+    }
+  }
+
+  /**
+   * 持久化当前评价到目标批次（R2.9）。
+   *
+   * 失败**不静默吞**：平台已有「catch {} 吞掉 422 让功能长期空转」的踩坑记录。
+   */
+  async function persistEvaluation(
+    extra?: Record<string, unknown>,
+  ): Promise<boolean> {
+    const payload = buildEvaluationPayload()
+    if (!payload) return false
+    if (!projectId.value || !workpaperId.value) return false
+    try {
+      const res = await http.post(
+        `/api/projects/${projectId.value}/sampling/voucher-evaluation`,
+        {
+          workpaper_id: workpaperId.value,
+          log_id: loadedFromBatch.value?.logId ?? null,
+          evaluation: { ...payload, ...(extra ?? {}) },
+        },
+      )
+      const data = (res.data as any)?.data ?? res.data
+      const evaluatedAt = data?.evaluation?.evaluated_at ?? null
+      if (data?.log_id) {
+        loadedFromBatch.value = {
+          logId: String(data.log_id),
+          batchId: data.batch_id != null ? String(data.batch_id) : null,
+          evaluatedAt,
+        }
+      }
+      return true
+    } catch (err: any) {
+      // 404 = 该底稿尚无抽凭批次（先抽样未回填时评价无处可落）→ 信息级提示
+      const status = err?.response?.status
+      if (status === 404) {
+        ElMessage.info('尚未回填抽凭批次，抽样评价将在回填时一并保存')
+      } else {
+        ElMessage.error('抽样评价保存失败，请重试（本次推断结果尚未落库）')
+      }
+      return false
+    }
+  }
+
+  /**
+   * 从最近一条未撤销批次回读评价（R2.7）。
+   *
+   * 仅在本会话尚未执行新抽样时调用；失败静默降级为空评价（回读是增强，
+   * 不得阻塞打开引擎），但**绝不把失败当"无评价"写回库**。
+   */
+  async function loadLatestEvaluation(): Promise<boolean> {
+    if (!projectId.value || !workpaperId.value) return false
+    if (sampledVouchers.value.length > 0) return false // 已有当前批次样本，不覆盖
+    try {
+      const res = await http.get(
+        `/api/projects/${projectId.value}/sampling/voucher-history`,
+        { params: { wp_id: workpaperId.value } },
+      )
+      const list: any[] = (res.data as any)?.data ?? res.data ?? []
+      const latest = list.find((r) => !r?.is_undone && r?.evaluation)
+      if (!latest) return false
+      const ev = latest.evaluation
+      misstatementResult.value = {
+        projected: String(ev.projected ?? '0.00'),
+        knownHighValue: String(ev.known_high_value ?? '0.00'),
+        basicPrecision: String(ev.basic_precision ?? '0.00'),
+        incrementalAllowance: String(ev.incremental_allowance ?? '0.00'),
+        upperLimit: String(ev.upper_limit ?? '0.00'),
+      }
+      const code = String(ev.conclusion_code ?? 'undetermined')
+      // 抑制一次 watch：先写结论会触发"确认失效"，把下一行刚还原的确认状态打回 false
+      suppressConfirmInvalidateOnce = true
+      samplingConclusion.value =
+        code === 'undetermined'
+          ? null
+          : { accepted: code === 'acceptable', message: String(ev.conclusion_message ?? '') }
+      conclusionConfirmed.value = Boolean(ev.conclusion_confirmed)
+      a13PushedAt.value = ev.a13_pushed_at != null ? String(ev.a13_pushed_at) : null
+      loadedFromBatch.value = {
+        logId: String(latest.id),
+        batchId: latest.batch_id != null ? String(latest.batch_id) : null,
+        evaluatedAt: ev.evaluated_at != null ? String(ev.evaluated_at) : null,
+      }
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  // ─── 推断错报推送至 A13（R3）─────────────────────────────────────────────
+
+  /**
+   * 构造推断错报的描述（内嵌方法/样本量/种子/批次四项标识，供 A13 溯源）。
+   *
+   * 高值层已知错报**不并入金额**：它是逐笔查实的事实错报，应按 factual 单独记入
+   * （多数情况下审计师已在底稿逐笔推过），并入 projected 会重复计入。此处仅在描述
+   * 中提示，避免遗漏。
+   */
+  function buildProjectedMisstatementDescription(): string {
+    const r = misstatementResult.value
+    const parts = [
+      `抽样推断错报（${config.value.samplingMethod}）`,
+      `样本量:${sampledVouchers.value.length}`,
+    ]
+    if (samplingInterval.value) parts.push(`抽样间隔:${samplingInterval.value}`)
+    parts.push(`随机种子:${seedUsed.value ?? '-'}`)
+    parts.push(`批次:${loadedFromBatch.value?.batchId ?? '-'}`)
+    if (r && Number(r.upperLimit) > 0) parts.push(`错报上限:${r.upperLimit}`)
+    let desc = parts.join(' ')
+    const known = Number(r?.knownHighValue ?? 0)
+    if (known > 0) {
+      desc += `；另有高值层已知错报 ${r?.knownHighValue} 元应按事实错报单独记入`
+    }
+    return desc
+  }
+
+  /**
+   * 推送推断错报至 A13 未更正错报汇总（R3.5~3.8）。
+   *
+   * 门控：结论已人工确认 且 推断错报 > 0。二者缺一不推 ——
+   * 未确认的结论进错报汇总等于把未定稿的判断写进交付物。
+   */
+  async function pushProjectedToA13(): Promise<boolean> {
+    const r = misstatementResult.value
+    if (!r) {
+      ElMessage.warning('尚未推断错报，请先录入样本实际错报并执行推断')
+      return false
+    }
+    if (!conclusionConfirmed.value) {
+      ElMessage.warning('请先确认抽样结论后再推送推断错报')
+      return false
+    }
+    const projected = Number(r.projected)
+    if (!(projected > 0)) {
+      ElMessage.info('推断错报为 0，无需记入未更正错报汇总')
+      return false
+    }
+    if (a13PushedAt.value) {
+      try {
+        await ElMessageBox.confirm(
+          `本批次已于 ${a13PushedAt.value} 推送过推断错报。重复推送会在错报汇总中重复计入，确认继续？`,
+          '重复推送确认',
+          { type: 'warning', confirmButtonText: '仍然推送', cancelButtonText: '取消' },
+        )
+      } catch {
+        return false
+      }
+    }
+
+    eventBus.emit('a13:push-misstatement' as any, {
+      // 宿主未传 wpCode 时留空 → bridge 写 source_wp_code = null（如实留空）
+      wpCode: (options.wpCode ?? '').slice(0, 20),
+      accountCode: config.value.accountCodes[0] ?? null,
+      amount: projected,
+      description: buildProjectedMisstatementDescription(),
+      misstatementType: 'projected',
+      timestamp: Date.now(),
+    })
+
+    const pushedAt = new Date().toISOString()
+    a13PushedAt.value = pushedAt
+    // 写回已推送标记（防重复计入）；持久化失败时回滚内存标记以便重试
+    const ok = await persistEvaluation({ a13_pushed_at: pushedAt })
+    if (!ok) a13PushedAt.value = null
+    ElMessage.success('已将推断错报记入未更正错报汇总')
+    return true
+  }
+
   // ─── checkCompliance ────────────────────────────────────────────────────
 
   /**
@@ -972,6 +1412,14 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
     tolerableFromMateriality,
     reconcileInfo,
     methodologySnapshot,
+    // 抽样框版本 + 评价留痕状态（R1/R2/R3）
+    datasetId,
+    loadedFromBatch,
+    conclusionConfirmed,
+    a13PushedAt,
+    // 跨底稿重复抽凭（R8）
+    crossWpDuplicates,
+    duplicateDecision,
 
     // 计算属性
     selectedVouchers,
@@ -998,6 +1446,22 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
     inferMisstatement,
     recordActualMisstatement,
     resample,
+
+    // 抽样评价持久化与回读（R2）+ 结论确认（R18.7）
+    buildEvaluationPayload,
+    persistEvaluation,
+    loadLatestEvaluation,
+    confirmConclusion,
+    countDeviations,
+
+    // 推断错报推送 A13（R3）
+    pushProjectedToA13,
+    buildProjectedMisstatementDescription,
+
+    // 跨底稿重复抽凭确认（R8）
+    confirmCrossWpDuplicates,
+    buildDuplicateSummary,
+    recomputeCoverageAfterRemoval,
 
     // 校验
     validateConfig,

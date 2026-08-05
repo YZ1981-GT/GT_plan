@@ -1,5 +1,8 @@
 <template>
   <div class="i2-cutoff-forward">
+  <!-- 抽样方法学（来自抽凭引擎回填，底稿正文可见 → 归档与复核可追溯） -->
+  <WpSamplingMethodologyBar :methodology="methodology" />
+
     <div class="section-header">
       <span class="section-title">I2-13 截止性测试（账簿→单据）</span>
       <div class="section-actions">
@@ -276,6 +279,9 @@ import type { ExtractedVoucher, FillMode } from '../../composables/useCutoffAuto
 import { useCutoffMaterialityHint } from '../../composables/useCutoffMaterialityHint'
 import { useI2ImportExport } from '../../composables/useI2ImportExport'
 import { suggestsRdExpense } from '../../composables/cutoffRowHelpers'
+import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
+import { useSamplingMethodologyPersist, buildChecklistDirectPersist } from '../../composables/shared/useSamplingMethodologyPersist'
+import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'
 
 const GtCutoffAutoSampling = defineAsyncComponent(() => import('../../cutoff/GtCutoffAutoSampling.vue'))
 const GtVoucherSamplingEngine = defineAsyncComponent(() => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'))
@@ -406,7 +412,26 @@ function onRemove(row: CutoffRow) {
 async function handleAutoSampling() {
   await loadFromAutoSampling('forward')
 }
+const rawMethodologyPersist = buildChecklistDirectPersist({
+  wpId: computed(() => props.wpId),
+  projectId: computed(() => props.projectId),
+})
+const methodologyDirectPersist = rawMethodologyPersist
+/**
+ * 抽样方法学留痕（R6.3/R6.4）：把 `filled` 载荷里的 methodology 落到固定 item key，
+ * 并在抽凭区渲染到底稿正文 —— 复核与归档看的是底稿，不是后台抽凭日志。
+ */
+const { methodology, persistMethodology } = useSamplingMethodologyPersist({
+  wpCode: 'I2',
+  allResponses: toRef(props, 'allResponses') as never,
+  persist: methodologyDirectPersist,
+  isReadonly: computed(() => props.isReadonly === true),
+})
+
 function handleCutoffFilled(payload: { samples: ExtractedVoucher[]; fillMode: FillMode }) {
+  // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
+  void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
+
   const items = payload.samples.map((v) => ({
     voucher_date: v.voucherDate,
     voucher_no: v.voucherNo,

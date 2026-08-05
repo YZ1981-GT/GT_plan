@@ -39,7 +39,11 @@ export interface UseL7FormDataOptions {
 
 const DEBOUNCE_MS = 2000
 const ITEM_PREFIX = 'L7-'
-const ACCOUNT_CODE = '2801' // 其他非流动负债（贷方/负债类）
+import { L7_REPORT_ROW_CODE } from './l7AccountScope'
+
+// 🔴 L7 宁缺勿造：2801 是预计负债（K5），2901 是递延所得税负债（N1/N3）。
+// report_config BS-071/BS-097 引用 2901 属撞码缺陷。保留 writebackTB 用 report_row_code。
+const ACCOUNT_CODE = L7_REPORT_ROW_CODE as string // writeback 用报表行，非科目码
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 

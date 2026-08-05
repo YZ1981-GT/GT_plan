@@ -97,6 +97,20 @@
               title="将已发函/已回函的行同步到项目函证中心台账（供工作包摘要/覆盖率消费）"
               @click="handleSyncHub"
             >同步到函证中心</el-button>
+            <!--
+              🔴 显式保存（七枢纽共享，用户 2026-08-03 裁决「补按钮不做自动保存」）：
+              完整表格视图的编辑原先只改内存不落库，刷新即全丢且无提示。
+              放在工具栏而非某个视图内部 —— 两个视图都能看到同一个保存入口与未保存标记。
+            -->
+            <el-tag v-if="hasUnsavedChanges" size="small" type="warning" effect="plain">未保存</el-tag>
+            <el-button
+              v-if="!readonly"
+              size="small"
+              :type="hasUnsavedChanges ? 'primary' : 'default'"
+              :disabled="!hasUnsavedChanges"
+              title="保存本表明细行改动。完整表格视图与列表视图的编辑都只在内存中，必须点此保存才落库。"
+              @click="handleSaveClick"
+            >{{ hasUnsavedChanges ? '保存' : '已保存' }}</el-button>
             <el-radio-group v-model="viewMode.viewMode.value" size="small">
               <el-radio-button value="list">列表视图</el-radio-button>
               <el-radio-button value="grid">完整表格</el-radio-button>
@@ -124,6 +138,21 @@
             :readonly="readonly"
             :dict-data="dictData"
             @update="handleFieldUpdate"
+          />
+          <!--
+            跨表导航条（七枢纽共享）——「本笔相关底稿」横向跳转。
+            🔴 改造前 `CrossWorkpaperNav.vue` **全仓零渲染宿主**：`buildCrossWorkpaperNavDefs`
+               有消费方（就是它），但它自己没有任何宿主 → 整条链是死的，用户点不到。
+               这是新缺陷模式「链条上游合格、整条链仍是死的」的首例
+               （spec confirmation-orphan-and-amount-format-closure，Task 6 / Property 1）。
+            🔴 只在选中行且该行有索引号时出现（组件内部 `v-if="confirmIndex"` 亦已守）。
+          -->
+          <CrossWorkpaperNav
+            v-if="currentRowConfirmIndex"
+            :confirm-index="currentRowConfirmIndex"
+            :wp-code="props.wpCode"
+            :current-wp-code="currentSummaryCode"
+            @navigate-sheet="onCrossNavigateSheet"
           />
         </template>
 
@@ -371,6 +400,7 @@ import ConfirmationSampling from './ConfirmationSampling.vue'
 import ConfirmationNotes from './ConfirmationNotes.vue'
 import ConfirmationConclusion from './ConfirmationConclusion.vue'
 import ConfirmationContextMenu from './ConfirmationContextMenu.vue'
+import CrossWorkpaperNav from './coordination/CrossWorkpaperNav.vue'
 
 // GtGridSheet for legacy fallback
 const GtGridSheet = defineAsyncComponent(() => import('../GtGridSheet.vue'))
@@ -386,6 +416,13 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'save', payload: any): void
+  /**
+   * 跨表导航（Task 6 / Requirement 1.1）——由 `CrossWorkpaperNav` 冒泡上来，
+   * 宿主 `GtWpRenderer` 的 `@navigate-sheet="onChildNavigateSheet"` 接收后切页。
+   *
+   * 🔴 加法式：既有 `save` 声明与调用点一行未动 → 六枢纽零回归。
+   */
+  (e: 'navigate-sheet', locator: string, confirmIndex: string): void
 }>()
 
 // ─── 格式检测 ────────────────────────────────────────────────────────────────
@@ -516,7 +553,10 @@ async function handleH0RefreshBookAmounts() {
   }
   h0Refreshing.value = true
   try {
-    await http.get(`/workpapers/${props.wpId}/render-config`)
+    // 🔴 必须带 `/api` —— `utils/http` 的 baseURL 是 `/` 且**无 /api 注入拦截器**，
+    //    而 vite proxy 只代理 `/api` → 漏掉会打到 SPA 路由拿回 index.html（HTTP 200 + HTML），
+    //    请求"看起来成功"但后端从未收到，重算根本没发生（2026-08-04 修）。
+    await http.get(`/api/workpapers/${props.wpId}/render-config`)
     ElMessage.success('已请求后端重算账面金额，请刷新页面查看最新取数')
   } catch (e: any) {
     ElMessage.error(`刷新取数失败：${e?.message || '未知错误'}`)
@@ -536,7 +576,10 @@ async function handleH0LowerAi(aiSection: string, key: string) {
     // H0 专属 AI 端点（`_h0_confirmation_ai.py`）；section 必须在其
     // `_SUPPORTED_SECTIONS` 已登记，否则 400。载荷字段名为
     // `existingContent` / `relatedContext`（驼峰），传错会被静默忽略。
-    const res = await http.post(`/workpapers/${props.wpId}/h0/ai-generate`, {
+    // 🔴 必须带 `/api`（同 handleH0RefreshBookAmounts 的说明）—— 漏掉会拿回 index.html，
+    //    `(res.data?.data ?? res.data)?.content` 恒 undefined → 提示「AI 未返回内容」，
+    //    与「后端没登记 section 导致 400」症状完全一样，极难定位（2026-08-04 修）。
+    const res = await http.post(`/api/workpapers/${props.wpId}/h0/ai-generate`, {
       section: aiSection,
       existingContent: h0Responses.value[key] ?? '',
       relatedContext: {
@@ -708,13 +751,48 @@ async function loadG0Sources() {
   }
 }
 
-/** 下区录入落库（单条，交由宿主 save 处理器写 checklist_responses） */
-function handleG0LowerSave(itemId: string, value: string) {
+/**
+ * G0 下区录入落库 —— 与 `handleH0LowerSave` 同源，见其上方注释。
+ *
+ * 🔴🔴 **绝不能** `emit('save', { itemId, value })`：宿主 save 处理器把载荷整体写成
+ * 该 sheet 的 `parsed_data.html_data[sheetName]`。**G0 侧 2026-08-04 浏览器实测已复现**
+ * （项目 `2aa00f57`）：`html_data['函证结果汇总表G0-1']` 被整体覆盖成
+ * `{"value":"未见异常。","itemId":"G0-1-lower-conclusion"}`，`_format` 一并消失
+ * → 该 sheet 下次打开退化成「此底稿使用旧格式，仅支持只读查看」，函证行全丢。
+ * 下区是 itemId 维度录入，必须直接走平台标准 `checklist-responses` PUT。
+ */
+async function handleG0LowerSave(itemId: string, value: string) {
   g0Responses.value = { ...g0Responses.value, [itemId]: value }
-  emit('save', { itemId, value })
+  if (!props.wpId) return
+  try {
+    const payload: Record<string, any> = {
+      items: [{ item_id: itemId, remark: value, conclusion: null }],
+    }
+    // 空字符串会让后端 UUID 校验 422；缺省时服务端按底稿解析 project_id
+    if (props.projectId) payload.project_id = props.projectId
+    await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, payload)
+  } catch (e: any) {
+    console.warn('[GtConfirmationSummary] G0 下区录入保存失败:', e?.message)
+    ElMessage.warning('保存失败：' + (e?.message || '网络错误'))
+  }
 }
 
-/** 下区审计说明/结论的 AI 辅助（通用端点 /ai/generate-text，context 值必须全为字符串） */
+/**
+ * 下区审计说明/结论的 AI 辅助 —— 走 **G0 专属端点** `/api/workpapers/{id}/g0/ai-generate`
+ * （`_g0_confirmation_ai.py`，spec g0-confirmation-source-alignment Task 19）。
+ *
+ * 🔴 为什么不用通用 `/ai/generate-text`：通用端点（`wp_guidance_chat.py`）**无门**且取值为
+ *    `request.prompt or _SECTION_PROMPTS.get(section) or 通用兜底` —— 显式 prompt 优先，
+ *    故拿不到 G0 专属的 `_SYSTEM_PROMPT`（投资循环科目覆盖 / 三维差异核对 / Level1-3 佐证）
+ *    与 `_load_project_context`（客户名 + 审计年度）。专属端点两者都有。
+ *
+ * 🔴 两处约定与通用端点不同，写错就静默失效：
+ *    ① `section` 必须已在专属端点的 `_SUPPORTED_SECTIONS` 登记（**硬门 400**，前端 catch 会
+ *       吞成「AI 生成失败」）—— 6 条已登记，守卫 `test_g0_review_prompts.py` 双向锁死
+ *    ② 载荷是 `{section, existingContent, relatedContext}` **驼峰**且**无 `prompt` 字段**
+ *       （prompt 由后端按 section 取），传 `context`/`prompt` 会被 pydantic 静默忽略
+ *    ③ 必须带 `/api` 前缀（`utils/http` 无 /api 注入拦截器，vite proxy 只代理 `/api`）
+ */
 async function handleG0LowerAi(aiSection: string, key: string) {
   if (!props.wpId) {
     ElMessage.warning('缺少底稿标识，无法调用 AI')
@@ -726,13 +804,10 @@ async function handleG0LowerAi(aiSection: string, key: string) {
     const itemId = noteDef
       ? `${G0_LOWER_KEY_PREFIX}audit-note-${noteDef.seq}`
       : `${G0_LOWER_KEY_PREFIX}conclusion`
-    const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+    const res = await http.post(`/api/workpapers/${props.wpId}/g0/ai-generate`, {
       section: aiSection,
-      prompt: noteDef
-        ? `请按源模板口径撰写 G0-1 投资循环函证结果汇总表「${noteDef.title}」的内容，只使用下方上下文中的事实，无数据处写「[待补充]」，不得虚构金额或结论。`
-        : '请按源模板口径撰写 G0-1 投资循环函证的审计结论，只使用下方上下文中的事实，无数据处写「[待补充]」，不得虚构金额或结论。',
       existingContent: g0Responses.value[itemId] ?? '',
-      context: {
+      relatedContext: {
         底稿编码: String(props.wpCode || 'G0-1'),
         函证行数: String(data.rows.value.length),
         已回函行数: String(
@@ -913,6 +988,27 @@ const syncStatusSummary = computed(() => {
 
 const selectedIds = ref<string[]>([])
 const currentRow = ref<ConfirmationRow | null>(null)
+
+/**
+ * 跨表导航条数据（Task 6 / Requirement 1.1、1.2、1.6、1.7）。
+ *
+ * 🔴 `currentSummaryCode` 必须走 `getCycleConfirmationMeta(wpCode).summaryCode`，
+ *    **不能写 `'D0-1'` 字面量** —— 它决定「当前底稿」高亮落在哪个 chip 上，
+ *    写死会让 E0/F0/G0/H0/K0/L0 六个循环全部高亮到 D0-1（既有平台缺陷同款：
+ *    memory 已记 `GtConfirmationSummary` 曾写死 D0-5/D0-6/D0-7）。
+ *    这里用 computed 而非复用上方非响应式的 `meta` 常量，保证 `wpCode` 变化时跟随。
+ *
+ * 🔴 `currentRowConfirmIndex` 取选中行的 `confirm_index`：导航条是「本笔函证相关底稿」，
+ *    没选中行 / 该行还没填索引号时不渲染（组件内部 `v-if="confirmIndex"` 是第二道）。
+ */
+const currentSummaryCode = computed(() => getCycleConfirmationMeta(props.wpCode).summaryCode)
+const currentRowConfirmIndex = computed(() => String(currentRow.value?.confirm_index ?? '').trim())
+
+/** 导航条点击 → 冒泡给宿主 `GtWpRenderer`（它按 `resolveSheetNameByDeepLink` 切页） */
+function onCrossNavigateSheet(locator: string, confirmIndex: string) {
+  emit('navigate-sheet', locator, confirmIndex)
+}
+
 const contextMenu = ref({ visible: false, x: 0, y: 0 })
 // 同步到函证中心（P0-2：编制真源 confirmation-v1 → 后端 Confirmation 台账/工作包摘要真源）
 const syncing = ref(false)
@@ -1332,9 +1428,36 @@ function _triggerAutoSyncHub() {
   })
 }
 
+/**
+ * 未保存改动标记 —— 七枢纽共享的显式保存入口所需。
+ *
+ * 🔴 修复背景（2026-08-03 F0 浏览器实测抓到的 P0，波及 D0/E0/F0/G0/H0/K0/L0）：
+ * 「完整表格视图」的 `@update="handleGridUpdate"` 原先只改内存（`data.updateField`）、
+ * 既不 `emit('save')` 也没有 autosave；`useConfirmationData` 亦无自动保存。
+ * 只有列表视图的 `ConfirmationMaster @save="handleSave"` 有保存入口
+ * → 在完整表格视图录完一行刷新页面，`checklist_responses` 0 条、`html_data` 仍为空，
+ * **数据全丢且无任何提示**。
+ *
+ * 用户裁决（2026-08-03）：**补显式保存按钮**（不做自动保存）。
+ * 故所有改内存的入口都要 `markDirty()`，工具栏保存按钮据此高亮/禁用。
+ */
+const hasUnsavedChanges = ref(false)
+
+function markDirty() {
+  hasUnsavedChanges.value = true
+}
+
+/** 工具栏保存按钮：走同一个 handleSave（与列表视图保存同源幂等）+ 明确回执 */
+function handleSaveClick() {
+  if (!hasUnsavedChanges.value) return
+  handleSave()
+  ElMessage.success('已保存本表明细行')
+}
+
 function handleSave() {
   const payload = data.buildPayload()
   emit('save', payload)
+  hasUnsavedChanges.value = false
   // 通知兄弟函证 sheet 刷新（confirmation:updated EventBus 联动）
   if (props.projectId && props.wpCode) {
     eventBus.emit('confirmation:updated', {

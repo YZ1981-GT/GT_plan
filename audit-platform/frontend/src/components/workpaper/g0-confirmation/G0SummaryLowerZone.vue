@@ -131,7 +131,16 @@
 
       <div v-for="d in AUDIT_NOTE_DEFS" :key="d.key" class="g0-lower__note">
         <div class="g0-lower__head">
-          <div class="g0-lower__note-title">{{ d.title }}</div>
+          <div class="g0-lower__note-title">
+            {{ d.title }}
+            <!--
+              源模板此项标题的交叉引用写「（G0-6）」实为笔误（回函可靠性验证表是 G0-7）。
+              R10.3：标题**逐字保留原文** + 加标注，不静默修正。
+            -->
+            <el-tooltip v-if="defectNoteOf(d.key)" placement="top" :content="defectNoteOf(d.key)">
+              <span class="g0-lower__typo">源模板笔误</span>
+            </el-tooltip>
+          </div>
           <div class="g0-lower__head-actions">
             <el-button
               size="small"
@@ -216,6 +225,22 @@
       />
     </el-card>
 
+    <!-- ══════════ 源模板已知缺陷（只读折叠，Task 20 / R10.2~10.3） ══════════ -->
+    <details class="g0-lower__guidance">
+      <summary>
+        源模板已知缺陷（{{ SOURCE_DEFECTS.length }} 项）—— 平台按意图实现，逐条可追溯
+      </summary>
+      <div v-for="d in SOURCE_DEFECTS" :key="d.id" class="g0-lower__hint g0-lower__hint--amber">
+        <p class="g0-lower__guidance-line">
+          <b>{{ DEFECT_HANDLING_LABEL[d.handling] }}</b>
+          <span class="g0-lower__anchor">源模板 {{ d.anchor }}</span>
+        </p>
+        <p class="g0-lower__guidance-line">源模板事实：{{ d.defect }}</p>
+        <p class="g0-lower__guidance-line">正确意图：{{ d.intent }}（判据：{{ d.intentEvidence }}）</p>
+        <p class="g0-lower__guidance-line">平台处置：{{ d.uiNote }}</p>
+      </div>
+    </details>
+
     <!-- ══════════ 编制说明（只读折叠） ══════════ -->
     <details class="g0-lower__guidance">
       <summary>编制说明（准则 1312 第十条选样要求 · 函证注意事项 8 条 · 参考结论 · 后附审计证据）</summary>
@@ -295,6 +320,11 @@ import {
   G0_REF_CONCLUSION_HEADING as REF_CONCLUSION_HEADING,
   G0_REF_CONCLUSIONS as REF_CONCLUSIONS,
 } from './g0SummaryLowerZone'
+import {
+  G0_SOURCE_DEFECTS as SOURCE_DEFECTS,
+  g0DefectUiNote,
+  type G0DefectHandling,
+} from './g0SourceDefects'
 
 const props = defineProps<{
   /** G0-1 上区明细行（矩阵按品种 SUMIF 的数据源） */
@@ -333,6 +363,24 @@ const CONCLUSION_KEY_LOCAL = 'conclusion'
 const matrixBlock = getG0LowerBlock('matrix')
 const auditNoteBlock = getG0LowerBlock('audit_note')
 const conclusionBlock = getG0LowerBlock('conclusion')
+
+/** 源缺陷处置方式的中文标签（UI 全中文化铁律） */
+const DEFECT_HANDLING_LABEL: Readonly<Record<G0DefectHandling, string>> = {
+  'implement-intent': '按意图实现（平台不复现该缺陷）',
+  'display-as-is': '原文保留 + 加标注',
+  'index-label-correction': '定位用 tab 名 / 展示用目录索引号',
+}
+
+/**
+ * 审计说明某项的源缺陷标注（目前只有第 3 项 `reliability` 的 S24 交叉引用笔误）。
+ * 🔴 按 `G0_AUDIT_NOTE_DEFS[].key` 映射而非写死序号 —— 序号变了标注不会跟着串位。
+ */
+const AUDIT_NOTE_DEFECT_ID: Readonly<Record<string, string>> = { reliability: 'xref-reliability' }
+
+function defectNoteOf(noteKey: string): string {
+  const id = AUDIT_NOTE_DEFECT_ID[noteKey]
+  return id ? g0DefectUiNote(id) : ''
+}
 
 /** 自定义品种持久化键（源 `H20` 的 `……` 可扩位；R3.2.5） */
 const CUSTOM_CATEGORIES_KEY = 'G0-1-lower-custom-categories'
@@ -468,9 +516,18 @@ function isCustomCategory(category: string): boolean {
   return !G0_CATEGORY_NAMES.includes(category)
 }
 
+/**
+ * 账面金额输入框 placeholder。
+ *
+ * 🔴 三态必须分开（Requirement 4.3）：**「本项目无此科目」是业务事实**（后端
+ * `resolved_from='none'`），**「未取数」是待补编制**（相邻审定表还没编 / 取数失败）。
+ * 改造前两者共用「本项目无此科目」一句话 —— 会让审计师把「G7 审定表没编」误读成
+ * 「公司没有长期股权投资」。
+ */
 function bookPlaceholder(category: string): string {
   if (props.bookAmounts && category in props.bookAmounts) return '自动取数（可覆盖）'
-  if (props.diagnostics?.bookMissing.includes(category)) return '本项目无此科目，可手填'
+  if (props.diagnostics?.bookAbsent?.includes(category)) return '本项目无此科目，可手填'
+  if (props.diagnostics?.bookMissing.includes(category)) return '未取数（审定表未编制？），可手填'
   return '未取数，可手填'
 }
 
@@ -478,9 +535,12 @@ function bookPlaceholder(category: string): string {
 const bookSourceSummary = computed(() => {
   const d = props.diagnostics
   if (!d) return ''
+  const absent = new Set(d.bookAbsent ?? [])
+  const pending = d.bookMissing.filter((c) => !absent.has(c))
   const parts: string[] = []
   if (d.bookResolved.length) parts.push(`已取数：${d.bookResolved.join('、')}`)
-  if (d.bookMissing.length) parts.push(`待手工填写：${d.bookMissing.join('、')}`)
+  if (absent.size) parts.push(`本项目无此科目：${[...absent].join('、')}`)
+  if (pending.length) parts.push(`待手工填写：${pending.join('、')}`)
   return parts.join('　|　')
 })
 
@@ -720,6 +780,17 @@ defineExpose({
   font-size: 13px;
   font-weight: 500;
   color: var(--el-text-color-primary);
+}
+.g0-lower__typo {
+  margin-left: 6px;
+  padding: 0 5px;
+  font-size: 11px;
+  font-weight: 400;
+  border-radius: 2px;
+  border: 1px dashed #e6a23c;
+  background: #fdf6ec;
+  color: #b88230;
+  cursor: help;
 }
 .g0-lower__hint {
   border-left: 3px solid var(--el-color-warning-light-3);

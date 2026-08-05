@@ -36,9 +36,16 @@
       <details class="gt-confirmation-alternative-g06__tips">
         <summary>编制提示</summary>
         <p>
-          依据 CAS 1312《函证》：对回函可能性不高或余额重大的证券投资，发函同时执行替代程序。投资循环替代程序按四类证据检查：
-          ①持仓证明（托管对账单／中登查询）②投资收益/股利（分红公告＋银行回单）③处置收益（交易确认单＋成本＋手续费）④公允价值佐证（报价来源／估值模型／Level 层级）。
-          逐笔核对凭证与检查证据，系统自动计算股利差异、处置损益与检查比例，标记异常项，并在审计结论中说明检查情况与结论类型（A/B/C）。
+          依据 CAS 1312《函证》：对回函可能性不高或余额重大的投资，发函同时执行替代程序。
+          源模板 <b>替代程序检查表G0-6</b> 的检查过程记录分三区：
+          ①检查初始投资协议、公司章程等（被投资单位／投资比例／投资金额／投资条款）
+          ②检查本期发生额（借方、贷方各一区；记账凭证 + 支持性文件1／支持性文件2 各三要素）
+          ③检查期后是否被出售或赎回（记账凭证 + 投资协议·交易确认单·交割单 + 银行回单）。
+          ④为源外增强区（持仓证明／股利收入／公允价值佐证），非源模板列，逐列登记于
+          <code>G06_SOURCE_EXTRA</code>，用于承接既有数据并支持证券类投资的补充核查。
+        </p>
+        <p class="src-hint">
+          源模板编制说明（逐字）：①检查期初原始投资协议、期后出售或赎回协议；②检查原始凭证：合同、交易流水、银行回单、支票存根等；③对回函可能性不高的、余额重大的，发函同时执行替代程序。
         </p>
       </details>
 
@@ -53,9 +60,11 @@
         :get-completion-status="data.getCompletionStatus"
         :has-abnormal="data.hasAbnormal"
         :get-check-ratio="getCheckRatioForMaster"
+        :labels="G06_MASTER_LABELS"
         @select="handleSelectCompany"
         @add-company="handleAddCompany"
         @delete-company="handleDeleteCompany"
+        @update-field="handleMasterUpdateField"
         @import-d01="handleImportG01"
         @import-excel="handleImportExcel"
         @export-template="handleExportExcel"
@@ -70,9 +79,9 @@
             {{ selectedCompany.entity_name || '未命名公司' }} — 检查详情
           </div>
 
-          <!-- 抽样配置 -->
+          <!-- 抽样配置（源 G0-6!A6「一、样本选取标准与规模」） -->
           <div class="detail-section">
-            <div class="detail-section__header">一、样本选取标准与规模</div>
+            <div class="detail-section__header">{{ g06Section('sampling').title }}</div>
             <el-form
               :model="selectedCompany.sampling || {}"
               label-width="100px"
@@ -81,14 +90,31 @@
             >
               <el-row :gutter="12">
                 <el-col :span="12">
+                  <!--
+                    源 `B7` 是 5 个点选项（`大额（）关联方（）大额交易频繁（）异常（）全部（）`），
+                    改造前是自由 textarea → 违反「交互点选优先」铁律且源选项文字完全缺失。
+                    `allow-create` 让存量自由文本作自定义 tag 保留（数据零丢失）。
+                  -->
                   <el-form-item label="测试范围">
-                    <el-input
-                      v-model="selectedCompany.sampling!.test_scope"
-                      type="textarea"
-                      :rows="2"
-                      placeholder="如应付账款借方发生额所有凭证共XX笔金额XX、贷方发生额所有凭证共XX笔金额XX"
-                      @change="markDirty"
-                    />
+                    <el-select
+                      :model-value="testScopeSelections"
+                      multiple
+                      filterable
+                      allow-create
+                      default-first-option
+                      collapse-tags
+                      collapse-tags-tooltip
+                      class="g06-scope-select"
+                      placeholder="按源模板勾选（可多选，亦可输入补充）"
+                      @update:model-value="onTestScopeChange"
+                    >
+                      <el-option
+                        v-for="opt in G06_TEST_SCOPE_OPTIONS"
+                        :key="opt"
+                        :value="opt"
+                        :label="opt"
+                      />
+                    </el-select>
                   </el-form-item>
                 </el-col>
                 <el-col :span="12">
@@ -153,14 +179,48 @@
             </el-form>
           </div>
 
-          <!-- 余额汇总 -->
+          <!--
+            余额汇总 —— **源模板 G0-6 无此段**（其「二、检查过程记录」直接是三个检查区块）。
+            🔴 改造前它带段号「二」，把源模板的「二、检查过程记录」挤成「三」、
+               「三、审计说明」+「四、审计结论」挤成合并的「四」→ 整表段号串位。
+               现改为不带段号并明示「源外增强」，源模板四段各归其位。
+          -->
           <div class="detail-section">
-            <div class="detail-section__header">二、余额汇总与检查比例</div>
+            <div class="detail-section__header">{{ G06_EXTRA_SECTIONS[0].title }}</div>
             <div class="balance-cards">
               <!-- 左卡：余额数据 -->
               <div class="balance-card balance-card--data">
                 <div class="balance-card__title">余额数据</div>
                 <div class="balance-card__grid">
+                  <!-- 源模板 G0-6!A5「会计科目：」（g0 spec R7.1） -->
+                  <div class="balance-card__item">
+                    <span class="balance-card__label">会计科目</span>
+                    <el-select
+                      v-if="!readonly"
+                      v-model="selectedCompany.balance!.account_subject"
+                      size="small"
+                      filterable
+                      allow-create
+                      default-first-option
+                      placeholder="选择或输入会计科目"
+                      @change="markDirty"
+                    >
+                      <el-option v-for="s in G0_ACCOUNT_SUBJECT_OPTIONS" :key="s" :label="s" :value="s" />
+                    </el-select>
+                    <span v-else class="balance-card__value">{{ selectedCompany.balance?.account_subject || '—' }}</span>
+                  </div>
+                  <!-- 源模板 G0-6!D5「投资产品/名称：」（g0 spec R7.1） -->
+                  <div class="balance-card__item">
+                    <span class="balance-card__label">投资产品/名称</span>
+                    <el-input
+                      v-if="!readonly"
+                      v-model="selectedCompany.balance!.investment_product"
+                      size="small"
+                      placeholder="如：XX 结构性存款 / XX 有限公司股权"
+                      @change="markDirty"
+                    />
+                    <span v-else class="balance-card__value">{{ selectedCompany.balance?.investment_product || '—' }}</span>
+                  </div>
                   <div class="balance-card__item">
                     <span class="balance-card__label">函证项目</span>
                     <el-input
@@ -174,66 +234,66 @@
                   </div>
                   <div class="balance-card__item">
                     <span class="balance-card__label">年初余额</span>
-                    <el-input
+                    <WpAmountInput
                       v-if="!readonly"
-                      v-model.number="selectedCompany.balance!.opening_balance"
-                      type="number"
+                      v-model="selectedCompany.balance!.opening_balance"
                       size="small"
+                      aria-label="年初余额"
                       @change="markDirty"
                     />
                     <span v-else class="balance-card__value balance-card__value--num">{{ formatAmount(selectedCompany.balance?.opening_balance) }}</span>
                   </div>
                   <div class="balance-card__item">
                     <span class="balance-card__label">本期增加</span>
-                    <el-input
+                    <WpAmountInput
                       v-if="!readonly"
-                      v-model.number="selectedCompany.balance!.increase_amount"
-                      type="number"
+                      v-model="selectedCompany.balance!.increase_amount"
                       size="small"
+                      aria-label="本期增加"
                       @change="markDirty"
                     />
                     <span v-else class="balance-card__value balance-card__value--num">{{ formatAmount(selectedCompany.balance?.increase_amount) }}</span>
                   </div>
                   <div class="balance-card__item">
                     <span class="balance-card__label">本期减少</span>
-                    <el-input
+                    <WpAmountInput
                       v-if="!readonly"
-                      v-model.number="selectedCompany.balance!.decrease_amount"
-                      type="number"
+                      v-model="selectedCompany.balance!.decrease_amount"
                       size="small"
+                      aria-label="本期减少"
                       @change="markDirty"
                     />
                     <span v-else class="balance-card__value balance-card__value--num">{{ formatAmount(selectedCompany.balance?.decrease_amount) }}</span>
                   </div>
                   <div class="balance-card__item">
                     <span class="balance-card__label">期末余额</span>
-                    <el-input
+                    <WpAmountInput
                       v-if="!readonly"
-                      v-model.number="selectedCompany.balance!.closing_balance"
-                      type="number"
+                      v-model="selectedCompany.balance!.closing_balance"
                       size="small"
+                      aria-label="期末余额"
                       @change="markDirty"
                     />
                     <span v-else class="balance-card__value balance-card__value--num">{{ formatAmount(selectedCompany.balance?.closing_balance) }}</span>
                   </div>
                   <div class="balance-card__item">
                     <span class="balance-card__label">投资收益</span>
-                    <el-input
+                    <WpAmountInput
                       v-if="!readonly"
-                      v-model.number="selectedCompany.balance!.investment_income"
-                      type="number"
+                      v-model="selectedCompany.balance!.investment_income"
                       size="small"
+                      aria-label="投资收益"
                       @change="markDirty"
                     />
                     <span v-else class="balance-card__value balance-card__value--num">{{ formatAmount(selectedCompany.balance?.investment_income) }}</span>
                   </div>
                   <div class="balance-card__item">
                     <span class="balance-card__label">公允价值变动</span>
-                    <el-input
+                    <WpAmountInput
                       v-if="!readonly"
-                      v-model.number="selectedCompany.balance!.fv_change"
-                      type="number"
+                      v-model="selectedCompany.balance!.fv_change"
                       size="small"
+                      aria-label="公允价值变动"
                       @change="markDirty"
                     />
                     <span v-else class="balance-card__value balance-card__value--num">{{ formatAmount(selectedCompany.balance?.fv_change) }}</span>
@@ -264,8 +324,37 @@
           </div>
 
           <!-- 4 区块检查表：block1/block3/block4 统一渲染，block2 借贷拆表 -->
+          <!-- 源 G0-6!A8 段号是「二」（改造前误编为「三」，因源外增强段抢占了「二」） -->
           <div class="detail-section">
-            <div class="detail-section__header">三、检查过程记录</div>
+            <div class="detail-section__header">{{ g06Section('process').title }}</div>
+            <!--
+              源 `C15`「2.检查本期发生额」行的抽样标准 5 点选项 —— 改造前平台**完全没有这个录入位置**。
+              🔴 末项是「其他」不是「全部」（与 `B7` 只差最后一项，抄错会让两处语义混同）。
+            -->
+            <el-form label-width="130px" size="small" :disabled="readonly" class="g06-occurrence-form">
+              <el-form-item label="本期发生额抽样标准">
+                <el-select
+                  :model-value="occurrenceScopeSelections"
+                  multiple
+                  filterable
+                  allow-create
+                  default-first-option
+                  collapse-tags
+                  collapse-tags-tooltip
+                  class="g06-scope-select"
+                  placeholder="按源模板勾选（可多选，亦可输入补充）"
+                  @update:model-value="onOccurrenceScopeChange"
+                >
+                  <el-option
+                    v-for="opt in G06_OCCURRENCE_SAMPLING_OPTIONS"
+                    :key="opt"
+                    :value="opt"
+                    :label="opt"
+                  />
+                </el-select>
+                <span class="g06-anchor">源模板 C15</span>
+              </el-form-item>
+            </el-form>
             <!-- 非 block2 统一渲染 -->
             <CheckBlock
               v-for="bt in blockTypes.filter((b) => b !== 'block2')"
@@ -327,10 +416,15 @@
             </div>
           </div>
 
-          <!-- 审计结论 -->
+          <!--
+            🔴 源模板是**两个独立段**：`A40 三、审计说明：` 与 `A43 四、审计结论：`。
+               改造前被并成一段「四、审计说明与结论」→ 段号错（审计说明本应是「三」）+ 两段并一。
+               现拆两段、编号归位；**数据仍共用同一 `AuditConclusion` 对象**（不新增持久化键，零迁移）。
+          -->
+          <!-- 三、审计说明（源 A40） -->
           <div class="detail-section">
             <div class="detail-section__header">
-              <span>四、审计说明与结论</span>
+              <span>{{ g06Section('audit_note').title }}</span>
               <div style="margin-left: auto; display: flex; align-items: center; gap: 8px">
                 <el-button
                   v-if="!readonly"
@@ -342,7 +436,7 @@
                 >
                   AI 智能填充
                 </el-button>
-                <GtReviewTrigger section-id="G0-6-conclusion" label="复核" />
+                <GtReviewTrigger section-id="G0-6-audit-note" label="复核" />
               </div>
             </div>
             <el-form
@@ -360,6 +454,23 @@
                   @change="markDirty"
                 />
               </el-form-item>
+            </el-form>
+          </div>
+
+          <!-- 四、审计结论（源 A43） -->
+          <div class="detail-section">
+            <div class="detail-section__header">
+              <span>{{ g06Section('conclusion').title }}</span>
+              <div style="margin-left: auto; display: flex; align-items: center; gap: 8px">
+                <GtReviewTrigger section-id="G0-6-conclusion" label="复核" />
+              </div>
+            </div>
+            <el-form
+              :model="selectedCompany.conclusion || {}"
+              label-width="80px"
+              size="small"
+              :disabled="readonly"
+            >
               <el-form-item label="审计结论">
                 <el-radio-group v-model="selectedCompany.conclusion!.conclusion_type" @change="markDirty">
                   <el-radio value="A">A - 替代程序结果支持余额</el-radio>
@@ -405,7 +516,17 @@ import { api } from '@/services/apiProxy'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useAlternativeG06Data } from './composables/useAlternativeG06Data'
 import type { AlternativeCompany, BlockType, CheckRow } from '../../confirmation/alternativeD05/alternativeD05Types'
-import { BLOCK_COLUMN_CONFIGS_G06 } from './blockColumnConfigsG06'
+import { BLOCK_COLUMN_CONFIGS_G06, G0_ACCOUNT_SUBJECT_OPTIONS } from './blockColumnConfigsG06'
+// 🔴 段结构与点选项字面**单一真源**（本组件不抄第二份中文，守卫按源码断言）
+import {
+  G06_EXTRA_SECTIONS,
+  G06_MASTER_LABELS,
+  G06_OCCURRENCE_SAMPLING_OPTIONS,
+  G06_TEST_SCOPE_OPTIONS,
+  g06Section,
+  parseG06ScopeSelections,
+  serializeG06ScopeSelections,
+} from './g06SourceFidelity'
 import {
   WorkpaperRuntimeContextKey,
   type WorkpaperRuntimeContext,
@@ -418,6 +539,9 @@ import AlternativeD05Dashboard from '../../confirmation/alternativeD05/Alternati
 import AlternativeD05Master from '../../confirmation/alternativeD05/AlternativeD05Master.vue'
 // 复用 D0-5 的 CheckBlock 组件
 import CheckBlock from '../../confirmation/alternativeD05/CheckBlock.vue'
+// 「余额数据」卡片的 6 个金额输入走平台金额控件（失焦千分符 / 聚焦原始值）。
+// 原为 `el-input type="number"` —— HTML number input 天然拒逗号，千分符结构上不可能出现。
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 
 const GtGridSheet = defineAsyncComponent(() => import('../../GtGridSheet.vue'))
 
@@ -908,6 +1032,51 @@ function markDirty() {
   data.isDirty.value = true
 }
 
+/**
+ * 主表行内编辑回写（被投资单位名称 / 函证索引号）。
+ *
+ * 🔴 改造前 G0-6 **没有监听 `AlternativeD05Master` 的 `update-field`** → 在主表里改名称或
+ * 索引号被**静默丢弃**（与「传不存在的 prop = 静默失效」同族：不报错、四层验证全绿，
+ * 只有真在界面上改一次才发现）。九个替代程序组件里只有 D0-5 接了，其余属平台级遗留。
+ */
+function handleMasterUpdateField(companyId: string, field: string, value: unknown) {
+  data.updateCompany(companyId, { [field]: value } as Partial<AlternativeCompany>)
+}
+
+// ─── 源模板两组点选项（源 B7 测试范围 / C15 本期发生额抽样标准）───────────────
+//
+// 二者都存成「、」分隔字符串（与旧自由文本同一字段、同一形态 → 零迁移）；
+// `allow-create` 让存量整段叙述作自定义 tag 保留，绝不丢弃（数据零丢失红线）。
+
+const testScopeSelections = computed<string[]>(() =>
+  parseG06ScopeSelections(selectedCompany.value?.sampling?.test_scope),
+)
+
+const occurrenceScopeSelections = computed<string[]>(() =>
+  parseG06ScopeSelections(selectedCompany.value?.sampling?.occurrence_sampling_scope),
+)
+
+function ensureSampling(): NonNullable<AlternativeCompany['sampling']> | null {
+  const company = selectedCompany.value
+  if (!company) return null
+  if (!company.sampling) company.sampling = {}
+  return company.sampling
+}
+
+function onTestScopeChange(values: string[]) {
+  const sampling = ensureSampling()
+  if (!sampling) return
+  sampling.test_scope = serializeG06ScopeSelections(values)
+  markDirty()
+}
+
+function onOccurrenceScopeChange(values: string[]) {
+  const sampling = ensureSampling()
+  if (!sampling) return
+  sampling.occurrence_sampling_scope = serializeG06ScopeSelections(values)
+  markDirty()
+}
+
 function formatRatio(val: number | null): string {
   if (val === null) return 'N/A'
   return `${val.toFixed(1)}%`
@@ -938,6 +1107,19 @@ defineExpose({
 <style scoped>
 .gt-confirmation-alternative-g06 {
   padding: 8px 0;
+}
+
+/* 源模板两组点选项（B7 测试范围 / C15 本期发生额抽样标准） */
+.g06-scope-select {
+  width: 100%;
+}
+.g06-occurrence-form {
+  margin-bottom: 6px;
+}
+.g06-anchor {
+  margin-left: 8px;
+  font-size: 11px;
+  color: var(--el-text-color-placeholder);
 }
 
 .gt-confirmation-alternative-g06__legacy-notice {

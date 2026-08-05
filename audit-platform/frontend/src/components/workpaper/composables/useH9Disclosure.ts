@@ -75,7 +75,25 @@ export function useH9ListedDisclosure(params: {
     const pack = _parseJson(_getRemark(allResponses.value, H9_LISTED_KEYS.pack))
     if (pack && typeof pack === 'object') {
       if (Array.isArray(pack.rows) && pack.rows.length) {
+        // 🔴 迁移零丢数 + 不撞键：
+        //    ① 已有 `rowId` 的**原样保留**（改造后的行、改名过的行都靠它定位）；
+        //    ② 历史行（改造前只有 label）补一个**不与现存 rowId 冲突**的新号 ——
+        //       不能按索引补 `H9-listed-{i+1}`：删掉前几行后剩下的行会被改号，
+        //       与将来新增的行撞键，按 rowId 查行会命中错行。
+        const used = new Set<string>(
+          pack.rows.map((r: any) => String(r?.rowId ?? '')).filter(Boolean),
+        )
+        let seq = 0
+        const allocate = (): string => {
+          do {
+            seq += 1
+          } while (used.has(`H9-listed-${seq}`))
+          const id = `H9-listed-${seq}`
+          used.add(id)
+          return id
+        }
         next.rows = pack.rows.map((r: any) => ({
+          rowId: String(r.rowId || allocate()),
           item: String(r.item || ''),
           endBalance: r.endBalance == null || r.endBalance === '' ? null : num(r.endBalance),
           lastYearEnd: r.lastYearEnd == null || r.lastYearEnd === '' ? null : num(r.lastYearEnd),
@@ -198,13 +216,30 @@ export function useH9ListedDisclosure(params: {
     persist()
   }
 
-  function addCategory(item?: string): void {
+  /**
+   * 新增租赁类别行（源模板 `A8:A10` 是空白自由列示区，行数由实际数据决定）。
+   *
+   * 🔴 **撞名拒绝**：附注同步按行标签匹配，同名行会互相覆盖丢数据。
+   * 🔴 **稳定 key 用 `rowId` 不用 label** —— 改名不丢数据、同名不撞键。
+   *
+   * @returns ``{ ok, message }``；`ok=false` 时调用方须提示且不落库。
+   */
+  function addCategory(item?: string): { ok: boolean; message: string } {
+    const name = (item ?? '').trim()
+    if (!name) {
+      return { ok: false, message: '请输入租赁类别名称' }
+    }
+    if (state.value.rows.some((r) => String(r.item ?? '').trim() === name)) {
+      return { ok: false, message: `已存在同名类别「${name}」，请换一个名称` }
+    }
     state.value.rows.push({
-      item: item?.trim() || '其他',
+      rowId: nextListedRowId(state.value.rows),
+      item: name,
       endBalance: null,
       lastYearEnd: null,
     })
     persist()
+    return { ok: true, message: `已新增「${name}」` }
   }
 
   function removeCategory(index: number): void {
@@ -225,6 +260,35 @@ export function useH9ListedDisclosure(params: {
   }
 }
 
+/**
+ * 生成下一个稳定行 key（`H9-listed-{seq}`）。
+ *
+ * 取现存最大 seq + 1，**不用行数** —— 删中间行后行数会回退导致 key 重用，
+ * 让新行"继承"被删行的持久化数据。
+ */
+export function nextListedRowId(rows: readonly { rowId?: string }[]): string {
+  let max = 0
+  for (const r of rows || []) {
+    const m = /^H9-listed-(\d+)$/.exec(String(r?.rowId ?? ''))
+    if (m) max = Math.max(max, Number(m[1]) || 0)
+  }
+  return `H9-listed-${max + 1}`
+}
+
+/**
+ * 生成下一个国企侧续加扣减项 key（`H9-soe-extra-{seq}`）。
+ *
+ * 对应源模板 `A11` 的 `……` 可续扣减行。
+ */
+export function nextSoeExtraRowId(rows: readonly { rowId?: string }[]): string {
+  let max = 0
+  for (const r of rows || []) {
+    const m = /^H9-soe-extra-(\d+)$/.exec(String(r?.rowId ?? ''))
+    if (m) max = Math.max(max, Number(m[1]) || 0)
+  }
+  return `H9-soe-extra-${max + 1}`
+}
+
 export function useH9SoeDisclosure(params: {
   allResponses: Ref<Map<string, any>>
   onSave?: (itemId: string, value: any) => void
@@ -237,8 +301,11 @@ export function useH9SoeDisclosure(params: {
     const pack = _parseJson(_getRemark(allResponses.value, H9_SOE_KEYS.pack))
     if (pack && typeof pack === 'object') {
       if (Array.isArray(pack.rows) && pack.rows.length) {
+        // 🔴 固定三行按 key 去重合并；`extra` 行**必须按 rowId 保留全部**
+        //    （按 key 去重会把 N 个续加扣减项压成一行 → 丢数据）
         const byKey = new Map<string, H9SoeLineRow>()
         for (const d of next.rows) byKey.set(d.key, { ...d })
+        const extras: H9SoeLineRow[] = []
         for (const r of pack.rows) {
           const key = (r.key as H9SoeLineRow['key'])
             || (String(r.item || '').includes('未确认')
@@ -246,14 +313,23 @@ export function useH9SoeDisclosure(params: {
               : String(r.item || '').includes('一年内') || String(r.item || '').includes('重分类')
                 ? 'reclass'
                 : 'payment')
-          byKey.set(key, {
+          const row: H9SoeLineRow = {
             key,
             item: String(r.item || byKey.get(key)?.item || ''),
             endBalance: r.endBalance == null || r.endBalance === '' ? null : num(r.endBalance),
             beginBalance: r.beginBalance == null || r.beginBalance === '' ? null : num(r.beginBalance),
-          })
+          }
+          if (key === 'extra') {
+            row.rowId = String(r.rowId || nextSoeExtraRowId(extras))
+            extras.push(row)
+          } else {
+            byKey.set(key, row)
+          }
         }
-        next.rows = createDefaultSoeState().rows.map((d) => byKey.get(d.key) || { ...d })
+        next.rows = [
+          ...createDefaultSoeState().rows.map((d) => byKey.get(d.key) || { ...d }),
+          ...extras,
+        ]
       }
       if (typeof pack.supplementNote === 'string') next.supplementNote = pack.supplementNote
     }
@@ -317,5 +393,65 @@ export function useH9SoeDisclosure(params: {
     persist()
   }
 
-  return { state, load, persist, pullFromSources, updateLine }
+  /** 续加扣减项也允许改名（固定三行不可改，源模板行名是准则用语） */
+  function updateExtraItem(index: number, value: any): { ok: boolean; message: string } {
+    const row = state.value.rows[index]
+    if (!row || row.key !== 'extra') {
+      return { ok: false, message: '仅续加扣减项可改名' }
+    }
+    const name = String(value ?? '').trim()
+    if (!name) return { ok: false, message: '名称不能为空' }
+    if (state.value.rows.some((r, i) => i !== index && String(r.item ?? '').trim() === name)) {
+      return { ok: false, message: `已存在同名行「${name}」` }
+    }
+    row.item = name
+    persist()
+    return { ok: true, message: '' }
+  }
+
+  /**
+   * 续加扣减项（源模板 `A11` 的 `……` 可续行）。
+   *
+   * 固定三行（`payment` / `unearned` / `reclass`）是准则规定项不可增删；
+   * 本函数只在其后追加 `extra` 行。
+   */
+  function addExtraDeduction(item?: string): { ok: boolean; message: string } {
+    const name = (item ?? '').trim()
+    if (!name) return { ok: false, message: '请输入扣减项名称' }
+    if (state.value.rows.some((r) => String(r.item ?? '').trim() === name)) {
+      return { ok: false, message: `已存在同名行「${name}」，请换一个名称` }
+    }
+    state.value.rows.push({
+      key: 'extra',
+      rowId: nextSoeExtraRowId(state.value.rows),
+      item: name,
+      endBalance: null,
+      beginBalance: null,
+    } as H9SoeLineRow)
+    persist()
+    return { ok: true, message: `已新增扣减项「${name}」` }
+  }
+
+  /** 删除续加扣减项（固定三行拒绝删除） */
+  function removeExtraDeduction(index: number): { ok: boolean; message: string } {
+    const row = state.value.rows[index]
+    if (!row) return { ok: false, message: '行不存在' }
+    if (row.key !== 'extra') {
+      return { ok: false, message: '源模板固定行不可删除' }
+    }
+    state.value.rows.splice(index, 1)
+    persist()
+    return { ok: true, message: '已删除' }
+  }
+
+  return {
+    state,
+    load,
+    persist,
+    pullFromSources,
+    updateLine,
+    updateExtraItem,
+    addExtraDeduction,
+    removeExtraDeduction,
+  }
 }

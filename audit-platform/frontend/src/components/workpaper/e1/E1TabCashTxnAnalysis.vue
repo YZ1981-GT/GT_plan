@@ -18,7 +18,6 @@ import { useE1ImportExport } from '../composables/useE1ImportExport'
 import type { UseE1BaseOptions } from '../composables/useE1Adjudication'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
-import { amountFormatter, amountParser } from '../composables/wpAmountInput'
 
 const props = defineProps<{
   wpId: string
@@ -311,8 +310,6 @@ async function handleImport(file: File): Promise<boolean> {
                       :disabled="isReadonly"
                       :controls="false"
                       :precision="2"
-                      :formatter="amountFormatter"
-                      :parser="amountParser"
                       size="small"
                       style="width: 100%"
                       @update:model-value="(v: number | undefined) => updateMonth('sales', row.month, 'current', Number(v) || 0)"
@@ -326,8 +323,6 @@ async function handleImport(file: File): Promise<boolean> {
                       :disabled="isReadonly"
                       :controls="false"
                       :precision="2"
-                      :formatter="amountFormatter"
-                      :parser="amountParser"
                       size="small"
                       style="width: 100%"
                       @update:model-value="(v: number | undefined) => updateMonth('sales', row.month, 'prior', Number(v) || 0)"
@@ -341,8 +336,6 @@ async function handleImport(file: File): Promise<boolean> {
                       :disabled="isReadonly"
                       :controls="false"
                       :precision="2"
-                      :formatter="amountFormatter"
-                      :parser="amountParser"
                       size="small"
                       style="width: 100%"
                       @update:model-value="(v: number | undefined) => updateMonth('sales', row.month, 'prior2', Number(v) || 0)"
@@ -366,8 +359,6 @@ async function handleImport(file: File): Promise<boolean> {
                     :disabled="isReadonly"
                     :controls="false"
                     :precision="2"
-                    :formatter="amountFormatter"
-                    :parser="amountParser"
                     size="small"
                     @update:model-value="(v: number | undefined) => updateOverall('sales', 'taxInclusiveBase', Number(v) || 0)"
                   />
@@ -390,8 +381,6 @@ async function handleImport(file: File): Promise<boolean> {
                       :disabled="isReadonly"
                       :controls="false"
                       :precision="2"
-                      :formatter="amountFormatter"
-                      :parser="amountParser"
                       size="small"
                       style="width: 100%"
                       @update:model-value="(v: number | undefined) => updateMonth('purchase', row.month, 'current', Number(v) || 0)"
@@ -405,8 +394,6 @@ async function handleImport(file: File): Promise<boolean> {
                       :disabled="isReadonly"
                       :controls="false"
                       :precision="2"
-                      :formatter="amountFormatter"
-                      :parser="amountParser"
                       size="small"
                       style="width: 100%"
                       @update:model-value="(v: number | undefined) => updateMonth('purchase', row.month, 'prior', Number(v) || 0)"
@@ -420,8 +407,6 @@ async function handleImport(file: File): Promise<boolean> {
                       :disabled="isReadonly"
                       :controls="false"
                       :precision="2"
-                      :formatter="amountFormatter"
-                      :parser="amountParser"
                       size="small"
                       style="width: 100%"
                       @update:model-value="(v: number | undefined) => updateMonth('purchase', row.month, 'prior2', Number(v) || 0)"
@@ -445,8 +430,6 @@ async function handleImport(file: File): Promise<boolean> {
                     :disabled="isReadonly"
                     :controls="false"
                     :precision="2"
-                    :formatter="amountFormatter"
-                    :parser="amountParser"
                     size="small"
                     @update:model-value="(v: number | undefined) => updateOverall('purchase', 'taxInclusiveBase', Number(v) || 0)"
                   />
@@ -500,7 +483,7 @@ async function handleImport(file: File): Promise<boolean> {
               <div class="side-title">现金销售收款</div>
               <el-form label-width="110px" size="small">
                 <el-form-item label="现金销售总额">
-                  <el-input-number :model-value="pack.salesDist.totalAmount" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" @update:model-value="(v: number | undefined) => updateDist('sales', 'totalAmount', Number(v) || 0)" />
+                  <el-input-number :model-value="pack.salesDist.totalAmount" :disabled="isReadonly" :controls="false" :precision="2" @update:model-value="(v: number | undefined) => updateDist('sales', 'totalAmount', Number(v) || 0)" />
                 </el-form-item>
                 <el-form-item label="现金销售笔数">
                   <el-input-number :model-value="pack.salesDist.txnCount" :disabled="isReadonly" :controls="false" @update:model-value="(v: number | undefined) => updateDist('sales', 'txnCount', Number(v) || 0)" />
@@ -521,12 +504,12 @@ async function handleImport(file: File): Promise<boolean> {
                 </el-table-column>
                 <el-table-column label="本期金额" min-width="110">
                   <template #default="{ row }">
-                    <el-input-number :model-value="row.current" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small" style="width:100%" @update:model-value="(v: number | undefined) => updateStratum('sales', row.id, 'current', Number(v) || 0)" />
+                    <el-input-number :model-value="row.current" :disabled="isReadonly" :controls="false" :precision="2" size="small" style="width:100%" @update:model-value="(v: number | undefined) => updateStratum('sales', row.id, 'current', Number(v) || 0)" />
                   </template>
                 </el-table-column>
                 <el-table-column label="上期金额" min-width="110">
                   <template #default="{ row }">
-                    <el-input-number :model-value="row.prior" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small" style="width:100%" @update:model-value="(v: number | undefined) => updateStratum('sales', row.id, 'prior', Number(v) || 0)" />
+                    <el-input-number :model-value="row.prior" :disabled="isReadonly" :controls="false" :precision="2" size="small" style="width:100%" @update:model-value="(v: number | undefined) => updateStratum('sales', row.id, 'prior', Number(v) || 0)" />
                   </template>
                 </el-table-column>
                 <el-table-column label="本期变动" width="90" align="right">
@@ -543,7 +526,7 @@ async function handleImport(file: File): Promise<boolean> {
               <div class="side-title">现金采购付款</div>
               <el-form label-width="110px" size="small">
                 <el-form-item label="现金采购总额">
-                  <el-input-number :model-value="pack.purchaseDist.totalAmount" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" @update:model-value="(v: number | undefined) => updateDist('purchase', 'totalAmount', Number(v) || 0)" />
+                  <el-input-number :model-value="pack.purchaseDist.totalAmount" :disabled="isReadonly" :controls="false" :precision="2" @update:model-value="(v: number | undefined) => updateDist('purchase', 'totalAmount', Number(v) || 0)" />
                 </el-form-item>
                 <el-form-item label="现金采购笔数">
                   <el-input-number :model-value="pack.purchaseDist.txnCount" :disabled="isReadonly" :controls="false" @update:model-value="(v: number | undefined) => updateDist('purchase', 'txnCount', Number(v) || 0)" />
@@ -564,12 +547,12 @@ async function handleImport(file: File): Promise<boolean> {
                 </el-table-column>
                 <el-table-column label="本期金额" min-width="110">
                   <template #default="{ row }">
-                    <el-input-number :model-value="row.current" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small" style="width:100%" @update:model-value="(v: number | undefined) => updateStratum('purchase', row.id, 'current', Number(v) || 0)" />
+                    <el-input-number :model-value="row.current" :disabled="isReadonly" :controls="false" :precision="2" size="small" style="width:100%" @update:model-value="(v: number | undefined) => updateStratum('purchase', row.id, 'current', Number(v) || 0)" />
                   </template>
                 </el-table-column>
                 <el-table-column label="上期金额" min-width="110">
                   <template #default="{ row }">
-                    <el-input-number :model-value="row.prior" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small" style="width:100%" @update:model-value="(v: number | undefined) => updateStratum('purchase', row.id, 'prior', Number(v) || 0)" />
+                    <el-input-number :model-value="row.prior" :disabled="isReadonly" :controls="false" :precision="2" size="small" style="width:100%" @update:model-value="(v: number | undefined) => updateStratum('purchase', row.id, 'prior', Number(v) || 0)" />
                   </template>
                 </el-table-column>
                 <el-table-column label="本期变动" width="90" align="right">

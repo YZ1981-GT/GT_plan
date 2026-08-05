@@ -1,5 +1,8 @@
 <template>
   <div class="f5-adjudication">
+    <!-- 四表取数溯源面板 -->
+    <F5FourTableSourcePanel :source-codes="props.tbSourceCodes" />
+
     <details class="guidance-details">
       <summary>📋 编制思路与审定逻辑</summary>
       <div class="guidance-content">
@@ -31,6 +34,14 @@
         <span class="chip-wrap"><GtIndexChip value="wp:F5-4" :context-project-id="projectIdStr" /></span>
       </div>
       <div class="toolbar-right">
+        <el-button
+          v-if="hasTbPrefill"
+          size="small"
+          type="success"
+          plain
+          :disabled="isReadonly"
+          @click="handlePullFromTB"
+        >从四表库带入未审数</el-button>
         <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
           <el-icon><Download /></el-icon>带入调整
         </el-button>
@@ -363,8 +374,10 @@ import { useF5Adjudication } from '../composables/useF5Adjudication'
 import { useF5AiGenerate } from '../composables/useF5AiGenerate'
 import { useAdjudicationBringIn } from '../composables/useAdjudicationBringIn'
 import { useAuditContext } from '@/composables/useAuditContext'
+import { F5_GROSS_FALLBACK_STANDARD } from '../composables/f5AccountScope'
 import type { ChecklistResponse } from '../composables/useF1FormData'
 import F5SheetAttachments from './F5SheetAttachments.vue'
+import F5FourTableSourcePanel from './F5FourTableSourcePanel.vue'
 import GtIndexChip from '../GtIndexChip.vue'
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 
@@ -373,6 +386,10 @@ const props = defineProps<{
   wpId: string
   projectId: string
   isReadonly: boolean
+  /** 后端 render 输出的 adjudication_prefill（按主营/其他品种段给本期发生额） */
+  adjudicationPrefill?: Record<string, { amount: number; label: string; codes: string[] }> | null
+  /** 后端 render 输出的 tb_source_codes */
+  tbSourceCodes?: any
 }>()
 
 const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
@@ -402,11 +419,11 @@ const {
 } = useAdjudicationBringIn({
   projectId: projectIdRef as any,
   year: useAuditContext().year as any,
-  subjectPrefix: '6401',
+  subjectPrefix: F5_GROSS_FALLBACK_STANDARD,
   direction: 'debit',
-  subjectCode: '6401',
+  subjectCode: F5_GROSS_FALLBACK_STANDARD,
   wpCode: 'F5',
-  subjectLabel: '营业成本(6401)',
+  subjectLabel: `营业成本(${F5_GROSS_FALLBACK_STANDARD})`,
   rows: bringInRows,
   updateCell: (rowKey: string, field: any, value: number) =>
     adj.updateCell('main', rowKey, field === 'rje' ? 'currentRje' : 'currentAje', value),
@@ -420,6 +437,18 @@ watch(adj.priorTrialBalanceAmount, (v) => { priorTbInput.value = v })
 
 const projectIdStr = computed(() => props.projectId)
 const dataRowCount = computed(() => adj.mainBusinessRows.value.length + adj.otherBusinessRows.value.length)
+
+const hasTbPrefill = computed(() => !!props.adjudicationPrefill && Object.keys(props.adjudicationPrefill).length > 0)
+
+function handlePullFromTB(): void {
+  if (!props.adjudicationPrefill) return
+  const { written, skipped } = adj.pullFromTB(props.adjudicationPrefill)
+  if (written > 0) {
+    ElMessage.success(`已从四表库带入 ${written} 段本期发生额${skipped ? `，跳过 ${skipped} 段已有值` : ''}`)
+  } else if (skipped > 0) {
+    ElMessage.info(`所有段已有手工值，未覆盖`)
+  }
+}
 
 function onTbChange() {
   adj.updateTrialBalance(tbInput.value ?? 0)
@@ -499,7 +528,7 @@ function openReview() {
 function aiContext(): Record<string, unknown> {
   return {
     sheet: 'F5-1',
-    accountCode: '6401',
+    accountCode: F5_GROSS_FALLBACK_STANDARD,
     mainCostChange: adj.mainCostChange.value,
     significantChanges: adj.significantChanges.value,
     mainSubtotal: {

@@ -122,6 +122,11 @@ export function useFraudRiskData(props: UseFraudRiskDataProps): UseFraudRiskData
       if (userRow) {
         return ensureRowId({
           ...userRow,
+          // 🔴 预置行的 description 在 UI 上是只读的（`FraudRiskChecklist` 对 `_preset`
+          //    行只渲染文本不给输入框）→ 它不是用户数据，必须始终取最新预置。
+          //    否则预置文字更正（如 2026-08-03 按源模板重写 19 条）永远传不到既有项目。
+          //    用户数据只有 is_exist / source_ref / countermeasure 三项，均在 userRow 里保留。
+          description: preset.description,
           tooltip_key: preset.tooltip_key, // tooltip 始终取最新预置
           _preset: true,
         })

@@ -58,16 +58,14 @@
       <el-table-column label="产生公允价值变动收益的来源" prop="label" min-width="280" fixed />
       <el-table-column label="本期发生额" width="140" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="row.rowKey !== 'total' && !isReadonly" :model-value="row.currentAmount" size="small"
-            :controls="false" style="width:100%"
+          <WpAmountInput v-if="row.rowKey !== 'total' && !isReadonly" :model-value="row.currentAmount" size="small"
             @update:model-value="(v: number) => dis.updateField(row.rowKey, 'currentAmount', v ?? 0)" />
           <span v-else>{{ fmt(row.currentAmount) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="上期发生额" width="140" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="row.rowKey !== 'total' && !isReadonly" :model-value="row.priorAmount" size="small"
-            :controls="false" style="width:100%"
+          <WpAmountInput v-if="row.rowKey !== 'total' && !isReadonly" :model-value="row.priorAmount" size="small"
             @update:model-value="(v: number) => dis.updateField(row.rowKey, 'priorAmount', v ?? 0)" />
           <span v-else>{{ fmt(row.priorAmount) }}</span>
         </template>
@@ -129,6 +127,7 @@ import { api } from '@/services/apiProxy'
 import GCycleDisclosureExtras from '../shared/GCycleDisclosureExtras.vue'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
 import GtIndexChip from '../GtIndexChip.vue'
+import WpAmountInput from '../shared/WpAmountInput.vue'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>

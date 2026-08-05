@@ -428,6 +428,52 @@ export function buildG6FvSeedCells(
   prefill: GAdjPrefill | null,
   labelOf: (rowKey: string) => string = (k) => k,
 ): G6FvSeedResult {
+  return _buildPlaceholderSeedCells(prefill, [...G6_FV_PLACEHOLDER_ROWS], labelOf)
+}
+
+/**
+ * G8 其他权益工具投资（`1507`）的公允价值段落点 —— 与 G6 同款占位行范式。
+ *
+ * G8-1 有 10 个固定行（`fv_1` ~ `fv_10`），标签为 `权益工具投资(FVOCI)/其他/被投资单位1~8`，
+ * 按叶子顺序逐一落（同 G6 的 4 行 → G8 是 10 行，容量更大）。
+ */
+export const G8_FV_PLACEHOLDER_ROWS = Array.from(
+  { length: 10 },
+  (_, i) => `fv_${i + 1}`,
+) as string[]
+
+export function buildG8FvSeedCells(
+  prefill: GAdjPrefill | null,
+  labelOf: (rowKey: string) => string = (k) => k,
+): G6FvSeedResult {
+  return _buildPlaceholderSeedCells(prefill, G8_FV_PLACEHOLDER_ROWS, labelOf)
+}
+
+/**
+ * G9 其他非流动金融资产（`1519`）—— 15 行分三组，跳过 `isGroupTotal` 小计行。
+ *
+ * 可编辑行 = `fvtpl_2~8` / `fvoci_2~4` / `amort_2~3`（12 行），
+ * 小计行 `fvtpl_1`/`fvoci_1`/`amort_1` 不可编辑，不落 seed。
+ */
+export const G9_EDITABLE_ROWS = [
+  'fvtpl_2', 'fvtpl_3', 'fvtpl_4', 'fvtpl_5', 'fvtpl_6', 'fvtpl_7', 'fvtpl_8',
+  'fvoci_2', 'fvoci_3', 'fvoci_4',
+  'amort_2', 'amort_3',
+] as const
+
+export function buildG9SeedCells(
+  prefill: GAdjPrefill | null,
+  labelOf: (rowKey: string) => string = (k) => k,
+): G6FvSeedResult {
+  return _buildPlaceholderSeedCells(prefill, [...G9_EDITABLE_ROWS], labelOf)
+}
+
+/** 通用占位行 seed 逻辑（G6/G8/G9 共用） */
+function _buildPlaceholderSeedCells(
+  prefill: GAdjPrefill | null,
+  placeholderRows: string[],
+  labelOf: (rowKey: string) => string,
+): G6FvSeedResult {
   const out: G6FvSeedResult = {
     cells: [], unclassified: [], absentSlots: [], usedDefaults: [], mappings: [],
   }
@@ -437,7 +483,7 @@ export function buildG6FvSeedCells(
   }
   const leaves = prefill.leaves.filter((l) => l.slot === 'gross')
   leaves.forEach((leaf, i) => {
-    const rowKey = G6_FV_PLACEHOLDER_ROWS[i]
+    const rowKey = placeholderRows[i]
     if (!rowKey) {
       out.unclassified.push({
         code: leaf.code, name: leaf.name, amount: leaf.closing, opening: leaf.opening,
@@ -466,8 +512,102 @@ export function buildG6FvSeedCells(
   return out
 }
 
-/** wp_code → seed 声明（`buildGSeedCells` 通用路径；G6 走 `buildG6FvSeedCells`） */
+/**
+ * G4 债权投资（`1504`，资产负债表，备抵 `1505`）。
+ *
+ * 审定表结构 = `一、原值` × `(单项计提 / 按组合计提)` + `二、减值准备` × `(单项 / 组合)` + `三、净值`。
+ *
+ * 🔴 **「单项计提 / 按组合计提」是减值方法的会计判断**，四表里没有：
+ * - 原值默认落 `original-collective`（按组合计提坏账准备），与 G2 同款处理。
+ * - 减值准备默认落 `impairment-collective`（按组合计提减值准备）。
+ * - 备抵科目 `1505` 的叶子通过 `slot='provision'` 标识，按关键字归入减值段行。
+ *
+ * ⚠️ 四表库只有余额无法区分减值方法 → 默认 + 明示审计师调整。
+ */
+export const G4_SEED_SPEC: GSeedSpec = {
+  openingField: 'openingUnadjusted',
+  closingField: 'closingUnadjusted',
+  openingLabel: '期初未审',
+  closingLabel: '期末未审',
+  rules: [
+    // provision slot → 减值准备段（备抵科目 1505 的叶子）
+    { rowKey: 'impairment-collective', any: ['减值', '坏账', '准备'], slot: 'provision' },
+  ],
+  defaults: { gross: 'original-collective', provision: 'impairment-collective' },
+  defaultNote:
+    '四表库无法区分「单项计提 / 按组合计提坏账准备」（属减值方法的会计判断），'
+    + '原值已统一落在「按组合计提坏账准备」行，减值准备已统一落在对应减值行；'
+    + '请按实际计提方法调整。',
+}
+
+/**
+ * G10 交易性金融负债（`2101`，负债类，贷方科目）。
+ *
+ * 审定表结构 = `(一) 初始金额` + `(二) 累计公允价值变动` + `(三) 账面余额(=公允价值)`。
+ *
+ * 🔴 **三组结构（成本 / FV 变动 / 账面）无法从 TB 余额拆分**：
+ * TB 只有每个子科目的总余额，不含「初始金额」与「累计公允价值变动」的拆分信息 ——
+ * 两者之和才等于账面余额（= TB 余额）。
+ *
+ * 设计：默认落 `book-collective`（「（三）账面余额·按组合」行），因为 TB 余额即账面余额。
+ * 如需拆分为初始金额 + FV 变动，需审计师从 G10-2 明细/子科目会计核算中手工分摊。
+ * 无规则（子科目名无法映射到成本/FV 变动维度）。
+ */
+export const G10_SEED_SPEC: GSeedSpec = {
+  openingField: 'openingUnadjusted',
+  closingField: 'closingUnadjusted',
+  openingLabel: '期初未审',
+  closingLabel: '期末未审',
+  rules: [],
+  defaults: { gross: 'book-collective' },
+  defaultNote:
+    '四表库只有科目余额，无法拆分为「初始金额」与「累计公允价值变动」'
+    + '（两者之和 = 账面余额 = TB 余额），已统一落在「（三）账面余额·按组合」行；'
+    + '如需拆分请手工调整。',
+}
+
+/**
+ * G1 交易性金融资产（`1101`，资产负债表）。
+ *
+ * 审定表结构 = `(投资成本 / 累计公允价值变动)` × `(交易性 / 划分为 / 指定为)` × `品种(股票/债券/基金/权证/其他)`。
+ * rowKey 格式 = `{section}-{class}-{product}`。
+ *
+ * 🔴 **三个维度中两个无法从四表推断**：
+ * 1. `section`（成本 vs FV 变动）—— 可从子科目名推断：
+ *    - `1101.01.01 _成本` → `cost`
+ *    - `1101.01.02 _公允价值变动` → `fv`
+ *    - 平铺形态 `110101`/`110102` 同理
+ * 2. `class`（交易性 / 划分为 / 指定为）—— **会计判断**，四表无信息 → 默认 `trading`
+ * 3. `product`（股票/债券/基金/权证/其他）—— 客户子科目名多为银行户名/部门名
+ *    （如「招行基本户」），通常无品种关键字 → 默认 `other`
+ *
+ * 设计：
+ * - 规则只做 section 判定（含「公允价值变动」→ fv；含「成本」/「投资」→ cost）
+ * - class 和 product 统一默认为 `trading` + `other`
+ * - 多分类/多品种时须审计师手工用分摊对话框分配
+ */
+export const G1_SEED_SPEC: GSeedSpec = {
+  openingField: 'openingUnadjusted',
+  closingField: 'closingUnadjusted',
+  openingLabel: '期初未审',
+  closingLabel: '期末未审',
+  rules: [
+    // section 判定：子科目名含「公允价值变动」→ fv；含「成本」/「投资」→ cost
+    { rowKey: 'fv-trading-other', any: ['公允价值变动'] },
+    { rowKey: 'cost-trading-other', any: ['成本', '投资'] },
+  ],
+  defaults: { gross: 'cost-trading-other' },
+  defaultNote:
+    '四表库无法区分交易性金融资产的分类（交易性 / 划分为 / 指定为）与品种（股票 / 债券 / 基金等），'
+    + '已统一落在「投资成本·交易性·其他」行；'
+    + '多分类或多品种时请手工分摊到对应行（可用分摊对话框）。',
+}
+
+/** wp_code → seed 声明（`buildGSeedCells` 通用路径；G6 走 `buildG6FvSeedCells`；G8 走 `buildG8FvSeedCells`） */
 export const G_SEED_SPECS: Readonly<Record<string, GSeedSpec>> = Object.freeze({
+  G1: G1_SEED_SPEC,
   G2: G2_SEED_SPEC,
+  G4: G4_SEED_SPEC,
+  G10: G10_SEED_SPEC,
   G11: G11_SEED_SPEC,
 })

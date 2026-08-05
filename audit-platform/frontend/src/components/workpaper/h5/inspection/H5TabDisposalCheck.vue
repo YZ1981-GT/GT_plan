@@ -1,5 +1,8 @@
 <template>
   <div class="h5-tab-disposal-check">
+  <!-- 抽样方法学（来自抽凭引擎回填，底稿正文可见 → 归档与复核可追溯） -->
+  <WpSamplingMethodologyBar :methodology="methodology" />
+
     <!-- 审计目标 -->
     <el-alert type="info" :closable="false" title="审计目标：检查本期油气资产减少(处置)的损益计算准确性，并联动 H10 资产处置收益。" class="objective-alert" />
 
@@ -130,6 +133,9 @@ import { MagicStick } from '@element-plus/icons-vue'
 import { useH5DisposalCheck } from '../../composables/useH5DisposalCheck'
 import { useH5FormData } from '../../composables/useH5FormData'
 import { useAuditContext } from '@/composables/useAuditContext'
+import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
+import { useSamplingMethodologyPersist, buildChecklistDirectPersist } from '../../composables/shared/useSamplingMethodologyPersist'
+import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'
 
 const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
 const GtVoucherSamplingEngine = defineAsyncComponent(() => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'))
@@ -148,7 +154,26 @@ const samplingVisible = ref(false)
 const { year: auditYear } = useAuditContext()
 const samplingYear = computed(() => props.year || auditYear.value || new Date().getFullYear())
 
+const rawMethodologyPersist = buildChecklistDirectPersist({
+  wpId: computed(() => props.wpId),
+  projectId: computed(() => props.projectId),
+})
+const methodologyDirectPersist = rawMethodologyPersist
+/**
+ * 抽样方法学留痕（R6.3/R6.4）：把 `filled` 载荷里的 methodology 落到固定 item key，
+ * 并在抽凭区渲染到底稿正文 —— 复核与归档看的是底稿，不是后台抽凭日志。
+ */
+const { methodology, persistMethodology } = useSamplingMethodologyPersist({
+  wpCode: 'H5',
+  allResponses: toRef(props, 'allResponses') as never,
+  persist: methodologyDirectPersist,
+  isReadonly: computed(() => props.isReadonly === true),
+})
+
 function onSampleFilled(payload: any): void {
+  // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
+  void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
+
   const samples = payload?.samples ?? []
   for (const s of samples) {
     state.addRow(s.summary || s.counterpartAccount || '抽凭样本', {

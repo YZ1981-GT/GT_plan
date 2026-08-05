@@ -26,7 +26,6 @@ import GtIndexChip from '../GtIndexChip.vue'
 import GtCutoffAutoSampling from '../cutoff/GtCutoffAutoSampling.vue'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
-import { amountFormatter, amountParser } from '../composables/wpAmountInput'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -183,6 +182,83 @@ function saveAuditConclusion(val: string): void {
   props.allResponses.set(CONCLUSION_KEY.value, item)
   void props.saveImmediate([item])
 }
+
+// ─── OCR 链路（凭证影像 → E1CutoffOcrConfirmDialog → 确认写行）──────────────
+// @spec e1-orphan-components-wiring — Task 7
+
+import E1CutoffOcrConfirmDialog from './E1CutoffOcrConfirmDialog.vue'
+import type { CutoffOcrFields } from './E1CutoffOcrConfirmDialog.vue'
+import http from '@/utils/http'
+
+const ocrVisible = ref(false)
+const ocrFields = ref<Partial<CutoffOcrFields>>({})
+const ocrConfidence = ref<number | undefined>()
+const ocrPreview = ref('')
+const ocrFileName = ref('')
+
+async function onOcrUpload(file: File): Promise<boolean> {
+  const form = new FormData()
+  form.append('file', file)
+  try {
+    const res = await http.post(`/api/workpapers/${props.wpId}/e1/cutoff-ocr`, form)
+    const data = res?.data ?? res
+    ocrFields.value = data?.fields ?? {}
+    ocrConfidence.value = data?.confidence
+    ocrPreview.value = data?.preview ?? ''
+    ocrFileName.value = data?.file_name ?? file.name ?? ''
+    ocrVisible.value = true
+  } catch (e) {
+    console.warn('[E1TabCutoffTest] OCR failed:', e)
+    ElMessage.warning('OCR 识别失败，请手工录入')
+  }
+  return false // prevent el-upload default behavior
+}
+
+function onOcrConfirm(fields: CutoffOcrFields): void {
+  ocrVisible.value = false
+  // Write confirmed fields into a new row
+  addRow()
+  const lastRow = rows.value[rows.value.length - 1]
+  if (!lastRow) return
+  if (fields.voucherNo) updateCell(lastRow.id, 'voucherNo', fields.voucherNo)
+  if (fields.date) updateCell(lastRow.id, 'date', fields.date)
+  if (fields.businessContent) updateCell(lastRow.id, 'businessContent', fields.businessContent)
+  if (fields.counterparty) updateCell(lastRow.id, 'counterparty', fields.counterparty)
+  if (fields.debitAmount) updateCell(lastRow.id, 'debitAmount', Number(fields.debitAmount) || 0)
+  if (fields.creditAmount) updateCell(lastRow.id, 'creditAmount', Number(fields.creditAmount) || 0)
+  if (fields.receiptDate) updateCell(lastRow.id, 'receiptDate', fields.receiptDate)
+  if (fields.otherDocDate) updateCell(lastRow.id, 'otherDocDate', fields.otherDocDate)
+  if (fields.note) updateCell(lastRow.id, 'note', fields.note)
+}
+
+// ─── AI 辅助（spec: e1-orphan-components-wiring Task 9）─────────────────────
+import { useE1AiGenerate } from '../composables/useE1AiGenerate'
+
+const { generateText, isGenerating } = useE1AiGenerate(toRef(props, 'wpId') as Ref<string>)
+
+async function generateAuditNote(): Promise<void> {
+  if (props.isReadonly) return
+  const text = await generateText({
+    section: 'e1-21-audit-note',
+    prompt: '你是注册会计师助理。请撰写 E1-21/22 截止测试 的审计说明，概述审计程序执行情况与主要发现。不得虚构。约 100～200 字。',
+    context: { 底稿: 'E1-21/22 截止测试', 说明: auditNote.value },
+    existingContent: auditNote.value,
+    confirmTitle: 'AI 生成 · 审计说明',
+  })
+  if (text) saveAuditNote(text)
+}
+
+async function generateAuditConclusion(): Promise<void> {
+  if (props.isReadonly) return
+  const text = await generateText({
+    section: 'e1-21-audit-conclusion',
+    prompt: '你是注册会计师助理。请撰写 E1-21/22 截止测试 的审计结论，对审计程序结果给出结论性评价。不得虚构。约 60～150 字。',
+    context: { 底稿: 'E1-21/22 截止测试', 结论: auditConclusion.value },
+    existingContent: auditConclusion.value,
+    confirmTitle: 'AI 生成 · 审计结论',
+  })
+  if (text) saveAuditConclusion(text)
+}
 </script>
 
 <template>
@@ -215,6 +291,9 @@ function saveAuditConclusion(val: string): void {
         <el-tag v-if="balanceSheetDate" size="small" type="info">资产负债表日：{{ balanceSheetDate }}</el-tag>
         <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">+ 添加行</el-button>
         <el-button size="small" type="warning" :disabled="isReadonly" @click="cutoffSamplingVisible = true">🎲 截止取数</el-button>
+        <el-upload :show-file-list="false" accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff,.bmp,.webp" :before-upload="onOcrUpload" :disabled="isReadonly" style="display:inline-block;margin-left:4px">
+          <el-button size="small" :disabled="isReadonly">📎 凭证OCR</el-button>
+        </el-upload>
       </div>
       <div class="toolbar-right">
         <el-dropdown size="small" trigger="click" :disabled="isReadonly">
@@ -268,7 +347,7 @@ function saveAuditConclusion(val: string): void {
           <el-table-column label="金额" width="150" align="right">
             <template #default="{ row }">
               <el-input-number :model-value="row.amount" :disabled="isReadonly"
-                :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small"
+                :controls="false" :precision="2" size="small"
                 @change="(val: number) => updateCell(row.id, 'amount', val ?? 0)" />
             </template>
           </el-table-column>
@@ -346,6 +425,17 @@ function saveAuditConclusion(val: string): void {
         @applied="onCutoffApplied"
       />
     </el-dialog>
+
+    <!-- OCR 确认弹窗 -->
+    <E1CutoffOcrConfirmDialog
+      v-model="ocrVisible"
+      :fields="ocrFields"
+      :confidence="ocrConfidence"
+      :ocr-preview="ocrPreview"
+      :file-name="ocrFileName"
+      @confirm="onOcrConfirm"
+      @cancel="ocrVisible = false"
+    />
   </div>
 </template>
 

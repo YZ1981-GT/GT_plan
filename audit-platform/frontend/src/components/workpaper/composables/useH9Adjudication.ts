@@ -474,10 +474,13 @@ export function useH9Adjudication(params: {
       await onWritebackTB(liabilitySubtotal.value.audited, unearnedSubtotal.value.audited)
     }
     // Dispatch EventBus 'substantive:adjudicated' to notify other workpapers (附注/H8/报表)
+    // 🔴 2026-08-03 纠正：原写 `2205`（合同负债，D7 域）→ 租赁负债真值 `2601`。
+    //    该载荷驱动 TB 回写与跨底稿联动，写错科目会**污染 D7 合同负债的审定口径**
+    //    （Req 6.4）。兜底码与后端 `four_table/h9_account_scope.py` 一致。
     window.dispatchEvent(new CustomEvent('substantive:adjudicated', {
       detail: {
         wpCode: 'H9',
-        accountCode: '2205',
+        accountCode: '2601',
         auditedAmount: liabilitySubtotal.value.audited,
         auditedAmountFinanceCost: unearnedSubtotal.value.audited,
       },

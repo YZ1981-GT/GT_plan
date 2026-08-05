@@ -7,6 +7,7 @@
 import { ref, computed, watch, toRef, inject, type Ref } from 'vue'
 import { useF3Detail, type F3NoteDetailRow, type F3DetailColumn } from '../composables/useF3Detail'
 import { useF3AiGenerate, type F3AiSection } from '../composables/useF3AiGenerate'
+import { F3_GROSS_FALLBACK_STANDARD } from '../composables/f3AccountScope'
 import F3ImportExportToolbar from './F3ImportExportToolbar.vue'
 import F3SheetAttachments from './F3SheetAttachments.vue'
 import GtIndexChip from '../GtIndexChip.vue'
@@ -120,7 +121,7 @@ watch(() => props.allResponses.get(CONCLUSION_KEY)?.remark, (v) => { if (typeof 
 function aiContext(): Record<string, unknown> {
   return {
     sheet: 'F3-2',
-    accountCode: '2201',
+    accountCode: F3_GROSS_FALLBACK_STANDARD,
     rowCount: filledCount.value,
     abnormalCount: abnormalCount.value,
     totals: {

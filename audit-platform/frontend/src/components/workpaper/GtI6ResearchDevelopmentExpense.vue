@@ -50,26 +50,27 @@
         />
 
         <!-- I6-1 审定表（损益类！73公式） -->
-        <HiFourTableSourcePanel
-          v-if="props.htmlData?.hi_extraction_enabled"
-          :wp-code="'I6'"
-          :segments="getHiExtractionSegments('I6')"
-          :all-responses="allResponses"
-          :is-readonly="isReadonly"
-          @refresh-complete="selfLoad()"
-        />
-        <I6TabAdjudication
-          v-else-if="currentSheet === 'I6-1'"
-          :wp-id="props.wpId"
-          :project-id="props.projectId"
-          :all-responses="allResponses"
-          :tb-data="tbData"
-          :is-readonly="isReadonly"
-          :applicable-standards="applicableStandards"
-          :html-data="props.htmlData"
-          @save="handleChildSave"
-          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
-        />
+        <template v-else-if="currentSheet === 'I6-1'">
+          <HiFourTableSourcePanel
+            v-if="props.htmlData?.hi_extraction_enabled"
+            :wp-code="'I6'"
+            :segments="getHiExtractionSegments('I6')"
+            :all-responses="allResponses"
+            :is-readonly="isReadonly"
+            @refresh-complete="selfLoad()"
+          />
+          <I6TabAdjudication
+            :wp-id="props.wpId"
+            :project-id="props.projectId"
+            :all-responses="allResponses"
+            :tb-data="tbData"
+            :is-readonly="isReadonly"
+            :applicable-standards="applicableStandards"
+            :html-data="props.htmlData"
+            @save="handleChildSave"
+            @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
+          />
+        </template>
 
         <!-- I6-2 明细表（月度12列横向） -->
         <I6TabDetail

@@ -20,6 +20,7 @@ import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
+import { L3_GROSS_FALLBACK_STANDARD } from './l3AccountScope'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -229,12 +230,12 @@ export function useL3FormData(options: UseL3FormDataOptions) {
     if (!projectId.value) return
     try {
       await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: '2501',
+        account_code: L3_GROSS_FALLBACK_STANDARD,
         audited_amount: auditedAmount,
       })
       // 发布 mitt EventBus 通知审定数变更（附注等组件订阅刷新）
       eventBus.emit('substantive:adjudicated', {
-        accountCode: '2501',
+        accountCode: L3_GROSS_FALLBACK_STANDARD,
         auditedAmount,
         wpCode: 'L3',
         timestamp: Date.now(),

@@ -18,7 +18,7 @@ const VOUCHER_COLS: BlockColumnDef[] = [
   { field: 'voucher_no', label: '凭证编号', width: 100, type: 'text', group: '记账凭证' },
   { field: 'business_desc', label: '业务内容', width: 140, type: 'text', group: '记账凭证' },
   { field: 'counter_account', label: '对方科目', width: 100, type: 'text', group: '记账凭证' },
-  { field: 'voucher_amount', label: '金额', width: 110, type: 'number', sumField: true, group: '记账凭证', align: 'right' },
+  { field: 'voucher_amount', label: '金额', width: 110, type: 'number', render: 'amount', sumField: true, group: '记账凭证', align: 'right' },
 ]
 
 /** ① 期后收款检查 */
@@ -27,7 +27,7 @@ const BLOCK1_COLUMNS: BlockColumnDef[] = [
   ...VOUCHER_COLS,
   { field: 'receipt_date_no', label: '银行回单日期/编号', width: 130, type: 'text', group: '银行回单' },
   { field: 'receipt_payer', label: '收款方', width: 120, type: 'text', group: '银行回单' },
-  { field: 'receipt_amount', label: '金额', width: 110, type: 'number', sumField: true, group: '银行回单', align: 'right' },
+  { field: 'receipt_amount', label: '金额', width: 110, type: 'number', render: 'amount', sumField: true, group: '银行回单', align: 'right' },
   { field: 'post_receipt_ratio', label: '期后收回比例', width: 100, type: 'text', group: '汇总' },
   { field: 'ref_index', label: '索引号', width: 90, type: 'text' },
   { field: 'is_abnormal', label: '是否异常', width: 80, type: 'select', align: 'center' },
@@ -41,7 +41,7 @@ const BLOCK2_COLUMNS: BlockColumnDef[] = [
   { field: 'approval_proper', label: '是否恰当审批', width: 100, type: 'text', group: '审批单', align: 'center' },
   { field: 'agreement_no', label: '借据/协议编号', width: 120, type: 'text', group: '借据/协议' },
   { field: 'agreement_party', label: '对方单位', width: 120, type: 'text', group: '借据/协议' },
-  { field: 'agreement_amount', label: '金额', width: 110, type: 'number', sumField: true, group: '借据/协议', align: 'right' },
+  { field: 'agreement_amount', label: '金额', width: 110, type: 'number', render: 'amount', sumField: true, group: '借据/协议', align: 'right' },
   { field: 'ref_index', label: '索引号', width: 90, type: 'text' },
   { field: 'is_abnormal', label: '是否异常', width: 80, type: 'select', align: 'center' },
 ]
@@ -54,7 +54,7 @@ const BLOCK3_COLUMNS: BlockColumnDef[] = [
   { field: 'doc_reason', label: '事由', width: 140, type: 'text', group: '原始单据' },
   { field: 'approval_voucher', label: '审批凭证', width: 100, type: 'text', group: '审批' },
   { field: 'approval_person', label: '审批人', width: 90, type: 'text', group: '审批' },
-  { field: 'approval_amount', label: '金额', width: 110, type: 'number', sumField: true, group: '审批', align: 'right' },
+  { field: 'approval_amount', label: '金额', width: 110, type: 'number', render: 'amount', sumField: true, group: '审批', align: 'right' },
   { field: 'ref_index', label: '索引号', width: 90, type: 'text' },
   { field: 'is_abnormal', label: '是否异常', width: 80, type: 'select', align: 'center' },
 ]
@@ -64,8 +64,8 @@ const BLOCK4_COLUMNS: BlockColumnDef[] = [
   { field: 'seq', label: '序号', width: 50, type: 'number', editable: false, fixed: true, align: 'center' },
   ...VOUCHER_COLS,
   { field: 'reconcile_date', label: '对账单日期', width: 100, type: 'date', group: '对账单' },
-  { field: 'other_balance', label: '对方余额', width: 110, type: 'number', sumField: true, group: '对账单', align: 'right' },
-  { field: 'self_balance', label: '本方余额', width: 110, type: 'number', sumField: true, group: '对账单', align: 'right' },
+  { field: 'other_balance', label: '对方余额', width: 110, type: 'number', render: 'amount', sumField: true, group: '对账单', align: 'right' },
+  { field: 'self_balance', label: '本方余额', width: 110, type: 'number', render: 'amount', sumField: true, group: '对账单', align: 'right' },
   { field: 'reconcile_diff', label: '对账差异', width: 110, type: 'formula', group: '对账单', align: 'right' },
   { field: 'agreement_no', label: '往来协议编号', width: 120, type: 'text', group: '往来协议' },
   { field: 'agreement_date', label: '签订日期', width: 100, type: 'date', group: '往来协议' },

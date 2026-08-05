@@ -136,14 +136,14 @@
       <el-table-column :label="dis.colLabels.value.item" prop="label" min-width="220" fixed />
       <el-table-column :label="dis.colLabels.value.current" width="130" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="row.rowKey !== 'total' && !isReadonly" :model-value="row.currentAmount" size="small" :controls="false" style="width:100%"
+          <WpAmountInput v-if="row.rowKey !== 'total' && !isReadonly" :model-value="row.currentAmount" size="small"
             @update:model-value="(v: number) => dis.updateField(row.rowKey, 'currentAmount', v ?? 0)" />
           <span v-else>{{ fmt(row.currentAmount) }}</span>
         </template>
       </el-table-column>
       <el-table-column :label="dis.colLabels.value.prior" width="130" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="row.rowKey !== 'total' && !isReadonly" :model-value="row.priorAmount" size="small" :controls="false" style="width:100%"
+          <WpAmountInput v-if="row.rowKey !== 'total' && !isReadonly" :model-value="row.priorAmount" size="small"
             @update:model-value="(v: number) => dis.updateField(row.rowKey, 'priorAmount', v ?? 0)" />
           <span v-else>{{ fmt(row.priorAmount) }}</span>
         </template>
@@ -192,12 +192,10 @@
         <el-table-column label="项目" prop="label" min-width="280" />
         <el-table-column :label="dis.colLabels.value.current" width="130" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.rowKey !== 'total' && !isReadonly"
               :model-value="row.currentAmount"
               size="small"
-              :controls="false"
-              style="width:100%"
               @update:model-value="(v: number) => dis.updateTradingDisposeField(row.rowKey, 'currentAmount', v ?? 0)"
             />
             <span v-else>{{ fmt(row.currentAmount) }}</span>
@@ -205,12 +203,10 @@
         </el-table-column>
         <el-table-column :label="dis.colLabels.value.prior" width="130" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.rowKey !== 'total' && !isReadonly"
               :model-value="row.priorAmount"
               size="small"
-              :controls="false"
-              style="width:100%"
               @update:model-value="(v: number) => dis.updateTradingDisposeField(row.rowKey, 'priorAmount', v ?? 0)"
             />
             <span v-else>{{ fmt(row.priorAmount) }}</span>
@@ -281,6 +277,7 @@ import type { ChecklistResponse } from '../../composables/useF1FormData'
 import { api } from '@/services/apiProxy'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import G11ImportExportDropdown from '../G11ImportExportDropdown.vue'
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 
 const props = defineProps<{
   variant: 'listed' | 'soe'

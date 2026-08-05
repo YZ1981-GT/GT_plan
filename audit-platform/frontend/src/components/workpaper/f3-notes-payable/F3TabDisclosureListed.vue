@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /** F3TabDisclosureListed — 附注披露（上市）| 与附注模块（五、36 应付票据）联动 */
-import { ref, toRef, watch, type Ref } from 'vue'
+import { ref, toRef, watch, inject, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { useF3DisclosureListed } from '../composables/useF3DisclosureListed'
@@ -8,6 +8,9 @@ import { useF3AiGenerate } from '../composables/useF3AiGenerate'
 import { buildF3SyncPayload, F3_NOTE_SECTION } from '../composables/f3NoteSectionMap'
 import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
 import GtIndexChip from '../GtIndexChip.vue'
+import WpAmountInput from '../shared/WpAmountInput.vue'
+import { useDisplayPrefsStore, DisplayPrefs_Key } from '@/stores/displayPrefs'
+const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 
 const props = defineProps<{
   wpId: string
@@ -16,10 +19,6 @@ const props = defineProps<{
   isReadonly: boolean
   applicableStandards: string[]
 }>()
-
-function fmtAmount(v: number): string {
-  return v === 0 ? '-' : v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
 
 const {
   isApplicable, section1Rows, section1Subtotal, section2Rows, section2Subtotal,
@@ -151,12 +150,12 @@ watch([section1Rows, section2Rows, noteText], () => {
           </el-table-column>
           <el-table-column label="期末余额" width="130" align="right">
             <template #default="{ row }">
-              <span :class="{ 'cross-sheet-cell': row.rowId?.startsWith('cs-') }">{{ fmtAmount(row.endAmount) }}</span>
+              <span :class="{ 'cross-sheet-cell': row.rowId?.startsWith('cs-') }">{{ displayPrefs.fmtAmount(row.endAmount) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="上年年末余额" width="130" align="right">
             <template #default="{ row }">
-              <span :class="{ 'cross-sheet-cell': row.rowId?.startsWith('cs-') }">{{ fmtAmount(row.priorAmount) }}</span>
+              <span :class="{ 'cross-sheet-cell': row.rowId?.startsWith('cs-') }">{{ displayPrefs.fmtAmount(row.priorAmount) }}</span>
             </template>
           </el-table-column>
         </el-table>
@@ -177,18 +176,18 @@ watch([section1Rows, section2Rows, noteText], () => {
           </el-table-column>
           <el-table-column label="期末余额" width="130" align="right">
             <template #default="{ row }">
-              <span v-if="row.rowId === '__subtotal__'">{{ fmtAmount(row.endAmount) }}</span>
-              <el-input-number v-else :model-value="row.endAmount" :controls="false" size="small"
-                :disabled="isReadonly" style="width:100%"
-                @change="(v: number) => updateCell(row.rowId, 'endAmount', v ?? 0)" />
+              <span v-if="row.rowId === '__subtotal__'">{{ displayPrefs.fmtAmount(row.endAmount) }}</span>
+              <WpAmountInput v-else :model-value="row.endAmount"
+                :disabled="isReadonly"
+                @update:model-value="(v: number) => updateCell(row.rowId, 'endAmount', v)" />
             </template>
           </el-table-column>
           <el-table-column label="期初余额" width="130" align="right">
             <template #default="{ row }">
-              <span v-if="row.rowId === '__subtotal__'">{{ fmtAmount(row.priorAmount) }}</span>
-              <el-input-number v-else :model-value="row.priorAmount" :controls="false" size="small"
-                :disabled="isReadonly" style="width:100%"
-                @change="(v: number) => updateCell(row.rowId, 'priorAmount', v ?? 0)" />
+              <span v-if="row.rowId === '__subtotal__'">{{ displayPrefs.fmtAmount(row.priorAmount) }}</span>
+              <WpAmountInput v-else :model-value="row.priorAmount"
+                :disabled="isReadonly"
+                @update:model-value="(v: number) => updateCell(row.rowId, 'priorAmount', v)" />
             </template>
           </el-table-column>
           <el-table-column label="操作" width="60">

@@ -52,6 +52,8 @@
         :wp-id="wpIdRef"
         :project-id="projectIdRef"
         :is-readonly="isReadonly"
+        :adjudication-prefill="props.htmlData?.adjudication_prefill"
+        :tb-source-codes="props.htmlData?.project_context?.tb_source_codes"
       />
 
       <!-- F5-2 月度明细 -->

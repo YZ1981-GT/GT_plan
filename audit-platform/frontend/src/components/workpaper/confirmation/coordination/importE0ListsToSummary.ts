@@ -332,7 +332,7 @@ export async function importE0ListsToSummary(
       if (!spec) continue
       // 按 spec.formats 顺序尝试：专属组件格式优先，通用 d-form-table 兜底
       for (const format of spec.formats) {
-        const res = await fetchWorkpaperHtmlRows(projectId, code, format)
+        const res = await fetchWorkpaperHtmlRows(projectId, code, format, spec.sheetName)
         if (!res || !res.rows?.length) continue
         all.push(...buildSummaryRowsFromListRows(res.rows, code))
         break

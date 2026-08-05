@@ -674,6 +674,35 @@ export function useF4Adjudication(options: UseF4AdjudicationOptions) {
     }
   })
 
+  /**
+   * 从四表库带入未审数（按性质桶写入 openingUnadjusted / closingUnadjusted）。
+   *
+   * 🔴 手工优先：该行已有非零值时不覆盖，只补空值行。
+   * 🔴 四表无子科目时 prefill=null → 不做任何写入。
+   */
+  function pullFromTB(prefill: Record<string, { opening: number; closing: number; label: string; codes: string[] }> | null | undefined): { written: number; skipped: number } {
+    if (!prefill || readonly.value) return { written: 0, skipped: 0 }
+    let written = 0
+    let skipped = 0
+    const rows = natureStored.value
+    for (const [bucketKey, bucket] of Object.entries(prefill)) {
+      const row = rows.find((r) => r.rowKey === bucketKey)
+      if (!row) { skipped++; continue }
+      // 手工优先：已有非零值不覆盖
+      if (Math.abs(row.openingUnadjusted) > 0.005 || Math.abs(row.closingUnadjusted) > 0.005) {
+        skipped++
+        continue
+      }
+      row.openingUnadjusted = bucket.opening
+      row.closingUnadjusted = bucket.closing
+      written++
+    }
+    if (written > 0) {
+      persistRows('nature')
+    }
+    return { written, skipped }
+  }
+
   return {
     segments,
     natureDataRows,
@@ -701,6 +730,7 @@ export function useF4Adjudication(options: UseF4AdjudicationOptions) {
     publishAdjudicated,
     serialize,
     deserialize,
+    pullFromTB,
   }
 }
 

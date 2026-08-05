@@ -3,6 +3,16 @@
     <div class="g10-toolbar tab-toolbar">
       <h3 class="g10-title">G10-1 交易性金融负债审定表</h3>
       <div class="g10-actions">
+        <el-tooltip :content="fourTableHint" placement="top">
+          <el-button
+            size="small"
+            :disabled="isReadonly || !hasFourTablePrefill"
+            :loading="seeding"
+            @click="onPullFromFourTable"
+          >
+            从四表库带入未审数
+          </el-button>
+        </el-tooltip>
         <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
           <el-icon><Download /></el-icon>带入调整
         </el-button>
@@ -276,7 +286,7 @@
 
 <script setup lang="ts">
 import { computed, ref, inject } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download } from '@element-plus/icons-vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import GtReviewDot from '../../GtReviewDot.vue'
@@ -287,6 +297,18 @@ import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBring
 import { useG10Adjudication } from '../../composables/useG10Adjudication'
 import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
 import { useAuditContext } from '@/composables/useAuditContext'
+import {
+  G10_SEED_SPEC,
+  buildGSeedCells,
+  normalizeGAdjPrefill,
+} from '../../composables/gCycleAdjudicationSeed'
+import {
+  describeAdjPrefillConflicts,
+  describeAdjPrefillPlan,
+  planAdjudicationPrefill,
+  planHasWork,
+  resolveAdjPrefillWrites,
+} from '../../composables/shared/adjudicationPrefillPlan'
 import {
   confirmNavigateToSheet,
   dispatchProcedureFocus,
@@ -382,6 +404,82 @@ const conclusionProxy = computed({
   get: () => adj.auditConclusion.value,
   set: (v: string) => adj.updateAuditConclusion(v),
 })
+
+// ─── 从四表库带入未审数（2101 期初+期末，默认落「（三）账面余额·按组合」行）──────
+//
+// TB 余额 = 账面余额 = 初始金额 + 累计公允价值变动，四表无法拆分两者。
+
+const seeding = ref(false)
+
+const fourTablePrefill = computed(() =>
+  normalizeGAdjPrefill(props.htmlData?.adjudication_prefill),
+)
+
+const seedResult = computed(() => buildGSeedCells(fourTablePrefill.value, {
+  ...G10_SEED_SPEC,
+  labelOf: (k) => adj.dataRows.value.find((r) => r.rowKey === k)?.label ?? k,
+}))
+
+const hasFourTablePrefill = computed(() => seedResult.value.cells.length > 0)
+
+const fourTableHint = computed(() =>
+  hasFourTablePrefill.value
+    ? '把四表库（tb_balance 交易性金融负债叶子余额）带入对应行的期初/期末未审数；已录入的格不覆盖'
+    : '四表库暂无交易性金融负债科目数据（需先导入余额表）',
+)
+
+function readCurrentCellG10(cell: { rowKey: string; field: string }): number | null {
+  const row = adj.dataRows.value.find((r) => r.rowKey === cell.rowKey)
+  if (!row) return null
+  const v = (row as unknown as Record<string, unknown>)[cell.field]
+  return v == null || v === 0 ? null : Number(v)
+}
+
+async function onPullFromFourTable(): Promise<void> {
+  if (props.isReadonly) return
+  const { cells, unclassified, absentSlots } = seedResult.value
+  if (!cells.length) {
+    ElMessage.info('四表库暂无交易性金融负债科目数据可带入')
+    return
+  }
+  const plan = planAdjudicationPrefill(cells, readCurrentCellG10, { unclassified, absentSlots })
+  if (!planHasWork(plan)) {
+    ElMessage.info(describeAdjPrefillPlan(plan))
+    return
+  }
+
+  let mode: 'fill-blank' | 'overwrite' = 'fill-blank'
+  if (plan.conflicts.length) {
+    try {
+      const action = await ElMessageBox.confirm(
+        `以下 ${plan.conflicts.length} 格已有录入且与四表不一致：\n`
+        + `${describeAdjPrefillConflicts(plan)}\n\n`
+        + '「覆盖」以四表数据替换；「仅补空值」保留已录入数据、只填空白格。',
+        '从四表库带入未审数',
+        {
+          confirmButtonText: '覆盖',
+          cancelButtonText: '仅补空值',
+          distinguishCancelAndClose: true,
+          type: 'warning',
+        },
+      )
+      if (action === 'confirm') mode = 'overwrite'
+    } catch (e) {
+      if (e === 'close') return
+      mode = 'fill-blank'
+    }
+  }
+
+  seeding.value = true
+  try {
+    for (const w of resolveAdjPrefillWrites(plan, mode)) {
+      adj.updateField(w.rowKey, w.field as 'openingUnadjusted' | 'closingUnadjusted', w.amount)
+    }
+    ElMessage.success(describeAdjPrefillPlan(plan))
+  } finally {
+    seeding.value = false
+  }
+}
 
 const chk01Type = computed(() => {
   if (adj.hasTbMissing.value) return 'info'

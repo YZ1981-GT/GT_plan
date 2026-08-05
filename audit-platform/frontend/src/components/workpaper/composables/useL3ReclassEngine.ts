@@ -20,6 +20,8 @@
  * Task: 2.3
  */
 
+import { L3_GROSS_FALLBACK_STANDARD } from './l3AccountScope'
+
 // ─── 类型定义 ────────────────────────────────────────────────
 
 /** 重分类调整分录 */
@@ -95,7 +97,7 @@ export function buildReclassEntry(currentPortion: number): ReclassEntry {
     description: '一年内到期的长期借款重分类',
     debit: {
       account: '长期借款',
-      accountCode: '2501',
+      accountCode: L3_GROSS_FALLBACK_STANDARD,
       amount: absAmount,
     },
     credit: {

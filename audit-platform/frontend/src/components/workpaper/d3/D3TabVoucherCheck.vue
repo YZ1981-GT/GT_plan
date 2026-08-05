@@ -47,6 +47,9 @@
     </div>
   </div>
 
+  <!-- 抽样方法学（来自抽凭引擎回填，底稿正文可见 → 归档与复核可追溯） -->
+  <WpSamplingMethodologyBar :methodology="methodology" />
+
   <!-- 汇总 + 导入导出 -->
   <div class="summary-bar">
     <el-tag type="info">已检查：{{ totalChecked }}</el-tag>
@@ -570,6 +573,9 @@ import GtReviewTrigger from '../GtReviewTrigger.vue'
 import GtVoucherSamplingEngine from '../voucher-sampling/GtVoucherSamplingEngine.vue'
 import PostFillAiReviewDialog, { type PostFillReviewRow } from '../voucher-sampling/PostFillAiReviewDialog.vue'
 import D3VoucherCheckDialog from './D3VoucherCheckDialog.vue'
+import WpSamplingMethodologyBar from '../shared/WpSamplingMethodologyBar.vue'
+import { useSamplingMethodologyPersist } from '../composables/shared/useSamplingMethodologyPersist'
+import type { SamplingMethodologySnapshot } from '../composables/shared/samplingFillTarget'
 
 const props = withDefaults(defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -699,6 +705,17 @@ const samplingSection = ref<'current' | 'postPeriod'>('current')
 /** 抽凭总体年度：优先父级传入，缺省取上一年度 */
 const engineYear = computed(() => props.year ?? (new Date().getFullYear() - 1))
 
+/**
+ * 抽样方法学留痕（R6.3/R6.4）：把 `filled` 载荷里的 methodology 落到固定 item key，
+ * 并在抽凭区把它渲染到底稿正文上 —— 复核与归档看的是底稿，不是后台抽凭日志。
+ */
+const { methodology, persistMethodology } = useSamplingMethodologyPersist({
+  wpCode: 'D3',
+  allResponses: allResponsesRef,
+  persist: (itemId, remark) => props.saveImmediate(itemId, { remark, conclusion: null }),
+  isReadonly: computed(() => props.isReadonly),
+})
+
 /** 打开抽凭弹窗（只读禁用，Req 4.5） */
 function openSampling() {
   if (props.isReadonly) return
@@ -714,8 +731,11 @@ function onSampleFilled(payload: {
   phase: Phase
   fillMode: FillMode
   method?: SamplingMethod
+  methodology?: SamplingMethodologySnapshot
 }) {
   if (props.isReadonly) return
+  // 方法学先落库：即便回填 0 条，"抽过样且方法学如此"也是应留的痕
+  void persistMethodology(payload.methodology)
   const n = fillFromSampling(payload.samples, payload.fillMode, samplingSection.value)
   showSampling.value = false
   if (n > 0) {

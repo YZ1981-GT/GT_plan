@@ -1,5 +1,8 @@
 <template>
   <div class="i6-cutoff-backward">
+  <!-- 抽样方法学（来自抽凭引擎回填，底稿正文可见 → 归档与复核可追溯） -->
+  <WpSamplingMethodologyBar :methodology="methodology" />
+
     <div class="section-header">
       <span class="section-title">I6-6 截止性测试（单据→账簿）</span>
       <div class="section-actions">
@@ -140,6 +143,9 @@ import type { CutoffRow } from '../../composables/useCycleCutoff'
 import type { ExtractedVoucher, FillMode } from '../../composables/useCutoffAutoSampling'
 import { useCutoffMaterialityHint } from '../../composables/useCutoffMaterialityHint'
 import { useI6ImportExport } from '../../composables/useI6ImportExport'
+import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
+import { useSamplingMethodologyPersist, buildChecklistDirectPersist } from '../../composables/shared/useSamplingMethodologyPersist'
+import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'
 
 const GtCutoffAutoSampling = defineAsyncComponent(() => import('../../cutoff/GtCutoffAutoSampling.vue'))
 const GtVoucherSamplingEngine = defineAsyncComponent(() => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'))
@@ -213,7 +219,26 @@ function rowIndex(row: CutoffRow) { return backwardRows.value.indexOf(row) }
 function onUpdate(row: CutoffRow, field: string, value: any) { const idx = rowIndex(row); if (idx >= 0) updateBackwardRow(idx, field, value) }
 function onRemove(row: CutoffRow) { const idx = rowIndex(row); if (idx >= 0) removeBackwardRow(idx) }
 async function handleAutoSampling() { await loadFromAutoSampling('backward') }
+const rawMethodologyPersist = buildChecklistDirectPersist({
+  wpId: computed(() => props.wpId),
+  projectId: computed(() => props.projectId),
+})
+const methodologyDirectPersist = rawMethodologyPersist
+/**
+ * 抽样方法学留痕（R6.3/R6.4）：把 `filled` 载荷里的 methodology 落到固定 item key，
+ * 并在抽凭区渲染到底稿正文 —— 复核与归档看的是底稿，不是后台抽凭日志。
+ */
+const { methodology, persistMethodology } = useSamplingMethodologyPersist({
+  wpCode: 'I6',
+  allResponses: toRef(props, 'allResponses') as never,
+  persist: methodologyDirectPersist,
+  isReadonly: computed(() => props.isReadonly === true),
+})
+
 function handleCutoffFilled(payload: { samples: ExtractedVoucher[]; fillMode: FillMode }) {
+  // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
+  void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
+
   importExtractedVouchers('backward', payload.samples.map((v) => ({
     voucher_date: v.voucherDate, voucher_no: v.voucherNo, summary: v.summary,
     amount: v.debitAmount ? parseFloat(v.debitAmount) : (v.creditAmount ? parseFloat(v.creditAmount) : 0),

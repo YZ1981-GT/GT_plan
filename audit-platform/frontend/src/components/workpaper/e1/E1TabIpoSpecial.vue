@@ -201,6 +201,35 @@ function formatCellValue(row: any, col: ColumnDef): string {
   if (col.type === 'boolean') return val ? '是' : '否'
   return String(val || '')
 }
+
+// ─── AI 辅助（spec: e1-orphan-components-wiring Task 9）─────────────────────
+import { useE1AiGenerate } from '../composables/useE1AiGenerate'
+
+const { generateText, isGenerating } = useE1AiGenerate(toRef(props, 'wpId') as Ref<string>)
+
+async function generateAuditNote(): Promise<void> {
+  if (props.isReadonly) return
+  const text = await generateText({
+    section: 'e1-ipo-audit-note',
+    prompt: '你是注册会计师助理。请撰写 E1 IPO/舞弊应对通用表 的审计说明，概述审计程序执行情况与主要发现。不得虚构。约 100～200 字。',
+    context: { 底稿: 'E1 IPO/舞弊应对通用表', 说明: auditNote.value },
+    existingContent: auditNote.value,
+    confirmTitle: 'AI 生成 · 审计说明',
+  })
+  if (text) saveAuditNote(text)
+}
+
+async function generateAuditConclusion(): Promise<void> {
+  if (props.isReadonly) return
+  const text = await generateText({
+    section: 'e1-ipo-audit-conclusion',
+    prompt: '你是注册会计师助理。请撰写 E1 IPO/舞弊应对通用表 的审计结论，对审计程序结果给出结论性评价。不得虚构。约 60～150 字。',
+    context: { 底稿: 'E1 IPO/舞弊应对通用表', 结论: auditConclusion.value },
+    existingContent: auditConclusion.value,
+    confirmTitle: 'AI 生成 · 审计结论',
+  })
+  if (text) saveAuditConclusion(text)
+}
 </script>
 
 <template>

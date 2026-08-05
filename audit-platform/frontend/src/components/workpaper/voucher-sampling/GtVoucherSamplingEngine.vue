@@ -8,7 +8,7 @@
  * 通用组件：通过 props 配置适配 D2-7/D4-14/D4-15/E2-7 等所有抽凭底稿
  * Requirements: 5.4, 8.3, 9.1, 9.3, 10.1, 10.3, 10.4, 10.5, 12.3
  */
-import { defineAsyncComponent, toRef, computed, ref, watch } from 'vue'
+import { defineAsyncComponent, toRef, computed, ref, onMounted } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { useVoucherSampling } from '../composables/useVoucherSampling'
 import { useSamplingPhase, type ViewMode } from '../composables/useSamplingPhase'
@@ -59,6 +59,11 @@ interface Props {
    * append/replace/merge 的真实前态；不传则视为空前态（向后兼容）。
    */
   existingSamples?: SampledVoucher[]
+  /**
+   * 宿主底稿编码（如 'D2' / 'K8'），用于推断错报推送 A13 时的 source_wp_code 溯源。
+   * 不传时该字段为 null（如实留空，不用科目码或占位文本冒充底稿编码）。
+   */
+  wpCode?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -67,6 +72,7 @@ const props = withDefaults(defineProps<Props>(), {
   initialConfigPatch: undefined,
   configHint: '',
   existingSamples: undefined,
+  wpCode: '',
 })
 
 // ─── Emits ────────────────────────────────────────────────────────────────────
@@ -140,6 +146,15 @@ const {
   inferMisstatement,
   recordActualMisstatement,
   resample,
+  // ─── 抽样框版本 + 评价留痕（R1/R2/R3）───
+  datasetId,
+  loadedFromBatch,
+  conclusionConfirmed,
+  a13PushedAt,
+  persistEvaluation,
+  loadLatestEvaluation,
+  confirmConclusion,
+  pushProjectedToA13,
 } = useVoucherSampling({
   projectId: toRef(props, 'projectId'),
   year: toRef(props, 'year'),
@@ -149,6 +164,7 @@ const {
   defaultMethod: props.defaultMethod,
   initialPeriodRange: props.initialPeriodRange,
   initialConfigPatch: props.initialConfigPatch,
+  wpCode: props.wpCode,
 })
 
 // ─── Composable: useSamplingPhase ─────────────────────────────────────────────
@@ -194,6 +210,19 @@ function handleShowHistory() {
   loadHistory()
 }
 
+/**
+ * 重新打开抽样结果预览（不重抽、不换种子）。
+ *
+ * 用于两种情形：审计师手动关掉了预览；或被结论确认门禁挡回主体确认结论后要回来填充。
+ */
+function handleReopenPreview() {
+  if (sampledVouchers.value.length === 0) {
+    ElMessage.info('本会话尚无抽样结果，请先执行「自动抽凭」')
+    return
+  }
+  previewVisible.value = true
+}
+
 /** 批量标记已核查：标记当前可见行 */
 function handleBatchMarkChecked() {
   const indices: number[] = []
@@ -208,12 +237,32 @@ function handleBatchMarkChecked() {
   }
 }
 
+/**
+ * R18.7 结论确认门禁的**原因文案**（null = 未阻断）。
+ *
+ * 传给预览弹窗让「确认填充」按钮**前置 disabled + tooltip**：审计师在勾选样本时
+ * 就知道还差一步，而不是勾完点下去才被一条看不见的 warning 拦住。
+ * 未做错报推断（无可容忍错报 → `samplingConclusion` 为 null）的简单抽凭不受约束。
+ */
+const confirmBlockedReason = computed<string | null>(() => {
+  if (samplingConclusion.value && !conclusionConfirmed.value) {
+    return '已生成抽样结论建议：请先关闭本预览，在「错报推断与总体结论」区点「确认采用此结论」，再点操作栏的「继续填充」回到本页填入底稿'
+  }
+  return null
+})
+
 /** 确认填充后 emit */
 async function handleConfirmFill() {
-  // R18.7 结论确认门禁：已推断出总体结论但未经审计师确认时，不得定稿回填。
-  // 未做错报推断（无可容忍错报 → samplingConclusion 为 null）的简单抽凭不受此门禁约束。
-  if (samplingConclusion.value && !conclusionConfirmed.value) {
-    ElMessage.warning('已生成抽样结论建议，请先在下方「错报推断与总体结论」区确认结论后再填入底稿')
+  // 双保险：预览弹窗已按 confirmBlockedReason 前置 disabled，这里兜住其它调用路径。
+  // 🔴 命中门控必须**先关闭预览弹窗** —— 它带遮罩，不关则提示指向的
+  // 「错报推断与总体结论」区既看不到也点不到，那条提示就是死信。
+  if (confirmBlockedReason.value) {
+    previewVisible.value = false
+    ElMessage.warning({
+      message: confirmBlockedReason.value,
+      duration: 6000,
+      showClose: true,
+    })
     return
   }
   // 传入父底稿真实前态，供 before_data 快照与 append/replace/merge 基于真实底稿状态
@@ -372,10 +421,13 @@ const populationReconcile = computed(() => {
 
 // ─── 方法学增强：错报推断区（R18）────────────────────────────────────────────
 
-/** 行内录入实际错报金额 → 即时重算推断 */
+/** 行内录入实际错报金额 → 即时重算推断 + 落库（R2.9） */
 function handleActualMisstatementChange(row: SampledVoucher, val: string) {
   const idx = sampledVouchers.value.indexOf(row)
-  if (idx >= 0) recordActualMisstatement(idx, val)
+  if (idx >= 0) {
+    recordActualMisstatement(idx, val)
+    void persistEvaluation()
+  }
 }
 
 /** 手动触发错报推断（若尚未自动计算） */
@@ -387,17 +439,52 @@ function handleInferMisstatement() {
   if (!conclusion) {
     ElMessage.warning('请先在抽样参数中填写可容忍错报')
   }
+  // R2.9：推断结果必须落库，否则关弹窗即丢（destroy-on-close）
+  void persistEvaluation()
 }
 
-/** 结论人工确认标识（R18.7：确认前不定稿） */
-const conclusionConfirmed = ref(false)
-// 任一次错报推断/结论重算（录入实际错报、重新推断、重抽、重新抽样清空）都会使
-// 上一次的人工确认失效，强制审计师对最新结论重新确认后方可定稿。
-watch(samplingConclusion, () => {
-  conclusionConfirmed.value = false
+// R2.7：打开引擎时若本会话尚未抽样，回读最近一条未撤销批次的评价并还原推断区。
+// 失败静默降级（回读是增强，不阻塞打开）；有当前批次样本时不覆盖。
+onMounted(() => {
+  void loadLatestEvaluation()
 })
+
+// ─── 推断错报记入 A13（R3）──────────────────────────────────────────────────
+
+/** 可否推送：结论已确认 且 推断错报 > 0（R3.5） */
+const canPushProjected = computed(() => {
+  if (!misstatementResult.value) return false
+  if (!conclusionConfirmed.value) return false
+  return Number(misstatementResult.value.projected) > 0
+})
+
+/** 不可推送时的原因（tooltip 明示，避免"按钮灰着不知为何"） */
+const pushProjectedDisabledReason = computed(() => {
+  if (!misstatementResult.value) return '尚未推断错报：请先录入样本实际错报并执行推断'
+  if (!conclusionConfirmed.value) return '请先确认抽样结论（未确认的结论不得进入错报汇总）'
+  if (!(Number(misstatementResult.value.projected) > 0)) return '推断错报为 0，无需记入'
+  return ''
+})
+
+async function handlePushProjected() {
+  await pushProjectedToA13()
+}
+
+/** 评价来源批次标注（R2.7）：区分"上一批次的结论"与"刚算出来的结论" */
+const evaluationSourceHint = computed(() => {
+  const b = loadedFromBatch.value
+  if (!b || !b.evaluatedAt) return ''
+  const batch = b.batchId ? b.batchId.slice(0, 8) : '—'
+  return `读自批次 ${batch}（${b.evaluatedAt.slice(0, 19).replace('T', ' ')} 评价）`
+})
+
+// 结论人工确认标识（R18.7：确认前不定稿）已收进 useVoucherSampling 作单一真源 ——
+// 回读既有批次评价时须还原该状态，组件级 ref 随 destroy-on-close 消失。
+// 「结论变化 ⇒ 确认失效」的 watch 也随之移入 composable（带一次性抑制，供回读使用）。
 function handleConfirmConclusion() {
-  conclusionConfirmed.value = true
+  confirmConclusion()
+  // 确认动作本身即是审计判断，须落库（否则重开弹窗又要再确认一遍）
+  void persistEvaluation()
   ElMessage.success('已确认抽样结论')
 }
 
@@ -587,6 +674,21 @@ async function handleResample() {
       <el-button size="small" @click="handleBatchMarkChecked">
         批量标记已核查
       </el-button>
+      <!--
+        重开预览：本会话已抽出样本但预览被关闭时提供回填通路。
+        🔴 没有这个入口，用户一旦关掉预览（或被结论确认门禁挡回来）就只能「重抽」，
+        而重抽会换随机种子与样本集合、打断本批次留痕（2026-08-04 实测）。
+      -->
+      <el-button
+        v-if="sampledVouchers.length > 0 && !previewVisible"
+        size="small"
+        type="success"
+        plain
+        data-testid="reopen-sampling-preview"
+        @click="handleReopenPreview"
+      >
+        继续填充（{{ sampledVouchers.length }} 笔待回填）
+      </el-button>
       <el-button
         size="small"
         type="warning"
@@ -705,6 +807,9 @@ async function handleResample() {
       <template #header>
         <div class="misstatement-header">
           <span class="misstatement-title">错报推断与总体结论</span>
+          <el-tag v-if="evaluationSourceHint" size="small" type="info">
+            {{ evaluationSourceHint }}
+          </el-tag>
           <el-button size="small" type="primary" plain @click="handleInferMisstatement">
             重新推断
           </el-button>
@@ -756,6 +861,34 @@ async function handleResample() {
           </el-button>
           <span class="conclusion-hint">结论建议由系统计算，需经审计师确认后方可作为最终结论</span>
         </div>
+
+        <!-- 推断错报记入未更正错报汇总（R3.5~3.8）：CAS 1251 要求推断错报与
+             事实错报一并汇总后与重要性比较，这是形成审计意见的必要步骤 -->
+        <div class="a13-push-bar">
+          <el-tooltip
+            :disabled="canPushProjected"
+            :content="pushProjectedDisabledReason"
+            placement="top"
+          >
+            <span>
+              <el-button
+                size="small"
+                type="danger"
+                plain
+                :disabled="!canPushProjected"
+                @click="handlePushProjected"
+              >
+                记入未更正错报汇总（推断错报）
+              </el-button>
+            </span>
+          </el-tooltip>
+          <el-tag v-if="a13PushedAt" size="small" type="info">
+            已于 {{ a13PushedAt.slice(0, 19).replace('T', ' ') }} 记入
+          </el-tag>
+          <span class="conclusion-hint">
+            仅推送推断错报（{{ misstatementResult.projected }} 元）；高值层已知错报按事实错报单独记入
+          </span>
+        </div>
         <el-alert
           v-if="!samplingConclusion"
           type="info"
@@ -794,6 +927,7 @@ async function handleResample() {
       :selected-debit-total="selectedDebitTotal"
       :selected-credit-total="selectedCreditTotal"
       :phase="props.phase"
+      :confirm-blocked-reason="confirmBlockedReason"
       @update:fill-mode="(v: FillMode) => fillMode = v"
       @confirm="handleConfirmFill"
       @toggle-select-all="toggleSelectAll"
@@ -902,6 +1036,15 @@ async function handleResample() {
 /* ── 错报推断区 ── */
 .misstatement-card {
   margin-top: 12px;
+}
+
+/* 推断错报记入 A13 操作条 */
+.a13-push-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
 }
 
 .misstatement-header {

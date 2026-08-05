@@ -152,21 +152,29 @@
             </template>
           </el-table-column>
         </el-table-column>
-        <!-- 差异（K 数量 / L 市价 / M 公允价值，②−①，只读派生） -->
-        <el-table-column label="差异（②−①）" align="center">
+        <!--
+          差异（K 数量 / L 市价 / M 公允价值，只读派生）。
+          🔴 表头方向必须与派生方向一致 = **①−②（账面 − 回函）**，源模板 `K5` 表头逐字 `差异③=①-②`。
+             Task 20 已把三个派生函数改成 `booked - reply`，但此处组表头曾遗留旧字面 `差异（②−①）`
+             → 界面「表头说 ②−①、数值却是 ①−②」自相矛盾（浏览器实测抓出，`get_diagnostics`/vitest 全绿）。
+             守卫：`__tests__/g0SourceDefects.spec.ts` Property 27 已加组表头方向断言 + 反向自检。
+        -->
+        <el-table-column label="差异（①−②）" align="center">
           <el-table-column label="差异数量" width="88" align="right">
             <template #default="{ row }">
-              <span class="formula-cell" title="回函数量 − 账面数量">{{ row.qty_diff }}</span>
+              <span class="formula-cell" :title="`账面数量 − 回函数量（${DIFF_DIRECTION_HINT}）`">{{ diffCellText('qty_diff', row.qty_diff) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="差异市价(单价)" width="104" align="right">
             <template #default="{ row }">
-              <span class="formula-cell" title="回函市价 − 账面市价">{{ row.fv_diff }}</span>
+              <span class="formula-cell" :title="`账面市价 − 回函市价（${DIFF_DIRECTION_HINT}）`">{{ diffCellText('fv_diff', row.fv_diff) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="差异公允价值" width="100" align="right">
             <template #default="{ row }">
-              <span class="formula-cell" title="回函公允价值 − 账面余额">{{ row.market_value_diff }}</span>
+              <el-tooltip placement="top" :content="MV_DIFF_TOOLTIP">
+                <span class="formula-cell formula-cell--corrected">{{ diffCellText('market_value_diff', row.market_value_diff) }}</span>
+              </el-tooltip>
             </template>
           </el-table-column>
         </el-table-column>
@@ -268,8 +276,54 @@ import {
 } from '../../composables/useWorkpaperScaffold'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { DisplayPrefs_Key } from '../../composables/displayPrefsKey'
+import {
+  G0_DIFF_DIRECTION_HINT as DIFF_DIRECTION_HINT,
+  g0DefectUiNote,
+} from '../g0SourceDefects'
+import { isDiffAmountColumn } from '../g0DiffSourceManifest'
 
 const GtGridSheet = defineAsyncComponent(() => import('../../GtGridSheet.vue'))
+
+/**
+ * 源模板缺陷提示（Task 20 / Requirement 10.2~10.3）。
+ * 源 `M` 列公式 `=J−G`（回函 − 账面）与表头 `③=①−②` 及同组 K/L 方向相反 → 平台按意图统一为
+ * 账面 − 回函，并在此处显式说明"平台为何与源模板公式不同"，避免被当成漂移。
+ */
+const MV_DIFF_DEFECT_NOTE = g0DefectUiNote('securities-mv-diff-direction')
+const MV_DIFF_TOOLTIP = `账面余额 − 回函公允价值（${DIFF_DIRECTION_HINT}）\n${MV_DIFF_DEFECT_NOTE}`
+
+/**
+ * 金额格式偏好 store。
+ *
+ * 🔴 平台铁律写法 = setup 顶层 `inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()`：
+ *    优先用底稿主入口（`useWorkpaperScaffold` 已 `provide`）注入的**同一个** store 实例，
+ *    无宿主 provide 时才回退自取 —— 这样单位/小数/showZero 偏好与同页其它 tab 恒一致。
+ * 🔴 `useDisplayPrefsStore()` 是 **setup 作用域 composable**，必须在 setup 顶层调用；
+ *    写进函数体内会静默失效（平台已有先例，且四层验证全绿查不出）。
+ */
+const prefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
+
+/**
+ * 派生格显示值（Task 3 / Requirement 3）。
+ *
+ * 🔴 改造前三个差异列一律 `{{ row.xxx }}` 裸渲染 —— 浏览器实测（2026-08-04，项目
+ *    `2aa00f57`）「差异公允价值」显示 `3200` 而非 `3,200.00`，违反平台「金额格式
+ *    单一真源」铁律。而**同表的「差异数量」不能套金额格式**（数量无小数），
+ *    「差异市价(单价)」是金额 → 逐列语义只能由 manifest 的 `kind` 决定，
+ *    组件不再各写一份判定。
+ *
+ * 🔴 金额格式唯一真源 = `displayPrefs` store 成员 `fmt`（千分符 + 2 位小数 +
+ *    单位/showZero 偏好）。**它是 store 成员不是模块级导出** —— 写
+ *    `import { fmtAmount } from '@/stores/displayPrefs'` 会让整页崩成
+ *    「does not provide an export named 'fmtAmount'」且四层验证全绿。
+ */
+function diffCellText(field: string, val: unknown): string {
+  if (val == null || val === '') return ''
+  if (isDiffAmountColumn('securities', field)) return prefs.fmt(val)
+  return String(val)
+}
 
 const props = defineProps<{
   htmlData: any
@@ -385,6 +439,11 @@ function rowClassName({ row }: { row: SecuritiesDiffRow }) {
   border-radius: 2px;
   background: var(--el-fill-color-light);
   cursor: help;
+}
+/* 平台按源模板意图纠正了公式方向的列（源 M 列写反），琥珀下划线以示可追溯 */
+.formula-cell--corrected {
+  border-bottom-color: #e6a23c;
+  background: #fdf6ec;
 }
 .gt-confirmation-diff-securities__tips {
   margin-top: 16px;

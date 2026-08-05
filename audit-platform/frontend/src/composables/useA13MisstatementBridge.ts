@@ -26,6 +26,24 @@ import { createMisstatement } from '@/services/auditPlatformApi'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
+/**
+ * 错报类型（CAS 1251 三分类，与 PG enum `misstatement_type` 逐字对齐）。
+ *
+ * - `factual` 事实错报：已确认的具体错报（既有 ~35 个底稿推送点的语义）
+ * - `judgmental` 判断错报：因会计估计/政策选择差异形成的错报
+ * - `projected` 推断错报：抽样样本错报按抽样口径外推到总体的错报（CAS 1314 输出）
+ *
+ * 改造前本桥把类型硬编码为 `factual`，导致后两值在全库零使用 —— 抽样算出的
+ * 推断错报无法进入错报汇总，「样本错报 → 总体错报 → 与重要性比较」这条准则主线断裂。
+ */
+export type MisstatementTypeValue = 'factual' | 'judgmental' | 'projected'
+
+export const MISSTATEMENT_TYPES: readonly MisstatementTypeValue[] = [
+  'factual',
+  'judgmental',
+  'projected',
+] as const
+
 export interface MisstatementDraft {
   /** 来源底稿编码（溯源，写入 source_wp_code；截断 ≤20 字符对齐 DB 列宽） */
   wpCode: string
@@ -39,6 +57,8 @@ export interface MisstatementDraft {
   amount: number
   /** 原始索引号（保留供测试/后续使用） */
   indexRef: string
+  /** 错报类型（缺省 `factual`，保既有推送点逐字节等价） */
+  misstatementType: MisstatementTypeValue
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -47,6 +67,19 @@ function toNum(v: unknown): number {
   if (v === null || v === undefined || v === '') return 0
   const n = Number(v)
   return Number.isFinite(n) ? n : 0
+}
+
+/**
+ * 错报类型归一：非法/缺失一律回退 `factual`。
+ *
+ * 回退而非透传的理由：透传非法值会让后端 enum 校验拒绝**整批**推送，
+ * 一个字段拼错就把审计师这一批错报全打掉。
+ */
+export function normalizeMisstatementType(v: unknown): MisstatementTypeValue {
+  const s = typeof v === 'string' ? v : ''
+  return (MISSTATEMENT_TYPES as readonly string[]).includes(s)
+    ? (s as MisstatementTypeValue)
+    : 'factual'
 }
 
 /**
@@ -61,6 +94,8 @@ export function normalizeMisstatementPushPayload(payload: any): MisstatementDraf
   const topAccountName = payload.accountName ?? payload.account_name ?? null
   const topSource = String(payload.source ?? '')
   const topAmount = toNum(payload.amount ?? payload.misstatement_amount)
+  // 顶层错报类型（行级优先于顶层；两者皆缺 → factual，等价于改造前行为）
+  const topTypeRaw = payload.misstatementType ?? payload.misstatement_type
 
   // 行集合优先级：items > entries > 扁平单行(payload 自身)
   let rawRows: any[]
@@ -92,6 +127,11 @@ export function normalizeMisstatementPushPayload(payload: any): MisstatementDraf
     const accountName = r.accountName ?? r.affectedAccountName ?? r.account_name ?? topAccountName ?? null
     const wpCode = String(r.wpCode ?? r.wp_code ?? topWpCode ?? '')
 
+    const rowTypeRaw = r.misstatementType ?? r.misstatement_type
+    const misstatementType = normalizeMisstatementType(
+      rowTypeRaw !== undefined && rowTypeRaw !== null ? rowTypeRaw : topTypeRaw,
+    )
+
     drafts.push({
       wpCode,
       description,
@@ -99,6 +139,7 @@ export function normalizeMisstatementPushPayload(payload: any): MisstatementDraf
       accountName: accountName ? String(accountName) : null,
       amount,
       indexRef,
+      misstatementType,
     })
   }
   return drafts
@@ -114,7 +155,9 @@ export function useA13MisstatementBridge(): void {
   const recentHashes = new Map<string, number>()
 
   function draftHash(d: MisstatementDraft): string {
-    return `${d.wpCode}|${d.description}|${d.amount}|${d.accountCode ?? ''}`
+    // 类型入 hash：同金额同描述的事实错报与推断错报是两笔不同性质的错报
+    // （CAS 1251 要求分类汇总），不得互相吞掉。
+    return `${d.wpCode}|${d.description}|${d.amount}|${d.accountCode ?? ''}|${d.misstatementType}`
   }
 
   async function handler(payload: any): Promise<void> {
@@ -147,7 +190,7 @@ export function useA13MisstatementBridge(): void {
           affected_account_code: d.accountCode || null,
           affected_account_name: d.accountName || null,
           misstatement_amount: d.amount,
-          misstatement_type: 'factual',
+          misstatement_type: d.misstatementType,
           source_wp_code: (d.wpCode || '').slice(0, 20) || null,
         })
         ok += 1

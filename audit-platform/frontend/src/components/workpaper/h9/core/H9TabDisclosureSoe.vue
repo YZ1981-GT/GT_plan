@@ -44,7 +44,12 @@
 
     <el-card shadow="never" class="disclosure-card">
       <template #header>
-        <div class="section-title"><span>49、租赁负债</span></div>
+        <div class="section-title">
+          <span>49、租赁负债</span>
+          <el-button v-if="!isReadonly" size="small" @click="promptAddExtra">
+            + 续加扣减项
+          </el-button>
+        </div>
       </template>
 
       <el-table :data="displayRows" border size="small" class="disclosure-table" :row-class-name="rowClass">
@@ -77,8 +82,24 @@
             <span v-else class="formula-cell">{{ fmt(row.beginBalance) }}</span>
           </template>
         </el-table-column>
+        <el-table-column v-if="!isReadonly" label="操作" width="72" align="center">
+          <template #default="{ row }">
+            <!-- 仅续加扣减项可删；固定三行是准则用语（composable 也会拒绝） -->
+            <el-button
+              v-if="row.key === 'extra'"
+              type="danger"
+              size="small"
+              link
+              @click="handleRemoveExtra(row.rowIndex!)"
+            >
+              删
+            </el-button>
+          </template>
+        </el-table-column>
       </el-table>
-      <p class="hint">净额 = 租赁付款额 − 未确认融资费用 − 重分类至一年内到期（公式列）。</p>
+      <p class="hint">
+        净额 = 租赁付款额 − 未确认融资费用 − 重分类至一年内到期 − 续加扣减项（公式列）。
+      </p>
     </el-card>
 
     <WpDisclosureConsistencyPanel :results="consistencyChecks" :project-id="projectId" />
@@ -156,7 +177,7 @@
  * 对齐源模板 A1:F16 + note_template 八、52；同步附注模块
  */
 import { computed, ref, toRef, onBeforeUnmount } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import { api } from '@/services/apiProxy'
@@ -202,7 +223,14 @@ function jumpToNote(target: DisclosureVariant): void {
   router.push(route)
 }
 
-const { state, persist, pullFromSources, updateLine } = useH9SoeDisclosure({
+const {
+  state,
+  persist,
+  pullFromSources,
+  updateLine,
+  addExtraDeduction,
+  removeExtraDeduction,
+} = useH9SoeDisclosure({
   allResponses: toRef(props, 'allResponses'),
   onSave: (id, v) => { emit('save', id, v); autoSync.scheduleAutoSync(syncToNotes) },
 })
@@ -241,6 +269,37 @@ function fmt(n: number | null | undefined): string {
 
 function rowClass({ row }: { row: H9SoeDisplayRow }) {
   return row.kind === 'net' ? 'row-calc' : ''
+}
+
+/**
+ * 续加扣减项 —— 对应源模板 `A11` 的 `……` 可续行。
+ *
+ * 固定三行（租赁付款额 / 减：未确认的融资费用 / 重分类至一年内到期）是准则用语，
+ * 不可增删改名；本按钮只在其后追加。
+ */
+async function promptAddExtra(): Promise<void> {
+  let name = ''
+  try {
+    const { value } = await ElMessageBox.prompt('请输入扣减项名称', '续加扣减项', {
+      confirmButtonText: '创建',
+      cancelButtonText: '取消',
+      inputPlaceholder: '如：减：售后回租扣减',
+      inputValidator: (v: string) => (v && v.trim() ? true : '名称不能为空'),
+    })
+    name = String(value ?? '').trim()
+  } catch {
+    return
+  }
+  const res = addExtraDeduction(name)
+  if (res.ok) ElMessage.success(res.message)
+  else ElMessage.warning(res.message)
+}
+
+/** 删除续加扣减项（固定行会被 composable 拒绝） */
+function handleRemoveExtra(index: number): void {
+  const res = removeExtraDeduction(index)
+  if (res.ok) ElMessage.success(res.message)
+  else ElMessage.warning(res.message)
 }
 
 function handlePull() {

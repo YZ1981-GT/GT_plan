@@ -160,13 +160,24 @@ export const ALTERNATIVE_BLOCK_MANIFEST: Record<AltCycleSheet, BlockSpec[]> = {
   // 【改造前现状】block1=持仓证明 / block2=股利 / block3=处置 / block4=公允价值
   // 【改造后目标】block1=①初始投资协议 / block2=②本期发生额(借贷拆表) / block3=③期后出售赎回 / block4=源外增强
   G06: [
-    { block: 'block1', title: '①初始投资协议检查', columns: ['voucher_amount', 'investment_amount'] },
+    // 🔴 2026-08-04 对齐源模板：区块①源 A10:E10 只有 5 列且**无记账凭证列** →
+    //    `voucher_amount` 不再是本区块的合计列，唯一合计列是 C10「投资金额」。
+    //    Property 10 拿 `getSumFields()` 与本表逐数组比对，改 configs 必须同步改这里。
+    { block: 'block1', title: '①初始投资协议检查', columns: ['investment_amount'] },
     {
       block: 'block2', title: '②本期发生额检查',
-      columns: ['voucher_amount', 'trade_amount'],
+      // 源 A17:N18 = 记账凭证{日期|凭证编号|业务内容|对方科目|**金额**} + 支持性文件1/2
+      // 各 3 列（识别特征/信息1/信息2，均非金额） → 唯一合计列是记账凭证的金额。
+      // `trade_amount` 是旧实现自造列，已移出渲染并登记进 G06_SOURCE_EXTRA。
+      columns: ['voucher_amount'],
       splitByDirection: true, // 源模板 G0-6 第②区块为借方/贷方两张表
     },
-    { block: 'block3', title: '③期后出售/赎回检查', columns: ['voucher_amount', 'disposal_amount', 'trade_amount'] },
+    // 源 A33:N34 补齐两组证据后新增两个金额列（`deal_amount` 投资协议/交易确认单/交割单·金额、
+    // `bank_slip_amount` 银行回单·金额）；顺序 = 列声明顺序（Property 10 用 toEqual 比数组）。
+    {
+      block: 'block3', title: '③期后出售/赎回检查',
+      columns: ['voucher_amount', 'deal_amount', 'bank_slip_amount', 'disposal_amount', 'trade_amount'],
+    },
     {
       block: 'block4', title: '④源外增强（公允价值/持仓/股利）',
       columns: ['voucher_amount', 'market_value', 'dividend_receivable', 'trade_amount'],

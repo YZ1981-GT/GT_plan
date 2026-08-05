@@ -1,5 +1,8 @@
 <template>
   <div class="h2-tab-addition-check">
+  <!-- 抽样方法学（来自抽凭引擎回填，底稿正文可见 → 归档与复核可追溯） -->
+  <WpSamplingMethodologyBar :methodology="methodology" />
+
     <!-- 审计目标 -->
     <el-alert type="info" :closable="false" class="objective-alert"
       title="审计目标：针对本期在建工程增加实施细节测试——（1）存在/发生：增加真实且工程存在；（2）准确性与计价：金额与合同/进度/发票相符，资本化范围恰当；（3）截止：记入正确期间；（4）权利与义务：合同权利义务归属于被审计单位。总体与 H2-2 勾稽，关联方→H2-17，调整→H2-3。" />
@@ -368,6 +371,9 @@ import { useH2AdditionCheck, isEvidenceApplicable, type H2AdditionRow, type H2Ad
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
+import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
+import { useSamplingMethodologyPersist, buildChecklistDirectPersist } from '../../composables/shared/useSamplingMethodologyPersist'
+import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'
 
 const props = defineProps<{
   wpId: string
@@ -417,7 +423,26 @@ function handleSampling() {
 }
 
 /** 抽凭引擎完成后回调：将样本行填入检查表 */
+const rawMethodologyPersist = buildChecklistDirectPersist({
+  wpId: computed(() => props.wpId),
+  projectId: computed(() => props.projectId),
+})
+const methodologyDirectPersist = rawMethodologyPersist
+/**
+ * 抽样方法学留痕（R6.3/R6.4）：把 `filled` 载荷里的 methodology 落到固定 item key，
+ * 并在抽凭区渲染到底稿正文 —— 复核与归档看的是底稿，不是后台抽凭日志。
+ */
+const { methodology, persistMethodology } = useSamplingMethodologyPersist({
+  wpCode: 'H2',
+  allResponses: toRef(props, 'allResponses') as never,
+  persist: methodologyDirectPersist,
+  isReadonly: computed(() => props.isReadonly === true),
+})
+
 function onSampleFilled(payload: any) {
+  // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
+  void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
+
   showSamplingDialog.value = false
   // 引擎 emit('filled', { samples, phase, fillMode, ... })；兼容旧数组形态
   const samples: any[] = Array.isArray(payload) ? payload : (payload?.samples ?? [])

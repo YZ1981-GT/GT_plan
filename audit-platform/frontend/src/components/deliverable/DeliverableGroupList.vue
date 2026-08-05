@@ -29,11 +29,27 @@
             <span class="deliverable-ver">v{{ row.version_no }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="status" label="状态" width="100" align="center">
+        <el-table-column prop="status" label="状态" width="150" align="center">
           <template #default="{ row }">
             <el-tag :type="statusTag(row.status)" size="small" effect="light" round>
               {{ statusLabel(row.status) }}
             </el-tag>
+            <!--
+              需求 10.3：报表数字与按试算表重算不一致时列表行即可见。
+              🔴 判定用后端下发的 `drift_blocked`（should_block_confirm 唯一入口），
+              不在前端写 `if (row.drift_report)` —— `{"diffs": []}` 是非空对象但
+              表示已比对且一致，那样写会让配了映射的报表常亮一条空告警。
+            -->
+            <el-tooltip
+              v-if="row.drift_blocked"
+              :content="row.drift_reason || '报表数字与按试算表重算的结果不一致，本版本不可确认'"
+              placement="top"
+              :show-after="200"
+            >
+              <el-tag size="small" type="danger" effect="light" round class="deliverable-drift-tag">
+                数字待核
+              </el-tag>
+            </el-tooltip>
           </template>
         </el-table-column>
         <el-table-column prop="exporter_name" label="导出者" width="110">
@@ -75,6 +91,10 @@
                     <el-dropdown-item command="versions">
                       <el-icon><Connection /></el-icon>版本链
                     </el-dropdown-item>
+                    <!-- 需求 11.5：每行提供溯源入口（不必先打开在线编辑器） -->
+                    <el-dropdown-item command="trace">
+                      <el-icon><Share /></el-icon>数据溯源
+                    </el-dropdown-item>
                     <el-dropdown-item v-if="docType === 'audit_report'" command="guidance">
                       <el-icon><Reading /></el-icon>下载编制参考版
                     </el-dropdown-item>
@@ -103,6 +123,7 @@ import {
   Document,
   Folder,
   Reading,
+  Share,
 } from '@element-plus/icons-vue'
 import type { DeliverableItem } from '@/services/deliverableApi'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
@@ -133,11 +154,13 @@ const emit = defineEmits<{
   edit: [item: DeliverableItem]
   select: [item: DeliverableItem]
   delete: [item: DeliverableItem]
+  trace: [item: DeliverableItem]
 }>()
 
 function onCommand(cmd: string, row: DeliverableItem) {
   if (cmd === 'versions') emit('toggle-versions', row.task_id)
   else if (cmd === 'guidance') emit('download-guidance', row)
+  else if (cmd === 'trace') emit('trace', row)
   else if (cmd === 'delete') emit('delete', row)
 }
 
@@ -269,6 +292,10 @@ function formatSize(size: number | null) {
 }
 .deliverable-actions__more {
   padding-left: 4px;
+}
+.deliverable-drift-tag {
+  margin-left: 4px;
+  cursor: help;
 }
 .deliverable-actions__danger {
   display: inline-flex;

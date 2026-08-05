@@ -19,6 +19,7 @@ import { computed, ref, type ComputedRef } from 'vue'
 import { eventBus } from '@/utils/eventBus'
 import { calcSubtotal } from './useL8FormulaEngine'
 import type { useL8FormData } from './useL8FormData'
+import { L8_GROSS_FALLBACK_STANDARD } from './l8AccountScope'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -232,7 +233,7 @@ export function useL8Adjustment(formData: ReturnType<typeof useL8FormData>) {
     // EventBus publish（双向同步L8-1 + 通知A13）
     eventBus.emit('adjustment:created', {
       wpCode: 'L8',
-      accountCode: '6603',
+      accountCode: L8_GROSS_FALLBACK_STANDARD,
       ajeNet: ajeNet6603.value,
       rjeNet: rjeNet6603.value,
       timestamp: Date.now(),

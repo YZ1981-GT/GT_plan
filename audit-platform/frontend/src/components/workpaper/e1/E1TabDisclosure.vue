@@ -115,6 +115,22 @@ const applicableStandards = useHostApplicableStandards({
   explicit: () => props.applicableStandards,
   htmlData: () => props.htmlData,
 })
+
+/**
+ * 变体适用性门控（Property 14/15）：
+ * - 准则列表含本变体前缀 → 适用，渲染录入区
+ * - 不含 → 不适用，渲染提示页，三个同步入口全部不写入
+ * - 空数组 → fail-open 放行（解析不出不误杀）
+ * 只判 entity 维度（listed*/soe*），scope 差异（standalone/consolidated）不触发
+ * @spec e1-orphan-components-wiring — Task 10
+ */
+const variantApplicable = computed<boolean>(() => {
+  const list = applicableStandards.value
+  if (!list || !list.length) return true // fail-open
+  const prefix = (props.variant || 'listed') === 'listed' ? 'listed' : 'soe'
+  return list.some((s: string) => String(s).toLowerCase().startsWith(prefix))
+})
+
 const { generateText, isGenerating } = useE1AiGenerate(toRef(props, 'wpId') as Ref<string>)
 const router = useRouter()
 // 审计年度（单一真源 projectStore），用于同步到附注时定位正确年度的附注记录，
@@ -997,6 +1013,7 @@ const isSyncing = ref(false)
  * 失败静默：外币段是附加推送，不能让它的失败盖掉主章节「已同步」的提示。
  */
 async function syncFxSectionToNote(year: number | undefined): Promise<void> {
+  if (!variantApplicable.value) return // 门控
   const fxPayload = buildE1FxSyncPayload(variant.value, props.wpId || '', applicableStandards.value, {
     fxRows: foreignCurrencyRows.value.map((r) => ({
       groupId: r.groupId,
@@ -1037,6 +1054,7 @@ async function syncFxSectionToNote(year: number | undefined): Promise<void> {
 }
 
 async function syncToDisclosureNotes(): Promise<void> {
+  if (!variantApplicable.value) return // 门控：不适用时不写入
   if (isSyncing.value || !props.projectId || props.isReadonly) return
   isSyncing.value = true
   try {
@@ -1118,6 +1136,7 @@ async function syncToDisclosureNotes(): Promise<void> {
  * （空推送会把段恢复成模板骨架，等于清掉审计师手填内容）。失败静默不盖主提示。
  */
 async function syncRestrictedAssetsToNote(year: number | undefined): Promise<void> {
+  if (!variantApplicable.value) return // 门控
   const payloads = buildRestrictedAssetsPayloads(
     variant.value,
     props.wpId || '',
@@ -1193,6 +1212,19 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="e1-tab-disclosure">
+    <!-- 变体适用性门控：不适用时显示提示页，不渲染录入区 -->
+    <template v-if="!variantApplicable">
+      <el-result icon="info" title="当前项目不适用此附注披露">
+        <template #sub-title>
+          <p>{{ variant === 'listed' ? '当前项目不适用上市公司附注披露' : '当前项目不适用国企附注披露' }}</p>
+          <p style="color: var(--el-text-color-secondary); font-size: 12px;">
+            项目适用准则：{{ applicableStandards?.length ? applicableStandards.join(', ') : '未配置' }}
+          </p>
+        </template>
+      </el-result>
+    </template>
+
+    <template v-else>
     <!-- 编制提示 -->
     <details class="guidance-details">
       <summary>📋 编制提示</summary>
@@ -1572,6 +1604,7 @@ onBeforeUnmount(() => {
       </el-card>
 
       <!-- 审计结论卡片下方无更多内容 -->
+    </template>
   </div>
 </template>
 

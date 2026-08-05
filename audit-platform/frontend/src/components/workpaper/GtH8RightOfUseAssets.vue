@@ -76,23 +76,24 @@
         />
 
         <!-- H8-1 审定表（四区块：原值/折旧/减值/净额 + H8-3 账项回写） -->
-        <HiFourTableSourcePanel
-          v-if="props.htmlData?.hi_extraction_enabled"
-          :wp-code="'H8'"
-          :segments="getHiExtractionSegments('H8')"
-          :all-responses="allResponses"
-          :is-readonly="isReadonly"
-          @refresh-complete="selfLoad()"
-        />
-        <H8TabAdjudication
-          v-else-if="currentSheet === 'H8-1'"
-          @save="persistResponse"
-          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
-          :wp-id="props.wpId"
-          :project-id="props.projectId"
-          :all-responses="allResponses"
-          :is-readonly="isReadonly"
-        />
+        <template v-else-if="currentSheet === 'H8-1'">
+          <HiFourTableSourcePanel
+            v-if="props.htmlData?.hi_extraction_enabled"
+            :wp-code="'H8'"
+            :segments="getHiExtractionSegments('H8')"
+            :all-responses="allResponses"
+            :is-readonly="isReadonly"
+            @refresh-complete="selfLoad()"
+          />
+          <H8TabAdjudication
+            @save="persistResponse"
+            @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
+            :wp-id="props.wpId"
+            :project-id="props.projectId"
+            :all-responses="allResponses"
+            :is-readonly="isReadonly"
+          />
+        </template>
 
         <!-- 附注披露信息（上市公司） -->
         <H8TabDisclosureListed

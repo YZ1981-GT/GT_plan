@@ -1,5 +1,8 @@
 <template>
 <div class="d6-tab-inspection">
+  <!-- 抽样方法学（来自抽凭引擎回填，底稿正文可见 → 归档与复核可追溯） -->
+  <WpSamplingMethodologyBar :methodology="methodology" />
+
   <!-- 编制提示 -->
   <details class="guidance-details">
     <summary>📋 编制提示</summary>
@@ -401,6 +404,10 @@ import type { ChecklistResponse } from '../composables/useD6FormData'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
 import GtIndexChip from '../GtIndexChip.vue'
 import GtVoucherSamplingEngine from '../voucher-sampling/GtVoucherSamplingEngine.vue'
+import WpSamplingMethodologyBar from '../shared/WpSamplingMethodologyBar.vue'
+import { useSamplingMethodologyPersist } from '../composables/shared/useSamplingMethodologyPersist'
+import type { SamplingMethodologySnapshot } from '../composables/shared/samplingFillTarget'
+import { partyNameForColumn } from '../composables/shared/samplingPartyTarget'
 
 const props = defineProps<{
   wpId: string
@@ -456,7 +463,21 @@ const sampleCount = computed(() => block1Rows.value.length + block2Rows.value.le
 const samplingYear = computed(() => props.year || new Date().getFullYear())
 const showSamplingDialog = ref(false)
 
+/**
+ * 抽样方法学留痕（R6.3/R6.4）：把 `filled` 载荷里的 methodology 落到固定 item key，
+ * 并在抽凭区渲染到底稿正文 —— 复核与归档看的是底稿，不是后台抽凭日志。
+ */
+const { methodology, persistMethodology } = useSamplingMethodologyPersist({
+  wpCode: 'D6',
+  allResponses: allResponsesRef,
+  persist: (itemId, remark) => props.saveImmediate(itemId, { remark, conclusion: null }),
+  isReadonly: computed(() => props.isReadonly),
+})
+
 function onSampleFilled(payload: any) {
+  // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
+  void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
+
   const samples: any[] = payload?.samples || []
   if (samples.length === 0) return
   const existingNos = new Set(block1Rows.value.map(r => r.voucherNo).filter(Boolean))
@@ -464,11 +485,17 @@ function onSampleFilled(payload: any) {
     .filter((s: any) => s.voucherNo && !existingNos.has(s.voucherNo))
     .map((s: any) => ({
       rowId: `row-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`,
-      customerName: s.counterpartAccount || '',
+      // 🔴 客户名称必须走语义门控取辅助明细账里的往来单位。
+      // 改造前这里写的是 `s.counterpartAccount`（**对方科目编码**）——「1122.01」
+      // 这类科目码被当成客户名填进「客户名称」列，是错列而不只是缺值。
+      // 门控在「未命中 / 一键多名 / 维度不适格（如职员）」时返回空串 ⇒ 留空由
+      // 审计师填，绝不猜。
+      customerName: partyNameForColumn(s, 'customer'),
       date: s.voucherDate || '',
       voucherNo: s.voucherNo || '',
       businessContent: s.summary || '',
-      counterAccount: '',
+      // 对方科目回归它本来的列（此前被错填进客户名，这一列反而空着）
+      counterAccount: s.counterpartAccount || '',
       counterDetail: '',
       debitAmount: s.debitAmount || 0,
       creditAmount: s.creditAmount || 0,

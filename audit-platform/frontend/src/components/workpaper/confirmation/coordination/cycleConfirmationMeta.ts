@@ -5,6 +5,10 @@
  * 须按 wpCode 前缀解析 sheet 名，避免文案写死 D0-*。
  */
 
+// 🔴 G0 的 sheet 定位/展示真源在 G0 专属目录（源模板 10 张 tab 名逐字固化 + 三处索引号笔误说明）。
+//    反向只有 `import type`（被编译期擦除）→ 无运行时循环依赖。
+import { G0_CONFIRMATION_SHEETS } from '../../g0-confirmation/g0SheetRegistry'
+
 export type ConfirmationCycle =
   | 'D0'
   | 'E0'
@@ -14,6 +18,37 @@ export type ConfirmationCycle =
   | 'K0'
   | 'L0'
 
+/**
+ * 单张函证 sheet 的「定位值 / 展示值」分离声明（H10 范式；裁决门 B，2026-08-04 用户裁决）。
+ *
+ * spec: g0-confirmation-source-alignment，Requirement 6.1~6.4
+ */
+export interface ConfirmationSheetRef {
+  /**
+   * 定位真源：源模板真实 tab 名（逐字，含全/半角括号与索引号笔误）。
+   * 本循环无此表时为 null。**一切 sheet 请求 / `?sheet=` 深链只许用它。**
+   */
+  sheetName: string | null
+  /** 展示真源：底稿目录索引号（tab 名笔误已按目录裁决修正）。一切 UI 展示只许用它。 */
+  indexLabel: string
+  /** tab 名索引号与底稿目录不一致时的说明（tooltip 用；SHALL NOT 静默改写，见 R6.3） */
+  indexTypoNote?: string
+}
+
+/** `CycleConfirmationMeta.sheets` 的槽位集合（与既有 `*Code` 字段一一对应） */
+export type ConfirmationSheetSlot =
+  | 'program'
+  | 'summary'
+  | 'entityVerify'
+  | 'followup'
+  | 'diff'
+  | 'diffSecurities'
+  | 'diffChecklist'
+  | 'altPrimary'
+  | 'altSecondary'
+  | 'reliability'
+  | 'fraud'
+
 export interface CycleConfirmationMeta {
   cycle: ConfirmationCycle
   /** 汇总表，如 F0-1 */
@@ -22,7 +57,7 @@ export interface CycleConfirmationMeta {
   diffCode: string | null
   /** 差异检查表（D0/F0/K0 有 4b；其余可能无） */
   diffChecklistCode: string | null
-  /** 差异证券专表（仅 G0-3S；其余 null） */
+  /** 差异证券专表（仅 G0 有；展示值取底稿目录索引号 G0-4，其余 null） */
   diffSecuritiesCode: string | null
   /** 替代程序主表（部分循环仅一张；E0 货币资金无替代程序 → null） */
   altPrimaryCode: string | null
@@ -36,9 +71,21 @@ export interface CycleConfirmationMeta {
   entityVerifyCode: string
   /** 跟函 */
   followupCode: string
+  /**
+   * 逐 sheet 的「定位值 / 展示值」分离声明（R6.1）。**加法式新增，既有 `*Code` 字段一个不删。**
+   *
+   * - G0 引用 `g0SheetRegistry`（源模板 tab 名真源，含三处索引号笔误说明）
+   * - 其余六循环由既有 `*Code` 字段**派生**（`deriveSheetsFromCodes`）—— 它们没有 tab 名
+   *   真源，故 `sheetName` 取既有 code 而**不编造中文 tab 名**，`indexLabel` 与 code 相同
+   *   → 六枢纽的展示与跳转行为逐字不变（R11.1 零回归支点）。
+   */
+  sheets: Record<ConfirmationSheetSlot, ConfirmationSheetRef | null>
 }
 
-const CYCLE_SHEETS: Record<ConfirmationCycle, Omit<CycleConfirmationMeta, 'cycle'>> = {
+/** 既有编码字段（不含派生出来的 `sheets`），`CYCLE_SHEETS` 的声明形态 */
+type CycleConfirmationCodes = Omit<CycleConfirmationMeta, 'cycle' | 'sheets'>
+
+const CYCLE_SHEETS: Record<ConfirmationCycle, CycleConfirmationCodes> = {
   D0: {
     summaryCode: 'D0-1',
     entityVerifyCode: 'D0-2',
@@ -62,7 +109,7 @@ const CYCLE_SHEETS: Record<ConfirmationCycle, Omit<CycleConfirmationMeta, 'cycle
     diffSecuritiesCode: null,
     altPrimaryCode: null, // E0 无替代程序 sheet（发函记录 E0-3~6 为 d-form 直接编制，非替代确认）
     altSecondaryCode: null,
-    reliabilityCode: null, // E0 无回函可靠性验证 sheet
+    reliabilityCode: null, // 源模板有「邮件传真回函核对记录F1-12」，但为 hidden sheet 且 override 置 skip，故不启用
     fraudCode: 'E0-8',
   },
   F0: {
@@ -81,9 +128,12 @@ const CYCLE_SHEETS: Record<ConfirmationCycle, Omit<CycleConfirmationMeta, 'cycle
     summaryCode: 'G0-1',
     entityVerifyCode: 'G0-2',
     followupCode: 'G0-3',
-    diffCode: 'G0-4',
+    // 🔴 展示值 = 底稿目录 F4:F12 索引号（索引号唯一裁决者），不是 tab 名里的索引号：
+    //    非证券差异表 tab 写 G0-4 而目录为 G0-5；证券差异表 tab 写 G0-3 而目录为 G0-4。
+    //    定位一律走 sheets.diff / sheets.diffSecurities 的 sheetName（真实 tab 名）。
+    diffCode: 'G0-5',
     diffChecklistCode: null,
-    diffSecuritiesCode: 'G0-3S', // 证券差异专表（G0 特有）
+    diffSecuritiesCode: 'G0-4', // 证券差异专表（G0 特有）；旧值 'G0-3S' 是不存在的底稿
     altPrimaryCode: 'G0-6',
     altSecondaryCode: null,
     reliabilityCode: 'G0-7',
@@ -138,9 +188,64 @@ export function resolveConfirmationCycle(wpCode?: string | null): ConfirmationCy
   return 'D0'
 }
 
+/**
+ * 槽位 → 既有编码字段名（`sheets` 与 `*Code` 的唯一对应表）。
+ * `program` 不在此表：既有字段里没有程序表 code，按循环前缀派生 `{cycle}A`。
+ */
+const SLOT_CODE_FIELD: Readonly<
+  Record<Exclude<ConfirmationSheetSlot, 'program'>, keyof CycleConfirmationCodes>
+> = Object.freeze({
+    summary: 'summaryCode',
+    entityVerify: 'entityVerifyCode',
+    followup: 'followupCode',
+    diff: 'diffCode',
+    diffSecurities: 'diffSecuritiesCode',
+    diffChecklist: 'diffChecklistCode',
+    altPrimary: 'altPrimaryCode',
+    altSecondary: 'altSecondaryCode',
+    reliability: 'reliabilityCode',
+    fraud: 'fraudCode',
+  })
+
+/**
+ * 由既有 `*Code` 字段派生 `sheets`（D0/E0/F0/H0/K0/L0 走这条路）。
+ *
+ * 🔴 这些循环**没有 tab 名真源** → `sheetName` 取既有 code（与 `indexLabel` 相同），
+ * 绝不编造中文 tab 名。由此 `isSameWorkbookNavTarget()` 对它们恒为 false，
+ * 跳转仍走既有 `navigate`（按 wp_code 解析），行为逐字不变。
+ *
+ * `program`（程序表）在既有字段里没有对应 code，按循环前缀派生 `{cycle}A`（D0A/F0A/…）。
+ */
+function deriveSheetsFromCodes(
+  cycle: ConfirmationCycle,
+  codes: CycleConfirmationCodes,
+): Record<ConfirmationSheetSlot, ConfirmationSheetRef | null> {
+  const programCode = `${cycle}A`
+  const out = {
+    program: { sheetName: programCode, indexLabel: programCode },
+  } as Record<ConfirmationSheetSlot, ConfirmationSheetRef | null>
+  for (const slot of Object.keys(SLOT_CODE_FIELD) as Array<
+    Exclude<ConfirmationSheetSlot, 'program'>
+  >) {
+    const raw = codes[SLOT_CODE_FIELD[slot]] as string | null | undefined
+    out[slot] = raw ? { sheetName: raw, indexLabel: raw } : null
+  }
+  return out
+}
+
+function resolveCycleSheets(
+  cycle: ConfirmationCycle,
+  codes: CycleConfirmationCodes,
+): Record<ConfirmationSheetSlot, ConfirmationSheetRef | null> {
+  // G0 有源模板 tab 名真源（10 张 sheet 逐字固化）→ 用注册表；其余六循环派生。
+  if (cycle === 'G0') return G0_CONFIRMATION_SHEETS
+  return deriveSheetsFromCodes(cycle, codes)
+}
+
 export function getCycleConfirmationMeta(wpCode?: string | null): CycleConfirmationMeta {
   const cycle = resolveConfirmationCycle(wpCode)
-  return { cycle, ...CYCLE_SHEETS[cycle] }
+  const codes = CYCLE_SHEETS[cycle]
+  return { cycle, ...codes, sheets: resolveCycleSheets(cycle, codes) }
 }
 
 /** 替代程序标签（主表/次表拼接；无替代程序 sheet 时返回 null，如 E0） */
@@ -174,31 +279,81 @@ export function buildCrossRefRules(wpCode?: string | null) {
   return rules
 }
 
-/** CrossWorkpaperNav 导航项（按循环；null sheet 自动跳过，不生成跳错的入口） */
-export function buildCrossWorkpaperNavDefs(wpCode?: string | null) {
+/** 跨表导航项（`sheetName` 为定位值、`label` 为展示值、`tooltip` 含笔误说明） */
+export interface CrossWorkpaperNavDef {
+  /** 跨工作簿跳转用的底稿编码（= 展示索引号；组合替代程序为 `X0-5/X0-6` 形态） */
+  wpCode: string
+  /** 展示值（底稿目录索引号） */
+  label: string
+  /** 悬停提示；有 `indexTypoNote` 时追加源模板笔误说明 */
+  tooltip: string
+  /**
+   * 同工作簿定位值（源模板真实 tab 名）。为 null 表示本槽没有 tab 名真源
+   * （六枢纽的派生值与 `wpCode` 相同、组合替代程序无单一 sheet）→ 回退按 `wpCode` 跳转。
+   */
+  sheetName: string | null
+}
+
+/**
+ * 判「该导航目标是否在同一工作簿内」。
+ *
+ * 判据 = 该槽有**真实 tab 名真源**且与展示编码不同。G0 是单 `wp_code` 多 sheet 工作簿，
+ * 其 10 个 sheetName 都是中文 tab 名 → 恒为 true → 走 `?sheet=` 深链；
+ * D0/E0/F0/H0/K0/L0 的 sheetName 由 code 派生（与 wpCode 相同）→ 恒为 false → 走既有
+ * `navigate`（按 wp_code 解析），**行为逐字不变**（R11.1）。
+ */
+export function isSameWorkbookNavTarget(def: CrossWorkpaperNavDef): boolean {
+  return !!def.sheetName && def.sheetName !== def.wpCode
+}
+
+/** CrossWorkpaperNav 导航项（按循环；槽位本身不存在（meta 为 null）时才跳过，不生成跳错的入口） */
+export function buildCrossWorkpaperNavDefs(wpCode?: string | null): CrossWorkpaperNavDef[] {
   const m = getCycleConfirmationMeta(wpCode)
   const altLabel = altProcedureLabel(m)
-  const items: Array<{ wpCode: string; label: string; tooltip: string }> = [
-    { wpCode: m.entityVerifyCode, label: m.entityVerifyCode, tooltip: '核实被函证单位' },
-    { wpCode: m.summaryCode, label: m.summaryCode, tooltip: '函证汇总表' },
-    { wpCode: m.followupCode, label: m.followupCode, tooltip: '跟函过程控制' },
+  const sheetNameOf = (slot: ConfirmationSheetSlot): string | null =>
+    m.sheets[slot]?.sheetName ?? null
+  const tooltipOf = (slot: ConfirmationSheetSlot, base: string): string => {
+    const note = m.sheets[slot]?.indexTypoNote
+    return note ? `${base}（${note}）` : base
+  }
+  const item = (
+    slot: ConfirmationSheetSlot,
+    code: string,
+    base: string,
+  ): CrossWorkpaperNavDef => ({
+    wpCode: code,
+    label: code,
+    tooltip: tooltipOf(slot, base),
+    sheetName: sheetNameOf(slot),
+  })
+
+  const items: CrossWorkpaperNavDef[] = [
+    item('entityVerify', m.entityVerifyCode, '核实被函证单位'),
+    item('summary', m.summaryCode, '函证汇总表'),
+    item('followup', m.followupCode, '跟函过程控制'),
   ]
   if (m.reliabilityCode) {
-    items.push({ wpCode: m.reliabilityCode, label: m.reliabilityCode, tooltip: '回函可靠性验证' })
+    items.push(item('reliability', m.reliabilityCode, '回函可靠性验证'))
   }
   if (m.diffCode) {
-    items.push({ wpCode: m.diffCode, label: m.diffCode, tooltip: '差异调节表' })
+    items.push(item('diff', m.diffCode, '差异调节表'))
   }
   if (m.diffSecuritiesCode) {
-    items.push({ wpCode: m.diffSecuritiesCode, label: m.diffSecuritiesCode, tooltip: '证券差异专表' })
+    items.push(item('diffSecurities', m.diffSecuritiesCode, '证券差异专表'))
   }
   if (m.diffChecklistCode) {
-    items.push({ wpCode: m.diffChecklistCode, label: m.diffChecklistCode, tooltip: '差异检查表' })
+    items.push(item('diffChecklist', m.diffChecklistCode, '差异检查表'))
   }
   if (altLabel) {
-    items.push({ wpCode: altLabel, label: altLabel, tooltip: '替代程序' })
+    // 组合替代程序（D0-5/D0-6 等）没有单一 sheet → sheetName 取 null，回退按 wpCode 跳转
+    items.push({
+      wpCode: altLabel,
+      label: altLabel,
+      tooltip: tooltipOf('altPrimary', '替代程序'),
+      sheetName: m.altSecondaryCode ? null : sheetNameOf('altPrimary'),
+    })
   }
-  items.push({ wpCode: m.fraudCode, label: m.fraudCode, tooltip: '舞弊风险评价' })
+  items.push(item('fraud', m.fraudCode, '舞弊风险评价'))
   return items
 }
 

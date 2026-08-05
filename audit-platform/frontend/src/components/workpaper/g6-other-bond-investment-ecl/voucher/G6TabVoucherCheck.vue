@@ -1,5 +1,8 @@
 <template>
   <div class="g6-voucher-check">
+  <!-- 抽样方法学（来自抽凭引擎回填，底稿正文可见 → 归档与复核可追溯） -->
+  <WpSamplingMethodologyBar :methodology="methodology" />
+
     <div class="guide-banner">
       <div><b>1</b> 确认测试总体</div>
       <div><b>2</b> 特定项目全部测试</div>
@@ -389,6 +392,9 @@
 
 <script setup lang="ts">
 import { computed, inject, onMounted, onBeforeUnmount, ref, watch } from 'vue'
+import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
+import { useSamplingMethodologyPersist, buildChecklistDirectPersist, snapshotToResponseMap } from '../../composables/shared/useSamplingMethodologyPersist'
+import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'
 import { Paperclip } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import G6EclImportExportDropdown from '../G6EclImportExportDropdown.vue'
@@ -515,7 +521,31 @@ function rowClassName({ row }: { row: any }): string {
 function openSampling(): void {
   samplingVisible.value = true
 }
+const methodologyStore = ref(snapshotToResponseMap(props.htmlData))
+const rawMethodologyPersist = buildChecklistDirectPersist({
+  wpId: computed(() => props.wpId),
+  projectId: computed(() => props.projectId),
+})
+async function methodologyDirectPersist(itemId: string, remark: string) {
+  // 无 allResponses 的宿主：写库同时更新本地只读表，供 bar 即时反映
+  methodologyStore.value.set(itemId, { remark })
+  await rawMethodologyPersist(itemId, remark)
+}
+/**
+ * 抽样方法学留痕（R6.3/R6.4）：把 `filled` 载荷里的 methodology 落到固定 item key，
+ * 并在抽凭区渲染到底稿正文 —— 复核与归档看的是底稿，不是后台抽凭日志。
+ */
+const { methodology, persistMethodology } = useSamplingMethodologyPersist({
+  wpCode: 'G6',
+  allResponses: methodologyStore,
+  persist: methodologyDirectPersist,
+  isReadonly: computed(() => props.isReadonly === true),
+})
+
 function onSamplesFilled(payload: { samples: any[]; fillMode?: 'append' | 'replace' | 'merge'; method?: string }): void {
+  // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
+  void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
+
   const result = vc.fillVoucherSamples(vc.activePeriod.value, payload.samples, {
     mode: payload.fillMode === 'merge' ? 'append' : payload.fillMode,
     method: payload.method,

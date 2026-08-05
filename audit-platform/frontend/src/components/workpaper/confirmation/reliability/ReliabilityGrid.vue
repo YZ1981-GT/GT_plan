@@ -237,17 +237,28 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="邮箱域名" prop="email_domain" width="120">
+      <el-table-column label="邮箱域名" prop="email_domain" width="180">
         <template #default="{ row }">
           <template v-if="!isVerificationDisabled(row)">
-            <el-input
-              v-if="!readonly"
-              :model-value="row.email_domain"
-              size="small"
-              placeholder="如 @company.com"
-              @change="(val: string) => $emit('update', row._row_id, 'email_domain', val)"
-            />
-            <span v-else>{{ row.email_domain || '—' }}</span>
+            <div class="reliability-grid__email-cell">
+              <el-input
+                v-if="!readonly"
+                :model-value="row.email_domain"
+                size="small"
+                placeholder="如 @company.com"
+                @change="(val: string) => $emit('update', row._row_id, 'email_domain', val)"
+              />
+              <span v-else>{{ row.email_domain || '—' }}</span>
+              <el-tooltip
+                v-if="row.email_domain"
+                :content="emailReliabilityTag(row.email_domain).tooltip"
+                placement="top"
+              >
+                <el-tag :type="emailReliabilityTag(row.email_domain).type" size="small" disable-transitions>
+                  {{ emailReliabilityTag(row.email_domain).label }}
+                </el-tag>
+              </el-tooltip>
+            </div>
           </template>
           <span v-else class="reliability-grid__disabled">—</span>
         </template>
@@ -313,16 +324,45 @@
           <span v-else>{{ row.send_email || '—' }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="回函邮箱" prop="reply_email" width="140" show-overflow-tooltip>
+      <!--
+        回函邮箱：带域名可靠性实时判定（源模板 F0-7 注2「从私人电子信箱发送的回函不可靠」）
+        私人域名（qq/163/gmail 等 30+）标红、公司域名标绿、无法识别标灰
+      -->
+      <el-table-column label="回函邮箱" prop="reply_email" width="200" show-overflow-tooltip>
+        <template #header>
+          <span>回函邮箱</span>
+          <el-tooltip placement="top" :width="320">
+            <template #content>
+              <div style="line-height:1.6">
+                <strong>回函邮箱可靠性（注2）</strong><br />
+                1. 从私人电子信箱（如 163/qq/gmail）发送的回函<strong>不可靠</strong>——无法确认发件人身份与授权<br />
+                2. 工作邮箱验证：确认域名与被询证单位官方域名一致，且该邮箱属于有权回复人员<br />
+                3. 系统按域名自动初判，最终判断仍需审计师复核
+              </div>
+            </template>
+            <span style="cursor:help;color:var(--el-color-primary);margin-left:2px">ⓘ</span>
+          </el-tooltip>
+        </template>
         <template #default="{ row }">
-          <el-input
-            v-if="!readonly"
-            :model-value="row.reply_email"
-            size="small"
-            placeholder="回函邮箱"
-            @change="(val: string) => $emit('update', row._row_id, 'reply_email', val)"
-          />
-          <span v-else>{{ row.reply_email || '—' }}</span>
+          <div class="reliability-grid__email-cell">
+            <el-input
+              v-if="!readonly"
+              :model-value="row.reply_email"
+              size="small"
+              placeholder="回函邮箱"
+              @change="(val: string) => $emit('update', row._row_id, 'reply_email', val)"
+            />
+            <span v-else>{{ row.reply_email || '—' }}</span>
+            <el-tooltip
+              v-if="row.reply_email"
+              :content="emailReliabilityTag(row.reply_email).tooltip"
+              placement="top"
+            >
+              <el-tag :type="emailReliabilityTag(row.reply_email).type" size="small" disable-transitions>
+                {{ emailReliabilityTag(row.reply_email).label }}
+              </el-tag>
+            </el-tooltip>
+          </div>
         </template>
       </el-table-column>
       <el-table-column label="传真信息及验证" prop="fax_info_verify" min-width="140" show-overflow-tooltip>
@@ -380,7 +420,33 @@
             <el-option value="部分可靠需补充" label="部分可靠需补充" />
             <el-option value="不可靠" label="不可靠" />
           </el-select>
-          <template v-else>
+          <!--
+            系统初判建议（R6.4）：仅在**尚未填结论**时出现，点击采纳。
+            🔴 不自动写入、已填值不覆盖 —— 源模板注2 第 3 条明确
+            「系统按域名自动初判，最终判断仍需审计师复核」。
+          -->
+          <div v-if="!readonly && shouldOfferSuggestion(row)" class="reliability-grid__suggest">
+            <el-tooltip placement="top">
+              <template #content>
+                <div class="reliability-grid__tooltip-content">
+                  <strong>系统初判：{{ suggestionOf(row)?.status }}</strong>
+                  <div>{{ suggestionOf(row)?.reason }}</div>
+                  <ul v-if="suggestionOf(row)?.blockers?.length">
+                    <li v-for="(b, i) in suggestionOf(row)!.blockers" :key="i">{{ b }}</li>
+                  </ul>
+                  <div>点击采纳后可再手工调整。</div>
+                </div>
+              </template>
+              <el-tag
+                size="small"
+                effect="plain"
+                :type="suggestionTagType(suggestionOf(row)!.status)"
+                class="reliability-grid__suggest-tag"
+                @click="applySuggestion(row)"
+              >初判：{{ suggestionOf(row)?.status }}</el-tag>
+            </el-tooltip>
+          </div>
+          <template v-else-if="readonly">
             <el-tag
               v-if="row.conclusion_status"
               size="small"
@@ -412,6 +478,27 @@ import { ref, computed } from 'vue'
 import { Plus, Delete, Download, InfoFilled, QuestionFilled, Select } from '@element-plus/icons-vue'
 import type { ReliabilityRow } from './reliabilityTypes'
 import { FIELD_TOOLTIPS_D07, RELIABILITY_HEADER_NOTE } from './reliabilityNotes'
+// 邮箱域名可靠性判定（源模板 X0-7 注2：私人电子信箱回函不可靠）
+import { emailReliabilityTag } from '@/utils/emailDomainCheck'
+// 结论自动推导（R6.4）：只给建议，采纳与否由审计师决定
+import {
+  deriveReliabilityConclusion,
+  shouldOfferSuggestion,
+  suggestionTagType,
+  type ReliabilityConclusionSuggestion,
+} from './reliabilityConclusionDerive'
+
+/** 建议缓存（模板里多处引用同一行的建议，避免重复计算） */
+function suggestionOf(row: ReliabilityRow): ReliabilityConclusionSuggestion | null {
+  return deriveReliabilityConclusion(row)
+}
+
+/** 采纳系统初判（写入 conclusion_status，之后仍可手工改） */
+function applySuggestion(row: ReliabilityRow) {
+  const s = deriveReliabilityConclusion(row)
+  if (!s || !row._row_id) return
+  emit('update', row._row_id, 'conclusion_status', s.status)
+}
 
 const props = defineProps<{
   rows: ReliabilityRow[]
@@ -503,6 +590,18 @@ function conclusionTagType(status: string): string {
   color: var(--el-color-primary);
   cursor: pointer;
   text-decoration: underline;
+}
+
+/* 邮箱列：输入框 + 域名可靠性 tag 横向紧凑排列 */
+.reliability-grid__email-cell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.reliability-grid__email-cell :deep(.el-input) {
+  flex: 1;
+  min-width: 0;
 }
 
 .reliability-grid__disabled {

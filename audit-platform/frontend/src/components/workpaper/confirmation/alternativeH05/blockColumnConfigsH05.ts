@@ -10,7 +10,7 @@ const VOUCHER_COLS: BlockColumnDef[] = [
   { field: 'voucher_no', label: '凭证编号', width: 100, type: 'text', group: '记账凭证' },
   { field: 'business_desc', label: '业务内容', width: 140, type: 'text', group: '记账凭证' },
   { field: 'counter_account', label: '对方科目', width: 100, type: 'text', group: '记账凭证' },
-  { field: 'voucher_amount', label: '金额', width: 110, type: 'number', sumField: true, group: '记账凭证', align: 'right' },
+  { field: 'voucher_amount', label: '金额', width: 110, type: 'number', render: 'amount', sumField: true, group: '记账凭证', align: 'right' },
 ]
 
 const BLOCK1_COLUMNS: BlockColumnDef[] = [
@@ -32,11 +32,11 @@ const BLOCK2_COLUMNS: BlockColumnDef[] = [
   ...VOUCHER_COLS,
   { field: 'contract_date_no', label: '合同日期/编号', width: 120, type: 'text', group: '采购合同' },
   { field: 'contract_vendor', label: '供应商', width: 120, type: 'text', group: '采购合同' },
-  { field: 'contract_amount', label: '合同金额', width: 110, type: 'number', sumField: true, group: '采购合同', align: 'right' },
+  { field: 'contract_amount', label: '合同金额', width: 110, type: 'number', render: 'amount', sumField: true, group: '采购合同', align: 'right' },
   { field: 'invoice_date_no', label: '发票日期/编号', width: 120, type: 'text', group: '采购发票' },
-  { field: 'invoice_amount', label: '发票金额', width: 110, type: 'number', sumField: true, group: '采购发票', align: 'right' },
+  { field: 'invoice_amount', label: '发票金额', width: 110, type: 'number', render: 'amount', sumField: true, group: '采购发票', align: 'right' },
   { field: 'payment_date', label: '付款日期', width: 100, type: 'date', group: '付款凭证' },
-  { field: 'payment_amount', label: '付款金额', width: 110, type: 'number', sumField: true, group: '付款凭证', align: 'right' },
+  { field: 'payment_amount', label: '付款金额', width: 110, type: 'number', render: 'amount', sumField: true, group: '付款凭证', align: 'right' },
   { field: 'ref_index', label: '索引号', width: 90, type: 'text' },
   { field: 'is_abnormal', label: '是否异常', width: 80, type: 'select', align: 'center' },
 ]
@@ -50,7 +50,7 @@ const BLOCK3_COLUMNS: BlockColumnDef[] = [
   { field: 'recv_asset_name', label: '资产名称', width: 120, type: 'text', group: '到货验收' },
   { field: 'recv_qty', label: '数量', width: 80, type: 'number', group: '到货验收', align: 'right' },
   { field: 'cap_date', label: '转固日期', width: 100, type: 'date', group: '转固' },
-  { field: 'cap_cost', label: '原值', width: 110, type: 'number', sumField: true, group: '转固', align: 'right' },
+  { field: 'cap_cost', label: '原值', width: 110, type: 'number', render: 'amount', sumField: true, group: '转固', align: 'right' },
   { field: 'ref_index', label: '索引号', width: 90, type: 'text' },
   { field: 'is_abnormal', label: '是否异常', width: 80, type: 'select', align: 'center' },
 ]
@@ -60,7 +60,7 @@ const BLOCK4_COLUMNS: BlockColumnDef[] = [
   ...VOUCHER_COLS,
   { field: 'mortgage_contract', label: '抵押合同编号', width: 120, type: 'text', group: '抵押担保' },
   { field: 'mortgage_holder', label: '抵押权人', width: 120, type: 'text', group: '抵押担保' },
-  { field: 'mortgage_amount', label: '担保金额', width: 110, type: 'number', sumField: true, group: '抵押担保', align: 'right' },
+  { field: 'mortgage_amount', label: '担保金额', width: 110, type: 'number', render: 'amount', sumField: true, group: '抵押担保', align: 'right' },
   { field: 'lease_contract', label: '融资租赁合同编号', width: 130, type: 'text', group: '融资租赁' },
   { field: 'lease_lessor', label: '出租方', width: 120, type: 'text', group: '融资租赁' },
   { field: 'lease_term', label: '租赁期', width: 90, type: 'text', group: '融资租赁' },

@@ -22,6 +22,7 @@ import { computed, ref, type ComputedRef } from 'vue'
 import { eventBus } from '@/utils/eventBus'
 import { calcSubtotal } from './useL6FormulaEngine'
 import type { useL6FormData } from './useL6FormData'
+import { L6_GROSS_FALLBACK_STANDARD } from './l6AccountScope'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -234,7 +235,7 @@ export function useL6Adjustment(formData: ReturnType<typeof useL6FormData>) {
     // EventBus publish（双向同步L6-1 + 通知A13）
     eventBus.emit('adjustment:created', {
       wpCode: 'L6',
-      accountCode: '2601',
+      accountCode: L6_GROSS_FALLBACK_STANDARD,
       ajeNet: ajeNet2601.value,
       rjeNet: rjeNet2601.value,
       timestamp: Date.now(),

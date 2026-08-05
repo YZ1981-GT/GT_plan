@@ -88,6 +88,10 @@
 
           :tb-amount="tbAmount2201"
 
+          :adjudication-prefill="props.htmlData?.adjudication_prefill"
+
+          :tb-source-codes="props.htmlData?.project_context?.tb_source_codes"
+
         />
 
 

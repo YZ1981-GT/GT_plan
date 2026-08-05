@@ -13,6 +13,24 @@
           从 D0-1 带入
         </el-button>
       </el-button-group>
+      <!--
+        超重要性差异 → A13 未更正错报汇总（走平台既有 `a13:push-misstatement`）。
+        无重要性水平配置时禁用并提示 —— 没有阈值就判不出「超重要性」，
+        此时应走单行「推送」按钮由审计师自行判断。
+      -->
+      <el-tooltip :content="batchPushHint" placement="top" :disabled="!batchPushHint">
+        <span>
+          <el-button
+            size="small"
+            type="warning"
+            plain
+            :disabled="readonly || overMaterialityRowIds.length === 0"
+            @click="$emit('push-a13', [...overMaterialityRowIds])"
+          >
+            推送 {{ overMaterialityRowIds.length }} 笔超重要性差异至 A13
+          </el-button>
+        </span>
+      </el-tooltip>
       <el-button-group>
         <el-button size="small" :disabled="readonly" @click="$emit('import-excel')">
           导入
@@ -246,6 +264,31 @@
           <span v-else>—</span>
         </template>
       </el-table-column>
+
+      <!-- 错报推送（源模板第 9 列「是否调整」的下游动作） -->
+      <el-table-column v-if="!readonly" label="错报" min-width="72" align="center">
+        <template #header>
+          <span>错报</span>
+          <el-tooltip
+            content="推送至 A13 未更正错报汇总；金额取差异绝对值（错报只关心差多少）"
+            placement="top"
+          >
+            <el-icon :size="12" style="margin-left:2px"><InfoFilled /></el-icon>
+          </el-tooltip>
+        </template>
+        <template #default="{ row }">
+          <el-button
+            v-if="(row.difference ?? 0) !== 0"
+            :type="isOverMateriality(row) ? 'danger' : 'primary'"
+            text
+            size="small"
+            @click="$emit('push-a13', [row._row_id])"
+          >
+            {{ isOverMateriality(row) ? '推送错报' : '推送' }}
+          </el-button>
+          <span v-else class="diff-reconcile-master__empty">无差异</span>
+        </template>
+      </el-table-column>
     </el-table>
   </div>
 </template>
@@ -277,6 +320,11 @@ const emit = defineEmits<{
   (e: 'export-excel'): void
   (e: 'export-template'): void
   (e: 'jump-d01', confirmIndex: string): void
+  /**
+   * 推送错报至 A13 未更正错报汇总（走平台既有 `a13:push-misstatement`）。
+   * 携带行 ID 数组：单行按钮传 `[row._row_id]`，工具栏批量传全部超重要性行。
+   */
+  (e: 'push-a13', rowIds: string[]): void
 }>()
 
 const tableRef = ref()
@@ -289,6 +337,25 @@ const displayRows = computed(() => {
   if (!groupBySubject.value) return props.rows
   // 按科目排序（分组视觉效果）
   return [...props.rows].sort((a, b) => (a.subject ?? '').localeCompare(b.subject ?? ''))
+})
+
+// ─── 超重要性差异（A13 批量推送） ────────────────────────────────────────────
+
+const overMaterialityRowIds = computed(() =>
+  props.rows
+    .filter((r) => (r.difference ?? 0) !== 0 && props.isOverMateriality(r))
+    .map((r) => r._row_id!)
+    .filter(Boolean),
+)
+
+const batchPushHint = computed(() => {
+  if (props.readonly) return '只读模式下不可推送'
+  if (overMaterialityRowIds.value.length > 0) return ''
+  // 区分「没配阈值」与「配了但没有超阈值的行」—— 两者的下一步动作完全不同
+  if (!props.rows.some((r) => props.isOverMateriality(r))) {
+    return '暂无超过实际执行重要性的差异（未配置重要性水平时请用单行「推送」按钮自行判断）'
+  }
+  return ''
 })
 
 // ─── Selection ───────────────────────────────────────────────────────────────

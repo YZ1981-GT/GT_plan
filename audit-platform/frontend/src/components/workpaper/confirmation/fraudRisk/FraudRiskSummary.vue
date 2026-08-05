@@ -62,20 +62,40 @@
       </p>
     </div>
 
-    <!-- B50 跳转 -->
+    <!-- B50 推送 + 跳转 -->
     <div class="fraud-risk-summary__section fraud-risk-summary__jump">
+      <el-tooltip
+        :content="pushHint"
+        placement="top"
+        :disabled="!readonly && existCount > 0"
+      >
+        <span>
+          <el-button
+            type="warning"
+            plain
+            size="small"
+            :disabled="readonly || existCount === 0"
+            @click="$emit('push-b50')"
+          >
+            推送 {{ existCount }} 项迹象至 B50 风险因素
+          </el-button>
+        </span>
+      </el-tooltip>
       <el-button type="primary" text @click="$emit('jump-b50')">
         → 跳转 B50 风险评估底稿
       </el-button>
+      <el-tag v-if="summary.b50_ref" type="success" size="small" effect="plain">
+        已推送（{{ summary.b50_ref }}）
+      </el-tag>
       <span class="fraud-risk-summary__hint">
-        （舞弊风险评价结果应同步更新至 B50 整体风险评估）
+        （源模板 A26：汇总已发现的舞弊迹象，在「汇总识别的风险因素」中记录并区分财务报表层次与认定层次的风险）
       </span>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { FraudRiskSummary, FraudRiskMetrics } from './fraudRiskTypes'
 
@@ -89,7 +109,22 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'update', field: string, value: string): void
   (e: 'jump-b50'): void
+  /**
+   * 推送「是否存在=是」的迹象至 B50 风险因素识别。
+   * 走平台既有 `b50:push-risk-factor` 通道（真消费者 `GtB50RiskAssessment.appendRiskFactorsFromB2`），
+   * 载荷由 `composables/confirmationRiskPush.buildB50RiskFactorPayload` 构建。
+   */
+  (e: 'push-b50'): void
 }>()
+
+/** 存在的迹象数（推送按钮启用判据 —— 与看板 exist_count 同源） */
+const existCount = computed(() => props.metrics?.exist_count ?? 0)
+
+const pushHint = computed(() => {
+  if (props.readonly) return '只读模式下不可推送'
+  if (existCount.value === 0) return '暂无「是否存在=是」的迹象，无需推送'
+  return ''
+})
 
 const aiLoading = ref(false)
 

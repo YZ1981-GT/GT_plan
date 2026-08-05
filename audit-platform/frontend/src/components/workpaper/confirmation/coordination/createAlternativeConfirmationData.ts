@@ -242,6 +242,15 @@ export function createAlternativeConfirmationData(config: AltConfig): AltCoreRet
         block4_rows: [],
         conclusion: {},
       }
+      // 🔴 溯源标记必须透传（2026-08-04 实测）：本函数原按**字段白名单**构造公司行，
+      // `_balance_source`（'aux' = 辅助余额精确账面值 / 'summary' = 汇总表发函金额）
+      // 被静默丢弃 → 落库恒 null → 审计师看不出某家的期末余额是哪个口径来的，
+      // 而这两个口径常有差异（发函金额是抽样口径、账面余额才是被验证对象）。
+      // 只透传**已声明**的 `_` 前缀溯源字段，不做整体 spread（防把上游临时字段
+      // 一并写进持久化载荷）。
+      if (item._balance_source) {
+        company._balance_source = item._balance_source
+      }
       companies.value.push(company)
     })
     isDirty.value = true

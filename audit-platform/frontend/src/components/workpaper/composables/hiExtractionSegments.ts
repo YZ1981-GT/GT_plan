@@ -24,13 +24,19 @@ const _REGISTRY: Record<string, HiExtractionSegment[]> = {
   H7: [
     { label: '生产性生物资产(1621)', accountCode: '1621', expression: "TB('1621','期末余额')", anchorKey: 'H7-1-tb-amount' },
   ],
+  // 🔴 2026-08-03 纠正（浏览器实测发现）：H8 原写 `1901`（待处理财产损溢）/
+  //    `190101`（非真实科目），H9 原写 `2205`（合同负债，D7 域）/ `220501`。
+  //    这两组是本 spec 的 P0 —— 底稿「四表取数（公式管理）」面板显示的就是这里的值，
+  //    改后端 render 但漏改本文件时，面板照旧显示错科目、当前值恒为 0/—。
+  //    兜底码与后端 `four_table/h{8,9}_account_scope.py` 的声明一致。
   H8: [
-    { label: '使用权资产原值(1901)', accountCode: '1901', expression: "TB('1901','期末余额')", anchorKey: 'H8-1-tb-amount' },
-    { label: '累计折旧(190101)', accountCode: '190101', expression: "TB('190101','期末余额')", anchorKey: 'H8-1-tb-dep' },
+    { label: '使用权资产原值(1641)', accountCode: '1641', expression: "TB('1641','期末余额')", anchorKey: 'H8-1-tb-amount' },
+    { label: '累计折旧(1642)', accountCode: '1642', expression: "TB('1642','期末余额')", anchorKey: 'H8-1-tb-dep' },
+    { label: '减值准备(1643)', accountCode: '1643', expression: "TB('1643','期末余额')", anchorKey: 'H8-1-tb-impair' },
   ],
   H9: [
-    { label: '租赁负债(2205)', accountCode: '2205', expression: "TB('2205','期末余额')", anchorKey: 'H9-1-tb-amount' },
-    { label: '未确认融资费用', accountCode: '220501', expression: "TB('220501','期末余额')", anchorKey: 'H9-1-tb-unearned' },
+    { label: '租赁负债(2601)', accountCode: '2601', expression: "TB('2601','期末余额')", anchorKey: 'H9-1-tb-amount' },
+    { label: '未确认融资费用(2602)', accountCode: '2602', expression: "TB('2602','期末余额')", anchorKey: 'H9-1-tb-unearned' },
   ],
   H10: [
     { label: '资产处置损益(6115)', accountCode: '6115', expression: "TB('6115','审定数')", anchorKey: 'H10-1-tb-amount' },

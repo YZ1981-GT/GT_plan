@@ -386,6 +386,15 @@ import { useAuditContext } from '@/composables/useAuditContext'
 import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
+import { h9Scope } from '../../composables/hCycleAccountScope'
+
+/**
+ * 🔴 科目码单一真源 = `h9Scope`（租赁负债 2601 / 未确认融资费用 2602）。
+ * 历史实现写死 `2205`（合同负债）与 `1802` → 审定数回写到错科目。
+ * 本组件无 `htmlData` prop 故用 scope 兜底码（与 `useH9FormData` 同源，不会分叉）。
+ */
+const leaseLiabilityCode = h9Scope.def.slotFallbacks.gross[0]
+const unearnedFinanceCode = h9Scope.def.slotFallbacks.unearned_finance[0]
 
 const props = defineProps<{
   wpId: string
@@ -450,11 +459,13 @@ const {
 } = useAdjudicationBringIn({
   projectId: toRef(props, 'projectId') as any,
   year: useAuditContext().year as any,
-  subjectPrefix: '2205',
+  subjectPrefix: '2601',
   direction: 'credit',
-  subjectCode: '2205',
+  // 🔴 2026-08-03 纠正：原写 `2205`（合同负债，D7 域）→ 租赁负债真值 `2601`。
+  //    该 subjectCode 用于「带入调整」按科目拉调整分录，写错会拉到 D7 的分录。
+  subjectCode: '2601',
   wpCode: 'H9',
-  subjectLabel: '租赁负债(2205)',
+  subjectLabel: '租赁负债(2601)',
   rows: bringInRows,
   updateCell: (rowKey: string, field: any, value: number) =>
     updateCell(rowKey, field === 'rje' ? 'rje' : 'aje', value),
@@ -527,19 +538,19 @@ function handleDeleteRow(rowId: string) {
 async function handleWriteback() {
   writebackLoading.value = true
   try {
-    // Call TB writeback API for 2205 租赁负债 (贷方/负债类)
+    // 回写租赁负债（贷方/负债类）——科目码走 h9Scope 单一真源
     await http.put(`/projects/${props.projectId}/trial-balance/writeback`, {
-      account_code: '2205',
+      account_code: leaseLiabilityCode,
       audited_amount: liabilitySubtotal.value.audited,
     })
-    // Call TB writeback API for 未确认融资费用 (借方/负债备抵类)
+    // 回写未确认融资费用（借方/负债备抵类）
     await http.put(`/projects/${props.projectId}/trial-balance/writeback`, {
-      account_code: '1802',
+      account_code: unearnedFinanceCode,
       audited_amount: unearnedSubtotal.value.audited,
     })
     // Publish adjudicated event (dispatches 'substantive:adjudicated')
     await publishAdjudicated()
-    ElMessage.success('审定数已回写TB（2205租赁负债 + 未确认融资费用）')
+    ElMessage.success(`审定数已回写TB（${leaseLiabilityCode} 租赁负债 + 未确认融资费用）`)
   } catch {
     ElMessage.warning('审定数回写失败，请手动确认试算表数据')
   } finally {

@@ -19,7 +19,6 @@ import E1KeyPersonFlowOcrConfirmDialog, {
 } from './E1KeyPersonFlowOcrConfirmDialog.vue'
 import E1IpoSheetChrome from './E1IpoSheetChrome.vue'
 import http from '@/utils/http'
-import { amountFormatter, amountParser } from '../composables/wpAmountInput'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
@@ -504,13 +503,13 @@ async function onRemovePerson(): Promise<void> {
             </el-table-column>
             <el-table-column label="收入金额" width="110" align="right">
               <template #default="{ row }">
-                <el-input-number :model-value="row.income" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small" style="width: 100%"
+                <el-input-number :model-value="row.income" :disabled="isReadonly" :controls="false" :precision="2" size="small" style="width: 100%"
                   @change="(v: number) => updateRow(row.id, 'income', v ?? 0)" />
               </template>
             </el-table-column>
             <el-table-column label="支出金额" width="110" align="right">
               <template #default="{ row }">
-                <el-input-number :model-value="row.expense" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small" style="width: 100%"
+                <el-input-number :model-value="row.expense" :disabled="isReadonly" :controls="false" :precision="2" size="small" style="width: 100%"
                   @change="(v: number) => updateRow(row.id, 'expense', v ?? 0)" />
               </template>
             </el-table-column>

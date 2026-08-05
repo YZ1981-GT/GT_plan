@@ -120,12 +120,12 @@
         <el-table-column label="差异（③）" align="center">
           <el-table-column label="差异比例(百分点)" width="112" align="right">
             <template #default="{ row }">
-              <span class="formula-cell" title="账面持股比例 − 回函持股比例（百分点）">{{ row.ratio_diff }}</span>
+              <span class="formula-cell" title="账面持股比例 − 回函持股比例（百分点）">{{ diffCellText('ratio_diff', row.ratio_diff) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="差异金额" width="104" align="right">
             <template #default="{ row }">
-              <span class="formula-cell" title="账面投资金额 − 回函投资金额">{{ row.amount_diff }}</span>
+              <span class="formula-cell" title="账面投资金额 − 回函投资金额">{{ diffCellText('amount_diff', row.amount_diff) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="投资条款差异" min-width="150">
@@ -231,8 +231,34 @@ import {
 } from '../../composables/useWorkpaperScaffold'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { DisplayPrefs_Key } from '../../composables/displayPrefsKey'
+import { isDiffAmountColumn } from '../g0DiffSourceManifest'
 
 const GtGridSheet = defineAsyncComponent(() => import('../../GtGridSheet.vue'))
+
+/**
+ * 金额格式单一真源（store 成员，非模块级导出）。
+ * 🔴 平台铁律写法 = setup 顶层 `inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()`：
+ *    优先用底稿主入口注入的**同一个** store 实例，无宿主 provide 时才回退自取。
+ * 🔴 必须在 setup 顶层取 —— `useDisplayPrefsStore()` 是 setup 作用域 composable，
+ *    写进函数体会静默失效。
+ */
+const prefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
+
+/**
+ * 派生格显示值（Task 3 / Requirement 3）。
+ *
+ * 🔴 本表两个派生列语义**相反**：`amount_diff` 是金额（要千分符 + 2 位小数），
+ *    `ratio_diff` 是**百分点**（套金额格式会把 3.5 个百分点显示成「3.50 元」，
+ *    在「报表/附注金额默认元」的平台语境下直接误导审计判断）。
+ *    故逐列语义只由 `g0DiffSourceManifest` 的 `kind` 决定，组件不写第二份判定。
+ */
+function diffCellText(field: string, val: unknown): string {
+  if (val == null || val === '') return ''
+  if (isDiffAmountColumn('nonSecurities', field)) return prefs.fmt(val)
+  return String(val)
+}
 
 const props = defineProps<{
   htmlData: any

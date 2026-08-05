@@ -3,10 +3,10 @@
     <!-- 工具栏 -->
     <div class="alternative-master__toolbar">
       <el-button v-if="!readonly" size="small" type="primary" @click="$emit('add-company')">
-        <el-icon><Plus /></el-icon> 新增公司
+        <el-icon><Plus /></el-icon> {{ labelsResolved.addButton }}
       </el-button>
       <el-button v-if="!readonly" size="small" plain @click="$emit('import-d01')">
-        从 D0-1 带入
+        {{ labelsResolved.importFromSummary }}
       </el-button>
       <el-button v-if="!readonly" size="small" plain @click="$emit('import-excel')">
         导入 Excel
@@ -35,13 +35,13 @@
       class="alternative-master__table"
     >
       <el-table-column prop="seq" label="序号" min-width="40" align="center" />
-      <el-table-column prop="entity_name" label="供应商/客户名称" min-width="130">
+      <el-table-column prop="entity_name" :label="labelsResolved.entityColumn" min-width="130">
         <template #default="{ row }">
           <el-input
             v-if="!readonly"
             :model-value="row.entity_name"
             size="small"
-            placeholder="单位名称"
+            :placeholder="labelsResolved.entityPlaceholder"
             @change="(val: string) => $emit('update-field', row._company_id, 'entity_name', val)"
           />
           <template v-else>
@@ -56,7 +56,7 @@
             v-if="!readonly"
             :model-value="row.confirm_index"
             size="small"
-            placeholder="D0-"
+            :placeholder="labelsResolved.confirmIndexPlaceholder"
             @change="(val: string) => $emit('update-field', row._company_id, 'confirm_index', val)"
           />
           <span v-else>{{ row.confirm_index || '—' }}</span>
@@ -75,14 +75,20 @@
           <span v-else class="text-secondary">—</span>
         </template>
       </el-table-column>
-      <el-table-column label="收款比例" min-width="70" align="right">
+      <!--
+        两个检查比例列按循环取标签（`type` 仍是 `'receipt' | 'shipment'` → 本组件的
+        `getCheckRatio` prop 签名不变；各循环用自己的 `getCheckRatioForMaster` 适配器
+        把这两个键映射到本循环口径，G0-6 即 receipt→payment / shipment→inbound）。
+      -->
+      <el-table-column
+        v-for="col in labelsResolved.ratioColumns"
+        :key="col.type"
+        :label="col.label"
+        min-width="70"
+        align="right"
+      >
         <template #default="{ row }">
-          {{ formatRatio(getCheckRatio(row, 'receipt')) }}
-        </template>
-      </el-table-column>
-      <el-table-column label="出库比例" min-width="70" align="right">
-        <template #default="{ row }">
-          {{ formatRatio(getCheckRatio(row, 'shipment')) }}
+          {{ formatRatio(getCheckRatio(row, col.type)) }}
         </template>
       </el-table-column>
       <el-table-column label="结论" min-width="55" align="center">
@@ -113,14 +119,19 @@
 
     <!-- 空态 -->
     <div v-if="companies.length === 0" class="alternative-master__empty">
-      暂无公司记录，请新增或从 D0-1 带入未回函公司
+      {{ labelsResolved.emptyText }}
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { Plus, Check } from '@element-plus/icons-vue'
 import type { AlternativeCompany, BlockType } from './alternativeD05Types'
+import {
+  resolveAlternativeMasterLabels,
+  type AlternativeMasterLabels,
+} from './alternativeMasterLabels'
 
 const props = defineProps<{
   companies: AlternativeCompany[]
@@ -129,7 +140,14 @@ const props = defineProps<{
   getCompletionStatus: (c: AlternativeCompany) => { completed: number; total: number; rate: number }
   hasAbnormal: (c: AlternativeCompany) => boolean
   getCheckRatio: (c: AlternativeCompany, type: 'receipt' | 'shipment') => number | null
+  /**
+   * 按循环覆盖主表文案（**可选**）。
+   * 不传 = 套 `DEFAULT_ALTERNATIVE_MASTER_LABELS`，与改造前逐字节相同（零回归）。
+   */
+  labels?: Partial<AlternativeMasterLabels> | null
 }>()
+
+const labelsResolved = computed(() => resolveAlternativeMasterLabels(props.labels))
 
 const emit = defineEmits<{
   (e: 'select', companyId: string): void

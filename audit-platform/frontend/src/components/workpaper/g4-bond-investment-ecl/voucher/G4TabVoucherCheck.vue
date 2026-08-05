@@ -19,6 +19,9 @@
 -->
 <template>
   <div class="g4-voucher-check">
+  <!-- 抽样方法学（来自抽凭引擎回填，底稿正文可见 → 归档与复核可追溯） -->
+  <WpSamplingMethodologyBar :methodology="methodology" />
+
     <!-- 一、审计目标（对齐纸质底稿三认定） -->
     <el-alert type="info" :closable="false" show-icon class="objective-alert">
       <template #title><span class="ao-title">一、审计目标</span></template>
@@ -629,6 +632,9 @@
  * - 行级OCR：📎上传→POST /d4/contract-ocr→ElMessageBox确认→merge填入
  */
 import { ref, computed, inject, watch, onMounted } from 'vue'
+import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
+import { useSamplingMethodologyPersist, buildChecklistDirectPersist, snapshotToResponseMap } from '../../composables/shared/useSamplingMethodologyPersist'
+import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'
 import { Delete, Paperclip } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
@@ -821,7 +827,31 @@ function pushAbnormalDrafts(): void {
 
 // ─── 抽凭引擎集成（Requirements: 6.3, 9.2） ─────────────────────────────────
 
+const methodologyStore = ref(snapshotToResponseMap(props.htmlData))
+const rawMethodologyPersist = buildChecklistDirectPersist({
+  wpId: computed(() => props.wpId),
+  projectId: computed(() => props.projectId),
+})
+async function methodologyDirectPersist(itemId: string, remark: string) {
+  // 无 allResponses 的宿主：写库同时更新本地只读表，供 bar 即时反映
+  methodologyStore.value.set(itemId, { remark })
+  await rawMethodologyPersist(itemId, remark)
+}
+/**
+ * 抽样方法学留痕（R6.3/R6.4）：把 `filled` 载荷里的 methodology 落到固定 item key，
+ * 并在抽凭区渲染到底稿正文 —— 复核与归档看的是底稿，不是后台抽凭日志。
+ */
+const { methodology, persistMethodology } = useSamplingMethodologyPersist({
+  wpCode: 'G4',
+  allResponses: methodologyStore,
+  persist: methodologyDirectPersist,
+  isReadonly: computed(() => props.isReadonly === true),
+})
+
 function handleSamplingFilled(payload: { samples: SampledVoucher[]; phase: Phase; fillMode: FillMode }): void {
+  // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
+  void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
+
   // 将抽样结果映射为 fillVoucherSamples 所需格式
   const mappedSamples = payload.samples.map(s => ({
     voucherNo: s.voucherNo,

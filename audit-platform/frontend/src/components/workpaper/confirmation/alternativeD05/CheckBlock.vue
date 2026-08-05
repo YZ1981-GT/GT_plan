@@ -79,8 +79,18 @@
                 </template>
                 <!-- 数字列 -->
                 <template v-else-if="col.type === 'number'">
+                  <!-- 金额列（render==='amount'）→ WpAmountInput：失焦千分符 / 聚焦原始值 / 非法输入回退不写 NaN -->
+                  <WpAmountInput
+                    v-if="!readonly && col.editable !== false && col.render === 'amount'"
+                    :model-value="row[col.field] ?? null"
+                    size="small"
+                    :placeholder="col.placeholder"
+                    :aria-label="col.label"
+                    @change="(val: number) => { row[col.field] = val; handleFieldChange(row, col.field, val) }"
+                  />
+                  <!-- 非金额数值列（数量 / 单价 / 每股指标）→ 保持原生 number 输入不变 -->
                   <el-input
-                    v-if="!readonly && col.editable !== false"
+                    v-else-if="!readonly && col.editable !== false"
                     v-model.number="row[col.field]"
                     size="small"
                     type="number"
@@ -88,7 +98,7 @@
                     @change="(val: string) => handleFieldChange(row, col.field, Number(val))"
                   />
                   <span v-else class="check-block__number">
-                    {{ formatNumber(row[col.field]) }}
+                    {{ formatCell(row[col.field], col.render) }}
                   </span>
                 </template>
                 <!-- 日期列 -->
@@ -147,7 +157,7 @@
       <div v-if="rows.length > 0" class="check-block__totals">
         <span class="check-block__totals-label">合计：</span>
         <span v-for="(val, field) in totals" :key="field" class="check-block__total-item">
-          {{ getFieldLabel(field as string) }}：<b>{{ formatNumber(val) }}</b>
+          {{ getFieldLabel(field as string) }}：<b>{{ formatCell(val, getFieldRender(field as string)) }}</b>
         </span>
       </div>
     </div>
@@ -155,9 +165,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, inject } from 'vue'
 import { ArrowRight, ArrowDown, Plus, Delete, InfoFilled } from '@element-plus/icons-vue'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { DisplayPrefs_Key } from '../../composables/displayPrefsKey'
+import WpAmountInput from '../../shared/WpAmountInput.vue'
+import { formatPlainNumber } from './blockNumberFormat'
 import type { CheckRow, BlockType } from './alternativeD05Types'
 import type { BlockConfig, BlockColumnDef } from './blockColumnConfigs'
 
@@ -186,7 +199,12 @@ function onOcrFileChange(row: CheckRow, uploadFile: any): void {
 }
 
 const collapsed = ref(false)
-const prefs = useDisplayPrefsStore()
+/**
+ * 🔴 金额格式单一真源 = displayPrefs store 成员（不是模块级导出）。
+ * inject 优先，保证同页各 tab 共享同一实例；必须在 setup 顶层取
+ * （`useDisplayPrefsStore` 是 setup 作用域 composable，写进函数体会静默失效）。
+ */
+const prefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 const selectedRowId = ref<string | null>(null)
 
 // ─── 分组列（分组表头 5 色轮转） ─────────────────────────────────────────────
@@ -238,11 +256,23 @@ function getFieldLabel(field: string): string {
   return col?.label ?? field
 }
 
-function formatNumber(val: any): string {
-  if (val == null || val === '') return ''
-  const num = Number(val)
-  if (isNaN(num)) return String(val)
-  return prefs.fmt(num)
+/** 合计行按 sumField 所属列的 render 语义选择格式化函数（与单元格只读态同一对函数） */
+function getFieldRender(field: string): BlockColumnDef['render'] {
+  return props.config.columns.find((c) => c.field === field)?.render
+}
+
+/**
+ * 只读态数值格式化：金额列走平台金额格式（千分符 + 单位偏好），
+ * 非金额列走 `formatPlainNumber`（千分符但不做金额单位换算、不强制小数位）。
+ */
+function formatCell(val: any, render: BlockColumnDef['render']): string {
+  if (render === 'amount') {
+    if (val == null || val === '') return ''
+    const num = Number(val)
+    if (isNaN(num)) return String(val)
+    return prefs.fmt(num)
+  }
+  return formatPlainNumber(val)
 }
 </script>
 

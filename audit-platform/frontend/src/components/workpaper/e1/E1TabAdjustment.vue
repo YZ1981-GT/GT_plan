@@ -137,6 +137,35 @@ function saveAuditConclusion(val: string): void {
   props.allResponses.set(CONCLUSION_KEY, item)
   void props.saveImmediate([item])
 }
+
+// ─── AI 辅助（spec: e1-orphan-components-wiring Task 9）─────────────────────
+import { useE1AiGenerate } from '../composables/useE1AiGenerate'
+
+const { generateText, isGenerating } = useE1AiGenerate(toRef(props, 'wpId') as Ref<string>)
+
+async function generateAuditNote(): Promise<void> {
+  if (props.isReadonly) return
+  const text = await generateText({
+    section: 'e1-5-audit-note',
+    prompt: '你是注册会计师助理。请撰写 E1-5 调整分录汇总表的审计说明，概述本期审计调整事项（AJE/RJE）的类型、金额与原因，说明对货币资金余额的影响方向与金额。不得虚构。约 100～200 字。',
+    context: { 底稿: 'E1-5 调整分录', 说明: auditNote.value },
+    existingContent: auditNote.value,
+    confirmTitle: 'AI 生成 · 审计说明',
+  })
+  if (text) saveAuditNote(text)
+}
+
+async function generateAuditConclusion(): Promise<void> {
+  if (props.isReadonly) return
+  const text = await generateText({
+    section: 'e1-5-audit-conclusion',
+    prompt: '你是注册会计师助理。请撰写 E1-5 调整分录的审计结论，评价调整是否充分反映审计发现，对货币资金列报的影响已恰当处理。不得虚构。约 60～150 字。',
+    context: { 底稿: 'E1-5 调整分录', 结论: auditConclusion.value },
+    existingContent: auditConclusion.value,
+    confirmTitle: 'AI 生成 · 审计结论',
+  })
+  if (text) saveAuditConclusion(text)
+}
 </script>
 
 <template>
@@ -367,6 +396,7 @@ function saveAuditConclusion(val: string): void {
           <template #header>
             <div class="card-header">
               <span>审计说明</span>
+              <el-button size="small" :loading="isGenerating('e1-5-audit-note')" :disabled="isReadonly" @click="generateAuditNote">🤖 AI</el-button>
             </div>
           </template>
           <el-input
@@ -384,6 +414,7 @@ function saveAuditConclusion(val: string): void {
           <template #header>
             <div class="card-header">
               <span>审计结论</span>
+              <el-button size="small" :loading="isGenerating('e1-5-audit-conclusion')" :disabled="isReadonly" @click="generateAuditConclusion">🤖 AI</el-button>
             </div>
           </template>
           <el-input

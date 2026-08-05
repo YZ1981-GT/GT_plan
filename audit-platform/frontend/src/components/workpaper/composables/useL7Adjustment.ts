@@ -230,7 +230,7 @@ export function useL7Adjustment(formData: ReturnType<typeof useL7FormData>) {
     // EventBus publish（双向同步L7-1 + 通知A13）
     eventBus.emit('adjustment:created', {
       wpCode: 'L7',
-      accountCode: '2801',
+      accountCode: 'BS-071', // L7 宁缺勿造，EventBus 用报表行标识（2801 是预计负债 K5）
       ajeNet: ajeNet2801.value,
       rjeNet: rjeNet2801.value,
       timestamp: Date.now(),

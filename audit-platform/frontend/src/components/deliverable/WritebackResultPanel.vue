@@ -88,6 +88,26 @@
         </el-button>
       </div>
 
+      <!--
+        写入失败（需求 5.1/5.2）：上游无对应 disclosure_notes 记录 → UPDATE 影响 0 行。
+        改造前这类章节被计入 written 并 Toast「已成功回填」= 假成功；现独立成桶并给
+        明确处置指引，绝不与「已回填」混排。
+      -->
+      <div v-if="(result.failed?.length ?? 0) > 0" class="writeback-panel__group writeback-panel__group--failed">
+        <div class="writeback-panel__group-header">
+          <el-icon class="writeback-panel__group-icon"><CircleClose /></el-icon>
+          <span>写入失败（{{ result.failed!.length }}）</span>
+        </div>
+        <div
+          v-for="item in result.failed!"
+          :key="item.section_code"
+          class="writeback-panel__item writeback-panel__item--failed"
+        >
+          <span class="writeback-panel__item-code">{{ item.section_code }}</span>
+          <span class="writeback-panel__item-reason">{{ item.reason }}</span>
+        </div>
+      </div>
+
       <!-- 跳过（锚点丢失） -->
       <div v-if="result.skipped.length > 0" class="writeback-panel__group writeback-panel__group--skipped">
         <div class="writeback-panel__group-header">
@@ -130,6 +150,12 @@ export interface WritebackResult {
   rejected: WritebackResultItem[]
   conflicts: WritebackConflict[]
   skipped: string[]
+  /**
+   * 写入失败桶（spec deliverable-lineage-wiring-and-writeback-closure 需求 5.2）。
+   * 上游无对应记录（UPDATE 影响 0 行）落此桶，**不得**与 written 混排。
+   * 可选是为兼容尚未升级的后端响应，前端读取一律用 `?? []`。
+   */
+  failed?: WritebackResultItem[]
   trace_id: string | null
   message?: string
 }
@@ -177,11 +203,29 @@ async function onWriteback(): Promise<void> {
     result.value = data as WritebackResult
     emit('writeback-complete', result.value)
 
+    const failedCount = result.value.failed?.length ?? 0
+
     if (result.value.written.length > 0) {
       ElMessage.success(`已成功回填 ${result.value.written.length} 个章节`)
     }
+    // 需求 5.2：写入失败必须独立提示，不能被「成功 N 个」掩盖
+    if (failedCount > 0) {
+      ElMessage.error(
+        `${failedCount} 个章节写入失败（上游无对应附注记录），未计入已回填，详见下方明细`,
+      )
+    }
     if (result.value.conflicts.length > 0) {
       ElMessage.warning(`${result.value.conflicts.length} 个章节存在冲突，需要裁决`)
+    }
+    // 全空回执（无锚点/无差异）也要有反馈，避免「点了没反应」
+    if (
+      result.value.written.length === 0
+      && failedCount === 0
+      && result.value.conflicts.length === 0
+      && result.value.rejected.length === 0
+      && result.value.skipped.length === 0
+    ) {
+      ElMessage.info('未检测到可回填的文字变更')
     }
   } catch (e: any) {
     if (e?.response?.status === 403) {
@@ -268,6 +312,18 @@ defineExpose({
 .writeback-panel__group--skipped {
   border-color: var(--el-border-color-lighter);
   background: var(--el-fill-color-lighter);
+}
+
+/* 写入失败桶：与「已回填」视觉上必须明确区分（需求 5.2 —— 不得看着像成功） */
+.writeback-panel__group--failed {
+  border-color: var(--el-color-danger-light-5);
+  background: var(--el-color-danger-light-9);
+}
+
+.writeback-panel__item--failed {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .writeback-panel__group-header {

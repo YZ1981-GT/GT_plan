@@ -45,7 +45,7 @@
       <template #header>
         <div class="section-title">
           <span>47、租赁负债</span>
-          <el-button v-if="!isReadonly" size="small" @click="addCategory()">+ 增加类别</el-button>
+          <el-button v-if="!isReadonly" size="small" @click="promptAddCategory">+ 增加类别</el-button>
         </div>
       </template>
 
@@ -223,7 +223,7 @@
  * 对齐源模板 A1:F18 + note_template 五、47；同步附注模块
  */
 import { computed, ref, toRef, onBeforeUnmount } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import { api } from '@/services/apiProxy'
@@ -336,6 +336,29 @@ const { aiLoadingSection: aiLoadingRef, runAi, openReview } = useHCycleDisclosur
   },
 })
 const aiLoadingSection = computed(() => aiLoadingRef.value)
+
+/**
+ * 新增租赁类别 —— 先输名再创建（平台铁律：动态行新增需命名的必须先 prompt）。
+ *
+ * 撞名由 `addCategory` 拒绝（附注同步按行标签匹配，同名会互相覆盖丢数据）。
+ */
+async function promptAddCategory(): Promise<void> {
+  let name = ''
+  try {
+    const { value } = await ElMessageBox.prompt('请输入租赁类别名称', '增加类别', {
+      confirmButtonText: '创建',
+      cancelButtonText: '取消',
+      inputPlaceholder: '如：土地租赁 / 仓储租赁',
+      inputValidator: (v: string) => (v && v.trim() ? true : '名称不能为空'),
+    })
+    name = String(value ?? '').trim()
+  } catch {
+    return // 用户取消
+  }
+  const res = addCategory(name)
+  if (res.ok) ElMessage.success(res.message)
+  else ElMessage.warning(res.message)
+}
 
 function handlePull() {
   const res = pullFromSources()

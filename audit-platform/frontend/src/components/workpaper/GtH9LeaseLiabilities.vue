@@ -65,22 +65,23 @@
         />
 
         <!-- H9-1 审定表（负债类双区块：租赁负债+未确认融资费用） -->
-        <HiFourTableSourcePanel
-          v-if="props.htmlData?.hi_extraction_enabled"
-          :wp-code="'H9'"
-          :segments="getHiExtractionSegments('H9')"
-          :all-responses="allResponses"
-          :is-readonly="isReadonly"
-          @refresh-complete="selfLoad()"
-        />
-        <H9TabAdjudication
-          v-else-if="currentSheet === 'H9-1'"
-          @save="persistResponse"
-          :wp-id="props.wpId"
-          :project-id="props.projectId"
-          :all-responses="allResponses"
-          :is-readonly="isReadonly"
-        />
+        <template v-else-if="currentSheet === 'H9-1'">
+          <HiFourTableSourcePanel
+            v-if="props.htmlData?.hi_extraction_enabled"
+            :wp-code="'H9'"
+            :segments="getHiExtractionSegments('H9')"
+            :all-responses="allResponses"
+            :is-readonly="isReadonly"
+            @refresh-complete="selfLoad()"
+          />
+          <H9TabAdjudication
+            @save="persistResponse"
+            :wp-id="props.wpId"
+            :project-id="props.projectId"
+            :all-responses="allResponses"
+            :is-readonly="isReadonly"
+          />
+        </template>
 
         <!-- 附注披露信息（上市公司） -->
         <H9TabDisclosureListed

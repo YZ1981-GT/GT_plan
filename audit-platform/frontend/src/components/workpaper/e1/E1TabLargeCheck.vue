@@ -22,7 +22,7 @@ import GtIndexChip from '../GtIndexChip.vue'
 import GtVoucherSamplingEngine from '../voucher-sampling/GtVoucherSamplingEngine.vue'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
-import { amountFormatter, amountParser, isAmountColumn } from '../composables/wpAmountInput'
+import { isAmountColumn } from '../composables/wpAmountInput'
 import { ElMessage } from 'element-plus'
 import {
   pullSamplesForWorkpaper,
@@ -104,7 +104,21 @@ function accountNameOf(code: string): string {
   return c
 }
 
+/**
+ * 抽样方法学留痕（R6.3/R6.4）：把 `filled` 载荷里的 methodology 落到固定 item key，
+ * 并在抽凭区渲染到底稿正文 —— 复核与归档看的是底稿，不是后台抽凭日志。
+ */
+const { methodology, persistMethodology } = useSamplingMethodologyPersist({
+  wpCode: 'E1',
+  allResponses: toRef(props, 'allResponses') as never,
+  persist: (itemId, remark) => props.saveImmediate([{ item_id: itemId, conclusion: null, remark }]),
+  isReadonly: computed(() => props.isReadonly),
+})
+
 function onSampleFilled(payload: any): void {
+  // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
+  void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
+
   const samples = payload?.samples || []
   if (!Array.isArray(samples) || samples.length === 0) return
   let added = 0
@@ -203,10 +217,100 @@ function saveAuditConclusion(val: string): void {
   props.allResponses.set(CONCLUSION_KEY, item)
   void props.saveImmediate([item])
 }
+
+// ─── OCR 链路（收支单据 → E1LargeCheckOcrConfirmDialog → 确认写行）──────────
+// @spec e1-orphan-components-wiring — Task 7
+
+import E1LargeCheckOcrConfirmDialog from './E1LargeCheckOcrConfirmDialog.vue'
+import type { LargeCheckOcrFields } from './E1LargeCheckOcrConfirmDialog.vue'
+import http from '@/utils/http'
+
+const ocrVisible = ref(false)
+const ocrSide = ref<'debit' | 'credit'>('debit')
+const ocrFields = ref<Partial<LargeCheckOcrFields>>({})
+const ocrConfidence = ref<number | undefined>()
+const ocrPreview = ref('')
+const ocrFileName = ref('')
+
+async function onOcrUpload(file: File, side: 'debit' | 'credit'): Promise<boolean> {
+  ocrSide.value = side
+  const form = new FormData()
+  form.append('file', file)
+  form.append('side', side)
+  try {
+    const res = await http.post(`/api/workpapers/${props.wpId}/e1/large-check-ocr`, form)
+    const data = res?.data ?? res
+    ocrFields.value = data?.fields ?? {}
+    ocrConfidence.value = data?.confidence
+    ocrPreview.value = data?.preview ?? ''
+    ocrFileName.value = data?.file_name ?? file.name ?? ''
+    ocrVisible.value = true
+  } catch (e) {
+    console.warn('[E1TabLargeCheck] OCR failed:', e)
+    ElMessage.warning('OCR 识别失败，请手工录入')
+  }
+  return false
+}
+
+function onOcrConfirm(fields: LargeCheckOcrFields): void {
+  ocrVisible.value = false
+  addRow()
+  const lastRow = rows.value[rows.value.length - 1]
+  if (!lastRow) return
+  if (fields.date) updateCell(lastRow.id, 'date', fields.date)
+  if (fields.voucherNo) updateCell(lastRow.id, 'voucherNo', fields.voucherNo)
+  if (fields.businessContent) updateCell(lastRow.id, 'businessContent', fields.businessContent)
+  if (fields.counterAccount) updateCell(lastRow.id, 'counterAccount', fields.counterAccount)
+  if (fields.amount) updateCell(lastRow.id, 'amount', Number(fields.amount) || 0)
+  if (fields.receiptDate) updateCell(lastRow.id, 'receiptDate', fields.receiptDate)
+  if (fields.receiptParty) updateCell(lastRow.id, 'receiptParty', fields.receiptParty)
+  if (fields.receiptAmount) updateCell(lastRow.id, 'receiptAmount', Number(fields.receiptAmount) || 0)
+  if (fields.approvalDateNo) updateCell(lastRow.id, 'approvalDateNo', fields.approvalDateNo)
+  if (fields.isProperlyApproved) updateCell(lastRow.id, 'isProperlyApproved', fields.isProperlyApproved)
+  if (fields.otherSupportDocs) updateCell(lastRow.id, 'otherSupportDocs', fields.otherSupportDocs)
+  if (fields.indexNo) updateCell(lastRow.id, 'indexNo', fields.indexNo)
+  // Mark direction based on OCR side
+  updateCell(lastRow.id, 'direction', ocrSide.value === 'debit' ? '收' : '支')
+}
+
+// ─── AI 辅助（spec: e1-orphan-components-wiring Task 9）─────────────────────
+import { useE1AiGenerate } from '../composables/useE1AiGenerate'
+import WpSamplingMethodologyBar from '../shared/WpSamplingMethodologyBar.vue'
+import { useSamplingMethodologyPersist } from '../composables/shared/useSamplingMethodologyPersist'
+import type { SamplingMethodologySnapshot } from '../composables/shared/samplingFillTarget'
+
+const { generateText, isGenerating } = useE1AiGenerate(toRef(props, 'wpId') as Ref<string>)
+
+async function generateAuditNote(): Promise<void> {
+  if (props.isReadonly) return
+  const text = await generateText({
+    section: 'e1-23-audit-note',
+    prompt: '你是注册会计师助理。请撰写 E1-23 收支检查 的审计说明，概述审计程序执行情况与主要发现。不得虚构。约 100～200 字。',
+    context: { 底稿: 'E1-23 收支检查', 说明: auditNote.value },
+    existingContent: auditNote.value,
+    confirmTitle: 'AI 生成 · 审计说明',
+  })
+  if (text) saveAuditNote(text)
+}
+
+async function generateAuditConclusion(): Promise<void> {
+  if (props.isReadonly) return
+  const text = await generateText({
+    section: 'e1-23-audit-conclusion',
+    prompt: '你是注册会计师助理。请撰写 E1-23 收支检查 的审计结论，对审计程序结果给出结论性评价。不得虚构。约 60～150 字。',
+    context: { 底稿: 'E1-23 收支检查', 结论: auditConclusion.value },
+    existingContent: auditConclusion.value,
+    confirmTitle: 'AI 生成 · 审计结论',
+  })
+  if (text) saveAuditConclusion(text)
+}
 </script>
 
 <template>
   <div class="e1-tab-large-check">
+  <!-- 抽样方法学（来自抽凭引擎回填，底稿正文可见 → 归档与复核可追溯） -->
+  <WpSamplingMethodologyBar :methodology="methodology" />
+
     <!-- 编制提示 -->
     <details class="guidance-details">
       <summary>📋 编制提示</summary>
@@ -232,6 +336,12 @@ function saveAuditConclusion(val: string): void {
         <el-tag size="small" type="success">收支检查 (E1-23)</el-tag>
         <el-button size="small" type="primary" :disabled="isReadonly" @click="addRow">+ 添加行</el-button>
         <el-button size="small" type="warning" :disabled="isReadonly" @click="samplingVisible = true">🎲 抽凭引擎</el-button>
+        <el-upload :show-file-list="false" accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff,.bmp,.webp" :before-upload="(f: File) => onOcrUpload(f, 'debit')" :disabled="isReadonly" style="display:inline-block;margin-left:4px">
+          <el-button size="small" :disabled="isReadonly">📎 借方OCR</el-button>
+        </el-upload>
+        <el-upload :show-file-list="false" accept=".pdf,.png,.jpg,.jpeg,.tif,.tiff,.bmp,.webp" :before-upload="(f: File) => onOcrUpload(f, 'credit')" :disabled="isReadonly" style="display:inline-block;margin-left:4px">
+          <el-button size="small" :disabled="isReadonly">📎 贷方OCR</el-button>
+        </el-upload>
         <el-badge :value="attachedCount" :hidden="attachedCount === 0" type="warning">
           <el-button
             size="small"
@@ -271,8 +381,6 @@ function saveAuditConclusion(val: string): void {
                 :disabled="isReadonly"
                 :controls="false"
                 :precision="isAmountColumn(col) ? 2 : undefined"
-                :formatter="isAmountColumn(col) ? amountFormatter : undefined"
-                :parser="isAmountColumn(col) ? amountParser : undefined"
                 size="small"
                 @change="(val: number) => updateCell(row.id, col.key, val ?? 0)"
               />
@@ -364,6 +472,18 @@ function saveAuditConclusion(val: string): void {
         @filled="onSampleFilled"
       />
     </el-dialog>
+
+    <!-- OCR 确认弹窗 -->
+    <E1LargeCheckOcrConfirmDialog
+      v-model="ocrVisible"
+      :side="ocrSide"
+      :fields="ocrFields"
+      :confidence="ocrConfidence"
+      :ocr-preview="ocrPreview"
+      :file-name="ocrFileName"
+      @confirm="onOcrConfirm"
+      @cancel="ocrVisible = false"
+    />
   </div>
 </template>
 

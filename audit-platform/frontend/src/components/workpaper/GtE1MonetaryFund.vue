@@ -102,9 +102,9 @@
       <!-- E1-15 利息收入月度分析 -->
       <E1TabInterestAnalysis v-else-if="currentSheet === 'E1-15'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :save-immediate="saveImmediate" :debounced-save="debouncedSave" :is-readonly="isReadonly" :bs-date="bsDate" />
       <!-- E1-18 企业信用报告查询 -->
-      <E1TabCreditReport v-else-if="currentSheet === 'E1-18'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :save-immediate="saveImmediate" :debounced-save="debouncedSave" :is-readonly="isReadonly" :bs-date="bsDate" variant="query" />
-      <!-- E1-19 企业信用报告核对 -->
-      <E1TabCreditReport v-else-if="currentSheet === 'E1-19'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :save-immediate="saveImmediate" :debounced-save="debouncedSave" :is-readonly="isReadonly" :bs-date="bsDate" variant="check" />
+      <E1TabCreditReport v-else-if="currentSheet === 'E1-18'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :save-immediate="saveImmediate" :debounced-save="debouncedSave" :is-readonly="isReadonly" :bs-date="bsDate" />
+      <!-- E1-19 企业信用报告信息与账面核对记录（五小节：注册资本对照/信贷类别/不一致调节/担保/关联关系） -->
+      <E1TabCreditCheck v-else-if="currentSheet === 'E1-19'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :save-immediate="saveImmediate" :debounced-save="debouncedSave" :is-readonly="isReadonly" :bs-date="bsDate" />
       <!-- E1-20 应计利息测算 -->
       <E1TabAccruedInterest v-else-if="currentSheet === 'E1-20'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :save-immediate="saveImmediate" :debounced-save="debouncedSave" :is-readonly="isReadonly" :bs-date="bsDate" />
       <!-- E1-21 银行存款截止测试 -->
@@ -113,8 +113,18 @@
       <E1TabCutoffTest v-else-if="currentSheet === 'E1-22'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :save-immediate="saveImmediate" :debounced-save="debouncedSave" :is-readonly="isReadonly" :bs-date="bsDate" variant="other" />
       <!-- E1-23 收支检查情况表 -->
       <E1TabLargeCheck v-else-if="currentSheet === 'E1-23'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :save-immediate="saveImmediate" :debounced-save="debouncedSave" :is-readonly="isReadonly" :bs-date="bsDate" />
-      <!-- E1-26~32 IPO/舞弊应对 -->
+      <!-- E1-26 现金交易分析 -->
+      <E1TabCashTxnAnalysis v-else-if="currentSheet === 'E1-26'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :save-immediate="saveImmediate" :debounced-save="debouncedSave" :is-readonly="isReadonly" :bs-date="bsDate" :sheet-name="props.sheetName" />
+      <!-- E1-27/28 IPO 通用表（无专属组件） -->
       <E1TabIpoSpecial v-else-if="ipoSheetCode" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :save-immediate="saveImmediate" :debounced-save="debouncedSave" :is-readonly="isReadonly" :bs-date="bsDate" :sheet-code="ipoSheetCode" />
+      <!-- E1-29 银行账户分析 -->
+      <E1TabBankAccountAnalysis v-else-if="currentSheet === 'E1-29'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :save-immediate="saveImmediate" :debounced-save="debouncedSave" :is-readonly="isReadonly" :bs-date="bsDate" :sheet-name="props.sheetName" />
+      <!-- E1-30 存款规模与利息收入匹配性 -->
+      <E1TabDepositInterestDaily v-else-if="currentSheet === 'E1-30'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :save-immediate="saveImmediate" :debounced-save="debouncedSave" :is-readonly="isReadonly" :bs-date="bsDate" :sheet-name="props.sheetName" />
+      <!-- E1-31 银行流水双向核对 -->
+      <E1TabBankFlowReconcile v-else-if="currentSheet === 'E1-31'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :save-immediate="saveImmediate" :debounced-save="debouncedSave" :is-readonly="isReadonly" :bs-date="bsDate" :sheet-name="props.sheetName" />
+      <!-- E1-32 董监高关键岗位资金流水核查 -->
+      <E1TabKeyPersonFlow v-else-if="currentSheet === 'E1-32'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :save-immediate="saveImmediate" :debounced-save="debouncedSave" :is-readonly="isReadonly" :bs-date="bsDate" :sheet-name="props.sheetName" />
       <!-- 附注(上市) -->
       <E1TabDisclosure v-else-if="currentSheet === '附注上市'" :wp-id="props.wpId" :project-id="props.projectId" :all-responses="allResponses" :save-immediate="saveImmediate" :debounced-save="debouncedSave" :is-readonly="isReadonly" :bs-date="bsDate" :html-data="props.htmlData" :applicable-standards="applicableStandards" variant="listed" />
       <!-- 附注(国企) -->
@@ -186,6 +196,13 @@ const E1TabCutoffTest = defineAsyncComponent(() => import('./e1/E1TabCutoffTest.
 const E1TabLargeCheck = defineAsyncComponent(() => import('./e1/E1TabLargeCheck.vue'))
 const E1TabIpoSpecial = defineAsyncComponent(() => import('./e1/E1TabIpoSpecial.vue'))
 const E1TabDisclosure = defineAsyncComponent(() => import('./e1/E1TabDisclosure.vue'))
+// ★ 孤儿组件接线 (spec: e1-orphan-components-wiring)
+const E1TabCreditCheck = defineAsyncComponent(() => import('./e1/E1TabCreditCheck.vue'))
+const E1TabCashTxnAnalysis = defineAsyncComponent(() => import('./e1/E1TabCashTxnAnalysis.vue'))
+const E1TabBankAccountAnalysis = defineAsyncComponent(() => import('./e1/E1TabBankAccountAnalysis.vue'))
+const E1TabDepositInterestDaily = defineAsyncComponent(() => import('./e1/E1TabDepositInterestDaily.vue'))
+const E1TabBankFlowReconcile = defineAsyncComponent(() => import('./e1/E1TabBankFlowReconcile.vue'))
+const E1TabKeyPersonFlow = defineAsyncComponent(() => import('./e1/E1TabKeyPersonFlow.vue'))
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -443,11 +460,11 @@ const e13Variant = computed<'rmb' | 'multi'>(() => {
 })
 
 /**
- * IPO 系列 sheet (E1-26~E1-32) 提取 sheetCode
+ * IPO 系列 sheet：只剩 E1-27/E1-28 无专属组件，走通用 E1TabIpoSpecial
  */
 const ipoSheetCode = computed<string | null>(() => {
   const sheet = currentSheet.value
-  const match = sheet.match(/^E1-(2[6-9]|3[0-2])$/)
+  const match = sheet.match(/^E1-(27|28)$/)
   return match ? sheet : null
 })
 

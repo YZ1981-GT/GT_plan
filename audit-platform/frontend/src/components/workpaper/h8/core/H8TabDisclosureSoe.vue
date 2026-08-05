@@ -338,7 +338,7 @@ async function syncToNotes() {
     }
     eventBus.emit('disclosure:note-text-updated' as any, {
       projectId: props.projectId,
-      accountCode: '1901',
+      accountCode: '1641',
       sectionIds: [noteSectionId],
       wpId: props.wpId,
       sheet: payloads[0].sheet_name,

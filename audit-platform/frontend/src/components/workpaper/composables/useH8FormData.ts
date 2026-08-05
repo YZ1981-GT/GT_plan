@@ -7,15 +7,16 @@
  *
  * 职责：
  * - allResponses Map 加载 + saveImmediate + debouncedSave(2s) + saveBatch
- * - writebackTrialBalance（科目1901使用权资产 借方/资产类 + 累计折旧 贷方/备抵类）
+ * - writebackTrialBalance（使用权资产原值 借方/资产类 + 累计折旧 贷方/备抵类）
  * - selfLoad逻辑（render-config?force_component_type=h8-right-of-use-assets）
- * - TB自动取数 unadjusted_amount → 审定表未审数（1901+累计折旧）
+ * - TB自动取数 unadjusted_amount → 审定表未审数（原值+累计折旧）
  * - CAS21特有：H8=H9初始计量+初始直接费用-租赁激励
  */
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
+import { h8Scope } from './hCycleAccountScope'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -26,10 +27,10 @@ export interface ChecklistItem {
 }
 
 export interface TbData {
-  /** 科目1901使用权资产 未审数（借方/资产类） */
-  unadjusted1901: number
-  /** 科目1901 审定数 */
-  audited1901: number
+  /** 使用权资产原值 未审数（借方/资产类） */
+  unadjustedCost: number
+  /** 使用权资产原值 审定数 */
+  auditedCost: number
   /** 累计折旧 未审数（贷方/备抵类） */
   unadjustedAccDep: number
   /** 累计折旧 审定数 */
@@ -39,9 +40,16 @@ export interface TbData {
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const DEBOUNCE_MS = 2000
-const ACCOUNT_CODE_1901 = '1901'
-/** 累计折旧科目编码（使用权资产对应的累计折旧，通常为1901的备抵） */
-const ACCOUNT_CODE_ACC_DEP = '1902'
+/**
+ * 🔴 科目码单一真源 = `hCycleAccountScope.h8Scope`（原值 1641 / 累计折旧 1642）。
+ * 历史实现写死 `1901`（待处理财产损溢）与 `1902` → TB 取数与回写全部落在错科目上。
+ * 运行态优先取 render 下发的 `tb_source_codes`，常量只作兜底。
+ */
+const FALLBACK_ROU_COST_CODE = h8Scope.def.slotFallbacks.gross[0]
+const FALLBACK_ROU_DEP_CODE = h8Scope.def.slotFallbacks.accum_dep[0]
+/** render `tb_values` 键前缀（与后端 `H8_SLOT_KEY_PREFIX` 逐字对应） */
+const TB_KEY_COST = 'rou_asset'
+const TB_KEY_DEP = 'rou_dep'
 const ITEM_PREFIX = 'H8-'
 const ITEM_PREFIX_A = 'H8A-'
 
@@ -59,8 +67,8 @@ export function useH8FormData(params: {
   const lastSavedAt = ref<string | null>(null)
   const allResponses = ref<Map<string, ChecklistItem>>(new Map())
   const tbData = ref<TbData>({
-    unadjusted1901: 0,
-    audited1901: 0,
+    unadjustedCost: 0,
+    auditedCost: 0,
     unadjustedAccDep: 0,
     auditedAccDep: 0,
   })
@@ -216,32 +224,35 @@ export function useH8FormData(params: {
     }, DEBOUNCE_MS))
   }
 
-  // ─── writebackTrialBalance（科目1901使用权资产 + 累计折旧） ─────────────────
+  // ─── writebackTrialBalance（使用权资产原值 + 累计折旧） ─────────────────────
 
   /**
    * 审定数回写 trial_balance：
-   * - 科目1901使用权资产（借方/资产类）
+   * - 使用权资产原值（借方/资产类）
    * - 累计折旧（贷方/备抵类）
    *
    * 审定数变化时回写TB并发布 'substantive:adjudicated' EventBus事件。
    * CAS21特有：H8与H9强联动，回写后通知H9底稿。
+   *
+   * 🔴 目标科目走 scope（历史往 `1901` 写审定数会污染 K2 其他流动资产）。
    */
   async function writebackTrialBalance(
-    auditedAmount1901: number,
+    auditedAmountCost: number,
     auditedAmountAccDep?: number
   ): Promise<void> {
     if (!projectId.value) return
+    const costCode = _costCode()
     try {
-      // 回写1901使用权资产
+      // 回写使用权资产原值
       await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: ACCOUNT_CODE_1901,
-        audited_amount: auditedAmount1901,
+        account_code: costCode,
+        audited_amount: auditedAmountCost,
       })
 
       // 回写累计折旧（如果提供）
       if (auditedAmountAccDep != null) {
         await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-          account_code: ACCOUNT_CODE_ACC_DEP,
+          account_code: _depCode(),
           audited_amount: auditedAmountAccDep,
         })
       }
@@ -249,9 +260,9 @@ export function useH8FormData(params: {
       // 发布 EventBus 事件通知其他底稿（附注/H9租赁负债/报表等）
       eventBus.emit('substantive:adjudicated', {
         wpCode: 'H8',
-        accountCode: ACCOUNT_CODE_1901,
-        auditedAmount: auditedAmount1901,
-        adjudicatedAmount: auditedAmount1901,
+        accountCode: costCode,
+        auditedAmount: auditedAmountCost,
+        adjudicatedAmount: auditedAmountCost,
         auditedAmountAccDep: auditedAmountAccDep ?? null,
       })
     } catch {
@@ -298,7 +309,7 @@ export function useH8FormData(params: {
       }
       allResponses.value = map
 
-      // 3. TB自动取数（1901 + 累计折旧）
+      // 3. TB自动取数（原值 + 累计折旧）
       await _loadTbData()
     } catch {
       // selfLoad 404 静默处理，显示空状态
@@ -335,59 +346,72 @@ export function useH8FormData(params: {
     }
   }
 
-  // ─── TB自动取数 unadjusted_amount（1901 + 累计折旧） ───────────────────────
+  // ─── TB自动取数 unadjusted_amount（原值 + 累计折旧） ───────────────────────
 
   /**
-   * 从 trial_balance 自动获取科目 1901 和累计折旧的未审数和审定数。
+   * 从 trial_balance 自动获取使用权资产原值与累计折旧的未审数和审定数。
    * 填入审定表"未审数"列（只读取数）。
-   * 1901：使用权资产，借方/资产类（期末=期初+借-贷）
+   * 原值：借方/资产类（期末=期初+借-贷）
    * 累计折旧：贷方/备抵类（期末=期初+贷-借）
    */
   async function loadTbData(): Promise<void> {
     await _loadTbData()
   }
 
+  /** 运行态科目码：溯源优先 → scope 兜底 */
+  function _costCode(): string {
+    return h8Scope.slotCodes(renderMeta.value?.tb_source_codes, 'gross')[0] || FALLBACK_ROU_COST_CODE
+  }
+
+  function _depCode(): string {
+    return h8Scope.slotCodes(renderMeta.value?.tb_source_codes, 'accum_dep')[0] || FALLBACK_ROU_DEP_CODE
+  }
+
   async function _loadTbData(): Promise<void> {
     if (!projectId.value) return
 
-    // 优先从 render-config seed 取值
-    const seeded1901 = renderMeta.value?.tb_values?.rou_1901_unadjusted
-    if (seeded1901 != null) {
+    // 优先从 render-config seed 取值（键与后端 H8_SLOT_KEY_PREFIX 逐字对应）
+    const tv = renderMeta.value?.tb_values
+    const seededCost = tv?.[`${TB_KEY_COST}_unadjusted`]
+    if (seededCost != null) {
       tbData.value = {
-        unadjusted1901: Number(seeded1901) || 0,
-        audited1901: Number(renderMeta.value?.tb_values?.rou_1901_audited ?? 0),
-        unadjustedAccDep: Number(renderMeta.value?.tb_values?.rou_acc_dep_unadjusted ?? 0),
-        auditedAccDep: Number(renderMeta.value?.tb_values?.rou_acc_dep_audited ?? 0),
+        unadjustedCost: Number(seededCost) || 0,
+        auditedCost: Number(tv?.[`${TB_KEY_COST}_audited`] ?? 0),
+        unadjustedAccDep: Number(tv?.[`${TB_KEY_DEP}_unadjusted`] ?? 0),
+        auditedAccDep: Number(tv?.[`${TB_KEY_DEP}_audited`] ?? 0),
       }
       return
     }
 
+    const costCode = _costCode()
+    const depCode = _depCode()
+
     try {
-      // 查询1901使用权资产
-      const res1901 = await api.get(`/api/projects/${projectId.value}/trial-balance`, {
-        params: { account_prefix: ACCOUNT_CODE_1901 },
+      // 查询使用权资产原值
+      const resCost = await api.get(`/api/projects/${projectId.value}/trial-balance`, {
+        params: { account_prefix: costCode },
         _silent: true,
       } as any)
-      const list1901: any[] = Array.isArray(res1901?.data ?? res1901)
-        ? (res1901?.data ?? res1901)
-        : (res1901?.data?.items ?? [])
+      const listCost: any[] = Array.isArray(resCost?.data ?? resCost)
+        ? (resCost?.data ?? resCost)
+        : (resCost?.data?.items ?? [])
 
-      let unadjusted1901 = 0
-      let audited1901 = 0
-      let found1901 = false
+      let unadjustedCost = 0
+      let auditedCost = 0
+      let foundCost = false
 
-      for (const item of list1901) {
+      for (const item of listCost) {
         const code = String(item.standard_account_code ?? item.account_code ?? '')
-        if (code.startsWith(ACCOUNT_CODE_1901)) {
-          unadjusted1901 = Number(item.unadjusted_amount ?? 0)
-          audited1901 = Number(item.audited_amount ?? 0)
-          found1901 = true
+        if (code.startsWith(costCode)) {
+          unadjustedCost = Number(item.unadjusted_amount ?? 0)
+          auditedCost = Number(item.audited_amount ?? 0)
+          foundCost = true
         }
       }
 
       // 查询累计折旧
       const resAccDep = await api.get(`/api/projects/${projectId.value}/trial-balance`, {
-        params: { account_prefix: ACCOUNT_CODE_ACC_DEP },
+        params: { account_prefix: depCode },
         _silent: true,
       } as any)
       const listAccDep: any[] = Array.isArray(resAccDep?.data ?? resAccDep)
@@ -399,19 +423,21 @@ export function useH8FormData(params: {
 
       for (const item of listAccDep) {
         const code = String(item.standard_account_code ?? item.account_code ?? '')
-        if (code.startsWith(ACCOUNT_CODE_ACC_DEP)) {
+        if (code.startsWith(depCode)) {
           unadjustedAccDep = Number(item.unadjusted_amount ?? 0)
           auditedAccDep = Number(item.audited_amount ?? 0)
         }
       }
 
-      tbData.value = { unadjusted1901, audited1901, unadjustedAccDep, auditedAccDep }
+      tbData.value = { unadjustedCost, auditedCost, unadjustedAccDep, auditedAccDep }
 
-      if (!found1901) {
-        ElMessage.warning('科目1901使用权资产未在试算表中找到，请先导入试算平衡表')
+      if (!foundCost) {
+        ElMessage.warning(
+          `科目${costCode}使用权资产未在试算表中找到，请先导入试算平衡表`,
+        )
       }
     } catch {
-      tbData.value = { unadjusted1901: 0, audited1901: 0, unadjustedAccDep: 0, auditedAccDep: 0 }
+      tbData.value = { unadjustedCost: 0, auditedCost: 0, unadjustedAccDep: 0, auditedAccDep: 0 }
     }
   }
 
@@ -467,7 +493,7 @@ export function useH8FormData(params: {
     // Save actions
     saveResponse,
     saveBatchResponses,
-    // TB writeback (1901 + 累计折旧)
+    // TB writeback (原值 + 累计折旧)
     writebackTrialBalance,
     // Load
     selfLoad,

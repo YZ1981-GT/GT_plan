@@ -17,6 +17,7 @@ import { computed, ref, type ComputedRef } from 'vue'
 import { eventBus } from '@/utils/eventBus'
 import { calcSubtotal } from './useL5FormulaEngine'
 import type { useL5FormData } from './useL5FormData'
+import { L5_GROSS_FALLBACK_STANDARD } from './l5AccountScope'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -107,7 +108,7 @@ export function useL5Adjustment(formData: ReturnType<typeof useL5FormData>) {
 
   /** AJE 对科目2701长期应付款的净影响（贷方增加-借方减少） */
   const ajeNetPayable: ComputedRef<number> = computed(() => {
-    const entries2701 = ajeEntries.value.filter(e => e.accountCode === '2701')
+    const entries2701 = ajeEntries.value.filter(e => e.accountCode === L5_GROSS_FALLBACK_STANDARD)
     const credit = calcSubtotal(entries2701.map(e => e.creditAmount))
     const debit = calcSubtotal(entries2701.map(e => e.debitAmount))
     return credit - debit
@@ -115,7 +116,7 @@ export function useL5Adjustment(formData: ReturnType<typeof useL5FormData>) {
 
   /** RJE 对科目2701长期应付款的净影响 */
   const rjeNetPayable: ComputedRef<number> = computed(() => {
-    const entries2701 = rjeEntries.value.filter(e => e.accountCode === '2701')
+    const entries2701 = rjeEntries.value.filter(e => e.accountCode === L5_GROSS_FALLBACK_STANDARD)
     const credit = calcSubtotal(entries2701.map(e => e.creditAmount))
     const debit = calcSubtotal(entries2701.map(e => e.debitAmount))
     return credit - debit

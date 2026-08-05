@@ -12,7 +12,11 @@
       </el-button>
     </div>
 
-    <CompletenessBanner :project-id="projectId" :year="year" />
+    <CompletenessBanner
+      :project-id="projectId"
+      :year="year"
+      @regenerate="onRegenerateTrio"
+    />
 
     <DeliverableToolbar
       v-model:doc-type="filterDocType"
@@ -56,7 +60,15 @@
         @download-guidance="downloadGuidanceVersion"
         @edit="openEditor"
         @select="selectItem"
+        @trace="openTrace"
         @delete="confirmDeleteItem"
+      />
+
+      <!-- 需求 10.3：报表 xlsx 数字与试算表重算不一致时，在交付中心呈现具体行与差额 -->
+      <DeliverableDriftAlert
+        v-if="expandedTaskId && latestDriftReport"
+        :report="latestDriftReport"
+        class="deliverable-center__versions"
       />
 
       <DeliverableVersionList
@@ -64,6 +76,15 @@
         :versions="versionChain"
         :project-id="projectId"
         class="deliverable-center__versions"
+      />
+
+      <!-- 需求 11.5：列表行级溯源（无需先打开在线编辑器） -->
+      <DeliverableTraceDrawer
+        v-if="traceItem"
+        v-model:visible="traceVisible"
+        :project-id="projectId"
+        :task-id="traceItem.task_id"
+        :title="traceItem.file_name || DOC_TYPE_LABEL[traceItem.doc_type] || '交付件'"
       />
     </template>
 
@@ -104,6 +125,9 @@
       :preview-type="editorPreviewType"
       :preview-url="editorUrl"
       :deliverable-status="editorItem.status"
+      :doc-type="editorItem.doc_type"
+      :supports-writeback="editorItem.supports_writeback === true"
+      :supports-section-refresh="editorItem.supports_section_refresh === true"
       :show-watermark="['draft', 'editing'].includes(editorItem.status)"
       @close="editorVisible = false"
     />
@@ -199,6 +223,8 @@ import OnlyOfficeEditor from '@/components/deliverable/OnlyOfficeEditor.vue'
 import DeliverableToolbar from '@/components/deliverable/DeliverableToolbar.vue'
 import DeliverableGroupList from '@/components/deliverable/DeliverableGroupList.vue'
 import DeliverableVersionList from '@/components/deliverable/DeliverableVersionList.vue'
+import DeliverableDriftAlert from '@/components/deliverable/DeliverableDriftAlert.vue'
+import DeliverableTraceDrawer from '@/components/deliverable/DeliverableTraceDrawer.vue'
 import DeliverableExportDialog from '@/components/deliverable/DeliverableExportDialog.vue'
 import DisclosureNotesSelectionDialog from '@/components/deliverable/DisclosureNotesSelectionDialog.vue'
 import DeliverablePreview from '@/components/deliverable/DeliverablePreview.vue'
@@ -274,6 +300,23 @@ const filterStatus = ref('')
 const filterKeyword = ref('')
 const expandedTaskId = ref<string | null>(null)
 const versionChain = ref<DeliverableVersion[]>([])
+
+/**
+ * 最新版本的报表差异检测结果（需求 10.3）。
+ *
+ * 版本链已按时间倒序，故取第 0 项即最新版。只在**最新版**上告警 ——
+ * 历史版本的差异已无处置意义（confirm 闸门也只看最新版）。
+ */
+const latestDriftReport = computed(() => versionChain.value[0]?.drift_report ?? null)
+
+/** 行级溯源抽屉状态（需求 11.5） */
+const traceVisible = ref(false)
+const traceItem = ref<DeliverableItem | null>(null)
+
+function openTrace(item: DeliverableItem) {
+  traceItem.value = item
+  traceVisible.value = true
+}
 const showExportDialog = ref(false)
 const notesDialogVisible = ref(false)
 const showGenerateReport = ref(false)
@@ -448,6 +491,18 @@ async function openPreview(item: DeliverableItem) {
   if (suffix === 'pdf') previewType.value = 'pdf'
   else previewType.value = 'unsupported'
   previewVisible.value = true
+}
+
+/**
+ * 三件套一致性面板的「重新生成这一类」入口（需求 11.4）。
+ *
+ * 直接复用既有三条生成通路（含各自的权限门控与选择弹窗），
+ * 不新造生成逻辑 —— 否则会绕过 `guardGenerate` 的权限校验。
+ */
+function onRegenerateTrio(docType: string) {
+  if (docType === 'audit_report') openGenerateReport()
+  else if (docType === 'financial_report') goGenerateReports()
+  else if (docType === 'disclosure_notes') goGenerateNotes()
 }
 
 function openGenerateReport() {

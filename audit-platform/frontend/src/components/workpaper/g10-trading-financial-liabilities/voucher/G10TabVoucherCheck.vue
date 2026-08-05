@@ -1,5 +1,8 @@
 <template>
   <div class="g10-voucher-check" data-testid="g10-voucher-check">
+  <!-- 抽样方法学（来自抽凭引擎回填，底稿正文可见 → 归档与复核可追溯） -->
+  <WpSamplingMethodologyBar :methodology="methodology" />
+
     <div class="section-head">
       <h3 class="sheet-title">G10-7 交易性金融负债凭证检查表</h3>
       <div class="head-actions">
@@ -412,6 +415,9 @@ import G10AuditTextCards from '../G10AuditTextCards.vue'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
+import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
+import { useSamplingMethodologyPersist } from '../../composables/shared/useSamplingMethodologyPersist'
+import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -544,7 +550,21 @@ function onRowChange(row: G10VoucherCheckRow | undefined) {
   if (idx >= 0) vc.setActiveRowIndex(idx)
 }
 
+/**
+ * 抽样方法学留痕（R6.3/R6.4）：把 `filled` 载荷里的 methodology 落到固定 item key，
+ * 并在抽凭区渲染到底稿正文 —— 复核与归档看的是底稿，不是后台抽凭日志。
+ */
+const { methodology, persistMethodology } = useSamplingMethodologyPersist({
+  wpCode: 'G10',
+  allResponses: toRef(props, 'allResponses') as never,
+  persist: (itemId, remark) => props.debouncedSave(itemId, { remark, conclusion: null }),
+  isReadonly: computed(() => props.isReadonly === true),
+})
+
 function onSampleFilled(payload: { samples: Array<{ summary?: string; amount?: number; voucherDate?: string; voucherNo?: string }> }) {
+  // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
+  void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
+
   for (const s of payload.samples ?? []) {
     vc.mergeSample({
       businessContent: s.summary,

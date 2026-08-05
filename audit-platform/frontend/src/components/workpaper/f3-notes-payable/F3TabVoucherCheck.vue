@@ -17,6 +17,9 @@ import type { F3ImportableSheet } from '../composables/useF3ImportExport'
 import F3VoucherCheckTable from './F3VoucherCheckTable.vue'
 import F3VoucherCheckDialog from './F3VoucherCheckDialog.vue'
 import GtIndexChip from '../GtIndexChip.vue'
+import WpSamplingMethodologyBar from '../shared/WpSamplingMethodologyBar.vue'
+import { useSamplingMethodologyPersist } from '../composables/shared/useSamplingMethodologyPersist'
+import type { SamplingMethodologySnapshot } from '../composables/shared/samplingFillTarget'
 
 const f3VoucherNav = [
   { id: 'f3-7-sampling', label: '抽凭' },
@@ -137,7 +140,25 @@ async function generateAiConclusion() {
   if (text) auditConclusion.value = text
 }
 
+/**
+ * 抽样方法学留痕（R6.3/R6.4）：把 `filled` 载荷里的 methodology 落到固定 item key，
+ * 并在抽凭区渲染到底稿正文 —— 复核与归档看的是底稿，不是后台抽凭日志。
+ */
+const { methodology, persistMethodology } = useSamplingMethodologyPersist({
+  wpCode: 'F3',
+  allResponses: toRef(props, 'allResponses') as never,
+  persist: (itemId, remark) => {
+    const item = { item_id: itemId, conclusion: null, remark }
+    props.allResponses.set(itemId, item as never)
+    window.dispatchEvent(new CustomEvent('f3:save-items', { detail: { items: [item] } }))
+  },
+  isReadonly: computed(() => props.isReadonly),
+})
+
 function handleSamplingFilled(payload: { samples: SampledVoucher[]; phase: Phase; fillMode: FillMode }): void {
+  // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
+  void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
+
   applySamplingResults(payload.samples, payload.fillMode)
 }
 
@@ -148,6 +169,9 @@ function ratioClass(ratio: number): string {
 
 <template>
   <div class="f3-tab-voucher">
+  <!-- 抽样方法学（来自抽凭引擎回填，底稿正文可见 → 归档与复核可追溯） -->
+  <WpSamplingMethodologyBar :methodology="methodology" />
+
     <!-- 编制提示 -->
     <details class="guidance-details">
       <summary>📋 编制提示与核对逻辑</summary>

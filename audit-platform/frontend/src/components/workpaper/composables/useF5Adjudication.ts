@@ -615,6 +615,48 @@ export function useF5Adjudication(options: UseF5AdjudicationOptions) {
     }
   })
 
+  /**
+   * 从四表库带入未审数（主营 / 其他两段写入 currentUnadjusted）。
+   *
+   * 🔴 手工优先：已有非零值时不覆盖。
+   * 🔴 损益类只有「本期发生额」，不写 prior（上年数走 PREV 公式）。
+   */
+  function pullFromTB(prefill: Record<string, { amount: number; label: string; codes: string[] }> | null | undefined): { written: number; skipped: number } {
+    if (!prefill || readonly.value) return { written: 0, skipped: 0 }
+    let written = 0
+    let skipped = 0
+
+    // 主营段
+    if (prefill.main) {
+      const mainRows = safeParseRows<StoredF5AdjRow>(allResponses.value.get(MAIN_STORAGE_KEY)?.remark)
+      const rows = mainRows.length ? mainRows : DEFAULT_MAIN_ROWS.map((r) => ({ ...r }))
+      const mainTotal = rows.reduce((sum, r) => sum + r.currentUnadjusted, 0)
+      if (Math.abs(mainTotal) < 0.005 && rows.length > 0) {
+        rows[0].currentUnadjusted = prefill.main.amount
+        persistRows(MAIN_STORAGE_KEY, rows)
+        written++
+      } else {
+        skipped++
+      }
+    }
+
+    // 其他业务成本段
+    if (prefill.other) {
+      const otherRows = safeParseRows<StoredF5AdjRow>(allResponses.value.get(OTHER_STORAGE_KEY)?.remark)
+      const rows = otherRows.length ? otherRows : DEFAULT_OTHER_ROWS.map((r) => ({ ...r }))
+      const otherTotal = rows.reduce((sum, r) => sum + r.currentUnadjusted, 0)
+      if (Math.abs(otherTotal) < 0.005 && rows.length > 0) {
+        rows[0].currentUnadjusted = prefill.other.amount
+        persistRows(OTHER_STORAGE_KEY, rows)
+        written++
+      } else {
+        skipped++
+      }
+    }
+
+    return { written, skipped }
+  }
+
   return {
     mainBusinessRows,
     mainSubtotal,
@@ -643,6 +685,7 @@ export function useF5Adjudication(options: UseF5AdjudicationOptions) {
     publishAdjudicated,
     serialize,
     deserialize,
+    pullFromTB,
   }
 }
 

@@ -20,6 +20,7 @@ import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
+import { L2_GROSS_FALLBACK_STANDARD } from './l2AccountScope'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -224,12 +225,12 @@ export function useL2FormData(options: UseL2FormDataOptions) {
     if (!projectId.value) return
     try {
       await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: '2231',
+        account_code: L2_GROSS_FALLBACK_STANDARD,
         audited_amount: auditedAmount,
       })
       // 发布 mitt EventBus 通知审定数变更（附注等组件订阅刷新）
       eventBus.emit('substantive:adjudicated', {
-        accountCode: '2231',
+        accountCode: L2_GROSS_FALLBACK_STANDARD,
         auditedAmount,
         wpCode: 'L2',
         timestamp: Date.now(),

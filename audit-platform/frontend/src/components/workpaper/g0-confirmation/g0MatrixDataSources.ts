@@ -5,8 +5,10 @@
  *
  * 数据源两个：
  * ┌────────────────┬──────────────────────────────────────────────────────────┐
- * │ bookAmounts    │ G1/G4/G5/G6/G7/G8/G9/G10 的 render-config                 │
- * │                │ `project_context.tb_amount`（八者是独立 working_paper）    │
+ * │ bookAmounts    │ G1/G4/G5/G6/G7/G8/G9/G10 的 render-config（八者是独立      │
+ * │                │ working_paper）；取值规则见 `extractG0BookAmount` ——       │
+ * │                │ **键名不统一**，`tb_values.closing` 优先、                 │
+ * │                │ `project_context.tb_amount` 兼容回退                       │
  * ├────────────────┼──────────────────────────────────────────────────────────┤
  * │ manualOverrides│ `checklist_responses` 的 `G0-1-matrix-{品种}-{指标key}` 键 │
  * └────────────────┴──────────────────────────────────────────────────────────┘
@@ -27,7 +29,12 @@
  */
 
 import { api } from '@/services/apiProxy'
-import { G0_MATRIX_CATEGORIES, type G0MetricKey } from './g0SummaryMatrix'
+import {
+  G0_MATRIX_CATEGORIES,
+  extractG0BookAmount,
+  type G0BookAmountState,
+  type G0MetricKey,
+} from './g0SummaryMatrix'
 
 // ─── 类型 ─────────────────────────────────────────────────────────────────────
 
@@ -38,10 +45,20 @@ export interface G0MatrixSources {
 }
 
 export interface G0SourceDiagnostics {
-  /** 成功取到 tb_amount 的品种 */
+  /** 成功取到账面金额的品种 */
   bookResolved: string[]
-  /** 未取到的品种（本项目无此科目 / 未编制该审定表 / 取数失败） */
+  /**
+   * 未取到的品种（`bookAbsent` ∪ 未编制该审定表 ∪ 取数失败）。
+   *
+   * 保留该字段是为了让「有没有取到」这一问的答案只有一处；细分原因看 `bookAbsent`。
+   */
   bookMissing: string[]
+  /**
+   * **本项目无此科目**的品种（后端 `tb_source_codes.resolved_from === 'none'` 且
+   * `gross` 为空）。与「未编制审定表 / 取数失败」是两回事：前者是业务事实，
+   * 后者是待补编制 —— UI 文案必须分开（Requirement 4.3）。
+   */
+  bookAbsent: string[]
   /** 取数过程中的错误（不阻断，仅记录并暴露） */
   errors: string[]
 }
@@ -54,32 +71,32 @@ export interface G0SourceDiagnostics {
  * 不走 `fetchWorkpaperHtmlRows`（它按 `_format` 匹配 sheet，与本需求无关）——
  * render 对每个 sheet 都注入同一份 `project_context`，任一 sheet 皆可。
  */
-async function fetchTbAmountByWpCode(
+async function fetchBookAmountByWpCode(
   projectId: string,
   wpCode: string,
-): Promise<number | undefined> {
+): Promise<G0BookAmountState> {
   const idRes = await api.get<{ wp_id?: string }>('/api/custom-query/wp-id-by-code', {
     params: { project_id: projectId, wp_code: wpCode },
     _silent: true,
   } as never)
   const wpId = idRes?.wp_id
-  if (!wpId) return undefined
+  if (!wpId) return { kind: 'unknown' }
 
   const cfg = await api.get<{ sheets?: unknown[] }>(`/api/workpapers/${wpId}/render-config`, {
     _silent: true,
   } as never)
   const sheets = (cfg?.sheets ?? []) as Array<Record<string, unknown>>
 
+  // 🔴 逐 sheet 取「最有信息量」的那个状态：同一底稿内多数 sheet 共享同一份
+  //    project_context，但 G4/G6/G7 的部分 sheet（业务模式分析等）压根没有 html_data
+  //    → 不能取首个 sheet 就返回，否则会把 unknown 当成结论。
+  let best: G0BookAmountState = { kind: 'unknown' }
   for (const sheet of sheets) {
-    const hd = (sheet?.html_data ?? sheet?.htmlData) as
-      | { project_context?: { tb_amount?: unknown } }
-      | undefined
-    const raw = hd?.project_context?.tb_amount
-    const amount = Number(raw)
-    // 🔴 `raw == null` 时 Number(null) === 0 → 必须先排除 null/undefined/''
-    if (raw != null && raw !== '' && Number.isFinite(amount)) return amount
+    const state = extractG0BookAmount(sheet?.html_data ?? sheet?.htmlData)
+    if (state.kind === 'value') return state
+    if (state.kind === 'absent') best = state
   }
-  return undefined
+  return best
 }
 
 // ─── 主编排 ───────────────────────────────────────────────────────────────────
@@ -92,7 +109,12 @@ async function fetchTbAmountByWpCode(
 export async function loadG0MatrixSources(
   projectId: string | undefined,
 ): Promise<G0MatrixSources> {
-  const diagnostics: G0SourceDiagnostics = { bookResolved: [], bookMissing: [], errors: [] }
+  const diagnostics: G0SourceDiagnostics = {
+    bookResolved: [],
+    bookMissing: [],
+    bookAbsent: [],
+    errors: [],
+  }
   const bookAmounts: Record<string, number> = {}
 
   if (!projectId?.trim()) {
@@ -104,13 +126,14 @@ export async function loadG0MatrixSources(
   await Promise.allSettled(
     G0_MATRIX_CATEGORIES.map(async (cat) => {
       try {
-        const amount = await fetchTbAmountByWpCode(projectId, cat.book.wpCode)
-        if (amount != null) {
-          bookAmounts[cat.name] = amount
+        const state = await fetchBookAmountByWpCode(projectId, cat.book.wpCode)
+        if (state.kind === 'value') {
+          bookAmounts[cat.name] = state.amount
           diagnostics.bookResolved.push(cat.name)
-        } else {
-          diagnostics.bookMissing.push(cat.name)
+          return
         }
+        diagnostics.bookMissing.push(cat.name)
+        if (state.kind === 'absent') diagnostics.bookAbsent.push(cat.name)
       } catch (e: unknown) {
         diagnostics.bookMissing.push(cat.name)
         const msg = e instanceof Error ? e.message : '取数失败'

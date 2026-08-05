@@ -13,6 +13,7 @@
  */
 import { ref, computed, type Ref } from 'vue'
 import { isK1RelatedPartyMarked } from './useK1RelatedParty'
+import { partyNameForColumn } from './shared/samplingPartyTarget'
 
 // ─── 源模板五项核对（对齐 K1-12 Excel R13 测试内容说明）────────────────────────
 export const K1_VOUCHER_CHECK_LABELS = [
@@ -366,7 +367,10 @@ export function useK1VoucherCheck(opts: {
   function fillFromSamples(target: 'occurrence' | 'post', samples: any[]): void {
     const mapped: K1VoucherRow[] = samples.map((s, i) => ({
       ...emptyRow(i),
-      debtorName: s.counterpartName ?? s.debtorName ?? '',
+      // 债务人名称走语义门控（K1 其他应收款，这一列语义是「债务人」）。
+      // 原实现读 `s.counterpartName` —— 抽凭样本里**没有这个字段**（后端给的是
+      // party_name/counterpart_account），故该列一直为空。
+      debtorName: partyNameForColumn(s, 'debtor') || s.debtorName || '',
       date: s.voucherDate ?? s.date ?? '',
       voucherNo: s.voucherNo ?? '',
       businessContent: s.summary ?? s.businessContent ?? '',

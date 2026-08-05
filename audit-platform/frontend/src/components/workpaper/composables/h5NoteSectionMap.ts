@@ -112,9 +112,10 @@ function n(v: unknown): number {
  * 待底稿补按矿区类别/变动明细的录入位置后再填。
  */
 export function buildH5SoeRows(totals: H5LayerTotals): Record<string, unknown>[] {
-  const cost = n(totals.cost)
-  const depletion = n(totals.depletion)
-  const impairment = n(totals.impairment)
+  const t = totals || {}
+  const cost = n(t.cost)
+  const depletion = n(t.depletion)
+  const impairment = n(t.impairment)
   const endOf: Record<string, number> = {
     cost,
     depletion,

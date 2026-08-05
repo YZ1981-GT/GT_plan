@@ -39,7 +39,9 @@ export interface UseL4FormDataOptions {
 
 const DEBOUNCE_MS = 2000
 const ITEM_PREFIX = 'L4-'
-const ACCOUNT_CODE = '2502' // 应付债券（贷方/负债类）
+import { L4_GROSS_FALLBACK_STANDARD } from './l4AccountScope'
+
+const ACCOUNT_CODE = L4_GROSS_FALLBACK_STANDARD // 应付债券（贷方/负债类）
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 

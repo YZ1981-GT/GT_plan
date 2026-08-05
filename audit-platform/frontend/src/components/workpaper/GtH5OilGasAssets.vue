@@ -57,21 +57,22 @@
         />
 
         <!-- H5-1 审定表 -->
-        <HiFourTableSourcePanel
-          v-if="props.htmlData?.hi_extraction_enabled"
-          :wp-code="'H5'"
-          :segments="getHiExtractionSegments('H5')"
-          :all-responses="allResponses"
-          :is-readonly="isReadonly"
-          @refresh-complete="selfLoad()"
-        />
-        <H5TabAdjudication
-          v-else-if="currentSheet === 'H5-1'"
-          :wp-id="props.wpId"
-          :project-id="props.projectId"
-          :all-responses="allResponses"
-          :is-readonly="isReadonly"
-        />
+        <template v-else-if="currentSheet === 'H5-1'">
+          <HiFourTableSourcePanel
+            v-if="props.htmlData?.hi_extraction_enabled"
+            :wp-code="'H5'"
+            :segments="getHiExtractionSegments('H5')"
+            :all-responses="allResponses"
+            :is-readonly="isReadonly"
+            @refresh-complete="selfLoad()"
+          />
+          <H5TabAdjudication
+            :wp-id="props.wpId"
+            :project-id="props.projectId"
+            :all-responses="allResponses"
+            :is-readonly="isReadonly"
+          />
+        </template>
 
         <!-- H5-2 明细表 -->
         <H5TabDetail

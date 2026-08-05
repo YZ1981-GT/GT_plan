@@ -151,7 +151,7 @@ export function useF3Adjudication(options: UseF3BaseOptions & { crossSheet?: Ret
     // P0-1：明细存在供应链/其他票据时，动态补入对应审定行（避免金额被丢弃）
     if (crossSheet) {
       const keys = new Set(base.map((r) => r.rowKey))
-      for (const key of ['supplychain', 'other'] as F3CategoryKey[]) {
+      for (const key of ['letter_of_credit', 'supplychain', 'other'] as F3CategoryKey[]) {
         if (!keys.has(key) && crossSheet.hasCategory(key)) {
           base.push({ ...CATEGORY_DEFAULT[key] })
         }
@@ -330,6 +330,45 @@ function mergeCrossSheet(stored: StoredF3AdjRow): StoredF3AdjRow {
     }
   })
 
+  /**
+   * 从四表库带入未审数（按票据种类桶写入 openingUnadjusted）。
+   *
+   * 🔴 手工优先：该行已有非零 openingUnadjusted 时不覆盖，只补空值行。
+   * 🔴 四表无子科目时 prefill=null → 不做任何写入（宁缺勿造）。
+   */
+  function pullFromTB(prefill: Record<string, { opening: number; closing: number; label: string; codes: string[] }> | null | undefined): { written: number; skipped: number } {
+    if (!prefill || readonly.value) return { written: 0, skipped: 0 }
+
+    const stored = ensureDefaultRows(safeParseRows<StoredF3AdjRow>(allResponses.value.get(ADJ_STORAGE_KEY)?.remark))
+    let written = 0
+    let skipped = 0
+
+    for (const [bucketKey, bucket] of Object.entries(prefill)) {
+      let idx = stored.findIndex((r) => r.rowKey === bucketKey)
+      // 四表有该类别但审定表无对应行 → 新增
+      if (idx === -1 && CATEGORY_KEYS.has(bucketKey)) {
+        stored.push({ ...CATEGORY_DEFAULT[bucketKey as F3CategoryKey] })
+        idx = stored.length - 1
+      }
+      if (idx === -1) {
+        skipped++
+        continue
+      }
+      // 手工优先：已有非零值不覆盖
+      if (Math.abs(stored[idx].openingUnadjusted) > 0.005) {
+        skipped++
+        continue
+      }
+      stored[idx].openingUnadjusted = bucket.opening
+      written++
+    }
+
+    if (written > 0) {
+      persistRows(stored)
+    }
+    return { written, skipped }
+  }
+
   return {
     dataRows,
     subtotalRow,
@@ -340,6 +379,7 @@ function mergeCrossSheet(stored: StoredF3AdjRow): StoredF3AdjRow {
     auditConclusion,
     updateCell,
     publishAdjudicated,
+    pullFromTB,
   }
 }
 

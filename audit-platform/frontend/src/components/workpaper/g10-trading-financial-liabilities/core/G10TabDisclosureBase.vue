@@ -139,12 +139,10 @@
         <el-table-column :label="dis.colLabels.value.movement.item" prop="label" min-width="220" fixed />
         <el-table-column :label="dis.colLabels.value.movement.opening" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!row.isTotal && !row.isParent && !isReadonly"
               :model-value="row.openingAmount"
               size="small"
-              :controls="false"
-              style="width:100%"
               @update:model-value="(v: number) => dis.updateListedMovement(row.rowKey, 'openingAmount', v ?? 0)"
             />
             <span v-else :class="{ 'formula-cell': row.isTotal || row.isParent }">{{ fmt(row.openingAmount) }}</span>
@@ -152,12 +150,10 @@
         </el-table-column>
         <el-table-column :label="dis.colLabels.value.movement.increase" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!row.isTotal && !row.isParent && !isReadonly"
               :model-value="row.increaseAmount"
               size="small"
-              :controls="false"
-              style="width:100%"
               @update:model-value="(v: number) => dis.updateListedMovement(row.rowKey, 'increaseAmount', v ?? 0)"
             />
             <span v-else :class="{ 'formula-cell': row.isTotal || row.isParent }">{{ fmt(row.increaseAmount) }}</span>
@@ -165,12 +161,10 @@
         </el-table-column>
         <el-table-column :label="dis.colLabels.value.movement.decrease" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!row.isTotal && !row.isParent && !isReadonly"
               :model-value="row.decreaseAmount"
               size="small"
-              :controls="false"
-              style="width:100%"
               @update:model-value="(v: number) => dis.updateListedMovement(row.rowKey, 'decreaseAmount', v ?? 0)"
             />
             <span v-else :class="{ 'formula-cell': row.isTotal || row.isParent }">{{ fmt(row.decreaseAmount) }}</span>
@@ -178,12 +172,10 @@
         </el-table-column>
         <el-table-column :label="dis.colLabels.value.movement.closing" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!row.isTotal && !row.isParent && !isReadonly"
               :model-value="row.closingAmount"
               size="small"
-              :controls="false"
-              style="width:100%"
               @update:model-value="(v: number) => dis.updateListedMovement(row.rowKey, 'closingAmount', v ?? 0)"
             />
             <span v-else class="formula-cell">{{ fmt(row.closingAmount) }}</span>
@@ -219,12 +211,10 @@
         </el-table-column>
         <el-table-column :label="dis.colLabels.value.designated.opening" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.openingAmount"
               size="small"
-              :controls="false"
-              style="width:100%"
               @update:model-value="(v: number) => dis.updateDesignatedDetail(row.rowKey, 'openingAmount', v ?? 0)"
             />
             <span v-else>{{ fmt(row.openingAmount) }}</span>
@@ -232,12 +222,10 @@
         </el-table-column>
         <el-table-column :label="dis.colLabels.value.designated.closing" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.closingAmount"
               size="small"
-              :controls="false"
-              style="width:100%"
               @update:model-value="(v: number) => dis.updateDesignatedDetail(row.rowKey, 'closingAmount', v ?? 0)"
             />
             <span v-else>{{ fmt(row.closingAmount) }}</span>
@@ -290,12 +278,10 @@
         </el-table-column>
         <el-table-column :label="dis.colLabels.value.fvCredit.fvChange" width="140" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!row.isTotal && !isReadonly"
               :model-value="row.fvChangeAmount"
               size="small"
-              :controls="false"
-              style="width:100%"
               @update:model-value="(v: number) => dis.updateFvCredit(row.rowKey, 'fvChangeAmount', v ?? 0)"
             />
             <span v-else class="formula-cell">{{ fmt(row.fvChangeAmount) }}</span>
@@ -303,12 +289,10 @@
         </el-table-column>
         <el-table-column :label="dis.colLabels.value.fvCredit.creditCurrent" width="160" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!row.isTotal && !isReadonly"
               :model-value="row.creditRiskCurrent"
               size="small"
-              :controls="false"
-              style="width:100%"
               @update:model-value="(v: number) => dis.updateFvCredit(row.rowKey, 'creditRiskCurrent', v ?? 0)"
             />
             <span v-else class="formula-cell">{{ fmt(row.creditRiskCurrent) }}</span>
@@ -316,12 +300,10 @@
         </el-table-column>
         <el-table-column :label="dis.colLabels.value.fvCredit.creditCumulative" width="160" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!row.isTotal && !isReadonly"
               :model-value="row.creditRiskCumulative"
               size="small"
-              :controls="false"
-              style="width:100%"
               @update:model-value="(v: number) => dis.updateFvCredit(row.rowKey, 'creditRiskCumulative', v ?? 0)"
             />
             <span v-else class="formula-cell">{{ fmt(row.creditRiskCumulative) }}</span>
@@ -375,12 +357,10 @@
         </el-table-column>
         <el-table-column :label="dis.colLabels.value.derivative.current" width="130" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!row.isTotal && !isReadonly"
               :model-value="row.currentAmount"
               size="small"
-              :controls="false"
-              style="width:100%"
               @update:model-value="(v: number) => dis.updateDerivativeRow(row.rowKey, 'currentAmount', v ?? 0)"
             />
             <span v-else class="formula-cell">{{ fmt(row.currentAmount) }}</span>
@@ -388,12 +368,10 @@
         </el-table-column>
         <el-table-column :label="dis.colLabels.value.derivative.prior" width="130" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!row.isTotal && !isReadonly"
               :model-value="row.priorAmount"
               size="small"
-              :controls="false"
-              style="width:100%"
               @update:model-value="(v: number) => dis.updateDerivativeRow(row.rowKey, 'priorAmount', v ?? 0)"
             />
             <span v-else class="formula-cell">{{ fmt(row.priorAmount) }}</span>
@@ -437,12 +415,10 @@
         <el-table-column :label="dis.colLabels.value.balance.item" prop="label" min-width="220" fixed />
         <el-table-column :label="dis.colLabels.value.balance.current" width="130" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!row.isTotal && !row.isParent && !isReadonly"
               :model-value="row.currentAmount"
               size="small"
-              :controls="false"
-              style="width:100%"
               @update:model-value="(v: number) => dis.updateSoeBalance(row.rowKey, 'currentAmount', v ?? 0)"
             />
             <span v-else class="formula-cell">{{ fmt(row.currentAmount) }}</span>
@@ -450,12 +426,10 @@
         </el-table-column>
         <el-table-column :label="dis.colLabels.value.balance.prior" width="130" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!row.isTotal && !row.isParent && !isReadonly"
               :model-value="row.priorAmount"
               size="small"
-              :controls="false"
-              style="width:100%"
               @update:model-value="(v: number) => dis.updateSoeBalance(row.rowKey, 'priorAmount', v ?? 0)"
             />
             <span v-else class="formula-cell">{{ fmt(row.priorAmount) }}</span>
@@ -491,12 +465,10 @@
         </el-table-column>
         <el-table-column :label="dis.colLabels.value.fvCredit.fvChange" width="140" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!row.isTotal && !isReadonly"
               :model-value="row.fvChangeAmount"
               size="small"
-              :controls="false"
-              style="width:100%"
               @update:model-value="(v: number) => dis.updateFvCredit(row.rowKey, 'fvChangeAmount', v ?? 0)"
             />
             <span v-else class="formula-cell">{{ fmt(row.fvChangeAmount) }}</span>
@@ -504,12 +476,10 @@
         </el-table-column>
         <el-table-column :label="dis.colLabels.value.fvCredit.creditCurrent" width="160" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!row.isTotal && !isReadonly"
               :model-value="row.creditRiskCurrent"
               size="small"
-              :controls="false"
-              style="width:100%"
               @update:model-value="(v: number) => dis.updateFvCredit(row.rowKey, 'creditRiskCurrent', v ?? 0)"
             />
             <span v-else class="formula-cell">{{ fmt(row.creditRiskCurrent) }}</span>
@@ -517,12 +487,10 @@
         </el-table-column>
         <el-table-column :label="dis.colLabels.value.fvCredit.creditCumulative" width="160" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!row.isTotal && !isReadonly"
               :model-value="row.creditRiskCumulative"
               size="small"
-              :controls="false"
-              style="width:100%"
               @update:model-value="(v: number) => dis.updateFvCredit(row.rowKey, 'creditRiskCumulative', v ?? 0)"
             />
             <span v-else class="formula-cell">{{ fmt(row.creditRiskCumulative) }}</span>
@@ -610,6 +578,7 @@ import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import G10AuditTextCards from '../G10AuditTextCards.vue'
 import G10ImportExportDropdown from '../G10ImportExportDropdown.vue'
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 
 const props = defineProps<{
   variant: 'listed' | 'soe'

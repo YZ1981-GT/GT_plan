@@ -585,9 +585,9 @@ const {
 } = useAdjudicationBringIn({
   projectId: toRef(props, 'projectId') as any,
   year: useAuditContext().year as any,
-  subjectPrefix: '1901',
+  subjectPrefix: '1641',
   direction: 'debit',
-  subjectCode: '1901',
+  subjectCode: '1641',
   wpCode: 'H8',
   subjectLabel: '使用权资产(1901)',
   rows: bringInRows,

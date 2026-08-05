@@ -1,5 +1,8 @@
 ﻿<template>
   <div class="f2-val-sheet f2-contract-check f2-soft-matrix">
+  <!-- 抽样方法学（来自抽凭引擎回填，底稿正文可见 → 归档与复核可追溯） -->
+  <WpSamplingMethodologyBar :methodology="methodology" />
+
     <header class="sheet-header">
       <div>
         <h3>合同履约成本检查表</h3>
@@ -402,6 +405,9 @@ import GtIndexChip from '../../GtIndexChip.vue'
 import ItemAttachment from '../../ItemAttachment.vue'
 import F2ContractCostTestExampleRef from './F2ContractCostTestExampleRef.vue'
 import F2ContractCostCheckDialog from './F2ContractCostCheckDialog.vue'
+import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
+import { useSamplingMethodologyPersist } from '../../composables/shared/useSamplingMethodologyPersist'
+import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'
 
 const props = defineProps<{
   wpId?: string
@@ -511,7 +517,25 @@ onMounted(() => {
 
 const auditYear = computed(() => props.auditYear ?? new Date().getFullYear() - 1)
 
+/**
+ * 抽样方法学留痕（R6.3/R6.4）：把 `filled` 载荷里的 methodology 落到固定 item key，
+ * 并在抽凭区渲染到底稿正文 —— 复核与归档看的是底稿，不是后台抽凭日志。
+ */
+const { methodology, persistMethodology } = useSamplingMethodologyPersist({
+  wpCode: 'F2',
+  allResponses: toRef(props, 'allResponses') as never,
+  persist: (itemId, remark) => {
+    const item = { item_id: itemId, conclusion: null, remark }
+    props.allResponses.set(itemId, item as never)
+    window.dispatchEvent(new CustomEvent('f2-spe:save-items', { detail: { items: [item] } }))
+  },
+  isReadonly: computed(() => props.isReadonly),
+})
+
 function handleSamplingFilled(payload: { samples: SampledVoucher[]; fillMode: FillMode }) {
+  // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
+  void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
+
   chk.fillFromSampling(payload.samples, payload.fillMode)
 }
 

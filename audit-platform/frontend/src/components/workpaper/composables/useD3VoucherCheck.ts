@@ -18,6 +18,7 @@ import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import { parseNum, calcAnomalyRate } from './useD3FormulaEngine'
+import { partyNameForColumn } from './shared/samplingPartyTarget'
 import type { ChecklistResponse } from './useD3FormData'
 import type { FillMode } from './useSamplingAlgorithms'
 
@@ -47,6 +48,8 @@ export interface VoucherCheckRow {
  * 抽样引擎回填样本（子集，仅回填映射所需字段；与 useSamplingAlgorithms.SampledVoucher 结构兼容）。
  */
 export interface SampledVoucherLike {
+  /** 往来单位名称（后端 tb_aux_ledger 补全）；未匹配/歧义时为 null，不得臆造 */
+  partyName?: string | null
   voucherNo: string
   voucherDate?: string | null
   summary?: string | null
@@ -348,7 +351,11 @@ export function mapSampledToVoucherRow(s: SampledVoucherLike): VoucherCheckRow {
   const debit = s.debitAmount != null ? parseNum(s.debitAmount) : undefined
   return {
     rowId: generateRowId(),
-    customerName: '',
+    // 客户名称 = 辅助明细账（tb_aux_ledger）精确匹配出的往来单位，**经语义门控**。
+    // D3 预收款项这一列语义是「客户」（付款方），故只接受来自「客户/往来单位」
+    // 维度的名称；来自「职员」等维度一律不填（备用金往来不是客户）。
+    // 匹配不到 / 一键多名 / 维度不符 → 留空由审计师填，**绝不猜**。
+    customerName: partyNameForColumn(s, 'customer'),
     date: s.voucherDate || '',
     voucherNo: s.voucherNo || '',
     businessContent: s.summary || '',

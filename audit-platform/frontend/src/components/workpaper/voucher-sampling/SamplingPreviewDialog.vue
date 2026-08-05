@@ -36,10 +36,20 @@ interface Props {
   selectedCreditTotal: number
   /** 当前审计阶段，用于手工新增行标注 phase */
   phase?: Phase
+  /**
+   * 「确认填充」被上游门控阻断的原因（非空 ⇒ 按钮 disabled + tooltip 显示该原因）。
+   *
+   * 🔴 门控必须**前置**为 disabled，不能等用户勾完样本、点了按钮才弹 warning ——
+   * 本弹窗带遮罩，提示里指向的「错报推断与总体结论」区在弹窗背后既看不到也点不到，
+   * 那条提示等于死信（2026-08-04 浏览器实测：点确认填充后弹窗不关、四张表全 0 行、
+   * 用户无从下手）。缺省 null = 无门控，行为与引入前逐字等价。
+   */
+  confirmBlockedReason?: string | null
 }
 
 const props = withDefaults(defineProps<Props>(), {
   phase: 'preliminary',
+  confirmBlockedReason: null,
 })
 
 // ─── Emits ────────────────────────────────────────────────────────────────────
@@ -181,7 +191,14 @@ function handleFillModeChange(val: FillMode) {
   emit('update:fill-mode', val)
 }
 
+/** 确认填充是否被上游门控阻断 */
+const isConfirmBlocked = computed(
+  () => !!(props.confirmBlockedReason && props.confirmBlockedReason.trim()),
+)
+
 function handleConfirm() {
+  // 双保险：即便调用方没传 confirmBlockedReason（旧调用点），命中门控也不 emit
+  if (isConfirmBlocked.value) return
   emit('confirm')
 }
 </script>
@@ -411,9 +428,23 @@ function handleConfirm() {
           </el-tooltip>
         </el-radio-group>
       </div>
-      <el-button type="primary" @click="handleConfirm">
-        确认填充
-      </el-button>
+      <el-tooltip
+        :disabled="!isConfirmBlocked"
+        :content="confirmBlockedReason || ''"
+        placement="top"
+      >
+        <!-- disabled 按钮不触发鼠标事件 → 必须套一层 span 才有 tooltip 宿主 -->
+        <span class="confirm-fill-wrap">
+          <el-button
+            type="primary"
+            :disabled="isConfirmBlocked"
+            data-testid="sampling-preview-confirm"
+            @click="handleConfirm"
+          >
+            确认填充
+          </el-button>
+        </span>
+      </el-tooltip>
     </div>
 
     <!-- ═══ 人工增补凭证弹窗（凭证号去重）═══ -->

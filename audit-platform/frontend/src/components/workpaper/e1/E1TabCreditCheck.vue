@@ -24,7 +24,6 @@ import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useE1AiGenerate } from '../composables/useE1AiGenerate'
 import { useE1ImportExport } from '../composables/useE1ImportExport'
-import { amountFormatter, amountParser } from '../composables/wpAmountInput'
 
 const props = defineProps<{
   wpId: string
@@ -652,8 +651,6 @@ async function generateAi(target: 'note' | 'conclusion'): Promise<void> {
                 :disabled="isReadonly"
                 :controls="false"
                 :precision="2"
-                :formatter="amountFormatter"
-                :parser="amountParser"
                 size="small"
                 style="width: 100%"
                 @change="(v: number | undefined) => updateSummary(col.key, 'creditAmount', v ?? 0)"
@@ -665,8 +662,6 @@ async function generateAi(target: 'note' | 'conclusion'): Promise<void> {
                 :disabled="isReadonly"
                 :controls="false"
                 :precision="2"
-                :formatter="amountFormatter"
-                :parser="amountParser"
                 size="small"
                 style="width: 100%"
                 @change="(v: number | undefined) => updateSummary(col.key, 'bookAmount', v ?? 0)"
@@ -698,19 +693,19 @@ async function generateAi(target: 'note' | 'conclusion'): Promise<void> {
         </el-table-column>
         <el-table-column label="①打印日未结清" min-width="120" align="right">
           <template #default="{ row }">
-            <el-input-number :model-value="row.printUncleared" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small" style="width:100%"
+            <el-input-number :model-value="row.printUncleared" :disabled="isReadonly" :controls="false" :precision="2" size="small" style="width:100%"
               @change="(v: number | undefined) => updateAdjust(row.id, 'printUncleared', v ?? 0)" />
           </template>
         </el-table-column>
         <el-table-column label="②加：BS日至打印日已还" min-width="140" align="right">
           <template #default="{ row }">
-            <el-input-number :model-value="row.plusRepaid" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small" style="width:100%"
+            <el-input-number :model-value="row.plusRepaid" :disabled="isReadonly" :controls="false" :precision="2" size="small" style="width:100%"
               @change="(v: number | undefined) => updateAdjust(row.id, 'plusRepaid', v ?? 0)" />
           </template>
         </el-table-column>
         <el-table-column label="③减：BS日至打印日新增" min-width="140" align="right">
           <template #default="{ row }">
-            <el-input-number :model-value="row.minusNew" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small" style="width:100%"
+            <el-input-number :model-value="row.minusNew" :disabled="isReadonly" :controls="false" :precision="2" size="small" style="width:100%"
               @change="(v: number | undefined) => updateAdjust(row.id, 'minusNew', v ?? 0)" />
           </template>
         </el-table-column>
@@ -727,7 +722,7 @@ async function generateAi(target: 'note' | 'conclusion'): Promise<void> {
         </el-table-column>
         <el-table-column label="⑤总账金额" min-width="120" align="right">
           <template #default="{ row }">
-            <el-input-number :model-value="row.glAmount" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small" style="width:100%"
+            <el-input-number :model-value="row.glAmount" :disabled="isReadonly" :controls="false" :precision="2" size="small" style="width:100%"
               @change="(v: number | undefined) => updateAdjust(row.id, 'glAmount', v ?? 0)" />
           </template>
         </el-table-column>

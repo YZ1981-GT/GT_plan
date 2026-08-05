@@ -3,6 +3,16 @@
     <div class="g9-toolbar tab-toolbar">
       <h3 class="g9-title">G9-1 其他非流动金融资产审定表</h3>
       <div class="g9-actions">
+        <el-tooltip :content="fourTableHint" placement="top">
+          <el-button
+            size="small"
+            :disabled="isReadonly || !hasFourTablePrefill"
+            :loading="seeding"
+            @click="onPullFromFourTable"
+          >
+            从四表库带入未审数
+          </el-button>
+        </el-tooltip>
         <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
           <el-icon><Download /></el-icon>带入调整
         </el-button>
@@ -259,7 +269,7 @@
 
 <script setup lang="ts">
 import { computed, toRef, ref, watch } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download } from '@element-plus/icons-vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import GtReviewDot from '../../GtReviewDot.vue'
@@ -271,6 +281,17 @@ import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn
 import { useAuditContext } from '@/composables/useAuditContext'
 import { G9_ADJUDICATION_ITEMS, G9_GROUP_LABELS, G9_ACCOUNT_ALIASES } from '../../composables/g9Constants'
 import { g9AccountLabel } from '../../composables/g9AccountMatch'
+import {
+  buildG9SeedCells,
+  normalizeGAdjPrefill,
+} from '../../composables/gCycleAdjudicationSeed'
+import {
+  describeAdjPrefillConflicts,
+  describeAdjPrefillPlan,
+  planAdjudicationPrefill,
+  planHasWork,
+  resolveAdjPrefillWrites,
+} from '../../composables/shared/adjudicationPrefillPlan'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
 
@@ -347,6 +368,80 @@ const adjRowCount = computed(() =>
 const groupTotalKeys = new Set(
   G9_ADJUDICATION_ITEMS.filter((d) => d.isGroupTotal).map((d) => d.rowKey),
 )
+
+// ─── 从四表库带入未审数（1519 期初+期末，按叶子顺序落可编辑行，跳过小计行）──────
+
+const seeding = ref(false)
+
+const fourTablePrefill = computed(() =>
+  normalizeGAdjPrefill(props.htmlData?.adjudication_prefill),
+)
+
+const seedResult = computed(() => buildG9SeedCells(
+  fourTablePrefill.value,
+  (k) => adj.dataRows.value.find((r) => r.rowKey === k)?.label ?? k,
+))
+
+const hasFourTablePrefill = computed(() => seedResult.value.cells.length > 0)
+
+const fourTableHint = computed(() =>
+  hasFourTablePrefill.value
+    ? '把四表库（tb_balance 其他非流动金融资产叶子余额）按顺序带入可编辑行的期初/期末未审数；已录入的格不覆盖'
+    : '四表库暂无其他非流动金融资产科目数据（需先导入余额表）',
+)
+
+function readCurrentCellG9(cell: { rowKey: string; field: string }): number | null {
+  const row = adj.dataRows.value.find((r) => r.rowKey === cell.rowKey)
+  if (!row) return null
+  const v = (row as unknown as Record<string, unknown>)[cell.field]
+  return v == null || v === 0 ? null : Number(v)
+}
+
+async function onPullFromFourTable(): Promise<void> {
+  if (props.isReadonly) return
+  const { cells, unclassified, absentSlots } = seedResult.value
+  if (!cells.length) {
+    ElMessage.info('四表库暂无其他非流动金融资产科目数据可带入')
+    return
+  }
+  const plan = planAdjudicationPrefill(cells, readCurrentCellG9, { unclassified, absentSlots })
+  if (!planHasWork(plan)) {
+    ElMessage.info(describeAdjPrefillPlan(plan))
+    return
+  }
+
+  let mode: 'fill-blank' | 'overwrite' = 'fill-blank'
+  if (plan.conflicts.length) {
+    try {
+      const action = await ElMessageBox.confirm(
+        `以下 ${plan.conflicts.length} 格已有录入且与四表不一致：\n`
+        + `${describeAdjPrefillConflicts(plan)}\n\n`
+        + '「覆盖」以四表数据替换；「仅补空值」保留已录入数据、只填空白格。',
+        '从四表库带入未审数',
+        {
+          confirmButtonText: '覆盖',
+          cancelButtonText: '仅补空值',
+          distinguishCancelAndClose: true,
+          type: 'warning',
+        },
+      )
+      if (action === 'confirm') mode = 'overwrite'
+    } catch (e) {
+      if (e === 'close') return
+      mode = 'fill-blank'
+    }
+  }
+
+  seeding.value = true
+  try {
+    for (const w of resolveAdjPrefillWrites(plan, mode)) {
+      adj.updateField(w.rowKey, w.field as 'openingUnadjusted' | 'closingUnadjusted', w.amount)
+    }
+    ElMessage.success(describeAdjPrefillPlan(plan))
+  } finally {
+    seeding.value = false
+  }
+}
 function isGroupTotalKey(rowKey?: string): boolean {
   return !!rowKey && groupTotalKeys.has(rowKey)
 }

@@ -257,9 +257,19 @@ const tab1Count = computed(() => {
   return parseInt(item?.remark || '0', 10)
 })
 
+/**
+ * 风险因素来源枚举。
+ *
+ * 🔴 `appendRiskFactorsFromB2` 对**不在本列表**的 source 静默改写成 `'b2_predecessor'`
+ * → 推送方的溯源会错标成「B2 前任沟通」。故新增推送方必须在此登记。
+ * 新增 `confirmation`（2026-08-04，f0-confirmation-linkage… Task 33）：
+ * 七个函证枢纽的 X0-8/X0-7 舞弊风险评价表推送迹象，具体是哪一张由 factor 文案尾部
+ * 的「（来自 F0-8）」承载（同 B19-1 范式），不为七个循环各开一项。
+ */
 const SOURCE_OPTIONS = [
   { value: 'B22A', label: 'B22A 内控了解' },
   { value: 'B23', label: 'B23 流程了解' },
+  { value: 'confirmation', label: '函证程序舞弊风险评价' },
   { value: 'industry', label: '行业分析' },
   { value: 'discussion', label: '项目组讨论' },
   { value: 'prior_audit', label: '前期审计经验' },

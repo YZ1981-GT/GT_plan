@@ -74,6 +74,17 @@ export interface SamplingConfig {
   sampling_method?: string
   /** 抽样过程 */
   sampling_process?: string
+  /**
+   * 「本期发生额」抽样标准（**G0-6 专属**，源 `替代程序检查表G0-6!C15`）。
+   *
+   * 源模板在 `2.检查本期发生额` 标题行右侧另有一组 5 点选项
+   * `大额（）关联方（）大额交易频繁（）异常（）其他（）`（**末项是「其他」不是「全部」**，
+   * 与 `A7 测试范围` 的 `B7` 只差最后一项），改造前平台完全没有该录入位置。
+   *
+   * additive 可选字段：其余六枢纽从不设值 → 逐字节零影响（与 `BalanceSummary` 里
+   * `current_addition`(H0-5) / `purchase_amount`(F0-5) 的循环专属字段同一范式）。
+   */
+  occurrence_sampling_scope?: string
 }
 
 // ─── 余额汇总 ───────────────────────────────────────────────────────────────
@@ -125,6 +136,17 @@ export interface AlternativeCompany {
   confirm_index?: string
   /** 数据来源（auto/manual） */
   _source?: string
+
+  /**
+   * 期末余额取数来源（供 UI 溯源）：
+   * `aux` = 辅助余额表精确账面值 / `summary` = 汇总表发函金额（抽样口径）。
+   *
+   * 🔴 由 `coordination/importFromSummary.mapSummaryToAlternativeCompany` 产出。
+   * optional 故不传时其余替代程序套别（D05/H05/K05/K06/L05/G06）逐字零回归。
+   * 未声明前该字段在 `importCompanies` 白名单里被静默丢弃 → 落库恒 null，
+   * 审计师看不出某家余额是账面精确值还是发函金额（2026-08-04 实测）。
+   */
+  _balance_source?: 'aux' | 'summary'
 
   /** 抽样配置 */
   sampling?: SamplingConfig

@@ -1,5 +1,8 @@
 <template>
   <div class="h8-tab-disposal-check">
+  <!-- 抽样方法学（来自抽凭引擎回填，底稿正文可见 → 归档与复核可追溯） -->
+  <WpSamplingMethodologyBar :methodology="methodology" />
+
     <!-- 一、审计目标 -->
     <el-alert type="info" :closable="false" class="objective-alert">
       <template #title>
@@ -569,7 +572,7 @@
     >
       <GtVoucherSamplingEngine
         v-if="showSampling && wpId && projectId"
-        account-code="1901"
+        account-code="1641"
         phase="final"
         default-method="mus"
         :workpaper-id="wpId"
@@ -600,6 +603,9 @@ import { useH8ImportExport } from '../../composables/useH8ImportExport'
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
 import type { SampledVoucher } from '../../composables/useSamplingAlgorithms'
+import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
+import { useSamplingMethodologyPersist } from '../../composables/shared/useSamplingMethodologyPersist'
+import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'
 
 const props = defineProps<{
   wpId: string
@@ -737,7 +743,21 @@ async function onSyncAllToH9() {
   ElMessage.success(`已批量同步 ${synced} 笔至 H9`)
 }
 
+/**
+ * 抽样方法学留痕（R6.3/R6.4）：把 `filled` 载荷里的 methodology 落到固定 item key，
+ * 并在抽凭区渲染到底稿正文 —— 复核与归档看的是底稿，不是后台抽凭日志。
+ */
+const { methodology, persistMethodology } = useSamplingMethodologyPersist({
+  wpCode: 'H8',
+  allResponses: toRef(props, 'allResponses') as never,
+  persist: (itemId, remark) => emit('save', itemId, { remark }),
+  isReadonly: computed(() => props.isReadonly === true),
+})
+
 function onSampleFilled(payload: { samples?: SampledVoucher[] }) {
+  // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
+  void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
+
   showSampling.value = false
   const items = payload?.samples || []
   if (!items.length) return

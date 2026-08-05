@@ -12,6 +12,7 @@ import {
 } from '../composables/useF4Detail'
 import { overOneYearKeys } from '../composables/f4AgingModel'
 import { useF4AiGenerate } from '../composables/useF4AiGenerate'
+import { F4_GROSS_FALLBACK_STANDARD } from '../composables/f4AccountScope'
 import F4ImportExportToolbar from './F4ImportExportToolbar.vue'
 import F4SheetAttachments from './F4SheetAttachments.vue'
 import GtIndexChip from '../GtIndexChip.vue'
@@ -208,7 +209,7 @@ function aiContext(): Record<string, unknown> {
   )
   return {
     sheet: 'F4-2',
-    accountCode: '2202',
+    accountCode: F4_GROSS_FALLBACK_STANDARD,
     rowCount: meaningfulRows.length,
     abnormalCount: abnormalCount.value,
     totals: {

@@ -12,9 +12,11 @@ import {
 import { useF4AiGenerate } from '../composables/useF4AiGenerate'
 import { useAdjudicationBringIn } from '../composables/useAdjudicationBringIn'
 import { useAuditContext } from '@/composables/useAuditContext'
+import { F4_GROSS_FALLBACK_STANDARD } from '../composables/f4AccountScope'
 import F4AdjudicationTable from './F4AdjudicationTable.vue'
 import F4ImportExportToolbar from './F4ImportExportToolbar.vue'
 import F4SheetAttachments from './F4SheetAttachments.vue'
+import F4FourTableSourcePanel from './F4FourTableSourcePanel.vue'
 import GtIndexChip from '../GtIndexChip.vue'
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 
@@ -23,6 +25,10 @@ const props = defineProps<{
   projectId: string
   allResponses: Map<string, any>
   isReadonly: boolean
+  /** 后端 render 输出的 adjudication_prefill（按性质桶给期初/期末） */
+  adjudicationPrefill?: Record<string, { opening: number; closing: number; label: string; codes: string[] }> | null
+  /** 后端 render 输出的 tb_source_codes */
+  tbSourceCodes?: any
 }>()
 
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
@@ -49,6 +55,7 @@ const {
   auditNote,
   auditConclusion,
   publishAdjudicated,
+  pullFromTB,
 } = useF4Adjudication({
   wpId: toRef(props, 'wpId') as Ref<string>,
   projectId: toRef(props, 'projectId') as Ref<string>,
@@ -74,11 +81,11 @@ const {
 } = useAdjudicationBringIn({
   projectId: toRef(props, 'projectId') as any,
   year: useAuditContext().year as any,
-  subjectPrefix: '2202',
+  subjectPrefix: F4_GROSS_FALLBACK_STANDARD,
   direction: 'credit',
-  subjectCode: '2202',
+  subjectCode: F4_GROSS_FALLBACK_STANDARD,
   wpCode: 'F4',
-  subjectLabel: '应付账款(2202)',
+  subjectLabel: `应付账款(${F4_GROSS_FALLBACK_STANDARD})`,
   rows: bringInRows,
   updateCell: (rowKey: string, field: any, value: number) =>
     updateCell('nature', rowKey, field === 'rje' ? 'closingRje' : 'closingAje', value),
@@ -90,6 +97,18 @@ const agingTableData = computed(() => [...agingDataRows.value, agingSubtotalRow.
 const hasOpeningVariance = computed(() => Math.abs(openingVariance.value) >= 0.005)
 const hasClosingVariance = computed(() => Math.abs(closingVariance.value) >= 0.005)
 const totalChangeRate = computed(() => natureSubtotalRow.value.changeRate)
+
+const hasTbPrefill = computed(() => !!props.adjudicationPrefill && Object.keys(props.adjudicationPrefill).length > 0)
+
+function handlePullFromTB(): void {
+  if (!hasTbPrefill.value) return
+  const { written, skipped } = pullFromTB(props.adjudicationPrefill)
+  if (written > 0) {
+    ElMessage.success(`已从四表库带入 ${written} 个性质桶的期初/期末未审数${skipped ? `，跳过 ${skipped} 个已有值` : ''}`)
+  } else if (skipped > 0) {
+    ElMessage.info(`所有性质桶已有手工值，未覆盖（跳过 ${skipped} 个）`)
+  }
+}
 
 function amount(value: number): string {
   if (Math.abs(value) < 0.005) return '-'
@@ -115,7 +134,7 @@ function handleUpdate(
 
 function aiContext() {
   return {
-    accountCode: '2202',
+    accountCode: F4_GROSS_FALLBACK_STANDARD,
     natureRows: natureDataRows.value.map((row) => ({
       item: row.label,
       openingAudited: row.openingAdjusted,
@@ -201,6 +220,9 @@ function confirmAdjudication(): void {
 
 <template>
   <div class="f4-tab-adjudication">
+    <!-- 四表取数溯源面板 -->
+    <F4FourTableSourcePanel :source-codes="props.tbSourceCodes" />
+
     <details class="guidance-details">
       <summary>📋 编制思路与公式逻辑</summary>
       <div class="guidance-content">
@@ -231,6 +253,14 @@ function confirmAdjudication(): void {
         <el-tag v-else type="warning" size="small">F4-2无有效明细，期末可手工录入</el-tag>
       </div>
       <div class="toolbar-right">
+        <el-button
+          v-if="hasTbPrefill"
+          size="small"
+          type="success"
+          plain
+          :disabled="isReadonly"
+          @click="handlePullFromTB"
+        >从四表库带入未审数</el-button>
         <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
           <el-icon><Download /></el-icon>带入调整
         </el-button>

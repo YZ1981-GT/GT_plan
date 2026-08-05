@@ -7,6 +7,9 @@
 -->
 <template>
   <el-card shadow="never" class="g7-voucher-sample" :data-testid="`g7-voucher-sample-${storageKey}`">
+  <!-- 抽样方法学（来自抽凭引擎回填，底稿正文可见 → 归档与复核可追溯） -->
+  <WpSamplingMethodologyBar :methodology="methodology" />
+
     <template #header>
       <div class="vs-head">
         <span>{{ title }}</span>
@@ -101,6 +104,9 @@ import {
   type G7VoucherSample,
 } from '../composables/g7VoucherSample'
 import { G7_GROSS_FALLBACK_STANDARD } from '../composables/g7AccountScope'
+import WpSamplingMethodologyBar from '../shared/WpSamplingMethodologyBar.vue'
+import { useSamplingMethodologyPersist, buildChecklistDirectPersist, snapshotToResponseMap } from '../composables/shared/useSamplingMethodologyPersist'
+import type { SamplingMethodologySnapshot } from '../composables/shared/samplingFillTarget'
 
 const props = withDefaults(defineProps<{
   wpId: string
@@ -162,7 +168,31 @@ function removeRow(index: number): void {
   persistRows()
 }
 
+const methodologyStore = ref(snapshotToResponseMap(props.htmlData))
+const rawMethodologyPersist = buildChecklistDirectPersist({
+  wpId: computed(() => props.wpId),
+  projectId: computed(() => props.projectId),
+})
+async function methodologyDirectPersist(itemId: string, remark: string) {
+  // 无 allResponses 的宿主：写库同时更新本地只读表，供 bar 即时反映
+  methodologyStore.value.set(itemId, { remark })
+  await rawMethodologyPersist(itemId, remark)
+}
+/**
+ * 抽样方法学留痕（R6.3/R6.4）：把 `filled` 载荷里的 methodology 落到固定 item key，
+ * 并在抽凭区渲染到底稿正文 —— 复核与归档看的是底稿，不是后台抽凭日志。
+ */
+const { methodology, persistMethodology } = useSamplingMethodologyPersist({
+  wpCode: 'G7',
+  allResponses: methodologyStore,
+  persist: methodologyDirectPersist,
+  isReadonly: computed(() => props.isReadonly === true),
+})
+
 function onSampleFilled(payload: { samples?: G7VoucherSample[] }): void {
+  // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
+  void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
+
   if (props.isReadonly) return
   const samples = payload?.samples ?? []
   if (!samples.length) {

@@ -21,6 +21,7 @@
 import { computed, type ComputedRef, type Ref } from 'vue'
 import { calcAssetEndBalance, calcContraEndBalance } from './useH8FormulaEngine'
 import { calcInitialMeasurement } from './useH8CAS21Engine'
+import { h8Scope } from './hCycleAccountScope'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -221,14 +222,18 @@ function _parseRows(raw: unknown): any[] {
   return []
 }
 
+/** 科目码单一真源 = `hCycleAccountScope.h8Scope`（历史写死 1901/1902） */
+const ROU_COST_CODE = h8Scope.def.slotFallbacks.gross[0]
+const ROU_DEP_CODE = h8Scope.def.slotFallbacks.accum_dep[0]
+
 function _isRouCostAccount(code: string): boolean {
   const c = String(code || '')
-  return c === '1901' || c.startsWith('1901')
+  return c === ROU_COST_CODE || c.startsWith(ROU_COST_CODE)
 }
 
 function _isRouDepAccount(code: string): boolean {
   const c = String(code || '')
-  return c === '1902' || c.startsWith('1902')
+  return c === ROU_DEP_CODE || c.startsWith(ROU_DEP_CODE)
 }
 
 function _isRjeRow(r: any): boolean {

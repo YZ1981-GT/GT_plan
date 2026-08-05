@@ -75,27 +75,28 @@
         />
 
         <!-- I2-1 审定表 -->
-        <HiFourTableSourcePanel
-          v-if="props.htmlData?.hi_extraction_enabled"
-          :wp-code="'I2'"
-          :segments="getHiExtractionSegments('I2')"
-          :all-responses="allResponses"
-          :is-readonly="isReadonly"
-          @refresh-complete="selfLoad()"
-        />
-        <I2TabAdjudication
-          v-else-if="currentSheet === 'I2-1'"
-          :sheet-name="props.sheetName || ''"
-          :wp-id="props.wpId"
-          :project-id="props.projectId"
-          :all-responses="allResponses"
-          :save-response="saveResponse"
-          :is-readonly="isReadonly"
-          :html-data="props.htmlData"
-          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
-          @save="() => { emit('save'); scheduleAutoSnapshot() }"
-          @imported="() => void selfLoad()"
-        />
+        <template v-else-if="currentSheet === 'I2-1'">
+          <HiFourTableSourcePanel
+            v-if="props.htmlData?.hi_extraction_enabled"
+            :wp-code="'I2'"
+            :segments="getHiExtractionSegments('I2')"
+            :all-responses="allResponses"
+            :is-readonly="isReadonly"
+            @refresh-complete="selfLoad()"
+          />
+          <I2TabAdjudication
+            :sheet-name="props.sheetName || ''"
+            :wp-id="props.wpId"
+            :project-id="props.projectId"
+            :all-responses="allResponses"
+            :save-response="saveResponse"
+            :is-readonly="isReadonly"
+            :html-data="props.htmlData"
+            @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
+            @save="() => { emit('save'); scheduleAutoSnapshot() }"
+            @imported="() => void selfLoad()"
+          />
+        </template>
 
         <!-- I2-2 明细表（Excel滚动勾稽 + I2-3账项同步） -->
         <I2TabDetail

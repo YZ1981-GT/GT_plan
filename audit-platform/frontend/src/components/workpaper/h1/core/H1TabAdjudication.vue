@@ -7,6 +7,14 @@
       title="审计目标：复核固定资产原值(1601)、累计折旧(1602)、减值准备(1603)审定数；三角勾稽平衡；AJE/RJE 与 H1-3 一致；净值=原值−折旧−减值，与报表及 H1-2 勾稽。"
     />
 
+    <!-- 四表取数科目溯源面板 -->
+    <WpSemanticAccountSourcePanel
+      :source="htmlData?.tb_source_codes"
+      :slot-order="['gross', 'accum_dep', 'impairment']"
+      :slot-labels="{ gross: '固定资产原值', accum_dep: '累计折旧', impairment: '减值准备' }"
+      hint="科目定位：BS-028 固定资产 = TB('1601') − TB('1602') + TB('1606')"
+    />
+
     <div class="tab-toolbar">
       <GtIndexChip value="wp:H1-1" :context-project-id="projectId" />
       <el-tag size="small" type="info">分类 {{ costDetailRows.length }}</el-tag>
@@ -700,6 +708,7 @@ import { useAuditContext } from '@/composables/useAuditContext'
 import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
+import WpSemanticAccountSourcePanel from '../../shared/WpSemanticAccountSourcePanel.vue'
 
 const props = defineProps<{
   wpId: string

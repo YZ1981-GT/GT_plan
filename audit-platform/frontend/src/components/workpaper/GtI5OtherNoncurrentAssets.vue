@@ -49,25 +49,26 @@
         />
 
         <!-- I5-1 审定表 -->
-        <HiFourTableSourcePanel
-          v-if="props.htmlData?.hi_extraction_enabled"
-          :wp-code="'I5'"
-          :segments="getHiExtractionSegments('I5')"
-          :all-responses="allResponses"
-          :is-readonly="isReadonly"
-          @refresh-complete="selfLoad()"
-        />
-        <I5TabAdjudication
-          v-else-if="currentSheet === 'I5-1'"
-          :wp-id="props.wpId"
-          :project-id="props.projectId"
-          :all-responses="allResponses"
-          :tb-data="tbData"
-          :is-readonly="isReadonly"
-          :html-data="props.htmlData"
-          @save="handleChildSave"
-          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
-        />
+        <template v-else-if="currentSheet === 'I5-1'">
+          <HiFourTableSourcePanel
+            v-if="props.htmlData?.hi_extraction_enabled"
+            :wp-code="'I5'"
+            :segments="getHiExtractionSegments('I5')"
+            :all-responses="allResponses"
+            :is-readonly="isReadonly"
+            @refresh-complete="selfLoad()"
+          />
+          <I5TabAdjudication
+            :wp-id="props.wpId"
+            :project-id="props.projectId"
+            :all-responses="allResponses"
+            :tb-data="tbData"
+            :is-readonly="isReadonly"
+            :html-data="props.htmlData"
+            @save="handleChildSave"
+            @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
+          />
+        </template>
 
         <!-- I5-2 明细表 -->
         <I5TabDetail

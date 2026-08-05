@@ -16,6 +16,7 @@ import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
+import { h9Scope } from './hCycleAccountScope'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -39,10 +40,13 @@ export interface H9TbData {
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const DEBOUNCE_MS = 2000
-/** 科目2205 租赁负债（贷方/负债类） */
-const ACCOUNT_CODE_2205 = '2205'
+/**
+ * 🔴 科目码单一真源 = `hCycleAccountScope.h9Scope`（租赁负债 2601 / 未确认融资费用 2602）。
+ * 历史实现写死 `2205`（合同负债，D7 循环）与 `1802` → 取数与回写全部落在错科目上。
+ */
+const ACCOUNT_CODE_2601 = h9Scope.def.slotFallbacks.gross[0]
 /** 未确认融资费用科目编码（借方/负债备抵类） */
-const ACCOUNT_CODE_FINANCE_COST = '1802'
+const ACCOUNT_CODE_FINANCE_COST = h9Scope.def.slotFallbacks.unearned_finance[0]
 const ITEM_PREFIX = 'H9-'
 const ITEM_PREFIX_A = 'H9A-'
 
@@ -235,7 +239,7 @@ export function useH9FormData(params: {
     try {
       // 回写2205租赁负债（贷方/负债类）
       await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: ACCOUNT_CODE_2205,
+        account_code: ACCOUNT_CODE_2601,
         audited_amount: auditedAmount2205,
       })
 
@@ -250,7 +254,7 @@ export function useH9FormData(params: {
       // 发布 EventBus 事件通知其他底稿（附注/H8使用权资产/报表等）
       eventBus.emit('substantive:adjudicated' as any, {
         wpCode: 'H9',
-        accountCode: ACCOUNT_CODE_2205,
+        accountCode: ACCOUNT_CODE_2601,
         auditedAmount: auditedAmount2205,
         adjudicatedAmount: auditedAmount2205,
         auditedAmountFinanceCost: auditedAmountFinanceCost ?? null,
@@ -366,7 +370,7 @@ export function useH9FormData(params: {
     try {
       // 查询2205租赁负债
       const res2205 = await api.get(`/api/projects/${projectId.value}/trial-balance`, {
-        params: { account_prefix: ACCOUNT_CODE_2205 },
+        params: { account_prefix: ACCOUNT_CODE_2601 },
         _silent: true,
       } as any)
       const list2205: any[] = Array.isArray(res2205?.data ?? res2205)
@@ -379,7 +383,7 @@ export function useH9FormData(params: {
 
       for (const item of list2205) {
         const code = String(item.standard_account_code ?? item.account_code ?? '')
-        if (code.startsWith(ACCOUNT_CODE_2205)) {
+        if (code.startsWith(ACCOUNT_CODE_2601)) {
           unadjusted2205 = Number(item.unadjusted_amount ?? 0)
           audited2205 = Number(item.audited_amount ?? 0)
           found2205 = true

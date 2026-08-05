@@ -42,6 +42,9 @@
       </el-form-item>
     </el-form>
 
+    <!-- 抽样方法学（由父级从 checklist 读回后下传；本组件是展示件，不直接落库） -->
+    <WpSamplingMethodologyBar :methodology="methodology" />
+
     <!-- 工具栏 -->
     <div class="toolbar">
       <GtVoucherSamplingEngine
@@ -161,6 +164,8 @@ import type { SampledVoucher, FillMode } from '../../composables/useSamplingAlgo
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import F2SheetToolbar from '../shared/F2SheetToolbar.vue'
+import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
+import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'
 
 export interface SegmentOption {
   label: string
@@ -183,12 +188,15 @@ const props = withDefaults(defineProps<{
   exceedCount: number
   samplingParams: { population: string; sampleSize: number; method: string; confidence: string; tolerableError: string; conclusion: string }
   testConclusion: string
+  /** 抽样方法学（父级从 checklist 读回后下传；无内容时 bar 整条不渲染） */
+  methodology?: SamplingMethodologySnapshot | null
   // 环境
   wpId?: string
   projectId?: string
   auditYear?: number
   isReadonly: boolean
 }>(), {
+  methodology: null,
   guidanceText: '请根据抽样结果逐项核对存货计价方法的正确性，关注差异率超过阈值的样本。',
   objectiveText: '选取样本存货品种，重新计算发出/结存成本，验证企业存货计价方法运用的正确性与一贯性，防止计价错误导致成本与存货错报。',
   auditNote: '',
@@ -200,7 +208,12 @@ const emit = defineEmits<{
   addRow: []
   removeRow: [id: string]
   updateRow: [id: string, patch: Partial<ValuationTestRow>]
-  samplingFilled: [payload: { samples: SampledVoucher[]; fillMode: FillMode }]
+  samplingFilled: [payload: {
+    samples: SampledVoucher[]
+    fillMode: FillMode
+    /** 方法学快照原样上抛，由父级落到 `samplingMethodologyItemKey(wpCode)`（R6.3） */
+    methodology?: SamplingMethodologySnapshot
+  }]
   'update:testConclusion': [text: string]
   'update:auditNote': [text: string]
 }>()
@@ -213,7 +226,12 @@ const tableMaxHeight = computed(() => props.displayRows.length > 50 ? 560 : 420)
 // 存货计价测试科目范围（保留原 account-code 值 1401~1411，不新增硬编码）
 const valuationAccountCodes = '1401,1402,1403,1404,1405,1406,1407,1408,1409,1410,1411'.split(',')
 
-function handleSamplingFilled(payload: { samples: SampledVoucher[]; fillMode: FillMode }) {
+function handleSamplingFilled(payload: {
+  samples: SampledVoucher[]
+  fillMode: FillMode
+  methodology?: SamplingMethodologySnapshot
+}) {
+  // methodology 原样上抛 —— 本组件无 allResponses，落库能力在父级（F2-38/39/40 宿主）
   emit('samplingFilled', payload)
 }
 

@@ -7,6 +7,14 @@
       title="审计目标：核实在建工程原值(1604)及减值准备期末余额的存在、完整与计价；审定净值=原值−减值；与 H2-2/TB 勾稽，为报表列报与转固提供审定依据。"
     />
 
+    <!-- 四表取数科目溯源面板 -->
+    <WpSemanticAccountSourcePanel
+      :source="htmlData?.tb_source_codes"
+      :slot-order="['gross', 'eng_mat', 'impairment']"
+      :slot-labels="{ gross: '在建工程', eng_mat: '工程物资', impairment: '在建工程减值准备' }"
+      hint="科目定位：BS-029 在建工程 = TB('1604')"
+    />
+
     <div class="tab-toolbar">
       <div class="toolbar-left">
         <el-button
@@ -406,6 +414,7 @@ import { useAuditContext } from '@/composables/useAuditContext'
 import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
+import WpSemanticAccountSourcePanel from '../../shared/WpSemanticAccountSourcePanel.vue'
 
 const props = defineProps<{
   wpId: string

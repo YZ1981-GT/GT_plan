@@ -17,6 +17,7 @@ import { computed, ref, type ComputedRef } from 'vue'
 import { eventBus } from '@/utils/eventBus'
 import { calcSubtotal } from './useL4FormulaEngine'
 import type { useL4FormData } from './useL4FormData'
+import { L4_GROSS_FALLBACK_STANDARD } from './l4AccountScope'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -107,7 +108,7 @@ export function useL4Adjustment(formData: ReturnType<typeof useL4FormData>) {
 
   /** AJE 对科目2502的净影响（贷方增加-借方减少） */
   const ajeNetAmount: ComputedRef<number> = computed(() => {
-    const aje2502 = ajeEntries.value.filter(e => e.accountCode === '2502')
+    const aje2502 = ajeEntries.value.filter(e => e.accountCode === L4_GROSS_FALLBACK_STANDARD)
     const credit = calcSubtotal(aje2502.map(e => e.creditAmount))
     const debit = calcSubtotal(aje2502.map(e => e.debitAmount))
     return credit - debit
@@ -115,7 +116,7 @@ export function useL4Adjustment(formData: ReturnType<typeof useL4FormData>) {
 
   /** RJE 对科目2502的净影响 */
   const rjeNetAmount: ComputedRef<number> = computed(() => {
-    const rje2502 = rjeEntries.value.filter(e => e.accountCode === '2502')
+    const rje2502 = rjeEntries.value.filter(e => e.accountCode === L4_GROSS_FALLBACK_STANDARD)
     const credit = calcSubtotal(rje2502.map(e => e.creditAmount))
     const debit = calcSubtotal(rje2502.map(e => e.debitAmount))
     return credit - debit

@@ -132,18 +132,35 @@ export function useDiffChecklistData(props: UseDiffChecklistDataProps): UseDiffC
 
   // ─── A-I 公式链计算 ───────────────────────────────────────────────────────
 
+  /**
+   * 子表金额求和。
+   *
+   * 🔴 `?? 0` 只挡 null/undefined，**NaN/Infinity 会穿透**让整条 A-I 公式链变 NaN
+   * （导入 Excel 的脏数据、`parseFloat('abc')`、手输 `1e400` 都会产生）。
+   * 故必须用 `Number.isFinite` 逐行过滤 —— 单个坏行不应污染整表调节结果。
+   * 守卫见 `__tests__/useDiffChecklistData.pbt.spec.ts`。
+   */
   function sumSubTable(rows?: SubTableRow[]): number {
     if (!rows || !rows.length) return 0
-    return rows.reduce((s, r) => s + (r.amount ?? 0), 0)
+    return rows.reduce((s, r) => {
+      const v = Number(r.amount)
+      return Number.isFinite(v) ? s + v : s
+    }, 0)
+  }
+
+  /** 标量金额归一：非有限值（NaN/±Infinity/非数字串）一律视为 0，防污染公式链 */
+  function safeAmount(v: unknown): number {
+    const n = Number(v)
+    return Number.isFinite(n) ? n : 0
   }
 
   function computeFormula(company: DiffChecklistCompany): DiffChecklistCompany {
-    const A = company.a_reply_amount ?? 0
+    const A = safeAmount(company.a_reply_amount)
     const B = sumSubTable(company.b_rows)
     const C = sumSubTable(company.c_rows)
     const D = precise2(A + B - C)
 
-    const E = company.e_book_amount ?? 0
+    const E = safeAmount(company.e_book_amount)
     const F = sumSubTable(company.f_rows)
     const G = sumSubTable(company.g_rows)
     const H = precise2(E + F - G)

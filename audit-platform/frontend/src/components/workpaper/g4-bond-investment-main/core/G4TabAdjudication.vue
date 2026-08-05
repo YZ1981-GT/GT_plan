@@ -3,6 +3,16 @@
     <div class="section-head">
       <h3 class="sheet-title">G4-1 债权投资审定表</h3>
       <div class="head-actions tab-toolbar">
+        <el-tooltip :content="fourTableHint" placement="top">
+          <el-button
+            size="small"
+            :disabled="isReadonly || !hasFourTablePrefill"
+            :loading="seeding"
+            @click="onPullFromFourTable"
+          >
+            从四表库带入未审数
+          </el-button>
+        </el-tooltip>
         <el-button size="small" type="primary" plain :loading="adjPull.loading.value" @click="openBringInAdjustment">
           <el-icon><Download /></el-icon>带入调整
         </el-button>
@@ -216,6 +226,19 @@ import type { G4AdjudicationRow } from '../../composables/useG4MainAdjudication'
 import type { ChecklistResponse } from '../../composables/useF1FormData'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
+import {
+  G4_SEED_SPEC,
+  buildGSeedCells,
+  normalizeGAdjPrefill,
+} from '../../composables/gCycleAdjudicationSeed'
+import {
+  describeAdjPrefillConflicts,
+  describeAdjPrefillPlan,
+  planAdjudicationPrefill,
+  planHasWork,
+  resolveAdjPrefillWrites,
+} from '../../composables/shared/adjudicationPrefillPlan'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import G4AuditTextCards from '../G4AuditTextCards.vue'
@@ -313,6 +336,83 @@ onMounted(() => {
   hydrateFromHtmlData()
   adj.fetchTrialBalance()
 })
+
+// ─── 从四表库带入未审数（1504 期初+期末，按减值方法默认落「按组合计提」行）──────
+//
+// G4 的备抵科目 1505 叶子通过 slot='provision' 进入减值准备段行。
+// 「单项计提 / 按组合计提」是减值方法的会计判断，四表无信息 → 默认 + 明示。
+
+const seeding = ref(false)
+
+const fourTablePrefill = computed(() =>
+  normalizeGAdjPrefill(props.htmlData?.adjudication_prefill),
+)
+
+const seedResult = computed(() => buildGSeedCells(fourTablePrefill.value, {
+  ...G4_SEED_SPEC,
+  labelOf: (k) => adj.rows.value.find((r) => r.rowKey === k)?.label ?? k,
+}))
+
+const hasFourTablePrefill = computed(() => seedResult.value.cells.length > 0)
+
+const fourTableHint = computed(() =>
+  hasFourTablePrefill.value
+    ? '把四表库（tb_balance 债权投资/减值准备叶子科目余额）带入对应行的期初/期末未审数；已录入的格不覆盖'
+    : '四表库暂无债权投资科目数据（需先导入余额表）',
+)
+
+function readCurrentCell(cell: { rowKey: string; field: string }): number | null {
+  const row = adj.rows.value.find((r) => r.rowKey === cell.rowKey)
+  if (!row) return null
+  const v = (row as unknown as Record<string, unknown>)[cell.field]
+  return v == null || v === 0 ? null : Number(v)
+}
+
+async function onPullFromFourTable(): Promise<void> {
+  if (props.isReadonly) return
+  const { cells, unclassified, absentSlots } = seedResult.value
+  if (!cells.length) {
+    ElMessage.info('四表库暂无债权投资科目数据可带入')
+    return
+  }
+  const plan = planAdjudicationPrefill(cells, readCurrentCell, { unclassified, absentSlots })
+  if (!planHasWork(plan)) {
+    ElMessage.info(describeAdjPrefillPlan(plan))
+    return
+  }
+
+  let mode: 'fill-blank' | 'overwrite' = 'fill-blank'
+  if (plan.conflicts.length) {
+    try {
+      const action = await ElMessageBox.confirm(
+        `以下 ${plan.conflicts.length} 格已有录入且与四表不一致：\n`
+        + `${describeAdjPrefillConflicts(plan)}\n\n`
+        + '「覆盖」以四表数据替换；「仅补空值」保留已录入数据、只填空白格。',
+        '从四表库带入未审数',
+        {
+          confirmButtonText: '覆盖',
+          cancelButtonText: '仅补空值',
+          distinguishCancelAndClose: true,
+          type: 'warning',
+        },
+      )
+      if (action === 'confirm') mode = 'overwrite'
+    } catch (e) {
+      if (e === 'close') return
+      mode = 'fill-blank'
+    }
+  }
+
+  seeding.value = true
+  try {
+    for (const w of resolveAdjPrefillWrites(plan, mode)) {
+      adj.updateCell(w.rowKey, w.field as 'openingUnadjusted' | 'closingUnadjusted', w.amount)
+    }
+    ElMessage.success(describeAdjPrefillPlan(plan))
+  } finally {
+    seeding.value = false
+  }
+}
 
 function rowClassName({ row }: { row: G4AdjudicationRow }): string {
   if (row.kind === 'section_header') return 'row-section'

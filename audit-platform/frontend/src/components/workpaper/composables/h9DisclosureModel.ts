@@ -17,6 +17,13 @@ export const H9_SOE_KEYS = {
 } as const
 
 export interface H9ListedCategoryRow {
+  /**
+   * 稳定行 key（`H9-listed-{seq}`）。
+   *
+   * 🔴 **不用 label 作 key** —— 改名会丢持久化数据、同名会撞键。
+   * 历史行无此字段（`undefined`），由 `load()` 按序补齐以保证零丢数。
+   */
+  rowId?: string
   item: string
   endBalance: number | null
   lastYearEnd: number | null
@@ -49,7 +56,13 @@ export interface H9ListedDisclosureState {
 }
 
 export interface H9SoeLineRow {
-  key: 'payment' | 'unearned' | 'reclass'
+  /**
+   * 行语义。前三个是源模板固定行（准则用语，不可增删改名）；
+   * `extra` 对应源模板 `A11` 的 `……` **可续扣减行**。
+   */
+  key: 'payment' | 'unearned' | 'reclass' | 'extra'
+  /** 稳定行 key（`H9-soe-extra-{seq}`），仅 `extra` 行有值 */
+  rowId?: string
   item: string
   endBalance: number | null
   beginBalance: number | null
@@ -62,11 +75,19 @@ export interface H9SoeDisclosureState {
   auditConclusion: string
 }
 
+/**
+ * 上市租赁类别 seed 行（源模板 `A8:A10` 是**空白自由列示区**，这四行只是首次进入的
+ * 建议值，可增删改名）。
+ *
+ * 🔴 **必须带显式 `rowId`**：否则 `nextListedRowId()` 对「只剩默认行」的状态返回
+ * `H9-listed-1`，而 `load()` 又按序把默认行补成 `H9-listed-1` → **撞键**，
+ * 按 rowId 查行会命中错行（PBT `Property 11` 用 `amt=0` 抓到过这个）。
+ */
 export const H9_LISTED_DEFAULT_ROWS: H9ListedCategoryRow[] = [
-  { item: '房屋及建筑物租赁', endBalance: null, lastYearEnd: null },
-  { item: '设备租赁', endBalance: null, lastYearEnd: null },
-  { item: '车辆租赁', endBalance: null, lastYearEnd: null },
-  { item: '其他', endBalance: null, lastYearEnd: null },
+  { rowId: 'H9-listed-1', item: '房屋及建筑物租赁', endBalance: null, lastYearEnd: null },
+  { rowId: 'H9-listed-2', item: '设备租赁', endBalance: null, lastYearEnd: null },
+  { rowId: 'H9-listed-3', item: '车辆租赁', endBalance: null, lastYearEnd: null },
+  { rowId: 'H9-listed-4', item: '其他', endBalance: null, lastYearEnd: null },
 ]
 
 export const H9_SOE_DEFAULT_ROWS: H9SoeLineRow[] = [
@@ -178,10 +199,18 @@ export function buildSoeDisplayRows(state: H9SoeDisclosureState): H9SoeDisplayRo
   const payment = lines.find((r) => r.key === 'payment')
   const unearned = lines.find((r) => r.key === 'unearned')
   const reclass = lines.find((r) => r.key === 'reclass')
+  // 🔴 续加扣减项（源模板 `A11` 的 `……`）也是**扣减**项，必须计入净额，
+  //    否则加了扣减项后「净额」与各行不勾稽。
+  const extraEnd = lines
+    .filter((r) => r.key === 'extra')
+    .reduce((s, r) => s + num(r.endBalance), 0)
+  const extraBegin = lines
+    .filter((r) => r.key === 'extra')
+    .reduce((s, r) => s + num(r.beginBalance), 0)
   const endNet =
-    num(payment?.endBalance) - num(unearned?.endBalance) - num(reclass?.endBalance)
+    num(payment?.endBalance) - num(unearned?.endBalance) - num(reclass?.endBalance) - extraEnd
   const beginNet =
-    num(payment?.beginBalance) - num(unearned?.beginBalance) - num(reclass?.beginBalance)
+    num(payment?.beginBalance) - num(unearned?.beginBalance) - num(reclass?.beginBalance) - extraBegin
   return [
     ...lines.map((r, i) => ({
       item: r.item,

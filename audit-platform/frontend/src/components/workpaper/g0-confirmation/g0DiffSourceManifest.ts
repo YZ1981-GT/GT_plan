@@ -84,3 +84,43 @@ export const SECURITIES_PREVIOUSLY_MISSING = [
   'account_holder',
   'support_evidence',
 ] as const
+
+// ─── 派生格格式化语义（Task 3 / Requirement 3） ────────────────────────────────
+
+/**
+ * 按 `field` 反查该列的 `kind`。
+ *
+ * 🔴 为什么需要它：两张差异表的三个/两个派生列此前一律 `{{ row.xxx }}` 裸渲染
+ *    —— 浏览器实测（2026-08-04，项目 `2aa00f57`）「差异公允价值」显示 `3200`
+ *    而非 `3,200.00`，违反平台「金额格式单一真源」铁律；同时「差异数量」
+ *    与「差异比例」**不能**套金额格式（数量无小数、比例是百分点）。
+ *    本函数把「哪列是金额」的判定收敛到 manifest 这一处，组件不再各写一份。
+ *
+ * 🔴 本函数是 `g0DiffSourceManifest.ts` 由「只有自己的测试引用」转为真实生产
+ *    消费方的接线点（改造前它是第 4 个零消费方模块）。
+ *
+ * @param table 'securities' = G0-4 证券差异（目录索引号）；'nonSecurities' = G0-5
+ * @param field 列字段名
+ * @returns 该列 kind；字段不在 manifest 中时返回 `undefined`（调用方按非金额处理，
+ *          绝不猜成金额 —— 猜错会把数量/比例也加上千分符与两位小数）
+ */
+export function diffColumnKind(
+  table: 'securities' | 'nonSecurities',
+  field: string,
+): G0DiffColumnSpec['kind'] | undefined {
+  const cols = table === 'securities' ? SECURITIES_DIFF_COLUMNS : NONSECURITIES_DIFF_COLUMNS
+  return cols.find((c) => c.field === field)?.kind
+}
+
+/**
+ * 判「该派生格是否按金额格式化」。
+ *
+ * 只有 `kind === 'amount'` 为真：`number`（数量）/`ratio`（百分点）/`term`/`text`/`enum`
+ * 全部为假。**未登记字段一律为假**（宁缺勿造，见 `diffColumnKind` 注释）。
+ */
+export function isDiffAmountColumn(
+  table: 'securities' | 'nonSecurities',
+  field: string,
+): boolean {
+  return diffColumnKind(table, field) === 'amount'
+}

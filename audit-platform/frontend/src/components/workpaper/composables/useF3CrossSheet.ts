@@ -42,20 +42,22 @@ export interface F3DetailRowRaw {
 }
 
 /** 票据类别 → 审定/附注分类键（单一真源，供 F3-1 审定表与附注共用） */
-export type F3CategoryKey = 'bank' | 'commercial' | 'supplychain' | 'other'
+export type F3CategoryKey = 'bank' | 'commercial' | 'letter_of_credit' | 'supplychain' | 'other'
 
 export const F3_CATEGORY_META: ReadonlyArray<{ rowKey: F3CategoryKey; label: string; keyword: string }> = [
   { rowKey: 'bank', label: '银行承兑汇票', keyword: '银行' },
   { rowKey: 'commercial', label: '商业承兑汇票', keyword: '商业' },
+  { rowKey: 'letter_of_credit', label: '信用证', keyword: '信用证' },
   { rowKey: 'supplychain', label: '供应链票据', keyword: '供应链' },
   { rowKey: 'other', label: '其他', keyword: '' },
 ]
 
-/** 按票据类别归类：银行/商业/供应链关键字匹配，其余归"其他"。 */
+/** 按票据类别归类：银行/商业/信用证/供应链关键字匹配，其余归"其他"。 */
 export function rowCategoryKey(r: F3DetailRowRaw): F3CategoryKey {
   const t = String(r.noteType || '')
   if (t.includes('银行')) return 'bank'
   if (t.includes('商业')) return 'commercial'
+  if (t.includes('信用证')) return 'letter_of_credit'
   if (t.includes('供应链')) return 'supplychain'
   return 'other'
 }

@@ -49,25 +49,26 @@
         />
 
         <!-- I4-1 审定表 -->
-        <HiFourTableSourcePanel
-          v-if="props.htmlData?.hi_extraction_enabled"
-          :wp-code="'I4'"
-          :segments="getHiExtractionSegments('I4')"
-          :all-responses="allResponses"
-          :is-readonly="isReadonly"
-          @refresh-complete="selfLoad()"
-        />
-        <I4TabAdjudication
-          v-else-if="currentSheet === 'I4-1'"
-          :wp-id="props.wpId"
-          :project-id="props.projectId"
-          :all-responses="allResponses"
-          :tb-data="tbData"
-          :is-readonly="isReadonly"
-          :html-data="props.htmlData"
-          @save="handleChildSave"
-          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
-        />
+        <template v-else-if="currentSheet === 'I4-1'">
+          <HiFourTableSourcePanel
+            v-if="props.htmlData?.hi_extraction_enabled"
+            :wp-code="'I4'"
+            :segments="getHiExtractionSegments('I4')"
+            :all-responses="allResponses"
+            :is-readonly="isReadonly"
+            @refresh-complete="selfLoad()"
+          />
+          <I4TabAdjudication
+            :wp-id="props.wpId"
+            :project-id="props.projectId"
+            :all-responses="allResponses"
+            :tb-data="tbData"
+            :is-readonly="isReadonly"
+            :html-data="props.htmlData"
+            @save="handleChildSave"
+            @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
+          />
+        </template>
 
         <!-- 附注披露（上市） -->
         <I4TabDisclosureListed

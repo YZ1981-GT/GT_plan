@@ -37,6 +37,7 @@
         :metrics="data.metrics.value"
         @update="handleSummaryUpdate"
         @jump-b50="handleJumpB50"
+        @push-b50="handlePushB50"
       />
 
       <!-- 审计结论 -->
@@ -73,6 +74,11 @@ import { useFraudRiskData } from './composables/useFraudRiskData'
 import { useFraudSignalCollector } from '../coordination/useFraudSignalCollector'
 import { filterSummaryRows, fetchWorkpaperHtmlRows, fetchConfirmationSummaryRows } from '../coordination/importFromSummary'
 import { navigateToCycleSheet } from '../coordination/navigateToCycleSheet'
+import { eventBus } from '@/utils/eventBus'
+import {
+  buildB50RiskFactorPayload,
+  hasPresentFraudIndicators,
+} from '../composables/confirmationRiskPush'
 import type { FraudSignal } from '../coordination/useFraudSignalCollector'
 import FraudRiskDashboard from './FraudRiskDashboard.vue'
 import FraudRiskChecklist from './FraudRiskChecklist.vue'
@@ -316,6 +322,60 @@ function _ruleFallbackFill(items: any[]) {
 }
 
 const router = useRouter()
+
+/**
+ * 把「是否存在=是」的迹象推送到 B50 风险因素识别（源模板 A26 + H26='B50'）。
+ *
+ * 🔴 走平台**既有**通道 `b50:push-risk-factor`（唯一消费者
+ * `GtB50RiskAssessment.appendRiskFactorsFromB2`，既有生产者 B19-1 / B2-12 / B22A / B23）。
+ * 不要发明 `fraud-risk:push-to-b50` 之类的新事件名 —— 旧 `f0FraudRiskPush.ts` 就是这么
+ * 变成零消费方孤儿模块的（全库 grep 该事件名 0 命中，点了按钮什么都不会发生）。
+ *
+ * B50 侧按 factor 文本去重 → 重复推送幂等，无需本地记「已推送」状态。
+ * 七枢纽共享：wp_code 由 props 带入，文案尾部标注「（来自 F0-8）」区分来源底稿。
+ */
+function handlePushB50() {
+  if (props.readonly) return
+  const rows = data.items.value
+  if (!hasPresentFraudIndicators(rows)) {
+    ElMessage.info('暂无标记为「是」的舞弊迹象，无需推送')
+    return
+  }
+
+  // 已识别但未填应对措施时先提示（与 handleJumpB50 同款守门，避免推出半成品风险因素）
+  const unaddressed = rows.filter(
+    (item: any) => String(item.is_exist ?? '').trim() === '是' && !item.countermeasure,
+  )
+  if (unaddressed.length > 0) {
+    ElMessageBox.confirm(
+      `有 ${unaddressed.length} 条已识别的舞弊迹象尚未填写应对措施，推送后 B50 只能看到迹象本身。是否仍要推送？`,
+      '提示',
+      { confirmButtonText: '继续推送', cancelButtonText: '返回补齐', type: 'warning' },
+    )
+      .then(() => doPushB50())
+      .catch(() => { /* 用户取消 */ })
+  } else {
+    doPushB50()
+  }
+}
+
+function doPushB50() {
+  const wpCode = props.wpCode || 'F0-8'
+  const payload = buildB50RiskFactorPayload(data.items.value, wpCode)
+  if (!payload.factors.length) {
+    ElMessage.info('可推送的迹象为空（迹象描述不能为空）')
+    return
+  }
+  eventBus.emit('b50:push-risk-factor' as any, payload)
+  // R4.5：回填 B50 索引（源模板 F0-8!H26 就写着 `B50`）
+  if (data.summary.value.b50_ref !== 'B50') {
+    data.summary.value.b50_ref = 'B50'
+    data.isDirty.value = true
+  }
+  ElMessage.success(
+    `已推送 ${payload.factors.length} 项舞弊迹象至 B50 风险因素识别（B50 按描述去重，重复推送不会产生重复行）`,
+  )
+}
 
 function handleJumpB50() {
   // Task 15: B50 跳转实装（e0-confirmation-completion R10，七枢纽共享）

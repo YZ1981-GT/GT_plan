@@ -1,5 +1,8 @@
 <template>
   <div class="g8-voucher" data-testid="g8-voucher-check">
+  <!-- 抽样方法学（来自抽凭引擎回填，底稿正文可见 → 归档与复核可追溯） -->
+  <WpSamplingMethodologyBar :methodology="methodology" />
+
     <details class="guidance-details">
       <summary>📋 编制提示</summary>
       <div class="guidance-content">
@@ -726,6 +729,9 @@ import type { GCycleCutoffFilledDetail } from '../../composables/gCycleCutoffFil
 import { GCYCLE_CUTOFF_EVENT } from '../../composables/gCycleCutoffFill'
 import type { SampledVoucher, SamplingMethod, Phase } from '../../composables/useSamplingAlgorithms'
 import type { FillMode } from '../../composables/useCutoffAutoSampling'
+import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
+import { useSamplingMethodologyPersist } from '../../composables/shared/useSamplingMethodologyPersist'
+import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'
 
 const props = defineProps<{
   allResponses: Map<string, ChecklistResponse>
@@ -917,12 +923,26 @@ function hintTagType(level: string): 'info' | 'warning' | 'danger' {
   return 'info'
 }
 
+/**
+ * 抽样方法学留痕（R6.3/R6.4）：把 `filled` 载荷里的 methodology 落到固定 item key，
+ * 并在抽凭区渲染到底稿正文 —— 复核与归档看的是底稿，不是后台抽凭日志。
+ */
+const { methodology, persistMethodology } = useSamplingMethodologyPersist({
+  wpCode: 'G8',
+  allResponses: toRef(props, 'allResponses') as never,
+  persist: (itemId, remark) => props.debouncedSave(itemId, { remark, conclusion: null }),
+  isReadonly: computed(() => props.isReadonly === true),
+})
+
 function onSampleFilled(payload: {
   samples: SampledVoucher[]
   phase: Phase
   fillMode: FillMode
   method?: SamplingMethod
 }) {
+  // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
+  void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
+
   if (props.isReadonly) return
   const n = vc.fillFromSampling(payload.samples ?? [], payload.fillMode ?? 'append', payload.method)
   showSampling.value = false

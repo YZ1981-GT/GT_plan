@@ -38,6 +38,7 @@
         @export-excel="handleExportExcel"
         @export-template="handleExportTemplate"
         @jump-d01="handleJumpD01"
+        @push-a13="handlePushA13"
       />
 
       <!-- 差异原因分析表 -->
@@ -102,6 +103,8 @@ import { filterSummaryRows, defaultDiffFilter } from '../coordination/importFrom
 import { CONFIRMATION_DICTS, fallbackSelectOptions } from '../coordination/confirmationDicts'
 import { getCycleConfirmationMeta } from '../coordination/cycleConfirmationMeta'
 import { navigateToCycleSheet } from '../coordination/navigateToCycleSheet'
+import { eventBus } from '@/utils/eventBus'
+import { buildDiffMisstatementPayload } from '../composables/confirmationRiskPush'
 import type { DiffReconcileRow } from './diffReconcileTypes'
 
 import DiffReconcileDashboard from './DiffReconcileDashboard.vue'
@@ -311,6 +314,36 @@ function handleJumpD01(confirmIndex: string) {
     targetWpCode: meta.summaryCode,
     confirmIndex,
   })
+}
+
+/**
+ * 推送函证差异至 A13 未更正错报汇总（Requirement 7.3 / 7.4）。
+ *
+ * 🔴 走平台**既有**通道 `a13:push-misstatement` —— 唯一消费者
+ * `useA13MisstatementBridge`（挂在 WorkpaperEditor Shell，全平台 60+ 生产者），
+ * 它会写入 `unadjusted_misstatements` 表并带 `source_wp_code` 溯源。
+ * 载荷必须是形态 A（`{ wpCode, items:[...] }`）：bridge 读 `wpCode ?? wp_code`，
+ * **不认 `source_wp_code`** —— 键名写错就丢溯源（旧 `f0FraudRiskPush` 正是这么错的）。
+ *
+ * bridge 自带 5s 去重窗口（按 wpCode|description|amount|accountCode 哈希），
+ * 故快速双击/批量与单行重叠推送不会产生重复错报。
+ */
+function handlePushA13(rowIds: string[]) {
+  if (props.readonly) return
+  const ids = new Set((rowIds ?? []).filter(Boolean))
+  if (!ids.size) {
+    ElMessage.info('请先选择要推送的差异行')
+    return
+  }
+  const picked = data.rows.value.filter((r) => r._row_id && ids.has(r._row_id))
+  const payload = buildDiffMisstatementPayload(picked, props.wpCode || 'F0-4')
+  if (!payload.items.length) {
+    ElMessage.info('所选行差异金额为 0，无错报可推送')
+    return
+  }
+  eventBus.emit('a13:push-misstatement', payload as any)
+  // 落库回执由 useA13MisstatementBridge 弹出（它知道成功/失败笔数），此处只报「已发起」
+  ElMessage.success(`已提交 ${payload.items.length} 笔函证差异至未更正错报汇总`)
 }
 
 function handleAuditNoteUpdate(field: string, value: string) {

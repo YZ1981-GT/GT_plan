@@ -307,6 +307,7 @@ import {
   F5_MONTHLY_CHANGE_RATE_THRESHOLD,
 } from '../composables/useF5MonthlyDetail'
 import { useF5AiGenerate } from '../composables/useF5AiGenerate'
+import { F5_GROSS_FALLBACK_STANDARD } from '../composables/f5AccountScope'
 import { resolveImportExportSheet, isImportExportSheet } from '../shared/cycleImportExportRegistry'
 import CycleImportExportDropdown from '../shared/CycleImportExportDropdown.vue'
 import F5SheetAttachments from './F5SheetAttachments.vue'
@@ -419,7 +420,7 @@ function openReview() {
 function aiContext(): Record<string, unknown> {
   return {
     sheet: 'F5-2',
-    accountCode: '6401',
+    accountCode: F5_GROSS_FALLBACK_STANDARD,
     threshold,
     significantChanges: detail.significantChanges.value.map((r) => ({
       product: r.product,

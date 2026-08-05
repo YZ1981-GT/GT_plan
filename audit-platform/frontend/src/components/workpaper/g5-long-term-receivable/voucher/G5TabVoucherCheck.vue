@@ -11,6 +11,9 @@
 -->
 <template>
   <div class="g5-voucher-check">
+  <!-- 抽样方法学（来自抽凭引擎回填，底稿正文可见 → 归档与复核可追溯） -->
+  <WpSamplingMethodologyBar :methodology="methodology" />
+
     <div class="guide-banner">
       <div class="guide-step"><span class="gs-no">1</span>确认测试目标（三认定）</div>
       <div class="guide-step"><span class="gs-no">2</span>填写样本选取方法与规模</div>
@@ -471,6 +474,9 @@ import G5ImportExportDropdown from '../G5ImportExportDropdown.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import { ElMessage } from 'element-plus'
+import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
+import { useSamplingMethodologyPersist, buildChecklistDirectPersist, snapshotToResponseMap } from '../../composables/shared/useSamplingMethodologyPersist'
+import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'
 
 const GtVoucherSamplingEngine = defineAsyncComponent(
   () => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'),
@@ -545,7 +551,31 @@ function openSampling(target: 'occurrence' | 'post'): void {
   samplingTarget.value = target
   samplingVisible.value = true
 }
+const methodologyStore = ref(snapshotToResponseMap(props.htmlData))
+const rawMethodologyPersist = buildChecklistDirectPersist({
+  wpId: computed(() => props.wpId),
+  projectId: computed(() => props.projectId),
+})
+async function methodologyDirectPersist(itemId: string, remark: string) {
+  // 无 allResponses 的宿主：写库同时更新本地只读表，供 bar 即时反映
+  methodologyStore.value.set(itemId, { remark })
+  await rawMethodologyPersist(itemId, remark)
+}
+/**
+ * 抽样方法学留痕（R6.3/R6.4）：把 `filled` 载荷里的 methodology 落到固定 item key，
+ * 并在抽凭区渲染到底稿正文 —— 复核与归档看的是底稿，不是后台抽凭日志。
+ */
+const { methodology, persistMethodology } = useSamplingMethodologyPersist({
+  wpCode: 'G5',
+  allResponses: methodologyStore,
+  persist: methodologyDirectPersist,
+  isReadonly: computed(() => props.readonly === true),
+})
+
 function onSamplesFilled(payload: { samples: any[] }): void {
+  // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
+  void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
+
   fillFromSamples(samplingTarget.value, payload?.samples ?? [])
   samplingVisible.value = false
   persist()

@@ -60,6 +60,8 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :adjudication-prefill="props.htmlData?.adjudication_prefill"
+          :tb-source-codes="props.htmlData?.project_context?.tb_source_codes"
         />
 
         <F4TabDetail

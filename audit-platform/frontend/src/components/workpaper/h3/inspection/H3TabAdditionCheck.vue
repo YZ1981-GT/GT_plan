@@ -1,5 +1,8 @@
 <template>
   <div class="h3-tab-addition-check">
+  <!-- 抽样方法学（来自抽凭引擎回填，底稿正文可见 → 归档与复核可追溯） -->
+  <WpSamplingMethodologyBar :methodology="methodology" />
+
     <!-- 编制提示（致同 H3-5 提示区） -->
     <details class="guidance-details" open>
       <summary>📋 编制提示</summary>
@@ -728,6 +731,9 @@ import type { TitleRow } from '../../composables/h3TitleRowModel'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 import { generateH3AI, h3AiLoading } from '../useH3AiGenerate'
+import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
+import { useSamplingMethodologyPersist, buildChecklistDirectPersist } from '../../composables/shared/useSamplingMethodologyPersist'
+import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'
 
 const GtVoucherSamplingEngine = defineAsyncComponent(() => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'))
 
@@ -887,7 +893,26 @@ async function onTraceFileSelected(ev: Event) {
 const samplingVisible = ref(false)
 const samplingYear = computed(() => props.year ?? new Date().getFullYear())
 function openSampling() { samplingVisible.value = true }
+const rawMethodologyPersist = buildChecklistDirectPersist({
+  wpId: computed(() => props.wpId),
+  projectId: computed(() => props.projectId),
+})
+const methodologyDirectPersist = rawMethodologyPersist
+/**
+ * 抽样方法学留痕（R6.3/R6.4）：把 `filled` 载荷里的 methodology 落到固定 item key，
+ * 并在抽凭区渲染到底稿正文 —— 复核与归档看的是底稿，不是后台抽凭日志。
+ */
+const { methodology, persistMethodology } = useSamplingMethodologyPersist({
+  wpCode: 'H3',
+  allResponses: toRef(props, 'allResponses') as never,
+  persist: methodologyDirectPersist,
+  isReadonly: computed(() => props.isReadonly === true),
+})
+
 function onSamplesFilled(payload: { samples?: any[] }) {
+  // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
+  void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
+
   const n = state.fillFromSampledVouchers(payload?.samples ?? [])
   samplingVisible.value = false
   ElMessage[n > 0 ? 'success' : 'info'](n > 0 ? `已回填 ${n} 笔抽样凭证到增减检查行` : '未回填新凭证（可能已存在或无样本）')

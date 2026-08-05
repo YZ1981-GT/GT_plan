@@ -49,25 +49,26 @@
         />
 
         <!-- I3-1 审定表（66公式，商誉不摊销！） -->
-        <HiFourTableSourcePanel
-          v-if="props.htmlData?.hi_extraction_enabled"
-          :wp-code="'I3'"
-          :segments="getHiExtractionSegments('I3')"
-          :all-responses="allResponses"
-          :is-readonly="isReadonly"
-          @refresh-complete="selfLoad()"
-        />
-        <I3TabAdjudication
-          v-else-if="currentSheet === 'I3-1'"
-          :wp-id="props.wpId"
-          :project-id="props.projectId"
-          :all-responses="allResponses"
-          :tb-data="tbData"
-          :is-readonly="isReadonly"
-          :html-data="props.htmlData"
-          @save="handleChildSave"
-          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
-        />
+        <template v-else-if="currentSheet === 'I3-1'">
+          <HiFourTableSourcePanel
+            v-if="props.htmlData?.hi_extraction_enabled"
+            :wp-code="'I3'"
+            :segments="getHiExtractionSegments('I3')"
+            :all-responses="allResponses"
+            :is-readonly="isReadonly"
+            @refresh-complete="selfLoad()"
+          />
+          <I3TabAdjudication
+            :wp-id="props.wpId"
+            :project-id="props.projectId"
+            :all-responses="allResponses"
+            :tb-data="tbData"
+            :is-readonly="isReadonly"
+            :html-data="props.htmlData"
+            @save="handleChildSave"
+            @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
+          />
+        </template>
 
         <!-- I3-2 明细表（原值/减值双表滚动） -->
         <I3TabDetail

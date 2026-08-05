@@ -33,24 +33,25 @@
         :is-readonly="isReadonly"
       />
 
-      <HiFourTableSourcePanel
-        v-if="props.htmlData?.hi_extraction_enabled"
-        :wp-code="'H10'"
-        :segments="getHiExtractionSegments('H10')"
-        :all-responses="allResponses"
-        :is-readonly="isReadonly"
-        @refresh-complete="selfLoad()"
-      />
-      <H10TabAdjudication
-        v-else-if="currentSheet === 'H10-1'"
-        :all-responses="formData.allResponses.value"
-        :wp-id="props.wpId"
-        :project-id="props.projectId"
-        :is-readonly="isReadonly"
-        :debounced-save="onDebouncedSave"
-        :writeback-trial-balance="formData.writebackTrialBalance"
-        @imported="reloadAll"
-      />
+      <template v-else-if="currentSheet === 'H10-1'">
+        <HiFourTableSourcePanel
+          v-if="props.htmlData?.hi_extraction_enabled"
+          :wp-code="'H10'"
+          :segments="getHiExtractionSegments('H10')"
+          :all-responses="allResponses"
+          :is-readonly="isReadonly"
+          @refresh-complete="selfLoad()"
+        />
+        <H10TabAdjudication
+          :all-responses="formData.allResponses.value"
+          :wp-id="props.wpId"
+          :project-id="props.projectId"
+          :is-readonly="isReadonly"
+          :debounced-save="onDebouncedSave"
+          :writeback-trial-balance="formData.writebackTrialBalance"
+          @imported="reloadAll"
+        />
+      </template>
 
       <H10TabDetail
         v-else-if="currentSheet === 'H10-2'"

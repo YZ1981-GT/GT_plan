@@ -36,8 +36,63 @@
       </el-tooltip>
     </div>
 
+    <!--
+      源模板 6 项（G0-1!J19「二、样本选择」）——🔴 `isG0` 门控（裁决门 E）。
+      其余六枢纽走下方既有 4 项分支，渲染结果逐字节不变。
+      文字真源全部 import 自 `g0-confirmation/g0SummaryLowerZone`，本组件不抄第二份。
+      spec: g0-confirmation-source-alignment R3.6 / R3.6.1 / R3.6.2 / R3.6.3
+    -->
+    <el-form v-if="isG0" label-width="132px" size="small" class="confirmation-sampling__form">
+      <el-form-item
+        v-for="def in G0_SAMPLE_DEFS"
+        :key="def.field"
+        :label="def.label"
+      >
+        <!-- 抽样方法：源模板 K25 本就是斜杠分隔的备选项 → 点选优先（可自定义） -->
+        <el-select
+          v-if="def.options"
+          :model-value="valueOf(def.field)"
+          :disabled="readonly"
+          :placeholder="def.placeholder"
+          filterable
+          allow-create
+          default-first-option
+          style="width: 100%"
+          @update:model-value="(v: string) => $emit('update', def.field, v)"
+        >
+          <el-option v-for="opt in def.options" :key="opt" :value="opt" :label="opt" />
+        </el-select>
+        <el-input
+          v-else
+          :model-value="valueOf(def.field)"
+          :disabled="readonly"
+          type="textarea"
+          :autosize="{ minRows: 2 }"
+          :placeholder="def.placeholder"
+          @update:model-value="(v: string) => $emit('update', def.field, v)"
+        />
+        <!-- 源模板补充说明段（K24 / K27），只读提示不是录入项 -->
+        <div v-if="hintOf(def.field)" class="confirmation-sampling__hint">
+          {{ hintOf(def.field) }}
+          <span class="confirmation-sampling__anchor">源模板 {{ hintAnchorOf(def.field) }}</span>
+        </div>
+      </el-form-item>
+
+      <!-- 源外增强字段：源模板无此项，保留既有数据不丢失（R3.6 数据零丢失） -->
+      <el-form-item label="抽样结论">
+        <el-input
+          :model-value="data.sampling_conclusion"
+          :disabled="readonly"
+          type="textarea"
+          :autosize="{ minRows: 2 }"
+          placeholder="抽样结果是否支持审计结论（源模板无此项，平台源外增强）"
+          @update:model-value="(v) => $emit('update', 'sampling_conclusion', v)"
+        />
+      </el-form-item>
+    </el-form>
+
     <!-- 表单区 -->
-    <el-form label-width="80px" size="small" class="confirmation-sampling__form">
+    <el-form v-else label-width="80px" size="small" class="confirmation-sampling__form">
       <el-row :gutter="16">
         <el-col :span="12">
           <el-form-item label="抽样方式">
@@ -93,13 +148,43 @@
 </template>
 
 <script setup lang="ts">
+/**
+ * ConfirmationSampling.vue — 函证「二、样本选择」区块
+ *
+ * 🔴 `isG0` 门控（裁决门 E，spec g0-confirmation-source-alignment R3.6.2）：
+ * 本组件唯一消费方是 `GtConfirmationSummary.vue`，而后者服务**全部七枢纽** →
+ * 无门控地改成 6 项会同时改掉 D0/E0/F0/H0/K0/L0 的样本选择区（与 R11.1 冲突）。
+ * 故 G0 渲染源模板 6 项、其余六枢纽继续渲染既有 4 项。
+ *
+ * 🔴 **门控只在渲染层** —— `SamplingData` 的 6 个字段对全部枢纽都可读写，
+ * `emit('update', field, value)` 不按枢纽分叉，故其余枢纽若已存 6 项数据不会因门控丢失（R3.6.3）。
+ *
+ * 🔴 旧 4 字段**每个都有落点**（数据零丢失）：
+ *   `sampling_size` → `sample_size` · `sampling_criteria` → `specific_samples`
+ *   `sampling_method` 同名沿用 · `sampling_conclusion` 作源外增强字段独立保留并渲染
+ * 读回时新字段为空则回落旧字段值；写入一律写新字段（不双写，避免双真源）。
+ *
+ * 平台级统一为 6 项已登记为待收敛项（见 spec tasks.md §Notes「收敛 spec 登记」）。
+ */
 import { computed } from 'vue'
 import type { SamplingData } from './confirmationTypes'
+import type { ConfirmCycle } from './confirmationColumnSpec'
+// 文字真源单一化：6 项的 label / placeholder / 只读提示全部来自 G0 下区声明模块，
+// 本组件不抄第二份（改源模板文案只需改那一处）。
+import {
+  G0_SAMPLE_SELECTION_DEFS as G0_SAMPLE_DEFS,
+  G0_SAMPLE_SELECTION_HINTS as G0_SAMPLE_HINTS,
+} from '../g0-confirmation/g0SummaryLowerZone'
 
 const props = defineProps<{
   data: SamplingData
   readonly: boolean
   dictData: Record<string, any[]>
+  /**
+   * 函证枢纽（`GtConfirmationSummary.vue` 由 wpCode 派生传入）。
+   * 缺省按**非 G0** 处理 —— 绝不默认 G0，否则其余枢纽会被误改成 6 项。
+   */
+  cycle?: ConfirmCycle
   /** 从父组件传入的发函统计数据 */
   totalCount?: number
   totalAmount?: number
@@ -110,6 +195,36 @@ const props = defineProps<{
 defineEmits<{
   (e: 'update', field: string, value: any): void
 }>()
+
+/** 🔴 渲染层门控：只有 G0 渲染源模板 6 项 */
+const isG0 = computed(() => props.cycle === 'G0')
+
+/** 新字段为空时的旧字段落点（读回映射；写入只写新字段） */
+const LEGACY_FALLBACK: Readonly<Record<string, keyof SamplingData>> = {
+  sample_size: 'sampling_size',
+  specific_samples: 'sampling_criteria',
+  sampling_method: 'sampling_method',
+}
+
+function valueOf(field: string): string {
+  const d = (props.data ?? {}) as Record<string, unknown>
+  const own = d[field]
+  if (own !== undefined && own !== null && own !== '') return String(own)
+  const legacy = LEGACY_FALLBACK[field]
+  if (legacy) {
+    const v = d[legacy]
+    if (v !== undefined && v !== null && v !== '') return String(v)
+  }
+  return ''
+}
+
+function hintOf(field: string): string {
+  return G0_SAMPLE_HINTS.find((h) => h.field === field)?.text ?? ''
+}
+
+function hintAnchorOf(field: string): string {
+  return G0_SAMPLE_HINTS.find((h) => h.field === field)?.anchor ?? ''
+}
 
 const stats = computed(() => ({
   totalCount: props.totalCount ?? 0,
@@ -160,5 +275,19 @@ const criteriaSuggestion = computed(() => {
 }
 .confirmation-sampling__form {
   padding: 0 4px;
+}
+.confirmation-sampling__hint {
+  border-left: 3px solid var(--el-color-warning-light-3);
+  background: var(--el-color-warning-light-9);
+  padding: 4px 8px;
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--el-text-color-regular);
+}
+.confirmation-sampling__anchor {
+  margin-left: 6px;
+  font-size: 11px;
+  color: var(--el-text-color-placeholder);
 }
 </style>

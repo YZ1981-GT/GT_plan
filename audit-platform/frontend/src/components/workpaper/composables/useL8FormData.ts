@@ -57,7 +57,9 @@ export interface TbOccurrence {
 
 const DEBOUNCE_MS = 2000
 const ITEM_PREFIX = 'L8-'
-const ACCOUNT_CODE = '6603' // 财务费用（借方/损益类！取发生额）
+import { L8_GROSS_FALLBACK_STANDARD } from './l8AccountScope'
+
+const ACCOUNT_CODE = L8_GROSS_FALLBACK_STANDARD // 财务费用（借方/损益类！取发生额）
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 

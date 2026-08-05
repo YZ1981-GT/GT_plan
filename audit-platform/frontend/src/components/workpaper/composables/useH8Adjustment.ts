@@ -5,10 +5,14 @@
  * 1. 列：调整事项说明 / 类别(账项调整·报表调整·其他) / 报表项目 / 科目 /
  *    附注项目 / 借方调整金额 / 贷方调整金额 / 索引 / 备注
  * 2. 「账项调整」→ AJE 影响审定数；「报表调整」→ RJE 仅列报；「其他」按 AJE
- * 3. 仅列示与使用权资产相关的审计调整；完整分录通常多行（1901/1902 + 对方科目）且整表借贷平衡
+ * 3. 仅列示与使用权资产相关的审计调整；完整分录通常多行（原值/累计折旧 + 对方科目）且整表借贷平衡
  * 4. 索引交叉引用来源底稿（H8-2/H8-6/H8-8/H8-10/H8-12 等）
- * 5. 与中央调整分录模块双向同步（含 1901 的完整分录组）；可推送 A13；1901/1902 净额可回写 H8-1
+ * 5. 与中央调整分录模块双向同步（含原值科目的完整分录组）；可推送 A13；原值/折旧净额可回写 H8-1
  * 6. 兼容旧存档：adjustType AJE|RJE、summary、counterAccount、debit/credit
+ *
+ * 🔴 科目码单一真源 = `hCycleAccountScope.h8Scope`（H8 真实族 1641/1642/1643）。
+ *    历史实现写死 `1901/1902/1903`（1901 实为待处理财产损溢）与 `2205`（合同负债，
+ *    租赁负债真值 2601）→ 调整分录会记到错科目名下。禁在本文件再写科目码字面量。
  */
 import {
   ref,
@@ -21,6 +25,7 @@ import {
   type ComputedRef,
 } from 'vue'
 import { calcSubtotal } from './useH8FormulaEngine'
+import { h8Scope, h9Scope } from './hCycleAccountScope'
 import { api } from '@/services/apiProxy'
 import { adjustments as adjPaths } from '@/services/apiPaths/accounting'
 import { eventBus } from '@/utils/eventBus'
@@ -76,22 +81,44 @@ const NOTE_KEY = 'H8-3-audit-note'
 const WP_CODE = 'H8'
 const BALANCE_TOLERANCE = 0.01
 
+/** 科目码单一真源（不写字面量，全部取自 scope 声明） */
+function slotCode(scope: typeof h8Scope, slotKey: string, index = 0): string {
+  return scope.def.slotFallbacks[slotKey]?.[index] ?? scope.def.grossFallback
+}
+
+/** 使用权资产原值 / 累计折旧 / 减值准备 */
+export const H8_ROU_COST_CODE = slotCode(h8Scope, 'gross')
+export const H8_ROU_DEP_CODE = slotCode(h8Scope, 'accum_dep')
+export const H8_ROU_IMP_CODE = slotCode(h8Scope, 'impairment')
+/** 租赁负债侧对方科目（H9 循环真源） */
+const H9_LEASE_LIABILITY_CODE = slotCode(h9Scope, 'gross')
+const H9_UNEARNED_FINANCE_CODE = slotCode(h9Scope, 'unearned_finance')
+/** 财务费用（非 H 循环科目，无 scope 声明，作对方科目常量） */
+const FINANCE_EXPENSE_CODE = '6603'
+
 /** 中央模块同步：分录组内含这些科目前缀即视为使用权资产相关候选 */
-const H8_RELATED_PREFIXES = ['1901', '1902', '1903', '2205', '1802', '6603']
+const H8_RELATED_PREFIXES = [
+  H8_ROU_COST_CODE,
+  H8_ROU_DEP_CODE,
+  H8_ROU_IMP_CODE,
+  H9_LEASE_LIABILITY_CODE,
+  H9_UNEARNED_FINANCE_CODE,
+  FINANCE_EXPENSE_CODE,
+]
 
 export const H8_CATEGORY_OPTIONS: readonly H8AdjCategory[] = ['账项调整', '报表调整', '其他']
 
 /** 使用权资产及相关对方科目（录入下拉） */
 export const H8_ADJ_ACCOUNT_OPTIONS = [
-  { code: '1901', name: '使用权资产' },
-  { code: '1902', name: '使用权资产累计折旧' },
-  { code: '1903', name: '使用权资产减值准备' },
-  { code: '2205', name: '租赁负债' },
-  { code: '1802', name: '未确认融资费用' },
+  { code: H8_ROU_COST_CODE, name: '使用权资产' },
+  { code: H8_ROU_DEP_CODE, name: '使用权资产累计折旧' },
+  { code: H8_ROU_IMP_CODE, name: '使用权资产减值准备' },
+  { code: H9_LEASE_LIABILITY_CODE, name: '租赁负债' },
+  { code: H9_UNEARNED_FINANCE_CODE, name: '未确认融资费用' },
   { code: '1002', name: '银行存款' },
   { code: '2202', name: '应付账款' },
   { code: '1221', name: '其他应收款' },
-  { code: '6603', name: '财务费用' },
+  { code: FINANCE_EXPENSE_CODE, name: '财务费用' },
   { code: '5301', name: '营业外支出' },
   { code: '6301', name: '营业外收入' },
   { code: '6115', name: '资产处置收益' },
@@ -134,12 +161,12 @@ function isH8RelatedAccount(code: string): boolean {
 
 function isRouCostAccount(code: string): boolean {
   const c = String(code || '')
-  return c === '1901' || c.startsWith('1901')
+  return c === H8_ROU_COST_CODE || c.startsWith(H8_ROU_COST_CODE)
 }
 
 function isRouDepAccount(code: string): boolean {
   const c = String(code || '')
-  return c === '1902' || c.startsWith('1902') || /累计折旧|累计摊销/.test(c)
+  return c === H8_ROU_DEP_CODE || c.startsWith(H8_ROU_DEP_CODE) || /累计折旧|累计摊销/.test(c)
 }
 
 function entryTypeFromModule(t: string | undefined): 'AJE' | 'RJE' {
@@ -467,7 +494,7 @@ export function useH8Adjustment(params: {
       category,
       entryType: adjustType,
       reportItem: '使用权资产',
-      accountCode: '1901',
+      accountCode: H8_ROU_COST_CODE,
       accountName: '使用权资产',
       noteItem: '',
       debitAmount: 0,
@@ -571,7 +598,7 @@ export function useH8Adjustment(params: {
         wpCode: WP_CODE,
         entryType: 'AJE',
         amount: Math.abs(rouCostAjeNet.value),
-        accountCode: '1901',
+        accountCode: H8_ROU_COST_CODE,
         accountName: '使用权资产',
         description: `H8-3 使用权资产账项净额 ${rouCostAjeNet.value}`,
         ...payload,
@@ -690,7 +717,7 @@ export function useH8Adjustment(params: {
             company_code: 'default',
             description: `[H8] ${lines[0].description || '使用权资产调整'}`,
             line_items: lines.map((r) => ({
-              standard_account_code: r.accountCode || '1901',
+              standard_account_code: r.accountCode || H8_ROU_COST_CODE,
               account_name: r.accountName || undefined,
               debit_amount: r.debitAmount,
               credit_amount: r.creditAmount,
@@ -742,11 +769,11 @@ export function useH8Adjustment(params: {
           isH8RelatedAccount(li.standard_account_code || li.account_code),
         )
         if (!hasRelated) continue
-        // 组内须含 1901，避免误拉纯租赁负债（H9）调整
-        const has1901 = lines.some((li: any) =>
+        // 组内须含使用权资产原值科目，避免误拉纯租赁负债（H9）调整
+        const hasRouCost = lines.some((li: any) =>
           isRouCostAccount(li.standard_account_code || li.account_code),
         )
-        if (!has1901) continue
+        if (!hasRouCost) continue
 
         const groupId = String(item.entry_group_id || item.id || '')
         const et = entryTypeFromModule(item.adjustment_type || item.type)
@@ -782,7 +809,7 @@ export function useH8Adjustment(params: {
       _persist([...manual, ...imported])
       lastSyncMsg.value = imported.length
         ? `已同步 ${imported.length} 行`
-        : '调整分录模块中无含 1901 的相关分录'
+        : `调整分录模块中无含 ${H8_ROU_COST_CODE} 的相关分录`
       return imported.length
     } catch {
       lastSyncMsg.value = '同步失败，请稍后重试'

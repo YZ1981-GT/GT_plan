@@ -199,6 +199,9 @@
           <el-select v-model="form.misstatement_type" style="width: 100%">
             <el-option label="事实错报" value="factual" />
             <el-option label="判断错报" value="judgmental" />
+            <!-- 推断错报：抽样样本错报外推到总体（CAS 1314），由抽凭引擎推送，
+                 亦允许手工录入（如底稿外的分析性程序推断） -->
+            <el-option label="推断错报" value="projected" />
             <el-option label="推断错报" value="projected" />
           </el-select>
         </el-form-item>

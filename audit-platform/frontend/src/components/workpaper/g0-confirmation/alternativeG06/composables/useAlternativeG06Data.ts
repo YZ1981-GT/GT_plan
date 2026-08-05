@@ -120,9 +120,35 @@ export function useAlternativeG06Data(props: UseAlternativeG06DataProps): UseAlt
     }
   }
 
+  // ─── block2 `support_doc` 单列 → 支持性文件1「识别特征」（g0 spec R7.5 / Task 16）──
+  //
+  // 重构前 block2 把源模板「支持性文件1/2」各 3 列压成一个 `support_doc` 文本列。
+  // 拆列后旧值必须有落点，否则既有底稿的支持性证据文字消失（数据零丢失红线）。
+  //
+  // 🔴 幂等：只在「有 support_doc 且 support1_feature 为空」时搬；`support_doc`
+  //    **不删**（保留原值，供导入导出与回溯），故重复执行不会二次覆盖已填的新字段。
+
+  function migrateSupportDoc() {
+    for (const company of core.companies.value) {
+      for (const row of (company.block2_rows || []) as CheckRow[]) {
+        const legacy = row.support_doc
+        if (legacy == null || legacy === '') continue
+        if (row.support1_feature != null && row.support1_feature !== '') continue
+        row.support1_feature = legacy
+      }
+    }
+  }
+
   // 工厂已在构造时 initFromHtmlData 同步填充 companies；watch 覆盖 init + 后续 htmlData 变更。
-  // 迁移靠 _g06_migrated 标记保证只迁一次（幂等）。
-  watch(core.companies, () => migrateLegacyBlocks(), { immediate: true })
+  // 迁移靠 _g06_migrated 标记保证只迁一次（幂等）；support_doc 迁移自身幂等（见函数注释）。
+  watch(
+    core.companies,
+    () => {
+      migrateLegacyBlocks()
+      migrateSupportDoc()
+    },
+    { immediate: true },
+  )
 
   // ─── updateBlockField 包装：block3/block4 公式重算 ────────────────────────
 

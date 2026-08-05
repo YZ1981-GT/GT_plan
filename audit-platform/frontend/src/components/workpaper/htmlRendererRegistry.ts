@@ -126,6 +126,9 @@ export type HtmlComponentType =
   | 'confirmation-fraud-risk'
   | 'confirmation-reliability'
   | 'confirmation-wealth-list'
+  | 'confirmation-send-list-e03'
+  | 'confirmation-send-list-e04'
+  | 'confirmation-send-list-e05'
   | 'b50-risk-assessment'
   | 'b22a-control-matrix'
   | 'b22b-deficiency-evaluation'
@@ -332,6 +335,9 @@ const GtConfirmationDiffChecklist = defineAsyncComponent(() => import('./confirm
 const GtConfirmationFraudRisk = defineAsyncComponent(() => import('./confirmation/fraudRisk/GtConfirmationFraudRisk.vue'))
 const GtConfirmationReliability = defineAsyncComponent(() => import('./confirmation/reliability/GtConfirmationReliability.vue'))
 const GtConfirmationWealthList = defineAsyncComponent(() => import('./confirmation/wealthList/GtConfirmationWealthList.vue'))
+const GtE0SendListE03 = defineAsyncComponent(() => import('./confirmation/e0-send-list/GtE0SendListE03.vue'))
+const GtE0SendListE04 = defineAsyncComponent(() => import('./confirmation/e0-send-list/GtE0SendListE04.vue'))
+const GtE0SendListE05 = defineAsyncComponent(() => import('./confirmation/e0-send-list/GtE0SendListE05.vue'))
 const GtB50RiskAssessment = defineAsyncComponent(() => import('./GtB50RiskAssessment.vue'))
 const GtB22AControlMatrix = defineAsyncComponent(() => import('./GtB22AControlMatrix.vue'))
 const GtB22BDeficiencyEvaluation = defineAsyncComponent(() => import('./GtB22BDeficiencyEvaluation.vue'))
@@ -811,6 +817,30 @@ contextProps: 'form-type' as const,
     component: GtConfirmationWealthList,
     icon: '💰',
     label: '理财产品发函记录表',
+    emits: ['save'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'confirmation-send-list-e03',
+    component: GtE0SendListE03,
+    icon: '✉️',
+    label: '发函清单(货币资金)',
+    emits: ['save'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'confirmation-send-list-e04',
+    component: GtE0SendListE04,
+    icon: '✉️',
+    label: '发函清单(借款)',
+    emits: ['save'],
+    contextProps: 'standard',
+  },
+{
+    componentType: 'confirmation-send-list-e05',
+    component: GtE0SendListE05,
+    icon: '✉️',
+    label: '发函清单(银承)',
     emits: ['save'],
     contextProps: 'standard',
   },

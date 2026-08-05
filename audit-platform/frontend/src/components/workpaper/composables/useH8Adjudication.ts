@@ -2,14 +2,16 @@
  * useH8Adjudication — H8-1 使用权资产、累计折旧及减值准备审定表
  *
  * 对齐致同 Excel「使用权资产、累计折旧及减值准备审定表 H8-1」：
- *   一、原值(1901) → 二、累计折旧(1902) → 三、减值准备(1903) → 四、净额
+ *   一、原值(1641) → 二、累计折旧(1642) → 三、减值准备(1643) → 四、净额
  *   列：期初{未审/账项调整/审定} | 期末{未审/账项调整/审定} | 变动额/变动率
  *
  * 数字化增强：
  * - 默认五类资产分类；审定=未审+账项调整；变动率≥30% 须说明
- * - 从 H8-3 回写期末账项调整（1901/1902 净额按未审权重分摊）
- * - H8-2 / H9 / TB 勾稽；TB 回写 1901+累计折旧
+ * - 从 H8-3 回写期末账项调整（原值/累计折旧净额按未审权重分摊）
+ * - H8-2 / H9 / TB 勾稽；TB 回写原值+累计折旧
  * - 兼容旧存档：block cost|accDep + beginBalance/debit/credit/unadjusted/aje/rje
+ *
+ * 🔴 科目码单一真源 = `hCycleAccountScope.h8Scope`；历史实现写死 1901/1902/1903。
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import {
@@ -18,6 +20,11 @@ import {
   calcNetValue,
   calcSubtotal,
 } from './useH8FormulaEngine'
+import { h8Scope } from './hCycleAccountScope'
+
+/** 使用权资产原值 / 累计折旧科目码（scope 单一真源） */
+const ROU_COST_CODE = h8Scope.def.slotFallbacks.gross[0]
+const ROU_DEP_CODE = h8Scope.def.slotFallbacks.accum_dep[0]
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -923,11 +930,11 @@ export function useH8Adjudication(params: {
           const isRje =
             r.category === '报表调整' ||
             String(r.entryType || r.adjustType || '').toUpperCase() === 'RJE'
-          if (code === '1901' || code.startsWith('1901')) {
+          if (code === ROU_COST_CODE || code.startsWith(ROU_COST_CODE)) {
             if (isRje) cRje += net
             else cAje += net
           }
-          if (code === '1902' || code.startsWith('1902')) {
+          if (code === ROU_DEP_CODE || code.startsWith(ROU_DEP_CODE)) {
             if (isRje) dRje += net
             else dAje += net
           }
@@ -938,7 +945,10 @@ export function useH8Adjudication(params: {
     const costNet = cAje + cRje
     const depNet = dAje + dRje
     if (Math.abs(costNet) < 0.005 && Math.abs(depNet) < 0.005) {
-      return { applied: false, message: 'H8-3 暂无 1901/1902 调整净额' }
+      return {
+        applied: false,
+        message: `H8-3 暂无 ${ROU_COST_CODE}/${ROU_DEP_CODE} 调整净额`,
+      }
     }
 
     if (Math.abs(costNet) >= 0.005) {

@@ -303,21 +303,90 @@ export const G0_BOOK_AMOUNT_WP_CODES: readonly string[] = Object.freeze(
 )
 
 /**
- * 从相邻 G 循环的 render-config `html_data` 提取账面金额。
+ * 账面金额的三态结果。
+ *
+ * 🔴 `absent`（本项目无此科目）与 `value: 0`（科目存在但余额为 0）**必须可区分**
+ *    （Requirement 4.3）—— 前者应显示「本项目无此科目」，后者显示 0.00。
+ */
+export type G0BookAmountState =
+  | { kind: 'value'; amount: number; source: 'tb_values.closing' | 'project_context.tb_amount' }
+  | { kind: 'absent' }
+  | { kind: 'unknown' }
+
+/** 兼容两处存放位置的 `tb_source_codes` 读取（见下方 `extractG0BookAmount` 注释） */
+function readTbSourceCodes(
+  hd: Record<string, unknown> | undefined,
+): { resolved_from?: unknown; gross?: unknown } | undefined {
+  if (!hd) return undefined
+  const pc = hd.project_context as Record<string, unknown> | undefined
+  const fromPc = pc?.tb_source_codes
+  const fromTop = hd.tb_source_codes
+  const picked = (fromPc ?? fromTop) as Record<string, unknown> | undefined
+  return picked && typeof picked === 'object' ? picked : undefined
+}
+
+function finite(raw: unknown): number | undefined {
+  if (raw == null || raw === '') return undefined
+  const n = Number(raw)
+  return Number.isFinite(n) ? n : undefined
+}
+
+/**
+ * 从单个相邻 G 循环底稿的 `html_data` 提取账面金额（原值口径 = `tb_values.closing`）。
+ *
+ * 🔴🔴 **G1..G10 的账面金额键名并不统一（2026-08-04 真实库逐个实测，Task 23）**：
+ * ┌──────────────┬──────────────────────────┬────────────────────────────────────┐
+ * │ G1/G4/G8/G9/ │ `project_context.tb_amount`│ 由 `tb_values.closing` 派生；     │
+ * │ G10          │ + `tb_values`              │ **无科目时仍下发字面 0**          │
+ * ├──────────────┼──────────────────────────┼────────────────────────────────────┤
+ * │ G5 / G6      │ 只有 `tb_values`（可能空） │ 压根不下发 `tb_amount`            │
+ * ├──────────────┼──────────────────────────┼────────────────────────────────────┤
+ * │ G7           │ 只有 `tb_values`           │ **有真实金额却无 `tb_amount`** ——  │
+ * │              │                            │ 实测 closing=40,459,060.60        │
+ * └──────────────┴──────────────────────────┴────────────────────────────────────┘
+ * 故取值顺序 = `tb_values.closing` → `project_context.tb_amount`（后者作兼容回退），
+ * 且**先判「本项目无此科目」**：`tb_source_codes.resolved_from === 'none'` 且 `gross`
+ * 为空时直接返 `absent`，否则 G1/G4/G8/G9/G10 的字面 0 会伪装成「余额为 0」
+ * （与平台铁律「`Number(null) === 0` 假 0」同族，只不过假 0 是后端下发的）。
+ *
+ * `tb_source_codes` 两处存放：`project_context.tb_source_codes`（G1/G4/G7…）与
+ * `html_data.tb_source_codes`（G5/G6）—— 两处都读，不假设。
+ */
+export function extractG0BookAmount(htmlData: unknown): G0BookAmountState {
+  const hd = (htmlData ?? undefined) as Record<string, unknown> | undefined
+  if (!hd || typeof hd !== 'object') return { kind: 'unknown' }
+
+  const tsc = readTbSourceCodes(hd)
+  if (tsc && tsc.resolved_from === 'none') {
+    const gross = Array.isArray(tsc.gross) ? tsc.gross : []
+    if (gross.length === 0) return { kind: 'absent' }
+  }
+
+  const tbValues = hd.tb_values as Record<string, unknown> | undefined
+  const closing = tbValues && typeof tbValues === 'object' ? finite(tbValues.closing) : undefined
+  if (closing != null) return { kind: 'value', amount: closing, source: 'tb_values.closing' }
+
+  const pc = hd.project_context as Record<string, unknown> | undefined
+  const legacy = finite(pc?.tb_amount)
+  if (legacy != null) return { kind: 'value', amount: legacy, source: 'project_context.tb_amount' }
+
+  return { kind: 'unknown' }
+}
+
+/**
+ * 从相邻 G 循环的 render-config `html_data` 提取账面金额（品种 → 金额）。
  *
  * 设计约束：
- * - 缺失返回 `undefined`（**非 0**）—— 「本项目无此科目」与「余额为 0」是两种状态
- * - 只读 `project_context.tb_amount`（trial_balance 期末），不臆造
+ * - 缺失/无此科目**不落键**（返回 `undefined` 而非 0）
+ * - 取值规则见 `extractG0BookAmount`
  */
 export function fetchG0BookAmounts(
-  htmlDataByWpCode: Readonly<Record<string, { project_context?: { tb_amount?: unknown } } | undefined>>,
+  htmlDataByWpCode: Readonly<Record<string, unknown>>,
 ): Record<string, number> {
   const out: Record<string, number> = {}
   for (const cat of G0_MATRIX_CATEGORIES) {
-    const amount = htmlDataByWpCode[cat.book.wpCode]?.project_context?.tb_amount
-    if (typeof amount === 'number' && Number.isFinite(amount)) {
-      out[cat.name] = amount
-    }
+    const state = extractG0BookAmount(htmlDataByWpCode[cat.book.wpCode])
+    if (state.kind === 'value') out[cat.name] = state.amount
   }
   return out
 }

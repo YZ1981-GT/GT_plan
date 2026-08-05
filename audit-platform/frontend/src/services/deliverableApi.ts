@@ -14,11 +14,54 @@ export interface DeliverableItem {
   exported_at: string | null
   template_type: string | null
   selected_sections: string[] | null
+  /**
+   * 能力标志（spec deliverable-lineage-wiring-and-writeback-closure 需求 6.5）。
+   * 单一真源在后端 `app/services/deliverable_capabilities.py`，经列表 DTO 下发。
+   * 🔴 前端**不得**再写一份 doc_type 白名单 —— 双真源改一处另一处不红。
+   * 兼容旧后端：字段缺失时按 false 处理（入口隐藏，比误显示更安全）。
+   */
+  supports_writeback?: boolean
+  supports_section_refresh?: boolean
+  /**
+   * 报表差异告警（需求 10.3）：列表行即可见「数字与按试算表重算不一致」。
+   * 判定由后端 `should_block_confirm` 唯一入口给出 —— 前端**不得**自己写
+   * `if (drift_report)`（`{"diffs": []}` 是非空对象但表示已比对且一致）。
+   */
+  drift_blocked?: boolean
+  drift_reason?: string | null
 }
 
 export interface DeliverableListResponse {
   items: DeliverableItem[]
   grouped: Record<string, DeliverableItem[]>
+}
+
+/** 报表差异检测的单条差异（后端 financial_report_drift_service.compare_cells 产出） */
+export interface DeliverableDriftDiff {
+  row_code: string
+  row_name: string
+  sheet: string
+  period: 'current' | 'prior'
+  coord: string
+  file_value: string
+  expected_value: string
+  diff: string
+  /** 该格在被编辑的上一版是否就已不一致；无基线可比时该字段不存在 */
+  pre_existing?: boolean
+}
+
+export interface DeliverableDriftReport {
+  diffs?: DeliverableDriftDiff[]
+  checked?: number
+  variant?: string
+  stale?: boolean
+  /** upstream_changed / pre_existing / manual_edit / unknown */
+  attribution?: string
+  baseline_version_no?: number
+  pre_existing_count?: number
+  introduced_count?: number
+  /** 检测不可用（映射配置损坏）时才有 */
+  unavailable?: string
 }
 
 export interface DeliverableVersion {
@@ -32,6 +75,20 @@ export interface DeliverableVersion {
   created_at: string | null
   selected_sections: string[] | null
   created_via: string | null
+  /**
+   * 溯源展示字段（spec deliverable-lineage-wiring-and-writeback-closure 需求 11.1/11.2/10.3）。
+   * 全部由后端派生下发；`is_stale` 是**三态**（null = 未知，不得当 false 显示成"最新"）。
+   * 兼容旧后端：字段缺失时按 undefined 处理。
+   */
+  edited_by?: string | null
+  edited_at?: string | null
+  edited_by_name?: string | null
+  bound_tb_hash?: string | null
+  is_stale?: boolean | null
+  drift_report?: DeliverableDriftReport | null
+  /** 由后端 should_block_confirm 唯一入口判定，前端不得自己写 `if drift_report` */
+  drift_blocked?: boolean
+  drift_reason?: string | null
 }
 
 export interface ReportBodyRenderResult {
@@ -193,6 +250,17 @@ export interface CompletenessResult {
   has_confirmed: boolean
   trio_consistent: boolean
   trio_message: string | null
+  /**
+   * 三件套各自绑定的 tb_hash（需求 11.3 三列对照）。
+   * 键为 doc_type，值为完整 hash 或 null（该类尚未生成 / 无绑定）。
+   * 兼容旧后端：字段缺失时按空处理。
+   */
+  trio_tb_hashes?: Record<string, string | null>
+  /** 与多数不同的 doc_type（需求 11.4：给「重新生成这一类」入口） */
+  trio_lagging?: string[]
+  trio_majority_tb_hash?: string | null
+  /** 不一致但无法判定滞后方（各类绑定互不相同）⇒ 建议三类一并重新生成 */
+  trio_ambiguous?: boolean
   warnings: string[]
 }
 
@@ -304,4 +372,29 @@ export async function fetchExportJob(
   jobId: string,
 ): Promise<ExportJobResult> {
   return api.get<ExportJobResult>(wordExports.jobStatus(projectId, jobId))
+}
+
+// ─── 章节状态（溯源锚点是否已写入的唯一判据，需求 6.4）────────────────────
+
+export interface DeliverableSectionStateItem {
+  section_code: string
+  source_snapshot_hash: string | null
+  is_stale: boolean
+  last_writeback_baseline_hash: string | null
+  anchor_name: string | null
+  rendered_block_hash?: string | null
+  block_locate_mode?: string | null
+  version_no: number | null
+}
+
+/**
+ * 拉取出品物章节状态列表。
+ *
+ * `sections` 为空数组即「该出品物无锚点」——这是判定「旧版本出品物、
+ * 溯源不可用」的**唯一判据**（不可由前端按 doc_type 猜测）。
+ */
+export async function fetchSectionStates(projectId: string, taskId: string) {
+  return api.get<{ sections: DeliverableSectionStateItem[] }>(
+    `/api/projects/${projectId}/deliverables/${taskId}/section-states`,
+  )
 }

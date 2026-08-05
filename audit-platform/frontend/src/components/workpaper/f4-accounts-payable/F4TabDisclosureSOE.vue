@@ -9,8 +9,10 @@ import { computed, inject, onBeforeUnmount, toRef, watch, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useF4DisclosureSOE } from '../composables/useF4DisclosureSOE'
 import { useF4AiGenerate } from '../composables/useF4AiGenerate'
+import { F4_GROSS_FALLBACK_STANDARD } from '../composables/f4AccountScope'
 import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
 import GtIndexChip from '../GtIndexChip.vue'
+import WpAmountInput from '../shared/WpAmountInput.vue'
 
 const props = defineProps<{
   wpId: string
@@ -130,7 +132,7 @@ async function generateDisclosure(): Promise<void> {
 
 function onAdjudicated(event: Event): void {
   const detail = (event as CustomEvent).detail
-  if (detail?.accountCode === '2202') {
+  if (detail?.accountCode === F4_GROSS_FALLBACK_STANDARD) {
     ElMessage.info('F4-1审定数据已更新，披露表账龄金额已自动联动，请复核')
   }
 }
@@ -264,13 +266,11 @@ onBeforeUnmount(() => window.removeEventListener('substantive:adjudicated', onAd
           <el-tooltip v-if="row.linked" content="联动F4-5挂账金额，请在长期挂账检查表中修改">
             <span class="linked-amount">{{ amount(row.amount) }}</span>
           </el-tooltip>
-          <el-input-number
+          <WpAmountInput
             v-else-if="!isReadonly"
             :model-value="row.amount"
-            :controls="false"
-            size="small"
-            style="width:100%"
-            @change="(value: number | undefined) => updateImportantCell(row.rowId, 'amount', value ?? 0)"
+            :disabled="isReadonly"
+            @update:model-value="(value: number) => updateImportantCell(row.rowId, 'amount', value)"
           />
           <span v-else>{{ amount(row.amount) }}</span>
         </template>
@@ -364,7 +364,6 @@ onBeforeUnmount(() => window.removeEventListener('substantive:adjudicated', onAd
 .section-label { font-weight: 600; font-size: 14px; color: #303133; }
 .sync-badge { margin-left: 4px; }
 .disclosure-table { width: 100%; }
-.disclosure-table :deep(.el-input-number) { width: 100%; }
 .linked-label { font-weight: 600; color: #315a8a; }
 .linked-amount { color: #7b4ba3; font-weight: 600; border-bottom: 1px dashed #b7bcc5; cursor: help; }
 .total-strip {

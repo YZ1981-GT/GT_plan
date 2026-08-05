@@ -26,11 +26,14 @@ function recalcRow(row: SecuritiesDiffRow): SecuritiesDiffRow {
   const bookedFv = toNum(row.booked_unit_fv)
   const confirmedMv = toNum(row.confirmed_market_value)
   const bookedMv = toNum(row.booked_market_value)
+  // 🔴 差异 = 账面 − 回函（源模板表头 `③=①−②`，①账面/②回函）。
+  //    形参顺序 `(booked, reply)`，勿颠倒 —— 源 M 列公式写反已登记为源缺陷
+  //    `g0SourceDefects#securities-mv-diff-direction`（Task 20 / Property 27）。
   return {
     ...row,
-    qty_diff: calcQuantityDiff(confirmedQty, bookedQty),
-    fv_diff: calcFairValueDiff(confirmedFv, bookedFv),
-    market_value_diff: calcMarketValueDiff(confirmedMv, bookedMv),
+    qty_diff: calcQuantityDiff(bookedQty, confirmedQty),
+    fv_diff: calcFairValueDiff(bookedFv, confirmedFv),
+    market_value_diff: calcMarketValueDiff(bookedMv, confirmedMv),
   }
 }
 

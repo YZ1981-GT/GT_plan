@@ -66,6 +66,22 @@ export const CYCLE_IMPORT_EXPORT: Record<string, CycleImportExportEntry> = {
     apiPrefix: 'f5',
     sheets: ['F5-2', 'F5-3', 'F5-4', 'F5-5', 'F5-6', 'F5-8'],
   },
+  /**
+   * 🔴 `sheets` 里的值是**后端 API 的 sheet key，不是 wp_code**（Task 4 勘查纠正）。
+   *
+   * `G0-3S` 看着像个不存在的底稿编码（`wp_index` 实测 G0 只有 `G0`/`G0-1..G0-5`，
+   * 而源模板底稿目录里证券差异表的索引号是 `G0-4`），但它是
+   * `_g0_confirmation_import_export._SHEET_NAME_MAP` 的**键**：
+   *   `G0-3S` → tab 名 `函证差异核对表G0-3（证券投资）`
+   *   `G0-6`  → tab 名 `替代程序检查表G0-6`
+   * 前端 `CycleImportExportDropdown` 把它原样放进 `?sheet=` 查询串，后端据此查表。
+   * → **改这里的字面量会让 G0 的三个导入导出端点全部 400**（`不支持的sheet`）。
+   *
+   * 与「展示索引号」是两个不同层：展示层由 `g0SheetRegistry` 的 `indexLabel` 负责
+   * （G0-4/G0-5/G0-8 + tooltip 标注源模板笔误），此处是传输层键名，两者刻意不统一。
+   *
+   * 守卫 `cycleImportExportRegistry.spec.ts` 与后端 `_SHEET_NAME_MAP` 键集双向锁死。
+   */
   g0: {
     apiPrefix: 'g0',
     sheets: ['G0-3S', 'G0-6'],

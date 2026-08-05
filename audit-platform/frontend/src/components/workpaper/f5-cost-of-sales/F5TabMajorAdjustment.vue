@@ -1,5 +1,8 @@
 <template>
   <div class="f5-major-adj">
+  <!-- 抽样方法学（来自抽凭引擎回填，底稿正文可见 → 归档与复核可追溯） -->
+  <WpSamplingMethodologyBar :methodology="methodology" />
+
     <details class="guidance-details">
       <summary>📋 编制提示</summary>
       <div class="guidance-content">
@@ -261,6 +264,9 @@ import GtVoucherSamplingEngine from '../voucher-sampling/GtVoucherSamplingEngine
 import GtIndexChip from '../GtIndexChip.vue'
 import type { SampledVoucher, FillMode } from '../composables/useSamplingAlgorithms'
 import type { ChecklistResponse } from '../composables/useF1FormData'
+import WpSamplingMethodologyBar from '../shared/WpSamplingMethodologyBar.vue'
+import { useSamplingMethodologyPersist } from '../composables/shared/useSamplingMethodologyPersist'
+import type { SamplingMethodologySnapshot } from '../composables/shared/samplingFillTarget'
 
 defineEmits<{ imported: [] }>()
 
@@ -302,7 +308,25 @@ function isInadequate(v: string): boolean {
   return !v || v === '不充分' || v === '待补充'
 }
 
+/**
+ * 抽样方法学留痕（R6.3/R6.4）：把 `filled` 载荷里的 methodology 落到固定 item key，
+ * 并在抽凭区渲染到底稿正文 —— 复核与归档看的是底稿，不是后台抽凭日志。
+ */
+const { methodology, persistMethodology } = useSamplingMethodologyPersist({
+  wpCode: 'F5',
+  allResponses: toRef(props, 'allResponses') as never,
+  persist: (itemId, remark) => {
+    const item = { item_id: itemId, conclusion: null, remark }
+    props.allResponses.set(itemId, item as never)
+    window.dispatchEvent(new CustomEvent('f5:save-items', { detail: { items: [item] } }))
+  },
+  isReadonly: computed(() => props.isReadonly),
+})
+
 function handleSamplingFilled(payload: { samples: SampledVoucher[]; fillMode?: FillMode }) {
+  // 方法学先落库：即便回填 0 条，「抽过样且方法学如此」也是应留的痕
+  void persistMethodology((payload as { methodology?: SamplingMethodologySnapshot })?.methodology)
+
   const n = adj.mergeSamplingRows((payload?.samples ?? []) as any[])
   if (n > 0) ElMessage.success(`已填入 ${n} 笔抽凭样本`)
 }

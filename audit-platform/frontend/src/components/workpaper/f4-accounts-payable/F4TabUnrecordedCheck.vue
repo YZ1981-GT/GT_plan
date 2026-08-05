@@ -14,6 +14,7 @@ import {
   type UnrecordedSectionConfig,
 } from '../composables/useF4UnrecordedCheck'
 import { useF4AiGenerate } from '../composables/useF4AiGenerate'
+import { F4_GROSS_FALLBACK_STANDARD } from '../composables/f4AccountScope'
 import { useStickySectionNav } from '../composables/useStickySectionNav'
 import F4ImportExportToolbar from './F4ImportExportToolbar.vue'
 import F4SheetAttachments from './F4SheetAttachments.vue'
@@ -113,7 +114,7 @@ async function handleCutoffExtract(): Promise<void> {
   cutoffLoading.value = true
   try {
     const response = await http.post(`/api/workpapers/${props.wpId}/cutoff-auto-sampling`, {
-      accountCode: '2202',
+      accountCode: F4_GROSS_FALLBACK_STANDARD,
       dayRange: 30,
     })
     const vouchers = response.data?.data?.vouchers ?? response.data?.vouchers ?? []

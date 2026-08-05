@@ -63,21 +63,22 @@
         />
 
         <!-- H6-1 审定表（过渡科目59公式+期末应为零） -->
-        <HiFourTableSourcePanel
-          v-if="props.htmlData?.hi_extraction_enabled"
-          :wp-code="'H6'"
-          :segments="getHiExtractionSegments('H6')"
-          :all-responses="allResponses"
-          :is-readonly="isReadonly"
-          @refresh-complete="selfLoad()"
-        />
-        <H6TabAdjudication
-          v-else-if="currentSheet === 'H6-1'"
-          :wp-id="props.wpId"
-          :project-id="props.projectId"
-          :all-responses="allResponses"
-          :is-readonly="isReadonly"
-        />
+        <template v-else-if="currentSheet === 'H6-1'">
+          <HiFourTableSourcePanel
+            v-if="props.htmlData?.hi_extraction_enabled"
+            :wp-code="'H6'"
+            :segments="getHiExtractionSegments('H6')"
+            :all-responses="allResponses"
+            :is-readonly="isReadonly"
+            @refresh-complete="selfLoad()"
+          />
+          <H6TabAdjudication
+            :wp-id="props.wpId"
+            :project-id="props.projectId"
+            :all-responses="allResponses"
+            :is-readonly="isReadonly"
+          />
+        </template>
 
         <!-- 附注披露信息（上市公司） -->
         <H6TabDisclosureListed

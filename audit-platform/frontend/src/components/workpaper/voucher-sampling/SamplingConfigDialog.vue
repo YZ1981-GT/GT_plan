@@ -119,6 +119,14 @@ const confidenceOptions: { value: number; label: string }[] = [
 
 const isStatisticalMethod = computed(() => props.config.samplingMethod === 'mus')
 
+// ─── 排除范围（R5.5）────────────────────────────────────────────────────────
+// `excludeScope` 是可选字段，既有配置不带它 → 读时默认 'workpaper'（零回归）。
+// 不在 buildDefaultConfig 里写死默认值，避免既有持久化配置被判定为"已显式选择"。
+const excludeScopeModel = computed<'workpaper' | 'project'>({
+  get: () => props.config.excludeScope ?? 'workpaper',
+  set: (v) => { props.config.excludeScope = v },
+})
+
 // 建议样本量展示：>0 才有意义
 const hasSuggested = computed(
   () => props.suggestedSampleSize != null && props.suggestedSampleSize > 0,
@@ -553,6 +561,18 @@ function hasError(key: string): boolean {
                 inactive-text="关闭"
               />
               <span class="hint-text">开启后自动排除历史已抽凭证号</span>
+            </div>
+
+            <!-- 排除范围（R5.5）：默认仅当前底稿，可扩到全项目防跨循环重复抽凭 -->
+            <div v-if="config.excludeExtracted" class="filter-item">
+              <label class="filter-label">排除范围</label>
+              <el-radio-group v-model="excludeScopeModel" size="small">
+                <el-radio-button value="workpaper">仅当前底稿</el-radio-button>
+                <el-radio-button value="project">全项目已抽</el-radio-button>
+              </el-radio-group>
+              <span class="hint-text">
+                「全项目已抽」会叠加排除本项目其它底稿已抽过的凭证，避免同一凭证被多个循环重复抽取
+              </span>
             </div>
           </div>
         </el-collapse-item>

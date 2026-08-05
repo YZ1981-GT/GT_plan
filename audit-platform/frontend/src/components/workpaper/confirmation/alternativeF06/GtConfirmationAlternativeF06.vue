@@ -31,6 +31,7 @@
         :get-completion-status="data.getCompletionStatus"
         :has-abnormal="data.hasAbnormal"
         :get-check-ratio="getCheckRatioForMaster"
+        :labels="F0_ALTERNATIVE_MASTER_LABELS"
         @select="handleSelectCompany"
         @add-company="handleAddCompany"
         @delete-company="handleDeleteCompany"
@@ -90,6 +91,7 @@ import {
 } from '../../composables/useWorkpaperScaffold'
 import type { AlternativeCompany, BlockType, CheckRow } from '../alternativeD05/alternativeD05Types'
 import { importUnrepliedAsCompanies } from '../coordination/importFromSummary'
+import { F0_ALTERNATIVE_MASTER_LABELS } from '../composables/f0MasterLabels'
 import { BLOCK_COLUMN_CONFIGS_F06 } from './blockColumnConfigsF06'
 
 // 复用 D0-5 的 Dashboard 和 Master 组件
@@ -183,7 +185,12 @@ function handleDeleteCompany(companyId: string) {
 
 async function handleImportF01() {
   // 从 F0-1 函证结果汇总带入未回函应付账款单位（复用 coordination/importFromSummary）
-  const res = await importUnrepliedAsCompanies(props.projectId || '', 'F0-1', { defaultItemName: '应付账款' })
+  // auxAccountCode='2202'：期末余额优先取辅助余额表的账面精确值，
+  // 未命中回退汇总表发函金额（R2.3 / Task 25）
+  const res = await importUnrepliedAsCompanies(props.projectId || '', 'F0-1', {
+    defaultItemName: '应付账款',
+    auxAccountCode: '2202',
+  })
   if (!res.ok) {
     ElMessage.warning(res.reason === 'missing-summary' ? '未找到 F0-1 或尚未编制' : ('从 F0-1 带入失败：' + res.message))
     return
@@ -193,7 +200,8 @@ async function handleImportF01() {
     return
   }
   data.importCompanies(res.companies)
-  ElMessage.success(`已从 F0-1 带入 ${res.companies.length} 个未回函被函证单位`)
+  const auxNote = res.auxMatchedCount ? `，其中 ${res.auxMatchedCount} 家期末余额已按辅助余额表校准` : ''
+  ElMessage.success(`已从 F0-1 带入 ${res.companies.length} 个未回函被函证单位${auxNote}`)
 }
 
 const importFileInput = ref<HTMLInputElement | null>(null)

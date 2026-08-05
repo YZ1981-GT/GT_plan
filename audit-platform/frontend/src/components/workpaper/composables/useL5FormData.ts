@@ -47,7 +47,9 @@ export interface WritebackPayload {
 
 const DEBOUNCE_MS = 2000
 const ITEM_PREFIX = 'L5-'
-const ACCOUNT_CODE_PAYABLE = '2701' // 长期应付款（贷方/负债类）
+import { L5_GROSS_FALLBACK_STANDARD } from './l5AccountScope'
+
+const ACCOUNT_CODE_PAYABLE = L5_GROSS_FALLBACK_STANDARD // 长期应付款（贷方/负债类）
 const ACCOUNT_CODE_UNRECOGNIZED = '2702' // 未确认融资费用（借方/负债备抵类）
 
 // ─── Composable ──────────────────────────────────────────────────────────────

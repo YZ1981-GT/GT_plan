@@ -9,6 +9,7 @@
  * Requirements: 17.1-17.9, 14.1
  */
 import { computed, ref, type ComputedRef, type Ref } from 'vue'
+import { D4_MAIN_REVENUE_STANDARD, D4_OTHER_REVENUE_STANDARD } from './d4AccountScope'
 import {
   calcMonthlyTotal,
   calcAuditedWithAdj,
@@ -184,8 +185,8 @@ export function useD4CrossSheet(options: UseD4CrossSheetOptions) {
     for (const row of d4Row4Data.value) {
       const code = row.accountCode || row.accountName || ''
       const amount = parseNum(row.debitAmount) - parseNum(row.creditAmount)
-      const isMain = code.includes('6001')
-      const isOther = code.includes('6051')
+      const isMain = code.includes(D4_MAIN_REVENUE_STANDARD)
+      const isOther = code.includes(D4_OTHER_REVENUE_STANDARD)
       const isAje = row.entryType === 'AJE'
 
       if (isMain) {

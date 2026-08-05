@@ -19,6 +19,7 @@ import { ElMessage } from 'element-plus'
 import { calcSubtotal } from './useL2FormulaEngine'
 import { eventBus } from '@/utils/eventBus'
 import type { ChecklistResponse } from './useL2FormData'
+import { L2_GROSS_FALLBACK_STANDARD } from './l2AccountScope'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -203,12 +204,12 @@ export function useL2Adjustment(options: UseL2AdjustmentOptions) {
   const ajeNetAmount: ComputedRef<number> = computed(() => {
     const totalCredit = calcSubtotal(
       ajeEntries.value
-        .filter(e => e.accountCode === '2231')
+        .filter(e => e.accountCode === L2_GROSS_FALLBACK_STANDARD)
         .map(e => e.creditAmount),
     )
     const totalDebit = calcSubtotal(
       ajeEntries.value
-        .filter(e => e.accountCode === '2231')
+        .filter(e => e.accountCode === L2_GROSS_FALLBACK_STANDARD)
         .map(e => e.debitAmount),
     )
     return totalCredit - totalDebit
@@ -218,12 +219,12 @@ export function useL2Adjustment(options: UseL2AdjustmentOptions) {
   const rjeNetAmount: ComputedRef<number> = computed(() => {
     const totalCredit = calcSubtotal(
       rjeEntries.value
-        .filter(e => e.accountCode === '2231')
+        .filter(e => e.accountCode === L2_GROSS_FALLBACK_STANDARD)
         .map(e => e.creditAmount),
     )
     const totalDebit = calcSubtotal(
       rjeEntries.value
-        .filter(e => e.accountCode === '2231')
+        .filter(e => e.accountCode === L2_GROSS_FALLBACK_STANDARD)
         .map(e => e.debitAmount),
     )
     return totalCredit - totalDebit
@@ -241,7 +242,7 @@ export function useL2Adjustment(options: UseL2AdjustmentOptions) {
       entryId: generateEntryId(),
       entryType: type,
       seqNo: sameTypeEntries.length + 1,
-      accountCode: '2231',
+      accountCode: L2_GROSS_FALLBACK_STANDARD,
       accountName: '应付利息',
       debitAmount: 0,
       creditAmount: 0,

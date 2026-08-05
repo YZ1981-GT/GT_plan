@@ -12,9 +12,11 @@ import type { F3AdjudicationRow } from '../composables/useF3Adjudication'
 import { useF3AiGenerate, type F3AiSection } from '../composables/useF3AiGenerate'
 import { useAdjudicationBringIn } from '../composables/useAdjudicationBringIn'
 import { useAuditContext } from '@/composables/useAuditContext'
+import { F3_GROSS_FALLBACK_STANDARD } from '../composables/f3AccountScope'
 import GtIndexChip from '../GtIndexChip.vue'
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import F3SheetAttachments from './F3SheetAttachments.vue'
+import F3FourTableSourcePanel from './F3FourTableSourcePanel.vue'
 
 const props = defineProps<{
   wpId: string
@@ -24,6 +26,10 @@ const props = defineProps<{
   crossSheet?: ReturnType<typeof import('../composables/useF3CrossSheet').useF3CrossSheet>
   /** 2201 应付票据 TB 核对标量（后端 render tb_values['2201']），审定表「试算平衡表数」只读回退 seed */
   tbAmount?: number | null
+  /** 后端 render 输出的 adjudication_prefill（按票据种类桶给期初/期末） */
+  adjudicationPrefill?: Record<string, { opening: number; closing: number; label: string; codes: string[] }> | null
+  /** 后端 render 输出的 tb_source_codes（溯源面板消费） */
+  tbSourceCodes?: any
 }>()
 
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
@@ -44,6 +50,7 @@ const {
   auditConclusion,
   updateCell,
   publishAdjudicated,
+  pullFromTB,
 } = useF3Adjudication({
   wpId: toRef(props, 'wpId') as Ref<string>,
   projectId: toRef(props, 'projectId') as Ref<string>,
@@ -54,6 +61,20 @@ const {
 })
 
 const hasDifference = computed(() => Math.abs(differenceRow.value) > 0.005)
+
+/** 是否有四表预填数据可供带入 */
+const hasTbPrefill = computed(() => !!props.adjudicationPrefill && Object.keys(props.adjudicationPrefill).length > 0)
+
+/** 从四表库带入未审数 */
+function handlePullFromTB(): void {
+  if (!hasTbPrefill.value) return
+  const { written, skipped } = pullFromTB(props.adjudicationPrefill)
+  if (written > 0) {
+    ElMessage.success(`已从四表库带入 ${written} 个票据种类的期初未审数${skipped ? `，跳过 ${skipped} 个已有值` : ''}`)
+  } else if (skipped > 0) {
+    ElMessage.info(`所有票据种类已有手工值，未覆盖（跳过 ${skipped} 个）`)
+  }
+}
 
 // ─── 从集中登记带入调整（2201 应付票据，负债贷方；带入期末 AJE/RJE） ──────────────
 const bringInRows = computed(() =>
@@ -68,11 +89,11 @@ const {
 } = useAdjudicationBringIn({
   projectId: toRef(props, 'projectId') as any,
   year: useAuditContext().year as any,
-  subjectPrefix: '2201',
+  subjectPrefix: F3_GROSS_FALLBACK_STANDARD,
   direction: 'credit',
-  subjectCode: '2201',
+  subjectCode: F3_GROSS_FALLBACK_STANDARD,
   wpCode: 'F3',
-  subjectLabel: '应付票据(2201)',
+  subjectLabel: `应付票据(${F3_GROSS_FALLBACK_STANDARD})`,
   rows: bringInRows,
   updateCell: (rowKey: string, field: any, value: number) =>
     updateCell(rowKey, field === 'rje' ? 'closingRje' : 'closingAje', value),
@@ -87,7 +108,7 @@ const {
 
 function adjudicationAiContext(): Record<string, unknown> {
   return {
-    accountCode: '2201',
+    accountCode: F3_GROSS_FALLBACK_STANDARD,
     accountName: '应付票据',
     detailCrossValidation: detailCrossValidation.value || '未发现明细表核对提示',
     trialBalanceClosing: trialBalanceRow.value,
@@ -181,6 +202,9 @@ function confirmAdjudication() {
 
 <template>
   <div class="f3-tab-adjudication">
+    <!-- 四表取数溯源面板 -->
+    <F3FourTableSourcePanel :source-codes="props.tbSourceCodes" />
+
     <!-- 编制提示 -->
     <details class="guidance-details">
       <summary>📋 编制提示</summary>
