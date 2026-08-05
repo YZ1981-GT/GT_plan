@@ -19,8 +19,39 @@ from pathlib import Path
 import sqlalchemy as sa
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-V067_PATH = REPO_ROOT / "backend" / "migrations" / "V067__deliverable_section_state.sql"
-R067_PATH = REPO_ROOT / "backend" / "migrations" / "R067__rollback.sql"
+MIGRATIONS_DIR = REPO_ROOT / "backend" / "migrations"
+V067_PATH = MIGRATIONS_DIR / "V067__deliverable_section_state.sql"
+R067_PATH = MIGRATIONS_DIR / "R067__rollback.sql"
+V141_PATH = MIGRATIONS_DIR / "V141__deliverable_section_rendered_block_hash.sql"
+R141_PATH = MIGRATIONS_DIR / "R141__deliverable_section_rendered_block_hash.sql"
+
+# 后续以 ALTER TABLE ... ADD COLUMN 追加到本表的列（additive 迁移）。
+# 三层一致的 DDL 侧 = V067 CREATE TABLE ∪ 全部 ALTER ADD COLUMN —— 只解析 V067
+# 会把新增列误判成 orm_extra 漂移。
+_ALTER_ADD_RE = re.compile(
+    r"ALTER\s+TABLE\s+(?:public\.)?deliverable_section_state\s+"
+    r"ADD\s+COLUMN\s+(?:IF\s+NOT\s+EXISTS\s+)?"
+    r"(?P<name>[a-z_][a-z0-9_]*)\s+(?P<type>[A-Za-z]+(?:\(\d+(?:,\s*\d+)?\))?)"
+    r"(?P<rest>[^;]*)",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _parse_alter_added_columns() -> dict[str, dict]:
+    """扫描全部 V*.sql，收集对本表的 ADD COLUMN 声明。"""
+    added: dict[str, dict] = {}
+    for path in sorted(MIGRATIONS_DIR.glob("V*.sql")):
+        text = path.read_text(encoding="utf-8")
+        if "deliverable_section_state" not in text:
+            continue
+        for m in _ALTER_ADD_RE.finditer(text):
+            rest = (m.group("rest") or "").upper()
+            added[m.group("name").lower()] = {
+                "type": m.group("type").upper(),
+                "nullable": "NOT NULL" not in rest,
+                "has_default": "DEFAULT" in rest,
+            }
+    return added
 
 
 # ---------------------------------------------------------------------------
@@ -137,9 +168,10 @@ def test_deliverable_section_state_ddl_orm_column_set():
     # ORM 声明的列
     orm_columns = {c.name for c in table.columns}
 
-    # DDL 定义的列
+    # DDL 定义的列 = V067 CREATE TABLE ∪ 后续 ALTER ADD COLUMN
     ddl_text = V067_PATH.read_text(encoding="utf-8")
     ddl_columns = set(_parse_ddl_columns(ddl_text).keys())
+    ddl_columns |= set(_parse_alter_added_columns().keys())
 
     # 双向校验
     orm_extra = orm_columns - ddl_columns
@@ -153,6 +185,7 @@ def test_deliverable_section_state_ddl_orm_column_set():
         "id", "word_export_task_id", "version_no", "project_id", "year",
         "section_code", "source_snapshot_hash", "is_stale",
         "last_writeback_baseline_hash", "anchor_name",
+        "rendered_block_hash",  # V141
         "created_at", "updated_at",
     }
     assert orm_columns == expected_columns, (
@@ -167,6 +200,7 @@ def test_deliverable_section_state_type_match():
     table = DeliverableSectionState.__table__
     ddl_text = V067_PATH.read_text(encoding="utf-8")
     ddl_cols = _parse_ddl_columns(ddl_text)
+    ddl_cols.update(_parse_alter_added_columns())
 
     mismatches: list[str] = []
     for col in table.columns:
@@ -191,6 +225,7 @@ def test_deliverable_section_state_nullability_match():
     table = DeliverableSectionState.__table__
     ddl_text = V067_PATH.read_text(encoding="utf-8")
     ddl_cols = _parse_ddl_columns(ddl_text)
+    ddl_cols.update(_parse_alter_added_columns())
 
     mismatches: list[str] = []
     for col in table.columns:
@@ -244,3 +279,76 @@ def test_r067_rollback_exists_and_valid():
     assert "DROP TABLE IF EXISTS deliverable_section_state" in content, (
         "R067 回滚文件不包含 'DROP TABLE IF EXISTS deliverable_section_state'"
     )
+
+
+# ---------------------------------------------------------------------------
+# V141: rendered_block_hash（Rendered_Block_Hash）三层一致
+# Spec: deliverable-lineage-wiring-and-writeback-closure Task 3
+# **Validates: Requirements 4.1, 12.6**
+# ---------------------------------------------------------------------------
+
+
+def test_v141_migration_exists_and_is_idempotent():
+    """V141 存在且用 ADD COLUMN IF NOT EXISTS（幂等可重入，需求 12.6）。"""
+    assert V141_PATH.exists(), f"V141 迁移文件不存在: {V141_PATH}"
+    content = V141_PATH.read_text(encoding="utf-8")
+    assert "ADD COLUMN IF NOT EXISTS rendered_block_hash" in content, (
+        "V141 必须用 ADD COLUMN IF NOT EXISTS 保证幂等"
+    )
+    assert "deliverable_section_state" in content
+
+
+def test_r141_rollback_exists_and_is_idempotent():
+    assert R141_PATH.exists(), f"R141 回滚文件不存在: {R141_PATH}"
+    content = R141_PATH.read_text(encoding="utf-8")
+    assert "DROP COLUMN IF EXISTS rendered_block_hash" in content
+
+
+def test_v141_column_is_nullable_varchar64_in_all_three_layers():
+    """DDL / ORM / service 三层一致：VARCHAR(64) 且可空。
+
+    可空是语义要求（需求 4.4）：存量交付件无此值 → 人工编辑检测 fail-open。
+    """
+    from app.models.audit_platform_models import DeliverableSectionState
+
+    added = _parse_alter_added_columns()
+    assert "rendered_block_hash" in added, "V141 的 ADD COLUMN 未被解析到"
+    assert added["rendered_block_hash"]["type"] == "VARCHAR(64)"
+    assert added["rendered_block_hash"]["nullable"] is True
+
+    col = DeliverableSectionState.__table__.columns["rendered_block_hash"]
+    assert _normalize_sa_type(col.type) == "VARCHAR(64)"
+    assert col.nullable is True
+
+
+def test_v141_version_number_not_reused():
+    """铁律：迁移版本号永不复用 —— V141 只能有一个文件。"""
+    matches = sorted(MIGRATIONS_DIR.glob("V141__*.sql"))
+    assert len(matches) == 1, f"V141 版本号被复用: {[m.name for m in matches]}"
+
+
+def test_rendered_block_hash_domain_differs_from_snapshot_hash():
+    """反向自检：两列语义不可互换。
+
+    历史缺陷是拿 `source_snapshot_hash`（源数据域）去比块内文字哈希 ⇒ 永远不等。
+    本断言钉住「计算入口是 block_text_hash 而非 compute_snapshot_hash_from_parts」，
+    防后来者又把它们混用。
+    """
+    from app.services.deliverable_section_state_service import (
+        compute_snapshot_hash_from_parts,
+    )
+    from app.services.section_anchor_utils import block_text_hash
+
+    # 同一段文字，两个函数必须给出不同结果（哈希域不同）
+    from docx import Document
+
+    doc = Document()
+    doc.add_paragraph("甲")
+    block_hash = block_text_hash(list(doc.element.body))
+    snapshot_hash = compute_snapshot_hash_from_parts(
+        section_code="八、1",
+        text_content="甲",
+        table_data=None,
+        audited_amounts=[],
+    )
+    assert block_hash != snapshot_hash

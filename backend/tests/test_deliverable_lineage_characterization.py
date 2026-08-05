@@ -135,9 +135,14 @@ BASELINE_FLAG_OFF = {
 # ---------------------------------------------------------------------------
 
 
-def test_flag_default_is_false():
-    """灰度开关缺省 = False（Requirement 6.1 / Property 11）。"""
-    assert settings.DELIVERABLE_LINEAGE_CONTENT_CONTROL_ENABLED is False
+def test_flag_default_is_true_after_gray_flip():
+    """灰度开关缺省 = True（spec deliverable-lineage-wiring-… Task 5 / 需求 3.1）。
+
+    2026-08-04 由 False 翻为 True。本文件其余测试一律**显式**传 ``flag=``（见
+    ``_finalize(doc, flag=...)``），故默认值翻转不影响它们 —— 这也是需求 3.5 的要求：
+    characterization 测试不得依赖默认值，否则每次灰度调整都产生一批假红。
+    """
+    assert settings.DELIVERABLE_LINEAGE_CONTENT_CONTROL_ENABLED is True
 
 
 def test_flag_off_matches_frozen_baseline():

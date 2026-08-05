@@ -1,10 +1,13 @@
-"""Characterization 测试 — 锁定抽凭引擎并行实现的当前行为（voucher-sampling-hardening Task 1）
+"""Characterization 测试 — 锁定 canonical 抽凭算法的当前行为（voucher-sampling-hardening Task 1）
 
 作为等价迁移安全网：在全量抽样框（Task 3）、算法收敛（Task 10）改造前，锁定
-- `voucher_sampling_algorithms.execute_sampling`（canonical，seeded 确定性）当前行为
-- `WpSamplingEngine`（sampling-execute 旧引擎）确定性方法当前行为
+`voucher_sampling_algorithms.execute_sampling`（canonical，seeded 确定性）当前行为。
 
 改造后这些断言必须持续全绿；任一断言变化即为回归信号，不得放宽。
+
+注：原先本文件还锁定 legacy `WpSamplingEngine` 的确定性方法，该引擎已于
+sampling-compliance-closure Wave 2（R4）整体下线（口径与 canonical 不同且无留痕），
+对应的 `TestWpSamplingEngineCharacterization` 随之移除。canonical 段断言一字未动。
 
 Validates: Requirements 12.5
 """
@@ -18,7 +21,6 @@ from app.services.voucher_sampling_algorithms import (
     StratumConfig,
     execute_sampling,
 )
-from app.services.wp_sampling_engine import WpSamplingEngine
 
 
 def _pop(n: int) -> list[dict]:
@@ -103,87 +105,3 @@ class TestExecuteSamplingCharacterization:
         )
         assert r.truncated is True
         assert r.sample_count == 500
-
-
-# ─── WpSamplingEngine（旧引擎）确定性方法锁定 ────────────────────────────────
-
-
-class TestWpSamplingEngineCharacterization:
-    def _entries(self, n: int) -> list[dict]:
-        return [
-            {
-                "voucher_no": f"V-{i:04d}",
-                "voucher_date": "2025-01-01",
-                "account_code": "1122",
-                "account_name": "应收账款",
-                "debit_amount": float(100 * (i + 1)),
-                "credit_amount": 0.0,
-                "amount": float(100 * (i + 1)),
-                "summary": "",
-            }
-            for i in range(n)
-        ]
-
-    def test_top_n_sample_deterministic(self):
-        eng = WpSamplingEngine()
-        entries = self._entries(50)  # amount 100..5000
-        sampled = eng._top_n_sample(entries, threshold=4000.0)
-        assert len(sampled) == 11
-        assert all(e["amount"] >= 4000.0 for e in sampled)
-
-    def test_random_sample_size_bound(self):
-        eng = WpSamplingEngine()
-        entries = self._entries(10)
-        assert len(eng._random_sample(entries, 5)) == 5
-        assert len(eng._random_sample(entries, 100)) == 10  # 不超总体
-
-    def test_stratified_sample_within_bound(self):
-        eng = WpSamplingEngine()
-        entries = self._entries(30)
-        sampled = eng._stratified_sample(entries, 9)
-        assert 0 < len(sampled) <= 9
-
-    def test_mus_sample_capped(self):
-        eng = WpSamplingEngine()
-        entries = self._entries(100)
-        sampled = eng._mus_sample(entries, interval=5000.0, max_samples=8)
-        assert len(sampled) <= 8
-
-    def test_response_shape(self):
-        # execute_sampling 返回形状：method/total_population/sample_size/entries
-        eng = WpSamplingEngine()
-        # 直接测试空总体分支（无需 DB）
-        import asyncio
-
-        class _FakeDB:
-            async def execute(self, *a, **k):
-                class _R:
-                    def scalars(self_inner):
-                        class _S:
-                            def all(self_s):
-                                return []
-                        return _S()
-                return _R()
-
-        from uuid import uuid4
-
-        async def _run():
-            # _fetch_candidates 返回空 → execute_sampling 走空分支
-            return await eng.execute_sampling(
-                _FakeDB(), uuid4(), 2025, ["1122"], method="random", sample_size=25
-            )
-
-        # get_active_filter 需真实 DB；此处仅锁定空总体响应形状，跳过 DB 依赖分支
-        # 通过直接构造验证 keys 契约
-        result = {
-            "method": "random",
-            "total_population": 0,
-            "sample_size": 0,
-            "entries": [],
-        }
-        assert set(result.keys()) == {
-            "method",
-            "total_population",
-            "sample_size",
-            "entries",
-        }

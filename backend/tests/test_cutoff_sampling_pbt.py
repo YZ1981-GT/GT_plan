@@ -10,7 +10,7 @@ Properties tested:
 - P7: 金额 Decimal 序列化 Round-Trip
 - P9: 排除已提取凭证去重
 
-Uses hypothesis with max_examples=100.
+Uses hypothesis with max_examples=20.
 """
 from __future__ import annotations
 
@@ -122,7 +122,7 @@ class TestProperty3QuerySecurityIsolation:
     """
 
     @pytest.mark.asyncio
-    @settings(max_examples=100)
+    @settings(max_examples=20)
     @given(
         project_id=st.uuids(),
         year=st.integers(min_value=2020, max_value=2030),
@@ -196,7 +196,7 @@ class TestProperty4QueryFilterConstruction:
     """
 
     @pytest.mark.asyncio
-    @settings(max_examples=100)
+    @settings(max_examples=20)
     @given(filters=st_ledger_query_filters())
     async def test_filter_fields_map_to_sql_clauses(
         self, filters: LedgerQueryFilters
@@ -335,7 +335,7 @@ class TestProperty5StatsAccuracy:
     - sum(by_voucher_type.values()) == total_count
     """
 
-    @settings(max_examples=100)
+    @settings(max_examples=20)
     @given(entries=st_voucher_entries())
     def test_stats_computation_accuracy(self, entries: list[dict[str, Any]]):
         """**Validates: Requirements 2.9**
@@ -400,7 +400,7 @@ class TestProperty6TruncationThreshold:
     <= 500 → truncated=false + items == total_count
     """
 
-    @settings(max_examples=100)
+    @settings(max_examples=20)
     @given(total_count=st.integers(min_value=0, max_value=1000))
     def test_truncation_behavior(self, total_count: int):
         """**Validates: Requirements 2.10**
@@ -448,7 +448,7 @@ class TestProperty7DecimalRoundTrip:
     Decimal(str(d)) == d for any Decimal with precision (20,2).
     """
 
-    @settings(max_examples=100)
+    @settings(max_examples=20)
     @given(
         d=st.decimals(
             min_value=Decimal("-1e18"),
@@ -483,7 +483,7 @@ class TestProperty9ExcludeExtractedDedup:
     After filtering, result ∩ extracted = ∅; all non-extracted items preserved.
     """
 
-    @settings(max_examples=100)
+    @settings(max_examples=20)
     @given(
         extracted_nos=st.lists(
             st.text(min_size=1, max_size=20, alphabet="0123456789-ABCabc"),

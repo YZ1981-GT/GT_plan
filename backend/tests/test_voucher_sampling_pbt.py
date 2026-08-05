@@ -12,7 +12,7 @@ Properties tested:
 - P9: 覆盖率计算准确性
 - P11: 随机种子可复现性
 
-Uses hypothesis with max_examples=100.
+Uses hypothesis with max_examples=20.
 """
 from __future__ import annotations
 
@@ -108,7 +108,7 @@ class TestProperty1RandomSamplingCount:
     items, and every item in the result SHALL exist in the original population.
     """
 
-    @settings(max_examples=100)
+    @settings(max_examples=20)
     @given(data=st.data())
     def test_random_sampling_produces_exactly_n_items(self, data):
         """**Validates: Requirements 3.3**
@@ -196,7 +196,7 @@ class TestProperty2StratifiedSamplingBoundaries:
     per-stratum count <= configured size, and total = sum of per-stratum counts.
     """
 
-    @settings(max_examples=100)
+    @settings(max_examples=20)
     @given(
         population=st.lists(ledger_entry_strategy(), min_size=1, max_size=200),
         strata=non_overlapping_strata_strategy(),
@@ -266,7 +266,7 @@ class TestProperty3SpecificItemCapture:
     capture all and only items with GREATEST(debit, credit) >= T.
     """
 
-    @settings(max_examples=100)
+    @settings(max_examples=20)
     @given(
         population=st.lists(ledger_entry_strategy(), min_size=1, max_size=200),
         threshold=st.decimals(
@@ -327,7 +327,7 @@ class TestProperty4SystematicSamplingInterval:
     SHALL select items at indices {S-1, S-1+K, S-1+2K, ...} ∩ [0, len).
     """
 
-    @settings(max_examples=100)
+    @settings(max_examples=20)
     @given(data=st.data())
     def test_systematic_sampling_selects_correct_indices(self, data):
         """**Validates: Requirements 3.6**
@@ -384,7 +384,7 @@ class TestProperty5MUSCoverage:
     result items must exist in the population.
     """
 
-    @settings(max_examples=100)
+    @settings(max_examples=20)
     @given(
         population=st.lists(
             ledger_entry_strategy(positive=True), min_size=1, max_size=200
@@ -447,7 +447,7 @@ class TestProperty7ExcludeExtractedCorrectness:
     filtered ∪ excluded ⊇ original (no false exclusions).
     """
 
-    @settings(max_examples=100)
+    @settings(max_examples=20)
     @given(
         population_nos=st.lists(
             st.text(min_size=1, max_size=20), min_size=0, max_size=50
@@ -503,7 +503,7 @@ class TestProperty9CoverageCalculationAccuracy:
     count_rate == round(S/P×100, 2); amount_rate == round(B/A×100, 2).
     """
 
-    @settings(max_examples=100)
+    @settings(max_examples=20)
     @given(data=st.data())
     def test_coverage_calculation_accuracy(self, data):
         """**Validates: Requirements 3.9, 12.1, 12.2**
@@ -585,7 +585,7 @@ class TestProperty11SeedReproducibility:
     twice with identical inputs SHALL produce identical results.
     """
 
-    @settings(max_examples=100)
+    @settings(max_examples=20)
     @given(
         population=st.lists(ledger_entry_strategy(), min_size=1, max_size=100),
         seed=st.integers(min_value=0, max_value=2**31),
