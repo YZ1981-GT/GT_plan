@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import logging
 import re
+from dataclasses import dataclass, field
 from io import BytesIO
 from pathlib import Path
 from typing import Any, Literal
@@ -61,6 +62,29 @@ from app.services.word_doc_utils import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# 导出元数据（供交付中心落章节状态；spec deliverable-lineage-wiring-…）
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class NoteExportMeta:
+    """一次附注导出的章节级元数据。
+
+    交付中心据此 upsert ``deliverable_section_state``（章节溯源 / stale 增量刷新 /
+    回填的全部前提）。programmatic 模式无 SECTION 块，三项均为空 —— 与接线前
+    行为一致。
+    """
+
+    kept_codes: list[str] = field(default_factory=list)
+    #: section_code → anchor_name（Section_Anchor 书签名）
+    anchor_map: dict[str, str] = field(default_factory=dict)
+    #: section_code → Rendered_Block_Hash（生成时写入块内文字的规范化 sha256）
+    rendered_block_hashes: dict[str, str] = field(default_factory=dict)
+    variant_key: str = ""
+
 
 # ---------------------------------------------------------------------------
 # 致同标准格式常量
@@ -749,7 +773,7 @@ class NoteWordExporter:
             BytesIO containing the docx file
         """
         if mode == "template":
-            return await self._export_template_mode(
+            buf, _meta = await self._export_template_mode_with_meta(
                 project_id,
                 year,
                 template_type=template_type,
@@ -759,6 +783,7 @@ class NoteWordExporter:
                 annotate_manual=annotate_manual,
                 flatten_formulas=flatten_formulas,
             )
+            return buf
 
         template_type = normalize_template_type(template_type)
         if report_scope is None:
@@ -831,6 +856,53 @@ class NoteWordExporter:
         output.seek(0)
         return output
 
+    async def export_with_meta(
+        self,
+        project_id: UUID,
+        year: int,
+        template_type: str = "soe",
+        report_scope: str | None = None,
+        sections: list[str] | None = None,
+        skip_empty: bool = False,
+        annotate_formulas: bool = False,
+        annotate_manual: bool = False,
+        flatten_formulas: bool = False,
+        mode: Literal["template", "programmatic"] = "programmatic",
+    ) -> tuple[BytesIO, NoteExportMeta]:
+        """与 :meth:`export` 等价，另返回章节级 :class:`NoteExportMeta`。
+
+        交付中心用 meta 落 ``deliverable_section_state``（章节溯源 / stale 刷新 /
+        回填的前提）。**additive 设计**：``export`` 的签名与返回值不变，既有 3 个
+        生产调用方与大量测试零改动。
+
+        programmatic 模式无 SECTION 块 → meta 为空壳（行为与接线前一致）。
+        """
+        if mode == "template":
+            return await self._export_template_mode_with_meta(
+                project_id,
+                year,
+                template_type=template_type,
+                report_scope=report_scope,
+                sections=sections,
+                annotate_formulas=annotate_formulas,
+                annotate_manual=annotate_manual,
+                flatten_formulas=flatten_formulas,
+            )
+
+        buf = await self.export(
+            project_id,
+            year,
+            template_type=template_type,
+            report_scope=report_scope,
+            sections=sections,
+            skip_empty=skip_empty,
+            annotate_formulas=annotate_formulas,
+            annotate_manual=annotate_manual,
+            flatten_formulas=flatten_formulas,
+            mode="programmatic",
+        )
+        return buf, NoteExportMeta()
+
     async def _export_template_mode(
         self,
         project_id: UUID,
@@ -843,6 +915,31 @@ class NoteWordExporter:
         annotate_manual: bool = False,
         flatten_formulas: bool = False,
     ) -> BytesIO:
+        """向后兼容薄壳：委托 :meth:`_export_template_mode_with_meta` 只取文档。"""
+        buf, _meta = await self._export_template_mode_with_meta(
+            project_id,
+            year,
+            template_type=template_type,
+            report_scope=report_scope,
+            sections=sections,
+            annotate_formulas=annotate_formulas,
+            annotate_manual=annotate_manual,
+            flatten_formulas=flatten_formulas,
+        )
+        return buf
+
+    async def _export_template_mode_with_meta(
+        self,
+        project_id: UUID,
+        year: int,
+        *,
+        template_type: str,
+        report_scope: str | None,
+        sections: list[str] | None,
+        annotate_formulas: bool = False,
+        annotate_manual: bool = False,
+        flatten_formulas: bool = False,
+    ) -> tuple[BytesIO, NoteExportMeta]:
         """基于附注 docx 模板填充导出（design §7 附注模板填充流程）.
 
         算法：
@@ -939,6 +1036,54 @@ class NoteWordExporter:
         )
         self._fill_seq_placeholders(doc, kept_codes, seq_numbers)
 
+        # 6.4 Section_Anchor 写入（spec deliverable-lineage-wiring-…，需求 1.1/1.2）：
+        # 隐藏书签 bookmarkStart 落在块首标记**前**、bookmarkEnd 落在块尾标记**后**，
+        # 故 step7 清掉标记段落后，锚点区间恰好覆盖章节内部内容 —— 这是标记清理后
+        # 唯一可用的章节定位手段（回填 / 增量刷新 / 溯源全部依赖它）。
+        # 只对 kept_codes 写（裁剪章节不写，需求 1.1）；写入不改变可见文字（需求 1.3）。
+        # 必须在 6.5 内容控件注入之前：注入只包 elements[1:-1]（标记之间），书签在
+        # 标记之外，两者互不吞并（已由 test_section_anchor_scan 实证）。
+        anchor_map: dict[str, str] = {}
+        rendered_block_hashes: dict[str, str] = {}
+        try:
+            from app.services.section_anchor_utils import (
+                SectionBlock as _AnchorSectionBlock,
+            )
+            from app.services.section_anchor_utils import (
+                block_text_hash,
+                write_section_anchors,
+            )
+
+            kept_set = set(kept_codes)
+            post_blocks: list[Any] = []
+            seen: set[str] = set()
+            for b in scan_section_blocks(doc):
+                if b.section_code in kept_set and b.section_code not in seen:
+                    seen.add(b.section_code)
+                    post_blocks.append(b)
+
+            # Rendered_Block_Hash 在标记清理前按块内正文段落算（block_text_hash 内部
+            # 排除 ## 标记行），与 refresh 侧人工编辑检测共用同一函数，禁各写一份。
+            rendered_block_hashes = {
+                b.section_code: block_text_hash(b.elements) for b in post_blocks
+            }
+            anchor_map = write_section_anchors(
+                doc,
+                [
+                    _AnchorSectionBlock(
+                        section_code=b.section_code,
+                        open_el=b.open_el,
+                        close_el=b.close_el,
+                    )
+                    for b in post_blocks
+                ],
+            )
+        except Exception:  # noqa: BLE001 — 锚点写入失败不阻断导出（需求 1.6）
+            logger.warning(
+                "section anchor write failed, deliverable will lack lineage anchors",
+                exc_info=True,
+            )
+
         # 6.5 内容控件化（灰度 DELIVERABLE_LINEAGE_CONTENT_CONTROL_ENABLED）：
         # 为每节「标记之间的内部内容」注入 Block Content Control（Tag=sec_xxx，与 note
         # bookmark 并存），供前端 OnlyOffice 连接器实现真·光标跟随溯源。
@@ -972,7 +1117,12 @@ class NoteWordExporter:
         output = BytesIO()
         doc.save(output)
         output.seek(0)
-        return output
+        return output, NoteExportMeta(
+            kept_codes=list(kept_codes),
+            anchor_map=anchor_map,
+            rendered_block_hashes=rendered_block_hashes,
+            variant_key=variant_key,
+        )
 
     def _fill_section_block(
         self, doc: Document, block, note: DisclosureNote

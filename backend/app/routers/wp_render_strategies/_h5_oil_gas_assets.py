@@ -1,8 +1,14 @@
 """H5 油气资产 — 专属渲染策略.
 
-科目1631油气资产（借方/资产类）+ 1632累计折耗（贷方/资产备抵类）
+科目定位（语义驱动）：
+  原值 = 1631 油气资产
+  累计折耗 = 1632 油气资产累计折耗
+  无 BS 报表行（仅 CFSS-005 提折耗）
+
 行业适用性守卫：仅 oil_gas / mining 行业适用
-返回 allResponses + projectContext + TB数据(1631+1632) + sheet_list
+返回 allResponses + projectContext + TB数据(三层) + sheet_list + tb_source_codes
+
+spec: .kiro/specs/h-cycle-four-table-extraction-and-account-mapping/
 """
 from __future__ import annotations
 
@@ -12,16 +18,24 @@ import sqlalchemy as sa
 
 from app.models.audit_platform_models import TbBalance, TrialBalance
 from app.services.dataset_query import get_active_filter
+from app.services.four_table.h5_account_scope import H5_ACCOUNT_SPEC, H5_SLOT_KEY_PREFIX
+from app.services.four_table.semantic_account_resolver import (
+    SemanticAccountResult,
+    resolve_semantic_accounts,
+)
+from app.services.four_table.leaf_aggregation import (
+    aggregate_leaves,
+    select_leaves,
+    to_leaf_rows,
+)
+from app.services.four_table.parent_check import build_parent_check
 
 from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
 
-# 科目前缀：1631油气资产(借方) + 1632累计折耗(贷方/备抵)
-_H5_ACCOUNT_PREFIXES = {
-    "1631": ("cost_unadjusted", "cost_audited"),       # 油气资产原值
-    "1632": ("dep_unadjusted", "dep_audited"),         # 累计折耗
-}
+# 适用行业
+_APPLICABLE_INDUSTRIES = {"oil_gas", "mining"}
 
 # 适用行业
 _APPLICABLE_INDUSTRIES = {"oil_gas", "mining"}
@@ -74,77 +88,112 @@ async def _check_industry_applicability(ctx: RenderContext) -> tuple[bool, str]:
     return False, ""
 
 
-async def _fetch_tb_data(ctx: RenderContext) -> dict:
-    """取科目1631+1632的期初/期末余额及未审数.
+async def _fetch_tb_data(ctx: RenderContext) -> tuple[dict, SemanticAccountResult]:
+    """按语义槽取油气资产三层数据（原值 / 累计折耗 / 减值准备）。
 
-    🔴 叶子过滤防父子双算：只汇总叶子科目（某code不是任何其它code前缀）。
+    Returns:
+        ``(tb_values, accounts)``
     """
-    tb: dict[str, float] = {}
+    accounts = await resolve_semantic_accounts(ctx, H5_ACCOUNT_SPEC)
+
+    tb_rows: list = []
     try:
         active_filter = await get_active_filter(
             ctx.db, TbBalance.__table__, ctx.project_id, ctx.year
         )
-        # 先拉全部 1631%/1632% 行
-        all_h5_filter = sa.or_(
-            TbBalance.account_code.like("1631%"),
-            TbBalance.account_code.like("1632%"),
-        )
         result = await ctx.db.execute(
             sa.select(
                 TbBalance.account_code,
+                TbBalance.account_name,
                 TbBalance.opening_balance,
                 TbBalance.closing_balance,
                 TbBalance.debit_amount,
                 TbBalance.credit_amount,
-            ).where(sa.and_(active_filter, all_h5_filter))
+                TbBalance.closing_direction,
+                TbBalance.dataset_id,
+            ).where(active_filter)
         )
-        rows_data = result.fetchall()
-
-        # 叶子判定：某 code 不是任何其它 code 的前缀
-        all_codes = {(r.account_code or "").strip() for r in rows_data}
-
-        def _is_leaf(code: str) -> bool:
-            for other in all_codes:
-                if other != code and other.startswith(code):
-                    return False
-            return True
-
-        for row in rows_data:
-            code = (row.account_code or "").strip()
-            if not _is_leaf(code):
-                continue
-            for prefix, (unadj_key, audited_key) in _H5_ACCOUNT_PREFIXES.items():
-                if code == prefix or code.startswith(prefix):
-                    tb[f"{unadj_key}_opening"] = tb.get(f"{unadj_key}_opening", 0.0) + float(row.opening_balance or 0)
-                    tb[f"{unadj_key}_closing"] = tb.get(f"{unadj_key}_closing", 0.0) + float(row.closing_balance or 0)
-                    tb[f"{unadj_key}_debit"] = tb.get(f"{unadj_key}_debit", 0.0) + float(row.debit_amount or 0)
-                    tb[f"{unadj_key}_credit"] = tb.get(f"{unadj_key}_credit", 0.0) + float(row.credit_amount or 0)
-                    break
+        tb_rows = list(result.fetchall())
     except Exception as e:  # noqa: BLE001
         logger.warning("H5 TB balance fetch failed: %s", e)
 
-    # 从trial_balance取未审数
-    try:
-        result = await ctx.db.execute(
-            sa.text("""
-                SELECT standard_account_code, unadjusted_amount, audited_amount
-                FROM trial_balance
-                WHERE project_id = :pid AND year = :year AND is_deleted = false
-                  AND (standard_account_code LIKE '1631%%' OR standard_account_code LIKE '1632%%')
-            """),
-            {"pid": str(ctx.project_id), "year": ctx.year},
-        )
-        for row in result.fetchall():
-            code = (row.standard_account_code or "").strip()
-            for prefix, (unadj_key, audited_key) in _H5_ACCOUNT_PREFIXES.items():
-                if code == prefix or code.startswith(prefix):
-                    tb[unadj_key] = tb.get(unadj_key, 0.0) + float(row.unadjusted_amount or 0)
-                    tb[audited_key] = tb.get(audited_key, 0.0) + float(row.audited_amount or 0)
-                    break
-    except Exception as e:  # noqa: BLE001
-        logger.warning("H5 trial_balance fetch failed: %s", e)
+    trial_rows: list = []
+    standard_codes = sorted(
+        {c for slot in accounts.slots.values() for c in slot.standard_codes if c}
+    )
+    if standard_codes:
+        try:
+            result = await ctx.db.execute(
+                sa.text(
+                    "SELECT standard_account_code, unadjusted_amount, audited_amount "
+                    "FROM trial_balance "
+                    "WHERE project_id = :pid AND year = :year AND is_deleted = false "
+                    "  AND standard_account_code = ANY(:codes)"
+                ),
+                {"pid": str(ctx.project_id), "year": ctx.year, "codes": standard_codes},
+            )
+            trial_rows = list(result.fetchall())
+        except Exception as e:  # noqa: BLE001
+            logger.warning("H5 trial_balance fetch failed: %s", e)
 
-    return tb
+    tb = _build_h5_tb_values(accounts, tb_rows, trial_rows)
+    tb["_parent_check"] = build_parent_check(
+        accounts, tb_rows, trial_rows, H5_SLOT_KEY_PREFIX.keys()
+    )
+    return tb, accounts
+
+
+def _build_h5_tb_values(
+    accounts: SemanticAccountResult,
+    tb_rows,
+    trial_rows,
+) -> dict[str, float]:
+    """按语义槽聚合油气资产各层金额。纯函数。
+
+    输出键契约（保持既有 `cost_*`/`dep_*` 不变）::
+
+        {prefix}_unadjusted_opening / _closing / _debit / _credit  ← tb_balance 叶子
+        {prefix}_unadjusted / {prefix}_audited                     ← trial_balance
+    """
+    leaves = select_leaves(to_leaf_rows(tb_rows))
+    out: dict[str, float] = {}
+
+    for slot_key, prefix in H5_SLOT_KEY_PREFIX.items():
+        slot = accounts.slots.get(slot_key)
+        if slot is None or not slot.found:
+            continue
+        agg = aggregate_leaves(leaves, slot.codes)
+        out[f"{prefix}_unadjusted_opening"] = agg["opening"]
+        out[f"{prefix}_unadjusted_closing"] = agg["closing"]
+        out[f"{prefix}_unadjusted_debit"] = agg["debit"]
+        out[f"{prefix}_unadjusted_credit"] = agg["credit"]
+
+    # trial_balance：按标准码精确匹配
+    by_code: dict[str, tuple[float, float]] = {}
+    for row in trial_rows or []:
+        get = row.get if isinstance(row, dict) else (lambda k, _r=row: getattr(_r, k, None))
+        code = str(get("standard_account_code") or "").strip()
+        if not code:
+            continue
+        prev = by_code.get(code, (0.0, 0.0))
+        by_code[code] = (
+            prev[0] + float(get("unadjusted_amount") or 0),
+            prev[1] + float(get("audited_amount") or 0),
+        )
+
+    for slot_key, prefix in H5_SLOT_KEY_PREFIX.items():
+        slot = accounts.slots.get(slot_key)
+        if slot is None or not slot.found:
+            continue
+        wanted = set(slot.standard_codes)
+        if not wanted:
+            continue
+        unadj = sum(v[0] for c, v in by_code.items() if c in wanted)
+        audited = sum(v[1] for c, v in by_code.items() if c in wanted)
+        out[f"{prefix}_unadjusted"] = unadj
+        out[f"{prefix}_audited"] = audited
+
+    return out
 
 
 async def _load_project_context(ctx: RenderContext) -> dict:
@@ -207,17 +256,20 @@ async def render(ctx: RenderContext) -> dict | None:
     except Exception as e:  # noqa: BLE001
         logger.warning("H5 render responses load failed: %s", e)
 
-    # ─── 3. TB 数据（1631 + 1632） ─────────────────────────────────────────
-    tb_values = await _fetch_tb_data(ctx)
+    # ─── 3. TB 数据（语义定位：油气资产 + 累计折耗 + 减值准备） ────────────
+    tb_values, accounts = await _fetch_tb_data(ctx)
 
     # ─── 4. 项目上下文 ──────────────────────────────────────────────────────
     project_context = await _load_project_context(ctx)
 
+    resolved_codes = sorted({c for slot in accounts.slots.values() if slot.found for c in slot.codes})
+
     payload = {
         "component_type": "h5-oil-gas-assets",
-        "account_codes": ["1631", "1632"],
+        "account_codes": resolved_codes or ["1631"],
         "responses_snapshot": responses_snapshot,
         "tb_values": tb_values,
+        "tb_source_codes": accounts.as_dict(),
         "project_context": project_context,
         "prefix": "H5",
         "sheets": H5_SHEETS,
@@ -230,19 +282,21 @@ async def render(ctx: RenderContext) -> dict | None:
         try:
             import asyncio
             from app.services.d_cycle_extraction.prefill import build_d_adjudication_prefill
+
+            # 按解析后的各槽动态取数
             segments = []
-            cost_items = await asyncio.wait_for(
-                build_d_adjudication_prefill(ctx, account_prefix="1631", mode="balance"),
-                timeout=5.0,
-            )
-            if cost_items:
-                segments.append({"segment": "cost", "account_prefix": "1631", "mode": "balance", "items": cost_items})
-            dep_items = await asyncio.wait_for(
-                build_d_adjudication_prefill(ctx, account_prefix="1632", mode="balance"),
-                timeout=5.0,
-            )
-            if dep_items:
-                segments.append({"segment": "depletion", "account_prefix": "1632", "mode": "balance", "items": dep_items})
+            for slot_key, prefix in H5_SLOT_KEY_PREFIX.items():
+                slot = accounts.slots.get(slot_key)
+                if not slot or not slot.found:
+                    continue
+                for code in slot.codes:
+                    seg_items = await asyncio.wait_for(
+                        build_d_adjudication_prefill(ctx, account_prefix=code, mode="balance"),
+                        timeout=5.0,
+                    )
+                    if seg_items:
+                        segments.append({"segment": slot_key, "account_prefix": code, "mode": "balance", "items": seg_items})
+
             if segments:
                 payload["adjudication_segment_prefill"] = {"segments": segments, "enabled": True}
                 payload["hi_extraction_enabled"] = True

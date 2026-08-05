@@ -1,7 +1,14 @@
 """H1 固定资产 — 专属渲染策略.
 
-科目1601固定资产 + 1602累计折旧 + 1603减值准备
-返回 allResponses + projectContext + TB汇总 + 按分类预填(adjudication_category_prefill)
+科目定位（语义驱动）：
+  原值 = 1601 固定资产
+  累计折旧 = 1602 累计折旧
+  减值准备 = 1603 固定资产减值准备
+  报表行 BS-028 = TB('1601')-TB('1602')+TB('1606')  (soe)
+
+返回 allResponses + projectContext + TB汇总 + 按分类预填 + tb_source_codes
+
+spec: .kiro/specs/h-cycle-four-table-extraction-and-account-mapping/
 """
 from __future__ import annotations
 
@@ -13,12 +20,23 @@ import sqlalchemy as sa
 from app.core.config import settings
 from app.models.audit_platform_models import TbBalance, TbLedger, TrialBalance
 from app.services.dataset_query import get_active_filter
+from app.services.four_table.h1_account_scope import H1_ACCOUNT_SPEC, H1_SLOT_KEY_PREFIX
+from app.services.four_table.semantic_account_resolver import (
+    SemanticAccountResult,
+    resolve_semantic_accounts,
+)
+from app.services.four_table.leaf_aggregation import (
+    aggregate_leaves,
+    select_leaves,
+    to_leaf_rows,
+)
+from app.services.four_table.parent_check import build_parent_check
 
 from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
 
-# 科目前缀：1601原值 / 1602累计折旧 / 1603减值准备
+# 🔴 _H1_ACCOUNT_PREFIXES 保留作为兼容旧键名映射的引用，不再作取数路径真源
 _H1_ACCOUNT_PREFIXES = {
     "1601": ("cost_unadjusted", "cost_audited"),
     "1602": ("dep_unadjusted", "dep_audited"),
@@ -457,9 +475,16 @@ async def _build_h1_four_table_prefill(ctx: RenderContext) -> dict:
     }
 
 
-async def _fetch_tb_data(ctx: RenderContext) -> dict:
-    """取科目1601+1602+1603的期初/期末余额及未审数."""
+async def _fetch_tb_data(ctx: RenderContext) -> tuple[dict, SemanticAccountResult]:
+    """按语义槽取固定资产三层数据（原值 1601 / 累计折旧 1602 / 减值准备 1603）。
+
+    Returns:
+        ``(tb_values, accounts)``
+    """
+    accounts = await resolve_semantic_accounts(ctx, H1_ACCOUNT_SPEC)
+
     tb: dict[str, float] = {}
+    tb_rows: list = []
     try:
         active_filter = await get_active_filter(
             ctx.db, TbBalance.__table__, ctx.project_id, ctx.year
@@ -467,62 +492,72 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict:
         result = await ctx.db.execute(
             sa.select(
                 TbBalance.account_code,
+                TbBalance.account_name,
                 TbBalance.opening_balance,
                 TbBalance.closing_balance,
                 TbBalance.debit_amount,
                 TbBalance.credit_amount,
+                TbBalance.closing_direction,
+                TbBalance.dataset_id,
             ).where(active_filter)
         )
-        tb_rows = [
-            r for r in result.fetchall()
-            if _classify_fa_block((r.account_code or "").strip())
-        ]
-        tb_leaves = _leaf_codes({(r.account_code or "").strip() for r in tb_rows})
-        for row in tb_rows:
-            code = (row.account_code or "").strip()
-            if code not in tb_leaves:
-                continue  # 父级科目：只汇总叶子防双算
-            for prefix, (unadj_key, _audited_key) in _H1_ACCOUNT_PREFIXES.items():
-                if code == prefix or code.startswith(prefix):
-                    tb[f"{unadj_key}_opening"] = tb.get(f"{unadj_key}_opening", 0.0) + float(row.opening_balance or 0)
-                    tb[f"{unadj_key}_closing"] = tb.get(f"{unadj_key}_closing", 0.0) + float(row.closing_balance or 0)
-                    tb[f"{unadj_key}_debit"] = tb.get(f"{unadj_key}_debit", 0.0) + abs(float(row.debit_amount or 0))
-                    tb[f"{unadj_key}_credit"] = tb.get(f"{unadj_key}_credit", 0.0) + abs(float(row.credit_amount or 0))
-                    break
+        tb_rows = list(result.fetchall())
     except Exception as e:  # noqa: BLE001
         logger.warning("H1 TB balance fetch failed: %s", e)
 
-    try:
-        tb_filter = await get_active_filter(
-            ctx.db, TrialBalance.__table__, ctx.project_id, ctx.year
-        )
-        result = await ctx.db.execute(
-            sa.select(
-                TrialBalance.standard_account_code,
-                TrialBalance.unadjusted_amount,
-                TrialBalance.audited_amount,
-            ).where(
-                tb_filter,
-                sa.or_(
-                    TrialBalance.standard_account_code.like("1601%"),
-                    TrialBalance.standard_account_code.like("1602%"),
-                    TrialBalance.standard_account_code.like("1603%"),
+    # 按语义槽叶子聚合
+    leaves = select_leaves(to_leaf_rows(tb_rows))
+    for slot_key, prefix in H1_SLOT_KEY_PREFIX.items():
+        slot = accounts.slots.get(slot_key)
+        if slot is None or not slot.found:
+            continue
+        agg = aggregate_leaves(leaves, slot.codes)
+        tb[f"{prefix}_unadjusted_opening"] = agg["opening"]
+        tb[f"{prefix}_unadjusted_closing"] = agg["closing"]
+        tb[f"{prefix}_unadjusted_debit"] = agg["debit"]
+        tb[f"{prefix}_unadjusted_credit"] = agg["credit"]
+
+    # trial_balance 精确匹配
+    trial_rows: list = []
+    standard_codes = sorted(
+        {c for slot in accounts.slots.values() for c in slot.standard_codes if c}
+    )
+    if standard_codes:
+        try:
+            result = await ctx.db.execute(
+                sa.text(
+                    "SELECT standard_account_code, unadjusted_amount, audited_amount "
+                    "FROM trial_balance "
+                    "WHERE project_id = :pid AND year = :year AND is_deleted = false "
+                    "  AND standard_account_code = ANY(:codes)"
                 ),
+                {"pid": str(ctx.project_id), "year": ctx.year, "codes": standard_codes},
             )
-        )
-        tbal_rows = list(result.fetchall())
-        tbal_leaves = _leaf_codes({(r.standard_account_code or "").strip() for r in tbal_rows})
-        for row in tbal_rows:
-            code = (row.standard_account_code or "").strip()
-            if code not in tbal_leaves:
-                continue  # trial_balance 通常只到标准码级；含子级时只取叶子防双算
-            for prefix, (unadj_key, audited_key) in _H1_ACCOUNT_PREFIXES.items():
-                if code == prefix or code.startswith(prefix):
-                    tb[unadj_key] = tb.get(unadj_key, 0.0) + float(row.unadjusted_amount or 0)
-                    tb[audited_key] = tb.get(audited_key, 0.0) + float(row.audited_amount or 0)
-                    break
-    except Exception as e:  # noqa: BLE001
-        logger.warning("H1 trial_balance fetch failed: %s", e)
+            trial_rows = list(result.fetchall())
+            by_code: dict[str, tuple[float, float]] = {}
+            for row in trial_rows:
+                code = str(row.standard_account_code or "").strip()
+                if not code:
+                    continue
+                prev = by_code.get(code, (0.0, 0.0))
+                by_code[code] = (
+                    prev[0] + float(row.unadjusted_amount or 0),
+                    prev[1] + float(row.audited_amount or 0),
+                )
+
+            for slot_key, prefix in H1_SLOT_KEY_PREFIX.items():
+                slot = accounts.slots.get(slot_key)
+                if slot is None or not slot.found:
+                    continue
+                wanted = set(slot.standard_codes)
+                if not wanted:
+                    continue
+                unadj = sum(v[0] for c, v in by_code.items() if c in wanted)
+                audited = sum(v[1] for c, v in by_code.items() if c in wanted)
+                tb[f"{prefix}_unadjusted"] = unadj
+                tb[f"{prefix}_audited"] = audited
+        except Exception as e:  # noqa: BLE001
+            logger.warning("H1 trial_balance fetch failed: %s", e)
 
     # 兼容前端旧键名
     if "cost_unadjusted" in tb:
@@ -532,7 +567,10 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict:
     if "impair_unadjusted" in tb:
         tb["impair_1603_unadjusted"] = tb["impair_unadjusted"]
 
-    return tb
+    tb["_parent_check"] = build_parent_check(
+        accounts, tb_rows, trial_rows, H1_SLOT_KEY_PREFIX.keys()
+    )
+    return tb, accounts
 
 
 async def _load_project_context(ctx: RenderContext) -> dict:
@@ -590,7 +628,7 @@ async def render(ctx: RenderContext) -> dict | None:
     except Exception as e:  # noqa: BLE001
         logger.warning("H1 render responses load failed: %s", e)
 
-    tb_values = await _fetch_tb_data(ctx)
+    tb_values, accounts = await _fetch_tb_data(ctx)
 
     # Wave 6: 审定表 TB 核对走报表行规则映射（Req5.1-5.3）
     try:
@@ -627,14 +665,25 @@ async def render(ctx: RenderContext) -> dict | None:
         except Exception:  # noqa: BLE001
             project_context["related_parties"] = []
 
+    resolved_codes = sorted({c for slot in accounts.slots.values() if slot.found for c in slot.codes})
+
+    # 🔴 2026-08-03：曾在同一 dict 里写了**两个** `tb_source_codes` 键
+    # （前者 `accounts.as_dict()` 语义 dict、后者 `h1_source_codes` 旧路径码列表），
+    # Python 静默取最后一个 → 溯源面板拿到数组、`hasSemanticAccountSource` 恒 false、
+    # **面板永不渲染**。`get_diagnostics` / vitest / 55 个守卫全查不出，
+    # 只有浏览器实测 + 拉 render-config 看实际结构才暴露。
+    # 现统一为语义 dict，旧列表并入 `legacy_report_line_codes` 供既有消费方兼容。
+    source_codes = accounts.as_dict()
+    source_codes["legacy_report_line_codes"] = list(h1_source_codes or [])
+
     payload = {
         "component_type": "h1-fixed-assets",
-        "account_codes": ["1601", "1602", "1603"],
+        "account_codes": resolved_codes or ["1601", "1602", "1603"],
         "responses_snapshot": responses_snapshot,
         "tb_values": tb_values,
+        "tb_source_codes": source_codes,
         "adjudication_category_prefill": category_prefill,
         "project_context": project_context,
-        "tb_source_codes": h1_source_codes,
         "prefix": "H1",
         "sheets": H1_SHEETS,
     }

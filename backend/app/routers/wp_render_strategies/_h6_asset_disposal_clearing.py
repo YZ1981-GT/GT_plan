@@ -2,13 +2,15 @@
 
 component_type = "h6-asset-disposal-clearing"
 
-科目1606固定资产清理（借方/资产类，过渡科目）
-返回 allResponses + tb_values(1606) + transit_status(期末=0?) + sheets元数据
-资产类公式：期末=期初+借方-贷方；审定=未审+AJE+RJE
-过渡科目规则：期末余额应为0（清理完毕结转H10）
-联动：H1处置(subscribe disposal:initiated) + H10损益(publish disposal:completed)
+科目定位（语义驱动）：
+  固定资产清理 = 1606（借方/资产类，过渡科目）
+  含于报表行 BS-028（公式 soe: TB('1601')-TB('1602')+TB('1606')）
 
-Requirements: 1.6, 6.3
+返回 allResponses + tb_values + transit_status + sheets元数据 + tb_source_codes
+过渡科目规则：期末余额应为0（清理完毕结转H10）
+联动：H1处置(subscribe) + H10损益(publish)
+
+spec: .kiro/specs/h-cycle-four-table-extraction-and-account-mapping/
 """
 from __future__ import annotations
 
@@ -18,13 +20,21 @@ import sqlalchemy as sa
 
 from app.models.audit_platform_models import TbBalance, TrialBalance
 from app.services.dataset_query import get_active_filter
+from app.services.four_table.h6_account_scope import H6_ACCOUNT_SPEC, H6_SLOT_KEY_PREFIX
+from app.services.four_table.semantic_account_resolver import (
+    SemanticAccountResult,
+    resolve_semantic_accounts,
+)
+from app.services.four_table.leaf_aggregation import (
+    aggregate_leaves,
+    select_leaves,
+    to_leaf_rows,
+)
+from app.services.four_table.parent_check import build_parent_check
 
 from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
-
-# 科目前缀：1606固定资产清理（借方/资产类，过渡科目）
-_H6_ACCOUNT_PREFIX = "1606"
 
 H6_SHEETS = [
     {"sheet_name": "底稿目录", "component_type": "h6-asset-disposal-clearing"},
@@ -38,15 +48,18 @@ H6_SHEETS = [
 ]
 
 
-async def _fetch_tb_data(ctx: RenderContext) -> dict:
-    """取科目1606的期初/期末余额及未审数/审定数.
+async def _fetch_tb_data(ctx: RenderContext) -> tuple[dict, SemanticAccountResult]:
+    """按语义槽取固定资产清理数据（单层过渡科目）。"""
+    accounts = await resolve_semantic_accounts(ctx, H6_ACCOUNT_SPEC)
 
-    资产类借方科目：期末=期初+借方-贷方
-    过渡科目期末应为0。
-    """
     tb: dict[str, float] = {}
+    gross_slot = accounts.slots.get("gross")
+    if not gross_slot or not gross_slot.found:
+        return tb, accounts
 
-    # 从 tb_balance 取余额数据（使用 get_active_filter）
+    codes = gross_slot.codes
+
+    # tb_balance 叶子聚合
     try:
         active_filter = await get_active_filter(
             ctx.db, TbBalance.__table__, ctx.project_id, ctx.year
@@ -54,48 +67,48 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict:
         result = await ctx.db.execute(
             sa.select(
                 TbBalance.account_code,
+                TbBalance.account_name,
                 TbBalance.opening_balance,
                 TbBalance.closing_balance,
                 TbBalance.debit_amount,
                 TbBalance.credit_amount,
-            ).where(
-                active_filter,
-                sa.or_(
-                    TbBalance.account_code == _H6_ACCOUNT_PREFIX,
-                    TbBalance.account_code.startswith(_H6_ACCOUNT_PREFIX),
-                ),
-            )
+                TbBalance.closing_direction,
+                TbBalance.dataset_id,
+            ).where(active_filter)
         )
-        for row in result.fetchall():
-            tb["opening_balance"] = tb.get("opening_balance", 0.0) + float(row.opening_balance or 0)
-            tb["closing_balance"] = tb.get("closing_balance", 0.0) + float(row.closing_balance or 0)
-            tb["debit_amount"] = tb.get("debit_amount", 0.0) + float(row.debit_amount or 0)
-            tb["credit_amount"] = tb.get("credit_amount", 0.0) + float(row.credit_amount or 0)
+        tb_rows = list(result.fetchall())
+        leaves = select_leaves(to_leaf_rows(tb_rows))
+        agg = aggregate_leaves(leaves, codes)
+        tb["opening_balance"] = agg["opening"]
+        tb["closing_balance"] = agg["closing"]
+        tb["debit_amount"] = agg["debit"]
+        tb["credit_amount"] = agg["credit"]
     except Exception as e:  # noqa: BLE001
         logger.warning("H6 TB balance fetch failed: %s", e)
 
-    # 从 trial_balance 取未审数+审定数（使用 get_active_filter 对齐平台口径）
-    try:
-        tb_active_filter = await get_active_filter(
-            ctx.db, TrialBalance.__table__, ctx.project_id, ctx.year
-        )
-        result = await ctx.db.execute(
-            sa.select(
-                TrialBalance.standard_account_code,
-                TrialBalance.unadjusted_amount,
-                TrialBalance.audited_amount,
-            ).where(
-                tb_active_filter,
-                TrialBalance.standard_account_code.like("1606%"),
+    # trial_balance 精确匹配
+    standard_codes = gross_slot.standard_codes
+    if standard_codes:
+        try:
+            result = await ctx.db.execute(
+                sa.text(
+                    "SELECT standard_account_code, unadjusted_amount, audited_amount "
+                    "FROM trial_balance "
+                    "WHERE project_id = :pid AND year = :year AND is_deleted = false "
+                    "  AND standard_account_code = ANY(:codes)"
+                ),
+                {"pid": str(ctx.project_id), "year": ctx.year, "codes": standard_codes},
             )
-        )
-        for row in result.fetchall():
-            tb["unadjusted_amount"] = tb.get("unadjusted_amount", 0.0) + float(row.unadjusted_amount or 0)
-            tb["audited_amount"] = tb.get("audited_amount", 0.0) + float(row.audited_amount or 0)
-    except Exception as e:  # noqa: BLE001
-        logger.warning("H6 trial_balance fetch failed: %s", e)
+            for row in result.fetchall():
+                tb["unadjusted_amount"] = tb.get("unadjusted_amount", 0.0) + float(row.unadjusted_amount or 0)
+                tb["audited_amount"] = tb.get("audited_amount", 0.0) + float(row.audited_amount or 0)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("H6 trial_balance fetch failed: %s", e)
 
-    return tb
+    tb["_parent_check"] = build_parent_check(
+        accounts, tb_rows, [], H6_SLOT_KEY_PREFIX.keys()
+    )
+    return tb, accounts
 
 
 def _compute_transit_status(tb_values: dict) -> dict:
@@ -132,7 +145,7 @@ async def render(ctx: RenderContext) -> dict | None:
     except Exception as e:  # noqa: BLE001
         logger.warning("H6 render responses load failed: %s", e)
 
-    tb_values = await _fetch_tb_data(ctx)
+    tb_values, accounts = await _fetch_tb_data(ctx)
     transit_status = _compute_transit_status(tb_values)
 
     # 加载 project_context（template_type + report_scope 供前端附注变体判定）
@@ -162,11 +175,14 @@ async def render(ctx: RenderContext) -> dict | None:
     except Exception as e:  # noqa: BLE001
         logger.warning("H6 project context load failed: %s", e)
 
+    resolved_codes = accounts.codes_of("gross") or ["1606"]
+
     payload = {
         "component_type": "h6-asset-disposal-clearing",
-        "account_codes": ["1606"],
+        "account_codes": resolved_codes,
         "responses_snapshot": responses_snapshot,
         "tb_values": tb_values,
+        "tb_source_codes": accounts.as_dict(),
         "transit_status": transit_status,
         "project_context": project_context,
         "prefix": "H6",
@@ -180,16 +196,22 @@ async def render(ctx: RenderContext) -> dict | None:
         try:
             import asyncio
             from app.services.d_cycle_extraction.prefill import build_d_adjudication_prefill
-            segment_prefill = await asyncio.wait_for(
-                build_d_adjudication_prefill(ctx, account_prefix="1606", mode="balance"),
-                timeout=5.0,
-            )
-            payload["adjudication_segment_prefill"] = {
-                "segments": [{"segment": "cost", "account_prefix": "1606", "mode": "balance", "items": segment_prefill}],
-                "enabled": True,
-            }
-            payload["hi_extraction_enabled"] = True
-            # Tier A transient seed（TB核对行）
+
+            segments = []
+            gross_slot = accounts.slots.get("gross")
+            if gross_slot and gross_slot.found:
+                for code in gross_slot.codes:
+                    seg_items = await asyncio.wait_for(
+                        build_d_adjudication_prefill(ctx, account_prefix=code, mode="balance"),
+                        timeout=5.0,
+                    )
+                    if seg_items:
+                        segments.append({"segment": "gross", "account_prefix": code, "mode": "balance", "items": seg_items})
+
+            if segments:
+                payload["adjudication_segment_prefill"] = {"segments": segments, "enabled": True}
+                payload["hi_extraction_enabled"] = True
+            # Tier A transient seed
             from app.services.d_cycle_extraction.tier_a_seed import seed_tier_a_reconciliation
             from app.services.d_cycle_extraction.presets import resolve_effective
             from app.services.wp_formula_eval_service import evaluate_wp_formula_expression
@@ -202,8 +224,7 @@ async def render(ctx: RenderContext) -> dict | None:
                 ),
                 timeout=5.0,
             )
-        except Exception as e:
-            import logging as _logging
-            _logging.getLogger(__name__).warning("HI extraction prefill failed (%s): %s", "H6", e)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("HI extraction prefill failed (%s): %s", "H6", e)
 
     return payload

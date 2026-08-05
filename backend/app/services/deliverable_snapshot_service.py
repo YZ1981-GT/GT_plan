@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from uuid import UUID
 
@@ -16,6 +16,13 @@ from app.services.report_snapshot_service import ReportSnapshotService
 logger = logging.getLogger(__name__)
 
 STANDARD_TRIO = ("audit_report", "financial_report", "disclosure_notes")
+
+#: 三件套中文名（需求 11.3 的滞后提示要给人看，禁裸英文 doc_type）
+_TRIO_LABEL = {
+    "audit_report": "审计报告",
+    "financial_report": "财务报表",
+    "disclosure_notes": "财务报表附注",
+}
 
 
 @dataclass
@@ -32,6 +39,12 @@ class TrioConsistencyResult:
     consistent: bool
     tb_hashes: dict[str, str | None]
     message: str | None = None
+    #: 与多数一致的那个 tb_hash；无严格多数（各绑定互不相同）时为 None
+    majority_tb_hash: str | None = None
+    #: 与多数不同的 doc_type 清单（需求 11.3：指出滞后的类别）
+    lagging: list[str] = field(default_factory=list)
+    #: True = 存在不一致但**无法**判定哪一类滞后（如两类各绑定不同 hash）
+    ambiguous: bool = False
 
 
 @dataclass
@@ -132,12 +145,42 @@ class DeliverableSnapshotService:
 
         unique = set(present)
         if len(unique) == 1:
-            return TrioConsistencyResult(consistent=True, tb_hashes=hashes)
+            return TrioConsistencyResult(
+                consistent=True,
+                tb_hashes=hashes,
+                majority_tb_hash=present[0],
+            )
+
+        # 需求 11.3：指出**哪一类**滞后。判据 = 与多数绑定不同的那些。
+        # 无严格多数（如两类各绑定不同 hash）时不指名，只标 ambiguous ——
+        # 硬指一类等于凭空猜，审计师会照着重新生成错的那一类。
+        counts: dict[str, int] = {}
+        for h in present:
+            counts[h] = counts.get(h, 0) + 1
+        top = max(counts.values())
+        winners = [h for h, c in counts.items() if c == top]
+        if len(winners) == 1:
+            majority = winners[0]
+            lagging = [d for d, h in hashes.items() if h and h != majority]
+            names = "、".join(_TRIO_LABEL.get(d, d) for d in lagging)
+            return TrioConsistencyResult(
+                consistent=False,
+                tb_hashes=hashes,
+                message=(
+                    f"三件套绑定的数据快照不一致，请重新生成滞后的交付物（{names}）"
+                ),
+                majority_tb_hash=majority,
+                lagging=lagging,
+            )
 
         return TrioConsistencyResult(
             consistent=False,
             tb_hashes=hashes,
-            message="三件套绑定的数据快照不一致，请重新生成滞后的交付物",
+            message=(
+                "三件套绑定的数据快照不一致，且各类绑定互不相同、无法判定哪一类滞后，"
+                "建议三类一并重新生成"
+            ),
+            ambiguous=True,
         )
 
     async def check_stale(

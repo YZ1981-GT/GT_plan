@@ -322,10 +322,12 @@ class FullDeliverablesExecutor:
     async def _run_disclosure_notes(
         self, project_id: UUID, year: int, user_id: UUID
     ) -> UUID:
-        """生成附注 Word（programmatic 模式）并落交付中心。
+        """生成附注 Word 并落交付中心 + 落章节状态。
 
-        注：template 模式（``##SECTION:`` 模板填充）在 Phase 0.6.2 附注全量打标前
-        HARD-BLOCK；``NoteWordExporter.export`` 当前实现即 programmatic（从零构建文档）。
+        导出模式跟随 ``settings.USE_TEMPLATE_FILL_SERVICE``（与 ``render_disclosure_notes``
+        路由同一灰度开关）。此前本入口硬写 programmatic —— 那是 Phase 0.6.2 打标未完成
+        期的遗留，导致「一键生成全套」与「单独生成附注」产出**两种排版**，且全套路径的
+        附注永远没有 Section_Anchor（溯源/刷新/回填对它全部失效）。现统一为同一开关。
         """
         from app.services.deliverable_service import DeliverableService
         from app.services.note_section_catalog import normalize_report_scope
@@ -344,22 +346,44 @@ class FullDeliverablesExecutor:
         template_type = await self._project_template_type(project_id)
 
         exporter = NoteWordExporter(self.db)
-        buf = await exporter.export(
+        # export_with_meta：拿章节级元数据落 deliverable_section_state（与
+        # render_disclosure_notes 路由同款接线；需求 1.5 要求覆盖两条生产入口）
+        from app.core.config import settings as _settings
+
+        export_mode = (
+            "template" if _settings.USE_TEMPLATE_FILL_SERVICE else "programmatic"
+        )
+        buf, note_meta = await exporter.export_with_meta(
             project_id,
             year,
             template_type=template_type,
             report_scope=normalize_report_scope(proj_scope),
+            mode=export_mode,
+            # 与路由一致：交付导出把残留公式串解析为静态值（Req 18.1/18.3 兜底守卫）
+            flatten_formulas=True,
         )
         file_name = f"disclosure_notes_{year}.docx"
         snapshot_refs = await dsvc.capture_snapshot_refs(
             project_id, year, WordExportDocType.disclosure_notes.value
         )
-        await dsvc.render_and_store(
+        store = await dsvc.render_and_store(
             task.id,
             docx_bytes=buf.getvalue(),
             user_id=user_id,
             source_snapshot_refs=snapshot_refs,
             file_name=file_name,
+        )
+        from app.services.deliverable_section_state_service import (
+            persist_note_export_section_states,
+        )
+
+        await persist_note_export_section_states(
+            self.db,
+            word_export_task_id=task.id,
+            project_id=project_id,
+            year=year,
+            meta=note_meta,
+            version_no=store.version.version_no,
         )
         await self._advance_to_editing(dsvc, task.id)
         return task.id

@@ -1,6 +1,25 @@
 """抽样管理服务 — 抽样配置 + 抽样记录 + 样本量计算 + MUS评价
 
 Validates: Requirements 11.1-11.6, 12.1-12.2
+
+.. deprecated:: sampling-compliance-closure Wave 2（R5.7）
+   **`SamplingConfig` 相关能力（`create_config` / `list_configs` / `update_config`
+   与本模块的样本量计算）已软弃用，禁新增写入点。**
+
+   理由（2026-08-04 实证）：
+   - 样本量与抽样间隔的**单一真源**已是 `app/services/sampling_methodology.py`
+     （CAS 1314 泊松可信赖度系数，带 `algo_version`），由 canonical 抽凭链路
+     `POST /sampling/voucher-extract` 直接消费并回传前端；本模块的
+     `_calc_basic_sample_size` 还带一个无审计依据的启发式 `cf * sqrt(N)`。
+   - `sampling_config` 表全库 **0 行**（10 个项目 / `tb_ledger` 697 万行），
+     其唯一写入点即本模块 `create_config`，无实际消费方。
+
+   保留不删的原因：删表/删端点属破坏性操作，需用户单独授权。现状为「保留既有端点
+   与行为不变、不再新增写入点」，由 `test_sampling_config_deprecation.py` 钉死
+   `SamplingConfig(` 构造点数量不增加。
+
+   **`SamplingRecord` 不在弃用范围内** —— 它已被定性为 canonical 抽样评价记录表
+   （R5.1），由 `app/services/sampling_registry_service.py` 在回填/评价时写入。
 """
 
 from __future__ import annotations

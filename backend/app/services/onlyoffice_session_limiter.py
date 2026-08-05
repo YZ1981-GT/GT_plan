@@ -96,6 +96,37 @@ async def release_session(user_id: UUID | str, document_key: str) -> None:
     await redis.delete(session_key)
 
 
+async def release_sessions_by_doc_key(document_key: str) -> int:
+    """释放某个文档上的**全部**席位（不需要知道是谁占的）。
+
+    Spec: deliverable-lineage-wiring-and-writeback-closure — Wave 2 Task 13 / 需求 7.5
+
+    为什么需要按 doc_key 释放：席位在 `onlyoffice_config` 由**打开编辑的那个人**
+    （`current_user.id`）占用，而释放发生在 **OnlyOffice 回调**里 —— 回调无鉴权用户
+    上下文。历史实现用 `task.created_by` 近似，于是「A 打开、回调释放 creator」
+    两把 key 不匹配 ⇒ **席位从未真正释放**，全靠 1h TTL 自愈（期间虚占名额）。
+
+    OO 在**最后一个用户断开**时才发 status 2（有修改保存）/ 4（无修改关闭），
+    故「该文档所有席位一并释放」语义正确。
+
+    Returns:
+        实际删除的 key 数（Redis 不可用时返回 0）。
+    """
+    from app.core.redis import get_redis
+
+    redis = await get_redis()
+    if redis is None:
+        return 0
+
+    keys = await _scan_session_keys(redis)
+    suffix = f":{document_key}"
+    targets = [k for k in keys if k.endswith(suffix)]
+    if not targets:
+        return 0
+    await redis.delete(*targets)
+    return len(targets)
+
+
 async def get_active_count() -> int:
     """获取当前活跃编辑席位数（去重用户数）。"""
     from app.core.redis import get_redis

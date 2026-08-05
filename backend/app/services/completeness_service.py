@@ -25,6 +25,13 @@ class CompletenessResult:
     has_confirmed: bool = False
     trio_consistent: bool = True
     trio_message: str | None = None
+    #: 三件套各自绑定的 tb_hash（需求 11.3：三列对照）
+    trio_tb_hashes: dict[str, str | None] = field(default_factory=dict)
+    #: 与多数不同的 doc_type（需求 11.3/11.4：指出滞后类别并给重新生成入口）
+    trio_lagging: list[str] = field(default_factory=list)
+    trio_majority_tb_hash: str | None = None
+    #: 不一致但无法判定滞后方（各类绑定互不相同）
+    trio_ambiguous: bool = False
     warnings: list[str] = field(default_factory=list)
 
 
@@ -102,6 +109,10 @@ class CompletenessService:
             has_confirmed=has_confirmed,
             trio_consistent=trio.consistent,
             trio_message=trio.message,
+            trio_tb_hashes=dict(trio.tb_hashes),
+            trio_lagging=list(trio.lagging),
+            trio_majority_tb_hash=trio.majority_tb_hash,
+            trio_ambiguous=trio.ambiguous,
             warnings=warnings,
         )
 

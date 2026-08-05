@@ -23,6 +23,7 @@ from uuid import UUID, uuid4
 import sqlalchemy as sa
 from pydantic import BaseModel, Field
 from sqlalchemy import Select
+from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -64,6 +65,165 @@ def _escape_like_pattern(keyword: str) -> str:
     return (
         keyword.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
     )
+
+
+# ─── 辅助维度补全（往来单位名称）────────────────────────────────────────────
+#
+# 背景（2026-08-04 实测）：抽凭回填后底稿的「客户名称」列恒空，因为 `tb_ledger`
+# 没有往来单位字段。而 `tb_aux_ledger`（辅助明细账）有 `aux_name`，且带
+# `voucher_no` / `voucher_date` / `account_code` / 借贷金额 → 可按凭证行精确关联。
+#
+# 🔴 匹配键必须含金额：只用 (凭证号, 日期, 科目) 时该项目 52.8 万个键组里有
+# 1293 组对应多个 aux_name（同一凭证同一科目挂了多个客户）；补上借贷金额后
+# 实测 2203 科目 170/170 全部唯一命中。歧义组一律**不猜**（留空由审计师填），
+# 「填错客户」比「留空」严重得多。
+#
+# 只补 `tb_ledger` 里根本没有的字段，不覆盖任何既有字段（加法式，零回归）。
+
+AUX_PARTY_TYPES: tuple[str, ...] = ("客户", "供应商", "往来单位", "职员")
+"""可作为「往来单位名称」的辅助维度类型（按优先级）。
+
+不含「成本中心」「业态」「税率」等 —— 那些是分摊/分类维度，不是交易对手方，
+放进来会把「重庆区域」这类值填进客户名称列。
+"""
+
+
+def _aux_match_key(
+    voucher_no: str | None,
+    voucher_date,
+    account_code: str | None,
+    debit,
+    credit,
+) -> tuple:
+    """辅助明细账 ↔ 序时账的行级匹配键。
+
+    金额归一为 2 位小数字符串：两表都是 numeric，但精度声明可能不同
+    （如 12.10 vs 12.1），直接用 Decimal 比较会漏匹配。
+    """
+    def _amt(v) -> str:
+        if v is None:
+            return ""
+        return f"{Decimal(str(v)):.2f}"
+
+    return (
+        (voucher_no or "").strip(),
+        voucher_date.isoformat() if voucher_date else "",
+        (account_code or "").strip(),
+        _amt(debit),
+        _amt(credit),
+    )
+
+
+async def enrich_items_with_aux_party(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+    items: list[dict],
+) -> list[dict]:
+    """给样本行补 `party_name` / `party_aux_type`（原地写入并返回同一列表）。
+
+    - 命中唯一 → 写入名称与维度类型
+    - 一键多名（歧义）→ **不写**，只在 `party_ambiguous` 标 True 供前端提示
+    - 查不到 / 查询失败 → 字段缺省（fail-open + WARNING，绝不阻断抽样）
+
+    不修改 items 里任何既有字段。
+    """
+    if not items:
+        return items
+
+    # 缺省先声明，保证「查询失败」与「本项目无辅助明细」对前端表现一致
+    for it in items:
+        it.setdefault("party_name", None)
+        it.setdefault("party_aux_type", None)
+        it.setdefault("party_ambiguous", False)
+
+    try:
+        vouchers = sorted({
+            (it.get("voucher_no") or "").strip()
+            for it in items
+            if (it.get("voucher_no") or "").strip()
+        })
+        if not vouchers:
+            return items
+
+        # 🔴 列必须带类型声明：裸 `sa.column("project_id")` 无类型信息 → asyncpg 按
+        # 调用方实参推断，传 str 时按 VARCHAR 绑参，PG 抛
+        # `operator does not exist: uuid = character varying`（实测过）。
+        # 生产路径 pid 是 UUID 对象故"碰巧能跑"，但那是对调用方类型的隐式依赖 ——
+        # 显式声明后 str / UUID 两种入参都正确。
+        aux = sa.table(
+            "tb_aux_ledger",
+            sa.column("project_id", PGUUID(as_uuid=True)),
+            sa.column("year", sa.Integer),
+            sa.column("voucher_no", sa.String),
+            sa.column("voucher_date", sa.Date),
+            sa.column("account_code", sa.String),
+            sa.column("aux_type", sa.String),
+            sa.column("aux_name", sa.String),
+            sa.column("debit_amount", sa.Numeric),
+            sa.column("credit_amount", sa.Numeric),
+            sa.column("is_deleted", sa.Boolean),
+        )
+        stmt = sa.select(
+            aux.c.voucher_no,
+            aux.c.voucher_date,
+            aux.c.account_code,
+            aux.c.debit_amount,
+            aux.c.credit_amount,
+            aux.c.aux_type,
+            aux.c.aux_name,
+        ).where(
+            # 归一为 UUID 对象：调用方可能传字符串（诊断脚本/旧调用点），而列已声明
+            # PGUUID → 传 str 时 asyncpg 仍会按 VARCHAR 编码而报
+            # `operator does not exist: uuid = character varying`。
+            aux.c.project_id == (
+                project_id if isinstance(project_id, UUID) else UUID(str(project_id))
+            ),
+            aux.c.year == year,
+            sa.not_(aux.c.is_deleted),
+            aux.c.aux_type.in_(list(AUX_PARTY_TYPES)),
+            aux.c.aux_name.isnot(None),
+            aux.c.aux_name != "",
+            aux.c.voucher_no.in_(vouchers),
+        )
+        rows = (await db.execute(stmt)).all()
+        if not rows:
+            return items
+
+        # key → {(aux_type, aux_name)}；集合大小 >1 即歧义
+        buckets: dict[tuple, set[tuple[str, str]]] = {}
+        for r in rows:
+            key = _aux_match_key(
+                r.voucher_no, r.voucher_date, r.account_code,
+                r.debit_amount, r.credit_amount,
+            )
+            buckets.setdefault(key, set()).add(
+                ((r.aux_type or "").strip(), (r.aux_name or "").strip())
+            )
+
+        for it in items:
+            key = _aux_match_key(
+                it.get("voucher_no"),
+                date.fromisoformat(it["voucher_date"]) if it.get("voucher_date") else None,
+                it.get("account_code"),
+                it.get("debit_amount"),
+                it.get("credit_amount"),
+            )
+            cand = buckets.get(key)
+            if not cand:
+                continue
+            if len(cand) > 1:
+                it["party_ambiguous"] = True
+                continue
+            aux_type, aux_name = next(iter(cand))
+            it["party_name"] = aux_name
+            it["party_aux_type"] = aux_type
+    except Exception as exc:  # noqa: BLE001 — 补全是增强，绝不阻断抽样
+        logger.warning(
+            "辅助维度往来单位补全失败（不影响抽样）：project=%s year=%s err=%s",
+            project_id, year, exc,
+        )
+    return items
 
 
 def _ledger_row_to_item(row) -> dict:

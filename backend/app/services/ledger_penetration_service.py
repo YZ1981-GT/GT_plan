@@ -421,16 +421,37 @@ class LedgerPenetrationService:
         self, project_id: UUID, year: int, account_code: str,
         aux_type: str | None = None,
     ) -> list[dict]:
-        """辅助余额（按科目穿透到辅助维度）"""
+        """辅助余额（按科目穿透到辅助维度）
+
+        🔴 一级科目码按**前缀**匹配（`1123` → `1123.01` / `1123.03` …），
+        含点号的子科目码按精确等值。
+
+        依据（三方一致，本方法此前是唯一的例外）：
+        - `four_table/aux_aggregation.py` 铁律 3 —— 「账套里科目通常落在子科目，
+          故用前缀匹配而非精确等值」
+        - 同族端点 `GET /ledger/aux-balance-detail` 早已是这个判据（逐字同款表达式）
+        - 全库实测（2026-08-04）：`tb_aux_balance` 落在子科目的 **810,884 行**，
+          落在精确四位码的仅 **1,507 行** → 精确等值漏掉 99.8% 的数据
+
+        修复前的实证后果：`1123`/`2202`/`1503`/`1519`/`2101` 等一级码在多数项目
+        **一条都查不到**（该项目 1123 只有 `1123.01`/`1123.03`），四个前端消费方
+        （F0-5/F0-6 替代程序 aux 精确余额 + G8/G9/G10 辅助核算取数）全部静默取空。
+        """
         tbl = TbAuxBalance.__table__
         active_filter = await get_active_filter(self.db, tbl, project_id, year)
+        code_predicate = (
+            tbl.c.account_code == account_code
+            if "." in account_code
+            else tbl.c.account_code.like(account_code + "%")
+        )
         stmt = (
             sa.select(
                 tbl.c.aux_type, tbl.c.aux_code, tbl.c.aux_name,
                 tbl.c.opening_balance, tbl.c.debit_amount,
                 tbl.c.credit_amount, tbl.c.closing_balance,
+                tbl.c.account_code,
             )
-            .where(active_filter, tbl.c.account_code == account_code)
+            .where(active_filter, code_predicate)
             .order_by(tbl.c.aux_type, tbl.c.aux_code)
         )
         if aux_type:

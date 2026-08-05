@@ -13,6 +13,7 @@ import hashlib
 import json
 import logging
 from pathlib import Path
+from typing import Any
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -171,6 +172,10 @@ class DeliverableSectionStateService:
         project_id: UUID,
         year: int,
         kept_codes: list[str],
+        *,
+        anchor_map: dict[str, str] | None = None,
+        version_no: int | None = None,
+        rendered_block_hashes: dict[str, str] | None = None,
     ) -> None:
         """confirm 生成时为每个保留章节 upsert 快照 + 清 stale（需求 4.1/4.6）。
 
@@ -178,11 +183,27 @@ class DeliverableSectionStateService:
         1. 计算 source_snapshot_hash
         2. upsert deliverable_section_state（insert or update on conflict）
         3. 清除 is_stale
+        4. 落 anchor_name / version_no / rendered_block_hash（若调用方提供）
+
+        Args:
+            anchor_map: section_code → Section_Anchor 书签名（导出时写入的锚点）。
+            version_no: 本次落库的交付件版本号（记录列）。
+            rendered_block_hashes: section_code → Rendered_Block_Hash
+                （生成时写入块内文字的规范化 sha256，供人工编辑检测）。
+
+        三个 kwarg 均为 **additive**，默认 None ⇒ 与引入前逐字节等价（不写这三列），
+        既有调用方与测试零改动。
         """
+        anchor_map = anchor_map or {}
+        rendered_block_hashes = rendered_block_hashes or {}
+
         for section_code in kept_codes:
             snapshot_hash = await self.compute_source_snapshot_hash(
                 project_id, year, section_code
             )
+            anchor = anchor_map.get(section_code)
+            block_hash = rendered_block_hashes.get(section_code)
+
             # upsert: 利用唯一约束 (word_export_task_id, section_code)
             existing_stmt = sa.select(DeliverableSectionState).where(
                 DeliverableSectionState.word_export_task_id == word_export_task_id,
@@ -196,6 +217,13 @@ class DeliverableSectionStateService:
                 existing.is_stale = False
                 existing.project_id = project_id
                 existing.year = year
+                # 未提供时保留原值（不把已有锚点/哈希抹成 None）
+                if anchor is not None:
+                    existing.anchor_name = anchor
+                if version_no is not None:
+                    existing.version_no = version_no
+                if block_hash is not None:
+                    existing.rendered_block_hash = block_hash
             else:
                 new_state = DeliverableSectionState(
                     word_export_task_id=word_export_task_id,
@@ -204,6 +232,9 @@ class DeliverableSectionStateService:
                     section_code=section_code,
                     source_snapshot_hash=snapshot_hash,
                     is_stale=False,
+                    anchor_name=anchor,
+                    version_no=version_no,
+                    rendered_block_hash=block_hash,
                 )
                 self.db.add(new_state)
 
@@ -246,18 +277,30 @@ class DeliverableSectionStateService:
         word_export_task_id: UUID,
         section_code: str,
         new_hash: str,
+        *,
+        rendered_block_hash: str | None = None,
     ) -> None:
-        """增量刷新/全量刷新后清 stale + 更新快照（需求 4.6 / 5.3）。"""
+        """增量刷新/全量刷新后清 stale + 更新快照（需求 4.6 / 5.3）。
+
+        Args:
+            rendered_block_hash: 刷新后**实际写入块内文字**的规范化 sha256。
+                additive 默认 None ⇒ 不动该列（与引入前逐字节等价）。
+                刷新路径必须传：不传则下次刷新会拿旧基线比新内容 → 误判「有人工编辑」。
+        """
+        values: dict[str, Any] = {
+            "is_stale": False,
+            "source_snapshot_hash": new_hash,
+        }
+        if rendered_block_hash is not None:
+            values["rendered_block_hash"] = rendered_block_hash
+
         stmt = (
             sa.update(DeliverableSectionState)
             .where(
                 DeliverableSectionState.word_export_task_id == word_export_task_id,
                 DeliverableSectionState.section_code == section_code,
             )
-            .values(
-                is_stale=False,
-                source_snapshot_hash=new_hash,
-            )
+            .values(**values)
         )
         await self.db.execute(stmt)
         await self.db.flush()
@@ -271,7 +314,11 @@ class DeliverableSectionStateService:
         Returns:
             list of dicts with keys:
             section_code, source_snapshot_hash, is_stale,
-            last_writeback_baseline_hash, anchor_name
+            last_writeback_baseline_hash, anchor_name, version_no,
+            rendered_block_hash
+
+        🔴 不返回 ``anchor_locate_mode``：它是运行态判定值（见 V141 注释），
+        表里刻意不存，需要时由 :func:`resolve_section_blocks` 现算。
         """
         stmt = sa.select(DeliverableSectionState).where(
             DeliverableSectionState.word_export_task_id == word_export_task_id,
@@ -287,6 +334,7 @@ class DeliverableSectionStateService:
                 "last_writeback_baseline_hash": row.last_writeback_baseline_hash,
                 "anchor_name": row.anchor_name,
                 "version_no": row.version_no,
+                "rendered_block_hash": row.rendered_block_hash,
             }
             for row in rows
         ]
@@ -395,3 +443,123 @@ class DeliverableSectionStateService:
         )
 
         return current_hash != baseline_hash
+
+
+# ---------------------------------------------------------------------------
+# 导出后接线入口（spec deliverable-lineage-wiring-and-writeback-closure Task 4）
+# ---------------------------------------------------------------------------
+
+
+async def persist_note_export_section_states(
+    db: AsyncSession,
+    *,
+    word_export_task_id: UUID,
+    project_id: UUID,
+    year: int,
+    meta: Any,
+    version_no: int | None = None,
+) -> int:
+    """把一次附注导出的章节元数据落 ``deliverable_section_state``（需求 1.4/1.5/1.6）。
+
+    这是**溯源 / stale 增量刷新 / 回填三条链的共同物理前提** —— 本函数不被调用则
+    该表恒空、`/section-states` 返空、回填恒返回全空、刷新恒「锚点丢失」。
+    历史缺陷正是 `snapshot_on_confirm` 全仓零生产调用方。
+
+    Args:
+        meta: :class:`app.services.note_word_exporter.NoteExportMeta`
+            （鸭子类型：``kept_codes`` / ``anchor_map`` / ``rendered_block_hashes``）。
+        version_no: 本次落库的交付件版本号。
+
+    Returns:
+        成功 upsert 的章节数；失败返回 0。
+
+    **fail-open（需求 1.6）**：任何异常只记 warning，绝不阻断已生成并落盘的交付件
+    —— 交付件本身可用，只是暂时失去溯源能力，下次重新生成即恢复。
+    """
+    kept_codes = list(getattr(meta, "kept_codes", None) or [])
+    if not kept_codes:
+        return 0
+
+    try:
+        service = DeliverableSectionStateService(db)
+        await service.snapshot_on_confirm(
+            word_export_task_id,
+            project_id,
+            year,
+            kept_codes,
+            anchor_map=getattr(meta, "anchor_map", None),
+            version_no=version_no,
+            rendered_block_hashes=getattr(meta, "rendered_block_hashes", None),
+        )
+        logger.info(
+            "[DELIVERABLE_LINEAGE] 章节状态已落库: task=%s sections=%d anchors=%d",
+            word_export_task_id,
+            len(kept_codes),
+            len(getattr(meta, "anchor_map", None) or {}),
+        )
+        return len(kept_codes)
+    except Exception:  # noqa: BLE001 — 需求 1.6：不阻断已生成的交付件
+        logger.warning(
+            "[DELIVERABLE_LINEAGE] 章节状态落库失败，交付件已生成但暂无溯源能力: task=%s",
+            word_export_task_id,
+            exc_info=True,
+        )
+        return 0
+
+
+async def persist_report_body_section_states(
+    db: AsyncSession,
+    *,
+    word_export_task_id: UUID,
+    project_id: UUID,
+    year: int,
+    anchor_map: dict[str, str],
+    rendered_block_hashes: dict[str, str] | None = None,
+    version_no: int | None = None,
+) -> int:
+    """把一次**报告正文**导出的章节元数据落 ``deliverable_section_state``。
+
+    Spec: deliverable-lineage-wiring-and-writeback-closure — Wave 3 Task 17 / 需求 9.1
+
+    与 :func:`persist_note_export_section_states` 并列而非复用同一函数的理由：
+    附注侧的 ``kept_codes`` 来自 ``NoteExportMeta``（鸭子类型），而报告正文没有
+    exporter meta 对象、章节标识来自 docx 扫描结果的 ``anchor_map`` 键集。
+    两者共用底层 :meth:`DeliverableSectionStateService.snapshot_on_confirm`。
+
+    🔴 ``source_snapshot_hash`` 的口径说明：``compute_source_snapshot_hash`` 按
+    ``disclosure_notes`` + ``trial_balance`` 计算，对报告正文章节（``opinion`` /
+    ``basis`` …）查不到 note 记录 ⇒ 得到「空 note + 无科目」的确定性哈希。
+    这**不是缺陷**：报告正文的 stale 判定靠 doc 级 ``tb_hash``（`detect_stale_sections_layered`
+    的第一道闸），章节级哈希只需在「上游未变时保持稳定」即可满足冲突检测语义。
+    真正承载「生成时写了什么」的是 ``rendered_block_hash``。
+
+    **fail-open**：异常只记 warning，绝不阻断已生成并落盘的交付件（需求 1.6 同款）。
+    """
+    codes = sorted(anchor_map)
+    if not codes:
+        return 0
+
+    try:
+        service = DeliverableSectionStateService(db)
+        await service.snapshot_on_confirm(
+            word_export_task_id,
+            project_id,
+            year,
+            codes,
+            anchor_map=anchor_map,
+            version_no=version_no,
+            rendered_block_hashes=rendered_block_hashes,
+        )
+        logger.info(
+            "[DELIVERABLE_LINEAGE] 报告正文章节状态已落库: task=%s sections=%d",
+            word_export_task_id,
+            len(codes),
+        )
+        return len(codes)
+    except Exception:  # noqa: BLE001 — 需求 1.6：不阻断已生成的交付件
+        logger.warning(
+            "[DELIVERABLE_LINEAGE] 报告正文章节状态落库失败: task=%s",
+            word_export_task_id,
+            exc_info=True,
+        )
+        return 0

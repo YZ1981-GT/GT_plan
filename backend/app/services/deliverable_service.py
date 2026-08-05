@@ -23,6 +23,10 @@ from app.services.export_task_service import ExportTaskService
 from app.models.base import ProjectStatus
 from app.models.core import Project
 from app.services.completeness_service import CompletenessService
+from app.services.deliverable_capabilities import (
+    supports_section_refresh,
+    supports_writeback,
+)
 from app.services.deliverable_hash_service import DeliverableHashService
 from app.services.deliverable_snapshot_service import DeliverableSnapshotService
 
@@ -47,6 +51,15 @@ class DeliverableDTO:
     exported_at: datetime | None
     template_type: str | None
     selected_sections: list | None
+    #: 能力标志（需求 6.5）：由 deliverable_capabilities 单一真源派生，供前端门控
+    supports_writeback: bool = False
+    supports_section_refresh: bool = False
+    #: 报表差异告警（需求 10.3）：由 should_block_confirm **唯一入口**判定。
+    #: 放在列表 DTO 而非只放版本链 —— 「数字与试算表不符」是阻断 confirmed 的信号，
+    #: 藏在「更多 ▾ → 版本链」里等于要用户先怀疑再去查。列表循环本就取了最新版本
+    #: 对象，读它的 drift_report 是**零额外查询**。
+    drift_blocked: bool = False
+    drift_reason: str | None = None
 
 
 @dataclass
@@ -95,6 +108,77 @@ class DeliverableService(ExportTaskService):
             )
         )
         return list(result.scalars().all())
+
+    async def get_version_chain_view(self, task_id: UUID) -> list[dict]:
+        """版本链 + 派生展示字段（需求 11.1 / 11.2 / 10.3）。
+
+        在 ORM 行之外补三类**只能在后端算**的字段，避免前端各拼一份：
+
+        - ``bound_tb_hash`` / ``is_stale``：该版绑定的试算表快照，以及它是否已与
+          交付件当前绑定不同。``is_stale`` 用 **三态** —— 任一侧 hash 缺失时返
+          ``None``（未知），**不返 False**，否则历史版本会一律显示成"最新"骗人。
+        - ``edited_by_name``：实际编辑人用户名（V142 的 ``edited_by``；OO 路径下
+          ``created_by`` 只是回调处理占位，展示链路一律读 ``edited_by``）。
+        - ``drift_blocked`` / ``drift_reason``：由 ``should_block_confirm`` **唯一入口**
+          判定，前端不得自己写 `if drift_report:`。
+        """
+        from app.services.financial_report_drift_service import should_block_confirm
+
+        task = await self.get_task(task_id)
+        task_refs = (
+            task.source_snapshot_refs
+            if task is not None and isinstance(task.source_snapshot_refs, dict)
+            else {}
+        )
+        task_tb_hash = task_refs.get("tb_hash")
+
+        rows = (
+            await self.db.execute(
+                sa.select(WordExportTaskVersion, User.username)
+                .outerjoin(User, User.id == WordExportTaskVersion.edited_by)
+                .where(WordExportTaskVersion.word_export_task_id == task_id)
+                .order_by(
+                    WordExportTaskVersion.created_at.desc(),
+                    WordExportTaskVersion.version_no.desc(),
+                )
+            )
+        ).all()
+
+        out: list[dict] = []
+        for version, edited_by_name in rows:
+            refs = (
+                version.source_snapshot_refs
+                if isinstance(version.source_snapshot_refs, dict)
+                else {}
+            )
+            bound = refs.get("tb_hash")
+            is_stale: bool | None = None
+            if bound and task_tb_hash:
+                is_stale = bound != task_tb_hash
+            blocked, reason = should_block_confirm(version.drift_report)
+            out.append(
+                {
+                    "id": version.id,
+                    "word_export_task_id": version.word_export_task_id,
+                    "version_no": version.version_no,
+                    "file_path": version.file_path,
+                    "html_path": version.html_path,
+                    "file_size": version.file_size,
+                    "created_by": version.created_by,
+                    "created_at": version.created_at,
+                    "selected_sections": version.selected_sections,
+                    "created_via": version.created_via,
+                    "edited_by": version.edited_by,
+                    "edited_at": version.edited_at,
+                    "edited_by_name": edited_by_name,
+                    "bound_tb_hash": bound,
+                    "is_stale": is_stale,
+                    "drift_report": version.drift_report,
+                    "drift_blocked": blocked,
+                    "drift_reason": reason,
+                }
+            )
+        return out
 
     async def get_version(
         self, task_id: UUID, version_no: int
@@ -151,6 +235,8 @@ class DeliverableService(ExportTaskService):
         selected_sections: list | None = None,
         file_size: int | None = None,
         created_via: str = "generate",
+        edited_by: UUID | None = None,
+        edited_at: datetime | None = None,
     ) -> WordExportTaskVersion:
         # 归档锁定不变式（需求 11.2 / Property 24）：archived 态禁止创建新版本
         task = await self.get_task(task_id)
@@ -176,6 +262,8 @@ class DeliverableService(ExportTaskService):
             source_snapshot_refs=source_snapshot_refs,
             selected_sections=selected_sections,
             created_via=created_via,
+            edited_by=edited_by,
+            edited_at=edited_at,
         )
         self.db.add(version)
         await self.db.flush()
@@ -252,6 +340,34 @@ class DeliverableService(ExportTaskService):
         if status not in allowed:
             raise ValueError("需先完成 EQCR 复核")
 
+    async def _assert_no_report_drift(self, task_id: UUID) -> None:
+        """财务报表 xlsx 若被手工改过数字则拒绝确认（需求 10.4 / 10.6 / 10.8）。
+
+        判定**唯一入口**是 ``should_block_confirm`` —— 它区分三态：
+        ``None``（未配映射）放行 / ``{"unavailable":…}``（检测不可用）阻断 /
+        ``{"diffs":[…]}`` 非空阻断、空数组放行。
+
+        🔴 禁止在此写 ``if version.drift_report:`` —— ``{"diffs": []}`` 是非空 dict
+        但表示「已比对且一致」，那样写会让每个配了映射的报表永远确认不了。
+
+        fail-open 边界：读不到最新版本时不阻断（该交付件可能尚无版本），
+        但**检测结果本身**若为「不可用」则必须阻断（配置坏了不得放行）。
+        """
+        from app.services.financial_report_drift_service import should_block_confirm
+
+        latest = await self._latest_version(task_id)
+        if latest is None:
+            return
+        blocked, reason = should_block_confirm(latest.drift_report)
+        if blocked:
+            logger.warning(
+                "confirm 被差异检测阻断: task=%s v%s reason=%s",
+                task_id,
+                latest.version_no,
+                reason,
+            )
+            raise ValueError(reason or "报表存在手工改动，不可确认")
+
     async def confirm_deliverable(
         self, task_id: UUID, user_id: UUID, year: int
     ) -> WordExportTask:
@@ -259,6 +375,7 @@ class DeliverableService(ExportTaskService):
         if task is None:
             raise ValueError(f"交付物不存在: {task_id}")
         await self._assert_eqcr_passed(task.project_id, year)
+        await self._assert_no_report_drift(task_id)
         return await self.confirm_task(task_id, user_id)
 
     async def sign(
@@ -306,10 +423,39 @@ class DeliverableService(ExportTaskService):
         selected_sections: list | None = None,
         file_name: str | None = None,
         created_via: str = "generate",
+        inherit_snapshot_refs: bool = False,
+        edited_by: UUID | None = None,
+        edited_at: datetime | None = None,
     ) -> StoreResult:
+        """落盘一个新版本。
+
+        Args:
+            inherit_snapshot_refs: 为 True 时**继承上一版**的 ``source_snapshot_refs``
+                并且**不覆盖** ``task.source_snapshot_refs``（需求 7.1）。
+
+                为什么必须有这个开关：OO 在线编辑保存产生的新版本，其内容并未按新的
+                试算表重算，只是人工改了文字。若像历史实现那样重新
+                ``capture_snapshot_refs()`` 拿**当前** tb_hash 并赋给 task，
+                则「试算表已变、交付件本该 stale」的状态会被一次错别字修改洗白 ——
+                `check_stale` / `check_trio_consistency` 双双转绿而内容其实过期。
+                故 OO 路径必须锁定「生成时快照」作为 stale 判定基准。
+
+            edited_by / edited_at: 实际编辑人与编辑时间（需求 7.2/7.3）。
+                解析不出时传 None（如实记为未知），**禁止**回退 ``task.created_by``。
+
+        三个参数均为 additive，默认值 ⇒ 与引入前逐字节等价。
+        """
         task = await self.get_task(task_id)
         if task is None:
             raise ValueError(f"交付物不存在: {task_id}")
+
+        if inherit_snapshot_refs:
+            prev = await self._latest_version(task_id)
+            inherited = prev.source_snapshot_refs if prev is not None else None
+            if inherited is None:
+                # 上一版也没有绑定（历史数据），退回 task 级；仍不主动捕获当前快照
+                inherited = task.source_snapshot_refs
+            source_snapshot_refs = inherited
 
         out_dir = self._deliverable_dir(task.project_id, task_id)
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -350,6 +496,8 @@ class DeliverableService(ExportTaskService):
             selected_sections=selected_sections,
             file_size=file_size if not platform_persist_failed else None,
             created_via=created_via,
+            edited_by=edited_by,
+            edited_at=edited_at,
         )
 
         if not platform_persist_failed and file_path and file_path.exists():
@@ -361,7 +509,11 @@ class DeliverableService(ExportTaskService):
             task.file_path = str(file_path)
             task.html_path = str(html_path) if html_path and html_path.exists() else None
             task.file_size = file_size
-            task.source_snapshot_refs = source_snapshot_refs
+            # 需求 7.1：继承模式下**不覆盖** task 级快照绑定。
+            # 覆盖会让 stale 判定基准漂移到「最后一次人工编辑的时刻」，
+            # 而该版本内容并未按当时的试算表重算 → staleness 被静默洗白。
+            if not inherit_snapshot_refs:
+                task.source_snapshot_refs = source_snapshot_refs
             task.selected_sections = selected_sections
             # 渲染完成并落盘 → 交付物进入 generated 态。
             # 既覆盖 draft 直接生成，也覆盖经 generating 中间态的标准渲染流程
@@ -426,6 +578,17 @@ class DeliverableService(ExportTaskService):
                 if not name_match and not exporter_match:
                     continue
 
+            # 需求 10.3：列表行即可见「数字与重算值不一致」。判定走唯一入口
+            # should_block_confirm（禁写 `if version.drift_report:` —— `{"diffs": []}`
+            # 是非空 dict 但表示已比对且一致）。
+            from app.services.financial_report_drift_service import (
+                should_block_confirm,
+            )
+
+            drift_blocked, drift_reason = should_block_confirm(
+                version.drift_report if version is not None else None
+            )
+
             dtos.append(
                 DeliverableDTO(
                     task_id=task.id,
@@ -439,6 +602,10 @@ class DeliverableService(ExportTaskService):
                     exported_at=task.updated_at or task.created_at,
                     template_type=task.template_type,
                     selected_sections=task.selected_sections,
+                    supports_writeback=supports_writeback(task.doc_type),
+                    supports_section_refresh=supports_section_refresh(task.doc_type),
+                    drift_blocked=drift_blocked,
+                    drift_reason=drift_reason,
                 )
             )
         return dtos

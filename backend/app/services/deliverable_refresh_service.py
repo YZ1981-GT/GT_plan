@@ -112,16 +112,23 @@ class DeliverableRefreshService:
 
         from docx import Document
 
-        from app.services.word_doc_utils import delete_section_block, scan_section_blocks
+        from app.services.section_anchor_utils import resolve_section_blocks
 
         doc = Document(BytesIO(docx_bytes))
-        blocks = scan_section_blocks(doc)
+        # 锚点优先、##SECTION 标记回退：交付 docx 的标记在导出末尾已被清掉，
+        # 只用 scan_section_blocks 会恒得空 → 刷新永远走「锚点丢失 skip」（历史缺陷）。
+        locate_mode, blocks = resolve_section_blocks(doc)
         target_block = next(
             (b for b in blocks if b.section_code == section_code), None
         )
 
         if target_block is None:
-            # 锚点丢失 → 跳过
+            logger.warning(
+                "refresh_section: 定位失败 mode=%s section=%s（该交付件可能生成于"
+                "锚点接线之前，请重新生成后再刷新）",
+                locate_mode,
+                section_code,
+            )
             return RefreshResult(
                 version_no=None,
                 refreshed=[],
@@ -145,34 +152,23 @@ class DeliverableRefreshService:
                 )
 
         # ─── 3. 获取最新 disclosure_notes 内容并重填 ─────────────────────────
-        note_stmt = sa.select(
-            DisclosureNote.text_content,
-            DisclosureNote.table_data,
-        ).where(
-            DisclosureNote.project_id == project_id,
-            DisclosureNote.year == year,
-            DisclosureNote.note_section == section_code,
-            DisclosureNote.is_deleted == sa.false(),
-        )
-        note_result = await self.db.execute(note_stmt)
-        note_row = note_result.first()
+        latest_text = await self._latest_note_text(project_id, year, section_code)
 
-        latest_text = note_row.text_content if note_row else ""
-
-        # 删除旧块内容
-        delete_section_block(target_block)
-
-        # 重新填充（简化：插入文字段落作为块内容）
-        self._insert_refreshed_content(
-            doc, target_block, section_code, latest_text or ""
+        # 就地替换块内容（需求 4.5）：先在原位置插入新段落、再删旧元素，
+        # 保证该章节在文档中的位置不变（旧实现用 doc.add_paragraph 追加到文末）。
+        rendered_hash = self._replace_block_content(
+            target_block, latest_text or "", locate_mode
         )
 
-        # ─── 4. 更新该章节 source_snapshot_hash + 清 stale ──────────────────
+        # ─── 4. 更新该章节 source_snapshot_hash + Rendered_Block_Hash + 清 stale ──
         new_hash = await self._section_state_service.compute_source_snapshot_hash(
             project_id, year, section_code
         )
         await self._section_state_service.clear_section_stale(
-            word_export_task_id, section_code, new_hash
+            word_export_task_id,
+            section_code,
+            new_hash,
+            rendered_block_hash=rendered_hash,
         )
 
         # ─── 5. 创建新版本 ──────────────────────────────────────────────────
@@ -255,44 +251,114 @@ class DeliverableRefreshService:
                 pending_confirm_sections=[],
             )
 
-        # 逐章节刷新
+        # 🔴 全部章节在**同一份 doc** 上替换后**只落一个版本**。
+        # 旧实现是逐章节调 refresh_section 且每次都传同一份原始 docx_bytes：
+        # 每次从原始字节重新解析 → 上一章节的替换结果被丢弃 → 最终版本只含
+        # 最后一个章节的刷新，其余全部丢失；同时产生 N 个版本污染版本链。
+        from docx import Document
+
+        from app.services.section_anchor_utils import resolve_section_blocks
+
+        doc = Document(BytesIO(docx_bytes))
+        locate_mode, blocks = resolve_section_blocks(doc)
+        block_map = {b.section_code: b for b in blocks}
+
         refreshed: list[str] = []
         skipped: list[str] = []
         pending_confirm: list[str] = []
+        new_hashes: dict[str, str] = {}
 
         for code in stale_codes:
-            result = await self.refresh_section(
-                word_export_task_id=word_export_task_id,
-                project_id=project_id,
-                year=year,
-                section_code=code,
-                actor_id=actor_id,
-                confirm_overwrite=confirm_overwrite,
-                docx_bytes=docx_bytes,
-            )
-            refreshed.extend(result["refreshed"])
-            skipped.extend(result["skipped"])
-            pending_confirm.extend(result["pending_confirm_sections"])
+            block = block_map.get(code)
+            if block is None:
+                logger.warning(
+                    "refresh_all_stale_sections: 定位失败 mode=%s section=%s",
+                    locate_mode,
+                    code,
+                )
+                skipped.append(code)
+                continue
 
+            if not confirm_overwrite:
+                has_user_edits = await self._detect_user_edits(
+                    word_export_task_id, project_id, year, code, block
+                )
+                if has_user_edits:
+                    pending_confirm.append(code)
+                    continue
+
+            latest_text = await self._latest_note_text(project_id, year, code)
+            new_hashes[code] = self._replace_block_content(
+                block, latest_text, locate_mode
+            )
+            refreshed.append(code)
+
+        # 有待确认章节且未确认 → 整批不写入（避免半写状态）
         if pending_confirm and not confirm_overwrite:
             return RefreshResult(
                 version_no=None,
-                refreshed=refreshed,
+                refreshed=[],
                 skipped=skipped,
                 requires_confirm=True,
                 pending_confirm_sections=pending_confirm,
             )
 
-        # 取最终版本号（最后一次成功刷新的版本）
-        version_no = result["version_no"] if refreshed else None
+        if not refreshed:
+            return RefreshResult(
+                version_no=None,
+                refreshed=[],
+                skipped=skipped,
+                requires_confirm=False,
+                pending_confirm_sections=[],
+            )
+
+        # 逐章节更新基线，再整份落一个新版本
+        for code in refreshed:
+            new_hash = await self._section_state_service.compute_source_snapshot_hash(
+                project_id, year, code
+            )
+            await self._section_state_service.clear_section_stale(
+                word_export_task_id,
+                code,
+                new_hash,
+                rendered_block_hash=new_hashes.get(code),
+            )
+
+        from app.services.deliverable_service import DeliverableService
+
+        output = BytesIO()
+        doc.save(output)
+        store_result = await DeliverableService(self.db).render_and_store(
+            word_export_task_id,
+            docx_bytes=output.getvalue(),
+            user_id=actor_id,
+            created_via="refresh_stale",
+        )
 
         return RefreshResult(
-            version_no=version_no,
+            version_no=store_result.version.version_no,
             refreshed=refreshed,
             skipped=skipped,
             requires_confirm=False,
             pending_confirm_sections=[],
         )
+
+    async def _latest_note_text(
+        self, project_id: UUID, year: int, section_code: str
+    ) -> str:
+        """读取该章节当前 DB 文字（刷新写入源）。"""
+        import sqlalchemy as sa
+
+        from app.models.report_models import DisclosureNote
+
+        stmt = sa.select(DisclosureNote.text_content).where(
+            DisclosureNote.project_id == project_id,
+            DisclosureNote.year == year,
+            DisclosureNote.note_section == section_code,
+            DisclosureNote.is_deleted == sa.false(),
+        )
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none() or ""
 
     # ─── Private helpers ─────────────────────────────────────────────────────
 
@@ -352,76 +418,115 @@ class DeliverableRefreshService:
         section_code: str,
         target_block,
     ) -> bool:
-        """检测用户是否对该章节做过人工编辑。
+        """检测用户是否对该章节做过人工编辑（需求 4.2/4.3/4.4）。
 
-        比较当前 docx 块内文字与上次刷新/生成时的基线 hash：
-        - 若块内文字 hash ≠ source_snapshot_hash → 有人工编辑
+        判据：当前块内文字的 Rendered_Block_Hash ≠ 上次生成/刷新时记录的
+        ``deliverable_section_state.rendered_block_hash``。
+
+        🔴 **不能拿 ``source_snapshot_hash`` 来比** —— 它是「DB 源数据域」
+        （``sha256(json{section_code,text_content,table_data,audited_amounts})``），
+        与「块内渲染文字域」根本不是一回事，两者永远不等 ⇒ 刷新恒返回
+        ``requires_confirm=True``（历史缺陷即此，用户每次刷新都被要求确认覆盖）。
+
+        Rendered_Block_Hash 为 NULL（存量交付件）⇒ 判定无人工编辑（fail-open，
+        与引入前行为一致，需求 4.4）。
         """
-        import hashlib
-
-        from docx.oxml.ns import qn
-
-        # 提取块内文字（排除标记行）
-        text_parts: list[str] = []
-        ns_w = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
-        for el in target_block.elements:
-            if el.tag == qn("w:p"):
-                para_text = "".join(
-                    t.text or ""
-                    for t in el.iter(f"{{{ns_w}}}t")
-                ).strip()
-                # 排除 SECTION 标记行
-                if para_text and not para_text.startswith("##"):
-                    text_parts.append(para_text)
-
-        block_text = "\n".join(text_parts)
-        block_hash = hashlib.sha256(block_text.encode("utf-8")).hexdigest()
-
-        # 比较基线
         import sqlalchemy as sa
 
         from app.models.audit_platform_models import DeliverableSectionState
+        from app.services.section_anchor_utils import block_text_hash
 
-        stmt = sa.select(DeliverableSectionState.source_snapshot_hash).where(
+        stmt = sa.select(DeliverableSectionState.rendered_block_hash).where(
             DeliverableSectionState.word_export_task_id == word_export_task_id,
             DeliverableSectionState.section_code == section_code,
         )
         result = await self.db.execute(stmt)
-        baseline_hash = result.scalar_one_or_none()
+        baseline_block_hash = result.scalar_one_or_none()
 
-        if baseline_hash is None:
-            # 无基线 → 视为无人工编辑
+        if not baseline_block_hash:
+            # 无渲染基线（存量交付件 / 首次）→ 视为无人工编辑
             return False
 
-        # 文本哈希与基线不同 → 有人工编辑
-        # 注：这是简化判断，实际应比较规范化后的内容
-        return block_hash != baseline_hash
+        # 与导出侧共用同一个哈希函数（禁各写一份，否则哈希域必然漂移）
+        current_block_hash = block_text_hash(list(target_block.elements))
+        return current_block_hash != baseline_block_hash
 
-    def _insert_refreshed_content(
+    def _replace_block_content(
         self,
-        doc,
         target_block,
-        section_code: str,
         text_content: str,
-    ) -> None:
-        """在已删除块的位置插入刷新后的内容。
+        locate_mode: str,
+    ) -> str:
+        """就地替换章节块内容，返回新内容的 Rendered_Block_Hash（需求 4.5/4.6）。
 
-        插入新的 SECTION 标记 + 文字段落。
+        算法（顺序关键）：
+        1. 先在**原位置**插入新段落 —— anchor 模式插到锚点区间内（有内容控件时插进
+           ``w:sdtContent`` 内部，新内容才被 Tag 覆盖）；marker 模式插到开标记之后；
+        2. 再删除旧内容元素。
+
+        先插后删是为了保住位置：旧实现 ``doc.add_paragraph`` 把刷新后的章节追加到
+        **文档末尾**（注释自承认「实际生产中应在删除前记录位置并 insertbefore」），
+        刷新一次章节顺序就乱。
+
+        Returns:
+            新写入内容的规范化 sha256（与导出侧同函数），供更新基线。
         """
-        body = doc.element.body
+        from docx.oxml import OxmlElement
 
-        # 使用 doc.add_paragraph 接口（安全的 python-docx API）
-        # 由于 target_block 已被删除，直接在末尾追加新内容
-        # 实际生产中应在删除前记录位置并 insertbefore
+        from app.services.section_anchor_utils import (
+            anchor_block_content_host,
+            block_text_hash,
+        )
 
-        # 创建 SECTION 开标记
-        doc.add_paragraph(f"##SECTION:{section_code}##")
+        lines = [ln.strip() for ln in (text_content or "").split("\n") if ln.strip()]
 
-        # 插入文字内容段落
-        if text_content:
-            for line in text_content.split("\n"):
-                if line.strip():
-                    doc.add_paragraph(line.strip())
+        def _new_paragraph(text: str):
+            p = OxmlElement("w:p")
+            r = OxmlElement("w:r")
+            t = OxmlElement("w:t")
+            t.text = text
+            t.set(
+                "{http://www.w3.org/XML/1998/namespace}space", "preserve"
+            )
+            r.append(t)
+            p.append(r)
+            return p
 
-        # 创建 SECTION 闭标记
-        doc.add_paragraph(f"##/SECTION:{section_code}##")
+        old_elements = list(getattr(target_block, "elements", None) or [])
+        new_paragraphs = [_new_paragraph(line) for line in lines]
+
+        if locate_mode == "anchor":
+            host, children = anchor_block_content_host(target_block)
+            if children:
+                anchor_el = children[0]
+                for p in new_paragraphs:
+                    anchor_el.addprevious(p)
+            else:
+                # 空区间：紧跟 bookmarkStart 之后逆序插入以保持先后顺序
+                start_el = target_block.start_el
+                for p in reversed(new_paragraphs):
+                    start_el.addnext(p)
+            # 删除旧内容（仅区间内内容元素；书签与内容控件外壳保留）
+            for el in children:
+                parent = el.getparent()
+                if parent is not None:
+                    parent.remove(el)
+        else:
+            # marker 模式：开闭标记保留，只换标记之间的内容
+            open_el = getattr(target_block, "open_el", None)
+            inner = [
+                el
+                for el in old_elements
+                if el is not open_el
+                and el is not getattr(target_block, "close_el", None)
+            ]
+            if open_el is not None:
+                for p in reversed(new_paragraphs):
+                    open_el.addnext(p)
+            for el in inner:
+                parent = el.getparent()
+                if parent is not None:
+                    parent.remove(el)
+
+        # 用与导出侧完全一致的口径算新哈希（只取 w:p、排除 ## 标记行）
+        return block_text_hash(new_paragraphs)

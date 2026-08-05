@@ -193,8 +193,15 @@ class Settings(BaseSettings):
     # 交付物章节内容控件化（deliverable-lineage-content-control spec）
     # True = 生成审计报告正文/附注 docx 时为每节注入 Block Content Control（Tag=sec_xxx，
     # 与 bookmark 并存），供前端 OnlyOffice 连接器实现真·光标跟随溯源。
-    # 默认 False = 不注入内容控件，生成的 docx 与引入前逐字节等价（零回归）。
-    DELIVERABLE_LINEAGE_CONTENT_CONTROL_ENABLED: bool = False
+    #
+    # 2026-08-04 默认由 False 翻为 True（spec deliverable-lineage-wiring-and-writeback-closure
+    # Task 5 / 需求 3.1）：注入只加不可见的 w:sdt 包裹层，可见文字与段落顺序逐字不变
+    # （test_deliverable_lineage_characterization 冻结基线实证），且内部逐节 fail-open。
+    # 内容控件同时给刷新提供正确的插入宿主（新内容写进 w:sdtContent 内部，Tag 才覆盖得到）。
+    # 注意：前端自动跟随 AUTO_FOLLOW_ENABLED 仍默认关闭 —— 连接器未经真实 OnlyOffice 实测，
+    # 后端注入与前端自动跟随是两件事，不要一起打开。
+    # 生产可通过 .env 置 False 回退（回退后 docx 与引入前逐字节等价）。
+    DELIVERABLE_LINEAGE_CONTENT_CONTROL_ENABLED: bool = True
 
     # 向量存储后端切换（pgtext=现状降级 | pgvector=原生向量列+ivfflat）
     # 默认 pgtext（安全，现有行为不变）；pgvector 需 V043 迁移 + CREATE EXTENSION vector

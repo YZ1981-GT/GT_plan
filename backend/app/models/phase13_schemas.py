@@ -183,6 +183,15 @@ class DeliverableDTOSchema(BaseModel):
     exported_at: datetime | None = None
     template_type: str | None = None
     selected_sections: list | None = None
+    #: 能力标志（spec deliverable-lineage-wiring-… 需求 6.5）：单一真源 =
+    #: app.services.deliverable_capabilities；前端据此门控回填/刷新入口，
+    #: 禁止前端再写一份 doc_type 白名单（双真源改一处另一处不红）。
+    supports_writeback: bool = False
+    supports_section_refresh: bool = False
+    #: 报表差异告警（需求 10.3）：列表行即可见，判定由后端 should_block_confirm
+    #: 唯一入口给出；前端只渲染，不得自己写 `if drift_report:`。
+    drift_blocked: bool = False
+    drift_reason: str | None = None
 
 
 class DeliverableListResponse(BaseModel):
@@ -203,6 +212,20 @@ class DeliverableVersionSchema(BaseModel):
     created_at: datetime | None = None
     selected_sections: list | None = None
     created_via: str | None = None
+    # ↓ spec deliverable-lineage-wiring-… 需求 11.1/11.2 + 10.3（全部 additive）
+    #: 实际编辑人（V142 `edited_by`）；OO 路径下 `created_by` 只是回调处理占位。
+    edited_by: UUID | None = None
+    edited_at: datetime | None = None
+    edited_by_name: str | None = None
+    #: 该版绑定的试算表快照短标识来源（完整 hash，前端截短显示）
+    bound_tb_hash: str | None = None
+    #: 三态：True=已过期 / False=最新 / None=未知（任一侧 hash 缺失，不得当 False）
+    is_stale: bool | None = None
+    #: 报表手工改动差异检测结果（三态见 financial_report_drift_service）
+    drift_report: dict | None = None
+    #: 由 should_block_confirm 唯一入口判定，前端不得自己写 `if drift_report:`
+    drift_blocked: bool = False
+    drift_reason: str | None = None
 
 
 class VersionCompareRequest(BaseModel):
@@ -321,6 +344,11 @@ class CompletenessResponse(BaseModel):
     has_confirmed: bool = False
     trio_consistent: bool = True
     trio_message: str | None = None
+    # ↓ 需求 11.3/11.4（additive）：三列对照 + 指出滞后类别 + 重新生成入口
+    trio_tb_hashes: dict[str, str | None] = {}
+    trio_lagging: list[str] = []
+    trio_majority_tb_hash: str | None = None
+    trio_ambiguous: bool = False
     warnings: list[str] = []
 
 

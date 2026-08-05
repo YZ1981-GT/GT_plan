@@ -176,6 +176,21 @@ class WordExportTaskVersion(Base):
     created_via: Mapped[str | None] = mapped_column(
         String(20), server_default=text("'generate'"), nullable=True
     )
+    # V142（deliverable-lineage-wiring-and-writeback-closure Wave 2 / 需求 7.2, 7.3）
+    # 实际编辑人与编辑时间。NULL = 未知 —— **禁止回退 created_by 展示**：
+    # created_by 在 OO 回调场景只是「回调处理占位」，把它当编辑人会让版本链上
+    # 所有在线编辑版本作者都变成交付物创建人（历史缺陷）。
+    edited_by: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+    edited_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    # V143（deliverable-lineage-wiring-and-writeback-closure Wave 4 / 需求 10.2、10.8）
+    # xlsx 手工改动差异检测**三态**：
+    #   None                      = 未检测 / 未配 Cell_Mapping → 放行
+    #   {"unavailable": "<原因>"}  = 映射存在但解析失败 → **拒绝 confirmed**（fail-closed）
+    #   {"diffs": [...]}          = 已比对；非空即有手工改动 → 拒绝；空数组 → 放行
+    # 🔴 判据不是「非空即拒绝」——`{"diffs": []}` 非空但表示已比对且一致。
+    drift_report: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
     __table_args__ = (
         Index(

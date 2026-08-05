@@ -30,6 +30,11 @@ from app.services.ledger_sampling_service import (
     LedgerQueryFilters,
     LedgerSamplingService,
 )
+from app.services.sampling_registry_service import (
+    register_sampled_vouchers,
+    register_sampling_batch,
+    resolve_project_year,
+)
 from app.services.version_trail_service import VersionTrailService
 
 logger = logging.getLogger(__name__)
@@ -220,6 +225,29 @@ async def cutoff_fill(
         )
 
         result = await LedgerSamplingService.record_extraction_log(db, log_data)
+
+        # ── R5：抽凭批次落库后写 CAS 1314 记录表投影（仅抽凭类型）──────────────
+        # 权威留痕是 workpaper_extraction_log.extraction_criteria；这里写的
+        # sampling_records / sampled_vouchers 是**可查询侧投影**，支撑项目级/QC 级
+        # 「所有抽样是否都有总体描述/样本量依据/结论」与「同一凭证被哪些底稿抽过」。
+        # 两个 register_* 均 fail-open（内部 warning），不让投影失败打掉审计师的回填。
+        if req.extraction_type == "voucher_sampling":
+            log_row = await _load_log_row(db, result)
+            if log_row is not None:
+                record_id = await register_sampling_batch(
+                    db, log=log_row, created_by=current_user.id
+                )
+                year = await resolve_project_year(db, pid)
+                if year is not None:
+                    await register_sampled_vouchers(
+                        db, log=log_row, year=year, sampling_record_id=record_id
+                    )
+                else:
+                    logger.warning(
+                        "项目审计年度无法反解，跳过已抽凭证登记（不猜年度）project=%s",
+                        pid,
+                    )
+
         await db.commit()
         return result
 
@@ -228,6 +256,32 @@ async def cutoff_fill(
 
 
 # ─── Helper ───────────────────────────────────────────────────────────────────
+
+
+async def _load_log_row(
+    db: AsyncSession,
+    record_result: dict,
+) -> WorkpaperExtractionLog | None:
+    """按 `record_extraction_log` 返回的 id 取回 ORM 行（供抽样登记投影使用）。
+
+    该服务返回的是精简 dict（id / created_at / batch_id），而登记需要
+    project_id / workpaper_id / extraction_criteria / total_matched / filled_count，
+    故此处回读一次。取不到返回 None（调用方跳过投影，不影响权威留痕）。
+    """
+    log_id = record_result.get("id") if isinstance(record_result, dict) else None
+    if not log_id:
+        return None
+    try:
+        return (
+            await db.execute(
+                select(WorkpaperExtractionLog).where(
+                    WorkpaperExtractionLog.id == UUID(str(log_id))
+                )
+            )
+        ).scalar_one_or_none()
+    except Exception:  # noqa: BLE001 — 回读失败只跳过投影
+        logger.warning("抽样登记回读批次行失败 log_id=%s", log_id)
+        return None
 
 
 async def _get_extracted_voucher_nos(

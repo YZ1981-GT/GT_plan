@@ -1218,6 +1218,13 @@ class DeliverableSectionState(Base, TimestampMixin):
         String(64), nullable=True
     )
     anchor_name: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    #: Rendered_Block_Hash（V141）：生成/刷新时写入块内文字的规范化 sha256。
+    #: 与 source_snapshot_hash **哈希域不同**（后者是 DB 源数据域）—— 二者不可互换，
+    #: 历史缺陷正是拿 source_snapshot_hash 去比块内文字致刷新恒要求确认覆盖。
+    #: 计算入口单一真源 = section_anchor_utils.block_text_hash；NULL=存量交付件。
+    rendered_block_hash: Mapped[str | None] = mapped_column(
+        String(64), nullable=True
+    )
 
     __table_args__ = (
         UniqueConstraint(

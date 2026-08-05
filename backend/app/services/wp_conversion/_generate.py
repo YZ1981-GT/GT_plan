@@ -365,22 +365,33 @@ class WpConversionGenerateMixin:
         实现时，回退为写入最小非空占位 dict，保证 ``parsed_data`` 字段非 NULL
         （验收的核心是 parsed_data 被填充，而非 NULL）。
         """
+        # 🔴 用 getattr 显式探测而非「调用 + except ImportError」：
+        #    `wp_parsed_data_service` 模块**已存在**（有 4 个别的函数），缺的只是
+        #    `populate_parsed_data` 这一个属性 → 直接调用抛的是 AttributeError，
+        #    落进下面的 `except Exception` 打一条 WARNING，而注释声称的是
+        #    「尚未实现 ⇒ ImportError ⇒ 静默回退」。两者行为不同：每生成一张底稿
+        #    都会刷一条误导性告警，且把「未实现」与「实现了但跑挂了」混为一谈。
+        #    （平台守卫 test_service_call_wiring_integrity.py 抓出此处）
+        populate = None
         try:
             from app.services import wp_parsed_data_service  # type: ignore
 
-            await wp_parsed_data_service.populate_parsed_data(
-                self.db, wp, wp_code, wp_name, cycle
-            )
-            return
+            populate = getattr(wp_parsed_data_service, "populate_parsed_data", None)
         except ImportError:
-            # wp_parsed_data_service 尚未实现（见 wp-generation-pipeline spec）
-            pass
-        except Exception as exc:
-            logger.warning(
-                "_populate_parsed_data: populate_parsed_data 失败 wp=%s，回退占位: %s",
-                wp_code,
-                exc,
-            )
+            # 模块本身不存在（见 wp-generation-pipeline spec）→ 静默回退占位
+            populate = None
+
+        if populate is not None:
+            try:
+                await populate(self.db, wp, wp_code, wp_name, cycle)
+                return
+            except Exception as exc:
+                # 已实现但执行失败：这才是真需要告警的情形
+                logger.warning(
+                    "_populate_parsed_data: populate_parsed_data 失败 wp=%s，回退占位: %s",
+                    wp_code,
+                    exc,
+                )
 
         # 回退：写入最小非空占位，确保 parsed_data 非 NULL（避免 HTML 渲染器
         # "有记录无内容"）。结构对齐渲染器消费的 html_data 形态。

@@ -1,14 +1,35 @@
-"""H10 资产处置损益 — 专属渲染策略."""
+"""H10 资产处置损益 — 专属渲染策略.
+
+科目定位（语义驱动，2026-08-03 纠正）：
+  资产处置损益 = 6115（损益类）
+  报表行 IS-018 = TB('6115','本期发生额')
+
+🔴 **损益口径**：取本期发生额，不取期末余额。
+- `trial_balance` 优先（`unadjusted_amount` 即发生额）
+- 兜底 `tb_balance`：按正方向取（6115 多为 credit，取 credit_amount）
+- 禁用 `debit - credit`（含年末结转损益的全年账上结构性恒为 0）
+
+spec: .kiro/specs/h-cycle-four-table-extraction-and-account-mapping/
+"""
 from __future__ import annotations
 import logging
 import sqlalchemy as sa
 from app.models.audit_platform_models import TbBalance
 from app.services.dataset_query import get_active_filter
+from app.services.four_table.h10_account_scope import H10_ACCOUNT_SPEC, H10_SLOT_KEY_PREFIX
+from app.services.four_table.semantic_account_resolver import (
+    SemanticAccountResult,
+    resolve_semantic_accounts,
+)
+from app.services.four_table.leaf_aggregation import (
+    select_leaves,
+    to_leaf_rows,
+)
+from app.services.four_table.parent_check import build_parent_check
 from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
 
-_H10_ACCOUNT_PREFIX = "6115"
 _ADJUDICATED_ITEM_ID = "H10-1-adjudicated-amount"
 
 H10_SHEETS = [
@@ -76,9 +97,55 @@ async def _load_project_context(ctx: RenderContext) -> dict:
     return project_ctx
 
 
-async def _fetch_tb_pl_amount(ctx: RenderContext) -> dict:
-    """损益类 6115：本期发生额 = 贷方 - 借方。"""
+async def _fetch_tb_pl_amount(ctx: RenderContext) -> tuple[dict, SemanticAccountResult]:
+    """损益类取数：本期发生额（trial_balance 优先，兜底 tb_balance credit_amount）。
+
+    Returns:
+        ``(tb_values, accounts)``
+    """
+    accounts = await resolve_semantic_accounts(ctx, H10_ACCOUNT_SPEC)
     tb: dict[str, float] = {}
+
+    gross_slot = accounts.slots.get("gross")
+    if not gross_slot or not gross_slot.found:
+        return tb, accounts
+
+    codes = gross_slot.codes  # 语义定位后的科目码
+
+    # 优先从 trial_balance 取发生额（权威口径）
+    standard_codes = gross_slot.standard_codes
+    if standard_codes:
+        try:
+            result = await ctx.db.execute(
+                sa.text(
+                    "SELECT standard_account_code, unadjusted_amount, audited_amount "
+                    "FROM trial_balance "
+                    "WHERE project_id = :pid AND year = :year AND is_deleted = false "
+                    "  AND standard_account_code = ANY(:codes)"
+                ),
+                {"pid": str(ctx.project_id), "year": ctx.year, "codes": standard_codes},
+            )
+            trial_rows = list(result.fetchall())
+            unadj_total = 0.0
+            audited_total = 0.0
+            for row in trial_rows:
+                unadj_total += float(row.unadjusted_amount or 0)
+                audited_total += float(row.audited_amount or 0)
+            if unadj_total != 0 or audited_total != 0:
+                tb["current_amount"] = unadj_total
+                tb["current_audited"] = audited_total
+                tb["source"] = "trial_balance"
+                # 走 trial_balance 路径时也要出 parent_check（Req 3.4）；
+                # 此处未查 tb_balance 故叶子侧为空，只暴露 trial 口径
+                tb["_parent_check"] = build_parent_check(
+                    accounts, [], trial_rows, H10_SLOT_KEY_PREFIX.keys(), occurrence=True
+                )
+                return tb, accounts
+        except Exception as e:  # noqa: BLE001
+            logger.warning("H10 trial_balance fetch failed: %s", e)
+
+    # 兜底：从 tb_balance 取本期发生额（按正方向：损益类取 credit_amount）
+    tb_rows: list = []
     try:
         active_filter = await get_active_filter(
             ctx.db, TbBalance.__table__, ctx.project_id, ctx.year
@@ -90,20 +157,30 @@ async def _fetch_tb_pl_amount(ctx: RenderContext) -> dict:
                 TbBalance.credit_amount,
             ).where(active_filter)
         )
+        # 按解析后的科目码前缀匹配（点号边界）
+        tb_rows = list(result.fetchall())
         debit = 0.0
         credit = 0.0
         matched = False
-        for row in result.fetchall():
+        for row in tb_rows:
             code = (row.account_code or "").strip()
-            if code == _H10_ACCOUNT_PREFIX or code.startswith(_H10_ACCOUNT_PREFIX):
+            if any(code == c or code.startswith(c + ".") for c in codes):
                 debit += float(row.debit_amount or 0)
                 credit += float(row.credit_amount or 0)
                 matched = True
         if matched:
-            tb = {"current_amount": credit - debit, "debit_amount": debit, "credit_amount": credit}
+            # 损益类正方向：资产处置损益 direction 多为 credit
+            # 但贷方-借方在含年末结转的全年账上恒为 0 → 单侧取 credit_amount
+            tb = {"current_amount": credit, "debit_amount": debit, "credit_amount": credit}
+            tb["source"] = "tb_balance_credit"
     except Exception as e:  # noqa: BLE001
         logger.warning("H10 TB fetch failed: %s", e)
-    return tb
+
+    # Req 3.4：损益类用发生额口径自检（`occurrence=True`）
+    tb["_parent_check"] = build_parent_check(
+        accounts, tb_rows, [], H10_SLOT_KEY_PREFIX.keys(), occurrence=True
+    )
+    return tb, accounts
 
 
 async def render(ctx: RenderContext) -> dict | None:
@@ -127,15 +204,19 @@ async def render(ctx: RenderContext) -> dict | None:
     except Exception as e:
         logger.warning("H10 render failed: %s", e)
 
-    tb_values = await _fetch_tb_pl_amount(ctx)
+    tb_values, accounts = await _fetch_tb_pl_amount(ctx)
     project_context = await _load_project_context(ctx)
+
+    resolved_gross_codes = accounts.codes_of("gross") or ["6115"]
 
     payload = {
         "component_type": "h10-asset-disposal-income",
-        "account_code": _H10_ACCOUNT_PREFIX,
+        "account_code": resolved_gross_codes[0] if resolved_gross_codes else "6115",
+        "account_codes": resolved_gross_codes,
         "responses_snapshot": responses_snapshot,
         "adjudicated_amount": adjudicated_amount,
         "tb_values": tb_values,
+        "tb_source_codes": accounts.as_dict(),
         "project_context": project_context,
         "prefix": "H10",
         "sheets": H10_SHEETS,
@@ -147,12 +228,20 @@ async def render(ctx: RenderContext) -> dict | None:
         try:
             import asyncio
             from app.services.d_cycle_extraction.prefill import build_d_adjudication_prefill
-            segment_prefill = await asyncio.wait_for(
-                build_d_adjudication_prefill(ctx, account_prefix="6115", mode="occurrence"),
-                timeout=5.0,
-            )
+
+            # 按解析后的科目码取数（不再硬编码 "6115"）
+            segments = []
+            gross_slot = accounts.slots.get("gross")
+            if gross_slot and gross_slot.found:
+                for code in gross_slot.codes:
+                    seg_items = await asyncio.wait_for(
+                        build_d_adjudication_prefill(ctx, account_prefix=code, mode="occurrence"),
+                        timeout=5.0,
+                    )
+                    segments.append({"segment": "gross", "account_prefix": code, "mode": "occurrence", "items": seg_items})
+
             payload["adjudication_segment_prefill"] = {
-                "segments": [{"segment": "cost", "account_prefix": "6115", "mode": "occurrence", "items": segment_prefill}],
+                "segments": segments,
                 "enabled": True,
             }
             payload["hi_extraction_enabled"] = True

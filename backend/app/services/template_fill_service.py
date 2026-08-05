@@ -35,12 +35,21 @@ from app.models.report_models import (
     FillPreviewSession,
     OpinionType,
 )
+from app.services.deliverable_section_state_service import (
+    persist_report_body_section_states,
+)
 from app.services.deliverable_service import STORAGE_ROOT, DeliverableService
 from app.services.placeholder_registry import (
     PlaceholderRegistry,
     get_placeholder_registry,
 )
+from app.services.report_body_section_blocks import (
+    build_report_body_sections_payload,
+    report_body_anchor_name,
+    scan_report_body_sections,
+)
 from app.services.report_body_service import ReportBodyService
+from app.services.section_anchor_utils import block_text_hash, write_section_anchors
 from app.services.template_manifest_loader import (
     TemplateManifestLoader,
     get_template_manifest_loader,
@@ -412,6 +421,37 @@ class TemplateFillService:
 
         # 4. 剥除 NOTE 指引注释（工作副本）
         strip_guidance_notes(doc)
+
+        # 4.5 写入 Section_Anchor（deliverable-lineage Wave 3 Task 17 / 需求 9.1）
+        #
+        # 必须在剥除 NOTE 之后、落盘之前：锚点是**不可见**的 w:bookmarkStart/End，
+        # 可见段落文字序列逐字不变（需求 12.4 档 2 由守卫钉死）。
+        # 有了锚点，交付件才具备章节级溯源 / stale 增量刷新 / 段落级回填能力 ——
+        # 三者的共同物理前提（附注侧的历史缺陷正是锚点从未写入）。
+        #
+        # 🔴 命名器必须传 report_body_anchor_name（sec_rb_*）：
+        # 沿用附注默认命名器会写出 sec_opinion 与附注章节码域撞命名空间，
+        # 实测会让附注回填反解出 `mgmt、responsibility` 这类伪章节码。
+        rb_sections_payload: list[dict] = []
+        try:
+            rb_blocks = scan_report_body_sections(doc)
+            rb_anchor_map = write_section_anchors(
+                doc,
+                [b.to_section_block() for b in rb_blocks],
+                namer=report_body_anchor_name,
+            )
+            rb_sections_payload = build_report_body_sections_payload(doc)
+            rb_block_hashes = {
+                b.section_id: block_text_hash(b.content_els) for b in rb_blocks
+            }
+        except Exception:  # noqa: BLE001 — 需求 1.6 同款：不阻断已生成的交付件
+            logger.warning(
+                "报告正文锚点写入失败，交付件照常生成但暂无章节溯源能力 project=%s",
+                project_id,
+                exc_info=True,
+            )
+            rb_anchor_map, rb_block_hashes = {}, {}
+
         clean_path = self._preview_dir(session.id) / "clean.docx"
         doc.save(str(clean_path))
 
@@ -442,7 +482,24 @@ class TemplateFillService:
             company_subtype=session.company_subtype,
             template_variant=session.template_variant,
             missing_fields=(session.missing_fields or {}).get("fields", []),
+            sections=rb_sections_payload,
         )
+
+        # 7.5 章节状态落库（Wave 3 Task 17 / 需求 9.1）
+        #
+        # 与附注侧 `persist_note_export_section_states` 同款：不落库则
+        # `/section-states` 返空 ⇒ 溯源面板章节下拉为空、回填恒返回全空。
+        # fail-open：失败只 warning，不回滚已落盘的交付件版本。
+        if rb_anchor_map:
+            await persist_report_body_section_states(
+                self.db,
+                word_export_task_id=task.id,
+                project_id=project_id,
+                year=year,
+                anchor_map=rb_anchor_map,
+                rendered_block_hashes=rb_block_hashes,
+                version_no=store_result.version.version_no,
+            )
 
         # 8. 删除 preview session（TTL 清理：confirm 即删）
         await self._purge_session(session)
@@ -500,8 +557,25 @@ class TemplateFillService:
         company_subtype: str | None,
         template_variant: str | None,
         missing_fields: list[str],
+        sections: list[dict] | None = None,
     ) -> dict:
-        """写入需求 6.8 schema 到 audit_report.report_body_json。"""
+        """写入需求 6.8 schema 到 audit_report.report_body_json。
+
+        Args:
+            sections: **additive**（Wave 3 Task 17 / 需求 9.2、9.6）——
+                各章节正文文字 ``[{section_id, section_name, content, section_order}]``。
+
+                为什么必须存进 DB：Word 模板模式下段落文字**只在 docx 文件里**，
+                DB 侧 `report_body_json` 原本只有 6 个元数据键（真实库实证）。
+                不存 DB 则「回填」无目标字段，且「重新生成后保留人工文字」
+                （需求 9.6）根本不可能 —— 重新生成必然全丢，这正是要解决的痛点。
+
+                形态对齐 JSON 模式的 sections，使既有 ``ReportBodyService.get_section``
+                等读取端两模式共用；**不动**既有 6 个元数据键 ⇒ 既有读取方零回归。
+
+                传 ``None``（如锚点扫描失败）时**保留**上一版 sections，不清空 ——
+                否则一次扫描失败就把已回填的人工文字抹掉。
+        """
         report = await self._get_report(project_id, year)
         body_json = {
             "optional_sections": optional_sections,
@@ -511,6 +585,12 @@ class TemplateFillService:
             "template_variant": template_variant,
             "missing_fields": missing_fields,
         }
+        if sections:
+            body_json["sections"] = sections
+        elif report is not None and isinstance(report.report_body_json, dict):
+            prev = report.report_body_json.get("sections")
+            if prev:
+                body_json["sections"] = prev
         if report is not None:
             report.report_body_json = body_json
             # 同步 Word 模式相关元数据列

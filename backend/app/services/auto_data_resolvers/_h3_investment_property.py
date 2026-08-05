@@ -1,4 +1,12 @@
-"""H3 投资性房地产 Auto Data Resolvers — 科目1503+1504 / 租金收入."""
+"""H3 投资性房地产 Auto Data Resolvers — 从科目真源取数 / 租金收入.
+
+科目码引用 `four_table.h3_account_scope` 的声明，不硬编码字面量。
+render 走完整语义定位（按科目名逐项目），auto_resolver 用兜底码做轻量取数
+（程序表步骤填充不需要精确到逐项目定位，兜底码在标准表里是正确的）。
+
+🔴 2026-08-03 纠正：旧实现取 `1503`（可供出售金融资产）/ `1504`（债权投资），
+两者都不是投资性房地产。
+"""
 
 from __future__ import annotations
 
@@ -11,10 +19,18 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.auto_data_resolvers import auto_resolver
+from app.services.four_table.h3_account_scope import H3_ACCOUNT_SPEC, H3_SLOT_KEY_PREFIX
 
 logger = logging.getLogger(__name__)
 
-_H3_ACCOUNT_PREFIXES = ("1503", "1504")
+
+def _h3_fallback_codes() -> dict[str, list[str]]:
+    """从 H3_ACCOUNT_SPEC 单一真源提取兜底码。"""
+    return {
+        slot.key: list(slot.fallback_standard_codes)
+        for slot in H3_ACCOUNT_SPEC.slots
+        if slot.fallback_standard_codes
+    }
 
 
 @auto_resolver("h3_tb_unadjusted")
@@ -24,16 +40,20 @@ async def _resolve_h3_tb_unadjusted(
     year: int,
     **kwargs: Any,
 ) -> dict[str, Any]:
-    """从 trial_balance 取科目1503投资性房地产+1504累计折旧(成本模式)的未审数.
+    """从 trial_balance 按 H3_ACCOUNT_SPEC 声明的兜底码取投资性房地产各层未审数。
 
-    1503: 资产类/借方 — unadjusted_amount 为正数（期末余额）
-    1504: 备抵类/贷方 — unadjusted_amount 为正数（期末余额，贷方方向）
-         公允价值模式下1504无余额，但仍查询
+    动态构造查询：从单一真源提取全部兜底码，按槽键分桶聚合。
     """
-    ip_unadjusted = 0.0
-    dep_unadjusted = 0.0
-    ip_audited = 0.0
-    dep_audited = 0.0
+    codes_by_slot = _h3_fallback_codes()
+    all_codes = [c for codes in codes_by_slot.values() for c in codes]
+    if not all_codes:
+        return {"summary": "⚠️ H3 无兜底科目码声明", "_error": True}
+
+    # 按槽聚合
+    slot_amounts: dict[str, dict[str, float]] = {
+        slot_key: {"unadjusted": 0.0, "audited": 0.0}
+        for slot_key in codes_by_slot
+    }
 
     try:
         result = await db.execute(
@@ -41,26 +61,39 @@ async def _resolve_h3_tb_unadjusted(
                 SELECT standard_account_code, unadjusted_amount, audited_amount
                 FROM trial_balance
                 WHERE project_id = :pid AND year = :year AND is_deleted = false
-                  AND (standard_account_code LIKE '1503%' OR standard_account_code LIKE '1504%')
+                  AND standard_account_code = ANY(:codes)
             """),
-            {"pid": str(project_id), "year": year},
+            {"pid": str(project_id), "year": year, "codes": all_codes},
         )
         for row in result.fetchall():
             code = (row.standard_account_code or "").strip()
-            if code.startswith("1503"):
-                ip_unadjusted += float(row.unadjusted_amount or 0)
-                ip_audited += float(row.audited_amount or 0)
-            elif code.startswith("1504"):
-                dep_unadjusted += float(row.unadjusted_amount or 0)
-                dep_audited += float(row.audited_amount or 0)
+            # 按最长前缀匹配归槽
+            for slot_key, slot_codes in codes_by_slot.items():
+                if any(code == sc or code.startswith(sc + ".") or code.startswith(sc + "-") for sc in slot_codes):
+                    slot_amounts[slot_key]["unadjusted"] += float(row.unadjusted_amount or 0)
+                    slot_amounts[slot_key]["audited"] += float(row.audited_amount or 0)
+                    break
     except Exception as e:  # noqa: BLE001
         logger.warning("h3_tb_unadjusted resolver failed: %s", e)
         return {"summary": "⚠️ 数据获取失败", "_error": True}
 
+    # 组装输出（保持既有接口兼容：ip_unadjusted / dep_unadjusted / net_unadjusted）
+    ip_unadjusted = slot_amounts.get("gross", {}).get("unadjusted", 0.0)
+    ip_audited = slot_amounts.get("gross", {}).get("audited", 0.0)
+    dep_unadjusted = (
+        slot_amounts.get("accum_dep", {}).get("unadjusted", 0.0)
+        + slot_amounts.get("accum_amort", {}).get("unadjusted", 0.0)
+    )
+    dep_audited = (
+        slot_amounts.get("accum_dep", {}).get("audited", 0.0)
+        + slot_amounts.get("accum_amort", {}).get("audited", 0.0)
+    )
     net_unadjusted = ip_unadjusted - dep_unadjusted
+
+    gross_codes = codes_by_slot.get("gross", [])
     summary = (
-        f"H3: 1503原值未审={ip_unadjusted:,.0f}，"
-        f"1504折旧未审={dep_unadjusted:,.0f}，"
+        f"H3: {'/'.join(gross_codes)}原值未审={ip_unadjusted:,.0f}，"
+        f"折旧摊销未审={dep_unadjusted:,.0f}，"
         f"净值未审={net_unadjusted:,.0f}"
     )
     return {
@@ -70,7 +103,7 @@ async def _resolve_h3_tb_unadjusted(
         "ip_audited": ip_audited,
         "dep_audited": dep_audited,
         "net_unadjusted": net_unadjusted,
-        "account_codes": list(_H3_ACCOUNT_PREFIXES),
+        "account_codes": all_codes,
     }
 
 

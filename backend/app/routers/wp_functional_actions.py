@@ -259,20 +259,12 @@ async def _dispatch_action(
             params.get("year", 2025),
         )
 
-    elif endpoint == "sampling/execute":
-        # 抽凭 — 使用 WpSamplingEngine
-        from app.services.wp_sampling_engine import WpSamplingEngine
-        engine = WpSamplingEngine()
-        return await engine.execute_sampling(
-            db=db,
-            project_id=project_id,
-            year=params.get("year", 2025),
-            account_codes=params.get("account_codes", []),
-            method=params.get("method", "random"),
-            sample_size=params.get("sample_size", 25),
-            amount_threshold=params.get("amount_threshold"),
-            sampling_interval=params.get("sampling_interval"),
-        )
+    # 注：`sampling/execute` 分支已于 sampling-compliance-closure Wave 2 移除。
+    # 它走的是 legacy `WpSamplingEngine`，与 canonical 抽凭链路
+    # （`/sampling/voucher-extract` → `voucher_sampling_algorithms.execute_sampling`）
+    # 口径不同：金额用 debit+credit（canonical 用 GREATEST，一借一贷会翻倍）、
+    # 分层写死 max*0.33/0.66 + 权重 0.2/0.3/0.5（无审计依据）、MUS 用固定 interval、
+    # 且不落 workpaper_extraction_log / 不入批次 / 不可撤销。抽凭一律走 canonical 端点。
 
     else:
         raise ValueError(f"未实现的端点: {endpoint}")

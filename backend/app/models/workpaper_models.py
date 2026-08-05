@@ -725,6 +725,18 @@ class SamplingRecord(Base):
         sa.Numeric(20, 2), nullable=True
     )
     conclusion: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # ── V139（sampling-compliance-closure R5.3）：与抽凭批次绑定 + 方法学快照 ──
+    # 权威留痕仍是 workpaper_extraction_log.extraction_criteria；本表是可查询侧投影，
+    # 支撑项目级/QC 级「所有抽样是否都有总体描述/样本量依据/结论」的一次性查询。
+    batch_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+    sampling_method: Mapped[str | None] = mapped_column(sa.String(32), nullable=True)
+    random_seed: Mapped[int | None] = mapped_column(sa.BigInteger, nullable=True)
+    # 抽样框数据集版本：序时账重导后据此判定该批次已不可复算
+    dataset_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
     is_deleted: Mapped[bool] = mapped_column(
         server_default=text("false"), nullable=False
     )
@@ -765,6 +777,13 @@ class SampledVoucher(Base):
         PG_UUID(as_uuid=True), nullable=True
     )
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # ── V139（sampling-compliance-closure R5.3）──
+    # 抽凭批次标识；NULL = 非抽凭引擎来源（如 ledger_penetration 穿透页手工标记）。
+    # 同批次同凭证由部分唯一索引 uq_sampled_vouchers_batch 防重；不同 batch_id 的
+    # 同一凭证**允许共存** —— 那正是「该凭证被抽过两次」这一需要被发现的事实。
+    batch_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
     sampled_by: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id"), nullable=True
     )

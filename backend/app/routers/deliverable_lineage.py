@@ -147,27 +147,101 @@ async def get_section_states(
 # ---------------------------------------------------------------------------
 
 
+async def _load_task_gate_fields(
+    db: AsyncSession,
+    word_export_task_id: UUID,
+) -> tuple[str | None, str | None]:
+    """一次查询取出门控所需两列：``(status, doc_type)``。
+
+    合并为单次查询的理由：终态检查与能力门控在同一请求里背靠背执行，拆两次
+    ``SELECT`` 是白付一次往返；且拆开后「任务不存在」在两处各判一次，语义容易漂移。
+
+    两列都可能为 ``None``：任务不存在 → ``(None, None)``；老数据缺列 → 该列 None。
+    调用方必须把 ``None`` 当「未知」而不是「已知的某个值」处理（见
+    ``_require_capability`` 的 fail-open 说明）。
+    """
+    from sqlalchemy import text
+
+    result = await db.execute(
+        text("SELECT status, doc_type FROM word_export_task WHERE id = :tid"),
+        {"tid": str(word_export_task_id)},
+    )
+    row = result.first()
+    if row is None:
+        return None, None
+    status = row[0] if len(row) > 0 else None
+    # 索引 1 可能不存在（测试替身只备了 status 一列）→ 视为 doc_type 未知
+    doc_type = row[1] if len(row) > 1 else None
+    return status, doc_type
+
+
 async def _check_terminal_state(
     db: AsyncSession,
     word_export_task_id: UUID,
 ) -> str | None:
     """Check if deliverable is in terminal state. Returns status if terminal, None otherwise."""
-    from sqlalchemy import select, text
-
-    # Query WordExportTask.status
-    result = await db.execute(
-        text(
-            "SELECT status FROM word_export_task WHERE id = :tid"
-        ),
-        {"tid": str(word_export_task_id)},
-    )
-    row = result.first()
-    if row is None:
-        return None  # task not found, will be caught downstream
-    status = row[0]
+    status, _ = await _load_task_gate_fields(db, word_export_task_id)
     if status in TERMINAL_STATUSES:
         return status
     return None
+
+
+# ---------------------------------------------------------------------------
+# Helper: doc_type 能力门控（spec deliverable-lineage-wiring-… 需求 6.4）
+# ---------------------------------------------------------------------------
+
+
+async def _get_doc_type(db: AsyncSession, word_export_task_id: UUID) -> str | None:
+    """读交付件 doc_type；读不到返回 None（=未知，不等于「不支持」）。"""
+    _, doc_type = await _load_task_gate_fields(db, word_export_task_id)
+    return doc_type
+
+
+async def _require_capability(
+    db: AsyncSession,
+    word_export_task_id: UUID,
+    *,
+    kind: str,
+) -> str | None:
+    """校验该交付件类型是否支持 writeback / section_refresh。
+
+    服务端硬校验（需求 6.4）：不依赖前端门控 —— 前端只是隐藏按钮，
+    直接 POST 仍会打到端点；历史缺陷是 xlsx 交付件回填后返回「成功」但零写入。
+    """
+    from app.services.deliverable_capabilities import (
+        section_refresh_unsupported_message,
+        supports_section_refresh,
+        supports_writeback,
+        writeback_unsupported_message,
+    )
+
+    doc_type = await _get_doc_type(db, word_export_task_id)
+
+    # 🔴 「读不到 doc_type」是**未知**，不是「已知不支持」——两者必须分开：
+    # 任务不存在 / 老数据缺列时若一律拒绝，会把真实的 404 掩盖成「该类型不支持回填」，
+    # 让人以为是能力问题而不是数据问题。此处 fail-open 交下游（下游取不到版本文件
+    # 会给出准确错误）；门控只拦「确实读到了某个不支持的 doc_type」。
+    if doc_type is None:
+        logger.warning(
+            "[DELIVERABLE_CAPABILITY] doc_type 未知，跳过能力门控交由下游处理: "
+            "task=%s kind=%s",
+            word_export_task_id,
+            kind,
+        )
+        return None
+
+    if kind == "writeback":
+        if not supports_writeback(doc_type):
+            raise HTTPException(
+                status_code=400, detail=writeback_unsupported_message(doc_type)
+            )
+    else:
+        if not supports_section_refresh(doc_type):
+            raise HTTPException(
+                status_code=400,
+                detail=section_refresh_unsupported_message(doc_type),
+            )
+    return doc_type
 
 
 # ---------------------------------------------------------------------------
@@ -227,6 +301,9 @@ async def writeback_deliverable(
             status_code=409,
             detail=f"该出品物已{terminal_status}，不可回填或刷新；如需修改请走撤回/解锁流程",
         )
+
+    # doc_type 能力门控（需求 6.4）：服务端硬校验，不依赖前端隐藏按钮
+    await _require_capability(db, word_export_task_id, kind="writeback")
 
     # 获取章节状态以判断是否需要异步（needs 10.2）
     dss = DeliverableSectionStateService(db)
@@ -305,6 +382,9 @@ async def refresh_section(
             detail=f"该出品物已{terminal_status}，不可回填或刷新；如需修改请走撤回/解锁流程",
         )
 
+    # doc_type 能力门控（需求 6.4）
+    await _require_capability(db, word_export_task_id, kind="section_refresh")
+
     # 写审计日志（needs 10.4）
     await audit_logger.log_action(
         user_id=current_user.id,
@@ -365,6 +445,9 @@ async def refresh_stale(
             status_code=409,
             detail=f"该出品物已{terminal_status}，不可回填或刷新；如需修改请走撤回/解锁流程",
         )
+
+    # doc_type 能力门控（需求 6.4）
+    await _require_capability(db, word_export_task_id, kind="section_refresh")
 
     # 获取 stale 章节
     dss = DeliverableSectionStateService(db)

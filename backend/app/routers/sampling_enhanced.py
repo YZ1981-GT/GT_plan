@@ -103,35 +103,15 @@ async def monthly_detail(
     )
 
 
-# ── 抽凭执行（wp-functional-actions spec） ────────────────
-
-class SamplingExecuteRequest(BaseModel):
-    method: str  # random / stratified / top_n / mus
-    account_codes: list[str]
-    year: int
-    sample_size: int = 25
-    amount_threshold: float | None = None
-    sampling_interval: float | None = None
-
-
-@router.post("/{project_id}/sampling/execute")
-async def sampling_execute(
-    project_id: UUID,
-    req: SamplingExecuteRequest,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """从 tb_ledger 按方式抽样 — 支持随机/分层/大额/MUS"""
-    from app.services.wp_sampling_engine import WpSamplingEngine
-
-    engine = WpSamplingEngine()
-    return await engine.execute_sampling(
-        db=db,
-        project_id=project_id,
-        year=req.year,
-        account_codes=req.account_codes,
-        method=req.method,
-        sample_size=req.sample_size,
-        amount_threshold=req.amount_threshold,
-        sampling_interval=req.sampling_interval,
-    )
+# ── 抽凭执行 ──────────────────────────────────────────────
+#
+# `POST /{project_id}/sampling/execute` 已于 sampling-compliance-closure Wave 2 下线
+# （R4）。它走 legacy `WpSamplingEngine`，与 canonical 抽凭链路口径不同且无留痕：
+#   - 金额用 debit + credit，而 canonical 用 GREATEST(debit, credit)（一借一贷会翻倍）
+#   - 分层写死 max*0.33/0.66 三层 + 权重 0.2/0.3/0.5，无审计依据且不可配置
+#   - MUS 用固定 interval 而非 population / sample_size
+#   - 不落 workpaper_extraction_log、不入批次状态机、无方法学快照、不可撤销
+#   - 前端零调用（`useWpFunctionalActions.ts` 对 `sampling` 零命中）
+#
+# 抽凭唯一入口 = `POST /api/projects/{pid}/sampling/voucher-extract`
+# （`app/routers/voucher_sampling.py`）。

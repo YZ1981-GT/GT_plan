@@ -1,8 +1,14 @@
 """H2 在建工程 — 专属渲染策略.
 
-科目1604在建工程（借方/资产类）
-返回 allResponses + projectContext + TB数据(1604)
+科目定位（语义驱动）：
+  在建工程 = 1604
+  工程物资 = 1605（含于同报表行 BS-029）
+  报表行 BS-029 = TB('1604')
+
+返回 allResponses + projectContext + TB数据(两层) + tb_source_codes
 三角勾稽含转固扣减：期末=期初+增加-减少-转固
+
+spec: .kiro/specs/h-cycle-four-table-extraction-and-account-mapping/
 """
 from __future__ import annotations
 
@@ -12,13 +18,23 @@ import sqlalchemy as sa
 
 from app.models.audit_platform_models import TbBalance, TrialBalance
 from app.services.dataset_query import get_active_filter
+from app.services.four_table.h2_account_scope import H2_ACCOUNT_SPEC, H2_SLOT_KEY_PREFIX
+from app.services.four_table.semantic_account_resolver import (
+    SemanticAccountResult,
+    resolve_semantic_accounts,
+)
+from app.services.four_table.leaf_aggregation import (
+    aggregate_leaves,
+    select_leaves,
+    to_leaf_rows,
+)
+from app.services.four_table.parent_check import build_parent_check
 
 from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
 
-# 科目前缀：1604在建工程 + 1605工程物资（审定表与试算核对）
-# 键名同时提供短名与 cip_1604_* / eng_mat_1605_* 别名，兼容前后端
+# 保留旧常量供 _alias_tb_keys 兼容，不再作取数路径真源
 _H2_ACCOUNT_PREFIXES = {
     "1604": ("cip_unadjusted", "cip_audited"),
     "1605": ("eng_mat_unadjusted", "eng_mat_audited"),
@@ -70,9 +86,12 @@ def _is_leaf(code: str, all_codes: set[str]) -> bool:
     return True
 
 
-async def _fetch_tb_data(ctx: RenderContext) -> dict:
-    """取科目1604/1605的期初/期末余额及未审数/审定数（只取叶子防双算）."""
+async def _fetch_tb_data(ctx: RenderContext) -> tuple[dict, SemanticAccountResult]:
+    """按语义槽取在建工程两层数据（在建工程 + 工程物资）。"""
+    accounts = await resolve_semantic_accounts(ctx, H2_ACCOUNT_SPEC)
+
     tb: dict[str, float] = {}
+    tb_rows: list = []
     try:
         active_filter = await get_active_filter(
             ctx.db, TbBalance.__table__, ctx.project_id, ctx.year
@@ -80,68 +99,62 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict:
         result = await ctx.db.execute(
             sa.select(
                 TbBalance.account_code,
+                TbBalance.account_name,
                 TbBalance.opening_balance,
                 TbBalance.closing_balance,
                 TbBalance.debit_amount,
                 TbBalance.credit_amount,
+                TbBalance.closing_direction,
+                TbBalance.dataset_id,
             ).where(active_filter)
         )
-        all_rows = result.fetchall()
-        # 收集 1604/1605 前缀下的全部科目码，用于叶子判定
-        h2_codes: set[str] = set()
-        for row in all_rows:
-            code = (row.account_code or "").strip()
-            for prefix in _H2_ACCOUNT_PREFIXES:
-                if code == prefix or code.startswith(prefix):
-                    h2_codes.add(code)
-                    break
-        # 只累加叶子科目（防父子双算）
-        for row in all_rows:
-            code = (row.account_code or "").strip()
-            if code not in h2_codes:
-                continue
-            if not _is_leaf(code, h2_codes):
-                continue
-            for prefix, (unadj_key, _audited_key) in _H2_ACCOUNT_PREFIXES.items():
-                if code == prefix or code.startswith(prefix):
-                    tb[f"{unadj_key}_opening"] = tb.get(f"{unadj_key}_opening", 0.0) + float(row.opening_balance or 0)
-                    tb[f"{unadj_key}_closing"] = tb.get(f"{unadj_key}_closing", 0.0) + float(row.closing_balance or 0)
-                    tb[f"{unadj_key}_debit"] = tb.get(f"{unadj_key}_debit", 0.0) + float(row.debit_amount or 0)
-                    tb[f"{unadj_key}_credit"] = tb.get(f"{unadj_key}_credit", 0.0) + float(row.credit_amount or 0)
-                    break
+        tb_rows = list(result.fetchall())
     except Exception as e:  # noqa: BLE001
         logger.warning("H2 TB balance fetch failed: %s", e)
 
-    # 从trial_balance取未审数/审定数（1604 + 1605）— 使用 ORM 模型 + get_active_filter 确保
-    # 只读 active dataset（与 tb_balance 段口径一致），避免裸 is_deleted 漏读 superseded 行。
-    try:
-        tb_filter = await get_active_filter(
-            ctx.db, TrialBalance.__table__, ctx.project_id, ctx.year
-        )
-        result = await ctx.db.execute(
-            sa.select(
-                TrialBalance.standard_account_code,
-                TrialBalance.unadjusted_amount,
-                TrialBalance.audited_amount,
-            ).where(
-                tb_filter,
-                sa.or_(
-                    TrialBalance.standard_account_code.like("1604%"),
-                    TrialBalance.standard_account_code.like("1605%"),
-                ),
-            )
-        )
-        for row in result.fetchall():
-            code = (row.standard_account_code or "").strip()
-            for prefix, (unadj_key, audited_key) in _H2_ACCOUNT_PREFIXES.items():
-                if code == prefix or code.startswith(prefix):
-                    tb[unadj_key] = tb.get(unadj_key, 0.0) + float(row.unadjusted_amount or 0)
-                    tb[audited_key] = tb.get(audited_key, 0.0) + float(row.audited_amount or 0)
-                    break
-    except Exception as e:  # noqa: BLE001
-        logger.warning("H2 trial_balance fetch failed: %s", e)
+    leaves = select_leaves(to_leaf_rows(tb_rows))
+    for slot_key, prefix in H2_SLOT_KEY_PREFIX.items():
+        slot = accounts.slots.get(slot_key)
+        if slot is None or not slot.found:
+            continue
+        agg = aggregate_leaves(leaves, slot.codes)
+        tb[f"{prefix}_unadjusted_opening"] = agg["opening"]
+        tb[f"{prefix}_unadjusted_closing"] = agg["closing"]
+        tb[f"{prefix}_unadjusted_debit"] = agg["debit"]
+        tb[f"{prefix}_unadjusted_credit"] = agg["credit"]
 
-    return _alias_tb_keys(tb)
+    # trial_balance 精确匹配
+    trial_rows: list = []
+    standard_codes = sorted(
+        {c for slot in accounts.slots.values() for c in slot.standard_codes if c}
+    )
+    if standard_codes:
+        try:
+            result = await ctx.db.execute(
+                sa.text(
+                    "SELECT standard_account_code, unadjusted_amount, audited_amount "
+                    "FROM trial_balance "
+                    "WHERE project_id = :pid AND year = :year AND is_deleted = false "
+                    "  AND standard_account_code = ANY(:codes)"
+                ),
+                {"pid": str(ctx.project_id), "year": ctx.year, "codes": standard_codes},
+            )
+            trial_rows = list(result.fetchall())
+            for row in trial_rows:
+                code = str(row.standard_account_code or "").strip()
+                for slot_key, prefix in H2_SLOT_KEY_PREFIX.items():
+                    slot = accounts.slots.get(slot_key)
+                    if slot and code in set(slot.standard_codes):
+                        tb[f"{prefix}_unadjusted"] = tb.get(f"{prefix}_unadjusted", 0.0) + float(row.unadjusted_amount or 0)
+                        tb[f"{prefix}_audited"] = tb.get(f"{prefix}_audited", 0.0) + float(row.audited_amount or 0)
+                        break
+        except Exception as e:  # noqa: BLE001
+            logger.warning("H2 trial_balance fetch failed: %s", e)
+
+    tb["_parent_check"] = build_parent_check(
+        accounts, tb_rows, trial_rows, H2_SLOT_KEY_PREFIX.keys()
+    )
+    return _alias_tb_keys(tb), accounts
 
 
 async def _load_project_context(ctx: RenderContext) -> dict:
@@ -254,7 +267,7 @@ async def render(ctx: RenderContext) -> dict | None:
     except Exception as e:  # noqa: BLE001
         logger.warning("H2 render responses load failed: %s", e)
 
-    tb_values = await _fetch_tb_data(ctx)
+    tb_values, accounts = await _fetch_tb_data(ctx)
     project_context = await _load_project_context(ctx)
 
     # 灰度门控：H2_FOUR_TABLE_EXTRACTION_ENABLED 控制是否输出 detail_prefill
@@ -264,11 +277,14 @@ async def render(ctx: RenderContext) -> dict | None:
     else:
         detail_prefill = []
 
+    resolved_codes = sorted({c for slot in accounts.slots.values() if slot.found for c in slot.codes})
+
     return {
         "component_type": "h2-construction-in-progress",
-        "account_codes": ["1604", "1605"],
+        "account_codes": resolved_codes or ["1604", "1605"],
         "responses_snapshot": responses_snapshot,
         "tb_values": tb_values,
+        "tb_source_codes": accounts.as_dict(),
         "project_context": project_context,
         "detail_prefill": detail_prefill,
         "prefix": "H2",

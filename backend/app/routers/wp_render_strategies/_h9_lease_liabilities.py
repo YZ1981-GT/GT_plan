@@ -2,16 +2,23 @@
 
 component_type = "h9-lease-liabilities"
 
-科目2205租赁负债（贷方/负债类）+ 未确认融资费用（借方/负债备抵类）
+科目定位（语义驱动，2026-08-03 纠正）：
+  租赁负债 = 2601（贷方/负债类）
+  未确认融资费用 = 2602（借方/负债备抵类）
+  报表行 BS-063 = TB('2601') - TB('2602')
+
+🔴 旧实现写死 `2205`（合同负债，D7 循环），**取错整个科目族**。
+
 CAS21: 与H8使用权资产配对
-返回 allResponses + tb_values(2205+未确认融资费用) + h8_linkage + formula_validation
-     + sheets元数据
+返回 allResponses + tb_values(两层) + h8_linkage + formula_validation
+     + sheets元数据 + tb_source_codes(溯源)
 
 负债类公式：期末=期初+贷方-借方（与资产类相反！）
 备抵类公式：期末=期初+借方-贷方
-联动：H8使用权资产(双向) + TB回写(2205+未确认融资费用) + 附注
+联动：H8使用权资产(双向) + TB回写(语义定位后的科目码) + 附注
 
 Requirements: 1.6
+spec: .kiro/specs/h-cycle-four-table-extraction-and-account-mapping/
 """
 from __future__ import annotations
 
@@ -20,17 +27,104 @@ from typing import Any
 
 import sqlalchemy as sa
 
+from app.models.audit_platform_models import TbBalance, TrialBalance
+from app.services.dataset_query import get_active_filter
+from app.services.four_table.h9_account_scope import H9_ACCOUNT_SPEC, H9_SLOT_KEY_PREFIX
+from app.services.four_table.semantic_account_resolver import (
+    SemanticAccountResult,
+    resolve_semantic_accounts,
+)
+from app.services.four_table.leaf_aggregation import (
+    aggregate_leaves,
+    select_leaves,
+    to_leaf_rows,
+)
+from app.services.four_table.parent_check import build_parent_check
+
 from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
 
-# 科目前缀：2205租赁负债（贷方/负债类）
-_H9_ACCOUNT_PREFIXES = {
-    "2205": ("lease_liability", "lease_liability_audited"),
-}
+# ──────────────────────────────────────────────────────────────────────────────
+# 两层取数纯函数（无 DB 依赖，可独立单测）
+# ──────────────────────────────────────────────────────────────────────────────
 
-# 未确认融资费用可能使用的科目编码（借方/负债备抵类）
-_H9_FINANCE_COST_PREFIXES = ["220501", "2205%融资%", "6602%租赁%"]
+
+def build_h9_tb_values(
+    accounts: SemanticAccountResult,
+    tb_rows,
+    trial_rows,
+) -> dict[str, float]:
+    """按语义槽聚合租赁负债两层金额。纯函数。
+
+    输出键契约::
+
+        lease_liability_unadjusted_opening / _closing / _debit / _credit   ← tb_balance
+        unearned_finance_unadjusted_opening / _closing / _debit / _credit  ← tb_balance（新增）
+        {prefix}_unadjusted / {prefix}_audited                             ← trial_balance
+
+    某槽 `found=False` 时不产生该槽的任何键（宁缺勿造）。
+
+    🔴 既有前端消费方可能读 `lease_2205_*` 旧键名 → 保留兼容别名。
+    """
+    leaves = select_leaves(to_leaf_rows(tb_rows))
+    out: dict[str, float] = {}
+
+    for slot_key, prefix in H9_SLOT_KEY_PREFIX.items():
+        slot = accounts.slots.get(slot_key)
+        if slot is None or not slot.found:
+            continue
+        agg = aggregate_leaves(leaves, slot.codes)
+        out[f"{prefix}_unadjusted_opening"] = agg["opening"]
+        out[f"{prefix}_unadjusted_closing"] = agg["closing"]
+        out[f"{prefix}_unadjusted_debit"] = agg["debit"]
+        out[f"{prefix}_unadjusted_credit"] = agg["credit"]
+
+    # 兼容旧键名（前端可能仍读 `lease_2205_*`）
+    if "lease_liability_unadjusted_opening" in out:
+        out["lease_2205_opening"] = out["lease_liability_unadjusted_opening"]
+        out["lease_2205_closing"] = out["lease_liability_unadjusted_closing"]
+        out["lease_2205_debit"] = out["lease_liability_unadjusted_debit"]
+        out["lease_2205_credit"] = out["lease_liability_unadjusted_credit"]
+    if "unearned_finance_unadjusted_opening" in out:
+        out["lease_finance_cost_opening"] = out["unearned_finance_unadjusted_opening"]
+        out["lease_finance_cost_closing"] = out["unearned_finance_unadjusted_closing"]
+        out["lease_finance_cost_debit"] = out["unearned_finance_unadjusted_debit"]
+        out["lease_finance_cost_credit"] = out["unearned_finance_unadjusted_credit"]
+
+    # trial_balance：按标准码精确匹配
+    by_code: dict[str, tuple[float, float]] = {}
+    for row in trial_rows or []:
+        get = row.get if isinstance(row, dict) else (lambda k, _r=row: getattr(_r, k, None))
+        code = str(get("standard_account_code") or "").strip()
+        if not code:
+            continue
+        prev = by_code.get(code, (0.0, 0.0))
+        by_code[code] = (
+            prev[0] + float(get("unadjusted_amount") or 0),
+            prev[1] + float(get("audited_amount") or 0),
+        )
+
+    for slot_key, prefix in H9_SLOT_KEY_PREFIX.items():
+        slot = accounts.slots.get(slot_key)
+        if slot is None or not slot.found:
+            continue
+        wanted = set(slot.standard_codes)
+        if not wanted:
+            continue
+        unadj = sum(v[0] for c, v in by_code.items() if c in wanted)
+        audited = sum(v[1] for c, v in by_code.items() if c in wanted)
+        out[f"{prefix}_unadjusted"] = unadj
+        out[f"{prefix}_audited"] = audited
+        # 兼容旧键名
+        if slot_key == "gross":
+            out["lease_2205_unadjusted"] = unadj
+            out["lease_2205_audited"] = audited
+        elif slot_key == "unearned_finance":
+            out["lease_finance_cost_unadjusted"] = unadj
+            out["lease_finance_cost_audited"] = audited
+
+    return out
 
 H9_SHEETS = [
     {"sheet_name": "底稿目录", "component_type": "h9-lease-liabilities"},
@@ -44,72 +138,59 @@ H9_SHEETS = [
 ]
 
 
-async def _fetch_tb_data(ctx: RenderContext) -> dict:
-    """取科目2205的期初/期末余额及未审数/审定数.
+async def _fetch_tb_data(ctx: RenderContext) -> tuple[dict, SemanticAccountResult]:
+    """按语义槽取租赁负债两层数据（租赁负债 2601 / 未确认融资费用 2602）。
 
-    包含租赁负债(2205, 贷方/负债类)和未确认融资费用(备抵/借方)。
-    负债类贷方科目：期末=期初+贷方-借方
-    备抵类借方科目：期末=期初+借方-贷方
+    Returns:
+        ``(tb_values, accounts)`` —— ``accounts`` 供 render 下发 `tb_source_codes` 溯源。
     """
-    tb: dict[str, float] = {}
+    accounts = await resolve_semantic_accounts(ctx, H9_ACCOUNT_SPEC)
 
+    tb_rows: list = []
     try:
-        from app.models.audit_platform_models import TbBalance
-        from app.services.dataset_query import get_active_filter
-
         active_filter = await get_active_filter(
             ctx.db, TbBalance.__table__, ctx.project_id, ctx.year
         )
         result = await ctx.db.execute(
             sa.select(
                 TbBalance.account_code,
+                TbBalance.account_name,
                 TbBalance.opening_balance,
                 TbBalance.closing_balance,
                 TbBalance.debit_amount,
                 TbBalance.credit_amount,
-            ).where(
-                active_filter,
-                sa.or_(
-                    TbBalance.account_code == "2205",
-                    TbBalance.account_code.startswith("2205"),
-                ),
-            )
+                TbBalance.closing_direction,
+                TbBalance.dataset_id,
+            ).where(active_filter)
         )
-        for row in result.fetchall():
-            code = (row.account_code or "").strip()
-            # 判断是否为未确认融资费用子科目(220501等)
-            is_finance_cost = len(code) > 4 and code.startswith("2205")
-            key_prefix = "lease_finance_cost" if is_finance_cost else "lease_2205"
-
-            tb[f"{key_prefix}_opening"] = tb.get(f"{key_prefix}_opening", 0.0) + float(row.opening_balance or 0)
-            tb[f"{key_prefix}_closing"] = tb.get(f"{key_prefix}_closing", 0.0) + float(row.closing_balance or 0)
-            tb[f"{key_prefix}_debit"] = tb.get(f"{key_prefix}_debit", 0.0) + float(row.debit_amount or 0)
-            tb[f"{key_prefix}_credit"] = tb.get(f"{key_prefix}_credit", 0.0) + float(row.credit_amount or 0)
+        tb_rows = list(result.fetchall())
     except Exception as e:  # noqa: BLE001
         logger.warning("H9 TB balance fetch failed: %s", e)
 
-    # 从 trial_balance 取未审数+审定数
-    try:
-        result = await ctx.db.execute(
-            sa.text("""
-                SELECT standard_account_code, unadjusted_amount, audited_amount
-                FROM trial_balance
-                WHERE project_id = :pid AND year = :year AND is_deleted = false
-                  AND standard_account_code LIKE '2205%'
-            """),
-            {"pid": str(ctx.project_id), "year": ctx.year},
-        )
-        for row in result.fetchall():
-            code = (row.standard_account_code or "").strip()
-            is_finance_cost = len(code) > 4 and code.startswith("2205")
-            key_prefix = "lease_finance_cost" if is_finance_cost else "lease_2205"
+    trial_rows: list = []
+    standard_codes = sorted(
+        {c for slot in accounts.slots.values() for c in slot.standard_codes if c}
+    )
+    if standard_codes:
+        try:
+            result = await ctx.db.execute(
+                sa.text(
+                    "SELECT standard_account_code, unadjusted_amount, audited_amount "
+                    "FROM trial_balance "
+                    "WHERE project_id = :pid AND year = :year AND is_deleted = false "
+                    "  AND standard_account_code = ANY(:codes)"
+                ),
+                {"pid": str(ctx.project_id), "year": ctx.year, "codes": standard_codes},
+            )
+            trial_rows = list(result.fetchall())
+        except Exception as e:  # noqa: BLE001
+            logger.warning("H9 trial_balance fetch failed: %s", e)
 
-            tb[f"{key_prefix}_unadjusted"] = tb.get(f"{key_prefix}_unadjusted", 0.0) + float(row.unadjusted_amount or 0)
-            tb[f"{key_prefix}_audited"] = tb.get(f"{key_prefix}_audited", 0.0) + float(row.audited_amount or 0)
-    except Exception as e:  # noqa: BLE001
-        logger.warning("H9 trial_balance fetch failed: %s", e)
-
-    return tb
+    tb = build_h9_tb_values(accounts, tb_rows, trial_rows)
+    tb["_parent_check"] = build_parent_check(
+        accounts, tb_rows, trial_rows, H9_SLOT_KEY_PREFIX.keys()
+    )
+    return tb, accounts
 
 
 async def _validate_liability_formulas(tb_values: dict) -> dict[str, Any]:
@@ -281,8 +362,8 @@ async def render(ctx: RenderContext) -> dict | None:
     except Exception as e:  # noqa: BLE001
         logger.warning("H9 render responses load failed: %s", e)
 
-    # 2. 获取TB数据（2205租赁负债 + 未确认融资费用子科目）
-    tb_values = await _fetch_tb_data(ctx)
+    # 2. 获取TB数据（语义定位：2601 租赁负债 + 2602 未确认融资费用）
+    tb_values, accounts = await _fetch_tb_data(ctx)
 
     # 3. 负债类公式验证
     formula_validation = await _validate_liability_formulas(tb_values)
@@ -290,11 +371,15 @@ async def render(ctx: RenderContext) -> dict | None:
     # 4. H8联动校验
     h8_linkage = await _fetch_h8_linkage(ctx)
 
+    # 解析后的主科目码（供前端 writebackTB 等，不再写死 `2205`）
+    resolved_gross_codes = accounts.codes_of("gross") or ["2601"]
+
     payload = {
         "component_type": "h9-lease-liabilities",
-        "account_codes": ["2205"],
+        "account_codes": resolved_gross_codes,
         "responses_snapshot": responses_snapshot,
         "tb_values": tb_values,
+        "tb_source_codes": accounts.as_dict(),
         "formula_validation": formula_validation,
         "h8_linkage": h8_linkage,
         "prefix": "H9",
@@ -307,7 +392,7 @@ async def render(ctx: RenderContext) -> dict | None:
         },
         # 负债类公式方向元数据（前端可用于初始化校验）
         "formula_direction": {
-            "account_code": "2205",
+            "account_code": resolved_gross_codes[0] if resolved_gross_codes else "2601",
             "account_name": "租赁负债",
             "direction": "credit",  # 贷方/负债类
             "end_balance_formula": "begin + credit - debit",  # 期末=期初+贷方-借方
@@ -325,12 +410,22 @@ async def render(ctx: RenderContext) -> dict | None:
         try:
             import asyncio
             from app.services.d_cycle_extraction.prefill import build_d_adjudication_prefill
-            segment_prefill = await asyncio.wait_for(
-                build_d_adjudication_prefill(ctx, account_prefix="2205", mode="balance"),
-                timeout=5.0,
-            )
+
+            # 按解析后的两层各发一段（不再传 "2205"）
+            segments = []
+            for slot_key, prefix in H9_SLOT_KEY_PREFIX.items():
+                slot = accounts.slots.get(slot_key)
+                if not slot or not slot.found:
+                    continue
+                for code in slot.codes:
+                    seg_items = await asyncio.wait_for(
+                        build_d_adjudication_prefill(ctx, account_prefix=code, mode="balance"),
+                        timeout=5.0,
+                    )
+                    segments.append({"segment": slot_key, "account_prefix": code, "mode": "balance", "items": seg_items})
+
             payload["adjudication_segment_prefill"] = {
-                "segments": [{"segment": "cost", "account_prefix": "2205", "mode": "balance", "items": segment_prefill}],
+                "segments": segments,
                 "enabled": True,
             }
             payload["hi_extraction_enabled"] = True

@@ -247,7 +247,9 @@ async def get_version_chain(
     if task is None:
         raise HTTPException(status_code=404, detail="交付物不存在")
     _ensure_task_belongs(task, project_id)
-    versions = await svc.get_version_chain(task_id)
+    # 需求 11.1/11.2/10.3：版本链需带绑定快照、stale 三态、实际编辑人与差异检测结论。
+    # 这些派生字段只能在后端算（前端拿不到 task 级绑定与 should_block_confirm）。
+    versions = await svc.get_version_chain_view(task_id)
     return [DeliverableVersionSchema.model_validate(v) for v in versions]
 
 
@@ -712,7 +714,9 @@ async def render_disclosure_notes(
     else:
         export_mode = "template" if settings.USE_TEMPLATE_FILL_SERVICE else "programmatic"
 
-    buf = await exporter.export(
+    # export_with_meta：额外拿到章节级元数据（kept_codes / 锚点 / Rendered_Block_Hash），
+    # 供落 deliverable_section_state —— 溯源 / stale 刷新 / 回填三条链的共同前提。
+    buf, note_meta = await exporter.export_with_meta(
         project_id,
         body.year,
         template_type=effective_template_type,
@@ -735,6 +739,19 @@ async def render_disclosure_notes(
         source_snapshot_refs=snapshot_refs,
         selected_sections=body.selected_sections,
         file_name=file_name,
+    )
+    # 章节状态落库（需求 1.4/1.5）：内部 fail-open，落库失败只 warning 不阻断交付件
+    from app.services.deliverable_section_state_service import (
+        persist_note_export_section_states,
+    )
+
+    await persist_note_export_section_states(
+        db,
+        word_export_task_id=task.id,
+        project_id=project_id,
+        year=body.year,
+        meta=note_meta,
+        version_no=store.version.version_no,
     )
     await _advance_to_editing(dsvc, task.id)
     await db.commit()
@@ -878,6 +895,10 @@ async def check_completeness(
         has_confirmed=result.has_confirmed,
         trio_consistent=result.trio_consistent,
         trio_message=result.trio_message,
+        trio_tb_hashes=result.trio_tb_hashes,
+        trio_lagging=result.trio_lagging,
+        trio_majority_tb_hash=result.trio_majority_tb_hash,
+        trio_ambiguous=result.trio_ambiguous,
         warnings=result.warnings,
     )
 
@@ -1213,7 +1234,9 @@ async def onlyoffice_config(
     # 并发编辑会话限制：仅可编辑态（edit mode）占席位，只读预览不计入
     is_edit_mode = oos._editor_mode(task.status) == "edit"
     if is_edit_mode:
-        doc_key = f"deliverable-{task_id}-{version_no}"
+        # 需求 7.5：席位 key 与 build_editor_config 下发的 doc_key **同源**
+        # （历史上两处各写一份字面量 → 改一处另一处不红，席位统计漂移）
+        doc_key = deliverable_doc_key(task_id, version_no)
         allowed = await acquire_session(current_user.id, doc_key)
         if not allowed:
             raise HTTPException(
@@ -1306,14 +1329,28 @@ async def onlyoffice_callback(
     await db.commit()
 
     # 文档关闭时释放编辑席位（status 2=保存关闭, 4=关闭无修改, 6=强制保存）
+    #
+    # 🔴 需求 7.5：占用与释放必须成对。历史实现两处都对不上 ——
+    #   ① key 用 `body["version"]`（OnlyOffice 自己的内部版本号）拼，而占用时用的是
+    #      URL 路径里的平台 version_no；
+    #   ② user 用 `task.created_by` 近似，而占用时用的是 `current_user.id`。
+    # 两处任一不匹配 ⇒ DEL 打空 ⇒ 席位从未释放、全靠 1h TTL 自愈（期间虚占名额）。
+    #
+    # 正解：回调体的 `key` **就是**我们在 config 里下发的 doc_key（OO 原样回传），
+    # 以它按 doc_key 释放该文档全部席位；缺 key 时才退回确定性派生（此时版本号无从得知，
+    # 只能靠 TTL，但至少不再拼出一个必然错的 key）。
     status = body.get("status")
     if status in (2, 4, 6):
-        from app.services.onlyoffice_session_limiter import release_session
-        # callback 不携带具体 user_id，用 task creator 近似；
-        # 多用户场景下靠 TTL 兜底清理（1h 过期）
-        version_no = body.get("version", 1)
-        doc_key = f"deliverable-{task_id}-{version_no}"
-        await release_session(creator_id, doc_key)
+        from app.services.onlyoffice_session_limiter import release_sessions_by_doc_key
+
+        doc_key = body.get("key")
+        if isinstance(doc_key, str) and doc_key.strip():
+            await release_sessions_by_doc_key(doc_key.strip())
+        else:
+            logger.warning(
+                "OnlyOffice callback 未携带 key，席位无法定向释放，等待 TTL 自愈 task=%s",
+                task_id,
+            )
 
     return result
 

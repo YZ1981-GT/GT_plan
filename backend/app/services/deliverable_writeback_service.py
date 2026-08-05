@@ -67,14 +67,38 @@ class WritebackConflict(TypedDict):
     baseline_value: str  # 生成时基线值（按 source_snapshot_hash 对应版本）
 
 
-class WritebackResult(TypedDict):
-    """回填结果。"""
+class WritebackFailure(TypedDict):
+    """写入未生效的章节（spec deliverable-lineage-wiring-… 需求 5.1）。
 
-    written: list[str]  # 成功写回的 section_code 列表
+    与 ``skipped``（未参与写入）和 ``rejected``（护栏主动拒绝）语义不同：
+    本类是**尝试写入但影响 0 行** —— 历史缺陷是这类被静默计入 ``written`` 并
+    Toast「已成功回填 N 个章节」，而 DB 里什么都没变。
+    """
+
+    section_code: str
+    reason: str
+
+
+class WritebackResult(TypedDict):
+    """回填结果。
+
+    五类 section_code 集合两两不交（Property 10）：
+    written / rejected / conflicts / skipped / failed。
+    """
+
+    written: list[str]  # 成功写回且**影响行数 > 0** 的 section_code
     rejected: list[ChangeClassification]  # 被护栏拒绝的变更
     conflicts: list[WritebackConflict]  # 待裁决的冲突
     skipped: list[str]  # 跳过的 section_code（如锚点丢失）
+    failed: list[WritebackFailure]  # 尝试写入但影响 0 行（需求 5.1）
     trace_id: str | None  # 留痕 trace_id
+
+
+#: 上游无对应记录时的失败原因（需求 5.1：必须给可读原因，不能静默成功）
+_NO_UPSTREAM_ROW_REASON = (
+    "上游附注中找不到该章节记录（未生成或已删除），回填未写入任何数据；"
+    "请先在附注模块生成该章节后重试"
+)
 
 
 # ─── DeliverableWritebackService ─────────────────────────────────────────────
@@ -94,6 +118,16 @@ class DeliverableWritebackService:
     def __init__(self, db: AsyncSession):
         self.db = db
         self._section_state_service = DeliverableSectionStateService(db)
+        #: 上一次 `_extract_sections_from_docx` 解析出的 section_code → 块 XML。
+        #: 供第 4a 步护栏分类按**块内结构**定位（需求 8.5：不得用正则猜测）。
+        #: 每次 extract 覆盖式重置，避免跨次回填串味。
+        self._last_block_xml: dict[str, str] = {}
+        #: 当前回填的上游适配器（Wave 3 Task 18）。默认附注 —— 与抽适配器之前的
+        #: 硬编码行为等价，使**直接调用** `_write_text_content` 的既有测试零改动。
+        #: `writeback()` 会在主流程里按 doc_type 覆盖它。
+        from app.services.writeback_target_adapters import DisclosureNoteAdapter
+
+        self._adapter: Any = DisclosureNoteAdapter(db)
 
     # ─── Task 12.1: 合规护栏分类 ──────────────────────────────────────────────
 
@@ -260,7 +294,6 @@ class DeliverableWritebackService:
         import sqlalchemy as sa
 
         from app.models.audit_platform_models import DeliverableSectionState
-        from app.models.report_models import DisclosureNote
 
         # 1. 读取基线 hash（生成时快照）
         state_stmt = sa.select(
@@ -290,14 +323,11 @@ class DeliverableWritebackService:
             return None
 
         # 4. 上游已变 → 检查是否幂等（双方改成一样）
-        note_stmt = sa.select(DisclosureNote.text_content).where(
-            DisclosureNote.project_id == project_id,
-            DisclosureNote.year == year,
-            DisclosureNote.note_section == section_code,
-            DisclosureNote.is_deleted == sa.false(),
+        #    上游读取走适配器（Wave 3 Task 18）：报告正文的上游是
+        #    AuditReport.report_body_json.sections，不是 disclosure_notes。
+        upstream_value = await self._adapter.read_upstream(
+            project_id, year, section_code
         )
-        note_result = await self.db.execute(note_stmt)
-        upstream_value = note_result.scalar_one_or_none() or ""
 
         if _normalize_text(deliverable_text) == _normalize_text(upstream_value):
             # 双方改成一样 → 幂等跳过（实质无冲突）
@@ -328,7 +358,7 @@ class DeliverableWritebackService:
         resolution: str,
         conflict: WritebackConflict,
         actor_id: UUID,
-    ) -> str | None:
+    ) -> tuple[str | None, int]:
         """裁决冲突并写回 + 更新基线。
 
         Args:
@@ -336,12 +366,13 @@ class DeliverableWritebackService:
             conflict: 冲突三方内容
 
         Returns:
-            写回的值（如选择 upstream 则返回 None 表示不写回）
+            ``(写回的值, 受影响行数)``。选择 ``upstream`` 时值为 None 且行数记 1
+            （「保留上游」是有效裁决，不是失败）；写 DB 但影响 0 行时行数为 0，
+            **此时不更新基线**（需求 5.4）。
         """
         import sqlalchemy as sa
 
         from app.models.audit_platform_models import DeliverableSectionState
-        from app.models.report_models import DisclosureNote
 
         # 确定写回值
         if resolution == "upstream":
@@ -353,19 +384,18 @@ class DeliverableWritebackService:
             # 自定义文本
             write_value = resolution
 
-        # 写回 text_content（如非 upstream）
+        # 写回上游（如非 upstream 裁决）—— 走适配器，不硬编码 DisclosureNote
+        rowcount = 1  # upstream 裁决不写库，视为有效裁决
         if write_value is not None:
-            update_stmt = (
-                sa.update(DisclosureNote)
-                .where(
-                    DisclosureNote.project_id == project_id,
-                    DisclosureNote.year == year,
-                    DisclosureNote.note_section == section_code,
-                    DisclosureNote.is_deleted == sa.false(),
-                )
-                .values(text_content=write_value)
+            rowcount = await self._adapter.write_upstream(
+                project_id, year, section_code, write_value
             )
-            await self.db.execute(update_stmt)
+            if rowcount == 0:
+                logger.warning(
+                    "writeback: 冲突裁决写入章节 %s 影响 0 行，不更新基线",
+                    section_code,
+                )
+                return None, 0
 
         # 更新基线 hash（需求 8.6）
         new_hash = await self._section_state_service.compute_source_snapshot_hash(
@@ -386,7 +416,7 @@ class DeliverableWritebackService:
         await self.db.execute(update_baseline_stmt)
         await self.db.flush()
 
-        return write_value
+        return write_value, rowcount
 
     # ─── Task 15.1: TraceEventService 留痕 ───────────────────────────────────
 
@@ -483,25 +513,47 @@ class DeliverableWritebackService:
     async def _extract_sections_from_docx(
         self, docx_bytes: bytes
     ) -> dict[str, str]:
-        """下载 docx → scan_section_blocks 按书签区间切块 → 提取 TEXT 段落文字。
+        """下载 docx → 按章节区间切块 → 提取 TEXT 段落文字。
+
+        定位走 ``resolve_section_blocks``（锚点优先、``##SECTION:`` 标记回退）：
+        **交付 docx 的 ``##SECTION:`` 标记在导出末尾已被 remove_section_markers 清掉**，
+        只用 scan_section_blocks 会恒得空 dict → 回填永远「无变更」且不报错
+        （历史缺陷即此）。
 
         Returns:
-            {section_code: normalized_text} 仅含 SECTION 块内的正文段落文字。
+            {section_code: normalized_text} 仅含章节区间内的正文段落文字。
         """
         from docx import Document
         from docx.oxml.ns import qn
+        from lxml import etree
 
-        from app.services.word_doc_utils import scan_section_blocks
+        from app.services.section_anchor_utils import resolve_section_blocks
 
         doc = Document(BytesIO(docx_bytes))
-        blocks = scan_section_blocks(doc)
+        mode, blocks = resolve_section_blocks(doc)
+        if mode == "none":
+            logger.warning(
+                "writeback: 交付 docx 既无章节锚点也无 ##SECTION 标记，无法定位章节；"
+                "该交付件可能生成于锚点接线之前，请重新生成后再回填"
+            )
+            return {}
+        logger.info("writeback: 章节定位模式=%s blocks=%d", mode, len(blocks))
 
         ns_w = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
         sections: dict[str, str] = {}
+        self._last_block_xml = {}
 
         for block in blocks:
             text_parts: list[str] = []
+            xml_parts: list[str] = []
             for el in block.elements:
+                # 块内原始 XML 留给护栏分类（需求 8.5：按块内结构定位，不用正则猜）
+                try:
+                    xml_parts.append(
+                        etree.tostring(el, encoding="unicode")
+                    )
+                except Exception:  # noqa: BLE001 — 单个元素序列化失败不影响文字提取
+                    pass
                 if el.tag == qn("w:p"):
                     para_text = "".join(
                         t.text or ""
@@ -513,6 +565,7 @@ class DeliverableWritebackService:
                             text_parts.append(para_text)
                 # 表格跳过（仅提取 TEXT 段落）
             sections[block.section_code] = _normalize_text("\n".join(text_parts))
+            self._last_block_xml[block.section_code] = "".join(xml_parts)
 
         return sections
 
@@ -573,7 +626,6 @@ class DeliverableWritebackService:
         import sqlalchemy as sa
         import uuid as uuid_mod
 
-        from app.models.report_models import DisclosureNote
 
         # ─── 0. 终态检查 ─────────────────────────────────────────────────────
         terminal = await self._check_terminal_status(word_export_task_id)
@@ -598,12 +650,29 @@ class DeliverableWritebackService:
                 rejected=[],
                 conflicts=[],
                 skipped=[],
+                failed=[],
                 trace_id=None,
             )
 
+        # ─── 1.5 选上游适配器（Wave 3 Task 18 / 需求 9.2、9.5）────────────────
+        #
+        # 历史实现把 DisclosureNote 硬编码在五处 → 报告正文交付件点回填也去写
+        # disclosure_notes（章节标识 `opinion` 与附注章节号不是同一命名空间）
+        # ⇒ UPDATE 恒 0 行，而 rowcount 未检查时还报「回填成功」。
+        adapter = await self._resolve_adapter(word_export_task_id)
+        if adapter is None:
+            logger.warning(
+                "writeback: 该交付件类型不支持回填 task=%s", word_export_task_id
+            )
+            return WritebackResult(
+                written=[], rejected=[], conflicts=[], skipped=[], failed=[],
+                trace_id=None,
+            )
+        self._adapter = adapter
+
         # ─── 2. 按锚点分块 + 提取 TEXT ─────────────────────────────────────
         try:
-            docx_sections = await self._extract_sections_from_docx(docx_bytes)
+            docx_sections = await self._extract_sections_for(adapter, docx_bytes)
         except Exception as exc:
             logger.error(
                 "writeback: docx 解析失败 task=%s: %s, 保留原值",
@@ -615,6 +684,7 @@ class DeliverableWritebackService:
                 rejected=[],
                 conflicts=[],
                 skipped=[],
+                failed=[],
                 trace_id=None,
             )
 
@@ -624,23 +694,16 @@ class DeliverableWritebackService:
                 rejected=[],
                 conflicts=[],
                 skipped=[],
+                failed=[],
                 trace_id=None,
             )
 
-        # ─── 3. 加载 DB text_content + diff ─────────────────────────────────
+        # ─── 3. 加载上游当前文字 + diff ─────────────────────────────────────
         db_sections: dict[str, str] = {}
         section_codes = list(docx_sections.keys())
 
         for code in section_codes:
-            note_stmt = sa.select(DisclosureNote.text_content).where(
-                DisclosureNote.project_id == project_id,
-                DisclosureNote.year == year,
-                DisclosureNote.note_section == code,
-                DisclosureNote.is_deleted == sa.false(),
-            )
-            result = await self.db.execute(note_stmt)
-            text_content = result.scalar_one_or_none()
-            db_sections[code] = text_content or ""
+            db_sections[code] = await adapter.read_upstream(project_id, year, code)
 
         diff = self._compute_section_diff(docx_sections, db_sections)
 
@@ -650,12 +713,14 @@ class DeliverableWritebackService:
                 rejected=[],
                 conflicts=[],
                 skipped=[],
+                failed=[],
                 trace_id=None,
             )
 
         # ─── 4. 逐章节处理 ──────────────────────────────────────────────────
         written: list[str] = []
         rejected: list[ChangeClassification] = []
+        failed: list[WritebackFailure] = []
         conflicts: list[WritebackConflict] = []
         skipped: list[str] = []
         trace_id = str(uuid_mod.uuid4())
@@ -667,17 +732,35 @@ class DeliverableWritebackService:
                 skipped.append(code)
                 continue
 
-            # 4a. 护栏分类
-            # 简化：对纯文字 diff，直接构造 TEXT 分类
-            # 实际中应解析 XML 块结构，此处以文字为主（已在 _extract_sections_from_docx 中过滤了 table）
-            classifications = [
-                ChangeClassification(
-                    kind=ChangeKind.TEXT,
-                    section_code=code,
-                    content=docx_text,
-                    rejection_reason=None,
+            # 4a. 护栏分类（需求 8.1：必须调用护栏，不得硬编码为纯文字变更）
+            #
+            # 🔴 历史缺陷：此处曾硬编码 `[ChangeClassification(kind=TEXT, ...)]` 并注释
+            # 「简化」，于是 130 行的 `_classify_change`（TABLE/TITLE 拒绝 + 拒绝留痕，
+            # design 标「审计底线 Property 16」）**全仓零生产调用方** → `rejected` 恒空、
+            # 需求 8.4 的被拒变更留痕从未产生。表格/标题写不进去只是因为提取阶段过滤掉了，
+            # 不是护栏在起作用 —— 一旦提取逻辑放宽，数字就能直接写回上游。
+            block_xml = self._last_block_xml.get(code, "")
+            if block_xml:
+                classifications = self._classify_change(code, db_text, block_xml)
+            else:
+                # 拿不到块 XML（序列化失败等）→ 退回文字分类，但记 warning：
+                # 此时护栏对表格/标题不设防，属可观测的降级而非静默。
+                logger.warning(
+                    "writeback: 章节 %s 无块 XML，护栏降级为纯文字分类", code
                 )
-            ]
+                classifications = [
+                    ChangeClassification(
+                        kind=ChangeKind.TEXT,
+                        section_code=code,
+                        content=docx_text,
+                        rejection_reason=None,
+                    )
+                ]
+
+            if not classifications:
+                # 护栏判定「无实质变更」（如仅空白差异）→ 跳过，不写不拒
+                skipped.append(code)
+                continue
 
             # 对每个分类做处理
             for cls_item in classifications:
@@ -719,7 +802,7 @@ class DeliverableWritebackService:
                         word_export_task_id, project_id, year, code, docx_text
                     )
                     if conflict:
-                        await self._resolve_conflict_and_write(
+                        _value, rowcount = await self._resolve_conflict_and_write(
                             word_export_task_id,
                             project_id,
                             year,
@@ -728,6 +811,25 @@ class DeliverableWritebackService:
                             conflict,
                             actor_id,
                         )
+                        if rowcount == 0:
+                            failed.append(
+                                WritebackFailure(
+                                    section_code=code,
+                                    reason=_NO_UPSTREAM_ROW_REASON,
+                                )
+                            )
+                            await self._log_writeback(
+                                project_id=project_id,
+                                word_export_task_id=word_export_task_id,
+                                section_code=code,
+                                actor_id=actor_id,
+                                action="rejected",
+                                before_text=db_text,
+                                after_text=docx_text,
+                                rejection_reason=_NO_UPSTREAM_ROW_REASON,
+                                trace_id=trace_id,
+                            )
+                            continue
                         written.append(code)
                         await self._log_writeback(
                             project_id=project_id,
@@ -741,9 +843,28 @@ class DeliverableWritebackService:
                         )
                     else:
                         # 无冲突但有 resolution → 直接写
-                        await self._write_text_content(
+                        rowcount = await self._write_text_content(
                             project_id, year, code, docx_text, word_export_task_id
                         )
+                        if rowcount == 0:
+                            failed.append(
+                                WritebackFailure(
+                                    section_code=code,
+                                    reason=_NO_UPSTREAM_ROW_REASON,
+                                )
+                            )
+                            await self._log_writeback(
+                                project_id=project_id,
+                                word_export_task_id=word_export_task_id,
+                                section_code=code,
+                                actor_id=actor_id,
+                                action="rejected",
+                                before_text=db_text,
+                                after_text=docx_text,
+                                rejection_reason=_NO_UPSTREAM_ROW_REASON,
+                                trace_id=trace_id,
+                            )
+                            continue
                         written.append(code)
                         await self._log_writeback(
                             project_id=project_id,
@@ -764,9 +885,29 @@ class DeliverableWritebackService:
                         conflicts.append(conflict)
                     else:
                         # 无冲突 → 直接写回
-                        await self._write_text_content(
+                        rowcount = await self._write_text_content(
                             project_id, year, code, docx_text, word_export_task_id
                         )
+                        if rowcount == 0:
+                            # 需求 5.1：影响 0 行不得计入 written（历史缺陷：静默成功）
+                            failed.append(
+                                WritebackFailure(
+                                    section_code=code,
+                                    reason=_NO_UPSTREAM_ROW_REASON,
+                                )
+                            )
+                            await self._log_writeback(
+                                project_id=project_id,
+                                word_export_task_id=word_export_task_id,
+                                section_code=code,
+                                actor_id=actor_id,
+                                action="rejected",
+                                before_text=db_text,
+                                after_text=docx_text,
+                                rejection_reason=_NO_UPSTREAM_ROW_REASON,
+                                trace_id=trace_id,
+                            )
+                            continue
                         written.append(code)
                         # 触发 NOTE_SECTION_SAVED 事件（需求 7.6）
                         await self._emit_note_saved(
@@ -788,6 +929,7 @@ class DeliverableWritebackService:
             rejected=rejected,
             conflicts=conflicts,
             skipped=skipped,
+            failed=failed,
             trace_id=trace_id,
         )
 
@@ -831,6 +973,53 @@ class DeliverableWritebackService:
 
         return file_path.read_bytes()
 
+    async def _resolve_adapter(self, word_export_task_id: UUID):
+        """按交付件 doc_type 取上游适配器（Wave 3 Task 18）。
+
+        取不到 doc_type 时**回退附注适配器** —— 与引入前行为等价（历史实现即硬编码
+        附注），保证「读不到元数据」不会让既有附注回填突然失效；
+        真正的门控在端点层（`deliverable_capabilities` 的 400 校验）。
+        """
+        import sqlalchemy as sa
+
+        from app.models.phase13_models import WordExportTask
+        from app.services.writeback_target_adapters import (
+            DisclosureNoteAdapter,
+            get_writeback_adapter,
+        )
+
+        try:
+            stmt = sa.select(WordExportTask.doc_type).where(
+                WordExportTask.id == word_export_task_id
+            )
+            result = await self.db.execute(stmt)
+            doc_type = result.scalar_one_or_none()
+        except Exception:  # noqa: BLE001 — 读不到不阻断，退回既有行为
+            logger.warning(
+                "writeback: 读取 doc_type 失败，回退附注适配器 task=%s",
+                word_export_task_id,
+                exc_info=True,
+            )
+            return DisclosureNoteAdapter(self.db)
+
+        if doc_type is None:
+            return DisclosureNoteAdapter(self.db)
+        return get_writeback_adapter(self.db, doc_type)
+
+    async def _extract_sections_for(self, adapter, docx_bytes: bytes) -> dict[str, str]:
+        """按适配器种类提取章节文字。
+
+        附注侧仍走 ``_extract_sections_from_docx`` —— 它同时采集块 XML 供护栏使用
+        （护栏需要 ``w:tbl`` 结构，适配器协议只返回文字，故不能收进适配器）。
+        """
+        from app.services.writeback_target_adapters import DisclosureNoteAdapter
+
+        if isinstance(adapter, DisclosureNoteAdapter):
+            return await self._extract_sections_from_docx(docx_bytes)
+        # 其他上游：护栏降级为纯文字分类（报告正文段落无表格数字回写场景）
+        self._last_block_xml = {}
+        return await adapter.extract_sections(docx_bytes)
+
     async def _write_text_content(
         self,
         project_id: UUID,
@@ -838,24 +1027,32 @@ class DeliverableWritebackService:
         section_code: str,
         new_text: str,
         word_export_task_id: UUID,
-    ) -> None:
-        """写回 text_content 到 disclosure_notes + 更新基线。"""
+    ) -> int:
+        """写回上游 + 更新基线。
+
+        上游由 ``self._adapter`` 决定（附注 / 报告正文），**不再硬编码 DisclosureNote**。
+
+        Returns:
+            受影响行数。**0 表示上游无对应记录 → 调用方必须计入 ``failed`` 而非
+            ``written``**（需求 5.1）；此时不更新基线 hash（需求 5.4），否则会把
+            「没写进去」记成「已同步」。
+        """
         import sqlalchemy as sa
 
         from app.models.audit_platform_models import DeliverableSectionState
-        from app.models.report_models import DisclosureNote
 
-        update_stmt = (
-            sa.update(DisclosureNote)
-            .where(
-                DisclosureNote.project_id == project_id,
-                DisclosureNote.year == year,
-                DisclosureNote.note_section == section_code,
-                DisclosureNote.is_deleted == sa.false(),
-            )
-            .values(text_content=new_text)
+        adapter = self._adapter
+        rowcount = await adapter.write_upstream(
+            project_id, year, section_code, new_text
         )
-        await self.db.execute(update_stmt)
+        if rowcount == 0:
+            logger.warning(
+                "writeback: 章节 %s 写入影响 0 行（上游%s无对应记录），"
+                "不计入成功、不更新基线",
+                section_code,
+                adapter.upstream_label,
+            )
+            return 0
 
         # 更新基线 hash
         new_hash = await self._section_state_service.compute_source_snapshot_hash(
@@ -875,6 +1072,7 @@ class DeliverableWritebackService:
         )
         await self.db.execute(update_baseline)
         await self.db.flush()
+        return rowcount
 
     async def _emit_note_saved(
         self,

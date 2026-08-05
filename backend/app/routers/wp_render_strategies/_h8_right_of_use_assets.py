@@ -2,15 +2,21 @@
 
 component_type = "h8-right-of-use-assets"
 
-科目1901使用权资产（借方/资产类）+ 累计折旧（贷方/备抵类）
-CAS21核心：H8=H9+直接费用-激励
-返回 allResponses + tb_values(1901+累计折旧) + h9_linkage + cas21_validation
-     + simplified_leases + sheets元数据
-资产类公式：期末=期初+借方-贷方
-备抵类公式：期末=期初+贷方-借方
-联动：H9租赁负债(双向) + H1固定资产(终止时) + TB回写(1901+累计折旧)
+科目定位（语义驱动，2026-08-03 纠正）：
+  原值 = 1641 使用权资产
+  累计折旧 = 1642 使用权资产累计折旧
+  减值准备 = 1643 使用权资产减值准备
+  报表行 BS-031 = TB('1641') - TB('1642') - TB('1643')
 
-Requirements: 1.6
+🔴 旧实现写死 `1901`（待处理财产损溢）/ `190101`，**取错整个科目族**。
+
+CAS21核心：H8=H9+直接费用-激励
+返回 allResponses + tb_values(三层) + h9_linkage + cas21_validation
+     + simplified_leases + sheets元数据 + tb_source_codes(溯源)
+联动：H9租赁负债(双向) + H1固定资产(终止时) + TB回写(语义定位后的科目码)
+
+Requirements: 1.5, 2.1, 4.1
+spec: .kiro/specs/h-cycle-four-table-extraction-and-account-mapping/
 """
 from __future__ import annotations
 
@@ -21,19 +27,92 @@ import sqlalchemy as sa
 
 from app.models.audit_platform_models import TbBalance, TrialBalance
 from app.services.dataset_query import get_active_filter
+from app.services.four_table.h8_account_scope import H8_ACCOUNT_SPEC, H8_SLOT_KEY_PREFIX
+from app.services.four_table.semantic_account_resolver import (
+    SemanticAccountResult,
+    resolve_semantic_accounts,
+)
+from app.services.four_table.leaf_aggregation import (
+    aggregate_leaves,
+    select_leaves,
+    to_leaf_rows,
+)
+from app.services.four_table.parent_check import build_parent_check
 
 from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
 
-# 科目前缀：1901使用权资产（借方/资产类）+ 累计折旧子科目
-_H8_ACCOUNT_PREFIXES = {
-    "1901": ("rou_asset", "rou_asset_audited"),          # 使用权资产-原值
-    "190101": ("rou_dep", "rou_dep_audited"),            # 使用权资产-累计折旧(备抵)
-}
+# ──────────────────────────────────────────────────────────────────────────────
+# 三层取数纯函数（无 DB 依赖，可独立单测）
+# ──────────────────────────────────────────────────────────────────────────────
 
-# 累计折旧可能在不同科目编码体系下（如1901xx02或单独科目）
-_H8_CONTRA_PATTERNS = ["190101", "190102", "1901%折旧%"]
+
+def build_h8_tb_values(
+    accounts: SemanticAccountResult,
+    tb_rows,
+    trial_rows,
+) -> dict[str, float]:
+    """按语义槽聚合使用权资产三层金额。纯函数。
+
+    输出键契约（保持既有 `rou_asset`/`rou_dep` 不变，新增 `rou_imp`）::
+
+        {prefix}_unadjusted_opening / _closing / _debit / _credit  ← tb_balance 叶子
+        {prefix}_unadjusted / {prefix}_audited                     ← trial_balance
+
+    某槽 `found=False` 时不产生该槽的任何键（宁缺勿造）。
+    """
+    leaves = select_leaves(to_leaf_rows(tb_rows))
+    out: dict[str, float] = {}
+
+    for slot_key, prefix in H8_SLOT_KEY_PREFIX.items():
+        slot = accounts.slots.get(slot_key)
+        if slot is None or not slot.found:
+            continue
+        agg = aggregate_leaves(leaves, slot.codes)
+        out[f"{prefix}_unadjusted_opening"] = agg["opening"]
+        out[f"{prefix}_unadjusted_closing"] = agg["closing"]
+        out[f"{prefix}_unadjusted_debit"] = agg["debit"]
+        out[f"{prefix}_unadjusted_credit"] = agg["credit"]
+        # 🔴 兼容旧键名 —— `GtH8RightOfUseAssets.vue` 用 `tv.rou_asset_closing ?? 0`
+        # 读 TB 核对种子（`H8-adj-tb-amount-ending` / `-opening`）。不发这些键会让
+        # 那两行**静默恒为 0**（`?? 0` 吞掉 undefined，不报错不崩溃）。
+        out[f"{prefix}_opening"] = agg["opening"]
+        out[f"{prefix}_closing"] = agg["closing"]
+        out[f"{prefix}_debit"] = agg["debit"]
+        out[f"{prefix}_credit"] = agg["credit"]
+
+    # 折旧层再补一组无前缀别名（宿主同时读 `tv.dep_opening` / `tv.dep_closing`）
+    if "rou_dep_unadjusted_opening" in out:
+        out["dep_opening"] = out["rou_dep_unadjusted_opening"]
+        out["dep_closing"] = out["rou_dep_unadjusted_closing"]
+
+    # trial_balance：按标准码精确匹配
+    by_code: dict[str, tuple[float, float]] = {}
+    for row in trial_rows or []:
+        get = row.get if isinstance(row, dict) else (lambda k, _r=row: getattr(_r, k, None))
+        code = str(get("standard_account_code") or "").strip()
+        if not code:
+            continue
+        prev = by_code.get(code, (0.0, 0.0))
+        by_code[code] = (
+            prev[0] + float(get("unadjusted_amount") or 0),
+            prev[1] + float(get("audited_amount") or 0),
+        )
+
+    for slot_key, prefix in H8_SLOT_KEY_PREFIX.items():
+        slot = accounts.slots.get(slot_key)
+        if slot is None or not slot.found:
+            continue
+        wanted = set(slot.standard_codes)
+        if not wanted:
+            continue
+        unadj = sum(v[0] for c, v in by_code.items() if c in wanted)
+        audited = sum(v[1] for c, v in by_code.items() if c in wanted)
+        out[f"{prefix}_unadjusted"] = unadj
+        out[f"{prefix}_audited"] = audited
+
+    return out
 
 H8_SHEETS = [
     {"sheet_name": "底稿目录", "component_type": "h8-right-of-use-assets"},
@@ -59,15 +138,15 @@ H8_SHEETS = [
 ]
 
 
-async def _fetch_tb_data(ctx: RenderContext) -> dict:
-    """取科目1901的期初/期末余额及未审数/审定数.
+async def _fetch_tb_data(ctx: RenderContext) -> tuple[dict, SemanticAccountResult]:
+    """按语义槽取使用权资产三层数据（原值 1641 / 累计折旧 1642 / 减值准备 1643）。
 
-    包含使用权资产原值(1901)和累计折旧(190101/190102等备抵子科目)。
-    资产类借方科目：期末=期初+借方-贷方
-    备抵类贷方科目：期末=期初+贷方-借方
+    Returns:
+        ``(tb_values, accounts)`` —— ``accounts`` 供 render 下发 `tb_source_codes` 溯源。
     """
-    tb: dict[str, float] = {}
+    accounts = await resolve_semantic_accounts(ctx, H8_ACCOUNT_SPEC)
 
+    tb_rows: list = []
     try:
         active_filter = await get_active_filter(
             ctx.db, TbBalance.__table__, ctx.project_id, ctx.year
@@ -75,67 +154,93 @@ async def _fetch_tb_data(ctx: RenderContext) -> dict:
         result = await ctx.db.execute(
             sa.select(
                 TbBalance.account_code,
+                TbBalance.account_name,
                 TbBalance.opening_balance,
                 TbBalance.closing_balance,
                 TbBalance.debit_amount,
                 TbBalance.credit_amount,
-            ).where(
-                active_filter,
-                sa.or_(
-                    TbBalance.account_code == "1901",
-                    TbBalance.account_code.startswith("1901"),
-                ),
-            )
+                TbBalance.closing_direction,
+                TbBalance.dataset_id,
+            ).where(active_filter)
         )
-        for row in result.fetchall():
-            code = (row.account_code or "").strip()
-            # 判断是否为累计折旧子科目(190101/190102等)
-            is_contra = len(code) > 4 and code.startswith("1901")
-            key_prefix = "rou_dep" if is_contra else "rou_asset"
-
-            tb[f"{key_prefix}_opening"] = tb.get(f"{key_prefix}_opening", 0.0) + float(row.opening_balance or 0)
-            tb[f"{key_prefix}_closing"] = tb.get(f"{key_prefix}_closing", 0.0) + float(row.closing_balance or 0)
-            tb[f"{key_prefix}_debit"] = tb.get(f"{key_prefix}_debit", 0.0) + float(row.debit_amount or 0)
-            tb[f"{key_prefix}_credit"] = tb.get(f"{key_prefix}_credit", 0.0) + float(row.credit_amount or 0)
+        tb_rows = list(result.fetchall())
     except Exception as e:  # noqa: BLE001
         logger.warning("H8 TB balance fetch failed: %s", e)
 
-    # 从 trial_balance 取未审数+审定数（使用 get_active_filter 保证数据集版本一致）
-    try:
-        tb_active_filter = await get_active_filter(
-            ctx.db, TrialBalance.__table__, ctx.project_id, ctx.year
-        )
-        result = await ctx.db.execute(
-            sa.select(
-                TrialBalance.standard_account_code,
-                TrialBalance.unadjusted_amount,
-                TrialBalance.audited_amount,
-            ).where(
-                tb_active_filter,
-                TrialBalance.standard_account_code.startswith("1901"),
+    trial_rows: list = []
+    standard_codes = sorted(
+        {c for slot in accounts.slots.values() for c in slot.standard_codes if c}
+    )
+    if standard_codes:
+        try:
+            result = await ctx.db.execute(
+                sa.text(
+                    "SELECT standard_account_code, unadjusted_amount, audited_amount "
+                    "FROM trial_balance "
+                    "WHERE project_id = :pid AND year = :year AND is_deleted = false "
+                    "  AND standard_account_code = ANY(:codes)"
+                ),
+                {"pid": str(ctx.project_id), "year": ctx.year, "codes": standard_codes},
             )
-        )
-        for row in result.fetchall():
-            code = (row.standard_account_code or "").strip()
-            is_contra = len(code) > 4 and code.startswith("1901")
-            key_prefix = "rou_dep" if is_contra else "rou_asset"
+            trial_rows = list(result.fetchall())
+        except Exception as e:  # noqa: BLE001
+            logger.warning("H8 trial_balance fetch failed: %s", e)
 
-            tb[f"{key_prefix}_unadjusted"] = tb.get(f"{key_prefix}_unadjusted", 0.0) + float(row.unadjusted_amount or 0)
-            tb[f"{key_prefix}_audited"] = tb.get(f"{key_prefix}_audited", 0.0) + float(row.audited_amount or 0)
-    except Exception as e:  # noqa: BLE001
-        logger.warning("H8 trial_balance fetch failed: %s", e)
-
-    return tb
+    tb = build_h8_tb_values(accounts, tb_rows, trial_rows)
+    tb["_parent_check"] = build_h8_parent_check(accounts, tb_rows, trial_rows)
+    return tb, accounts
 
 
-async def _build_h8_detail_prefill(ctx: RenderContext) -> list[dict[str, Any]]:
+def build_h8_parent_check(
+    accounts: SemanticAccountResult,
+    tb_rows,
+    trial_rows,
+) -> dict[str, dict[str, float]]:
+    """三口径自检（Req 3.4）—— 薄壳委托 `four_table.parent_check`。
+
+    实测价值（2026-08-03，项目 `2aa00f57`）：`trial_balance.1651` = 352,406,145.74
+    而 `tb_balance` 叶子和 = 父行 = 176,203,072.87 —— 「叶子和 == 父额」这条勾稽
+    **完全成立**，问题在 trial_balance recalc 父子双算。只比对两口径发现不了这 1.76 亿。
+    """
+    return build_parent_check(accounts, tb_rows, trial_rows, H8_SLOT_KEY_PREFIX.keys())
+
+
+async def _build_h8_detail_prefill(
+    ctx: RenderContext, accounts: SemanticAccountResult
+) -> list[dict[str, Any]]:
     """从 tb_balance 叶子子科目为 H8-2 明细表种子预填.
 
-    仅取 1901 下叶子科目（code 不是任何其它 code 的前缀）且非全零行。
+    🔴 **2026-08-03 修掉的遗留 P0**：本函数原先硬编码 `startswith("1901")` ——
+    `1901` 是**待处理财产损溢**（K2 `BS-014` 亦引用），不是使用权资产。
+    render 主路径已改走语义定位（真族 `1641/1642/1643`，客户实际可能是 `1651/1652`），
+    但本函数漏改 → **H8-2 明细表的种子预填一直在拿另一个科目族的数据**
+    （活体 `1901` 期末全 0.00 → 表现为「恒空」而非「数字错」，更隐蔽）。
+    原「>=6 位 + 名称含折旧/摊销/减值则跳过」的备抵判定也随之失效：
+    新模型下累计折旧是**独立一级码** `1642`，不是 `190101` 式子科目。
+
+    现在的口径：
+    - 只取 `gross` 槽命中的科目码前缀（`accounts.codes_of("gross")`）
+    - **显式排除**其余槽（`accum_dep`/`impairment`）的码 —— 它们是备抵，
+      不该出现在原值明细表里
+    - 叶子判定走共享件 `select_leaves`（禁自造，缺点号边界会误判 `1641.1` vs `1641.11`）
+    - 跳过全零行（明细表种子无意义），但**不过滤零余额账户之外的东西**
+    - 本项目无 `gross` 科目（`found=False`）→ 返空（宁缺勿造）
+
     资产类（借方正）：期初=opening_balance，本期增加=debit，本期减少=credit，期末=closing_balance。
-    H8 明细表按合同驱动，但如果账套有 1901 多级子科目（如 1901.01 房屋/1901.02 设备），
-    则可为审计师预填初始数据减少手工录入——仅当 H8-2-rows 空时种子填入，手工优先。
+    仅当 H8-2-rows 空时种子填入，手工优先。
     """
+    gross_codes = accounts.codes_of("gross")
+    if not gross_codes:
+        return []
+
+    # 备抵槽的码：即便它们恰好落在 gross 前缀下也要排除
+    provision_codes = {
+        code
+        for slot_key in H8_SLOT_KEY_PREFIX
+        if slot_key != "gross"
+        for code in accounts.codes_of(slot_key)
+    }
+
     prefill: list[dict[str, Any]] = []
     try:
         active_filter = await get_active_filter(
@@ -151,43 +256,32 @@ async def _build_h8_detail_prefill(ctx: RenderContext) -> list[dict[str, Any]]:
                 TbBalance.credit_amount,
             ).where(
                 active_filter,
-                TbBalance.account_code.startswith("1901"),
+                sa.or_(*[TbBalance.account_code.startswith(c) for c in gross_codes]),
             )
         )
-        rows = result.fetchall()
+        rows = list(result.fetchall())
         if not rows:
             return []
 
-        # 收集所有 code
-        all_codes = {(r.account_code or "").strip() for r in rows}
-
-        for row in rows:
+        for row in select_leaves(to_leaf_rows(rows)):
             code = (row.account_code or "").strip()
-            if not code or code == "1901":
-                continue  # 跳过父级汇总
+            if not code or code in gross_codes:
+                continue  # 跳过一级父科目汇总行
+            if any(code == p or code.startswith(f"{p}.") for p in provision_codes):
+                continue  # 备抵科目不进原值明细表
 
-            # 叶子判定：该 code 不是任何其它 code 的前缀
-            is_leaf = not any(
-                other_code != code and other_code.startswith(code)
-                for other_code in all_codes
-            )
-            if not is_leaf:
-                continue
-
-            # 跳过累计折旧子科目（>=6位的190101/190102等属于备抵）
-            if len(code) >= 6 and code[:4] == "1901":
-                # 190101 等明确是折旧子科目
-                name_lower = (row.account_name or "").lower()
-                if "折旧" in name_lower or "摊销" in name_lower or "减值" in name_lower:
-                    continue
-
-            opening = float(row.opening_balance or 0)
-            closing = float(row.closing_balance or 0)
-            debit = float(row.debit_amount or 0)
-            credit = float(row.credit_amount or 0)
+            opening = float(row.opening or 0)
+            closing = float(row.closing or 0)
+            debit = float(row.debit or 0)
+            credit = float(row.credit or 0)
 
             # 跳过全零行
-            if abs(opening) < 0.005 and abs(closing) < 0.005 and abs(debit) < 0.005 and abs(credit) < 0.005:
+            if (
+                abs(opening) < 0.005
+                and abs(closing) < 0.005
+                and abs(debit) < 0.005
+                and abs(credit) < 0.005
+            ):
                 continue
 
             prefill.append({
@@ -544,8 +638,8 @@ async def render(ctx: RenderContext) -> dict | None:
     except Exception as e:  # noqa: BLE001
         logger.warning("H8 render responses load failed: %s", e)
 
-    # 2. 获取TB数据（1901使用权资产 + 累计折旧子科目）
-    tb_values = await _fetch_tb_data(ctx)
+    # 2. 获取TB数据（语义定位：1641 使用权资产 + 1642 累计折旧 + 1643 减值准备）
+    tb_values, accounts = await _fetch_tb_data(ctx)
 
     # 3. H9联动校验
     h9_linkage = await _fetch_h9_linkage(ctx)
@@ -560,14 +654,18 @@ async def render(ctx: RenderContext) -> dict | None:
     project_context = await _load_project_context(ctx)
 
     # 7. H8-2 明细表种子预填（叶子子科目，仅有子科目时产出）
-    detail_prefill = await _build_h8_detail_prefill(ctx)
+    detail_prefill = await _build_h8_detail_prefill(ctx, accounts)
+
+    # 解析后的主科目码（供前端 writebackTB 等，不再写死 `1901`）
+    resolved_gross_codes = accounts.codes_of("gross") or ["1641"]
 
     payload = {
         "component_type": "h8-right-of-use-assets",
-        "account_codes": ["1901"],
+        "account_codes": resolved_gross_codes,
         "responses_snapshot": responses_snapshot,
         "project_context": project_context,
         "tb_values": tb_values,
+        "tb_source_codes": accounts.as_dict(),
         "detail_prefill": detail_prefill,
         "h9_linkage": h9_linkage,
         "cas21_validation": cas21_validation,
@@ -583,12 +681,22 @@ async def render(ctx: RenderContext) -> dict | None:
         try:
             import asyncio
             from app.services.d_cycle_extraction.prefill import build_d_adjudication_prefill
-            segment_prefill = await asyncio.wait_for(
-                build_d_adjudication_prefill(ctx, account_prefix="1901", mode="balance"),
-                timeout=5.0,
-            )
+
+            # 按解析后的三层各发一段（不再传 "1901"）
+            segments = []
+            for slot_key, prefix in H8_SLOT_KEY_PREFIX.items():
+                slot = accounts.slots.get(slot_key)
+                if not slot or not slot.found:
+                    continue
+                for code in slot.codes:
+                    seg_items = await asyncio.wait_for(
+                        build_d_adjudication_prefill(ctx, account_prefix=code, mode="balance"),
+                        timeout=5.0,
+                    )
+                    segments.append({"segment": slot_key, "account_prefix": code, "mode": "balance", "items": seg_items})
+
             payload["adjudication_segment_prefill"] = {
-                "segments": [{"segment": "cost", "account_prefix": "1901", "mode": "balance", "items": segment_prefill}],
+                "segments": segments,
                 "enabled": True,
             }
             payload["hi_extraction_enabled"] = True

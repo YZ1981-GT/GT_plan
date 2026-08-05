@@ -15,7 +15,7 @@ Validates: Requirements 2.2, 2.3, 2.5, 3.1, 3.2, 3.11, 6.3, 6.4, 8.1, 8.2,
 from __future__ import annotations
 
 import logging
-from datetime import date
+from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Any, Optional
 from uuid import UUID
@@ -33,11 +33,20 @@ from app.deps import authorize_wp_edit
 from app.models.audit_platform_models import TrialBalance, WorkpaperExtractionLog
 from app.models.core import Project, User as _CoreUser  # noqa: F401 (Project 用于年度校验)
 from app.models.core import User
+from app.services.dataset_query import get_active_dataset_id_or_none
 from app.services.ledger_sampling_service import (
     LedgerQueryFilters,
     LedgerSamplingService,
+    enrich_items_with_aux_party,
 )
 from app.services.sampling_methodology import build_methodology_snapshot
+from app.services.sampling_registry_service import (
+    cross_workpaper_duplicate_vouchers,
+    project_level_extracted_voucher_nos,
+    project_sampling_coverage,
+    resolve_project_year as registry_resolve_project_year,
+    update_sampling_record_evaluation,
+)
 from app.services.voucher_sampling_algorithms import (
     SamplingMethod,
     SamplingParams,
@@ -81,6 +90,17 @@ class VoucherCompareRequest(BaseModel):
     log_id_b: UUID
 
 
+class VoucherEvaluationRequest(BaseModel):
+    """抽样评价持久化请求体（R2）
+
+    log_id 缺省时落到该底稿最近一条未撤销的 voucher_sampling 批次。
+    """
+
+    workpaper_id: UUID
+    log_id: Optional[UUID] = None
+    evaluation: dict = Field(default_factory=dict)
+
+
 # ─── POST /voucher-extract ────────────────────────────────────────────────────
 
 
@@ -122,6 +142,12 @@ async def voucher_extract(
         voucher_type_filter: list[str] = filters.get("voucher_type_filter", [])
         summary_keyword: str = filters.get("summary_keyword", "")
         exclude_extracted: bool = filters.get("exclude_extracted", True)
+        # 排除范围（R5.5）：'workpaper' = 仅当前底稿已抽（现状，**缺省保零回归**）；
+        # 'project' = 项目级已抽凭证（来自 sampled_vouchers 登记表），用于避免同一
+        # 凭证被多个循环重复抽取 —— 该问题此前在项目层面完全发现不了。
+        exclude_scope: str = filters.get("exclude_scope", "workpaper")
+        if exclude_scope not in ("workpaper", "project"):
+            exclude_scope = "workpaper"
         # 抽样单位（默认分录行，零回归）；voucher 单位按凭证号聚合（Task 5 前端接入）
         sampling_unit: str = filters.get("sampling_unit", "ledger_line")
         if sampling_unit not in ("ledger_line", "voucher"):
@@ -192,6 +218,13 @@ async def voucher_extract(
                 )
                 exclude_voucher_nos = list(set(exclude_voucher_nos) | set(p_nos))
                 exclude_unit_ids = list(set(exclude_unit_ids) | set(p_uids))
+            if exclude_extracted and exclude_scope == "project":
+                # 叠加项目级已抽凭证（按凭证号）。ledger_line 单位下与行级排除并存：
+                # 行级防"同凭证跨科目被整张误排"，项目级防"跨循环重复抽同一凭证"。
+                proj_nos = await project_level_extracted_voucher_nos(
+                    db, pid, req.year
+                )
+                exclude_voucher_nos = list(set(exclude_voucher_nos) | set(proj_nos))
         else:
             if exclude_extracted:
                 exclude_voucher_nos = await _get_voucher_sampling_extracted_nos(
@@ -206,6 +239,11 @@ async def voucher_extract(
                     if no not in existing_set:
                         exclude_voucher_nos.append(no)
                         existing_set.add(no)
+            if exclude_extracted and exclude_scope == "project":
+                proj_nos = await project_level_extracted_voucher_nos(
+                    db, pid, req.year
+                )
+                exclude_voucher_nos = list(set(exclude_voucher_nos) | set(proj_nos))
 
         # 4. 构建 LedgerQueryFilters
         ledger_filters = LedgerQueryFilters(
@@ -231,6 +269,13 @@ async def voucher_extract(
         items, stats = await LedgerSamplingService.execute_with_stats(
             db, query, page=1, page_size=_SAMPLING_FRAME_LIMIT, max_total=_SAMPLING_FRAME_LIMIT
         )
+
+        # 6.5 抽样框数据集版本（可复算前提）：记录本次抽样所依据的 active 序时账版本。
+        #     置于 build_ledger_query 之后 —— 该函数内的 get_active_filter 已用同一
+        #     active dataset 构建了查询条件，此处解析到的即"实际被抽的那一版"。
+        #     取不到（无 active 数据集 / 查询失败）一律 None，禁任何兜底：
+        #     "未绑定版本"与"绑定到某个错版本"是两件事，后者会让复算判定失效。
+        sampling_dataset_id = await _resolve_sampling_dataset_id(db, pid, req.year)
 
         # 7. 构建 SamplingParams
         sp = req.sampling_params
@@ -384,6 +429,14 @@ async def voucher_extract(
         # 全量框是否仍受硬上限约束（极端超大总体）：如实透明，不声称覆盖全总体
         truncated = bool(stats.truncated or result_truncated or frame_capped)
 
+        # 9.9 辅助维度补全（客户/供应商名称）：序时账本身没有往来单位字段，
+        #     该信息在辅助明细账 tb_aux_ledger 里。仅对最终样本行补（几十条），
+        #     不碰 canonical 抽样查询与总体统计口径。取不到一律留空 —— 抽凭表的
+        #     「客户名称」列宁可空着让审计师填，也不能猜错往来单位。
+        sample_items = await enrich_items_with_aux_party(
+            db, pid, req.year, sample_items
+        )
+
         # 10. 高值必选项标识（R17）：单笔金额 ≥ 抽样间隔者标记 high_value
         marked_items: list[dict] = []
         for it in sample_items:
@@ -394,9 +447,25 @@ async def voucher_extract(
                 marked["high_value"] = False
             marked_items.append(marked)
 
-        # 11. 构建返回值（金额序列化为字符串，新增字段均向后兼容）
+        # 11. 跨底稿重复抽凭检测（R8）：把「这张凭证别的底稿已经抽过」这一事实交给
+        #     审计师判断（有意交叉复核 vs 样本浪费），而非由 exclude_scope 静默决定。
+        #     exclude_scope='project' 时重复项已在第 2~3 步排除 → 此处自然为空（R8.8）。
+        sample_voucher_nos = [
+            str(it.get("voucher_no")) for it in marked_items if it.get("voucher_no")
+        ]
+        cross_wp_duplicates = await cross_workpaper_duplicate_vouchers(
+            db,
+            project_id=pid,
+            year=req.year,
+            voucher_nos=sample_voucher_nos,
+            exclude_workpaper_id=req.workpaper_id,
+        )
+
+        # 12. 构建返回值（金额序列化为字符串，新增字段均向后兼容）
         return {
             "items": marked_items,
+            # R8.1：本次样本中被其它底稿抽取过的凭证；前端据此弹窗要求显式确认
+            "cross_workpaper_duplicates": cross_wp_duplicates,
             "stats": {
                 "population_count": population_count_full,
                 "population_debit_total": str(stats.debit_total),
@@ -421,6 +490,13 @@ async def voucher_extract(
                 # 全量框硬上限命中（极端超大总体仍未覆盖全体）→ 前端如实提示
                 "frame_capped": frame_capped,
                 "sampling_unit": sampling_unit,
+                # 抽样框数据集版本（R1）：序时账重导后据此判定该批次已不可复算。
+                # None = 未识别到 active 账套版本（如尚未导入账套），前端如实提示不阻断。
+                "dataset_id": (
+                    str(sampling_dataset_id)
+                    if sampling_dataset_id is not None
+                    else None
+                ),
             },
             # 方法学单一真源快照（含 algo_version）——前端以此为准展示/回填留痕
             "methodology": methodology,
@@ -433,6 +509,61 @@ async def voucher_extract(
     except Exception as e:
         logger.exception("voucher-extract failed: %s", e)
         raise HTTPException(status_code=500, detail="抽凭执行失败")
+
+
+# ─── POST /voucher-evaluation ────────────────────────────────────────────────
+
+
+@router.post("/voucher-evaluation")
+async def voucher_evaluation(
+    pid: UUID,
+    req: VoucherEvaluationRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """持久化抽样评价结果（CAS 1314 样本评价输出）到目标批次。
+
+    背景：推断错报 / 高值层已知错报 / 基本准备 / 增量准备 / 错报上限 / 总体结论此前
+    只存在于前端 `useVoucherSampling` 的裸 ref 中，而抽凭 dialog 一律 destroy-on-close
+    → 关弹窗即丢，复核人打开底稿看不到推断过程。且回填（cutoff-fill）在逐笔核查**之前**
+    发生，故必须有独立入口在核查完成后补写评价。
+
+    落点为既有 `workpaper_extraction_log.extraction_criteria.evaluation`（JSONB 加 key，
+    无需迁移、不影响批次幂等键派生 —— 幂等键只从 filled_voucher_nos 派生）。
+    """
+    # 授权置于 try 之外：403/404 不被 except 吞成 500（沿用 voucher-extract 范式）
+    await _authorize_and_validate_evaluation(db, current_user, pid, req.workpaper_id)
+
+    log = await _resolve_target_log(db, req.workpaper_id, req.log_id)
+
+    existing_criteria = log.extraction_criteria if isinstance(log.extraction_criteria, dict) else {}
+    existing_eval = existing_criteria.get("evaluation")
+    normalized = _normalize_evaluation(
+        req.evaluation,
+        actor_id=current_user.id,
+        existing=existing_eval if isinstance(existing_eval, dict) else None,
+    )
+
+    # 🔴 JSONB 必须整体赋一个**新 dict**：原地 mutate 不触发 SQLAlchemy 脏检测 →
+    # flush 时该列被跳过，表现为"接口返回成功但库里没变"。
+    log.extraction_criteria = merge_evaluation_into_criteria(
+        existing_criteria, normalized
+    )
+
+    await db.flush()
+    # R5：把评价投影进 sampling_records（可查询侧）。fail-open —— 投影失败不影响
+    # 权威留痕（extraction_criteria 已 flush），但服务内部会留 WARNING。
+    await update_sampling_record_evaluation(
+        db, batch_id=log.batch_id, evaluation=normalized
+    )
+    await db.commit()
+
+    return {
+        "success": True,
+        "log_id": str(log.id),
+        "batch_id": str(log.batch_id) if log.batch_id is not None else None,
+        "evaluation": normalized,
+    }
 
 
 # ─── GET /voucher-history ─────────────────────────────────────────────────────
@@ -460,6 +591,16 @@ async def voucher_history(
     result = await db.execute(stmt)
     rows = result.scalars().all()
 
+    # 抽样框版本比对（R1.4）：一次解析当前 active 版本，逐行判定是否已过期。
+    # year 从项目审计年度反解（history 端点签名不带 year，保持向后兼容）；
+    # 解析不到年度或取不到 active 版本时 compute_dataset_stale 一律返回 False。
+    project_year = await _resolve_project_year(db, pid)
+    current_dataset_id = (
+        await _resolve_sampling_dataset_id(db, pid, project_year)
+        if project_year is not None
+        else None
+    )
+
     return [
         {
             "id": str(row.id),
@@ -476,9 +617,51 @@ async def voucher_history(
             "resample_reason": _echo_criteria_field(row, "resample_reason"),
             "sampling_interval": _echo_criteria_field(row, "sampling_interval"),
             "conclusion": _echo_criteria_field(row, "conclusion"),
+            # 批次号（V123 已有列）：抽样评价与 A13 推断错报推送均按批次关联
+            "batch_id": str(row.batch_id) if row.batch_id is not None else None,
+            # R1.4：抽样框版本 + 是否已过期（既有记录无 dataset_id → stale=False）
+            "dataset_id": _echo_criteria_field(row, "dataset_id"),
+            "dataset_stale": compute_dataset_stale(
+                _echo_criteria_field(row, "dataset_id"), current_dataset_id
+            ),
+            # R2.6：抽样评价（推断错报/UML/结论），未评价为 null
+            "evaluation": _echo_criteria_field(row, "evaluation"),
         }
         for row in rows
     ]
+
+
+# ─── GET /voucher-coverage ───────────────────────────────────────────────────
+
+
+@router.get("/voucher-coverage")
+async def voucher_coverage(
+    pid: UUID,
+    year: int | None = Query(None, description="年度，缺省取项目审计年度"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """项目级抽样登记概览（R5.6）。
+
+    解决的问题：此前「本项目所有抽样是否都有总体描述/样本量依据/结论」只能逐张底稿
+    点开翻 `extraction_criteria` JSON；且重复抽凭只在同一 `workpaper_id` 内排除 ——
+    同一凭证被多个循环重复抽取在项目层面完全发现不了。
+
+    返回：
+    - `by_workpaper`：按底稿汇总批次数 / 样本数
+    - `duplicated`：被 ≥2 个底稿抽取的凭证（跨循环重复抽凭）
+    """
+    resolved_year = year if year is not None else await registry_resolve_project_year(db, pid)
+    if resolved_year is None:
+        # 年度无法判定时如实返回空 + 原因，不猜年度（跨年归档会算错）
+        return {
+            "year": None,
+            "by_workpaper": [],
+            "duplicated": [],
+            "note": "项目审计年度无法判定，无法统计已抽凭证登记",
+        }
+    data = await project_sampling_coverage(db, pid, int(resolved_year))
+    return {"year": int(resolved_year), **data}
 
 
 # ─── POST /voucher-undo ──────────────────────────────────────────────────────
@@ -596,6 +779,223 @@ async def voucher_compare(
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
+
+
+async def _resolve_sampling_dataset_id(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+) -> UUID | None:
+    """解析本次抽样所依据的 active 序时账数据集版本（R1）。
+
+    失败处理镜像 `dataset_query.get_active_filter`：`ledger_datasets` 查询失败时
+    rollback 恢复事务再返回 None（不 rollback 会让后续 trial_balance 查询在被污染的
+    事务上失败，把"版本未识别"放大成"整个抽凭 500"）。
+
+    返回 None 的两种语义都如实表达为"未绑定抽样框版本"，**不做任何兜底**
+    （不取最近一个 dataset、不取 is_deleted=false 的任意一版）——
+    绑定到错误版本比不绑定更坏：它会让"同 seed 可复算"的判定假绿。
+    """
+    try:
+        return await get_active_dataset_id_or_none(db, project_id, year)
+    except Exception:  # noqa: BLE001 — 版本识别失败不得阻断抽样
+        try:
+            await db.rollback()
+        except Exception:  # noqa: BLE001
+            pass
+        logger.warning(
+            "抽样框数据集版本解析失败，本次抽样不绑定版本 project=%s year=%s",
+            project_id,
+            year,
+        )
+        return None
+
+
+def compute_dataset_stale(
+    record_dataset_id: str | UUID | None,
+    current_dataset_id: str | UUID | None,
+) -> bool:
+    """判定某批次的抽样框是否已过期（R1.4/R1.6，纯函数）。
+
+    三态：
+    - 批次未记录版本（改造前的既有数据）→ False（**未知不当已变更**，否则全部历史
+      记录一夜之间全打告警，审计师无法分辨哪条是真的变了）
+    - 记录版本 == 当前 active → False
+    - 记录版本 != 当前 active → True（以同一随机种子重跑不会得到相同样本）
+
+    当前 active 为空（项目尚未导入账套 / 已全部作废）时同样返回 False：
+    无法判定 ⇒ 不报告。
+    """
+    if record_dataset_id in (None, ""):
+        return False
+    if current_dataset_id in (None, ""):
+        return False
+    return str(record_dataset_id) != str(current_dataset_id)
+
+
+# ─── 抽样评价（R2）normalize / authorize / resolve ────────────────────────────
+
+# 金额型字段（一律以 Decimal 字符串存储，2 位小数）
+_EVAL_AMOUNT_KEYS = (
+    "projected",
+    "known_high_value",
+    "basic_precision",
+    "incremental_allowance",
+    "upper_limit",
+    "tolerable_misstatement",
+)
+# 计数型字段（非负整数）
+_EVAL_COUNT_KEYS = (
+    "checked_sample_count",
+    "unchecked_sample_count",
+    "deviation_count",
+)
+# 文本型字段
+_EVAL_TEXT_KEYS = ("conclusion_message", "algo_version")
+# 结论代码取值域
+_EVAL_CONCLUSION_CODES = ("acceptable", "not_acceptable", "undetermined")
+# 由 A13 推送流程写入、且**在未显式提供时须保留既有值**的字段：
+# persistEvaluation() 在每次推断变化时都会调用且不带这两个键，
+# 若按"未提供即清空"处理会把已推送标记抹掉 → 同一批次可被反复推入错报汇总。
+_EVAL_PRESERVE_KEYS = ("a13_pushed_at", "a13_misstatement_id")
+
+
+def _eval_amount(value: Any) -> str:
+    """金额归一：任何不可解析的输入 → "0.00"（不抛错，评价是审计师成果不因格式丢弃）。"""
+    if value is None or value == "":
+        return "0.00"
+    try:
+        return str(Decimal(str(value)).quantize(Decimal("0.01")))
+    except (InvalidOperation, ValueError, TypeError):
+        return "0.00"
+
+
+def _eval_count(value: Any) -> int:
+    """计数归一：非法/负数 → 0。"""
+    try:
+        n = int(Decimal(str(value)))
+    except (InvalidOperation, ValueError, TypeError):
+        return 0
+    return n if n > 0 else 0
+
+
+def _normalize_evaluation(
+    raw: Any,
+    *,
+    actor_id: UUID,
+    existing: dict | None = None,
+) -> dict:
+    """把客户端提交的评价载荷归一为固定形状（key 白名单，未知 key 丢弃）。
+
+    - 金额 → Decimal 字符串 2 位小数；计数 → 非负整数；结论代码 → 取值域内否则 undetermined
+    - `evaluated_at` / `evaluated_by` **由服务端覆盖**（客户端传值不可信）
+    - `a13_pushed_at` / `a13_misstatement_id` 未提供时**保留既有值**（见 _EVAL_PRESERVE_KEYS）
+    """
+    src = raw if isinstance(raw, dict) else {}
+    prev = existing if isinstance(existing, dict) else {}
+    out: dict[str, Any] = {}
+
+    for key in _EVAL_AMOUNT_KEYS:
+        out[key] = _eval_amount(src.get(key))
+    for key in _EVAL_COUNT_KEYS:
+        out[key] = _eval_count(src.get(key))
+    for key in _EVAL_TEXT_KEYS:
+        val = src.get(key)
+        out[key] = str(val) if val not in (None, "") else None
+
+    code = str(src.get("conclusion_code") or "")
+    out["conclusion_code"] = code if code in _EVAL_CONCLUSION_CODES else "undetermined"
+    out["conclusion_confirmed"] = bool(src.get("conclusion_confirmed"))
+
+    for key in _EVAL_PRESERVE_KEYS:
+        if key in src and src.get(key) not in (None, ""):
+            out[key] = str(src.get(key))
+        else:
+            kept = prev.get(key)
+            out[key] = str(kept) if kept not in (None, "") else None
+
+    # 服务端权威字段
+    out["evaluated_at"] = datetime.now(timezone.utc).isoformat()
+    out["evaluated_by"] = str(actor_id)
+    return out
+
+
+def merge_evaluation_into_criteria(existing: Any, normalized: dict) -> dict:
+    """把归一后的评价并入 extraction_criteria（纯函数，返回新 dict）。
+
+    只写 `evaluation` 一个 key，其余留痕（filled_voucher_nos / filled_unit_ids /
+    filters / random_seed / dataset_id …）逐字节保留 —— 评价是**追加**信息，
+    绝不能因为写评价而丢掉抽样时点的留痕（那是可复算的依据）。
+    """
+    base = dict(existing) if isinstance(existing, dict) else {}
+    base["evaluation"] = normalized
+    return base
+
+
+async def _authorize_and_validate_evaluation(
+    db: AsyncSession,
+    current_user: User,
+    pid: UUID,
+    workpaper_id: UUID,
+) -> None:
+    """抽样评价端点授权（与 voucher-extract 同口径，先于任何写入）。
+
+    不校验年度：评价针对既有批次，年度已在该批次抽样时校验过。
+    """
+    wp_project_id = await authorize_wp_edit(db, current_user, workpaper_id)
+    if str(wp_project_id) != str(pid):
+        raise HTTPException(status_code=403, detail="底稿不属于该项目，禁止写入抽样评价")
+
+
+async def _resolve_target_log(
+    db: AsyncSession,
+    workpaper_id: UUID,
+    log_id: UUID | None,
+) -> WorkpaperExtractionLog:
+    """定位评价写入的目标批次：显式 log_id 优先，否则取最近一条未撤销 voucher_sampling。"""
+    if log_id is not None:
+        row = (
+            await db.execute(
+                select(WorkpaperExtractionLog).where(
+                    WorkpaperExtractionLog.id == log_id,
+                    WorkpaperExtractionLog.workpaper_id == workpaper_id,
+                    WorkpaperExtractionLog.extraction_type == "voucher_sampling",
+                )
+            )
+        ).scalar_one_or_none()
+        if row is None:
+            raise HTTPException(status_code=404, detail="抽凭批次不存在或不属于该底稿")
+        return row
+
+    row = (
+        await db.execute(
+            select(WorkpaperExtractionLog)
+            .where(
+                WorkpaperExtractionLog.workpaper_id == workpaper_id,
+                WorkpaperExtractionLog.extraction_type == "voucher_sampling",
+                WorkpaperExtractionLog.is_undone == False,  # noqa: E712
+            )
+            .order_by(WorkpaperExtractionLog.created_at.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(
+            status_code=404, detail="该底稿尚无抽凭批次，无法写入抽样评价"
+        )
+    return row
+
+
+async def _resolve_project_year(db: AsyncSession, project_id: UUID) -> int | None:
+    """反解项目审计年度（供不带 year 参数的端点复用，如 voucher-history）。
+
+    优先 `audit_year`；缺省回退审计期结束年份；两者皆缺返回 None（调用方按"无法判定"
+    处理，不得用 `datetime.now().year` 兜底 —— 跨年归档时会解析到错误年度）。
+    """
+    # 委托 sampling_registry_service 的单一真源实现（抽样登记也要用同一解析）。
+    # 该实现已全 try 包裹并降级 None：history 是只读端点，年度反解仅服务于
+    # "抽样框是否已变更"这一增强信息，失败一律 dataset_stale=false，绝不打成 500。
+    return await registry_resolve_project_year(db, project_id)
 
 
 async def _authorize_and_validate_extract(
