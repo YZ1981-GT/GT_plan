@@ -154,7 +154,7 @@ describe('Property 1：落点声明与审定表行定义交叉锁死', () => {
   })
 
   it('G_SEED_SPECS 只登记走通用路径的循环（G6 走专用 buildG6FvSeedCells）', () => {
-    expect(Object.keys(G_SEED_SPECS).sort()).toEqual(['G11', 'G2'])
+    expect(Object.keys(G_SEED_SPECS).sort()).toEqual(['G1', 'G10', 'G11', 'G2', 'G4'])
     expect(G_SEED_SPECS).not.toHaveProperty('G6')
   })
 })

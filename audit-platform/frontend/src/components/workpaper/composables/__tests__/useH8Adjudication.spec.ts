@@ -11,6 +11,10 @@ import {
   CHANGE_RATE_THRESHOLD,
 } from '../useH8Adjudication'
 import { calcChangeRate } from '../useH8FormulaEngine'
+import { H8_ROU_COST_CODE, H8_ROU_DEP_CODE } from '../useH8Adjustment'
+import { h9Scope } from '../hCycleAccountScope'
+
+const LEASE_LIABILITY_CODE = h9Scope.def.grossFallback
 
 function makeMap(entries?: Record<string, unknown>) {
   const m = new Map<string, { item_id: string; conclusion: null; remark: string | null }>()
@@ -98,24 +102,24 @@ describe('useH8Adjudication', () => {
     expect(saves.some((s) => s.id === 'H8-1-cost-audited-total')).toBe(true)
   })
 
-  it('syncEndAdjFromH83 allocates 1901/1902 nets by endUnadjusted weight', () => {
+  it('syncEndAdjFromH83 allocates 原值/折旧 nets by endUnadjusted weight', () => {
     const allResponses = makeMap({
       'H8-3-rows': [
         {
           category: '账项调整',
-          accountCode: '1901',
+          accountCode: H8_ROU_COST_CODE,
           debitAmount: 300,
           creditAmount: 0,
         },
         {
           category: '账项调整',
-          accountCode: '2205',
+          accountCode: LEASE_LIABILITY_CODE,
           debitAmount: 0,
           creditAmount: 300,
         },
         {
           category: '账项调整',
-          accountCode: '1902',
+          accountCode: H8_ROU_DEP_CODE,
           debitAmount: 0,
           creditAmount: 90,
         },
@@ -141,7 +145,7 @@ describe('useH8Adjudication', () => {
       },
     })
 
-    // 两行有未审权重：房屋 200、机器 100 → 1901 净额 300 分摊 200/100
+    // 两行有未审权重：房屋 200、机器 100 → 原值净额 300 分摊 200/100
     const b = state.costRows.value.find((r) => r.category === '房屋及建筑物')!
     const m = state.costRows.value.find((r) => r.category === '机器设备')!
     state.updateCell('cost', b.rowId, 'endUnadjusted', 200)

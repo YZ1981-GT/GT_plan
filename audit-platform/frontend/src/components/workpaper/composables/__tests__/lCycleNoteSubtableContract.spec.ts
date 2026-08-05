@@ -404,3 +404,114 @@ describe('L8 财务费用 披露映射', () => {
     }
   })
 })
+
+
+// ─── L1 / L3 / L4 子表契约（Property 7/8/11）─────────────────────────────────
+//
+// 验证：
+// - Property 7：子表名逐字与附注模板一致
+// - Property 8：列元数据 flat/group 双侧表态
+// - Property 11：_removed_table_keys 与推送键无交集
+//
+// spec: .kiro/specs/l-cycle-four-table-extraction-and-disclosure-alignment/ R8, Property 7/8/11
+
+import { buildL1ListedColumns, buildL1SoeColumns } from '../l1NoteSectionMap'
+import { buildL3ListedColumns, buildL3SoeColumns } from '../l3NoteSectionMap'
+import { buildL4ListedColumns, buildL4SoeColumns } from '../l4NoteSectionMap'
+
+/**
+ * Property 8 helper：每张表的列必须显式表态 flat 或 group。
+ * - 有任何列带 `group` → 该表是两级表头
+ * - 有任何列带 `flat: true` → 该表是单级表头
+ * - 不允许：某表既无 group 也无 flat（未表态 → 会被 _infer_groups_from_headers 推断）
+ */
+function assertColumnsStated(columns: Record<string, any[]>, context: string) {
+  for (const [tableName, cols] of Object.entries(columns)) {
+    const hasGroup = cols.some((c: any) => c.group)
+    const hasFlat = cols.some((c: any) => c.flat === true)
+    expect(
+      hasGroup || hasFlat,
+      `${context} / ${tableName}: 列未表态 flat 或 group（会被后端前缀推断凭空造父表头）`,
+    ).toBe(true)
+    // 单级表不得同时声明 group
+    if (hasFlat && !hasGroup) {
+      for (const col of cols) {
+        expect(
+          (col as any).group,
+          `${context} / ${tableName}: 标了 flat 又有 group "${(col as any).group}"`,
+        ).toBeUndefined()
+      }
+    }
+  }
+}
+
+describe('L1 子表契约', () => {
+  it('上市列定义表态正确', () => {
+    const cols = buildL1ListedColumns({ includeOverdue: true })
+    assertColumnsStated(cols, 'L1 listed')
+    // 所有表都是 flat（单行表头）
+    for (const [, tableCols] of Object.entries(cols)) {
+      expect(tableCols.some((c: any) => c.flat === true)).toBe(true)
+    }
+  })
+  it('国企列定义表态正确', () => {
+    const cols = buildL1SoeColumns({ includeOverdue: true })
+    assertColumnsStated(cols, 'L1 soe')
+  })
+})
+
+describe('L3 子表契约', () => {
+  it('上市列定义含两级表头（利率区间）', () => {
+    const cols = buildL3ListedColumns()
+    assertColumnsStated(cols, 'L3 listed')
+    // 长期借款表应为 flat（无 group）
+    const mainCols = cols['长期借款']
+    expect(mainCols).toBeDefined()
+    expect(mainCols.some((c: any) => c.flat === true)).toBe(true)
+  })
+  it('国企列定义表态正确', () => {
+    const cols = buildL3SoeColumns()
+    assertColumnsStated(cols, 'L3 soe')
+  })
+  it('子表名包含一年内到期', () => {
+    const listedKeys = Object.keys(buildL3ListedColumns())
+    expect(listedKeys).toContain('一年内到期的长期借款')
+  })
+})
+
+describe('L4 子表契约', () => {
+  it('上市列定义含两级表头', () => {
+    const cols = buildL4ListedColumns()
+    assertColumnsStated(cols, 'L4 listed')
+    // 主表有 group（期末余额/上年年末余额）
+    const mainCols = cols['应付债券']
+    expect(mainCols).toBeDefined()
+    expect(mainCols.some((c: any) => c.group === '期末余额')).toBe(true)
+  })
+  it('国企列定义表态正确', () => {
+    const cols = buildL4SoeColumns()
+    assertColumnsStated(cols, 'L4 soe')
+  })
+  it('上市有 4 张子表', () => {
+    const keys = Object.keys(buildL4ListedColumns())
+    expect(keys.length).toBe(4)
+    expect(keys).toContain('应付债券')
+    expect(keys).toContain('应付债券增减变动')
+    expect(keys).toContain('一年内到期的应付债券')
+    expect(keys).toContain('已到期未偿付的应付债券')
+  })
+  it('国企有 2 张子表', () => {
+    const keys = Object.keys(buildL4SoeColumns())
+    expect(keys.length).toBe(2)
+    expect(keys).toContain('应付债券')
+    expect(keys).toContain('应付债券增减变动')
+  })
+  it('增减变动表列有 group（两级表头）', () => {
+    const cols = buildL4ListedColumns()
+    const movCols = cols['应付债券增减变动']
+    expect(movCols.some((c: any) => c.group === '期初余额')).toBe(true)
+    expect(movCols.some((c: any) => c.group === '本期增加')).toBe(true)
+    expect(movCols.some((c: any) => c.group === '本期减少')).toBe(true)
+    expect(movCols.some((c: any) => c.group === '期末余额')).toBe(true)
+  })
+})

@@ -26,7 +26,11 @@ import {
 } from '../g0-confirmation/composables/useG0FormulaEngine'
 import { useDiffSecuritiesData } from '../g0-confirmation/diffSecurities/composables/useDiffSecuritiesData'
 import { useAlternativeG06Data } from '../g0-confirmation/alternativeG06/composables/useAlternativeG06Data'
-import { getSumFieldsG06, BLOCK_COLUMN_CONFIGS_G06 } from '../g0-confirmation/alternativeG06/blockColumnConfigsG06'
+import {
+  getSumFieldsG06,
+  BLOCK_COLUMN_CONFIGS_G06,
+  G06_SOURCE_EXTRA,
+} from '../g0-confirmation/alternativeG06/blockColumnConfigsG06'
 import type { BlockType } from '../confirmation/alternativeD05/alternativeD05Types'
 
 // ---------------------------------------------------------------------------
@@ -46,7 +50,10 @@ describe('G0 集成: wp_code_overrides 10 条映射', () => {
     ['G0-2', 'confirmation-entity-verify'],
     ['G0-3', 'confirmation-followup'],
     ['G0-3S', 'confirmation-diff-securities'],
-    ['G0-4', 'confirmation-diff-reconcile'],
+    // 🔴 G0-4（非证券投资差异）已由归档 spec `g0-investment-diff-model` 从 D0 通用
+    //    `confirmation-diff-reconcile` 改为 G0 专属 `confirmation-diff-nonsecurities`
+    //    （三维差异：持股比例 / 投资金额 / 投资条款）。本断言长期停留在旧值 = 陈旧镜像。
+    ['G0-4', 'confirmation-diff-nonsecurities'],
     ['G0-6', 'confirmation-alternative-g06'],
     ['G0-7', 'confirmation-reliability'],
     ['G0-8', 'confirmation-fraud-risk'],
@@ -61,44 +68,59 @@ describe('G0 集成: wp_code_overrides 10 条映射', () => {
     expect(g0Keys.sort()).toEqual(expected.map(([c]) => c).sort())
   })
 
-  it('两个新建 componentType 与 D0 共享类型区分明确', () => {
-    // G0-3S 走证券专属，G0-4 走 D0 通用（非证券），二者不同
+  it('两张差异表各走 G0 专属 componentType，且与 D0 通用类型区分明确', () => {
+    // 证券投资差异 / 非证券投资差异 各有专属组件（列集不同构：17 列 vs 15 列）
     expect(overrides['G0-3S']).toBe('confirmation-diff-securities')
-    expect(overrides['G0-4']).toBe('confirmation-diff-reconcile')
+    expect(overrides['G0-4']).toBe('confirmation-diff-nonsecurities')
     expect(overrides['G0-3S']).not.toBe(overrides['G0-4'])
+    // 二者都不再退回 D0 通用差异调节组件
+    expect(overrides['G0-3S']).not.toBe('confirmation-diff-reconcile')
+    expect(overrides['G0-4']).not.toBe('confirmation-diff-reconcile')
+  })
+
+  it('两条含索引号笔误的**全名键**存在（裁决门 B：定位用 tab 名）', () => {
+    // 定位一律走源模板真实 tab 名；`wp_render_config` 的 skip/componentType 判定
+    // 顺序不同，全名键是唯一可靠的定位入口（详见 g0SheetRegistry.ts 文件头）
+    expect(overrides['函证差异核对表G0-3（证券投资）']).toBe('confirmation-diff-securities')
+    expect(overrides['函证差异核对表G0-4(非证券投资)']).toBe('confirmation-diff-nonsecurities')
   })
 })
 
 // ---------------------------------------------------------------------------
 // 2. G0-3(证券) 差异三维公式 + Master-Detail CRUD
 // ---------------------------------------------------------------------------
-describe('G0 集成: G0-3(证券) 三维差异公式', () => {
-  it('数量差异 = 回函持仓 - 账面持仓', () => {
+// 🔴 差异方向 = **账面 − 回函**（源模板 `函证差异核对表G0-3（证券投资）!K5` 表头逐字
+//    `差异③=①-②`，①账面②回函；同组 `K7=E7-H7`/`L7=F7-I7` 亦如此）。
+//    原用例镜像的「回函 − 账面」照抄了源 `M7=J7-G7` 的缺陷方向，已随
+//    spec g0-confirmation-source-alignment Task 20（R10.2 / Property 27）纠正。
+//    形参顺序同步改为 `(booked, reply)`。
+describe('G0 集成: G0-3(证券) 三维差异公式（账面 − 回函）', () => {
+  it('数量差异 = 账面持仓 − 回函持仓', () => {
     expect(calcQuantityDiff(10000, 9800)).toBe(200)
     expect(calcQuantityDiff(5000, 5000)).toBe(0)
   })
 
-  it('公允价值差异 = 回函单位公允值 - 账面单位公允值', () => {
+  it('市价（单价）差异 = 账面单价 − 回函单价', () => {
     expect(calcFairValueDiff(12.5, 12.0)).toBeCloseTo(0.5, 6)
   })
 
-  it('市值差异 = 回函总市值 - 账面总市值', () => {
+  it('公允价值差异 = 账面余额 − 回函公允价值（源 M 列方向写反，按表头意图统一）', () => {
     expect(calcMarketValueDiff(125000, 117600)).toBeCloseTo(7400, 6)
   })
 
   it('三维差异完整链路（持仓×单价=市值）', () => {
-    const confirmedQty = 10000
-    const bookedQty = 9800
-    const confirmedFv = 12.5
-    const bookedFv = 12.0
-    const confirmedMv = confirmedQty * confirmedFv // 125000
-    const bookedMv = bookedQty * bookedFv // 117600
+    const bookedQty = 10000
+    const replyQty = 9800
+    const bookedFv = 12.5
+    const replyFv = 12.0
+    const bookedMv = bookedQty * bookedFv // 125000
+    const replyMv = replyQty * replyFv // 117600
 
-    expect(calcQuantityDiff(confirmedQty, bookedQty)).toBe(200)
-    expect(calcFairValueDiff(confirmedFv, bookedFv)).toBeCloseTo(0.5, 6)
-    expect(calcMarketValueDiff(confirmedMv, bookedMv)).toBeCloseTo(7400, 6)
+    expect(calcQuantityDiff(bookedQty, replyQty)).toBe(200)
+    expect(calcFairValueDiff(bookedFv, replyFv)).toBeCloseTo(0.5, 6)
+    expect(calcMarketValueDiff(bookedMv, replyMv)).toBeCloseTo(7400, 6)
     // 有数量差异 → hasDifference 为真
-    expect(hasDifference(calcQuantityDiff(confirmedQty, bookedQty), calcFairValueDiff(confirmedFv, bookedFv))).toBe(true)
+    expect(hasDifference(calcQuantityDiff(bookedQty, replyQty), calcFairValueDiff(bookedFv, replyFv))).toBe(true)
   })
 
   it('无差异证券 → hasDifference 为假', () => {
@@ -123,9 +145,11 @@ describe('G0 集成: useDiffSecuritiesData CRUD + 差异自动计算 + 汇总', 
     d.updateRow(row._row_id!, 'booked_market_value', 117600)
 
     const updated = d.rows.value[0]
-    expect(updated.qty_diff).toBe(200)
-    expect(updated.fv_diff).toBeCloseTo(0.5, 6)
-    expect(updated.market_value_diff).toBeCloseTo(7400, 6)
+    // 🔴 差异 = 账面 − 回函 → 本 fixture 账面(9800/12.0/117600) 低于回函(10000/12.5/125000)
+    //    故三列为**负**。原期望的 +200/+0.5/+7400 是旧方向（回函 − 账面）的镜像值。
+    expect(updated.qty_diff).toBe(-200)
+    expect(updated.fv_diff).toBeCloseTo(-0.5, 6)
+    expect(updated.market_value_diff).toBeCloseTo(-7400, 6)
     expect(d.rowHasDiff(updated)).toBe(true)
   })
 
@@ -143,6 +167,7 @@ describe('G0 集成: useDiffSecuritiesData CRUD + 差异自动计算 + 汇总', 
     expect(d.metrics.value.total_count).toBe(2)
     expect(d.metrics.value.diff_count).toBe(1)
     expect(d.metrics.value.no_diff_count).toBe(1)
+    // 汇总取绝对值 → 方向翻转不影响（下游 hasDifference / metrics / 推送阈值全走 Math.abs）
     expect(d.metrics.value.max_abs_diff).toBe(200)
   })
 
@@ -239,20 +264,22 @@ describe('G0 集成: useAlternativeG06Data 四区块 CRUD + 合计', () => {
     expect(updated.dividend_diff).toBeCloseTo(500, 2)
   })
 
-  it('getBlockTotal 按 sumField 累加金额列', () => {
+  // 🔴 以下三条断言原先要求 block1 含记账凭证列、block2 含 `trade_amount`，
+  //    那是**源对齐前**的结构。g0 spec R7.2/R7.3 明确：源模板 `A10:E10` 区块①只有
+  //    被投资单位/投资比例/投资金额/投资条款/索引号 5 列（无记账凭证），`trade_amount`
+  //    属区块③处置口径 → 两者已移出渲染并逐列登记进 `G06_SOURCE_EXTRA`（字段不删）。
+  it('getBlockTotal 按 sumField 累加金额列（block1 只有「投资金额」）', () => {
     const d = makeData()
     const c = d.addCompany()
     const r1 = d.addBlockRow(c._company_id!, 'block1')!
     const r2 = d.addBlockRow(c._company_id!, 'block1')!
-    d.updateBlockField(c._company_id!, 'block1', r1._row_id!, 'voucher_amount', 1000)
-    d.updateBlockField(c._company_id!, 'block1', r2._row_id!, 'voucher_amount', 2500)
     d.updateBlockField(c._company_id!, 'block1', r1._row_id!, 'investment_amount', 5000)
     d.updateBlockField(c._company_id!, 'block1', r2._row_id!, 'investment_amount', 3000)
 
     const total = d.getBlockTotal(d.companies.value[0], 'block1')
-    // block1 sumField：voucher_amount + investment_amount（源三区对齐后 block1=①初始投资协议检查）
-    expect(total.voucher_amount).toBeCloseTo(3500, 2)
     expect(total.investment_amount).toBeCloseTo(8000, 2)
+    // 记账凭证列已移出区块①（源 A10:E10 无此列）→ 不再产生 voucher_amount 合计
+    expect(getSumFieldsG06('block1')).not.toContain('voucher_amount')
   })
 
   it('getBlockTotalByDirection 按借贷方向分组累加 block2 本期发生额', () => {
@@ -260,36 +287,39 @@ describe('G0 集成: useAlternativeG06Data 四区块 CRUD + 合计', () => {
     const c = d.addCompany()
     const rd = d.addBlockRow(c._company_id!, 'block2')!
     d.updateBlockField(c._company_id!, 'block2', rd._row_id!, 'direction', 'debit')
-    d.updateBlockField(c._company_id!, 'block2', rd._row_id!, 'trade_amount', 1200)
+    d.updateBlockField(c._company_id!, 'block2', rd._row_id!, 'voucher_amount', 1200)
     const rc = d.addBlockRow(c._company_id!, 'block2')!
     d.updateBlockField(c._company_id!, 'block2', rc._row_id!, 'direction', 'credit')
-    d.updateBlockField(c._company_id!, 'block2', rc._row_id!, 'trade_amount', 800)
+    d.updateBlockField(c._company_id!, 'block2', rc._row_id!, 'voucher_amount', 800)
 
     const company = d.companies.value[0]
-    expect(d.getBlockTotalByDirection(company, 'block2', 'debit').trade_amount).toBeCloseTo(1200, 2)
-    expect(d.getBlockTotalByDirection(company, 'block2', 'credit').trade_amount).toBeCloseTo(800, 2)
+    // 区块② 的金额列是源 `E18 金额`（voucher_amount），不是自造的 trade_amount
+    expect(d.getBlockTotalByDirection(company, 'block2', 'debit').voucher_amount).toBeCloseTo(1200, 2)
+    expect(d.getBlockTotalByDirection(company, 'block2', 'credit').voucher_amount).toBeCloseTo(800, 2)
     // 全 block 合计 = 借+贷
-    expect(d.getBlockTotal(company, 'block2').trade_amount).toBeCloseTo(2000, 2)
+    expect(d.getBlockTotal(company, 'block2').voucher_amount).toBeCloseTo(2000, 2)
   })
 
   it('每区块 sumField 定义与列配置一致（源三区对齐后新结构）', () => {
-    // block1 = ①初始投资协议检查
-    expect(getSumFieldsG06('block1')).toContain('investment_amount')
-    expect(getSumFieldsG06('block1')).toContain('voucher_amount')
-    // block2 = ②本期发生额检查
-    expect(getSumFieldsG06('block2')).toContain('trade_amount')
-    expect(getSumFieldsG06('block2')).toContain('voucher_amount')
-    // block3 = ③期后出售/赎回检查
+    // block1 = ①初始投资协议检查（源 A10:E10，无记账凭证列）
+    expect(getSumFieldsG06('block1')).toEqual(['investment_amount'])
+    // block2 = ②本期发生额检查（源 E18「金额」）
+    expect(getSumFieldsG06('block2')).toEqual(['voucher_amount'])
+    // block3 = ③期后出售/赎回检查（源三组证据金额 + 源外增强处置口径）
+    expect(getSumFieldsG06('block3')).toContain('voucher_amount')
+    expect(getSumFieldsG06('block3')).toContain('deal_amount')
+    expect(getSumFieldsG06('block3')).toContain('bank_slip_amount')
     expect(getSumFieldsG06('block3')).toContain('disposal_amount')
     expect(getSumFieldsG06('block3')).toContain('trade_amount')
-    expect(getSumFieldsG06('block3')).toContain('voucher_amount')
     // block4 = ④源外增强（保留原持仓/股利字段）
     expect(getSumFieldsG06('block4')).toContain('market_value')
     expect(getSumFieldsG06('block4')).toContain('dividend_receivable')
-    // 4 区块均含记账凭证金额列
-    for (const bt of blocks) {
+    // 🔴 原断言「4 区块均含记账凭证金额列」已作废：源模板区块①无记账凭证列（R7.2）。
+    //    改为断言「除区块① 外均含」+ 区块① 显式不含（反向锁死，防又被塞回去）。
+    for (const bt of blocks.filter((b) => b !== 'block1')) {
       expect(getSumFieldsG06(bt)).toContain('voucher_amount')
     }
+    expect(getSumFieldsG06('block1')).not.toContain('voucher_amount')
   })
 
   it('metrics 完成度：四区块均有行才算完成', () => {
@@ -401,18 +431,24 @@ describe('G0 集成: 导入导出列定义前后端一致性', () => {
     expect(content).toContain('④公允价值佐证')
   })
 
-  it('G0-6 后端四区块与前端 blockColumnConfigsG06 均含记账凭证 5 列', () => {
+  // 🔴 原断言要求**四**区块都含记账凭证 5 列 —— 源对齐后区块①不含（源 A10:E10 只有
+  //    5 列且无凭证信息，g0 spec R7.2）。改为「区块②③④含 + 区块①显式不含」双向锁死；
+  //    区块①的 5 个凭证字段已逐列登记进 `G06_SOURCE_EXTRA`（字段保留、不再渲染）。
+  it('G0-6 记账凭证 5 列：区块②③④ 前后端均含，区块① 已按源模板移出渲染', () => {
     const voucherFields = ['voucher_date', 'voucher_no', 'business_desc', 'counter_account', 'voucher_amount']
-    for (const bt of ['block1', 'block2', 'block3', 'block4'] as BlockType[]) {
-      const cfg = BLOCK_COLUMN_CONFIGS_G06[bt]
-      const fields = cfg.columns.map((c) => c.field)
+    for (const bt of ['block2', 'block3', 'block4'] as BlockType[]) {
+      const fields = BLOCK_COLUMN_CONFIGS_G06[bt].columns.map((c) => c.field)
       for (const vf of voucherFields) {
         expect(fields).toContain(vf)
-      }
-      // 后端也定义同一批 field_key
-      for (const vf of voucherFields) {
+        // 后端也定义同一批 field_key
         expect(content).toContain(`"${vf}"`)
       }
+    }
+    const block1Fields = BLOCK_COLUMN_CONFIGS_G06.block1.columns.map((c) => c.field)
+    for (const vf of voucherFields) {
+      expect(block1Fields).not.toContain(vf)
+      // 移出渲染 ≠ 丢字段：必须在源外增强登记表里有落点（数据零丢失红线 R7.5）
+      expect(G06_SOURCE_EXTRA.some((e) => e.block === 'block1' && e.field === vf)).toBe(true)
     }
   })
 

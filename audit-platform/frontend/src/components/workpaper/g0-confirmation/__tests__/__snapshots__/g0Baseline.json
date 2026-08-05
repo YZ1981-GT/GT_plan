@@ -1,0 +1,78 @@
+{
+  "_purpose": "g0-confirmation-source-alignment Task 3 —— D-2「各自实现后收敛」的零回归锚点。",
+  "_how_to_regenerate": "改动 confirmationColumnSpec.ts / f0SummaryAggregation.ts 后，若本快照与实现不一致，先判断是「有意的 G0 侧加法」还是「误伤其它枢纽」；只有前者才更新本文件，且必须在 spec tasks.md 记录变更理由。",
+  "_captured_at": "2026-08-04",
+  "_captured_by": "g0-confirmation-source-alignment Task 3",
+  "convergenceTargets": {
+    "matrix": "confirmation-summary-matrix-convergence",
+    "lowerZone": "confirmation-summary-lower-zone-convergence"
+  },
+  "columnCountsByCycle": {
+    "D0": 30,
+    "E0": 30,
+    "F0": 30,
+    "G0": 29,
+    "H0": 33,
+    "K0": 32,
+    "L0": 32
+  },
+  "labelOverrideCycles": ["G0", "H0"],
+  "excludedColumnsByCycle": {
+    "D0": [],
+    "E0": [
+      "sample_purpose",
+      "contact_person",
+      "contact_phone",
+      "use_alternative",
+      "alt_confirmed",
+      "alt_unconfirmed",
+      "alt_ref_index",
+      "remark"
+    ],
+    "F0": [],
+    "G0": ["contact_person", "contact_phone", "currency"],
+    "H0": ["contact_person", "contact_phone", "currency"],
+    "K0": [],
+    "L0": []
+  },
+  "f0MatrixExports": [
+    "F0_ALT_VOUCHER_FIELD",
+    "F0_BOOK_AMOUNT_SOURCES",
+    "F0_MATRIX_CATEGORIES",
+    "F0_MATRIX_LABELS",
+    "buildF0SummaryMatrix",
+    "checkAltConsistency",
+    "computeAltTotalsFromCompanies",
+    "detectAltOverlapRows",
+    "fetchTbAmountsForF0",
+    "getMatrixRow",
+    "isManualOverride",
+    "safeRatio",
+    "sumByCategory"
+  ],
+  "e0MatrixExports": [
+    "E0_BOOK_AMOUNT_SOURCES",
+    "E0_MATRIX_CATEGORIES",
+    "E0_MATRIX_METRICS",
+    "buildE0SummaryMatrix"
+  ],
+  "f0MatrixLabels": [
+    "本期（期末）账面金额",
+    "抽取样本的发函金额",
+    "发函金额占账面金额的比例(%)",
+    "回函确认金额",
+    "回函可确认金额占发函金额的比例(%)",
+    "回函可确认金额占账面金额的比例(%)",
+    "替代测试确认金额",
+    "回函和替代确认金额占账面金额的比例(%)"
+  ],
+  "f0MatrixCategories": ["预付账款", "应付票据", "应付账款", "本期采购"],
+  "e0MatrixMetrics": [
+    "本期（期末）账面金额",
+    "抽取样本的发函金额",
+    "发函金额占账面金额的比例(%)",
+    "回函确认金额",
+    "回函可确认金额占发函金额的比例(%)",
+    "回函可确认金额占账面金额的比例(%)"
+  ]
+}

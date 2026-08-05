@@ -105,18 +105,11 @@ const E1_LEGACY_FORMATTER_BUDGET: Record<string, number> = {
   'E1TabAdjustment.vue': 2,
   'E1TabAnalysis.vue': 9,
   'E1TabBankDetail.vue': 11,
-  'E1TabBankFlowReconcile.vue': 17,
   'E1TabCashDetail.vue': 5,
-  'E1TabCashTxnAnalysis.vue': 14,
   'E1TabCertificateCount.vue': 1,
-  'E1TabCreditCheck.vue': 6,
-  'E1TabCutoffTest.vue': 1,
-  'E1TabDepositInterestDaily.vue': 2,
   'E1TabDigitalCurrency.vue': 5,
   'E1TabInterestAnalysis.vue': 4,
   'E1TabIpoSpecial.vue': 1,
-  'E1TabKeyPersonFlow.vue': 2,
-  'E1TabLargeCheck.vue': 1,
   'E1TabReconciliation.vue': 3,
 }
 
@@ -238,7 +231,7 @@ describe('E1 金额格式铁律 — 全目录', () => {
       if (n > 0) actual[name] = n
     }
     // 反向自检：预算表必须真的对上现存文件（防表失效后断言空转）
-    expect(Object.keys(E1_LEGACY_FORMATTER_BUDGET).length).toBeGreaterThan(10)
+    expect(Object.keys(E1_LEGACY_FORMATTER_BUDGET).length).toBeGreaterThan(5)
     for (const [name, budget] of Object.entries(E1_LEGACY_FORMATTER_BUDGET)) {
       expect(
         (actual[name] ?? 0) <= budget,

@@ -62,10 +62,38 @@ describe('Property 1 — additive 读回不丢', () => {
     expect(row.security_type).toBe('股票')
     expect(row.verify_conclusion).toBe('已核实')
     expect(row.adjustment_note).toBe('调增500')
-    // 差异派生
+    // 差异派生 —— 🔴 方向 = **账面 − 回函**（源模板表头 `差异③=①-②`）
+    // 本 fixture：账面 10/10000 vs 回函 10.5/10500 → 账面低于回函 → 差异为**负**。
+    // 原断言 `fv_diff=0.5` / `market_value_diff=500` 是旧方向（回函 − 账面）的镜像值，
+    // 已随 Task 20（Requirement 10.2 / Property 27）纠正为负值。
     expect(row.qty_diff).toBe(0)
-    expect(row.fv_diff).toBe(0.5)
-    expect(row.market_value_diff).toBe(500)
+    expect(row.fv_diff).toBe(-0.5)
+    expect(row.market_value_diff).toBe(-500)
+  })
+
+  it('差异方向为「账面 − 回函」：账面高于回函时三列为正（反向自检）', () => {
+    const higherBook = {
+      _format: 'diff-securities-v1' as const,
+      rows: [
+        {
+          _row_id: 'r2',
+          booked_qty: 1200,
+          booked_unit_fv: 11,
+          booked_market_value: 13200,
+          confirmed_qty: 1000,
+          confirmed_unit_fv: 10,
+          confirmed_market_value: 10000,
+        },
+      ],
+    }
+    const data = useDiffSecuritiesData({ htmlData: () => higherBook, readonly: false })
+    const row = data.rows.value[0]
+    expect(row.qty_diff).toBe(200)
+    expect(row.fv_diff).toBeCloseTo(1, 6)
+    expect(row.market_value_diff).toBeCloseTo(3200, 6)
+    // 有差异 → 仍被判定为差异行（下游全走 Math.abs，符号翻转不影响判定）
+    expect(data.rowHasDiff(row)).toBe(true)
+    expect(data.metrics.value.diff_count).toBe(1)
   })
 
   it('旧 payload（仅 adjustment_note 无 need_adjust）读入自动迁移待定', () => {

@@ -156,6 +156,10 @@ const MISSING_SYNC_PATH: readonly string[] = [
  * 每条必须写明「源模板依据」，新增前先 openpyxl 读 `wb.sheetnames` 确认。
  */
 const CYCLES_WITHOUT_DISCLOSURE: Readonly<Record<string, string>> = {
+  F0: '源模板 F0 存货循环函证.xlsx 为 11 张函证程序底稿，无「附注披露信息」sheet；'
+    + '函证结果归函证模块，不产生附注章节',
+  F5: '源模板 F5 营业成本.xlsx 为 10 张成本程序底稿，无「附注披露信息」sheet；'
+    + '营业成本附注归损益类章节（IS-002），不由 F5 底稿产生披露 Tab',
   N3: '源模板 N3 递延所得税负债.xlsx 仅 底稿目录/N3A/N3-1/N3-2/N3-3/GT_Custom，无附注披露 sheet；'
     + '递延所得税负债披露与 N1 共节（五、30 / 八、31，N1 表(1) 含负债段）',
   J3: '源模板 J3 股份支付.xlsx 仅 底稿目录/J3A/J3-1/J3-2/J3-3/GT_Custom，无附注披露 sheet；'

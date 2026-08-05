@@ -35,7 +35,10 @@ describe('useFraudRiskData', () => {
           {
             _row_id: 'existing-1',
             seq: 1,
-            description: '管理层凌驾（用户已编辑）',
+            // 存量项目落库的是**旧版自造预置文字**（预置行 description 在 UI 上只读，
+            // 用户无法编辑它）→ 合并时必须被最新预置文字取代，否则 2026-08-03 按
+            // 源模板的更正传不到既有项目。用户数据只有下面三项。
+            description: '被审计单位管理层凌驾于内部控制之上',
             is_exist: '是',
             source_ref: 'D0-1',
             countermeasure: '扩大样本',
@@ -57,10 +60,12 @@ describe('useFraudRiskData', () => {
       // 预置 19 条 + 1 自定义 = 20 条
       expect(data.items.value).toHaveLength(20)
 
-      // 第1条保留用户已填值
+      // 第1条：用户数据保留，description 取最新预置（源模板逐字）
       const item1 = data.items.value.find((i) => i.seq === 1)!
-      expect(item1.description).toBe('管理层凌驾（用户已编辑）')
+      expect(item1.description).toBe('管理层不允许寄发询证函')
+      expect(item1.description).not.toBe('被审计单位管理层凌驾于内部控制之上')
       expect(item1.is_exist).toBe('是')
+      expect(item1.source_ref).toBe('D0-1')
       expect(item1.countermeasure).toBe('扩大样本')
 
       // 自定义条目保留

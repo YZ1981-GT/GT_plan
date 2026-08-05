@@ -72,12 +72,24 @@ describe('cycleConfirmationMeta', () => {
     expect(rules.some(r => r.field === '替代确认')).toBe(false)
   })
 
-  it('G0 models securities diff专表 (G0-3S) in meta/nav/rules', () => {
+  // 🔴 本用例原先断言 `diffSecuritiesCode === 'G0-3S'` —— 那是**镜像 bug 的失效断言**：
+  //    `wp_index` 实测只有 `G0` 与遗留族 `G0-1..G0-5`，从来没有 `G0-3S` 这个底稿。
+  //    裁决门 B（2026-08-04）= 定位用源模板 tab 名 / 展示用底稿目录索引号：
+  //    证券差异 → G0-4（tab 名写 G0-3）；非证券差异 → G0-5（tab 名写 G0-4）。
+  it('G0 差异两表按底稿目录索引号展示，且定位值是真实 tab 名', () => {
     const m = getCycleConfirmationMeta('G0-1')
-    expect(m.diffSecuritiesCode).toBe('G0-3S')
+    expect(m.diffSecuritiesCode).toBe('G0-4')
+    expect(m.diffCode).toBe('G0-5')
+    expect(m.sheets.diffSecurities?.sheetName).toBe('函证差异核对表G0-3（证券投资）')
+    expect(m.sheets.diff?.sheetName).toBe('函证差异核对表G0-4(非证券投资)')
+
     const defs = buildCrossWorkpaperNavDefs('G0-1')
-    expect(defs.map(d => d.wpCode)).toContain('G0-3S')
+    expect(defs.map(d => d.wpCode)).not.toContain('G0-3S')
+    expect(defs.map(d => d.wpCode)).toEqual(
+      expect.arrayContaining(['G0-4', 'G0-5']),
+    )
     const rules = buildCrossRefRules('G0-1')
     expect(rules.some(r => r.field === '证券差异')).toBe(true)
+    expect(rules.every(r => !r.target.includes('G0-3S'))).toBe(true)
   })
 })

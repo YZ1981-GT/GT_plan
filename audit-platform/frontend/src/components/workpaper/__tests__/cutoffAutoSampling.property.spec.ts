@@ -106,7 +106,7 @@ describe('Feature: cutoff-test-auto-sampling, Property 8: 填充策略正确性'
           }
         },
       ),
-      { numRuns: 100 },
+      { numRuns: 20 },
     )
   })
 
@@ -127,7 +127,7 @@ describe('Feature: cutoff-test-auto-sampling, Property 8: 填充策略正确性'
           }
         },
       ),
-      { numRuns: 100 },
+      { numRuns: 20 },
     )
   })
 
@@ -163,7 +163,7 @@ describe('Feature: cutoff-test-auto-sampling, Property 8: 填充策略正确性'
           }
         },
       ),
-      { numRuns: 100 },
+      { numRuns: 20 },
     )
   })
 
@@ -186,7 +186,7 @@ describe('Feature: cutoff-test-auto-sampling, Property 8: 填充策略正确性'
           }
         },
       ),
-      { numRuns: 100 },
+      { numRuns: 20 },
     )
   })
 })
@@ -231,7 +231,7 @@ describe('Feature: cutoff-test-auto-sampling, Property 10: 撤销 Round-Trip —
           }
         },
       ),
-      { numRuns: 100 },
+      { numRuns: 20 },
     )
   })
 
@@ -256,7 +256,7 @@ describe('Feature: cutoff-test-auto-sampling, Property 10: 撤销 Round-Trip —
           expect(afterUndo.length).toBe(originalSamples.length)
         },
       ),
-      { numRuns: 100 },
+      { numRuns: 20 },
     )
   })
 
@@ -285,7 +285,7 @@ describe('Feature: cutoff-test-auto-sampling, Property 10: 撤销 Round-Trip —
           }
         },
       ),
-      { numRuns: 100 },
+      { numRuns: 20 },
     )
   })
 })

@@ -7,7 +7,15 @@ import {
   useH8Adjustment,
   categoryFromLegacy,
   entryTypeFromCategory,
+  H8_ROU_COST_CODE,
+  H8_ROU_DEP_CODE,
+  H8_ROU_IMP_CODE,
+  H8_ADJ_ACCOUNT_OPTIONS,
 } from '../useH8Adjustment'
+import { h8Scope, h9Scope } from '../hCycleAccountScope'
+
+/** 租赁负债对方科目（H9 真源） */
+const LEASE_LIABILITY_CODE = h9Scope.def.grossFallback
 
 vi.mock('@/utils/eventBus', () => ({
   eventBus: { emit: vi.fn(), on: vi.fn(), off: vi.fn() },
@@ -56,6 +64,55 @@ describe('categoryFromLegacy / entryTypeFromCategory', () => {
   })
 })
 
+describe('H8 科目码单一真源（防旧码复活）', () => {
+  it('原值/折旧/减值三码取自 h8Scope 声明', () => {
+    expect(H8_ROU_COST_CODE).toBe(h8Scope.def.slotFallbacks.gross[0])
+    expect(H8_ROU_DEP_CODE).toBe(h8Scope.def.slotFallbacks.accum_dep[0])
+    expect(H8_ROU_IMP_CODE).toBe(h8Scope.def.slotFallbacks.impairment[0])
+  })
+
+  it('录入下拉不得出现历史错码（1901 待处理财产损溢 / 2205 合同负债）', () => {
+    const codes = H8_ADJ_ACCOUNT_OPTIONS.map((o) => o.code)
+    for (const wrong of ['1901', '1902', '1903', '2205', '1802']) {
+      expect(codes).not.toContain(wrong)
+    }
+    // 正向：真实族三码 + 租赁负债侧两码都在
+    expect(codes).toContain(H8_ROU_COST_CODE)
+    expect(codes).toContain(H8_ROU_DEP_CODE)
+    expect(codes).toContain(H8_ROU_IMP_CODE)
+    expect(codes).toContain(LEASE_LIABILITY_CODE)
+  })
+
+  it('旧码不再被识别为使用权资产相关（组内含 1901 的分录不再拉取）', async () => {
+    const { api } = await import('@/services/apiProxy')
+    ;(api.get as any).mockResolvedValue({
+      data: {
+        items: [
+          {
+            entry_group_id: 'legacy',
+            adjustment_type: 'aje',
+            description: '旧码分录',
+            line_items: [
+              { standard_account_code: '1901', debit_amount: 100, credit_amount: 0 },
+              { standard_account_code: '2205', debit_amount: 0, credit_amount: 100 },
+            ],
+          },
+        ],
+      },
+    })
+    const allResponses = makeMap()
+    const state = useH8Adjustment({
+      wpId: ref('wp1'),
+      projectId: ref('p1'),
+      allResponses: allResponses as any,
+      isReadonly: ref(false),
+      auditYear: ref(2024),
+      onSave: () => {},
+    })
+    expect(await state.syncFromAdjustmentModule()).toBe(0)
+  })
+})
+
 describe('useH8Adjustment', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -70,7 +127,7 @@ describe('useH8Adjustment', () => {
         debit: 1000,
         credit: 0,
         indexRef: 'H8-6',
-        accountCode: '1901',
+        accountCode: H8_ROU_COST_CODE,
       },
       {
         rowId: 'r2',
@@ -78,7 +135,7 @@ describe('useH8Adjustment', () => {
         adjustType: 'AJE',
         debit: 0,
         credit: 1000,
-        accountCode: '2205',
+        accountCode: LEASE_LIABILITY_CODE,
         accountName: '租赁负债',
       },
     ])
@@ -98,7 +155,7 @@ describe('useH8Adjustment', () => {
     expect(state.rouCostAjeNet.value).toBe(1000)
   })
 
-  it('addRow defaults to 账项调整 + 1901 and persists', () => {
+  it('addRow defaults to 账项调整 + 使用权资产原值科目 and persists', () => {
     const allResponses = makeMap()
     const saves: { id: string; val: unknown }[] = []
     const state = useH8Adjustment({
@@ -111,7 +168,7 @@ describe('useH8Adjustment', () => {
     state.addRow()
     expect(state.rows.value).toHaveLength(1)
     expect(state.rows.value[0].category).toBe('账项调整')
-    expect(state.rows.value[0].accountCode).toBe('1901')
+    expect(state.rows.value[0].accountCode).toBe(H8_ROU_COST_CODE)
     expect(saves.some((s) => s.id === 'H8-3-rows')).toBe(true)
     const persisted = saves.find((s) => s.id === 'H8-3-rows')!.val as any[]
     expect(persisted[0].debitAmount).toBe(0)
@@ -122,19 +179,19 @@ describe('useH8Adjustment', () => {
     const allResponses = makeMap([
       {
         category: '账项调整',
-        accountCode: '1901',
+        accountCode: H8_ROU_COST_CODE,
         debitAmount: 500,
         creditAmount: 0,
       },
       {
         category: '账项调整',
-        accountCode: '2205',
+        accountCode: LEASE_LIABILITY_CODE,
         debitAmount: 0,
         creditAmount: 500,
       },
       {
         category: '账项调整',
-        accountCode: '1902',
+        accountCode: H8_ROU_DEP_CODE,
         debitAmount: 0,
         creditAmount: 80,
       },
@@ -146,7 +203,7 @@ describe('useH8Adjustment', () => {
       },
       {
         category: '报表调整',
-        accountCode: '1901',
+        accountCode: H8_ROU_COST_CODE,
         debitAmount: 100,
         creditAmount: 0,
       },
@@ -169,7 +226,7 @@ describe('useH8Adjustment', () => {
     expect(state.rouDepAjeNet.value).toBe(-80)
   })
 
-  it('syncFromAdjustmentModule imports full groups containing 1901', async () => {
+  it('syncFromAdjustmentModule imports full groups containing 使用权资产原值科目', async () => {
     const { api } = await import('@/services/apiProxy')
     ;(api.get as any).mockResolvedValue({
       data: {
@@ -179,8 +236,8 @@ describe('useH8Adjustment', () => {
             adjustment_type: 'aje',
             description: '[H8] 补记ROU',
             line_items: [
-              { standard_account_code: '1901', account_name: '使用权资产', debit_amount: 200, credit_amount: 0 },
-              { standard_account_code: '2205', account_name: '租赁负债', debit_amount: 0, credit_amount: 200 },
+              { standard_account_code: H8_ROU_COST_CODE, account_name: '使用权资产', debit_amount: 200, credit_amount: 0 },
+              { standard_account_code: LEASE_LIABILITY_CODE, account_name: '租赁负债', debit_amount: 0, credit_amount: 200 },
             ],
           },
           {
@@ -195,9 +252,9 @@ describe('useH8Adjustment', () => {
           {
             entry_group_id: 'g3',
             adjustment_type: 'aje',
-            description: '纯租赁负债（无1901）',
+            description: '纯租赁负债（无使用权资产原值科目）',
             line_items: [
-              { standard_account_code: '2205', debit_amount: 50, credit_amount: 0 },
+              { standard_account_code: LEASE_LIABILITY_CODE, debit_amount: 50, credit_amount: 0 },
               { standard_account_code: '1002', debit_amount: 0, credit_amount: 50 },
             ],
           },
@@ -206,7 +263,13 @@ describe('useH8Adjustment', () => {
     })
 
     const allResponses = makeMap([
-      { rowId: 'manual-1', category: '账项调整', accountCode: '1901', debitAmount: 10, creditAmount: 0 },
+      {
+        rowId: 'manual-1',
+        category: '账项调整',
+        accountCode: H8_ROU_COST_CODE,
+        debitAmount: 10,
+        creditAmount: 0,
+      },
     ])
     const state = useH8Adjustment({
       wpId: ref('wp1'),
@@ -240,7 +303,7 @@ describe('useH8Adjustment', () => {
         rowId: 'a1',
         category: '账项调整',
         description: '补记使用权资产',
-        accountCode: '1901',
+        accountCode: H8_ROU_COST_CODE,
         debitAmount: 300,
         creditAmount: 0,
       },
@@ -248,7 +311,7 @@ describe('useH8Adjustment', () => {
         rowId: 'a2',
         category: '账项调整',
         description: '补记使用权资产',
-        accountCode: '2205',
+        accountCode: LEASE_LIABILITY_CODE,
         debitAmount: 0,
         creditAmount: 300,
       },

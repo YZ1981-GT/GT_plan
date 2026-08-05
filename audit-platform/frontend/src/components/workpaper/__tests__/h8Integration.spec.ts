@@ -15,6 +15,10 @@ import { ref, nextTick } from 'vue'
 import { useH8CrossSheet } from '../composables/useH8CrossSheet'
 import { calcAuditedAmount, calcAssetEndBalance, calcContraEndBalance, calcNetValue, calcSubtotal } from '../composables/useH8FormulaEngine'
 import { calcInitialMeasurement, calcDepreciationPeriod, calcTerminationGainLoss, isShortTermLease, isLowValueLease } from '../composables/useH8CAS21Engine'
+import { H8_ROU_COST_CODE, H8_ROU_DEP_CODE } from '../composables/useH8Adjustment'
+import { h9Scope } from '../composables/hCycleAccountScope'
+
+const LEASE_LIABILITY_CODE = h9Scope.def.grossFallback
 
 // ─── Helper: 构造 allResponses Map ──────────────────────────────────────────
 
@@ -301,13 +305,13 @@ describe('useH8CrossSheet — allocationVsDepreciation', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('useH8CrossSheet — h83AdjustmentSync', () => {
-  it('从 H8-3-rows 汇总 1901/1902 账项与报表净额', async () => {
+  it('从 H8-3-rows 汇总 原值/累计折旧 账项与报表净额', async () => {
     const rows = [
-      { category: '账项调整', accountCode: '1901', debitAmount: 500, creditAmount: 0 },
-      { category: '账项调整', accountCode: '2205', debitAmount: 0, creditAmount: 500 },
-      { category: '账项调整', accountCode: '1902', debitAmount: 0, creditAmount: 80 },
+      { category: '账项调整', accountCode: H8_ROU_COST_CODE, debitAmount: 500, creditAmount: 0 },
+      { category: '账项调整', accountCode: LEASE_LIABILITY_CODE, debitAmount: 0, creditAmount: 500 },
+      { category: '账项调整', accountCode: H8_ROU_DEP_CODE, debitAmount: 0, creditAmount: 80 },
       { category: '账项调整', accountCode: '6603', debitAmount: 80, creditAmount: 0 },
-      { category: '报表调整', accountCode: '1901', debitAmount: 100, creditAmount: 0 },
+      { category: '报表调整', accountCode: H8_ROU_COST_CODE, debitAmount: 100, creditAmount: 0 },
       { category: '报表调整', accountCode: '1601', debitAmount: 0, creditAmount: 100 },
     ]
     const map = createMockResponses({})

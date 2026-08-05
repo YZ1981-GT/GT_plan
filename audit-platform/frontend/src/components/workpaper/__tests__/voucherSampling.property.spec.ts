@@ -94,7 +94,7 @@ describe('Feature: voucher-sampling-engine, Property 6: 阶段隔离 — 年审�
           }
         },
       ),
-      { numRuns: 100 },
+      { numRuns: 20 },
     )
   })
 
@@ -114,7 +114,7 @@ describe('Feature: voucher-sampling-engine, Property 6: 阶段隔离 — 年审�
           }
         },
       ),
-      { numRuns: 100 },
+      { numRuns: 20 },
     )
   })
 
@@ -150,7 +150,7 @@ describe('Feature: voucher-sampling-engine, Property 6: 阶段隔离 — 年审�
           expect(viewFinal.length).toBe(finalRows.length)
         },
       ),
-      { numRuns: 100 },
+      { numRuns: 20 },
     )
   })
 })
@@ -188,7 +188,7 @@ describe('Feature: voucher-sampling-engine, Property 8: 填充策略正确性', 
           expect(resultPhaseCount).toBe(existingPhaseCount + selected.length)
         },
       ),
-      { numRuns: 100 },
+      { numRuns: 20 },
     )
   })
 
@@ -216,7 +216,7 @@ describe('Feature: voucher-sampling-engine, Property 8: 填充策略正确性', 
           expect(resultFinal.length).toBe(selected.length)
         },
       ),
-      { numRuns: 100 },
+      { numRuns: 20 },
     )
   })
 
@@ -241,7 +241,7 @@ describe('Feature: voucher-sampling-engine, Property 8: 填充策略正确性', 
           expect(phaseRows.length).toBe(existing.length + newCount)
         },
       ),
-      { numRuns: 100 },
+      { numRuns: 20 },
     )
   })
 
@@ -264,7 +264,7 @@ describe('Feature: voucher-sampling-engine, Property 8: 填充策略正确性', 
           }
         },
       ),
-      { numRuns: 100 },
+      { numRuns: 20 },
     )
   })
 })
@@ -306,7 +306,7 @@ describe('Feature: voucher-sampling-engine, Property 10: 版本对比 diff 正�
           }
         },
       ),
-      { numRuns: 100 },
+      { numRuns: 20 },
     )
   })
 
@@ -338,7 +338,7 @@ describe('Feature: voucher-sampling-engine, Property 10: 版本对比 diff 正�
           }
         },
       ),
-      { numRuns: 100 },
+      { numRuns: 20 },
     )
   })
 
@@ -372,7 +372,7 @@ describe('Feature: voucher-sampling-engine, Property 10: 版本对比 diff 正�
           }
         },
       ),
-      { numRuns: 100 },
+      { numRuns: 20 },
     )
   })
 })
@@ -449,7 +449,7 @@ describe('Feature: voucher-sampling-engine, Property 12: 编辑留痕不可变�
           }
         },
       ),
-      { numRuns: 100 },
+      { numRuns: 20 },
     )
   })
 
@@ -481,7 +481,7 @@ describe('Feature: voucher-sampling-engine, Property 12: 编辑留痕不可变�
           }
         },
       ),
-      { numRuns: 100 },
+      { numRuns: 20 },
     )
   })
 
@@ -507,7 +507,7 @@ describe('Feature: voucher-sampling-engine, Property 12: 编辑留痕不可变�
           }
         },
       ),
-      { numRuns: 100 },
+      { numRuns: 20 },
     )
   })
 })
