@@ -14,6 +14,7 @@ import json
 import logging
 import os
 import re
+from dataclasses import dataclass
 from decimal import Decimal
 from functools import lru_cache
 from io import BytesIO
@@ -30,6 +31,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.core import Project
 from app.models.report_models import FinancialReport, FinancialReportType
+from app.services.parent_company_scope import resolve_parent_standalone_project
 
 logger = logging.getLogger(__name__)
 
@@ -186,8 +188,8 @@ class ReportExcelExporter:
         )
 
         # 4b. Load parent (母公司个别) report data for consolidated :parent columns.
-        #     母分汇总已作为现成 FinancialReport 存储——读「上级代码」匹配的 standalone
-        #     项目的报表行，按 row_code 建索引；缺失则留空（不崩）。
+        #     读**同企业代码、同年度、standalone 口径**的兄弟项目（母公司单体）的报表行，
+        #     按 row_code 建索引；定位不到则留空（不崩）。详见 _load_parent_row_index。
         parent_row_index = await self._load_parent_row_index(
             project, year, types_to_export, mode=mode,
         )
@@ -301,32 +303,76 @@ class ReportExcelExporter:
     ) -> dict[str, dict]:
         """加载母公司个别报表行索引（``:parent`` 占位/``current_parent`` 坐标用）.
 
-        母公司个别数（公司列）取自「上级代码」（``Project.parent_company_code``）
-        匹配的 standalone 项目（``Project.company_code == parent_company_code``，
-        未软删）的已审定 ``FinancialReport`` 行，按 ``row_code`` 建索引。
+        母公司个别数（公司列）= **编制合并报表那家公司自己的单体数**，即与合并项目
+        **同企业代码、同年度、口径为 standalone** 的兄弟项目（唯一真源
+        :func:`app.services.parent_company_scope.resolve_parent_standalone_project`）
+        的 ``FinancialReport`` 行，按 ``row_code`` 建索引。
 
-        母分汇总已作为现成 FinancialReport 存储——直接读匹配项目的报表，
-        无需实时聚合。找不到母公司项目则返回空 dict（导出时该列留空，不崩）。
+        「同代码 standalone 兄弟」≠「``parent_company_code`` 指向的上级公司」
+        --------------------------------------------------------------------
+        ``projects`` 有三个企业代码：``company_code``（本企业）/
+        ``parent_company_code``（**上级公司，代码不同的另一家公司**）/
+        ``ultimate_company_code``（最终）。母公司个别列要的是前者的 standalone 口径，
+        与上级公司是两件事。原实现按 ``Project.company_code ==
+        project.parent_company_code`` 定位（即取**上级公司**的报表），且查询只过滤
+        ``company_code`` + ``is_deleted``、**缺 ``report_scope`` 与 ``audit_year``** ——
+        同代码同时存在合并与单体两条项目时 ``.first()`` 可能把**合并数**当母公司个别数
+        写进导出报表，还会跨年度串数。改用 helper 后三个条件（``company_code`` /
+        ``audit_year`` / ``report_scope='standalone'``）齐备，两个缺口一并消除。
+
+        fail-open 为何留在本层
+        ----------------------
+        ``parent_company_scope`` 模块**有意不做 fail-open**（DB 异常原样抛出、命中多条
+        抛 ``AssertionError``），否则「函数名写错 / 接线错」会被伪装成「本项目无母公司
+        单体」。fail-open 的取舍由调用方决定：报表导出是交付件生成路径，母公司列取不到
+        数不应让整份报表导出失败，故本层用 ``except Exception`` 兜住（含
+        ``AssertionError``）→ WARNING → 返回空 dict，该列留空不崩（需求 9.3）。
+
+        ``year`` 形参与 ``project.audit_year`` 的分歧处置
+        ------------------------------------------------
+        helper 按 ``consol_project.audit_year`` 定位兄弟项目，而本函数另有 ``year``
+        形参用于读取 ``FinancialReport``。两者不一致时**不静默继续**：按 ``year``
+        （用户请求导出的年度）为准，若 ``project.audit_year`` 与之分歧则记 WARNING 并
+        返回空 dict、该列留空。理由 —— 唯一索引是
+        ``(company_code, audit_year, report_scope)``，此时 helper 定位到的是 **另一个
+        年度** 的 standalone 项目，再拿它去读 ``year`` 年度的报表行正是需求 9.2 要消除
+        的「跨年度串数」；宁可留空也不把错年度的数字写进交付件。``audit_year`` 为 NULL
+        时 helper 自身即判定「定位字段不齐」返回 None，同样留空。
+
+        Returns:
+            ``{row_code: row_dict}``；定位不到母公司单体项目时为空 dict
+            （占位与坐标语义不变，导出时该列留空）。
         """
-        parent_code = getattr(project, "parent_company_code", None)
-        if not parent_code:
+        if project is None:
             return {}
         try:
-            result = await self.db.execute(
-                select(Project).where(
-                    Project.company_code == parent_code,
-                    Project.is_deleted == False,  # noqa: E712
+            project_audit_year = getattr(project, "audit_year", None)
+            if project_audit_year is not None and project_audit_year != year:
+                logger.warning(
+                    "母公司个别列留空：导出年度 %s 与项目 %s 的 audit_year=%s 分歧，"
+                    "按导出年度为准；helper 会按 audit_year 定位到另一年度的 standalone "
+                    "项目，填入即为跨年度串数",
+                    year,
+                    getattr(project, "id", None),
+                    project_audit_year,
                 )
+                return {}
+            parent_project = await resolve_parent_standalone_project(self.db, project)
+        except Exception as e:  # pragma: no cover - defensive (fail-open，见 docstring)
+            logger.warning(
+                "母公司单体项目定位失败（project=%s year=%s）：%s；"
+                "公司(母公司个别) columns will be left blank",
+                getattr(project, "id", None),
+                year,
+                e,
             )
-            parent_project = result.scalars().first()
-        except Exception as e:  # pragma: no cover - defensive
-            logger.warning("Parent project lookup failed for code %s: %s", parent_code, e)
             return {}
         if parent_project is None:
             logger.info(
-                "No parent project found for parent_company_code=%s; "
+                "未定位到母公司单体项目（project=%s year=%s）；"
                 "公司(母公司个别) columns will be left blank",
-                parent_code,
+                getattr(project, "id", None),
+                year,
             )
             return {}
 

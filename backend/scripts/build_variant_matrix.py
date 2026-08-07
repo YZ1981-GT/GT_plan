@@ -138,6 +138,48 @@ def build_matrix(index: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+# 本生成器**不产出**的 additive 字段：由别的脚本按母公司章追加
+# (backend/scripts/fix/fix_variant_matrix_parent_sections.py, spec
+#  parent-company-note-chapter-and-sourcing Task 10)。
+# 重生成时必须原样搬过来，否则 --write 一次就把母公司维度静默抹掉。
+ADDITIVE_ACCOUNT_FIELDS = ("parent_company_sections",)
+
+
+def carry_over_additive_fields(
+    matrix: dict[str, Any], existing: dict[str, Any] | None
+) -> dict[str, Any]:
+    """把既有输出里 additive 的 account 级字段搬进新生成的矩阵（按 account_key）.
+
+    纯函数（不读盘、不写盘），便于守卫直接断言。``existing`` 为 None 时原样返回。
+    只搬 ``ADDITIVE_ACCOUNT_FIELDS`` 列出的字段；本生成器自己产出的
+    ``variants`` / ``legacy_aliases`` 一律不碰。
+    """
+    if not existing:
+        return matrix
+    extras: dict[str, dict[str, Any]] = {}
+    for acct in existing.get("accounts", []) or []:
+        key = acct.get("account_key")
+        if not key:
+            continue
+        kept = {f: acct[f] for f in ADDITIVE_ACCOUNT_FIELDS if f in acct}
+        if kept:
+            extras[key] = kept
+    for acct in matrix.get("accounts", []) or []:
+        for field, value in extras.get(acct.get("account_key"), {}).items():
+            acct[field] = value
+    return matrix
+
+
+def load_existing_matrix() -> dict[str, Any] | None:
+    if not OUT_PATH.exists():
+        return None
+    try:
+        return json.loads(OUT_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:  # pragma: no cover
+        print(f"[WARN] cannot read existing matrix for additive carry-over: {exc}")
+        return None
+
+
 def print_stats(matrix: dict[str, Any]) -> None:
     accounts = matrix["accounts"]
     print(f"Total accounts emitted: {len(accounts)}")
@@ -146,6 +188,9 @@ def print_stats(matrix: dict[str, Any]) -> None:
         print(f"  {vk}: {cnt} accounts")
     with_alias = sum(1 for a in accounts if a["legacy_aliases"])
     print(f"  accounts with legacy_aliases: {with_alias}")
+    for field in ADDITIVE_ACCOUNT_FIELDS:
+        carried = sum(1 for a in accounts if field in a)
+        print(f"  accounts carrying additive field {field}: {carried}")
 
 
 def main() -> None:
@@ -155,6 +200,7 @@ def main() -> None:
 
     index = load_index()
     matrix = build_matrix(index)
+    matrix = carry_over_additive_fields(matrix, load_existing_matrix())
     print_stats(matrix)
 
     if args.write:

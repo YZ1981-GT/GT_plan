@@ -41,6 +41,14 @@ from app.services.note_section_catalog import (
     normalize_report_scope,
     normalize_section_code,
 )
+from app.services.parent_company_note_sections import (
+    PARENT_PROJECT_MISSING_KEY,
+    PARENT_SOURCE_META_KEY,
+    ParentScopeCache,
+    build_parent_source_meta,
+    is_parent_company_section,
+    resolve_parent_scope_for_notes,
+)
 from app.services.note_template_service import NoteTemplateService
 from app.services.note_template_merge import merge_templates
 from app.services.note_custom_template_service import NoteCustomTemplateService
@@ -549,6 +557,10 @@ class DisclosureEngine:
         self._wp_account_cache: dict = {}
         self._tb_cache: dict = {}
         self._wp_fine_cache: dict = {}  # 底稿精细化明细行缓存
+        # 母公司章取数上下文（Task 12/13）：母公司章的 binding 取数须指向
+        # **同代码同年度 standalone 兄弟项目**而非合并项目自身。惰性构造，
+        # 非合并项目 / 未命中母公司章时全程不查库（零回归支点）。
+        self._parent_scope_cache: ParentScopeCache | None = None
         # RAG 增强旁路：按 note_section 暂存本次生成所依据的 Citation，
         # 供后续落库/返回时附带（不改 _generate_text_with_llm 的 str|None 签名）。
         self._last_citations: dict = {}
@@ -566,6 +578,185 @@ class DisclosureEngine:
         if not isinstance(getattr(self, "_last_citations", None), dict):
             self._last_citations = {}
         self._last_citations[note_section] = citations or []
+
+    # ------------------------------------------------------------------
+    # 母公司章取数上下文（Task 12/13）
+    # ------------------------------------------------------------------
+    async def _parent_scope(self, project_id: UUID, year: int) -> ParentScopeCache:
+        """惰性解析并缓存母公司口径（每个 engine 实例只查一次库）。
+
+        判定与取数**完全由 `parent_company_scope` helper 承担**，本层不重写
+        `(company_code, audit_year, report_scope)` 三条件（Property 20 的
+        源码级守卫按此断言）。
+        """
+        cached = getattr(self, "_parent_scope_cache", None)
+        if cached is not None and cached.matches(project_id, year):
+            return cached
+        scope = await resolve_parent_scope_for_notes(self.db, project_id, year)
+        self._parent_scope_cache = scope
+        return scope
+
+    async def _build_resolver_ctx(
+        self,
+        project_id: UUID,
+        year: int,
+        section_number: str | None,
+        **extra: Any,
+    ) -> dict[str, Any]:
+        """构造 resolver ctx；母公司章切换到母公司单体项目的 `_tb_cache`。
+
+        非母公司章 / 非合并项目 → 与改造前逐键等价（零回归支点，
+        `test_parent_company_note_sourcing` 有 characterization 断言）。
+
+        母公司章命中且兄弟项目存在 → `project_id` 与 `_tb_cache` 双双换成母公司
+        单体项目的，并附 `_parent_source_meta` 供载荷溯源（Task 13）。
+        兄弟项目缺失 → 不改 `project_id`，但 `_tb_cache` 置空 dict 并标
+        `parent_project_missing`：**留空而非取合并数**（需求 8.4，取到合并数
+        比取不到更坏 —— 母公司章会静默显示合并口径金额）。
+        """
+        ctx: dict[str, Any] = {
+            "project_id": project_id,
+            "year": year,
+            "db": self.db,
+            "_tb_cache": getattr(self, "_tb_cache", None) or {},
+            "_wp_cache": getattr(self, "_wp_cache", None) or {},
+            "_prior_notes_cache": getattr(self, "_prior_notes_cache", None) or {},
+        }
+        if section_number is not None:
+            ctx["section_number"] = section_number
+        ctx.update(extra)
+
+        if not is_parent_company_section(section_number):
+            return ctx
+
+        try:
+            scope = await self._parent_scope(project_id, year)
+        except Exception as err:  # pragma: no cover - defensive
+            # fail-open：母公司口径解析失败不阻断整份附注生成，但**必须留空**
+            # 而不是回落合并数（否则母公司章静默显示合并口径）。
+            logger.warning(
+                "母公司口径解析失败（project=%s year=%s section=%s）：%s；"
+                "该章节取数留空",
+                project_id, year, section_number, err,
+            )
+            ctx["_tb_cache"] = {}
+            ctx[PARENT_PROJECT_MISSING_KEY] = True
+            return ctx
+
+        if scope.resolution_failed:
+            # 🔴 「口径解析本身失败」与「确定不是合并项目」必须是两态：
+            # 前者是「不知道该取哪个项目」⇒ 必须留空；后者是「确定不是合并项目」
+            # ⇒ 按原路径取数。两者合并处理会让 DB 抖动时母公司章静默显示
+            # **合并口径金额**（错数，比取不到更坏）。
+            logger.warning(
+                "母公司口径解析失败（project=%s year=%s section=%s）：该章节取数留空",
+                project_id, year, section_number,
+            )
+            ctx["_tb_cache"] = {}
+            ctx[PARENT_PROJECT_MISSING_KEY] = True
+            return ctx
+
+        if not scope.is_consolidated:
+            # 非合并项目：母公司章按 scope='consolidated_only' 本不该出现在
+            # 单体项目的附注里（`filter_template_sections` 已过滤）；真到了
+            # 这里说明是存量数据，按原路径取数不改行为。
+            return ctx
+
+        if scope.parent_project_id is None:
+            logger.info(
+                "母公司章 %s 取数留空：项目 %s 尚未建母公司单体（合法状态）",
+                section_number, project_id,
+            )
+            ctx["_tb_cache"] = {}
+            ctx[PARENT_PROJECT_MISSING_KEY] = True
+            return ctx
+
+        ctx["project_id"] = scope.parent_project_id
+        ctx["_tb_cache"] = await self._parent_tb_cache(scope.parent_project_id, year)
+        ctx[PARENT_SOURCE_META_KEY] = build_parent_source_meta(scope)
+        return ctx
+
+    @staticmethod
+    def _attach_parent_source_meta(
+        table_data: Any, ctx: dict[str, Any] | None
+    ) -> Any:
+        """把 ctx 里的母公司取数溯源落进 table_data 并**返回该 table_data**（Task 13）。
+
+        非母公司章 → ctx 无这两个键 ⇒ **空操作**（零回归支点：改造前后 table_data
+        逐键相同）。母公司章 → 落 ``_parent_company_source``（三项溯源）或
+        ``parent_project_missing``（前端显示「本项目未建母公司单体」灰态）。
+
+        🔴 只落在**表级** dict 上，不动 ``rows`` —— 母公司章的 rows 由结构任务
+        （Task 4~7）拥有，本任务不得改行结构。
+
+        🔴 两条签名约定（勿"精简"回去，各对应一个已实测的 P0）：
+
+        1. **必须返回 ``table_data``**。legacy 路径写的是
+           ``return self._attach_parent_source_meta({...}, parent_ctx)``；返回
+           ``None`` 会让 ``_build_table_data`` 对**每一张**无 binding 的表返回
+           ``None`` ⇒ 整章表格凭空消失，而 ``get_diagnostics`` 与既有测试全绿。
+        2. **``ctx`` 允许为 ``None``**。legacy 路径在非母公司章时 ``parent_ctx``
+           就是 ``None``；不容忍会抛 ``AttributeError: 'NoneType' has no
+           attribute 'get'`` ⇒ 所有 legacy 表构建整体崩溃（已实测复现）。
+        """
+        if not isinstance(table_data, dict) or not ctx:
+            return table_data
+        meta = ctx.get(PARENT_SOURCE_META_KEY)
+        if isinstance(meta, dict) and meta:
+            table_data[PARENT_SOURCE_META_KEY] = meta
+        if ctx.get(PARENT_PROJECT_MISSING_KEY):
+            table_data[PARENT_PROJECT_MISSING_KEY] = True
+        return table_data
+
+    async def _parent_tb_cache(self, parent_project_id: UUID, year: int) -> dict:
+        """母公司单体项目的 `trial_balance` 缓存（结构与 `_tb_cache` 逐键一致）。
+
+        复用 `_preload_data_for_notes` 的同一投影口径（按 `standard_account_code`
+        与 `account_name` 双键索引、三个字段 audited/unadjusted/opening），
+        避免两套取数口径漂移。
+        """
+        cached = getattr(self, "_parent_tb_cache_store", None)
+        key = (parent_project_id, year)
+        if isinstance(cached, dict) and key in cached:
+            return cached[key]
+
+        tb: dict[str, dict] = {}
+        try:
+            result = await self.db.execute(
+                sa.select(TrialBalance).where(
+                    TrialBalance.project_id == parent_project_id,
+                    TrialBalance.year == year,
+                    TrialBalance.is_deleted == sa.false(),
+                )
+            )
+            for row in result.scalars().all():
+                code = row.standard_account_code or row.account_code or ""
+                name = row.account_name or row.standard_account_name or ""
+                entry = {
+                    "audited": float(row.audited_amount or 0),
+                    "unadjusted": float(row.unadjusted_amount or 0),
+                    "opening": float(row.opening_balance or 0),
+                }
+                if name:
+                    tb[name] = entry
+                if code:
+                    tb[code] = entry
+        except Exception as err:
+            logger.warning(
+                "母公司单体项目 %s 的 trial_balance 预加载失败：%s；该章节取数留空",
+                parent_project_id, err,
+            )
+            try:
+                await self.db.rollback()
+            except Exception:
+                pass
+            tb = {}
+
+        if not isinstance(cached, dict):
+            cached = {}
+            self._parent_tb_cache_store = cached
+        cached[key] = tb
+        return tb
 
     async def _get_project_basic_info(self, project_id: UUID) -> dict:
         result = await self.db.execute(
@@ -980,8 +1171,25 @@ class DisclosureEngine:
         wp_data = getattr(self, '_wp_cache', None) or {}
         wp_account_map = getattr(self, '_wp_account_cache', None) or {}
         tb_map = getattr(self, '_tb_cache', None) or {}
+
+        # ── Task 12/13：母公司章的 legacy 路径同样须换取数源 ──────────────
+        # 🔴 母公司章 7 个子节里只有 5 个命中 binding（营业收入与营业成本 / 投资收益 /
+        # 现金流量表补充资料 三者无 binding 条目），它们走的正是本 legacy 路径直读
+        # `self._tb_cache` = 合并项目的试算表 ⇒ 只接 binding 路径会让这几节**静默显示
+        # 合并口径金额**（错数，比取不到更坏）。
+        parent_ctx: dict[str, Any] | None = None
+        if is_parent_company_section(section_number):
+            parent_ctx = await self._build_resolver_ctx(project_id, year, section_number)
+            tb_map = parent_ctx.get("_tb_cache") or {}
+            # 底稿缓存也一并清空：`_wp_cache` 里是**合并项目**的底稿审定数，
+            # 留着会让母公司章优先取到合并口径（legacy 路径底稿优先于试算表）。
+            wp_data = {}
         # 底稿精细化提取结果缓存（detail rows）
         wp_fine_cache = getattr(self, '_wp_fine_cache', None) or {}
+        if parent_ctx is not None:
+            # 同理：`_wp_fine_cache` 是合并项目底稿的 fine_summary 明细行，
+            # 留着会让母公司章的动态明细行显示合并口径明细。
+            wp_fine_cache = {}
 
         # 构建底稿数据按科目名索引
         wp_by_account: dict[str, dict] = {}
@@ -1093,7 +1301,9 @@ class DisclosureEngine:
                     )
                     row["values"][ci] = total
 
-        return {"headers": headers, "rows": rows}
+        return self._attach_parent_source_meta(
+            {"headers": headers, "rows": rows}, parent_ctx
+        )
 
     # ------------------------------------------------------------------
     # Sprint 1 Task 1.3 / 1.4 — binding 驱动的新路径
@@ -1170,15 +1380,9 @@ class DisclosureEngine:
             return {"headers": headers, "rows": []}
 
         # 构造 ctx — 注入预加载缓存 + db + project_id + year + section_number
-        ctx: dict = {
-            "project_id": project_id,
-            "year": year,
-            "db": self.db,
-            "section_number": section_number,
-            "_tb_cache": getattr(self, "_tb_cache", None) or {},
-            "_wp_cache": getattr(self, "_wp_cache", None) or {},
-            "_prior_notes_cache": getattr(self, "_prior_notes_cache", None) or {},
-        }
+        # 母公司章（十六、* / 十二、*）会在此把 project_id 与 _tb_cache 换成
+        # 同代码同年度 standalone 兄弟项目的（Task 12），其余章节逐键等价。
+        ctx: dict = await self._build_resolver_ctx(project_id, year, section_number)
 
         # binding.rows 是 dict (label -> row_binding)
         binding_rows = table_binding.get("rows") or {}
@@ -1293,7 +1497,10 @@ class DisclosureEngine:
         # 回填合计行
         self._backfill_totals(output_rows, num_value_cols)
 
-        return {"headers": list(headers), "rows": output_rows}
+        out: dict = {"headers": list(headers), "rows": output_rows}
+        # Task 13：母公司章取数溯源随表落库（前端溯源面板 / 「本项目未建母公司单体」灰态）
+        self._attach_parent_source_meta(out, ctx)
+        return out
 
     # ------------------------------------------------------------------
     # Wave2 (Task 3.2)：表内公式二次求值编排（灰度内调用）
@@ -1351,17 +1558,13 @@ class DisclosureEngine:
                 label, col_idx, binding_rows, header_normalize, cell_meta,
             )
 
-        ctx: dict[str, Any] = {
-            "project_id": project_id,
-            "year": year,
-            "db": self.db,
-            "section_number": note_section,
-            "_tb_cache": getattr(self, "_tb_cache", None) or {},
-            "_wp_cache": getattr(self, "_wp_cache", None) or {},
-            "_prior_notes_cache": getattr(self, "_prior_notes_cache", None) or {},
-            "report_data": getattr(self, "_report_data_cache", None) or {},
-            "_cell_binding_resolver": _binding_resolver,
-        }
+        # 母公司章在此同样切换到母公司单体项目（Task 12）——公式二次求值与首遍
+        # 取数必须同源，否则同一格首遍取母公司数、二次求值又按合并数覆盖。
+        ctx: dict[str, Any] = await self._build_resolver_ctx(
+            project_id, year, note_section
+        )
+        ctx["report_data"] = getattr(self, "_report_data_cache", None) or {}
+        ctx["_cell_binding_resolver"] = _binding_resolver
         evaluator = NoteFormulaEvaluator()
         return await evaluator.evaluate_table(table_data, ctx)
 
@@ -1812,16 +2015,6 @@ class DisclosureEngine:
         )
         notes = result.scalars().all()
 
-        # 构造 resolver ctx
-        ctx: dict[str, Any] = {
-            "project_id": project_id,
-            "year": year,
-            "db": self.db,
-            "_tb_cache": self._tb_cache,
-            "_wp_cache": self._wp_cache,
-            "_prior_notes_cache": getattr(self, "_prior_notes_cache", {}),
-        }
-
         for note in notes:
             section = note.note_section or ""
 
@@ -1869,8 +2062,12 @@ class DisclosureEngine:
                     continue
                 targets.append((0, td))
 
-            # 更新 ctx section_number
-            ctx["section_number"] = section
+            # 逐 note 构造 resolver ctx（Task 12：收敛到 `_build_resolver_ctx` 唯一入口）。
+            # 🔴 原实现在循环**外**构造一次并复用 ⇒ 母公司章的 refill 会拿合并项目
+            # 的 `_tb_cache` 取数（静默显示合并数）。改为逐 note 构造后：
+            # 非母公司章零额外查询（`_build_resolver_ctx` 对非母公司章不查库）、
+            # 母公司口径经 `_parent_scope_cache` 每实例只解析一次。
+            ctx = await self._build_resolver_ctx(project_id, year, section)
             # Wave2：暴露当前 note table_data 供 sum source 反查兄弟单元格
             #（含 `_tables`；resolver 侧按 binding.table_index / ctx.table_index 选表）
             ctx["table_data"] = td
