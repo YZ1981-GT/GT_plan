@@ -68,7 +68,7 @@
           </span>
         </template>
       </el-table-column>
-      <el-table-column label="被询证单位" prop="entity_name" width="150" show-overflow-tooltip>
+      <el-table-column :label="RELIABILITY_COLUMN_LABELS.entity_name" prop="entity_name" width="150" show-overflow-tooltip>
         <template #default="{ row }">
           <el-input
             v-if="!readonly"
@@ -97,7 +97,21 @@
           </template>
         </template>
       </el-table-column>
-      <el-table-column label="回函日期" prop="reply_date" width="100" align="center">
+      <!--
+        🔴 源外增强列：六个可靠性 sheet 的源模板**都没有**「回函日期」列
+           （`test_k0_source_template_facts.py::test_no_reply_date_column` 已钉死）。
+           平台保留它是有意的（回函日期与「报告日前寄回原件」的时限判断相关），
+           故按「显式登记 + 表头标注」处置，而非按循环隐藏 —— 隐藏会让 K0 与
+           其余六枢纽的可靠性表列集分叉，且该列在任何枢纽都同样属源外。
+        spec: k0-confirmation-source-alignment R9.3 / Property 24
+      -->
+      <el-table-column prop="reply_date" width="100" align="center">
+        <template #header>
+          <span>{{ SOURCE_EXTRA_RELIABILITY_COLUMNS[0].label }}</span>
+          <el-tooltip placement="top" :content="SOURCE_EXTRA_RELIABILITY_COLUMNS[0].reason">
+            <el-icon class="reliability-grid__src-extra-icon" :size="12"><QuestionFilled /></el-icon>
+          </el-tooltip>
+        </template>
         <template #default="{ row }">
           <el-date-picker
             v-if="!readonly"
@@ -112,7 +126,7 @@
           <span v-else>{{ row.reply_date || '—' }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="寄回原件" prop="original_returned" width="80" align="center">
+      <el-table-column :label="RELIABILITY_COLUMN_LABELS.original_returned" prop="original_returned" width="80" align="center">
         <template #default="{ row }">
           <el-select
             v-if="!readonly"
@@ -128,7 +142,7 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="直接接收" prop="direct_received" width="80" align="center">
+      <el-table-column :label="RELIABILITY_COLUMN_LABELS.direct_received" prop="direct_received" width="80" align="center">
         <template #default="{ row }">
           <el-select
             v-if="!readonly"
@@ -148,10 +162,29 @@
         </template>
       </el-table-column>
 
+      <!--
+        ═══ 期末未收回原件函证可靠性验证（源模板 X0-7 `G5:M5` 合并父表头） ═══
+
+        🔴 R9.2：源模板把 `G:M` 七列合并在一个父表头「期末未收回原件函证可靠性验证」之下
+        （后端 `test_k0_source_template_facts.py::TestReliability::test_14_columns_with_parent_header`
+         已 openpyxl 直读断言 `G5:M5` 在 `merged_cells.ranges` 内）。改造前平台把这七列平铺，
+        父表头缺失 ⇒ 审计师看不出「这组列只在未收回原件时才需要填」这一源模板语义。
+
+        七列与源模板列字母的对应（`g0SharedComponentCoverage.spec.ts` Property 26 已逐列锁死）：
+          G 被函证者身份确认（注1）      → identity_verified / identity_method
+          H 发函及回函传真信息及验证      → fax_info_verify
+          I 发函邮箱                    → send_email
+          J 回函邮箱                    → reply_email
+          K 邮箱可靠性验证（注2）        → email_verified / email_domain
+          L 是否致电被函证者确认          → phone_called / phone_source
+          M 对函证信息可靠性的考虑（注3） → reliability_consideration
+        平台把 G/K/L 各拆成「勾选 + 明细」两列（录入更细），故子列数多于 7。
+      -->
+      <el-table-column :label="RELIABILITY_PARENT_HEADER" align="center">
       <!-- ═══ 验证组（条件列：寄回原件=否 展开，=是 灰掉） ═══ -->
-      <el-table-column label="身份已确认" width="90" align="center">
+      <el-table-column :label="RELIABILITY_COLUMN_LABELS.identity_verified" width="90" align="center">
         <template #header>
-          <span>身份已确认</span>
+          <span>{{ RELIABILITY_COLUMN_LABELS.identity_verified }}</span>
           <el-tooltip placement="top">
             <template #content>
               <div class="reliability-grid__tooltip-content">
@@ -178,7 +211,13 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="确认方式" prop="identity_method" width="110">
+      <el-table-column  prop="identity_method" width="110">
+        <template #header>
+          <span>{{ SOURCE_EXTRA_RELIABILITY_COLUMNS[1].label }}</span>
+          <el-tooltip placement="top" :content="SOURCE_EXTRA_RELIABILITY_COLUMNS[1].reason">
+            <el-icon class="reliability-grid__src-extra-icon" :size="12"><QuestionFilled /></el-icon>
+          </el-tooltip>
+        </template>
         <template #default="{ row }">
           <template v-if="!isVerificationDisabled(row)">
             <el-select
@@ -200,9 +239,9 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="邮箱已验证" width="90" align="center">
+      <el-table-column :label="RELIABILITY_COLUMN_LABELS.email_verified" width="90" align="center">
         <template #header>
-          <span>邮箱已验证</span>
+          <span>{{ RELIABILITY_COLUMN_LABELS.email_verified }}</span>
           <el-tooltip placement="top" :width="360">
             <template #content>
               <div class="reliability-grid__tooltip-content">
@@ -264,7 +303,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="已致电" prop="phone_called" width="70" align="center">
+      <el-table-column :label="RELIABILITY_COLUMN_LABELS.phone_called" prop="phone_called" width="70" align="center">
         <template #default="{ row }">
           <template v-if="!isVerificationDisabled(row)">
             <el-checkbox
@@ -279,7 +318,13 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="电话来源" prop="phone_source" width="110">
+      <el-table-column  prop="phone_source" width="110">
+        <template #header>
+          <span>{{ SOURCE_EXTRA_RELIABILITY_COLUMNS[2].label }}</span>
+          <el-tooltip placement="top" :content="SOURCE_EXTRA_RELIABILITY_COLUMNS[2].reason">
+            <el-icon class="reliability-grid__src-extra-icon" :size="12"><QuestionFilled /></el-icon>
+          </el-tooltip>
+        </template>
         <template #default="{ row }">
           <template v-if="!isVerificationDisabled(row)">
             <el-input
@@ -295,7 +340,13 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="验证备注" prop="reliability_note" min-width="150" show-overflow-tooltip>
+      <el-table-column  prop="reliability_note" min-width="150" show-overflow-tooltip>
+        <template #header>
+          <span>{{ SOURCE_EXTRA_RELIABILITY_COLUMNS[3].label }}</span>
+          <el-tooltip placement="top" :content="SOURCE_EXTRA_RELIABILITY_COLUMNS[3].reason">
+            <el-icon class="reliability-grid__src-extra-icon" :size="12"><QuestionFilled /></el-icon>
+          </el-tooltip>
+        </template>
         <template #default="{ row }">
           <template v-if="!isVerificationDisabled(row)">
             <el-input
@@ -365,7 +416,7 @@
           </div>
         </template>
       </el-table-column>
-      <el-table-column label="传真信息及验证" prop="fax_info_verify" min-width="140" show-overflow-tooltip>
+      <el-table-column :label="RELIABILITY_COLUMN_LABELS.fax_info_verify" prop="fax_info_verify" min-width="140" show-overflow-tooltip>
         <template #default="{ row }">
           <el-input
             v-if="!readonly"
@@ -377,7 +428,7 @@
           <span v-else>{{ row.fax_info_verify || '—' }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="可靠性考虑" prop="reliability_consideration" min-width="160" show-overflow-tooltip>
+      <el-table-column :label="RELIABILITY_COLUMN_LABELS.reliability_consideration" prop="reliability_consideration" min-width="160" show-overflow-tooltip>
         <template #default="{ row }">
           <el-input
             v-if="!readonly"
@@ -389,11 +440,13 @@
           <span v-else>{{ row.reliability_consideration || '—' }}</span>
         </template>
       </el-table-column>
+      </el-table-column>
+      <!-- ═══ 「期末未收回原件函证可靠性验证」父表头结束（源 G5:M5） ═══ -->
 
       <!-- ═══ 结论组 ═══ -->
-      <el-table-column label="信息可靠性" width="120" align="center">
+      <el-table-column :label="RELIABILITY_COLUMN_LABELS.conclusion_status" width="120" align="center">
         <template #header>
-          <span>信息可靠性</span>
+          <span>{{ RELIABILITY_COLUMN_LABELS.conclusion_status }}</span>
           <el-tooltip placement="top">
             <template #content>
               <div class="reliability-grid__tooltip-content">
@@ -477,7 +530,24 @@
 import { ref, computed } from 'vue'
 import { Plus, Delete, Download, InfoFilled, QuestionFilled, Select } from '@element-plus/icons-vue'
 import type { ReliabilityRow } from './reliabilityTypes'
-import { FIELD_TOOLTIPS_D07, RELIABILITY_HEADER_NOTE } from './reliabilityNotes'
+import {
+  FIELD_TOOLTIPS_D07,
+  RELIABILITY_HEADER_NOTE,
+  RELIABILITY_PARENT_HEADER,
+} from './reliabilityNotes'
+/**
+ * 列标签源模板用词 + 源外增强列登记（R9.3 / R9.4）。
+ *
+ * 🔴 六个可见的可靠性 sheet 表头逐字相同 ⇒ 一份映射七枢纽通用，**不按循环分叉**
+ *    （立项写的「按循环控制 `reply_date` 可见性」经实证不成立，理由见
+ *    `reliabilityColumnLabels.ts` 文件头）。
+ */
+import {
+  RELIABILITY_COLUMN_LABELS,
+  RELIABILITY_COLUMN_SOURCE_LABELS,
+  SOURCE_EXTRA_RELIABILITY_COLUMNS,
+  reliabilitySourceLabel,
+} from './reliabilityColumnLabels'
 // 邮箱域名可靠性判定（源模板 X0-7 注2：私人电子信箱回函不可靠）
 import { emailReliabilityTag } from '@/utils/emailDomainCheck'
 // 结论自动推导（R6.4）：只给建议，采纳与否由审计师决定
@@ -559,6 +629,13 @@ function conclusionTagType(status: string): string {
 </script>
 
 <style scoped>
+/* 源外保留列表头标记（源模板无该列，见 SOURCE_EXTRA_RELIABILITY_COLUMNS） */
+.reliability-grid__src-extra-icon {
+  margin-left: 3px;
+  color: #e6a23c;
+  cursor: help;
+  vertical-align: middle;
+}
 .reliability-grid__header-note {
   display: flex;
   align-items: center;

@@ -432,6 +432,35 @@
       <div class="entity-verify-detail__src-hint-title">审计说明（源模板）</div>
       <p v-for="(t, i) in SOURCE_AUDIT_NOTES" :key="i">{{ t }}</p>
     </div>
+
+    <!--
+      源模板 X0-2 `A27:A41` 五条编制说明 —— 只读方法论上下文，折叠置底。
+
+      🔴 改造前 `entityVerifyGuidance.ts` 已建好真源（后端 openpyxl 逐字锁死），
+         但**全前端零渲染宿主** ⇒ 审计师要翻源 xlsx 才知道该记什么。
+         这正是平台已登记的「链条上游合格、整条链仍是死的」缺陷形态。
+
+      🔴 说明 3「核实联系人的身份并记录工号（若有）」与 X0-3 跟函话术的工号占位
+         交叉呼应（R8.4）—— 两处不得只改一处。
+
+      spec: k0-confirmation-source-alignment R8.4 / Property 25
+    -->
+    <details class="entity-verify-detail__guidance">
+      <summary>{{ ENTITY_VERIFY_GUIDANCE_TITLE }}（源模板 {{ ENTITY_VERIFY_GUIDANCE_TITLE_ANCHOR }}）</summary>
+      <div
+        v-for="g in ENTITY_VERIFY_GUIDANCE"
+        :key="g.anchor"
+        class="entity-verify-detail__guidance-block"
+      >
+        <div class="entity-verify-detail__guidance-title">
+          {{ g.title }}
+          <span class="entity-verify-detail__guidance-anchor">{{ g.anchor }}</span>
+        </div>
+        <p v-for="(t, i) in g.items" :key="i" class="entity-verify-detail__guidance-item">
+          {{ t }}
+        </p>
+      </div>
+    </details>
   </div>
 </template>
 
@@ -440,6 +469,12 @@ import { ref, computed } from 'vue'
 import type { EntityVerifyRow } from './entityVerifyTypes'
 import FieldHintIcon from './FieldHintIcon.vue'
 import { CONFIRMATION_DICTS, fallbackOptions } from '../coordination/confirmationDicts'
+// 源模板 X0-2 `A27:A41` 五条编制说明（只读方法论上下文，真源在后端守卫锁死）
+import {
+  ENTITY_VERIFY_GUIDANCE,
+  ENTITY_VERIFY_GUIDANCE_TITLE,
+  ENTITY_VERIFY_GUIDANCE_TITLE_ANCHOR,
+} from './entityVerifyGuidance'
 
 /**
  * 地址不一致的核实方式 —— 源模板 X0-2!L7 数据验证 6 项，单一真源在
@@ -528,5 +563,40 @@ function getDictOptions(dictKey: string): string[] {
 }
 .entity-verify-detail__src-hint p {
   margin: 0;
+}
+
+/* 编制说明折叠区（源模板 X0-2 A27:A41，Task 13 / R8.4） */
+.entity-verify-detail__guidance {
+  margin-top: 12px;
+}
+.entity-verify-detail__guidance-anchor {
+  margin-left: 6px;
+  font-size: 11px;
+  color: #909399;
+  font-weight: normal;
+}
+.entity-verify-detail__guidance-item {
+  margin-bottom: 10px;
+}
+.entity-verify-detail__guidance-item:last-child {
+  margin-bottom: 0;
+}
+.entity-verify-detail__guidance-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #b88230;
+  margin-bottom: 4px;
+}
+.entity-verify-detail__guidance-title-anchor {
+  margin-left: 4px;
+  font-size: 11px;
+  color: #909399;
+  font-weight: normal;
+}
+.entity-verify-detail__guidance-line {
+  margin: 0 0 3px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: #606266;
 }
 </style>

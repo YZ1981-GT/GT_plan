@@ -1240,26 +1240,6 @@ jobs:
       - name: Run note L-cycle structure contract tests
         run: python -m pytest backend/tests/test_note_l_cycle_structure.py -q
 
-  note-m-equity-structure:
-    # 附注 M 循环权益类变动表章节结构守卫
-    # （disclosure-sync-path-buildout Task 5，批 4）
-    # 覆盖 资本公积（五、55/八、60）/ 盈余公积（五、59/八、62）/ 专项储备（五、58/八、61）。
-    # 背景：6 张表名 / 表头 / 行骨架均正确（源模板单行表头），但 columns 与 guidance 全缺
-    # → seed 路径走 `_infer_groups_from_headers` 前缀推断（「本期增加」「本期减少」共享
-    # 「本期」前缀 → 凭空造「本期」父表头）。国企八、61 专项储备源模板含第 6 列「备注」。
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - name: Check note M-cycle equity section alignment (五、55/八、60/五、59/八、62/五、58/八、61)
-        run: python backend/scripts/fix/fix_note_m_equity_structure.py --check
-      - name: Install test dependency
-        run: python -m pip install pytest==8.4.2
-      - name: Run note M-cycle equity structure contract tests
-        run: python -m pytest backend/tests/test_note_m_equity_structure.py -q
-
   note-k-cycle-structure:
     # 附注 K 系章节结构 + sheet 名守卫（批 1 损益类 K8~K13 + 批 2 负债/递延类 K3/K4/K5/K7）
     # （k-cycle-disclosure-alignment 批 1）
@@ -1820,6 +1800,11 @@ jobs:
     # （m-cycle-four-table-extraction-and-disclosure-alignment Task 4）
     # 背景：M 循环 11 个章节原本 columns 全缺、两级表头被压扁成单级、
     # 五、60 一般风险准备甚至 tables=0（整章零表格）、八、94 新建。
+    # 另（原 disclosure-sync-path-buildout 批 4 的同名 job 已并入本 job，命令逐字相同）：
+    # 资本公积（五、55/八、60）/ 盈余公积（五、59/八、62）/ 专项储备（五、58/八、61）
+    # 6 张表名/表头/行骨架均正确（源模板单行表头），缺 columns 会让 seed 路径走
+    # `_infer_groups_from_headers` 前缀推断 →「本期增加」「本期减少」共享「本期」前缀
+    # ⇒ 凭空造「本期」父表头；国企八、61 专项储备源模板含第 6 列「备注」。
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -2671,6 +2656,67 @@ jobs:
           tests/four_table/test_legacy_encoding_balances_stay_zero.py
           -v --tb=short -rs
 
+  report-config-account-integrity:
+    # `report_config` 科目码完整性守卫（spec report-config-account-code-integrity R6）
+    #
+    # 背景：这张表此前**零一致性校验** —— `row_name` 与 formula 引用科目的实际名从不比对，
+    # 错码可以静默存在数年（两次被动修复中还有一次前提本身就是错的：V136 的 WHERE
+    # 从不命中 0 行影响，因为它假设 BS-082 是专项储备，实际那行叫「其他权益工具」）。
+    # V138 一次修掉 13 行；本 job 防它再漂回去。
+    #
+    # 三层守卫：
+    # 1. **连库**一致性（`test_report_config_account_integrity`）—— 名称比对限定
+    #    余额类报表 + 去重后单码（多码合成行/流量表/「其中：」明细行各有反例，
+    #    第一版判据因此误报约 40 行，全是判据缺陷不是数据问题）；
+    #    另含双算检测（按 `(报表, 完整码, 取数列)` 归并，按 head 归并会误判三组）
+    #    与「全表 formula 只允许 TB/SUM_TB/ROW」的函数名封顶。
+    # 2. **第二写入路径镜像**（`test_report_formula_filler_mirror`，不连库）——
+    #    `ReportFormulaService.fill_all_formulas()` 按**行名**索引且只填 NULL 行，
+    #    恰好正是 V138 置 NULL 的那批 ⇒ 不锁死就等于 V138 白做。
+    # 3. **接缝防过期**（`test_cycle_specs_row_code_evidence`，不连库）——
+    #    与 `CODE_CORRECTIONS` 交叉锁死：已改对的行留在 `_WRONG_FORMULA_ROWS` 即打红，
+    #    防 `trust_report_config=False` 这类临时防护静默长存（关掉层③是有代价的）。
+    #
+    # 🔴 只读，不写库；`-rs` 让「PG 不可达」的 skip 原因出现在日志里（静默 skip 是假绿源）。
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: audit_platform
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt -q
+      - name: Run migrations (report_config + four-table schema, applies V138)
+        run: python -c "import asyncio; from app.core.migration_runner import MigrationRunner; asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform').run_pending())"
+      - name: report_config account-code integrity (live DB, read-only)
+        run: >-
+          python -m pytest
+          tests/four_table/test_report_config_account_integrity.py
+          -v --tb=short -rs
+      - name: Second write path mirrors V138 (report_formula_service)
+        run: python -m pytest tests/four_table/test_report_formula_filler_mirror.py -q
+      - name: V138 seam does not silently expire (cross-lock CODE_CORRECTIONS)
+        run: python -m pytest tests/four_table/test_cycle_specs_row_code_evidence.py -q
+
   h0-confirmation-fidelity:
     # H0 固定资产循环函证源模板保真度守卫
     # （h0-confirmation-source-fidelity-and-linkage R12.6）
@@ -3096,4 +3142,833 @@ jobs:
         run: >-
           npx vitest run
           src/components/deliverable/__tests__/deliverableLineageDisplay.spec.ts
+        working-directory: audit-platform/frontend
+  sampling-evaluation-governance-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test dependencies
+        run: python -m pip install pytest==8.4.2 pytest-asyncio==0.24.0 hypothesis==6.112.1 sqlalchemy==2.0.36
+
+      # R1：撤销回填必须同步软删两张投影表（改造前撤销后投影仍活着 →
+      # 跨底稿排除/重复检测/项目级统计四个消费方全部被污染）
+      - name: Run undo projection guards
+        run: python -m pytest backend/tests/test_sampling_undo_registration.py -q --tb=short
+
+      # R6：QC 引擎门控三态。改造前 qc_rule_definitions 空表 → active_rules 为
+      # 空集 → 全部 20 条内置规则静默不执行且无 WARNING（真实库实测 0 行）
+      - name: Run QC engine rule gating guards
+        run: python -m pytest backend/tests/test_qc_engine_rule_gating.py -q --tb=short
+
+      # R7：QC-12 判据重写（改造前遍历 SamplingConfig 0 行 → 循环体永不执行）
+      - name: Run sampling QC rule guards
+        run: python -m pytest backend/tests/test_sampling_qc_rules.py -q --tb=short
+
+      # R8：归档章节 06 + 完整性第 5 类
+      - name: Run archive sampling section guards
+        run: python -m pytest backend/tests/test_archive_sampling_records_section.py backend/tests/test_archive_completeness_report.py -q --tb=short
+
+      # R10：复核 prompt 前后端交叉锁死（前端新增 sampling-* section 必须后端跟上）
+      - name: Run sampling review prompt cross-lock guards
+        run: python -m pytest backend/tests/test_review_dialog_sampling_prompts.py -q --tb=short
+
+      # 诊断脚本必须可导入且全部 import 符号与真实导出对账一致 ——
+      # 本轮连踩 3 次「import 名不符被运行时才炸」，get_diagnostics 零诊断
+      - name: Assert live verifier imports resolve (no stale symbol names)
+        run: |
+          python - <<'PY'
+          import ast, importlib, pathlib, sys
+          sys.path.insert(0, 'backend')
+          p = pathlib.Path('backend/scripts/diagnose/verify_sampling_governance_live.py')
+          tree = ast.parse(p.read_text(encoding='utf-8'))
+          bad = []
+          checked = 0
+          for node in ast.walk(tree):
+              if isinstance(node, ast.ImportFrom) and node.module and node.module.startswith('app'):
+                  try:
+                      mod = importlib.import_module(node.module)
+                  except Exception as exc:
+                      bad.append((node.module, '<module>', type(exc).__name__))
+                      continue
+                  for alias in node.names:
+                      checked += 1
+                      if hasattr(mod, alias.name):
+                          continue
+                      # `from app.services import archive_section_registry` 形态：
+                      # 子模块未被父包加载时 hasattr 为 False，须显式再导一次
+                      try:
+                          importlib.import_module(f'{node.module}.{alias.name}')
+                      except Exception:
+                          bad.append((node.module, alias.name, 'AttributeError'))
+          if bad:
+              print('::error::诊断脚本引用了不存在的符号（会在运行时才炸）:', bad)
+              sys.exit(1)
+          if checked == 0:
+              print('::error::未扫到任何 app.* 导入，自检可能已空转')
+              sys.exit(1)
+          print(f'all {checked} imported symbols resolve')
+          PY
+
+  sampling-evaluation-governance-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: audit-platform/frontend/package-lock.json
+      - name: Install deps
+        run: npm ci
+        working-directory: audit-platform/frontend
+
+      # Wave 1：覆盖率阈值单一真源 + 合规检查判据纠正
+      - name: Run coverage threshold + compliance criteria guards
+        run: npx vitest run src/components/workpaper/__tests__/samplingCoverageThreshold.spec.ts src/components/workpaper/__tests__/samplingComplianceCriteria.spec.ts
+        working-directory: audit-platform/frontend
+
+      # Wave 2：未检查样本处置 / 偏差性质（复用 C 类口径）/ 分层层内评价 / 确认门控
+      - name: Run evaluation closure guards
+        run: npx vitest run src/components/workpaper/__tests__/samplingUncheckedDisposition.spec.ts src/components/workpaper/__tests__/samplingDeviationNature.spec.ts src/components/workpaper/__tests__/stratifiedMisstatement.spec.ts src/components/workpaper/__tests__/samplingConfirmGating.spec.ts
+        working-directory: audit-platform/frontend
+
+      # Wave 4：属性抽样接线（消费方存在性）+ 复核入口
+      - name: Run attribute sampling wiring + review wiring guards
+        run: npx vitest run src/components/workpaper/__tests__/attributeSamplingWiring.spec.ts src/components/workpaper/__tests__/samplingReviewWiring.spec.ts
+        working-directory: audit-platform/frontend
+
+      # 零回归：既有抽样算法测试不得被本次改动打破（签名从位置参数改为 options）
+      - name: Run existing sampling algorithm regression
+        run: npx vitest run src/components/workpaper/__tests__/useSamplingAlgorithms.spec.ts src/components/workpaper/__tests__/useSamplingAlgorithms.attribute.spec.ts src/components/workpaper/__tests__/useSamplingAlgorithms.methodology.spec.ts
+        working-directory: audit-platform/frontend
+
+  l0-confirmation-alignment:
+    # L0 债务循环函证源模板对齐（l0-confirmation-source-alignment Task 19）
+    # 四个后端守卫 + 两个幂等脚本 --check：
+    # 1. 源模板事实：9 visible + 1 hidden 的 sheet_state / 底稿目录 8 行索引 / L0-1 五段合并
+    #    表头与 28 列字面 / 8 指标 SUMIF 公式 / 2 品种字面 / L0A 12 条程序含分类与索引号 /
+    #    四处**真实** DV（含反向自检：镜像残留 sqref `JK8:JL27` 存在于文件但不覆盖真实列）/
+    #    三处索引号笔误 —— 判 DV 一律 `coord in dv.sqref` 逐格测试，禁按打印顺序取第一个；
+    # 2. L0A 程序表：`get_template('L0A')` 由 None → 12 条（改造前 `resolve_program_template_code`
+    #    回退 F0A、加载「采购存货循环」程序且 ref_index 全为 F0-*）+ 字段名必须是 `content`
+    #    （服务侧以 `item["content"]` 必填读取，写 `description` 会 KeyError；无 `hint` 透传通道）；
+    # 3. 公式预设：sheet 必须是源 xlsx 真实 tab（`审定表L0-1` 不存在）+ account_codes 禁
+    #    `2001`/`2501`（短期/长期银行借款，正是 L0A 程序 1 明确排除的）+ 禁区间 `SUM_TB`/`TB_SUM`
+    #    + cell_ref 必须是矩阵手工覆盖键且 formula_type 为 PLACEHOLDER（写 `TB()` 会让「按码取到
+    #    的 0」伪装成审计师手填值，压住语义定位的 undefined，使「无此科目」与「余额为 0」不可区分）；
+    # 4. render sheets：L0 隐藏 sheet 走 `{wp_code}-{sheet_name}` **复合键** skip（接在既有三条
+    #    判定之后，既有命中路径优先）—— `函证差异检查表（示例）` 在 D0/F0 是 visible，按裸名标
+    #    skip 会连它们的真实页签一起杀掉；含 characterization（全库既有 skip 条目逐条不受影响）。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt -q
+        working-directory: backend
+      # 🔴 pytest 一律从**仓库根**跑 —— 从 backend/ 跑会让用相对路径读
+      #    `backend/wp_templates/...` 的守卫拼成 `backend/backend/...` 而假红。
+      - name: L0 source template facts (openpyxl direct read + mirror-sqref self-check)
+        run: python -m pytest backend/tests/test_l0_source_template_facts.py -q
+      - name: L0A procedure template (get_template no longer falls back to F0A)
+        run: python -m pytest backend/tests/test_l0a_program_template.py -q
+      - name: L0 book amounts (reuse l_cycle_specs L5/L4 + three-state)
+        run: python -m pytest backend/tests/four_table/test_l0_book_amounts.py -q
+      - name: L0 render sheets (compound-key skip, D0/F0 not harmed)
+        run: python -m pytest backend/tests/test_l0_render_sheets.py -q
+      - name: L0A program template idempotent check
+        run: python scripts/fix/fix_l0a_program_template.py --check
+        working-directory: backend
+      - name: L0 prefill presets idempotent check
+        run: python scripts/fix/fix_l0_prefill_presets.py --check
+        working-directory: backend
+
+  l0-confirmation-frontend:
+    # L0 函证前端守卫（l0-confirmation-source-alignment Task 19）
+    # 覆盖五条改造线：
+    # - 品种矩阵（2 品种 × 8 指标；与 F0 的**同源性**断言 = D-2 分叉对冲；比例列
+    #   `ISERROR` 兜底返 0 而 F0/G0 返 null，该差异已登记待收敛 spec 吸收）
+    # - 下区四块（6 样本项 + 5 说明段逐字对源格；三处「一句话被源模板拆两格」必须合并渲染；
+    #   **field 持久化键逐字断言** —— 长度/label/source_ref 三条都拦不住键名漂移，
+    #   而键漂移 = 既有项目已录入内容读不回来）
+    # - 列集与标签覆盖（撤伪列 send_memo 但字段不删 + 剔三列空列 + 渠道与函证类型显式区分 +
+    #   13 处 label 逐条对源模板 + **VARIANT_COLUMN_DEFS 顶层键唯一性** —— 本轮实测查出
+    #   `l0_row_conclusion` 被重复定义两次，JS 静默取后者，四层验证全查不出）
+    # - sheet 定位/展示分离（三处索引号笔误 → 展示 L0A/L0-4/L0-3 + tooltip；
+    #   `L0-1!S33` 的「（L0-6）」是**正确**索引号，不得被当笔误改掉）
+    # - 下区接线（标签存在性断言带标签名边界 `<L0SummaryLowerZone(?=[\s/>])`；
+    #   共享 `ConfirmationSampling` 对 L0 用 `v-if="!isL0"` 排除 —— L0 的 6 项在下区
+    #   专属组件内，两处都渲染会形成双真源）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: audit-platform/frontend/package-lock.json
+      - name: Install deps
+        run: npm ci
+        working-directory: audit-platform/frontend
+      - name: Run L0 confirmation frontend guards
+        run: >-
+          npx vitest run
+          src/components/workpaper/confirmation/l0-confirmation
+          src/components/workpaper/confirmation/__tests__/l0LowerZoneWiring.spec.ts
+          src/components/workpaper/confirmation/__tests__/l0-integration.spec.ts
+          src/components/workpaper/confirmation/__tests__/useL0FormulaEngine.pbt.spec.ts
+          src/components/workpaper/confirmation/__tests__/confirmationColumnSpec.spec.ts
+        working-directory: audit-platform/frontend
+
+  parent-company-note-chapter:
+    # 母公司附注章节结构与取数（parent-company-note-chapter-and-sourcing Task 17）
+    # 四个后端守卫 + 幂等脚本 --check + 变异检验 + 真实库诚实报告：
+    # 1. 结构守卫：判据真源是 docs/模版/ 两份 docx（python-docx 直读 Heading 1），
+    #    不得以 note_template_*.json 自证；源 docx 缺失必须明确失败不静默跳过。
+    #    两版子节集合**不对称且禁对齐**（listed 独有「应收票据」/ soe 独有
+    #    「现金流量表补充资料」）；soe 长期股权投资表 1(5 列)/表 2(7 列) 结构**已正确**，
+    #    只有表 3 与 listed 全部 3 表需还原两级表头 —— 按「三张全压扁」的错误前提
+    #    改会破坏正确结构。
+    # 2. 口径守卫：resolve_parent_standalone_project 三条件（company_code /
+    #    audit_year / report_scope='standalone'）齐备，去掉任一条必红；与展示层
+    #    project_display.get_project_display_name（函数名逐字为此，按 build_* 写会
+    #    0 命中空转）交叉锁死。
+    # 3. 取数守卫：母公司章 ctx 切到母公司单体项目；**兄弟项目缺失时 _tb_cache 置空
+    #    ⇒ 金额 None 而非 0**（回落合并缓存是错数，比取不到更坏）；resolution_failed
+    #    与 is_consolidated=False 必须两态。另含本轮实测的两个 P0 回归钉子 ——
+    #    _attach_parent_source_meta 必须**返回 table_data** 且容忍 ctx=None，
+    #    否则 legacy 路径对每张无 binding 的表返 None / 抛 AttributeError（四层验证全绿）。
+    # 4. 报表守卫：_load_parent_row_index 不得再引用 parent_company_code（**上级公司**
+    #    ≠ 同代码 standalone 兄弟）。判据必须剥 docstring —— 代码级 0 处、docstring
+    #    3 处是需求 9.1 要求写明的口径对比说明，裸 count() 会误红。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt -q
+        working-directory: backend
+      # 🔴 pytest 一律从**仓库根**跑 —— 从 backend/ 跑会让用相对路径读
+      #    docs/模版/*.docx 与 backend/data/*.json 的守卫拼成 backend/backend/... 而假红
+      - name: Parent company chapter structure (source docx three-way)
+        run: python -m pytest backend/tests/test_note_parent_company_chapter.py -q
+      - name: Parent company scope helper (three conditions + display cross-lock)
+        run: python -m pytest backend/tests/test_parent_company_scope.py -q
+      - name: Parent company note sourcing (ctx switch, blank-not-zero, provenance)
+        run: python -m pytest backend/tests/test_parent_company_note_sourcing.py -q
+      - name: Report parent column scope (old behaviour reproduced must fail)
+        run: python -m pytest backend/tests/test_report_parent_column_scope.py -q
+      - name: Exporter parent column end-to-end (same-code standalone sibling)
+        run: python -m pytest backend/tests/test_financial_template_cell_mapping.py -q
+      - name: variant_matrix additive (parent_company_sections, 102 variants unchanged)
+        run: python -m pytest backend/tests/test_variant_matrix_null_audit.py -q
+      - name: Parent company chapter idempotent check
+        run: python backend/scripts/fix/fix_note_parent_company_chapter.py --check
+      - name: Mutation check (every guard must go red, then restore)
+        run: python backend/scripts/diagnose/mutate_parent_company_note_guards.py
+      # 真实库验收：无合并项目时诚实输出「无法验收」并 exit 0（禁 fixture 冒充）。
+      # CI 无 DB ⇒ 脚本连不上库返 2，故用 || true 只作烟测；真实验收在本地/预发跑。
+      - name: Live verification (honest report; DB-less in CI)
+        run: python backend/scripts/diagnose/verify_parent_company_note_live.py || true
+
+  parent-company-note-frontend:
+    # 母公司章取数溯源的前端消费方（Task 13）
+    # 🔴 防「dead output」——后端 payload 落了三项溯源但前端零消费方的形态在本 spec
+    #    真实出现过（改造前 `_parent_company_source` 全前端 0 命中）。守卫直读后端
+    #    parent_company_note_sections.py 抽常量做跨前后端交叉锁死，并断言
+    #    DisclosureEditor.vue 真的渲染了横幅（标签名带边界，防被改名骗过）。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: audit-platform/frontend/package-lock.json
+      - name: Install deps
+        run: npm ci
+        working-directory: audit-platform/frontend
+      - name: Run parent company note source guards
+        run: >-
+          npx vitest run
+          src/views/composables/__tests__/parentCompanyNoteSource.spec.ts
+        working-directory: audit-platform/frontend
+
+  h-cycle-extraction-formula:
+    # H 类取数/公式/披露收口（h-cycle-extraction-formula-and-disclosure-completion Task 16）
+    #
+    # 覆盖本 spec 的后端判据真源：
+    # 1. 双族并取（Task 1/6/8/9）—— `1641|1651` / `1642|1652` / `2601|2651` 在**同一项目内
+    #    互斥**（9 项目逐个核，唯一并存的 0ec33ac9 双方均 0.00）⇒ `TB(a)+TB(b)` 零双算。
+    #    改 report_config 前后 8 个单族项目取值必须逐分不变。
+    # 2. 列别名（Task 2/4）—— `本期借方`/`本期贷方` 未注册时 `_handle_tb` 会**静默回退
+    #    期末余额**（数字错不是取不到），且 **AST 与 regex 两条求值路径都要改**，
+    #    只改一条守卫仍红。
+    # 3. 预设科目自洽（Task 3/7）—— 公式里的科目码 ⊆ 该块 accounts 声明 ∪ 双族 alternate
+    #    ∪ PLACEHOLDER；抽码时**必须先整体消费 `SUM_TB('a~b')` 的区间端点**
+    #    （否则 H1-3 的上界 1604 会被当成「引用了在建工程」误报）。
+    # 4. 会计政策章（Task 13）—— 裁决者是 docs/模版/ 两份附注源 docx，按
+    #    `paragraph.style.name == 'Heading N'` 定位（**docx 章号是 Word 自动编号，
+    #    段落文本不含「三、」，用 `^N、` 正则会 0 命中**）；两份 docx 层级不同构
+    #    （listed Heading 2 = 节 / soe Heading 3 = 节、局部到 Heading 5），
+    #    且同名 heading 在会计政策章与项目注释章各出现一次 → 必须取首次。
+    # 5. 可扩标记（Task 15）—— `……` 作**列头**要展开、作**行**是真实可扩位要保留
+    #    （两种语义处理方式相反）；H7-soe 已改动态类别行 ⇒ 有意不 seed。
+    #
+    # 🔴 pytest 一律从**仓库根**跑 —— 从 backend/ 跑会让 16 个用相对路径读
+    #    backend/wp_templates/**.xlsx 与 docs/模版/*.docx 的守卫拼成 backend/backend/...
+    #    而假红（实测 four_table 从 backend/ 跑 17 failed、从仓库根跑 0 failed）。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt -q
+        working-directory: backend
+      - name: Column alias coverage (both AST and regex paths)
+        run: python -m pytest backend/tests/test_formula_column_alias_coverage.py -q
+      - name: H cycle preset account coherence (range endpoints excluded)
+        run: python -m pytest backend/tests/test_h_cycle_preset_account_coherence.py -q
+      - name: H1~H4 adjudication prefill (no account => no key)
+        run: python -m pytest backend/tests/four_table/test_h_cycle_adjudication_prefill.py -q
+      - name: Accounting policy chapter (source docx is the arbiter)
+        run: python -m pytest backend/tests/test_note_h_policy_chapter_structure.py -q
+      - name: Right-of-use note structure (incl. source-docx text_sections cross-check)
+        run: python -m pytest backend/tests/test_note_h8_right_of_use_structure.py -q
+      - name: Expandable row marks (header expand vs row keep, per-cycle policy)
+        run: python -m pytest backend/tests/test_h_cycle_expandable_rows.py -q
+      - name: Accounting policy chapter idempotent check
+        run: python backend/scripts/fix/fix_note_h_policy_chapter_structure.py --check
+      - name: H cycle preset fix idempotent check
+        run: python backend/scripts/fix/fix_h_cycle_prefill_presets_phase2.py --check
+      # 双族真源守卫连库（CI 无 DB ⇒ 只作烟测，真实验收在本地/预发跑）
+      - name: Dual family codes (DB-backed evidence; DB-less in CI)
+        run: python -m pytest backend/tests/four_table/test_dual_family_codes.py -q || true
+      # 变异检验（Task 17）：8 个变异必须逐条打红并还原；GREEN 或 ANCHOR-MISS ⇒ 非零退出。
+      # 🔴 本步曾判出 3 个 GREEN，暴露 Task 6「H8/H9 兜底码接双族」是**假绿** ——
+      #    scope 里仍写单族字面量 `("1641",)`，而守卫只测双族真源自身、
+      #    一条都没钉「谁在用它」。补「运行时值比对 + 源码级禁字面量」双层判据后转红。
+      - name: Mutation check (every guard must go red, then restore)
+        run: python backend/scripts/diagnose/mutate_h_cycle_guards.py
+
+  h-cycle-frontend:
+    # H 类前端守卫（Task 10/11/12/15）
+    #
+    # 🔴 这四条都是「四层验证全绿、只有浏览器/守卫能发现」的形态：
+    # - Task 10：Vue 对**传不存在的 prop** 不报错（落到根元素当 HTML 属性），
+    #   G5 的溯源面板曾因此从未渲染过 ⇒ 守卫从面板 defineProps **动态抽**合法 prop 名比对。
+    # - Task 11：`H5_NOTE_SECTION.listed ?? '五、油气资产'` —— 该常量连 listed 键都没有，
+    #   `??` 恒取右值 ⇒ 向 AI/复核下发**虚构章节号**。
+    # - Task 12：element-plus 2.13.6 的 input-number **不存在 formatter prop**
+    #   ⇒ 存量 `:formatter` 全是空操作、千分符从未生效；替换须双向锁死
+    #   （金额列必须 WpAmountInput / 4 个比率列必须保持 el-input-number）。
+    # - Task 15：`blankRows(p, Math.max(seed.length, 1))` 用 `\(([^)]*)\)` 取实参会被
+    #   截成 `, 1` 而误判成写死行数 ⇒ 判据必须按圆括号配对。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: audit-platform/frontend/package-lock.json
+      - name: Install deps
+        run: npm ci
+        working-directory: audit-platform/frontend
+      - name: H3 source panel wiring (unknown props are silently dropped by Vue)
+        run: >-
+          npx vitest run
+          src/components/workpaper/h3/__tests__/h3SourcePanelWiring.spec.ts
+        working-directory: audit-platform/frontend
+      - name: H5 listed disclosure not-applicable (no fabricated section number)
+        run: >-
+          npx vitest run
+          src/components/workpaper/h5/__tests__/h5ListedNotApplicable.spec.ts
+        working-directory: audit-platform/frontend
+      - name: "H cycle amount controls (two-way lock: amount vs rate columns)"
+        run: >-
+          npx vitest run
+          src/components/workpaper/__tests__/hCycleAmountControl.spec.ts
+        working-directory: audit-platform/frontend
+      - name: H cycle no aging enum + no hardcoded skeleton rows
+        run: >-
+          npx vitest run
+          src/components/workpaper/__tests__/hCycleNoAgingEnum.spec.ts
+        working-directory: audit-platform/frontend
+      - name: H disclosure AI wiring (H5 listed must stay not-applicable)
+        run: >-
+          npx vitest run
+          src/components/workpaper/composables/__tests__/hDisclosureAiWiring.spec.ts
+        working-directory: audit-platform/frontend
+
+  d-cycle-four-table-completion:
+    # D 类取数 / 公式预设 / 披露附注收口后端守卫
+    # （d-cycle-four-table-extraction-and-disclosure-completion Task 28）
+    #
+    # 覆盖本 spec 的判据真源，五类都是「四层验证全绿、只有真实数据或守卫能发现」的形态：
+    # 1. 语义槽与备抵名称过滤（Task 11/12）—— 共享件 `fetch_d_cycle_tb` 用
+    #    `getattr(codes, 'subject_keywords', ())` 读行为开关型字段，而 `D1AccountCodes`
+    #    改造前**没有该字段** ⇒ 默认值 `()` 恰好就是「功能关闭」，D1 备抵取到整个 `1231`
+    #    （一个项目 1.02 亿）。守卫要求同域全部 dataclass 都真有该字段且非空。
+    # 2. 公式预设自洽（Task 18~21）—— sheet 名必须是源 xlsx 真实 tab；`PREV()` 目标必须
+    #    是真实 tab（**不是**「必须指向自己 sheet」，明细表取上年审定数是平台既有范式）；
+    #    「明细表不得引用审定表」只禁**同 wp_code 内**（跨循环引用如 D0→D2 是合法分母）。
+    # 3. 母公司附注章禁删（Task 22）—— 立项的「孤儿重复章」实为 listed 十六章 / soe 十二章
+    #    母公司附注的正当子节（`parent_section_id` + `scope='consolidated_only'` 双证），
+    #    删它等于删整章。锁死的不变量是**归属关系**，不是「columns 全 0」那种会被
+    #    并发会话补列打红的观测值；且诊断脚本本体必须只读（禁 `--apply`/`db.delete(`）。
+    # 4. D3 枚举单一真源（Task 26）—— `审定表D3-1!B8=SUMIF(D3-2!$C$12:$C$22, A8, ...)`
+    #    ⇒ D3-2 的 C 列是联动键，两侧标签必须逐字相同。openpyxl 三向锁死
+    #    （源 xlsx DV ↔ 审定表行名 ↔ 前端 `d3NatureCategories.ts`）。
+    #    顺带登记源模板两处缺陷（C23 挂了另一套 6 项枚举 / SUMIF 到 R22 而合计含 R23）。
+    # 5. D4（4）分解信息表行列（Task 31）—— 源模板 9 列 9 行，**无横向合计列**（合计是行），
+    #    父行是 SUM 且覆盖空可扩行。改造前自造 `total_revenue`/`total_cost` 两列。
+    #
+    # 🔴 pytest 一律从**仓库根**跑：多个守卫用相对路径读 `backend/wp_templates/**.xlsx`，
+    #    从 backend/ 跑会拼成 `backend/backend/...` 而假红（FileNotFoundError 表现为
+    #    文件级失败、零断言执行，极易被当噪声跳过）。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt -q
+        working-directory: backend
+      - name: D cycle semantic slots evidence (subject_keywords must exist on all dataclasses)
+        run: python -m pytest backend/tests/four_table/test_d_cycle_specs_evidence.py -q
+      - name: D cycle TB fetch (provision name filter must not be a no-op)
+        run: python -m pytest backend/tests/d_cycle_extraction/test_d_tb_fetch.py -q
+      - name: D cycle render characterization (gray flag on/off byte-equivalent)
+        run: python -m pytest backend/tests/d_cycle_extraction/test_d_render_characterization.py -q
+      - name: D cycle prefill presets (sheet names / PREV targets / no cross-ref cycles)
+        run: python -m pytest backend/tests/test_d_cycle_prefill_presets.py -q
+      - name: Parent-company note chapters must not be deleted (ownership invariant)
+        run: python -m pytest backend/tests/services/test_note_d_orphan_sections.py -q
+      - name: D3 nature/relation enums locked to source xlsx (three-way)
+        run: python -m pytest backend/tests/services/test_d3_nature_categories.py -q
+      - name: D4 segment table rows/columns match source template (9x9, no total column)
+        run: python -m pytest backend/tests/services/test_note_d4_segment_structure.py -q
+      - name: D cycle prefill preset fix idempotent check
+        run: python backend/scripts/fix/fix_d_cycle_prefill_presets.py --check
+      - name: D cycle disclosure preset fix idempotent check
+        run: python backend/scripts/fix/fix_d_cycle_disclosure_presets.py --check
+      - name: D4 segment structure fix idempotent check
+        run: python backend/scripts/fix/fix_note_d4_segment_structure.py --check
+      - name: D cycle amount control fix idempotent check
+        run: python backend/scripts/fix/fix_d_cycle_amount_inputs.py --check
+      # 只读诊断（母公司章归属 + D 类合并章列元数据健康度），连库故在 CI 里只作烟测
+      - name: Note section hygiene diagnose (read-only; DB-less in CI)
+        run: python backend/scripts/diagnose/diagnose_d_cycle_note_section_hygiene.py --strict || true
+
+  d-cycle-four-table-completion-frontend:
+    # D 类前端守卫（Task 17 / 23 / 24 / 25 / 26 / 31）
+    #
+    # 🔴 五条都是「`get_diagnostics` 与 vitest 各自全绿、缺口只在跨文件接缝」的形态：
+    # - Task 17：`tb_source_codes` 在 D 类落 `html_data` **顶层**而 D4 落 `project_context`
+    #   （平台两套约定并存）；且 6 个宿主改造前**漏传 `:html-data`** ⇒ 消费方恒 undefined。
+    # - Task 23：动态列稳定键取「现有列表 max+1」会**复用已删序号**（删 cat_4 再新增又得
+    #   cat_4，历史 cell 串列）⇒ 必须持久化单调计数器。
+    # - Task 24：D3/D7 的账龄枚举判据不能按「grep 账龄信号」（立项据此误判）。
+    # - Task 25：element-plus 2.13.6 的 input-number **无 formatter prop** ⇒ 存量
+    #   `:formatter` 全是空操作，金额列必须 `WpAmountInput`；比例/账龄天数列反向锁死。
+    # - Task 26：D3-2 C 列曾内联硬编码四个性质 label，与 `NATURE_ROWS` 双真源 ⇒ 改一处
+    #   另一处不动即 SUMIF 匹配不上、该性质行恒 0。守卫按 `el-table-column` 块精确定位，
+    #   并反向锁死禁按 `2203` 子科目名建 D3-2 行（行维度是「对方单位」）。
+    # - Task 31：（4）表派生格必须**读时派生**（父行/合计行不可写），列定义禁自造合计列。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: audit-platform/frontend/package-lock.json
+      - name: Install deps
+        run: npm ci
+        working-directory: audit-platform/frontend
+      - name: D cycle account scope + host prop wiring (dead output guard)
+        run: >-
+          npx vitest run
+          src/components/workpaper/composables/__tests__/dCycleAccountScope.spec.ts
+          src/components/workpaper/composables/__tests__/dHostPropWiring.spec.ts
+        working-directory: audit-platform/frontend
+      - name: D cycle TB seed (three-way key names mirror backend)
+        run: >-
+          npx vitest run
+          src/components/workpaper/composables/__tests__/dCycleTbSeed.spec.ts
+        working-directory: audit-platform/frontend
+      - name: D cycle aging enum wiring
+        run: >-
+          npx vitest run
+          src/components/workpaper/composables/__tests__/dCycleAgingWiring.spec.ts
+        working-directory: audit-platform/frontend
+      - name: "D cycle amount controls (two-way lock: amount vs rate/day columns)"
+        run: >-
+          npx vitest run
+          src/components/workpaper/composables/__tests__/dCycleAmountControl.spec.ts
+        working-directory: audit-platform/frontend
+      - name: D3 nature/relation enum single source + no account-keyed detail rows
+        run: >-
+          npx vitest run
+          src/components/workpaper/composables/__tests__/d3NatureCategoryWiring.spec.ts
+        working-directory: audit-platform/frontend
+      - name: D4 segment dynamic columns (monotonic counter, no key reuse)
+        run: >-
+          npx vitest run
+          src/components/workpaper/composables/__tests__/d4RevenueSegmentColumns.spec.ts
+        working-directory: audit-platform/frontend
+      - name: D4 segment rows aligned to source template (derived cells read-only)
+        run: >-
+          npx vitest run
+          src/components/workpaper/composables/__tests__/d4SegmentRowAlignment.spec.ts
+          src/components/workpaper/composables/__tests__/d4DisclosureModel.spec.ts
+          src/components/workpaper/composables/__tests__/d4NoteSectionMap.spec.ts
+        working-directory: audit-platform/frontend
+
+  custom-workpaper-backend:
+    # 自定义底稿（componentType=custom）双模式 + 自定义公式 + 批量创建
+    # （custom-workpaper-dual-mode-formula-and-batch R10.1/R10.4）
+    #
+    # 六个后端守卫：
+    # 1. 恒等坐标投影（xlsx 坐标 == html_data.cells 键；extract_grid 会重编行号，
+    #    照它做「HTML 编辑写回 xlsx」会写进表头区覆盖别的格）；
+    # 2. 单元格写回端点（custom 判定 fail-closed + 只读状态拦截 + 溢出不静默截断）；
+    # 3. 可编辑网格纯函数层（前后端解析交叉锁死）；
+    # 4. 公式求值结果双写 xlsx（xlsx 先、写失败 raise 500 —— xlsx 是唯一权威）；
+    # 5. 独立导出路径（读 xlsx 本体，不调 load_schema、不套 dynamic_table；
+    #    两条导出路径都要分流，否则 WpExportEngine 静默回退空白 workbook）；
+    # 6. 批量创建/预览（per-item savepoint + 三态 + 预览只读 + 上限两侧交叉锁死）。
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt -q
+      - name: Custom workpaper projection (identity coordinates)
+        run: python -m pytest tests/test_custom_workpaper_projection.py -q
+      - name: Custom workpaper cell edit endpoints
+        run: python -m pytest tests/test_custom_workpaper_cells.py -q
+      - name: Custom workpaper export (dedicated path, both routes)
+        run: python -m pytest tests/test_custom_workpaper_export.py -q
+      - name: Custom workpaper batch create + preview
+        run: python -m pytest tests/test_custom_workpaper_batch.py -q
+      - name: Export format whitelist stays in sync (PBT copy)
+        run: python -m pytest tests/test_pbt_export_format.py -q
+
+  custom-workpaper-frontend:
+    # 自定义底稿前端守卫（custom-workpaper-dual-mode-formula-and-batch R10.2）
+    # - 可编辑网格：单元格编辑纯函数层（坐标恒等 / 溢出上报 / 公式格只读）
+    # - 双模式接线：createDualMode（禁 v-model —— 取值 'html'|'onlyoffice' 与
+    #   既有 40+ 处一致，选错会与既有 localStorage 冲突）
+    # - 公式接线：选址语义标签 / 求值结果可见 / 公式清单走 apiPaths / 点击定位
+    # - 批量创建：清单解析双入口 + 门控前置 disabled + 上限与后端交叉锁死
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: audit-platform/frontend/package-lock.json
+      - name: Install deps
+        run: npm ci
+        working-directory: audit-platform/frontend
+      - name: Custom workpaper grid editing + dual mode + formula wiring
+        run: >-
+          npx vitest run
+          src/components/workpaper/custom/__tests__/customGridEditing.spec.ts
+          src/components/workpaper/custom/__tests__/customDualModeWiring.spec.ts
+          src/components/workpaper/custom/__tests__/customFormulaWiring.spec.ts
+        working-directory: audit-platform/frontend
+      - name: Custom workpaper batch list parsing + submit gating
+        run: >-
+          npx vitest run
+          src/components/workpaper/custom/__tests__/customWpBatchParse.spec.ts
+        working-directory: audit-platform/frontend
+  formula-management-runtime:
+    # 公式管理运行层闭环守卫（spec formula-management-runtime-closure R8/R9）
+    #
+    # 背景：该模块「定义层与治理层完整、运行层在真实库空转」——2026-08-06 实证
+    # `wp_formula` 表 0 行 ⇒ `FormulaRuntimeCoordinator._load_formulas` 每次返空并
+    # early-return，整条 mutation plan 流水线从上线起没有真实数据流经过。
+    # 本 job 拦六类已实测缺陷的回退：
+    #
+    # 1. **静默回退期末余额（数字错，不是取不到）** —— `COLUMN_ALIASES` 原只 8 键，
+    #    `本期借方`/`本期贷方`/`借方发生额`/`贷方发生额` 四个未注册，而两条求值路径
+    #    （`_handle_tb` AST 路径 与 `_execute_regex` 降级路径）**都**写
+    #    `account_data.get(resolved_col, account_data.get("期末余额", 0))`
+    #    ⇒ 全库 48 个公式格的「本期增加/减少/计提」列拿到期末余额。
+    #    🔴 规范名必须是 `本期借方`/`本期贷方`（与共享件 `DEBIT_KEY`/`CREDIT_KEY` 一致），
+    #    写成 `借方发生额` 会让共享件与引擎两侧对不上。
+    # 2. **两套互不可见的公式存储** —— 用户公式原落 `parsed_data['user_formulas']`，
+    #    而运行时只 `select(WpFormula)` ⇒ 用户在公式管理里保存的公式**永远不被求值**。
+    #    Wave 3 收敛进 `wp_formula` 表（0 行 = 零迁移压力）；GET 保留读时合并兼容分支，
+    #    该分支必须有守卫钉死，否则下个会话会当死代码删掉（将来某环境有存量即静默丢数据）。
+    # 3. **`WP()` 双实现语义无守卫** —— `prefill_engine` 读 `parsed_data['cells']`（0 行=死）、
+    #    `formula_engine` 读 `ctx.wp_data`；修一份不会修另一份且无人提醒（死链本体归
+    #    `prefill-wp-prev-resolution-repair`，本 spec 只做一致性锁死）。
+    # 4. **三类型只有一类真跑起来** —— `logic_check` 结果原不落库（`cross_check_results`
+    #    0 行）；`_load_formulas` 空结果静默 early-return（现进 `scope_failures`）。
+    # 5. **零回归** —— `_REGISTRY` 14 个内置函数 / `_FORMULA_RESOLVERS` 9 个 resolver
+    #    键集逐字不变；`COLUMN_ALIASES` 原 8 键映射目标逐字不变（改一个就是数字级回归，
+    #    影响 467 格已注册列名公式）；三个 user-formulas 端点响应形状不变。
+    # 6. **诊断脚本四态可复算** —— `ok` / `missing_column` / `no_data` / `no_formula`
+    #    禁合并成「无数据」（合并会让「本项目没数据」与「链路仍是死的」不可区分）。
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend deps
+        run: python -m pip install -r requirements.txt
+      - name: COLUMN_ALIASES coverage + 两条求值路径无静默回退
+        # 🔴 复用 h-cycle spec 已交付的守卫文件（同一不变式禁两份守卫 = 双真源）
+        run: python -m pytest tests/test_formula_column_alias_coverage.py -q
+      - name: 零回归 —— 函数集 / 列名映射 / 响应形状
+        run: python -m pytest tests/test_formula_runtime_zero_regression.py -q
+      - name: 用户公式存储收敛（写表 + GET 读时兼容 + cell_key 往返 PBT）
+        run: python -m pytest tests/test_user_formula_storage_convergence.py -q
+      - name: 三类型执行链定性 + 三张 0 行表登记
+        run: python -m pytest tests/test_formula_type_runtime_status.py -q
+      - name: WP() 双实现语义登记锁死
+        run: python -m pytest tests/test_formula_wp_semantics.py -q
+      - name: 诊断脚本可运行且四态齐备（--no-db，不连库）
+        run: python scripts/diagnose/diagnose_formula_runtime_state.py --no-db --out /tmp/formula_runtime_state.txt
+      - name: 诊断报告须复算出 0 格未注册列名（修复前 48）
+        # 结构性判据：报告里必须出现「0 格 —— Wave 2 修复已生效」，
+        # 出现「仍是修复前的 48 格」即说明 COLUMN_ALIASES 被回退。
+        run: |
+          set -e
+          if grep -q "仍是修复前的 48 格" /tmp/formula_runtime_state.txt; then
+            echo "::error::COLUMN_ALIASES 被回退 —— 48 格公式又在静默取期末余额"
+            exit 1
+          fi
+          grep -q "Wave 2 修复已生效" /tmp/formula_runtime_state.txt
+          echo "✅ 未注册列名格数 = 0"
+
+  formula-management-frontend:
+    # 公式管理前端守卫（spec formula-management-runtime-closure R1/R2/R7）
+    #
+    # 1. **平台级端点存在性** —— 前端公式相关 `/api/` URL 去掉插值后必须 ⊆
+    #    后端真实注册路由（读 `backend/app/routers/**` 抽装饰器交叉锁死，
+    #    **不用手写期望清单**否则与后端漂移）。缺陷 1 那类错配（请求
+    #    `projects/{pid}/workpapers/{wpId}/formulas` + 读 `data.formulas` 而后端返
+    #    `items`）能静默存在数月，正是因为无人钉住；且孤儿文件把坏端点养在死代码里。
+    # 2. **活面板展示四字段** —— `FormulaStatusPanel.vue` 曾丢弃
+    #    `issue_description`/`hint_text`/`last_computed_at`/`refs` 且 `formula_type`
+    #    渲染裸英文值；中文标签必须复用单一真源 `FORMULA_TYPE_LABEL`（禁自建标签表）。
+    # 3. **URL 登记率只升不降** —— formula 域未登记进 `apiPaths` 的硬编码 URL 条目数
+    #    由常量钉死且只许减少（改一个 prefix 原本要手工扫 18 个文件）。
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: audit-platform/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: audit-platform/frontend/package-lock.json
+      - name: Install deps
+        run: npm ci
+      - name: 端点存在性交叉锁死 + 孤儿清单 + 面板展示
+        run: >-
+          npx vitest run
+          src/components/workpaper/composables/__tests__/formulaEndpointExistence.spec.ts
+          src/components/workpaper/__tests__/formulaStatusPanelDisplay.spec.ts
+      - name: apiPaths formula 端点登记率（只升不降）
+        run: >-
+          npx vitest run
+          src/services/apiPaths/__tests__/formulaPaths.spec.ts
+
+  note-columns-legacy-closure:
+    # 附注模板列元数据 / 表名唯一性 / legacy 快照迁移就绪度守卫
+    # （note-template-columns-and-legacy-snapshot-closure Task 2/3/6/21）
+    #
+    # 背景（2026-08-07 实测，立项数字已过期）：
+    # ① 模板 `columns == 0` listed 179 / soe 61；按 scope 分桶后本 spec 作用面 =
+    #    `unregistered` 234 张（母公司章 104 张已由 A spec 补齐、`registry_covered` 6 张归各 per-cycle spec）；
+    # ② 表名是 `sub_table_data` 的**键** —— 空名与章节内重名会让两张表互相覆盖**丢整表**。
+    #    Wave 2 已把 listed 空名 15→0 / 表头泄漏名 97→4 / 含重名表的 section 14→0；
+    # ③ legacy 快照 493 章 / 892 表，其中 205 张「模板有该表但 columns==0」—— 迁过去
+    #    投影会降级成 `_needs_columns`（只显示行名），**比不迁移更糟** ⇒ 列头闸不可绕过。
+    #
+    # 🔴 母公司章排除走 `parent_company_note_sections` 真源（按章节号逐字相等），
+    #    **不是 `section_id` 前缀** —— listed 的 `chapter-12-*` 是「十二、股份支付」不是母公司章。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: python -m pip install pytest==8.4.2 python-docx==1.1.2
+      - name: Check note table names (空名 / 表头泄漏 / 章节内重名)
+        run: python backend/scripts/fix/fix_note_table_names.py --check
+      - name: Check note columns coverage (规则内欠账必须为 0)
+        # Wave 3：规则表 backend/data/note_columns_rules.json 覆盖 85 张，
+        # 已全部 --apply（unregistered cols0：listed 175→105 / soe 59→44）。
+        # 规则外 203 张进 deficits 逐条带原因码（NO_SECTION / COUNT_MISMATCH /
+        # LEN_MISMATCH / CROSS_CHAPTER / EXISTING_DIFFERS），**不得按 JSON headers 兜底补**。
+        run: python backend/scripts/fix/fix_note_columns_coverage.py --check
+      - name: Run note columns coverage guard
+        run: python -m pytest backend/tests/test_note_columns_coverage.py -q
+      - name: Run legacy snapshot readiness guard
+        run: python -m pytest backend/tests/test_legacy_note_snapshot_readiness.py -q
+      - name: Run shared-table segments guard (表名派生的 manifest 不得漂移)
+        run: python -m pytest backend/tests/test_note_shared_table_segments.py -q
+
+  prefill-wp-prev-resolution:
+    # spec: prefill-wp-prev-resolution-repair Task 15
+    #
+    # 修 `prefill_engine` 的 `WP()` / `PREV()` 两个死链 resolver（337 条预设恒返 None），
+    # 并把「预设中文锚点 -> checklist_responses 真实落点」建成单一真源 `prefill_anchor_map`。
+    #
+    # 🔴 本 job **必须带 postgres service** —— 本 spec 最贵的一条教训是：
+    # `read_anchor_value` 曾把 `checklist_responses` 的列名写成不存在的 `workpaper_id`
+    # （真实列名是 `wp_id`），每次取值抛 UndefinedColumnError 被 `_resolve_wp_formula`
+    # 的 `except Exception` 吞成 WARNING ⇒ 8 条已对齐锚点全部仍返 None，而
+    #   * 源码守卫全绿（只查「不许出现 cells」「有没有 ORDER BY」）
+    #   * 44 个纯函数单测全绿（parse_anchor_value 零 DB 依赖）
+    #   * characterization「恒返 None」全绿（与「没修好」不可区分）
+    # ⇒ 「三层验证全绿 + fail-soft 吞异常」正是本 spec 要修的缺陷模式本身。
+    # 唯一防线是 **真实执行**：TestAnchorSqlSchemaContract 连库跑一次每条映射，
+    # 任何异常即打红。没有 DB 的 job 抓不到这类缺陷。
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: audit_platform
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies (uv accelerated)
+        run: |
+          pip install "uv>=0.7"
+          uv pip install --system -r backend/requirements.txt || pip install -r backend/requirements.txt
+      - name: Run migrations (PG schema for connected guards)
+        run: python -c "import asyncio; from app.core.migration_runner import MigrationRunner; asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform').run_pending())"
+        working-directory: backend
+      - name: Anchor map guards (Property 3/4/5/6/7/8/13/14/15/16)
+        # Property 4 是本 spec 最有价值的一条：读前端 composable 源码抽 serializeRows()
+        # 真正写入的字段集，断言 ANCHOR_MAP 每条的 column 都在其中 ——
+        # 把「后端复刻前端派生公式」这一双真源风险变成编译期可检测。
+        run: python -m pytest backend/tests/test_prefill_anchor_map.py -q
+      - name: Resolution guards (cells 零命中 / characterization / SQL schema 契约)
+        # 含 Property 17（连库真跑每条映射）—— 本轮 P0 的唯一防线。
+        run: python -m pytest backend/tests/test_prefill_wp_prev_resolution.py -q
+      - name: Zero regression (八个未触碰 resolver 逐字不变 + 键集不变)
+        run: python -m pytest backend/tests/test_formula_runtime_zero_regression.py -q
+  k0-source-alignment:
+    # K0 管理循环函证源模板对齐（k0-confirmation-source-alignment Task 16）
+    # 两个后端守卫 + 一个幂等脚本 --check：
+    # 1. 源模板事实（openpyxl 直读裁决，不连库可进 CI）：11 sheet（GT_Custom 为 hidden）/
+    #    底稿目录 9 行且序号序列 `[1,2,3,4,5,7,8,9,10]`（**序号 6 缺失是源模板跳号事实**，
+    #    故定位与展示一律以索引号为真源，禁按序号推导底稿数量）/ K0-1 上区 28 列 6 段与
+    #    七条 VLOOKUP 的 col_index / 下区四块锚点与 8 指标 SUMIF（末行 `(E35+E32)/E29`
+    #    **无 ISERROR 兜底**）/ K0-2 38 列 5 段与 DV 覆盖行区**非对称**（提供信息段到 24 行、
+    #    回函与二次发函段到 26 行）/ K0-7 十四列且**无「回函日期」列** / K0-8 19 条迹象 /
+    #    K0A 12 条程序（含 `K0-1/K0-2//K0-4` 双斜杠事实）/ 5 条源模板笔误登记 + 6 组反向自检。
+    # 2. 公式预设：K0 块 sheet 必须是源 xlsx 真实 tab（`审定表K0-1` **不存在**）+ cell_ref
+    #    必须是矩阵手工覆盖键 `K0-1-matrix-{品种}-book_amount`（写裸单元格地址或审定表口径的键
+    #    都落不到矩阵上）+ 七枢纽 sheet 名存在性（E0 的 `审定表E0-1` 是已知预存在缺陷，
+    #    登记白名单且**只许变短**；白名单结构是 `(cycle, sheet) → reason`，因 D0 有三条）。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: pip install -r requirements.txt -q
+        working-directory: backend
+      # 🔴 pytest 一律从**仓库根**跑 —— 从 backend/ 跑会让用相对路径读
+      #    `backend/wp_templates/...` 的守卫拼成 `backend/backend/...` 而假红。
+      - name: K0 source template facts (openpyxl direct read + reverse self-checks)
+        run: python -m pytest backend/tests/test_k0_source_template_facts.py -q
+      - name: K0 formula presets (sheet name exists in source xlsx, 7 hubs)
+        run: python -m pytest backend/tests/test_k0_formula_presets.py -q
+      - name: K0 prefill presets idempotent check
+        run: python scripts/fix/fix_k0_prefill_presets.py --check
+        working-directory: backend
+
+  k0-source-alignment-frontend:
+    # K0 函证前端守卫（k0-confirmation-source-alignment Task 15/16）
+    # 覆盖六条改造线：
+    # - 列集与分段（撤伪列 `send_memo` 但**字段不删**、既有值走 ConfirmationDetail 只读留档；
+    #   剔 `contact_person`/`contact_phone`/`currency` 三列空列噪声；渠道 `send_channel` 与
+    #   `confirmation_method`（准则 1312 积极式/消极式，源外保留列）显式区分；
+    #   15 处 label 与 7 处 group override 逐条对源模板 —— 判据读后端
+    #   `SUMMARY_COLUMN_MAP` 三元组做**跨前后端交叉锁死**，不拿自写 fixture 自证）
+    # - 唯一 label 例外是**已登记的索引号笔误修正**：源 `V6` 字面「调节索引（K1-12）」而平台按
+    #   意图显示「调节索引（K0-4）」，例外由后端 `SOURCE_TEMPLATE_TYPOS` 交叉锁死（禁前端写死）
+    # - 品种矩阵（2 品种 × 8 指标，沿用 H0 范式只 import 不改 `safeRatio`/`sumByCategory`）
+    # - 下区四块 + 取数（`bookAmounts` 缺失返 `undefined` 而非 0，使「无此科目」与「余额为 0」可区分）
+    # - K0-7 可靠性表：九处列标签走 `RELIABILITY_COLUMN_SOURCE_LABELS` 真源（逐字对后端 r5/r6）；
+    #   四个源外列（`reply_date`/`identity_method`/`phone_source`/`reliability_note`）**显式登记
+    #   理由并在 UI 标注** —— 实测七枢纽源模板**全部**无「回函日期」列，故 R9.3 的「按循环控制
+    #   可见性」不成立，正确形态是平台级源外保留列（按循环分叉只会产出自相矛盾的结果）
+    # - K0-2 五条编制说明真源已真实渲染（零消费方即打红，防「常量写好从未接线」）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: audit-platform/frontend/package-lock.json
+      - name: Install deps
+        run: npm ci
+        working-directory: audit-platform/frontend
+      - name: Run K0 confirmation frontend guards
+        run: >-
+          npx vitest run
+          src/components/workpaper/confirmation/k0-confirmation
+          src/components/workpaper/confirmation/__tests__/k0ColumnAlignment.spec.ts
+          src/components/workpaper/confirmation/__tests__/k0SharedComponentBoundary.spec.ts
+          src/components/workpaper/confirmation/reliability/__tests__
+          src/components/workpaper/confirmation/__tests__/confirmationColumnSpec.spec.ts
         working-directory: audit-platform/frontend
