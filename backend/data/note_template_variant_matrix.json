@@ -67,7 +67,10 @@
         "listed_standalone": "五、4",
         "listed_consolidated": "五、4"
       },
-      "legacy_aliases": {}
+      "legacy_aliases": {},
+      "parent_company_sections": {
+        "listed": "十六、应收票据"
+      }
     },
     {
       "account_key": "ying_shou_zhang_kuan",
@@ -78,7 +81,11 @@
         "listed_standalone": "五、5",
         "listed_consolidated": "五、5"
       },
-      "legacy_aliases": {}
+      "legacy_aliases": {},
+      "parent_company_sections": {
+        "listed": "十六、应收账款",
+        "soe": "十二、应收账款"
+      }
     },
     {
       "account_key": "ying_shou_kuan_xiang_rong_zi",
@@ -122,7 +129,11 @@
         "listed_standalone": "五、8",
         "listed_consolidated": "五、8"
       },
-      "legacy_aliases": {}
+      "legacy_aliases": {},
+      "parent_company_sections": {
+        "listed": "十六、其他应收款",
+        "soe": "十二、其他应收款"
+      }
     },
     {
       "account_key": "cun_huo",
@@ -221,7 +232,11 @@
         "listed_standalone": "五、18",
         "listed_consolidated": "五、18"
       },
-      "legacy_aliases": {}
+      "legacy_aliases": {},
+      "parent_company_sections": {
+        "listed": "十六、长期股权投资",
+        "soe": "十二、长期股权投资"
+      }
     },
     {
       "account_key": "qi_ta_quan_yi_gong_ju_tou_zi",
@@ -727,7 +742,11 @@
         "listed_standalone": "五、62",
         "listed_consolidated": "五、62"
       },
-      "legacy_aliases": {}
+      "legacy_aliases": {},
+      "parent_company_sections": {
+        "listed": "十六、营业收入与营业成本",
+        "soe": "十二、营业收入与营业成本"
+      }
     },
     {
       "account_key": "xiao_shou_fei_yong",
@@ -834,8 +853,8 @@
       "variants": {
         "soe_standalone": "八、74",
         "soe_consolidated": "八、74",
-        "listed_standalone": null,
-        "listed_consolidated": null
+        "listed_standalone": "三、资产减值损失（损",
+        "listed_consolidated": "三、资产减值损失（损"
       },
       "legacy_aliases": {}
     },
@@ -845,8 +864,8 @@
       "variants": {
         "soe_standalone": "八、75",
         "soe_consolidated": "八、75",
-        "listed_standalone": null,
-        "listed_consolidated": null
+        "listed_standalone": "三、资产处置收益（损",
+        "listed_consolidated": "三、资产处置收益（损"
       },
       "legacy_aliases": {}
     },
@@ -856,8 +875,8 @@
       "variants": {
         "soe_standalone": "八、76",
         "soe_consolidated": "八、76",
-        "listed_standalone": null,
-        "listed_consolidated": null
+        "listed_standalone": "三、营业外收入（注：",
+        "listed_consolidated": "三、营业外收入（注："
       },
       "legacy_aliases": {}
     },
@@ -867,8 +886,8 @@
       "variants": {
         "soe_standalone": "八、77",
         "soe_consolidated": "八、77",
-        "listed_standalone": null,
-        "listed_consolidated": null
+        "listed_standalone": "三、营业外支出（注：",
+        "listed_consolidated": "三、营业外支出（注："
       },
       "legacy_aliases": {}
     },
@@ -911,8 +930,8 @@
       "variants": {
         "soe_standalone": "八、81",
         "soe_consolidated": "八、81",
-        "listed_standalone": null,
-        "listed_consolidated": null
+        "listed_standalone": "三、现金流量表项目注",
+        "listed_consolidated": "三、现金流量表项目注"
       },
       "legacy_aliases": {}
     },
@@ -944,8 +963,8 @@
       "variants": {
         "soe_standalone": "八、84",
         "soe_consolidated": "八、84",
-        "listed_standalone": null,
-        "listed_consolidated": null
+        "listed_standalone": "三、债务重组【不适用",
+        "listed_consolidated": "三、债务重组【不适用"
       },
       "legacy_aliases": {}
     },
@@ -955,8 +974,8 @@
       "variants": {
         "soe_standalone": "八、85",
         "soe_consolidated": "八、85",
-        "listed_standalone": null,
-        "listed_consolidated": null
+        "listed_standalone": "三、借款费用",
+        "listed_consolidated": "三、借款费用"
       },
       "legacy_aliases": {}
     },
@@ -988,8 +1007,8 @@
       "variants": {
         "soe_standalone": "八、89",
         "soe_consolidated": "八、89",
-        "listed_standalone": null,
-        "listed_consolidated": null
+        "listed_standalone": "十四、终止经营",
+        "listed_consolidated": "十四、终止经营"
       },
       "legacy_aliases": {}
     },
@@ -1096,8 +1115,8 @@
       "account_key": "yi_ban_feng_xian_zhun_bei",
       "section_title": "一般风险准备",
       "variants": {
-        "soe_standalone": null,
-        "soe_consolidated": null,
+        "soe_standalone": "八、94",
+        "soe_consolidated": "八、94",
         "listed_standalone": "五、60",
         "listed_consolidated": "五、60"
       },
@@ -1123,7 +1142,11 @@
         "listed_standalone": "五、69",
         "listed_consolidated": "五、69"
       },
-      "legacy_aliases": {}
+      "legacy_aliases": {},
+      "parent_company_sections": {
+        "listed": "十六、投资收益（注：以",
+        "soe": "十二、投资收益"
+      }
     },
     {
       "account_key": "xian_jin_liu_liang_biao_bu_chong_zi_liao",
@@ -1134,7 +1157,10 @@
         "listed_standalone": "五、71",
         "listed_consolidated": "五、71"
       },
-      "legacy_aliases": {}
+      "legacy_aliases": {},
+      "parent_company_sections": {
+        "soe": "十二、现金流量表补充资"
+      }
     },
     {
       "account_key": "gu_dong_quan_yi_bian_dong_biao_xiang_mu_zhu",
