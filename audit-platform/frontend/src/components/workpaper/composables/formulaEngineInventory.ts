@@ -43,6 +43,51 @@ export const INTEGRATION_STATUS_LABEL: Record<IntegrationStatus, string> = {
   pending: '待接入',
 }
 
+// ─── 公式定义生命周期（wp_formula.lifecycle_state） ──────────────────────────
+
+/**
+ * `wp_formula.lifecycle_state` 取值域（**按实证**，不按推测）。
+ *
+ * spec: formula-management-runtime-closure Task 11 / Task 18
+ *   （Requirements 2.2, 6.6 / Property 16）
+ *
+ * 该列与 `definition_version` 实测**零消费**（前端命中均为 0），根因是后端
+ * `_formula_to_dict` 压根没下发；Task 11 已补进响应体，这里补中文标签让它可展示。
+ *
+ * 🔴 **2026-08-07 浏览器实测纠正了本表的取值域**：首版按推测写
+ * `draft / active / archived`，而**这三个值后端一个都不写** ——
+ * 真实取值只有 `saved`（三条证据）：
+ *   1. 迁移 `V104__formula_runtime_outbox.sql`：
+ *      `ADD COLUMN lifecycle_state VARCHAR(20) DEFAULT 'saved'`
+ *   2. `wp_formula_service.save()` 两条分支（新建 / 更新）都显式置 `'saved'`，
+ *      且其模块 docstring 明写「save 只保存定义并设置 lifecycle_state='saved'，
+ *      绝不写 last_computed_at」
+ *   3. 真实库实测：`SELECT lifecycle_state, count(*) FROM wp_formula GROUP BY 1`
+ *      → 全部 `saved`（浏览器往返存了 3 条，逐条为 `saved`）
+ *
+ * ⇒ 首版映射**恰好漏掉唯一真实存在的值**，面板会走 `?? state` 兜底显示裸英文
+ * `saved` —— 正是 R2.2 要消除的「裸英文值」，只是换了个字段。
+ *
+ * `succeeded` 只在 `tests/formula_runtime/test_wp_formula_lifecycle.py` 里作
+ * 「被 save 覆盖掉的前置状态」出现，生产代码零写入 ⇒ 登记为已知但非当前产出值。
+ *
+ * 🔴 与 `FORMULA_TYPE_LABEL` 一样是**单一真源**：禁在各组件内自建第二份映射。
+ * 守卫 `formulaStatusPanelDisplay.spec.ts` 交叉锁死「本表键集 ⊇ 后端实际写入值」。
+ */
+export type FormulaLifecycleState = 'saved' | 'succeeded'
+
+/** 生命周期中文标签（供 UI 展示；未登记取值由调用方原样透出） */
+export const FORMULA_LIFECYCLE_LABEL: Record<FormulaLifecycleState, string> = {
+  saved: '定义已保存',
+  succeeded: '求值成功',
+}
+
+/** 生命周期标签解析：未登记取值原样透出（宁可显示原值也不编造标签） */
+export function formulaLifecycleLabel(state: string | null | undefined): string {
+  if (!state) return '未标记'
+  return FORMULA_LIFECYCLE_LABEL[state as FormulaLifecycleState] ?? state
+}
+
 // ─── 计算原语 → 三类型 的规则映射（Req 19.2） ─────────────────────────────────
 
 /**

@@ -33,6 +33,12 @@ export {
   sync, independenceDeclarations, my,
 } from './collaboration'
 
+// 公式管理域（spec formula-management-runtime-closure Task 14）
+export {
+  wpFormula, wpUserFormula, projectFormula, formulaScope,
+  formulaPresets, reportConfigFormula, draftRefresh, noteFormula, formulaApi,
+} from './formula'
+
 export {
   auth, users, system, recycleBin, knowledge, knowledgeLibrary,
   dashboard, auditLogs, ai, aiModels, aiProject, admin,

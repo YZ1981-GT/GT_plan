@@ -15,13 +15,27 @@
  *   FORMULA_REF_NOT_FOUND）清晰提示（R5.3）。
  *
  * `extraction` 缺失（灰度关 / 非 D 循环）时 → 仅展示 items，优雅无报错（R7.1）。
+ *
+ * spec: formula-management-runtime-closure Task 2（Requirements 2.1–2.6）
+ *   后端 `_formula_to_dict` 下发 17 键，而本面板改造前只声明 7 键，把
+ *   `issue_description` / `hint_text` / `last_computed_at` / `refs` 全部丢弃，
+ *   且 `formula_type` 以裸英文值渲染（违反 UI 全中文化）。本轮补齐四字段展示，
+ *   中文标签**复用**单一真源 `formulaEngineInventory.FORMULA_TYPE_LABEL`
+ *   （禁本文件内自建 `Record<FormulaType, string>` 字面量 —— 会形成第二份标签表）。
  */
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+// spec: formula-management-runtime-closure Task 14 — 公式端点收敛进 apiPaths（纯搬迁，URL 逐字不变）
+import { wpFormula } from '@/services/apiPaths/formula'
 import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
+import {
+  FORMULA_TYPE_LABEL,
+  formulaLifecycleLabel,
+  type FormulaType,
+} from './composables/formulaEngineInventory'
 
-/** 用户已落库的原始公式（wp_formula 行） */
+/** 用户已落库的原始公式（wp_formula 行，键集与后端 `_formula_to_dict` 对齐） */
 interface RawFormulaItem {
   id: string
   sheet_name: string
@@ -30,6 +44,23 @@ interface RawFormulaItem {
   category?: string | null
   description?: string | null
   formula_type: string
+  /** 逻辑判断说明（logic_check 类公式的判断结论） */
+  issue_description?: string | null
+  /** 合理性提示（reasonability 类公式的提示文字） */
+  hint_text?: string | null
+  /** 最近一次求值时间（ISO 字符串；未计算为 null） */
+  last_computed_at?: string | null
+  /** 该公式引用的地址列表 */
+  refs?: unknown[] | null
+  /**
+   * 定义生命周期（`draft` / `active` / `archived`）。
+   *
+   * spec: formula-management-runtime-closure Task 11（Property 16）——
+   * 该列此前不在后端 `_formula_to_dict` 下发键集内，故全前端命中 0。
+   */
+  lifecycle_state?: string | null
+  /** 定义版本号（每次 upsert 递增，供排查「用户改过几次」） */
+  definition_version?: number | null
 }
 
 /** Tier A 提取公式绑定（预设 ∪ 用户，读时收敛） */
@@ -139,12 +170,76 @@ function displayValue(v: number | string | null | undefined): string {
   return typeof v === 'number' ? v.toLocaleString() : String(v)
 }
 
+/**
+ * 三类型中文标签（Requirements 2.2 / 2.5）。
+ *
+ * 真源 = `formulaEngineInventory.FORMULA_TYPE_LABEL`；未登记的取值原样透出
+ * （宁可显示原值也不编造标签，便于发现后端新增了未登记的 formula_type）。
+ */
+function formulaTypeLabel(t: string | null | undefined): string {
+  if (!t) return '未分类'
+  return FORMULA_TYPE_LABEL[t as FormulaType] ?? t
+}
+
+const FORMULA_TYPE_TAG_TYPE: Record<string, string> = {
+  auto_calc: 'primary',
+  logic_check: 'warning',
+  reasonability: 'success',
+}
+
+function formulaTypeTagType(t: string | null | undefined): string {
+  return (t && FORMULA_TYPE_TAG_TYPE[t]) || 'info'
+}
+
+/**
+ * 生命周期是否为**非生效**态（Task 11 / Property 16）。
+ *
+ * `active` 是常态；`null`/`undefined`（历史行或后端未下发）也不算异常
+ * —— 否则每条公式都挂一个标签，等于噪音。
+ */
+function isAbnormalLifecycle(state: string | null | undefined): boolean {
+  return !!state && state !== 'active'
+}
+
+/** 计算时间（Requirements 2.3）：为空显示「未计算」，有值显示本地化时间。 */
+function computedAtText(iso: string | null | undefined): string {
+  if (!iso) return '未计算'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return String(iso)
+  return d.toLocaleString('zh-CN', { hour12: false })
+}
+
+/** 引用数量（Requirements 2.4）：非数组或空数组返回 0。 */
+function refsCount(refs: unknown[] | null | undefined): number {
+  return Array.isArray(refs) ? refs.length : 0
+}
+
+function refText(r: unknown): string {
+  if (r === null || r === undefined) return '—'
+  if (typeof r === 'string' || typeof r === 'number') return String(r)
+  try {
+    return JSON.stringify(r)
+  } catch {
+    return String(r)
+  }
+}
+
+/** 展开引用列表的公式 id 集合（Requirements 2.4）。 */
+const expandedRefs = ref<Set<string>>(new Set())
+
+function toggleRefs(id: string) {
+  const next = new Set(expandedRefs.value)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
+  expandedRefs.value = next
+}
+
 async function loadFormulas() {
   if (!props.wpId) return
   loading.value = true
   try {
     // 真实端点（Task 4.1）：GET /api/workpapers/{wp_id}/formulas → { items, extraction? }
-    const data = await api.get<FormulasResponse>(`/api/workpapers/${props.wpId}/formulas`)
+    const data = await api.get<FormulasResponse>(wpFormula.list(props.wpId))
     rawItems.value = Array.isArray(data?.items) ? data.items : []
     const ex = data?.extraction
     if (ex) {
@@ -203,7 +298,7 @@ async function putFormula(binding: {
 }): Promise<boolean> {
   try {
     await api.put(
-      `/api/workpapers/${props.wpId}/formulas`,
+      wpFormula.upsert(props.wpId),
       {
         sheet_name: binding.sheet_name,
         target_cell: binding.anchor,
@@ -278,7 +373,7 @@ async function restoreDefault(binding: TierABinding) {
     return
   }
   try {
-    await api.delete(`/api/workpapers/${props.wpId}/formulas/${fid}`)
+    await api.delete(wpFormula.remove(props.wpId, fid))
     ElMessage.success('已恢复默认')
     await loadFormulas()
   } catch {
@@ -328,10 +423,48 @@ defineExpose({ loadFormulas })
           <div v-for="it in grp.items" :key="it.id" class="formula-item">
             <div class="formula-header">
               <span class="formula-cell">{{ it.target_cell }}</span>
-              <el-tag size="small" type="info">{{ it.formula_type }}</el-tag>
+              <!-- Requirements 2.2：中文类型标签，真源 FORMULA_TYPE_LABEL -->
+              <el-tag size="small" :type="(formulaTypeTagType(it.formula_type) as any)">
+                {{ formulaTypeLabel(it.formula_type) }}
+              </el-tag>
+              <!--
+                Task 11 / Property 16：生命周期标签。
+                `active`（生效）是常态，不渲染以免噪音；只在 `draft` / `archived`
+                这类**非生效**态显示警示，让「这条公式当前不参与求值」可见。
+              -->
+              <el-tag
+                v-if="isAbnormalLifecycle(it.lifecycle_state)"
+                size="small"
+                type="warning"
+                effect="plain"
+                :title="`定义版本 v${it.definition_version ?? '?'}`"
+              >
+                {{ formulaLifecycleLabel(it.lifecycle_state) }}
+              </el-tag>
+              <!-- Requirements 2.3：计算时间，为空显示「未计算」 -->
+              <span class="formula-computed-at" :title="it.last_computed_at || '尚未求值'">
+                {{ computedAtText(it.last_computed_at) }}
+              </span>
             </div>
             <div class="formula-detail">{{ it.expression }}</div>
             <div v-if="it.description" class="formula-desc">{{ it.description }}</div>
+            <!-- Requirements 2.1：逻辑判断说明（issue_description），有值才渲染 -->
+            <div v-if="it.issue_description" class="formula-issue">
+              <el-tag size="small" type="danger" effect="plain">逻辑判断</el-tag>
+              <span class="formula-issue-text">{{ it.issue_description }}</span>
+            </div>
+            <!-- Requirements 2.1：合理性提示（hint_text），有值才渲染 -->
+            <div v-if="it.hint_text" class="formula-hint">💡 {{ it.hint_text }}</div>
+            <!-- Requirements 2.4：引用数量 + 可展开引用列表 -->
+            <div v-if="refsCount(it.refs)" class="formula-refs">
+              <el-button link type="primary" size="small" @click="toggleRefs(it.id)">
+                引用 {{ refsCount(it.refs) }} 项
+                <span class="refs-caret">{{ expandedRefs.has(it.id) ? '▴' : '▾' }}</span>
+              </el-button>
+              <ul v-if="expandedRefs.has(it.id)" class="refs-list">
+                <li v-for="(r, ri) in (it.refs || [])" :key="ri">{{ refText(r) }}</li>
+              </ul>
+            </div>
           </div>
         </div>
 
@@ -525,6 +658,54 @@ defineExpose({ loadFormulas })
   font-size: 12px;
   color: var(--el-color-warning);
   line-height: 1.4;
+}
+
+/* R2.3：计算时间（右对齐在 header 末尾） */
+.formula-computed-at {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--el-text-color-placeholder);
+  white-space: nowrap;
+}
+
+.formula-issue {
+  margin-top: 4px;
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.formula-issue-text {
+  font-size: 12px;
+  color: var(--el-color-danger);
+  line-height: 1.4;
+}
+
+.formula-hint {
+  margin-top: 4px;
+  padding: 4px 6px;
+  border-left: 2px solid var(--el-color-warning);
+  background: var(--el-color-warning-light-9);
+  font-size: 12px;
+  color: var(--el-text-color-regular);
+  line-height: 1.4;
+}
+
+.formula-refs {
+  margin-top: 2px;
+}
+
+.refs-caret {
+  margin-left: 2px;
+}
+
+.refs-list {
+  margin: 2px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  font-family: 'Consolas', monospace;
+  word-break: break-all;
 }
 
 .formula-actions {
