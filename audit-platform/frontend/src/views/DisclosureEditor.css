@@ -206,3 +206,7 @@
 .gt-de-progress-bar__legend .dot--text { background: #3b82f6; }
 .gt-de-progress-bar__legend .dot--table { background: #f59e0b; }
 .gt-de-progress-bar__legend .dot--empty { background: #d1d5db; }
+
+/* 母公司章取数溯源横幅（Task 13）：来源项目 + 企业代码 + 口径三项 */
+.gt-de-parent-source { margin-bottom: 12px; }
+.gt-de-parent-source__body { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; line-height: 1.6; }

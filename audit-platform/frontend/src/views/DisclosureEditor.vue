@@ -139,6 +139,10 @@
                 </el-button>
               </el-tooltip>
               <el-button v-if="isEqcrRole" size="small" type="info">📋 只读副本</el-button>
+              <!-- 使用手册：各功能键用途 / 数据提取来源 / 操作流程 -->
+              <el-tooltip content="附注模块使用手册：各功能键用途、数据提取来源、标准操作流程" placement="bottom" :show-after="400">
+                <el-button size="small" @click="showNoteHandbook = true">📖 使用手册</el-button>
+              </el-tooltip>
             </div>
           </template>
         </GtToolbar>
@@ -506,6 +510,27 @@
                     </div>
                   </el-checkbox-group>
                 </el-popover>
+              </div>
+              <!-- 母公司章取数溯源（Task 13）：来源项目 + 企业代码 + 口径三项 -->
+              <div v-if="parentSourceView.state !== 'none'" class="gt-de-parent-source">
+                <el-alert
+                  :type="parentSourceView.state === 'missing' ? 'warning' : 'info'"
+                  :closable="false"
+                  show-icon
+                >
+                  <template #title>
+                    <span>{{ parentSourceView.state === 'missing' ? '本项目未建母公司单体' : '母公司口径取数' }}</span>
+                  </template>
+                  <template #default>
+                    <div v-if="parentSourceView.state === 'missing'" class="gt-de-parent-source__body">
+                      {{ PARENT_PROJECT_MISSING_TEXT }}
+                    </div>
+                    <div v-else class="gt-de-parent-source__body">
+                      <span>{{ parentCompanySourceSummary(parentSourceView) }}</span>
+                      <el-tag size="small" type="info" effect="plain">{{ parentSourceView.scopeLabel || '—' }}</el-tag>
+                    </div>
+                  </template>
+                </el-alert>
               </div>
               <!-- 当前表格 -->
               <div v-if="isActiveTableEmpty" class="gt-de-empty-table-hint">
@@ -877,6 +902,9 @@
         @custom-template-restored="onCustomTemplateRestored"
       />
     </el-dialog>
+
+    <!-- 附注模块使用手册 -->
+    <DisclosureNoteHandbookDialog v-model="showNoteHandbook" />
 
     <!-- 附注转换规则弹窗（国企↔上市） -->
     <NoteMappingDialog
@@ -1333,8 +1361,14 @@ import { useAcnr } from '@/services/acnr'
 import { useNoteTemplate } from '@/views/composables/useNoteTemplate'
 import { useNoteExport } from '@/views/composables/useNoteExport'
 import { useNoteAi } from '@/views/composables/useNoteAi'
+import {
+  readParentCompanySource,
+  parentCompanySourceSummary,
+  PARENT_PROJECT_MISSING_TEXT,
+} from '@/views/composables/parentCompanyNoteSource'
 import { useAuditContext } from '@/composables/useAuditContext'
 import NoteMappingDialog from '@/views/components/NoteMappingDialog.vue'
+import DisclosureNoteHandbookDialog from '@/views/DisclosureNoteHandbookDialog.vue'
 import ArchivedBanner from '@/components/common/ArchivedBanner.vue'
 import ConsolLockedBanner from '@/components/common/ConsolLockedBanner.vue'
 import AiContentPendingBanner from '@/components/ai/AiContentPendingBanner.vue'
@@ -1657,6 +1691,8 @@ function onScopeChange(scope: 'standalone' | 'consolidated' | 'both') {
 const validateLoading = ref(false)
 const detailLoading = ref(false)
 const showNoteFormulaManager = ref(false)
+// 附注模块使用手册（工具栏右侧入口）
+const showNoteHandbook = ref(false)
 // 附注联动复盘 P0-1：就绪度看板（未从底稿同步 / 无数据 / 校验问题）
 const showReadiness = ref(false)
 const readinessSummary = ref<{ never_synced: number; error_sections: number } | null>(null)
@@ -2039,6 +2075,10 @@ const activeTableColumns = computed(() => {
 // 注：per-tab 说明文本框（activeTabNoteText/activeTabNoteTextEditable）已移除。
 // 底稿披露表「表格下面的文本框」经同步写入 note.text_content（_note_texts→_format_note_texts），
 // 统一落地到表格下方的富文本编辑器（textContent），不再拆分为 per-tab 纯文本框。
+
+// 母公司章取数溯源（Task 13）：三态 —— none 不渲染 / missing 灰态提示 / resolved 展示三项。
+// 键由后端 `_attach_parent_source_meta` 落在**表级**，故按 activeTableData 取。
+const parentSourceView = computed(() => readParentCompanySource(activeTableData.value))
 
 // 当前 Tab 的提示文字：优先取该表 guidance，降级章节级 guidance_text
 const activeTableGuidance = computed(() =>
