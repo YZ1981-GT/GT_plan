@@ -254,15 +254,23 @@ def _synthetic_consolidated_template(tmp_path):
     return p
 
 
-async def _add_project(db, *, company_code, parent_code, scope):
+async def _add_project(db, *, company_code, parent_code, scope, audit_year=2024):
+    """建一条测试项目。
+
+    🔴 ``audit_year`` 必须显式给值（默认 2024，与 ``_add_bs_row`` 的年度一致）——
+    母公司个别列的定位口径是唯一索引 ``(company_code, audit_year, report_scope)``，
+    ``audit_year`` 为 NULL 时 ``resolve_parent_standalone_project`` 判「定位字段不齐」
+    直接返 None ⇒ 公司列必然留空。
+    """
     proj = Project(
         id=uuid.uuid4(),
-        name=f"测试{company_code}",
+        name=f"测试{company_code}-{scope}",
         client_name=f"测试{company_code}",
         template_type="soe",
         report_scope=scope,
         company_code=company_code,
         parent_company_code=parent_code,
+        audit_year=audit_year,
     )
     db.add(proj)
     await db.flush()
@@ -288,16 +296,28 @@ async def _add_bs_row(db, project_id, *, current, prior):
 
 @pytest.mark.asyncio
 async def test_exporter_resolves_parent_column(db_session, tmp_path, monkeypatch):
-    """公司列填母公司个别值，合并列填本项目值."""
-    parent = await _add_project(
-        db_session, company_code="PARENT01", parent_code=None, scope="standalone"
-    )
-    child = await _add_project(
-        db_session, company_code="CHILD01", parent_code="PARENT01",
+    """公司列填母公司个别值，合并列填本项目值.
+
+    🔴 母公司个别数 = **同企业代码、同年度、standalone 口径**的兄弟项目
+    （唯一索引 ``uq_project_company_year_scope`` 保证同代码同年度只能靠 ``report_scope``
+    区分 ⇒「合并 + 母公司单体」是唯一可能的同代码对）。
+
+    本用例原先用 ``PARENT01``（**上级公司**，代码与合并项目不同）当母公司并断言公司列
+    取到它的 2000.0 —— 那正是被修掉的旧错口径（``parent_company_code`` 指向的是另一家
+    公司，不是本公司的单体）。「上级公司不得被使用」已拆成独立反向自检
+    ``test_exporter_ignores_upper_level_company``。
+    """
+    consol = await _add_project(
+        db_session, company_code="GROUP01", parent_code="UPPER01",
         scope="consolidated",
     )
-    await _add_bs_row(db_session, child.id, current=1000.0, prior=900.0)
-    await _add_bs_row(db_session, parent.id, current=2000.0, prior=1800.0)
+    standalone = await _add_project(
+        db_session, company_code="GROUP01", parent_code="UPPER01",
+        scope="standalone",
+    )
+    child = consol
+    await _add_bs_row(db_session, consol.id, current=1000.0, prior=900.0)
+    await _add_bs_row(db_session, standalone.id, current=2000.0, prior=1800.0)
 
     synth = _synthetic_consolidated_template(tmp_path)
     monkeypatch.setattr(
@@ -319,6 +339,41 @@ async def test_exporter_resolves_parent_column(db_session, tmp_path, monkeypatch
     assert ws["F7"].value == pytest.approx(1800.0)
     # SUM 未被覆盖
     assert str(ws["C8"].value).startswith("=SUM")
+
+
+@pytest.mark.asyncio
+async def test_exporter_ignores_upper_level_company(db_session, tmp_path, monkeypatch):
+    """反向自检：``parent_company_code`` 指向的**上级公司**绝不能被当母公司个别数.
+
+    构造旧实现会命中的场景（存在一条 ``company_code == 合并项目的
+    parent_company_code`` 的 standalone 项目且带真实报表数），断言公司列**留空** ——
+    复现旧行为即打红（需求 9.4）。
+    """
+    upper = await _add_project(
+        db_session, company_code="UPPER02", parent_code=None, scope="standalone"
+    )
+    consol = await _add_project(
+        db_session, company_code="GROUP02", parent_code="UPPER02",
+        scope="consolidated",
+    )
+    await _add_bs_row(db_session, consol.id, current=1000.0, prior=900.0)
+    await _add_bs_row(db_session, upper.id, current=7777.0, prior=6666.0)
+
+    synth = _synthetic_consolidated_template(tmp_path)
+    monkeypatch.setattr(
+        ReportExcelExporter, "_load_template",
+        lambda self, key: load_workbook(str(synth)),
+    )
+    exporter = ReportExcelExporter(db_session)
+    output = await exporter.export(
+        project_id=consol.id, year=2024, mode="audited",
+        report_types=["balance_sheet"], include_prior_year=True,
+    )
+    ws = load_workbook(output)[_BS_SHEET]
+    assert ws["C7"].value == pytest.approx(1000.0), "合并列仍取本项目值"
+    assert ws["D7"].value not in (7777.0,), "公司列取到了上级公司的数（旧错口径复现）"
+    assert ws["D7"].value in (None, ""), "无同代码 standalone 兄弟 ⇒ 公司列必须留空"
+    assert ws["F7"].value in (None, "")
 
 
 @pytest.mark.asyncio
