@@ -23,6 +23,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.workpaper_models import WorkingPaper
+from app.services.prefill_anchor_map import read_anchor_value, resolve_anchor
 
 _logger = logging.getLogger(__name__)
 
@@ -128,29 +129,50 @@ def _parse_args(raw: str) -> list[str]:
 async def _resolve_wp_formula(
     db: AsyncSession, project_id: UUID, year: int, args: list[str]
 ) -> Decimal | None:
-    """=WP('wp_code', 'sheet', 'cell') → 从其他底稿 parsed_data 取值"""
+    """``=WP('wp_code','sheet','cell_ref')`` → 从被引底稿的 ``checklist_responses`` 取值。
+
+    改造前本函数读 ``working_paper.parsed_data`` 的 ``cells`` 键，而该键在当前平台的
+    **任何写入路径下都不产生**（真实库 407 个 ``parsed_data`` 非空底稿中零命中）
+    ⇒ 176 条 ``WP()`` 预设恒返 ``None`` 且 fail-soft 无告警。底稿录入值的真实落点是
+    ``checklist_responses(wp_id, item_id).remark``。
+
+    第三参 ``cell_ref`` 是**中文业务锚点名**（``期末合计`` / ``全年收入合计``），与
+    ``item_id`` 的英文 kebab 键零重叠 ⇒ 必须经声明式映射表
+    :mod:`app.services.prefill_anchor_map` 解析，禁字符串启发式。
+
+    **底稿定位不依赖** ``parsed_data['wp_code']``（该键仅 63/407 存在），改经
+    ``wp_index`` JOIN；同 wp_code 多份记录时按 ``updated_at DESC, id ASC`` 确定性选取
+    （见 ``prefill_anchor_map.read_anchor_value``）。
+
+    对外契约不变：命中返 ``Decimal``，其余一切情形返 ``None``（fail-soft）。
+    六态诊断信息只在 :func:`prefill_anchor_map.read_anchor_value` 的返回值里，
+    供诊断脚本区分「未编制」「未对齐」「确实为空」—— 三者合并成「无数据」正是
+    本缺陷长期潜伏的机理。
+    """
     if len(args) < 3:
         return None
     wp_code, sheet_name, cell_ref = args[0], args[1], args[2]
-    from app.models.wp_optimization_models import WpTemplateMetadata
-    # 通过 wp_code 找到对应底稿
-    result = await db.execute(
-        sa.select(WorkingPaper).where(
-            WorkingPaper.project_id == project_id,
-            WorkingPaper.is_deleted == False,  # noqa: E712
+
+    spec = resolve_anchor(wp_code, sheet_name, cell_ref)
+    if spec is None:
+        _logger.warning(
+            "WP() 锚点未对齐，返回 None：wp_code=%s sheet=%s cell_ref=%s"
+            "（需在 prefill_anchor_map.ANCHOR_MAP 登记，或确认已在 UNALIGNED 清单）",
+            wp_code,
+            sheet_name,
+            cell_ref,
         )
-    )
-    workpapers = result.scalars().all()
-    # 匹配 wp_code（从 wp_index 或 template_metadata）
-    for wp in workpapers:
-        if wp.parsed_data and wp.parsed_data.get("wp_code") == wp_code:
-            cell_data = wp.parsed_data.get("cells", {}).get(f"{sheet_name}!{cell_ref}")
-            if cell_data is not None:
-                try:
-                    return Decimal(str(cell_data))
-                except Exception:
-                    return None
-    return None
+        return None
+
+    try:
+        res = await read_anchor_value(db, project_id, wp_code, spec)
+    except Exception:
+        # fail-soft 但**必须留日志** —— 静默吞异常会把接线错误伪装成「本项目无此数据」
+        _logger.warning(
+            "WP() 取值失败：wp_code=%s item_id=%s", wp_code, spec.item_id, exc_info=True
+        )
+        return None
+    return res.value
 
 
 async def _resolve_ledger_formula(
@@ -214,27 +236,23 @@ async def _resolve_aux_formula(
 async def _resolve_prev_formula(
     db: AsyncSession, project_id: UUID, year: int, args: list[str]
 ) -> Decimal | None:
-    """=PREV('wp_code', 'sheet', 'cell') → 从上年底稿取值"""
-    if len(args) < 3:
-        return None
-    wp_code, sheet_name, cell_ref = args[0], args[1], args[2]
-    # 查上年底稿（同项目 year-1）
-    result = await db.execute(
-        sa.select(WorkingPaper).where(
-            WorkingPaper.project_id == project_id,
-            WorkingPaper.is_deleted == False,  # noqa: E712
-        )
-    )
-    workpapers = result.scalars().all()
-    for wp in workpapers:
-        if wp.parsed_data and wp.parsed_data.get("wp_code") == wp_code:
-            # 尝试从 parsed_data.cells 取值
-            cell_data = wp.parsed_data.get("cells", {}).get(f"{sheet_name}!{cell_ref}")
-            if cell_data is not None:
-                try:
-                    return Decimal(str(cell_data))
-                except Exception:
-                    return None
+    """``=PREV('wp_code','sheet','cell_ref')`` → **恒返 None**（fail-closed）。
+
+    🔴 **当前数据模型无法表达「上年底稿」** —— ``working_paper`` 与 ``wp_index``
+    **都没有 year 列**（实测），底稿的年度维度只在 project 层。
+
+    改造前的实现声称「从上年底稿取值（同项目 year-1）」，而其查询里**没有任何 year
+    条件**，取值又走真实库零命中的 ``parsed_data['cells']`` ⇒ 表面恒返 ``None``。
+    危险在于：一旦有人把 ``cells`` 链「修通」而不修年度维度，它会取到**本年**值并
+    显示在「上年数」列 —— 161 条 ``PREV()`` 里 **118 条**第三参是「审定数」
+    （即「上年审定数」类预设），那是数字级错误，比现在的恒空更危险。
+
+    故本函数 fail-closed：宁缺勿造，**绝不回退本年值**。跨年度取数需数据模型变更，
+    已登记在 :data:`app.services.prefill_anchor_map.OUT_OF_SCOPE_CHANGES` 的
+    ``prev_year_dimension`` 条目，另立 spec。
+
+    参数保留完整签名（``_FORMULA_RESOLVERS`` 的统一契约），实参不使用。
+    """
     return None
 
 
