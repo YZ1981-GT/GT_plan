@@ -36,6 +36,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.audit_platform_models import TrialBalance
 from app.services.dataset_query import get_active_filter
 from app.services.formula_engine import FormulaContext
+from app.services.four_table.occurrence_by_standard_code import (
+    fetch_occurrence_by_standard_code,
+    merge_occurrence_into_tb_data,
+)
 from app.services.formula_management.engine import (
     FormulaRecord,
     IssueItem,
@@ -122,6 +126,20 @@ class AdjudicationWritebackService:
                 "RJE调整": rje,
                 "年初余额": opening,
             }
+
+        # ── 借贷发生额（`本期借方` / `本期贷方`）──
+        #
+        # 🔴 `trial_balance` **没有**发生额列，发生额明细只在 `tb_balance`。改造前
+        # 本方法只产出上面 6 键，而 `formula_engine` 两条求值路径又**静默回退
+        # 期末余额** ⇒ 引用 `TB(code,'本期借方')` 的公式拿到的是**期末余额**
+        # （数字错，不是取不到）。引擎侧现已改三态，故这里必须真正产出这两个键，
+        # 否则只是从「错数字」变成「恒 0」。
+        #
+        # 复用共享件（叶子聚合防父子双算 + 最长前缀继承祖先映射 + fail-open），
+        # **禁**在此另写一份 tb_balance 查询。
+        occurrence = await fetch_occurrence_by_standard_code(self.db, project_id, year)
+        merge_occurrence_into_tb_data(tb_data, occurrence)
+
         return FormulaContext(tb_data=tb_data)
 
     # ─── 单条公式回写 ────────────────────────────────────────────────────────

@@ -31,6 +31,14 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.report_models import FinancialReport, FinancialReportType
+
+# 🔴 **同名双实体，import 必须改名**：本模块下方的 `CrossCheckResult` 是
+# `@dataclass` 聚合结果，而 `wp_optimization_models.CrossCheckResult` 是
+# 表 `cross_check_results` 的 ORM 模型。按符号名 grep 会把两者混为一谈 ——
+# 判「有无落库」必须看是否 `db.add(<ORM 实例>)`（spec requirements 缺陷 5 已记）。
+from app.models.wp_optimization_models import (
+    CrossCheckResult as CrossCheckResultRow,
+)
 from app.services.formula_engine import FormulaContext
 from app.services.formula_management.engine import (
     FormulaRecord,
@@ -39,6 +47,10 @@ from app.services.formula_management.engine import (
 )
 
 logger = logging.getLogger(__name__)
+
+#: `cross_check_results.status` 取值域（列宽 String(20)）。
+CROSS_CHECK_STATUS_PASSED = "passed"
+CROSS_CHECK_STATUS_FAILED = "failed"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -361,19 +373,118 @@ async def _fetch_report_rows(
     return list(rows)
 
 
+async def persist_cross_check_results(
+    db: AsyncSession,
+    *,
+    project_id: Any,
+    year: int,
+    result: CrossCheckResult,
+) -> int:
+    """把勾稽执行结果 upsert 进 ``cross_check_results`` 表，返回写入行数。
+
+    spec: formula-management-runtime-closure Task 10（Requirements 6.1, 6.6）
+
+    🔴 **为什么需要落库**：改造前 `execute_report_cross_checks` 只
+    ``return CrossCheckResult(...)``，router 层虽 `await db.commit()` 但**无 INSERT**
+    ⇒ 表 `cross_check_results` 全库 **0 行**，勾稽结论不可查询、不可归档、
+    质量评分与归档完整性两个读方（`wp_cross_check_service` /
+    `wp_quality_score_service`）永远读不到 logic_check 的产出。
+
+    **upsert 语义 = 同 ``(project_id, year, rule_id)`` 覆盖**。表上只有普通索引
+    ``idx_cross_check_project(project_id, year)``、**没有唯一约束** ⇒ 不能用
+    ``on_conflict_do_update``，改为「先删同键旧行再插」（幂等且无需迁移加约束）。
+
+    **fail-open**：落库失败只记 WARNING 并返回 0，不阻断 GET 返回勾稽结果
+    —— 勾稽本身是只读计算，用户拿到 Issue_List 比拿到 500 更有价值。
+
+    字段映射（ORM 列 ← 执行结果）::
+
+        rule_id      ← outcome.formula_id      （如 `report-cross-check-1`，≤30 字符）
+        status       ← 'passed' / 'failed'
+        left_amount  ← 同 formula_id 的 issue.left_value（passed 时 None）
+        right_amount ← 同 formula_id 的 issue.right_value
+        difference   ← left - right（两侧都有值时才算，否则 None —— 缺一侧时
+                       算差额会把「取不到」伪装成「差额等于某个值」）
+        details      ← {description, expression, issue_description}
+    """
+    if not result.outcomes:
+        return 0
+
+    issue_by_formula: dict[str, IssueItem] = {}
+    for issue in result.issues:
+        # 同一条勾稽只会产一条 issue；重复时保留首条（与 Issue_List 顺序一致）
+        issue_by_formula.setdefault(issue.formula_id, issue)
+
+    try:
+        rule_ids = [o.formula_id for o in result.outcomes]
+        await db.execute(
+            sa.delete(CrossCheckResultRow).where(
+                CrossCheckResultRow.project_id == project_id,
+                CrossCheckResultRow.year == year,
+                CrossCheckResultRow.rule_id.in_(rule_ids),
+            )
+        )
+        written = 0
+        for outcome in result.outcomes:
+            issue = issue_by_formula.get(outcome.formula_id)
+            left = issue.left_value if issue else None
+            right = issue.right_value if issue else None
+            diff = (left - right) if (left is not None and right is not None) else None
+            db.add(
+                CrossCheckResultRow(
+                    project_id=project_id,
+                    year=year,
+                    rule_id=outcome.formula_id,
+                    left_amount=left,
+                    right_amount=right,
+                    difference=diff,
+                    status=(
+                        CROSS_CHECK_STATUS_PASSED
+                        if outcome.passed
+                        else CROSS_CHECK_STATUS_FAILED
+                    ),
+                    details={
+                        "description": outcome.description,
+                        "expression": outcome.expression,
+                        "issue_description": issue.description if issue else None,
+                        "source": "formula_management.logic_check",
+                    },
+                )
+            )
+            written += 1
+        await db.flush()
+        return written
+    except Exception as exc:  # noqa: BLE001 - fail-open：不阻断只读勾稽结果返回
+        logger.warning(
+            "cross_check_results 落库失败（project=%s year=%s）：%s",
+            project_id,
+            year,
+            exc,
+        )
+        return 0
+
+
 async def execute_report_cross_checks(
     db: AsyncSession,
     *,
     project_id: Any,
     year: int,
+    persist: bool = True,
 ) -> CrossCheckResult:
-    """执行报表勾稽（logic_check）→ 返回 Issue_List。
+    """执行报表勾稽（logic_check）→ 返回 Issue_List，并落库勾稽结论。
 
     从 ``financial_report`` 取资产负债表 / 利润表行 → 构建 row_cache →
-    经 ``execute_formula``（logic_check 分派）执行 7 条勾稽 → 聚合 Issue_List。
-    **绝不修改任何数据单元值**（Req 6.3 语义由 logic_check 分派保证）。
+    经 ``execute_formula``（logic_check 分派）执行 7 条勾稽 → 聚合 Issue_List
+    → **upsert 进 ``cross_check_results``**（Task 10）。
+    **绝不修改任何数据单元值**（Req 6.3 语义由 logic_check 分派保证）——
+    落库写的是「勾稽结论」这一新事实，不是被勾稽的数据。
 
-    Requirements: 6.4
+    ``persist=False`` 供纯计算场景（单测 / 预览）跳过落库。
+
+    **本函数是 ``run_cross_checks`` 与 ``build_cross_check_formulas`` 的唯一
+    外部入口**（两者是它的内部实现，非孤儿 —— requirements 缺陷 5 勘误已记）。
+
+    Requirements: 6.1, 6.2, 6.4, 6.6
     """
     bs_rows = await _fetch_report_rows(
         db, project_id=project_id, year=year,
@@ -384,6 +495,11 @@ async def execute_report_cross_checks(
         report_type=FinancialReportType.income_statement,
     )
     row_cache = build_report_row_cache(bs_rows, is_rows)
-    return await run_cross_checks(
+    result = await run_cross_checks(
         row_cache, db=db, project_id=str(project_id), resolve_refs=True
     )
+    if persist:
+        await persist_cross_check_results(
+            db, project_id=project_id, year=year, result=result
+        )
+    return result

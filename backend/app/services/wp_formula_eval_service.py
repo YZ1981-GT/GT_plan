@@ -15,8 +15,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.audit_platform_models import TrialBalance
 from app.services.dataset_query import get_active_filter
-from app.services.formula_engine import FormulaContext, execute
+from app.services.formula_engine import COLUMN_ALIASES, FormulaContext, execute
 from app.services.formula_engine import WPExecutor
+from app.services.four_table.occurrence_by_standard_code import (
+    CREDIT_KEY,
+    DEBIT_KEY,
+    fetch_occurrence_by_standard_code,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +65,19 @@ def find_unsupported_formula_functions(expression: str | None) -> list[str]:
             hits.append(name)
     return hits
 
+#: 列名 → ``trial_balance`` 的**真实列**。
+#:
+#: 🔴 **只许出现 `TrialBalance` 上真实存在的列名**（守卫
+#: ``test_formula_tb_sign_passthrough::test_wp_formula_eval_column_map_is_pure_column``
+#: 按白名单钉死）。改造前这里有两条死映射::
+#:
+#:     "借方发生额": "debit_amount",     # TrialBalance 无此列
+#:     "贷方发生额": "credit_amount",    # TrialBalance 无此列
+#:
+#: 而取值处写 ``getattr(row, field, None)`` **带默认值** ⇒ 取不到列返 ``None``
+#: → 归一成 ``Decimal("0")`` ⇒ **看着已注册、实则恒 0**（不是崩溃，所以没人发现）。
+#: `trial_balance` 只有余额与调整列，**发生额明细只在 `tb_balance`**，故发生额
+#: 一律走 :data:`_OCCURRENCE_COLUMNS` 分支，禁再写进本表。
 _COLUMN_MAP = {
     "期末余额": "audited_amount",
     "审定数": "audited_amount",
@@ -68,9 +86,40 @@ _COLUMN_MAP = {
     "未审数": "unadjusted_amount",
     "RJE调整": "rje_adjustment",
     "AJE调整": "aje_adjustment",
-    "借方发生额": "debit_amount",
-    "贷方发生额": "credit_amount",
 }
+
+#: 发生额列名 → 归集结果里的**规范字段名**（`本期借方` / `本期贷方`）。
+#:
+#: 别名集合与规范名都取自 `formula_engine.COLUMN_ALIASES` / 共享件
+#: `four_table.occurrence_by_standard_code`，**不在本文件另立第二套词表**。
+#: 数据源 = ``tb_balance.debit_amount`` / ``credit_amount``，经
+#: :func:`fetch_occurrence_by_standard_code` 按标准码归集（含叶子聚合，父子不双算）。
+_OCCURRENCE_COLUMNS: dict[str, str] = {
+    alias: canonical
+    for alias, canonical in COLUMN_ALIASES.items()
+    if canonical in (DEBIT_KEY, CREDIT_KEY)
+}
+
+
+async def _resolve_occurrence(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+    column_name: str,
+) -> dict[str, dict[str, Decimal]]:
+    """发生额取数（`tb_balance` 叶子归集），供 TB / SUM_TB 的发生额列共用。
+
+    🔴 **不要在 `TrialBalance` 上取发生额** —— 该表没有 `debit_amount` /
+    `credit_amount` 两列（实测 ORM 列只有 `unadjusted_amount` / `rje_adjustment` /
+    `aje_adjustment` / `audited_amount` / `opening_balance`），而原实现走
+    `getattr(row, field, None)` **带默认值** ⇒ 取不到列时静默返 `Decimal("0")`，
+    使「借方发生额 / 贷方发生额」这两个已登记的列名**恒为 0**（看着注册了、
+    实则死映射，2026-08-06 实测）。该 service 有 24 个生产消费方
+    （D1~D7 / H5~H10 / I1~I6 全部 render 策略）。
+
+    fail-open 由 `fetch_occurrence_by_standard_code` 内部承担（异常返 `{}`）。
+    """
+    return await fetch_occurrence_by_standard_code(db, project_id, year)
 
 
 async def _resolve_tb(
@@ -80,6 +129,15 @@ async def _resolve_tb(
     account_code: str,
     column_name: str,
 ) -> Decimal:
+    # ── 发生额列走 tb_balance（按**列名**判定，且门控早于 TrialBalance 查询） ──
+    #
+    # 🔴 必须按 `column_name` 判、不能按 `_COLUMN_MAP` 的结果判：发生额列已从
+    # `_COLUMN_MAP` 移除，`.get(column_name, "audited_amount")` 对它们会回退成
+    # 「审定数」—— 那正是本次要消除的静默回退，只是换了个位置。
+    canonical = _OCCURRENCE_COLUMNS.get(column_name)
+    if canonical is not None:
+        occ = await _resolve_occurrence(db, project_id, year, column_name)
+        return occ.get(account_code, {}).get(canonical, Decimal("0"))
     field = _COLUMN_MAP.get(column_name, "audited_amount")
     # 数据集版本口径统一（与 Tier B prefill 同口径，见决策3）：
     # 用 get_active_filter 替代裸 is_deleted，规避读到 superseded/staged 数据。
@@ -115,6 +173,16 @@ async def _resolve_sum_tb(
     if len(parts) != 2:
         return Decimal("0")
     start_code, end_code = parts[0].strip(), parts[1].strip()
+    # ── 发生额区间求和走 tb_balance（同 `_resolve_tb`，按列名判定并早于查询） ──
+    canonical = _OCCURRENCE_COLUMNS.get(column_name)
+    if canonical is not None:
+        occ = await _resolve_occurrence(db, project_id, year, column_name)
+        total = Decimal("0")
+        for code, cols in occ.items():
+            # 与 TrialBalance 分支同口径：按标准码字符串区间比较
+            if start_code <= code <= end_code:
+                total += cols.get(canonical, Decimal("0"))
+        return total
     field = _COLUMN_MAP.get(column_name, "audited_amount")
     # 数据集版本口径统一（与 Tier B prefill 同口径，见决策3）。
     active_filter = await get_active_filter(

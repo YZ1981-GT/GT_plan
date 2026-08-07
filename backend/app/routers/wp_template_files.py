@@ -16,6 +16,10 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.services.four_table.occurrence_by_standard_code import (
+    fetch_occurrence_by_standard_code,
+    merge_occurrence_into_tb_data,
+)
 from app.services.wp_template_init_service import (
     get_workpaper_file,
     get_workpaper_storage_path,
@@ -213,14 +217,51 @@ async def _get_tb_data_for_prefill(
         code = row[0]
         if not code:
             continue
-        # trial_balance 无 closing_balance/借贷发生额列：期末余额/未审数取 unadjusted_amount，
-        # 审定数取 audited_amount；发生额明细在 tb_balance（此处不取）。
+        # trial_balance 无 closing_balance 列：期末余额/未审数取 unadjusted_amount，
+        # 审定数取 audited_amount。
         tb_data[code] = {
             "期初余额": float(row[1] or 0),
             "期末余额": float(row[2] or 0),
             "未审数": float(row[2] or 0),
             "审定数": float(row[3] or 0),
         }
+
+    # ── 借贷发生额（`本期借方` / `本期贷方`）──
+    #
+    # 🔴 `trial_balance` **没有**发生额列，发生额明细只在 `tb_balance`。改造前本函数
+    # 注释写「发生额明细在 tb_balance（此处不取）」⇒ 不产出这两个键，而
+    # `formula_engine` 两条求值路径又**静默回退期末余额** ⇒ 全库 48 个预设格
+    # （`本期借方` 19 / `本期贷方` 17 / `贷方发生额` 7 / `借方发生额` 5）的
+    # 「本期增加 / 本期减少 / 本期计提」列拿到的是**期末余额**（数字错，不是取不到）。
+    #
+    # 现在引擎侧已改三态（列缺失 → 诚实的 0 + trace），故这里必须把键真正产出，
+    # 否则 48 格从「错数字」变成「恒 0」——对使用方仍是取不到数。
+    #
+    # 复用共享件（含叶子聚合防父子双算 + 未映射叶子按最长前缀继承祖先映射 +
+    # fail-open），**禁**在此另写一份 tb_balance 查询。
+    try:
+        year_row = await db.execute(
+            text("SELECT audit_year FROM projects WHERE id = :pid LIMIT 1"),
+            {"pid": str(project_id)},
+        )
+        audit_year = year_row.scalar_one_or_none()
+    except Exception as e:  # noqa: BLE001
+        logger.warning("预填充解析审计年度失败 pid=%s: %s", project_id, e)
+        audit_year = None
+
+    if audit_year is not None:
+        occurrence = await fetch_occurrence_by_standard_code(
+            db, project_id, int(audit_year)
+        )
+        # as_float=True：本函数对外契约是 dict[str, dict[str, float]]
+        merge_occurrence_into_tb_data(tb_data, occurrence, as_float=True)
+    else:
+        logger.warning(
+            "预填充跳过发生额归集（审计年度未解析）pid=%s —— "
+            "TB(code,'本期借方') 将落到「列无数据」分支返 0",
+            project_id,
+        )
+
     return tb_data
 
 
