@@ -212,6 +212,20 @@ async def cutoff_fill(
         if req.filled_voucher_nos:
             criteria["filled_voucher_nos"] = req.filled_voucher_nos
 
+        # ── R2.5：回填时随带的抽样评价必须与 /voucher-evaluation 走**同一归一器** ──
+        # 否则该路径写进去的 evaluation 缺 `evaluated_at` / `evaluated_by`
+        # （两者是服务端权威字段，客户端不传）→ 前端 `evaluationSourceHint` 因
+        # `evaluatedAt` 为空而不渲染「读自批次 X（… 评价）」标注，R2.7 的
+        # 「标注来源批次与评价时间」就落不了地（实测形态）。
+        # 局部 import：`voucher_sampling` 与本模块此前无依赖边，放模块级会新增
+        # 一条仅为一个纯函数而存在的耦合。
+        if isinstance(criteria.get("evaluation"), dict):
+            from app.routers.voucher_sampling import _normalize_evaluation
+
+            criteria["evaluation"] = _normalize_evaluation(
+                criteria["evaluation"], actor_id=current_user.id
+            )
+
         log_data = ExtractionLogCreate(
             project_id=pid,
             workpaper_id=req.workpaper_id,

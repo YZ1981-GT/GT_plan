@@ -609,6 +609,10 @@ class LedgerSamplingService:
                 return {
                     "id": str(existing.id),
                     "created_at": existing.created_at.isoformat(),
+                    # 🔴 幂等重放也必须回报 batch_id：调用方要用它做批次留痕
+                    # （抽样方法学 bar 的「批次号」列）。此前只有首次插入路径返回该键，
+                    # 幂等重放时调用方拿不到批次号 → 留痕字段静默为空。
+                    "batch_id": str(existing.batch_id) if existing.batch_id else None,
                     "idempotent": True,
                 }
 
@@ -648,6 +652,8 @@ class LedgerSamplingService:
                     return {
                         "id": str(existing.id),
                         "created_at": existing.created_at.isoformat(),
+                        # 与上方幂等分支同口径：并发竞态回退时同样回报 batch_id
+                        "batch_id": str(existing.batch_id) if existing.batch_id else None,
                         "idempotent": True,
                     }
             raise
