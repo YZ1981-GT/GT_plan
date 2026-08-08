@@ -525,3 +525,38 @@ allowlist 的子集；allowlist 每条须带理由字符串（≥10 字），条
 （由 R3 通路写入），证明该 enum 值真正可用；实测后须复原测试数据。
 
 **Validates: Requirements 7.4, 3.3**
+
+### Property 22: 抽样方法学与错报留痕的可追溯字段真能取到值
+
+Task 24 浏览器实测挖出四处「声明了但取不到值」（dead output）—— 判据一律是**源码形态**
+而非「字段名出现过」，因为「出现过」挡不住把它写成恒 null 的表达式：
+
+1. **`filled` 载荷的 methodology 必须携带 `batchId` / `datasetId`**。改造前引擎只填 9 个
+   字段，而共享类型 `SamplingMethodologySnapshot`、`buildMethodologySummary` 与
+   `WpSamplingMethodologyBar` 三处都声明并渲染这两列 ⇒ 归档件上最要紧的两个可追溯字段
+   **结构上恒为空**（实测：一个 `dataset_id` 已绑定的批次仍显示「未绑定账套版本」）。
+   `batchId` 的真源是 `cutoff-fill` 响应，故 `confirmFill` 不得丢弃该响应；
+   备忘导出侧亦不得读 `methodologySnapshot.batch_id`（后端 `build_methodology_snapshot`
+   是纯方法学函数，抽样时批次还不存在，其快照里压根没有该键）。
+2. **`wpCode` 必须回落 `WorkpaperRuntimeContext.wpCode`**。实测 78 个抽凭宿主一个都没传
+   该 prop ⇒ 只靠 prop 会让 A13 的 `source_wp_code` 恒 null（错报汇总看不出这笔推断错报
+   出自哪张底稿）。`inject` 必须在 setup 顶层，且传给 composable 的必须是 getter
+   （runtime 在引擎 setup 那一刻未必已就位，静态快照会把它固化成空串）。
+   复核 `section_id` 前缀与 `source_wp_code` 共用同一真源，不得两处分叉。
+3. **R2.7 回读态卡片不得被样本数门控藏起来**。回读既有批次评价时会话内没有样本，
+   只按 `sampledVouchers.length > 0` 渲染会把回读结果整块藏起来 —— 状态还原了但用户
+   看不见。同时「重新推断」与「记入 A13」在该态下必须禁用并给出根因（0 笔样本重算会
+   抹掉回读结果；描述里的样本量/种子取自会话内值，会写出 `样本量:0 随机种子:-`）。
+4. **A13 描述里的批次号必须与同一条描述的样本量/种子同属一个事件**。「已抽样但未回填」
+   时 `loadedFromBatch` 仍指向**上一个批次**，直接取它会写出「样本量:2 随机种子:20260811
+   批次:43da7592」而那个批次是另一套样本 —— 错的批次号比没有批次号更坏（复核人按它去翻
+   批次会对不上样本），此时如实写「未回填」。
+
+配套后端不变量：R2.5 的回填路径（`cutoff-fill`）随带的 `evaluation` 必须复用
+`/voucher-evaluation` 的**同一归一器**，否则该路径写出的评价缺 `evaluated_at` /
+`evaluated_by`（服务端权威字段，客户端不传）⇒ 前端 `evaluationSourceHint` 因
+`evaluatedAt` 为空而不渲染「读自批次 X（… 评价）」标注，R2.7 的「标注来源批次与评价
+时间」落不了地。`record_extraction_log` 的**幂等重放分支**同样要回报 `batch_id`
+（改造前只有首次插入路径返回该键 ⇒ 幂等重放时调用方拿不到批次号）。
+
+**Validates: Requirements 2.3, 2.5, 2.7, 3.6, 6.2, 6.3**

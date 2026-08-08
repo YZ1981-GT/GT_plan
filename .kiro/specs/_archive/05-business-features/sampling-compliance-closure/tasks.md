@@ -274,7 +274,7 @@
   - **提交前确认 yml 不引用任何未提交的测试文件**（否则 CI 立刻红；memory 已记该踩坑）
   - _Requirements: 7.5_
 
-- [ ] 24. 浏览器实测 + 真实库验证 + 数据复原
+- [x] 24. 浏览器实测 + 真实库验证 + 数据复原
   - 抽样 → 录实际错报 → 推断 → 确认结论 → 推送 A13 → `postgres` 查到
     `misstatement_type='projected'` 行（Property 18）
   - 关弹窗重开 → 推断区还原且标注来源批次（R2.7）
@@ -865,6 +865,155 @@ tooltip 与关闭后提示指向**不同动作**（前者「先确认结论」/�
 由 bar 满足。**改判据必须同步复核自己的反向自检**，否则会误判成回归。
 ②`toEqual` 严格比对会因新增字段打红（`mapSampledToGenericRow` 加 `partyName` 后）——
 那是测试镜像旧结构，补字段并加一条往来单位专项断言。
+
+### Wave 4 收口实录（2026-08-08，任务 24）—— 浏览器实测 + 真实库验证 + 数据复原
+
+实测目标：项目 `2aa00f57`（重庆和平药房连锁）/ 底稿 `d35c715a` = **D3 预收账款**（科目 2203）。
+**实测三件套齐备**：录真实数据 + 看目标区域真出数 + postgres 查落库；测完逐项复原。
+
+#### 实测通过项
+
+| 验收项 | 实测结果 |
+|---|---|
+| Property 18 projected 落库（R7.4） | `misstatement_type='projected'` 真落库，金额 **449,019.06**（= projected，**不含**高值层已知错报，R3.6）；描述内嵌 方法/样本量/种子/批次/错报上限 |
+| 推断算术（独立复算） | `1200.50 / 12,988.02 × 4,857,866.37 = 449,019.06` 与界面逐分相符；UML = 449,019.06 + 0 + 224,509.53 = **673,528.59** ✓（用 `Decimal` 独立算，不拿被测代码自证） |
+| R1.1/R1.3 dataset 绑定 | `stats.dataset_id` = `d6f5f77b…` 落进 `extraction_criteria`，与 `ledger_datasets` 的 active 记录一致 |
+| R1.4/R1.6 history 三字段 | `voucher-history` 返 `dataset_id` / `dataset_stale=false` / `evaluation` 键齐备（dataset 未变 ⇒ 不告警，符合 R1.6「不把未知当已变更」） |
+| R5.6 voucher-coverage | 只读 GET 返 `by_workpaper`（batch_count/sample_count）+ `duplicated`，形态正确 |
+| R2.7 回读还原 | 关弹窗重开后 推断错报/UML/结论/已人工确认 全部还原，并标注 **「读自批次 43da7592（2026-08-08 10:03:41 评价）」** |
+| R18.7 确认填充门控可达性 | 「确认填充」**前置 disabled + tooltip 说明具体缺什么**（未检查处置 → 偏差性质 → 确认结论 三级依次推进），且 tooltip 指明「关闭本预览 → 在下方补齐 → 点操作栏的『继续填充』」；「继续填充（N 笔待回填）」重开入口实测可用（不必重抽换 seed） |
+| R4/R5（姊妹 spec）门控联动 | 未检查处置二选一 / 偏差性质三选一（人为偏差另要求原因+影响评估）/ 完整性核对 ≥10 字放行 —— 三道门实测逐级生效，`deviation_nature_summary` 落库为 `{"human":{"count":1,...}}` 结构化形态 |
+| Property 11 同批次防重 | 回填后 `sampling_records` / `sampled_vouchers` 有投影行且按 batch 唯一 |
+| R2.9 失败不静默 | `persistEvaluation` 失败时如实弹「抽样评价保存失败，请重试（本次推断结果尚未落库）」，未被 `catch {}` 吞掉 |
+
+#### 🔴 实测挖出并修掉 **4 个真缺陷**（全属「声明了但取不到值」的 dead output 族）
+
+四者的共性：**四层验证全绿**（`get_diagnostics` 零诊断 / vitest 全绿 / Vite transform 200 /
+既有守卫 229 例全过），**只有浏览器 + postgres 交叉核对才能暴露**。
+
+1. **🔴🔴 方法学 bar 的「批次号」「账套版本」两列结构上恒为空（R6.2 实际未满足）**
+   实测形态：`抽样方法学 随机抽样 科目2203 样本量30 种子1959784991 **未绑定账套版本**`
+   —— 而该批次的 `extraction_criteria.dataset_id` 明明已绑定。
+   根因链：共享类型 `SamplingMethodologySnapshot` 声明了 `batchId?` / `datasetId?`、
+   `buildMethodologySummary` 渲染两者、`WpSamplingMethodologyBar` 也渲染两者（含 8 位截断 +
+   全量 tooltip），**唯独引擎构造 `filled` 载荷时只填 9 个字段**，两个字段一次都没传过。
+   且 `confirmFill` **丢弃了 `cutoff-fill` 的响应**（`await http.post(...)` 无赋值），而
+   `batch_id` 正是该响应回报的 —— 前端根本无从得知批次号。
+   同族第二处：抽样备忘导出把 `batchId` 读成 `methodologySnapshot.batch_id`，而后端
+   `build_methodology_snapshot` 是**纯方法学函数**（抽样时批次还不存在），快照里压根没有
+   该键 ⇒ 恒 null；代码注释里还留着「batchId 待 Task 7 前端 wiring 后接入」的自认 TODO。
+   **修法**：`confirmFill` 捕获响应 → 新增 `filledBatchId` ref（新抽样时清空，避免把上一
+   批次号贴到新样本上）→ 引擎把 `batchId`/`datasetId` 填进 `filled` 载荷 →
+   `serializeMethodology` 是整体 `JSON.stringify` 故两个字段自动流通到 41 个已接线宿主。
+   **实测**：`抽样方法学 随机抽样 科目2203 样本量2 可容忍错报50,000.00 种子20260810
+   **批次43da7592 账套版本d6f5f77b**`，两值与 DB 的 `batch_id` / active `dataset_id`
+   逐字相符（独立 SQL 交叉核对，非拿界面自证）。
+
+2. **🔴🔴 `wpCode` prop 是死 prop ⇒ A13 的 `source_wp_code` 恒 null**
+   实测：**78 个抽凭宿主 0 个传 `wp-code`**（脚本按标签属性串精确统计）。Wave 1 的
+   Progress Log 曾把它记为「Wave 3 宿主收口时一并补传」，但 Wave 3 未做。
+   后果：推断错报进了 A13 错报汇总，却看不出出自哪张底稿 —— 而平台其余 ~35 个推送点都写
+   `source_wp_code`（残留数据里可见 `'D1'` / `'F0'`）。
+   **修法不是改 78 个宿主**：`WorkpaperRuntimeContext` 本就声明了 `wpCode: Ref<string>` 且由
+   `useWorkpaperScaffold` 在底稿页统一 provide → 引擎 setup 顶层 `inject` 后回落即可（一个
+   文件替代 78 个）。传给 composable 的是 **getter** 而非静态快照（runtime 在引擎 setup
+   那一刻未必已就位，快照会把它固化成空串）；composable 侧新增 `resolveWpCode()`
+   支持 string/ref/getter 三形态。顺带把复核 `section_id` 前缀也收敛到同一真源
+   （**改前缀零丢数**：实测全库 4 张含 `section_id` 的表里 `sampling-*` 记录数为 **0**）。
+   **实测**：同一张 `unadjusted_misstatements` 表里前后对照 —— 改造前那条
+   `source_wp_code = None`，改造后那条 `source_wp_code = 'D3'`。
+
+3. **🔴 R2.7 回读态整块不可见**（用户故事「打开底稿就能看到上一批次的推断错报与结论」不成立）
+   `loadLatestEvaluation` 把评价还原进了 refs，但错报推断卡片的渲染门控是
+   `v-if="sampledVouchers.length > 0"` —— 回读时会话内没有样本 ⇒ **卡片整块不渲染**，
+   状态还原了用户看不见。
+   **修法**：门控改 `sampledVouchers.length > 0 || misstatementResult`；同时新增
+   `hasSessionSamples` 把「重新推断」与「记入 A13」在该态下禁用并给出根因 ——
+   0 笔样本重算会抹掉回读结果，而描述里的样本量/种子取自会话内值，会写出
+   `样本量:0 随机种子:-` 的错留痕。
+
+4. **🔴 A13 描述里的批次号与同一条描述的样本量/种子不是同一个事件**
+   「已抽样但未回填」时 `loadedFromBatch` 仍指向**上一个批次**，直接取它会写出
+   「样本量:2 随机种子:20260811 批次:43da7592」而那个批次是另一套样本（本轮真实复现）。
+   **错的批次号比没有批次号更坏** —— 复核人按它去翻批次会对不上样本。
+   **修法**：新增 `resolveDescriptionBatchId()` 三态（本会话已回填 > 已抽未回填写「未回填」>
+   纯回读态取回读批次）。**诚实改写**了既有 `voucherSamplingEvaluation.spec.ts` 里
+   「描述含批次:batch-abc」那条用例 —— 它的 fixture 手工把 `loadedFromBatch` 设成
+   'batch-abc' 而会话内有样本，恰是本缺陷形态；改成分三态断言（判据变**更强更具体**，
+   不是放宽），并补两条新用例。
+
+#### 配套后端修正（R2.3/R2.5 一致性）
+
+- **`cutoff-fill` 随带的 `evaluation` 未走归一器** → 该路径写出的评价缺
+  `evaluated_at` / `evaluated_by`（服务端权威字段，客户端不传）⇒ 前端
+  `evaluationSourceHint` 因 `evaluatedAt` 为空而不渲染「读自批次 X（… 评价）」
+  ⇒ R2.7 的「标注来源批次与评价时间」落不了地。修法 = 复用 `/voucher-evaluation` 的
+  **同一归一器** `_normalize_evaluation`（局部 import，`isinstance(...,dict)` 门控保零回归，
+  `actor_id` 取服务端会话用户）。**实测**：新批次 `43da7592` 的评价带
+  `evaluated_at=2026-08-08T10:03:41…` / `evaluated_by`，来源标注随即渲染。
+- **`record_extraction_log` 的两条幂等重放分支不回报 `batch_id`**（只有首次插入路径返回该
+  键）⇒ 幂等重放时调用方拿不到批次号、留痕字段静默为空。已补上，与首次插入同口径。
+
+#### 守卫与验证
+
+- 新建 `samplingMethodologyTraceability.spec.ts`（**28 例**，Property 22）+
+  `test_sampling_evaluation_fill_path.py`（**18 例**）。判据一律**源码形态**而非「字段名出现
+  过」（后者挡不住写成恒 null 的表达式）；含 `stripComments` / AST 剥 docstring 自检、
+  跨文件交叉锁死（读 `useWorkpaperScaffold.ts` 断言 `wpCode` 字段与 `provide` 都在）、
+  「顺序判据」（未回填分支必须在回读分支之前）。
+- **变异检验三轮共 21 个变异，21/21 全部 RED**，每轮均按「失败测试名集合差集」判定并做
+  字节级还原 + md5 校验，还原后基线复归 0。逐条复现了上述四个缺陷的原始形态
+  （batchId 写死 null / 读方法学快照 / 丢弃 cutoff-fill 响应 / inject 挪进函数体 /
+  传静态快照 / 两处真源分叉 / 门控退回只看样本数 / 描述借用上一批次号 / 不归一 evaluation…）。
+  M19 首轮 ANCHOR-MISS —— 原因是**跨行锚点在 CRLF 工作树必 MISS**（平台已记该踩坑），
+  改单行锚点后 RED。
+- **回归**：前端 11 文件 **259 passed / 0 failed**（基线 229，净增 30 全通过、新增失败 0）；
+  后端本 spec 守卫 **69 + 47 = 116 passed 零 skip**（连库文件独立进程跑）。
+- **零回归（HEAD-swap 硬判据）**：把改过的两个后端文件换成 `git show HEAD:` 版跑同一选择集
+  （`-k "sampling or voucher or cutoff or functional_actions or ledger_sampling"`），
+  两侧**失败集合逐条相同 4 项**（全是 `test_voucher_sampling_batch_wiring.py` 已知的
+  `asyncio.get_event_loop()` 事件循环污染，该文件单独跑 9 passed），
+  **新增 0 / 修好 0**；跑完按 md5 校验还原。
+  🔴 第一次跑该脚本时 `-k "a or b"` 经 cmd 被拆成多个参数 → pytest 报
+  `file or directory not found: or` 且 **collected 0** → 两侧失败集合都是空集 →
+  差集为空 → **假「零回归」**。已改为不经 shell 传参数列表，并加「passed < 100 即中止」
+  的自检闸。
+- CI：`sampling-compliance-backend` 增挂 `test_sampling_evaluation_fill_path.py`；
+  `sampling-compliance-frontend` 增挂 `samplingMethodologyTraceability.spec.ts` 与
+  `samplingConfirmFillReachability.spec.ts`（后者此前已交付但未挂 CI）。
+  YAML 校验：可解析 136 job、**无重名 job**、两个 job 引用的 15 个文件全部存在。
+
+#### 数据复原（复原到**真基线**，非「我实测前那一刻」）
+
+2026-08-04 那轮 Task 24 部分实测留下的残留同属本 spec 的测试产物，一并清除。原子事务
+（`engine.begin()`）删除 3 log + 3 sampling_records + 26 sampled_vouchers + 2 projected 错报 +
+3 checklist_responses + 4 snapshots，**复原后独立只读查询逐项核对**：
+
+| 表 | 复原后 | 真基线 | 依据 |
+|---|---|---|---|
+| `workpaper_extraction_log` | 2（id 逐一相符） | 2 | 08-04/08-08 的 D3 记录全是实测产物 |
+| `sampling_records` | 0 | 0 | V139 新接投影表，实测前全库 0 行 |
+| `sampled_vouchers` | 1（`batch_id IS NULL`） | 1 | 仅保留穿透页手工标记 |
+| `unadjusted_misstatements` | 2（均 `is_deleted`，0 projected） | 2 | 那 2 条属别的 spec 的残留 |
+| `checklist_responses`(D3) | 0 | 0 | 3 条全是实测写入 |
+| `workpaper_snapshots` | 164 全库 / 2 (D3) | 164 / 2 | 4 条是本轮 fire-and-forget |
+| `working_paper.parsed_data` | md5 `6c3e226b…` / `updated_at 2026-06-08` | 同 | 全程未变 |
+
+#### 🟡 未修（超本 spec 边界，已登记）
+
+- **对方科目 / 对方明细两列如实留空**：`tb_ledger.counterpart_account` 全库 0 填充（数据层
+  缺失，非代码缺陷）；前端映射已接好，导入侧补齐该列即自动生效。「按同凭证其它分录派生」
+  已被实证否决（凭证键不唯一，40/63 组有多条对方分录）。
+- **R1.5「抽样框已变更」告警的 UI 未在浏览器验**：该项目只有 1 个 active dataset，制造
+  stale 需改动共享数据集状态（破坏性）。后端三态判定已由 `test_sampling_dataset_binding.py`
+  在真实库上验过（含 superseded ⇒ stale 实证），前端 tag 渲染由 `SamplingHistoryDrawer`
+  侧守卫覆盖 —— **如实登记为未做浏览器实测**，不用 fixture 冒充。
+- **跨底稿重复凭证（R5.6 `duplicated` / R8）未在浏览器触发**：需第二张底稿抽到同一批凭证，
+  实测时只有 D3 有引擎登记行 ⇒ `duplicated` 正确地为 `[]`。后端范围判据与前端三出口
+  由 `crossWorkpaperDuplicateConfirm.spec.ts`(17) + 后端 4 例覆盖。
+- **`readonly` prop 仍是死 prop**（78 个宿主均未传，运行态恒可编辑）——
+  `wpCode` 已找到运行时来源故已修，`readonly` 无同款来源，需宿主显式传，归
+  `voucher-check-shared-layer`。
 
 ## Notes
 

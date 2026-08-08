@@ -2,7 +2,7 @@
 
 **最后更新**：2026-08-08
 **当前分支**：`work/2026-05-30-wp-specs`
-**统计**：Active **6**（2026-08-08 行首锚定正则实扫）/ Archived **537**
+**统计**：Active **7**（2026-08-08 行首锚定正则实扫）/ Archived **545**
 **最高迁移**：**V143**（`word_export_task_versions.drift_report`；以 `migration_status` 实测为准）
 **技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer
 
@@ -31,14 +31,17 @@
 | `custom-workpaper-dual-mode-formula-and-batch` | 28/29 | 自定义底稿（componentType=custom）双模式 + 自定义公式 + 批量创建。xlsx 为唯一权威、`html_data.cells` 是其恒等坐标投影；剩 Wave 5 导出 / Wave 6 批量创建收尾 |
 | `h-cycle-extraction-formula-and-disclosure-completion` | 17/18（Task 18 `[-]` = 浏览器实测收尾） | H 类（H1~H10）取数/公式/披露收口。双族并存取数（`dual_family_codes`）+ 列名注册 + H1~H4 审定预填 + 会计政策章 + 金额控件。真实库 80 组合验收已过，只剩浏览器实测 |
 | `note-template-columns-and-legacy-snapshot-closure` | 21/23 | 附注模板列元数据补齐 + legacy 快照收口。列真源按章节三分（有底稿披露 sheet → openpyxl 直读 / 母公司章 → A spec / 无披露 sheet → 附注 docx）。已补 columns 85 张 + guidance 53 张；legacy 快照迁移已执行（132 章节 / 152 表 / 1134 行，行数守恒 + 幂等 + 回滚往返 + 三消费方 issues=0）。剩 Task 13/14（⏸ 等 B spec 收口，撞模板行集）+ Task 23 收口 |
-| `soe-listed-note-conversion-correctness` | 12/19（inprog 1 + queued 5，**并发会话在推进，勿碰**） | 国企↔上市附注转换正确性。生产 6 步里 3 步空操作、v2 映射是孤儿；同义两码 / 一码两义 / 章节映射修复。依赖 A spec（已收口） |
-| `sampling-compliance-closure` | 24/25（只剩 Task 24 浏览器实测） | 抽样/抽凭合规闭环：dataset 版本绑定 + 推断错报持久化 + A13 `projected` 通路 + 删 legacy 抽样引擎 + 42 宿主 methodology 收口 |
-| `e-cycle-extraction-formula-and-disclosure-completion` | 1/22（并发会话新建） | E 类（E0/E1）取数/公式/披露收口 |
+| `soe-listed-note-conversion-correctness` | 17/19（**并发会话在推进，勿碰**） | 国企↔上市附注转换正确性。生产 6 步里 3 步空操作、v2 映射是孤儿；同义两码 / 一码两义 / 章节映射修复。依赖 A spec（已收口） |
+| `e-cycle-extraction-formula-and-disclosure-completion` | 1/22（并发会话新建） | E 类（E0/E1）取数/公式/披露收口。账户级取数走 `tb_aux_balance` 银行账户维度（客户 1002 不分户，叶子恒 1 行） |
+| `g7-column-alignment-and-extraction-closure` | 0/24（并发会话新建） | G7 长期股权投资列结构对齐与取数闭合。核心 = 补上「源 xlsx ↔ 模板 seed ↔ 运行时载荷」三向锁死的第三条边（既有两个守卫各自只覆盖两条边，故 32 处列偏差长期逃逸） |
+| `procedure-trimming-and-delegation-intelligence` | 0/26（并发会话新建） | 程序裁剪三维判据（风险评估 → 重要性 → 数据存在性）+ 人员委派智能化。现状只实现最末位「科目在试算表无数据」一维 |
 
-> 🔴 `soe-listed-*` 由**并发会话**推进（tasks.md mtime 秒/分钟级刷新），本会话未触碰。
+> 🔴 `soe-listed-*` / `e-cycle-*` / `g7-*` / `procedure-trimming-*` 由**并发会话**推进
+> （tasks.md mtime 秒/分钟级刷新），本会话未触碰。
 > 跨会话协作时不要并行推进同一 spec（memory 已实证并发会话会互相回退同一文件）。
 > `f0`(144/144) / `parent-company`(18/18) / `report-config`(12/12) /
-> `sampling-evaluation-and-governance-closure`(19/19) 已于 2026-08-08 归档（见 §二）。
+> `sampling-evaluation-and-governance-closure`(19/19) / `k0`(18/18) /
+> **`sampling-compliance-closure`(25/25)** 已于 2026-08-08 归档（见 §二）。
 
 **2026-08-08 归档（1 个，→ `05-business-features`，与 `voucher-sampling-*` /
 `cutoff-test-*` / `voucher-check-sampling-integration` 同分类）**：
@@ -125,28 +128,34 @@ H0 聚合忽略 `closing_direction` 把 contra 子科目加成正数）。
 
 ---
 
-## 二、已归档 Spec（537 个，15 分类）
+## 二、已归档 Spec（545 个，15 分类）
 
 ```
 _archive/
 ├── 01-phase-foundation/              24
 ├── 02-workpaper-cycles/              16
-├── 03-refinement-rounds/              7
+├── 03-refinement-rounds/              9
 ├── 04-infra/                          3
 ├── 04-infra-architecture/            39
-├── 05-business-features/            236
+├── 05-business-features/            237
 ├── 06-engineering-governance/        13
 ├── 07-workpaper-slimdown/            22
-├── 08-disclosure-notes/              76
+├── 08-disclosure-notes/              77
 ├── 09-consolidation-phases/           5
 ├── 10-A~S-workpaper-all-cycles-complete/  31
-├── 11-confirmation-d0-module/        16
+├── 11-confirmation-d0-module/        17
 ├── 12-2026-06-23-batch/              12
 ├── 13-2026-06-29-batch/              33
-└── 99-superseded/                     3
+└── 99-superseded/                     7
 ```
 
 ### 最近归档（2026-08-08）
+
+**→ 05-business-features（+1，抽样域第 5 个 spec）**
+
+| Spec | 说明 |
+|------|------|
+| sampling-compliance-closure | 抽样/抽凭合规闭环（**25/25 全完成** + 浏览器实测 + 数据逐项复原）。四波：dataset 版本绑定（抽样查询原先只走 `get_active_filter`，序时账重导后同 seed 同参数得到不同样本且无提示 ⇒「seed 可复现」是假的）· 推断错报持久化 + A13 **`projected`** 通路（改造前 `misstatement_type` 硬编码 `factual`，PG enum 的 `judgmental`/`projected` 是死枚举 ⇒ CAS 1314 的核心输出进不了错报汇总）· 删 legacy `wp_sampling_engine`（金额口径 `debit+credit` 与 canonical 的 `GREATEST` 不同、分层权重写死、不落 log 不可撤销）+ V139/V140 迁移（**加唯一索引前必先查既有唯一约束** —— `uq_sampled_voucher_project_year_no` 全局唯一会让引擎登记撞它并被 fail-open 吞成 WARNING）· 78 宿主 methodology 收口（字段集判据按行模型语义分层：凭证明细型强制四要素 / 合规检查·计价测试型只要求样本可回溯，源模板实证 F2-33 只有源单据日期号、H4-5 只有入账凭证号，加「凭证日期」列属自造底稿列）。**用户裁决**：同一凭证被多底稿抽取必须弹窗人工确认（三出口 + 处置随回填留痕），不由配置项静默决定。**Task 24 收口修掉 4 个前端 dead output 缺陷**（`filled` 载荷缺 `batchId`/`datasetId` 致 bar 恒显「未绑定账套版本」· `wpCode` 是死 prop（78/78 宿主未传）致 `source_wp_code` 恒 null → 改 setup 顶层 `inject(WorkpaperRuntimeContextKey)` 传 getter · 回读态卡片被 `sampledVouchers.length > 0` 藏起来 · A13 描述批次号与样本量/种子不同源）+ 2 处后端修正（`cutoff_fill` 复用 `_normalize_evaluation` · `record_extraction_log` 两条幂等重放分支补回 `batch_id`）。新增 Property 22 + 守卫 46 例，**变异检验三轮 21/21 全 RED**，数据复原后独立只读查询逐项相符。与同分类 `sampling-evaluation-and-governance-closure`（其后继）、`voucher-sampling-engine`、`voucher-sampling-hardening`、`voucher-check-sampling-integration`、`cutoff-test-*` 同域 |
 
 **→ 11-confirmation-d0-module（+2）**
 
