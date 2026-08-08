@@ -15,11 +15,16 @@ import { describe, it, expect } from 'vitest'
 import {
   computeCoverage,
   checkCAS1314Compliance,
+  type ComplianceCheckInput,
   validateSamplingConfig,
   computeVersionDiff,
   type SamplingConfig,
   type CoverageStats,
 } from '../composables/useSamplingAlgorithms'
+import {
+  DEFAULT_COVERAGE_THRESHOLD,
+  THRESHOLD_SOURCE_LABELS,
+} from '../composables/samplingCoverageThreshold'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -91,59 +96,130 @@ describe('computeCoverage', () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('checkCAS1314Compliance', () => {
-  it('金额覆盖率 < 60% → coverage_low warning', () => {
-    const stats = makeStats({ amountCoverageRate: '59.99' })
-    const warnings = checkCAS1314Compliance(stats, 'random', 30, 100)
+  /**
+   * 入参构造器：默认给一组「不触发任何告警」的基线，各用例只覆盖关心的字段。
+   *
+   * 签名于 sampling-evaluation-and-governance-closure R2 由位置参数改为 options 对象 ——
+   * 原签名 `(stats, method, sampleCount, totalCount)` 的后两个参数在调用点被传成
+   * 「勾选数 / 抽出总数」，与规则语义不符（详见 ComplianceCheckInput 的文档注释）。
+   */
+  const makeInput = (over: Partial<ComplianceCheckInput> = {}): ComplianceCheckInput => ({
+    stats: makeStats({ amountCoverageRate: '80.00' }),
+    method: 'random',
+    methodSampleCount: 30,
+    totalSampleCount: 100,
+    suggestedSampleSize: null,
+    coverageThreshold: DEFAULT_COVERAGE_THRESHOLD,
+    coverageThresholdLabel: THRESHOLD_SOURCE_LABELS.platform_default,
+    ...over,
+  })
+
+  it('金额覆盖率低于阈值 → coverage_low warning', () => {
+    const warnings = checkCAS1314Compliance(
+      makeInput({ stats: makeStats({ amountCoverageRate: '59.99' }) }),
+    )
     expect(warnings.some(w => w.type === 'coverage_low')).toBe(true)
   })
 
-  it('金额覆盖率 = 60% → 不触发 coverage_low', () => {
-    const stats = makeStats({ amountCoverageRate: '60.00' })
-    const warnings = checkCAS1314Compliance(stats, 'random', 30, 100)
+  it('金额覆盖率 = 阈值 → 不触发 coverage_low（边界含等号侧不告警）', () => {
+    const warnings = checkCAS1314Compliance(
+      makeInput({ stats: makeStats({ amountCoverageRate: '60.00' }) }),
+    )
     expect(warnings.some(w => w.type === 'coverage_low')).toBe(false)
   })
 
-  it('金额覆盖率 > 60% → 不触发 coverage_low', () => {
-    const stats = makeStats({ amountCoverageRate: '75.00' })
-    const warnings = checkCAS1314Compliance(stats, 'random', 30, 100)
+  it('金额覆盖率高于阈值 → 不触发 coverage_low', () => {
+    const warnings = checkCAS1314Compliance(
+      makeInput({ stats: makeStats({ amountCoverageRate: '75.00' }) }),
+    )
     expect(warnings.some(w => w.type === 'coverage_low')).toBe(false)
+  })
+
+  it('阈值可配：传 0.8 时 75% 覆盖率转为告警（改造前 60% 写死在函数体内）', () => {
+    const warnings = checkCAS1314Compliance(
+      makeInput({
+        stats: makeStats({ amountCoverageRate: '75.00' }),
+        coverageThreshold: 0.8,
+        coverageThresholdLabel: THRESHOLD_SOURCE_LABELS.project,
+      }),
+    )
+    expect(warnings.some(w => w.type === 'coverage_low')).toBe(true)
+  })
+
+  it('覆盖率告警文案明示阈值取值与来源（R2.8）', () => {
+    const warnings = checkCAS1314Compliance(
+      makeInput({
+        stats: makeStats({ amountCoverageRate: '10.00' }),
+        coverageThresholdLabel: THRESHOLD_SOURCE_LABELS.platform_default,
+      }),
+    )
+    const msg = warnings.find(w => w.type === 'coverage_low')!.message
+    expect(msg).toContain('60%')
+    expect(msg).toContain(THRESHOLD_SOURCE_LABELS.platform_default)
   })
 
   it('specific_item 占比 > 50% → specific_item_high suggestion', () => {
-    const stats = makeStats({ amountCoverageRate: '80.00' })
-    const warnings = checkCAS1314Compliance(stats, 'specific_item', 51, 100)
+    const warnings = checkCAS1314Compliance(
+      makeInput({ method: 'specific_item', methodSampleCount: 51, totalSampleCount: 100 }),
+    )
     expect(warnings.some(w => w.type === 'specific_item_high')).toBe(true)
     expect(warnings.find(w => w.type === 'specific_item_high')!.level).toBe('suggestion')
   })
 
   it('specific_item 占比 = 50% → 不触发', () => {
-    const stats = makeStats({ amountCoverageRate: '80.00' })
-    const warnings = checkCAS1314Compliance(stats, 'specific_item', 50, 100)
+    const warnings = checkCAS1314Compliance(
+      makeInput({ method: 'specific_item', methodSampleCount: 50, totalSampleCount: 100 }),
+    )
+    expect(warnings.some(w => w.type === 'specific_item_high')).toBe(false)
+  })
+
+  it('specific_item 分母等于分子（底稿无其它方法样本）→ 判据不可用，不告警', () => {
+    // 改造前此处传的是「勾选数 / 抽出总数」，审计师全选时比值恒为 1 → 必然告警（纯噪声）
+    const warnings = checkCAS1314Compliance(
+      makeInput({ method: 'specific_item', methodSampleCount: 40, totalSampleCount: 40 }),
+    )
     expect(warnings.some(w => w.type === 'specific_item_high')).toBe(false)
   })
 
   it('非 specific_item 方法 → 不检查占比', () => {
-    const stats = makeStats({ amountCoverageRate: '80.00' })
-    const warnings = checkCAS1314Compliance(stats, 'random', 80, 100)
+    const warnings = checkCAS1314Compliance(
+      makeInput({ method: 'random', methodSampleCount: 80, totalSampleCount: 100 }),
+    )
     expect(warnings.some(w => w.type === 'specific_item_high')).toBe(false)
   })
 
-  it('MUS sampleCount < totalCount → mus_insufficient warning', () => {
-    const stats = makeStats({ amountCoverageRate: '80.00' })
-    const warnings = checkCAS1314Compliance(stats, 'mus', 5, 10)
+  it('MUS 实际样本量 < 系统建议样本量 → mus_insufficient warning', () => {
+    const warnings = checkCAS1314Compliance(
+      makeInput({ method: 'mus', totalSampleCount: 5, suggestedSampleSize: 10 }),
+    )
     expect(warnings.some(w => w.type === 'mus_insufficient')).toBe(true)
   })
 
-  it('MUS sampleCount >= totalCount → 不触发', () => {
-    const stats = makeStats({ amountCoverageRate: '80.00' })
-    const warnings = checkCAS1314Compliance(stats, 'mus', 10, 10)
+  it('MUS 实际样本量 >= 系统建议样本量 → 不触发', () => {
+    const warnings = checkCAS1314Compliance(
+      makeInput({ method: 'mus', totalSampleCount: 10, suggestedSampleSize: 10 }),
+    )
     expect(warnings.some(w => w.type === 'mus_insufficient')).toBe(false)
   })
 
+  it('MUS 建议样本量为 null（参数不足推不出）→ 不告警：判据不可用 ≠ 不合规', () => {
+    // 改造前判据是「勾选数 < 抽出总数」= 有没有全选，与样本量充分性无关：
+    // 不全选必告警且文案说"低于期望样本量"，全选则永远不告警。
+    const warnings = checkCAS1314Compliance(
+      makeInput({ method: 'mus', totalSampleCount: 1, suggestedSampleSize: null }),
+    )
+    expect(warnings.some(w => w.type === 'mus_insufficient')).toBe(false)
+  })
+
+  it('MUS 判据与勾选无关：同一实际样本量下结果一致', () => {
+    const base = { method: 'mus' as const, totalSampleCount: 10, suggestedSampleSize: 10 }
+    const a = checkCAS1314Compliance(makeInput({ ...base, methodSampleCount: 1 }))
+    const b = checkCAS1314Compliance(makeInput({ ...base, methodSampleCount: 10 }))
+    expect(a.map(w => w.type)).toEqual(b.map(w => w.type))
+  })
+
   it('无警告时返回空数组', () => {
-    const stats = makeStats({ amountCoverageRate: '80.00' })
-    const warnings = checkCAS1314Compliance(stats, 'random', 30, 100)
-    expect(warnings).toHaveLength(0)
+    expect(checkCAS1314Compliance(makeInput())).toHaveLength(0)
   })
 })
 
