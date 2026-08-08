@@ -165,6 +165,89 @@ def build_method_description(criteria: dict) -> str:
     return "；".join(parts)
 
 
+#: 处置方式 → 中文标签（投影到 `conclusion` 文本，UI 全中文化）
+_UNCHECKED_MODE_LABELS = {
+    "treated_as_deviation": "视同偏差",
+    "alternative_performed": "已实施替代程序",
+}
+
+#: 偏差性质 → 中文标签。与 C 类控制测试 `useDeviationDecisionTree.getStepOptions(2)`
+#: 逐字一致（前端 `samplingDeviationNature.ts` 是标签真源并有交叉锁死守卫）。
+_DEVIATION_NATURE_LABELS = {
+    "systematic": "系统性偏差",
+    "human": "人为偏差",
+    "random": "随机性偏差",
+}
+
+#: 需要填写原因与影响评估的性质：这两类不宜简单外推（准则要求考虑扩大范围或改变方法）。
+_NATURE_REQUIRING_EXPLANATION = ("systematic", "human")
+
+
+def build_conclusion_supplements(evaluation: dict) -> list[str]:
+    """把 Wave 2 三项结构化评价渲染成结论补充说明（纯函数）。
+
+    **为什么拼进 `conclusion` 而不加列**：这三项都是说明性内容，且 QC 与归档两个消费场景
+    都是整行读出后渲染、不做按列过滤。加列会让迁移 V 号顺延、投影表列数膨胀，收益为零。
+
+    每条带前缀标签，便于归档件与 QC finding 里定位来源。空结构一律跳过（不产生
+    「未记录」之类的噪声文本 —— 缺失本身由 `evaluate_sampling_completeness` 判定）。
+    """
+    parts: list[str] = []
+
+    disposition = evaluation.get("unchecked_disposition")
+    if isinstance(disposition, dict) and disposition:
+        by_mode: dict[str, int] = {}
+        for item in disposition.values():
+            if isinstance(item, dict):
+                mode = str(item.get("mode") or "")
+                if mode in _UNCHECKED_MODE_LABELS:
+                    by_mode[mode] = by_mode.get(mode, 0) + 1
+        if by_mode:
+            detail = "、".join(
+                f"{_UNCHECKED_MODE_LABELS[m]} {n} 笔" for m, n in sorted(by_mode.items())
+            )
+            parts.append(f"【未检查样本处置】{detail}")
+
+    nature = evaluation.get("deviation_nature_summary")
+    if isinstance(nature, dict) and nature:
+        segs = []
+        for key, label in _DEVIATION_NATURE_LABELS.items():
+            item = nature.get(key)
+            if isinstance(item, dict) and (item.get("count") or 0):
+                segs.append(f"{label} {item.get('count')} 笔（{item.get('amount')} 元）")
+        if segs:
+            text = "、".join(segs)
+            flagged = [
+                _DEVIATION_NATURE_LABELS[k]
+                for k in _NATURE_REQUIRING_EXPLANATION
+                if (nature.get(k) or {}).get("count")
+            ]
+            if flagged:
+                # 准则要求：这类偏差不宜简单外推，需考虑扩大范围或改变审计方法
+                text += f"；存在{'、'.join(flagged)}，不宜简单外推"
+            parts.append(f"【偏差性质】{text}")
+
+    strata = evaluation.get("stratified_evaluation")
+    if isinstance(strata, dict) and strata.get("enabled"):
+        seg = (
+            f"层内外推 {strata.get('projected_by_strata')} 元"
+            f"（合并口径 {strata.get('projected_legacy')} 元）"
+        )
+        if strata.get("unclassified_count"):
+            seg += f"；未归层样本 {strata.get('unclassified_count')} 笔"
+        if strata.get("unsampled_strata_count"):
+            seg += f"；未抽样层 {strata.get('unsampled_strata_count')} 个"
+        if strata.get("fallback"):
+            seg += "；层内评价异常已回退合并口径"
+        parts.append(f"【分层评价】{seg}")
+
+    reason = evaluation.get("reconcile_override_reason")
+    if reason:
+        parts.append(f"【总体完整性核对放行理由】{reason}")
+
+    return parts
+
+
 def build_record_fields(
     *,
     criteria: dict,
@@ -190,8 +273,18 @@ def build_record_fields(
         "misstatements_found": _as_decimal(ev.get("known_high_value")),
         "projected_misstatement": _as_decimal(ev.get("projected")),
         "upper_misstatement_limit": _as_decimal(ev.get("upper_limit")),
-        "conclusion": ev.get("conclusion_message") or criteria.get("conclusion"),
+        "conclusion": _compose_conclusion(ev, criteria),
     }
+
+
+def _compose_conclusion(ev: dict, criteria: dict) -> str | None:
+    """结论正文 + Wave 2 三项结构化摘要（拼接，见 build_conclusion_supplements）。"""
+    base = ev.get("conclusion_message") or criteria.get("conclusion")
+    supplements = build_conclusion_supplements(ev)
+    if not supplements:
+        return base
+    head = str(base) if base else ""
+    return "\n".join([head, *supplements]) if head else "\n".join(supplements)
 
 
 # ─── 写入：批次登记 ───────────────────────────────────────────────────────────
@@ -323,6 +416,79 @@ async def register_sampled_vouchers(
         return 0
 
 
+async def undo_sampling_registration(
+    db: AsyncSession,
+    *,
+    batch_id: UUID | None,
+) -> dict[str, int]:
+    """撤销回填时软删该批次的两张投影行（R1）。
+
+    **为什么必须做**：改造前 `voucher_undo` 只写 `workpaper_extraction_log.is_undone`，
+    两张投影表原封不动。而投影已在产出真实数据（2026-08-05 实测 `sampled_vouchers` 21 行
+    引擎登记），四个消费方全部被污染：
+
+    - `project_level_extracted_voucher_nos` 仍返回已撤销批次的凭证号 ⇒ 审计师选「全项目
+      排除」时那些凭证**再也抽不到**，且界面上看不出原因（不可见的选择偏差）
+    - `cross_workpaper_duplicate_vouchers` 基于已撤销批次误报重复，逼审计师对不存在的
+      重复做判断并留痕
+    - `project_sampling_coverage` 把撤销批次算进 batch/sample 计数与 duplicated
+    - 归档/QC 侧看到一条「已评价」的记录，而回填其实已撤销
+
+    **为什么按 batch_id 而不是 workpaper_id**：同一底稿可以有多个批次（预审/年审、
+    不同科目分别抽），按底稿宽删会连带删掉仍然有效的其它批次登记。
+
+    **为什么软删而不是物理删**：撤销本身是需要留痕的审计动作；物理删会让「这批样本曾被
+    抽取过又撤销」这一事实彻底消失。全部查询方均已带 `is_deleted == false` 条件。
+
+    **撤销后重新回填不需要「复活」**（2026-08-05 实证）：`record_extraction_log` 的幂等
+    去重只命中 `is_undone=false` 的 log，撤销后再次回填会新建 log 并生成**新的 uuid4
+    batch_id** ⇒ V139 部分唯一索引下新行与软删旧行的 batch_id 不同、天然不冲突。
+
+    fail-open：异常时 WARNING 后返回零计数，绝不让投影失败使审计师的撤销整体失败。
+
+    Args:
+        batch_id: 被撤销批次的 batch_id。为 None 时**零操作**（见上「为什么按 batch_id」）。
+
+    Returns:
+        `{"records": n, "vouchers": n}` 实际软删行数。
+    """
+    if batch_id is None:
+        logger.warning(
+            "撤销批次缺少 batch_id，跳过抽样登记投影撤销"
+            "（不按 workpaper_id 宽删，避免误删同底稿其它批次）"
+        )
+        return {"records": 0, "vouchers": 0}
+    try:
+        rec_res = await db.execute(
+            sa.update(SamplingRecord.__table__)
+            .where(
+                SamplingRecord.batch_id == batch_id,
+                SamplingRecord.is_deleted == sa.false(),
+            )
+            .values(is_deleted=True)
+        )
+        vou_res = await db.execute(
+            sa.update(SampledVoucher.__table__)
+            .where(
+                SampledVoucher.batch_id == batch_id,
+                SampledVoucher.is_deleted == sa.false(),
+            )
+            .values(is_deleted=True)
+        )
+        await db.flush()
+        return {
+            "records": int(rec_res.rowcount or 0),
+            "vouchers": int(vou_res.rowcount or 0),
+        }
+    except Exception:  # noqa: BLE001 — 投影撤销失败不得阻断审计师的撤销操作
+        logger.warning(
+            "抽样登记投影撤销失败（两张投影表未软删，权威留痕已标记撤销）batch=%s",
+            batch_id,
+            exc_info=True,
+        )
+        return {"records": 0, "vouchers": 0}
+
+
 async def update_sampling_record_evaluation(
     db: AsyncSession,
     *,
@@ -350,7 +516,11 @@ async def update_sampling_record_evaluation(
         record.misstatements_found = _as_decimal(evaluation.get("known_high_value"))
         record.projected_misstatement = _as_decimal(evaluation.get("projected"))
         record.upper_misstatement_limit = _as_decimal(evaluation.get("upper_limit"))
-        record.conclusion = evaluation.get("conclusion_message") or record.conclusion
+        # 与 build_record_fields 走同一拼接：否则每次评价更新都会把三项结构化摘要抹掉，
+        # 而 `register_sampling_batch` 只在回填时跑一次 ⇒ 摘要永久丢失。
+        composed = _compose_conclusion(evaluation, {})
+        if composed:
+            record.conclusion = composed
         await db.flush()
         return True
     except Exception:  # noqa: BLE001

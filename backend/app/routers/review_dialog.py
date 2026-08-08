@@ -880,7 +880,38 @@ _I_CYCLE_DISCLOSURE_PROMPTS: dict[str, dict[str, dict[str, str]]] = {
     },
 }
 
+#: 抽凭引擎复核 prompt（sampling-evaluation-and-governance-closure R10）
+#:
+#: 前端 section_id = `{wpCode}-sampling-config` / `-sampling-conclusion`
+#: （`GtVoucherSamplingEngine` 的两处 GtReviewTrigger；改造前引擎零复核入口，
+#: 而抽样是审计判断最集中的环节）。wpCode 缺省时退化为无前缀形式，故两种都登记。
+_SAMPLING_REVIEW_PROMPTS: dict[str, str] = {
+    "sampling-config": (
+        "复核本次抽凭的总体界定与抽样参数：总体是否完整（抽样总体金额与独立账面是否核对一致、"
+        "核对不可用时是否填写了放行理由）、抽样单位与过滤条件是否与测试目标一致、"
+        "样本量确定依据是否充分（置信度、可容忍错报、预期错报是否与重要性水平和风险评估衔接）、"
+        "抽样框数据集版本是否仍然适用（是否存在序时账重导致使同一种子不可复算）。"
+        "按 CAS 1314 指出参数设置与总体界定中不恰当或缺少依据之处。"
+    ),
+    "sampling-conclusion": (
+        "复核本次抽凭的评价与总体结论：未检查样本是否逐笔选择了准则处置（视同偏差或已实施替代程序，"
+        "替代程序是否有说明）、偏差性质与原因是否已判断（系统性或人为偏差是否说明了原因与影响、"
+        "是否仍按简单外推处理）、推断错报与错报上限的计算口径是否与抽样方法匹配"
+        "（分层抽样是否逐层外推、是否存在未归层或未抽样层）、结论是否已由审计师确认、"
+        "推断错报是否已按 CAS 1251 记入未更正错报汇总。按 CAS 1314 指出评价过程中的不足。"
+    ),
+}
+
 _SECTION_PROMPTS: dict[str, str] = {
+    # 抽凭引擎复核。**只登记无前缀形态**：2026-08-05 实测 78 个抽凭宿主
+    # **一个都没给 GtVoucherSamplingEngine 传 wp-code**（`props.wpCode` 恒 undefined），
+    # 故带底稿编码前缀的 section_id 当前不可达。前端仍保留前缀派生逻辑，等宿主补传
+    # wp-code 后再按需登记 `{wpCode}-sampling-*`（`resolve_review_ai_prompt` 未登记会
+    # 回退通用 prompt，不会报错）。
+    **{
+        key: f"{text}\n{_NO_FABRICATION}"
+        for key, text in _SAMPLING_REVIEW_PROMPTS.items()
+    },
     # I 循环六组披露表（前端 buildSectionId = `{wpCode}-disc-{variant}-{key}`）
     **{
         f"{wp_code}-disc-{variant}-{key}": f"{text}\n{_NO_FABRICATION}"

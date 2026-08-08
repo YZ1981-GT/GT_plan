@@ -45,6 +45,7 @@ from app.services.sampling_registry_service import (
     project_level_extracted_voucher_nos,
     project_sampling_coverage,
     resolve_project_year as registry_resolve_project_year,
+    undo_sampling_registration,
     update_sampling_record_evaluation,
 )
 from app.services.voucher_sampling_algorithms import (
@@ -715,11 +716,24 @@ async def voucher_undo(
         record.is_undone = True
         record.status = "undone"
         await db.flush()
+
+        # 5. 同步软删抽样登记投影（R1）
+        #    权威留痕（本 log）已标记撤销，但 sampling_records / sampled_vouchers 若不同步，
+        #    项目级已抽清单、跨底稿重复提示、抽样概览、归档/QC 全部会继续把该批次算进去。
+        #    整体 fail-open：投影撤销失败只记 WARNING，不让审计师的撤销失败。
+        undone_projection = await undo_sampling_registration(
+            db, batch_id=record.batch_id
+        )
+
         await db.commit()
 
-        # 5. 返回 before_data
+        # 6. 返回 before_data
         before_data = record.before_data if record.before_data is not None else []
-        return {"success": True, "before_data": before_data}
+        return {
+            "success": True,
+            "before_data": before_data,
+            "undone_registration": undone_projection,
+        }
 
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -852,8 +866,38 @@ _EVAL_COUNT_KEYS = (
 )
 # 文本型字段
 _EVAL_TEXT_KEYS = ("conclusion_message", "algo_version")
+# 总体完整性核对放行理由（R5.3/5.4）：审计师在核对不可用或差异超阈值时填写的理由。
+# 长度下限由前端门控（≥10 字）；后端只做非空归一 —— 后端再判长度会让「前端已放行、
+# 后端静默丢理由」这种半通状态出现，那比没有下限更坏。
+_EVAL_OVERRIDE_REASON_KEY = "reconcile_override_reason"
+# 放行的操作人与时间**必须服务端覆盖**（与 evaluated_by/at 同理，客户端传值不可信）。
+_EVAL_OVERRIDE_ACTOR_KEYS = ("reconcile_override_by", "reconcile_override_at")
 # 结论代码取值域
 _EVAL_CONCLUSION_CODES = ("acceptable", "not_acceptable", "undetermined")
+# 比率型字段（0 < v ≤ 1 的小数；越界或不可解析 → None 表示"未记录"而非默认值）。
+# `coverage_threshold` 记录本次合规检查实际采用的金额覆盖率告警阈值 —— 60% 不是准则
+# 规定的数字，复核人必须能看出当年是按什么阈值判的（sampling-evaluation R2.6）。
+_EVAL_RATIO_KEYS = ("coverage_threshold",)
+# 枚举型字段：key → 允许取值。非法值 → None（不猜、不回退到某个"看起来合理"的值）
+_EVAL_ENUM_KEYS: dict[str, tuple[str, ...]] = {
+    "coverage_threshold_source": ("workpaper", "project", "platform_default"),
+}
+
+# ── 结构化字段（sampling-evaluation-and-governance-closure Wave 2）──────────────
+# 这三项承载 CAS 1314 评价环节此前完全缺失的记录内容。全部**可缺省**：不提供时输出
+# 与改造前逐字节一致（零回归支点），故存量项目与未升级前端不受影响。
+
+# 未检查样本处置：`{凭证号: {"mode": ..., "note": ...}}`
+# 准则要求「无法对选取项目实施程序时，视同偏差 或 实施替代程序」二选一。改造前只有
+# `unchecked_sample_count` 计数 + 一句「未纳入错报推断」的 warning ⇒ 既不计入错报也没有
+# 替代证据，这部分样本在抽样结论里等于凭空消失。
+_EVAL_UNCHECKED_MODES = ("treated_as_deviation", "alternative_performed")
+
+# 偏差性质取值域。**中文标签的单一真源在前端** `samplingDeviationNature.ts`，它与 C 类
+# 控制测试 `useDeviationDecisionTree.getStepOptions(2)` 的标签逐字锁死（系统性偏差 /
+# 人为偏差 / 随机性偏差）。后端只校验 key 取值域，不复制业务判定与中文文案。
+# 「待判断」不是枚举值而是「未标注」（该性质键不出现在摘要里），与 C 类的 null 语义一致。
+_EVAL_DEVIATION_NATURES = ("systematic", "human", "random")
 # 由 A13 推送流程写入、且**在未显式提供时须保留既有值**的字段：
 # persistEvaluation() 在每次推断变化时都会调用且不带这两个键，
 # 若按"未提供即清空"处理会把已推送标记抹掉 → 同一批次可被反复推入错报汇总。
@@ -879,6 +923,81 @@ def _eval_count(value: Any) -> int:
     return n if n > 0 else 0
 
 
+def _eval_ratio(value: Any) -> float | None:
+    """比率归一：(0, 1] 内的有限数原样保留，否则 None。
+
+    **不回退默认值**：把「未记录」与「按平台默认 0.60 判的」混为一谈，会让复核人
+    无法区分「当年确实用了 60%」与「阈值根本没传上来」。
+    """
+    if value is None or value == "":
+        return None
+    try:
+        v = float(value)
+    except (ValueError, TypeError):
+        return None
+    if not (v == v) or v in (float("inf"), float("-inf")):  # NaN / ±Inf
+        return None
+    return v if 0 < v <= 1 else None
+
+
+def _normalize_unchecked_disposition(value: Any) -> dict[str, dict[str, Any]] | None:
+    """未检查样本处置归一：`{凭证号: {"mode": 合法值, "note": str|None}}`。
+
+    非 dict、空 dict、或全部条目 mode 非法 → None（表示「未记录处置」）。
+    单条 mode 非法 → 丢弃该条（不猜成某一种处置：视同偏差与替代程序的审计后果完全不同）。
+    """
+    if not isinstance(value, dict) or not value:
+        return None
+    out: dict[str, dict[str, Any]] = {}
+    for key, item in value.items():
+        voucher_no = str(key).strip()
+        if not voucher_no or not isinstance(item, dict):
+            continue
+        mode = str(item.get("mode") or "")
+        if mode not in _EVAL_UNCHECKED_MODES:
+            continue
+        note = item.get("note")
+        out[voucher_no] = {
+            "mode": mode,
+            "note": str(note) if note not in (None, "") else None,
+        }
+    return out or None
+
+
+def _normalize_deviation_nature_summary(value: Any) -> dict[str, dict[str, Any]] | None:
+    """偏差性质摘要归一：`{性质: {"count": int, "amount": "0.00"}}`。
+
+    只保留取值域内的性质键；未出现的性质**不补零**（「没有系统性偏差」与「没有评价过
+    偏差性质」是两件事，补零会把后者伪装成前者）。
+    """
+    if not isinstance(value, dict) or not value:
+        return None
+    out: dict[str, dict[str, Any]] = {}
+    for nature in _EVAL_DEVIATION_NATURES:
+        item = value.get(nature)
+        if not isinstance(item, dict):
+            continue
+        out[nature] = {
+            "count": _eval_count(item.get("count")),
+            "amount": _eval_amount(item.get("amount")),
+        }
+    return out or None
+
+
+def _normalize_stratified_evaluation(value: Any) -> dict[str, Any] | None:
+    """分层评价摘要归一。`enabled` 为假或结构非法 → None（未启用即不留痕）。"""
+    if not isinstance(value, dict) or not value.get("enabled"):
+        return None
+    return {
+        "enabled": True,
+        "projected_by_strata": _eval_amount(value.get("projected_by_strata")),
+        "projected_legacy": _eval_amount(value.get("projected_legacy")),
+        "unclassified_count": _eval_count(value.get("unclassified_count")),
+        "unsampled_strata_count": _eval_count(value.get("unsampled_strata_count")),
+        "fallback": bool(value.get("fallback")),
+    }
+
+
 def _normalize_evaluation(
     raw: Any,
     *,
@@ -902,6 +1021,34 @@ def _normalize_evaluation(
     for key in _EVAL_TEXT_KEYS:
         val = src.get(key)
         out[key] = str(val) if val not in (None, "") else None
+    for key in _EVAL_RATIO_KEYS:
+        out[key] = _eval_ratio(src.get(key))
+    for key, allowed in _EVAL_ENUM_KEYS.items():
+        val = str(src.get(key) or "")
+        out[key] = val if val in allowed else None
+
+    # 结构化字段（Wave 2）：缺省即 None，与改造前逐字节等价
+    out["unchecked_disposition"] = _normalize_unchecked_disposition(
+        src.get("unchecked_disposition")
+    )
+    out["deviation_nature_summary"] = _normalize_deviation_nature_summary(
+        src.get("deviation_nature_summary")
+    )
+    out["stratified_evaluation"] = _normalize_stratified_evaluation(
+        src.get("stratified_evaluation")
+    )
+
+    # 完整性核对放行理由：有理由才写操作人与时间（服务端权威）；
+    # 理由被清空则三项一并清空 —— 否则会留下「无理由但有放行签名」的残迹。
+    reason = src.get(_EVAL_OVERRIDE_REASON_KEY)
+    if reason not in (None, ""):
+        out[_EVAL_OVERRIDE_REASON_KEY] = str(reason)
+        out["reconcile_override_by"] = str(actor_id)
+        out["reconcile_override_at"] = datetime.now(timezone.utc).isoformat()
+    else:
+        out[_EVAL_OVERRIDE_REASON_KEY] = None
+        for key in _EVAL_OVERRIDE_ACTOR_KEYS:
+            out[key] = None
 
     code = str(src.get("conclusion_code") or "")
     out["conclusion_code"] = code if code in _EVAL_CONCLUSION_CODES else "undetermined"
