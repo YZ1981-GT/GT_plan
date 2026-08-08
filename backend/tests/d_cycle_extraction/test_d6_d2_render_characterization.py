@@ -114,7 +114,11 @@ def _d6_session():
             business_category="general",
             applicable_standards="listed",
         ),
-        tb_row=SimpleNamespace(amount=98765.43),
+        tb_row=SimpleNamespace(
+            amount=98765.43,
+            unadjusted=98765.43,
+            audited=98765.43,
+        ),
         rp_rows=[SimpleNamespace(name="关联方甲", relation_type="subsidiary")],
     )
 
@@ -135,9 +139,15 @@ def _d2_session():
 
 
 def test_d6_render_top_level_keys_baseline():
-    """D6 render 顶层键锁定（零回归基线）——尚无 adjudication_prefill。"""
+    """D6 render 顶层键锁定（零回归基线）——尚无 adjudication_prefill。
+
+    ⚠️ 本用例**不显式设灰度开关**，故键集随环境（本地 `.env` 置 True）。
+    d-cycle-four-table-extraction-and-disclosure-completion R1 起，灰度开时额外输出
+    两个 additive 溯源键 `tb_source_codes` / `parent_check`，两者用可选集合表达
+    以便本用例在开/关两种环境下都成立。
+    """
     result = _run(d6.render(_ctx(_d6_session())))
-    assert set(result.keys()) == {
+    base = {
         "sections",
         "adjudication_config",
         "ecl_config",
@@ -145,6 +155,10 @@ def test_d6_render_top_level_keys_baseline():
         "disclosure_visibility",
         "responses_snapshot",
     }
+    optional = {"tb_source_codes", "parent_check"}
+    keys = set(result.keys())
+    assert base <= keys, "基线键缺失: %s" % (base - keys)
+    assert keys - base <= optional, "出现未登记的新增键: %s" % (keys - base - optional)
     # 本 spec Req1 的核心缺口：当前 D6 未返回 adjudication_prefill（接入后灰度关时仍应缺席）
     assert "adjudication_prefill" not in result
 
@@ -235,34 +249,41 @@ def test_d2_render_sheet_name_from_classification():
 
 
 def test_reference_prefill_pattern_exists_k9_k1_n5():
-    """确认 K/M/N 三处已证明的审定表预填范式函数存在（D1–D7 将镜像它）。
+    """确认平台仍存在「审定表预填」范式函数 `_build_adjudication_prefill`（D1–D7 参照）。
 
-    范式：render 内 `_build_adjudication_prefill(ctx)` —— get_active_filter + tb_balance
-    叶子级 SUM + 手工优先 + 返回 adjudication_prefill。此断言防止 D1–D7 接入时另造机制。
+    范式：render 内 `_build_adjudication_prefill(...)` —— tb_balance 叶子级 SUM +
+    手工优先 + 返回 adjudication_prefill。此断言防平台整体丢失该范式。
+
+    🔴 基准模块由 `(k9, k1, n5)` 改为 `(k1, n5, n1)`：**K9 已重构走共享件
+    `four_table/pl_render`**（损益类不再 in-module 造 `_build_adjudication_prefill`），
+    继续拿它当基准会恒红。K1/N5/N1 仍保留 in-module 范式，是活样本。
     """
     from app.routers.wp_render_strategies import (
         _k1_other_receivables as k1,
-        _k9_admin_expenses as k9,
+        _n1_deferred_tax_assets as n1,
         _n5_income_tax_expense as n5,
     )
 
-    for mod in (k9, k1, n5):
+    for mod in (k1, n5, n1):
         fn = getattr(mod, "_build_adjudication_prefill", None)
         assert callable(fn), f"{mod.__name__} 缺 _build_adjudication_prefill（范式基准）"
 
 
 def test_reference_prefill_uses_active_filter():
-    """确认 K9/K1（canonical 用法）在 render 模块内绑定了 get_active_filter（数据集版本过滤）。
+    """确认 canonical 模块在 render 内绑定 get_active_filter（数据集版本过滤，禁裸 is_deleted）。
 
-    K9/K1 用 `await get_active_filter(ctx.db, TbBalance.__table__, ctx.project_id, ctx.year)`
-    —— 这是 D1–D7 应镜像的权威口径（数据集版本，禁裸 is_deleted）。
+    用 `await get_active_filter(ctx.db, TbBalance.__table__, ctx.project_id, ctx.year)`
+    —— 这是 D1–D7 应镜像的权威口径。
+
+    🔴 基准由 `(k9, k1)` 改为 `(k1, k2)`：**K9 已重构走 `pl_render`**，其 render 模块
+    不再直接 import get_active_filter；K1/K2 仍是 in-module 取数的活样本。
     """
     from app.routers.wp_render_strategies import (
         _k1_other_receivables as k1,
-        _k9_admin_expenses as k9,
+        _k2_other_current_assets as k2,
     )
 
-    for mod in (k9, k1):
+    for mod in (k1, k2):
         assert hasattr(mod, "get_active_filter"), (
             f"{mod.__name__} 未导入 get_active_filter（Tier B 四表库统一读入口）"
         )

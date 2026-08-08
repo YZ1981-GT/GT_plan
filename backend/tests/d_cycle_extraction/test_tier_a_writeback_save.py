@@ -102,6 +102,11 @@ def _saved_formula(target_cell, *, sheet_name="D6-1", wp=None,
         refs=None,
         issue_description=None,
         hint_text=None,
+        # V104/V100 生命周期与来源字段（_formula_to_dict 会下发这三个键，
+        # 缺则 AttributeError；值取 ORM server_default）
+        lifecycle_state="saved",
+        definition_version=1,
+        formula_source="custom",
         last_computed_at=None,
         created_by=None,
         created_at=None,

@@ -168,7 +168,10 @@ def _saved(target_cell, *, sheet_name="D6-1", wp=None, formula_type="auto_calc",
         wp_id=(wp.id if wp else uuid4()), sheet_name=sheet_name,
         target_cell=target_cell, expression=expression, category=None,
         description="用户公式", formula_type=formula_type, refs=None,
-        issue_description=None, hint_text=None, last_computed_at=None,
+        issue_description=None, hint_text=None,
+        # V104/V100 生命周期与来源字段（_formula_to_dict 下发这三个键）
+        lifecycle_state="saved", definition_version=1, formula_source="custom",
+        last_computed_at=None,
         created_by=None, created_at=None, updated_at=None,
     )
 

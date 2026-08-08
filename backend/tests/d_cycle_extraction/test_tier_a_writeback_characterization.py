@@ -115,6 +115,11 @@ def _saved_formula(target_cell, *, sheet_name="D6-1", wp=None,
         refs=None,
         issue_description=None,
         hint_text=None,
+        # V104/V100 生命周期与来源字段（_formula_to_dict 会下发这三个键，
+        # 缺则 AttributeError；值取 ORM server_default）
+        lifecycle_state="saved",
+        definition_version=1,
+        formula_source="custom",
         last_computed_at=None,
         created_by=None,
         created_at=None,
@@ -382,7 +387,13 @@ def _d6_render_ctx():
         project_row=SimpleNamespace(client_name="测试客户", audit_year=2025,
                                     business_category="general",
                                     applicable_standards="listed"),
-        tb_row=SimpleNamespace(amount=98765.43),
+        tb_row=SimpleNamespace(
+            amount=98765.43,
+            # 取数收敛到共享件 `fetch_trial_balance_amounts` 后统一读这两个
+            # 别名（= 真实 DB 的列名）；`amount` 是 D6 改造前裸 SQL 的别名，保留兼容。
+            unadjusted=98765.43,
+            audited=98765.43,
+        ),
         rp_rows=[SimpleNamespace(name="关联方甲", relation_type="subsidiary")],
     )
     return SimpleNamespace(
