@@ -1,8 +1,8 @@
 # 致同审计作业平台 — Spec 开发索引
 
-**最后更新**：2026-08-07
+**最后更新**：2026-08-08
 **当前分支**：`work/2026-05-30-wp-specs`
-**统计**：Active **12**（2026-08-07 行首锚定正则实扫）/ Archived **531**
+**统计**：Active **6**（2026-08-08 行首锚定正则实扫）/ Archived **536**
 **最高迁移**：**V143**（`word_export_task_versions.drift_report`；以 `migration_status` 实测为准）
 **技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer
 
@@ -28,17 +28,16 @@
 
 | spec | 进度 | 一句话 |
 |------|------|--------|
-| `f0-confirmation-linkage-and-structural-enhancement` | 139/144（1 个 `[-]` + 2 个 `[~]` + 2 个 `[ ]`，**全是浏览器实测且用户 2026-08-03 已中止该轮 → 编排器不得接管**） | F0 存货循环函证联动增强：矩阵自动聚合 + F0-5/F0-6 供应商自动带入 + B50/A13 推送 + F0-7 可靠性结构化。**复盘退回 3 项 + Wave 7 返工 9 项**（矩阵三个入参仍传 `undefined` → 4 个百分比行恒 `-`；5 个新模块 4 个零消费方）—— **并发会话在推进，勿碰** |
-| `sampling-compliance-closure` | 24/25（只剩 Task 24 浏览器实测） | 抽样/抽凭合规闭环：dataset 版本绑定 + 推断错报持久化 + A13 `projected` 通路 + 删 legacy 抽样引擎 + 准则记录表接入 + 42 宿主 methodology 收口。canonical 抽凭链路不重构，只做加法 + 删 legacy |
-| `k0-confirmation-source-alignment` | 7/18（三件套已立） | **K0 管理循环函证源模板对齐**。逐格精读 11 张 sheet（10 visible + `GT_Custom` hidden）后实证 5 类缺口：**K0-1 下区四块完全缺失**（2 品种×8 指标矩阵 / 样本选择 6 项 / 审计说明 5 项 / 审计结论），`isK0` 在 `GtConfirmationSummary.vue` 零命中；**`send_memo` 是伪列**（把源 `C5:F5` 合并的分组表头当成了一个自由文本列），`row_conclusion` 段归属错（G0/H0 已用 `row_summary` 并在注释指明 K0/L0 待修正），源模板无联系人/联系电话/币种三列而 `CYCLE_EXCLUDED_COLUMNS.K0` 为空，源 `G6 函证方式` 实为渠道而未启用已有的 `send_channel`；**列标签 13 处与源模板分叉**（`account_type` 标「科目」而源为「账户/交易」，它是矩阵 SUMIF 的品种维度）；**公式预设整块贴错标签**（`sheet='审定表K0-1'` 源 xlsx 无此 tab + 审定表口径 cell_ref + 漏 `2241`）；**三处源模板索引号笔误 + 底稿目录序号跳号**（`K1-12`→K0-4 / `K0-6`→K0-7 / `K1-11`→K0-3；序号 `[1..5,7..10]` 缺 6）。矩阵按 H0 已确立范式新建（复用 `safeRatio`/`sumByCategory`，**不重构三份矩阵**）。Wave 3 须等 F0 spec 收口 |
-| `report-config-account-code-integrity` | **10/12**（Wave 1~3 + CI 完成；剩 Task 10 BS-014 待用户拍板 + Task 12 收口） | **`report_config` 科目码完整性**。全表对账（132 条 `TB()` 引用 / 102 行）扫出 **13 行错码**，远超此前手工发现的 6 处 —— **权益段 BS-081~BS-090 是一整块错位**（BS-082 其他权益工具取到其他综合收益 / BS-084 库存股取到零命中码 / BS-085 / BS-086 专项储备取到本年利润 / BS-090 少数股东权益取到库存股），另 BS-033 开发支出取到无形资产减值准备、BS-053 与 BS-067 同认领 `2901` **跨行双算**、IMP-008 取到旧准则科目、IMP-017 把商誉原值当备抵。并查出 **`V136` 是失效迁移**（前提错、`WHERE` 从不命中）。**V138 已应用真实库**（连库守卫 29 passed）。**Task 7 挖出立项完全没看到的风险：`report_config.formula` 有第二条写入路径** —— `ReportFormulaService.fill_all_formulas()` 按**行名**索引且 `if cfg.formula: skip` 只填 NULL 行，恰好正是 V138 置 NULL 的那批 ⇒ 不修等于 V138 白做（已按镜像改码 + 策略前置拦截 + 名表删除三层收口，8 个变异全部打红）。核心交付是**平台级一致性守卫**（这张表此前零校验，错码可静默存在数年）+ CI job（117→118）。BS-014 与 V138 范围（12 行 vs 并入 BS-052/BS-066 = 14 行）待用户裁决 |
-| `l0-confirmation-source-alignment` | 0/20（三件套刚立，**并发会话新建 08-05 17:41**） | L0 循环函证源模板对齐（沿用 K0/G0/H0 范式） |
-| `sampling-evaluation-and-governance-closure` | 0/19（三件套刚立，**并发会话新建 08-05 18:12**） | 抽样评价与治理闭环（`sampling-compliance-closure` 的后继） |
+| `custom-workpaper-dual-mode-formula-and-batch` | 28/29 | 自定义底稿（componentType=custom）双模式 + 自定义公式 + 批量创建。xlsx 为唯一权威、`html_data.cells` 是其恒等坐标投影；剩 Wave 5 导出 / Wave 6 批量创建收尾 |
+| `h-cycle-extraction-formula-and-disclosure-completion` | 17/18（Task 18 `[-]` = 浏览器实测收尾） | H 类（H1~H10）取数/公式/披露收口。双族并存取数（`dual_family_codes`）+ 列名注册 + H1~H4 审定预填 + 会计政策章 + 金额控件。真实库 80 组合验收已过，只剩浏览器实测 |
+| `note-template-columns-and-legacy-snapshot-closure` | 14/23 | 附注模板列元数据补齐 + legacy 快照收口。列真源按章节三分（有底稿披露 sheet → openpyxl 直读 / 母公司章 → A spec / 无披露 sheet → 附注 docx）。剩 Wave 3 补 234 张 columns + Wave 4~6 |
+| `soe-listed-note-conversion-correctness` | 12/19（inprog 1 + queued 5，**并发会话在推进，勿碰**） | 国企↔上市附注转换正确性。生产 6 步里 3 步空操作、v2 映射是孤儿；同义两码 / 一码两义 / 章节映射修复。依赖 A spec（已收口） |
+| `sampling-compliance-closure` | 24/25（只剩 Task 24 浏览器实测） | 抽样/抽凭合规闭环：dataset 版本绑定 + 推断错报持久化 + A13 `projected` 通路 + 删 legacy 抽样引擎 + 42 宿主 methodology 收口 |
+| `sampling-evaluation-and-governance-closure` | 18/19（剩 Wave 4 属性抽样接线） | 抽样评价与治理闭环（`sampling-compliance-closure` 后继）：撤销回填同步软删投影表 + 合规判据修正 + 分层评价 + 归档章节 |
 
-> 🔴 `f0-*` / `l0-*` / `sampling-evaluation-*` 由**并发会话**推进，本会话未触碰。
-> 跨会话协作时不要并行推进同一 spec（memory 已实证并发会话会互相回退同一文件，
-> 本会话又实测到一次：`report_formula_service.py` 的「存货的减少」在十分钟内被改成单码，
-> 由新上线的守卫打红后按实证恢复）。
+> 🔴 `soe-listed-*` 由**并发会话**推进（tasks.md mtime 秒/分钟级刷新），本会话未触碰。
+> 跨会话协作时不要并行推进同一 spec（memory 已实证并发会话会互相回退同一文件）。
+> `f0`(144/144) / `parent-company`(18/18) / `report-config`(12/12) 已于 2026-08-08 归档（见 §二）。
 
 **2026-08-05 空壳目录清理（2 个，Active 区不再有非 spec 目录）**：
 
@@ -104,7 +103,7 @@ H0 聚合忽略 `closing_direction` 把 contra 子科目加成正数）。
 
 ---
 
-## 二、已归档 Spec（531 个，15 分类）
+## 二、已归档 Spec（536 个，15 分类）
 
 ```
 _archive/
@@ -112,25 +111,46 @@ _archive/
 ├── 02-workpaper-cycles/              16
 ├── 03-refinement-rounds/              7
 ├── 04-infra/                          3
-├── 04-infra-architecture/            37
+├── 04-infra-architecture/            39
 ├── 05-business-features/            235
 ├── 06-engineering-governance/        13
 ├── 07-workpaper-slimdown/            22
-├── 08-disclosure-notes/              75
+├── 08-disclosure-notes/              76
 ├── 09-consolidation-phases/           5
 ├── 10-A~S-workpaper-all-cycles-complete/  31
-├── 11-confirmation-d0-module/        15
+├── 11-confirmation-d0-module/        16
 ├── 12-2026-06-23-batch/              12
 ├── 13-2026-06-29-batch/              33
 └── 99-superseded/                     3
 ```
 
-### 最近归档（2026-08-07）
+### 最近归档（2026-08-08）
+
+**→ 11-confirmation-d0-module（+1）**
+
+| Spec | 说明 |
+|------|------|
+| f0-confirmation-linkage-and-structural-enhancement | F0 存货循环函证联动增强（144/144 全完成）。矩阵自动聚合（三行取数 + 五派生比例 + 勾稽）+ F0-5/F0-6 供应商自动带入 + B50/A13 推送 + F0-7 邮箱域名可靠性 + F0-3 工号字段。Wave 7 九项返工其中三项修法与立项相反（舞弊迹象/矩阵取值/AI prompt 均按源模板忠实实现或撤回自造）；Task 20/21/22 浏览器实测于 2026-08-05/08-06 三轮补做全通（含 http 客户端形态错配、请求去重 abort、三循环键名各异三个只有浏览器能发现的缺陷）。与同分类 g0/h0/confirmation-orphan 同域 |
+
+**→ 08-disclosure-notes（+1）**
+
+| Spec | 说明 |
+|------|------|
+| parent-company-note-chapter-and-sourcing | 母公司附注章节结构与取数修复（18/18 全完成 + 已 push 8 个分层 commit）。判据真源 = `docs/模版/` 两份源 docx。修 5 类缺陷：soe 第 12 章标题误为「股份支付」+ slug 错、母公司 93 张表 columns/guidance/report_row_code 全缺、长期股权投资三表两级表头压扁、listed 表名首格泄漏且重名、母公司章 100% 无数据来源。核心件 `parent_company_note_sections.py`（母公司口径单一真源，按章节号逐字相等匹配）。收尾修 3 条守卫红（docstring 剥注释 / removed 键基线由 HEAD 名集推导 / 中间名留痕降级为条件断言），13/13 变异 RED |
 
 **→ 04-infra-architecture（+1）**
 
 | Spec | 说明 |
 |------|------|
+| report-config-account-code-integrity | `report_config` 科目码完整性（12/12 全完成）。全表对账 132 条 `TB()` 引用扫出 16 行错码（本 spec 修 V138 13 行 + V144 3 行），远超此前手工发现的 6 处。Task 7 挖出立项未见的第二写入路径 `ReportFormulaService.fill_all_formulas()`（按行名索引 + 只填 NULL 行 = 恰是 V138 置 NULL 那批 ⇒ 不修等于白做）+ 未完成重构残留副本 `fill_report_formulas.py`。修 6701/6702 互换 6 处（约 1.5 亿）。核心交付 = 平台级一致性守卫（此前零校验，错码可静默存在数年，先打红 13 行再改数据）+ CI job。V138/V144 均已应用真实库。撤 4 个已到期的 `trust_report_config=False`（零回归双证：40 组合仅 3 组变 resolved_from、码不变） |
+
+### 最近归档（2026-08-07）
+
+**→ 04-infra-architecture（+2）**
+
+| Spec | 说明 |
+|------|------|
+| prefill-wp-prev-resolution-repair | `WP()`/`PREV()` 死链修复（17/17）。两个 resolver 读 `parsed_data['cells']`，该键真实库**零命中**（407 个非空 parsed_data 中 0 条）⇒ 337 条预设恒返 `None` 且 fail-soft 无告警。新建声明式真源 `prefill_anchor_map.py`（三元组键 `(wp_code, sheet, cell_ref)` → `AnchorSpec`，四种聚合 + **六态** `AnchorReadStatus`），取值改走 `checklist_responses(wp_id, item_id).remark`。**核心守卫 Property 4**：读前端 composable 源码抽 `serializeRows()` 持久化字段集与映射列键交叉锁死 ⇒ 「后端复刻前端派生列公式」这一双真源风险变成编译期可检测（D1-2 一族派生列因此进待对齐清单，宁缺勿造）。`PREV()` 改 **fail-closed** 恒返 `None`（`working_paper`/`wp_index` 都无 year 列，取本年值填「上年数」列属数字级错误，161 条里 118 条是「上年审定数」）。**落地时抓到 1 个 P0**：取值层 SQL 写 `checklist_responses.workpaper_id` 而真实列名是 `wp_id` ⇒ 被 `except Exception` 吞成 WARNING、8 条已对齐锚点全部仍返 None，而源码守卫/纯函数单测/characterization 三层全绿（characterization 恰好与「已修好」不可区分）⇒ 新增 **Property 17 真实执行守卫**。另修 `PL` 灰区（`WP('PL','利润表','净利润')` 目标是**报表**不是底稿，硬编码字母表 `"EFGHIJKLMN"` 结构上表达不了 ⇒ 改预设实时派生 + 独立登记表，Property 18）。实测 **6 HIT / 0 ERROR**，`624,025,343.06`（1260 行）经独立 SQL 交叉核对同值同行数；**10/10 变异 RED**；零回归双证（6 个未触碰 resolver 与 HEAD 逐字节相同 + 广域两侧失败集合逐条相同 126 条）。 |
 | formula-management-runtime-closure | 公式管理运行层闭环（18/18 + 归档前双轮复核）。修六类实证缺陷：**48 格数字错**（`COLUMN_ALIASES` 缺 4 个发生额列名，两条求值路径静默回退期末余额 → 现 8→14 键 + 三态 helper `_resolve_tb_column`，未注册列名格数 48→**0**）· 用户公式与 Tier A **两套存储收敛**进 `wp_formula`（0 行 = 零迁移压力，GET 保留读兼容分支且守卫钉死）· `logic_check` 结果落库 `cross_check_results` · 删 **4 个同族孤儿**（`useFormulaStatus.ts` / `FormulaTooltip.vue` / `FormulaSourceDrawer.vue` / `FormulaDependencyGraph.vue`，均 0 消费方 + 调后端零命中端点）· 底稿公式面板补 issue/hint/计算时间/中文类型标签 · 27 处硬编码 URL 收敛进 `apiPaths/formula.ts` + **平台级「前端公式 URL ⊆ 后端真实路由」守卫**。另修 3 处 spec 未记缺陷（`SUM_TB` 丢弃列名 / `_COLUMN_MAP` 把发生额映到无该列的 `TrialBalance` 静默返 0，24 个消费方 / TB 正则缺词边界误匹配 `SUM_TB` 后半段）。归档复核再修 2 处：**`test_wp_formula_layer_contract.py` 恒红零信号**（列清单只到 V100 而 V104 又加 3 列 → 判据改为扫全部 `V*.sql` 抽取，自动跟随迁移）· `draftRefresh` 漏进 `apiPaths` barrel（+ barrel 完整性守卫）。后端守卫 133 passed / 前端 60 passed / 变异 6/6 RED。与同分类 `formula-engine-unification`、`formula-runtime-convergence` 同族 |
 
 ### 最近归档（2026-08-05）

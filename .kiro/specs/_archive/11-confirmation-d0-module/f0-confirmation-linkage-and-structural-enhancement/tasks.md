@@ -188,12 +188,54 @@ Wave 7 的九项返工全部完成，其中 **三项的修法与立项时写的�
 - [x] 19. CI job `f0-confirmation-linkage`：跑 Wave 1~5 全部守卫文件
   - _Requirements: 9.3_
 
-- [-] 20. 浏览器实测（chrome-devtools + postgres 只读）：F0-1 矩阵自动聚合 → 修改 grid 后刷新 → 值变化；F0-5 从 F0-1 带入供应商；F0-4b 录入后公式实时计算
+- [x] 20. 浏览器实测（chrome-devtools + postgres 只读）：F0-1 矩阵自动聚合 → 修改 grid 后刷新 → 值变化；F0-5 从 F0-1 带入供应商；F0-4b 录入后公式实时计算
   - _🔴 2026-08-03 复盘退回：上轮只验证了「11 Tab 挂载 + 零 console error」，**一条数据都没录**，空底稿下矩阵区域因 `v-if` 压根未渲染（看到的是 onboarding 页）。验收标准「修改 grid 后刷新 → 值变化」未执行。_
   - **子项进度**：
     - [x] 20.1 F0-1 矩阵自动聚合（三行取数 + 五个派生比例 + 勾稽提示）—— **第三轮实测全通**
-    - [ ] 20.2 F0-5 从 F0-1 带入供应商（Task 25.5 接的 `auxAccountCode`，未实测）
-    - [ ] 20.3 F0-4b 录入后 A~I 公式实时计算（Task 24 改的 NaN 防御，未实测）
+    - [x] 20.2 F0-5/F0-6 从 F0-1 带入供应商 + aux 精确余额校准 —— **2026-08-05 实测全通，并抓到 1 个新缺陷**
+    - [x] 20.3 F0-4b 录入后 A~I 公式实时计算 —— **2026-08-06 实测全通（含 NaN 防御）**
+  - **2026-08-06 Task 20.3 实测记录**：项目 `2aa00f57` / wp `1d23aba1` → F0-4b「函证差异检查表（示例）」→
+    「新增公司」→ 九段区渲染齐全（A/B/C→D、E/F/G→H、I=H−D 公式标注可见）。
+    | 步骤 | 录入 | 界面派生 | 手算 |
+    |------|------|---------|------|
+    | ① A/E | A=100000 / E=95000 | D=100,000.00 · H=95,000.00 · I=**−5,000.00** | 100000+0−0 / 95000+0−0 / 95000−100000 |
+    | ② B 段动态行 | 3000 + 2000 | B 合计=**5,000.00** → D=**105,000.00** → I=**−10,000.00** | 100000+5000−0 / 95000−105000 |
+    | ③ **NaN 防御** | B 段第 3 行填 `abc` | B 合计**仍 5,000.00**、D/I **逐字不变** | Task 24.2 生效 |
+    概览同步「有差异 1 / 差异绝对值合计 5,000.00」。
+    ⇒ ③ 正是 Task 24.2 的核心改动：改造前 `r.amount ?? 0` 挡不住 `parseFloat('abc')` 的 NaN，
+    整条 A~I 链会全变 NaN；实测确认 `Number.isFinite` 逐行过滤在运行态生效。
+  - **2026-08-05 Task 20.2 实测记录（三件套齐：录数据 → 验行为 → 查库）**：
+    项目 `2aa00f57` / wp `1d23aba1`。F0-1 录入 3 行并**点「保存」**后 `parsed_data.rows` 落库 n=3：
+    | 索引号 | 单位名 | 科目 | 发函金额 | 相符情况 |
+    |--------|--------|------|---------|---------|
+    | F0-001 | 重庆航天职业技术学院 | 预付账款 | 1,000 | （空，Task 20.1 残留） |
+    | F0-002 | 重庆发展置业管理有限公司 | 预付账款 | 200,000 | 未回函 |
+    | F0-003 | 重庆兴创眼镜有限公司 | 应付账款 | 300,000 | 未回函 |
+    **F0-5（`auxAccountCode='1123'`）**：toast「已从 F0-1 带入 2 个未回函被函证单位，**其中 1 家期末余额已按辅助余额表校准**」；
+    重庆发展置业期末余额 = **225,843.47**（aux 精确值，**非**发函金额 200,000）—— 该单位在 `1123` 下是
+    **6 个维度组合求和**（20,619.51+23,124.84+10,752.20+45,530.70+45,991.73+79,824.49），与 SQL 独立复算逐分一致。
+    **F0-6（`auxAccountCode='2202'`）**：toast 同款 N=1；重庆兴创眼镜期末余额 = **−5,034,622.41**
+    （跨 `2202.01/.02/.97/.98` **四个子科目**求和，**负号保留未取绝对值**）。
+    ⇒ **Wave 8 的 Task 33（apiProxy 形态）/ 34（跨子科目·跨维度求和 + 不去重）/ 35（`pickAuxType`）三项在运行态全部生效**
+    （若 apiProxy 仍错配则校准数恒 0、该 toast 子句根本不会出现；若仍 `.find()` 取单条则金额会明显偏小）。
+    F0-001 未被带入是**正确行为**（相符情况为空、不属未回函）。
+  - **🔴 本轮新抓到的真实缺陷（未修，需科目归属裁决）**：**带入不按科目分流** ——
+    `GtConfirmationAlternativeF05/F06.vue` 的 `handleImportF01` 都只传 `{defaultItemName, auxAccountCode}`，
+    **没传 `accountTypes`** → `importUnrepliedAsCompanies` 的 filters 只装 `defaultUnrepliedFilter`
+    → 实测 F0-5（预付账款）把 `应付账款` 的 F0-003 一并带入、F0-6（应付账款）把 `预付账款` 的 F0-002 一并带入，
+    两侧对称。**aux 侧行为反而是对的**（跨科目单位在对方科目下查不到 → 正确地没命中、余额停在发函金额），
+    这恰好成了科目不匹配的旁证。
+    **不擅自加过滤的理由**：`accountTypeFilter` 传什么集合需要源模板依据 —— F0-5 是「预付**及采购**替代程序」、
+    F0-6 是「应付**及采购**替代程序」，「本期采购」这一品种是否两表都收、`应付票据` 归 F0-6 还是不收，
+    源模板未直接给出（Task 28 已推翻过一次「按品种归属」的编造分摊）。**先报告，待裁决后再落 + 加守卫**。
+  - **顺带观察（未修）**：F0-5/F0-6「余额数据」卡片期末余额格是 `el-input-number`（a11y 树 `spinbutton`），
+    内部值 `225843.46875` 未按 2 位收敛且节点带 `valuemin=0`/`valuemax=0` 异常 →
+    属 memory 已记的「可编辑金额千分符只能用 `el-input`/`WpAmountInput`」存量替换范围，非本 spec 半径。
+  - **实测手法教训（下轮直接复用）**：**共享 Chrome tab 被并发会话反复导航**，未保存的新增行因组件重挂被丢弃 3 次
+    → 录入应压成一次原子操作（`vue.setupState.data.addRow()` + `data.updateField(rowId, field, value)`，
+    这正是各 select/input 的 `handleFieldUpdate` 内部调用的同一函数，走同一条写入与派生路径）再点真实「保存」按钮；
+    **一次派发只做一个浏览器动作**（本轮整段派发连续两次把预算耗在重建上下文上、浏览器交互零进展，
+    拆成微步骤后一次成功）。
   - **2026-08-03 第三轮实测（Task 20.1 完成，抓到 3 个缺陷，修 2 报 1）**：
     项目 `2aa00f57` / wp `1d23aba1`，点开 F0-1 → 点「+ 新增函证对象」→ 展开「一、函证情况」→
     在完整表格视图录入 科目=预付账款 / 函证金额=1000 / 相符情况=相符（走 el-select 下拉真点选）/
@@ -246,11 +288,127 @@ Wave 7 的九项返工全部完成，其中 **三项的修法与立项时写的�
       （实测受 sessionStorage 跨域限制 + 相对路径解析失败，两条路都不通）。
     - （已于第三轮全部完成，见上）
 
-- [~] 21. 浏览器实测：F0-8 三态选择 + 推送 B50 → `checklist_responses` 落库验证；F0-4 差异超阈值 + 推送 A13 → `unadjusted_misstatements` 落库验证
+- [x] 21. 浏览器实测：F0-8 三态选择 + 推送 B50 → `checklist_responses` 落库验证；F0-4 差异超阈值 + 推送 A13 → `unadjusted_misstatements` 落库验证
   - _🔴 2026-08-03 复盘退回：仅确认 F0-8 渲染完整（19 条迹象 7 组 + 三态 combobox + 「→ 跳转 B50」按钮），**未做任何点选与落库核查**。B50/A13 真推送依赖平台共享件 `handleJumpB50`（仍是 TODO stub）。_
+  - _✅ 2026-08-05 前置复核：**上述退回理由已过期** —— `handleJumpB50` 已由 `e0-confirmation-completion` 实装（走 `workpapers?wp_code=B50` 查询 + `router.push`，并有零回归守卫 `confirmationStubWiring.spec.ts`）；推送侧亦已接线 —— F0-8 `handlePushB50` 走平台既有 `b50:push-risk-factor`（消费者 `GtB50RiskAssessment.appendRiskFactorsFromB2`）、F0-4 走 `a13:push-misstatement`（消费者 `useA13MisstatementBridge`）。代码前置齐备，只差实测。_
 
-- [~] 22. 浏览器实测：F0-7 邮箱域名检测（输入 qq.com → 红色 / 输入 company.com.cn → 绿色）+ 自动推导结论；F0-3 三 checkbox 勾选 + 工号输入
+  - **2026-08-06 实测（本轮完成）**：F0-8 渲染 **19 个三态 el-select**，
+    第 1 条逐字为源模板 A6「管理层不允许寄发询证函」→ **直接实证 Task 27 按源模板重写预置生效**
+    （改造前是自造的「被审计单位管理层凌驾于内部控制之上」）。
+    把第 1 条设为「是」+ 填应对措施 → 按钮由「推送 **0** 项」变「推送 **1** 项迹象至 B50 风险因素」
+    且 `disabled=false` → 点击后 toast「已推送 1 项舞弊迹象至 B50 风险因素识别（B50 按描述去重，
+    重复推送不会产生重复行）」，并回填 `summary.b50_ref='B50'`（源模板 F0-8!H26 就写着 B50）。
+    **A13 侧见 Task 20 记录**（落库 1 笔 30,000,000.00 / `source_wp_code='F0'`，已按 API 软删复原）。
+  - **🔴 B50 侧「未落库」是既有架构约束，不是本 spec 缺陷（已定性，勿再重查）**：
+    `b50:push-risk-factor` 的唯一消费者 `appendRiskFactorsFromB2` 挂在
+    **`GtB50RiskAssessment.vue` 的 `onMounted`** —— 即**必须 B50 底稿已打开**才接得到；
+    实测时 B50 未打开，故 `checklist_responses` 5 个 B50 底稿全 0 行。
+    这与 A13 通道形态不同（`useA13MisstatementBridge` 挂在 `WorkpaperEditor.vue` 顶层，
+    只要在底稿编辑器内就常驻 → 因此 A13 能直接落库）。
+    F0 侧发送链路已完整验证（按钮启用判据 / 载荷构建 / 事件名 / source 白名单 / toast / 索引回填），
+    「跨底稿离线投递」属平台级 EventBus 架构议题（要么把 B50 消费者上移到 Shell 层，
+    要么给 B50 加服务端收件箱），**半径覆盖 B19-1 / B2-12 / B22A / B23 四个既有生产者**，
+    不在本 spec 内。
+
+- [x] 22. 浏览器实测：F0-7 邮箱域名检测（输入 qq.com → 红色 / 输入 company.com.cn → 绿色）+ 自动推导结论；F0-3 三 checkbox 勾选 + 工号输入
   - _🔴 2026-08-03 复盘退回：`emailDomainCheck.ts` **零消费方**（未接入 `ReliabilityGrid` 的 `email_domain` 列），故「输入 qq.com → 红色」这条无法测。需先完成 Task 26。_
+  - _✅ 2026-08-05 前置复核：**两条退回理由均已过期** —— Task 26 已完成（`ReliabilityGrid.vue` 已 import `emailDomainCheck` 并按 `email-cell` flex 布局渲染 tag）；F0-3 工号字段亦已实装（`followupTypes.confirm_staff_no` / `leave_staff_no`，源模板 A13/A17，`useMemoCompose` 已登记中文标签）。代码前置齐备，只差实测。_
+
+### 2026-08-06 Wave 6 收口实测（Task 20.3 / 21 / 22 全通，并修掉 1 个新查出的真缺陷）
+
+项目 `2aa00f57` / wp `1d23aba1`（整册 F0，深链 `?sheet=` 进各页）。
+
+**Task 20.3 — F0-4b A~I 公式链 + NaN 防御**
+
+| 步骤 | 实测值 | 手算 |
+|------|--------|------|
+| A=100000 / E=95000 | D=100,000.00 / H=95,000.00 / I=**−5,000.00** | I=H−D ✓ |
+| B 段新增 3 行，填 3000+2000 | B 合计 **5,000.00** → D=**105,000.00** → I=**−10,000.00** | D=A+B−C ✓ |
+| B 段第 3 行填脏数据 `abc` | B 合计**仍 5,000.00**、D/I **不变** | Task 24.2 的 `Number.isFinite` 逐行过滤生效 ✓ |
+
+概览同步「有差异 1 / 差异绝对值合计 5,000.00」。**改造前 `?? 0` 挡不住 `parseFloat('abc')` 的 NaN，整条 A~I 链会全变 NaN**。
+
+**Task 21 — A13 推送（真落库）**
+
+`unadjusted_misstatements` 实测新增 1 行：金额 **30,000,000.00** / `source_wp_code='F0'` / `misstatement_type='factual'`。
+链路四环全部由「不可达」变为「可达」（见下方新修缺陷）：按钮文案 0→**1 笔**且 `disabled=false` ·
+行 `--row--alert` ×1 · 金额 `--amount--over` ×1 · 看板「超重要性 1」+ 告警条「1 笔差异超过实际执行重要性，请重点关注」。
+**测试数据已复原**（走 `DELETE /api/projects/{id}/misstatements/{id}` → 该项目 `is_deleted=false` 计数回 0；
+另一条 D1 记录的 `deleted_at` 是 2026-07-30，**不是本轮删的**）。
+
+**Task 21 — B50 推送（发送链路通，落库受既有架构约束）**
+
+F0-8 渲染 19 个三态 el-select，**第 1 条逐字为源模板「管理层不允许寄发询证函」** ⇒ 直接实证 Task 27
+「按源模板重写平台预置」在运行态生效（改造前是自造的「管理层凌驾于内部控制之上」）。
+设第 1 条=「是」+ 填应对措施 → 按钮由「推送 **0** 项」变「推送 **1** 项迹象至 B50 风险因素」且启用 →
+点击后 toast「已推送 1 项舞弊迹象至 B50 风险因素识别（B50 按描述去重，重复推送不会产生重复行）」。
+🔴 **B50 侧 `checklist_responses` 落库 0 行是既有架构约束，不是本 spec 缺陷** ——
+唯一消费者 `GtB50RiskAssessment.appendRiskFactorsFromB2` 挂在该组件自己的 `onMounted`
+（`eventBus.on` / `onUnmounted` 里 `off`），**B50 底稿未打开时进程内无接收方**；
+而 A13 侧的 `useA13MisstatementBridge()` 挂在 `WorkpaperEditor.vue` 顶层故随时可收。
+两者挂载层级不同 = 「推送后必须打开 B50 才生效」，属平台级设计（B19-1 / B2-12 / B22A / B23 四个既有生产者同款）。
+
+**Task 22 — F0-7 邮箱域名 + F0-3 三核对点**
+
+| 输入 | 邮箱域名列 | 回函邮箱列 | 结论（自动推导） |
+|------|-----------|-----------|----------------|
+| `@qq.com` / `abc@qq.com` | 🔴 私人邮箱 | 🔴 私人邮箱 | 🔴 初判：不可靠 |
+| `@company.com.cn` / `zhang.wei@company.com.cn` | 🟢 公司邮箱 | 🟢 公司邮箱 | 🟡 初判：部分可靠需补充 |
+
+**裸域名形态（`@company.com.cn`）与完整邮箱形态都能识别** ⇒ Task 26.3 修的盲区生效
+（改造前裸域名一律判 unknown 灰色，而该列 placeholder 恰恰就是 `如 @company.com`，等于"接了也没用"）。
+结论落 warning 而非 success 也正确 —— 邮箱合格但「寄回原件/致电确认」未勾，按 R6.4 逻辑应为部分可靠。
+F0-3：三核对点（了解流程/身份权限/正常流程）全部渲染 + 「工号」3 处 + 4 个 el-select + 控制结论选项齐备。
+
+**🔴 本轮新查出并已修的真缺陷（P0，七枢纽共享）：F0-4 重要性水平（PM）取数链路从未接通**
+
+- **现象**：库里 `materiality.performance_materiality = 26,104,487.00`、
+  `GET /api/projects/{id}/materiality?year=2025` 返回 200 且字段完整，
+  而 F0-4 界面「实际执行重要性」显示 **未配置**。
+- **根因**：`useDiffReconcileData` 的 `materialityConfig` **只从底稿自身载荷**
+  （`htmlData.materiality_config`）读，全文没有任何取数调用。而 UI 文案
+  （`DiffReconcileConclusion.vue`）早已写着「默认从 B15 重要性水平底稿自动获取」= 承诺未兑现。
+- **三个连带静默后果**：① `isOverMateriality` 恒 false → 差异行永不标红
+  ② 「推送 N 笔超重要性差异至 A13」**按钮永久禁用**（N 恒 0）→ Task 21 的批量推送本来无法实测
+  ③ `MaterialityConfig.source === 'auto'` → 「自动取值」tag 是**死分支**（全平台无一处写入 `'auto'`）。
+- **修法**：新建 `diffReconcile/composables/fetchMaterialityConfig.ts`
+  （`fetchMaterialityConfig` + `hasUsablePm`，用 `api`/apiProxy 直接取返回值、fail-open 返 null）；
+  `useDiffReconcileData` 加**可选**入参 `projectId`/`year` + `applyAutoMateriality()`（手工优先）；
+  宿主 `GtConfirmationDiffReconcile.vue` 真传两个 prop（宿主本就有这两个 prop，只是没往下传）。
+- **实测**：阈值格显示 **26,104,487.00** + tag 变 **「自动取值」**；录一行差异 3,000 万（> PM 2,610 万）
+  后上述四环全部点亮。
+- **受益面 = D0-4 / E0-4 / F0-4 / G0-4 / H0-4 / K0-4 / L0-4 七个函证枢纽共用该组件。**
+- **改造中修掉自己两个缺陷**：① **TDZ** —— `_autoConfig`（`let`，不提升）原声明在文件后半段，
+  而 `initFromHtmlData()` 在其之前就被调用并读它 → 首次挂载必抛 `ReferenceError`，
+  且 `get_diagnostics`/vitest 查不出（与 E1TabDisclosure 那次同族）→ 声明前移到 composable 顶部；
+  ② **deep watch 冲掉 auto 值** —— `initFromHtmlData` 由 `watch(htmlData,{deep:true})` 反复触发、
+  每次把 `materialityConfig` 重置为载荷值 → 只在取数那一刻赋值会让阈值"时有时无"→ 改为缓存 `_autoConfig`
+  并在 `initFromHtmlData` 末尾重新套用。
+- **守卫** `diffReconcile/composables/__tests__/materialityAutoFetch.spec.ts`（19 例）：
+  P1 三态语义（有效 PM / PM≤0 / 端点抛错 fail-open / projectId 缺失不发请求 / 字符串数值兼容）·
+  P2 手工优先不变式（`is_overridden` 与已有载荷值都不得被覆盖）·
+  P3 **接线存在性源码级断言**（宿主必须真传 `projectId`/`year`，防能力退化成零消费方）·
+  P4 **TDZ 顺序断言**（`let _autoConfig` 行号必须早于首次 `initFromHtmlData` 调用行号）。
+  回归：`diffReconcile` 域 **20 文件 / 42 passed / 0 failed**（基线 23 例，新增 19 例零回归）；3 文件 Vite 200。
+
+**🔴 本轮另查出 2 处未修（跨循环写死文案，与 Task 37 同族，需科目归属裁决后一并处理）**
+
+- `DiffChecklistMaster.vue` 两处写死「从 **D0-4** 带入」（按钮 + 空态提示），而 F0-4b 上应显示 F0-4；
+  **且该带入功能本身仍是 TODO stub**（`GtConfirmationDiffChecklist.vue` 里只有 `console.log`）
+  → 只改文案等于给 stub 化妆，应与实装一起做。
+- `ReliabilityGrid` 工具栏写死「从 **D0-1** 带入电子回函」（F0-7 上应为 F0-1）。
+  两处都可复用 Task 37 已建的 `alternativeMasterLabels` 范式（labels 常量 + prop 注入）。
+
+**实测手法沉淀**
+
+- **共享 Chrome 的 sessionStorage token 会掉** → 被重定向到 `/login` 时直接
+  `fetch('/api/auth/login')` 写 `access_token` 再导航，比走 UI 快且稳。
+- **`el-table` 固定列分区**：tbody 分散在 3 个 `.el-table__body` 里，按「表头列序 → td 下标」定位必失败
+  → 改按 `placeholder` / `type=number` 特征定位输入框。
+- **`wait_for` 的 MCP 参数序列化不稳**（`text` 需数组、`timeout` 需数字，多次报 invalid_type）
+  → 直接用 `evaluate_script` 读 DOM 状态判断就绪。
+- **终端失稳（PSReadLine 崩溃刷屏）时**改用 `control_pwsh_process start` + 脚本自己写盘 + `read_file` 读结果
+  （memory 已记该铁律，本轮再次验证有效）。
 
 ## Wave 7 — 返工（2026-08-03 复盘新增）
 
