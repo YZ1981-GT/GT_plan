@@ -136,7 +136,8 @@
   - `buildK0SummaryMatrix({ rows, bookAmounts, manualOverrides })` → `2 × 8` 矩阵；品种为**固定 2 个**（源 `E28`/`F28`，非 H0 那种动态可扩位）
   - 文件头写清与 F0/H0 的关系及「为何不统一内核」（重构半径覆盖 E0/F0/H0/G0 四 spec）
   - 黄金快照冻结 E0/F0/H0 三份矩阵改造前输出 + 断言三文件内容哈希不变；三侧既有 spec 断言**不改一个字**必须全绿
-  - _Requirements: 3.2, 3.3, 3.4, 11.2, 11.3_
+  - 🔴 本任务是 Wave 3 的第一个共享件任务 ⇒ 开工即 R11.1 的并发闸判定点（F0 spec 实测 144/144 且已归档 ⇒ 闸门已客观解除）
+  - _Requirements: 3.2, 3.3, 3.4, 11.1, 11.2, 11.3_
 
 - [x] 9. `confirmationColumnSpec.ts` — 撤伪列 + 对齐 G0/H0 处置（**两个机制已存在，只增 K0 声明**）
   - 删 `VARIANT_COLUMN_DEFS.send_memo`（伪列）；`row_conclusion` 的 `group` 由 `send_memo` 改 `row_summary`（现有注释已指明 K0/L0 归属待修正）
@@ -168,7 +169,7 @@
 
 - [x] 12. `send_memo` 既有值只读呈现 + `cycleConfirmationMeta.ts` 笔误登记
   - 撤列后若某行 `send_memo` 非空，在行详情以只读提示呈现并说明「源模板无此列，请改填对应分段内的具体列」
-  - `cycleConfirmationMeta` 新增可选 `indexTypoMap`，K0 声明三条；其余循环缺省 `undefined` ⇒ 行为不变
+  - `cycleConfirmationMeta` 新增可选笔误说明字段（**落地字段名是 `SheetMeta.indexTypoNote`，不是立项写的 `indexTypoMap`** —— 笔误说明挂在 per-sheet 条目上比再建一张 map 少一层间接），K0 声明三条；其余循环缺省 `undefined` ⇒ 行为不变
   - 跨表跳转与 CrossRef 文案按 `intended` 目标（`K0-4`/`K0-7`/`K0-3`），tooltip 标源模板原值
   - _Requirements: 2.2, 6.1, 6.2_
 
@@ -176,13 +177,16 @@
   - `blockColumnConfigsK05.block1`：`receipt_payer` label「收款方」→「**付款方**」；补 `支持性文件1{识别特征,信息1,信息2}` 三列；银行回单日期列 label 回归源模板用词
   - 源模板红字「检查的关键证据和要素根据被审计单位具体情况修改」以琥珀块置于对应区块上方（K0-5/K0-6 各 3 处）
   - 编制说明内嵌 3 条替代程序要点
-  - `entityVerifyTypes.ts` additive 六字段（`second_send_address`/`_zipcode`/`_contact`/`_phone`/`_fax`/`second_info_match`）+ `EntityVerifyDetail.vue` 在 `is_second_send` 为真时展开、为假时折叠
+  - `entityVerifyTypes.ts` additive 六字段 + `EntityVerifyDetail.vue` 在 `is_second_send` 为真时展开、为假时折叠
+    - 🔴 **落地字段名是 `second_entity_address`/`second_entity_zipcode`/`second_contact_person`/`second_contact_phone`/`second_fax`/`second_info_verified`**，不是立项写的 `second_send_*`/`second_info_match` —— 与该文件既有一次发函侧命名（`entity_*`/`contact_*`/`info_verified`）保持同一构词法，改成 `send_*` 会让同一张表出现两套构词
   - K0-2 五条编制说明作只读方法论上下文就地展示
   - _Requirements: 7.1, 7.2, 7.3, 7.4, 8.1, 8.2, 8.3, 8.4_
 
 - [x] 14. K0-7 渠道列渲染 + K0-3 通用话术补齐（共享件，全循环受益）
-  - `ReliabilityGrid.vue`：12 个渠道字段按 `reply_method` 分组展开录入位置（通用 2 项 + 邮寄 3 项 + 跟函 3 项 + 电子平台 4 项）；`G:M` 七列加父表头「期末未收回原件函证可靠性验证」
-  - K0 侧列标签按源模板用词；「回函日期」列按循环控制可见性（K0 源模板无该列），D0/F0/G0/H0/L0 侧行为不变
+  - 🔴 **12 个渠道字段按「明确撤回」处置，不接线**（R9.1 的两个选项之一）—— 三条并列实证：①六份 visible 源模板（D0-7/F0-7/G0-7/H0-6/K0-7/L0-6）的可靠性表列集**逐字同构且都是 14 列，没有这 12 列** ②它们的原始出处是 E0 的 `邮件传真回函核对记录F1-12`，而该 sheet 是 `hidden` 且用户已于 2026-08-02 裁决「三张隐藏底稿不需要再实现」 ③全库 `parsed_data` 命中这 12 个字段名的行数为 **0**（删除不触碰数据零丢失红线）。⇒ 接线出来的录入位在**任何**循环的源模板上都不存在 = 自造底稿列。守卫 `reliability/__tests__/reliabilityChannelFieldsWithdrawal.spec.ts` 钉死「不得复活」
+  - `ReliabilityGrid.vue`：`G:M` 七列加父表头「期末未收回原件函证可靠性验证」（走 `RELIABILITY_PARENT_HEADER` 常量，禁写字面量）
+  - K0 侧列标签按源模板用词（走 `RELIABILITY_COLUMN_SOURCE_LABELS` 真源，逐字对后端 r5/r6）
+  - 🔴 **「回函日期」不做按循环可见性控制**（R9.3 落地时被实证推翻）—— 六个枢纽源模板**全部**无该列 ⇒ 按循环分叉说不出哪个循环该显示，正确形态是**平台级源外保留列 + 显式登记 + UI tooltip 标注**（Property 24）
   - `memoTemplates.ts`：通用两段话术补工号占位；`LATER_FOLLOW_TPL` 补「确认其确实于〔visit_date〕接待跟函人员」核实要点；`getTemplate` 两种旧签名调用形态不变；E0 五段**逐字不变**
   - _Requirements: 9.1, 9.2, 9.3, 9.4, 10.1, 10.2, 10.3_
 
@@ -191,21 +195,26 @@
 - [x] 15. 建守卫 `k0ColumnAlignment.spec.ts` / `k0SummaryMatrix.spec.ts` / `k0LowerZone.spec.ts`
   - Property 2/3/4：28 列一一映射（含 `send_channel` 承载渠道、三列已剔除、`confirmation_method` 作显式登记源外保留列）+ 伪列已撤且字段保留 + D0/E0/F0/G0/H0 黄金快照逐字节不变
   - Property 5/6/7/8：矩阵 8 指标同构 + PBT 不产 NaN/Infinity（金额生成器**显式排除 `±Infinity`**，`fc.float({noNaN:true})` 不够）+ E0/F0/H0 三份矩阵内容哈希与输出快照不变 + row_code 精确匹配
-  - Property 9/10/22/23：下区四键与既有键无交集 + 旧 payload 兼容 + 5 项说明逐字 + `fmtAmount` 单一真源 + `el-input-number` 计数 0
-  - _Requirements: 2.7, 3.4, 3.12, 4.6, 11.3_
+  - Property 9/10/13：下区四键与既有键无交集 + 旧 payload 兼容 + 5 项说明逐字 + 笔误三条登记 → 落 `k0LowerZoneSpec.spec.ts`（守**声明真源**）
+  - Property 22/23：`fmtAmount` 单一真源（setup 顶层 inject / 禁模块级命名导入 / 禁 `toLocaleString`）+ `el-input-number` 与 `:formatter` 计数 0 + `WpAmountInput` 受控形态 → 落 `k0LowerZone.spec.ts`（守**组件实现形态**）
+    - 🔴 下区拆两个守卫文件：混在一个文件里会让「改声明」与「改渲染」的红信号混淆
+    - 🔴 `DisplayPrefs_Key` **引入来源**已有平台级守卫 `components/workpaper/__tests__/displayPrefsKeyImportSource.spec.ts` 全量扫 `.vue` ⇒ 本文件只做一条「该守卫仍在」的交叉锁死，**不抄第二份扫描逻辑**（同一不变式两份判据 = 改一处另一处不红）
+  - _Requirements: 2.7, 3.1, 3.4, 3.5, 3.12, 4.6, 11.3_
 
 - [x] 16. 建守卫 `k0AlternativeBlocks.spec.ts` / `k0SharedComponentBoundary.spec.ts` + CI job
   - Property 14/15/16：段①对方当事人 label 必须不同（反向自检：统一即红）+ 支持性文件三列齐备 + 索引号列不参与求和 + `SOURCE_EXTRA_MANIFEST` 与 `splitByDirection` 登记不变
   - Property 17/18/19：二次发函六列 additive（对改造前字段名集合取差集，删除项与重命名项须为空）+ 12 个渠道字段**全部有 UI 消费方**（反向自检：删任一渲染点即红）+ 通用话术含两处占位且 E0 五段逐字不变
   - Property 20/21：本 spec 新建模块**零消费方即打红**（排除自身/`__tests__`/`components.d.ts`）+ 共享件受影响循环声明表完整
   - 登记 `RELIABILITY_COLUMN_CONFIG` 零消费方为已知死配置（平台级，不在本 spec 清理）
-  - CI 新增 job：`k0-source-alignment`（后端 3 个测试文件）+ `k0-source-alignment-frontend`（前端 5 个 spec）
-  - _Requirements: 7.6, 8.5, 9.5, 9.6, 10.4, 11.4, 11.6_
+  - 落地时另加两条 Property（design 已补声明，防悬挂引用）：**Property 24** 源外保留列显式登记 + UI 标注（`reply_date`/`identity_method`/`phone_source`/`reliability_note` 四条，reason 须有实质内容）· **Property 25** 模板引用的标识符均已定义或导入（`<script setup>` 未声明标识符不阻断编译，只在浏览器打开时整页崩）
+  - CI 新增 job：`k0-source-alignment`（后端 2 个测试文件 + 幂等脚本 `--check`）+ `k0-source-alignment-frontend`（k0-confirmation 目录 + `k0ColumnAlignment` + `k0SharedComponentBoundary` + `reliability/__tests__` + `confirmationColumnSpec`）
+  - _Requirements: 7.6, 8.5, 9.3, 9.5, 9.6, 10.4, 11.4, 11.6_
 
 - [x] 17. 浏览器实测（三件套，缺一不算实测）
   - 逐个打开 K0 的 9 个 sheet 页签，确认无「页面渲染出错」（Vue 运行期错误四层验证全查不出）
   - K0-1 录 ≥2 行（两品种各一行 + 一行未回函走替代）→ 确认矩阵 8 指标出数、三个比例正确、账面金额可手填且手工优先、未归类提示按预期出现/消失
-  - `postgres` 只读确认 `html_data['函证结果汇总表K0-1']` 落库了下区四键且键名符合 Property 9
+  - `postgres` 只读确认下区键落库且键名符合 Property 9
+    - 🔴 **落点是 `checklist_responses` 不是 `html_data`**（立项写错）—— 下区一律 `emit('save', itemId, value)` 走 `PUT /checklist-responses`；`html_data['函证结果汇总表K0-1']` 只承载上区明细行 `rows` 与 `sampling`/`notes`/`conclusion`/`summary_config`
   - K0-2 勾「是否进行第二次发函=是」→ 六列展开可录入并落库；K0-7 切 `reply_method` → 对应渠道列组展开
   - K0-5 段①确认 label 为「付款方」且支持性文件三列在；K0-6 为「收款方」
   - 实测前抓快照，测完**逐字复原**测试数据
@@ -220,6 +229,92 @@
   - _Requirements: 11.5, 11.6_
 
 ## Notes
+
+### 收口实录（2026-08-08，18/18 全完成）
+
+**接手时的第一件事是「spec 三件套在工作树里被并发会话删掉了」** —— `.kiro/specs/k0-confirmation-source-alignment/` 三个文件全部处于 ` D`（已删未暂存）状态，`file_search` 全仓零命中；`git log` 显示它们只被 `6ab66b76` 收过一次，故 `git checkout HEAD -- <dir>` 即完整恢复。**恢复出来的 tasks.md 是 7/18 的旧快照，而磁盘上的代码产物远超它** —— 这是「复选框与代码实证不一致」的又一实例，且成因是新的一种：**spec 文档被删导致进度记载整体回退**（此前记载的成因是「并发会话完成不回写」或「IDE 自动标绿」）。⇒ 判进度一律先逐项探针，别信复选框，也别因为文档不见了就以为工作没做。
+
+**逐项探针实证：Wave 3（Task 8~14）早已完整交付，本轮只剩一个真缺口。**
+
+| Task | 实证 |
+|---|---|
+| 8 | `k0SummaryMatrix.ts` 14.3 KB + `k0SummaryMatrix.spec.ts` 23.8 KB（Property 5/6/7/8） |
+| 9 | `CYCLE_VARIANT_COLUMNS.K0=['send_channel','k0_row_conclusion']` / `CYCLE_EXCLUDED_COLUMNS.K0` 三列 / `CYCLE_COLUMN_LABEL_OVERRIDES` 含 `K0`（另有 G0/H0/L0）/ **`CYCLE_COLUMN_GROUP_OVERRIDES` 已新建且只有 `K0` 一个键**（其余循环缺省 ⇒ 零回归） |
+| 10 | `K0SummaryLowerZone.vue` 23.2 KB；`GtConfirmationSummary.vue` 的 `isK0` 8 处 + 挂载 3 处；`ConfirmationSampling.vue` 的 `isK0` 4 处 + `K0_SAMPLE_SELECTION` 4 处 |
+| 11 | `k0MatrixDataSources.ts` 17.6 KB |
+| 12 | `cycleConfirmationMeta.ts` 的 `indexTypoNote` 3 处；`ConfirmationDetail.vue` 的 `send_memo` 只读留档区（`v-if="row.send_memo"`）在 L356 |
+| 13 | `blockColumnConfigsK05.ts` 付款方 4 / 识别特征 3 / 支持性文件 5；`blockColumnConfigsK06.ts` 收款方 5；`k0AlternativeSourceFidelity.ts` 红字真源；`entityVerifyGuidance.ts`（K0-2 五条编制说明）；二次发函六列在 types + Detail 双侧 |
+| 14 | `RELIABILITY_PARENT_HEADER` 已在 `ReliabilityGrid.vue` L183 用常量渲染；`reliabilityColumnLabels.ts` 九处源模板用词；`memoTemplates.ts` 工号 12 处 + `THIRD_PARTY_CALLBACK_TPL`（接待事实核实）；12 渠道字段按「明确撤回」处置并有专门守卫 |
+| 16 | `k0ColumnAlignment.spec.ts` 17.8 KB + `k0SharedComponentBoundary.spec.ts` 25.6 KB（**都在 `confirmation/__tests__/` 而非 `k0-confirmation/__tests__/`**）；CI 两个 job 已在 `governance-checks.yml`（jobs 137） |
+
+**本轮唯一真缺口 = Property 22/23 无守卫。** design 的 Testing Strategy 表点名 `k0LowerZone.spec.ts`，该文件不存在；Property 覆盖矩阵实扫结果是「1~21、24、25 全有引用，**22 无任何引用**、23 只被 H0 的 `entityVerifyH0Columns.spec.ts` 偶然命中（那是 H0 自己的 Property 23）」。→ 新建 `k0-confirmation/__tests__/k0LowerZone.spec.ts`（20 例），**变异检验 6/6 全 RED、md5 逐字节还原**：
+
+| 变异 | 结果 |
+|---|---|
+| M1 `inject` 挪进函数体（setup 顶层失效） | RED（2 条） |
+| M2 把 `fmtAmount` 当模块级命名导出引入 | RED |
+| M3 自造 `toLocaleString` 格式化 | RED |
+| M4 金额控件换成 `el-input-number :formatter` | RED（7 条） |
+| M5 去掉 `readonly` 门控 | RED |
+| M6 比例分支退化成金额格式 | RED |
+
+> 🔴 变异脚本首版 M3/M4 报 ANCHOR-MISS（hits=0）—— **含 `\n` 的跨行锚点在 CRLF 工作树必不命中**（已记铁律，本轮又踩）。改单行锚点后立刻 RED。**ANCHOR-MISS 是脚本缺陷、既不是 RED 也不是 GREEN**，当成 GREEN 处理会漏掉真正的守卫缺陷。
+
+**同轮修掉三处三件套自身缺陷**：
+
+1. **悬挂引用** —— `k0SharedComponentBoundary.spec.ts` 引用了 design 里不存在的 Property 24/25 ⇒ design 补齐两条声明（24 源外保留列显式登记 + UI 标注 / 25 模板标识符均已定义），并写明 24 是对 R9.3「按循环控制 `reply_date` 可见性」的**落地修正**（六枢纽源模板全部无该列 ⇒ 按循环分叉说不出依据）。
+2. **Testing Strategy 表路径漂移** —— 矩阵守卫写成 `confirmation/__tests__/x0SummaryMatrix.spec.ts`（泛化内核撤回后该文件名不再成立）、替代程序守卫写成 `confirmation/__tests__/`，实际两者都在 `k0-confirmation/__tests__/`；下区由一份拆成「声明真源」+「实现形态」两份。
+3. **AC 11.1 无人引用** —— 它是 Wave 3 的并发闸（F0 未收口前不得改共享件），落到 Task 8 的 `_Requirements:`（Wave 3 第一个共享件任务即闸门判定点）。
+
+三件套现自洽：11 需求 / 80 AC / **25 Property 无缺号无重复** / design 与 tasks 的 AC 引用**悬挂 0 条** / 未被任何一侧覆盖的 AC **0 条** / waves JSON 18 个 id ≡ 复选框 18 个 / `get_diagnostics` 零诊断。
+
+**四处立项描述被落地实证推翻（勿按旧文字实现）**：`indexTypoMap` → 实为 `SheetMeta.indexTypoNote` · `second_send_*`/`second_info_match` → 实为 `second_entity_*`/`second_contact_*`/`second_fax`/`second_info_verified`（与一次发函侧同构词法）· 12 渠道字段「接线或撤回」→ 撤回（三条并列实证）· 下区落点 `html_data` → 实为 `checklist_responses`。
+
+### 浏览器实测（Task 17，2026-08-08，chrome-devtools `isolatedContext` + postgres 只读）
+
+项目 `2aa00f57`（重庆和平药房连锁有限责任公司_2025）/ wp `02c5f9b2`（**`wp_code=K0` 整册 10 sheet** —— 单 sheet 遗留 wp_code 的 `html_data` 为 null，用它测不到注入）。
+基线：`parsed_data IS NULL` / `md5=d41d8cd9…` / `updated_at=2026-06-08 02:00:53.647970+00` / `checklist_responses` 0 行。
+
+| 验证项 | 结果 |
+|---|---|
+| 9 个 sheet 逐个打开 | 全部无「页面渲染出错」；console **零 `[error]`**（39 条 `[warn]` 全是平台预存在的 EP/prop 类型告警，如 `year` Number vs String、`GtAProgramConsole` 缺 `schema`） |
+| 下区四块渲染 | 一、函证情况（C27）/ 三、审计说明（S27）/ 四、审计结论（C38）+ 编制说明 `details` 折叠；二、样本选择由共享 `ConfirmationSampling` 承担（`renderedHere:false` 设计如实） |
+| 8 指标锚点与文案 | `C29..C36` 逐格显示锚点；X29+X30 合并句完整不半句结尾；第 3 项挂「源模板索引号笔误」tag（逐字保留源模板的「（K0-6）」）；第 5 项 `aliasOf` 只读引用 + 「请在那里编辑（避免两处录入）」 |
+| **账面金额自动取数** | 其他应收款 **87,794,660.16**（= K1 `adjudication_prefill.fs_reconciliation.report_total`，BS-009 净额口径）/ 其他应付款 **110,361,076.52**；取数诊断告警**真实渲染**（K3 row_code 缺口那条），不是只收集 |
+| 矩阵 8 指标出数 | 录 2 行（其他应收款 100 万相符 / 其他应付款 50 万未回函+替代 20 万）→ C30 1,000,000/500,000 · C31 1.14%/0.45% · C32 1,000,000/200,000 · C33 100.00%/40.00% · C34 1.14%/0.18% · C35 −/200,000 · C36 1.14%/0.36%，逐格与源模板 SUMIF 口径相符；**C36 无 ISERROR 兜底**如实实现 |
+| 三态与 null 口径 | 分母为 0 的 C33 显示 `-`（null，非 0）；分母非 0 分子为 0 的 C31/C34/C36 显示 `0.00%` |
+| **Property 22/23** | 账面金额格显示 `87,794,660.16` / 手工改 90000000 → `90,000,000.00`（千分符 + 2 位小数）；比例随之 1.14% → **1.11%** ⇒ 手工优先生效 |
+| **Property 2/4（完整表格视图）** | 六段分组 `发函信息(8)/发函询证纪要(4)/收到回函(7)/回函金额确认(5)/未收到回函的替代程序(4)/行级审计结论(1)` = **29 个叶子列 = 源模板 28 列 + 显式登记的「函证类型（积极式/消极式）」**；「账户/交易」（非「科目」）、「调节索引（K0-4）」（源模板笔误 K1-12 按意图修正）、无联系人/联系电话/币种三列、无 `send_memo` 伪列 —— 全部生效 |
+| 落库（Property 9） | `checklist_responses` 恰 3 键：`K0-1-lower-audit-note-1` / `K0-1-lower-conclusion` / **`K0-1-matrix-其他应收款-book_amount`**（后者逐字等于 `prefill_formula_mapping.json` 的 `cell_ref`，前后端双向锁死在浏览器端得到证实）；`parsed_data.html_data['函证结果汇总表K0-1']` = `rows`(2) + `_format:confirmation-v1` + `summary_config.account_types` 两品种 |
+| 硬刷新读回 | 矩阵 8 指标由落库数据重算一致、手工覆盖 `90,000,000.00` 读回、审计说明与结论读回、两行明细读回 |
+| K0-2 | 二次发函六列（地址/邮编/联系人/联系电话/传真/信息核查一致）受 `二次发函` 开关门控；**五条编制说明全部渲染**（`说明1：`~`说明5：` + 锚点 A28/A34/A36/A38/A40 + 「记录工号（若有）」），默认折叠在 `details` 里 |
+| K0-7 | 父表头「期末未收回原件函证可靠性验证」**跨 11 列**渲染；九处源模板用词 label 全部生效（被函证者身份确认 / 邮箱可靠性验证 / 是否致电被函证者确认 / 发函及回函传真信息及验证 / 对函证信息可靠性的考虑 / 是否由审计项目组直接接收 / 是否寄回原件） |
+| K0-6 段① | `付款审批单{日期/编号, 是否经过恰当审批}` + `银行回单{日期, **收款方**, 金额}`；「付款方」计数 0 ⇒ Property 14 的方向正确；红字「关键证据和要素…」琥珀块已渲染 |
+| 「账户/交易」下拉 | 已含 `其他应收款`/`其他应付款`（立项记的「三处下拉都无 K 类科目」已被后端 4 新枚举 + 21 追加取值修好） |
+
+**数据已逐字复原并经独立工具交叉核实**：复原脚本报 `deleted=3 updated=1` 后另起事务复查，再用 postgres MCP 第三方核对 —— `parsed_is_null=true` / `md5=d41d8cd98f00b204e9800998ecf8427e` / `updated_at=2026-06-08 02:00:53.647970+00` / `cr_rows=0` / 全库 `parsed_data` 命中「K0实测」**0 行**，与基线逐项相等。
+
+> 复原时踩到一条：**asyncpg 的 timestamptz 参数必须传 `datetime` 对象，传字符串会 `DataError`**，`CAST(:ts AS timestamptz)` 救不了（参数在绑定期就已按 timestamptz 编码）。因为写在 `engine.begin()` 里，首次失败整体回滚、未产生半写状态。
+
+### 回归
+
+| 范围 | 结果 |
+|---|---|
+| `backend/tests/test_k0_*.py` | **209 passed** |
+| 后端本 spec + 邻域（`test_fraud_risk_presets_source_fidelity` / `test_confirmation_meta_override_alignment`） | 223 passed / **1 failed 预存在** |
+| `fix_k0_prefill_presets.py --check` | `[OK] K0 预设已达目标状态，0 项欠账`（exit 0） |
+| 前端 `src/components/workpaper/confirmation` 全量 | **1975 passed / 0 failed**（改造前 1955；新增 20 例全通过、**新增失败 0**） |
+| F0/E0/G0/D0/H0/L0 的 confirmation spec | **未改任何断言**，全绿 |
+
+**唯一失败 `test_confirmation_meta_override_alignment::test_non_null_codes_have_override`（`G0.diffCode=G0-5` 在 override 无映射）是预存在的 G0 侧不一致**，判据不是「看着像别人的」：把 `wp_code_overrides.json` 与 `cycleConfirmationMeta.ts` 的**工作树版与 `git show HEAD:` 版逐项对比**，两侧都是 `meta G0.diffCode='G0-5'` 而 override 的 G0* 键集都是 `G0/G0-1/G0-2/G0-3/G0-3S/G0-4/G0-6/G0-7/G0-8/G0A`（**都没有 `G0-5`**）⇒ 与本轮零因果，归 G0 循环侧。
+
+### 本轮新查出、未修、需登记归属的问题
+
+| 项 | 实证 | 归属与不修的理由 |
+|---|---|---|
+| **保存后切走再切回，函证汇总回到 render-config 初始载荷（空态）** | 同一次页面加载内：录 2 行 → 保存成功（DB 已落库）→ 切 K0-6/K0-5 → 回 K0-1 显示 onboarding 空态；**硬刷新后恢复正常**（切 K0-2/K0-6 再回来行数稳定 2 行）⇒ 不是数据丢失，是宿主保存后不刷新 `htmlData` prop | 平台级（七枢纽共享 `GtConfirmationSummary`）。**该组件源码明文写着「本组件未 inject `reloadWorkpaperData`，写了会运行时 ReferenceError 而 `get_diagnostics` 查不出」** ⇒ 补刷新通路要动共享宿主、波及 7 个循环，超 R11.4 边界。**但它是一条潜在数据丢失路径**（用户看到空态重新录入再保存 = 整表覆盖掉已存的行），建议单独立 spec 并优先于其它函证增强 |
+| **列表视图的详情面板不套用列剔除与 label 覆盖** | `ConfirmationDetail.vue` 仍显示「联系人/联系电话/币种」（K0 已在 `CYCLE_EXCLUDED_COLUMNS` 剔除）且用「函证方式」而非「函证类型（积极式/消极式）」—— 因为 label/exclusion 由 `resolveConfirmationColumns` 施加，只有 `ConfirmationFullGrid` 消费它；详情面板有自己一套固定字段与 label | 平台级（七枢纽共享）。**详情面板是主要录入路径**，故这不只是显示问题：审计师在这里看到源模板没有的三列。Requirement 2 的验收对象是「列集」，落地已达标；要让两个视图口径一致须让详情面板也走 `resolveConfirmationColumns` = 改共享件 + 影响 7 循环，另立 spec |
+| K0-6 的「从 D0-1 带入」按钮文案 | 七循环替代程序主控件共用 `AlternativeD05Master`，标签在所有循环都写 D0-1 | memory 已登记的平台文案项，非本 spec |
 
 ### 🔴 进度校正（2026-08-07 逐项探针实测：**14/18**，此前复选框记 7/18 = 五项假红）
 
@@ -275,7 +370,7 @@
 **验证**：`get_diagnostics` 零诊断 + Vite transform 5 个文件全 200 +
 `vitest run confirmation reliability entityVerify` **655 files / 2359 passed / 0 failed**（零回归）。
 
-### 交付实录（2026-08-04，Wave 1 + Wave 2 完成 7/18；Wave 3 被并发约束挡住）
+### 交付实录（2026-08-04，Wave 1 + Wave 2 完成 7/18；Wave 3 当时被并发约束挡住）
 
 **Wave 3 未开工的判据（每次接手都要重扫）**：F0 spec 仍 `done=28 / inprog=1 / queued=2`
 （tasks.md mtime 08-03 23:35 静置），按 Requirement 11.5 只能推进 Wave 1/2；G0 spec 13/23、

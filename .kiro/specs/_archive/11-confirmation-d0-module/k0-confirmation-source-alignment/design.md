@@ -372,6 +372,22 @@ interface X0MatrixCell {
 
 **Validates: Requirements 3.5**
 
+### Property 24: 源外保留列显式登记且已在 UI 标注
+
+K0-7 可靠性表里源模板**没有**的列（落地实证四条：`reply_date` / `identity_method` / `phone_source` / `reliability_note`）必须在 `SOURCE_EXTRA_RELIABILITY_COLUMNS` 显式登记且 `reason` 有实质内容（禁「历史遗留」这类无信息量理由）；守卫另断言每条登记的 `field` 真实存在于 `ReliabilityRow`、且四条都在 `ReliabilityGrid.vue` 有 tooltip 标注（登记不能只躺在常量里）。
+
+**落地时对 Requirement 9.3 的修正**：立项写「按循环控制 `reply_date` 可见性（K0 源模板无该列）」，而 openpyxl 实测**六个枢纽（D0-7/F0-7/G0-7/H0-6/K0-7/L0-6）的可靠性表列集逐字同构、全部没有「回函日期」列** ⇒ 按循环分叉只会产出自相矛盾的结果（哪个循环该显示都说不出依据），正确形态是**平台级源外保留列 + 显式登记 + UI 标注**。后端 `test_k0_source_template_facts.py::test_no_reply_date_column` 是该判据的来源，前端交叉锁死到它。
+
+**Validates: Requirements 9.3, 9.5**
+
+### Property 25: 模板引用的标识符均已定义或导入
+
+`ReliabilityGrid.vue` 等被改造的共享组件，其 `<template>` 求值上下文引用的每个标识符都必须能在 `<script setup>` 中解析到（import / const / function / props 解构）。
+
+**为什么单列一条**：`<script setup>` 里**未声明的标识符不阻断编译** —— `get_diagnostics`(Volar) 零诊断 / vitest 全绿 / Vite transform 返回 200，只在浏览器打开该页时抛 `Property "xxx" was accessed during render but is not defined` 并让整页崩成「页面渲染出错」。本 spec 把常量（`RELIABILITY_PARENT_HEADER` / `RELIABILITY_COLUMN_LABELS`）接进模板，正是这类缺陷的高发形态。守卫配反向自检（注入一个未定义常量必须被抓到）。
+
+**Validates: Requirements 9.6, 11.6**
+
 ## Error Handling
 
 | 场景 | 策略 | 依据 |
@@ -394,10 +410,14 @@ interface X0MatrixCell {
 | 后端·源模板事实 | `backend/tests/test_k0_source_template_facts.py` | Property 1（sheet/目录）+ 1.3~1.16 全部结构断言（openpyxl 直读，不连库，可进 CI） |
 | 后端·公式预设 | `backend/tests/test_k0_formula_presets.py` | Property 11、12（含 7 循环 sheet 名存在性 + E0 白名单） |
 | 前端·列对齐 | `confirmation/__tests__/k0ColumnAlignment.spec.ts` | Property 2、3、4（读源 xlsx 的 JSON 化结构 + 黄金快照） |
-| 前端·矩阵 | `confirmation/__tests__/x0SummaryMatrix.spec.ts` | Property 5、6（含 PBT）、7（F0/E0 零回归快照）、8 |
-| 前端·下区 | `confirmation/k0-confirmation/__tests__/k0LowerZone.spec.ts` | Property 9、10、22、23 |
-| 前端·替代程序 | `confirmation/__tests__/k0AlternativeBlocks.spec.ts` | Property 14、15、16 |
-| 前端·共享件 | `confirmation/__tests__/k0SharedComponentBoundary.spec.ts` | Property 17、18、19、20、21 |
+| 前端·矩阵 | `confirmation/k0-confirmation/__tests__/k0SummaryMatrix.spec.ts` | Property 5、6（含 PBT）、7（F0/E0/H0 零回归快照）、8 |
+| 前端·下区声明 | `confirmation/k0-confirmation/__tests__/k0LowerZoneSpec.spec.ts` | Property 9、10、13 |
+| 前端·下区实现 | `confirmation/k0-confirmation/__tests__/k0LowerZone.spec.ts` | Property 22、23 |
+| 前端·替代程序 | `confirmation/k0-confirmation/__tests__/k0AlternativeBlocks.spec.ts` | Property 14、15、16、17、18 |
+| 前端·共享件 | `confirmation/__tests__/k0SharedComponentBoundary.spec.ts` | Property 17、18、19、20、21、24、25 |
+| 前端·渠道字段撤回 | `confirmation/reliability/__tests__/reliabilityChannelFieldsWithdrawal.spec.ts` | Property 18（「不得复活」方向） |
+
+> **落地时的路径修正**：初稿把矩阵守卫写成 `confirmation/__tests__/x0SummaryMatrix.spec.ts`（泛化内核撤回后该文件名不再成立），替代程序守卫写成 `confirmation/__tests__/`；实际两者都在 `confirmation/k0-confirmation/__tests__/` 下（per-cycle 件与其守卫同目录，与 L0 一致）。**下区拆两个文件**：`k0LowerZoneSpec.spec.ts` 守声明真源（四块文字/键名/笔误映射），`k0LowerZone.spec.ts` 守组件实现形态（金额怎么读、怎么录）—— 混在一个文件里会让「改声明」与「改渲染」的红信号混淆。
 
 **PBT 边界**（Property 6）：金额生成器必须收敛到金额域并显式排除 `±Infinity` —— `fc.float({noNaN:true})` 仍会生成无穷值（平台已踩过一次，seed 1139061718）。
 

@@ -30,7 +30,7 @@
 |------|------|--------|
 | `custom-workpaper-dual-mode-formula-and-batch` | 28/29 | 自定义底稿（componentType=custom）双模式 + 自定义公式 + 批量创建。xlsx 为唯一权威、`html_data.cells` 是其恒等坐标投影；剩 Wave 5 导出 / Wave 6 批量创建收尾 |
 | `h-cycle-extraction-formula-and-disclosure-completion` | 17/18（Task 18 `[-]` = 浏览器实测收尾） | H 类（H1~H10）取数/公式/披露收口。双族并存取数（`dual_family_codes`）+ 列名注册 + H1~H4 审定预填 + 会计政策章 + 金额控件。真实库 80 组合验收已过，只剩浏览器实测 |
-| `note-template-columns-and-legacy-snapshot-closure` | 14/23 | 附注模板列元数据补齐 + legacy 快照收口。列真源按章节三分（有底稿披露 sheet → openpyxl 直读 / 母公司章 → A spec / 无披露 sheet → 附注 docx）。剩 Wave 3 补 234 张 columns + Wave 4~6 |
+| `note-template-columns-and-legacy-snapshot-closure` | 21/23 | 附注模板列元数据补齐 + legacy 快照收口。列真源按章节三分（有底稿披露 sheet → openpyxl 直读 / 母公司章 → A spec / 无披露 sheet → 附注 docx）。已补 columns 85 张 + guidance 53 张；legacy 快照迁移已执行（132 章节 / 152 表 / 1134 行，行数守恒 + 幂等 + 回滚往返 + 三消费方 issues=0）。剩 Task 13/14（⏸ 等 B spec 收口，撞模板行集）+ Task 23 收口 |
 | `soe-listed-note-conversion-correctness` | 12/19（inprog 1 + queued 5，**并发会话在推进，勿碰**） | 国企↔上市附注转换正确性。生产 6 步里 3 步空操作、v2 映射是孤儿；同义两码 / 一码两义 / 章节映射修复。依赖 A spec（已收口） |
 | `sampling-compliance-closure` | 24/25（只剩 Task 24 浏览器实测） | 抽样/抽凭合规闭环：dataset 版本绑定 + 推断错报持久化 + A13 `projected` 通路 + 删 legacy 抽样引擎 + 42 宿主 methodology 收口 |
 | `sampling-evaluation-and-governance-closure` | 18/19（剩 Wave 4 属性抽样接线） | 抽样评价与治理闭环（`sampling-compliance-closure` 后继）：撤销回填同步软删投影表 + 合规判据修正 + 分层评价 + 归档章节 |
@@ -126,10 +126,11 @@ _archive/
 
 ### 最近归档（2026-08-08）
 
-**→ 11-confirmation-d0-module（+1）**
+**→ 11-confirmation-d0-module（+2）**
 
 | Spec | 说明 |
 |------|------|
+| k0-confirmation-source-alignment | K0 管理循环函证源模板对齐（18/18 全完成 + 浏览器实测 + 数据逐字复原）。**接手时三件套在工作树里被并发会话删掉**（`git checkout HEAD --` 恢复；恢复出的是 7/18 旧快照而磁盘产物远超它 ⇒ 「spec 文档被删导致进度记载整体回退」是新的一种假红成因）。**归档副本此前已被并发会话扫进 `d720d522`（无关 spec 的 commit）带进 HEAD，而 active 副本也还在 HEAD ⇒ 两份重复**；本轮按「以归档副本为基底、逐条施加增量」合并（保留并发会话两段实录，10 项结构性核验）后 `git rm` 掉 active 重复副本。**本轮唯一真缺口 = Property 22/23 无守卫**（design 的 Testing Strategy 表点名 `k0LowerZone.spec.ts` 而该文件不存在，Property 覆盖矩阵实扫「22 零引用、23 只被 H0 的同号 Property 偶然命中」）→ 新建 20 例守卫、**变异 6/6 全 RED + md5 逐字节还原**。另修三处三件套缺陷：悬挂引用（补 design 的 Property 24/25）· Testing Strategy 表路径漂移（`x0SummaryMatrix` 已随泛化内核撤回而不存在）· AC 11.1 无人引用。浏览器实测证实 29 叶子列六段分组 / 8 指标出数 / 账面金额自动取数 87,794,660.16（K1 BS-009 净额口径）/ 手工覆盖优先 / 下区键落 `checklist_responses`（**立项写的 `html_data` 是错的**）。新登记两个平台级缺口：保存后切走再切回回到 render-config 初始载荷（潜在数据丢失路径）· 详情面板不套用列剔除与 label 覆盖 |
 | f0-confirmation-linkage-and-structural-enhancement | F0 存货循环函证联动增强（144/144 全完成）。矩阵自动聚合（三行取数 + 五派生比例 + 勾稽）+ F0-5/F0-6 供应商自动带入 + B50/A13 推送 + F0-7 邮箱域名可靠性 + F0-3 工号字段。Wave 7 九项返工其中三项修法与立项相反（舞弊迹象/矩阵取值/AI prompt 均按源模板忠实实现或撤回自造）；Task 20/21/22 浏览器实测于 2026-08-05/08-06 三轮补做全通（含 http 客户端形态错配、请求去重 abort、三循环键名各异三个只有浏览器能发现的缺陷）。与同分类 g0/h0/confirmation-orphan 同域 |
 
 **→ 08-disclosure-notes（+1）**
