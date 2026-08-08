@@ -8,9 +8,10 @@
  * 通用组件：通过 props 配置适配 D2-7/D4-14/D4-15/E2-7 等所有抽凭底稿
  * Requirements: 5.4, 8.3, 9.1, 9.3, 10.1, 10.3, 10.4, 10.5, 12.3
  */
-import { defineAsyncComponent, toRef, computed, ref, onMounted } from 'vue'
+import { defineAsyncComponent, toRef, computed, inject, ref, onMounted } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { useVoucherSampling } from '../composables/useVoucherSampling'
+import { WorkpaperRuntimeContextKey } from '../composables/useWorkpaperScaffold'
 import { useSamplingPhase, type ViewMode } from '../composables/useSamplingPhase'
 import { reconcilePopulation, buildSamplingMemo } from '../composables/useSamplingAlgorithms'
 import {
@@ -76,7 +77,11 @@ interface Props {
   existingSamples?: SampledVoucher[]
   /**
    * 宿主底稿编码（如 'D2' / 'K8'），用于推断错报推送 A13 时的 source_wp_code 溯源。
-   * 不传时该字段为 null（如实留空，不用科目码或占位文本冒充底稿编码）。
+   *
+   * 不传时**回落到 `WorkpaperRuntimeContext.wpCode`**（scaffold 在底稿页统一 provide）——
+   * 实测 78 个宿主一个都没传该 prop，若只靠 prop 则 `source_wp_code` 恒为 null，
+   * A13 错报汇总里看不出这笔推断错报出自哪张底稿。两处都取不到时才留空
+   * （不用科目码或占位文本冒充底稿编码）。
    */
   wpCode?: string
   /**
@@ -85,8 +90,11 @@ interface Props {
    * `true` 时禁用抽样配置、执行抽样、回填与全部行内录入 —— 已归档底稿的抽样结果
    * 不应被改动。默认 `false` 与改造前逐位一致（零回归）。
    *
-   * **当前 78 个抽凭宿主均未传该 prop**（与 `wpCode` 同款：实测零字面量传参），
-   * 故运行态恒为可编辑。接口先就位，宿主批量接线归 `voucher-check-shared-layer`。
+   * **当前 78 个抽凭宿主均未传该 prop**（实测零字面量传参），故运行态恒为可编辑。
+   * 接口先就位，宿主批量接线归 `voucher-check-shared-layer`。
+   *
+   * 注：`wpCode` 同样零宿主传参，但它已改为回落 `WorkpaperRuntimeContext.wpCode`
+   * （见上），故不再是死 prop；`readonly` 无同款运行时来源，仍需宿主显式传。
    */
   readonly?: boolean
 }
@@ -113,6 +121,16 @@ export interface SamplingFilledMethodology {
   confidenceLevel: number | null
   accountCodes: string[]
   randomSeed: string | null
+  /**
+   * 抽凭批次号（R6.2）：由 `cutoff-fill` 响应回报，使归档件上的样本可追溯到唯一批次。
+   * 无批次时为 null（如日志接口未回报），bar 侧如实不渲染该列。
+   */
+  batchId: string | null
+  /**
+   * 抽样框数据集版本（R6.2）：本次抽样所依据的 active 序时账版本 id。
+   * null = 未识别到已激活账套版本 → bar 显示「未绑定账套版本」（不可据 seed 复算）。
+   */
+  datasetId: string | null
 }
 
 const emit = defineEmits<{
@@ -125,6 +143,16 @@ const emit = defineEmits<{
   }): void
   (e: 'phase-changed', payload: { phase: Phase }): void
 }>()
+
+// ─── 宿主底稿编码：prop 优先，回落 WorkpaperRuntimeContext ────────────────────
+// 🔴 `inject` 必须在 setup 顶层（写进函数体会静默拿不到，平台已记该踩坑）。
+// 实测 78 个抽凭宿主一个都没传 `wp-code` prop → 只靠 prop 会让 A13 里
+// `source_wp_code` 恒为 null（看不出推断错报出自哪张底稿）。scaffold 在底稿页
+// 统一 provide 了 `wpCode`，故这里回落到它，无需改 78 个宿主。
+const workpaperRuntime = inject(WorkpaperRuntimeContextKey, null)
+const effectiveWpCode = computed(
+  () => props.wpCode || workpaperRuntime?.wpCode?.value || '',
+)
 
 // ─── Composable: useVoucherSampling ───────────────────────────────────────────
 
@@ -173,6 +201,7 @@ const {
   resample,
   // ─── 抽样框版本 + 评价留痕（R1/R2/R3）───
   datasetId,
+  filledBatchId,
   loadedFromBatch,
   conclusionConfirmed,
   a13PushedAt,
@@ -203,7 +232,8 @@ const {
   defaultMethod: props.defaultMethod,
   initialPeriodRange: props.initialPeriodRange,
   initialConfigPatch: props.initialConfigPatch,
-  wpCode: props.wpCode,
+  // getter 而非静态字符串：runtime.wpCode 在本组件 setup 时未必已就位
+  wpCode: () => effectiveWpCode.value,
 })
 
 // ─── Composable: useSamplingPhase ─────────────────────────────────────────────
@@ -323,6 +353,11 @@ async function handleConfirmFill() {
       confidenceLevel: config.value.confidenceLevel ?? null,
       accountCodes: [...(config.value.accountCodes ?? [])],
       randomSeed: seedUsed.value != null ? String(seedUsed.value) : (config.value.randomSeed != null ? String(config.value.randomSeed) : null),
+      // R6.2：批次号与抽样框版本 —— 归档件上最要紧的两个可追溯字段。
+      // `confirmFill` 已在其内部消费 `cutoff-fill` 响应写入 filledBatchId，
+      // 故此处（confirmFill 之后）取值已就绪。
+      batchId: filledBatchId.value,
+      datasetId: datasetId.value,
     }
     emit('filled', {
       samples: result,
@@ -507,8 +542,12 @@ function handleActualMisstatementChange(row: SampledVoucher, val: string) {
 // 形如 `D2-sampling-config` / `D2-sampling-conclusion`。带底稿编码前缀是为了让复核记录
 // 能定位到具体循环（平台 section_id 命名惯例），后端按同名 key 登记专属 prompt。
 //
-// `wpCode` 缺省时退化为 `sampling-*`（不用科目码冒充底稿编码 —— 那会让复核记录的来源
-// 列不可信，与 pushProjectedToA13 的 source_wp_code 同款处置）。
+// 编码取 `effectiveWpCode`（prop 优先 → 回落 `WorkpaperRuntimeContext.wpCode`），与
+// pushProjectedToA13 的 source_wp_code 同一真源。两处都取不到才退化为 `sampling-*`
+// （不用科目码冒充底稿编码 —— 那会让复核记录的来源列不可信）。
+//
+// 改前缀不丢数据：实测全库 4 张含 `section_id` 的表里，`sampling-*` 记录数为 0
+// （78 个宿主都没传 prop ⇒ 该前缀从未真正产生过带编码的 key）。
 
 /**
  * R10.3 行可编辑判定 = phase 约束 **且** 非只读态。
@@ -520,7 +559,9 @@ function canEditRow(row: SampledVoucher): boolean {
   return !props.readonly && isRowEditable(row)
 }
 
-const samplingSectionPrefix = computed(() => (props.wpCode ? `${props.wpCode}-` : ''))
+const samplingSectionPrefix = computed(() =>
+  effectiveWpCode.value ? `${effectiveWpCode.value}-` : '',
+)
 const samplingConfigSectionId = computed(() => `${samplingSectionPrefix.value}sampling-config`)
 const samplingConclusionSectionId = computed(
   () => `${samplingSectionPrefix.value}sampling-conclusion`,
@@ -586,9 +627,20 @@ onMounted(() => {
 
 // ─── 推断错报记入 A13（R3）──────────────────────────────────────────────────
 
-/** 可否推送：结论已确认 且 推断错报 > 0（R3.5） */
+/**
+ * 本会话是否执行过抽样（R2.7 回读态的判据）。
+ *
+ * 回读既有批次评价时 `misstatementResult` 有值而 `sampledVouchers` 为空 ——
+ * 此时「重新推断」会拿 0 笔样本重算把回读结果抹掉，「记入 A13」的描述里
+ * `样本量:0 随机种子:-`（`buildProjectedMisstatementDescription` 取的是会话内
+ * 样本数与本次 seed）＝ 写错留痕。故这两个动作要求会话内确有样本。
+ */
+const hasSessionSamples = computed(() => sampledVouchers.value.length > 0)
+
+/** 可否推送：会话内有样本 且 结论已确认 且 推断错报 > 0（R3.5） */
 const canPushProjected = computed(() => {
   if (!misstatementResult.value) return false
+  if (!hasSessionSamples.value) return false
   if (!conclusionConfirmed.value) return false
   return Number(misstatementResult.value.projected) > 0
 })
@@ -596,10 +648,20 @@ const canPushProjected = computed(() => {
 /** 不可推送时的原因（tooltip 明示，避免"按钮灰着不知为何"） */
 const pushProjectedDisabledReason = computed(() => {
   if (!misstatementResult.value) return '尚未推断错报：请先录入样本实际错报并执行推断'
+  if (!hasSessionSamples.value) {
+    return '当前数字读自上一批次评价，本会话未执行抽样：如需记入错报汇总请先「自动抽凭」取回样本（否则留痕里的样本量与随机种子会与实际批次不符）'
+  }
   if (!conclusionConfirmed.value) return '请先确认抽样结论（未确认的结论不得进入错报汇总）'
   if (!(Number(misstatementResult.value.projected) > 0)) return '推断错报为 0，无需记入'
   return ''
 })
+
+/** 「重新推断」不可用原因（同上：0 笔样本重算会抹掉回读结果） */
+const reInferDisabledReason = computed(() =>
+  hasSessionSamples.value
+    ? ''
+    : '当前数字读自上一批次评价，本会话未执行抽样：重新推断会按 0 笔样本重算并覆盖该结果，请先「自动抽凭」',
+)
 
 async function handlePushProjected() {
   await pushProjectedToA13()
@@ -640,9 +702,13 @@ function handleExportMemo() {
     samplingConclusion: samplingConclusion.value,
     seedUsed: seedUsed.value,
     sampleCount: sampledVouchers.value.length,
-    // R14.2 归档留痕：方法学算法版本（后端权威快照）；batchId 待 Task 7 前端 wiring 后接入
+    // R14.2 归档留痕：方法学算法版本（后端权威快照）+ 批次号。
+    // 🔴 batchId 不能读 `methodologySnapshot.batch_id` —— 后端
+    // `build_methodology_snapshot` 是纯方法学函数（抽样时批次还不存在），其快照里
+    // 压根没有该键 → 恒 null。真源是 `cutoff-fill` 回报的 `filledBatchId`；
+    // 重开底稿后（未重新回填）回落到评价回读拿到的 `loadedFromBatch.batchId`。
     algoVersion: methodologySnapshot.value?.algo_version ?? null,
-    batchId: (methodologySnapshot.value?.batch_id as string | undefined) ?? null,
+    batchId: filledBatchId.value ?? loadedFromBatch.value?.batchId ?? null,
   })
   const stamp = new Date().toISOString().slice(0, 10)
   const account = config.value.accountCodes[0] ?? '抽样'
@@ -1057,9 +1123,13 @@ async function handleResample() {
       </el-table-column>
     </el-table>
 
-    <!-- ═══ 错报推断与总体结论区（R18）═══ -->
+    <!-- ═══ 错报推断与总体结论区（R18）═══
+         🔴 渲染门控必须含 `misstatementResult`：R2.7 回读既有批次评价时会话内没有
+         样本，只按 `sampledVouchers.length > 0` 会把回读结果整块藏起来 ——
+         「打开底稿就能看到上一批次的推断错报与结论」这条用户故事因此不成立
+         （状态还原了但用户看不见 = dead output）。 -->
     <el-card
-      v-if="sampledVouchers.length > 0"
+      v-if="sampledVouchers.length > 0 || misstatementResult"
       shadow="never"
       class="misstatement-card"
     >
@@ -1069,15 +1139,23 @@ async function handleResample() {
           <el-tag v-if="evaluationSourceHint" size="small" type="info">
             {{ evaluationSourceHint }}
           </el-tag>
-          <el-button
-            size="small"
-            type="primary"
-            plain
-            :disabled="props.readonly"
-            @click="handleInferMisstatement"
+          <el-tooltip
+            :disabled="!reInferDisabledReason"
+            :content="reInferDisabledReason"
+            placement="top"
           >
-            重新推断
-          </el-button>
+            <span>
+              <el-button
+                size="small"
+                type="primary"
+                plain
+                :disabled="props.readonly || !hasSessionSamples"
+                @click="handleInferMisstatement"
+              >
+                重新推断
+              </el-button>
+            </span>
+          </el-tooltip>
           <!-- R10：结论区复核入口。抽样是审计判断最集中的环节（总体界定、样本量、
                种子、未检查样本处置、结论采纳），改造前引擎零 GtReviewTrigger。 -->
           <GtReviewTrigger :section-id="samplingConclusionSectionId" label="💬 复核" />

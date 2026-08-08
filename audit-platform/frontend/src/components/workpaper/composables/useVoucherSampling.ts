@@ -21,7 +21,7 @@
  *
  * Requirements: 1.7, 1.8, 2.2, 3.9, 4.2, 4.5, 7.1, 7.2, 7.3, 7.4, 8.3, 9.1, 9.2, 9.3, 10.3, 10.4
  */
-import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+import { ref, computed, watch, unref, type Ref, type ComputedRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
 import { eventBus } from '@/utils/eventBus'
@@ -93,8 +93,12 @@ export interface VoucherSamplingOptions {
   /**
    * 宿主底稿编码（如 'D2'），仅用于推断错报推送 A13 时的 source_wp_code 溯源。
    * 缺省为空串 → 该字段留 null（不用科目码冒充底稿编码，否则错报汇总的来源列不可信）。
+   *
+   * 允许传 ref/getter：引擎侧的有效值可能来自 `WorkpaperRuntimeContext.wpCode`
+   * （78 个宿主都没传 prop），而该 ref 在引擎 setup 时未必已就位 → 必须**延迟取值**，
+   * 静态快照会把它固化成空串。
    */
-  wpCode?: string
+  wpCode?: string | Ref<string> | (() => string)
   phase: Ref<Phase>
   defaultMethod?: SamplingMethod
   /** 初始期间月份 1-12（如期后默认 [1,2,3]） */
@@ -201,6 +205,19 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
     initialPeriodRange,
     initialConfigPatch,
   } = options
+
+  /**
+   * 取宿主底稿编码（string / ref / getter 三形态都认，延迟求值）。
+   *
+   * 🔴 必须延迟：引擎侧的有效值来自 `WorkpaperRuntimeContext.wpCode`，
+   * 在引擎 setup 那一刻未必已填充；解构成静态字符串会把它固化成空串，
+   * 于是 A13 里 `source_wp_code` 恒为 null（改造前的实测形态）。
+   */
+  function resolveWpCode(): string {
+    const raw = options.wpCode
+    if (typeof raw === 'function') return String(raw() ?? '')
+    return String(unref(raw) ?? '')
+  }
 
   // ─── Config 初始化 ──────────────────────────────────────────────────────
 
@@ -409,6 +426,15 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
    * UI 如实提示但不阻断抽样（"先建底稿后导账套"是合法工作流）。
    */
   const datasetId = ref<string | null>(null)
+  /**
+   * 本次回填形成的批次号（R6.2）：由 `cutoff-fill` 响应回报，供底稿方法学 bar
+   * 渲染「批次号」列，使归档件上的样本可追溯到唯一批次。
+   *
+   * 🔴 与 `loadedFromBatch.batchId` 不是同一回事：后者是「评价读自哪个批次」
+   * （回读/持久化评价时才有值），本 ref 是「本次刚回填的批次」。抽样重置时清空，
+   * 避免把上一批次的批次号贴到新样本上。
+   */
+  const filledBatchId = ref<string | null>(null)
   /**
    * 跨底稿重复抽凭（R8）：本次样本中被**其它底稿**抽取登记过的凭证。
    *
@@ -867,6 +893,8 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
       // R2.8：同时清空"评价来自哪个批次"的标注 —— 否则界面会把上一批次的结论
       // 挂到全新样本上（结论与样本不匹配，是比无结论更坏的状态）
       loadedFromBatch.value = null
+      // 同理清空上一批次的批次号：新样本尚未回填，此刻无批次可言（R6.2）
+      filledBatchId.value = null
 
       // 截断提示
       if (truncated) {
@@ -1079,7 +1107,7 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
 
     // 记录填充日志（含 before_data 快照 — 向后兼容）
     try {
-      await http.post(
+      const fillRes = await http.post(
         `/api/projects/${projectId.value}/sampling/cutoff-fill`,
         {
           project_id: projectId.value,
@@ -1148,6 +1176,12 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
           before_data: beforeData,
         },
       )
+      // R6.2 批次留痕：`cutoff-fill` 回报本次批次号，供底稿方法学 bar 渲染。
+      // 响应形态 = `{code,message,data}` 信封（`@/utils/http` 只剥进 res.data，
+      // 不返回 data 本身）→ 必须 `res.data.data`，否则恒 undefined。
+      const fillData = (fillRes?.data as any)?.data ?? fillRes?.data
+      const rawBatchId = fillData?.batch_id ?? fillData?.batchId ?? null
+      filledBatchId.value = rawBatchId != null ? String(rawBatchId) : null
     } catch {
       ElMessage.error('记录填充日志失败')
       return []
@@ -1503,6 +1537,22 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
    * （多数情况下审计师已在底稿逐笔推过），并入 projected 会重复计入。此处仅在描述
    * 中提示，避免遗漏。
    */
+  /**
+   * 描述里的批次号：必须与同一条描述里的 `样本量` / `随机种子` 描述**同一个事件**。
+   *
+   * 🔴 不能直接取 `loadedFromBatch.batchId` —— 「本会话已抽样但尚未回填」时它仍指向
+   * **上一个批次**，于是留痕写成「样本量:2 随机种子:20260811 批次:43da7592」而那个批次
+   * 是另一套样本（实测形态）。错的批次号比没有批次号更坏：复核人按它去翻批次会
+   * 对不上样本。故此时如实写「未回填」。
+   *
+   * 优先级：本会话已回填批次 > 回读批次（此时会话内无样本，两者描述的是同一事件）。
+   */
+  function resolveDescriptionBatchId(): string {
+    if (filledBatchId.value) return filledBatchId.value
+    if (sampledVouchers.value.length > 0) return '未回填'
+    return loadedFromBatch.value?.batchId ?? '-'
+  }
+
   function buildProjectedMisstatementDescription(): string {
     const r = misstatementResult.value
     const parts = [
@@ -1511,7 +1561,7 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
     ]
     if (samplingInterval.value) parts.push(`抽样间隔:${samplingInterval.value}`)
     parts.push(`随机种子:${seedUsed.value ?? '-'}`)
-    parts.push(`批次:${loadedFromBatch.value?.batchId ?? '-'}`)
+    parts.push(`批次:${resolveDescriptionBatchId()}`)
     if (r && Number(r.upperLimit) > 0) parts.push(`错报上限:${r.upperLimit}`)
     let desc = parts.join(' ')
     const known = Number(r?.knownHighValue ?? 0)
@@ -1555,8 +1605,10 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
     }
 
     eventBus.emit('a13:push-misstatement' as any, {
-      // 宿主未传 wpCode 时留空 → bridge 写 source_wp_code = null（如实留空）
-      wpCode: (options.wpCode ?? '').slice(0, 20),
+      // 延迟取值（ref/getter 都认）：引擎侧的有效编码可能来自
+      // `WorkpaperRuntimeContext.wpCode`，setup 时未必已就位。
+      // 两处都取不到时留空 → bridge 写 source_wp_code = null（如实留空）
+      wpCode: resolveWpCode().slice(0, 20),
       accountCode: config.value.accountCodes[0] ?? null,
       amount: projected,
       description: buildProjectedMisstatementDescription(),
@@ -1654,6 +1706,7 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
     methodologySnapshot,
     // 抽样框版本 + 评价留痕状态（R1/R2/R3）
     datasetId,
+    filledBatchId,
     loadedFromBatch,
     conclusionConfirmed,
     a13PushedAt,
