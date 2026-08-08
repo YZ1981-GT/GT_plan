@@ -2921,6 +2921,7 @@ jobs:
         run: >-
           python -m pytest
           backend/tests/test_sampling_evaluation_endpoint.py
+          backend/tests/test_sampling_evaluation_fill_path.py
           backend/tests/test_voucher_sampling_canonical_guard.py
           backend/tests/test_sampling_config_deprecation.py
           -q --tb=short
@@ -2936,7 +2937,13 @@ jobs:
     # 3. 跨底稿重复抽凭显式确认三出口 + **剔除后覆盖率分母（总体）不变**
     #    （用剩余样本当分母会虚高到 100%，那正是本功能要避免的问题）；
     # 4. 宿主方法学收口覆盖率单调收敛（Property 15/16）+ 方法学 bar 渲染门控与
-    #    金额格式化（Property 17）+ 共享接线件（只读不写库 / 无实质内容不写空壳）。
+    #    金额格式化（Property 17）+ 共享接线件（只读不写库 / 无实质内容不写空壳）；
+    # 5. 方法学可追溯性（Task 24 浏览器实测挖出的三处 dead output）：
+    #    `filled` 载荷的 methodology 必须携带 `batchId`/`datasetId`（此前只填 9 个字段，
+    #    而共享类型/摘要/bar 三处都声明并渲染这两列 ⇒ 结构上恒为空）·
+    #    `wpCode` 回落 `WorkpaperRuntimeContext`（实测 78 个宿主一个都没传该 prop ⇒
+    #    A13 的 `source_wp_code` 恒 null）· R2.7 回读态卡片不得被样本数门控藏起来 ·
+    #    A13 描述里的批次号必须与同一条描述的样本量/种子同属一个事件。
     #
     # 🔴 覆盖率守卫的 allowlist 只许变短：修好一个宿主就删一条豁免并下调
     # `ALLOWED_EXCUSE_BASELINE`；守卫自带「不得残留已修好的豁免」一条强制收敛。
@@ -2961,6 +2968,8 @@ jobs:
           src/components/workpaper/composables/shared/__tests__/useSamplingMethodologyPersist.spec.ts
           src/components/workpaper/shared/__tests__/WpSamplingMethodologyBar.spec.ts
           src/components/workpaper/__tests__/samplingHostMethodologyCoverage.spec.ts
+          src/components/workpaper/__tests__/samplingConfirmFillReachability.spec.ts
+          src/components/workpaper/__tests__/samplingMethodologyTraceability.spec.ts
         working-directory: audit-platform/frontend
   deliverable-lineage-wiring-backend:
     # 交付件溯源接线与回填闭环 —— 后端守卫（deliverable-lineage-wiring-and-writeback-closure Task 16）
