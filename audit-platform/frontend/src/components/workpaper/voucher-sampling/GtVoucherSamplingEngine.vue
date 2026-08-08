@@ -13,8 +13,23 @@ import { ElMessageBox, ElMessage } from 'element-plus'
 import { useVoucherSampling } from '../composables/useVoucherSampling'
 import { useSamplingPhase, type ViewMode } from '../composables/useSamplingPhase'
 import { reconcilePopulation, buildSamplingMemo } from '../composables/useSamplingAlgorithms'
+import {
+  UNCHECKED_DISPOSITION_HINTS,
+  UNCHECKED_DISPOSITION_LABELS,
+  UNCHECKED_DISPOSITION_MODES,
+  isUnchecked,
+  type UncheckedDispositionMode,
+} from '../composables/samplingUncheckedDisposition'
+import {
+  DEVIATION_NATURES,
+  NO_SIMPLE_PROJECTION_HINT,
+  deviationNatureLabels,
+  isDeviation,
+  type DeviationNature,
+} from '../composables/samplingDeviationNature'
 import { saveBlobAsFile } from '@/utils/http'
 import GtAmountCell from '@/components/common/GtAmountCell.vue'
+import GtReviewTrigger from '@/components/workpaper/GtReviewTrigger.vue'
 import type {
   Phase,
   SamplingMethod,
@@ -64,6 +79,16 @@ interface Props {
    * 不传时该字段为 null（如实留空，不用科目码或占位文本冒充底稿编码）。
    */
   wpCode?: string
+  /**
+   * 只读态（底稿已归档/锁定/复核通过，R10.3）。
+   *
+   * `true` 时禁用抽样配置、执行抽样、回填与全部行内录入 —— 已归档底稿的抽样结果
+   * 不应被改动。默认 `false` 与改造前逐位一致（零回归）。
+   *
+   * **当前 78 个抽凭宿主均未传该 prop**（与 `wpCode` 同款：实测零字面量传参），
+   * 故运行态恒为可编辑。接口先就位，宿主批量接线归 `voucher-check-shared-layer`。
+   */
+  readonly?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -155,6 +180,20 @@ const {
   loadLatestEvaluation,
   confirmConclusion,
   pushProjectedToA13,
+  // ─── Wave 2：未检查处置 / 偏差性质 / 完整性放行 / 分层评价 ───
+  // （sampling-evaluation-and-governance-closure R3~R6）
+  coverageThreshold,
+  uncheckedDisposition,
+  uncheckedResolution,
+  setUncheckedDisposition,
+  deviationAnnotations,
+  deviationResolution,
+  setDeviationAnnotation,
+  reconcileOverrideReason,
+  setReconcileBlockedReason,
+  conclusionBlockedReason,
+  stratifiedDetail,
+  stratifiedFallback,
 } = useVoucherSampling({
   projectId: toRef(props, 'projectId'),
   year: toRef(props, 'year'),
@@ -192,7 +231,7 @@ const checkResultOptions: { label: string; value: CheckResult }[] = [
 // ─── 行样式：预审行在年审阶段 disabled ───────────────────────────────────────
 
 function getRowClassName({ row }: { row: SampledVoucher }): string {
-  if (!isRowEditable(row)) {
+  if (!canEditRow(row)) {
     return 'row-disabled'
   }
   return ''
@@ -227,7 +266,7 @@ function handleReopenPreview() {
 function handleBatchMarkChecked() {
   const indices: number[] = []
   visibleSamples.value.forEach((row) => {
-    if (isRowEditable(row)) {
+    if (canEditRow(row)) {
       const idx = sampledVouchers.value.indexOf(row)
       if (idx >= 0) indices.push(idx)
     }
@@ -245,6 +284,12 @@ function handleBatchMarkChecked() {
  * 未做错报推断（无可容忍错报 → `samplingConclusion` 为 null）的简单抽凭不受约束。
  */
 const confirmBlockedReason = computed<string | null>(() => {
+  // Wave 2（sampling-evaluation R3.4/R4.3/R5.1~5.3）：三处准则门控收敛在 composable 的
+  // `conclusionBlockedReason` 里，此处只做合并与文案补全，不另开判定分支。
+  const criteriaBlocked = conclusionBlockedReason.value
+  if (criteriaBlocked) {
+    return `${criteriaBlocked}（请先关闭本预览，在下方对应区域补齐后再点操作栏的「继续填充」）`
+  }
   if (samplingConclusion.value && !conclusionConfirmed.value) {
     return '已生成抽样结论建议：请先关闭本预览，在「错报推断与总体结论」区点「确认采用此结论」，再点操作栏的「继续填充」回到本页填入底稿'
   }
@@ -419,6 +464,33 @@ const populationReconcile = computed(() => {
   )
 })
 
+/**
+ * R5.1/5.2：总体完整性核对未通过 → 阻断结论确认。
+ *
+ * 「从不完整的总体中抽样」会让整个抽样结论失效，比「结论未人工确认」更该阻断。
+ * 改造前这里只显示一条 alert，`confirmBlockedReason` 完全不看它。
+ *
+ * 尚未执行抽样（`coverageStats` 为空）时不判定 —— 那不是"核对失败"而是"还没开始"。
+ */
+const reconcileIssue = computed<string | null>(() => {
+  if (!coverageStats.value) return null
+  if (!reconcileAvailable.value) {
+    return '未执行总体完整性核对：无独立账面来源且未手工录入账面金额，无法确认样本取自完整总体'
+  }
+  const r = populationReconcile.value
+  if (r && !r.withinThreshold) {
+    return (
+      `总体完整性核对不符：抽样总体 ${samplingPopulationAmount.value} 元与账面 ` +
+      `${effectiveBookAmount.value} 元差异 ${r.diff} 元，超出可容忍差异 ` +
+      `${(reconcileThresholdPct.value * 100).toFixed(0)}%`
+    )
+  }
+  return null
+})
+
+// 把判定结果注入 composable 的统一门控链（composable 不去猜组件里的手工录入状态）
+watch(reconcileIssue, val => setReconcileBlockedReason(val), { immediate: true })
+
 // ─── 方法学增强：错报推断区（R18）────────────────────────────────────────────
 
 /** 行内录入实际错报金额 → 即时重算推断 + 落库（R2.9） */
@@ -430,11 +502,74 @@ function handleActualMisstatementChange(row: SampledVoucher, val: string) {
   }
 }
 
+// ─── R10：复核 section_id ─────────────────────────────────────────────────────
+//
+// 形如 `D2-sampling-config` / `D2-sampling-conclusion`。带底稿编码前缀是为了让复核记录
+// 能定位到具体循环（平台 section_id 命名惯例），后端按同名 key 登记专属 prompt。
+//
+// `wpCode` 缺省时退化为 `sampling-*`（不用科目码冒充底稿编码 —— 那会让复核记录的来源
+// 列不可信，与 pushProjectedToA13 的 source_wp_code 同款处置）。
+
+/**
+ * R10.3 行可编辑判定 = phase 约束 **且** 非只读态。
+ *
+ * `isRowEditable`（来自 useSamplingPhase）只判「年审阶段不可改预审行」，
+ * 不含底稿归档/锁定态。此处合并，模板一律走 `canEditRow` 而不再直接用 `isRowEditable`。
+ */
+function canEditRow(row: SampledVoucher): boolean {
+  return !props.readonly && isRowEditable(row)
+}
+
+const samplingSectionPrefix = computed(() => (props.wpCode ? `${props.wpCode}-` : ''))
+const samplingConfigSectionId = computed(() => `${samplingSectionPrefix.value}sampling-config`)
+const samplingConclusionSectionId = computed(
+  () => `${samplingSectionPrefix.value}sampling-conclusion`,
+)
+
+// ─── Wave 2：未检查样本处置 / 偏差性质（R3 / R4）──────────────────────────────
+
+/** 偏差性质中文标签（运行时取自 C 类控制测试口径，非硬编码副本） */
+const natureLabels = deviationNatureLabels()
+
+/** 处置下拉：写入并即时重算推断（视同偏差会按 100% 污染率进推断） */
+function handleUncheckedModeChange(row: SampledVoucher, mode: UncheckedDispositionMode | null) {
+  setUncheckedDisposition(row.voucherNo, mode)
+  void persistEvaluation()
+}
+
+/** 替代程序说明 */
+function handleUncheckedNoteChange(row: SampledVoucher, note: string) {
+  const mode = uncheckedDisposition.value[row.voucherNo]?.mode
+  if (!mode) return
+  setUncheckedDisposition(row.voucherNo, mode, note)
+  void persistEvaluation()
+}
+
+/** 偏差性质 */
+function handleDeviationNatureChange(row: SampledVoucher, nature: DeviationNature | null) {
+  setDeviationAnnotation(row.voucherNo, { nature })
+  void persistEvaluation()
+}
+
+/** 偏差原因 / 影响评估 */
+function handleDeviationTextChange(
+  row: SampledVoucher,
+  field: 'cause' | 'impact',
+  value: string,
+) {
+  setDeviationAnnotation(row.voucherNo, { [field]: value })
+  void persistEvaluation()
+}
+
 /** 手动触发错报推断（若尚未自动计算） */
 function handleInferMisstatement() {
   const { conclusion } = inferMisstatement()
-  if (uncheckedSampleCount.value > 0) {
-    ElMessage.warning(`有 ${uncheckedSampleCount.value} 笔样本尚未填写核查结果，未纳入错报推断`)
+  // R3：未检查样本不再只是"提示未纳入推断"，而是要求逐笔选择准则处置
+  const pending = uncheckedResolution.value.pending.length
+  if (pending > 0) {
+    ElMessage.warning(
+      `有 ${pending} 笔未检查样本尚未选择处置方式：按 CAS 1314 须逐笔选择「视同偏差」或「已实施替代程序」`,
+    )
   }
   if (!conclusion) {
     ElMessage.warning('请先在抽样参数中填写可容忍错报')
@@ -580,6 +715,8 @@ async function handleResample() {
         <div class="reconcile-header">
           <span class="reconcile-title">总体完整性校验</span>
           <span class="reconcile-sub">将抽样总体与账面（序时账/明细表/审定数）核对，确认从完整总体中抽样</span>
+          <!-- R10：抽样配置与总体界定的复核入口（总体是否完整、抽样框版本是否适用） -->
+          <GtReviewTrigger :section-id="samplingConfigSectionId" label="💬 复核" />
         </div>
       </template>
       <div class="reconcile-body">
@@ -595,6 +732,7 @@ async function handleResample() {
           <span class="reconcile-label">账面金额（独立来源）</span>
           <el-input
             v-model="bookAmountInput"
+            :disabled="props.readonly"
             size="small"
             :placeholder="reconcileInfo?.available ? '已取独立账面，可手工覆盖' : '无独立账面，请手工录入核对'"
             style="width: 200px"
@@ -607,7 +745,12 @@ async function handleResample() {
         </div>
         <div class="reconcile-item">
           <span class="reconcile-label">可容忍差异</span>
-          <el-select v-model="reconcileThresholdPct" size="small" style="width: 100px">
+          <el-select
+            v-model="reconcileThresholdPct"
+            :disabled="props.readonly"
+            size="small"
+            style="width: 100px"
+          >
             <el-option :value="0.01" label="1%" />
             <el-option :value="0.03" label="3%" />
             <el-option :value="0.05" label="5%" />
@@ -635,6 +778,38 @@ async function handleResample() {
         title="总体可能不完整，抽样结论受限：抽样总体与独立账面差异超过可容忍阈值，请核实总体来源"
         style="margin-top: 8px"
       />
+
+      <!-- R5.3：核对未通过时的理由放行入口。
+           硬阻断会让合法例外（确无独立明细表可核对）无法推进；填写不少于 10 字的说明后
+           可继续确认结论，理由与操作人、时间随评价留痕并进入归档件。 -->
+      <div v-if="reconcileIssue" class="reconcile-override">
+        <div class="reconcile-override-head">
+          <el-tag type="danger" size="small" effect="dark">结论确认已阻断</el-tag>
+          <span class="reconcile-override-text">{{ reconcileIssue }}</span>
+        </div>
+        <el-input
+          v-model="reconcileOverrideReason"
+          :disabled="props.readonly"
+          type="textarea"
+          :autosize="{ minRows: 2 }"
+          maxlength="500"
+          show-word-limit
+          placeholder="如确有正当理由（例如该科目无独立明细表、已与总账另行核对一致），请说明不少于 10 字后继续；该说明将随抽样评价留痕"
+        />
+        <div class="reconcile-override-foot">
+          <el-tag
+            :type="reconcileOverrideReason.trim().length >= 10 ? 'success' : 'info'"
+            size="small"
+            effect="plain"
+          >
+            {{
+              reconcileOverrideReason.trim().length >= 10
+                ? '已填写放行理由，可继续确认结论'
+                : `还需 ${10 - reconcileOverrideReason.trim().length} 字`
+            }}
+          </el-tag>
+        </div>
+      </div>
     </el-card>
 
     <!-- ═══ 视图模式切换 ═══ -->
@@ -748,7 +923,7 @@ async function handleResample() {
           <el-select
             :model-value="row.checkResult"
             size="small"
-            :disabled="!isRowEditable(row)"
+            :disabled="!canEditRow(row)"
             placeholder="—"
             @change="(val: CheckResult) => handleCheckResultChange(row, val)"
           >
@@ -767,7 +942,7 @@ async function handleResample() {
           <el-switch
             :model-value="row.abnormal"
             size="small"
-            :disabled="!isRowEditable(row)"
+            :disabled="!canEditRow(row)"
             @change="(val: boolean) => handleAbnormalChange(row, val)"
           />
         </template>
@@ -778,19 +953,103 @@ async function handleResample() {
           <el-input
             :model-value="row.actualMisstatement"
             size="small"
-            :disabled="!isRowEditable(row)"
+            :disabled="!canEditRow(row)"
             placeholder="0"
             @change="(val: string) => handleActualMisstatementChange(row, val)"
           />
         </template>
       </el-table-column>
+      <!-- R3：未检查样本处置（CAS 1314 二选一）。只对 checkResult 为空的行显示 —— 
+           已检查样本没有"无法实施程序"这回事。 -->
+      <el-table-column label="未检查处置" min-width="220">
+        <template #default="{ row }">
+          <div v-if="isUnchecked(row)" class="disposition-cell">
+            <el-select
+              :model-value="uncheckedDisposition[row.voucherNo]?.mode ?? null"
+              size="small"
+              clearable
+              placeholder="须选择处置方式"
+              :disabled="!canEditRow(row)"
+              style="width: 100%"
+              @change="(val: UncheckedDispositionMode | null) => handleUncheckedModeChange(row, val)"
+            >
+              <el-option
+                v-for="mode in UNCHECKED_DISPOSITION_MODES"
+                :key="mode"
+                :value="mode"
+                :label="UNCHECKED_DISPOSITION_LABELS[mode]"
+              >
+                <el-tooltip :content="UNCHECKED_DISPOSITION_HINTS[mode]" placement="right">
+                  <span>{{ UNCHECKED_DISPOSITION_LABELS[mode] }}</span>
+                </el-tooltip>
+              </el-option>
+            </el-select>
+            <el-input
+              v-if="uncheckedDisposition[row.voucherNo]?.mode === 'alternative_performed'"
+              :model-value="uncheckedDisposition[row.voucherNo]?.note ?? ''"
+              size="small"
+              :disabled="!canEditRow(row)"
+              placeholder="替代程序说明（必填）"
+              @change="(val: string) => handleUncheckedNoteChange(row, val)"
+            />
+          </div>
+          <span v-else class="strata-muted">—</span>
+        </template>
+      </el-table-column>
+
+      <!-- R4：偏差性质与原因。只对偏差行（N / 异常）显示。 -->
+      <el-table-column label="偏差性质与原因" min-width="260">
+        <template #default="{ row }">
+          <div v-if="isDeviation(row)" class="disposition-cell">
+            <el-select
+              :model-value="deviationAnnotations[row.voucherNo]?.nature ?? null"
+              size="small"
+              clearable
+              placeholder="须标注偏差性质"
+              :disabled="!canEditRow(row)"
+              style="width: 100%"
+              @change="(val: DeviationNature | null) => handleDeviationNatureChange(row, val)"
+            >
+              <el-option
+                v-for="nature in DEVIATION_NATURES"
+                :key="nature"
+                :value="nature"
+                :label="natureLabels[nature]"
+              />
+            </el-select>
+            <template
+              v-if="
+                deviationAnnotations[row.voucherNo]?.nature === 'systematic' ||
+                deviationAnnotations[row.voucherNo]?.nature === 'human'
+              "
+            >
+              <el-input
+                :model-value="deviationAnnotations[row.voucherNo]?.cause ?? ''"
+                size="small"
+                :disabled="!canEditRow(row)"
+                placeholder="偏差原因（必填）"
+                @change="(val: string) => handleDeviationTextChange(row, 'cause', val)"
+              />
+              <el-input
+                :model-value="deviationAnnotations[row.voucherNo]?.impact ?? ''"
+                size="small"
+                :disabled="!canEditRow(row)"
+                placeholder="对审计程序目的的影响评估（必填）"
+                @change="(val: string) => handleDeviationTextChange(row, 'impact', val)"
+              />
+            </template>
+          </div>
+          <span v-else class="strata-muted">—</span>
+        </template>
+      </el-table-column>
+
       <!-- 备注（inline input） -->
       <el-table-column label="备注" min-width="140">
         <template #default="{ row }">
           <el-input
             :model-value="row.remark"
             size="small"
-            :disabled="!isRowEditable(row)"
+            :disabled="!canEditRow(row)"
             placeholder="备注"
             @change="(val: string) => handleRemarkChange(row, val)"
           />
@@ -810,9 +1069,18 @@ async function handleResample() {
           <el-tag v-if="evaluationSourceHint" size="small" type="info">
             {{ evaluationSourceHint }}
           </el-tag>
-          <el-button size="small" type="primary" plain @click="handleInferMisstatement">
+          <el-button
+            size="small"
+            type="primary"
+            plain
+            :disabled="props.readonly"
+            @click="handleInferMisstatement"
+          >
             重新推断
           </el-button>
+          <!-- R10：结论区复核入口。抽样是审计判断最集中的环节（总体界定、样本量、
+               种子、未检查样本处置、结论采纳），改造前引擎零 GtReviewTrigger。 -->
+          <GtReviewTrigger :section-id="samplingConclusionSectionId" label="💬 复核" />
         </div>
       </template>
 
@@ -840,6 +1108,98 @@ async function handleResample() {
           </div>
         </div>
 
+        <!-- ═══ 分层层内评价明细（R6.4/6.7）═══
+             各层抽样比例不同，合并做比率估计会把抽得密的层的错报率摊到整个总体。
+             新旧口径并列展示，差异非零时提示复核。 -->
+        <div v-if="stratifiedDetail" class="strata-panel">
+          <div class="strata-head">
+            <span class="strata-title">分层层内评价</span>
+            <el-tag size="small" type="warning" effect="plain">
+              层内外推 {{ stratifiedDetail.projected }} 元
+            </el-tag>
+            <el-tag size="small" type="info" effect="plain">
+              合并口径 {{ stratifiedDetail.legacy.projected }} 元
+            </el-tag>
+            <el-tag
+              v-if="stratifiedDetail.projected !== stratifiedDetail.legacy.projected"
+              size="small"
+              type="danger"
+              effect="plain"
+            >
+              两口径存在差异，请复核推断过程
+            </el-tag>
+          </div>
+          <el-alert
+            v-if="stratifiedDetail.unclassifiedCount > 0"
+            type="warning"
+            :closable="false"
+            show-icon
+            :title="`有 ${stratifiedDetail.unclassifiedCount} 笔样本金额不落入任何声明的层区间，已单独归入「未归层」并单独外推，请核实分层配置是否覆盖全部总体`"
+            style="margin-bottom: 8px"
+          />
+          <el-alert
+            v-if="stratifiedDetail.unsampledStrataCount > 0"
+            type="warning"
+            :closable="false"
+            show-icon
+            :title="`有 ${stratifiedDetail.unsampledStrataCount} 个层有总体金额但未抽到样本，该层不参与外推（属覆盖缺口，请考虑补充抽样）`"
+            style="margin-bottom: 8px"
+          />
+          <el-alert
+            v-if="stratifiedFallback"
+            type="error"
+            :closable="false"
+            show-icon
+            title="层内评价计算异常，已回退合并口径（数字按合并比率估计，请报告技术支持）"
+            style="margin-bottom: 8px"
+          />
+          <el-table :data="stratifiedDetail.strataDetail" size="small" border>
+            <el-table-column prop="label" label="层次" width="90" />
+            <el-table-column label="金额区间" min-width="150">
+              <template #default="{ row }">
+                <span v-if="row.index === -1" class="strata-muted">未落入声明区间</span>
+                <span v-else>{{ row.lowerBound }} ~ {{ row.upperBound }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="populationAmount" label="层总体金额" align="right" min-width="130" />
+            <el-table-column prop="sampleCount" label="样本笔数" align="right" width="90" />
+            <el-table-column prop="sampleAmount" label="样本金额" align="right" min-width="120" />
+            <el-table-column prop="sampleError" label="样本错报" align="right" min-width="110" />
+            <el-table-column prop="projected" label="该层外推额" align="right" min-width="120" />
+            <el-table-column label="状态" width="110">
+              <template #default="{ row }">
+                <el-tag v-if="row.unsampled" size="small" type="danger" effect="plain">
+                  未抽样
+                </el-tag>
+                <el-tag v-else-if="row.index === -1" size="small" type="warning" effect="plain">
+                  未归层
+                </el-tag>
+                <span v-else class="strata-muted">—</span>
+              </template>
+            </el-table-column>
+          </el-table>
+        </div>
+
+        <!-- 结论确认门控提示（R3.4/R4.3/R5.1~5.3 统一出口） -->
+        <el-alert
+          v-if="conclusionBlockedReason"
+          type="error"
+          :closable="false"
+          show-icon
+          :title="conclusionBlockedReason"
+          class="conclusion-alert"
+        />
+
+        <!-- 存在系统性或人为偏差时的准则提示（R4.2） -->
+        <el-alert
+          v-if="deviationResolution.hasNonProjectable"
+          type="warning"
+          :closable="false"
+          show-icon
+          :title="NO_SIMPLE_PROJECTION_HINT"
+          class="conclusion-alert"
+        />
+
         <!-- 结论建议（人工确认前不定稿，R18.7） -->
         <el-alert
           v-if="samplingConclusion"
@@ -851,14 +1211,25 @@ async function handleResample() {
         />
         <div v-if="samplingConclusion" class="conclusion-confirm-bar">
           <el-tag v-if="conclusionConfirmed" type="success" effect="dark">已人工确认</el-tag>
-          <el-button
+          <!-- 门控一律「前置 disabled + tooltip」：命中时按钮不可点且鼠标悬停即知原因，
+               而不是点下去才弹一条可能被遮挡的提示（平台已登记的死信铁律）。 -->
+          <el-tooltip
             v-else
-            size="small"
-            type="primary"
-            @click="handleConfirmConclusion"
+            :disabled="!conclusionBlockedReason"
+            :content="conclusionBlockedReason ?? ''"
+            placement="top"
           >
-            确认采用此结论
-          </el-button>
+            <span>
+              <el-button
+                size="small"
+                type="primary"
+                :disabled="props.readonly || !!conclusionBlockedReason"
+                @click="handleConfirmConclusion"
+              >
+                确认采用此结论
+              </el-button>
+            </span>
+          </el-tooltip>
           <span class="conclusion-hint">结论建议由系统计算，需经审计师确认后方可作为最终结论</span>
         </div>
 
@@ -986,6 +1357,64 @@ async function handleResample() {
 .stat-value--interval {
   color: var(--el-color-warning, #e6a23c);
   font-size: 15px;
+}
+
+/* ── Wave 2：完整性放行 / 分层明细 / 逐行处置 ── */
+.reconcile-override {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--el-color-danger);
+  background: var(--el-color-danger-light-9);
+  border-radius: 4px;
+}
+
+.reconcile-override-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.reconcile-override-text {
+  font-size: 13px;
+  color: var(--el-text-color-regular);
+}
+
+.reconcile-override-foot {
+  margin-top: 6px;
+}
+
+.strata-panel {
+  margin: 12px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 4px;
+}
+
+.strata-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.strata-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+}
+
+.strata-muted {
+  color: var(--el-text-color-placeholder);
+  font-size: 12px;
+}
+
+.disposition-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 /* ── 总体完整性校验区 ── */

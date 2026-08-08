@@ -23,6 +23,8 @@
 
 import Decimal from 'decimal.js'
 
+import { formatThresholdPercent } from './samplingCoverageThreshold'
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export type SamplingMethod = 'random' | 'stratified' | 'specific_item' | 'systematic' | 'mus'
@@ -149,6 +151,42 @@ export interface ComplianceWarning {
   level: 'warning' | 'suggestion'
 }
 
+/**
+ * 合规检查入参（sampling-evaluation-and-governance-closure R2）
+ *
+ * 改造前是位置参数 `(stats, method, sampleCount, totalCount)`，而调用方
+ * （`useVoucherSampling.checkCompliance`）传的是 `(selectedCount, sampledVouchers.length)`
+ * 即「勾选数 / 抽出总数」，与两条规则的真实语义都不符：
+ *
+ * - 规则 2 要的是「特定项目法抽出的样本数 / 全部样本数」→ 传勾选数后，审计师全选时
+ *   比值恒为 1 > 0.5，**用特定项目法就必然告警**，纯噪声。
+ * - 规则 3 要的是「实际样本量 < 系统建议样本量」→ 传成「勾选数 < 抽出总数」后语义变成
+ *   「有没有全选」：全选恒不触发、不全选必触发，而文案说的是"低于期望样本量"，完全错。
+ *
+ * 改 options 对象是为了让每个入参的语义在调用点自明，避免再次传错位置。
+ */
+export interface ComplianceCheckInput {
+  stats: CoverageStats
+  method: SamplingMethod
+  /**
+   * **该抽样方法抽出的样本数**（不是勾选数）。
+   * 规则 2 的分子；仅 `specific_item` 用到。
+   */
+  methodSampleCount: number
+  /** 全部样本数（规则 2 的分母；规则 3 的实际样本量） */
+  totalSampleCount: number
+  /**
+   * 系统建议样本量。
+   * `null` = 判据不可用（缺置信度或可容忍错报，推不出建议值）→ **不告警**。
+   * 判据不可用与不合规是两件事，默认告警会制造噪声。
+   */
+  suggestedSampleSize: number | null
+  /** 覆盖率阈值（小数），由 `resolveCoverageThreshold` 解析，禁止在本模块写死 */
+  coverageThreshold: number
+  /** 阈值来源标签（中文），用于告警文案如实标注 */
+  coverageThresholdLabel: string
+}
+
 // ─── 方法学增强：错报推断与总体结论数据模型 ─────────────────────────────────
 //
 // spec: voucher-check-sampling-integration, Task 2（design B.1）
@@ -242,56 +280,84 @@ export function computeCoverage(
 // ─── checkCAS1314Compliance ──────────────────────────────────────────────────
 
 /**
- * CAS 1314 合规性检查
+ * 特定项目占比上限：超过即提示补充随机样本。
+ *
+ * 与覆盖率阈值不同，这个数字**不做成可配**：它表达「特定项目不应成为样本主体」这一
+ * 结构性判断（过半即失去随机性，抽样结论无法外推到总体），不随科目或风险等级变化。
+ */
+const SPECIFIC_ITEM_RATIO_LIMIT = 0.5
+
+/**
+ * CAS 1314 合规性检查（sampling-evaluation-and-governance-closure R2 修正判据）
  *
  * 规则：
- * 1. 金额覆盖率 < 60% → warning "覆盖率偏低，建议增大样本量或调整抽样条件"
- * 2. specific_item 占比 > 50% → suggestion "特定项目过多，建议增加随机样本补充"
- * 3. MUS sample_size < expected → warning "MUS样本量不足"
+ * 1. 金额覆盖率 < 阈值 → warning。**阈值由入参传入**，本函数体内不得出现数字字面量
+ *    （60% 不是准则规定，见 `samplingCoverageThreshold.ts` 模块头）
+ * 2. `specific_item` 占比 > 50% → suggestion。分子 = 特定项目法抽出的样本数，
+ *    **与审计师的勾选无关**（改造前传勾选数导致全选必告警）
+ * 3. `mus` 实际样本量 < 系统建议样本量 → warning。建议值不可推导时**不告警**
+ *    （改造前判据是「勾选数 < 抽出总数」= 有没有全选，与样本量充分性无关）
  *
- * @param stats 覆盖率统计
- * @param method 当前抽样方法
- * @param sampleCount 当前方法的实际样本量
- * @param totalCount 总样本量（含所有方法的已填充行数）
+ * 50% 这个占比阈值保留字面量：它表达的是「特定项目不应成为样本主体」这一结构性判断
+ * （过半即失去随机性），不随科目/风险变化，与覆盖率阈值的性质不同。
  */
-export function checkCAS1314Compliance(
-  stats: CoverageStats,
-  method: SamplingMethod,
-  sampleCount: number,
-  totalCount: number,
-): ComplianceWarning[] {
+export function checkCAS1314Compliance(input: ComplianceCheckInput): ComplianceWarning[] {
+  const {
+    stats,
+    method,
+    methodSampleCount,
+    totalSampleCount,
+    suggestedSampleSize,
+    coverageThreshold,
+    coverageThresholdLabel,
+  } = input
   const warnings: ComplianceWarning[] = []
 
-  // 规则1：金额覆盖率 < 60%
+  // 规则1：金额覆盖率低于阈值（阈值与来源均来自入参）
   const amountRate = parseFloat(stats.amountCoverageRate) || 0
-  if (amountRate < 60) {
+  const thresholdPercent = coverageThreshold * 100
+  if (amountRate < thresholdPercent) {
     warnings.push({
       type: 'coverage_low',
-      message: '覆盖率偏低，建议增大样本量或调整抽样条件',
+      message:
+        `金额覆盖率 ${stats.amountCoverageRate}% 低于 ${formatThresholdPercent(coverageThreshold)}` +
+        `（阈值来源：${coverageThresholdLabel}），建议增大样本量或调整抽样条件`,
       level: 'warning',
     })
   }
 
-  // 规则2：specific_item 占比 > 50%
-  if (method === 'specific_item' && totalCount > 0) {
-    const ratio = sampleCount / totalCount
-    if (ratio > 0.5) {
+  // 规则2：特定项目占比过高（分子是该方法抽出的样本数，不是勾选数）
+  //
+  // `totalSampleCount > methodSampleCount` 是**判据可用性前提**：占比有意义的前提是
+  // 分母里存在其它方法的样本可作对比。若底稿全部样本都来自本次特定项目选取
+  // （分母 == 分子），那是「抽样方法选择」问题而非「占比」问题，应由方法选择环节提示；
+  // 此时算出的 ratio 恒为 1 必然告警，属噪声（改造前传勾选数导致全选必告警是同类症状）。
+  if (
+    method === 'specific_item' &&
+    totalSampleCount > 0 &&
+    totalSampleCount > methodSampleCount
+  ) {
+    const ratio = methodSampleCount / totalSampleCount
+    if (ratio > SPECIFIC_ITEM_RATIO_LIMIT) {
       warnings.push({
         type: 'specific_item_high',
-        message: '特定项目过多，建议增加随机样本补充',
+        message:
+          `特定项目样本 ${methodSampleCount} 笔占全部 ${totalSampleCount} 笔的` +
+          `${(ratio * 100).toFixed(1)}%，建议增加随机样本补充`,
         level: 'suggestion',
       })
     }
   }
 
-  // 规则3：MUS sample_size < expected（样本量不足）
-  if (method === 'mus') {
-    // MUS 期望样本量：基于总体金额和间隔计算
-    // 此处 sampleCount 是实际抽到的样本量，totalCount 是配置的期望样本量
-    if (sampleCount < totalCount) {
+  // 规则3：MUS 实际样本量低于系统建议样本量
+  // suggestedSampleSize 为 null ⇒ 判据不可用（缺置信度/可容忍错报）⇒ 不告警。
+  // 「判据不可用」与「不合规」是两件事，默认告警只会制造噪声让审计师整体忽略合规提示。
+  if (method === 'mus' && suggestedSampleSize !== null && suggestedSampleSize > 0) {
+    if (totalSampleCount < suggestedSampleSize) {
       warnings.push({
         type: 'mus_insufficient',
-        message: 'MUS样本量不足，实际抽取数量低于期望样本量',
+        message:
+          `MUS 样本量不足：实际 ${totalSampleCount} 笔低于系统建议 ${suggestedSampleSize} 笔`,
         level: 'warning',
       })
     }
@@ -740,6 +806,186 @@ export function projectMisstatement(
     basicPrecision: (0).toFixed(2),
     incrementalAllowance: incremental.toFixed(2, Decimal.ROUND_HALF_EVEN),
     upperLimit: '0.00',
+  }
+  result.upperLimit = computeUpperMisstatementLimit(result)
+  return result
+}
+
+// ─── 分层抽样的层内单独评价（sampling-evaluation R6）───────────────────────────
+
+/** 单层评价明细 */
+export interface StratumEvaluation {
+  /** 层序号；`-1` = 未归层桶 */
+  index: number
+  label: string
+  lowerBound: string
+  upperBound: string
+  /** 该层总体金额（按样本推算不可得时为 "0.00"，见 populationByStratum 说明） */
+  populationAmount: string
+  sampleCount: number
+  sampleAmount: string
+  sampleError: string
+  /** 该层外推额 */
+  projected: string
+  /** 有总体金额但无样本（覆盖缺口，不参与外推） */
+  unsampled: boolean
+}
+
+export interface StratifiedMisstatementResult extends MisstatementResult {
+  strataDetail: StratumEvaluation[]
+  /** 未落入任何声明层区间的样本数 */
+  unclassifiedCount: number
+  /** 有总体无样本的层数 */
+  unsampledStrataCount: number
+  /** 旧口径（全样本合并比率估计），供 UI 并列对照 */
+  legacy: MisstatementResult
+}
+
+/** 判断金额落入哪一层；返回层下标，未命中返回 -1。 */
+function stratumIndexOf(amount: Decimal, strata: StratumConfig[]): number {
+  for (let i = 0; i < strata.length; i++) {
+    const lo = toDecimal(strata[i].lowerBound)
+    const hi = toDecimal(strata[i].upperBound)
+    // 区间取 [lo, hi]：上下界都含。分层配置由审计师填写，相邻层通常写成
+    // [0,1万] / [1万,10万]，边界值归入**低层**（先匹配先得），避免同一金额被两层重复计入。
+    if (amount.gte(lo) && amount.lte(hi)) return i
+  }
+  return -1
+}
+
+/**
+ * R6 分层抽样层内单独评价
+ *
+ * ## 为什么必须分层外推
+ *
+ * 改造前 `projectMisstatement` 对 `stratified` 走的是「经典比率估计」把**全部样本合并**
+ * 计算 `Σ错报 / Σ金额 × 总体金额`，而 `config.strata` 只进了留痕、不参与评价。
+ * 分层抽样各层的抽样比例本来就不同（高值层抽得密、低值层抽得疏），合并算比率估计会让
+ * 抽得密的层的错报率被摊到整个总体上，产生系统性偏误。准则要求各层单独外推后加总。
+ *
+ * ## 层内总体金额从哪来
+ *
+ * 抽样框的逐层总体金额后端未下发（`coverageStats` 只有总体合计）。故本函数按
+ * `populationByStratum` 入参接收；调用方不提供时按**各层样本金额占样本合计的比例**
+ * 拆分总体合计作为近似，并在返回里标注 —— 这是有偏近似但仍优于完全不分层，
+ * 且比凭空假设「各层总体均分」更贴近实际。精确值需后端在抽样时按层统计（另立任务）。
+ *
+ * @param samples 已检查样本（含 actualMisstatement）
+ * @param strata 分层配置（金额区间）
+ * @param populationAmount 总体金额合计
+ * @param confidenceLevel 置信度
+ * @param populationByStratum 各层总体金额（可选，index → Decimal 字符串）
+ */
+export function projectMisstatementByStrata(
+  samples: SampledVoucher[],
+  strata: StratumConfig[],
+  populationAmount: string,
+  confidenceLevel = 0.95,
+  populationByStratum?: Record<number, string>,
+): StratifiedMisstatementResult {
+  const list = Array.isArray(samples) ? samples : []
+  const cfg = Array.isArray(strata) ? strata : []
+  const legacy = projectMisstatement(list, 'stratified', '0', populationAmount, confidenceLevel)
+
+  // 分层配置为空 → 无法分层，直接回退 legacy 并标注（R6.5）
+  if (cfg.length === 0) {
+    return {
+      ...legacy,
+      strataDetail: [],
+      unclassifiedCount: 0,
+      unsampledStrataCount: 0,
+      legacy,
+    }
+  }
+
+  // 1) 按层归集样本
+  const buckets = new Map<number, SampledVoucher[]>()
+  for (const v of list) {
+    const idx = stratumIndexOf(voucherBookAmount(v), cfg)
+    const arr = buckets.get(idx)
+    if (arr) arr.push(v)
+    else buckets.set(idx, [v])
+  }
+
+  // 2) 样本金额合计（用于在缺少逐层总体时按比例拆分）
+  let totalSampleAmount = new Decimal(0)
+  for (const v of list) totalSampleAmount = totalSampleAmount.plus(voucherBookAmount(v))
+  const popTotal = toDecimal(populationAmount)
+
+  const detail: StratumEvaluation[] = []
+  let projectedSum = new Decimal(0)
+  let knownHighValue = new Decimal(0)
+  let unsampledStrataCount = 0
+
+  const indices = [...cfg.keys(), -1]
+  for (const idx of indices) {
+    const rows = buckets.get(idx) ?? []
+    let sampleAmount = new Decimal(0)
+    let sampleError = new Decimal(0)
+    for (const v of rows) {
+      sampleAmount = sampleAmount.plus(voucherBookAmount(v))
+      sampleError = sampleError.plus(toDecimal(v.actualMisstatement))
+      if (v.isHighValue) {
+        knownHighValue = knownHighValue.plus(
+          Decimal.max(toDecimal(v.actualMisstatement), new Decimal(0)),
+        )
+      }
+    }
+
+    // 层总体金额：优先入参；否则按样本金额占比拆分总体合计
+    let stratumPop: Decimal
+    const declared = populationByStratum?.[idx]
+    if (declared != null && declared !== '') {
+      stratumPop = toDecimal(declared)
+    } else if (totalSampleAmount.gt(0)) {
+      stratumPop = popTotal.times(sampleAmount).div(totalSampleAmount)
+    } else {
+      stratumPop = new Decimal(0)
+    }
+
+    // 该层外推：无样本 → 不外推（没有样本证据支撑外推，这是覆盖缺口，R6.3）
+    const unsampled = rows.length === 0 && stratumPop.gt(0)
+    if (unsampled) unsampledStrataCount += 1
+    const projected =
+      rows.length > 0 && sampleAmount.gt(0)
+        ? Decimal.max(sampleError.div(sampleAmount).times(stratumPop), new Decimal(0))
+        : new Decimal(0)
+    projectedSum = projectedSum.plus(projected)
+
+    // 未归层桶在没有任何样本时不产生行（避免空行干扰）
+    if (idx === -1 && rows.length === 0) continue
+
+    detail.push({
+      index: idx,
+      label: idx === -1 ? '未归层' : `第 ${idx + 1} 层`,
+      lowerBound: idx === -1 ? '' : cfg[idx].lowerBound,
+      upperBound: idx === -1 ? '' : cfg[idx].upperBound,
+      populationAmount: stratumPop.toFixed(2, Decimal.ROUND_HALF_EVEN),
+      sampleCount: rows.length,
+      sampleAmount: sampleAmount.toFixed(2, Decimal.ROUND_HALF_EVEN),
+      sampleError: sampleError.toFixed(2, Decimal.ROUND_HALF_EVEN),
+      projected: projected.toFixed(2, Decimal.ROUND_HALF_EVEN),
+      unsampled,
+    })
+  }
+
+  // 3) 抽样风险余量：与经典法同口径（按可信赖度系数相对 95% 缩放）
+  const rfBase = new Decimal(reliabilityFactor(confidenceLevel, 0))
+  const rf95 = new Decimal(reliabilityFactor(0.95, 0))
+  const marginRatio = rf95.gt(0)
+    ? rfBase.div(rf95).times(CLASSIC_BASE_MARGIN)
+    : new Decimal(CLASSIC_BASE_MARGIN)
+
+  const result: StratifiedMisstatementResult = {
+    projected: projectedSum.toFixed(2, Decimal.ROUND_HALF_EVEN),
+    knownHighValue: knownHighValue.toFixed(2, Decimal.ROUND_HALF_EVEN),
+    basicPrecision: (0).toFixed(2),
+    incrementalAllowance: projectedSum.times(marginRatio).toFixed(2, Decimal.ROUND_HALF_EVEN),
+    upperLimit: '0.00',
+    strataDetail: detail,
+    unclassifiedCount: (buckets.get(-1) ?? []).length,
+    unsampledStrataCount,
+    legacy,
   }
   result.upperLimit = computeUpperMisstatementLimit(result)
   return result

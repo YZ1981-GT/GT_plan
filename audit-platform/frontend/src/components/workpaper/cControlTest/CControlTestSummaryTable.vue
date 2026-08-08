@@ -254,20 +254,52 @@
         </template>
       </el-table-column>
 
-      <!-- 12. 是否识别出偏差 -->
-      <el-table-column label="是否偏差" prop="hasDeviation" min-width="100">
+      <!-- 12. 是否识别出偏差（附 CAS 1314 偏差率上限评价，R9.2）-->
+      <el-table-column label="是否偏差" prop="hasDeviation" min-width="130">
         <template #default="{ row, $index }">
-          <el-select
-            v-model="row.hasDeviation"
-            :disabled="readonly"
-            size="small"
-            placeholder="—"
-            clearable
-            @change="(v: string) => onEnumChange($index, 'hasDeviation', v)"
-          >
-            <el-option label="是" value="是" />
-            <el-option label="否" value="否" />
-          </el-select>
+          <div class="cct-deviation-cell">
+            <el-select
+              v-model="row.hasDeviation"
+              :disabled="readonly"
+              size="small"
+              placeholder="—"
+              clearable
+              @change="(v: string) => onEnumChange($index, 'hasDeviation', v)"
+            >
+              <el-option label="是" value="是" />
+              <el-option label="否" value="否" />
+            </el-select>
+            <el-tooltip
+              v-if="getDeviationEvaluationTooltip(row)"
+              :content="getDeviationEvaluationTooltip(row)"
+              placement="top"
+            >
+              <el-tag
+                size="small"
+                effect="plain"
+                :type="
+                  evaluateControlDeviation(
+                    Number(row.sampleSize),
+                    row.hasDeviation === '是' ? 1 : 0,
+                    defaultStatisticalInput(),
+                  ).effective
+                    ? 'success'
+                    : 'danger'
+                "
+              >
+                上限
+                {{
+                  (
+                    evaluateControlDeviation(
+                      Number(row.sampleSize),
+                      row.hasDeviation === '是' ? 1 : 0,
+                      defaultStatisticalInput(),
+                    ).upperDevRate * 100
+                  ).toFixed(1)
+                }}%
+              </el-tag>
+            </el-tooltip>
+          </div>
         </template>
       </el-table-column>
 
@@ -343,6 +375,11 @@ import { ElMessageBox, ElMessage } from 'element-plus'
 import { ArrowLeft, Plus, Delete, InfoFilled } from '@element-plus/icons-vue'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
 import { suggestSampleSize } from '@/composables/useSampleSizeEngine'
+import {
+  defaultStatisticalInput,
+  evaluateControlDeviation,
+  statisticalSampleSize,
+} from '@/composables/useAttributeSamplingMode'
 import type { SummaryRow } from '@/composables/useCControlTestData'
 
 // ─── Props & Emits ───────────────────────────────────────────────────────────
@@ -465,6 +502,39 @@ function getSampleSizeTooltip(row: SummaryRow): string {
   let tip = `建议样本量：${result.min}`
   if (result.max !== result.min) tip += `~${result.max}`
   tip += '（基于致同2025样本规模区间表，按频率×次数建议）'
+
+  // R9.1：并列给出 CAS 1314 统计口径建议，让审计师看得到「量化抽样风险」的口径。
+  // 快捷表仍是默认与主口径（结果与改造前逐位一致，R9.3）；统计口径只作补充提示 ——
+  // 两套方法学入参维度不同（频率×次数 vs 置信度×可容忍偏差率），不可互相校验或替代，
+  // 故不做成"二选一覆盖"，而是并列展示由审计师判断采用哪一个。
+  const statN = statisticalSampleSize(defaultStatisticalInput())
+  if (statN != null) {
+    tip += `\nCAS 1314 统计口径参考：${statN} 项`
+    tip += '（95% 置信度，可容忍偏差率 5%，预期偏差率 0%；如需按项目风险调整参数请在测试说明中记录）'
+  }
+  return tip
+}
+
+/**
+ * R9.2：偏差率上限评价（CAS 1314 附录）。
+ *
+ * 改造前 `evaluateDeviationRate` 零生产消费方 —— 准则附录的「该控制是否可依赖」统计结论
+ * 写好了但用户不可达。此处按行的实际样本量与偏差笔数给出上限偏差率与结论。
+ *
+ * 返回空串表示不适用（样本量或偏差数未录入），不显示提示。
+ */
+function getDeviationEvaluationTooltip(row: SummaryRow): string {
+  const size = Number(row.sampleSize)
+  if (!Number.isFinite(size) || size <= 0) return ''
+  // 汇总表只记录「是否识别出偏差」，偏差笔数在明细页。此处以「是=至少 1 笔」做保守评价：
+  // 上限偏差率随偏差数单调递增，故按 1 笔算出的上限是**下界** —— 结论为"不可依赖"时必然成立，
+  // 为"可依赖"时须以明细页实际笔数复核，文案已注明。
+  const deviations = row.hasDeviation === '是' ? 1 : 0
+  const evaluation = evaluateControlDeviation(size, deviations, defaultStatisticalInput())
+  let tip = evaluation.conclusion
+  if (deviations > 0) {
+    tip += '\n（按至少 1 笔偏差保守估算；实际偏差笔数请以明细页为准，笔数越多上限越高）'
+  }
   return tip
 }
 
@@ -672,5 +742,11 @@ function tableRowClassName({ rowIndex }: { row: SummaryRow; rowIndex: number }):
 
 .cct-tips-content p {
   margin: 0 0 4px;
+}
+
+.cct-deviation-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 </style>

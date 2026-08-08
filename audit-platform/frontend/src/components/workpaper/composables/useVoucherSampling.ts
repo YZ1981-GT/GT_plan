@@ -34,7 +34,9 @@ import {
   computeSampleSize,
   markHighValueItems,
   projectMisstatement,
+  projectMisstatementByStrata,
   deriveSamplingConclusion,
+  type StratifiedMisstatementResult,
   type SamplingMethod,
   type Phase,
   type FillMode,
@@ -46,6 +48,22 @@ import {
   type MisstatementResult,
   type SamplingConclusion,
 } from './useSamplingAlgorithms'
+import {
+  resolveCoverageThreshold,
+  type ResolvedCoverageThreshold,
+} from './samplingCoverageThreshold'
+import {
+  applyUncheckedDisposition,
+  buildUncheckedDispositionPayload,
+  countTreatedAsDeviation,
+  resolveUncheckedDisposition,
+  type UncheckedDispositionMap,
+} from './samplingUncheckedDisposition'
+import {
+  buildDeviationNatureSummaryPayload,
+  summarizeDeviationNature,
+  type DeviationAnnotationMap,
+} from './samplingDeviationNature'
 import { useVersionTrail } from './useVersionTrail'
 
 // ─── Interfaces ──────────────────────────────────────────────────────────────
@@ -83,6 +101,19 @@ export interface VoucherSamplingOptions {
   initialPeriodRange?: number[]
   /** 打开引擎时合并进默认配置（如 I4-5 按测试原因预填关键词/方向） */
   initialConfigPatch?: Partial<SamplingConfig>
+  /**
+   * 底稿现有样本数（本次抽样之前已在底稿里的样本，sampling-evaluation R2.1）。
+   *
+   * 用于「特定项目占比」判据的分母：占比有意义的前提是分母里存在其它方法抽的样本。
+   * 不传 → 分母 == 分子 → 判据不可用 → **不产生该告警**（宁可不告警也不制造噪声）。
+   *
+   * 精确判定「底稿全量样本的方法构成」需要 `SampledVoucher` 带 `samplingMethod` 字段
+   * （当前没有，改动波及 20 份 per-cycle 行模型，归 `voucher-check-shared-layer`），
+   * 故此处只用数量做保守判定。
+   */
+  existingSampleCount?: Ref<number> | ComputedRef<number>
+  /** 底稿级金额覆盖率告警阈值（小数）。当前平台无该配置位，预留接口。 */
+  coverageThresholdOverride?: Ref<number | null> | ComputedRef<number | null>
 }
 
 export interface ExtractionLogEntry {
@@ -223,6 +254,123 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
   const sampledVouchers = ref<SampledVoucher[]>([])
   const coverageStats = ref<CoverageStats | null>(null)
   const complianceWarnings = ref<ComplianceWarning[]>([])
+  /**
+   * 本次合规检查实际采用的覆盖率阈值与来源（R2.6/2.8 留痕与展示）。
+   * 初值即平台默认，保证在未跑过 checkCompliance 时读到的也是真实生效值。
+   */
+  const coverageThreshold = ref<ResolvedCoverageThreshold>(resolveCoverageThreshold())
+
+  // ─── Wave 2：未检查处置 / 偏差性质 / 完整性放行 / 分层评价 ───────────────────
+
+  /** 未检查样本处置（凭证号 → {mode, note}），R3 */
+  const uncheckedDisposition = ref<UncheckedDispositionMap>({})
+  /** 偏差性质标注（凭证号 → {nature, cause, impact}），R4 */
+  const deviationAnnotations = ref<DeviationAnnotationMap>({})
+  /** 总体完整性核对放行理由，R5.3 */
+  const reconcileOverrideReason = ref<string>('')
+  /** 分层层内评价明细（仅 stratified + 灰度开启时非空），R6.4 */
+  const stratifiedDetail = ref<StratifiedMisstatementResult | null>(null)
+  /** 层内评价异常回退标记，R6.5 */
+  const stratifiedFallback = ref(false)
+
+  /**
+   * 分层层内评价灰度（R6.6）。
+   *
+   * 这是本 spec **唯一会改变已有项目推断错报数字**的改动，故默认关闭；
+   * 开启时 UI 并列展示新旧两个口径供审计师复核（R6.7）。
+   */
+  const strataEvaluationEnabled =
+    String(import.meta.env?.VITE_SAMPLING_STRATA_EVALUATION_ENABLED ?? '').toLowerCase() ===
+    'true'
+
+  /** 未检查样本处置解析结果（驱动门控与推断） */
+  const uncheckedResolution = computed(() =>
+    resolveUncheckedDisposition(sampledVouchers.value, uncheckedDisposition.value),
+  )
+
+  /** 偏差性质汇总（驱动门控与结论提示） */
+  const deviationResolution = computed(() =>
+    summarizeDeviationNature(sampledVouchers.value, deviationAnnotations.value),
+  )
+
+  /** 设置某凭证的未检查处置 */
+  function setUncheckedDisposition(
+    voucherNo: string,
+    mode: UncheckedDispositionMap[string]['mode'] | null,
+    note?: string | null,
+  ): void {
+    const next = { ...uncheckedDisposition.value }
+    if (mode == null) delete next[voucherNo]
+    else next[voucherNo] = { mode, note: note ?? next[voucherNo]?.note ?? null }
+    uncheckedDisposition.value = next
+    conclusionConfirmed.value = false
+    inferMisstatement()
+  }
+
+  /** 设置某凭证的偏差性质标注 */
+  function setDeviationAnnotation(
+    voucherNo: string,
+    patch: Partial<DeviationAnnotationMap[string]>,
+  ): void {
+    const prev = deviationAnnotations.value[voucherNo] ?? { nature: null }
+    deviationAnnotations.value = {
+      ...deviationAnnotations.value,
+      [voucherNo]: { ...prev, ...patch },
+    }
+    conclusionConfirmed.value = false
+  }
+
+  /**
+   * 结论确认门控（R3.4 / R4.3 / R5.1~5.3 统一出口）
+   *
+   * **所有新门控都收敛到这一个计算链**，不新开提示通道。平台已登记的铁律：门控提示
+   * 指向被弹窗遮挡的区域等于死信，故消费方必须用它做「前置 disable + tooltip」。
+   *
+   * 返回 `null` = 可确认。
+   */
+  const conclusionBlockedReason = computed<string | null>(() => {
+    const unchecked = uncheckedResolution.value
+    if (unchecked.pending.length > 0) {
+      return (
+        `有 ${unchecked.pending.length} 笔未检查样本尚未选择处置方式：` +
+        '按 CAS 1314 须逐笔选择「视同偏差」或「已实施替代程序」'
+      )
+    }
+    if (unchecked.missingNote.length > 0) {
+      return `有 ${unchecked.missingNote.length} 笔样本选择了替代程序但未填写替代程序说明`
+    }
+
+    const dev = deviationResolution.value
+    if (dev.unannotated.length > 0) {
+      return `有 ${dev.unannotated.length} 笔偏差尚未标注性质（系统性 / 人为 / 随机性）`
+    }
+    if (dev.missingExplanation.length > 0) {
+      return (
+        `有 ${dev.missingExplanation.length} 笔系统性或人为偏差未填写原因与影响评估：` +
+        '这类偏差不宜简单外推，须说明处置'
+      )
+    }
+
+    // R5：总体完整性核对未通过 → 阻断，但允许填写理由放行
+    const reconcileIssue = reconcileBlockedReason.value
+    if (reconcileIssue && reconcileOverrideReason.value.trim().length < 10) {
+      return `${reconcileIssue}；如确有正当理由，请在完整性校验区填写不少于 10 字的说明后继续`
+    }
+    return null
+  })
+
+  /**
+   * 总体完整性核对的阻断原因（`null` = 通过或无需判定）。
+   *
+   * 由消费方注入判定结果 —— 核对涉及审计师手工录入的账面金额与可容忍差异比例，
+   * 那些状态在引擎组件里（`reconcileThresholdPct` / 手工账面金额输入），
+   * composable 不去猜。未注入时视为「未判定」不阻断（零回归）。
+   */
+  const reconcileBlockedReason = ref<string | null>(null)
+
+  function setReconcileBlockedReason(reason: string | null): void {
+    reconcileBlockedReason.value = reason
+  }
   const loading = ref(false)
   const configDialogVisible = ref(false)
   const previewVisible = ref(false)
@@ -443,18 +591,48 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
     const cl = config.value.confidenceLevel ?? 0.95
     const interval = samplingInterval.value ?? '0'
     const popAmount = coverageStats.value?.populationAmount ?? '0'
-    // R18：仅纳入已检查（checkResult 非空：Y/N/异常）的样本参与推断。
-    // 未检查样本的 actualMisstatement 为空会被当作“零错报”，若计入将系统性低估
-    // 推断错报与错报上限（UML），故此处显式排除，未检查数量由 uncheckedSampleCount 暴露给 UI 提示。
-    const samples = sampledVouchers.value.filter(v => v.checkResult !== '')
 
-    const result = projectMisstatement(
-      samples,
-      config.value.samplingMethod,
-      interval,
-      popAmount,
-      cl,
+    // R3.2 + R3.3：未检查样本按处置方式改写后参与推断。必须在过滤未检查样本
+    // **之前**做 —— 改写 checkResult 正是让它们从"被排除"转为"参与推断"的机制：
+    //   · 视同偏差 → checkResult='N' + 实际错报=账面金额（100% 污染率）
+    //   · 已实施替代程序 → checkResult='Y'，实际错报原样（留空即未发现错报）
+    // 🔴 只改写「视同偏差」会让替代程序样本既不进分子也不进分母、把污染率放大，
+    //    详见 applyAlternativeTreatment 的 docstring（Task 19 浏览器实测取证）。
+    const treated = applyUncheckedDisposition(
+      sampledVouchers.value,
+      uncheckedDisposition.value,
     )
+
+    // R18：仅纳入已检查（checkResult 非空：Y/N/异常）的样本参与推断。
+    // 剩下的是**未选处置方式**的未检查样本 —— 它们的 actualMisstatement 为空，
+    // 计入会被当作“零错报”而系统性低估推断错报与 UML，故显式排除；
+    // 该情形由 conclusionBlockedReason 阻断结论确认，未检查数量另由
+    // uncheckedSampleCount 暴露给 UI 提示（两个计数都读原数组，不受上面的改写影响）。
+    const samples = treated.filter(v => v.checkResult !== '')
+
+    // R6：分层抽样走层内单独评价（灰度开关控制）。各层抽样比例不同，合并做比率估计
+    // 会把抽得密的层的错报率摊到整个总体，产生系统性偏误。
+    let result: MisstatementResult
+    if (config.value.samplingMethod === 'stratified' && strataEvaluationEnabled) {
+      try {
+        const strat = projectMisstatementByStrata(
+          samples,
+          config.value.strata ?? [],
+          popAmount,
+          cl,
+        )
+        stratifiedDetail.value = strat
+        result = strat
+      } catch {
+        // 层内评价异常 → 回退合并口径并标注：宁可用旧口径也不给错数字
+        stratifiedDetail.value = null
+        stratifiedFallback.value = true
+        result = projectMisstatement(samples, config.value.samplingMethod, interval, popAmount, cl)
+      }
+    } else {
+      stratifiedDetail.value = null
+      result = projectMisstatement(samples, config.value.samplingMethod, interval, popAmount, cl)
+    }
     misstatementResult.value = result
 
     const tol = config.value.tolerableMisstatement
@@ -1190,7 +1368,10 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
       tolerable_misstatement: config.value.tolerableMisstatement ?? null,
       checked_sample_count: checkedSampleCount.value,
       unchecked_sample_count: uncheckedSampleCount.value,
-      deviation_count: countDeviations(),
+      // R3.2：视同偏差的未检查样本计入偏差笔数（它们已按 100% 污染率进推断）
+      deviation_count:
+        countDeviations() +
+        countTreatedAsDeviation(sampledVouchers.value, uncheckedDisposition.value),
       conclusion_code: conclusion
         ? conclusion.accepted
           ? 'acceptable'
@@ -1199,6 +1380,30 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
       conclusion_message: conclusion?.message ?? null,
       conclusion_confirmed: conclusionConfirmed.value,
       algo_version: methodologySnapshot.value?.algo_version ?? null,
+      // R2.6：覆盖率阈值与来源随评价留痕 —— 复核人需要知道当年那条覆盖率告警
+      // （或没有告警）是按什么阈值判的，60% 并非准则规定
+      coverage_threshold: coverageThreshold.value.value,
+      coverage_threshold_source: coverageThreshold.value.source,
+      // ── Wave 2 结构化留痕：三项全部可缺省，缺省时后端归一为 None ──
+      unchecked_disposition: buildUncheckedDispositionPayload(
+        sampledVouchers.value,
+        uncheckedDisposition.value,
+      ),
+      deviation_nature_summary: buildDeviationNatureSummaryPayload(
+        sampledVouchers.value,
+        deviationAnnotations.value,
+      ),
+      stratified_evaluation: stratifiedDetail.value
+        ? {
+            enabled: true,
+            projected_by_strata: stratifiedDetail.value.projected,
+            projected_legacy: stratifiedDetail.value.legacy.projected,
+            unclassified_count: stratifiedDetail.value.unclassifiedCount,
+            unsampled_strata_count: stratifiedDetail.value.unsampledStrataCount,
+            fallback: stratifiedFallback.value,
+          }
+        : null,
+      reconcile_override_reason: reconcileOverrideReason.value.trim() || null,
     }
   }
 
@@ -1375,15 +1580,36 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
    *
    * @returns ComplianceWarning[] 合规警告列表
    */
+  /**
+   * 合规检查（sampling-evaluation-and-governance-closure R2）
+   *
+   * 改造前传的是 `(selectedCount, sampledVouchers.length)` 即「勾选数 / 抽出总数」，
+   * 与两条规则的语义都不符：规则 2 因此在全选时恒告警、规则 3 变成「有没有全选」。
+   * 现按各自真实语义分别取数，并把覆盖率阈值从函数体内移出。
+   */
   function checkCompliance(): ComplianceWarning[] {
     if (!coverageStats.value) return []
 
-    const warnings = checkCAS1314Compliance(
-      coverageStats.value,
-      config.value.samplingMethod,
-      selectedCount.value,
-      sampledVouchers.value.length,
-    )
+    const thisRoundCount = sampledVouchers.value.length
+    const existingCount = Math.max(0, options.existingSampleCount?.value ?? 0)
+    const resolvedThreshold = resolveCoverageThreshold({
+      workpaper: options.coverageThresholdOverride?.value ?? null,
+    })
+    coverageThreshold.value = resolvedThreshold
+
+    // 建议样本量为 0 表示参数不足无法推导 → 传 null 让规则 3 不告警（判据不可用 ≠ 不合规）
+    const suggested = suggestedSampleSize.value
+    const usableSuggested = suggested != null && suggested > 0 ? suggested : null
+
+    const warnings = checkCAS1314Compliance({
+      stats: coverageStats.value,
+      method: config.value.samplingMethod,
+      methodSampleCount: thisRoundCount,
+      totalSampleCount: existingCount + thisRoundCount,
+      suggestedSampleSize: usableSuggested,
+      coverageThreshold: resolvedThreshold.value,
+      coverageThresholdLabel: resolvedThreshold.sourceLabel,
+    })
     complianceWarnings.value = warnings
     return warnings
   }
@@ -1396,6 +1622,20 @@ export function useVoucherSampling(options: VoucherSamplingOptions) {
     sampledVouchers,
     coverageStats,
     complianceWarnings,
+    coverageThreshold,
+    // Wave 2：未检查处置 / 偏差性质 / 完整性放行 / 分层评价
+    uncheckedDisposition,
+    uncheckedResolution,
+    setUncheckedDisposition,
+    deviationAnnotations,
+    deviationResolution,
+    setDeviationAnnotation,
+    reconcileOverrideReason,
+    setReconcileBlockedReason,
+    conclusionBlockedReason,
+    stratifiedDetail,
+    stratifiedFallback,
+    strataEvaluationEnabled,
     loading,
     configDialogVisible,
     previewVisible,
