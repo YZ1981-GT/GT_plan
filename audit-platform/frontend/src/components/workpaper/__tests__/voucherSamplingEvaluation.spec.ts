@@ -381,15 +381,42 @@ describe('Property 7 — 推送草稿的金额、类型与描述标识', () => {
     expect(emitted[0].payload.amount).toBe(Number(projected))
   })
 
-  it('描述含方法 / 样本量 / 随机种子 / 批次 四项标识', async () => {
+  it('描述含方法 / 样本量 / 随机种子 / 批次 四项标识（本会话已回填）', async () => {
     const s = makeEvaluatedEngine()
-    s.loadedFromBatch.value = { logId: 'log-1', batchId: 'batch-abc', evaluatedAt: null }
+    // 本会话回填形成的批次号（由 `cutoff-fill` 响应回报）
+    s.filledBatchId.value = 'batch-abc'
     await s.pushProjectedToA13()
     const desc = String(emitted[0].payload.description)
     expect(desc).toContain('random')          // 抽样方法
     expect(desc).toContain('样本量:2')
     expect(desc).toContain('随机种子:424242')
     expect(desc).toContain('批次:batch-abc')
+  })
+
+  it('已抽样但未回填 → 批次写「未回填」，不得借用上一批次号', async () => {
+    // 🔴 诚实改写（Task 24 实测挖出）：本用例原先把 `loadedFromBatch` 手工设成
+    // 'batch-abc' 并断言描述里出现该批次号 —— 但那是**上一个批次**的号，而同一条
+    // 描述里的 `样本量` / `随机种子` 描述的是本会话这套尚未回填的样本。
+    // 错的批次号比没有批次号更坏：复核人按它去翻批次会对不上样本。
+    const s = makeEvaluatedEngine()
+    s.loadedFromBatch.value = { logId: 'log-1', batchId: 'batch-prev', evaluatedAt: null }
+    expect(s.filledBatchId.value).toBeNull()
+    expect(s.sampledVouchers.value.length).toBeGreaterThan(0)
+    await s.pushProjectedToA13()
+    const desc = String(emitted[0].payload.description)
+    expect(desc).toContain('批次:未回填')
+    expect(desc).not.toContain('batch-prev')
+    // 样本量/种子仍如实描述本会话样本（三项同属一个事件）
+    expect(desc).toContain('样本量:2')
+    expect(desc).toContain('随机种子:424242')
+  })
+
+  it('纯回读态（会话内无样本）→ 批次取回读批次（两者同源）', async () => {
+    const s = makeEvaluatedEngine()
+    s.loadedFromBatch.value = { logId: 'log-1', batchId: 'batch-read', evaluatedAt: null }
+    s.sampledVouchers.value = []
+    const desc = s.buildProjectedMisstatementDescription()
+    expect(desc).toContain('批次:batch-read')
   })
 
   it('高值层已知错报 > 0 时描述追加「应按事实错报单独记入」提示', async () => {
