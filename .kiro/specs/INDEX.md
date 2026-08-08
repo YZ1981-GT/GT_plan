@@ -2,7 +2,7 @@
 
 **最后更新**：2026-08-08
 **当前分支**：`work/2026-05-30-wp-specs`
-**统计**：Active **6**（2026-08-08 行首锚定正则实扫）/ Archived **536**
+**统计**：Active **6**（2026-08-08 行首锚定正则实扫）/ Archived **537**
 **最高迁移**：**V143**（`word_export_task_versions.drift_report`；以 `migration_status` 实测为准）
 **技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer
 
@@ -33,11 +33,33 @@
 | `note-template-columns-and-legacy-snapshot-closure` | 21/23 | 附注模板列元数据补齐 + legacy 快照收口。列真源按章节三分（有底稿披露 sheet → openpyxl 直读 / 母公司章 → A spec / 无披露 sheet → 附注 docx）。已补 columns 85 张 + guidance 53 张；legacy 快照迁移已执行（132 章节 / 152 表 / 1134 行，行数守恒 + 幂等 + 回滚往返 + 三消费方 issues=0）。剩 Task 13/14（⏸ 等 B spec 收口，撞模板行集）+ Task 23 收口 |
 | `soe-listed-note-conversion-correctness` | 12/19（inprog 1 + queued 5，**并发会话在推进，勿碰**） | 国企↔上市附注转换正确性。生产 6 步里 3 步空操作、v2 映射是孤儿；同义两码 / 一码两义 / 章节映射修复。依赖 A spec（已收口） |
 | `sampling-compliance-closure` | 24/25（只剩 Task 24 浏览器实测） | 抽样/抽凭合规闭环：dataset 版本绑定 + 推断错报持久化 + A13 `projected` 通路 + 删 legacy 抽样引擎 + 42 宿主 methodology 收口 |
-| `sampling-evaluation-and-governance-closure` | 18/19（剩 Wave 4 属性抽样接线） | 抽样评价与治理闭环（`sampling-compliance-closure` 后继）：撤销回填同步软删投影表 + 合规判据修正 + 分层评价 + 归档章节 |
+| `e-cycle-extraction-formula-and-disclosure-completion` | 1/22（并发会话新建） | E 类（E0/E1）取数/公式/披露收口 |
 
 > 🔴 `soe-listed-*` 由**并发会话**推进（tasks.md mtime 秒/分钟级刷新），本会话未触碰。
 > 跨会话协作时不要并行推进同一 spec（memory 已实证并发会话会互相回退同一文件）。
-> `f0`(144/144) / `parent-company`(18/18) / `report-config`(12/12) 已于 2026-08-08 归档（见 §二）。
+> `f0`(144/144) / `parent-company`(18/18) / `report-config`(12/12) /
+> `sampling-evaluation-and-governance-closure`(19/19) 已于 2026-08-08 归档（见 §二）。
+
+**2026-08-08 归档（1 个，→ `05-business-features`，与 `voucher-sampling-*` /
+`cutoff-test-*` / `voucher-check-sampling-integration` 同分类）**：
+
+`sampling-evaluation-and-governance-closure`(19/19) —— 抽样评价与治理闭环
+（`sampling-compliance-closure` 的后继）。四波：**Wave 1** 撤销回填同步软删两张投影表
++ 合规判据修正（特定项目占比不再用勾选数、MUS 样本量改比系统建议值）+ 覆盖率阈值
+单一真源（底稿 > 项目 > 平台默认 0.60，显式标注"非准则数字"）· **Wave 2** CAS 1314
+四条评价缺口（未检查样本二选一处置 / 偏差性质结构化复用 C 类口径 / 完整性核对阻断 +
+≥10 字理由放行 / 分层层内评价灰度）· **Wave 3** 平台级 P0 —— `qc_rule_definitions`
+**0 行**使 `_get_enabled_rule_codes` 返回空集 ⇒ **20 条 QC 规则全部静默不执行**，
+门控语义改「禁用黑名单过滤」三态后真实库实测恢复 **20/20** 条；QC-12 判据重写为
+不依赖已软弃用的 `SamplingConfig`；新增归档章节 `06-抽样记录汇总.txt` + 归档完整性
+第 5 类（非阻断）· **Wave 4** 属性抽样接线控制测试 + 抽样引擎复核入口 + CI 两 job +
+真实库只读验收（PASS=10 / FAIL=0 / SKIP=2）+ 浏览器实测。
+**收口期修掉一个只有浏览器 + 独立算术复核才会暴露的真缺陷**：`alternative_performed`
+的样本 `checkResult` 仍为空 ⇒ 被 `inferMisstatement` 的既有过滤整体排除 ⇒ 既不进
+分子也不进分母，推断错报被**放大 2.26 倍**（真实库落库取证 3,412,422.05 vs 正确
+1,511,272.73），不符 R3.3 且方向是虚高；修法 = 新增 `applyAlternativeTreatment` +
+统一入口 `applyUncheckedDisposition`（留痕计数读原数组、逐位不变），
+Property 28 守卫 8 例 + **变异检验 5/5 全 RED**。
 
 **2026-08-05 空壳目录清理（2 个，Active 区不再有非 spec 目录）**：
 
@@ -103,7 +125,7 @@ H0 聚合忽略 `closing_direction` 把 contra 子科目加成正数）。
 
 ---
 
-## 二、已归档 Spec（536 个，15 分类）
+## 二、已归档 Spec（537 个，15 分类）
 
 ```
 _archive/
@@ -112,7 +134,7 @@ _archive/
 ├── 03-refinement-rounds/              7
 ├── 04-infra/                          3
 ├── 04-infra-architecture/            39
-├── 05-business-features/            235
+├── 05-business-features/            236
 ├── 06-engineering-governance/        13
 ├── 07-workpaper-slimdown/            22
 ├── 08-disclosure-notes/              76
@@ -144,6 +166,12 @@ _archive/
 | Spec | 说明 |
 |------|------|
 | report-config-account-code-integrity | `report_config` 科目码完整性（12/12 全完成）。全表对账 132 条 `TB()` 引用扫出 16 行错码（本 spec 修 V138 13 行 + V144 3 行），远超此前手工发现的 6 处。Task 7 挖出立项未见的第二写入路径 `ReportFormulaService.fill_all_formulas()`（按行名索引 + 只填 NULL 行 = 恰是 V138 置 NULL 那批 ⇒ 不修等于白做）+ 未完成重构残留副本 `fill_report_formulas.py`。修 6701/6702 互换 6 处（约 1.5 亿）。核心交付 = 平台级一致性守卫（此前零校验，错码可静默存在数年，先打红 13 行再改数据）+ CI job。V138/V144 均已应用真实库。撤 4 个已到期的 `trust_report_config=False`（零回归双证：40 组合仅 3 组变 resolved_from、码不变） |
+
+**→ 05-business-features（+1）**
+
+| Spec | 说明 |
+|------|------|
+| sampling-evaluation-and-governance-closure | 抽样评价与治理闭环（19/19 全完成 + 真实库只读验收 PASS=10/FAIL=0/SKIP=2 + 浏览器实测 + 数据逐位复原）。**Wave 3 是平台级 P0**：`qc_rule_definitions` **0 行** ⇒ `_get_enabled_rule_codes` 返回空集 ⇒ **20 条 QC 规则全部静默不执行**（非 except 分支、连 WARNING 都没有），门控语义改「禁用黑名单过滤」三态后真实库恢复 20/20。另修：撤销回填从不清两张投影表（撤销的凭证永久抽不到 + 项目级统计虚高）· 合规判据把「有没有全选」当准则风险 · 60% 覆盖率阈值写死在函数体 · CAS 1314 四条评价缺口（未检查样本处置 / 偏差性质 / 完整性阻断 / 分层层内评价）· 归档完整性完全不感知抽样。**收口期浏览器实测挖出并修掉一个数字级缺陷**：`alternative_performed` 样本被静默挤出比率估计基数、推断错报放大 2.26 倍（真实库落库取证 3,412,422.05 vs 正确 1,511,272.73），Property 28 + 变异 5/5 全 RED。**两项诚实登记未做浏览器实测**：分层明细（灰度默认关，开启需重启共享 dev server）与撤销后重复提示（会在真实批次留下不可逐字节复原的软删痕迹），均由守卫 + 只读脚本 SKIP 承担 |
 
 ### 最近归档（2026-08-07）
 
