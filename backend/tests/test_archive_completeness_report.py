@@ -46,8 +46,15 @@ class TestCompletenessReportStructure:
     """报告结构不变量测试。"""
 
     @pytest.mark.asyncio
-    async def test_report_always_has_4_categories(self):
-        """报告始终包含固定 4 类。"""
+    async def test_report_always_has_5_categories(self):
+        """报告始终包含固定 5 类。
+
+        第 5 类 `sampling_records`（抽样记录不完整）由
+        sampling-evaluation-and-governance-closure R8.4 加入：改造前归档包完全不感知
+        抽样（三个归档服务的 sampling/抽样/抽凭 提及数均为 0），而 CAS 1314 的记录要求
+        本身是归档件的组成部分。该类别**非阻断**（补齐抽样记录是审计判断，
+        硬卡会让存量项目全线阻塞归档）。
+        """
         project_id = uuid4()
 
         # Mock DB session that returns empty results
@@ -58,9 +65,18 @@ class TestCompletenessReportStructure:
 
         result = await get_archive_completeness_report(db=mock_db, project_id=project_id)
 
-        assert len(result.categories) == 4
+        assert len(result.categories) == 5
         category_names = {cat.category for cat in result.categories}
-        assert category_names == {"missing", "unsigned", "unresolved_reviews", "stale"}
+        assert category_names == {
+            "missing",
+            "unsigned",
+            "unresolved_reviews",
+            "stale",
+            "sampling_records",
+        }
+        # 抽样记录类别非阻断：其余四类保持阻断语义不变
+        blocking = {cat.category for cat in result.categories if cat.is_blocking}
+        assert blocking == {"missing", "unsigned", "unresolved_reviews", "stale"}
 
     @pytest.mark.asyncio
     async def test_can_proceed_true_when_all_empty(self):
