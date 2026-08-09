@@ -3854,6 +3854,42 @@ jobs:
         run: python -m pytest backend/tests/test_legacy_note_snapshot_readiness.py -q
       - name: Run shared-table segments guard (表名派生的 manifest 不得漂移)
         run: python -m pytest backend/tests/test_note_shared_table_segments.py -q
+      - name: Check note text hygiene (裸表名标题化 / md 重建假行清理)
+        # Wave 4 Task 13：`text_sections` 里的**裸表名段落**会被
+        # `disclosure_engine._is_table_title_paragraph` 判为正文 → 附注与 Word
+        # 凭空多出「只有表名」的一段；`row_type=header_label` 假行更严重 ——
+        # `note_word_exporter._render_table` **不读 row_type**，它在交付件里是可见的一行。
+        # 落地：裸表名 listed 18 / soe 20 加 `#### ` 前缀；假行 listed 36 / soe 6 删除
+        # （fail-closed：只删可由该表 headers 证明为表头残留的行）。
+        run: python backend/scripts/fix/fix_note_text_hygiene.py --check
+      - name: Check note expandable rows (可扩位行标记 row_type=expandable)
+        # Wave 4 Task 14：additive 第 6 个 `row_type` 取值。落地 121 行
+        # （125 全量 − 母公司章 4 行，后者归 A spec）。
+        # 判据真源 backend/data/note_expandable_markers.json（6 词 + 逐词 source_ref）。
+        run: python backend/scripts/fix/fix_note_expandable_rows.py --check
+      - name: Run text hygiene guard (Property 35~37)
+        run: python -m pytest backend/tests/test_note_text_hygiene.py -q
+      - name: Run expandable rows guard (Property 33~34 + 38 判据单一真源)
+        run: python -m pytest backend/tests/test_note_expandable_rows.py -q
+      - name: Run row_type enum guard (只跑与本 spec 相关的用例)
+        # 🔴 该文件另有 4 条**预存在红**，本 job 不为它们背红：
+        #   `test_every_row_has_row_type` 39(soe)/45(listed) 行缺 row_type
+        #   `test_row_type_is_valid_enum` 出现第 7 个取值 `section_header`
+        # 两者**全在 `_tables` 容器**（读时投影的持久化残留，非权威 `tables`），
+        # 集中在 N 类章节（`八、31` / `五、30` 递延所得税、`三、所得税费用`），
+        # 与本 spec 的 `expandable` 无交集 —— 同口径 HEAD 对照实证：
+        # missing 变化 **+0**、`section_header` HEAD=2 当前=2 未变（2026-08-09）。
+        # 归 N 类 spec / `_tables` 残留清理。
+        #
+        # 本 spec 真正要守的「VALID_ROW_TYPES 含 expandable」已由上一步交叉锁死
+        # （`TestRowTypeEnumRegistration::test_template_row_type_test_enum_registered`
+        #  直接读该文件源码断言），此处保留其余 6 例作附加信号。
+        #
+        # 🔴 用 `-k` 不用 `--deselect`：参数化用例的 nodeid 必须带 `[参数]` 才能被
+        # `--deselect` 匹配，写不带参数的形式会**静默不生效**（实测仍 4 failed）。
+        run: >-
+          python -m pytest backend/tests/services/test_note_template_row_type.py -q
+          -k "not test_every_row_has_row_type and not test_row_type_is_valid_enum"
 
   prefill-wp-prev-resolution:
     # spec: prefill-wp-prev-resolution-repair Task 15
