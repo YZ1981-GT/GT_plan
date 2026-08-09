@@ -42,7 +42,13 @@ logger = logging.getLogger(__name__)
 
 # ─── 底稿类型 → 导出格式映射 ───────────────────────────────────────────────────
 # 表格/审定表/程序表 → xlsx；文字 → docx
-_XLSX_TYPES = {"univer", "form", "hybrid", "table", "audit_sheet", "program_sheet"}
+# 🔴 `"custom"` 显式登记：不加它时它落「默认 xlsx」这条**隐式兜底**，
+#    行为相同但**判据不可断言**（守卫只能靠集合成员判定，见 Property 19）。
+# 🔴 改这个集合必须同步 `backend/tests/test_pbt_export_format.py` 里的
+#    `XLSX_TYPES` 副本 —— 那份是测试自带的第二真源，漏改即「守卫清单漏一张 = 假失败」。
+_XLSX_TYPES = {
+    "univer", "form", "hybrid", "table", "audit_sheet", "program_sheet", "custom",
+}
 _DOCX_TYPES = {"word", "text"}
 
 _schema_service = WpRenderSchemaService()
@@ -156,8 +162,19 @@ class WpExportEngine:
         if file_format == "docx":
             file_bytes_io = await self._export_docx(wp, wp_code, wp_name)
         else:
+            # custom 判定在此处做（这里有 db），结果传给 _export_xlsx
+            # 🔴 判定失败按非 custom 处理（走原路径），不因判定异常打断导出
+            _is_custom = False
+            try:
+                from app.services.custom_workpaper_context import resolve_is_custom
+
+                _is_custom = await resolve_is_custom(db, wp, wp_code)
+            except Exception as _ctx_err:  # noqa: BLE001
+                logger.warning(
+                    "export_single: custom 判定失败 wp_code=%s: %s", wp_code, _ctx_err
+                )
             file_bytes_io = await self._export_xlsx(
-                wp, wp_code, schema, project_meta
+                wp, wp_code, schema, project_meta, is_custom=_is_custom
             )
 
         # ─── Step 6: 嵌入元数据 ──────────────────────────────────────────
@@ -441,6 +458,7 @@ class WpExportEngine:
         wp_code: str,
         schema: dict,
         project_meta: dict[str, Any],
+        is_custom: bool = False,
     ) -> BytesIO:
         """xlsx 导出：直接调用现有 export_workpaper_xlsx。
 
@@ -450,6 +468,21 @@ class WpExportEngine:
         parsed_data = wp.parsed_data or {}
         html_data = parsed_data.get("html_data", {})
 
+        # ─── custom 底稿：走独立导出路径（xlsx 本体即权威）───────────────
+        # 🔴 为什么这条路径也必须分流（立项漏登记，2026-08-06 实证）：
+        #    下面的 `except (TemplateNotFoundError, Exception)` 会**吞掉一切异常**
+        #    并回退空白 workbook，而回退逻辑只读 `sheet_data["rows"]` ——
+        #    自定义底稿是 `{"cells": {...}}` 形态 ⇒ 产出「只有一个 sheet 名的空表」
+        #    却**返回 200**。这比 `/export-xlsx` 的 500 更坏：用户拿到空文件
+        #    还以为导出成功了，归档时才发现。
+        # 🔴 加法式分流：非 custom 底稿此块整体跳过，行为逐字节不变。
+        if is_custom:
+            from app.services.custom_workpaper_export import export_custom_workpaper
+
+            # 🔴 有意**不**包 try/except：CustomExportError 必须冒泡到调用方，
+            #    绝不能落进下面的空白 workbook 回退（那正是本分流要消除的行为）。
+            return export_custom_workpaper(wp)
+
         try:
             return await export_workpaper_xlsx(
                 wp_code=wp_code,
@@ -457,32 +490,63 @@ class WpExportEngine:
                 schema=schema,
                 project_meta=project_meta,
             )
-        except (TemplateNotFoundError, Exception) as e:
+        # 🔴 改造前是 `except (TemplateNotFoundError, Exception)`（2026-08-09 修）：
+        #    元组里带 `Exception` 等于吞一切，且回退产出的 workbook **不自证是失败**
+        #    → 用户拿到一个内容空的 xlsx 且 HTTP 200，以为「这份底稿本来就没数据」，
+        #    归档时才发现。现在保留 fail-open（批量导出不因单份失败整批中断），
+        #    但回退 workbook 第一行必须写明「导出失败」+ 原因，让空文件自证。
+        except Exception as e:  # noqa: BLE001
             logger.warning(
-                "export_workpaper_xlsx 失败 wp_code=%s: %s，回退空白 workbook",
+                "export_workpaper_xlsx 失败 wp_code=%s: %s，回退空白 workbook（已在表内标注失败原因）",
                 wp_code, e,
             )
-            # 回退：生成空白 workbook 填入 html_data
-            from openpyxl import Workbook as _Wb
+            return self._build_failure_fallback_workbook(wp_code, html_data, e)
 
-            wb = _Wb()
-            ws = wb.active
-            ws.title = wp_code
-            # 写入 html_data 数据（如有）
-            row_idx = 1
-            for sheet_name, sheet_data in html_data.items():
-                if isinstance(sheet_data, dict):
-                    rows = sheet_data.get("rows", [])
-                    for row_data in rows:
-                        if isinstance(row_data, dict):
-                            for col_idx, val in enumerate(row_data.values(), start=1):
-                                ws.cell(row=row_idx, column=col_idx, value=val)
-                            row_idx += 1
-            buf = BytesIO()
-            wb.save(buf)
-            buf.seek(0)
-            wb.close()
-            return buf
+    @staticmethod
+    def _build_failure_fallback_workbook(
+        wp_code: str,
+        html_data: dict[str, Any],
+        error: BaseException,
+    ) -> BytesIO:
+        """导出失败时的兜底 workbook —— 必须**自证是失败**而非「内容本来就空」。
+
+        第 1 行写「导出失败：<原因>」并加粗标红；第 2 行留空；
+        第 3 行起才填 `html_data` 里能读出的行数据（尽力保留已有内容）。
+
+        🔴 判据：`导出失败` 这四个字必须出现在 workbook 里（守卫按此断言）。
+        """
+        from openpyxl import Workbook as _Wb
+        from openpyxl.styles import Font
+
+        wb = _Wb()
+        ws = wb.active
+        ws.title = wp_code
+
+        # ─── 失败标注（第 1 行）────────────────────────────────────────
+        reason = f"{type(error).__name__}: {error}"
+        banner = ws.cell(
+            row=1,
+            column=1,
+            value=f"导出失败：{reason}（本表为兜底空白模板，内容不完整，请勿用于归档）",
+        )
+        banner.font = Font(bold=True, color="C00000")
+
+        # ─── 尽力保留 html_data 已有内容（第 3 行起）──────────────────
+        row_idx = 3
+        for _sheet_name, sheet_data in html_data.items():
+            if isinstance(sheet_data, dict):
+                rows = sheet_data.get("rows", [])
+                for row_data in rows:
+                    if isinstance(row_data, dict):
+                        for col_idx, val in enumerate(row_data.values(), start=1):
+                            ws.cell(row=row_idx, column=col_idx, value=val)
+                        row_idx += 1
+
+        buf = BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+        wb.close()
+        return buf
 
     async def _export_docx(
         self,
@@ -513,21 +577,17 @@ class WpExportEngine:
     def _resolve_docx_template(
         self, file_path: str | None, wp_code: str
     ) -> Path | None:
-        """解析 docx 模板路径，file_path 不存在时回退模板库。"""
-        if file_path:
-            p = Path(file_path)
-            if p.is_file():
-                return p
-            # 尝试从项目根解析
-            project_root = Path(__file__).resolve().parent.parent.parent.parent
-            candidate = project_root / file_path
-            if candidate.is_file():
-                return candidate
+        """解析 docx 模板路径，file_path 不可达时回退模板库。
 
-        # 回退：模板库查找
-        from app.services.wp_template_init_service import find_template_file_any
+        🔴 收敛到共享解析件 `resolve_wp_file`（2026-08-09）：
+        改造前此处自写了「原样 → 仓库根 → 模板库」三级回退，与
+        `wp_download_service` / `wp_render_config_helpers` / `wp_xlsx_export_service`
+        各写一份（4 套并存），且都漏了「`file_path` 为空串时 `Path('')` 判 True」
+        这个 Python 语义坑。现在只留声明式委托，路径形态归一由共享件负责。
+        """
+        from app.services.wp_export.wp_file_resolver import resolve_wp_file
 
-        return find_template_file_any(wp_code)
+        return resolve_wp_file(file_path, wp_code=wp_code).path
 
     def _fill_docx_content(self, doc: Document, wp: WorkingPaper) -> None:
         """将 parsed_data 中的文字内容填充到 docx 文档。"""

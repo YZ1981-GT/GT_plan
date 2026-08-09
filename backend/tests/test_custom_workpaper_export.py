@@ -75,6 +75,23 @@ def _fn_body(src: str, name: str) -> str:
     return body
 
 
+def _fallback_except_pos(body: str) -> int:
+    """定位「空白 workbook 回退」那条 `except` 的位置。
+
+    🔴 为什么按**形态**而非写死字面量（2026-08-09 假红 + 假绿双证）：
+      改造前判据写死 `except (TemplateNotFoundError, Exception)`，而本轮把它
+      收窄成 `except Exception:  # noqa: BLE001`（元组里带 `Exception` 等于吞
+      一切、且 flake8 不告警 = 更坏）。字面量判据于是：
+        · `test_engine_gate_precedes_...` 直接**假红** —— 看着像「回退分支被删了」；
+        · `test_engine_custom_branch_not_wrapped_in_try` **假绿** ——
+          `find()` 返回 `-1`，`body[gate:-1]` 恰好仍是「分流到末尾」这段，
+          断言照样通过 ⇒ 同一处过期判据在两个测试里表现相反。
+      形态匹配同时认两种写法，且返回 -1 时由调用方显式断言，不再靠切片兜。
+    """
+    m = re.search(r"(?m)^\s*except\s+(?:Exception|\(\s*[\w.]+\s*,\s*Exception\s*\))\s*(?:as\s+\w+\s*)?:", body)
+    return m.start() if m else -1
+
+
 def _call_pos(body: str, name: str) -> int:
     """调用点位置（-1 = 无调用）。裸标识符会命中局部 import，必须匹配 `name(`。"""
     m = re.search(rf"{re.escape(name)}\s*\(", body)
@@ -195,16 +212,53 @@ class TestProperty18BothExportPathsBranch:
     def test_engine_gate_precedes_blank_workbook_fallback(self):
         """🔴 分流必须早于空白 workbook 回退。
 
-        回退分支 `except (TemplateNotFoundError, Exception)` 会吞掉一切异常并
-        产出「只有 wp_code 一个 sheet 名的空表」却**返回 200** —— 比 500 更坏。
+        回退分支会吞掉异常并产出「只有 wp_code 一个 sheet 名的空表」却**返回 200**
+        —— 比 500 更坏（用户拿到空文件以为导出成功，归档时才发现）。
+
+        🔴 判据已于 2026-08-09 诚实改写：原断言要求源码里存在
+        `except (TemplateNotFoundError, Exception)`，而那个元组形态本身就是缺陷
+        （元组里带 `Exception` 等于吞一切，且 `TemplateNotFoundError` 是它的子类
+        故整个元组是冗余写法）。`wp-export-file-path-resolution` 那轮已把它收敛为
+        `except Exception:` 并让回退 workbook **自证失败**。守卫不能继续要求缺陷
+        形态存在，否则修好反而打红。现改为：认新形态 + 反向锁死旧形态不得复活。
         """
         src = _strip_py_comments(_read(_ENGINE_REL))
         body = _fn_body(src, "_export_xlsx")
         gate = body.find("if is_custom:")
-        fallback = body.find("except (TemplateNotFoundError, Exception)")
+        fallback = _fallback_except_pos(body)
         assert gate >= 0, "_export_xlsx 应有 custom 分流"
         assert fallback >= 0, "_export_xlsx 的回退分支应仍在（标准路径依赖它）"
         assert gate < fallback, "分流必须早于空白 workbook 回退"
+
+    def test_swallow_all_except_tuple_not_revived(self):
+        """🔴 反向锁死：吞一切的元组形态不得复活。
+
+        `except (TemplateNotFoundError, Exception)` 里 `TemplateNotFoundError` 是
+        `Exception` 子类 ⇒ 元组等价于裸 `except Exception`，但**读起来像只捕两类**，
+        是本轮修掉的可读性陷阱。写成裸 `except Exception:` 才让「这里吞一切」自证。
+        """
+        src = _strip_py_comments(_read(_ENGINE_REL))
+        assert "except (TemplateNotFoundError, Exception)" not in src, (
+            "吞一切的元组形态已被收敛为 `except Exception:`，不得复活"
+        )
+
+    def test_fallback_workbook_self_evidences_failure(self):
+        """🔴 回退 workbook 必须自证是失败，而非「内容本来就空」。
+
+        这是「导出来都是空的」这类用户报告最难排查的一环：HTTP 200 + 一个空 xlsx，
+        既看不出失败也看不出原因。故兜底 workbook 第 1 行必须写明「导出失败」+ 原因。
+        """
+        src = _strip_py_comments(_read(_ENGINE_REL))
+        helper = _fn_body(src, "_build_failure_fallback_workbook")
+        assert helper, "应有 _build_failure_fallback_workbook 兜底构造器"
+        assert "导出失败" in helper, "兜底 workbook 必须写明「导出失败」"
+        # 原因文本必须来自真实异常，不能是写死的空话
+        assert "type(error).__name__" in helper, "失败原因必须包含异常类型名"
+        # 回退分支必须真的调它（防「helper 写了但没接线」）
+        body = _fn_body(src, "_export_xlsx")
+        assert _call_pos(body, "_build_failure_fallback_workbook") > 0, (
+            "_export_xlsx 的回退分支必须调用兜底构造器"
+        )
 
     def test_engine_gate_condition_shape(self):
         """🔴 engine 侧分流同样断言条件形态（防 `if False:` / 常量短路）。"""
@@ -223,11 +277,19 @@ class TestProperty18BothExportPathsBranch:
         )
 
     def test_engine_custom_branch_not_wrapped_in_try(self):
-        """CustomExportError 必须冒泡，不得落进空白 workbook 回退。"""
+        """CustomExportError 必须冒泡，不得落进空白 workbook 回退。
+
+        🔴 这条曾是**假绿**（2026-08-09 发现）：`fallback` 用旧元组形态 find 得 -1，
+        `body[gate:-1]` 仍切出一段几乎完整的正文 ⇒ 断言恰好通过。切片边界为负时
+        必须显式判否，不能让 Python 的负索引语义把「判据失效」伪装成「通过」。
+        """
         src = _strip_py_comments(_read(_ENGINE_REL))
         body = _fn_body(src, "_export_xlsx")
         gate = body.find("if is_custom:")
-        fallback = body.find("except (TemplateNotFoundError, Exception)")
+        fallback = _fallback_except_pos(body)
+        assert gate >= 0 and fallback > gate, (
+            f"切片边界无效（gate={gate} fallback={fallback}）—— 判据已失效，勿当通过"
+        )
         seg = body[gate:fallback]
         assert "try:" not in seg.split("return export_custom_workpaper")[0], (
             "custom 分流不得被 try 包住（异常必须冒泡）"

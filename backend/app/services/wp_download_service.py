@@ -17,10 +17,63 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.workpaper_models import WorkingPaper, WpIndex
+from app.services.wp_export.wp_file_resolver import VERDICT_LABELS, resolve_wp_file
 
 logger = logging.getLogger(__name__)
 
 STORAGE_ROOT = Path("storage")
+
+#: ZIP 内跳过清单的文件名（下划线前缀让它排在循环目录之前，用户一眼能看到）
+_SKIPPED_MANIFEST_NAME = "_未导出清单.txt"
+
+
+def _render_skipped_manifest(
+    *,
+    project_id: UUID,
+    total: int,
+    written: int,
+    skipped: list[dict[str, str]],
+) -> str:
+    """把跳过的底稿渲染成人可读清单（写进 ZIP 根目录）。
+
+    🔴 为什么必须写进 ZIP 而不是只记后端日志：审计师拿到 ZIP 只看到少了底稿，
+    既不知道少了哪些、也不知道原因（"很多模板导不出来都是空的"）。清单让
+    「导出不全」这件事自证，而不是让人以为内容本来就空。
+    """
+    lines = [
+        "底稿批量导出 — 未导出清单",
+        "",
+        f"项目：{project_id}",
+        f"应导出：{total} 份    已导出：{written} 份    未导出：{len(skipped)} 份",
+        "",
+        "未导出明细（按原因分组）：",
+    ]
+
+    by_verdict: dict[str, list[dict[str, str]]] = {}
+    for item in skipped:
+        by_verdict.setdefault(item.get("verdict", "missing"), []).append(item)
+
+    for verdict, items in sorted(by_verdict.items()):
+        label = VERDICT_LABELS.get(verdict, verdict)
+        lines.append("")
+        lines.append(f"【{label}】共 {len(items)} 份")
+        for item in items:
+            cycle = item.get("audit_cycle") or "其他"
+            lines.append(
+                f"  - {cycle} / {item.get('wp_code', '')} {item.get('wp_name', '')}"
+                f"    原因：{item.get('reason', '')}"
+            )
+
+    lines.extend(
+        [
+            "",
+            "处置建议：",
+            "  · 「未配置底稿文件路径」/「底稿文件不存在」→ 该底稿尚未生成实体文件，",
+            "    请先在底稿列表中打开并保存一次，或用「生成底稿」重新生成。",
+            "  · 「已回退空白模板」→ ZIP 内该份为空白模板，尚无录入内容。",
+        ]
+    )
+    return "\n".join(lines) + "\n"
 
 
 class WpDownloadService:
@@ -41,19 +94,22 @@ class WpDownloadService:
         if not row:
             raise ValueError("底稿不存在")
         wp, idx = row
-        file_path = Path(wp.file_path)
-        # 相对路径可能相对于 backend/ 目录（底稿生成时的 cwd）
-        if not file_path.exists():
-            backend_path = Path(__file__).resolve().parent.parent.parent / wp.file_path
-            if backend_path.exists():
-                file_path = backend_path
-            else:
-                raise ValueError(f"底稿文件不存在: {wp.file_path}")
+
+        # 🔴 路径解析统一委托共享件 resolve_wp_file（四种 file_path 形态 + 模板库回退）。
+        #    此处原有一段自写的「相对 backend/ 再试一次」回退，而紧邻的 download_pack
+        #    没有 —— 同一语义两处各写一份、只有一处做了回退，正是本次缺陷的成因之一。
+        res = resolve_wp_file(wp.file_path, wp_code=idx.wp_code)
+        if res.path is None:
+            raise ValueError(f"底稿文件不存在: {res.reason}（file_path={wp.file_path!r}）")
+
+        # 扩展名按解析到的真实文件取（docx 底稿不能一律叫 .xlsx）
+        suffix = res.path.suffix or ".xlsx"
         return {
-            "file_path": str(file_path),
-            "file_name": f"{idx.wp_code}_{idx.wp_name}.xlsx",
+            "file_path": str(res.path),
+            "file_name": f"{idx.wp_code}_{idx.wp_name}{suffix}",
             "file_version": wp.file_version,
             "wp_id": str(wp.id),
+            "resolved_verdict": res.verdict,
         }
 
     async def download_pack(
@@ -80,21 +136,70 @@ class WpDownloadService:
         if not rows:
             raise ValueError("未找到可下载的底稿")
 
+        written = 0
+        skipped: list[dict[str, str]] = []
+        seen_arc: dict[str, int] = {}
+
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
             for wp, idx in rows:
-                file_path = Path(wp.file_path)
-                if not file_path.exists():
-                    logger.warning("底稿文件缺失: %s", wp.file_path)
+                # 🔴 路径解析走共享件：覆盖空串 / wp_templates 相对 / storage 相对 /
+                #    绝对路径四种形态，并在不可达时回退模板库（空白模板仍比空目录有用）。
+                res = resolve_wp_file(wp.file_path, wp_code=idx.wp_code)
+
+                # 🔴 兜底红线：解析结果必须是**文件**。
+                #    原实现只判 `Path(wp.file_path).exists()`，而 `Path("")` 会被
+                #    规范成 `WindowsPath(".")` 且 `.exists()` 为 True ⇒ zf.write 把
+                #    整个进程 cwd 写成一个「目录条目」，解压出来就是空文件夹。
+                #    这条 is_file() 判断即便将来路径解析又出新形态也不会再产出空条目。
+                if res.path is None or not res.path.is_file():
+                    logger.warning(
+                        "download_pack 跳过底稿: wp_code=%s verdict=%s file_path=%r",
+                        idx.wp_code, res.verdict, wp.file_path,
+                    )
+                    skipped.append(
+                        {
+                            "wp_code": idx.wp_code or "",
+                            "wp_name": idx.wp_name or "",
+                            "audit_cycle": idx.audit_cycle or "",
+                            "verdict": res.verdict,
+                            "reason": res.reason,
+                        }
+                    )
                     continue
+
                 cycle = idx.audit_cycle or "其他"
-                arc_name = f"{cycle}/{idx.wp_code}_{idx.wp_name}.xlsx"
-                zf.write(file_path, arc_name)
+                suffix = res.path.suffix or ".xlsx"
+                arc_name = f"{cycle}/{idx.wp_code}_{idx.wp_name}{suffix}"
+                # 同 wp_code 多份（历史遗留双命名族）会撞 arcname，ZIP 里同名条目
+                # 解压时互相覆盖 → 加序号后缀而不是静默丢弃。
+                if arc_name in seen_arc:
+                    seen_arc[arc_name] += 1
+                    stem = f"{idx.wp_code}_{idx.wp_name}({seen_arc[arc_name]})"
+                    arc_name = f"{cycle}/{stem}{suffix}"
+                else:
+                    seen_arc[arc_name] = 1
+
+                zf.write(res.path, arc_name)
+                written += 1
+
+            # 🔴 跳过清单必须进 ZIP：原实现只写后端 warning 日志，用户下载完
+            #    完全不知道少了哪些底稿、为什么少（"导出来是空的"无从排查）。
+            if skipped:
+                zf.writestr(
+                    _SKIPPED_MANIFEST_NAME,
+                    _render_skipped_manifest(
+                        project_id=project_id,
+                        total=len(rows),
+                        written=written,
+                        skipped=skipped,
+                    ).encode("utf-8"),
+                )
 
         buf.seek(0)
         logger.info(
-            "download_pack: project=%s, count=%d, size=%d bytes",
-            project_id, len(rows), buf.getbuffer().nbytes,
+            "download_pack: project=%s, total=%d, written=%d, skipped=%d, size=%d bytes",
+            project_id, len(rows), written, len(skipped), buf.getbuffer().nbytes,
         )
         return buf
 
