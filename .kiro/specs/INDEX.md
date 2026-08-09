@@ -1,8 +1,8 @@
 # 致同审计作业平台 — Spec 开发索引
 
-**最后更新**：2026-08-08
+**最后更新**：2026-08-09
 **当前分支**：`work/2026-05-30-wp-specs`
-**统计**：Active **5**（2026-08-09 行首锚定正则实扫；另有 2 个仅剩 evidence 的空壳目录 `procedure-delegation-visibility-isolation` / `visibility-isolation-go-live-hardening`，无 tasks.md）/ Archived **547**
+**统计**：Active **4**（2026-08-09 行首锚定正则实扫；另有 2 个仅剩 evidence 的空壳目录 `procedure-delegation-visibility-isolation` / `visibility-isolation-go-live-hardening`，无 tasks.md）/ Archived **548**
 **最高迁移**：**V143**（`word_export_task_versions.drift_report`；以 `migration_status` 实测为准）
 **技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer
 
@@ -29,7 +29,6 @@
 | spec | 进度 | 一句话 |
 |------|------|--------|
 | `h-cycle-extraction-formula-and-disclosure-completion` | 17/18（Task 18 `[-]` = 浏览器实测收尾） | H 类（H1~H10）取数/公式/披露收口。双族并存取数（`dual_family_codes`）+ 列名注册 + H1~H4 审定预填 + 会计政策章 + 金额控件。真实库 80 组合验收已过，只剩浏览器实测 |
-| `note-template-columns-and-legacy-snapshot-closure` | 21/23 | 附注模板列元数据补齐 + legacy 快照收口。列真源按章节三分（有底稿披露 sheet → openpyxl 直读 / 母公司章 → A spec / 无披露 sheet → 附注 docx）。已补 columns 85 张 + guidance 53 张；legacy 快照迁移已执行（132 章节 / 152 表 / 1134 行，行数守恒 + 幂等 + 回滚往返 + 三消费方 issues=0）。剩 Task 13/14（⏸ 等 B spec 收口，撞模板行集）+ Task 23 收口 |
 | `e-cycle-extraction-formula-and-disclosure-completion` | 1/22（并发会话新建） | E 类（E0/E1）取数/公式/披露收口。账户级取数走 `tb_aux_balance` 银行账户维度（客户 1002 不分户，叶子恒 1 行） |
 | `g7-column-alignment-and-extraction-closure` | 0/24（并发会话新建） | G7 长期股权投资列结构对齐与取数闭合。核心 = 补上「源 xlsx ↔ 模板 seed ↔ 运行时载荷」三向锁死的第三条边（既有两个守卫各自只覆盖两条边，故 32 处列偏差长期逃逸） |
 | `procedure-trimming-and-delegation-intelligence` | 0/26（并发会话新建） | 程序裁剪三维判据（风险评估 → 重要性 → 数据存在性）+ 人员委派智能化。现状只实现最末位「科目在试算表无数据」一维 |
@@ -41,6 +40,7 @@
 > `sampling-evaluation-and-governance-closure`(19/19) / `k0`(18/18) /
 > **`sampling-compliance-closure`(25/25)** 已于 2026-08-08 归档（见 §二）；
 > **`soe-listed-note-conversion-correctness`(19/19)** 已于 2026-08-09 归档。
+> **`note-template-columns-and-legacy-snapshot-closure`(23/23)** 已于 2026-08-09 归档（见 §二）。
 
 **2026-08-08 归档（1 个，→ `05-business-features`，与 `voucher-sampling-*` /
 `cutoff-test-*` / `voucher-check-sampling-integration` 同分类）**：
