@@ -300,10 +300,19 @@ class TestTemplateLookupRealData:
         rows = template_rows(*FX_SOE)
         assert rows is not None and len(rows) == 25
         segs = split_segments(rows)
+        # 🔴 2026-08-09：短期借款段由 `BS-031` 改为 `BS-041`。
+        # `BS-031` 在 `report_config` 四准则下 row_name 均为**使用权资产**（H8 的报表行），
+        # 短期借款真值是 `BS-041`（`TB('2001')` 四准则一致）。改动方 =
+        # spec `e-cycle-extraction-formula-and-disclosure-completion`（其
+        # `fix_note_e1_monetary_fund_structure.py` 的修正表 `("短期借款","BS-031","BS-041")`）。
+        # 本处只跟随更新常量；「`BS-031` 仍归 H8」由
+        # `test_note_e1_structure.py::TestProperty24Bs031StaysWithH8` 反向锁死。
+        # ⚠️ soe `八、81` / `八、91` 的「短期借款」段**仍挂 `BS-031`**（未同步），
+        # 见 `test_note_report_row_code_alignment.py` 的 ambiguous allowlist。
         assert [(s.row_code, s.label, s.start, s.end) for s in segs] == [
             ("BS-002", "货币资金", 0, 5),
             ("BS-006", "应收账款", 5, 10),
-            ("BS-031", "短期借款", 10, 15),
+            ("BS-041", "短期借款", 10, 15),
             ("BS-061", "长期借款", 15, 20),
             ("BS-062", "应付债券", 20, 25),
         ]
@@ -341,8 +350,9 @@ class TestTemplateLookupRealData:
 
         base = template_baseline_rows(*FX_SOE)
         assert len(base) == 25
+        # 短期借款段 = `BS-041`（`BS-031` 是使用权资产，理由见上一处注释）
         assert {r[SEG_KEY] for r in base} == {
-            "BS-002", "BS-006", "BS-031", "BS-061", "BS-062"
+            "BS-002", "BS-006", "BS-041", "BS-061", "BS-062"
         }
         for r in base:
             assert set(r) <= {"label", SEG_KEY, "is_total", "row_type"}
@@ -410,17 +420,32 @@ class TestSharedTableInventory:
         assert segment_row_codes(rows) == ["BS-041", "BS-002"]
 
     def test_empty_table_name_is_excluded_from_lookup(self):
-        """🔴 真实脏数据：listed 风险管理有一张表 `name=''`（空表名）。
+        """空表名不得作为 `sub_table_data` 的键，`template_rows` 必须拒绝它。
 
-        空表名无法作为 `sub_table_data` 的键，`template_rows` 必须拒绝它
-        （否则行级合并会去查一张永远匹配不上的表）。属另一个 data-hygiene 点，
-        本 spec 只保证不被误用。
+        🔴 **本断言已于 2026-08-07 诚实修正**：原版依赖「listed 风险管理确实有一张
+        `name=''` 的脏数据」并断言 `len(empties) == 1`。spec
+        `note-template-columns-and-legacy-snapshot-closure` 的 Wave 2 把模板侧空表名
+        **清零**（listed 15 → 0）后，该断言从「证明空名被排除」退化成**假红**
+        —— 这是平台已登记的「反向自检因扫描面变空而失效」的又一实例。
+
+        修正后的形态：不再要求脏数据存在，只钉死两件事
+        ① 共享表清单里**不得**出现空表名（Wave 2 的成果，回退即红）；
+        ② 无论如何，用空串查 `template_rows` 必须返回 None（行级合并不得去查
+           一张永远匹配不上的表）。
         """
         empties = [
             (n, t) for n, _ti, t, _r, _s in iter_shared_tables(VARIANT_LISTED) if not t
         ]
-        assert len(empties) == 1, f"空表名的表数变了：{empties}"
-        assert template_rows(VARIANT_LISTED, empties[0][0], "") is None
+        assert not empties, (
+            f"共享表清单里又出现空表名：{empties} —— "
+            "模板侧空表名已由 note-template-columns-and-legacy-snapshot-closure Wave 2 清零，"
+            "守卫见 backend/tests/test_note_columns_coverage.py"
+        )
+        # 反向自检：扫描面非空（否则上一条断言恒真 = 空转）
+        listed_tables = list(iter_shared_tables(VARIANT_LISTED))
+        assert listed_tables, "共享表扫描面为空，判据失效"
+        any_section = listed_tables[0][0]
+        assert template_rows(VARIANT_LISTED, any_section, "") is None
 
     def test_data_end_excludes_trailing_total_rows(self):
         """🔴 段尾的表级汇总行（合计/小计）**不属于任何段**。
