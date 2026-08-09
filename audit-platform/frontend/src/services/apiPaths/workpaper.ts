@@ -29,6 +29,14 @@ export const workpapers = {
   crossLinks: (pid: string, wpId: string) => `/api/projects/${pid}/working-papers/${wpId}/cross-links`,
   syncProcedure: (pid: string, wpId: string) => `/api/projects/${pid}/working-papers/${wpId}/sync-procedure`,
   dependencies: (pid: string, wpId: string) => `/api/projects/${pid}/workpapers/${wpId}/dependencies`,
+  // ─── 自定义底稿（componentType=custom）───
+  // 注意：这四个端点**不带 project 前缀**（挂在 /api/workpapers/{wpId} 下），
+  // 与上面 project-scoped 的路径不同族，勿"顺手"补 pid。
+  // spec: custom-workpaper-dual-mode-formula-and-batch
+  customCells: (wpId: string) => `/api/workpapers/${wpId}/custom-cells`,
+  customRefreshProjection: (wpId: string) => `/api/workpapers/${wpId}/custom-refresh-projection`,
+  formulas: (wpId: string) => `/api/workpapers/${wpId}/formulas`,
+  formulaDetail: (wpId: string, formulaId: string) => `/api/workpapers/${wpId}/formulas/${formulaId}`,
   structure: {
     get: (pid: string, wpId: string) => `/api/projects/${pid}/workpapers/${wpId}/structure`,
     rebuild: (pid: string, wpId: string) => `/api/projects/${pid}/workpapers/${wpId}/structure/rebuild`,
@@ -206,6 +214,8 @@ export const procedureRowTasks = {
   // 三粒度委派 preview-apply（Task 8，materialize 前置 + 一次性 preview 凭证）
   delegationPreview: (pid: string) => `/api/projects/${pid}/procedure-delegations/preview`,
   delegationApply: (pid: string) => `/api/projects/${pid}/procedure-delegations/apply`,
+  // 成员负载批量视图（只读）：口径与 preview 的 membership_load.active_task_count 一致
+  delegationMemberLoads: (pid: string) => `/api/projects/${pid}/procedure-delegations/member-loads`,
   // 显式物化 job（delegation preview 前置；job 失败不产生 preview）
   materialize: (pid: string) => `/api/projects/${pid}/procedure-row-tasks/materialize`,
   materializeJob: (pid: string) => `/api/projects/${pid}/procedure-row-tasks/materialize-jobs`,
