@@ -228,7 +228,7 @@
             },
             {
               "label": "…….",
-              "row_type": "data"
+              "row_type": "expandable"
             }
           ],
           "legacy_aliases": [
@@ -246,7 +246,8 @@
               "label": "重要性标准",
               "flat": true
             }
-          ]
+          ],
+          "guidance": "（15号文第四条，公司在编制和披露财务报告时应遵循重要性原则，披露事项涉及重要性标准判断的，应披露重要性标准确定方法和选择依据。"
         }
       ],
       "text_sections": [
@@ -264,7 +265,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
-      "_aligned_at": "2026-08-07 17:32:07"
+      "_aligned_at": "2026-08-09 11:08:41"
     },
     {
       "section_number": "三、同一控制下和非同",
@@ -527,15 +528,6 @@
           ],
           "rows": [
             {
-              "label": "项  目",
-              "values": [
-                null,
-                null
-              ],
-              "is_total": false,
-              "row_type": "header_label"
-            },
-            {
               "label": "对子公司投资",
               "values": [
                 null,
@@ -604,7 +596,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
-      "_aligned_at": "2026-08-07 16:58:18"
+      "_aligned_at": "2026-08-09 11:07:15"
     },
     {
       "section_number": "三、投资性房地产【不",
@@ -698,7 +690,7 @@
         "固定资产确认条件",
         "本公司固定资产是指为生产商品、提供劳务、出租或经营管理而持有的，使用寿命超过一个会计年度的有形资产。",
         "与该固定资产有关的经济利益很可能流入企业，并且该固定资产的成本能够可靠地计量时，固定资产才能予以确认。",
-        "各类固定资产的折旧方法",
+        "#### 各类固定资产的折旧方法",
         "固定资产的减值测试方法、减值准备计提方法见附注三、24。",
         "每年年度终了，本公司对固定资产的使用寿命、预计净残值和折旧方法进行复核。",
         "固定资产处置"
@@ -723,7 +715,8 @@
       "sort_index": 16,
       "auto_numbering": true,
       "lock_number": false,
-      "_aligned_by": "fix_note_h_policy_chapter_structure"
+      "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
+      "_aligned_at": "2026-08-09 11:07:15"
     },
     {
       "section_number": "三、在建工程",
@@ -828,7 +821,7 @@
             },
             {
               "label": "……",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "畜牧养殖业",
@@ -840,7 +833,7 @@
             },
             {
               "label": "……",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "林业",
@@ -852,7 +845,7 @@
             },
             {
               "label": "……",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "水产业",
@@ -864,7 +857,7 @@
             },
             {
               "label": "……",
-              "row_type": "data"
+              "row_type": "expandable"
             }
           ],
           "columns": [
@@ -932,7 +925,8 @@
       "sort_index": 20,
       "auto_numbering": true,
       "lock_number": false,
-      "_aligned_by": "fix_note_h_policy_chapter_structure"
+      "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
+      "_aligned_at": "2026-08-09 11:08:41"
     },
     {
       "section_number": "三、无形资产",
@@ -1004,14 +998,15 @@
               "label": "备注",
               "flat": true
             }
-          ]
+          ],
+          "guidance": "【注：对于只有土地使用权的，建议以如下方式说明：】"
         }
       ],
       "text_sections": [
         "本公司无形资产包括【土地使用权、专利权、数据资源】等。",
         "无形资产按照成本进行初始计量，并于取得无形资产时分析判断其使用寿命。使用寿命为有限的，自无形资产可供使用时起，采用能反映与该资产有关的经济利益的预期实现方式的摊",
-        "使用寿命有限的无形资产摊销方法如下：",
-        "本公司无形资产均为使用寿命有限的土地使用权，采用直线法摊销，使用年限如下："
+        "#### 使用寿命有限的无形资产摊销方法如下：",
+        "#### 本公司无形资产均为使用寿命有限的土地使用权，采用直线法摊销，使用年限如下："
       ],
       "check_presets": [
         "LLM审核",
@@ -1032,7 +1027,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
-      "_aligned_at": "2026-08-07 17:32:07"
+      "_aligned_at": "2026-08-09 11:07:15"
     },
     {
       "section_number": "三、研发支出",
@@ -1048,15 +1043,6 @@
             "上期发生额"
           ],
           "rows": [
-            {
-              "label": "项  目",
-              "values": [
-                null,
-                null
-              ],
-              "is_total": false,
-              "row_type": "header_label"
-            },
             {
               "label": "人工费",
               "values": [
@@ -1118,7 +1104,7 @@
                 null
               ],
               "is_total": false,
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "合  计",
@@ -1132,7 +1118,8 @@
           ],
           "legacy_aliases": [
             "项  目"
-          ]
+          ],
+          "guidance": "（按费用性质披露研发支出本期发生额、上期发生额，包括费用化研发支出和资本化研发支出。（15号文第二十六条））"
         }
       ],
       "text_sections": [
@@ -1163,7 +1150,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
-      "_aligned_at": "2026-08-07 16:58:18"
+      "_aligned_at": "2026-08-09 11:08:41"
     },
     {
       "section_number": "三、资产减值",
@@ -1212,17 +1199,6 @@
           ],
           "rows": [
             {
-              "label": "项  目",
-              "values": [
-                null,
-                null,
-                null,
-                null
-              ],
-              "is_total": false,
-              "row_type": "header_label"
-            },
-            {
               "label": "使用权资产改良及维护支出",
               "values": [
                 null,
@@ -1269,7 +1245,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
-      "_aligned_at": "2026-08-07 16:58:18"
+      "_aligned_at": "2026-08-09 11:07:15"
     },
     {
       "section_number": "三、职工薪酬",
@@ -1986,7 +1962,7 @@
         "重要会计政策变更",
         "#### 会计政策变更的内容【不适用删除】",
         "（财政部于2025年7月8日发布标准仓单交易相关会计处理实施问答。该问答规定企业在期货交易场所通过频繁签订买卖标准仓单的合同以赚取差价、不提取标准仓单对应的商品",
-        "重要会计估计变更"
+        "#### 重要会计估计变更"
       ],
       "check_presets": [],
       "wide_table_presets": [],
@@ -1997,7 +1973,9 @@
       "parent_section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji",
       "sort_index": 41,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
+      "_aligned_at": "2026-08-09 11:07:15"
     },
     {
       "section_number": "三、公允价值变动收益",
@@ -3058,7 +3036,8 @@
               "label": "上期发生额",
               "flat": true
             }
-          ]
+          ],
+          "guidance": "【提示：企业实际收到的政府补助，无论是与资产相关还是与收益相关，均在“收到其他与经营活动有关的现金”项目填列。】"
         },
         {
           "name": "收到的重要的投资活动有关的现金",
@@ -3094,7 +3073,8 @@
               "label": "上期发生额",
               "flat": true
             }
-          ]
+          ],
+          "guidance": "【提示：企业支付与短期租赁和低价值资产租赁相关的预付租金和租赁保证金应当计入经营活动现金流出。】"
         },
         {
           "name": "收到其他与投资活动有关的现金",
@@ -3291,10 +3271,6 @@
           ],
           "rows": [
             {
-              "label": "项目",
-              "row_type": "header_label"
-            },
-            {
               "label": "短期借款",
               "account_codes": [
                 "2001"
@@ -3338,15 +3314,15 @@
         }
       ],
       "text_sections": [
-        "收到其他与经营活动有关的现金",
-        "支付其他与经营活动有关的现金",
-        "收到的重要的投资活动有关的现金",
-        "收到其他与投资活动有关的现金",
-        "支付的重要的投资活动有关的现金",
-        "支付其他与投资活动有关的现金",
-        "收到其他与筹资活动有关的现金",
-        "支付其他与筹资活动有关的现金",
-        "筹资活动产生的各项负债的变动情况",
+        "#### 收到其他与经营活动有关的现金",
+        "#### 支付其他与经营活动有关的现金",
+        "#### 收到的重要的投资活动有关的现金",
+        "#### 收到其他与投资活动有关的现金",
+        "#### 支付的重要的投资活动有关的现金",
+        "#### 支付其他与投资活动有关的现金",
+        "#### 收到其他与筹资活动有关的现金",
+        "#### 支付其他与筹资活动有关的现金",
+        "#### 筹资活动产生的各项负债的变动情况",
         "净额列报"
       ],
       "check_presets": [],
@@ -3360,7 +3336,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
-      "_aligned_at": "2026-08-07 17:32:07"
+      "_aligned_at": "2026-08-09 11:07:15"
     },
     {
       "section_number": "三、研发支出",
@@ -3376,10 +3352,6 @@
             "上期发生额"
           ],
           "rows": [
-            {
-              "label": "项目",
-              "row_type": "header_label"
-            },
             {
               "label": "人工费",
               "row_type": "data"
@@ -3406,7 +3378,7 @@
             },
             {
               "label": "……",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "合计",
@@ -3416,7 +3388,8 @@
           ],
           "legacy_aliases": [
             "项  目"
-          ]
+          ],
+          "guidance": "（按费用性质披露研发支出本期发生额、上期发生额，包括费用化研发支出和资本化研发支出。（15号文第二十六条））"
         }
       ],
       "text_sections": [
@@ -3447,7 +3420,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
-      "_aligned_at": "2026-08-07 16:24:29"
+      "_aligned_at": "2026-08-09 11:08:41"
     },
     {
       "section_number": "三、开发支出",
@@ -3465,10 +3438,6 @@
             "期末余额"
           ],
           "rows": [
-            {
-              "label": "项目",
-              "row_type": "header_label"
-            },
             {
               "label": "合计",
               "is_total": true,
@@ -3534,7 +3503,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
-      "_aligned_at": "2026-08-07 16:58:18"
+      "_aligned_at": "2026-08-09 11:07:15"
     },
     {
       "section_number": "三、外购在研项目",
@@ -3577,10 +3546,6 @@
           ],
           "rows": [
             {
-              "label": "子公司名称",
-              "row_type": "header_label"
-            },
-            {
               "label": "子公司A",
               "row_type": "data"
             }
@@ -3601,7 +3566,7 @@
           "rows": [
             {
               "label": "可无限量添加行",
-              "row_type": "data"
+              "row_type": "expandable"
             }
           ],
           "legacy_aliases": [
@@ -3614,12 +3579,7 @@
             "子公司名称",
             "期末余额"
           ],
-          "rows": [
-            {
-              "label": "子公司名称",
-              "row_type": "header_label"
-            }
-          ],
+          "rows": [],
           "legacy_aliases": [
             "子公司名称"
           ]
@@ -3630,12 +3590,7 @@
             "子公司名称",
             "上年年末余额"
           ],
-          "rows": [
-            {
-              "label": "子公司名称",
-              "row_type": "header_label"
-            }
-          ],
+          "rows": [],
           "legacy_aliases": [
             "子公司名称"
           ]
@@ -3647,12 +3602,7 @@
             "本期发生额",
             "上期发生额"
           ],
-          "rows": [
-            {
-              "label": "子公司名称",
-              "row_type": "header_label"
-            }
-          ],
+          "rows": [],
           "legacy_aliases": [
             "子公司名称"
           ]
@@ -3680,7 +3630,7 @@
             },
             {
               "label": "…",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "购买成本/处置对价合计",
@@ -3734,7 +3684,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
-      "_aligned_at": "2026-08-07 16:58:18"
+      "_aligned_at": "2026-08-09 11:08:41"
     },
     {
       "section_number": "三、非同一控制下企业",
@@ -3767,7 +3717,7 @@
             },
             {
               "label": "可无限量添加行",
-              "row_type": "data"
+              "row_type": "expandable"
             }
           ],
           "legacy_aliases": [
@@ -3903,7 +3853,8 @@
               "label": "可无限量加列",
               "flat": true
             }
-          ]
+          ],
+          "guidance": "（分步实现企业合并且在本期取得控制权的交易，应分别说明前期和本期取得股权的时点、成本、比例及方式。）\n【也可文字表述，如下："
         },
         {
           "name": "非同一控制下企业合并（表3）",
@@ -3913,10 +3864,6 @@
             "XX公司"
           ],
           "rows": [
-            {
-              "label": "项目",
-              "row_type": "header_label"
-            },
             {
               "label": "资产：",
               "row_type": "data"
@@ -3987,7 +3934,7 @@
             },
             {
               "label": "......",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "负债：",
@@ -4019,7 +3966,7 @@
             },
             {
               "label": "......",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "净资产",
@@ -4036,7 +3983,8 @@
           ],
           "legacy_aliases": [
             "项  目"
-          ]
+          ],
+          "guidance": "【提示：以前期间发生的企业合并相关或有对价的变动及其原因、影响应在或有对价形成的相关资产、负债项目中予以说明。】\n【提示：证监会《2015 年上市公司年报会计监管报告》，基于业绩承诺实现的可能性、或有对价支付方的信用风险、货币时间价值、可能需支付或返回股权的公允价值等因素，合理估计或有对价的公允价值；披露相关的业绩承诺条款、在购买日及后续期间披露与或有对价公允价值计量相关的信息。】\n（3）对于合并中形成的大额商誉，应说明形成的主要原因。\n（15号文第三十条（七））"
         },
         {
           "name": "非同一控制下企业合并（表4）",
@@ -4055,7 +4003,7 @@
             },
             {
               "label": "……",
-              "row_type": "data"
+              "row_type": "expandable"
             }
           ],
           "legacy_aliases": [
@@ -4093,11 +4041,12 @@
               "label": "购买日之前与原持有股权相关的其他综合收益转入投资收益或留存收益的金额",
               "flat": true
             }
-          ]
+          ],
+          "guidance": "【15号文第三十条（九），分步实现的非同一控制下企业合并，还应披露以下信息："
         }
       ],
       "text_sections": [
-        "本期发生的非同一控制下企业合并",
+        "#### 本期发生的非同一控制下企业合并",
         "（分步实现企业合并且在本期取得控制权的交易，应分别说明前期和本期取得股权的时点、成本、比例及方式。）",
         "本期内，本公司取得了[B公司][90%]股权，合并成本为现金[   ]元及[其他资产][账面价值[  ]元，根据评估确定合并成本的公允价值[  ]元，购买日确定",
         "合并成本及商誉",
@@ -4116,7 +4065,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
-      "_aligned_at": "2026-08-07 17:32:07"
+      "_aligned_at": "2026-08-09 11:08:41"
     },
     {
       "section_number": "三、反向购买",
@@ -4164,7 +4113,8 @@
               "label": "合并中确认的商誉或计入当期的损益或调整权益的金额及计算过程",
               "flat": true
             }
-          ]
+          ],
+          "guidance": "（15号文第三十一条，公司以发行股份购买资产等方式实现非上市公司或业务借壳上市并构成反向购买的，还应说明构成反向购买的依据、交易之前公司的资产是否构成业务及其判断依据、合并成本的确定方法、交易中确认的商誉或计入当期的损益或调整权益的金额及其计算过程。）"
         }
       ],
       "text_sections": [
@@ -4182,7 +4132,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
-      "_aligned_at": "2026-08-07 17:32:07"
+      "_aligned_at": "2026-08-07 21:15:55"
     },
     {
       "section_number": "三、同一控制下企业合",
@@ -4210,7 +4160,7 @@
             },
             {
               "label": "可无限量添加行",
-              "row_type": "data"
+              "row_type": "expandable"
             }
           ],
           "legacy_aliases": [
@@ -4325,7 +4275,8 @@
               "label": "可无限量添加列",
               "flat": true
             }
-          ]
+          ],
+          "guidance": "（202X年[8]月，本公司以现金[ ]元吸收合并了[A公司]，[A公司]系本公司的母公司——[S公司]的子公司，由于合并前后合并双方均受[S公司]控制且该控制并非暂时性，故本合并属同一控制下的企业合并，合并日确定为[8月31日]。(披露确定合并日的依据。)本公司与[A公司]的吸收合并中取得的资产及负债，均按照合并日在被合并方的账面价值计量。(描述合并的具体情况。) ）"
         },
         {
           "name": "同一控制下企业合并（表3）",
@@ -4335,10 +4286,6 @@
             "XX公司"
           ],
           "rows": [
-            {
-              "label": "项目",
-              "row_type": "header_label"
-            },
             {
               "label": "资产：",
               "row_type": "data"
@@ -4409,7 +4356,7 @@
             },
             {
               "label": "......",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "负债：",
@@ -4445,7 +4392,7 @@
             },
             {
               "label": "......",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "净资产",
@@ -4470,7 +4417,8 @@
           ],
           "legacy_aliases": [
             "项  目"
-          ]
+          ],
+          "guidance": "说明或有对价的安排、合并日确认的或有对价的金额及其确定方法和依据，合并日后或有对价的变动及其原因。\n【提示：以前期间发生的企业合并相关或有对价的变动及其原因应在或有对价形成的资产、负债项目中予以说明。】\n（15号文第三十二条（七））"
         }
       ],
       "text_sections": [
@@ -4491,7 +4439,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
-      "_aligned_at": "2026-08-07 17:32:07"
+      "_aligned_at": "2026-08-09 11:08:41"
     },
     {
       "section_number": "三、处置子公司",
@@ -4799,10 +4747,6 @@
           ],
           "rows": [
             {
-              "label": "合营企业或联营<br/>企业名称",
-              "row_type": "header_label"
-            },
-            {
               "label": "一、合营企业",
               "row_type": "data"
             },
@@ -4812,7 +4756,7 @@
             },
             {
               "label": "可无限量添加行",
-              "row_type": "data"
+              "row_type": "expandable"
             }
           ],
           "legacy_aliases": [
@@ -4828,10 +4772,6 @@
             "C公司"
           ],
           "rows": [
-            {
-              "label": "项目",
-              "row_type": "header_label"
-            },
             {
               "label": "流动资产",
               "row_type": "data"
@@ -4912,7 +4852,8 @@
           ],
           "legacy_aliases": [
             "项  目"
-          ]
+          ],
+          "guidance": "（3）对合伙企业存在权益性投资，应披露对被投资单位是否具有共同控制或重大影响的相关判断依据。\n（15号文第三十九条（四）、（五）、（六））\n（主要财务信息按照权益法调整后的金额披露；不重要的，这里可以不披露。）\n（如果母公司为投资性主体，无需披露下列财务信息。）"
         },
         {
           "name": "在合营安排或联营企业中的权益（表3）",
@@ -4923,10 +4864,6 @@
             "C公司"
           ],
           "rows": [
-            {
-              "label": "项目",
-              "row_type": "header_label"
-            },
             {
               "label": "营业收入",
               "account_codes": [
@@ -4988,10 +4925,6 @@
             "C公司"
           ],
           "rows": [
-            {
-              "label": "项目",
-              "row_type": "header_label"
-            },
             {
               "label": "流动资产",
               "row_type": "data"
@@ -5068,7 +5001,8 @@
           ],
           "legacy_aliases": [
             "项  目"
-          ]
+          ],
+          "guidance": "（注：存在终止经营的净利润的，还应当在本表中单列项目披露）\n（主要财务信息按照权益法调整后的金额披露；不重要的，这里可以不披露。）\n（“调整事项”包括投资形成的正商誉、抵消的未实现内部交易损益 、减值准备等事项；）\n（如果母公司为投资性主体，无需披露下列财务信息。）"
         },
         {
           "name": "在合营安排或联营企业中的权益（表5）",
@@ -5079,10 +5013,6 @@
             "C公司"
           ],
           "rows": [
-            {
-              "label": "项目",
-              "row_type": "header_label"
-            },
             {
               "label": "营业收入",
               "account_codes": [
@@ -5210,7 +5140,8 @@
               "label": "上年年末余额/上期发生额",
               "flat": true
             }
-          ]
+          ],
+          "guidance": "（注：存在终止经营的净利润的，还应当在本表中单列项目披露）"
         },
         {
           "name": "在合营安排或联营企业中的权益（表7）",
@@ -5270,7 +5201,8 @@
               "label": "本期末累积未确认的损失份额",
               "flat": true
             }
-          ]
+          ],
+          "guidance": "【提示：被划分为持有待售资产的，不需要披露合营企业或联营企业的上述财务信息。】\n（15号文第四十一条）"
         },
         {
           "name": "在合营安排或联营企业中的权益（表8）",
@@ -5283,17 +5215,14 @@
           ],
           "rows": [
             {
-              "label": "共同经营名称",
-              "row_type": "header_label"
-            },
-            {
               "label": "可无限量添加行",
-              "row_type": "data"
+              "row_type": "expandable"
             }
           ],
           "legacy_aliases": [
             "共同经营名称"
-          ]
+          ],
+          "guidance": "（15号文第四十三条）"
         }
       ],
       "text_sections": [
@@ -5319,7 +5248,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
-      "_aligned_at": "2026-08-07 17:32:07"
+      "_aligned_at": "2026-08-09 11:08:41"
     },
     {
       "section_number": "三、在未纳入合并财务",
@@ -5338,10 +5267,6 @@
           ],
           "rows": [
             {
-              "label": "项目",
-              "row_type": "header_label"
-            },
-            {
               "label": "优先级债券",
               "row_type": "data"
             },
@@ -5355,12 +5280,13 @@
             },
             {
               "label": "……",
-              "row_type": "data"
+              "row_type": "expandable"
             }
           ],
           "legacy_aliases": [
             "项  目"
-          ]
+          ],
+          "guidance": "（未纳入合并财务报表范围的结构化主体的性质、目的、规模、活动及融资方式。）"
         },
         {
           "name": "在未纳入合并财务报表范围的结构化主体中的权益（表2）",
@@ -5371,10 +5297,6 @@
           ],
           "rows": [
             {
-              "label": "结构化主体<br/>类型",
-              "row_type": "header_label"
-            },
-            {
               "label": "信贷资产证券化",
               "row_type": "data"
             },
@@ -5384,7 +5306,7 @@
             },
             {
               "label": "……",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "合计",
@@ -5401,7 +5323,7 @@
         "（15号文第四十五条）",
         "未纳入合并范围的结构化主体的基础信息",
         "（未纳入合并财务报表范围的结构化主体的性质、目的、规模、活动及融资方式。）",
-        "与权益相关资产负债的账面价值和最大损失敞口",
+        "#### 与权益相关资产负债的账面价值和最大损失敞口",
         "向未纳入合并财务报表范围的结构化主体提供支持的情况",
         "未纳入合并财务报表范围的结构化主体的额外信息披露"
       ],
@@ -5416,7 +5338,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
-      "_aligned_at": "2026-08-07 16:58:18"
+      "_aligned_at": "2026-08-09 11:08:41"
     },
     {
       "section_number": "三、计入其他应收款的",
@@ -5637,7 +5559,8 @@
               "label": "本期结转计入损益的列报项目",
               "flat": true
             }
-          ]
+          ],
+          "guidance": "（15号文第四十七条 对涉及政府补助的负债项目，在财务报表附注的相关项目下，披露相关期初余额、本期新增补助金额、本期计入营业外收入金额、本期转入其他收益等金额以及期末余额。）\n【《关于严格执行企业会计准则 切实做好企业2024年年报工作的通知》：企业应当严格审核把关，对于政府补助的种类、金额应当按照“与资产相关的政府补助”和“与收益相关的政府补助”两类汇总信息进行披露。"
         },
         {
           "name": "计入递延收益的政府补助，后续采用净额法计量",
@@ -5741,7 +5664,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
-      "_aligned_at": "2026-08-07 17:32:07"
+      "_aligned_at": "2026-08-07 21:15:55"
     },
     {
       "section_number": "三、采用总额法计入当",
@@ -5907,7 +5830,7 @@
           "rows": [
             {
               "label": "可无限量添加行",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "合计",
@@ -5967,7 +5890,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
-      "_aligned_at": "2026-08-07 17:32:07"
+      "_aligned_at": "2026-08-09 11:08:41"
     },
     {
       "section_number": "三、风险管理目标和政",
@@ -6022,7 +5945,8 @@
               "row_type": "total"
             }
           ],
-          "legacy_aliases": []
+          "legacy_aliases": [],
+          "guidance": "【其他应收款、长期应收款等项目如重要，可根据其具体信用风险状况参照债权投资的披露逻辑进行披露。】"
         },
         {
           "name": "风险管理目标和政策（表2）",
@@ -6049,7 +5973,8 @@
               "row_type": "total"
             }
           ],
-          "legacy_aliases": []
+          "legacy_aliases": [],
+          "guidance": "(a) 信用风险敞口\n【按照CAS 37第77条规定披露期末信用风险集中度信息，以及各信用风险集中度相关的风险敞口金额。例如："
         },
         {
           "name": "风险管理目标和政策（表3）",
@@ -6060,14 +5985,6 @@
           ],
           "rows": [
             {
-              "label": "信用评级",
-              "row_type": "header_label"
-            },
-            {
-              "label": "信用评级",
-              "row_type": "header_label"
-            },
-            {
               "label": "[X]至[X]级",
               "row_type": "data"
             },
@@ -6077,7 +5994,7 @@
             },
             {
               "label": "可无限量添加行",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "账面余额",
@@ -6140,7 +6057,8 @@
               "row_type": "data"
             }
           ],
-          "legacy_aliases": []
+          "legacy_aliases": [],
+          "guidance": "（b）减值准备的变动\n(i) 以摊余成本计量的债权投资发生的减值准备变动如下表所示："
         },
         {
           "name": "风险管理目标和政策（表5）",
@@ -6189,7 +6107,8 @@
               "label": "本期数",
               "flat": true
             }
-          ]
+          ],
+          "guidance": "【披露导致2025年以摊余成本计量的债权投资减值准备的变动的原因。例如：\n(ii) 以公允价值计量且其变动计入其他综合收益的其他债权投资本年度发生的减值准备变动如下表所示："
         },
         {
           "name": "风险管理目标和政策（表6）",
@@ -6198,10 +6117,6 @@
             "期末余额"
           ],
           "rows": [
-            {
-              "label": "项目",
-              "row_type": "header_label"
-            },
             {
               "label": "金融负债：",
               "row_type": "data"
@@ -6294,7 +6209,8 @@
           ],
           "legacy_aliases": [
             "项  目"
-          ]
+          ],
+          "guidance": "【提示：到期期限根据企业实际情况调整，如可披露为：即时偿还；六个月以内；六个月至一年以内；一年至五年以内；五年以上等。"
         },
         {
           "name": "风险管理目标和政策（表7）",
@@ -6303,10 +6219,6 @@
             "上年年末余额"
           ],
           "rows": [
-            {
-              "label": "项目",
-              "row_type": "header_label"
-            },
             {
               "label": "金融负债：",
               "row_type": "data"
@@ -6395,7 +6307,8 @@
           ],
           "legacy_aliases": [
             "项  目"
-          ]
+          ],
+          "guidance": "【提示：当企业将所持有的金融资产作为流动性风险管理的一部分，且披露金融资产的到期期限分析使财务报表使用者能够恰当地评估企业流动性风险的性质和范围时，企业应当披露金融资产的到期期限分析】"
         },
         {
           "name": "风险管理目标和政策（表8）",
@@ -6493,10 +6406,6 @@
           ],
           "rows": [
             {
-              "label": "项目",
-              "row_type": "header_label"
-            },
-            {
               "label": "美元",
               "row_type": "data"
             },
@@ -6512,7 +6421,8 @@
           ],
           "legacy_aliases": [
             "项  目"
-          ]
+          ],
+          "guidance": "【注：相关外币资产及外币负债包括：以外币计价的货币资金、应收票据、应收账款、交易性金融资产、其他应收款、债权投资、长期应收款、应付票据、应付账款、其他应付款、长期应付款、短期借款、长期借款及应付债券等。】"
         },
         {
           "name": "风险管理目标和政策（表10）",
@@ -6552,10 +6462,6 @@
           ],
           "rows": [
             {
-              "label": "项目",
-              "row_type": "header_label"
-            },
-            {
               "label": "因权益证券投资价格上升",
               "row_type": "data"
             },
@@ -6566,7 +6472,8 @@
           ],
           "legacy_aliases": [
             "项  目"
-          ]
+          ],
+          "guidance": "【注：以外币标价的债务工具对汇率具有敏感性。无论该工具是一项资产还是负债，也无论其是以公允价值计量还是以摊余成本计量。汇率变动幅度根据对未来汇率变动幅度的预计确定】"
         }
       ],
       "text_sections": [
@@ -6594,7 +6501,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
-      "_aligned_at": "2026-08-07 17:32:07"
+      "_aligned_at": "2026-08-09 11:08:41"
     },
     {
       "section_number": "三、资本管理",
@@ -6730,7 +6637,8 @@
               "row_type": "data"
             }
           ],
-          "legacy_aliases": []
+          "legacy_aliases": [],
+          "guidance": "（1）公允价值套期\n【提示：相关披露格式参见《企业会计准则第37号——金融工具列报》应用指南“九、金融工具对财务状况和经营成果影响的列报” （四）套期会计相关披露】"
         },
         {
           "name": "套期（表2）",
@@ -6916,7 +6824,8 @@
               "row_type": "data"
             }
           ],
-          "legacy_aliases": []
+          "legacy_aliases": [],
+          "guidance": "（2）现金流量套期\n【提示：相关披露格式参见《企业会计准则第37号——金融工具列报》应用指南“九、金融工具对财务状况和经营成果影响的列报” （四）套期会计相关披露】"
         },
         {
           "name": "套期（表10）",
@@ -7161,7 +7070,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
-      "_aligned_at": "2026-08-07 17:32:07"
+      "_aligned_at": "2026-08-07 21:15:55"
     },
     {
       "section_number": "三、金融资产转移",
@@ -7465,10 +7374,6 @@
           ],
           "rows": [
             {
-              "label": "项目（本期金额）",
-              "row_type": "header_label"
-            },
-            {
               "label": "交易性金融资产：",
               "account_codes": [
                 "1101"
@@ -7600,10 +7505,6 @@
             "对于在报告期末持有的资产，计入损益的当期未实现利得或损失的变动"
           ],
           "rows": [
-            {
-              "label": "项目<br/>（上期金额）",
-              "row_type": "header_label"
-            },
             {
               "label": "交易性金融资产：",
               "account_codes": [
@@ -7900,7 +7801,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
-      "_aligned_at": "2026-08-07 16:58:18"
+      "_aligned_at": "2026-08-09 11:07:15"
     },
     {
       "section_number": "三、本公司的母公司情",
@@ -7990,7 +7891,8 @@
               "label": "期末余额",
               "flat": true
             }
-          ]
+          ],
+          "guidance": "（母公司和最终控制方均不对外提供财务报表的，还需说明母公司之上与其最相近的对外提供财务报表的母公司名称。）\n（如报告期内母公司变更、母公司注册资本或实收资本有变化，应按以下格式披露；如无变化，不披露。)"
         }
       ],
       "text_sections": [
@@ -8009,7 +7911,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
-      "_aligned_at": "2026-08-07 17:32:07"
+      "_aligned_at": "2026-08-07 21:15:55"
     },
     {
       "section_number": "三、本公司的子公司情",
@@ -8170,7 +8072,8 @@
               "label": "所得税税率%",
               "flat": true
             }
-          ]
+          ],
+          "guidance": "（房产税、土地使用税、车船使用税、印花税项目金额较大时，披露相关计税依据和税率。）"
         }
       ],
       "text_sections": [
@@ -8188,7 +8091,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
-      "_aligned_at": "2026-08-07 17:32:07"
+      "_aligned_at": "2026-08-07 21:15:55"
     },
     {
       "section_number": "四、税收优惠及批文",
@@ -8358,12 +8261,16 @@
               "row_type": "data"
             },
             {
+              "label": "金融企业法定存款准备金或备付金",
+              "row_type": "data"
+            },
+            {
               "label": "合计",
               "is_total": true,
               "row_type": "total"
             }
           ],
-          "guidance": "列示保证金、担保存款、冻结款项及存放境外且资金汇回受限等不符合现金及现金等价物条件或使用受限的款项。类别行由底稿②表按科目名动态归集（受限资金无独立标准科目，各项目子科目命名不同，判不出来的科目在底稿「待归类科目」面板由审计师点选归类）；源模板类别之外可动态增行。受限事由不设列，按源模板括注要求写在本节文字说明「受限及境外款项说明」中。勾稽（校验预设 F1-4/F1-5/F1-6）：合计行 = 各明细行之和（每个数值列独立校验）；合计行期末 = 报表货币资金期末 − 现金流量表补充资料「期末现金及现金等价物余额」；合计行期初同理。"
+          "guidance": "列示保证金、担保存款、冻结款项及存放境外且资金汇回受限等不符合现金及现金等价物条件或使用受限的款项。类别行由底稿②表按科目名动态归集（受限资金无独立标准科目，各项目子科目命名不同，判不出来的科目在底稿「待归类科目」面板由审计师点选归类）；源模板类别之外可动态增行。受限事由不设列，按源模板括注要求写在本节文字说明「受限及境外款项说明」中。勾稽（校验预设 F1-4/F1-5/F1-6）：合计行 = 各明细行之和（每个数值列独立校验）；合计行期末 = 报表货币资金期末 − 现金流量表补充资料「期末现金及现金等价物余额」；合计行期初同理。有意偏离登记：源 docx 本表只有类别明细行、无合计行，平台保留合计行是按校验预设 F1-4/F1-5/F1-6 的自动勾稽要求。有意偏离登记：本表是平台补充表 —— 上市源 docx 该节只有 1 张主表加两段受限文字说明，源 docx 无该表；补建依据是校验预设 listed 侧 F1-4/F1-5/F1-6 明确引用本表，行集依据是镜像国企 docx 的六类（含第 6 类「金融企业法定存款准备金或备付金」），不得据此声称「与上市 docx 三向一致」。"
         }
       ],
       "text_sections": [
@@ -8393,7 +8300,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "e1-four-table-extraction-and-disclosure-alignment",
-      "_aligned_at": "2026-08-02 12:09:45"
+      "_aligned_at": "2026-08-09 12:45:29"
     },
     {
       "section_number": "五、2",
@@ -14979,15 +14886,12 @@
           ],
           "rows": [
             {
-              "label": "债权项目",
-              "row_type": "header_label"
-            },
-            {
               "label": "合计",
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "guidance": "（对于大额的一年内到期的非流动资产说明形成的原因、内容、性质。）\n（一年内到期的债权投资、其他债权投资参照债权投资、其他债权投资进行披露。）\n【提示：对于按照相关会计准则采用折旧（或摊销、折耗）方法进行后续计量的固定资产、无形资产、长期待摊费用等非流动资产，折旧（或摊销、折耗）年限（或期限）只剩一年或不足一年的，无需归类为流动资产，仍在各该非流动资产项目中列报，不转入“一年内到期的非流动资产”项目列报；预计在一年内（含一年）进行折旧（或摊销、折耗）的部分，也无需归类为流动资产，不转入“一年内到期的非流动资产”项目列报。】"
         }
       ],
       "text_sections": [
@@ -15013,7 +14917,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
-      "_aligned_at": "2026-08-07 17:32:07"
+      "_aligned_at": "2026-08-09 11:07:15"
     },
     {
       "section_number": "五、13",
@@ -18145,7 +18049,7 @@
             },
             {
               "label": "…",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "小计",
@@ -18158,7 +18062,7 @@
             },
             {
               "label": "…",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "小计",
@@ -18279,8 +18183,8 @@
       "sort_index": 17,
       "auto_numbering": true,
       "lock_number": false,
-      "_aligned_by": "fix_note_g7_long_term_equity_structure",
-      "_aligned_at": "2026-08-01 09:37:24"
+      "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
+      "_aligned_at": "2026-08-09 11:08:41"
     },
     {
       "section_number": "五、19",
@@ -18907,7 +18811,7 @@
             },
             {
               "label": "……",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "3.本期减少金额",
@@ -18923,7 +18827,7 @@
             },
             {
               "label": "……",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "4.期末余额",
@@ -18951,7 +18855,7 @@
             },
             {
               "label": "……",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "3.本期减少金额",
@@ -18967,7 +18871,7 @@
             },
             {
               "label": "……",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "4.期末余额",
@@ -18995,7 +18899,7 @@
             },
             {
               "label": "……",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "3.本期减少金额",
@@ -19011,7 +18915,7 @@
             },
             {
               "label": "……",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "4.期末余额",
@@ -19288,8 +19192,8 @@
       "sort_index": 21,
       "auto_numbering": true,
       "lock_number": false,
-      "_aligned_by": "h1-fixed-assets-mapping-and-disclosure-alignment",
-      "_aligned_at": "2026-07-31 12:03:14"
+      "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
+      "_aligned_at": "2026-08-09 11:08:41"
     },
     {
       "section_number": "五、23",
@@ -19720,7 +19624,7 @@
             },
             {
               "label": "……",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "4.期末余额",
@@ -19760,7 +19664,7 @@
             },
             {
               "label": "……",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "4.期末余额",
@@ -19800,7 +19704,7 @@
             },
             {
               "label": "……",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "4.期末余额",
@@ -19912,7 +19816,7 @@
             },
             {
               "label": "……",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "减：处置",
@@ -19928,7 +19832,7 @@
             },
             {
               "label": "……",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "三、期末余额",
@@ -20018,8 +19922,8 @@
       "sort_index": 23,
       "auto_numbering": true,
       "lock_number": false,
-      "_aligned_by": "h7-biological-assets-disclosure-rebuild",
-      "_aligned_at": "2026-07-31 21:50:42"
+      "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
+      "_aligned_at": "2026-08-09 11:08:41"
     },
     {
       "section_number": "五、25",
@@ -20060,7 +19964,7 @@
             },
             {
               "label": "……",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "3.本期减少金额",
@@ -20080,7 +19984,7 @@
             },
             {
               "label": "……",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "4.期末余额",
@@ -20108,7 +20012,7 @@
             },
             {
               "label": "……",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "3.本期减少金额",
@@ -20128,7 +20032,7 @@
             },
             {
               "label": "……",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "4.期末余额",
@@ -20156,7 +20060,7 @@
             },
             {
               "label": "……",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "3.本期减少金额",
@@ -20176,7 +20080,7 @@
             },
             {
               "label": "……",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "4.期末余额",
@@ -20251,8 +20155,8 @@
       "sort_index": 24,
       "auto_numbering": true,
       "lock_number": false,
-      "_aligned_by": "h8-right-of-use-disclosure-alignment",
-      "_aligned_at": "2026-07-31 20:13:46"
+      "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
+      "_aligned_at": "2026-08-09 11:08:41"
     },
     {
       "section_number": "五、26",
@@ -20301,7 +20205,7 @@
             },
             {
               "label": "……",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "3.本期减少金额",
@@ -20345,7 +20249,7 @@
             },
             {
               "label": "……",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "3.本期减少金额",
@@ -20389,7 +20293,7 @@
             },
             {
               "label": "……",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "3.本期减少金额",
@@ -20405,7 +20309,7 @@
             },
             {
               "label": "……",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "4.期末余额",
@@ -20640,8 +20544,8 @@
       "sort_index": 25,
       "auto_numbering": true,
       "lock_number": false,
-      "_aligned_by": "i-cycle-four-table-extraction-and-disclosure-alignment",
-      "_aligned_at": "2026-08-02 14:17:30"
+      "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
+      "_aligned_at": "2026-08-09 11:08:41"
     },
     {
       "section_number": "五、27",
@@ -20944,7 +20848,7 @@
           "rows": [
             {
               "label": "可无限量添加行",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "合计",
@@ -21027,7 +20931,7 @@
           "rows": [
             {
               "label": "可无限量添加行",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "合计",
@@ -21176,8 +21080,8 @@
       "sort_index": 27,
       "auto_numbering": true,
       "lock_number": false,
-      "_aligned_by": "i-cycle-four-table-extraction-and-disclosure-alignment",
-      "_aligned_at": "2026-08-02 14:04:57"
+      "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
+      "_aligned_at": "2026-08-09 11:08:41"
     },
     {
       "section_number": "五、29",
@@ -22033,7 +21937,7 @@
             },
             {
               "label": "……",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "合计",
@@ -22122,7 +22026,7 @@
             },
             {
               "label": "……",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "合计",
@@ -22160,8 +22064,8 @@
       "sort_index": 31,
       "auto_numbering": true,
       "lock_number": false,
-      "_aligned_by": "fix_note_restricted_assets_structure.py",
-      "_aligned_at": "2026-08-02 17:33:22"
+      "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
+      "_aligned_at": "2026-08-09 11:08:41"
     },
     {
       "section_number": "五、33",
@@ -22520,7 +22424,8 @@
               "label": "上年年末余额",
               "flat": true
             }
-          ]
+          ],
+          "guidance": "（提示：企业衍生金融工具业务具有重要性的，单独披露衍生金融负债。）\n（15号文第二十条（三），分类列示衍生金融负债期初余额、期末余额，披露其形成的原因以及相关会计处理。）"
         }
       ],
       "text_sections": [
@@ -22542,7 +22447,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
-      "_aligned_at": "2026-08-07 17:32:07"
+      "_aligned_at": "2026-08-07 21:15:55"
     },
     {
       "section_number": "五、36",
@@ -23224,7 +23129,7 @@
             },
             {
               "label": "……",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "住房公积金",
@@ -23395,8 +23300,8 @@
       "sort_index": 39,
       "auto_numbering": true,
       "lock_number": false,
-      "_aligned_by": "j-cycle-four-table-extraction-and-disclosure-alignment",
-      "_aligned_at": "2026-08-02 14:11:32"
+      "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
+      "_aligned_at": "2026-08-09 11:08:41"
     },
     {
       "section_number": "五、41",
@@ -24700,7 +24605,7 @@
             },
             {
               "label": "……",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "合计",
@@ -24856,8 +24761,8 @@
       "sort_index": 45,
       "auto_numbering": true,
       "lock_number": false,
-      "_aligned_by": "fix_note_l3_l4_structure.py",
-      "_aligned_at": "2026-08-02 22:43:45"
+      "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
+      "_aligned_at": "2026-08-09 11:08:41"
     },
     {
       "section_number": "五、47",
@@ -25271,7 +25176,7 @@
             },
             {
               "label": "……",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "五、期末余额",
@@ -25336,7 +25241,7 @@
             },
             {
               "label": "……",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "五、期末余额",
@@ -25474,15 +25379,15 @@
             },
             {
               "label": "1、……",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "2、……",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "……",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "债务工具投资",
@@ -25490,15 +25395,15 @@
             },
             {
               "label": "1、……",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "2、……",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "……",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "其他",
@@ -25568,7 +25473,7 @@
             },
             {
               "label": "……",
-              "row_type": "data"
+              "row_type": "expandable"
             }
           ],
           "columns": [
@@ -25694,8 +25599,8 @@
       "sort_index": 48,
       "auto_numbering": true,
       "lock_number": false,
-      "_aligned_by": "j-cycle-four-table-extraction-and-disclosure-alignment",
-      "_aligned_at": "2026-08-02 15:49:40"
+      "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
+      "_aligned_at": "2026-08-09 11:08:41"
     },
     {
       "section_number": "五、50",
@@ -26099,7 +26004,7 @@
             },
             {
               "label": "……",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "合计",
@@ -26356,8 +26261,8 @@
       "sort_index": 53,
       "auto_numbering": true,
       "lock_number": false,
-      "_aligned_by": "fix_note_m_equity_structure",
-      "_aligned_at": "2026-08-02 15:46:25"
+      "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
+      "_aligned_at": "2026-08-09 11:08:41"
     },
     {
       "section_number": "五、55",
@@ -26556,7 +26461,7 @@
             },
             {
               "label": "可无限量添加行",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "二、将重分类进损益的其他综合收益",
@@ -26588,7 +26493,7 @@
             },
             {
               "label": "可无限量添加行",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "其他综合收益合计",
@@ -26687,7 +26592,7 @@
             },
             {
               "label": "可无限量添加行",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "二、将重分类进损益的其他综合收益",
@@ -26719,7 +26624,7 @@
             },
             {
               "label": "可无限量添加行",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "其他综合收益合计",
@@ -26805,8 +26710,8 @@
       "sort_index": 56,
       "auto_numbering": true,
       "lock_number": false,
-      "_aligned_by": "fix_note_m_equity_structure",
-      "_aligned_at": "2026-08-02 15:46:25"
+      "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
+      "_aligned_at": "2026-08-09 11:08:41"
     },
     {
       "section_number": "五、58",
@@ -28000,7 +27905,7 @@
             },
             {
               "label": "……",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "合计",
@@ -28046,8 +27951,8 @@
       "sort_index": 65,
       "auto_numbering": true,
       "lock_number": false,
-      "_aligned_by": "i-cycle-four-table-extraction-and-disclosure-alignment",
-      "_aligned_at": "2026-08-02 13:49:01"
+      "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
+      "_aligned_at": "2026-08-09 11:08:41"
     },
     {
       "section_number": "五、67",
@@ -28701,7 +28606,8 @@
               "label": "本期发生额",
               "flat": true
             }
-          ]
+          ],
+          "guidance": "【提示：高危企业提取的专项储备暂列“其他”项目】"
         },
         {
           "name": "本期收到的处置子公司的现金净额",
@@ -28881,7 +28787,8 @@
               "label": "不属于现金及现金等价物的理由",
               "flat": true
             }
-          ]
+          ],
+          "guidance": "（披露公司持有的使用范围受限但仍作为现金和现金等价物列示的金额及理由。如募投资金、特定用途但使用不受限的资金等。\n分类披露不属于现金及现金等价物的货币资金的本期金额、上期金额及理由。（15号文第二十三条（四））"
         },
         {
           "name": "资产负债表中的列报项目和相关信息",
@@ -28950,7 +28857,8 @@
               "label": "期初余额",
               "flat": true
             }
-          ]
+          ],
+          "guidance": "（3）对于数字货币，应根据《企业会计准则第31号——现金流量表》等规定判断是否属于现金及现金等价物。】\n（6）供应商融资安排（解释第17号要求披露，不适用的删除）"
         },
         {
           "name": "付款到期日的区间",
@@ -29023,7 +28931,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
-      "_aligned_at": "2026-08-07 17:32:07"
+      "_aligned_at": "2026-08-07 21:15:55"
     },
     {
       "section_number": "五、72",
@@ -29084,7 +28992,7 @@
             },
             {
               "label": "可无限量添加行",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "应收账款",
@@ -29108,7 +29016,7 @@
             },
             {
               "label": "可无限量添加行",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "长期借款",
@@ -29132,11 +29040,11 @@
             },
             {
               "label": "可无限量添加行",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "可无限量添加行",
-              "row_type": "data"
+              "row_type": "expandable"
             }
           ],
           "columns": [
@@ -29181,8 +29089,8 @@
       "sort_index": 72,
       "auto_numbering": true,
       "lock_number": false,
-      "_aligned_by": "e1-four-table-extraction-and-disclosure-alignment",
-      "_aligned_at": "2026-08-02 16:17:47"
+      "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
+      "_aligned_at": "2026-08-09 11:08:41"
     },
     {
       "section_number": "五、74",
@@ -29231,7 +29139,8 @@
               "label": "本期发生额",
               "flat": true
             }
-          ]
+          ],
+          "guidance": "（公司作为承租人的租赁，应披露未纳入租赁负债计量的可变租赁付款额、简化处理的短期租赁费用和低价值资产租赁费用、与租赁相关的现金流出总额等相关信息。涉及售后租回交易的，应披露是否满足销售及其判断依据。）"
         },
         {
           "name": "①销售损益、租赁投资净额的融资收益以及与未纳入租赁投资净额的可变租赁付款额相关的收入",
@@ -29265,7 +29174,8 @@
               "label": "本期发生额",
               "flat": true
             }
-          ]
+          ],
+          "guidance": "（涉及售后租回交易的，应披露是否满足销售及其判断依据。）\n（公司作为出租人的融资租赁，应披露销售损益、融资收益及未纳入租赁投资净额的可变租赁付款额相关的收入、未折现租赁收款额与租赁投资净额的调节表。出租人还应当披露未来五年每年未折现租赁收款额以及五年后未折现租赁收款额总额。）"
         },
         {
           "name": "②资产负债表日后连续五个会计年度每年将收到的未折现租赁收款额，以及剩余年度将收到的未折现租赁收款额总额",
@@ -29390,7 +29300,8 @@
               "label": "本期发生额",
               "flat": true
             }
-          ]
+          ],
+          "guidance": "（公司作为出租人的经营租赁，应披露租赁收入及其中包含的未计入租赁收款额的可变租赁付款额相关的收入。出租人还应当披露未来五年每年未折现租赁收款额以及五年后未折现租赁收款额总额。）"
         },
         {
           "name": "②资产负债表日后连续五个会计年度每年将收到的未折现租赁收款额，以及剩余年度将收到的未折现租赁收款额总额。",
@@ -29451,7 +29362,7 @@
         }
       ],
       "text_sections": [
-        "作为承租人",
+        "#### 作为承租人",
         "（公司作为承租人的租赁，应披露未纳入租赁负债计量的可变租赁付款额、简化处理的短期租赁费用和低价值资产租赁费用、与租赁相关的现金流出总额等相关信息。涉及售后租回交",
         "（涉及售后租回交易的，应披露是否满足销售及其判断依据。）",
         "作为出租人",
@@ -29472,7 +29383,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
-      "_aligned_at": "2026-08-07 17:32:07"
+      "_aligned_at": "2026-08-09 11:07:15"
     },
     {
       "section_id": "chapter-06-yan-fa-zhi-chu",
@@ -29526,15 +29437,6 @@
             "上期发生额"
           ],
           "rows": [
-            {
-              "label": "项  目",
-              "values": [
-                null,
-                null
-              ],
-              "is_total": false,
-              "row_type": "header_label"
-            },
             {
               "label": "人工费",
               "values": [
@@ -29596,7 +29498,7 @@
                 null
               ],
               "is_total": false,
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "合  计",
@@ -29607,7 +29509,8 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "guidance": "（按费用性质披露研发支出本期发生额、上期发生额，包括费用化研发支出和资本化研发支出。（15号文第二十六条））"
         }
       ],
       "section_id": "chapter-06-yan-fa-zhi-chu-yan-fa-zhi-chu",
@@ -29615,7 +29518,9 @@
       "parent_section_id": "chapter-06-yan-fa-zhi-chu",
       "sort_index": 0,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
+      "_aligned_at": "2026-08-09 11:08:41"
     },
     {
       "section_id": "chapter-07-zai-qi-ta-zhu-ti-zhong-de-quan-yi",
@@ -31234,7 +31139,7 @@
           "rows": [
             {
               "label": "可无限量添加行",
-              "row_type": "data"
+              "row_type": "expandable"
             }
           ]
         },
@@ -31249,7 +31154,7 @@
           "rows": [
             {
               "label": "可无限量添加行",
-              "row_type": "data"
+              "row_type": "expandable"
             }
           ]
         },
@@ -31267,7 +31172,7 @@
           "rows": [
             {
               "label": "可无限量添加行",
-              "row_type": "data"
+              "row_type": "expandable"
             }
           ]
         },
@@ -31285,7 +31190,7 @@
           "rows": [
             {
               "label": "可无限量添加行",
-              "row_type": "data"
+              "row_type": "expandable"
             }
           ]
         },
@@ -31411,8 +31316,8 @@
         "关联托管、承包情况",
         "关联租赁情况",
         "关联担保情况",
-        "关联方资金拆借情况",
-        "关联方资产转让、债务重组情况",
+        "#### 关联方资金拆借情况",
+        "#### 关联方资产转让、债务重组情况",
         "关键管理人员薪酬",
         "其他关联交易（参考格式同上）"
       ],
@@ -31425,7 +31330,9 @@
       "parent_section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi",
       "sort_index": 1,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
+      "_aligned_at": "2026-08-09 11:08:41"
     },
     {
       "section_number": "十一、关联方应收应付款",
@@ -31443,12 +31350,8 @@
           ],
           "rows": [
             {
-              "label": "项目名称",
-              "row_type": "header_label"
-            },
-            {
               "label": "可无限量添加行",
-              "row_type": "data"
+              "row_type": "expandable"
             }
           ]
         },
@@ -31463,7 +31366,7 @@
           "rows": [
             {
               "label": "可无限量添加行",
-              "row_type": "data"
+              "row_type": "expandable"
             }
           ],
           "columns": [
@@ -31488,7 +31391,8 @@
               "label": "上年年末余额",
               "flat": true
             }
-          ]
+          ],
+          "guidance": "（提示：关联交易约定以净额结算的，应收关联方款项可以抵销后金额填列。）"
         }
       ],
       "text_sections": [
@@ -31509,7 +31413,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
-      "_aligned_at": "2026-08-07 17:32:07"
+      "_aligned_at": "2026-08-09 11:08:41"
     },
     {
       "section_id": "chapter-12-gu-fen-zhi-fu",
@@ -31547,10 +31451,6 @@
           ],
           "rows": [
             {
-              "label": "授予对象类别",
-              "row_type": "header_label"
-            },
-            {
               "label": "销售人员",
               "row_type": "data"
             },
@@ -31567,7 +31467,8 @@
               "is_total": true,
               "row_type": "total"
             }
-          ]
+          ],
+          "guidance": "（15号文第六十一条 公司应按授予对象类别披露本期授予、行权、解锁和失效的各项权益工具数量和金额，期末发行在外的股票期权或其他权益工具行权价格的范围和合同剩余期限。）"
         },
         {
           "name": "期末发行在外的股票期权或其他权益工具",
@@ -31577,10 +31478,6 @@
             "期末发行在外的其他权益工具"
           ],
           "rows": [
-            {
-              "label": "授予对象类别",
-              "row_type": "header_label"
-            },
             {
               "label": "销售人员",
               "row_type": "data"
@@ -31626,7 +31523,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
-      "_aligned_at": "2026-08-07 16:58:18"
+      "_aligned_at": "2026-08-09 11:07:15"
     },
     {
       "section_number": "十二、以权益结算的股份",
@@ -31656,7 +31553,8 @@
               "label": "以权益结算的股份支付计入资本公积的累计金额",
               "row_type": "data"
             }
-          ]
+          ],
+          "guidance": "（15号文第六十二条 以权益结算的股份支付，公司应披露授予日权益工具公允价值的确定方法和重要参数，等待期内每个资产负债表日可行权权益工具数量的确定依据。本期估计与上期估计有重要差异的，应说明原因。公司还应披露以权益结算的股份支付计入资本公积的累计金额。）"
         }
       ],
       "text_sections": [
@@ -31684,7 +31582,9 @@
       "parent_section_id": "chapter-12-gu-fen-zhi-fu",
       "sort_index": 1,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
+      "_aligned_at": "2026-08-07 21:15:55"
     },
     {
       "section_number": "十二、以现金结算的股份",
@@ -31709,7 +31609,8 @@
           ],
           "legacy_aliases": [
             "公司承担的、以股份或其他权益工具为基础计算确定的负债的公允价值确定方法"
-          ]
+          ],
+          "guidance": "（15号文第六十三条 以现金结算的股份支付，公司应披露承担的、以股份或其他权益工具为基础计算确定的负债的公允价值确定方法和重要参数。公司应披露负债中以现金结算的股份支付产生的累计负债金额。）"
         }
       ],
       "text_sections": [
@@ -31739,7 +31640,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
-      "_aligned_at": "2026-08-07 16:58:18"
+      "_aligned_at": "2026-08-07 21:15:55"
     },
     {
       "section_number": "十二、本期股份支付费用",
@@ -31793,7 +31694,8 @@
               "label": "以现金结算的股份支付费用",
               "flat": true
             }
-          ]
+          ],
+          "guidance": "（15号文第六十四条，按授予对象类别分别披露本期以权益结算的股份支付和以现金结算的股份支付确认的费用总额。）"
         }
       ],
       "text_sections": [
@@ -31823,7 +31725,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
-      "_aligned_at": "2026-08-07 17:32:07"
+      "_aligned_at": "2026-08-07 21:15:55"
     },
     {
       "section_number": "十二、股份支付的修改、",
@@ -31964,7 +31866,8 @@
               "label": "上年年末余额",
               "flat": true
             }
-          ]
+          ],
+          "guidance": "【《企业会计准则第30号-财务报表列报》第三十九条 附注一般应当按照下列顺序至少披露：（七）或有和承诺事项、资产负债表日后非调整事项、关联方关系及其交易等需要说明的事项。】\n【证监会会计部：关于做好2014年度上市公司财务信息披露工作的通知（会计部函〔2014〕674号）：四、对于资产负债表日存在的对外重要承诺事项，公司应在财务报表附注中披露其性质及涉及金额。】\n【提示：承诺，指由合同或协议的要求引起的义务，在未来的特定期间内，只要特定条件达到，即发生现金流出、其他资产的减少或负债的增加。对于资产负债表日存在的重大承诺事项，应在财务报表附注中按已签订的尚未履行或尚未完全履行的对外投资合同及有关财务支出、已签订的正在或准备履行的大额发包合同、已签订的正在或准备履行的租赁合同及财务影响、已签订的正在或准备履行的并购协议、已签订的正在或准备履行的重组计划、其他重大财务承诺等分项说明其存在的原因和金额。】"
         }
       ],
       "text_sections": [
@@ -31995,7 +31898,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
-      "_aligned_at": "2026-08-07 17:32:07"
+      "_aligned_at": "2026-08-07 21:15:55"
     },
     {
       "section_number": "十三、或有事项",
@@ -32051,7 +31954,8 @@
               "label": "案件进展情况",
               "flat": true
             }
-          ]
+          ],
+          "guidance": "【披露资产负债表日存在的重要或有事项。】\n【提示：与合营企业或联营企业投资相关的或有负债索引至“附注七、在其他主体中的权益”部分相应内容。】"
         },
         {
           "name": "截至2025年12月31日，本公司为下列单位贷款提供保证：",
@@ -32096,7 +32000,8 @@
               "label": "备注",
               "flat": true
             }
-          ]
+          ],
+          "guidance": "【《关于严格执行企业会计准则 切实做好企业2025年年报工作的通知》：在涉及未决诉讼、未决仲裁的情况下，按照《企业会计准则第13号——或有事项》（财会〔2006〕3号，以下简称或有事项准则）第十四条的规定披露有关预计负债、或有负债等的全部或部分信息预期对企业造成重大不利影响的，企业无须披露这些信息，但仍应当披露该未决诉讼、未决仲裁的性质以及未披露这些信息的事实和原因，不得以预期对企业造成重大不利影响为由不作任何披露。】"
         }
       ],
       "text_sections": [
@@ -32149,7 +32054,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
-      "_aligned_at": "2026-08-07 17:32:07"
+      "_aligned_at": "2026-08-07 21:15:55"
     },
     {
       "section_id": "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang",
@@ -32487,7 +32392,8 @@
               "label": "股本等所有者权益增加金额",
               "flat": true
             }
-          ]
+          ],
+          "guidance": "（1）本企业当期与债务人以下列方式对债务进行重组：[资产清偿债务]，或[债务转为权益工具]，或[调整债务本金、改变债务利息、变更还款期限等]，或[根据具体的组合情况描述重组方式]。\n（2）原债权账面价值为XXX元，其中原值为XXX元，已计提减值准备XXX元。\n（3）因债务重组确认的利得/损失金额为XXX元。\n（4）将债权转为对联营企业或合营企业的权益性投资增加额为XXX元，该投资占联营企业或合营企业股份总额的比例为X%。\n（5）放弃债权的公允价值的确定方法及依据。）"
         },
         {
           "name": "重要债务重组（表2）",
@@ -32530,7 +32436,8 @@
               "label": "确定方法及依据",
               "flat": true
             }
-          ]
+          ],
+          "guidance": "说明转让非现金资产的公允价值、债务转成的权益工具的公允价值和修改其他债务条件后债务的公允价值的确定方法及依据。"
         },
         {
           "name": "债权人披露情况",
@@ -32621,7 +32528,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
-      "_aligned_at": "2026-08-07 17:32:07"
+      "_aligned_at": "2026-08-07 21:15:55"
     },
     {
       "section_number": "十四、重要资产置换",
@@ -33078,7 +32985,8 @@
               "label": "申请状态",
               "flat": true
             }
-          ]
+          ],
+          "guidance": "（15号文第七十七条，对投资者决策有影响的其他重要交易和事项，公司应披露具体情况、判断依据及相关会计处理）"
         },
         {
           "name": "其他（表2）",
@@ -33328,7 +33236,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
-      "_aligned_at": "2026-08-07 17:32:07"
+      "_aligned_at": "2026-08-07 21:15:55"
     },
     {
       "section_id": "chapter-15-qi-ta-zhong-yao-shi-xiang",
@@ -38318,10 +38226,6 @@
           ],
           "rows": [
             {
-              "label": "报告期利润",
-              "row_type": "header_label"
-            },
-            {
               "label": "归属于公司普通股股东的净利润",
               "row_type": "data"
             },
@@ -38396,7 +38300,8 @@
               "label": "上期金额",
               "flat": true
             }
-          ]
+          ],
+          "guidance": "（企业不存在稀释因素时，利润表不删除稀释每股收益，该栏为空白；“净资产收益率及每股收益”中也不填稀释每股收益（即，该栏为空白）。）\n（【企业如有终止经营的情况，应当分别披露持续经营和终止经营基本每股收益和稀释每股收益。】）"
         }
       ],
       "text_sections": [
@@ -38415,7 +38320,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
-      "_aligned_at": "2026-08-07 17:32:07"
+      "_aligned_at": "2026-08-09 11:07:15"
     },
     {
       "section_number": "十七、境内外会计准则下会计数据差异",
@@ -38432,10 +38337,6 @@
           ],
           "rows": [
             {
-              "label": "项目",
-              "row_type": "header_label"
-            },
-            {
               "label": "按中国企业会计准则",
               "row_type": "data"
             },
@@ -38445,7 +38346,7 @@
             },
             {
               "label": "…",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "按国际会计准则",
@@ -38462,10 +38363,6 @@
           ],
           "rows": [
             {
-              "label": "项目",
-              "row_type": "header_label"
-            },
-            {
               "label": "按中国企业会计准则",
               "row_type": "data"
             },
@@ -38475,7 +38372,7 @@
             },
             {
               "label": "…",
-              "row_type": "data"
+              "row_type": "expandable"
             },
             {
               "label": "按境外XX会计准则",
@@ -38505,7 +38402,9 @@
       "parent_section_id": "chapter-17-bu-chong-zi-liao",
       "sort_index": 2,
       "auto_numbering": true,
-      "lock_number": false
+      "lock_number": false,
+      "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
+      "_aligned_at": "2026-08-09 11:08:41"
     }
   ]
 }

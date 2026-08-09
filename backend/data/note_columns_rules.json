@@ -1,0 +1,4548 @@
+{
+  "generated_at": "2026-08-07T11:47:07.009083+00:00",
+  "_source": "生成自 backend/scripts/diagnose/build_note_columns_rules.py；列真源 = docs/模版 两份附注模板 docx（note_table_headers_source_facts.json）",
+  "_key": "rules 以 section_id 为键（section_number 不唯一）",
+  "rules": {
+    "listed": {
+      "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zhong-yao-xing-biao-zhun-que-ding-fang-f": {
+        "section_number": "三、重要性标准确定方",
+        "section_title": "重要性标准确定方法和选择依据",
+        "docx_key": "重要会计政策及会计估计 / 重要性标准确定方法和选择依据",
+        "tables": [
+          {
+            "index": 0,
+            "table_name": "重要性标准确定方法和选择依据",
+            "columns": [
+              {
+                "key": "项目",
+                "label": "项目",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "重要性标准",
+                "label": "重要性标准",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:重要会计政策及会计估计 / 重要性标准确定方法和选择依据#0row0",
+            "headers_equal": true
+          }
+        ]
+      },
+      "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-wu-xing-zi-chan": {
+        "section_number": "三、无形资产",
+        "section_title": "无形资产",
+        "docx_key": "重要会计政策及会计估计 / 无形资产",
+        "tables": [
+          {
+            "index": 0,
+            "table_name": "使用寿命有限的无形资产摊销方法如下：",
+            "columns": [
+              {
+                "key": "类别",
+                "label": "类别",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "使用寿命",
+                "label": "使用寿命",
+                "flat": true
+              },
+              {
+                "key": "使用寿命的确定依据",
+                "label": "使用寿命的确定依据",
+                "flat": true
+              },
+              {
+                "key": "摊销方法",
+                "label": "摊销方法",
+                "flat": true
+              },
+              {
+                "key": "备注",
+                "label": "备注",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:重要会计政策及会计估计 / 无形资产#0row0",
+            "headers_equal": true
+          },
+          {
+            "index": 1,
+            "table_name": "本公司无形资产均为使用寿命有限的土地使用权，采用直线法摊销，使用年限如下：",
+            "columns": [
+              {
+                "key": "地块类别",
+                "label": "地块类别",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "使用期间",
+                "label": "使用期间",
+                "flat": true
+              },
+              {
+                "key": "备注",
+                "label": "备注",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:重要会计政策及会计估计 / 无形资产#1row0",
+            "headers_equal": true
+          }
+        ]
+      },
+      "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-yu-ji-fu-zhai": {
+        "section_number": "三、预计负债",
+        "section_title": "预计负债",
+        "docx_key": "合并财务报表项目附注 / 预计负债",
+        "tables": [
+          {
+            "index": 0,
+            "table_name": "预计负债",
+            "columns": [
+              {
+                "key": "项  目",
+                "label": "项  目",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "期末余额",
+                "label": "期末余额",
+                "flat": true
+              },
+              {
+                "key": "上年年末余额",
+                "label": "上年年末余额",
+                "flat": true
+              },
+              {
+                "key": "形成原因",
+                "label": "形成原因",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:合并财务报表项目附注 / 预计负债#0row0",
+            "headers_equal": true
+          }
+        ]
+      },
+      "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-xian-jin-liu-liang-biao-xiang-mu-zhu-shi": {
+        "section_number": "三、现金流量表项目注",
+        "section_title": "现金流量表项目注释",
+        "docx_key": "合并财务报表项目附注 / 现金流量表项目注释",
+        "tables": [
+          {
+            "index": 0,
+            "table_name": "收到其他与经营活动有关的现金",
+            "columns": [
+              {
+                "key": "项目",
+                "label": "项目",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "本期发生额",
+                "label": "本期发生额",
+                "flat": true
+              },
+              {
+                "key": "上期发生额",
+                "label": "上期发生额",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:合并财务报表项目附注 / 现金流量表项目注释#0row0",
+            "headers_equal": true
+          },
+          {
+            "index": 1,
+            "table_name": "支付其他与经营活动有关的现金",
+            "columns": [
+              {
+                "key": "项目",
+                "label": "项目",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "本期发生额",
+                "label": "本期发生额",
+                "flat": true
+              },
+              {
+                "key": "上期发生额",
+                "label": "上期发生额",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:合并财务报表项目附注 / 现金流量表项目注释#1row0",
+            "headers_equal": true
+          },
+          {
+            "index": 2,
+            "table_name": "收到的重要的投资活动有关的现金",
+            "columns": [
+              {
+                "key": "项目",
+                "label": "项目",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "本期发生额",
+                "label": "本期发生额",
+                "flat": true
+              },
+              {
+                "key": "上期发生额",
+                "label": "上期发生额",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:合并财务报表项目附注 / 现金流量表项目注释#2row0",
+            "headers_equal": true
+          },
+          {
+            "index": 3,
+            "table_name": "收到其他与投资活动有关的现金",
+            "columns": [
+              {
+                "key": "项目",
+                "label": "项目",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "本期发生额",
+                "label": "本期发生额",
+                "flat": true
+              },
+              {
+                "key": "上期发生额",
+                "label": "上期发生额",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:合并财务报表项目附注 / 现金流量表项目注释#3row0",
+            "headers_equal": true
+          },
+          {
+            "index": 4,
+            "table_name": "支付的重要的投资活动有关的现金",
+            "columns": [
+              {
+                "key": "项目",
+                "label": "项目",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "本期发生额",
+                "label": "本期发生额",
+                "flat": true
+              },
+              {
+                "key": "上期发生额",
+                "label": "上期发生额",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:合并财务报表项目附注 / 现金流量表项目注释#4row0",
+            "headers_equal": true
+          },
+          {
+            "index": 5,
+            "table_name": "支付其他与投资活动有关的现金",
+            "columns": [
+              {
+                "key": "项目",
+                "label": "项目",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "本期发生额",
+                "label": "本期发生额",
+                "flat": true
+              },
+              {
+                "key": "上期发生额",
+                "label": "上期发生额",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:合并财务报表项目附注 / 现金流量表项目注释#5row0",
+            "headers_equal": true
+          },
+          {
+            "index": 6,
+            "table_name": "收到其他与筹资活动有关的现金",
+            "columns": [
+              {
+                "key": "项目",
+                "label": "项目",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "本期发生额",
+                "label": "本期发生额",
+                "flat": true
+              },
+              {
+                "key": "上期发生额",
+                "label": "上期发生额",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:合并财务报表项目附注 / 现金流量表项目注释#6row0",
+            "headers_equal": true
+          },
+          {
+            "index": 7,
+            "table_name": "支付其他与筹资活动有关的现金",
+            "columns": [
+              {
+                "key": "项目",
+                "label": "项目",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "本期发生额",
+                "label": "本期发生额",
+                "flat": true
+              },
+              {
+                "key": "上期发生额",
+                "label": "上期发生额",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:合并财务报表项目附注 / 现金流量表项目注释#7row0",
+            "headers_equal": true
+          }
+        ]
+      },
+      "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-fei-tong-yi-kong-zhi-xia-qi-ye-he-bing": {
+        "section_number": "三、非同一控制下企业",
+        "section_title": "非同一控制下企业合并",
+        "docx_key": "在其他主体中的权益 / 非同一控制下企业合并",
+        "tables": [
+          {
+            "index": 0,
+            "table_name": "本期发生的非同一控制下企业合并",
+            "columns": [
+              {
+                "key": "被购买方名称",
+                "label": "被购买方名称",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "股权取得时点",
+                "label": "股权取得时点",
+                "flat": true
+              },
+              {
+                "key": "股权取得成本",
+                "label": "股权取得成本",
+                "flat": true
+              },
+              {
+                "key": "股权取得比例（%）",
+                "label": "股权取得比例（%）",
+                "flat": true
+              },
+              {
+                "key": "股权取得方式",
+                "label": "股权取得方式",
+                "flat": true
+              },
+              {
+                "key": "购买日",
+                "label": "购买日",
+                "flat": true
+              },
+              {
+                "key": "购买日的确定依据",
+                "label": "购买日的确定依据",
+                "flat": true
+              },
+              {
+                "key": "购买日至期末被购买方的收入",
+                "label": "购买日至期末被购买方的收入",
+                "flat": true
+              },
+              {
+                "key": "购买日至期末被购买方的净利润",
+                "label": "购买日至期末被购买方的净利润",
+                "flat": true
+              },
+              {
+                "key": "购买日至期末被购买方的现金流量",
+                "label": "购买日至期末被购买方的现金流量",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:在其他主体中的权益 / 非同一控制下企业合并#0row0",
+            "headers_equal": true
+          },
+          {
+            "index": 1,
+            "table_name": "非同一控制下企业合并（表2）",
+            "columns": [
+              {
+                "key": "项目",
+                "label": "项目",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "XX公司",
+                "label": "XX公司",
+                "flat": true
+              },
+              {
+                "key": "XX公司",
+                "label": "XX公司",
+                "flat": true
+              },
+              {
+                "key": "可无限量加列",
+                "label": "可无限量加列",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:在其他主体中的权益 / 非同一控制下企业合并#1row0",
+            "headers_equal": true
+          },
+          {
+            "index": 3,
+            "table_name": "非同一控制下企业合并（表4）",
+            "columns": [
+              {
+                "key": "被购买方名称",
+                "label": "被购买方名称",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "购买日之前原持有股权在购买日的账面价值",
+                "label": "购买日之前原持有股权在购买日的账面价值",
+                "flat": true
+              },
+              {
+                "key": "购买日之前原持有股权在购买日的公允价值",
+                "label": "购买日之前原持有股权在购买日的公允价值",
+                "flat": true
+              },
+              {
+                "key": "购买日之前原持有股权按公允价值重新计量产生的利得/损失",
+                "label": "购买日之前原持有股权按公允价值重新计量产生的利得/损失",
+                "flat": true
+              },
+              {
+                "key": "购买日之前原持有股权在购买日的公允价值的确定方法及主要假设",
+                "label": "购买日之前原持有股权在购买日的公允价值的确定方法及主要假设",
+                "flat": true
+              },
+              {
+                "key": "购买日之前与原持有股权相关的其他综合收益转入投资收益或留存收益的金额",
+                "label": "购买日之前与原持有股权相关的其他综合收益转入投资收益或留存收益的金额",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:在其他主体中的权益 / 非同一控制下企业合并#3row0",
+            "headers_equal": true
+          }
+        ]
+      },
+      "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-fan-xiang-gou-mai": {
+        "section_number": "三、反向购买",
+        "section_title": "反向购买",
+        "docx_key": "在其他主体中的权益 / 反向购买",
+        "tables": [
+          {
+            "index": 0,
+            "table_name": "反向购买",
+            "columns": [
+              {
+                "key": "会计上的购买方",
+                "label": "会计上的购买方",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "判断构成反向购买的依据",
+                "label": "判断构成反向购买的依据",
+                "flat": true
+              },
+              {
+                "key": "是否构成业务及其判断依据",
+                "label": "是否构成业务及其判断依据",
+                "flat": true
+              },
+              {
+                "key": "合并成本的确定方法",
+                "label": "合并成本的确定方法",
+                "flat": true
+              },
+              {
+                "key": "合并中确认的商誉或计入当期的损益或调整权益的金额及计算过程",
+                "label": "合并中确认的商誉或计入当期的损益或调整权益的金额及计算过程",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:在其他主体中的权益 / 反向购买#0row0",
+            "headers_equal": true
+          }
+        ]
+      },
+      "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-tong-yi-kong-zhi-xia-qi-ye-he-bing": {
+        "section_number": "三、同一控制下企业合",
+        "section_title": "同一控制下企业合并",
+        "docx_key": "在其他主体中的权益 / 同一控制下企业合并",
+        "tables": [
+          {
+            "index": 0,
+            "table_name": "同一控制下企业合并（表1）",
+            "columns": [
+              {
+                "key": "被合并方名称",
+                "label": "被合并方名称",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "企业合并中取得的权益比例",
+                "label": "企业合并中取得的权益比例",
+                "flat": true
+              },
+              {
+                "key": "交易构成同一控制下企业合并的依据",
+                "label": "交易构成同一控制下企业合并的依据",
+                "flat": true
+              },
+              {
+                "key": "合并日",
+                "label": "合并日",
+                "flat": true
+              },
+              {
+                "key": "合并日的确定依据",
+                "label": "合并日的确定依据",
+                "flat": true
+              },
+              {
+                "key": "合并当期期初至合并日被合并方的收入",
+                "label": "合并当期期初至合并日被合并方的收入",
+                "flat": true
+              },
+              {
+                "key": "合并当期期初至合并日被合并方的净利润",
+                "label": "合并当期期初至合并日被合并方的净利润",
+                "flat": true
+              },
+              {
+                "key": "上期被合并方的收入",
+                "label": "上期被合并方的收入",
+                "flat": true
+              },
+              {
+                "key": "上期被合并方的净利润",
+                "label": "上期被合并方的净利润",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:在其他主体中的权益 / 同一控制下企业合并#0row0",
+            "headers_equal": true
+          },
+          {
+            "index": 1,
+            "table_name": "同一控制下企业合并（表2）",
+            "columns": [
+              {
+                "key": "项目",
+                "label": "项目",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "XX公司",
+                "label": "XX公司",
+                "flat": true
+              },
+              {
+                "key": "XX公司",
+                "label": "XX公司",
+                "flat": true
+              },
+              {
+                "key": "可无限量添加列",
+                "label": "可无限量添加列",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:在其他主体中的权益 / 同一控制下企业合并#1row0",
+            "headers_equal": true
+          }
+        ]
+      },
+      "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zai-he-ying-an-pai-huo-lian-ying-qi-ye-z": {
+        "section_number": "三、在合营安排或联营",
+        "section_title": "在合营安排或联营企业中的权益",
+        "docx_key": "在其他主体中的权益 / 在合营安排或联营企业中的权益",
+        "tables": [
+          {
+            "index": 5,
+            "table_name": "在合营安排或联营企业中的权益（表6）",
+            "columns": [
+              {
+                "key": "项目",
+                "label": "项目",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "期末余额/本期发生额",
+                "label": "期末余额/本期发生额",
+                "flat": true
+              },
+              {
+                "key": "上年年末余额/上期发生额",
+                "label": "上年年末余额/上期发生额",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:在其他主体中的权益 / 在合营安排或联营企业中的权益#5row0",
+            "headers_equal": true
+          },
+          {
+            "index": 6,
+            "table_name": "在合营安排或联营企业中的权益（表7）",
+            "columns": [
+              {
+                "key": "被投资单位名称",
+                "label": "被投资单位名称",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "前期累积未确认的损失份额",
+                "label": "前期累积未确认的损失份额",
+                "flat": true
+              },
+              {
+                "key": "本期未确认的损失份额（或本期实现净利润的分享额）",
+                "label": "本期未确认的损失份额（或本期实现净利润的分享额）",
+                "flat": true
+              },
+              {
+                "key": "本期末累积未确认的损失份额",
+                "label": "本期末累积未确认的损失份额",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:在其他主体中的权益 / 在合营安排或联营企业中的权益#6row0",
+            "headers_equal": true
+          }
+        ]
+      },
+      "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-ji-ru-qi-ta-ying-shou-kuan-de-zheng-fu-b": {
+        "section_number": "三、计入其他应收款的",
+        "section_title": "计入其他应收款的政府补助",
+        "docx_key": "政府补助 / 计入其他应收款的政府补助",
+        "tables": [
+          {
+            "index": 0,
+            "table_name": "计入其他应收款的政府补助",
+            "columns": [
+              {
+                "key": "种类",
+                "label": "种类",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "期末余额",
+                "label": "期末余额",
+                "flat": true
+              },
+              {
+                "key": "未能在预计时点收到政府补助的原因",
+                "label": "未能在预计时点收到政府补助的原因",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:政府补助 / 计入其他应收款的政府补助#0row0",
+            "headers_equal": true
+          }
+        ]
+      },
+      "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-ji-ru-di-yan-shou-yi-de-zheng-fu-bu-zhu": {
+        "section_number": "三、计入递延收益的政",
+        "section_title": "计入递延收益的政府补助",
+        "docx_key": "政府补助 / 计入递延收益的政府补助",
+        "tables": [
+          {
+            "index": 0,
+            "table_name": "分  类",
+            "columns": [
+              {
+                "key": "分类",
+                "label": "分类",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "期初余额",
+                "label": "期初余额",
+                "flat": true
+              },
+              {
+                "key": "本期增加",
+                "label": "本期增加",
+                "flat": true
+              },
+              {
+                "key": "本期减少",
+                "label": "本期减少",
+                "flat": true
+              },
+              {
+                "key": "期末余额",
+                "label": "期末余额",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:政府补助 / 计入递延收益的政府补助#0row0",
+            "headers_equal": true
+          },
+          {
+            "index": 1,
+            "table_name": "计入递延收益的政府补助，后续采用总额法计量",
+            "columns": [
+              {
+                "key": "种类",
+                "label": "种类",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "期初余额",
+                "label": "期初余额",
+                "flat": true
+              },
+              {
+                "key": "本期新增补助金额",
+                "label": "本期新增补助金额",
+                "flat": true
+              },
+              {
+                "key": "本期结转计入损益的金额",
+                "label": "本期结转计入损益的金额",
+                "flat": true
+              },
+              {
+                "key": "其他变动",
+                "label": "其他变动",
+                "flat": true
+              },
+              {
+                "key": "期末余额",
+                "label": "期末余额",
+                "flat": true
+              },
+              {
+                "key": "本期结转计入损益的列报项目",
+                "label": "本期结转计入损益的列报项目",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:政府补助 / 计入递延收益的政府补助#1row0",
+            "headers_equal": true
+          },
+          {
+            "index": 2,
+            "table_name": "计入递延收益的政府补助，后续采用净额法计量",
+            "columns": [
+              {
+                "key": "种类",
+                "label": "种类",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "期初余额",
+                "label": "期初余额",
+                "flat": true
+              },
+              {
+                "key": "本期新增补助金额",
+                "label": "本期新增补助金额",
+                "flat": true
+              },
+              {
+                "key": "本期结转冲减相关成本费用的金额",
+                "label": "本期结转冲减相关成本费用的金额",
+                "flat": true
+              },
+              {
+                "key": "其他变动",
+                "label": "其他变动",
+                "flat": true
+              },
+              {
+                "key": "期末余额",
+                "label": "期末余额",
+                "flat": true
+              },
+              {
+                "key": "本期结转冲减相关成本费用的列报项目",
+                "label": "本期结转冲减相关成本费用的列报项目",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:政府补助 / 计入递延收益的政府补助#2row0",
+            "headers_equal": true
+          }
+        ]
+      },
+      "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-cai-yong-zong-e-fa-ji-ru-dang-qi-sun-yi": {
+        "section_number": "三、采用总额法计入当",
+        "section_title": "采用总额法计入当期损益的政府补助情况",
+        "docx_key": "政府补助 / 采用总额法计入当期损益的政府补助情况",
+        "tables": [
+          {
+            "index": 0,
+            "table_name": "种  类",
+            "columns": [
+              {
+                "key": "种类",
+                "label": "种类",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "本期计入损益的金额",
+                "label": "本期计入损益的金额",
+                "flat": true
+              },
+              {
+                "key": "上期计入损益的金额",
+                "label": "上期计入损益的金额",
+                "flat": true
+              },
+              {
+                "key": "计入损益的列报项目",
+                "label": "计入损益的列报项目",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:政府补助 / 采用总额法计入当期损益的政府补助情况#0row0",
+            "headers_equal": true
+          }
+        ]
+      },
+      "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-ben-nian-fan-huan-zheng-fu-bu-zhu-qing-k": {
+        "section_number": "三、本年返还政府补助",
+        "section_title": "本年返还政府补助情况",
+        "docx_key": "政府补助 / 本年返还政府补助情况",
+        "tables": [
+          {
+            "index": 0,
+            "table_name": "本年返还政府补助情况",
+            "columns": [
+              {
+                "key": "项目",
+                "label": "项目",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "金额",
+                "label": "金额",
+                "flat": true
+              },
+              {
+                "key": "原因",
+                "label": "原因",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:政府补助 / 本年返还政府补助情况#0row0",
+            "headers_equal": true
+          }
+        ]
+      },
+      "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-feng-xian-guan-li-mu-biao-he-zheng-ce": {
+        "section_number": "三、风险管理目标和政",
+        "section_title": "风险管理目标和政策",
+        "docx_key": "金融工具风险管理 / 风险管理目标和政策",
+        "tables": [
+          {
+            "index": 4,
+            "table_name": "风险管理目标和政策（表5）",
+            "columns": [
+              {
+                "key": "项目",
+                "label": "项目",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "本期数",
+                "label": "本期数",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:金融工具风险管理 / 风险管理目标和政策#4row0",
+            "headers_equal": true
+          },
+          {
+            "index": 7,
+            "table_name": "风险管理目标和政策（表8）",
+            "columns": [
+              {
+                "key": "项目",
+                "label": "项目",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "本期数",
+                "label": "本期数",
+                "flat": true
+              },
+              {
+                "key": "上期数",
+                "label": "上期数",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:金融工具风险管理 / 风险管理目标和政策#7row0",
+            "headers_equal": true
+          }
+        ]
+      },
+      "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zi-ben-guan-li": {
+        "section_number": "三、资本管理",
+        "section_title": "资本管理",
+        "docx_key": "金融工具风险管理 / 资本管理",
+        "tables": [
+          {
+            "index": 0,
+            "table_name": "资本管理",
+            "columns": [
+              {
+                "key": "项目",
+                "label": "项目",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "期末余额",
+                "label": "期末余额",
+                "flat": true
+              },
+              {
+                "key": "上年年末余额",
+                "label": "上年年末余额",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:金融工具风险管理 / 资本管理#0row0",
+            "headers_equal": true
+          }
+        ]
+      },
+      "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-tao-qi": {
+        "section_number": "三、套期（不适用的删",
+        "section_title": "套期",
+        "docx_key": "金融工具风险管理 / 套期（不适用的删除）",
+        "tables": [
+          {
+            "index": 6,
+            "table_name": "套期（表7）",
+            "columns": [
+              {
+                "key": "公允价值套期",
+                "label": "公允价值套期",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "计入当期损益的套期无效部分",
+                "label": "计入当期损益的套期无效部分",
+                "flat": true
+              },
+              {
+                "key": "计入其他综合收益的套期无效部分",
+                "label": "计入其他综合收益的套期无效部分",
+                "flat": true
+              },
+              {
+                "key": "计入当期损益的利润表列示项目（包括套期无效部分）",
+                "label": "计入当期损益的利润表列示项目（包括套期无效部分）",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:金融工具风险管理 / 套期（不适用的删除）#6row0",
+            "headers_equal": true
+          },
+          {
+            "index": 7,
+            "table_name": "套期（表8）",
+            "columns": [
+              {
+                "key": "公允价值套期",
+                "label": "公允价值套期",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "计入当期损益的套期无效部分",
+                "label": "计入当期损益的套期无效部分",
+                "flat": true
+              },
+              {
+                "key": "计入其他综合收益的套期无效部分",
+                "label": "计入其他综合收益的套期无效部分",
+                "flat": true
+              },
+              {
+                "key": "计入当期损益的利润表列示项目（包括套期无效部分）",
+                "label": "计入当期损益的利润表列示项目（包括套期无效部分）",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:金融工具风险管理 / 套期（不适用的删除）#7row0",
+            "headers_equal": true
+          },
+          {
+            "index": 14,
+            "table_name": "套期（表15）",
+            "columns": [
+              {
+                "key": "现金流量套期",
+                "label": "现金流量套期",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "计入其他综合收益的套期工具的公允价值变动",
+                "label": "计入其他综合收益的套期工具的公允价值变动",
+                "flat": true
+              },
+              {
+                "key": "计入当期的套期无效部分",
+                "label": "计入当期的套期无效部分",
+                "flat": true
+              },
+              {
+                "key": "包含已确认的套期无效部分的利润表列示项目",
+                "label": "包含已确认的套期无效部分的利润表列示项目",
+                "flat": true
+              },
+              {
+                "key": "从现金流量套期储备重分类至当期损益的金额",
+                "label": "从现金流量套期储备重分类至当期损益的金额",
+                "flat": true
+              },
+              {
+                "key": "包含重分类调整的利润表列示项目",
+                "label": "包含重分类调整的利润表列示项目",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:金融工具风险管理 / 套期（不适用的删除）#14row0",
+            "headers_equal": true
+          },
+          {
+            "index": 15,
+            "table_name": "套期（表16）",
+            "columns": [
+              {
+                "key": "现金流量套期",
+                "label": "现金流量套期",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "计入其他综合收益的套期工具的公允价值变动",
+                "label": "计入其他综合收益的套期工具的公允价值变动",
+                "flat": true
+              },
+              {
+                "key": "计入当期的套期无效部分",
+                "label": "计入当期的套期无效部分",
+                "flat": true
+              },
+              {
+                "key": "包含已确认的套期无效部分的利润表列示项目",
+                "label": "包含已确认的套期无效部分的利润表列示项目",
+                "flat": true
+              },
+              {
+                "key": "从现金流量套期储备重分类至当期损益的金额",
+                "label": "从现金流量套期储备重分类至当期损益的金额",
+                "flat": true
+              },
+              {
+                "key": "包含重分类调整的利润表列示项目",
+                "label": "包含重分类调整的利润表列示项目",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:金融工具风险管理 / 套期（不适用的删除）#15row0",
+            "headers_equal": true
+          }
+        ]
+      },
+      "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-ben-gong-si-de-mu-gong-si-qing-kuang": {
+        "section_number": "三、本公司的母公司情",
+        "section_title": "本公司的母公司情况",
+        "docx_key": "关联方及关联交易 / 本公司的母公司情况",
+        "tables": [
+          {
+            "index": 0,
+            "table_name": "本公司的母公司情况（表1）",
+            "columns": [
+              {
+                "key": "母公司名称",
+                "label": "母公司名称",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "注册地",
+                "label": "注册地",
+                "flat": true
+              },
+              {
+                "key": "业务性质",
+                "label": "业务性质",
+                "flat": true
+              },
+              {
+                "key": "注册资本(万元)",
+                "label": "注册资本(万元)",
+                "flat": true
+              },
+              {
+                "key": "母公司对本公司持股比例%",
+                "label": "母公司对本公司持股比例%",
+                "flat": true
+              },
+              {
+                "key": "母公司对本公司表决权比例%",
+                "label": "母公司对本公司表决权比例%",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:关联方及关联交易 / 本公司的母公司情况#0row0",
+            "headers_equal": true
+          },
+          {
+            "index": 1,
+            "table_name": "本公司的母公司情况（表2）",
+            "columns": [
+              {
+                "key": "期初余额",
+                "label": "期初余额",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "本期增加",
+                "label": "本期增加",
+                "flat": true
+              },
+              {
+                "key": "本期减少",
+                "label": "本期减少",
+                "flat": true
+              },
+              {
+                "key": "期末余额",
+                "label": "期末余额",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:关联方及关联交易 / 本公司的母公司情况#1row0",
+            "headers_equal": true
+          }
+        ]
+      },
+      "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-ben-gong-si-de-he-ying-qi-ye-he-lian-yin": {
+        "section_number": "三、本公司的合营企业",
+        "section_title": "本公司的合营企业和联营企业情况",
+        "docx_key": "关联方及关联交易 / 本公司的合营企业和联营企业情况",
+        "tables": [
+          {
+            "index": 0,
+            "table_name": "本公司的合营企业和联营企业情况",
+            "columns": [
+              {
+                "key": "合营或联营企业名称",
+                "label": "合营或联营企业名称",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "与本公司关系",
+                "label": "与本公司关系",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:关联方及关联交易 / 本公司的合营企业和联营企业情况#0row0",
+            "headers_equal": true
+          }
+        ]
+      },
+      "chapter-04-shui-xiang-zhu-yao-shui-zhong-ji-shui-lv": {
+        "section_number": "四、主要税种及税率",
+        "section_title": "主要税种及税率",
+        "docx_key": "税项 / 主要税种及税率",
+        "tables": [
+          {
+            "index": 0,
+            "table_name": "主要税种及税率",
+            "columns": [
+              {
+                "key": "税种",
+                "label": "税种",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "计税依据",
+                "label": "计税依据",
+                "flat": true
+              },
+              {
+                "key": "法定税率",
+                "label": "法定税率",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:税项 / 主要税种及税率#0row0",
+            "headers_equal": true
+          },
+          {
+            "index": 1,
+            "table_name": "主要税种及税率（表2）",
+            "columns": [
+              {
+                "key": "纳税主体名称",
+                "label": "纳税主体名称",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "所得税税率%",
+                "label": "所得税税率%",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:税项 / 主要税种及税率#1row0",
+            "headers_equal": true
+          }
+        ]
+      },
+      "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-yi-nian-nei-dao-qi-de-fei-liu-dong-zi-chan": {
+        "section_number": "五、12",
+        "section_title": "一年内到期的非流动资产",
+        "docx_key": "合并财务报表项目附注 / 一年内到期的非流动资产",
+        "tables": [
+          {
+            "index": 0,
+            "table_name": "一年内到期的非流动资产",
+            "columns": [
+              {
+                "key": "项目",
+                "label": "项目",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "期末余额",
+                "label": "期末余额",
+                "flat": true
+              },
+              {
+                "key": "上年年末余额",
+                "label": "上年年末余额",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:合并财务报表项目附注 / 一年内到期的非流动资产#0row0",
+            "headers_equal": true
+          }
+        ]
+      },
+      "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-yan-sheng-jin-rong-fu-zhai": {
+        "section_number": "五、35",
+        "section_title": "衍生金融负债",
+        "docx_key": "合并财务报表项目附注 / 衍生金融负债",
+        "tables": [
+          {
+            "index": 0,
+            "table_name": "衍生金融负债",
+            "columns": [
+              {
+                "key": "项目",
+                "label": "项目",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "期末余额",
+                "label": "期末余额",
+                "flat": true
+              },
+              {
+                "key": "上年年末余额",
+                "label": "上年年末余额",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:合并财务报表项目附注 / 衍生金融负债#0row0",
+            "headers_equal": true
+          }
+        ]
+      },
+      "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-xian-jin-liu-liang-biao-bu-chong-zi-liao": {
+        "section_number": "五、71",
+        "section_title": "现金流量表补充资料",
+        "docx_key": "合并财务报表项目附注 / 现金流量表补充资料",
+        "tables": [
+          {
+            "index": 0,
+            "table_name": "现金流量表补充资料",
+            "columns": [
+              {
+                "key": "补充资料",
+                "label": "补充资料",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "本期发生额",
+                "label": "本期发生额",
+                "flat": true
+              },
+              {
+                "key": "上期发生额",
+                "label": "上期发生额",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:合并财务报表项目附注 / 现金流量表补充资料#0row0",
+            "headers_equal": true
+          },
+          {
+            "index": 1,
+            "table_name": "本期支付的取得子公司的现金净额",
+            "columns": [
+              {
+                "key": "项目",
+                "label": "项目",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "本期发生额",
+                "label": "本期发生额",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:合并财务报表项目附注 / 现金流量表补充资料#1row0",
+            "headers_equal": true
+          },
+          {
+            "index": 2,
+            "table_name": "本期收到的处置子公司的现金净额",
+            "columns": [
+              {
+                "key": "项目",
+                "label": "项目",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "本期发生额",
+                "label": "本期发生额",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:合并财务报表项目附注 / 现金流量表补充资料#2row0",
+            "headers_equal": true
+          },
+          {
+            "index": 3,
+            "table_name": "现金及现金等价物的构成",
+            "columns": [
+              {
+                "key": "项目",
+                "label": "项目",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "期末余额",
+                "label": "期末余额",
+                "flat": true
+              },
+              {
+                "key": "上年年末余额",
+                "label": "上年年末余额",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:合并财务报表项目附注 / 现金流量表补充资料#3row0",
+            "headers_equal": true
+          },
+          {
+            "index": 4,
+            "table_name": "不属于现金及现金等价物的货币资金",
+            "columns": [
+              {
+                "key": "项目",
+                "label": "项目",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "期末余额",
+                "label": "期末余额",
+                "flat": true
+              },
+              {
+                "key": "上年年末余额",
+                "label": "上年年末余额",
+                "flat": true
+              },
+              {
+                "key": "不属于现金及现金等价物的理由",
+                "label": "不属于现金及现金等价物的理由",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:合并财务报表项目附注 / 现金流量表补充资料#4row0",
+            "headers_equal": true
+          },
+          {
+            "index": 5,
+            "table_name": "资产负债表中的列报项目和相关信息",
+            "columns": [
+              {
+                "key": "列报项目",
+                "label": "列报项目",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "期末余额",
+                "label": "期末余额",
+                "flat": true
+              },
+              {
+                "key": "期初余额",
+                "label": "期初余额",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:合并财务报表项目附注 / 现金流量表补充资料#5row0",
+            "headers_equal": true
+          },
+          {
+            "index": 6,
+            "table_name": "付款到期日的区间",
+            "columns": [
+              {
+                "key": "项目",
+                "label": "项目",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "期末",
+                "label": "期末",
+                "flat": true
+              },
+              {
+                "key": "期初",
+                "label": "期初",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:合并财务报表项目附注 / 现金流量表补充资料#6row0",
+            "headers_equal": true
+          }
+        ]
+      },
+      "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-zu-lin": {
+        "section_number": "五、74",
+        "section_title": "租赁",
+        "docx_key": "合并财务报表项目附注 / 租赁",
+        "tables": [
+          {
+            "index": 0,
+            "table_name": "作为承租人",
+            "columns": [
+              {
+                "key": "项目",
+                "label": "项目",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "本期发生额",
+                "label": "本期发生额",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:合并财务报表项目附注 / 租赁#0row0",
+            "headers_equal": true
+          },
+          {
+            "index": 1,
+            "table_name": "①销售损益、租赁投资净额的融资收益以及与未纳入租赁投资净额的可变租赁付款额相关的收入",
+            "columns": [
+              {
+                "key": "项目",
+                "label": "项目",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "本期发生额",
+                "label": "本期发生额",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:合并财务报表项目附注 / 租赁#1row0",
+            "headers_equal": true
+          },
+          {
+            "index": 2,
+            "table_name": "②资产负债表日后连续五个会计年度每年将收到的未折现租赁收款额，以及剩余年度将收到的未折现租赁收款额总额",
+            "columns": [
+              {
+                "key": "资产负债表日后",
+                "label": "资产负债表日后",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "期末",
+                "label": "期末",
+                "flat": true
+              },
+              {
+                "key": "上年年末",
+                "label": "上年年末",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:合并财务报表项目附注 / 租赁#2row0",
+            "headers_equal": true
+          },
+          {
+            "index": 3,
+            "table_name": "③未折现租赁收款额与租赁投资净额的调节表",
+            "columns": [
+              {
+                "key": "项目",
+                "label": "项目",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "金额",
+                "label": "金额",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:合并财务报表项目附注 / 租赁#3row0",
+            "headers_equal": true
+          },
+          {
+            "index": 4,
+            "table_name": "①租赁收入",
+            "columns": [
+              {
+                "key": "项目",
+                "label": "项目",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "本期发生额",
+                "label": "本期发生额",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:合并财务报表项目附注 / 租赁#4row0",
+            "headers_equal": true
+          },
+          {
+            "index": 5,
+            "table_name": "②资产负债表日后连续五个会计年度每年将收到的未折现租赁收款额，以及剩余年度将收到的未折现租赁收款额总额。",
+            "columns": [
+              {
+                "key": "资产负债表日后",
+                "label": "资产负债表日后",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "期末余额",
+                "label": "期末余额",
+                "flat": true
+              },
+              {
+                "key": "上年年末余额",
+                "label": "上年年末余额",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:合并财务报表项目附注 / 租赁#5row0",
+            "headers_equal": true
+          }
+        ]
+      },
+      "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-ben-gong-si-de-qi-ta-guan-lian-fang-qing-kuang": {
+        "section_number": "十一、本公司的其他关联",
+        "section_title": "本公司的其他关联方情况",
+        "docx_key": "关联方及关联交易 / 本公司的其他关联方情况",
+        "tables": [
+          {
+            "index": 0,
+            "table_name": "本公司的其他关联方情况",
+            "columns": [
+              {
+                "key": "关联方名称",
+                "label": "关联方名称",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "与本公司关系",
+                "label": "与本公司关系",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:关联方及关联交易 / 本公司的其他关联方情况#0row0",
+            "headers_equal": true
+          }
+        ]
+      },
+      "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-fang-ying-shou-ying-fu-kuan-xiang": {
+        "section_number": "十一、关联方应收应付款",
+        "section_title": "关联方应收应付款项",
+        "docx_key": "关联方及关联交易 / 关联方应收应付款项",
+        "tables": [
+          {
+            "index": 1,
+            "table_name": "应付关联方款项（注意：是报表项目）",
+            "columns": [
+              {
+                "key": "项目名称",
+                "label": "项目名称",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "关联方",
+                "label": "关联方",
+                "flat": true
+              },
+              {
+                "key": "期末余额",
+                "label": "期末余额",
+                "flat": true
+              },
+              {
+                "key": "上年年末余额",
+                "label": "上年年末余额",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:关联方及关联交易 / 关联方应收应付款项#1row0",
+            "headers_equal": true
+          }
+        ]
+      },
+      "chapter-12-gu-fen-zhi-fu-ben-qi-gu-fen-zhi-fu-fei-yong": {
+        "section_number": "十二、本期股份支付费用",
+        "section_title": "本期股份支付费用",
+        "docx_key": "股份支付（不适用的一定删除） / 本期股份支付费用",
+        "tables": [
+          {
+            "index": 0,
+            "table_name": "本期股份支付费用",
+            "columns": [
+              {
+                "key": "授予对象类别",
+                "label": "授予对象类别",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "以权益结算的股份支付费用",
+                "label": "以权益结算的股份支付费用",
+                "flat": true
+              },
+              {
+                "key": "以现金结算的股份支付费用",
+                "label": "以现金结算的股份支付费用",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:股份支付（不适用的一定删除） / 本期股份支付费用#0row0",
+            "headers_equal": true
+          }
+        ]
+      },
+      "chapter-13-cheng-nuo-ji-huo-you-shi-xiang-zhong-yao-de-cheng-nuo-shi-xiang": {
+        "section_number": "十三、重要的承诺事项",
+        "section_title": "重要的承诺事项",
+        "docx_key": "承诺及或有事项 / 重要的承诺事项",
+        "tables": [
+          {
+            "index": 0,
+            "table_name": "资本承诺",
+            "columns": [
+              {
+                "key": "已签约但尚未于财务报表中确认的资本承诺",
+                "label": "已签约但尚未于财务报表中确认的资本承诺",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "期末余额",
+                "label": "期末余额",
+                "flat": true
+              },
+              {
+                "key": "上年年末余额",
+                "label": "上年年末余额",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:承诺及或有事项 / 重要的承诺事项#0row0",
+            "headers_equal": true
+          }
+        ]
+      },
+      "chapter-13-cheng-nuo-ji-huo-you-shi-xiang-huo-you-shi-xiang": {
+        "section_number": "十三、或有事项",
+        "section_title": "或有事项",
+        "docx_key": "承诺及或有事项 / 或有事项",
+        "tables": [
+          {
+            "index": 0,
+            "table_name": "未决诉讼仲裁形成的或有负债及其财务影响",
+            "columns": [
+              {
+                "key": "原告",
+                "label": "原告",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "被告",
+                "label": "被告",
+                "flat": true
+              },
+              {
+                "key": "案由",
+                "label": "案由",
+                "flat": true
+              },
+              {
+                "key": "受理法院",
+                "label": "受理法院",
+                "flat": true
+              },
+              {
+                "key": "标的额",
+                "label": "标的额",
+                "flat": true
+              },
+              {
+                "key": "案件进展情况",
+                "label": "案件进展情况",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:承诺及或有事项 / 或有事项#0row0",
+            "headers_equal": true
+          },
+          {
+            "index": 1,
+            "table_name": "截至2025年12月31日，本公司为下列单位贷款提供保证：",
+            "columns": [
+              {
+                "key": "被担保单位名称",
+                "label": "被担保单位名称",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "担保事项",
+                "label": "担保事项",
+                "flat": true
+              },
+              {
+                "key": "金额",
+                "label": "金额",
+                "flat": true
+              },
+              {
+                "key": "期限",
+                "label": "期限",
+                "flat": true
+              },
+              {
+                "key": "备注",
+                "label": "备注",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:承诺及或有事项 / 或有事项#1row0",
+            "headers_equal": true
+          }
+        ]
+      },
+      "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-zhong-yao-de-zi-chan-fu-zhai-biao-ri-hou-fei-t": {
+        "section_number": "十四、重要的资产负债表",
+        "section_title": "重要的资产负债表日后非调整事项说明",
+        "docx_key": "资产负债表日后事项 / 重要的资产负债表日后非调整事项说明",
+        "tables": [
+          {
+            "index": 0,
+            "table_name": "重要的资产负债表日后非调整事项说明",
+            "columns": [
+              {
+                "key": "项目",
+                "label": "项目",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "内容",
+                "label": "内容",
+                "flat": true
+              },
+              {
+                "key": "对财务状况和经营成果的影响数",
+                "label": "对财务状况和经营成果的影响数",
+                "flat": true
+              },
+              {
+                "key": "无法估计影响数的原因",
+                "label": "无法估计影响数的原因",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:资产负债表日后事项 / 重要的资产负债表日后非调整事项说明#0row0",
+            "headers_equal": true
+          }
+        ]
+      },
+      "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-qian-qi-cha-cuo-geng-zheng": {
+        "section_number": "十四、前期差错更正",
+        "section_title": "前期差错更正",
+        "docx_key": "其他重要事项 / 前期差错更正",
+        "tables": [
+          {
+            "index": 0,
+            "table_name": "追溯重述法",
+            "columns": [
+              {
+                "key": "差错更正的内容",
+                "label": "差错更正的内容",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "处理程序",
+                "label": "处理程序",
+                "flat": true
+              },
+              {
+                "key": "受影响的比较期间报表项目",
+                "label": "受影响的比较期间报表项目",
+                "flat": true
+              },
+              {
+                "key": "累积影响数",
+                "label": "累积影响数",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:其他重要事项 / 前期差错更正#0row0",
+            "headers_equal": true
+          },
+          {
+            "index": 1,
+            "table_name": "未来适用法",
+            "columns": [
+              {
+                "key": "差错更正的内容",
+                "label": "差错更正的内容",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "批准程序",
+                "label": "批准程序",
+                "flat": true
+              },
+              {
+                "key": "采用未来适用法的原因",
+                "label": "采用未来适用法的原因",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:其他重要事项 / 前期差错更正#1row0",
+            "headers_equal": true
+          }
+        ]
+      },
+      "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-zhong-yao-zhai-wu-chong-zu": {
+        "section_number": "十四、重要债务重组",
+        "section_title": "重要债务重组",
+        "docx_key": "其他重要事项 / 重要债务重组",
+        "tables": [
+          {
+            "index": 0,
+            "table_name": "重要债务重组（表1）",
+            "columns": [
+              {
+                "key": "债务重组方式",
+                "label": "债务重组方式",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "债务账面价值",
+                "label": "债务账面价值",
+                "flat": true
+              },
+              {
+                "key": "债务重组利得金额",
+                "label": "债务重组利得金额",
+                "flat": true
+              },
+              {
+                "key": "股本等所有者权益增加金额",
+                "label": "股本等所有者权益增加金额",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:其他重要事项 / 重要债务重组#0row0",
+            "headers_equal": true
+          },
+          {
+            "index": 1,
+            "table_name": "重要债务重组（表2）",
+            "columns": [
+              {
+                "key": "项目",
+                "label": "项目",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "公允价值金额",
+                "label": "公允价值金额",
+                "flat": true
+              },
+              {
+                "key": "确定方法及依据",
+                "label": "确定方法及依据",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:其他重要事项 / 重要债务重组#1row0",
+            "headers_equal": true
+          },
+          {
+            "index": 2,
+            "table_name": "债权人披露情况",
+            "columns": [
+              {
+                "key": "债务重组方式",
+                "label": "债务重组方式",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "债权账面价值",
+                "label": "债权账面价值",
+                "flat": true
+              },
+              {
+                "key": "债务重组损失金额",
+                "label": "债务重组损失金额",
+                "flat": true
+              },
+              {
+                "key": "长期股权投资或权益工具投资增加金额",
+                "label": "长期股权投资或权益工具投资增加金额",
+                "flat": true
+              },
+              {
+                "key": "占债务人股份总额的比例",
+                "label": "占债务人股份总额的比例",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:其他重要事项 / 重要债务重组#2row0",
+            "headers_equal": true
+          }
+        ]
+      },
+      "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-zhong-zhi-jing-ying": {
+        "section_number": "十四、终止经营",
+        "section_title": "终止经营",
+        "docx_key": "其他重要事项 / 终止经营",
+        "tables": [
+          {
+            "index": 0,
+            "table_name": "终止经营",
+            "columns": [
+              {
+                "key": "项目",
+                "label": "项目",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "本期发生额",
+                "label": "本期发生额",
+                "flat": true
+              },
+              {
+                "key": "上期发生额",
+                "label": "上期发生额",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:其他重要事项 / 终止经营#0row0",
+            "headers_equal": true
+          }
+        ]
+      },
+      "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-qi-ta": {
+        "section_number": "十四、其他",
+        "section_title": "其他",
+        "docx_key": "其他重要事项 / 其他",
+        "tables": [
+          {
+            "index": 0,
+            "table_name": "其他（表1）",
+            "columns": [
+              {
+                "key": "处于申请状态的知识产权",
+                "label": "处于申请状态的知识产权",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "开始资本化时点",
+                "label": "开始资本化时点",
+                "flat": true
+              },
+              {
+                "key": "申请状态",
+                "label": "申请状态",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:其他重要事项 / 其他#0row0",
+            "headers_equal": true
+          },
+          {
+            "index": 1,
+            "table_name": "其他（表2）",
+            "columns": [
+              {
+                "key": "失效的知识产权",
+                "label": "失效的知识产权",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "失效事由",
+                "label": "失效事由",
+                "flat": true
+              },
+              {
+                "key": "账面原值",
+                "label": "账面原值",
+                "flat": true
+              },
+              {
+                "key": "累计摊销",
+                "label": "累计摊销",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:其他重要事项 / 其他#1row0",
+            "headers_equal": true
+          }
+        ]
+      },
+      "chapter-17-bu-chong-zi-liao-dang-qi-fei-jing-chang-xing-sun-yi-ming-xi-biao": {
+        "section_number": "十七、当期非经常性损益明细表（无数据的行项目，尽可能删除）",
+        "section_title": "当期非经常性损益明细表",
+        "docx_key": "补充资料 / 当期非经常性损益明细表（无数据的行项目，尽可能删除）",
+        "tables": [
+          {
+            "index": 0,
+            "table_name": "当期非经常性损益明细表",
+            "columns": [
+              {
+                "key": "项目",
+                "label": "项目",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "本期发生额",
+                "label": "本期发生额",
+                "flat": true
+              },
+              {
+                "key": "说明",
+                "label": "说明",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:补充资料 / 当期非经常性损益明细表（无数据的行项目，尽可能删除）#0row0",
+            "headers_equal": true
+          }
+        ]
+      },
+      "chapter-17-bu-chong-zi-liao-jing-zi-chan-shou-yi-lv-he-mei-gu-shou-yi": {
+        "section_number": "十七、净资产收益率和每股收益",
+        "section_title": "净资产收益率和每股收益",
+        "docx_key": "补充资料 / 净资产收益率和每股收益",
+        "tables": [
+          {
+            "index": 1,
+            "table_name": "净资产收益率和每股收益（表2）",
+            "columns": [
+              {
+                "key": "每股收益的计算",
+                "label": "每股收益的计算",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "本期金额",
+                "label": "本期金额",
+                "flat": true
+              },
+              {
+                "key": "上期金额",
+                "label": "上期金额",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:补充资料 / 净资产收益率和每股收益#1row0",
+            "headers_equal": true
+          }
+        ]
+      }
+    },
+    "soe": {
+      "chapter-06-shui-xiang-zhu-yao-shui-zhong-ji-shui-lv": {
+        "section_number": "六、主要税种及税率",
+        "section_title": "主要税种及税率",
+        "docx_key": "税项 / 主要税种及税率",
+        "tables": [
+          {
+            "index": 0,
+            "table_name": "主要税种及税率",
+            "columns": [
+              {
+                "key": "税种",
+                "label": "税种",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "计税依据",
+                "label": "计税依据",
+                "flat": true
+              },
+              {
+                "key": "法定税率%",
+                "label": "法定税率%",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:税项 / 主要税种及税率#0row0",
+            "headers_equal": true
+          }
+        ]
+      },
+      "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-ying-shou-zi-jin-ji-zhong-guan-li-kuan": {
+        "section_number": "八、8",
+        "section_title": "应收资金集中管理款",
+        "docx_key": "财务报表主要项目注释 / 应收资金集中管理款",
+        "tables": [
+          {
+            "index": 0,
+            "table_name": "应收资金集中管理款",
+            "columns": [
+              {
+                "key": "项目",
+                "label": "项目",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "期末余额",
+                "label": "期末余额",
+                "flat": true
+              },
+              {
+                "key": "期初余额",
+                "label": "期初余额",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:财务报表主要项目注释 / 应收资金集中管理款#0row0",
+            "headers_equal": true
+          }
+        ]
+      },
+      "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-yi-nian-nei-dao-qi-de-fei-liu-dong-zi-chan": {
+        "section_number": "八、13",
+        "section_title": "一年内到期的非流动资产",
+        "docx_key": "财务报表主要项目注释 / 一年内到期的非流动资产",
+        "tables": [
+          {
+            "index": 0,
+            "table_name": "一年内到期的非流动资产",
+            "columns": [
+              {
+                "key": "项目",
+                "label": "项目",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "期末余额",
+                "label": "期末余额",
+                "flat": true
+              },
+              {
+                "key": "期初余额",
+                "label": "期初余额",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:财务报表主要项目注释 / 一年内到期的非流动资产#0row0",
+            "headers_equal": true
+          }
+        ]
+      },
+      "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-yan-sheng-jin-rong-fu-zhai": {
+        "section_number": "八、35",
+        "section_title": "衍生金融负债",
+        "docx_key": "财务报表主要项目注释 / 衍生金融负债",
+        "tables": [
+          {
+            "index": 0,
+            "table_name": "衍生金融负债",
+            "columns": [
+              {
+                "key": "项目",
+                "label": "项目",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "期末余额",
+                "label": "期末余额",
+                "flat": true
+              },
+              {
+                "key": "期初余额",
+                "label": "期初余额",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:财务报表主要项目注释 / 衍生金融负债#0row0",
+            "headers_equal": true
+          }
+        ]
+      },
+      "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-yi-nian-nei-dao-qi-de-chang-qi-jie-kuan": {
+        "section_number": "八、45",
+        "section_title": "（1）一年内到期的长期借款",
+        "docx_key": "财务报表主要项目注释 / （1）一年内到期的长期借款",
+        "tables": [
+          {
+            "index": 0,
+            "table_name": "（1）一年内到期的长期借款",
+            "columns": [
+              {
+                "key": "项目",
+                "label": "项目",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "期末余额",
+                "label": "期末余额",
+                "flat": true
+              },
+              {
+                "key": "期初余额",
+                "label": "期初余额",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:财务报表主要项目注释 / （1）一年内到期的长期借款#0row0",
+            "headers_equal": true
+          }
+        ]
+      },
+      "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-yi-nian-nei-dao-qi-de-ying-fu-zhai-quan": {
+        "section_number": "八、46",
+        "section_title": "（2）一年内到期的应付债券",
+        "docx_key": "财务报表主要项目注释 / （2）一年内到期的应付债券",
+        "tables": [
+          {
+            "index": 0,
+            "table_name": "（2）一年内到期的应付债券",
+            "columns": [
+              {
+                "key": "债券名称",
+                "label": "债券名称",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "面值",
+                "label": "面值",
+                "flat": true
+              },
+              {
+                "key": "发行日期",
+                "label": "发行日期",
+                "flat": true
+              },
+              {
+                "key": "债券期限",
+                "label": "债券期限",
+                "flat": true
+              },
+              {
+                "key": "发行金额",
+                "label": "发行金额",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:财务报表主要项目注释 / （2）一年内到期的应付债券#0row0",
+            "headers_equal": true
+          },
+          {
+            "index": 1,
+            "table_name": "一年内到期的应付债券",
+            "columns": [
+              {
+                "key": "债券名称",
+                "label": "债券名称",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "期初余额",
+                "label": "期初余额",
+                "flat": true
+              },
+              {
+                "key": "本期发行",
+                "label": "本期发行",
+                "flat": true
+              },
+              {
+                "key": "按面值计提利息",
+                "label": "按面值计提利息",
+                "flat": true
+              },
+              {
+                "key": "溢折价摊销",
+                "label": "溢折价摊销",
+                "flat": true
+              },
+              {
+                "key": "本期偿还",
+                "label": "本期偿还",
+                "flat": true
+              },
+              {
+                "key": "期末余额",
+                "label": "期末余额",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:财务报表主要项目注释 / （2）一年内到期的应付债券#1row0",
+            "headers_equal": true
+          }
+        ]
+      },
+      "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-mei-gu-shou-yi": {
+        "section_number": "八、80",
+        "section_title": "每股收益",
+        "docx_key": "财务报表主要项目注释 / 每股收益（仅限于上市公司和证监会已经明确复函企业同意发行股票的拟上市公司披露）",
+        "tables": [
+          {
+            "index": 0,
+            "table_name": "每股收益",
+            "columns": [
+              {
+                "key": "项目",
+                "label": "项目",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "代码",
+                "label": "代码",
+                "flat": true
+              },
+              {
+                "key": "本期发生额",
+                "label": "本期发生额",
+                "flat": true
+              },
+              {
+                "key": "上期发生额",
+                "label": "上期发生额",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:财务报表主要项目注释 / 每股收益（仅限于上市公司和证监会已经明确复函企业同意发行股票的拟上市公司披露）#0row0",
+            "headers_equal": true
+          }
+        ]
+      },
+      "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-jie-kuan-fei-yong": {
+        "section_number": "八、85",
+        "section_title": "借款费用",
+        "docx_key": "财务报表主要项目注释 / 借款费用",
+        "tables": [
+          {
+            "index": 0,
+            "table_name": "借款费用",
+            "columns": [
+              {
+                "key": "项目",
+                "label": "项目",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "当期资本化的借款费用金额",
+                "label": "当期资本化的借款费用金额",
+                "flat": true
+              },
+              {
+                "key": "资本化率",
+                "label": "资本化率",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:财务报表主要项目注释 / 借款费用#0row0",
+            "headers_equal": true
+          }
+        ]
+      },
+      "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-zhong-zhi-jing-ying": {
+        "section_number": "八、89",
+        "section_title": "终止经营",
+        "docx_key": "财务报表主要项目注释 / 终止经营",
+        "tables": [
+          {
+            "index": 0,
+            "table_name": "终止经营",
+            "columns": [
+              {
+                "key": "项目",
+                "label": "项目",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "本期发生额",
+                "label": "本期发生额",
+                "flat": true
+              },
+              {
+                "key": "上期发生额",
+                "label": "上期发生额",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:财务报表主要项目注释 / 终止经营#0row0",
+            "headers_equal": true
+          }
+        ]
+      },
+      "chapter-09-huo-you-shi-xiang-huo-you-zi-chan": {
+        "section_number": "九、2、或有资产",
+        "section_title": "2、或有资产",
+        "docx_key": "或有事项 / 2、或有资产",
+        "tables": [
+          {
+            "index": 0,
+            "table_name": "2、或有资产",
+            "columns": [
+              {
+                "key": "种类",
+                "label": "种类",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "形成原因",
+                "label": "形成原因",
+                "flat": true
+              },
+              {
+                "key": "预计产生的财务影响",
+                "label": "预计产生的财务影响",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:或有事项 / 2、或有资产#0row0",
+            "headers_equal": true
+          }
+        ]
+      },
+      "chapter-10-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-zhong-yao-de-zi-chan-fu-zhai-biao-ri-hou-shi-x": {
+        "section_number": "十、重要的资产负债表",
+        "section_title": "重要的资产负债表日后事项说明",
+        "docx_key": "资产负债表日后事项 / 重要的资产负债表日后事项说明",
+        "tables": [
+          {
+            "index": 0,
+            "table_name": "重要的资产负债表日后事项说明",
+            "columns": [
+              {
+                "key": "项目",
+                "label": "项目",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "内容",
+                "label": "内容",
+                "flat": true
+              },
+              {
+                "key": "对财务状况和经营成果的影响数",
+                "label": "对财务状况和经营成果的影响数",
+                "flat": true
+              },
+              {
+                "key": "无法估计影响数的原因",
+                "label": "无法估计影响数的原因",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:资产负债表日后事项 / 重要的资产负债表日后事项说明#0row0",
+            "headers_equal": true
+          }
+        ]
+      },
+      "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-ben-gong-si-de-mu-gong-si-qing-kuang": {
+        "section_number": "十一、本公司的母公司情",
+        "section_title": "本公司的母公司情况",
+        "docx_key": "关联方关系及其交易 / 本公司的母公司情况",
+        "tables": [
+          {
+            "index": 0,
+            "table_name": "本公司的母公司情况",
+            "columns": [
+              {
+                "key": "母公司名称",
+                "label": "母公司名称",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "注册地",
+                "label": "注册地",
+                "flat": true
+              },
+              {
+                "key": "业务性质",
+                "label": "业务性质",
+                "flat": true
+              },
+              {
+                "key": "注册资本",
+                "label": "注册资本",
+                "flat": true
+              },
+              {
+                "key": "母公司对本公司的持股比例（%）",
+                "label": "母公司对本公司的持股比例（%）",
+                "flat": true
+              },
+              {
+                "key": "母公司对本公司的表决权比例（%）",
+                "label": "母公司对本公司的表决权比例（%）",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:关联方关系及其交易 / 本公司的母公司情况#0row0",
+            "headers_equal": true
+          },
+          {
+            "index": 1,
+            "table_name": "本公司的母公司情况（表2）",
+            "columns": [
+              {
+                "key": "母公司名称",
+                "label": "母公司名称",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "期初余额",
+                "label": "期初余额",
+                "flat": true
+              },
+              {
+                "key": "本期增加",
+                "label": "本期增加",
+                "flat": true
+              },
+              {
+                "key": "本期减少",
+                "label": "本期减少",
+                "flat": true
+              },
+              {
+                "key": "期末余额",
+                "label": "期末余额",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:关联方关系及其交易 / 本公司的母公司情况#1row0",
+            "headers_equal": true
+          }
+        ]
+      },
+      "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-ben-gong-si-de-qi-ta-guan-lian-fang-qing-kuang": {
+        "section_number": "十一、本公司的其他关联",
+        "section_title": "本公司的其他关联方情况",
+        "docx_key": "关联方关系及其交易 / 本公司的其他关联方情况",
+        "tables": [
+          {
+            "index": 0,
+            "table_name": "本公司的其他关联方情况",
+            "columns": [
+              {
+                "key": "关联方名称",
+                "label": "关联方名称",
+                "flat": true,
+                "is_label": true
+              },
+              {
+                "key": "与本公司关系",
+                "label": "与本公司关系",
+                "flat": true
+              },
+              {
+                "key": "组织机构代码",
+                "label": "组织机构代码",
+                "flat": true
+              }
+            ],
+            "source_ref": "docx:关联方关系及其交易 / 本公司的其他关联方情况#0row0",
+            "headers_equal": true
+          }
+        ]
+      }
+    }
+  },
+  "deficits": {
+    "listed": [
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-chang-qi-gu-quan-tou-zi",
+        "section_number": "三、长期股权投资",
+        "section_title": "长期股权投资",
+        "index": 0,
+        "table_name": "长期股权投资",
+        "json_header_count": 3,
+        "reason": "LEN_MISMATCH（docx 13 列 vs JSON 3 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-gu-ding-zi-chan",
+        "section_number": "三、固定资产",
+        "section_title": "固定资产",
+        "index": 0,
+        "table_name": "各类固定资产的折旧方法",
+        "json_header_count": 4,
+        "reason": "LEN_MISMATCH（docx 3 列 vs JSON 4 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-sheng-wu-zi-chan",
+        "section_number": "三、生物资产【不适用",
+        "section_title": "生物资产",
+        "index": 0,
+        "table_name": "生产性生物资产",
+        "json_header_count": 4,
+        "reason": "EXISTING_DIFFERS（已有 4 列与规则给的 4 列不一致；不覆盖，需人工裁决归属）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-yan-fa-zhi-chu",
+        "section_number": "三、研发支出",
+        "section_title": "研发支出",
+        "index": 0,
+        "table_name": "研发支出",
+        "json_header_count": 3,
+        "reason": "LEN_MISMATCH（docx 5 列 vs JSON 3 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-chang-qi-dai-tan-fei-yong",
+        "section_number": "三、长期待摊费用",
+        "section_title": "长期待摊费用",
+        "index": 0,
+        "table_name": "长期待摊费用",
+        "json_header_count": 5,
+        "reason": "LEN_MISMATCH（docx 6 列 vs JSON 5 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+        "section_number": "三、重要会计政策、会",
+        "section_title": "重要会计政策、会计估计的变更",
+        "index": 0,
+        "table_name": "执行上述会计政策对2025年度合并利润表的影响如下：",
+        "json_header_count": 2,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+        "section_number": "三、重要会计政策、会",
+        "section_title": "重要会计政策、会计估计的变更",
+        "index": 1,
+        "table_name": "执行上述会计政策对2024年12月31日合并资产负债表的影响如下：",
+        "json_header_count": 4,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+        "section_number": "三、重要会计政策、会",
+        "section_title": "重要会计政策、会计估计的变更",
+        "index": 2,
+        "table_name": "执行上述会计政策对2024年1月1日合并资产负债表的影响如下：",
+        "json_header_count": 4,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+        "section_number": "三、重要会计政策、会",
+        "section_title": "重要会计政策、会计估计的变更",
+        "index": 3,
+        "table_name": "本期会计政策变更的累积影响",
+        "json_header_count": 3,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji",
+        "section_number": "三、重要会计政策、会",
+        "section_title": "重要会计政策、会计估计的变更",
+        "index": 4,
+        "table_name": "重要会计估计变更",
+        "json_header_count": 4,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-xian-jin-liu-liang-biao-xiang-mu-zhu-shi",
+        "section_number": "三、现金流量表项目注",
+        "section_title": "现金流量表项目注释",
+        "index": 8,
+        "table_name": "筹资活动产生的各项负债的变动情况",
+        "json_header_count": 5,
+        "reason": "LEN_MISMATCH（docx 8 列 vs JSON 5 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-yan-fa-zhi-chu-2",
+        "section_number": "三、研发支出",
+        "section_title": "研发支出",
+        "index": 0,
+        "table_name": "研发支出",
+        "json_header_count": 3,
+        "reason": "LEN_MISMATCH（docx 5 列 vs JSON 3 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-kai-fa-zhi-chu",
+        "section_number": "三、开发支出",
+        "section_title": "开发支出",
+        "index": 0,
+        "table_name": "开发支出（表1）",
+        "json_header_count": 5,
+        "reason": "COUNT_MISMATCH（docx 1 表 vs JSON 3 表）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-kai-fa-zhi-chu",
+        "section_number": "三、开发支出",
+        "section_title": "开发支出",
+        "index": 1,
+        "table_name": "开发支出（表2）",
+        "json_header_count": 6,
+        "reason": "COUNT_MISMATCH（docx 1 表 vs JSON 3 表）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-kai-fa-zhi-chu",
+        "section_number": "三、开发支出",
+        "section_title": "开发支出",
+        "index": 2,
+        "table_name": "开发支出（表3）",
+        "json_header_count": 5,
+        "reason": "COUNT_MISMATCH（docx 1 表 vs JSON 3 表）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zai-zi-gong-si-zhong-de-quan-yi",
+        "section_number": "三、在子公司中的权益",
+        "section_title": "在子公司中的权益",
+        "index": 0,
+        "table_name": "在子公司中的权益（表1）",
+        "json_header_count": 7,
+        "reason": "COUNT_MISMATCH（docx 5 表 vs JSON 6 表）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zai-zi-gong-si-zhong-de-quan-yi",
+        "section_number": "三、在子公司中的权益",
+        "section_title": "在子公司中的权益",
+        "index": 1,
+        "table_name": "在子公司中的权益（表2）",
+        "json_header_count": 5,
+        "reason": "COUNT_MISMATCH（docx 5 表 vs JSON 6 表）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zai-zi-gong-si-zhong-de-quan-yi",
+        "section_number": "三、在子公司中的权益",
+        "section_title": "在子公司中的权益",
+        "index": 2,
+        "table_name": "在子公司中的权益（表3）",
+        "json_header_count": 2,
+        "reason": "COUNT_MISMATCH（docx 5 表 vs JSON 6 表）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zai-zi-gong-si-zhong-de-quan-yi",
+        "section_number": "三、在子公司中的权益",
+        "section_title": "在子公司中的权益",
+        "index": 3,
+        "table_name": "在子公司中的权益（表4）",
+        "json_header_count": 2,
+        "reason": "COUNT_MISMATCH（docx 5 表 vs JSON 6 表）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zai-zi-gong-si-zhong-de-quan-yi",
+        "section_number": "三、在子公司中的权益",
+        "section_title": "在子公司中的权益",
+        "index": 4,
+        "table_name": "在子公司中的权益（表5）",
+        "json_header_count": 3,
+        "reason": "COUNT_MISMATCH（docx 5 表 vs JSON 6 表）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zai-zi-gong-si-zhong-de-quan-yi",
+        "section_number": "三、在子公司中的权益",
+        "section_title": "在子公司中的权益",
+        "index": 5,
+        "table_name": "在子公司中的权益（表6）",
+        "json_header_count": 4,
+        "reason": "COUNT_MISMATCH（docx 5 表 vs JSON 6 表）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-fei-tong-yi-kong-zhi-xia-qi-ye-he-bing",
+        "section_number": "三、非同一控制下企业",
+        "section_title": "非同一控制下企业合并",
+        "index": 2,
+        "table_name": "非同一控制下企业合并（表3）",
+        "json_header_count": 3,
+        "reason": "LEN_MISMATCH（docx 5 列 vs JSON 3 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-tong-yi-kong-zhi-xia-qi-ye-he-bing",
+        "section_number": "三、同一控制下企业合",
+        "section_title": "同一控制下企业合并",
+        "index": 2,
+        "table_name": "同一控制下企业合并（表3）",
+        "json_header_count": 3,
+        "reason": "LEN_MISMATCH（docx 5 列 vs JSON 3 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-chu-zhi-zi-gong-si",
+        "section_number": "三、处置子公司",
+        "section_title": "处置子公司",
+        "index": 0,
+        "table_name": "处置子公司（表1）",
+        "json_header_count": 8,
+        "reason": "COUNT_MISMATCH（docx 2 表 vs JSON 12 表）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-chu-zhi-zi-gong-si",
+        "section_number": "三、处置子公司",
+        "section_title": "处置子公司",
+        "index": 1,
+        "table_name": "处置子公司（表2）",
+        "json_header_count": 7,
+        "reason": "COUNT_MISMATCH（docx 2 表 vs JSON 12 表）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-chu-zhi-zi-gong-si",
+        "section_number": "三、处置子公司",
+        "section_title": "处置子公司",
+        "index": 2,
+        "table_name": "处置子公司（表3）",
+        "json_header_count": 8,
+        "reason": "COUNT_MISMATCH（docx 2 表 vs JSON 12 表）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-chu-zhi-zi-gong-si",
+        "section_number": "三、处置子公司",
+        "section_title": "处置子公司",
+        "index": 3,
+        "table_name": "处置子公司（表4）",
+        "json_header_count": 6,
+        "reason": "COUNT_MISMATCH（docx 2 表 vs JSON 12 表）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-chu-zhi-zi-gong-si",
+        "section_number": "三、处置子公司",
+        "section_title": "处置子公司",
+        "index": 4,
+        "table_name": "处置子公司（表5）",
+        "json_header_count": 3,
+        "reason": "COUNT_MISMATCH（docx 2 表 vs JSON 12 表）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-chu-zhi-zi-gong-si",
+        "section_number": "三、处置子公司",
+        "section_title": "处置子公司",
+        "index": 5,
+        "table_name": "处置子公司（表6）",
+        "json_header_count": 6,
+        "reason": "COUNT_MISMATCH（docx 2 表 vs JSON 12 表）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-chu-zhi-zi-gong-si",
+        "section_number": "三、处置子公司",
+        "section_title": "处置子公司",
+        "index": 6,
+        "table_name": "处置子公司（表7）",
+        "json_header_count": 8,
+        "reason": "COUNT_MISMATCH（docx 2 表 vs JSON 12 表）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-chu-zhi-zi-gong-si",
+        "section_number": "三、处置子公司",
+        "section_title": "处置子公司",
+        "index": 7,
+        "table_name": "处置子公司（表8）",
+        "json_header_count": 6,
+        "reason": "COUNT_MISMATCH（docx 2 表 vs JSON 12 表）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-chu-zhi-zi-gong-si",
+        "section_number": "三、处置子公司",
+        "section_title": "处置子公司",
+        "index": 8,
+        "table_name": "处置子公司（表9）",
+        "json_header_count": 3,
+        "reason": "COUNT_MISMATCH（docx 2 表 vs JSON 12 表）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-chu-zhi-zi-gong-si",
+        "section_number": "三、处置子公司",
+        "section_title": "处置子公司",
+        "index": 9,
+        "table_name": "处置子公司（表10）",
+        "json_header_count": 6,
+        "reason": "COUNT_MISMATCH（docx 2 表 vs JSON 12 表）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-chu-zhi-zi-gong-si",
+        "section_number": "三、处置子公司",
+        "section_title": "处置子公司",
+        "index": 10,
+        "table_name": "处置子公司（表11）",
+        "json_header_count": 5,
+        "reason": "COUNT_MISMATCH（docx 2 表 vs JSON 12 表）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-chu-zhi-zi-gong-si",
+        "section_number": "三、处置子公司",
+        "section_title": "处置子公司",
+        "index": 11,
+        "table_name": "处置子公司（表12）",
+        "json_header_count": 2,
+        "reason": "COUNT_MISMATCH（docx 2 表 vs JSON 12 表）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zai-he-ying-an-pai-huo-lian-ying-qi-ye-z",
+        "section_number": "三、在合营安排或联营",
+        "section_title": "在合营安排或联营企业中的权益",
+        "index": 0,
+        "table_name": "在合营安排或联营企业中的权益（表1）",
+        "json_header_count": 6,
+        "reason": "LEN_MISMATCH（docx 7 列 vs JSON 6 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zai-he-ying-an-pai-huo-lian-ying-qi-ye-z",
+        "section_number": "三、在合营安排或联营",
+        "section_title": "在合营安排或联营企业中的权益",
+        "index": 1,
+        "table_name": "在合营安排或联营企业中的权益（表2）",
+        "json_header_count": 4,
+        "reason": "LEN_MISMATCH（docx 7 列 vs JSON 4 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zai-he-ying-an-pai-huo-lian-ying-qi-ye-z",
+        "section_number": "三、在合营安排或联营",
+        "section_title": "在合营安排或联营企业中的权益",
+        "index": 2,
+        "table_name": "在合营安排或联营企业中的权益（表3）",
+        "json_header_count": 4,
+        "reason": "LEN_MISMATCH（docx 7 列 vs JSON 4 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zai-he-ying-an-pai-huo-lian-ying-qi-ye-z",
+        "section_number": "三、在合营安排或联营",
+        "section_title": "在合营安排或联营企业中的权益",
+        "index": 3,
+        "table_name": "在合营安排或联营企业中的权益（表4）",
+        "json_header_count": 4,
+        "reason": "LEN_MISMATCH（docx 7 列 vs JSON 4 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zai-he-ying-an-pai-huo-lian-ying-qi-ye-z",
+        "section_number": "三、在合营安排或联营",
+        "section_title": "在合营安排或联营企业中的权益",
+        "index": 4,
+        "table_name": "在合营安排或联营企业中的权益（表5）",
+        "json_header_count": 4,
+        "reason": "LEN_MISMATCH（docx 7 列 vs JSON 4 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zai-he-ying-an-pai-huo-lian-ying-qi-ye-z",
+        "section_number": "三、在合营安排或联营",
+        "section_title": "在合营安排或联营企业中的权益",
+        "index": 7,
+        "table_name": "在合营安排或联营企业中的权益（表8）",
+        "json_header_count": 5,
+        "reason": "LEN_MISMATCH（docx 6 列 vs JSON 5 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zai-wei-na-ru-he-bing-cai-wu-bao-biao-fa",
+        "section_number": "三、在未纳入合并财务",
+        "section_title": "在未纳入合并财务报表范围的结构化主体中的权益",
+        "index": 0,
+        "table_name": "与权益相关资产负债的账面价值和最大损失敞口",
+        "json_header_count": 5,
+        "reason": "LEN_MISMATCH（docx 7 列 vs JSON 5 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-zai-wei-na-ru-he-bing-cai-wu-bao-biao-fa",
+        "section_number": "三、在未纳入合并财务",
+        "section_title": "在未纳入合并财务报表范围的结构化主体中的权益",
+        "index": 1,
+        "table_name": "在未纳入合并财务报表范围的结构化主体中的权益（表2）",
+        "json_header_count": 3,
+        "reason": "LEN_MISMATCH（docx 5 列 vs JSON 3 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-cai-yong-jing-e-fa-chong-jian-xiang-guan",
+        "section_number": "三、采用净额法冲减相",
+        "section_title": "采用净额法冲减相关成本费用的政府补助情况",
+        "index": 0,
+        "table_name": "种  类",
+        "json_header_count": 4,
+        "reason": "LEN_MISMATCH（docx 5 列 vs JSON 4 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-feng-xian-guan-li-mu-biao-he-zheng-ce",
+        "section_number": "三、风险管理目标和政",
+        "section_title": "风险管理目标和政策",
+        "index": 0,
+        "table_name": "风险管理目标和政策（表1）",
+        "json_header_count": 2,
+        "reason": "LEN_MISMATCH（docx 3 列 vs JSON 2 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-feng-xian-guan-li-mu-biao-he-zheng-ce",
+        "section_number": "三、风险管理目标和政",
+        "section_title": "风险管理目标和政策",
+        "index": 1,
+        "table_name": "风险管理目标和政策（表2）",
+        "json_header_count": 2,
+        "reason": "LEN_MISMATCH（docx 3 列 vs JSON 2 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-feng-xian-guan-li-mu-biao-he-zheng-ce",
+        "section_number": "三、风险管理目标和政",
+        "section_title": "风险管理目标和政策",
+        "index": 2,
+        "table_name": "风险管理目标和政策（表3）",
+        "json_header_count": 3,
+        "reason": "LEN_MISMATCH（docx 11 列 vs JSON 3 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-feng-xian-guan-li-mu-biao-he-zheng-ce",
+        "section_number": "三、风险管理目标和政",
+        "section_title": "风险管理目标和政策",
+        "index": 3,
+        "table_name": "风险管理目标和政策（表4）",
+        "json_header_count": 2,
+        "reason": "LEN_MISMATCH（docx 9 列 vs JSON 2 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-feng-xian-guan-li-mu-biao-he-zheng-ce",
+        "section_number": "三、风险管理目标和政",
+        "section_title": "风险管理目标和政策",
+        "index": 5,
+        "table_name": "风险管理目标和政策（表6）",
+        "json_header_count": 2,
+        "reason": "LEN_MISMATCH（docx 7 列 vs JSON 2 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-feng-xian-guan-li-mu-biao-he-zheng-ce",
+        "section_number": "三、风险管理目标和政",
+        "section_title": "风险管理目标和政策",
+        "index": 6,
+        "table_name": "风险管理目标和政策（表7）",
+        "json_header_count": 2,
+        "reason": "LEN_MISMATCH（docx 7 列 vs JSON 2 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-feng-xian-guan-li-mu-biao-he-zheng-ce",
+        "section_number": "三、风险管理目标和政",
+        "section_title": "风险管理目标和政策",
+        "index": 8,
+        "table_name": "风险管理目标和政策（表9）",
+        "json_header_count": 3,
+        "reason": "LEN_MISMATCH（docx 5 列 vs JSON 3 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-feng-xian-guan-li-mu-biao-he-zheng-ce",
+        "section_number": "三、风险管理目标和政",
+        "section_title": "风险管理目标和政策",
+        "index": 9,
+        "table_name": "风险管理目标和政策（表10）",
+        "json_header_count": 3,
+        "reason": "LEN_MISMATCH（docx 5 列 vs JSON 3 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-feng-xian-guan-li-mu-biao-he-zheng-ce",
+        "section_number": "三、风险管理目标和政",
+        "section_title": "风险管理目标和政策",
+        "index": 10,
+        "table_name": "风险管理目标和政策（表11）",
+        "json_header_count": 3,
+        "reason": "LEN_MISMATCH（docx 5 列 vs JSON 3 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-tao-qi",
+        "section_number": "三、套期（不适用的删",
+        "section_title": "套期",
+        "index": 0,
+        "table_name": "套期（表1）",
+        "json_header_count": 4,
+        "reason": "LEN_MISMATCH（docx 5 列 vs JSON 4 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-tao-qi",
+        "section_number": "三、套期（不适用的删",
+        "section_title": "套期",
+        "index": 1,
+        "table_name": "套期（表2）",
+        "json_header_count": 4,
+        "reason": "LEN_MISMATCH（docx 5 列 vs JSON 4 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-tao-qi",
+        "section_number": "三、套期（不适用的删",
+        "section_title": "套期",
+        "index": 2,
+        "table_name": "套期（表3）",
+        "json_header_count": 4,
+        "reason": "LEN_MISMATCH（docx 7 列 vs JSON 4 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-tao-qi",
+        "section_number": "三、套期（不适用的删",
+        "section_title": "套期",
+        "index": 3,
+        "table_name": "套期（表4）",
+        "json_header_count": 4,
+        "reason": "LEN_MISMATCH（docx 7 列 vs JSON 4 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-tao-qi",
+        "section_number": "三、套期（不适用的删",
+        "section_title": "套期",
+        "index": 4,
+        "table_name": "套期（表5）",
+        "json_header_count": 4,
+        "reason": "LEN_MISMATCH（docx 6 列 vs JSON 4 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-tao-qi",
+        "section_number": "三、套期（不适用的删",
+        "section_title": "套期",
+        "index": 5,
+        "table_name": "套期（表6）",
+        "json_header_count": 4,
+        "reason": "LEN_MISMATCH（docx 6 列 vs JSON 4 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-tao-qi",
+        "section_number": "三、套期（不适用的删",
+        "section_title": "套期",
+        "index": 8,
+        "table_name": "套期（表9）",
+        "json_header_count": 4,
+        "reason": "LEN_MISMATCH（docx 5 列 vs JSON 4 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-tao-qi",
+        "section_number": "三、套期（不适用的删",
+        "section_title": "套期",
+        "index": 9,
+        "table_name": "套期（表10）",
+        "json_header_count": 4,
+        "reason": "LEN_MISMATCH（docx 5 列 vs JSON 4 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-tao-qi",
+        "section_number": "三、套期（不适用的删",
+        "section_title": "套期",
+        "index": 10,
+        "table_name": "套期（表11）",
+        "json_header_count": 2,
+        "reason": "LEN_MISMATCH（docx 3 列 vs JSON 2 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-tao-qi",
+        "section_number": "三、套期（不适用的删",
+        "section_title": "套期",
+        "index": 11,
+        "table_name": "套期（表12）",
+        "json_header_count": 2,
+        "reason": "LEN_MISMATCH（docx 3 列 vs JSON 2 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-tao-qi",
+        "section_number": "三、套期（不适用的删",
+        "section_title": "套期",
+        "index": 12,
+        "table_name": "套期（表13）",
+        "json_header_count": 4,
+        "reason": "LEN_MISMATCH（docx 6 列 vs JSON 4 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-tao-qi",
+        "section_number": "三、套期（不适用的删",
+        "section_title": "套期",
+        "index": 13,
+        "table_name": "套期（表14）",
+        "json_header_count": 4,
+        "reason": "LEN_MISMATCH（docx 6 列 vs JSON 4 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-jin-rong-zi-chan-zhuan-yi",
+        "section_number": "三、金融资产转移",
+        "section_title": "金融资产转移",
+        "index": 0,
+        "table_name": "金融资产转移（表1）",
+        "json_header_count": 5,
+        "reason": "COUNT_MISMATCH（docx 3 表 vs JSON 12 表）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-jin-rong-zi-chan-zhuan-yi",
+        "section_number": "三、金融资产转移",
+        "section_title": "金融资产转移",
+        "index": 1,
+        "table_name": "金融资产转移（表2）",
+        "json_header_count": 4,
+        "reason": "COUNT_MISMATCH（docx 3 表 vs JSON 12 表）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-jin-rong-zi-chan-zhuan-yi",
+        "section_number": "三、金融资产转移",
+        "section_title": "金融资产转移",
+        "index": 2,
+        "table_name": "金融资产转移（表3）",
+        "json_header_count": 4,
+        "reason": "COUNT_MISMATCH（docx 3 表 vs JSON 12 表）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-jin-rong-zi-chan-zhuan-yi",
+        "section_number": "三、金融资产转移",
+        "section_title": "金融资产转移",
+        "index": 3,
+        "table_name": "金融资产转移（表4）",
+        "json_header_count": 5,
+        "reason": "COUNT_MISMATCH（docx 3 表 vs JSON 12 表）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-jin-rong-zi-chan-zhuan-yi",
+        "section_number": "三、金融资产转移",
+        "section_title": "金融资产转移",
+        "index": 4,
+        "table_name": "金融资产转移（表5）",
+        "json_header_count": 4,
+        "reason": "COUNT_MISMATCH（docx 3 表 vs JSON 12 表）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-jin-rong-zi-chan-zhuan-yi",
+        "section_number": "三、金融资产转移",
+        "section_title": "金融资产转移",
+        "index": 5,
+        "table_name": "金融资产转移（表6）",
+        "json_header_count": 5,
+        "reason": "COUNT_MISMATCH（docx 3 表 vs JSON 12 表）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-jin-rong-zi-chan-zhuan-yi",
+        "section_number": "三、金融资产转移",
+        "section_title": "金融资产转移",
+        "index": 6,
+        "table_name": "金融资产转移（表7）",
+        "json_header_count": 8,
+        "reason": "COUNT_MISMATCH（docx 3 表 vs JSON 12 表）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-jin-rong-zi-chan-zhuan-yi",
+        "section_number": "三、金融资产转移",
+        "section_title": "金融资产转移",
+        "index": 7,
+        "table_name": "金融资产转移（表8）",
+        "json_header_count": 3,
+        "reason": "COUNT_MISMATCH（docx 3 表 vs JSON 12 表）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-jin-rong-zi-chan-zhuan-yi",
+        "section_number": "三、金融资产转移",
+        "section_title": "金融资产转移",
+        "index": 8,
+        "table_name": "金融资产转移（表9）",
+        "json_header_count": 8,
+        "reason": "COUNT_MISMATCH（docx 3 表 vs JSON 12 表）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-jin-rong-zi-chan-zhuan-yi",
+        "section_number": "三、金融资产转移",
+        "section_title": "金融资产转移",
+        "index": 9,
+        "table_name": "项  目（上期金额）",
+        "json_header_count": 3,
+        "reason": "COUNT_MISMATCH（docx 3 表 vs JSON 12 表）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-jin-rong-zi-chan-zhuan-yi",
+        "section_number": "三、金融资产转移",
+        "section_title": "金融资产转移",
+        "index": 10,
+        "table_name": "项  目（期末余额）",
+        "json_header_count": 6,
+        "reason": "COUNT_MISMATCH（docx 3 表 vs JSON 12 表）"
+      },
+      {
+        "section_id": "chapter-03-zhong-yao-kuai-ji-zheng-ce-ji-kuai-ji-gu-ji-jin-rong-zi-chan-zhuan-yi",
+        "section_number": "三、金融资产转移",
+        "section_title": "金融资产转移",
+        "index": 11,
+        "table_name": "项  目（上年年末余额）",
+        "json_header_count": 6,
+        "reason": "COUNT_MISMATCH（docx 3 表 vs JSON 12 表）"
+      },
+      {
+        "section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-yan-sheng-jin-rong-zi-chan",
+        "section_number": "五、3",
+        "section_title": "衍生金融资产",
+        "index": 0,
+        "table_name": "衍生金融资产",
+        "json_header_count": 3,
+        "reason": "EXISTING_DIFFERS（已有 3 列与规则给的 3 列不一致；不覆盖，需人工裁决归属）"
+      },
+      {
+        "section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-yi-nian-nei-dao-qi-de-fei-liu-dong-zi-chan",
+        "section_number": "五、12",
+        "section_title": "一年内到期的非流动资产",
+        "index": 1,
+        "table_name": "重要的债权投资/其他债权投资",
+        "json_header_count": 3,
+        "reason": "LEN_MISMATCH（docx 9 列 vs JSON 3 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-she-ding-shou-yi-ji-hua-jing-zi-chan",
+        "section_number": "五、17",
+        "section_title": "设定受益计划净资产",
+        "index": 0,
+        "table_name": "设定受益计划净资产",
+        "json_header_count": 5,
+        "reason": "EXISTING_DIFFERS（已有 5 列与规则给的 5 列不一致；不覆盖，需人工裁决归属）"
+      },
+      {
+        "section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-suo-you-quan-huo-shi-yong-quan-shou-dao-xia",
+        "section_number": "五、32",
+        "section_title": "所有权或使用权受到限制的资产",
+        "index": 0,
+        "table_name": "所有权或使用权受到限制的资产",
+        "json_header_count": 2,
+        "reason": "LEN_MISMATCH（docx 5 列 vs JSON 2 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-suo-you-quan-huo-shi-yong-quan-shou-dao-xia",
+        "section_number": "五、32",
+        "section_title": "所有权或使用权受到限制的资产",
+        "index": 1,
+        "table_name": "所有权或使用权受到限制的资产（续：上年年末）",
+        "json_header_count": 2,
+        "reason": "LEN_MISMATCH（docx 5 列 vs JSON 2 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-yi-nian-nei-dao-qi-de-fei-liu-dong-fu-zhai",
+        "section_number": "五、43",
+        "section_title": "一年内到期的非流动负债",
+        "index": 0,
+        "table_name": "一年内到期的非流动负债",
+        "json_header_count": 3,
+        "reason": "EXISTING_DIFFERS（已有 3 列与规则给的 3 列不一致；不覆盖，需人工裁决归属）"
+      },
+      {
+        "section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-yi-nian-nei-dao-qi-de-fei-liu-dong-fu-zhai",
+        "section_number": "五、43",
+        "section_title": "一年内到期的非流动负债",
+        "index": 1,
+        "table_name": "一年内到期的长期借款",
+        "json_header_count": 3,
+        "reason": "EXISTING_DIFFERS（已有 3 列与规则给的 3 列不一致；不覆盖，需人工裁决归属）"
+      },
+      {
+        "section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-yi-nian-nei-dao-qi-de-fei-liu-dong-fu-zhai",
+        "section_number": "五、43",
+        "section_title": "一年内到期的非流动负债",
+        "index": 2,
+        "table_name": "一年内到期的应付债券",
+        "json_header_count": 5,
+        "reason": "EXISTING_DIFFERS（已有 5 列与规则给的 5 列不一致；不覆盖，需人工裁决归属）"
+      },
+      {
+        "section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-yi-nian-nei-dao-qi-de-fei-liu-dong-fu-zhai",
+        "section_number": "五、43",
+        "section_title": "一年内到期的非流动负债",
+        "index": 3,
+        "table_name": "一年内到期的应付债券（续）",
+        "json_header_count": 7,
+        "reason": "EXISTING_DIFFERS（已有 7 列与规则给的 7 列不一致；不覆盖，需人工裁决归属）"
+      },
+      {
+        "section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-yi-nian-nei-dao-qi-de-fei-liu-dong-fu-zhai",
+        "section_number": "五、43",
+        "section_title": "一年内到期的非流动负债",
+        "index": 4,
+        "table_name": "一年内到期的长期应付款",
+        "json_header_count": 3,
+        "reason": "EXISTING_DIFFERS（已有 3 列与规则给的 3 列不一致；不覆盖，需人工裁决归属）"
+      },
+      {
+        "section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-ying-fu-zhai-quan",
+        "section_number": "五、46",
+        "section_title": "应付债券",
+        "index": 0,
+        "table_name": "应付债券",
+        "json_header_count": 3,
+        "reason": "EXISTING_DIFFERS（已有 3 列与规则给的 3 列不一致；不覆盖，需人工裁决归属）"
+      },
+      {
+        "section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-ying-fu-zhai-quan",
+        "section_number": "五、46",
+        "section_title": "应付债券",
+        "index": 1,
+        "table_name": "应付债券的增减变动（不包括划分为金融负债的优先股、永续债等其他金融工具）",
+        "json_header_count": 6,
+        "reason": "EXISTING_DIFFERS（已有 6 列与规则给的 6 列不一致；不覆盖，需人工裁决归属）"
+      },
+      {
+        "section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-ying-fu-zhai-quan",
+        "section_number": "五、46",
+        "section_title": "应付债券",
+        "index": 2,
+        "table_name": "应付债券（续）",
+        "json_header_count": 8,
+        "reason": "EXISTING_DIFFERS（已有 8 列与规则给的 8 列不一致；不覆盖，需人工裁决归属）"
+      },
+      {
+        "section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-ying-fu-zhai-quan",
+        "section_number": "五、46",
+        "section_title": "应付债券",
+        "index": 3,
+        "table_name": "（3）划分为金融负债的其他金融工具",
+        "json_header_count": 10,
+        "reason": "EXISTING_DIFFERS（已有 10 列与规则给的 10 列不一致；不覆盖，需人工裁决归属）"
+      },
+      {
+        "section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-ying-fu-zhai-quan",
+        "section_number": "五、46",
+        "section_title": "应付债券",
+        "index": 4,
+        "table_name": "期末发行在外的优先股、永续债等其他金融工具变动情况",
+        "json_header_count": 5,
+        "reason": "LEN_MISMATCH（docx 9 列 vs JSON 5 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-05-he-bing-cai-wu-bao-biao-xiang-mu-zhu-shi-wai-bi-huo-bi-xing-xiang-mu",
+        "section_number": "五、73",
+        "section_title": "外币货币性项目",
+        "index": 0,
+        "table_name": "外币货币性项目",
+        "json_header_count": 4,
+        "reason": "EXISTING_DIFFERS（已有 4 列与规则给的 4 列不一致；不覆盖，需人工裁决归属）"
+      },
+      {
+        "section_id": "chapter-06-yan-fa-zhi-chu-yan-fa-zhi-chu",
+        "section_number": "六、1",
+        "section_title": "研发支出",
+        "index": 0,
+        "table_name": "研发支出",
+        "json_header_count": 3,
+        "reason": "LEN_MISMATCH（docx 5 列 vs JSON 3 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-07-zai-qi-ta-zhu-ti-zhong-de-quan-yi-zai-qi-ta-zhu-ti-zhong-de-quan-yi",
+        "section_number": "七、1",
+        "section_title": "在其他主体中的权益",
+        "index": 0,
+        "table_name": "企业集团的构成",
+        "json_header_count": 7,
+        "reason": "CROSS_CHAPTER（按末级 heading 命中 docx 其他重要事项 但章归属不符且未登记为等价；JSON 章=「在其他主体中的权益」）"
+      },
+      {
+        "section_id": "chapter-07-zai-qi-ta-zhu-ti-zhong-de-quan-yi-zai-qi-ta-zhu-ti-zhong-de-quan-yi",
+        "section_number": "七、1",
+        "section_title": "在其他主体中的权益",
+        "index": 1,
+        "table_name": "重要的非全资子公司",
+        "json_header_count": 5,
+        "reason": "CROSS_CHAPTER（按末级 heading 命中 docx 其他重要事项 但章归属不符且未登记为等价；JSON 章=「在其他主体中的权益」）"
+      },
+      {
+        "section_id": "chapter-07-zai-qi-ta-zhu-ti-zhong-de-quan-yi-zai-qi-ta-zhu-ti-zhong-de-quan-yi",
+        "section_number": "七、1",
+        "section_title": "在其他主体中的权益",
+        "index": 2,
+        "table_name": "重要非全资子公司主要财务信息—期末数",
+        "json_header_count": 7,
+        "reason": "CROSS_CHAPTER（按末级 heading 命中 docx 其他重要事项 但章归属不符且未登记为等价；JSON 章=「在其他主体中的权益」）"
+      },
+      {
+        "section_id": "chapter-07-zai-qi-ta-zhu-ti-zhong-de-quan-yi-zai-qi-ta-zhu-ti-zhong-de-quan-yi",
+        "section_number": "七、1",
+        "section_title": "在其他主体中的权益",
+        "index": 3,
+        "table_name": "续（1）",
+        "json_header_count": 7,
+        "reason": "CROSS_CHAPTER（按末级 heading 命中 docx 其他重要事项 但章归属不符且未登记为等价；JSON 章=「在其他主体中的权益」）"
+      },
+      {
+        "section_id": "chapter-07-zai-qi-ta-zhu-ti-zhong-de-quan-yi-zai-qi-ta-zhu-ti-zhong-de-quan-yi",
+        "section_number": "七、1",
+        "section_title": "在其他主体中的权益",
+        "index": 4,
+        "table_name": "续（2）",
+        "json_header_count": 9,
+        "reason": "CROSS_CHAPTER（按末级 heading 命中 docx 其他重要事项 但章归属不符且未登记为等价；JSON 章=「在其他主体中的权益」）"
+      },
+      {
+        "section_id": "chapter-07-zai-qi-ta-zhu-ti-zhong-de-quan-yi-zai-qi-ta-zhu-ti-zhong-de-quan-yi",
+        "section_number": "七、1",
+        "section_title": "在其他主体中的权益",
+        "index": 5,
+        "table_name": "未丧失控制权的所有者权益份额变动影响",
+        "json_header_count": 7,
+        "reason": "CROSS_CHAPTER（按末级 heading 命中 docx 其他重要事项 但章归属不符且未登记为等价；JSON 章=「在其他主体中的权益」）"
+      },
+      {
+        "section_id": "chapter-07-zai-qi-ta-zhu-ti-zhong-de-quan-yi-zai-qi-ta-zhu-ti-zhong-de-quan-yi",
+        "section_number": "七、1",
+        "section_title": "在其他主体中的权益",
+        "index": 6,
+        "table_name": "重要的合营企业或联营企业",
+        "json_header_count": 7,
+        "reason": "CROSS_CHAPTER（按末级 heading 命中 docx 其他重要事项 但章归属不符且未登记为等价；JSON 章=「在其他主体中的权益」）"
+      },
+      {
+        "section_id": "chapter-07-zai-qi-ta-zhu-ti-zhong-de-quan-yi-zai-qi-ta-zhu-ti-zhong-de-quan-yi",
+        "section_number": "七、1",
+        "section_title": "在其他主体中的权益",
+        "index": 7,
+        "table_name": "重要合营企业主要财务信息",
+        "json_header_count": 3,
+        "reason": "CROSS_CHAPTER（按末级 heading 命中 docx 其他重要事项 但章归属不符且未登记为等价；JSON 章=「在其他主体中的权益」）"
+      },
+      {
+        "section_id": "chapter-07-zai-qi-ta-zhu-ti-zhong-de-quan-yi-zai-qi-ta-zhu-ti-zhong-de-quan-yi",
+        "section_number": "七、1",
+        "section_title": "在其他主体中的权益",
+        "index": 8,
+        "table_name": "续：重要合营企业本期及上期经营成果",
+        "json_header_count": 3,
+        "reason": "CROSS_CHAPTER（按末级 heading 命中 docx 其他重要事项 但章归属不符且未登记为等价；JSON 章=「在其他主体中的权益」）"
+      },
+      {
+        "section_id": "chapter-07-zai-qi-ta-zhu-ti-zhong-de-quan-yi-zai-qi-ta-zhu-ti-zhong-de-quan-yi",
+        "section_number": "七、1",
+        "section_title": "在其他主体中的权益",
+        "index": 9,
+        "table_name": "重要联营企业主要财务信息",
+        "json_header_count": 7,
+        "reason": "CROSS_CHAPTER（按末级 heading 命中 docx 其他重要事项 但章归属不符且未登记为等价；JSON 章=「在其他主体中的权益」）"
+      },
+      {
+        "section_id": "chapter-07-zai-qi-ta-zhu-ti-zhong-de-quan-yi-zai-qi-ta-zhu-ti-zhong-de-quan-yi",
+        "section_number": "七、1",
+        "section_title": "在其他主体中的权益",
+        "index": 10,
+        "table_name": "续：重要联营企业本期及上期经营成果",
+        "json_header_count": 7,
+        "reason": "CROSS_CHAPTER（按末级 heading 命中 docx 其他重要事项 但章归属不符且未登记为等价；JSON 章=「在其他主体中的权益」）"
+      },
+      {
+        "section_id": "chapter-07-zai-qi-ta-zhu-ti-zhong-de-quan-yi-zai-qi-ta-zhu-ti-zhong-de-quan-yi",
+        "section_number": "七、1",
+        "section_title": "在其他主体中的权益",
+        "index": 11,
+        "table_name": "其他不重要合营企业和联营企业的汇总财务信息",
+        "json_header_count": 3,
+        "reason": "CROSS_CHAPTER（按末级 heading 命中 docx 其他重要事项 但章归属不符且未登记为等价；JSON 章=「在其他主体中的权益」）"
+      },
+      {
+        "section_id": "chapter-07-zai-qi-ta-zhu-ti-zhong-de-quan-yi-zai-qi-ta-zhu-ti-zhong-de-quan-yi",
+        "section_number": "七、1",
+        "section_title": "在其他主体中的权益",
+        "index": 12,
+        "table_name": "对合营企业或联营企业发生超额亏损的分担额",
+        "json_header_count": 4,
+        "reason": "CROSS_CHAPTER（按末级 heading 命中 docx 其他重要事项 但章归属不符且未登记为等价；JSON 章=「在其他主体中的权益」）"
+      },
+      {
+        "section_id": "chapter-07-zai-qi-ta-zhu-ti-zhong-de-quan-yi-zai-qi-ta-zhu-ti-zhong-de-quan-yi",
+        "section_number": "七、1",
+        "section_title": "在其他主体中的权益",
+        "index": 13,
+        "table_name": "重要的共同经营",
+        "json_header_count": 6,
+        "reason": "CROSS_CHAPTER（按末级 heading 命中 docx 其他重要事项 但章归属不符且未登记为等价；JSON 章=「在其他主体中的权益」）"
+      },
+      {
+        "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-jiao-yi-qing-kuang",
+        "section_number": "十一、关联交易情况",
+        "section_title": "关联交易情况",
+        "index": 0,
+        "table_name": "采购商品、接受劳务",
+        "json_header_count": 4,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-jiao-yi-qing-kuang",
+        "section_number": "十一、关联交易情况",
+        "section_title": "关联交易情况",
+        "index": 1,
+        "table_name": "出售商品、提供劳务",
+        "json_header_count": 4,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-jiao-yi-qing-kuang",
+        "section_number": "十一、关联交易情况",
+        "section_title": "关联交易情况",
+        "index": 2,
+        "table_name": "公司受托管理、承包",
+        "json_header_count": 7,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-jiao-yi-qing-kuang",
+        "section_number": "十一、关联交易情况",
+        "section_title": "关联交易情况",
+        "index": 3,
+        "table_name": "公司委托管理、出包",
+        "json_header_count": 7,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-jiao-yi-qing-kuang",
+        "section_number": "十一、关联交易情况",
+        "section_title": "关联交易情况",
+        "index": 4,
+        "table_name": "公司出租",
+        "json_header_count": 4,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-jiao-yi-qing-kuang",
+        "section_number": "十一、关联交易情况",
+        "section_title": "关联交易情况",
+        "index": 5,
+        "table_name": "公司承租",
+        "json_header_count": 4,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-jiao-yi-qing-kuang",
+        "section_number": "十一、关联交易情况",
+        "section_title": "关联交易情况",
+        "index": 6,
+        "table_name": "公司作为承租方当年新增的使用权资产：",
+        "json_header_count": 4,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-jiao-yi-qing-kuang",
+        "section_number": "十一、关联交易情况",
+        "section_title": "关联交易情况",
+        "index": 7,
+        "table_name": "公司作为承租方当年承担的租赁负债利息支出：",
+        "json_header_count": 4,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-jiao-yi-qing-kuang",
+        "section_number": "十一、关联交易情况",
+        "section_title": "关联交易情况",
+        "index": 8,
+        "table_name": "本公司作为担保方",
+        "json_header_count": 5,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-jiao-yi-qing-kuang",
+        "section_number": "十一、关联交易情况",
+        "section_title": "关联交易情况",
+        "index": 9,
+        "table_name": "本公司作为被担保方",
+        "json_header_count": 5,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-jiao-yi-qing-kuang",
+        "section_number": "十一、关联交易情况",
+        "section_title": "关联交易情况",
+        "index": 10,
+        "table_name": "关联方资金拆借情况",
+        "json_header_count": 5,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-jiao-yi-qing-kuang",
+        "section_number": "十一、关联交易情况",
+        "section_title": "关联交易情况",
+        "index": 11,
+        "table_name": "关联方资产转让、债务重组情况",
+        "json_header_count": 4,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-jiao-yi-qing-kuang",
+        "section_number": "十一、关联交易情况",
+        "section_title": "关联交易情况",
+        "index": 12,
+        "table_name": "本公司本期关键管理人员XX人，上期关键管理人员XX人，支付薪酬情况见下表：",
+        "json_header_count": 3,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-fang-ying-shou-ying-fu-kuan-xiang",
+        "section_number": "十一、关联方应收应付款",
+        "section_title": "关联方应收应付款项",
+        "index": 0,
+        "table_name": "应收关联方款项（注意：是报表项目）",
+        "json_header_count": 4,
+        "reason": "LEN_MISMATCH（docx 6 列 vs JSON 4 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-12-gu-fen-zhi-fu-gu-fen-zhi-fu-zong-ti-qing-kuang",
+        "section_number": "十二、股份支付总体情况",
+        "section_title": "股份支付总体情况",
+        "index": 0,
+        "table_name": "股份支付总体情况",
+        "json_header_count": 5,
+        "reason": "LEN_MISMATCH（docx 9 列 vs JSON 5 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-12-gu-fen-zhi-fu-gu-fen-zhi-fu-zong-ti-qing-kuang",
+        "section_number": "十二、股份支付总体情况",
+        "section_title": "股份支付总体情况",
+        "index": 1,
+        "table_name": "期末发行在外的股票期权或其他权益工具",
+        "json_header_count": 3,
+        "reason": "LEN_MISMATCH（docx 5 列 vs JSON 3 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-12-gu-fen-zhi-fu-yi-quan-yi-jie-suan-de-gu-fen-zhi-fu-qing-kuang",
+        "section_number": "十二、以权益结算的股份",
+        "section_title": "以权益结算的股份支付情况",
+        "index": 0,
+        "table_name": "以权益结算的股份支付情况",
+        "json_header_count": 1,
+        "reason": "LEN_MISMATCH（docx 2 列 vs JSON 1 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-12-gu-fen-zhi-fu-yi-xian-jin-jie-suan-de-gu-fen-zhi-fu-qing-kuang",
+        "section_number": "十二、以现金结算的股份",
+        "section_title": "以现金结算的股份支付情况",
+        "index": 0,
+        "table_name": "以现金结算的股份支付情况",
+        "json_header_count": 1,
+        "reason": "LEN_MISMATCH（docx 2 列 vs JSON 1 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-12-gu-fen-zhi-fu-gu-fen-zhi-fu-de-xiu-gai-zhong-zhi-qing-kuang",
+        "section_number": "十二、股份支付的修改、",
+        "section_title": "股份支付的修改、终止情况",
+        "index": 0,
+        "table_name": "股份支付的修改、终止情况",
+        "json_header_count": 1,
+        "reason": "LEN_MISMATCH（docx 2 列 vs JSON 1 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-zi-chan-fu-zhai-biao-ri-hou-li-run-fen-pei-qin",
+        "section_number": "十四、资产负债表日后利",
+        "section_title": "资产负债表日后利润分配情况（只写现金分配，若仅有转增，则不写）",
+        "index": 0,
+        "table_name": "资产负债表日后利润分配情况（只写现金分配，若仅有转增，则不写）",
+        "json_header_count": 1,
+        "reason": "LEN_MISMATCH（docx 2 列 vs JSON 1 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-fen-bu-bao-gao",
+        "section_number": "十四、分部报告",
+        "section_title": "分部报告",
+        "index": 0,
+        "table_name": "分部报告（表1）",
+        "json_header_count": 6,
+        "reason": "COUNT_MISMATCH（docx 2 表 vs JSON 5 表）"
+      },
+      {
+        "section_id": "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-fen-bu-bao-gao",
+        "section_number": "十四、分部报告",
+        "section_title": "分部报告",
+        "index": 1,
+        "table_name": "分部报告（表2）",
+        "json_header_count": 6,
+        "reason": "COUNT_MISMATCH（docx 2 表 vs JSON 5 表）"
+      },
+      {
+        "section_id": "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-fen-bu-bao-gao",
+        "section_number": "十四、分部报告",
+        "section_title": "分部报告",
+        "index": 2,
+        "table_name": "分部报告（表3）",
+        "json_header_count": 3,
+        "reason": "COUNT_MISMATCH（docx 2 表 vs JSON 5 表）"
+      },
+      {
+        "section_id": "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-fen-bu-bao-gao",
+        "section_number": "十四、分部报告",
+        "section_title": "分部报告",
+        "index": 3,
+        "table_name": "分部报告（表4）",
+        "json_header_count": 6,
+        "reason": "COUNT_MISMATCH（docx 2 表 vs JSON 5 表）"
+      },
+      {
+        "section_id": "chapter-14-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-fen-bu-bao-gao",
+        "section_number": "十四、分部报告",
+        "section_title": "分部报告",
+        "index": 4,
+        "table_name": "分部报告（表5）",
+        "json_header_count": 6,
+        "reason": "COUNT_MISMATCH（docx 2 表 vs JSON 5 表）"
+      },
+      {
+        "section_id": "chapter-17-bu-chong-zi-liao-jing-zi-chan-shou-yi-lv-he-mei-gu-shou-yi",
+        "section_number": "十七、净资产收益率和每股收益",
+        "section_title": "净资产收益率和每股收益",
+        "index": 0,
+        "table_name": "净资产收益率和每股收益",
+        "json_header_count": 3,
+        "reason": "LEN_MISMATCH（docx 4 列 vs JSON 3 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-17-bu-chong-zi-liao-jing-nei-wai-kuai-ji-zhun-ze-xia-kuai-ji-shu-ju-cha-yi",
+        "section_number": "十七、境内外会计准则下会计数据差异",
+        "section_title": "境内外会计准则下会计数据差异",
+        "index": 0,
+        "table_name": "同时按照国际会计准则与中国企业会计准则披露的财务报告中净利润和净资产差异情况",
+        "json_header_count": 3,
+        "reason": "LEN_MISMATCH（docx 5 列 vs JSON 3 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-17-bu-chong-zi-liao-jing-nei-wai-kuai-ji-zhun-ze-xia-kuai-ji-shu-ju-cha-yi",
+        "section_number": "十七、境内外会计准则下会计数据差异",
+        "section_title": "境内外会计准则下会计数据差异",
+        "index": 1,
+        "table_name": "同时按照境外XX会计准则与中国企业会计准则披露的财务报告中净利润和净资产差异情况",
+        "json_header_count": 3,
+        "reason": "LEN_MISMATCH（docx 5 列 vs JSON 3 列；多为两级表头被 md 重建压扁）"
+      }
+    ],
+    "soe": [
+      {
+        "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-gu-ding-zi-chan",
+        "section_number": "四、固定资产",
+        "section_title": "固定资产",
+        "index": 0,
+        "table_name": "固定资产分类及折旧政策",
+        "json_header_count": 4,
+        "reason": "CROSS_CHAPTER（按末级 heading 命中 docx 财务报表主要项目注释 但章归属不符且未登记为等价；JSON 章=「重要会计政策、会计估计」）"
+      },
+      {
+        "section_id": "chapter-04-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-sheng-wu-zi-chan",
+        "section_number": "四、生物资产",
+        "section_title": "生物资产",
+        "index": 0,
+        "table_name": "生产性生物资产",
+        "json_header_count": 4,
+        "reason": "EXISTING_DIFFERS（已有 4 列与规则给的 4 列不一致；不覆盖，需人工裁决归属）"
+      },
+      {
+        "section_id": "chapter-05-zhong-yao-kuai-ji-zheng-ce-kuai-ji-gu-ji-de-bian-geng-yi-ji-qian-qi-cha-cuo-de-g-dui",
+        "section_number": "五、对期初所有者权益",
+        "section_title": "对期初所有者权益的累积影响",
+        "index": 0,
+        "table_name": "对期初所有者权益的累积影响",
+        "json_header_count": 2,
+        "reason": "LEN_MISMATCH（docx 11 列 vs JSON 2 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-ben-qi-na-ru-he-bing-bao-biao-fan-wei-de-zi-gong-si-ji-b",
+        "section_number": "七、本期纳入合并报表",
+        "section_title": "本期纳入合并报表范围的子公司基本情况",
+        "index": 0,
+        "table_name": "本期纳入合并报表范围的子公司基本情况",
+        "json_header_count": 13,
+        "reason": "CROSS_CHAPTER（按末级 heading 命中 docx 企业合并及合并财务报表 但章归属不符且未登记为等价；JSON 章=「合并范围的变化」）"
+      },
+      {
+        "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-mu-gong-si-yong-you-bei-tou-zi-dan-wei-biao-jue-quan-bu",
+        "section_number": "七、母公司拥有被投资",
+        "section_title": "母公司拥有被投资单位表决权不足半数但能对被投资单位形成控制的原因",
+        "index": 0,
+        "table_name": "母公司拥有被投资单位表决权不足半数但能对被投资单位形成控制的原因",
+        "json_header_count": 8,
+        "reason": "CROSS_CHAPTER（按末级 heading 命中 docx 企业合并及合并财务报表 但章归属不符且未登记为等价；JSON 章=「合并范围的变化」）"
+      },
+      {
+        "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-mu-gong-si-zhi-jie-huo-tong-guo-qi-ta-zi-gong-si-jian-ji",
+        "section_number": "七、母公司直接或通过",
+        "section_title": "母公司直接或通过其他子公司间接拥有被投资单位半数以上的表决权但未能对其形成控制的",
+        "index": 0,
+        "table_name": "母公司直接或通过其他子公司间接拥有被投资单位半数以上的表决权但未能对其形成控制的原因",
+        "json_header_count": 8,
+        "reason": "CROSS_CHAPTER（按末级 heading 命中 docx 企业合并及合并财务报表 但章归属不符且未登记为等价；JSON 章=「合并范围的变化」）"
+      },
+      {
+        "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-zhong-yao-fei-quan-zi-zi-gong-si-qing-kuang",
+        "section_number": "七、重要非全资子公司",
+        "section_title": "重要非全资子公司情况",
+        "index": 0,
+        "table_name": "少数股东",
+        "json_header_count": 6,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-zhong-yao-fei-quan-zi-zi-gong-si-qing-kuang",
+        "section_number": "七、重要非全资子公司",
+        "section_title": "重要非全资子公司情况",
+        "index": 1,
+        "table_name": "主要财务信息",
+        "json_header_count": 11,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-ben-qi-bu-zai-na-ru-he-bing-fan-wei-de-yuan-zi-gong-si",
+        "section_number": "七、本期不再纳入合并",
+        "section_title": "本期不再纳入合并范围的原子公司",
+        "index": 0,
+        "table_name": "原子公司的基本情况",
+        "json_header_count": 7,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-ben-qi-bu-zai-na-ru-he-bing-fan-wei-de-yuan-zi-gong-si",
+        "section_number": "七、本期不再纳入合并",
+        "section_title": "本期不再纳入合并范围的原子公司",
+        "index": 1,
+        "table_name": "本期出售的子公司出售日的财务状况",
+        "json_header_count": 5,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-ben-qi-bu-zai-na-ru-he-bing-fan-wei-de-yuan-zi-gong-si",
+        "section_number": "七、本期不再纳入合并",
+        "section_title": "本期不再纳入合并范围的原子公司",
+        "index": 2,
+        "table_name": "本期出售的子公司出售日的经营成果",
+        "json_header_count": 11,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-ben-qi-xin-na-ru-he-bing-fan-wei-de-zhu-ti",
+        "section_number": "七、本期新纳入合并范",
+        "section_title": "本期新纳入合并范围的主体",
+        "index": 0,
+        "table_name": "本期新纳入合并范围的主体",
+        "json_header_count": 3,
+        "reason": "CROSS_CHAPTER（按末级 heading 命中 docx 企业合并及合并财务报表 但章归属不符且未登记为等价；JSON 章=「合并范围的变化」）"
+      },
+      {
+        "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-ben-qi-fa-sheng-de-tong-yi-kong-zhi-xia-qi-ye-he-bing-qi",
+        "section_number": "七、本期发生的同一控",
+        "section_title": "本期发生的同一控制下企业合并情况",
+        "index": 0,
+        "table_name": "本期发生的同一控制下企业合并情况",
+        "json_header_count": 9,
+        "reason": "CROSS_CHAPTER（按末级 heading 命中 docx 企业合并及合并财务报表 但章归属不符且未登记为等价；JSON 章=「合并范围的变化」）"
+      },
+      {
+        "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-ben-qi-fa-sheng-de-fei-tong-yi-kong-zhi-xia-qi-ye-he-bin",
+        "section_number": "七、本期发生的非同一",
+        "section_title": "本期发生的非同一控制下企业合并情况",
+        "index": 0,
+        "table_name": "本期发生的非同一控制下企业合并情况",
+        "json_header_count": 13,
+        "reason": "CROSS_CHAPTER（按末级 heading 命中 docx 企业合并及合并财务报表 但章归属不符且未登记为等价；JSON 章=「合并范围的变化」）"
+      },
+      {
+        "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-ben-qi-fa-sheng-de-xi-shou-he-bing",
+        "section_number": "七、本期发生的吸收合",
+        "section_title": "本期发生的吸收合并",
+        "index": 0,
+        "table_name": "本期发生的吸收合并",
+        "json_header_count": 5,
+        "reason": "CROSS_CHAPTER（按末级 heading 命中 docx 企业合并及合并财务报表 但章归属不符且未登记为等价；JSON 章=「合并范围的变化」）"
+      },
+      {
+        "section_id": "chapter-07-he-bing-fan-wei-de-bian-hua-mu-gong-si-zai-zi-gong-si-de-suo-you-zhe-quan-yi-fen-e-f",
+        "section_number": "七、母公司在子公司的",
+        "section_title": "母公司在子公司的所有者权益份额发生变化的情况",
+        "index": 0,
+        "table_name": "母公司在子公司的所有者权益份额发生变化的情况",
+        "json_header_count": 4,
+        "reason": "CROSS_CHAPTER（按末级 heading 命中 docx 企业合并及合并财务报表 但章归属不符且未登记为等价；JSON 章=「合并范围的变化」）"
+      },
+      {
+        "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-yan-sheng-jin-rong-zi-chan",
+        "section_number": "八、3",
+        "section_title": "衍生金融资产",
+        "index": 0,
+        "table_name": "衍生金融资产",
+        "json_header_count": 3,
+        "reason": "EXISTING_DIFFERS（已有 3 列与规则给的 3 列不一致；不覆盖，需人工裁决归属）"
+      },
+      {
+        "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-chi-you-dai-shou-fu-zhai",
+        "section_number": "八、43",
+        "section_title": "持有待售负债",
+        "index": 0,
+        "table_name": "持有待售负债",
+        "json_header_count": 5,
+        "reason": "EXISTING_DIFFERS（已有 5 列与规则给的 5 列不一致；不覆盖，需人工裁决归属）"
+      },
+      {
+        "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-yi-nian-nei-dao-qi-de-fei-liu-dong-fu-zhai",
+        "section_number": "八、44",
+        "section_title": "一年内到期的非流动负债",
+        "index": 0,
+        "table_name": "一年内到期的非流动负债",
+        "json_header_count": 3,
+        "reason": "EXISTING_DIFFERS（已有 3 列与规则给的 3 列不一致；不覆盖，需人工裁决归属）"
+      },
+      {
+        "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-yi-nian-nei-dao-qi-de-chang-qi-ying-fu-kuan",
+        "section_number": "八、47",
+        "section_title": "（3）一年内到期的长期应付款",
+        "index": 0,
+        "table_name": "（3）一年内到期的长期应付款",
+        "json_header_count": 3,
+        "reason": "EXISTING_DIFFERS（已有 3 列与规则给的 3 列不一致；不覆盖，需人工裁决归属）"
+      },
+      {
+        "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-ying-fu-zhai-quan",
+        "section_number": "八、50",
+        "section_title": "应付债券",
+        "index": 0,
+        "table_name": "应付债券",
+        "json_header_count": 3,
+        "reason": "COUNT_MISMATCH（docx 1 表 vs JSON 2 表）"
+      },
+      {
+        "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-ying-fu-zhai-quan",
+        "section_number": "八、50",
+        "section_title": "应付债券",
+        "index": 1,
+        "table_name": "应付债券的增减变动（不包括划分为金融负债的优先股、永续债等其他金融工具）",
+        "json_header_count": 10,
+        "reason": "COUNT_MISMATCH（docx 1 表 vs JSON 2 表）"
+      },
+      {
+        "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-you-xian-gu-yong-xu-zhai-deng-jin-rong-gong",
+        "section_number": "八、51",
+        "section_title": "优先股、永续债等金融工具",
+        "index": 0,
+        "table_name": "期末发行在外的优先股、永续债等金融工具情况",
+        "json_header_count": 10,
+        "reason": "COUNT_MISMATCH（docx 1 表 vs JSON 2 表）"
+      },
+      {
+        "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-you-xian-gu-yong-xu-zhai-deng-jin-rong-gong",
+        "section_number": "八、51",
+        "section_title": "优先股、永续债等金融工具",
+        "index": 1,
+        "table_name": "发行在外的优先股、永续债等金融工具变动情况",
+        "json_header_count": 5,
+        "reason": "COUNT_MISMATCH（docx 1 表 vs JSON 2 表）"
+      },
+      {
+        "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-xian-jin-liu-liang-biao-xiang-mu-zhu-shi",
+        "section_number": "八、81",
+        "section_title": "现金流量表项目注释",
+        "index": 0,
+        "table_name": "收到的重要的投资活动有关的现金",
+        "json_header_count": 3,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-xian-jin-liu-liang-biao-xiang-mu-zhu-shi",
+        "section_number": "八、81",
+        "section_title": "现金流量表项目注释",
+        "index": 1,
+        "table_name": "支付的重要的投资活动有关的现金",
+        "json_header_count": 3,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-xian-jin-liu-liang-biao-xiang-mu-zhu-shi",
+        "section_number": "八、81",
+        "section_title": "现金流量表项目注释",
+        "index": 2,
+        "table_name": "收到的其他与经营活动有关的现金",
+        "json_header_count": 3,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-xian-jin-liu-liang-biao-xiang-mu-zhu-shi",
+        "section_number": "八、81",
+        "section_title": "现金流量表项目注释",
+        "index": 3,
+        "table_name": "支付的其他与经营活动有关的现金",
+        "json_header_count": 3,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-xian-jin-liu-liang-biao-xiang-mu-zhu-shi",
+        "section_number": "八、81",
+        "section_title": "现金流量表项目注释",
+        "index": 4,
+        "table_name": "收到的其他与投资活动有关的现金",
+        "json_header_count": 3,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-xian-jin-liu-liang-biao-xiang-mu-zhu-shi",
+        "section_number": "八、81",
+        "section_title": "现金流量表项目注释",
+        "index": 5,
+        "table_name": "支付的其他与投资活动有关的现金",
+        "json_header_count": 3,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-xian-jin-liu-liang-biao-xiang-mu-zhu-shi",
+        "section_number": "八、81",
+        "section_title": "现金流量表项目注释",
+        "index": 6,
+        "table_name": "收到的其他与筹资活动有关的现金",
+        "json_header_count": 3,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-xian-jin-liu-liang-biao-xiang-mu-zhu-shi",
+        "section_number": "八、81",
+        "section_title": "现金流量表项目注释",
+        "index": 7,
+        "table_name": "支付的其他与筹资活动有关的现金",
+        "json_header_count": 3,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-xian-jin-liu-liang-biao-xiang-mu-zhu-shi",
+        "section_number": "八、81",
+        "section_title": "现金流量表项目注释",
+        "index": 8,
+        "table_name": "筹资活动产生的各项负债的变动情况",
+        "json_header_count": 7,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-gu-fen-zhi-fu",
+        "section_number": "八、83",
+        "section_title": "股份支付",
+        "index": 0,
+        "table_name": "股份支付总体情况",
+        "json_header_count": 1,
+        "reason": "COUNT_MISMATCH（docx 1 表 vs JSON 3 表）"
+      },
+      {
+        "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-gu-fen-zhi-fu",
+        "section_number": "八、83",
+        "section_title": "股份支付",
+        "index": 1,
+        "table_name": "以权益结算的股份支付情况",
+        "json_header_count": 1,
+        "reason": "COUNT_MISMATCH（docx 1 表 vs JSON 3 表）"
+      },
+      {
+        "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-gu-fen-zhi-fu",
+        "section_number": "八、83",
+        "section_title": "股份支付",
+        "index": 2,
+        "table_name": "以现金结算的股份支付情况",
+        "json_header_count": 1,
+        "reason": "COUNT_MISMATCH（docx 1 表 vs JSON 3 表）"
+      },
+      {
+        "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-zhai-wu-chong-zu",
+        "section_number": "八、84",
+        "section_title": "债务重组",
+        "index": 0,
+        "table_name": "债务人披露情况",
+        "json_header_count": 4,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-zhai-wu-chong-zu",
+        "section_number": "八、84",
+        "section_title": "债务重组",
+        "index": 1,
+        "table_name": "企业应披露转让非现金资产的公允价值、债务转成的股份的公允价值和修改其他债务条件后债务的公允价值的确定方法及依据。",
+        "json_header_count": 3,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-zhai-wu-chong-zu",
+        "section_number": "八、84",
+        "section_title": "债务重组",
+        "index": 2,
+        "table_name": "债权人披露情况",
+        "json_header_count": 5,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-zhai-wu-chong-zu",
+        "section_number": "八、84",
+        "section_title": "债务重组",
+        "index": 3,
+        "table_name": "企业应披露受让非现金资产的公允价值、债权转成的股权的公允价值和修改其他债务条件后债权的公允价值的确定方法及依据。",
+        "json_header_count": 3,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-zu-lin",
+        "section_number": "八、87",
+        "section_title": "租赁",
+        "index": 0,
+        "table_name": "承租人信息",
+        "json_header_count": 2,
+        "reason": "COUNT_MISMATCH（docx 1 表 vs JSON 3 表）"
+      },
+      {
+        "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-zu-lin",
+        "section_number": "八、87",
+        "section_title": "租赁",
+        "index": 1,
+        "table_name": "融资租赁出租人",
+        "json_header_count": 2,
+        "reason": "COUNT_MISMATCH（docx 1 表 vs JSON 3 表）"
+      },
+      {
+        "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-zu-lin",
+        "section_number": "八、87",
+        "section_title": "租赁",
+        "index": 2,
+        "table_name": "经营租赁出租人",
+        "json_header_count": 2,
+        "reason": "COUNT_MISMATCH（docx 1 表 vs JSON 3 表）"
+      },
+      {
+        "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-fen-bu-xin-xi",
+        "section_number": "八、90",
+        "section_title": "分部信息",
+        "index": 0,
+        "table_name": "分部信息",
+        "json_header_count": 4,
+        "reason": "COUNT_MISMATCH（docx 1 表 vs JSON 4 表）"
+      },
+      {
+        "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-fen-bu-xin-xi",
+        "section_number": "八、90",
+        "section_title": "分部信息",
+        "index": 1,
+        "table_name": "产品和劳务对外交易收入",
+        "json_header_count": 3,
+        "reason": "COUNT_MISMATCH（docx 1 表 vs JSON 4 表）"
+      },
+      {
+        "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-fen-bu-xin-xi",
+        "section_number": "八、90",
+        "section_title": "分部信息",
+        "index": 2,
+        "table_name": "地区信息",
+        "json_header_count": 6,
+        "reason": "COUNT_MISMATCH（docx 1 表 vs JSON 4 表）"
+      },
+      {
+        "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-fen-bu-xin-xi",
+        "section_number": "八、90",
+        "section_title": "分部信息",
+        "index": 3,
+        "table_name": "分部信息（表4）",
+        "json_header_count": 6,
+        "reason": "COUNT_MISMATCH（docx 1 表 vs JSON 4 表）"
+      },
+      {
+        "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-he-bing-xian-jin-liu-liang-biao-xiang-guan",
+        "section_number": "八、91",
+        "section_title": "合并现金流量表相关事项",
+        "index": 0,
+        "table_name": "现金流量表补充资料",
+        "json_header_count": 3,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-he-bing-xian-jin-liu-liang-biao-xiang-guan",
+        "section_number": "八、91",
+        "section_title": "合并现金流量表相关事项",
+        "index": 1,
+        "table_name": "本期取得子公司和收到处置子公司的现金净额",
+        "json_header_count": 2,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-he-bing-xian-jin-liu-liang-biao-xiang-guan",
+        "section_number": "八、91",
+        "section_title": "合并现金流量表相关事项",
+        "index": 2,
+        "table_name": "现金和现金等价物的构成",
+        "json_header_count": 3,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-he-bing-xian-jin-liu-liang-biao-xiang-guan",
+        "section_number": "八、91",
+        "section_title": "合并现金流量表相关事项",
+        "index": 3,
+        "table_name": "资产负债表中的列报项目和相关信息",
+        "json_header_count": 3,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-he-bing-xian-jin-liu-liang-biao-xiang-guan",
+        "section_number": "八、91",
+        "section_title": "合并现金流量表相关事项",
+        "index": 4,
+        "table_name": "付款到期日的区间",
+        "json_header_count": 3,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-wai-bi-huo-bi-xing-xiang-mu",
+        "section_number": "八、92",
+        "section_title": "外币货币性项目",
+        "index": 0,
+        "table_name": "外币货币性项目",
+        "json_header_count": 4,
+        "reason": "EXISTING_DIFFERS（已有 4 列与规则给的 4 列不一致；不覆盖，需人工裁决归属）"
+      },
+      {
+        "section_id": "chapter-08-cai-wu-bao-biao-zhu-yao-xiang-mu-zhu-shi-suo-you-quan-he-shi-yong-quan-shou-dao-xian",
+        "section_number": "八、93",
+        "section_title": "所有权和使用权受到限制的资产",
+        "index": 0,
+        "table_name": "所有权和使用权受到限制的资产",
+        "json_header_count": 3,
+        "reason": "EXISTING_DIFFERS（已有 3 列与规则给的 3 列不一致；不覆盖，需人工裁决归属）"
+      },
+      {
+        "section_id": "chapter-09-huo-you-shi-xiang-huo-you-fu-zhai",
+        "section_number": "九、1、或有负债",
+        "section_title": "1、或有负债",
+        "index": 0,
+        "table_name": "未决诉讼仲裁形成的或有负债及其财务影响",
+        "json_header_count": 6,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-09-huo-you-shi-xiang-huo-you-fu-zhai",
+        "section_number": "九、1、或有负债",
+        "section_title": "1、或有负债",
+        "index": 1,
+        "table_name": "截至2025年12月31 日，本公司为下列单位贷款提供保证",
+        "json_header_count": 5,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-10-zi-chan-fu-zhai-biao-ri-hou-shi-xiang-zi-chan-fu-zhai-biao-ri-hou-li-run-fen-pei-qin",
+        "section_number": "十、资产负债表日后利",
+        "section_title": "资产负债表日后利润分配情况说明",
+        "index": 0,
+        "table_name": "资产负债表日后利润分配情况说明",
+        "json_header_count": 1,
+        "reason": "LEN_MISMATCH（docx 2 列 vs JSON 1 列；多为两级表头被 md 重建压扁）"
+      },
+      {
+        "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-ben-gong-si-de-he-ying-qi-ye-lian-ying-qi-ye-qin",
+        "section_number": "十一、本公司的合营企业",
+        "section_title": "本公司的合营企业、联营企业情况",
+        "index": 0,
+        "table_name": "重要的合营企业或联营企业基本信息",
+        "json_header_count": 6,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-ben-gong-si-de-he-ying-qi-ye-lian-ying-qi-ye-qin",
+        "section_number": "十一、本公司的合营企业",
+        "section_title": "本公司的合营企业、联营企业情况",
+        "index": 1,
+        "table_name": "本公司的合营企业、联营企业情况（表2）",
+        "json_header_count": 2,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-jiao-yi-qing-kuang",
+        "section_number": "十一、关联交易情况",
+        "section_title": "关联交易情况",
+        "index": 0,
+        "table_name": "A、采购商品、接受劳务情况表",
+        "json_header_count": 5,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-jiao-yi-qing-kuang",
+        "section_number": "十一、关联交易情况",
+        "section_title": "关联交易情况",
+        "index": 1,
+        "table_name": "B、出售商品、提供劳务情况表",
+        "json_header_count": 5,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-jiao-yi-qing-kuang",
+        "section_number": "十一、关联交易情况",
+        "section_title": "关联交易情况",
+        "index": 2,
+        "table_name": "本公司作为出租方当年确认的租赁收入",
+        "json_header_count": 4,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-jiao-yi-qing-kuang",
+        "section_number": "十一、关联交易情况",
+        "section_title": "关联交易情况",
+        "index": 3,
+        "table_name": "本公司作为承租方",
+        "json_header_count": 4,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-jiao-yi-qing-kuang",
+        "section_number": "十一、关联交易情况",
+        "section_title": "关联交易情况",
+        "index": 4,
+        "table_name": "本公司作为承租方当年新增的使用权资产",
+        "json_header_count": 4,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-jiao-yi-qing-kuang",
+        "section_number": "十一、关联交易情况",
+        "section_title": "关联交易情况",
+        "index": 5,
+        "table_name": "本公司为承租方当年承担的租赁负债利息支出",
+        "json_header_count": 4,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-fang-ying-shou-ying-fu-kuan-xiang",
+        "section_number": "十一、关联方应收应付款",
+        "section_title": "关联方应收应付款项",
+        "index": 0,
+        "table_name": "应收关联方款项",
+        "json_header_count": 4,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      },
+      {
+        "section_id": "chapter-11-guan-lian-fang-ji-guan-lian-jiao-yi-guan-lian-fang-ying-shou-ying-fu-kuan-xiang",
+        "section_number": "十一、关联方应收应付款",
+        "section_title": "关联方应收应付款项",
+        "index": 1,
+        "table_name": "应付关联方款项",
+        "json_header_count": 4,
+        "reason": "NO_SECTION（源 docx 未映射到该章节）"
+      }
+    ]
+  },
+  "summary": {
+    "listed_COUNT_MISMATCH": 38,
+    "listed_CROSS_CHAPTER": 14,
+    "listed_EXISTING_DIFFERS": 13,
+    "listed_LEN_MISMATCH": 53,
+    "listed_NO_SECTION": 18,
+    "listed_chapter_allowlisted": 31,
+    "listed_chapter_equiv": 10,
+    "listed_chapter_same": 19,
+    "listed_cross_chapter_rejected": 1,
+    "listed_deficit": 136,
+    "listed_rule": 70,
+    "listed_rule_sections": 34,
+    "soe_COUNT_MISMATCH": 14,
+    "soe_CROSS_CHAPTER": 9,
+    "soe_EXISTING_DIFFERS": 7,
+    "soe_LEN_MISMATCH": 2,
+    "soe_NO_SECTION": 35,
+    "soe_chapter_equiv": 3,
+    "soe_chapter_same": 24,
+    "soe_cross_chapter_rejected": 9,
+    "soe_deficit": 67,
+    "soe_rule": 15,
+    "soe_rule_sections": 13
+  }
+}
