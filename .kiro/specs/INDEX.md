@@ -2,7 +2,7 @@
 
 **最后更新**：2026-08-08
 **当前分支**：`work/2026-05-30-wp-specs`
-**统计**：Active **7**（2026-08-08 行首锚定正则实扫）/ Archived **545**
+**统计**：Active **6**（2026-08-09 行首锚定正则实扫）/ Archived **546**
 **最高迁移**：**V143**（`word_export_task_versions.drift_report`；以 `migration_status` 实测为准）
 **技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer
 
@@ -31,17 +31,17 @@
 | `custom-workpaper-dual-mode-formula-and-batch` | 28/29 | 自定义底稿（componentType=custom）双模式 + 自定义公式 + 批量创建。xlsx 为唯一权威、`html_data.cells` 是其恒等坐标投影；剩 Wave 5 导出 / Wave 6 批量创建收尾 |
 | `h-cycle-extraction-formula-and-disclosure-completion` | 17/18（Task 18 `[-]` = 浏览器实测收尾） | H 类（H1~H10）取数/公式/披露收口。双族并存取数（`dual_family_codes`）+ 列名注册 + H1~H4 审定预填 + 会计政策章 + 金额控件。真实库 80 组合验收已过，只剩浏览器实测 |
 | `note-template-columns-and-legacy-snapshot-closure` | 21/23 | 附注模板列元数据补齐 + legacy 快照收口。列真源按章节三分（有底稿披露 sheet → openpyxl 直读 / 母公司章 → A spec / 无披露 sheet → 附注 docx）。已补 columns 85 张 + guidance 53 张；legacy 快照迁移已执行（132 章节 / 152 表 / 1134 行，行数守恒 + 幂等 + 回滚往返 + 三消费方 issues=0）。剩 Task 13/14（⏸ 等 B spec 收口，撞模板行集）+ Task 23 收口 |
-| `soe-listed-note-conversion-correctness` | 17/19（**并发会话在推进，勿碰**） | 国企↔上市附注转换正确性。生产 6 步里 3 步空操作、v2 映射是孤儿；同义两码 / 一码两义 / 章节映射修复。依赖 A spec（已收口） |
 | `e-cycle-extraction-formula-and-disclosure-completion` | 1/22（并发会话新建） | E 类（E0/E1）取数/公式/披露收口。账户级取数走 `tb_aux_balance` 银行账户维度（客户 1002 不分户，叶子恒 1 行） |
 | `g7-column-alignment-and-extraction-closure` | 0/24（并发会话新建） | G7 长期股权投资列结构对齐与取数闭合。核心 = 补上「源 xlsx ↔ 模板 seed ↔ 运行时载荷」三向锁死的第三条边（既有两个守卫各自只覆盖两条边，故 32 处列偏差长期逃逸） |
 | `procedure-trimming-and-delegation-intelligence` | 0/26（并发会话新建） | 程序裁剪三维判据（风险评估 → 重要性 → 数据存在性）+ 人员委派智能化。现状只实现最末位「科目在试算表无数据」一维 |
 
-> 🔴 `soe-listed-*` / `e-cycle-*` / `g7-*` / `procedure-trimming-*` 由**并发会话**推进
+> 🔴 `e-cycle-*` / `g7-*` / `procedure-trimming-*` 由**并发会话**推进
 > （tasks.md mtime 秒/分钟级刷新），本会话未触碰。
 > 跨会话协作时不要并行推进同一 spec（memory 已实证并发会话会互相回退同一文件）。
 > `f0`(144/144) / `parent-company`(18/18) / `report-config`(12/12) /
 > `sampling-evaluation-and-governance-closure`(19/19) / `k0`(18/18) /
-> **`sampling-compliance-closure`(25/25)** 已于 2026-08-08 归档（见 §二）。
+> **`sampling-compliance-closure`(25/25)** 已于 2026-08-08 归档（见 §二）；
+> **`soe-listed-note-conversion-correctness`(19/19)** 已于 2026-08-09 归档。
 
 **2026-08-08 归档（1 个，→ `05-business-features`，与 `voucher-sampling-*` /
 `cutoff-test-*` / `voucher-check-sampling-integration` 同分类）**：
@@ -128,7 +128,7 @@ H0 聚合忽略 `closing_direction` 把 contra 子科目加成正数）。
 
 ---
 
-## 二、已归档 Spec（545 个，15 分类）
+## 二、已归档 Spec（546 个，15 分类）
 
 ```
 _archive/
@@ -140,7 +140,7 @@ _archive/
 ├── 05-business-features/            237
 ├── 06-engineering-governance/        13
 ├── 07-workpaper-slimdown/            22
-├── 08-disclosure-notes/              77
+├── 08-disclosure-notes/              78
 ├── 09-consolidation-phases/           5
 ├── 10-A~S-workpaper-all-cycles-complete/  31
 ├── 11-confirmation-d0-module/        17
@@ -148,6 +148,14 @@ _archive/
 ├── 13-2026-06-29-batch/              33
 └── 99-superseded/                     7
 ```
+
+### 最近归档（2026-08-09）
+
+**→ 08-disclosure-notes（+1）**
+
+| Spec | 说明 |
+|------|------|
+| soe-listed-note-conversion-correctness | 国企↔上市附注转换正确性（**19/19 全完成**，守卫 549 passed / 0 failed）。修「生产 6 步里 3 步空操作 + v2 映射是孤儿」：`_map_disclosure_notes` 原先只 `SELECT count(*)` 一行不改却把该数报成 `mapped_notes` = **假成功反馈**；`_map_report_rows` / `_update_formula_references` 是 `return 0`。四处立项判断被实证推翻 —— ①跨变体 row_code 必须按 `(entity, scope)` **四象限**统计（按 entity 合并会虚构出「78 条一码两义」）②「同义两码」standalone **14** 条 / consolidated **13** 条（非 12），且 `EQ-030`/`EQ-033` 两 scope 目标码冲突 ⇒ 映射常量必须 `dict[scope, list]`③需求 3.8「两清单互斥」按字面**不成立**（14 条映射的 listed 目标码全部属「一码两义」，正因两侧异名才需要改写）→ 真不变量 = 「改写源不得落在该 scope 禁止清单里」④公式改写在 `report_config` 域内**零可改写对象**（该表无 `project_id` 列 = 纯模板表 / 全库 formula 对那批 row_code 引用 0 条 / `wp_formula` 0 行 / 附注 `binding_id` 是「章节号.行标签.列键」不含 row_code）⇒ 保留 `return 0` 但补原因码 `no_mapping_needed`。Task 10 裁决 = **删除 v2 不接线**（生产 Step 4 已调 `_map_disclosure_notes`、v2 零调用方且生产版严格更强），21 条断言迁移到生产测试 + 52 例移除守卫。Task 19 达成状态是**诚实输出「无法验收（缺授权）」**（`eligibility=NO_CANDIDATE` + rc=1，需求 10.7 明确允许）—— 8 个 live 项目里技术可切换 4 个、已授权 0 个，建议 `c8621493`（规模最小）。新建件：`note_conversion_row_codes.py` / `note_section_matcher.py`（5 对别名穷举 + 禁止匹配对 + 零相似度实现）/ `note_variant_matrix_null_audit.py`（35 条 null 三态裁决）/ `fix_variant_matrix_false_nulls.py`（三闸门：撞码 / 落点形态 / additive）/ `verify_note_conversion_live.py`；CI job `note-conversion-correctness`（jobs 136→137）。5 个生产文件收尾 md5 与开工基线逐字节一致 = 零净改动 |
 
 ### 最近归档（2026-08-08）
 
