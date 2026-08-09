@@ -3981,3 +3981,89 @@ jobs:
           src/components/workpaper/confirmation/reliability/__tests__
           src/components/workpaper/confirmation/__tests__/confirmationColumnSpec.spec.ts
         working-directory: audit-platform/frontend
+
+  note-conversion-correctness:
+    # spec: soe-listed-note-conversion-correctness Task 18
+    #
+    # 国企↔上市附注转换正确性收口。改造前 `execute_conversion` 六步里有三步是空操作
+    # （`_map_report_rows` / `_update_formula_references` 直接 `return 0`，
+    # `_map_disclosure_notes` 只 `SELECT count(*)` 把存量章节数当「已映射数」上报），
+    # 而两份模板有 20 个章节号重合且 13 个标题不同（`八、1` soe=货币资金 / listed=政府补助）
+    # ⇒ 切准则后原货币资金数据显示在政府补助章节位置，且用户看到「已映射 N 个章节」。
+    #
+    # 🔴 本 job **必须带 postgres service**：三个守卫连库
+    # （`test_note_conversion_row_codes.py` 与 `test_note_conversion_section_mapping.py`
+    # 读 `report_config` 做跨变体 row_code 对账，`test_note_conversion_preview_rollback.py`
+    # 用 `async_session` 验「预览零写入」）。跨变体 row_code 的判据真源是 DB 里
+    # 四个 `applicable_standard` 的 `(report_type, row_name)` 实际取值 ——
+    # 没有 DB 时这批断言会退化成 skip，而「同义两码」映射写反的后果是把
+    # 「一年内到期的非流动资产」指向「其中：应收股利」（实测 `BS-016` 两侧异义）。
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: audit_platform
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies (uv accelerated)
+        run: |
+          pip install "uv>=0.7"
+          uv pip install --system -r backend/requirements.txt || pip install -r backend/requirements.txt
+      - name: Run migrations (PG schema for connected guards)
+        run: python -c "import asyncio; from app.core.migration_runner import MigrationRunner; asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform').run_pending())"
+        working-directory: backend
+      - name: Diff data integrity (Property 1~4；is_mock / 落盘↔实时逐条相等 / format_diff 可定位)
+        # 落盘 `note_soe_listed_diff.json` 曾自标 `is_mock=true` 且已 stale
+        # （common 106 vs 实时 107 / format_diff 33 vs 39），而生产走 `load_diff_data()`
+        # 拿的正是那份 stale 数据 ⇒ 该守卫按「条目集合」而非数量比对，模板一改即打红。
+        run: python -m pytest backend/tests/test_note_template_diff_integrity.py -q
+      - name: Section matcher (Property 20~23；穷举配对，源码级禁相似度)
+        # 🔴 禁引入 difflib/SequenceMatcher：实测「财务报表主要项目注释」↔
+        # 「母公司财务报表主要项目注释」相似度 0.87，任何阈值都无法既救回 5 对
+        # 措辞差异（0.80~0.94）又拦住这一对 ⇒ 只能穷举别名 + 禁止对清单。
+        run: python -m pytest backend/tests/test_note_section_matcher.py -q
+      - name: Cross-variant row_code lists (Property 11~15；连库对账 report_config)
+        run: python -m pytest backend/tests/test_note_conversion_row_codes.py -q
+      - name: Section mapping (Property 5~10/16~19/24~26/35/36；binding_id 不失联 + sid NULL 有处置)
+        # Property 35：`table_data` 内 446/1030 条 `binding_id` 形态是「章节号.行标签.列键」，
+        # 只改 `note_section` 不改前缀会让公式绑定**静默失联**（取数变空而非报错）。
+        # Property 36：`section_id` 大面积为 NULL（抽样 12 条里 8 条），静默跳过即漏映射。
+        run: python -m pytest backend/tests/test_note_conversion_section_mapping.py -q
+      - name: Section mapping (production path, v2 断言迁移后的 26 例)
+        run: python -m pytest backend/tests/services/test_note_conversion_section_mapping_production.py -q
+      - name: Preview / rollback (Property 27~33；预览零写入 + 往返可复原)
+        run: python -m pytest backend/tests/test_note_conversion_preview_rollback.py -q
+      - name: v2 removal (Property 24/26；code-level 零残留 + 断言迁移对照表双向锁死)
+        run: python -m pytest backend/tests/test_note_conversion_v2_removal.py -q
+      - name: variant_matrix null audit (Property 27~29；假 null 三态裁决)
+        run: python -m pytest backend/tests/test_variant_matrix_null_audit.py -q
+      - name: Zero regression (Property 34；附注生成/同步/导出/投影四链路与转换零耦合)
+        # 档 1 结构性零耦合 + 档 2 纯函数行为对照。刻意**不**比 docx 字节
+        # （zip 容器含时间戳，同数据两次字节都不同），也**不**冻结上游 md5 常量
+        # （两份模板被 5 个 spec 共享，合法变更即让常量过期 = 假红发生器）。
+        run: python -m pytest backend/tests/test_note_conversion_zero_regression.py -q
+      - name: Live verifier guard (Property 37；验收脚本不得改真实项目口径)
+        # spec Task 19。转换会改 `project.template_type` 并触发
+        # `execute_full_chain(force=True)` 全链重算 = 破坏性操作，故真实库验收脚本
+        # 一律不得写 template_type / report_scope / applicable_standard_v2。
+        #
+        # 🔴 判据只有一份实现：守卫 import 被测脚本导出的 `find_forbidden_writes`
+        # （上一轮两侧各写一份 ⇒ 改一处另一处不红，正是本 spec 全程在治的双真源）。
+        # 判据是「赋值/UPDATE 形态」而非裸标识符 —— 脚本 docstring 必然原样写出
+        # 这三个字段名来说明「为什么禁」，裸子串判据会把说明文字数成违规。
+        run: python -m pytest backend/tests/test_note_conversion_live_verifier.py -q
