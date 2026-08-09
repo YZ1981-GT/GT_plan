@@ -37,6 +37,12 @@ from app.services.wp_visibility.denial import (
 
 logger = logging.getLogger(__name__)
 
+#: 仓库内 `backend/` 目录绝对路径。`working_paper.file_path` 存的是**相对 `backend/` 的
+#: 相对路径**（`storage\projects\...`，Windows 反斜杠），生产进程 CWD 恰为 `backend/` 故
+#: 裸 `Path(file_path)` 可用；但诊断脚本/测试可能从仓库根运行 ⇒ 需要绝对回退。
+#: 🔴 与 `custom_workpaper_projection` 的相对解析口径一致（先按 CWD，再按 backend 根）。
+_BACKEND_ROOT = Path(__file__).resolve().parents[2]
+
 router = APIRouter(
     prefix="/api/workpapers",
     tags=["working-papers"],
@@ -157,6 +163,59 @@ async def _load_wp_or_404(db: AsyncSession, wp_id: UUID) -> tuple[WorkingPaper, 
         raise HTTPException(status_code=404, detail="项目已删除")
 
     return wp, wp_code
+
+
+def _resolve_custom_wp_file(wp, wp_code: str | None) -> Path | None:
+    """自定义底稿的 OO 目标文件 = **业务文件本体**（不走 OO 缓存副本）。
+
+    非 custom / 无 file_path / 文件不存在 / 非 xlsx 一律返回 None，调用方退回既有
+    「模板 → 缓存副本」路径（零回归方向）。
+
+    ## 为什么 custom 必须直编本体（2026-08-08 浏览器实测抓出，Task 26）
+
+    既有 `_resolve_wp_file` 只认两个来源：OO 缓存 `{oo_dir}/{wp_code}.xlsx` 或
+    **模板文件**。自定义底稿**没有模板**（`find_template_file_any` 必返 None），
+    其 xlsx 在 `working_paper.file_path` 指的业务存储下 ⇒ 两来源都不命中 ⇒
+    `FileNotFoundError` ⇒ **config 端点 404，「在线编辑」从来打不开**。
+
+    更深一层：即便复制一份到缓存也不对 —— callback 落盘写缓存，而
+    `refresh_custom_projection` 读的是 `wp.file_path`（业务文件）⇒ OO 改动永远进不了
+    HTML 侧，且「xlsx 为唯一权威」退化成两份 xlsx 互相打架（本 spec 的架构口径是
+    xlsx 本体唯一权威、`html_data.cells` 只是它的投影）。
+
+    故 custom 的 config / WOPI 下载 / callback 落盘三处统一指向业务文件本体，
+    与投影读取同源。
+
+    🔴 **不调 `_hide_non_target_sheets`**：custom 恒单 sheet（sheet 名 == wp_code），
+    没有「多 sheet workbook 在 OO 里显示无关 tab」的问题；而对业务文件本体动
+    可见性会真实改写用户底稿。
+    """
+    from app.services.custom_workpaper_context import resolve_is_custom_sync
+
+    try:
+        if not resolve_is_custom_sync(wp, wp_code):
+            return None
+        raw = getattr(wp, "file_path", None)
+        if not raw:
+            return None
+        fp = Path(str(raw))
+        if fp.suffix.lower() not in (".xlsx", ".xlsm"):
+            return None
+        # 🔴 `working_paper.file_path` 存的是**相对 backend/ 的相对路径**
+        #    （`storage\projects\...`，Windows 反斜杠）。投影侧 `project_custom_workpaper`
+        #    直接 `Path(file_path)` 依赖 CWD=backend/，此处沿用同一口径 + 一次
+        #    backend 根回退，避免两侧解析出不同文件（那会让 OO 编的与投影读的分叉）。
+        if not fp.exists():
+            fp2 = _BACKEND_ROOT / fp
+            if fp2.exists():
+                fp = fp2
+        if not fp.exists() or fp.stat().st_size == 0:
+            logger.warning("custom OO: 业务文件缺失或为空 %s", fp)
+            return None
+        return fp
+    except Exception as exc:  # noqa: BLE001 — 解析失败退回既有路径
+        logger.warning("custom OO 文件解析失败 wp_code=%s: %s", wp_code, exc)
+        return None
 
 
 def _resolve_wp_file(
@@ -609,16 +668,26 @@ async def get_sheet_onlyoffice_config(
                 _sheet_wp_code = _candidate
 
     template_path = find_template_file_any(_sheet_wp_code)
-    try:
-        file_path = _resolve_wp_file(
-            project_id, _sheet_wp_code, template_path,
-            visible_sheet=None if whole_workbook else sheet_name,
-        )
-    except FileNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+    # custom：直编业务文件本体（无模板可复制，且必须与投影读取同源）
+    _custom_file = _resolve_custom_wp_file(wp, _sheet_wp_code)
+    if _custom_file is not None:
+        file_path = _custom_file
+    else:
+        try:
+            file_path = _resolve_wp_file(
+                project_id, _sheet_wp_code, template_path,
+                visible_sheet=None if whole_workbook else sheet_name,
+            )
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
 
     # 完整Excel 页签：恢复全部 sheet 可见（共享文件可能被单 sheet 模式隐藏过）
-    if whole_workbook and file_path.suffix.lower() in (".xlsx", ".xlsm"):
+    # 🔴 custom 跳过：恒单 sheet，且不得改写用户底稿本体的可见性
+    if (
+        whole_workbook
+        and _custom_file is None
+        and file_path.suffix.lower() in (".xlsx", ".xlsm")
+    ):
         _ensure_all_sheets_visible(file_path)
 
     # 4. 生成 doc_key
@@ -873,15 +942,20 @@ async def get_sheet_wopi_contents(
             raise HTTPException(status_code=404, detail=EXTERNAL_NOT_FOUND_DETAIL)
 
     template_path = find_template_file_any(_sheet_wp_code)
-    try:
-        file_path = _resolve_wp_file(
-            project_id, _sheet_wp_code, template_path,
-            visible_sheet=None if _is_whole else sheet_name,
-        )
-    except FileNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+    # custom：下载业务文件本体（与 config / callback / 投影同源）
+    _custom_file = _resolve_custom_wp_file(wp, _sheet_wp_code)
+    if _custom_file is not None:
+        file_path = _custom_file
+    else:
+        try:
+            file_path = _resolve_wp_file(
+                project_id, _sheet_wp_code, template_path,
+                visible_sheet=None if _is_whole else sheet_name,
+            )
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
 
-    if _is_whole and file_path.suffix.lower() in (".xlsx", ".xlsm"):
+    if _is_whole and _custom_file is None and file_path.suffix.lower() in (".xlsx", ".xlsm"):
         _ensure_all_sheets_visible(file_path)
 
     if not file_path.exists():
@@ -1154,7 +1228,13 @@ async def post_sheet_onlyoffice_callback(
         if (_oo_dir / f"{_save_wp_code}.docx").exists():
             _save_ext = ".docx"
 
-        if is_word_template:
+        # custom：落盘到业务文件本体（与 config / WOPI / 投影同源）。
+        # 🔴 写缓存副本会让 `refresh_custom_projection`（读 wp.file_path）永远看不到
+        #    OO 改动，且「xlsx 唯一权威」退化成两份 xlsx（Task 26 实测抓出）。
+        _custom_target = _resolve_custom_wp_file(wp, _save_wp_code or wp_code)
+        if _custom_target is not None:
+            target = _custom_target
+        elif is_word_template:
             # word-template: 保存到 storage/{project_id}/workpapers/{wp_code}.docx
             target = Path(f"storage/{project_id}/workpapers/{wp_code}.docx")
         else:
@@ -1243,6 +1323,38 @@ async def post_sheet_onlyoffice_callback(
                 logger.warning(
                     "OnlyOffice callback: %s 回写失败 wp_id=%s: %s",
                     _save_wp_code,
+                    wp_id,
+                    exc,
+                )
+
+        # ─── custom: OO 侧编辑落盘后从 xlsx 重投影，让 HTML 侧看得见 ───
+        # 🔴 加法式接线：`_is_custom` 为假时本块整体跳过，非 custom 回调路径逐字节不变。
+        # 🔴 fail-open + WARNING：投影只是 xlsx 的派生物，投影失败不能让 OO 保存报错
+        #    （报错会让用户以为文档没保存，从而重复保存/丢失编辑）。
+        # 这是「OO 改动能被 HTML 侧看见」的唯一通路 —— 平台既有双模式两侧数据不共享，
+        # 自定义底稿是自由网格、两侧编同一批单元格，只能靠 xlsx 权威打通。
+        if target.suffix.lower() == ".xlsx":
+            try:
+                from app.services.custom_workpaper_context import resolve_is_custom
+                from app.services.custom_workpaper_projection import (
+                    refresh_custom_projection,
+                )
+
+                # 🔴 三个位置参数（db, wp, wp_code）—— 少传一个会抛 TypeError
+                # 并被下面的 `except Exception` 吞成 WARNING ⇒ 整块变死代码而测试全绿
+                # （H 循环 Task 5 已实证同型缺陷，故守卫用 sig.bind 钉死绑定）
+                _custom_sheet = _save_wp_code or wp_code
+                if await resolve_is_custom(db, wp, _custom_sheet):
+                    refresh_custom_projection(wp, _custom_sheet)
+                    await db.commit()
+                    logger.info(
+                        "OnlyOffice callback: custom 底稿投影已刷新 wp_id=%s sheet=%s",
+                        wp_id,
+                        _custom_sheet,
+                    )
+            except Exception as exc:  # noqa: BLE001 — 投影失败不阻塞 OO 保存
+                logger.warning(
+                    "OnlyOffice callback: custom 投影刷新失败 wp_id=%s: %s",
                     wp_id,
                     exc,
                 )

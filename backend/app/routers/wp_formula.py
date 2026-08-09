@@ -247,6 +247,13 @@ def _formula_to_dict(f: WpFormula) -> dict:
         "category": f.category,
         "description": f.description,
         "formula_type": f.formula_type,
+        # spec: formula-management-runtime-closure Task 11（Requirements 2.2, 6.6 /
+        # Property 16）—— `lifecycle_state` 与 `definition_version` 实测**零消费**
+        # （前端命中均为 0），根因是它们压根不在响应体里。补进下发键集后，
+        # 前端 `GtFormulaEditDialog` 才可能展示「草稿 / 生效 / 已归档」。
+        "lifecycle_state": f.lifecycle_state,
+        "definition_version": f.definition_version,
+        "formula_source": f.formula_source,
         "refs": f.refs,
         "issue_description": f.issue_description,
         "hint_text": f.hint_text,
@@ -718,12 +725,63 @@ async def save_formula(
             )
         if not is_dcycle_anchor and not is_f2_anchor:
             # 普通网格 cell（∉ known_anchors）/ 非 D-cycle / 主开关关 → parsed_data 网格写回（零回归）
-            write_cell_to_parsed_data(
-                wp,
-                sheet_name=body.sheet_name,
-                cell_ref=body.target_cell,
-                value=format_cell_display_value(evaluated_value),
-            )
+            _display = format_cell_display_value(evaluated_value)
+
+            # ─── custom 底稿：求值结果必须**双写 xlsx 与投影** ───
+            # 🔴 自定义底稿口径 = xlsx 权威、`html_data` 只是它的投影。只写投影会让
+            #    OnlyOffice 侧（直编 xlsx 本体）看不到公式值，且下次 render 重投影时
+            #    该值静默消失 —— 属于「界面上有、文件里没有」的数据错误。
+            # 🔴 顺序：先写 xlsx（权威）再写投影；xlsx 写失败 raise 让整个保存失败，
+            #    绝不能只有投影有值（那正是要消除的分叉态）。
+            # 🔴 加法式门控：非 custom 底稿完全走原路径（只写投影），逐字节不变。
+            _is_custom_wp = False
+            try:
+                from app.services.custom_workpaper_context import resolve_is_custom
+
+                _is_custom_wp = await resolve_is_custom(db, wp, wp_code)
+            except Exception as _ctx_err:  # noqa: BLE001 — 判定失败按非 custom 处理
+                logger.warning(
+                    "save_formula: custom 判定失败 wp_id=%s: %s", wp_id, _ctx_err
+                )
+                _is_custom_wp = False
+
+            if _is_custom_wp:
+                from app.services.custom_workpaper_projection import (
+                    refresh_custom_projection,
+                    write_cells_to_xlsx,
+                )
+
+                if not wp.file_path:
+                    raise HTTPException(
+                        status_code=404, detail="底稿文件路径为空，请重新生成底稿"
+                    )
+                try:
+                    write_cells_to_xlsx(
+                        wp.file_path, body.sheet_name, {body.target_cell: _display}
+                    )
+                except HTTPException:
+                    raise
+                except Exception as _xlsx_err:  # noqa: BLE001
+                    # 权威写失败 → 整个保存失败（不留「只有投影有值」的分叉态）
+                    logger.error(
+                        "save_formula: custom 公式值写 xlsx 失败 wp_id=%s cell=%s: %s",
+                        wp_id,
+                        body.target_cell,
+                        _xlsx_err,
+                    )
+                    raise HTTPException(
+                        status_code=500,
+                        detail=f"公式值写入底稿文件失败: {_xlsx_err}",
+                    ) from _xlsx_err
+                # 从 xlsx 重投影（而非就地改投影）—— 保证投影恒等于权威
+                refresh_custom_projection(wp, body.sheet_name)
+            else:
+                write_cell_to_parsed_data(
+                    wp,
+                    sheet_name=body.sheet_name,
+                    cell_ref=body.target_cell,
+                    value=_display,
+                )
 
     linkage: dict | None = None
     # D-cycle 锚点未写 parsed_data 网格 → 无网格 cell 变更可传播，跳过 linkage（避免误导）。
@@ -786,7 +844,52 @@ async def delete_formula(
     ).scalar_one_or_none()
     if existing is None:
         raise HTTPException(status_code=404, detail="公式不存在")
+
+    # 删除前留存目标格坐标（delete 之后 ORM 对象字段不可靠）
+    _target_cell = existing.target_cell
+    _sheet_name = existing.sheet_name
+
     await wp_formula_service.delete(db, formula_id)
     await db.commit()
     # NOTE: touch_wp_registry 已由 ACNR events.on_workpaper_saved 统一处理（R23.1/R23.2）
-    return {"deleted": str(formula_id)}
+
+    payload: dict = {"deleted": str(formula_id)}
+
+    # ─── custom 底稿：同时清掉该格在 xlsx 与投影里的求值结果（R6.4 完整语义）───
+    # 🔴 只删 `wp_formula` 行不够：xlsx 里那格还留着上次求值结果，该格恢复可手工编辑后
+    #    显示的是旧公式值。在 xlsx 权威口径下这是**数据错误**而非显示问题。
+    # 🔴 加法式门控：非 custom 底稿此块整体跳过，delete_formula 路径逐字节不变。
+    # 🔴 清格失败**不得让删除整体失败**（公式定义已删是用户意图，且已 commit），
+    #    改为记 WARNING + 响应带 `cell_clear_failed` 让前端如实提示。
+    if _target_cell and _sheet_name:
+        try:
+            from app.services.custom_workpaper_context import resolve_is_custom
+
+            _wp_code = await _resolve_wp_code(db, wp)
+            if await resolve_is_custom(db, wp, _wp_code):
+                from app.services.custom_workpaper_projection import (
+                    refresh_custom_projection,
+                    write_cells_to_xlsx,
+                )
+
+                try:
+                    write_cells_to_xlsx(
+                        wp.file_path, _sheet_name, {_target_cell: None}
+                    )
+                    refresh_custom_projection(wp, _sheet_name)
+                    await db.commit()
+                    payload["cell_cleared"] = _target_cell
+                except Exception as _clear_err:  # noqa: BLE001
+                    logger.warning(
+                        "delete_formula: custom 清格失败 wp_id=%s cell=%s: %s",
+                        wp_id,
+                        _target_cell,
+                        _clear_err,
+                    )
+                    payload["cell_clear_failed"] = True
+        except Exception as _ctx_err:  # noqa: BLE001 — 判定失败不影响删除结果
+            logger.warning(
+                "delete_formula: custom 判定失败 wp_id=%s: %s", wp_id, _ctx_err
+            )
+
+    return payload

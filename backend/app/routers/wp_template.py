@@ -16,6 +16,7 @@ Validates: Requirements 1.1-1.8
 
 from __future__ import annotations
 
+import re
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -487,6 +488,175 @@ class CreateCustomWorkpaperRequest(BaseModel):
     year: int = 2025
 
 
+class CustomBatchItem(BaseModel):
+    wp_code: str
+    wp_name: str
+    audit_cycle: str | None = None
+
+
+class CreateCustomBatchRequest(BaseModel):
+    items: list[CustomBatchItem] = []
+    year: int = 2025
+
+
+class CustomBatchPreviewRequest(BaseModel):
+    items: list[CustomBatchItem] = []
+
+
+#: 单次批量上限，**与前端 `customWpBatchParse.MAX_BATCH_ITEMS` 交叉锁死**。
+#:
+#: 🔴 两侧不等的后果：前端放行 300 条、后端 422 整批拒绝 → 用户白填一屏清单。
+#: 守卫读前端源码比对该常量值（改一侧另一侧必红）。
+#: 🔴 超限返 422 且**不静默截断** —— 截断会让用户以为整份清单都创建了。
+MAX_BATCH_ITEMS = 200
+
+#: 底稿编号字符集，**与前端 `customWpBatchParse.WP_CODE_RE` 交叉锁死**。
+#: 字母/数字开头，其后可含字母数字中划线下划线点，总长 ≤32。
+WP_CODE_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9\-_.]{0,31}$"
+
+
+async def _custom_code_exists(
+    db: AsyncSession, project_id: UUID, wp_code: str
+) -> bool:
+    """该项目下是否已存在此底稿编号。"""
+    existing = await db.execute(
+        sa.select(WpIndex.id).where(
+            WpIndex.project_id == project_id,
+            WpIndex.wp_code == wp_code,
+            WpIndex.is_deleted == sa.false(),
+        )
+    )
+    return existing.scalar_one_or_none() is not None
+
+
+async def _create_one_custom_workpaper(
+    db: AsyncSession,
+    *,
+    project_id: UUID,
+    wp_code: str,
+    wp_name: str,
+    audit_cycle: str | None,
+    year: int,
+    created_by: UUID | None,
+) -> dict:
+    """创建**一个**自定义底稿（单条端点与批量端点的唯一实现）。
+
+    🔴 抽出这个共享函数是为了满足 R8.7/R8.9：批量与单条**必须共用同一份创建逻辑**。
+    两份实现会漂移 —— 平台已有多起「同一语义两处各写一份，修一处另一处不动」的实证
+    （如 `fill_report_formulas.py` vs `ReportFormulaService`）。守卫会断言批量路径
+    确实调用本函数（变异「批量另写一份」必须打红）。
+
+    🔴 **不 commit**：事务边界由调用方决定 —— 批量端点要在最外层一次 commit，
+    每条用 savepoint 隔离；本函数内部 commit 会破坏 per-item 回滚语义。
+
+    Raises:
+        ValueError: 编号已存在（调用方决定映射成 409 还是 skipped）
+    """
+    from pathlib import Path
+
+    if await _custom_code_exists(db, project_id, wp_code):
+        raise ValueError(f"底稿编号 {wp_code} 已存在")
+
+    cycle = audit_cycle or (wp_code[0] if wp_code else "X")
+
+    wp_index = WpIndex(
+        project_id=project_id,
+        wp_code=wp_code,
+        wp_name=wp_name,
+        audit_cycle=cycle,
+        status=WpStatus.not_started,
+    )
+    db.add(wp_index)
+    await db.flush()
+
+    # 创建空白 xlsx（sheet 名恒取 wp_code —— render 只读 html_data[wp_code]）
+    project_wp_dir = Path("storage") / "projects" / str(project_id) / "workpapers"
+    cycle_dir = project_wp_dir / cycle
+    cycle_dir.mkdir(parents=True, exist_ok=True)
+    dest_file = cycle_dir / f"{wp_code}.xlsx"
+
+    try:
+        import openpyxl
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = wp_code
+        wb.save(str(dest_file))
+        wb.close()
+    except Exception:
+        dest_file.write_bytes(b"")
+
+    wp = WorkingPaper(
+        project_id=project_id,
+        wp_index_id=wp_index.id,
+        file_path=str(dest_file),
+        source_type=WpSourceType.manual,
+        file_version=1,
+        created_by=created_by,
+    )
+    db.add(wp)
+    await db.flush()
+
+    # F50 / Sprint 8.17: 自定义底稿同样绑定当前 active dataset
+    try:
+        from app.services.dataset_query import bind_to_active_dataset
+
+        await bind_to_active_dataset(db, wp, project_id, year)
+    except Exception as _bind_err:
+        import logging
+
+        logging.getLogger(__name__).warning(
+            "dataset binding failed for custom wp %s: %s", wp_code, _bind_err
+        )
+
+    # 自定义底稿强制写入标准表头（is_custom=True）
+    try:
+        from app.services.wp_header_service import fill_workpaper_header
+
+        await fill_workpaper_header(
+            db=db,
+            project_id=project_id,
+            wp_id=wp.id,
+            file_path=str(dest_file),
+            wp_code=wp_code,
+            wp_name=wp_name,
+            cycle=cycle,
+            is_custom=True,
+        )
+    except Exception as _e:
+        import logging
+
+        logging.getLogger(__name__).warning(
+            "fill custom header failed for %s: %s", wp_code, _e
+        )
+
+    # 🔴 投影 parsed_data（必须在 fill_workpaper_header 之后、commit 之前）
+    #
+    # 改造前 create_custom_workpaper 不填 parsed_data ⇒ html_data.cells 为空
+    # ⇒ GtGridSheet.hasData = keys(cells)>0 && maxRow>0 恒 false
+    # ⇒ 网格恒显示「此表格底稿模板暂无内容」，且公式选址列表为空（选不了目标格）。
+    #
+    # 顺序原因：表头由 fill_workpaper_header 写进 xlsx，投影必须在其后才能读到表头格；
+    # 放到 commit 之后则本次请求的投影不落库。
+    try:
+        from app.services.custom_workpaper_projection import refresh_custom_projection
+
+        refresh_custom_projection(wp, wp_code)
+    except Exception as _proj_err:
+        import logging
+
+        logging.getLogger(__name__).warning(
+            "custom projection failed for %s: %s", wp_code, _proj_err
+        )
+
+    return {
+        "wp_id": str(wp.id),
+        "wp_code": wp_code,
+        "wp_name": wp_name,
+        "file_path": str(dest_file),
+    }
+
+
 @router.post("/api/projects/{project_id}/working-papers/create-custom")
 async def create_custom_workpaper(
     project_id: UUID,
@@ -497,88 +667,204 @@ async def create_custom_workpaper(
     """创建自定义底稿（用户自建，非模板生成）
 
     自动填充致同标准表头（编制单位/审计期间/索引号/交叉索引等）。
+
+    🔴 响应形状保持不变（既有前端调用方零改动）；创建逻辑委托
+    `_create_one_custom_workpaper`，与批量端点共用同一份实现。
     """
-    from pathlib import Path
-
-    # 检查编号是否已存在
-    existing = await db.execute(
-        sa.select(WpIndex).where(
-            WpIndex.project_id == project_id,
-            WpIndex.wp_code == data.wp_code,
-            WpIndex.is_deleted == sa.false(),
-        )
-    )
-    if existing.scalar_one_or_none():
-        raise HTTPException(status_code=409, detail=f"底稿编号 {data.wp_code} 已存在")
-
-    cycle = data.audit_cycle or (data.wp_code[0] if data.wp_code else "X")
-
-    # 创建 wp_index
-    wp_index = WpIndex(
-        project_id=project_id,
-        wp_code=data.wp_code,
-        wp_name=data.wp_name,
-        audit_cycle=cycle,
-        status=WpStatus.not_started,
-    )
-    db.add(wp_index)
-    await db.flush()
-
-    # 创建空白 xlsx
-    project_wp_dir = Path("storage") / "projects" / str(project_id) / "workpapers"
-    cycle_dir = project_wp_dir / cycle
-    cycle_dir.mkdir(parents=True, exist_ok=True)
-    dest_file = cycle_dir / f"{data.wp_code}.xlsx"
-
     try:
-        import openpyxl
-        wb = openpyxl.Workbook()
-        ws = wb.active
-        ws.title = data.wp_code
-        wb.save(str(dest_file))
-        wb.close()
-    except Exception:
-        dest_file.write_bytes(b"")
-
-    # 创建 working_paper
-    wp = WorkingPaper(
-        project_id=project_id,
-        wp_index_id=wp_index.id,
-        file_path=str(dest_file),
-        source_type=WpSourceType.manual,
-        file_version=1,
-        created_by=current_user.id,
-    )
-    db.add(wp)
-    await db.flush()
-
-    # F50 / Sprint 8.17: 自定义底稿同样绑定当前 active dataset
-    try:
-        from app.services.dataset_query import bind_to_active_dataset
-        await bind_to_active_dataset(db, wp, project_id, data.year)
-    except Exception as _bind_err:
-        import logging
-        logging.getLogger(__name__).warning(
-            "dataset binding failed for custom wp %s: %s", data.wp_code, _bind_err
+        result = await _create_one_custom_workpaper(
+            db,
+            project_id=project_id,
+            wp_code=data.wp_code,
+            wp_name=data.wp_name,
+            audit_cycle=data.audit_cycle,
+            year=data.year,
+            created_by=current_user.id,
         )
-
-    # 自定义底稿强制写入标准表头（is_custom=True）
-    try:
-        from app.services.wp_header_service import fill_workpaper_header
-        await fill_workpaper_header(
-            db=db, project_id=project_id, wp_id=wp.id,
-            file_path=str(dest_file), wp_code=data.wp_code, wp_name=data.wp_name,
-            cycle=cycle, is_custom=True,
-        )
-    except Exception as _e:
-        import logging
-        logging.getLogger(__name__).warning("fill custom header failed for %s: %s", data.wp_code, _e)
+    except ValueError as e:
+        # 单条端点沿用既有 409 语义（批量端点则映射成 skipped）
+        raise HTTPException(status_code=409, detail=str(e))
 
     await db.commit()
     return {
-        "wp_id": str(wp.id),
-        "wp_code": data.wp_code,
-        "wp_name": data.wp_name,
-        "file_path": str(dest_file),
+        **result,
         "message": "自定义底稿创建成功，表头已自动填充",
+    }
+
+
+@router.post("/api/projects/{project_id}/working-papers/create-custom-batch/preview")
+async def preview_custom_workpaper_batch(
+    project_id: UUID,
+    data: CustomBatchPreviewRequest,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(get_current_user),
+):
+    """批量创建**预览**（只读）。
+
+    🔴 **绝不写库** —— 调用前后 `wp_index` / `working_paper` 行数必须不变（Property 11）。
+    R8.2「不得直接开始创建」靠本端点成立：前端拿它的逐行结论渲染预览表格。
+
+    🔴 `duplicate_db` 只有后端能判（前端 `validateItems` 只管格式与清单内重号）。
+
+    status 取值：`ok` / `duplicate_input` / `duplicate_db` / `invalid`
+    """
+    if len(data.items or []) > MAX_BATCH_ITEMS:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "message": f"单次最多 {MAX_BATCH_ITEMS} 条，收到 {len(data.items or [])} 条",
+                "overflow": True,
+                "max_items": MAX_BATCH_ITEMS,
+            },
+        )
+
+    results: list[dict] = []
+    seen: set[str] = set()
+
+    for item in data.items or []:
+        code = (item.wp_code or "").strip()
+        name = (item.wp_name or "").strip()
+        cycle = (item.audit_cycle or "").strip() or (code[0] if code else "")
+
+        if not code or not name:
+            results.append({
+                "wp_code": code, "wp_name": name, "audit_cycle": cycle,
+                "status": "invalid", "reason": "编号与名称均不能为空",
+            })
+            continue
+        if not re.fullmatch(WP_CODE_PATTERN, code):
+            results.append({
+                "wp_code": code, "wp_name": name, "audit_cycle": cycle,
+                "status": "invalid",
+                "reason": "编号只能含字母/数字/中划线/下划线/点，且以字母或数字开头（≤32 字符）",
+            })
+            continue
+        # 🔴 清单内重号按**归一后**的键判（大小写不敏感），与前端
+        # `normalizeWpCode` 同口径 —— 两侧不一致会出现「前端说重复、后端说都能建」，
+        # 用户最后拿到两份只差大小写的底稿。
+        # 🔴 但**库内**存在性检查（`_custom_code_exists`）仍是精确匹配：那是既有单条
+        # `create-custom` 端点的行为，改成大小写不敏感会让历史上能创建的组合突然 409。
+        if code.upper() in seen:
+            results.append({
+                "wp_code": code, "wp_name": name, "audit_cycle": cycle,
+                "status": "duplicate_input", "reason": "清单内编号重复（大小写不敏感）",
+            })
+            continue
+        seen.add(code.upper())
+        if await _custom_code_exists(db, project_id, code):
+            results.append({
+                "wp_code": code, "wp_name": name, "audit_cycle": cycle,
+                "status": "duplicate_db", "reason": "该项目下编号已存在，创建时将跳过",
+            })
+            continue
+        results.append({
+            "wp_code": code, "wp_name": name, "audit_cycle": cycle,
+            "status": "ok", "reason": None,
+        })
+
+    summary = {
+        "total": len(results),
+        "ok": sum(1 for r in results if r["status"] == "ok"),
+        "duplicate_input": sum(1 for r in results if r["status"] == "duplicate_input"),
+        "duplicate_db": sum(1 for r in results if r["status"] == "duplicate_db"),
+        "invalid": sum(1 for r in results if r["status"] == "invalid"),
+    }
+    return {"results": results, "summary": summary}
+
+
+@router.post("/api/projects/{project_id}/working-papers/create-custom-batch")
+async def create_custom_workpaper_batch(
+    project_id: UUID,
+    data: CreateCustomBatchRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """批量创建自定义底稿。
+
+    🔴 **per-item savepoint**（`begin_nested`）+ per-item try/except：一条失败只回滚
+    该条，其余照常创建，最外层一次 commit。范式取自同文件 `generate_from_codes`。
+    没有 savepoint 时一条失败会让**整批**回滚 —— 用户重试还是同样失败，无从下手。
+
+    🔴 三态可分：`created` / `skipped`（编号已存在）/ `failed`（带原因）。
+    编号已存在归 **skipped 而非 failed** —— 它是幂等重跑的正常结果，混进 failed
+    会让用户以为出错了。
+    """
+    # 🔴 上限与格式判据必须与 preview 端点**逐字一致**，否则出现
+    #    「preview 说 ok、create 却 422/failed」的不一致体验（用户已按预览确认过）。
+    if len(data.items or []) > MAX_BATCH_ITEMS:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "message": f"单次最多 {MAX_BATCH_ITEMS} 条，收到 {len(data.items or [])} 条",
+                "overflow": True,
+                "max_items": MAX_BATCH_ITEMS,
+            },
+        )
+
+    created: list[dict] = []
+    skipped: list[dict] = []
+    failed: list[dict] = []
+    results: list[dict] = []
+    seen: set[str] = set()
+
+    for item in data.items or []:
+        code = (item.wp_code or "").strip()
+        name = (item.wp_name or "").strip()
+        if not code or not name:
+            failed.append({"wp_code": code, "reason": "编号与名称均不能为空"})
+            results.append({"wp_code": code, "status": "failed", "reason": "编号与名称均不能为空"})
+            continue
+        if not re.fullmatch(WP_CODE_PATTERN, code):
+            reason = "编号只能含字母/数字/中划线/下划线/点，且以字母或数字开头（≤32 字符）"
+            failed.append({"wp_code": code, "reason": reason})
+            results.append({"wp_code": code, "status": "failed", "reason": reason})
+            continue
+        # 🔴 清单内重号按**归一后**的键（大小写不敏感），与 preview 端点及前端
+        #    `normalizeWpCode` 同口径；库内存在性仍走 `_custom_code_exists` 精确匹配。
+        if code.upper() in seen:
+            skipped.append({"wp_code": code, "reason": "清单内编号重复（大小写不敏感）"})
+            results.append({
+                "wp_code": code, "status": "skipped", "reason": "清单内编号重复（大小写不敏感）",
+            })
+            continue
+        seen.add(code.upper())
+
+        try:
+            async with db.begin_nested():
+                one = await _create_one_custom_workpaper(
+                    db,
+                    project_id=project_id,
+                    wp_code=code,
+                    wp_name=name,
+                    audit_cycle=item.audit_cycle,
+                    year=data.year,
+                    created_by=current_user.id,
+                )
+            created.append(one)
+            results.append({"wp_code": code, "status": "created", "reason": None})
+        except ValueError as dup_err:
+            # 编号已存在 → skipped（幂等重跑的正常结果，不是错误）
+            skipped.append({"wp_code": code, "reason": str(dup_err)})
+            results.append({"wp_code": code, "status": "skipped", "reason": str(dup_err)})
+        except Exception as e:  # noqa: BLE001 — 单条失败不阻断整批
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "batch custom create failed wp_code=%s: %s", code, e
+            )
+            failed.append({"wp_code": code, "reason": str(e)})
+            results.append({"wp_code": code, "status": "failed", "reason": str(e)})
+
+    await db.commit()
+    return {
+        "created": len(created),
+        "skipped": len(skipped),
+        "failed": len(failed),
+        "created_items": created,
+        "skipped_items": skipped,
+        "failed_items": failed,
+        "results": results,
+        "message": (
+            f"已创建 {len(created)} 个，跳过 {len(skipped)} 个，失败 {len(failed)} 个"
+        ),
     }
