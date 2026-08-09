@@ -32,6 +32,15 @@ BASE = Path(__file__).resolve().parent.parent.parent  # backend/
 LISTED_PATH = BASE / "data" / "note_template_listed.json"
 SOE_PATH = BASE / "data" / "note_template_soe.json"
 
+if str(BASE) not in sys.path:
+    sys.path.insert(0, str(BASE))
+
+# `row_type` 判据单一真源：`……` 是源模板可扩位（零可见内容），禁硬编码 "data"，
+# 否则与 `fix_note_expandable_rows.py` 互相翻转。
+from app.services.note_expandable_markers import (  # noqa: E402
+    row_type_for_label as _row_type_for_label,
+)
+
 # ─────────────────── 列头目标态 ───────────────────
 
 # 五、40 三张表列头（R6 口径）
@@ -48,7 +57,7 @@ LISTED_COL_LABEL_MAP = {
 
 LISTED_SHORT_INSERT_AFTER = "3．生育保险费"
 LISTED_SHORT_INSERT_BEFORE = "住房公积金"
-LISTED_SHORT_INSERT_ROW = {"label": "……", "row_type": "data"}
+LISTED_SHORT_INSERT_ROW = {"label": "……", "row_type": _row_type_for_label("……")}
 
 # ─────── 八、40 表[1]「短期薪酬列示」行集修正 ─────
 

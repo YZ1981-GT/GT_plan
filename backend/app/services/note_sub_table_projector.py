@@ -16,10 +16,35 @@ import logging
 from functools import lru_cache
 from typing import Any
 
+# 可扩位行判据的单一真源（纯函数、stdlib-only）；本模块只 re-export 以保住既有
+# import 路径（``note_word_exporter`` 从本模块取这两个符号）。
+from app.services.note_expandable_markers import (
+    EXPANDABLE_ROW_TYPE,
+    is_zero_visible_row,
+)
+
 logger = logging.getLogger(__name__)
 
 # ``_source`` 视为"底稿同步来源"的标识（投影权威来源，Req6.1）
 _WORKPAPER_SOURCES = ("workpaper", "workpaper_html")
+
+#: 源模板留的「可扩位」行 —— 附注模板里形如 ``……`` / ``可无限量添加行`` 的行。
+#: 它标记的是「此处可增行」这个**位置**，本身没有披露内容 ⇒ 投影与 Word 导出
+#: 一律**不产出可见数据行**、不参与任何合计。
+#:
+#: 🔴 additive 新增（第 6 个 ``row_type`` 取值），既有五个取值
+#: （``data``/``total``/``subtotal``/``header_label``/``unowned``）的语义与行为
+#: **逐字不变**：`header_label` 的假行由模板侧删除解决（见
+#: ``backend/scripts/fix/fix_note_text_hygiene.py``），不由渲染层过滤解决。
+#: 零回归的结构性保证 = 落地前全库 ``expandable`` 计数为 0，故本过滤对存量数据空操作。
+#:
+#: spec: note-template-columns-and-legacy-snapshot-closure R11.2 / R11.4 / Property 33
+#:
+#: 🔴 判据本体在 ``app.services.note_expandable_markers``（单一真源，纯函数无 IO）——
+#: ``row_type`` 有多个写者（本 spec 的幂等脚本、``_note_structure_kit.data_row()``、
+#: 若干 per-cycle 幂等脚本会整表重写 rows），判据分散会让写者互相翻转。
+#: 此处只是 re-export，为保住既有 import 路径（``note_word_exporter`` 从本模块取）。
+#: 实际绑定在文件头部的 import 处。
 
 
 def _is_meta_key(key: Any) -> bool:
@@ -165,7 +190,7 @@ def project_sub_tables(table_data: Any) -> list[dict] | None:
                     "is_total": bool(r.get("is_total", False)),
                 }
                 for r in rows
-                if isinstance(r, dict)
+                if isinstance(r, dict) and not is_zero_visible_row(r)
             ]
             tables.append({
                 "name": key,
@@ -198,6 +223,8 @@ def project_sub_tables(table_data: Any) -> list[dict] | None:
         projected_rows = []
         for r in rows:
             if not isinstance(r, dict):
+                continue
+            if is_zero_visible_row(r):  # 可扩位：零可见内容（Property 33）
                 continue
             label_val = r.get(label_key, "") if label_key else ""
             # 兜底：标签列键值缺失时回退通用 `label`（合计/小计行常用 label 而非业务键）

@@ -34,8 +34,10 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 # 不参与合计的 row_type（与合计算法语义对齐）
+# `expandable` = 源模板留的可扩位行（`……` / `可无限量添加行`），零可见内容、
+# 不参与任何合计（note-template-columns-and-legacy-snapshot-closure Property 33）。
 _SKIP_ROW_TYPES = frozenset(
-    {"header_label", "dynamic_anchor", "dynamic_marker_end"}
+    {"header_label", "dynamic_anchor", "dynamic_marker_end", "expandable"}
 )
 # 视为合计的 row_type（is_total 兜底）
 _TOTAL_ROW_TYPES = frozenset({"subtotal", "total"})

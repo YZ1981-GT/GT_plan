@@ -44,6 +44,11 @@ from _note_structure_kit import (  # noqa: E402
     validate_section,
 )
 
+# `row_type` 判据单一真源（kit 已把 backend/ 加进 sys.path）。
+from app.services.note_expandable_markers import (  # noqa: E402
+    row_type_for_label as _row_type_for_label,
+)
+
 _BACKEND = Path(__file__).resolve().parent.parent.parent
 DATA_DIR = _BACKEND / "data"
 LISTED_PATH = DATA_DIR / "note_template_listed.json"
@@ -87,12 +92,15 @@ LISTED_MAIN_HEADERS = [
 # 删 `row_type: header_label` 假行，保留 `…` 动态行
 # 行集：①合营企业 + … + 小计 + ②联营企业 + … + 小计 + 合计
 
+# 🔴 `…` 是源模板留的**可扩位**（零可见内容），禁硬编码 `row_type: "data"` ——
+# 否则与 `fix_note_expandable_rows.py` 互相翻转。判据单一真源 =
+# app/services/note_expandable_markers.row_type_for_label。
 LISTED_MAIN_ROWS: list[dict[str, Any]] = [
-    {"label": "①合营企业", "row_type": "data"},
-    {"label": "…", "row_type": "data"},
+    {"label": "①合营企业", "row_type": _row_type_for_label("①合营企业")},
+    {"label": "…", "row_type": _row_type_for_label("…")},
     {"label": "小计", "is_total": True, "row_type": "subtotal"},
-    {"label": "②联营企业", "row_type": "data"},
-    {"label": "…", "row_type": "data"},
+    {"label": "②联营企业", "row_type": _row_type_for_label("②联营企业")},
+    {"label": "…", "row_type": _row_type_for_label("…")},
     {"label": "小计", "is_total": True, "row_type": "subtotal"},
     {"label": "合计", "is_total": True, "row_type": "total"},
 ]

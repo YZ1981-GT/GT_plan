@@ -38,8 +38,12 @@ __all__ = [
 # 视为"数值列"的 format 值：空值与 0 都算空
 AMOUNT_FORMATS = frozenset({"amount", "percent", "number"})
 
-# 不参与空表判定的行类型（派生行 / 结构行）
-SKIP_ROW_TYPES = frozenset({"total", "subtotal", "section", "header_label"})
+# 不参与空表判定的行类型（派生行 / 结构行 / 可扩位行）
+# `expandable` = 源模板留的可扩位（`……` / `可无限量添加行`），零可见内容。
+# spec: note-template-columns-and-legacy-snapshot-closure Property 33
+SKIP_ROW_TYPES = frozenset(
+    {"total", "subtotal", "section", "header_label", "expandable"}
+)
 
 # 数值零容差：附注金额保留 2 位小数，绝对值小于半分即视为零
 _ZERO_EPS = 0.005

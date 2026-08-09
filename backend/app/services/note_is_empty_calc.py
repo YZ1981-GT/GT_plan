@@ -47,6 +47,10 @@ _SKIP_ROW_TYPES = frozenset(
         "dynamic_marker_end",
         "total",
         "subtotal",
+        # 源模板留的可扩位行（`……` / `可无限量添加行`）——「只有可扩位」的表必须判空，
+        # 否则空骨架会被当成有内容而不折叠。
+        # spec: note-template-columns-and-legacy-snapshot-closure Property 33
+        "expandable",
     }
 )
 

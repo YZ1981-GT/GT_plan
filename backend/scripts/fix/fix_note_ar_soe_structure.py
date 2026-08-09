@@ -25,7 +25,16 @@ import json
 import sys
 from pathlib import Path
 
-TPL_PATH = Path(__file__).resolve().parents[2] / "data" / "note_template_soe.json"
+_BACKEND_ROOT = Path(__file__).resolve().parents[2]
+if str(_BACKEND_ROOT) not in sys.path:
+    sys.path.insert(0, str(_BACKEND_ROOT))
+
+# `row_type` 判据单一真源（见 `_data()` 处注释）。
+from app.services.note_expandable_markers import (  # noqa: E402
+    row_type_for_label as _row_type_for_label,
+)
+
+TPL_PATH = _BACKEND_ROOT / "data" / "note_template_soe.json"
 SECTION_NUMBER = "八、5"
 ALIGNED_BY = "d2-ar-disclosure-soe-alignment"
 
@@ -44,7 +53,10 @@ PORTFOLIO_EXAMPLES = ["应收中央企业客户", "应收海外企业客户"]
 
 
 def _data(label: str) -> dict:
-    return {"label": label, "row_type": "data"}
+    # 🔴 禁硬编码 "data"：源模板可扩位标签（`……` / `可无限量添加行` 等）须标
+    # `expandable`（零可见内容），否则与 fix_note_expandable_rows.py 互相翻转。
+    # 判据单一真源 = app/services/note_expandable_markers.row_type_for_label。
+    return {"label": label, "row_type": _row_type_for_label(label)}
 
 
 def _header(label: str) -> dict:

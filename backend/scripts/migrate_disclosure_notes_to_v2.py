@@ -58,6 +58,10 @@ VALID_ROW_TYPES = (
     # 与 `tests/services/test_note_template_row_type.VALID_ROW_TYPES` 保持一致。
     # spec: restricted-assets-note-row-scope-rollout Requirement 2
     "unowned",
+    # 源模板留的「可扩位」行（`……` / `可无限量添加行`）—— 标记的是「此处可增行」
+    # 这个位置，本身零可见内容、不参与合计。additive 第 6 个取值。
+    # spec: note-template-columns-and-legacy-snapshot-closure R11.2 / Property 33
+    "expandable",
 )
 
 #: label 关键字 → row_type（顺序即优先级；「小计」判定须先于默认 data）。

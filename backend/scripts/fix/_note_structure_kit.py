@@ -29,8 +29,20 @@ import argparse
 import datetime as _dt
 import json
 import re
+import sys
 from pathlib import Path
 from typing import Any, Callable
+
+_BACKEND_ROOT = Path(__file__).resolve().parents[2]
+if str(_BACKEND_ROOT) not in sys.path:
+    sys.path.insert(0, str(_BACKEND_ROOT))
+
+# 🔴 `row_type` 判据的单一真源（纯函数、stdlib-only）。本 kit 是**多个 per-cycle
+# 幂等脚本共用的行构造器**，若在这里硬编码 `"row_type": "data"`，就会与
+# `fix_note_expandable_rows.py` 互相翻转 —— 实测 soe `四、生物资产` 的 4 行 `……`
+# 被 `fix_note_h_policy_chapter_structure.py`（经本 kit 构造 rows）翻回 `data`
+# （2026-08-08）。故行构造一律走 `row_type_for_label()`。
+from app.services.note_expandable_markers import row_type_for_label  # noqa: E402
 
 AMOUNT = "amount"
 PERCENT = "percent"
@@ -40,7 +52,10 @@ TEXT = "text"
 # ─────────────────────────── 行构造 ───────────────────────────
 
 def data_row(label: str = "") -> dict[str, Any]:
-    return {"label": label, "row_type": "data"}
+    """普通数据行；label 若是源模板可扩位标记（`……` / `可无限量添加行` 等）
+    则自动标 ``expandable``（零可见内容），见 `row_type_for_label` 的 docstring。
+    """
+    return {"label": label, "row_type": row_type_for_label(label)}
 
 
 def total_row(label: str = "合计") -> dict[str, Any]:

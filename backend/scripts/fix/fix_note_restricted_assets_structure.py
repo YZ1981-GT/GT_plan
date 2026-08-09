@@ -59,6 +59,7 @@ sys.path.insert(0, str(_HERE.parent))
 
 from _note_structure_kit import (  # noqa: E402
     build_cli,
+    data_row,
     flat_columns,
     rule,
     run_section,
@@ -120,7 +121,9 @@ def _listed_rows() -> list[dict[str, Any]]:
     """listed 两表同构：6 个科目段 + 可扩行 + 合计（**删掉 header_label 假行**）。"""
     return [
         *_seg_rows(LISTED_SEGMENTS),
-        {"label": "……", "row_type": "data"},
+        # `……` 是源模板可扩位 → 走 kit 的 marker-aware `data_row()`（零可见内容），
+        # 禁硬编码 "data"，否则与 `fix_note_expandable_rows.py` 互相翻转。
+        data_row("……"),
         {"label": "合计", "is_total": True, "row_type": "total"},
     ]
 

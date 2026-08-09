@@ -50,6 +50,9 @@ from app.services.note_section_catalog import (
     normalize_template_type,
 )
 from app.services.note_section_numbering import compute_section_numbers
+from app.services.note_sub_table_projector import (
+    is_zero_visible_row as _is_zero_visible_row,
+)
 from app.services.note_word_dynamic_styles import (
     get_table_render_mode,
     should_skip_empty_section,
@@ -1535,6 +1538,13 @@ class NoteWordExporter:
         """
         headers_raw = table_data.get("headers", [])
         rows = table_data.get("rows", [])
+
+        # 可扩位行（`row_type=expandable`）是「此处可增行」的位置标记、没有披露内容
+        # ⇒ 不渲染成可见数据行（note-template-columns-and-legacy-snapshot-closure
+        # Property 33）。判据复用投影器的单一真源谓词，不另写一份。
+        # additive：落地前全库 expandable 计数为 0 ⇒ 对存量交付件是空操作。
+        if isinstance(rows, list):
+            rows = [r for r in rows if not _is_zero_visible_row(r)]
 
         if not headers_raw or not rows:
             return

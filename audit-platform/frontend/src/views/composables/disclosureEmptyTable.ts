@@ -21,12 +21,20 @@
 /** 视为「数值列」的 format 值 */
 export const AMOUNT_FORMATS: ReadonlySet<string> = new Set(['amount', 'percent', 'number'])
 
-/** 不参与空表判定的行类型（派生行 / 结构行） */
+/**
+ * 不参与空表判定的行类型（派生行 / 结构行 / 可扩位行）
+ *
+ * 🔴 必须与后端 `note_empty_table_detector.SKIP_ROW_TYPES` 逐项一致
+ * （守卫 `test_note_expandable_rows.py` 读本文件源码交叉锁死）。
+ * `expandable` = 源模板留的可扩位（`……` / `可无限量添加行`），零可见内容。
+ * spec: note-template-columns-and-legacy-snapshot-closure Property 33
+ */
 export const SKIP_ROW_TYPES: ReadonlySet<string> = new Set([
   'total',
   'subtotal',
   'section',
   'header_label',
+  'expandable',
 ])
 
 /** 数值零容差：附注金额保留 2 位小数，绝对值小于半分即视为零 */
