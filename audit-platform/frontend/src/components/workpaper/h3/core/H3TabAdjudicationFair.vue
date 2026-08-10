@@ -6,9 +6,15 @@
       <div class="guidance-content">
         <p>1. 本表为投资性房地产审定表（公允价值模式），单区块列示公允价值变动，期末公允 = 期初 + 增加 − 减少 ± 转换 + 公允价值变动。</p>
         <p>2. 公允价值模式下不计提折旧与减值（CAS3）；公允价值变动计入当期损益。</p>
-        <p>3. 未审数取自试算表（科目 1503），审定数 = 未审 + AJE + RJE；采用公允价值模式须满足有活跃交易市场且可获取同类价格信息。</p>
+        <p>
+          3. 未审数取自试算表（科目 {{ bringInGrossCode }} 投资性房地产，具体码以下方「四表库取数口径」为准），
+          审定数 = 未审 + AJE + RJE；采用公允价值模式须满足有活跃交易市场且可获取同类价格信息。
+        </p>
         <p>4. 若企业采用成本模式，请切换至成本模式版本填报。</p>
-        <p>5.「带入调整」：从集中登记按科目 1503 拉取调整分录（资产借方净额=借−贷），逐笔分配到各分类的 AJE/RJE，带入后审定数自动更新并联动附注。</p>
+        <p>
+          5.「带入调整」：从集中登记按科目 {{ bringInGrossCode }} 拉取调整分录（资产借方净额=借−贷），
+          逐笔分配到各分类的 AJE/RJE，带入后审定数自动更新并联动附注。
+        </p>
       </div>
     </details>
 
@@ -17,7 +23,16 @@
       type="info"
       :closable="false"
       class="objective-alert"
-      title="审计目标：核实投资性房地产（公允价值模式，科目 1503）期末公允价值的存在、准确与计量恰当，验证公允价值变动损益的合理性，为报表及附注披露提供审定依据。"
+      :title="`审计目标：核实投资性房地产（公允价值模式，科目 ${bringInGrossCode}）期末公允价值的存在、准确与计量恰当，验证公允价值变动损益的合理性，为报表及附注披露提供审定依据。`"
+    />
+
+    <!-- 四表库取数口径溯源（消费 render 下发的 tb_source_codes） -->
+    <WpFourTableSourcePanel
+      :source-codes="tbSourceCodes"
+      gross-label="投资性房地产（公允价值）"
+      :extra-slot-keys="H3_EXTRA_SLOT_KEYS"
+      :fallback-row-code="H3_REPORT_ROW_CODE"
+      :hints="sourcePanelHints"
     />
 
     <!-- 工具栏 -->
@@ -217,8 +232,8 @@
           <el-tag :type="hasTransferDiff ? 'danger' : 'success'" size="small">{{ fmtNum(transferDiff) }}</el-tag>
         </el-descriptions-item>
 
-        <el-descriptions-item label="H3-3 AJE(1503)">{{ fmtNum(adjustmentSync.aje1503) }}</el-descriptions-item>
-        <el-descriptions-item label="H3-3 RJE(1503)">{{ fmtNum(adjustmentSync.rje1503) }}</el-descriptions-item>
+        <el-descriptions-item :label="`H3-3 原值AJE(${bringInGrossCode})`">{{ fmtNum(adjustmentSync.ajeGross) }}</el-descriptions-item>
+        <el-descriptions-item :label="`H3-3 原值RJE(${bringInGrossCode})`">{{ fmtNum(adjustmentSync.rjeGross) }}</el-descriptions-item>
         <el-descriptions-item label="H3-3 AJE/RJE合计">{{ fmtNum(adjustmentSync.totalAje) }} / {{ fmtNum(adjustmentSync.totalRje) }}</el-descriptions-item>
       </el-descriptions>
       <p class="reconcile-note">{{ crossSheetNote }}</p>
@@ -253,7 +268,7 @@
       v-model="bringInVisible"
       :matches="adjPull.matches.value"
       :row-options="bringInRowOptions"
-      subject-label="1503 投资性房地产（公允价值模式）"
+      :subject-label="`${bringInGrossCode} 投资性房地产（公允价值模式）`"
       :loading="adjPull.loading.value"
       @apply="onBringInApply"
     />
@@ -277,13 +292,48 @@ import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { generateH3AI, h3AiLoading } from '../useH3AiGenerate'
+import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
+import {
+  H3_EXTRA_SLOT_KEYS,
+  H3_FALLBACK_CODES,
+  H3_REPORT_ROW_CODE,
+  H3_SLOT_GROSS,
+  h3AccountScope,
+} from '../../composables/h3AccountScope'
+import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
 
 const props = defineProps<{
   wpId: string
   projectId: string
   allResponses: Map<string, any>
+  /** render 下发的整册载荷；缺它 = 溯源面板不渲染 + 回写科目退回兜底码 */
+  htmlData?: Record<string, any> | null
   isReadonly: boolean
 }>()
+
+// ─── 四表库取数溯源（`tb_source_codes`，两层落点兼容）────────────────────────
+const tbSourceCodes = computed<TbSourceCodes | null>(() => {
+  const hd = props.htmlData as Record<string, any> | null | undefined
+  return (hd?.tb_source_codes ?? hd?.project_context?.tb_source_codes ?? null) as
+    | TbSourceCodes
+    | null
+})
+
+/**
+ * 原值科目码（回写 / 带入 / 事件载荷统一口径）。
+ *
+ * 🔴 改造前写死 `1503` = **可供出售金融资产**（G6 域），投资性房地产真实科目是 `1521`。
+ * 运行态取 render 下发的语义定位结果，兜底为本循环正确的 `1521`。
+ */
+const grossCode = computed(() => h3AccountScope.accountCode(tbSourceCodes.value, H3_SLOT_GROSS))
+const bringInGrossCode = grossCode.value || H3_FALLBACK_CODES.gross
+
+/** 溯源面板口径说明（编译期常量） */
+const sourcePanelHints = [
+  '公允价值模式下<strong>不计提折旧与减值</strong>（CAS3）—— 下表若出现累计折旧/摊销/减值槽，'
+  + '说明本项目科目表里仍有这些备抵科目，请核实计量模式选择是否恰当。',
+  '科目按<strong>名称</strong>在本项目自己的科目表里定位（客户科目表优先），不按标准码硬查。',
+] as const
 
 const emit = defineEmits<{
   (e: 'navigate-sheet', sheetName: string): void
@@ -314,7 +364,8 @@ const {
   getValue, setValue, saveImmediate,
 })
 
-// ─── 从集中登记带入调整（1503 投资性房地产，公允价值模式，资产借方；带入AJE/RJE） ───
+// ─── 从集中登记带入调整（投资性房地产，公允价值模式，资产借方；带入AJE/RJE） ───
+// 🔴 科目码取 `h3AccountScope`（改造前写死 1503 = 可供出售金融资产，属 G6 域）。
 const bringInRows = computed(() =>
   fairRows.value.map((r) => ({ rowKey: r.rowId, name: r.category, aje: r.aje, rje: r.rje })),
 )
@@ -327,11 +378,11 @@ const {
 } = useAdjudicationBringIn({
   projectId: toRef(props, 'projectId') as any,
   year: useAuditContext().year as any,
-  subjectPrefix: '1503',
+  subjectPrefix: bringInGrossCode,
   direction: 'debit',
-  subjectCode: '1503',
+  subjectCode: bringInGrossCode,
   wpCode: 'H3',
-  subjectLabel: '投资性房地产(1503·公允)',
+  subjectLabel: `投资性房地产(${bringInGrossCode}·公允)`,
   rows: bringInRows,
   updateCell: (rowKey: string, field: any, value: number) => updateFairCell(rowKey, field, value),
   totalAudited: () => fairTotal.value.audited,

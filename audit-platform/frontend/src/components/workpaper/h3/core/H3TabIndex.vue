@@ -16,7 +16,7 @@
     <!-- 顶部引导区 -->
     <div class="guide-area">
       <div class="guide-grid">
-        <div class="guide-step"><span class="step-num">①</span> 审定表(H3-1)根据计量模式选择成本/公允→TB回写1503(+1504)</div>
+        <div class="guide-step"><span class="step-num">①</span> 审定表(H3-1)根据计量模式选择成本/公允→TB回写1521(+1525/1526)</div>
         <div class="guide-step"><span class="step-num">②</span> 明细表(H3-2)逐项登记→区段Tab切换→交叉核对H3-1</div>
         <div class="guide-step"><span class="step-num">③</span> 会计政策(H3-4)CAS3五段落→计量模式恰当性评价</div>
         <div class="guide-step"><span class="step-num">④</span> 增减检查(H3-5)+互转(H3-6)三方向→联动H1/H2</div>

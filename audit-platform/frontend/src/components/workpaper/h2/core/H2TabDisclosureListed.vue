@@ -39,10 +39,9 @@
         </el-table-column>
         <el-table-column label="期末余额" width="150" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.key !== '__total__' && !isReadonly"
               :model-value="row.endBalance"
-              :controls="false"
               size="small"
               style="width:100%"
               @update:model-value="(v: number) => updateSummary(row.key, 'endBalance', v ?? 0)"
@@ -52,10 +51,9 @@
         </el-table-column>
         <el-table-column label="上年年末余额" width="150" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.key !== '__total__' && !isReadonly"
               :model-value="row.priorBalance"
-              :controls="false"
               size="small"
               style="width:100%"
               @update:model-value="(v: number) => updateSummary(row.key, 'priorBalance', v ?? 0)"
@@ -85,13 +83,13 @@
         <el-table-column label="期末余额" align="center">
           <el-table-column label="账面余额" width="120" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="row.rowId !== '__total__' && !isReadonly" v-model="row.endBook" :controls="false" size="small" style="width:100%" @change="scheduleSave" />
+              <WpAmountInput v-if="row.rowId !== '__total__' && !isReadonly" v-model="row.endBook" size="small" style="width:100%" @change="scheduleSave" />
               <span v-else :class="{ 'formula-cell': row.rowId === '__total__' }">{{ fmt(row.endBook) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="减值准备" width="110" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="row.rowId !== '__total__' && !isReadonly" v-model="row.endImpairment" :controls="false" size="small" style="width:100%" @change="scheduleSave" />
+              <WpAmountInput v-if="row.rowId !== '__total__' && !isReadonly" v-model="row.endImpairment" size="small" style="width:100%" @change="scheduleSave" />
               <span v-else :class="{ 'formula-cell': row.rowId === '__total__' }">{{ fmt(row.endImpairment) }}</span>
             </template>
           </el-table-column>
@@ -104,13 +102,13 @@
         <el-table-column label="上年年末余额" align="center">
           <el-table-column label="账面余额" width="120" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="row.rowId !== '__total__' && !isReadonly" v-model="row.priorBook" :controls="false" size="small" style="width:100%" @change="scheduleSave" />
+              <WpAmountInput v-if="row.rowId !== '__total__' && !isReadonly" v-model="row.priorBook" size="small" style="width:100%" @change="scheduleSave" />
               <span v-else :class="{ 'formula-cell': row.rowId === '__total__' }">{{ fmt(row.priorBook) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="减值准备" width="110" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="row.rowId !== '__total__' && !isReadonly" v-model="row.priorImpairment" :controls="false" size="small" style="width:100%" @change="scheduleSave" />
+              <WpAmountInput v-if="row.rowId !== '__total__' && !isReadonly" v-model="row.priorImpairment" size="small" style="width:100%" @change="scheduleSave" />
               <span v-else :class="{ 'formula-cell': row.rowId === '__total__' }">{{ fmt(row.priorImpairment) }}</span>
             </template>
           </el-table-column>
@@ -147,40 +145,40 @@
           <el-table-column label="期初余额" width="110" align="right">
             <template #header>期初余额<br /><span class="col-hint">A</span></template>
             <template #default="{ row }">
-              <el-input-number v-if="row.rowId !== '__total__' && !isReadonly" v-model="row.beginBalance" :controls="false" size="small" style="width:100%" @change="scheduleSave" />
+              <WpAmountInput v-if="row.rowId !== '__total__' && !isReadonly" v-model="row.beginBalance" size="small" style="width:100%" @change="scheduleSave" />
               <span v-else class="formula-cell">{{ fmt(row.beginBalance) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="本期增加" width="110" align="right">
             <template #header>本期增加<br /><span class="col-hint">B</span></template>
             <template #default="{ row }">
-              <el-input-number v-if="row.rowId !== '__total__' && !isReadonly" v-model="row.increase" :controls="false" size="small" style="width:100%" @change="scheduleSave" />
+              <WpAmountInput v-if="row.rowId !== '__total__' && !isReadonly" v-model="row.increase" size="small" style="width:100%" @change="scheduleSave" />
               <span v-else class="formula-cell">{{ fmt(row.increase) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="转入固定资产" width="120" align="right">
             <template #header>转入固定资产<br /><span class="col-hint">C</span></template>
             <template #default="{ row }">
-              <el-input-number v-if="row.rowId !== '__total__' && !isReadonly" v-model="row.transferToFA" :controls="false" size="small" style="width:100%" @change="scheduleSave" />
+              <WpAmountInput v-if="row.rowId !== '__total__' && !isReadonly" v-model="row.transferToFA" size="small" style="width:100%" @change="scheduleSave" />
               <span v-else class="formula-cell">{{ fmt(row.transferToFA) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="其他减少" width="110" align="right">
             <template #header>其他减少<br /><span class="col-hint">D</span></template>
             <template #default="{ row }">
-              <el-input-number v-if="row.rowId !== '__total__' && !isReadonly" v-model="row.otherDecrease" :controls="false" size="small" style="width:100%" @change="scheduleSave" />
+              <WpAmountInput v-if="row.rowId !== '__total__' && !isReadonly" v-model="row.otherDecrease" size="small" style="width:100%" @change="scheduleSave" />
               <span v-else class="formula-cell">{{ fmt(row.otherDecrease) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="利息资本化累计金额" width="130" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="row.rowId !== '__total__' && !isReadonly" v-model="row.interestCapAccum" :controls="false" size="small" style="width:100%" @change="scheduleSave" />
+              <WpAmountInput v-if="row.rowId !== '__total__' && !isReadonly" v-model="row.interestCapAccum" size="small" style="width:100%" @change="scheduleSave" />
               <span v-else class="formula-cell">{{ fmt(row.interestCapAccum) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="其中：本期利息资本化金额" width="140" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="row.rowId !== '__total__' && !isReadonly" v-model="row.interestCapCurrent" :controls="false" size="small" style="width:100%" @change="scheduleSave" />
+              <WpAmountInput v-if="row.rowId !== '__total__' && !isReadonly" v-model="row.interestCapCurrent" size="small" style="width:100%" @change="scheduleSave" />
               <span v-else class="formula-cell">{{ fmt(row.interestCapCurrent) }}</span>
             </template>
           </el-table-column>
@@ -219,7 +217,7 @@
         </el-table-column>
         <el-table-column label="预算数" width="130" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="row.rowId !== '__total__' && !isReadonly" v-model="row.budget" :controls="false" size="small" style="width:100%" @change="scheduleSave" />
+            <WpAmountInput v-if="row.rowId !== '__total__' && !isReadonly" v-model="row.budget" size="small" style="width:100%" @change="scheduleSave" />
             <span v-else class="formula-cell">{{ fmt(row.budget) }}</span>
           </template>
         </el-table-column>
@@ -275,19 +273,19 @@
         </el-table-column>
         <el-table-column label="期初余额" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="row.rowId !== '__total__' && !isReadonly" v-model="row.beginBalance" :controls="false" size="small" style="width:100%" @change="scheduleSave" />
+            <WpAmountInput v-if="row.rowId !== '__total__' && !isReadonly" v-model="row.beginBalance" size="small" style="width:100%" @change="scheduleSave" />
             <span v-else class="formula-cell">{{ fmt(row.beginBalance) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="本期计提" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="row.rowId !== '__total__' && !isReadonly" v-model="row.provision" :controls="false" size="small" style="width:100%" @change="scheduleSave" />
+            <WpAmountInput v-if="row.rowId !== '__total__' && !isReadonly" v-model="row.provision" size="small" style="width:100%" @change="scheduleSave" />
             <span v-else class="formula-cell">{{ fmt(row.provision) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="本期减少" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="row.rowId !== '__total__' && !isReadonly" v-model="row.decrease" :controls="false" size="small" style="width:100%" @change="scheduleSave" />
+            <WpAmountInput v-if="row.rowId !== '__total__' && !isReadonly" v-model="row.decrease" size="small" style="width:100%" @change="scheduleSave" />
             <span v-else class="formula-cell">{{ fmt(row.decrease) }}</span>
           </template>
         </el-table-column>
@@ -330,10 +328,9 @@
         </el-table-column>
         <el-table-column label="期末余额" width="150" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.editable && !isReadonly"
               :model-value="row.endBalance"
-              :controls="false"
               size="small"
               style="width:100%"
               @update:model-value="(v: number) => updateMaterial(row.key, 'endBalance', v ?? 0)"
@@ -343,10 +340,9 @@
         </el-table-column>
         <el-table-column label="上年年末余额" width="150" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.editable && !isReadonly"
               :model-value="row.priorBalance"
-              :controls="false"
               size="small"
               style="width:100%"
               @update:model-value="(v: number) => updateMaterial(row.key, 'priorBalance', v ?? 0)"
@@ -374,7 +370,7 @@
         </el-table-column>
         <el-table-column label="抵押/担保金额" width="140" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.amount" :controls="false" size="small" style="width:100%" @change="scheduleSave" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.amount" size="small" style="width:100%" @change="scheduleSave" />
             <span v-else class="formula-cell">{{ fmt(row.amount) }}</span>
           </template>
         </el-table-column>
@@ -446,6 +442,7 @@ import { buildH2ListedChecks } from '../../composables/h2DisclosureConsistency'
 import { H2_NOTE_SECTION } from '../../composables/h2NoteSectionMap'
 import { buildH2ListedSyncPayloads, type H2ListedSyncSnapshot } from '../../composables/h2DisclosureSyncPayload'
 import {
+import WpAmountInput from '../../shared/WpAmountInput.vue'
   H2_LISTED_GUIDANCE,
   H2_LISTED_ITEM,
   buildMortgageNoteText,

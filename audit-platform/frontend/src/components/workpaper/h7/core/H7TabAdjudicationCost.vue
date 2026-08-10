@@ -31,19 +31,19 @@
         <el-table-column prop="category" label="项目" min-width="140" fixed />
         <el-table-column label="期初余额" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="row.editable && !isReadonly" v-model="row.begin" :controls="false" size="small" class="amt-input" @change="onOrig()" />
+            <WpAmountInput v-if="row.editable && !isReadonly" v-model="row.begin" size="small" class="amt-input" @change="onOrig()" />
             <span v-else class="amount-cell">{{ fmtAmt(row.begin) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="本期借方(增加)" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="row.editable && !isReadonly" v-model="row.debit" :controls="false" size="small" class="amt-input" @change="onOrig()" />
+            <WpAmountInput v-if="row.editable && !isReadonly" v-model="row.debit" size="small" class="amt-input" @change="onOrig()" />
             <span v-else class="amount-cell">{{ fmtAmt(row.debit) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="本期贷方(减少)" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="row.editable && !isReadonly" v-model="row.credit" :controls="false" size="small" class="amt-input" @change="onOrig()" />
+            <WpAmountInput v-if="row.editable && !isReadonly" v-model="row.credit" size="small" class="amt-input" @change="onOrig()" />
             <span v-else class="amount-cell">{{ fmtAmt(row.credit) }}</span>
           </template>
         </el-table-column>
@@ -59,13 +59,13 @@
         </el-table-column>
         <el-table-column label="AJE" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="row.editable && !isReadonly" v-model="row.aje" :controls="false" size="small" class="amt-input" @change="onOrig()" />
+            <WpAmountInput v-if="row.editable && !isReadonly" v-model="row.aje" size="small" class="amt-input" @change="onOrig()" />
             <span v-else class="amount-cell">{{ fmtAmt(row.aje) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="RJE" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="row.editable && !isReadonly" v-model="row.rje" :controls="false" size="small" class="amt-input" @change="onOrig()" />
+            <WpAmountInput v-if="row.editable && !isReadonly" v-model="row.rje" size="small" class="amt-input" @change="onOrig()" />
             <span v-else class="amount-cell">{{ fmtAmt(row.rje) }}</span>
           </template>
         </el-table-column>
@@ -91,19 +91,19 @@
         <el-table-column prop="category" label="项目" min-width="140" fixed />
         <el-table-column label="期初余额" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.begin" :controls="false" size="small" class="amt-input" @change="onDep()" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.begin" size="small" class="amt-input" @change="onDep()" />
             <span v-else class="amount-cell">{{ fmtAmt(row.begin) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="本期借方(减少)" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.debit" :controls="false" size="small" class="amt-input" @change="onDep()" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.debit" size="small" class="amt-input" @change="onDep()" />
             <span v-else class="amount-cell">{{ fmtAmt(row.debit) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="本期贷方(计提)" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.credit" :controls="false" size="small" class="amt-input" @change="onDep()" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.credit" size="small" class="amt-input" @change="onDep()" />
             <span v-else class="amount-cell">{{ fmtAmt(row.credit) }}</span>
           </template>
         </el-table-column>
@@ -114,7 +114,7 @@
         </el-table-column>
         <el-table-column label="AJE" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.aje" :controls="false" size="small" class="amt-input" @change="onDep()" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.aje" size="small" class="amt-input" @change="onDep()" />
             <span v-else class="amount-cell">{{ fmtAmt(row.aje) }}</span>
           </template>
         </el-table-column>
@@ -140,19 +140,19 @@
         <el-table-column prop="category" label="项目" min-width="140" fixed />
         <el-table-column label="期初余额" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.begin" :controls="false" size="small" class="amt-input" @change="onImp()" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.begin" size="small" class="amt-input" @change="onImp()" />
             <span v-else class="amount-cell">{{ fmtAmt(row.begin) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="本期借方(转回/核销)" min-width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.debit" :controls="false" size="small" class="amt-input" @change="onImp()" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.debit" size="small" class="amt-input" @change="onImp()" />
             <span v-else class="amount-cell">{{ fmtAmt(row.debit) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="本期贷方(计提)" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.credit" :controls="false" size="small" class="amt-input" @change="onImp()" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.credit" size="small" class="amt-input" @change="onImp()" />
             <span v-else class="amount-cell">{{ fmtAmt(row.credit) }}</span>
           </template>
         </el-table-column>
@@ -163,7 +163,7 @@
         </el-table-column>
         <el-table-column label="AJE" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.aje" :controls="false" size="small" class="amt-input" @change="onImp()" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.aje" size="small" class="amt-input" @change="onImp()" />
             <span v-else class="amount-cell">{{ fmtAmt(row.aje) }}</span>
           </template>
         </el-table-column>
@@ -258,6 +258,7 @@ import GtIndexChip from '../../GtIndexChip.vue'
 import { useH7AdjudicationCost } from '../../composables/useH7AdjudicationCost'
 import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 
 const projectStore = useProjectStore()
 

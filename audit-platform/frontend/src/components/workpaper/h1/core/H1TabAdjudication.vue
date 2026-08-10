@@ -90,10 +90,9 @@
         <el-table-column prop="category" label="资产分类" min-width="120" fixed />
         <el-table-column label="期初余额" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.isEditable && !isReadonly"
               v-model="row.beginBalance"
-              :controls="false"
               size="small"
               class="amount-input"
               @change="onCellChange('cost', row.rowId, 'beginBalance', $event)"
@@ -103,10 +102,9 @@
         </el-table-column>
         <el-table-column label="本期借方(增加)" min-width="120" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.isEditable && !isReadonly"
               v-model="row.debit"
-              :controls="false"
               size="small"
               class="amount-input"
               @change="onCellChange('cost', row.rowId, 'debit', $event)"
@@ -116,10 +114,9 @@
         </el-table-column>
         <el-table-column label="本期贷方(减少)" min-width="120" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.isEditable && !isReadonly"
               v-model="row.credit"
-              :controls="false"
               size="small"
               class="amount-input"
               @change="onCellChange('cost', row.rowId, 'credit', $event)"
@@ -134,10 +131,9 @@
         </el-table-column>
         <el-table-column label="未审数" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.isEditable && !isReadonly"
               v-model="row.unadjusted"
-              :controls="false"
               size="small"
               class="amount-input"
               @change="onCellChange('cost', row.rowId, 'unadjusted', $event)"
@@ -147,10 +143,9 @@
         </el-table-column>
         <el-table-column label="AJE" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.isEditable && !isReadonly"
               v-model="row.aje"
-              :controls="false"
               size="small"
               class="amount-input"
               @change="onCellChange('cost', row.rowId, 'aje', $event)"
@@ -160,10 +155,9 @@
         </el-table-column>
         <el-table-column label="RJE" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.isEditable && !isReadonly"
               v-model="row.rje"
-              :controls="false"
               size="small"
               class="amount-input"
               @change="onCellChange('cost', row.rowId, 'rje', $event)"
@@ -198,10 +192,9 @@
         <el-table-column prop="category" label="资产分类" min-width="120" fixed />
         <el-table-column label="期初余额" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.isEditable && !isReadonly"
               v-model="row.beginBalance"
-              :controls="false"
               size="small"
               class="amount-input"
               @change="onCellChange('dep', row.rowId, 'beginBalance', $event)"
@@ -211,10 +204,9 @@
         </el-table-column>
         <el-table-column label="本期借方(减少)" min-width="120" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.isEditable && !isReadonly"
               v-model="row.debit"
-              :controls="false"
               size="small"
               class="amount-input"
               @change="onCellChange('dep', row.rowId, 'debit', $event)"
@@ -224,10 +216,9 @@
         </el-table-column>
         <el-table-column label="本期贷方(增加)" min-width="120" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.isEditable && !isReadonly"
               v-model="row.credit"
-              :controls="false"
               size="small"
               class="amount-input"
               @change="onCellChange('dep', row.rowId, 'credit', $event)"
@@ -242,10 +233,9 @@
         </el-table-column>
         <el-table-column label="未审数" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.isEditable && !isReadonly"
               v-model="row.unadjusted"
-              :controls="false"
               size="small"
               class="amount-input"
               @change="onCellChange('dep', row.rowId, 'unadjusted', $event)"
@@ -255,10 +245,9 @@
         </el-table-column>
         <el-table-column label="AJE" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.isEditable && !isReadonly"
               v-model="row.aje"
-              :controls="false"
               size="small"
               class="amount-input"
               @change="onCellChange('dep', row.rowId, 'aje', $event)"
@@ -268,10 +257,9 @@
         </el-table-column>
         <el-table-column label="RJE" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.isEditable && !isReadonly"
               v-model="row.rje"
-              :controls="false"
               size="small"
               class="amount-input"
               @change="onCellChange('dep', row.rowId, 'rje', $event)"
@@ -306,10 +294,9 @@
         <el-table-column prop="category" label="资产分类" min-width="120" fixed />
         <el-table-column label="期初余额" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.isEditable && !isReadonly"
               v-model="row.beginBalance"
-              :controls="false"
               size="small"
               class="amount-input"
               @change="onCellChange('impair', row.rowId, 'beginBalance', $event)"
@@ -319,10 +306,9 @@
         </el-table-column>
         <el-table-column label="本期借方(转销)" min-width="120" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.isEditable && !isReadonly"
               v-model="row.debit"
-              :controls="false"
               size="small"
               class="amount-input"
               @change="onCellChange('impair', row.rowId, 'debit', $event)"
@@ -332,10 +318,9 @@
         </el-table-column>
         <el-table-column label="本期贷方(计提)" min-width="120" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.isEditable && !isReadonly"
               v-model="row.credit"
-              :controls="false"
               size="small"
               class="amount-input"
               @change="onCellChange('impair', row.rowId, 'credit', $event)"
@@ -350,10 +335,9 @@
         </el-table-column>
         <el-table-column label="未审数" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.isEditable && !isReadonly"
               v-model="row.unadjusted"
-              :controls="false"
               size="small"
               class="amount-input"
               @change="onCellChange('impair', row.rowId, 'unadjusted', $event)"
@@ -363,10 +347,9 @@
         </el-table-column>
         <el-table-column label="AJE" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.isEditable && !isReadonly"
               v-model="row.aje"
-              :controls="false"
               size="small"
               class="amount-input"
               @change="onCellChange('impair', row.rowId, 'aje', $event)"
@@ -376,10 +359,9 @@
         </el-table-column>
         <el-table-column label="RJE" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.isEditable && !isReadonly"
               v-model="row.rje"
-              :controls="false"
               size="small"
               class="amount-input"
               @change="onCellChange('impair', row.rowId, 'rje', $event)"
@@ -709,6 +691,7 @@ import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import WpSemanticAccountSourcePanel from '../../shared/WpSemanticAccountSourcePanel.vue'
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 
 const props = defineProps<{
   wpId: string

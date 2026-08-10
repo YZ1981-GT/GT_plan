@@ -53,7 +53,7 @@ function close() {
       :closable="false"
       show-icon
       class="mb12"
-      title="一句话：租赁识别(是否豁免短期低价值) → 初始计量(租赁负债现值+初始直接费用+复原成本)勾稽H9 → 后续直线法折旧(租赁期与寿命孰短)+减值 → 回写审定表勾稽TB 1901。CAS21租赁,与H9一体。"
+      title="一句话：租赁识别(是否豁免短期低价值) → 初始计量(租赁负债现值+初始直接费用+复原成本)勾稽H9 → 后续直线法折旧(租赁期与寿命孰短)+减值 → 回写审定表勾稽TB使用权资产原值。CAS21租赁,与H9一体。"
     />
     <el-tabs v-model="activeTab">
       <el-tab-pane label="编制手册（目标·逻辑·勾稽）" name="preparation">

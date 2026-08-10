@@ -689,11 +689,17 @@
       />
     </el-card>
 
-    <!-- 抽凭引擎 Dialog（科目 1503 投资性房地产） -->
-    <el-dialog v-model="samplingVisible" title="⚡ 抽凭引擎 — 投资性房地产(1503) 增减测试" width="90%" top="5vh" destroy-on-close>
+    <!-- 抽凭引擎 Dialog（科目码取 render 下发的语义定位结果，不写死） -->
+    <el-dialog
+      v-model="samplingVisible"
+      :title="`⚡ 抽凭引擎 — 投资性房地产(${samplingAccountCode}) 增减测试`"
+      width="90%"
+      top="5vh"
+      destroy-on-close
+    >
       <GtVoucherSamplingEngine
         v-if="samplingVisible && props.wpId && props.projectId"
-        account-code="1503"
+        :account-code="samplingAccountCode"
         phase="final"
         :workpaper-id="props.wpId"
         :project-id="props.projectId"
@@ -734,6 +740,12 @@ import { generateH3AI, h3AiLoading } from '../useH3AiGenerate'
 import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
 import { useSamplingMethodologyPersist, buildChecklistDirectPersist } from '../../composables/shared/useSamplingMethodologyPersist'
 import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'
+import {
+  H3_FALLBACK_CODES,
+  H3_SLOT_GROSS,
+  h3AccountScope,
+} from '../../composables/h3AccountScope'
+import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
 
 const GtVoucherSamplingEngine = defineAsyncComponent(() => import('../../voucher-sampling/GtVoucherSamplingEngine.vue'))
 
@@ -744,11 +756,28 @@ const props = defineProps<{
   isReadonly: boolean
   measurementModel: H3AdditionMode | string
   year?: number
+  /** render 下发的整册载荷（抽凭引擎的科目码取自其 `tb_source_codes`） */
+  htmlData?: Record<string, any> | null
 }>()
 
 const emit = defineEmits<{
   (e: 'navigate-sheet', sheetName: string): void
 }>()
+
+/**
+ * 抽凭科目码 —— 取 render 下发的语义定位结果。
+ *
+ * 🔴 改造前写死 `1503`，那是**可供出售金融资产**（G6 域）⇒ 抽的是别的循环的凭证。
+ * 序时账按客户**原始码**前缀匹配，故优先取 `originalCodes`，缺失时回退标准码。
+ */
+const samplingAccountCode = computed(() => {
+  const hd = props.htmlData as Record<string, any> | null | undefined
+  const src = (hd?.tb_source_codes ?? hd?.project_context?.tb_source_codes ?? null) as
+    | TbSourceCodes
+    | null
+  const originals = h3AccountScope.originalCodes(src, H3_SLOT_GROSS)
+  return originals[0] || h3AccountScope.accountCode(src, H3_SLOT_GROSS) || H3_FALLBACK_CODES.gross
+})
 
 const openReviewDialog = inject<(section: string) => void>('openReviewDialog', () => {})
 const h3Nav = inject(H3RowNavigationKey, null)

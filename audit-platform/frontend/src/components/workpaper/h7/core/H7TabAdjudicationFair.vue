@@ -31,25 +31,25 @@
         <el-table-column prop="category" label="项目" min-width="150" fixed />
         <el-table-column label="期初公允价值" min-width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.begin" :controls="false" size="small" class="amt-input" @change="onFair()" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.begin" size="small" class="amt-input" @change="onFair()" />
             <span v-else class="amount-cell">{{ fmtAmt(row.begin) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="本期增加" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.increase" :controls="false" size="small" class="amt-input" @change="onFair()" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.increase" size="small" class="amt-input" @change="onFair()" />
             <span v-else class="amount-cell">{{ fmtAmt(row.increase) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="本期减少" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.decrease" :controls="false" size="small" class="amt-input" @change="onFair()" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.decrease" size="small" class="amt-input" @change="onFair()" />
             <span v-else class="amount-cell">{{ fmtAmt(row.decrease) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="公允价值变动损益" min-width="130" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.fvChange" :controls="false" size="small" class="amt-input" @change="onFair()" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.fvChange" size="small" class="amt-input" @change="onFair()" />
             <span v-else class="amount-cell">{{ fmtAmt(row.fvChange) }}</span>
           </template>
         </el-table-column>
@@ -65,7 +65,7 @@
         </el-table-column>
         <el-table-column label="AJE" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.aje" :controls="false" size="small" class="amt-input" @change="onFair()" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.aje" size="small" class="amt-input" @change="onFair()" />
             <span v-else class="amount-cell">{{ fmtAmt(row.aje) }}</span>
           </template>
         </el-table-column>
@@ -158,6 +158,7 @@ import GtIndexChip from '../../GtIndexChip.vue'
 import { useH7AdjudicationFair } from '../../composables/useH7AdjudicationFair'
 import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 
 const projectStore = useProjectStore()
 

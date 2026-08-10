@@ -15,7 +15,7 @@
           同步到附注
         </el-button>
         <el-button size="small" type="primary" plain @click="jumpToNote">
-          ↩ 跳转回附注（八、22）
+          ↩ 跳转回附注（{{ H3_NOTE_SECTION.soe }}）
         </el-button>
       </div>
     </div>
@@ -615,6 +615,7 @@ import { useH3Disclosure } from '../../composables/useH3Disclosure'
 import { useH3FormData } from '../../composables/useH3FormData'
 import { useH3CrossSheet } from '../../composables/useH3CrossSheet'
 import { eventBus } from '@/utils/eventBus'
+import { H3_FALLBACK_CODES } from '../../composables/h3AccountScope'
 import http from '@/utils/http'
 import { buildH3SyncPayload, H3_NOTE_SECTION } from '../../composables/h3NoteSectionMap'
 import { buildNoteJumpRoute } from '@/views/composables/noteDisclosureReverseJump'
@@ -680,9 +681,10 @@ function publishNoteTextUpdated(key: string) {
   eventBus.emit('disclosure:note-text-updated', {
     wpCode: 'H3',
     section: key,
-    accountCode: '1503',
+    // 🔴 改造前写死 1503 = 可供出售金融资产（G6 域）；投资性房地产是 1521 族
+    accountCode: H3_FALLBACK_CODES.gross,
     projectId: props.projectId,
-    sectionIds: ['投资性房地产', '五、21', '八、22'],
+    sectionIds: ['投资性房地产', H3_NOTE_SECTION.listed, H3_NOTE_SECTION.soe],
     timestamp: Date.now(),
   })
 }
@@ -712,7 +714,7 @@ async function syncToDisclosureNotes() {
       `/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`,
       { ...payload, year: auditYear.value },
     )
-    ElMessage.success('已同步到附注（国企 八、22）')
+    ElMessage.success(`已同步到附注（国企 ${H3_NOTE_SECTION.soe}）`)
     publishNoteTextUpdated('sync-soe')
   } catch (e: any) {
     ElMessage.error('同步失败：' + (e?.response?.data?.message || e?.message || '未知错误'))

@@ -27,7 +27,7 @@
     <div class="guide-area">
       <div class="guide-grid">
         <div class="guide-step"><span class="step-num">①</span> 程序表(H8A)确认审计程序清单</div>
-        <div class="guide-step"><span class="step-num">②</span> 审定表(H8-1)四区块→H8-3账项回写→TB(1901/折旧/减值)</div>
+        <div class="guide-step"><span class="step-num">②</span> 审定表(H8-1)四区块→H8-3账项回写→TB(原值/折旧/减值)</div>
         <div class="guide-step"><span class="step-num">③</span> 明细表(H8-2)逐笔租赁合同登记→初始计量=H9+直接-激励</div>
         <div class="guide-step"><span class="step-num">④</span> 调整分录(H8-3)→借贷平衡→推送调整分录模块/A13</div>
         <div class="guide-step"><span class="step-num">⑤</span> 租赁判断(H8-4/5/7)识别+期限+变更三表</div>
@@ -82,7 +82,7 @@
         <li>H8-6初始及后续计量有2个分支：按年（E9/L9动态期数，最多30年）/按月（日期与年租金参数驱动）</li>
         <li>H8-8折旧测算有2个分支：不含减值(62公式)和含减值(86公式)</li>
         <li>H8-11可收回金额：公允净额与DCF/WACC现值孰高，测算后回写H8-10；折现率可用WACC税前或增量借款利率</li>
-        <li>H8-1审定表完成后自动回写TB科目1901+累计折旧</li>
+        <li>H8-1审定表完成后自动回写TB使用权资产原值+累计折旧</li>
         <li>H8-12减少检查(五段式)含终止损益与H9同步终止确认</li>
         <li>H8-13简化处理检查：短期(≤12月)/低价值(≤4万)资格判断 + 直线法费用重算（应计 vs 账面）</li>
         <li>建议先完成H9租赁负债，再编制H8使用权资产（数据联动）</li>

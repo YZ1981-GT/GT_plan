@@ -25,6 +25,7 @@ spec: .kiro/specs/h-cycle-four-table-extraction-and-account-mapping/
 """
 from __future__ import annotations
 
+from .dual_family_codes import codes_for_cycle_slot
 from .semantic_account_resolver import SemanticAccountSlot, SemanticAccountSpec
 
 _GROSS_EXCLUDES = (
@@ -41,6 +42,17 @@ H8_SLOT_KEY_PREFIX = {
     "impairment": "rou_imp",
 }
 
+# 🔴 兜底码走**双族真源** `dual_family_codes`（spec h-cycle-… 裁决 1 / Task 6）：
+# 使用权资产在真实库里**两套编码族并存且逐项目互斥** ——
+#   trial_balance: 1641=160,078.75（5 项目） vs 1651=386,272,594.21（5 项目）
+#   tb_balance:    1641=0.00（1 项目）      vs 1651=872,197,195.23（9 项目）
+# 只写 `("1641",)` 时，在用新族的 9 个项目上**只取到 0.04%**（比恒空更隐蔽）。
+# 两族在同一项目内互斥（唯一并存的 0ec33ac9 双方均 0.00）⇒ 并取零双算风险。
+# 这里**不写字面量** —— 引常量才能让「改一处漏一处」在守卫里立刻暴露。
+_GROSS_CODES = codes_for_cycle_slot("H8", "gross")
+_ACCUM_DEP_CODES = codes_for_cycle_slot("H8", "accum_dep")
+_IMPAIRMENT_CODES = codes_for_cycle_slot("H8", "impairment")
+
 H8_ACCOUNT_SPEC = SemanticAccountSpec(
     row_code="BS-031",
     slots=(
@@ -48,7 +60,7 @@ H8_ACCOUNT_SPEC = SemanticAccountSpec(
             key="gross",
             names=("使用权资产",),
             exclude_names=_GROSS_EXCLUDES,
-            fallback_standard_codes=("1641",),
+            fallback_standard_codes=_GROSS_CODES,
             label="使用权资产原值",
         ),
         SemanticAccountSlot(
@@ -61,7 +73,7 @@ H8_ACCOUNT_SPEC = SemanticAccountSpec(
             # 删裸名后行为逐字不变，只关掉这条隐患。
             names=("使用权资产累计折旧",),
             exclude_names=("固定资产", "投资性房地产", "生产性生物资产", "油气"),
-            fallback_standard_codes=("1642",),
+            fallback_standard_codes=_ACCUM_DEP_CODES,
             label="累计折旧",
             is_provision=True,
         ),
@@ -69,7 +81,9 @@ H8_ACCOUNT_SPEC = SemanticAccountSpec(
             key="impairment",
             names=("使用权资产减值准备",),
             exclude_names=("减值损失",),
-            fallback_standard_codes=("1643",),
+            # 🔴 该槽 `alternate=None`（新族无对应减值准备码，客户科目表未见 1653）
+            # ⇒ 双族真源只返 `('1643',)`。**宁缺勿造**：不为它臆造一个 1653。
+            fallback_standard_codes=_IMPAIRMENT_CODES,
             label="减值准备",
             is_provision=True,
         ),

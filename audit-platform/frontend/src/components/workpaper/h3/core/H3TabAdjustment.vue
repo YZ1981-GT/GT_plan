@@ -5,7 +5,7 @@
       <summary>📋 编制提示</summary>
       <div class="guidance-content">
         <p>1. 本表登记投资性房地产相关的调整分录（AJE 审计调整 / RJE 重分类调整），每笔借贷必须平衡。</p>
-        <p>2. 成本模式常见调整涉及科目 1503 投资性房地产、1504 累计折旧、1505 减值准备；公允价值模式涉及 1503 及公允价值变动损益。</p>
+        <p>2. 成本模式常见调整涉及科目 1521 投资性房地产、1525 累计折旧 / 1526 累计摊销（土地使用权）、1527 减值准备；公允价值模式涉及 1521 及公允价值变动损益。</p>
         <p>3. 每笔分录需选定资产类别（房屋及建筑物 / 土地使用权 / 其他）；未选时按摘要/科目名称推断。</p>
         <p>4. 借贷平衡后方可「发布至 H3-1」：按资产类别分摊写入各分类行的 AJE/RJE，并可「推送 A13」。</p>
         <p>5. 索引列填写支持性底稿索引号，便于交叉引用与复核追溯。</p>
@@ -61,30 +61,30 @@
         <el-descriptions-item label="借贷状态">
           <el-tag :type="isBalanced ? 'success' : 'danger'" size="small">{{ isBalanced ? '平衡' : '不平衡' }}</el-tag>
         </el-descriptions-item>
-        <el-descriptions-item label="1503 AJE">{{ fmtNum(syncSummary.aje1503) }}</el-descriptions-item>
-        <el-descriptions-item label="1503 RJE">{{ fmtNum(syncSummary.rje1503) }}</el-descriptions-item>
-        <el-descriptions-item label="1504 AJE/RJE">{{ fmtNum(syncSummary.aje1504) }} / {{ fmtNum(syncSummary.rje1504) }}</el-descriptions-item>
-        <el-descriptions-item label="1505 AJE/RJE" :span="3">{{ fmtNum(syncSummary.aje1505) }} / {{ fmtNum(syncSummary.rje1505) }}</el-descriptions-item>
+        <el-descriptions-item label="原值 AJE">{{ fmtNum(syncSummary.ajeGross) }}</el-descriptions-item>
+        <el-descriptions-item label="原值 RJE">{{ fmtNum(syncSummary.rjeGross) }}</el-descriptions-item>
+        <el-descriptions-item label="累计折旧摊销 AJE/RJE">{{ fmtNum(syncSummary.ajeAccumDep) }} / {{ fmtNum(syncSummary.rjeAccumDep) }}</el-descriptions-item>
+        <el-descriptions-item label="减值准备 AJE/RJE" :span="3">{{ fmtNum(syncSummary.ajeImpairment) }} / {{ fmtNum(syncSummary.rjeImpairment) }}</el-descriptions-item>
       </el-descriptions>
       <el-table :data="categoryPreviewRows" border size="small" class="cat-preview-table">
         <el-table-column prop="category" label="资产类别" min-width="120" />
-        <el-table-column prop="aje1503" label="1503 AJE" min-width="90" align="right">
-          <template #default="{ row }">{{ fmtNum(row.aje1503) }}</template>
+        <el-table-column prop="ajeGross" label="原值 AJE" min-width="90" align="right">
+          <template #default="{ row }">{{ fmtNum(row.ajeGross) }}</template>
         </el-table-column>
-        <el-table-column prop="rje1503" label="1503 RJE" min-width="90" align="right">
-          <template #default="{ row }">{{ fmtNum(row.rje1503) }}</template>
+        <el-table-column prop="rjeGross" label="原值 RJE" min-width="90" align="right">
+          <template #default="{ row }">{{ fmtNum(row.rjeGross) }}</template>
         </el-table-column>
-        <el-table-column prop="aje1504" label="1504 AJE" min-width="90" align="right">
-          <template #default="{ row }">{{ fmtNum(row.aje1504) }}</template>
+        <el-table-column prop="ajeAccumDep" label="折旧摊销 AJE" min-width="90" align="right">
+          <template #default="{ row }">{{ fmtNum(row.ajeAccumDep) }}</template>
         </el-table-column>
-        <el-table-column prop="rje1504" label="1504 RJE" min-width="90" align="right">
-          <template #default="{ row }">{{ fmtNum(row.rje1504) }}</template>
+        <el-table-column prop="rjeAccumDep" label="折旧摊销 RJE" min-width="90" align="right">
+          <template #default="{ row }">{{ fmtNum(row.rjeAccumDep) }}</template>
         </el-table-column>
-        <el-table-column prop="aje1505" label="1505 AJE" min-width="90" align="right">
-          <template #default="{ row }">{{ fmtNum(row.aje1505) }}</template>
+        <el-table-column prop="ajeImpairment" label="减值 AJE" min-width="90" align="right">
+          <template #default="{ row }">{{ fmtNum(row.ajeImpairment) }}</template>
         </el-table-column>
-        <el-table-column prop="rje1505" label="1505 RJE" min-width="90" align="right">
-          <template #default="{ row }">{{ fmtNum(row.rje1505) }}</template>
+        <el-table-column prop="rjeImpairment" label="减值 RJE" min-width="90" align="right">
+          <template #default="{ row }">{{ fmtNum(row.rjeImpairment) }}</template>
         </el-table-column>
       </el-table>
       <el-table :data="writeTargets" border size="small" class="cat-preview-table">
@@ -101,7 +101,7 @@
           <template #default="{ row }">{{ fmtNum(row.rje) }}</template>
         </el-table-column>
       </el-table>
-      <p class="sync-note">发布后按资产类别分摊：1503→原值/公允行，1504→折旧行，1505→减值行；无对应分类行时并入「其他」。</p>
+      <p class="sync-note">发布后按资产类别分摊：原值(1521)→原值/公允行，累计折旧摊销(1525/1526)→折旧行，减值准备(1527)→减值行；无对应分类行时并入「其他」。</p>
     </el-card>
 
     <!-- 分录表 -->
@@ -261,12 +261,12 @@ const categoryPreviewRows = computed(() => {
   const b = syncSummary.value.byCategory
   return H3_ASSET_CATEGORIES.map((category) => ({
     category,
-    aje1503: b.aje1503[category] || 0,
-    rje1503: b.rje1503[category] || 0,
-    aje1504: b.aje1504[category] || 0,
-    rje1504: b.rje1504[category] || 0,
-    aje1505: b.aje1505[category] || 0,
-    rje1505: b.rje1505[category] || 0,
+    ajeGross: b.ajeGross[category] || 0,
+    rjeGross: b.rjeGross[category] || 0,
+    ajeAccumDep: b.ajeAccumDep[category] || 0,
+    rjeAccumDep: b.rjeAccumDep[category] || 0,
+    ajeImpairment: b.ajeImpairment[category] || 0,
+    rjeImpairment: b.rjeImpairment[category] || 0,
   }))
 })
 

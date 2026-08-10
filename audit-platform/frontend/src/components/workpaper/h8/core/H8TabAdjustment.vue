@@ -6,10 +6,10 @@
       <div class="hint-content">
         <p>1. 本表对齐 Excel「使用权资产调整分录汇总表」：调整事项说明 / 类别 / 报表项目 / 科目 / 附注项目 / 借贷 / 索引 / 备注。</p>
         <p>2. 「账项调整」影响审定数（AJE）；「报表调整」为重分类（RJE），仅影响列报；「其他」按账项调整处理。</p>
-        <p>3. 仅列示与使用权资产相关的审计调整；一笔完整分录通常需多行（1901/1902 + 对方科目，常涉及 2205 租赁负债）且整表借贷平衡。</p>
+        <p>3. 仅列示与使用权资产相关的审计调整；一笔完整分录通常需多行（使用权资产原值 {{ ROU_COST_CODE }} / 累计折旧 {{ ROU_DEP_CODE }} + 对方科目，常涉及租赁负债 {{ LEASE_LIAB_CODE }}）且整表借贷平衡。</p>
         <p>4. 索引应交叉引用来源底稿（如 H8-2 明细、H8-6 计量、H8-8 折旧、H8-10 减值、H8-12 减少检查）。</p>
-        <p>5. 可「从调整分录模块同步 / 推送至调整分录模块」与集中台账双向联动（含 1901 的完整分录组）；「推送 A13」将账项调整送入未更正错报汇总（报表调整默认不推）。</p>
-        <p>6. 科目 1901/1902 账项净额可回写 H8-1 审定表 AJE/RJE；借贷须平衡后方可推送中央模块。</p>
+        <p>5. 可「从调整分录模块同步 / 推送至调整分录模块」与集中台账双向联动（含使用权资产原值的完整分录组）；「推送 A13」将账项调整送入未更正错报汇总（报表调整默认不推）。</p>
+        <p>6. 使用权资产原值 / 累计折旧账项净额可回写 H8-1 审定表 AJE/RJE；借贷须平衡后方可推送中央模块。</p>
         <p class="excel-tip">提示：本底稿适用于调整分录较多、较复杂的项目，且仅列示与本报表项目相关的审计调整。项目组可根据实际情况选择是否使用。</p>
       </div>
     </details>
@@ -37,8 +37,8 @@
       :closable="false"
       class="balance-alert"
     >
-      1901 账项净额 {{ fmtAmt(state.rouCostAjeNet.value) }}（可回写 H8-1 原值 AJE）；报表调整净额
-      {{ fmtAmt(state.rouCostRjeNet.value) }}；1902 账项净额 {{ fmtAmt(state.rouDepAjeNet.value) }}
+      原值({{ ROU_COST_CODE }}) 账项净额 {{ fmtAmt(state.rouCostAjeNet.value) }}（可回写 H8-1 原值 AJE）；报表调整净额
+      {{ fmtAmt(state.rouCostRjeNet.value) }}；累计折旧({{ ROU_DEP_CODE }}) 账项净额 {{ fmtAmt(state.rouDepAjeNet.value) }}
     </el-alert>
 
     <!-- 工具栏 -->
@@ -118,10 +118,10 @@
       <div class="toolbar-right">
         <el-tag size="small" type="info" effect="plain">共 {{ state.rows.value.length }} 行</el-tag>
         <el-tag v-if="state.rouCostAjeNet.value !== 0" type="success" size="small" effect="plain">
-          1901账项净额 {{ fmtAmt(state.rouCostAjeNet.value) }}
+          原值({{ ROU_COST_CODE }})账项净额 {{ fmtAmt(state.rouCostAjeNet.value) }}
         </el-tag>
         <el-tag v-if="state.rouDepAjeNet.value !== 0" type="warning" size="small" effect="plain">
-          1902账项净额 {{ fmtAmt(state.rouDepAjeNet.value) }}
+          累计折旧({{ ROU_DEP_CODE }})账项净额 {{ fmtAmt(state.rouDepAjeNet.value) }}
         </el-tag>
         <span class="chip-wrap"><GtIndexChip value="wp:H8-3" :context-project-id="projectId" /></span>
         <span class="chip-wrap"><GtIndexChip value="wp:H8-1" :validate="false" /></span>
@@ -315,8 +315,8 @@
         {{ state.isBalanced.value ? '借贷平衡' : `差额 ${fmtAmt(Math.abs(state.balanceDiff.value))}` }}
       </el-tag>
       <span class="sep">|</span>
-      <span>1901账项净额 {{ fmtAmt(state.rouCostAjeNet.value) }}</span>
-      <span>1902账项净额 {{ fmtAmt(state.rouDepAjeNet.value) }}</span>
+      <span>原值({{ ROU_COST_CODE }})账项净额 {{ fmtAmt(state.rouCostAjeNet.value) }}</span>
+      <span>累计折旧({{ ROU_DEP_CODE }})账项净额 {{ fmtAmt(state.rouDepAjeNet.value) }}</span>
     </div>
 
     <p class="sheet-note">
@@ -364,6 +364,17 @@ import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composabl
 import { useAuditContext } from '@/composables/useAuditContext'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { WorkpaperRuntimeContextKey } from '../../composables/useWorkpaperScaffold'
+import { h8Scope, h9Scope } from '../../composables/hCycleAccountScope'
+
+/**
+ * 提示文案里的科目码一律由 scope 派生（禁写数字字面量）。
+ *
+ * 🔴 历史文案写死 `1901/1902`（待处理财产损溢，`K2 BS-014` 亦引用）与
+ * `2205`（合同负债，D7 域）—— 三个都不是使用权资产 / 租赁负债的真码。
+ */
+const ROU_COST_CODE = h8Scope.def.grossFallback
+const ROU_DEP_CODE = h8Scope.def.slotFallbacks.accum_dep[0]
+const LEASE_LIAB_CODE = h9Scope.def.grossFallback
 
 const props = defineProps<{
   wpId: string
@@ -530,7 +541,7 @@ async function handleSaveAndSync() {
   try {
     state.save()
     state.publishAndSync()
-    ElMessage.success('已保存，1901/1902 净额已回写 H8-1')
+    ElMessage.success(`已保存，原值(${ROU_COST_CODE})/累计折旧(${ROU_DEP_CODE}) 净额已回写 H8-1`)
   } finally {
     saving.value = false
   }

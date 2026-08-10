@@ -9,10 +9,86 @@
       title="审计目标：核实租赁负债及未确认融资费用期末余额的完整、准确与计价，验证与 H8 使用权资产初始确认的 CAS21 勾稽关系，为报表列报及 TB 回写提供审定依据。"
     />
 
-    <!-- 方法论上下文 -->
+    <!-- 方法论上下文（科目码走运行态解析，不写字面量） -->
     <div class="methodology-context">
-      <p>租赁负债审定表：科目2205（贷方/负债类）+ 未确认融资费用（借方/负债备抵类）。负债类期末=期初+贷方-借方；备抵类期末=期初+借方-贷方。审定数=未审+AJE+RJE。净额=原值-未确认融资费用。</p>
+      <p>
+        租赁负债审定表：租赁负债（科目 {{ leaseLiabilityCode }}，贷方/负债类）+ 未确认融资费用（科目
+        {{ unearnedFinanceCode }}，借方/负债备抵类）。负债类期末=期初+贷方-借方；备抵类期末=期初+借方-贷方。审定数=未审+AJE+RJE。净额=原值-未确认融资费用。
+      </p>
     </div>
+
+    <!-- 四表库取数口径溯源（消费 render 下发的 tb_source_codes；缺 :html-data 则不渲染） -->
+    <WpFourTableSourcePanel
+      :source-codes="tbSourceCodes"
+      gross-label="租赁负债"
+      provision-label="未确认融资费用"
+      :extra-slot-keys="H9_EXTRA_SLOT_KEYS"
+      :fallback-row-code="H9_REPORT_ROW_CODE"
+      :hints="sourcePanelHints"
+    />
+
+    <!-- 与四表库核对（三口径并列：四表叶子 / 试算表 / 底稿审定） -->
+    <el-card v-if="hasTbValues" shadow="never" class="block-card tb-reconcile-card">
+      <template #header>
+        <div class="section-title">
+          <span>与四表库核对</span>
+          <el-tag size="small" type="info">报表行 {{ H9_REPORT_ROW_CODE }}</el-tag>
+        </div>
+      </template>
+      <el-table :data="tbReconcileRows" border size="small" class="formula-table">
+        <el-table-column prop="label" label="项目" min-width="140" />
+        <el-table-column label="来源科目" min-width="140">
+          <template #default="{ row }">
+            <span v-if="row.absent" class="tb-absent">本项目无此科目</span>
+            <span v-else>{{ row.code }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="四表叶子（期末）" width="150" align="right" class-name="formula-col">
+          <template #default="{ row }">
+            <span
+              class="formula-value"
+              title="tb_balance 叶子口径期末余额；已按 closing_direction 净掉族内借方性质子科目"
+            >{{ row.leafClosing === null ? '—' : fmtAmt(row.leafClosing) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="试算表（未审）" width="150" align="right" class-name="formula-col">
+          <template #default="{ row }">
+            <span
+              class="formula-value"
+              :title="row.trialNetOf.length
+                ? `trial_balance 未审数；已按报表行语义扣减备抵科目 ${row.trialNetOf.join('、')}`
+                : 'trial_balance 未审数（原样求和）'"
+            >{{ row.trialUnadjusted === null ? '—' : fmtAmt(row.trialUnadjusted) }}</span>
+            <el-tag v-if="row.trialNetOf.length" size="small" type="warning" class="net-of-tag">
+              已减 {{ row.trialNetOf.join('、') }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="两口径差异" width="130" align="right">
+          <template #default="{ row }">
+            <el-tag
+              v-if="tbDiff(row) !== null"
+              size="small"
+              :type="Math.abs(tbDiff(row)!) < 0.01 ? 'success' : 'danger'"
+            >{{ Math.abs(tbDiff(row)!) < 0.01 ? '一致' : fmtAmt(tbDiff(row)!) }}</el-tag>
+            <span v-else class="tb-absent">无法比对</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="底稿审定合计" width="140" align="right">
+          <template #default="{ row }">{{ fmtAmt(row.wpAudited) }}</template>
+        </el-table-column>
+        <el-table-column label="审定 − 四表" width="130" align="right">
+          <template #default="{ row }">
+            <el-tag
+              v-if="auditedDiff(row) !== null"
+              size="small"
+              :type="Math.abs(auditedDiff(row)!) < 0.01 ? 'success' : 'warning'"
+            >{{ Math.abs(auditedDiff(row)!) < 0.01 ? '一致' : fmtAmt(auditedDiff(row)!) }}</el-tag>
+            <span v-else class="tb-absent">—</span>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
 
     <!-- 工具栏 -->
     <div class="tab-toolbar">
@@ -40,7 +116,7 @@
     <el-card shadow="never" class="block-card">
       <template #header>
         <div class="section-title">
-          <span>一、租赁负债原值（科目2205，贷方/负债类）</span>
+          <span>一、租赁负债原值（科目 {{ leaseLiabilityCode }}，贷方/负债类）</span>
           <div class="title-actions">
             <el-button v-if="!isReadonly" size="small" @click="handleAddLiabilityRow">+ 新增行</el-button>
             <el-button size="small" @click="$emit('open-review', 'adjudication-liability')">复核</el-button>
@@ -56,21 +132,21 @@
         </el-table-column>
         <el-table-column prop="beginBalance" label="期初余额" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.beginBalance" :controls="false" size="small"
+            <WpAmountInput v-if="!isReadonly" v-model="row.beginBalance" size="small"
               @change="(v: number | undefined) => onCellChange(row.rowId, 'beginBalance', v)" />
             <span v-else>{{ fmtAmt(row.beginBalance) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="creditAmount" label="贷方发生(增加)" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.creditAmount" :controls="false" size="small"
+            <WpAmountInput v-if="!isReadonly" v-model="row.creditAmount" size="small"
               @change="(v: number | undefined) => onCellChange(row.rowId, 'creditAmount', v)" />
             <span v-else>{{ fmtAmt(row.creditAmount) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="debitAmount" label="借方发生(减少)" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.debitAmount" :controls="false" size="small"
+            <WpAmountInput v-if="!isReadonly" v-model="row.debitAmount" size="small"
               @change="(v: number | undefined) => onCellChange(row.rowId, 'debitAmount', v)" />
             <span v-else>{{ fmtAmt(row.debitAmount) }}</span>
           </template>
@@ -82,21 +158,21 @@
         </el-table-column>
         <el-table-column prop="unadjusted" label="未审数" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.unadjusted" :controls="false" size="small"
+            <WpAmountInput v-if="!isReadonly" v-model="row.unadjusted" size="small"
               @change="(v: number | undefined) => onCellChange(row.rowId, 'unadjusted', v)" />
             <span v-else>{{ fmtAmt(row.unadjusted) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="aje" label="AJE" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.aje" :controls="false" size="small"
+            <WpAmountInput v-if="!isReadonly" v-model="row.aje" size="small"
               @change="(v: number | undefined) => onCellChange(row.rowId, 'aje', v)" />
             <span v-else>{{ fmtAmt(row.aje) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="rje" label="RJE" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.rje" :controls="false" size="small"
+            <WpAmountInput v-if="!isReadonly" v-model="row.rje" size="small"
               @change="(v: number | undefined) => onCellChange(row.rowId, 'rje', v)" />
             <span v-else>{{ fmtAmt(row.rje) }}</span>
           </template>
@@ -108,7 +184,7 @@
         </el-table-column>
         <el-table-column prop="reclassification" label="重分类(一年内到期)" width="130" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.reclassification" :controls="false" size="small"
+            <WpAmountInput v-if="!isReadonly" v-model="row.reclassification" size="small"
               @change="(v: number | undefined) => onCellChange(row.rowId, 'reclassification', v)" />
             <span v-else>{{ fmtAmt(row.reclassification) }}</span>
           </template>
@@ -120,7 +196,7 @@
         </el-table-column>
         <el-table-column prop="beginFsAmount" label="期初报表数" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.beginFsAmount" :controls="false" size="small"
+            <WpAmountInput v-if="!isReadonly" v-model="row.beginFsAmount" size="small"
               @change="(v: number | undefined) => onCellChange(row.rowId, 'beginFsAmount', v)" />
             <span v-else>{{ fmtAmt(row.beginFsAmount) }}</span>
           </template>
@@ -165,21 +241,21 @@
         </el-table-column>
         <el-table-column prop="beginBalance" label="期初余额" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.beginBalance" :controls="false" size="small"
+            <WpAmountInput v-if="!isReadonly" v-model="row.beginBalance" size="small"
               @change="(v: number | undefined) => onCellChange(row.rowId, 'beginBalance', v)" />
             <span v-else>{{ fmtAmt(row.beginBalance) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="debitAmount" label="借方发生(增加)" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.debitAmount" :controls="false" size="small"
+            <WpAmountInput v-if="!isReadonly" v-model="row.debitAmount" size="small"
               @change="(v: number | undefined) => onCellChange(row.rowId, 'debitAmount', v)" />
             <span v-else>{{ fmtAmt(row.debitAmount) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="creditAmount" label="贷方发生(摊销确认)" width="130" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.creditAmount" :controls="false" size="small"
+            <WpAmountInput v-if="!isReadonly" v-model="row.creditAmount" size="small"
               @change="(v: number | undefined) => onCellChange(row.rowId, 'creditAmount', v)" />
             <span v-else>{{ fmtAmt(row.creditAmount) }}</span>
           </template>
@@ -191,21 +267,21 @@
         </el-table-column>
         <el-table-column prop="unadjusted" label="未审数" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.unadjusted" :controls="false" size="small"
+            <WpAmountInput v-if="!isReadonly" v-model="row.unadjusted" size="small"
               @change="(v: number | undefined) => onCellChange(row.rowId, 'unadjusted', v)" />
             <span v-else>{{ fmtAmt(row.unadjusted) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="aje" label="AJE" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.aje" :controls="false" size="small"
+            <WpAmountInput v-if="!isReadonly" v-model="row.aje" size="small"
               @change="(v: number | undefined) => onCellChange(row.rowId, 'aje', v)" />
             <span v-else>{{ fmtAmt(row.aje) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="rje" label="RJE" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.rje" :controls="false" size="small"
+            <WpAmountInput v-if="!isReadonly" v-model="row.rje" size="small"
               @change="(v: number | undefined) => onCellChange(row.rowId, 'rje', v)" />
             <span v-else>{{ fmtAmt(row.rje) }}</span>
           </template>
@@ -217,7 +293,7 @@
         </el-table-column>
         <el-table-column prop="reclassification" label="重分类(一年内到期)" width="130" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.reclassification" :controls="false" size="small"
+            <WpAmountInput v-if="!isReadonly" v-model="row.reclassification" size="small"
               @change="(v: number | undefined) => onCellChange(row.rowId, 'reclassification', v)" />
             <span v-else>{{ fmtAmt(row.reclassification) }}</span>
           </template>
@@ -229,7 +305,7 @@
         </el-table-column>
         <el-table-column prop="beginFsAmount" label="期初报表数" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.beginFsAmount" :controls="false" size="small"
+            <WpAmountInput v-if="!isReadonly" v-model="row.beginFsAmount" size="small"
               @change="(v: number | undefined) => onCellChange(row.rowId, 'beginFsAmount', v)" />
             <span v-else>{{ fmtAmt(row.beginFsAmount) }}</span>
           </template>
@@ -307,7 +383,7 @@
     <!-- TB回写 -->
     <div v-if="!isReadonly" class="writeback-area">
       <el-button type="primary" @click="handleWriteback" :loading="writebackLoading">
-        审定数回写TB（2205租赁负债 + 未确认融资费用）
+        审定数回写TB（{{ LEASE_LIAB_CODE }} 租赁负债 + 未确认融资费用）
       </el-button>
     </div>
 
@@ -343,7 +419,10 @@
         <li>净额变动率超过 30% 时须在审计说明中写明主要原因（模板红字要求）</li>
         <li>CAS21：H9初始确认≈H8初始计量-直接费用+激励（±1元）；H9-1 审定合计应与 H9-2 明细合计勾稽</li>
         <li>回写TB后自动发布 substantive:adjudicated 事件</li>
-        <li>「带入调整」：从集中登记按科目 2205 拉取调整分录，逐笔分配到租赁负债原值行的 AJE/RJE，带入后审定数自动更新并联动附注</li>
+        <li>「带入调整」：从集中登记按科目 {{ LEASE_LIAB_CODE }} 拉取调整分录，逐笔分配到租赁负债原值行的 AJE/RJE，带入后审定数自动更新并联动附注</li>
+        <!-- 历史版本曾把租赁负债科目号误写为 2205（合同负债，D7 循环 BS-047）；
+             该说明**只留在注释里**，用户侧只应看到本项目真实科目码。 -->
+        <li>科目码说明：租赁负债在平台标准科目表里两套编码族并存（旧族 {{ LEASE_LIAB_CODE }} 与新族 {{ LEASE_LIAB_ALT_CODE }}），实际取数科目由四表科目表按科目名定位</li>
       </ul>
     </details>
 
@@ -351,7 +430,7 @@
       v-model="bringInVisible"
       :matches="adjPull.matches.value"
       :row-options="bringInRowOptions"
-      subject-label="2205 租赁负债"
+      :subject-label="`${LEASE_LIAB_CODE} 租赁负债`"
       :loading="adjPull.loading.value"
       @apply="onBringInApply"
     />
@@ -368,7 +447,7 @@
  * 三、租赁负债净额（原值-未确认融资费用）
  *
  * + H8-H9 联动校验区（CAS21：H9初始≈H8初始-直接费用+激励，±1元容差）
- * + TB回写（2205+未确认融资费用）
+ * + TB回写（租赁负债+未确认融资费用）
  * + 审计说明/结论
  *
  * Spec: .kiro/specs/h9-lease-liabilities/
@@ -387,21 +466,58 @@ import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { h9Scope } from '../../composables/hCycleAccountScope'
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 
-/**
- * 🔴 科目码单一真源 = `h9Scope`（租赁负债 2601 / 未确认融资费用 2602）。
- * 历史实现写死 `2205`（合同负债）与 `1802` → 审定数回写到错科目。
- * 本组件无 `htmlData` prop 故用 scope 兜底码（与 `useH9FormData` 同源，不会分叉）。
- */
-const leaseLiabilityCode = h9Scope.def.slotFallbacks.gross[0]
-const unearnedFinanceCode = h9Scope.def.slotFallbacks.unearned_finance[0]
+/** 租赁负债科目码（scope 单一真源；双族 = 旧族 primary + 新族 alternate） */
+const LEASE_LIAB_CODE = h9Scope.def.grossFallback
+const LEASE_LIAB_ALT_CODE = h9Scope.def.slotFallbacks.gross[1] ?? h9Scope.def.grossFallback
+import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
+import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
 
 const props = defineProps<{
   wpId: string
   projectId: string
   allResponses: Map<string, any>
   isReadonly: boolean
+  /**
+   * render 下发的 `html_data`（宿主 `GtH9LeaseLiabilities` 透传）。
+   *
+   * 🔴 2026-08-07 补接：此前本组件**完全不消费** `tb_values` / `tb_source_codes`
+   * （两者计数皆 0、连 prop 都没声明）⇒ 后端按语义定位算出的租赁负债净额
+   * 在审定表界面**看不到**，科目码只能退到 `h9Scope` 兜底常量 = dead output。
+   */
+  htmlData?: Record<string, any> | null
 }>()
+
+/**
+ * 四表取数溯源（`tb_source_codes`）—— 顶层优先、`project_context` 兼容。
+ *
+ * 平台两套落点并存（见 memory「`tb_source_codes` 落点平台有两套并存约定」）：
+ * H 类各 render 写 `html_data` 顶层，F1/G1/E1 等写 `project_context`。
+ */
+const tbSourceCodes = computed<TbSourceCodes | null>(() => {
+  const hd = props.htmlData as Record<string, any> | null | undefined
+  return (hd?.tb_source_codes ?? hd?.project_context?.tb_source_codes ?? null) as TbSourceCodes | null
+})
+
+/** render 下发的 `tb_values`（键契约见 `_h9_lease_liabilities.build_h9_tb_values`） */
+const tbValues = computed<Record<string, any>>(() => {
+  const hd = props.htmlData as Record<string, any> | null | undefined
+  return (hd?.tb_values ?? {}) as Record<string, any>
+})
+
+/**
+ * 🔴 科目码单一真源 = 运行态 `tb_source_codes`，`h9Scope` 兜底码只作回退与展示。
+ * 历史实现写死 `2205`（合同负债）与 `1802` → 审定数回写到错科目。
+ *
+ * 该项目实际用哪一族由 `resolve_semantic_accounts` 逐项目判定 —— 实证
+ * `c8621493` 走新族 `2651`、`f064f5e4` 走旧族 `2601`，写死任一族都会在另一批项目取空。
+ */
+const leaseLiabilityCode = computed(() => h9Scope.grossCode(tbSourceCodes.value))
+const unearnedFinanceCode = computed(
+  () => h9Scope.slotCodes(tbSourceCodes.value, 'unearned_finance')[0]
+    || h9Scope.def.slotFallbacks.unearned_finance[0],
+)
 
 const emit = defineEmits<{
   (e: 'save', itemId: string, value: any): void
@@ -441,6 +557,92 @@ const {
 } = useH9CrossSheet(allResponsesRef)
 const h8Linkage = computed(() => h9VsH8Linkage.value)
 
+// ─── 与四表库核对（消费 render 下发的 tb_values；缺 :html-data 则整块不渲染） ───
+
+/** 数值归一：`null`/`''`/非数一律返回 `null`（**「无此科目」与「余额为 0」必须可区分**） */
+function _num(v: unknown): number | null {
+  if (v === null || v === undefined || v === '') return null
+  const n = Number(v)
+  return Number.isFinite(n) ? n : null
+}
+
+interface H9TbReconcileRow {
+  key: string
+  label: string
+  /** 科目码（运行态解析结果） */
+  code: string
+  /** 本项目是否确实没有该科目（`found=false`）—— 与「余额 0」区分展示 */
+  absent: boolean
+  /** `tb_balance` 叶子口径期末（已按 `closing_direction` 净掉族内 contra 子科目） */
+  leafClosing: number | null
+  /** `trial_balance` 未审数（原值槽内混入的备抵码已按报表行语义相减） */
+  trialUnadjusted: number | null
+  /** 本槽审定合计（底稿录入侧） */
+  wpAudited: number
+  /** 被扣减的备抵标准码（供追溯，空数组 = 原样求和） */
+  trialNetOf: string[]
+}
+
+const tbReconcileRows = computed<H9TbReconcileRow[]>(() => {
+  const tv = tbValues.value
+  const src = tbSourceCodes.value
+  const defs: Array<{ key: string; prefix: string; label: string; audited: () => number }> = [
+    {
+      key: 'gross',
+      prefix: 'lease_liability',
+      label: '租赁负债',
+      audited: () => Number(liabilitySubtotal.value.audited) || 0,
+    },
+    {
+      key: 'unearned_finance',
+      prefix: 'unearned_finance',
+      label: '未确认融资费用',
+      audited: () => Number(unearnedSubtotal.value.audited) || 0,
+    },
+  ]
+  return defs.map((d) => {
+    const slot = h9Scope.slot(src, d.key)
+    const codes = h9Scope.slotCodes(src, d.key)
+    return {
+      key: d.key,
+      label: d.label,
+      code: codes.join(' / ') || '—',
+      absent: slot?.found === false,
+      leafClosing: _num(tv[`${d.prefix}_unadjusted_closing`]),
+      trialUnadjusted: _num(tv[`${d.prefix}_unadjusted`]),
+      wpAudited: d.audited(),
+      trialNetOf: (tv[`${d.prefix}_trial_net_of`] as string[] | undefined) ?? [],
+    }
+  })
+})
+
+/** 整块可见性：render 未下发 `tb_values` 时不渲染（不显示一排 0 误导审计师） */
+const hasTbValues = computed(() =>
+  tbReconcileRows.value.some((r) => r.leafClosing !== null || r.trialUnadjusted !== null),
+)
+
+/** 叶子口径与试算表口径的差额（两侧都有值才算，否则 `null` = 无法比对） */
+function tbDiff(row: H9TbReconcileRow): number | null {
+  if (row.leafClosing === null || row.trialUnadjusted === null) return null
+  return row.leafClosing - row.trialUnadjusted
+}
+
+/** 审定合计与叶子口径的差额 */
+function auditedDiff(row: H9TbReconcileRow): number | null {
+  if (row.leafClosing === null) return null
+  return row.wpAudited - row.leafClosing
+}
+
+const H9_REPORT_ROW_CODE = h9Scope.def.reportRowCode ?? 'BS-063'
+const H9_EXTRA_SLOT_KEYS = ['unearned_finance'] as const
+
+const sourcePanelHints = [
+  '租赁负债按<strong>语义名称</strong>逐项目定位，不写死科目码 —— 实证部分项目用 <code>2651</code> 族、部分用 <code>2601</code> 族。',
+  '「四表叶子」列取 <code>tb_balance</code> 叶子口径期末余额，已按 <code>closing_direction</code> 净掉族内借方性质子科目（如 <code>2651.02 未确认融资费用</code>）。',
+  `「试算表」列按报表行 <code>${H9_REPORT_ROW_CODE}</code> 语义计算（租赁负债 − 未确认融资费用），不是简单相加。`,
+  '两列不一致时请核对客户科目表是否改动、序时账数据集版本是否一致，或 <code>trial_balance</code> 重算是否父子双算。',
+] as const
+
 // ─── 从集中登记带入调整（2205 租赁负债原值，负债贷方；分列 AJE/RJE，作用于原值行） ───
 const bringInRows = computed(() =>
   liabilityRows.value.map((r) => ({
@@ -459,13 +661,15 @@ const {
 } = useAdjudicationBringIn({
   projectId: toRef(props, 'projectId') as any,
   year: useAuditContext().year as any,
-  subjectPrefix: '2601',
-  direction: 'credit',
   // 🔴 2026-08-03 纠正：原写 `2205`（合同负债，D7 域）→ 租赁负债真值 `2601`。
-  //    该 subjectCode 用于「带入调整」按科目拉调整分录，写错会拉到 D7 的分录。
-  subjectCode: '2601',
+  //    2026-08-07 再改走**运行态解析结果**（`Resolvable` getter，延迟求值）——
+  //    该项目实际用 `2651` 族时按 `2601` 拉调整分录一条都拉不到；且 setup 期
+  //    `htmlData` 可能还没到，传字符串快照会永久锁死在兜底码上。
+  subjectPrefix: () => leaseLiabilityCode.value,
+  direction: 'credit',
+  subjectCode: () => leaseLiabilityCode.value,
   wpCode: 'H9',
-  subjectLabel: '租赁负债(2601)',
+  subjectLabel: () => `租赁负债(${leaseLiabilityCode.value})`,
   rows: bringInRows,
   updateCell: (rowKey: string, field: any, value: number) =>
     updateCell(rowKey, field === 'rje' ? 'rje' : 'aje', value),
@@ -607,6 +811,9 @@ function getUnearnedSummary({ columns }: { columns: any[]; data: H9AdjudicationR
 .chip-wrap { display: inline-flex; align-items: center; }
 
 .block-card { margin-bottom: 16px; }
+.tb-reconcile-card { margin-bottom: 12px; }
+.tb-absent { color: var(--el-text-color-secondary); font-size: 12px; }
+.net-of-tag { margin-left: 6px; }
 .formula-table { font-size: var(--wp-font-size, 13px); }
 .formula-table :deep(.formula-col) { background: #f0f9ff; }
 .formula-value { border-bottom: 1px dashed #409eff; cursor: help; color: #409eff; }

@@ -354,7 +354,7 @@
             <template #default="{ row }">
               <el-select v-if="!props.isReadonly" :model-value="row.aging || undefined" size="small" clearable
                 placeholder="选择" @change="updateCell(row.rowId, 'aging', $event ?? '')">
-                <el-option v-for="o in AGING_OPTS" :key="o" :label="o" :value="o" />
+                <el-option v-for="o in STOCK_AGE_OPTS" :key="o" :label="o" :value="o" />
               </el-select>
               <span v-else>{{ row.aging || '—' }}</span>
             </template>
@@ -500,7 +500,25 @@ import { useH4CrossSheet } from '../../composables/useH4CrossSheet'
 import { pullAssetMovementFromLedger } from '../../composables/assetLedgerMovementPull'
 import GtIndexChip from '../../GtIndexChip.vue'
 
-const AGING_OPTS = ['1年以内', '1-2年', '2-3年', '3年以上']
+/**
+ * 工程物资**库龄**（库存时长）的录入选项 —— 与「账龄」无关，禁接平台账龄枚举。
+ *
+ * 🔴 命名刻意避开 `AGING`（原名 `AGING_OPTS` 会让后来者误以为是账龄，
+ * 进而「顺手统一」到 `composables/disclosureAgingLabels.ts` 的项目级账龄配置）：
+ * - 账龄 = 应收款项**已发生多久**的过去分段，有项目级 3/5 年段配置，进附注披露；
+ * - 库龄 = 工程物资的**库存时长**，是减值迹象判断的辅助输入（→ H4-7），
+ *   **不进披露载荷**（实证：`h4NoteSectionMap.ts` / `h4DisclosureSyncPayload.ts` /
+ *   两个披露 Tab 对「库龄」与该字段的命中数**全为 0**）⇒ 不会污染附注。
+ *
+ * 源模板 `H4 工程物资.xlsx` 的 `明细表H4-2!AV8` 只有列头「库龄」二字、
+ * **无数据验证也无区间字面量**（AV 列全列仅 3 个值：索引号 / 页次 / 库龄）
+ * ⇒ 取值域由平台按常规库龄分段提供，仅作录入辅助，不作披露口径。
+ *
+ * 持久化字段名仍是 `row.aging`（历史键，改名会让既有项目已录数据读不回来）。
+ *
+ * spec: h-cycle-extraction-formula-and-disclosure-completion Task 15（裁决 2）
+ */
+const STOCK_AGE_OPTS = ['1年以内', '1-2年', '2-3年', '3年以上']
 const QUALITY_OPTS = ['正常', '闲置', '毁损', '待报废', '积压']
 
 const props = defineProps<{

@@ -55,6 +55,16 @@
           带入在建工程(H2/TB)
         </el-button>
         <el-button
+          v-if="!props.isReadonly && hasFourTableSeed"
+          size="small"
+          type="primary"
+          plain
+          :loading="fourTableSeeding"
+          @click="handleSeedFromFourTable"
+        >
+          从四表库带入未审数
+        </el-button>
+        <el-button
           v-if="!props.isReadonly && state.significantChangeItems.value.length"
           size="small"
           plain
@@ -421,12 +431,32 @@ import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import WpSemanticAccountSourcePanel from '../../shared/WpSemanticAccountSourcePanel.vue'
+import {
+  applyHSeedCells,
+  buildHSeedCells,
+  getHSeedSpec,
+  readHSegmentPrefill,
+  type HSeedRowAdapter,
+} from '../../composables/hCycleAdjudicationSeed'
+import {
+  describeAdjPrefillConflicts,
+  describeAdjPrefillPlan,
+  planAdjudicationPrefill,
+  planHasWork,
+  resolveAdjPrefillWrites,
+} from '../../composables/shared/adjudicationPrefillPlan'
 
 const props = defineProps<{
   wpId: string
   projectId: string
   allResponses: Map<string, any>
   isReadonly: boolean
+  /**
+   * 🔴 改造前**未声明**该 prop，而模板里已在用 `htmlData?.tb_source_codes`
+   * → 溯源面板恒收不到数据、从不渲染；宿主也没传 `:html-data`（两侧同时缺）。
+   * `get_diagnostics` / vitest / Vite transform 四层全绿，只有浏览器才暴露。
+   */
+  htmlData?: any
 }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
@@ -628,6 +658,99 @@ function handleApplySignificantNote() {
   const r = state.applySignificantNoteDraft(false)
   if (r.applied) ElMessage.success(r.message)
   else ElMessage.warning(r.message)
+}
+
+// ─── 从四表库带入未审数（spec h-cycle Task 5）────────────────────────────────
+// 数据源 = render 下发的 `adjudication_segment_prefill`（1605 工程物资叶子）。
+// 归类按**科目名称**（客户子科目编码语义在项目间冲突），未命中不兜底。
+const fourTableSeeding = ref(false)
+
+const h4SeedBuild = computed(() => {
+  const spec = getHSeedSpec('H4')
+  const payload = readHSegmentPrefill(props.htmlData)
+  if (!spec || !payload) return null
+  return buildHSeedCells(spec, payload)
+})
+
+const hasH4FourTableSeed = computed(() => (h4SeedBuild.value?.cells.length ?? 0) > 0)
+
+/** 行适配器：H4 的 `updateCell(rowId, field, value)` 无 block 参数，行带 section */
+function makeH4SeedAdapter(): HSeedRowAdapter {
+  return {
+    findRowId: (rowKey) =>
+      state.originalRows.value.find(
+        (r: any) => !r.isSubtotal && !r.isTotal && String(r.name ?? '').trim() === rowKey,
+      )?.rowId ?? null,
+    createRow: (rowKey) => {
+      state.addRow(rowKey, 'original')
+      return (
+        state.originalRows.value.find((r: any) => String(r.name ?? '').trim() === rowKey)?.rowId ??
+        null
+      )
+    },
+    writeCell: (rowId, field, amount) => state.updateCell(rowId, field, amount),
+  }
+}
+
+async function handleSeedFromFourTable() {
+  if (props.isReadonly) return
+  const built = h4SeedBuild.value
+  if (!built || built.cells.length === 0) {
+    ElMessage.info('四表库暂无工程物资明细科目，或该科目未导入')
+    return
+  }
+  const adapter = makeH4SeedAdapter()
+  const plan = planAdjudicationPrefill(
+    built.cells,
+    (cell) => {
+      const rowId = adapter.findRowId(cell.rowKey)
+      if (!rowId) return null
+      const row: any = state.originalRows.value.find((r: any) => r.rowId === rowId)
+      const v = row?.[cell.field]
+      return v === 0 ? null : v // 0 视为未填（避免把「未录入」当「已核实为零」）
+    },
+    { unclassified: built.unclassified, absentSlots: built.absentSlots },
+  )
+
+  if (!planHasWork(plan)) {
+    ElMessage.info(describeAdjPrefillPlan(plan))
+    return
+  }
+
+  let mode: AdjPrefillMode = 'fill-blank'
+  if (plan.conflicts.length > 0) {
+    try {
+      await ElMessageBox.confirm(
+        `以下单元格已有录入且与四表不一致：\n${describeAdjPrefillConflicts(plan)}\n\n` +
+          '「仅补空值」保留现有录入；「全部覆盖」以四表数值替换。',
+        '手工录入优先',
+        {
+          type: 'warning',
+          confirmButtonText: '全部覆盖',
+          cancelButtonText: '仅补空值',
+          distinguishCancelAndClose: true,
+        },
+      )
+      mode = 'overwrite'
+    } catch (e) {
+      if (e === 'close') return // 右上角关闭 = 取消整个操作
+    }
+  }
+
+  fourTableSeeding.value = true
+  try {
+    const r = applyHSeedCells(resolveAdjPrefillWrites(plan, mode), adapter)
+    const extra = r.failed.length ? `；${r.failed.length} 格未能写入（行创建失败）` : ''
+    ElMessage.success(`已带入 ${r.written} 格（新建 ${r.created} 行）${extra}`)
+    if (built.unclassified.length) {
+      ElMessage.warning(
+        `${built.unclassified.length} 个科目未能归类，请人工分配：` +
+          built.unclassified.map((u) => u.name).join('、'),
+      )
+    }
+  } finally {
+    fourTableSeeding.value = false
+  }
 }
 
 function onH2Adjudicated(ev: Event) {

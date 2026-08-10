@@ -565,14 +565,14 @@
 
     <el-dialog
       v-model="showSampling"
-      title="抽凭引擎（科目 1901 使用权资产-减少）"
+      :title="`抽凭引擎（科目 ${ROU_COST_CODE} 使用权资产-减少）`"
       width="860px"
       :close-on-click-modal="false"
       destroy-on-close
     >
       <GtVoucherSamplingEngine
         v-if="showSampling && wpId && projectId"
-        account-code="1641"
+        :account-code="ROU_COST_CODE"
         phase="final"
         default-method="mus"
         :workpaper-id="wpId"
@@ -601,11 +601,15 @@ import {
 } from '../../composables/useH8DisposalCheck'
 import { useH8ImportExport } from '../../composables/useH8ImportExport'
 import GtIndexChip from '../../GtIndexChip.vue'
+import { h8Scope } from '../../composables/hCycleAccountScope'
 import GtVoucherSamplingEngine from '../../voucher-sampling/GtVoucherSamplingEngine.vue'
 import type { SampledVoucher } from '../../composables/useSamplingAlgorithms'
 import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
 import { useSamplingMethodologyPersist } from '../../composables/shared/useSamplingMethodologyPersist'
 import type { SamplingMethodologySnapshot } from '../../composables/shared/samplingFillTarget'
+
+/** 抽凭科目码（scope 单一真源；历史文案写死 `1901` = 待处理财产损溢） */
+const ROU_COST_CODE = h8Scope.def.grossFallback
 
 const props = defineProps<{
   wpId: string

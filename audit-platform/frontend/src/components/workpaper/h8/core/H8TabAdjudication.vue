@@ -3,11 +3,14 @@
     <details class="compile-hint" open>
       <summary>📋 编制提示（对齐 Excel 使用权资产、累计折旧及减值准备审定表 H8-1）</summary>
       <div class="hint-content">
-        <p>1. 四区块：一、原值(1901) → 二、累计折旧(1902) → 三、减值准备(1903) → 四、净额=原值−折旧−减值。</p>
+        <p>1. 四区块：一、原值({{ SLOT_CODE_TEXT.gross }}) → 二、累计折旧({{ SLOT_CODE_TEXT.dep }}) → 三、减值准备({{ SLOT_CODE_TEXT.impair }}) → 四、净额=原值−折旧−减值。</p>
         <p>2. 列组：期初/期末 × 未审·账项调整·审定 + 本期审定与上期审定比较（变动额/率）。审定=未审+账项调整。</p>
-        <p>3. 默认分类：房屋及建筑物 / 机器设备 / 运输设备 / 办公设备 / 其他设备；可从 H8-3 回写期末账项调整（1901/1902 按未审权重分摊）。</p>
+        <p>3. 默认分类：房屋及建筑物 / 机器设备 / 运输设备 / 办公设备 / 其他设备；可从 H8-3 回写期末账项调整（原值/累计折旧按未审权重分摊）。</p>
         <p>4. 变动率≥{{ CHANGE_RATE_THRESHOLD }}% 须在说明(1)解释；说明(2)(3)分别覆盖简化处理与转租；与 TB 差异行核对后回写试算表。</p>
-        <p>5.「带入调整」：从集中登记按科目 1901 拉取调整分录，逐笔分配到原值分类行的期末账项调整，带入后审定数自动更新并联动附注。</p>
+        <p>5.「带入调整」：从集中登记按科目 {{ SLOT_CODE_TEXT.gross }} 拉取调整分录，逐笔分配到原值分类行的期末账项调整，带入后审定数自动更新并联动附注。</p>
+        <!-- 历史版本曾把三槽科目号误写为 1901/1902/1903（待处理财产损溢，K2 BS-014 亦引用）；
+             该说明**只留在注释里**，用户侧只应看到本项目真实科目码。 -->
+        <p class="excel-tip">科目码说明：使用权资产在平台标准科目表里两套编码族并存，本项目实际科目由四表科目表按科目名定位后显示于上（原值 {{ SLOT_CODE_TEXT.gross }} / 累计折旧 {{ SLOT_CODE_TEXT.dep }} / 减值准备 {{ SLOT_CODE_TEXT.impair }}）。</p>
         <p class="excel-tip">提示：账项调整应与 H8-3 / 调整分录模块勾稽；CAS21 初始计量须与 H9 勾稽（使用权资产=H9+直接费用−激励）。</p>
       </div>
     </details>
@@ -73,7 +76,7 @@
           type="info"
           effect="plain"
         >
-          H8-3：1901账项 {{ fmtAmt(h83Sync.rouCostAjeNet) }} / 1902 {{ fmtAmt(h83Sync.rouDepAjeNet) }}
+          H8-3：原值账项 {{ fmtAmt(h83Sync.rouCostAjeNet) }} / 累计折旧 {{ fmtAmt(h83Sync.rouDepAjeNet) }}
         </el-tag>
         <el-tag v-if="significantNetChanges.length" size="small" type="warning" effect="plain">
           净值变动≥{{ CHANGE_RATE_THRESHOLD }}%：{{ significantNetChanges.length }} 项
@@ -460,7 +463,7 @@
       v-model="bringInVisible"
       :matches="adjPull.matches.value"
       :row-options="bringInRowOptions"
-      subject-label="1901 使用权资产"
+      :subject-label="`${SLOT_CODE_TEXT.gross} 使用权资产`"
       :loading="adjPull.loading.value"
       @apply="onBringInApply"
     />
@@ -481,6 +484,7 @@ import {
   type H8AdjBlock,
 } from '../../composables/useH8Adjudication'
 import { useH8CrossSheet } from '../../composables/useH8CrossSheet'
+import { h8Scope } from '../../composables/hCycleAccountScope'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
@@ -491,6 +495,14 @@ const props = defineProps<{
   projectId: string
   allResponses: Map<string, any>
   isReadonly: boolean
+  /**
+   * render-config 下发的本 sheet `html_data`。
+   *
+   * 🔴 缺它则「与试算平衡表核对」整块拿不到真实 TB 数（旧实现的 `tbUnadjusted`
+   * 形参零生产者 ⇒ 试算平衡表数恒回退本表口径或 0，差异显示成整额假差异）。
+   * 双族项目（`1651` 族）的真实金额就在 `tb_values.rou_asset_unadjusted` 里。
+   */
+  htmlData?: any
 }>()
 
 const emit = defineEmits<{
@@ -506,6 +518,46 @@ const allResponsesRef = computed(() => props.allResponses)
 const isReadonly = computed(() => props.isReadonly)
 const projectId = computed(() => props.projectId)
 const writebackLoading = ref(false)
+
+/** render 下发的四表溯源（TB 核对行的科目码展示；新族项目会显示 1651/1652） */
+const tbSourceCodes = computed(
+  () => props.htmlData?.project_context?.tb_source_codes ?? props.htmlData?.tb_source_codes ?? null,
+)
+
+/**
+ * 三槽科目码文案（编制提示与区块标题用）。
+ *
+ * 🔴 一律由 `h8Scope` 派生，禁在模板里写数字字面量 —— 历史实现写死
+ * `1901/1902/1903`（`1901` 实为待处理财产损溢、`K2 BS-014` 亦引用），
+ * 审定表把错科目号直接展示给审计师，破坏逻辑追溯。
+ */
+const SLOT_CODE_TEXT = computed(() => {
+  const pick = (slot: string) => {
+    const codes = h8Scope.slotCodes(tbSourceCodes.value, slot)
+    return codes.length ? codes.join('/') : '本项目无此科目'
+  }
+  return { gross: pick('gross'), dep: pick('accum_dep'), impair: pick('impairment') }
+})
+
+/**
+ * 试算平衡表未审数（三槽）—— 键与后端 `H8_SLOT_KEY_PREFIX` 逐字对应：
+ * `gross → rou_asset` / `accum_dep → rou_dep` / `impairment → rou_imp`。
+ *
+ * 🔴 备抵槽下发的是**带符号**值（贷方为负），核对行按绝对值口径展示。
+ * 🔴 槽 `found=false` 时后端**不产出该键**（宁缺勿造），此处保持 0 而不是臆造。
+ */
+const tbUnadjusted = computed(() => {
+  const tv = props.htmlData?.tb_values ?? null
+  const num = (k: string) => {
+    const raw = tv?.[k]
+    return raw == null || raw === '' ? 0 : Math.abs(Number(raw)) || 0
+  }
+  return {
+    cost: num('rou_asset_unadjusted'),
+    dep: num('rou_dep_unadjusted'),
+    impair: num('rou_imp_unadjusted'),
+  }
+})
 
 const {
   costDisplayRows,
@@ -536,6 +588,8 @@ const {
   projectId: toRef(props, 'projectId'),
   allResponses: allResponsesRef as any,
   isReadonly: toRef(props, 'isReadonly'),
+  tbUnadjusted,
+  tbSourceCodes,
   onSave: (itemId, value) => {
     saveResponse(itemId, value)
     emit('save', itemId, value)
@@ -565,12 +619,12 @@ const canSyncH83 = computed(
 )
 
 const blocks = computed(() => [
-  { key: 'cost' as H8AdjBlock, title: '一、使用权资产原值（科目1901）', rows: costDisplayRows.value },
-  { key: 'dep' as H8AdjBlock, title: '二、累计折旧（科目1902·备抵）', rows: depDisplayRows.value },
-  { key: 'impair' as H8AdjBlock, title: '三、减值准备（科目1903·备抵）', rows: impairDisplayRows.value },
+  { key: 'cost' as H8AdjBlock, title: `一、使用权资产原值（科目${SLOT_CODE_TEXT.value.gross}）`, rows: costDisplayRows.value },
+  { key: 'dep' as H8AdjBlock, title: `二、累计折旧（科目${SLOT_CODE_TEXT.value.dep}·备抵）`, rows: depDisplayRows.value },
+  { key: 'impair' as H8AdjBlock, title: `三、减值准备（科目${SLOT_CODE_TEXT.value.impair}·备抵）`, rows: impairDisplayRows.value },
 ])
 
-// ─── 从集中登记带入调整（1901 使用权资产原值，资产借方；双期单一账项调整列，作用于期末） ───
+// ─── 从集中登记带入调整（使用权资产原值，资产借方；双期单一账项调整列，作用于期末） ───
 const bringInRows = computed(() =>
   costDisplayRows.value
     .filter((r: any) => !r.isSubtotal)
@@ -585,11 +639,11 @@ const {
 } = useAdjudicationBringIn({
   projectId: toRef(props, 'projectId') as any,
   year: useAuditContext().year as any,
-  subjectPrefix: '1641',
+  subjectPrefix: h8Scope.def.grossFallback,
   direction: 'debit',
-  subjectCode: '1641',
+  subjectCode: h8Scope.def.grossFallback,
   wpCode: 'H8',
-  subjectLabel: '使用权资产(1901)',
+  subjectLabel: `使用权资产(${h8Scope.def.grossFallback})`,
   rows: bringInRows,
   // 单一「账项调整」列（审定=未审+账项调整）：aje/rje 净额均累加至原值行期末账项调整（增量累加）
   updateCell: (rowKey: string, _field: any, value: number) => {
@@ -664,7 +718,7 @@ async function handleWriteback() {
   writebackLoading.value = true
   try {
     await publishAdjudicated()
-    ElMessage.success('已回写 TB（1901/累计折旧）')
+    ElMessage.success(`已回写 TB（${SLOT_CODE_TEXT.value.gross} 原值 / ${SLOT_CODE_TEXT.value.dep} 累计折旧）`)
   } finally {
     writebackLoading.value = false
   }

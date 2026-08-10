@@ -63,10 +63,9 @@
         </el-table-column>
         <el-table-column label="期末账面价值" width="150" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.clearingEditable && !isReadonly"
               v-model="state.summary.clearingEnd"
-              :controls="false"
               size="small"
               @change="persistAll"
             />
@@ -75,10 +74,9 @@
         </el-table-column>
         <el-table-column label="期初账面价值" width="150" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.clearingEditable && !isReadonly"
               v-model="state.summary.clearingBegin"
-              :controls="false"
               size="small"
               @change="persistAll"
             />
@@ -108,10 +106,9 @@
         <el-table-column label="期初余额" width="120" align="right">
           <template #default="{ row }">
             <template v-if="isNaCell(row)"><span class="na-cell">—</span></template>
-            <el-input-number
+            <WpAmountInput
               v-else-if="row.editable && !isReadonly"
               :model-value="cellAmt(row, 'begin')"
-              :controls="false"
               size="small"
               @update:model-value="(v) => setMoveCell(row, 'begin', v)"
             />
@@ -121,10 +118,9 @@
         <el-table-column label="本期增加" width="120" align="right">
           <template #default="{ row }">
             <span v-if="row.movementNa || isNaCell(row)" class="na-cell">—</span>
-            <el-input-number
+            <WpAmountInput
               v-else-if="row.editable && !isReadonly"
               :model-value="cellAmt(row, 'increase')"
-              :controls="false"
               size="small"
               @update:model-value="(v) => setMoveCell(row, 'increase', v)"
             />
@@ -134,10 +130,9 @@
         <el-table-column label="本期减少" width="120" align="right">
           <template #default="{ row }">
             <span v-if="row.movementNa || isNaCell(row)" class="na-cell">—</span>
-            <el-input-number
+            <WpAmountInput
               v-else-if="row.editable && !isReadonly"
               :model-value="cellAmt(row, 'decrease')"
-              :controls="false"
               size="small"
               @update:model-value="(v) => setMoveCell(row, 'decrease', v)"
             />
@@ -184,19 +179,19 @@
         </el-table-column>
         <el-table-column label="账面原值" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.originalCost" :controls="false" size="small" @change="onIdleAmt(row)" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.originalCost" size="small" @change="onIdleAmt(row)" />
             <span v-else class="amount-cell">{{ fmtAmt(row.originalCost) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="累计折旧" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.accumDep" :controls="false" size="small" @change="onIdleAmt(row)" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.accumDep" size="small" @change="onIdleAmt(row)" />
             <span v-else class="amount-cell">{{ fmtAmt(row.accumDep) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="减值准备" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.impairment" :controls="false" size="small" @change="onIdleAmt(row)" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.impairment" size="small" @change="onIdleAmt(row)" />
             <span v-else class="amount-cell">{{ fmtAmt(row.impairment) }}</span>
           </template>
         </el-table-column>
@@ -244,7 +239,7 @@
         </el-table-column>
         <el-table-column label="账面价值" width="130" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.carrying" :controls="false" size="small" @change="persistAll" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.carrying" size="small" @change="persistAll" />
             <span v-else class="amount-cell">{{ fmtAmt(row.carrying) }}</span>
           </template>
         </el-table-column>
@@ -285,13 +280,13 @@
         </el-table-column>
         <el-table-column label="期末账面价值" width="130" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.endCarrying" :controls="false" size="small" @change="onClearingChange" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.endCarrying" size="small" @change="onClearingChange" />
             <span v-else class="amount-cell">{{ fmtAmt(row.endCarrying) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="期初账面价值" width="130" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.beginCarrying" :controls="false" size="small" @change="onClearingChange" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.beginCarrying" size="small" @change="onClearingChange" />
             <span v-else class="amount-cell">{{ fmtAmt(row.beginCarrying) }}</span>
           </template>
         </el-table-column>
@@ -352,7 +347,7 @@
         </el-table-column>
         <el-table-column label="账面原值" width="140" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.cost" :controls="false" size="small" @change="persistAll" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.cost" size="small" @change="persistAll" />
             <span v-else class="amount-cell">{{ fmtAmt(row.cost) }}</span>
           </template>
         </el-table-column>
@@ -420,6 +415,7 @@ import {
 } from '../../composables/h1DisclosurePack'
 import { pullH6ClearingForH1Soe, type H6ClearingPullResult } from '../../composables/h1SoeClearingH6Pull'
 import {
+import WpAmountInput from '../../shared/WpAmountInput.vue'
   H1_SOE_KEYS,
   readSoeRemark,
   CLEARING_NOTE_PLACEHOLDER,

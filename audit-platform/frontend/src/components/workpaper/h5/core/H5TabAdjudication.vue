@@ -32,21 +32,21 @@
         <el-table-column prop="category" label="项目" min-width="130" fixed />
         <el-table-column prop="beginBalance" label="期初余额" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="row.isEditable && !isReadonly" v-model="row.beginBalance" :controls="false" size="small" class="amount-input"
+            <WpAmountInput v-if="row.isEditable && !isReadonly" v-model="row.beginBalance" size="small" class="amount-input"
               @change="onCellChange('cost', row.rowId, 'beginBalance', $event)" />
             <span v-else class="amount-cell">{{ fmtAmt(row.beginBalance) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="debit" label="本期借方" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="row.isEditable && !isReadonly" v-model="row.debit" :controls="false" size="small" class="amount-input"
+            <WpAmountInput v-if="row.isEditable && !isReadonly" v-model="row.debit" size="small" class="amount-input"
               @change="onCellChange('cost', row.rowId, 'debit', $event)" />
             <span v-else class="amount-cell">{{ fmtAmt(row.debit) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="credit" label="本期贷方" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="row.isEditable && !isReadonly" v-model="row.credit" :controls="false" size="small" class="amount-input"
+            <WpAmountInput v-if="row.isEditable && !isReadonly" v-model="row.credit" size="small" class="amount-input"
               @change="onCellChange('cost', row.rowId, 'credit', $event)" />
             <span v-else class="amount-cell">{{ fmtAmt(row.credit) }}</span>
           </template>
@@ -63,14 +63,14 @@
         </el-table-column>
         <el-table-column prop="aje" label="AJE" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="row.isEditable && !isReadonly" v-model="row.aje" :controls="false" size="small" class="amount-input"
+            <WpAmountInput v-if="row.isEditable && !isReadonly" v-model="row.aje" size="small" class="amount-input"
               @change="onCellChange('cost', row.rowId, 'aje', $event)" />
             <span v-else class="amount-cell">{{ fmtAmt(row.aje) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="rje" label="RJE" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="row.isEditable && !isReadonly" v-model="row.rje" :controls="false" size="small" class="amount-input"
+            <WpAmountInput v-if="row.isEditable && !isReadonly" v-model="row.rje" size="small" class="amount-input"
               @change="onCellChange('cost', row.rowId, 'rje', $event)" />
             <span v-else class="amount-cell">{{ fmtAmt(row.rje) }}</span>
           </template>
@@ -99,21 +99,21 @@
         <el-table-column prop="category" label="项目" min-width="130" fixed />
         <el-table-column prop="beginBalance" label="期初余额" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="row.isEditable && !isReadonly" v-model="row.beginBalance" :controls="false" size="small" class="amount-input"
+            <WpAmountInput v-if="row.isEditable && !isReadonly" v-model="row.beginBalance" size="small" class="amount-input"
               @change="onCellChange('depletion', row.rowId, 'beginBalance', $event)" />
             <span v-else class="amount-cell">{{ fmtAmt(row.beginBalance) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="debit" label="本期借方(减少)" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="row.isEditable && !isReadonly" v-model="row.debit" :controls="false" size="small" class="amount-input"
+            <WpAmountInput v-if="row.isEditable && !isReadonly" v-model="row.debit" size="small" class="amount-input"
               @change="onCellChange('depletion', row.rowId, 'debit', $event)" />
             <span v-else class="amount-cell">{{ fmtAmt(row.debit) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="credit" label="本期贷方(增加)" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="row.isEditable && !isReadonly" v-model="row.credit" :controls="false" size="small" class="amount-input"
+            <WpAmountInput v-if="row.isEditable && !isReadonly" v-model="row.credit" size="small" class="amount-input"
               @change="onCellChange('depletion', row.rowId, 'credit', $event)" />
             <span v-else class="amount-cell">{{ fmtAmt(row.credit) }}</span>
           </template>
@@ -130,14 +130,14 @@
         </el-table-column>
         <el-table-column prop="aje" label="AJE" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="row.isEditable && !isReadonly" v-model="row.aje" :controls="false" size="small" class="amount-input"
+            <WpAmountInput v-if="row.isEditable && !isReadonly" v-model="row.aje" size="small" class="amount-input"
               @change="onCellChange('depletion', row.rowId, 'aje', $event)" />
             <span v-else class="amount-cell">{{ fmtAmt(row.aje) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="rje" label="RJE" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="row.isEditable && !isReadonly" v-model="row.rje" :controls="false" size="small" class="amount-input"
+            <WpAmountInput v-if="row.isEditable && !isReadonly" v-model="row.rje" size="small" class="amount-input"
               @change="onCellChange('depletion', row.rowId, 'rje', $event)" />
             <span v-else class="amount-cell">{{ fmtAmt(row.rje) }}</span>
           </template>
@@ -166,21 +166,21 @@
         <el-table-column prop="category" label="项目" min-width="130" fixed />
         <el-table-column prop="beginBalance" label="期初余额" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="row.isEditable && !isReadonly" v-model="row.beginBalance" :controls="false" size="small" class="amount-input"
+            <WpAmountInput v-if="row.isEditable && !isReadonly" v-model="row.beginBalance" size="small" class="amount-input"
               @change="onCellChange('impairment', row.rowId, 'beginBalance', $event)" />
             <span v-else class="amount-cell">{{ fmtAmt(row.beginBalance) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="debit" label="本期借方(转回)" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="row.isEditable && !isReadonly" v-model="row.debit" :controls="false" size="small" class="amount-input"
+            <WpAmountInput v-if="row.isEditable && !isReadonly" v-model="row.debit" size="small" class="amount-input"
               @change="onCellChange('impairment', row.rowId, 'debit', $event)" />
             <span v-else class="amount-cell">{{ fmtAmt(row.debit) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="credit" label="本期贷方(计提)" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="row.isEditable && !isReadonly" v-model="row.credit" :controls="false" size="small" class="amount-input"
+            <WpAmountInput v-if="row.isEditable && !isReadonly" v-model="row.credit" size="small" class="amount-input"
               @change="onCellChange('impairment', row.rowId, 'credit', $event)" />
             <span v-else class="amount-cell">{{ fmtAmt(row.credit) }}</span>
           </template>
@@ -197,14 +197,14 @@
         </el-table-column>
         <el-table-column prop="aje" label="AJE" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="row.isEditable && !isReadonly" v-model="row.aje" :controls="false" size="small" class="amount-input"
+            <WpAmountInput v-if="row.isEditable && !isReadonly" v-model="row.aje" size="small" class="amount-input"
               @change="onCellChange('impairment', row.rowId, 'aje', $event)" />
             <span v-else class="amount-cell">{{ fmtAmt(row.aje) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="rje" label="RJE" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="row.isEditable && !isReadonly" v-model="row.rje" :controls="false" size="small" class="amount-input"
+            <WpAmountInput v-if="row.isEditable && !isReadonly" v-model="row.rje" size="small" class="amount-input"
               @change="onCellChange('impairment', row.rowId, 'rje', $event)" />
             <span v-else class="amount-cell">{{ fmtAmt(row.rje) }}</span>
           </template>
@@ -331,6 +331,7 @@ import { useAuditContext } from '@/composables/useAuditContext'
 import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn'
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import { eventBus } from '@/utils/eventBus'
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 
 const props = defineProps<{
   wpId: string

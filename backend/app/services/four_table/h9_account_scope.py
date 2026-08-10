@@ -22,6 +22,7 @@ spec: .kiro/specs/h-cycle-four-table-extraction-and-account-mapping/
 """
 from __future__ import annotations
 
+from .dual_family_codes import codes_for_cycle_slot
 from .semantic_account_resolver import SemanticAccountSlot, SemanticAccountSpec
 
 #: 槽键 → 前端 `tb_values` 键前缀
@@ -30,6 +31,9 @@ H9_SLOT_KEY_PREFIX = {
     "unearned_finance": "unearned_finance",
 }
 
+_GROSS_CODES = codes_for_cycle_slot("H9", "gross")
+_UNEARNED_CODES = codes_for_cycle_slot("H9", "unearned_finance")
+
 H9_ACCOUNT_SPEC = SemanticAccountSpec(
     row_code="BS-063",
     slots=(
@@ -37,7 +41,11 @@ H9_ACCOUNT_SPEC = SemanticAccountSpec(
             key="gross",
             names=("租赁负债",),
             exclude_names=("未确认融资费用", "一年内到期"),
-            fallback_standard_codes=("2601",),
+            # 🔴 双族真源（裁决 1 / Task 6）：租赁负债两套族并存且逐项目互斥 ——
+            #   trial_balance: 2601=98,176.48 vs 2651=146,970,513.03
+            #   tb_balance:    2601=0.00（1 项目） vs 2651=−134,149,603.09（9 项目）
+            # 只写 `("2601",)` 会在用新族的 9 个项目上几乎取空。不写字面量、引常量。
+            fallback_standard_codes=_GROSS_CODES,
             label="租赁负债",
         ),
         # 🔴 裸名 `未确认融资费用` 在全库**同时**对应两个顶层科目（2026-08-04 DB 实证）：
@@ -53,7 +61,11 @@ H9_ACCOUNT_SPEC = SemanticAccountSpec(
             key="unearned_finance",
             names=("租赁负债未确认融资费用",),
             exclude_names=("长期应付款",),
-            fallback_standard_codes=("2602",),
+            # 🔴 该槽双族真源只返 `('2602',)`（`alternate=None`）——
+            # `account_mapping` 实证新族下 `2651.02 租赁负债_未确认融资费用` 是
+            # **`2651` 的子科目**，父族聚合已按 `closing_direction` 净掉它
+            # ⇒ 再并一个新族 contra 码就是**双算**。不得为它臆造 `2652`。
+            fallback_standard_codes=_UNEARNED_CODES,
             label="未确认融资费用",
             is_provision=True,
         ),

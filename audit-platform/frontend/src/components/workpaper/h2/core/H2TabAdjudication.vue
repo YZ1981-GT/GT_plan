@@ -47,6 +47,17 @@
           size="small"
           type="primary"
           plain
+          :disabled="!hasFourTableSeed"
+          :title="hasFourTableSeed ? '按 1604 叶子子科目带入期初/期末未审数' : '四表库暂无在建工程明细子科目'"
+          @click="handleSeedFromFourTable"
+        >
+          从四表库带入未审数
+        </el-button>
+        <el-button
+          v-if="!isReadonly"
+          size="small"
+          type="primary"
+          plain
           :loading="adjPull.loading.value"
           @click="openBringInAdjustment"
         >
@@ -404,6 +415,20 @@ import { ElMessage, ElMessageBox, ElTable, ElTableColumn, ElInputNumber, ElButto
 import http from '@/utils/http'
 import { eventBus } from '@/utils/eventBus'
 import {
+  buildHSeedCells,
+  getHSeedSpec,
+  readHSegmentPrefill,
+  applyHSeedCells,
+  type HSeedRowAdapter,
+} from '../../composables/hCycleAdjudicationSeed'
+import {
+  planAdjudicationPrefill,
+  resolveAdjPrefillWrites,
+  describeAdjPrefillPlan,
+  describeAdjPrefillConflicts,
+  planHasWork,
+} from '../../composables/shared/adjudicationPrefillPlan'
+import {
   useH2Adjudication,
   type H2AdjudicationBlock,
   type H2AdjudicationRow,
@@ -609,6 +634,93 @@ function handleSyncFromH23() {
   const res = state.syncEndAdjustmentFromH23(h23Sync.value.cipAjeNet)
   if (res.applied) ElMessage.success(res.message)
   else ElMessage.warning(res.message)
+}
+
+// ─── 从四表库带入未审数（1604 叶子子科目 → 工程行）─────────────────────────
+// 后端 `adjudication_segment_prefill` 在改造前是全平台 dead output（零消费方），
+// 这里是它的第一个消费点。手工优先 / 幂等 / 不兜底三条由共享件保证。
+const hSeedSpec = getHSeedSpec('H2')
+
+const fourTableSeed = computed(() => {
+  const payload = readHSegmentPrefill(props.htmlData)
+  if (!payload || !hSeedSpec) return null
+  return buildHSeedCells(hSeedSpec, payload)
+})
+
+const hasFourTableSeed = computed(() => (fourTableSeed.value?.cells.length ?? 0) > 0)
+
+/** 行键（工程名）→ rowId；建行走 `addProjectRow`（同时建原值+减值两行） */
+const h2SeedAdapter: HSeedRowAdapter = {
+  findRowId: (rowKey) =>
+    state.costRows.value.find((r) => !r.isTotal && !r.isSubtotal && r.name === rowKey)?.rowId ??
+    null,
+  createRow: (rowKey) => {
+    state.addProjectRow(rowKey)
+    return state.costRows.value.find((r) => r.name === rowKey)?.rowId ?? null
+  },
+  writeCell: (rowId, field, amount) => {
+    state.updateCell('cost', rowId, field, amount)
+  },
+}
+
+async function handleSeedFromFourTable() {
+  if (props.isReadonly) return
+  const built = fourTableSeed.value
+  if (!built || built.cells.length === 0) {
+    ElMessage.info('四表库暂无在建工程明细子科目，或该科目未导入')
+    return
+  }
+
+  const plan = planAdjudicationPrefill(
+    built.cells,
+    (cell) => {
+      const row = state.costRows.value.find(
+        (r) => !r.isTotal && !r.isSubtotal && r.name === cell.rowKey,
+      )
+      if (!row) return null
+      const v = (row as unknown as Record<string, unknown>)[cell.field]
+      // 0 视为「未填」——审定表新建行的数值字段默认就是 0
+      return v === 0 ? null : (v as number | null)
+    },
+    { unclassified: built.unclassified, absentSlots: built.absentSlots },
+  )
+
+  if (!planHasWork(plan)) {
+    ElMessage.info(describeAdjPrefillPlan(plan))
+    return
+  }
+
+  let mode: AdjPrefillMode = 'fill-blank'
+  if (plan.conflicts.length > 0) {
+    try {
+      await ElMessageBox.confirm(
+        `以下单元格已有录入且与四表库不一致：\n\n${describeAdjPrefillConflicts(plan)}\n\n选择「覆盖」将以四表库金额替换，选择「仅补空值」保留现有录入。`,
+        '手工录入与四表库不一致',
+        {
+          type: 'warning',
+          confirmButtonText: '覆盖',
+          cancelButtonText: '仅补空值',
+          distinguishCancelAndClose: true,
+        },
+      )
+      mode = 'overwrite'
+    } catch (e) {
+      if (e === 'close') return // 点 ✕ = 取消整个操作
+      mode = 'fill-blank'
+    }
+  }
+
+  const toWrite = resolveAdjPrefillWrites(plan, mode)
+  const res = applyHSeedCells(toWrite, h2SeedAdapter)
+
+  const parts = [describeAdjPrefillPlan(plan)]
+  if (res.created > 0) parts.push(`新建 ${res.created} 个工程行`)
+  if (res.failed.length > 0) {
+    parts.push(`${res.failed.length} 格建行失败未写入`)
+    ElMessage.warning(parts.join('；'))
+    return
+  }
+  ElMessage.success(parts.join('；'))
 }
 
 async function handleSeedMaterials() {

@@ -1,9 +1,9 @@
 # 致同审计作业平台 — Spec 开发索引
 
-**最后更新**：2026-08-09
+**最后更新**：2026-08-10
 **当前分支**：`work/2026-05-30-wp-specs`
-**统计**：Active **4**（2026-08-09 行首锚定正则实扫；另有 2 个仅剩 evidence 的空壳目录 `procedure-delegation-visibility-isolation` / `visibility-isolation-go-live-hardening`，无 tasks.md）/ Archived **548**
-**最高迁移**：**V143**（`word_export_task_versions.drift_report`；以 `migration_status` 实测为准）
+**统计**：Active **6**（2026-08-10 行首锚定正则 `^\s*-\s\[([ x~-])\]` 实扫；另有 **3** 个无 tasks.md 的空壳目录 `procedure-delegation-visibility-isolation` / `visibility-isolation-go-live-hardening` / `workpaper-import-export-lifecycle-closure`）/ Archived **549**（2026-08-10 按 `_archive/*/*` 一级子目录实扫，含 6 个仅剩 evidence 无三件套的历史残留目录；此前记的 548 是过时数）
+**最高迁移**：**V146**（`procedure_instance_suggestion_state`，并发会话 `procedure-trimming-*` 所加；本 spec 贡献 **V145** `report_config` 双族使用权资产/租赁负债。以磁盘 `backend/migrations/V*.sql` 实扫为准，`R1xx__` 是配对回滚脚本非同号冲突）
 **技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer
 
 ---
@@ -28,19 +28,48 @@
 
 | spec | 进度 | 一句话 |
 |------|------|--------|
-| `h-cycle-extraction-formula-and-disclosure-completion` | 17/18（Task 18 `[-]` = 浏览器实测收尾） | H 类（H1~H10）取数/公式/披露收口。双族并存取数（`dual_family_codes`）+ 列名注册 + H1~H4 审定预填 + 会计政策章 + 金额控件。真实库 80 组合验收已过，只剩浏览器实测 |
-| `e-cycle-extraction-formula-and-disclosure-completion` | 1/22（并发会话新建） | E 类（E0/E1）取数/公式/披露收口。账户级取数走 `tb_aux_balance` 银行账户维度（客户 1002 不分户，叶子恒 1 行） |
-| `g7-column-alignment-and-extraction-closure` | 0/24（并发会话新建） | G7 长期股权投资列结构对齐与取数闭合。核心 = 补上「源 xlsx ↔ 模板 seed ↔ 运行时载荷」三向锁死的第三条边（既有两个守卫各自只覆盖两条边，故 32 处列偏差长期逃逸） |
-| `procedure-trimming-and-delegation-intelligence` | 0/26（并发会话新建） | 程序裁剪三维判据（风险评估 → 重要性 → 数据存在性）+ 人员委派智能化。现状只实现最末位「科目在试算表无数据」一维 |
+| `e-cycle-extraction-formula-and-disclosure-completion` | 21/24（`[-]`1 / `[~]`2） | E 类（E0/E1）取数/公式/披露收口。账户级取数走 `tb_aux_balance` 银行账户维度（客户 1002 不分户，叶子恒 1 行） |
+| `i-cycle-extraction-formula-and-disclosure-closure` | 9/25 | I 类（无形资产/商誉/长期待摊）取数/公式/披露收口 |
+| `k-cycle-extraction-formula-and-disclosure-closure` | 5/25 | K 类取数公式与披露收口 |
+| `g7-column-alignment-and-extraction-closure` | 4/24（`[~]`19） | G7 长期股权投资列结构对齐与取数闭合。核心 = 补上「源 xlsx ↔ 模板 seed ↔ 运行时载荷」三向锁死的第三条边（既有两个守卫各自只覆盖两条边，故 32 处列偏差长期逃逸） |
+| `l-cycle-extraction-formula-and-disclosure-completion` | 3/26 | L 类（借款/应付债券）取数公式与披露收口 |
+| `procedure-trimming-and-delegation-intelligence` | 15/26（`[-]`1 / `[~]`10） | 程序裁剪三维判据（风险评估 → 重要性 → 数据存在性）+ 人员委派智能化。现状只实现最末位「科目在试算表无数据」一维 |
 
-> 🔴 `e-cycle-*` / `g7-*` / `procedure-trimming-*` 由**并发会话**推进
-> （tasks.md mtime 秒/分钟级刷新），本会话未触碰。
+> 🔴 上表 6 个 spec 均由**并发会话**推进（tasks.md mtime 秒/分钟级刷新）。
 > 跨会话协作时不要并行推进同一 spec（memory 已实证并发会话会互相回退同一文件）。
+> 🔴 **判 Active 数量一律行首锚定正则实扫 `.kiro/specs/*/tasks.md`，别信本表旧数** ——
+> 2026-08-10 实扫发现表头写「Active 4」而真实是 6 个带 tasks.md 的活 spec
+> （`i-cycle` / `k-cycle` / `l-cycle` 三个漏登记）。
 > `f0`(144/144) / `parent-company`(18/18) / `report-config`(12/12) /
 > `sampling-evaluation-and-governance-closure`(19/19) / `k0`(18/18) /
 > **`sampling-compliance-closure`(25/25)** 已于 2026-08-08 归档（见 §二）；
 > **`soe-listed-note-conversion-correctness`(19/19)** 已于 2026-08-09 归档。
 > **`note-template-columns-and-legacy-snapshot-closure`(23/23)** 已于 2026-08-09 归档（见 §二）。
+> **`h-cycle-extraction-formula-and-disclosure-completion`(18/18)** 已于 2026-08-10 归档（见 §二）。
+
+**2026-08-10 归档（1 个，→ `08-disclosure-notes`，与前序 `h-cycle-four-table-extraction-and-account-mapping` /
+`h-cycle-legacy-cleanup-and-platform-hygiene` 同分类）**：
+
+`h-cycle-extraction-formula-and-disclosure-completion`(18/18) —— H 类（H1~H10）取数 / 公式 /
+披露收口。**双族并存取数**（新族 `1651`/`1652` 使用权资产与旧族 `1641`/`1642` 在同一项目内互斥，
+真源 `four_table/dual_family_codes.py` + 迁移 **V145** 改 `report_config` 公式为并取）+
+`h_cycle_adjudication_prefill` 共享件（H1~H4 审定表段预填，四个 render 策略共用）+
+H3 前端槽真源 `h3AccountScope.ts` + 金额控件登记 `hCycleAmountControlRegistry.ts` +
+会计政策章 + 八、26 `text_sections`。真实库 **80 组合验收 0 违规**
+（`verify_h_cycle_extraction_live.py`，9 项目 × 10 循环）。
+**Task 18 浏览器实测 5/5 全过**（2026-08-10，实测项目 `2aa00f57` 重庆和平药房_2025 / soe）：
+H8 审定表 TB 核对块出 `352,406,145.74` · H3 溯源面板四槽全渲染 · H1 溯源面板出数 +
+预填按钮 enabled · 披露推送后附注「八、26 使用权资产」`last_sync_at` 由 NULL 前移且
+`sub_table_data['使用权资产']` 25 行列结构未压扁 · 金额控件千分符生效。
+**实测修正 tasks 原文三处**：H1 按钮真实文案是「从TB子科目预填」（非「从四表库带入未审数」，
+后者宿主是 N1/N3/N4/N5·K1/K2·J1/J2·G8/G9·H2/H4）· H3 用 `WpFourTableSourcePanel`
+而 H1/H2/H4/E1 用 `WpSemanticAccountSourcePanel`（DOM 与展开方式都不同）·
+立项预设「三个底稿是空底稿」被推翻（实为已有 37 行 `checklist_responses`）。
+**登记未修两项**：H8-1 四个金额列用裸 `el-input-number` 未传 `formatter`（EP 2.13.6 无该 prop，
+A/B 对照实测确认千分符不生效，属存量替换待单独 spec）· `H8TabDisclosureSoe.syncToNotes()`
+裸 `catch {}` 在 HTTP 全 200 时仍弹「同步附注失败」（fail-open 误报）。
+实测后按基线**逐字节复原**并双重核实（脚本 verify `diff_count=0` + 独立 SQL 直查九项吻合），
+复原后重跑验收脚本仍 0 违规。
 
 **2026-08-08 归档（1 个，→ `05-business-features`，与 `voucher-sampling-*` /
 `cutoff-test-*` / `voucher-check-sampling-integration` 同分类）**：
@@ -127,7 +156,7 @@ H0 聚合忽略 `closing_direction` 把 contra 子科目加成正数）。
 
 ---
 
-## 二、已归档 Spec（547 个，15 分类）
+## 二、已归档 Spec（549 个，15 分类）
 
 ```
 _archive/

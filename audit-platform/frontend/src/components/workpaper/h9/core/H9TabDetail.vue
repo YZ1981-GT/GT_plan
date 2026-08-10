@@ -348,7 +348,7 @@ import { ref, toRef, inject } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { useH9Detail, type H9DetailRow } from '../../composables/useH9Detail'
 import { useH9ImportExport } from '../../composables/useH9ImportExport'
-import { fetchH9LedgerByLessor } from '../../composables/h9LedgerPull'
+import { fetchH9LedgerByLessor, H9_LEDGER_ACCOUNT_CODES } from '../../composables/h9LedgerPull'
 import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{
@@ -436,7 +436,9 @@ async function handleLedgerPull() {
     const year = props.year || new Date().getFullYear()
     const ledgerRows = await fetchH9LedgerByLessor(props.projectId, year)
     if (!ledgerRows.length) {
-      ElMessage.info('序时账中未找到科目2205的租赁相关分录，请确认试算表已导入')
+      ElMessage.info(
+        `序时账中未找到租赁负债科目（${H9_LEDGER_ACCOUNT_CODES.join(' / ')}）的相关分录，请确认序时账已导入`,
+      )
       return
     }
     const summary = `共找到 ${ledgerRows.length} 个出租方的租赁发生额数据（偿还/利息），是否合并到明细表？\n（仅填充空值，不覆盖已有数据）`

@@ -5,10 +5,16 @@
       <summary>📋 编制提示</summary>
       <div class="guidance-content">
         <p>1. 本表为投资性房地产审定表（成本模式），列示原值与累计折旧双区块，净值 = 原值期末 − 折旧期末。</p>
-        <p>2. 期初数应与上年末审定数一致；未审数取自试算表（科目 1503 投资性房地产 / 1504 累计折旧），审定数 = 未审 + AJE + RJE。</p>
+        <p>
+          2. 期初数应与上年末审定数一致；未审数取自试算表（原值 {{ bringInGrossCode }} 投资性房地产 /
+          累计折旧 {{ bringInDepCode }}），审定数 = 未审 + AJE + RJE。具体科目码以下方「四表库取数口径」为准。
+        </p>
         <p>3. 计量模式在成本模式与公允价值模式之间选择（CAS3）：成本模式计提折旧与减值；公允价值模式不计提折旧、以公允价值调整账面价值，请切换至公允价值版本。</p>
         <p>4. 关注三角勾稽是否平衡（期初 + 增加 − 减少 ± 转换 = 期末）。</p>
-        <p>5.「带入调整(原值/折旧/减值)」：从集中登记按科目 1503/1504/1505 拉取调整分录，逐笔分配到各分类的 AJE/RJE（原值借方净额、折旧/减值贷方净额），带入后审定数自动更新并联动附注。</p>
+        <p>
+          5.「带入调整(原值/折旧/减值)」：从集中登记按科目 {{ bringInGrossCode }}/{{ bringInDepCode }}/{{ bringInImpairCode }}
+          拉取调整分录，逐笔分配到各分类的 AJE/RJE（原值借方净额、折旧/减值贷方净额），带入后审定数自动更新并联动附注。
+        </p>
       </div>
     </details>
 
@@ -17,7 +23,16 @@
       type="info"
       :closable="false"
       class="objective-alert"
-      title="审计目标：核实投资性房地产（成本模式：原值 1503 + 累计折旧 1504）期末余额的存在、准确与完整，确认调整分录恰当，为报表及附注披露提供审定依据。"
+      :title="`审计目标：核实投资性房地产（成本模式：原值 ${bringInGrossCode} + 累计折旧 ${bringInDepCode}）期末余额的存在、准确与完整，确认调整分录恰当，为报表及附注披露提供审定依据。`"
+    />
+
+    <!-- 四表库取数口径溯源（消费 render 下发的 tb_source_codes；缺 :html-data 则不渲染） -->
+    <WpFourTableSourcePanel
+      :source-codes="tbSourceCodes"
+      gross-label="投资性房地产原值"
+      :extra-slot-keys="H3_EXTRA_SLOT_KEYS"
+      :fallback-row-code="H3_REPORT_ROW_CODE"
+      :hints="sourcePanelHints"
     />
 
     <!-- 工具栏 -->
@@ -301,10 +316,10 @@
         <el-descriptions-item label="H3-6 投资→自用(H1)" :span="1">{{ fmtNum(transferSummary.toH1) }}</el-descriptions-item>
         <el-descriptions-item label="H3-6 在建→投资(H2)" :span="1">{{ fmtNum(transferSummary.fromH2) }}</el-descriptions-item>
 
-        <el-descriptions-item label="H3-3 AJE(1503)">{{ fmtNum(adjustmentSync.aje1503) }}</el-descriptions-item>
-        <el-descriptions-item label="H3-3 RJE(1503)">{{ fmtNum(adjustmentSync.rje1503) }}</el-descriptions-item>
-        <el-descriptions-item label="H3-3 折旧AJE/RJE">{{ fmtNum(adjustmentSync.aje1504) }} / {{ fmtNum(adjustmentSync.rje1504) }}</el-descriptions-item>
-        <el-descriptions-item label="H3-3 减值AJE/RJE" :span="3">{{ fmtNum(adjustmentSync.aje1505) }} / {{ fmtNum(adjustmentSync.rje1505) }}</el-descriptions-item>
+        <el-descriptions-item :label="`H3-3 原值AJE(${bringInGrossCode})`">{{ fmtNum(adjustmentSync.ajeGross) }}</el-descriptions-item>
+        <el-descriptions-item :label="`H3-3 原值RJE(${bringInGrossCode})`">{{ fmtNum(adjustmentSync.rjeGross) }}</el-descriptions-item>
+        <el-descriptions-item label="H3-3 折旧AJE/RJE">{{ fmtNum(adjustmentSync.ajeAccumDep) }} / {{ fmtNum(adjustmentSync.rjeAccumDep) }}</el-descriptions-item>
+        <el-descriptions-item label="H3-3 减值AJE/RJE" :span="3">{{ fmtNum(adjustmentSync.ajeImpairment) }} / {{ fmtNum(adjustmentSync.rjeImpairment) }}</el-descriptions-item>
       </el-descriptions>
       <p class="reconcile-note">{{ crossSheetNote }}</p>
       <div v-if="hasDetailCostDiff || hasDetailDepDiff" class="align-row">
@@ -342,7 +357,7 @@
       v-model="bringInCostVisible"
       :matches="adjPullCost.matches.value"
       :row-options="bringInCostRowOptions"
-      subject-label="1503 投资性房地产原值"
+      :subject-label="`${bringInGrossCode} 投资性房地产原值`"
       :loading="adjPullCost.loading.value"
       @apply="onBringInCostApply"
     />
@@ -350,7 +365,7 @@
       v-model="bringInDepVisible"
       :matches="adjPullDep.matches.value"
       :row-options="bringInDepRowOptions"
-      subject-label="1504 累计折旧"
+      :subject-label="`${bringInDepCode} 累计折旧`"
       :loading="adjPullDep.loading.value"
       @apply="onBringInDepApply"
     />
@@ -358,7 +373,7 @@
       v-model="bringInImpairVisible"
       :matches="adjPullImpair.matches.value"
       :row-options="bringInImpairRowOptions"
-      subject-label="1505 减值准备"
+      :subject-label="`${bringInImpairCode} 减值准备`"
       :loading="adjPullImpair.loading.value"
       @apply="onBringInImpairApply"
     />
@@ -385,13 +400,59 @@ import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { generateH3AI, h3AiLoading } from '../useH3AiGenerate'
+import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
+import {
+  H3_EXTRA_SLOT_KEYS,
+  H3_FALLBACK_CODES,
+  H3_REPORT_ROW_CODE,
+  H3_SLOT_ACCUM_DEP,
+  H3_SLOT_GROSS,
+  H3_SLOT_IMPAIRMENT,
+  h3AccountScope,
+} from '../../composables/h3AccountScope'
+import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
 
 const props = defineProps<{
   wpId: string
   projectId: string
   allResponses: Map<string, any>
+  /**
+   * render 下发的整册载荷。
+   * 🔴 缺它 = 溯源面板不渲染 + 回写科目退回兜底码（宿主必须传 `:html-data`）。
+   */
+  htmlData?: Record<string, any> | null
   isReadonly: boolean
 }>()
+
+// ─── 四表库取数溯源（`tb_source_codes`，两层落点兼容）────────────────────────
+const tbSourceCodes = computed<TbSourceCodes | null>(() => {
+  const hd = props.htmlData as Record<string, any> | null | undefined
+  return (hd?.tb_source_codes ?? hd?.project_context?.tb_source_codes ?? null) as
+    | TbSourceCodes
+    | null
+})
+
+/** 回写 / 带入 / 抽凭 / 事件载荷统一取语义定位结果，本项目无该科目时为空串 */
+const grossCode = computed(() => h3AccountScope.accountCode(tbSourceCodes.value, H3_SLOT_GROSS))
+const accumDepCode = computed(() =>
+  h3AccountScope.isAccountAbsent(tbSourceCodes.value, H3_SLOT_ACCUM_DEP)
+    ? ''
+    : h3AccountScope.accountCode(tbSourceCodes.value, H3_SLOT_ACCUM_DEP),
+)
+const impairmentCode = computed(() =>
+  h3AccountScope.isAccountAbsent(tbSourceCodes.value, H3_SLOT_IMPAIRMENT)
+    ? ''
+    : h3AccountScope.accountCode(tbSourceCodes.value, H3_SLOT_IMPAIRMENT),
+)
+
+/** 溯源面板口径说明（编译期常量，允许内嵌 `<code>`） */
+const sourcePanelHints = [
+  '科目按<strong>名称</strong>在本项目自己的科目表里定位（客户科目表优先），'
+  + '不按标准码硬查 —— <code>account_mapping</code> 实证同一原始码在不同项目映射到不同标准码'
+  + '（<code>1525 投资性房地产累计折旧</code> 在 1 个项目并入母科目 <code>1521</code>、在 4 个项目独立）。',
+  '土地使用权走<strong>累计摊销</strong>（<code>1526</code>）而非累计折旧；'
+  + '本项目无某备抵科目时如实显示「本项目无此科目」并<strong>不扣减</strong>（宁缺勿造）。',
+] as const
 
 const emit = defineEmits<{
   (e: 'navigate-sheet', sheetName: string): void
@@ -417,7 +478,19 @@ const {
   getValue, setValue, saveImmediate,
 })
 
-// ─── 从集中登记带入调整（三科目：1503原值[资产借]/1504累计折旧[备抵贷]/1505减值[备抵贷]；带入AJE/RJE） ───
+// ─── 从集中登记带入调整（原值[资产借] / 累计折旧[备抵贷] / 减值准备[备抵贷]）───
+//
+// 🔴 科目码取 `h3AccountScope`（改造前写死 1503/1504/1505 = 可供出售金融资产 /
+//    债权投资 / 债权投资减值准备，属 G6·G4 域 ⇒ 拉的是别的循环的调整分录）。
+//
+// 🔴 `useAdjudicationBringIn` 的 `subjectPrefix`/`subjectCode` 是**普通 string**
+//    （非 ref），只在 setup 期求值一次。render 尚未下发时会落到 `h3AccountScope`
+//    的兜底码 —— 那是**本循环正确的科目族**（1521/1525/1527），不再是别的循环的码，
+//    故最坏情况也只是「用标准码而非项目映射码」，不会再取错科目。
+const bringInGrossCode = grossCode.value || H3_FALLBACK_CODES.gross
+const bringInDepCode = accumDepCode.value || H3_FALLBACK_CODES.accumDep
+const bringInImpairCode = impairmentCode.value || H3_FALLBACK_CODES.impairment
+
 const bringInCostRows = computed(() =>
   originalRows.value.map((r) => ({ rowKey: r.rowId, name: r.category, aje: r.aje, rje: r.rje })),
 )
@@ -430,11 +503,11 @@ const {
 } = useAdjudicationBringIn({
   projectId: toRef(props, 'projectId') as any,
   year: useAuditContext().year as any,
-  subjectPrefix: '1503',
+  subjectPrefix: bringInGrossCode,
   direction: 'debit',
-  subjectCode: '1503',
+  subjectCode: bringInGrossCode,
   wpCode: 'H3',
-  subjectLabel: '投资性房地产原值(1503)',
+  subjectLabel: `投资性房地产原值(${bringInGrossCode})`,
   rows: bringInCostRows,
   updateCell: (rowKey: string, field: any, value: number) => updateOriginalCell(rowKey, field, value),
   totalAudited: () => originalTotal.value.audited,
@@ -452,11 +525,11 @@ const {
 } = useAdjudicationBringIn({
   projectId: toRef(props, 'projectId') as any,
   year: useAuditContext().year as any,
-  subjectPrefix: '1504',
+  subjectPrefix: bringInDepCode,
   direction: 'credit',
-  subjectCode: '1504',
+  subjectCode: bringInDepCode,
   wpCode: 'H3',
-  subjectLabel: '累计折旧(1504)',
+  subjectLabel: `累计折旧(${bringInDepCode})`,
   rows: bringInDepRows,
   updateCell: (rowKey: string, field: any, value: number) => updateDepCell(rowKey, field, value),
   totalAudited: () => depTotal.value.audited,
@@ -474,11 +547,11 @@ const {
 } = useAdjudicationBringIn({
   projectId: toRef(props, 'projectId') as any,
   year: useAuditContext().year as any,
-  subjectPrefix: '1505',
+  subjectPrefix: bringInImpairCode,
   direction: 'credit',
-  subjectCode: '1505',
+  subjectCode: bringInImpairCode,
   wpCode: 'H3',
-  subjectLabel: '减值准备(1505)',
+  subjectLabel: `减值准备(${bringInImpairCode})`,
   rows: bringInImpairRows,
   updateCell: (rowKey: string, field: any, value: number) => updateImpairCell(rowKey, field, value),
   totalAudited: () => impairTotal.value.audited,
@@ -607,20 +680,26 @@ async function writebackTrialBalance() {
   try {
     const costAudited = originalTotal.value.audited ?? 0
     const depAudited = depTotal.value.audited ?? 0
-    // 回写 1503 投资性房地产原值（借方审定数）
-    await http.put(`/api/projects/${props.projectId}/trial-balance/writeback`, {
-      account_code: '1503',
-      audited_amount: costAudited,
-    })
-    // 回写 1504 累计折旧（贷方备抵审定数，绝对值）
-    await http.put(`/api/projects/${props.projectId}/trial-balance/writeback`, {
-      account_code: '1504',
-      audited_amount: depAudited,
-    })
+    // 🔴 回写目标科目一律取 render 下发的语义定位结果（`h3AccountScope`），
+    //    改造前写死 1503/1504 —— 那是**可供出售金融资产(G6)** 与 **债权投资(G4)**，
+    //    历史上一直在往别的循环的试算表行写投资性房地产审定数（同 H8/H9 污染 K2 那次）。
+    if (grossCode.value) {
+      await http.put(`/api/projects/${props.projectId}/trial-balance/writeback`, {
+        account_code: grossCode.value,
+        audited_amount: costAudited,
+      })
+    }
+    // 累计折旧（贷方备抵审定数，绝对值）；本项目无该科目时不写（宁缺勿造）
+    if (accumDepCode.value) {
+      await http.put(`/api/projects/${props.projectId}/trial-balance/writeback`, {
+        account_code: accumDepCode.value,
+        audited_amount: depAudited,
+      })
+    }
     // 发布审定事件联动附注/公式管理/A13
     eventBus.emit('substantive:adjudicated', {
       wpCode: 'H3',
-      accountCode: '1503',
+      accountCode: grossCode.value,
       auditedAmount: costAudited - depAudited,
       adjudicatedAmount: costAudited - depAudited,
       timestamp: Date.now(),

@@ -200,7 +200,7 @@
         <li>借方合计必须等于贷方合计（借贷平衡），不平衡时红色警告</li>
         <li>本表仅列示与本报表项目相关的调整；项目组可按复杂程度选用</li>
         <li>保存后自动通过EventBus发布'adjustment:created'联动H9-1审定表</li>
-        <li>科目名称填写「租赁负债」(2205)或「未确认融资费用」等相关科目</li>
+        <li>科目名称填写「租赁负债」（{{ LEASE_LIAB_CODES }}，两套编码族并存）或「未确认融资费用」等相关科目</li>
         <li>H9为负债类贷方科目：增加记贷方，减少记借方</li>
       </ul>
     </details>
@@ -227,6 +227,10 @@ import { useH9ImportExport } from '../../composables/useH9ImportExport'
 import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
 import GtIndexChip from '../../GtIndexChip.vue'
+import { h9Scope } from '../../composables/hCycleAccountScope'
+
+/** 租赁负债科目码（scope 单一真源；历史文案写死 `2205` = 合同负债 D7 域） */
+const LEASE_LIAB_CODES = h9Scope.def.slotFallbacks.gross.join(' / ')
 
 const props = defineProps<{
   wpId: string
