@@ -70,6 +70,28 @@ class DelegationApplyRequest(DelegationPreviewRequest):
     request_id: str
 
 
+@router.get("/{pid}/procedure-delegations/member-loads")
+async def delegation_member_loads(
+    pid: UUID,
+    db: AsyncSession = Depends(get_db),
+    user=Depends(get_current_user),
+    _guard: DelegatorContext = Depends(require_project_delegator_pid),
+):
+    """成员负载批量视图（**只读**，供委派界面与底稿主编下拉展示）。
+
+    返回 ``{"loads": {staff_id: 非终态任务数}}``。口径与委派 preview 返回的
+    ``membership_load.active_task_count`` 完全一致（同一 service 方法族）。
+
+    未出现在 ``loads`` 里的成员 = 当前无非终态任务（负载 0）；请求失败时前端
+    应显示"负载未知"而非 0 —— 后者会误导为"这个人很空闲"。
+
+    纯 GET 读路径：不 flush、不 commit、不写任何表。
+    """
+    svc = ProcedureDelegationService(db)
+    loads = await svc.member_workloads(pid)
+    return {"loads": loads}
+
+
 @router.post("/{pid}/procedure-delegations/preview")
 async def delegation_preview(
     pid: UUID,

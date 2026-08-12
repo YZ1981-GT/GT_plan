@@ -34,6 +34,7 @@ from app.services.procedure_authorization import (
 )
 from app.services.procedure_service import ProcedureService
 from app.services.procedure_trim_scope import resolve_subject_data_availability
+from app.services.trim_decision_context import build_trim_decision_context
 
 router = APIRouter(prefix="/api/projects", tags=["procedures"])
 
@@ -84,6 +85,27 @@ async def get_procedure_data_availability(
     独立路径段 `procedure-scope`，避免被 `/procedures/{cycle}` 捕获。
     """
     return await resolve_subject_data_availability(db, project_id, year)
+
+
+@router.get("/{project_id}/procedure-scope/trim-decision-context")
+async def get_trim_decision_context(
+    project_id: UUID,
+    year: int = Query(..., description="审计年度"),
+    cycles: str | None = Query(None, description="逗号分隔的循环代号；缺省为全部科目余额驱动循环"),
+    db: AsyncSession = Depends(get_db),
+    user=Depends(require_project_access("readonly")),
+):
+    """裁剪三维判据上下文（风险 / 重要性 / 数据存在性）+ 完整性覆盖 + 底稿录入探测。
+
+    只读。任一维度取数失败 → 该维度置 null/空 + ``degradations`` 记一条，不抛异常也不
+    伪造默认值；``degradations`` 是前端摘要降级标注的**唯一来源**。
+
+    独立路径段 `procedure-scope`，避免被 `/procedures/{cycle}` 捕获。
+    ``cycles`` 用逗号分隔字符串而非 `list[str]` query（避免 FastAPI 多值 query 与既有
+    前端调用形态不一致）；服务层签名仍是 `list[str]`。
+    """
+    cycle_list = [c.strip() for c in (cycles or "").split(",") if c.strip()]
+    return await build_trim_decision_context(db, project_id, year, cycle_list)
 
 
 @router.get("/{project_id}/procedures/{cycle}")

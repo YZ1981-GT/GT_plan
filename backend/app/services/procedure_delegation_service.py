@@ -277,6 +277,42 @@ class ProcedureDelegationService:
             )
         ).scalar() or 0
 
+    async def member_workloads(self, project_id: UUID) -> dict[str, int]:
+        """本项目**全部**执行人的非终态任务数（成员负载批量视图）。
+
+        与 :meth:`_assignee_workload` **必须同口径** —— 四个过滤条件逐条一致
+        （project_id / 非软删 / workflow_status 不在终态 / assignee 非空）；
+        差别仅在单成员版用等值匹配 staff_id（故无需显式排除 NULL），
+        批量版按 assignee 分组（故须显式 ``isnot(None)`` 排除未分配任务）。
+        两者口径一致性由守卫钉死 —— 一侧改了过滤条件而另一侧未跟进即打红。
+
+        为什么需要批量版：委派 preview 只返回**被选中那一个** assignee 的
+        ``membership_load``，而底稿主编下拉需要展示所有候选人的负载。前端曾自行
+        按"底稿张数"聚合一份（口径与本方法的"非终态任务数"不同，且仅在打开
+        全项目概览后才有值）—— 那是双真源，已由本方法取代。
+
+        未出现在返回 dict 里的成员 = 该成员当前无非终态任务（负载 0），
+        与"负载未知"（请求失败）是两种状态，由调用方区分。
+        """
+        rows = (
+            await self.db.execute(
+                sa.select(
+                    ProcedureRowTask.assignee_staff_id,
+                    sa.func.count(),
+                )
+                .where(
+                    ProcedureRowTask.project_id == project_id,
+                    ProcedureRowTask.assignee_staff_id.isnot(None),
+                    ProcedureRowTask.is_deleted == sa.false(),
+                    ProcedureRowTask.workflow_status.notin_(
+                        list(TERMINAL_WORKFLOW_STATES)
+                    ),
+                )
+                .group_by(ProcedureRowTask.assignee_staff_id)
+            )
+        ).all()
+        return {str(r[0]): int(r[1] or 0) for r in rows}
+
     @staticmethod
     def _request_payload(
         canonical_selector: dict,

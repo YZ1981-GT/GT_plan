@@ -515,6 +515,22 @@ class ProcedureService:
     # （/api/my/procedure-row-tasks），把 ProcedureInstance.id 当 task_id 暴露会串线。
 
     def _to_dict(self, p: ProcedureInstance) -> dict:
+        # `suggestion_state`（V146）是 additive 新增键：裁剪建议态与理由码。
+        #
+        # 🔴 为什么必须下发：前端决策内核 `procedureTrimDecision.decideTrim` 的
+        #    「建议已被驳回 ⇒ 恒保留」（R6.4）判据读的就是它。不下发 ⇒ 该判据恒 false ⇒
+        #    审计师驳回过的建议每次打开裁剪页都被重新建议，驳回等于没驳回。
+        #
+        # 🔴 三态语义不得压扁：NULL = 从未参与智能裁剪（存量记录全为此态）；
+        #    `{"rejected": true, ...}` = 已驳回；`{"reason_code": ...}` = 有建议理由码。
+        #    故这里原样透传 `None` 而不套 `or {}` —— 补成空 dict 会让「从未参与」与
+        #    「参与过但无理由码」不可区分。
+        #
+        # 🔴 `is_mandatory` 有意**不**在此下发：`ProcedureInstance` 压根没有该列
+        #    （2026-08-09 实证 16 列全量；该字段只在 `WorkpaperProcedure` 上，是底稿内
+        #    程序行的另一张表）。凭空补该键 = 伪造一个数据库里不存在的判据。既有前端
+        #    `if (p.is_mandatory)` 因此一直是死判据，属已登记的既有限制，不在本次修复
+        #    范围内 —— 修它需要新增列或建立实例↔底稿程序行的映射，是独立议题。
         return {
             "id": str(p.id),
             "project_id": str(p.project_id),
@@ -529,4 +545,5 @@ class ProcedureService:
             "execution_status": p.execution_status,
             "wp_code": p.wp_code,
             "wp_id": str(p.wp_id) if p.wp_id else None,
+            "suggestion_state": p.suggestion_state,
         }

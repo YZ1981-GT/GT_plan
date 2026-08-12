@@ -30,12 +30,14 @@ Properties：P9（裁剪与 workflow 正交）、P10（方案 applied 真实）
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from uuid import UUID
 
 import sqlalchemy as sa
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.services.procedure_trim_engine import TrimReasonCode
 from app.models.procedure_models import (
     ProcedureInstance,
     ProcedureRowDefinition,
@@ -67,6 +69,27 @@ KIND_ROW = "row"
 
 _SCOPE_STATUSES = ("execute", "skip", "not_applicable")
 _ROW_APPLICABILITIES = (APPLICABILITY_EXECUTE, APPLICABILITY_NOT_APPLICABLE)
+
+# 粗裁结构化理由码的合法取值集合。
+#
+# 🔴 从 `TrimReasonCode` 枚举**派生**而不是另写一份字面量元组 —— 平台已因手写清单
+#    栽过（守卫的表名清单漏一张 ⇒ 断言以 KeyError 形式假失败）。枚举新增取值时
+#    本集合自动跟随；前端镜像由 `composables/trimReasonCodes.ts` 的交叉锁死守卫
+#    保证同步（一侧新增另一侧未跟进即打红）。
+_VALID_TRIM_REASON_CODES = frozenset(c.value for c in TrimReasonCode)
+
+# 完整性敏感清单项目级覆盖的 checklist_responses 键前缀（Task 14）。
+#
+# 🔴 从读取侧 import 而不是另写一份字面量：`trim_decision_context._load_completeness_override`
+#    按该前缀 LIKE 查询，两侧漂移会让「写进去的覆盖读不出来」，而两侧单测各用自己的
+#    前缀构造样本 ⇒ 都全绿，只有真实往返才暴露。
+#
+# 🔴 引公开别名 `COMPLETENESS_SCOPE_ITEM_PREFIX` 而不是私有名 `_CSCOPE_PREFIX`
+#    （读取侧模块文档明确要求）。本文件曾同时 import 两个名字（一个未被使用），
+#    那种"看着像双真源、实际同一对象"的写法会让守卫难以判断写入侧到底引的是哪个。
+from app.services.trim_decision_context import (  # noqa: E402
+    COMPLETENESS_SCOPE_ITEM_PREFIX as _CSCOPE_ITEM_PREFIX,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -203,6 +226,285 @@ class ProcedureTrimService:
         return row is not None
 
     # ======================================================================
+    # 完整性敏感清单项目级覆盖（Task 14：R5.5 / R5.6 / R5.7）
+    # ======================================================================
+
+    async def set_completeness_scope_override(
+        self,
+        project_id: UUID,
+        *,
+        cycle: str,
+        sensitive: bool,
+        actor_user_id: UUID,
+        reason: str,
+    ) -> dict:
+        """写一条完整性敏感清单的项目级覆盖（``B50-T3-cscope-{cycle}``）。
+
+        ## 为什么落 ``checklist_responses`` 而不是新建一张表
+
+        「本项目认为 L 循环的完整性风险不高」本质是一条**风险评估判断**，不是一次
+        裁剪操作：它与 B50 同生命周期（B50 审批锁定后应自动只读）、天然有
+        ``updated_by`` / ``updated_at`` 留痕、且零迁移成本。放进
+        ``procedure_trim_schemes.trim_data`` 反而语义错位 —— 那里是**带日期的历史
+        方案快照**，键空间是 procedure_instance UUID，把「当前生效的项目级口径」
+        塞进历史快照里，下次存快照就会把它复制一份或覆盖掉。
+
+        ## 三条约束
+
+        1. **`Y`/`N` 都是「已表态」**，只有「该循环没有行」才算未覆盖。故本方法
+           **不提供**「写空串取消表态」的语义 —— 取消表态用 :meth:`clear_completeness_scope_override`
+           删行，避免出现「有行但 conclusion 为空」这种下游读取端要额外兜底的脏态。
+        2. **理由必填**（R5.5）。覆盖平台默认清单是一项需要向质控与项目质量控制
+           复核人解释的判断，没有理由的覆盖在复核时无法评价其适当性；故空理由直接
+           拒绝而不是存一个空串。
+        3. **只写这一个 item_id**，绝不触碰 B50 的矩阵 / cycle / plan 三类键。
+           守卫另有一条断言「cscope 行不改变 ``load_b50_accounts()`` 的任何输出」
+           （R5.5 的零污染要求）。
+
+        Returns: ``{"cycle": ..., "sensitive": bool, "created": bool, "updated": bool}``
+        """
+        normalized = str(cycle or "").strip().upper()
+        if not normalized:
+            raise HTTPException(status_code=400, detail="cycle 不能为空")
+        text_reason = str(reason or "").strip()
+        if not text_reason:
+            raise HTTPException(
+                status_code=400,
+                detail="覆盖平台默认完整性敏感清单必须填写理由（供质控与复核评价其适当性）",
+            )
+
+        b50_wp = await self._require_b50_wp_id(project_id)
+        item_id = f"{_CSCOPE_ITEM_PREFIX}{normalized}"
+        conclusion = "Y" if sensitive else "N"
+        now = datetime.now(timezone.utc)
+
+        # 🔴 UUID 与 timestamptz 两类参数的正确写法**方向相反**，别按一个套路推另一个
+        #    （2026-08-12 浏览器实测踩到：PUT 恒 500，而 112 例守卫全绿）：
+        #
+        #    - **UUID**：`CAST(:x AS uuid)` + 传 `str(uuid)`。不 CAST 则 asyncpg 按 VARCHAR
+        #      编码 → `operator does not exist: uuid = character varying`。
+        #    - **timestamptz**：`CAST(:ts AS timestamptz)` + 传 **datetime 对象**。
+        #      一旦写了 CAST，asyncpg 就把该参数的推断类型定为 timestamptz，于是它要求
+        #      Python `datetime`；此时传 `isoformat()` 字符串会 `DataError: expected a
+        #      datetime.date or datetime.datetime instance, got 'str'`。
+        #      ⇒ 「CAST 了就该传字符串」这个直觉对 UUID 成立、对时间戳恰好相反。
+        #
+        #    这类错误**只有真实 asyncpg 编码路径才暴露**：替身/sqlite 单测不做参数编码，
+        #    源码级守卫只看到「CAST 写了、参数传了」⇒ 全绿。故本处配了一条连库写入守卫
+        #    （`test_completeness_scope_override.py::TestRealDbWriteRoundTrip`），它真写真读真删。
+        existing = (
+            await self.db.execute(
+                sa.text(
+                    "SELECT id, conclusion FROM checklist_responses "
+                    "WHERE wp_id = CAST(:wp AS uuid) AND item_id = :item"
+                ),
+                {"wp": str(b50_wp), "item": item_id},
+            )
+        ).first()
+
+        if existing is None:
+            await self.db.execute(
+                sa.text(
+                    "INSERT INTO checklist_responses "
+                    "(project_id, wp_id, item_id, conclusion, remark, updated_by, "
+                    " created_at, updated_at) "
+                    "VALUES (CAST(:pid AS uuid), CAST(:wp AS uuid), :item, :conclusion, "
+                    "        :remark, CAST(:actor AS uuid), "
+                    "        CAST(:ts AS timestamptz), CAST(:ts AS timestamptz))"
+                ),
+                {
+                    "pid": str(project_id),
+                    "wp": str(b50_wp),
+                    "item": item_id,
+                    "conclusion": conclusion,
+                    "remark": text_reason,
+                    "actor": str(actor_user_id),
+                    # datetime 对象，不是 isoformat() 字符串（见上方注释）
+                    "ts": now,
+                },
+            )
+            await self.db.flush()
+            return {
+                "cycle": normalized, "sensitive": sensitive,
+                "created": True, "updated": False,
+            }
+
+        await self.db.execute(
+            sa.text(
+                "UPDATE checklist_responses SET conclusion = :conclusion, "
+                "remark = :remark, updated_by = CAST(:actor AS uuid), "
+                "updated_at = CAST(:ts AS timestamptz) "
+                "WHERE id = CAST(:rid AS uuid)"
+            ),
+            {
+                "conclusion": conclusion,
+                "remark": text_reason,
+                "actor": str(actor_user_id),
+                # datetime 对象，不是 isoformat() 字符串（见上方注释）
+                "ts": now,
+                "rid": str(existing.id),
+            },
+        )
+        await self.db.flush()
+        return {
+            "cycle": normalized, "sensitive": sensitive,
+            "created": False, "updated": True,
+        }
+
+    async def clear_completeness_scope_override(
+        self, project_id: UUID, *, cycle: str,
+    ) -> dict:
+        """撤销某循环的项目级覆盖 → 该循环退回平台默认清单。
+
+        删行而不是写空串：读取侧（``trim_decision_context._load_completeness_override``）
+        以「该循环是否出现在 dict 里」区分「已表态」与「未覆盖」，留一行空 conclusion
+        会让两态都表现为「未覆盖」但多一条无意义记录，且下次读取端若放宽判据就会
+        把它误读成表态。
+        """
+        normalized = str(cycle or "").strip().upper()
+        if not normalized:
+            raise HTTPException(status_code=400, detail="cycle 不能为空")
+        b50_wp = await self._require_b50_wp_id(project_id)
+        res = await self.db.execute(
+            sa.text(
+                "DELETE FROM checklist_responses "
+                "WHERE wp_id = CAST(:wp AS uuid) AND item_id = :item"
+            ),
+            {"wp": str(b50_wp), "item": f"{_CSCOPE_ITEM_PREFIX}{normalized}"},
+        )
+        await self.db.flush()
+        return {"cycle": normalized, "deleted": int(res.rowcount or 0)}
+
+    async def list_completeness_scope_overrides(self, project_id: UUID) -> dict:
+        """读回本项目的全部覆盖（含理由与留痕），供覆盖面板回显。
+
+        与 ``trim_decision_context._load_completeness_override`` 的区别：那个只给
+        决策内核用（仅需 ``{cycle: bool}``），这个要给 UI 展示理由与最后修改人。
+        两者读同一批行、同一判据（``Y``/``N`` 之外视为未覆盖），故不构成双真源。
+        """
+        b50_wp = await self._find_b50_wp_id(project_id)
+        if not b50_wp:
+            return {"overrides": []}
+        rows = (
+            await self.db.execute(
+                sa.text(
+                    "SELECT cr.item_id, cr.conclusion, cr.remark, cr.updated_at, "
+                    "       u.username AS updated_by_name "
+                    "FROM checklist_responses cr "
+                    "LEFT JOIN users u ON u.id = cr.updated_by "
+                    "WHERE cr.wp_id = CAST(:wp AS uuid) AND cr.item_id LIKE :pattern "
+                    "ORDER BY cr.item_id"
+                ),
+                {"wp": str(b50_wp), "pattern": f"{_CSCOPE_ITEM_PREFIX}%"},
+            )
+        ).fetchall()
+
+        out: list[dict] = []
+        for r in rows:
+            cycle = (r.item_id or "").removeprefix(_CSCOPE_ITEM_PREFIX)
+            if not cycle or cycle == (r.item_id or ""):
+                continue
+            val = (r.conclusion or "").strip().upper()
+            if val not in ("Y", "N"):
+                continue  # 与读取侧同判据：其它取值视为未覆盖
+            out.append({
+                "cycle": cycle,
+                "sensitive": val == "Y",
+                "reason": r.remark or "",
+                "updated_at": r.updated_at.isoformat() if r.updated_at else None,
+                "updated_by_name": r.updated_by_name,
+            })
+        return {"overrides": out}
+
+    async def _find_b50_wp_id(self, project_id: UUID) -> UUID | None:
+        """定位本项目 B50 底稿；复用 ``b50_risk_reader`` 的同一 JOIN，不另写一份。"""
+        from app.services.b50_risk_reader import _find_b50_wp_id as _find
+
+        return await _find(self.db, project_id)
+
+    async def _require_b50_wp_id(self, project_id: UUID) -> UUID:
+        """写入前定位 B50 底稿；未建则 409 并给出可操作的下一步。"""
+        wp = await self._find_b50_wp_id(project_id)
+        if not wp:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "本项目尚未创建 B50 风险评估底稿，无法保存完整性敏感清单覆盖。"
+                    "请先在底稿列表中创建 B50 后重试。"
+                ),
+            )
+        return wp
+
+    # ======================================================================
+    # 建议态驳回（Task 13：R6.4 驳回后不再重复建议）
+    # ======================================================================
+
+    async def reject_suggestions(
+        self,
+        project_id: UUID,
+        *,
+        cycle: str,
+        wp_index_codes: list[str],
+        actor_user_id: UUID,
+        reason: str | None = None,
+    ) -> dict:
+        """把一批程序的裁剪建议标记为「已驳回」（不改适用性状态）。
+
+        驳回是**纯标记**动作：程序仍保持 execute，只是决策内核下次不再对它出建议
+        （`procedureTrimDecision` 档 2 的 `suggestionRejected` 判据）。故它**不走**
+        canonical trim preview/apply —— 那条链路是改适用性状态的，用它来驳回会把
+        「我不同意裁这个」变成「把这个裁掉」，语义正好相反。
+
+        🔴 JSONB 写入必须**深拷贝构造新 dict 整体赋值**：未声明 `MutableDict` 的
+        JSONB 列，就地改嵌套对象不标脏；而「就地改完再整体重赋值」同样不发 UPDATE ——
+        因为 `body` 就是 ORM 持有的那个 dict、嵌套已被就地改过 ⇒ 新旧值 `==` 相等 ⇒
+        工作单元判「无净变更」。判据必须是 DB 列真值，不是 ORM 对象。
+
+        Returns: ``{"rejected": n, "unchanged": m, "not_found": [...]}``
+        """
+        codes = [str(c).strip() for c in (wp_index_codes or []) if str(c or "").strip()]
+        if not codes:
+            return {"rejected": 0, "unchanged": 0, "not_found": []}
+
+        rows = (
+            await self.db.execute(
+                sa.select(ProcedureInstance).where(
+                    ProcedureInstance.project_id == project_id,
+                    ProcedureInstance.audit_cycle == str(cycle).strip(),
+                    ProcedureInstance.wp_code.in_(codes),
+                    ProcedureInstance.is_deleted == sa.false(),
+                )
+            )
+        ).scalars().all()
+
+        found = {inst.wp_code for inst in rows}
+        rejected = 0
+        unchanged = 0
+        now = datetime.now(timezone.utc)
+        for inst in rows:
+            prev = inst.suggestion_state if isinstance(inst.suggestion_state, dict) else {}
+            if prev.get("rejected") is True:
+                unchanged += 1
+                continue
+            # 深拷贝构造新结构（见上方 JSONB 铁律）；保留既有 reason_code / evidence
+            # 作为「被驳回的那条建议是什么」的留痕 —— 复核视图要能看出驳回了什么。
+            inst.suggestion_state = {
+                **{k: v for k, v in prev.items()},
+                "rejected": True,
+                "rejected_by": str(actor_user_id),
+                "rejected_at": now.isoformat(),
+                "rejected_reason": (str(reason).strip() or None) if reason else None,
+            }
+            rejected += 1
+
+        await self.db.flush()
+        return {
+            "rejected": rejected,
+            "unchanged": unchanged,
+            "not_found": sorted(c for c in codes if c not in found),
+        }
+
+    # ======================================================================
     # 方案解析（纯读；供 preview 与 apply 复用）
     # ======================================================================
 
@@ -222,7 +524,18 @@ class ProcedureTrimService:
             # execute 恒为 None，保证 canonical payload 稳定（preview/apply hash 必须一致）。
             raw_reason = entry.get("skip_reason")
             skip_reason = str(raw_reason).strip() if raw_reason is not None else ""
-            return {
+            # 结构化理由码（Task 12，additive）。与 skip_reason 同口径处理：
+            # execute 恒 None，保证 canonical payload 稳定（preview/apply hash 必须一致）。
+            #
+            # 🔴 必须参与本归一函数：preview 与 apply 各自把请求体过一遍 _canonical_entries
+            # 后比对 payload hash 防篡改，若 reason_code 只在 apply 侧读取而不进 canonical
+            # 形式，两侧 payload 不一致会直接 409。
+            #
+            # 🔴 未提供时**不写入该键**（不是写 None）—— 写 None 会改变 canonical payload
+            # 的字节形态，让存量调用方的 preview/apply 与基线不一致（R8.9 零回归）。
+            raw_code = entry.get("reason_code")
+            reason_code = str(raw_code).strip() if raw_code is not None else ""
+            normalized: dict = {
                 "kind": KIND_SCOPE,
                 "key": build_scope_key(cycle, wp_index_code),
                 "cycle": cycle,
@@ -232,6 +545,14 @@ class ProcedureTrimService:
                     skip_reason or None
                 ) if target_status in ("skip", "not_applicable") else None,
             }
+            if reason_code and target_status in ("skip", "not_applicable"):
+                if reason_code not in _VALID_TRIM_REASON_CODES:
+                    raise HTTPException(
+                        status_code=422,
+                        detail=f"非法 reason_code: {reason_code}",
+                    )
+                normalized["reason_code"] = reason_code
+            return normalized
         if kind == KIND_ROW:
             template_code = str(entry.get("template_code", "")).strip()
             sheet_key = str(entry.get("sheet_key", "")).strip()
@@ -438,6 +759,30 @@ class ProcedureTrimService:
             )
         ).all()
         return sorted([[str(r[0]), (r[1] or "").strip().lower()] for r in rows])
+
+    @staticmethod
+    def _write_suggestion_reason_code(inst, reason_code: str | None) -> None:
+        """把结构化理由码写进 ``suggestion_state.reason_code``（就地修改，调用方负责 flush）。
+
+        与 ``skip_reason`` **同一事务**写入（R8.8）：理由码与适用性状态必须一次落库，
+        禁「先 apply 状态再补写理由码」的两次写入 —— 那会产生「状态已改、理由码未写」
+        的中间态，且一次性 preview 凭证不覆盖第二次写入。
+
+        🔴 不传 ``reason_code`` 时**完全不碰** ``suggestion_state``（连读都不读）：
+        这是本扩展 additive 零回归的结构性保证 —— 存量调用方不传该字段，
+        写入行为与扩展前逐字节相同。
+
+        🔴 JSONB 列必须**深拷贝构造新 dict** 再整体赋值。就地改嵌套 dict 不标脏
+        （未声明 ``MutableDict``），而「就地改完再整体重赋值」因新旧值 ``==`` 相等
+        同样不发 UPDATE（平台已在 `ReportBodyAdapter` 上踩过一次）。
+
+        `rejected` 等既有键原样保留：确认建议时只覆盖 `reason_code` 与 `evidence`，
+        不得清掉驳回留痕。
+        """
+        if reason_code is None:
+            return
+        existing = inst.suggestion_state if isinstance(inst.suggestion_state, dict) else {}
+        inst.suggestion_state = {**existing, "reason_code": reason_code}
 
     @staticmethod
     def _request_payload(canonical_entries: list[dict]) -> dict:
@@ -670,6 +1015,14 @@ class ProcedureTrimService:
                 target_status = sp["target_status"]
                 entry_applied = 0
                 entry_unchanged = 0
+                # 结构化理由码（Task 12）：与 `skip_reason` **并列写在同一事务**。
+                #
+                # 🔴 禁「先 apply 状态再补写理由码」的两次写入 —— 那会产生「状态已改、
+                #    理由码未写」的中间态，且一次性 preview 凭证不覆盖第二次写入，
+                #    第二次请求既无凭证也无幂等键。
+                # 🔴 未携带 `reason_code` 时**不触碰** `suggestion_state`（保持 NULL 或
+                #    既有值），使存量调用方的写入行为逐字节不变（R8.9 additive 零回归）。
+                entry_reason_code = sp["entry"].get("reason_code")
                 for inst in sp["instances"]:
                     changed = await self.transition.set_scope_status(
                         inst,
@@ -678,6 +1031,8 @@ class ProcedureTrimService:
                         # 用户填写的裁剪理由（审计轨迹），不写内部动作码
                         reason=sp["entry"].get("skip_reason"),
                     )
+                    if entry_reason_code:
+                        self._write_suggestion_reason_code(inst, entry_reason_code)
                     if changed:
                         entry_applied += 1
                     else:

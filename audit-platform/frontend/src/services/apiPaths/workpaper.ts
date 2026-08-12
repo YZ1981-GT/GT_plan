@@ -185,6 +185,15 @@ export const procedures = {
   applyScheme: (pid: string, cycle: string) => `/api/projects/${pid}/procedures/${cycle}/apply-scheme`,
   /** @deprecated 已下线（410）→ 改用 workpaperLeads */
   assign: (pid: string) => `/api/projects/${pid}/procedures/assign`,
+  /**
+   * 裁剪三维判据上下文（只读，Task 9）：风险 / 重要性 / 数据存在性 + 完整性覆盖 + 底稿录入探测。
+   *
+   * 独立路径段 `procedure-scope`，避免被 `/procedures/{cycle}` 捕获。
+   * 任一维度取数失败 → 该维度置 null/空 + `degradations` 记一条；`degradations` 是
+   * 前端摘要降级标注的**唯一来源**（前端不再自行判断某维度是不是空的）。
+   */
+  trimDecisionContext: (pid: string) =>
+    `/api/projects/${pid}/procedure-scope/trim-decision-context`,
 } as const
 
 // ─── 底稿主编（procedure-mainline-convergence 需求 5）────────────────────────
@@ -211,6 +220,38 @@ export const procedureRowTasks = {
   trimSaveScheme: (pid: string) => `/api/projects/${pid}/procedure-trim/schemes`,
   trimRowNotApplicable: (pid: string, taskId: string) => `/api/projects/${pid}/procedure-trim/rows/${taskId}/not-applicable`,
   trimRowRestore: (pid: string, taskId: string) => `/api/projects/${pid}/procedure-trim/rows/${taskId}/restore`,
+  /**
+   * 驳回裁剪建议（procedure-trimming-and-delegation-intelligence Task 13）。
+   *
+   * 只写 `procedure_instances.suggestion_state.rejected`，**不动 status/skip_reason** ——
+   * 驳回的语义是「不接受这个建议」，程序仍按原状保留，故不走 canonical trim。
+   */
+  trimRejectSuggestions: (pid: string) => `/api/projects/${pid}/procedure-trim/suggestions/reject`,
+  /**
+   * 完整性敏感清单的项目级覆盖（procedure-trimming-and-delegation-intelligence Task 14 / R5.5~R5.7）。
+   *
+   * 同一路径三个方法：`GET` 读回全部覆盖（含理由与最后修改留痕）、`PUT` 写一条
+   * （`Y`/`N` 都算已表态，理由必填）、`DELETE {cycle}` 撤销该循环的覆盖使其退回平台默认。
+   *
+   * 🔴 撤销是 **DELETE 删行**而不是 `PUT` 写空 —— 读取侧以「该循环是否出现在返回里」
+   * 区分「已表态」与「未覆盖」，写空串会让两态都表现为未覆盖却多一条脏记录。
+   */
+  trimCompletenessScope: (pid: string) => `/api/projects/${pid}/procedure-trim/completeness-scope`,
+  trimCompletenessScopeItem: (pid: string, cycle: string) =>
+    `/api/projects/${pid}/procedure-trim/completeness-scope/${encodeURIComponent(cycle)}`,
+  /**
+   * 附注反向联动（Task 21 / R13.1~R13.3）：程序整体裁剪 → 附注章节标「本期不适用」。
+   *
+   * `GET` 只读预览（要 `?year=`），`POST .../apply` 落库。
+   *
+   * 🔴 后端**只写** `disclosure_notes.is_empty`（附注侧既有的唯一不适用真源）+ 一条
+   * `template_lineage` provenance 面包屑。不新建不适用字段、不删章节、不动
+   * `table_data` —— 另建一套会让附注树标记与 Word 导出结果漂移。
+   * 🔴 apply 请求体**只有 year**：标注哪些章节由后端按当下裁剪状态派生，不由前端
+   * 传清单（传清单会与并发会话改过的裁剪状态脱节，把已恢复执行的循环标成不适用）。
+   */
+  trimNoteLinkage: (pid: string) => `/api/projects/${pid}/procedure-trim/note-linkage`,
+  trimNoteLinkageApply: (pid: string) => `/api/projects/${pid}/procedure-trim/note-linkage/apply`,
   // 三粒度委派 preview-apply（Task 8，materialize 前置 + 一次性 preview 凭证）
   delegationPreview: (pid: string) => `/api/projects/${pid}/procedure-delegations/preview`,
   delegationApply: (pid: string) => `/api/projects/${pid}/procedure-delegations/apply`,

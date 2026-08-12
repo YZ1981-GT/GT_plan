@@ -48,6 +48,17 @@ class ProcedureInstance(Base, SoftDeleteMixin, TimestampMixin):
     execution_status: Mapped[str] = mapped_column(String(20), default="not_started")
     wp_code: Mapped[str | None] = mapped_column(String(50), nullable=True)
     wp_id: Mapped[uuid.UUID | None] = mapped_column(nullable=True)
+    # V146（procedure-trimming-and-delegation-intelligence Task 11）：裁剪建议态与理由码。
+    #
+    # 结构：{reason_code, rejected, rejected_by, rejected_at, evidence}
+    #   reason_code —— 与 `skip_reason` 并列写在同一事务（R8.8：理由码与状态同一次落库）
+    #   rejected    —— 审计师驳回系统建议；驳回后不再被重新建议（R6.4）
+    #   evidence    —— 本次判定实际用到的判据数值与来源（R3.10 复核追溯）
+    #
+    # 🔴 为什么不落 `procedure_trim_schemes.trim_data`：后者实测是**带日期的多份历史
+    #    方案快照**（`裁剪方案-D-20260706` 等），键空间是 procedure_instance UUID；
+    #    把「当前建议态」塞进历史快照语义错位。建议态跟着**程序实例**走。
+    suggestion_state: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
     __table_args__ = (
         Index("idx_proc_project_cycle", "project_id", "audit_cycle",

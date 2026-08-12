@@ -19,6 +19,7 @@ import {
   sampling as P_samp, processRecord as P_pr, wpAI as P_wpai,
   projects as P_projects, jobs as P_jobs,
   aiPlugins as P_aip, gtCoding as P_gtc,
+  riskAssessments as P_risk,
 } from '@/services/apiPaths'
 
 // ── 项目 ──
@@ -231,21 +232,67 @@ export async function applyProcedureTrim(
 
 // ── canonical 粗裁（ProcedureTrimming.vue 主链入口）────────────────────────────
 // 与 previewProcedureTrim/applyProcedureTrim 走同一端点，但签名更贴合粗裁页调用方。
-// entries 里每条包含 kind/cycle/wp_index_code/target_status/skip_reason。
+// entries 里每条包含 kind/cycle/wp_index_code/target_status/skip_reason/reason_code。
+//
+// 🔴 `reason_code` 是 additive 可选字段（procedure-trimming-and-delegation-intelligence
+//    Task 12）。它必须与 `target_status` **同一次请求**提交 —— 不得「先 apply 状态
+//    再补写理由码」：一次性 preview 凭证不覆盖第二次写入，且会产生「状态已改、
+//    理由码未写」的中间态。
+//
+// 🔴 不传该字段时请求体与扩展前**逐字节相同**（后端归一函数条件性写入该键），
+//    故存量调用方零影响。传了则后端同事务写 `procedure_instances.suggestion_state.reason_code`。
+
+/** canonical 粗裁 scope entry（`reason_code` 为 additive 可选字段）。 */
+export interface CanonicalTrimScopeEntry {
+  kind: string
+  cycle: string
+  wp_index_code: string
+  target_status: string
+  skip_reason?: string | null
+  /** 结构化裁剪理由码（取值域见 composables/trimReasonCodes.ts，与后端 TrimReasonCode 交叉锁死）。 */
+  reason_code?: string | null
+}
 
 /** 粗裁 canonical preview：构造 scope entries → 创建一次性 preview 凭证。 */
 export async function canonicalTrimPreview(
   projectId: string,
-  entries: Array<{ kind: string; cycle: string; wp_index_code: string; target_status: string; skip_reason?: string | null }>,
+  entries: CanonicalTrimScopeEntry[],
 ): Promise<any> {
   const { data } = await http.post(P_prt.trimPreview(projectId), { entries })
   return data?.data ?? data
 }
 
+/**
+ * 驳回裁剪建议：写 `suggestion_state.rejected`，**不改 status/skip_reason**。
+ *
+ * 🔴 与「确认裁剪」走的是两条不同路径，不可混用：
+ * - 确认 → canonical trim preview/apply（改适用性状态 + 写理由码）
+ * - 驳回 → 本端点（只标记「不接受建议」，程序仍保留在原状态）
+ *
+ * 驳回后决策内核恒判 `keep`（`procedureTrimDecision` 档 2），不再重复提示（R6.4）。
+ */
+export async function rejectTrimSuggestions(
+  projectId: string,
+  cycle: string,
+  wpIndexCodes: string[],
+  reason?: string | null,
+): Promise<{ rejected: number; not_found: string[] }> {
+  const { data } = await http.post(P_prt.trimRejectSuggestions(projectId), {
+    cycle,
+    wp_index_codes: wpIndexCodes,
+    reason: reason ?? null,
+  })
+  const p = data?.data ?? data
+  return {
+    rejected: Number(p?.rejected ?? 0),
+    not_found: Array.isArray(p?.not_found) ? p.not_found : [],
+  }
+}
+
 /** 粗裁 canonical apply：消费 preview + request_id 幂等。 */
 export async function canonicalTrimApply(
   projectId: string,
-  entries: Array<{ kind: string; cycle: string; wp_index_code: string; target_status: string; skip_reason?: string | null }>,
+  entries: CanonicalTrimScopeEntry[],
   previewId: string,
   requestId: string,
 ): Promise<any> {
@@ -291,6 +338,311 @@ export async function applyProcedureDelegation(
     ...body, preview_id: previewId, request_id: requestId,
   })
   return data?.data ?? data
+}
+
+/**
+ * 成员负载批量视图（只读）。
+ *
+ * 口径 = 各执行人当前**非终态任务数**，与委派 preview 返回的
+ * `membership_load.active_task_count` 同源（后端同一 service 方法族）。
+ *
+ * 🔴 前端**不得**再自行按"底稿张数"聚合一份负载 —— 那是双真源且口径不同
+ * （历史实现还依赖先打开全项目概览才有值）。
+ *
+ * 未出现在返回 `loads` 里的成员 = 当前无非终态任务（负载 0）；
+ * 请求失败时调用方须显示"负载未知"而非 0（0 会误导为"这个人很空闲"）。
+ */
+export async function fetchDelegationMemberLoads(
+  projectId: string,
+): Promise<Record<string, number>> {
+  const { data } = await http.get(P_prt.delegationMemberLoads(projectId))
+  const payload = data?.data ?? data
+  const loads = payload?.loads
+  return loads && typeof loads === 'object' ? loads as Record<string, number> : {}
+}
+
+/**
+ * B50 认定层次风险行（只读）。
+ *
+ * 复用**既有**端点 `GET /api/b60/b50-risk-rows`（本为 B60 六/七章一键带入而建），
+ * 它直接返回 `load_b50_accounts()` 输出 ⇒ 裁剪页取 B50 完成度**零后端改动**。
+ *
+ * 🔴 不要为此新建 `/api/b50/risk-rows` 之类的第二个端点 —— 那会让「B50 认定层次
+ * 数据」出现两个读取口径，两侧下次各自演进即漂移。
+ *
+ * B50 未编制 / 查询失败时后端返回空列表（不报错），故调用方拿到 `[]` 时**不能**
+ * 断定「B50 未填」—— 只能断定「读不到数据」；两者在裁剪页都显示为「未开始」，
+ * 但请求本身失败要另标「状态未知」。
+ */
+export async function fetchB50RiskRows(projectId: string): Promise<{
+  fs_risks: any[]
+  assertion_risks: any[]
+  accounts: any[]
+}> {
+  const { data } = await http.get(P_risk.b50RiskRows(), { params: { project_id: projectId } })
+  const payload = data?.data ?? data
+  return {
+    fs_risks: Array.isArray(payload?.fs_risks) ? payload.fs_risks : [],
+    assertion_risks: Array.isArray(payload?.assertion_risks) ? payload.assertion_risks : [],
+    accounts: Array.isArray(payload?.accounts) ? payload.accounts : [],
+  }
+}
+
+// ── 裁剪三维判据上下文（Task 9，只读） ──
+
+/** 降级标注：`cause` 是 accounts 维度**专属**可选字段（其余维度只有 dimension+reason）。 */
+export interface TrimDecisionDegradation {
+  dimension: 'accounts' | 'materiality' | 'risk' | 'completeness_override' | 'workpaper_entry'
+  reason: string
+  /** 仅 accounts 维度出现：query_failed / not_imported / no_material_accounts */
+  cause?: 'query_failed' | 'not_imported' | 'no_material_accounts'
+}
+
+export interface TrimDecisionContext {
+  /** {科目名: {amount, cycle}}；空 dict ⇒ 数据存在性判据不可用 ⇒ 不得裁剪 */
+  accounts: Record<string, { amount: number; cycle: string }>
+  /**
+   * 两键齐全或整体 null，**不会半开**。
+   * 🔴 后端刻意不下发 `overall_materiality` —— 前端也不得自行按比例推算实际执行重要性
+   * （那是会计判断，Requirement 4.6）。
+   */
+  materiality: { performance_materiality: number; trivial_threshold: number } | null
+  /** {科目名: B50 科目项（cells / max_risk / has_special / balance / category / is_estimate…）} */
+  risk: Record<string, any>
+  /** 「至少一个认定有 rmm」即为 true（不是「六认定全填」，两个口径有意不统一） */
+  risk_dimension_available: boolean
+  /** {cycle: bool}；键不存在 ⇒ 该循环未覆盖，退回平台默认清单。null ⇒ 读取失败 */
+  completeness_override: Record<string, boolean> | null
+  /** {wp_code: bool}；空 dict 必伴随一条 workpaper_entry degradation */
+  workpaper_entry: Record<string, boolean>
+  /** 🔴 前端摘要降级标注的**唯一来源** —— 不要自行判断「某维度是不是空的」 */
+  degradations: TrimDecisionDegradation[]
+}
+
+/**
+ * 裁剪三维判据上下文（只读）：风险评估 / 重要性 / 数据存在性 + 完整性豁免覆盖 + 底稿录入探测。
+ *
+ * 供前端决策内核 `procedureTrimDecision.ts` 消费。后端 fail-soft：任一维度取数失败 →
+ * 该维度置 null/空 + `degradations` 记一条，**不抛异常也不伪造默认值**。
+ *
+ * 🔴 本函数**不吞**请求级错误（网络/权限/500）：整体拿不到判据时必须让调用方 catch 并
+ * 显示「判据不可用，已阻断裁剪」。若在此吞成空上下文，前端决策内核会看到 `accounts={}`
+ * 且 `degradations=[]` ⇒ 与「后端说没有任何降级」不可区分，可能被误判为"可以裁"。
+ *
+ * @param cycles 循环代号数组；空数组 = 全部科目余额驱动循环（不过滤）
+ */
+export async function fetchTrimDecisionContext(
+  projectId: string,
+  year: number,
+  cycles: string[] = [],
+): Promise<TrimDecisionContext> {
+  const params: Record<string, any> = { year }
+  const list = (cycles || []).map(c => String(c).trim()).filter(Boolean)
+  if (list.length) params.cycles = list.join(',')
+  const { data } = await http.get(P_proc.trimDecisionContext(projectId), { params })
+  const p = data?.data ?? data
+  const asObj = (v: any) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {})
+  return {
+    accounts: asObj(p?.accounts),
+    // null 与 {} 语义不同（缺失 vs 齐全），故不套 asObj 兜底
+    materiality: p?.materiality ?? null,
+    risk: asObj(p?.risk),
+    risk_dimension_available: p?.risk_dimension_available === true,
+    completeness_override: p?.completeness_override ?? null,
+    workpaper_entry: asObj(p?.workpaper_entry),
+    degradations: Array.isArray(p?.degradations) ? p.degradations : [],
+  }
+}
+
+// ── 完整性敏感清单的项目级覆盖（Task 14，R5.5 / R5.6 / R5.7） ──
+
+/**
+ * 一条项目级覆盖（落 `checklist_responses` 的 `B50-T3-cscope-{cycle}`）。
+ *
+ * 🔴 承载表**只保留当前值** —— `updated_by_name` / `updated_at` 是**最后一次**修改的
+ * 留痕，不是变更历史。需要完整历史属另一议题（R5.5 明确只要求最后一次的 who/when/why）。
+ */
+export interface CompletenessScopeOverride {
+  /** 循环代号（大写单字母，如 `L`） */
+  cycle: string
+  /** true = 本项目确认该循环属完整性敏感（豁免金额判据）；false = 确认不属 */
+  sensitive: boolean
+  /** 覆盖理由（写入时必填，供质控与项目质量控制复核人评价其适当性） */
+  reason: string
+  /** 最后一次修改时间（ISO 字符串）；null = 后端未记录 */
+  updated_at: string | null
+  /** 最后一次修改人用户名；null = 关联用户已删或未记录 */
+  updated_by_name: string | null
+}
+
+/**
+ * 读回本项目全部完整性敏感清单覆盖（含理由与留痕）。
+ *
+ * 🔴 **未出现在返回里的循环 = 未覆盖**（前端据此退回平台默认清单
+ * `completenessExemption.COMPLETENESS_CYCLE_RULES` 并标注「使用平台默认，未经本项目确认」）。
+ * 故本函数**不吞**请求级错误：吞成空数组会让「读不到」与「一条都没覆盖过」不可区分，
+ * 从而把技术故障显示成「全部使用平台默认」这一实质结论。
+ */
+export async function fetchCompletenessScopeOverrides(
+  projectId: string,
+): Promise<CompletenessScopeOverride[]> {
+  const { data } = await http.get(P_prt.trimCompletenessScope(projectId))
+  const payload = data?.data ?? data
+  const list = Array.isArray(payload?.overrides) ? payload.overrides : []
+  return list.map((o: any) => ({
+    cycle: String(o?.cycle ?? '').toUpperCase(),
+    sensitive: o?.sensitive === true,
+    reason: String(o?.reason ?? ''),
+    updated_at: o?.updated_at ?? null,
+    updated_by_name: o?.updated_by_name ?? null,
+  })).filter((o: CompletenessScopeOverride) => o.cycle !== '')
+}
+
+/**
+ * 写一条项目级覆盖（`sensitive` 为 `true`/`false` **都算已表态**）。
+ *
+ * 🔴 `reason` 必填且后端按空白串拒绝（400）—— 覆盖平台默认清单是一项要向质控解释的
+ * 职业判断，无理由的覆盖在复核时无法评价其适当性。调用方须在发请求前自行校验并给出
+ * 可操作提示，不要靠 400 兜底（那会把可预期的校验显示成"保存失败"）。
+ */
+export async function saveCompletenessScopeOverride(
+  projectId: string,
+  cycle: string,
+  sensitive: boolean,
+  reason: string,
+): Promise<{ cycle: string; sensitive: boolean; created: boolean; updated: boolean }> {
+  const { data } = await http.put(P_prt.trimCompletenessScope(projectId), {
+    cycle, sensitive, reason,
+  })
+  const p = data?.data ?? data
+  return {
+    cycle: String(p?.cycle ?? cycle).toUpperCase(),
+    sensitive: p?.sensitive === true,
+    created: p?.created === true,
+    updated: p?.updated === true,
+  }
+}
+
+/**
+ * 撤销某循环的项目级覆盖 → 该循环退回平台默认清单。
+ *
+ * 🔴 走 `DELETE` 删行而不是 `PUT` 写空值：读取侧以「该循环是否出现在返回里」区分
+ * 「已表态」与「未覆盖」，写空值会留一条既非表态也非缺失的脏记录。
+ */
+export async function clearCompletenessScopeOverride(
+  projectId: string,
+  cycle: string,
+): Promise<{ cycle: string; deleted: number }> {
+  const { data } = await http.delete(P_prt.trimCompletenessScopeItem(projectId, cycle))
+  const p = data?.data ?? data
+  return { cycle: String(p?.cycle ?? cycle).toUpperCase(), deleted: Number(p?.deleted ?? 0) }
+}
+
+// ── 附注反向联动（Task 21，R13.1 / R13.2 / R13.3 / R13.4 / R13.6） ──
+
+/** 联动清单里的一条附注章节。 */
+export interface NoteLinkageItem {
+  /** 章节号（如 `五、42`），真源 = `note_workpaper_sync_registry.json` */
+  note_section: string
+  /** 该章节对应的底稿编码（可多个：registry 实测有跨循环共有章节） */
+  owners: string[]
+  /** 这些底稿所属循环 */
+  cycles: string[]
+  /** 面向审计师的一句话判据说明 */
+  narrative: string
+  /** 附注侧章节标题；null = 后端未取到 */
+  section_title: string | null
+  /** 仅 `conflicts` 项有：该章节当前是否已被标为不适用 */
+  currently_marked?: boolean
+  /** 仅 `conflicts` / `unlocatable` / `skipped_foreign_mark` 项有 */
+  reason?: string
+}
+
+export interface NoteLinkageView {
+  /** 将被标为「本期不适用」的章节 */
+  to_mark: NoteLinkageItem[]
+  /** 已处于该状态（幂等，无需再写） */
+  already_marked: NoteLinkageItem[]
+  /**
+   * 命中裁剪但**已有内容** → 只提示，两个方向都不自动动（R13.4）。
+   *
+   * 🔴 「不自动撤销」也是刻意的：撤销同样是自动动作。有人工内容时由审计师在附注侧决定。
+   */
+  conflicts: NoteLinkageItem[]
+  /** 裁剪已撤销 → 本联动标过的标注将相应撤销（R13.3） */
+  to_revoke: NoteLinkageItem[]
+  /** 附注侧没有该章节行 → 跳过并记录，不阻断裁剪保存（R13.6） */
+  unlocatable: NoteLinkageItem[]
+  /** 审计师手工标的不适用（无 provenance 面包屑）→ 本联动无权撤销 */
+  skipped_foreign_mark: NoteLinkageItem[]
+  /** 取数降级（registry 不可用 / 映射为空 / 单章节写入失败） */
+  degradations: { stage: string; reason: string; note_section?: string }[]
+  /** 本项目已被整体裁剪的循环 */
+  cycles_fully_trimmed: string[]
+  summary: {
+    to_mark: number
+    already_marked: number
+    conflicts: number
+    to_revoke: number
+    unlocatable: number
+  }
+}
+
+const _emptyNoteLinkage = (): NoteLinkageView => ({
+  to_mark: [], already_marked: [], conflicts: [], to_revoke: [],
+  unlocatable: [], skipped_foreign_mark: [], degradations: [],
+  cycles_fully_trimmed: [],
+  summary: { to_mark: 0, already_marked: 0, conflicts: 0, to_revoke: 0, unlocatable: 0 },
+})
+
+function _normalizeNoteLinkage(raw: any): NoteLinkageView {
+  const arr = (v: any): NoteLinkageItem[] => (Array.isArray(v) ? v : [])
+  const base = _emptyNoteLinkage()
+  const view: NoteLinkageView = {
+    to_mark: arr(raw?.to_mark),
+    already_marked: arr(raw?.already_marked),
+    conflicts: arr(raw?.conflicts),
+    to_revoke: arr(raw?.to_revoke),
+    unlocatable: arr(raw?.unlocatable),
+    skipped_foreign_mark: arr(raw?.skipped_foreign_mark),
+    degradations: Array.isArray(raw?.degradations) ? raw.degradations : [],
+    cycles_fully_trimmed: Array.isArray(raw?.cycles_fully_trimmed) ? raw.cycles_fully_trimmed : [],
+    summary: { ...base.summary, ...(raw?.summary && typeof raw.summary === 'object' ? raw.summary : {}) },
+  }
+  return view
+}
+
+/**
+ * 只读预览：本次程序裁剪会把哪些附注章节标为本期不适用 / 撤销 / 只提示。
+ *
+ * 🔴 `year` 必传：`procedure_instances` 没有 year 列，而 `disclosure_notes` 按
+ * `(project, year, note_section)` 唯一 —— 缺 year 后端定位不到章节行，整份联动会返回空
+ * （表现为「这个项目没有可标注的章节」这一实质结论）。
+ */
+export async function fetchTrimNoteLinkage(
+  projectId: string,
+  year: number,
+): Promise<NoteLinkageView> {
+  const { data } = await http.get(P_prt.trimNoteLinkage(projectId), { params: { year } })
+  return _normalizeNoteLinkage(data?.data ?? data)
+}
+
+/**
+ * 应用联动：后端**只写** `disclosure_notes.is_empty` + provenance 面包屑。
+ *
+ * 幂等：可反复调用，已处于目标态的章节零写入。
+ */
+export async function applyTrimNoteLinkage(
+  projectId: string,
+  year: number,
+): Promise<NoteLinkageView & { marked: number; revoked: number }> {
+  const { data } = await http.post(P_prt.trimNoteLinkageApply(projectId), { year })
+  const raw = data?.data ?? data
+  return {
+    ..._normalizeNoteLinkage(raw),
+    marked: Number(raw?.marked ?? 0),
+    revoked: Number(raw?.revoked ?? 0),
+  }
 }
 
 /** 查询 materialize job 状态（delegation preview 前置 job）。 */

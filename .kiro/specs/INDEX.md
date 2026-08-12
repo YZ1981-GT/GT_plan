@@ -1,8 +1,9 @@
 # 致同审计作业平台 — Spec 开发索引
 
-**最后更新**：2026-08-10
+**最后更新**：2026-08-12
 **当前分支**：`work/2026-05-30-wp-specs`
-**统计**：Active **6**（2026-08-10 行首锚定正则 `^\s*-\s\[([ x~-])\]` 实扫；另有 **3** 个无 tasks.md 的空壳目录 `procedure-delegation-visibility-isolation` / `visibility-isolation-go-live-hardening` / `workpaper-import-export-lifecycle-closure`）/ Archived **549**（2026-08-10 按 `_archive/*/*` 一级子目录实扫，含 6 个仅剩 evidence 无三件套的历史残留目录；此前记的 548 是过时数）
+**统计**：Active **7**（2026-08-12 行首锚定正则 `^\s*-\s\[([ x~-])\]\s+\d+\.` 实扫，**7 个目录全部带 tasks.md、无空壳**）/ Archived **550**（2026-08-12 按 `_archive/*/*` 一级子目录实扫，含 6 个仅剩 evidence 无三件套的历史残留目录）
+> 🔴 **2026-08-12 实扫修正了表头三处过时记载**：①Active 写 6 而真实是 7；②「另有 3 个无 tasks.md 的空壳目录」已不成立 —— 其中两个（`procedure-delegation-visibility-isolation` / `visibility-isolation-go-live-hardening`）早在 2026-08-05 清理入归档区，而 `workpaper-import-export-lifecycle-closure` **有 tasks.md 且进度 3/25**，把它记成空壳会让一个在办 spec 从索引上消失；③Archived 549 → 550（本轮归档 `procedure-trimming-and-delegation-intelligence`）。再次印证本文件 §四 的「凭印象禁令」：完成度与数量一律实扫，别信上一轮写下的数。
 **最高迁移**：**V146**（`procedure_instance_suggestion_state`，并发会话 `procedure-trimming-*` 所加；本 spec 贡献 **V145** `report_config` 双族使用权资产/租赁负债。以磁盘 `backend/migrations/V*.sql` 实扫为准，`R1xx__` 是配对回滚脚本非同号冲突）
 **技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer
 
@@ -33,9 +34,10 @@
 | `k-cycle-extraction-formula-and-disclosure-closure` | 5/25 | K 类取数公式与披露收口 |
 | `g7-column-alignment-and-extraction-closure` | 4/24（`[~]`19） | G7 长期股权投资列结构对齐与取数闭合。核心 = 补上「源 xlsx ↔ 模板 seed ↔ 运行时载荷」三向锁死的第三条边（既有两个守卫各自只覆盖两条边，故 32 处列偏差长期逃逸） |
 | `l-cycle-extraction-formula-and-disclosure-completion` | 3/26 | L 类（借款/应付债券）取数公式与披露收口 |
-| `procedure-trimming-and-delegation-intelligence` | 15/26（`[-]`1 / `[~]`10） | 程序裁剪三维判据（风险评估 → 重要性 → 数据存在性）+ 人员委派智能化。现状只实现最末位「科目在试算表无数据」一维 |
+| `workpaper-import-export-lifecycle-closure` | 3/25 | 底稿导入导出生命周期收口（**此前被表头误记为「无 tasks.md 的空壳」，2026-08-12 实扫纠正**） |
+| `procedure-trim-report-line-account-resolution` | 0/16 | **2026-08-12 新建**。裁剪判据的科目金额定位从「程序名 ↔ 科目名子串匹配」改为「程序 → 报表行 → 报表公式 → 金额」。立项实证：E 循环 5 条程序名全是「货币资金 …」而 `trial_balance` 只有明细「其他货币资金」(1012)/「银行存款」(1002) ⇒ 单向子串匹配全部落空 ⇒ 重要性判据（决策内核档 7/8）整体空转。净新增仅 2 个后端模块 + 1 处前端优先级调整 —— 三段映射的每一段都已有生产真源（`four_table/*_cycle_specs.py` 的 `row_code` 声明 · `report_config.formula` · `ReportFormulaParser`），索引只做 dispatch、**零 `row_code` 字面量** |
 
-> 🔴 上表 6 个 spec 均由**并发会话**推进（tasks.md mtime 秒/分钟级刷新）。
+> 🔴 上表 7 个 spec 中前 6 个由**并发会话**推进（tasks.md mtime 秒/分钟级刷新）。
 > 跨会话协作时不要并行推进同一 spec（memory 已实证并发会话会互相回退同一文件）。
 > 🔴 **判 Active 数量一律行首锚定正则实扫 `.kiro/specs/*/tasks.md`，别信本表旧数** ——
 > 2026-08-10 实扫发现表头写「Active 4」而真实是 6 个带 tasks.md 的活 spec
@@ -46,6 +48,36 @@
 > **`soe-listed-note-conversion-correctness`(19/19)** 已于 2026-08-09 归档。
 > **`note-template-columns-and-legacy-snapshot-closure`(23/23)** 已于 2026-08-09 归档（见 §二）。
 > **`h-cycle-extraction-formula-and-disclosure-completion`(18/18)** 已于 2026-08-10 归档（见 §二）。
+> **`procedure-trimming-and-delegation-intelligence`(26/26)** 已于 2026-08-12 归档（见 §二）。
+
+**2026-08-12 归档（1 个，→ `05-business-features`，与前身 `procedure-applicability-trimming` /
+`procedure-delegation-notification` 同分类）**：
+
+`procedure-trimming-and-delegation-intelligence`(**26/26**) —— 程序裁剪三维判据（风险评估 →
+重要性 → 数据存在性）+ 人员委派智能化。把裁剪从「单维（科目有无余额）」升级为九档短路的
+决策内核（`procedureTrimDecision.decideTrim`）+ 汇总闸（`trimAggregateGate`）+ 完整性豁免
+（`completenessExemption`，11 个循环各带 ≥20 字 rationale）+ 建议态/确认/驳回三态 +
+理由码真源统一（`TrimReasonCode` 扩 4 值，canonical trim entry additive 扩 `reason_code?`）+
+裁剪充分性复核视图 + 附注反向联动（复用 `disclosure_notes.is_empty`，不新建第二套不适用字段）+
+委派建议分配算法（按风险降序 × 加权负载最小）。
+**Task 26 浏览器实测收口（2026-08-12）**：只读部分 5 passed / 写库项两轮各 2 passed。
+**核心链路在真实库首次完整跑通** —— 用 Task 14 的覆盖开关把 D 循环改判为完整性不敏感后，
+D3 预收账款 13,656,018.02 < 实际执行重要性 26,104,487.00 ⇒ 档 8 产出 `below_materiality`，
+逐条确认后落库 `suggestion_state={'reason_code':'below_materiality'}`（`jsonb_typeof=object`，
+未踩「写成 JSON 字符串标量」那个坑）+ 含判据数值的 `skip_reason` 并列同事务；汇总闸真算出
+「建议裁剪科目 1 个（已按科目去重），金额合计 13,656,018.02 元，低于实际执行重要性
+26,104,487.00 元」。**顺带修掉一个真产品缺陷**：Task 14 的写入端点
+`PUT /procedure-trim/completeness-scope` 在真实库上**恒 500** —— `CAST(:ts AS timestamptz)`
+配 `now.isoformat()` 触发 asyncpg `DataError`（**UUID 与 timestamptz 的正确写法方向相反**：
+UUID 是 `CAST + str`，timestamptz 是 `CAST + datetime 对象`）；而该模块 112 例守卫
+（56 后端 + 56 前端）+ 14/14 变异全绿，因为写入 9 例全走替身而**替身不做参数编码** ⇒
+补 3 条守卫（连库真写往返 INSERT/UPDATE/list/DELETE 末尾 rollback · 反向自检钉死驱动行为事实 ·
+源码级），变异检验双双 RED。**实测 5 条失败全是判据缺陷无一产品缺陷**（按文案猜按钮 ——
+真实是「保存覆盖」/「撤销覆盖」· `.el-message--success` 被前置步骤自己满足 ⇒ 改用网络请求作硬判据 ·
+复核端点漏 cycle 段 · `locator.click()` 命中假阳性 ⇒ 改 `page.mouse.click` 真实输入事件 ·
+交叉核实查询漏 `is_deleted` 过滤差点误报漂移）。数据按基线复原并经 postgres 只读交叉核实
+（已裁剪 0 / `suggestion_state` 0 / `B50-T3-*` 0 行 / `row_tasks` 27 全部回到基线）。
+**遗留议题已立后继 spec** `procedure-trim-report-line-account-resolution`（见 §一）。
 
 **2026-08-10 归档（1 个，→ `08-disclosure-notes`，与前序 `h-cycle-four-table-extraction-and-account-mapping` /
 `h-cycle-legacy-cleanup-and-platform-hygiene` 同分类）**：
@@ -156,7 +188,7 @@ H0 聚合忽略 `closing_direction` 把 contra 子科目加成正数）。
 
 ---
 
-## 二、已归档 Spec（549 个，15 分类）
+## 二、已归档 Spec（550 个，15 分类）
 
 ```
 _archive/
@@ -165,7 +197,7 @@ _archive/
 ├── 03-refinement-rounds/              9
 ├── 04-infra/                          3
 ├── 04-infra-architecture/            39
-├── 05-business-features/            238
+├── 05-business-features/            239
 ├── 06-engineering-governance/        13
 ├── 07-workpaper-slimdown/            22
 ├── 08-disclosure-notes/              78
@@ -176,6 +208,14 @@ _archive/
 ├── 13-2026-06-29-batch/              33
 └── 99-superseded/                     7
 ```
+
+### 最近归档（2026-08-12）
+
+**→ 05-business-features（+1，程序裁剪/委派域第 3 个 spec）**
+
+| Spec | 说明 |
+|------|------|
+| procedure-trimming-and-delegation-intelligence | 程序裁剪三维判据 + 委派智能化（**26/26 全完成** + 浏览器实测 + 数据复原经 postgres 只读交叉核实）。详见 §一「2026-08-12 归档」段。要点：九档决策内核 + 汇总闸 + 完整性豁免 + 建议态三态 + 理由码真源统一 + 复核视图 + 附注反向联动；**真实库历史上第一次产生裁剪结果**（`procedure_instances` 此前 436 行全为 `execute`、0 条已裁剪 ⇒ 「裁剪→委派联动」逻辑正确但从未有数据流经过）；收口期修掉 Task 14 写入端点恒 500 的真产品缺陷（asyncpg timestamptz 参数编码，112 例守卫因替身不做参数编码而全绿）。与同分类前身 `procedure-applicability-trimming`、`procedure-delegation-notification` 同域；后继 spec = `procedure-trim-report-line-account-resolution` |
 
 ### 最近归档（2026-08-09）
 
